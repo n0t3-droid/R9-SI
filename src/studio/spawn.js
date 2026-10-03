@@ -64,7 +64,7 @@
   function note(box, label) {
     if (!WM.world || !box) return;
     const v = viewpoint(box, label || L('land.new', 'Neu'));
-    LD.note(WM.world.id, v);
+    if (!LD.note(WM.world.id, v)) C.full('landing');
     WM.landing = LD.read(WM.world.id).landing;
     play.label(); C.parts();
   }
@@ -82,8 +82,12 @@
   WM.setSpawn = function (pos) {
     if (!WM.world || !Array.isArray(pos)) return false;
     const p = [Math.floor(pos[0]) + 0.5, Math.floor(pos[1]), Math.floor(pos[2]) + 0.5];
-    LD.setSpawn(WM.world.id, p);
-    const g = host(); if (g && g.meta && g.meta.id === WM.world.id && g.player) { g.player.spawn = p.slice(); g.player.spawnBed = null; }
+    const stored = LD.setSpawn(WM.world.id, p);
+    // the game under this Studio (its overlay) takes it at once; else only the browser's storage carries it to the game
+    const g = host(), live = !!(g && g.meta && g.meta.id === WM.world.id && g.player);
+    if (live) { g.player.spawn = p.slice(); g.player.spawnBed = null; }
+    if (!stored) C.full('spawn');
+    if (!stored && !live) { WM.tipW && WM.tipW('⚠ ' + L('land.spawnFail', 'Spawnpunkt nicht gespeichert — der Browser-Speicher ist voll'), false); C.parts(); return false; }
     WM.tipW && WM.tipW('📍 ' + L('land.spawnSet', 'Spawnpunkt gesetzt') + ' · ' + fmtP(p), true);
     play.label(); C.parts();
     return true;
@@ -156,9 +160,11 @@
     async go() {
       let w = play.target();
       if (!w && WM.list) { try { await WM.list(); } catch (e) { /* */ } w = play.target(); }
+      // everything still waiting here goes along — the plan's drafts, the 🎨 Stil preview — and with the newest piece
+      // the 📍 landing in front of it; on both ways out: into the game under this Studio, or the game's page
+      if (WM.keepNow) { try { WM.keepNow(w ? w.id : null); } catch (e) { console.warn('▶ keep', e); } }
       const g = host();
       if (g) { g.studioPlay(w ? w.id : null); return; }
-      if (WM.keepNow) { try { WM.keepNow(); } catch (e) { /* */ } }
       location.href = 'index.html' + (location.search || '') + (w ? '#play=' + encodeURIComponent(w.id) : '');
     },
   };
