@@ -16,7 +16,7 @@ const fs = require('fs'), path = require('path');
 }
 const ROOT = __dirname;
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
-const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'blocks4', 'items', 'groceries', 'biomes', 'gen_common', 'gen_overworld', 'gen_realm', 'shipgen', 'starship', 'gen_village', 'gen_city', 'gen_modern', 'gen_plan', 'gen_villa', 'gen_villa_rooms', 'gen_rails', 'gen_citadel', 'gen_heart', 'gen_temple', 'gen_isles', 'gen_canyon', 'gen_hills', 'gen_station', 'lod', 'gen_dims', 'light_local', 'mesher', 'physics', 'custom', 'style', 'edits'];
+const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'biomes', 'gen_common', 'gen_overworld', 'gen_realm', 'shipgen', 'starship', 'gen_village', 'gen_city', 'gen_modern', 'gen_plan', 'gen_villa', 'gen_villa_rooms', 'gen_rails', 'gen_citadel', 'gen_heart', 'gen_temple', 'gen_isles', 'gen_canyon', 'gen_hills', 'gen_station', 'lod', 'gen_dims', 'light_local', 'mesher', 'physics', 'custom', 'style', 'edits'];
 const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_build'];
 const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'landing', 'ui', 'game'];
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
@@ -41,10 +41,10 @@ fs.writeFileSync(path.join(ROOT, 'dist/artifact.html'), `<title>R9-SI</title>${f
 // ---- the Model Studio: the live catalogue + editor page. Main thread: registry, model language, furniture and facade
 // packs, the VX material textures. Worker (the game's own worker + a studio extension): block textures, whole
 // catalogue houses built with the villa generator, lit and meshed with the game's mesher.
-const STUDIO_MAIN = ['core', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'blocks4', 'items', 'groceries', 'physics', 'custom', 'style', 'edits', 'schem'];
+const STUDIO_MAIN = ['core', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'physics', 'custom', 'style', 'edits', 'schem'];
 const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'landing']);
 const studioWorkerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js') + '\n' + read('src/studio/studio_worker.js');
-const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js');
+const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js') + '\n' + read('src/shared/voxmodern.js');
 const notes = exists('src/studio/notes.md') ? read('src/studio/notes.md') : '';
 const studioCss = read('src/studio/studio.css');
 const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -99,6 +99,7 @@ const studioBody = `<div id="studio" class="boot">
 <script>${guard(read('src/studio/genie_site.js'))}</script>
 <script>${guard(read('src/studio/imagine.js'))}</script>
 <script>${guard(read('src/studio/catalog.js'))}</script>
+<script>${guard(read('src/studio/modern.js'))}</script>
 <script>${guard(read('src/studio/spawn.js'))}</script>`;
 const studioHead = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>`;
 // two studios: studio.html sits next to the game (same origin → "Update ins Spiel" lands directly in the game; a link back

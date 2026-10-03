@@ -1,0 +1,132 @@
+// The "Modern Living" item pack (voxmodern.js): registered late (after Vollton) so every shipped block keeps its
+// state ids, compiled lazily (nothing compiles at load; a model builds itself on first use), lamps switch on and off.
+// Checks: ids unchanged, names, limits, counts per set, display names, every model compiles to exactly its declared
+// cells, every state paints + meshes under the quad budget, icons, toggles, containers, registration cost.
+const t0 = Date.now();
+require('./load_shared.js');
+const loadMs = Date.now() - t0;
+const fs = require('fs');
+const R = VR.R, VX = VR.VX, VM = VR.VM, F = VR.F;
+let fails = 0;
+const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
+
+// ---- the pack's sets (id: vm_<set>_<item>_<variant>) and how many items each must have at least
+const EXPECT = { light: 24, smart: 18 };
+const LATER = { kitchen: 26, living: 30, sleep: 16, bath: 16, plant: 14, office: 20, garden: 18, mobility: 11, shop: 18, deco: 13 };   // checked once a set exists
+const pack = R.types.filter(t => t.o.modern);
+const names = pack.map(t => t.name);
+console.log('pack', pack.length, 'items · load', loadMs, 'ms');
+
+// 1 · ids: every shipped type keeps [base, nstates]; the pack comes after everything else
+{
+  const snap = JSON.parse(fs.readFileSync('/home/claude/vr/test/id_snapshot.json', 'utf8'));
+  let bad = 0, end = 1;
+  for (const [name, base, n] of snap) { end = Math.max(end, base + n); const t = R.byName[name]; if (!t || t.base !== base || t.nstates !== n) { if (bad++ < 5) console.log('    shifted: ' + name); } }
+  check(!bad, 'id snapshot: all ' + snap.length + ' shipped types keep their state ids');
+  const first = pack.length ? Math.min(...pack.map(t => t.base)) : 0;
+  check(pack.length > 0 && first >= end, 'the pack is appended after the last shipped state (' + (end - 1) + '), first pack state ' + first);
+  const lastVollton = R.byName.vollton_plum_stairs;
+  check(pack.every(t => t.id > lastVollton.id), 'every pack item is registered after Vollton');
+}
+
+// 2 · names and limits
+{
+  check(new Set(names).size === names.length && names.every(n => /^vm_[a-z]+_[a-z0-9]+(_[a-z0-9]+)+$/.test(n)), 'ids unique and shaped vm_<set>_<item>_<variant>');
+  const disp = pack.map(t => t.display);
+  check(new Set(disp).size === disp.length, 'display names unique');
+  const badFmt = pack.filter(t => !/^\p{Lu}[\p{L}0-9&'"\- ]+ · [\p{Ll}0-9][\p{L}0-9 &\-]*$/u.test(t.display));
+  check(!badFmt.length, 'display names read "Family · variant"' + (badFmt.length ? ' — not: ' + badFmt.slice(0, 4).map(t => t.display).join(' | ') : ''));
+  check(R.stateCount < 65535, 'state count ' + R.stateCount + ' < 65,535');
+  check(R.texNames.length < 2048, 'texture layers ' + R.texNames.length + ' < 2,048');
+  check(pack.every(t => t.cat === 'vmodern' && t.o.vxModel && VM.MODELS[t.name]), 'every item sits in the creative tab "vmodern" as a VX model');
+  const CATS = VM.MODERN_CATS || {};
+  check(pack.every(t => Array.isArray(t.o.cats) && t.o.cats.length && t.o.cats.every(c => CATS[c])), 'every item has Studio categories with German labels');
+}
+
+// 3 · counts per set
+{
+  const per = {};
+  for (const n of names) { const s = n.split('_')[1]; per[s] = (per[s] || 0) + 1; }
+  console.log('    per set', JSON.stringify(per));
+  for (const [s, n] of Object.entries(EXPECT)) check((per[s] || 0) >= n, 'set ' + s + ': ' + (per[s] || 0) + ' items (≥ ' + n + ')');
+  for (const [s, n] of Object.entries(LATER)) if (per[s]) check(per[s] >= n, 'set ' + s + ': ' + per[s] + ' items (≥ ' + n + ')');
+  check(Object.keys(per).every(s => EXPECT[s] || LATER[s]), 'no unknown set');
+  const pal = new Set(Object.values(VM.MODERN_PALETTE || {}));
+  const off = pack.filter(t => !pal.has(t.o.vx.col));
+  check(!off.length, 'every item registers with a colour of the shared palette (' + pal.size + ' colours)' + (off.length ? ' — not: ' + off.slice(0, 4).map(t => t.name).join(', ') : ''));
+}
+
+// 4 · lazy: nothing compiled right after load; registration cost
+{
+  const compiled = pack.filter(t => VM.MODELS[t.name].compiled);
+  check(!compiled.length, 'nothing in the pack is compiled after load' + (compiled.length ? ' — compiled: ' + compiled.slice(0, 5).map(t => t.name).join(', ') : ''));
+  const st = VM.stats || {};
+  console.log('    registration', (st.lateMs || 0).toFixed(1), 'ms for', st.lateN, 'models =', ((st.lateMs || 0) / Math.max(1, st.lateN)).toFixed(3), 'ms/model');
+  check(st.lateN === pack.length && st.lateMs < 50, 'registering the pack takes < 50 ms (' + (st.lateMs || 0).toFixed(1) + ' ms)');
+}
+
+// 5 · every model compiles to exactly its declared cells, every state paints and meshes under the budget
+const BUDGET = 1000;
+{
+  let errs = [], maxQ = 0, maxN = '', quads = 0, states = 0, bytes = 0, cms = 0, emptyIcon = [];
+  const per = [];
+  for (const t of pack) {
+    const m = VM.MODELS[t.name];
+    const declared = m.parts.map(p => p.px + ',' + p.py + ',' + p.pz).join(' ');
+    const c0 = performance.now(); VM.materialize(m); const dt = performance.now() - c0; cms += dt;
+    if (!m.compiled) { errs.push(t.name + ' did not compile'); continue; }
+    const scanned = VM.scanParts(m).map(p => p.px + ',' + p.py + ',' + p.pz).join(' ');
+    if (scanned !== declared) errs.push(t.name + ' cells: declared [' + declared + '] built [' + scanned + ']');
+    bytes += m.vol.byteLength + m.pal.byteLength;
+    per.push([t.name, dt, (m.vol.byteLength + m.pal.byteLength) / 1024]);
+    const ic = VX.iconGrid(t.defaultState); if (!ic || !ic.some(v => v)) emptyIcon.push(t.name);
+    for (let s = t.base; s < t.base + t.nstates; s++) {
+      const sp = VX.spec(s);
+      try {
+        VM.paint(sp, { part: t.get(s, 'part'), facing: t.get(s, 'facing'), x: 0, lit: t.has('lit') ? t.get(s, 'lit') : 1 });
+        const q = VX.meshGridN(VX.gridFor(sp.res), sp.res, 0, 0), nq = q.length / 27;
+        quads += nq; states++;
+        if (nq > maxQ) { maxQ = nq; maxN = t.name; }
+        if (!nq) errs.push(t.name + ' state ' + (s - t.base) + ' meshes to nothing');
+        const bx = VX.boxes(s, true); if (!bx.length) errs.push(t.name + ' has no selection box');
+      } catch (e) { errs.push(t.name + ': ' + e.message); }
+    }
+  }
+  console.log('    compiled', pack.length, 'models in', cms.toFixed(0), 'ms (' + (cms / Math.max(1, pack.length)).toFixed(1), 'ms/model) · volume', (bytes / 1048576).toFixed(1), 'MB (' + (bytes / 1024 / Math.max(1, pack.length)).toFixed(0), 'KB/model) · states', states, '· avg', (quads / Math.max(1, states)).toFixed(0), 'quads/state · max', maxQ, '(' + maxN + ')');
+  per.sort((a, b) => b[2] - a[2]); console.log('    heaviest', per.slice(0, 4).map(p => p[0] + ' ' + p[2].toFixed(0) + ' KB ' + p[1].toFixed(1) + ' ms').join(' · '));
+  check(!errs.length, 'every model compiles to its declared cells and every state paints and meshes' + (errs.length ? ' — ' + errs.slice(0, 6).join(' | ') : ''));
+  check(maxQ <= BUDGET, 'every state stays under ' + BUDGET + ' quads (max ' + maxQ + ' · ' + maxN + ')');
+  check(!emptyIcon.length, 'every item has an icon' + (emptyIcon.length ? ' — empty: ' + emptyIcon.slice(0, 5).join(', ') : ''));
+}
+
+// 6 · switches and containers
+{
+  const lamps = pack.filter(t => t.o.toggle);
+  check(lamps.length >= 20 && lamps.every(t => t.has('lit') && (R.T.flags[t.base] & F.INTERACT)), lamps.length + ' lamps switch (a "lit" property, right click)');
+  let bad = [];
+  for (const t of lamps) {
+    const on = t.state({ lit: 1 }), off = t.state({ lit: 0 });
+    if (!R.T.emit[on] || R.T.emit[off]) bad.push(t.name + ' light');
+    if (t.defaultState !== t.state({ lit: 1 })) bad.push(t.name + ' is placed switched off');
+    const sp = VX.spec(on), m = VM.MODELS[t.name];
+    const glow = (lit) => { let n = 0; for (let i = 0; i < m.parts.length; i++) { VM.paint(sp, { part: i, facing: 0, x: 0, lit }); for (const v of VX.gridFor(sp.res)) if (v & VX.EMIS) n++; } return n; };
+    if (!glow(1)) bad.push(t.name + ' has nothing that glows');
+    if (glow(0)) bad.push(t.name + ' still glows when off');
+  }
+  check(!bad.length, 'lamps give light only when on, glowing voxels go dark when off' + (bad.length ? ' — ' + bad.slice(0, 5).join(', ') : ''));
+  const cab = pack.filter(t => t.o.ui === 'chest');
+  if (names.some(n => /^vm_(kitchen|sleep|bath)_/.test(n))) check(cab.length >= 4 && cab.every(t => R.T.flags[t.base] & F.INTERACT) && cab.every(t => !t.o.seat && !t.o.bed && !t.o.toggle), cab.length + ' cupboards open as containers');
+  // every part of a model finds its anchor (part 0) — the container and the switch work from any part
+  const big = pack.find(t => VM.MODELS[t.name].parts.length >= 4);
+  if (big) {
+    const m = VM.MODELS[big.name]; let ok = true;
+    for (let f = 0; f < 4; f++) for (let i = 0; i < m.parts.length; i++) {
+      const fp = VM.footprint(m, f), me = fp[i], cells = VM.partCells(m, f, i, 100 + me[0], 50 + me[1], 100 + me[2]);
+      if (cells.length !== m.parts.length || cells[0].join() !== '100,50,100') ok = false;
+    }
+    check(ok, 'from any part every cell of a model is found (' + big.name + ')');
+  }
+}
+
+console.log(fails ? 'FAILED ' + fails : 'OK — Modern Living pack');
+process.exit(fails ? 1 : 0);

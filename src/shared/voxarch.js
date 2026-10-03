@@ -731,7 +731,7 @@
     // full-face masks from a neutral paint (all neighbours solid)
     const cc = neutralCtx();
     for (let s = 1; s < n; s++) {
-      if (!specOf[s]) continue;
+      if (!specOf[s] || specOf[s].lazy) continue;   // lazy models (voxmodel.js) build on first use, not here: no full faces
       fillCtxFromState(cc, s);
       paintState(s, cc);
       let m = 0;

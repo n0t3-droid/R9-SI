@@ -22,6 +22,7 @@
 
   // ---------------------------------------------------------------- every block, by what it is for
   const KINDS = [['fav', '★', 'Favoriten'], ['all', '', 'Alle'], ['roof', '🏠', 'Dach'], ['light', '💡', 'Licht'], ['glass', '🪟', 'Fenster & Glas'], ['door', '🚪', 'Türen'], ['wall', '🧱', 'Wände'], ['floor', '🟫', 'Böden'], ['stairs', '🪜', 'Treppen & Stufen'], ['rail', '🏛', 'Geländer & Säulen'], ['garden', '🌳', 'Garten & Natur'], ['deco', '🪴', 'Deko & Dinge'], ['color', '🎨', 'Farben'], ['other', '…', 'Sonstiges']];
+  KINDS.splice(2, 0, ['modern', '✨', 'Modern']);   // the Modern Living pack (voxmodern.js): its models show here with their pictures
   const RX = [
     ['roof', /roof|(^|_)hip(_|$)|ridge|gutter|downpipe|shingle|thatch|chimney|(^|_)eaves?(_|$)|dormer|skylight|soffit|fascia/],
     ['glass', /glass|window|_pane$|_panes$|skylight|panorama/],
@@ -41,6 +42,7 @@
     ENT = []; BYID = new Map();
     for (const t of R.types) {
       if (!t || !t.cat || t.o.noItem || t.o.cutOf || t.name === 'air') continue;
+      if (t.o.modern && VM.MODELS[t.name]) { const e = { id: t.name, t, kinds: t.o.toggle ? ['modern', 'light'] : ['modern'] }; ENT.push(e); BYID.set(t.name, e); continue; }
       if (VM.MODELS[t.name]) continue;   // furniture and facade pieces live in Möbel and Fassade
       if (t.o.kind === 'model' && t.has && t.has('part') && !(VX.spec && VX.spec(t.defaultState))) continue;
       const n = t.name, kinds = [];
@@ -112,7 +114,20 @@
     }
     requestAnimationFrame(pump);
   })();
+  // the ✨ Modern models: their rendered pictures come one or two per frame (each model is built on first use)
+  const mq = [];
+  (function pumpModels() {
+    const t0 = performance.now();
+    while (mq.length && performance.now() - t0 < 10) {
+      const [cv, id] = mq.shift(); if (!cv.isConnected) continue;
+      const th = C.thumbOf ? C.thumbOf(id) : null; if (!th) continue;
+      const x = cv.getContext('2d'), k = Math.min(cv.width / th.width, cv.height / th.height), w = th.width * k, h = th.height * k;
+      x.clearRect(0, 0, cv.width, cv.height); x.drawImage(th, (cv.width - w) / 2, (cv.height - h) / 2, w, h);
+    }
+    requestAnimationFrame(pumpModels);
+  })();
   function picture(id, w, h) {
+    if (VM.MODELS[id] && R.byName[id] && R.byName[id].o.modern) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; mq.push([cv, id]); return cv; }
     if (VM.MODELS[id]) { const th = C.thumbOf ? C.thumbOf(id) : null; if (th) { const c = th.cloneNode(true); c.getContext('2d').drawImage(th, 0, 0); return c; } }
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; iq.push([cv, id]); return cv;
   }
@@ -179,6 +194,7 @@
     CAT.sel = id;
     for (const c of $$('#list .card[data-bid]')) c.classList.toggle('on', c.dataset.bid === id);
     const card = [...$$('#list .card[data-bid]')].find(c => c.dataset.bid === id); if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
+    if (VM.MODELS[id]) { const sc = C.sceneModel(id); if (sc) { C.setScene(sc); C.parts(); C.crumb(); return; } }   // a ✨ Modern model: the whole model
     await C.showBlock(id);
     C.crumb();
   }

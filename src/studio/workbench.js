@@ -520,6 +520,7 @@
 
   // ---------------------------------------------------------------- the left side: the blocks (the hotbar slot takes the click)
   const CATS = [['fav', '★'], ['modern', 'Modern'], ['build', 'Bauen'], ['arch', 'Voxel Homes'], ['vtech', 'Möbel'], ['nature', 'Natur'], ['func', 'Funktion'], ['all', 'Alle']];
+  CATS.splice(2, 0, ['vmodern', '✨ Modern Living']);   // the Modern Living pack (voxmodern.js)
   let byCat = null;
   function cats() {
     if (byCat) return byCat;
