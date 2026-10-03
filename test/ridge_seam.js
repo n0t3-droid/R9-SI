@@ -1,6 +1,8 @@
 // Seam check for the test hill's ridge end at every section alignment: along the hill's south edge (z = 44) the top
 // surface of the last hill row must meet the flat ground's top, with a side face closing any difference.
 const VR = require('./load_shared.js');
+// smooth ground exists in the Nahtlos look (LOOK=classic runs the same seam check on the Klassisch cube steps)
+VR.setLook(process.env.LOOK || 'seamless');
 const R = VR.R, F = VR.F;
 const PAD = VR.MESH_PAD, PS = VR.MESH_PS, PSS = PS * PS;
 const st = (n) => R.byName[n].defaultState;
