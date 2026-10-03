@@ -80,11 +80,11 @@ NEU IN v0.35 (2) — ✨ Erschaffen: 🏠 Haus-Baukasten, ✨ Genie, 🏘 Ort pl
   alles andere (Auto, Schiff, Baum, Leuchtturm …) wird aus Formen gebaut. ✏️ Ändern („größere Räder“), ⟲ zurück,
   ⚡ / ✨ / 🧠 wie gründlich. In 🏠 Haus: die ✨-Zeile ändert das Haus, an dem du gerade baust.
 - 🏘 Ort (mit offener Welt): ein ganzer Ort aus einem Satz. Das Gebiet ist, wo die Kamera hinschaut (oder ▣ deine
-  Auswahl; 48/64/96). Claude liest Höhen, Wasser, Fels, Bäume und Gebautes und plant passend: Häuser mit der Tür zum
+  Auswahl; 48/64/96). Das Studio liest Höhen, Wasser, Fels, Bäume und Gebautes und plant passend: Häuser mit der Tür zum
   Weg (alle eingerichtet), Wege, Platz, Felder, Bäume, Laternen, Bänke, Brunnen, Markt, Stege und Boote, Wahrzeichen.
   Erst die Karte ansehen, dann ✓ Bauen: Boden unter jedem Haus geebnet (am Hang Terrassen), Wege folgen dem
   Gelände, über Wasser Stege — alles EIN Schritt (⟲ Zurück nimmt den ganzen Ort weg), sofort im Spiel.
-  🎲 Dorf würfeln plant ein Dorf ohne Claude. 📍 Hier ausmessen = das Gebiet neu an die Kamera setzen.
+  🎲 Dorf würfeln plant ein Dorf ganz ohne Satz. 📍 Hier ausmessen = das Gebiet neu an die Kamera setzen.
 - Ohne Welt (eigenes Studio): Ergebnis als 🧩 Bauteil behalten oder als .schem / .vox / .json speichern.
 
 
@@ -246,4 +246,4 @@ SO BENUTZT DU DAS STUDIO
 - Links ein Modell wählen, in der Mitte drehen (ziehen), zoomen (Rad), N/E/S/W = Ausrichtung,
   „Ohne Textur“ zeigt die reine Voxel-Form.
 - Rechts „Modell“: die Definition — ändern und ▶ Ausführen. „Datei“: die ganze voxfurn.js.
-- Was du änderst, bleibt nur in deinem Browser; schick mir den Text, dann übernehme ich es.
+- Was du hier änderst, gilt nur in diesem Browser (zum Ausprobieren).

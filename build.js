@@ -18,7 +18,7 @@ const ROOT = __dirname;
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'blocks4', 'items', 'groceries', 'biomes', 'gen_common', 'gen_overworld', 'gen_realm', 'shipgen', 'starship', 'gen_village', 'gen_city', 'gen_modern', 'gen_plan', 'gen_villa', 'gen_villa_rooms', 'gen_rails', 'gen_citadel', 'gen_heart', 'gen_temple', 'gen_isles', 'gen_canyon', 'gen_hills', 'gen_station', 'lod', 'gen_dims', 'light_local', 'mesher', 'physics', 'custom', 'style', 'edits'];
 const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_build'];
-const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'landing', 'ui', 'game'];
+const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'game'];
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const js = (dir, list) => list.filter(f => exists(`src/${dir}/${f}.js`)).map(f => `/* ${dir}/${f}.js */\n` + read(`src/${dir}/${f}.js`)).join('\n');
 const shared = js('shared', SHARED);
@@ -42,7 +42,7 @@ fs.writeFileSync(path.join(ROOT, 'dist/artifact.html'), `<title>R9-SI</title>${f
 // packs, the VX material textures. Worker (the game's own worker + a studio extension): block textures, whole
 // catalogue houses built with the villa generator, lit and meshed with the game's mesher.
 const STUDIO_MAIN = ['core', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'blocks4', 'items', 'groceries', 'physics', 'custom', 'style', 'edits', 'schem'];
-const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'landing']);
+const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']);
 const studioWorkerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js') + '\n' + read('src/studio/studio_worker.js');
 const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js');
 const notes = exists('src/studio/notes.md') ? read('src/studio/notes.md') : '';
@@ -51,11 +51,12 @@ const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const studioFonts = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">`;
 const studioBody = `<div id="studio" class="boot">
 <header>
-  <div class="brand"><span class="sig">R9</span><span class="t">MODEL STUDIO</span><span class="v">v3.9 · ▶ Spielen</span></div>
-  <nav class="modes"><button data-hub class="hubm" title="Weitermachen — alles, was du angefangen hast (Strg+O)"><i>🕘</i>Weitermachen<b class="hubN"></b></button><button data-mode="arch" class="on"><i>◈</i>Architektur</button><button data-mode="furn"><i>▣</i>Möbel</button><button data-mode="facade"><i>▤</i>Fassade</button><button data-mode="parts" title="Alle Blöcke des Spiels: Dächer, Licht, Fenster, Türen, Wände, Böden … mit ★ Favoriten"><i>🧱</i>Teile</button><button data-mode="craft" class="craftm"><i>⚒</i>Crafter</button><button data-mode="world" class="worldm"><i>◍</i>Welt</button><button data-create class="createm" title="Ein Haus aus dem Baukasten, alles Mögliche vom Genie, Bilder als Blöcke — alles hier im Spiel, ohne Konto"><i>✨</i>Erschaffen</button><button data-mode="folk" disabled title="kommt mit der Bewohner-Animation"><i>⚇</i>Figuren<small>bald</small></button></nav>
+  <div class="brand"><span class="sig">R9</span><span class="t">MODEL STUDIO</span><span class="v">v3.9<!--PLAYTAG--></span></div>
+  <nav class="modes"><button data-hub class="hubm" title="Weitermachen — alles, was du angefangen hast (Strg+O)"><i>🕘</i>Weitermachen<b class="hubN"></b></button><button data-mode="arch" class="on"><i>◈</i>Architektur</button><button data-mode="furn"><i>▣</i>Möbel</button><button data-mode="facade"><i>▤</i>Fassade</button><button data-mode="parts" title="Alle Blöcke des Spiels: Dächer, Licht, Fenster, Türen, Wände, Böden … mit ★ Favoriten"><i>🧱</i>Teile</button><button data-mode="craft" class="craftm"><i>⚒</i>Crafter</button><button data-mode="world" class="worldm"><i>◍</i>Welt</button><button data-create class="createm" title="Ein Haus aus dem Baukasten, alles Mögliche vom Genie, Bilder als Blöcke — alles hier, ohne Konto"><i>✨</i>Erschaffen</button></nav>
   <!--GAMELINK-->
   <div class="sys"><span class="dot" id="sysDot"></span><span id="sysText">boot</span></div>
 </header>
+<div id="bars"></div>
 <aside id="left">
   <div class="search"><span class="ico">⌕</span><input id="search" placeholder="Suchen …" autocomplete="off" spellcheck="false"><kbd>/</kbd></div>
   <div id="chips"></div>
@@ -73,10 +74,10 @@ const studioBody = `<div id="studio" class="boot">
   <div id="boot"><div class="logo">R9</div><div class="log" id="bootLog"></div><div class="bar"><i id="bootBar"></i></div></div>
 </main>
 <aside id="right">
-  <div class="tabs"><div class="tab on" data-pane="parts">Bausteine</div><div class="tab" data-pane="edit">Quelle</div><div class="tab" data-pane="filePane">Datei</div><div class="tab" data-pane="notesPane">Log</div><div class="tab" data-pane="help">Sprache</div></div>
+  <div class="tabs"><div class="tab on" data-pane="parts">Bausteine</div><div class="tab pro" data-pane="edit">Quelle</div><div class="tab pro" data-pane="filePane">Datei</div><div class="tab pro" data-pane="notesPane">Log</div><div class="tab pro" data-pane="help">Sprache</div><button class="proT" title="Werkzeuge für Entwickler: Modell-Quelle, ganze Datei, Log, Modell-Sprache">⚙ Profi</button></div>
   <div class="pane on" id="parts"><div id="partsBody" class="empty">Wähle links ein Haus oder ein Modell.</div></div>
   <div class="pane" id="edit"><textarea id="src" spellcheck="false"></textarea><div class="row"><button id="run" class="pri">▶ Ausführen</button><button id="copy">Kopieren</button><span id="msg"></span></div></div>
-  <div class="pane" id="filePane"><textarea id="file" spellcheck="false"></textarea><div class="row"><button id="runAll" class="pri">▶ Ganze Datei ausführen</button><span class="hint">Änderungen bleiben in deinem Browser — schick mir den Text, dann übernehme ich sie ins Spiel.</span></div></div>
+  <div class="pane" id="filePane"><textarea id="file" spellcheck="false"></textarea><div class="row"><button id="runAll" class="pri">▶ Ganze Datei ausführen</button><span class="hint">Zum Ausprobieren: Änderungen gelten nur hier in diesem Browser.</span></div></div>
   <div class="pane" id="notesPane"><pre id="notes">${esc(notes)}</pre></div>
   <div class="pane" id="help"><pre id="helpText"></pre></div>
 </aside>
@@ -99,13 +100,20 @@ const studioBody = `<div id="studio" class="boot">
 <script>${guard(read('src/studio/genie_site.js'))}</script>
 <script>${guard(read('src/studio/imagine.js'))}</script>
 <script>${guard(read('src/studio/catalog.js'))}</script>
-<script>${guard(read('src/studio/spawn.js'))}</script>`;
+<script>${guard(read('src/studio/variants.js'))}</script>
+<script>${guard(read('src/studio/spawn.js'))}</script>
+<script>${guard(read('src/studio/space.js'))}</script>
+<script>${guard(read('src/studio/bridge.js'))}</script>`;
 const studioHead = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>`;
 // two studios: studio.html sits next to the game (same origin → "Update ins Spiel" lands directly in the game; a link back
 // to the game), studio_artifact.html is the standalone published Model Studio (export / import bridge)
-const inGame = studioBody.replace('<!--GAMELINK-->', '<button id="playBtn" class="gamelink playb" title="Ins Spiel">▶ Spielen</button>').replace('<script type="text/js-worker"', '<script>window.__R9_IN_GAME = true;</script>\n<script type="text/js-worker"');
+const inGame = studioBody.replace('<!--GAMELINK-->', '<button id="playBtn" class="gamelink playb" title="Ins Spiel">▶ Spielen</button>').replace('<!--PLAYTAG-->', ' · ▶ Spielen').replace('<script type="text/js-worker"', '<script>window.__R9_IN_GAME = true;</script>\n<script type="text/js-worker"');
+// the standalone Studio is its own artifact (another web origin, its own storage): it says so, and knows where the game is
+const GAME_URL = 'https://claude.ai/artifact/EP9fJV6R8Grw4ev5RVUP4r';
+const standalone = studioBody.replace('<!--PLAYTAG-->', '').replace('<script type="text/js-worker"', `<script>window.__R9_STANDALONE = true; window.__R9_GAME_URL = '${GAME_URL}';</script>\n<script type="text/js-worker"`);
 fs.writeFileSync(path.join(ROOT, 'dist/studio.html'), `<!doctype html>\n<html lang="de"><head>${studioHead}</head><body>${inGame}</body></html>\n`);
-fs.writeFileSync(path.join(ROOT, 'dist/studio_artifact.html'), `<title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>\n${studioBody}\n`);
+// (the charset first: a host that serves the page as it is — not wrapped in its own document — still reads it as UTF-8)
+fs.writeFileSync(path.join(ROOT, 'dist/studio_artifact.html'), `<meta charset="utf-8"><title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>\n${standalone}\n`);
 if (exists('dist/studio_index.html')) fs.unlinkSync(path.join(ROOT, 'dist/studio_index.html'));
 const kb = (f) => (fs.statSync(path.join(ROOT, f)).size / 1024).toFixed(0) + ' KB';
 console.log('built dist/index.html', kb('dist/index.html'), '· artifact.html', kb('dist/artifact.html'), '· studio.html', kb('dist/studio.html'), '· studio_artifact.html', kb('dist/studio_artifact.html'));

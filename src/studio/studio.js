@@ -86,7 +86,11 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
   S.vy = () => (S.invY ? -1 : 1);
   // the mouse speed for turning the view (0.4 … 2, "Maus-Tempo"), remembered like ⇅
   S.sens = 1; try { const v = parseFloat(localStorage.getItem('r9si.studio.sens')); if (v > 0.2 && v < 3) S.sens = v; } catch (e) { /* */ }
-  const HOOK = {};             // the Crafter (crafter.js) plugs in here: overlay, pointer, key, list, chips, parts, hud, mode
+  const HOOK = {};             // the Crafter (crafter.js) plugs in here: overlay, pointer, key, list, chips, parts, hud, mode, crumb
+  // the standalone Studio (published on its own: its own storage, no game behind it) says so wherever it matters
+  const SA = !!window.__R9_STANDALONE;
+  // a write the browser's storage refused: one signal for the whole page (space.js shows "⚠ Browser-Speicher voll")
+  const full = (what) => { try { window.dispatchEvent(new CustomEvent('r9-storage-full', { detail: { what: what || '' } })); } catch (e) { /* */ } };
   const HOUSE = new Map();      // index → { data, gpu, name, thumb }
   const THUMB = new Map();      // model name → canvas
   const BLOCKS = new Map();     // block name → { gpu, thumb }
@@ -554,7 +558,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     const bm = document.createElement('button'); bm.textContent = '⇋'; bm.title = 'Grundriss spiegeln'; bm.className = d.mirrored ? 'on' : ''; bm.onclick = () => rebuildHouse(sc.index, { skin: d.skin, mirror: !d.mirrored }); g2.appendChild(bm);
     el.appendChild(g2);
     const g3 = document.createElement('div'); g3.className = 'grp';
-    const bc = document.createElement('button'); bc.className = 'craft'; bc.innerHTML = '⚒ Im Crafter bearbeiten'; bc.title = 'Mit allen Items umbauen — Update übernimmt es ins Spiel'; bc.onclick = () => setMode('craft'); g3.appendChild(bc);
+    const bc = document.createElement('button'); bc.className = 'craft'; bc.dataset.act = 'edit'; bc.innerHTML = '✏️ Bearbeiten'; bc.title = SA ? 'Im Crafter umbauen, mit allen Items — 💾 Speichern behält es' : 'Im Crafter umbauen, mit allen Items — „Ins Spiel“ übernimmt es'; bc.onclick = () => setMode('craft'); g3.appendChild(bc);
     if (d.custom) { const tag = document.createElement('span'); tag.className = 'lbl mine'; tag.textContent = 'EIGENES DESIGN'; g3.appendChild(tag); }
     el.appendChild(g3);
   }
@@ -688,12 +692,12 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     const el = $('#chips'); el.innerHTML = '';
     const set = S.mode === 'arch' ? FAMS.map(f => [f[0], f[1]]) : (S.mode === 'facade' ? FCATS : CATS).map(c => [c[0], c[1]]);
     const names = Object.keys(VM.MODELS).filter(n => S.mode === 'facade' ? isFacade(n) : !isFacade(n));
-    if (S.mode !== 'arch') set.splice(1, 0, ['fav', '★ Favoriten']);   // the same ★ as everywhere
+    set.splice(1, 0, ['fav', '★ Favoriten']);   // the same ★ as everywhere (a whole house is its blueprint: blueprint_<i>)
     const favs = new Set(VR.Favs ? VR.Favs.list() : []);
     for (const [id, label] of set) {
       const b = document.createElement('button'); b.className = S.cat === id ? 'on' : ''; b.dataset.fcat = id;
       let n = 0;
-      if (S.mode === 'arch') n = id === 'all' ? HOUSES.length : HOUSES.filter(h => h.fam === id).length;
+      if (S.mode === 'arch') n = id === 'all' ? HOUSES.length : id === 'fav' ? HOUSES.filter(h => favs.has(favHouse(h.i))).length : HOUSES.filter(h => h.fam === id).length;
       else n = id === 'all' ? names.length : id === 'fav' ? names.filter(x => favs.has(x)).length : names.filter(x => catsOf(x).includes(id)).length;
       b.innerHTML = label + '<b>' + n + '</b>';
       b.onclick = () => { S.cat = id; chips(); list(); };
@@ -702,6 +706,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
   }
   function crumb() {
     const el = $('#crumb'); el.innerHTML = '';
+    if (HOOK.crumb && HOOK.crumb(el)) return;
     if (!S.from) return;
     const b = document.createElement('button'); b.textContent = '← zurück zu ' + S.from.name;
     b.onclick = () => { const i = S.from.index; S.from = null; setMode('arch'); selectHouse(i); };
@@ -713,14 +718,18 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     const f = S.filter;
     if (S.mode === 'arch') {
       let k = 0;
-      for (const h of HOUSES) {
-        if (S.cat !== 'all' && h.fam !== S.cat) continue;
+      const favL = VR.Favs ? VR.Favs.list() : [], fs = new Set(favL);
+      let hs = HOUSES.filter(h => S.cat === 'all' || (S.cat === 'fav' ? fs.has(favHouse(h.i)) : h.fam === S.cat));
+      if (S.cat === 'fav') hs = hs.slice().sort((a, b) => favL.indexOf(favHouse(a.i)) - favL.indexOf(favHouse(b.i)));
+      for (const h of hs) {
         if (f && !(h.name + ' ' + h.sub + ' ' + h.fam).toLowerCase().includes(f)) continue;
         const c = document.createElement('div'); c.className = 'card house' + (S.scene && S.scene.type === 'house' && S.scene.index === h.i ? ' on' : ''); c.dataset.house = h.i; c.style.animationDelay = (k++ * 35) + 'ms';
         c.innerHTML = `<div class="cap"><div class="n">${h.name}</div><div class="s">${h.sub}</div></div>`;
         c.onclick = () => selectHouse(h.i);
+        houseCardButtons(c, h.i);
         el.appendChild(c); updateHouseCard(h.i, c);
       }
+      if (S.cat === 'fav' && !hs.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = 'Noch keine Lieblingshäuser — der ☆ an einer Karte legt sie hierher' + (SA ? '. 📦 Mitnehmen bringt sie ins Spiel.' : ', und im Spiel liegen sie im ★-Tab als Bauplan.'); el.appendChild(d); }
       return;
     }
     const favs = VR.Favs ? VR.Favs.list() : [];
@@ -743,8 +752,21 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
         el.appendChild(c);
       }
     }
-    if (!names.length) { const d = document.createElement('div'); d.className = S.cat === 'fav' && !f ? 'note dim' : 'grp'; d.textContent = S.cat === 'fav' && !f ? 'Noch keine Favoriten hier — der ☆ an einer Karte legt sie hierher. Sie gelten überall: Teile, Crafter, Werkbank, Welt, Spiel.' : 'nichts gefunden'; el.appendChild(d); }
+    if (!names.length) { const d = document.createElement('div'); d.className = S.cat === 'fav' && !f ? 'note dim' : 'grp'; d.textContent = S.cat === 'fav' && !f ? (SA ? 'Noch keine Favoriten hier — der ☆ an einer Karte legt sie hierher. Sie gelten überall im Studio — 📦 Mitnehmen bringt sie ins Spiel.' : 'Noch keine Favoriten hier — der ☆ an einer Karte legt sie hierher. Sie gelten überall: Teile, Crafter, Werkbank, Welt, Spiel.') : 'nichts gefunden'; el.appendChild(d); }
   }
+  // a whole catalogue house as a favourite: its blueprint item (the game's ★ tab takes it as it is)
+  const favHouse = (i) => 'blueprint_' + i;
+  // ☆ and ✏️ on a house card (a click on them does not select the card)
+  function houseCardButtons(c, i) {
+    const CATL = VR.StudioCatalog;
+    if (CATL && CATL.favButton) c.appendChild(CATL.favButton(favHouse(i), () => { chips(); if (S.cat === 'fav') list(); }));
+    const e = document.createElement('button'); e.className = 'editb'; e.textContent = '✏️'; e.title = 'Bearbeiten — im Crafter umbauen';
+    e.onclick = (ev) => { ev.stopPropagation(); selectHouse(i); editHouse(i); };   // (the card it was opened from is the one to come back to)
+    c.appendChild(e);
+  }
+  // ✏️ a house / a model: the Crafter on it (it remembers where it was opened from)
+  function editHouse(i) { if (VR.Crafter) { VR.Crafter.want = { kind: 'house', idx: i }; setMode('craft'); } }
+  function editModel(n) { if (VR.Crafter) { VR.Crafter.want = { kind: 'item', name: n }; setMode('craft'); } }
   function updateHouseCard(i, card) {
     card = card || $(`#list .card[data-house="${i}"]`); if (!card) return;
     const rec = HOUSE.get(i);
@@ -799,9 +821,9 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     }
     if (sc.type === 'model') {
       const m = sc.model;
-      { const b = document.createElement('button'); b.className = 'cbtn pri'; b.innerHTML = '⚒ Im Crafter verschönern'; b.title = 'Farben, Materialien und Form Voxel für Voxel ändern — Update übernimmt es ins Spiel'; b.onclick = () => setMode('craft'); const r = document.createElement('div'); r.className = 'crow'; r.appendChild(b); el.appendChild(r); }
-      if (CATL) CATL.actions(el, m.name);
-      if (VR.Custom && VR.CUSTOM && VR.CUSTOM.models && VR.CUSTOM.models[m.name]) { const t = document.createElement('div'); t.className = 'note good'; t.textContent = 'Eigenes Design aktiv — so steht es im Spiel.'; el.appendChild(t); }
+      { const b = document.createElement('button'); b.className = 'cbtn pri'; b.dataset.act = 'edit'; b.innerHTML = '✏️ Bearbeiten'; b.title = 'Im Crafter: Farben, Materialien und Form Voxel für Voxel ändern'; b.onclick = () => editModel(m.name); const r = document.createElement('div'); r.className = 'crow'; r.appendChild(b); el.appendChild(r); }
+      if (CATL) CATL.actions(el, m.name, { model: true });
+      if (VR.Custom && VR.CUSTOM && VR.CUSTOM.models && VR.CUSTOM.models[m.name]) { const t = document.createElement('div'); t.className = 'note good'; t.textContent = SA ? 'Eigenes Design — in diesem Studio gespeichert.' : 'Eigenes Design aktiv — so steht es im Spiel.'; el.appendChild(t); }
       H('Modell');
       const kv = document.createElement('div'); kv.className = 'kv';
       const mats = new Set(); for (const q of [sc.mesh]) void q; // (materials are in the quads; keep the readout short)
@@ -813,11 +835,12 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
       for (const rec of HOUSE.values()) { const hit = rec.data.models.find(([n]) => n === m.name); if (hit) used.push([rec, hit[1]]); }
       H('Verbaut in', used.length ? used.length + ' Häusern' : (HOUSE.size < HOUSES.length ? 'Häuser werden noch gebaut …' : 'keinem Katalog-Haus'));
       used.sort((a, b) => b[1] - a[1]).forEach(([rec, cnt], k) => {
-        const p = document.createElement('div'); p.className = 'part'; p.style.animationDelay = (k * 18) + 'ms';
+        const p = document.createElement('div'); p.className = 'part used'; p.style.animationDelay = (k * 18) + 'ms';
         const c = rec.thumb.cloneNode(true); c.getContext('2d').drawImage(rec.thumb, 0, 0); c.className = 'th'; p.appendChild(c);
-        p.insertAdjacentHTML('beforeend', `<div class="n">${rec.name}<small>${HOUSES[rec.index].sub}</small></div><div class="c">${cnt}</div>`);
+        p.insertAdjacentHTML('beforeend', `<div class="n">${rec.name}<small>${houseSub(rec.index)}</small></div><div class="c">${cnt}</div>`);
         p.title = 'Das Haus öffnen — das Modell leuchtet darin auf';
         p.onclick = () => { setMode('arch'); selectHouse(rec.index); if (CATL) CATL.pickId(m.name); };
+        usedActs(p, rec, m.name);
         el.appendChild(p);
       });
       return;
@@ -829,7 +852,23 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     const kinds = CATL ? CATL.kindsOf(sc.name).filter(k => k !== 'other').map(k => CATL.kindLabel(k)).join(' · ') : '';
     kv.innerHTML = `<span>Anzeige</span><b>${blockDisplay(sc.name)}</b><span>Name</span><b>${sc.name}</b>` + (kinds ? `<span>Art</span><b>${kinds}</b>` : ''); el.appendChild(kv);
     H('Verbaut in', used.length ? used.length + ' Häusern' : (HOUSE.size < HOUSES.length ? 'Häuser werden noch gebaut …' : 'keinem Katalog-Haus'));
-    used.sort((a, b) => b[1] - a[1]).forEach(([rec, cnt], k) => { const p = document.createElement('div'); p.className = 'part'; p.style.animationDelay = (k * 18) + 'ms'; p.title = 'Das Haus öffnen — der Block leuchtet darin auf'; const c = rec.thumb.cloneNode(true); c.getContext('2d').drawImage(rec.thumb, 0, 0); c.className = 'th'; p.appendChild(c); p.insertAdjacentHTML('beforeend', `<div class="n">${rec.name}<small>${HOUSES[rec.index].sub}</small></div><div class="c">${fmt(cnt)}</div>`); p.onclick = () => { const id = sc.name; setMode('arch'); selectHouse(rec.index); if (CATL) CATL.pickId(id); }; el.appendChild(p); });
+    used.sort((a, b) => b[1] - a[1]).forEach(([rec, cnt], k) => { const p = document.createElement('div'); p.className = 'part used'; p.style.animationDelay = (k * 18) + 'ms'; p.title = 'Das Haus öffnen — der Block leuchtet darin auf'; const c = rec.thumb.cloneNode(true); c.getContext('2d').drawImage(rec.thumb, 0, 0); c.className = 'th'; p.appendChild(c); p.insertAdjacentHTML('beforeend', `<div class="n">${rec.name}<small>${houseSub(rec.index)}</small></div><div class="c">${fmt(cnt)}</div>`); p.onclick = () => { const id = sc.name; setMode('arch'); selectHouse(rec.index); if (CATL) CATL.pickId(id); }; usedActs(p, rec, sc.name); el.appendChild(p); });
+  }
+  const houseSub = (i) => { const h = HOUSES.find(x => x.i === i); return h ? h.sub : ''; };
+  // a "Verbaut in" row: ⚒ that house in the Crafter with it in the hand · 🎨 all of it in that house → something else
+  function usedActs(p, rec, id) {
+    p.dataset.house = rec.index;
+    const box = document.createElement('span'); box.className = 'uacts';
+    const b1 = document.createElement('button'); b1.className = 'cbtn mini'; b1.dataset.act = 'usedCraft'; b1.textContent = '⚒'; b1.title = 'Im Crafter öffnen — mit diesem Teil in der Hand, 🖌 Malen bereit';
+    b1.onclick = (e) => { e.stopPropagation(); if (VR.StudioCatalog && VR.StudioCatalog.preview) VR.StudioCatalog.preview(null); if (VR.Crafter && VR.Crafter.openWith) VR.Crafter.openWith(rec.index, id); };
+    const b2 = document.createElement('button'); b2.className = 'cbtn mini'; b2.dataset.act = 'usedPaint'; b2.textContent = '🎨'; b2.title = 'Alles davon in diesem Haus ersetzen — durch eine Variante oder ein anderes Teil';
+    b2.onclick = (e) => {
+      e.stopPropagation();
+      const open = p.nextElementSibling && p.nextElementSibling.classList.contains('varPick'); for (const x of $$('#partsBody .varPick')) x.remove();
+      if (open || !VR.Variants || !VR.Variants.picker) return;
+      p.after(VR.Variants.picker({ id, houseName: rec.name, onPick: (to) => { if (VR.StudioCatalog && VR.StudioCatalog.preview) VR.StudioCatalog.preview(null); VR.Crafter.replaceIn(rec.index, id, to); } }));
+    };
+    box.appendChild(b1); box.appendChild(b2); p.appendChild(box);
   }
 
   // ---------------------------------------------------------------- live editing: run the edited definition (or the whole file)
@@ -895,6 +934,12 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     $('#runAll').onclick = () => runSource($('#file').value, true);
     $('#copy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText($('#src').value); $('#msg').textContent = 'kopiert'; $('#msg').className = 'ok'; };
     for (const t of $$('.tab')) t.onclick = () => { for (const x of $$('.tab')) x.classList.toggle('on', x === t); for (const p of $$('.pane')) p.classList.toggle('on', p.id === t.dataset.pane); };
+    // ⚙ Profi: the model source, the whole file, the log and the model language are tools for developers
+    { const pb = $('.tabs .proT'); let pro = false; try { pro = localStorage.getItem('r9si.studio.pro') === '1'; } catch (e) { /* */ }
+      const set = (on) => { pro = on; $('#studio').classList.toggle('pro', on); if (pb) { pb.classList.toggle('on', on); pb.title = on ? 'Entwickler-Reiter ausblenden' : 'Werkzeuge für Entwickler: Modell-Quelle, ganze Datei, Log, Modell-Sprache'; }
+        if (!on && $('.tab.on.pro')) { for (const x of $$('.tab')) x.classList.toggle('on', x.dataset.pane === 'parts'); for (const p of $$('.pane')) p.classList.toggle('on', p.id === 'parts'); } };
+      set(pro);
+      if (pb) pb.onclick = () => { set(!pro); try { localStorage.setItem('r9si.studio.pro', pro ? '1' : '0'); } catch (e) { /* */ } }; }
     // deep link: #h/<index> · #m/<model> · else the first house
     const h = (location.hash || '').slice(1);
     if (h.startsWith('m/') && VM.MODELS[h.slice(2)]) { setMode(isFacade(h.slice(2)) ? 'facade' : 'furn', true); selectModel(h.slice(2)); }
@@ -911,6 +956,6 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     });
   }
   window.__st = S; window.__studio = { HOUSE, THUMB, selectHouse, selectModel, setMode, renderThumb };
-  window.__studioCore = { CAM, post: (m) => W && W.postMessage(m), S, HOOK, HOUSES, HOUSE, THUMB, $, $$, fmt, call: (m, tr) => call(m, tr), callP: (m, p, tr) => callP(m, p, tr), MODES, renderThumb: (sc, w, h, cam) => renderThumb(sc, w, h, cam), thumbOf: (n) => thumbOf(n), uploadSections, freeSections, camFor, drawLines, quadMesh, freeQuadMesh, drawQuadMesh, setScene, sceneHouse, sceneModel, meshModel, uploadVM, buildGrid, hud, houseTools, parts, list, chips, sys, crumb, setMode, selectHouse, selectModel, rebuildHouse, isFacade, catsOf, CATS, FCATS, showBlock, swatch, blockDisplay, texInfo: () => texInfo, view: () => $('#view'), gl: () => gl };
+  window.__studioCore = { SA, full, editHouse, editModel, favHouse, CAM, post: (m) => W && W.postMessage(m), S, HOOK, HOUSES, HOUSE, THUMB, $, $$, fmt, call: (m, tr) => call(m, tr), callP: (m, p, tr) => callP(m, p, tr), MODES, renderThumb: (sc, w, h, cam) => renderThumb(sc, w, h, cam), thumbOf: (n) => thumbOf(n), uploadSections, freeSections, camFor, drawLines, quadMesh, freeQuadMesh, drawQuadMesh, setScene, sceneHouse, sceneModel, meshModel, uploadVM, buildGrid, hud, houseTools, parts, list, chips, sys, crumb, setMode, selectHouse, selectModel, rebuildHouse, isFacade, catsOf, CATS, FCATS, showBlock, swatch, blockDisplay, texInfo: () => texInfo, view: () => $('#view'), gl: () => gl };
   window.addEventListener('load', ui);
 })();
