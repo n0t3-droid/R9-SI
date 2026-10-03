@@ -20,6 +20,9 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 const boot = await ev(() => ({ setting: VR.game.settings.look, look: VR.LOOK && VR.LOOK.mode, rim: VR.game.texRim }));
 check(boot.setting === 'classic' && boot.look === 'classic' && boot.rim === true, 'a new player starts in Klassisch (setting, registry and textures): ' + JSON.stringify(boot));
+// Settings → Graphics: the "Blöcke" control
+const ctl = await ev(() => { const u = VR.game.ui; u.settingsTab = 'graphics'; u.showSettings(); const bs = [...document.querySelectorAll('#setbody [data-look]')]; const r = bs.map(b => b.textContent + (b.classList.contains('on') ? '*' : '')); const lab = bs.length ? bs[0].closest('.field').querySelector('label').textContent : ''; u.show('title'); return { lab, r }; });
+check(ctl.lab === 'Blöcke' && ctl.r.join() === 'Klassisch*,Nahtlos', 'Settings → Graphics shows "Blöcke: Klassisch / Nahtlos" with Klassisch on: ' + JSON.stringify(ctl));
 const LOOKS = (process.env.LOOKS || 'classic,seamless').split(',');
 await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 6; g.settings.look = lk; g.applySettings('*'); }, [process.env.PRESET || 'high', LOOKS[0]]);
 await ev(`VR.game.createWorld({name:'Blocks',mode:'creative',difficulty:'peaceful',type:'flat',seed:'31',cheats:true,kit:true})`);
@@ -70,7 +73,8 @@ const [ox, y0, oz] = base;
 const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; }, [pos, yaw, pitch]); await settle(30); await step(6); await shot(TAG + '_' + name); };
 for (const lk of LOOKS) {
   const t0 = Date.now();
-  const sw = await ev((lk) => { const g = VR.game; g.settings.look = lk; const changed = g.applyLook(); return { changed, look: VR.LOOK.mode }; }, lk);
+  // the first look was set before the world was made; the next ones come by chat command, as a player types it
+  const sw = await ev((lk) => { const g = VR.game, before = VR.LOOK.mode; g.chat('/look ' + lk); return { before, now: VR.LOOK.mode, saved: JSON.parse(localStorage.getItem('r9si.settings') || '{}').look }; }, lk);
   // the textures come back from the worker: wait for them (the rim follows the look)
   for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim)) break; await step(2); await wait(100); }
   await settle(80);
@@ -86,6 +90,22 @@ for (const lk of LOOKS) {
   const trace = await ev(([ox, y0, oz]) => { window.__norender = true; const g = VR.game, p = g.player; p.flying = false; p.noclip = false; p.teleport(ox + 1.5, y0 + 3, oz + 22.5); p.yaw = -Math.PI / 2; p.pitch = 0; const out = []; for (let i = 0; i < 200; i++) { p.vel[0] = 4; g.last = performance.now() - 16; g.loop(performance.now()); if (i % 25 === 0) out.push(+(p.pos[1] - y0).toFixed(2)); } return out; }, base);
   console.log(`${lk}: walking up the hill, heights`, JSON.stringify(trace));
 }
+// back with the settings button (Esc → Settings → Graphics → Blöcke: Klassisch)
+const back = await ev(() => { const g = VR.game, u = g.ui; u.settingsTab = 'graphics'; u.showSettings(); const b = document.querySelector('#setbody [data-look=classic]'); if (b) b.click(); const on = document.querySelector('#setbody [data-look].on'); return { look: VR.LOOK.mode, setting: g.settings.look, on: on && on.dataset.look }; });
+for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim)) break; await step(2); await wait(100); }
+const back2 = await ev(() => ({ rim: VR.game.texRim, icons: VR.game.icons.cache.size >= 0 }));
+check(back.look === 'classic' && back.setting === 'classic' && back.on === 'classic' && back2.rim === true, 'the settings button switches back to Klassisch (textures with the rim again): ' + JSON.stringify([back, back2]));
+// the R9 Studio takes the player's look from the same settings (here: Nahtlos)
+await ev(() => { const s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); s.look = 'seamless'; localStorage.setItem('r9si.settings', JSON.stringify(s)); });
+const sp = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 1500)));
+sp.on('console', m => { if (m.type() === 'error') logs.push('[studio] ' + m.text().slice(0, 500)); });
+await sp.goto('file:///home/claude/vr/dist/studio.html');
+for (let i = 0; i < 240; i++) { await sp.waitForTimeout(500); const s = await sp.evaluate(() => ({ boot: document.getElementById('studio').classList.contains('boot'), houses: window.__studio ? window.__studio.HOUSE.size : -1 })); if (!s.boot && s.houses >= 1) break; }
+const stl = await sp.evaluate(() => ({ look: VR.LOOK && VR.LOOK.mode, smooth: !!(VR.R.T.flags[VR.R.byName.grass_block.defaultState] & VR.F.SMOOTH) }));
+check(stl.look === 'seamless' && stl.smooth, 'the Studio follows the player\'s look setting: ' + JSON.stringify(stl));
+await sp.evaluate(() => window.__studio.selectHouse(0)); await sp.waitForTimeout(1500);
+await sp.screenshot({ path: `/home/claude/vr/test/shots/${TAG}_studio_seamless.png` }); console.log('shot', TAG + '_studio_seamless');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);
 console.log(fails ? 'FAIL ' + fails : 'OK');
 await browser.close();
