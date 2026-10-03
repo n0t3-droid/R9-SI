@@ -187,7 +187,7 @@
         w: { id: meta.id, name: cleanName(meta.name), seed: meta.seed, type: meta.type, mode: meta.mode, difficulty: meta.difficulty, cheats: !!meta.cheats, keep: !!meta.keep, vgen: meta.vgen || 1 },
         time: Math.round(g.env.ticks), day: g.env.day || 0, rain: g.env.rainTarget || 0, th: g.env.thunder || 0,
         spawn: [Math.round(p.pos[0] * 100) / 100, Math.round(p.pos[1] * 100) / 100, Math.round(p.pos[2] * 100) / 100, Math.round(p.yaw * 1000) / 1000, p.flying ? 1 : 0],
-        home: meta.worldSpawn || null, host: this.myName(),
+        home: meta.worldSpawn || null, host: this.myName(), look: g.settings.look === 'seamless' ? 'seamless' : 'classic',   // the host's block look wins
         // the world's style as multiplayer allows it: everyone sees the same buildings, furniture and trees
         style: (() => { const st = VR.WorldStyle ? VR.WorldStyle.effective(VR.WorldStyle.load(meta.id), true) : null; return st ? { sv: st.sv, rules: st.rules, water: null, mp: true } : null; })(),
       });
