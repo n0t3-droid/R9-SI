@@ -209,6 +209,26 @@ console.log('(e) VX pieces');
     else check(seamL !== edge && seamR !== edge, `${lk}: the two rugs join into one`);
   }
 }
+// ---------------------------------------------------------------- (g) the worker's side: {type:'look'} and the textures job
+console.log('(g) worker messages');
+{
+  const posted = [];
+  global.self = { postMessage: (m) => posted.push(m) };
+  require('../src/worker/worker_main.js');
+  VR.setLook('classic');
+  self.onmessage({ data: { type: 'look', mode: 'seamless' } });
+  const G = st('grass_block');
+  check(VR.LOOK.mode === 'seamless' && (T.flags[G] & F.SMOOTH) !== 0, "{type:'look', mode:'seamless'} switches the worker to Nahtlos (smooth grass)");
+  self.onmessage({ data: { type: 'look', mode: 'classic' } });
+  check(VR.LOOK.mode === 'classic' && (T.flags[G] & F.SMOOTH) === 0 && (T.flags[st('grass_block_cut')] & F.SMOOTH) === 0, "{type:'look', mode:'classic'} switches it back (no smooth flag anywhere)");
+  self.onmessage({ data: { type: 'textures', id: 7, bevel: 1, bevelAll: true } });
+  const tx = posted.find(m => m.type === 'textures' && m.id === 7);
+  check(!!tx && tx.layers === R.texNames.length, 'the textures job answers with every layer');
+  if (tx) {
+    const N = tx.size, A = tx.albedo[0], l = R.texIndex.vollton_matte, br = (x, y) => { const o = (l * N * N + y * N + x) * 4; return (A[o] + A[o + 1] + A[o + 2]) / 3; };
+    check(br(0, 16) / br(16, 16) < 0.9, `bevelAll puts the edge line on Vollton (${(br(0, 16) / br(16, 16)).toFixed(3)})`);
+  }
+}
 VR.setLook('classic');
 console.log(fails ? 'FAIL ' + fails : 'OK');
 process.exit(fails ? 1 : 0);
