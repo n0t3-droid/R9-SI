@@ -32,6 +32,7 @@
 
   // ---------------------------------------------------------------- the palette: every placeable item
   const PCATS = [['all', 'Alle'], ['fav', '★ Favoriten'], ['recent', 'Zuletzt'], ['modern', 'Modern & Vollton'], ['build', 'Bauen'], ['arch', 'Voxel Homes'], ['vtech', 'Möbel & Technik'], ['vlife', 'Leben'], ['vshop', 'Markt'], ['nature', 'Natur'], ['func', 'Funktion'], ['volt', 'Mechanik'], ['tech', 'Starforge']];
+  PCATS.splice(4, 0, ['vmodern', '✨ Modern Living']);   // the Modern Living pack (voxmodern.js)
   let itemsByCat = null, itemSet = null;
   const FV = () => VR.Favs;
   // ★ favourites that can be placed here (the same list as in Teile, the Werkbank, the World and the game)

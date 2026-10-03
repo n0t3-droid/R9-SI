@@ -28,7 +28,7 @@ const c1 = await ev(async () => {
   const roofs = E.filter(e => e.kinds.includes('roof')).map(e => e.id);
   return { mode: window.__st.mode, chips, n: E.length, cards: document.querySelectorAll('#list .card[data-bid]').length, scene: window.__st.scene && window.__st.scene.type,
     roofs: roofs.length, roofHas: ['vx_roof_red', 'vx_ridge_slate', 'slate_roof_stairs', 'vx_hip_shingle'].filter(x => roofs.includes(x)),
-    led: CAT.kindsOf('vx_led_cove'), trim: CAT.kindsOf('white_trim'), furn: E.some(e => e.id.startsWith('vm_')) };
+    led: CAT.kindsOf('vx_led_cove'), trim: CAT.kindsOf('white_trim'), furn: E.some(e => e.id.startsWith('vm_') && !VR.R.byName[e.id].o.modern) };   // (the ✨ Modern pack is meant to be here)
 });
 console.log('  parts', JSON.stringify(c1).slice(0, 700));
 const chip = (k) => (c1.chips.find(c => c[0] === k) || [0, 0])[1];

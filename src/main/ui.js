@@ -30,7 +30,7 @@
   ];
 const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game and click <b>Share</b> (top right).</li><li>Enter your friend\'s <b>email</b> and choose <b>Contributor</b> (or Editor), then send.</li><li>Your friend signs in to Claude <b>with that email</b> and opens the same link (the email is only a notice).</li><li>Start or load a world — it shows up on their title screen with a <b>Join</b> button.</li></ol>';
   const MP_OFF_HTML = 'Multiplayer isn\'t available in this copy. Open the game <b>on claude.ai while signed in</b> — the downloaded index.html plays single-player.';
-  const CAT_TABS = [['fav', '★ Favorites'], ['build', 'Building'], ['modern', 'Modern & Vollton'], ['blueprints', 'Blueprints'], ['arch', 'Voxel Homes'], ['vtech', 'Voxel Tech'], ['vlife', 'Village Life'], ['vshop', 'Supermarket'], ['nature', 'Nature'], ['func', 'Functional'], ['volt', 'Volt & Mech'], ['tech', 'Starforge'], ['tools', 'Tools'], ['combat', 'Combat'], ['food', 'Food'], ['items', 'Materials'], ['spawn', 'Spawn'], ['search', '🔍 Search']];
+  const CAT_TABS = [['fav', '★ Favorites'], ['build', 'Building'], ['modern', 'Modern & Vollton'], ['vmodern', '✨ Modern Living'], ['blueprints', 'Blueprints'], ['arch', 'Voxel Homes'], ['vtech', 'Voxel Tech'], ['vlife', 'Village Life'], ['vshop', 'Supermarket'], ['nature', 'Nature'], ['func', 'Functional'], ['volt', 'Volt & Mech'], ['tech', 'Starforge'], ['tools', 'Tools'], ['combat', 'Combat'], ['food', 'Food'], ['items', 'Materials'], ['spawn', 'Spawn'], ['search', '🔍 Search']];
 
   class UI {
     constructor(game) {
@@ -661,13 +661,25 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
         // ☆ in the corner (on hover): a favourite, the same as in the R9 Studio
         if (VR.Favs) { const fb = el('span', 'favS'); fb.onmousedown = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleFav(id); }; s.appendChild(fb); }
         frag.appendChild(s);
-        // paint lazily
-        requestAnimationFrame(() => this.game.icons.paint(s.firstChild, id));
+        // paint lazily, a few per frame (pumpIcons)
+        (this._iconQ || (this._iconQ = [])).push([s.firstChild, id]);
       }
       pal.appendChild(frag);
+      this.pumpIcons();
       this.markFavs(pal);
       if (this.creativeTab === 'fav' && !items.length) { const n = el('div', 'note', 'No favourites yet — hover an item and press <b>F</b> (or click its ☆). Your ★ from the R9 Studio show up here too.'); n.style.gridColumn = '1 / -1'; n.style.padding = '10px 4px'; pal.appendChild(n); }
       pal.onmousedown = (e) => { if (e.target === pal && this.cursor) { this.cursor = null; this.updateCursor(); } };
+    }
+    // palette icons paint in small batches, about 6 ms per frame: a tab of hundreds of models (each builds its voxels
+    // on first use) never stalls a frame on a small PC; slots that left the screen are skipped
+    pumpIcons() {
+      if (this._iconPump) return;
+      const step = () => {
+        const q = this._iconQ || [], t0 = performance.now();
+        while (q.length && performance.now() - t0 < 6) { const [cv, id] = q.shift(); if (cv.isConnected) this.game.icons.paint(cv, id); }
+        this._iconPump = q.length ? requestAnimationFrame(step) : 0;
+      };
+      this._iconPump = requestAnimationFrame(step);
     }
     // ★ marks on the palette slots
     markFavs(pal) {

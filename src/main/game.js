@@ -883,6 +883,18 @@
       }
       if (k === 'lever') { const ns = t.with(s, 'powered', t.get(s, 'powered') ? 0 : 1); w.setBlock(x, y, z, ns, 4); this.audio.play('click'); return true; }
       if (k === 'button') { if (t.get(s, 'powered')) return true; w.setBlock(x, y, z, t.with(s, 'powered', 1), 4); this.audio.play('click'); if (this.sim) this.sim.schedule(x, y, z, t.o.pulse || 20, 'unpress'); return true; }
+      // Modern Living (voxmodern.js): a lamp switches on / off — every part of the model at once; a cupboard opens one
+      // container for the whole model, kept at its anchor part
+      if ((t.o.toggle || t.o.ui === 'chest') && t.o.vxModel && t.has('part') && VR.VM && VR.VM.MODELS[t.name]) {
+        const cells = VR.VM.partCells(VR.VM.MODELS[t.name], t.get(s, 'facing'), t.get(s, 'part'), x, y, z);
+        if (t.o.toggle && t.has('lit')) {
+          const lit = t.get(s, 'lit') ? 0 : 1;
+          for (const [bx, by, bz] of cells) { const bs = w.getBlock(bx, by, bz); if (R.T.type[bs] === t.id) w.setBlock(bx, by, bz, t.with(bs, 'lit', lit), 4); }
+          this.audio.play('click');
+          return true;
+        }
+        if (t.o.ui === 'chest' && this.openContainer) { this.openContainer(cells[0][0], cells[0][1], cells[0][2], t); return true; }
+      }
       if (this.sim && this.sim.interact && this.sim.interact(x, y, z, s, t, p)) return true;
       if (t.o.ui === 'craft' || t.name === 'crafting_table') { this.ui.openInventory('craft'); return true; }
       return false;

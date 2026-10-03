@@ -199,7 +199,9 @@
 
   // ---------------------------------------------------------------- compile: volume → parts
   // the volume is kept once per model as palette indices (one byte per voxel) + a palette of packed voxels
+  // (a lazy definition — o.lazy, the late packs — gets a model that builds itself on first use, see lazyModel)
   function compile(name, o) {
+    if (o.lazy) return lazyModel(name, o);
     const [W, H, D] = o.size, R = o.res || RES;
     const b = new Builder(W, H, D, R);
     o.build(b, M);
@@ -225,10 +227,75 @@
     const col = n ? ((Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(bb / n)) : 0x999999;
     const VW = b.W, VD = b.D;
     const P = Uint32Array.from(pal);
-    const model = { name, W, H, D, res: R, parts, at, col, vox, vol, pal: P, VW, VH: b.H, VD, get: (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= VW || y >= b.H || z >= VD) ? 0 : P[vol[(y * VD + z) * VW + x]] };
+    const model = { name, W, H, D, res: R, parts, at, col, vox, vol, pal: P, VW, VH: b.H, VD, get: (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= VW || y >= b.H || z >= VD) ? 0 : P[vol[(y * VD + z) * VW + x]], compiled: true };
     return model;
   }
   VM.compile = compile;
+
+  // ---------------------------------------------------------------- lazy models (the late packs, voxmodern.js)
+  // Registering a model needs only its occupied cells and a colour: a lazy definition declares them (o.cells — a list
+  // of [x, y, z] blocks — or the full W×H×D box minus o.skip; o.col, a colour of the pack's palette). The heavy part —
+  // running build(), the palette volume, the per-part bounds — happens on first use (a paint, an icon, a collision
+  // box, the Studio) in whichever thread needs it: the volume fields are accessors that compile the model in place.
+  const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+  VM.stats = { lateN: 0, lateMs: 0, compiled: 0, compileMs: 0 };
+  // the declared cells, in the order compile() finds parts (y, then z, then x)
+  function declaredCells(o) {
+    const [W, H, D] = o.size, key = (c) => (c[1] * D + c[2]) * W + c[0];
+    let cells;
+    if (o.cells) cells = o.cells.map(c => [c[0], c[1], c[2]]);
+    else { const skip = new Set((o.skip || []).map(c => c[0] + ',' + c[1] + ',' + c[2])); cells = []; for (let y = 0; y < H; y++) for (let z = 0; z < D; z++) for (let x = 0; x < W; x++) if (!skip.has(x + ',' + y + ',' + z)) cells.push([x, y, z]); }
+    return cells.filter(c => c[0] >= 0 && c[1] >= 0 && c[2] >= 0 && c[0] < W && c[1] < H && c[2] < D).sort((a, b) => key(a) - key(b));
+  }
+  const HEAVY = ['vol', 'pal', 'get', 'vox'];
+  const setData = (obj, k, v) => Object.defineProperty(obj, k, { value: v, writable: true, configurable: true, enumerable: true });
+  function lazyModel(name, o) {
+    const [W, H, D] = o.size, R = o.res || RES;
+    const m = { name, W, H, D, res: R, parts: [], at: new Map(), col: o.col === undefined ? 0x999999 : o.col, VW: W * R, VH: H * R, VD: D * R, lazy: true, compiled: false };
+    // the build runs from the definition this model was made with (an edit in the Studio makes a new model)
+    Object.defineProperty(m, 'src', { value: o, enumerable: false });
+    const own = (obj, k) => { const d = Object.getOwnPropertyDescriptor(obj, k); return d && 'value' in d ? d.value : undefined; };
+    for (const k of HEAVY) Object.defineProperty(m, k, { configurable: true, enumerable: true, get() { materialize(m); return own(m, k); }, set(v) { setData(m, k, v); } });
+    for (const [px, py, pz] of declaredCells(o)) {
+      const p = { px, py, pz };
+      Object.defineProperty(p, 'bounds', { configurable: true, enumerable: true, get() { materialize(m); return own(p, 'bounds'); }, set(v) { setData(p, 'bounds', v); } });
+      m.at.set(px + ',' + py + ',' + pz, m.parts.length); m.parts.push(p);
+    }
+    return m;
+  }
+  VM.lazyModel = lazyModel;
+  // build a lazy model now (a no-op once built): the volume, its palette, and the bounds of every declared part
+  function materialize(m) {
+    if (m.compiled || !m.src) return m;
+    m.compiled = true;
+    const t0 = now(), o = m.src, R = m.res, VW = m.VW, VH = m.VH, VD = m.VD;
+    let V;
+    try { const b = new Builder(m.W, m.H, m.D, R); o.build(b, M); V = b.V; } catch (e) { console.warn('VM build failed', m.name, e); V = new Uint32Array(VW * VH * VD); }
+    const palMap = new Map([[0, 0]]), pal = [0];
+    let vox = 0;
+    for (let i = 0; i < V.length; i++) { const v = V[i]; if (!v) continue; vox++; if (!palMap.has(v)) { palMap.set(v, pal.length); pal.push(v); } }
+    const vol = pal.length <= 256 ? new Uint8Array(V.length) : new Uint16Array(V.length);
+    for (let i = 0; i < V.length; i++) { const v = V[i]; if (v) vol[i] = palMap.get(v); }
+    const P = Uint32Array.from(pal);
+    setData(m, 'vol', vol); setData(m, 'pal', P); setData(m, 'vox', vox);
+    setData(m, 'get', (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= VW || y >= VH || z >= VD) ? 0 : P[vol[(y * VD + z) * VW + x]]);
+    for (const p of m.parts) setData(p, 'bounds', boundsIn(vol, VW, VD, R, p.px, p.py, p.pz));
+    VM.stats.compiled++; VM.stats.compileMs += now() - t0;
+    return m;
+  }
+  VM.materialize = materialize;
+  // the voxel bounds of one block of a volume ([0, 0, 0, 0, 0, 0] when it is empty)
+  function boundsIn(vol, VW, VD, R, px, py, pz) {
+    let x0 = R, y0 = R, z0 = R, x1 = -1, y1 = -1, z1 = -1;
+    for (let y = 0; y < R; y++) for (let z = 0; z < R; z++) { const row = ((py * R + y) * VD + pz * R + z) * VW + px * R; for (let x = 0; x < R; x++) if (vol[row + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; } }
+    return x1 < 0 ? [0, 0, 0, 0, 0, 0] : [x0, y0, z0, x1 + 1, y1 + 1, z1 + 1];
+  }
+  // the blocks a built model really fills, in part order (tests: a lazy model's declared cells must be exactly these)
+  VM.scanParts = function (m) {
+    const out = [];
+    for (let py = 0; py < m.H; py++) for (let pz = 0; pz < m.D; pz++) for (let px = 0; px < m.W; px++) if (boundsIn(m.vol, m.VW, m.VD, m.res, px, py, pz)[3]) out.push({ px, py, pz });
+    return out;
+  };
 
   // rotate part offsets around the model's vertical axis, q quarter-turns (same sense as VX.rotateGrid)
   function rotOffset(px, pz, W, D, q) { let x = px, z = pz, w = W, d = D; for (let r = 0; r < q; r++) { const t = x; x = d - 1 - z; z = t; const tw = w; w = d; d = tw; } return [x, z]; }
@@ -299,10 +366,19 @@
       for (let x = x0; x < x1; x++) { const v = vol[row + x]; if (!v) continue; let nx = x, nz = z; for (let r = 0; r < q; r++) { const t = nx; nx = R - 1 - nz; nz = t; } G[IX(nx, y, nz)] = pal[v]; }
     }
   }
+  // a switched-off lamp: its glowing voxels turn into the frosted, unlit glass they are made of (no glow); dark glowing
+  // colours (a screen's picture, a deep LED) go to dark glass instead
+  const OFF = 0xBEBAB2;
+  VM.offColor = (c) => { c &= 0xffffff; const l = (((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11) / 255; return l > 0.5 ? VX.mix(c, OFF, 0.72) : VX.mix(c, 0x16181C, 0.8); };
+  function lightsOff(R) {
+    const G = VX.gridFor(R);
+    for (let i = 0; i < G.length; i++) { const v = G[i]; if (v & EMIS) G[i] = pack(VM.offColor(v), v & (GLASS | GLOSS | 0xE0000000)); }
+  }
   // the game's paint: the part itself, plus neighbour masks for the sibling parts the context says are really there (c.x bits)
   VM.paint = function (sp, c) {
     const model = sp.model;
     VM.paintPart(model, model.parts[c.part], c.facing);
+    if (sp.toggle && c.lit === 0) lightsOff(model.res);
     const bits = c.x | 0;
     if (bits) { const t = VM.siblings(model, c.facing), single = model.parts.length === 1; for (let d = 0; d < 6; d++) if ((bits >> d) & 1) { const j = t[c.part * 6 + d] >= 0 ? t[c.part * 6 + d] : single ? 0 : -1; if (j >= 0) VM.fillNeighbour(model, model.parts[j], c.facing, d); } }
   };
@@ -318,6 +394,7 @@
     const m = sp.model, out = new Uint32Array(512), R = m.res;
     const span = Math.max(m.W, m.H, m.D) * R, k = span / 8;
     const ox = (span - m.W * R) / 2, oz = (span - m.D * R) / 2;
+    const acc = [];
     for (let y = 0; y < 8; y++) for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) {
       let r = 0, g = 0, b = 0, n = 0, fl = 0;
       for (let dy = 0; dy < k; dy++) for (let dz = 0; dz < k; dz++) for (let dx = 0; dx < k; dx++) {
@@ -326,8 +403,12 @@
         if (!v) continue;
         r += (v >> 16) & 255; g += (v >> 8) & 255; b += v & 255; n++; fl |= v & (EMIS | GLASS | GLOSS);
       }
-      if (n >= Math.max(1, (k * k * k) * 0.18)) out[(y * 8 + z) * 8 + x] = pack((Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n), fl);
+      if (n) acc.push([(y * 8 + z) * 8 + x, r, g, b, n, fl]);
     }
+    // a cell shows when it is 18 % full; a slim thing (a floor lamp's pole, a wire) that leaves almost nothing at that
+    // gets a thinner threshold, so its icon is never empty
+    const fill = (th) => { let c = 0; for (const [i, r, g, b, n, fl] of acc) if (n >= Math.max(1, (k * k * k) * th)) { out[i] = pack((Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n), fl); c++; } return c; };
+    if (fill(0.18) < 4) { out.fill(0); fill(0.03); }
     return out;
   };
   VX.icon16 = (sp) => sp.kind === 'model' ? VM.icon(sp) : null;
@@ -335,12 +416,17 @@
   // ---------------------------------------------------------------- definitions
   const DEFS = VM.DEFS = [];
   // VM.define(name, display, { size: [W, H, D], res, build(b, M), light, sound, hard, bed, seat })
+  // late packs add: late (registered by VM.registerLate from VR.BL.late, after every older block), lazy + cells / skip
+  // + col (see lazyModel), cat, cats, ui ('chest'), solid, toggle (a switch: a "lit" property), group, meta (merged
+  // into the block options)
   VM.define = function (name, display, o) { DEFS.push({ name, display, o }); return name; };
   // registration hook: runs inside VX.define (blocks4.js) with the VX adder
   VX.defineExtra.push(function (K) {
     const { add, FACING4 } = K;
     const G_ = K.G;
+    VM._K = K;   // the late packs register with the same adder (VM.registerLate)
     for (const d of DEFS) {
+      if (d.o.late) continue;
       let model;
       try { model = compile(d.name, d.o); } catch (e) { console.warn('VM compile failed', d.name, e); continue; }
       if (!model.parts.length) { console.warn('VM empty model', d.name); continue; }
@@ -350,6 +436,49 @@
       add(d.name, d.display, spec, Object.assign({ props: [FACING4, ['part', partNames]], filter: 0, solid: true, group: G_.HOME || G_.ARCH, cat: 'vtech', sound: d.o.sound || 'wood', hard: d.o.hard || 1, vxModel: true }, d.o.light ? { light: d.o.light } : {}, d.o.bed ? { bed: true } : {}, d.o.seat ? { seat: true } : {}));
     }
   });
+  // the late definitions (o.late) named here, in definition order — called from VR.BL.late (blocks4.js runs it after
+  // the cut twins and Vollton), so every block registered before keeps its state ids. Nothing is compiled: a lazy model
+  // is registered from its declared cells. A switch (o.toggle) adds a "lit" property (placed switched on): light only
+  // when lit, the glowing voxels go dark when off; ui 'chest' opens a container (keyed to the model's anchor part).
+  VM.registerLate = function (names) {
+    const K = VM._K; if (!K) return 0;
+    const t0 = now(), want = names ? new Set(names) : null, Rg = VR.R, F_ = K.F || VR.F;
+    let n = 0;
+    for (const d of DEFS) {
+      const o = d.o;
+      if (!o.late || (want && !want.has(d.name)) || Rg.byName[d.name]) continue;
+      let model;
+      try { model = o.lazy ? lazyModel(d.name, o) : compile(d.name, o); } catch (e) { console.warn('VM late model failed', d.name, e); continue; }
+      if (!model.parts.length) { console.warn('VM empty model', d.name); continue; }
+      MODELS[d.name] = model;
+      const partNames = model.parts.map(p => 'p' + p.px + p.py + p.pz);
+      const spec = { kind: 'model', res: model.res, model, col: model.col };
+      if (model.lazy) spec.lazy = true;
+      const props = [K.FACING4, ['part', partNames]], opt = { filter: 0, solid: o.solid !== false, group: o.group || K.G.HOME || K.G.ARCH, cat: o.cat || 'vtech', sound: o.sound || 'wood', hard: o.hard || 1, vxModel: true };
+      if (o.toggle) {
+        spec.toggle = true;
+        props.push(['lit', 2]);
+        opt.toggle = true; opt.defaultIndex = 4 * partNames.length;   // facing 0, part 0, lit
+        const L = o.light || [14, 12, 8];
+        opt.light = (p) => (p.lit ? L : null);
+      } else if (o.light) opt.light = o.light;
+      if (o.toggle || o.ui) opt.flags = F_.INTERACT;
+      if (o.ui) opt.ui = o.ui;
+      if (o.bed) opt.bed = true;
+      if (o.seat) opt.seat = true;
+      if (o.cats) opt.cats = o.cats.slice();
+      opt.props = props;
+      K.add(d.name, d.display, spec, Object.assign(opt, o.meta || {}));
+      n++;
+    }
+    VM.stats.lateN += n; VM.stats.lateMs += now() - t0;
+    return n;
+  };
+  // every cell of a placed model, its anchor (part 0) first — from any one part at (x, y, z), its facing and part index
+  VM.partCells = function (model, facing, part, x, y, z) {
+    const fp = VM.footprint(model, facing), me = fp[part] || fp[0];
+    return fp.map(([dx, dy, dz]) => [x - me[0] + dx, y - me[1] + dy, z - me[2] + dz]);
+  };
   // paint / box / icon hooks for kind 'model' (installed once voxarch has its tables)
   VM.install = function (PAINT_FN, KIND, boxHook, iconHook, OTHER) {
     PAINT_FN.model = VM.paint;
@@ -367,6 +496,7 @@
     VX.ctxHook.model = (c, sp, s, nbS) => {
       const model = sp.model, f = c.facing, t = VM.siblings(model, f), single = model.parts.length === 1;
       const R = VR.R, T = R.T;
+      if (sp.toggle) { const tt = R.types[T.type[s]]; c.lit = tt.get(s, 'lit'); } else c.lit = 1;   // a lamp switched off paints dark
       let x = 0;
       for (let d = 0; d < 6; d++) {
         // a run of one-part models (gutters, downpipes, rails) continues into the next cell like a sibling part
