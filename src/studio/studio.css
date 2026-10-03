@@ -594,3 +594,56 @@ nav.modes button.hubm.on { color: var(--txt); background: #2a2110; box-shadow: 0
 .landRow .t small { display: block; font: 10px var(--mono); color: var(--mute); }
 .landBox .cbtn.mini.on { color: #0b1a07; background: var(--acc2); border-color: var(--acc2); }
 .landBox .note { font-size: 11px; padding: 4px 0 2px; }
+
+/* ---- v0.39 Phase A · Keine Sackgassen ---- */
+/* the bars under the top bar (🔌 the standalone bridge, ⚠ a full browser storage): a grid row, empty most of the time */
+#studio { grid-template-rows: 50px auto 1fr; grid-template-areas: "h h h" "b b b" "l m r"; }
+#bars { grid-area: b; display: flex; flex-direction: column; min-width: 0; }
+#bridgeBar, #fullBar.on { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 18px; font-size: 12.5px; border-bottom: 1px solid var(--line); background: rgba(56, 230, 255, 0.06); }
+#bridgeBar .t, #fullBar .t { flex: 1; min-width: 240px; }
+#fullBar { display: none; }
+#fullBar.on { background: rgba(255, 182, 72, 0.1); border-bottom-color: rgba(255, 182, 72, 0.35); }
+#fullBar .freeList { display: flex; flex-direction: column; gap: 2px; font: 11.5px var(--mono); color: var(--txt); }
+#fullBar .keep { font-size: 11.5px; }
+#bridgeBar .x, #fullBar .x { border: 0; background: transparent; color: var(--mute); padding: 2px 6px; }
+.gameLink { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--mute); }
+.gameLink input { width: 300px; max-width: 46vw; padding: 3px 6px; font: 11px var(--mono); color: var(--acc); }
+/* ⚙ Profi: the developer tabs */
+#studio:not(.pro) .tab.pro { display: none; }
+.tabs .proT { margin-left: auto; align-self: center; padding: 3px 8px; font-size: 11px; color: var(--mute); background: transparent; border-color: transparent; }
+.tabs .proT.on { color: var(--acc); border-color: rgba(56, 230, 255, 0.35); box-shadow: none; }
+/* ✏️ on a card, next to its ☆ */
+.card .editb { position: absolute; top: 6px; right: 36px; z-index: 2; width: 26px; height: 26px; padding: 0; border-radius: 50%; font-size: 13px; line-height: 1; display: grid; place-items: center; background: rgba(7, 9, 13, 0.62); border-color: transparent; opacity: 0; transition: opacity .15s; }
+.card:hover .editb, .card .editb:focus-visible { opacity: 1; }
+@media (hover: none) { .card .editb { opacity: 1; } }
+/* "Verbaut in": ⚒ 🎨 */
+.part.used { grid-template-columns: 40px 1fr auto auto; }
+.part .uacts { display: flex; gap: 4px; }
+.part .uacts .cbtn.mini { padding: 3px 7px; font-size: 13px; }
+/* ✏️ Varianten · 🎨 replace all of it in a house */
+.varStrip { margin: 6px 0 8px; }
+.varStrip .varT, .varPick .varT { font-size: 11.5px; color: var(--mute); margin-bottom: 4px; }
+.varStrip .varT b { color: var(--acc); font-weight: 500; }
+.varStrip .varRow { display: flex; flex-wrap: wrap; gap: 4px; }
+.varStrip .vt { width: 40px; height: 40px; padding: 2px; border-radius: 8px; display: grid; place-items: center; background: #0b1119; }
+.varStrip .vt.on { border-color: var(--acc2); box-shadow: 0 0 0 1px rgba(157, 255, 106, 0.4) inset; }
+.varStrip .vt canvas { width: 34px; height: 34px; image-rendering: pixelated; }
+.varPick { margin: 2px 0 10px 46px; padding: 8px; border: 1px solid var(--line2); border-radius: 10px; background: rgba(8, 12, 18, 0.7); }
+.varPick .varQ { width: 100%; padding: 5px 8px; margin: 4px 0; font-size: 12px; }
+.varHouses { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0 8px; font-size: 11.5px; color: var(--mute); }
+/* the Crafter: ↻ turns the next piece (R) */
+#craftBar .rotb { width: 48px; height: 48px; padding: 0; border-radius: 8px; font-size: 20px; background: #0b1119; }
+/* 🕘: 📦 Mitnehmen · 📥 Übernehmen */
+#hub footer .xfer { display: flex; gap: 6px; }
+#hub footer .xfer button { font-size: 12.5px; padding: 6px 12px; border-radius: 10px; }
+/* 📥 what is in a pack */
+#packDlg { position: fixed; inset: 0; z-index: 90; display: none; place-items: center; background: rgba(3, 5, 8, 0.55); backdrop-filter: blur(3px); }
+#packDlg.on { display: grid; }
+#packDlg .box { width: min(440px, 92vw); padding: 18px 20px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line2); box-shadow: 0 30px 80px -30px #000; }
+#packDlg h3 { margin: 0 0 10px; font-size: 16px; }
+#packDlg .sum { font-size: 15px; color: var(--acc); margin-bottom: 4px; }
+#packDlg .src, #packDlg .how { font-size: 11.5px; margin-bottom: 6px; }
+#packDlg .crow { display: flex; gap: 8px; margin-top: 12px; }
+#packDlg .crow .cbtn { flex: 1; }
+/* a file held over the Studio */
+#studio.packdrop::after { content: '📥 R9-Paket hier ablegen'; position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; font: 600 22px var(--font); color: var(--acc); background: rgba(3, 5, 8, 0.5); border: 3px dashed rgba(56, 230, 255, 0.5); pointer-events: none; }
