@@ -1,0 +1,6 @@
+{
+  "cur": "E.vivid = 0;",
+  "viv5": "E.vivid = 0.5;",
+  "viv8": "E.vivid = 0.8;",
+  "viv8e": "E.vivid = 0.8; E.exposure *= 0.9; E.saturation = 1.2; const a = E.ambSky; E.ambSky = [a[0]*0.7, a[1]*0.72, a[2]*0.85];"
+}

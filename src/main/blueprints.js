@@ -1,0 +1,352 @@
+// ============================================================================
+// Blueprints — every catalogue villa as an item, and the player's own R9 Studio
+// design of it when there is one (★). Holding a blueprint shows where the lot
+// goes: the front (street side, orange) faces you, R turns it, F flips through
+// the facades. Right click levels the ground the way a town does it (filled up
+// to the yard, hills cut back, a stepped verge around the lot — only natural
+// blocks are cut there) and lays the house down block by block; Z or /undo
+// takes the whole thing back. Each house is built once per design and facade
+// in a worker (flat lot, lot-local cells, the builder's last write per cell)
+// and cached here. Creative and Zen Builder only.
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const R = VR.R, F = VR.F;
+  const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];   // = the lot builder's
+  const FRONT = [[0, -1], [1, 0], [0, 1], [-1, 0]];                                            // street side of a lot turned r
+  const REACH = 120, MARGIN = 3, DEPTH = 48, CLEAR = 80;
+  // natural blocks (the verge may cut or cover them) and ground (what a house can stand on)
+  let NAT = null, GROUND = null;
+  function tables() {
+    if (NAT) return;
+    NAT = new Uint8Array(R.types.length); GROUND = new Uint8Array(R.types.length);
+    const ROCK = /^(stone|andesite|granite|diorite|tuff|deepstone|deepslate|calcite|dripstone_block|basalt|smooth_basalt|blackstone|netherrack|end_stone)$/;
+    for (const t of R.types) {
+      if (!t || !t.name) continue;
+      const nat = t.cat === 'nature' || /^Natural/.test(t.group || '') || ROCK.test(t.name) || /_log$|_stem$|_leaves$/.test(t.name);
+      NAT[t.id] = nat ? 1 : 0;
+      const s = t.defaultState, fl = R.T.flags[s];
+      GROUND[t.id] = (fl & F.SOLID) && (fl & F.FULL) && !(fl & F.LEAVES) && !/_log$|_stem$|_wood$/.test(t.name) ? 1 : 0;
+    }
+  }
+
+  class Blueprints {
+    constructor(gad) {
+      this.gad = gad; this.g = gad.g;
+      this.cache = new Map(); this.pending = new Set();
+      this.rot = 0; this.variant = {}; this.at = null;
+      this.names();
+    }
+    plan() { const VG = VR.VillageGen; return VG && VG.plan2; }
+    hint(t, ms) { this.g.ui.hint(t, ms || 2400); }
+    // item names carry a star while the player's own design replaces the house
+    names() {
+      const P = this.plan(); if (!P) return;
+      P.CATALOGUE.forEach((c, i) => { const it = VR.ITEMS['blueprint_' + i]; if (it) it.name = 'Blueprint · ' + c.name + (VR.Custom && VR.Custom.houseFor(i) ? ' ★' : ''); });
+    }
+    // the Studio saved new designs: every cached house is stale
+    reset() { this.cache.clear(); this.pending.clear(); this.names(); }
+    // the facades a house offers: every skin, plain and mirrored (a design has exactly its own)
+    variants(i) {
+      const P = this.plan(), cat = P && P.CATALOGUE[i]; if (!cat) return [];
+      if (VR.Custom && VR.Custom.houseFor(i)) return [{ custom: true }];
+      const skins = cat.skins.filter((s, k, a) => a.indexOf(s) === k), out = [];
+      for (const mirror of [false, true]) for (const skin of skins) out.push({ skin, mirror });
+      return out;
+    }
+    key(i) {
+      const vs = this.variants(i), n = vs.length, vi = n ? ((this.variant[i] || 0) % n + n) % n : 0, h = VR.Custom && VR.Custom.houseFor(i);
+      return { k: i + ':' + vi + ':' + (h ? h.t || 1 : 0), v: vs[vi] || {}, n, vi };
+    }
+    // the built house for blueprint i (null while the worker builds it)
+    get(i) {
+      const K = this.key(i), c = this.cache.get(K.k); if (c) return c;
+      if (!this.pending.has(K.k) && this.g.pool) {
+        this.pending.add(K.k);
+        const msg = { type: 'blueprint', index: i, seed: 7 };
+        if (!K.v.custom) { msg.skin = K.v.skin; msg.mirror = K.v.mirror; }
+        this.g.pool.direct(0, msg, null, (m) => {
+          this.pending.delete(K.k);
+          if (m.type !== 'blueprint' || m.error) { this.hint('Blueprint failed: ' + (m.error || m.msg || '?'), 3000); return; }
+          m.variant = K.vi; m.variants = K.n;
+          this.cache.set(K.k, m);
+        });
+      }
+      return null;
+    }
+
+    // ---------------------------------------------------------------- where it goes
+    locate(p, bp) {
+      const g = this.g, w = g.world, e = p.eyePos(), d = p.lookDir();
+      const hit = VR.PHYS.raycast((x, y, z) => w.getBlock(x, y, z), e[0], e[1], e[2], d[0], d[1], d[2], REACH);
+      if (!hit) return null;
+      const ax = hit.x + VR.DX[hit.face], ay = hit.y + VR.DY[hit.face], az = hit.z + VR.DZ[hit.face];
+      // the street side faces the player (from the target back to the eye), R turns it further
+      const bx = Math.sin(p.yaw), bz = Math.cos(p.yaw);
+      let best = 0, bd = -9; for (let r = 0; r < 4; r++) { const dd = FRONT[r][0] * bx + FRONT[r][1] * bz; if (dd > bd) { bd = dd; best = r; } }
+      const r = (best + this.rot) & 3;
+      const W = bp.lot[0], D = bp.lot[1], q = ROT[r](W >> 1, 0), ox = ax - q[0], oz = az - q[1];
+      const rect = (u0, v0, u1, v1) => { const a = ROT[r](u0, v0), b = ROT[r](u1, v1); return [ox + Math.min(a[0], b[0]), oz + Math.min(a[1], b[1]), ox + Math.max(a[0], b[0]), oz + Math.max(a[1], b[1])]; };
+      const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1);
+      const at = { bp, r, ox, oz, F: ay, x0, z0, x1, z1, rect, ok: true, why: '' };
+      // can it go here? loaded ground all around, inside the world's height, nobody standing on the lot
+      if (ay - DEPTH < 1 || ay + bp.top + 8 >= VR.MAXY) { at.ok = false; at.why = 'Too high or too low for this house'; }
+      else {
+        outer: for (let cz = (z0 - MARGIN) >> 4; cz <= (z1 + MARGIN) >> 4; cz++) for (let cx = (x0 - MARGIN) >> 4; cx <= (x1 + MARGIN) >> 4; cx++) {
+          const c = w.col(cx, cz); if (!c || !c.ready) { at.ok = false; at.why = 'The ground there is still loading — get closer'; break outer; }
+        }
+      }
+      const P = p.pos;
+      if (at.ok && P[0] >= x0 - 0.3 && P[0] <= x1 + 1.3 && P[2] >= z0 - 0.3 && P[2] <= z1 + 1.3 && P[1] > ay - 4 && P[1] < ay + bp.top + 2) { at.ok = false; at.why = 'You are standing on the lot — step back'; }
+      return at;
+    }
+
+    // ---------------------------------------------------------------- per frame while a blueprint is held
+    input(input, p, hdef, lmb, rmb) {
+      const g = this.g, i = hdef.house | 0;
+      const bp = this.get(i);
+      this.at = bp ? this.locate(p, bp) : null;
+      if (!g.ui.typing) {
+        if (input.hit('KeyR')) { this.rot = (this.rot + 1) & 3; g.audio.play('click'); }
+        if (input.hit('KeyF')) { const n = this.variants(i).length; if (n > 1) { this.variant[i] = ((this.variant[i] || 0) + 1) % n; g.audio.play('click'); } else this.hint('Your own design has one facade — change it in R9 Studio', 2200); }
+        if (input.hit('KeyZ')) this.gad.undo();
+      }
+      if (rmb) this.build(p, i);
+      return lmb || rmb || input.mouse.down[0] || input.mouse.down[2];
+    }
+    hud(hdef) {
+      const P = this.plan(), i = hdef.house | 0, cat = P && P.CATALOGUE[i]; if (!cat) return null;
+      const K = this.key(i), bp = this.cache.get(K.k), own = K.v.custom;
+      const facade = own ? '<span style="color:#ffd27a">★ your R9 Studio design</span>' : `facade ${K.vi + 1}/${K.n}${bp ? ' · ' + bp.skin + (bp.mirror ? ' · mirrored' : '') : ''}`;
+      const at = this.at, where = !bp ? 'drawing up the plan…' : !at ? 'look at the ground' : at.ok ? `${cat.lot[0]}×${cat.lot[1]} lot · ${bp.top + 1} high` : `<span style="color:#ff8a8a">${at.why}</span>`;
+      return `<b>BLUEPRINT</b> · ${cat.name} · ${facade} · ${where}<br><small>RMB build · R turn · F facade · Z undo${this.g.player.creative ? '' : ' · <b>Creative / Zen only</b>'}</small>`;
+    }
+    outlines(out) {
+      const at = this.at; if (!at) return;
+      const bp = at.bp, ok = at.ok, c = ok ? [0.35, 0.95, 1, 0.9] : [1, 0.32, 0.3, 0.9];
+      const add = (r4, y0, y1, col) => out.push({ x: r4[0], y: y0, z: r4[1], boxes: [[0, 0, 0, r4[2] - r4[0] + 1, y1 - y0, r4[3] - r4[1] + 1]], color: col, xray: true });
+      add([at.x0, at.z0, at.x1, at.z1], at.F - 0.02, at.F + 0.06, c);                                        // the lot
+      const [hu, hv, hw, hd] = bp.house;
+      add(at.rect(hu, hv, hu + hw - 1, hv + hd - 1), at.F, at.F + bp.top + 1, [c[0], c[1], c[2], 0.55]);         // the house
+      add(at.rect(0, -1, bp.lot[0] - 1, -1), at.F - 0.02, at.F + 0.3, ok ? [1, 0.72, 0.25, 0.95] : c);           // the street side
+    }
+
+    // ---------------------------------------------------------------- build it
+    build(p, i) {
+      const g = this.g, at = this.at;
+      if (!at) return;
+      if (!p.creative) { this.hint('Blueprints build in Creative or Zen Builder', 2600); return; }
+      if (!at.ok) { this.hint(at.why, 2200); return; }
+      const t0 = performance.now(), n = this.buildAt(at);
+      if (!n) { this.hint('Already standing here', 1600); return; }
+      g.audio.place(R.byName.stone.defaultState);
+      g.particles && g.particles.spark && g.particles.spark(at.ox + 0.5, at.F + 1, at.oz + 0.5, [0.5, 0.9, 1], 30, 4);
+      const P = this.plan(), name = P.CATALOGUE[i].name;
+      this.hint(`${name}${at.bp.custom ? ' ★' : ''} built · ${n.toLocaleString()} blocks · Z or /undo takes it back`, 3200);
+      g.codex && g.codex.event && g.codex.event('blueprint');
+      this.lastMs = performance.now() - t0;
+    }
+    // level the ground under a lot and lay the house down (at: a placement from locate() or a Studio plan);
+    // returns how many blocks changed (all of it one undo step)
+    buildAt(at) {
+      const g = this.g, w = g.world, T = R.T;
+      tables();
+      const bp = at.bp, r = at.r, F0 = at.F;
+      // a box over the lot + verge (+ whatever the house puts outside its lot) and DEPTH below … CLEAR above the floor
+      let ux0 = -MARGIN, uz0 = -MARGIN, ux1 = bp.lot[0] - 1 + MARGIN, uz1 = bp.lot[1] - 1 + MARGIN;
+      const ops = bp.ops;
+      for (let k = 0; k < ops.length; k += 4) { if (ops[k] < ux0) ux0 = ops[k]; if (ops[k] > ux1) ux1 = ops[k]; if (ops[k + 2] < uz0) uz0 = ops[k + 2]; if (ops[k + 2] > uz1) uz1 = ops[k + 2]; }
+      const B = at.rect(ux0, uz0, ux1, uz1), BX = B[2] - B[0] + 1, BZ = B[3] - B[1] + 1, Y0 = F0 - DEPTH, BY = DEPTH + Math.max(CLEAR, bp.top + 6);
+      const box = new Int32Array(BX * BY * BZ).fill(-1);
+      const bi = (x, y, z) => ((y - Y0) * BZ + (z - B[1])) * BX + (x - B[0]);
+      const inBox = (x, y, z) => x >= B[0] && x <= B[2] && z >= B[1] && z <= B[3] && y >= Y0 && y < Y0 + BY;
+      const put = (x, y, z, s) => { if (inBox(x, y, z)) box[bi(x, y, z)] = s; };
+      const dirt = R.byName.dirt.defaultState, grass = R.byName.grass_block.defaultState;
+      const tid = (s) => T.type[s];
+      const ground = (x, z, yHi, yLo) => { for (let y = yHi; y >= yLo; y--) { const s = w.getBlock(x, y, z); if (s && GROUND[tid(s)]) return y; } return yLo - 1; };
+      // the highest thing standing on a column from y up (gaps of 4+ air end it)
+      const reach = (x, z, y, max) => { let last = y - 1, gap = 0; for (let yy = y; yy < max; yy++) { if (w.getBlock(x, yy, z)) { last = yy; gap = 0; } else if (++gap >= 4) break; } return last; };
+      const topOf = (s) => { const n = s && R.types[tid(s)].name; return n === 'sand' || n === 'red_sand' || n === 'snow_block' || n === 'podzol' || n === 'mycelium' ? s : grass; };
+      // 1 · the lot: filled up to the yard, everything from the floor up cleared (the house writes its own ground);
+      //     where the lot stands more than two blocks over the land its edge is a stacked-stone retaining wall
+      const wallS = (R.byName.stacked_stone || R.byName.cobblestone).defaultState;
+      for (let v = 0; v < bp.lot[1]; v++) for (let u = 0; u < bp.lot[0]; u++) {
+        const q = ROT[r](u, v), x = at.ox + q[0], z = at.oz + q[1];
+        const gy = ground(x, z, F0 + 60, F0 - DEPTH), edge = u === 0 || v === 0 || u === bp.lot[0] - 1 || v === bp.lot[1] - 1;
+        const fillS = edge && F0 - 1 - gy > 2 ? wallS : dirt;
+        for (let y = Math.max(gy + 1, F0 - DEPTH); y <= F0 - 1; y++) put(x, y, z, fillS);
+        const top = Math.max(F0 + bp.top + 2, Math.min(F0 + CLEAR - 1, reach(x, z, F0, F0 + CLEAR)));
+        for (let y = F0; y <= top; y++) put(x, y, z, 0);
+      }
+      // 2 · the verge: ring k may sit k−1 above or below the yard. Small steps of natural ground are filled up or cut
+      //     back to that band (a soft slope); a big drop keeps the retaining wall; a big hill is cut back one ring and
+      //     held by a stacked-stone wall in the second ring. Only natural blocks are ever touched out here.
+      const natCol = (x, z, y0, y1) => { for (let y = y0; y <= y1; y++) { const s = w.getBlock(x, y, z); if (s && !NAT[tid(s)]) return false; } return true; };
+      for (let k = 1; k <= MARGIN; k++) {
+        const lo = F0 - 1 - (k - 1), hi = F0 - 1 + (k - 1);
+        for (let x = at.x0 - k; x <= at.x1 + k; x++) for (let z = at.z0 - k; z <= at.z1 + k; z++) {
+          if (x > at.x0 - k && x < at.x1 + k && z > at.z0 - k && z < at.z1 + k) continue;
+          const gy = ground(x, z, F0 + 40, F0 - DEPTH), gs = w.getBlock(x, gy, z);
+          if (gy < lo) {
+            if (lo - gy > 3 || !natCol(x, z, gy + 1, lo)) continue;
+            for (let y = gy + 1; y < lo; y++) put(x, y, z, dirt);
+            put(x, lo, z, topOf(gs));
+          } else if (gy > hi) {
+            const big = gy - hi > 4;
+            if (big && k === 3) continue;
+            if (big && k === 2) {
+              // the wall that holds the hill back: the ring's natural face from the yard up, stacked stone
+              for (let y = F0 - 1; y <= Math.min(gy, F0 + 7); y++) { const s = w.getBlock(x, y, z); if (s && NAT[tid(s)] && GROUND[tid(s)]) put(x, y, z, wallS); }
+              continue;
+            }
+            const floor = big ? F0 - 1 : hi;
+            let gap = 0;
+            for (let y = floor + 1; y < F0 + CLEAR; y++) { const s = w.getBlock(x, y, z); if (!s) { if (++gap >= 4) break; continue; } gap = 0; if (!NAT[tid(s)]) break; put(x, y, z, 0); }
+            const hs = w.getBlock(x, floor, z); if (hs && NAT[tid(hs)] && GROUND[tid(hs)]) put(x, floor, z, topOf(gs));
+          }
+        }
+      }
+      // 3 · the house (rotated onto the lot); air in the plan clears
+      for (let k = 0; k < ops.length; k += 4) {
+        const q = ROT[r](ops[k], ops[k + 2]), s = ops[k + 3];
+        put(at.ox + q[0], F0 + ops[k + 1], at.oz + q[1], s ? VR.Custom.rotState(s, r) : 0);
+      }
+      // what actually changes (and how to undo it)
+      const list = [], undo = [];
+      for (let y = 0; y < BY; y++) for (let z = 0; z < BZ; z++) for (let x = 0; x < BX; x++) {
+        const s = box[(y * BZ + z) * BX + x]; if (s < 0) continue;
+        const X = B[0] + x, Y = Y0 + y, Z = B[1] + z;
+        if (Y < 0 || Y >= VR.MAXY) continue;
+        const old = w.getBlock(X, Y, Z); if (old === s) continue;
+        list.push([X, Y, Z, s]); undo.push([X, Y, Z, old]);
+      }
+      if (!list.length) return 0;
+      this.gad.applyEdit(list, undo);
+      return list.length;
+    }
+
+    // ---------------------------------------------------------------- plans from the R9 Studio's World mode
+    // localStorage 'r9si.plans.<world id>': houses and furniture the player planned in the Studio. A pending piece is
+    // built once its ground (lot + verge) is loaded — right away when it is near — then marked built for the Studio.
+    plansKey() { const m = this.g.meta; return m && m.id && !m.guest ? 'r9si.plans.' + m.id : null; }
+    loadPlans() {
+      const k = this.plansKey(); this.plans = [];
+      if (!k) return;
+      try { const d = JSON.parse(localStorage.getItem(k) || 'null'); this.plans = d && Array.isArray(d.plans) ? d.plans : []; } catch (e) { this.plans = []; }
+    }
+    markPlan(id, status) {
+      const k = this.plansKey(); if (!k) return;
+      try {
+        const d = JSON.parse(localStorage.getItem(k) || 'null') || { v: 1, plans: [] };
+        for (const q of d.plans || []) if (q.id === id) { q.status = status; q.builtAt = Date.now(); }
+        d.t = Date.now(); localStorage.setItem(k, JSON.stringify(d));
+      } catch (e) { /* storage full or blocked: it stays built in this world anyway */ }
+    }
+    // the built piece of a plan (house variant or design, or a furniture model), cached like the blueprints
+    planPiece(pl) {
+      if (pl.kind === 'model') {
+        const VM = VR.VM, md = VM && VM.MODELS[pl.name]; if (!md) return null;
+        const key = 'm:' + pl.name; let c = this.cache.get(key); if (c) return c;
+        const cells = []; VM.put((u, y, v, nm, pr) => { const t = R.byName[nm]; cells.push(u, y, v, t ? t.state(Object.assign(t.decode(t.defaultState), pr || {})) : 0); }, 0, 0, 0, pl.name, 0);
+        let W = 1, D = 1, top = 0; for (let k = 0; k < cells.length; k += 4) { W = Math.max(W, cells[k] + 1); D = Math.max(D, cells[k + 2] + 1); top = Math.max(top, cells[k + 1]); }
+        c = { ops: Int32Array.from(cells), lot: [W, D], house: [0, 0, W, D], top, bottom: 0, model: true };
+        this.cache.set(key, c); return c;
+      }
+      const h = VR.Custom && VR.Custom.houseFor(pl.index), key = 'p:' + pl.index + ':' + (h ? 'c' + (h.t || 1) : pl.skin + ':' + (pl.mirror ? 1 : 0));
+      const c = this.cache.get(key); if (c) return c;
+      if (!this.pending.has(key) && this.g.pool) {
+        this.pending.add(key);
+        const msg = { type: 'blueprint', index: pl.index, seed: 7 };
+        if (!h) { if (pl.skin) msg.skin = pl.skin; msg.mirror = !!pl.mirror; }
+        this.g.pool.direct(0, msg, null, (m) => { this.pending.delete(key); if (m.type === 'blueprint' && !m.error) this.cache.set(key, m); });
+      }
+      return null;
+    }
+    tickPlans(dt) {
+      this.planT = (this.planT || 0) - dt; if (this.planT > 0) return;
+      this.planT = 0.5;
+      if (!this.plans) this.loadPlans();
+      const g = this.g, w = g.world; if (!w || g.state !== 'play') return;
+      for (const pl of this.plans) {
+        if (pl.status !== 'pending' || pl.failed) continue;
+        const bp = this.planPiece(pl); if (!bp) { if (pl.kind === 'model' && !(VR.VM && VR.VM.MODELS[pl.name])) pl.failed = true; continue; }
+        const r = (pl.r | 0) & 3, W = bp.lot[0], D = bp.lot[1];
+        const rect = (u0, v0, u1, v1) => { const a = ROT[r](u0, v0), b = ROT[r](u1, v1); return [pl.ox + Math.min(a[0], b[0]), pl.oz + Math.min(a[1], b[1]), pl.ox + Math.max(a[0], b[0]), pl.oz + Math.max(a[1], b[1])]; };
+        const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1), M = bp.model ? 0 : MARGIN;
+        let ready = true;
+        for (let cz = (z0 - M - 16) >> 4; cz <= (z1 + M + 16) >> 4 && ready; cz++) for (let cx = (x0 - M - 16) >> 4; cx <= (x1 + M + 16) >> 4; cx++) { const c = w.col(cx, cz); if (!c || !c.ready) { ready = false; break; } }
+        if (!ready) continue;
+        if (pl.F - DEPTH < 1 || pl.F + bp.top + 8 >= VR.MAXY) { pl.failed = true; continue; }
+        let n = 0;
+        if (bp.model) {
+          const list = [], undo = [];
+          for (let k = 0; k < bp.ops.length; k += 4) {
+            const q = ROT[r](bp.ops[k], bp.ops[k + 2]), x = pl.ox + q[0], y = pl.F + bp.ops[k + 1], z = pl.oz + q[1], s = bp.ops[k + 3] ? VR.Custom.rotState(bp.ops[k + 3], r) : 0;
+            const old = w.getBlock(x, y, z); if (old === s) continue;
+            list.push([x, y, z, s]); undo.push([x, y, z, old]);
+          }
+          if (list.length) { this.gad.applyEdit(list, undo); n = list.length; }
+        } else n = this.buildAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true });
+        pl.status = 'built';
+        this.markPlan(pl.id, 'built');
+        if (g.player && g.player.unstick) g.player.unstick();
+        const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
+        if (g.ui && g.ui.toast) g.ui.toast('R9 Studio', `${name} gebaut · ${n.toLocaleString('de-DE')} Blöcke`);
+        break;   // one piece per half second keeps the frame smooth
+      }
+    }
+
+    // ---------------------------------------------------------------- edits from the R9 Studio's Werkbank (v0.35)
+    // Batches of block changes (VR.Edits) the player made in the Studio's view of this world: each one is built as soon
+    // as its columns are loaded — at once when the world is open — with the game's undo, then marked built for the Studio.
+    editWorld() { const m = this.g.meta; return m && m.id && !m.guest ? m.id : null; }
+    tickEdits(dt) {
+      this.editT = (this.editT || 0) - dt; if (this.editT > 0) return;
+      this.editT = 0.25;
+      const E = VR.Edits, id = this.editWorld(), g = this.g, w = g.world;
+      if (!E || !id || !w || g.state !== 'play') return;
+      const ids = E.list(id); if (!ids.length) return;
+      const done = new Set(E.done(id));
+      let n = 0, nb = 0;
+      for (const bid of ids) {
+        if (done.has(bid)) continue;
+        const b = E.ls.get(E.batchKey(id, bid)); if (!b) continue;
+        let ready = true;
+        for (const [cx, cz] of E.columns(b)) { const c = w.col(cx, cz); if (!c || !c.ready) { ready = false; break; } }
+        if (!ready) continue;
+        const list = [], undo = [];
+        for (const [x, y, z, s] of E.unpack(b)) { const old = w.getBlock(x, y, z); if (old === s) continue; list.push([x, y, z, s]); undo.push([x, y, z, old]); }
+        if (list.length) this.gad.applyEdit(list, undo);
+        E.markDone(id, bid);
+        n += list.length; nb++;
+        if (n > 60000) break;    // a big one per quarter second keeps the frame smooth
+      }
+      if (!nb) return;
+      // built where you stand? you step out to the nearest free spot instead of being stuck in it
+      if (g.player && g.player.unstick) g.player.unstick();
+      // into the save right away (the Studio reads the world from it)
+      clearTimeout(this.editSave); this.editSave = setTimeout(() => { if (g.world === w && w.saveAll) w.saveAll(); }, 800);
+      if (n && g.ui && g.ui.toast) g.ui.toast('R9 Studio', VR.I18N ? VR.I18N.tx('g.studio.edits', { n: n.toLocaleString() }, '{n} Blöcke aus der Werkbank', '{n} blocks from the Werkbank') : n + ' blocks from the Werkbank');
+    }
+
+    // ---------------------------------------------------------------- /haus [n]
+    command(a) {
+      const g = this.g, p = g.player, P = this.plan(), say = (t, c) => g.ui.chatLine(t, c || '#cfe6ff');
+      if (!P) { say('No house catalogue in this build.', '#ff8a8a'); return true; }
+      const list = P.CATALOGUE.map((c, i) => `${i} ${c.name}${VR.Custom && VR.Custom.houseFor(i) ? ' ★' : ''}`).join(' · ');
+      if (!a[0]) { say('Houses: ' + list); say('/haus <n> puts its blueprint in your hand — RMB builds it where you look (★ = your R9 Studio design).'); return true; }
+      const q = a.join(' ').toLowerCase();
+      let i = /^\d+$/.test(q) ? +q : P.CATALOGUE.findIndex(c => c.name.toLowerCase().indexOf(q) >= 0);
+      if (!(i >= 0 && i < P.CATALOGUE.length)) { say('Unknown house. ' + list, '#ff8a8a'); return true; }
+      if (!p.creative) { say('Blueprints build in Creative or Zen Builder.', '#ff8a8a'); return true; }
+      const id = 'blueprint_' + i, inv = p.inv;
+      let k = inv.slots.findIndex((s, j) => j < 9 && s && s.id === id);
+      if (k < 0) { k = inv.slots.findIndex((s, j) => j < 9 && !s); if (k < 0) k = inv.sel; inv.slots[k] = { id, n: 1 }; }
+      inv.sel = k; inv.changed = true;
+      this.get(i);
+      say(`Blueprint · ${P.CATALOGUE[i].name}${VR.Custom && VR.Custom.houseFor(i) ? ' ★' : ''} in hand — RMB builds it where you look, R turns it, F changes the facade.`);
+      return true;
+    }
+  }
+  VR.Blueprints = Blueprints;
+})(VR);

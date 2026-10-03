@@ -1,0 +1,9 @@
+play
+t 0 frames 111 maxms 28
+t 1 frames TIMEOUT
+  at bindTerrainTextures line 16118 col 22
+  at render line 16354 col 15
+  at playFrame line 22595 col 20
+  at loop line 22484 col 45
+  at  line 22474 col 41
+

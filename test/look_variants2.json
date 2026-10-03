@@ -1,0 +1,6 @@
+{
+  "cur": "VR.game.renderer.q.rays = true;",
+  "nobloom": "VR.game.renderer.q.rays = true; E.bloomStrength = 0;",
+  "norays": "VR.game.renderer.q.rays = false;",
+  "neither": "VR.game.renderer.q.rays = false; E.bloomStrength = 0;"
+}
