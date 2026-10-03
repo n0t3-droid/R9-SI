@@ -82,8 +82,8 @@
     // ★ union: the ones not here yet go first, in the file's order
     const F = VR.Favs;
     if (F && pk.favs && pk.favs.length) {
-      const add = pk.favs.filter(id => !F.has(id));
-      for (let i = add.length - 1; i >= 0; i--) if (F.add(add[i])) { out.favs++; if (F.ok === false) out.ok = false; }
+      if (F.addMany) { out.favs = F.addMany(pk.favs); if (out.favs && F.ok === false) out.ok = false; }
+      else { const add = pk.favs.filter(id => !F.has(id)); for (let i = add.length - 1; i >= 0; i--) if (F.add(add[i])) { out.favs++; if (F.ok === false) out.ok = false; } }
     }
     // designs: the newer one wins
     const CU = VR.Custom, inH = (pk.studio && pk.studio.houses) || {}, inM = (pk.studio && pk.studio.models) || {};
