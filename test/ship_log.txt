@@ -1,0 +1,21 @@
+outpost [168,95,-269]
+load 0 pend 6
+load 25 pend 11
+shot s1_outpost 54ms
+helm [168,98,-263]
+{"hull_plating_dark":86,"hull_stripe_orange":34,"hull_plating":122,"neon_cyan":12,"hull_plating_gray":36,"cargo_crate":1,"reactor_core":1,"pilot_seat":3,"console":2,"helm":1,"thruster":2,"hull_stripe_blue":21,"light_panel":2,"viewport":39,"neon_magenta":5}
+{"state":"flying","count":367,"thr":2,"max":"42.1","turn":"1.71","sx":17,"sy":11,"sz":20,"cells":367,"pos":[168,101,-269]}
+shot s2_ship_chase 21ms
+shot s3_ship_flying 2ms
+{"pos":[-677.8,248.5,2588.4],"vel":[-12,0,40.4],"psi":"-0.29","roll":"-0.00"}
+shot s4_cockpit 2ms
+after land: {"ship":null,"riding":false,"pos":[-1201.5,245,4365.5]}
+shot s5_landed 3ms
+final: {"ship":null}
+shot s6_bike 9ms
+bike {"pos":[-1203.5,245,4368.4],"spd":"0.3"}
+shot s7_map 2ms
+shot s8_codex 4ms
+--- logs (2)
+[warning] [.WebGL-0x1f7c0010b600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): Running out of reserved outsideRenderPass queueSerial. ending renderPass now.
+[warning] [.WebGL-0x1f7c0010b600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): Running out of reserved outsideRenderPass queueSerial. ending renderPass now.

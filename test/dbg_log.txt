@@ -1,0 +1,13 @@
+play
+0 ok 9.8
+10 ok 2.3
+20 ok 4.2
+node:internal/modules/run_main:123
+    triggerUncaughtException(
+    ^
+
+page.evaluate: Target page, context or browser has been closed
+    at ev (/home/claude/vr/test/dbg.mjs:9:30)
+    at /home/claude/vr/test/dbg.mjs:17:19
+
+Node.js v22.22.2

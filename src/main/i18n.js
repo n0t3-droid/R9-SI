@@ -1,0 +1,77 @@
+// ============================================================================
+// Languages (v0.34): the game and the R9 Studio speak 13 languages. VR.I18N.t(key,
+// vars, fallback) looks the key up in the chosen language, then in English, then
+// uses the fallback text written at the call. The choice is stored per browser
+// ('r9si.lang') and shared by the game and the Studio; the first visit follows
+// the browser's language. Arabic turns the page right-to-left.
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const LANGS = [
+    ['de', 'Deutsch', 'de-DE'], ['en', 'English', 'en-GB'], ['fr', 'Français', 'fr-FR'], ['es', 'Español', 'es-ES'],
+    ['it', 'Italiano', 'it-IT'], ['pt', 'Português', 'pt-PT'], ['nl', 'Nederlands', 'nl-NL'], ['pl', 'Polski', 'pl-PL'],
+    ['tr', 'Türkçe', 'tr-TR'], ['ru', 'Русский', 'ru-RU'], ['ar', 'العربية', 'ar', 'rtl'], ['zh', '中文', 'zh-CN'], ['ja', '日本語', 'ja-JP'],
+  ];
+  const I = VR.I18N = VR.I18N || { dict: {} };
+  I.langs = LANGS;
+  I.dict = I.dict || {};
+  I.listeners = I.listeners || [];
+  I.add = function (lang, table) { Object.assign(I.dict[lang] || (I.dict[lang] = {}), table); };
+  const fill = (s, v) => (v ? String(s).replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m)) : String(s));
+  I.t = function (key, vars, fallback) {
+    let s;
+    const d = I.dict[I.lang]; if (d) s = d[key];
+    if (s === undefined && I.lang !== 'en' && I.dict.en) s = I.dict.en[key];
+    if (s === undefined) s = fallback !== undefined ? fallback : key;
+    return fill(s, vars);
+  };
+  // the fallback text is German in the Studio, English in the game: English users must never see German
+  I.tx = function (key, vars, de, en) { const d = I.dict[I.lang]; if (d && d[key] !== undefined) return fill(d[key], vars); if (I.lang === 'de') return fill(de !== undefined ? de : en, vars); const e = I.dict.en && I.dict.en[key]; return fill(e !== undefined ? e : (en !== undefined ? en : de), vars); };
+  I.info = (code) => LANGS.find(l => l[0] === code) || LANGS[1];
+  I.locale = () => I.info(I.lang)[2];
+  I.rtl = () => I.info(I.lang)[3] === 'rtl';
+  function detect() {
+    try { const s = localStorage.getItem('r9si.lang'); if (s && LANGS.some(l => l[0] === s)) return s; } catch (e) { /* storage blocked */ }
+    const nav = (typeof navigator !== 'undefined' && (navigator.languages && navigator.languages[0] || navigator.language)) || 'en';
+    const c = String(nav).slice(0, 2).toLowerCase();
+    return LANGS.some(l => l[0] === c) ? c : 'en';
+  }
+  I.apply = function () {
+    if (typeof document === 'undefined') return;
+    const de = document.documentElement; de.lang = I.lang; de.dir = I.rtl() ? 'rtl' : 'ltr';
+  };
+  I.set = function (code) {
+    if (!LANGS.some(l => l[0] === code)) return;
+    I.lang = code;
+    try { localStorage.setItem('r9si.lang', code); } catch (e) { /* */ }
+    I.apply();
+    for (const f of I.listeners.slice()) { try { f(code); } catch (e) { console.warn('lang listener', e); } }
+  };
+  I.on = function (f) { I.listeners.push(f); };
+  if (!I.lang) I.lang = detect();
+  // another tab (the Studio next to the game) changed the language
+  if (typeof window !== 'undefined') window.addEventListener('storage', (e) => { if (e.key === 'r9si.lang' && e.newValue && e.newValue !== I.lang) I.set(e.newValue); });
+  I.apply();
+  // a small language picker: a globe button with the code, a list of native names
+  I.picker = function (opts) {
+    opts = opts || {};
+    const wrap = document.createElement('div'); wrap.className = 'langpick' + (opts.cls ? ' ' + opts.cls : '');
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'lp-btn'; btn.title = 'Language · Sprache · Langue · Idioma · 语言';
+    const list = document.createElement('div'); list.className = 'lp-list';
+    const draw = () => {
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><b>' + I.lang.toUpperCase() + '</b>';
+      list.innerHTML = '';
+      for (const [code, name] of LANGS) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'lp-item' + (code === I.lang ? ' on' : '');
+        b.innerHTML = '<i>' + code.toUpperCase() + '</i><span></span>'; b.lastChild.textContent = name;
+        b.onclick = (e) => { e.stopPropagation(); wrap.classList.remove('open'); I.set(code); };
+        list.appendChild(b);
+      }
+    };
+    btn.onclick = (e) => { e.stopPropagation(); wrap.classList.toggle('open'); };
+    document.addEventListener('click', () => wrap.classList.remove('open'));
+    wrap.appendChild(btn); wrap.appendChild(list); draw();
+    I.on(draw);
+    return wrap;
+  };
+})(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

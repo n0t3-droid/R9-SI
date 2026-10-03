@@ -1,0 +1,7 @@
+shot look_shuttle
+shot look_interceptor
+shot look_gunship
+shot look_dropship
+shot look_freighter
+shot look_cruiser
+--- logs (0)

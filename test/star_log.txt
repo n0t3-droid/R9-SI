@@ -1,0 +1,12 @@
+outpost [168,95,-269]
+ships [{"pos":[168,96,-269],"yaw":-3.141592653589793,"meta":"IX-55 Orrin","tris":5236}]
+shot st1_parked 34ms
+near 1
+shot st2_flying 4ms
+pilot {"pos":[43.4,249,590.8],"vel":[-4.4,0,30.7],"gear":"0.00"}
+shot st3_cockpit 2ms
+landed {"pilot":false,"riding":false,"ships":["parked@-87,249,1488"]}
+shot st4_landed 23ms
+shot st5_traffic 2ms
+traffic ["cruiser CR-47 Rising Halo -136,211,1479","gunship GW-86 Silent Bramble -42,174,1556","gunship GW-59 Patient Solstice 11,147,1499","shuttle SH-19 Drift -3,158,1521","gunship GW-66 Corvid -60,171,1509","cruiser CR-99 Swift 31,216,1596"]
+--- logs (0)
