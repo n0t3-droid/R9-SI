@@ -245,10 +245,12 @@
         fput(d, u, v, 1, P1, PF1);
       }
     }
-    // opening (merges with stacked / side-by-side windows); 7-wide so the mullion cross is centred
-    const up = c.nc[2] === WIN, dn = c.nc[3] === WIN;
+    // opening (merges with stacked / side-by-side windows in the Nahtlos look; Klassisch: every window block is a whole
+    // window with its own frame, sill and wall strip); 7-wide so the mullion cross is centred
+    const J = VR.LOOK.vxJoin;
+    const up = J && c.nc[2] === WIN, dn = J && c.nc[3] === WIN;
     const sides = f === 0 ? [1, 0] : [5, 4];
-    const lf = c.nc[sides[0]] === WIN, rt = c.nc[sides[1]] === WIN;
+    const lf = J && c.nc[sides[0]] === WIN, rt = J && c.nc[sides[1]] === WIN;
     const u0 = lf ? 0 : 1, u1 = 7, v0 = dn ? 0 : 1, v1 = 7;
     const at = (u, v, dp) => f === 0 ? [u, v, dp] : [dp, v, u];
     const P = (u, v, dp, col, fl) => { const p = at(u, v, dp); put(p[0], p[1], p[2], col, fl); };
@@ -776,6 +778,10 @@
   // ---------------------------------------------------------------- context for a block in a padded section
   const ctx = neutralCtx();
   const nbS = [0, 0, 0, 0, 0, 0];
+  // the building surfaces whose patterns (timber braces, boards, panels, floor planks, rug motifs …) run across blocks
+  // from the world position: in the Klassisch look every block of them is painted as if it stood at an even position,
+  // so each block carries the whole pattern on its own (furniture and plants keep their per-position variety)
+  const PERBLOCK = { wall: 1, window: 1, floor: 1, roof: 1, rug: 1 };
   // build context; returns the extra-bits key part
   function buildCtx(s, sp, B, bi, DOFF, L, wx, wy, wz) {
     const c = ctx;
@@ -787,7 +793,8 @@
     c.px = wx & 1; c.py = wy & 1; c.pz = wz & 1; c.h = hh(wx, wy, wz, 77) & 3;
     fillCtxFromState(c, s);
     let x = 0;
-    const k = sp.kind;
+    const k = sp.kind, join = VR.LOOK.vxJoin;
+    if (!join && PERBLOCK[k]) { c.px = 0; c.py = 0; c.pz = 0; }
     if (k === 'wall') {
       // shutter colours of in-plane neighbouring windows: bits [face0 lo, hi | face4 lo, hi] per plane
       // for faces 0/1 (plane along z): neighbours 5 (-z) and 4 (+z) → k=0,1 at bits 0..5 ; faces 4/5 (plane x): neighbours 1,0 → bits 6..11
@@ -825,7 +832,8 @@
       const con = (d) => { const ns = nbS[d], cl = clsOf[ns]; return cl === SOLID || cl === WALL || cl === WIN || (specOf[ns] && (specOf[ns].kind === 'fence' || specOf[ns].kind === 'lamppost')) || cl === DOOR ? 1 : 0; };
       x = con(5) | (con(0) << 1) | (con(4) << 2) | (con(1) << 3);
     } else if (k === 'rug') {
-      const same = (d) => specOf[nbS[d]] && specOf[nbS[d]].kind === 'rug' ? 1 : 0;
+      // Nahtlos: rugs side by side join into one big rug · Klassisch: every rug block has its own border
+      const same = (d) => join && specOf[nbS[d]] && specOf[nbS[d]].kind === 'rug' ? 1 : 0;
       x = same(0) | (same(1) << 1) | (same(4) << 2) | (same(5) << 3);
     } else if (VX.ctxHook[k]) x = VX.ctxHook[k](c, sp, s, nbS, B, bi, DOFF) & 0x3ffff;
     c.x = x;
@@ -1089,14 +1097,16 @@
     if (M.far && quads.lod === undefined) quads.lod = lodFromQuads(quads);
     if (M.far && quads.lod) emitFar(M, x, y, z, quads.lod, cull);
     const bufs = M.bufs, smooth = sp.res >= 16;   // fine models get smooth lacquer surfaces instead of the bevel tile
+    const macro = VR.LOOK.macro;
     for (let q = 0; q < quads.length; q += RS) {
       const d = quads[q], col = quads[q + 1] & 0xffff, fl = quads[q + 2];
       const glass = (fl & 2) !== 0;
       const buf = glass ? bufs[2] : bufs[0];
       const matId = (fl >> 4) & 7;
       const matLayer = matId && M.layerMat ? M.layerMat[matId] : 0;
-      // material quads: texture layer + upright rotation (bit 12) + world-scale variation (bit 15; not on metal)
-      const layer = glass ? M.layerGlass : matLayer ? matLayer | ((fl & 128) ? 4096 : 0) | (matId !== 5 ? 32768 : 0) : (fl & 8) && M.layerHolo ? M.layerHolo : (fl & 4) ? (smooth && M.layerSmoothGloss ? M.layerSmoothGloss : M.layerGloss) : (smooth && M.layerSmooth ? M.layerSmooth : M.layerTile);
+      // material quads: texture layer + upright rotation (bit 12) + world-scale variation (bit 15; not on metal, not
+      // in the Klassisch look)
+      const layer = glass ? M.layerGlass : matLayer ? matLayer | ((fl & 128) ? 4096 : 0) | (matId !== 5 && macro ? 32768 : 0) : (fl & 8) && M.layerHolo ? M.layerHolo : (fl & 4) ? (smooth && M.layerSmoothGloss ? M.layerSmoothGloss : M.layerGloss) : (smooth && M.layerSmooth ? M.layerSmooth : M.layerTile);
       const w5base = d | ((fl & 1) ? 1 << 12 : 0);
       const light = lightFor[d];
       buf.ensure(4);
