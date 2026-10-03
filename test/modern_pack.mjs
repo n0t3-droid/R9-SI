@@ -84,25 +84,30 @@ const sets = SETS.length ? SETS : await ev(() => [...new Set(VR.R.types.filter(t
 for (const set of sets) {
   const room = await ev((set) => {
     const g = VR.game, w = g.world, p = g.player, R = VR.R, VM = VR.VM, L = [];
-    const S = (n, pr) => { const t = R.byName[n]; return pr ? t.state(pr) : t.defaultState; };
-    const x0 = Math.floor(p.pos[0]) + 20, z0 = Math.floor(p.pos[2]) + 10, y0 = 120, W = 34, D = 10;
-    for (let x = -8; x < W + 8; x++) for (let z = -14; z < D + 2; z++) for (let y = y0 - 1; y < y0 + 7; y++) L.push([x0 + x, y, z0 + z, 0]);
-    for (let x = 0; x < W; x++) for (let z = 0; z < D; z++) { L.push([x0 + x, y0 - 1, z0 + z, S('vollton_light_grey')]); L.push([x0 + x, y0 + 4, z0 + z, S('vollton_white')]); }
-    for (let x = 0; x < W; x++) for (let y = 0; y < 4; y++) L.push([x0 + x, y0 + y, z0 + D, S('vollton_cream')]);
-    const items = R.types.filter(t => t.o.modern && t.o.set === set);
+    const S = (n) => R.byName[n].defaultState;
+    const items = R.types.filter(t => t.o.modern && t.o.set === set), Wr = 18;
+    const floor = items.filter(t => (t.o.mount || 'floor') === 'floor'), wall = items.filter(t => t.o.mount === 'wall'), ceil = items.filter(t => t.o.mount === 'ceiling');
+    // rows of floor items, front to back, 1 block apart
+    const rows = []; let row = [], rw = 1;
+    for (const t of floor) { const m = VM.MODELS[t.name]; if (rw + m.W > Wr - 1) { rows.push(row); row = []; rw = 1; } row.push(t); rw += m.W + 1; }
+    if (row.length) rows.push(row);
+    const depth = rows.reduce((a, r) => a + Math.max(...r.map(t => VM.MODELS[t.name].D)) + 1, 1) + (ceil.length ? 4 : 1) + 1;
+    const x0 = Math.floor(p.pos[0]) + 24, z0 = Math.floor(p.pos[2]) + 8, y0 = 120;
+    for (let x = -10; x < Wr + 10; x++) for (let z = -16; z < depth + 2; z++) for (let y = y0 - 1; y < y0 + 9; y++) L.push([x0 + x, y, z0 + z, 0]);
+    for (let x = 0; x < Wr; x++) for (let z = 0; z <= depth; z++) L.push([x0 + x, y0 - 1, z0 + z, S((x + z) % 2 ? 'vollton_light_grey' : 'vollton_white')]);
+    for (let x = 0; x < Wr; x++) for (let y = 0; y < 5; y++) L.push([x0 + x, y0 + y, z0 + depth, S('vollton_cream')]);
+    if (ceil.length) for (let x = 0; x < Wr; x++) for (let z = depth - 4; z < depth; z++) L.push([x0 + x, y0 + 4, z0 + z, S('vollton_white')]);
     const put = (t, x, y, z) => { const m = VM.MODELS[t.name]; for (const [dx, dy, dz, i] of VM.footprint(m, 0)) L.push([x + dx, y + dy, z + dz, t.state({ facing: 0, part: i, lit: 1 })]); };
-    let xw = 1, xc = 1, xf = 1, zf = D - 1;
-    for (const t of items) {
-      const m = VM.MODELS[t.name], mount = t.o.mount || 'floor';
-      if (mount === 'wall') { put(t, x0 + xw, y0 + (m.H > 1 ? 0 : 1), z0 + D - m.D); xw += m.W + 1; }
-      else if (mount === 'ceiling') { put(t, x0 + xc, y0 + 4 - m.H, z0 + 3); xc += m.W + 1; }
-      else { if (xf + m.W > W - 1) { xf = 1; zf -= 3; } put(t, x0 + xf, y0, z0 + zf - m.D + 1 - (zf === D - 1 ? 1 : 0)); xf += m.W + 1; }
-    }
+    let z = 1;
+    for (const r of rows) { let x = 1; for (const t of r) { put(t, x0 + x, y0, z0 + z); x += VM.MODELS[t.name].W + 1; } z += Math.max(...r.map(t => VM.MODELS[t.name].D)) + 1; }
+    let xw = 1; for (const t of wall) { const m = VM.MODELS[t.name]; put(t, x0 + xw, y0 + (m.H > 1 ? 0 : 1), z0 + depth - m.D); xw += m.W + 1; }
+    let xc = 1; for (const t of ceil) { const m = VM.MODELS[t.name]; put(t, x0 + xc, y0 + 4 - m.H, z0 + depth - 3); xc += m.W + 1; }
     w.bulkSet(L, false);
-    return { x0, y0, z0, W, n: items.length };
+    return { x0, y0, z0, Wr, depth, n: items.length };
   }, set);
   await settle(40);
-  await ev(([r]) => { const g = VR.game, p = g.player; p.flying = true; p.teleport(r.x0 + r.W / 2, r.y0 + 2.4, r.z0 - 10); p.yaw = Math.PI; p.pitch = -0.14; g.env.setTime(15500); g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; }, [room]);
+  const night = set === 'light';
+  await ev(([r, night]) => { const g = VR.game, p = g.player; p.flying = true; p.teleport(r.x0 + r.Wr / 2, r.y0 + 6.5, r.z0 - 5); p.yaw = Math.PI; p.pitch = -0.52; g.env.setTime(night ? 15500 : 5200); g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; }, [room, night]);
   await settle(30); await step(4);
   await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; });
   await game.screenshot({ path: `/home/claude/vr/test/shots/modern_room_${set}.png`, timeout: 120000 });

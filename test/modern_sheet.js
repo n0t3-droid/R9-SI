@@ -25,7 +25,7 @@ function render(m, size) {
   for (let j = 0; j < size; j++) for (let i = 0; i < size; i++) {
     const pu = cu + (i - size / 2) * s, pv = cv + (size / 2 - j) * s;
     const o = [r[0] * pu + u[0] * pv - f[0] * far, r[1] * pu + u[1] * pv - f[1] * far, r[2] * pu + u[2] * pv - f[2] * far];
-    let col = null, alpha = 1, acc = [0, 0, 0], accA = 0;
+    let col = null, alpha = 1, acc = [0, 0, 0], accA = 0, inGlass = false;
     // slab entry
     let t0 = 0, t1 = 1e9;
     for (let k = 0; k < 3; k++) { const lo = 0, hi = [W, H, D][k]; if (Math.abs(f[k]) < 1e-9) { if (o[k] < lo || o[k] > hi) { t0 = 1e9; break; } continue; } let a = (lo - o[k]) / f[k], b = (hi - o[k]) / f[k]; if (a > b) [a, b] = [b, a]; t0 = Math.max(t0, a); t1 = Math.min(t1, b); }
@@ -39,13 +39,14 @@ function render(m, size) {
       { let best = -1, bt = -1e9; for (let k = 0; k < 3; k++) { if (Math.abs(f[k]) < 1e-9) continue; const lo = 0, hi = [W, H, D][k]; let a = (lo - o[k]) / f[k], b = (hi - o[k]) / f[k]; const e = Math.min(a, b); if (e > bt) { bt = e; best = k; } } lastAxis = best; }
       for (let n = 0; n < W + H + D + 4; n++) {
         const v = m.get(x, y, z);
+        if (!(v & GLASS)) inGlass = false;
         if (v & PRESENT) {
           const c = [(v >> 16) & 255, (v >> 8) & 255, v & 255];
           let sh;
           if (v & EMIS) sh = 1.12;
           else { const nrm = [0, 0, 0]; nrm[lastAxis] = -st[lastAxis]; sh = 0.52 + 0.55 * Math.max(0, dot(nrm, light)) + (lastAxis === 1 ? 0.06 : 0); }
           const cc = c.map(q => Math.min(255, q * sh));
-          if (v & GLASS) { const a = 0.38; for (let k = 0; k < 3; k++) acc[k] += (1 - accA) * a * cc[k]; accA += (1 - accA) * a; }
+          if (v & GLASS) { if (!inGlass) { const a = 0.38; for (let k = 0; k < 3; k++) acc[k] += (1 - accA) * a * cc[k]; accA += (1 - accA) * a; } inGlass = true; }   // one glass surface, as the mesher draws it
           else { col = cc; break; }
         }
         const k = tm[0] < tm[1] ? (tm[0] < tm[2] ? 0 : 2) : (tm[1] < tm[2] ? 1 : 2);

@@ -408,7 +408,7 @@
     // a cell shows when it is 18 % full; a slim thing (a floor lamp's pole, a wire) that leaves almost nothing at that
     // gets a thinner threshold, so its icon is never empty
     const fill = (th) => { let c = 0; for (const [i, r, g, b, n, fl] of acc) if (n >= Math.max(1, (k * k * k) * th)) { out[i] = pack((Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n), fl); c++; } return c; };
-    if (fill(0.18) < 4) { out.fill(0); fill(0.03); }
+    if (fill(0.18) < 4) { out.fill(0); if (fill(0.03) < 4) { out.fill(0); fill(0); } }
     return out;
   };
   VX.icon16 = (sp) => sp.kind === 'model' ? VM.icon(sp) : null;
