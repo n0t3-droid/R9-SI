@@ -19,11 +19,13 @@
   const fmt = C.fmt;
   const firstModel = (re) => Object.keys(VM.MODELS).find(n => re.test(n)) || null;
   const CR = VR.Crafter = { on: false, kind: null, hot: ['vollton_white', 'panorama_black', 'door_glass_black', 'oak_herringbone', 'vollton_anthracite', 'vollton_coral', 'panorama_grid', firstModel(/sofa/), firstModel(/lamp|pendant/)], slot: 0, rot: 0, recent: [], undo: [], redo: [], keys: {}, hover: null, msg: '' };
-  const IN_GAME = !!window.__R9_IN_GAME;
+  // the standalone Studio (its own artifact, its own storage): it saves here, 📦 Mitnehmen brings it into the game
+  const SA = !!window.__R9_STANDALONE;
+  const SAVE_TIP = 'Gespeichert in diesem Studio — 📦 Mitnehmen bringt es ins Spiel';
   const PJ = () => VR.Projects;
   const store = () => CU.load() || { v: 1, houses: {}, models: {} };
   // the designs the game reads come first: when the browser's storage is full, project pictures make room
-  const saveStore = (d) => { let ok = CU.save(d); if (!ok && PJ() && PJ().freeSpace && PJ().freeSpace()) ok = CU.save(d); if (ok) C.post({ type: 'custom', custom: d }); return ok; };
+  const saveStore = (d) => { let ok = CU.save(d); if (!ok && PJ() && PJ().freeSpace && PJ().freeSpace()) ok = CU.save(d); if (ok) C.post({ type: 'custom', custom: d }); else C.full('designs'); return ok; };
 
   // ---------------------------------------------------------------- icons from the game's textures
   let icons = null;
@@ -79,12 +81,12 @@
       // ☆ on the tile (hover; always there on touch) or a right click: a favourite, the same everywhere
       if (FV()) {
         const fb = document.createElement('button'); const on = FV().has(id); fb.className = 'favb sm' + (on ? ' on' : ''); fb.textContent = on ? '★' : '☆'; fb.title = on ? 'Aus den Favoriten nehmen' : 'Zu den Favoriten (Rechtsklick geht auch)';
-        const tog = (ev) => { ev.stopPropagation(); ev.preventDefault(); const now = FV().toggle(id); fb.classList.toggle('on', now); fb.textContent = now ? '★' : '☆'; C.sys((now ? '★ ' : '☆ ') + nameOf(id) + (now ? ' — bei den Favoriten' : ' — nicht mehr bei den Favoriten'), 'ok'); HOOK.chips(); if (S.cat === 'fav') C.list(); };
+        const tog = (ev) => { ev.stopPropagation(); ev.preventDefault(); const now = FV().toggle(id); fb.classList.toggle('on', now); fb.textContent = now ? '★' : '☆'; if (FV().ok === false) C.sys('⚠ ' + nameOf(id) + ' — ' + L('fav.unsaved', 'nur bis zum Schließen: Browser-Speicher voll'), 'err'); else C.sys((now ? '★ ' : '☆ ') + nameOf(id) + (now ? ' — bei den Favoriten' : ' — nicht mehr bei den Favoriten'), 'ok'); HOOK.chips(); if (S.cat === 'fav') C.list(); };
         fb.onclick = tog; d.oncontextmenu = tog; d.appendChild(fb);
       }
       el.appendChild(d); queueIcon(cv, id);
     }
-    if (!arr.length) { const d = document.createElement('div'); d.className = 'grp'; d.textContent = S.cat === 'recent' ? 'Noch nichts benutzt.' : S.cat === 'fav' ? 'Noch keine Favoriten — ☆ auf einer Kachel (oder Rechtsklick) legt sie hierher. Sie gelten überall: Teile, Werkbank, Welt, Spiel.' : 'nichts gefunden'; el.appendChild(d); }
+    if (!arr.length) { const d = document.createElement('div'); d.className = 'grp'; d.textContent = S.cat === 'recent' ? 'Noch nichts benutzt.' : S.cat === 'fav' ? (SA ? 'Noch keine Favoriten — ☆ auf einer Kachel (oder Rechtsklick) legt sie hierher. Sie gelten überall im Studio — 📦 Mitnehmen bringt sie ins Spiel.' : 'Noch keine Favoriten — ☆ auf einer Kachel (oder Rechtsklick) legt sie hierher. Sie gelten überall: Teile, Werkbank, Welt, Spiel.') : 'nichts gefunden'; el.appendChild(d); }
     return true;
   };
   // ★ changed elsewhere (Teile, the World, the game in another tab): the palette follows
@@ -131,8 +133,11 @@
       if (id) { const ic = iconOf(id); if (ic) { const x = cv.getContext('2d'); x.imageSmoothingEnabled = false; x.drawImage(ic, 0, 0, 40, 40); } }
     });
     const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = CR.hot[CR.slot] ? nameOf(CR.hot[CR.slot]) + (CR.rot ? '  ·  ↻' + CR.rot * 90 + '°' : '') : '—'; bar.appendChild(nm);
+    // R without a keyboard: turn the next piece (doors, stairs, furniture)
+    const rb = document.createElement('button'); rb.className = 'rotb'; rb.textContent = '↻'; rb.title = L('cr.rot', 'Nächstes Teil drehen') + ' (R)';
+    rb.onclick = (e) => { e.stopPropagation(); turnNext(); }; bar.appendChild(rb);
     // the backpack: your hotbar from the game
-    if (CR.player && CR.player.gameHotbar) {
+    if (CR.player && CR.player.gameHotbar && !SA) {      // (the standalone Studio cannot see the game's worlds)
       const bp = document.createElement('button'); bp.className = 'pack'; bp.innerHTML = IC('backpack', 22); bp.title = L('cr.pack', 'Hotbar aus dem Spiel holen (zuletzt gespielte Welt)');
       bp.onclick = (e) => { e.stopPropagation(); CR.player.gameHotbar(); }; bar.insertBefore(bp, bar.firstChild);
     }
@@ -216,15 +221,20 @@
       + row('area', L('cr.tool.area', 'Bereich'), L('cr.card.area', 'Zwei Ecken setzen, dann füllen, Wände, hohl oder leeren'))
       + row('walk', L('cr.tool.player', 'Spieler'), L('cr.card.player', 'Herumlaufen und bauen wie im Spiel: Rechtsklick öffnet Türen und setzt dich auf Stühle und Sofas, Schiebetüren gehen von selbst auf, rund ums Grundstück ist Wiese'))
       + row('undo', L('cr.undo', 'Zurück'), L('cr.card.undo', 'Strg+Z nimmt alles zurück — auch große Änderungen'))
-      + row('upload', L('cr.save', 'Ins Spiel'), L('cr.card.save', 'Jede Stadt im Spiel baut dein Haus genau so'))
+      + (SA ? row('save', L('cr.saveSA', '💾 Speichern'), L('cr.card.saveSA', 'Hier gespeichert — 📦 Mitnehmen bringt es ins Spiel')) : row('upload', L('cr.save', 'Ins Spiel'), L('cr.card.save2', 'Neue Städte bauen dein Haus genau so — schon stehende bleiben, wie sie sind')))
       + `<p class="dim">${L('cr.card.close', 'Klick zum Schließen')}</p></div>`;
   }
   function tip(text, ok) { const t = $('#craftTip'); if (!t) return; t.innerHTML = (ok === false ? IC('close', 16) : ok ? IC('check', 16) : '') + '<span></span>'; t.lastChild.textContent = text; t.className = 'on' + (ok === false ? ' err' : ok ? ' ok' : ''); clearTimeout(tip.t); tip.t = setTimeout(() => { t.className = ''; }, 2600); }
 
   // ---------------------------------------------------------------- entering / leaving
   HOOK.enter = function () {
-    // 🕘 Weitermachen asked for something particular
-    if (CR.want) { const w = CR.want; CR.want = null; return w.kind === 'item' ? openItem(w.name) : openHouse(w.idx); }
+    // 🕘 Weitermachen (or ⚒ / 🎨 / ✏️ elsewhere) asked for something particular; then: what to do once it is open
+    if (CR.want) {
+      const w = CR.want; CR.want = null;
+      const p = w.kind === 'item' ? openItem(w.name) : openHouse(w.idx);
+      if (w.then) Promise.resolve(p).then(() => { if (S.mode === 'craft' && (w.kind === 'item' ? CR.item && CR.item.name === w.name : CR.house && CR.house.index === w.idx)) w.then(); });
+      return p;
+    }
     const sc = S.scene;
     if (sc && (sc.type === 'model' || sc.type === 'vedit')) return openItem(sc.name);
     const idx = sc && (sc.type === 'house' || sc.type === 'craft') ? sc.index : (S.pendingHouse || 0);
@@ -239,15 +249,57 @@
     drawBar(); drawHelp(); showCard(false); $('#studio').classList.remove('crafting');
     // the mode switch that called us selects what comes next; remember what was open so it can go back to it
     CR.last = { kind, idx, name };
+    CR.origin = null; C.crumb();
+  };
+  // ---------------------------------------------------------------- where the Crafter was opened from (← back there)
+  // {mode, …the selection there}: Architektur and its house, Möbel / Fassade and the model (and its "← zurück zu"),
+  // Teile and its block (or the favourite shown there), Welt and its tab
+  const MODE_NAME = { arch: 'Architektur', furn: 'Möbel', facade: 'Fassade', parts: 'Teile', world: 'Welt' };
+  function originNow() {
+    const m = S.mode, sc = S.scene, CATL = VR.StudioCatalog, WM = VR.StudioWorld;
+    if (!MODE_NAME[m]) return null;
+    const o = { mode: m, cat: S.cat };
+    if (m === 'arch') o.index = sc && sc.type === 'house' ? sc.index : null;
+    else if (m === 'furn' || m === 'facade') { o.name = sc && sc.type === 'model' ? sc.name : null; o.from = S.from || null; }
+    else if (m === 'parts') { o.scene = sc ? sc.type : null; o.id = sc && sc.type === 'block' ? sc.name : CATL ? CATL.sel : null; o.name = sc && sc.type === 'model' ? sc.name : null; o.index = sc && sc.type === 'house' ? sc.index : null; o.from = S.from || null; }
+    else if (m === 'world') { o.tab = WM ? WM.tab : null; o.world = WM && WM.world ? WM.world.name : ''; }
+    return o;
+  }
+  function originLabel(o) {
+    const H = (i) => { const h = C.HOUSES.find(x => x.i === i); return h ? h.name : ''; };
+    const nm = o.mode === 'arch' ? (Number.isFinite(o.index) ? H(o.index) : '') : (o.mode === 'furn' || o.mode === 'facade') ? (o.name && VM.MODELS[o.name] ? VM.MODELS[o.name].display : '')
+      : o.mode === 'parts' ? (o.scene === 'model' && o.name ? (VM.MODELS[o.name] || {}).display || '' : o.scene === 'house' ? H(o.index) : o.id ? nameOf(o.id) : '') : o.mode === 'world' ? o.world || '' : '';
+    return '← ' + L('mode.' + o.mode, MODE_NAME[o.mode]) + (nm ? ' · ' + nm : '');
+  }
+  // ✕ and "← <Herkunft>": back there, with the same selection
+  CR.back = function () {
+    const o = CR.origin, wasItem = CR.kind === 'item' && CR.item ? CR.item.name : null; CR.origin = null;
+    if (!o) { C.setMode(wasItem ? (C.isFacade(wasItem) ? 'facade' : 'furn') : 'arch'); return; }
+    const CATL = VR.StudioCatalog, WM = VR.StudioWorld;
+    const cat = () => { if (o.cat && o.cat !== S.cat) { S.cat = o.cat; C.chips(); C.list(); } };
+    if (o.mode === 'arch') { C.setMode('arch', true); cat(); C.selectHouse(Number.isFinite(o.index) ? o.index : (CR.last && Number.isFinite(CR.last.idx) ? CR.last.idx : 0)); }
+    else if (o.mode === 'furn' || o.mode === 'facade') { C.setMode(o.mode, true); cat(); const n = o.name && VM.MODELS[o.name] ? o.name : wasItem; if (n) C.selectModel(n, o.from || null); }
+    else if (o.mode === 'parts') {
+      if (CATL) { CATL.cat = o.cat || CATL.cat; if (o.id) CATL.sel = o.id; CATL.restore = o.scene === 'model' && o.name ? () => C.selectModel(o.name, o.from || null) : o.scene === 'house' && Number.isFinite(o.index) ? () => C.selectHouse(o.index) : null; CATL.openFrom = o.from || null; }
+      C.setMode('parts');
+    } else if (o.mode === 'world') { if (WM && o.tab) WM.tab = o.tab; C.setMode('world'); }
+    else C.setMode('arch');
+  };
+  HOOK.crumb = function (el) {
+    if (!CR.on || !CR.origin) return false;
+    const b = document.createElement('button'); b.className = 'back'; b.textContent = originLabel(CR.origin); b.title = L('cr.backT', 'Zurück, wo du warst');
+    b.onclick = () => CR.back(); el.appendChild(b);
+    return true;
   };
   function enterUI(kind) {
     ensureOverlay();
+    if (S.mode !== 'craft') CR.origin = originNow();          // opened from another mode: the way back
     S.mode = 'craft'; S.cat = kind === 'house' ? 'modern' : 'all'; CR.on = true; CR.kind = kind; CR.undo = []; CR.redo = []; CR.hover = null;
     $('#studio').classList.add('crafting');
     for (const b of $$('nav.modes button')) b.classList.toggle('on', b.dataset.mode === 'craft');
     for (const t of $$('.tab')) t.classList.toggle('on', t.dataset.pane === 'parts');
     for (const p of $$('.pane')) p.classList.toggle('on', p.id === 'parts');
-    C.chips(); C.list(); drawBar(); drawHelp();
+    C.chips(); C.list(); drawBar(); drawHelp(); C.crumb();
   }
 
   // ================================================================ HOUSE CRAFTER
@@ -282,8 +334,8 @@
     if (draft && draft.undo) CR.undo = unpackUndo(draft.undo);      // Strg+Z goes on where it stopped
     C.hud(); C.parts(); drawBar(); drawHelp();
     if (draft) {
-      C.sys(`Crafter · ${H.name} · ✎ ${L('cr.draftSys', 'Entwurf: {n} Änderungen, noch nicht im Spiel', { n: fmt(draft.n || 0) })}`, 'ok');
-      tip(L('cr.resumed', 'Weiter, wo du warst — {n} Änderungen, noch nicht im Spiel', { n: fmt(draft.n || 0) }) + (pj && pj.view && pj.view.player ? ' · P: ' + L('cr.asPlayer', 'als Spieler weiter') : ''), true);
+      C.sys(`Crafter · ${H.name} · ✎ ${SA ? L('cr.draftSysSA', 'Entwurf: {n} Änderungen, noch nicht gespeichert', { n: fmt(draft.n || 0) }) : L('cr.draftSys', 'Entwurf: {n} Änderungen, noch nicht im Spiel', { n: fmt(draft.n || 0) })}`, 'ok');
+      tip((SA ? L('cr.resumedSA', 'Weiter, wo du warst — {n} Änderungen, noch nicht gespeichert', { n: fmt(draft.n || 0) }) : L('cr.resumed', 'Weiter, wo du warst — {n} Änderungen, noch nicht im Spiel', { n: fmt(draft.n || 0) })) + (pj && pj.view && pj.view.player ? ' · P: ' + L('cr.asPlayer', 'als Spieler weiter') : ''), true);
     } else C.sys(`Crafter · ${H.name} · ${m.applied ? fmt(m.applied) + ' eigene Änderungen geladen' : 'Original'}`, 'ok');
     if (pj) P.seen(id);
     loadMeadow(sc);
@@ -605,6 +657,10 @@
     const s0 = gGet(hit.x, hit.y, hit.z); if (!s0) return null;
     const ot = R.types[T.type[s0]];
     const starts = scope === 'all' ? cellsOfType(ot) : scope === 'face' && !multiCell(ot) ? floodFace(hit, ot) : [[hit.x, hit.y, hit.z]];
+    return piecesAt(starts, ot);
+  }
+  // the whole pieces the start cells belong to (a door is both halves, a sofa every cell)
+  function piecesAt(starts, ot) {
     const seen = new Set(), pieces = [], cells = [];
     for (const c of starts) {
       if (seen.has(gIdx(c[0], c[1], c[2]))) continue;
@@ -614,6 +670,36 @@
     }
     return { from: ot, cells, pieces };
   }
+  // 🎨 "Verbaut in": every piece of one kind in the open house becomes another — the paint tool's "Alle im Haus", as
+  // one undo step, each piece keeping its turn, half and the rest (then "Ins Spiel" takes it into the game)
+  function replaceAll(fromId, toId) {
+    const h = CR.house, ot = R.byName[fromId], nt = R.byName[toId];
+    if (!h || !ot || !nt) { tip(L('cr.paint.pick', 'Wähle unten in der Hotbar den neuen Block.'), false); return null; }
+    if (ot.id === nt.id) { tip(L('cr.paint.same', 'Ist schon {n}.', { n: nameOf(nt.name) }), true); return null; }
+    const tg = piecesAt(cellsOfType(ot), ot);
+    if (!tg.pieces.length) { tip(L('cr.all.none', 'Kein {n} in diesem Haus.', { n: nameOf(ot.name) }), false); return null; }
+    const r = replacePieces(tg.pieces, nt);
+    if (!r.done) { tip(L('cr.paint.nofit', '{n} passt dort nicht hin.', { n: nameOf(nt.name) }), false); return null; }
+    if (!r.list.length) { tip(L('cr.nothing', 'Nichts zu ändern.'), true); return null; }
+    applyChanges(r.list); useRecent(nt.name);
+    CR.hot[CR.slot] = nt.name; drawBar();
+    flashCells(tg.cells);
+    tip(`${nameOf(ot.name)} → ${nameOf(nt.name)} ×${r.done}${r.failed ? ' · ' + L('cr.paint.failed', '{n} passten nicht', { n: r.failed }) : ''} — ${SA ? L('cr.all.thenSA', '💾 Speichern behält es') : L('cr.all.then', '„Ins Spiel“ übernimmt es')} · Strg+Z`, true);
+    return { done: r.done, failed: r.failed };
+  }
+  CR.replaceAll = replaceAll;
+  // ⚒ "Verbaut in": that house in the Crafter, the piece in the hand, 🖌 Malen ready — point at something, it becomes that
+  CR.openWith = function (idx, id) {
+    const then = () => { CR.hot[CR.slot] = id; useRecent(id); if (CR.tool !== 'paint') setTool('paint'); drawBar(); C.hud(); tip('🖌 ' + nameOf(id) + ' — ' + L('cr.with', 'in der Hand: zeig auf etwas, Klick macht es dazu (Tab: Fläche · Alle)'), true); };
+    if (S.mode === 'craft' && CR.on && CR.kind === 'house' && CR.house && CR.house.index === idx) { then(); return; }
+    CR.want = { kind: 'house', idx, then }; C.setMode('craft');
+  };
+  // 🎨 "Verbaut in": that house in the Crafter, every piece of one kind replaced by the chosen one
+  CR.replaceIn = function (idx, fromId, toId) {
+    const then = () => replaceAll(fromId, toId);
+    if (S.mode === 'craft' && CR.on && CR.kind === 'house' && CR.house && CR.house.index === idx) { then(); return; }
+    CR.want = { kind: 'house', idx, then }; C.setMode('craft');
+  };
   // carry out the replacement of whole pieces by the type nt: the list of changes, and how many fit
   function replacePieces(pieces, nt) {
     const h = CR.house, K = (x, y, z) => (y * h.sz + z) * h.sx + x, plan = new Map();
@@ -763,18 +849,38 @@
   // ---------------------------------------------------------------- the house as the game stores it
   // v2: the whole lot as a template (every cell the house or the player put there) — the game lays it down
   // exactly, whatever later versions of the villa builder would generate
+  // the facade the game builds a house in without a design: the catalogue's own pick (the villa builder's first
+  // choice with seed 7, not mirrored) — another facade or a mirrored plan is a choice worth keeping as a design
+  function skin0(index) {
+    const rec = C.HOUSE.get(index), skins = rec && rec.data && rec.data.skins;
+    if (!skins || !skins.length || !VR.RNG) return null;
+    try { return skins[new VR.RNG(7).int(skins.length)]; } catch (e) { return null; }
+  }
   function updateHouse() {
     const h = CR.house; if (!h) return;
     clearTimeout(draftT); draftT = 0; draftDue = 0;
     const st = store(), P = PJ(), id = 'h:' + h.index;
     const r = CU.makeTemplate({ sx: h.sx, sy: h.sy, sz: h.sz, pad: h.pad, F: h.F, lot: h.lot, blocks: h.blocks, base: h.base, wrote: h.wrote });
-    if (!r || !r.changed) { delete st.houses[h.index]; saveStore(st); h.dirty = false; h.savedAt = 0; if (P) { P.dropData(id); if (P.get(id)) P.put(id, { n: 0 }); } tip('Keine Änderungen — im Spiel steht das Original.', true); C.parts(); return; }
-    st.houses[h.index] = { v: 2, name: h.name, index: h.index, seed: 7, beds: 3, skin: h.skin, mirror: !!h.mirror, tpl: r.tpl, n: r.changed, top: r.top, t: Date.now() };
-    if (!saveStore(st)) { tip('Speichern fehlgeschlagen (Browser-Speicher voll oder gesperrt).', false); draftSoon(); return; }
+    const changed = r ? r.changed : 0, s0 = skin0(h.index), ownLook = !!h.mirror || !!(s0 && h.skin && h.skin !== s0);
+    let what;
+    if (!changed && !ownLook) {
+      // exactly the original: no design
+      delete st.houses[h.index];
+      if (!saveStore(st)) { tip(L('cr.saveFail', 'Speichern fehlgeschlagen — der Browser-Speicher ist voll'), false); draftSoon(); return; }
+      h.dirty = false; h.savedAt = 0; if (P) { P.dropData(id); if (P.get(id)) P.put(id, { n: 0 }); }
+      tip(SA ? L('cr.origSA', 'Keine Änderungen — gespeichert ist das Original') : L('cr.orig2', 'Keine Änderungen — neue Städte bauen das Original'), true); C.parts(); return;
+    }
+    // only another facade (or the mirrored plan): kept as a design of its own, so the choice reaches the game
+    st.houses[h.index] = changed
+      ? { v: 2, name: h.name, index: h.index, seed: 7, beds: 3, skin: h.skin, mirror: !!h.mirror, tpl: r.tpl, n: changed, top: r.top, t: Date.now() }
+      : { v: 2, name: h.name, index: h.index, seed: 7, beds: 3, skin: h.skin, mirror: !!h.mirror, n: 0, t: Date.now() };
+    what = changed ? fmt(changed) + ' ' + L('cr.blocks', 'Blöcke geändert') : L('cr.facade', 'Fassade {s}', { s: h.skin + (h.mirror ? ' ⇋' : '') });
+    if (!saveStore(st)) { tip(L('cr.saveFail', 'Speichern fehlgeschlagen — der Browser-Speicher ist voll'), false); draftSoon(); return; }
     h.dirty = false; h.savedAt = Date.now();
-    // in the game now: the draft has done its job
-    if (P) { P.dropData(id); P.put(id, { kind: 'house', name: h.name, ref: { index: h.index }, n: r.changed, view: viewState() }); shootProject(id); }
-    tip(`✓ ${h.name} ist im Spiel — ${fmt(r.changed)} Blöcke geändert.`, true);
+    // saved: the draft has done its job
+    if (P) { P.dropData(id); P.put(id, { kind: 'house', name: h.name, ref: { index: h.index }, n: changed, view: viewState() }); shootProject(id); }
+    tip(SA ? `💾 ${h.name} ${L('cr.savedSA', 'gespeichert')} (${what}) — ${L('cr.takeSA', '📦 Mitnehmen bringt es ins Spiel')}`
+      : `✓ ${h.name}: ${L('cr.inGame', 'neue Städte bauen es so — schon stehende Häuser bleiben, wie sie sind')} (${what})`, true);
     C.rebuildHouse(h.index, { skin: h.skin, mirror: h.mirror }).then(() => { if (S.mode === 'craft') { C.hud(); } });
     C.parts();
   }
@@ -807,7 +913,7 @@
     const list = [];
     for (let i = 0; i < h.blocks.length; i++) if (h.blocks[i] !== h.base[i]) { const x = i % h.sx, z = Math.floor(i / h.sx) % h.sz, y = Math.floor(i / (h.sx * h.sz)); list.push([x, y, z, h.base[i]]); }
     if (!list.length) { tip('Schon das Original.', true); return; }
-    applyChanges(list); tip('Original wiederhergestellt — „Update ins Spiel“ übernimmt es auch dort.', true);
+    applyChanges(list); tip(SA ? L('cr.resetSA', 'Original wiederhergestellt — 💾 Speichern behält es') : L('cr.reset2', 'Original wiederhergestellt — „Ins Spiel“ übernimmt es'), true);
   }
 
   // ---------------------------------------------------------------- 🕘 drafts: unfinished work is never lost
@@ -828,7 +934,7 @@
     catch (e) { console.warn('draft', e); }
     if (CR.on) C.hud();
   }
-  const draftFull = () => { if (!draftFail) { draftFail = true; tip(L('cr.draftFail', 'Der Browser-Speicher ist voll — „Ins Spiel“ sichert deine Arbeit'), false); } };
+  const draftFull = () => { C.full('drafts'); if (!draftFail) { draftFail = true; tip(L('cr.draftFail3', 'Browser-Speicher voll — der Entwurf ist nur bis zum Schließen da'), false); } };
   function saveHouseDraft() {
     const P = PJ(), h = CR.house; if (!P || !h) return;
     const id = 'h:' + h.index, saved = store().houses[h.index];
@@ -841,7 +947,7 @@
       if (h.dirty) { h.dirty = false; C.parts(); }
       if (P.get(id)) P.put(id, { n: saved ? saved.n || n : 0, view: viewState() });
     } else {
-      if (!P.setData(id, { v: 2, index: h.index, name: h.name, seed: 7, beds: 3, skin: h.skin, mirror: !!h.mirror, tpl: r.tpl, n, top: r.top, t: Date.now(), on: saved ? saved.t : 0, undo: packUndo() })) draftFull();
+      if (!P.setData(id, { v: 2, index: h.index, name: h.name, seed: 7, beds: 3, skin: h.skin, mirror: !!h.mirror, tpl: r.tpl, n, top: r.top, t: Date.now(), on: saved ? saved.t : 0, undo: packUndo() })) draftFull(); else draftFail = false;
       P.put(id, { kind: 'house', name: h.name, ref: { index: h.index }, n, view: viewState() });
     }
     shootSoon(id);
@@ -856,7 +962,7 @@
       if (P.get(id)) P.put(id, { n: 0, view: viewState() });
     } else {
       const { idx, pal } = itemModel();
-      if (!P.setData(id, { v: 1, W: it.W, H: it.H, D: it.D, res: it.res, pal: Array.from(pal), rle: CU.b64(new Uint8Array(CU.rle(idx).buffer)), n: it.changed || 0, t: Date.now(), undo: packVUndo() })) draftFull();
+      if (!P.setData(id, { v: 1, W: it.W, H: it.H, D: it.D, res: it.res, pal: Array.from(pal), rle: CU.b64(new Uint8Array(CU.rle(idx).buffer)), n: it.changed || 0, t: Date.now(), undo: packVUndo() })) draftFull(); else draftFail = false;
       P.put(id, { kind: 'item', name: it.display, ref: { name: it.name }, n: it.changed || 0, view: viewState() });
     }
     shootSoon(id);
@@ -984,27 +1090,27 @@
       icon: '🏠', label: L('pj.k.house', 'Haus'),
       state(p, st) {
         const i = p.ref ? p.ref.index : -1; if (!C.HOUSES.some(h => h.i === i)) return null;
-        if (P.hasData(p.id)) return { live: true, status: 'wip', n: p.n || 0, sub: L('pj.wipSub', '{n} Änderungen · noch nicht im Spiel', { n: fmt(p.n || 0) }) };
+        if (P.hasData(p.id)) return { live: true, status: 'wip', n: p.n || 0, sub: SA ? L('pj.wipSubSA', '{n} Änderungen · noch nicht gespeichert', { n: fmt(p.n || 0) }) : L('pj.wipSub', '{n} Änderungen · noch nicht im Spiel', { n: fmt(p.n || 0) }) };
         const sv = st.houses && st.houses[i];
-        if (sv) return { live: true, status: 'game', n: sv.n || 0, sub: L('pj.gameSub', '{n} Änderungen · im Spiel', { n: fmt(sv.n || (sv.cells ? sv.cells.length : 0)) }) };
+        if (sv) { const n = sv.n || (sv.cells ? sv.cells.length : 0), what = n ? L('pj.changes', '{n} Änderungen', { n: fmt(n) }) : L('pj.facade', 'Fassade {s}', { s: (sv.skin || '') + (sv.mirror ? ' ⇋' : '') }); return { live: true, status: 'game', n, sub: what + ' · ' + (SA ? L('pj.savedSA', 'gespeichert') : L('pj.inGame', 'im Spiel')) }; }
         return { live: !!p.pin, status: 'orig', sub: L('pj.orig', 'Original') };
       },
       live(p) { const r = C.HOUSE.get(p.ref.index); return r && r.thumb; },
       open(p) { return CR.resume({ kind: 'house', idx: p.ref.index }); },
-      delTip: (p, s) => (s.status === 'wip' ? L('pj.delWip', 'Entwurf verwerfen und aus der Liste — was im Spiel ist, bleibt') : L('pj.delGame', 'Aus der Liste — im Spiel bleibt es (Crafter → Meine Designs entfernt es dort)')),
+      delTip: (p, s) => (s.status === 'wip' ? (SA ? L('pj.delWipSA', 'Entwurf verwerfen und aus der Liste — was gespeichert ist, bleibt') : L('pj.delWip', 'Entwurf verwerfen und aus der Liste — was im Spiel ist, bleibt')) : (SA ? L('pj.delGameSA', 'Aus der Liste — gespeichert bleibt es (Crafter → Meine Designs entfernt es)') : L('pj.delGame', 'Aus der Liste — im Spiel bleibt es (Crafter → Meine Designs entfernt es dort)'))),
       discard(p) { discardDraft(p.id); P.dropThumb(p.id); P.put(p.id, { hide: true, pin: false }, { touch: false }); },
     });
     P.kind('item', {
       icon: '🪑', label: L('pj.k.item', 'Möbel'),
       state(p, st) {
         const n = p.ref && p.ref.name; if (!n || !VM.MODELS[n]) return null;
-        if (P.hasData(p.id)) return { live: true, status: 'wip', n: p.n || 0, sub: L('pj.wipSubV', '{n} Voxel · noch nicht im Spiel', { n: fmt(p.n || 0) }) };
-        if (st.models && st.models[n]) return { live: true, status: 'game', sub: L('pj.gameSubV', 'eigenes Design · im Spiel') };
+        if (P.hasData(p.id)) return { live: true, status: 'wip', n: p.n || 0, sub: SA ? L('pj.wipSubVSA', '{n} Voxel · noch nicht gespeichert', { n: fmt(p.n || 0) }) : L('pj.wipSubV', '{n} Voxel · noch nicht im Spiel', { n: fmt(p.n || 0) }) };
+        if (st.models && st.models[n]) return { live: true, status: 'game', sub: SA ? L('pj.gameSubVSA', 'eigenes Design · gespeichert') : L('pj.gameSubV', 'eigenes Design · im Spiel') };
         return { live: !!p.pin, status: 'orig', sub: L('pj.orig', 'Original') };
       },
       live(p) { return C.thumbOf(p.ref.name); },
       open(p) { return CR.resume({ kind: 'item', name: p.ref.name }); },
-      delTip: (p, s) => (s.status === 'wip' ? L('pj.delWip', 'Entwurf verwerfen und aus der Liste — was im Spiel ist, bleibt') : L('pj.delGame2', 'Aus der Liste — im Spiel bleibt es')),
+      delTip: (p, s) => (s.status === 'wip' ? (SA ? L('pj.delWipSA', 'Entwurf verwerfen und aus der Liste — was gespeichert ist, bleibt') : L('pj.delWip', 'Entwurf verwerfen und aus der Liste — was im Spiel ist, bleibt')) : (SA ? L('pj.delGame2SA', 'Aus der Liste — gespeichert bleibt es') : L('pj.delGame2', 'Aus der Liste — im Spiel bleibt es'))),
       discard(p) { discardDraft(p.id); P.dropThumb(p.id); P.put(p.id, { hide: true, pin: false }, { touch: false }); },
     });
     P.onFlush((o) => keepWork(!!o.thumbs));
@@ -1127,7 +1233,7 @@
     if ((e.ctrlKey || e.metaKey) && k === 'y') { if (CR.kind === 'house') undo(true); else vUndo(true); return true; }
     if (e.ctrlKey || e.metaKey || e.altKey) return false;
     if (CR.kind === 'house' && /^[1-9]$/.test(k)) { CR.slot = +k - 1; drawBar(); C.hud(); return true; }
-    if (CR.kind === 'house' && k === 'r') { CR.rot = (CR.rot + 1) & 3; drawBar(); tip('Nächstes Teil gedreht: ' + CR.rot * 90 + '°'); return true; }
+    if (CR.kind === 'house' && k === 'r') { turnNext(); return true; }
     if (k === '?' || k === 'f1') { showCard(); return true; }
     if ($('#craftCard') && $('#craftCard').classList.contains('on') && k === 'escape') { showCard(false); return true; }
     if (CR.kind === 'house' && k === 'b') { setTool('area'); return true; }
@@ -1152,6 +1258,8 @@
     if ('wasdqec '.includes(k) || k === 'shift') { CR.keys[k] = true; return !!S.cam.fly || 'wasdqe'.includes(k); }
     return false;
   };
+  // R (or ↻ on the hotbar): the next piece turns a quarter
+  function turnNext() { CR.rot = (CR.rot + 1) & 3; drawBar(); tip(L('cr.turned', 'Nächstes Teil gedreht: {d}°', { d: CR.rot * 90 })); }
   function toggleFly() {
     const sc = S.scene; if (!sc) return;
     if (S.cam.fly) { S.cam.fly = null; drawHelp(); tip('Orbit-Kamera'); return; }
@@ -1187,7 +1295,7 @@
       $('#hudName').textContent = h.name;
       const hv = CR.hover, tgt = hv && !hv.ground && hv.state ? nameOf(R.types[T.type[hv.state]].name) : '';
       $('#hudMeta').innerHTML = `<span class="chip" title="${L('cr.changes', 'Änderungen')}">${IC('pencil', 13)}<b>${fmt(d)}</b></span>`
-        + (h.dirty ? `<span class="chip warn" title="${L('cr.unsaved', 'noch nicht im Spiel')}">${IC('upload', 13)}</span><span class="chip saved${draftT ? ' busy' : ''}" title="${draftT ? L('cr.saving', 'wird gleich gesichert …') : L('cr.autosaved', 'Entwurf gesichert — nichts geht verloren · 🕘 Strg+O')}">${IC('save', 13)}${draftT ? '…' : ''}</span>` : h.savedAt ? `<span class="chip good" title="${L('cr.saved', 'im Spiel')}">${IC('check', 13)}</span>` : '')
+        + (h.dirty ? `<span class="chip warn" title="${SA ? L('cr.unsavedSA', 'noch nicht gespeichert') : L('cr.unsaved', 'noch nicht im Spiel')}">${IC('upload', 13)}</span><span class="chip saved${draftT ? ' busy' : ''}" title="${draftT ? L('cr.saving', 'wird gleich gesichert …') : L('cr.autosaved', 'Entwurf gesichert — nichts geht verloren · 🕘 Strg+O')}">${IC('save', 13)}${draftT ? '…' : ''}</span>` : h.savedAt ? `<span class="chip good" title="${SA ? L('cr.savedSA', 'gespeichert') : L('cr.saved', 'im Spiel')}">${IC('check', 13)}</span>` : '')
         + `<span class="chip" title="${L('cr.height', 'Bauhöhe über dem Boden')}">${IC('height', 13)}<b>${h.sy - h.F}</b></span>`
         + (tgt ? `<span class="chip tgt">${IC('eye', 13)}${tgt}</span>` : '');
       return true;
@@ -1195,7 +1303,7 @@
     if (CR.kind === 'item' && CR.item) {
       const it = CR.item;
       $('#hudName').textContent = 'Crafter · ' + it.display;
-      $('#hudMeta').innerHTML = `<b>${it.W}×${it.H}×${it.D}</b> Blöcke · 1/${it.res} · <b>${fmt(it.changed || 0)}</b> Voxel geändert${it.dirty ? ` · <span class="warn">${L('cr.itemDraft', 'Entwurf gesichert, noch nicht im Spiel')}</span>` : it.savedAt ? ' · <span class="good">im Spiel</span>' : ''} · Werkzeug <b>${TOOLS.find(t => t[0] === it.tool)[1]}</b>`;
+      $('#hudMeta').innerHTML = `<b>${it.W}×${it.H}×${it.D}</b> Blöcke · 1/${it.res} · <b>${fmt(it.changed || 0)}</b> Voxel geändert${it.dirty ? ` · <span class="warn">${SA ? L('cr.itemDraftSA', 'Entwurf gesichert, noch nicht gespeichert') : L('cr.itemDraft', 'Entwurf gesichert, noch nicht im Spiel')}</span>` : it.savedAt ? ` · <span class="good">${SA ? L('cr.savedSA', 'gespeichert') : L('cr.saved', 'im Spiel')}</span>` : ''} · Werkzeug <b>${TOOLS.find(t => t[0] === it.tool)[1]}</b>`;
       return true;
     }
     return false;
@@ -1219,30 +1327,28 @@
       const h = CR.house, n = houseDiffCount();
       H(IC('house', 15) + ' ' + h.name);
       // one big button that says what it does; it glows while there is something new to take into the game
-      const saved = !h.dirty && h.savedAt;
-      const up = btn(saved ? IC('check', 22) + `<span>${L('cr.saved', 'Im Spiel')}</span>` : IC('upload', 22) + `<span>${L('cr.save', 'Ins Spiel')}</span>`, 'big ' + (saved ? 'done' : 'pri') + (h.dirty ? ' glow' : ''), updateHouse,
-        IN_GAME ? L('cr.save.tip', 'Jede Stadt im Spiel baut dein Haus genau so') : L('cr.save.tip2', 'Speichert hier — ins Spiel über Spiel → R9 Studio, oder Export'));
-      row(up);
+      row(saveButton(!h.dirty && h.savedAt, h.dirty, updateHouse, L('cr.save.tip3', 'Neue Städte bauen dein Haus genau so — schon stehende bleiben, wie sie sind')));
       // small things as pictures: back, forward, original, leave
       const ib = (icon, title, fn, cls) => btn(IC(icon, 20), 'ico ' + (cls || ''), fn, title);
       let armed = 0;
       const reset = ib('reset', L('cr.reset', 'Original (alles zurück)'), () => { if (Date.now() - armed < 2500) { resetHouse(); return; } armed = Date.now(); reset.classList.add('arm'); reset.innerHTML = IC('check', 20); tip(L('cr.reset.again', 'Nochmal klicken: zurück zum Original'), false); setTimeout(() => { reset.classList.remove('arm'); reset.innerHTML = IC('reset', 20); }, 2500); });
-      row(ib('undo', L('cr.undo', 'Zurück') + ' (Strg+Z)', () => undo(false)), ib('redo', L('cr.redo', 'Vor') + ' (Strg+Y)', () => undo(true)), reset, ib('close', L('cr.leave', 'Crafter schließen'), () => C.setMode('arch')));
+      const close = ib('close', CR.origin ? originLabel(CR.origin) : L('cr.leave', 'Crafter schließen'), () => CR.back()); close.dataset.act = 'close';
+      row(ib('undo', L('cr.undo', 'Zurück') + ' (Strg+Z)', () => undo(false)), ib('redo', L('cr.redo', 'Vor') + ' (Strg+Y)', () => undo(true)), reset, close);
       const st = document.createElement('div'); st.className = 'chips3';
       st.innerHTML = `<span title="${L('cr.changes', 'Änderungen')}">${IC('pencil', 15)}<b>${fmt(n)}</b></span><span title="${L('cr.height', 'Bauhöhe über dem Boden')}">${IC('height', 15)}<b>${h.sy - h.F}</b></span><span title="${L('cr.skin', 'Fassade')}">${IC('palette', 15)}<b>${h.skin}${h.mirror ? ' ⇋' : ''}</b></span>`;
       el.appendChild(st);
       // unsaved work is safe: say so, and offer the way back to what the game has
       if (h.dirty) {
         const nt = document.createElement('div'); nt.className = 'note dim draftNote';
-        nt.innerHTML = IC('save', 14) + ' ' + L('cr.draftNote', 'Entwurf — automatisch gesichert. Ins Spiel kommt er erst mit „Ins Spiel“.');
+        nt.innerHTML = IC('save', 14) + ' ' + (SA ? L('cr.draftNoteSA', 'Entwurf — automatisch gesichert. Fest gespeichert erst mit 💾 Speichern.') : L('cr.draftNote', 'Entwurf — automatisch gesichert. Ins Spiel kommt er erst mit „Ins Spiel“.'));
         el.appendChild(nt);
         if (h.savedAt && PJ() && PJ().hasData('h:' + h.index)) {
           let armG = 0;
-          const g = btn(IC('undo', 16) + `<span>${L('cr.toGame', 'Spielversion laden')}</span>`, '', () => {
-            if (Date.now() - armG < 2600) { discardDraft('h:' + h.index); tip(L('cr.toGameDone', 'Zurück zur Spielversion — der Entwurf ist weg'), true); return; }
-            armG = Date.now(); g.classList.add('arm'); tip(L('cr.toGameAgain', 'Nochmal klicken: Entwurf verwerfen, Spielversion laden'), false);
+          const g = btn(IC('undo', 16) + `<span>${SA ? L('cr.toSaved', 'Gespeicherte Version laden') : L('cr.toGame', 'Spielversion laden')}</span>`, '', () => {
+            if (Date.now() - armG < 2600) { discardDraft('h:' + h.index); tip(SA ? L('cr.toSavedDone', 'Zurück zur gespeicherten Version — der Entwurf ist weg') : L('cr.toGameDone', 'Zurück zur Spielversion — der Entwurf ist weg'), true); return; }
+            armG = Date.now(); g.classList.add('arm'); tip(SA ? L('cr.toSavedAgain', 'Nochmal klicken: Entwurf verwerfen, gespeicherte Version laden') : L('cr.toGameAgain', 'Nochmal klicken: Entwurf verwerfen, Spielversion laden'), false);
             setTimeout(() => g.classList.remove('arm'), 2600);
-          }, L('cr.toGameT', 'Den Entwurf verwerfen und das Haus so laden, wie es im Spiel steht'));
+          }, SA ? L('cr.toSavedT', 'Den Entwurf verwerfen und das Haus so laden, wie es gespeichert ist') : L('cr.toGameT', 'Den Entwurf verwerfen und das Haus so laden, wie es im Spiel steht'));
           row(g);
         }
       }
@@ -1252,6 +1358,26 @@
     if (CR.kind === 'item' && CR.item) { itemPanel(el, H, btn, row); designList(el, H, btn, row); return true; }
     return true;
   };
+  // the big button: "⬆ Ins Spiel" (the Studio in the game) or "💾 Speichern" (the standalone Studio); ✓ once it is done
+  function saveButton(saved, dirty, fn, tipGame) {
+    const b = document.createElement('button');
+    b.className = 'cbtn big ' + (saved ? 'done' : 'pri') + (dirty ? ' glow' : ''); b.dataset.act = 'save';
+    b.innerHTML = SA ? (saved ? IC('check', 22) + `<span>${L('cr.savedSA2', 'Gespeichert')}</span>` : `💾 <span>${L('cr.saveSA2', 'Speichern')}</span>`)
+      : saved ? IC('check', 22) + `<span>${L('cr.saved', 'Im Spiel')}</span>` : IC('upload', 22) + `<span>${L('cr.save', 'Ins Spiel')}</span>`;
+    b.title = SA ? SAVE_TIP : tipGame; b.onclick = fn;
+    return b;
+  }
+  // 🗑 asks twice (like ↺ Original): the first click arms it, the second within 2½ s removes
+  function delButton(btn, fn, title) {
+    let armed = 0;
+    const b = btn(IC('trash', 16), 'mini', () => {
+      if (Date.now() - armed < 2600) { fn(); return; }
+      armed = Date.now(); b.classList.add('arm'); b.innerHTML = IC('check', 16); tip(L('cr.del.again', 'Nochmal klicken: Design entfernen (Original zurück)'), false);
+      setTimeout(() => { if (b.isConnected) { b.classList.remove('arm'); b.innerHTML = IC('trash', 16); } }, 2600);
+    }, title);
+    b.dataset.act = 'del';
+    return b;
+  }
   // every saved design, with open / remove
   function designList(el, H, btn, row) {
     const st = store(), hs = Object.values(st.houses || {}), ms = Object.keys(st.models || {}), P = PJ();
@@ -1270,38 +1396,22 @@
     }
     for (const hh of hs) {
       const d = document.createElement('div'); d.className = 'design';
-      d.innerHTML = `<span class="ic">${IC('house', 18)}</span><span class="n">${hh.name}<small>${IC('pencil', 11)} ${fmt(designCount(hh))} · ${when(hh.t)}${wip('h:' + hh.index)}</small></span>`;
+      const cnt = designCount(hh), what = cnt ? IC('pencil', 11) + ' ' + fmt(cnt) : IC('palette', 11) + ' ' + esc(hh.skin || '') + (hh.mirror ? ' ⇋' : '');
+      d.innerHTML = `<span class="ic">${IC('house', 18)}</span><span class="n">${esc(hh.name)}<small>${what} · ${when(hh.t)}${wip('h:' + hh.index)}</small></span>`;
       d.appendChild(btn(IC('arrow', 16), 'mini', () => openHouse(hh.index), L('cr.open', 'öffnen')));
-      d.appendChild(btn(IC('trash', 16), 'mini', () => { const s2 = store(); delete s2.houses[hh.index]; saveStore(s2); if (CR.house && CR.house.index === hh.index) CR.house.savedAt = 0; C.rebuildHouse(hh.index, {}); tip(hh.name + ' → ' + L('cr.original', 'Original'), true); C.parts(); }, L('cr.remove', 'Design entfernen (Original zurück)')));
+      d.appendChild(delButton(btn, () => { const s2 = store(); delete s2.houses[hh.index]; if (!saveStore(s2)) { tip(L('cr.saveFail', 'Speichern fehlgeschlagen — der Browser-Speicher ist voll'), false); return; } if (CR.house && CR.house.index === hh.index) CR.house.savedAt = 0; C.rebuildHouse(hh.index, {}); tip(hh.name + ' → ' + L('cr.original', 'Original'), true); C.parts(); }, L('cr.remove', 'Design entfernen (Original zurück)')));
       el.appendChild(d);
     }
     for (const n of ms) {
       const m = VM.MODELS[n], d = document.createElement('div'); d.className = 'design';
       d.innerHTML = `<span class="ic">${IC('cube', 18)}</span><span class="n">${m ? m.display : n}<small>${when(st.models[n].t)}${wip('m:' + n)}</small></span>`;
       d.appendChild(btn(IC('arrow', 16), 'mini', () => openItem(n), L('cr.open', 'öffnen')));
-      d.appendChild(btn(IC('trash', 16), 'mini', () => { const s2 = store(); delete s2.models[n]; saveStore(s2); CU.applyModel(n, null); C.THUMB.delete(n); if (CR.item && CR.item.name === n) openItem(n); tip((m ? m.display : n) + ' → ' + L('cr.original', 'Original'), true); C.parts(); }, L('cr.remove', 'Design entfernen (Original zurück)')));
+      d.appendChild(delButton(btn, () => { const s2 = store(); delete s2.models[n]; if (!saveStore(s2)) { tip(L('cr.saveFail', 'Speichern fehlgeschlagen — der Browser-Speicher ist voll'), false); return; } CU.applyModel(n, null); C.THUMB.delete(n); if (CR.item && CR.item.name === n) openItem(n); tip((m ? m.display : n) + ' → ' + L('cr.original', 'Original'), true); C.parts(); }, L('cr.remove', 'Design entfernen (Original zurück)')));
       el.appendChild(d);
     }
-    row(btn(IC('upload', 18) + `<span>${L('cr.export', 'Export')}</span>`, '', exportAll, L('cr.export.tip', 'Alle Designs als Text kopieren')), btn(IC('download', 18) + `<span>${L('cr.import', 'Import')}</span>`, '', importAll, L('cr.import.tip', 'Designs aus kopiertem Text holen')));
-  }
-  function exportAll() {
-    const txt = JSON.stringify(Object.assign({}, store(), FV() && FV().list().length ? { favs: FV().list() } : null));   // ★ go along
-    const done = () => tip('Alle Designs kopiert — im Spiel: Titel → R9 Studio → Import, oder hier wieder einfügen.', true);
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, () => showText(txt)); else showText(txt);
-  }
-  function showText(txt) { const ta = document.createElement('textarea'); ta.className = 'xfer'; ta.value = txt; $('#partsBody').appendChild(ta); ta.select(); tip('Text markiert — mit Strg+C kopieren.'); }
-  function importAll() {
-    const ta = document.createElement('textarea'); ta.className = 'xfer'; ta.placeholder = 'Exportierten Text hier einfügen …'; $('#partsBody').appendChild(ta); ta.focus();
-    const ok = document.createElement('button'); ok.className = 'cbtn pri'; ok.textContent = 'Übernehmen'; $('#partsBody').appendChild(ok);
-    ok.onclick = () => {
-      try {
-        const d = JSON.parse(ta.value); if (!d || typeof d !== 'object' || (!d.houses && !d.models && !Array.isArray(d.favs))) throw new Error('kein Studio-Export');
-        const st = store(); Object.assign(st.houses, d.houses || {}); Object.assign(st.models, d.models || {}); saveStore(st); CU.apply(st); C.THUMB.clear(); for (const k of Object.keys(d.houses || {})) C.rebuildHouse(+k, {});
-        let nf = 0; if (Array.isArray(d.favs) && FV()) for (const id of d.favs.slice(0, 300).reverse()) if (typeof id === 'string' && R.byName[id] && FV().add(id)) nf++;
-        tip('Importiert: ' + Object.keys(d.houses || {}).length + ' Häuser, ' + Object.keys(d.models || {}).length + ' Items' + (nf ? ', ' + nf + ' ★ Favoriten' : '') + '.', true); C.parts(); upgradeDesigns();
-      }
-      catch (e) { tip('Import fehlgeschlagen: ' + e.message, false); }
-    };
+    // everything in one file: 📦 Mitnehmen (to the other Studio, to the game) · 📥 Übernehmen (a file from there)
+    const BR = VR.StudioBridge;
+    if (BR) row(btn(`📦 <span>${L('br.out', 'Mitnehmen')}</span>`, '', () => BR.exportPack(), L('br.outT', 'Favoriten, Designs und Bauteile als eine Datei — für das Spiel oder ein anderes Studio')), btn(`📥 <span>${L('br.in', 'Übernehmen')}</span>`, '', () => BR.pickFile(), L('br.inT', 'Ein R9-Paket (.json) übernehmen — oder die Datei einfach hierher ziehen')));
   }
 
   // ================================================================ ITEM CRAFTER (voxel models)
@@ -1334,7 +1444,7 @@
     if (resumed && d.undo) CR.item.vundo = unpackVUndo(d.undo, V.length);
     countItem();
     C.list(); C.parts(); C.hud(); drawHelp();
-    if (resumed) tip(L('cr.resumedItem', 'Weiter, wo du warst — {n} Voxel, noch nicht im Spiel', { n: fmt(CR.item.changed) }), true);
+    if (resumed) tip(SA ? L('cr.resumedItemSA', 'Weiter, wo du warst — {n} Voxel, noch nicht gespeichert', { n: fmt(CR.item.changed) }) : L('cr.resumedItem', 'Weiter, wo du warst — {n} Voxel, noch nicht im Spiel', { n: fmt(CR.item.changed) }), true);
     if (pj) P.seen(id);
   }
   // the edited volume as a compiled model (same parts and states as the original)
@@ -1445,13 +1555,14 @@
   }
   function itemPanel(el, H, btn, row) {
     const it = CR.item;
-    H('Crafter · Item', it.display);
+    H('Crafter · Item', esc(it.display));
+    row(saveButton(!it.dirty && it.savedAt, it.dirty, updateItem, L('cr.saveItemT', 'Das Item sieht überall im Spiel so aus — auch wo es schon steht')));
     const kv = document.createElement('div'); kv.className = 'kv';
-    kv.innerHTML = `<span>Modell</span><b>${it.name}</b><span>Größe</span><b>${it.W} × ${it.H} × ${it.D} Blöcke · ${it.res}³ Voxel je Block</b><span>Geändert</span><b>${fmt(it.changed || 0)} Voxel</b><span>Im Spiel</span><b>${it.savedAt ? 'eigenes Design aktiv' : 'Original'}${it.dirty ? ' · ✎ Entwurf (automatisch gesichert)' : ''}</b>`;
+    kv.innerHTML = `<span>Modell</span><b>${esc(it.name)}</b><span>Größe</span><b>${it.W} × ${it.H} × ${it.D} Blöcke · ${it.res}³ Voxel je Block</b><span>Geändert</span><b>${fmt(it.changed || 0)} Voxel</b><span>${SA ? L('cr.kvSavedSA', 'Gespeichert') : L('cr.kvSaved', 'Im Spiel')}</span><b>${it.savedAt ? L('cr.ownDesign', 'eigenes Design') : 'Original'}${it.dirty ? ' · ✎ ' + L('cr.draftAuto', 'Entwurf (automatisch gesichert)') : ''}</b>`;
     el.appendChild(kv);
-    row(btn('⬆ Update ins Spiel', 'pri' + (it.dirty ? ' glow' : ''), updateItem, 'Das Item sieht überall im Spiel so aus'));
     row(btn('⟲ Rückgängig', '', () => vUndo(false), 'Strg+Z'), btn('⟳ Wiederholen', '', () => vUndo(true), 'Strg+Y'));
-    row(btn('↺ Original', '', resetItem, 'Alle Voxel-Änderungen zurücknehmen'), btn('✕ Crafter verlassen', '', () => C.setMode(C.isFacade(it.name) ? 'facade' : 'furn')));
+    const x = btn('✕ ' + (CR.origin ? esc(originLabel(CR.origin).replace(/^← /, '')) : L('cr.leave', 'Crafter schließen')), '', () => CR.back(), L('cr.backT', 'Zurück, wo du warst')); x.dataset.act = 'close';
+    row(btn('↺ Original', '', resetItem, 'Alle Voxel-Änderungen zurücknehmen'), x);
   }
   function updateItem() {
     const it = CR.item; if (!it) return;
@@ -1461,14 +1572,19 @@
     // compare with the compiled original source (not with an earlier design)
     const fresh = VM.compile(it.name, o.def ? o.def.o : o.def);
     for (let i = 0; i < it.V.length && same; i++) { const k = fresh.vol[i]; if ((k ? fresh.pal[k] : 0) !== it.V[i]) same = false; }
-    if (same) { delete st.models[it.name]; saveStore(st); CU.applyModel(it.name, null); it.savedAt = 0; it.dirty = false; it.orig = it.V.slice(); countItem(); if (P) { P.dropData(id); if (P.get(id)) P.put(id, { n: 0 }); } tip('Wie das Original — im Spiel steht das Original.', true); C.THUMB.delete(it.name); C.parts(); C.hud(); return; }
+    if (same) {
+      delete st.models[it.name];
+      if (!saveStore(st)) { tip(L('cr.saveFail', 'Speichern fehlgeschlagen — der Browser-Speicher ist voll'), false); draftSoon(); return; }
+      CU.applyModel(it.name, null); it.savedAt = 0; it.dirty = false; it.orig = it.V.slice(); countItem(); if (P) { P.dropData(id); if (P.get(id)) P.put(id, { n: 0 }); }
+      tip(SA ? L('cr.sameSA', 'Wie das Original — gespeichert ist das Original') : L('cr.same2', 'Wie das Original — im Spiel steht wieder das Original'), true); C.THUMB.delete(it.name); C.parts(); C.hud(); return;
+    }
     st.models[it.name] = { v: 1, W: it.W, H: it.H, D: it.D, res: it.res, pal: Array.from(pal), rle: CU.b64(new Uint8Array(CU.rle(idx).buffer)), t: Date.now() };
-    if (!saveStore(st)) { tip('Speichern fehlgeschlagen (Browser-Speicher voll oder gesperrt).', false); draftSoon(); return; }
+    if (!saveStore(st)) { tip(L('cr.saveFail', 'Speichern fehlgeschlagen — der Browser-Speicher ist voll'), false); draftSoon(); return; }
     CU.applyModel(it.name, st.models[it.name]);
     it.savedAt = Date.now(); it.dirty = false; it.orig = it.V.slice(); countItem();
     if (P) { P.dropData(id); P.put(id, { kind: 'item', name: it.display, ref: { name: it.name }, n: 0, view: viewState() }); shootProject(id); }
     C.THUMB.delete(it.name);
-    tip(`✓ ${it.display} ist im Spiel — überall, wo es steht.`, true);
+    tip(SA ? `💾 ${it.display} ${L('cr.savedSA', 'gespeichert')} — ${L('cr.takeSA', '📦 Mitnehmen bringt es ins Spiel')}` : `✓ ${it.display} ${L('cr.itemInGame', 'ist im Spiel — überall, wo es steht.')}`, true);
     for (const k of C.HOUSE.keys()) C.rebuildHouse(k, { skin: C.HOUSE.get(k).data.skin, mirror: C.HOUSE.get(k).data.mirrored });
     C.parts(); C.hud();
   }
@@ -1477,7 +1593,7 @@
     const o = VM.MODELS[it.name], fresh = VM.compile(it.name, o.def.o), list = [];
     for (let i = 0; i < it.V.length; i++) { const k = fresh.vol[i], v = k ? fresh.pal[k] : 0; if (v !== it.V[i]) { const x = i % it.VW, z = Math.floor(i / it.VW) % it.VD, y = Math.floor(i / (it.VW * it.VD)); list.push([x, y, z, v]); } }
     if (!list.length) { tip('Schon das Original.', true); return; }
-    vApply(list); tip('Original wiederhergestellt — „Update ins Spiel“ übernimmt es auch dort.', true);
+    vApply(list); tip(SA ? L('cr.resetSA', 'Original wiederhergestellt — 💾 Speichern behält es') : L('cr.reset2', 'Original wiederhergestellt — „Ins Spiel“ übernimmt es'), true);
   }
   CR.open = { house: openHouse, item: openItem };
   CR.update = { house: updateHouse, item: updateItem };
