@@ -14,7 +14,8 @@ const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(
 const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: `/home/claude/vr/test/shots/${name}.png`, timeout: 180000 }); console.log('shot', name); };
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 const missing = await ev(() => VR.game && VR.game.texMissing ? VR.game.texMissing : null);
-await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 6; g.applySettings('*'); }, process.env.PRESET || 'high');
+// the joined panorama frames in this test belong to the Nahtlos look (LOOK=classic photographs the same scene in Klassisch)
+await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.look = lk; g.settings.horizon = 1; g.settings.renderDist = 6; g.applySettings('*'); }, [process.env.PRESET || 'high', process.env.LOOK || 'seamless']);
 await ev(`VR.game.createWorld({name:'Modern',mode:'creative',difficulty:'peaceful',type:'flat',seed:'11',cheats:true,kit:true})`);
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; g.env.setTime(6000); });

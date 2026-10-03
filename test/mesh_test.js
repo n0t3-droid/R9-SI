@@ -1,7 +1,8 @@
 // Mesher speed + size: the 16 sections of an overworld column, padded like the game does (VR.MESH_PAD blocks of the
 // neighbour columns on every side). Two scenes: the plain land of seed 12345 at column 0,0 and the middle of the
 // village "Nova Haven" (seed 12345, vgen 5, column 1,-13: ~1300 mini-voxel pieces on smooth ground).
-// LOOK=classic|seamless picks the block look (default: the game's default).
+// Times are the best of 5 runs (other processes on the machine only ever make a run slower): "cold" with an empty
+// mini-voxel cache, "warm" right after. LOOK=classic|seamless picks the block look (default: the game's default).
 const V=require('./load_shared.js');
 if(process.env.LOOK&&V.setLook)V.setLook(process.env.LOOK);
 const PAD=V.MESH_PAD||1, PS=V.MESH_PS||18, PSS=PS*PS;
@@ -23,13 +24,15 @@ function scene(name, opts, CX, CZ){
     return {blocks,light,grass:gr,foliage:fo,water:wa,sy,ox:CX*16,oz:CZ*16,smooth:true,fancyLeaves:true,vxLod:true};
   }
   const jobs=[]; for(let sy=0;sy<16;sy++) jobs.push(pad(sy));
-  if(V.VX&&V.VX.clearCache)V.VX.clearCache();
-  let t0=Date.now(); const tot=[0,0,0,0];
-  for(let sy=0;sy<16;sy++){const r=V.meshSection(jobs[sy]); tot[0]+=r.opaque.length/8; tot[1]+=r.cutout.length/8; tot[2]+=r.trans.length/8; tot[3]+=r.vx?r.vx.length/8:0;}
-  const first=Date.now()-t0;
-  t0=Date.now();
-  for(let k=0;k<3;k++)for(let sy=0;sy<16;sy++)V.meshSection(jobs[sy]);
-  console.log(`${name}: look ${(V.LOOK&&V.LOOK.mode)||'(none)'} · mesh 16 sections ${first} ms (cold VX cache) · x3 ${Date.now()-t0} ms · verts [opaque, cutout, trans, vx] ${JSON.stringify(tot)}`);
+  let cold=1e9, warm=1e9, painted=0; const tot=[0,0,0,0];
+  for(let k=0;k<5;k++){
+    if(V.VX&&V.VX.clearCache){V.VX.clearCache(); V.VX.stats.miss=0;}
+    let t0=performance.now();
+    for(let sy=0;sy<16;sy++){const r=V.meshSection(jobs[sy]); if(!k){tot[0]+=r.opaque.length/8; tot[1]+=r.cutout.length/8; tot[2]+=r.trans.length/8; tot[3]+=r.vx?r.vx.length/8:0;}}
+    cold=Math.min(cold,performance.now()-t0); painted=V.VX?V.VX.stats.miss:0;
+    t0=performance.now(); for(let sy=0;sy<16;sy++)V.meshSection(jobs[sy]); warm=Math.min(warm,performance.now()-t0);
+  }
+  console.log(`${name}: look ${(V.LOOK&&V.LOOK.mode)||'(none)'} · mesh 16 sections ${cold.toFixed(0)} ms cold / ${warm.toFixed(0)} ms warm (best of 5) · ${painted} VX pieces painted · verts [opaque, cutout, trans, vx] ${JSON.stringify(tot)}`);
 }
 scene('land 0,0', {}, 0, 0);
 scene('village 1,-13', {vgen:5}, 1, -13);

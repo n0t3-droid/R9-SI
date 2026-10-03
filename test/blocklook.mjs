@@ -1,0 +1,91 @@
+// Block look (v0.39): the same scene in "Klassisch" and "Nahtlos" — a grass hill, a stucco house with panorama glass
+// and Vollton trim, a mini-voxel cottage (plaster, timber, stacked and side-by-side windows, a roof), tech panels,
+// glass walls and plaza tiles. The look is switched live in between (re-mesh + texture rebuild), as a player would.
+// LOOKS=classic,seamless (default) · PRESET=high
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+const TAG = process.env.TAG || 'bl';
+const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
+const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const logs = [];
+page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail|missing/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
+page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
+await page.goto('file:///home/claude/vr/dist/index.html');
+const wait = (ms) => page.waitForTimeout(ms);
+const ev = (fn, arg) => page.evaluate(fn, arg);
+const step = async (n, dtms = 16) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
+const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && i > 2) break; await wait(60); } };
+const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: `/home/claude/vr/test/shots/${name}.png`, timeout: 180000 }); console.log('shot', name); };
+let fails = 0;
+const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
+for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
+const boot = await ev(() => ({ setting: VR.game.settings.look, look: VR.LOOK && VR.LOOK.mode, rim: VR.game.texRim }));
+check(boot.setting === 'classic' && boot.look === 'classic' && boot.rim === true, 'a new player starts in Klassisch (setting, registry and textures): ' + JSON.stringify(boot));
+const LOOKS = (process.env.LOOKS || 'classic,seamless').split(',');
+await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 6; g.settings.look = lk; g.applySettings('*'); }, [process.env.PRESET || 'high', LOOKS[0]]);
+await ev(`VR.game.createWorld({name:'Blocks',mode:'creative',difficulty:'peaceful',type:'flat',seed:'31',cheats:true,kit:true})`);
+for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
+await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; g.env.setTime(5200); });
+await settle(60);
+const base = await ev(() => {
+  const g = VR.game, w = g.world, p = g.player, R = VR.R;
+  const st = (n, pr) => { const t = R.byName[n]; if (!t) throw new Error('no block ' + n); return pr ? t.state(Object.assign({}, t.decode(t.defaultState), pr)) : t.defaultState; };
+  const ox = Math.floor(p.pos[0]) + 6, oz = Math.floor(p.pos[2]) - 40, y0 = Math.floor(p.pos[1]) - 1;
+  const list = [], put = (x, y, z, s) => list.push([ox + x, y0 + y, oz + z, typeof s === 'string' ? st(s) : s]);
+  for (let x = -4; x < 60; x++) for (let z = -4; z < 48; z++) for (let y = 1; y < 12; y++) put(x, y, z, 0);
+  // the hill (as in terrain_edit / ridge_seam): a dome and a ridge, grass over dirt
+  const G = st('grass_block'), D = st('dirt');
+  for (let z = 0; z < 44; z++) for (let x = 0; x < 30; x++) { const h = Math.round(6 * Math.exp(-((x - 16) ** 2 + (z - 22) ** 2) / 90) + 2 * Math.exp(-((x - 6) ** 2) / 12)); for (let y = 0; y <= h; y++) put(x, y, z, y < h ? D : G); }
+  // the stucco house: stucco walls, a Vollton band, panorama glass 3×2 and 2×2, a charcoal roof
+  const HX = 34, HZ = 4;
+  for (let x = 0; x < 9; x++) for (let z = 0; z < 7; z++) for (let y = 1; y <= 5; y++) {
+    const wall = x === 0 || x === 8 || z === 0 || z === 6;
+    if (y === 5) { put(HX + x, y, HZ + z, 'roof_charcoal'); continue; }
+    if (!wall) continue;
+    put(HX + x, y, HZ + z, y === 4 ? 'vollton_white' : 'stucco_white');
+  }
+  for (let x = 1; x <= 3; x++) for (let y = 2; y <= 3; y++) put(HX + x, y, HZ + 6, 'panorama_black');
+  for (let x = 5; x <= 6; x++) for (let y = 2; y <= 3; y++) put(HX + x, y, HZ + 6, 'panorama_black');
+  for (let z = 2; z <= 4; z++) for (let y = 2; y <= 3; y++) put(HX + 8, y, HZ + z, 'panorama_black');
+  // a low wall of Vollton colours in front of it, matte and gloss
+  ['cobalt', 'coral', 'sage', 'mustard', 'anthracite', 'sky', 'terracotta'].forEach((c, k) => { put(HX + 1 + k, 1, HZ + 9, 'vollton_' + c); put(HX + 1 + k, 2, HZ + 9, 'vollton_' + c + '_gloss'); });
+  // the mini-voxel cottage: plaster and timber walls, windows stacked and side by side, a red roof, plaza in front
+  const CX = 34, CZ = 22;
+  for (let x = 0; x < 9; x++) for (let z = 0; z < 6; z++) for (let y = 1; y <= 4; y++) {
+    const wall = x === 0 || x === 8 || z === 0 || z === 5;
+    if (!wall) continue;
+    put(CX + x, y, CZ + z, x <= 4 ? 'vx_plaster_cream' : 'vx_timber_white');
+  }
+  put(CX + 2, 2, CZ + 5, st('vx_window', { facing: 'south' })); put(CX + 2, 3, CZ + 5, st('vx_window', { facing: 'south' }));
+  put(CX + 5, 2, CZ + 5, st('vx_window', { facing: 'south' })); put(CX + 6, 2, CZ + 5, st('vx_window', { facing: 'south' }));
+  for (let x = -1; x <= 9; x++) { put(CX + x, 5, CZ + 0, st('vx_roof_red', { facing: 'south' })); put(CX + x, 5, CZ + 5, st('vx_roof_red', { facing: 'north' })); for (let z = 1; z <= 4; z++) put(CX + x, 5, CZ + z, 'vx_floor_oak'); }
+  for (let x = -1; x <= 9; x++) for (let z = 6; z <= 9; z++) put(CX + x, 0, CZ + z, 'vx_floor_plaza');
+  // tech panels, a glass wall and rugs beside it
+  for (let x = 0; x < 6; x++) for (let y = 1; y <= 4; y++) put(CX + 12 + x, y, CZ + 5, x < 3 ? 'vx_tech_white_strip' : 'vx_tech_gray');
+  for (let x = 0; x < 4; x++) for (let y = 1; y <= 3; y++) put(CX + 12 + x, y, CZ + 9, st('vx_glass_wall', { facing: 'north' }));
+  for (let x = 0; x < 3; x++) for (let z = 0; z < 2; z++) put(CX + 17 + x, 1, CZ + 9 + z, 'vx_rug_red');
+  w.bulkSet(list, false);
+  return [ox, y0, oz];
+});
+const [ox, y0, oz] = base;
+const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; }, [pos, yaw, pitch]); await settle(30); await step(6); await shot(TAG + '_' + name); };
+for (const lk of LOOKS) {
+  const t0 = Date.now();
+  const sw = await ev((lk) => { const g = VR.game; g.settings.look = lk; const changed = g.applyLook(); return { changed, look: VR.LOOK.mode }; }, lk);
+  // the textures come back from the worker: wait for them (the rim follows the look)
+  for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim)) break; await step(2); await wait(100); }
+  await settle(80);
+  const st = await ev(() => ({ look: VR.LOOK.mode, rim: VR.game.texRim, smooth: !!(VR.R.T.flags[VR.R.byName.grass_block.defaultState] & VR.F.SMOOTH) }));
+  check(st.look === lk && st.rim === (lk === 'classic') && st.smooth === (lk === 'seamless'), `${lk}: switched live in ${((Date.now() - t0) / 1000).toFixed(1)} s (${JSON.stringify(sw)} → ${JSON.stringify(st)})`);
+  // yaw 0 looks toward −z in this game
+  await look(lk + '_1_overview', [ox + 26, y0 + 15, oz + 48], 0.2, -0.38);
+  await look(lk + '_2_hill', [ox + 3, y0 + 8, oz + 46], -0.35, -0.3);
+  await look(lk + '_3_stucco', [ox + 40, y0 + 3.2, oz + 17], -0.2, -0.16);
+  await look(lk + '_4_cottage', [ox + 40, y0 + 4, oz + 36], 0.05, -0.18);
+  await look(lk + '_5_tech', [ox + 52, y0 + 3, oz + 38], 0.2, -0.12);
+  // physics: walk up the hill's flank — steps (Klassisch) or slope (Nahtlos)
+  const trace = await ev(([ox, y0, oz]) => { window.__norender = true; const g = VR.game, p = g.player; p.flying = false; p.noclip = false; p.teleport(ox + 1.5, y0 + 3, oz + 22.5); p.yaw = -Math.PI / 2; p.pitch = 0; const out = []; for (let i = 0; i < 200; i++) { p.vel[0] = 4; g.last = performance.now() - 16; g.loop(performance.now()); if (i % 25 === 0) out.push(+(p.pos[1] - y0).toFixed(2)); } return out; }, base);
+  console.log(`${lk}: walking up the hill, heights`, JSON.stringify(trace));
+}
+console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);
+console.log(fails ? 'FAIL ' + fails : 'OK');
+await browser.close();
