@@ -100,8 +100,8 @@
   const PAT = {};
   // flat walls (plaster, adobe) in the Klassisch look: a slightly darker line on each block's low edges (u 0, v 0),
   // so the wall shows its blocks like every other block does
-  const seam = (u, v) => (u === 0 || v === 0) && !VR.LOOK.vxJoin;
-  PAT.plaster = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.985 + ((c.h & 1) ? 0.03 : 0)) * (seam(u, v) ? 0.93 : 1)); };
+  const blockSeam = (u, v) => (u === 0 || v === 0) && !VR.LOOK.vxJoin;
+  PAT.plaster = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.985 + ((c.h & 1) ? 0.03 : 0)) * (blockSeam(u, v) ? 0.93 : 1)); };
   PAT.timber = (s, u, v, c, d) => {
     // posts every two blocks, rails at the block top, a diagonal brace across each two-block panel
     const along = (d === 0 || d === 1) ? c.pz : c.px;
@@ -140,7 +140,7 @@
     if (edge) { P0 = -1; P1 = s.col2; } else { P0 = sh(mix(s.col, (id >> 12) & 1 ? 0x8A8070 : s.col, 0.3), k); P1 = sh(s.col, k * 0.8); }
   };
   PAT.sandstone = (s, u, v, c) => { const line = v === 3 || v === 7; P0 = line ? -1 : sh(s.col, v < 3 ? 1.0 : 0.97); P1 = sh(s.col, 0.82); };
-  PAT.adobe = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.98 + (c.h & 1) * 0.03) * (seam(u, v) ? 0.93 : 1)); };
+  PAT.adobe = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.98 + (c.h & 1) * 0.03) * (blockSeam(u, v) ? 0.93 : 1)); };
   PAT.hull = (s, u, v, c) => {
     const seam = u === 0 || v === 0;
     const stripe = s.stripe && ((c.py + (c.h >> 1)) & 3) === 1 && (v === 3 || v === 4);
