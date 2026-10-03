@@ -1,9 +1,10 @@
 // ============================================================================
 // Starships (mini-voxel vehicles): designs are built & meshed in workers,
 // parked ships are solid (you can walk on their wings), right-click boards,
-// mouse steers, gear retracts in flight, V lands them snapped to the block
-// grid. Outposts park one on their pad; the shipyard conjures any design.
-// Also renders ships for the sky traffic.
+// the flight model (flight.js) flies them — the mouse looks, the keys fly, V
+// sets the ship down on its gear right where it is. Outposts park one on
+// their pad; the shipyard conjures any design. Also renders ships for the sky
+// traffic.
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -78,15 +79,31 @@
     }
     buildCells(d) {
       const o = d.occ, m = d.meta, org = m.origin, R0 = m.res;
-      const all = [], surf = [];
+      const all = [], surf = [], bot = [];
       const at = (i, j, k) => i >= 0 && j >= 0 && k >= 0 && i < o.bx && j < o.by && k < o.bz && o.occ[(j * o.bz + k) * o.bx + i];
+      let lo = null, hi = null;
       for (let j = 0; j < o.by; j++) for (let k = 0; k < o.bz; k++) for (let i = 0; i < o.bx; i++) {
         if (!at(i, j, k)) continue;
         const lx = org[0] + i + 0.5, ly = org[1] + j + 0.5, lz = org[2] + k + 0.5;
         all.push(lx, ly, lz);
         if (!at(i + 1, j, k) || !at(i - 1, j, k) || !at(i, j + 1, k) || !at(i, j - 1, k) || !at(i, j, k + 1) || !at(i, j, k - 1)) surf.push(lx, ly, lz);
+        if (!at(i, j - 1, k)) bot.push(lx, ly, lz);
+        if (!lo || lx < lo[0]) lo = [lx, ly, lz]; if (!hi || lx > hi[0]) hi = [lx, ly, lz];
       }
-      d.cells = new Float32Array(surf); d.allCells = new Float32Array(all);
+      d.cells = new Float32Array(surf); d.allCells = new Float32Array(all); d.bottom = new Float32Array(bot);
+      // flight: up to 16 belly points spread over the underside (support when the gear is up), the wingtips
+      const belly = [];
+      for (let n = 0; n < bot.length; n += 3) belly.push([bot[n], bot[n + 1] - 0.5, bot[n + 2]]);
+      belly.sort((a, b) => a[1] - b[1]);
+      const low = belly.filter(q => q[1] <= belly[0][1] + 1.01);
+      const pick = [];
+      if (low.length) {
+        const ext = (f) => low.reduce((a, q) => (f(q) > f(a) ? q : a), low[0]);
+        for (const f of [(q) => -q[0], (q) => q[0], (q) => -q[2], (q) => q[2], (q) => -q[0] - q[2], (q) => q[0] - q[2], (q) => -q[0] + q[2], (q) => q[0] + q[2]]) { const q = ext(f); if (pick.indexOf(q) < 0) pick.push(q); }
+        for (let n = 0; n < low.length && pick.length < 16; n += Math.max(1, Math.floor(low.length / 8))) if (pick.indexOf(low[n]) < 0) pick.push(low[n]);
+      }
+      d.belly = pick;
+      d.wingtips = lo && hi ? [[lo[0] - 0.3, lo[1], lo[2]], [hi[0] + 0.3, hi[1], hi[2]]] : null;
       void R0;
     }
     free(d) { const gl = this.g.renderer.gl; if (d.gpu) for (const k in d.gpu) { const p = d.gpu[k]; if (p) { gl.deleteBuffer(p.vbo); gl.deleteVertexArray(p.vao); } } d.gpu = null; }
@@ -167,243 +184,86 @@
       }
       return best;
     }
-    hits(s, px, py, pz, yaw) {
-      const w = this.g.world, T = R.T, cells = s.d.cells; if (!cells) return false;
+    // does the hull (its surface cells, or every cell with all) touch solid blocks at this pose?
+    hits(s, px, py, pz, yaw, all) {
+      const w = this.g.world, T = R.T, cells = all ? s.d.allCells : s.d.cells; if (!cells) return false;
       const c = Math.cos(yaw), sn = Math.sin(yaw);
       for (let n = 0; n < cells.length; n += 3) {
         const y = Math.floor(py + cells[n + 1]); if (y < 1) return true; if (y >= VR.MAXY) continue;
         const b = w.getBlock(Math.floor(px + cells[n] * c + cells[n + 2] * sn), y, Math.floor(pz - cells[n] * sn + cells[n + 2] * c));
         if (b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE)) return true;
       }
+      // the underside rests on the ground: its cells count down to just above their bottom face
+      const bot = s.d.bottom;
+      if (bot) for (let n = 0; n < bot.length; n += 3) {
+        const y = Math.floor(py + bot[n + 1] - 0.45); if (y < 1) return true; if (y >= VR.MAXY) continue;
+        const b = w.getBlock(Math.floor(px + bot[n] * c + bot[n + 2] * sn), y, Math.floor(pz - bot[n] * sn + bot[n + 2] * c));
+        if (b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE)) return true;
+      }
       return false;
     }
-    // ---------------------------------------------------------------- piloting
+    // ---------------------------------------------------------------- piloting (flight.js does the flying)
+    // the ship as the flight model sees it (ship-frame metres, origin on the ground under the ship's middle)
+    body(s) {
+      const mgr = this, d = s.d, m = d.meta, B = m.bounds;
+      const agility = { racer: 1.25, interceptor: 1.2, gunship: 0.95, dropship: 0.9, freighter: 0.75, cruiser: 0.65, carrier: 0.45 }[m.arch] || 1;
+      return {
+        kind: 'starship', ship: s,
+        get pos() { return s.pos; }, get vel() { return s.vel; },
+        get heading() { return s.yaw; }, set heading(v) { s.yaw = v; },
+        setAttitude(pitch, roll) { s.pitch = pitch; s.roll = roll; mgr.rotOf(s); },
+        setGear(v) { s.gear = v; },
+        setDip(v) { s.dip = v; },
+        hits: (x, y, z, h) => mgr.hits(s, x, y, z, h),
+        overlaps: (x, y, z, h) => mgr.hits(s, x, y, z, h, true),
+        cruiseBase: m.speed, agility,
+        eye: m.eye, seat: m.seat, center: [0, m.height * 0.5, (B[2] + B[5]) * 0.5], bottom: 0,
+        radius: Math.max(m.length, m.width) * 0.5, length: m.length, width: m.width, height: m.height,
+        extent: [Math.max(Math.abs(B[0]), Math.abs(B[3])), Math.max(Math.abs(B[2]), Math.abs(B[5]))],
+        gearFeet: (m.gear || []).map(q => [q[0], 0, q[1]]), belly: d.belly || [], exhaust: m.exhaust, guns: m.guns, wingtips: d.wingtips,
+        name: m.name, label: m.label,
+      };
+    }
     board(s, p) {
       const g = this.g, gad = g.gadgets;
-      if (!s.d.meta || this.pilot || (gad && gad.riding)) return;
+      if (!s.d.meta || !s.d.cells || this.pilot || (gad && gad.riding) || !VR.Flight) return;
       this.pilot = s; s.state = 'flying';
       if (gad) gad.riding = { type: 'starship', ship: s };
-      p.flying = false; p.target = null; p.breaking = null; p.yaw = s.yaw; p.pitch = 0;
+      p.flying = false; p.target = null; p.breaking = null;
+      // the flight (and the view you chose) stays with the ship
+      if (!s.flight) s.flight = new VR.Flight(g, this.body(s));
+      s.flight.enter();
       g.audio.play('door');
-      g.ui.hint(`${s.d.meta.name} · W thrust · mouse steer · Space/Shift up/down · G autopilot to a village · V land`, 4000);
+      g.ui.hint(`${s.d.meta.name} · W/S throttle · A/D turn · Space/Shift climb · mouse looks (hold right button to steer) · B boost · C view · G autopilot · V land`, 5000);
       g.codex && g.codex.event && g.codex.event('ship');
+      this.refreshNear(true);
     }
     drive(dt, input, blocked) {
-      const g = this.g, p = g.player, s = this.pilot, m = s.d.meta;
-      const k = (c) => !blocked && !g.ui.typing && input.down(c);
-      if (!blocked && input.hit('KeyV')) { this.auto = null; this.land(); return; }
-      if (!blocked && !g.ui.typing && input.hit('KeyG')) this.toggleAuto();
-      let fw = (k('KeyW') ? 1 : 0) - (k('KeyS') ? 1 : 0), st = (k('KeyD') ? 1 : 0) - (k('KeyA') ? 1 : 0);
-      let up = (k('Space') ? 1 : 0) - (k('ShiftLeft') || k('ShiftRight') ? 1 : 0);
-      let boost = k('ControlLeft') || k('ControlRight') ? 1.7 : 1;
-      const agile = m.arch === 'racer' || m.arch === 'interceptor' ? 2.4 : m.arch === 'freighter' || m.arch === 'cruiser' ? 0.9 : m.arch === 'carrier' ? 0.45 : 1.6;
-      let wantYaw = p.yaw, steer = !k('AltLeft');
-      // autopilot: any flight key hands the controls back
-      if (this.auto && (fw || st || up)) this.stopAuto('Autopilot off — you have the controls.');
-      if (this.auto) {
-        const a = this.autoDrive(dt, s, m, agile);
-        if (a === 'landed') return;
-        if (a) { fw = a.fw; up = a.up; st = a.st || 0; boost = a.boost; wantYaw = a.yaw; steer = true; }
-      }
-      let turn = 0;
-      if (steer) { const dd = wrapA(wantYaw - s.yaw); turn = M.clamp(dd, -agile * dt, agile * dt); }
-      if (turn && !this.hits(s, s.pos[0], s.pos[1], s.pos[2], s.yaw + turn)) { s.yaw += turn; if (this.auto) p.yaw += turn; } else turn = 0; // on autopilot your view turns with the ship
-      s.turnVel += (turn / Math.max(dt, 1e-3) - s.turnVel) * Math.min(1, dt * 6);
-      const vmax = m.speed * boost, fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw), rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
-      const tv = [fx * fw * vmax + rx * st * vmax * 0.4, up * Math.min(22, vmax * 0.6), fz * fw * vmax + rz * st * vmax * 0.4];
-      const acc = 1 - Math.exp(-dt * (fw || st || up ? 1.4 : 0.9));
-      for (let i = 0; i < 3; i++) s.vel[i] += (tv[i] - s.vel[i]) * acc;
-      for (const ax of [0, 2, 1]) {
-        const dd = s.vel[ax] * dt; if (!dd) continue;
-        const np = s.pos.slice(); np[ax] += dd;
-        if (ax === 1 && np[1] + m.height > 254) { s.vel[1] = 0; continue; }
-        if (this.hits(s, np[0], np[1], np[2], s.yaw)) { if (Math.abs(s.vel[ax]) > 10) { g.audio.play('explode', { vol: 0.25 }); g.damageFlash = 0.3; } s.vel[ax] *= -0.12; }
-        else s.pos[ax] = np[ax];
-      }
-      s.roll += (M.clamp(s.turnVel * 0.4, -0.55, 0.55) - s.roll) * (1 - Math.exp(-dt * 3));
-      s.pitch += (M.clamp(s.vel[1] * 0.02 - fw * 0.02, -0.25, 0.25) - s.pitch) * (1 - Math.exp(-dt * 3));
-      this.rotOf(s);
-      // gear retracts once airborne
-      const alt = s.pos[1] - (this.groundY(s, s.pos[1] + 1, 6) || -99);
-      s.gear += ((alt > 2.5 ? 0 : 1) - s.gear) * Math.min(1, dt * 2);
-      // engines
-      const speed = Math.hypot(s.vel[0], s.vel[1], s.vel[2]);
-      const thrust = Math.min(1, (Math.abs(fw) + Math.abs(up) * 0.6 + Math.abs(st) * 0.4) * boost);
-      g.audio.loop('engine', 0.16 + thrust * 0.32, 0.3 + Math.min(1, speed / 60) * 0.9);
-      if (g.trails) for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine('pilot' + ei, s.toWorld([e[0], e[1], e[2] + 0.3]), speed, { thrust: Math.max(0.15, thrust), size: e[3], col: boost > 1 ? [0.35, 0.9, 1] : [0.55, 0.5, 1] }); }
-      for (const e of m.exhaust) {
-        if (Math.random() > 0.3 + thrust * 0.7) continue;
-        const wp = s.toWorld([e[0], e[1], e[2] + 0.2]), dir = s.dirWorld([0, 0, 1]), v = 6 + thrust * 16;
-        g.particles.spawn(wp[0] + (Math.random() - 0.5) * e[3], wp[1] + (Math.random() - 0.5) * e[3], wp[2], dir[0] * v + s.vel[0] * 0.7, dir[1] * v + s.vel[1] * 0.7, dir[2] * v + s.vel[2] * 0.7, { life: 0.16 + thrust * 0.22, size: e[3] * (0.5 + thrust * 0.5), grav: 0, col: boost > 1 ? [0.55, 0.85, 1] : [1, 0.62, 0.28], emis: 1, drag: 2, grow: 0.7, collide: false });
-      }
-      // lasers
+      const g = this.g, p = g.player, s = this.pilot, m = s.d.meta, fl = s.flight;
+      if (fl.update(dt, input, blocked) === 'exit') { this.exit(); return; }
+      // lasers (they fly where you look)
       this.fireCool -= dt;
       const fire = input.dragLook ? input.clickAction(0) : input.mouse.down[0];
-      if (!blocked && fire && this.fireCool <= 0 && g.entities) {
+      if (!blocked && !g.ui.typing && fire && this.fireCool <= 0 && g.entities && this.armed(fl)) {
         this.fireCool = 0.15;
         const guns = m.guns.length ? m.guns : [[-1, m.eye[1] - 0.6, m.bounds[2] - 0.5], [1, m.eye[1] - 0.6, m.bounds[2] - 0.5]];
         const look = p.lookDir();
-        for (const gp of guns) g.entities.fireBolt(s.toWorld(gp), look, 120, 10, p, [0.4, 1, 1]);
+        for (const gp of guns) g.entities.fireBolt(fl.toWorld(gp), look, 120, 10, p, [0.4, 1, 1]);
       }
       if (s.pos[1] > 230) g.codex && g.codex.event && g.codex.event('orbit');
-      const eye = s.toWorld(m.eye);
+      const eye = fl.eyeWorld();
       p.pos = [eye[0], eye[1] - p.eye, eye[2]]; p.vel = s.vel.slice(); p.fallStart = null;
     }
-    // ---------------------------------------------------------------- autopilot: fly me to the next village
-    autoTargets() {
-      const g = this.g, V = g.villages, s = this.pilot; if (!V || !s) return [];
-      return V.list().filter(v => Math.hypot(v.x - s.pos[0], v.z - s.pos[2]) > 140).sort((a, b) => Math.hypot(a.x - s.pos[0], a.z - s.pos[2]) - Math.hypot(b.x - s.pos[0], b.z - s.pos[2]));
-    }
-    toggleAuto() {
-      const g = this.g, s = this.pilot; if (!s) return;
-      const list = this.autoTargets();
-      if (!list.length) { g.ui.hint('Autopilot: no other village within 900 blocks yet — fly on and try again', 2600); return; }
-      // G cycles through the villages, nearest first, then switches the autopilot off
-      let i = 0;
-      if (this.auto) { i = list.findIndex(v => v.id === this.auto.site.id) + 1; if (i <= 0 || i >= Math.min(list.length, 6)) { this.stopAuto('Autopilot off.'); return; } }
-      this.startAuto(list[i]);
-    }
-    startAuto(site) {
-      const g = this.g, s = this.pilot, m = s.d.meta;
-      const dx = site.x - s.pos[0], dz = site.z - s.pos[2], L = Math.hypot(dx, dz) || 1;
-      // touch down just outside the houses, on the side we arrive from
-      const RAD = site.rad || (VR.VillageGen && VR.VillageGen.RAD) || 58;
-      const A = this.auto = { site, spot: null, cruise: Math.max(s.pos[1] + 18, site.y + 60, 120), t: 0, tries: 0, climb: 0, dist: L, eta: 0, refined: false };
-      const base = Math.atan2(-dx, -dz), cand = [];
-      for (const off of [0, 0.45, -0.45, 0.9, -0.9, 1.4, -1.4]) {
-        const a = base + off, r = RAD + 10 + Math.max(m.length, m.width) * 0.5;
-        cand.push([Math.round(site.x + Math.sin(a) * r), Math.round(site.z + Math.cos(a) * r)]);
-      }
-      const pts = [];
-      for (const c of cand) for (const [ox, oz] of [[0, 0], [-6, -6], [6, -6], [-6, 6], [6, 6]]) pts.push([c[0] + ox, c[1] + oz]);
-      // cruise altitude clears the highest ground under the whole route
-      const N = Math.min(60, Math.ceil(L / 24));
-      for (let i = 1; i <= N; i++) pts.push([Math.round(s.pos[0] + dx * i / N), Math.round(s.pos[2] + dz * i / N)]);
-      g.pool.direct(0, { type: 'surface', dim: g.dim || 'overworld', points: pts }, null, (msg) => {
-        if (this.auto !== A || !msg.res || A.refined) return;
-        const H = msg.res, SEA = VR.C.SEA;
-        let best = null, bv = 1e9;
-        cand.forEach((c, k) => { const hs = H.slice(k * 5, k * 5 + 5); const mn = Math.min(...hs), mx = Math.max(...hs); const v = (mx - mn) * 2 + k * 0.8 + (mn <= SEA + 1 ? 40 : 0); if (v < bv) { bv = v; best = [c[0] + 0.5, mx + 1, c[1] + 0.5]; } });
-        A.spot = best;
-        let top = 0; for (let i = cand.length * 5; i < H.length; i++) top = Math.max(top, H[i]);
-        A.cruise = M.clamp(Math.max(top + 34, (best ? best[1] : site.y) + 45), 100, 236);
-      });
-      g.ui.chatLine(`Autopilot engaged → ${site.name} (${(L / 1000).toFixed(1)} km). G: next village · any flight key takes the controls · V lands now.`, '#9affd8');
-      g.audio && g.audio.tone && g.audio.tone(660, 0.08, 0.1, 'triangle', true);
-    }
-    stopAuto(msg) { if (!this.auto) return; this.auto = null; if (msg) this.g.ui.hint(msg, 2200); }
-    // near the destination, pick a real landing field from the loaded chunks: flat, dry, no trees or houses
-    refineSpot(A, s, m) {
-      const g = this.g, w = g.world, T = R.T, VG = VR.VillageGen, site = A.site, RAD = site.rad || (VG && VG.RAD) || 58;
-      const b = m.bounds, hx = Math.ceil(Math.max(Math.abs(b[0]), Math.abs(b[3]))) + 1, hz = Math.ceil(Math.max(Math.abs(b[2]), Math.abs(b[5]))) + 1;
-      const BAD = /leaves|log|wood|vx_|glass|fence|door|wheat|carrot|potato|beet|farmland|planks|bed|lamp|torch|chest|landing_pad|hazard|crystal|ice$/;
-      // ground height at a column: -1 water / trees / houses / crops, null not loaded yet
-      const ground = (x, z) => {
-        const c = w.col(x >> 4, z >> 4); if (!c || !c.ready) return null;
-        let y = c.height[((z & 15) << 4) | (x & 15)];
-        for (let k = 0; k < 3 && y > 1; k++) { const bl = w.getBlock(x, y, z); if (bl && (T.flags[bl] & F.SOLID)) break; y--; }
-        const bl = w.getBlock(x, y, z);
-        if (!bl || (T.flags[bl] & (F.WATER | F.LAVA))) return -1;
-        const t = R.types[T.type[bl]];
-        if (t && BAD.test(t.name)) return -1;
-        return y;
-      };
-      let best = null, bs = 1e9, missing = 0;
-      const a0 = Math.atan2(s.pos[0] - site.x, s.pos[2] - site.z);
-      for (const rho of [RAD - 4, RAD + 4, RAD + 12, RAD + 22, RAD + 34, RAD + 48, RAD + 64]) for (let k = 0; k < 20; k++) {
-        const a = a0 + (k % 2 ? -1 : 1) * Math.ceil(k / 2) * (Math.PI / 10);
-        for (const rot of [0, 1]) {
-          const ex = rot ? hz : hx, ez = rot ? hx : hz;
-          const cx = Math.round(site.x + Math.sin(a) * (rho + Math.max(ex, ez) * 0.5)), cz = Math.round(site.z + Math.cos(a) * (rho + Math.max(ex, ez) * 0.5));
-          let mn = 999, mx = -1, bad = 0, n = 0, miss = false;
-          for (let dz = -ez; dz <= ez && !miss; dz += 2) for (let dx = -ex; dx <= ex; dx += 2) {
-            const y = ground(cx + dx, cz + dz); n++;
-            if (y === null) { miss = true; break; }
-            if (y < 0) { bad++; continue; }
-            if (y < mn) mn = y; if (y > mx) mx = y;
-          }
-          if (miss) { missing++; continue; }
-          if (mx < 0 || bad > n * 0.35) continue;
-          const score = rho + Math.max(0, mx - mn - 1) * 6 + bad * 30 + Math.ceil(k / 2) * 3;
-          if (score < bs) { bs = score; best = [cx + 0.5, mx + 1, cz + 0.5, bad]; }
-        }
-      }
-      A.refineTries = (A.refineTries || 0) + 1;
-      if (best && (!best[3] || !missing || A.refineTries > 6)) { A.spot = best.slice(0, 3); A.refined = true; }
-      else if (!missing || A.refineTries > 6) A.refined = true; // keep the surveyed spot
-    }
-    autoDrive(dt, s, m, agile) {
-      const g = this.g, w = g.world, A = this.auto;
-      A.t += dt;
-      const site = A.site;
-      const d0 = Math.hypot(site.x - s.pos[0], site.z - s.pos[2]);
-      if (!A.refined && d0 < 150 && (A.refineT = (A.refineT || 0) - dt) <= 0) { A.refineT = 0.5; this.refineSpot(A, s, m); }
-      const tgt = A.spot || [site.x + 0.5, site.y + 1, site.z + 0.5];
-      const dx = tgt[0] - s.pos[0], dz = tgt[2] - s.pos[2], dist = Math.hypot(dx, dz);
-      A.dist = dist;
-      const yaw = Math.atan2(-dx, -dz), off = Math.abs(wrapA(yaw - s.yaw));
-      const speed = Math.hypot(s.vel[0], s.vel[2]);
-      A.eta = speed > 1 ? dist / speed : 0;
-      const vcruise = Math.min(110, m.speed * 1.5), brake = Math.max(70, vcruise * 2.2);
-      // altitude: cruise high, glide down over the last stretch
-      let alt = A.cruise;
-      if (dist < brake) alt = tgt[1] + 2 + (A.cruise - tgt[1] - 2) * Math.max(0, (dist - 5) / brake) ** 1.4;
-      // obstacles ahead in the direction of travel (sky islands, a mountain the survey missed): pull up
-      if (dist > 20) {
-        const look = Math.min(1.4, 8 / Math.max(1, speed) + 0.6);
-        if (this.hits(s, s.pos[0] + s.vel[0] * look, s.pos[1] + 1, s.pos[2] + s.vel[2] * look, s.yaw) || this.hits(s, s.pos[0] + s.vel[0] * look * 0.5, s.pos[1] + 1, s.pos[2] + s.vel[2] * look * 0.5, s.yaw)) A.climb = 1.6;
-      }
-      A.climb = Math.max(0, A.climb - dt);
-      if (A.climb > 0) { alt = Math.max(alt, s.pos[1] + 14); if (dist > brake) A.cruise = Math.min(236, Math.max(A.cruise, s.pos[1] + 10)); }
-      const up = M.clamp((alt - s.pos[1]) / 7, -1, 1);
-      // final approach: hold the heading and slide sideways onto the spot
-      if (dist < 18) {
-        if (A.finalYaw === undefined) A.finalYaw = s.yaw;
-        const vmax = m.speed, vd = Math.min(7, dist * 0.9) / Math.max(dist, 1e-3);
-        const vx = dx * vd, vz = dz * vd, fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw), rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
-        const fw = M.clamp((vx * fx + vz * fz) / vmax, -1, 1), st = M.clamp((vx * rx + vz * rz) / (vmax * 0.4), -1, 1);
-        // touch down once the ground there is loaded and we're right above it
-        const resting = dist < 2.5 && this.hits(s, s.pos[0], s.pos[1] - 0.6, s.pos[2], s.yaw);
-        if (dist < 2.5 && (s.pos[1] - tgt[1] < 5 || resting)) {
-          const c = w.col(Math.floor(tgt[0]) >> 4, Math.floor(tgt[2]) >> 4);
-          if (c && c.ready) {
-            const name = site.name;
-            this.auto = null;
-            if (this.land() !== false && !this.pilot) { g.ui.chatLine(`Welcome to ${name}!`, '#ffd98a'); g.ui.hint(`Welcome to ${name}!`, 3000); if (g.codex && g.codex.event) g.codex.event('autopilot'); return 'landed'; }
-            // no room: try another field
-            this.auto = A; A.tries++; A.refined = false; A.refineT = 0; A.finalYaw = undefined;
-            if (A.tries > 4) { this.stopAuto('Autopilot: no room to land — take the controls (V lands)'); return null; }
-            const a = Math.random() * Math.PI * 2; A.spot = [tgt[0] + Math.cos(a) * 14, tgt[1], tgt[2] + Math.sin(a) * 14];
-          }
-        }
-        return { fw, st, up: dist < 6 ? up : Math.max(up, -0.3), boost: 1, yaw: A.finalYaw };
-      }
-      A.finalYaw = undefined;
-      // throttle: gentle while climbing out or turning, slower on the approach
-      let fw = 1;
-      if (s.pos[1] < Math.min(alt, A.cruise) - 25 && dist > brake) fw = 0.35;
-      if (off > 0.5) fw = Math.min(fw, 0.3);
-      if (A.climb > 0) fw = Math.min(fw, 0.15);
-      if (dist < brake) fw = Math.min(fw, M.clamp(dist / brake, 0.12, 1));
-      const boost = dist > brake * 1.5 && off < 0.2 && A.climb <= 0 ? vcruise / m.speed : 1;
-      return { fw, st: 0, up, boost, yaw };
-    }
-    land() {
+    armed(fl) { return !fl.weapons || fl.weapons.armed !== false; }
+    // get out (V once landed; quitting or saving parks the ship wherever it is)
+    exit() {
       const g = this.g, s = this.pilot, p = g.player;
       if (!s) return;
-      const yaw = Math.round(s.yaw / QT) * QT;
-      const old = [s.pos.slice(), s.yaw, s.pitch, s.roll];
-      s.yaw = yaw; s.pitch = 0; s.roll = 0;
-      s.pos[0] = Math.round(s.pos[0]); s.pos[2] = Math.round(s.pos[2]);
-      let y = this.groundY(s, s.pos[1] + 0.5, 40);
-      if (y === null || s.pos[1] - y > 40) y = Math.round(s.pos[1]); // hover-park in the sky
-      let ok = false;
-      for (let k = 0; k < 8 && !ok; k++) { if (!this.hits(s, s.pos[0], y + k, s.pos[2], s.yaw)) { y += k; ok = true; } }
-      if (!ok) { s.pos = old[0]; s.yaw = old[1]; s.pitch = old[2]; s.roll = old[3]; this.rotOf(s); g.ui.hint('No room to land here', 1800); return false; }
-      s.pos[1] = y; s.vel = [0, 0, 0]; s.state = 'parked'; s.gear = 1; this.rotOf(s);
+      if (s.flight) s.flight.leave();
+      s.vel[0] = 0; s.vel[1] = 0; s.vel[2] = 0; s.state = 'parked'; s.gear = 1; s.dip = 0;
       this.pilot = null;
       if (g.gadgets) g.gadgets.riding = null;
-      g.audio.loop('engine', 0); g.audio.play('door');
+      g.audio.play('door');
       // step out on the port side
       const m = s.d.meta, side = s.toWorld([m.bounds[0] - 1.2, 0.2, (m.bounds[2] + m.bounds[5]) * 0.5]);
       const spot = g.gadgets ? g.gadgets.freeSpot([[side[0], Math.floor(side[1]), side[2]], [side[0], Math.floor(side[1]) + 1, side[2]], [s.pos[0], s.pos[1] + m.height + 0.2, s.pos[2]]]) : side;
@@ -411,6 +271,17 @@
       g.ui.vehicleHud(null);
       this.refreshNear(true);
     }
+    // V: landed → get out, flying → the assisted landing
+    land() {
+      const fl = this.pilot && this.pilot.flight; if (!fl) return false;
+      if (fl.state === 'landed') { this.exit(); return true; }
+      fl.assistLand(true); return false;
+    }
+    // the autopilot lives in the flight model (the villagers' shuttle ride starts it from here)
+    get auto() { const fl = this.pilot && this.pilot.flight; return fl ? fl.auto : null; }
+    toggleAuto() { const fl = this.pilot && this.pilot.flight; if (fl) fl.toggleAuto(); }
+    startAuto(site) { const fl = this.pilot && this.pilot.flight; if (fl) fl.startAuto(site); }
+    stopAuto(msg) { const fl = this.pilot && this.pilot.flight; if (fl) fl.stopAuto(msg); }
     // ---------------------------------------------------------------- per frame
     update(dt) {
       const g = this.g, p = g.player;
@@ -427,26 +298,18 @@
       void force;
     }
     hudText() {
-      const s = this.pilot; if (!s || !s.d.meta) return null;
-      const sp = Math.hypot(s.vel[0], s.vel[1], s.vel[2]), hd = ((Math.round(-s.yaw * 180 / Math.PI) % 360) + 360) % 360;
-      const ap = this.auto ? `<br><b style="color:#9affd8">AUTOPILOT → ${this.auto.site.name.toUpperCase()} · ${(this.auto.dist / 1000).toFixed(2)} km</b>` : '';
-      return `<b>${Math.round(sp)} m/s</b> · ALT ${Math.round(s.pos[1])} · HDG ${hd}° · ${s.d.meta.name}${ap}<br><small>W/S thrust · mouse steer · A/D strafe · Space/Shift climb · Ctrl boost · LMB lasers · F5 view · <b>G autopilot</b> · <b>V land</b></small>`;
+      const s = this.pilot; if (!s || !s.d.meta || !s.flight) return null;
+      const fl = s.flight, I = fl.info(), A = I.auto;
+      const ap = A ? `<br><b style="color:#9affd8">AUTOPILOT → ${A.site.name.toUpperCase()} · ${(A.dist / 1000).toFixed(2)} km</b>` : '';
+      const st = I.state === 'landed' ? ' · <b>LANDED</b>' : I.state === 'landing' ? ' · <b>LANDING</b>' : '';
+      return `<b>${Math.round(I.speed)} m/s</b> · ALT ${Math.round(I.alt)} · HDG ${Math.round(I.heading)}° · THR ${Math.round(I.throttle * 100)}%${I.boost ? ' · <b style="color:#7ad8ff">BOOST</b>' : ''} · ${s.d.meta.name}${st}${ap}<br><small>W/S throttle · A/D turn · Space/Shift climb · B boost · X hover · right mouse steers · C view · F gear · <b>G autopilot</b> · <b>V land</b></small>`;
     }
-    camera(cam) {
-      const g = this.g, s = this.pilot, p = g.player, m = s.d.meta;
-      const sp = Math.hypot(s.vel[0], s.vel[1], s.vel[2]), fovK = 1 + Math.min(0.15, sp / 500);
-      if (g.camMode === 0) { const e = s.toWorld(m.eye); return Object.assign(cam, { x: e[0], y: e[1], z: e[2], roll: s.roll * 0.6, fixed: true, fov: cam.fov * fovK }); }
-      const rad = Math.max(m.length, m.width) * 0.5;
-      const dist = Math.max(8, rad * (g.camMode === 1 ? 1.9 : 3));
-      const target = s.toWorld([0, m.height * 0.5, (m.bounds[2] + m.bounds[5]) * 0.5]);
-      const c = g.gadgets ? g.gadgets.chase(target, dist, rad * 0.3, p) : target;
-      return Object.assign(cam, { x: c[0], y: c[1], z: c[2], roll: 0, fixed: true, fov: cam.fov * fovK, far: cam.far + 60 });
-    }
+    camera(cam) { return this.pilot.flight.camera(cam); }
     // ---------------------------------------------------------------- rendering (vox program)
     modelMat(s, cam, stretch) {
       const m = this.m, md = s.d.meta, res = md.res;
       m.set(IDENT);
-      mat4.translate(m, m, s.pos[0] - cam.x, s.pos[1] - cam.y, s.pos[2] - cam.z);
+      mat4.translate(m, m, s.pos[0] - cam.x, s.pos[1] + (s.dip || 0) - cam.y, s.pos[2] - cam.z);
       mat4.rotY(m, m, s.yaw);
       if (s.pitch) mat4.rotX(m, m, s.pitch);
       if (s.roll) mat4.rotZ(m, m, s.roll);
@@ -509,7 +372,7 @@
       meta.starships = this.ships.filter(s => s.d.meta).map(s => ({ seed: s.d.seed, arch: s.d.meta.arch, palette: s.d.palette || null, pos: s.pos.map(v => Math.round(v * 100) / 100), yaw: s.yaw, key: s.key }));
       meta.starshipSpawns = [...this.spawned];
     }
-    shutdown() { if (this.pilot) this.land(); }
+    shutdown() { if (this.pilot) this.exit(); }
     destroy() { for (const d of this.designs.values()) this.free(d); this.designs.clear(); this.ships = []; this.near = []; }
   }
   VR.Starships = Starships;

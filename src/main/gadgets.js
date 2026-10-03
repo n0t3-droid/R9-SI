@@ -687,9 +687,10 @@
       this.riding = { type: 'ship' };
       p.flying = false; p.target = null; p.breaking = null; p.pitch = 0;
       p.yaw = S.yaw0;
+      if (VR.Flight) S.flight = new VR.Flight(g, this.shipBody(S));
       this.requestShipMesh(S);
-      this.say(`Helm engaged · ${S.count} blocks · ${S.thrusters.length} thrusters · top speed ${Math.round(S.maxSpeed)} m/s`, '#9affd8');
-      g.ui.hint('Ship systems online — steer with the mouse, V to land', 3500);
+      this.say(`Helm engaged · ${S.count} blocks · ${S.thrusters.length} thrusters · cruise ${Math.round(S.flight ? S.flight.cruise : S.maxSpeed)} m/s`, '#9affd8');
+      g.ui.hint('Ship systems online — W/S throttle · A/D turn · Space/Shift climb · the mouse looks (hold right button to steer) · V land', 4000);
     }
     buildShip(sx, sy, sz, blocks, facing, helmL) {
       const T = R.T;
@@ -698,7 +699,7 @@
       const fl = [VR.HF_DX[facing], VR.HF_DZ[facing]];
       const idx = (x, y, z) => (y * sz + z) * sx + x;
       const at = (x, y, z) => (x < 0 || y < 0 || z < 0 || x >= sx || y >= sy || z >= sz) ? 0 : blocks[idx(x, y, z)];
-      const cells = [], all = [], thr = [];
+      const cells = [], all = [], thr = [], allC = [], bot = [];
       let reac = 0, seat = null, seatD = 1e9, nose = 0, minY = 1e9, maxY = -1e9;
       const tSeat = R.byName.pilot_seat && R.byName.pilot_seat.id, tThr = R.byName.thruster && R.byName.thruster.id, tReac = R.byName.reactor_core && R.byName.reactor_core.id;
       for (let y = 0; y < sy; y++) for (let z = 0; z < sz; z++) for (let x = 0; x < sx; x++) {
@@ -706,6 +707,8 @@
         S.count++;
         all.push(x, y, z, s);
         const ox = x + 0.5 - S.pivot[0], oy = y + 0.5 - S.pivot[1], oz = z + 0.5 - S.pivot[2];
+        allC.push(ox, oy, oz);
+        if (!at(x, y - 1, z)) bot.push(ox, oy, oz);
         if (!at(x + 1, y, z) || !at(x - 1, y, z) || !at(x, y + 1, z) || !at(x, y - 1, z) || !at(x, y, z + 1) || !at(x, y, z - 1)) cells.push(ox, oy, oz);
         const ty = T.type[s];
         if (ty === tThr) { const t = R.types[ty]; const f = t.get(s, 'facing'); thr.push([ox, oy, oz, F6V[f] || [0, 0, 1]]); }
@@ -715,6 +718,7 @@
         if (oy < minY) minY = oy; if (oy > maxY) maxY = oy;
       }
       S.cells = new Float32Array(cells);
+      S.allCells = new Float32Array(allC); S.bottomCells = new Float32Array(bot);
       S.all = all;
       S.thrusters = thr;
       S.nose = nose; S.minY = minY; S.maxY = maxY;
@@ -748,6 +752,7 @@
       if (c) { for (let i = 0; i < c.length; i += 4) { list.push([c[i], c[i + 1], c[i + 2], 0]); this.noteBlock(c[i], c[i + 1], c[i + 2], 0); } g.world.bulkSet(list, false); }
       S.worldCells = null;
       S.state = 'flying';
+      if (S.flight) S.flight.enter();
       g.audio.play('warp');
       g.codex && g.codex.event && g.codex.event('ship');
       for (const t of S.thrusters) { const wp = this.shipPoint(S, [t[0] + S.pivot[0], t[1] + S.pivot[1], t[2] + S.pivot[2]]); g.particles.smoke(wp[0], wp[1], wp[2], 6); }
@@ -766,8 +771,9 @@
       return [S.pos[0] + m[0] * x + m[4] * y + m[8] * z, S.pos[1] + m[1] * x + m[5] * y + m[9] * z, S.pos[2] + m[2] * x + m[6] * y + m[10] * z];
     }
     shipDir(S, d) { const m = S.rotM; return [m[0] * d[0] + m[4] * d[1] + m[8] * d[2], m[1] * d[0] + m[5] * d[1] + m[9] * d[2], m[2] * d[0] + m[6] * d[1] + m[10] * d[2]]; }
-    shipHits(S, px, py, pz, psi) {
-      const w = this.g.world, T = R.T, c = Math.cos(psi), s = Math.sin(psi), cells = S.cells, n = cells.length;
+    // does the hull (its surface blocks, or every block with all) touch solid blocks at this pose?
+    shipHits(S, px, py, pz, psi, all) {
+      const w = this.g.world, T = R.T, c = Math.cos(psi), s = Math.sin(psi), cells = all && S.allCells ? S.allCells : S.cells, n = cells.length;
       for (let i = 0; i < n; i += 3) {
         const ox = cells[i], oy = cells[i + 1], oz = cells[i + 2];
         const y = Math.floor(py + oy);
@@ -776,67 +782,74 @@
         const b = w.getBlock(Math.floor(px + ox * c + oz * s), y, Math.floor(pz - ox * s + oz * c));
         if (b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE)) return true;
       }
+      // the underside rests on the ground: its blocks count down to just above their bottom face
+      const bot = S.bottomCells;
+      if (bot) for (let i = 0; i < bot.length; i += 3) {
+        const ox = bot[i], oz = bot[i + 2], y = Math.floor(py + bot[i + 1] - 0.45);
+        if (y < 1) return true;
+        if (y >= VR.MAXY) continue;
+        const b = w.getBlock(Math.floor(px + ox * c + oz * s), y, Math.floor(pz - ox * s + oz * c));
+        if (b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE)) return true;
+      }
       return false;
+    }
+    // the block ship as the flight model sees it: ship-frame metres (nose −z) around the pivot
+    shipBody(S) {
+      const gad = this, c0 = Math.cos(-S.yaw0), s0 = Math.sin(-S.yaw0), P = S.pivot;
+      const L = (gx, gy, gz) => [gx * c0 + gz * s0, gy, -gx * s0 + gz * c0];
+      const eye = L(S.eyeLocal[0] - P[0], S.eyeLocal[1] - P[1], S.eyeLocal[2] - P[2]);
+      // extents, wingtips and belly points in the ship frame
+      let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9, lo = null, hi = null;
+      for (let i = 0; i < S.cells.length; i += 3) {
+        const q = L(S.cells[i], S.cells[i + 1], S.cells[i + 2]);
+        if (q[0] < x0) { x0 = q[0]; lo = q; } if (q[0] > x1) { x1 = q[0]; hi = q; }
+        if (q[2] < z0) z0 = q[2]; if (q[2] > z1) z1 = q[2];
+      }
+      const B = S.bottomCells, low = [];
+      for (let i = 0; i < B.length; i += 3) low.push(L(B[i], B[i + 1] - 0.5, B[i + 2]));
+      low.sort((a, b) => a[1] - b[1]);
+      const lowest = low.filter(q => q[1] <= (low.length ? low[0][1] : 0) + 1.01), belly = [];
+      if (lowest.length) {
+        const ext = (f) => lowest.reduce((a, q) => (f(q) > f(a) ? q : a), lowest[0]);
+        for (const f of [(q) => -q[0], (q) => q[0], (q) => -q[2], (q) => q[2], (q) => -q[0] - q[2], (q) => q[0] - q[2], (q) => -q[0] + q[2], (q) => q[0] + q[2]]) { const q = ext(f); if (belly.indexOf(q) < 0) belly.push(q); }
+        for (let n = 0; n < lowest.length && belly.length < 16; n += Math.max(1, Math.floor(lowest.length / 8))) if (belly.indexOf(lowest[n]) < 0) belly.push(lowest[n]);
+      }
+      const exhaust = S.thrusters.slice(0, 8).map(t => { const q = L(t[0] + t[3][0] * 0.6, t[1] + t[3][1] * 0.6, t[2] + t[3][2] * 0.6); return [q[0], q[1], q[2], 0.55]; });
+      const nose = L(S.fl[0] * (S.nose + 0.6), 0, S.fl[1] * (S.nose + 0.6));
+      return {
+        kind: 'ship', ship: S,
+        get pos() { return S.pos; }, get vel() { return S.vel; },
+        get heading() { return S.yaw0 + S.psi; }, set heading(v) { S.psi = v - S.yaw0; },
+        setAttitude(pitch, roll) { S.pitch = pitch; S.roll = roll; gad.updateShipRot(S); },
+        setGear() { }, setDip(v) { S.dip = v; },
+        hits: (x, y, z, h) => gad.shipHits(S, x, y, z, h - S.yaw0),
+        overlaps: (x, y, z, h) => gad.shipHits(S, x, y, z, h - S.yaw0, true),
+        cruiseBase: S.maxSpeed, agility: M.clamp(S.turnRate / 1.2, 0.35, 1),
+        eye, center: [0, 0, 0], bottom: S.minY - 0.5,
+        radius: S.radius, length: z1 - z0 + 1, width: x1 - x0 + 1, height: S.maxY - S.minY + 1,
+        extent: [Math.max(-x0, x1) + 0.5, Math.max(-z0, z1) + 0.5],
+        gearFeet: [], belly, exhaust, guns: [[nose[0] - 1.4, 0, nose[2]], [nose[0] + 1.4, 0, nose[2]]],
+        wingtips: lo && hi ? [[lo[0] - 0.5, lo[1], lo[2]], [hi[0] + 0.5, hi[1], hi[2]]] : null,
+        name: S.name || 'Ship', label: S.count + ' blocks',
+      };
     }
     driveShip(dt, input, blocked) {
       const g = this.g, p = g.player, S = this.ship;
       if (!S) { this.riding = null; return; }
-      const k = (c) => !blocked && !g.ui.typing && input.down(c);
-      if (S.state === 'flying') {
-        if (!blocked && input.hit('KeyV')) { if (this.landShip(false)) return; }
-        const fw = (k('KeyW') ? 1 : 0) - (k('KeyS') ? 1 : 0), st = (k('KeyD') ? 1 : 0) - (k('KeyA') ? 1 : 0);
-        const up = (k('Space') ? 1 : 0) - (k('ShiftLeft') || k('ShiftRight') ? 1 : 0);
-        const boost = k('ControlLeft') || k('ControlRight') ? 1.65 : 1;
-        // heading follows where you look (hold Alt to look around freely)
-        let turn = 0;
-        if (!k('AltLeft')) { const d = wrapA(p.yaw - (S.yaw0 + S.psi)); turn = M.clamp(d, -S.turnRate * dt, S.turnRate * dt); }
-        if (turn) { if (!this.shipHits(S, S.pos[0], S.pos[1], S.pos[2], S.psi + turn)) S.psi += turn; else turn = 0; }
-        S.turnVel += (turn / Math.max(dt, 1e-3) - S.turnVel) * Math.min(1, dt * 6);
-        const h = S.yaw0 + S.psi, fx = -Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h);
-        const vmax = S.maxSpeed * boost;
-        const tv = [fx * fw * vmax + rx * st * vmax * 0.4, up * Math.min(20, vmax * 0.55), fz * fw * vmax + rz * st * vmax * 0.4];
-        const a = 1 - Math.exp(-dt * S.accel * (fw || st || up ? 1 : 0.7));
-        for (let i = 0; i < 3; i++) S.vel[i] += (tv[i] - S.vel[i]) * a;
-        for (const ax of [0, 2, 1]) {
-          const d = S.vel[ax] * dt; if (!d) continue;
-          const np = [S.pos[0], S.pos[1], S.pos[2]]; np[ax] += d;
-          if (ax === 1) { if (np[1] + S.maxY > 254) { S.vel[1] = 0; continue; } }
-          if (this.shipHits(S, np[0], np[1], np[2], S.psi)) {
-            if (Math.abs(S.vel[ax]) > 9) { g.audio.play('explode', { vol: 0.25 }); g.damageFlash = 0.3; }
-            S.vel[ax] *= -0.12;
-          } else S.pos[ax] = np[ax];
-        }
-        // visual attitude
-        S.roll += (M.clamp(S.turnVel * 0.45, -0.5, 0.5) - S.roll) * (1 - Math.exp(-dt * 3));
-        S.pitch += (M.clamp(S.vel[1] * 0.018 + fw * 0.03, -0.22, 0.22) - S.pitch) * (1 - Math.exp(-dt * 3));
-        this.updateShipRot(S);
-        // thrusters & sound
-        const speed = Math.hypot(S.vel[0], S.vel[1], S.vel[2]);
-        const thrust = Math.min(1, (Math.abs(fw) + Math.abs(up) * 0.6 + Math.abs(st) * 0.4) * boost);
-        g.audio.loop('engine', 0.18 + thrust * 0.32, 0.25 + Math.min(1, speed / 60) * 0.9);
-        const nThr = Math.min(10, S.thrusters.length);
-        for (let i = 0; i < nThr; i++) {
-          const t = S.thrusters[(i + g.frame) % S.thrusters.length];
-          if (Math.random() > 0.35 + thrust * 0.65) continue;
-          const dir = this.shipDir(S, t[3]);
-          const wp = this.shipPoint(S, [t[0] + S.pivot[0] + t[3][0] * 0.6, t[1] + S.pivot[1] + t[3][1] * 0.6, t[2] + S.pivot[2] + t[3][2] * 0.6]);
-          const v = 6 + thrust * 14;
-          g.particles.spawn(wp[0], wp[1], wp[2], dir[0] * v + S.vel[0] * 0.8, dir[1] * v + S.vel[1] * 0.8, dir[2] * v + S.vel[2] * 0.8, { life: 0.18 + thrust * 0.2, size: 0.18 + thrust * 0.12, grav: 0, col: boost > 1 ? [0.5, 0.8, 1] : [1, 0.6, 0.25], emis: 1, drag: 2, grow: 0.6, collide: false });
-        }
-        // lasers from the nose
+      if (S.state === 'flying' && S.flight) {
+        // the flight model flies it (V once landed: back onto the block grid and out)
+        if (S.flight.update(dt, input, blocked) === 'exit') { if (this.landShip(false)) return; }
+        // lasers from the nose, where you look
         const fire = input.dragLook ? input.clickAction(0) : input.mouse.down[0];
-        if (!blocked && fire && this.fireCool <= 0 && g.entities) {
+        if (!blocked && !g.ui.typing && fire && this.fireCool <= 0 && g.entities && (!S.flight.weapons || S.flight.weapons.armed !== false)) {
           this.fireCool = 0.17;
           const d3 = p.lookDir();
-          for (const side of [-1.4, 1.4]) {
-            const l = [S.pivot[0] + S.fl[0] * (S.nose + 0.6) + (-S.fl[1]) * side, S.pivot[1], S.pivot[2] + S.fl[1] * (S.nose + 0.6) + S.fl[0] * side];
-            g.entities.fireBolt(this.shipPoint(S, l), d3, 110, 10, p, [0.4, 1, 1]);
-          }
+          for (const gp of S.flight.b.guns) g.entities.fireBolt(S.flight.toWorld(gp), d3, 110, 10, p, [0.4, 1, 1]);
         }
         if (S.pos[1] + S.maxY > 235) g.codex && g.codex.event && g.codex.event('orbit');
       }
       // keep the pilot in the seat
-      const e = this.shipPoint(S, S.eyeLocal);
+      const e = S.flight && S.state === 'flying' ? S.flight.eyeWorld() : this.shipPoint(S, S.eyeLocal);
       p.pos = [e[0], e[1] - p.eye, e[2]]; p.vel = S.vel.slice(); p.fallStart = null;
     }
     // snap to the block grid and put the blocks back into the world
@@ -881,7 +894,8 @@
         if (be.pos) be.pos = [e[0], e[1], e[2]];
       }
       // freeze the render transform on the landing spot until the terrain meshes catch up
-      S.pos = at.slice(); S.psi = psiS; S.roll = 0; S.pitch = 0; S.vel = [0, 0, 0];
+      if (S.flight) S.flight.leave();
+      S.pos = at.slice(); S.psi = psiS; S.roll = 0; S.pitch = 0; S.vel = [0, 0, 0]; S.dip = 0;
       this.updateShipRot(S);
       S.state = 'landing'; S.landT = 0; S.landCols = touched;
       this.riding = null;
@@ -1166,14 +1180,16 @@
       if (this.drone) return null;
       // in the cockpit the heads-up display shows the numbers; keep only the key hints
       const ck = g.cockpit && g.cockpit.active();
-      if (ck && r && (r.type === 'starship' || (r.type === 'ship' && this.ship && this.ship.state !== 'meshing'))) return g.cockpit.activeT < 9 ? '<small>W/S thrust · mouse steer · A/D strafe · Space/Shift climb · Ctrl boost · LMB lasers · F5 view' + (r.type === 'starship' ? ' · <b>G autopilot</b>' : '') + ' · <b>V land</b></small>' : null;
+      if (ck && r && (r.type === 'starship' || (r.type === 'ship' && this.ship && this.ship.state !== 'meshing'))) return g.cockpit.activeT < 9 ? '<small>W/S throttle · A/D turn · Space/Shift climb · B boost · X hover · the mouse looks, hold the right button to steer · C view · F gear · L lights · <b>G autopilot</b> · <b>V land</b> · hold Q look back</small>' : null;
       if (r && r.type === 'starship') return g.starships ? g.starships.hudText() : null;
       if (r && r.type === 'ship' && this.ship) {
         const S = this.ship;
         if (S.state === 'meshing') return '<b>SHIP SYSTEMS</b> · spooling up…';
-        const sp = Math.hypot(S.vel[0], S.vel[1], S.vel[2]);
+        const fl = S.flight, I = fl ? fl.info() : null;
+        const sp = I ? I.speed : Math.hypot(S.vel[0], S.vel[1], S.vel[2]);
         const hd = ((Math.round(-(S.yaw0 + S.psi) * 180 / Math.PI) % 360) + 360) % 360;
-        return `<b>${Math.round(sp)} m/s</b> · ALT ${Math.round(S.pos[1])} · HDG ${hd}° · ${S.count} blocks<br><small>W/S thrust · A/D strafe · Space/Shift climb · Ctrl boost · LMB lasers · Alt free-look · F5 view · <b>V land</b></small>`;
+        const st = I && I.state === 'landed' ? ' · <b>LANDED</b>' : I && I.state === 'landing' ? ' · <b>LANDING</b>' : '';
+        return `<b>${Math.round(sp)} m/s</b> · ALT ${Math.round(S.pos[1])} · HDG ${hd}°${I ? ' · THR ' + Math.round(I.throttle * 100) + '%' : ''}${I && I.boost ? ' · <b style="color:#7ad8ff">BOOST</b>' : ''} · ${S.count} blocks${st}<br><small>W/S throttle · A/D turn · Space/Shift climb · B boost · X hover · right mouse steers · C view · G autopilot · <b>V land</b></small>`;
       }
       if (r && r.type === 'bike') return `<b>${Math.round(Math.abs(r.bike.spd || 0))} m/s</b> · HOVERBIKE<br><small>Shift to get off · Space hop · Ctrl boost</small>`;
       if (r && r.type === 'seat') return null;
@@ -1223,6 +1239,7 @@
       }
       if (r.type === 'ship' && this.ship) {
         const S = this.ship;
+        if (S.flight && S.state === 'flying') return S.flight.camera(cam);
         const sp = Math.hypot(S.vel[0], S.vel[1], S.vel[2]);
         const fovK = 1 + Math.min(0.15, sp / 500);
         if (g.camMode === 0) { const e = this.shipPoint(S, S.eyeLocal); return Object.assign(cam, { x: e[0], y: e[1], z: e[2], roll: S.roll * 0.6, fixed: true, fov: cam.fov * fovK }); }
@@ -1242,8 +1259,10 @@
     }
     // called by the game instead of player physics while controlling a vehicle/drone
     drive(dt, input, blocked) {
-      const g = this.g, p = g.player;
-      if (!blocked && input.captured && !g.ui.typing) {
+      const g = this.g, p = g.player, r0 = this.riding;
+      // in a ship the flight model owns the mouse (your head; the right button steers)
+      const shipMouse = r0 && !this.drone && (r0.type === 'starship' || (r0.type === 'ship' && this.ship && this.ship.flight && this.ship.state === 'flying'));
+      if (!blocked && input.captured && !g.ui.typing && !shipMouse) {
         const sens = input.sensitivity;
         p.yaw -= input.mouse.dx * sens;
         p.pitch = M.clamp(p.pitch - input.mouse.dy * sens * (input.invertY ? -1 : 1), -1.55, 1.55);
@@ -1308,7 +1327,7 @@
       if (!S || !S.gpu || !(S.state === 'flying' || S.state === 'landing')) return;
       const cam = r.cam, m = S.modelMat;
       m.set(IDENT);
-      mat4.translate(m, m, S.pos[0] - cam.x, S.pos[1] - cam.y, S.pos[2] - cam.z);
+      mat4.translate(m, m, S.pos[0] - cam.x, S.pos[1] + (S.dip || 0) - cam.y, S.pos[2] - cam.z);
       mat4.mul(m, m, S.rotM);
       mat4.translate(m, m, -S.pivot[0], -S.pivot[1], -S.pivot[2]);
       // piloting in first person: the cockpit overlay replaces the hull right around your head

@@ -101,7 +101,44 @@
         case 'warp': { const o = this.tone(80, 0.4, 2.2, 'sawtooth', true); if (o) o.frequency.exponentialRampToValueAtTime(1600, t + 2); break; }
         case 'meteor': { const src = c.createBufferSource(); src.buffer = this.noise; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(200, t + 2.5); const g = c.createGain(); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.6); src.connect(f); f.connect(g); g.connect(this.sfx); src.start(t, 0, 2.7); break; }
         case 'toast': this.tone(988, 0.1, 0.25, 'sine', true); this.tone(1319, 0.08, 0.35, 'sine', true, t + 0.08); break;
+        // ---- ships (flight.js / cockpit.js)
+        case 'thump': { const v = (opts && opts.vol) || 0.6; this.tone(62, 0.7 * v, 0.32, 'sine'); this.tone(118, 0.25 * v, 0.12, 'triangle'); this.noiseHit({ f: 260, q: 0.9, g: 0.9 }, v, 0.16, 1); break; }
+        case 'boost': {
+          const src = c.createBufferSource(); src.buffer = this.noise;
+          const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.4; f.frequency.setValueAtTime(260, t); f.frequency.exponentialRampToValueAtTime(2400, t + 0.45);
+          const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.55, t + 0.06); g.gain.exponentialRampToValueAtTime(0.001, t + 1.1);
+          src.connect(f); f.connect(g); g.connect(this.sfx); g.connect(this.rev); src.start(t, Math.random(), 1.2);
+          const o = this.tone(48, 0.5, 0.9, 'sawtooth'); if (o) o.frequency.exponentialRampToValueAtTime(96, t + 0.6); break;
+        }
+        case 'servo': { const v = (opts && opts.vol) || 1; const o = this.tone(170, 0.07 * v, 0.75, 'sawtooth'); if (o) { o.frequency.setValueAtTime(170, t); o.frequency.linearRampToValueAtTime(320, t + 0.6); } this.tone(1900, 0.015 * v, 0.6, 'sine'); break; }
+        case 'clunk': { const v = (opts && opts.vol) || 1; this.tone(95, 0.45 * v, 0.14, 'triangle'); this.noiseHit({ f: 900, q: 2, g: 0.6, knock: 1 }, 0.6 * v, 0.06, 1); break; }
+        case 'switch': { const v = (opts && opts.vol) || 1; this.noiseHit({ f: 3600, q: 3, g: 0.6 }, 0.55 * v, 0.025, 1); this.tone(2400, 0.05 * v, 0.02, 'square'); break; }
+        case 'button': { const v = (opts && opts.vol) || 1; this.noiseHit({ f: 1500, q: 2.5, g: 0.6 }, 0.5 * v, 0.03, 1); this.tone(880, 0.06 * v, 0.06, 'sine'); break; }
+        case 'lever': { const v = (opts && opts.vol) || 1; const src = c.createBufferSource(); src.buffer = this.noise; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 1.2; const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.18 * v, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); src.connect(f); f.connect(g); g.connect(this.sfx); src.start(t, Math.random(), 0.3); this.tone(140, 0.2 * v, 0.1, 'triangle', false, t + 0.22); break; }
+        case 'deny': this.tone(220, 0.12, 0.12, 'square'); this.tone(165, 0.12, 0.16, 'square', false, t + 0.12); break;
+        case 'spool': { const o = this.tone(90, 0.12, 3.2, 'sawtooth', true); if (o) o.frequency.exponentialRampToValueAtTime(520, t + 3); const o2 = this.tone(400, 0.03, 3.2, 'sine'); if (o2) o2.frequency.exponentialRampToValueAtTime(2200, t + 3); break; }
       }
+    }
+    // turbine whine of a ship's engines: two oscillators through a band-pass, the pitch follows the spool (0…1.45)
+    turbine(level, spool) {
+      if (!this.ctx) return;
+      const c = this.ctx, t = c.currentTime;
+      let L = this.turb;
+      if (!L) {
+        if (level <= 0.001) return;
+        const g = c.createGain(); g.gain.value = 0;
+        const f = c.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2.5; f.frequency.value = 900;
+        const o1 = c.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = 260;
+        const o2 = c.createOscillator(); o2.type = 'triangle'; o2.frequency.value = 523;
+        const g2 = c.createGain(); g2.gain.value = 0.7;
+        o1.connect(f); o2.connect(g2); g2.connect(f); f.connect(g); g.connect(this.sfx);
+        o1.start(); o2.start();
+        L = this.turb = { g, f, o1, o2 };
+      }
+      const sp = Math.max(0, spool || 0), f0 = 240 + sp * 760;
+      L.g.gain.setTargetAtTime(Math.max(0, level), t, 0.2);
+      L.o1.frequency.setTargetAtTime(f0, t, 0.3); L.o2.frequency.setTargetAtTime(f0 * 2.013, t, 0.3);
+      L.f.frequency.setTargetAtTime(f0 * 1.7, t, 0.3);
     }
     // continuous loops: name → {gain, filter}; level 0..1
     loop(name, level, pitch) {

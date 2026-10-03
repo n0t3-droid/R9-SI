@@ -18,10 +18,10 @@ await wait(300);
 for (let i = 0; i < 10; i++) await step(10);
 await ev((arch) => { const g = VR.game; g.starships.placeInFront(12345, arch, null, g.player); }, process.env.ARCH || 'shuttle');
 for (let i = 0; i < 30; i++) { await step(10); const ok = await ev(() => VR.game.starships.ships.length > 0 && !!VR.game.starships.ships[VR.game.starships.ships.length - 1].d.meta); if (ok) break; await wait(200); }
-await ev(() => { const g = VR.game, s = g.starships.ships[g.starships.ships.length - 1]; g.starships.board(s, g.player); s.pos[1] += 25; g.player.pitch = -0.05; });
+await ev(() => { const g = VR.game, s = g.starships.ships[g.starships.ships.length - 1]; g.starships.board(s, g.player); s.pos[1] += 25; const f = g.flight; f.state = 'flying'; f.holdAlt = s.pos[1]; f.headPitch = -0.05; });
 for (let i = 0; i < 6; i++) await step(10);
 await shot('cockpit_a');
-await ev(() => { const g = VR.game; g.player.yaw += 1.2; g.player.pitch = 0.1; });
+await ev(() => { const f = VR.game.flight; f.headYaw += 1.2; f.headPitch = 0.1; });
 for (let i = 0; i < 12; i++) await step(10);
 await shot('cockpit_b');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 25)) console.log(l);
