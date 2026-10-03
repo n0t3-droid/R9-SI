@@ -11,7 +11,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 
 // ---- the pack's sets (id: vm_<set>_<item>_<variant>) and how many items each must have at least
-const EXPECT = { light: 24, smart: 18 };
+const EXPECT = { light: 24, smart: 18, kitchen: 26, living: 30, sleep: 16, bath: 16, plant: 14 };
 const LATER = { kitchen: 26, living: 30, sleep: 16, bath: 16, plant: 14, office: 20, garden: 18, mobility: 11, shop: 18, deco: 13 };   // checked once a set exists
 const pack = R.types.filter(t => t.o.modern);
 const names = pack.map(t => t.name);
@@ -34,7 +34,7 @@ console.log('pack', pack.length, 'items · load', loadMs, 'ms');
   check(new Set(names).size === names.length && names.every(n => /^vm_[a-z]+_[a-z0-9]+(_[a-z0-9]+)+$/.test(n)), 'ids unique and shaped vm_<set>_<item>_<variant>');
   const disp = pack.map(t => t.display);
   check(new Set(disp).size === disp.length, 'display names unique');
-  const badFmt = pack.filter(t => !/^\p{Lu}[\p{L}0-9&'"\- ]+ · [\p{Ll}0-9][\p{L}0-9 &\-]*$/u.test(t.display));
+  const badFmt = pack.filter(t => !/^[\p{Lu}0-9][\p{L}0-9&'"\- ]+ · [\p{L}0-9][\p{L}0-9 &\-]*$/u.test(t.display));
   check(!badFmt.length, 'display names read "Family · variant"' + (badFmt.length ? ' — not: ' + badFmt.slice(0, 4).map(t => t.display).join(' | ') : ''));
   check(R.stateCount < 65535, 'state count ' + R.stateCount + ' < 65,535');
   check(R.texNames.length < 2048, 'texture layers ' + R.texNames.length + ' < 2,048');
@@ -65,7 +65,30 @@ console.log('pack', pack.length, 'items · load', loadMs, 'ms');
   check(st.lateN === pack.length && st.lateMs < 50, 'registering the pack takes < 50 ms (' + (st.lateMs || 0).toFixed(1) + ' ms)');
 }
 
-// 5 · every model compiles to exactly its declared cells, every state paints and meshes under the budget
+// 5 · lint while building: a primitive that draws nothing (a quarter-unit face rounds away on the grid) or reaches past
+// the model's box (a tap above a one-block counter) means detail that silently is not there
+const lint = {};
+{
+  const B = VM.Builder.prototype; let cur = null;
+  const note = (msg) => (lint[cur] = lint[cur] || []).push(msg);
+  const out = (b, x0, y0, z0, x1, y1, z1) => x1 * b.S > b.W + 0.5 || y1 * b.S > b.H + 0.5 || z1 * b.S > b.D + 0.5 || x0 < -0.25 || y0 < -0.25 || z0 < -0.25;
+  for (const fn of ['box', 'pbox', 'rbox', 'cushion', 'cyl', 'tube', 'sphere', 'ellipsoid', 'lathe', 'extrude', 'rod', 'beam']) {
+    const o = B[fn];
+    B[fn] = function (...a) {
+      if (!cur) return o.apply(this, a);
+      const mat = fn === 'box' ? a[6] : fn === 'lathe' ? a[3] : fn === 'extrude' ? a[4] : fn === 'pbox' || fn === 'rbox' || fn === 'cushion' || fn === 'rod' || fn === 'beam' ? a[7] : fn === 'cyl' ? a[6] : fn === 'tube' ? a[7] : fn === 'sphere' ? a[4] : a[6];
+      let n = 0, outside = 0; const set = this.set;
+      this.set = function (x, y, z, v) { if (x < 0 || y < 0 || z < 0 || x >= this.W || y >= this.H || z >= this.D) outside++; else n++; return set.call(this, x, y, z, v); };
+      const r = o.apply(this, a); this.set = set;
+      if (mat && !n) note(fn + ' draws nothing (' + a.slice(0, 6).map(v => typeof v === 'number' ? +v.toFixed(2) : '…').join(',') + ')');
+      else if (mat && outside > 8) note(fn + ' reaches past the model (' + outside + ' voxels)');
+      else if (mat && (fn === 'box' || fn === 'pbox' || fn === 'rbox' || fn === 'cushion') && out(this, a[0], a[1], a[2], a[3], a[4], a[5])) note(fn + ' reaches past the model');
+      return r;
+    };
+  }
+  VM._lintSet = (name) => { cur = name; };
+}
+// 6 · every model compiles to exactly its declared cells, every state paints and meshes under the budget
 const BUDGET = 1000;
 {
   let errs = [], maxQ = 0, maxN = '', quads = 0, states = 0, bytes = 0, cms = 0, emptyIcon = [];
@@ -73,7 +96,7 @@ const BUDGET = 1000;
   for (const t of pack) {
     const m = VM.MODELS[t.name];
     const declared = m.parts.map(p => p.px + ',' + p.py + ',' + p.pz).join(' ');
-    const c0 = performance.now(); VM.materialize(m); const dt = performance.now() - c0; cms += dt;
+    VM._lintSet(t.name); const c0 = performance.now(); VM.materialize(m); const dt = performance.now() - c0; cms += dt; VM._lintSet(null);
     if (!m.compiled) { errs.push(t.name + ' did not compile'); continue; }
     const scanned = VM.scanParts(m).map(p => p.px + ',' + p.py + ',' + p.pz).join(' ');
     if (scanned !== declared) errs.push(t.name + ' cells: declared [' + declared + '] built [' + scanned + ']');
@@ -97,9 +120,11 @@ const BUDGET = 1000;
   check(!errs.length, 'every model compiles to its declared cells and every state paints and meshes' + (errs.length ? ' — ' + errs.slice(0, 6).join(' | ') : ''));
   check(maxQ <= BUDGET, 'every state stays under ' + BUDGET + ' quads (max ' + maxQ + ' · ' + maxN + ')');
   check(!emptyIcon.length, 'every item has an icon' + (emptyIcon.length ? ' — empty: ' + emptyIcon.slice(0, 5).join(', ') : ''));
+  const lk = Object.keys(lint);
+  check(!lk.length, 'no detail is lost on the grid or past the model\'s box' + (lk.length ? ' — ' + lk.slice(0, 4).map(k => k + ': ' + lint[k].slice(0, 2).join(' / ')).join(' | ') : ''));
 }
 
-// 6 · switches and containers
+// 7 · switches and containers
 {
   const lamps = pack.filter(t => t.o.toggle);
   check(lamps.length >= 20 && lamps.every(t => t.has('lit') && (R.T.flags[t.base] & F.INTERACT)), lamps.length + ' lamps switch (a "lit" property, right click)');
