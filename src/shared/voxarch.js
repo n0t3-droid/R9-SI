@@ -98,7 +98,10 @@
   // pattern(u, v, C, d) sets P0 (colour at depth 0 or -1 = carved) and P1 (colour at depth 1)
   let P0 = 0, P1 = 0, PF0 = 0, PF1 = 0;
   const PAT = {};
-  PAT.plaster = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, 0.985 + ((c.h & 1) ? 0.03 : 0)); };
+  // flat walls (plaster, adobe) in the Klassisch look: a slightly darker line on each block's low edges (u 0, v 0),
+  // so the wall shows its blocks like every other block does
+  const seam = (u, v) => (u === 0 || v === 0) && !VR.LOOK.vxJoin;
+  PAT.plaster = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.985 + ((c.h & 1) ? 0.03 : 0)) * (seam(u, v) ? 0.93 : 1)); };
   PAT.timber = (s, u, v, c, d) => {
     // posts every two blocks, rails at the block top, a diagonal brace across each two-block panel
     const along = (d === 0 || d === 1) ? c.pz : c.px;
@@ -137,7 +140,7 @@
     if (edge) { P0 = -1; P1 = s.col2; } else { P0 = sh(mix(s.col, (id >> 12) & 1 ? 0x8A8070 : s.col, 0.3), k); P1 = sh(s.col, k * 0.8); }
   };
   PAT.sandstone = (s, u, v, c) => { const line = v === 3 || v === 7; P0 = line ? -1 : sh(s.col, v < 3 ? 1.0 : 0.97); P1 = sh(s.col, 0.82); };
-  PAT.adobe = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, 0.98 + (c.h & 1) * 0.03); };
+  PAT.adobe = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.98 + (c.h & 1) * 0.03) * (seam(u, v) ? 0.93 : 1)); };
   PAT.hull = (s, u, v, c) => {
     const seam = u === 0 || v === 0;
     const stripe = s.stripe && ((c.py + (c.h >> 1)) & 3) === 1 && (v === 3 || v === 4);
@@ -361,7 +364,7 @@
     for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) {
       let cc = s.col, fl = s.flags || 0;
       switch (s.pat) {
-        case 'planks': { const X = c.px * 8 + x, b = (c.pz * 8 + z) >> 1; const seam = (X + (b & 1) * 5 + (hh(b, c.h, 0, 3) & 7)) % 16 === 0; cc = seam ? sh(s.col, 0.72) : sh(s.col, 0.94 + (hh(b, c.h, 2, 5) & 3) * 0.03); if ((z & 1) === 1) cc = sh(cc, 0.93); break; }
+        case 'planks': { const X = c.px * 8 + x, b = (c.pz * 8 + z) >> 1; const seam = (X + (b & 1) * 5 + (hh(b, c.h, 0, 3) & 7)) % 16 === 0 || (x === 0 && !VR.LOOK.vxJoin); cc = seam ? sh(s.col, 0.72) : sh(s.col, 0.94 + (hh(b, c.h, 2, 5) & 3) * 0.03); if ((z & 1) === 1) cc = sh(cc, 0.93); break; }   // Klassisch: the boards end at every block edge
         case 'tiles': cc = (x === 0 || z === 0) ? s.col2 : sh(s.col, 0.97 + (c.h & 1) * 0.04); break;
         case 'checker': cc = ((x >> 2) + (z >> 2) + c.px + c.pz) & 1 ? s.col : s.col2; fl |= GLOSS; break;
         case 'stone': PF0 = 0; PAT.fieldstone(FOUND_TOP, x, z, c, 2); cc = P0 < 0 ? s.col2 : P0; break;
