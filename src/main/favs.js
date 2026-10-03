@@ -31,6 +31,8 @@
   F.add = (id) => { if (!id) return false; sync(); if (F.has(id)) return false; cache.unshift(id); if (cache.length > MAX) cache.length = MAX; save(); return true; };
   F.remove = (id) => { sync(); const i = load().indexOf(id); if (i < 0) return false; cache.splice(i, 1); save(); return true; };
   F.toggle = (id) => { sync(); return F.has(id) ? (F.remove(id), false) : F.add(id); };
+  // several at once (an import): the new ones go first, in the given order — one save, one notice; → how many were new
+  F.addMany = (ids) => { sync(); const have = new Set(load()), add = []; for (const id of ids || []) if (typeof id === 'string' && id && !have.has(id)) { have.add(id); add.push(id); } if (!add.length) return 0; cache = add.concat(cache).slice(0, MAX); save(); return add.length; };
   F.on = (fn) => { subs.add(fn); return () => subs.delete(fn); };
   F.sync = sync;
   try {
