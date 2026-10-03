@@ -1,6 +1,7 @@
 // Mesh the end of the test hill's ridge in node and print every quad around it — finds the stray face that
 // te_2_edits.png shows at the ridge's end (bottom-left of the hill).  OX/OZ: the hill's origin (section alignment).
 const VR = require('./load_shared.js');
+VR.setLook(process.env.LOOK || 'seamless');   // the smooth ground of the Nahtlos look
 const R = VR.R, F = VR.F, T = R.T;
 const PAD = VR.MESH_PAD, PS = VR.MESH_PS, PSS = PS * PS;
 const st = (n) => R.byName[n].defaultState;
