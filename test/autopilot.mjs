@@ -23,13 +23,13 @@ console.log(JSON.stringify(r0));
 let landed = false;
 for (let i = 0; i < 90; i++) {
   await step(20); await wait(40);
-  const st = await ev(() => { const g = VR.game, S = g.starships, s = S.pilot, A = S.auto; let below = null, col = null; if (s) { below = S.hits(s, s.pos[0], s.pos[1] - 1.5, s.pos[2], s.yaw); const w = g.world, x = Math.floor(s.pos[0]), z = Math.floor(s.pos[2]); col = []; for (let y = Math.floor(s.pos[1]); y > Math.floor(s.pos[1]) - 60 && y > 0; y--) { const b = w.getBlock(x, y, z); if (b) { col.push(y + ':' + VR.R.types[VR.R.T.type[b]].name); if (col.length > 2) break; } } const c = w.col(x >> 4, z >> 4); col.push('ready=' + !!(c && c.ready)); } return { pilot: !!s, auto: !!A, dist: A ? Math.round(A.dist) : null, alt: s ? +s.pos[1].toFixed(1) : null, vy: s ? +s.vel[1].toFixed(1) : null, cruise: A ? Math.round(A.cruise) : null, spot: A && A.spot ? A.spot.map(Math.round) : null, v: s ? Math.round(Math.hypot(s.vel[0], s.vel[2])) : 0, climb: A ? +A.climb.toFixed(1) : 0, below, col }; });
+  const st = await ev(() => { const g = VR.game, S = g.starships, s = S.pilot && !(g.flight && g.flight.state === 'landed' && !S.auto) ? S.pilot : null, A = S.auto; let below = null, col = null; if (s) { below = S.hits(s, s.pos[0], s.pos[1] - 1.5, s.pos[2], s.yaw); const w = g.world, x = Math.floor(s.pos[0]), z = Math.floor(s.pos[2]); col = []; for (let y = Math.floor(s.pos[1]); y > Math.floor(s.pos[1]) - 60 && y > 0; y--) { const b = w.getBlock(x, y, z); if (b) { col.push(y + ':' + VR.R.types[VR.R.T.type[b]].name); if (col.length > 2) break; } } const c = w.col(x >> 4, z >> 4); col.push('ready=' + !!(c && c.ready)); } return { pilot: !!s, auto: !!A, dist: A ? Math.round(A.dist) : null, alt: s ? +s.pos[1].toFixed(1) : null, vy: s ? +s.vel[1].toFixed(1) : null, cruise: A ? Math.round(A.cruise) : null, spot: A && A.spot ? A.spot.map(Math.round) : null, v: s ? Math.round(Math.hypot(s.vel[0], s.vel[2])) : 0, climb: A ? +A.climb.toFixed(1) : 0, below, col }; });
   if (i % 5 === 0 || !st.pilot) console.log(i, JSON.stringify(Object.assign(st, { col: undefined })));
   if (i === 12) await shot('auto_cruise');
-  if (i === 14) { await ev(() => { VR.game.player.yaw += 1.2; VR.game.player.pitch = -0.2; }); await step(2); await shot('auto_freelook'); await ev(() => { VR.game.player.yaw -= 1.2; VR.game.player.pitch = 0; }); }
+  if (i === 14) { await ev(() => { const f = VR.game.flight; f.headYaw += 1.2; f.headPitch = -0.2; }); await step(2); await shot('auto_freelook'); await ev(() => { const f = VR.game.flight; f.headYaw -= 1.2; f.headPitch = 0; }); }
   if (!st.pilot) { landed = true; break; }
 }
-console.log('landed', landed);
+console.log('landed', landed, await ev(() => { const g = VR.game; return JSON.stringify({ state: g.flight && g.flight.state, pilot: !!g.starships.pilot }); }));
 if (landed) { for (let i = 0; i < 10; i++) { await step(10); await wait(100); } await shot('auto_arrived'); }
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 25)) console.log(l);
 await browser.close();

@@ -12,7 +12,7 @@
     high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false },
     ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false },
   };
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true }, PRESETS.balanced);
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true }, PRESETS.balanced);
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -168,7 +168,7 @@
     teardownWorld() {
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
-      this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false;
+      this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false; this.flight = null; this.flightWind = 0;
       if (this.traffic) { this.traffic.destroy(); this.traffic = null; }
       if (this.starships) { this.starships.destroy(); this.starships = null; }
       if (this.villages) { this.villages.destroy(); this.villages = null; }
@@ -757,7 +757,7 @@
       if (this.cockpit) this.cockpit.updateHud(dt);
       // audio
       this.audio.loop('rain', precip && !precip.snow ? E.rain * 0.35 : 0);
-      this.audio.loop('wind', Math.max(0, (cam.y - 90) / 120) * 0.25 + (p.flying ? Math.hypot(p.vel[0], p.vel[2]) / 40 : 0));
+      this.audio.loop('wind', Math.max(0, (cam.y - 90) / 120) * 0.25 + (p.flying ? Math.hypot(p.vel[0], p.vel[2]) / 40 : 0) + (this.flight ? this.flightWind || 0 : 0));
       const skyAtEye = (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12);
       this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true });
       // HUD
@@ -808,10 +808,12 @@
       if (i.hit('F1')) { this.hideHud = !this.hideHud; document.getElementById('hud').style.visibility = this.hideHud ? 'hidden' : 'visible'; }
       if (i.hit('F2')) this.screenshot();
       if (i.hit('F3')) { this.debugOn = !this.debugOn; if (!this.debugOn) ui.debug(null); }
-      if (i.hit('F5')) this.camMode = (this.camMode + 1) % 3;
+      // piloting a ship: F5 / C cycle the ship's own views and Q looks back (flight.js) — nothing gets dropped
+      const piloting = !!this.flight;
+      if (i.hit('F5') && !piloting) this.camMode = (this.camMode + 1) % 3;
       if (i.hit('KeyP')) this.photoMode(true);
-      if (i.hit('KeyQ') && this.player.inv.held) this.dropHeld(i.down('ControlLeft'));
-      this.zoom = i.down('KeyC') && this.player.inv.held && this.player.inv.held.id === 'spyglass';
+      if (i.hit('KeyQ') && this.player.inv.held && !piloting) this.dropHeld(i.down('ControlLeft'));
+      this.zoom = !piloting && i.down('KeyC') && this.player.inv.held && this.player.inv.held.id === 'spyglass';
     }
     screenshot() {
       // grab the next rendered frame; show it in an overlay (downloads are blocked inside embedded viewers)

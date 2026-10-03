@@ -543,6 +543,7 @@
         origin: [G.x0, G.y0, G.z0], dims: [G.nx, G.ny, G.nz],
         bounds: [G.cx(i0) - 0.5 / R, 0, G.cz(k0) - 0.5 / R, G.cx(i1) + 0.5 / R, G.cy(j1) + 0.5 / R, G.cz(k1) + 0.5 / R],
         eye: S.meta.eye || [0, 3, -3], seat: S.meta.seat || [0, 2, -3], exhaust: S.meta.exhaust, guns: S.meta.guns,
+        gear: (S.meta.gearParts || []).map(q => [q[0], q[1]]),   // landing feet [x, z] (pads at y = 0)
       };
       meta.length = +(meta.bounds[5] - meta.bounds[2]).toFixed(1); meta.width = +(meta.bounds[3] - meta.bounds[0]).toFixed(1); meta.height = +meta.bounds[4].toFixed(1);
       meta.speed = Math.round(Math.min(90, 26 + meta.exhaust.length * 7 * 40 / Math.max(20, meta.length * meta.width * 0.6)));

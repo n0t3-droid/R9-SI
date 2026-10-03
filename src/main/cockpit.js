@@ -1,9 +1,11 @@
 // ============================================================================
 // Cockpit: when you fly a starship or shuttle in first person you sit behind a
 // jet-style instrument panel (radar / nav / systems screens, glare shield,
-// throttle and flight stick that move with your inputs, slim canopy frame
-// that keeps the view wide open) and a glowing heads-up display (pitch
-// ladder, heading tape, speed & altitude, boresight, throttle and boost).
+// throttle and flight stick that move with the flight model, slim canopy frame
+// that keeps the view wide open) — fixed to the ship while your head looks
+// around — and a heads-up display on the ship's glass (pitch ladder, heading
+// tape, speed & altitude tapes, flight path marker, throttle, boost energy,
+// gear) that banks and pitches with the ship and fades when you look away.
 // The ship's own hull right around your head is clipped away.
 // ============================================================================
 (function (VR) {
@@ -90,162 +92,194 @@
     };
   };
 
+  const DEG = Math.PI / 180;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   class Cockpit {
     constructor(g) {
-      this.g = g; this.t = 0; this.thr = 0; this.stickX = 0; this.stickY = 0; this.activeT = 0; this.wasActive = false;
+      this.g = g; this.t = 0; this.thr = 0; this.stickX = 0; this.stickY = 0; this.activeT = 0; this.wasActive = false; this.hudAcc = 1;
+      this.mP = mat4.create(); this.mVP = mat4.create(); this.mB = mat4.create();
       const c = this.canvas = document.createElement('canvas');
       c.id = 'cockpitHud';
       c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;display:none';
       (document.getElementById('app') || document.body).appendChild(c);
       this.ctx = c.getContext('2d');
     }
-    // flight state of whatever we're piloting in first person
+    // the flight we sit in, in the cockpit view
     state() {
-      const g = this.g;
-      if (g.camMode !== 0 || g.hideHud === 'all') return null;
-      const sp = g.starships && g.starships.pilot;
-      if (sp && sp.d.meta) {
-        const m = sp.d.meta;
-        return { kind: 'starship', pos: sp.pos, vel: sp.vel, yaw: sp.yaw, pitch: sp.pitch, roll: sp.roll, turn: sp.turnVel || 0, gear: sp.gear, name: m.name, label: m.label, vmax: m.speed };
-      }
-      const gad = g.gadgets;
-      if (gad && gad.riding && gad.riding.type === 'ship' && gad.ship) {
-        const S = gad.ship;
-        if (S.state === 'meshing') return null;
-        return { kind: 'ship', pos: S.pos, vel: S.vel || [0, 0, 0], yaw: (S.yaw0 || 0) + (S.psi || 0), pitch: S.pitch || 0, roll: S.roll || 0, turn: S.turnVel || 0, gear: 0, name: S.name || 'Shuttle', label: '', vmax: S.maxSpeed || 40 };
-      }
-      return null;
+      const g = this.g, fl = g.flight;
+      if (!fl || g.camMode !== 0 || fl.view !== 0 || g.hideHud === 'all') return null;
+      const b = fl.b;
+      if (b.kind === 'ship' && b.ship && b.ship.state !== 'flying') return null;
+      return { fl, kind: b.kind, name: b.name || 'Ship', label: b.label || '' };
     }
     active() { return !!this.state(); }
-    // 3D: the instrument panel, attached to the camera (drawn after the scene with its own depth range)
+    // 3D: the instrument panel, part of the ship (drawn after the scene with its own depth range)
     draw(r, E, cam) {
       const st = this.state(); if (!st) return;
-      const g = this.g, gl = r.gl, ent = g.entities;
+      const g = this.g, gl = r.gl, ent = g.entities, fl = st.fl;
       const model = VR.getVoxModel(gl, 'cockpit'); if (!model || !ent) return;
-      const aspect = r.W / r.H;
-      const proj = mat4.perspective(mat4.create(), 72 * Math.PI / 180, aspect, 0.02, 10);
-      const vp = mat4.mul(mat4.create(), proj, r.view);
-      const inv = mat4.invert(mat4.create(), r.view);
-      const input = g.input;
-      const k = (c) => input && input.down(c) && !g.ui.typing;
-      const fw = (k('KeyW') ? 1 : 0) - (k('KeyS') ? 1 : 0);
-      this.thr += (Math.max(0, fw) * (k('ControlLeft') ? 1 : 0.75) - this.thr) * 0.08;
-      const speed = Math.hypot(st.vel[0], st.vel[1], st.vel[2]);
-      this.stickX += (Math.max(-1, Math.min(1, st.turn * 0.8)) - this.stickX) * 0.15;
-      this.stickY += (Math.max(-1, Math.min(1, st.vel[1] * 0.08)) - this.stickY) * 0.15;
-      const shake = Math.min(1, speed / 90) * 0.004;
+      // the scene's own field of view, so the panel and the world line up
+      const proj = mat4.perspective(this.mP, cam.fov || 72 * DEG, r.W / r.H, 0.02, 10);
+      const vp = mat4.mul(this.mVP, proj, r.view);
+      const I = fl.info();
+      this.thr += (Math.max(0, I.throttle) - this.thr) * 0.3;
+      this.stickX += (clamp(fl.yawRate * 0.9, -1, 1) - this.stickX) * 0.2;
+      this.stickY += (clamp(fl.b.vel[1] * 0.07, -1, 1) - this.stickY) * 0.2;
       const p = ent.beginVox(r, E, vp);
-      gl.uniform1f(p.u.u_sky, Math.max(0.55, ent.lightAt(st.pos[0], st.pos[1] + 2, st.pos[2]).sky));
+      const pos = fl.b.pos;
+      gl.uniform1f(p.u.u_sky, Math.max(0.55, ent.lightAt(pos[0], pos[1] + 2, pos[2]).sky));
       gl.uniform3f(p.u.u_blockLight, 0.05, 0.12, 0.14);
       gl.uniform1f(p.u.u_flash, 0); gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_noFog, 1);
-      // the panel belongs to the ship, not to your eyes: look around (free-look, autopilot) and it stays put
-      const base = mat4.create();
-      mat4.rotY(base, base, st.yaw); if (st.pitch) mat4.rotX(base, base, st.pitch * 0.5); if (st.roll) mat4.rotZ(base, base, st.roll * 0.6);
-      void inv;
-      mat4.translate(base, base, (Math.random() - 0.5) * shake, 0.024 + (Math.random() - 0.5) * shake, -0.35);
+      // rigid in the ship's frame, in front of the (unshaken) eye: the head looks around and shakes, the panel doesn't
+      const e = fl.eyeWorld(), base = this.mB;
+      base.set(fl.R3); base[12] = e[0] - cam.x; base[13] = e[1] - cam.y; base[14] = e[2] - cam.z;
+      mat4.translate(base, base, 0, 0.024, -0.35);
       const pose = { sweep: [-0.5, 0, -this.t * 2.2], thr: [-0.35 + this.thr * 0.8, 0, 0], stick: [-this.stickY * 0.25, 0, -this.stickX * 0.3] };
       ent.drawModel(r, p, model, [0, 0, 0], { x: 0, y: 0, z: 0 }, 0, pose, { sky: 1, bl: [0.05, 0.12, 0.14] }, { baseMat: base, noFog: true });
     }
-    // 2D: the heads-up display
+    // 2D: the heads-up display — ≤ 30 redraws a second, 1 canvas pixel per CSS pixel, no blur
     updateHud(dt, off) {
       this.t += dt;
       const st = off ? null : this.state(), c = this.canvas;
       // in the cockpit the regular HUD (hotbar, hearts, crosshair) steps aside for the instruments
       const on = !!st && !this.g.hideHud;
-      if (on !== this.wasActive) { this.wasActive = on; this.activeT = 0; const hud = document.getElementById('hud'); if (hud) hud.classList.toggle('cockpit', on); }
+      if (on !== this.wasActive) { this.wasActive = on; this.activeT = 0; this.hudAcc = 1; const hud = document.getElementById('hud'); if (hud) hud.classList.toggle('cockpit', on); }
       if (on) this.activeT += dt;
-      if (!st || this.g.hideHud) { if (c.style.display !== 'none') c.style.display = 'none'; return; }
+      if (!on) { if (c.style.display !== 'none') c.style.display = 'none'; return; }
       if (c.style.display !== 'block') c.style.display = 'block';
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const W = Math.round(c.clientWidth * dpr), Hh = Math.round(c.clientHeight * dpr);
-      if (c.width !== W || c.height !== Hh) { c.width = W; c.height = Hh; }
-      const x = this.ctx, g = this.g, cam = g.cam || {};
-      x.clearRect(0, 0, W, Hh);
-      const s = dpr, cx = W / 2, cy = Hh * 0.47;
-      const col = 'rgba(125,252,255,0.92)', dim = 'rgba(125,252,255,0.45)';
-      x.save();
-      x.strokeStyle = col; x.fillStyle = col; x.lineWidth = 1.6 * s; x.shadowColor = 'rgba(80,240,255,0.9)'; x.shadowBlur = 6 * s;
-      x.font = `${Math.round(12 * s)}px Orbitron, Rajdhani, monospace`; x.textAlign = 'center'; x.textBaseline = 'middle';
-      // pitch ladder (camera pitch & roll)
-      const fovY = (cam.fov || 1.25);
-      const pxPerRad = Hh / fovY;
-      const pitch = (g.player ? g.player.pitch : 0), roll = cam.roll || 0;
-      x.save(); x.translate(cx, cy); x.rotate(-roll);
+      this.hudAcc += dt;
+      if (this.hudAcc < 1 / 31) return;
+      this.hudAcc = 0;
+      const W = c.clientWidth | 0, H = c.clientHeight | 0;
+      if (!W || !H) return;
+      if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+      this.drawHud(st, W, H);
+      this.hudDraws = (this.hudDraws || 0) + 1;
+    }
+    drawHud(st, W, H) {
+      const x = this.ctx, g = this.g, r = g.renderer, fl = st.fl, b = fl.b, I = fl.info();
+      x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, W, H);
+      const VP = r && r.viewProj; if (!VP) return;
+      // a direction from the eye → screen pixels (the view matrix has no translation)
+      const P = (d) => { const X = VP[0] * d[0] + VP[4] * d[1] + VP[8] * d[2], Y = VP[1] * d[0] + VP[5] * d[1] + VP[9] * d[2], Wc = VP[3] * d[0] + VP[7] * d[1] + VP[11] * d[2]; if (Wc <= 1e-3) return null; return [(X / Wc * 0.5 + 0.5) * W, (0.5 - Y / Wc * 0.5) * H]; };
+      const fwd = fl.dirWorld([0, 0, -1]), up = fl.dirWorld([0, 1, 0]), rt = fl.dirWorld([1, 0, 0]);
+      // drawn on the ship's combiner glass: it fades as the head turns away from the nose
+      const cf = r.camFwd || [0, 0, -1], ang = Math.acos(clamp(fwd[0] * cf[0] + fwd[1] * cf[1] + fwd[2] * cf[2], -1, 1)) / DEG;
+      const fade = clamp(1 - (ang - 16) / 16, 0, 1);
+      if (fade < 0.02) return;
+      const c = P(fwd); if (!c) return;
+      const t1 = Math.tan(DEG), pr = P([fwd[0] + rt[0] * t1, fwd[1] + rt[1] * t1, fwd[2] + rt[2] * t1]), pu = P([fwd[0] + up[0] * t1, fwd[1] + up[1] * t1, fwd[2] + up[2] * t1]);
+      if (!pr || !pu) return;
+      const ux = [pr[0] - c[0], pr[1] - c[1]], uy = [pu[0] - c[0], pu[1] - c[1]], ppd = Math.hypot(ux[0], ux[1]) || 1;
+      const S = H / 720, A = fade;
+      const col = `rgba(125,252,255,${0.92 * A})`, dim = `rgba(125,252,255,${0.45 * A})`, warm = `rgba(255,190,90,${0.95 * A})`, mint = `rgba(154,255,216,${0.95 * A})`;
+      x.lineWidth = Math.max(1, 1.5 * S); x.lineCap = 'round';
+      x.font = `${Math.round(12 * S)}px Orbitron, Rajdhani, monospace`; x.textAlign = 'center'; x.textBaseline = 'middle';
+      // ---- pitch ladder & horizon: the world's horizon around the ship's heading (projected, so it banks and pitches)
+      const hd = b.heading, hr = [Math.cos(hd), 0, -Math.sin(hd)], R0 = 210 * S;
+      x.save(); x.beginPath(); x.arc(c[0], c[1], R0, 0, Math.PI * 2); x.clip();
       for (let a = -60; a <= 60; a += 10) {
-        const yy = (pitch - a * Math.PI / 180) * pxPerRad;
-        if (Math.abs(yy) > Hh * 0.32) continue;
-        const w = a === 0 ? 150 * s : 60 * s, gap = 34 * s;
-        x.strokeStyle = a === 0 ? col : dim;
-        x.setLineDash(a < 0 ? [6 * s, 5 * s] : []);
-        x.beginPath(); x.moveTo(-gap - w, yy); x.lineTo(-gap, yy); x.moveTo(gap, yy); x.lineTo(gap + w, yy); x.stroke();
-        if (a !== 0) { x.fillText(String(Math.abs(a)), -gap - w - 16 * s, yy); x.fillText(String(Math.abs(a)), gap + w + 16 * s, yy); }
+        const e = a * DEG, ce = Math.cos(e), se = Math.sin(e), d0 = [-Math.sin(hd) * ce, se, -Math.cos(hd) * ce];
+        const gap = Math.tan(3.2 * DEG), len = Math.tan((a ? 9 : 26) * DEG);
+        const L0 = P([d0[0] - hr[0] * (gap + len), d0[1], d0[2] - hr[2] * (gap + len)]), L1 = P([d0[0] - hr[0] * gap, d0[1], d0[2] - hr[2] * gap]);
+        const R1 = P([d0[0] + hr[0] * gap, d0[1], d0[2] + hr[2] * gap]), R2 = P([d0[0] + hr[0] * (gap + len), d0[1], d0[2] + hr[2] * (gap + len)]);
+        if (!L0 || !L1 || !R1 || !R2) continue;
+        x.strokeStyle = a === 0 ? col : dim; x.setLineDash(a < 0 ? [6 * S, 5 * S] : []);
+        x.beginPath(); x.moveTo(L0[0], L0[1]); x.lineTo(L1[0], L1[1]); x.moveTo(R1[0], R1[1]); x.lineTo(R2[0], R2[1]); x.stroke();
+        if (a) { x.fillStyle = dim; x.fillText(String(Math.abs(a)), L0[0] - 14 * S, L0[1]); x.fillText(String(Math.abs(a)), R2[0] + 14 * S, R2[1]); }
       }
-      x.setLineDash([]); x.restore();
-      // boresight + flight path marker
-      x.beginPath(); x.arc(cx, cy, 9 * s, 0, TAU); x.stroke();
-      x.beginPath(); x.moveTo(cx - 22 * s, cy); x.lineTo(cx - 9 * s, cy); x.moveTo(cx + 9 * s, cy); x.lineTo(cx + 22 * s, cy); x.moveTo(cx, cy - 9 * s); x.lineTo(cx, cy - 16 * s); x.stroke();
+      x.setLineDash([]);
+      // flight path marker: where the ship is really going
+      const v = b.vel, sp = I.speed;
+      if (sp > 2.5) {
+        const q = P([v[0] / sp, v[1] / sp, v[2] / sp]);
+        if (q) { x.strokeStyle = col; x.beginPath(); x.arc(q[0], q[1], 6 * S, 0, Math.PI * 2); x.moveTo(q[0] - 15 * S, q[1]); x.lineTo(q[0] - 6 * S, q[1]); x.moveTo(q[0] + 6 * S, q[1]); x.lineTo(q[0] + 15 * S, q[1]); x.moveTo(q[0], q[1] - 6 * S); x.lineTo(q[0], q[1] - 12 * S); x.stroke(); }
+      }
+      x.restore();
+      // ---- everything else sits on the glass: the ship's frame (right / down in pixels at the nose)
+      x.setTransform(ux[0] / ppd, ux[1] / ppd, -uy[0] / ppd, -uy[1] / ppd, c[0], c[1]);
+      x.strokeStyle = col; x.fillStyle = col;
+      // boresight (waterline)
+      x.beginPath(); x.moveTo(-26 * S, 0); x.lineTo(-11 * S, 0); x.lineTo(-6 * S, 6 * S); x.lineTo(0, 0); x.lineTo(6 * S, 6 * S); x.lineTo(11 * S, 0); x.lineTo(26 * S, 0); x.stroke();
       // heading tape
-      const hdg = ((-st.yaw * 180 / Math.PI) % 360 + 360) % 360;
-      const ty = Hh * 0.08, span = 70, tw = W * 0.34;
-      x.strokeStyle = dim;
-      x.beginPath(); x.moveTo(cx - tw / 2, ty + 12 * s); x.lineTo(cx + tw / 2, ty + 12 * s); x.stroke();
+      const hdg = I.heading, ty = -235 * S, span = 60, tw = 330 * S;
+      x.strokeStyle = dim; x.beginPath(); x.moveTo(-tw / 2, ty + 12 * S); x.lineTo(tw / 2, ty + 12 * S); x.stroke();
       for (let d = Math.ceil((hdg - span / 2) / 5) * 5; d <= hdg + span / 2; d += 5) {
-        const xx = cx + (d - hdg) / span * tw;
-        const big = d % 30 === 0;
-        x.beginPath(); x.moveTo(xx, ty + 12 * s); x.lineTo(xx, ty + (big ? 2 : 7) * s); x.stroke();
-        if (big) { const n = ((d % 360) + 360) % 360; x.fillStyle = dim; x.fillText(n === 0 ? 'N' : n === 90 ? 'E' : n === 180 ? 'S' : n === 270 ? 'W' : String(n / 10), xx, ty - 8 * s); }
+        const xx = (d - hdg) / span * tw, big = d % 30 === 0;
+        x.beginPath(); x.moveTo(xx, ty + 12 * S); x.lineTo(xx, ty + (big ? 2 : 7) * S); x.stroke();
+        if (d % 10 === 0) { const n = ((d % 360) + 360) % 360; x.fillStyle = big ? col : dim; x.fillText(n === 0 ? 'N' : n === 90 ? 'E' : n === 180 ? 'S' : n === 270 ? 'W' : String(n / 10).padStart(2, '0'), xx, ty - 6 * S); }
       }
       x.fillStyle = col; x.strokeStyle = col;
-      x.strokeRect(cx - 24 * s, ty + 16 * s, 48 * s, 18 * s); x.fillText(String(Math.round(hdg)).padStart(3, '0'), cx, ty + 25 * s);
-      // speed (left) & altitude (right)
-      const spd = Math.hypot(st.vel[0], st.vel[1], st.vel[2]);
-      const box = (bx, label, val) => { x.strokeRect(bx - 38 * s, cy - 13 * s, 76 * s, 26 * s); x.fillText(val, bx, cy); x.fillStyle = dim; x.fillText(label, bx, cy - 24 * s); x.fillStyle = col; };
-      box(cx - W * 0.2, 'SPD m/s', String(Math.round(spd)));
-      box(cx + W * 0.2, 'ALT', String(Math.round(st.pos[1])));
-      // vertical speed caret
-      const vs = Math.max(-1, Math.min(1, st.vel[1] / 20));
-      x.beginPath(); x.moveTo(cx + W * 0.2 + 46 * s, cy - vs * 40 * s); x.lineTo(cx + W * 0.2 + 54 * s, cy - vs * 40 * s - 5 * s); x.lineTo(cx + W * 0.2 + 54 * s, cy - vs * 40 * s + 5 * s); x.closePath(); x.fill();
-      // throttle / boost / gear
-      const bx = cx - W * 0.2 - 70 * s, by = cy + 60 * s;
-      x.strokeRect(bx, by - 60 * s, 10 * s, 60 * s);
-      x.fillRect(bx + 2 * s, by - 2 * s - this.thr * 56 * s, 6 * s, this.thr * 56 * s);
-      x.textAlign = 'left'; x.fillStyle = dim;
-      x.fillText('THR', bx - 2 * s, by + 12 * s);
-      x.fillText(st.gear > 0.5 ? 'GEAR DN' : 'GEAR UP', cx + W * 0.2 - 38 * s, cy + 40 * s);
-      x.fillText(st.name.toUpperCase(), cx - W * 0.2 - 38 * s, cy + 40 * s);
-      if (this.g.input && this.g.input.down('ControlLeft')) { x.fillStyle = 'rgba(255,170,60,0.95)'; x.fillText('BOOST', cx - 24 * s, cy + 70 * s); }
-      // navigation: autopilot status or the nearest village, with a marker on the canopy
-      const SS = g.starships, ap = st.kind === 'starship' && SS ? SS.auto : null;
+      x.strokeRect(-24 * S, ty + 16 * S, 48 * S, 18 * S); x.fillText(String(Math.round(hdg) % 360).padStart(3, '0'), 0, ty + 25 * S);
+      // speed (left) & altitude (right) with tapes
+      const tape = (cx, val, step, label, right) => {
+        x.strokeStyle = dim; x.fillStyle = dim;
+        const pxPer = 5 * S / step * 2, top = -110 * S, bot = 110 * S;
+        x.beginPath(); x.moveTo(cx, top); x.lineTo(cx, bot); x.stroke();
+        for (let k = Math.ceil((val - 22 * step) / step) * step; k <= val + 22 * step; k += step) {
+          const yy = (val - k) * pxPer; if (yy < top || yy > bot) continue;
+          const big = Math.round(k / step) % 5 === 0;
+          x.beginPath(); x.moveTo(cx, yy); x.lineTo(cx + (right ? 1 : -1) * (big ? 9 : 5) * S, yy); x.stroke();
+          if (big && Math.abs(yy) > 16 * S) x.fillText(String(Math.round(k)), cx + (right ? 1 : -1) * 24 * S, yy);
+        }
+        x.fillStyle = col; x.strokeStyle = col;
+        const bx = cx + (right ? 1 : -1) * 30 * S;
+        x.clearRect(bx - 30 * S, -12 * S, 60 * S, 24 * S); x.strokeRect(bx - 30 * S, -12 * S, 60 * S, 24 * S); x.fillText(String(Math.round(val)), bx, 0);
+        x.fillStyle = dim; x.fillText(label, bx, -24 * S); x.fillStyle = col;
+      };
+      tape(-235 * S, sp, 2, 'm/s', false);
+      tape(235 * S, I.alt, 2, 'ALT', true);
+      // height above ground & vertical speed under the altitude
+      x.textAlign = 'left';
+      if (I.agl !== null && I.agl < 200) { x.fillStyle = I.agl < 8 ? warm : col; x.fillText('R ' + (I.agl < 10 ? I.agl.toFixed(1) : Math.round(I.agl)), 237 * S, 32 * S); }
+      x.fillStyle = dim; x.fillText('VS ' + (I.vs >= 0 ? '+' : '') + I.vs.toFixed(1), 237 * S, 50 * S);
+      // throttle lever (with the reverse range) and the boost energy bar
+      const thx = -330 * S, th0 = 70 * S, th1 = -70 * S, thr = I.throttle;
+      x.strokeStyle = dim; x.strokeRect(thx - 5 * S, th1, 10 * S, th0 - th1 + 18 * S);
+      x.fillStyle = thr < 0 ? warm : (I.boost ? `rgba(120,200,255,${A})` : col);
+      if (thr >= 0) x.fillRect(thx - 3 * S, th0 - thr * (th0 - th1), 6 * S, thr * (th0 - th1)); else x.fillRect(thx - 3 * S, th0, 6 * S, -thr / 0.25 * 16 * S);
+      x.strokeStyle = col; x.beginPath(); x.moveTo(thx - 9 * S, th0); x.lineTo(thx + 9 * S, th0); x.stroke();
+      const ex = thx - 18 * S; x.strokeStyle = dim; x.strokeRect(ex - 3 * S, th1, 6 * S, th0 - th1);
+      x.fillStyle = I.boost ? `rgba(120,200,255,${A})` : I.energy < 0.15 ? warm : dim; x.fillRect(ex - 2 * S, th0 - I.energy * (th0 - th1), 4 * S, I.energy * (th0 - th1));
+      x.textAlign = 'center'; x.fillStyle = dim;
+      x.fillText(thr < 0 ? 'REV' : Math.round(thr * 100) + '%', thx, th0 + 30 * S);
+      if (I.boost) { x.fillStyle = `rgba(120,200,255,${A})`; x.fillText('BOOST', 0, 70 * S); }
+      // systems line: gear, lights, ramp, state
+      const lamp = (on, txt) => (on ? txt : '');
+      const sys = [I.gear > 0.98 ? 'GEAR ▼' : I.gear < 0.02 ? 'GEAR ▲' : 'GEAR ◆', lamp(I.lights, 'LIGHTS'), lamp(I.ramp > 0.02, 'RAMP'), I.state === 'landed' ? 'LANDED' : I.state === 'landing' ? 'LANDING' : ''].filter(Boolean).join('   ');
+      x.fillStyle = I.state === 'landing' || (I.gear > 0.02 && I.gear < 0.98) ? warm : dim; x.fillText(sys, 0, 150 * S);
+      x.fillStyle = dim; x.fillText(st.name.toUpperCase(), 0, 170 * S);
+      // navigation: autopilot or the nearest village, a marker on the canopy
+      const SS = g.villages, ap = I.auto, pos = b.pos;
       let dest = null, line = null;
       if (ap) { const t = ap.spot || [ap.site.x, ap.site.y + 1, ap.site.z]; dest = [t[0], t[1] + 3, t[2]]; const eta = Math.round(ap.eta || 0); line = `AUTOPILOT ▸ ${ap.site.name.toUpperCase()} · ${(ap.dist / 1000).toFixed(2)} km` + (eta > 0 ? ` · ETA ${Math.floor(eta / 60)}:${String(eta % 60).padStart(2, '0')}` : ''); }
-      else if (g.villages && g.villages.list) {
+      else if (SS && SS.list) {
         let best = null, bd = 1e18;
-        for (const v of g.villages.list()) { const d = (v.x - st.pos[0]) ** 2 + (v.z - st.pos[2]) ** 2; if (d > 140 * 140 && d < bd) { bd = d; best = v; } }
-        if (best) { dest = [best.x, best.y + 8, best.z]; line = `⌂ ${best.name.toUpperCase()} ${(Math.sqrt(bd) / 1000).toFixed(1)} km` + (st.kind === 'starship' ? ' · G AUTOPILOT' : ''); }
+        for (const vv of SS.list()) { const d = (vv.x - pos[0]) ** 2 + (vv.z - pos[2]) ** 2; if (d > 140 * 140 && d < bd) { bd = d; best = vv; } }
+        if (best) { dest = [best.x, best.y + 8, best.z]; line = `⌂ ${best.name.toUpperCase()} ${(Math.sqrt(bd) / 1000).toFixed(1)} km · G AUTOPILOT`; }
       }
-      if (line) { x.textAlign = 'center'; x.fillStyle = ap ? 'rgba(154,255,216,0.95)' : dim; x.fillText(line, cx, ty + 50 * s); }
-      const r = g.renderer;
-      if (dest && r && r.viewProj && cam.x !== undefined) {
-        const m = r.viewProj, px = dest[0] - cam.x, py = dest[1] - cam.y, pz = dest[2] - cam.z;
-        const X = m[0] * px + m[4] * py + m[8] * pz + m[12], Y = m[1] * px + m[5] * py + m[9] * pz + m[13], Wc = m[3] * px + m[7] * py + m[11] * pz + m[15];
-        let sx = X / Math.abs(Wc || 1), sy = Y / Math.abs(Wc || 1);
-        const behind = Wc <= 0.01;
-        x.strokeStyle = ap ? 'rgba(154,255,216,0.95)' : col;
-        if (!behind && Math.abs(sx) < 0.95 && Math.abs(sy) < 0.9) {
-          const qx = (sx * 0.5 + 0.5) * W, qy = (0.5 - sy * 0.5) * Hh, d = 9 * s;
-          x.beginPath(); x.moveTo(qx, qy - d); x.lineTo(qx + d, qy); x.lineTo(qx, qy + d); x.lineTo(qx - d, qy); x.closePath(); x.stroke();
-          x.beginPath(); x.moveTo(qx, qy - d * 2.2); x.lineTo(qx, qy - d * 1.3); x.stroke();
+      if (line) { x.fillStyle = ap ? mint : dim; x.fillText(line, 0, ty + 52 * S); }
+      x.setTransform(1, 0, 0, 1, 0, 0);
+      const cam = g.cam;
+      if (dest && cam && cam.x !== undefined) {
+        const q = P([dest[0] - cam.x, dest[1] - cam.y, dest[2] - cam.z]);
+        x.strokeStyle = ap ? mint : col;
+        const inView = q && q[0] > W * 0.04 && q[0] < W * 0.96 && q[1] > H * 0.06 && q[1] < H * 0.94;
+        if (inView) {
+          const d = 9 * S;
+          x.beginPath(); x.moveTo(q[0], q[1] - d); x.lineTo(q[0] + d, q[1]); x.lineTo(q[0], q[1] + d); x.lineTo(q[0] - d, q[1]); x.closePath(); x.stroke();
+          x.beginPath(); x.moveTo(q[0], q[1] - d * 2.2); x.lineTo(q[0], q[1] - d * 1.3); x.stroke();
         } else {
-          // off-canopy: an arrow on the rim points the way
-          if (behind) { sx = -sx; sy = -sy; }
-          const a = Math.atan2(-sy, sx), rx = W * 0.3, ry = Hh * 0.3;
-          const qx = cx + Math.cos(a) * rx, qy = cy + Math.sin(a) * ry, d = 10 * s;
-          x.save(); x.translate(qx, qy); x.rotate(a);
+          // off the canopy: an arrow on the HUD rim points the way (relative to the nose)
+          const dd = [dest[0] - pos[0], dest[1] - pos[1], dest[2] - pos[2]];
+          const lr = dd[0] * rt[0] + dd[1] * rt[1] + dd[2] * rt[2], lu = dd[0] * up[0] + dd[1] * up[1] + dd[2] * up[2];
+          const a = Math.atan2(lu, lr), sx = Math.cos(a), sy = -Math.sin(a);
+          const qx = c[0] + (ux[0] * sx - uy[0] * sy) / ppd * 190 * S, qy = c[1] + (ux[1] * sx - uy[1] * sy) / ppd * 190 * S, d = 10 * S, ra = Math.atan2(qy - c[1], qx - c[0]);
+          x.save(); x.translate(qx, qy); x.rotate(ra);
           x.beginPath(); x.moveTo(d, 0); x.lineTo(-d * 0.7, -d * 0.7); x.lineTo(-d * 0.3, 0); x.lineTo(-d * 0.7, d * 0.7); x.closePath(); x.stroke();
           x.restore();
         }
       }
-      x.restore();
     }
   }
   VR.Cockpit = Cockpit;
