@@ -47,6 +47,23 @@
     SMOOTH: 1 << 30,      // natural ground: the mesher draws its top as a smooth slope between neighbouring columns
   };
 
+  // ---- Block look (v0.39) ----------------------------------------------------------
+  // "classic" (Klassisch, the default): every block a cube with its own edges, like the original game — hills in
+  // one-block steps, glass frames and mini-voxel patterns per block, a rim on every cube texture, no world-space
+  // mottling. "seamless" (Nahtlos): natural ground as smooth slopes (F.SMOOTH), panorama frames and VX pieces that
+  // join their neighbours, patterns running across blocks, seamless modern materials, macro mottling.
+  // Main thread, workers and the Studio each call VR.setLook; the mesher, physics and the VX painter follow.
+  const LOOK = VR.LOOK = { mode: 'classic', ground: false, ctm: false, rim: true, vxJoin: false, macro: false };
+  VR.setLook = function (mode) {
+    const m = mode === 'seamless' ? 'seamless' : 'classic', seam = m === 'seamless', changed = LOOK.mode !== m;
+    LOOK.mode = m; LOOK.ground = seam; LOOK.ctm = seam; LOOK.rim = !seam; LOOK.vxJoin = seam; LOOK.macro = seam;
+    // smooth ground: the SMOOTH flag of the natural ground states (o.smooth) is on in Nahtlos only
+    const TF = R.T && R.T.flags, sm = R.smoothStates;
+    if (TF && sm) for (let i = 0; i < sm.length; i++) { if (seam) TF[sm[i]] |= F.SMOOTH; else TF[sm[i]] &= ~F.SMOOTH; }
+    if (changed && VR.VX && VR.VX.clearCache) VR.VX.clearCache();   // painted VX pieces depend on the look
+    return changed;
+  };
+
   // Shape ids
   const S = VR.SHAPE = { NONE: 0, CUBE: 1, CROSS: 2, CROP: 3, FLUID: 4, MODEL: 5, SLAB: 6, STAIRS: 7, FENCE: 8, WALL: 9, PANE: 10, WIRE: 11, CHORUS: 12, TALLCROSS: 13, DRIP: 14, VOXEL: 15 };
   const LAYER = VR.LAYER = { OPAQUE: 0, CUTOUT: 1, TRANS: 2 };
@@ -287,6 +304,7 @@
     };
     R.models = new Array(n).fill(null);
     R.stateInfo = new Array(n).fill(null);
+    const smooth = [];   // natural ground states: smooth slopes in the Nahtlos look (VR.setLook)
     // air (state 0)
     T.type[0] = 65535; T.flags[0] = F.REPLACE | F.INVISIBLE; T.shape[0] = S.NONE; T.filter[0] = 0;
     for (const t of R.types) {
@@ -315,7 +333,7 @@
         if (opaque) fl |= F.OPAQUE | F.CONDUCT;
         if (T.layer[s] === 1) fl |= F.CUTOUT;
         if (T.layer[s] === 2) fl |= F.TRANS;
-        if (get('smooth', false) && opaque) fl |= F.SMOOTH;
+        if (get('smooth', false) && opaque) { smooth.push(s); if (LOOK.ground) fl |= F.SMOOTH; }
         T.flags[s] = fl;
         const light = get('light', null);
         if (light) T.emit[s] = VR.packLight(light[0], light[1], light[2]);
@@ -337,6 +355,7 @@
         }
       }
     }
+    R.smoothStates = Int32Array.from(smooth);
   };
   // what a pane (glass pane, iron bars, glass balustrade) joins on its sides: other panes, walls and every full solid
   // block — stone and planks, but also glass, window and panorama glass (not leaves, like the original game).

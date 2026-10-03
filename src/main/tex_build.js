@@ -84,7 +84,23 @@
     return out;
   }
 
-  // Build all layers. opts: {names, cubeMask (Uint8Array per layer), cutoutMask, bevel (0..1)}
+  // which layers are faces of full opaque cubes (they get the rim) and which are cut-out (alpha-coverage mips)
+  VR.textureMasks = function () {
+    const R = VR.R, T = R.T, L = R.texNames.length;
+    const cube = new Uint8Array(L), cut = new Uint8Array(L);
+    for (let s = 0; s < T.shape.length; s++) {
+      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 0 && (T.flags[s] & VR.F.FULL)) for (let f = 0; f < 6; f++) cube[T.tex[s * 6 + f] & 0xfff] = 1;
+      if (T.layer[s] === 1) for (let f = 0; f < 6; f++) cut[T.tex[s * 6 + f] & 0xfff] = 1;
+    }
+    for (let s = 0; s < R.models.length; s++) { const md = R.models[s]; if (md && T.layer[s] === 1) for (const f of md) cut[f.tex & 0xfff] = 1; }
+    if (VR.CUTOUT_TEX) for (const n of VR.CUTOUT_TEX) { const i = R.texIndex[n]; if (i !== undefined) cut[i] = 1; }
+    return { cube, cut };
+  };
+  // the rim of the seamless materials (stucco, Vollton, marble …) in the Klassisch look: a little softer than the others
+  const SOFT_RIM = 0.85;
+
+  // Build all layers. opts: {names, cubeMask (Uint8Array per layer), cutoutMask, bevel (0..1), bevelAll (the Klassisch
+  // look: the seamless materials get the rim too, so every block shows its edges)}
   VR.buildTextureArrays = function (opts) {
     const names = opts.names, L = names.length;
     const albedo = [], material = [];
@@ -96,7 +112,8 @@
       let img = null;
       try { img = resolve(names[l]); } catch (e) { img = null; missing.push(names[l] + ' (error: ' + e.message + ')'); }
       if (!img) { if (!missing.length || missing[missing.length - 1].indexOf(names[l]) !== 0) missing.push(names[l]); img = missingTex(); }
-      if (opts.cubeMask && opts.cubeMask[l] && opts.bevel > 0 && !img.noBevel) stylize(img, opts.bevel);   // seamless materials (stucco, marble…) opt out
+      // seamless materials (stucco, marble…) opt out — except in the Klassisch look
+      if (opts.cubeMask && opts.cubeMask[l] && opts.bevel > 0 && (!img.noBevel || opts.bevelAll)) stylize(img, img.noBevel ? opts.bevel * SOFT_RIM : opts.bevel);
       TX.toArrays(img, alb0, mat0, 0);
       albedo[0].set(alb0, l * N * N * 4); material[0].set(mat0, l * N * N * 4);
       // mips

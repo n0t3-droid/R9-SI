@@ -135,16 +135,12 @@
         const r = VR.LOD && m.dim === 'overworld' ? VR.LOD.build(g, m) : null;
         if (!r || r.empty) { self.postMessage({ type: 'lod', id: m.id, empty: true, ms: performance.now() - t0 }); return; }
         self.postMessage({ type: 'lod', id: m.id, verts: r.verts, idx: r.idx, count: r.count, minY: r.minY, maxY: r.maxY, big: r.big, bx0: r.bx0, bz0: r.bz0, bx1: r.bx1, bz1: r.bz1, ms: performance.now() - t0 }, [r.verts, r.idx.buffer]);
+      } else if (m.type === 'look') {
+        // the block look (Klassisch / Nahtlos): the next meshes follow it (the main thread re-meshes)
+        if (VR.setLook) VR.setLook(m.mode);
       } else if (m.type === 'textures') {
-        const R = VR.R, T = R.T, L = R.texNames.length;
-        const cube = new Uint8Array(L), cut = new Uint8Array(L);
-        for (let s = 0; s < T.shape.length; s++) {
-          if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 0 && (T.flags[s] & VR.F.FULL)) for (let f = 0; f < 6; f++) cube[T.tex[s * 6 + f] & 0xfff] = 1;
-          if (T.layer[s] === 1) for (let f = 0; f < 6; f++) cut[T.tex[s * 6 + f] & 0xfff] = 1;
-        }
-        for (let s = 0; s < R.models.length; s++) { const md = R.models[s]; if (md && T.layer[s] === 1) for (const f of md) cut[f.tex & 0xfff] = 1; }
-        if (VR.CUTOUT_TEX) for (const n of VR.CUTOUT_TEX) { const i = R.texIndex[n]; if (i !== undefined) cut[i] = 1; }
-        const out = VR.buildTextureArrays({ names: R.texNames, cubeMask: cube, cutoutMask: cut, bevel: m.bevel === undefined ? 1 : m.bevel });
+        const R = VR.R, mk = VR.textureMasks();
+        const out = VR.buildTextureArrays({ names: R.texNames, cubeMask: mk.cube, cutoutMask: mk.cut, bevel: m.bevel === undefined ? 1 : m.bevel, bevelAll: !!m.bevelAll });
         const noise = VR.buildNoiseTexture();
         const tr = [noise.buffer, out.avgColor.buffer];
         for (const a of out.albedo) tr.push(a.buffer); for (const a of out.material) tr.push(a.buffer);
