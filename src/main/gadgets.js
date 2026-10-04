@@ -831,17 +831,19 @@
         gearFeet: [], belly, exhaust, guns: [[nose[0] - 1.4, 0, nose[2]], [nose[0] + 1.4, 0, nose[2]]],
         wingtips: lo && hi ? [[lo[0] - 0.5, lo[1], lo[2]], [hi[0] + 0.5, hi[1], hi[2]]] : null,
         name: S.name || 'Ship', label: S.count + ' blocks',
+        cockpit: VR.consoleRoom(eye), consoleOnly: true,
       };
     }
     driveShip(dt, input, blocked) {
       const g = this.g, p = g.player, S = this.ship;
       if (!S) { this.riding = null; return; }
       if (S.state === 'flying' && S.flight) {
-        // the flight model flies it (V once landed: back onto the block grid and out)
+        // the console's controls get the left button first; the flight model flies it (V once landed: back onto the block grid and out)
+        const onCtl = g.cockpit && g.cockpit.interact ? g.cockpit.interact(S.flight, input, blocked) : false;
         if (S.flight.update(dt, input, blocked) === 'exit') { if (this.landShip(false)) return; }
-        // lasers from the nose, where you look
+        // lasers from the nose, where you look — once the weapons are armed
         const fire = input.dragLook ? input.clickAction(0) : input.mouse.down[0];
-        if (!blocked && !g.ui.typing && fire && this.fireCool <= 0 && g.entities && (!S.flight.weapons || S.flight.weapons.armed !== false)) {
+        if (!blocked && !g.ui.typing && !onCtl && fire && this.fireCool <= 0 && g.entities && S.flight.armed) {
           this.fireCool = 0.17;
           const d3 = p.lookDir();
           for (const gp of S.flight.b.guns) g.entities.fireBolt(S.flight.toWorld(gp), d3, 110, 10, p, [0.4, 1, 1]);
@@ -1182,6 +1184,7 @@
       const ck = g.cockpit && g.cockpit.active();
       if (ck && r && (r.type === 'starship' || (r.type === 'ship' && this.ship && this.ship.state !== 'meshing'))) return g.cockpit.activeT < 9 ? '<small>W/S throttle · A/D turn · Space/Shift climb · B boost · X hover · the mouse looks, hold the right button to steer · C view · F gear · L lights · <b>G autopilot</b> · <b>V land</b> · hold Q look back</small>' : null;
       if (r && r.type === 'starship') return g.starships ? g.starships.hudText() : null;
+      if (r && r.type === 'cabin') { const cb = g.starships && g.starships.cabin, h = cb && cb.hover; return h ? `<b>${h.c.label}</b> · click` : '<small>WASD walk · Space jump · aim + click: pilot seat, doors, ramp, holo map · <b>V</b> pilot seat</small>'; }
       if (r && r.type === 'ship' && this.ship) {
         const S = this.ship;
         if (S.state === 'meshing') return '<b>SHIP SYSTEMS</b> · spooling up…';
@@ -1229,6 +1232,7 @@
       const r = this.riding;
       if (!r) return null;
       if (r.type === 'starship') return g.starships && g.starships.pilot ? g.starships.camera(cam) : null;
+      if (r.type === 'cabin') return g.starships && g.starships.cabin ? g.starships.cabin.camera(cam) : null;
       if (r.type === 'tram') return g.trams ? g.trams.camera(cam, r) : null;
       if (r.type === 'seat') { if (g.camMode !== 0) return null; return Object.assign(cam, { x: r.x + 0.5, y: r.y + 1.45, z: r.z + 0.5, roll: 0, fixed: true }); }
       if (r.type === 'bike') {
@@ -1261,7 +1265,7 @@
     drive(dt, input, blocked) {
       const g = this.g, p = g.player, r0 = this.riding;
       // in a ship the flight model owns the mouse (your head; the right button steers)
-      const shipMouse = r0 && !this.drone && (r0.type === 'starship' || (r0.type === 'ship' && this.ship && this.ship.flight && this.ship.state === 'flying'));
+      const shipMouse = r0 && !this.drone && (r0.type === 'starship' || r0.type === 'cabin' || (r0.type === 'ship' && this.ship && this.ship.flight && this.ship.state === 'flying'));
       if (!blocked && input.captured && !g.ui.typing && !shipMouse) {
         const sens = input.sensitivity;
         p.yaw -= input.mouse.dx * sens;
@@ -1270,6 +1274,7 @@
       if (this.drone) { this.driveDrone(dt, input, blocked); return; }
       const r = this.riding; if (!r) return;
       if (r.type === 'starship') { if (g.starships && g.starships.pilot) g.starships.drive(dt, input, blocked); else this.riding = null; p.target = null; return; }
+      if (r.type === 'cabin') { if (g.starships) g.starships.walk(dt, input, blocked); else this.riding = null; p.target = null; return; }
       if (r.type === 'bike') this.driveBike(dt, input, r.bike, blocked);
       else if (r.type === 'ship') this.driveShip(dt, input, blocked);
       else if (r.type === 'seat') this.driveSeat(dt, input, blocked);
@@ -1330,8 +1335,8 @@
       mat4.translate(m, m, S.pos[0] - cam.x, S.pos[1] + (S.dip || 0) - cam.y, S.pos[2] - cam.z);
       mat4.mul(m, m, S.rotM);
       mat4.translate(m, m, -S.pivot[0], -S.pivot[1], -S.pivot[2]);
-      // piloting in first person: the cockpit overlay replaces the hull right around your head
-      S.clipNear = this.riding && this.riding.type === 'ship' && this.g.camMode === 0 ? 2.2 : 0;
+      // piloting in first person you see your own build around you; the console sits in front of the seat
+      S.clipNear = 0;
       r.drawShip(S, E, layer);
     }
 

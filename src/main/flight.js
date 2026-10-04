@@ -40,7 +40,7 @@
     cushion: 8, gearAlt: 10, gearSpeed: 25, gearTime: 1.2, landSpeed: 8,
     stepLen: 0.5, stuck: 0.2,
     headYaw: 150 * DEG, headUp: 80 * DEG, headDown: 70 * DEG, lookBack: 150 * DEG,
-    boostTime: 5, boostRefill: 9, rampMax: 8,
+    boostTime: 5, boostRefill: 9, rampMax: 8, startTime: 3,
   };
 
   let NEXT = 1;
@@ -58,12 +58,15 @@
       this.spool = 0; this.speed = 0; this.alt = null; this.stuckT = 0; this.dip = 0; this.dipV = 0;
       this.shakeAmp = 0; this.bump = 0; this.shake = [0, 0, 0, 0]; this.fovK = 1; this.fovKick = 0;
       this.t = 0; this.dt = 1 / 60; this.auto = null; this.skyClear = false; this.strobeT = 0;
+      // cockpit systems: a ship starts cold (POWER, then START: a 3 s spool-up; W, Space or G does both)
+      this.power = 'off'; this.startT = 0; this.armed = false; this.radio = false; this.anim = {}; this.chatT = 2;
       this.R3 = mat4.create(); this.C4 = mat4.create();
       this.chaseYaw = null; this.shot = null; this.accSm = [0, 0, 0]; this.lastV = [0, 0, 0];
       this.orient();
     }
     get cruise() { return clamp(this.b.cruiseBase * 1.35, 30, 80); }
     get heading() { return this.b.heading; }
+    get running() { return this.power === 'running'; }
     static get TUNE() { return TUNE; }
 
     // ---------------------------------------------------------------- frames
@@ -88,9 +91,12 @@
     inside() { const b = this.b, p = b.pos; return !!b.overlaps(p[0], p[1], p[2], b.heading); }
 
     // ---------------------------------------------------------------- boarding
-    enter() {
+    // resume: back into the seat of a ship that kept flying on its own (hover hold / the autopilot) — it carries on
+    enter(resume) {
       const g = this.g, b = this.b;
       g.flight = this;
+      if (b.hatch) { this.rampOpen = b.hatch.rampOpen; this.ramp = b.hatch.ramp; }
+      if (resume) { this.headYaw = 0; this.headPitch = 0; this.backT = 0; this.recenter = false; g.camMode = this.view === 0 ? 0 : 1; return; }
       this.headYaw = 0; this.headPitch = 0; this.backT = 0; this.recenter = false;
       this.ctl.turn = 0; this.ctl.climb = 0; this.ctl.strafe = 0; this.ctl.speed = null;
       this.throttle = 0; this.yawRate = 0; this.boost = false; this.boostWant = false; this.auto = null; this.chaseYaw = null; this.shot = null;
@@ -102,14 +108,35 @@
       this.roll = 0; this.pitch = 0; b.setAttitude(0, 0); this.orient();
       if (b.setGear) b.setGear(this.gear);
       g.camMode = this.view === 0 ? 0 : 1;
-      this.spool = this.state === 'landed' ? 0 : 0.25;
+      // up in the air the engines are running; on the ground the ship waits cold
+      if (this.state !== 'landed') { this.power = 'running'; this.startT = TUNE.startTime; }
+      this.spool = this.running ? 0.25 : 0;
+      if (!this.running && g.ui && g.ui.hint) g.ui.hint('Systems cold — flip POWER and press START in the cockpit, or just push W', 4500);
     }
     leave() {
       const g = this.g;
       if (g.flight === this) g.flight = null;
       g.camMode = 0; g.flightWind = 0; this.auto = null; this.boost = false;
-      if (g.audio) { g.audio.loop('engine', 0); if (g.audio.turbine) g.audio.turbine(0, 0); }
+      // getting out shuts the ship down
+      if (this.state === 'landed') { this.power = 'off'; this.startT = 0; this.throttle = 0; }
+      if (g.audio) { g.audio.loop('engine', 0); g.audio.loop('radio', 0); if (g.audio.turbine) g.audio.turbine(0, 0); }
     }
+    // ---- cockpit systems
+    setPower(on) {
+      if (on) { if (this.power === 'off') { this.power = 'on'; this.sfx('switch'); this.say('Power on — START spins up the engines'); } return true; }
+      if (this.power === 'off') return true;
+      if (this.state !== 'landed') { this.say('Not while flying!'); this.sfx('deny'); return false; }
+      this.power = 'off'; this.startT = 0; this.throttle = 0; this.boost = false; this.auto = null; this.sfx('switch');
+      return true;
+    }
+    startEngines() {
+      if (this.power === 'running' || this.power === 'starting') return true;
+      if (this.power === 'off') { this.say('No power — open the guard and flip POWER first'); this.sfx('deny'); return false; }
+      this.power = 'starting'; this.startT = 0; this.sfx('spool');
+      return true;
+    }
+    autoStart() { if (this.power === 'off') this.power = 'on'; return this.startEngines(); }
+    setThrottle(v) { this.throttle = clamp(v, -TUNE.rev, 1); this.detent = 0; if (this.throttle > 0.05 && !this.running) this.autoStart(); }
     setView(v) {
       this.view = v; this.g.camMode = v === 0 ? 0 : 1; this.shot = null; this.chaseYaw = null;
       if (this.g.audio) this.g.audio.play('click');
@@ -172,6 +199,8 @@
       let turn = turnK, climb = climbK;
       if (this.steering && !turnK) turn = clamp(this.headYaw / (28 * DEG), -1, 1);
       if (this.steering && !climbK && this.state !== 'landed') { const hp = this.headPitch, dz = 2 * DEG; climb = clamp((Math.abs(hp) < dz ? 0 : hp - Math.sign(hp) * dz) / (22 * DEG), -1, 1); }
+      // a cold ship starts by itself when you ask it to fly
+      if (!this.running && (thrIn > 0 || climbK > 0 || wheel < 0)) this.autoStart();
       // any flight input hands the controls back (autopilot, assisted landing)
       const mouseFly = this.steering && (dx || dy);
       if (this.auto && (thrIn || turnK || climbK || x0 || wheel || mouseFly)) this.stopAuto('Autopilot off — you have the controls.');
@@ -202,6 +231,7 @@
     // ---------------------------------------------------------------- physics
     simulate(dt) {
       const b = this.b, p = b.pos, v = b.vel, cr = this.cruise;
+      if (this.power === 'starting') { this.startT += dt; if (this.startT >= TUNE.startTime) { this.power = 'running'; this.startT = TUNE.startTime; this.sfx('clunk', { vol: 0.5 }); } }
       for (let i = 0; i < 3; i++) { if (!isFinite(p[i])) p[i] = this.lastGood ? this.lastGood[i] : 100; if (!isFinite(v[i])) v[i] = 0; }
       // boost: B burns the energy bar (≈ 5 s), it refills a moment after you let go
       const wantB = this.boostWant && this.state === 'flying';
@@ -218,12 +248,12 @@
       this.gear = clamp(this.gear + (this.gearDown ? 1 : -1) * dt / TUNE.gearTime, 0, 1);
       if (g0 !== this.gear && (this.gear === 1 || this.gear === 0)) this.sfx('clunk', { vol: 0.5 });
       if (b.setGear) b.setGear(this.gear);
-      this.ramp = clamp(this.ramp + (this.rampOpen ? 1 : -1) * dt / 2.2, 0, 1);
+      if (!b.hatch) this.ramp = clamp(this.ramp + (this.rampOpen ? 1 : -1) * dt / 2.2, 0, 1);   // (a cabin's ramp moves with its hatches)
       if (this.rampOpen && this.speed > TUNE.rampMax + 4) this.rampOpen = false;   // the slipstream slams it shut
       // ---- on the ground
       if (this.state === 'landed') {
         v[0] = 0; v[1] = 0; v[2] = 0; this.vF = 0; this.yawRate = 0;
-        if (this.throttle > 0.05 || this.ctl.climb > 0.05 || (this.ctl.speed !== null && this.ctl.speed > 0.5)) { this.state = 'flying'; this.holdAlt = p[1] + 2.5; this.sfx('clunk', { vol: 0.3 }); }
+        if (this.running && (this.throttle > 0.05 || this.ctl.climb > 0.05 || (this.ctl.speed !== null && this.ctl.speed > 0.5))) { this.state = 'flying'; this.holdAlt = p[1] + 2.5; this.sfx('clunk', { vol: 0.3 }); }
         else { this.attitude(dt, 0, 0); this.suspension(dt); this.lastGood = p.slice(); return; }
       }
       const h0 = b.heading, fx = -Math.sin(h0), fz = -Math.cos(h0), rx = Math.cos(h0), rz = -Math.sin(h0);
@@ -425,13 +455,19 @@
       const sp = this.speed = Math.hypot(v[0], v[1], v[2]);
       const cr = this.cruise;
       // engine spool follows the lever (hovering needs some thrust too)
-      const demand = this.state === 'landed' ? 0.06 : clamp(Math.max(Math.abs(this.ctl.speed !== null ? this.ctl.speed / cr : this.throttle), Math.abs(this.ctl.climb) * 0.6, 0.2) + (this.boost ? 0.45 : 0), 0, 1.45);
+      const demand = !this.running ? (this.power === 'starting' ? 0.3 * this.startT / TUNE.startTime : 0) : this.state === 'landed' ? 0.08 : clamp(Math.max(Math.abs(this.ctl.speed !== null ? this.ctl.speed / cr : this.throttle), Math.abs(this.ctl.climb) * 0.6, 0.2) + (this.boost ? 0.45 : 0), 0, 1.45);
       this.spool += (demand - this.spool) * k1(this.spool < demand ? 1.1 : 0.6, dt);
       if (g.audio) {
         g.audio.loop('engine', 0.08 + this.spool * 0.2, 0.22 + Math.min(1, sp / 70) * 0.8);
         if (g.audio.turbine) g.audio.turbine(0.025 + this.spool * 0.05, this.spool);
       }
       g.flightWind = Math.min(0.9, (sp / 75) * (sp / 75) * 0.7);
+      // the radio: soft static with bursts of chatter
+      if (g.audio) {
+        let lv = 0;
+        if (this.radio && this.power !== 'off') { this.chatT -= dt; if (this.chatT < -1.4) this.chatT = 2 + Math.random() * 5; lv = 0.025 + (this.chatT < 0 ? 0.07 * (0.6 + 0.4 * Math.sin(this.t * 31) * Math.sin(this.t * 7.3)) : 0); }
+        g.audio.loop('radio', lv);
+      }
       // smooth camera shake: speed rumble, ground effect, boost, impacts
       const lowAlt = this.alt !== null && this.alt < 6 && sp > 6 ? (1 - this.alt / 6) * 0.35 : 0;
       const amp = S.camShake === false ? 0 : clamp(0.22 * (sp / cr) * (sp / cr) * (this.boost ? 1.5 : 1) + lowAlt + this.bump + 0.03 * this.spool, 0, 3);
@@ -456,8 +492,8 @@
       const dir = this.dirWorld([0, 0, 1]);
       for (let i = 0; i < ex.length; i++) {
         const e = ex[i];
-        if (TR) TR.engine('fl' + this.id + ':' + i, this.toWorld([e[0], e[1], e[2] + 0.3]), sp, { thrust: Math.min(1.3, thrust), size: (e[3] || 0.5) * (boost ? 1.45 : 1), col: boost ? [0.35, 0.72, 1] : [0.55, 0.5, 1], minor: i > 1 });
-        if (!P || this.state === 'landed' || Math.random() > (low ? 0.25 : 0.35) + thrust * 0.5) continue;
+        if (TR && this.spool > 0.05) TR.engine('fl' + this.id + ':' + i, this.toWorld([e[0], e[1], e[2] + 0.3]), sp, { thrust: Math.min(1.3, thrust), size: (e[3] || 0.5) * (boost ? 1.45 : 1), col: boost ? [0.35, 0.72, 1] : [0.55, 0.5, 1], minor: i > 1 });
+        if (!P || this.state === 'landed' || !this.running || Math.random() > (low ? 0.25 : 0.35) + thrust * 0.5) continue;
         const wp = this.toWorld([e[0] + (Math.random() - 0.5) * e[3], e[1] + (Math.random() - 0.5) * e[3], e[2] + 0.2]), vv = 6 + thrust * 16 + (boost ? 14 : 0), v = b.vel;
         P.spawn(wp[0], wp[1], wp[2], dir[0] * vv + v[0] * 0.7, dir[1] * vv + v[1] * 0.7, dir[2] * vv + v[2] * 0.7, { life: 0.14 + thrust * 0.2 + (boost ? 0.12 : 0), size: (e[3] || 0.5) * (0.5 + thrust * 0.45) * (boost ? 1.3 : 1), grav: 0, col: boost ? [0.5, 0.82, 1] : [1, 0.62, 0.28], emis: 1, drag: 2, grow: 0.7, collide: false });
       }
@@ -600,6 +636,7 @@
     }
     startAuto(site) {
       const g = this.g, b = this.b, p = b.pos;
+      if (!this.running) this.autoStart();
       const dx = site.x - p[0], dz = site.z - p[2], L = Math.hypot(dx, dz) || 1;
       const RAD = site.rad || (VR.VillageGen && VR.VillageGen.RAD) || 58;
       const A = this.auto = { site, spot: null, cruise: Math.max(p[1] + 18, site.y + 60, 120), t: 0, tries: 0, climb: 0, dist: L, eta: 0, refined: false, landing: false };
@@ -716,7 +753,7 @@
     // ---------------------------------------------------------------- for the HUD & cockpit
     info() {
       const b = this.b, v = b.vel, p = b.pos;
-      return { speed: this.speed, vs: v[1], alt: p[1], agl: this.alt, heading: ((-b.heading * 180 / Math.PI) % 360 + 360) % 360, throttle: this.ctl.speed !== null ? clamp(this.ctl.speed / this.cruise, -TUNE.rev, 1) : this.throttle, boost: this.boost, energy: this.energy, gear: this.gear, gearDown: this.gearDown, lights: this.lights, ramp: this.ramp, state: this.state, spool: this.spool, auto: this.auto };
+      return { speed: this.speed, vs: v[1], alt: p[1], agl: this.alt, heading: ((-b.heading * 180 / Math.PI) % 360 + 360) % 360, throttle: this.ctl.speed !== null ? clamp(this.ctl.speed / this.cruise, -TUNE.rev, 1) : this.throttle, boost: this.boost, energy: this.energy, gear: this.gear, gearDown: this.gearDown, lights: this.lights, ramp: this.ramp, state: this.state, spool: this.spool, auto: this.auto, power: this.power, armed: this.armed, radio: this.radio };
     }
   }
   VR.Flight = Flight;
