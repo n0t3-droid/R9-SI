@@ -26,16 +26,21 @@
     return img;
   }
 
-  // the Klassisch look's edge on the seamless materials (stucco, Vollton, marble, tiles …): a crisp darker line on the
-  // block's outermost texels and a groove — the gentle rim of stylize() vanishes on bright surfaces (tone mapping and
-  // bloom swallow a few percent), this line still shows every block edge; mips fade it out with distance
+  // the Klassisch look's edge on the seamless materials (stucco, Vollton, marble, tiles …): a darker border two texels
+  // wide (one pixel of a 16-pixel block) and a groove — the gentle rim of stylize() vanishes on bright surfaces (tone
+  // mapping and bloom swallow a few percent). The brighter the material, the darker its border: a sunlit white wall
+  // sits on the tone curve's shoulder, where only a strong line still shows (measured in the game: ~9 grey levels on
+  // white stucco in the sun, ~24 on grey stucco up close). Mips fade it out with distance.
   function edgeLine(img, strength) {
     const s = strength;
+    let lum = 0; for (let i = 0; i < N * N; i++) lum += 0.2126 * img.c[i * 4] + 0.7152 * img.c[i * 4 + 1] + 0.0722 * img.c[i * 4 + 2];
+    lum = Math.min(1, lum / (N * N));
+    const k0 = (0.14 + 0.22 * lum) * s, k1 = (0.08 + 0.12 * lum) * s;   // white: ×0.65 / ×0.81 · dark: ×0.82 / ×0.9
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
       const e = Math.min(x, y, N - 1 - x, N - 1 - y);
       if (e > 1) continue;
-      const i = y * N + x, m = 1 - (e === 0 ? 0.18 : 0.05) * s;
-      img.h[i] -= (e === 0 ? 0.2 : 0.08) * s;
+      const i = y * N + x, m = 1 - (e === 0 ? k0 : k1);
+      img.h[i] -= (e === 0 ? 0.2 : 0.1) * s;
       img.c[i * 4] *= m; img.c[i * 4 + 1] *= m; img.c[i * 4 + 2] *= m;
     }
   }
