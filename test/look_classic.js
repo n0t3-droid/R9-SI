@@ -1,8 +1,10 @@
 // Block look (v0.39): "Klassisch" (the default — every block a cube with its own edges, glass and patterns per block,
 // like Minecraft) and "Nahtlos" (smooth ground slopes, joined panorama frames, seamless materials, joined VX pieces).
-//  (a) the texture rim: texel columns 0 and 31 darker than the inside on stucco, Vollton and stone in Klassisch
+//  (a) the texture rim: texel columns 0 and 31 darker than the inside on stucco, Vollton and stone in Klassisch (the
+//      seamless materials' border darker the brighter they are)
 //  (b) a 4×3 stucco wall meshed and sampled through the mesher's UVs: a dip at every block border (Klassisch only)
-//  (c) a hill: every opaque vertex on a whole block height, no slope flag (Klassisch) — slopes in Nahtlos
+//  (c) a hill: every opaque vertex on a whole block height, no slope flag (Klassisch) — slopes in Nahtlos; a body
+//      walking into it steps up the terraces (Klassisch) or follows the slope (Nahtlos); stone steps still take a jump
 //  (d) 3×3 panorama glass: the full-frame layer everywhere (Klassisch) — the centre joined on all sides in Nahtlos
 //  (e) VX: two timber walls at odd / even x give the same quads; stacked windows each get a closed frame; rugs end per block
 const VR = require('./load_shared.js');
@@ -137,7 +139,39 @@ console.log('(c) hill');
     if (lk === 'classic') check(smooth === 0, `${lk}: bodies stand on block tops (smooth ground under ${smooth} of ${n} points)`);
     else check(between > 50, `${lk}: bodies walk on the slopes (${between} of ${n} points between block heights)`);
   }
+  // walking up the hill like the player does (step height 0.6, gravity, the smooth-ground follower): Klassisch steps
+  // up the one-block terraces of natural ground, Nahtlos walks up the slope — and both get to the top
+  const walk = (getS, x0, z0, ticks) => {
+    const P = VR.PHYS, pos = [x0, 0, z0], dt = 1 / 60;
+    for (let y = 255; y > 0; y--) { const s = getS(Math.floor(x0), y, Math.floor(z0)); if (s && (T.flags[s] & F.SOLID)) { pos[1] = y + 1; break; } }
+    let vy = 0, onGround = true, steps = 0;
+    for (let i = 0; i < ticks; i++) {
+      vy -= 30 * dt; let my = vy * dt; const mx = 4.3 * dt;
+      let follow = null;
+      if (onGround && vy <= 0) { follow = P.walkSmooth(getS, pos, mx, 0); if (follow !== null) { my = follow; vy = 0; } }
+      const r = P.move(getS, pos, 0.3, 1.8, mx, my, 0, 0.6, null, onGround);
+      if (r.stepped > 0.9) steps++;
+      if (follow !== null) { onGround = true; vy = 0; } else { if (r.hitY) { if (vy < 0) onGround = true; vy = 0; } else onGround = r.onGround; if (my < 0 && !r.hitY) onGround = false; if (vy <= 0 && P.snapSmooth(getS, pos)) { onGround = true; vy = 0; } }
+    }
+    return { pos, steps };
+  };
+  for (const lk of looks) {
+    VR.setLook(lk);
+    const r = walk(get, 4.5, 22.5, 240), top = Y0 + hillH(Math.floor(r.pos[0]), 22) + 1;
+    const ok = r.pos[0] > 18 && Math.abs(r.pos[1] - top) < 0.35;
+    if (lk === 'classic') check(ok && r.steps >= 4, `${lk}: walking into the hill steps up its terraces (${r.steps} whole-block steps, at x ${r.pos[0].toFixed(1)}, height ${(r.pos[1] - Y0).toFixed(2)} on the step ${top - Y0})`);
+    else check(ok && r.steps === 0, `${lk}: walking into the hill follows the slope (at x ${r.pos[0].toFixed(1)}, height ${(r.pos[1] - Y0).toFixed(2)}, ground ${top - Y0})`);
+  }
+  // Klassisch: only natural ground — a stone step and a two-block grass wall still take a jump
+  VR.setLook('classic');
+  const S1 = st('stone');
+  for (const [what, fn] of [['a one-block stone step', (x, y, z) => (y < 64 ? S1 : (x >= 8 && y === 64) ? S1 : 0)], ['a two-block grass wall', (x, y, z) => (y < 64 ? D0() : (x >= 8 && (y === 64 || y === 65)) ? G0() : 0)]]) {
+    const r = walk(fn, 4.5, 2.5, 120);
+    check(r.pos[0] < 8 && r.pos[1] === 64, `classic: ${what} stops the walk (at x ${r.pos[0].toFixed(2)}, height ${r.pos[1]})`);
+  }
 }
+function D0() { return st('dirt'); }
+function G0() { return st('grass_block'); }
 
 // ---------------------------------------------------------------- (d) 3×3 panorama glass
 console.log('(d) panorama glass');
