@@ -99,7 +99,8 @@
       say(this.lookText(m + 'Say'), '#9affd8');
       if (this.meta && this.meta.guest && this.hostLook && this.hostLook !== m) say(this.lookText('host'), '#ffd27a');
     }
-    // the look's words in the player's language (German or English; the other languages read the English)
+    // the look's words in the player's language (German or English; the other languages read the English). Without
+    // the language module (i18n.js) German players are told by the Studio's language choice, else by the browser's.
     lookText(k) {
       const L = {
         label: ['Blöcke', 'Blocks'], classic: ['Klassisch', 'Classic'], seamless: ['Nahtlos', 'Seamless'],
@@ -109,7 +110,9 @@
         seamlessSay: ['Blöcke: Nahtlos — sanfte Hänge, verbundenes Glas, nahtlose Materialien.', 'Blocks: Seamless — smooth slopes, joined glass, seamless materials.'],
         host: ['In dieser Welt gilt der Look des Hosts.', "In this world the host's look applies."],
       }[k] || [k, k];
-      return VR.I18N ? VR.I18N.tx('g.look.' + k, null, L[0], L[1]) : L[1];
+      if (VR.I18N) return VR.I18N.tx('g.look.' + k, null, L[0], L[1]);
+      let de = false; try { const s = localStorage.getItem('r9si.lang'); de = s ? s === 'de' : /^de\b/i.test(navigator.language || ''); } catch (e) { /* storage blocked */ }
+      return de ? L[0] : L[1];
     }
     // the player's hero look (Settings → Character); a random one is rolled on first start
     heroOpts() {
