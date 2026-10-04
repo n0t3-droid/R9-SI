@@ -369,7 +369,7 @@
         case 'checker': cc = ((x >> 2) + (z >> 2) + c.px + c.pz) & 1 ? s.col : s.col2; fl |= GLOSS; break;
         case 'stone': PF0 = 0; PAT.fieldstone(FOUND_TOP, x, z, c, 2); cc = P0 < 0 ? s.col2 : P0; break;
         case 'metal': cc = (x === 0 || z === 0) ? s.col2 : ((x + z) & 3) === 0 ? sh(s.col, 0.8) : s.col; fl |= GLOSS; if (x === 4 && z === 4 && (c.h & 1)) { cc = C.cyan; fl |= EMIS; } break;
-        case 'marble': cc = mix(s.col, s.col2, (hh(x >> 1, z >> 1, c.h, 7) & 7) === 0 ? 0.6 : 0); fl |= GLOSS; break;
+        case 'marble': cc = mix(s.col, s.col2, (hh(x >> 1, z >> 1, c.h, 7) & 7) === 0 ? 0.6 : 0); if ((x === 0 || z === 0) && !VR.LOOK.vxJoin) cc = sh(cc, 0.9); fl |= GLOSS; break;   // Klassisch: a seam at every block edge
         default: { const fp = VX.floorPat[s.pat]; if (fp) { const r = fp(s, c, x, z); cc = r[0]; fl = r[1]; if (r[2]) { put(x, 7, z, cc, fl); continue; } } }
       }
       if (cc < 0) { del(x, 7, z); put(x, 6, z, s.col2 || sh(s.col, 0.7)); continue; }
