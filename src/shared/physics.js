@@ -302,6 +302,23 @@
     return out;
   };
 
+  // Klassisch terraces: natural ground is drawn in one-block steps there instead of slopes (VR.LOOK.ground off). A
+  // grounded body that walks into such a step goes up the whole block, as it walks up the slope in Nahtlos — hills
+  // stay walkable. Only when everything solid ahead at the feet is natural ground (R.terrace: grass, dirt, sand …
+  // and their cut twins); stone, placed blocks and walls of two blocks still take a jump.
+  const terraceAhead = (getState, pos, w, vx, vz) => {
+    const TR = R.terrace; if (!TR) return false;
+    const y = Math.floor(pos[1] + 1e-3);
+    const x0 = Math.floor(pos[0] - w + vx), x1 = Math.floor(pos[0] + w + vx - 1e-7), z0 = Math.floor(pos[2] - w + vz), z1 = Math.floor(pos[2] + w + vz - 1e-7);
+    let any = false;
+    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+      const s = getState(x, y, z);
+      if (!s || !(R.T.flags[s] & F.SOLID)) continue;
+      if (!TR[s]) return false;
+      any = true;
+    }
+    return any;
+  };
   // Move AABB (center-bottom pos, half width w, height h) by (vx,vy,vz); returns collision flags
   const tmp = [];
   P.move = function (getState, pos, w, h, vx, vy, vz, stepH, nbFn, groundedHint) {
@@ -338,8 +355,9 @@
     const blockedH = Math.abs(nx - vx) > 1e-6 || Math.abs(nz - vz) > 1e-6;
     const grounded = vy <= 0 && (ny > vy + 1e-6 || !!groundedHint);   // the hint: standing on smooth ground above its collision box
     if (stepH > 0 && blockedH && (grounded || stepH > 0.6)) {
-      // try step up
-      const up = sweep(pos[0] - w, pos[1], pos[2] - w, pos[0] + w, pos[1] + h, pos[2] + w, 1, stepH);
+      // try step up (a whole block onto a natural terrace in the Klassisch look)
+      const LK = VR.LOOK, sh = stepH < 1 && grounded && LK && !LK.ground && terraceAhead(getState, pos, w, vx, vz) ? 1.01 : stepH;
+      const up = sweep(pos[0] - w, pos[1], pos[2] - w, pos[0] + w, pos[1] + h, pos[2] + w, 1, sh);
       if (up > 0.01) {
         const r2 = attempt(pos[0], pos[1] + up, pos[2], vx, 0, vz);
         const down = sweep(pos[0] + r2[0] - w, pos[1] + up, pos[2] + r2[2] - w, pos[0] + r2[0] + w, pos[1] + up + h, pos[2] + r2[2] + w, 1, -up);

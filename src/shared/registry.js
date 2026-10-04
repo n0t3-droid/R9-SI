@@ -305,6 +305,8 @@
     R.models = new Array(n).fill(null);
     R.stateInfo = new Array(n).fill(null);
     const smooth = [];   // natural ground states: smooth slopes in the Nahtlos look (VR.setLook)
+    // natural ground and its cut twins: one-block terraces a walking body steps up in the Klassisch look (physics.js)
+    const terrace = R.terrace = new Uint8Array(n);
     // air (state 0)
     T.type[0] = 65535; T.flags[0] = F.REPLACE | F.INVISIBLE; T.shape[0] = S.NONE; T.filter[0] = 0;
     for (const t of R.types) {
@@ -334,6 +336,7 @@
         if (T.layer[s] === 1) fl |= F.CUTOUT;
         if (T.layer[s] === 2) fl |= F.TRANS;
         if (get('smooth', false) && opaque) { smooth.push(s); if (LOOK.ground) fl |= F.SMOOTH; }
+        if ((get('smooth', false) || o.cutOf) && opaque) terrace[s] = 1;
         T.flags[s] = fl;
         const light = get('light', null);
         if (light) T.emit[s] = VR.packLight(light[0], light[1], light[2]);
