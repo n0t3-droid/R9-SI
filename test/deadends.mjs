@@ -4,7 +4,8 @@
 // · ☆ for whole houses (blueprint_<i>), a ★ chip in Architektur, Teile ★ shows every favourite with ✏️;
 // · "Verbaut in" rows: ⚒ (that house in the Crafter, the piece in the hand) and 🎨 (replace all of it in that house with
 //   a variant — one undo step);
-// · ▶ Spielen takes the plan drafts along (and you land in front of the new house);
+// · ▶ Spielen takes the plan drafts and the 🎨 Stil preview along — from the Studio's page and from the Studio over the
+//   open game — and you land in front of the new house;
 // · a full browser storage shows "⚠ Browser-Speicher voll" with 🧹 Platz schaffen — never a ✓ after a failed write;
 // · the developer tabs wait behind ⚙ Profi, no text says you need Claude; small ones: 🗑 asks twice, ↻ on screen,
 //   ✋ Benutzen with a world open → the Werkbank's hand, a skin-only design is kept, house saves do not re-mesh the game.
@@ -289,6 +290,8 @@ await section('7 · the small ones: 🗑 asks twice, ↻ on screen, ✋ Benutzen
 const inGame = async (id, maxS = 180) => { for (let i = 0; i < maxS * 2; i++) { await wait(500); if (await safe((id) => { const g = window.VR && VR.game; return !!(g && g.state === 'play' && g.meta && g.meta.id === id && g.player && !g.player.hold && !g.studioOpen && !g.revealPending && !(g.director && g.director.active)); }, id)) return true; } return false; };
 const atTitle = async (maxS = 120) => { for (let i = 0; i < maxS * 2; i++) { await wait(500); if (await safe(() => !!(window.VR && VR.game && VR.game.state === 'title'))) return true; } return false; };
 const inStudio = async (id, maxS = 240) => { for (let i = 0; i < maxS * 2; i++) { await wait(500); if (await safe((id) => { const WM = window.VR && VR.StudioWorld; return !!(WM && WM.world && WM.world.id === id && !WM.loading && WM.cols.size && WM.wb && WM.wb.region === WM.region && document.getElementById('playBtn')); }, id)) return true; } return false; };
+// a planned piece: its status in the browser's storage, and whether the game has it in its own plan list
+const planNow = (id, pid) => safe(([id, pid]) => { const d = JSON.parse(localStorage.getItem('r9si.plans.' + id) || '{"plans":[]}'), q = d.plans.find(x => x.id === pid), bp = VR.game.gadgets && VR.game.gadgets.blue; return { status: q ? q.status : null, game: !!(bp && bp.plans && bp.plans.some(x => x.id === pid)) }; }, [id, pid]);
 let W = null;
 await section('8 · a world: Welt → Häuser ★, placing with buttons, ✋ Benutzen → the Werkbank, a full storage there', async () => {
   await page.goto(URL0 + '/index.html', NAV);
@@ -359,7 +362,7 @@ await section('8 · a world: Welt → Häuser ★, placing with buttons, ✋ Ben
   check(/Browser-Speicher voll/.test(r.bar), 'the banner is there in the Welt mode too');
 });
 
-await section('9 · ▶ Spielen takes the plan draft along: the game builds it, you land in front of it', async () => {
+await section('9 · ▶ Spielen takes the plan draft along: the game has it, you land in front of it', async () => {
   if (!W) { check(false, 'no world'); return; }
   const p = await ev(async (P) => {
     const sleep = (ms) => new Promise(res => setTimeout(res, ms)), WM = VR.StudioWorld, C = window.__studioCore;
@@ -378,9 +381,12 @@ await section('9 · ▶ Spielen takes the plan draft along: the game builds it, 
   check(p.status === 'draft' && p.stored === 0 && p.keepNow === 'function', 'a house planned, still a draft (nothing handed over yet)');
   await ev(() => document.getElementById('playBtn').click());
   check(await inGame(W.id), '▶ starts the world');
-  let built = false;
-  for (let i = 0; i < 120 && !built; i++) { await wait(500); built = await safe((id) => { const d = JSON.parse(localStorage.getItem('r9si.plans.' + id) || '{"plans":[]}'); return d.plans.some(q => q.id === 'dead-1' && q.status === 'built'); }, W.id); }
-  check(built, 'the game built the planned house (the draft went along)');
+  // the draft went along: handed to the game, and the game has it in its plan list. (Building it is the game's own
+  // business, tested in world_mode.mjs: this flat world's floor, y 4, is too close to the bedrock for a catalogue house —
+  // the game's builder wants 48 blocks of ground below a floor (blueprints.js DEPTH) and leaves such a plan unbuilt.)
+  let handed = null;
+  for (let i = 0; i < 20 && !(handed && handed.game); i++) { await wait(500); handed = await planNow(W.id, 'dead-1'); }
+  check(handed && (handed.status === 'pending' || handed.status === 'built') && handed.game, 'the draft went along: handed to the game, in its plan list (' + JSON.stringify(handed) + ')');
   await wait(1200);
   const me = await ev(() => { const g = VR.game, p = g.player, w = g.world, T = VR.R.T, F = VR.F; const solid = (x, y, z) => !!(T.flags[w.getBlock(x, y, z)] & F.SOLID); const fx = Math.floor(p.pos[0]), fy = Math.floor(p.pos[1] + 0.01), fz = Math.floor(p.pos[2]); return { pos: p.pos.map(v => +v.toFixed(2)), yaw: p.yaw, wall: solid(fx, fy, fz) || solid(fx, fy + 1, fz), ground: solid(fx, fy - 1, fz) }; });
   const b = p.box, [x, , z] = me.pos, cx = (b[0] + b[3] + 1) / 2, cz = (b[2] + b[5] + 1) / 2;
@@ -404,6 +410,47 @@ await section('9 · ▶ Spielen takes the plan draft along: the game builds it, 
   }, SOFA);
   console.log('  remesh', JSON.stringify(rm));
   check(rm.house === 0 && rm.model === 1, 'the game: a house design does not re-mesh the world, a furniture design does');
+});
+
+// ---- the other way out: ▶ in the Studio over the open game (the game's overlay)
+const frameStudio = () => page.frames().find(f => /studio\.html/.test(f.url()));
+const fev = (fn, a) => frameStudio().evaluate(fn, a);
+await section('10 · the Studio over the open game: ▶ takes the plan draft and the 🎨 Stil preview along', async () => {
+  if (!W) { check(false, 'no world'); return; }
+  // a 🎨 Stil preview waiting for this world (the Stil tab keeps one like this), then the Studio over the game
+  await ev((id) => localStorage.setItem('r9si.styledraft.' + id, JSON.stringify({ rules: [['oak_planks', 'spruce_planks']], water: null })), W.id);
+  await ev(() => VR.game.openStudio());
+  let ready = false;
+  for (let i = 0; i < 480 && !ready; i++) { await wait(500); const f = frameStudio(); if (!f) continue; try { ready = await f.evaluate((id) => { const WM = window.VR && VR.StudioWorld; return !!(WM && WM.world && WM.world.id === id && !WM.loading && WM.cols.size && WM.st && WM.st.region === WM.region && document.getElementById('playBtn')); }, W.id); } catch (e) { /* loading */ } }
+  check(ready, 'the Studio opens over the game, on this world');
+  if (!ready) return;
+  const p = await fev(async (P) => {
+    const sleep = (ms) => new Promise(res => setTimeout(res, ms)), WM = VR.StudioWorld;
+    const out = { style: WM.styleDraft ? WM.styleDraft.rules : null };
+    const it = WM.houseItem(6);
+    for (let i = 0; i < 600 && !WM.meshFor(it); i++) await sleep(200);
+    const m = WM.meshFor(it); if (!m) return Object.assign(out, { err: 'no mesh' });
+    const hit = WM.pickGround({ o: [P[0] - 40.5, 300, P[2] + 0.5], d: [0, -1, 0] }), gp = WM.ghostAt(hit, it, m);
+    WM.change(() => { const q = Object.assign({}, gp, { id: 'dead-2', status: 'draft', t: Date.now() }); delete q.ok; WM.plans.push(q); });
+    WM.refresh();
+    const q = WM.plans.find(x => x.id === 'dead-2'), L = WM.placeOf(q, m).lot;
+    return Object.assign(out, { status: q.status, box: [L[0], q.F, L[1], L[2], q.F + Math.max(3, m.top || 8), L[3]] });
+  }, W.P);
+  console.log('  overlay plan', JSON.stringify(p));
+  check(p.status === 'draft' && JSON.stringify(p.style) === '[["oak_planks","spruce_planks"]]', 'a house planned (a draft) and a 🎨 Stil preview waiting');
+  await fev(() => document.getElementById('playBtn').click());
+  check(await inGame(W.id), '▶: back in the game');
+  let handed = null;
+  for (let i = 0; i < 20 && !(handed && handed.game); i++) { await wait(500); handed = await planNow(W.id, 'dead-2'); }
+  const st = await ev((id) => ({ saved: (JSON.parse(localStorage.getItem('r9si.style.' + id) || '{}').rules) || [], draft: localStorage.getItem('r9si.styledraft.' + id), game: (VR.game.style && VR.game.style.rules) || [] }), W.id);
+  console.log('  overlay ▶', JSON.stringify(handed), JSON.stringify(st));
+  check(handed && (handed.status === 'pending' || handed.status === 'built') && handed.game, 'the plan draft went along: handed to the game, in its plan list');
+  const rule = (a) => a.some(x => x[0] === 'oak_planks' && x[1] === 'spruce_planks');
+  check(rule(st.saved) && !st.draft && rule(st.game), 'the 🎨 Stil preview went into the world: saved, no draft left, the game has the rule');
+  const me = await ev(() => { const g = VR.game, p = g.player; return { pos: p.pos.map(v => +v.toFixed(2)), by: g.landedBy }; });
+  const b = p.box || [0, 0, 0, 0, 0, 0], [x, , z] = me.pos, dist = Math.hypot(Math.max(b[0] - x, 0, x - (b[3] + 1)), Math.max(b[2] - z, 0, z - (b[5] + 1)));
+  console.log('  overlay landed', JSON.stringify(me), dist.toFixed(1));
+  check(me.by === 'new' && dist >= 2 && dist <= 30, 'and you land in front of the new house (the 📍 landing still fires: ' + dist.toFixed(1) + ' blocks)');
 });
 
 await done();
