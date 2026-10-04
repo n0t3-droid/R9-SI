@@ -347,7 +347,7 @@
       <button id="gnToSite" class="cbtn" style="display:${WM.world && PLACE_RE.test(Gs.text) ? '' : 'none'}">🏘 ${L('gn.toSite', 'Das ist ein ganzer Ort — im Gelände planen')}</button>
       ${z ? `<div class="gnNote">${z.kind === 'house' ? '🏠' : '🧩'} <b>${esc(z.name || '')}</b>${z.notes ? ' — ' + esc(z.notes) : ''}</div>` : ''}
       ${z && z.kind === 'house' ? `<button data-mode="house" class="cbtn">🏠 ${L('gn.tune', 'Im Baukasten anpassen')}</button>` : ''}
-      <p class="dim">${L('gn.how2', 'Das Genie kennt {n} Dinge — Fahrzeuge, Schiffe, Tiere, Figuren, Gebäude, Pflanzen, Essen, Schriftzüge — und baut Häuser mit Zimmern. Farben, Größe und Extras sagst du einfach dazu. Alles passiert hier im Spiel: ohne Konto, ohne Limit.', { n: B ? B.LIB.length + '+' : '170+' })}</p>`;
+      <p class="dim">${L('gn.how2', 'Das Genie kennt {n} Dinge — Fahrzeuge, Schiffe, Tiere, Figuren, Gebäude, Pflanzen, Essen, Schriftzüge — und baut Häuser mit Zimmern. Farben, Größe und Extras sagst du einfach dazu. Alles passiert hier: ohne Konto, ohne Limit.', { n: B ? B.LIB.length + '+' : '170+' })}</p>`;
   }
   function draw() {
     const el = $('#imagine'); if (!el) return;

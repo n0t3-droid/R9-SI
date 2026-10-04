@@ -75,7 +75,9 @@
     b.classList.toggle('on', SP.on);
     if (!SP.on) { b.innerHTML = ''; return; }
     if (SP.freed) {
-      b.innerHTML = `<span class="t">✓ ${esc(L('sp.freed', '{s} frei — mach das Letzte nochmal (💾 / Ins Spiel / ☆), jetzt passt es wieder', { s: kb(SP.freed) }))}</span><button class="x" data-act="close" title="${esc(L('sp.close', 'Schließen'))}">✕</button>`;
+      // (the standalone Studio has no "Ins Spiel": its button is 💾 Speichern)
+      const again = C.SA ? L('sp.freedSA', '{s} frei — mach das Letzte nochmal (💾 Speichern, ☆ …), jetzt passt es wieder', { s: kb(SP.freed) }) : L('sp.freed2', '{s} frei — mach das Letzte nochmal („Ins Spiel“, ☆ …), jetzt passt es wieder', { s: kb(SP.freed) });
+      b.innerHTML = `<span class="t">✓ ${esc(again)}</span><button class="x" data-act="close" title="${esc(L('sp.close', 'Schließen'))}">✕</button>`;
     } else if (!SP.open) {
       b.innerHTML = `<span class="t">⚠ <b>${esc(L('sp.full', 'Browser-Speicher voll'))}</b> — ${esc(L('sp.fullT', 'was du gerade gemacht hast, ist nur bis zum Schließen da'))}</span><button class="cbtn mini pri" data-act="free">🧹 ${esc(L('sp.make', 'Platz schaffen'))}</button><button class="x" data-act="close" title="${esc(L('sp.close', 'Schließen'))}">✕</button>`;
     } else {
