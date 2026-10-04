@@ -94,10 +94,22 @@
     lookCommand(arg) {
       const say = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
       const m = { classic: 'classic', klassisch: 'classic', seamless: 'seamless', nahtlos: 'seamless' }[String(arg || '').toLowerCase()];
-      if (!m) { say('Blöcke: ' + (this.settings.look === 'seamless' ? 'Nahtlos' : 'Klassisch') + ' · /look classic | seamless'); return; }
+      if (!m) { say(this.lookText('label') + ': ' + this.lookText(this.settings.look === 'seamless' ? 'seamless' : 'classic') + ' · /look classic | seamless'); return; }
       this.settings.look = m; this.applySettings('look'); this.saveSettings();
-      say(m === 'seamless' ? 'Blöcke: Nahtlos — sanfte Hänge, verbundenes Glas, nahtlose Materialien.' : 'Blöcke: Klassisch — jeder Block mit eigenen Kanten, Hügel in Stufen.', '#9affd8');
-      if (this.meta && this.meta.guest && this.hostLook && this.hostLook !== m) say('In dieser Welt gilt der Look des Hosts.', '#ffd27a');
+      say(this.lookText(m + 'Say'), '#9affd8');
+      if (this.meta && this.meta.guest && this.hostLook && this.hostLook !== m) say(this.lookText('host'), '#ffd27a');
+    }
+    // the look's words in the player's language (German or English; the other languages read the English)
+    lookText(k) {
+      const L = {
+        label: ['Blöcke', 'Blocks'], classic: ['Klassisch', 'Classic'], seamless: ['Nahtlos', 'Seamless'],
+        classicTip: ['Wie im Original: jeder Block mit eigenen Kanten, Hügel in Blockstufen, Glas und Muster pro Block', 'Like the original: every block with its own edges, hills in one-block steps, glass and patterns per block'],
+        seamlessTip: ['Sanfte Hänge, verbundene Panoramafenster und Wandteile, nahtlose Putz- und Volltonflächen', 'Smooth slopes, joined panorama windows and wall pieces, seamless plaster and Vollton surfaces'],
+        classicSay: ['Blöcke: Klassisch — jeder Block mit eigenen Kanten, Hügel in Stufen.', 'Blocks: Classic — every block with its own edges, hills in steps.'],
+        seamlessSay: ['Blöcke: Nahtlos — sanfte Hänge, verbundenes Glas, nahtlose Materialien.', 'Blocks: Seamless — smooth slopes, joined glass, seamless materials.'],
+        host: ['In dieser Welt gilt der Look des Hosts.', "In this world the host's look applies."],
+      }[k] || [k, k];
+      return VR.I18N ? VR.I18N.tx('g.look.' + k, null, L[0], L[1]) : L[1];
     }
     // the player's hero look (Settings → Character); a random one is rolled on first start
     heroOpts() {

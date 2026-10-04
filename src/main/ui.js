@@ -473,13 +473,13 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
         const seg = el('div', 'seg');
         for (const p of ['potato', 'low', 'balanced', 'high', 'ultra']) { const b = el('button', S.preset === p ? 'on' : '', p === 'potato' ? 'Very Low' : p[0].toUpperCase() + p.slice(1)); b.title = p === 'potato' ? 'Very Low: for old laptops and integrated graphics — flat materials, no shadows, 4 chunks, Super Resolution from 55 % with strong sharpening' : ''; b.onclick = () => { this.game.applyPreset(p); this.showSettings(); }; seg.appendChild(b); }
         const f = el('div', 'field'); f.innerHTML = '<label>Quality preset</label>'; f.appendChild(seg); body.appendChild(f);
-        // the block look (also /look): Klassisch — every block on its own, like the original game — or Nahtlos
-        const lk = el('div', 'seg'), cur = S.look === 'seamless' ? 'seamless' : 'classic';
-        for (const [k, n, tip] of [['classic', 'Klassisch', 'Wie im Original: jeder Block mit eigenen Kanten, Hügel in Blockstufen, Glas und Muster pro Block'], ['seamless', 'Nahtlos', 'Sanfte Hänge, verbundene Panoramafenster und Wandteile, nahtlose Putz- und Volltonflächen']]) {
-          const b = el('button', cur === k ? 'on' : '', n); b.title = tip; b.dataset.look = k;
+        // the block look (also /look): Klassisch / Classic — every block on its own, like the original game — or Nahtlos / Seamless
+        const lk = el('div', 'seg'), cur = S.look === 'seamless' ? 'seamless' : 'classic', LT = (k) => this.game.lookText(k);
+        for (const k of ['classic', 'seamless']) {
+          const b = el('button', cur === k ? 'on' : ''); b.textContent = LT(k); b.title = LT(k + 'Tip'); b.dataset.look = k;
           b.onclick = () => { S.look = k; this.game.applySettings('look'); this.game.saveSettings(); this.showSettings(); }; lk.appendChild(b);
         }
-        const lf = el('div', 'field'); lf.innerHTML = '<label>Blöcke</label>'; lf.appendChild(lk); body.appendChild(lf);
+        const lf = el('div', 'field'); lf.innerHTML = '<label></label>'; lf.firstChild.textContent = LT('label'); lf.appendChild(lk); body.appendChild(lf);
         slider('renderDist', 'Render distance', 3, 24, 1, (v) => v + ' chunks (' + v * 16 + ' m full detail)');
         slider('horizon', 'Far horizon', 0, 4, 1, (v) => ['Off', '1 km', '2 km', '3 km', '5 km (preloaded)'][v]);
         slider('scale', 'Resolution scale', 0.4, 1, 0.05, (v) => Math.round(v * 100) + '%');
