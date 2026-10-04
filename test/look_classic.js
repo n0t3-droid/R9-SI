@@ -37,8 +37,8 @@ const looks = ['classic', 'seamless'];
 
 // ---------------------------------------------------------------- (a) texture rim
 console.log('(a) texture rim');
-const TEXN = ['stucco_white', 'vollton_matte', 'stone'];
-const texFor = {};
+const TEXN = ['stucco_white', 'vollton_matte', 'stone', 'charcoal_panel'];
+const texFor = {}, borderOf = {};
 for (const lk of looks) {
   VR.setLook(lk);
   const mk = VR.textureMasks();
@@ -57,9 +57,16 @@ for (const lk of looks) {
     let inner = 0, innerRaw = 0; for (let y = 2; y < N - 2; y++) for (let x = 2; x < N - 2; x++) { inner += br(x, y); innerRaw += brRaw(x, y); }
     const r0 = col(br, 0) / col(brRaw, 0), r31 = col(br, N - 1) / col(brRaw, N - 1), ri = inner / innerRaw;
     const info = `columns 0 / 31 at ${r0.toFixed(3)} / ${r31.toFixed(3)} of the texture without rim, inside ${ri.toFixed(3)}; of the inside's brightness ${(col(br, 0) / (inner / (N - 4) ** 2)).toFixed(3)}`;
+    if (lk === 'classic') borderOf[n] = [r0, col(br, 1) / col(brRaw, 1)];
     if (lk === 'classic' || n === 'stone') check(r0 <= 0.95 && r31 <= 0.95 && ri > 0.995, `${lk}: ${n} has its rim — ${info}`);
     else check(r0 > 0.995 && r31 > 0.995, `${lk}: ${n} stays seamless — ${info}`);
   });
+}
+// the border is two texels wide (one pixel of a 16-pixel block) and darker on bright materials: a sunlit white wall
+// sits on the tone curve's shoulder, where only a strong line still shows
+{
+  const w = borderOf.stucco_white, d = borderOf.charcoal_panel;
+  check(w[0] <= 0.7 && w[1] <= 0.85 && d[0] >= 0.78 && d[0] <= 0.9 && d[1] <= 0.95, `classic: the border follows the brightness — white stucco ×${w[0].toFixed(2)} / ×${w[1].toFixed(2)}, charcoal ×${d[0].toFixed(2)} / ×${d[1].toFixed(2)} (outer / second texel)`);
 }
 
 // ---------------------------------------------------------------- (b) a stucco wall through the mesher's UVs
