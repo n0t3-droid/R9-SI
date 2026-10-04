@@ -10,6 +10,8 @@
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import { spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
+import path from 'path';
 const P1 = 8765 + Math.floor(Math.random() * 200), P2 = P1 + 300;
 const srv1 = spawn('python3', ['-m', 'http.server', String(P1), '--bind', '127.0.0.1', '--directory', '/home/claude/vr/dist'], { stdio: 'ignore' });
 const srv2 = spawn('python3', ['-m', 'http.server', String(P2), '--bind', '127.0.0.1', '--directory', '/home/claude/vr/dist'], { stdio: 'ignore' });
@@ -26,8 +28,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const done = async () => { console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l); check(!logs.some(l => /pageerror/.test(l)), 'no page errors'); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await browser.close(); srv1.kill(); srv2.kill(); process.exit(fails ? 1 : 0); };
 const section = async (name, fn) => { console.log(name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).slice(0, 400)); } };
-const SP = '/tmp/claude-0/-home-claude/faf7c5c5-3403-55c6-865b-eb66c7edd5f9/scratchpad';
-fs.mkdirSync(SP, { recursive: true });
+const SP = fs.mkdtempSync(path.join(os.tmpdir(), 'r9-bridge-'));   // (the downloaded r9-paket lands here)
 const up = async (pg, all) => { for (let i = 0; i < 700; i++) { await pg.waitForTimeout(500); try { if (await pg.evaluate((all) => !!(window.__studioCore && window.__studioCore.texInfo() && !document.getElementById('studio').classList.contains('boot') && window.__studio.HOUSE.size >= (all ? window.__studioCore.HOUSES.length : 1)), all)) return true; } catch (e) { /* loading */ } } return false; };
 
 // ---------------------------------------------------------------- the standalone Studio (its own origin)
@@ -89,6 +90,8 @@ await section('2 · honest labels: 💾 Speichern, no "im Spiel"', async () => {
     // ✨ Erschaffen without a world
     VR.StudioWorld.imagine.open(null, 'house'); await sleep(500);
     out.create = document.getElementById('imagine') ? document.getElementById('imagine').textContent : '';
+    VR.StudioWorld.imagine.open(null, 'genie'); await sleep(500);
+    out.genie = document.getElementById('imagine') ? document.getElementById('imagine').textContent : '';
     VR.StudioWorld.imagine.close();
     C.setMode('arch'); await sleep(200);
     return out;
@@ -101,6 +104,7 @@ await section('2 · honest labels: 💾 Speichern, no "im Spiel"', async () => {
   check(/💾 gespeichert/.test(r.hub) && !/im Spiel/.test(r.hub), '🕘 shows "💾 gespeichert", never "im Spiel"');
   check(r.worldBtn && /Welten/.test(r.world) && /⏸ → 🧰 R9 Studio/.test(r.world), 'Welt explains that the worlds live in the game (⏸ → 🧰 R9 Studio), with 🎮 Zum Spiel: ' + r.world.slice(0, 160));
   check(!/Im Spiel \(Pause → R9 Studio\)/.test(r.create) && /Mitnehmen/.test(r.create), '✨ Erschaffen promises no game it cannot reach');
+  check(/Genie/.test(r.genie) && !/im Spiel/.test(r.genie), '✨ Genie: no "hier im Spiel" in a Studio that is not the game');
 });
 
 await section('3 · 📦 Mitnehmen: one file with favourites, designs and Bauteile', async () => {
