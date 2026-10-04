@@ -338,6 +338,10 @@ await section('8 · a world: Welt → Häuser ★, placing with buttons, ✋ Ben
     out.wb = { n, live: (document.querySelector('#partsBody .wbLive') || {}).textContent || '', panel: document.getElementById('partsBody').textContent.slice(0, 400) };
     const sp = WM.setSpawn([P[0] + 0.5, P[1], P[2] + 0.5]);
     out.spawn = { ret: sp, tip: (document.getElementById('worldTip') || {}).textContent || '' };
+    // a ☆ on the Werkbank's palette: kept for now, but not reported as done
+    const wt = document.querySelector('#list .tile .favb'); if (wt) wt.click();
+    const wtip = document.getElementById('worldTip');
+    out.wfav = { btn: !!wt, tip: wtip ? wtip.textContent : '', err: !!(wtip && wtip.classList.contains('err')) };
     out.bar = (document.getElementById('fullBar') || {}).textContent || '';
     Storage.prototype.setItem = real;
     return out;
@@ -351,6 +355,7 @@ await section('8 · a world: Welt → Häuser ★, placing with buttons, ✋ Ben
   check(r.paint && r.paint.name === 'vollton_white_stairs' && r.paint.facing === 1, 'the Werkbank\'s 🖌 Malen keeps the turn: painted stairs still face east (' + JSON.stringify(r.paint) + ')');
   check(r.wb.n === 1 && !/Alles ist im Spiel/.test(r.wb.panel) && /Speicher/.test(r.wb.live + r.wb.panel), 'the Werkbank with a full storage: no "✓ Alles ist im Spiel", it says why (' + r.wb.live + ')');
   check(r.spawn.ret === false && !/gesetzt/.test(r.spawn.tip), 'the spawn point with a full storage: not "gesetzt" (' + r.spawn.tip + ')');
+  check(r.wfav.btn && r.wfav.err && /Browser-Speicher voll/.test(r.wfav.tip), 'a ☆ in the Werkbank with a full storage is not reported as done (' + r.wfav.tip + ')');
   check(/Browser-Speicher voll/.test(r.bar), 'the banner is there in the Welt mode too');
 });
 

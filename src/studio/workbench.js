@@ -567,7 +567,8 @@
       d.onclick = () => { hot()[slot()] = id; if (CRF().useRecent) CRF().useRecent(id); drawBar(); for (const x of document.querySelectorAll('#list .tile')) x.classList.toggle('on', x.dataset.id === id); C.parts(); };
       if (FV) {
         const fb = document.createElement('button'); const on = FV.has(id); fb.className = 'favb sm' + (on ? ' on' : ''); fb.textContent = on ? '★' : '☆'; fb.title = on ? L('fav.off', 'Aus den Favoriten nehmen') : L('fav.onR', 'Zu den Favoriten (Rechtsklick geht auch)');
-        const tog = (ev) => { ev.stopPropagation(); ev.preventDefault(); const now = FV.toggle(id); fb.classList.toggle('on', now); fb.textContent = now ? '★' : '☆'; tip((now ? '★ ' : '☆ ') + nameOf(id), true); if (WB.cat === 'fav') C.list(); else { const b = el.querySelector('[data-wcat="fav"]'); if (b) b.textContent = '★ ' + L('wb.cat.fav', 'Favoriten') + (FV.list().length ? ' ' + FV.list().filter(x => inAll.has(x)).length : ''); } };
+        // (a ☆ the storage refused holds for this page only: said so, never shown as done)
+        const tog = (ev) => { ev.stopPropagation(); ev.preventDefault(); const now = FV.toggle(id); fb.classList.toggle('on', now); fb.textContent = now ? '★' : '☆'; if (FV.ok === false) tip('⚠ ' + nameOf(id) + ' — ' + L('fav.unsaved', 'nur bis zum Schließen: Browser-Speicher voll'), false); else tip((now ? '★ ' : '☆ ') + nameOf(id), true); if (WB.cat === 'fav') C.list(); else { const b = el.querySelector('[data-wcat="fav"]'); if (b) b.textContent = '★ ' + L('wb.cat.fav', 'Favoriten') + (FV.list().length ? ' ' + FV.list().filter(x => inAll.has(x)).length : ''); } };
         fb.onclick = tog; d.oncontextmenu = tog; d.appendChild(fb);
       }
       el.appendChild(d);
