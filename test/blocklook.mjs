@@ -1,11 +1,14 @@
 // Block look (v0.39): the same scene in "Klassisch" and "Nahtlos" — a grass hill, a stucco house with panorama glass
 // and Vollton trim, a mini-voxel cottage (plaster, timber, stacked and side-by-side windows, a roof), tech panels,
 // glass walls and plaza tiles. The look is switched live in between (re-mesh + texture rebuild), as a player would.
+// In each look the player walks up the hill (terrace steps / slope) and digs a path with the shovel; the settings
+// control is checked in German and English, the Studio follows the player's look.
 // LOOKS=classic,seamless (default) · PRESET=high
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 const TAG = process.env.TAG || 'bl';
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });   // the Studio opens in the same context (same localStorage)
+const page = await ctx.newPage();
 const logs = [];
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail|missing/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
@@ -20,9 +23,14 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 const boot = await ev(() => ({ setting: VR.game.settings.look, look: VR.LOOK && VR.LOOK.mode, rim: VR.game.texRim }));
 check(boot.setting === 'classic' && boot.look === 'classic' && boot.rim === true, 'a new player starts in Klassisch (setting, registry and textures): ' + JSON.stringify(boot));
-// Settings → Graphics: the "Blöcke" control
-const ctl = await ev(() => { const u = VR.game.ui; u.settingsTab = 'graphics'; u.showSettings(); const bs = [...document.querySelectorAll('#setbody [data-look]')]; const r = bs.map(b => b.textContent + (b.classList.contains('on') ? '*' : '')); const lab = bs.length ? bs[0].closest('.field').querySelector('label').textContent : ''; u.show('title'); return { lab, r }; });
-check(ctl.lab === 'Blöcke' && ctl.r.join() === 'Klassisch*,Nahtlos', 'Settings → Graphics shows "Blöcke: Klassisch / Nahtlos" with Klassisch on: ' + JSON.stringify(ctl));
+// Settings → Graphics: the "Blöcke" control, in German and in English (English players never see German)
+const ctl = await ev(() => {
+  const u = VR.game.ui, I = VR.I18N, was = I ? I.lang : localStorage.getItem('r9si.lang'), out = {};
+  const set = (lang) => { if (I) I.set(lang); else if (lang) localStorage.setItem('r9si.lang', lang); else localStorage.removeItem('r9si.lang'); };
+  for (const lang of ['de', 'en']) { set(lang); u.settingsTab = 'graphics'; u.showSettings(); const bs = [...document.querySelectorAll('#setbody [data-look]')]; out[lang] = { lab: bs.length ? bs[0].closest('.field').querySelector('label').textContent : '', r: bs.map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join() }; }
+  set(was); u.show('title'); return out;
+});
+check(ctl.de.lab === 'Blöcke' && ctl.de.r === 'Klassisch*,Nahtlos' && ctl.en.lab === 'Blocks' && ctl.en.r === 'Classic*,Seamless', 'Settings → Graphics shows "Blöcke: Klassisch / Nahtlos" (English: "Blocks: Classic / Seamless") with Klassisch on: ' + JSON.stringify(ctl));
 const LOOKS = (process.env.LOOKS || 'classic,seamless').split(',');
 await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 6; g.settings.look = lk; g.applySettings('*'); }, [process.env.PRESET || 'high', LOOKS[0]]);
 await ev(`VR.game.createWorld({name:'Blocks',mode:'creative',difficulty:'peaceful',type:'flat',seed:'31',cheats:true,kit:true})`);
@@ -86,9 +94,19 @@ for (const lk of LOOKS) {
   await look(lk + '_3_stucco', [ox + 40, y0 + 3.2, oz + 17], -0.2, -0.16);
   await look(lk + '_4_cottage', [ox + 40, y0 + 4, oz + 36], 0.05, -0.18);
   await look(lk + '_5_tech', [ox + 52, y0 + 3, oz + 38], 0.2, -0.12);
-  // physics: walk up the hill's flank — steps (Klassisch) or slope (Nahtlos)
-  const trace = await ev(([ox, y0, oz]) => { window.__norender = true; const g = VR.game, p = g.player; p.flying = false; p.noclip = false; p.teleport(ox + 1.5, y0 + 3, oz + 22.5); p.yaw = -Math.PI / 2; p.pitch = 0; const out = []; for (let i = 0; i < 200; i++) { p.vel[0] = 4; g.last = performance.now() - 16; g.loop(performance.now()); if (i % 25 === 0) out.push(+(p.pos[1] - y0).toFixed(2)); } return out; }, base);
-  console.log(`${lk}: walking up the hill, heights`, JSON.stringify(trace));
+  // physics: walk up the hill's flank — terrace steps (Klassisch) or the slope (Nahtlos)
+  const trace = await ev(([ox, y0, oz]) => { window.__norender = true; const g = VR.game, p = g.player; p.flying = false; p.noclip = false; p.teleport(ox + 1.5, y0 + 3, oz + 22.5); p.yaw = -Math.PI / 2; p.pitch = 0; const out = []; for (let i = 0; i < 320; i++) { p.vel[0] = 4; g.last = performance.now() - 16; g.loop(performance.now()); if (i % 32 === 0 || i === 319) out.push(+(p.pos[1] - y0).toFixed(2)); } return out; }, base);
+  // Klassisch steps up the one-block terraces, Nahtlos walks the slope: either way the player gets up the hill
+  check(Math.max(...trace) >= 6, `${lk}: walking into the hill gets the player up it (heights ${JSON.stringify(trace)})`);
+  // the shovel on grass: a path at once in Klassisch (no cut / smooth toggle there), the cut twin first in Nahtlos
+  const sv = await ev(([ox, y0, oz]) => {
+    const g = VR.game, w = g.world, R = VR.R, x = ox - 3 - (VR.LOOK.mode === 'classic' ? 0 : 1), z = oz - 3, y = y0;
+    w.setBlock(x, y, z, R.byName.grass_block.defaultState, 0); w.setBlock(x, y + 1, z, 0, 0);
+    const s = w.getBlock(x, y, z), t = R.types[R.T.type[s]];
+    const used = g.sim.interact(x, y, z, s, t, { inv: { held: { id: 'iron_shovel' } }, damageHeld() {}, target: { face: 2 } });
+    return { used, now: R.types[R.T.type[w.getBlock(x, y, z)]].name };
+  }, base);
+  check(sv.used && sv.now === (lk === 'classic' ? 'dirt_path' : 'grass_block_cut'), `${lk}: the shovel on grass makes ${sv.now}`);
 }
 // back with the settings button (Esc → Settings → Graphics → Blöcke: Klassisch)
 const back = await ev(() => { const g = VR.game, u = g.ui; u.settingsTab = 'graphics'; u.showSettings(); const b = document.querySelector('#setbody [data-look=classic]'); if (b) b.click(); const on = document.querySelector('#setbody [data-look].on'); return { look: VR.LOOK.mode, setting: g.settings.look, on: on && on.dataset.look }; });
@@ -97,7 +115,7 @@ const back2 = await ev(() => ({ rim: VR.game.texRim, icons: VR.game.icons.cache.
 check(back.look === 'classic' && back.setting === 'classic' && back.on === 'classic' && back2.rim === true, 'the settings button switches back to Klassisch (textures with the rim again): ' + JSON.stringify([back, back2]));
 // the R9 Studio takes the player's look from the same settings (here: Nahtlos)
 await ev(() => { const s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); s.look = 'seamless'; localStorage.setItem('r9si.settings', JSON.stringify(s)); });
-const sp = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+const sp = await ctx.newPage();   // the game's context: the same localStorage (browser.newPage would open a fresh one)
 sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 sp.on('console', m => { if (m.type() === 'error') logs.push('[studio] ' + m.text().slice(0, 500)); });
 await sp.goto('file:///home/claude/vr/dist/studio.html');
