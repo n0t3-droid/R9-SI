@@ -203,7 +203,8 @@
       }
       this.send('env', this.envData());
     }
-    envData() { const e = this.g.env; return { t: Math.round(e.ticks), d: e.day || 0, r: e.rainTarget || 0, th: e.thunder || 0 }; }
+    // lk: the host's block look rides along, so a switch reaches the guests within a few seconds (older guests ignore it)
+    envData() { const e = this.g.env; return { t: Math.round(e.ticks), d: e.day || 0, r: e.rainTarget || 0, th: e.thunder || 0, lk: this.g.settings.look === 'seamless' ? 's' : 'c' }; }
     onPdata(m) {
       const g = this.g, d = m.data || {};
       if (this.role === 'host') {
@@ -429,6 +430,8 @@
       if (Math.abs(t - e.ticks) > 120) e.ticks = t; else e.ticks += (t - e.ticks) * 0.5;
       e.day = num(d.d, e.day);
       e.rainTarget = num(d.r, 0); e.thunder = num(d.th, 0);
+      const lk = d.lk === 's' ? 'seamless' : d.lk === 'c' ? 'classic' : null;
+      if (lk && lk !== this.g.hostLook) { this.g.hostLook = lk; this.g.applyLook(); }   // the host switched the block look
     }
     chat(text) {
       const t = String(text).slice(0, 200);
