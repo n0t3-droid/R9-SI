@@ -24,7 +24,7 @@ const ev = (fn, a) => game.evaluate(fn, a);
 for (let i = 0; i < 160; i++) { await game.waitForTimeout(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 const boot = await ev(() => { const pack = VR.R.types.filter(t => t.o.modern); return { ms: Math.round(performance.now()), pack: pack.length, compiled: pack.filter(t => VR.VM.MODELS[t.name].compiled).length, late: VR.VM.stats.lateMs, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1 }; });
 console.log('1 · boot', JSON.stringify(boot), 'wall', Date.now() - t0, 'ms');
-check(boot.pack >= 40 && boot.compiled === 0, 'the title screen is up with ' + boot.pack + ' Modern Living items registered, none of them built yet');
+check(boot.pack >= 236 && boot.compiled === 0, 'the title screen is up with ' + boot.pack + ' Modern Living items registered, none of them built yet');
 await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 4; g.settings.horizon = 0; g.applySettings('*'); });
 await ev(`VR.game.createWorld({name:'Modern',mode:'creative',difficulty:'peaceful',seed:'4711',cheats:true,kit:false})`);
 for (let i = 0; i < 120; i++) { await game.waitForTimeout(1000); if (await ev(() => VR.game.state) === 'play') break; }
@@ -129,17 +129,23 @@ const s1 = await sev(async () => {
   const chip = document.querySelector('#chips button[data-pcat="modern"]');
   if (!chip) return { chip: false };
   chip.click();
-  const cards = [...document.querySelectorAll('#list .card[data-bid]')];
-  const lit = () => cards.slice(0, 12).filter(c => { const cv = c.querySelector('canvas.th'); if (!cv) return false; const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; }).length;
-  for (let k = 0; k < 400 && lit() < Math.min(12, cards.length); k++) await new Promise(r => setTimeout(r, 100));   // software GL renders a picture in about a second
-  const r = { chip: chip.textContent, cards: cards.length, pictures: lit(), lazy: lazy.length, builtAtBoot: built };
+  const cards = [...document.querySelectorAll('#list .card[data-bid]')], list = document.getElementById('list');
+  // pictures are made as cards scroll into view: check the cards the list shows, then scroll to its end (Deko & Kunst)
+  const pic = (c) => { const cv = c.querySelector('canvas.th'); if (!cv) return false; const d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; };
+  const shown = () => { const lr = list.getBoundingClientRect(); return cards.filter(c => { const b = c.getBoundingClientRect(); return b.bottom > lr.top + 4 && b.top < lr.bottom - 4; }); };
+  const settle = async (set) => { for (let k = 0; k < 1200 && set.filter(pic).length < set.length; k++) await new Promise(r => setTimeout(r, 100)); return set.filter(pic).length; };   // software GL: about a second a picture (several on a busy machine)
+  const top = shown(), r = { chip: chip.textContent, cards: cards.length, shown: top.length, pictures: await settle(top), lazy: lazy.length, builtAtBoot: built };
+  list.scrollTop = list.scrollHeight; await new Promise(res => setTimeout(res, 400));
+  const end = shown(); r.shownEnd = end.length; r.picturesEnd = await settle(end); r.endIds = end.map(c => c.dataset.bid.replace(/^vm_/, '')).join(' ');
+  list.scrollTop = 0;
   cards[0].click(); await new Promise(res => setTimeout(res, 300));
   r.scene = window.__st.scene && window.__st.scene.type; r.sceneName = window.__st.scene && window.__st.scene.name;
   return r;
 });
 console.log('  teile', JSON.stringify(s1));
-check(s1.chip && s1.cards >= 40, '🧱 Teile has a ✨ Modern chip with the pack (' + s1.cards + ' cards)');
-check(s1.pictures >= Math.min(12, s1.cards), 'the cards get rendered pictures (' + s1.pictures + ' of the first 12)');
+check(s1.chip && s1.cards === boot.pack, '🧱 Teile has a ✨ Modern chip with the whole pack (' + s1.cards + ' cards)');
+check(s1.shown >= 4 && s1.pictures === s1.shown, 'the cards in view get rendered pictures (' + s1.pictures + ' of ' + s1.shown + ')');
+check(s1.shownEnd >= 4 && s1.picturesEnd === s1.shownEnd, 'scrolled to the end, those cards get theirs too (' + s1.picturesEnd + ' of ' + s1.shownEnd + ': ' + s1.endIds + ')');
 check(s1.scene === 'model' && /^vm_/.test(s1.sceneName || ''), 'a click shows the whole model (' + s1.sceneName + ')');
 check(s1.lazy >= 40 && s1.builtAtBoot <= 12, 'the Studio builds the pack lazily too (' + s1.builtAtBoot + ' of ' + s1.lazy + ' built at boot)');
 await st.screenshot({ path: '/home/claude/vr/test/shots/modern_studio_teile.png' });
@@ -152,7 +158,8 @@ const s2 = await sev(async () => {
 });
 console.log('  möbel', JSON.stringify(s2).slice(0, 600));
 const chipN = (k) => (s2.chips.find(c => c[0] === k) || [0, 0])[1];
-check(chipN('modern') >= 40 && chipN('smart') >= 18 && chipN('light') >= 24, 'Möbel: ✨ Modern Living ' + chipN('modern') + ', Smart Home ' + chipN('smart') + ', Licht ' + chipN('light'));
+check(chipN('modern') === boot.pack && chipN('smart') >= 18 && chipN('light') >= 24, 'Möbel: ✨ Modern Living ' + chipN('modern') + ', Smart Home ' + chipN('smart') + ', Licht ' + chipN('light'));
+check(chipN('work') >= 20 && chipN('garden') >= 21 && chipN('mobility') >= 12 && chipN('shop') >= 21 && chipN('deco') >= 14, 'Möbel: Arbeit & Medien ' + chipN('work') + ', Garten ' + chipN('garden') + ', Mobilität ' + chipN('mobility') + ', Laden & Café ' + chipN('shop') + ', Deko ' + chipN('deco'));
 check(s2.light.includes('light') && s2.smart.includes('smart') && s2.old.includes('light'), 'categories come from the definitions (the older pack keeps its own)');
 
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);

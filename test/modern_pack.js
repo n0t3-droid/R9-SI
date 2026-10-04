@@ -10,9 +10,8 @@ const R = VR.R, VX = VR.VX, VM = VR.VM, F = VR.F;
 let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 
-// ---- the pack's sets (id: vm_<set>_<item>_<variant>) and how many items each must have at least
-const EXPECT = { light: 24, smart: 18, kitchen: 26, living: 30, sleep: 16, bath: 16, plant: 14 };
-const LATER = { kitchen: 26, living: 30, sleep: 16, bath: 16, plant: 14, office: 20, garden: 18, mobility: 11, shop: 18, deco: 13 };   // checked once a set exists
+// ---- the pack's sets (id: vm_<set>_<item>_<variant>) and how many items each must have at least (236 in all)
+const EXPECT = { light: 24, smart: 18, kitchen: 27, living: 32, sleep: 17, bath: 16, plant: 14, office: 20, garden: 21, mobility: 12, shop: 21, deco: 14 };
 const pack = R.types.filter(t => t.o.modern);
 const names = pack.map(t => t.name);
 console.log('pack', pack.length, 'items · load', loadMs, 'ms');
@@ -27,6 +26,14 @@ console.log('pack', pack.length, 'items · load', loadMs, 'ms');
   check(pack.length > 0 && first >= end, 'the pack is appended after the last shipped state (' + (end - 1) + '), first pack state ' + first);
   const lastVollton = R.byName.vollton_plum_stairs;
   check(pack.every(t => t.id > lastVollton.id), 'every pack item is registered after Vollton');
+  // the pack itself is append-only too: every item keeps the state ids it shipped with (test/modern_ids.json; a new item
+  // goes after the last one). Only while no build with the pack has been played may the file be deleted and rewritten.
+  const idFile = '/home/claude/vr/test/modern_ids.json';
+  if (!fs.existsSync(idFile)) { fs.writeFileSync(idFile, '[\n' + pack.map(t => JSON.stringify([t.name, t.base, t.nstates])).join(',\n') + '\n]\n'); console.log('    wrote', idFile); }
+  const mine = JSON.parse(fs.readFileSync(idFile, 'utf8'));
+  const moved = mine.filter(([n, base, ns]) => { const t = R.byName[n]; return !t || t.base !== base || t.nstates !== ns; });
+  check(!moved.length && mine.every(([n], i) => names[i] === n), 'the pack keeps the state ids of its ' + mine.length + ' recorded items (append-only)' + (moved.length ? ' — moved: ' + moved.slice(0, 4).map(r => r[0]).join(', ') : ''));
+  check(VM.MODERN_NAMES.length === pack.length, 'every defined item registered (' + VM.MODERN_NAMES.length + ' defined, ' + pack.length + ' registered: a name an older block already has would be skipped)');
 }
 
 // 2 · names and limits
@@ -49,8 +56,7 @@ console.log('pack', pack.length, 'items · load', loadMs, 'ms');
   for (const n of names) { const s = n.split('_')[1]; per[s] = (per[s] || 0) + 1; }
   console.log('    per set', JSON.stringify(per));
   for (const [s, n] of Object.entries(EXPECT)) check((per[s] || 0) >= n, 'set ' + s + ': ' + (per[s] || 0) + ' items (≥ ' + n + ')');
-  for (const [s, n] of Object.entries(LATER)) if (per[s]) check(per[s] >= n, 'set ' + s + ': ' + per[s] + ' items (≥ ' + n + ')');
-  check(Object.keys(per).every(s => EXPECT[s] || LATER[s]), 'no unknown set');
+  check(Object.keys(per).every(s => EXPECT[s]), 'no unknown set');
   const pal = new Set(Object.values(VM.MODERN_PALETTE || {}));
   const off = pack.filter(t => !pal.has(t.o.vx.col));
   check(!off.length, 'every item registers with a colour of the shared palette (' + pal.size + ' colours)' + (off.length ? ' — not: ' + off.slice(0, 4).map(t => t.name).join(', ') : ''));
