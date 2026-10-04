@@ -21,9 +21,17 @@ console.log('ships', await ev(() => JSON.stringify(VR.game.starships.ships.map(s
 await shot('st1_parked');
 // walk on it? check proxy collision
 console.log('near', await ev(() => VR.game.starships.near.length));
-// board & fly
-await ev(() => { const g = VR.game, s = g.starships.ships[0]; if (s) g.starships.board(s, g.player); if (g.flight) g.flight.setView(1); const i = g.input; i.captured = true; i.keys.add('Space'); });
-await step(30);
+// board & fly: a parked ship waits cold and dark — Space (like W) powers it up and spins the engines up (3 s), then it climbs
+// (the outpost's ship — the nearest one; the world's spawn has a shuttle of its own far away)
+await ev(() => { const g = VR.game, p = g.player, d2 = (q) => (q.pos[0] - p.pos[0]) ** 2 + (q.pos[2] - p.pos[2]) ** 2, s = g.starships.ships.slice().sort((a, b) => d2(a) - d2(b))[0]; if (s) g.starships.board(s, g.player); if (g.flight) g.flight.setView(1); const i = g.input; i.captured = true; i.keys.add('Space'); });
+const fl0 = await ev(() => { const f = VR.game.flight; return f ? { power: f.power, y: VR.game.starships.pilot.pos[1] } : null; });
+console.log('boarded', JSON.stringify(fl0));
+await step(45);
+const fl1 = await ev(() => { const f = VR.game.flight; return f ? { power: f.power, y: VR.game.starships.pilot.pos[1] } : null; });
+await step(75);
+const fl2 = await ev(() => { const f = VR.game.flight; return f ? { power: f.power, y: VR.game.starships.pilot.pos[1] } : null; });
+console.log('spool-up', JSON.stringify(fl1), '→', JSON.stringify(fl2));
+console.log(fl0 && fl0.power === 'off' && fl1.power === 'starting' && fl2.power === 'running' && fl2.y > fl0.y + 2 ? '  ✓ cold → Space starts the engines → it climbs' : '  ✗ cold start (' + JSON.stringify([fl0, fl1, fl2]) + ')');
 // the mouse only looks around now: turn with A/D (or hold the right button and move the mouse)
 await ev(() => { const i = VR.game.input; i.keys.delete('Space'); i.keys.add('KeyW'); i.keys.add('KeyD'); });
 await step(30);

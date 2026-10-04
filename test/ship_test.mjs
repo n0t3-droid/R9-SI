@@ -32,9 +32,13 @@ if (helm) {
   await ev(() => { const g = VR.game; if (g.flight) g.flight.setView(1); });
   await step(20);
   await shot('s2_ship_chase');
-  // fly up and forward (the mouse only looks around now: turn with A/D)
+  // fly up and forward (the mouse only looks around now: turn with A/D); the ship waits cold: Space powers it up and
+  // spins the engines up (3 s) before it climbs
   await ev(() => { const i = VR.game.input; i.captured = true; i.keys.add('Space'); });
-  await step(40);
+  const y0 = await ev(() => { const S = VR.game.gadgets.ship, f = VR.game.flight; return { power: f && f.power, y: S.pos[1] }; });
+  await step(130);
+  const y1 = await ev(() => { const S = VR.game.gadgets.ship, f = VR.game.flight; return { power: f && f.power, y: S.pos[1] }; });
+  console.log(y1.power === 'running' && y1.y > y0.y + 2 ? '  ✓ cold → Space starts the engines → it climbs' : '  ✗ cold start', JSON.stringify(y0), '→', JSON.stringify(y1));
   await ev(() => { const i = VR.game.input; i.keys.delete('Space'); i.keys.add('KeyW'); i.keys.add('KeyD'); });
   await step(30);
   await ev(() => { VR.game.input.keys.delete('KeyD'); });

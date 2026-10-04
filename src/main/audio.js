@@ -116,6 +116,7 @@
         case 'button': { const v = (opts && opts.vol) || 1; this.noiseHit({ f: 1500, q: 2.5, g: 0.6 }, 0.5 * v, 0.03, 1); this.tone(880, 0.06 * v, 0.06, 'sine'); break; }
         case 'lever': { const v = (opts && opts.vol) || 1; const src = c.createBufferSource(); src.buffer = this.noise; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 700; f.Q.value = 1.2; const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.18 * v, t + 0.05); g.gain.exponentialRampToValueAtTime(0.001, t + 0.28); src.connect(f); f.connect(g); g.connect(this.sfx); src.start(t, Math.random(), 0.3); this.tone(140, 0.2 * v, 0.1, 'triangle', false, t + 0.22); break; }
         case 'deny': this.tone(220, 0.12, 0.12, 'square'); this.tone(165, 0.12, 0.16, 'square', false, t + 0.12); break;
+        case 'static': { const src = c.createBufferSource(); src.buffer = this.noise; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2200; f.Q.value = 1.5; const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.16, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.45); src.connect(f); f.connect(g); g.connect(this.sfx); src.start(t, Math.random(), 0.5); this.tone(1320, 0.04, 0.09, 'sine', false, t + 0.35); break; }
         case 'spool': { const o = this.tone(90, 0.12, 3.2, 'sawtooth', true); if (o) o.frequency.exponentialRampToValueAtTime(520, t + 3); const o2 = this.tone(400, 0.03, 3.2, 'sine'); if (o2) o2.frequency.exponentialRampToValueAtTime(2200, t + 3); break; }
       }
     }
@@ -150,7 +151,7 @@
         const src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
         const f = c.createBiquadFilter();
         const g = c.createGain(); g.gain.value = 0;
-        const cfg = { rain: ['highpass', 1200, 0.2], wind: ['bandpass', 400, 0.8], jet: ['bandpass', 900, 1.2], engine: ['lowpass', 300, 4], flyby: ['lowpass', 420, 2.5], water: ['bandpass', 600, 0.6], fire: ['bandpass', 1500, 0.5], cave: ['lowpass', 180, 1] }[name] || ['lowpass', 500, 1];
+        const cfg = { rain: ['highpass', 1200, 0.2], wind: ['bandpass', 400, 0.8], jet: ['bandpass', 900, 1.2], engine: ['lowpass', 300, 4], flyby: ['lowpass', 420, 2.5], water: ['bandpass', 600, 0.6], fire: ['bandpass', 1500, 0.5], cave: ['lowpass', 180, 1], radio: ['bandpass', 1700, 2.2] }[name] || ['lowpass', 500, 1];
         f.type = cfg[0]; f.frequency.value = cfg[1]; f.Q.value = cfg[2];
         src.connect(f); f.connect(g); g.connect(name === 'jet' || name === 'engine' || name === 'flyby' ? this.sfx : this.amb);
         src.start();

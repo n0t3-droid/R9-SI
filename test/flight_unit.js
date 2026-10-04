@@ -6,7 +6,10 @@ globalThis.VR = VR;
 global.window = global.window || {};
 global.document = global.document || { getElementById: () => null, createElement: () => ({ style: {}, getContext: () => null }) };
 global.performance = global.performance || { now: () => Date.now() };
+VR.SHADERS = VR.SHADERS || {};
+require(__dirname + '/../src/main/voxmodels.js');
 require(__dirname + '/../src/main/flight.js');
+require(__dirname + '/../src/main/cockpit.js');
 require(__dirname + '/../src/main/starships.js');
 require(__dirname + '/../src/main/gadgets.js');
 const R = VR.R;
@@ -52,9 +55,11 @@ const s = mgr.spawn(4242, 'shuttle', null, [0.5, G, 0.5], 0);
 mgr.board(s, g.player);
 const fl = s.flight;
 console.log('shuttle', s.d.meta.name, 'speed', s.d.meta.speed, 'cruise', fl.cruise.toFixed(1), 'gear feet', JSON.stringify(s.d.meta.gear), 'belly', s.d.belly.length, 'cells', s.d.cells.length / 3);
-check(fl.state === 'landed', 'boarded on the ground: landed (' + fl.state + ', alt ' + fl.alt + ')');
-hold(['Space'], 2.5); run(1);
-check(fl.state === 'flying' && s.pos[1] - G > 15, 'Space climbs (' + (s.pos[1] - G).toFixed(1) + ' m)');
+check(fl.state === 'landed' && fl.power === 'off', 'boarded on the ground: landed and cold (' + fl.state + ', ' + fl.power + ', alt ' + fl.alt + ')');
+input.keys.add('Space'); run(1.5);
+check(fl.power === 'starting' && fl.state === 'landed', 'Space in a cold ship starts the engines first (' + fl.power + ', ' + fl.state + ')');
+run(4); input.keys.delete('Space'); run(1);
+check(fl.running && fl.state === 'flying' && s.pos[1] - G > 15, 'then it lifts off and climbs (' + (s.pos[1] - G).toFixed(1) + ' m)');
 // mouse = head
 let h0 = s.yaw; run(0.4, 1 / 30, () => { input.mouse.dx += 40; });
 check(Math.abs(s.yaw - h0) < 1e-3 && Math.abs(fl.headYaw) > 0.3, 'mouse moves the head (' + fl.headYaw.toFixed(2) + ') not the ship (Δ' + (s.yaw - h0).toExponential(1) + ')');
@@ -102,7 +107,7 @@ check(fl.state === 'landed', 'V: landed (alt ' + (fl.alt !== null ? fl.alt.toFix
 check(gearLow > 0.9, 'gear down below 3 m (' + gearLow.toFixed(2) + ')');
 check(td !== null && Math.abs(td) < 2, 'touchdown ' + (td !== null ? td.toFixed(2) : '?') + ' m/s');
 check(jump < 1, 'no teleport (max step ' + jump.toFixed(2) + ' m)');
-// take off & the wall at 10 fps
+// take off (the engines still run: we landed without getting out) & the wall at 10 fps
 hold(['Space'], 0.8); run(0.5);
 const h = s.yaw, fx = -Math.sin(h), fz = -Math.cos(h), rx = Math.cos(h), rz = -Math.sin(h), cx = s.pos[0] + fx * 45, cz = s.pos[2] + fz * 45;
 const wallCells = [];
@@ -141,7 +146,7 @@ press('KeyV'); run(0.1);
   const bframe = (dt) => { g.time += dt; gad.drive(dt, input, false); input.pressed.clear(); input.mouse.dx = 0; input.mouse.dy = 0; input.mouse.wheel = 0; input.mouse.clicked = [false, false, false]; };
   const brun = (sec, dt = 1 / 30, each) => { const n = Math.round(sec / dt); for (let i = 0; i < n; i++) { if (each) each(i); bframe(dt); if (!gad.riding) break; } };
   const bhold = (codes, sec) => { for (const c of codes) input.keys.add(c); brun(sec); for (const c of codes) input.keys.delete(c); };
-  const y0b = S.pos[1]; bhold(['Space'], 2); brun(0.5);
+  const y0b = S.pos[1]; bhold(['Space'], 5); brun(0.5);
   check(bf.state === 'flying' && S.pos[1] - y0b > 10, 'block ship climbs (' + (S.pos[1] - y0b).toFixed(1) + ' m)');
   let hb = bf.heading; brun(0.4, 1 / 30, () => { input.mouse.dx += 40; });
   check(Math.abs(bf.heading - hb) < 1e-3, 'block ship: the mouse only looks');
@@ -161,7 +166,7 @@ press('KeyV'); run(0.1);
 }
 // timing: cruising high (no collision tests) and low over the ground (sub-stepped collision tests)
 s.yaw += Math.PI; mgr.rotOf(s);
-mgr.board(s, g.player); hold(['Space'], 2); input.keys.add('KeyW'); run(5);
+mgr.board(s, g.player); hold(['Space'], 5); input.keys.add('KeyW'); run(5);
 let t0 = process.hrtime.bigint(); run(5, 1 / 60); let ms = Number(process.hrtime.bigint() - t0) / 1e6 / 300;
 console.log('  sim cost high ' + ms.toFixed(3) + ' ms/frame at ' + fl.speed.toFixed(0) + ' m/s, sky clear ' + fl.skyClear);
 input.keys.add('ShiftLeft'); run(3); input.keys.delete('ShiftLeft');

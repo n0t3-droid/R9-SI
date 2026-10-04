@@ -2,7 +2,10 @@
 // Starships (mini-voxel vehicles): designs are built & meshed in workers,
 // parked ships are solid (you can walk on their wings), right-click boards,
 // the flight model (flight.js) flies them — the mouse looks, the keys fly, V
-// sets the ship down on its gear right where it is. Outposts park one on
+// sets the ship down on its gear right where it is. Shuttles can be walked
+// (cabin.js): up the rear ramp or the side stair, out of the pilot seat; the
+// ramp, the side door with its stair and the cockpit door move here, and a
+// parked shuttle kneels on its gear while its ramp is down. Outposts park one on
 // their pad; the shipyard conjures any design. Also renders ships for the sky
 // traffic.
 // ============================================================================
@@ -30,7 +33,7 @@
       for (const lx of [b[0], b[3]]) for (const lz of [b[2], b[5]]) { const wx = lx * c + lz * s, wz = -lx * s + lz * c; x0 = Math.min(x0, wx); x1 = Math.max(x1, wx); z0 = Math.min(z0, wz); z1 = Math.max(z1, wz); }
       return [this.pos[0] + x0, this.pos[1] + 0.3, this.pos[2] + z0, this.pos[0] + x1, this.pos[1] + b[4], this.pos[2] + z1];
     }
-    onUse(p) { this.mgr.board(this, p); }
+    onUse(p) { this.mgr.use(this, p); }
     // ship-local metres → world
     toWorld(l) {
       const m = this.rot || this.mgr.rotOf(this);
@@ -55,6 +58,8 @@
       for (const s of meta.starships || []) this.spawn(s.seed, s.arch, s.palette, s.pos, s.yaw, s.key);
       this.plainGet = (x, y, z) => g.world.getBlock(x, y, z);
       this.proxyGet = (x, y, z) => this.getBlock(x, y, z);
+      this.cabin = VR.Cabin ? new VR.Cabin(g, this) : null;
+      this.mH = mat4.create();
     }
     // ---------------------------------------------------------------- designs (worker built, shared)
     design(seed, arch, palette, cb) {
@@ -70,7 +75,10 @@
         if (!this.designs.has(key)) return;
         const gl = this.g.renderer.gl;
         d.meta = m.meta; d.occ = m.occ;
-        d.gpu = { hull: m.hull.count ? VR.VoxGPU.upload(gl, m.hull) : null, glass: m.glass.count ? VR.VoxGPU.upload(gl, m.glass) : null, gear: m.gear.count ? VR.VoxGPU.upload(gl, m.gear) : null };
+        const up = (mm) => (mm && mm.count ? VR.VoxGPU.upload(gl, mm) : null);
+        d.gpu = { hull: up(m.hull), glass: up(m.glass), gear: up(m.gear), interior: up(m.interior) };
+        if (m.extra) { d.gpu.ramp = up(m.extra.ramp); d.gpu.door = up(m.extra.door); d.gpu.stair = up(m.extra.stair); d.gpu.cabin = up(m.extra.cabin); }
+        d.walk = m.walk || null;
         this.buildCells(d);
         const w = d.waiters; d.waiters = [];
         for (const f of w) f(d);
@@ -131,7 +139,7 @@
       if (b && (R.T.flags[b] & F.SOLID)) return b;
       for (const s of this.near) {
         const o = s.d.occ; if (!o) continue;
-        const cx = x + 0.5 - s.pos[0], cy = y + 0.5 - s.pos[1], cz = z + 0.5 - s.pos[2];
+        const cx = x + 0.5 - s.pos[0], cy = y + 0.5 - s.pos[1] + (s.kneel || 0), cz = z + 0.5 - s.pos[2];
         const c = Math.cos(s.yaw), sn = Math.sin(s.yaw);
         const lx = cx * c - cz * sn, lz = cx * sn + cz * c; // inverse yaw
         const org = s.d.meta.origin;
@@ -222,17 +230,22 @@
         extent: [Math.max(Math.abs(B[0]), Math.abs(B[3])), Math.max(Math.abs(B[2]), Math.abs(B[5]))],
         gearFeet: (m.gear || []).map(q => [q[0], 0, q[1]]), belly: d.belly || [], exhaust: m.exhaust, guns: m.guns, wingtips: d.wingtips,
         name: m.name, label: m.label,
+        // the furnished cockpit: the room the generator carved — or, for the big bridges, a console in front of the seat
+        cockpit: m.cockpit || VR.consoleRoom(m.eye), consoleOnly: !m.cockpit,
+        get hatch() { return m.cabin && mgr.cabin ? mgr.cabin.hatch(s) : null; },
+        palette: VR.Starship && VR.Starship.PAL.find(q => q.key === m.palette),
       };
     }
-    board(s, p) {
+    board(s, p, resume) {
       const g = this.g, gad = g.gadgets;
       if (!s.d.meta || !s.d.cells || this.pilot || (gad && gad.riding) || !VR.Flight) return;
+      const flying = s.state === 'flying' && s.flight && s.flight.state !== 'landed';
       this.pilot = s; s.state = 'flying';
       if (gad) gad.riding = { type: 'starship', ship: s };
       p.flying = false; p.target = null; p.breaking = null;
       // the flight (and the view you chose) stays with the ship
       if (!s.flight) s.flight = new VR.Flight(g, this.body(s));
-      s.flight.enter();
+      s.flight.enter(resume && flying);
       g.audio.play('door');
       g.ui.hint(`${s.d.meta.name} · W/S throttle · A/D turn · Space/Shift climb · mouse looks (hold right button to steer) · B boost · C view · G autopilot · V land`, 5000);
       g.codex && g.codex.event && g.codex.event('ship');
@@ -240,11 +253,13 @@
     }
     drive(dt, input, blocked) {
       const g = this.g, p = g.player, s = this.pilot, m = s.d.meta, fl = s.flight;
+      // the cockpit's controls get the left button first (aim + click)
+      const onCtl = g.cockpit && g.cockpit.interact ? g.cockpit.interact(fl, input, blocked) : false;
       if (fl.update(dt, input, blocked) === 'exit') { this.exit(); return; }
-      // lasers (they fly where you look)
+      // lasers (they fly where you look) — once the weapons are armed
       this.fireCool -= dt;
       const fire = input.dragLook ? input.clickAction(0) : input.mouse.down[0];
-      if (!blocked && !g.ui.typing && fire && this.fireCool <= 0 && g.entities && this.armed(fl)) {
+      if (!blocked && !g.ui.typing && !onCtl && fire && this.fireCool <= 0 && g.entities && fl.armed) {
         this.fireCool = 0.15;
         const guns = m.guns.length ? m.guns : [[-1, m.eye[1] - 0.6, m.bounds[2] - 0.5], [1, m.eye[1] - 0.6, m.bounds[2] - 0.5]];
         const look = p.lookDir();
@@ -254,22 +269,65 @@
       const eye = fl.eyeWorld();
       p.pos = [eye[0], eye[1] - p.eye, eye[2]]; p.vel = s.vel.slice(); p.fallStart = null;
     }
-    armed(fl) { return !fl.weapons || fl.weapons.armed !== false; }
     // get out (V once landed; quitting or saving parks the ship wherever it is)
     exit() {
       const g = this.g, s = this.pilot, p = g.player;
       if (!s) return;
+      if (this.cabin && this.cabin.w) this.cabin.end();
       if (s.flight) s.flight.leave();
       s.vel[0] = 0; s.vel[1] = 0; s.vel[2] = 0; s.state = 'parked'; s.gear = 1; s.dip = 0;
       this.pilot = null;
       if (g.gadgets) g.gadgets.riding = null;
       g.audio.play('door');
-      // step out on the port side
-      const m = s.d.meta, side = s.toWorld([m.bounds[0] - 1.2, 0.2, (m.bounds[2] + m.bounds[5]) * 0.5]);
-      const spot = g.gadgets ? g.gadgets.freeSpot([[side[0], Math.floor(side[1]), side[2]], [side[0], Math.floor(side[1]) + 1, side[2]], [s.pos[0], s.pos[1] + m.height + 0.2, s.pos[2]]]) : side;
-      p.teleport(spot[0], spot[1], spot[2]);
+      this.stepOut(s, p);
       g.ui.vehicleHud(null);
       this.refreshNear(true);
+    }
+    // put the player down beside a ship (the port side), or on its roof
+    stepOut(s, p) {
+      const g = this.g, m = s.d.meta, side = s.toWorld([m.bounds[0] - 1.2, 0.2, (m.bounds[2] + m.bounds[5]) * 0.5]);
+      const spot = g.gadgets ? g.gadgets.freeSpot([[side[0], Math.floor(side[1]), side[2]], [side[0], Math.floor(side[1]) + 1, side[2]], [s.pos[0], s.pos[1] + m.height + 0.2, s.pos[2]]]) : side;
+      p.teleport(spot[0], spot[1], spot[2]);
+    }
+    // the walker sits down at the controls (the ship may be flying itself)
+    takeSeat(s, p) { this.board(s, p, true); }
+    // the pilot gets up (cabin.js): the ship parks if it stands, flies on (hover hold / autopilot) if not
+    leavePilot(s) {
+      const g = this.g, fl = s.flight;
+      if (this.pilot !== s) return;
+      if (fl && fl.state === 'landed') { fl.leave(); s.vel[0] = 0; s.vel[1] = 0; s.vel[2] = 0; s.state = 'parked'; s.gear = 1; s.dip = 0; }
+      else if (fl) { if (g.flight === fl) g.flight = null; g.camMode = 0; fl.view = fl.view; }
+      this.pilot = null;
+      if (g.gadgets) g.gadgets.riding = null;
+      if (g.ui && g.ui.vehicleHud) g.ui.vehicleHud(null);
+      if (g.audio) g.audio.play('door');
+      this.refreshNear(true);
+    }
+    // walking aboard (gadgets.drive while riding 'cabin')
+    walk(dt, input, blocked) { if (this.cabin && this.cabin.w) this.cabin.update(dt, input, blocked); else if (this.g.gadgets) this.g.gadgets.riding = null; }
+    // on foot in the world: stepping onto a lowered ramp or the stair takes you aboard
+    tryWalkIn(p) {
+      if (!this.cabin || !p || this.cabin.w) return false;
+      // (parked, or hovering on its own with nobody at the controls)
+      for (const s of this.ships) if (s !== this.pilot && s.hatch && (s.hatch.ramp > 0.95 || s.hatch.door > 0.95) && Math.abs(s.pos[0] - p.pos[0]) < 30 && Math.abs(s.pos[2] - p.pos[2]) < 30 && this.cabin.tryBoard(s, p)) return true;
+      return false;
+    }
+    // right-click a parked shuttle: at the tail the ramp goes up / down, at the side door that opens / shuts, anywhere else
+    // you take the pilot seat
+    use(s, p) {
+      const C = VR.Cabin && VR.Cabin.of(s);
+      if (C && this.cabin) {
+        const e = p.eyePos(), d = p.lookDir(), l = this.cabin.toLocal(s, e), ld = this.cabin.dirLocal(s, d), B = s.d.meta.bounds;
+        // where the look ray enters the ship's box (ship frame)
+        let t0 = 0, t1 = 8;
+        for (let a = 0; a < 3; a++) { const lo = [B[0], 0, B[2]][a], hi = [B[3], B[4], B[5]][a]; if (Math.abs(ld[a]) < 1e-6) { if (l[a] < lo || l[a] > hi) { t0 = 9; break; } continue; } let ta = (lo - l[a]) / ld[a], tb = (hi - l[a]) / ld[a]; if (ta > tb) { const q = ta; ta = tb; tb = q; } t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); }
+        if (t0 <= t1) {
+          const h = [l[0] + ld[0] * t0, l[1] + ld[1] * t0, l[2] + ld[2] * t0];
+          if (h[2] > C.zT - 1.2 && Math.abs(h[0]) < C.ramp.w + 0.8) { this.cabin.toggleRamp(s); return; }
+          if (h[0] * C.door.side > 0.8 && Math.abs(h[2] - C.door.z) < C.door.w) { this.cabin.toggleDoor(s); return; }
+        }
+      }
+      this.board(s, p);
     }
     // V: landed → get out, flying → the assisted landing
     land() {
@@ -288,9 +346,22 @@
       this.nearT -= dt;
       if (this.nearT <= 0) { this.nearT = 0.4; this.refreshNear(); }
       if ((this.gcT = (this.gcT || 0) - dt) <= 0) { this.gcT = 20; this.gc(); }
-      // keep parked ships' gear down & designs fresh
-      for (const s of this.ships) { if (s.state === 'parked') s.gear = 1; s.d.last = performance.now(); }
-      void p;
+      // keep parked ships' gear down & designs fresh; ramps, doors and the kneel move
+      for (const s of this.ships) { if (s.state === 'parked') s.gear = 1; s.d.last = performance.now(); if (this.cabin && s.d.meta && s.d.meta.cabin) this.cabin.animate(s, dt); }
+      // on foot in the world: up a lowered ramp or a stair → aboard
+      if (p && this.cabin && !(g.gadgets && g.gadgets.riding) && !p.dead) this.tryWalkIn(p);
+      // on foot inside a parked ship's hull (a world saved while walking aboard, a teleport): out beside it
+      if (p && this.near.length && !(g.gadgets && g.gadgets.riding) && (this.stuckT = (this.stuckT || 0) - dt) <= 0) {
+        this.stuckT = 0.5;
+        const x = Math.floor(p.pos[0]), z = Math.floor(p.pos[2]);
+        for (const y of [Math.floor(p.pos[1] + 0.3), Math.floor(p.pos[1] + 1.4)]) { if (this.getBlock(x, y, z) !== this.barrier) continue; const s = this.near.find(q => this.inOcc(q, x, y, z)); if (s) { this.stepOut(s, p); break; } }
+      }
+    }
+    inOcc(s, x, y, z) {
+      const o = s.d.occ; if (!o) return false;
+      const cx = x + 0.5 - s.pos[0], cy = y + 0.5 - s.pos[1] + (s.kneel || 0), cz = z + 0.5 - s.pos[2], c = Math.cos(s.yaw), sn = Math.sin(s.yaw), org = s.d.meta.origin;
+      const i = Math.floor(cx * c - cz * sn - org[0]), j = Math.floor(cy - org[1]), k = Math.floor(cx * sn + cz * c - org[2]);
+      return i >= 0 && j >= 0 && k >= 0 && i < o.bx && j < o.by && k < o.bz && !!o.occ[(j * o.bz + k) * o.bx + i];
     }
     refreshNear(force) {
       const p = this.g.player; if (!p) { this.near = []; return; }
@@ -309,7 +380,7 @@
     modelMat(s, cam, stretch) {
       const m = this.m, md = s.d.meta, res = md.res;
       m.set(IDENT);
-      mat4.translate(m, m, s.pos[0] - cam.x, s.pos[1] + (s.dip || 0) - cam.y, s.pos[2] - cam.z);
+      mat4.translate(m, m, s.pos[0] - cam.x, s.pos[1] + (s.dip || 0) - (s.kneel || 0) - cam.y, s.pos[2] - cam.z);
       mat4.rotY(m, m, s.yaw);
       if (s.pitch) mat4.rotX(m, m, s.pitch);
       if (s.roll) mat4.rotZ(m, m, s.roll);
@@ -318,15 +389,35 @@
       mat4.translate(m, m, md.origin[0] * res, md.origin[1] * res, md.origin[2] * res);
       return m;
     }
-    drawOne(r, prog, s, cam, layer, light, stretch, hideGlass) {
+    // room: you sit inside it — the furnished cockpit replaces the stand-in furniture and the glass is nearly clear;
+    // aboard: the furnished cabin replaces the cabin's coarse furniture
+    drawOne(r, prog, s, cam, layer, light, stretch, hideGlass, room, aboard) {
       const gl = r.gl, d = s.d; if (!d.gpu) return;
-      const M2 = this.modelMat(s, cam, stretch);
+      const md = d.meta, M2 = this.modelMat(s, cam, stretch);
       gl.uniformMatrix4fv(prog.u.u_model, false, M2);
       gl.uniform1f(prog.u.u_sky, light.sky); gl.uniform3f(prog.u.u_blockLight, light.bl[0], light.bl[1], light.bl[2]);
+      const mesh = (mm, M) => { if (!mm) return; if (M) gl.uniformMatrix4fv(prog.u.u_model, false, M); gl.bindVertexArray(mm.vao); gl.drawArrays(gl.TRIANGLES, 0, mm.count); if (M) gl.uniformMatrix4fv(prog.u.u_model, false, M2); };
       if (layer === 'opaque') {
-        if (d.gpu.hull) { gl.bindVertexArray(d.gpu.hull.vao); gl.drawArrays(gl.TRIANGLES, 0, d.gpu.hull.count); }
-        if (d.gpu.gear && s.gear > 0.5) { gl.bindVertexArray(d.gpu.gear.vao); gl.drawArrays(gl.TRIANGLES, 0, d.gpu.gear.count); }
-      } else if (d.gpu.glass && !hideGlass) { gl.bindVertexArray(d.gpu.glass.vao); gl.drawArrays(gl.TRIANGLES, 0, d.gpu.glass.count); }
+        mesh(d.gpu.hull);
+        // kneeling, the gear's feet stay on the ground (the struts slide up into the hull)
+        if (d.gpu.gear && s.gear > 0.5) { if (s.kneel) { const G2 = this.mH; G2.set(M2); mat4.translate(G2, G2, 0, s.kneel * md.res, 0); mesh(d.gpu.gear, G2); } else mesh(d.gpu.gear); }
+        if (d.gpu.interior && !room) mesh(d.gpu.interior);
+        if (md.cabin) {
+          const H = s.hatch || null, C = md.cabin, R = md.res, O = md.origin, T = this.mH;
+          const hv = (q) => [(q[0] - O[0]) * R, (q[1] - O[1]) * R, (q[2] - O[2]) * R];
+          // the ramp swings about its hinge
+          if (d.gpu.ramp) { const a = (H ? H.ramp : 0) * C.ramp.open, h = hv(C.ramp.hinge); T.set(M2); mat4.translate(T, T, h[0], h[1], h[2]); if (a) mat4.rotX(T, T, a); mat4.translate(T, T, -h[0], -h[1], -h[2]); mesh(d.gpu.ramp, T); }
+          // the side door steps out of its frame, then slides aft along the hull
+          if (d.gpu.door) { const u = H ? H.door : 0, out = Math.min(1, u / 0.3) * 0.3, aft = Math.max(0, (u - 0.3) / 0.7) * 1.15; T.set(M2); mat4.translate(T, T, C.door.side * out * R, 0, aft * R); mesh(d.gpu.door, T); }
+          // the stair unfolds down from the sill once the door is out of the way
+          if (d.gpu.stair && H && H.door > 0.55) { const k = Math.min(1, (H.door - 0.55) / 0.45), y = (C.floor - O[1]) * R; T.set(M2); mat4.translate(T, T, 0, y, 0); mat4.scale(T, T, 1, Math.max(0.02, k * k * (3 - 2 * k)), 1); mat4.translate(T, T, 0, -y, 0); mesh(d.gpu.stair, T); }
+          if (!aboard) mesh(d.gpu.cabin);
+        }
+      } else if (d.gpu.glass && !hideGlass) {
+        if (room) gl.uniform1f(prog.u.u_alpha, 0.13);
+        gl.bindVertexArray(d.gpu.glass.vao); gl.drawArrays(gl.TRIANGLES, 0, d.gpu.glass.count);
+        if (room) gl.uniform1f(prog.u.u_alpha, 0.42);
+      }
     }
     begin(r, E, layer) {
       const g = this.g, gl = r.gl, p = r.P.vox;
@@ -350,8 +441,8 @@
       const extra = g.mp && g.mp.remoteShips ? g.mp.remoteShips() : null;
       const list = extra && extra.length ? this.ships.concat(extra) : this.ships;
       if (!list.length) return;
-      const cam = r.cam;
-      let prog = null;
+      const cam = r.cam, walker = this.cabin && this.cabin.w ? this.cabin.w.s : null;
+      let prog = null, pilotRoom = null, cabinShip = null;
       for (const s of list) {
         if (!s.d.gpu || s.hidden) continue;
         const m = s.d.meta, rad = Math.max(m.length, m.width, m.height) * 0.6;
@@ -360,19 +451,33 @@
         if (!mat4.boxInFrustum(r.planes, dx - rad, dy - rad, dz - rad, dx + rad, dy + rad, dz + rad)) continue;
         if (layer !== 'opaque' && !s.d.gpu.glass) continue;
         if (!prog) prog = this.begin(r, E, layer);
-        const hide = s === this.pilot && g.camMode === 0;
-        if (prog.u.u_clipNear) r.gl.uniform1f(prog.u.u_clipNear, hide ? 2.6 : 0);
-        this.drawOne(r, prog, s, cam, layer, this.lightAt(s.pos[0], s.pos[1] + m.height + 1, s.pos[2]), 1, hide);
-        if (hide && prog.u.u_clipNear) r.gl.uniform1f(prog.u.u_clipNear, 0);
+        // flying it from the cockpit: you sit in its furnished room (no hull clipping any more); until the worker has
+        // furnished it, the generator's stand-in seats and dash stay. Walking aboard, the cockpit and the cabin are
+        // furnished too (and the cabin whenever you are close to a shuttle with a hatch open)
+        const inside = s === this.pilot && g.camMode === 0 && s.flight && s.flight.view === 0, walking = s === walker;
+        const room = (inside || walking) && !!m.cockpit && !!(g.cockpit && g.cockpit.ready(s.flight || this.flightOf(s)));
+        const near = s.hatch && (s.hatch.ramp > 0.02 || s.hatch.door > 0.02) && dx * dx + dz * dz < 45 * 45;
+        // (from the pilot seat you only see the cabin through the open cockpit door)
+        const aboard = !!(m.cabin && g.cockpit && (walking || near || (inside && s.hatch && s.hatch.cdoor > 0.02)) && g.cockpit.cabinReady(s));
+        if (prog.u.u_clipNear) r.gl.uniform1f(prog.u.u_clipNear, 0);
+        this.drawOne(r, prog, s, cam, layer, this.lightAt(s.pos[0], s.pos[1] + m.height + 1, s.pos[2]), 1, false, room, aboard);
+        if (layer === 'opaque') { if (inside) pilotRoom = s; if (aboard && (!cabinShip || walking)) cabinShip = s; }
       }
       if (prog) this.end(r, layer);
+      if (layer !== 'opaque' || !g.cockpit) return;
+      if (pilotRoom && g.cockpit.drawRoom) g.cockpit.drawRoom(r, E, pilotRoom.flight);
+      if (walker && walker.d.meta.cockpit && g.cockpit.drawRoomOf) g.cockpit.drawRoomOf(r, E, this.flightOf(walker));
+      if (cabinShip && g.cockpit.drawCabin) g.cockpit.drawCabin(r, E, cabinShip);
     }
+    // a ship's flight model (made the first time someone steps aboard: its switches, hatches and panels live there)
+    flightOf(s) { if (!s.flight && VR.Flight && s.d.meta) s.flight = new VR.Flight(this.g, this.body(s)); return s.flight; }
     // ---------------------------------------------------------------- persistence
     beforeSave(meta) {
       meta.starships = this.ships.filter(s => s.d.meta).map(s => ({ seed: s.d.seed, arch: s.d.meta.arch, palette: s.d.palette || null, pos: s.pos.map(v => Math.round(v * 100) / 100), yaw: s.yaw, key: s.key }));
       meta.starshipSpawns = [...this.spawned];
     }
-    shutdown() { if (this.pilot) this.exit(); }
+    // (saving & leaving: out of the seat, or off the ship you walk in, so the world reloads with you beside it)
+    shutdown() { if (this.pilot) this.exit(); else if (this.cabin && this.cabin.w) { const s = this.cabin.w.s; this.cabin.end(); this.stepOut(s, this.g.player); } }
     destroy() { for (const d of this.designs.values()) this.free(d); this.designs.clear(); this.ships = []; this.near = []; }
   }
   VR.Starships = Starships;

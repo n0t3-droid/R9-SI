@@ -41,7 +41,7 @@ const inj = (o) => ev((o) => { window.__inj = o; }, o);
 const F = () => ev(() => {
   const g = VR.game, fl = g.flight; if (!fl) return null;
   const b = fl.b, p = b.pos, v = b.vel;
-  return { state: fl.state, view: fl.view, camMode: g.camMode, thr: +fl.throttle.toFixed(3), boost: !!fl.boost, energy: +fl.energy.toFixed(3), gear: +fl.gear.toFixed(3), heading: b.heading, roll: +fl.roll.toFixed(4), headYaw: +fl.headYaw.toFixed(4),
+  return { state: fl.state, view: fl.view, camMode: g.camMode, power: fl.power, thr: +fl.throttle.toFixed(3), boost: !!fl.boost, energy: +fl.energy.toFixed(3), gear: +fl.gear.toFixed(3), heading: b.heading, roll: +fl.roll.toFixed(4), headYaw: +fl.headYaw.toFixed(4),
     pos: p.slice(), vel: v.slice(), speed: Math.hypot(v[0], v[1], v[2]), alt: fl.alt, inside: fl.inside(), cruise: fl.cruise, camYaw: g.cam ? g.cam.yaw : null, kind: b.kind };
 });
 const nan = (a) => a.some(x => !isFinite(x));
@@ -68,12 +68,15 @@ for (let i = 0; i < 60; i++) { await step(5); if (await ev(() => { const S = VR.
 const parked = await ev(() => { const g = VR.game, s = g.starships.ships[g.starships.ships.length - 1]; g.starships.board(s, g.player); return s.pos.slice(); });
 await step(3);
 let f = await F();
-check(f && f.kind === 'starship' && f.state === 'landed' && f.view === 0 && f.camMode === 0, 'boarding a parked ship: a flight in the cockpit, standing on the ground (' + JSON.stringify(f && { state: f.state, view: f.view, cam: f.camMode }) + ')');
+check(f && f.kind === 'starship' && f.state === 'landed' && f.view === 0 && f.camMode === 0 && f.power === 'off', 'boarding a parked ship: a cold flight in the cockpit, standing on the ground (' + JSON.stringify(f && { state: f.state, view: f.view, cam: f.camMode, power: f.power }) + ')');
 check(f && f.cruise > 36 && f.cruise < 48, 'shuttle cruise speed ≈ 42 m/s (' + (f && f.cruise.toFixed(1)) + ')');
-// take off: Space climbs, the gear retracts once high and fast enough… here just high
-await keys(['Space']); await step(75); await keys([], ['Space']); await step(30);
+// take off: Space in a cold ship spins the engines up (3 s), then it climbs
+await keys(['Space']); await step(45);
 f = await F();
-check(f.state === 'flying' && f.pos[1] - parked[1] > 15, 'Space lifts off and climbs (' + (f.pos[1] - parked[1]).toFixed(1) + ' m)');
+check(f.power === 'starting' && f.state === 'landed', 'Space in a cold ship starts the engines first (' + f.power + ')');
+await step(130); await keys([], ['Space']); await step(30);
+f = await F();
+check(f.power === 'running' && f.state === 'flying' && f.pos[1] - parked[1] > 15, 'then it lifts off and climbs (' + (f.pos[1] - parked[1]).toFixed(1) + ' m)');
 
 console.log('2 · the mouse is your head, never the stick');
 await ev(() => { window.__camYaw0 = VR.game.cam.yaw; });
@@ -166,7 +169,7 @@ check(Math.hypot(out.pos[0] - landedAt[0], out.pos[1] - landedAt[1], out.pos[2] 
 
 console.log('9 · boosting into a wall at 10 frames per second: no tunnelling, no NaN');
 await ev(() => { const g = VR.game, s = g.starships.ships[g.starships.ships.length - 1]; g.starships.board(s, g.player); });
-await keys(['Space']); await step(25); await keys([], ['Space']); await step(15);
+await keys(['Space']); await step(125); await keys([], ['Space']); await step(15);
 const wall = await ev(() => {
   const g = VR.game, fl = g.flight, b = fl.b, w = g.world, p = b.pos, h = b.heading, fx = -Math.sin(h), fz = -Math.cos(h);
   // a wall across the flight path 45 m ahead, 4 thick, 50 wide, 24 high, standing on the ground
@@ -210,7 +213,7 @@ if (hpos) {
   for (let i = 0; i < 30; i++) { await step(5); await wait(150); if (await ev(() => VR.game.gadgets.ship && VR.game.gadgets.ship.state === 'flying')) break; }
   f = await F();
   check(f && f.kind === 'ship' && f.state === 'landed', 'helm taken: the block ship is a flight standing on the ground (' + (f && f.state) + ')');
-  await keys(['Space']); await step(60); await keys([], ['Space']); await step(15);
+  await keys(['Space']); await step(160); await keys([], ['Space']); await step(15);
   f0 = await F();
   await inj({ dx: 40 }); await step(12); await inj(null); await step(3);
   f = await F();
