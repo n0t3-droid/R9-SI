@@ -16,6 +16,9 @@
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const H = Folk.hash;
+  // the player's language (lang_de.js / lang_en.js): T a text, TL a list, FS a villager's line (g.folk.<key>)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
+  const FS = (key, h, vars) => Folk.say(key, h, vars), pickL = (key, k) => { const L = TL(key); return L.length ? L[(k >>> 0) % L.length] : ''; };
   const WORK_ROLE = { bakery: 'baker', smithy: 'smith', library: 'scholar', clinic: 'healer', hall: 'mayor', workshop: 'builder', garden: 'gardener', base: 'operator', market: 'cashier', barn: 'farmer', school: 'teacher', factory: 'worker', office: 'office', cafe: 'barista' };
   // how many keepers a workplace employs
   const WORK_N = { factory: 4, office: 4, school: 2, market: 1 };
@@ -219,7 +222,7 @@
       const g = this.g;
       vil.active = true;
       vil.agents = [];
-      if (!vil.visited) { vil.visited = true; if (g.ui && g.settings.toasts !== false) g.ui.toast('Welcome to ' + vil.name, `${vil.people.length} villagers · ${vil.fams.length} families`, null); if (g.codex && g.codex.event) g.codex.event('village'); }
+      if (!vil.visited) { vil.visited = true; if (g.ui && g.settings.toasts !== false) g.ui.toast(T('g.vil.welcome', { v: vil.name }), T('g.vil.welcomeSub', { n: vil.people.length, f: vil.fams.length }), null); if (g.codex && g.codex.event) g.codex.event('village'); }
       this.catchUp(vil);
       for (const person of vil.people) {
         const pos = this.spawnPos(vil, person, tod);
@@ -288,7 +291,7 @@
       const d = Math.hypot(g.player.pos[0] - b[0], g.player.pos[2] - b[2]);
       if (d < 80 && g.audio && g.audio.ctx) { const a = g.audio, t = a.ctx.currentTime; const vol = Math.max(0.05, 0.3 * (1 - d / 80)); for (let k = 0; k < 3; k++) for (const f of [523, 1046, 1568]) a.tone(f, vol * (f === 523 ? 1 : 0.4), 2.2, 'sine', true, t + k * 0.9); }
       const mayor = vil.agents.find(a => a.role === 'mayor');
-      if (mayor) mayor.say('Lunch time, everyone! ♪', 4);
+      if (mayor) mayor.say(T('g.folk.lunch'), 4);
     }
 
     // -------------------------------------------------- construction & repairs
@@ -340,12 +343,12 @@
       makeRoster(vil);
       if (vil.active) {
         const tod = g.env.timeOfDay;
-        for (let k = oldCount; k < vil.people.length; k++) { const person = vil.people[k]; const a = new Villager(vil, person, this.spawnPos(vil, person, tod)); vil.agents.push(a); this.agents.push(a); a.say(k === oldCount ? 'Our new home! Thank you all!' : 'It\'s perfect!', 5); }
+        for (let k = oldCount; k < vil.people.length; k++) { const person = vil.people[k]; const a = new Villager(vil, person, this.spawnPos(vil, person, tod)); vil.agents.push(a); this.agents.push(a); a.say(TL('g.folk.newHome')[k === oldCount ? 0 : 1] || '', 5); }
         // re-link existing agents to (possibly re-ordered) roster entries
         for (const a of vil.agents) { const np = vil.people.find(pp => pp.id === a.p.id); if (np) a.p = np; }
       }
       const fam = vil.fams[vil.fams.length - 1];
-      if (!quiet && g.ui) { g.ui.toast(vil.name + ' is growing!', `The ${fam ? fam.surname : 'new'} family moved into a brand-new home.`, null); if (g.audio) g.audio.play('achievement'); }
+      if (!quiet && g.ui) { g.ui.toast(T('g.vil.growing', { v: vil.name }), T('g.vil.movedIn', { fam: fam ? fam.surname : T('g.vil.newFam') }), null); if (g.audio) g.audio.play('achievement'); }
     }
     // a family moves into a house the player built
     onCustomHome(vil) {
@@ -358,13 +361,13 @@
           const o = home && home.outside;
           const pos = o ? [o[0] + 0.5 + (k - oldCount) * 0.6, o[1], o[2] + 0.5] : this.spawnPos(vil, person, tod);
           const a = new Villager(vil, person, pos); vil.agents.push(a); this.agents.push(a);
-          a.say(k === oldCount ? ['What a lovely house! Can we really live here?', 'You built this for us? Thank you!', 'Our very own home!'][person.seed % 3] : ['Yay, a new home!', 'I call the top bunk!', 'It\'s perfect!'][person.seed % 3], 5);
+          a.say(FS(k === oldCount ? 'builtFirst' : 'builtKids', person.seed), 5);
         }
         for (const a of vil.agents) { const np = vil.people.find(pp => pp.id === a.p.id); if (np) a.p = np; }
       }
       const fam = vil.fams[vil.fams.length - 1];
       vil.st.rep = (vil.st.rep || 0) + 6;
-      if (g.ui) { g.ui.toast(`A family moved in!`, `The ${fam ? fam.surname : 'new'} family now lives in the house you built in ${vil.name}.`, null); if (g.audio) g.audio.play('achievement'); }
+      if (g.ui) { g.ui.toast(T('g.vil.movedTitle'), T('g.vil.movedYours', { fam: fam ? fam.surname : T('g.vil.newFam'), v: vil.name }), null); if (g.audio) g.audio.play('achievement'); }
       if (g.codex && g.codex.event) g.codex.event('home');
     }
     setBlock(x, y, z, s) {
@@ -392,14 +395,14 @@
           const rep = vil.st.repairs || (vil.st.repairs = []);
           if (rep.length < 300) rep.push([x, y, z, old]);
           // someone saw that…
-          if (vil.active && vil.agents.length) { const a = this.closest(vil, x, z, 18); if (a && Math.random() < 0.35) a.say(Math.random() < 0.5 ? 'Hey! That\'s the ' + this.houseName(vil, x, z) + ' house!' : 'Oh dear… I\'ll tell the builders.', 3.5); }
+          if (vil.active && vil.agents.length) { const a = this.closest(vil, x, z, 18); if (a && Math.random() < 0.35) a.say(FS('vandal', Math.random() < 0.5 ? 0 : 1, { s: this.houseName(vil, x, z) }), 3.5); }
           return;
         }
       }
     }
     houseName(vil, x, z) {
       for (let i = 0; i < vil.homes.length; i++) { const b = vil.homes[i].box; if (b && x >= b[0] && x <= b[3] && z >= b[2] && z <= b[5]) { const f = vil.fams.find(ff => ff.home === i); if (f) return f.surname; } }
-      return 'village';
+      return T('g.vil.houseVillage');
     }
     closest(vil, x, z, maxD) { let best = null, bd = maxD * maxD; for (const a of vil.agents) { const d = (a.pos[0] - x) ** 2 + (a.pos[2] - z) ** 2; if (d < bd && a.act && a.act.type !== 'sleep') { bd = d; best = a; } } return best; }
 
@@ -669,7 +672,7 @@
           if (!desks.length) { act.type = 'learn'; return; }
           if (!act.spot) { const mine = desks.filter((d, i) => !vil.agents.some(o => o !== a && o.act && o.act.type === 'school' && o.act.spot && o.act.spot[0] === d[0] && o.act.spot[2] === d[2])); if (!mine.length) { act.type = 'play'; act.recess = true; return; } act.spot = mine[H2(14) % mine.length].slice(); }
           if (a.pose === 'sit') {
-            if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say([`${2 + (a.p.years % 5)} plus ${3 + (a.p.years % 4)} is ${5 + (a.p.years % 5) + (a.p.years % 4)}!`, 'Can I answer? Please!', 'The rings are made of ice, right?', 'I finished my drawing!', 'Is it break time yet?', 'A is for Aether!'][H2(15) % 6], 2.5);
+            if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(FS('school', H2(15), { a: 2 + (a.p.years % 5), b: 3 + (a.p.years % 4), c: 5 + (a.p.years % 5) + (a.p.years % 4) }), 2.5);
             if (act.t > 90 + (H2(16) % 60)) { a.pose = 'stand'; a.stretchT = 2.4; act.t = 0; act.spot = null; }   // a quick stretch, then back to the desk
             return;
           }
@@ -681,7 +684,7 @@
           const seats = cafe && cafe.seats || [];
           if (!seats.length) { act.type = 'plaza'; return; }
           if (!act.spot) act.spot = seats[H2(17) % seats.length].slice();
-          if (a.pose === 'sit') { if (Math.random() < dt * 0.05 && this.near(a, 12)) a.say(['Best coffee in ' + vil.name + '.', 'One more croissant…', 'Lunch break! Finally.', 'Cheers!', 'This latte is perfect.'][H2(18) % 5], 3); if (act.t > 60) act.done = true; return; }
+          if (a.pose === 'sit') { if (Math.random() < dt * 0.05 && this.near(a, 12)) a.say(FS('cafe', H2(18), { v: vil.name }), 3); if (act.t > 60) act.done = true; return; }
           if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 0.8)) this.sit(a, act.spot);
           return;
         }
@@ -689,7 +692,7 @@
           const park = (vil.workOf.gardener || []).find(w => w.seats && w.seats.length);
           if (!park) { act.type = 'stroll'; return; }
           if (!act.spot) act.spot = park.seats[H2(19) % park.seats.length].slice();
-          if (a.pose === 'sit') { if (Math.random() < dt * 0.03 && this.near(a, 12)) a.say(a.elder ? ['Ah, the fountain. Peaceful.', 'I fed the birds here for sixty years.', 'Sit down, young one, rest a while.', 'Such a lovely evening.'][H2(21) % 4] : ['What a day.', 'The fountain is so relaxing.', 'Fresh air at last.'][H2(21) % 3], 3); if (act.t > 50) { act.done = true; } return; }
+          if (a.pose === 'sit') { if (Math.random() < dt * 0.03 && this.near(a, 12)) a.say(FS(a.elder ? 'parkElder' : 'park', H2(21)), 3); if (act.t > 50) { act.done = true; } return; }
           if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 0.8)) this.sit(a, act.spot);
           return;
         }
@@ -698,7 +701,7 @@
           const lib = (vil.workOf.scholar || [])[0];
           const spot = lib && lib.work && lib.work[0] ? lib.work[0].slice(1) : (home && home.outside);
           if (!spot) { act.type = 'play'; return; }
-          if (this.goTo(a, spot[0], spot[1], spot[2], 2.5)) { a.pose = 'stand'; if (Math.random() < dt * 0.05 && this.near(a, 10)) a.say(['What does this word mean?', 'I can read this!', 'Ooh, pictures!'][H2(10) % 3], 2.5); }
+          if (this.goTo(a, spot[0], spot[1], spot[2], 2.5)) { a.pose = 'stand'; if (Math.random() < dt * 0.05 && this.near(a, 10)) a.say(FS('library', H2(10)), 2.5); }
           return;
         }
         case 'garden': {
@@ -756,7 +759,7 @@
     famName(a) {
       const fam = a.vil.fams[a.p.fam];
       const others = fam.members.filter(m => m !== a.p);
-      return others.length ? others[H(a.p.seed, (this.time / 5) | 0, 2) % others.length].name : 'friend';
+      return others.length ? others[H(a.p.seed, (this.time / 5) | 0, 2) % others.length].name : T('g.talk.friend');
     }
     // role work
     work(a, dt, tod) {
@@ -793,7 +796,7 @@
         if (act.deliver) {
           const bake = spotOf('baker') || (vil.homes[a.p.home] && vil.homes[a.p.home].outside);
           act.cell = { c: bake, deliver: true };
-          if (bake && this.goTo(a, bake[0], bake[1], bake[2], 2)) { act.deliver = false; act.cell = null; if (this.near(a, 20)) a.say('A basket of ' + (farm.crop === 'wheat' ? 'wheat' : farm.crop) + ' for the bakery!', 3); }
+          if (bake && this.goTo(a, bake[0], bake[1], bake[2], 2)) { act.deliver = false; act.cell = null; if (this.near(a, 20)) a.say(T('g.folk.basket', { crop: farm.crop === 'wheat' ? 'wheat' : farm.crop }), 3); }
         }
         return;
       }
@@ -814,7 +817,7 @@
               if (r && r.repair && !r.skip && this.near(a, 20) && Math.random() < 0.4) a.say(Folk.say('repair', H2(40), { s: this.houseName(vil, r.pos[0], r.pos[2]) }), 3);
               if (r && r.done) a.say(Folk.say('build_done', H2(41), { s: vil.fams[vil.fams.length - 1].surname }), 5);
               if (!r) act.acc = -3;
-              if (Math.random() < 0.02 && this.near(a, 16)) { const lot = st.proj && P.lots[st.proj.lot]; const pct = lot ? Math.round(100 * st.proj.i / lot.ops.length) : 0; a.say(pct ? `New house ${pct}% done!` : Folk.say('build', H2(42), { s: 'new' }), 3); }
+              if (Math.random() < 0.02 && this.near(a, 16)) { const lot = st.proj && P.lots[st.proj.lot]; const pct = lot ? Math.round(100 * st.proj.i / lot.ops.length) : 0; a.say(pct ? T('g.folk.progress', { pct }) : Folk.say('build', H2(42), { s: T('g.vil.newHouse') }), 3); }
             }
           }
           return;
@@ -829,7 +832,7 @@
           const target = vil.homes[act.deliver - 1];
           const o = target && target.outside;
           if (!o) { act.deliver = 0; return; }
-          if (this.goTo(a, o[0], o[1], o[2], 1.6)) { const fam = vil.fams.find(f => f.home === act.deliver - 1); if (this.near(a, 24)) a.say(`Fresh bread for the ${fam ? fam.surname : 'neighbours'}!`, 3.5); vil.st.stats.bread++; act.deliver = 0; if (this.near(a, 14) && g.audio) g.audio.play('door'); }
+          if (this.goTo(a, o[0], o[1], o[2], 1.6)) { const fam = vil.fams.find(f => f.home === act.deliver - 1); if (this.near(a, 24)) a.say(T('g.folk.bread', { s: fam ? fam.surname : T('g.vil.neighbours') }), 3.5); vil.st.stats.bread++; act.deliver = 0; if (this.near(a, 14) && g.audio) g.audio.play('door'); }
           return;
         }
         if (spot && this.goTo(a, spot[0], spot[1], spot[2], 1.5)) {
@@ -852,7 +855,7 @@
       if (role === 'pilot' && P.pad) {
         const pd = P.pad;
         if (!act.spot || act.t > 14) { act.t = 0; const an = Math.random() * 6.28; act.spot = [Math.floor(pd.x + Math.cos(an) * 5), pd.y, Math.floor(pd.z + Math.sin(an) * 5)]; }
-        if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.5)) { a.lookAt = [pd.x, pd.y + 2, pd.z]; a.pose = 'stand'; if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(['Pre-flight checks…', 'Thrusters look good.', 'One day I\'ll take her to the rings.'][H2(70) % 3], 3); }
+        if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.5)) { a.lookAt = [pd.x, pd.y + 2, pd.z]; a.pose = 'stand'; if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(FS('pilot', H2(70)), 3); }
         return;
       }
       if (role === 'ranger') { act.type = 'patrol'; return; }
@@ -866,7 +869,7 @@
           if (!act.spot || act.t > 26) { act.t = 0; act.spot = (H2(22) % 4 === 0 && pupils.length) ? [Math.floor(pupils[H2(23) % pupils.length].pos[0]), spot[1], Math.floor(pupils[H2(23) % pupils.length].pos[2]) + 1] : spot.slice(); }
           if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.0)) {
             a.pose = 'talk'; const lookP = pupils[H2(24) % Math.max(1, pupils.length)]; a.lookAt = lookP ? lookP.pos : null;
-            if (Math.random() < dt * 0.04 && this.near(a, 16)) a.say(pupils.length ? [`${pupils[H2(25) % pupils.length].p.name}, what is ${3 + H2(26) % 6} times ${2 + H2(27) % 4}?`, 'Eyes on the board, everyone.', 'Today: the planets and their rings!', 'Very good! Who else?', 'Open your books at page ' + (4 + H2(28) % 30) + '.'][H2(29) % 5] : ['Class starts soon.', 'Let me tidy the board.', 'Homework: draw the sky tram!'][H2(29) % 3], 3);
+            if (Math.random() < dt * 0.04 && this.near(a, 16)) a.say(pupils.length ? FS('teach', H2(29), { n: pupils[H2(25) % pupils.length].p.name, a: 3 + H2(26) % 6, b: 2 + H2(27) % 4, p: 4 + H2(28) % 30 }) : FS('teachIdle', H2(29)), 3);
           }
           return;
         }
@@ -878,7 +881,7 @@
           if (this.goTo(a, spot[0], spot[1], spot[2], 1.1)) {
             a.pose = 'work'; act.acc = (act.acc || 0) + dt;
             if (act.acc > 0.7) { act.acc = 0; if (this.near(a, 30)) { g.particles.spark(a.pos[0] - Math.sin(a.yaw) * 0.8, a.pos[1] + 1.1, a.pos[2] - Math.cos(a.yaw) * 0.8, [0.5, 0.9, 1], 4, 2, 1); if (g.audio.ctx && Math.random() < 0.3) g.audio.tone(220 + Math.random() * 80, 0.06, 0.12, 'square', true); } }
-            if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(['Shift two, all machines green.', 'Another batch of hull plates done.', 'Mind the conveyor!', 'Coffee break in ten.', 'Quality check passed.'][H2(60) % 5], 3);
+            if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(FS('factory', H2(60)), 3);
           }
           return;
         }
@@ -888,7 +891,7 @@
         if (off && off.work && off.work.length) {
           const wk = off.work[(a.p.idx + a.p.fam * 2) % off.work.length], spot = wk.slice(1);
           const seat = off.seats && off.seats.find(sx => Math.abs(sx[0] - spot[0]) <= 1 && Math.abs(sx[2] - spot[2]) <= 1 && sx[1] === spot[1]);
-          if (a.pose === 'sit') { if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(['Just answering the mail.', 'The quarterly numbers look good.', 'Meeting at three.', 'Spreadsheets… so many spreadsheets.', 'Have you seen our new office plants?'][H2(61) % 5], 3); if (act.t > 120) { act.t = 0; a.pose = 'stand'; } return; }
+          if (a.pose === 'sit') { if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(FS('office', H2(61)), 3); if (act.t > 120) { act.t = 0; a.pose = 'stand'; } return; }
           if (this.goTo(a, spot[0], spot[1], spot[2], 0.9)) { if (seat) this.sit(a, seat); else a.pose = 'work'; }
           return;
         }
@@ -897,7 +900,7 @@
         const cafe = (vil.workOf.barista || [])[0];
         if (cafe && cafe.work && cafe.work.length) {
           const spot = cafe.work[0].slice(1);
-          if (this.goTo(a, spot[0], spot[1], spot[2], 1.0)) { a.pose = 'work'; if (Math.random() < dt * 1.2 && this.near(a, 20)) g.particles.smoke(a.pos[0] + (Math.random() - 0.5) * 0.6, a.pos[1] + 1.3, a.pos[2] + (Math.random() - 0.5) * 0.6, 0.6); if (Math.random() < dt * 0.03 && this.near(a, 12)) a.say(['Two lattes coming up!', 'Fresh croissants, still warm.', 'Oat milk? Of course.', 'Take a seat on the terrace!'][H2(62) % 4], 3); }
+          if (this.goTo(a, spot[0], spot[1], spot[2], 1.0)) { a.pose = 'work'; if (Math.random() < dt * 1.2 && this.near(a, 20)) g.particles.smoke(a.pos[0] + (Math.random() - 0.5) * 0.6, a.pos[1] + 1.3, a.pos[2] + (Math.random() - 0.5) * 0.6, 0.6); if (Math.random() < dt * 0.03 && this.near(a, 12)) a.say(FS('barista', H2(62)), 3); }
           return;
         }
       }
@@ -909,7 +912,7 @@
           const spot = wk ? wk.slice(1) : b.inside;
           if (this.goTo(a, spot[0], spot[1], spot[2], 1.1)) {
             a.pose = 'work'; a.lookAt = [spot[0] + 0.5 - Math.sin(b.yaw + Math.PI) * 3, spot[1] + 1.8, spot[2] + 0.5 - Math.cos(b.yaw + Math.PI) * 3];
-            if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(['Traffic control: two ships inbound.', 'Telemetry nominal.', 'Course plotted. Cleared for launch!', 'Watching the skies…'][H2(90) % 4], 3);
+            if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(FS('control', H2(90)), 3);
           }
           return;
         }
@@ -919,10 +922,10 @@
         if (sh) {
           if (role === 'cashier') {
             const till = sh.tills[a.p.idx % sh.tills.length];
-            if (this.goTo(a, till.cashier[0], till.cashier[1], till.cashier[2], 0.8)) { a.pose = 'stand'; a.lookAt = [till.lane[0] + 0.5, till.lane[1] + 1.5, till.lane[2] + 0.5]; if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(['Next, please!', 'Did you find everything?', 'Have a lovely day!'][H2(91) % 3], 3); }
+            if (this.goTo(a, till.cashier[0], till.cashier[1], till.cashier[2], 0.8)) { a.pose = 'stand'; a.lookAt = [till.lane[0] + 0.5, till.lane[1] + 1.5, till.lane[2] + 0.5]; if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(FS('cashier', H2(91)), 3); }
           } else {
             if (!act.spot || act.t > 22) { act.t = 0; const c = sh.box; act.spot = [c[0] + 1 + (H2(92) % Math.max(1, c[3] - c[0] - 2)), c[1], c[2] + 1 + (H2(93) % Math.max(1, c[5] - c[2] - 2))]; }
-            if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.4)) { a.pose = 'work'; if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(['Restocking the shelves.', 'Fresh delivery today!', 'Aisle three has a sale.'][H2(94) % 3], 3); }
+            if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.4)) { a.pose = 'work'; if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(FS('clerk', H2(94)), 3); }
           }
           return;
         }
@@ -933,18 +936,18 @@
       if (this.goTo(a, tgt[0], tgt[1], tgt[2], 1.8)) {
         a.pose = role === 'scholar' ? 'read' : 'stand';
         if (act.t > 30) act.done = true;
-        if (role === 'healer' && g.player.health < 12 && this.near(a, 8) && !act.healed) { act.healed = true; a.say('You look hurt — here, let me help.', 4); g.player.heal(8); g.particles.spark(g.player.pos[0], g.player.pos[1] + 1, g.player.pos[2], [0.4, 1, 0.5], 16, 2, 1); }
-        if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(Folk.say(role === 'scholar' ? 'read' : 'friends', H2(81), { n: this.g.playerName || 'friend', fact: this.fact(vil) }), 3);
+        if (role === 'healer' && g.player.health < 12 && this.near(a, 8) && !act.healed) { act.healed = true; a.say(T('g.folk.heal'), 4); g.player.heal(8); g.particles.spark(g.player.pos[0], g.player.pos[1] + 1, g.player.pos[2], [0.4, 1, 0.5], 16, 2, 1); }
+        if (Math.random() < dt * 0.03 && this.near(a, 14)) a.say(Folk.say(role === 'scholar' ? 'read' : 'friends', H2(81), { n: this.g.playerName || T('g.talk.friend'), fact: this.fact(vil) }), 3);
       }
     }
     fact(vil) {
       const s = vil.st.stats, P = vil.plan;
       const facts = [];
-      if (s.harvest) facts.push(`the ${s.harvest} crops harvested`);
-      if (s.bread) facts.push(`the ${s.bread} loaves baked`);
-      if (vil.st.proj) { const lot = P.lots[vil.st.proj.lot]; if (lot) facts.push(`the new house (${Math.round(100 * vil.st.proj.i / lot.ops.length)}% built)`); }
-      if (vil.st.rep > 4) facts.push('our friendly traveler');
-      facts.push('the ships over the ridge', 'the glowing crystals', 'tonight\'s stars');
+      if (s.harvest) facts.push(T('g.fact.harvest', { n: s.harvest }));
+      if (s.bread) facts.push(T('g.fact.bread', { n: s.bread }));
+      if (vil.st.proj) { const lot = P.lots[vil.st.proj.lot]; if (lot) facts.push(T('g.fact.house', { pct: Math.round(100 * vil.st.proj.i / lot.ops.length) })); }
+      if (vil.st.rep > 4) facts.push(T('g.fact.traveler'));
+      facts.push(...TL('g.fact.more'));
       return facts[(this.time | 0) % facts.length];
     }
     // chance meetings: family hugs, friends chatting
@@ -1005,7 +1008,7 @@
       g.audio.play('hurt');
       a.vil.st.rep = Math.max(-20, (a.vil.st.rep || 0) - 2);
       const fam = a.vil.agents.find(o => o !== a && o.p.fam === a.p.fam && !o.kid && Math.hypot(o.pos[0] - a.pos[0], o.pos[2] - a.pos[2]) < 16);
-      if (fam) setTimeout(() => fam.say(`Leave ${a.p.name} alone!`, 3), 900);
+      if (fam) setTimeout(() => fam.say(T('g.folk.leaveAlone', { n: a.p.name }), 3), 900);
     }
     chirp(a) {
       const g = this.g;
@@ -1029,17 +1032,17 @@
       ui.show('talk');
       this.drawFace($('#tk_face'), a.p.look);
       const fam = vil.fams[a.p.fam];
-      $('#tk_name').innerHTML = `<b>${esc(a.name)}</b>${a.p.years ? ` <span class="note">· ${a.p.years} years</span>` : ''}`;
-      const rel = fam.members.filter(m => m !== a.p).map(m => `${esc(m.name)} <span class="note">(${this.relation(a.p, m)})</span>`).join(', ');
-      $('#tk_role').innerHTML = `${esc(Folk.ROLES[a.role] ? Folk.ROLES[a.role].title : a.role)} of ${esc(vil.name)} · ${esc(a.p.trait)}, loves ${esc(a.p.likes)}${rel ? '<br>Family: ' + rel : ''}`;
+      $('#tk_name').innerHTML = `<b>${esc(a.name)}</b>${a.p.years ? ` <span class="note">· ${esc(T('g.talk.years', { n: a.p.years }))}</span>` : ''}`;
+      const rel = fam.members.filter(m => m !== a.p).map(m => `${esc(m.name)} <span class="note">(${esc(T('g.rel.' + this.relation(a.p, m)))})</span>`).join(', ');
+      $('#tk_role').innerHTML = esc(T('g.talk.role', { role: Folk.roleTitle(a.role), v: vil.name, trait: T('g.trait.' + a.p.trait, null, a.p.trait), likes: T('g.likes.' + a.p.likes, null, a.p.likes) })) + (rel ? '<br>' + T('g.talk.family', { list: rel }) : '');
       this.renderRep();
-      const pname = g.playerName || 'traveler';
+      const pname = g.playerName || T('g.talk.traveler');
       const tod = g.env.timeOfDay;
       let hello;
-      if (st.rep < -4) hello = 'Oh… it\'s you. What do you want?';
-      else if (first) hello = a.kid ? `Hi! I'm ${a.p.name}! Are you a space explorer?!` : `Oh, a traveler! I'm ${a.p.name}. Welcome to ${vil.name}!`;
+      if (st.rep < -4) hello = T('g.talk.grumpy');
+      else if (first) hello = T(a.kid ? 'g.talk.firstKid' : 'g.talk.first', { n: a.p.name, v: vil.name });
       else hello = Folk.say('helloBack', H(a.p.seed, this.time | 0, 20), { p: pname });
-      if (tod >= 13000 && tod < 23300 && !first) hello = 'Mmh… I was sleeping. ' + hello;
+      if (tod >= 13000 && tod < 23300 && !first) hello = T('g.talk.sleepy', { s: hello });
       this.talkText(hello);
       this.talkOptions(a);
       this.chirp(a);
@@ -1059,19 +1062,19 @@
       const a = this.talking; if (!a) return;
       const r = a.vil.st.rep || 0;
       const hearts = Math.max(0, Math.min(10, Math.round(r / 2)));
-      $('#tk_rep').innerHTML = `<span style="color:#ff6a8a">${'♥'.repeat(hearts)}</span><span style="color:#44303a">${'♥'.repeat(10 - hearts)}</span> <span class="note">village friendship</span>`;
+      $('#tk_rep').innerHTML = `<span style="color:#ff6a8a">${'♥'.repeat(hearts)}</span><span style="color:#44303a">${'♥'.repeat(10 - hearts)}</span> <span class="note">${esc(T('g.talk.rep'))}</span>`;
     }
     talkText(s) { const el = $('#tk_text'); el.textContent = s; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
     talkOptions(a) {
       const box = $('#tk_opts'); box.innerHTML = '';
       const add = (label, fn) => { const b = document.createElement('button'); b.className = 'btn small'; b.textContent = label; b.onclick = () => { this.chirp(a); fn(); }; box.appendChild(b); };
-      add('How are you?', () => this.talkText(this.chatLine(a)));
-      add(`Tell me about ${a.vil.name}`, () => this.talkText(this.aboutVillage(a)));
-      add('Can I help?', () => this.talkText(this.quest(a)));
-      if (!a.kid) add('Trade', () => this.showTrade(a));
-      add('Give held item', () => this.gift(a));
-      if (a.role === 'pilot' && a.vil.plan.pad && this.g.starships) add('Fly me to another village', () => this.rideMenu(a));
-      add('Goodbye', () => this.closeTalk());
+      add(T('g.talk.how'), () => this.talkText(this.chatLine(a)));
+      add(T('g.talk.about', { v: a.vil.name }), () => this.talkText(this.aboutVillage(a)));
+      add(T('g.talk.help'), () => this.talkText(this.quest(a)));
+      if (!a.kid) add(T('g.talk.trade'), () => this.showTrade(a));
+      add(T('g.talk.give'), () => this.gift(a));
+      if (a.role === 'pilot' && a.vil.plan.pad && this.g.starships) add(T('g.talk.fly'), () => this.rideMenu(a));
+      add(T('g.talk.bye'), () => this.closeTalk());
     }
     // the village pilot lends you the shuttle, with the autopilot set for another village
     padShip(vil) {
@@ -1081,11 +1084,11 @@
     rideMenu(a) {
       const vil = a.vil, g = this.g, box = $('#tk_opts');
       const ship = this.padShip(vil);
-      if (!ship) { this.talkText('Our shuttle is out right now — come back a little later!'); return; }
+      if (!ship) { this.talkText(T('g.talk.shuttleOut')); return; }
       const p = g.player.pos;
       const list = this.sites.filter(s2 => s2.id !== vil.id && Math.hypot(s2.x - p[0], s2.z - p[2]) > 140).sort((x, y) => Math.hypot(x.x - p[0], x.z - p[2]) - Math.hypot(y.x - p[0], y.z - p[2])).slice(0, 4);
-      if (!list.length) { this.talkText('Hmm, I don\'t know any other village close enough for a hop.'); return; }
-      this.talkText(`The ${ship.d.meta.name} is fuelled and ready. Where to?`);
+      if (!list.length) { this.talkText(T('g.talk.noVillage')); return; }
+      this.talkText(T('g.talk.whereTo', { ship: ship.d.meta.name }));
       box.innerHTML = '';
       const add = (label, fn) => { const b = document.createElement('button'); b.className = 'btn small'; b.textContent = label; b.onclick = () => { this.chirp(a); fn(); }; box.appendChild(b); };
       for (const site of list) {
@@ -1093,32 +1096,32 @@
         add(`${site.name} · ${(d / 1000).toFixed(1)} km ${this.compass(site.x - p[0], site.z - p[2])}`, () => {
           const S = g.starships;
           this.closeTalk();
-          a.say(`Hop in! The autopilot knows the way to ${site.name}.`, 4);
+          a.say(T('g.folk.hopIn', { s: site.name }), 4);
           if (!ship.d.meta || S.pilot || (g.gadgets && g.gadgets.riding)) return;
           S.board(ship, g.player);
           if (S.pilot === ship) { g.camMode = 0; S.startAuto(site); }
         });
       }
-      add('Back', () => this.talkOptions(a));
+      add(T('g.btn.back'), () => this.talkOptions(a));
     }
-    closeTalk() { const a = this.talking; this.talking = null; if (a) { a.lookAt = null; a.say(['See you!', 'Take care!', 'Come back soon!', 'Bye-bye!'][a.p.seed % 4], 2.5); } this.g.ui.resume(); }
+    closeTalk() { const a = this.talking; this.talking = null; if (a) { a.lookAt = null; a.say(FS('bye', a.p.seed), 2.5); } this.g.ui.resume(); }
     chatLine(a) {
       const vil = a.vil, fam = vil.fams[a.p.fam], g = this.g;
       const kids = fam.members.filter(m => m.age === 'child' && m !== a.p);
       const partner = fam.members.find(m => m !== a.p && this.relation(a.p, m) === 'partner');
       const h = H(a.p.seed, (this.time / 3) | 0, 30);
       const opts = [];
-      if (kids.length) opts.push(`${kids[h % kids.length].name} has been ${['learning to read', 'chasing wisps all day', 'building a starship out of crates', 'helping at the farm'][h % 4]}. I'm so proud.`);
-      if (partner) opts.push(`${partner.name} and I ${['watch the rings rise every evening', 'are planting a new garden', 'still dance at the plaza on festival nights'][h % 3]}.`);
-      if (a.kid) opts.push(['Wanna play tag? You\'re it!', 'When I grow up I want to fly a starship!', 'Mom says the crystals sing at night. Is that true?', (vil.workOf.teacher ? `${vil.workOf.teacher[0] ? 'Our teacher' : 'School'} says the moons are ${['made of cheese', 'older than the sun', 'full of crystals'][h % 3]}. Is that true?` : `I'm ${a.p.years}! How old are you?`)][h % 4]);
-      if (a.elder) opts.push([`${a.p.years} years old and still walking to the park every day.`, 'Back in my day the sky tram did not exist. We walked!', 'My grandchildren keep me young.'][h % 3]);
-      const R = { teacher: ['Twenty-two pupils and every one of them asks about the rings.', 'Grading homework tonight — the drawings are wonderful.'], worker: ['Four machines, one conveyor, zero accidents this month.', 'The factory hums like a starship engine.'], office: ['Emails, meetings, more emails. But the view from the third floor!', 'We are hiring, if you can type.'], barista: ['I know every regular\'s order by heart.', 'The terrace is the best spot in town at sunset.'], mayor: ['The fountain plaza cost a fortune, but look at it!', 'Town hall is open every morning. Bring your ideas.'] }[a.role];
-      if (R) opts.push(R[h % R.length]);
+      if (kids.length) opts.push(T('g.talk.kidNews', { kid: kids[h % kids.length].name, what: pickL('g.talk.kidDoing', h) }));
+      if (partner) opts.push(T('g.talk.partnerNews', { p: partner.name, what: pickL('g.talk.partnerDoing', h) }));
+      if (a.kid) { const ks = TL('g.talk.kidSays'), last = vil.workOf.teacher ? T('g.talk.kidTeacher', { who: pickL('g.talk.who', vil.workOf.teacher[0] ? 0 : 1), what: pickL('g.talk.moons', h) }) : T('g.talk.kidAge', { y: a.p.years }); opts.push([...ks, last][h % (ks.length + 1)]); }
+      if (a.elder) opts.push(pickL('g.talk.elderSays', h).replace('{y}', a.p.years));
+      const R = TL('g.talk.r.' + a.role);
+      if (R.length) opts.push(R[h % R.length]);
       const tod = g.env.timeOfDay;
-      opts.push(tod < 900 || tod >= 23300 ? 'Early bird? Breakfast first, then the day.' : tod < 5600 ? (a.kid ? 'I should be in class…' : 'Busy morning — work does not do itself!') : tod < 6900 ? 'Lunch time! The café makes a great sandwich.' : tod < 10600 ? 'Afternoon shift. A few more hours.' : 'Evening at last. Time for the park and the stars.');
+      opts.push(T(tod < 900 || tod >= 23300 ? 'g.talk.early' : tod < 5600 ? (a.kid ? 'g.talk.morningKid' : 'g.talk.morning') : tod < 6900 ? 'g.talk.lunch' : tod < 10600 ? 'g.talk.afternoon' : 'g.talk.evening'));
       if (g.env.rain > 0.3) opts.push(Folk.say('rain', h));
-      opts.push(`I'm ${['doing wonderfully', 'a bit tired but happy', 'feeling great today'][h % 3]}! ${a.p.likes === 'stars' ? 'Did you see the stars last night?' : a.p.likes === 'starships' ? 'I love watching the ships fly over.' : a.p.likes === 'bread' ? 'The bakery smells amazing today.' : 'Life is good here.'}`);
-      if (vil.st.proj) { const lot = vil.plan.lots[vil.st.proj.lot]; if (lot) opts.push(`Our builders are raising a new house — it's ${Math.round(100 * vil.st.proj.i / lot.ops.length)}% done!`); }
+      opts.push(T('g.talk.mood', { mood: pickL('g.talk.moods', h), more: T(a.p.likes === 'stars' ? 'g.talk.likeStars' : a.p.likes === 'starships' ? 'g.talk.likeShips' : a.p.likes === 'bread' ? 'g.talk.likeBread' : 'g.talk.likeLife') }));
+      if (vil.st.proj) { const lot = vil.plan.lots[vil.st.proj.lot]; if (lot) opts.push(T('g.talk.builders', { pct: Math.round(100 * vil.st.proj.i / lot.ops.length) })); }
       vil.st.rep = (vil.st.rep || 0) + (Math.random() < 0.25 ? 1 : 0);
       this.renderRep();
       return opts[h % opts.length];
@@ -1126,52 +1129,51 @@
     aboutVillage(a) {
       const vil = a.vil, g = this.g;
       const pop = vil.people.length;
-      let s = `${vil.name} is home to ${pop} folk in ${vil.fams.length} families. We've been here ${vil.st.founded} years`;
-      s += vil.st.built && vil.st.built.length ? `, and ${vil.st.built.length} new home${vil.st.built.length > 1 ? 's were' : ' was'} built recently.` : '.';
+      let s = T('g.talk.aboutHome', { v: vil.name, pop, fams: vil.fams.length, years: vil.st.founded });
+      s += vil.st.built && vil.st.built.length ? (vil.st.built.length > 1 ? T('g.talk.aboutBuiltN', { n: vil.st.built.length }) : T('g.talk.aboutBuilt1')) : '.';
       // point the traveler somewhere interesting (outpost / another village) and mark it
       const p = g.player.pos;
       const other = this.sites.filter(s2 => s2.id !== vil.id).sort((x, y) => ((x.x - p[0]) ** 2 + (x.z - p[2]) ** 2) - ((y.x - p[0]) ** 2 + (y.z - p[2]) ** 2))[0];
       if (other) {
         const d = Math.round(Math.hypot(other.x - p[0], other.z - p[2]));
         const dir = this.compass(other.x - p[0], other.z - p[2]);
-        s += ` Our cousins live in ${other.name}, about ${d} blocks to the ${dir}. I marked it on your map!`;
+        s += T('g.talk.cousins', { name: other.name, d, dir });
         if (g.gadgets && g.gadgets.addWaypoint) { try { g.gadgets.addWaypoint(other.name, [other.x, other.y + 2, other.z]); } catch (e) { void e; } }
       }
       return s;
     }
-    compass(dx, dz) { const a = Math.atan2(dx, -dz); const names = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west']; return names[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8]; }
+    compass(dx, dz) { const a = Math.atan2(dx, -dz); const names = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']; return T('g.dir.' + names[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8]); }
     // quests: small, role-flavoured requests
     quest(a) {
       const st = a.vil.st, q = st.quests || (st.quests = {});
       const cur = q[a.p.id];
-      if (cur && !cur.done) return `Still hoping for ${cur.n} ${VR.itemName ? VR.itemName(cur.id) : cur.id}. Give it to me when you have it!`;
+      if (cur && !cur.done) return T('g.quest.still', { n: cur.n, item: VR.itemName ? VR.itemName(cur.id) : cur.id });
+      // the requests: [item, count]; the words are g.quest.<role>
       const Q = {
-        farmer: ['bone_meal', 8, 'The soil is tired. Could you bring me 8 bone meal?'], baker: ['wheat', 12, 'I\'m out of flour! Could you bring 12 wheat?'], smith: ['iron_ingot', 6, 'I need 6 iron ingots for new hinges.'],
-        builder: ['oak_planks', 32, 'We\'re short on wood for the new house — 32 oak planks would be amazing!'], scholar: ['paper', 6, 'Could you bring me 6 sheets of paper? I\'m writing the village history.'],
-        healer: ['honey_bottle', 2, 'Honey soothes sore throats. Two bottles?'], mayor: ['lantern', 4, 'The east lane is so dark at night. 4 lanterns?'], ranger: ['energy_cell', 2, 'My blaster is low. Two energy cells?'],
-        pilot: ['energy_cell', 3, 'The shuttle needs 3 energy cells before its next flight.'], gardener: ['poppy', 6, 'Six poppies for the plaza beds?'], child: ['cookie', 3, 'Can I have 3 cookies? Pleeease?'], elder: ['book', 1, 'I\'d love a good book to read by the fire.'], crafter: ['string', 8, '8 string for my loom?'],
+        farmer: ['bone_meal', 8], baker: ['wheat', 12], smith: ['iron_ingot', 6], builder: ['oak_planks', 32], scholar: ['paper', 6], healer: ['honey_bottle', 2], mayor: ['lantern', 4],
+        ranger: ['energy_cell', 2], pilot: ['energy_cell', 3], gardener: ['poppy', 6], child: ['cookie', 3], elder: ['book', 1], crafter: ['string', 8],
       };
-      const d = Q[a.role] || Q.gardener;
-      if (!VR.itemDef(d[0]) && !R.byName[d[0]]) return 'Oh, we\'re doing fine, thank you for asking!';
+      const role = Q[a.role] ? a.role : 'gardener', d = Q[role];
+      if (!VR.itemDef(d[0]) && !R.byName[d[0]]) return T('g.quest.fine');
       q[a.p.id] = { id: d[0], n: d[1], done: false };
-      return d[2] + ' (Hold the items and choose "Give held item".)';
+      return T('g.quest.' + role) + T('g.quest.hold');
     }
     gift(a) {
       const g = this.g, p = g.player, h = p.inv.held;
       const st = a.vil.st;
-      if (!h) { this.talkText('Your hands are empty, silly!'); return; }
+      if (!h) { this.talkText(T('g.gift.empty')); return; }
       const q = st.quests && st.quests[a.p.id];
       const name = VR.itemName ? VR.itemName(h.id) : h.id;
       if (q && !q.done && h.id === q.id) {
         const have = p.inv.count(q.id);
-        if (have < q.n) { this.talkText(`That's ${have} — I need ${q.n}.`); return; }
+        if (have < q.n) { this.talkText(T('g.gift.short', { have, n: q.n })); return; }
         p.inv.remove(q.id, q.n); q.done = true;
         st.rep = (st.rep || 0) + 4;
         const rewards = [['emerald', 6], ['cake', 1], ['vx_crystal_violet', 2], ['golden_apple', 1], ['vx_window_shutter_green', 8], ['vx_lamppost', 4], ['shuttle_beacon', 1]];
         const rw = rewards[H(a.p.seed, 77, 1) % rewards.length];
         const ok = VR.itemDef(rw[0]) || R.byName[rw[0]];
         if (ok) p.inv.add(rw[0], rw[1]); else p.inv.add('emerald', 5);
-        this.talkText(`You did it! Thank you so much! Please take this: ${rw[1]} × ${VR.itemName ? VR.itemName(rw[0]) : rw[0]}.`);
+        this.talkText(T('g.gift.done', { n: rw[1], item: VR.itemName ? VR.itemName(rw[0]) : rw[0] }));
         g.audio.play('levelup'); this.hearts(a); this.renderRep();
         if (g.codex && g.codex.event) g.codex.event('quest');
         return;
@@ -1181,7 +1183,7 @@
       const loved = (a.p.likes === 'bread' && /bread|cake|cookie|pie/.test(h.id)) || (a.p.likes === 'flowers' && /poppy|dandelion|tulip|orchid|allium|bluet|daisy|rose|lily|flower/.test(h.id)) || (a.p.likes === 'crystals' && /crystal|shard|amethyst/.test(h.id)) || (a.p.likes === 'books' && /book|paper/.test(h.id)) || (a.p.likes === 'stars' && /star|glow/.test(h.id));
       const food = def && def.food;
       st.rep = (st.rep || 0) + (loved ? 3 : food ? 2 : 1);
-      this.talkText(loved ? `A ${name}?! I LOVE ${esc(a.p.likes)}! You're the best!` : Folk.say('thanks', H(a.p.seed, this.time | 0, 41)));
+      this.talkText(loved ? T('g.gift.love', { item: name, likes: T('g.likes.' + a.p.likes, null, a.p.likes) }) : Folk.say('thanks', H(a.p.seed, this.time | 0, 41)));
       this.hearts(a); this.renderRep();
       g.audio.play('pop');
     }
@@ -1205,7 +1207,7 @@
       const offers = (T[a.role] || T.farmer).filter(o => (VR.itemDef(o[0][0]) || R.byName[o[0][0]]) && (VR.itemDef(o[1][0]) || R.byName[o[1][0]]));
       const box = $('#tk_opts'); box.innerHTML = '';
       const nm = (id) => VR.itemName ? VR.itemName(id) : id;
-      this.talkText(`Here's what I can offer. You have ${p.inv.count('emerald')} emerald${p.inv.count('emerald') === 1 ? '' : 's'}.`);
+      this.talkText(T('g.trade.offer', { n: p.inv.count('emerald'), emeralds: T(p.inv.count('emerald') === 1 ? 'g.trade.emerald1' : 'g.trade.emeraldN') }));
       for (const [give, get] of offers) {
         const b = document.createElement('button'); b.className = 'btn small tktrade';
         const can = p.inv.count(give[0]) >= give[1] || p.mode !== 'survival';
@@ -1219,12 +1221,12 @@
           if (got < get[1]) g.dropStack({ id: get[0], n: get[1] - got }, false, [p.pos[0], p.pos[1] + 1, p.pos[2]]);
           a.vil.st.rep = (a.vil.st.rep || 0) + 1;
           g.audio.play('pop'); this.renderRep();
-          this.talkText(['Pleasure doing business!', 'Enjoy!', 'Thank you kindly!'][H(a.p.seed, this.time | 0, 9) % 3]);
+          this.talkText(pickL('g.trade.thanks', H(a.p.seed, this.time | 0, 9)));
           this.showTrade(a);
         };
         box.appendChild(b);
       }
-      const back = document.createElement('button'); back.className = 'btn small'; back.textContent = 'Back'; back.onclick = () => this.talkOptions(a); box.appendChild(back);
+      const back = document.createElement('button'); back.className = 'btn small'; back.textContent = T('g.btn.back'); back.onclick = () => this.talkOptions(a); box.appendChild(back);
     }
     drawFace(cv, L) {
       const x = cv.getContext('2d'); const s = 10;

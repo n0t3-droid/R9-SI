@@ -4,6 +4,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F, PH = VR.PHYS, M = VR.M;
   const W = 0.3, H = 1.8, EYE = 1.62, SNEAK_EYE = 1.27;
 
@@ -129,7 +131,7 @@
         if (H.bed) {
           // the bed you slept in is gone? back to the world's spawn
           const s = world.getBlock(H.bed[0], H.bed[1], H.bed[2]), t = R.types[R.T.type[s]];
-          if (!t || !(t.o.bed || t.o.kind === 'bed')) { const ws = g.worldSpawn(); this.spawn = ws.slice(); g.ui && g.ui.chatLine('Your bed is missing — back to the world spawn.', '#ffb86a'); this.safeTeleport(ws[0], ws[1], ws[2]); return; }
+          if (!t || !(t.o.bed || t.o.kind === 'bed')) { const ws = g.worldSpawn(); this.spawn = ws.slice(); g.ui && g.ui.chatLine(T('g.chat.bedGone'), '#ffb86a'); this.safeTeleport(ws[0], ws[1], ws[2]); return; }
         }
         const keepOk = H.keep && this.isFree(H.x, H.y, H.z);
         if (H.fly && this.creative && (!H.keep || keepOk)) { this.pos = [H.x, H.y, H.z]; this.flying = true; }

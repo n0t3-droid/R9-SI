@@ -195,3 +195,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .slot .favS:hover { color: #ffd34d; }
 .slot.fav .favS { opacity: 1; color: #ffd34d; text-shadow: 0 0 6px rgba(255, 211, 77, 0.7), 0 0 2px #000; }
 @media (hover: none) { .slot .favS { opacity: 0.8; font-size: 14px; } }
+/* 🌐 language (Settings → Sprache / Language): Deutsch and English as a seg; the module's other languages as "soon" chips */
+.langsoon { margin: 4px 0 10px; }
+.langsoon .btn.tiny { margin-left: 0; opacity: 0.55; cursor: default; }
+#langseg button { flex: 0 1 180px; }
+/* right-to-left languages (the language module sets html dir=rtl): texts in panels, chat and hints follow */
+[dir=rtl] .panel, [dir=rtl] #chatlog, [dir=rtl] #hint, [dir=rtl] #toasts, [dir=rtl] #vehiclehud { direction: rtl; unicode-bidi: plaintext; }
