@@ -422,6 +422,7 @@ uniform vec3 u_camFrac;
 uniform float u_emissiveBoost;
 uniform float u_normalStrength;
 uniform float u_holoLayer;
+uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade, the normal map turns with the tile (Nahtlos: macro mottling)
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -492,6 +493,13 @@ void main() {
   float mipK = u_mipScale > 0.0 ? u_mipScale : 1.0;
   vec2 dx = dFdx(uv) * mipK, dy = dFdy(uv) * mipK;
   if (rot == 1u || rot == 3u) { dx = dx.yx; dy = dy.yx; }
+  // Klassisch: crisp texels up close, as in the original game — the sample snaps to its texel's centre and only the
+  // half pixel on either side of a texel edge blends across it (with anisotropic filtering many GPUs magnify linearly,
+  // which smeared the chunky pixels and the block outline into soft bands); texels smaller than a pixel pass as they are
+  if (u_blockVar > 0.5) {
+    vec2 tx = fu * 32.0, seam = floor(tx + 0.5), tw = max((abs(dx) + abs(dy)) * 32.0, vec2(1e-3));
+    fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
+  }
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
@@ -503,13 +511,23 @@ void main() {
 #else
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
-#ifndef LITE
   if (((v_w3 >> 15u) & 1u) == 1u) {
-    vec2 wp = v_localPos.xz + vec2(u_camInt.xz);
-    float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
-    alb.rgb *= 0.9 + m * 0.2;
-  }
+#ifdef MODEL
+    bool own = false;   // a ship's blocks move with it: no world cell to hash
+#else
+    bool own = u_blockVar > 0.5;
 #endif
+    // Klassisch v2: every natural block its own shade (±5 %), all its faces alike — a field of one material is
+    // many blocks, never one surface
+    if (own) alb.rgb *= 0.95 + 0.1 * hash13(cellF + vec3(3.7, 1.3, 7.1));
+#ifndef LITE
+    else {
+      vec2 wp = v_localPos.xz + vec2(u_camInt.xz);
+      float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
+      alb.rgb *= 0.9 + m * 0.2;
+    }
+#endif
+  }
   // normal (smooth ground slopes: the true surface normal from the position derivatives)
   vec3 N = NORMALS[face];
   if (((v_w5 >> 13u) & 1u) == 1u) { vec3 gn = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (gn.y < 0.0) gn = -gn; N = gn; }
@@ -520,6 +538,10 @@ void main() {
   vec3 n = N;
 #else
   vec2 nxy = mat.rg * 2.0 - 1.0;
+  // Klassisch: the normal map turns with the tile, so a turned grass top is lit as its texels lie and every block's
+  // edges catch the low sun alike (unturned, the edges of neighbouring blocks lit up at random and pairs of blocks
+  // read as one); Nahtlos keeps its normals as they were
+  if (u_blockVar > 0.5) { if (rot == 1u) nxy = vec2(-nxy.y, nxy.x); else if (rot == 2u) nxy = -nxy; else if (rot == 3u) nxy = vec2(nxy.y, -nxy.x); }
   nxy *= u_normalStrength;
   vec3 T = TANG[face], Bt = BITN[face];
 #ifdef MODEL
@@ -601,6 +623,7 @@ uniform ivec3 u_camInt;
 uniform vec3 u_camFrac;
 uniform vec3 u_waterFogColor;
 uniform float u_underwater;
+uniform float u_blockVar;     // Klassisch: still water reads per block (chunky ripples, a faint seam), glass texels crisp
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -666,7 +689,8 @@ void main() {
     // facing the camera may shade — the other one z-fights and would mirror the sky at fresnel = 1
     if (dot(NORMALS[face], V) < 0.0) discard;
     vec3 wp = v_localPos + vec3(u_camInt);
-    vec3 n = face == 2u || face == 3u ? waveNormal(wp.xz) : NORMALS[face];
+    // Klassisch: the ripples in 16 chunky pixels per block, like the ground's texels
+    vec3 n = face == 2u || face == 3u ? waveNormal(u_blockVar > 0.5 ? (floor(wp.xz * 16.0) + 0.5) / 16.0 : wp.xz) : NORMALS[face];
     if (face == 3u) n = -n;
     if (kind == 6u && face != 2u) n = normalize(NORMALS[face] + vec3(sin(wp.y * 6.0 - u_time * 6.0) * 0.08, 0.0, 0.0));
     vec3 wcol = v_tint;
@@ -689,6 +713,13 @@ void main() {
     float ripple = clamp(0.5 + dot(n.xz, normalize(L.xz + vec2(1e-4))) * 2.6, 0.0, 1.0);
     body *= 0.84 + ripple * 0.32;
     body = mix(body, wcol * vec3(0.55, 0.75, 0.9), 0.16);
+    // Klassisch: a faint seam where two blocks of the surface meet, in the water's own colour (the reflection stays
+    // whole), fading out where a block is only a few pixels wide
+    float seamK = 0.0, pxW = max(fwidth(wp.x), fwidth(wp.z));
+    if (u_blockVar > 0.5 && face == 2u) {
+      vec2 g = fract(wp.xz), e = min(g, 1.0 - g);
+      seamK = (1.0 - smoothstep(0.08, 0.25, pxW)) * (1.0 - smoothstep(0.03, 0.03 + pxW, min(e.x, e.y)));
+    }
     vec3 deep = body * (u_ambSky * skyL * 0.74 + blockL * 0.45 + lc * 0.095 * v_sky) + body * 0.012;
     vec3 under = mix(refr * mix(vec3(1.0), vec3(0.26, 0.6, 0.92) + vec3(0.0, 0.04, 0.0) * bandN, 0.72), deep, clamp(absorb, 0.0, 0.96));
     vec3 R = reflect(-V, n);
@@ -698,7 +729,7 @@ void main() {
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
     fres = min(fres * 0.85, 0.66);
     if (u_underwater > 0.5) { fres = face == 3u ? 0.0 : fres * 0.3; }
-    vec3 col = mix(under, refl, clamp(fres, 0.0, 1.0));
+    vec3 col = mix(under * (1.0 - 0.22 * seamK), refl, clamp(fres, 0.0, 1.0));
     // sun glints
     vec3 H = normalize(L + V);
     float sp = pow(max(dot(n, H), 0.0), 700.0) * 30.0 + pow(max(dot(n, H), 0.0), 60.0) * 0.4;
@@ -736,7 +767,13 @@ void main() {
   // gradients of the continuous uv: fract() jumps at every block edge and would pick the 1×1 mip there (a seam line)
   // connected-frame glass (flag bit 14) is one tile per face: clamp inside it, so an edge pixel never wraps onto the frame of the opposite edge
   if (((v_w5 >> 14u) & 1u) == 1u) fu = ctmUV(v_uv, v_w5);
-  vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dFdx(v_uv), dFdy(v_uv));
+  vec2 gdx = dFdx(v_uv), gdy = dFdy(v_uv);
+  // Klassisch: crisp texels up close, as on the opaque blocks (each glass block's frame drawn sharp)
+  if (u_blockVar > 0.5) {
+    vec2 tx = fu * 32.0, seam = floor(tx + 0.5), tw = max((abs(gdx) + abs(gdy)) * 32.0, vec2(1e-3));
+    fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
+  }
+  vec4 alb = textureGrad(u_albedo, vec3(fu, layer), gdx, gdy);
   alb.rgb *= v_tint;
   vec3 n = NORMALS[face];
 #ifdef MODEL
@@ -899,6 +936,7 @@ uniform vec3 u_camFrac;
 uniform ivec3 u_camInt;
 uniform float u_emissiveBoost;
 uniform float u_lodNear;
+uniform float u_blockVar;     // Klassisch: per-block shades and the block grid instead of the macro mottling
 ${'__COMMON__'}
 in vec3 v_rel;
 in vec3 v_col;
@@ -961,11 +999,27 @@ void main() {
     if (v_face == 2u) col += lc * (pow(max(dot(n, H), 0.0), 700.0) * 30.0 + pow(max(dot(n, H), 0.0), 60.0) * 0.4) * (1.0 - u_rain);
   } else {
     vec3 alb = v_col;
-    float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
-    alb *= 0.9 + m * 0.2;
-    // per-block speckle so the big cells read as many small blocks
-    vec3 bp = floor(vec3(wp.x, v_rel.y + u_camFrac.y + float(u_camInt.y), wp.y) - N * 0.02);
-    alb *= 0.93 + hash13(bp) * 0.14;
+    vec3 wp3 = vec3(wp.x, v_rel.y + u_camFrac.y + float(u_camInt.y), wp.y) - N * 0.02;
+    vec3 bp = floor(wp3);
+    if (u_blockVar > 0.5) {
+      // Klassisch v2: no mottling — every block its own shade, and the block grid as far as a pixel can still show
+      // it (a line a texel wide, softened over one pixel); where a block shrinks under ~4 pixels the lines fade out
+      // into the per-block shades, and the inside is lifted by what the lines take, so the far land keeps the
+      // brightness of the near blocks (whose mips keep their mean too)
+      alb *= 0.92 + hash13(bp) * 0.16;
+      vec3 fr = wp3 - bp;
+      vec2 g = v_face <= 1u ? fr.zy : v_face <= 3u ? fr.xz : fr.xy;
+      vec2 e = min(g, 1.0 - g);
+      float px = max(length(fwidth(wp3)), 1e-3);
+      float k = 0.12 * (1.0 - smoothstep(0.12, 0.3, px));
+      float cover = min(1.0, 4.0 * (0.03 + 0.5 * px));
+      alb *= (1.0 - k * (1.0 - smoothstep(0.03, 0.03 + px, min(e.x, e.y)))) / (1.0 - k * cover);
+    } else {
+      float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
+      alb *= 0.9 + m * 0.2;
+      // per-block speckle so the big cells read as many small blocks
+      alb *= 0.93 + hash13(bp) * 0.14;
+    }
     float faceShade = v_face == 2u ? 1.0 : v_face == 3u ? 0.55 : (v_face <= 1u ? 0.78 : 0.88);
     float ndl = max(dot(N, L), 0.0);
     vec3 amb = u_ambSky * mix(0.62, 1.0, faceShade);

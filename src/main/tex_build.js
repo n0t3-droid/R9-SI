@@ -44,8 +44,9 @@
       img.c[i * 4] *= m; img.c[i * 4 + 1] *= m; img.c[i * 4 + 2] *= m;
     }
   }
-  // soft bevel + edge definition for cube faces (normal-mapped groove, gentle AO rim)
-  function stylize(img, strength) {
+  // soft bevel + edge definition for cube faces (normal-mapped groove, gentle AO rim). colour false (Klassisch v2):
+  // the groove only — the outline below draws the edge's colour, one crisp texel
+  function stylize(img, strength, colour) {
     const s = strength;
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
       const e = Math.min(x, y, N - 1 - x, N - 1 - y);
@@ -53,10 +54,120 @@
       const i = y * N + x;
       const k = e === 0 ? 1 : 0.4;
       img.h[i] -= 0.22 * k * s;
+      if (colour === false) continue;
       const m = 1 - 0.07 * k * s;
       img.c[i * 4] *= m; img.c[i * 4 + 1] *= m; img.c[i * 4 + 2] *= m;
     }
   }
+  const LUM = (c, i) => 0.2126 * c[i] + 0.7152 * c[i + 1] + 0.0722 * c[i + 2];
+  // Klassisch v2: the outline — the tile's outer texel line, a crisp line darker and a touch greyer; two blocks side by
+  // side meet in a line two texels wide, one pixel of a 16-pixel block, so a field of one material still shows every
+  // block. Built materials (planks, bricks, wool …) show their blocks by their own pattern: 11–16 % (the brighter the
+  // material, the darker — a sunlit surface sits on the tone curve's shoulder). The chunky natural ones are noisy:
+  // the line grows with the texture's own spread so it reads as clearly on grass and gravel as on sand and snow
+  // (sand 15 %, grass 20 %, dirt 22 %). Cut-outs (leaves) get it on their solid texels only; a texture whose alpha is
+  // a tint mask (grass sides) on all of them.
+  function outline(img, strength, cut, chunky) {
+    let lum = 0, lum2 = 0, n = 0;
+    for (let i = 0; i < N * N; i++) { if (cut && img.c[i * 4 + 3] < 0.5) continue; const l = LUM(img.c, i * 4); lum += l; lum2 += l * l; n++; }
+    lum = n ? lum / n : 0.5;
+    const spread = n && lum > 0 ? Math.sqrt(Math.max(0, lum2 / n - lum * lum)) / lum : 0;
+    lum = Math.min(1, lum);
+    const k = (chunky ? Math.min(0.22, Math.max(0.13, 0.1 + 0.04 * lum + 0.6 * spread)) : 0.11 + 0.05 * lum) * strength, ds = 0.25 * strength;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (x > 0 && y > 0 && x < N - 1 && y < N - 1) continue;
+      const i = y * N + x, o = i * 4;
+      if (cut && img.c[o + 3] < 0.5) continue;
+      const l = LUM(img.c, o), m = 1 - k;
+      img.c[o] = (img.c[o] + (l - img.c[o]) * ds) * m; img.c[o + 1] = (img.c[o + 1] + (l - img.c[o + 1]) * ds) * m; img.c[o + 2] = (img.c[o + 2] + (l - img.c[o + 2]) * ds) * m;
+    }
+    // every edge line is either distinctly brighter than the two lines inside it (a bevel highlight, as on the metal
+    // blocks) or at least a tenth darker — an edge that sits in a bright band of its own texture (deepstone's
+    // stripes) is pushed down; and a recipe with a bright frame of its own (bookshelf, furnace, vent …) still ends
+    // up with its whole edge ring at least a tenth darker than its inside
+    const solid = (i) => !cut || img.c[i * 4 + 3] >= 0.5, kk = 0.1 * strength;
+    const at = [(t, d) => d * N + t, (t, d) => (N - 1 - d) * N + t, (t, d) => t * N + d, (t, d) => t * N + (N - 1 - d)];
+    const lineMean = (e, d) => { let s = 0, w = 0; for (let t = 1; t < N - 1; t++) { const i = at[e](t, d); if (!solid(i)) continue; s += LUM(img.c, i * 4); w++; } return w ? s / w : -1; };
+    const f = [1, 1, 1, 1];
+    for (let e = 0; e < 4; e++) {
+      const l0 = lineMean(e, 0), l1 = lineMean(e, 1), l2 = lineMean(e, 2), inner = l1 >= 0 && l2 >= 0 ? (l1 + l2) / 2 : Math.max(l1, l2);
+      if (l0 > 0 && inner > 0 && l0 > inner * (1 - kk) && l0 < inner * (1 + kk)) f[e] = inner * (1 - kk) / l0;
+    }
+    const factor = (x, y) => Math.min(y === 0 ? f[0] : 1, y === N - 1 ? f[1] : 1, x === 0 ? f[2] : 1, x === N - 1 ? f[3] : 1);
+    let rl = 0, rw = 0, il = 0, iw = 0;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const i = y * N + x; if (!solid(i)) continue; const l = LUM(img.c, i * 4); if (x === 0 || y === 0 || x === N - 1 || y === N - 1) { rl += l * factor(x, y); rw++; } else { il += l; iw++; } }
+    const cap = rw && iw && rl / rw > (il / iw) * (1 - kk) ? (il / iw) * (1 - kk) / (rl / rw) : 1;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      if (x > 0 && y > 0 && x < N - 1 && y < N - 1) continue;
+      const i = y * N + x; if (!solid(i)) continue;
+      const m = factor(x, y) * cap; if (m === 1) continue;
+      img.c[i * 4] *= m; img.c[i * 4 + 1] *= m; img.c[i * 4 + 2] *= m;
+    }
+  }
+  // Klassisch v2: the chunky build of a natural recipe — 16×16-style texels (every 2×2 cell takes its first texel's
+  // colour, height, roughness, glow and alpha), the same palette, so the ground looks the same from afar but blocky
+  // up close, as in the original game. Recipes opt in with img.chunky (TX.chunky); Nahtlos never pixelates.
+  function pixelate(img) {
+    for (let y = 0; y < N; y += 2) for (let x = 0; x < N; x += 2) {
+      const i = y * N + x;
+      for (const j of [i + 1, i + N, i + N + 1]) {
+        img.c[j * 4] = img.c[i * 4]; img.c[j * 4 + 1] = img.c[i * 4 + 1]; img.c[j * 4 + 2] = img.c[i * 4 + 2]; img.c[j * 4 + 3] = img.c[i * 4 + 3];
+        img.h[j] = img.h[i]; img.ro[j] = img.ro[i]; img.em[j] = img.em[i];
+      }
+    }
+  }
+  // Klassisch v2: the relief of a chunky texture at its own resolution — every 2×2 cell one flat facet, its normal
+  // from the cells around it and gentler than the recipe's (the sun of the long golden hour stands low and turns every
+  // height step into a bright or a black texel), and no groove at the tile's edge: the dark outline is the block's
+  // edge — a groove would light up on the sun side and hide it there. Leaves keep their clumps rounded (relief 1).
+  // hc: the heights right after pixelate().
+  function cellNormals(mat, hc, relief) {
+    const C = N >> 1, H = (cx, cy) => hc[(((cy + C) % C) * 2) * N + ((cx + C) % C) * 2];
+    for (let cy = 0; cy < C; cy++) for (let cx = 0; cx < C; cx++) {
+      const nx = (H(cx - 1, cy) - H(cx + 1, cy)) * 1.1 * relief, ny = (H(cx, cy - 1) - H(cx, cy + 1)) * 1.1 * relief;
+      const len = Math.hypot(nx, ny, 1);
+      const r = Math.round((nx / len * 0.5 + 0.5) * 255), g = Math.round((ny / len * 0.5 + 0.5) * 255);
+      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) { const o = ((cy * 2 + dy) * N + cx * 2 + dx) * 4; mat[o] = r; mat[o + 1] = g; }
+    }
+  }
+  // Klassisch v2: the outline in the mips — the box filter averages a one-texel line away by mip 2, which is what a
+  // block 20 blocks away is drawn with. Each of the level's four edge lines is darkened to (1 − k) of the two lines
+  // inside it again (its own neighbourhood: a grass side is bright on top and dark below), then the whole level is
+  // brightened back to its mean, so a block never gets darker with distance. Solid texels only on cut-outs; levels
+  // of 2×2 and smaller are all edge and stay as they are.
+  function mipOutline(fa, n, k, cut) {
+    if (n < 4) return;
+    const solid = (i) => !cut || fa[i * 4 + 3] >= 0.5;
+    const at = [(t, d) => d * n + t, (t, d) => (n - 1 - d) * n + t, (t, d) => t * n + d, (t, d) => t * n + (n - 1 - d)];   // top, bottom, left, right: texel t of line d
+    const lineMean = (e, d) => { let s = 0, w = 0; for (let t = 1; t < n - 1; t++) { const i = at[e](t, d); if (!solid(i)) continue; s += LUM(fa, i * 4); w++; } return w ? s / w : -1; };   // without the corners
+    // (ii) each edge line against the two lines inside it
+    const f = [1, 1, 1, 1];
+    for (let e = 0; e < 4; e++) {
+      const l0 = lineMean(e, 0), l1 = lineMean(e, 1), l2 = lineMean(e, 2);
+      const inner = l1 >= 0 && l2 >= 0 ? (l1 + l2) / 2 : Math.max(l1, l2);
+      if (!(l0 > 0) || !(inner > 0)) continue;
+      const target = inner * (1 - k);
+      if (l0 > target) f[e] = target / l0;
+    }
+    const isEdge = (x, y) => x === 0 || y === 0 || x === n - 1 || y === n - 1;
+    const factor = (x, y) => Math.min(y === 0 ? f[0] : 1, y === n - 1 ? f[1] : 1, x === 0 ? f[2] : 1, x === n - 1 ? f[3] : 1);
+    // (i) the whole ring against the whole inside
+    let rl = 0, rw = 0, il = 0, iw = 0;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const i = y * n + x; if (!solid(i)) continue; const l = LUM(fa, i * 4); if (isEdge(x, y)) { rl += l * factor(x, y); rw++; } else { il += l; iw++; } }
+    if (!rw || !iw) return;
+    const ring = rl / rw > (il / iw) * (1 - k) ? (il / iw) * (1 - k) / (rl / rw) : 1;
+    if (ring === 1 && f[0] === 1 && f[1] === 1 && f[2] === 1 && f[3] === 1) return;
+    // keep the level's mean: before = Σ l (solid), after = Σ l · factor · ring (edge) + Σ l (inside)
+    let before = 0, after = 0;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) { const i = y * n + x; if (!solid(i)) continue; const l = LUM(fa, i * 4); before += l; after += l * (isEdge(x, y) ? factor(x, y) * ring : 1); }
+    const norm = after > 0 ? before / after : 1;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const i = y * n + x; if (!solid(i)) continue;
+      const o = i * 4, m = (isEdge(x, y) ? factor(x, y) * ring : 1) * norm;
+      fa[o] = Math.min(1, fa[o] * m); fa[o + 1] = Math.min(1, fa[o + 1] * m); fa[o + 2] = Math.min(1, fa[o + 2] * m);
+    }
+  }
+  const MIP_OUTLINE = [0, 0.12, 0.12, 0.06];   // k per mip level (32, 16, 8, 4)
 
   // alpha-coverage preserving downsample
   function coverage(a, n, ref) { let c = 0; for (let i = 0; i < n * n; i++) if (a[i] >= ref) c++; return c / (n * n); }
@@ -102,22 +213,44 @@
     return out;
   }
 
-  // which layers are faces of full opaque cubes (they get the rim) and which are cut-out (alpha-coverage mips)
+  // which layers are faces of full opaque cubes (they get the rim), which are cut-out (alpha-coverage mips), which
+  // are the faces of leaf cubes (Klassisch: the outline on their solid texels) and which are the faces of block-like
+  // models that are not cubes — a top over the whole footprint, a side over the whole width and ¾ of the height:
+  // the dirt path and the farmland (Klassisch: chunky and outlined like the ground around them, when their recipe
+  // is a natural one)
   VR.textureMasks = function () {
     const R = VR.R, T = R.T, L = R.texNames.length;
-    const cube = new Uint8Array(L), cut = new Uint8Array(L);
+    const cube = new Uint8Array(L), cut = new Uint8Array(L), leaf = new Uint8Array(L), block = new Uint8Array(L);
     for (let s = 0; s < T.shape.length; s++) {
       if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 0 && (T.flags[s] & VR.F.FULL)) for (let f = 0; f < 6; f++) cube[T.tex[s * 6 + f] & 0xfff] = 1;
       if (T.layer[s] === 1) for (let f = 0; f < 6; f++) cut[T.tex[s * 6 + f] & 0xfff] = 1;
+      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 1 && (T.flags[s] & VR.F.LEAVES)) for (let f = 0; f < 6; f++) leaf[T.tex[s * 6 + f] & 0xfff] = 1;
     }
-    for (let s = 0; s < R.models.length; s++) { const md = R.models[s]; if (md && T.layer[s] === 1) for (const f of md) cut[f.tex & 0xfff] = 1; }
+    for (let s = 0; s < R.models.length; s++) {
+      const md = R.models[s]; if (!md) continue;
+      if (T.layer[s] === 1) for (const f of md) cut[f.tex & 0xfff] = 1;
+      if (T.layer[s] !== 0) continue;
+      for (const f of md) {
+        const p = f.p; if (!p || p.length < 12) continue;
+        let x0 = 1, x1 = 0, y0 = 1, y1 = 0, z0 = 1, z1 = 0;
+        for (let k = 0; k < 4; k++) { x0 = Math.min(x0, p[k * 3]); x1 = Math.max(x1, p[k * 3]); y0 = Math.min(y0, p[k * 3 + 1]); y1 = Math.max(y1, p[k * 3 + 1]); z0 = Math.min(z0, p[k * 3 + 2]); z1 = Math.max(z1, p[k * 3 + 2]); }
+        const wx = x0 <= 0 && x1 >= 1, wz = z0 <= 0 && z1 >= 1, tall = y0 <= 0 && y1 >= 0.75;
+        if (f.dir === 2 || f.dir === 3 ? wx && wz : f.dir >= 4 ? wx && tall : wz && tall) block[f.tex & 0xfff] = 1;
+      }
+    }
+    for (let l = 0; l < L; l++) if (cube[l]) block[l] = 0;
     if (VR.CUTOUT_TEX) for (const n of VR.CUTOUT_TEX) { const i = R.texIndex[n]; if (i !== undefined) cut[i] = 1; }
-    return { cube, cut };
+    return { cube, cut, leaf, block };
   };
-  // Build all layers. opts: {names, cubeMask (Uint8Array per layer), cutoutMask, bevel (0..1), bevelAll (the Klassisch
-  // look: the seamless materials get the rim too, so every block shows its edges)}
+  // Build all layers. opts: {names, cubeMask (Uint8Array per layer), cutoutMask, leafMask, blockMask, bevel (0..1),
+  // bevelAll (the Klassisch look: the seamless materials get the rim too, so every block shows its edges), classic
+  // (Klassisch v2, defaults to bevelAll: chunky natural recipes, the outline on every cube and leaf texture and on the
+  // natural ones of the block-like models, kept through the mips)}
   VR.buildTextureArrays = function (opts) {
     const names = opts.names, L = names.length;
+    const classic = opts.classic !== undefined ? !!opts.classic : !!opts.bevelAll;
+    const own = classic && (!opts.leafMask || !opts.blockMask) && VR.R && VR.R.texNames === names ? VR.textureMasks() : null;
+    const leafMask = opts.leafMask || (own && own.leaf), blockMask = opts.blockMask || (own && own.block);
     const albedo = [], material = [];
     for (let lv = 0; lv < LEVELS; lv++) { const n = N >> lv; albedo.push(new Uint8Array(n * n * 4 * L)); material.push(new Uint8Array(n * n * 4 * L)); }
     const missing = [];
@@ -127,9 +260,23 @@
       let img = null;
       try { img = resolve(names[l]); } catch (e) { img = null; missing.push(names[l] + ' (error: ' + e.message + ')'); }
       if (!img) { if (!missing.length || missing[missing.length - 1].indexOf(names[l]) !== 0) missing.push(names[l]); img = missingTex(); }
-      // seamless materials (stucco, marble…) opt out of the rim — in the Klassisch look they get the edge line instead
-      if (opts.cubeMask && opts.cubeMask[l] && opts.bevel > 0) { if (!img.noBevel) stylize(img, opts.bevel); else if (opts.bevelAll) edgeLine(img, opts.bevel); }
+      const isCube = !!(opts.cubeMask && opts.cubeMask[l]), isLeaf = !!(leafMask && leafMask[l]);
+      const isBlock = !!(blockMask && blockMask[l] && img.chunky);   // a natural block-like model: dirt path, farmland
+      // Klassisch v2: the natural recipes chunky (before the rim, which stays one texel)
+      const chunked = classic && img.chunky && (isCube || isLeaf || isBlock);
+      if (chunked) pixelate(img);
+      const hCell = chunked ? img.h.slice() : null;
+      // chunky leaves are matte: on their flat facets a sun glint would cover whole texels and bleach the canopy
+      if (chunked && isLeaf) for (let i = 0; i < N * N; i++) img.ro[i] = Math.max(img.ro[i], 0.85);
+      // Klassisch v2: the outline on every cube texture (the seamless materials have their stronger edge line), leaf
+      // and natural block-like model
+      const outlined = classic && ((isCube && !img.noBevel) || isLeaf || isBlock);
+      // seamless materials (stucco, marble…) opt out of the rim — in the Klassisch look they get the edge line instead;
+      // under the outline the rim keeps its groove only (the outline is the edge's colour)
+      if (isCube && opts.bevel > 0) { if (!img.noBevel) stylize(img, opts.bevel, !outlined); else if (opts.bevelAll) edgeLine(img, opts.bevel); }
+      if (outlined) outline(img, 1, isLeaf, chunked);
       TX.toArrays(img, alb0, mat0, 0);
+      if (chunked) cellNormals(mat0, hCell, isLeaf ? 1 : 0.45);
       albedo[0].set(alb0, l * N * N * 4); material[0].set(mat0, l * N * N * 4);
       // mips
       let fa = new Float32Array(N * N * 4), fm = new Float32Array(N * N * 4);
@@ -139,9 +286,11 @@
       avgColor[l * 4] = wa ? r / wa : 0; avgColor[l * 4 + 1] = wa ? g / wa : 0; avgColor[l * 4 + 2] = wa ? b / wa : 0; avgColor[l * 4 + 3] = wa / (N * N);
       const cut = opts.cutoutMask ? !!opts.cutoutMask[l] : false;
       const cov0 = cut ? coverage(fa.filter((_, i) => (i & 3) === 3), N, 0.5) : 0;
+      const keepEdge = classic && (isCube || isLeaf || isBlock);
       let n = N;
       for (let lv = 1; lv < LEVELS; lv++) {
         fa = downsample(fa, n, cut, cov0); fm = downsampleMat(fm, n); n >>= 1;
+        if (keepEdge && MIP_OUTLINE[lv]) mipOutline(fa, n, MIP_OUTLINE[lv], isLeaf);
         const A = albedo[lv], Mt = material[lv], off = l * n * n * 4;
         for (let i = 0; i < n * n * 4; i++) { A[off + i] = Math.round(Math.min(1, fa[i]) * 255); Mt[off + i] = Math.round(Math.min(1, fm[i]) * 255); }
       }

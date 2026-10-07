@@ -79,7 +79,7 @@
     // rebuild the block textures in a worker and upload them into the existing texture arrays; the icons follow
     reloadTextures() {
       const rim = VR.LOOK.rim, req = this.texReq = (this.texReq || 0) + 1;
-      this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: rim }, null, (tex) => {
+      this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: rim, classic: rim }, null, (tex) => {   // classic: Klassisch v2 (chunky natural recipes, the outline on every cube)
         const r = this.renderer, gl = r && r.gl;
         if (req !== this.texReq || tex.type !== 'textures' || !gl || !r.texAlbedo || tex.layers !== r.layers) return;
         for (const [t, lv] of [[r.texAlbedo, tex.albedo], [r.texMaterial, tex.material]]) {
@@ -189,7 +189,7 @@
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
       // the textures are forged in a worker; a worker that fails (out of memory on a very small machine) is tried
       // once more on another, then the game says so instead of waiting forever behind the loading screen
-      const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
+      const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim), classic: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
       let tex = await forge(0);
       if (tex.type !== 'textures') { console.warn('textures failed once:', tex.msg); tex = await forge(this.pool.workers.length > 1 ? 1 : 0); }
       if (tex.type !== 'textures') { this.fatal('The block textures could not be built (' + (tex.msg || 'worker failed') + '). Close other tabs and reload.'); return; }
