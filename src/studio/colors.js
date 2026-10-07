@@ -5,7 +5,7 @@
 // ============================================================================
 (function () {
   'use strict';
-  const C = window.__studioCore; if (!C) return;
+  const C = window.__studioCore || window.__r9TexHost; if (!C) return;   // (W2: in the game, the ✨ wizard's — its textures)
   const R = VR.R, T = R.T, F = VR.F;
   const BC = VR.BlockColors = {};
   // palettes to choose from: everything plain, or a family that looks good together
