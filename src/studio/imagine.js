@@ -377,7 +377,7 @@
     const SITE = WM.site, siteMode = IM.mode === 'site';
     const how = { site: '', flat: L('im.flatHow', 'Fotos, Pixel-Art, Logos: der Hintergrund fällt weg, jede Farbe wird der Block, der ihr am nächsten kommt.'), solid: L('im.solidHow', 'Zeichne oder fotografiere dein Ding von vorne und von der Seite (gleiche Höhe) — das Studio schnitzt die Form heraus und malt sie mit den Farben der Bilder an. Ohne Seitenansicht wird die Vorderansicht ausgestochen.'), house: L('hk.how', 'Jede Wahl baut das Haus sofort neu — mit Zimmern, Treppe und Möbeln. Fertig? „In die Werkbank“, auf die Welt zeigen, klicken. R dreht es.'), genie: '' }[IM.mode];
     const modes = [['flat', '🧱', 'im.flat', 'Blockbild'], ['solid', '🧊', 'im.solid', '3D aus Ansichten'], ['house', '🏠', 'hk.tab', 'Haus'], ['genie', '✨', 'gn.tab', 'Genie'], ['site', '🏘', 'st.tab', 'Ort']].filter(m => m[0] !== 'site' || WM.world);
-    el.innerHTML = `<div class="imBox"><header><b>✨ ${L('im.title2', 'Erschaffen')}</b><div class="imModes">${modes.map(([id, ic, k, de]) => `<button data-mode="${id}" class="${IM.mode === id ? 'on' : ''}">${ic} ${esc(L(k, de))}</button>`).join('')}</div><button class="x" data-close>✕</button></header>
+    el.innerHTML = `<div class="imBox"><header><b>✨ ${L('im.title2', 'Erschaffen')}</b><div class="imModes">${modes.map(([id, ic, k, de]) => `<button data-mode="${id}" class="${IM.mode === id ? 'on' : ''}">${ic} ${esc(L(k, de))}</button>`).join('')}${VR.StudioForge && C.setMode ? `<button data-forge title="${esc(L('im.forgeT', 'Hochhaus, Haus, Brücke, Turm, Burg, Raumschiff … aus Worten oder Symbolen'))}">🏭 ${esc(L('im.forge', 'Forge'))}</button>` : ''}</div><button class="x" data-close>✕</button></header>
       <div class="imBody"><div class="imLeft ${IM.mode}">${left}${setsRow}${tolRow}</div>
       <div class="imRight">${siteMode ? `<canvas id="imPrev" class="map" width="440" height="440"></canvas><div id="imInfo" class="dim"></div>
         <div class="imActs"><button id="stBuild" class="cbtn pri" ${SITE && SITE.placed && (SITE.placed.houses.length || SITE.plan.paths.length) && !(GN() && GN().busy()) ? '' : 'disabled'}>✓ ${L('st.build', 'Bauen')}</button><button id="stHere" class="cbtn" title="${L('st.hereT', 'Das Gebiet neu ausmessen — dort, wo die Kamera jetzt hinschaut')}">📍 ${L('st.here', 'Hier ausmessen')}</button></div>
@@ -388,6 +388,8 @@
     IM.shown = false;
     // wiring
     el.querySelector('[data-close]').onclick = close;
+    // 🏭 Forge: the Forge is a Studio mode (its button in the mode bar waits behind Profi) — here it is one tap for everyone
+    const fb = el.querySelector('[data-forge]'); if (fb) fb.onclick = () => { close(); if (VR.Nav && VR.Nav.clear) VR.Nav.clear(); C.setMode('forge'); };
     el.onclick = (e) => { if (e.target === el) close(); };
     for (const b of el.querySelectorAll('[data-mode]')) b.onclick = () => { if (b.dataset.mode === 'genie') IM.genie.want = b.dataset.want || null; IM.mode = b.dataset.mode; if (IM.mode === 'house' && IM.genie.last && IM.genie.last.kind === 'house' && b.closest('.imLeft')) { kitFlush(); IM.house = HK().normalize(IM.genie.last.spec); IM.pj.kit = null; } draw(); run(); };
     for (const b of el.querySelectorAll('[data-set]')) b.onclick = () => { P.set = b.dataset.set; if (IM.mode === 'genie') IM.solid.set = b.dataset.set; draw(); run(); };
