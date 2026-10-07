@@ -241,6 +241,94 @@ const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
     check(keep(grid) === keep(world), 'back to the middle and forward again = the world now');
     await r.close();
   }
+  // ---------------------------------------------------------------- (h) the replay engine (zeitraffer.js) with a fake game
+  //  open: the busiest place's columns are swapped for copies showing the land as it was (the originals untouched,
+  //  aside); play: the copies become the finished build; a save meanwhile writes no copy; close: the originals are
+  //  back (the same objects), the ring's light as before, the sky and the menu as before
+  {
+    const dom = require('./dom_stub.js');
+    void dom;
+    document.getElementById = () => null;
+    require('../src/main/director.js');
+    require('../src/main/zeitraffer.js');
+    const Zt = V.Zeit;
+    check(!!Zt && typeof Zt.open === 'function', 'VR.Zeit loads (zeitraffer.js)');
+    const jobs = { light: 0 };
+    const pool = { workers: [{}], busy: 0, queueDirty: false, pump() {},
+      submit(m, tr, cb) { if (m.type === 'lightonly') { jobs.light++; setTimeout(() => cb({ type: 'lightonly', light: V.computeColumnLight(m.blocks, true) }), 0); } } };
+    const saved = [];
+    const store = { saveColumn(dim, c) { saved.push(c); c.modified = false; return Promise.resolve(); } };
+    const w = new V.World({}, { dim: 'overworld', seed: 1, pool, renderer: { freeSection(s) { s.hasMesh = false; } }, store, renderDist: 6 });
+    for (let cz = -4; cz <= 4; cz++) for (let cx = -4; cx <= 4; cx++) {
+      const c = new V.Column(cx, cz); c.blocks = new Uint16Array(256 * 256);
+      for (let i = 0; i < 256 * 60; i++) c.blocks[i] = 1;
+      c.light = V.computeColumnLight(c.blocks, true);
+      c.biome = new Uint8Array(256); c.grass = new Uint16Array(256); c.foliage = new Uint16Array(256); c.water = new Uint16Array(256);
+      c.ready = true; w.cols.set(c.key, c);
+    }
+    const be = new Z.MemBackend(), rec = new Z.Rec('wZ', be, { checkMs: 1e9 }); let now = 6e12; rec.now = () => (now += 300);
+    w.zr = rec;
+    // a pillar by hand, a box tower in one bulk (a plan), and a few of its blocks taken back (undo)
+    for (let y = 60; y < 66; y++) w.setBlock(3, y, 3, 5, 1 | V.SB_EDIT);
+    const tower = [], back = [];
+    for (let y = 60; y < 72; y++) for (let z = 8; z < 14; z++) for (let x = 8; x < 14; x++) if (x === 8 || x === 13 || z === 8 || z === 13) tower.push([x, y, z, 7]);
+    w.bulkSet(tower, false, V.EDIT.PLAN);
+    for (let x = 9; x < 13; x++) back.push([x, 71, 8, 0]);
+    w.bulkSet(back, false, V.EDIT.UNDO);
+    await sleep(30);   // (the edits' own relights land first: the light the world has before the replay)
+    const live = new Map(); for (const [k, c] of w.cols) live.set(k, c);
+    const blocksOf = (c) => c.blocks.slice();
+    const before = new Map(); for (const [k, c] of w.cols) before.set(k, { b: blocksOf(c), l: c.light.slice() });
+    const ui = { calls: [], show(m) { this.calls.push(m); }, hint() {}, pause() { this.paused = true; }, resume() { this.resumed = true; } };
+    const fakeUI = { on: false, mode: null, show(m) { this.on = true; this.mode = m; }, hide() { this.on = false; }, update() {}, note() {}, video() {} };
+    Zt.mount = () => { Zt.ui = fakeUI; return fakeUI; };
+    const g = {
+      state: 'play', world: w, meta: { id: 'wZ', name: 'Testwelt' }, zeitRec: rec, player: { pos: [8, 61, 8] },
+      ui, saveMeta: async () => {}, env: { ticks: 5000, setTime(t) { this.ticks = t; }, wx: { forced: null, force(k) { this.forced = k; } } },
+      renderer: { visDirty: false, freeSection(s) { s.hasMesh = false; }, render() { g.frames = (g.frames || 0) + 1; } },
+      farFor: () => 300, envFor: () => ({}), input: { hit: () => false }, canvas: { width: 1280, height: 720 }, time: 0, hideHud: false, camMode: 0, last: 0,
+    };
+    g.director = new V.Director(g);
+    V.game = g;
+    const opened = await Zt.open('pause');
+    const S = Zt.S;
+    check(opened && Zt.active && S && S.C.n === 6 + tower.length + 4, 'open: the replay is ready with every recorded change of the place (' + (S ? S.C.n : 0) + ')');
+    const keys = S ? [...S.cols.keys()] : [];
+    check(keys.length >= 1 && keys.every(k => w.cols.get(k).zr === true && w.cols.get(k) !== live.get(k)), 'the place\'s columns (' + keys.length + ') are replay copies in the world now');
+    check(keys.every(k => S.cols.get(k).orig === live.get(k) && S.cols.get(k).orig.blocks.every((v, i) => v === before.get(k).b[i])), 'the originals wait aside, untouched');
+    check(w.getBlock(8, 65, 8) === 0 && w.getBlock(3, 63, 3) === 0 && w.getBlock(8, 59, 8) === 1, 'the copies show the land as it was: no tower, no pillar, the ground');
+    check(g.env.ticks === 11200 && g.env.wx.forced === 'klar', 'the sky: the golden hour, clear');
+    // a save during the replay writes no copy
+    saved.length = 0; for (const k of keys) w.cols.get(k).modified = true;
+    await w.saveAll();
+    check(saved.every(c => !c.zr), 'a save during the replay writes no replay copy (' + saved.length + ' columns saved, none of them a copy)');
+    // play at ×1000 to the end
+    Zt.toggle(); Zt.setSpeed(10);
+    const seenMid = [];
+    for (let i = 0; i < 400 && S.cursor < S.C.n; i++) { Zt.frame(g, 0.016); if (S.cursor > 6 && S.cursor < 246) seenMid.push(S.cursor); if (i % 8 === 7) await sleep(160); }
+    await sleep(30);
+    check(seenMid.length >= 3, 'at ×10 the tower grows over several frames (' + seenMid.slice(0, 6).join(', ') + ' …)');
+    check(S.cursor === S.C.n && keys.every(k => w.cols.get(k).blocks.every((v, i) => v === before.get(k).b[i])), 'played to the end, the copies are the finished build (' + S.cursor + '/' + S.C.n + ', ' + g.frames + ' frames)');
+    check(jobs.light > keys.length, 'changed copies were relit in the workers (' + jobs.light + ' light jobs)');
+    // the scrubber: back to the middle and to the start
+    Zt.seek(S.T.total / 2);
+    const mid = S.cursor;
+    Zt.seek(0);
+    check(mid > 0 && mid < S.C.n && S.cursor === 0 && w.getBlock(8, 65, 8) === 0, 'the scrubber seeks: the middle (' + mid + ') and back to the land as it was');
+    Zt.seek(S.T.total);
+    // close: everything as before
+    Zt.close();
+    await sleep(20);
+    check(!Zt.active && [...live].every(([k, c]) => w.cols.get(k) === c) && ![...w.cols.values()].some(c => c.zr), 'Esc: the original columns are back (the same objects), no copy left');
+    check([...w.cols].every(([k, c]) => c.blocks.every((v, i) => v === before.get(k).b[i])), 'the world\'s blocks are exactly as before');
+    check([...w.cols].every(([k, c]) => c.light.every((v, i) => v === before.get(k).l[i])), 'the light of every column (the ring too) is as before');
+    check(g.env.ticks === 5000 && g.env.wx.forced === null && ui.paused === true, 'the sky as before, back in the pause menu');
+    // an empty world: a message, nothing swapped
+    const g2be = new Z.MemBackend(), rec2 = new Z.Rec('wE', g2be, {}); g.zeitRec = rec2; g.meta = { id: 'wE', name: 'Leer' };
+    const o2 = await Zt.open(null);
+    check(!o2 && fakeUI.mode === 'empty' && !Zt.active, 'a world without history: the message „Noch nichts aufgenommen …“, nothing swapped');
+    Zt.close();
+  }
   console.log(fails ? 'FAILED ' + fails : 'ALL OK');
   process.exit(fails ? 1 : 0);
 })().catch((e) => { console.log('  ✗ crashed: ' + (e && e.stack || e)); console.log('FAILED ' + (fails + 1)); process.exit(1); });
