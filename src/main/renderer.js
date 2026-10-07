@@ -993,7 +993,7 @@
         gl.bindVertexArray(null); this.guideVer = -1;
       }
       gl.bindVertexArray(this.guideVAO);
-      if (this.guideVer !== G.ver) { gl.bindBuffer(gl.ARRAY_BUFFER, this.guideVBO); gl.bufferSubData(gl.ARRAY_BUFFER, 0, G.verts); this.guideVer = G.ver; }
+      if (this.guideVer !== G.ver || this.guideOf !== G) { gl.bindBuffer(gl.ARRAY_BUFFER, this.guideVBO); gl.bufferSubData(gl.ARRAY_BUFFER, 0, G.verts); this.guideVer = G.ver; this.guideOf = G; }   // (a new world brings a new guide)
       gl.useProgram(p.p);
       gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
       gl.uniform3f(p.u.u_offset, G.ox - cam.x, G.oy - cam.y, G.oz - cam.z);
