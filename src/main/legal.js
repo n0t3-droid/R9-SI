@@ -10,7 +10,7 @@
 // filled in, the texts show marked placeholders and the Impressum a warning.
 // Also here: the 📜 button (pause menu, settings, the Studio's header), the
 // one-line share hint of every export, and the multiplayer name notice („👥
-// Mitspieler sehen deinen Namen" — ✓ OK · Spitzname… · Mehrspieler aus) that
+// Mitspieler sehen deinen Namen" — ✓ OK · ✎ Spitzname · Mehrspieler aus) that
 // the game shows before any name leaves the browser (mp.js holds the rule).
 // This is the audit's research put into the page, not legal advice.
 // ============================================================================
@@ -18,10 +18,11 @@
   'use strict';
   const L = VR.Legal = VR.Legal || {};
   // ⚠ Fill these in before the public launch (§ 18 Abs. 1 MStV): first and last name, a postal address where letters
-  // can be served (no P.O. box; 'Straße Hausnummer, PLZ Ort' — each comma starts a line) and an e-mail address.
+  // can be served (no P.O. box; 'Straße Hausnummer, PLZ Ort' — each comma starts a line), an e-mail address and the
+  // copyright year of the © line (e.g. 2026).
   // Never invent them: while one is empty, its placeholder shows (marked) and the Impressum says what is missing.
-  const OWNER = L.OWNER = L.OWNER || { name: '', address: '', email: '' };
-  const YEAR = '2026', STAND = ['7. Oktober 2026', '7 October 2026'];
+  const OWNER = L.OWNER = L.OWNER || { name: '', address: '', email: '', year: '' };
+  const STAND = ['7. Oktober 2026', '7 October 2026'];
   const SECTIONS = L.SECTIONS = ['impressum', 'datenschutz', 'credits', 'hinweis'];
   const ALIAS = { imprint: 'impressum', legal: 'impressum', 'legal notice': 'impressum', privacy: 'datenschutz', datenschutzerklaerung: 'datenschutz', 'datenschutzerklärung': 'datenschutz', credit: 'credits', quellen: 'credits', notice: 'hinweis', disclaimer: 'hinweis', marken: 'hinweis' };
   const norm = (s) => { s = String(s || '').toLowerCase().trim(); s = ALIAS[s] || s; return SECTIONS.includes(s) ? s : 'impressum'; };
@@ -45,9 +46,9 @@
   L.t = T;
 
   // ---------------------------------------------------------------- the owner's details
-  const PH = { name: ['[Name]', '[Name]'], address: ['[Anschrift]', '[Address]'], email: ['[E-Mail]', '[E-mail]'] };
+  const PH = { name: ['[Name]', '[Name]'], address: ['[Anschrift]', '[Address]'], email: ['[E-Mail]', '[E-mail]'], year: ['[Jahr]', '[Year]'] };
   const val = (k) => String(OWNER[k] == null ? '' : OWNER[k]).trim();
-  L.incomplete = () => !val('name') || !val('address') || !val('email');
+  L.incomplete = () => !val('name') || !val('address') || !val('email') || !val('year');
   const lines = (s) => String(s).split(/\s*[,\n]\s*/).filter(Boolean);
   // a detail as text (the placeholder when empty) and as HTML (escaped; the placeholder marked)
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -59,7 +60,7 @@
     const ls = k === 'address' ? lines(v) : [v];
     return (html ? ls.map(esc) : ls).join(multi ? (html ? '<br>' : '\n') : ', ');
   }
-  const vars = (lang, html) => ({ name: detail('name', lang, html), address: detail('address', lang, html), email: detail('email', lang, html), year: YEAR, stand: STAND[lang === 'de' ? 0 : 1] });
+  const vars = (lang, html) => ({ name: detail('name', lang, html), address: detail('address', lang, html), email: detail('email', lang, html), year: detail('year', lang, html), stand: STAND[lang === 'de' ? 0 : 1] });
 
   // ---------------------------------------------------------------- the texts
   // a section: [type, key, German, English] — h heading · p paragraph · li list item · small fine print —
@@ -96,8 +97,8 @@
         ['h', 'ds.h5', `5. Zusammen spielen (Mehrspieler) – nur mit eingeladenen Spielern`, `5. Playing together (multiplayer) — only with invited players`],
         ['p', 'ds.p5a', `Mehrspieler ist nur möglich, wenn der Inhaber des Spiels dich auf claude.ai zu diesem Artifact eingeladen hat und du dort angemeldet bist. Wer den öffentlichen Link ohne Einladung öffnet, spielt allein; es werden dann keine Daten ausgetauscht.`,
           `Multiplayer is only possible if the owner of the game has invited you to this artifact on claude.ai and you are signed in there. Anyone who opens the public link without an invitation plays alone; no data are exchanged then.`],
-        ['p', 'ds.p5b', `Bevor andere deinen Namen sehen, fragt dich das Spiel einmal: „Mitspieler sehen deinen Namen“ – ✓ OK, ein Spitzname oder „Mehrspieler aus“. Bis dahin sendet das Spiel keinen Namen und teilt keine Welt; mit „Mehrspieler aus“ sendet es gar nichts.`,
-          `Before others see your name, the game asks you once: "Other players see your name" — ✓ OK, a nickname or "Multiplayer off". Until then the game sends no name and shares no world; with "Multiplayer off" it sends nothing at all.`],
+        ['p', 'ds.p5b', `Bevor andere deinen Namen sehen, fragt dich das Spiel einmal: „Mitspieler sehen deinen Namen“ – ✓ OK, ein Spitzname oder „Mehrspieler aus“. Bis dahin wird als Name nur „Explorer“ gesendet, nie dein Profilname; mit „Mehrspieler aus“ sendet das Spiel gar nichts.`,
+          `Before others see your name, the game asks you once: "Other players see your name" — ✓ OK, a nickname or "Multiplayer off". Until then only the name "Explorer" is sent, never your profile name; with "Multiplayer off" the game sends nothing at all.`],
         ['p', 'ds.p5c', `Beim Zusammenspielen werden folgende Daten über die Echtzeit-Infrastruktur von claude.ai zwischen den Browsern der beteiligten Spieler ausgetauscht:`,
           `When playing together, the following data are exchanged between the browsers of the players involved, through claude.ai's real-time infrastructure:`],
         ['li', 'ds.l1', `dein Anzeigename (der Spitzname, den du wählst; ist keiner gesetzt, der Anzeigename deines claude.ai-Profils),`, `your display name (the nickname you choose; if none is set, the display name of your claude.ai profile),`],
@@ -106,8 +107,8 @@
         ['li', 'ds.l4', `Name, Startwert (Seed) und Blockänderungen der Welt sowie – bei Gästen – das eigene Inventar, das der Gastgeber für den nächsten Besuch in seiner Welt aufbewahrt.`, `the world's name, seed and block changes and — for guests — their own inventory, which the host keeps in their world for the next visit.`],
         ['p', 'ds.p5d', `Die Daten werden nicht von mir gespeichert. Sie sind nur für die Spieler sichtbar, die dasselbe Spiel geöffnet haben, und werden gelöscht, sobald du die Seite verlässt. Der Gastgeber speichert das Inventar seiner Gäste lokal in seinem Browser, zugeordnet zu einer pseudonymen Kennung der Plattform (ersatzweise dem Anzeigenamen); eine Welt zu löschen löscht auch diese Einträge. Es besteht keine direkte Verbindung zwischen den Browsern der Spieler; IP-Adressen werden anderen Spielern nicht bekannt. Die Plattform kann dir deinen eigenen Spielstatus in deinem eigenen Claude-Gespräch anzeigen; anderen Nutzern wird er nicht weitergegeben.`,
           `I do not store these data. They are only visible to the players who have the same game open and are gone as soon as you leave the page. The host keeps their guests' inventories locally in the host's browser, assigned to a pseudonymous identifier of the platform (or, failing that, to the display name); deleting a world deletes these entries too. There is no direct connection between the players' browsers; other players never learn your IP address. The platform may show you your own game status in your own Claude conversation; it is not passed on to other users.`],
-        ['p', 'ds.p5e', `Du kannst Mehrspieler jederzeit ausschalten (Einstellungen → Spiel → „Mehrspieler“) und einen Spitznamen statt deines Profilnamens wählen (Einstellungen → Spiel → Name).`,
-          `You can switch multiplayer off at any time (Settings → Game → "Multiplayer") and choose a nickname instead of your profile name (Settings → Game → name).`],
+        ['p', 'ds.p5e', `Du kannst Mehrspieler jederzeit in den Einstellungen (Reiter „Game“, 👥 „Mehrspieler“) ausschalten und dort unter „Your name (shown to friends)“ einen Spitznamen statt deines Profilnamens eintragen.`,
+          `You can switch multiplayer off at any time in the settings (the "Game" tab, 👥 "Multiplayer") and enter a nickname instead of your profile name under "Your name (shown to friends)".`],
         ['h', 'ds.h6', `6. Dateien, die du erzeugst`, `6. Files you create`],
         ['p', 'ds.p6', `Exporte (📦 R9-Paket, .schem, .vox, .json, Screenshots) sind Dateien, die du selbst erzeugst und speicherst. Sie enthalten Spielinhalte (Blöcke, Designs, Favoriten) und die Namen, die du deinen Entwürfen gibst – keine Kennungen deiner Person und keine Kontodaten. Was du davon weitergibst, entscheidest du: Teile nur, was dir gehört.`,
           `Exports (📦 R9 pack, .schem, .vox, .json, screenshots) are files you create and save yourself. They contain game content (blocks, designs, favourites) and the names you give your designs — no identifiers of you and no account data. What you pass on is up to you: share only what is yours.`],
@@ -181,7 +182,7 @@
   // titles, authors and links come from other people's files); the owner block: its lines, already safe for `html`
   function special(type, want, html) {
     const lang = langOf(want), V = vars(lang, html), e = (s) => (html ? esc(s) : s);
-    if (type === 'warn') return L.incomplete() ? [['warn', T('warn', '⚠ Vor dem öffentlichen Start ausfüllen: Name, Anschrift und E-Mail sind noch Platzhalter (OWNER in src/main/legal.js). Nichts erfinden — ohne echte Angaben ist das Impressum unvollständig.', '⚠ To fill in before the public launch: name, address and e-mail are still placeholders (OWNER in src/main/legal.js). Never invent them — without real details the Impressum is incomplete.', null, want)]] : [];
+    if (type === 'warn') return L.incomplete() ? [['warn', T('warn', '⚠ Vor dem öffentlichen Start ausfüllen: Name, Anschrift, E-Mail und Jahr sind noch Platzhalter (OWNER in src/main/legal.js). Nichts erfinden — ohne echte Angaben ist das Impressum unvollständig.', '⚠ To fill in before the public launch: name, address, e-mail and year are still placeholders (OWNER in src/main/legal.js). Never invent them — without real details the Impressum is incomplete.', null, want)]] : [];
     if (type === 'owner') return [['owner', [V.name, detail('address', lang, html, true), e(T('imp.country', 'Deutschland', 'Germany', null, want)), e(T('imp.contact', 'Kontakt:', 'Contact:', null, want)) + ' ' + V.email]]];
     if (type === 'imports') {
       const list = importList(); if (!list) return [];
@@ -262,14 +263,14 @@
     root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-labelledby', 'r9legalT');
     root.innerHTML = '<div class="lg-box"><div class="lg-head"><b class="lg-title" id="r9legalT"></b><div class="lg-tabs" role="tablist"></div>'
       + '<div class="lg-tools"><span class="lg-lang"><button type="button" data-lang="de" lang="de">DE</button><button type="button" data-lang="en" lang="en">EN</button></span>'
-      + '<button type="button" class="lg-copy" data-act="copy">📋</button><button type="button" class="lg-x" data-act="close">✕</button></div></div>'
-      + '<div class="lg-body" tabindex="0"></div><div class="lg-foot"><span class="lg-msg" aria-live="polite"></span></div></div>';
+      + '<button type="button" class="lg-x" data-act="close">✕</button></div></div>'
+      + '<div class="lg-body" tabindex="0"></div><div class="lg-foot"><button type="button" class="lg-copy" data-act="copy"></button><span class="lg-msg" aria-live="polite"></span></div></div>';
     root.addEventListener('click', (e) => {
       if (e.target === root) { L.close(); return; }        // a click beside the box
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.sec) { cur = b.dataset.sec; draw(); }
       else if (b.dataset.lang) { L.lang = b.dataset.lang; draw(); }
-      else if (b.dataset.act === 'copy') L.copy();
+      else if (b.dataset.act === 'copy') L.copy(cur);
       else if (b.dataset.act === 'close') L.close();
     });
     // nothing below (the game's canvas, the Studio's view) gets the pointer while this is open
@@ -288,7 +289,7 @@
       tabs.appendChild(b);
     }
     for (const b of root.querySelectorAll('[data-lang]')) { b.classList.toggle('on', b.dataset.lang === lang); b.setAttribute('aria-pressed', b.dataset.lang === lang ? 'true' : 'false'); }
-    $('.lg-copy').title = T('copyT', 'Impressum, Datenschutz, Credits und Hinweis als Text kopieren', 'Copy the legal notice, privacy, credits and notice as text');
+    const cp = $('.lg-copy'); cp.textContent = T('copy', '📋 Kopieren', '📋 Copy'); cp.title = T('copyT', 'Diesen Reiter als Text in die Zwischenablage kopieren', 'Copy this tab as text to the clipboard');
     $('.lg-x').title = T('closeT', 'Schließen (Esc)', 'Close (Esc)');
     const body = $('.lg-body'); body.innerHTML = L.html(cur); body.scrollTop = 0; body.dataset.sec = cur;
     root.dataset.sec = cur;
@@ -314,9 +315,9 @@
     try { if (o && o.focus && document.contains(o)) o.focus(); } catch (e) { /* gone */ }
     return true;
   };
-  // 📋 everything as plain text: the clipboard, else the old copy command, else the text selected to copy by hand
-  L.copy = async function () {
-    const text = L.plain();
+  // 📋 this tab as plain text: the clipboard, else the old copy command, else the text selected to copy by hand
+  L.copy = async function (sec) {
+    const s = norm(sec || cur), text = L.text(s);
     L.copied = text;
     let ok = false;
     try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); ok = true; } } catch (e) { ok = false; }
@@ -327,7 +328,7 @@
       const body = $('.lg-body'); body.innerHTML = '<textarea class="lg-all" readonly></textarea>';
       const ta = body.firstChild; ta.value = text; ta.focus(); ta.select();
     }
-    msg(ok ? T('copied', '📋 Kopiert: Impressum, Datenschutz, Credits und Hinweis', '📋 Copied: legal notice, privacy, credits and notice') : T('copyHand', 'Automatisches Kopieren ist hier gesperrt — der Text ist markiert: Strg+C', 'Copying is blocked here — the text is selected: press Ctrl+C'));
+    msg(ok ? T('copied', '📋 Kopiert: {tab}', '📋 Copied: {tab}', { tab: secTitle(s) }) : T('copyHand', 'Automatisches Kopieren ist hier gesperrt — der Text ist markiert: Strg+C', 'Copying is blocked here — the text is selected: press Ctrl+C'));
     return ok;
   };
   // Esc closes; while it is open no key reaches the game or the Studio below (a capture listener on the window,
@@ -369,38 +370,37 @@
   if (HAS_DOM) { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => L.mountStudio()); else L.mountStudio(); }
 
   // ---------------------------------------------------------------- 👥 the multiplayer name notice
-  // mp.js decides (noticeOk / confirmNotice / turnOff / turnOn); this is what the player sees: in the title's
-  // multiplayer box, the pause menu's and the settings — „👥 Mitspieler sehen deinen Namen: X — ✓ OK · Spitzname… ·
-  // Mehrspieler aus", or with multiplayer off: one line and „Mehrspieler an"
-  let nick = false, nickDraft = null, nickFocus = false;   // (the box is re-drawn often: a half-typed name stays, the focus is set once)
+  // mp.js decides (noticeOk / confirmNotice / turnOff / turnOn / nameIfShown); this is what the player sees: a small
+  // card at the bottom right until it is answered (L.syncNotice, from mp.js once the lobby is ready — the title's own
+  // box is not touched), and the same line in the pause menu's 👥 panel and in the settings: „👥 Mitspieler sehen
+  // deinen Namen: X — ✓ OK · ✎ Spitzname · Mehrspieler aus“; with multiplayer off: one line and „Mehrspieler an“
+  let nick = false, nickDraft = null, nickFocus = false;   // (a half-typed nickname survives a re-draw; the focus is set once)
+  let card = null, cardShut = false;                        // ✕ hides the card for this page only: the question comes back at the next start
   const elx = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const btnx = (cls, text, fn) => { const b = elx('button', cls, text); b.type = 'button'; b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }); return b; };
   function refresh(g) {
     const ui = g && g.ui; if (!ui) return;
-    try { if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.mpnotice')) document.activeElement.blur(); } catch (e) { /* */ }
     try {
       if (ui.renderHosts) ui.renderHosts();
       if (ui.screen === 'pause' && ui.buildMpPanel) ui.buildMpPanel();
       if (ui.screen === 'settings' && ui.showSettings) ui.showSettings();
     } catch (e) { console.warn('legal refresh', e); }
+    L.syncNotice(g, true);
   }
-  L.mpHint = () => T('mp.hint', '👥 Freunde sind online — damit sie mitspielen können: Esc → 👥 Mehrspieler und einmal ✓ OK (dann sehen sie deinen Namen).', '👥 Friends are online — to let them join: Esc → 👥 Multiplayer and ✓ OK once (then they see your name).');
   L.mpNotice = function (g, withHead) {
     const box = elx('div', 'mpnotice'), mp = g && g.mp;
     if (withHead) box.appendChild(elx('div', 'subtitle', '👥 ' + T('mp.head', 'Mehrspieler', 'Multiplayer')));
     if (!mp) return box;
-    const small = withHead ? 'btn small' : 'btn tiny';
+    const small = 'btn small';
     if (mp.status === 'off') {
       box.classList.add('off');
       box.appendChild(elx('div', 'mpn-t', '👥 ' + T('mp.offLine', 'Mehrspieler ist aus — das Spiel sendet nichts.', 'Multiplayer is off — the game sends nothing.')));
       const r = elx('div', 'mpn-b'); r.appendChild(btnx(small, T('mp.on', 'Mehrspieler an', 'Turn multiplayer on'), () => { Promise.resolve(mp.turnOn()).then(() => refresh(g), () => refresh(g)); refresh(g); })); box.appendChild(r);
       return box;
     }
-    if (mp.noticeAsk) box.classList.add('ask');
     const t = elx('div', 'mpn-t', '👥 ' + T('mp.notice', 'Mitspieler sehen deinen Namen:', 'Other players see your name:') + ' ');
-    t.appendChild(elx('b', '', mp.myName ? mp.myName() : ''));
+    t.appendChild(elx('b', '', mp.nameIfShown ? mp.nameIfShown() : mp.myName()));
     box.appendChild(t);
-    if (mp.noticeAsk) box.appendChild(elx('div', 'mpn-ask', T('mp.ask', 'Erst bestätigen — dann kannst du beitreten.', 'Confirm first — then you can join.')));
     const r = elx('div', 'mpn-b');
     if (nick) {
       const inp = elx('input', 'mpn-nick'); inp.type = 'text'; inp.maxLength = 24; inp.placeholder = T('mp.nickPh', 'Spitzname', 'Nickname'); inp.value = nickDraft != null ? nickDraft : (g.settings && g.settings.playerName) || '';
@@ -422,12 +422,32 @@
       return box;
     }
     r.appendChild(btnx(small + ' primary', '✓ OK', () => { mp.confirmNotice(); refresh(g); }));
-    r.appendChild(btnx(small, T('mp.nick', 'Spitzname…', 'Nickname…'), () => { nick = true; nickFocus = true; refresh(g); }));
+    r.appendChild(btnx(small, T('mp.nick', '✎ Spitzname', '✎ Nickname'), () => { nick = true; nickFocus = true; refresh(g); }));
     r.appendChild(btnx(small, T('mp.off', 'Mehrspieler aus', 'Multiplayer off'), () => { mp.turnOff(); refresh(g); }));
     const more = btnx(small + ' mpn-more', '📜', () => L.open('datenschutz')); more.title = T('mp.more', 'Datenschutz: was beim Zusammenspielen ausgetauscht wird', 'Privacy: what is exchanged when playing together');
     r.appendChild(more);
     box.appendChild(r);
     return box;
+  };
+  // the card (bottom right): shown from the moment the lobby is ready until the notice is answered or multiplayer is off.
+  // Until then the lobby sees „Explorer“ only (mp.js). ✕ hides it for this page; the card eats the pointer, so the
+  // game under it gets no clicks. redraw: re-render the content (keeps a half-typed nickname)
+  L.syncNotice = function (g, redraw) {
+    if (!HAS_DOM || !document.body) return false;
+    const mp = g && g.mp;
+    const need = !!(mp && mp.ready && mp.status !== 'off' && mp.noticeOk && !mp.noticeOk() && !cardShut);
+    if (!need) { if (card) { card.remove(); card = null; } return false; }
+    if (card && !redraw) return true;
+    if (!card) {
+      card = elx('div', 'mpcard'); card.id = 'r9mpcard';
+      for (const t of ['mousedown', 'pointerdown', 'wheel', 'touchstart']) card.addEventListener(t, (e) => e.stopPropagation(), { passive: true });
+      document.body.appendChild(card);
+    }
+    const shut = btnx('mpc-x', '✕', () => { cardShut = true; L.syncNotice(g); });
+    shut.title = T('mp.later', 'Später: die Frage kommt beim nächsten Start wieder', 'Later: the question comes back at the next start');
+    while (card.firstChild) card.removeChild(card.firstChild);
+    card.appendChild(shut); card.appendChild(L.mpNotice(g));
+    return true;
   };
   // Settings → Game: 👥 Mehrspieler an / aus (aus: no presence at all, from the next start no connection), and the
   // notice when it was never answered

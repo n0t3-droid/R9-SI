@@ -32,7 +32,7 @@
   'use strict';
   const R = VR.R, F = VR.F;
   const PROTO = 1;
-  const NOTICE = 'r9si.mpNotice';   // 👥 the one-time name notice was answered (✓ OK or a nickname) — once per browser
+  const NOTICE = 'r9si.mpNotice';   // 👥 the one-time name notice: '1' = answered (✓ OK or a nickname), 'off' = „Mehrspieler aus“ — once per browser
   const TOPICS = ['hello', 'welcome', 'mods', 'req', 'diff', 'blk', 'edit', 'env', 'chat', 'summon', 'pdata', 'bye'];
   VR.MP_TOPICS = TOPICS;
   const unkey = (k) => [Math.floor(k / 65536) - 32768, (k % 65536) - 32768];
@@ -63,30 +63,35 @@
     get isHost() { return this.role === 'host'; }
     get isClient() { return this.role === 'client' || this.role === 'joining'; }
     get active() { return this.role === 'host' || this.role === 'client'; }
-    myName() { const s = this.g.settings; return cleanName(s.playerName) || cleanName(this.T && this.T.me && this.T.me.name) || 'Explorer'; }
+    // the name the others see: 'Explorer' until the one-time notice is answered — the claude.ai profile name is never
+    // sent before that; afterwards the nickname (settings.playerName), else the profile name
+    myName() { return this.noticeOk() ? this.nameIfShown() : 'Explorer'; }
+    nameIfShown() { const s = this.g.settings; return cleanName(s.playerName) || cleanName(this.T && this.T.me && this.T.me.name) || 'Explorer'; }
     myPeer() { const p = this.T && this.T.myPeer ? this.T.myPeer() : null; if (p) return p; if (this.room) { const me = this.room.peers().find(q => q.sameTab); if (me) return me.peer; } return this.peerFallback || null; }
 
     // ---------------------------------------------------------------- 👥 privacy by default
-    // No name leaves the browser before the player answered the one-time notice („👥 Mitspieler sehen deinen Namen:
-    // X — ✓ OK · Spitzname… · Mehrspieler aus", src/main/legal.js shows it): until then the lobby gets nothing, no
-    // world is hosted and no join is sent. „Mehrspieler aus" = no presence at all, and from the next start no
-    // connection ('r9si.mp' = 'off'; Settings → Game turns it back on).
+    // Until the player answers the one-time notice („👥 Mitspieler sehen deinen Namen: X — ✓ OK · ✎ Spitzname ·
+    // Mehrspieler aus“; src/main/legal.js shows it as a card) the lobby sees the name „Explorer“ and no profile name.
+    // „Mehrspieler aus“ = no presence at all, and from the next start no connection ('r9si.mp' = 'off'; Settings →
+    // Game turns it back on). „Friends can join my worlds“ off = no presence at all.
     noticeOk() { if (this.noticeMem) return true; try { return localStorage.getItem(NOTICE) === '1'; } catch (e) { return false; } }
     confirmNotice() {
-      this.noticeMem = true; this.noticeAsk = false;
+      this.noticeMem = true;
       try { localStorage.setItem(NOTICE, '1'); } catch (e) { /* this page only */ }
-      this.setLobby();
+      this.setLobby(); this.syncNotice();
       const g = this.g;
       if (g.state === 'play' && g.meta && !g.meta.guest) this.startHosting();
     }
+    syncNotice() { if (VR.Legal && VR.Legal.syncNotice) VR.Legal.syncNotice(this.g); }
     turnOff() {
-      try { localStorage.setItem('r9si.mp', 'off'); } catch (e) { /* this page only */ }
+      try { localStorage.setItem('r9si.mp', 'off'); if (localStorage.getItem(NOTICE) !== '1') localStorage.setItem(NOTICE, 'off'); } catch (e) { /* this page only */ }   // (a confirmed answer is never overwritten: the notice is once per browser)
       const g = this.g, T = this.T, guest = this.isClient;
       this.ready = false; this.status = 'off';        // (from here setLobby sends nothing)
       if (this.role === 'host') this.stopHosting(); else if (this.role) this.leave();
       if (T && T.lobby) T.lobby.presence({ v: null, n: null, host: null, pl: null, role: null, ss: null }).catch(() => { });
       if (this.lobbyUnsub) { try { this.lobbyUnsub(); } catch (e) { /* gone */ } this.lobbyUnsub = null; }
-      this.T = null; this.online = []; this.lobbyHosts = []; this.lobbyNamed = false; this.noticeAsk = false;
+      this.T = null; this.online = []; this.lobbyHosts = []; this.lobbyOn = false;
+      this.syncNotice();
       if (guest && g.meta && g.meta.guest && (g.state === 'play' || g.state === 'loading')) g.leaveGuestWorld();
     }
     turnOn() {
@@ -105,19 +110,19 @@
       const L = this.T.lobby;
       this.lobbyUnsub = L.onPeers((ch) => this.lobbyChanged(ch.peers), () => { });
       this.setLobby();
+      this.syncNotice();
       if (this.g.ui && this.g.ui.renderHosts) this.g.ui.renderHosts();
     }
     setLobby() {
       if (!this.ready) return;
       const g = this.g;
-      // 👥 a name only after the notice, and only while friends may join or a session runs (Settings → Game:
-      // „Friends can join" off = nobody sees you on their title screen); before that the lobby gets nothing at all
-      if (!this.noticeOk() || (g.settings.mpHost === false && !this.role)) {
-        if (this.lobbyNamed) { this.lobbyNamed = false; this.T.lobby.presence({ v: null, n: null, host: null }).catch(() => { }); }
+      // 👥 „Friends can join my worlds“ off and no session running: nobody sees you in the lobby, the name included
+      if (g.settings.mpHost === false && !this.role) {
+        if (this.lobbyOn) { this.lobbyOn = false; this.T.lobby.presence({ v: null, n: null, host: null }).catch(() => { }); }
         return;
       }
       const host = this.role === 'host' && g.meta ? { s: this.session, w: cleanName(g.meta.name) || 'World', m: g.meta.mode, t: Date.now() } : null;
-      this.lobbyNamed = true;
+      this.lobbyOn = true;
       this.T.lobby.presence({ v: PROTO, n: this.myName(), host }).catch(() => { });
     }
     lobbyChanged(peers) {
@@ -178,8 +183,6 @@
     async startHosting() {
       const g = this.g;
       if (!this.ready || this.role || !g.meta || g.meta.guest || g.settings.mpHost === false) return;
-      // 👥 hosting shows your name to friends: it waits for the notice (pause menu → 👥, or the title's box)
-      if (!this.noticeOk()) { if (!this.noticeHinted && this.online.length && g.ui && VR.Legal) { this.noticeHinted = true; g.ui.chatLine(VR.Legal.mpHint(), '#ffd27a'); } return; }
       if (g.dim !== 'overworld' && g.dim !== 'flat') return;
       const sess = ('w-' + String(g.meta.id).toLowerCase().replace(/[^a-z0-9]/g, '')).slice(0, 40);
       const room = this.sessionRoom();
@@ -321,8 +324,6 @@
     async join(host) {
       const g = this.g;
       if (!this.ready || this.role) return false;
-      // 👥 the host would see your name: first the notice (it lights up in the title's multiplayer box)
-      if (!this.noticeOk()) { this.noticeAsk = true; if (g.ui && g.ui.renderHosts) g.ui.renderHosts(); return false; }
       g.ui.loading('Joining ' + host.name + '…', 0.05);
       const room = this.sessionRoom();
       if (!room) { g.ui.show('title'); g.ui.titleNote && g.ui.titleNote('Could not reach ' + host.name); return false; }
