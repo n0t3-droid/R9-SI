@@ -209,7 +209,7 @@
           const n = $('#studionote'); if (!n || !VR.Custom) break;
           if (n.querySelector('textarea')) break;
           const ta = document.createElement('textarea'); ta.className = 'studioxfer'; ta.placeholder = T('g.title.importPh'); ta.setAttribute('aria-label', T('g.title.packIn'));
-          const ok = document.createElement('button'); ok.className = 'btn tiny'; ok.textContent = T('g.title.take');
+          const ok = document.createElement('button'); ok.className = 'btn tiny take'; ok.textContent = T('g.title.take');
           ok.onclick = () => this.studioTake(ta.value);
           const file = document.createElement('button'); file.className = 'btn tiny'; file.dataset.act = 'studiofile'; file.textContent = T('g.title.file');
           n.appendChild(ta); n.appendChild(ok); n.appendChild(file); ta.focus();
