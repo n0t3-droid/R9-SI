@@ -34,17 +34,27 @@
     labels();
   }
   function labels() {
-    const L = (k, de, en, sub, title) => { const b = $(`#tiles .tile[data-tile="${k}"]`); if (!b) return; if (k !== 'play' || SA) b.querySelector('.lbl').textContent = k === 'play' ? tx('st.toGame', null, '🎮 Zum Spiel', '🎮 To the game') : tx('start.' + k, null, de, en); b.querySelector('.sub2').textContent = sub || ''; if (title) b.title = title; };
-    L('play', '▶ Spielen', '▶ Play', '', SA ? tx('st.toGameT', null, 'Das Spiel in einem neuen Tab — 📦 Mitnehmen bringt deine Sachen hin', 'The game in a new tab — 📦 take-along brings your things there') : '');
-    L('bauen', '🏗 Bauen', '🏗 Build', '', tx('st.bauenT', null, 'Häuser und Möbel auf die Karte setzen — das Spiel baut sie', 'Place houses and furniture on the map — the game builds them'));
-    L('erschaffen', '✨ Erschaffen', '✨ Create', '', tx('st.erschaffenT', null, 'Ein Haus aus dem Baukasten, alles Mögliche vom Genie, Bilder als Blöcke', 'A house from the kit, anything from the Genie, pictures as blocks'));
-    L('meins', '🎒 Meins', '🎒 Mine', '', tx('st.meinsT', null, 'Deine Sachen: Favoriten, Designs, Bauteile, Welten', 'Your things: favourites, designs, pieces, worlds'));
-    for (const b of $$('#proSwitch button')) { const on = (b.dataset.pro === '1') === !!prefs().pro; b.classList.toggle('on', on); b.textContent = b.dataset.pro === '1' ? tx('start.pro', null, 'Profi', 'Profi') : tx('start.einfach', null, 'Einfach', 'Simple'); b.title = b.dataset.pro === '1' ? tx('start.proT', null, 'Alles: Werkbank, Crafter, Welten-Formular, Befehle, Entwickler-Reiter', 'Everything: workbench, crafter, the world form, commands, developer tabs') : tx('start.einfachT', null, 'Nur das Nötige, groß und klar', 'Only what you need, big and clear'); }
+    // (the in-game Studio's ▶ reads what spawn.js writes: „▶ Spielen · <world>"; the standalone one: 🎮 Zum Spiel)
+    const L = (k, label, title) => { const b = $(`#tiles .tile[data-tile="${k}"]`); if (!b) return; if (label) b.querySelector('.lbl').textContent = label; b.querySelector('.sub2').textContent = ''; if (title) { b.title = title; b.setAttribute('aria-label', (label || b.querySelector('.lbl').textContent) + ' — ' + title); } };
+    L('play', SA ? tx('st.toGame', null, '🎮 Zum Spiel', '🎮 To the game') : '', SA ? tx('st.toGameT', null, 'Das Spiel in einem neuen Tab — 📦 Mitnehmen bringt deine Sachen hin', 'The game in a new tab — 📦 Take along brings your things there') : '');
+    L('bauen', tx('start.bauen', null, '🏗 Bauen', '🏗 Build'), tx('st.bauenT', null, 'Häuser und Möbel auf die Karte setzen — das Spiel baut sie', 'Place houses and furniture on the map — the game builds them'));
+    L('erschaffen', tx('start.erschaffen', null, '✨ Erschaffen', '✨ Create'), tx('st.erschaffenT', null, 'Ein Haus aus dem Baukasten, alles Mögliche vom Genie, Bilder als Blöcke', 'A house from the kit, anything from the Genie, pictures as blocks'));
+    L('meins', tx('start.meins', null, '🎒 Meins', '🎒 Mine'), tx('st.meinsT', null, 'Deine Sachen: Favoriten, Designs, Bauteile, Welten', 'Your things: favourites, designs, pieces, worlds'));
+    for (const b of $$('#proSwitch button')) { const on = (b.dataset.pro === '1') === !!prefs().pro; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.textContent = b.dataset.pro === '1' ? tx('start.pro', null, 'Profi', 'Pro') : tx('start.einfach', null, 'Einfach', 'Simple'); b.title = b.dataset.pro === '1' ? tx('start.proT', null, 'Alles: Werkbank, Crafter, Welten-Formular, Befehle, Entwickler-Reiter', 'Everything: workbench, crafter, the world form, commands, developer tabs') : tx('start.einfachT', null, 'Nur das Nötige, groß und klar', 'Only what you need, big and clear'); }
   }
   function proSwitch() {
     const host = $('#proSwitch'); if (!host || host.children.length) return;
+    host.setAttribute('role', 'group');
     for (const v of ['0', '1']) { const b = document.createElement('button'); b.type = 'button'; b.dataset.pro = v; b.onclick = () => { if (VR.UIPrefs) VR.UIPrefs.set({ pro: v === '1' }); }; host.appendChild(b); }
   }
+  // 📜 Impressum, Datenschutz, Credits: VR.Legal (its own module) — the button shows only when it is there
+  function legal() {
+    const ok = !!(VR.Legal && typeof VR.Legal.open === 'function');
+    let b = $('#legalBtn');
+    if (!b) { const head = $('#studio header'); if (!head) return; b = document.createElement('button'); b.type = 'button'; b.id = 'legalBtn'; b.className = 'cbtn'; b.textContent = '📜'; b.onclick = () => { if (VR.Legal && VR.Legal.open) VR.Legal.open(); }; const sys = head.querySelector('.sys'); head.insertBefore(b, sys || null); }
+    b.hidden = !ok; b.title = tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); b.setAttribute('aria-label', b.title);
+  }
+  SS.legal = legal;
   // which tile is lit: 🏗 on the Karte, 🎒 while Meins is open, ✨ while the dialog is open
   function light() {
     const P = PJ(), im = $('#imagine.on'), hub = !!(P && P.isOpen && P.isOpen());
@@ -63,7 +73,7 @@
       if (P && P.isOpen && P.isOpen()) P.show(false);
       ready(async () => {
         if (NAV()) NAV().clear();
-        if (!W || SA) { C.setMode('arch'); if (SA) toast(tx('st.saBauen', null, 'Die Häuser und Möbel — 📍 wird im Spiel zum Setzen; hier: 🎒 Merken', 'The houses and furniture — 📍 places in the game; here: 🎒 keep')); return; }
+        if (!W || SA) { C.setMode('arch'); if (SA) toast(tx('st.saBauen', null, 'Häuser und Möbel — setzen kannst du sie im Spiel, hier: 🎒 Merken', 'Houses and furniture — you place them in the game, here: 🎒 Keep')); return; }
         if (W.world) { W.tab = 'karte'; C.setMode('world'); W.refresh(); return; }
         if (!W.worlds && W.list) { try { await W.list(); } catch (e) { /* */ } }
         const last = W.worlds && W.worlds[0];
@@ -177,7 +187,7 @@
     if (d.kind === 'h') C.editHouse(+d.key);
     else if (d.kind === 'm') C.editModel(d.key);
     else if (d.kind === 'b') { if (VR.StudioCatalog) { VR.StudioCatalog.edit = true; VR.StudioCatalog.open('block', d.key); } }
-    else if (d.kind === 'p') { const W = WM(); if (W && W.world) { W.tab = 'bench'; C.setMode('world'); W.refresh(); } else toast(tx('st.pieceNeedsWorld', null, 'Ein Bauteil bearbeitest du in der Werkbank einer Welt (🏗 Bauen, Profi).', 'A piece is edited in a world\'s workbench (🏗 Bauen, Profi).')); }
+    else if (d.kind === 'p') { const W = WM(); if (W && W.world) { W.tab = 'bench'; C.setMode('world'); W.refresh(); } else toast(tx('st.pieceNeedsWorld', null, 'Ein Bauteil bearbeitest du in der Werkbank einer Welt (🏗 Bauen, Profi).', 'A piece is edited in a world\'s workbench (🏗 Build, Pro).')); }
     else if (P) P.open(d.key);
     light();
     return true;
@@ -365,9 +375,10 @@
     if (VR.Crafter && VR.Crafter.back) { const orig = VR.Crafter.back; VR.Crafter.back = function () { const N = NAV(); if (N && N.top() && N.top().kind === 'editor') { N.pop(); return; } return orig.apply(this, arguments); }; }
     handlers();
     if (WM()) WM().placeNow = placeNow;
-    tiles(); proSwitch(); labels();
+    tiles(); proSwitch(); labels(); legal();
+    window.addEventListener('load', legal);   // (a module after this one)
     if (VR.UIPrefs) VR.UIPrefs.on(() => { labels(); const W = WM(); if (W && W.on && S.mode === 'world') { C.chips(); C.list(); C.parts(); } });   // (Einfach ↔ Profi changes the Welt mode's chips)
-    if (VR.I18N && VR.I18N.on) VR.I18N.on(() => labels());
+    if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { labels(); legal(); });
     // the mode bar (Profi): a mode switch drops the layers
     for (const b of $$('nav.modes button[data-mode]')) if (!b.disabled) b.onclick = () => { if (NAV()) NAV().clear(); C.setMode(b.dataset.mode); };
     setInterval(light, 400);

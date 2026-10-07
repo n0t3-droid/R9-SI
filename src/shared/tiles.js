@@ -18,7 +18,7 @@
     o = o || {};
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'tile ' + kind + (o.cls ? ' ' + o.cls : ''); b.dataset.tile = kind; if (o.id) b.id = o.id;
-    b.innerHTML = `<span class="pic">${T.SVG[kind] || ''}</span><span class="lbl"></span><span class="sub2"></span>`;
+    b.innerHTML = `<span class="pic" aria-hidden="true">${T.SVG[kind] || ''}</span><span class="lbl"></span><span class="sub2"></span>`;
     b.querySelector('.lbl').textContent = o.label || ''; b.querySelector('.sub2').textContent = o.sub || '';
     if (o.title) b.title = o.title;
     return b;
