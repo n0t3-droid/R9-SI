@@ -736,7 +736,7 @@
         // move (on the deck the walk sets the place; off it a straight walk), the walk cycle from the distance covered
         const dx = tx - b.pos[0], dz = tz - b.pos[2], dist = Math.hypot(dx, dz);
         let moved = 0;
-        if (b.mode === 'deck' || b.mode === 'cheer' || b.mode === 'ride') { moved = Math.hypot(tx - b.lx, tz - b.lz); b.pos[0] = tx; b.pos[2] = tz; b.pos[1] = ty; }
+        if (b.mode === 'deck' || b.mode === 'cheer' || b.mode === 'ride') { const k = Math.min(1, dt * 12); b.pos[0] += (tx - b.pos[0]) * k; b.pos[2] += (tz - b.pos[2]) * k; b.pos[1] = ty; moved = Math.hypot(b.pos[0] - b.lx, b.pos[2] - b.lz); }   // (where the deck steps in at a setback they walk over, no jump)
         else if (dist > 0.01) { const st = Math.min(dist, speed * dt); b.pos[0] += dx / dist * st; b.pos[2] += dz / dist * st; moved = st; b.pos[1] += (ty - b.pos[1]) * Math.min(1, dt * 8); }
         const mv = moved / Math.max(dt, 1e-3);
         if (moved > 0.002) { const yw = Math.atan2(-(b.pos[0] - b.lx), -(b.pos[2] - b.lz)); if (isFinite(yw) && moved > 0.01) b.yaw += wrapA(yw - b.yaw) * Math.min(1, dt * 10); }
