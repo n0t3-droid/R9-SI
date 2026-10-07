@@ -140,5 +140,5 @@ check(pageErrors.length === 0, 'no page errors in any start (' + pageErrors.leng
 check(cacheErrors.length === 0, 'the texture cache logs no error (' + cacheErrors.length + ')');
 if (errors.length) console.log('--- console and page messages (' + errors.length + ')\n' + errors.slice(0, 20).join('\n'));
 
-console.log(fail ? fail + ' FAILED' : 'all texture cache checks passed');
+console.log(fail ? 'FAILED ' + fail : 'all texture cache checks passed\nALL OK');
 process.exit(fail ? 1 : 0);

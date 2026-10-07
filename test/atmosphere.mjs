@@ -184,6 +184,6 @@ try {
   fails++; console.log('  FAIL  the run stopped: ' + (e.stack || e.message).slice(0, 800));
 } finally {
   await browser.close();
-  console.log(fails ? fails + ' FAILED' : 'ALL OK');
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
   process.exitCode = fails ? 1 : 0;
 }
