@@ -257,7 +257,7 @@ section('civic', () => {
     const wk = Forge.walkable(g, [d[0], d[1] - g.dy, d[2]], {});
     check(wk.floors.includes(M.floors[0] - g.dy + 1) && wk.floors.includes(M.floors[1] - g.dy + 1), dna + ' from the entrance down the tiers to the pitch and along the top walkway: ' + JSON.stringify(wk.floors));
   }
-  check(Forge.describe('hall:m0,holz#1').startsWith('Halle · Werkhalle') && Forge.describe('hall:holz#1').startsWith('Halle · Markthalle'), 'a hall says what it is: ' + Forge.describe('hall:m0,holz#1'));
+  check(Forge.describe('hall:m0,holz#1').startsWith('Werkhalle · ') && Forge.describe('hall:holz#1').startsWith('Markthalle · ') && Forge.describe('bridge:k2,stahl#1').startsWith('Hängebrücke') && Forge.describe('wall:k1,holz#1', true).startsWith('🧱 Zaun'), 'a structure says what it is: ' + [Forge.describe('hall:m0,holz#1'), Forge.describe('bridge:k2,stahl#1'), Forge.describe('wall:k1,holz#1', true)].join(' / '));
 });
 
 // ---------------------------------------------------------------- 🚀 🌳
