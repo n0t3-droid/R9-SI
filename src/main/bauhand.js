@@ -57,11 +57,11 @@
   // none; a friend's world: blocks only. → {slots: [{id, name, starter}], more, all, starter}
   BH.ringList = function (ctx) {
     ctx = ctx || {};
-    const Dg = D(), favs = VR.Favs ? VR.Favs.list() : [], seen = new Set(), all = [];
+    const Dg = D(), favs = VR.Favs ? VR.Favs.list() : [], seen = new Set(), all = [], lib = VR.Pack && VR.Pack.libLoad ? VR.Pack.libLoad() : [];
     for (const f of favs) {
       let id = Dg ? Dg.fromFav(f) : null; if (!id || seen.has(id)) continue;
       const k = id[0];
-      if ((k === 'k' || k === 'g') && !ctx.guest) { const pc = pieceOfProject(id); if (!pc) continue; id = pc; }
+      if ((k === 'k' || k === 'g') && !ctx.guest) { const pc = pieceOfProject(id, lib); if (!pc) continue; id = pc; }
       if (!/^[bmhfp]:/.test(id)) continue;
       if (k === 'b' && !(VR.itemDef ? VR.itemDef(id.slice(2)) : true)) continue;
       if (ctx.guest && id[0] !== 'b') continue;
@@ -75,9 +75,14 @@
     return { slots: all.slice(0, 8), more: all.length > 8, all, starter: false };
   };
   // a Baukasten house or a Genie thing (a project) is held as the Bauteil the wizard kept with it
-  function pieceOfProject(id) {
-    try { const d = JSON.parse(localStorage.getItem('r9si.projects') || 'null'), p = d && d.items && d.items[id.slice(2)]; return p && p.piece ? 'p:' + String(p.piece).replace(/^p:/, '') : null; } catch (e) { return null; }
+  function pieceOfProject(id, lib) {
+    let pc = null;
+    try { const d = JSON.parse(localStorage.getItem('r9si.projects') || 'null'), p = d && d.items && d.items[id.slice(2)]; pc = p && p.piece ? String(p.piece).replace(/^p:/, '') : null; } catch (e) { pc = null; }
+    if (!pc) return null;
+    const items = lib || (VR.Pack && VR.Pack.libLoad ? VR.Pack.libLoad() : []);
+    return items.some(it => it && it.id === pc) ? 'p:' + pc : null;   // (its Bauteil is still in the library)
   }
+  BH.pieceOf = (id) => (/^[kg]:/.test(id || '') ? pieceOfProject(id) : null);
 
   // ---------------------------------------------------------------- the piece behind a Ding (lot, height, cells)
   // → {lot:[W, D], top, bottom, level, terrain, model, ops, name} or null while it is made (the worker, the Genie)
@@ -639,6 +644,8 @@
   BH.keys = function (g) {
     const i = g.input, ui = g.ui;
     if (ui.typing) return false;
+    // (Esc in pointer lock: the browser took the lock and the hand put it away — the same key does not pause the game too)
+    if (BH.awayAt && i.hit('Escape')) { const recent = performance.now() - BH.awayAt < 600; BH.awayAt = 0; if (recent) return true; }
     if (i.hit('KeyB')) {
       if (ui.screen || g.studioOpen || (g.gadgets && g.gadgets.controlling) || (VR.Wizard && VR.Wizard.isOpen && VR.Wizard.isOpen())) return false;   // (a menu, the Studio, a vehicle, the wizard: B does nothing)
       BH.toggle(); return true;
@@ -675,7 +682,7 @@
   }, true);
   // Esc in pointer lock: the browser takes the lock away (and keeps the key) — that is the same wish: put it away
   let releasing = false;
-  if (hasDoc) document.addEventListener('pointerlockchange', () => { const g = game(); if (!document.pointerLockElement && BH.state === 'holding' && !releasing && g && g.input && g.input.captured && !g.ui.screen) BH.putAway(); releasing = false; });
+  if (hasDoc) document.addEventListener('pointerlockchange', () => { const g = game(); if (!document.pointerLockElement && BH.state === 'holding' && !releasing && g && g.input && g.input.captured && !g.ui.screen) { BH.putAway(); BH.awayAt = performance.now(); } releasing = false; });
   function hooks() {
     const G = VR.Game, Gd = VR.Gadgets, P = VR.Player;
     if (G && !G.prototype.__bh) {

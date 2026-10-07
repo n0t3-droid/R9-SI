@@ -311,7 +311,7 @@ await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: car
   const h = await ev((kid) => { const c = document.querySelector('#hub .pj.ding[data-id="' + kid + '"]'); const fav = document.querySelector('#hub .ding[data-ding="b:oak_planks"]'); return { on: !!document.querySelector('#hub.on'), head: (document.querySelector('#hub header .t') || {}).textContent, kcard: !!c, kacts: c ? [...c.querySelectorAll('.dacts button')].map(b => b.dataset.da) : [], favSection: [...document.querySelectorAll('#hub h4')].map(x => x.textContent.trim()), favCard: !!fav, favActs: fav ? [...fav.querySelectorAll('.dacts button')].map(b => b.textContent) : [], meinsOn: document.querySelector('#tiles .tile[data-tile="meins"]').classList.contains('on') }; }, kit.id);
   console.log('  hub', JSON.stringify(h));
   check(h.on && /Meins/.test(h.head || '') && h.meinsOn, '🎒 opens Meins (the 🎒 tile lit)');
-  check(h.kcard && h.kacts.join() === 'view,edit,fav', 'the k: card: 👁 ✏️ ☆ (📍 and 📦 come with the wizard, W2 — absent, not greyed)');
+  check(h.kcard && h.kacts.join() === 'view,edit,fav,set', 'the k: card: 👁 ✏️ ☆ 📍 (W2: 📍 puts its Bauteil on the Karte; 📦 comes with B1 — absent, not greyed)');
   check(h.favCard && h.favActs.length === 5 && h.favSection.some(x => /Favoriten/.test(x)), 'a ★ Favoriten section with the oak planks card and all five actions');
   await page.click('#hub .pj.ding[data-id="' + kit.id + '"] [data-da="fav"]'); await wait(200);
   const favs = await ev(() => JSON.parse(localStorage.getItem('r9si.favs')).items);

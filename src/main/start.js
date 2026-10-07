@@ -287,7 +287,7 @@
       __game: true,
       view: (id) => studio('#ding/' + id),
       edit: (id) => studio('#ding/' + id + '/edit'),
-      canSet: (id) => /^[bmhfpkg]:/.test(id),   // (W2: everything but a place goes into the 🖐 Bauhand)
+      canSet: (id) => /^[bmhfp]:/.test(id) || (/^[kg]:/.test(id) && !!(VR.Bauhand && VR.Bauhand.pieceOf && VR.Bauhand.pieceOf(id))),   // (W2: everything but a place goes into the 🖐 Bauhand; a project as its Bauteil)
       canEdit: (id) => !/^p:/.test(id) || prefs().pro,
       set: (id) => {
         const g = game(), d = Dg.parse(id); if (!g || !d) return false;

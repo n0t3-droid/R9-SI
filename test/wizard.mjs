@@ -57,6 +57,10 @@ await section(1, 'a world exists (flat, Zen); back at the start screen', async (
 let SNAP = null;
 await section(2, 'Was?: the ✨ tile opens the wizard — picture tiles, the wish line, the keyboard', async () => {
   SNAP = await plansSnap();
+  // (low-end: the Genie and the Baukasten are compiled on the first ✨ — how long that takes here)
+  const lazy = await ev(() => { const had = !!VR.GenieBrain, t0 = performance.now(), ok = VR.GenieLazy ? VR.GenieLazy() : false; return { had, ok, ms: Math.round(performance.now() - t0) }; });
+  console.log('  GenieLazy', JSON.stringify(lazy));
+  check(!lazy.had && lazy.ok, 'the Genie is not there before the first ✨, then it is (' + lazy.ms + ' ms to compile)');
   await page.click('#title .tile[data-tile="erschaffen"]');
   const w = await until(() => { const b = document.querySelector('#wizard.on'); if (!b) return null; const tiles = [...b.querySelectorAll('.wz-tile')]; return tiles.length ? { tiles: tiles.map(t => ({ id: t.dataset.tile, w: Math.round(t.getBoundingClientRect().width), h: Math.round(t.getBoundingClientRect().height), label: t.textContent.trim() })), steps: [...b.querySelectorAll('.wz-steps li')].map(l => l.textContent + (l.classList.contains('on') ? '*' : '')), wish: !!b.querySelector('.wz-wish input'), focus: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.tile : null } : null; }, null, 20);
   console.log('  was', JSON.stringify(w && { n: w.tiles.length, steps: w.steps, focus: w.focus, first: w.tiles.slice(0, 3) }));
