@@ -135,5 +135,110 @@ section('types', () => {
   check(W.TYPES.every(t => W.byName(t.de) === t.id && W.byName(t.en) === t.id && W.byName(t.de.toLowerCase()) === t.id), 'every wonder is found by its German and English name (any case)');
 });
 
+// ---------------------------------------------------------------- the game: near a site it is planned through the forge
+// placer and rises; a lot with a player edit is blocked; nature's own changes do not count; the heart is the discovery;
+// /bau builds a wonder only once it was found here; the Wunderkompass points to the nearest one not found yet
+section('game', () => {
+  require('./dom_stub.js');
+  { const mk = document.createElement; document.createElement = (t) => { const e = mk(t); e.style = e.style || {}; return e; }; }   // (the stub's elements get a style)
+  for (const f of ['i18n', 'lang_en', 'lang_de']) require('../src/main/' + f + '.js');
+  VR.I18N.lang = 'de';
+  VR.ITEMS = VR.ITEMS || {};
+  require('../src/main/blueprints.js');
+  require('../src/main/wonders_game.js');
+  const S = (nm, pr) => (pr ? R.byName[nm].state(pr) : R.byName[nm].defaultState), GY = 63, HI = 320;
+  // a world of real columns: flat land at y 63 (grass, dirt, stone); what the generator makes is the same land
+  const pristine = () => { const b = new Uint16Array(HI * 256); for (let i = 0; i < 256; i++) for (let y = 0; y <= GY; y++) b[(y << 8) | i] = y === GY ? S('grass_block') : y > GY - 4 ? S('dirt') : S('stone'); return b; };
+  const cols = new Map(), ck = (cx, cz) => cx + ',' + cz;
+  const world = {
+    dim: 'overworld', savedKeys: new Set(), relights: 0,
+    col(cx, cz) { let c = cols.get(ck(cx, cz)); if (!c) { c = { cx, cz, key: ck(cx, cz), ready: true, saved: false, modified: false, blocks: pristine() }; cols.set(c.key, c); } return c; },
+    getBlock(x, y, z) { if (y < 0 || y >= HI) return 0; return this.col(x >> 4, z >> 4).blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; },
+    setBlock(x, y, z, s) { const c = this.col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; c.modified = true; },
+    bulkSet(list, notify, defer) { const touched = new Set(); for (const [x, y, z, s] of list) { if (y < 0 || y >= HI) continue; const c = this.col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; c.modified = true; touched.add(c); } if (defer) { for (const c of touched) defer.add(c); return touched.size; } this.relights++; return touched.size; },
+    relightColumns() { this.relights++; },
+  };
+  const sounds = [], chat = [], unlocked = [], guestCells = [];
+  let listSites = [];
+  const pool = { queueDirty: false, direct(i, msg, tr, cb) { if (msg.type === 'forge') cb(Forge.job(msg)); else if (msg.type === 'wonders') cb({ type: 'wonders', list: listSites.map(s => Object.assign({}, s)), more: false }); }, submit(msg, tr, cb) { if (msg.type === 'gen') cb({ type: 'gen', blocks: pristine() }); } };
+  const player = { pos: [0.5, GY + 1, 0.5], yaw: 0, pitch: 0, eye: 1.6, dead: false, creative: true, unstick() {}, eyePos() { return [this.pos[0], this.pos[1] + 1.6, this.pos[2]]; }, lookDir() { const cp = Math.cos(this.pitch); return [-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp]; } };
+  const store = new Map(); global.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+  const g = { world, pool, meta: { id: 'w1' }, state: 'play', dim: 'overworld', player, settings: {}, ui: { chatLine: (t) => chat.push(t), toast() {}, hint() {}, screen: null }, particles: { spawn() {}, spark() {}, glow() {} }, audio: { play: (nm) => sounds.push(nm) }, codex: { unlock: (id, q) => unlocked.push(id + (q ? ':quiet' : '')) }, worldSpawn: () => [0.5, GY + 1, 0.5], saveMeta: () => Promise.resolve(), mp: { isHost: true, active: true, onBlockChanged: (x, y, z, o, s) => guestCells.push(s) } };
+  const gad = { g, wand: { undo: [] }, applyEdit(list, undo) { world.bulkSet(list); if (undo) this.wand.undo.push(undo); }, undo() { const u = this.wand.undo.pop(); if (u) world.bulkSet(u); }, noteBlock() {} };
+  g.gadgets = gad; gad.blue = new VR.Blueprints(gad);
+  const wg = g.wonders = new VR.WondersGame(g, g.meta);
+  const site = (key, type, x, z, r) => ({ key, i: 0, j: 0, x, z, y: GY + 1, type, seed: 0x2b1d, r: r || 0, first: false });
+  const A = site('a', 'sternwarte', 400, 300), B = site('b', 'pyramide', -400, 300, 1), C = site('c', 'mondtempel', 0, -500, 2);
+  // ---- a clean lot: planned when you come near, rises in slices, its light computed twice (cleared, then risen)
+  listSites = [A]; player.pos = [400.5, GY + 1, 160.5];
+  let ticks = 0, rising = 0; const tick = (n) => { for (let i = 0; i < n; i++) { wg.update(0.1, { night: 0 }); ticks++; if (wg.rise) rising++; } };
+  tick(4);
+  check(wg.sites.length === 1 && !wg.st.a, 'a site 140 blocks away: listed, not planned yet (160 is near enough, but its turn comes)');
+  tick(80);
+  const ea = wg.st.a || {};
+  check(ea.status === 'built' && rising >= 25 && rising <= 60, 'the Sternwarte rose over ' + (rising / 10).toFixed(1) + ' s and stands: ' + JSON.stringify({ status: ea.status, at: ea.at, heart: ea.heart }));
+  check(world.relights === 2, 'its columns were lit twice: once cleared, once risen (not once per slice): ' + world.relights);
+  check(ea.heart && T.emit[world.getBlock(ea.heart[0], ea.heart[1], ea.heart[2])] > 0, 'the heart in the world is a glowing block: ' + (ea.heart && nameOf(world.getBlock(ea.heart[0], ea.heart[1], ea.heart[2]))));
+  check(sounds.includes('wonder') && chat.some(t => /erhebt sich/.test(t)), 'a chime and a line in the chat while it rises');
+  check(guestCells.length > 2000 && !gad.wand.undo.length, 'with friends its blocks go out to them (' + guestCells.length + ' cells); no undo step (the wonder is the world\'s)');
+  check(wg.planMs < 400, 'planning its lot on the main thread: ' + (wg.planMs || 0).toFixed(0) + ' ms');
+  // ---- the Wunderkompass and the map: the nearest one not found yet
+  const comp = () => (wg.compEl ? (wg.compEl.style.display === 'none' ? '' : wg.compEl.textContent) : '');
+  wg.compT = 0; tick(1);
+  check(/^✨ \d+ m [↑↗→↘↓↙←↖]$/.test(comp()), 'the Wunderkompass shows the way: ' + comp());
+  player.yaw = 0; player.pos = [400.5, GY + 1, 200.5]; wg.compT = 0; tick(1); const c0 = comp();
+  player.yaw = Math.PI; wg.compT = 0; tick(1); const c1 = comp();
+  check(/↓$/.test(c0) && /↑$/.test(c1), 'its arrow is relative to the view (facing away ' + c0 + ', facing it ' + c1 + ')');
+  g.settings.wonderCompass = false; wg.compT = 0; tick(1); const c2 = comp(); g.settings.wonderCompass = undefined;
+  g.ui.screen = 'pause'; wg.compT = 0; tick(1); const c3 = comp(); g.ui.screen = null;
+  check(c2 === '' && c3 === '', 'hidden when switched off in ⚙ and while a screen is open');
+  // ---- /bau before the discovery: a kind word, no plan
+  const nPlans = () => (gad.blue.plans || []).length;
+  const p0 = nPlans(); gad.blue.forgeCommand(['Sternwarte']);
+  check(nPlans() === p0 && /entdeckt/.test(chat[chat.length - 1]), '/bau Sternwarte before finding it: ' + chat[chat.length - 1]);
+  // ---- the discovery: within four blocks of the heart
+  const h = ea.heart; player.pos = [h[0] + 0.5, h[1] - 0.5 + 0.0, h[2] + 3.4]; tick(4);
+  check(!!(wg.st.a && wg.st.a.found), 'standing by its heart discovers it');
+  const ban = document.body.children.find(c => c.textContent && /Wunder entdeckt: Sternwarte/.test(c.textContent));
+  check(!!ban && ban.classList.contains('on'), 'a big banner: ' + (ban && ban.textContent));
+  check(sounds.includes('fanfare') && unlocked.includes('w:sternwarte:quiet') && chat.some(t => /\/bau Sternwarte/.test(t)), 'a fanfare, the codex page (no small toast), the gift in the chat');
+  // ---- /bau after it: a Forge plan of that wonder where you look
+  player.pos = [300.5, GY + 1, 0.5]; player.pitch = -0.6; player.yaw = Math.PI;
+  gad.blue.forgeCommand(['Sternwarte']);
+  const pl = (gad.blue.plans || []).find(q => /^wonder:sternwarte#/.test(q.dna));
+  check(!!pl && pl.dna === VR.Wonders.dna('sternwarte', A.seed), '/bau Sternwarte after finding it plans one where you look: ' + (pl && pl.dna));
+  check((wg.marks() || []).some(m => m.found && /Sternwarte/.test(m.name)), 'the map marks it ✨ with its name');
+  // ---- a lot with a player's edit: blocked, never built
+  listSites = [A, B]; player.pos = [-400.5, GY + 1, 200.5];
+  const L = wg.lotOf(B); world.setBlock(L.x0 + 5, GY + 1, L.z0 + 7, S('oak_planks'));
+  tick(30);
+  check(wg.st.b && wg.st.b.status === 'blocked' && wg.st.b.why === 'edit', 'a plank someone set on the Sonnenpyramide\'s lot: blocked (' + JSON.stringify(wg.st.b) + ')');
+  let foreign = 0; for (let z = L.z0; z <= L.z1; z += 3) for (let x = L.x0; x <= L.x1; x += 3) for (let y = GY + 1; y < GY + 30; y++) { const s0 = world.getBlock(x, y, z); if (s0 && s0 !== S('oak_planks')) foreign++; }
+  check(foreign === 0, 'nothing of it was built there');
+  check((wg.marks() || []).every(m => !(Math.abs(m.x - B.x) < 2 && Math.abs(m.z - B.z) < 2)), 'a blocked site leaves the map and the compass');
+  // ---- nature's own changes (grass to dirt, plants growing) do not block
+  listSites = [A, B, C]; player.pos = [0.5, GY + 1, -360.5];
+  const L2 = wg.lotOf(C); world.setBlock(L2.x0 + 4, GY, L2.z0 + 4, S('dirt')); world.setBlock(L2.x0 + 9, GY + 1, L2.z0 + 9, S('short_grass'));
+  tick(90);
+  check(wg.st.c && wg.st.c.status === 'built', 'grass gone to dirt and a plant grown on the Mondtempel\'s lot: it is built (' + JSON.stringify(wg.st.c && wg.st.c.status) + ')');
+  check(VR.WonderNatural(S('grass_block'), S('dirt')) && VR.WonderNatural(S('oak_leaves', { persistent: 0, distance: 3 }), 0) && !VR.WonderNatural(S('stone'), 0) && !VR.WonderNatural(0, S('oak_planks')) && !VR.WonderNatural(S('dirt'), S('cobblestone')), 'what counts as nature: grass ↔ dirt, leaves falling — not stone dug out, not planks or cobble set');
+  // ---- the record travels with the world
+  const meta2 = {}; wg.beforeSave(meta2);
+  check(meta2.wonders && meta2.wonders.a.found && meta2.wonders.b.status === 'blocked' && meta2.wonders.c.status === 'built', 'meta.wonders is saved with the world: ' + Object.keys(meta2.wonders || {}).map(k => k + ':' + meta2.wonders[k].status + (meta2.wonders[k].found ? '+found' : '')).join(' '));
+  // the main thread's share for every wonder: levelling its lot (blueprints.js planAt) and the cells that rise
+  const perf = [];
+  for (const t of VR.Wonders.TYPES) {
+    const st0 = site('p' + t.id, t.id, 3000 + perf.length * 200, 3000); const Lp = wg.lotOf(st0), dna = VR.Wonders.dna(t.id, st0.seed), bp = Forge.job({ dna });
+    const c0 = process.cpuUsage(); const { list } = gad.blue.planAt({ bp, r: Lp.r, ox: Lp.ox, oz: Lp.oz, F: GY + 1, x0: Lp.x0, z0: Lp.z0, x1: Lp.x1, z1: Lp.z1, rect: Lp.rect, ok: true }); const cu = process.cpuUsage(c0);
+    perf.push([t.id, (cu.user + cu.system) / 1000, list.length]);
+  }
+  console.log('  main thread per wonder (planAt ms · cells): ' + perf.map(([id, m, n2]) => id + ' ' + m.toFixed(0) + ' · ' + n2).join(' | '));
+  check(perf.every(([, m]) => m < 300), 'planning any wonder\'s lot stays under 300 ms CPU (the slowest ' + Math.max(...perf.map(q => q[1])).toFixed(0) + ' ms)');
+  // a guest never builds
+  const g2 = Object.assign({}, g, { meta: { id: 'w2', guest: true } }); const wg2 = new VR.WondersGame(g2, g2.meta); wg2.sites = [site('d', 'labyrinth', 2000, 2000)]; player.pos = [2000.5, GY + 1, 1950.5];
+  for (let i = 0; i < 30; i++) wg2.update(0.1, { night: 0 });
+  check(!wg2.st.d && !wg2.job && !wg2.rise, 'a guest in a friend\'s world does not build (the host does)');
+});
+
 console.log(fails ? 'FAILED ' + fails + ' of ' + n : 'ALL OK (' + n + ' checks)');
 process.exit(fails ? 1 : 0);

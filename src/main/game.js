@@ -279,6 +279,7 @@
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
       this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false;
+      if (this.wonders) { this.wonders.destroy(); this.wonders = null; }
       if (this.traffic) { this.traffic.destroy(); this.traffic = null; }
       if (this.starships) { this.starships.destroy(); this.starships = null; }
       if (this.villages) { this.villages.destroy(); this.villages = null; }
@@ -333,6 +334,8 @@
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
+      if (this.wonders) this.wonders.destroy();
+      this.wonders = VR.WondersGame ? new VR.WondersGame(this, meta) : null;   // ✨ wonders_game.js
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
@@ -520,6 +523,8 @@
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
+      if (this.wonders) this.wonders.destroy();
+      this.wonders = VR.WondersGame ? new VR.WondersGame(this, meta) : null;   // ✨ wonders_game.js
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
@@ -564,6 +569,7 @@
       if (this.gadgets) this.gadgets.beforeSave(m);
       if (this.starships) this.starships.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
+      if (this.wonders) this.wonders.beforeSave(m);
       return this.store.saveWorld(m);
     }
     async quitToTitle() {
@@ -830,6 +836,7 @@
       const inLava = !!(R.T.flags[headState] & F.LAVA);
       const E = this.envFor(eye, dt, { underwater: underwater || inLava, waterColor: inLava ? [0.9, 0.3, 0.05] : waterColor, freezeTime: this.zenFreezeTime && p.mode !== 'survival', freezeWeather: this.zenFreezeWeather && p.mode !== 'survival' });
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
+      if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
       this.particles.update(dt, eye);
       if (this.trails) this.trails.update(dt);
       // camera

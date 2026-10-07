@@ -567,6 +567,8 @@
         if (S.mpHost === undefined) S.mpHost = true;
         toggle('mpHost', T('g.set.mpHost'));
         toggle('showCoords', T('g.set.showCoords')); toggle('minimap', T('g.set.minimap')); toggle('toasts', T('g.set.toasts'));
+        if (S.wonderCompass === undefined) S.wonderCompass = true;   // ✨ the Wunderkompass (wonders_game.js), on unless switched off
+        toggle('wonderCompass', T('g.set.wonderCompass'));
         body.appendChild(el('div', 'note', esc(T('g.set.storageNote'))));
       }
     }

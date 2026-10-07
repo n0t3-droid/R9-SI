@@ -358,7 +358,7 @@
   // ---------------------------------------------------------------- 🗼 Wolkenleuchtturm
   // a red-and-white tower on a rock wreathed in clouds, a stair up through it, a gallery, the lantern room with the
   // great light (the heart; the game turns a beam around it at night)
-  W.GENS.leuchtturm = function (P, env, rng) {
+  W.GENS.wolkenturm = function (P, env, rng) {
     const LW = 37, LD = 41, dy = -1, g0 = 0, f = 1, cx = 18, cz = 22;
     const rockTop = f + 7, towerTop = rockTop + 46, K = Forge.kit(LW, towerTop + 14, LD, dy), H = helpers(K);
     K.box(0, g0, 0, LW - 1, g0, LD - 1, 'grass_block');
