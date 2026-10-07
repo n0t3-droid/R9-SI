@@ -6,7 +6,7 @@
 (function (VR) {
   'use strict';
   const TX = VR.TX, N = TX.N;
-  const LEVELS = 6; // 32,16,8,4,2,1
+  const LEVELS = VR.TEX_LEVELS;   // tex_layout.js: 32,16,8,4,2,1
 
   function resolve(name) {
     const REC = VR.TEXREC, PRE = VR.TEXPRE;
@@ -102,18 +102,6 @@
     return out;
   }
 
-  // which layers are faces of full opaque cubes (they get the rim) and which are cut-out (alpha-coverage mips)
-  VR.textureMasks = function () {
-    const R = VR.R, T = R.T, L = R.texNames.length;
-    const cube = new Uint8Array(L), cut = new Uint8Array(L);
-    for (let s = 0; s < T.shape.length; s++) {
-      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 0 && (T.flags[s] & VR.F.FULL)) for (let f = 0; f < 6; f++) cube[T.tex[s * 6 + f] & 0xfff] = 1;
-      if (T.layer[s] === 1) for (let f = 0; f < 6; f++) cut[T.tex[s * 6 + f] & 0xfff] = 1;
-    }
-    for (let s = 0; s < R.models.length; s++) { const md = R.models[s]; if (md && T.layer[s] === 1) for (const f of md) cut[f.tex & 0xfff] = 1; }
-    if (VR.CUTOUT_TEX) for (const n of VR.CUTOUT_TEX) { const i = R.texIndex[n]; if (i !== undefined) cut[i] = 1; }
-    return { cube, cut };
-  };
   // Build all layers. opts: {names, cubeMask (Uint8Array per layer), cutoutMask, bevel (0..1), bevelAll (the Klassisch
   // look: the seamless materials get the rim too, so every block shows its edges)}
   VR.buildTextureArrays = function (opts) {
@@ -151,7 +139,7 @@
 
   // 256x256 tileable noise: R fbm(8), G fbm(16), B smooth waves(4+8), A white noise
   VR.buildNoiseTexture = function () {
-    const S = 256, out = new Uint8Array(S * S * 4);
+    const S = VR.TEX_NOISE, out = new Uint8Array(S * S * 4);
     const hh = (x, y, s) => { let h = (x * 374761393 + y * 668265263 + s * 982451653) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
     const vn = (x, y, p, s) => {
       const fx = x / S * p, fy = y / S * p, ix = Math.floor(fx), iy = Math.floor(fy);
