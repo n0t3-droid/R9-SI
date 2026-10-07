@@ -1,0 +1,95 @@
+/* ============================================================================
+   W2 · 🖐 the Bauhand (the game): the ring over the world, the card of what you look at, the strip above the hotbar
+   while holding, the chip at the crosshair, its toast and the 🖐 button. Pictures first, one word each, ≥ 44 px
+   targets, the one accent colour (start.css tokens), quick and calm motion (none with reduced motion).
+   ============================================================================ */
+#bauhand { --bh-r: 160px; position: absolute; inset: 0; display: none; z-index: 40; pointer-events: auto; background: radial-gradient(circle at 50% 52%, rgba(4, 8, 20, 0.18) 0, rgba(4, 8, 20, 0.62) 62%, rgba(4, 8, 20, 0.78) 100%); font-family: var(--st-font); color: var(--st-ink); }
+#bauhand.on { display: block; animation: bhFade .16s ease-out; }
+@keyframes bhFade { from { opacity: 0; } to { opacity: 1; } }
+/* the card of what you look at: above the ring */
+#bauhand .bh-card { position: absolute; left: 50%; top: max(12px, calc(52% - var(--bh-r) - 168px)); transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 10px; border-radius: 18px; background: var(--st-bg2); border: 1px solid var(--st-line); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); max-width: min(92vw, 640px); animation: bhDrop .2s ease-out; }
+#bauhand .bh-card.empty { display: none; }
+@keyframes bhDrop { from { opacity: 0; transform: translate(-50%, -10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+#bauhand .bh-card > .bh-pic { width: 64px; height: 64px; flex: 0 0 64px; }
+#bauhand .bh-ctxt { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+#bauhand .bh-cname { font: 700 calc(var(--st-fs) * 1.05) var(--st-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bauhand .bh-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+#bauhand .bh-act, #bauhand .bh-zen, #bauhand .bh-more, #bauhand .bh-allx { min-height: 44px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--st-line); background: rgba(255, 255, 255, 0.05); color: var(--st-ink); font: 600 var(--st-fs) var(--st-font); cursor: pointer; transition: border-color .12s, background .12s; }
+#bauhand .bh-act:hover, #bauhand .bh-zen:hover, #bauhand .bh-more:hover, #bauhand .bh-allx:hover { border-color: var(--st-acc); background: rgba(58, 240, 255, 0.12); }
+#bauhand .bh-act[data-act="edit"] { border-color: var(--st-acc-dim); }
+/* the ring: slots around the centre of the screen (the crosshair), ✨ at the top */
+#bauhand .bh-ring { position: absolute; left: 50%; top: 52%; width: 0; height: 0; }
+#bauhand .bh-slot { position: absolute; left: 0; top: 0; width: 84px; height: 84px; margin: -42px 0 0 -42px; display: grid; place-items: center; border-radius: 24px; border: 2px solid var(--st-line); background: radial-gradient(circle at 50% 35%, rgba(40, 58, 100, 0.95), rgba(10, 15, 30, 0.95)); color: var(--st-ink); cursor: pointer; transform: translate(var(--x), var(--y)); box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5); transition: transform .14s ease-out, border-color .12s, box-shadow .15s; }
+#bauhand.on .bh-slot { animation: bhPop .26s cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: calc(var(--i, 0) * 22ms); }
+@keyframes bhPop { from { opacity: 0; transform: translate(calc(var(--x) * 0.35), calc(var(--y) * 0.35)) scale(.4); } to { opacity: 1; transform: translate(var(--x), var(--y)) scale(1); } }
+#bauhand .bh-slot:hover, #bauhand .bh-slot:focus-visible { border-color: var(--st-acc); box-shadow: 0 0 0 3px var(--st-acc-dim), 0 0 26px rgba(58, 240, 255, 0.4); transform: translate(var(--x), var(--y)) scale(1.12); outline: none; z-index: 2; }
+#bauhand .bh-slot:active { transform: translate(var(--x), var(--y)) scale(.96); }
+#bauhand .bh-slot .bh-pic { width: 64px; height: 64px; }
+#bauhand .bh-slot kbd { position: absolute; left: 6px; top: 4px; font: 700 13px var(--st-font); color: var(--st-mute); background: none; border: 0; padding: 0; }
+#bauhand .bh-slot .bh-star { position: absolute; right: 7px; top: 3px; font-size: 14px; color: #ffd27a; opacity: .85; }
+#bauhand .bh-new { background: radial-gradient(circle at 50% 35%, rgba(58, 240, 255, 0.42), rgba(60, 20, 110, 0.92)); border-color: rgba(58, 240, 255, 0.7); }
+#bauhand .bh-new .bh-pic { font-size: 40px; filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.6)); }
+#bauhand .bh-name { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); max-width: 220px; padding: 6px 14px; border-radius: 12px; background: rgba(5, 8, 18, 0.82); font: 700 calc(var(--st-fs) * 1.1) var(--st-font); text-align: center; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bauhand .bh-name:empty { display: none; }
+#bauhand .bh-more { position: absolute; left: 0; top: 0; transform: translate(-50%, calc(var(--bh-r) + 56px)); white-space: nowrap; }
+#bauhand .bh-x { position: absolute; right: 18px; top: 18px; width: 52px; height: 52px; border-radius: 16px; border: 1px solid var(--st-line); background: var(--st-bg2); color: var(--st-ink); font: 700 22px var(--st-font); cursor: pointer; }
+#bauhand .bh-x:hover { border-color: var(--st-acc); }
+#bauhand .bh-note { position: absolute; left: 50%; top: calc(52% + var(--bh-r) + 104px); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; max-width: min(92vw, 560px); }
+#bauhand .bh-msg { padding: 8px 16px; border-radius: 14px; background: var(--st-bg2); border: 1px solid var(--st-line); font: 600 var(--st-fs) var(--st-font); }
+#bauhand.survival .bh-note { top: 52%; transform: translate(-50%, -50%); }
+#bauhand.survival .bh-msg { font-size: calc(var(--st-fs) * 1.2); padding: 14px 22px; }
+#bauhand .bh-zen { background: rgba(58, 240, 255, 0.16); border-color: var(--st-acc); }
+/* ▸ alle: everything for the hand, as a grid by kind */
+#bauhand .bh-all { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 760px); max-height: 76vh; overflow: auto; padding: 14px 16px 18px; border-radius: 20px; background: var(--st-bg2); border: 1px solid var(--st-line); box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6); z-index: 3; }
+#bauhand .bh-allhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; font: 700 calc(var(--st-fs) * 1.05) var(--st-font); }
+#bauhand .bh-gtitle { margin: 12px 2px 6px; color: var(--st-mute); font: 700 var(--st-fs) var(--st-font); }
+#bauhand .bh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+#bauhand .bh-gitem { display: flex; flex-direction: column; align-items: center; gap: 4px; min-height: 96px; padding: 8px 4px; border-radius: 14px; border: 1px solid var(--st-line); background: rgba(255, 255, 255, 0.04); color: var(--st-ink); cursor: pointer; }
+#bauhand .bh-gitem:hover, #bauhand .bh-gitem:focus-visible { border-color: var(--st-acc); background: rgba(58, 240, 255, 0.1); outline: none; }
+#bauhand .bh-gitem .bh-pic { width: 52px; height: 52px; }
+#bauhand .bh-gname { font: 600 calc(var(--st-fs) * 0.78) var(--st-font); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* a picture: the canvas or image fills its box; before it is there, the glyph */
+.bh-pic { display: inline-grid; place-items: center; font-size: 30px; line-height: 1; }
+.bh-pic.has { font-size: 0; }
+.bh-pic canvas, .bh-pic img { width: 100%; height: 100%; object-fit: contain; image-rendering: auto; }
+/* while holding: the strip above the hotbar */
+.bh-strip { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); display: none; align-items: center; gap: 12px; padding: 6px 8px 6px 8px; border-radius: 18px; background: var(--st-bg2); border: 1px solid var(--st-line); color: var(--st-ink); font: 600 var(--st-fs) var(--st-font); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5); z-index: 25; pointer-events: auto; max-width: min(96vw, 900px); }
+.bh-strip.on { display: flex; animation: bhUp .2s ease-out; }
+@keyframes bhUp { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+.bh-strip .bh-shand { display: flex; align-items: center; gap: 8px; padding-right: 10px; border-right: 1px solid var(--st-line); white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.bh-strip .bh-shand .bh-pic { width: 40px; height: 40px; flex: 0 0 40px; font-size: 22px; }
+.bh-strip .bh-pictos { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.bh-strip .bh-p { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.bh-strip kbd { font: 700 14px var(--st-font); color: var(--st-ink); min-width: 28px; height: 28px; display: inline-grid; place-items: center; padding: 0 6px; border: 1px solid var(--st-line); border-bottom-width: 3px; border-radius: 7px; background: rgba(255, 255, 255, 0.06); }
+.bh-mouse { display: inline-block; position: relative; width: 16px; height: 24px; border: 2px solid currentColor; border-radius: 9px; box-sizing: border-box; color: var(--st-ink); }
+.bh-mouse::before { content: ''; position: absolute; left: 50%; top: 0; width: 2px; height: 8px; background: currentColor; transform: translateX(-50%); }
+.bh-mouse.lr { background: linear-gradient(to bottom, var(--st-acc) 0 38%, transparent 38%); }
+.bh-mouse.l { background: linear-gradient(to right, var(--st-acc) 0 50%, transparent 50%) top left / 100% 38% no-repeat; }
+.bh-mouse.r { background: linear-gradient(to left, var(--st-acc) 0 50%, transparent 50%) top left / 100% 38% no-repeat; }
+.bh-mouse.wheel::after { content: ''; position: absolute; left: 50%; top: 2px; width: 4px; height: 7px; border-radius: 2px; background: var(--st-acc); transform: translateX(-50%); }
+.bh-strip .bh-sbtn { min-width: 44px; min-height: 44px; border-radius: 12px; border: 1px solid var(--st-line); background: rgba(255, 255, 255, 0.05); color: var(--st-ink); font: 700 20px var(--st-font); cursor: pointer; }
+.bh-strip .bh-sbtn:hover { border-color: var(--st-acc); }
+.bh-strip .bh-sbtn.x { margin-left: 2px; }
+.bh-strip.block .bh-shand { border-right: 1px solid var(--st-line); }
+#ui.bh-hold #hints { bottom: 158px; }
+#ui.bh-hold #itemname { opacity: 0 !important; }
+/* the chip at the crosshair: ✓ the name, or ✕ and the one reason (the colour is not the only sign) */
+.bh-chip { position: absolute; left: 50%; top: calc(50% + 28px); transform: translateX(-50%); display: none; padding: 6px 14px; border-radius: 12px; font: 700 calc(var(--st-fs) * 0.95) var(--st-font); background: rgba(5, 9, 20, 0.78); border: 2px solid var(--st-line); color: var(--st-ink); pointer-events: none; z-index: 24; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.bh-chip.on { display: block; }
+.bh-chip.ok { border-color: rgba(58, 240, 255, 0.85); color: #dffcff; }
+.bh-chip.bad { border-color: #ff5a5a; border-style: dashed; color: #ffd6d6; }
+.bh-chip.wait { color: var(--st-mute); }
+.bh-chip.shake { animation: bhShake .32s ease-in-out; }
+@keyframes bhShake { 0%, 100% { transform: translateX(-50%); } 25% { transform: translateX(calc(-50% - 7px)); } 50% { transform: translateX(calc(-50% + 7px)); } 75% { transform: translateX(calc(-50% - 4px)); } }
+/* the toast: what happened, six seconds */
+.bh-toast { position: absolute; left: 50%; bottom: 152px; transform: translateX(-50%); display: none; padding: 10px 18px; border-radius: 14px; background: var(--st-bg2); border: 1px solid rgba(58, 240, 255, 0.6); color: var(--st-ink); font: 700 calc(var(--st-fs) * 1.05) var(--st-font); box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5); z-index: 26; pointer-events: none; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+.bh-toast.on { display: block; animation: bhUp .25s ease-out; }
+.bh-toast.warn { border-color: #ffb45a; color: #ffe2bd; }
+#ui.bh-hold .bh-toast { bottom: 150px; }
+/* 🖐: the way to the hand without a key (bottom right) */
+.bh-btn { position: absolute; right: 16px; bottom: 16px; width: 64px; height: 64px; display: none; place-items: center; border-radius: 20px; border: 2px solid var(--st-line); background: var(--st-bg2); color: var(--st-ink); font-size: 32px; cursor: pointer; z-index: 22; pointer-events: auto; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45); }
+.bh-btn.on { display: grid; }
+.bh-btn:hover { border-color: var(--st-acc); }
+.bh-btn.pulse { animation: tilePulse 1.6s ease-in-out infinite; border-color: var(--st-acc); }
+@media (max-width: 700px) { #bauhand .bh-slot { width: 66px; height: 66px; margin: -33px 0 0 -33px; border-radius: 18px; } #bauhand .bh-slot .bh-pic { width: 50px; height: 50px; } .bh-strip .bh-pictos { display: none; } }
+@media (prefers-reduced-motion: reduce) { #bauhand.on, #bauhand.on .bh-slot, #bauhand .bh-card, .bh-strip.on, .bh-toast.on, .bh-chip.shake, .bh-btn.pulse { animation: none; } #bauhand .bh-slot { transition: none; } }
