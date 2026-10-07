@@ -438,7 +438,8 @@ await section(12, 'keyboard, 📜 and English: Tab lands on ▶, Enter and Esc, 
   check(lg.shown && /Impressum/.test(lg.text) && lg.h >= 44, 'with VR.Legal: „' + lg.text + '" on the start screen');
   await shot('start_game_legal');
   await page.click('#title [data-act="legal"]'); await wait(100);
-  check(await ev(() => window.__legal === 'open'), 'a click calls VR.Legal.open()');
+  check(await ev(() => window.__legal === 'impressum'), 'a click opens VR.Legal on the Impressum (≤ 2 clicks from the start)');
+  check(await ev(() => document.querySelectorAll('#title [data-legal]').length === 1), 'it carries data-legal: VR.Legal adds no second one');
   await ev(() => { delete VR.Legal; VR.Start.texts(); });
   // English, said in the game: /lang en works in Einfach (the language is a setting Einfach keeps)
   await ensureWorld();
