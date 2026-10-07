@@ -754,7 +754,17 @@
         else this.ui.chatLine(`Welcome to ${this.meta.name}. Click the view to look around · E inventory · Esc menu`, '#9ad8ff');
         if (this.player.mode === 'zen') this.ui.chatLine('Zen Builder: no mobs, no damage, no hunger. Freeze time & weather in the Esc menu.', '#b8ffcf');
         this.autosaveAt = performance.now() + 60000;
+        this.startPrewarm();
       }
+    }
+    // the lazy models (the Modern Living pack and the other generated blocks) are built in idle time, never in the first
+    // 10 s of play (VM.prewarm: one per idle slice, largest first); hidden tabs stop it, and it resumes when shown again
+    startPrewarm() {
+      if (!VR.VM || !VR.VM.prewarm) return;
+      if (this.prewarm) this.prewarm.stop();
+      this.prewarm = VR.VM.prewarm({ notBefore: performance.now() + 10000 });
+      this.prewarm.start();
+      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden && this.prewarm) this.prewarm.start(); }); }
     }
     playFrame(dt) {
       const g = this, p = this.player, w = this.world, input = this.input;
