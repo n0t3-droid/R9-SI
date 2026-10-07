@@ -356,6 +356,8 @@ section('place', () => {
   check(/ändert nichts|changes nothing/.test(chat[chat.length - 1]) && B.plans.length === nPlans, 'words that name nothing and change nothing: a hint, no plan: ' + chat[chat.length - 1]);
   // a bridge over a valley, placed on the near bank: the ground is read under it, the piers stand on the valley floor
   edits.clear(); groundAt = (x, z) => (z >= 10 && z <= 40 ? GY - 10 : GY); player.pos = [200.5, GY + 1, -6]; player.yaw = Math.PI; player.pitch = -0.4;
+  { const B3 = new VR.Blueprints(gad); B3.plans = []; B3.forgeCommand('Brücke aus Stein'.split(' ')); const b = B3.plans[0];
+    check(b && Forge.parse(b.dna).params.l >= 40 && Forge.parse(b.dna).params.l <= 47, '/bau Brücke (no length) spans the valley in front of you onto the far bank: ' + (b && b.dna)); }
   B.forgeCommand('Bogenbrücke 40 lang aus Stein'.split(' '));
   const br = B.plans.find(p => p.kind === 'forge' && /^bridge/.test(p.dna));
   run();
