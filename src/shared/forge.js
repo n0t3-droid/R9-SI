@@ -116,6 +116,14 @@
   };
   // the rows the game's levelling clears on a lot anyway (blueprints.js planAt: the piece's volume up to 24 rows)
   Forge.CLEARED = (top) => Math.min(top + 2, 23);
+  // the grid as it stands in the world: on a levelled lot the placer clears those rows, so keep-world there is air
+  // (what a walk from the street has to go through: the forecourt, the yard, the path to the door)
+  Forge.asPlaced = function (g) {
+    const M = g.meta || {}; if (!M.level) return g;
+    const c0 = Forge.CLEARED(M.top), b = g.blocks.slice(), n = g.sx * g.sz;
+    for (let y = 0; y < g.sy; y++) { const yy = y + g.dy; if (yy < 0 || yy > c0) continue; for (let i = y * n; i < (y + 1) * n; i++) if (b[i] === KEEP) b[i] = 0; }
+    return Object.assign({}, g, { blocks: b });
+  };
   // the game worker's job: {dna, ground?: Int16Array(W·D) (the terrain under the lot, rows relative to the floor, 99 =
   // unknown), W, D} → {type:'forge', ops: Int32Array [u, y, v, state]…, lot, top, bottom, level, terrain, name, doors,
   // floors, roof} — every non-keep cell, y relative to the floor; air included (it clears) except where the levelling of
