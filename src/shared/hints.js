@@ -49,6 +49,8 @@
   };
   function hide() { cur = null; if (box) { box.classList.remove('on'); box.innerHTML = ''; } }
   H.dismiss = () => { if (!cur) return false; hide(); return true; };
+  // the language changed while a hint shows: its line again, in the new words (nothing counted)
+  H.retext = (text) => { if (!cur || !box) return false; const t = box.querySelector('.txt'); if (t) t.textContent = String(text || ''); const x = box.querySelector('.x'); if (x && VR.I18N) x.setAttribute('title', VR.I18N.tx('hint.close', null, 'Ausblenden', 'Hide')); return true; };
   H.done = (id) => { const st = read(); if (!st.done[id]) { st.done[id] = Date.now(); write(st); } if (cur === id) hide(); };
   H.reset = () => { try { localStorage.removeItem(KEY); } catch (e) { /* */ } shownNow = new Set(); hide(); };
   H._newSession = () => { shownNow = new Set(); hide(); };   // (tests: the next session)
