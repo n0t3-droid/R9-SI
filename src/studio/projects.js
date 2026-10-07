@@ -226,7 +226,7 @@
   function ensureEl() {
     let el = $('#hub'); if (el) return el;
     el = document.createElement('div'); el.id = 'hub';
-    el.innerHTML = `<div class="hubBox" role="dialog" aria-label="${esc(L('pj.title', 'Weitermachen'))}">
+    el.innerHTML = `<div class="hubBox" role="dialog" aria-label="${esc('🎒 ' + L('pj.meins', 'Meins'))}">
       <header><span class="t">🎒 ${L('pj.meins', 'Meins')}</span><div class="hubF"></div><input class="hubQ" placeholder="${esc(L('pj.search', 'Suchen …'))}" autocomplete="off" spellcheck="false"><button class="x" data-a="close" title="${esc(L('pj.close', 'Schließen (Esc)'))}">${IC('close', 18)}</button></header>
       <div class="hubBody"></div>
       <footer><span class="lbl">${L('pj.new', 'Neu')}</span><div class="new"></div><span class="boot"></span><div class="xfer"><button data-pack="out" title="${esc(L('br.outT', 'Favoriten, Designs und Bauteile als eine Datei — für das Spiel oder ein anderes Studio'))}">📦 ${L('br.out', 'Mitnehmen')}</button><button data-pack="in" title="${esc(L('br.inT', 'Ein R9-Paket (.json) übernehmen — oder die Datei einfach hierher ziehen'))}">📥 ${L('br.in', 'Übernehmen')}</button></div><span class="keys"><kbd>Strg</kbd>+<kbd>O</kbd> ${L('pj.keys', 'öffnet diese Seite überall')}</span></footer></div>`;

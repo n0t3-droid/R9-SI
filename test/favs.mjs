@@ -30,17 +30,17 @@ const g1 = await gev(async () => {
   const g = VR.game, ui = g.ui;
   ui.openInventory('creative');
   const tabs = [...document.querySelectorAll('#invpanel .tabs button')].map(b => b.textContent);
-  [...document.querySelectorAll('#invpanel .tabs button')].find(b => /Favorites/.test(b.textContent)).click();
+  document.querySelector('#invpanel .tabs button[data-cat="fav"]').click();
   const empty = document.querySelector('#invpanel .palette .note');
   const r = { tabs: tabs.slice(0, 3), empty: empty ? empty.textContent : null, slots0: document.querySelectorAll('#invpanel .palette .slot').length };
   // the Building tab: hover a slot, press F
-  [...document.querySelectorAll('#invpanel .tabs button')].find(b => /Building/.test(b.textContent)).click();
+  document.querySelector('#invpanel .tabs button[data-cat="build"]').click();
   const s = document.querySelector('#invpanel .palette .slot[data-id]'); r.first = s.dataset.id;
   s.dispatchEvent(new MouseEvent('mouseenter'));
   return r;
 });
 console.log('  game', JSON.stringify(g1));
-check(g1.tabs[0] === '★ Favorites' && g1.slots0 === 0 && /No favourites yet/.test(g1.empty || ''), 'the creative inventory starts with a ★ Favorites tab (empty: it says how)');
+check(/^★ (Favourites|Favoriten)$/.test(g1.tabs[0]) && g1.slots0 === 0 && /No favourites yet|Noch keine Favoriten/.test(g1.empty || ''), 'the creative inventory starts with a ★ Favourites tab (empty: it says how) — ' + g1.tabs[0]);
 await game.keyboard.press('KeyF'); await game.waitForTimeout(150);
 for (let i = 0; i < 4; i++) { await gev(() => { const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); }); }
 const g2 = await gev((first) => {
@@ -48,7 +48,7 @@ const g2 = await gev((first) => {
   // a ☆ on another slot
   const s2 = [...document.querySelectorAll('#invpanel .palette .slot[data-id]')][5]; s2.querySelector('.favS').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   const r = { favs: VR.Favs.list(), mark: s && s.classList.contains('fav'), second: s2.dataset.id, cursor: !!VR.game.ui.cursor };
-  [...document.querySelectorAll('#invpanel .tabs button')].find(b => /Favorites/.test(b.textContent)).click();
+  document.querySelector('#invpanel .tabs button[data-cat="fav"]').click();
   r.favSlots = [...document.querySelectorAll('#invpanel .palette .slot[data-id]')].map(x => x.dataset.id);
   return r;
 }, g1.first);

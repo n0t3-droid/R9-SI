@@ -51,7 +51,7 @@
     }
     const sum = (a) => a.reduce((s, k) => s + bytes(k), 0);
     return [
-      { id: 'pics', ic: '🖼', label: L('sp.pics', 'Bilder in 🕘 Weitermachen'), keys: G.pics, bytes: sum(G.pics) },
+      { id: 'pics', ic: '🖼', label: L('sp.pics2', 'Bilder in 🎒 Meins'), keys: G.pics, bytes: sum(G.pics) },
       { id: 'built', ic: '🧱', label: L('sp.built', 'fertige Werkbank-Pakete (das Spiel hat sie gebaut)'), keys: G.built, bytes: sum(G.built) },
       { id: 'gone', ic: '✎', label: L('sp.gone', 'verworfene Entwürfe'), keys: G.gone, bytes: sum(G.gone) },
       { id: 'empty', ic: '○', label: L('sp.empty', 'leere Entwürfe'), keys: G.empty, bytes: sum(G.empty) },
