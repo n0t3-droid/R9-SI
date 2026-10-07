@@ -52,16 +52,19 @@
     fluidDelay(s) { const t = R.T.type[s]; return t === this.t.lava ? (this.game.dim === 'underforge' ? 10 : 30) : t === this.t.aether ? 4 : 5; }
 
     // ---------------------------------------------------------------- main update
-    update(dt) {
+    // guest: in a friend's world the host runs the world — here only the sliding doors answer this player at once
+    update(dt, guest) {
       this.acc += dt;
       let n = 0;
-      while (this.acc >= TICK && n < 4) { this.acc -= TICK; this.step(); n++; }
+      while (this.acc >= TICK && n < 4) { this.acc -= TICK; this.step(guest); n++; }
       if (n >= 4) this.acc = 0;
     }
-    step() {
+    step(guest) {
       this.tick++;
       const g = this.game;
-      if (!this.enabled) { this.sched.clear(); this.schedKeys.clear(); return; }
+      // automatic sliding doors: doors, not world physics (they slide in Zen Builder and for a guest too)
+      if (this.tick % 3 === 0) this.slidingDoors();
+      if (guest || !this.enabled) { this.sched.clear(); this.schedKeys.clear(); return; }
       // scheduled
       let budget = 600;
       while (this.sched.size && this.sched.peekPri() <= this.tick && budget-- > 0) {
@@ -73,8 +76,6 @@
       this.randomTicks(3);
       // pressure plates (entities standing on them)
       if (this.tick % 4 === 0) this.checkPlates();
-      // automatic sliding doors
-      if (this.tick % 3 === 0) this.slidingDoors();
       void g;
     }
     run(e) {
@@ -491,30 +492,46 @@
     }
 
     // ---------------------------------------------------------------- automatic sliding doors (v0.33.2)
-    // The voxel glass doors ('mdoor': shops, modern houses) slide open when the player comes within reach and close
-    // behind them a little later; a door group (panels side by side, stacked) moves together.
+    // The voxel glass doors ('mdoor': shops, modern houses) slide open when someone comes within reach — the player or a
+    // friend in a multiplayer world — or on a right click, and close behind them a little later; a door group (panels
+    // side by side, stacked) moves together.
+    isSlide(s) {
+      if (!this.mdoorS) { const n = R.T.type.length; this.mdoorS = new Uint8Array(n); for (const t of R.types) if (t && t.o.vx && t.o.vx.kind === 'mdoor' && t.has('open')) for (let k = t.base; k < t.base + t.nstates; k++) this.mdoorS[k] = 1; }
+      return this.mdoorS[s] === 1;
+    }
+    setSlides(cells, v) { const w = this.game.world; let n = 0; for (const c of cells) { const s = w.getBlock(c[0], c[1], c[2]); if (!this.isSlide(s)) continue; const t = R.types[R.T.type[s]]; if (t.get(s, 'open') !== v) { w.setBlock(c[0], c[1], c[2], t.with(s, 'open', v), 4); n++; } } return n; }
     slidingDoors() {
       const g = this.game, w = g.world, p = g.player; if (!w || !p || !p.pos) return;
-      if (!this.mdoorS) { const n = R.T.type.length; this.mdoorS = new Uint8Array(n); for (const t of R.types) if (t && t.o.vx && t.o.vx.kind === 'mdoor' && t.has('open')) for (let k = t.base; k < t.base + t.nstates; k++) this.mdoorS[k] = 1; }
+      this.isSlide(0);
       const M = this.mdoorS, open = this.slides || (this.slides = new Map()), q = p.pos, now = this.tick;
-      const setOpen = (cells, v) => { let n = 0; for (const c of cells) { const s = w.getBlock(c[0], c[1], c[2]); if (!M[s]) continue; const t = R.types[R.T.type[s]]; if (t.get(s, 'open') !== v) { w.setBlock(c[0], c[1], c[2], t.with(s, 'open', v), 4); n++; } } return n; };
-      for (let y = Math.floor(q[1]) - 1; y <= Math.floor(q[1] + 1.8); y++) for (let z = Math.floor(q[2] - 5); z <= Math.floor(q[2] + 5); z++) for (let x = Math.floor(q[0] - 5); x <= Math.floor(q[0] + 5); x++) {
+      // whoever walks through doors here: the player and the friends in a multiplayer world
+      const bodies = [q]; if (g.mp && g.mp.active) for (const f of g.mp.players()) if (f.pos) bodies.push(f.pos);
+      for (const b of bodies) for (let y = Math.floor(b[1]) - 1; y <= Math.floor(b[1] + 1.8); y++) for (let z = Math.floor(b[2] - 5); z <= Math.floor(b[2] + 5); z++) for (let x = Math.floor(b[0] - 5); x <= Math.floor(b[0] + 5); x++) {
         const s = w.getBlock(x, y, z); if (!M[s]) continue;
         const t = R.types[R.T.type[s]], k = x + ',' + y + ',' + z;
-        if (Math.hypot(x + 0.5 - q[0], z + 0.5 - q[2]) <= 1.9 && y <= q[1] + 1.8 && y + 1 >= q[1]) {
+        if (Math.hypot(x + 0.5 - b[0], z + 0.5 - b[2]) <= 1.9 && y <= b[1] + 1.8 && y + 1 >= b[1]) {
           // near: the whole door group opens (and stays open while someone is here)
           const cells = this.slideGroup(x, y, z, s);
-          if (!t.get(s, 'open') && setOpen(cells, 1) && g.audio) g.audio.play('door');
-          for (const c of cells) open.set(c.join(','), now);
-        } else if (t.get(s, 'open') && !open.has(k)) open.set(k, now);   // left open (a save, a friend): closes when nobody is near
+          if (!t.get(s, 'open') && this.setSlides(cells, 1) && g.audio) g.audio.play('door');
+          for (const c of cells) { const ck = c.join(','); open.set(ck, Math.max(now, open.get(ck) || 0)); }
+        } else if (t.get(s, 'open') && !open.has(k)) open.set(k, now + 28);   // left open (a friend's click, a save): closes a little later when nobody is near
       }
       for (const [k, t0] of open) {
         if (now - t0 < 12) continue;
         open.delete(k);
         const c = k.split(',').map(Number), d = Math.hypot(c[0] + 0.5 - q[0], c[2] + 0.5 - q[2]);
-        if (d > 32) continue;
-        if (setOpen([c], 0) && d < 12 && g.audio && (c[1] === Math.floor(q[1]) || Math.random() < 0.3)) g.audio.play('door');
+        if (d > 32 && !bodies.some(b => Math.hypot(c[0] + 0.5 - b[0], c[2] + 0.5 - b[2]) <= 32)) continue;
+        if (this.setSlides([c], 0) && d < 12 && g.audio && (c[1] === Math.floor(q[1]) || Math.random() < 0.3)) g.audio.play('door');
       }
+    }
+    // a right click opens the whole sliding door as well — and keeps it open long enough (2 s) to walk up to it from a few
+    // blocks away; nearness keeps it open from there. A click on an open one keeps it open. Never a block in the doorway.
+    slideOpen(x, y, z, s) {
+      if (!this.isSlide(s)) return false;
+      const g = this.game, open = this.slides || (this.slides = new Map()), cells = this.slideGroup(x, y, z, s);
+      if (this.setSlides(cells, 1) && g.audio) g.audio.play('door');
+      for (const c of cells) { const ck = c.join(','); open.set(ck, Math.max(this.tick + 28, open.get(ck) || 0)); }
+      return true;
     }
     slideGroup(x, y, z, s) {
       const w = this.game.world, id = R.T.type[s], out = [], seen = new Set([x + ',' + y + ',' + z]), q = [[x, y, z]];
