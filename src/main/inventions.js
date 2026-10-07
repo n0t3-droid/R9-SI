@@ -19,10 +19,11 @@
     { k: 'holz', id: 'oak_log' }, { k: 'stein', id: 'cobblestone' }, { k: 'feuer', id: 'fire' },
     { k: 'wasser', id: 'water' }, { k: 'erde', id: 'dirt' }, { k: 'luft', id: 'feather' },
   ];
-  // the chapters of the book: key, a picture
+  // the chapters of the book: key, a picture, the name's key in the tables
   Inv.CATS = [
-    { k: 'anfang', icon: '🌱' }, { k: 'stoffe', icon: '🧱' }, { k: 'natur', icon: '🍎' }, { k: 'werkzeug', icon: '🔧' },
-    { k: 'haus', icon: '🏠' }, { k: 'kueche', icon: '🍳' }, { k: 'technik', icon: '⚡' }, { k: 'weltall', icon: '🚀' },
+    { k: 'anfang', icon: '🌱', t: 'erf.cat.anfang' }, { k: 'stoffe', icon: '🧱', t: 'erf.cat.stoffe' }, { k: 'natur', icon: '🍎', t: 'erf.cat.natur' },
+    { k: 'werkzeug', icon: '🔧', t: 'erf.cat.werkzeug' }, { k: 'haus', icon: '🏠', t: 'erf.cat.haus' }, { k: 'kueche', icon: '🍳', t: 'erf.cat.kueche' },
+    { k: 'technik', icon: '⚡', t: 'erf.cat.technik' }, { k: 'weltall', icon: '🚀', t: 'erf.cat.weltall' },
   ];
 
   // key · picture id · the main pair · chapter · [alternative pairs, comma separated]

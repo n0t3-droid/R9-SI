@@ -18,7 +18,7 @@ const ROOT = __dirname;
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxcells', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'biomes', 'gen_common', 'gen_overworld', 'gen_realm', 'shipgen', 'starship', 'gen_village', 'gen_city', 'gen_modern', 'gen_plan', 'gen_villa', 'gen_villa_rooms', 'gen_rails', 'gen_citadel', 'gen_heart', 'gen_temple', 'gen_isles', 'gen_canyon', 'gen_hills', 'gen_station', 'lod', 'gen_dims', 'light_local', 'mesher', 'physics', 'custom', 'style', 'edits', 'forge', 'forge_kit', 'forge_tower', 'forge_house', 'forge_bridge', 'forge_civic', 'forge_park'];
 const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_layout', 'tex_build'];
-const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'weather', 'env', 'input', 'place', 'player', 'storage', 'audio', 'ambience', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'tex_cache', 'game', 'start'];
+const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'weather', 'env', 'input', 'place', 'player', 'storage', 'audio', 'ambience', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'inventions', 'ui', 'tex_cache', 'game', 'start', 'invent'];
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
@@ -36,7 +36,7 @@ const uiShared = js('main', LANG) + '\n' + js('shared', UI_SHARED);
 const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + uiShared + '\n' + js('main', MAIN) + `
 window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.game.boot(); } catch (e) { console.error(e); document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;position:fixed;top:0;left:0;z-index:99">' + (e && e.stack || e) + '</pre>'); } });
 `;
-const css = read('src/ui/style.css') + '\n' + (exists('src/ui/start.css') ? read('src/ui/start.css') : '');
+const css = read('src/ui/style.css') + '\n' + (exists('src/ui/start.css') ? read('src/ui/start.css') : '') + '\n' + (exists('src/ui/invent.css') ? read('src/ui/invent.css') : '');   // (invent.css: the 💡 Erfinden screen)
 const guard = (s) => s.replace(/<\/script/gi, '<\\/script');
 const fonts = `<style>${read('src/ui/fonts/game_fonts.css')}</style>`;   // embedded (OFL): no request to Google's servers leaves the player's browser
 // 📜 Rechtliches — Impressum, Datenschutz, Credits, Hinweis: one overlay with its styles for the game and the Studio
