@@ -86,7 +86,7 @@
   W.wish = function (text) {
     if (!S) return;
     const r = K().wish(text);
-    if (!r || r.error) { S.note = r && r.error === 'unknown' ? { text: tx('wiz.unknown', { w: String(text).slice(0, 30) }, '„{w}" kenne ich noch nicht — vielleicht eins davon?', 'I don\'t know “{w}” yet — maybe one of these?'), chips: r.suggestions || [] } : ''; S.step = 1; S.more = false; render(); return; }
+    if (!r || r.error) { S.note = r && r.error === 'unknown' ? { text: tx('wiz.unknown', { w: String(text).slice(0, 30) }, '„{w}“ kenne ich noch nicht — vielleicht eins davon?', 'I don\'t know “{w}” yet — maybe one of these?'), chips: r.suggestions || [] } : ''; S.step = 1; S.more = false; render(); return; }
     S.tile = r.tile; S.six = r; S.sub = r.sub || null; S.type = r.type || null; S.seed = 1; S.lit = 0; S.step = 2; S.note = '';
     render();
   };
@@ -189,9 +189,9 @@
     if (thing.src === 'forge' && H.forge) src = await H.forge(thing.dna);
     else if (thing.src === 'house' && H.house) src = await H.house(thing.index);
     else src = K().grid(thing);
-    if (!src || !S || !VR.IsoPic) return;
-    const col = H.colors ? H.colors() : null; if (!col) return;
-    if (src instanceof HTMLCanvasElement || (typeof HTMLImageElement !== 'undefined' && src instanceof HTMLImageElement)) { put(src); return; }
+    if (!src || !S) return;
+    if (src instanceof HTMLCanvasElement || (typeof HTMLImageElement !== 'undefined' && src instanceof HTMLImageElement)) { put(src); return; }   // (a picture the page already has: the Studio's catalogue thumbs)
+    const col = H.colors ? H.colors() : null; if (!col || !VR.IsoPic) return;
     put(VR.IsoPic.toCanvas(VR.IsoPic.render(src, PW, PH, col)));
   }
 

@@ -58,7 +58,7 @@
   SS.legal = legal;
   // which tile is lit: 🏗 on the Karte, 🎒 while Meins is open, ✨ while the dialog is open
   function light() {
-    const P = PJ(), im = $('#imagine.on'), hub = !!(P && P.isOpen && P.isOpen());
+    const P = PJ(), im = $('#imagine.on, #wizard.on'), hub = !!(P && P.isOpen && P.isOpen());
     const on = (k, v) => { const b = $(`#tiles .tile[data-tile="${k}"]`); if (b) b.classList.toggle('on', !!v); };
     on('meins', hub); on('erschaffen', !!im && !hub); on('bauen', !hub && !im && S.mode === 'world'); on('play', false);
   }
@@ -69,7 +69,7 @@
     const P = PJ(), W = WM();
     const ready = (fn) => (P && P.whenReady ? P.whenReady(fn) : fn());
     if (what === 'meins') { if (P && P.show) P.show(true); return; }
-    if (what === 'erschaffen') { if (P && P.isOpen && P.isOpen()) P.show(false); ready(() => { const IM = W && W.imagine; if (IM && IM.open) IM.open(null, IM.aiOK ? 'genie' : 'house'); }); return; }
+    if (what === 'erschaffen') { if (P && P.isOpen && P.isOpen()) P.show(false); ready(() => { if (VR.Wizard && VR.Wizard.host && VR.Wizard.open({ from: 'studio' })) return; const IM = W && W.imagine; if (IM && IM.open) IM.open(null, IM.aiOK ? 'genie' : 'house'); }); return; }
     if (what === 'bauen') {
       if (P && P.isOpen && P.isOpen()) P.show(false);
       ready(async () => {
@@ -154,6 +154,8 @@
     const P = PJ(), ready = (fn) => (P && P.whenReady ? P.whenReady(fn) : fn());
     if (h === '#bauen') ready(() => SS.go('bauen'));
     else if (h === '#erschaffen') ready(() => SS.go('erschaffen'));
+    else if (h.startsWith('#erschaffen/')) { const k = h.slice(12); ready(() => { if (VR.StudioWizard) VR.StudioWizard.tool(k); }); }
+    else if (h.startsWith('#karte/')) { const id = decodeURIComponent(h.slice(7)); ready(() => SS.set(id)); }
     else if (h.startsWith('#ding/')) { const id = decodeURIComponent(h.slice(6)).replace(/\/edit$/, ''), edit = /\/edit$/.test(h); ready(() => { if (!known(id)) { toast(tx('st.gone', null, 'Das gibt es hier nicht (mehr).', 'That is not here (any more).')); return; } if (edit && D().handlers.edit) D().handlers.edit(id); else SS.view(id, { noLayer: true }); }); }
   }
 
@@ -166,7 +168,7 @@
       edit: (id) => SS.edit(id),
       set: (id) => SS.set(id),
       share: (id) => Dg.share(id),
-      canSet: (id) => (SA ? true : /^[hmb]:/.test(id)),   // (h: m: → the Karte; b: → into your hand in the game; k: g: p: s: come with W2's wizard)
+      canSet: (id) => (SA ? true : /^[hmbfp]:/.test(id) || (/^[kg]:/.test(id) && !!(VR.StudioWizard && VR.StudioWizard.canPiece(id)))),   // (h: m: f: p: → the Karte; b: → into your hand in the game; k: g: → their Bauteil)
       canEdit: (id) => (/^p:/.test(id) ? !!prefs().pro : true),
       pic: (id, w, h) => {
         const d = Dg.parse(id); if (!d) return null;
@@ -197,7 +199,9 @@
   SS.set = async function (id) {
     const Dg = D(), W = WM(), P = PJ();
     if (SA) { const on = Dg.toggleFav(id); toast((on ? '★ ' : '☆ ') + Dg.name(id)); return on; }
-    const d = Dg.parse(id); if (!d || !/^[hmb]$/.test(d.kind) || !W) return false;
+    let d = Dg.parse(id); if (!d || !W) return false;
+    if (/^[kg]$/.test(d.kind)) { const pc = VR.StudioWizard && VR.StudioWizard.makePiece(id); if (!pc) return false; id = pc; d = Dg.parse(id); }
+    if (!/^[hmbfp]$/.test(d.kind)) return false;
     if (P && P.isOpen && P.isOpen()) P.show(false);
     if (d.kind === 'b') {
       // a block: into your hand — ▶ opens the world with it (the game reads r9si.hand once)
@@ -213,7 +217,7 @@
       await W.openId(last.id, 'karte');
     } else if (S.mode !== 'world' || W.tab !== 'karte') { W.tab = 'karte'; C.setMode('world'); W.refresh(); }
     if (NAV()) NAV().clear();
-    W.tool = d.kind === 'h' ? W.houseItem(+d.key) : { kind: 'model', name: d.key };
+    W.tool = d.kind === 'h' ? W.houseItem(+d.key) : d.kind === 'f' ? { kind: 'forge', dna: d.key } : d.kind === 'p' ? { kind: 'piece', piece: id } : { kind: 'model', name: d.key };
     W.ghost = null; W.sel = null; W.karteSel = null; W.meshFor(W.tool); W.refresh();
     if (W.tipW) W.tipW(tx('karte.aim', null, 'Zeig auf den Boden — Klick setzt es · R dreht · Esc fertig', 'Point at the ground — a click places it · R turns · Esc done'), true);
     return true;
@@ -221,7 +225,8 @@
 
   // ---------------------------------------------------------------- the Karte tab of the Welt mode
   const karte = () => { const W = WM(); return !!(W && W.on && S.mode === 'world' && W.world && W.tab === 'karte'); };
-  const toolId = () => { const W = WM(); return W && W.tool ? (W.tool.kind === 'house' ? 'h:' + W.tool.index : 'm:' + W.tool.name) : null; };
+  const dingOfPlan = (t) => (t.kind === 'house' ? 'h:' + t.index : t.kind === 'forge' ? 'f:' + t.dna : t.kind === 'piece' ? t.piece : 'm:' + t.name);
+  const toolId = () => { const W = WM(); return W && W.tool ? dingOfPlan(W.tool) : null; };
   const newId = () => 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
   function wrap(name, fn) { const prev = HOOK[name]; HOOK[name] = function (...a) { const r = fn.apply(null, a); if (r !== false) return r; return prev ? prev.apply(null, a) : false; }; }
   // the chips: Einfach → ★ · 🏠 Häuser · 🪑 Möbel · 🌍 Welten; Profi → the world's tabs with 🗺 Karte first
@@ -229,7 +234,7 @@
   HOOK.chips = function (...a) {
     const W = WM(); if (!W || !W.on || S.mode !== 'world' || !W.world) return prevChips ? prevChips.apply(null, a) : false;
     const el = $('#chips');
-    const favN = (VR.Favs ? VR.Favs.list() : []).map(f => D().fromFav(f)).filter(id => id && /^[hm]:/.test(id) && known(id)).length;
+    const favN = (VR.Favs ? VR.Favs.list() : []).map(f => D().fromFav(f)).filter(id => id && (/^[hmp]:/.test(id) ? known(id) : /^[fkg]:/.test(id))).length;
     if (prefs().pro) {
       // the world's own tabs, 🗺 Karte in front of them
       const r = prevChips ? prevChips.apply(null, a) : false;
@@ -254,7 +259,7 @@
     const W = WM(), Dg = D(), el = $('#list');
     const keepScroll = W.karteScroll !== undefined && W.karteScroll !== null ? W.karteScroll : el.scrollTop; W.karteScroll = null;
     el.classList.remove('palette'); el.classList.add('houses', 'dings');
-    const favIds = (VR.Favs ? VR.Favs.list() : []).map(f => Dg.fromFav(f)).filter(id => id && /^[hm]:/.test(id) && known(id) && !(id[0] === 'm' && C.isFacade(id.slice(2))));
+    const favIds = (VR.Favs ? VR.Favs.list() : []).map(f => Dg.fromFav(f)).map(id => (id && /^[kg]:/.test(id) && VR.StudioWizard ? VR.StudioWizard.pieceOf(id) : id)).filter((id, i, a) => id && /^[hmfp]:/.test(id) && a.indexOf(id) === i && (id[0] === 'f' || known(id)) && !(id[0] === 'm' && C.isFacade(id.slice(2))));
     const cat = prefs().pro ? (W.karteCat || 'house') : (W.karteCat || (favIds.length ? 'fav' : 'house'));
     let ids = [];
     if (cat === 'fav') ids = favIds;
@@ -332,7 +337,7 @@
     } else {
       const sel = W.plans.find(p => p.id === W.sel);
       if (sel && sel.status !== 'built') {
-        const sid = sel.kind === 'house' ? 'h:' + sel.index : 'm:' + sel.name;
+        const sid = dingOfPlan(sel);
         H(tx('st.selected', null, 'Ausgewählt', 'Selected'), esc(Dg.name(sid)));
         row(btn('↻ ' + tx('st.turn', null, 'Drehen · R', 'Turn · R'), () => { const m = W.meshFor(sel); if (m) W.change(() => W.rotate(sel, m)); }), btn('✕ ' + tx('st.remove', null, 'Weg damit', 'Remove'), () => { W.change(() => { W.plans = W.plans.filter(q => q !== sel); W.sel = null; }); W.commit(true); }));
         note(sel.status === 'pending' ? tx('st.pendingNote', null, 'Das Spiel baut es, sobald die Gegend geladen ist.', 'The game builds it as soon as that land is loaded.') : '', 'dim');
@@ -384,7 +389,7 @@
     for (const b of $$('nav.modes button[data-mode]')) if (!b.disabled) b.onclick = () => { if (NAV()) NAV().clear(); C.setMode(b.dataset.mode); };
     setInterval(light, 400);
     window.addEventListener('load', () => setTimeout(routes, 450));
-    window.addEventListener('hashchange', () => { if (/^#(bauen|erschaffen|ding\/)/.test(location.hash || '')) routes(); });
+    window.addEventListener('hashchange', () => { if (/^#(bauen|erschaffen|ding\/|karte\/)/.test(location.hash || '')) routes(); });
   }
   init();
 })();

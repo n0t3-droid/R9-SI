@@ -125,4 +125,21 @@
 
   // ---------------------------------------------------------------- the start screen's ✨ tile opens it right there
   if (VR.Start) VR.Start.erschaffen = function () { Wz.open({ from: 'title' }); };
+
+  // ---------------------------------------------------------------- 🎒 Meins: a Forge thing's card shows it (an iso picture)
+  const fPics = new Map();
+  function forgePic(id) {
+    const dna = id.slice(2), cv = document.createElement('canvas'); cv.width = 240; cv.height = 180; cv.style.width = '100%'; cv.style.height = '100%'; cv.style.objectFit = 'contain';
+    const paint = (img) => { if (img) cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); };
+    const have = fPics.get(dna); if (have && have.done) { paint(have.done); return cv; }
+    const job = have || { wait: [] }; job.wait.push(paint); fPics.set(dna, job);
+    if (!have) host.forge(dna).then((src) => { const col = host.colors(); if (!src || !col) { fPics.delete(dna); return; } const img = VR.IsoPic.toCanvas(VR.IsoPic.render(src, 240, 180, col)); job.done = img; for (const f of job.wait) f(img); job.wait = []; });
+    return cv;
+  }
+  setInterval(() => {
+    const Dg = VR.Ding, H = Dg && Dg.handlers; if (!H || !H.__game || H.__wz) return;
+    const prev = H.pic;
+    H.pic = function (id, w, h) { if (/^f:/.test(id) && VR.IsoPic && host.colors()) return forgePic(id); return prev ? prev(id, w, h) : null; };
+    H.__wz = true;
+  }, 1000);
 })(VR);
