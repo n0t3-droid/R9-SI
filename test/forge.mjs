@@ -128,14 +128,14 @@ const verify = await gev(([pl, lot]) => {
   const W = lot[0], D = lot[1], y0 = bp.bottom, sy = bp.top - y0 + 3, grid = { sx: W, sy, sz: D, dy: y0, blocks: new Uint16Array(W * sy * D) };
   for (let y = 0; y < sy; y++) for (let v = 0; v < D; v++) for (let u = 0; u < W; u++) { const q = ROT[pl.r & 3](u, v); grid.blocks[(y * D + v) * W + u] = w.getBlock(pl.x + q[0], pl.y + y0 + y, pl.z + q[1]); }
   const door = bp.doors && bp.doors[0];
-  const wk = door ? Fg.walkable(grid, [door[0], door[1] - y0, door[2] + 1], {}) : { floors: [] };
+  const wk = door ? Fg.walkable(grid, [door[0], -y0, 0], {}) : { floors: [] };   // from the street at the lot's front edge
   const want = (bp.floors || []).concat(bp.roof !== null && bp.roof !== undefined ? [bp.roof] : []).map(f => f - y0 + 1);
   const hit = want.filter(y => wk.floors.includes(y));
   return { ok, bad, floors: hit.length, want: want.length, roof: bp.roof !== null && wk.floors.includes(bp.roof - y0 + 1), reach: wk.reach ? wk.reach.size : 0, name: bp.name, cells: bp.ops.length / 4 };
 }, [plan.p, plan.lot]);
 console.log('in the game:', JSON.stringify(verify));
 check(verify.ok > 0 && verify.bad === 0, 'the world holds the tower cell for cell (' + verify.ok + ' ok / ' + verify.bad + ' off)');
-check(verify.want > 20 && verify.floors === verify.want && verify.roof, 'a person walks from the door over the stairs to every floor and onto the roof of the built tower (' + verify.floors + '/' + verify.want + ' levels, roof ' + verify.roof + ')');
+check(verify.want > 20 && verify.floors === verify.want && verify.roof, 'a person walks in from the street, over the stairs to every floor and onto the roof of the built tower (' + verify.floors + '/' + verify.want + ' levels, roof ' + verify.roof + ')');
 // one Z takes the whole tower back, another build puts it there again (the slices are one undo step)
 const undo = await gev(([pl]) => { const g = VR.game, before = g.world.getBlock(pl.x, pl.y + 10, pl.z + 10); const n = g.gadgets.wand.undo.length; return { n, top: g.gadgets.wand.undo[n - 1] ? g.gadgets.wand.undo[n - 1].length : 0, before }; }, [plan.p]);
 check(undo.top > 16000, 'the slices left one undo step for the whole tower (' + undo.top + ' cells)');

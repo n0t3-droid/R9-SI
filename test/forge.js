@@ -140,9 +140,9 @@ section('tower', () => {
     check(g && g.sx === 20 && g.sz === 18 && M.lot[0] === 20 && M.lot[1] === 18, dna + ' builds on its lot');
     check(M.floors.length === 12 && g.sy >= 12 * M.sh + 3, dna + ' twelve floors, ' + g.sy + ' high');
     check(M.doors.length >= 1 && cell(g, M.doors[0][0], M.doors[0][1] - g.dy, M.doors[0][2]) !== 0xFFFF, dna + ' has a door');
-    const wk = Forge.walkable(g, [M.doors[0][0], M.doors[0][1] - g.dy, M.doors[0][2] + 1], {});
+    const wk = Forge.walkable(Forge.asPlaced(g), [M.doors[0][0], -g.dy, 0], {});   // from the street at the lot's front edge (as placed: the forecourt cleared)
     const hit = M.floors.filter(y => wk.floors.includes(y - g.dy + 1));
-    check(hit.length === M.floors.length, dna + ' staircase reaches every floor without ladders: ' + hit.length + '/' + M.floors.length);
+    check(hit.length === M.floors.length, dna + ' from the street through the door, the staircase reaches every floor without ladders: ' + hit.length + '/' + M.floors.length);
     check(M.roof === M.floors[M.floors.length - 1] + M.sh && wk.floors.includes(M.roof - g.dy + 1), dna + ' … and goes on up onto the roof (' + (M.roof - g.dy + 1) + ')');
     const perFloor = M.floors.map(y => count(g, (s, x, yy, z) => isGlass(s) && (x === 0 || z === 0 || x === g.sx - 1 || z === g.sz - 1 || true), y - g.dy + 1, y - g.dy + M.sh - 1));
     check(perFloor.every(k => k >= 4), dna + ' glass on every storey: ' + perFloor.slice(0, 4).join('/') + '…');
@@ -340,7 +340,7 @@ section('place', () => {
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
   // the built piece read back from the world into a lot-local grid, then walked from its door
   const readBack = (pl, bp) => { const W = bp.lot[0], D = bp.lot[1], y0 = bp.bottom, sy = bp.top - y0 + 3, gr = { sx: W, sy, sz: D, dy: y0, blocks: new Uint16Array(W * sy * D) }; for (let y = 0; y < sy; y++) for (let v = 0; v < D; v++) for (let u = 0; u < W; u++) { const q = ROT[pl.r & 3](u, v); gr.blocks[(y * D + v) * W + u] = world.getBlock(pl.ox + q[0], pl.F + y0 + y, pl.oz + q[1]); } return gr; };
-  const levels = (pl, BB) => { const bp = (BB || B).planPiece(pl), gr = readBack(pl, bp), d = bp.doors[0], wk = Forge.walkable(gr, [d[0], d[1] - gr.dy, d[2] + 1], {}); const want = bp.floors.concat([bp.roof]).map(y => y - gr.dy + 1); return { hit: want.filter(y => wk.floors.includes(y)).length, want: want.length, bp }; };
+  const levels = (pl, BB) => { const bp = (BB || B).planPiece(pl), gr = readBack(pl, bp), d = bp.doors[0], wk = Forge.walkable(gr, [d[0], -gr.dy, 0], {}); const want = bp.floors.concat([bp.roof]).map(y => y - gr.dy + 1); return { hit: want.filter(y => wk.floors.includes(y)).length, want: want.length, bp }; };
   B.forgeCommand('Hochhaus 30 Stockwerke Glas'.split(' '));
   const pl = B.plans.find(p => p.kind === 'forge');
   check(pl && /^tower:f30/.test(pl.dna) && pl.status === 'pending' && JSON.parse(store.get('r9si.plans.w1')).plans.length === 1, '/bau Hochhaus 30 Stockwerke Glas → a plan where you look, stored for the Studio: ' + (pl && pl.dna) + ' at ' + (pl && [pl.ox, pl.F, pl.oz, pl.r].join(' · ')));
@@ -392,7 +392,7 @@ section('sweep', () => {
     const dna = Forge.dna(id, P, 1 + i, t.styles[i % t.styles.length].id), g = Forge.build(dna), M = g.meta, d = M.doors[0], up = (y) => y - g.dy + 1;
     const c0 = process.cpuUsage(); Forge.build(dna); const cu = process.cpuUsage(c0); if ((cu.user + cu.system) / 1000 > 400) slow++;
     let miss;
-    if (id === 'tower') miss = missing(g, [d[0], d[1] - g.dy, d[2] + 1], M.floors.map(up).concat([up(M.roof)]));
+    if (id === 'tower') miss = missing(Forge.asPlaced(g), [d[0], -g.dy, 0], M.floors.map(up).concat([up(M.roof)]));   // from the street
     else if (id === 'house') miss = missing(g, [d[0], d[1] - g.dy, d[2] - 1], M.floors.map(up));
     else if (id === 'castle') miss = missing(g, [g.sx >> 1, -g.dy + 1, 0], [up(M.walk), up(M.towerTop)].concat(M.keep ? M.keep.floors.map(up).concat([up(M.keep.roof)]) : []));
     else if (id === 'stadium') miss = missing(g, [d[0], d[1] - g.dy, d[2]], M.floors.map(up));
