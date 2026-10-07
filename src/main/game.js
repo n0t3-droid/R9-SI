@@ -5,6 +5,8 @@
 (function (VR) {
   'use strict';
   const R = VR.R, F = VR.F;
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
     potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true },
     low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false },
@@ -112,7 +114,7 @@
         seamlessSay: ['Blöcke: Nahtlos — sanfte Hänge, verbundenes Glas, nahtlose Materialien.', 'Blocks: Seamless — smooth slopes, joined glass, seamless materials.'],
         host: ['In dieser Welt gilt der Look des Hosts.', "In this world the host's look applies."],
       }[k] || [k, k];
-      if (VR.I18N) return VR.I18N.tx('g.look.' + k, null, L[0], L[1]);
+      if (VR.I18N) return VR.I18N.tx('g.look.' + k, null, L[0], L[1]);   // (lang_de.js / lang_en.js hold the same words)
       let de = false; try { const s = localStorage.getItem('r9si.lang'); de = s ? s === 'de' : /^de\b/i.test(navigator.language || ''); } catch (e) { /* storage blocked */ }
       return de ? L[0] : L[1];
     }
@@ -138,14 +140,14 @@
       if (after !== before) { if (this.icons) this.icons.cache.clear(); this.remeshAll(); }
       if (this.gadgets && this.gadgets.blue) this.gadgets.blue.reset();
       const n = VR.Custom.count();
-      if (this.ui && this.ui.toast && this.state === 'play') this.ui.toast('R9 Studio', `${n.houses} eigene Häuser · ${n.models} eigene Items übernommen`);
+      if (this.ui && this.ui.toast && this.state === 'play') this.ui.toast('R9 Studio', T('g.studio.designs', { h: n.houses, m: n.models }));
       if (this.ui && this.ui.studioNote) this.ui.studioNote();
     }
 
     // ---------------------------------------------------------------- boot
     async boot() {
       try { this.renderer = new VR.Renderer(this.canvas); }
-      catch (e) { this.fatal('This game needs WebGL 2. ' + e.message); return; }
+      catch (e) { this.fatal(T('g.fatal.webgl', { msg: e.message })); return; }
       this.input = new VR.Input(this.canvas);
       this.audio = new VR.Audio();
       this.env = new VR.Env();
@@ -153,7 +155,7 @@
       this.ui = new VR.UI(this);
       this.mp = VR.MP ? new VR.MP(this) : null;
       if (this.mp) this.mp.init();
-      this.ui.loading('Forging textures…', 0.05);
+      this.ui.loading(T('g.load.textures'), 0.05);
       const unlockAudio = () => { this.audio.resume(); };
       window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
       await this.store.open();
@@ -206,7 +208,7 @@
       else this.startTitle();
     }
     fatal(msg) {
-      document.getElementById('ui').innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#e8f0ff;font-family:sans-serif;text-align:center;padding:20px"><h2>R9-SI can't start</h2><div>${msg}</div><div style="color:#93a4c4">Try an up-to-date Chrome, Edge or Firefox with hardware acceleration enabled.</div></div>`;
+      document.getElementById('ui').innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#e8f0ff;font-family:sans-serif;text-align:center;padding:20px"><h2>${T('g.fatal.title')}</h2><div>${msg}</div><div style="color:#93a4c4">${T('g.fatal.hint')}</div></div>`;
     }
 
     // ---------------------------------------------------------------- title panorama
@@ -251,7 +253,7 @@
     }
     async loadWorld(meta) { meta.lastPlayed = Date.now(); await this.store.saveWorld(meta); this.startWorld(meta, false); }
     async startWorld(meta, fresh) {
-      this.ui.loading('Preparing world…', 0.02);
+      this.ui.loading(T('g.load.prepare'), 0.02);
       this.teardownWorld();
       this.meta = meta;
       this.store.bind(meta.id);
@@ -375,7 +377,7 @@
       if (LD && LD.freshSpawn(o, m)) { p.spawn = o.spawn.pos.slice(0, 3); p.spawnBed = null; m.spawnAt = o.spawn.at; }
       const fresh = !!(LD && LD.fresh(o, m));
       if (o.landing) m.seenLanding = Math.max(m.seenLanding || 0, o.landing.at || 0);
-      const toNew = () => { const L = o.landing; p.flying = false; p.safeTeleport(L.pos[0], L.pos[1], L.pos[2], { keep: true, yaw: L.yaw, pitch: L.pitch }); this.revealPending = Array.isArray(L.box) ? { box: L.box, label: L.label || '' } : null; if (!this.revealPending && this.ui.toast) this.ui.toast('R9 Studio', '✨ ' + (L.label || 'Neu')); return 'new'; };
+      const toNew = () => { const L = o.landing; p.flying = false; p.safeTeleport(L.pos[0], L.pos[1], L.pos[2], { keep: true, yaw: L.yaw, pitch: L.pitch }); this.revealPending = Array.isArray(L.box) ? { box: L.box, label: L.label || '' } : null; if (!this.revealPending && this.ui.toast) this.ui.toast('R9 Studio', '✨ ' + (L.label || T('g.studio.new'))); return 'new'; };
       let r = 'here';
       if (entry === 'studio') {
         if (fresh) r = toNew();
@@ -406,7 +408,7 @@
     async playWorldId(id) {
       try { if (this.meta && !this.meta.guest && this.world && this.state === 'play') { await this.saveMeta(); await this.world.saveAll(); } } catch (e) { console.warn(e); }
       let meta = null; try { meta = (await this.store.listWorlds()).find(w => w && w.id === id); } catch (e) { meta = null; }
-      if (!meta) { if (this.state !== 'title') this.startTitle(); this.ui.hint('That world is not here (any more).', 3200); return false; }
+      if (!meta) { if (this.state !== 'title') this.startTitle(); this.ui.hint(T('g.chat.noWorld'), 3200); return false; }
       this.pendingEntry = 'studio';
       await this.loadWorld(meta);
       return true;
@@ -433,17 +435,17 @@
     }
     goHome() {
       const p = this.player; if (!p || p.dead) return;
-      if (this.gadgets && this.gadgets.riding) { this.ui.chatLine('Land or get off first.', '#ff8a8a'); return; }
+      if (this.gadgets && this.gadgets.riding) { this.ui.chatLine(T('g.chat.landFirst'), '#ff8a8a'); return; }
       const sp = p.spawn && p.spawn.every(v => isFinite(v)) ? p.spawn : this.worldSpawn();
       p.safeTeleport(sp[0], sp[1], sp[2], { bed: p.spawnBed || null });
-      this.ui.chatLine(p.spawnBed ? 'Home to your bed.' : 'Home to the world spawn.', '#9affd8');
+      this.ui.chatLine(T(p.spawnBed ? 'g.chat.homeBed' : 'g.chat.homeSpawn'), '#9affd8');
     }
     // join a friend's world: same seed, their edits streamed in, nothing saved here
     startGuestWorld(wel, mp) {
-      this.ui.loading('Joining ' + (mp.hostName || 'your friend') + '…', 0.05);
+      this.ui.loading(T('g.load.joining', { name: mp.hostName || T('g.mp.friend') }), 0.05);
       this.teardownWorld();
       const W = wel.w || {};
-      const meta = { id: 'guest-' + String(W.id || 'x').replace(/[^a-z0-9]/gi, '').slice(0, 30), guest: true, name: (W.name || 'World') + ' · with ' + (mp.hostName || 'friend'), seed: (W.seed >>> 0), mode: ['survival', 'creative', 'zen'].includes(W.mode) ? W.mode : 'creative', difficulty: W.difficulty || 'normal', type: W.type || 'default', cheats: !!W.cheats, keep: !!W.keep, kit: true, time: +wel.time || 1000, day: +wel.day || 0, dim: 'overworld', worldSpawn: Array.isArray(wel.home) ? wel.home : null, vgen: +W.vgen || 1 };
+      const meta = { id: 'guest-' + String(W.id || 'x').replace(/[^a-z0-9]/gi, '').slice(0, 30), guest: true, name: T('g.mp.withName', { world: W.name || 'World', name: mp.hostName || T('g.talk.friend') }), seed: (W.seed >>> 0), mode: ['survival', 'creative', 'zen'].includes(W.mode) ? W.mode : 'creative', difficulty: W.difficulty || 'normal', type: W.type || 'default', cheats: !!W.cheats, keep: !!W.keep, kit: true, time: +wel.time || 1000, day: +wel.day || 0, dim: 'overworld', worldSpawn: Array.isArray(wel.home) ? wel.home : null, vgen: +W.vgen || 1 };
       this.meta = meta;
       this.hostLook = wel.look === 'seamless' || wel.look === 'classic' ? wel.look : null; this.applyLook();   // the host's block look
       this.difficulty = meta.difficulty; this.keepInventory = meta.keep;
@@ -520,7 +522,7 @@
     async quitToTitle() {
       if (this.meta && this.meta.guest) { if (this.mp) this.mp.leave(); this.leaveGuestWorld(); return; }
       if (this.mp && this.mp.isHost) this.mp.stopHosting();
-      this.ui.loading('Saving…', 0.5);
+      this.ui.loading(T('g.load.saving'), 0.5);
       try { if (this.starships) this.starships.shutdown(); if (this.gadgets) this.gadgets.shutdown(); } catch (e) { console.warn(e); }
       try { await this.saveMeta(); await this.world.saveAll(); } catch (e) { console.warn(e); }
       this.input.releaseLock();
@@ -551,7 +553,7 @@
         else if (this.state === 'loading') this.loadingFrame(dt);
         else if (this.state === 'play') { if (!this.studioOpen) this.playFrame(dt); }
         if (this.mp) this.mp.update(dt);
-      } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine('Error: ' + e.message, '#ff8a8a'); } }
+      } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine(T('g.chat.error', { msg: e.message }), '#ff8a8a'); } }
       this.input.endFrame();
       this.jsMs += (performance.now() - tj0 - this.jsMs) * 0.08;
     }
@@ -717,7 +719,7 @@
       const coarse = hz ? (hz.stats.coarse === undefined ? 0 : hz.stats.coarse) : 1;
       const near = have / need, frac = near * 0.8 + coarse * 0.2;
       if (near >= 1 && !this.nearReadyAt) this.nearReadyAt = performance.now();
-      this.ui.loading(near < 0.5 ? 'Generating terrain…' : near < 1 ? 'Building meshes…' : 'Preloading the horizon…', 0.05 + frac * 0.95);
+      this.ui.loading(T(near < 0.5 ? 'g.load.terrain' : near < 1 ? 'g.load.meshes' : 'g.load.horizon'), 0.05 + frac * 0.95);
       const E = this.envFor(p.eyePos(), dt);
       const lcam = { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: this.settings.fov * Math.PI / 180, far: this.farFor(w) };
       if (this.horizon) this.horizon.update(lcam);
@@ -733,9 +735,9 @@
         this.ui.show(null);
         this.input.captured = true;
         this.ui.updateHUD(true);
-        if (this.meta.guest) this.ui.chatLine(`You joined ${this.mp ? this.mp.hostName : 'your friend'}'s world! Esc → Multiplayer to teleport to them · T to chat`, '#9affd8');
-        else this.ui.chatLine(`Welcome to ${this.meta.name}. Click the view to look around · E inventory · Esc menu`, '#9ad8ff');
-        if (this.player.mode === 'zen') this.ui.chatLine('Zen Builder: no mobs, no damage, no hunger. Freeze time & weather in the Esc menu.', '#b8ffcf');
+        if (this.meta.guest) this.ui.chatLine(T('g.chat.joined', { name: this.mp && this.mp.hostName ? this.mp.hostName : T('g.mp.friend') }), '#9affd8');
+        else this.ui.chatLine(T('g.chat.welcome', { name: this.meta.name }), '#9ad8ff');
+        if (this.player.mode === 'zen') this.ui.chatLine(T('g.chat.zen'), '#b8ffcf');
         this.autosaveAt = performance.now() + 60000;
       }
     }
@@ -829,7 +831,7 @@
       // HUD
       this.ui.updateHUD();
       if (this.debugOn) this.ui.debug(this.debugText(cam, E));
-      if (S.showFps) this.ui.fps(Math.round(this.fps || 0) + ' fps');
+      if (S.showFps) this.ui.fps(T('g.hud.fps', { n: Math.round(this.fps || 0) }));
       if (this.codex && this.codex.update) this.codex.update(dt);
       if (this.map) this.map.update(dt);
       if (performance.now() > this.autosaveAt) { this.autosaveAt = performance.now() + 60000; this.saveMeta(); this.world.saveAll(); }
@@ -886,7 +888,7 @@
         this.shotPending = false;
         let url = null;
         try { url = this.canvas.toDataURL('image/png'); } catch (e) { url = null; }
-        if (!url) { this.ui.chatLine('Screenshot not available here.', '#ff8a8a'); return; }
+        if (!url) { this.ui.chatLine(T('g.chat.noShot'), '#ff8a8a'); return; }
         this.ui.showShot(url);
         this.audio.play('click');
         if (this.codex && this.codex.event) this.codex.event('shot');
@@ -895,7 +897,7 @@
       }));
     }
     photoMode(on) {
-      if (on) { this.photo = { vignette: 0.35, saturation: 1.18 }; document.getElementById('app').classList.add('photo-hide'); this.ui.show(null); this.input.captured = true; this.ui.hint('Photo mode — F2 to capture · Esc to exit', 3500); }
+      if (on) { this.photo = { vignette: 0.35, saturation: 1.18 }; document.getElementById('app').classList.add('photo-hide'); this.ui.show(null); this.input.captured = true; this.ui.hint(T('g.chat.photo'), 3500); }
       else { this.photo = null; document.getElementById('app').classList.remove('photo-hide'); }
     }
     dropHeld(all) {
@@ -1011,40 +1013,51 @@
     }
 
     // ---------------------------------------------------------------- chat & commands
+    // /lang de|en: the language, live (also Settings → 🌐); the other languages of the module are "soon"
+    langCommand(arg) {
+      const I = VR.I18N, say = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
+      if (!I) return;
+      const code = String(arg || '').toLowerCase().slice(0, 2);
+      if (!code) { say(T('g.cmd.lang', { name: T('g.lang.name') })); return; }
+      if (I.ready(code)) { I.set(code); say(T('g.cmd.langSet', { name: T('g.lang.name') }), '#9affd8'); return; }
+      const info = I.langs.find(l => l[0] === code);
+      say(info ? T('g.cmd.langSoon', { name: info[1] }) : T('g.cmd.lang', { name: T('g.lang.name') }), '#ffd27a');
+    }
     chat(text) {
-      if (!text.startsWith('/')) { if (this.mp && this.mp.active) this.mp.chat(text); else this.ui.chatLine('<You> ' + text); return; }
+      if (!text.startsWith('/')) { if (this.mp && this.mp.active) this.mp.chat(text); else this.ui.chatLine('<' + T('g.chat.you') + '> ' + text); return; }
       { // commands everyone may use, cheats or not
         const [c0, ...a0] = text.slice(1).split(/\s+/);
         const say0 = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
         if (c0 === 'home') { this.goHome(); return; }
         if (c0 === 'look') { this.lookCommand(a0[0]); return; }
-        if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0('To the world spawn.'); return; }
-        if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0('Home & friends: /home · /sethome · /spawn · /players · /tphost (guest) · /call <name> (host)'); return; }
-        if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0('Home set here.'); return; }
-        if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? 'Here: you, ' + L.map(q => q.name + (q.host ? ' (host)' : '') + ' ' + Math.round(q.dist) + 'm').join(', ') : 'Only you here.'); return; }
+        if (c0 === 'lang' || c0 === 'sprache') { this.langCommand(a0[0]); return; }
+        if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0(T('g.cmd.spawn')); return; }
+        if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0(T('g.cmd.helpHome')); return; }
+        if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0(T('g.cmd.sethome')); return; }
+        if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? T('g.cmd.players', { list: L.map(q => q.name + (q.host ? ' ' + T('g.mp.hostTag') : '') + ' ' + Math.round(q.dist) + 'm').join(', ') }) : T('g.cmd.onlyYou')); return; }
         if (c0 === 'tphost' && this.mp && this.mp.isClient) { this.mp.teleportToHost(); return; }
-        if (c0 === 'call' && this.mp && this.mp.isHost) { const n = (a0.join(' ') || '').toLowerCase(); const q = this.mp.players().find(x => !n || x.name.toLowerCase().startsWith(n)); if (q) this.mp.summon(q.peer); else say0('No player called ' + n, '#ff8a8a'); return; }
+        if (c0 === 'call' && this.mp && this.mp.isHost) { const n = (a0.join(' ') || '').toLowerCase(); const q = this.mp.players().find(x => !n || x.name.toLowerCase().startsWith(n)); if (q) this.mp.summon(q.peer); else say0(T('g.cmd.noPlayer', { name: n }), '#ff8a8a'); return; }
       }
-      if (this.meta && !this.meta.cheats && this.player.mode === 'survival') { this.ui.chatLine('Commands are disabled in this world.', '#ff8a8a'); return; }
+      if (this.meta && !this.meta.cheats && this.player.mode === 'survival') { this.ui.chatLine(T('g.cmd.disabled'), '#ff8a8a'); return; }
       const [cmd, ...a] = text.slice(1).split(/\s+/);
       const p = this.player, say = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
       const TIMES = { day: 1000, noon: 6000, sunset: 12000, dusk: 12500, night: 13000, midnight: 18000, sunrise: 23000, dawn: 23500 };
       switch (cmd) {
-        case 'help': say('/time set <day|noon|night|midnight|n> · /weather <clear|rain|thunder> · /gamemode <survival|creative|zen> · /tp x y z · /give <item> [n] · /locate <biome|outpost|village> · /seed · /spawn · /kill · /fly <speed> · /summon <mob> · /render <chunks> · /freeze'); say('Build: /pos1 /pos2 · /fill <block> · /walls · /hollow · /clear · /replace <a> <b> · /copy /paste /rotate /undo · /sphere <block> <r> · /hsphere · /cyl <block> <r> <h> · /hcyl'); say('Houses: /haus — the villa catalogue as blueprints (/haus <n> puts one in your hand, RMB builds it where you look; ★ = your R9 Studio design)'); say('Fun: /shuttle · /bike · /meteor · /raid · /wp <name> · /wpclear · /land'); say('Villages: /locate village · right-click a villager to talk, trade and help'); say('Home & friends: /home · /sethome · /spawn · /players · /tphost (guest) · /call <name> (host)'); break;
-        case 'time': { const v = a[0] === 'set' ? a[1] : a[0]; const n = TIMES[v] !== undefined ? TIMES[v] : parseInt(v, 10); if (!isNaN(n)) { this.env.setTime(n); say('Time set to ' + n); } break; }
-        case 'weather': if (a[0] === 'clear') { this.env.rainTarget = 0; this.env.rain = 0; } else if (a[0] === 'rain' || a[0] === 'thunder') { this.env.rainTarget = 1; this.env.thunder = a[0] === 'thunder' ? 1 : 0; this.env.weatherTimer = 12000; } say('Weather: ' + a[0]); break;
-        case 'gamemode': case 'gm': { const m = { s: 'survival', c: 'creative', z: 'zen', 0: 'survival', 1: 'creative', survival: 'survival', creative: 'creative', zen: 'zen' }[a[0]]; if (m) { p.setMode(m); say('Game mode: ' + m); } break; }
-        case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); p.teleport(v[0], v[1], v[2]); say('Teleported.'); } break;
-        case 'give': { const id = a[0], n = parseInt(a[1] || '1', 10) || 1; if (VR.itemDef(id)) { p.inv.add(id, n); say('Gave ' + n + ' ' + VR.itemName(id)); } else say('Unknown item: ' + id, '#ff8a8a'); break; }
-        case 'seed': say('Seed: ' + this.meta.seed); break;
+        case 'help': say(T('g.cmd.help1')); say(T('g.cmd.help2')); say(T('g.cmd.help3')); say(T('g.cmd.help4')); say(T('g.cmd.help5')); say(T('g.cmd.helpHome')); break;
+        case 'time': { const v = a[0] === 'set' ? a[1] : a[0]; const n = TIMES[v] !== undefined ? TIMES[v] : parseInt(v, 10); if (!isNaN(n)) { this.env.setTime(n); say(T('g.cmd.time', { n })); } break; }
+        case 'weather': if (a[0] === 'clear') { this.env.rainTarget = 0; this.env.rain = 0; } else if (a[0] === 'rain' || a[0] === 'thunder') { this.env.rainTarget = 1; this.env.thunder = a[0] === 'thunder' ? 1 : 0; this.env.weatherTimer = 12000; } say(T('g.cmd.weather', { w: a[0] })); break;
+        case 'gamemode': case 'gm': { const m = { s: 'survival', c: 'creative', z: 'zen', 0: 'survival', 1: 'creative', survival: 'survival', creative: 'creative', zen: 'zen' }[a[0]]; if (m) { p.setMode(m); say(T('g.cmd.gamemode', { m: T('g.mode.' + m) })); } break; }
+        case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); p.teleport(v[0], v[1], v[2]); say(T('g.cmd.tp')); } break;
+        case 'give': { const id = a[0], n = parseInt(a[1] || '1', 10) || 1; if (VR.itemDef(id)) { p.inv.add(id, n); say(T('g.cmd.gave', { n, item: VR.itemName(id) })); } else say(T('g.cmd.noItem', { id }), '#ff8a8a'); break; }
+        case 'seed': say(T('g.cmd.seed', { seed: this.meta.seed })); break;
         case 'kill': p.damage(1000, 'void'); break;
-        case 'fly': p.flySpeed = Math.max(0.2, Math.min(8, parseFloat(a[0]) || 1)); say('Fly speed ' + p.flySpeed); break;
-        case 'trailer': case 'cinema': if (this.director && this.director.play('trailer')) say('Director: rolling the trailer — Esc to stop'); else say('The trailer plays in a Heartland world (worlds made from v0.19 on).'); break;
-        case 'render': this.settings.renderDist = Math.max(3, Math.min(24, parseInt(a[0], 10) || 8)); this.applySettings('renderDist'); say('Render distance ' + this.settings.renderDist); break;
-        case 'freeze': this.zenFreezeTime = !this.zenFreezeTime; say('Time ' + (this.zenFreezeTime ? 'frozen' : 'flowing')); break;
-        case 'locate': this.pool.direct(0, { type: 'locate', dim: this.dim, biome: a[0], x: Math.floor(p.pos[0]), z: Math.floor(p.pos[2]) }, null, (m) => { if (m.pos) say(`${a[0]} at ${m.pos[0]} ${m.pos[1]} ${m.pos[2]} — /tp ${m.pos[0]} ${m.pos[1] + 2} ${m.pos[2]}`); else say('Not found nearby.', '#ff8a8a'); }); break;
-        case 'summon': if (this.entities && this.entities.summon) { if (!this.entities.summon(a[0], p.pos[0] + Math.sin(-p.yaw) * 3, p.pos[1], p.pos[2] - Math.cos(p.yaw) * 3)) say('Unknown mob', '#ff8a8a'); } break;
-        default: if (this.extraCommand && this.extraCommand(cmd, a)) break; say('Unknown command. Try /help', '#ff8a8a');
+        case 'fly': p.flySpeed = Math.max(0.2, Math.min(8, parseFloat(a[0]) || 1)); say(T('g.cmd.fly', { v: p.flySpeed })); break;
+        case 'trailer': case 'cinema': if (this.director && this.director.play('trailer')) say(T('g.cmd.trailer')); else say(T('g.cmd.noTrailer')); break;
+        case 'render': this.settings.renderDist = Math.max(3, Math.min(24, parseInt(a[0], 10) || 8)); this.applySettings('renderDist'); say(T('g.cmd.render', { n: this.settings.renderDist })); break;
+        case 'freeze': this.zenFreezeTime = !this.zenFreezeTime; say(T(this.zenFreezeTime ? 'g.cmd.freezeOn' : 'g.cmd.freezeOff')); break;
+        case 'locate': this.pool.direct(0, { type: 'locate', dim: this.dim, biome: a[0], x: Math.floor(p.pos[0]), z: Math.floor(p.pos[2]) }, null, (m) => { if (m.pos) say(T('g.cmd.located', { what: a[0], x: m.pos[0], y: m.pos[1], z: m.pos[2], y2: m.pos[1] + 2 })); else say(T('g.cmd.notFound'), '#ff8a8a'); }); break;
+        case 'summon': if (this.entities && this.entities.summon) { if (!this.entities.summon(a[0], p.pos[0] + Math.sin(-p.yaw) * 3, p.pos[1], p.pos[2] - Math.cos(p.yaw) * 3)) say(T('g.cmd.noMob'), '#ff8a8a'); } break;
+        default: if (this.extraCommand && this.extraCommand(cmd, a)) break; say(T('g.cmd.unknown'), '#ff8a8a');
       }
     }
   }

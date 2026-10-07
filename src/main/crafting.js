@@ -4,6 +4,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R;
   const has = (id) => !!(R.byName[id] || VR.ITEMS[id]);
   const TAGS = {
@@ -257,9 +259,9 @@
       const tod = g.env.timeOfDay;
       g.player.spawn = [x + 0.5, y + 0.6, z + 0.5];
       g.player.spawnBed = [x, y, z];
-      if (g.mp && g.mp.isClient) { g.ui.chatLine('Spawn point set. (In a friend\'s world only the host can sleep through the night.)', '#ffe0a0'); return; }
-      if (tod > 12500 && tod < 23500) { g.ui.loading('Sleeping…', 1); setTimeout(() => { g.env.setTime(0); g.env.day = (g.env.day || 0) + 1; g.env.rainTarget = 0; g.ui.show(null); g.input.captured = true; g.ui.chatLine('Good morning! Spawn point set.', '#ffe0a0'); g.codex && g.codex.event && g.codex.event('sleep'); }, 900); }
-      else g.ui.chatLine('Spawn point set. You can only sleep at night.', '#ffe0a0');
+      if (g.mp && g.mp.isClient) { g.ui.chatLine(T('g.chat.spawnSetGuest'), '#ffe0a0'); return; }
+      if (tod > 12500 && tod < 23500) { g.ui.loading(T('g.load.sleeping'), 1); setTimeout(() => { g.env.setTime(0); g.env.day = (g.env.day || 0) + 1; g.env.rainTarget = 0; g.ui.show(null); g.input.captured = true; g.ui.chatLine(T('g.chat.morning'), '#ffe0a0'); g.codex && g.codex.event && g.codex.event('sleep'); }, 900); }
+      else g.ui.chatLine(T('g.chat.spawnSetNight'), '#ffe0a0');
     };
     g.addXP = (n) => {
       const p = g.player;
