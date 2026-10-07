@@ -103,8 +103,9 @@ check(!!hud && /Hochhaus/.test(hud) && /gebaut/.test(hud) && /Fertig/.test(hud),
 await step(30);
 glErr |= await photo('fertig');
 check(!glErr, 'no GL error while drawing the site');
-const finale = await ev(() => { const g = VR.game, B = g.gadgets.blue, sh = B.sites && B.sites[0] && B.sites[0].show; return { confetti: g.particles.n, cheer: sh ? sh.crew.filter(b => b.state === 'cheer' || b.mode === 'cheer').length : -1 }; });
+const finale = await ev(() => { const g = VR.game, B = g.gadgets.blue, sh = B.sites && B.sites[0] && B.sites[0].show; return { confetti: g.particles.n, cheer: sh ? sh.crew.filter(b => b.state === 'cheer' || b.mode === 'cheer').length : -1, tree: sh && sh.tree ? [sh.tree.x, sh.tree.y, sh.tree.z] : null, top: sh ? sh.top : 0, office: sh && sh.office ? [sh.office.x, sh.office.y, sh.office.z] : null }; });
 check(finale.confetti > 50, 'confetti and fireworks fly (' + finale.confetti + ' particles)');
+check(!!finale.tree && finale.tree[1] >= finale.top - 3, 'Richtfest: a topping-out tree on the roof (' + JSON.stringify(finale.tree) + ', top ' + finale.top + '), the site office ' + JSON.stringify(finale.office));
 const MB = await measure();
 // one Z takes all of it back
 await ev(() => VR.game.gadgets.undo());
