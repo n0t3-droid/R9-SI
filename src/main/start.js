@@ -267,7 +267,8 @@
   // else when ▶ opens the world), 📦 makes the one-thing pack
   function dingHandlers() {
     const Dg = VR.Ding; if (!Dg || Dg.handlers.__game) return;
-    const studio = (h) => { try { location.href = 'studio.html' + (location.search || '') + h; } catch (e) { /* no studio page next to this one */ } };
+    // in play the Studio opens over the game (nothing is lost); from the start screen it is the page itself
+    const studio = (h) => { const g = game(); if (g && g.state === 'play') { if (!g.openStudio(h)) g.ui.hint(tx('start.noStudioGuest', null, 'Das Studio öffnet nur deine eigenen Welten (nicht als Gast).', 'The Studio opens your own worlds (not as a guest).'), 2400); return; } try { location.href = 'studio.html' + (location.search || '') + h; } catch (e) { /* no studio page next to this one */ } };
     Dg.handlers = {
       __game: true,
       view: (id) => studio('#ding/' + id),
