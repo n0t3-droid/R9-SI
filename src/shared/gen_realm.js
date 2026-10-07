@@ -83,14 +83,36 @@
   // every value of a corner that a block's climate interpolates (a later layer — the Heartland — adds its own here,
   // so one pass over the four corners serves them all)
   const KEYS = OG.CLIMATE_KEYS = ['c', 'e', 'w', 't', 'h', 'pv', 'H', 'river', 'mountain', 'windswept', 'swampy', 'inland', 'plateau', 'ember', 'prism', 'canyon'];
+  // written out field by field (the same sums as a loop over KEYS, the same order): a loop reads and writes every value
+  // by a computed name, which cost more than the rest of a column (800 climates a column)
   OG.climateAt = function (x, z) {
     const X0 = Math.floor(x / 4) * 4, Z0 = Math.floor(z / 4) * 4;
     const fx = (x - X0) / 4, fz = (z - Z0) / 4;
     const a = this.corner(X0, Z0), b = this.corner(X0 + 4, Z0), c = this.corner(X0, Z0 + 4), d = this.corner(X0 + 4, Z0 + 4);
     const w00 = (1 - fx) * (1 - fz), w10 = fx * (1 - fz), w01 = (1 - fx) * fz, w11 = fx * fz;
-    const o = {};
-    for (const k of KEYS) o[k] = (a[k] || 0) * w00 + (b[k] || 0) * w10 + (c[k] || 0) * w01 + (d[k] || 0) * w11;
-    return o;
+    return {
+      c: (a.c || 0) * w00 + (b.c || 0) * w10 + (c.c || 0) * w01 + (d.c || 0) * w11,
+      e: (a.e || 0) * w00 + (b.e || 0) * w10 + (c.e || 0) * w01 + (d.e || 0) * w11,
+      w: (a.w || 0) * w00 + (b.w || 0) * w10 + (c.w || 0) * w01 + (d.w || 0) * w11,
+      t: (a.t || 0) * w00 + (b.t || 0) * w10 + (c.t || 0) * w01 + (d.t || 0) * w11,
+      h: (a.h || 0) * w00 + (b.h || 0) * w10 + (c.h || 0) * w01 + (d.h || 0) * w11,
+      pv: (a.pv || 0) * w00 + (b.pv || 0) * w10 + (c.pv || 0) * w01 + (d.pv || 0) * w11,
+      H: (a.H || 0) * w00 + (b.H || 0) * w10 + (c.H || 0) * w01 + (d.H || 0) * w11,
+      river: (a.river || 0) * w00 + (b.river || 0) * w10 + (c.river || 0) * w01 + (d.river || 0) * w11,
+      mountain: (a.mountain || 0) * w00 + (b.mountain || 0) * w10 + (c.mountain || 0) * w01 + (d.mountain || 0) * w11,
+      windswept: (a.windswept || 0) * w00 + (b.windswept || 0) * w10 + (c.windswept || 0) * w01 + (d.windswept || 0) * w11,
+      swampy: (a.swampy || 0) * w00 + (b.swampy || 0) * w10 + (c.swampy || 0) * w01 + (d.swampy || 0) * w11,
+      inland: (a.inland || 0) * w00 + (b.inland || 0) * w10 + (c.inland || 0) * w01 + (d.inland || 0) * w11,
+      plateau: (a.plateau || 0) * w00 + (b.plateau || 0) * w10 + (c.plateau || 0) * w01 + (d.plateau || 0) * w11,
+      ember: (a.ember || 0) * w00 + (b.ember || 0) * w10 + (c.ember || 0) * w01 + (d.ember || 0) * w11,
+      prism: (a.prism || 0) * w00 + (b.prism || 0) * w10 + (c.prism || 0) * w01 + (d.prism || 0) * w11,
+      canyon: (a.canyon || 0) * w00 + (b.canyon || 0) * w10 + (c.canyon || 0) * w01 + (d.canyon || 0) * w11,
+      // the Heartland's four (gen_heart.js adds them to KEYS: the last four)
+      heart: (a.heart || 0) * w00 + (b.heart || 0) * w10 + (c.heart || 0) * w01 + (d.heart || 0) * w11,
+      hz1: (a.hz1 || 0) * w00 + (b.hz1 || 0) * w10 + (c.hz1 || 0) * w01 + (d.hz1 || 0) * w11,
+      hz2: (a.hz2 || 0) * w00 + (b.hz2 || 0) * w10 + (c.hz2 || 0) * w01 + (d.hz2 || 0) * w11,
+      hz3: (a.hz3 || 0) * w00 + (b.hz3 || 0) * w10 + (c.hz3 || 0) * w01 + (d.hz3 || 0) * w11,
+    };
   };
   const origBiome = OG.biomeFor;
   OG.biomeFor = function (cl, height) {
