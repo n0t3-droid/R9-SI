@@ -27,6 +27,20 @@
   };
   // the fallback text is German in the Studio, English in the game: English users must never see German
   I.tx = function (key, vars, de, en) { const d = I.dict[I.lang]; if (d && d[key] !== undefined) return fill(d[key], vars); if (I.lang === 'de') return fill(de !== undefined ? de : en, vars); const e = I.dict.en && I.dict.en[key]; return fill(e !== undefined ? e : (en !== undefined ? en : de), vars); };
+  // a list of lines (villager talk, loading tips): the table holds an array — the English list when the chosen
+  // language has none, an empty list when nobody has it
+  I.list = function (key) { const d = I.dict[I.lang], v = d && d[key]; if (Array.isArray(v)) return v; const e = I.dict.en && I.dict.en[key]; return Array.isArray(e) ? e : []; };
+  // the languages with a table (the game: de and en); the others are "soon"
+  I.ready = (code) => !!(I.dict[code] && Object.keys(I.dict[code]).length);
+  // static texts in a page: data-t (text), data-th (HTML), data-tt (title) are filled from the tables — again on
+  // every language change (the game calls it from a listener)
+  I.retext = function (root) {
+    if (typeof document === 'undefined') return;
+    root = root || document;
+    for (const e of root.querySelectorAll('[data-t]')) e.textContent = I.t(e.dataset.t);
+    for (const e of root.querySelectorAll('[data-th]')) e.innerHTML = I.t(e.dataset.th);
+    for (const e of root.querySelectorAll('[data-tt]')) e.title = I.t(e.dataset.tt);
+  };
   I.info = (code) => LANGS.find(l => l[0] === code) || LANGS[1];
   I.locale = () => I.info(I.lang)[2];
   I.rtl = () => I.info(I.lang)[3] === 'rtl';
