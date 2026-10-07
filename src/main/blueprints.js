@@ -330,7 +330,7 @@
         // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back
         if (list.length > SLICE_MAX) { list.sort((a, b) => a[1] - b[1]); this.slices = { pl, name, list, undo, at: 0, t: 0, w }; pl.status = 'building'; return; }
         if (list.length) this.gad.applyEdit(list, undo);
-        this.planDone(pl, name, list.length);
+        this.planDone(pl, name, list.length, list.length ? undo : null);
         break;   // one piece per half second keeps the frame smooth
       }
     }
@@ -347,11 +347,12 @@
       if (S.at < S.list.length) return;
       this.slices = null;
       this.gad.applyEdit([], S.undo);
-      this.planDone(S.pl, S.name, S.list.length);
+      this.planDone(S.pl, S.name, S.list.length, S.undo);
     }
-    planDone(pl, name, n) {
+    planDone(pl, name, n, undo) {
       const g = this.g;
       pl.status = 'built';
+      if (this.lastForge && this.lastForge.id === pl.id) this.lastForge.undo = undo || null;   // (/bau höher takes exactly this back)
       // (the plans may have been read again meanwhile — the Studio handed over more: that copy is built too)
       if (this.plans) for (const q of this.plans) if (q.id === pl.id) q.status = 'built';
       this.markPlan(pl.id, 'built');
@@ -409,6 +410,49 @@
       this.get(i);
       say(`Blueprint · ${P.CATALOGUE[i].name}${VR.Custom && VR.Custom.houseFor(i) ? ' ★' : ''} in hand — RMB builds it where you look, R turns it, F changes the facade.`);
       return true;
+    }
+    // ---------------------------------------------------------------- /bau <wish> · /forge <wish> (🏭 without the Studio)
+    // "/bau Hochhaus 30 Stockwerke Glas" puts a Forge plan where you look (the front toward you) — the game builds it
+    // like a plan from the Studio (levelled, in slices, one Z); "/bau höher", "/bau mehr Glas", "/bau aus Stein" take the
+    // last one back (while it is the newest change) and build it changed on the same spot; the Studio sees them as plans
+    forgeCommand(a) {
+      const g = this.g, p = g.player, Fg = VR.Forge, say = (t, c) => g.ui.chatLine(t, c || '#cfe6ff');
+      const T = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : en);
+      const text = a.join(' ').trim();
+      if (!Fg) { say('No Forge in this build.', '#ff8a8a'); return true; }
+      if (!this.plans) this.loadPlans();
+      if (!text) { say(T('g.forge.help', null, '🏭 /bau <Wunsch> — „/bau Hochhaus 30 Stockwerke Glas“, „/bau Hängebrücke 60 lang“, „/bau Burg mit Bergfried“ · danach „/bau höher“, „/bau mehr Glas“, „/bau aus Stein“', '🏭 /bau <wish> — “/bau skyscraper 30 floors glass”, “/bau suspension bridge 60 long”, “/bau castle with keep” · then “/bau taller”, “/bau more glass”, “/bau stone”')); return true; }
+      if (!p.creative) { say(T('g.forge.creative', null, 'Die Forge baut in Kreativ und Zen.', 'The Forge builds in Creative and Zen Builder.'), '#ff8a8a'); return true; }
+      const last = this.lastForge && this.plans && this.plans.find(q => q.id === this.lastForge.id), named = Fg.typeOf(Fg.norm(text));
+      let dna = named ? Fg.fromText(text) : null, again = null;
+      if (!dna && last) { dna = Fg.tweak(last.dna, text); again = last; }
+      if (!dna) { say(T('g.forge.what', null, 'Sag, was es sein soll: Hochhaus, Haus, Brücke, Turm, Halle, Burg, Stadion, Raumschiff, Park oder Mauer.', 'Say what it should be: high-rise, house, bridge, tower, hall, castle, stadium, spaceship, park or wall.'), '#ff8a8a'); return true; }
+      let pl;
+      if (again) {
+        if (again.dna === dna) { say(T('g.forge.same', null, 'Das ändert nichts — sag „höher“, „breiter“, „mehr Glas“, „aus Stein“ … oder etwas Neues: „/bau Brücke 40 lang“.', 'That changes nothing — say “taller”, “wider”, “more glass”, “stone” … or something new: “/bau bridge 40 long”.')); return true; }
+        // the last one goes (one Z, while nothing changed since), the changed one takes its place
+        const u = this.gad.wand.undo;
+        if (again.status === 'built' && !(this.lastForge.undo && u[u.length - 1] === this.lastForge.undo)) { say(T('g.forge.moved', null, 'Seit der letzten Forge hat sich etwas geändert — sag ein neues Ganzes: „/bau Hochhaus …“', 'Something changed since the last Forge build — say a whole new wish: “/bau skyscraper …”'), '#ff8a8a'); return true; }
+        if (this.slices && this.slices.pl.id === again.id) { say(T('g.forge.busy', null, 'Noch im Bau — gleich.', 'Still building — a moment.')); return true; }
+        if (again.status === 'built') this.gad.undo();
+        pl = Object.assign({}, again, { id: 'f' + Date.now().toString(36), dna, status: 'pending', t: Date.now() });
+        this.plans = this.plans.filter(q => q.id !== again.id); this.storePlans((ps) => ps.filter(q => q.id !== again.id));
+      } else {
+        const meta = Fg.meta(dna), at = this.locate(p, { lot: meta.lot, top: 40 });
+        if (!at) { say(T('g.forge.look', null, 'Schau auf den Boden, wo es stehen soll.', 'Look at the ground where it should stand.'), '#ff8a8a'); return true; }
+        if (!at.ok) { say(at.why, '#ff8a8a'); return true; }
+        pl = { id: 'f' + Date.now().toString(36), kind: 'forge', dna, ox: at.ox, oz: at.oz, F: at.F, r: at.r, status: 'pending', t: Date.now() };
+      }
+      this.plans.push(pl); this.storePlans((ps) => ps.concat([pl]));
+      this.lastForge = { id: pl.id, dna, undo: null };
+      this.planT = 0;
+      say('🏭 ' + Fg.describe(dna) + ' — ' + T('g.forge.building', null, 'wird gebaut', 'building') + ' · ' + dna, '#9fe8c4');
+      return true;
+    }
+    // the plans of this world in the browser's storage, changed by fn (the Studio reads them: built pieces show there)
+    storePlans(fn) {
+      const k = this.plansKey(); if (!k) return;
+      try { const d = JSON.parse(localStorage.getItem(k) || 'null') || { v: 1, world: this.g.meta.id, plans: [] }; d.plans = fn(d.plans || []); d.t = Date.now(); localStorage.setItem(k, JSON.stringify(d)); } catch (e) { /* storage full: built in this world anyway */ }
     }
   }
   VR.Blueprints = Blueprints;

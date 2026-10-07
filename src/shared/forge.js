@@ -116,6 +116,18 @@
   };
   // the rows the game's levelling clears on a lot anyway (blueprints.js planAt: the piece's volume up to 24 rows)
   Forge.CLEARED = (top) => Math.min(top + 2, 23);
+  // the game worker's job: {dna, ground?: Int16Array(W·D) (the terrain under the lot, rows relative to the floor, 99 =
+  // unknown), W, D} → {type:'forge', ops: Int32Array [u, y, v, state]…, lot, top, bottom, level, terrain, name, doors,
+  // floors, roof} — every non-keep cell, y relative to the floor; air included (it clears) except where the levelling of
+  // the lot clears anyway
+  Forge.job = function (m) {
+    const meta = Forge.meta(m.dna);
+    if (!meta) return { type: 'forge', id: m.id, error: 'unknown dna' };
+    let env = null;
+    if (m.ground && meta.terrain) { const W = m.W, D = m.D, gr = m.ground; env = { ground: (u, v) => { const g = gr[Math.max(0, Math.min(D - 1, v)) * W + Math.max(0, Math.min(W - 1, u))]; return g === 99 ? -1 : g; }, depth: 48 }; }
+    const g = Forge.build(m.dna, env), M = g.meta, ops = Forge.ops(g, M.level ? Forge.CLEARED(M.top) : undefined);
+    return { type: 'forge', id: m.id, dna: m.dna, ops, lot: M.lot, house: [0, 0, g.sx, g.sz], top: M.top, bottom: g.dy, level: M.level, terrain: M.terrain, name: M.name, n: M.n, doors: M.doors, floors: M.floors, roof: M.roof === undefined ? null : M.roof, ms: M.ms };
+  };
   // [start, end) chunks of at most `max` cells
   Forge.slices = function (n, max) { const out = []; for (let i = 0; i < n; i += max) out.push([i, Math.min(n, i + max)]); if (!out.length) out.push([0, 0]); return out; };
 
@@ -301,8 +313,10 @@
     const n = norm(text), ty = Forge.typeOf(n);
     const t = Forge.TYPES[ty && ty.id !== B.type ? ty.id : B.type];
     const P = t.id === B.type ? { type: t.id, params: Object.assign({}, B.params), style: B.style, seed: B.seed } : { type: t.id, params: {}, style: null, seed: B.seed };
-    for (const [re, fn] of REL) if (re.test(n)) fn(P, t);
-    applyWords(n, text, P, t);
+    // the relative words act once: "höher" makes it taller — it is not read again as "hoher" (a size word) after that
+    let rest = n;
+    for (const [re, fn] of REL) if (re.test(n)) { fn(P, t); rest = rest.replace(new RegExp(re.source, 'g'), ' '); }
+    applyWords(rest.replace(/\s+/g, ' ').trim(), text, P, t);
     return Forge.dna(P);
   };
   // n nearby variants for a 3 × 3 grid: the DNA itself first, then other seeds, every other one with a nudged dimension, every third with the next style
