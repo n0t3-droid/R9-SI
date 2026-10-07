@@ -1,10 +1,11 @@
 // Klassisch v2 (v0.39.1): every block visibly its own cube — the scenes of blocklook.mjs (grass hill, stucco house,
 // mini-voxel cottage, tech panels) plus a forest edge, a stone cliff with ores, a village street, a furnished
-// interior and a sand / snow patch, shot in both looks (switched live, as a player would). In Klassisch the block
-// grid must be measurable on flat grass: a row of pixels across ≥ 6 grass blocks in the hill scene shows darker
-// lines at a regular period (≥ 5 % luminance dips at the block width the camera geometry predicts) — the same
-// analysis must find no grid in the Nahtlos shot. Shots: test/shots/cl2_<look>_<n>_<scene>.png
-// LOOKS=classic,seamless (default) · PRESET=high · TAG=cl2
+// interior, a sand / snow patch, a pond and the flat grass at eye level, shot in both looks (switched live, as a
+// player would), then Klassisch on the Very Low preset (cl2_potato_*). In Klassisch the block grid must be
+// measurable on flat grass: rows of pixels 9–13 blocks away in the hill and the flat-grass scenes show darker lines
+// at a regular period (≥ 8 % luminance dips at the block borders the camera geometry predicts) — the same analysis
+// must find no grid in the Nahtlos shots. Shots: test/shots/cl2_<look>_<n>_<scene>.png
+// LOOKS=classic,seamless (default) · PRESET=high · TAG=cl2 · NO_POTATO=1 skips the Very Low shots
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/claude/.npm-global/lib/node_modules/sharp/lib/index.js';
 const TAG = process.env.TAG || 'cl2';
@@ -20,7 +21,7 @@ const ev = (fn, arg) => page.evaluate(fn, arg);
 const step = async (n, dtms = 16) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
 const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && i > 2) break; await wait(60); } };
 const shotPath = (name) => `/home/claude/vr/test/shots/${name}.png`;
-const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: shotPath(name), timeout: 180000 }); console.log('shot', name); };
+const shot = async (name, frames = 3) => { await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames); await page.screenshot({ path: shotPath(name), timeout: 180000 }); console.log('shot', name); };
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
@@ -108,7 +109,7 @@ const base = await ev(() => {
 });
 const [ox, y0, oz] = base;
 const EYE = 1.62, FOCAL = 360 / Math.tan(36 * Math.PI / 180);   // vertical fov 72° at 720 px
-const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; }, [pos, yaw, pitch]); await settle(30); await ev(() => { const e = VR.game.entities; if (e && e.mobs) e.mobs.length = 0; }); await step(6); await shot(TAG + '_' + name); };   // (the sheep that wander in would sit in the analysed rows)
+const look = async (name, pos, yaw, pitch, frames) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; }, [pos, yaw, pitch]); await settle(30); await ev(() => { const e = VR.game.entities; if (e && e.mobs) e.mobs.length = 0; }); await step(6); await shot(TAG + '_' + name, frames); };   // (the sheep that wander in would sit in the analysed rows)
 // ---------------------------------------------------------------- the grid analysis: a row of pixels across flat grass
 // The camera looks along −z (yaw 0) from an integer x (so block borders sit at screen x = 640 ± k · period) with
 // pitch pt from a height h above the grass. A row is chosen by the ground distance D it sees (D + ½: never along a
@@ -172,6 +173,18 @@ for (const lk of LOOKS) {
   } else {
     check(found(hill).length === 0 && found(grass).length === 0, `seamless: no block grid on the flat grass (${found(hill).length} + ${found(grass).length} rows with one) — hill ${JSON.stringify(hill)} grass ${JSON.stringify(grass)}`);
   }
+}
+// the Very Low preset (flat materials, 55 % Super Resolution): the same look on the weakest PCs — the frames build up
+// the full-resolution image, so a shot takes a few more of them
+if (LOOKS.includes('classic') && !process.env.NO_POTATO) {
+  await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.look = 'classic'; g.applySettings('*'); g.chat('/look classic'); });
+  for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim && VR.LOOK.mode === 'classic')) break; await step(2); await wait(100); }
+  await settle(80);
+  const q = await ev(() => ({ lite: VR.game.renderer.q.lite, tsr: VR.game.renderer.q.tsr, w: VR.game.renderer.w, W: VR.game.renderer.W }));
+  console.log('potato', JSON.stringify(q));
+  await look('potato_1_hill', HILL.pos, 0, HILL.pitch, 16);
+  await look('potato_3_forest', [ox - 17, y0 + 1 + 1.2, oz + 34], 0.15, -0.08, 16);
+  await look('potato_10_eye', [ox + 20.5, y0 + 1, oz + 90.5], 0.35, -0.05, 16);
 }
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);
 console.log(fails ? 'FAIL ' + fails : 'OK');
