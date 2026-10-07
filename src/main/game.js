@@ -1050,8 +1050,11 @@
       if (!word) { say('Wetter: ' + wx.info() + ' · /wetter klar|bewölkt|nebel|regen|gewitter|schnee|auto'); return; }
       const kind = VR.WX.parse(word);
       if (kind === null) { say('Das Wetter kenne ich nicht. Nimm: klar · bewölkt · nebel · regen · gewitter · schnee · auto', '#ff8a8a'); return; }
-      if (kind === 'auto') { wx.force(null); say('Wetter: wie es der Zeitplan der Welt will.'); }
-      else { wx.force(kind); say('Wetter: ' + VR.WX.label(kind)); }
+      if (kind === 'auto') { wx.force(null); say('Wetter: wie es der Zeitplan der Welt will.'); return; }
+      wx.force(kind);
+      const shown = wx.clamp(kind);     // the Wetter setting (Audio › Atmosphäre) wins over the command
+      say('Wetter: ' + VR.WX.label(shown));
+      if (shown !== kind) say('Die Einstellung Wetter (Audio › Atmosphäre) lässt nur ' + VR.WX.label(shown) + ' zu.', '#ffcf8a');
     }
     chat(text) {
       if (!text.startsWith('/')) { if (this.mp && this.mp.active) this.mp.chat(text); else this.ui.chatLine('<You> ' + text); return; }

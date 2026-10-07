@@ -140,6 +140,8 @@
     }
     setMode(m) { this.mode = m === 'calm' || m === 'off' ? m : 'normal'; }
     force(kind) { this.forced = KINDS.includes(kind) ? kind : null; }
+    // the switch wins over a command: Aus is always clear, Ruhig is at most cloudy
+    clamp(kind) { return this.mode === 'off' ? 'klar' : this.mode === 'calm' && kind !== 'klar' && kind !== 'bewoelkt' ? 'bewoelkt' : kind; }
     // "klar bis zum nächsten Wetter": the sky clears now and stays so until the next slot starts
     clearNow() { this.oneShot = true; this.oneShotSlot = this.slot >= 0 ? this.slot : null; }
     // c: {ticks, day, biome, dim, lowK (0..1: in a valley or near water), freeze}
@@ -155,7 +157,7 @@
       this.slot = slotK; this.slotEnd = sEnd;
       if (this.oneShot) { if (this.oneShotSlot === null) this.oneShotSlot = slotK; if (slotK !== this.oneShotSlot) this.oneShot = false; }
       let kind;
-      if (this.forced) kind = this.forced;
+      if (this.forced) kind = this.clamp(this.forced);
       else if (c.freeze) { if (this.frozen === null) this.frozen = this.kind; kind = this.frozen; }
       else { this.frozen = null; kind = this.oneShot ? 'klar' : kindAt(this.seed, A, climate, this.mode); }
       this.kind = kind;
