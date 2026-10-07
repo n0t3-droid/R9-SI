@@ -35,14 +35,23 @@ const digest = (page) => page.evaluate(async () => {
   return Array.from(h.slice(0, 10), (b) => b.toString(16).padStart(2, '0')).join('');
 });
 const texState = (page) => page.evaluate(() => ({ fromCache: VR.game.texFromCache, texMs: VR.game.texMs, rim: VR.game.texRim, layers: VR.game.tex && VR.game.tex.layers }));
-async function boot(page, t0) {
-  await until(page, () => !!(window.VR && VR.game && VR.game.state === 'title' && VR.game.tex), 'the title screen');
-  return { title: Date.now() - t0, ...(await texState(page)) };
+// the time when a condition first holds, on the page's own clock: performance.now() counts from this document's
+// navigation, so a reload does not also count the unload of the page before it (the game saves its world then)
+async function untilAt(page, expr, what, max = 240) {
+  for (let i = 0; i < max; i++) {
+    const at = await page.evaluate((e) => ((new Function('return (' + e + ')'))() ? performance.now() : null), expr);
+    if (at !== null) return Math.round(at);
+    await sleep(250);
+  }
+  console.log('  timeout waiting for ' + what); return -1;
 }
-async function firstWorldFrame(page, t0) {
+async function boot(page) {
+  const title = await untilAt(page, "!!(window.VR && VR.game && VR.game.state === 'title' && VR.game.tex)", 'the title screen');
+  return { title, ...(await texState(page)) };
+}
+async function firstWorldFrame(page) {
   await page.evaluate(() => { VR.game.createWorld({ name: 'Cache', mode: 'survival', difficulty: 'normal', type: 'default', seed: '424242', cheats: true, kit: true }); });
-  await until(page, () => VR.game.state === 'play' && VR.game.frame >= 3, 'the first frame of the world', 480);
-  return Date.now() - t0;
+  return untilAt(page, "VR.game.state === 'play' && VR.game.frame >= 3", 'the first frame of the world', 480);
 }
 // the keys of the cache database, read from the page (the same origin as the game)
 const cacheKeys = (page) => page.evaluate(() => new Promise((res) => {
@@ -56,22 +65,20 @@ const cacheKeys = (page) => page.evaluate(() => new Promise((res) => {
 // ---- start 1: nothing cached yet, the textures are forged and kept
 const ctx = await browser.newContext(VIEW);
 let page = await open(ctx, 'start1');
-let t0 = Date.now();
 await page.goto(URL);
-const s1 = await boot(page, t0);
+const s1 = await boot(page);
 const d1 = await digest(page);
-const w1 = await firstWorldFrame(page, t0);
+const w1 = await firstWorldFrame(page);
 console.log('start 1 ' + JSON.stringify({ fromCache: s1.fromCache, texMs: s1.texMs, titleMs: s1.title, worldMs: w1, layers: s1.layers }));
 check(s1.fromCache === false && s1.layers > 0, 'start 1 forges the block textures (nothing cached yet)');
 const keys1 = await cacheKeys(page);
 check(Array.isArray(keys1) && keys1.includes('rim-1'), 'the forged textures are stored in IndexedDB: ' + JSON.stringify(keys1));
 
 // ---- start 2: the same page reloaded: the textures come from the cache
-t0 = Date.now();
 await page.reload();
-const s2 = await boot(page, t0);
+const s2 = await boot(page);
 const d2 = await digest(page);
-const w2 = await firstWorldFrame(page, t0);
+const w2 = await firstWorldFrame(page);
 console.log('start 2 ' + JSON.stringify({ fromCache: s2.fromCache, texMs: s2.texMs, titleMs: s2.title, worldMs: w2, layers: s2.layers }));
 check(s2.fromCache === true, 'a reload takes the textures from the cache (VR.game.texFromCache)');
 check(d2 === d1, 'the cached textures are the same bytes as the forged ones');
@@ -103,12 +110,11 @@ await ctxB.addInitScript(() => {
   window.__idbOff = typeof indexedDB === 'undefined' || (() => { try { indexedDB.open('probe'); return false; } catch (e) { return true; } })();
 });
 const pageB = await open(ctxB, 'blocked');
-t0 = Date.now();
 await pageB.goto(URL);
 const idbOff = await pageB.evaluate(() => window.__idbOff);
-const sB = await boot(pageB, t0);
+const sB = await boot(pageB);
 const dB = await digest(pageB);
-const wB = await firstWorldFrame(pageB, t0);
+const wB = await firstWorldFrame(pageB);
 console.log('blocked ' + JSON.stringify({ fromCache: sB.fromCache, texMs: sB.texMs, titleMs: sB.title, worldMs: wB }));
 check(idbOff === true, 'IndexedDB refuses to open in this context');
 check(sB.fromCache === false && dB === d1, 'with IndexedDB refused the textures are forged again, the same bytes');
