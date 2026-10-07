@@ -36,7 +36,7 @@ function faceColor(s, face) {
   else if (tc === 1 || tc === 2) { r *= 0.5; g *= 0.75; b *= 0.33; }
   else if (tc === 3) { r *= 0.25; g *= 0.46; b *= 0.9; }
   // panes, glass, water: see-through
-  if (/glass|pane|panorama|window|frosted|rail$/.test(nm) && !/window_warm/.test(nm)) a = Math.min(a, 0.42);
+  if (/(^|_)glass|_pane$|panorama|window|frosted|glass_rail|iron_bars|_bars$/.test(nm) && !/window_warm|vx_glass_wall/.test(nm)) a = Math.min(a, 0.42);
   if (fl & VR.F.FLUID) { r = 0.25; g = 0.45; b = 0.85; a = 0.6; }
   if (/leaves/.test(nm)) { r *= 0.55; g *= 0.85; b *= 0.5; a = 1; }
   if (/^grass_block$/.test(nm) && face === 2) { r = 0.42; g = 0.66; b = 0.3; }
