@@ -866,5 +866,19 @@
     'g.forge.busy': 'Noch im Bau — gleich.',
     'g.forge.look': 'Schau auf den Boden, wo es stehen soll.',
     'g.forge.building': 'wird gebaut',
+    // ---- B1 Live-Schleife: 🎨 Aussehen und ⧉ Varianten (live.*; dieselben Texte stehen am Aufruf)
+    'live.title': '🎨 Aussehen',
+    'live.noTarget': '✏️ Zeig auf einen Block, dann ändere sein Aussehen.',
+    'live.guest': 'In der Welt eines Freundes gilt sein Aussehen.',
+    'live.notHere': '{n}: Aussehen lässt sich nicht ändern.',
+    'live.pause.look': '✏️ Aussehen ändern',
+    'live.pause.lookTip': 'Farbe und Material im R9 Studio — für alle deine Welten',
+    'live.bh.look': 'Aussehen ändern',
+    'live.restored': '{n} Varianten aus dieser Welt wiederhergestellt',
+    'live.mp.noPack': 'Looks des Hosts nicht geladen — du siehst deine eigenen.',
+    'live.var.full': 'Alle {n} Variantenplätze sind belegt — ändere eine Variante oder den Block „Für alle".',
+    'live.var.big': 'Zu groß für eine Variante.',
+    'live.var.bad': 'Davon geht keine Variante.',
+    'live.var.missing': 'Fehlende Variante',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -244,6 +244,7 @@
         case 'delete': if (this.selWorld) { if (b.dataset.confirm) { g.store.deleteWorld(this.selWorld.id).then(() => this.showWorlds()); } else { b.dataset.confirm = '1'; b.textContent = 'Click again to delete'; } } break;
         case 'resume': this.resume(); break;
         case 'studiolive': if (!g.openStudio()) this.hint(T('g.pause.studioGuest'), 2400); break;
+        case 'lookedit': if (VR.LiveLoop) VR.LiveLoop.fromPause(g); break;   // ✏️ Aussehen ändern (B1)
         case 'sethome': if (g.setSpawnHere()) { this.hint(T('g.pause.spawnSet'), 2600); if (this.chatLine) this.chatLine(T('g.pause.spawnSetChat'), '#9affd8'); } break;
         case 'quit': g.quitToTitle(); break;
         case 'respawn': g.player.respawn(); this.resume(); break;
@@ -371,6 +372,7 @@
       if (this.game.state !== 'play') return;
       this.show('pause');
       { const b = $('#studiolive'); if (b) b.style.display = this.game.meta && this.game.meta.guest ? 'none' : ''; }
+      if (VR.LiveLoop) VR.LiveLoop.pauseMenu(this);   // ✏️ Aussehen ändern — what the crosshair pointed at (B1)
       this.buildZenPanel();
       this.buildMpPanel();
       if (VR.Legal && !$('#pause [data-legal]')) { const q = $('#pause [data-act="quit"]'); if (q) q.after(VR.Legal.button('btn small')); }   // 📜 Impressum · Datenschutz (src/main/legal.js)

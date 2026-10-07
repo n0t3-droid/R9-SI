@@ -17,8 +17,10 @@
       if (h === undefined) return null;
       return [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
     }
-    face(layer, tint, shade, opaqueMask) {
-      const key = layer + ':' + (tint ? tint.join(',') : '') + ':' + shade + ':' + (opaqueMask ? 1 : 0);
+    // rc (B1 „🎨 Aussehen"): a recoloured block's colour (0xRRGGBB) — the texture's detail in that colour, as the shaders
+    // draw it: linear luminance against the layer's average, times the colour
+    face(layer, tint, shade, opaqueMask, rc) {
+      const key = layer + ':' + (tint ? tint.join(',') : '') + ':' + shade + ':' + (opaqueMask ? 1 : 0) + (rc ? ':' + rc : '');
       let c = this.faceCache.get(key);
       if (c) return c;
       const N = this.N;
@@ -26,9 +28,18 @@
       const ctx = c.getContext('2d');
       const img = ctx.createImageData(N, N);
       const src = this.alb, off = layer * N * N * 4;
+      let look = null;
+      if (rc && VR.Looks) {
+        const lin = (v) => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+        const avg = VR.Looks.lumFill(new Float32Array(4096), src, N, (VR.textureMasks ? VR.textureMasks().cut : null), [layer])[layer] || 0.5;
+        look = { k: 1 / Math.max(avg, 0.004), r: lin((rc >> 16) & 255), g: lin((rc >> 8) & 255), b: lin(rc & 255), lin, enc: (x) => Math.round(255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(Math.min(1, x), 1 / 2.4) - 0.055)) };
+      }
       for (let i = 0; i < N * N; i++) {
         let r = src[off + i * 4], g = src[off + i * 4 + 1], b = src[off + i * 4 + 2], a = src[off + i * 4 + 3];
-        if (tint) {
+        if (look) {
+          const l = (0.2126 * look.lin(r) + 0.7152 * look.lin(g) + 0.0722 * look.lin(b)) * look.k;
+          r = look.enc(look.r * l); g = look.enc(look.g * l); b = look.enc(look.b * l);
+        } else if (tint) {
           const k = opaqueMask ? a / 255 : 1;
           r *= 1 + (tint[0] - 1) * k; g *= 1 + (tint[1] - 1) * k; b *= 1 + (tint[2] - 1) * k;
         }
@@ -61,6 +72,7 @@
       const tint = this.tintOf(s);
       const opaque = layer === 0;
       const tex = (f) => T.tex[s * 6 + f] & 0xfff;
+      const rc = T.rc && T.rc[s] && VR.Looks ? VR.Looks.from565(T.rc[s]) : 0;
       if (shape === SH.VOXEL && VR.VX) { this.drawVoxels(ctx, s); return; }
       const flat = shape === SH.CROSS || shape === SH.TALLCROSS || shape === SH.CROP || shape === SH.WIRE || shape === SH.DRIP || shape === SH.FLUID || shape === SH.PANE ||
         (shape === SH.MODEL && this.thin(s)) || t.o.kind === 'torch' || t.o.kind === 'door' || t.o.kind === 'ladder' || t.o.kind === 'rail';
@@ -68,14 +80,14 @@
         let L = tex(4);
         if (t.o.itemTex !== undefined) L = t.o.itemTex;
         if (t.o.kind === 'door') L = R.texIndex[(R.texNames[L] || '').replace('door_bottom', 'door_top')] || L;
-        ctx.drawImage(this.face(L, tint, 1, false), 4, 4, 56, 56);
+        ctx.drawImage(this.face(L, tint, 1, false, rc), 4, 4, 56, 56);
         return;
       }
       let h = 1;
       if (shape === SH.MODEL) { const bb = VR.PHYS.selection(s)[0]; if (bb) h = Math.max(0.2, Math.min(1, bb[4] - bb[1])); }
       if (t.o.kind === 'slab') h = 0.5;
       if (T.height[s] && T.height[s] < 16 && shape !== SH.CUBE) h = Math.max(0.2, T.height[s] / 16);
-      const top = this.face(tex(2), tint, 1.0, opaque), left = this.face(tex(4), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.8, opaque), right = this.face(tex(0), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.62, opaque);
+      const top = this.face(tex(2), tint, 1.0, opaque, rc), left = this.face(tex(4), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.8, opaque, rc), right = this.face(tex(0), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.62, opaque, rc);
       // soil blocks (grass): tint only the overlay parts (mask handled by alpha)
       const N = this.N;
       const dy = (1 - h) * 29;
