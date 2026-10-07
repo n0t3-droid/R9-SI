@@ -30,6 +30,7 @@ await ev(`VR.game.createWorld({name:'Blocks v2',mode:'creative',difficulty:'peac
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; g.env.setTime(5200); });
 await settle(60);
+console.log('gpu', JSON.stringify(await ev(() => { const gl = VR.game.renderer.gl, e = gl.getExtension('EXT_texture_filter_anisotropic'); const d = gl.getExtension('WEBGL_debug_renderer_info'); return { aniso: e ? gl.getParameter(e.MAX_TEXTURE_MAX_ANISOTROPY_EXT) : 0, renderer: d ? gl.getParameter(d.UNMASKED_RENDERER_WEBGL) : '?' }; })));
 // ---------------------------------------------------------------- the scenes (relative to ox, y0, oz: y0 is the ground block, its top at y0 + 1)
 const base = await ev(() => {
   const g = VR.game, w = g.world, p = g.player, R = VR.R;
@@ -159,6 +160,7 @@ for (const lk of LOOKS) {
   await look(lk + '_7_sandsnow', [ox - 19, y0 + 1 + 2.5, oz + 54], 0, -0.5);
   await look(lk + '_8_far', [ox + 16, y0 + 1 + 24, oz + 118], 0, -0.16);
   await look(lk + '_9_pond', [ox + 43, y0 + 1 + 2.2, oz + 58.5], 0, -0.42);
+  await look(lk + '_10_eye', [ox + 20.5, y0 + 1, oz + 90.5], 0.35, -0.05);   // standing on the flat grass, looking across it
   // the grid on flat grass: the hill scene's foreground rows and the flat-grass scene
   const hill = await gridOn(TAG + '_' + lk + '_1_hill', HILL.h, HILL.pitch, [9.5, 10.5, 11.5, 12.5]);
   const grass = await gridOn(TAG + '_' + lk + '_2_grass', GRASS.h, GRASS.pitch, [9.5, 10.5, 11.5, 12.5]);
