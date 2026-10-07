@@ -262,4 +262,70 @@
     K.grid.meta = { name: 'Burg', doors, floors: [0], top: towerH + 7 + dy, walk: h - 1 + dy, lot: [w, d], anchor: [cx, 0] };
     return K.grid;
   });
+  // ---------------------------------------------------------------- 🏟
+  const SS = {
+    beton: { name: 'Beton', body: 'concrete_smooth', stair: 'concrete_smooth_stairs', tier: 'light_gray_concrete', wall: 'concrete_smooth', roof: 'charcoal_panel', roofGlass: 'glass', mast: 'black_metal', seat: ['red_concrete', 'blue_concrete', 'white_concrete'], glass: 'window_black', screen: 'vx_holo_screen' },
+    stahl: { name: 'Stahl', body: 'light_gray_concrete', stair: 'stone_brick_stairs', tier: 'light_gray_concrete', wall: 'charcoal_panel', roof: 'black_metal', roofGlass: 'glass', mast: 'black_metal', seat: ['yellow_concrete', 'black_concrete', 'white_concrete'], glass: 'window_black', screen: 'vx_holo_screen' },
+    tech: { name: 'Tech', body: 'vx_tech_gray', stair: 'concrete_smooth_stairs', tier: 'vx_tech_white', wall: 'vx_tech_white', roof: 'vx_tech_band', roofGlass: 'vx_glass_wall', mast: 'vx_tech_trim', seat: ['cyan_concrete', 'white_concrete', 'black_concrete'], glass: 'vx_window_tech', screen: 'vx_holo_screen' },
+    backstein: { name: 'Backstein', body: 'bricks', stair: 'brick_stairs', tier: 'stone_bricks', wall: 'bricks', roof: 'roof_charcoal', roofGlass: 'glass', mast: 'black_metal', seat: ['red_concrete', 'white_concrete', 'red_concrete'], glass: 'window_warm', screen: 'vx_holo_screen_amber' },
+  };
+  Forge.register({
+    id: 'stadium', icon: '🏟', name: 'Stadion', en: 'Stadium', level: true, sh: 1,
+    params: [
+      { k: 'l', label: 'Länge', min: 50, max: 110, def: 84, dim: true, step: 2 },
+      { k: 'w', label: 'Breite', min: 40, max: 80, def: 60, dim: true, step: 2 },
+      { k: 't', label: 'Ränge', min: 4, max: 12, def: 7 },
+      { k: 'r', label: 'Dach', min: 0, max: 1, def: 1 },
+      { k: 'k', label: 'Sport', min: 0, max: 1, def: 0, names: ['Fußball', 'Leichtathletik'] },
+    ],
+    styles: Object.keys(SS).map(id => ({ id, name: SS[id].name })),
+    lot: (P) => [P.params.w, P.params.l],
+    describe: (P) => [P.params.l + ' × ' + P.params.w, P.params.t + ' Ränge', P.params.k ? 'Laufbahn' : 'Fußball'].concat(P.params.r ? ['Dach'] : []),
+  }, function (P, env) {
+    const { l, w, t, r, k } = P.params, S = SS[P.style] || SS.beton, rng = Forge.rng(P, 'stadium');
+    const dy = -1, depth = 2 * t + 4, H = t + (r ? 8 : 3) + 2, K = Forge.kit(w, H + 16, l, dy);
+    const px0 = depth, px1 = w - 1 - depth, pz0 = depth, pz1 = l - 1 - depth, cx = (w - 1) / 2, cz = (l - 1) / 2;
+    K.box(0, 0, 0, w - 1, 0, l - 1, 'grass_block'); K.box(0, 1, 0, w - 1, H + 15, l - 1, 0);
+    // the pitch: grass with white lines (outline, halfway line, centre circle, the boxes), goals; a track ring for athletics
+    const track = k ? 5 : 0, ix0 = px0 + track, ix1 = px1 - track, iz0 = pz0 + track, iz1 = pz1 - track;
+    const line = (x, z) => K.set(x, 0, z, 'white_concrete');
+    for (let z = pz0; z <= pz1; z++) for (let x = px0; x <= px1; x++) K.set(x, 0, z, k && (x < ix0 || x > ix1 || z < iz0 || z > iz1) ? 'red_concrete' : 'grass_block');
+    if (k) { for (let i = 1; i < 5; i++) { for (let z = pz0 + i; z <= pz1 - i; z++) { if ((z & 1) === 0) { line(px0 + i, z); line(px1 - i, z); } } for (let x = px0 + i; x <= px1 - i; x++) if ((x & 1) === 0) { line(x, pz0 + i); line(x, pz1 - i); } } }
+    for (let z = iz0; z <= iz1; z++) { line(ix0, z); line(ix1, z); } for (let x = ix0; x <= ix1; x++) { line(x, iz0); line(x, iz1); line(x, Math.round(cz)); }
+    const cr = Math.max(4, Math.round((ix1 - ix0) / 7)); for (let a = 0; a < 48; a++) line(Math.round(cx + Math.cos(a / 48 * Math.PI * 2) * cr), Math.round(cz + Math.sin(a / 48 * Math.PI * 2) * cr));
+    const bw = Math.round((ix1 - ix0) * 0.6), bd = Math.max(4, Math.round((iz1 - iz0) / 7)), bx0 = Math.round(cx - bw / 2), bx1 = Math.round(cx + bw / 2);
+    for (const [za, zb] of [[iz0, iz0 + bd], [iz1 - bd, iz1]]) { for (let x = bx0; x <= bx1; x++) { line(x, za); line(x, zb); } for (let z = za; z <= zb; z++) { line(bx0, z); line(bx1, z); } }
+    for (const z of [iz0, iz1]) { for (let x = Math.round(cx) - 3; x <= Math.round(cx) + 3; x++) { K.set(x, 3, z, 'white_concrete'); for (let y = 1; y <= 2; y++) K.set(x, y, z, 'iron_bars'); } K.col(Math.round(cx) - 3, z, 1, 3, 'white_concrete'); K.col(Math.round(cx) + 3, z, 1, 3, 'white_concrete'); }
+    // the stands: tiers of stairs rising outward from the pitch's edge, a walkway and an outer wall; rounded corners
+    const dist = (x, z) => { const dx = x < px0 ? px0 - x : x > px1 ? x - px1 : 0, dz = z < pz0 ? pz0 - z : z > pz1 ? z - pz1 : 0; return Math.hypot(dx, dz); };
+    const side = (x, z) => { const dx = x < px0 ? px0 - x : x > px1 ? x - px1 : 0, dz = z < pz0 ? pz0 - z : z > pz1 ? z - pz1 : 0; return dx > dz ? (x < px0 ? 1 : 3) : (z < pz0 ? 2 : 0); };   // the stairs face the pitch
+    for (let z = 0; z < l; z++) for (let x = 0; x < w; x++) {
+      const d = dist(x, z); if (d < 1) continue;
+      const k2 = Math.round(d) - 1;                                   // 0 = the first tier
+      if (k2 >= depth) continue;
+      const y = 1 + Math.floor(Math.min(k2, 2 * t - 1) / 2);
+      for (let yy = 1; yy < y; yy++) K.set(x, yy, z, S.body);
+      if (k2 < 2 * t) { if ((k2 & 1) === 0) K.set(x, y, z, S.stair, { facing: side(x, z), half: 0 }); else K.set(x, y, z, S.seat[Math.floor(k2 / 2) % S.seat.length]); }
+      else if (k2 < 2 * t + 3) { K.set(x, y, z, S.tier); if (k2 === 2 * t + 1 && (x + z) % 7 === 0) K.set(x, y + 1, z, 'vx_lamppost_black'); }
+      else { K.col(x, z, y, y + 2, S.wall); if ((x + z) % 4 === 0 && d > 1) K.set(x, y + 1, z, S.glass); }
+    }
+    // four entrances through the outer wall and the walkway (the stand floor at the walkway is the top tier's height)
+    const topY = 1 + Math.floor((2 * t - 1) / 2);
+    for (const [x, z, dx, dz] of [[Math.round(cx), 0, 0, 1], [Math.round(cx), l - 1, 0, -1], [0, Math.round(cz), 1, 0], [w - 1, Math.round(cz), -1, 0]]) {
+      for (let i = 0; i < 4; i++) for (let a = -1; a <= 1; a++) { const xx = x + dx * i + (dz ? a : 0), zz = z + dz * i + (dx ? a : 0); K.box(xx, topY + 1, zz, xx, topY + 3, zz, 0); K.set(xx, topY, zz, S.tier); }
+      for (let a = -2; a <= 2; a += 4) { const xx = x + (dz ? a : 0), zz = z + (dx ? a : 0); K.col(xx, zz, topY + 1, topY + 4, S.mast); }
+    }
+    // the roof: a cantilevered band over the upper tiers on columns, glass at its inner edge; floodlight masts at the corners
+    if (r) {
+      const ry = topY + 6;
+      for (let z = 0; z < l; z++) for (let x = 0; x < w; x++) { const d = dist(x, z); if (d < t + 1 || d > depth + 1) continue; K.set(x, ry, z, d < t + 3 ? S.roofGlass : S.roof); }
+      for (let z = 0; z < l; z++) for (let x = 0; x < w; x++) { const d = dist(x, z); if (Math.round(d) !== 2 * t + 3 || (x + z) % 8 !== 0) continue; K.col(x, z, topY + 1, ry - 1, S.mast); }
+    }
+    for (const [x, z] of [[2, 2], [w - 3, 2], [2, l - 3], [w - 3, l - 3]]) { K.col(x, z, 1, topY + 12, S.mast); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) K.set(x + a, topY + 13, z + b, 'light_panel'); K.set(x, topY + 14, z, 'vx_lamppost_tech'); }
+    // the scoreboard at one end
+    for (let x = Math.round(cx) - 3; x <= Math.round(cx) + 3; x++) for (let y = topY + 3; y <= topY + 5; y++) K.set(x, y, 1, S.screen, { facing: 2 });
+    K.grid.meta = { name: k ? 'Leichtathletikstadion' : 'Fußballstadion', doors: [[Math.round(cx), topY + 1 + dy, 0]], floors: [dy, topY + dy], top: topY + 14 + dy, lot: [w, l], anchor: [w >> 1, 0] };
+    void rng;
+    return K.grid;
+  });
 })(VR);
