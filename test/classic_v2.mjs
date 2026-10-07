@@ -187,5 +187,6 @@ if (LOOKS.includes('classic') && !process.env.NO_POTATO) {
   await look('potato_10_eye', [ox + 20.5, y0 + 1, oz + 90.5], 0.35, -0.05, 16);
 }
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);
-console.log(fails ? 'FAIL ' + fails : 'OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 await browser.close();
+process.exit(fails ? 1 : 0);
