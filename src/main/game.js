@@ -173,7 +173,12 @@
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
-      const tex = await new Promise((res) => this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
+      // the textures are forged in a worker; a worker that fails (out of memory on a very small machine) is tried
+      // once more on another, then the game says so instead of waiting forever behind the loading screen
+      const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
+      let tex = await forge(0);
+      if (tex.type !== 'textures') { console.warn('textures failed once:', tex.msg); tex = await forge(this.pool.workers.length > 1 ? 1 : 0); }
+      if (tex.type !== 'textures') { this.fatal('The block textures could not be built (' + (tex.msg || 'worker failed') + '). Close other tabs and reload.'); return; }
       if (tex.missing && tex.missing.length) console.warn('Missing textures:', tex.missing);
       this.tex = tex; this.texRim = !!(VR.LOOK && VR.LOOK.rim);
       tex.noise = tex.noise;
