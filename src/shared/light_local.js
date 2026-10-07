@@ -6,22 +6,29 @@
 (function (VR) {
   'use strict';
   const R = VR.R;
+  // the flood-fill queue (a ring) is kept between columns: a worker lights hundreds of columns in a row, and a fresh
+  // 1 MB queue for each was a quarter of its garbage. computeColumnLight never re-enters itself, so one is enough.
+  let Q = new Int32Array(1 << 18);
   // a column is 16 × 16 × H (H = blocks.length / 256, a multiple of 16; 256 for generated terrain, taller where the
   // player has built higher — see world.js growColumn)
   VR.computeColumnLight = function (blocks, hasSky) {
     const T = R.T, filter = T.filter, emit = T.emit;
     const N = blocks.length, H = N >> 8, TOP = H - 1;
     const light = new Uint16Array(N);
-    let QN = 1 << 18; while (QN < N * 4) QN <<= 1;
-    const QM = QN - 1;
-    const q = new Int32Array(QN);
+    let QN = Q.length; while (QN < N * 4) QN <<= 1;
+    if (QN !== Q.length) Q = new Int32Array(QN);
+    const q = Q, QM = QN - 1;
     let qh = 0, qt = 0;
     const push = (i) => { q[qt] = i; qt = (qt + 1) & QM; };
+    // the highest row holding any block: everything above it is open air (full sky, nothing to seed or emit)
+    let maxTop = -1;
+    for (let y = TOP; y >= 0 && maxTop < 0; y--) { const o = y << 8; for (let c = 0; c < 256; c++) if (blocks[o | c]) { maxTop = y; break; } }
     // ---------- sky ----------
     if (hasSky) {
+      if (maxTop < TOP) light.fill(0xf000, (maxTop + 1) << 8);
       for (let col = 0; col < 256; col++) {
         let v = 15;
-        for (let y = TOP; y >= 0; y--) {
+        for (let y = maxTop; y >= 0; y--) {
           const i = (y << 8) | col;
           const f = filter[blocks[i]];
           if (f >= 15) { v = 0; } else if (f > 0) { v = v - f; if (v < 0) v = 0; }
@@ -33,8 +40,9 @@
           light[i] = v << 12;
         }
       }
-      // seed voxels whose neighbors are darker
-      for (let y = 0; y < H; y++) {
+      // seed voxels whose neighbors are darker (none above the row over the highest block: all its neighbours are open sky)
+      const seedTop = Math.min(H, maxTop + 2);
+      for (let y = 0; y < seedTop; y++) {
         for (let col = 0; col < 256; col++) {
           const i = (y << 8) | col;
           const s = light[i] >>> 12;
@@ -68,7 +76,8 @@
     }
     // ---------- block light ----------
     qh = qt = 0;
-    for (let i = 0; i < N; i++) {
+    const emitEnd = (maxTop + 1) << 8;   // air emits nothing
+    for (let i = 0; i < emitEnd; i++) {
       const e = emit[blocks[i]];
       if (e) { light[i] = (light[i] & 0xf000) | e; push(i); }
     }

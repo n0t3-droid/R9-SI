@@ -80,7 +80,9 @@
     if (prism > 0.001) { c.H = M.lerp(c.H, c.H + 5 + Math.max(0, c.pv) * 10, prism * 0.7); c.A += prism * 3; }
     return c;
   };
-  const KEYS = ['c', 'e', 'w', 't', 'h', 'pv', 'H', 'river', 'mountain', 'windswept', 'swampy', 'inland', 'plateau', 'ember', 'prism', 'canyon'];
+  // every value of a corner that a block's climate interpolates (a later layer — the Heartland — adds its own here,
+  // so one pass over the four corners serves them all)
+  const KEYS = OG.CLIMATE_KEYS = ['c', 'e', 'w', 't', 'h', 'pv', 'H', 'river', 'mountain', 'windswept', 'swampy', 'inland', 'plateau', 'ember', 'prism', 'canyon'];
   OG.climateAt = function (x, z) {
     const X0 = Math.floor(x / 4) * 4, Z0 = Math.floor(z / 4) * 4;
     const fx = (x - X0) / 4, fz = (z - Z0) / 4;

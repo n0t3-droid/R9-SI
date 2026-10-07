@@ -146,6 +146,18 @@
     async boot() {
       try { this.renderer = new VR.Renderer(this.canvas); }
       catch (e) { this.fatal('This game needs WebGL 2. ' + e.message); return; }
+      // the graphics context can be taken away (a driver reset, the GPU out of memory on a small machine, a tab
+      // in the background too long): everything on the GPU is gone. The world is saved and the page starts again —
+      // seconds, and nothing lost — instead of a black view that never comes back.
+      this.canvas.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        if (this.glLost) return;
+        this.glLost = true;
+        console.warn('WebGL context lost — saving and reloading');
+        try { this.ui && this.ui.loading && this.ui.loading('Graphics were lost — saving…', 0.5); } catch (err) { /* the page may be half gone */ }
+        const save = this.state === 'play' && this.meta && !this.meta.guest && this.world ? Promise.all([this.saveMeta(), this.world.saveAll()]) : Promise.resolve();
+        Promise.race([save.catch(() => {}), new Promise((r) => setTimeout(r, 4000))]).then(() => { try { location.reload(); } catch (err) { /* nothing more to do */ } });
+      }, false);
       this.input = new VR.Input(this.canvas);
       this.audio = new VR.Audio();
       this.env = new VR.Env();
@@ -175,7 +187,12 @@
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
-      const tex = await new Promise((res) => this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
+      // the textures are forged in a worker; a worker that fails (out of memory on a very small machine) is tried
+      // once more on another, then the game says so instead of waiting forever behind the loading screen
+      const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
+      let tex = await forge(0);
+      if (tex.type !== 'textures') { console.warn('textures failed once:', tex.msg); tex = await forge(this.pool.workers.length > 1 ? 1 : 0); }
+      if (tex.type !== 'textures') { this.fatal('The block textures could not be built (' + (tex.msg || 'worker failed') + '). Close other tabs and reload.'); return; }
       if (tex.missing && tex.missing.length) console.warn('Missing textures:', tex.missing);
       this.tex = tex; this.texRim = !!(VR.LOOK && VR.LOOK.rim);
       tex.noise = tex.noise;
@@ -532,6 +549,7 @@
 
     // ---------------------------------------------------------------- main loop
     loop(t) {
+      if (this.glLost) return;   // the context is gone: no more frames (the page reloads)
       requestAnimationFrame((tt) => this.loop(tt));
       let dt = (t - this.last) / 1000; this.last = t;
       if (!(dt > 0)) dt = 0.016;
@@ -1033,7 +1051,7 @@
         case 'time': { const v = a[0] === 'set' ? a[1] : a[0]; const n = TIMES[v] !== undefined ? TIMES[v] : parseInt(v, 10); if (!isNaN(n)) { this.env.setTime(n); say('Time set to ' + n); } break; }
         case 'weather': if (a[0] === 'clear') { this.env.rainTarget = 0; this.env.rain = 0; } else if (a[0] === 'rain' || a[0] === 'thunder') { this.env.rainTarget = 1; this.env.thunder = a[0] === 'thunder' ? 1 : 0; this.env.weatherTimer = 12000; } say('Weather: ' + a[0]); break;
         case 'gamemode': case 'gm': { const m = { s: 'survival', c: 'creative', z: 'zen', 0: 'survival', 1: 'creative', survival: 'survival', creative: 'creative', zen: 'zen' }[a[0]]; if (m) { p.setMode(m); say('Game mode: ' + m); } break; }
-        case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); p.teleport(v[0], v[1], v[2]); say('Teleported.'); } break;
+        case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); if (p.teleport(v[0], v[1], v[2])) say('Teleported.'); else say('/tp x y z — numbers, please (~ for here).', '#ff8a8a'); } break;
         case 'give': { const id = a[0], n = parseInt(a[1] || '1', 10) || 1; if (VR.itemDef(id)) { p.inv.add(id, n); say('Gave ' + n + ' ' + VR.itemName(id)); } else say('Unknown item: ' + id, '#ff8a8a'); break; }
         case 'seed': say('Seed: ' + this.meta.seed); break;
         case 'kill': p.damage(1000, 'void'); break;
