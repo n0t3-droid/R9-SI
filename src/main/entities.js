@@ -5,6 +5,7 @@
 (function (VR) {
   'use strict';
   const R = VR.R, F = VR.F, PH = VR.PHYS, mat4 = VR.mat4, SH = VR.SHAPE;
+  const IDENT = mat4.create();   // (drawModel starts from it: no new matrix per model drawn)
   const MOBS = VR.MOBS = {
     glimmer_deer: { model: 'glimmer_deer', hp: 10, speed: 3.2, w: 0.45, h: 1.4, drops: [['raw_beef', 1, 2], ['crystal_shard_azure', 0, 1]], xp: 2, biomes: /prism|crystal|forest|meadow|birch|taiga|grove/, group: [2, 4] },
     moss_boar: { model: 'moss_boar', hp: 12, speed: 2.8, w: 0.5, h: 0.95, drops: [['raw_porkchop', 1, 3], ['leather', 0, 1]], xp: 2, biomes: /forest|jungle|taiga|dark|swamp|plains|savanna/, group: [2, 3] },
@@ -416,7 +417,7 @@
       gl.uniform3f(p.u.u_tint, 1, 1, 1);
       gl.uniform1f(p.u.u_noFog, opts.noFog ? 1 : 0);
       const base = this.mm;
-      base.set(mat4.create());
+      base.set(IDENT);
       if (opts.baseMat) base.set(opts.baseMat);
       else {
         mat4.translate(base, base, pos[0] - cam.x, pos[1] - cam.y, pos[2] - cam.z);

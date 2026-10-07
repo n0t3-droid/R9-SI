@@ -221,5 +221,46 @@ check(WB.writes.every(c => c.length <= 8000), 'no write over 8 000 cells (larges
   check(/built/.test(status()) && t - st0 <= 2.5, 'a bed appears in a short magic moment (' + (t - st0).toFixed(1) + ' s)');
   check(!site || !site.scaffold, 'no construction site for a bed (no scaffold, no crane)');
 }
+// ---------------------------------------------------------------- 9 · the show (no GL here: its clock, its crew, its crane, its meshes)
+{
+  let folk = true; try { require('../src/main/villagers.js'); } catch (e) { folk = false; }
+  const W = makeWorld(), G = makeGame(W, 'site', planOf());
+  runUntil(G, 1 / 30, () => !!G.B.slices, 5);
+  const site = G.B.slices, sh = site && site.show;
+  check(!!sh && sh.scaffold && !!sh.inst && sh.inst.bays.length > 0, 'the tower gets a scaffold (' + (sh && sh.inst ? sh.inst.bays.length / 4 + ' bays, ' + sh.K + ' levels' : 'none') + ')');
+  check(!!(sh && sh.crane) && sh.crane.Lj >= 10 && sh.crane.mastTop > sh.top, 'and a crane taller than it (' + (sh && sh.crane ? 'mast top ' + sh.crane.mastTop + ', jib ' + sh.crane.Lj : 'none') + ')');
+  check(!folk || (sh && sh.crew.length === 3), 'a crew of three builders on Balanced (' + (sh ? sh.crew.length : 0) + ')');
+  let deckOk = 0, deckN = 0, onDeck = 0, onN = 0, worked = 0, hauled = 0;
+  const seen = new Set();
+  runUntil(G, 1 / 30, () => {
+    if (!(site.phase === 'build' && site.t > site.Te + 1)) return site.phase === 'done';
+    const front = (site.t - site.Te) / site.Tb * sh.H; deckN++; if (Math.abs(sh.deck - Math.max(0, front - 1.25)) < 2.5) deckOk++;
+    for (const b of sh.crew) { if (b.mode === 'deck') { onN++; if (Math.abs(b.pos[1] - (sh.oy + sh.deck + 0.11)) < 0.35) onDeck++; } if (b.state === 'work') worked++; }
+    if (sh.crane) { seen.add(sh.crane.st); if (sh.crane.load) hauled++; }
+    return false;
+  }, 40);
+  check(deckN > 100 && deckOk / deckN > 0.97, 'the working deck rises with the build front (' + deckOk + '/' + deckN + ' frames)');
+  check(!folk || (onN > 100 && onDeck / onN > 0.97 && worked > 50), 'the builders stand on the deck and hammer (' + onDeck + '/' + onN + ' on it, ' + worked + ' frames of work)');
+  check(hauled > 30 && seen.has('lower') && seen.has('down'), 'the crane picks loads at its yard and lowers them onto the deck (' + [...seen].join(' ') + ')');
+  const tDone = site.phase === 'done';
+  let gone = -1; runUntil(G, 1 / 30, (t) => { if (site.phase === 'gone' && gone < 0) gone = t; return gone >= 0; }, 30);
+  check(tDone && gone > 1 && gone < 16, 'when it stands the scaffold folds, the builders walk off, the site is gone (' + gone.toFixed(1) + ' s)');
+  check(!G.B.sites.length, 'no show is left behind');
+  // the meshes: every triangle turns its front to its normal (back faces are culled)
+  const BS = V.Baustelle, bad = [];
+  const mods = Object.keys(BS.MOD).map(k => [k, k === 'corner' ? BS.MOD.corner(false) : k === 'top' ? BS.MOD.top(30, 9) : BS.MOD[k]()]).concat([['deckCorner', BS.MOD.corner(true)]]);
+  for (const [k, m] of mods) {
+    const v = m.raw; let off = 0;
+    for (let i = 0; i < v.length; i += 30) {
+      const ax = v[i + 10] - v[i], ay = v[i + 11] - v[i + 1], az = v[i + 12] - v[i + 2], bx = v[i + 20] - v[i], by = v[i + 21] - v[i + 1], bz = v[i + 22] - v[i + 2];
+      const cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx, d = cx * v[i + 3] + cy * v[i + 4] + cz * v[i + 5];
+      if (d < -1e-9) off++;
+    }
+    if (off) bad.push(k + ' ' + off);
+  }
+  check(!bad.length, 'every triangle of the ' + mods.length + ' meshes faces out (culling keeps them)' + (bad.length ? ': ' + bad.join(', ') : ''));
+  const tris = mods.reduce((n, [, m]) => n + m.count / 3, 0), bay = mods.find(q => q[0] === 'bay')[1].count / 3;
+  console.log('  (meshes: ' + Math.round(tris) + ' triangles in all, ' + bay + ' per scaffold bay)');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

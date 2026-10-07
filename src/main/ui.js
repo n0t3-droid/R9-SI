@@ -563,6 +563,17 @@
           row(T('g.set.skin'), Folk.SKIN, 'skin', (c) => hex(c));
           body.appendChild(el('div', 'hr'));
         }
+        // 🏗 Bauen: Sofort or Baustelle — planned buildings at once, or built in front of you (baustelle.js)
+        {
+          const f = el('div', 'field'); f.innerHTML = '<label></label>'; f.firstChild.textContent = T('g.bau.setting');
+          const sg = el('div', 'seg'), cur = S.bau === 'instant' ? 'instant' : 'site';
+          for (const [v, k, tip] of [['site', 'g.bau.site', 'g.bau.siteTip'], ['instant', 'g.bau.instant', 'g.bau.instantTip']]) {
+            const b = el('button', cur === v ? 'on' : ''); b.textContent = T(k); b.title = T(tip); b.dataset.set = 'bau:' + v;
+            b.onclick = () => { S.bau = v; S.bauSet = true; this.game.saveSettings(); this.showSettings(); };
+            sg.appendChild(b);
+          }
+          f.appendChild(sg); body.appendChild(f);
+        }
         if (VR.Legal && this.game.mp) body.appendChild(VR.Legal.mpToggle(this.game));   // 👥 Mehrspieler an / aus and the name notice (src/main/legal.js)
         if (S.mpHost === undefined) S.mpHost = true;
         toggle('mpHost', T('g.set.mpHost'));
