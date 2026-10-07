@@ -29,8 +29,8 @@ cost · **S4** small or cosmetic. Status: **fixed** (commit, test) · **browser*
 | 13 | S2 | `src/shared/light_local.js` | 1 MB queue allocated per column; three passes over all 65536 cells though the sky above the land is empty. | fixed `93636e7` · test/light_same.js (v0.39 algorithm kept as reference: identical on 24 columns incl. 320-high, no-sky; 1.1–1.5 → 0.6 ms) |
 | 14 | S3 | `src/shared/gen_realm.js`, `gen_heart.js`, `gen_overworld.js` | A block's climate looked its 4 corners up twice (800 blocks a column); the density scan started at y = 255 above the empty sky. | fixed `27ce8c5` · test/gen_same.js (23 columns, 6 world kinds: identical; 8.1 → 7.8 ms/column of plain land — small) |
 | 15 | S3 | `src/main/tex_build.js`, `tex_core.js` | The block textures are forged in worker 0 at every start: **2.5 s cold / 1.0 s warm** here (1832 layers, 19 MB), 3–7 s on a small PC, the main thread waiting behind the loading screen. Profile: recipes (fbm, Img allocations, `forEach` closures) ~60 %, `toArrays` (a closure per pixel, `Math.hypot`) + mip loops ~30 %, GC 10 %. Tried: hoisting the closures and reusing the per-layer arrays — byte-identical, but only ~10 % and within this machine's noise, so **not committed**. | proposal: cache the finished arrays in IndexedDB keyed by a recipe/version hash (≈100 ms to load), or forge in two workers (split the layer range) |
-| 16 | S3 | `src/main/game.js` boot | Workers = max(2, min(6, cores − 1)): a 2-core machine runs 2 workers + the main thread while the title world streams. | proposal: measure 1 worker on ≤ 2 cores in a browser (generation throughput halves; frame time improves) |
-| 17 | S3 | `src/shared/gen_village.js` VG.plan/site, `gen_temple.js` | The first column of a town costs **1.6 s in the worker** (town plan + sites + temple) — once per town per worker (each worker plans the same town again). | proposal: plan a town in one job and share the summary; or plan ahead when a site comes within range |
+| 16 | S3 | `src/main/game.js` boot | Workers = max(2, min(6, cores − 1)): a 2-core machine runs 2 workers + the main thread while the title world streams. | fixed `a9d3e1a` · test/pool_size.js, test/pool_recover.js: one worker on 1–2 cores, two on 3–4, cores − 2 above (at most 6), capped at 2 on potato and 3 on low. The frame time on a 2-core PC is not measured here (§4, item 9) |
+| 17 | S3 | `src/shared/gen_village.js` VG.plan/site, `gen_temple.js` | The first column of a town costs **1.6 s in the worker** (town plan + sites + temple) — once per town per worker (each worker plans the same town again). | fixed `9959bf1` · test/town_slices.js, test/town_gen.js, test/gen_same.js: a town's plan is built in 20 ms slices and the job that needs it waits (`waiting` replies); the Gate Temple too. The chunk's own terrain (100–250 ms per chunk here) is not planning and is unchanged |
 | 18 | S3 | `src/shared/gen_overworld.js` carveCaves | Generation 8–40 ms/column; caves ~25 % of plain land (3 trilinear fields per cell). | proposal: sample the cave fields per 4×4×4 cell incrementally — the terrain hash (test/gen_same.js) would move, needs a visual check |
 | 19 | S4 | `src/main/horizon.js` update | Quadtree walk with string keys and per-node arrays: measured **0.17 ms/frame** at level 4, 0.06 at level 2. | fine as is |
 | 20 | S4 | `src/main/renderer.js` Arena | Fragmentation under churn (3000 live meshes, 10k ops): 1.6 µs per release+alloc, ~500 free entries, 71 % used. | fine as is |
@@ -56,12 +56,15 @@ cost · **S4** small or cosmetic. Status: **fixed** (commit, test) · **browser*
 | P.move with a 3000-block velocity | 7117 ms | 30 ms | test/phys_guard.js |
 | VX piece cache, worst case per worker | 200 MB, then a cold restart | ≤ ~120 MB, hot pieces kept | test/vx_cache.js |
 | Generation, plain land | 8.1 ms/column | 7.8 ms | test/gen_same.js |
+| Town plan, three modern towns (seed 424242), one job | 1.0–1.25 s (two towns), 0.4–0.6 s (one): the whole plan in one job | 20 ms turns (15–61 per town); the planner's own CPU per turn: median ~10 ms, longest ~20 ms; the sliced plan ~8 % more CPU in total (interleaved medians) | test/town_gen.js (before: HEAD 53d558c); test/town_slices.js |
+| Gate Temple build, once per world per worker | one synchronous build: 280–290 ms CPU (656–953 ms wall) | 20 ms slices: median 10 ms CPU, longest 14–17 ms; the same temple (hash 31d80e01 both ways) | scratch check (not committed); test/gen_same.js |
+| Worker pool, 2-core PC | 2 workers: max(2, min(6, cores − 1)) | 1 worker (the rule for 1–16 cores × presets) | test/pool_size.js |
 
 ## 3. Node tests added (all green; `bash test/wt_run.sh <name>.js`)
 
 mesh_same · worker_jobs · light_same · phys_guard · pool_recover · frame_cost · vx_cells (`--write` regenerates
 src/shared/voxcells.js after a first-pack model's build changes — the test says so) · vx_cache · gen_same ·
-store_fail. Still green: id_snapshot, model_smoke, housekit, villa_smoke, modern_pack, modern_sheet, look_classic,
+store_fail · pool_size · town_slices. Still green: id_snapshot, model_smoke, housekit, villa_smoke, modern_pack, modern_sheet, look_classic,
 variants, style_core, tpl_roundtrip, schem_io, heart_gen, pack, skin_design, genie_brain, genie_raster,
 ridge_mesh, ridge_seam (ship_designs needs the test/ships output folder, unrelated).
 
@@ -90,6 +93,9 @@ ridge_mesh, ridge_seam (ship_designs needs the test/ships output folder, unrelat
    the edits still there after the autosave retries once room is made.
 9. **Startup timing on a 2-core / 4 GB machine** (potato preset): time to title, time to play; compare worker
    counts 2 vs 1 (finding 16); note the texture forge time (finding 15).
+10. **Town plans** (`9959bf1`): fly to the nearest modern town from the spawn and walk in while its columns stream: expect
+   no stall while the town is planned, no "did not answer" line in the console, and the town complete within a few
+   seconds on a 2-core machine.
 
 ## 5. Merge notes
 
@@ -101,4 +107,7 @@ ridge_mesh, ridge_seam (ship_designs needs the test/ships output folder, unrelat
 - Behaviour deliberately changed, invisible to players: full-face masks for lazy (late) models are now real instead of
   0 (fewer hidden faces drawn against Modern Living furniture); a failed mesh job is retried 3×, a failed column after
   5 s; a save the database refuses keeps the column modified; `/tp` with non-numbers refuses.
+- Worker count and town plans (`a9d3e1a`, `9959bf1`): a 1–2 core machine runs one generation worker (was two); a town's
+  plan is built in 20 ms slices and a job that needs it waits (`waiting` replies; the pool keeps its slot). The output is
+  unchanged: the plan hashes and test/gen_same.js are identical.
 - Presets untouched. No new dependencies. README/ROADMAP untouched.

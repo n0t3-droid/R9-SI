@@ -196,7 +196,9 @@
   }
 
   // ---------------------------------------------------------------- build (cached per generator)
-  TEMPLE.build = function (g) {
+  // The build is a generator: it yields every few columns of the footprint and between its sections, so a worker can
+  // build it in slices (TEMPLE.advance, worker_main.js). TEMPLE.build runs it to the end, once per generator.
+  TEMPLE.buildSteps = function* (g) {
     if (g._temple) return g._temple;
     const K = mats(), mat = makeMat(K);
     const chunks = new Map();
@@ -223,6 +225,7 @@
     for (let x = bx0; x <= bx1; x++) for (let z = bz0; z <= bz1; z++) {
       const TOP = colTop(x, z);
       if (!TOP) continue;
+      yield;   // at most one column with structure per step (a tower column is ~90 material samples)
       let runS = -2, runY = 0, any = false, maxY = Y;
       const flush = (yEnd) => { if (runS === -2) return; if (runS >= 0) fill(x, z, runY, yEnd, runS); runS = -2; };
       for (let y = Y + 1; y <= TOP; y++) {
@@ -240,6 +243,7 @@
         fill(x, z, maxY + 1, Math.max(maxY + 6, gy + 3), AIR);
       }
     }
+    yield;
     // ---- hall floor, pad ring, light lines, furniture
     const HZ = -10; // pad centre z
     for (let x = -10; x <= 10; x++) for (let z = T.back + 1; z <= T.front - 1; z++) {
@@ -267,10 +271,12 @@
     // ceiling lights: an octagon ring over the pad, a row down the axis
     for (let x = -8; x <= 8; x++) for (let z = HZ - 8; z <= HZ + 8; z++) { if (Math.round(oct(x, z - HZ)) === 6) put(x, Y + 15, z, K.HEXLC); }
     for (let z = T.back + 4; z <= T.front - 4; z += 6) { if (Math.abs(z - HZ) > 7) { put(0, Y + 15, z, K.HEXL); put(-5, Y + 15, z, K.HEXL); put(5, Y + 15, z, K.HEXL); } }
+    yield;
     // ---- outside: the path to the city from the back door
     for (let z = T.back - 1; z >= T.back - 9; z--) for (let x = -3; x <= 3; x++) { const gy = ground(x, z); fill(x, z, gy + 1, Y - 1, K.DIRT); put(x, Y, z, Math.abs(x) === 3 ? K.LINE : K.PLAZA); fill(x, z, Y + 1, Y + 6, AIR); }
     // ---- the plaza & runway
     for (let x = -60; x <= 60; x++) for (let z = 21; z <= 140; z++) {
+      if (z === 21) yield;
       const ax = Math.abs(x);
       if (ax >= 24 && ax <= 56 && z <= 30) continue;                     // terraces
       if (ax >= 23 && ax <= 32 && z <= 38) continue;                     // stairs
@@ -306,6 +312,7 @@
       for (const [dx, dz] of [[-13, 26], [12, 22], [-3, 27]]) put(sx * (40 + dx), Y + 9, dz, K.BUSH);
       put(sx * 27, Y + 9, 17, K.PLANTER); put(sx * 53, Y + 9, 17, K.PLANTER);
     }
+    yield;
     // ---- roof gardens on the wings, railings on every roof edge
     for (const sx of [-1, 1]) {
       for (let x = 22; x <= 55; x++) for (let z = -28; z <= 15; z++) {
@@ -325,6 +332,26 @@
     };
     g._temple = { chunks, base, box: TEMPLE.box };
     return g._temple;
+  };
+  // the temple of g, built to the end. In a worker job that needs it (VG.probe set) the run ends instead, and the job
+  // waits for the slices (worker_main.js); a job that is not in a run builds it here.
+  TEMPLE.build = function (g) {
+    if (g._temple) return g._temple;
+    const pr = VR.VillageGen && VR.VillageGen.probe;
+    if (pr) { pr.miss = { temple: g }; throw pr; }
+    return TEMPLE.advance(g, Infinity);
+  };
+  // builds the temple of g for about ms (a worker's turn); returns it when done, else null
+  TEMPLE.advance = function (g, ms) {
+    if (g._temple) return g._temple;
+    if (!g._templeBuild) g._templeBuild = TEMPLE.buildSteps(g);
+    const t0 = performance.now();
+    let r;
+    try { do { r = g._templeBuild.next(); } while (!r.done && performance.now() - t0 < ms); }
+    catch (e) { g._templeBuild = null; throw e; }
+    if (!r.done) return null;
+    g._templeBuild = null;
+    return r.value;
   };
 
   // ---------------------------------------------------------------- per-chunk stamp

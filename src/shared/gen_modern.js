@@ -476,11 +476,12 @@
 
   // ---------------------------------------------------------------- dispatcher
   // returns the info record (lot-local) or null when the kind is not a modern building
-  MOD.build = function (kind, L, lot, o) {
+  // a generator (the villa catalogue yields between its phases, see gen_villa.js); MOD.build runs it to the end
+  MOD.buildSteps = function* (kind, L, lot, o) {
     switch (kind) {
       case 'home': case 'lot': {
         // homes come from the villa catalogue (real floor plans at real scale); lots too small for it get the two signature houses
-        if (VG.plan2 && VG.plan2.build) { const info = VG.plan2.build(L, lot, o); if (info) return info; }
+        if (VG.plan2 && VG.plan2.buildSteps) { const info = yield* VG.plan2.buildSteps(L, lot, o); if (info) return info; }
         if (lot.w >= 18 && lot.d >= 14) return MOD.houseA(L, lot, o);
         if (lot.w >= 15 && lot.d >= 13) return MOD.villa(L, lot, o);
         return null;
@@ -493,6 +494,10 @@
       case 'park': return MOD.park(L, lot, o);
       default: return null;
     }
+  };
+  MOD.build = function (kind, L, lot, o) {
+    const it = MOD.buildSteps(kind, L, lot, o);
+    for (;;) { const r = it.next(); if (r.done) return r.value; }
   };
   MOD.DIMS = { home: VG.plan2 && VG.plan2.DIMS ? VG.plan2.DIMS.slice() : [[18, 14], [15, 13]], hall: [[31, 19], [27, 17]], school: [[17, 14], [15, 13]], factory: [[19, 13], [15, 11]], office: [[11, 11]], cafe: [[9, 8]], park: [[12, 10]], clinic: [[11, 9]] };
   MOD.CIVIC = ['hall', 'school', 'factory', 'cafe', 'office', 'clinic', 'park'];
