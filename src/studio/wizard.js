@@ -90,6 +90,7 @@
     onClose() { },
   };
   if (VR.Projects) Wz.host = host;   // (a page without the projects list keeps the wizard closed)
+  if (VR.WizKinds && !VR.WizKinds.catalog) VR.WizKinds.catalog = () => (C.HOUSES || []).map(h => ({ i: h.i, name: h.name }));   // (the villas: this page has their list, not the generator)
 
   // ---------------------------------------------------------------- the world it goes to, and where its spot is
   async function target() {

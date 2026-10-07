@@ -179,10 +179,12 @@
     return out;
   }
   // ---------------------------------------------------------------- the villas of the catalogue (h:)
+  // (the villa catalogue: the game has it on its page; the Studio hands its list in — K.catalog() → [{i, name}])
   function villaSix(seed) {
-    const P = VR.VillageGen && VR.VillageGen.plan2, cat = P && P.CATALOGUE; if (!cat) return [];
+    const P = VR.VillageGen && VR.VillageGen.plan2, cat = P && P.CATALOGUE ? P.CATALOGUE.map((c, i) => ({ i, name: c.name })) : (K.catalog ? K.catalog() : null);
+    if (!cat || !cat.length) return [];
     const from = ((Math.max(1, seed) - 1) * 6) % cat.length, out = [];
-    for (let k = 0; k < Math.min(6, cat.length); k++) { const i = (from + k) % cat.length; out.push({ key: 'h:' + i, src: 'house', ding: 'h:' + i, index: i, name: cat[i].name }); }
+    for (let k = 0; k < Math.min(6, cat.length); k++) { const c = cat[(from + k) % cat.length]; out.push({ key: 'h:' + c.i, src: 'house', ding: 'h:' + c.i, index: c.i, name: c.name }); }
     return out;
   }
 
