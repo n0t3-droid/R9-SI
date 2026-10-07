@@ -15,6 +15,8 @@ const ctx = await browser.newContext({ viewport: { width: 1360, height: 820 } })
 const logs = [], fails = [];
 const check = (ok, msg) => { if (!ok) fails.push(msg); console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 const watch = (pg, tag) => { pg.on('pageerror', e => logs.push(`[${tag} pageerror] ` + (e.stack || e.message).slice(0, 900))); pg.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) logs.push(`[${tag}] ` + m.text().slice(0, 300)); }); };
+const crashed = async (e) => { console.log('✗ crashed: ' + String(e && e.message || e).slice(0, 600)); fails.push('crash'); try { await finish(); } catch (e2) { process.exit(1); } };
+process.on('unhandledRejection', crashed); process.on('uncaughtException', crashed);
 const finish = async () => { console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l); check(!logs.some(l => /pageerror/.test(l)), 'no pageerror on either page'); await browser.close(); srv.kill(); console.log(fails.length ? 'FAILED ' + fails.length : 'ALL OK'); process.exit(fails.length ? 1 : 0); };
 const game = await ctx.newPage(); watch(game, 'game');
 await game.goto(URL0 + '/index.html');
@@ -34,7 +36,10 @@ const studio = await ctx.newPage(); watch(studio, 'studio');
 await studio.goto(URL0 + '/studio.html');
 const sev = (fn, a) => studio.evaluate(fn, a);
 for (let i = 0; i < 240; i++) { await studio.waitForTimeout(500); if (await sev(() => !document.getElementById('studio').classList.contains('boot') && window.__studio && window.__studio.HOUSE.size >= 1)) break; }
-check(await sev(() => !!document.querySelector('nav.modes button[data-mode="forge"]')), 'the header has a 🏭 Forge button');
+console.log('studio', JSON.stringify(await sev(() => ({ boot: document.getElementById('studio').classList.contains('boot'), core: !!window.__studioCore, forge: !!(window.VR && VR.Forge), types: window.VR && VR.Forge ? VR.Forge.types.length : -1, sf: !!(window.VR && VR.StudioForge), nav: [...document.querySelectorAll('nav.modes button')].map(b => b.dataset.mode || '·').join(' ') }))));
+const hasNav = await sev(() => !!document.querySelector('nav.modes button[data-mode="forge"]'));
+check(hasNav, 'the header has a 🏭 Forge button');
+if (!hasNav) await finish();
 await studio.click('nav.modes button[data-mode="forge"]'); await studio.waitForTimeout(600);
 check(await sev(() => window.__st.mode === 'forge' && document.querySelectorAll('#chips button.fgt').length >= 10), 'Forge mode: an icon per type in the chip row (' + await sev(() => [...document.querySelectorAll('#chips button.fgt')].map(b => b.textContent.split(' ')[0]).join(' ')) + ')');
 const WISH = 'Hochhaus 30 Stockwerke Glas';

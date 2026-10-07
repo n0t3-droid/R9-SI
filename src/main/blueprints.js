@@ -187,7 +187,9 @@
         const gy = ground(x, z, F0 + 60, F0 - DEPTH), edge = u === 0 || v === 0 || u === bp.lot[0] - 1 || v === bp.lot[1] - 1;
         const fillS = edge && F0 - 1 - gy > 2 ? wallS : dirt;
         for (let y = Math.max(gy + 1, F0 - DEPTH); y <= F0 - 1; y++) put(x, y, z, fillS);
-        const top = Math.max(F0 + bp.top + 2, Math.min(F0 + CLEAR - 1, reach(x, z, F0, F0 + CLEAR)));
+        // (the piece's own volume up to 24 rows, above that whatever still stands there — a 160-high tower does not
+        // read 160 rows of open sky per column: the planning of it stays a few milliseconds on the main thread)
+        const top = Math.max(F0 + Math.min(bp.top + 2, 24), Math.min(F0 + CLEAR - 1, reach(x, z, F0, F0 + CLEAR)));
         for (let y = F0; y <= top; y++) put(x, y, z, 0);
       }
       // 2 · the verge: ring k may sit k−1 above or below the yard. Small steps of natural ground are filled up or cut

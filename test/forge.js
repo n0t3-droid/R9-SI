@@ -108,6 +108,8 @@ section('kit', () => {
   check(info && Array.isArray(info.seats) && info.seats.length >= 2, 'the info record collects seats: ' + (info && info.seats.length));
   const ops = Forge.ops({ sx: 2, sy: 2, sz: 2, blocks: Uint16Array.from([1, 2, 0xFFFF, 3, 0, 4, 5, 6]), dy: -1 });
   check(ops.length === 7 * 4 && ops[1] === -1 && ops[3] === 1, 'ops: every non-keep cell as [u, y, v, state] with y = dy + gy: ' + ops.length);
+  { const g = { sx: 1, sy: 4, sz: 1, dy: -1, blocks: Uint16Array.from([5, 0, 0, 0]) };   // rows −1 … 2
+    const a = Forge.ops(g), b = Forge.ops(g, 1); check(a.length === 16 && b.length === 8 && b[1] === -1 && b[5] === 2, 'ops without the air the levelling clears anyway (rows 0 … clearTo): ' + a.length / 4 + ' → ' + b.length / 4); }
   check(JSON.stringify(Forge.slices(100000, 24000)) === JSON.stringify([[0, 24000], [24000, 48000], [48000, 72000], [72000, 96000], [96000, 100000]]) && Forge.slices(10, 24000).length === 1, 'slices');
 });
 
