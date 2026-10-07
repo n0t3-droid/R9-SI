@@ -7,6 +7,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const mat4 = VR.mat4;
   const CAR = 6, GAP = 0.5, BOGIE = 2.2, VMAX = 13, ACC = 2.4, DWELL = 10;
   const OFF = CAR / 2 + GAP / 2;
@@ -138,7 +140,7 @@
         for (const c of L.cars) this.cars.push(c);
         if (ride && ride.line === L && L.stop && !was) {
           const name = L.names[L.stop - 1];
-          g.ui.chatLine('Sky tram: arriving at ' + (name || 'the station') + ' · Shift to get off', '#9affd8');
+          g.ui.chatLine(T('g.tram.arriving', { name: name || T('g.tram.station') }), '#9affd8');
           g.audio && g.audio.play && g.audio.play('click');
         }
       }
@@ -150,7 +152,7 @@
       gd.riding = { type: 'tram', car, seat: car.idx === 0 ? 1.1 : -1.1 };
       p.flying = false; p.target = null; p.breaking = null;
       const L = car.line, to = L.v > 0 || (L.stop === 1) ? L.names[1] : L.names[0];
-      g.ui.hint('Sky tram to ' + (to || 'the next town') + ' · Shift to get off at a station', 3000);
+      g.ui.hint(T('g.tram.to', { name: to || T('g.tram.nextTown') }), 3000);
       if (g.codex && g.codex.event) g.codex.event('tram');
     }
     seatPos(r) {
@@ -166,7 +168,7 @@
         if (c.line.stop) { g.gadgets.dismount(); return; }
         if (r.roofAsk && this.clock - r.roofAsk < 2.5) { g.gadgets.dismount(); return; }
         r.roofAsk = this.clock;
-        g.ui.hint('The tram is moving · Shift again to climb onto the roof', 2200);
+        g.ui.hint(T('g.tram.moving'), 2200);
       }
     }
     // where to put the rider down: the platform beside the car at a station, else the roof
@@ -189,9 +191,9 @@
     }
     hud(r) {
       const L = r.car.line;
-      if (L.stop) return `<b>SKY TRAM</b> · at ${L.names[L.stop - 1] || 'the station'} · leaves in ${Math.ceil(L.left)} s<br><small>Shift to get off · F5 view</small>`;
+      if (L.stop) return T('g.tram.hudStop', { name: L.names[L.stop - 1] || T('g.tram.station'), s: Math.ceil(L.left) });
       const to = L.v > 0 ? L.names[1] : L.names[0];
-      return `<b>SKY TRAM</b> → ${to || 'next town'} · ${Math.ceil(L.left)} s<br><small>Shift at a station to get off · F5 view</small>`;
+      return T('g.tram.hudGo', { name: to || T('g.tram.next'), s: Math.ceil(L.left) });
     }
     // ---------------------------------------------------------------- drawing (inside the entities' voxel pass)
     draw(r, E, cam, prog) {

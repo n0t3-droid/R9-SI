@@ -6,6 +6,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const M = VR.M;
   const TAU = Math.PI * 2;
   const TYPES = [['interceptor', 30], ['racer', 12], ['gunship', 16], ['freighter', 16], ['dropship', 10], ['shuttle', 10], ['cruiser', 6], ['carrier', 2.5]];
@@ -51,7 +53,7 @@
     spawnDefenders() {
       const g = this.g, p = g.player; if (!p) return;
       for (let k = 0; k < 2; k++) this.spawnFlight({ arch: 'interceptor', defender: true, circle: { r: 34 + k * 6, h: p.pos[1] + 16 + k * 4, w: (k ? -1 : 1) * 0.55, a0: k * Math.PI }, life: 150 });
-      g.ui.chatLine('✦ A defence wing drops out of hyperspace!', '#9affd8');
+      g.ui.chatLine(T('g.chat.defence'), '#9affd8');
     }
     update(dt) {
       const g = this.g, fp = this.focus();

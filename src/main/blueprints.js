@@ -12,6 +12,8 @@
 (function (VR) {
   'use strict';
   const R = VR.R, F = VR.F;
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];   // = the lot builder's
   const FRONT = [[0, -1], [1, 0], [0, 1], [-1, 0]];                                            // street side of a lot turned r
   const REACH = 120, MARGIN = 3, DEPTH = 48, CLEAR = 80;
@@ -67,7 +69,7 @@
         if (!K.v.custom) { msg.skin = K.v.skin; msg.mirror = K.v.mirror; }
         this.g.pool.direct(0, msg, null, (m) => {
           this.pending.delete(K.k);
-          if (m.type !== 'blueprint' || m.error) { this.hint('Blueprint failed: ' + (m.error || m.msg || '?'), 3000); return; }
+          if (m.type !== 'blueprint' || m.error) { this.hint(T('g.bp.failed', { why: m.error || m.msg || '?' }), 3000); return; }
           m.variant = K.vi; m.variants = K.n;
           this.cache.set(K.k, m);
         });
@@ -90,14 +92,14 @@
       const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1);
       const at = { bp, r, ox, oz, F: ay, x0, z0, x1, z1, rect, ok: true, why: '' };
       // can it go here? loaded ground all around, inside the world's height, nobody standing on the lot
-      if (ay - DEPTH < 1 || ay + bp.top + 8 >= VR.MAXY) { at.ok = false; at.why = 'Too high or too low for this house'; }
+      if (ay - DEPTH < 1 || ay + bp.top + 8 >= VR.MAXY) { at.ok = false; at.why = T('g.bp.tooHigh'); }
       else {
         outer: for (let cz = (z0 - MARGIN) >> 4; cz <= (z1 + MARGIN) >> 4; cz++) for (let cx = (x0 - MARGIN) >> 4; cx <= (x1 + MARGIN) >> 4; cx++) {
-          const c = w.col(cx, cz); if (!c || !c.ready) { at.ok = false; at.why = 'The ground there is still loading — get closer'; break outer; }
+          const c = w.col(cx, cz); if (!c || !c.ready) { at.ok = false; at.why = T('g.bp.loading'); break outer; }
         }
       }
       const P = p.pos;
-      if (at.ok && P[0] >= x0 - 0.3 && P[0] <= x1 + 1.3 && P[2] >= z0 - 0.3 && P[2] <= z1 + 1.3 && P[1] > ay - 4 && P[1] < ay + bp.top + 2) { at.ok = false; at.why = 'You are standing on the lot — step back'; }
+      if (at.ok && P[0] >= x0 - 0.3 && P[0] <= x1 + 1.3 && P[2] >= z0 - 0.3 && P[2] <= z1 + 1.3 && P[1] > ay - 4 && P[1] < ay + bp.top + 2) { at.ok = false; at.why = T('g.bp.onLot'); }
       return at;
     }
 
@@ -108,7 +110,7 @@
       this.at = bp ? this.locate(p, bp) : null;
       if (!g.ui.typing) {
         if (input.hit('KeyR')) { this.rot = (this.rot + 1) & 3; g.audio.play('click'); }
-        if (input.hit('KeyF')) { const n = this.variants(i).length; if (n > 1) { this.variant[i] = ((this.variant[i] || 0) + 1) % n; g.audio.play('click'); } else this.hint('Your own design has one facade — change it in R9 Studio', 2200); }
+        if (input.hit('KeyF')) { const n = this.variants(i).length; if (n > 1) { this.variant[i] = ((this.variant[i] || 0) + 1) % n; g.audio.play('click'); } else this.hint(T('g.bp.oneFacade'), 2200); }
         if (input.hit('KeyZ')) this.gad.undo();
       }
       if (rmb) this.build(p, i);
@@ -117,9 +119,9 @@
     hud(hdef) {
       const P = this.plan(), i = hdef.house | 0, cat = P && P.CATALOGUE[i]; if (!cat) return null;
       const K = this.key(i), bp = this.cache.get(K.k), own = K.v.custom;
-      const facade = own ? '<span style="color:#ffd27a">★ your R9 Studio design</span>' : `facade ${K.vi + 1}/${K.n}${bp ? ' · ' + bp.skin + (bp.mirror ? ' · mirrored' : '') : ''}`;
-      const at = this.at, where = !bp ? 'drawing up the plan…' : !at ? 'look at the ground' : at.ok ? `${cat.lot[0]}×${cat.lot[1]} lot · ${bp.top + 1} high` : `<span style="color:#ff8a8a">${at.why}</span>`;
-      return `<b>BLUEPRINT</b> · ${cat.name} · ${facade} · ${where}<br><small>RMB build · R turn · F facade · Z undo${this.g.player.creative ? '' : ' · <b>Creative / Zen only</b>'}</small>`;
+      const facade = own ? '<span style="color:#ffd27a">' + T('g.bp.own') + '</span>' : T('g.bp.facade', { i: K.vi + 1, n: K.n }) + (bp ? ' · ' + bp.skin + (bp.mirror ? T('g.bp.mirrored') : '') : '');
+      const at = this.at, where = !bp ? T('g.bp.drawing') : !at ? T('g.bp.lookGround') : at.ok ? T('g.bp.lot', { w: cat.lot[0], d: cat.lot[1], h: bp.top + 1 }) : `<span style="color:#ff8a8a">${at.why}</span>`;
+      return T('g.bp.hud', { name: cat.name, facade, where, only: this.g.player.creative ? '' : T('g.bp.onlyCreative') });
     }
     outlines(out) {
       const at = this.at; if (!at) return;
@@ -135,14 +137,14 @@
     build(p, i) {
       const g = this.g, at = this.at;
       if (!at) return;
-      if (!p.creative) { this.hint('Blueprints build in Creative or Zen Builder', 2600); return; }
+      if (!p.creative) { this.hint(T('g.bp.mode'), 2600); return; }
       if (!at.ok) { this.hint(at.why, 2200); return; }
       const t0 = performance.now(), n = this.buildAt(at);
-      if (!n) { this.hint('Already standing here', 1600); return; }
+      if (!n) { this.hint(T('g.bp.standing'), 1600); return; }
       g.audio.place(R.byName.stone.defaultState);
       g.particles && g.particles.spark && g.particles.spark(at.ox + 0.5, at.F + 1, at.oz + 0.5, [0.5, 0.9, 1], 30, 4);
       const P = this.plan(), name = P.CATALOGUE[i].name;
-      this.hint(`${name}${at.bp.custom ? ' ★' : ''} built · ${n.toLocaleString()} blocks · Z or /undo takes it back`, 3200);
+      this.hint(T('g.bp.built', { name: name + (at.bp.custom ? ' ★' : ''), n: n.toLocaleString() }), 3200);
       g.codex && g.codex.event && g.codex.event('blueprint');
       this.lastMs = performance.now() - t0;
     }
@@ -291,7 +293,7 @@
         this.markPlan(pl.id, 'built');
         if (g.player && g.player.unstick) g.player.unstick();
         const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
-        if (g.ui && g.ui.toast) g.ui.toast('R9 Studio', `${name} gebaut · ${n.toLocaleString('de-DE')} Blöcke`);
+        if (g.ui && g.ui.toast) g.ui.toast('R9 Studio', T('g.studio.built', { name, n: n.toLocaleString(VR.I18N && VR.I18N.locale ? VR.I18N.locale() : 'de-DE') }));
         break;   // one piece per half second keeps the frame smooth
       }
     }
@@ -332,19 +334,19 @@
     // ---------------------------------------------------------------- /haus [n]
     command(a) {
       const g = this.g, p = g.player, P = this.plan(), say = (t, c) => g.ui.chatLine(t, c || '#cfe6ff');
-      if (!P) { say('No house catalogue in this build.', '#ff8a8a'); return true; }
+      if (!P) { say(T('g.cmd.noCatalogue'), '#ff8a8a'); return true; }
       const list = P.CATALOGUE.map((c, i) => `${i} ${c.name}${VR.Custom && VR.Custom.houseFor(i) ? ' ★' : ''}`).join(' · ');
-      if (!a[0]) { say('Houses: ' + list); say('/haus <n> puts its blueprint in your hand — RMB builds it where you look (★ = your R9 Studio design).'); return true; }
+      if (!a[0]) { say(T('g.cmd.houses', { list })); say(T('g.cmd.hausHow')); return true; }
       const q = a.join(' ').toLowerCase();
       let i = /^\d+$/.test(q) ? +q : P.CATALOGUE.findIndex(c => c.name.toLowerCase().indexOf(q) >= 0);
-      if (!(i >= 0 && i < P.CATALOGUE.length)) { say('Unknown house. ' + list, '#ff8a8a'); return true; }
-      if (!p.creative) { say('Blueprints build in Creative or Zen Builder.', '#ff8a8a'); return true; }
+      if (!(i >= 0 && i < P.CATALOGUE.length)) { say(T('g.cmd.noHouse', { list }), '#ff8a8a'); return true; }
+      if (!p.creative) { say(T('g.cmd.bpMode'), '#ff8a8a'); return true; }
       const id = 'blueprint_' + i, inv = p.inv;
       let k = inv.slots.findIndex((s, j) => j < 9 && s && s.id === id);
       if (k < 0) { k = inv.slots.findIndex((s, j) => j < 9 && !s); if (k < 0) k = inv.sel; inv.slots[k] = { id, n: 1 }; }
       inv.sel = k; inv.changed = true;
       this.get(i);
-      say(`Blueprint · ${P.CATALOGUE[i].name}${VR.Custom && VR.Custom.houseFor(i) ? ' ★' : ''} in hand — RMB builds it where you look, R turns it, F changes the facade.`);
+      say(T('g.cmd.bpInHand', { name: P.CATALOGUE[i].name + (VR.Custom && VR.Custom.houseFor(i) ? ' ★' : '') }));
       return true;
     }
   }

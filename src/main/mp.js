@@ -30,6 +30,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const R = VR.R, F = VR.F;
   const PROTO = 1;
   const TOPICS = ['hello', 'welcome', 'mods', 'req', 'diff', 'blk', 'edit', 'env', 'chat', 'summon', 'pdata', 'bye'];
@@ -111,7 +113,7 @@
       this.subs.push(room.onPeers((ch) => this.peersChanged(ch), () => { }));
     }
     unsubscribe() { for (const u of this.subs) { try { u(); } catch (e) { /* ignore */ } } this.subs = []; }
-    roomError(e) { if (this.g.ui) this.g.ui.chatLine('Multiplayer connection lost (' + (e && e.code || 'error') + ')', '#ff8a8a'); }
+    roomError(e) { if (this.g.ui) this.g.ui.chatLine(T('g.mp.lost', { code: e && e.code || 'error' }), '#ff8a8a'); }
     // messages go out through a small queue so bursts never exceed the platform's budget
     send(topic, data) {
       if (!this.room) return;
@@ -130,7 +132,7 @@
       while (this.sendQ.length && this.sendT >= 1 && this.room) {
         const [topic, data] = this.sendQ.shift(); this.sendT -= 1;
         this.room.emit(topic, data).catch((e) => {
-          if (e && e.code === 'not_permitted' && !this.warnedPerm) { this.warnedPerm = true; this.g.ui.chatLine('To play together, the game\'s owner has to invite you in claude.ai (Share → Contributor or Editor).', '#ffb86a'); }
+          if (e && e.code === 'not_permitted' && !this.warnedPerm) { this.warnedPerm = true; this.g.ui.chatLine(T('g.mp.notPermitted'), '#ffb86a'); }
         });
       }
     }
@@ -443,26 +445,26 @@
       const t = String((m.data && m.data.t) || '').replace(/[\u0000-\u001f]/g, ' ').slice(0, 200);
       if (!t) return;
       const a = this.remote.get(m.peer);
-      this.g.ui.chatLine('<' + (a ? a.name : 'Friend') + '> ' + t, '#ffe9a8');
+      this.g.ui.chatLine('<' + (a ? a.name : T('g.talk.friend')) + '> ' + t, '#ffe9a8');
     }
     summon(peer) {
       const p = this.g.player; if (!p || this.role !== 'host') return;
       this.send('summon', { to: peer, p: [Math.round(p.pos[0] * 100) / 100, Math.round(p.pos[1] * 100) / 100, Math.round(p.pos[2] * 100) / 100], f: p.flying ? 1 : 0 });
       const a = this.remote.get(peer);
-      this.g.ui.chatLine('You called ' + (a ? a.name : 'your friend') + ' to you.', '#9affd8');
+      this.g.ui.chatLine(T('g.mp.called', { name: a ? a.name : T('g.mp.friend') }), '#9affd8');
     }
     onSummon(m) {
       const d = m.data || {};
       if (this.role !== 'client' || d.to !== this.myPeer() || m.peer !== this.hostPeer || !Array.isArray(d.p)) return;
       const [x, y, z] = d.p.map(v => num(v, 0));
       this.g.player.safeTeleport(x + 1.2, y, z + 0.6, { fly: d.f && this.g.player.creative });
-      this.g.ui.chatLine(this.hostName + ' called you over!', '#9affd8');
+      this.g.ui.chatLine(T('g.mp.calledYou', { name: this.hostName }), '#9affd8');
     }
     teleportToHost() {
       const h = this.hostPeer && this.remote.get(this.hostPeer);
-      if (!h || !h.has) { this.g.ui.chatLine('Can\'t see the host right now.', '#ff8a8a'); return; }
+      if (!h || !h.has) { this.g.ui.chatLine(T('g.mp.noHost'), '#ff8a8a'); return; }
       this.g.player.safeTeleport(h.tp[0] + 1.2, h.tp[1], h.tp[2] + 0.6, { fly: h.fly && this.g.player.creative });
-      this.g.ui.chatLine('Teleported to ' + h.name + '.', '#9affd8');
+      this.g.ui.chatLine(T('g.mp.teleported', { name: h.name }), '#9affd8');
     }
     teleportTo(peer) {
       const h = this.remote.get(peer); if (!h || !h.has) return;
@@ -474,11 +476,11 @@
       if (this.isClient && m.peer === this.hostPeer) {
         this.clearSession();
         const g = this.g;
-        g.ui.chatLine('The host closed the world.', '#ffb86a');
+        g.ui.chatLine(T('g.mp.hostClosed'), '#ffb86a');
         if (g.state === 'play' || g.state === 'loading') g.leaveGuestWorld('The host closed the world.');
         return;
       }
-      if (a && this.role === 'host') g_say(this.g, a.name + ' left the world.');
+      if (a && this.role === 'host') g_say(this.g, T('g.mp.leftWorld', { name: a.name }));
     }
 
     // ---------------------------------------------------------------- players you see
@@ -502,7 +504,7 @@
         if (inSess(byPeer.get(peer))) continue;
         if (peer === this.hostPeer && this.role === 'client') continue; // handled by the grace timer
         if (a.tag) a.tag.remove(); this.remote.delete(peer);
-        if (a.name && g.ui) g.ui.chatLine(a.name + ' left.', '#cfd8e6');
+        if (a.name && g.ui) g.ui.chatLine(T('g.mp.left', { name: a.name }), '#cfd8e6');
       }
       for (const p of ch.peers) {
         if (!inSess(p)) continue;
@@ -511,7 +513,7 @@
         if (!a) {
           a = { peer: p.peer, by: p.by, name: cleanName(pl.n) || 'Friend', has: false, pos: [0, 0, 0], tp: [0, 0, 0], yaw: 0, pitch: 0, walk: 0, walkAmt: 0, swing: 0, tag: null, seed: 0, look: null };
           this.remote.set(p.peer, a);
-          if (g.ui && this.active) g.ui.chatLine((cleanName(pl.n) || 'A friend') + ' joined the world!', '#9affd8');
+          if (g.ui && this.active) g.ui.chatLine(T('g.mp.joinedWorld', { name: cleanName(pl.n) || T('g.mp.aFriend') }), '#9affd8');
           if (g.audio) g.audio.play('toast');
         }
         a.name = cleanName(pl.n) || a.name;

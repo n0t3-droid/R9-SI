@@ -5,41 +5,17 @@
 (function (VR) {
   'use strict';
   const title = (id) => id.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
-  // [id, name, description, hint, icon]
+  // the player's language (lang_de.js / lang_en.js): every entry's name, description and hint are looked up when
+  // shown, so the language switches live. Milestones: [id, icon]; their texts are g.codex.m.<id> = [name, desc, hint].
+  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const MILESTONES = [
-    ['log', 'Timber!', 'Collected your first log.', 'Trees have more to give.', 'oak_log'],
-    ['table', 'Workbench', 'Crafted a crafting table.', 'Four planks, one purpose.', 'crafting_table'],
-    ['torch', 'First Light', 'Crafted torches.', 'Coal and sticks push back the dark.', 'torch'],
-    ['stone', 'Stone Age', 'Gathered cobblestone.', 'Dig deeper than dirt.', 'cobblestone'],
-    ['furnace', 'Hot Stuff', 'Built a furnace.', 'Eight stones in a ring.', 'furnace'],
-    ['iron', 'Iron Will', 'Obtained an iron ingot.', 'Smelt what you mine.', 'iron_ingot'],
-    ['diamond', 'Diamonds!', 'Found a diamond.', 'Deep, deep down.', 'diamond'],
-    ['crystal', 'Crystal Harvest', 'Collected a realm crystal shard.', 'The glowing spires shed shards.', 'crystal_shard_violet'],
-    ['aether', 'Liquid Energy', 'Bottled aether in a bucket.', 'Blue rivers hum with power.', 'aether_bucket'],
-    ['star_core', 'Meteor Hunter', 'Recovered a star core from a meteor crater.', 'Watch the night sky in Survival.', 'star_core'],
-    ['outpost', 'Outpost Explorer', 'Opened a crate at a Starforge outpost.', 'Find a landing pad with a tower.', 'cargo_crate'],
-    ['blaster', 'Armed & Ready', 'Got hold of a Pulse Blaster.', 'Outposts and Starforge crafting.', 'laser_blaster'],
-    ['jetpack', 'Rocket Pack', 'Flew with a jetpack.', 'Wear it, jump, hold Space.', 'jetpack'],
-    ['bike', 'Hover Time', 'Rode a hoverbike.', 'Outposts keep one parked nearby.', 'hoverbike'],
-    ['ship', 'Take the Helm', 'Flew a ship built from blocks.', 'Right-click a Ship Helm inside a hull.', 'helm'],
-    ['orbit', 'Edge of Space', 'Flew a ship to the top of the sky.', 'Climb, climb, climb.', 'viewport'],
-    ['wand', 'Master Builder', 'Shaped the world with the Builder Wand.', 'Two corners, one key.', 'builder_wand'],
-    ['blueprint', 'Architect', 'Built a villa from a blueprint.', 'Creative → Blueprints, or /haus.', 'blueprint_0'],
-    ['drone', 'Say Cheese', 'Launched the photo drone.', 'A camera with wings.', 'photo_drone'],
-    ['shot', 'Postcard', 'Captured a screenshot.', 'F2 or the photo drone.', 'glass'],
-    ['raid', 'Raid Defender', 'Repelled a night raid of drones.', 'Survive the night in Survival.', 'turret'],
-    ['kill', 'First Blood', 'Defeated a hostile creature.', 'Not everything here is friendly.', 'iron_sword'],
-    ['deep', 'Into the Depths', 'Reached the bottom of the world.', 'Keep digging.', 'deepstone'],
-    ['sky', 'Cloud Walker', 'Stood higher than the clouds.', 'Climb or fly above 200.', 'white_wool'],
-    ['night', 'Night Owl', 'Survived a full night in Survival.', 'Stay alive till dawn.', 'lantern'],
-    ['sleep', 'Sweet Dreams', 'Slept in a bed.', 'Beds skip the night.', 'red_bed'],
-    ['village', 'Neighbours', 'Found a village.', 'Follow the chimney smoke and the lamps.', 'vx_lamppost'],
-    ['villager', 'Hello, Friend', 'Talked to a villager.', 'Right-click someone in a village.', 'vx_bed_red'],
-    ['quest', 'Good Samaritan', 'Helped a villager with a request.', 'Ask "Can I help?"', 'emerald'],
-    ['home', 'Home Builder', 'A family moved into a house you built.', 'Near a village: walls, a roof, a door and a bed.', 'vx_bed_blue'],
-    ['festival', 'Lantern Night', 'Joined a Lantern Festival.', 'Villages celebrate every third evening.', 'lantern'],
-    ['autopilot', 'Sky Taxi', 'Let the autopilot fly you to another village.', 'Press G in a starship.', 'shuttle_beacon'],
+    ['log', 'oak_log'], ['table', 'crafting_table'], ['torch', 'torch'], ['stone', 'cobblestone'], ['furnace', 'furnace'], ['iron', 'iron_ingot'], ['diamond', 'diamond'],
+    ['crystal', 'crystal_shard_violet'], ['aether', 'aether_bucket'], ['star_core', 'star_core'], ['outpost', 'cargo_crate'], ['blaster', 'laser_blaster'], ['jetpack', 'jetpack'],
+    ['bike', 'hoverbike'], ['ship', 'helm'], ['orbit', 'viewport'], ['wand', 'builder_wand'], ['blueprint', 'blueprint_0'], ['drone', 'photo_drone'], ['shot', 'glass'],
+    ['raid', 'turret'], ['kill', 'iron_sword'], ['deep', 'deepstone'], ['sky', 'white_wool'], ['night', 'lantern'], ['sleep', 'red_bed'], ['village', 'vx_lamppost'],
+    ['villager', 'vx_bed_red'], ['quest', 'emerald'], ['home', 'vx_bed_blue'], ['festival', 'lantern'], ['autopilot', 'shuttle_beacon'],
   ];
+  const CATS = { milestones: 'g.codex.cat.milestones', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift' };
   const INV_TRIGGERS = { oak_log: 'log', birch_log: 'log', spruce_log: 'log', jungle_log: 'log', acacia_log: 'log', dark_oak_log: 'log', cherry_log: 'log', mangrove_log: 'log', cobblestone: 'stone', iron_ingot: 'iron', diamond: 'diamond', crystal_shard_violet: 'crystal', crystal_shard_azure: 'crystal', crystal_shard_verdant: 'crystal', crystal_shard_rose: 'crystal', crystal_shard_amber: 'crystal', aether_bucket: 'aether', star_core: 'star_core', laser_blaster: 'blaster', crafting_table: 'table', torch: 'torch', furnace: 'furnace' };
 
   class Codex {
@@ -49,12 +25,13 @@
       this.found = Object.assign({}, this.meta.codex || {});
       this.entries = [];
       this.byId = new Map();
-      const add = (id, cat, name, desc, hint, icon) => { const e = { id, cat, name, desc, hint, icon }; this.entries.push(e); this.byId.set(id, e); };
-      for (const [id, n, d, h, ic] of MILESTONES) add('m:' + id, 'Milestones', n, d, h, ic);
-      for (const k in VR.MOBS || {}) { if (VR.MOBS[k] === VR.MOBS.glimmer_deer && k !== 'glimmer_deer') continue; add('c:' + k, 'Creatures', title(k), 'Encountered a ' + title(k) + '.', 'A creature yet to be met.', 'egg_' + k); }
+      // an entry: {id, catKey, icon, text()} — text() gives {name, desc, hint} in the language of the moment
+      const add = (id, catKey, icon, text) => { const e = { id, catKey, icon, text }; this.entries.push(e); this.byId.set(id, e); };
+      for (const [id, ic] of MILESTONES) add('m:' + id, 'milestones', ic, () => { const L = TL('g.codex.m.' + id); return { name: L[0] || id, desc: L[1] || '', hint: L[2] || '' }; });
+      for (const k in VR.MOBS || {}) { if (VR.MOBS[k] === VR.MOBS.glimmer_deer && k !== 'glimmer_deer') continue; add('c:' + k, 'creatures', 'egg_' + k, () => { const name = T('g.mob.' + k, null, title(k)); return { name, desc: T('g.codex.metCreature', { name }), hint: T('g.codex.creatureHint') }; }); }
       for (const b of VR.BIOMES) {
-        const cat = b.realm ? 'Realm Biomes' : b.cave ? 'Caves' : b.forge ? 'Underforge' : b.hollow ? 'The Hollow' : b.drift ? 'Drift Isles' : 'Overworld Biomes';
-        add('b:' + b.key, cat, b.name, 'Discovered ' + b.name + '.', 'An unexplored ' + (cat === 'Caves' ? 'cave' : 'land') + '.', null);
+        const catKey = b.realm ? 'realm' : b.cave ? 'caves' : b.forge ? 'forge' : b.hollow ? 'hollow' : b.drift ? 'drift' : 'overworld';
+        add('b:' + b.key, catKey, null, () => { const name = T('g.biome.' + b.key, null, b.name); return { name, desc: T('g.codex.foundBiome', { name }), hint: T(catKey === 'caves' ? 'g.codex.biomeHintCave' : 'g.codex.biomeHint') }; });
       }
       this.t = 0; this.nightStart = null;
       this.seen = new Set();
@@ -64,9 +41,9 @@
       const e = this.byId.get(id); if (!e) return false;
       this.found[id] = Date.now();
       const g = this.g;
-      if (g.settings.toasts !== false && g.ui) g.ui.toast(e.cat === 'Milestones' ? 'Milestone' : 'Discovered', e.name, e.icon && VR.itemDef(e.icon) ? e.icon : null);
+      if (g.settings.toasts !== false && g.ui) g.ui.toast(T(e.catKey === 'milestones' ? 'g.codex.toastMilestone' : 'g.codex.toastFound'), e.text().name, e.icon && VR.itemDef(e.icon) ? e.icon : null);
       else if (g.audio) g.audio.play('achievement');
-      if (g.audio && e.cat === 'Milestones') g.audio.play('achievement');
+      if (g.audio && e.catKey === 'milestones') g.audio.play('achievement');
       return true;
     }
     event(name) { this.unlock('m:' + name); }
@@ -100,9 +77,10 @@
         if (p.dead) this.nightStart = null;
       }
     }
+    // the entries with their texts in the language of the moment: {id, cat, name, desc, hint, icon, found}
     list() {
-      const order = ['Milestones', 'Creatures', 'Realm Biomes', 'Overworld Biomes', 'Caves', 'Underforge', 'The Hollow', 'Drift Isles'];
-      return this.entries.map(e => Object.assign({ found: !!this.found[e.id] }, e)).sort((a, b) => order.indexOf(a.cat) - order.indexOf(b.cat));
+      const order = ['milestones', 'creatures', 'realm', 'overworld', 'caves', 'forge', 'hollow', 'drift'];
+      return this.entries.map(e => Object.assign({ id: e.id, catKey: e.catKey, cat: T(CATS[e.catKey]), icon: e.icon, found: !!this.found[e.id] }, e.text())).sort((a, b) => order.indexOf(a.catKey) - order.indexOf(b.catKey));
     }
     toJSON() { return this.found; }
   }
