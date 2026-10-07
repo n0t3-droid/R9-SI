@@ -284,7 +284,7 @@
     const fb = favButton(id, () => { if (S.mode === 'parts') { C.chips(); if (S.cat === 'fav') C.list(); else { const cb = [...$$('#list .card[data-bid]')].find(c => c.dataset.bid === id); if (cb) { const s = cb.querySelector('.favb'); const on = FV().has(id); s.classList.toggle('on', on); s.textContent = on ? '★' : '☆'; } } } });
     fb.className = 'cbtn' + (FV() && FV().has(id) ? ' on' : ''); fb.textContent = (FV() && FV().has(id) ? '★ ' : '☆ ') + L('fav.btn', 'Favorit');
     const fbClick = fb.onclick; fb.onclick = (ev) => { fbClick(ev); const on = FV().has(id); fb.className = 'cbtn' + (on ? ' on' : ''); fb.textContent = (on ? '★ ' : '☆ ') + L('fav.btn', 'Favorit'); };
-    const ub = document.createElement('button'); ub.className = 'cbtn'; ub.innerHTML = '✋ ' + L('cat.use', 'Benutzen'); ub.title = L('cat.useT', 'In die Hand nehmen und im Crafter damit bauen'); ub.onclick = () => CAT.use(id);
+    const ub = document.createElement('button'); ub.className = 'cbtn pro'; ub.innerHTML = '✋ ' + L('cat.use', 'Benutzen'); ub.title = L('cat.useT', 'In die Hand nehmen und im Crafter damit bauen'); ub.onclick = () => CAT.use(id);
     r.appendChild(ub); r.appendChild(fb); el.appendChild(r);
     if (!isModel && CAT.edit) editBox(el, id);
   };

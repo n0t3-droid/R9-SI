@@ -20,7 +20,7 @@ const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'v
 const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_build'];
 const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'game', 'start'];
 // the UI both pages share (W1): the languages, r9si.ui (Einfach / Profi), the hints, the Ding cards — before ui.js / studio.js
-const UI_SHARED = ['uiprefs', 'hints', 'ding'];
+const UI_SHARED = ['uiprefs', 'hints', 'ding', 'tiles'];
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const js = (dir, list) => list.filter(f => exists(`src/${dir}/${f}.js`)).map(f => `/* ${dir}/${f}.js */\n` + read(`src/${dir}/${f}.js`)).join('\n');
 const shared = js('shared', SHARED);
@@ -55,6 +55,9 @@ const studioFonts = `<link rel="preconnect" href="https://fonts.googleapis.com">
 const studioBody = `<div id="studio" class="boot">
 <header>
   <div class="brand"><span class="sig">R9</span><span class="t">MODEL STUDIO</span><span class="v">v4.0<!--PLAYTAG--></span></div>
+  <div id="tiles"></div>
+  <div id="navCrumb"></div>
+  <div id="proSwitch" class="proswitch"></div>
   <nav class="modes"><button data-hub class="hubm" title="Weitermachen — alles, was du angefangen hast (Strg+O)"><i>🕘</i>Weitermachen<b class="hubN"></b></button><button data-mode="arch" class="on"><i>◈</i>Architektur</button><button data-mode="furn"><i>▣</i>Möbel</button><button data-mode="facade"><i>▤</i>Fassade</button><button data-mode="parts" title="Alle Blöcke des Spiels: Dächer, Licht, Fenster, Türen, Wände, Böden … mit ★ Favoriten"><i>🧱</i>Teile</button><button data-mode="craft" class="craftm"><i>⚒</i>Crafter</button><button data-mode="world" class="worldm"><i>◍</i>Welt</button><button data-create class="createm" title="Ein Haus aus dem Baukasten, alles Mögliche vom Genie, Bilder als Blöcke — alles hier, ohne Konto"><i>✨</i>Erschaffen</button></nav>
   <!--GAMELINK-->
   <div class="sys"><span class="dot" id="sysDot"></span><span id="sysText">boot</span></div>
@@ -112,7 +115,8 @@ ${['nav', 'start'].filter(f => exists('src/studio/' + f + '.js')).map(f => `<scr
 const studioHead = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>`;
 // two studios: studio.html sits next to the game (same origin → "Update ins Spiel" lands directly in the game; a link back
 // to the game), studio_artifact.html is the standalone published Model Studio (export / import bridge)
-const inGame = studioBody.replace('<!--GAMELINK-->', '<button id="playBtn" class="gamelink playb" title="Ins Spiel">▶ Spielen</button>').replace('<!--PLAYTAG-->', ' · ▶ Spielen').replace('<script type="text/js-worker"', '<script>window.__R9_IN_GAME = true;</script>\n<script type="text/js-worker"');
+// (W1: the ▶ tile in the header is the play button, #playBtn — src/studio/start.js gives it the id in the Studio that belongs to the game)
+const inGame = studioBody.replace('<!--PLAYTAG-->', ' · ▶ Spielen').replace('<script type="text/js-worker"', '<script>window.__R9_IN_GAME = true;</script>\n<script type="text/js-worker"');
 // the standalone Studio is its own artifact (another web origin, its own storage): it says so, and knows where the game is
 const GAME_URL = 'https://claude.ai/artifact/EP9fJV6R8Grw4ev5RVUP4r';
 const standalone = studioBody.replace('<!--PLAYTAG-->', '').replace('<script type="text/js-worker"', `<script>window.__R9_STANDALONE = true; window.__R9_GAME_URL = '${GAME_URL}';</script>\n<script type="text/js-worker"`);

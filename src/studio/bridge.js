@@ -159,5 +159,5 @@
     b.querySelector('[data-act="pack"]').onclick = () => BR.exportPack();
     b.querySelector('[data-act="hide"]').onclick = () => { try { sessionStorage.setItem('r9si.bridge.hide', '1'); } catch (e) { /* this page only */ } b.remove(); };
   }
-  banner();
+  BR.banner = banner;   // (W1: the start tiles say it, the ▶ tile reads 'Zum Spiel' — the banner is not shown any more)
 })();
