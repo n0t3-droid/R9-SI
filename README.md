@@ -524,7 +524,7 @@ shadows are cached and furniture detail only casts shadows close by, so towns co
 
 The claude.ai version of the game is multiplayer: players the owner invited on claude.ai (Contributor or Editor) can
 see the worlds that are being played right now and join them. Before anyone sees your name, the game asks once
-(👥 ✓ OK · Spitzname… · Mehrspieler aus); a visitor of the public link plays alone.
+(👥 ✓ OK · ✎ Spitzname · Mehrspieler aus); a visitor of the public link plays alone.
 
 | Step | How |
 |---|---|

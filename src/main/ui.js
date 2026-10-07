@@ -378,17 +378,14 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
     // ---------------------------------------------------------------- multiplayer menus
     renderHosts() {
       const box = $('#mphosts'); if (!box) return;
-      if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;   // typing a nickname there: not now
       const mp = this.game.mp;
       box.innerHTML = '';
-      if (mp && mp.status === 'off' && VR.Legal) { box.appendChild(VR.Legal.mpNotice(this.game)); return; }   // 👥 Mehrspieler aus: one line and „Mehrspieler an“ (src/main/legal.js)
       const head = el('div', 'mphead');
       if (!mp || mp.status === 'connecting') { head.innerHTML = '<span class="dot wait"></span><b>Multiplayer</b> · connecting…'; box.appendChild(head); return; }
       if (!mp.ready) { head.innerHTML = '<span class="dot off"></span><b>Multiplayer</b> · not available here'; box.appendChild(head); box.appendChild(el('div', 'note', MP_OFF_HTML)); return; }
       const online = mp.online || [];
       head.innerHTML = '<span class="dot"></span><b>Multiplayer</b> · ' + (online.length ? online.length + ' friend' + (online.length > 1 ? 's' : '') + ' online: ' + online.map(o => esc(o.name)).join(', ') : 'no friends online yet');
       box.appendChild(head);
-      if (VR.Legal && mp.noticeOk && !mp.noticeOk()) box.appendChild(VR.Legal.mpNotice(this.game));   // 👥 the one-time name notice: nothing named goes out before it
       const list = mp.hostList().filter(h => !h.isMe);
       if (!list.length) {
         const d = document.createElement('details'); d.className = 'invitebox';
@@ -430,9 +427,10 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
     titleNote(msg) { const n = $('#titlenote'); if (!n) return; n.textContent = msg || ''; clearTimeout(this.titleNoteT); if (msg) this.titleNoteT = setTimeout(() => { n.textContent = ''; }, 12000); }
     buildMpPanel() {
       const g = this.game, mp = g.mp, box = $('#mppanel'); if (!box) return;
-      if (VR.Legal && mp && (mp.status === 'off' || (mp.ready && mp.noticeOk && !mp.noticeOk()))) { box.innerHTML = ''; box.appendChild(VR.Legal.mpNotice(g, true)); return; }   // 👥 Mehrspieler aus / the name notice first (src/main/legal.js)
       box.innerHTML = '';
+      if (VR.Legal && mp && mp.status === 'off') { box.appendChild(VR.Legal.mpNotice(g, true)); return; }   // 👥 Mehrspieler aus: one line and „Mehrspieler an“ (src/main/legal.js)
       const head = el('div', 'subtitle', '👥 Multiplayer'); box.appendChild(head);
+      if (VR.Legal && mp && mp.ready && !mp.noticeOk()) box.appendChild(VR.Legal.mpNotice(g));   // 👥 the one-time name notice above the panel until it is answered
       if (!mp || mp.status === 'connecting') { box.appendChild(el('div', 'note', 'Connecting…')); return; }
       if (!mp.ready) { box.appendChild(el('div', 'note', MP_OFF_HTML)); return; }
       const list = mp.players();
