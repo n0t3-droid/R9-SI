@@ -6,7 +6,7 @@
   'use strict';
   const R = VR.R, F = VR.F;
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
     potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true },
     low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false },
@@ -1018,7 +1018,7 @@
       if (!I) return;
       const code = String(arg || '').toLowerCase().slice(0, 2);
       if (!code) { say(T('g.cmd.lang', { name: T('g.lang.name') })); return; }
-      if (code === 'de' || code === 'en') { I.set(code); say(T('g.cmd.langSet', { name: T('g.lang.name') }), '#9affd8'); return; }
+      if (I.ready(code)) { I.set(code); say(T('g.cmd.langSet', { name: T('g.lang.name') }), '#9affd8'); return; }
       const info = I.langs.find(l => l[0] === code);
       say(info ? T('g.cmd.langSoon', { name: info[1] }) : T('g.cmd.lang', { name: T('g.lang.name') }), '#ffd27a');
     }

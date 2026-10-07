@@ -5,7 +5,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F, PH = VR.PHYS, M = VR.M;
   const W = 0.3, H = 1.8, EYE = 1.62, SNEAK_EYE = 1.27;
 

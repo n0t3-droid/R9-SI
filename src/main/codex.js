@@ -7,7 +7,7 @@
   const title = (id) => id.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
   // the player's language (lang_de.js / lang_en.js): every entry's name, description and hint are looked up when
   // shown, so the language switches live. Milestones: [id, icon]; their texts are g.codex.m.<id> = [name, desc, hint].
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const MILESTONES = [
     ['log', 'oak_log'], ['table', 'crafting_table'], ['torch', 'torch'], ['stone', 'cobblestone'], ['furnace', 'furnace'], ['iron', 'iron_ingot'], ['diamond', 'diamond'],
     ['crystal', 'crystal_shard_violet'], ['aether', 'aether_bucket'], ['star_core', 'star_core'], ['outpost', 'cargo_crate'], ['blaster', 'laser_blaster'], ['jetpack', 'jetpack'],

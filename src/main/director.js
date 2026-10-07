@@ -10,7 +10,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const M = VR.M;
   const lerp = (a, b, t) => a + (b - a) * t;
   const ease = (t) => t * t * (3 - 2 * t);

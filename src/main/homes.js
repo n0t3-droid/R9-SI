@@ -8,7 +8,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const Vs = VR.Villages;
   if (!Vs) return;
   const P = Vs.prototype, R = VR.R, F = VR.F;

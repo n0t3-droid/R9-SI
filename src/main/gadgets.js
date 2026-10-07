@@ -9,7 +9,7 @@
   const R = VR.R, F = VR.F, PH = VR.PHYS, mat4 = VR.mat4, M = VR.M;
   const TAU = Math.PI * 2, QT = Math.PI / 2;
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const wrapA = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
   const DIRN = ['north', 'east', 'south', 'west'];
   const F6V = [[0, 0, -1], [1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 1, 0], [0, -1, 0]];

@@ -31,7 +31,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F;
   const PROTO = 1;
   const TOPICS = ['hello', 'welcome', 'mods', 'req', 'diff', 'blk', 'edit', 'env', 'chat', 'summon', 'pdata', 'bye'];

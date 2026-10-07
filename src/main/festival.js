@@ -9,7 +9,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js): T a text, TL a list of lines
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const Vs = VR.Villages;
   if (!Vs) return;
   const P = Vs.prototype;
