@@ -118,7 +118,10 @@ html.pro #title .foot .credit { margin-left: auto; }
 /* ---- the pause menu (Einfach: seven things, big; Profi adds the rest) ---- */
 #pause .panel.box { min-width: min(420px, 94vw); gap: 8px; }
 #pause .ptitle { font-size: calc(var(--st-fs) * 1.25); text-align: center; }
-#pause .btn { min-width: 0; min-height: 46px; font-size: var(--st-fs); }
+#pause .btn { min-width: 0; min-height: 44px; font-size: var(--st-fs); }
+/* Einfach: the Zen tools keep their three switches; the time-of-day slider is a Profi detail (the menu fits 720 px) */
+html:not(.pro) #zenpanel .field { display: none; }
+#zenpanel .subtitle { color: var(--st-mute); font-size: calc(13px * var(--ui-scale)); letter-spacing: 1px; text-transform: uppercase; }
 #pause .prorow { justify-content: center; margin-top: 4px; }
 .proswitch { display: inline-flex; border: 1px solid var(--st-line); border-radius: 12px; overflow: hidden; background: var(--st-bg); }
 .proswitch button { min-width: 88px; min-height: 44px; border: 0; background: transparent; color: var(--st-mute); font: 600 var(--st-fs) var(--st-font); cursor: pointer; transition: none; }
