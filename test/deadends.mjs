@@ -19,7 +19,7 @@ const URL0 = `http://127.0.0.1:${PORT}`;
 // (big single-file pages on a busy 2-CPU box: do not wait for 'load', the test waits for the page itself)
 const NAV = { waitUntil: 'domcontentloaded', timeout: 180000 };
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 880 } });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 880 }, locale: 'de-DE' });   // (the German UI: its crumbs read ← Möbel / ← Architektur / ← Teile; Playwright's default is en-US)
 const page = await ctx.newPage();
 const logs = [];
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 900)));
