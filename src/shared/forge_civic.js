@@ -249,6 +249,15 @@
     K.set(w - 3, 1, d - TW - 3, 'vx_stove', { facing: 3 }); K.set(w - 4, 1, d - TW - 3, 'anvil'); K.set(w - 3, 1, d - TW - 4, 'vx_barrel'); K.set(w - 4, 1, d - TW - 5, 'vx_crate');
     for (let z = 4; z < d - 4; z += 6) { K.set(2, 1, z, S.lamp); K.set(w - 3, 1, z, S.lamp); }
     for (let x = 4; x < w - 4; x += 6) K.set(x, h + 1, 1, S.lamp);
+    // a little life in the bailey: a market by the gate (stalls under awnings, crates), benches and trees along the way to
+    // the keep, a training yard with targets and a grindstone (only where the ground is still free)
+    const open = (x, z) => x > 1 && z > 1 && x < w - 2 && z < d - 2 && K.get(x, 1, z) === 0 && K.get(x, 2, z) === 0 && Math.abs(x - cx) > 1;
+    const stalls = ['vx_shop_produce', 'vx_shop_shelf_veg', 'vx_shop_shelf_bakery', 'vx_shop_shelf_flowers'], awn = ['vx_awning_red', 'vx_awning_yellow', 'vx_awning_green', 'vx_awning_blue'];
+    for (let i = 0; i < 3; i++) { const x = cx + 4 + i, z = 7; if (!open(x, z)) continue; K.set(x, 1, z, rng.pick(stalls), { facing: 3 }); K.set(x, 3, z, rng.pick(awn), { facing: 3 }); if (open(x, z + 1)) K.set(x, 1, z + 1, rng.chance(0.5) ? 'vx_crate' : 'vx_barrel'); }
+    for (let z = 8; z < d - 16; z += 6) for (const x of [cx - 2, cx + 2]) if (open(x, z)) K.set(x, 1, z, 'vx_bench', { facing: x < cx ? 1 : 3 });
+    for (const [x, z] of [[cx - 7, 10], [cx - 7, d - 18]]) if (open(x, z) && open(x + 2, z) && open(x - 2, z)) K.tree(x, 1, z, rng.pick(['oak', 'birch']), rng);
+    for (let z = 10; z <= 16; z += 3) { const x = w - 5; if (open(x, z) && open(x, z + 1)) { K.set(x, 1, z, 'oak_fence'); K.set(x, 2, z, 'target'); } }
+    if (open(w - 6, 19)) K.set(w - 6, 1, 19, 'grindstone');
     // ---- the keep: 11 × 11 at the back, four to six floors with a scissor stair up onto its battlements, furnished
     const doors = [[cx, 1 + dy, 0]];
     if (k) {
