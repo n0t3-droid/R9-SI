@@ -440,17 +440,9 @@
       if (!this.visDirty && !world.visDirty && key === this.visKey && this.frameNo % 20 !== 0) return this.visList;
       this.visKey = key; this.visDirty = false; world.visDirty = false;
       const list = this.visList; list.length = 0;
-      const visited = new Set();
-      const q = [];
       const start = world.sectionAt(scx, scy, scz);
       const rd2 = (rd + 0.5) * (rd + 0.5);
       const cam0 = [cam.x, cam.y, cam.z];
-      const push = (cx, sy, cz, from, mask) => {
-        const id = VR.ckey(cx, cz) * VR.SECS + sy;
-        if (visited.has(id)) return;
-        visited.add(id);
-        q.push(cx, sy, cz, from, mask);
-      };
       if (!start || outside || this.q.noCaveCull) {
         // fallback: all loaded sections in range
         for (const c of world.cols.values()) {
@@ -461,12 +453,29 @@
         list.sort((a, b) => ((a.ox - cam0[0]) ** 2 + (a.oy - cam0[1]) ** 2 + (a.oz - cam0[2]) ** 2) - ((b.ox - cam0[0]) ** 2 + (b.oy - cam0[1]) ** 2 + (b.oz - cam0[2]) ** 2));
         return list;
       }
-      push(scx, scy, scz, -1, 0);
-      let qh = 0;
+      // the flood through the sections: a byte per section of the (2rd+3)² × (topSec+1) box around the camera says
+      // "seen", the columns of that box are looked up once each, the queue is a reused Int32Array (5 ints per entry).
+      // (A Set of big numbers and a growing array for the same walk cost 3 ms a frame at render distance 10 — and the
+      // walk runs every frame while sections arrive.)
+      const W = 2 * rd + 3, NS = topSec + 1, cells = W * W;
+      const need = cells * NS, needQ = need * 5;
+      if (!this.visSeen || this.visSeen.length < need) { this.visSeen = new Uint8Array(need); this.visQ = new Int32Array(needQ); this.visCols = new Array(cells); this.visColSeen = new Uint8Array(cells); }
+      const seen = this.visSeen, q = this.visQ, colsAt = this.visCols, colSeen = this.visColSeen;
+      seen.fill(0, 0, need); colSeen.fill(0, 0, cells);
+      const colOf = (cx, cz) => {
+        const ci = (cz - scz + rd + 1) * W + (cx - scx + rd + 1);
+        if (!colSeen[ci]) { colSeen[ci] = 1; colsAt[ci] = world.col(cx, cz); }
+        return colsAt[ci];
+      };
+      let qt = 0, qh = 0;
+      // the start
+      seen[(scy * W + rd + 1) * W + rd + 1] = 1;
+      q[0] = scx; q[1] = scy; q[2] = scz; q[3] = -1; q[4] = 0; qt = 5;
       const DXs = VR.DX, DYs = VR.DY, DZs = VR.DZ, OPP = VR.OPP;
-      while (qh < q.length) {
+      while (qh < qt) {
         const cx = q[qh], sy = q[qh + 1], cz = q[qh + 2], from = q[qh + 3], mask = q[qh + 4]; qh += 5;
-        const s = world.sectionAt(cx, sy, cz);
+        const c = colOf(cx, cz);
+        const s = c && sy < c.sec.length ? c.sec[sy] : null;
         if (!s) continue;
         if (s.hasMesh) list.push(s);
         const vis = s.meshed ? s.vis : 0x7fff;
@@ -477,9 +486,13 @@
           if (ny < 0 || ny > topSec) continue;
           const dx = nx - scx, dz = nz - scz;
           if (dx * dx + dz * dz > rd2) continue;
-          push(nx, ny, nz, OPP[d], mask | (1 << d));
+          const si = (ny * W + dz + rd + 1) * W + dx + rd + 1;
+          if (seen[si]) continue;
+          seen[si] = 1;
+          q[qt] = nx; q[qt + 1] = ny; q[qt + 2] = nz; q[qt + 3] = OPP[d]; q[qt + 4] = mask | (1 << d); qt += 5;
         }
       }
+      for (let i = 0; i < cells; i++) colsAt[i] = null;   // no column kept alive by the cache
       return list;
     }
 

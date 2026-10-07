@@ -435,13 +435,24 @@
     // worker whenever it runs low, so a slow frame never starves them. Sections far from the player are meshed
     // without their mini-voxel detail (the averaged boxes draw there anyway) and get it when the player comes close.
     scheduleMeshes(pcx, pcy, pcz, lcx, lcz, pos) {
+      const nw = this.pool.workers.length;
+      const room = nw * 10 - (this.meshInflight || 0);      // ~two frames of mesh work per worker in flight, never more
+      let budget = Math.min(room, 8 + nw * 8);
+      if (this.meshBudget <= 3) budget = Math.min(budget, this.meshBudget * 2);   // smart quality asked for less main-thread work
+      if (budget <= 0) return;                               // the workers are full: not even a look around (most frames while the world streams in)
       const rd = this.renderDist, r2 = (rd + 0.5) * (rd + 0.5);
       if (lcx === undefined) { lcx = pcx; lcz = pcz; }
-      const cand = [];
+      // the `budget` nearest dirty sections, kept in a short sorted list while the columns are scanned (a sort of every
+      // dirty section — thousands after a look switch — cost more than a frame on a small machine); ties keep scan
+      // order, as the stable sort did
+      const best = this._best || (this._best = []);
+      best.length = 0;
+      let worst = Infinity;
       for (const c of this.cols.values()) {
         const dx = c.cx - pcx, dz = c.cz - pcz, ex = c.cx - lcx, ez = c.cz - lcz;
         const d2 = Math.min(dx * dx + dz * dz, ex * ex + ez * ez);
         if (d2 > r2) continue;
+        if (best.length === budget && d2 >= worst) continue;   // nothing in this column can beat the list
         let anyDirty = false;
         for (let sy = 0; sy < c.sec.length; sy++) { const s = c.sec[sy]; if (s.dirty && !s.pending) { anyDirty = true; break; } }
         if (!anyDirty) continue;
@@ -452,21 +463,16 @@
         for (let sy = 0; sy < c.sec.length; sy++) {
           const s = c.sec[sy];
           if (!s.dirty || s.pending) continue;
-          const dy = sy - pcy;
-          cand.push([d2 + dy * dy * 0.5, c, sy]);
+          const dy = sy - pcy, prio = d2 + dy * dy * 0.5;
+          if (best.length === budget) { if (prio >= worst) continue; best.pop(); }
+          let i = best.length;
+          while (i > 0 && best[i - 1][0] > prio) i--;
+          best.splice(i, 0, [prio, c, sy]);
+          if (best.length === budget) worst = best[budget - 1][0];
         }
       }
-      if (!cand.length) return;
-      cand.sort((a, b) => a[0] - b[0]);
-      const nw = this.pool.workers.length;
-      const room = nw * 10 - (this.meshInflight || 0);      // ~two frames of mesh work per worker in flight, never more
-      let budget = Math.min(room, 8 + nw * 8);
-      if (this.meshBudget <= 3) budget = Math.min(budget, this.meshBudget * 2);   // smart quality asked for less main-thread work
-      for (const [prio, c, sy] of cand) {
-        if (budget <= 0) break;
-        this.meshSection(c, sy, false, prio, pos);            // same scale as the generation requests: nearest work first, whatever its kind
-        budget--;
-      }
+      for (let i = 0; i < best.length; i++) { const b = best[i]; this.meshSection(b[1], b[2], false, b[0], pos); }   // same scale as the generation requests: nearest work first, whatever its kind
+      best.length = 0;
     }
     // far-meshed sections inside the inner part of the keep ring are re-meshed with their detail
     detailReturn(px, py, pz) {
@@ -527,6 +533,9 @@
         this.visDirty = true;
       }, urgent ? -1e9 : (prio || 0));
     }
+    // the padded section for the mesher: 20³ blocks and light (16 + 2 of the neighbours on every side), 20² tints.
+    // A row of 16 blocks along x is one contiguous run in a column (y-major, then z, then x), so the middle of every
+    // padded row is one straight copy; only the two pad cells at each end come from the side neighbours one by one.
     buildJob(c, sy) {
       const blocks = new Uint16Array(PS * PS * PS), light = new Uint16Array(PS * PS * PS);
       const grass = new Uint16Array(PS * PS), foliage = new Uint16Array(PS * PS), water = new Uint16Array(PS * PS);
@@ -536,19 +545,24 @@
       const skyFull = this.hasSky ? 0xf000 : 0;
       for (let pz = 0; pz < PS; pz++) {
         const lz = pz - PAD, cz = lz < 0 ? 0 : lz > 15 ? 2 : 1, iz = (lz + 16) & 15;
+        const nL = nb[cz * 3], nM = nb[cz * 3 + 1], nR = nb[cz * 3 + 2];
+        // tints
+        const tz = pz * PS;
         for (let px = 0; px < PS; px++) {
-          const lx = px - PAD, cxi = lx < 0 ? 0 : lx > 15 ? 2 : 1, ix = (lx + 16) & 15;
-          const n = nb[cz * 3 + cxi];
-          const ci = (iz << 4) | ix;
-          const ti = pz * PS + px;
-          if (n) { grass[ti] = n.grass[ci]; foliage[ti] = n.foliage[ci]; water[ti] = n.water[ci]; }
-          for (let py = 0; py < PS; py++) {
-            const y = y0 + py;
-            const o = py * PSS + pz * PS + px;
-            if (y < 0) { blocks[o] = 0; light[o] = 0; continue; }
-            if (!n || y >= n.H) { blocks[o] = 0; light[o] = n ? 0xf000 : skyFull; continue; }
-            const i = (y << 8) | ci;
-            blocks[o] = n.blocks[i]; light[o] = n.light[i];
+          const lx = px - PAD, n = lx < 0 ? nL : lx > 15 ? nR : nM, ix = (lx + 16) & 15;
+          if (n) { const ci = (iz << 4) | ix, ti = tz + px; grass[ti] = n.grass[ci]; foliage[ti] = n.foliage[ci]; water[ti] = n.water[ci]; }
+        }
+        for (let py = 0; py < PS; py++) {
+          const y = y0 + py, o = py * PSS + tz;
+          if (y < 0) continue;   // below the world: air, no light (the arrays start at zero)
+          // the middle 16: the column itself
+          if (nM && y < nM.H) { const i = (y << 8) | (iz << 4), mb = nM.blocks, ml = nM.light, d = o + PAD; for (let k = 0; k < 16; k++) { blocks[d + k] = mb[i + k]; light[d + k] = ml[i + k]; } }
+          else { const v = nM ? 0xf000 : skyFull, d = o + PAD; for (let k = 0; k < 16; k++) light[d + k] = v; }
+          // the pads: PAD cells of the west and east neighbours
+          for (let k = 0; k < PAD; k++) {
+            const iL = (y << 8) | (iz << 4) | (16 - PAD + k), iR = (y << 8) | (iz << 4) | k;
+            if (nL && y < nL.H) { blocks[o + k] = nL.blocks[iL]; light[o + k] = nL.light[iL]; } else light[o + k] = nL ? 0xf000 : skyFull;
+            if (nR && y < nR.H) { blocks[o + PAD + 16 + k] = nR.blocks[iR]; light[o + PAD + 16 + k] = nR.light[iR]; } else light[o + PAD + 16 + k] = nR ? 0xf000 : skyFull;
           }
         }
       }
