@@ -328,4 +328,49 @@ await section(9, 'routes: #ding/<id> opens the thing, an unknown one only says s
   check(sc && sc.type === 'house' && sc.index === 3 && sc.mode === 'arch', '#ding/h:3 shows Bel Portale (' + JSON.stringify(sc) + ')');
 });
 
+await section(10, '← restores where you were: ✏️ from a card → the editor → ←; 👁 from Meins → Esc', async () => {
+  if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
+  await page.goto(URL0 + '/studio.html#world/' + encodeURIComponent(WORLD) + '/karte', NAV);
+  check(await inStudio(WORLD), 'the Karte view');
+  await page.click('#chips button[data-kcat="furn"]'); await wait(400);
+  const id3 = await ev(() => { const l = document.getElementById('list'); l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding; });
+  const editBtn = page.locator(`#list .ding[data-ding="${id3}"] [data-da="edit"]`);
+  await editBtn.scrollIntoViewIfNeeded();   // (a click scrolls its target into view first: measure after that)
+  const before = await ev((id) => { const l = document.getElementById('list'); return { id, scroll: l.scrollTop, scene: window.__st.scene && window.__st.scene.type, center: window.__st.scene.center.slice() }; }, id3);
+  console.log('  before', JSON.stringify(before));
+  check(before.id && before.scroll > 0 && before.scene === 'world', 'a furniture card, the list scrolled (' + before.scroll + ')');
+  await editBtn.click();
+  let craft = false; for (let i = 0; i < 120 && !craft; i++) { await wait(500); craft = await ev(() => window.__st.mode === 'craft' && !!(VR.Crafter.item && VR.Crafter.on)); }
+  const inEd = await ev(() => ({ mode: window.__st.mode, item: VR.Crafter.item && VR.Crafter.item.name, depth: VR.Nav.depth(), crumb: document.getElementById('navCrumb').textContent, kind: VR.Nav.top() && VR.Nav.top().kind }));
+  console.log('  editor', JSON.stringify(inEd));
+  check(craft && inEd.item === before.id.slice(2) && inEd.depth === 1 && inEd.kind === 'editor', '✏️ opens the Item-Crafter on it as a layer');
+  check(/Karte/.test(inEd.crumb) && /✏️/.test(inEd.crumb), 'the breadcrumb reads „🗺 Karte › ✏️" (' + inEd.crumb.trim() + ')');
+  await page.click('#navCrumb .back'); await wait(700);
+  const back = await ev((id) => { const l = document.getElementById('list'), c = l.querySelector(`.ding[data-ding="${id}"]`); return { mode: window.__st.mode, scene: window.__st.scene && window.__st.scene.type, tab: VR.StudioWorld.tab, scroll: l.scrollTop, on: !!(c && c.classList.contains('on')), depth: VR.Nav.depth(), center: window.__st.scene && window.__st.scene.center.slice(), crumb: document.getElementById('navCrumb').classList.contains('on') }; }, before.id);
+  console.log('  back', JSON.stringify(back));
+  check(back.mode === 'world' && back.scene === 'world' && back.tab === 'karte', '← is back on the Karte (S.scene is the world again)');
+  check(Math.abs(back.scroll - before.scroll) <= 2 && back.on, 'the list is scrolled as before (' + back.scroll + ' vs ' + before.scroll + ') and the card is the lit one');
+  check(back.depth === 0 && !back.crumb && before.center.every((v, i) => Math.abs(v - back.center[i]) < 1e-6), 'the stack is empty, the camera where it was');
+  // the Crafter's own ✕ / „← Welt" also pops the layer
+  await page.click(`#list .ding[data-ding="${before.id}"] [data-da="edit"]`);
+  craft = false; for (let i = 0; i < 120 && !craft; i++) { await wait(500); craft = await ev(() => window.__st.mode === 'craft' && !!(VR.Crafter.item && VR.Crafter.on)); }
+  await ev(() => VR.Crafter.back()); await wait(700);
+  check(await ev(() => window.__st.mode === 'world' && VR.Nav.depth() === 0 && VR.StudioWorld.tab === 'karte'), 'the Crafter\'s own ← pops the same layer');
+  // 👁 from 🎒 Meins: Esc brings Meins back, scrolled as it was
+  await ev(() => { VR.Favs.add('blueprint_3'); VR.Favs.add('oak_planks'); VR.Favs.add('vx_led_cove'); });
+  await page.click('#tiles .tile[data-tile="meins"]'); await wait(600);
+  const hb = await ev(() => { const b = document.querySelector('#hub .hubBody'); b.scrollTop = 200; const c = document.querySelector('#hub .ding[data-ding="h:3"]'); return { scroll: b.scrollTop, card: !!c, max: b.scrollHeight - b.clientHeight }; });
+  console.log('  hub', JSON.stringify(hb));
+  check(hb.card, 'Meins shows the Bel Portale card');
+  await page.click('#hub .ding[data-ding="h:3"] [data-da="view"]');
+  for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => window.__st.scene && window.__st.scene.type === 'house' && window.__st.scene.index === 3)) break; }   // (the house may still be being built)
+  const v = await ev(() => ({ hub: !!document.querySelector('#hub.on'), depth: VR.Nav.depth(), scene: window.__st.scene && window.__st.scene.type, index: window.__st.scene && window.__st.scene.index, crumb: document.getElementById('navCrumb').textContent }));
+  console.log('  view', JSON.stringify(v));
+  check(!v.hub && v.depth === 1 && v.scene === 'house' && v.index === 3 && /Meins/.test(v.crumb), '👁 shows the house as a layer over Meins (' + v.crumb.trim() + ')');
+  await page.keyboard.press('Escape'); await wait(500);
+  const e = await ev(() => ({ hub: !!document.querySelector('#hub.on'), scroll: document.querySelector('#hub .hubBody').scrollTop, depth: VR.Nav.depth() }));
+  check(e.hub && e.depth === 0 && Math.abs(e.scroll - Math.min(200, hb.max)) <= 2, 'Esc: Meins is back, scrolled as before (' + e.scroll + ')');
+  await page.keyboard.press('Escape'); await wait(200);
+});
+
 await done();
