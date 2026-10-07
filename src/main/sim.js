@@ -22,6 +22,7 @@
       for (const n of ['water', 'lava', 'aether', 'fire', 'spirit_fire', 'tnt', 'grass_block', 'dirt', 'farmland', 'ice', 'snow', 'volt_wire', 'lever', 'volt_lamp', 'volt_torch', 'volt_block', 'obsidian', 'cobblestone', 'stone', 'mycelium', 'sugar_cane', 'cactus', 'bamboo', 'kelp', 'depth_charge', 'piston', 'sticky_piston', 'piston_head', 'note_block', 'target', 'daylight_detector', 'repeater', 'observer', 'powered_rail', 'activator_rail', 'detector_rail']) this.t[n] = T(n);
       this.physics = true;
       this.plates = new Map();
+      this.doorPow = new Set();   // doors, trapdoors and gates that power holds open (updateConsumer)
     }
     get enabled() { const g = this.game; return !(g.player && g.player.mode === 'zen' && !g.zenPhysics); }
     typeOf(s) { return R.T.type[s]; }
@@ -423,7 +424,12 @@
       const powered = () => this.powerAt(x, y, z) > 0 || (k === 'door' && (this.powerAt(x, y + (t.get(s, 'half') ? -1 : 1), z) > 0));
       if (t.name === 'volt_lamp') { const on = powered() ? 1 : 0; if (t.get(s, 'lit') !== on) w.setBlock(x, y, z, t.with(s, 'lit', on), 4); }
       else if (k === 'door' || k === 'trapdoor' || k === 'gate') {
-        const on = powered() ? 1 : 0;
+        // power swings it only when the power CHANGES (a lever flipped, a plate stepped on): opened or shut by hand or by
+        // a villager, it keeps that while the power stays as it is. Every change at a door runs this update, which used
+        // to shut the door again one tick after a right click had opened it.
+        const on = powered() ? 1 : 0, pk = key3(x, y, z);
+        if (on === (this.doorPow.has(pk) ? 1 : 0)) return;
+        if (on) this.doorPow.add(pk); else this.doorPow.delete(pk);
         if (t.has('open') && t.get(s, 'open') !== on) { w.setBlock(x, y, z, t.with(s, 'open', on), 4); if (k === 'door') { const oy = t.get(s, 'half') ? -1 : 1; const o2 = w.getBlock(x, y + oy, z); if (T.type[o2] === t.id) w.setBlock(x, y + oy, z, t.with(o2, 'open', on), 4); } g.audio.play('door'); }
       }
       else if (t.name === 'tnt') { if (powered()) this.primeTNT(x, y, z); }
