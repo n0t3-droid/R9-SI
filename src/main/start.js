@@ -58,6 +58,7 @@
     box.appendChild(foot);
     const f2 = el('div', 'foot'); if (gpu) f2.appendChild(gpu); else f2.appendChild(el('span', '', '')).id = 'gpuinfo'; f2.appendChild(el('span', 'credit', '')); box.appendChild(f2);
     title.appendChild(box);
+    if (VR.Hints) VR.Hints.host = ui.root;
     // 🎒 Meins: its own screen (the cards come with renderMeins)
     if (!$('#meins')) { const m = el('div', 'screen'); m.id = 'meins'; m.innerHTML = '<div class="panel box meins"><div class="mhead"><h2></h2><button class="btn small" data-act="meinsback"></button></div><div class="mchips"></div><div class="mbody"></div></div>'; ui.root.appendChild(m); }
     worldsPanel(); createForm();
@@ -241,6 +242,44 @@
   };
   // 🎒 Meins (filled in by meins.js's part of this file later): the screen with your things
   ST.meins = function (from) { const ui = ST.ui; if (!ui) return; ST.meinsFrom = from || 'title'; if (ST.renderMeins) ST.renderMeins(); ui.show('meins'); };
+
+  // ---------------------------------------------------------------- 🧭 hints 2 and 3, and the Ding in your hand
+  // polled four times a second (no per-frame work, nothing in the game loop): after 5 s standing in the world the move
+  // hint; walking (W A S D or 1.5 blocks) ends it and brings the fly hint (not in Survival); flying ends that one
+  let hintState = { lastPos: null, standAt: 0, wasPlay: false };
+  const touch = () => (typeof window !== 'undefined' && ('ontouchstart' in window) && !window.matchMedia('(hover: hover)').matches);
+  function hintTick() {
+    const g = game(), H = VR.Hints; if (!g || !H) return;
+    const p = g.player, playing = g.state === 'play' && !!p && !g.studioOpen;
+    if (playing && !hintState.wasPlay) { hintState.lastPos = null; handIn(g); }
+    hintState.wasPlay = playing;
+    if (!playing) { if (H.current()) H.dismiss(); return; }
+    if (g.ui.screen || g.ui.typing) return;   // a menu is open: wait
+    const now = performance.now();
+    if (!hintState.lastPos) { hintState.lastPos = p.pos.slice(); hintState.standAt = now; }
+    const inp = g.input, keys = !!(inp && (inp.down('KeyW') || inp.down('KeyA') || inp.down('KeyS') || inp.down('KeyD')));
+    const d = Math.hypot(p.pos[0] - hintState.lastPos[0], p.pos[2] - hintState.lastPos[2]);
+    if (keys || d > 1.5) { H.done('move'); hintState.lastPos = p.pos.slice(); hintState.standAt = now; }
+    if (p.flying) H.done('fly');
+    const st = H.read();
+    if (!st.done.move) { if (now - hintState.standAt > 5000 && H.want('move')) H.show('move', touch() ? { text: tx('hint.moveTouch', null, '👆 ziehen = umschauen · 🕹 laufen', '👆 drag = look around · 🕹 walk'), picto: ['finger'] } : { text: tx('hint.move', null, '🖱 bewegen = umschauen · W A S D = gehen', '🖱 move = look around · W A S D = walk'), picto: ['mouse', 'W', 'A', 'S', 'D'] }); return; }
+    if (!st.done.fly && p.mode !== 'survival' && H.want('fly')) H.show('fly', { text: tx('hint.fly', null, 'Leertaste 2× = fliegen', 'Space twice = fly'), picto: ['Space', 'Space'] });
+  }
+  // a Ding set from the start screen (📍 Setzen on a card) is in your hand when the world opens — your own world,
+  // Creative or Zen (never a free item in Survival); r9si.hand is read once
+  ST.handAllowed = (meta) => !!(meta && !meta.guest && (meta.mode === 'creative' || meta.mode === 'zen'));
+  function handIn(g) {
+    let h = null; try { h = JSON.parse(localStorage.getItem('r9si.hand') || 'null'); } catch (e) { h = null; }
+    if (!h) return;
+    try { localStorage.removeItem('r9si.hand'); } catch (e) { /* */ }
+    const d = VR.Ding && VR.Ding.parse(h.ding); if (!d || !ST.handAllowed(g.meta) || (h.world && h.world !== g.meta.id)) return;
+    const id = d.kind === 'h' ? 'blueprint_' + d.key : d.kind === 'b' || d.kind === 'm' ? d.key : null;
+    if (!id || !VR.itemDef(id) || !g.player) return;
+    const inv = g.player.inv; inv.slots[inv.sel] = { id, n: VR.maxStack(id) }; inv.changed = true;
+    if (g.ui.updateHUD) g.ui.updateHUD(true);
+    if (g.ui.toast) g.ui.toast(tx('hand.title', null, '🖐 In der Hand', '🖐 In hand'), tx('hand.toast', { n: VR.itemName(id) }, '{n} — Rechtsklick setzt es', '{n} — right click places it'), id);
+  }
+  setInterval(hintTick, 250);
 
   // ---------------------------------------------------------------- hooks into ui.js (kept to one wrapper each)
   const UI = VR.UI; if (!UI) return;

@@ -77,6 +77,38 @@ await section(2, '▶ Losspielen: one click into a Zen world', async () => {
   WORLD = await ev(() => VR.game.meta.id);
 });
 
+await section('2b', 'hints 2 and 3: one at a time, dismissed by doing the thing; a Ding handed into the world', async () => {
+  await ensureWorld();
+  if (!(await ev(() => VR.game.state === 'play'))) { await ev(async (id) => { const g = VR.game, ws = await g.store.listWorlds(); g.loadWorld(ws.find(w => w.id === id)); }, WORLD); check(await inPlay(), 'the world is open'); }
+  await ev(() => { VR.Hints.reset(); VR.Hints.done('play'); });
+  let on = false;
+  for (let i = 0; i < 20 && !on; i++) { await wait(500); on = await ev(() => { const h = document.getElementById('hints'); return !!(h && h.classList.contains('on')); }); }
+  const h2 = await ev(() => ({ cur: VR.Hints.current(), txt: (document.getElementById('hints') || {}).textContent || '', kbd: document.querySelectorAll('#hints kbd').length }));
+  console.log('  hint 2', JSON.stringify(h2));
+  check(on && h2.cur === 'move' && /W A S D/.test(h2.txt) && h2.kbd >= 4, 'after standing a while: „🖱 bewegen = umschauen · W A S D = gehen" with key caps');
+  await page.keyboard.down('w'); await wait(700); await page.keyboard.up('w');
+  await wait(400);
+  const h3 = await ev(() => ({ st: JSON.parse(localStorage.getItem('r9si.hints')), cur: VR.Hints.current() }));
+  check(h3.st.seen.move > 0 && h3.st.done.move > 0, 'walking marks move as seen and done (' + JSON.stringify(h3.st) + ')');
+  let never2 = true, fly = false;
+  for (let i = 0; i < 12; i++) { await wait(250); const r = await ev(() => ({ n: document.querySelectorAll('#hints .hint').length, cur: VR.Hints.current() })); if (r.n > 1) never2 = false; if (r.cur === 'fly') fly = true; }
+  check(fly && await ev(() => /fliegen/.test(document.getElementById('hints').textContent)), 'then hint 3: „Leertaste 2× = fliegen"');
+  check(never2, 'never two hints at once');
+  await page.keyboard.press('Space'); await wait(120); await page.keyboard.press('Space'); await wait(600);
+  const h4 = await ev(() => ({ flying: VR.game.player.flying, done: !!JSON.parse(localStorage.getItem('r9si.hints')).done.fly, on: document.getElementById('hints').classList.contains('on') }));
+  check(h4.flying && h4.done && !h4.on, 'a double tap on Space flies — hint 3 is done and gone (' + JSON.stringify(h4) + ')');
+  // r9si.hand: a Ding set from the start screen is in your hand when the world opens
+  const ha = await ev(() => [VR.Start.handAllowed({ mode: 'survival' }), VR.Start.handAllowed({ mode: 'zen' }), VR.Start.handAllowed({ mode: 'creative', guest: true })]);
+  check(ha.join() === 'false,true,false', 'handAllowed: Survival no, Zen yes, a guest world no');
+  await ev((id) => { localStorage.setItem('r9si.hand', JSON.stringify({ v: 1, ding: 'b:oak_planks', world: id, t: Date.now() })); VR.game.quitToTitle(); }, WORLD);
+  check(await atTitle(), 'back at the start');
+  await page.click('#title .tile[data-tile="play"]');
+  check(await inPlay(), '▶ again');
+  await wait(800);
+  const hd = await ev(() => { const p = VR.game.player; return { held: p.inv.slots[p.inv.sel] && p.inv.slots[p.inv.sel].id, key: localStorage.getItem('r9si.hand') }; });
+  check(hd.held === 'oak_planks' && hd.key === null, 'oak planks are in the selected hotbar slot, r9si.hand is read once (' + JSON.stringify(hd) + ')');
+});
+
 await section(3, 'the pause menu: ▶ Weiterspielen first; 🏗 Bauen opens the Karte over the game; „mein Platz"', async () => {
   await ensureWorld();
   if (!(await ev(() => VR.game.state === 'play'))) { await ev(async (id) => { const g = VR.game, ws = await g.store.listWorlds(); g.loadWorld(ws.find(w => w.id === id)); }, WORLD); check(await inPlay(), 'the world is open'); }
