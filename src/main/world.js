@@ -14,6 +14,12 @@
   // filling in during a flight instead of waiting behind every chunk); an idle lane hands its time to the other.
   // A queued job may carry msg.cancel(): if it says so when its turn comes, the job is dropped and its callback
   // hears {type:'cancelled'} — stale requests (the player flew on) never cost worker time.
+  // A worker that throws (an uncaught error in a job) answers nothing for the jobs it held: their owners would wait
+  // forever (a section never meshed, a column never loaded) and the slots would stay counted as busy. A worker that
+  // died outright (out of memory, a crashed process) says nothing at all. So: an error frees the worker's slots and
+  // answers its jobs with {type:'error'}; a job that has had no answer for stuckMs means a dead worker — it is
+  // terminated and a fresh one takes its place, told the world again (the last init, custom, style, look and
+  // lodinit broadcasts are kept for that).
   class WorkerPool {
     constructor(src, n) {
       this.workers = [];
@@ -24,20 +30,48 @@
       this.farShare = 0.3;    // fraction of worker time the far lane gets while lane 0 has work
       this.laneMs = [0, 0];   // recent worker time per lane (decayed)
       this.started = new Map();
-      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-      for (let i = 0; i < n; i++) {
-        const w = new Worker(url);
-        w.inflight = 0; w.idx = i;
-        w.onmessage = (e) => this.onMsg(w, e.data);
-        w.onerror = (e) => { console.error('Worker error', e.message || e); };
-        this.workers.push(w);
+      this.state = new Map(); // the broadcasts a new worker must hear, by type
+      this.stuckMs = 45000;   // a job unanswered this long = a dead worker (a town column takes 2 s, the textures 3–8 s)
+      this.replaced = 0;
+      this.url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      for (let i = 0; i < n; i++) this.workers.push(this.spawn(i));
+    }
+    spawn(i) {
+      const w = new Worker(this.url);
+      w.inflight = 0; w.idx = i;
+      w.onmessage = (e) => this.onMsg(w, e.data);
+      w.onerror = (e) => { console.error('Worker error', e && (e.message || e)); if (e && e.preventDefault) e.preventDefault(); this.failWorker(w, 'error'); };
+      return w;
+    }
+    // every job this worker holds is answered with an error (its owner asks again) and its slots are free
+    failWorker(w, why) {
+      const ids = [];
+      for (const [id, st] of this.started) if (st.w === w) ids.push(id);
+      w.inflight = 0;
+      for (const id of ids) {
+        this.started.delete(id);
+        const cb = this.cb.get(id);
+        if (cb) { this.cb.delete(id); try { cb({ type: 'error', id, msg: 'worker ' + why }); } catch (err) { console.error(err); } }
       }
+      this.pump();
+    }
+    // a worker that has answered nothing for stuckMs is dead: a fresh one takes its place
+    replaceWorker(w) {
+      const i = this.workers.indexOf(w); if (i < 0) return;
+      try { w.terminate(); } catch (e) { /* already gone */ }
+      const nw = this.spawn(w.idx);
+      this.workers[i] = nw;
+      this.replaced++;
+      for (const t of ['init', 'custom', 'style', 'look', 'lodinit']) { const m = this.state.get(t); if (m) nw.postMessage(m); }
+      console.warn('Worker', w.idx, 'did not answer for', (this.stuckMs / 1000) | 0, 's — replaced');
+      this.failWorker(w, 'replaced');
     }
     onMsg(w, m) {
       if (m.type === 'log') { console.log('[worker]', m.msg); return; }
+      if (!this.workers.includes(w)) return;   // a late word from a worker already replaced
       w.inflight = Math.max(0, w.inflight - 1);
       const st = this.started.get(m.id);
-      if (st) { this.started.delete(m.id); const ms = m.ms !== undefined ? m.ms : Math.min(400, (performance.now() - st.t0) / Math.max(1, st.q)); this.laneMs[st.lane] += ms; }
+      if (st) { this.started.delete(m.id); if (!st.direct) { const ms = m.ms !== undefined ? m.ms : Math.min(400, (performance.now() - st.t0) / Math.max(1, st.q)); this.laneMs[st.lane] += ms; } }
       const cb = this.cb.get(m.id);
       if (cb) { this.cb.delete(m.id); try { cb(m); } catch (err) { console.error(err); } }
       if (m.type === 'error') console.error('Worker job failed:', m.msg);
@@ -45,10 +79,18 @@
     }
     // job: {msg, transfer, cb, prio}; msg.lane = 1 puts it on the far lane
     submit(msg, transfer, cb, prio) { (msg.lane === 1 ? this.queueFar : this.queue).push({ msg, transfer, cb, prio: prio || 0 }); this.queueDirty = true; }
-    broadcast(msg) { for (const w of this.workers) w.postMessage(msg); }
+    broadcast(msg) { if (msg && msg.type && msg.type !== 'textures') this.state.set(msg.type, msg); for (const w of this.workers) w.postMessage(msg); }
     direct(wi, msg, transfer, cb) {
       const id = this.nextId++; msg.id = id; if (cb) this.cb.set(id, cb);
-      const w = this.workers[wi]; w.inflight++; w.postMessage(msg, transfer || []);
+      const w = this.workers[wi]; w.inflight++; this.started.set(id, { lane: 0, t0: performance.now(), q: 1, w, direct: true }); w.postMessage(msg, transfer || []);
+    }
+    // jobs unanswered for too long: their workers are dead — replaced (checked from pump, i.e. every frame)
+    watchdog() {
+      if (!this.started.size) return;
+      const now = performance.now();
+      let dead = null;
+      for (const st of this.started.values()) if (now - st.t0 > this.stuckMs) { (dead || (dead = new Set())).add(st.w); }
+      if (dead) for (const w of dead) this.replaceWorker(w);
     }
     // the next job to run: the far lane when it is owed time (or lane 0 is empty), lane 0 otherwise; cancelled jobs are skipped
     _next() {
@@ -68,6 +110,7 @@
     }
     pump(maxInflight) {
       const lim = maxInflight || this.maxInflight || 2;
+      this.watchdog();
       if (!this.queue.length && !this.queueFar.length) return;
       if (this.queueDirty) { this.queue.sort((a, b) => a.prio - b.prio); this.queueFar.sort((a, b) => a.prio - b.prio); this.queueDirty = false; }
       // the lane clock forgets: recent seconds count, not the whole session
@@ -82,7 +125,7 @@
         const id = this.nextId++; job.msg.id = id;
         delete job.msg.cancel;
         if (job.cb) this.cb.set(id, job.cb);
-        this.started.set(id, { lane: job.lane, t0: performance.now(), q: best.inflight + 1 });
+        this.started.set(id, { lane: job.lane, t0: performance.now(), q: best.inflight + 1, w: best });
         best.inflight++;
         best.postMessage(job.msg, job.transfer || []);
       }
@@ -91,7 +134,7 @@
     get queued() { return this.queue.length + this.queueFar.length; }
     // drop every queued job (a world is torn down); running jobs finish and are ignored by their owners
     clear() { for (const q of [this.queue, this.queueFar]) { for (const job of q) { delete job.msg.cancel; } q.length = 0; } }
-    terminate() { for (const w of this.workers) w.terminate(); this.workers = []; }
+    terminate() { for (const w of this.workers) w.terminate(); this.workers = []; this.started.clear(); this.cb.clear(); }
   }
   VR.WorkerPool = WorkerPool;
 
@@ -246,6 +289,7 @@
         const c = this.cols.get(k);
         if (c) { c.lastSeen = now; continue; }
         if (this.pending.has(k)) continue;
+        if (this.failed && this.retryAfter(k, now) > now) continue;
         // columns ahead of the flight come first: their distance is measured from a point further ahead
         const ex = cx - pcx, ez = cz - pcz;
         const along = ahead ? Math.max(0, ex * ux + ez * uz) : 0;
@@ -274,11 +318,15 @@
       this.scheduleMeshes(pcx, Math.floor(py) >> 4, pcz, lcx, lcz, [px, py, pz]);
       this.pool.pump();
     }
+    // when a column whose generation failed may be asked for again (5 s after the failure; a failed worker is
+    // replaced meanwhile, a bug in one column costs a job every few seconds instead of every frame)
+    retryAfter(k, now) { const t = this.failed && this.failed.get(k); if (t === undefined) return now; if (now - t > 5000) { this.failed.delete(k); return now; } return t + 5000; }
     requestColumn(cx, cz, k, prio) {
       this.pending.set(k, true);
       const epoch = this.styleEpoch || 0;
       const onGen = (m) => {
         this.pending.delete(k);
+        if (m.type === 'error') { (this.failed || (this.failed = new Map())).set(k, performance.now()); return; }   // asked again after a pause
         if (m.type !== 'gen') return;
         if (!this.pending && !this.cols) return;
         if (this.dead) return;
@@ -387,13 +435,24 @@
     // worker whenever it runs low, so a slow frame never starves them. Sections far from the player are meshed
     // without their mini-voxel detail (the averaged boxes draw there anyway) and get it when the player comes close.
     scheduleMeshes(pcx, pcy, pcz, lcx, lcz, pos) {
+      const nw = this.pool.workers.length;
+      const room = nw * 10 - (this.meshInflight || 0);      // ~two frames of mesh work per worker in flight, never more
+      let budget = Math.min(room, 8 + nw * 8);
+      if (this.meshBudget <= 3) budget = Math.min(budget, this.meshBudget * 2);   // smart quality asked for less main-thread work
+      if (budget <= 0) return;                               // the workers are full: not even a look around (most frames while the world streams in)
       const rd = this.renderDist, r2 = (rd + 0.5) * (rd + 0.5);
       if (lcx === undefined) { lcx = pcx; lcz = pcz; }
-      const cand = [];
+      // the `budget` nearest dirty sections, kept in a short sorted list while the columns are scanned (a sort of every
+      // dirty section — thousands after a look switch — cost more than a frame on a small machine); ties keep scan
+      // order, as the stable sort did
+      const best = this._best || (this._best = []);
+      best.length = 0;
+      let worst = Infinity;
       for (const c of this.cols.values()) {
         const dx = c.cx - pcx, dz = c.cz - pcz, ex = c.cx - lcx, ez = c.cz - lcz;
         const d2 = Math.min(dx * dx + dz * dz, ex * ex + ez * ez);
         if (d2 > r2) continue;
+        if (best.length === budget && d2 >= worst) continue;   // nothing in this column can beat the list
         let anyDirty = false;
         for (let sy = 0; sy < c.sec.length; sy++) { const s = c.sec[sy]; if (s.dirty && !s.pending) { anyDirty = true; break; } }
         if (!anyDirty) continue;
@@ -404,21 +463,16 @@
         for (let sy = 0; sy < c.sec.length; sy++) {
           const s = c.sec[sy];
           if (!s.dirty || s.pending) continue;
-          const dy = sy - pcy;
-          cand.push([d2 + dy * dy * 0.5, c, sy]);
+          const dy = sy - pcy, prio = d2 + dy * dy * 0.5;
+          if (best.length === budget) { if (prio >= worst) continue; best.pop(); }
+          let i = best.length;
+          while (i > 0 && best[i - 1][0] > prio) i--;
+          best.splice(i, 0, [prio, c, sy]);
+          if (best.length === budget) worst = best[budget - 1][0];
         }
       }
-      if (!cand.length) return;
-      cand.sort((a, b) => a[0] - b[0]);
-      const nw = this.pool.workers.length;
-      const room = nw * 10 - (this.meshInflight || 0);      // ~two frames of mesh work per worker in flight, never more
-      let budget = Math.min(room, 8 + nw * 8);
-      if (this.meshBudget <= 3) budget = Math.min(budget, this.meshBudget * 2);   // smart quality asked for less main-thread work
-      for (const [prio, c, sy] of cand) {
-        if (budget <= 0) break;
-        this.meshSection(c, sy, false, prio, pos);            // same scale as the generation requests: nearest work first, whatever its kind
-        budget--;
-      }
+      for (let i = 0; i < best.length; i++) { const b = best[i]; this.meshSection(b[1], b[2], false, b[0], pos); }   // same scale as the generation requests: nearest work first, whatever its kind
+      best.length = 0;
     }
     // far-meshed sections inside the inner part of the keep ring are re-meshed with their detail
     detailReturn(px, py, pz) {
@@ -462,8 +516,14 @@
       this.pool.submit(job, [job.blocks.buffer, job.light.buffer, job.grass.buffer, job.foliage.buffer, job.water.buffer], (m) => {
         s.pending = false;
         this.meshInflight = Math.max(0, this.meshInflight - 1);
-        if (m.type !== 'mesh') { if (m.type === 'cancelled') s.dirty = true; return; }
+        if (m.type !== 'mesh') {
+          if (m.type === 'cancelled') s.dirty = true;
+          // a job that failed (a worker that died or threw) is tried again — a few times, not forever
+          else if (m.type === 'error') { s.fails = (s.fails || 0) + 1; if (s.fails <= 3) s.dirty = true; }
+          return;
+        }
         if (this.cols.get(c.key) !== c || this.dead) return;
+        s.fails = 0;
         this.stats.mesh++; this.stats.meshMs += m.ms || 0;
         s.vis = m.vis;
         this.renderer.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar);
@@ -473,6 +533,9 @@
         this.visDirty = true;
       }, urgent ? -1e9 : (prio || 0));
     }
+    // the padded section for the mesher: 20³ blocks and light (16 + 2 of the neighbours on every side), 20² tints.
+    // A row of 16 blocks along x is one contiguous run in a column (y-major, then z, then x), so the middle of every
+    // padded row is one straight copy; only the two pad cells at each end come from the side neighbours one by one.
     buildJob(c, sy) {
       const blocks = new Uint16Array(PS * PS * PS), light = new Uint16Array(PS * PS * PS);
       const grass = new Uint16Array(PS * PS), foliage = new Uint16Array(PS * PS), water = new Uint16Array(PS * PS);
@@ -482,19 +545,24 @@
       const skyFull = this.hasSky ? 0xf000 : 0;
       for (let pz = 0; pz < PS; pz++) {
         const lz = pz - PAD, cz = lz < 0 ? 0 : lz > 15 ? 2 : 1, iz = (lz + 16) & 15;
+        const nL = nb[cz * 3], nM = nb[cz * 3 + 1], nR = nb[cz * 3 + 2];
+        // tints
+        const tz = pz * PS;
         for (let px = 0; px < PS; px++) {
-          const lx = px - PAD, cxi = lx < 0 ? 0 : lx > 15 ? 2 : 1, ix = (lx + 16) & 15;
-          const n = nb[cz * 3 + cxi];
-          const ci = (iz << 4) | ix;
-          const ti = pz * PS + px;
-          if (n) { grass[ti] = n.grass[ci]; foliage[ti] = n.foliage[ci]; water[ti] = n.water[ci]; }
-          for (let py = 0; py < PS; py++) {
-            const y = y0 + py;
-            const o = py * PSS + pz * PS + px;
-            if (y < 0) { blocks[o] = 0; light[o] = 0; continue; }
-            if (!n || y >= n.H) { blocks[o] = 0; light[o] = n ? 0xf000 : skyFull; continue; }
-            const i = (y << 8) | ci;
-            blocks[o] = n.blocks[i]; light[o] = n.light[i];
+          const lx = px - PAD, n = lx < 0 ? nL : lx > 15 ? nR : nM, ix = (lx + 16) & 15;
+          if (n) { const ci = (iz << 4) | ix, ti = tz + px; grass[ti] = n.grass[ci]; foliage[ti] = n.foliage[ci]; water[ti] = n.water[ci]; }
+        }
+        for (let py = 0; py < PS; py++) {
+          const y = y0 + py, o = py * PSS + tz;
+          if (y < 0) continue;   // below the world: air, no light (the arrays start at zero)
+          // the middle 16: the column itself
+          if (nM && y < nM.H) { const i = (y << 8) | (iz << 4), mb = nM.blocks, ml = nM.light, d = o + PAD; for (let k = 0; k < 16; k++) { blocks[d + k] = mb[i + k]; light[d + k] = ml[i + k]; } }
+          else { const v = nM ? 0xf000 : skyFull, d = o + PAD; for (let k = 0; k < 16; k++) light[d + k] = v; }
+          // the pads: PAD cells of the west and east neighbours
+          for (let k = 0; k < PAD; k++) {
+            const iL = (y << 8) | (iz << 4) | (16 - PAD + k), iR = (y << 8) | (iz << 4) | k;
+            if (nL && y < nL.H) { blocks[o + k] = nL.blocks[iL]; light[o + k] = nL.light[iL]; } else light[o + k] = nL ? 0xf000 : skyFull;
+            if (nR && y < nR.H) { blocks[o + PAD + 16 + k] = nR.blocks[iR]; light[o + PAD + 16 + k] = nR.light[iR]; } else light[o + PAD + 16 + k] = nR ? 0xf000 : skyFull;
           }
         }
       }

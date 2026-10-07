@@ -425,14 +425,19 @@
     const { add, FACING4 } = K;
     const G_ = K.G;
     VM._K = K;   // the late packs register with the same adder (VM.registerLate)
+    // a model whose cells and colour are in the generated table (voxcells.js, test/vx_cells.js) registers without
+    // being built — the build runs on first use, in the thread that needs it (half a second of every start otherwise)
+    const CELLS = VR.VM_CELLS || {};
     for (const d of DEFS) {
       if (d.o.late) continue;
       let model;
-      try { model = compile(d.name, d.o); } catch (e) { console.warn('VM compile failed', d.name, e); continue; }
+      const known = CELLS[d.name];
+      try { model = known && !d.o.lazy ? lazyModel(d.name, Object.assign({}, d.o, { lazy: true, cells: known[1], col: known[0] })) : compile(d.name, d.o); } catch (e) { console.warn('VM compile failed', d.name, e); continue; }
       if (!model.parts.length) { console.warn('VM empty model', d.name); continue; }
       MODELS[d.name] = model;
       const partNames = model.parts.map(p => 'p' + p.px + p.py + p.pz);
       const spec = { kind: 'model', res: model.res, model, col: model.col };
+      if (model.lazy) spec.lazy = true;
       add(d.name, d.display, spec, Object.assign({ props: [FACING4, ['part', partNames]], filter: 0, solid: true, group: G_.HOME || G_.ARCH, cat: 'vtech', sound: d.o.sound || 'wood', hard: d.o.hard || 1, vxModel: true }, d.o.light ? { light: d.o.light } : {}, d.o.bed ? { bed: true } : {}, d.o.seat ? { seat: true } : {}));
     }
   });
