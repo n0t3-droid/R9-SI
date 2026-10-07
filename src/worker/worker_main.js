@@ -188,6 +188,15 @@
         }
         const H = info.plan;
         self.postMessage({ type: 'blueprint', id: m.id, index: m.index, ops, lot: [W, D], house: [H.u0, H.v0, H.w, H.d], top, bottom, custom: !!info.custom, skin: info.skin, mirror: !!H.mirrored, beds: info.beds.length }, [ops.buffer]);
+      } else if (m.type === 'forge') {
+        // a Forge structure (🏭) from its DNA: lot-local cells [u, y, v, state] (y relative to the floor, air included —
+        // it clears), built with the terrain profile under the lot when the type reads the ground
+        const Fg = VR.Forge, meta = Fg && Fg.meta(m.dna);
+        if (!meta) { self.postMessage({ type: 'forge', id: m.id, error: 'unknown dna' }); return; }
+        let env = null;
+        if (m.ground && meta.terrain) { const W = m.W, D = m.D, gr = m.ground; env = { ground: (u, v) => { const g = gr[Math.max(0, Math.min(D - 1, v)) * W + Math.max(0, Math.min(W - 1, u))]; return g === 99 ? -1 : g; }, depth: 48 }; }
+        const g = Fg.build(m.dna, env), ops = Fg.ops(g), M = g.meta;
+        self.postMessage({ type: 'forge', id: m.id, dna: m.dna, ops, lot: M.lot, house: [0, 0, g.sx, g.sz], top: M.top, bottom: g.dy, level: M.level, terrain: M.terrain, name: M.name, n: M.n, doors: M.doors, ms: M.ms }, [ops.buffer]);
       } else if (m.type === 'locate') {
         const g = getGen(m.dim);
         let found = null;

@@ -15,6 +15,7 @@
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];   // = the lot builder's
   const FRONT = [[0, -1], [1, 0], [0, 1], [-1, 0]];                                            // street side of a lot turned r
   const REACH = 120, MARGIN = 3, DEPTH = 48, CLEAR = 80;
+  const SLICE_MAX = 60000, SLICE_STEP = 24000;   // a piece changing more cells than this is built in slices per tick
   // natural blocks (the verge may cut or cover them) and ground (what a house can stand on)
   let NAT = null, GROUND = null;
   function tables() {
@@ -149,6 +150,15 @@
     // level the ground under a lot and lay the house down (at: a placement from locate() or a Studio plan);
     // returns how many blocks changed (all of it one undo step)
     buildAt(at) {
+      const { list, undo } = this.planAt(at);
+      if (!list.length) return 0;
+      this.gad.applyEdit(list, undo);
+      return list.length;
+    }
+    // the highest ground block of a column between two heights (−1 below yLo when there is none)
+    groundAt(x, z, yHi, yLo) { tables(); const w = this.g.world, T = R.T; for (let y = yHi; y >= yLo; y--) { const s = w.getBlock(x, y, z); if (s && GROUND[T.type[s]]) return y; } return yLo - 1; }
+    // the changes a placement makes (and how to undo them), without applying them: { list, undo }
+    planAt(at) {
       const g = this.g, w = g.world, T = R.T;
       tables();
       const bp = at.bp, r = at.r, F0 = at.F;
@@ -220,9 +230,18 @@
         const old = w.getBlock(X, Y, Z); if (old === s) continue;
         list.push([X, Y, Z, s]); undo.push([X, Y, Z, old]);
       }
-      if (!list.length) return 0;
-      this.gad.applyEdit(list, undo);
-      return list.length;
+      return { list, undo };
+    }
+    // the changes of a piece laid down as it is (no levelling): models, bridges, walls, shuttles
+    opsAt(bp, r, ox, oz, F) {
+      const w = this.g.world, list = [], undo = [];
+      for (let k = 0; k < bp.ops.length; k += 4) {
+        const q = ROT[r](bp.ops[k], bp.ops[k + 2]), x = ox + q[0], y = F + bp.ops[k + 1], z = oz + q[1], s = bp.ops[k + 3] ? VR.Custom.rotState(bp.ops[k + 3], r) : 0;
+        if (y < 0 || y >= VR.MAXY) continue;
+        const old = w.getBlock(x, y, z); if (old === s) continue;
+        list.push([x, y, z, s]); undo.push([x, y, z, old]);
+      }
+      return { list, undo };
     }
 
     // ---------------------------------------------------------------- plans from the R9 Studio's World mode
@@ -244,6 +263,7 @@
     }
     // the built piece of a plan (house variant or design, or a furniture model), cached like the blueprints
     planPiece(pl) {
+      if (pl.kind === 'forge') return this.forgePiece(pl);
       if (pl.kind === 'model') {
         const VM = VR.VM, md = VM && VM.MODELS[pl.name]; if (!md) return null;
         const key = 'm:' + pl.name; let c = this.cache.get(key); if (c) return c;
@@ -262,38 +282,73 @@
       }
       return null;
     }
+    // a Forge structure (🏭): rebuilt from its DNA in a worker; the ones that read the ground (bridges, walls) get the
+    // terrain under their rotated lot sampled here first, so their piers and bases land on the real land
+    forgePiece(pl) {
+      const Fg = VR.Forge; if (!Fg || !pl.dna) { pl.failed = true; return null; }
+      const meta = Fg.meta(pl.dna); if (!meta) { pl.failed = true; return null; }
+      const key = 'f:' + (meta.terrain ? pl.id + ':' : '') + pl.dna;
+      const c = this.cache.get(key); if (c) return c;
+      if (!this.pending.has(key) && this.g.pool) {
+        this.pending.add(key);
+        const msg = { type: 'forge', dna: pl.dna }, tr = [];
+        if (meta.terrain) {
+          const r = (pl.r | 0) & 3, W = meta.lot[0], D = meta.lot[1], gr = new Int16Array(W * D);
+          for (let v = 0; v < D; v++) for (let u = 0; u < W; u++) { const q = ROT[r](u, v), gy = this.groundAt(pl.ox + q[0], pl.oz + q[1], pl.F + 40, pl.F - DEPTH); gr[v * W + u] = gy >= pl.F - DEPTH ? gy - pl.F : 99; }
+          msg.ground = gr; msg.W = W; msg.D = D; tr.push(gr.buffer);
+        }
+        this.g.pool.direct(0, msg, tr, (m) => { this.pending.delete(key); if (m.type === 'forge' && !m.error) this.cache.set(key, m); else { pl.failed = true; this.hint('Forge: ' + (m.error || m.msg || '?'), 3000); } });
+      }
+      return null;
+    }
+    // the lot of a plan before its piece exists (a Forge plan knows it from its DNA): [W, D] or null
+    planLot(pl) { if (pl.kind === 'forge') { const m = VR.Forge && VR.Forge.meta(pl.dna); return m ? m.lot : null; } return null; }
     tickPlans(dt) {
+      if (this.slices) { this.tickSlices(dt); return; }
       this.planT = (this.planT || 0) - dt; if (this.planT > 0) return;
       this.planT = 0.5;
       if (!this.plans) this.loadPlans();
       const g = this.g, w = g.world; if (!w || g.state !== 'play') return;
       for (const pl of this.plans) {
         if (pl.status !== 'pending' || pl.failed) continue;
-        const bp = this.planPiece(pl); if (!bp) { if (pl.kind === 'model' && !(VR.VM && VR.VM.MODELS[pl.name])) pl.failed = true; continue; }
-        const r = (pl.r | 0) & 3, W = bp.lot[0], D = bp.lot[1];
+        const r = (pl.r | 0) & 3;
         const rect = (u0, v0, u1, v1) => { const a = ROT[r](u0, v0), b = ROT[r](u1, v1); return [pl.ox + Math.min(a[0], b[0]), pl.oz + Math.min(a[1], b[1]), pl.ox + Math.max(a[0], b[0]), pl.oz + Math.max(a[1], b[1])]; };
-        const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1), M = bp.model ? 0 : MARGIN;
-        let ready = true;
-        for (let cz = (z0 - M - 16) >> 4; cz <= (z1 + M + 16) >> 4 && ready; cz++) for (let cx = (x0 - M - 16) >> 4; cx <= (x1 + M + 16) >> 4; cx++) { const c = w.col(cx, cz); if (!c || !c.ready) { ready = false; break; } }
-        if (!ready) continue;
+        const colsReady = (W, D, M) => { const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1); for (let cz = (z0 - M - 16) >> 4; cz <= (z1 + M + 16) >> 4; cz++) for (let cx = (x0 - M - 16) >> 4; cx <= (x1 + M + 16) >> 4; cx++) { const c = w.col(cx, cz); if (!c || !c.ready) return false; } return true; };
+        // a Forge piece is built from the ground under it: the ground has to be there before the worker is asked
+        const pre = this.planLot(pl); if (pre && !colsReady(pre[0], pre[1], MARGIN)) continue;
+        const bp = this.planPiece(pl); if (!bp) { if (pl.kind === 'model' && !(VR.VM && VR.VM.MODELS[pl.name])) pl.failed = true; continue; }
+        const W = bp.lot[0], D = bp.lot[1], direct = bp.model || (pl.kind === 'forge' && !bp.level);
+        const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1), M = direct ? 0 : MARGIN;
+        if (!colsReady(W, D, M)) continue;
         if (pl.F - DEPTH < 1 || pl.F + bp.top + 8 >= VR.MAXY) { pl.failed = true; continue; }
-        let n = 0;
-        if (bp.model) {
-          const list = [], undo = [];
-          for (let k = 0; k < bp.ops.length; k += 4) {
-            const q = ROT[r](bp.ops[k], bp.ops[k + 2]), x = pl.ox + q[0], y = pl.F + bp.ops[k + 1], z = pl.oz + q[1], s = bp.ops[k + 3] ? VR.Custom.rotState(bp.ops[k + 3], r) : 0;
-            const old = w.getBlock(x, y, z); if (old === s) continue;
-            list.push([x, y, z, s]); undo.push([x, y, z, old]);
-          }
-          if (list.length) { this.gad.applyEdit(list, undo); n = list.length; }
-        } else n = this.buildAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true });
-        pl.status = 'built';
-        this.markPlan(pl.id, 'built');
-        if (g.player && g.player.unstick) g.player.unstick();
-        const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
-        if (g.ui && g.ui.toast) g.ui.toast('R9 Studio', `${name} gebaut · ${n.toLocaleString('de-DE')} Blöcke`);
+        const { list, undo } = direct ? this.opsAt(bp, r, pl.ox, pl.oz, pl.F) : this.planAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true });
+        const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : pl.kind === 'forge' ? (bp.name || 'Forge') : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
+        // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back
+        if (list.length > SLICE_MAX) { list.sort((a, b) => a[1] - b[1]); this.slices = { pl, name, list, undo, at: 0, t: 0 }; pl.status = 'building'; return; }
+        if (list.length) this.gad.applyEdit(list, undo);
+        this.planDone(pl, name, list.length);
         break;   // one piece per half second keeps the frame smooth
       }
+    }
+    // the slices of a big piece: one chunk per tick, the undo of all of them as one step at the end
+    tickSlices(dt) {
+      const S = this.slices, g = this.g, w = g.world; if (!w || g.state !== 'play') return;
+      S.t -= dt; if (S.t > 0) return;
+      S.t = 0.06;
+      const end = Math.min(S.list.length, S.at + SLICE_STEP), chunk = S.list.slice(S.at, end);
+      if (chunk.length) { w.bulkSet(chunk, false); for (const [x, y, z, s] of chunk) this.gad.noteBlock(x, y, z, s); }
+      S.at = end;
+      if (S.at < S.list.length) return;
+      this.slices = null;
+      this.gad.applyEdit([], S.undo);
+      this.planDone(S.pl, S.name, S.list.length);
+    }
+    planDone(pl, name, n) {
+      const g = this.g;
+      pl.status = 'built';
+      this.markPlan(pl.id, 'built');
+      if (g.player && g.player.unstick) g.player.unstick();
+      if (g.ui && g.ui.toast) g.ui.toast('R9 Studio', `${name} gebaut · ${n.toLocaleString('de-DE')} Blöcke`);
     }
 
     // ---------------------------------------------------------------- edits from the R9 Studio's Werkbank (v0.35)

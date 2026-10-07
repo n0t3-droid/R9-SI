@@ -101,6 +101,7 @@ const studioBody = `<div id="studio" class="boot">
 <script>${guard(read('src/studio/imagine.js'))}</script>
 <script>${guard(read('src/studio/catalog.js'))}</script>
 <script>${guard(read('src/studio/modern.js'))}</script>
+<script>${guard(read('src/studio/forge.js'))}</script>
 <script>${guard(read('src/studio/variants.js'))}</script>
 <script>${guard(read('src/studio/spawn.js'))}</script>
 <script>${guard(read('src/studio/space.js'))}</script>
