@@ -64,7 +64,7 @@
       if (!p.creative) { this.survivalHint(); return; }
       const w = String((a && a[0]) || '').toLowerCase();
       if (!w) { this.cycle(); return; }
-      if (!(w in WORDS)) { if (this.g.ui) this.g.ui.chatLine(tx('g.mirror.usage', null, '🪞 /spiegel x · z · 4 · 8 · aus — die Mitte ist der Block, auf den du zeigst', '🪞 /mirror x · z · 4 · 8 · off — the centre is the block you point at'), '#cfe6ff'); return; }
+      if (!Object.prototype.hasOwnProperty.call(WORDS, w)) { if (this.g.ui) this.g.ui.chatLine(tx('g.mirror.usage', null, '🪞 /spiegel x · z · 4 · 8 · aus — die Mitte ist der Block, auf den du zeigst', '🪞 /mirror x · z · 4 · 8 · off — the centre is the block you point at'), '#cfe6ff'); return; }
       this.set(WORDS[w], true);
     }
     // the centre: the block you point at (aim near one of its edges: between it and its neighbour there), else the

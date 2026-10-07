@@ -347,6 +347,8 @@ console.log('g · in the game: the hand, its copies, the world edit path (src/ma
   check(mb.mode === 'r8', '/spiegel 8 → 8-fach');
   mb.command(['aus']);
   check(mb.mode === null, '/spiegel aus → off');
+  mb.command(['constructor']); mb.command(['quatsch']);
+  check(mb.mode === null, 'an unknown word changes nothing (the usage line instead)');
   mb.key(); mb.key(); mb.key();
   check(mb.mode === 'xz', 'the key three times: X → Z → 4-fach');
   mb.key(); mb.key();
