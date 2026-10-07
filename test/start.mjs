@@ -372,14 +372,17 @@ await section(10, '← restores where you were: ✏️ from a card → the edito
   const hb = await ev(() => { const b = document.querySelector('#hub .hubBody'); b.scrollTop = 200; const c = document.querySelector('#hub .ding[data-ding="h:3"]'); return { scroll: b.scrollTop, card: !!c, max: b.scrollHeight - b.clientHeight }; });
   console.log('  hub', JSON.stringify(hb));
   check(hb.card, 'Meins shows the Bel Portale card');
-  await page.click('#hub .ding[data-ding="h:3"] [data-da="view"]');
+  const viewBtn = page.locator('#hub .ding[data-ding="h:3"] [data-da="view"]');
+  await viewBtn.scrollIntoViewIfNeeded();   // (a click scrolls its target into view first: measure after that)
+  const hs = await ev(() => document.querySelector('#hub .hubBody').scrollTop);
+  await viewBtn.click();
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => window.__st.scene && window.__st.scene.type === 'house' && window.__st.scene.index === 3)) break; }   // (the house may still be being built)
   const v = await ev(() => ({ hub: !!document.querySelector('#hub.on'), depth: VR.Nav.depth(), scene: window.__st.scene && window.__st.scene.type, index: window.__st.scene && window.__st.scene.index, crumb: document.getElementById('navCrumb').textContent }));
   console.log('  view', JSON.stringify(v));
   check(!v.hub && v.depth === 1 && v.scene === 'house' && v.index === 3 && /Meins/.test(v.crumb), '👁 shows the house as a layer over Meins (' + v.crumb.trim() + ')');
   await page.keyboard.press('Escape'); await wait(500);
   const e = await ev(() => ({ hub: !!document.querySelector('#hub.on'), scroll: document.querySelector('#hub .hubBody').scrollTop, depth: VR.Nav.depth() }));
-  check(e.hub && e.depth === 0 && Math.abs(e.scroll - Math.min(200, hb.max)) <= 2, 'Esc: Meins is back, scrolled as before (' + e.scroll + ')');
+  check(e.hub && e.depth === 0 && Math.abs(e.scroll - hs) <= 2 && hs > 0, 'Esc: Meins is back, scrolled as before (' + e.scroll + ' vs ' + hs + ')');
   await page.keyboard.press('Escape'); await wait(200);
 });
 
