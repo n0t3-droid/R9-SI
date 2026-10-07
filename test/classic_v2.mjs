@@ -96,6 +96,10 @@ const base = await ev(() => {
   put(IX + 1, 1, IZ + 1, 'bookshelf'); put(IX + 2, 1, IZ + 1, 'bookshelf'); put(IX + 1, 2, IZ + 1, 'bookshelf'); put(IX + 6, 1, IZ + 1, 'crafting_table'); put(IX + 7, 1, IZ + 1, 'chest');
   for (let x = 3; x <= 5; x++) for (let z = 3; z <= 5; z++) put(IX + x, 1, IZ + z, 'red_carpet');
   put(IX + 4, 3, IZ + 4, 'lantern'); put(IX + 1, 1, IZ + 7, 'red_wool'); put(IX + 2, 1, IZ + 7, 'red_wool'); put(IX + 7, 1, IZ + 7, 'oak_log');
+  // a pond east of the hill (water: a seamless surface in both looks, its banks blocks)
+  for (let x = 40; x <= 46; x++) for (let z = 50; z <= 53; z++) { put(x, 0, z, 'water'); if (x === 40 || x === 46 || z === 50 || z === 53) put(x, 0, z, (x + z) % 3 ? 'sand' : 'gravel'); }
+  for (let x = 41; x <= 45; x++) for (let z = 51; z <= 52; z++) { put(x, -1, z, 'water'); }
+  for (let x = 40; x <= 46; x++) for (let z = 50; z <= 53; z++) if (x === 40 || x === 46 || z === 50 || z === 53) put(x, -1, z, 'dirt');
   // sand and snow, side by side, south-west
   for (let x = -30; x < -8; x++) for (let z = 34; z < 48; z++) { const sand = x < -19; put(x, 0, z, sand ? 'sand' : 'snow_block'); if (sand && ((x * 5 + z * 3) % 13 === 0)) put(x, 1, z, 'sandstone'); if (!sand && ((x * 3 + z * 5) % 17 === 0)) put(x, 1, z, 'snow_block'); }
   w.bulkSet(list, false);
@@ -103,33 +107,37 @@ const base = await ev(() => {
 });
 const [ox, y0, oz] = base;
 const EYE = 1.62, FOCAL = 360 / Math.tan(36 * Math.PI / 180);   // vertical fov 72° at 720 px
-const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; }, [pos, yaw, pitch]); await settle(30); await step(6); await shot(TAG + '_' + name); };
+const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; }, [pos, yaw, pitch]); await settle(30); await ev(() => { const e = VR.game.entities; if (e && e.mobs) e.mobs.length = 0; }); await step(6); await shot(TAG + '_' + name); };   // (the sheep that wander in would sit in the analysed rows)
 // ---------------------------------------------------------------- the grid analysis: a row of pixels across flat grass
 // The camera looks along −z (yaw 0) from an integer x (so block borders sit at screen x = 640 ± k · period) with
-// pitch pt from a height h above the grass; a screen row v px below the centre sees the ground at the horizontal
-// distance D = h / tan(−pt + atan(v / f)), whose depth along the view axis is h·sin(−pt) + D·cos(−pt): there a block
-// is f / depth px wide. The row's luminance is folded by that period into 32 phase bins (the texture's own noise
-// averages out over the ≥ 6 blocks, a border line does not): the grid shows as a dip of the two border bins against
-// the fold's mean. The period is searched within ±6 % of the prediction (sub-pixel camera geometry).
-async function gridOn(name, h, pitch, rows) {
+// pitch pt from a height h above the grass. A row is chosen by the ground distance D it sees (D + ½: never along a
+// z-border line): row = 360 + f · tan(atan(h / D) + pt); the depth along the view axis there is h·sin(−pt) + D·cos(−pt),
+// so a block is f / depth px wide. The row's luminance over the 12 blocks around the centre is folded by that period
+// into 32 phase bins (the texture's own noise averages out, a border line does not): the grid shows as a dip of the
+// two border bins (31 and 0) against the fold's mean, with the darkest bin at the border. The period is searched
+// within ±2 % (sub-pixel camera geometry). Nahtlos' gentle rim groove stays under the threshold at these distances.
+async function gridOn(name, h, pitch, dists) {
   const { data, info } = await sharp(shotPath(name)).raw().toBuffer({ resolveWithObject: true });
   const W = info.width, C = info.channels;
   const out = [];
-  for (const ys of rows) {
+  for (const D0 of dists) {
+    const ys = Math.round(360 + FOCAL * Math.tan(Math.atan(h / D0) + pitch));
     const v = ys - 360, th = -pitch + Math.atan(v / FOCAL), D = h / Math.tan(th), depth = h * Math.sin(-pitch) + D * Math.cos(-pitch), pred = FOCAL / depth;
     const L = new Float32Array(W);
     for (let x = 0; x < W; x++) { let s = 0; for (let dy = -1; dy <= 1; dy++) { const o = ((ys + dy) * W + x) * C; s += 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2]; } L[x] = s / 3; }
+    const x0 = Math.max(0, Math.round(640 - 6 * pred)), x1 = Math.min(W, Math.round(640 + 6 * pred));
     const fold = (P) => {
       const bins = new Float64Array(32), cnt = new Float64Array(32);
-      for (let x = 0; x < W; x++) { let ph = ((x + 0.5 - 640) / P) % 1; if (ph < 0) ph += 1; const b = Math.min(31, Math.floor(ph * 32)); bins[b] += L[x]; cnt[b]++; }
+      for (let x = x0; x < x1; x++) { let ph = ((x + 0.5 - 640) / P) % 1; if (ph < 0) ph += 1; const b = Math.min(31, Math.floor(ph * 32)); bins[b] += L[x]; cnt[b]++; }
       let mean = 0; for (let b = 0; b < 32; b++) { bins[b] = cnt[b] ? bins[b] / cnt[b] : 0; mean += bins[b]; } mean /= 32;
       let darkest = 0; for (let b = 1; b < 32; b++) if (bins[b] < bins[darkest]) darkest = b;
       return { border: 1 - (bins[31] + bins[0]) / 2 / mean, darkest, darkDip: 1 - bins[darkest] / mean };
     };
     let best = null;
-    for (let P = pred * 0.94; P <= pred * 1.06; P += pred * 0.002) { const r = fold(P); if (!best || r.border > best.border) best = Object.assign({ P }, r); }
-    const grid = best.border >= 0.05 && (best.darkest === 0 || best.darkest === 31);
-    out.push({ row: ys, period: +pred.toFixed(1), blocks: +(W / pred).toFixed(1), bestPeriod: +best.P.toFixed(1), borderDip: +(best.border * 100).toFixed(1), darkestBin: best.darkest, darkestDip: +(best.darkDip * 100).toFixed(1), grid });
+    for (let P = pred * 0.98; P <= pred * 1.02; P += pred * 0.002) { const r = fold(P); if (!best || r.border > best.border) best = Object.assign({ P }, r); }
+    const atBorder = best.darkest >= 30 || best.darkest <= 1;
+    const grid = best.border >= 0.08 && atBorder;
+    out.push({ row: ys, D: +D.toFixed(1), period: +pred.toFixed(1), bestPeriod: +best.P.toFixed(1), borderDip: +(best.border * 100).toFixed(1), darkestBin: best.darkest, darkestDip: +(best.darkDip * 100).toFixed(1), grid });
   }
   return out;
 }
@@ -150,14 +158,15 @@ for (const lk of LOOKS) {
   await look(lk + '_6_interior', [ox + 64.5, y0 + 1 + 0.1, oz + 57.2], 0, -0.12);
   await look(lk + '_7_sandsnow', [ox - 19, y0 + 1 + 2.5, oz + 54], 0, -0.5);
   await look(lk + '_8_far', [ox + 16, y0 + 1 + 24, oz + 118], 0, -0.16);
+  await look(lk + '_9_pond', [ox + 43, y0 + 1 + 2.2, oz + 58.5], 0, -0.42);
   // the grid on flat grass: the hill scene's foreground rows and the flat-grass scene
-  const hill = await gridOn(TAG + '_' + lk + '_1_hill', HILL.h, HILL.pitch, [520, 580, 640]);
-  const grass = await gridOn(TAG + '_' + lk + '_2_grass', GRASS.h, GRASS.pitch, [300, 420, 540]);
+  const hill = await gridOn(TAG + '_' + lk + '_1_hill', HILL.h, HILL.pitch, [9.5, 10.5, 11.5, 12.5]);
+  const grass = await gridOn(TAG + '_' + lk + '_2_grass', GRASS.h, GRASS.pitch, [9.5, 10.5, 11.5, 12.5]);
   gridResults[lk] = { hill, grass };
   const found = (r) => r.filter(x => x.grid);
   if (lk === 'classic') {
-    check(found(hill).length >= 2, `classic: the block grid is found on the flat grass of the hill scene in ${found(hill).length} of ${hill.length} rows — ${JSON.stringify(hill)}`);
-    check(found(grass).length >= 2, `classic: and on the flat grass scene in ${found(grass).length} of ${grass.length} rows — ${JSON.stringify(grass)}`);
+    check(found(hill).length >= 3, `classic: the block grid is found on the flat grass of the hill scene in ${found(hill).length} of ${hill.length} rows (9–13 blocks away) — ${JSON.stringify(hill)}`);
+    check(found(grass).length >= 3, `classic: and on the flat grass scene in ${found(grass).length} of ${grass.length} rows — ${JSON.stringify(grass)}`);
   } else {
     check(found(hill).length === 0 && found(grass).length === 0, `seamless: no block grid on the flat grass (${found(hill).length} + ${found(grass).length} rows with one) — hill ${JSON.stringify(hill)} grass ${JSON.stringify(grass)}`);
   }

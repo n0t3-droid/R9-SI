@@ -10,7 +10,7 @@ const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle
 async function open(dist) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   page.on('pageerror', e => console.log('[pageerror]', (e.stack || e.message).slice(0, 300)));
-  await page.goto('file://' + dist);
+  await page.goto('file://' + dist, { timeout: 180000, waitUntil: 'domcontentloaded' });
   const ev = (fn, arg) => page.evaluate(fn, arg), wait = (ms) => page.waitForTimeout(ms);
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 4; g.settings.look = 'classic'; g.applySettings('*'); });
