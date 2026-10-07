@@ -9,7 +9,7 @@
 //  (e) VX: two timber walls at odd / even x give the same quads; stacked windows each get a closed frame; rugs end per block
 const VR = require('./load_shared.js');
 VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
-for (const f of ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_build']) require('../src/main/' + f + '.js');
+for (const f of ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_layout', 'tex_build']) require('../src/main/' + f + '.js');
 const R = VR.R, T = R.T, F = VR.F;
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
