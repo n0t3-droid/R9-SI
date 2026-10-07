@@ -220,7 +220,7 @@
       return r;
     }
     el.innerHTML = '';
-    if (W.tab !== 'karte') { W.tab = 'karte'; }
+    if (W.tab === 'bench' || W.tab === 'style' || W.tab === 'plan') W.tab = 'karte';   // (the Profi tabs wait behind the switch; houses / furn stay reachable for tools and tests)
     const cat = W.karteCat || (favN ? 'fav' : 'house');
     const own = Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {}).filter(n => VR.VM.MODELS[n] && !C.isFacade(n)).length, nFurn = Object.keys(VR.VM.MODELS).filter(n => !C.isFacade(n)).length;
     for (const [id, label, n] of [['fav', '★ ' + tx('st.favs', null, 'Favoriten', 'Favourites'), favN], ['house', '🏠 ' + tx('st.houses', null, 'Häuser', 'Houses'), C.HOUSES.length], ['furn', '🪑 ' + tx('st.furn', null, 'Möbel', 'Furniture'), own ? own + ' ✏️ · ' + nFurn : nFurn], ['worlds', '🌍 ' + tx('start.worldsTitle', null, 'Welten', 'Worlds'), W.worlds ? W.worlds.length : '']]) {
