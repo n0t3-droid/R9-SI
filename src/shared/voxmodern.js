@@ -769,6 +769,25 @@
     return h - 0.5;
   }
   const LEAF = 0x3E7D44, LEAF2 = 0x5A9A4E, LEAFD = 0x2E5A34;
+  // a flat leaf blade from base B along U (length L, widest about the middle at W) in the plane of U and V: rasterised
+  // voxel by voxel in a band at least one voxel thick, so it can lean any way without breaking up
+  function leafBlade(b, B, U, V, L, W, m) {
+    const S = b.S, ul = Math.hypot(U[0], U[1], U[2]), u = U.map(c => c / ul);
+    const dv = V[0] * u[0] + V[1] * u[1] + V[2] * u[2], vv = V.map((c, i) => c - u[i] * dv), vl = Math.hypot(vv[0], vv[1], vv[2]), v = vv.map(c => c / vl);
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const h = (Math.abs(n[0]) + Math.abs(n[1]) + Math.abs(n[2])) / 2 + 0.01;   // half the band
+    const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (const s of [0, L]) for (const a of [-W / 2, W / 2]) for (const d of [-h, h]) for (let k = 0; k < 3; k++) {
+      const c = B[k] + u[k] * s + v[k] * a + n[k] * d; lo[k] = Math.min(lo[k], c); hi[k] = Math.max(hi[k], c);
+    }
+    for (let z = Math.floor(lo[2] * S); z < Math.ceil(hi[2] * S); z++) for (let y = Math.floor(lo[1] * S); y < Math.ceil(hi[1] * S); y++) for (let x = Math.floor(lo[0] * S); x < Math.ceil(hi[0] * S); x++) {
+      const p = [(x + 0.5) / S - B[0], (y + 0.5) / S - B[1], (z + 0.5) / S - B[2]];
+      const s = p[0] * u[0] + p[1] * u[1] + p[2] * u[2];
+      if (s < 0 || s > L) continue;
+      const a = p[0] * v[0] + p[1] * v[1] + p[2] * v[2], d = p[0] * n[0] + p[1] * n[1] + p[2] * n[2], q = s / L;
+      if (Math.abs(a) <= (W / 2) * 2 * Math.sqrt(q * (1 - q)) && Math.abs(d) <= h) b.set(x, y, z, m);
+    }
+  }
   const PLANTS = [
     ['fig', 'Fiddle Leaf Fig', 2, (b, y) => {
       b.lathe(8, 8, [[y, 1], [20, 0.8]], M.wood(0x6A5A44)); b.rod(8, 17, 8, 5.5, 22, 7, 0.8, M.wood(0x6A5A44)); b.rod(8, 19, 8, 10.5, 24, 9, 0.8, M.wood(0x6A5A44));
@@ -782,12 +801,15 @@
       for (const [x, z, h] of L) { b.box(x, y, z, x + 1, y + h, z + 1, M.plant(LEAFD)); b.box(x, y + 1, z, x + 1, y + h - 2, z + 1, M.plant(0x4E7A3A)); b.box(x, y + h - 2, z, x + 1, y + h - 1, z + 1, M.plant(0xB8B04A)); }
     }],
     ['strelitzia', 'Bird of Paradise', 2, (b, y) => {
-      for (let k = 0; k < 9; k++) {
-        const a = k * 0.72 + 0.3, r = 2.5 + (k % 3) * 1.5, top = 17 + (k % 4) * 2.8, tx = 8 + Math.cos(a) * r, tz = 8 + Math.sin(a) * r;
-        b.rod(8, y, 8, tx, top - 4, tz, 0.75, M.plant(0x4E7A3A));
-        if (Math.abs(Math.cos(a)) > Math.abs(Math.sin(a))) b.ellipsoid(tx, top, tz, 0.8, 4.5, 2.3, M.plant(k % 3 ? LEAF : LEAF2)); else b.ellipsoid(tx, top, tz, 2.3, 4.5, 0.8, M.plant(k % 3 ? LEAFD : LEAF));
+      // broad paddle leaves on long stalks fanning out of the pot; the flower stands above them on its own stalk
+      for (let k = 0; k < 8; k++) {
+        const a = k * 0.8 + 0.3, r = 1.6 + (k % 3) * 0.7, top = 17 + (k % 4) * 2.4, ca = Math.cos(a), sa = Math.sin(a), tx = 8 + ca * r, tz = 8 + sa * r;
+        b.rod(8, y, 8, tx, top, tz, 0.75, M.plant(0x4E7A3A));
+        leafBlade(b, [tx, top, tz], [ca * 0.87, 0.49, sa * 0.87], [-sa, 0, ca], 5, 4.2, M.plant(k % 2 ? LEAF : LEAF2));
       }
-      b.extrude([[10, 23], [13.5, 24.5], [12, 23.5]], 'z', 8, 9, M.matte(0xF08A2A)); b.extrude([[10, 23.5], [12.5, 26], [11, 23.5]], 'z', 8, 9, M.matte(0x5A6AD8));   // the flower
+      b.rod(8, y, 8, 9.5, 27, 9, 0.6, M.plant(0x4E7A3A));
+      b.extrude([[9, 26.4], [13.2, 28.8], [14.6, 27.8], [11, 25.8]], 'z', 8.5, 9.5, M.matte(0xF08A2A));    // the orange bract
+      b.extrude([[11.2, 27.2], [15.4, 30.2], [14.2, 28.3], [11.8, 26.8]], 'z', 8.5, 9.5, M.matte(0x5A6AD8)); // the blue petals
     }],
     ['palm', 'Kentia Palm', 2, (b, y) => {
       for (let k = 0; k < 7; k++) {
@@ -797,9 +819,13 @@
       }
     }],
     ['rubber', 'Rubber Plant', 2, (b, y) => {
-      b.lathe(8, 8, [[y, 1], [27, 0.8]], M.plant(0x5A4A3A));
-      for (let k = 0; k < 14; k++) { const a = k * 2.2, h = y + 3 + k * 1.45, cx = 8 + Math.cos(a) * 2.6, cz = 8 + Math.sin(a) * 2.6, ax = Math.abs(Math.cos(a)) > 0.7; b.ellipsoid(cx, h, cz, ax ? 2.6 : 1.5, 0.75, ax ? 1.5 : 2.6, M.plant(k % 2 ? 0x2A4430 : 0x36553A)); }
-      b.ellipsoid(8, 27.5, 8, 1, 1.8, 1, M.plant(0x8A3A3A));
+      // a stem with big glossy leaves spiralling up it, each a flat blade leaning out and up, two greens; a red bud on top
+      b.lathe(8, 8, [[y, 1], [27.5, 0.7]], M.plant(0x5A4A3A));
+      for (let k = 0; k < 9; k++) {
+        const a = k * 2.4, h = y + 2.5 + k * 2.2, ca = Math.cos(a), sa = Math.sin(a), phi = 0.55 - k * 0.04;
+        leafBlade(b, [8 + ca * 0.5, h, 8 + sa * 0.5], [ca * Math.cos(phi), Math.sin(phi), sa * Math.cos(phi)], [-sa, 0, ca], 5.8, 3.6, M.gloss(k % 2 ? 0x2F6B3C : 0x3F7F48));
+      }
+      b.ellipsoid(8, 27.8, 8, 1, 1.6, 1, M.plant(0x8A3A3A));
     }],
     ['zz', 'ZZ Plant', 1, (b, y) => {
       for (let k = 0; k < 6; k++) {
