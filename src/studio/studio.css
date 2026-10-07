@@ -661,6 +661,9 @@ nav.modes button.hubm.on { color: var(--txt); background: #2a2110; box-shadow: 0
 .fparam b { color: var(--txt); font-weight: 500; text-align: right; }
 .fparam input[type=range] { width: 100%; accent-color: var(--acc); }
 .fparam select { grid-column: 2 / 4; padding: 4px 6px; font: 11px var(--font); color: var(--txt); background: #0a0e14; border: 1px solid var(--line2); border-radius: 6px; }
+.fbools { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 2px; }
+.fbools .fbool { padding: 4px 10px; font-size: 11px; border-radius: 20px; color: var(--mute); background: transparent; border: 1px dashed var(--line2); }
+.fbools .fbool.on { color: #9fe8c4; background: rgba(80, 230, 160, 0.08); border: 1px solid rgba(80, 230, 160, 0.45); }
 .fstyles { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 8px; }
 .fstyles .fstyle { padding: 4px 10px; font-size: 11px; border-radius: 20px; color: var(--mute); background: transparent; border: 1px solid var(--line); }
 .fstyles .fstyle.on { color: var(--acc); background: rgba(56, 230, 255, 0.08); border-color: rgba(56, 230, 255, 0.45); }

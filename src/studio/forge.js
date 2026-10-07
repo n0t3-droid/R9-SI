@@ -170,7 +170,11 @@
     note(esc(Fg.describe(dna)) + ' <span class="dim mono">' + esc(dna) + '</span>');
     // the parameters: a slider (or a choice) per parameter, every change rebuilds the nine after a short pause
     const pf = document.createElement('div'); pf.className = 'fparams';
+    // yes / no things (Carport, Pool, Laternen, Dach …) as chips that switch: ✓ on, ✗ off
+    const bools = t.params.filter(pr => pr.min === 0 && pr.max === 1 && !pr.names), br = document.createElement('div'); br.className = 'fbools';
+    for (const pr of bools) { const on = P.params[pr.k] === 1, b = document.createElement('button'); b.className = 'fbool' + (on ? ' on' : ''); b.dataset.fp = pr.k; b.textContent = (on ? '✓ ' : '✗ ') + pr.label; b.title = pr.label + (on ? ' — an (Klick: aus)' : ' — aus (Klick: an)'); b.onclick = () => FM.setParam(pr.k, on ? 0 : 1); br.appendChild(b); }
     for (const pr of t.params) {
+      if (bools.includes(pr)) continue;
       const line = document.createElement('label'); line.className = 'fparam';
       const v = P.params[pr.k];
       if (pr.names) {
@@ -188,6 +192,7 @@
       pf.appendChild(line);
     }
     el.appendChild(pf);
+    if (bools.length) el.appendChild(br);
     // materials
     const sr = document.createElement('div'); sr.className = 'fstyles';
     for (const st of t.styles) { const b = document.createElement('button'); b.className = 'fstyle' + (st.id === P.style ? ' on' : ''); b.dataset.fstyle = st.id; b.textContent = st.name; b.onclick = () => FM.setStyle(st.id); sr.appendChild(b); }
