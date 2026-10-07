@@ -51,7 +51,7 @@ const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const studioFonts = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">`;
 const studioBody = `<div id="studio" class="boot">
 <header>
-  <div class="brand"><span class="sig">R9</span><span class="t">MODEL STUDIO</span><span class="v">v3.9<!--PLAYTAG--></span></div>
+  <div class="brand"><span class="sig">R9</span><span class="t">MODEL STUDIO</span><span class="v">v4.0<!--PLAYTAG--></span></div>
   <nav class="modes"><button data-hub class="hubm" title="Weitermachen — alles, was du angefangen hast (Strg+O)"><i>🕘</i>Weitermachen<b class="hubN"></b></button><button data-mode="arch" class="on"><i>◈</i>Architektur</button><button data-mode="furn"><i>▣</i>Möbel</button><button data-mode="facade"><i>▤</i>Fassade</button><button data-mode="parts" title="Alle Blöcke des Spiels: Dächer, Licht, Fenster, Türen, Wände, Böden … mit ★ Favoriten"><i>🧱</i>Teile</button><button data-mode="craft" class="craftm"><i>⚒</i>Crafter</button><button data-mode="world" class="worldm"><i>◍</i>Welt</button><button data-create class="createm" title="Ein Haus aus dem Baukasten, alles Mögliche vom Genie, Bilder als Blöcke — alles hier, ohne Konto"><i>✨</i>Erschaffen</button></nav>
   <!--GAMELINK-->
   <div class="sys"><span class="dot" id="sysDot"></span><span id="sysText">boot</span></div>

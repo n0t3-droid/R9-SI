@@ -1,4 +1,18 @@
-Stand: 3. Okt 2026 · Studio v3.9 — ▶ Spielen und 📍 Spawnpunkt; 🧱 Teile, 🎯 Finden, ★ Favoriten; ✨ Genie ohne Claude
+Stand: 7. Okt 2026 · Studio v4.0 — ✏️ überall, ☆ Häuser, 📦 Mitnehmen, ✨ Modern, Klassisch; ▶ Spielen und 📍 Spawnpunkt; 🧱 Teile, 🎯 Finden, ★ Favoriten; ✨ Genie ohne Claude
+
+NEU IN v0.39 — 🧱 Klassisch, 🛋️ Modern Living, keine Sackgassen
+- Blöcke: Klassisch. Jeder Block ist wieder ein eigener Würfel: Hügel als Stufen, jede Wand mit Blockkante, Glas mit
+  Rahmen je Scheibe, Muster je Block. „Nahtlos“ (der alte Look) bleibt in den Einstellungen und schaltet live um.
+- 🛋️ Modern Living: 236 neue Teile in zwölf Sets (Licht an/aus, Smart Home, Küche, Wohnen, Schlafen, Bad, Pflanzen,
+  Büro & Technik, Garten & Pool, Mobilität, Laden & Café, Deko & Kunst). Im Spiel ein eigener Reiter, hier der Chip
+  ✨ Modern in 🧱 Teile. Sie werden erst gebaut, wenn du sie brauchst — der Start bleibt schnell.
+- ✏️ Bearbeiten auf jeder Karte, ← zurück dorthin, wo du warst. ☆ für ganze Häuser (dieselben ★ wie im Spiel).
+  „Verbaut in“: ⚒ öffnet das Haus mit dem Teil leuchtend, 🎨 ersetzt alle davon in einem Schritt. Blöcke zeigen
+  Varianten (die Familie in anderen Farben und Materialien).
+- ▶ Spielen nimmt geplante Häuser und Welt-Stil-Entwürfe mit. Meldungen sagen, was wirklich passiert; ein
+  fehlgeschlagenes Speichern zeigt nie ✓; bei vollem Browser-Speicher: ⚠ und 🧹 Platz schaffen. Profi-Reiter unter ⚙.
+- Das eigenständige Studio (nicht mit einem Spiel verbunden) sagt es, bietet 🎮 Zum Spiel und 📦 Mitnehmen: eine
+  r9-paket-Datei mit Favoriten, Designs und Bauteilen, die das Spiel (Titel → 📥) und das Studio im Spiel übernehmen.
 
 NEU IN v0.38 — 📍 Wo du landest, ▶ Spielen
 - ▶ Spielen (oben in der Leiste, im Studio des Spiels) öffnet die Welt, an der du arbeitest, direkt — ohne Titelbildschirm.
