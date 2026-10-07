@@ -46,6 +46,10 @@ html:not(.pro) #title #mphosts:not(.has), html:not(.pro) #title .splash, html:no
 #title .studionote { color: var(--st-ink); text-align: center; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
 #title .studionote .btn.tiny { min-height: 44px; font-size: calc(14px * var(--ui-scale)); padding: 0 16px; margin: 4px 4px 0; }
 #title .titlenote:not(:empty) { padding: 6px 12px; border-radius: 10px; background: var(--st-bg); color: var(--st-ink); }
+/* the multiplayer box over the world behind the start screen: its own dark ground, so the small text stays readable */
+#title #mphosts:not(:empty) { margin-top: 6px; padding: 8px 14px 10px; border-radius: 14px; background: var(--st-bg); border: 1px solid var(--st-line); text-align: center; }
+#title #mphosts .note { color: #c3cee3; font-size: calc(13px * var(--ui-scale)); max-width: 520px; }
+#title #mphosts .mphead { color: var(--st-ink); }
 /* the foot: the renderer (Profi), 📜, the credit — small, but readable on any sky (its own dark ground) */
 #title .foot { position: absolute; bottom: 10px; left: 16px; right: 16px; display: flex; align-items: center; justify-content: center; gap: 12px; color: #c3cee3; font-size: 13px; pointer-events: none; }
 #title .foot > * { pointer-events: auto; }

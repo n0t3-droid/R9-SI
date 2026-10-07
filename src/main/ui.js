@@ -10,7 +10,7 @@
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // the player's language (lang_de.js / lang_en.js): T a text, TL a list of lines; static panels carry data-t keys
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
-  const SPLASHES =['Now with ringed gas giants!', 'Crystal spires ahead!', 'Aether flows bright!', 'Zen Builder mode!', 'Fly your own shuttle!', 'Endless procedural beauty!', 'Voxels, but make it cosmic!', 'Mind the lava rivers!', 'Meteor showers tonight!', 'Build something beautiful!'];
+  // the start screen's splash line (Profi): TL('g.title.splashes')
   // the loading tips: TL('g.load.tips')
   // (the invitation steps and the offline note are in the tables: g.mp.inviteHow, g.mp.off)
   // the creative palette's tabs: their names are g.cat.<key> in the tables
@@ -148,7 +148,7 @@
       // bind buttons
       r.addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) { this.game.audio.play('click'); this.act(b.dataset.act, b); } });
       for (const id of ['cw_mode', 'cw_diff', 'cw_type']) $('#' + id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; for (const x of b.parentNode.children) x.classList.toggle('on', x === b); });
-      $('#splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
+      { const sp = TL('g.title.splashes'); this.splashI = Math.floor(Math.random() * Math.max(1, sp.length)); $('#splash').textContent = sp[this.splashI] || ''; }
       // hotbar
       const hb = $('#hotbar');
       for (let i = 0; i < 9; i++) { const s = el('div', 'slot'); s.innerHTML = `<span class="num">${i + 1}</span><canvas width="48" height="48"></canvas><span class="cnt"></span><div class="dur" style="display:none"><i></i></div>`; hb.appendChild(s); this.hudSlots.push(s); }
@@ -166,6 +166,7 @@
     retext() { if (VR.I18N && VR.I18N.retext) VR.I18N.retext(this.root); }
     onLang() {
       this.retext();
+      { const sp = TL('g.title.splashes'), e = $('#splash'); if (e && sp.length) e.textContent = sp[(this.splashI || 0) % sp.length]; }
       const lh = $('#lockhint'); if (lh) lh.textContent = T('g.hud.lock');
       this.lastName = undefined; this.vhud = null;
       if (this.game.player) this.updateHUD(true);
