@@ -62,6 +62,11 @@
 
   // Stairs/fence/wall/pane part caches per type
   const partCache = new Map();
+  // the section's vertex buffers, reused from section to section (out() copies what a section wrote; a section is meshed
+  // in one synchronous call), and the visibility flood's arrays
+  const BUF_POOL = [];
+  function takeBuf(i, cap) { let b = BUF_POOL[i]; if (!b) b = BUF_POOL[i] = new Buf(cap); b.n = 0; return b; }
+  const FLOOD_SEEN = new Uint8Array(4096), FLOOD_STACK = new Int32Array(4096);
   function stairsModels(t, state) {
     let e = partCache.get('s' + t.id + ':' + state);
     if (e) return e;
@@ -97,11 +102,11 @@
     // material never read as one surface (Klassisch v2)
     const LK = VR.LOOK, ctmJoin = !LK || LK.ctm, macroOn = !LK || LK.macro, varyOn = !!(LK && LK.vary && !macroOn);
     const NAT = R.natural;
-    const bufs = [new Buf(4096), new Buf(1024), new Buf(1024)];
+    const bufs = [takeBuf(0, 4096), takeBuf(1, 1024), takeBuf(2, 1024)];
     // world sections keep their mini-voxel pieces apart from the plain terrain: a detailed buffer drawn up close
     // and a far buffer of averaged boxes (ships and previews merge everything into the opaque stream as before)
     const vxSplit = !!job.vxLod;
-    if (vxSplit) { bufs.push(new Buf(2048), new Buf(512)); }
+    if (vxSplit) { bufs.push(takeBuf(3, 2048), takeBuf(4, 512)); }
     const sy = job.sy;
     const occl = (i) => (TF[B[i]] & (F.OPAQUE | F.LEAVES)) !== 0 && !((TF[B[i]] & F.LEAVES) && !fancy && false);
     const opaqueAt = (i) => (TF[B[i]] & F.OPAQUE) !== 0;
@@ -200,8 +205,7 @@
     // ---- visibility graph flood fill ----
     let visMask = 0;
     {
-      const seen = new Uint8Array(4096);
-      const stack = new Int32Array(4096);
+      const seen = FLOOD_SEEN.fill(0), stack = FLOOD_STACK;
       let anyOpaque = false;
       for (let i = 0; i < 4096; i++) { const x = i & 15, z = (i >> 4) & 15, y = i >> 8; if (opaqueAt(P(x, y, z))) { seen[i] = 1; anyOpaque = true; } }
       if (!anyOpaque) visMask = 0x7fff;
