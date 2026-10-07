@@ -117,7 +117,7 @@
     constructor(w, be, o) {
       this.w = w; this.be = be; this.o = Object.assign({}, LIMITS, o || {});
       this.cur = null;          // the open segment {id (null until first written), w: Writer}
-      this.dirty = false; this.timer = null; this.lastId = 0; this.inB = false;
+      this.dirty = false; this.timer = null; this.lastId = 0; this.inB = false; this.count = 0;   // (count: this session's changes)
       this.L = { t0: -1e15, kind: 0, dim: undefined };   // the hand batch that is still open (changes within joinMs join it)
       this.q = Promise.resolve();
       this.now = () => Date.now(); this.ticks = () => 0;
@@ -131,10 +131,11 @@
       this.open(t).batch(t, kind, dim, this.ticks());
       this.inB = true; this.L.kind = 0;
     }
-    add(x, y, z, o, n) { this.cur.w.change(x, y, z, o, n); }
+    add(x, y, z, o, n) { this.cur.w.change(x, y, z, o, n); this.count++; }
     end() { this.inB = false; this.touch(); }
     // one change of the hand (or a friend's): changes within joinMs of the batch's start join it (a door's two halves)
     one(x, y, z, o, n, dim, kind) {
+      this.count++;
       if (this.inB) { this.cur.w.change(x, y, z, o, n); return; }
       const L = this.L, t = this.now();
       if (!this.cur || L.kind !== kind || L.dim !== dim || t - L.t0 > this.o.joinMs) {
