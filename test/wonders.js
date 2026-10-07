@@ -35,7 +35,7 @@ section('sites', () => {
     // six cells in ten roll a wonder; one stands where the ground allows (dry, gentle, clear of everything built)
     let rolled = 0, unrolled = []; for (let j = -3; j <= 3; j++) for (let i = -3; i <= 3; i++) { const r = W.roll(g, i, j); if (r) rolled++; const s = W.site(g, i, j, spawn); if (s && !r && !s.first) unrolled.push(s.key); }
     check(C === 640 && rolled >= 20 && rolled <= 39 && !unrolled.length, tag + ': six cells in ten roll a wonder (' + rolled + '/49), no other cell holds one' + (unrolled.length ? ': ' + unrolled.join(' ') : ''));
-    check(list.length >= Math.max(6, rolled * 0.25) && list.length <= rolled + 1, tag + ': most rolled cells find a place for it: ' + list.length + '/' + rolled);
+    check(list.length >= Math.max(6, rolled * 0.25) && list.length <= rolled + 1, tag + ': a good share of the rolled cells find a dry, gentle place clear of everything (sea, mountains and towns take the rest): ' + list.length + '/' + rolled);
     check(list.every(s => s.key && W.TYPES.some(t => t.id === s.type) && Number.isFinite(s.x) && Number.isFinite(s.z) && Number.isFinite(s.y) && (s.r | 0) === s.r && s.r >= 0 && s.r < 4 && s.seed > 0), tag + ': every site has a key, a type, a place, a turn and a seed');
     // spacing: from each other, from the villages (their reach), from the spawn and the Heartland's temple
     let close = [], vil = [], sp = [], tem = [];
