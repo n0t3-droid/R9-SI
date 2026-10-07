@@ -79,6 +79,9 @@
         [BI.desert, BI.desert, BI.badlands, BI.wooded_badlands, BI.eroded_badlands]] });
   }
 
+  // the climates of a chunk's columns, by the output of generate (the layers' post passes read them: no second lookup)
+  const CLIMATE_OF = new WeakMap();
+
   class OverworldGen {
     constructor(seed, opts) {
       opts = opts || {};
@@ -105,8 +108,10 @@
       this.stripN = new VR.Simplex(s ^ 0xe7f809);
       this.caveBN = new F(s ^ 0xf8091a, 2, 1 / 180, 0.5);
       this.aqN = new VR.Simplex(s ^ 0x091a2b);
-      this.corners = new Map();
-      this.caveGrid = new Map();
+      this.corners = new Map();      // by X, then by Z (a Smi key each: a double key is boxed at every lookup)
+      this.nCorners = 0;
+      this.caveGrid = new Map();     // by X, then by Z and Y
+      this.nCave = 0;
       // badlands terracotta bands (hoodoo layers)
       const rng = new VR.RNG(s ^ 0x5eed);
       const cols = ['orange', 'yellow', 'brown', 'red', 'white', 'light_gray'];
@@ -117,15 +122,15 @@
 
     // ---------------- climate & height at a corner (multiples of 4) ----------------
     corner(X, Z) {
-      const key = (X + 2000000) * 4000001 + (Z + 2000000);
-      let c = this.corners.get(key);
-      if (c) return c;
-      if (this.corners.size > 60000) this.corners.clear();
-      c = this.computeClimate(X, Z);
+      let row = this.corners.get(X);
+      if (row !== undefined) { const hit = row.get(Z); if (hit !== undefined) return hit; }
+      if (this.nCorners > 60000) { this.corners.clear(); this.nCorners = 0; row = undefined; }
+      const c = this.computeClimate(X, Z);
       // the density column (33 noise samples) is computed on first use (densOf): climate-only lookups (biome
       // maps, structure site searches, the far horizon) never pay for it
       c.X = X; c.Z = Z; c.dens = null;
-      this.corners.set(key, c);
+      if (row === undefined) { row = new Map(); this.corners.set(X, row); }
+      row.set(Z, c); this.nCorners++;
       return c;
     }
     densOf(c) {
@@ -237,15 +242,16 @@
 
     // ---------------- cave fields on 4x4x4 grid ----------------
     caveSample(X, Y, Z) {
-      const key = ((X / 4 + 500000) * 1000003 + (Z / 4 + 500000)) * 70 + (Y / 4);
-      let v = this.caveGrid.get(key);
-      if (v) return v;
-      if (this.caveGrid.size > 200000) this.caveGrid.clear();
-      v = new Float32Array(3);
+      const inner = (Z / 4 + 500000) * 70 + (Y / 4);
+      let row = this.caveGrid.get(X);
+      if (row !== undefined) { const hit = row.get(inner); if (hit !== undefined) return hit; }
+      if (this.nCave > 200000) { this.caveGrid.clear(); this.nCave = 0; row = undefined; }
+      const v = new Float32Array(3);
       v[0] = this.cheese.n3(X, Y * 1.55, Z);
       v[1] = this.sp1.n3(X, Y * 1.3, Z);
       v[2] = this.sp2.n3(X + 777, Y * 1.3, Z - 777);
-      this.caveGrid.set(key, v);
+      if (row === undefined) { row = new Map(); this.caveGrid.set(X, row); }
+      row.set(inner, v); this.nCave++;
       return v;
     }
 
@@ -317,7 +323,9 @@
       this.freeze(blocks, cx, cz, biome);
       // tints
       const tints = this.tints(cx, cz);
-      return { blocks, biome, caveBiome, tints, chests };
+      const out = { blocks, biome, caveBiome, tints, chests };
+      CLIMATE_OF.set(out, climate);
+      return out;
     }
 
     carveCaves(blocks, cx, cz, H, climate, biome) {
@@ -337,7 +345,7 @@
         const protect = entrance ? 0 : (underWater ? 10 : 5);
         const ci = lx >> 2, cj = lz >> 2, fx = (lx & 3) / 4, fz = (lz & 3) / 4;
         const top = Math.min(h - protect, ny * 4 - 1);
-        let kc = -1, i00 = 0;
+        let kc = -1, i00 = 0, aqY = -1000, aqV = 0;
         for (let y = 5; y <= top; y++) {
           const bi = (y << 8) | col;
           const b = blocks[bi];
@@ -364,7 +372,8 @@
             else if (y < 40 && cheese) {
               // aquifer: regional water level
               const ax = Math.floor((x0 + lx) / 48), ay = Math.floor(y / 20), az = Math.floor((z0 + lz) / 48);
-              const hv = M.hash3(ax, ay, az, this.seed + 99) / 4294967296;
+              if (ay !== aqY) { aqY = ay; aqV = M.hash3(ax, ay, az, this.seed + 99) / 4294967296; }
+              const hv = aqV;
               if (hv < 0.3 && y <= ay * 20 + 6 + Math.floor(hv * 30)) blocks[bi] = S.water; else blocks[bi] = 0;
             } else blocks[bi] = 0;
           }
@@ -654,7 +663,7 @@
         const y = this.surfaceY(x, z) + 1;
         if (y <= SEA + 1 && key0 !== 'mangrove_swamp' && key0 !== 'swamp') continue;
         if (y <= SEA - 1) continue;
-        const cl = this.climateAt(x, z);
+        const cl = this._treeCl = this.climateAt(x, z, this._treeCl);
         const bio = this.biomeFor(cl, y - 1), key = BIOMES[bio].key;
         if (key.indexOf('ocean') >= 0 || key === 'river' || key === 'beach' || key === 'stony_shore' || key === 'desert') continue;
         this.tree(w, key, x, y, z, rng);
@@ -832,5 +841,7 @@
       return [0.5, 100, 0.5];
     }
   }
+  // the climates of a chunk's columns, as generate made them (the post passes of the layers read them)
+  OverworldGen.climateOf = (out) => CLIMATE_OF.get(out);
   VR.OverworldGen = OverworldGen;
 })(VR);

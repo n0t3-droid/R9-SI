@@ -165,10 +165,11 @@
     cover: new Set([st('snow_block'), st('calcite'), st('packed_ice'), st('ice'), st('gravel'), st('powder_snow'), st('stone'), st('cobblestone'), st('andesite'), st('diorite'), st('granite'), st('tuff'), st('deepslate')].filter(Boolean)), snowT: R.byName.snow ? R.byName.snow.id : -1 });
   HEART.post = function (g, cx, cz, out) {
     const S = states(), blocks = out.blocks, x0 = cx * 16, z0 = cz * 16;
+    const cls = VR.OverworldGen.climateOf(out);   // the columns' climates, as generate made them
     const T = R.T;
     for (let col = 0; col < 256; col++) {
       const x = x0 + (col & 15), z = z0 + (col >> 4);
-      const cl = g.climateAt(x, z);
+      const cl = cls ? cls[col] : g.climateAt(x, z);
       if (cl.heart < 0.5) continue;
       // the station peaks: dark blue-grey rock shot through with glowing aether veins (the trailer's cyan-veined mountains)
       if (cl.hz3 > 0.45 && g.nAether) {
