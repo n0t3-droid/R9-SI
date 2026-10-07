@@ -182,18 +182,28 @@
   function pauseMenu() {
     const panel = $('#pause .panel'); if (!panel || panel.dataset.w1) return;
     panel.dataset.w1 = '1';
+    // three groups: the way on (▶ 🏗 🎒 🏠 📍), the tools (multiplayer, Zen, Profi's Werkbank · Codex · Foto), the way out
+    // (⚙ ⏏) — one column in Einfach; Profi puts the tools beside the rest, so the longer menu still fits a 720 px screen
     panel.innerHTML = `<h2 class="ptitle" data-t="g.pause.title"></h2>
-      <button type="button" class="btn primary" data-act="resume" data-t="g.pause.resume"></button>
-      <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
-      <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
-      <div id="mppanel" class="col gap"></div>
-      <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
-      <div id="zenpanel" class="col gap"></div>
-      <button type="button" class="btn studio pro" data-act="studiolive" id="studiolive" data-t="g.pause.studio" data-tt="g.pause.studioTip"></button>
-      <button type="button" class="btn pro" data-act="codex" data-t="g.pause.codex"></button>
-      <button type="button" class="btn pro" data-act="photo" data-t="g.pause.photo"></button>
-      <button type="button" class="btn" data-act="settings" data-t="g.pause.settings"></button>
-      <button type="button" class="btn" data-act="quit" data-t="g.pause.quit"></button>
+      <div class="pgrid">
+        <div class="pgrp ptop">
+          <button type="button" class="btn primary" data-act="resume" data-t="g.pause.resume"></button>
+          <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
+          <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
+          <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
+        </div>
+        <div class="pgrp pside">
+          <div id="mppanel" class="col gap"></div>
+          <div id="zenpanel" class="col gap"></div>
+          <button type="button" class="btn studio pro" data-act="studiolive" id="studiolive" data-t="g.pause.studio" data-tt="g.pause.studioTip"></button>
+          <button type="button" class="btn pro" data-act="codex" data-t="g.pause.codex"></button>
+          <button type="button" class="btn pro" data-act="photo" data-t="g.pause.photo"></button>
+        </div>
+        <div class="pgrp pbottom">
+          <button type="button" class="btn" data-act="settings" data-t="g.pause.settings"></button>
+          <button type="button" class="btn" data-act="quit" data-t="g.pause.quit"></button>
+        </div>
+      </div>
       <div class="row prorow"><div class="proswitch" role="group"><button type="button" class="lnk" data-act="pro" data-pro="0"></button><button type="button" class="lnk" data-act="pro" data-pro="1"></button></div><button type="button" class="lnk legal" data-act="legal" data-legal="pause" hidden></button></div>
       <div class="note" style="text-align:center" id="pausenote"></div>`;
     if (VR.I18N && VR.I18N.retext) VR.I18N.retext(panel);
@@ -382,6 +392,7 @@
     if (this.game.state !== 'play') return; pauseMenu(); origPause.call(this);
     // (Einfach: the multiplayer box only where playing together works — the note why it does not is a Profi detail)
     const mpp = $('#mppanel'), mp = this.game.mp; if (mpp) mpp.classList.toggle('pro', !(mp && mp.ready));
+    const pn = $('#pausenote'), g = this.game; if (pn && g.meta && !prefs().pro) pn.textContent = g.meta.name || '';   // (the seed: Profi)
   };
   // chat commands are a Profi thing (Einfach: the chat stays, a /command gets the note) — except /lang (/sprache):
   // the language is a setting Einfach keeps

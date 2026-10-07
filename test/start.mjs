@@ -457,7 +457,7 @@ await section(12, 'keyboard, 📜 and English: Tab lands on ▶, Enter and Esc, 
   const pe = await ev(() => [...document.querySelectorAll('#pause button')].filter(b => b.getClientRects().length > 0).map(b => b.textContent.trim()));
   console.log('  pause (en)', JSON.stringify(pe));
   check(pe[0] === '▶ Play on' && ['🏗 Build', '🎒 Mine', '🏠 To my spot', '📍 My spot is here', '⚙ Settings', '⏏ Save & quit', 'Simple', 'Pro'].every(t => pe.includes(t)), 'the pause menu in English: ▶ Play on · 🏗 Build · 🎒 Mine · 🏠 To my spot · 📍 My spot is here · ⚙ Settings · ⏏ Save & quit');
-  check(await ev(() => document.querySelector('#pause h2').textContent === '⏸ Paused'), 'its title: ⏸ Paused');
+  check(await ev(() => document.querySelector('#pause h2').textContent === 'Paused'), 'its title: Paused');
   await shot('start_pause_en');
   await ev(() => VR.game.quitToTitle()); check(await atTitle(), 'back at the start screen');
   await wait(600);

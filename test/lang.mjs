@@ -1,5 +1,5 @@
 // Languages (v0.40): a German browser gets a German game — the start screen, the chat welcome, the HUD badge, the
-// pause menu (W1's words: ⏸ Pause, ▶ Weiterspielen, 📍 Mein Platz ist hier), the settings and the inventory; the 🌐 tab and /lang switch live (no reload) between Deutsch and English, the choice
+// pause menu (W1's words: Pause, ▶ Weiterspielen, 📍 Mein Platz ist hier), the settings and the inventory; the 🌐 tab and /lang switch live (no reload) between Deutsch and English, the choice
 // is remembered in r9si.lang and html lang follows; the codex, the death screen and a villager's talk box read the
 // tables too; no page errors.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -35,7 +35,7 @@ const chat = await texts('#chatlog div');
 check(chat.some(t => t.startsWith('Willkommen in Sprache')), 'the welcome line is German: ' + JSON.stringify(chat[0] || ''));
 check(await text('#modebadge') === 'KREATIV', 'the HUD badge reads KREATIV');
 await ev(() => VR.game.ui.pause()); await step(2);
-check(await text('#pause h2') === '⏸ Pause', 'the pause menu is German (⏸ Pause)');
+check(await text('#pause h2') === 'Pause', 'the pause menu is German (Pause)');
 check(await text('#pause [data-act="resume"]') === '▶ Weiterspielen', 'the resume button reads ▶ Weiterspielen');
 check(await text('#pause [data-act="sethome"]') === '📍 Mein Platz ist hier' && await text('#pause [data-act="gohome"]') === '🏠 Zu meinem Platz', 'the spawn buttons read 📍 Mein Platz ist hier · 🏠 Zu meinem Platz');
 check(await text('#pause [data-act="bauenlive"]') === '🏗 Bauen' && await text('#pause [data-act="meins"]') === '🎒 Meins', 'the W1 entries read 🏗 Bauen · 🎒 Meins');
@@ -71,14 +71,14 @@ const after = await ev(() => ({ lang: VR.I18N.lang, stored: localStorage.getItem
 console.log('after click', JSON.stringify(after));
 check(after.lang === 'en' && after.stored === 'en' && after.html === 'en', 'English is chosen, stored and on <html>');
 check(after.title === 'Settings' && after.tabs[0] === 'Graphics' && after.tabs[4] === '🌐 Language', 'the settings re-render in English without a reload');
-check(after.pause === '⏸ Paused' && after.resume === '▶ Play on', 'the pause screen (static texts) re-reads the tables: ' + after.pause + ' · ' + after.resume);
+check(after.pause === 'Paused' && after.resume === '▶ Play on', 'the pause screen (static texts) re-reads the tables: ' + after.pause + ' · ' + after.resume);
 check(after.soon.every(t => / · soon$/.test(t)), 'the soon-entries read "soon"');
 await ev(() => { VR.UIPrefs.set({ pro: false }); VR.game.ui.show(null); }); await step(1);
 check(await text('#modebadge') === 'CREATIVE', 'the HUD badge reads CREATIVE');
 await ev(() => VR.game.chat('/lang de')); await step(2);
 const back = await ev(() => ({ lang: VR.I18N.lang, badge: document.querySelector('#modebadge').textContent, chat: [...document.querySelectorAll('#chatlog div')].map(d => d.textContent).slice(-1)[0], pause: document.querySelector('#pause h2').textContent }));
 console.log('after /lang de', JSON.stringify(back));
-check(back.lang === 'de' && back.badge === 'KREATIV' && back.pause === '⏸ Pause', '/lang de switches back live — also in Einfach, where other commands wait for Profi');
+check(back.lang === 'de' && back.badge === 'KREATIV' && back.pause === 'Pause', '/lang de switches back live — also in Einfach, where other commands wait for Profi');
 check(back.chat === 'Sprache: Deutsch', 'the command answers in the new language: ' + back.chat);
 await ev(() => VR.game.chat('/lang fr')); await step(1);
 const fr = await ev(() => ({ lang: VR.I18N.lang, chat: [...document.querySelectorAll('#chatlog div')].map(d => d.textContent).slice(-1)[0] }));
