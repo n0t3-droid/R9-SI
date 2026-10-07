@@ -29,8 +29,12 @@ window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.
 const css = read('src/ui/style.css');
 const guard = (s) => s.replace(/<\/script/gi, '<\\/script');
 const fonts = `<style>${read('src/ui/fonts/game_fonts.css')}</style>`;   // embedded (OFL): no request to Google's servers leaves the player's browser
+// 📜 Rechtliches — Impressum, Datenschutz, Credits, Hinweis: one overlay with its styles for the game and the Studio
+// (VR.Legal.open(section)); in the game before its own scripts, so its Esc comes first
+const legal = `<style>${read('src/ui/legal.css')}</style>\n<script>${guard(read('src/main/legal.js'))}</script>`;
 const body = `<div id="app"><canvas id="gl" tabindex="0"></canvas><div id="ui"></div></div>
 <script type="text/js-worker" id="worker-src">${guard(workerSrc)}</script>
+${legal}
 <script>${guard(mainSrc)}</script>`;
 const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>R9-SI</title>${fonts}<style>${css}</style>`;
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
@@ -84,6 +88,7 @@ const studioBody = `<div id="studio" class="boot">
 </div>
 <script type="text/js-worker" id="worker-src">${guard(studioWorkerSrc)}</script>
 <script>${guard(studioLibs)}</script>
+${legal}
 <script>window.__FURN_SRC = ${JSON.stringify(furnSrc).replace(/<\/script/gi, '<\\/script')};</script>
 <script>${guard(read('src/studio/studio.js'))}</script>
 <script>${guard(read('src/studio/icons.js'))}</script>
