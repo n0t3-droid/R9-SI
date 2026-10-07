@@ -84,7 +84,8 @@
     $('#title [data-act="newworld"]').textContent = tx('start.newWorld', null, '＋ Neue Welt', '＋ New world');
     $('#title [data-act="settings"]').textContent = tx('start.settings', null, '⚙ Einstellungen', '⚙ Settings');
     const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.classList.toggle('on', p.scale >= 1.3);
-    for (const b of document.querySelectorAll('#proSwitch button')) { const on = (b.dataset.pro === '1') === !!p.pro; b.classList.toggle('on', on); b.textContent = b.dataset.pro === '1' ? tx('start.pro', null, 'Profi', 'Profi') : tx('start.einfach', null, 'Einfach', 'Simple'); b.title = b.dataset.pro === '1' ? tx('start.proT', null, 'Alles: Werkbank, Crafter, Welten-Formular, Befehle, Entwickler-Reiter', 'Everything: workbench, crafter, the world form, commands, developer tabs') : tx('start.einfachT', null, 'Nur das Nötige, groß und klar', 'Only what you need, big and clear'); }
+    pauseTexts();
+    for (const b of document.querySelectorAll('#proSwitch button, .proswitch button')) { const on = (b.dataset.pro === '1') === !!p.pro; b.classList.toggle('on', on); b.textContent = b.dataset.pro === '1' ? tx('start.pro', null, 'Profi', 'Profi') : tx('start.einfach', null, 'Einfach', 'Simple'); b.title = b.dataset.pro === '1' ? tx('start.proT', null, 'Alles: Werkbank, Crafter, Welten-Formular, Befehle, Entwickler-Reiter', 'Everything: workbench, crafter, the world form, commands, developer tabs') : tx('start.einfachT', null, 'Nur das Nötige, groß und klar', 'Only what you need, big and clear'); }
     { const h = $('#meins .mhead h2'), bk = $('#meins [data-act="meinsback"]'); if (h) h.textContent = tx('start.meins', null, T.meins[0], T.meins[1]); if (bk) bk.textContent = tx('start.back', null, '← Zurück', '← Back'); }
     const credit = $('#title .credit'); if (credit) credit.textContent = tx('start.credit', null, 'Ein eigenes Voxelspiel · inspiriert vom Block-Sandbox-Genre', 'Original voxel game · inspired by the block sandbox genre');
   }
@@ -163,6 +164,43 @@
     }
   }
 
+  // ---------------------------------------------------------------- the pause menu (Einfach: seven things; Profi adds the rest)
+  function pauseMenu() {
+    const panel = $('#pause .panel'); if (!panel || panel.dataset.w1) return;
+    panel.dataset.w1 = '1';
+    panel.innerHTML = `<h2 class="ptitle"></h2>
+      <button class="btn primary" data-act="resume"></button>
+      <button class="btn" data-act="bauenlive"></button>
+      <button class="btn" data-act="meins"></button>
+      <div id="mppanel" class="col gap"></div>
+      <div class="row gap"><button class="btn" data-act="gohome" style="flex:1"></button><button class="btn" data-act="sethome" style="flex:1"></button></div>
+      <div id="zenpanel" class="col gap"></div>
+      <button class="btn studio pro" data-act="studiolive" id="studiolive"></button>
+      <button class="btn pro" data-act="codex"></button>
+      <button class="btn pro" data-act="photo"></button>
+      <button class="btn" data-act="settings"></button>
+      <button class="btn" data-act="quit"></button>
+      <div class="row prorow"><div class="proswitch"><button class="lnk" data-act="pro" data-pro="0"></button><button class="lnk" data-act="pro" data-pro="1"></button></div></div>
+      <div class="note" style="text-align:center" id="pausenote"></div>`;
+    texts();
+  }
+  function pauseTexts() {
+    const panel = $('#pause .panel'); if (!panel || !panel.dataset.w1) return;
+    const t = (act, de, en, title) => { const b = $(`#pause [data-act="${act}"]`); if (!b) return; b.textContent = tx('pause.' + act, null, de, en); if (title) b.title = title; };
+    $('#pause .ptitle').textContent = tx('pause.title', null, '⏸ Pause', '⏸ Paused');
+    t('resume', '▶ Weiterspielen', '▶ Play on');
+    t('bauenlive', '🏗 Bauen', '🏗 Build', tx('pause.bauenT', null, 'Häuser und Möbel auf die Karte setzen — das Spiel baut sie', 'Place houses and furniture on the map — the game builds them'));
+    t('meins', '🎒 Meins', '🎒 Mine');
+    t('gohome', '🏠 Zu meinem Platz', '🏠 To my spot');
+    t('sethome', '📍 Mein Platz ist hier', '📍 My spot is here', tx('pause.sethomeT', null, 'Dein Platz ist, wo du jetzt stehst: 🏠 und ▶ Spielen aus dem Studio bringen dich hierher', 'Your spot is where you stand now: 🏠 and ▶ Play from the Studio bring you back here'));
+    t('studiolive', '🧰 Werkbank · diese Welt', '🧰 Workbench · this world', tx('pause.studioliveT', null, 'Die Werkbank des R9 Studios auf dieser Welt — auswählen, füllen, kopieren, Häuser planen, umgestalten', 'The R9 Studio\'s workbench on this world — select, fill, copy, plan houses, restyle'));
+    t('codex', '📖 Codex', '📖 Codex');
+    t('photo', '📷 Fotomodus', '📷 Photo mode');
+    t('settings', '⚙ Einstellungen', '⚙ Settings');
+    t('quit', '⏏ Speichern & zum Start', '⏏ Save & to the start');
+  }
+  ST.pauseMenu = pauseMenu;
+
   // ---------------------------------------------------------------- the create form (Profi), in German
   function createForm() {
     const panel = $('#create .panel'); if (!panel) return;
@@ -190,6 +228,9 @@
       case 'tile': { const k = b && b.dataset.tile; if (k === 'play') ST.play(); else if (k === 'bauen') ST.bauen(); else if (k === 'erschaffen') ST.erschaffen(); else if (k === 'meins') ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true; }
       case 'worlds': ST.worlds(ui); return true;
       case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
+      case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(tx('start.noStudioGuest', null, 'Das Studio öffnet nur deine eigenen Welten (nicht als Gast).', 'The Studio opens your own worlds (not as a guest).'), 2400); return true; }
+      case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
+      case 'sethome': { const g = game(); if (g && g.setSpawnHere()) { ui.hint(tx('start.spawnSet', null, '📍 Dein Platz ist jetzt hier — 🏠 bringt dich zurück', '📍 Your spot is here now — 🏠 brings you back'), 2600); if (ui.chatLine) ui.chatLine(tx('start.spawnSetLine', null, '📍 Dein Platz ist jetzt hier.', '📍 Your spot is here now.'), '#9affd8'); } return true; }
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;
       case 'scale': if (VR.UIPrefs) VR.UIPrefs.set({ scale: prefs().scale >= 1.3 ? 1.15 : 1.3 }); return true;
@@ -210,6 +251,16 @@
   const origShow = UI.prototype.show;
   UI.prototype.show = function (id) { origShow.call(this, id); if (id === 'title') ST.render(); };
   UI.prototype.showWorlds = function () { return ST.worlds(this); };
+  const origPause = UI.prototype.pause;
+  UI.prototype.pause = function () { if (this.game.state !== 'play') return; pauseMenu(); origPause.call(this); };
+  // chat commands are a Profi thing (Einfach: the chat stays, a /command gets the note)
+  if (VR.Game) {
+    const origChat = VR.Game.prototype.chat;
+    VR.Game.prototype.chat = function (text) {
+      if (typeof text === 'string' && text.startsWith('/') && !prefs().pro) { this.ui.chatLine(tx('start.cmdPro', null, 'Befehle gibt es im Profi-Modus (Start · Profi).', 'Commands are a Profi thing (Start · Profi).'), '#ffd27a'); return; }
+      return origChat.call(this, text);
+    };
+  }
   // the multiplayer box on the start screen: in Einfach only when there is a friend's world to join
   const origHosts = UI.prototype.renderHosts;
   if (origHosts) UI.prototype.renderHosts = function () { origHosts.call(this); const box = $('#mphosts'); if (box) box.classList.toggle('has', !!box.querySelector('.mphost')); };
