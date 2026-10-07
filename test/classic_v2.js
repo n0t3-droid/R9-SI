@@ -208,5 +208,5 @@ console.log('(f) shaders');
   check(/TEXTURE_MAG_FILTER, gl\.NEAREST\)/.test(rd) && /TEXTURE_MIN_FILTER, gl\.NEAREST_MIPMAP_LINEAR\)/.test(rd), 'the block textures sample nearest (mag) and nearest within a mip level (min)');
 }
 VR.setLook('classic');
-console.log(fails ? 'FAIL ' + fails : 'OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

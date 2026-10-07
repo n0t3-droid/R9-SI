@@ -61,5 +61,5 @@ check(V.poolSize(12, undefined) === 6, 'no preset given: no cap below 6');
   check(direct === 'textures', 'its answer reaches the caller');
   check(w0.inflight === 0 && pool.queued === 0 && pool.busy === 0, 'nothing is left in flight');
 }
-console.log(fail ? `FAIL ${fail}` : 'OK — the pool size follows the rule, and a pool of one worker works');
+console.log(fail ? `FAILED ${fail}` : 'the pool size follows the rule, and a pool of one worker works\nALL OK');
 process.exit(fail ? 1 : 0);

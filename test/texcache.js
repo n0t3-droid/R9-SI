@@ -150,6 +150,6 @@ const same = (a, b) => a.layers === b.layers && a.levels === b.levels && a.size 
   }
   globalThis.indexedDB = undefined;
 
-  console.log(fail ? fail + ' FAILED' : 'all texture cache checks passed');
+  console.log(fail ? 'FAILED ' + fail : 'all texture cache checks passed\nALL OK');
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

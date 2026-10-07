@@ -136,6 +136,9 @@ await section(3, 'the pause menu: ▶ Weiterspielen first; 🏗 Bauen opens the 
   // chat commands are a Profi thing
   const cmd = await ev(() => { const g = VR.game, log = document.getElementById('chatlog'); const n0 = log.children.length; g.chat('/time set day'); const last = log.lastChild ? log.lastChild.textContent : ''; return { added: log.children.length - n0, last }; });
   check(cmd.added === 1 && /Profi/.test(cmd.last) && !/Time set/.test(cmd.last), 'Einfach: a /command answers with the Profi note (' + cmd.last + ')');
+  // … but the friendly ones work in Einfach: /help lists them, /sethome answers as itself
+  const cmd2 = await ev(() => { const g = VR.game, log = document.getElementById('chatlog'), last = () => (log.lastChild ? log.lastChild.textContent : ''); g.chat('/help'); const help = last(); g.chat('/sethome'); return { help, sethome: last(), want: VR.I18N.t('g.cmd.sethome') }; });
+  check(/\/bau/.test(cmd2.help) && /\/home/.test(cmd2.help) && cmd2.sethome === cmd2.want, 'Einfach: /help lists the friendly commands and /sethome works (' + cmd2.help.slice(0, 60) + ' · ' + cmd2.sethome + ')');
   // 🏗 Bauen → the Studio over the game, on the Karte
   await page.click('#pause [data-act="bauenlive"]');
   let up = false;
