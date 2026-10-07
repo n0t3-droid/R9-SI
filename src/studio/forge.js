@@ -16,9 +16,8 @@
   const { S, HOOK, $, $$ } = C;
   const Fg = VR.Forge; if (!Fg) return;
   const WM = VR.StudioWorld;
-  // words: German first (the Studio's language), English for everyone else — VR.I18N.tx when the page has it
-  const EN = { 'fg.ask': 'What should it be? — “skyscraper 30 floors glass”', 'fg.building': 'building …', 'fg.cells': 'cells', 'fg.fail': 'Could not build {d}', 'fg.goTip': 'Read the wish and build it', 'fg.help': '<b>Symbol</b> above = kind · <b>sentence</b> = wish (also “taller”, “more glass”, “no balcony”) · <b>card</b> on the left = variant · <b>sliders</b> = sizes · <b>material</b> = look. Every change builds the nine again.', 'fg.how': 'How it works', 'fg.hudIdle': 'Pick a symbol or say a sentence', 'fg.inWorld': 'World: <b>{n}</b> — the game levels the lot (bridges and walls follow the land) and builds big pieces in slices; ▶ Play lands you in front of it.', 'fg.intro': 'A symbol above, a sentence here — the Forge builds nine variants, you pick one, adjust it and set it into your world. All here, no account.', 'fg.nav': 'Forge', 'fg.navTip': '🏭 Forge — architecture by symbol: high-rise, house, bridge, tower, hall, castle, spaceship, park, wall — all here, no account', 'fg.noType': 'Say what it should be: high-rise, house, bridge, tower, hall, castle, spaceship, park or wall', 'fg.noWorld': 'Open a world first (◍ World) — then you set it in. Without a world: 🧩 As a piece.', 'fg.noWorldNote': 'No world open: ◍ World opens one — or keep it as a 🧩 piece.', 'fg.noWorldTip': 'Open a world first (◍ World)', 'fg.other': 'Others', 'fg.otherTip': 'Nine other variants', 'fg.pick': 'Pick a symbol above or say on the right what should be built.', 'fg.piece': 'As a piece', 'fg.pieceTip': 'Keep it for the Werkbank', 'fg.place': 'Place', 'fg.placeNoWorld': 'Open a world first (◍ World)', 'fg.placeTip': 'Into the open world: point at the ground, click places it — the game builds it', 'fg.taller': 'Taller', 'fg.wait': 'Not built yet — a moment', 'fg.where': 'Where?', 'fg.wider': 'Wider' };
-  const L = (k, de, v) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, EN[k]) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
+  // words: VR.I18N.tx (the g.fgs.* entries of lang_de.js and lang_en.js); without the language module the German call-site text
+  const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const FM = VR.StudioForge = { on: false, type: 'tower', dna: null, variants: [], sel: 0, text: '', meshes: new Map(), ver: 0, busy: 0, queue: [], lastSeed: 1 };
   const KEEP = 0xFFFF, PREV_W = 150, PREV_H = 104;
@@ -27,8 +26,8 @@
   (function addNav() {
     const nav = $('nav.modes'); if (!nav || nav.querySelector('[data-mode="forge"]')) return;
     const b = document.createElement('button'); b.dataset.mode = 'forge'; b.className = 'forgem';
-    b.title = L('fg.navTip', '🏭 Forge — Architektur nach Symbol: Hochhaus, Haus, Brücke, Turm, Halle, Burg, Shuttle, Park, Mauer — alles hier, ohne Konto');
-    b.innerHTML = '<i>🏭</i>' + esc(L('fg.nav', 'Forge'));
+    b.title = tx('g.fgs.navTip', null, '🏭 Forge — Architektur nach Symbol: Hochhaus, Haus, Brücke, Turm, Halle, Burg, Shuttle, Park, Mauer — alles hier, ohne Konto', '🏭 Forge — architecture by symbol: high-rise, house, bridge, tower, hall, castle, spaceship, park, wall — all here, no account');
+    b.innerHTML = '<i>🏭</i>' + esc(tx('g.fgs.nav', null, 'Forge', 'Forge'));
     nav.insertBefore(b, nav.querySelector('[data-create]') || null);
   })();
 
@@ -50,7 +49,7 @@
     FM.text = text || '';
     const n = Fg.norm(text), ty = Fg.typeOf(n);
     const dna = ty ? Fg.fromText(text) : (current() ? Fg.tweak(current(), text) : Fg.fromText(text));
-    if (!dna) { C.sys(L('fg.noType', 'Sag, was es sein soll: Hochhaus, Haus, Brücke, Turm, Halle, Burg, Shuttle, Park oder Mauer'), 'err'); return false; }
+    if (!dna) { C.sys(tx('g.fgs.noType', null, 'Sag, was es sein soll: Hochhaus, Haus, Brücke, Turm, Halle, Burg, Shuttle, Park oder Mauer', 'Say what it should be: high-rise, house, bridge, tower, hall, castle, spaceship, park or wall'), 'err'); return false; }
     setBase(dna); return true;
   };
   FM.setParam = function (k, v) { const P = Fg.parse(current()); if (!P) return; P.params[k] = +v; setBase(Fg.dna(P), false); };
@@ -61,14 +60,14 @@
   // 📍 into the open world (the World mode holds it as a ghost), else a hint
   FM.place = function () {
     const dna = current(); if (!dna) return false;
-    if (!WM || !WM.world) { C.sys(L('fg.noWorld', 'Erst eine Welt öffnen (◍ Welt) — dann setzt du es hinein. Ohne Welt: 🧩 Als Bauteil.'), 'err'); tip(L('fg.noWorldTip', 'Öffne zuerst eine Welt (◍ Welt)'), false); return false; }
+    if (!WM || !WM.world) { C.sys(tx('g.fgs.noWorld', null, 'Erst eine Welt öffnen (◍ Welt) — dann setzt du es hinein. Ohne Welt: 🧩 Als Bauteil.', 'Open a world first (◍ World) — then you set it in. Without a world: 🧩 As a piece.'), 'err'); tip(tx('g.fgs.noWorldTip', null, 'Öffne zuerst eine Welt (◍ Welt)', 'Open a world first (◍ World)'), false); return false; }
     C.setMode('world');
     return WM.toolForge(dna);
   };
   // 🧩 the grid as a Werkbank piece (built by the worker; keep-world cells stay transparent)
   FM.asPiece = function () {
     const dna = current(); if (!dna || !WM || !WM.wb) return false;
-    const m = FM.meshes.get(dna); if (!m || !m.ready) { tip(L('fg.wait', 'Noch nicht fertig gebaut — gleich'), false); return false; }
+    const m = FM.meshes.get(dna); if (!m || !m.ready) { tip(tx('g.fgs.wait', null, 'Noch nicht fertig gebaut — gleich', 'Not built yet — a moment'), false); return false; }
     const ops = m.ops, W = m.lot[0], D = m.lot[1];
     let y0 = 1e9, y1 = -1e9; for (let i = 1; i < ops.length; i += 4) { if (ops[i] < y0) y0 = ops[i]; if (ops[i] > y1) y1 = ops[i]; }
     if (y1 < y0) return false;
@@ -93,7 +92,7 @@
     const ver = FM.ver;
     C.call({ type: 'place_mesh', kind: 'forge', dna }).then((r) => {
       FM.busy = 0;
-      if (r.type !== 'place_mesh') { console.error(r.msg); FM.meshes.delete(dna); C.sys(L('fg.fail', 'Konnte {d} nicht bauen', { d: dna }), 'err'); pump(); return; }
+      if (r.type !== 'place_mesh') { console.error(r.msg); FM.meshes.delete(dna); C.sys(tx('g.fgs.fail', { d: dna }, 'Konnte {d} nicht bauen', 'Could not build {d}'), 'err'); pump(); return; }
       if (!FM.variants.includes(dna)) { pump(); return; }
       Object.assign(m, { ready: true, gpu: C.uploadSections(r.sections), lot: r.lot, bounds: r.bounds, top: r.top, origin: r.origin, title: r.title, ops: r.ops, n: r.ops.length / 4, level: r.level, terrain: r.terrain });
       r.sections = null;
@@ -136,7 +135,7 @@
   });
   wrap('list', function () {
     const el = $('#list'); el.innerHTML = ''; el.classList.remove('houses', 'palette'); el.classList.add('forge');
-    if (!FM.variants.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = L('fg.pick', 'Wähle oben ein Symbol oder sag rechts, was entstehen soll.'); el.appendChild(d); el.classList.remove('forge'); return true; }
+    if (!FM.variants.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = tx('g.fgs.pick', null, 'Wähle oben ein Symbol oder sag rechts, was entstehen soll.', 'Pick a symbol above or say on the right what should be built.'); el.appendChild(d); el.classList.remove('forge'); return true; }
     FM.variants.forEach((dna, i) => {
       const c = document.createElement('div'); c.className = 'card fvar' + (i === FM.sel ? ' on' : ''); c.dataset.dna = dna; c.dataset.i = i;
       const cv = document.createElement('canvas'); cv.width = PREV_W; cv.height = PREV_H; cv.className = 'th'; c.appendChild(cv);
@@ -158,15 +157,15 @@
     H('🏭 Forge');
     // the wish
     const tr = document.createElement('div'); tr.className = 'crow ftextrow';
-    const inp = document.createElement('input'); inp.className = 'ftext'; inp.placeholder = L('fg.ask', 'Was soll entstehen? — „Hochhaus 30 Stockwerke Glas“'); inp.value = FM.text || ''; inp.autocomplete = 'off'; inp.spellcheck = false;
+    const inp = document.createElement('input'); inp.className = 'ftext'; inp.placeholder = tx('g.fgs.ask', null, 'Was soll entstehen? — „Hochhaus 30 Stockwerke Glas“', 'What should it be? — “skyscraper 30 floors glass”'); inp.value = FM.text || ''; inp.autocomplete = 'off'; inp.spellcheck = false;
     inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); FM.setText(inp.value); } e.stopPropagation(); };
     inp.onkeyup = (e) => e.stopPropagation();
-    const go = btn('✨', 'pri', () => FM.setText(inp.value), L('fg.goTip', 'Lies den Wunsch und baue ihn')); go.style.flex = '0 0 auto';
+    const go = btn('✨', 'pri', () => FM.setText(inp.value), tx('g.fgs.goTip', null, 'Lies den Wunsch und baue ihn', 'Read the wish and build it')); go.style.flex = '0 0 auto';
     tr.appendChild(inp); tr.appendChild(go); el.appendChild(tr);
     const dna = current();
-    if (!dna) { note(L('fg.intro', 'Ein Symbol oben, ein Satz hier — die Forge baut neun Varianten, du wählst eine, stellst sie ein und setzt sie in deine Welt. Alles hier, ohne Konto.'), 'dim'); return true; }
+    if (!dna) { note(tx('g.fgs.intro', null, 'Ein Symbol oben, ein Satz hier — die Forge baut neun Varianten, du wählst eine, stellst sie ein und setzt sie in deine Welt. Alles hier, ohne Konto.', 'A symbol above, a sentence here — the Forge builds nine variants, you pick one, adjust it and set it into your world. All here, no account.'), 'dim'); return true; }
     const P = Fg.parse(dna), t = Fg.type(P.type), m = FM.meshes.get(dna);
-    H(t.icon + ' ' + esc(t.name), m && m.ready ? m.n.toLocaleString('de-DE') + ' ' + L('fg.cells', 'Zellen') : '…');
+    H(t.icon + ' ' + esc(t.name), m && m.ready ? m.n.toLocaleString('de-DE') + ' ' + tx('g.fgs.cells', null, 'Zellen', 'cells') : '…');
     note(esc(Fg.describe(dna)) + ' <span class="dim mono">' + esc(dna) + '</span>');
     // the parameters: a slider (or a choice) per parameter, every change rebuilds the nine after a short pause
     const pf = document.createElement('div'); pf.className = 'fparams';
@@ -197,23 +196,23 @@
     const sr = document.createElement('div'); sr.className = 'fstyles';
     for (const st of t.styles) { const b = document.createElement('button'); b.className = 'fstyle' + (st.id === P.style ? ' on' : ''); b.dataset.fstyle = st.id; b.textContent = st.name; b.onclick = () => FM.setStyle(st.id); sr.appendChild(b); }
     el.appendChild(sr);
-    row(btn('🎲 ' + L('fg.other', 'Andere'), '', FM.reseed, L('fg.otherTip', 'Neun andere Varianten')), btn('⬆ ' + L('fg.taller', 'Höher'), '', () => FM.setText('höher')), btn('↔ ' + L('fg.wider', 'Breiter'), '', () => FM.setText('breiter')));
+    row(btn('🎲 ' + tx('g.fgs.other', null, 'Andere', 'Others'), '', FM.reseed, tx('g.fgs.otherTip', null, 'Neun andere Varianten', 'Nine other variants')), btn('⬆ ' + tx('g.fgs.taller', null, 'Höher', 'Taller'), '', () => FM.setText('höher')), btn('↔ ' + tx('g.fgs.wider', null, 'Breiter', 'Wider'), '', () => FM.setText('breiter')));
     // where it goes
-    H(L('fg.where', 'Wohin?'));
-    const pb = btn('📍 ' + L('fg.place', 'Setzen'), 'pri', FM.place, WM && WM.world ? L('fg.placeTip', 'In die offene Welt: zeig auf den Boden, Klick setzt — das Spiel baut es') : L('fg.placeNoWorld', 'Erst eine Welt öffnen (◍ Welt)'));
+    H(tx('g.fgs.where', null, 'Wohin?', 'Where?'));
+    const pb = btn('📍 ' + tx('g.fgs.place', null, 'Setzen', 'Place'), 'pri', FM.place, WM && WM.world ? tx('g.fgs.placeTip', null, 'In die offene Welt: zeig auf den Boden, Klick setzt — das Spiel baut es', 'Into the open world: point at the ground, click places it — the game builds it') : tx('g.fgs.placeNoWorld', null, 'Erst eine Welt öffnen (◍ Welt)', 'Open a world first (◍ World)'));
     pb.dataset.act = 'fplace';
-    const lb = btn('🧩 ' + L('fg.piece', 'Als Bauteil'), WM && WM.world ? '' : 'pri', FM.asPiece, L('fg.pieceTip', 'Für die Werkbank behalten')); lb.dataset.act = 'fpiece';
+    const lb = btn('🧩 ' + tx('g.fgs.piece', null, 'Als Bauteil', 'As a piece'), WM && WM.world ? '' : 'pri', FM.asPiece, tx('g.fgs.pieceTip', null, 'Für die Werkbank behalten', 'Keep it for the Werkbank')); lb.dataset.act = 'fpiece';
     row(pb, lb);
-    if (!(WM && WM.world)) note(L('fg.noWorldNote', 'Keine Welt offen: ◍ Welt öffnet eine — oder behalte es als 🧩 Bauteil.'), 'dim');
-    else note(WM && WM.world ? L('fg.inWorld', 'Welt: <b>{n}</b> — das Spiel ebnet das Grundstück (Brücken und Mauern folgen dem Gelände) und baut große Stücke in Scheiben; ▶ Spielen landet davor.', { n: esc(WM.world.name) }) : '', 'dim');
-    H(L('fg.how', 'So geht’s'));
-    note(L('fg.help', '<b>Symbol</b> oben = Art · <b>Satz</b> = Wunsch (auch „höher“, „mehr Glas“, „ohne Balkon“) · <b>Karte</b> links = Variante · <b>Regler</b> = Maße · <b>Stoff</b> = Material. Jede Änderung baut die neun neu.'));
+    if (!(WM && WM.world)) note(tx('g.fgs.noWorldNote', null, 'Keine Welt offen: ◍ Welt öffnet eine — oder behalte es als 🧩 Bauteil.', 'No world open: ◍ World opens one — or keep it as a 🧩 piece.'), 'dim');
+    else note(WM && WM.world ? tx('g.fgs.inWorld', { n: esc(WM.world.name) }, 'Welt: <b>{n}</b> — das Spiel ebnet das Grundstück (Brücken und Mauern folgen dem Gelände) und baut große Stücke in Scheiben; ▶ Spielen landet davor.', 'World: <b>{n}</b> — the game levels the lot (bridges and walls follow the land) and builds big pieces in slices; ▶ Play lands you in front of it.') : '', 'dim');
+    H(tx('g.fgs.how', null, 'So geht’s', 'How it works'));
+    note(tx('g.fgs.help', null, '<b>Symbol</b> oben = Art · <b>Satz</b> = Wunsch (auch „höher“, „mehr Glas“, „ohne Balkon“) · <b>Karte</b> links = Variante · <b>Regler</b> = Maße · <b>Stoff</b> = Material. Jede Änderung baut die neun neu.', '<b>Symbol</b> above = kind · <b>sentence</b> = wish (also “taller”, “more glass”, “no balcony”) · <b>card</b> on the left = variant · <b>sliders</b> = sizes · <b>material</b> = look. Every change builds the nine again.'));
     return true;
   });
   wrap('hud', function () {
     const dna = current(), m = dna && FM.meshes.get(dna);
     $('#hudName').textContent = dna ? Fg.describe(dna, true) : '🏭 Forge';
-    $('#hudMeta').innerHTML = dna ? (m && m.ready ? `<b>${m.lot[0]} × ${m.lot[1]}</b> · <b>${m.top + 1}</b> hoch · <b>${m.n.toLocaleString('de-DE')}</b> Zellen` : L('fg.building', 'wird gebaut …')) + (FM.queue.length || FM.busy ? ' · ⏳ ' + (FM.queue.length + FM.busy) : '') : L('fg.hudIdle', 'Symbol wählen oder einen Satz sagen');
+    $('#hudMeta').innerHTML = dna ? (m && m.ready ? `<b>${m.lot[0]} × ${m.lot[1]}</b> · <b>${m.top + 1}</b> hoch · <b>${m.n.toLocaleString('de-DE')}</b> Zellen` : tx('g.fgs.building', null, 'wird gebaut …', 'building …')) + (FM.queue.length || FM.busy ? ' · ⏳ ' + (FM.queue.length + FM.busy) : '') : tx('g.fgs.hudIdle', null, 'Symbol wählen oder einen Satz sagen', 'Pick a symbol or say a sentence');
     return true;
   });
   wrap('key', function (e, down) {
