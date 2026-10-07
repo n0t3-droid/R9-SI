@@ -323,12 +323,12 @@
     // (the Studio reads it from the save), the game stops drawing meanwhile, and everything the Studio changed — Werkbank
     // edits, plans, the world's style, designs — is in the world the moment you come back. A host that does not allow
     // frames gets the Studio in this window instead.
-    openStudio() {
+    openStudio(tab) {
       if (this.state !== 'play' || !this.meta || this.meta.guest || this.studioOpen) return false;
       this.studioOpen = true;
       this.ui.show(null);
       try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* */ }
-      const url = 'studio.html' + (location.search || '') + '#world/' + encodeURIComponent(this.meta.id) + '/bench';
+      const url = 'studio.html' + (location.search || '') + '#world/' + encodeURIComponent(this.meta.id) + '/' + (tab || 'bench');   // (W1: 🏗 Bauen opens the Karte view)
       const go = (fr) => {
         fr.src = url; fr.classList.add('on');
         const t0 = Date.now();

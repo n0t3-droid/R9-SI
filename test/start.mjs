@@ -65,6 +65,52 @@ await section(1, 'the game\'s start screen: four tiles, German, ▶ pulses', asy
   await shot('start_game_einfach');
 });
 
+await section(2, '▶ Losspielen: one click into a Zen world', async () => {
+  const ws0 = await ev(async () => (await VR.game.store.listWorlds()).length);
+  if (ws0) { check(false, 'the profile already has a world (' + ws0 + ')'); return; }
+  await page.click('#title .tile[data-tile="play"]');
+  check(await inPlay(), 'one click → the game is in play');
+  const m = await ev(() => ({ mode: VR.game.meta.mode, name: VR.game.meta.name, type: VR.game.meta.type, hints: JSON.parse(localStorage.getItem('r9si.hints') || '{}') }));
+  console.log('  world', JSON.stringify(m));
+  check(m.mode === 'zen' && /^Meine Welt/.test(m.name || '') && m.type === 'default', 'it is „Meine Welt" — Zen Builder, Realm');
+  check(!!(m.hints.done && m.hints.done.play), 'hint 1 is done (the ▶ tile stops pulsing)');
+  WORLD = await ev(() => VR.game.meta.id);
+});
+
+await section(3, 'the pause menu: ▶ Weiterspielen first; 🏗 Bauen opens the Karte over the game; „mein Platz"', async () => {
+  await ensureWorld();
+  if (!(await ev(() => VR.game.state === 'play'))) { await ev(async (id) => { const g = VR.game, ws = await g.store.listWorlds(); g.loadWorld(ws.find(w => w.id === id)); }, WORLD); check(await inPlay(), 'the world is open'); }
+  await ev(() => VR.game.ui.pause());
+  const vis = (sel) => ev((s) => [...document.querySelectorAll(s)].filter(b => b.getClientRects().length > 0).map(b => b.textContent.trim()), sel);
+  const btns = await vis('#pause button');
+  console.log('  pause', JSON.stringify(btns));
+  check(btns[0] === '▶ Weiterspielen', 'the first button is „▶ Weiterspielen"');
+  for (const t of ['🏗 Bauen', '🎒 Meins', '🏠 Zu meinem Platz', '📍 Mein Platz ist hier', '⚙ Einstellungen', '⏏ Speichern & zum Start']) check(btns.includes(t), 'has „' + t + '"');
+  check(!btns.some(b => /Codex|Foto|Werkbank/.test(b)), 'Einfach: no Codex, no Fotomodus, no Werkbank');
+  check(!(await ev(() => { const b = document.getElementById('studiolive'); return !!(b && b.getClientRects().length); })), '#studiolive (the Werkbank) is hidden in Einfach');
+  await ev(() => VR.UIPrefs.set({ pro: true })); await wait(100);
+  const pro = await vis('#pause button');
+  check(pro.some(b => /Codex/.test(b)) && pro.some(b => /Werkbank/.test(b)) && await ev(() => document.getElementById('studiolive').getClientRects().length > 0), 'Profi: Codex, Fotomodus and the Werkbank button show');
+  await ev(() => VR.UIPrefs.set({ pro: false })); await wait(100);
+  // 📍 Mein Platz ist hier
+  await page.click('#pause [data-act="sethome"]'); await wait(200);
+  const sh = await ev(() => ({ hint: document.getElementById('hint').textContent, spawn: VR.game.player.spawn.map(v => +v.toFixed(1)), pos: VR.game.player.pos.map(v => +v.toFixed(1)) }));
+  check(/Platz/.test(sh.hint) && !/Spawn/i.test(sh.hint) && Math.abs(sh.spawn[0] - sh.pos[0]) < 1 && Math.abs(sh.spawn[2] - sh.pos[2]) < 1, '📍 sets your spot where you stand and says „Platz" (' + sh.hint + ')');
+  // chat commands are a Profi thing
+  const cmd = await ev(() => { const g = VR.game, log = document.getElementById('chatlog'); const n0 = log.children.length; g.chat('/time set day'); const last = log.lastChild ? log.lastChild.textContent : ''; return { added: log.children.length - n0, last }; });
+  check(cmd.added === 1 && /Profi/.test(cmd.last) && !/Time set/.test(cmd.last), 'Einfach: a /command answers with the Profi note (' + cmd.last + ')');
+  // 🏗 Bauen → the Studio over the game, on the Karte
+  await page.click('#pause [data-act="bauenlive"]');
+  let up = false;
+  for (let i = 0; i < 480 && !up; i++) { await wait(500); up = await safe(() => { const f = document.getElementById('studioFrame'); try { const w = f && f.contentWindow; return !!(w && w.VR && w.VR.StudioWorld && w.VR.StudioWorld.world && !w.VR.StudioWorld.loading && w.VR.StudioWorld.tab === 'karte'); } catch (e) { return false; } }); }
+  const st = await safe(() => { const f = document.getElementById('studioFrame'); return { on: f && f.classList.contains('on'), open: VR.game.studioOpen, tab: f && f.contentWindow.VR.StudioWorld.tab }; });
+  console.log('  overlay', JSON.stringify(st));
+  check(up && st && st.on && st.open && st.tab === 'karte', '🏗 Bauen opens the Studio over the game on the Karte view');
+  await ev(() => VR.game.closeStudio(true)); await wait(300);
+  await ev(() => VR.game.quitToTitle());
+  check(await atTitle(), 'back at the start screen');
+});
+
 await section(4, 'worlds as cards, 🗑 asks twice, the picker, ＋ Neue Welt in Profi', async () => {
   await ensureWorld();
   check((await tiles())[0].label === '▶ Weiterspielen', 'with a world the tile reads „▶ Weiterspielen"');
