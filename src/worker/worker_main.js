@@ -241,6 +241,10 @@
         }
         const H = info.plan;
         post({ type: 'blueprint', id: m.id, index: m.index, ops, lot: [W, D], house: [H.u0, H.v0, H.w, H.d], top, bottom, custom: !!info.custom, skin: info.skin, mirror: !!H.mirrored, beds: info.beds.length }, [ops.buffer]);
+      } else if (m.type === 'forge') {
+        // a Forge structure (🏭) from its DNA: lot-local cells (forge.js Forge.job — the game's placer gets them)
+        const r = VR.Forge ? VR.Forge.job(m) : { type: 'forge', id: m.id, error: 'no forge' };
+        post(r, r.ops ? [r.ops.buffer] : []);
       } else if (m.type === 'locate') {
         const g = getGen(m.dim);
         let found = null;

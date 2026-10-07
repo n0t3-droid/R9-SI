@@ -1372,6 +1372,7 @@
         }
         case 'land': if (this.ship) this.landShip(false); return true;
         case 'haus': case 'house': case 'blueprint': return this.blue ? this.blue.command(a) : false;
+        case 'bau': case 'forge': return this.blue ? this.blue.forgeCommand(a) : false;
       }
       return false;
     }

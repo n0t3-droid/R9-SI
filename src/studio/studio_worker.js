@@ -396,9 +396,13 @@
   // or a furniture model. Lot-local cells (x = u, z = v, y relative to the floor) + sections of a tight grid around them.
   function placeMesh(m) {
     const cells = new Map(), M = 16;
-    let W = 1, D = 1, info = null, name = '';
+    let W = 1, D = 1, info = null, name = '', ops = null, forgeMeta = null;
     const VG = VR.VillageGen, PLAN = VG && VG.plan2, F = 64;
-    if (m.kind === 'house') {
+    if (m.kind === 'forge') {
+      // a Forge structure (🏭) from its DNA on flat ground: every non-keep cell, lot-local
+      const Fg = VR.Forge, g = Fg.build(m.dna);
+      ops = Fg.ops(g); W = g.sx; D = g.sz; name = Fg.describe(m.dna, true); forgeMeta = g.meta;
+    } else if (m.kind === 'house') {
       const cat = PLAN && PLAN.CATALOGUE[m.index]; if (!cat) throw new Error('unknown house ' + m.index);
       W = cat.lot[0]; D = cat.lot[1]; name = cat.name;
       const SX = W + M * 2, SZ = D + M * 2;
@@ -417,10 +421,10 @@
       var unpack = (key) => [key % SX - 8, Math.floor(key / (SX * SZ)) - 8, Math.floor(key / SX) % SZ - 8];
       const fp = VM.footprint(mod, 0); W = 1; D = 1; for (const [dx, , dz] of fp) { W = Math.max(W, dx + 1); D = Math.max(D, dz + 1); }
     }
-    const ops = new Int32Array(cells.size * 4); let k = 0, x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9, top = 0;
-    for (const [key, s] of cells) {
-      const [x, y, z] = unpack(key);
-      ops[k++] = x; ops[k++] = y; ops[k++] = z; ops[k++] = s;
+    if (!ops) { ops = new Int32Array(cells.size * 4); let k = 0; for (const [key, s] of cells) { const [x, y, z] = unpack(key); ops[k++] = x; ops[k++] = y; ops[k++] = z; ops[k++] = s; } }
+    let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9, top = 0;
+    for (let i = 0; i < ops.length; i += 4) {
+      const x = ops[i], y = ops[i + 1], z = ops[i + 2], s = ops[i + 3];
       if (!s) continue;
       if (x < x0) x0 = x; if (y < y0) y0 = y; if (z < z0) z0 = z; if (x > x1) x1 = x; if (y > y1) y1 = y; if (z > z1) z1 = z; if (y > top) top = y;
     }
@@ -431,7 +435,7 @@
     for (let i = 0; i < ops.length; i += 4) { const s = ops[i + 3]; if (!s) continue; grid[((ops[i + 1] - gy0) * sz + (ops[i + 2] - gz0)) * sx + (ops[i] - gx0)] = s; }
     const sections = meshGrid(sx, sy, sz, grid);
     const H = info && info.plan;
-    return { kind: m.kind, index: m.index, name: m.name || null, title: name, ops, lot: [W, D], house: H ? [H.u0, H.v0, H.w, H.d] : [0, 0, W, D], bounds: [x0, y0, z0, x1, y1, z1], top, origin: [gx0, gy0, gz0], sections, custom: !!(info && info.custom), skin: info ? info.skin : null, mirror: !!(H && H.mirrored) };
+    return { kind: m.kind, index: m.index, name: m.name || null, dna: m.dna || null, title: name, ops, lot: [W, D], house: H ? [H.u0, H.v0, H.w, H.d] : [0, 0, W, D], bounds: [x0, y0, z0, x1, y1, z1], top, origin: [gx0, gy0, gz0], sections, custom: !!(info && info.custom), skin: info ? info.skin : null, mirror: !!(H && H.mirrored), level: forgeMeta ? forgeMeta.level : true, terrain: forgeMeta ? forgeMeta.terrain : false, doors: forgeMeta ? forgeMeta.doors : null };
   }
   // ---------------------------------------------------------------- the meadow around the Crafter's lot (v0.33.2)
   // The player can walk off the property: grass all around (M blocks), the odd tuft and flower, a garden fence at
