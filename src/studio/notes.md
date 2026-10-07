@@ -54,8 +54,8 @@ NEU IN v0.37 — 🧱 Teile, 🎯 Finden, ★ Favoriten, alles ohne Konto
 
 
 STUDIO v2
-- Architektur: alle 11 Katalog-Häuser (Villa R9 180/160/140/130, Bel Portale, Sanssoucis, Toscana, Bungalow,
-  Palais Royal …) werden beim Start vom Villenbauer des Spiels gebaut, beleuchtet und mit dem Spiel-Mesher
+- Architektur: alle 11 Katalog-Häuser (Villa R9 180/160/140/130, Villa Belfronte, Beau Lac, Torre Ocra, Bungalow,
+  Palais Étoile …) werden beim Start vom Villenbauer des Spiels gebaut, beleuchtet und mit dem Spiel-Mesher
   gerendert — komplett mit Garten, Pool, Garage. Unten links: Schnitt (Erdgeschoss / Etage zeigt die Räume von
   oben), Skin-Farben und Spiegeln bauen das Haus live neu.
 - Bausteine (rechts): alles, woraus ein Haus besteht — jedes Möbel- und Fassadenmodell mit Stückzahl (Klick

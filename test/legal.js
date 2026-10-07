@@ -125,5 +125,26 @@ check((wb.match(/'⬇ ' \+ \w+ \+ \(shareHint\(\)/g) || []).length === 2, '⬇ .
 check(/note\(esc\(shareHint\(\)\), 'dim share'\)/.test(wb), 'and a line under the ⬇ buttons (Bauteile go out there too)');
 check(/VR\.Legal\.shareHint\(\)/.test(crf), 'the Crafter: a line under 📦 Mitnehmen / 📥 Übernehmen');
 
+console.log('9 · the house catalogue: no company or product name, the same indices and ids');
+// the audit (§0 finding 3, table #9): the house companies and their products as names; the lower-case ids
+// ('signus', 'blacklabel', 'belportale', 'sanssoucis', 'toscana') stay — designs, plans and favourites keep them
+const NAMES = [/Kern-?[Hh]aus/, /Stilhaus/i, /\bOKAL\b/i, /Signus/, /\bKarat\b/, /Bel ?Portale|BEL PORTALE/, /Sanssouci|SANSSOUCI/, /Villa am See/i, /Palais Royal/i, /Primavera/i, /Black ?Label|BLACK LABEL/, /Toscana|TOSCANA/];
+const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => (e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]));
+const files = walk(path.join(ROOT, 'src')).filter(f => /\.(js|css|md|html|json|txt)$/.test(f)).concat([path.join(ROOT, 'README.md')]);
+const hits = [];
+for (const f of files) fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) => { for (const re of NAMES) if (re.test(line)) hits.push(path.relative(ROOT, f) + ':' + (i + 1) + ' ' + re); });
+check(files.length > 100 && !hits.length, 'none of the audit\'s company / product names in src/ (' + files.length + ' files) or the README' + (hits.length ? ': ' + hits.slice(0, 8).join(' · ') : ''));
+require(path.join(ROOT, 'test/load_shared.js'));
+const PLAN = VR.VillageGen && VR.VillageGen.plan2;
+const want = ['Villa R9 180', 'Villa R9 160', 'Villa R9 140', 'Villa Belfronte', 'Beau Lac', 'Torre Ocra', 'Bungalow R9', 'Palais Étoile', 'Villa R9 130', 'Villa R9 130 Carport', 'Villa R9 Compact'];
+check(PLAN && JSON.stringify(PLAN.CATALOGUE.map(c => c.name)) === JSON.stringify(want), 'the catalogue, index by index: ' + (PLAN ? PLAN.CATALOGUE.map(c => c.name).join(' · ') : '?'));
+check(PLAN && ['stadtvilla', 'belportale', 'sanssoucis', 'toscana', 'bungalow', 'palais'].every(k => typeof PLAN.templates[k] === 'function') && ['signus', 'blacklabel', 'toscana', 'lake', 'classic'].every(k => PLAN.SKINS[k] && PLAN.SKINS[k].id === k), 'the family ids and skin ids are the same (saved designs keep working)');
+check(PLAN && [3, 4, 5, 7].every(i => PLAN.CATALOGUE[i].make({ rng: new VR.RNG(1), beds: 3 }).family === ['belportale', 'sanssoucis', 'toscana', 'palais'][[3, 4, 5, 7].indexOf(i)]), 'each renamed house still builds its own family');
+const bp = (i) => (VR.ITEMS && VR.ITEMS['blueprint_' + i] ? VR.ITEMS['blueprint_' + i].name : '?');
+check(bp(3) === 'Blueprint · Villa Belfronte' && bp(7) === 'Blueprint · Palais Étoile', 'the blueprint items (favourites keep blueprint_<i>): ' + bp(3) + ', ' + bp(7));
+const studioHouses = [...read('src/studio/studio.js').matchAll(/\{ i: (\d+), name: '([^']+)'/g)].map(m => [+m[1], m[2]]);
+check(studioHouses.length === 11 && studioHouses.every(([i, n]) => want[i] === n), 'the Studio\'s house list has the same names at the same indices');
+check(/signus: 'Weiß · Anthrazit'/.test(read('src/studio/studio.js')) && /blacklabel: 'Schwarzkubus'/.test(read('src/studio/studio.js')), 'the skins shown in the Studio: „Weiß · Anthrazit“, „Schwarzkubus“');
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
