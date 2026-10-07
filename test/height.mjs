@@ -4,6 +4,7 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto('file:///home/claude/vr/dist/index.html');
@@ -30,6 +31,7 @@ const base = await ev(() => {
   return { ox, oy: y0, oz, H: c.H, secs: c.sec.length, top: w.getBlock(ox, 469, oz), maxSec: w.maxSec };
 });
 console.log('built', JSON.stringify(base));
+check(base.H > 256 && base.top !== 0, 'the tower reaches y 469 and its column grows above 255');
 await settle(120);
 const probe = await ev(([ox, y0, oz]) => {
   const g = VR.game, w = g.world, L = (x, y, z) => { const l = w.getLight(x, y, z); return [l >>> 12, (l >> 8) & 15, (l >> 4) & 15, l & 15]; };
@@ -45,6 +47,7 @@ const stand = await ev(([ox, y0, oz]) => {
   for (let i = 0; i < 60; i++) { p.vel[0] = 3; g.last = performance.now() - 16; g.loop(performance.now()); }
   return { y: +y1.toFixed(3), onGround: p.onGround, afterWalk: [+(p.pos[0] - ox).toFixed(2), +p.pos[1].toFixed(2)] };
 }, [base.ox, base.oy, base.oz]);
+check(stand.onGround && Math.abs(stand.y - 451) < 0.01, 'standing on the platform: on its top at y 451');
 console.log('standing on the platform:', JSON.stringify(stand), stand.onGround && Math.abs(stand.y - 451) < 0.01 ? 'OK' : 'CHECK');
 await ev(([ox, y0, oz]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(ox - 14, 458, oz + 16); p.yaw = -0.7; p.pitch = -0.32; }, [base.ox, base.oy, base.oz]);
 await settle(30); await step(8); await shot('ht_1_platform');
@@ -58,5 +61,9 @@ const io = await ev(async ([ox, y0, oz]) => {
   return { savedH: c.H, loadedLen: b.length, H: b.length >> 8, blockAt460: b[(460 << 8) | ((oz & 15) << 4) | (ox & 15)] === c.blocks[(460 << 8) | ((oz & 15) << 4) | (ox & 15)] };
 }, [base.ox, base.oy, base.oz]);
 console.log('save/load', JSON.stringify(io));
+check(io.H === io.savedH && io.blockAt460, 'the tall column comes back whole from the save');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

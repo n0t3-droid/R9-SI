@@ -2,6 +2,7 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const page = await browser.newPage({ viewport: { width: 800, height: 450 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || t === 'warning' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 500)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto('file:///home/claude/vr/dist/index.html');
@@ -18,6 +19,7 @@ console.log('outpost', JSON.stringify(out));
 await ev((o) => { const p = VR.game.player; p.teleport(o[0] + 18.5, o[1] + 9, o[2] + 18.5); p.flying = true; p.yaw = Math.PI * 0.25; p.pitch = -0.35; }, out);
 for (let i = 0; i < 14; i++) { await step(20); await wait(250); }
 console.log('ships', await ev(() => JSON.stringify(VR.game.starships.ships.map(s => ({ pos: s.pos, yaw: s.yaw, meta: s.d.meta && s.d.meta.name, tris: s.d.meta && Math.round(s.d.meta.tris) })))));
+check(await ev(() => VR.game.starships.ships.length > 0), 'ships are parked at the outpost');
 await shot('st1_parked');
 // walk on it? check proxy collision
 console.log('near', await ev(() => VR.game.starships.near.length));
@@ -28,6 +30,7 @@ await ev(() => { const i = VR.game.input; i.keys.delete('Space'); i.keys.add('Ke
 await step(30);
 await shot('st2_flying');
 console.log('pilot', await ev(() => { const s = VR.game.starships.pilot; return s ? JSON.stringify({ pos: s.pos.map(v => +v.toFixed(1)), vel: s.vel.map(v => +v.toFixed(1)), gear: s.gear.toFixed(2) }) : 'none'; }));
+check(await ev(() => !!VR.game.starships.pilot), 'the player flies the ship (the pilot seat is taken)');
 await ev(() => { VR.game.camMode = 0; });
 await step(3);
 await shot('st3_cockpit');
@@ -46,9 +49,13 @@ await ev(() => { const g = VR.game; for (const s of g.traffic.ships) { s.t = Mat
 await step(2);
 await shot('st5_traffic');
 console.log('traffic', await ev(() => JSON.stringify(VR.game.traffic.ships.map(s => s.arch + ' ' + (s.d.meta && s.d.meta.name) + ' ' + s.pos.map(Math.round).join(',')))));
+check(await ev(() => VR.game.traffic.ships.length > 0), 'sky traffic flies over the outpost');
 await ev(() => { VR.game.ui.syArch = 'shuttle'; VR.game.ui.openShipyard(); });
 await wait(2500);
 await page.screenshot({ path: '/home/claude/vr/test/shots/st6_shipyard.png' });
 console.log('--- logs (' + logs.length + ')');
 for (const l of logs.slice(0, 30)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

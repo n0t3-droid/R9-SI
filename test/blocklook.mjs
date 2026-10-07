@@ -125,5 +125,7 @@ check(stl.look === 'seamless' && stl.smooth, 'the Studio follows the player\'s l
 await sp.evaluate(() => window.__studio.selectHouse(0)); await sp.waitForTimeout(1500);
 await sp.screenshot({ path: `/home/claude/vr/test/shots/${TAG}_studio_seamless.png` }); console.log('shot', TAG + '_studio_seamless');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);
-console.log(fails ? 'FAIL ' + fails : 'OK');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

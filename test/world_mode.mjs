@@ -10,6 +10,7 @@ const URL0 = `http://127.0.0.1:${PORT}`;
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 820 } });
 const logs = [];
+let fails = 0; const verify = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const watch = (pg, tag) => { pg.on('pageerror', e => logs.push(`[${tag} pageerror] ` + (e.stack || e.message).slice(0, 900))); pg.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) logs.push(`[${tag}] ` + m.text().slice(0, 300)); }); };
 const game = await ctx.newPage(); watch(game, 'game');
 await game.goto(URL0 + '/index.html');
@@ -17,7 +18,9 @@ const gev = (fn, a) => game.evaluate(fn, a);
 const gstep = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await gev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await game.waitForTimeout(5); } };
 const gsettle = async (max = 90) => { for (let i = 0; i < max; i++) { await gstep(10); const s = await gev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && i > 3) break; await game.waitForTimeout(60); } };
 for (let i = 0; i < 120; i++) { await game.waitForTimeout(500); if (await gev(() => VR.game && VR.game.state === 'title')) break; }
-console.log('game storage ok:', await gev(() => VR.game.store.ok));
+const storeOk = await gev(() => VR.game.store.ok);
+console.log('game storage ok:', storeOk);
+verify(storeOk === true, 'the game can save (its storage is ok)');
 await gev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.applySettings('*'); });
 await gev(`VR.game.createWorld({name:'Planwelt',mode:'creative',difficulty:'peaceful',type:'default',seed:'${process.env.SEED || '20261002'}',cheats:true,kit:true})`);
 for (let i = 0; i < 90; i++) { await game.waitForTimeout(1000); if (await gev(() => VR.game.state) === 'play') break; }
@@ -46,6 +49,7 @@ await sev((id) => { const WM = VR.StudioWorld; WM.open(WM.worlds.find(w => w.id 
 for (let i = 0; i < 400; i++) { await studio.waitForTimeout(500); if (await sev(() => VR.StudioWorld.world && !VR.StudioWorld.loading && VR.StudioWorld.cols.size)) break; }
 const reg = await sev(([tx, ty, tz]) => { const WM = VR.StudioWorld; return { cols: WM.cols.size, saved: [...WM.cols.values()].filter(c => c.saved).length, sections: WM.gpu.length, towerTop: VR.R.types[VR.R.T.type[WM.getBlock(tx, ty + 11, tz)]].name, sys: document.getElementById('sysText').textContent }; }, W.tower);
 console.log('region loaded in', ((Date.now() - t0) / 1000).toFixed(1), 's:', JSON.stringify(reg));
+verify(reg.cols > 0 && reg.towerTop === 'vollton_signal_red', 'the Studio loads the tower the player built (' + reg.towerTop + ')');
 await studio.waitForTimeout(500);
 await studio.screenshot({ path: '/home/claude/vr/test/shots/wm_1_region.png', timeout: 180000 });
 // ---- plan: a villa 28 blocks east of the player, a clone turned 90°, a sofa in front
@@ -98,6 +102,10 @@ const n3 = await sev(() => VR.StudioWorld.plans.length);
 await studio.keyboard.press('Control+z'); await studio.waitForTimeout(200);
 const n4 = await sev(() => VR.StudioWorld.plans.length);
 console.log('mouse path:', JSON.stringify({ ghost, placed: n1, selected: sel1, afterRandDrag: sel2, clone: n2, deleted: n3, undone: n4 }));
+verify(n1 > 2, 'the click places a house from the card');
+verify(n2 === n1 + 1, 'Ctrl+D makes one more plan');
+verify(n3 === n1, 'Entf takes it away again');
+verify(n4 === n2, 'Ctrl+Z brings it back');
 await studio.screenshot({ path: '/home/claude/vr/test/shots/wm_2b_mouse.png', timeout: 180000 });
 await sev(() => VR.StudioWorld.commit());
 const stored = await sev((id) => JSON.parse(localStorage.getItem('r9si.plans.' + id)).plans.map(p => p.status).join(','), W.id);
@@ -106,6 +114,7 @@ console.log('handed to the game:', stored);
 let built = null;
 for (let i = 0; i < 60; i++) { await gstep(20); built = await gev((id) => JSON.parse(localStorage.getItem('r9si.plans.' + id)).plans.map(p => p.status).join(','), W.id); if (!/pending/.test(built)) break; await game.waitForTimeout(200); }
 console.log('after the game ran:', built);
+verify(!!built && !/pending/.test(built), 'the game builds every planned piece');
 const check = await gev((id) => {
   // every planned piece: its cells in the world are exactly the piece's cells, turned and moved like the Studio shows them
   const g = VR.game, w = g.world, B = g.gadgets.blue, ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
@@ -122,6 +131,7 @@ const check = await gev((id) => {
   });
 }, W.id);
 console.log('in the game world:', JSON.stringify(check));
+verify(check.length > 0 && check.every(s => /: [1-9]\d* ok \/ 0 off$/.test(s)), 'every planned piece stands in the world as planned');
 console.log('off cells:', JSON.stringify(await gev(() => window.__offs || [])));
 await gsettle(80);
 await gev(([x, y, z]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x - 22, y + 24, z - 30); p.yaw = Math.atan2(22 + 18, 30 + 16) + Math.PI; p.pitch = -0.45; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; }, [plan.plans[0].x, plan.plans[0].y, plan.plans[0].z]);
@@ -131,4 +141,7 @@ await game.screenshot({ path: '/home/claude/vr/test/shots/wm_3_game.png', timeou
 await studio.waitForTimeout(600);
 console.log('the Studio sees:', JSON.stringify(await sev(() => VR.StudioWorld.plans.map(p => p.status))));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l);
+verify(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close(); srv.kill();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

@@ -34,6 +34,8 @@ await ev(() => { VR.Crafter.hot[0] = 'vollton_coral'; VR.Crafter.slot = 0; });
 await page.mouse.down({ button: 'right' }); await page.mouse.up({ button: 'right' }); await wait(1200);
 const after1 = await ev(() => { const h = VR.Crafter.house; let n = 0; for (let i = 0; i < h.blocks.length; i++) if (h.blocks[i] !== h.base[i]) n++; return n; });
 console.log('changes after one right click:', after1);
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
+check(after1 === 1, 'one right click places one block');
 // a little Vollton pavilion in the garden + a panorama window + a modern door, through the crafter's change path
 await ev(() => {
   const C = VR.Crafter, h = C.house, R = VR.R, st = (n, p) => { const t = R.byName[n]; return p ? t.state(Object.assign(t.decode(t.defaultState), p)) : t.defaultState; };
@@ -102,10 +104,12 @@ console.log('voxel hover', JSON.stringify(vh));
 await ev(() => { const it = VR.Crafter.item; it.tool = 'fill'; it.mat = 'velvet'; it.color = '#1e7a5a'; });
 await page.mouse.down({ button: 'left' }); await page.mouse.up({ button: 'left' }); await wait(1200);
 console.log('voxels changed', await ev(() => VR.Crafter.item.changed));
+check((await ev(() => VR.Crafter.item.changed)) > 0, 'the fill changes voxels');
 await page.screenshot({ path: '/home/claude/vr/test/shots/cr_4_item.png' });
 await ev(() => VR.Crafter.update.item()); await wait(1500);
 const savedM = await ev((n) => { const d = JSON.parse(localStorage.getItem('r9si.studio') || '{}'); const m = d.models && d.models[n]; return m ? { pal: m.pal.length, rle: m.rle.length } : null; }, sofa);
 console.log('saved item design:', sofa, JSON.stringify(savedM));
+check(savedM !== null, 'the edited item design is saved');
 // ---- the game page (same origin) reads the designs; its villa builder applies them
 const exported = await ev(() => localStorage.getItem('r9si.studio'));
 (await import('fs')).writeFileSync('/home/claude/vr/test/shots/custom_design.json', exported || '');
@@ -132,4 +136,7 @@ const gameSide = await game.evaluate(() => {
 console.log('game side:', JSON.stringify(gameSide));
 await game.screenshot({ path: '/home/claude/vr/test/shots/cr_5_game_title.png' });
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

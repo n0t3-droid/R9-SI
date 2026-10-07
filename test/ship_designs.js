@@ -37,4 +37,8 @@ for (const arch of [...SG.archetypes]) {
   console.log(arch.padEnd(12), 'blocks', avg(0), 'size', avg(1) + 'x' + avg(2) + 'x' + avg(3), 'maxW', max(1), 'maxL', max(3), 'thr', avg(4), 'ms', avg(5));
 }
 console.log('problems', bad);
-require('fs').writeFileSync('/home/claude/vr/test/ships/designs.json', JSON.stringify(out));
+const SHIPS = require('path').join(__dirname, '..', 'test', 'ships');   // the output folder (gitignored) may not exist yet
+require('fs').mkdirSync(SHIPS, { recursive: true });
+require('fs').writeFileSync(SHIPS + '/designs.json', JSON.stringify(out));
+console.log(bad ? 'FAILED ' + bad : 'ALL OK');
+process.exit(bad ? 1 : 0);

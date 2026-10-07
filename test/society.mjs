@@ -13,6 +13,7 @@ await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes
 await ev(`VR.game.createWorld({name:'Soc',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:true})`);
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { const g = VR.game; g.env.rain = 0; g.hideHud = true; window.requestAnimationFrame = () => 0; const R = g.renderer; R._render = R.render; R.render = function (F) { this.setupCamera(F.cam); }; const pl = g.player; pl.flying = true; pl.teleport(-740, 90, 168); });
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const run = async (tod, secs) => {
   await ev(([tod, secs]) => { const g = VR.game; g.env.setTime(tod); g.zenFreezeTime = true; let t = performance.now(); for (let i = 0; i < secs * 20; i++) { t += 50; g.last = t - 50; g.loop(t); } }, [tod, secs]);
   await wait(200);
@@ -29,10 +30,14 @@ const report = async (label) => {
     return { name: vil.name, agents: vil.agents.length, roles, acts, poses, kidsInClassSitting: sitting + '/' + kids.length, work: Object.keys(vil.workOf), desks: (vil.workOf.teacher && vil.workOf.teacher[0].desks || []).length };
   });
   console.log(label, JSON.stringify(r));
+  if (label.startsWith('school')) check(!r.none && parseInt(r.kidsInClassSitting) > 0, 'kids sit in class at school time (' + (r.kidsInClassSitting || 'no modern town') + ')');
 };
 await run(3000, 90); await report('school 3000');
 await run(6200, 60); await report('lunch 6200');
 await run(8000, 60); await report('afternoon 8000');
 await run(11200, 60); await report('evening 11200');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 8)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

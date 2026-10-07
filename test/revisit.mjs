@@ -23,6 +23,11 @@ await far(-400);
 for (let i = 0; i < 40; i++) { await step(10); if (await ev((a) => { const c = VR.game.world.col(a[0] >> 4, a[2] >> 4); return !!(c && c.ready); }, at)) break; await wait(100); }
 const back = await ev((a) => { const s = VR.game.world.getBlock(a[0], a[1], a[2]); return s ? VR.R.types[VR.R.T.type[s]].name : 'air'; }, at);
 console.log('unloaded while away:', gone, '· the block after coming back:', back);
-console.log(gone && back === 'vollton_coral' ? 'OK' : 'FAIL');
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
+check(gone, 'the column is unloaded while the player is far away');
+check(back === 'vollton_coral', 'the change comes back from the save');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 5)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

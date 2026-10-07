@@ -20,7 +20,8 @@ console.log('pack', pack.length, 'items · load', loadMs, 'ms');
 {
   const snap = JSON.parse(fs.readFileSync('/home/claude/vr/test/id_snapshot.json', 'utf8'));
   let bad = 0, end = 1;
-  for (const [name, base, n] of snap) { end = Math.max(end, base + n); const t = R.byName[name]; if (!t || t.base !== base || t.nstates !== n) { if (bad++ < 5) console.log('    shifted: ' + name); } }
+  const packNames = new Set(names); // the snapshot lists the pack's own items too: "after everything else" leaves them out
+  for (const [name, base, n] of snap) { if (!packNames.has(name)) end = Math.max(end, base + n); const t = R.byName[name]; if (!t || t.base !== base || t.nstates !== n) { if (bad++ < 5) console.log('    shifted: ' + name); } }
   check(!bad, 'id snapshot: all ' + snap.length + ' shipped types keep their state ids');
   const first = pack.length ? Math.min(...pack.map(t => t.base)) : 0;
   check(pack.length > 0 && first >= end, 'the pack is appended after the last shipped state (' + (end - 1) + '), first pack state ' + first);
@@ -159,5 +160,5 @@ const BUDGET = 1000;
   }
 }
 
-console.log(fails ? 'FAILED ' + fails : 'OK — Modern Living pack');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

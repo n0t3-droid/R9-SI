@@ -86,4 +86,6 @@ const at = (g, x, y, z) => { const X = x - g.origin[0], Y = y - g.origin[1], Z =
   const c = stats(g), has = (re) => [...c.keys()].some(n => re.test(n));
   ok(has(/^vm_toilet$/) && has(/^vm_bed_/) && has(/^vm_fridge$/), 'a one-storey cabin: bathroom, bed, kitchen all on the ground floor');
 }
-console.log((fails ? 'FAILED ' + fails : 'ALL OK') + ' · ' + (Date.now() - t0) + ' ms');
+console.log('· ' + (Date.now() - t0) + ' ms');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

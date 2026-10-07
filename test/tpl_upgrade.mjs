@@ -25,4 +25,9 @@ for (let i = 0; i < 120; i++) { await page.waitForTimeout(500); res = await page
 console.log('v1 cells', cells.length, '→ after start-up', JSON.stringify(res), res && res.v === 2 && res.n === cells.length ? 'OK' : 'CHECK');
 console.log('sys:', await page.evaluate(() => document.getElementById('sysText').textContent));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 8)) console.log(l);
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
+check(!!res && res.v === 2 && res.n === cells.length, 'the v1 design is a v2 template with every changed cell');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

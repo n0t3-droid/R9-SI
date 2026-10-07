@@ -32,5 +32,6 @@ const hex = h.toString(16).padStart(8, '0');
 console.log(`${n} columns, ${blocksN} blocks, ${(performance.now() - t0).toFixed(0)} ms cold · hash ${hex}`);
 if (process.argv.includes('--write')) { console.log('record in test/gen_same.js: EXPECT =', JSON.stringify(hex)); process.exit(0); }
 const ok = hex === EXPECT;
-console.log(ok ? 'OK — the generated terrain is the same as before' : `FAIL — the terrain changed (expected ${EXPECT})`);
+console.log(ok ? '  ✓ the generated terrain is the same as before' : `  ✗ the terrain changed (expected ${EXPECT})`);
+console.log(ok ? 'ALL OK' : 'FAILED 1');
 process.exit(ok ? 0 : 1);

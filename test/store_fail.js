@@ -59,6 +59,6 @@ const tick = () => new Promise(r => setTimeout(r, 5));
   DB.mode = 'ok';
   const list = await st2.listWorlds();
   check(list.some(w => w.id === 'wA') && list.some(w => w.id === 'wB'), 'a world whose meta could not be written is still in the list (from memory)');
-  console.log(fail ? `FAIL ${fail}` : 'OK — saving survives a failing database');
+  console.log(fail ? `FAILED ${fail}` : 'ALL OK');
   process.exit(fail ? 1 : 0);
 })();

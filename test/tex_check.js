@@ -1,6 +1,7 @@
 const V=require('./load_shared.js');
 require('../src/main/tex_core.js');require('../src/main/tex_recipes1.js');require('../src/main/tex_recipes2.js');
-try{require('../src/main/tex_recipes3.js');require('../src/main/tex_recipes4.js');require('../src/main/tex_recipes5.js');require('../src/main/tex_items.js');}catch(e){if(!/Cannot find/.test(e.message))throw e;}
+// the same texture modules as the main bundle in build.js (a module that is missing is a load error, not a skip)
+require('../src/main/tex_recipes3.js');require('../src/main/tex_recipes4.js');require('../src/main/tex_recipes5.js');require('../src/main/tex_recipes6.js');require('../src/main/tex_items.js');require('../src/main/tex_groceries.js');require('../src/main/tex_vox.js');
 const R=V.R, REC=V.TEXREC, PRE=V.TEXPRE;
 const missing=[], errs=[];
 for(const n of R.texNames){
@@ -15,3 +16,6 @@ for(const n of R.texNames){
 console.log('total',R.texNames.length,'missing',missing.length,'errors',errs.length);
 console.log(missing.join(' '));
 console.log(errs.slice(0,50).join('\n'));
+const bad=missing.length+errs.length;
+console.log(bad?'FAILED '+bad:'ALL OK');
+process.exit(bad?1:0);

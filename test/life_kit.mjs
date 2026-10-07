@@ -19,6 +19,7 @@ await ev(`VR.game.createWorld({name:'LifeKit',mode:'creative',difficulty:'peacef
 for (let i = 0; i < 60; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
 
+let fails = 0; const verify = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 // ---- 1. every required block exists
 const REQUIRED = [
   'vx_fruit_crown_apple', 'vx_fruit_crown_orange', 'vx_fruit_crown_cherry', 'vx_fruit_crown_plum', 'vx_fruit_trunk', 'vx_trough', 'vx_scarecrow', 'vx_pumpkin_pile', 'vx_veg_crate',
@@ -51,6 +52,9 @@ const check = await ev((names) => {
 console.log('required blocks:', REQUIRED.length, 'missing:', check.missing.length ? check.missing.join(', ') : 'none');
 console.log('states painted (icons+boxes):', check.icons, 'errors:', check.errs.length ? check.errs.join(' | ') : 'none');
 console.log('door boxes:', JSON.stringify(check.door));
+verify(check.missing.length === 0, 'every required block exists');
+verify(check.errs.length === 0, 'every block paints its icon and boxes');
+verify(check.door.closedBoxes > 0 && check.door.openBoxes === 0, 'a closed shop door has collision boxes, an open one none');
 if (process.env.VERBOSE) for (const n in check.info) console.log('  ', n, JSON.stringify(check.info[n]));
 
 // ---- 2. build the showcase (load the chunks around the site first so late terrain generation can't overwrite it)
@@ -157,4 +161,7 @@ await view('life_farm_yard', [FX + 11, y0 + 2.5, z0 + 26], 0.0, -0.3, 5200);
 await view('life_farm_barn_dusk', [FX + 7, y0 + 1.2, z0 + 20], 0.0, 0.05, 12600);
 await view('life_farm_night', [FX + 11, y0 + 7, z0 + 30], 0, -0.3, 18500);
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 30)) console.log(l);
+verify(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);
