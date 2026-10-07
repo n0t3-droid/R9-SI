@@ -28,7 +28,7 @@ window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.
 `;
 const css = read('src/ui/style.css');
 const guard = (s) => s.replace(/<\/script/gi, '<\\/script');
-const fonts = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">`;
+const fonts = `<style>${read('src/ui/fonts/game_fonts.css')}</style>`;   // embedded (OFL): no request to Google's servers leaves the player's browser
 const body = `<div id="app"><canvas id="gl" tabindex="0"></canvas><div id="ui"></div></div>
 <script type="text/js-worker" id="worker-src">${guard(workerSrc)}</script>
 <script>${guard(mainSrc)}</script>`;
@@ -48,7 +48,7 @@ const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacad
 const notes = exists('src/studio/notes.md') ? read('src/studio/notes.md') : '';
 const studioCss = read('src/studio/studio.css');
 const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-const studioFonts = `<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">`;
+const studioFonts = `<style>${read('src/ui/fonts/studio_fonts.css')}</style>`;   // embedded (OFL), see src/ui/fonts/LICENSES.md
 const studioBody = `<div id="studio" class="boot">
 <header>
   <div class="brand"><span class="sig">R9</span><span class="t">MODEL STUDIO</span><span class="v">v4.0<!--PLAYTAG--></span></div>
