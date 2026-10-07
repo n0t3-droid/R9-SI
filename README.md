@@ -3,8 +3,14 @@
 An original browser voxel sandbox with its own art style: violet prism fields with giant glowing
 crystal spires, red-ochre ember canyons cut by lava rivers, glowing aether energy rivers, sky
 islands with waterfalls, Starforge outposts with docked shuttles, a cosmic sky with a nebula
-and a ringed gas giant — and a full block roster researched from the block wiki's navigation
-groups, re-imagined with procedural textures.
+and a ringed gas giant — and a full block roster of the genre, re-imagined with procedural textures.
+
+**An independent work.** R9-SI and R9 Studio are an independent, non-commercial hobby project — an original voxel game
+inspired by the block sandbox genre. They are not affiliated with, endorsed, sponsored or approved by any other game
+company. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. Minecraft is a
+trademark of Mojang; WorldEdit, Amulet, Axiom, Litematica, MCEdit and MagicaVoxel are names or trademarks of their
+respective owners and are named only to describe file compatibility. Impressum, privacy policy and credits: 📜 in the
+pause menu, the settings and the R9 Studio's header.
 
 ## Play
 
@@ -210,6 +216,8 @@ the running game on that world's Werkbank; *◂ Spiel* closes it and everything 
 files (.nbt)**, **Litematica (.litematic)**, **MagicaVoxel (.vox)** and R9 Bauteile (.json): Minecraft block names and
 their properties (facing, half, hinge, open, axis …) become R9 blocks, unknown blocks are listed. The piece in hand goes
 out as **.schem**, **.vox** or **.json** (on claude.ai through the page's download prompt, .schem / .vox packed in a .zip).
+*NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.* The tool and format names
+only describe which files the Studio reads and writes. Share only what is yours — every export says so in one line.
 
 **🖼 Bild → 3D** — 🧱 **Blockbild**: a photo, pixel art or logo becomes a wall or a floor of blocks in the colours that
 fit best (all blocks, wool & concrete, Vollton, terracotta, stone & wood; matched in OKLab so blue stays blue), the
@@ -514,8 +522,9 @@ shadows are cached and furniture detail only casts shadows close by, so towns co
 
 ## Multiplayer — play together
 
-The claude.ai version of the game is multiplayer: everyone who opens the game's link can see the
-worlds that are being played right now and join them.
+The claude.ai version of the game is multiplayer: players the owner invited on claude.ai (Contributor or Editor) can
+see the worlds that are being played right now and join them. Before anyone sees your name, the game asks once
+(👥 ✓ OK · Spitzname… · Mehrspieler aus); a visitor of the public link plays alone.
 
 | Step | How |
 |---|---|
