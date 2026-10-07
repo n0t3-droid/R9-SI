@@ -82,6 +82,12 @@ check(cr2.includes('„Stein“ von Ich · CC0 (https://creativecommons.org/publ
 check(cr2.includes('„Knight“ · nur lokal') && /erscheint nicht in 📦 Paketen/.test(cr2), 'a „Nur für dich“ thing: local only, never in 📦 packs');
 check(/Imported things/.test(cr2En) && cr2En.includes('"Deer" by Kenney') && cr2En.includes('modified: turned into a voxel model') && cr2En.includes('local only'), 'the same in English');
 check(/das Spiel kann sie nicht prüfen/.test(cr2), 'the player attests the licence; the game cannot check it');
+VR.Credits = { list: () => [{ kind: 'ding', src: { title: '<img src=x onerror=alert(1)>', author: '<b>Mallory</b>', url: 'javascript:alert(1)', license: 'CC BY 4.0', tier: 'by' } }] };
+const evil = L.html('credits');
+check(!/<img|<b>Mallory|href="javascript/i.test(evil) && evil.includes('&lt;img src=x') && evil.includes('&lt;b&gt;Mallory'), 'in the page, what an imported file says is text, never markup or a script link');
+Object.assign(O, { name: '<script>x</script>', address: 'A & B', email: 'a@b.c' });
+check(!/<script>x/.test(L.html('impressum')) && L.html('impressum').includes('&lt;script&gt;x') && L.html('impressum').includes('A &amp; B'), 'the owner\'s details are escaped too');
+Object.assign(O, shipped);
 VR.Credits = { list: () => [] };
 check(/Noch nichts importiert/.test(T('credits', 'de')), 'an empty VR.Credits: "Noch nichts importiert"');
 VR.Credits = { list: () => { throw new Error('broken'); } };
