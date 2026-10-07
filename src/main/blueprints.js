@@ -93,7 +93,8 @@
       const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1);
       const at = { bp, r, ox, oz, F: ay, x0, z0, x1, z1, rect, ok: true, why: '' };
       // can it go here? loaded ground all around, inside the world's height, nobody standing on the lot
-      if (ay - DEPTH < 1 || ay + bp.top + 8 >= VR.MAXY) { at.ok = false; at.why = 'Too high or too low for this house'; }
+      // (the levelling reaches DEPTH under the floor where there is world — a flat world's floor at y 4 is fine)
+      if (ay < 1 || ay + bp.top + 8 >= VR.MAXY) { at.ok = false; at.why = 'Too high or too low for this house'; }
       else {
         outer: for (let cz = (z0 - MARGIN) >> 4; cz <= (z1 + MARGIN) >> 4; cz++) for (let cx = (x0 - MARGIN) >> 4; cx <= (x1 + MARGIN) >> 4; cx++) {
           const c = w.col(cx, cz); if (!c || !c.ready) { at.ok = false; at.why = 'The ground there is still loading — get closer'; break outer; }
@@ -324,7 +325,7 @@
         const W = bp.lot[0], D = bp.lot[1], direct = bp.model || (pl.kind === 'forge' && !bp.level);
         const [x0, z0, x1, z1] = rect(0, 0, W - 1, D - 1), M = direct ? 0 : MARGIN;
         if (!colsReady(W, D, M)) continue;
-        if (pl.F - DEPTH < 1 || pl.F + bp.top + 8 >= VR.MAXY) { pl.failed = true; continue; }
+        if (pl.F < 1 || pl.F + bp.top + 8 >= VR.MAXY) { pl.failed = true; continue; }   // (a flat world's floor at y 4 is fine)
         const { list, undo } = direct ? this.opsAt(bp, r, pl.ox, pl.oz, pl.F) : this.planAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true });
         const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : pl.kind === 'forge' ? (bp.name || 'Forge') : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
         // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back

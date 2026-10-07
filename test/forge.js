@@ -336,7 +336,7 @@ section('place', () => {
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
   // the built piece read back from the world into a lot-local grid, then walked from its door
   const readBack = (pl, bp) => { const W = bp.lot[0], D = bp.lot[1], y0 = bp.bottom, sy = bp.top - y0 + 3, gr = { sx: W, sy, sz: D, dy: y0, blocks: new Uint16Array(W * sy * D) }; for (let y = 0; y < sy; y++) for (let v = 0; v < D; v++) for (let u = 0; u < W; u++) { const q = ROT[pl.r & 3](u, v); gr.blocks[(y * D + v) * W + u] = world.getBlock(pl.ox + q[0], pl.F + y0 + y, pl.oz + q[1]); } return gr; };
-  const levels = (pl) => { const bp = B.planPiece(pl), gr = readBack(pl, bp), d = bp.doors[0], wk = Forge.walkable(gr, [d[0], d[1] - gr.dy, d[2] + 1], {}); const want = bp.floors.concat([bp.roof]).map(y => y - gr.dy + 1); return { hit: want.filter(y => wk.floors.includes(y)).length, want: want.length, bp }; };
+  const levels = (pl, BB) => { const bp = (BB || B).planPiece(pl), gr = readBack(pl, bp), d = bp.doors[0], wk = Forge.walkable(gr, [d[0], d[1] - gr.dy, d[2] + 1], {}); const want = bp.floors.concat([bp.roof]).map(y => y - gr.dy + 1); return { hit: want.filter(y => wk.floors.includes(y)).length, want: want.length, bp }; };
   B.forgeCommand('Hochhaus 30 Stockwerke Glas'.split(' '));
   const pl = B.plans.find(p => p.kind === 'forge');
   check(pl && /^tower:f30/.test(pl.dna) && pl.status === 'pending' && JSON.parse(store.get('r9si.plans.w1')).plans.length === 1, '/bau Hochhaus 30 Stockwerke Glas → a plan where you look, stored for the Studio: ' + (pl && pl.dna) + ' at ' + (pl && [pl.ox, pl.F, pl.oz, pl.r].join(' · ')));
@@ -369,6 +369,10 @@ section('place', () => {
   { const B2 = new VR.Blueprints(gad); B2.plans = []; B2.lastForge = null; edits.clear(); gad.wand.undo.length = 0; groundAt = () => GY; player.pos = [400.5, GY + 1, 0.5]; player.pitch = -0.08;
     B2.forgeCommand('Hochhaus 10 Stockwerke 20 breit'.split(' ')); run2(B2); const a = B2.plans[0]; B2.forgeCommand(['breiter']); const b = B2.plans.find(p => p.status === 'pending');
     check(b && Forge.parse(b.dna).params.w === 25 && b.ox + (25 >> 1) === a.ox + (20 >> 1) && b.oz === a.oz, '/bau breiter keeps the front centre where it was (' + (a && a.ox) + ' → ' + (b && b.ox) + ')'); }
+  // a flat world (the ground at y 3, the floor at 4): the levelling reaches as deep as there is world
+  { const B4 = new VR.Blueprints(gad); B4.plans = []; edits.clear(); groundAt = () => 3; player.pos = [600.5, 4, 0.5]; player.pitch = -0.08;
+    B4.forgeCommand('Hochhaus 12 Stockwerke'.split(' ')); run2(B4); const f = B4.plans[0];
+    check(f && f.F === 4 && f.status === 'built' && levels(f, B4).hit === 13, 'in a flat world (floor at y 4) it is built too, every floor reached: ' + (f && [f.F, f.status, f.failed].join(' '))); }
 });
 
 // ---------------------------------------------------------------- the sweep: random parameter sets of every type with
