@@ -7,6 +7,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const Vs = VR.Villages;
   if (!Vs) return;
   const P = Vs.prototype, R = VR.R, F = VR.F;
@@ -48,7 +50,7 @@
       if (!isBed(s)) { W.splice(i, 1); continue; }
       const res = this.checkRoom(vil, b);
       if (res.ok) { W.splice(i, 1); this.registerHome(vil, res); }
-      else if (res.why && (this.homeHintT || 0) < this.time) { this.homeHintT = this.time + 25; this.g.ui.hint(`${vil.name} would love new neighbours — ${res.why}`, 4200); }
+      else if (res.why && (this.homeHintT || 0) < this.time) { this.homeHintT = this.time + 25; this.g.ui.hint(T('g.home.hint', { v: vil.name, why: T(res.why) }), 4200); }
     }
   };
   // flood the room around a bed: enclosed (roof above every cell), not too big, with a door
@@ -66,7 +68,7 @@
     for (const [x, z] of [[bx + 1, bz], [bx - 1, bz], [bx, bz + 1], [bx, bz - 1], [hx + 1, hz], [hx - 1, hz], [hx, hz + 1], [hx, hz - 1]]) {
       for (const y of [by, by + 1]) { const s = w.getBlock(x, y, z); if (passable(s) && !isDoor(s) && !seen.has(key(x, y, z))) { seen.add(key(x, y, z)); Q.push([x, y, z]); } }
     }
-    if (!Q.length) return { ok: false, why: 'leave some space to walk next to the bed.' };
+    if (!Q.length) return { ok: false, why: 'g.home.space' };
     let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9;
     while (Q.length) {
       const c = Q.pop(); cells.push(c);
@@ -85,10 +87,10 @@
         seen.add(k); Q.push([nx, ny, nz]);
       }
     }
-    if (open) return { ok: false, why: 'the room around your bed needs a roof.' };
-    if (big) return { ok: false, why: 'close the walls around your bed (and keep the room cosy).' };
-    if (!doors.length) return { ok: false, why: 'put a door in the wall of the room with the bed.' };
-    if (cells.length < 4) return { ok: false, why: 'the room is a bit small to live in.' };
+    if (open) return { ok: false, why: 'g.home.roof' };
+    if (big) return { ok: false, why: 'g.home.walls' };
+    if (!doors.length) return { ok: false, why: 'g.home.door' };
+    if (cells.length < 4) return { ok: false, why: 'g.home.small' };
     const d = doors[0];
     // inside: the room cell next to the door, outside: the cell beyond it
     const ix = d[3], iz = d[4], ox = d[0] * 2 - ix, oz = d[2] * 2 - iz;
