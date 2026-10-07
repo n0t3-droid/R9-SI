@@ -24,7 +24,7 @@
   // ---------------------------------------------------------------- a spot in front of a box, looking at it
   const solid = (x, y, z) => { const s = WM.getBlock(x, y, z); return !!(s && (T.flags[s] & F.SOLID)); };
   const wet = (x, y, z) => { const s = WM.getBlock(x, y, z); return !!(s && (T.flags[s] & (F.FLUID | F.LAVA))); };
-  function viewpoint(box, label) {
+  function viewpoint(box, label, front) {
     const [x0, y0, z0, x1, y1, z1] = box;
     const w = x1 - x0 + 1, d = z1 - z0 + 1, h = y1 - y0 + 1, cx = (x0 + x1 + 1) / 2, cz = (z0 + z1 + 1) / 2, cy = y0 + h * 0.45;
     const RB = WM.regionBox ? WM.regionBox() : null;
@@ -46,6 +46,8 @@
     const pl = WM.world && WM.world.player && Array.isArray(WM.world.player.pos) ? WM.world.player.pos : null;
     const sides = [[0, -1], [1, 0], [0, 1], [-1, 0]];
     if (pl) sides.sort((a, b) => (b[0] * (pl[0] - cx) + b[1] * (pl[2] - cz)) - (a[0] * (pl[0] - cx) + a[1] * (pl[2] - cz)));
+    // a house or a Forge structure has a front (its street side, the entrance): stand there first
+    if (front) sides.sort((a, b) => (b[0] * front[0] + b[1] * front[1]) - (a[0] * front[0] + a[1] * front[1]));
     let first = null;
     for (const dist of [base, base + 3, Math.max(3, base - 2), base + 7]) for (const s of sides) for (const lat of [0, 3, -3, 6, -6]) {
       const ex = s[0] ? (s[0] > 0 ? x1 + dist : x0 - dist) : Math.floor(cx) + lat;
@@ -61,9 +63,9 @@
   WM.viewpoint = viewpoint;
 
   // ---------------------------------------------------------------- the newest thing set into the world
-  function note(box, label) {
+  function note(box, label, front) {
     if (!WM.world || !box) return;
-    const v = viewpoint(box, label || L('land.new', 'Neu'));
+    const v = viewpoint(box, label || L('land.new', 'Neu'), front);
     if (!LD.note(WM.world.id, v)) C.full('landing');
     WM.landing = LD.read(WM.world.id).landing;
     play.label(); C.parts();
@@ -76,7 +78,7 @@
     note([x0, y0, z0, x1, y1, z1], String(label || '').replace(/\s*·.*$/, '') || L('land.wb', 'Werkbank'));
   };
   // plans handed to the game (houses, furniture): the newest of them
-  WM.onCommit = (box, label) => note(box, label);
+  WM.onCommit = (box, label, front) => note(box, label, front);
 
   // ---------------------------------------------------------------- 📍 the spawn point
   WM.setSpawn = function (pos) {

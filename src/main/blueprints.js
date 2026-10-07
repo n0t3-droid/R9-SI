@@ -15,7 +15,9 @@
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];   // = the lot builder's
   const FRONT = [[0, -1], [1, 0], [0, 1], [-1, 0]];                                            // street side of a lot turned r
   const REACH = 120, MARGIN = 3, DEPTH = 48, CLEAR = 80;
-  const SLICE_MAX = 60000, SLICE_STEP = 24000;   // a piece changing more cells than this is built in slices per tick
+  // a piece changing more cells than SLICE_MAX is built in slices of SLICE_STEP, one every SLICE_T seconds (bottom up):
+  // a 30-storey tower is ~50 000 cells — on a slow PC one bulk edit of that stalls a frame, ten slices of it do not
+  const SLICE_MAX = 16000, SLICE_STEP = 8000, SLICE_T = 0.05;
   // natural blocks (the verge may cut or cover them) and ground (what a house can stand on)
   let NAT = null, GROUND = null;
   function tables() {
@@ -324,7 +326,7 @@
         const { list, undo } = direct ? this.opsAt(bp, r, pl.ox, pl.oz, pl.F) : this.planAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true });
         const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : pl.kind === 'forge' ? (bp.name || 'Forge') : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
         // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back
-        if (list.length > SLICE_MAX) { list.sort((a, b) => a[1] - b[1]); this.slices = { pl, name, list, undo, at: 0, t: 0 }; pl.status = 'building'; return; }
+        if (list.length > SLICE_MAX) { list.sort((a, b) => a[1] - b[1]); this.slices = { pl, name, list, undo, at: 0, t: 0, w }; pl.status = 'building'; return; }
         if (list.length) this.gad.applyEdit(list, undo);
         this.planDone(pl, name, list.length);
         break;   // one piece per half second keeps the frame smooth
@@ -332,9 +334,11 @@
     }
     // the slices of a big piece: one chunk per tick, the undo of all of them as one step at the end
     tickSlices(dt) {
-      const S = this.slices, g = this.g, w = g.world; if (!w || g.state !== 'play') return;
+      const S = this.slices, g = this.g, w = g.world;
+      if (S.w !== w) { this.slices = null; return; }     // another world now: that one rebuilds the plan when it is back
+      if (!w || g.state !== 'play') return;
       S.t -= dt; if (S.t > 0) return;
-      S.t = 0.06;
+      S.t = SLICE_T;
       const end = Math.min(S.list.length, S.at + SLICE_STEP), chunk = S.list.slice(S.at, end);
       if (chunk.length) { w.bulkSet(chunk, false); for (const [x, y, z, s] of chunk) this.gad.noteBlock(x, y, z, s); }
       S.at = end;
@@ -346,6 +350,8 @@
     planDone(pl, name, n) {
       const g = this.g;
       pl.status = 'built';
+      // (the plans may have been read again meanwhile — the Studio handed over more: that copy is built too)
+      if (this.plans) for (const q of this.plans) if (q.id === pl.id) q.status = 'built';
       this.markPlan(pl.id, 'built');
       if (g.player && g.player.unstick) g.player.unstick();
       if (g.ui && g.ui.toast) g.ui.toast('R9 Studio', `${name} gebaut · ${n.toLocaleString('de-DE')} Blöcke`);

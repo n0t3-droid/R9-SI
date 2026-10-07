@@ -196,7 +196,7 @@
         let env = null;
         if (m.ground && meta.terrain) { const W = m.W, D = m.D, gr = m.ground; env = { ground: (u, v) => { const g = gr[Math.max(0, Math.min(D - 1, v)) * W + Math.max(0, Math.min(W - 1, u))]; return g === 99 ? -1 : g; }, depth: 48 }; }
         const g = Fg.build(m.dna, env), ops = Fg.ops(g), M = g.meta;
-        self.postMessage({ type: 'forge', id: m.id, dna: m.dna, ops, lot: M.lot, house: [0, 0, g.sx, g.sz], top: M.top, bottom: g.dy, level: M.level, terrain: M.terrain, name: M.name, n: M.n, doors: M.doors, ms: M.ms }, [ops.buffer]);
+        self.postMessage({ type: 'forge', id: m.id, dna: m.dna, ops, lot: M.lot, house: [0, 0, g.sx, g.sz], top: M.top, bottom: g.dy, level: M.level, terrain: M.terrain, name: M.name, n: M.n, doors: M.doors, floors: M.floors, roof: M.roof === undefined ? null : M.roof, ms: M.ms }, [ops.buffer]);
       } else if (m.type === 'locate') {
         const g = getGen(m.dim);
         let found = null;
