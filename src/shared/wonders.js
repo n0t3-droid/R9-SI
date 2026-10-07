@@ -22,11 +22,11 @@
   const W = VR.Wonders = { CELL: 640, CHANCE: 0.6, GENS: {} };
   // the eight: German first (the names the owner gave them), English our own; prefer = the biomes where one fits
   W.TYPES = [
-    { id: 'kristall', icon: '💎', de: 'Kristallkathedrale', en: 'Cathedral of Crystals', prefer: /prism|crystal|cherry|amethyst/, lot: [44, 58] },
+    { id: 'kristall', icon: '💎', de: 'Kristallkathedrale', en: 'Cathedral of Crystals', prefer: /prism|crystal|cherry|amethyst/, lot: [45, 58] },
     { id: 'regenbogen', icon: '🌈', de: 'Regenbogenbrücke', en: 'Rainbow Arch', prefer: /river|flower|sunflower|meadow|lush/, coast: true, lot: [17, 62] },
-    { id: 'sternwarte', icon: '🔭', de: 'Sternwarte', en: 'Star Observatory', prefer: /windswept|hills|plateau|slopes|grove|meadow/, lot: [40, 44] },
-    { id: 'riesenbaum', icon: '🌳', de: 'Riesenbaum', en: 'Giant Tree', prefer: /forest|jungle|taiga|dappled|pale_garden/, lot: [56, 56] },
-    { id: 'leuchtturm', icon: '🗼', de: 'Wolkenleuchtturm', en: 'Cloud Lighthouse', prefer: /beach|shore|stony|windswept/, coast: true, lot: [36, 40] },
+    { id: 'sternwarte', icon: '🔭', de: 'Sternwarte', en: 'Star Observatory', prefer: /windswept|hills|plateau|slopes|grove|meadow/, lot: [41, 45] },
+    { id: 'riesenbaum', icon: '🌳', de: 'Riesenbaum', en: 'Giant Tree', prefer: /forest|jungle|taiga|dappled|pale_garden/, lot: [57, 57] },
+    { id: 'leuchtturm', icon: '🗼', de: 'Wolkenleuchtturm', en: 'Cloud Lighthouse', prefer: /beach|shore|stony|windswept/, coast: true, lot: [37, 41] },
     { id: 'labyrinth', icon: '🌿', de: 'Labyrinthgarten', en: 'Maze Garden', prefer: /plains|meadow|sky_meadow|flower|savanna_plateau/, lot: [61, 61] },
     { id: 'pyramide', icon: '☀️', de: 'Sonnenpyramide', en: 'Golden Sun Pyramid', prefer: /desert|savanna|badlands|ember/, lot: [51, 57] },
     { id: 'mondtempel', icon: '🌙', de: 'Mondtempel', en: 'Moonlight Temple', prefer: /snow|ice|frozen|taiga|grove|tundra|cold/, lot: [45, 55] },
