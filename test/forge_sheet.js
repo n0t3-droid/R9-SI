@@ -30,7 +30,11 @@ function faceColor(s, face) {
   let r = avg[li * 4], g = avg[li * 4 + 1], b = avg[li * 4 + 2], a = avg[li * 4 + 3];
   const t = R.types[T.type[s]], nm = t ? t.name : '';
   if (!(a > 0)) { r = 0.6; g = 0.6; b = 0.6; a = 1; }
-  const fl = T.flags[s];
+  const fl = T.flags[s], tc = T.tint[s];
+  // tinted faces: fixed colours (Vollton …) multiply the white base, grass / foliage tints go green
+  if (tc >= 8 && R.tintColors[tc - 8] !== undefined) { const v = R.tintColors[tc - 8]; r *= ((v >> 16) & 255) / 255; g *= ((v >> 8) & 255) / 255; b *= (v & 255) / 255; }
+  else if (tc === 1 || tc === 2) { r *= 0.5; g *= 0.75; b *= 0.33; }
+  else if (tc === 3) { r *= 0.25; g *= 0.46; b *= 0.9; }
   // panes, glass, water: see-through
   if (/glass|pane|panorama|window|frosted|rail$/.test(nm) && !/window_warm/.test(nm)) a = Math.min(a, 0.42);
   if (fl & VR.F.FLUID) { r = 0.25; g = 0.45; b = 0.85; a = 0.6; }
