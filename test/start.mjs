@@ -94,7 +94,7 @@ await section('2b', 'hints 2 and 3: one at a time, dismissed by doing the thing;
   for (let i = 0; i < 12; i++) { await wait(250); const r = await ev(() => ({ n: document.querySelectorAll('#hints .hint').length, cur: VR.Hints.current() })); if (r.n > 1) never2 = false; if (r.cur === 'fly') fly = true; }
   check(fly && await ev(() => /fliegen/.test(document.getElementById('hints').textContent)), 'then hint 3: „Leertaste 2× = fliegen"');
   check(never2, 'never two hints at once');
-  await page.keyboard.press('Space'); await wait(120); await page.keyboard.press('Space'); await wait(600);
+  for (let tries = 0; tries < 4; tries++) { await page.keyboard.press('Space'); await wait(100); await page.keyboard.press('Space'); await wait(700); if (await ev(() => VR.game.player.flying)) break; await wait(600); }   // (a slow software renderer may swallow a double tap)
   const h4 = await ev(() => ({ flying: VR.game.player.flying, done: !!JSON.parse(localStorage.getItem('r9si.hints')).done.fly, on: document.getElementById('hints').classList.contains('on') }));
   check(h4.flying && h4.done && !h4.on, 'a double tap on Space flies — hint 3 is done and gone (' + JSON.stringify(h4) + ')');
   // r9si.hand: a Ding set from the start screen is in your hand when the world opens
@@ -291,8 +291,8 @@ await section(7, 'Profi keeps its Plan tab — „📍 Alle setzen"', async () =
 await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: card, 📦 Teilen one thing', async () => {
   await page.goto(URL0 + '/studio.html', NAV);
   check(await booted(1), 'the Studio is up');
-  // a Baukasten house (a k: thing), a favourite block
-  await ev(() => VR.StudioWorld.imagine.open(null, 'house')); await wait(900);
+  // a Baukasten house (a k: thing), a favourite block  (the hub may have opened by itself: something to continue)
+  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); VR.StudioWorld.imagine.open(null, 'house'); }); await wait(900);
   await page.click('#imagine [data-hs="style"][data-v="modern"]'); await wait(2500);
   await ev(() => { VR.StudioWorld.imagine.close(); VR.Favs.add('oak_planks'); });
   const kit = await ev(() => Object.values(JSON.parse(localStorage.getItem('r9si.projects')).items).find(p => p.kind === 'kit'));
@@ -330,7 +330,7 @@ await section(9, 'routes: #ding/<id> opens the thing, an unknown one only says s
 
 await section(10, '← restores where you were: ✏️ from a card → the editor → ←; 👁 from Meins → Esc', async () => {
   if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
-  await page.goto(URL0 + '/studio.html#world/' + encodeURIComponent(WORLD) + '/karte', NAV);
+  await page.goto(URL0 + '/studio.html?r=' + Date.now() + '#world/' + encodeURIComponent(WORLD) + '/karte', NAV);   // (a fresh query: a hash-only change would not reload the Studio)
   check(await inStudio(WORLD), 'the Karte view');
   await page.click('#chips button[data-kcat="furn"]'); await wait(400);
   const id3 = await ev(() => { const l = document.getElementById('list'); l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding; });

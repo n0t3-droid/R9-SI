@@ -328,7 +328,8 @@
       this.studioOpen = true;
       this.ui.show(null);
       try { if (document.pointerLockElement) document.exitPointerLock(); } catch (e) { /* */ }
-      const url = 'studio.html' + (location.search || '') + '#world/' + encodeURIComponent(this.meta.id) + '/' + (tab || 'bench');   // (W1: 🏗 Bauen opens the Karte view)
+      // (W1: 🏗 Bauen opens the Karte view; a hash of its own — '#ding/<id>' — opens that thing)
+      const url = 'studio.html' + (location.search || '') + (tab && tab[0] === '#' ? tab : '#world/' + encodeURIComponent(this.meta.id) + '/' + (tab || 'bench'));
       const go = (fr) => {
         fr.src = url; fr.classList.add('on');
         const t0 = Date.now();
