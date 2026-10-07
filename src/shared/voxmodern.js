@@ -194,8 +194,12 @@
     b.box(5, 8, 15, 11, 12.5, 16, M.gloss(P.white)); screenUI(b, 5.5, 8.5, 10.5, 12, 14.5, 'tiles');
   } }));
   def('smart', 'thermostat', 'round', 'Smart Thermostat · round', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'chrome', solid: false, build: (b) => {
-    b.cyl('z', 8, 9.5, 1.7, 14.5, 16, M.chrome()); b.cyl('z', 8, 9.5, 1.3, 14, 14.5, M.gloss(0x0E1218));
-    b.tube('z', 8, 9.5, 1.0, 0.5, 13.5, 14, M.light(0xFF8A3A)); b.box(7.5, 9, 13.5, 8.5, 10, 14, M.light(0xFFC08A));
+    // a round chrome dial on a white backplate: a dark glass face with a glowing ring and a readout
+    b.cyl('z', 8, 8.5, 2.7, 15.25, 16, M.gloss(0xE8E6E0));
+    b.cyl('z', 8, 8.5, 2.3, 14.25, 15.25, M.chrome());
+    b.cyl('z', 8, 8.5, 1.9, 13.75, 14.25, M.gloss(0x0E1218));
+    b.tube('z', 8, 8.5, 1.85, 0.4, 13.75, 14.25, M.light(0xFF8A3A));
+    b.box(7.25, 7.75, 13.75, 8.75, 9.25, 14.25, M.light(0xFFC08A));
   } }));
   def('smart', 'router', 'wifi', 'WiFi Router · black', Object.assign({}, SM, { res: 32, size: [1, 1, 1], col: 'black', build: (b) => {
     b.pbox(4, 0.5, 5.5, 12, 2, 10.5, 0.5, M.gloss(P.black)); b.box(4.5, 0, 6, 11.5, 0.5, 10, M.matte(0x2A2C30));
@@ -206,8 +210,11 @@
     b.lathe(8, 8, [[0, 2], [0.5, 2.2], [4, 2.2], [4.5, 1.8]], M.gloss(P.white)); b.cyl('y', 8, 8, 0.5, 4.5, 5, M.light(0x5CC8F0));
   } }));
   def('smart', 'doorbell', 'video', 'Video Doorbell · black', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'black', solid: false, build: (b) => {
-    b.pbox(7, 7.5, 15, 9, 12, 16, 0.5, M.gloss(P.black));
-    b.cyl('z', 8, 11, 0.5, 14.5, 15, M.glass(0x3A4A5A)); b.tube('z', 8, 8.5, 0.8, 0.5, 14.5, 15, M.light(0x5CC8F0));
+    // a black plate on the wall: a glass lens in a glowing ring, a steel call button and the status light
+    b.pbox(6, 3.5, 15, 10, 14, 16, 1.2, M.gloss(P.black));
+    b.cyl('z', 8, 9, 1.3, 14, 15, M.glass(0x3A4A5A)); b.tube('z', 8, 9, 1.9, 0.5, 14, 15, M.light(0x5CC8F0));
+    b.cyl('z', 8, 5.8, 0.9, 14, 15, M.metal(P.steel));
+    b.box(7.5, 12.3, 14.5, 8.5, 12.9, 15, M.light(0x4AE08A));
   } }));
   def('smart', 'camera', 'dome', 'Security Camera · dome', Object.assign({}, SM, { mount: 'ceiling', res: 32, size: [1, 1, 1], col: 'white', solid: false, build: (b) => {
     b.cyl('y', 8, 8, 3, 15, 16, M.gloss(P.white)); b.lathe(8, 8, [[12.5, 1.6], [13.5, 2.4], [14.5, 2.6], [15, 2.6]], M.glass(0x2A3440));
@@ -245,8 +252,11 @@
     b.box(0.5, 12.5, 8.5, 15.5, 13, 15.5, M.metal(P.graphite));
   } }));
   def('smart', 'battery', 'wall', 'Home Battery · 10 kwh', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 2, 1], col: 'white', hard: 1.5, build: (b) => {
-    b.pbox(2, 2, 13, 14, 21, 16, 1, M.gloss(P.white)); b.box(2.5, 1, 14, 13.5, 2, 15.5, M.metal(P.graphite));
-    b.box(7.5, 5, 12.5, 8.5, 18, 13, M.light(0xE8F4FF)); b.box(6.5, 17.5, 12.5, 9.5, 18, 13, M.light(0x4AE08A));
+    // a white wall unit on a dark plinth: a raised front panel, cooling slats under it, three status lights on top
+    b.pbox(2, 2, 13, 14, 21, 16, 1, M.gloss(P.white)); b.box(2.5, 0.5, 13.5, 13.5, 2, 15.5, M.metal(P.graphite));
+    b.box(3.5, 14, 12, 12.5, 16.5, 13, M.gloss(0xE4E2DC));
+    for (let k = 0; k < 4; k++) b.box(4.5, 6 + k * 1.5, 12, 11.5, 6.6 + k * 1.5, 13, M.metal(P.graphite));
+    for (const x of [5.5, 8, 10.5]) b.box(x - 0.5, 18.3, 12.5, x + 0.5, 19.2, 13.2, M.light(0x4AE08A));
   } }));
   def('smart', 'inverter', 'hybrid', 'Solar Inverter · hybrid', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'stone', hard: 1.2, build: (b) => {
     b.pbox(3.5, 5, 13, 12.5, 15, 16, 0.5, M.gloss(P.stone)); b.box(4, 13.5, 12.5, 12, 14.5, 13, M.matte(P.graphite));
