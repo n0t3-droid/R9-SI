@@ -510,7 +510,22 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
         slider('volMaster', 'Master', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
         slider('volSfx', 'Effects', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
         slider('volMusic', 'Music', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
-        slider('volAmbient', 'Ambience', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
+        slider('volAmbient', 'Umgebung', 0, 1, 0.05, (v) => Math.round(v * 100) + '%');
+        // 🌦 Atmosphäre (A1): the sky's weather, the sounds of nature and the wet ground in the rain
+        body.appendChild(el('div', 'note', '<div class="hr"></div><b>🌦 Atmosphäre</b>'));
+        const atmSeg = (key, label, opts) => {
+          const f = el('div', 'field'); f.innerHTML = `<label>${label}</label>`;
+          const sg = el('div', 'seg');
+          for (const [v, t, tip] of opts) {
+            const b = el('button', S[key] === v ? 'on' : '', t); b.title = tip || ''; b.dataset.set = key + ':' + v;
+            b.onclick = () => { S[key] = v; this.game.applySettings(key); this.game.saveSettings(); this.showSettings(); };
+            sg.appendChild(b);
+          }
+          f.appendChild(sg); body.appendChild(f);
+        };
+        atmSeg('wx', 'Wetter', [['normal', 'Normal', 'Der Himmel wechselt zwischen klar, bewölkt, Nebel, Regen, Gewitter und Schnee'], ['calm', 'Ruhig', 'Nur klar und bewölkt: kein Regen, kein Gewitter, kein Nebel, kein Schnee'], ['off', 'Aus', 'Immer klarer Himmel ohne Wetter-Effekte und Blitze']]);
+        atmSeg('natSound', 'Natur-Klänge', [['synth', 'Synthetisch', 'Wind, Vögel am Tag, Grillen in der Nacht, Wasser — synthetisch erzeugt'], ['off', 'Aus', 'Keine Natur-Klänge (Regen und Donner bleiben, wenn das Wetter an ist)']]);
+        toggle('wetGround', 'Nasser Boden bei Regen');
       } else {
         const nf = el('div', 'field'); nf.innerHTML = '<label>Your name (shown to friends)</label><input type="text" maxlength="24" placeholder="Explorer">';
         const ni = nf.querySelector('input'); ni.value = S.playerName || ''; ni.onchange = () => { S.playerName = ni.value.replace(/[<>]/g, '').trim().slice(0, 24); this.game.saveSettings(); if (this.game.mp) this.game.mp.setLobby(); };
