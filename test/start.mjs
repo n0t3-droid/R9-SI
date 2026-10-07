@@ -2,7 +2,8 @@
 // the game and the R9 Studio; no world → ▶ reaches play in one click (Zen); the Einfach / Profi switch (r9si.ui) hides
 // and shows the Studio's mode bar; the pause menu starts with „▶ Weiterspielen"; the page is German, the picker turns
 // it English; the first hints come one at a time; every thing is a card with 👁 ✏️ ☆ 📍 📦; the Karte view commits every
-// placement; ← restores where you were; no page errors. ONLY=1,4 runs only those sections.
+// placement; ← restores where you were; the keyboard (Tab · Enter · Esc), 44 px targets, the 📜 entry (only with VR.Legal),
+// English via /lang en; a phone-sized screen; no page errors. ONLY=1,4 runs only those sections.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import { spawn } from 'child_process';
 const PORT = 8765 + Math.floor(Math.random() * 200);
@@ -116,6 +117,7 @@ await section(3, 'the pause menu: ▶ Weiterspielen first; 🏗 Bauen opens the 
   const vis = (sel) => ev((s) => [...document.querySelectorAll(s)].filter(b => b.getClientRects().length > 0).map(b => b.textContent.trim()), sel);
   const btns = await vis('#pause button');
   console.log('  pause', JSON.stringify(btns));
+  await shot('start_pause_einfach');
   check(btns[0] === '▶ Weiterspielen', 'the first button is „▶ Weiterspielen"');
   for (const t of ['🏗 Bauen', '🎒 Meins', '🏠 Zu meinem Platz', '📍 Mein Platz ist hier', '⚙ Einstellungen', '⏏ Speichern & zum Start']) check(btns.includes(t), 'has „' + t + '"');
   check(!btns.some(b => /Codex|Foto|Werkbank/.test(b)), 'Einfach: no Codex, no Fotomodus, no Werkbank');
@@ -215,10 +217,14 @@ await section(5, 'the Studio: four tiles in the header, the mode bar waits behin
   check(t.tiles[1].label === '🏗 Bauen' && t.tiles[2].label === '✨ Erschaffen' && t.tiles[3].label === '🎒 Meins', 'German labels');
   check(!t.pro && t.modes === 0 && t.nMode === 6, 'Einfach: nav.modes is hidden (its 6 mode buttons wait)');
   check(t.sw && !t.bar && t.lang === 'de', 'the Profi switch is in the header, no 🔌 banner, lang = de');
+  check(await ev(() => { const b = document.getElementById('legalBtn'); return !!b && b.hidden && !b.getClientRects().length; }), 'no 📜 in the header while there is no VR.Legal');
+  check(await ev(() => { VR.Legal = { open: () => { window.__legal = 1; } }; VR.StudioStart.legal(); const b = document.getElementById('legalBtn'); b.click(); const r = b.getClientRects().length > 0 && window.__legal === 1; delete VR.Legal; VR.StudioStart.legal(); return r && b.hidden; }), 'with VR.Legal the 📜 shows and opens it');
+  check(await ev(() => [...document.querySelectorAll('#studio header button')].filter(b => b.getClientRects().length).every(b => { const r = b.getBoundingClientRect(); return r.height >= 44 && r.width >= 44; })), 'every header button is at least 44 × 44 px');
   await ev(() => VR.UIPrefs.set({ pro: true })); await wait(150);
   const p = await ev(() => ({ pro: document.getElementById('studio').classList.contains('pro'), modes: [...document.querySelectorAll('nav.modes button[data-mode]')].filter(b => b.getClientRects().length > 0).map(b => b.dataset.mode), proT: document.querySelector('.tabs .proT').classList.contains('on'), tabs: [...document.querySelectorAll('#right .tabs .tab')].filter(t => t.getClientRects().length > 0).length, mem: localStorage.getItem('r9si.studio.pro') }));
   console.log('  profi', JSON.stringify(p));
   check(p.pro && p.modes.join() === 'arch,furn,facade,parts,craft,world', 'Profi: the six mode buttons show (' + p.modes.join(' · ') + ')');
+  check(await ev(() => ![...document.querySelectorAll('nav.modes [data-hub], nav.modes [data-create]')].some(b => b.getClientRects().length)), 'the mode bar does not repeat the tiles (no 🕘 Weitermachen, no second ✨)');
   check(p.proT && p.tabs === 5 && p.mem === '1', 'the ⚙ Profi of the right side is the same switch (five tabs, r9si.studio.pro = 1)');
   await booted(1);
   await shot('start_studio_profi');
@@ -386,7 +392,76 @@ await section(11, 'a phone-sized screen: the start screen fits, no sideways scro
   check(m.sw <= m.iw && m.tiles.every(t => t.right <= 390 && t.left >= 0), 'nothing sticks out sideways');
   check(m.tiles.length === 4 && m.tiles.every(t => t.w >= 150 && t.h >= 150), 'four tiles, each at least 150 px');
   await pp.screenshot({ path: '/home/claude/vr/test/shots/start_phone.png', fullPage: false });
+  const tgt = await pp.evaluate(() => [...document.querySelectorAll('#title button')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim().slice(0, 16), w: Math.round(r.width), h: Math.round(r.height) }; }).filter(x => x.w < 44 || x.h < 44));
+  check(!tgt.length, 'every button is at least 44 × 44 px to tap' + (tgt.length ? ': ' + JSON.stringify(tgt) : ''));
+  await pp.evaluate(() => VR.UIPrefs.set({ pro: true })); await pp.waitForTimeout(300);
+  await pp.screenshot({ path: '/home/claude/vr/test/shots/start_phone_profi.png', fullPage: false });
+  check(await pp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), 'Profi on a phone: no sideways scroll either');
+  await pp.evaluate(() => VR.UIPrefs.set({ pro: false }));
+  // the R9 Studio's front door on a phone
+  await pp.goto(URL0 + '/studio.html', NAV);
+  let st = false; for (let i = 0; i < 240 && !st; i++) { await pp.waitForTimeout(500); st = await pp.evaluate(() => !!(window.VR && VR.StudioStart && document.querySelectorAll('#tiles .tile').length === 4 && !document.getElementById('studio').classList.contains('boot'))).catch(() => false); }
+  await pp.waitForTimeout(1500);
+  const sp = await pp.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth, tiles: [...document.querySelectorAll('#tiles .tile')].map(t => { const r = t.getBoundingClientRect(); return { w: Math.round(r.width), h: Math.round(r.height), right: Math.round(r.right) }; }) }));
+  console.log('  studio phone', JSON.stringify(sp));
+  check(st && sp.tiles.length === 4 && sp.tiles.every(t => t.right <= 390 && t.h >= 44), 'the Studio on a phone: four tiles in the header, none sticks out');
+  await pp.screenshot({ path: '/home/claude/vr/test/shots/start_studio_phone.png', fullPage: false });
   await ph.close();
+});
+
+await section(12, 'keyboard, 📜 and English: Tab lands on ▶, Enter and Esc, the 📜 only with VR.Legal, /lang en in Einfach', async () => {
+  await page.goto(URL0 + '/index.html', NAV);
+  check(await atTitle(), 'the game is at its start screen');
+  await ev(() => VR.UIPrefs.set({ pro: false }));
+  await wait(400);
+  await page.keyboard.press('Tab');
+  const f1 = await ev(() => { const a = document.activeElement; return { tile: a && a.dataset ? a.dataset.tile : null, ring: a ? getComputedStyle(a).boxShadow : '' }; });
+  check(f1.tile === 'play' && /rgb/.test(f1.ring), 'the first Tab lands on ▶, with a ring (' + JSON.stringify(f1).slice(0, 120) + ')');
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Tab');
+  check(await ev(() => document.activeElement && document.activeElement.dataset.tile) === 'meins', 'Tab walks the tiles in order: ▶ · 🏗 · ✨ · 🎒');
+  await page.keyboard.press('Enter'); await wait(600);
+  const mk = await ev(() => ({ on: document.getElementById('meins').classList.contains('on'), focus: document.activeElement && document.activeElement.closest('#meins') ? true : false }));
+  check(mk.on && mk.focus, 'Enter on 🎒 opens Meins, the focus goes with it');
+  await page.keyboard.press('Escape'); await wait(300);
+  check(await ev(() => document.getElementById('title').classList.contains('on')), 'Esc brings the start screen back');
+  await ev(() => document.querySelector('#title [data-act="worlds"]').focus()); await page.keyboard.press('Enter'); await wait(600);
+  const wk = await ev(() => ({ on: document.getElementById('worlds').classList.contains('on'), focus: document.activeElement && document.activeElement.dataset.w }));
+  check(wk.on && wk.focus === 'play', 'Enter on „Andere Welt": the worlds, the focus on the newest world\'s ▶ (' + wk.focus + ')');
+  await page.keyboard.press('Escape'); await wait(300);
+  check(await ev(() => document.getElementById('title').classList.contains('on') && document.activeElement && document.activeElement.dataset.act === 'worlds'), 'Esc: back at the start, the focus where it was');
+  const small = await ev(() => [...document.querySelectorAll('#title button, #title .lp-btn')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim().slice(0, 18), w: Math.round(r.width), h: Math.round(r.height) }; }).filter(x => x.w < 44 || x.h < 44));
+  check(!small.length, 'every button on the start screen is at least 44 × 44 px' + (small.length ? ': ' + JSON.stringify(small) : ''));
+  // 📜 Impressum & Datenschutz: only when VR.Legal is there
+  check(await ev(() => { const b = document.querySelector('#title [data-act="legal"]'); return !!b && !b.getClientRects().length; }), 'without VR.Legal there is no 📜 button');
+  await ev(() => { VR.Legal = { open: (t) => { window.__legal = t || 'open'; } }; VR.Start.texts(); });
+  const lg = await ev(() => { const b = document.querySelector('#title [data-act="legal"]'); const r = b.getBoundingClientRect(); return { shown: b.getClientRects().length > 0, text: b.textContent, h: r.height }; });
+  check(lg.shown && /Impressum/.test(lg.text) && lg.h >= 44, 'with VR.Legal: „' + lg.text + '" on the start screen');
+  await shot('start_game_legal');
+  await page.click('#title [data-act="legal"]'); await wait(100);
+  check(await ev(() => window.__legal === 'open'), 'a click calls VR.Legal.open()');
+  await ev(() => { delete VR.Legal; VR.Start.texts(); });
+  // English, said in the game: /lang en works in Einfach (the language is a setting Einfach keeps)
+  await ensureWorld();
+  await ev(async (id) => { const g = VR.game, ws = await g.store.listWorlds(); g.loadWorld(ws.find(w => w.id === id)); }, WORLD);
+  check(await inPlay(), 'the world is open');
+  await ev(() => VR.game.chat('/lang en')); await wait(300);
+  check(await ev(() => VR.I18N.lang === 'en' && document.documentElement.lang === 'en'), '/lang en in Einfach switches the game to English');
+  await ev(() => VR.game.ui.pause()); await wait(300);
+  const pe = await ev(() => [...document.querySelectorAll('#pause button')].filter(b => b.getClientRects().length > 0).map(b => b.textContent.trim()));
+  console.log('  pause (en)', JSON.stringify(pe));
+  check(pe[0] === '▶ Play on' && ['🏗 Build', '🎒 Mine', '🏠 To my spot', '📍 My spot is here', '⚙ Settings', '⏏ Save & quit', 'Simple', 'Pro'].every(t => pe.includes(t)), 'the pause menu in English: ▶ Play on · 🏗 Build · 🎒 Mine · 🏠 To my spot · 📍 My spot is here · ⚙ Settings · ⏏ Save & quit');
+  check(await ev(() => document.querySelector('#pause h2').textContent === '⏸ Paused'), 'its title: ⏸ Paused');
+  await shot('start_pause_en');
+  await ev(() => VR.game.quitToTitle()); check(await atTitle(), 'back at the start screen');
+  await wait(600);
+  const te = await tiles();
+  const en2 = await ev(() => ({ sub: document.querySelector('#title .sub').textContent, set: document.querySelector('#title [data-act="settings"]').textContent, sw: [...document.querySelectorAll('#title #proSwitch button')].map(b => b.textContent).join('|'), title: document.getElementById('title').textContent }));
+  console.log('  start (en)', JSON.stringify(te.map(x => x.label)), JSON.stringify(en2).slice(0, 300));
+  check(te.map(x => x.label).join('|') === '▶ Play on|🏗 Build|✨ Create|🎒 Mine' && /Another world/.test(en2.sub) && /New world/.test(en2.sub) && en2.set === '⚙ Settings' && en2.sw === 'Simple|Pro', 'the start screen in English: ▶ Play on · 🏗 Build · ✨ Create · 🎒 Mine, Another world · ＋ New world, ⚙ Settings, Simple | Pro');
+  check(!/Weiterspielen|Einstellungen|Einfach|Andere Welt|übernehmen/.test(en2.title), 'no German left on the English start screen');
+  await shot('start_game_en');
+  await ev(() => VR.I18N.set('de')); await wait(300);
+  check((await tiles())[0].label === '▶ Weiterspielen', 'and back to German');
 });
 
 await done();
