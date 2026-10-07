@@ -254,7 +254,11 @@
       this.slices = site;
       if (job.pl) job.pl.status = 'building';
       this.siteListen(w);
-      if (site.show) { (this.sites || (this.sites = [])).push(site); site.show.start(); }
+      if (site.show) {
+        // (the site before it still celebrates: its office goes now — it may stand on this one's lot)
+        if (this.sites) for (const s of this.sites) if (s.show && s.show.office) s.show.office = null;
+        (this.sites || (this.sites = [])).push(site); site.show.start();
+      }
       this.siteStarted = site;
       return true;
     };
