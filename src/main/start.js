@@ -370,7 +370,11 @@
     if (to && ST.kbd) setTimeout(() => { const t = $(to) || $('#title .tile[data-tile="play"]'); if (t && t.focus) t.focus({ preventScroll: true }); }, 30);
   }, true);
   const origPause = UI.prototype.pause;
-  UI.prototype.pause = function () { if (this.game.state !== 'play') return; pauseMenu(); origPause.call(this); };
+  UI.prototype.pause = function () {
+    if (this.game.state !== 'play') return; pauseMenu(); origPause.call(this);
+    // (Einfach: the multiplayer box only where playing together works — the note why it does not is a Profi detail)
+    const mpp = $('#mppanel'), mp = this.game.mp; if (mpp) mpp.classList.toggle('pro', !(mp && mp.ready));
+  };
   // chat commands are a Profi thing (Einfach: the chat stays, a /command gets the note) — except /lang (/sprache):
   // the language is a setting Einfach keeps
   ST.einfachCmd = (text) => /^\/(lang|sprache)(\s|$)/i.test(text);
