@@ -54,7 +54,7 @@
   D.state = function (id) {
     const p = D.parse(id); if (!p) return '';
     let raw = null; try { raw = localStorage.getItem('r9si.wip.' + (p.kind === 'h' ? 'h:' + p.key : p.kind === 'm' ? 'm:' + p.key : p.key)); } catch (e) { raw = null; }
-    if (raw !== null && (p.kind === 'h' || p.kind === 'm')) return tx('ding.draft', null, '✎ Entwurf', '✎ draft');
+    if (raw !== null && (p.kind === 'h' || p.kind === 'm')) return tx('ding.draft', null, '✎ Entwurf', '✎ Draft');
     if (p.kind === 'h' || p.kind === 'm') { const d = designs(); if ((p.kind === 'h' ? d.houses : d.models)[p.key]) return tx('ding.inGame', null, '✓ im Spiel', '✓ in the game'); }
     return '';
   };

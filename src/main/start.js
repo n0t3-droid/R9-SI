@@ -8,22 +8,29 @@
 // and waits in Profi. Everything here hooks VR.UI at runtime: ui.js keeps its
 // screens and ids (#title #worlds #create #splash #studionote #mphosts
 // #titlenote #gpuinfo), this file re-draws what the player sees on them.
-// Texts: VR.I18N.tx(key, vars, de, en) — German first, English second.
+// Texts: the game's tables (lang_de.js / lang_en.js) — German first, English
+// second; VR.I18N.tx(key, vars, de, en) writes the same texts at the call (they
+// are checked against the tables by test/lang.js), t(key) reads a table key.
 // ============================================================================
 (function (VR) {
   'use strict';
   const ST = VR.Start = {};
   const $ = (s, r) => (r || document).querySelector(s);
   const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : de);
+  const t = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const prefs = () => (VR.UIPrefs ? VR.UIPrefs.get() : { pro: false, scale: 1.15 });
   const game = () => VR.game;
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
   const SVG = VR.Tiles ? VR.Tiles.SVG : {};
   const TILES = ['play', 'bauen', 'erschaffen', 'meins'];
-  const T = {   // the tile labels (de, en)
-    play: ['▶ Weiterspielen', '▶ Play on'], first: ['▶ Losspielen', '▶ Play'], bauen: ['🏗 Bauen', '🏗 Build'], erschaffen: ['✨ Erschaffen', '✨ Create'], meins: ['🎒 Meins', '🎒 Mine'],
+  const T = {   // the tile labels: key, de, en
+    play: ['start.play', '▶ Weiterspielen', '▶ Play on'], first: ['start.first', '▶ Losspielen', '▶ Play'], bauen: ['start.bauen', '🏗 Bauen', '🏗 Build'], erschaffen: ['start.erschaffen', '✨ Erschaffen', '✨ Create'], meins: ['start.meins', '🎒 Meins', '🎒 Mine'],
   };
+  const tl = (k) => tx(T[k][0], null, T[k][1], T[k][2]);
+  const modeName = (m) => t(m === 'zen' ? 'g.mode.zen' : m === 'creative' ? 'g.mode.creative' : 'g.mode.survival');
+  // 📜 Impressum, Datenschutz, Credits: VR.Legal (its own module) — the button shows only when it is there
+  const legalOK = () => !!(VR.Legal && typeof VR.Legal.open === 'function');
   ST.worldsCache = null;
 
   // ---------------------------------------------------------------- the start screen
@@ -35,23 +42,27 @@
     const box = el('div', 'start');
     const strip = el('div', 'strip');
     const sw = el('div', '', ''); sw.id = 'proSwitch';
-    for (const v of ['0', '1']) { const b = el('button', 'lnk'); b.dataset.act = 'pro'; b.dataset.pro = v; sw.appendChild(b); }
+    for (const v of ['0', '1']) { const b = el('button', 'lnk'); b.type = 'button'; b.dataset.act = 'pro'; b.dataset.pro = v; sw.appendChild(b); }
+    sw.setAttribute('role', 'group');
     strip.appendChild(sw);
-    if (VR.I18N && VR.I18N.picker) strip.appendChild(VR.I18N.picker({ cls: 'onstart' }));
-    const aa = el('button', 'lnk'); aa.dataset.act = 'scale'; aa.textContent = 'Aa'; strip.appendChild(aa);
-    const set = el('button', 'lnk'); set.dataset.act = 'settings'; strip.appendChild(set);
-    box.appendChild(strip);
-    const brand = el('div', 'brand'); brand.appendChild(el('div', 'logo', 'R9&#8209;SI')); if (splash) { splash.style.position = 'static'; splash.style.margin = '0'; brand.appendChild(splash); } box.appendChild(brand);
+    if (VR.I18N && VR.I18N.picker) strip.appendChild(VR.I18N.picker({ cls: 'onstart', ready: true }));   // (the languages with a table: Deutsch, English)
+    const aa = el('button', 'lnk'); aa.type = 'button'; aa.dataset.act = 'scale'; aa.textContent = 'Aa'; strip.appendChild(aa);
+    const set = el('button', 'lnk'); set.type = 'button'; set.dataset.act = 'settings'; strip.appendChild(set);
+    const brand = el('div', 'brand'); brand.appendChild(el('h1', 'logo', 'R9&#8209;SI')); if (splash) { splash.style.position = 'static'; splash.style.margin = '0'; brand.appendChild(splash); } box.appendChild(brand);
     const tiles = el('div', 'tiles');
-    for (const k of TILES) { const b = el('button', 'tile ' + k); b.dataset.act = 'tile'; b.dataset.tile = k; b.innerHTML = `<span class="pic">${SVG[k]}</span><span class="lbl"></span><span class="sub2"></span>`; tiles.appendChild(b); }
+    for (const k of TILES) { const b = el('button', 'tile ' + k); b.type = 'button'; b.dataset.act = 'tile'; b.dataset.tile = k; b.innerHTML = `<span class="pic" aria-hidden="true">${SVG[k]}</span><span class="lbl"></span><span class="sub2"></span>`; tiles.appendChild(b); }
     box.appendChild(tiles);
-    const sub = el('div', 'sub'); const w = el('button', 'lnk'); w.dataset.act = 'worlds'; const n = el('button', 'lnk'); n.dataset.act = 'newworld'; sub.appendChild(w); sub.appendChild(document.createTextNode(' · ')); sub.appendChild(n); box.appendChild(sub);
+    const sub = el('div', 'sub'); const w = el('button', 'lnk'); w.type = 'button'; w.dataset.act = 'worlds'; const n = el('button', 'lnk'); n.type = 'button'; n.dataset.act = 'newworld'; sub.appendChild(w); sub.appendChild(el('span', 'dot', '·')).setAttribute('aria-hidden', 'true'); sub.appendChild(n); box.appendChild(sub);
     const foot = el('div', 'below');
     foot.appendChild(el('div', 'studionote', '')).id = 'studionote';
     foot.appendChild(el('div', 'mphosts', '')).id = 'mphosts';
     foot.appendChild(el('div', 'titlenote', '')).id = 'titlenote';
     box.appendChild(foot);
-    const f2 = el('div', 'foot'); if (gpu) f2.appendChild(gpu); else f2.appendChild(el('span', '', '')).id = 'gpuinfo'; f2.appendChild(el('span', 'credit', '')); box.appendChild(f2);
+    // (the strip comes after the tiles in the page: the first Tab lands on ▶; it still shows top right — on a phone on top)
+    box.appendChild(strip);
+    const f2 = el('div', 'foot'); if (gpu) f2.appendChild(gpu); else f2.appendChild(el('span', '', '')).id = 'gpuinfo';
+    const lg = el('button', 'lnk legal'); lg.type = 'button'; lg.dataset.act = 'legal'; lg.hidden = true; f2.appendChild(lg);
+    f2.appendChild(el('span', 'credit', '')); box.appendChild(f2);
     title.appendChild(box);
     if (VR.Hints) VR.Hints.host = ui.root;
     // 🎒 Meins: its own screen (the cards come with renderMeins)
@@ -59,7 +70,7 @@
     worldsPanel(); createForm();
     texts();
     if (VR.UIPrefs) VR.UIPrefs.on(() => { texts(); });
-    if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { texts(); worldsPanel(); createForm(); if (ui.screen === 'worlds') ST.worlds(ui); });
+    if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { texts(); worldsPanel(); createForm(); if (ui.screen === 'worlds') ST.worlds(ui); else if (ui.screen === 'meins') ST.renderMeins(); try { if (ui.renderHosts) ui.renderHosts(); if (ui.studioNote) ui.studioNote(); } catch (e) { /* not built yet */ } });
     // the worlds, read once now and again whenever the start screen shows
     ST.listWorlds().then(() => texts());
   }
@@ -70,19 +81,20 @@
     const p = prefs(), ws = ST.worldsCache, last = ws && ws[0];
     for (const k of TILES) {
       const b = $(`#title .tile[data-tile="${k}"]`); if (!b) continue;
-      const lbl = k === 'play' ? (ws === null ? '▶ …' : ws.length ? tx('start.play', null, T.play[0], T.play[1]) : tx('start.first', null, T.first[0], T.first[1])) : tx('start.' + k, null, T[k][0], T[k][1]);
+      const lbl = k === 'play' ? (ws === null ? '▶ …' : ws.length ? tl('play') : tl('first')) : tl(k);
       $('.lbl', b).textContent = lbl;
       $('.sub2', b).textContent = k === 'play' ? (last ? last.name : (ws && ws.length === 0 ? tx('start.myWorld', null, 'Meine Welt', 'My World') : '')) : k === 'bauen' ? tx('start.bauenSub', null, 'Häuser & Möbel setzen', 'Place houses & furniture') : k === 'erschaffen' ? tx('start.erschaffenSub', null, 'Haus · Fahrzeug · Figur …', 'House · vehicle · figure …') : tx('start.meinsSub', null, 'Favoriten · Designs · Welten', 'Favourites · designs · worlds');
-      b.title = k === 'play' ? (last ? tx('start.playT', { n: last.name }, 'Weiter in „{n}", wo du warst', 'Back into “{n}”, where you were') : tx('start.firstT', null, 'Macht deine erste Welt und bringt dich hinein', 'Makes your first world and takes you in')) : '';
+      b.title = k === 'play' ? (last ? tx('start.playT', { n: last.name }, 'Weiter in „{n}“, wo du warst', 'Back into “{n}”, where you were') : tx('start.firstT', null, 'Macht deine erste Welt und bringt dich hinein', 'Makes your first world and takes you in')) : '';
       if (k === 'play') b.classList.toggle('pulse', !!(VR.Hints && VR.Hints.want('play')));
     }
     $('#title [data-act="worlds"]').textContent = tx('start.worlds', null, 'Andere Welt', 'Another world');
     $('#title [data-act="newworld"]').textContent = tx('start.newWorld', null, '＋ Neue Welt', '＋ New world');
     $('#title [data-act="settings"]').textContent = tx('start.settings', null, '⚙ Einstellungen', '⚙ Settings');
-    const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.classList.toggle('on', p.scale >= 1.3);
+    const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.setAttribute('aria-label', aa.title); aa.setAttribute('aria-pressed', String(p.scale >= 1.3)); aa.classList.toggle('on', p.scale >= 1.3);
+    for (const b of document.querySelectorAll('#ui [data-act="legal"]')) { b.hidden = !legalOK(); b.textContent = tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); }
     pauseTexts();
-    for (const b of document.querySelectorAll('#proSwitch button, .proswitch button')) { const on = (b.dataset.pro === '1') === !!p.pro; b.classList.toggle('on', on); b.textContent = b.dataset.pro === '1' ? tx('start.pro', null, 'Profi', 'Profi') : tx('start.einfach', null, 'Einfach', 'Simple'); b.title = b.dataset.pro === '1' ? tx('start.proT', null, 'Alles: Werkbank, Crafter, Welten-Formular, Befehle, Entwickler-Reiter', 'Everything: workbench, crafter, the world form, commands, developer tabs') : tx('start.einfachT', null, 'Nur das Nötige, groß und klar', 'Only what you need, big and clear'); }
-    { const h = $('#meins .mhead h2'), bk = $('#meins [data-act="meinsback"]'); if (h) h.textContent = tx('start.meins', null, T.meins[0], T.meins[1]); if (bk) bk.textContent = tx('start.back', null, '← Zurück', '← Back'); }
+    for (const b of document.querySelectorAll('#proSwitch button, .proswitch button')) { const on = (b.dataset.pro === '1') === !!p.pro; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.textContent = b.dataset.pro === '1' ? tx('start.pro', null, 'Profi', 'Pro') : tx('start.einfach', null, 'Einfach', 'Simple'); b.title = b.dataset.pro === '1' ? tx('start.proT', null, 'Alles: Werkbank, Crafter, Welten-Formular, Befehle, Entwickler-Reiter', 'Everything: workbench, crafter, the world form, commands, developer tabs') : tx('start.einfachT', null, 'Nur das Nötige, groß und klar', 'Only what you need, big and clear'); }
+    { const h = $('#meins .mhead h2'), bk = $('#meins [data-act="meinsback"]'); if (h) h.textContent = tl('meins'); if (bk) bk.textContent = tx('start.back', null, '← Zurück', '← Back'); }
     const credit = $('#title .credit'); if (credit) credit.textContent = tx('start.credit', null, 'Ein eigenes Voxelspiel · inspiriert vom Block-Sandbox-Genre', 'Original voxel game · inspired by the block sandbox genre');
   }
   ST.texts = texts;
@@ -124,21 +136,25 @@
     panel.innerHTML = `<h2>🌍 ${esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))}</h2><div class="worldlist" id="worldlist"></div><div class="row gap wrow"><button class="btn primary" data-act="newworld">${esc(tx('start.newWorld', null, '＋ Neue Welt', '＋ New world'))}</button><button class="btn" data-act="back">${esc(tx('start.back', null, '← Zurück', '← Back'))}</button></div>`;
     panel.onclick = (e) => { const arm = $('#worlds .wcard button.arm'); if (arm && !arm.contains(e.target)) { arm.classList.remove('arm'); arm.textContent = tx('start.del', null, '🗑 Löschen', '🗑 Delete'); } };
   }
+  // one world, one card: ▶ · 🏗 · ✎ · 🗑 (the worlds screen and 🎒 Meins); seed and time are a Profi detail
+  function worldCard(w) {
+    const c = el('div', 'wcard'); c.dataset.id = w.id;
+    c.innerHTML = `<div class="wtxt"><div class="wn"></div><div class="wm"></div></div><div class="wacts"></div>`;
+    $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
+    const when = w.lastPlayed ? new Date(w.lastPlayed).toLocaleString(VR.I18N ? VR.I18N.locale() : undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    $('.wm', c).innerHTML = esc(modeName(w.mode)) + (when ? ' · ' + esc(when) : '') + `<span class="pro"> · Seed ${w.seed >>> 0}</span>`;
+    const acts = $('.wacts', c);
+    const BTN = [['play', tx('start.w.play', null, '▶ Spielen', '▶ Play'), 'primary'], ['bauen', tx('start.w.bauen', null, '🏗 Bauen', '🏗 Build'), ''], ['rename', tx('start.w.rename', null, '✎ Name', '✎ Rename'), ''], ['del', tx('start.del', null, '🗑 Löschen', '🗑 Delete'), 'danger']];
+    for (const [k, label, cls] of BTN) { const b = el('button', 'btn small ' + cls); b.type = 'button'; b.dataset.act = 'w:' + k; b.dataset.w = k; b.dataset.id = w.id; b.textContent = label; if (k === 'rename' || k === 'del') b.setAttribute('aria-label', label + ' · ' + (w.name || '')); acts.appendChild(b); }
+    return c;
+  }
   ST.worlds = async function (ui) {
     ui = ui || ST.ui; ui.show('worlds');
     const list = await ST.listWorlds(), wl = $('#worldlist'); if (!wl) return;
     wl.innerHTML = '';
     if (!list.length) { wl.appendChild(el('div', 'note', esc(tx('start.noWorlds', null, 'Noch keine Welt — ＋ Neue Welt macht eine.', 'No world yet — ＋ New world makes one.')))); return; }
-    const mode = (m) => (m === 'zen' ? tx('start.zen', null, 'Zen-Baumeister', 'Zen Builder') : m === 'creative' ? tx('start.creative', null, 'Kreativ', 'Creative') : tx('start.survival', null, 'Überleben', 'Survival'));
-    for (const w of list) {
-      const c = el('div', 'wcard'); c.dataset.id = w.id;
-      c.innerHTML = `<div class="wtxt"><div class="wn"></div><div class="wm"></div></div><div class="wacts"></div>`;
-      $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
-      $('.wm', c).textContent = mode(w.mode) + ' · Seed ' + (w.seed >>> 0) + (w.lastPlayed ? ' · ' + new Date(w.lastPlayed).toLocaleString(VR.I18N ? VR.I18N.locale() : undefined, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
-      const acts = $('.wacts', c);
-      for (const [k, de, en, cls] of [['play', '▶ Spielen', '▶ Play', 'primary'], ['bauen', '🏗 Bauen', '🏗 Build', ''], ['rename', '✎ Name', '✎ Name', ''], ['del', '🗑 Löschen', '🗑 Delete', 'danger']]) { const b = el('button', 'btn small ' + cls); b.dataset.act = 'w:' + k; b.dataset.w = k; b.dataset.id = w.id; b.textContent = tx('start.w.' + k, null, de, en); acts.appendChild(b); }
-      wl.appendChild(c);
-    }
+    for (const w of list) wl.appendChild(worldCard(w));
+    const first = $('#worldlist .wcard [data-w="play"]'); if (first && ST.kbd) first.focus({ preventScroll: true });   // (keyboard: Enter plays the newest world)
   };
   async function worldAct(k, b) {
     const g = game(), id = b.dataset.id, w = (ST.worldsCache || []).find(x => x.id === id); if (!w) return;
@@ -155,67 +171,60 @@
     }
     if (k === 'del') {
       if (b.classList.contains('arm') && Date.now() - (+b.dataset.armAt || 0) < 4000) { b.classList.remove('arm'); try { await g.store.deleteWorld(id); } catch (e) { /* */ } ST.worldsCache = null; ST.worlds(); return; }
-      b.classList.add('arm'); b.dataset.armAt = String(Date.now()); b.textContent = tx('start.delSure', null, 'Sicher? Nochmal 🗑', 'Sure? Again 🗑');
+      b.classList.add('arm'); b.dataset.armAt = String(Date.now()); b.textContent = tx('start.delSure', null, 'Sicher? Nochmal 🗑', 'Sure? 🗑 again');
       setTimeout(() => { if (b.isConnected && b.classList.contains('arm')) { b.classList.remove('arm'); b.textContent = tx('start.del', null, '🗑 Löschen', '🗑 Delete'); } }, 4000);
     }
   }
 
   // ---------------------------------------------------------------- the pause menu (Einfach: seven things; Profi adds the rest)
+  // its words are the game's table keys (data-t / data-tt): ui.js's retext() renews them when the language changes
   function pauseMenu() {
     const panel = $('#pause .panel'); if (!panel || panel.dataset.w1) return;
     panel.dataset.w1 = '1';
-    panel.innerHTML = `<h2 class="ptitle"></h2>
-      <button class="btn primary" data-act="resume"></button>
-      <button class="btn" data-act="bauenlive"></button>
-      <button class="btn" data-act="meins"></button>
+    panel.innerHTML = `<h2 class="ptitle" data-t="g.pause.title"></h2>
+      <button type="button" class="btn primary" data-act="resume" data-t="g.pause.resume"></button>
+      <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
+      <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
       <div id="mppanel" class="col gap"></div>
-      <div class="row gap"><button class="btn" data-act="gohome" style="flex:1"></button><button class="btn" data-act="sethome" style="flex:1"></button></div>
+      <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
       <div id="zenpanel" class="col gap"></div>
-      <button class="btn studio pro" data-act="studiolive" id="studiolive"></button>
-      <button class="btn pro" data-act="codex"></button>
-      <button class="btn pro" data-act="photo"></button>
-      <button class="btn" data-act="settings"></button>
-      <button class="btn" data-act="quit"></button>
-      <div class="row prorow"><div class="proswitch"><button class="lnk" data-act="pro" data-pro="0"></button><button class="lnk" data-act="pro" data-pro="1"></button></div></div>
+      <button type="button" class="btn studio pro" data-act="studiolive" id="studiolive" data-t="g.pause.studio" data-tt="g.pause.studioTip"></button>
+      <button type="button" class="btn pro" data-act="codex" data-t="g.pause.codex"></button>
+      <button type="button" class="btn pro" data-act="photo" data-t="g.pause.photo"></button>
+      <button type="button" class="btn" data-act="settings" data-t="g.pause.settings"></button>
+      <button type="button" class="btn" data-act="quit" data-t="g.pause.quit"></button>
+      <div class="row prorow"><div class="proswitch" role="group"><button type="button" class="lnk" data-act="pro" data-pro="0"></button><button type="button" class="lnk" data-act="pro" data-pro="1"></button></div><button type="button" class="lnk legal" data-act="legal" hidden></button></div>
       <div class="note" style="text-align:center" id="pausenote"></div>`;
+    if (VR.I18N && VR.I18N.retext) VR.I18N.retext(panel);
     texts();
   }
   function pauseTexts() {
     const panel = $('#pause .panel'); if (!panel || !panel.dataset.w1) return;
-    const t = (act, de, en, title) => { const b = $(`#pause [data-act="${act}"]`); if (!b) return; b.textContent = tx('pause.' + act, null, de, en); if (title) b.title = title; };
-    $('#pause .ptitle').textContent = tx('pause.title', null, '⏸ Pause', '⏸ Paused');
-    t('resume', '▶ Weiterspielen', '▶ Play on');
-    t('bauenlive', '🏗 Bauen', '🏗 Build', tx('pause.bauenT', null, 'Häuser und Möbel auf die Karte setzen — das Spiel baut sie', 'Place houses and furniture on the map — the game builds them'));
-    t('meins', '🎒 Meins', '🎒 Mine');
-    t('gohome', '🏠 Zu meinem Platz', '🏠 To my spot');
-    t('sethome', '📍 Mein Platz ist hier', '📍 My spot is here', tx('pause.sethomeT', null, 'Dein Platz ist, wo du jetzt stehst: 🏠 und ▶ Spielen aus dem Studio bringen dich hierher', 'Your spot is where you stand now: 🏠 and ▶ Play from the Studio bring you back here'));
-    t('studiolive', '🧰 Werkbank · diese Welt', '🧰 Workbench · this world', tx('pause.studioliveT', null, 'Die Werkbank des R9 Studios auf dieser Welt — auswählen, füllen, kopieren, Häuser planen, umgestalten', 'The R9 Studio\'s workbench on this world — select, fill, copy, plan houses, restyle'));
-    t('codex', '📖 Codex', '📖 Codex');
-    t('photo', '📷 Fotomodus', '📷 Photo mode');
-    t('settings', '⚙ Einstellungen', '⚙ Settings');
-    t('quit', '⏏ Speichern & zum Start', '⏏ Save & to the start');
+    if (VR.I18N && VR.I18N.retext) VR.I18N.retext(panel);
   }
   ST.pauseMenu = pauseMenu;
 
   // ---------------------------------------------------------------- the create form (Profi), in German
   function createForm() {
     const panel = $('#create .panel'); if (!panel) return;
-    const seg = (id, items, on) => `<div class="seg" id="${id}">` + items.map(([v, de, en, sde, sen]) => `<button data-v="${v}"${v === on ? ' class="on"' : ''}>${esc(tx('start.cw.' + v, null, de, en))}${sde ? `<small>${esc(tx('start.cw.' + v + 'S', null, sde, sen))}</small>` : ''}</button>`).join('') + '</div>';
-    panel.innerHTML = `<h2>${esc(tx('start.newWorldTitle', null, '＋ Neue Welt', '＋ New world'))}</h2>
-      <div class="field"><label>${esc(tx('start.cw.name', null, 'Weltname', 'World name'))}</label><input type="text" id="cw_name" maxlength="40"></div>
-      <div class="field"><label>${esc(tx('start.cw.mode', null, 'Spielart', 'Game mode'))}</label>${seg('cw_mode', [['survival', 'Überleben', 'Survival', 'Sammeln, bauen, überleben', 'Gather, craft, survive'], ['creative', 'Kreativ', 'Creative', 'Alle Blöcke, Fliegen', 'Unlimited blocks, flight'], ['zen', 'Zen-Baumeister', 'Zen Builder', 'In Ruhe: keine Monster, kein Schaden', 'Unbothered: no mobs, no damage']], 'zen')}</div>
-      <div class="field"><label>${esc(tx('start.cw.diff', null, 'Schwierigkeit', 'Difficulty'))}</label>${seg('cw_diff', [['peaceful', 'Friedlich', 'Peaceful'], ['easy', 'Leicht', 'Easy'], ['normal', 'Normal', 'Normal'], ['hard', 'Schwer', 'Hard']], 'normal')}</div>
-      <div class="field"><label>${esc(tx('start.cw.type', null, 'Welttyp', 'World type'))}</label>${seg('cw_type', [['default', 'Realm', 'Realm'], ['large', 'Große Biome', 'Large biomes'], ['amplified', 'Verstärkt', 'Amplified'], ['flat', 'Flach', 'Flat']], 'default')}</div>
-      <div class="field"><label>${esc(tx('start.cw.seed', null, 'Seed (optional)', 'Seed (optional)'))}</label><input type="text" id="cw_seed" placeholder="${esc(tx('start.cw.seedP', null, 'Leer lassen für Zufall', 'Leave blank for random'))}"></div>
+    const seg = (id, label, items, on) => `<div class="seg" id="${id}" role="group" aria-label="${esc(label)}">` + items.map(([v, name, sub]) => `<button type="button" data-v="${v}"${v === on ? ' class="on"' : ''}>${esc(name)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`).join('') + '</div>';
+    const L = { name: tx('start.cw.name', null, 'Weltname', 'World name'), mode: tx('start.cw.mode', null, 'Spielart', 'Game mode'), diff: tx('start.cw.diff', null, 'Schwierigkeit', 'Difficulty'), type: tx('start.cw.type', null, 'Welttyp', 'World type'), seed: tx('start.cw.seed', null, 'Seed (optional)', 'Seed (optional)') };
+    panel.innerHTML = `<h2>${esc(tx('start.newWorld', null, '＋ Neue Welt', '＋ New world'))}</h2>
+      <div class="field"><label for="cw_name">${esc(L.name)}</label><input type="text" id="cw_name" maxlength="40"></div>
+      <div class="field"><label>${esc(L.mode)}</label>${seg('cw_mode', L.mode, [['survival', t('g.mode.survival'), tx('start.cw.survivalS', null, 'Sammeln, bauen, überleben', 'Gather, craft, survive')], ['creative', t('g.mode.creative'), tx('start.cw.creativeS', null, 'Alle Blöcke, Fliegen', 'Every block, flying')], ['zen', t('g.mode.zen'), tx('start.cw.zenS', null, 'In Ruhe: keine Monster, kein Schaden', 'At ease: no monsters, no damage')]], 'zen')}</div>
+      <div class="field"><label>${esc(L.diff)}</label>${seg('cw_diff', L.diff, [['peaceful', tx('start.cw.peaceful', null, 'Friedlich', 'Peaceful')], ['easy', tx('start.cw.easy', null, 'Leicht', 'Easy')], ['normal', tx('start.cw.normal', null, 'Normal', 'Normal')], ['hard', tx('start.cw.hard', null, 'Schwer', 'Hard')]], 'normal')}</div>
+      <div class="field"><label>${esc(L.type)}</label>${seg('cw_type', L.type, [['default', tx('start.cw.default', null, 'Realm', 'Realm')], ['large', tx('start.cw.large', null, 'Große Biome', 'Large biomes')], ['amplified', tx('start.cw.amplified', null, 'Verstärkt', 'Amplified')], ['flat', tx('start.cw.flat', null, 'Flach', 'Flat')]], 'default')}</div>
+      <div class="field"><label for="cw_seed">${esc(L.seed)}</label><input type="text" id="cw_seed" placeholder="${esc(tx('start.cw.seedP', null, 'Leer lassen für Zufall', 'Leave empty for a random one'))}"></div>
       <div class="row gap" style="flex-wrap:wrap">
         <label class="row gap note"><input type="checkbox" id="cw_cheats" checked> ${esc(tx('start.cw.cheats', null, 'Befehle', 'Commands'))}</label>
         <label class="row gap note"><input type="checkbox" id="cw_keep"> ${esc(tx('start.cw.keep', null, 'Inventar behalten', 'Keep inventory'))}</label>
         <label class="row gap note"><input type="checkbox" id="cw_kit" checked> ${esc(tx('start.cw.kit', null, 'Starter-Kit', 'Starter kit'))}</label>
       </div>
       <div class="hr"></div>
-      <div class="row gap"><button class="btn primary" data-act="docreate">${esc(tx('start.cw.go', null, 'Welt erstellen', 'Create world'))}</button><button class="btn small" data-act="toworlds">${esc(tx('start.cw.cancel', null, 'Abbrechen', 'Cancel'))}</button></div>`;
-    for (const id of ['cw_mode', 'cw_diff', 'cw_type']) $('#' + id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; for (const x of b.parentNode.children) x.classList.toggle('on', x === b); });
-    for (const i of ['cw_name', 'cw_seed']) $('#' + i).addEventListener('keydown', (e) => e.stopPropagation());
+      <div class="row gap"><button type="button" class="btn primary" data-act="docreate">${esc(tx('start.cw.go', null, 'Welt erstellen', 'Create world'))}</button><button type="button" class="btn small" data-act="toworlds">${esc(tx('start.cw.cancel', null, 'Abbrechen', 'Cancel'))}</button></div>`;
+    for (const id of ['cw_mode', 'cw_diff', 'cw_type']) $('#' + id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; for (const x of b.parentNode.children) { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); } });
+    for (const id of ['cw_mode', 'cw_diff', 'cw_type']) for (const x of $('#' + id).children) x.setAttribute('aria-pressed', String(x.classList.contains('on')));
+    for (const i of ['cw_name', 'cw_seed']) $('#' + i).addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { const go = $('#create [data-act="docreate"]'); if (go) go.click(); } });
   }
 
   // ---------------------------------------------------------------- the actions (before ui.js's own)
@@ -223,10 +232,10 @@
     switch (a) {
       case 'tile': { const k = b && b.dataset.tile; if (k === 'play') ST.play(); else if (k === 'bauen') ST.bauen(); else if (k === 'erschaffen') ST.erschaffen(); else if (k === 'meins') ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true; }
       case 'worlds': ST.worlds(ui); return true;
-      case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
-      case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(tx('start.noStudioGuest', null, 'Das Studio öffnet nur deine eigenen Welten (nicht als Gast).', 'The Studio opens your own worlds (not as a guest).'), 2400); return true; }
+      case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
+      case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
-      case 'sethome': { const g = game(); if (g && g.setSpawnHere()) { ui.hint(tx('start.spawnSet', null, '📍 Dein Platz ist jetzt hier — 🏠 bringt dich zurück', '📍 Your spot is here now — 🏠 brings you back'), 2600); if (ui.chatLine) ui.chatLine(tx('start.spawnSetLine', null, '📍 Dein Platz ist jetzt hier.', '📍 Your spot is here now.'), '#9affd8'); } return true; }
+      case 'legal': if (legalOK()) VR.Legal.open(); return true;
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;
       case 'scale': if (VR.UIPrefs) VR.UIPrefs.set({ scale: prefs().scale >= 1.3 ? 1.15 : 1.3 }); return true;
@@ -236,7 +245,7 @@
     }
   };
   // ---------------------------------------------------------------- 🎒 Meins: your things as cards (and the worlds)
-  ST.meins = function (from) { const ui = ST.ui; if (!ui) return; ST.meinsFrom = from || 'title'; ui.show('meins'); ST.renderMeins(); };
+  ST.meins = function (from) { const ui = ST.ui; if (!ui) return; ST.meinsFrom = from || 'title'; ui.show('meins'); ST.renderMeins().then(() => { const c = $('#meins .mchips button.on'); if (c && ST.kbd) c.focus({ preventScroll: true }); }); };
   ST.meinsChip = 'all';
   const CHIPS = () => [['all', tx('meins.all', null, 'Alles', 'All')], ['fav', '★ ' + tx('meins.fav', null, 'Favoriten', 'Favourites')], ['house', '🏠 ' + tx('meins.house', null, 'Häuser', 'Houses')], ['furn', '🪑 ' + tx('meins.furn', null, 'Möbel', 'Furniture')], ['parts', '🧱 ' + tx('meins.parts', null, 'Bauteile', 'Pieces')], ['worlds', '🌍 ' + tx('start.worldsTitle', null, 'Welten', 'Worlds')]];
   const chipOf = (id) => { const k = id[0]; return k === 'h' || k === 'k' || k === 's' ? 'house' : k === 'm' || k === 'g' ? 'furn' : k === 'p' ? 'parts' : 'other'; };
@@ -244,7 +253,7 @@
     const Dg = VR.Ding, chips = $('#meins .mchips'), body = $('#meins .mbody'); if (!Dg || !chips || !body) return;
     dingHandlers();
     chips.innerHTML = '';
-    for (const [k, label] of CHIPS()) { const b = el('button', k === ST.meinsChip ? 'on' : '', esc(label)); b.onclick = () => { ST.meinsChip = k; ST.renderMeins(); }; chips.appendChild(b); }
+    for (const [k, label] of CHIPS()) { const b = el('button', k === ST.meinsChip ? 'on' : '', esc(label)); b.type = 'button'; b.dataset.chip = k; b.setAttribute('aria-pressed', String(k === ST.meinsChip)); b.onclick = () => { ST.meinsChip = k; ST.renderMeins().then(() => { const n = $(`#meins .mchips [data-chip="${k}"]`); if (n && ST.kbd) n.focus({ preventScroll: true }); }); }; chips.appendChild(b); }
     body.innerHTML = '';
     const all = Dg.list().filter(x => Dg.parse(x.id));
     const chip = ST.meinsChip, items = chip === 'all' ? all : chip === 'fav' ? all.filter(x => Dg.isFav(x.id)) : chip === 'worlds' ? [] : all.filter(x => chipOf(x.id) === chip);
@@ -254,14 +263,7 @@
     Dg.fillNow(body, 24);   // (the first screen of cards has its pictures at once; the rest as they scroll in)
     if (ws.length) {
       body.appendChild(el('div', 'grp', '🌍 ' + esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))));
-      for (const w of ws) {
-        const c = el('div', 'wcard'); c.dataset.id = w.id; c.style.gridColumn = '1 / -1';
-        c.innerHTML = `<div class="wtxt"><div class="wn"></div><div class="wm"></div></div><div class="wacts"></div>`;
-        $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
-        $('.wm', c).textContent = (w.mode === 'zen' ? tx('start.zen', null, 'Zen-Baumeister', 'Zen Builder') : w.mode === 'creative' ? tx('start.creative', null, 'Kreativ', 'Creative') : tx('start.survival', null, 'Überleben', 'Survival')) + (w.lastPlayed ? ' · ' + new Date(w.lastPlayed).toLocaleDateString(VR.I18N ? VR.I18N.locale() : undefined) : '');
-        for (const [k, de, en, cls] of [['play', '▶ Spielen', '▶ Play', 'primary'], ['bauen', '🏗 Bauen', '🏗 Build', ''], ['rename', '✎ Name', '✎ Name', ''], ['del', '🗑 Löschen', '🗑 Delete', 'danger']]) { const b = el('button', 'btn small ' + cls); b.dataset.act = 'w:' + k; b.dataset.w = k; b.dataset.id = w.id; b.textContent = tx('start.w.' + k, null, de, en); $('.wacts', c).appendChild(b); }
-        body.appendChild(c);
-      }
+      for (const w of ws) { const c = worldCard(w); c.style.gridColumn = '1 / -1'; body.appendChild(c); }
     }
   };
   // the cards' actions on this page: 👁 and ✏️ open the R9 Studio on the thing, 📍 puts it in your hand (in play now,
@@ -269,7 +271,7 @@
   function dingHandlers() {
     const Dg = VR.Ding; if (!Dg || Dg.handlers.__game) return;
     // in play the Studio opens over the game (nothing is lost); from the start screen it is the page itself
-    const studio = (h) => { const g = game(); if (g && g.state === 'play') { if (!g.openStudio(h)) g.ui.hint(tx('start.noStudioGuest', null, 'Das Studio öffnet nur deine eigenen Welten (nicht als Gast).', 'The Studio opens your own worlds (not as a guest).'), 2400); return; } try { location.href = 'studio.html' + (location.search || '') + h; } catch (e) { /* no studio page next to this one */ } };
+    const studio = (h) => { const g = game(); if (g && g.state === 'play') { if (!g.openStudio(h)) g.ui.hint(t('g.pause.studioGuest'), 2400); return; } try { location.href = 'studio.html' + (location.search || '') + h; } catch (e) { /* no studio page next to this one */ } };
     Dg.handlers = {
       __game: true,
       view: (id) => studio('#ding/' + id),
@@ -346,19 +348,44 @@
   const origAct = UI.prototype.act;
   UI.prototype.act = function (a, b) { if (ST.act(a, b, this)) return; origAct.call(this, a, b); };
   const origShow = UI.prototype.show;
-  UI.prototype.show = function (id) { origShow.call(this, id); if (id === 'title') ST.render(); };
+  UI.prototype.show = function (id) {
+    origShow.call(this, id); if (id === 'title') ST.render();
+    // (the canvas leaves the Tab order while a screen is up: the first Tab on the start screen is ▶)
+    const gl = document.getElementById('gl'); if (gl) gl.tabIndex = id ? -1 : 0;
+  };
   UI.prototype.showWorlds = function () { return ST.worlds(this); };
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ST.ui && ST.ui.screen === 'meins') { e.preventDefault(); e.stopImmediatePropagation(); ST.act('meinsback', null, ST.ui); } }, true);
+  // Esc: one step back — 🎒 Meins to where it came from; at the start the worlds, the create form and the settings too
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !ST.ui) return;
+    const ui = ST.ui, g = game(), sc = ui.screen, ae = document.activeElement;
+    if (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName) && ae.value && sc !== 'meins') return;   // (a field with text: Esc stays with it)
+    let to = null;
+    if (sc === 'meins') { e.preventDefault(); e.stopImmediatePropagation(); ST.act('meinsback', null, ui); to = ui.screen === 'pause' ? '#pause [data-act="meins"]' : '#title .tile[data-tile="meins"]'; }
+    else if (g && g.state === 'title' && (sc === 'worlds' || sc === 'create' || sc === 'settings')) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (sc === 'worlds') { ui.show('title'); to = '#title [data-act="worlds"]'; }
+      else if (sc === 'create') { ST.worlds(ui); to = '#worlds [data-act="newworld"]'; }
+      else { ui.act('setback'); to = '#title [data-act="settings"]'; }
+    }
+    if (to && ST.kbd) setTimeout(() => { const t = $(to) || $('#title .tile[data-tile="play"]'); if (t && t.focus) t.focus({ preventScroll: true }); }, 30);
+  }, true);
   const origPause = UI.prototype.pause;
   UI.prototype.pause = function () { if (this.game.state !== 'play') return; pauseMenu(); origPause.call(this); };
-  // chat commands are a Profi thing (Einfach: the chat stays, a /command gets the note)
+  // chat commands are a Profi thing (Einfach: the chat stays, a /command gets the note) — except /lang (/sprache):
+  // the language is a setting Einfach keeps
+  ST.einfachCmd = (text) => /^\/(lang|sprache)(\s|$)/i.test(text);
   if (VR.Game) {
     const origChat = VR.Game.prototype.chat;
     VR.Game.prototype.chat = function (text) {
-      if (typeof text === 'string' && text.startsWith('/') && !prefs().pro) { this.ui.chatLine(tx('start.cmdPro', null, 'Befehle gibt es im Profi-Modus (Start · Profi).', 'Commands are a Profi thing (Start · Profi).'), '#ffd27a'); return; }
+      if (typeof text === 'string' && text.startsWith('/') && !prefs().pro && !ST.einfachCmd(text)) { this.ui.chatLine(tx('start.cmdPro', null, 'Befehle gibt es im Profi-Modus (Start · Profi).', 'Commands come with Pro (start screen · Pro).'), '#ffd27a'); return; }
       return origChat.call(this, text);
     };
   }
+  // keyboard or pointer: a screen opened with the keyboard puts the focus on its first button (Tab · Enter · Esc)
+  let kbd = false;
+  window.addEventListener('keydown', (e) => { if (e.key === 'Tab' || e.key === 'Enter' || e.key === ' ' || e.key === 'Escape' || /^Arrow/.test(e.key)) kbd = true; }, true);
+  window.addEventListener('pointerdown', () => { kbd = false; }, true);
+  Object.defineProperty(ST, 'kbd', { get: () => kbd });
   // the multiplayer box on the start screen: in Einfach only when there is a friend's world to join
   const origHosts = UI.prototype.renderHosts;
   if (origHosts) UI.prototype.renderHosts = function () { origHosts.call(this); const box = $('#mphosts'); if (box) box.classList.toggle('has', !!box.querySelector('.mphost')); };

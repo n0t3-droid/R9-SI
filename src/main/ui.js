@@ -12,8 +12,7 @@
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const SPLASHES =['Now with ringed gas giants!', 'Crystal spires ahead!', 'Aether flows bright!', 'Zen Builder mode!', 'Fly your own shuttle!', 'Endless procedural beauty!', 'Voxels, but make it cosmic!', 'Mind the lava rivers!', 'Meteor showers tonight!', 'Build something beautiful!'];
   // the loading tips: TL('g.load.tips')
-const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game and click <b>Share</b> (top right).</li><li>Enter your friend\'s <b>email</b> and choose <b>Contributor</b> (or Editor), then send.</li><li>Your friend signs in to Claude <b>with that email</b> and opens the same link (the email is only a notice).</li><li>Start or load a world — it shows up on their title screen with a <b>Join</b> button.</li></ol>';
-  const MP_OFF_HTML = 'Multiplayer isn\'t available in this copy. Open the game <b>on claude.ai while signed in</b> — the downloaded index.html plays single-player.';
+  // (the invitation steps and the offline note are in the tables: g.mp.inviteHow, g.mp.off)
   // the creative palette's tabs: their names are g.cat.<key> in the tables
   const CAT_TABS = ['fav', 'build', 'modern', 'vmodern', 'blueprints', 'arch', 'vtech', 'vlife', 'vshop', 'nature', 'func', 'volt', 'tech', 'tools', 'combat', 'food', 'items', 'spawn', 'search'];
 
@@ -209,24 +208,24 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
           // pasted (the older text export too): favourites, designs and Bauteile are merged in (VR.Pack)
           const n = $('#studionote'); if (!n || !VR.Custom) break;
           if (n.querySelector('textarea')) break;
-          const ta = document.createElement('textarea'); ta.className = 'studioxfer'; ta.placeholder = 'Im R9 Studio: 📦 Mitnehmen — dann hier die Datei wählen (📂) oder ihren Text einfügen …';
-          const ok = document.createElement('button'); ok.className = 'btn tiny'; ok.textContent = 'Übernehmen';
+          const ta = document.createElement('textarea'); ta.className = 'studioxfer'; ta.placeholder = T('g.title.importPh'); ta.setAttribute('aria-label', T('g.title.packIn'));
+          const ok = document.createElement('button'); ok.className = 'btn tiny'; ok.textContent = T('g.title.take');
           ok.onclick = () => this.studioTake(ta.value);
-          const file = document.createElement('button'); file.className = 'btn tiny'; file.dataset.act = 'studiofile'; file.textContent = '📂 Datei';
+          const file = document.createElement('button'); file.className = 'btn tiny'; file.dataset.act = 'studiofile'; file.textContent = T('g.title.file');
           n.appendChild(ta); n.appendChild(ok); n.appendChild(file); ta.focus();
           break;
         }
         case 'studiofile': {
           let inp = document.getElementById('studioFileIn');
-          if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.id = 'studioFileIn'; inp.accept = '.json,application/json'; inp.style.display = 'none'; document.body.appendChild(inp); inp.onchange = () => { const f = inp.files && inp.files[0]; inp.value = ''; if (f) f.text().then((t) => this.studioTake(t), () => this.titleNote('Import fehlgeschlagen: Datei nicht lesbar')); }; }
+          if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.id = 'studioFileIn'; inp.accept = '.json,application/json'; inp.style.display = 'none'; document.body.appendChild(inp); inp.onchange = () => { const f = inp.files && inp.files[0]; inp.value = ''; if (f) f.text().then((t) => this.studioTake(t), () => this.titleNote(T('g.title.unreadable'))); }; }
           inp.click();
           break;
         }
         case 'studioreset': {
           // two clicks: arm, then confirm (no browser dialogs in an embedded page)
           if (!VR.Custom) break;
-          if (this._studioArm && Date.now() - this._studioArm < 4000) { this._studioArm = 0; g.reloadCustom({ v: 1, houses: {}, models: {} }); this.titleNote('Alle Studio-Designs entfernt — die Originale sind zurück.'); }
-          else { this._studioArm = Date.now(); const bt = this.root.querySelector('[data-act="studioreset"]'); if (bt) bt.textContent = 'Sicher? Nochmal klicken'; }
+          if (this._studioArm && Date.now() - this._studioArm < 4000) { this._studioArm = 0; g.reloadCustom({ v: 1, houses: {}, models: {} }); this.titleNote(T('g.title.resetDone')); }
+          else { this._studioArm = Date.now(); const bt = this.root.querySelector('[data-act="studioreset"]'); if (bt) bt.textContent = T('g.title.resetSure'); }
           break;
         }
         case 'setback': this.show(this.prevScreen === 'pause' ? 'pause' : 'title'); this.game.saveSettings(); break;
@@ -236,7 +235,7 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
         case 'docreate': {
           const pick = (id) => $('#' + id + ' .on').dataset.v;
           const mode = pick('cw_mode');
-          g.createWorld({ name: $('#cw_name').value.trim() || 'New World', mode, difficulty: mode === 'zen' ? 'peaceful' : pick('cw_diff'), type: pick('cw_type'), seed: $('#cw_seed').value.trim(), cheats: $('#cw_cheats').checked, keep: $('#cw_keep').checked, kit: $('#cw_kit').checked });
+          g.createWorld({ name: $('#cw_name').value.trim() || T('start.newWorldName'), mode, difficulty: mode === 'zen' ? 'peaceful' : pick('cw_diff'), type: pick('cw_type'), seed: $('#cw_seed').value.trim(), cheats: $('#cw_cheats').checked, keep: $('#cw_keep').checked, kit: $('#cw_kit').checked });
           break;
         }
         case 'playsel': if (this.selWorld) g.loadWorld(this.selWorld); break;
@@ -382,15 +381,16 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
       const mp = this.game.mp;
       box.innerHTML = '';
       const head = el('div', 'mphead');
-      if (!mp || mp.status === 'connecting') { head.innerHTML = '<span class="dot wait"></span><b>Multiplayer</b> · connecting…'; box.appendChild(head); return; }
-      if (!mp.ready) { head.innerHTML = '<span class="dot off"></span><b>Multiplayer</b> · not available here'; box.appendChild(head); box.appendChild(el('div', 'note', MP_OFF_HTML)); return; }
+      const mpT = '<b>' + esc(T('g.title.mp')) + '</b> · ';
+      if (!mp || mp.status === 'connecting') { head.innerHTML = '<span class="dot wait"></span>' + mpT + esc(T('g.mp.connecting')); box.appendChild(head); return; }
+      if (!mp.ready) { head.innerHTML = '<span class="dot off"></span>' + mpT + esc(T('g.title.mpOff')); box.appendChild(head); box.appendChild(el('div', 'note', T('g.mp.off'))); return; }
       const online = mp.online || [];
-      head.innerHTML = '<span class="dot"></span><b>Multiplayer</b> · ' + (online.length ? online.length + ' friend' + (online.length > 1 ? 's' : '') + ' online: ' + online.map(o => esc(o.name)).join(', ') : 'no friends online yet');
+      head.innerHTML = '<span class="dot"></span>' + mpT + (online.length ? esc(T(online.length > 1 ? 'g.title.mpOnlineN' : 'g.title.mpOnline1', { n: online.length })) + ' ' + online.map(o => esc(o.name)).join(', ') : esc(T('g.title.mpNone')));
       box.appendChild(head);
       const list = mp.hostList().filter(h => !h.isMe);
       if (!list.length) {
         const d = document.createElement('details'); d.className = 'invitebox';
-        d.innerHTML = '<summary>➕ Invite a friend</summary>' + INVITE_HTML;
+        d.innerHTML = '<summary>' + esc(T('g.mp.invite')) + '</summary>' + T('g.mp.inviteHow');
         box.appendChild(d);
         return;
       }
@@ -398,10 +398,10 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
         const row = el('div', 'mphost');
         const txt = el('div', ''); txt.innerHTML = '<span class="dot"></span>';
         const b = document.createElement('b'); b.textContent = h.name; txt.appendChild(b);
-        txt.appendChild(document.createTextNode(' is playing '));
-        const i = document.createElement('i'); i.textContent = h.world || 'a world'; txt.appendChild(i);
-        txt.appendChild(document.createTextNode(' · ' + (h.mode === 'zen' ? 'Zen' : h.mode === 'survival' ? 'Survival' : 'Creative')));
-        const btn = el('button', 'btn primary small', 'Join');
+        txt.appendChild(document.createTextNode(' ' + T('g.title.isPlaying') + ' '));
+        const i = document.createElement('i'); i.textContent = h.world || T('g.title.aWorld'); txt.appendChild(i);
+        txt.appendChild(document.createTextNode(' · ' + T(h.mode === 'zen' ? 'g.mode.zen' : h.mode === 'survival' ? 'g.mode.survival' : 'g.mode.creative')));
+        const btn = el('button', 'btn primary small'); btn.textContent = T('g.title.join');
         btn.onclick = () => { if (this.game.state === 'title') this.game.mp.join(h); };
         row.appendChild(txt); row.appendChild(btn); box.appendChild(row);
       }
@@ -410,19 +410,19 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
     studioNote() {
       const n = $('#studionote'); if (!n || !VR.Custom) return;
       const c = VR.Custom.count();
-      if (!c.houses && !c.models) { n.innerHTML = '<button class="btn tiny" data-act="studioimport" title="Ein 📦 R9-Paket aus dem eigenständigen R9 Studio übernehmen: Favoriten, Designs, Bauteile">📥 R9-Paket übernehmen</button>'; return; }
+      if (!c.houses && !c.models) { n.innerHTML = `<button class="btn tiny" data-act="studioimport" title="${esc(T('g.title.packInT'))}">${esc(T('g.title.packIn'))}</button>`; return; }
       const escH = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
       const names = Object.values(VR.CUSTOM.houses || {}).map(h => h.name).filter(Boolean).slice(0, 3).map(escH).join(', ');
-      n.innerHTML = `<b>R9 Studio</b> · ${c.houses} eigene${c.houses === 1 ? 's Haus' : ' Häuser'}${names ? ' (' + names + ')' : ''} · ${c.models} eigene${c.models === 1 ? 's Item' : ' Items'} aktiv <button class="btn tiny" data-act="studioimport">Import</button><button class="btn tiny" data-act="studioreset">Originale</button>`;
+      n.innerHTML = `<b>R9 Studio</b> · ${esc(T(c.houses === 1 ? 'g.title.house1' : 'g.title.houseN', { n: c.houses }))}${names ? ' (' + names + ')' : ''} · ${esc(T(c.models === 1 ? 'g.title.item1' : 'g.title.itemN', { n: c.models }))} <button class="btn tiny" data-act="studioimport">${esc(T('g.title.import'))}</button><button class="btn tiny" data-act="studioreset">${esc(T('g.title.originals'))}</button>`;
     }
     // a 📦 r9-paket (or the older text export): ★ added (blocks and items, blueprints too), the newer design wins,
     // Bauteile added unless the same — then the designs are applied here
     studioTake(text) {
       const g = this.game, pk = VR.Pack ? VR.Pack.read(text) : null;
-      if (!pk) { this.titleNote('Import fehlgeschlagen: kein R9-Paket'); return false; }
+      if (!pk) { this.titleNote(T('g.title.notPack')); return false; }
       const r = VR.Pack.merge(pk);
       g.reloadCustom();
-      this.titleNote((r.ok ? 'Übernommen: ' : 'Nicht alles übernommen (Browser-Speicher voll): ') + r.text + '.');
+      this.titleNote(T(r.ok ? 'g.title.taken' : 'g.title.takenFull', { what: r.text }));
       return r.ok;
     }
     titleNote(msg) { const n = $('#titlenote'); if (!n) return; n.textContent = msg || ''; clearTimeout(this.titleNoteT); if (msg) this.titleNoteT = setTimeout(() => { n.textContent = ''; }, 12000); }
@@ -550,7 +550,7 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
       }
     }
     // 🌐 the language: Deutsch / English switch live (also /lang de|en); the other languages of the module are
-    // "soon" — shown unless the simple mode (r9si.ui.pro = 0) hides them
+    // "soon" — shown in Profi, Einfach hides them (r9si.ui.pro)
     buildLangPanel(body) {
       const I = VR.I18N; if (!I) return;
       const ready = I.langs.filter(l => I.ready(l[0])).map(l => l[0]);   // the languages with a table (de, en)
@@ -562,7 +562,7 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
         seg.appendChild(b);
       }
       const f = el('div', 'field'); f.innerHTML = '<label></label>'; f.firstChild.textContent = T('g.lang.title'); f.appendChild(seg); body.appendChild(f);
-      let showSoon = true; try { const v = localStorage.getItem('r9si.ui.pro'); if (v !== null) showSoon = v === '1'; } catch (e) { /* storage blocked */ }
+      const showSoon = VR.UIPrefs ? !!VR.UIPrefs.get().pro : true;   // (Einfach / Profi: r9si.ui)
       if (showSoon) {
         const soon = el('div', 'row gap langsoon'); soon.style.flexWrap = 'wrap';
         for (const [code, name] of I.langs) { if (ready.includes(code)) continue; const b = el('button', 'btn tiny'); b.disabled = true; b.lang = code; b.textContent = name + ' · ' + T('g.lang.soon'); soon.appendChild(b); }

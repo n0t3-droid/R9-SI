@@ -126,17 +126,18 @@
     out.text = P.report(out);
     return out;
   };
-  // what a merge did, in one line ("2 Favoriten · 2 Häuser (1 ersetzt) · 1 Bauteil")
+  // what a merge did, in one line ("2 Favoriten · 2 Häuser (1 ersetzt) · 1 Bauteil") — in the player's language
+  const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   P.report = function (r) {
-    const parts = [];
-    if (r.favs) parts.push(n(r.favs, 'Favorit', 'Favoriten'));
+    const parts = [], rep = (k) => (k ? ' ' + tx('g.pack.replaced', { n: k }, '({n} ersetzt)', '({n} replaced)') : '');
+    if (r.favs) parts.push(r.favs === 1 ? tx('g.pack.fav1', null, '1 Favorit', '1 favourite') : tx('g.pack.favN', { n: r.favs }, '{n} Favoriten', '{n} favourites'));
     const h = r.houses.added + r.houses.replaced, m = r.models.added + r.models.replaced;
-    if (h) parts.push(n(h, 'Haus', 'Häuser') + (r.houses.replaced ? ' (' + r.houses.replaced + ' ersetzt)' : ''));
-    if (m) parts.push(n(m, 'Möbel', 'Möbel') + (r.models.replaced ? ' (' + r.models.replaced + ' ersetzt)' : ''));
-    if (r.lib.added) parts.push(n(r.lib.added, 'Bauteil', 'Bauteile'));
+    if (h) parts.push((h === 1 ? tx('g.pack.house1', null, '1 Haus', '1 house') : tx('g.pack.houseN', { n: h }, '{n} Häuser', '{n} houses')) + rep(r.houses.replaced));
+    if (m) parts.push((m === 1 ? tx('g.pack.model1', null, '1 Möbelstück', '1 piece of furniture') : tx('g.pack.modelN', { n: m }, '{n} Möbel', '{n} pieces of furniture')) + rep(r.models.replaced));
+    if (r.lib.added) parts.push(r.lib.added === 1 ? tx('g.pack.lib1', null, '1 Bauteil', '1 building piece') : tx('g.pack.libN', { n: r.lib.added }, '{n} Bauteile', '{n} building pieces'));
     const kept = r.houses.kept + r.models.kept;
-    let t = parts.length ? parts.join(' · ') : 'nichts Neues';
-    if (kept) t += ' · ' + kept + ' hier neuer, behalten';
+    let t = parts.length ? parts.join(' · ') : tx('g.pack.nothing', null, 'nichts Neues', 'nothing new');
+    if (kept) t += ' · ' + tx('g.pack.kept', { n: kept }, '{n} hier neuer, behalten', '{n} newer here, kept');
     return t;
   };
 })();
