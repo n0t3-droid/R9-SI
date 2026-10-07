@@ -308,7 +308,7 @@
     title: (P) => (P.params.k ? 'Leichtathletikstadion' : 'Fußballstadion'),
     describe: (P) => [P.params.l + ' × ' + P.params.w, tiersOf(P.params) + ' Ränge'].concat(P.params.r ? ['Dach'] : []),
   }, function (P, env) {
-    const { l, w, r, k } = P.params, t = tiersOf(P.params), S = SS[P.style] || SS.beton, rng = Forge.rng(P, 'stadium');
+    const { l, w, r, k } = P.params, t = tiersOf(P.params), S = SS[P.style] || SS.beton;
     const dy = -1, depth = 2 * t + 4, H = t + (r ? 8 : 3) + 2, K = Forge.kit(w, H + 16, l, dy);
     const px0 = depth, px1 = w - 1 - depth, pz0 = depth, pz1 = l - 1 - depth, cx = (w - 1) / 2, cz = (l - 1) / 2;
     K.box(0, 0, 0, w - 1, 0, l - 1, 'grass_block'); K.box(0, 1, 0, w - 1, H + 15, l - 1, 0);
@@ -356,7 +356,6 @@
     // the scoreboard at one end
     for (let x = Math.round(cx) - 3; x <= Math.round(cx) + 3; x++) for (let y = topY + 3; y <= topY + 5; y++) K.set(x, y, 1, S.screen, { facing: 2 });
     K.grid.meta = { name: k ? 'Leichtathletikstadion' : 'Fußballstadion', doors: [[Math.round(cx), 1 + dy, 0]], floors: [dy, topY + dy], top: topY + 14 + dy, lot: [w, l], anchor: [w >> 1, 0] };
-    void rng;
     return K.grid;
   });
   // as many tiers as the lot leaves a pitch for: at least 20 wide and 30 long inside the stands

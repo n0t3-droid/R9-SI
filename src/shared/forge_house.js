@@ -63,7 +63,7 @@
           const hall = mk(1, 1, 4, 6, 'foyer'); blockStair(hall); rooms.push(hall);
           if (w >= 13) { rooms.push(mk(6, 1, 7, 3, 'wc')); rooms.push(mk(6, 5, 7, 6, 'utility')); rooms.push(mk(9, 1, w - 2, 6, 'study')); doors.push([5, 2, 1], [5, 5, 1], [10, 7, 0]); }
           else { rooms.push(mk(6, 1, w - 2, 3, 'wc')); rooms.push(mk(6, 5, w - 2, 6, 'utility')); doors.push([5, 2, 1], [5, 5, 1]); }
-          rooms.push(living(1, 8, w - 2, d - 2, w)); openings.push([3, 7, 4, 7]);
+          rooms.push(living(1, 8, w - 2, d - 2)); openings.push([3, 7, 4, 7]);
         } else {
           const hall = mk(1, 1, 4, 7, 'gallery'); blockStair(hall); rooms.push(hall);
           rooms.push(mk(5, 7, w - 2, 7, 'hall'));                 // the corridor
@@ -77,7 +77,7 @@
         if (k === 0) {
           const hall = mk(1, 1, 8, 3, 'foyer'); blockStair(hall); rooms.push(hall);
           if (w >= 12) { rooms.push(mk(10, 1, w - 2, 3, 'wc')); doors.push([9, 2, 1]); }
-          rooms.push(living(1, 5, w - 2, d - 2, w)); openings.push([7, 4, 8, 4]);
+          rooms.push(living(1, 5, w - 2, d - 2)); openings.push([7, 4, 8, 4]);
         } else {
           const hall = mk(1, 1, 8, 3, 'gallery'); blockStair(hall); rooms.push(hall);
           if (w >= 12) { rooms.push(mk(10, 1, w - 2, 3, 'bath')); doors.push([9, 2, 1]); }
@@ -125,12 +125,11 @@
       for (let v = 0; v < d; v++) for (let u = 0; u < w; u++) {
         const ring = u === 0 || u === w - 1 || v === 0 || v === d - 1; if (!ring) continue;
         const corner = (u === 0 || u === w - 1) && (v === 0 || v === d - 1); if (corner) continue;
-        const side = v === 0 ? 0 : u === w - 1 ? 1 : v === d - 1 ? 2 : 3, iu = u - DIR[side][0] * 0 + (side === 1 ? -1 : side === 3 ? 1 : 0), iv = side === 0 ? 1 : side === 2 ? -1 : 0;
+        const side = v === 0 ? 0 : u === w - 1 ? 1 : v === d - 1 ? 2 : 3, iv = side === 0 ? 1 : side === 2 ? -1 : 0;
         const rm = inRoom(fl.rooms, u + (side === 1 ? -1 : side === 3 ? 1 : 0), v + iv);
         const gl = glassFor(k, side, u, v, rm); if (!gl) continue;
         for (const row of gl.rows) K.set(hx(u), y0 + row, hz(v), gl.m);
         if (rm) rm.windows.push({ u: u + (side === 1 ? -1 : side === 3 ? 1 : 0), v: v + iv, side, kind: gl.rows.length === 3 ? 'tall' : 'std2' });
-        void iu;
       }
     }
     // the entrance: a pivot door, the step, lamps, the canopy
@@ -210,12 +209,12 @@
     return K.grid;
   }
   // the open living / dining / kitchen across the garden side, as zones of one room
-  function living(u0, v0, u1, v1, w) {
+  function living(u0, v0, u1, v1) {
     const rm = { u0, v0, u1, v1, type: 'living', doors: [], windows: [] }, W = u1 - u0 + 1;
     const kw = W >= 12 ? 5 : 4;
     if (W >= 15) rm.zones = [{ u0, v0, u1: u1 - kw - 4, v1, type: 'living' }, { u0: u1 - kw - 3, v0, u1: u1 - kw, v1, type: 'dining' }, { u0: u1 - kw + 1, v0, u1, v1, type: 'kitchen' }];
     else if (W >= 9) rm.zones = [{ u0, v0, u1: u1 - kw, v1, type: 'living' }, { u0: u1 - kw + 1, v0, u1, v1, type: 'kitchen' }];
-    void w; return rm;
+    return rm;
   }
   function floorOf(type, S) { if (WET[type]) return 'floor_tile'; if (type === 'foyer' || type === 'gallery' || type === 'hall' || type === 'kitchen') return S.floorH; if (type === 'master' || type === 'kid' || type === 'guest' || type === 'bedroom') return 'floor_carpet'; return S.floorL; }
   Forge.register(def, build);

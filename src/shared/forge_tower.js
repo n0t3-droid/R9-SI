@@ -244,12 +244,12 @@
       else { const x = s === 1 ? U.u1 : U.u0, wx = s === 1 ? U.u1 + 1 : U.u0 - 1; for (let v = U.v0; v <= U.v1; v++) if (isGlassCell(K, wx, y + 1, v)) wins.push({ u: x, v, side: s, kind: S.curtain ? 'tall' : 'std2' }); }
     }
     if (!apartments) {
-      const n = K.office({ u0: U.u0, v0: U.v0, u1: U.u1, v1: U.v1, doors: [doorCell, [doorCell[0], doorCell[1] + (dr.side === 2 ? -1 : 1)]] }, y, rng, { windows: ext.length ? ext : [dr.side === 2 ? 0 : 2] });
-      info.rooms++; void n; return;
+      K.office({ u0: U.u0, v0: U.v0, u1: U.u1, v1: U.v1, doors: [doorCell, [doorCell[0], doorCell[1] + (dr.side === 2 ? -1 : 1)]] }, y, rng, { windows: ext.length ? ext : [dr.side === 2 ? 0 : 2] });
+      info.rooms++; return;
     }
     // the apartment: living with an open kitchen toward the windows; bedroom and bath beside a small hall at the door
     const rooms = [], F0 = y - 1 - k * SH, fi = k;
-    const deep = d >= 8 && w >= 7, towardDoor = dr.side === 2 ? 1 : -1;   // the back rooms sit at the door side
+    const deep = d >= 8 && w >= 7;   // (the back rooms sit at the door side)
     if (deep) {
       const dl = Math.max(4, d - 4);                      // living depth
       const lv0 = dr.side === 2 ? U.v0 : U.v1 - dl + 1, lv1 = dr.side === 2 ? U.v0 + dl - 1 : U.v1;
@@ -276,7 +276,6 @@
     for (let i = 0; i <= fi; i++) H.floors.push({ y: i * SH, rect: [rect[0], rect[1], rect[2], rect[3]], rooms: i === fi ? rooms : [] });
     K.furnish(H, F0, S.skin, rng, SH);
     info.rooms += rooms.length;
-    void towardDoor;
   }
   const isGlassCell = (K, x, y, v) => { const s = K.get(x, y, v); if (!s || s === K.KEEP) return false; const t = VR.R.types[VR.R.T.type[s]]; return !!t && /glass|window|panorama/.test(t.name); };
   Forge.register(def, build);
