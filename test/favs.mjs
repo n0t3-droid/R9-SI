@@ -118,6 +118,7 @@ const s3 = await sev(async (id) => {
   const groups = [...document.querySelectorAll('#list .grp')].map(g => g.textContent);
   const firstGroup = []; let el = document.querySelector('#list .grp'); el = el && el.nextElementSibling;
   while (el && !el.classList.contains('grp')) { firstGroup.push(el.querySelector('.n') ? el.querySelector('.n').textContent : ''); el = el.nextElementSibling; }
+  if (VR.UIPrefs) VR.UIPrefs.set({ pro: true });   // (W1: the Werkbank is a Profi tab — Einfach shows the Karte)
   WM.tab = 'bench'; window.__studioCore.chips(); window.__studioCore.list();
   const fb = document.querySelector('#list [data-wcat="fav"]'); if (fb) fb.click();
   const tiles = [...document.querySelectorAll('#list .tile')].map(t => t.dataset.id);
