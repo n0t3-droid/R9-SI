@@ -189,14 +189,14 @@
       if (pre.length) { w.bulkSet(pre, false, defer); this.toGuests(pre); w.relightColumns([...defer]); defer.clear(); }
       const beam = bp.beam ? (() => { const b2 = ROT[J.L.r](bp.beam[0], bp.beam[2]); return [J.L.ox + b2[0] + 0.5, F0 + bp.beam[1] + 0.5, J.L.oz + b2[1] + 0.5]; })() : null;
       if (beam) this.st[J.site.key].beam = beam;
-      this.rise = { J, bp, up, at: 0, k: 0, steps, y0, rows, t: 0, defer, w, col: GLOW[J.site.type] || [1, 0.9, 0.6], n: list.length };
+      this.rise = { J, bp, up, at: 0, k: 0, steps, y0, rows, t: 0, defer, w, col: GLOW[J.site.type] || [1, 0.9, 0.6], n: list.length, flushY: y0, flushT: 0 };
       if (g.audio) g.audio.play('wonder');
       if (g.ui && g.ui.chatLine) g.ui.chatLine(T('g.wonder.rising'), '#ffe7a6');
     }
     tickRise(dt) {
       const S = this.rise, g = this.g, w = g.world;
       if (S.w !== w) { this.rise = null; this.job = null; return; }          // another world now: this one resumes it later
-      S.t -= dt; if (S.t > 0) return;
+      S.flushT -= dt; S.t -= dt; if (S.t > 0) return;
       S.t = STEP; S.k++;
       const yTop = S.y0 + Math.ceil(S.rows * S.k / S.steps), from = S.at;
       let to = from; while (to < S.up.length && S.up[to][1] < yTop) to++;
@@ -206,6 +206,15 @@
         this.sparkle(chunk, S.col);
       }
       if (S.at >= S.up.length) this.finishRise();
+      else if (S.flushT <= 0) { this.remesh(S, yTop - 1); S.flushT = 0.3; }
+    }
+    // the risen rows show while it rises: the sections of the band since the last time are meshed again (three times a
+    // second, not every slice); their light — and the glow of its lamps — comes once at the end
+    remesh(S, yHi) {
+      const w = S.w; if (!w.markDirty || yHi < S.flushY) return;
+      for (const c of S.defer) for (let sy = S.flushY >> 4; sy <= yHi >> 4; sy++) w.markDirty(c.cx * 16, sy * 16, c.cz * 16);
+      S.flushY = yHi;                     // (its section again next time: more rows come into it)
+      if (this.g.pool) this.g.pool.queueDirty = true;
     }
     // glows along the rising edge: a dozen of the newest cells' tops, some big enough to see from afar
     sparkle(chunk, col) {
