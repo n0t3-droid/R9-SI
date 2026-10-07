@@ -966,6 +966,8 @@
         const c = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]];
         for (const [a, bb] of [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]) pts.push(...c[a], ...c[bb]);
       }
+      // (W2: plain segments too — the Bauhand's dashed lot and its footprint grid: x y z x y z …, from o.x o.y o.z)
+      if (o.lines) { const n = o.lines.length - (o.lines.length % 6); for (let i = 0; i < n && pts.length < 4096 * 3; i++) pts.push(o.lines[i]); }
       if (pts.length > 4096 * 3) pts.length = 4096 * 3;
       gl.useProgram(p.p);
       gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);

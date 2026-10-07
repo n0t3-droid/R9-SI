@@ -3,7 +3,7 @@
 // Genie thing, Bauteil and planned place is a card with the same five actions,
 // in this order, a missing one absent and never greyed:
 //   👁 Ansehen · ✏️ Bearbeiten · ☆ Favorit · 📍 Setzen · 📦 Teilen
-// Ids: b:<block>  m:<model>  h:<catalogue i>  k:<kit id>  g:<genie id>  p:<Bauteil id>  s:<site id>
+// Ids: b:<block>  m:<model>  h:<catalogue i>  k:<kit id>  g:<genie id>  p:<Bauteil id>  s:<site id>  f:<Forge DNA> (W2)
 // The page that shows the cards fills VR.Ding.handlers — view(id, el), edit(id, el),
 // set(id, el), share(id, el), pic(id, w, h) → canvas | img | null — and may veto
 // one with canView / canEdit / canSet / canShare(id). The favourites and the 📦
@@ -14,7 +14,7 @@
 (function (VR) {
   'use strict';
   const D = VR.Ding = { handlers: {}, houseNames: null };
-  const KINDS = 'bmhkgps';
+  const KINDS = 'bmhkgpsf';
   const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   const lsGet = (k) => { try { const t = localStorage.getItem(k); return t ? JSON.parse(t) : null; } catch (e) { return null; } };
   const obj = (o) => (o && typeof o === 'object' && !Array.isArray(o) ? o : null);
@@ -48,6 +48,7 @@
     if (p.kind === 'm') { const m = VR.VM && VR.VM.MODELS && VR.VM.MODELS[p.key]; return m ? m.display : p.key; }
     if (p.kind === 'b') { if (VR.itemName) { const n = VR.itemName(p.key); if (n) return n; } const t = VR.R && VR.R.byName && VR.R.byName[p.key]; return t ? (t.display || (t.o && t.o.display) || p.key) : p.key; }
     if (p.kind === 'p') { const it = libItem(p.key); return it ? it.name || tx('ding.piece', null, 'Bauteil', 'Piece') : p.key; }
+    if (p.kind === 'f') { const Fg = VR.Forge; return Fg && Fg.parse(p.key) ? String(Fg.describe(p.key, true)).replace(/^\S+\s/, '') : p.key; }
     const pj = project(p.key); return pj ? (pj.label || pj.name || p.key) : p.key;
   };
   // one state line: „✎ Entwurf" (a draft in the Studio) · „✓ im Spiel" (a saved design) · ''
@@ -59,7 +60,7 @@
     return '';
   };
   // the picture: the page's painter, else a placeholder glyph by kind
-  const GLYPH = { b: '🧱', m: '🪑', h: '🏠', k: '🏠', g: '✨', p: '🧩', s: '🏘' };
+  const GLYPH = { b: '🧱', m: '🪑', h: '🏠', k: '🏠', g: '✨', p: '🧩', s: '🏘', f: '🏗' };
   D.thumbURL = function (id) {
     const p = D.parse(id); if (!p) return null;
     if (p.kind === 'p') { const it = libItem(p.key); return it && typeof it.thumb === 'string' ? it.thumb : null; }
