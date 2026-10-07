@@ -239,29 +239,24 @@
   // the home city is fixed north of the temple
   const VG = VR.VillageGen;
   if (VG) {
-    const prevVSite = VG.site;
-    VG.site = function (g, i, j) {
+    // (a generator like the village's search: the cell's cache and its slices are VG.site / VG.siteAdvance's)
+    const prevSteps = VG.siteSteps;
+    VG.siteSteps = function* (g, i, j) {
       if (HEART.on(g)) {
         g._homeFound = true; // the home city is placed here, never by the random site search
-        if (!g._vilSites) g._vilSites = new Map();
-        const key = (i + 1048576) * 2097152 + (j + 1048576);
-        if (g._vilSites.has(key)) return g._vilSites.get(key);
         const { CELL } = VG.par(g);
-        let site;
         const C = HEART.CITY;
         if (Math.floor(C.x / CELL) === i && Math.floor(C.z / CELL) === j) {
           const rng = new VR.RNG(M.hash2(7, 7, g.seed + 90210));
-          site = { id: i + '_' + j, i, j, x: C.x, z: C.z, y: HEART.PLAT + 1, style: 'tech', biome: 'sky_meadow', seed: rng.int(1 << 30), name: null, home: true, rad: C.rad };
+          const site = { id: i + '_' + j, i, j, x: C.x, z: C.z, y: HEART.PLAT + 1, style: 'tech', biome: 'sky_meadow', seed: rng.int(1 << 30), name: null, home: true, rad: C.rad };
           site.name = 'Nova Haven';
           g._homeFound = true;
-        } else {
-          const x = i * CELL + CELL / 2, z = j * CELL + CELL / 2;
-          site = Math.hypot(x, z) < 720 ? null : prevVSite.call(this, g, i, j); // the Heartland has one city: Nova Haven
+          return site;
         }
-        g._vilSites.set(key, site);
-        return site;
+        const x = i * CELL + CELL / 2, z = j * CELL + CELL / 2;
+        if (Math.hypot(x, z) < 720) return null; // the Heartland has one city: Nova Haven
       }
-      return prevVSite.call(this, g, i, j);
+      return yield* prevSteps.call(this, g, i, j);
     };
   }
 })(VR);
