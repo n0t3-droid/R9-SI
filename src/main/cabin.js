@@ -15,7 +15,9 @@
   const mat4 = VR.mat4, TAU = Math.PI * 2;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const BW = 0.27, BH = 1.78, EYE = 1.6, STEP = 0.3, REACH = 2.2;
-  const RAMP_T = 2.4, DOOR_T = 1.4, CDOOR_T = 0.55, KNEEL = 0.5;
+  // the cockpit door: 0.4 s to slide open, triggered 2.6 m away — it is fully open before a running walker (5.2 m/s)
+  // reaches it, so nobody ever pushes against a half-open door
+  const RAMP_T = 2.4, DOOR_T = 1.4, CDOOR_T = 0.4, CDOOR_NEAR = 2.6, KNEEL = 0.5;
 
   class Cabin {
     constructor(g, mgr) { this.g = g; this.mgr = mgr; this.w = null; this.C4 = mat4.create(); this.hover = null; }
@@ -108,8 +110,12 @@
       const fl = s.flight, C = Cabin.of(s); if (!fl || !C) return false;
       const steady = fl.state === 'landed' || fl.auto || (fl.speed < 2.5 && Math.abs(fl.throttle) < 0.03);
       if (!steady) { if (this.g.ui) this.g.ui.hint('Hover first (X) or let the autopilot fly — then you can get up', 2200); if (this.g.audio) this.g.audio.play('deny'); return false; }
-      const ck = s.d.meta.cockpit, sz = ck.seats[0][1];
-      const l = [0, ck.floor, Math.min(C.zb - 0.4, sz + 0.55)];
+      const ck = s.d.meta.cockpit, [sx, sz] = ck.seats[0], zMax = C.zb - 0.45;
+      // the first free spot behind the seats (the seat backs lean aft; the door is shut) — in the middle, else behind a seat;
+      // the walker's box must not start inside anything, or it could never move
+      let l = null;
+      for (let z = sz + 0.55; z <= zMax + 1e-6 && !l; z += 0.05) for (const x of [0, sx, -sx]) if (!this.hits(s, x, ck.floor, z)) { l = [x, ck.floor, z]; break; }
+      if (!l) l = [0, ck.floor, Math.min(zMax, sz + 0.55)];
       this.mgr.leavePilot(s);
       this.begin(s, l, Math.PI, 0);
       this.hatch(s).cdoorOpen = true;
@@ -157,9 +163,9 @@
       v[1] -= 24 * dt; if (v[1] < -30) v[1] = -30;
       if (live && input.hit('Space') && w.ground) { v[1] = 6.2; w.ground = false; }
       this.move(s, w, v[0] * dt, v[1] * dt, v[2] * dt);
-      // the cockpit door opens as you come near (and shuts behind you)
+      // the cockpit door opens as you come near, from either side (and shuts behind you)
       const cd = C.cockpitDoor, dz = w.p[2] - cd.z;
-      H.cdoorOpen = Math.abs(w.p[0]) < 1.2 && dz > -1.4 && dz < 1.6;
+      H.cdoorOpen = Math.abs(w.p[0]) < 1.3 && Math.abs(dz) < CDOOR_NEAR;
       // aim + click: the seat, the door buttons, the ramp, the holo table
       this.hover = this.pick(s, w);
       const click = live && (input.dragLook ? input.clickAction(0) : input.mouse.clicked[0]);
