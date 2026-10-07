@@ -32,6 +32,7 @@
     if (typeof id !== 'string' || !id || id.length > 80 || !/^[a-z0-9_:.-]+$/i.test(id) || id === 'air') return false;
     if (VR.R && VR.R.byName[id]) return true;
     if (VR.ITEMS && VR.ITEMS[id]) return true;
+    if (/^[kgps]:[A-Za-z0-9_.:-]{1,80}$/.test(id)) return true;   // a Ding that is not an item: Baukasten, Genie, Bauteil, Ort (W1)
     return /^blueprint_\d{1,2}$/.test(id);
   };
   // a house design: a template (v2), the changed cells (v1) or only a facade / mirror choice
@@ -42,9 +43,15 @@
   const libOK = (it) => !!obj(it) && [it.sx, it.sy, it.sz].every(v => Number.isInteger(v) && v > 0 && v <= 1024) && it.sx * it.sy * it.sz <= (1 << 22) && Array.isArray(it.pal) && b64OK(it.rle);
 
   // ---------------------------------------------------------------- out
-  P.make = function (from) {
+  // filter (📦 Teilen one thing): { favs: [id], houses: [i], models: [name], lib: [id] } — only those entries go in
+  P.make = function (from, filter) {
     const st = (VR.Custom && VR.Custom.load()) || {};
-    return { r9pack: 1, at: Date.now(), from: from === 'standalone' ? 'standalone' : 'game', favs: VR.Favs ? VR.Favs.list() : [], studio: { v: 1, houses: obj(st.houses) || {}, models: obj(st.models) || {} }, lib: P.libLoad() };
+    let favs = VR.Favs ? VR.Favs.list() : [], houses = obj(st.houses) || {}, models = obj(st.models) || {}, lib = P.libLoad();
+    if (filter && typeof filter === 'object') {
+      const pick = (o, keys) => { const r = {}; for (const k of keys || []) if (o[k] !== undefined) r[k] = o[k]; return r; };
+      favs = (filter.favs || []).filter(P.idOK); houses = pick(houses, (filter.houses || []).map(String)); models = pick(models, filter.models); lib = lib.filter(it => it && (filter.lib || []).includes(it.id));
+    }
+    return { r9pack: 1, at: Date.now(), from: from === 'standalone' ? 'standalone' : 'game', favs, studio: { v: 1, houses, models }, lib };
   };
 
   // ---------------------------------------------------------------- in
