@@ -122,9 +122,12 @@ await section(3, 'the pause menu: ▶ Weiterspielen first; 🏗 Bauen opens the 
   for (const t of ['🏗 Bauen', '🎒 Meins', '🏠 Zu meinem Platz', '📍 Mein Platz ist hier', '⚙ Einstellungen', '⏏ Speichern & zum Start']) check(btns.includes(t), 'has „' + t + '"');
   check(!btns.some(b => /Codex|Foto|Werkbank/.test(b)), 'Einfach: no Codex, no Fotomodus, no Werkbank');
   check(!(await ev(() => { const b = document.getElementById('studiolive'); return !!(b && b.getClientRects().length); })), '#studiolive (the Werkbank) is hidden in Einfach');
+  check(await ev(() => { const m = document.getElementById('mppanel'), mp = VR.game.mp; return mp && mp.ready ? m.getClientRects().length > 0 : !m.getClientRects().length; }), 'Einfach: the multiplayer box only where playing together works (here: ' + (await ev(() => !!(VR.game.mp && VR.game.mp.ready))) + ')');
   await ev(() => VR.UIPrefs.set({ pro: true })); await wait(100);
   const pro = await vis('#pause button');
   check(pro.some(b => /Codex/.test(b)) && pro.some(b => /Werkbank/.test(b)) && await ev(() => document.getElementById('studiolive').getClientRects().length > 0), 'Profi: Codex, Fotomodus and the Werkbank button show');
+  check(await ev(() => document.getElementById('mppanel').getClientRects().length > 0), 'Profi: the multiplayer box shows, also to say why it does not work here');
+  await shot('start_pause_profi');
   await ev(() => VR.UIPrefs.set({ pro: false })); await wait(100);
   // 📍 Mein Platz ist hier
   await page.click('#pause [data-act="sethome"]'); await wait(200);
