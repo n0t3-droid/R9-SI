@@ -144,7 +144,10 @@
   // Voxel raycast. getState(x,y,z). opts: {fluids:bool, maxDist, nb:(x,y,z,dir)→state}
   P.raycast = function (getState, ox, oy, oz, dx, dy, dz, maxDist, opts) {
     opts = opts || {};
-    const len = Math.hypot(dx, dy, dz); dx /= len; dy /= len; dz /= len;
+    const len = Math.hypot(dx, dy, dz);
+    // no direction, or a number gone bad: nothing is hit (the walk below would otherwise step 400 cells into nowhere)
+    if (!(len > 0) || !isFinite(len) || !isFinite(ox + oy + oz)) return null;
+    dx /= len; dy /= len; dz /= len;
     let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
     const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
     const tdx = Math.abs(1 / dx), tdy = Math.abs(1 / dy), tdz = Math.abs(1 / dz);
@@ -281,18 +284,22 @@
   // Gather world-space collision boxes intersecting region; feetY: the body's bottom (smooth ground under it uses its lowest corner as the box top)
   P.gather = function (getState, x0, y0, z0, x1, y1, z1, out, nbFn, feetY) {
     out.length = 0;
+    if (!isFinite(x0 + y0 + z0 + x1 + y1 + z1)) return out;   // a region gone NaN holds nothing
     const ix0 = Math.floor(x0), iy0 = Math.max(0, Math.floor(y0) - 1), iz0 = Math.floor(z0);
     const ix1 = Math.floor(x1), iy1 = Math.min(VR.MAXY - 1, Math.floor(y1)), iz1 = Math.floor(z1);
+    const TF = R.T.flags, TSH = R.T.shape;
     for (let y = iy0; y <= iy1; y++) for (let z = iz0; z <= iz1; z++) for (let x = ix0; x <= ix1; x++) {
       const s = getState(x, y, z);
       if (!s) continue;
-      if (!(R.T.flags[s] & F.SOLID)) continue;
+      if (!(TF[s] & F.SOLID)) continue;
       let boxes = null;
-      if ((R.T.flags[s] & F.SMOOTH) && feetY !== undefined && y + 1 >= feetY - 0.05 && y + 1 <= feetY + 1.05) {
+      if ((TF[s] & F.SMOOTH) && feetY !== undefined && y + 1 >= feetY - 0.05 && y + 1 <= feetY + 1.05) {
         const a = getState(x, y + 1, z);
-        if (!(a && (R.T.flags[a] & F.OPAQUE)) && P.smoothCorners(getState, x, y, z, cTmp)) { smBox[0][4] = Math.min(cTmp[0], cTmp[1], cTmp[2], cTmp[3]) - y; boxes = smBox; }
+        if (!(a && (TF[a] & F.OPAQUE)) && P.smoothCorners(getState, x, y, z, cTmp)) { smBox[0][4] = Math.min(cTmp[0], cTmp[1], cTmp[2], cTmp[3]) - y; boxes = smBox; }
       }
-      if (!boxes) boxes = P.collision(s, nbFn ? (d) => nbFn(x, y, z, d) : null);
+      // only the connected shapes ask their neighbours: the closure is made for them alone (it was made for every
+      // solid block a body touches — a few hundred per frame with the villagers about)
+      if (!boxes) { const sh = TSH[s]; boxes = P.collision(s, nbFn && (sh === SH.FENCE || sh === SH.WALL || sh === SH.PANE) ? (d) => nbFn(x, y, z, d) : null); }
       for (const b of boxes) {
         const bx0 = x + b[0], by0 = y + b[1], bz0 = z + b[2], bx1 = x + b[3], by1 = y + b[4], bz1 = z + b[5];
         if (bx1 <= x0 || bx0 >= x1 || by1 <= y0 || by0 >= y1 || bz1 <= z0 || bz0 >= z1) continue;
@@ -321,8 +328,14 @@
   };
   // Move AABB (center-bottom pos, half width w, height h) by (vx,vy,vz); returns collision flags
   const tmp = [];
+  // the furthest a body may move in one step: no real velocity comes near it (a fall is 78 blocks/s, a frame is at
+  // most 0.1 s) — a number gone bad counts as no move, so nobody ever lands in nowhere or sweeps a million cells
+  const MAX_STEP = 64;
+  const stepOf = (v) => (v !== v || v === Infinity || v === -Infinity) ? 0 : v > MAX_STEP ? MAX_STEP : v < -MAX_STEP ? -MAX_STEP : v;
   P.move = function (getState, pos, w, h, vx, vy, vz, stepH, nbFn, groundedHint) {
     const res = { hitX: false, hitY: false, hitZ: false, onGround: false, stepped: 0 };
+    vx = stepOf(vx); vy = stepOf(vy); vz = stepOf(vz);
+    if (!isFinite(pos[0] + pos[1] + pos[2])) return res;   // a body nowhere cannot be moved (its owner restores it)
     const x0 = pos[0] - w, x1 = pos[0] + w, y0 = pos[1], y1 = pos[1] + h, z0 = pos[2] - w, z1 = pos[2] + w;
     const boxes = P.gather(getState, Math.min(x0, x0 + vx) - 1, Math.min(y0, y0 + vy) - 1, Math.min(z0, z0 + vz) - 1, Math.max(x1, x1 + vx) + 1, Math.max(y1, y1 + vy) + 1 + (stepH || 0), Math.max(z1, z1 + vz) + 1, tmp, nbFn, pos[1]);
     const sweep = (bx0, by0, bz0, bx1, by1, bz1, axis, v) => {

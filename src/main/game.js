@@ -1030,7 +1030,7 @@
         case 'time': { const v = a[0] === 'set' ? a[1] : a[0]; const n = TIMES[v] !== undefined ? TIMES[v] : parseInt(v, 10); if (!isNaN(n)) { this.env.setTime(n); say('Time set to ' + n); } break; }
         case 'weather': if (a[0] === 'clear') { this.env.rainTarget = 0; this.env.rain = 0; } else if (a[0] === 'rain' || a[0] === 'thunder') { this.env.rainTarget = 1; this.env.thunder = a[0] === 'thunder' ? 1 : 0; this.env.weatherTimer = 12000; } say('Weather: ' + a[0]); break;
         case 'gamemode': case 'gm': { const m = { s: 'survival', c: 'creative', z: 'zen', 0: 'survival', 1: 'creative', survival: 'survival', creative: 'creative', zen: 'zen' }[a[0]]; if (m) { p.setMode(m); say('Game mode: ' + m); } break; }
-        case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); p.teleport(v[0], v[1], v[2]); say('Teleported.'); } break;
+        case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); if (p.teleport(v[0], v[1], v[2])) say('Teleported.'); else say('/tp x y z — numbers, please (~ for here).', '#ff8a8a'); } break;
         case 'give': { const id = a[0], n = parseInt(a[1] || '1', 10) || 1; if (VR.itemDef(id)) { p.inv.add(id, n); say('Gave ' + n + ' ' + VR.itemName(id)); } else say('Unknown item: ' + id, '#ff8a8a'); break; }
         case 'seed': say('Seed: ' + this.meta.seed); break;
         case 'kill': p.damage(1000, 'void'); break;

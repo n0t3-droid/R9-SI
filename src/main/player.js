@@ -54,13 +54,30 @@
     eyePos() { return [this.pos[0], this.pos[1] + this.eye, this.pos[2]]; }
     lookDir() { const cp = Math.cos(this.pitch); return [-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp]; }
     setMode(m) { this.mode = m; if (m === 'survival') this.flying = false; this.game.ui && this.game.ui.updateHUD(true); }
-    teleport(x, y, z) { this.pos = [x, y, z]; this.vel = [0, 0, 0]; this.fallStart = null; }
+    // (a destination with a number gone bad — "/tp a b c", a corrupt save — is refused: the player stays where they are)
+    teleport(x, y, z) { if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return false; this.pos = [x, y, z]; this.vel = [0, 0, 0]; this.fallStart = null; return true; }
+    // the player is somewhere real: every number of the position, velocity and view finite. A NaN anywhere (a bad
+    // command, a bug in a vehicle or a cutscene) would otherwise spread into every frame — the world vanishes, nothing
+    // loads, the save is poisoned. The position goes back to the last good one (or the spawn), the rest to rest.
+    sane() {
+      const p = this.pos, v = this.vel;
+      if (!Number.isFinite(p[0]) || !Number.isFinite(p[1]) || !Number.isFinite(p[2])) {
+        const g = this.lastGood || (Array.isArray(this.spawn) && this.spawn.every(Number.isFinite) ? this.spawn : null) || this.game.worldSpawn();
+        this.pos = [g[0], g[1], g[2]]; this.vel = [0, 0, 0]; this.fallStart = null;
+        if (!this.badWarned) { this.badWarned = true; console.warn('player position was not a number — restored'); }
+      }
+      if (!Number.isFinite(v[0]) || !Number.isFinite(v[1]) || !Number.isFinite(v[2])) this.vel = [0, 0, 0];
+      if (!Number.isFinite(this.yaw)) this.yaw = 0;
+      if (!Number.isFinite(this.pitch)) this.pitch = 0;
+      if (!this.lastGood) this.lastGood = [0, 0, 0];
+      this.lastGood[0] = this.pos[0]; this.lastGood[1] = this.pos[1]; this.lastGood[2] = this.pos[2];
+    }
     // teleport somewhere that may not be loaded yet: wait there (no falling) until the ground
     // is loaded, then stand on the nearest safe spot (never inside a wall, never in the void)
     // o: fly (stay in the air there, creative) · exact (that very spot) · keep (that spot when it is free, else the
     // nearest free one, outdoors first — a house set onto it meanwhile never traps you) · yaw/pitch (look that way)
     safeTeleport(x, y, z, o) {
-      this.teleport(x, y, z);
+      if (!this.teleport(x, y, z)) return false;
       this.hold = { x, y, z, t: 0, fly: !!(o && o.fly), exact: !!(o && o.exact), keep: !!(o && o.keep), bed: o && o.bed ? o.bed : null, yaw: o && Number.isFinite(o.yaw) ? o.yaw : null, pitch: o && Number.isFinite(o.pitch) ? o.pitch : null };
       if (this.hold.yaw !== null) { this.yaw = this.hold.yaw; this.pitch = this.hold.pitch || 0; }
     }
@@ -115,6 +132,7 @@
     update(dt, input) {
       const g = this.game, world = g.world;
       if (this.dead) return;
+      this.sane();
       if (this.hold) {
         // waiting for the destination to load: stay put, look around
         const H = this.hold;
@@ -273,6 +291,7 @@
       this.handSwing = Math.max(0, this.handSwing - dt * 3.2);
       // void
       if (this.pos[1] < -40) { if (this.creative) this.teleport(this.pos[0], 140, this.pos[2]); else this.damage(40, 'void'); }
+      this.sane();
     }
     // nearest spot where the player's box fits: straight up first (like climbing out), then sideways
     freeSpot(get, nb, W, H) {
@@ -516,9 +535,14 @@
     toJSON() { return { pos: this.pos, yaw: this.yaw, pitch: this.pitch, mode: this.mode, health: this.health, food: this.food, sat: this.sat, air: this.air, xp: this.xp, level: this.level, flying: this.flying, inv: this.inv.toJSON(), spawn: this.spawn, spawnBed: this.spawnBed || null }; }
     load(o) {
       if (!o) return;
-      if (o.pos) this.pos = o.pos.slice(); this.yaw = o.yaw || 0; this.pitch = o.pitch || 0;
-      if (o.mode) this.mode = o.mode; this.health = o.health ?? 20; this.food = o.food ?? 20; this.sat = o.sat ?? 5; this.air = o.air ?? 300; this.xp = o.xp || 0; this.level = o.level || 0;
-      this.flying = !!o.flying; this.inv.load(o.inv); if (o.spawn) this.spawn = o.spawn; this.spawnBed = o.spawnBed || null;
+      // every number checked: a save with a NaN (JSON writes null) or a wrong type takes the default, not the world down
+      const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+      const vec = (a) => Array.isArray(a) && a.length >= 3 && a.slice(0, 3).every(v => typeof v === 'number' && Number.isFinite(v)) ? a.slice(0, 3) : null;
+      const pos = vec(o.pos), spawn = vec(o.spawn);
+      if (pos) this.pos = pos; else if (spawn) this.pos = spawn.slice();
+      this.yaw = num(o.yaw, 0); this.pitch = num(o.pitch, 0);
+      if (o.mode) this.mode = o.mode; this.health = num(o.health, 20); this.food = num(o.food, 20); this.sat = num(o.sat, 5); this.air = num(o.air, 300); this.xp = num(o.xp, 0); this.level = num(o.level, 0);
+      this.flying = !!o.flying; this.inv.load(o.inv); if (spawn) this.spawn = spawn; this.spawnBed = o.spawnBed || null;
     }
   }
   VR.Player = Player;
