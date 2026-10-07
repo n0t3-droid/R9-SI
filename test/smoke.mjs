@@ -2,6 +2,7 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || t === 'warning' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 600)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto('file:///home/claude/vr/dist/index.html');
@@ -25,8 +26,10 @@ await shot('smoke_inv');
 await ev(() => VR.game.ui.closeInventory());
 await step(4);
 console.log('after inventory', JSON.stringify(await ev(() => { const i = VR.game.input; return { captured: i.captured, locked: i.locked, dragLook: i.dragLook, lockFailed: i.lockFailed, fails: i.lockFails, screen: VR.game.ui.screen }; })));
+check((await ev(() => VR.game.input.captured)) === true, 'after the inventory closes the game wants the mouse back');
 await wait(900); await step(2);
 console.log('after 900ms', JSON.stringify(await ev(() => { const i = VR.game.input; return { captured: i.captured, dragLook: i.dragLook, lockFailed: i.lockFailed, fails: i.lockFails, hint: (document.getElementById('lockhint') || {}).style ? document.getElementById('lockhint').style.display : 'none' }; })));
+check((await ev(() => VR.game.input.captured)) === true, 'and it still does 900 ms later');
 // creative voxel homes palette
 await ev(() => { const g = VR.game; g.player.setMode('creative'); g.ui.creativeTab = 'arch'; g.ui.openInventory(); });
 await step(2);
@@ -37,4 +40,7 @@ await ev(() => VR.game.env.setTime(14000));
 for (let i = 0; i < 20; i++) { await step(20); }
 console.log(JSON.stringify(await ev(() => { const g = VR.game; return { mobs: g.entities.mobs.length, hostile: g.entities.mobs.filter(m => m.def.hostile).length, sleep: g.villages.agents.filter(a => a.pose === 'sleep').length, fight: g.villages.agents.filter(a => a.act && a.act.type === 'fight').length, hp: g.player.health }; })));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 25)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

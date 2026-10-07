@@ -161,5 +161,5 @@ const BUDGET = 1000;
   }
 }
 
-console.log(fails ? 'FAILED ' + fails : 'OK — Modern Living pack');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

@@ -24,7 +24,12 @@ const r = await page.evaluate(() => {
   return { n: ids.length, bad, iconsApi: typeof g.icons };
 });
 console.log(JSON.stringify(r));
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
+check(r.bad.length === 0, 'every catalogue product resolves to an item (unresolved: ' + (r.bad.join(', ') || 'none') + ')');
 await page.waitForTimeout(1500);
 await page.screenshot({ path: '/home/claude/vr/test/shots/grocery_icons.png' });
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 20)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

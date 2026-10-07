@@ -67,5 +67,5 @@ check(posted.length === 1 && posted[0][0].type === 'error' && posted[0][0].id ==
   check(same(V.quadsToTris(q), refTris(q)), 'quadsToTris on 10k quads matches the reference');
   console.log(`     quadsToTris 10k quads: ${tNew.toFixed(2)} ms (reference with subarray views: ${tRef.toFixed(2)} ms)`);
 }
-console.log(fail ? `FAIL ${fail}` : 'OK — worker jobs');
+console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);

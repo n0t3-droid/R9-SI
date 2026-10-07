@@ -114,5 +114,5 @@ const gen = cols.filter(c => c[0].startsWith('land') || c[0].startsWith('town') 
 const time = (f) => { let best = 1e9; for (let r = 0; r < 5; r++) { const c0 = process.cpuUsage(); for (const [, b, s] of gen) f(b, s); const c1 = process.cpuUsage(c0); best = Math.min(best, (c1.user + c1.system) / 1000 / gen.length); } return best; };
 const tRef = time(refLight), tNew = time(V.computeColumnLight);
 console.log(`     ${gen.length} generated columns: ${tNew.toFixed(2)} ms per column (v0.39 reference ${tRef.toFixed(2)} ms)`);
-console.log(fail ? `FAIL ${fail}` : 'OK — the column light is the same as before');
+console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);

@@ -5,6 +5,7 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto('file:///home/claude/vr/dist/index.html');
@@ -33,6 +34,7 @@ const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => 
 await look('te_1_hill', [ox + 22, y0 + 14, oz + 48], 0, -0.5);
 // ---- stand on the slope: the body must not move at all
 const stand = await ev(([ox, y0, oz]) => { const g = VR.game, p = g.player; p.flying = false; p.noclip = false; const sx = ox + 15.5, sz = oz + 22.5; const top = g.world.topAt(Math.floor(sx), Math.floor(sz)); p.teleport(sx, top + 2, sz); p.vel[0] = p.vel[1] = p.vel[2] = 0; let ys = []; for (let i = 0; i < 180; i++) { g.last = performance.now() - 16; g.loop(performance.now()); if (i >= 60) ys.push(p.pos[1]); } const mn = Math.min(...ys), mx = Math.max(...ys); return { y: +ys[ys.length - 1].toFixed(3), jitter: +(mx - mn).toFixed(4), onGround: p.onGround }; }, base);
+check(stand.jitter < 0.002, 'standing on the slope does not jitter');
 console.log('stand on slope:', JSON.stringify(stand), stand.jitter < 0.002 ? 'OK (no jitter)' : 'JITTER!');
 // ---- walk over the dome: grounded all the way, no flying off the downhill side
 const walk = await ev(([ox, y0, oz]) => { const g = VR.game, p = g.player; p.teleport(ox + 4.5, g.world.topAt(ox + 4, oz + 22) + 1, oz + 22.5); p.yaw = -Math.PI / 2; p.vel[0] = p.vel[1] = p.vel[2] = 0; const out = []; let air = 0; for (let i = 0; i < 420; i++) { p.vel[0] = 4; g.last = performance.now() - 16; g.loop(performance.now()); if (!p.onGround) air++; if (i % 30 === 0) out.push([+(p.pos[0] - ox).toFixed(1), +p.pos[1].toFixed(2), p.onGround ? 1 : 0]); } return { trace: out, airFrames: air }; }, base);
@@ -56,4 +58,7 @@ await look('te_2_edits', [ox + 22, y0 + 12, oz + 52], 0, -0.62);
 await look('te_3_edits_low', [ox + 22, y0 + 4, oz + 42], 0, -0.25);
 await look('te_4_pit_close', [ox + 15, y0 + 6, oz + 36], 0, -0.7);
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 8)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

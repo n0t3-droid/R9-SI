@@ -6,7 +6,7 @@
 require('./load_shared.js');
 const fs = require('fs');
 const R = VR.R;
-const FILE = '/home/claude/vr/test/id_snapshot.json';
+const FILE = require('path').join(__dirname, '..', 'test', 'id_snapshot.json');   // also right from a copy in .tmp_tests (wt_run.sh)
 const now = R.types.map(t => [t.name, t.base, t.nstates]);
 if (process.argv.includes('--write')) {
   fs.writeFileSync(FILE, '[\n' + now.map(r => JSON.stringify(r)).join(',\n') + '\n]\n');
@@ -26,5 +26,6 @@ const known = new Set(snap.map(r => r[0]));
 const added = R.types.filter(t => !known.has(t.name));
 for (const t of added) if (t.base < end) errs.push(`new type ${t.name} at ${t.base} sits inside the shipped id range (< ${end})`);
 console.log('snapshot', snap.length, 'types, states 1…' + (end - 1), '· now', R.types.length, 'types,', R.stateCount, 'states · appended', added.length, 'types (' + (R.stateCount - end) + ' states)');
-console.log(errs.length ? 'FAIL ' + errs.length + '\n  ' + errs.slice(0, 12).join('\n  ') : 'OK — every shipped block keeps its state ids');
+console.log(errs.length ? errs.slice(0, 12).map(e => '  ✗ ' + e).join('\n') : '  ✓ every shipped block keeps its state ids');
+console.log(errs.length ? 'FAILED ' + errs.length : 'ALL OK');
 process.exit(errs.length ? 1 : 0);

@@ -2,6 +2,7 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl', '--allow-file-access-from-files'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
 const logs = []; page.on('pageerror', e => logs.push(e.message));
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 await page.goto('file:///home/claude/vr/dist/studio.html');
 await page.evaluate(() => { try { localStorage.removeItem('r9si.studio.invY'); } catch (e) { /* */ } });
 await page.reload();
@@ -12,12 +13,15 @@ const pitch = () => page.evaluate(() => window.__st.cam.fly ? 'fly ' + window.__
 await page.evaluate(() => window.__studio.selectHouse(0)); await page.waitForTimeout(800);
 let a = await pitch(); await drag('left', 120); let b = await pitch();
 console.log('Architektur, drag down:', a, '→', b, +b < +a ? 'camera goes down (looks up)' : 'camera goes up');
+check(+b < +a, 'Architektur: dragging down moves the camera down');
 await page.evaluate(() => window.__studioCore.setMode('craft'));
 for (let i = 0; i < 120; i++) { await page.waitForTimeout(500); if (await page.evaluate(() => !!(VR.Crafter.house && VR.Crafter.gpu))) break; }
 a = await pitch(); await drag('right', 120); b = await pitch();
 console.log('Crafter orbit, right-drag down:', a, '→', b, +b < +a ? 'camera goes down (looks up)' : 'camera goes up');
+check(+b < +a, 'Crafter orbit: dragging down moves the camera down');
 const changed = await page.evaluate(() => { const h = VR.Crafter.house; let n = 0; for (let i = 0; i < h.blocks.length; i++) if (h.blocks[i] !== h.base[i]) n++; return n; });
 console.log('a right-drag places nothing:', changed === 0);
+check(changed === 0, 'a right-drag places nothing');
 await page.keyboard.press('f'); await page.waitForTimeout(200);
 a = await pitch(); await drag('right', 120); b = await pitch();
 console.log('Crafter fly, right-drag down:', a, '→', b, +b.split(' ')[1] > +a.split(' ')[1] ? 'looks up' : 'looks down');
@@ -25,7 +29,11 @@ await page.keyboard.press('f');
 await page.click('#invY'); await page.waitForTimeout(200);
 a = await pitch(); await drag('right', 120); b = await pitch();
 console.log('⇅ on, Crafter orbit, right-drag down:', a, '→', b, +b < +a ? 'camera goes down' : 'camera goes up (inverted)');
+check(+b > +a, '⇅ on: dragging down moves the camera up');
 console.log('remembered:', await page.evaluate(() => localStorage.getItem('r9si.studio.invY')), '· sys:', await page.evaluate(() => document.getElementById('sysText').textContent));
 await page.click('#invY');
 console.log('logs', logs.length, logs.slice(0, 3));
+check(logs.length === 0, 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

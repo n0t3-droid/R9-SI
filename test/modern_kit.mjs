@@ -4,6 +4,7 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail|missing/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto('file:///home/claude/vr/dist/index.html');
@@ -76,6 +77,12 @@ const inter = await ev(([ox, y0, oz]) => {
   return { name: t.name, before, after, back, icons };
 }, base);
 console.log('door interaction', JSON.stringify(inter));
+check(inter.after[0] === inter.after[1] && inter.after[0] !== inter.before[0], 'a door opens in both halves');
+check(inter.back[0] === inter.before[0] && inter.back[1] === inter.before[1], 'and closes again the same way');
 console.log('texture problems:', JSON.stringify(missing));
+check(!logs.some(l => /Missing textures/.test(l)), 'the game reports no missing textures');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 10)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

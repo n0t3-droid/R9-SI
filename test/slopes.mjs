@@ -3,6 +3,7 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto('file:///home/claude/vr/dist/index.html');
@@ -39,4 +40,7 @@ await look('slopes_4_top', [ox + 20, y0 + 22, oz + 20], 0, -1.5);
 const trace = await ev(([ox, y0, oz]) => { window.__norender = true; const g = VR.game, p = g.player; p.flying = false; p.noclip = false; p.teleport(ox + 1.5, y0 + 2, oz + 20.5); p.yaw = -Math.PI / 2; p.pitch = 0; const out = []; for (let i = 0; i < 240; i++) { g.input = g.input || {}; p.vel[0] = 4; g.last = performance.now() - 16; g.loop(performance.now()); if (i % 20 === 0) out.push([+(p.pos[0] - ox).toFixed(1), +p.pos[1].toFixed(2), p.onGround ? 1 : 0]); } return out; }, base);
 console.log('walk trace [x, y, onGround]:', JSON.stringify(trace));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 8)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

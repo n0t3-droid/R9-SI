@@ -66,5 +66,7 @@ await page.mouse.dblclick(box.x + box.width * 0.62, cy + 40); await wait(800);
 const after2 = (await cam()).c;
 check(Math.hypot(after2[0] - before2[0], after2[1] - before2[1], after2[2] - before2[2]) > 0.5, 'Architektur: double-click flies to the clicked spot');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 5)) console.log(l);
-console.log(fails ? 'FAIL ' + fails : 'OK');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

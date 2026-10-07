@@ -9,8 +9,11 @@ await page.goto('file:///home/claude/vr/dist/studio.html' + (process.env.HASH ||
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const wait = (ms) => page.waitForTimeout(ms);
 const t0 = Date.now();
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 for (let i = 0; i < 240; i++) { await wait(500); const s = await ev(() => ({ boot: document.getElementById('studio').classList.contains('boot'), houses: window.__studio ? window.__studio.HOUSE.size : -1, sys: document.getElementById('sysText').textContent })); if (!s.boot && s.houses >= 11) break; if (i % 10 === 0) console.log('  t+' + ((Date.now() - t0) / 1000).toFixed(0) + 's', JSON.stringify(s)); }
-console.log('ready after', ((Date.now() - t0) / 1000).toFixed(1), 's', await ev(() => document.getElementById('sysText').textContent));
+const built = await ev(() => window.__studio ? window.__studio.HOUSE.size : -1), booting = await ev(() => document.getElementById('studio').classList.contains('boot'));
+check(built >= 11 && !booting, 'the Studio boots and builds every catalogue house (' + built + ')');
+console.log('ready after',((Date.now() - t0) / 1000).toFixed(1), 's', await ev(() => document.getElementById('sysText').textContent));
 await wait(800);
 await page.screenshot({ path: '/home/claude/vr/test/shots/st2_1_arch.png' });
 console.log('arch', await ev(() => document.getElementById('hudMeta').textContent));
@@ -37,4 +40,7 @@ await ev(() => { window.__studio.setMode('arch'); window.__studio.selectHouse(7)
 await page.screenshot({ path: '/home/claude/vr/test/shots/st2_7_palais.png' });
 console.log('palais', await ev(() => document.getElementById('hudMeta').textContent));
 console.log('logs', logs.length); for (const l of logs.slice(0, 10)) console.log(l);
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

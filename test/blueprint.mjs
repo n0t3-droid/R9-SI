@@ -6,6 +6,7 @@ import fs from 'fs';
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto('file:///home/claude/vr/dist/index.html');
@@ -61,7 +62,7 @@ await aim(eye, target); await settle(60);
 let at = null;
 for (let i = 0; i < 40; i++) { await step(2); at = await ev((house) => { const g = VR.game, B = g.gadgets.blue, bp = B.get(house); if (!bp) return null; B.at = B.locate(g.player, bp); const a = B.at; return a ? { ok: a.ok, why: a.why, r: a.r, F: a.F, lot: [a.x0, a.z0, a.x1, a.z1], top: bp.top, ops: bp.ops.length / 4, custom: bp.custom, skin: bp.skin, hud: B.hud(VR.itemDef('blueprint_' + house)).replace(/<[^>]+>/g, '') } : { none: true }; }, HOUSE); if (at) break; await wait(150); }
 console.log('ghost', JSON.stringify(at));
-if (!at || !at.ok) { console.log('ghost not buildable here — stopping'); console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l); await browser.close(); process.exit(0); }
+if (!at || !at.ok) { check(false, 'the ghost lot is buildable at the slope spot' + (at && at.why ? ' (' + at.why + ')' : '')); console.log('ghost not buildable here — stopping'); console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l); await browser.close(); console.log('FAILED ' + fails); process.exit(1); }
 await ev(() => { VR.game.hideHud = false; });
 await shot('bp_1_ghost');
 // remember the land, build, measure
@@ -103,6 +104,10 @@ console.log('diffbox', JSON.stringify(await ev(() => { const g = VR.game, a = wi
 console.log('diff', JSON.stringify(await ev(() => { const g = VR.game, a = window.__region, w = g.world, R = VR.R, nm = (s) => s ? R.types[R.T.type[s]].name : 'air'; let i = 0; const d = new Map(); for (let x = a.x0 - 3; x <= a.x1 + 3; x++) for (let z = a.z0 - 3; z <= a.z1 + 3; z++) for (let y = a.F - 20; y < a.F + 40; y++) { const o = window.__before[i++], n = w.getBlock(x, y, z); if (o !== n) { const k = nm(o) + '→' + nm(n); d.set(k, (d.get(k) || 0) + 1); } } return [...d.entries()].slice(0, 20); })));
 const realDiff = await ev(() => { const g = VR.game, a = window.__region, w = g.world, R = VR.R, nm = (s) => s ? R.types[R.T.type[s]].name : 'air'; let i = 0, n = 0; for (let x = a.x0 - 3; x <= a.x1 + 3; x++) for (let z = a.z0 - 3; z <= a.z1 + 3; z++) for (let y = a.F - 20; y < a.F + 40; y++) { const o = window.__before[i++], nn = w.getBlock(x, y, z); if (o !== nn) { const k = nm(o) + nm(nn); if (!/^(grass_block|dirt)(grass_block|dirt)$/.test(k) && !/_leavesair$/.test(k) && nm(o) !== nm(nn)) n++; } } return n; });
 console.log('undo restores the land:', realDiff === 0 ? 'OK' : 'DIFFERENT (' + realDiff + ' cells besides grass spreading / leaf decay)');
+check(realDiff === 0, 'undo restores the land exactly (' + realDiff + ' other cells differ)');
 await shot('bp_4_undone');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

@@ -121,5 +121,5 @@ console.log(`     world: ${ncol} columns, ${ncol * 16} sections`);
   console.log(`     buildJob: ${(tNew * 1000).toFixed(0)} µs per section (v0.39 loop ${(tRef * 1000).toFixed(0)} µs) — 20 of them a frame while the world streams in`);
   check(tNew < tRef, 'buildJob is faster than the cell-by-cell loop');
 }
-console.log(fail ? `FAIL ${fail}` : 'OK — frame costs');
+console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);

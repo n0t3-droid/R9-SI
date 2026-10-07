@@ -120,5 +120,5 @@ const check = (ok, what) => { console.log((ok ? 'OK   ' : 'FAIL ') + what); if (
   const now = performance.now();
   check(typeof world.retryAfter === 'function' && world.retryAfter(V.ckey(5, 5), now) > now && world.retryAfter(V.ckey(5, 5), now + 10000) <= now + 10000, 'it is asked for again after a pause, not at once');
 }
-console.log(fail ? `FAIL ${fail}` : 'OK — the worker pool recovers');
+console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);

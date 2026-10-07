@@ -8,7 +8,7 @@
 const fs = require('fs');
 const V = require('./load_shared.js');
 const VM = V.VM, R = V.R;
-const FILE = '/home/claude/vr/src/shared/voxcells.js';
+const FILE = require('path').join(__dirname, '..', 'src', 'shared', 'voxcells.js');   // also right from a copy in .tmp_tests (wt_run.sh)
 const eager = VM.DEFS.filter(d => !d.o.late && !d.o.lazy);
 const built = {};
 let ms = 0;
@@ -82,5 +82,5 @@ if (bad.length) console.log('     ' + bad.slice(0, 10).join('\n     '));
   if (wrong.length) console.log('     ' + wrong.join('\n     '));
 }
 console.log(`     building all ${eager.length} models takes ${ms.toFixed(0)} ms — now paid only for the ones a thread really meets`);
-console.log(fail ? `FAIL ${fail}` : 'OK — the first packs register from their cells');
+console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);
