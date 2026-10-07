@@ -144,6 +144,18 @@
     async boot() {
       try { this.renderer = new VR.Renderer(this.canvas); }
       catch (e) { this.fatal('This game needs WebGL 2. ' + e.message); return; }
+      // the graphics context can be taken away (a driver reset, the GPU out of memory on a small machine, a tab
+      // in the background too long): everything on the GPU is gone. The world is saved and the page starts again —
+      // seconds, and nothing lost — instead of a black view that never comes back.
+      this.canvas.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        if (this.glLost) return;
+        this.glLost = true;
+        console.warn('WebGL context lost — saving and reloading');
+        try { this.ui && this.ui.loading && this.ui.loading('Graphics were lost — saving…', 0.5); } catch (err) { /* the page may be half gone */ }
+        const save = this.state === 'play' && this.meta && !this.meta.guest && this.world ? Promise.all([this.saveMeta(), this.world.saveAll()]) : Promise.resolve();
+        Promise.race([save.catch(() => {}), new Promise((r) => setTimeout(r, 4000))]).then(() => { try { location.reload(); } catch (err) { /* nothing more to do */ } });
+      }, false);
       this.input = new VR.Input(this.canvas);
       this.audio = new VR.Audio();
       this.env = new VR.Env();
@@ -535,6 +547,7 @@
 
     // ---------------------------------------------------------------- main loop
     loop(t) {
+      if (this.glLost) return;   // the context is gone: no more frames (the page reloads)
       requestAnimationFrame((tt) => this.loop(tt));
       let dt = (t - this.last) / 1000; this.last = t;
       if (!(dt > 0)) dt = 0.016;
