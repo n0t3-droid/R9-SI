@@ -243,6 +243,11 @@ check(WB.writes.every(c => c.length <= 8000), 'no write over 8 000 cells (larges
   check(!folk || (onN > 100 && onDeck / onN > 0.97 && worked > 50), 'the builders stand on the deck and hammer (' + onDeck + '/' + onN + ' on it, ' + worked + ' frames of work)');
   check(hauled > 30 && seen.has('lower') && seen.has('down'), 'the crane picks loads at its yard and lowers them onto the deck (' + [...seen].join(' ') + ')');
   const tDone = site.phase === 'done';
+  // the site office by the gate (outside the plan's lot, on level open ground) and the Richtbaum on the roof
+  const of = sh.office, pb = site.o.box;
+  check(!!of && (of.x + 3 < pb[0] || of.x - 3 > pb[3] + 1 || of.z + 3 < pb[2] || of.z - 3 > pb[5] + 1) && Math.abs(of.y - (W.topAt(Math.floor(of.x), Math.floor(of.z)) + 1)) < 0.01, 'a site office by the gate, outside the lot, on the ground (' + JSON.stringify(of) + ')');
+  const tr = sh.tree, sbx = site.o.sbox;
+  check(!!tr && tr.y >= sh.top - 3 && tr.x > sbx[0] && tr.x < sbx[3] + 1 && tr.z > sbx[2] && tr.z < sbx[5] + 1 && W.getBlock(Math.floor(tr.x), tr.y - 1, Math.floor(tr.z)) !== 0, 'Richtfest: a topping-out tree on the roof (' + JSON.stringify(tr) + ', top ' + sh.top + ')');
   let gone = -1; runUntil(G, 1 / 30, (t) => { if (site.phase === 'gone' && gone < 0) gone = t; return gone >= 0; }, 30);
   check(tDone && gone > 1 && gone < 16, 'when it stands the scaffold folds, the builders walk off, the site is gone (' + gone.toFixed(1) + ' s)');
   check(!G.B.sites.length, 'no show is left behind');

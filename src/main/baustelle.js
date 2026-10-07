@@ -462,6 +462,29 @@
     // the load: two by two by two blocks on the pallet, white (the draw tints them with the layer's colour)
     cubes() { const M = new MeshBuf(), s = 0.31; for (const x of [-s, s]) for (const z of [-s, s]) for (const y of [0.08, 0.7]) M.box(x - s + 0.01, y, z - s + 0.01, x + s - 0.01, y + 0.6, z + s - 0.01, y < 0.5 ? 0xE8E8E8 : 0xFFFFFF); return M.pack(); },
     blink() { const M = new MeshBuf(); M.box(-0.16, 0, -0.16, 0.16, 0.26, 0.16, 0xFF3020, { e: true }); return M.pack(); },
+    // the topping-out tree (Richtbaum) put on the roof when it stands: a little fir with ribbons in the party's colours
+    tree() {
+      const M = new MeshBuf();
+      M.box(-0.07, 0, -0.07, 0.07, 2.25, 0.07, 0x7A5230, { skip: 8 });
+      const tiers = [[0.45, 0.62, 0.95, 0x2F7A3A], [0.85, 0.5, 1.3, 0x37884A], [1.22, 0.38, 1.62, 0x2B6E36], [1.55, 0.26, 1.92, 0x3C9450], [1.86, 0.13, 2.22, 0x2F7A3A]];
+      for (const [y0, r, y1, col] of tiers) M.box(-r, y0, -r, r, y1, r, col);
+      const rib = [0xD8322A, 0xF2B90F, 0x2E6FD8, 0xF2F2EE, 0x3CB44B, 0xE85BB0];
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2 + 0.4, ca = Math.cos(a), sa = Math.sin(a); M.beam(ca * 0.1, 2.1, sa * 0.1, ca * 0.86, 0.62, sa * 0.86, 0.07, rib[i]); }
+      return M.pack();
+    },
+    // the site office: a container (white, blue posts) with two windows, a door and a step at the front (+z), centred
+    office() {
+      const M = new MeshBuf(), BL = 0x2F5FA8, WH = 0xE6E9EC, hx = 3, hz = 1.22;
+      M.box(-hx, 0, -hz, hx, 0.22, hz, C.grey);
+      M.box(-hx + 0.06, 0.22, -hz + 0.06, hx - 0.06, 2.5, hz - 0.06, WH);
+      for (const [x, z] of [[-hx, -hz], [hx - 0.16, -hz], [hx - 0.16, hz - 0.16], [-hx, hz - 0.16]]) M.box(x, 0.22, z, x + 0.16, 2.6, z + 0.16, BL);
+      M.box(-hx, 2.5, -hz, hx, 2.62, hz, BL);
+      for (const x of [-2.3, 0.9]) { M.box(x, 1.05, hz - 0.06, x + 1.4, 2.0, hz - 0.02, C.glass, { skip: 47 }); M.box(x - 0.06, 0.98, hz - 0.06, x + 1.46, 1.05, hz + 0.02, BL, { skip: 32 }); }
+      M.box(-0.6, 0.22, hz - 0.06, 0.35, 2.2, hz - 0.02, 0x3D4C5E, { skip: 47 });
+      M.box(0.18, 1.14, hz - 0.02, 0.28, 1.22, hz + 0.06, C.steel);
+      M.box(-0.75, 0, hz, 0.5, 0.18, hz + 0.5, C.grey, { skip: 32 });
+      return M.pack();
+    },
     // the slewing part for a jib of length Lj and a counter-jib of Lc: turntable, cab, tower head, lattice jib,
     // counter-jib with its counterweight, pendants (local +x = the jib)
     top(Lj, Lc) {
@@ -489,7 +512,7 @@
     if (BS.gpuFor === gl && BS.gpuSet) return BS.gpuSet;
     const up = (m) => { const o = VR.VoxGPU.upload(gl, m); o.data = null; return o; };
     const G = {};
-    for (const k of ['bay', 'brace', 'screen', 'deck', 'mast', 'fence', 'trolley', 'cable', 'hook', 'pallet', 'cubes', 'blink']) G[k] = up(BS.MOD[k]());
+    for (const k of ['bay', 'brace', 'screen', 'deck', 'mast', 'fence', 'trolley', 'cable', 'hook', 'pallet', 'cubes', 'blink', 'tree', 'office']) G[k] = up(BS.MOD[k]());
     G.corner = up(BS.MOD.corner(false)); G.deckCorner = up(BS.MOD.corner(true));
     BS.gpuFor = gl; BS.gpuSet = G;
     return G;
@@ -539,12 +562,22 @@
       this.preset = S.preset || 'balanced';
       // the plan's volume as a blueprint ghost while it is built (gadgets.js outlines)
       this.outline = { x: sb[0], y: sb[1], z: sb[2], boxes: [[0, 0, 0, sb[3] + 1 - sb[0], sb[4] + 1 - sb[1], sb[5] + 1 - sb[2]]], color: [0.35, 0.95, 1, 0.5] };
+      // (the barrier, the office and the crane stand on the ground as the earthworks leave it: placed again then)
+      this.grounded = !o.nEarth; this.office = null; this.tree = null;
       if (this.scaffold) {
         this.rings();
         this.fence();
         if (VR.Folk && VR.FolkAnim) this.makeCrew();
         if (this.top - site.F > 12 && this.preset !== 'potato') this.makeCrane();
+        if (this.grounded) this.placeOffice();
       }
+    }
+    // the earthworks are done: the barrier on the new ground, the office, the crane (it goes up only now)
+    ground() {
+      if (this.gl) this.dispose();
+      this.fence();
+      this.placeOffice();
+      if (this.crane && this.crane.rise <= 0) this.makeCrane();
     }
     // ---- rings and the instance lists
     rings() {
@@ -590,6 +623,35 @@
       const gap = new Set(near.slice(0, 2).map(q => q[1]));
       const keep = []; for (let i = 0; i < out.length; i += 4) if (!gap.has(i)) keep.push(out[i], out[i + 1], out[i + 2], out[i + 3]);
       this.fenceInst = new Float32Array(keep);
+    }
+    // the site office: a container beside the gate, outside the barrier and the plan's lot, its door toward the
+    // player — only on level, open ground (nothing solid where it stands), else there is none
+    placeOffice() {
+      this.office = null;
+      const g = this.site.g, w = g.world, R0 = this.ring, TT = VR.R && VR.R.T, FF = VR.F, p = g.player && g.player.pos, pb = this.site.o.box;
+      if (!w || !w.getBlock || !w.topAt || !R0 || !TT || !TT.flags || !FF || !p) return;
+      const D = 5.2, X0 = this.ox + R0[0] - D, X1 = this.ox + R0[1] + D, Z0 = this.oz + R0[2] - D, Z1 = this.oz + R0[3] + D;
+      const dx = p[0] - this.cx, dz = p[2] - this.cz;
+      let nx = 0, nz = 0; if (Math.abs(dx) * (Z1 - Z0) > Math.abs(dz) * (X1 - X0)) nx = dx < 0 ? -1 : 1; else nz = dz < 0 ? -1 : 1;
+      const yaw = nz > 0 ? 0 : nz < 0 ? PI : nx > 0 ? PI / 2 : -PI / 2;
+      // its centre line: 0.8 off the barrier, clear of the lot
+      const n = nx || nz, at = nz ? (n > 0 ? Math.max(Z1 + 2.0, pb[5] + 2.6) : Math.min(Z0 - 2.0, pb[2] - 1.6)) : (n > 0 ? Math.max(X1 + 2.0, pb[3] + 2.6) : Math.min(X0 - 2.0, pb[0] - 1.6));
+      const gateU = nz ? clamp(p[0], X0, X1) : clamp(p[2], Z0, Z1);
+      const c = this.crane, solid = FF.SOLID;
+      for (const off of [6.5, -6.5, 10.5, -10.5]) {
+        const u = gateU + off, ox = nz ? u : at, oz = nz ? at : u;
+        if (c && (Math.hypot(ox - c.bx, oz - c.bz) < 6 || Math.hypot(ox - c.yard[0], oz - c.yard[1]) < 6)) continue;
+        const ax = nz ? 3 : 1.25, az = nz ? 1.25 : 3;
+        if (Math.abs(p[0] - ox) < ax + 1 && Math.abs(p[2] - oz) < az + 1) continue;   // (not where the player stands)
+        let gy = null, ok = true;
+        for (let x = Math.floor(ox - ax); ok && x <= Math.floor(ox + ax - 0.01); x++) for (let z = Math.floor(oz - az); ok && z <= Math.floor(oz + az - 0.01); z++) {
+          const t = w.topAt(x, z); if (gy === null) gy = t; else if (t !== gy) { ok = false; break; }
+          for (let y = t + 1; y <= t + 3; y++) { const s = w.getBlock(x, y, z); if (s && (TT.flags[s] & solid)) { ok = false; break; } }
+        }
+        if (!ok || gy === null || Math.abs(gy + 1 - this.oy) > 3) continue;
+        this.office = { x: ox, y: gy + 1, z: oz, yaw };
+        return;
+      }
     }
     // a point on the deck's walk around level k at s (0…1): out = [x, z, the yaw that faces the wall, the walk's length]
     ringPoint(k, s, out) {
@@ -671,14 +733,27 @@
         if (!this.tiny && this.sw) for (let i = 0; i < 48; i++) { const cx = this.ox + (i & 1 ? this.sw : 0), cz = this.oz + (i & 2 ? this.sd : 0); SPARKLE.col[0] = 1; SPARKLE.col[1] = 0.92; SPARKLE.col[2] = 0.6; P.spawn(cx + (rnd() - 0.5) * 0.4, this.oy + rnd() * Math.max(2, this.H) * 0.3, cz + (rnd() - 0.5) * 0.4, 0, 4 + rnd() * Math.max(4, this.H / 3), 0, SPARKLE); }
         SPARKLE.col[2] = 1;
       }
+      // Richtfest: the topping-out tree on the roof (the highest layer of four or more cells — over a spire or a flag
+      // pole it stands on the roof under it), the cell nearest the middle
+      if (this.scaffold && !this.tiny && this.H >= 4) {
+        const o = this.site.o, L = this.site.list;
+        let h = o.H - 1; while (h > 0 && o.layerStart[h + 1] - o.layerStart[h] < 4) h--;
+        let best = -1, bd = Infinity;
+        for (let i = o.nEarth + o.layerStart[h]; i < o.nEarth + o.layerStart[h + 1]; i++) { const e = L[i], d = (e[0] + 0.5 - this.cx) ** 2 + (e[2] + 0.5 - this.cz) ** 2; if (d < bd) { bd = d; best = i; } }
+        if (best >= 0) {
+          const e = L[best]; this.tree = { x: e[0] + 0.5, y: e[1] + 1, z: e[2] + 0.5, s: clamp(this.H / 18, 1, 2.6) };
+          if (P) for (let i = 0; i < 14; i++) sparkle(P, this.tree.x, this.tree.y + rnd() * 2 * this.tree.s, this.tree.z);
+        }
+      }
       for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } if (b.mode === 'walkin') { b.mode = 'leave'; continue; } b.mode = 'cheer'; b.timer = 1.6 + rnd() * 0.4; }
       if (g.ui && g.ui.hint && !this.tiny && this.site.kind !== 'blueprint') g.ui.hint(T('g.bau.done', { name: this.site.name }, '✨ {name} steht!', '✨ {name} is done!'), 2600);
     }
-    onCancel() { this.cancelT = 0; for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } b.mode = b.mode === 'walkin' ? 'leave' : 'ride'; b.timer = 0.8; } }
+    onCancel() { this.cancelT = 0; this.tree = null; for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } b.mode = b.mode === 'walkin' ? 'leave' : 'ride'; b.timer = 0.8; } }
     // ---- every frame
     tick(dt) {
       const site = this.site; this.t += dt;
       if (site.phase === 'gone') return;
+      if (!this.grounded && site.phase !== 'earth') { this.grounded = true; if (this.scaffold) this.ground(); }
       const o = site.o;
       // the build front over the origin (layers), smooth; the deck a little under it (hands at the newest layer)
       let front = 0;
@@ -761,8 +836,8 @@
     }
     tickCrane(dt, front) {
       const c = this.crane, site = this.site, building = site.phase === 'earth' || site.phase === 'build';
-      // up while it builds (the mast is put together in a second and a half), down when the scaffold folds
-      if (building || (this.doneT >= 0 && this.doneT < 2.0) || (this.cancelT >= 0 && this.cancelT < 0.8)) c.rise = Math.min(1, c.rise + dt / 1.5);
+      // up when the earthworks are done (the mast is put together in a second and a half), down when the scaffold folds
+      if ((building && this.grounded) || (c.rise > 0 && ((this.doneT >= 0 && this.doneT < 2.0) || (this.cancelT >= 0 && this.cancelT < 0.8)))) c.rise = Math.min(1, c.rise + dt / 1.5);
       else { c.rise = Math.max(0, c.rise - dt / 2.4); c.load = false; c.st = 'rest'; c.slewT = c.slew; c.hookT = c.mastTop - 4; }
       const deckY = this.oy + this.deck;
       if (building && c.rise >= 1) {
@@ -825,7 +900,40 @@
       const G = gpu(r);
       if (this.scaffold && this.inst && P.voxInst) this.drawScaffold(r, E, cam, G);
       if (this.crane && this.crane.rise > 0.01) this.drawCrane(r, E, cam, G);
+      if ((this.office && this.endT === undefined) || this.tree) this.drawExtras(r, E, cam, G);
       if (this.crew.length && ent && VR.Folk) this.drawCrew(r, E, cam, ent);
+    }
+    // the plain vox program for single meshes (this.one)
+    voxBegin(r, E) {
+      const gl = r.gl, p = r.P.vox; gl.useProgram(p.p); r.common(p, E);
+      gl.uniformMatrix4fv(p.u.u_viewProj, false, r.viewProj); gl.uniform1f(p.u.u_alpha, 1);
+      if (p.u.u_clipNear) gl.uniform1f(p.u.u_clipNear, 0);
+      gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
+      this.uniforms(gl, p, null);
+      this.dp = p;
+      return p;
+    }
+    // the site office by the gate; the Richtbaum on the roof (it pops up, sways in the wind, shrinks away at the end)
+    drawExtras(r, E, cam, G) {
+      const gl = r.gl; let on = false;
+      const f = this.office;
+      if (f && this.endT === undefined && VR.mat4.boxInFrustum(r.planes, f.x - 3.2 - cam.x, f.y - cam.y, f.z - 3.2 - cam.z, f.x + 3.2 - cam.x, f.y + 2.8 - cam.y, f.z + 3.2 - cam.z)) {
+        this.voxBegin(r, E); on = true;
+        this.one(gl, G.office, this.model(f.x, f.y, f.z, cam, f.yaw));
+      }
+      const T0 = this.tree;
+      if (T0 && this.doneT >= 0) {
+        const tt = this.doneT, u = Math.min(1, tt / 0.45), pop = 1 + 2.2 * (u - 1) * (u - 1) * (u - 1) + 1.2 * (u - 1) * (u - 1);   // (ease out with a little overshoot)
+        const end = this.endT === undefined ? 1 : clamp(1 - (tt - this.endT) / 0.8, 0, 1), s = T0.s * Math.max(0, Math.min(1.15, pop)) * end;
+        if (s > 0.02) {
+          if (!on) this.voxBegin(r, E);
+          const a = 0.07 * Math.sin(this.t * 2.3) + 0.03 * Math.sin(this.t * 5.1), ca = Math.cos(a), sa = Math.sin(a), m = this.mm;
+          m.fill(0); m[0] = ca * s; m[1] = sa * s; m[4] = -sa * s; m[5] = ca * s; m[10] = s; m[15] = 1;
+          m[12] = T0.x - cam.x; m[13] = T0.y - cam.y; m[14] = T0.z - cam.z;
+          this.one(gl, G.tree, m);
+        }
+      }
+      gl.bindVertexArray(null);
     }
     uniforms(gl, p, tint) {
       const L = this.light;
@@ -892,13 +1000,8 @@
         drawInst(gl, this.vaos.mast, this.bufs.mast, G.mast, 0, shown);
         gl.bindVertexArray(null);
       }
-      const p = P.vox; gl.useProgram(p.p); r.common(p, E);
-      gl.uniformMatrix4fv(p.u.u_viewProj, false, r.viewProj); gl.uniform1f(p.u.u_alpha, 1);
-      if (p.u.u_clipNear) gl.uniform1f(p.u.u_clipNear, 0);
-      gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
-      this.uniforms(gl, p, null);
+      const p = this.voxBegin(r, E);
       if (!c.top || c.topKey !== c.Lj) { if (c.top && c.top.vbo) { gl.deleteBuffer(c.top.vbo); gl.deleteVertexArray(c.top.vao); } c.top = VR.VoxGPU.upload(gl, BS.MOD.top(c.Lj, c.Lc)); c.topKey = c.Lj; }
-      this.dp = p;
       this.one(gl, c.top, this.model(c.bx, topY, c.bz, cam, c.slew));
       // the trolley; the cables swing (a pendulum across the jib, pushed by its turns); the hook and the load hang at their end
       const cs = Math.cos(c.slew), sn = Math.sin(c.slew), tx = c.bx + cs * c.r, tz = c.bz - sn * c.r, ty = topY + 0.55;
@@ -950,7 +1053,7 @@
       const gl = this.gl; if (!gl) return;
       if (this.vaos) for (const k in this.vaos) gl.deleteVertexArray(this.vaos[k]);
       if (this.bufs) for (const k in this.bufs) gl.deleteBuffer(this.bufs[k]);
-      const c = this.crane; if (c && c.top && c.top.vbo) { gl.deleteBuffer(c.top.vbo); gl.deleteVertexArray(c.top.vao); }
+      const c = this.crane; if (c && c.top && c.top.vbo) { gl.deleteBuffer(c.top.vbo); gl.deleteVertexArray(c.top.vao); c.top = null; }
       this.vaos = null; this.bufs = null;
     }
   }
