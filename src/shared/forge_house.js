@@ -29,20 +29,19 @@
       { k: 'd', label: 'Tiefe', min: 10, max: 17, def: 12, dim: true },
       { k: 'r', label: 'Dach', min: 0, max: 1, def: 0, names: ['Flachdach', 'Pultdach'] },
       { k: 'g', label: 'Glas', min: 0, max: 2, def: 1, names: ['Fenster', 'Panorama unten', 'Panorama überall'] },
-      { k: 't', label: 'Terrasse', min: 0, max: 1, def: 1 },
       { k: 'c', label: 'Carport', min: 0, max: 1, def: 1 },
       { k: 'b', label: 'Balkon', min: 0, max: 1, def: 1 },
     ],
     styles: Object.keys(STYLES).map(id => ({ id, name: STYLES[id].name })),
     lot: (P) => lotOf(P.params),
-    describe: (P) => [P.params.f + (P.params.f === 1 ? ' Etage' : ' Etagen'), P.params.w + ' × ' + P.params.d, P.params.r ? 'Pultdach' : 'Flachdach', P.params.g === 2 ? 'Panoramaglas' : P.params.g ? 'Glasfront' : 'Fenster'].concat(P.params.t ? ['Terrasse'] : [], P.params.c ? ['Carport'] : [], P.params.b && P.params.f > 1 ? ['Balkon'] : [], P.params.p ? ['Pool'] : []),
+    describe: (P) => [P.params.f + (P.params.f === 1 ? ' Etage' : ' Etagen'), P.params.w + ' × ' + P.params.d, P.params.r ? 'Pultdach' : 'Flachdach', P.params.g === 2 ? 'Panoramaglas' : P.params.g ? 'Glasfront' : 'Fenster'].concat(['Terrasse'], P.params.c ? ['Carport'] : [], P.params.b && P.params.f > 1 ? ['Balkon'] : [], P.params.p ? ['Pool'] : []),
   };
   def.params.push({ k: 'p', label: 'Pool', min: 0, max: 1, def: 0 });
   const SIDE = 2, FRONT = 3;
-  function lotOf(p) { const gd = Math.min(25 - FRONT - p.d, p.t ? (p.p ? 8 : 5) : (p.p ? 7 : 3)); return [p.w + 2 * SIDE + (p.c ? 6 : 0), FRONT + p.d + Math.max(2, gd)]; }
+  function lotOf(p) { const gd = Math.min(25 - FRONT - p.d, p.p ? 8 : 5); return [p.w + 2 * SIDE + (p.c ? 6 : 0), FRONT + p.d + Math.max(2, gd)]; }
 
   function build(P, env) {
-    const { f, w, d, r, g, t, c, b, p } = P.params, S = STYLES[P.style] || STYLES.weiss, rng = Forge.rng(P, 'house');
+    const { f, w, d, r, g, c, b, p } = P.params, t = 1, S = STYLES[P.style] || STYLES.weiss, rng = Forge.rng(P, 'house');
     const SH = 4, BASE = 1, Y = (k) => BASE + k * SH, top = Y(f);
     const [W, D] = lotOf(P.params), gd = D - FRONT - d, HU = SIDE, HV = FRONT;
     const K = Forge.kit(W, top + 8, D, -BASE);
