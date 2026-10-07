@@ -97,7 +97,7 @@ section('spawn', () => {
 // ---------------------------------------------------------------- the eight wonders
 section('types', () => {
   const emits = (s) => s && s !== 0xFFFF && T.emit[s] > 0;
-  const colourful = (s) => /stained_glass|^vollton_|crystal|amethyst|gold|glazed|_concrete$|_wool$|terracotta|lapis|prism|neon/.test(nameOf(s));
+  const colourful = (s) => /stained_glass|^vollton_|crystal|amethyst|gold|glazed|_concrete$|_wool$|terracotta|lapis|prism|neon|cherry_leaves|flowering_azalea/.test(nameOf(s));
   for (const t of W.TYPES) {
     let worst = 0, big = 0, over = [], notWalk = [], dark = [], plain = [], noHeart = [], nondet = [];
     for (let k = 0; k < 50; k++) {
