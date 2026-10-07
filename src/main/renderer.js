@@ -531,7 +531,8 @@
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
-      // the block look (Klassisch v2): natural blocks shaded and flipped per block, the far terrain gridded
+      // the block look (Klassisch v2): natural blocks shaded per block, normal maps turned with the tile, still water
+      // and the far terrain per block
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
     }
     bindTerrainTextures(p) {

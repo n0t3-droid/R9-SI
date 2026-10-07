@@ -1,11 +1,12 @@
 // Klassisch v2 frame cost on the potato preset: the same grass scene rendered from two builds (DIST_A, DIST_B: paths
 // of dist/index.html, e.g. the v0.39 baseline and this branch), interleaved A B A B … so the machine's load drifts
 // over both alike. SwiftShader rasterises on the CPU, so the per-frame time with gl.finish() includes the fragment
-// work — a relative measure of the shader and texture changes, not a GPU number. N=40 frames per pass, PASSES=3.
+// work — a relative measure of the shader and texture changes, not a GPU number. N=100 frames per pass (its median
+// frame counts), PASSES=5.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 const A = process.env.DIST_A, B = process.env.DIST_B;
 if (!A || !B) { console.log('usage: DIST_A=<index.html> DIST_B=<index.html> node cl2_perf.mjs'); process.exit(2); }
-const N = +(process.env.N || 40), PASSES = +(process.env.PASSES || 3);
+const N = +(process.env.N || 100), PASSES = +(process.env.PASSES || 5);
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 async function open(dist) {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -27,7 +28,9 @@ async function open(dist) {
     p.flying = true; p.noclip = true; p.teleport(ox + 4, y0 + 1 + 3.4, oz + 52); p.yaw = 0; p.pitch = -0.45;
   });
   for (let i = 0; i < 40; i++) { await ev(() => { const g = VR.game; for (let k = 0; k < 10; k++) { g.last = performance.now() - 16; g.loop(performance.now()); } }); const s = await ev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return g.pool.busy + g.world.pending.size + dirty; }); if (!s && i > 3) break; await wait(100); }
-  const measure = () => ev((n) => { const g = VR.game, gl = g.renderer.gl; g.last = performance.now() - 16; g.loop(performance.now()); gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 16; g.loop(performance.now()); gl.finish(); } return { ms: +((performance.now() - t0) / n).toFixed(2), look: VR.LOOK.mode, vary: VR.LOOK.vary, lite: g.renderer.q.lite, w: g.renderer.w, h: g.renderer.h, draws: g.renderer.stats.draws, tris: g.renderer.stats.tris }; }, N);
+  // every frame timed on its own (loop + gl.finish), the pass reports the median frame: a stray spike of the shared
+  // machine moves a mean, not a median
+  const measure = () => ev((n) => { const g = VR.game, gl = g.renderer.gl; g.last = performance.now() - 16; g.loop(performance.now()); gl.finish(); const t = []; for (let i = 0; i < n; i++) { const t0 = performance.now(); g.last = t0 - 16; g.loop(t0); gl.finish(); t.push(performance.now() - t0); } t.sort((a, b) => a - b); return { ms: +t[Math.floor(n / 2)].toFixed(3), p10: +t[Math.floor(n * 0.1)].toFixed(3), look: VR.LOOK.mode, vary: VR.LOOK.vary, lite: g.renderer.q.lite, w: g.renderer.w, h: g.renderer.h, draws: g.renderer.stats.draws, tris: g.renderer.stats.tris }; }, N);
   return { page, measure };
 }
 const pa = await open(A), pb = await open(B);
