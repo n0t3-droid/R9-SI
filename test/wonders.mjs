@@ -47,11 +47,12 @@ const comp0 = await ev(() => { const el = document.getElementById('wcompass'); r
 check(comp0 && comp0.shown && /^✨ [\d.]+ m [↑↗→↘↓↙←↖]$/.test(comp0.text), 'the Wunderkompass at the top points to it: ' + JSON.stringify(comp0));
 // ---- go there: 46 blocks short of it on the way from the spawn, hovering, looking at it
 const there = await ev((s) => { const g = VR.game, p = g.player, sp = g.worldSpawn(); const dx = sp[0] - s.x, dz = sp[2] - s.z, L = Math.hypot(dx, dz) || 1, x = s.x + dx / L * 46, z = s.z + dz / L * 46; p.flying = true; p.teleport(x, s.y + 14, z); p.yaw = Math.atan2(-(s.x - x), -(s.z - z)); p.pitch = -0.25; return [x, z]; }, first);
-let st = null, risingFrames = 0, sawRise = false;
+let st = null, risingFrames = 0, sawRise = false, shotRise = false;
 for (let i = 0; i < 400; i++) {
   await step(3);
   st = await ev((k) => { const W = VR.game.wonders, e = W.st[k]; return { e: e || null, rising: !!W.rise, job: W.job ? W.job.phase : null }; }, first.key);
   if (st.rising) { sawRise = true; risingFrames += 3; }
+  if (st.rising && !shotRise && risingFrames >= 60) { shotRise = true; await draw(true); await page.screenshot({ path: SHOTS + '/wonder_rising.png', timeout: 180000 }); }
   if (st.e && (st.e.status === 'built' || st.e.status === 'blocked')) break;
   if (!st.rising) await page.waitForTimeout(40);
 }
