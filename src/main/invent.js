@@ -415,6 +415,7 @@
     hideLayer();
     ui.show('invent');
     byKey = (VR.Start && VR.Start.kbd) || where === 'key';
+    if (VR.I18N && VR.I18N.retext) VR.I18N.retext(root);   // (the words may have changed while it was closed)
     renderAll(); defaultMsg();
     if (byKey) { const c = $('#erf-tray .erf-card', root); if (c) c.focus({ preventScroll: true }); }
     return true;
