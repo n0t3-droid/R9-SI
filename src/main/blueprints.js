@@ -435,7 +435,9 @@
         if (again.status === 'built' && !(this.lastForge.undo && u[u.length - 1] === this.lastForge.undo)) { say(T('g.forge.moved', null, 'Seit der letzten Forge hat sich etwas geändert — sag ein neues Ganzes: „/bau Hochhaus …“', 'Something changed since the last Forge build — say a whole new wish: “/bau skyscraper …”'), '#ff8a8a'); return true; }
         if (this.slices && this.slices.pl.id === again.id) { say(T('g.forge.busy', null, 'Noch im Bau — gleich.', 'Still building — a moment.')); return true; }
         if (again.status === 'built') this.gad.undo();
-        pl = Object.assign({}, again, { id: 'f' + Date.now().toString(36), dna, status: 'pending', t: Date.now() });
+        // the same front centre (a wider one grows to both sides, a longer bridge further out)
+        const r = again.r & 3, a0 = ROT[r](Fg.meta(again.dna).lot[0] >> 1, 0), a1 = ROT[r](Fg.meta(dna).lot[0] >> 1, 0);
+        pl = Object.assign({}, again, { id: 'f' + Date.now().toString(36), dna, ox: again.ox + a0[0] - a1[0], oz: again.oz + a0[1] - a1[1], status: 'pending', t: Date.now() });
         this.plans = this.plans.filter(q => q.id !== again.id); this.storePlans((ps) => ps.filter(q => q.id !== again.id));
       } else {
         const meta = Fg.meta(dna), at = this.locate(p, { lot: meta.lot, top: 40 });

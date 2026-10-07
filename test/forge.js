@@ -317,6 +317,7 @@ section('place', () => {
   const g = gad.g = { world, meta: { id: 'w1' }, state: 'play', player, ui: { hint() {}, toast: (a, b) => toasts.push(b), chatLine: (t) => chat.push(t) }, pool: { direct: (i, msg, tr, cb) => cb(Forge.job(msg)) } };
   const B = new VR.Blueprints(gad);
   let slices = 0, maxSlice = 0;
+  const run2 = (BB) => { for (let i = 0; i < 400; i++) { if (BB.slices) BB.tickSlices(0.06); else BB.tickPlans(0.6); if (BB.plans && BB.plans.every(p => p.status === 'built' || p.failed) && !BB.slices) break; } };
   const run = () => { for (let i = 0; i < 400; i++) { if (B.slices) { const a = B.slices.at; B.tickSlices(0.06); if (B.slices) { slices++; maxSlice = Math.max(maxSlice, B.slices.at - a); } else slices++; } else B.tickPlans(0.6); if (B.plans && B.plans.every(p => p.status === 'built' || p.failed) && !B.slices) break; } };
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
   // the built piece read back from the world into a lot-local grid, then walked from its door
@@ -349,6 +350,9 @@ section('place', () => {
   check(br && br.status === 'built' && piers >= 2, 'a Bogenbrücke over a valley: built from the bank (' + (br && br.dna) + '), piers or arches down on the valley floor in ' + piers + ' rows');
   const deckOK = br && (() => { let ok = 0; for (let z = br.oz; z < br.oz + 40; z++) if (world.getBlock(br.ox + 2, br.F, z)) ok++; return ok; })();
   check(deckOK >= 38, 'its deck spans the valley at the height of the bank: ' + deckOK + '/40 cells');
+  { const B2 = new VR.Blueprints(gad); B2.plans = []; B2.lastForge = null; edits.clear(); gad.wand.undo.length = 0; groundAt = () => GY; player.pos = [400.5, GY + 1, 0.5]; player.pitch = -0.08;
+    B2.forgeCommand('Hochhaus 10 Stockwerke 20 breit'.split(' ')); run2(B2); const a = B2.plans[0]; B2.forgeCommand(['breiter']); const b = B2.plans.find(p => p.status === 'pending');
+    check(b && Forge.parse(b.dna).params.w === 25 && b.ox + (25 >> 1) === a.ox + (20 >> 1) && b.oz === a.oz, '/bau breiter keeps the front centre where it was (' + (a && a.ox) + ' → ' + (b && b.ox) + ')'); }
 });
 
 // ---------------------------------------------------------------- the sweep: random parameter sets of every type with
