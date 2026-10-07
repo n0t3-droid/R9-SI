@@ -394,12 +394,14 @@
     const mpp = $('#mppanel'), mp = this.game.mp; if (mpp) mpp.classList.toggle('pro', !(mp && mp.ready));
     const pn = $('#pausenote'), g = this.game; if (pn && g.meta && !prefs().pro) pn.textContent = g.meta.name || '';   // (the seed: Profi)
   };
-  // chat commands are a Profi thing (Einfach: the chat stays, a /command gets the note) — except /lang (/sprache):
-  // the language is a setting Einfach keeps
-  ST.einfachCmd = (text) => /^\/(lang|sprache)(\s|$)/i.test(text);
+  // the cheat-like chat commands are a Profi thing (Einfach: the chat stays, /give, /time, /tp … get the note). The
+  // friendly ones work in Einfach too: the language, the way home, the block look, the weather and 🏭 /bau — they change
+  // nothing a world's rules forbid (survival without cheats still refuses /bau and /wetter after this gate)
+  ST.einfachCmd = (text) => /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call)(\s|$)/i.test(text);
   if (VR.Game) {
     const origChat = VR.Game.prototype.chat;
     VR.Game.prototype.chat = function (text) {
+      if (typeof text === 'string' && /^\/help(\s|$)/i.test(text) && !prefs().pro) { this.ui.chatLine(tx('start.cmdHelp', null, 'Befehle: /bau <Wunsch> (z. B. „/bau Holzhaus mit Pool“) · /home · /sethome · /look klassisch | nahtlos · /wetter · /sprache — alle weiteren im Profi-Modus.', 'Commands: /bau <wish> (e.g. “/bau wooden house with pool”) · /home · /sethome · /look classic | seamless · /wetter · /lang — all others with Pro.'), '#cfe6ff'); return; }
       if (typeof text === 'string' && text.startsWith('/') && !prefs().pro && !ST.einfachCmd(text)) { this.ui.chatLine(tx('start.cmdPro', null, 'Befehle gibt es im Profi-Modus (Start · Profi).', 'Commands come with Pro (start screen · Pro).'), '#ffd27a'); return; }
       return origChat.call(this, text);
     };

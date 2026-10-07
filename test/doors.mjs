@@ -251,11 +251,11 @@ else {
   const st0 = await stageN();
   await ev(() => { window.__said.length = 0; VR.game.player.spawnBed = null; });
   await click(60, bed);
-  const b1 = await ev(() => ({ bed: VR.game.player.spawnBed, said: window.__said.filter(t => /Spawn point/.test(t)).length }));
+  const b1 = await ev(() => ({ bed: VR.game.player.spawnBed, said: window.__said.filter(t => t === VR.I18N.t('g.chat.spawnSetNight') || t === VR.I18N.t('g.chat.morning')).length }));
   await ev(() => { window.__said.length = 0; });
   await aim(bed);
   await click(900, bed);
-  const b2 = await ev(() => window.__said.filter(t => /Spawn point/.test(t)).length);
+  const b2 = await ev(() => window.__said.filter(t => t === VR.I18N.t('g.chat.spawnSetNight') || t === VR.I18N.t('g.chat.morning')).length);
   check(!!b1.bed && bed.some(c => c.join() === b1.bed.join()) && b1.said === 1, 'bed: a quick click sets the spawn point (' + JSON.stringify(b1) + ')');
   check(b2 === 1, 'bed: a held click does it once (' + b2 + ' messages)');
   check(await stageN() === st0, 'bed: no block placed');

@@ -43,9 +43,14 @@ const sev = (fn, a) => studio.evaluate(fn, a);
 for (let i = 0; i < 240; i++) { await studio.waitForTimeout(500); if (await sev(() => !document.getElementById('studio').classList.contains('boot') && window.__studio && window.__studio.HOUSE.size >= 1)) break; }
 console.log('studio', JSON.stringify(await sev(() => ({ boot: document.getElementById('studio').classList.contains('boot'), core: !!window.__studioCore, forge: !!(window.VR && VR.Forge), types: window.VR && VR.Forge ? VR.Forge.types.length : -1, sf: !!(window.VR && VR.StudioForge), nav: [...document.querySelectorAll('nav.modes button')].map(b => b.dataset.mode || '·').join(' ') }))));
 const hasNav = await sev(() => !!document.querySelector('nav.modes button[data-mode="forge"]'));
-check(hasNav, 'the header has a 🏭 Forge button');
+check(hasNav, 'the header has a 🏭 Forge button (Profi)');
 if (!hasNav) await finish();
-await studio.click('nav.modes button[data-mode="forge"]'); await studio.waitForTimeout(600);
+// Einfach (the default): the mode bar waits behind Profi — ✨ Erschaffen offers 🏭 Forge
+check(await sev(() => !(VR.UIPrefs && VR.UIPrefs.get().pro)), 'the Studio starts in Einfach');
+await studio.click('#tiles .tile[data-tile="erschaffen"]'); await studio.waitForTimeout(800);
+check(!!(await studio.$('#imagine.on [data-forge]')), '✨ Erschaffen offers 🏭 Forge');
+await studio.click('#imagine.on [data-forge]'); await studio.waitForTimeout(600);
+check(await sev(() => !document.querySelector('#imagine.on')), 'the Erschaffen dialog closes on 🏭');
 check(await sev(() => window.__st.mode === 'forge' && document.querySelectorAll('#chips button.fgt').length >= 10), 'Forge mode: an icon per type in the chip row (' + await sev(() => [...document.querySelectorAll('#chips button.fgt')].map(b => b.textContent.split(' ')[0]).join(' ')) + ')');
 const WISH = 'Hochhaus 30 Stockwerke Glas';
 const wish = async () => { const inp = await studio.$('#partsBody input.ftext'); await inp.click(); await inp.fill(WISH); await studio.keyboard.press('Enter'); await studio.waitForTimeout(400); };

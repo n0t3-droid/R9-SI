@@ -135,8 +135,8 @@ r = await ev(() => ({ state: VR.game.state, role: VR.game.mp.role, hostPres: __m
 check(r.state === 'play' && r.role === 'host' && r.hostPres.length >= 1 && r.hostPres.every(n => n === 'Explorer') && !r.profile, 'in the world: it hosts, the lobby shows the world under „Explorer“ (' + JSON.stringify(r) + ')');
 await ev(() => VR.game.ui.pause());
 await wait(200);
-r = await ev(() => ({ inPanel: !!document.querySelector('#mppanel .mpnotice'), text: (document.querySelector('#mppanel') || {}).textContent || '', legal: !!document.querySelector('#pause [data-legal]') }));
-check(r.inPanel && /Mitspieler sehen deinen Namen/.test(r.text) && /Multiplayer/.test(r.text), 'the pause menu\'s 👥 shows the notice above the panel');
+r = await ev(() => ({ inPanel: !!document.querySelector('#mppanel .mpnotice'), text: (document.querySelector('#mppanel') || {}).textContent || '', title: VR.I18N.t('g.mp.title'), legal: !!document.querySelector('#pause [data-legal]') }));
+check(r.inPanel && /Mitspieler sehen deinen Namen/.test(r.text) && r.text.includes(r.title), 'the pause menu\'s 👥 shows the notice above the panel (' + r.text.slice(0, 80) + ')');
 check(await clickIn('#mppanel .mpnotice', '✓ OK'), '✓ OK in the pause menu');
 await wait(500);
 r = await ev(() => ({ role: VR.game.mp.role, named: __mp.pres.some(p => p.n === 'Erika Mustermann' && p.host && p.host.s), panel: (document.querySelector('#mppanel') || {}).textContent || '' }));

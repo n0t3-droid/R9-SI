@@ -1,4 +1,12 @@
-Stand: 7. Okt 2026 · Studio v4.0 — ✏️ überall, ☆ Häuser, 📦 Mitnehmen, ✨ Modern, Klassisch; ▶ Spielen und 📍 Spawnpunkt; 🧱 Teile, 🎯 Finden, ★ Favoriten; ✨ Genie ohne Claude
+Stand: 8. Okt 2026 · Studio v4.1 — 🏭 Forge, Einfach/Profi, Deutsch; ✏️ überall, ☆ Häuser, 📦 Mitnehmen, ✨ Modern, Klassisch; ▶ Spielen und 📍 Spawnpunkt; 🧱 Teile, 🎯 Finden, ★ Favoriten; ✨ Genie ohne Claude
+
+NEU IN v0.40 — 🏭 Forge, eine Tür für alle, Türen gehen auf
+- Eine Tür: oben vier Kacheln (🏗 Bauen, ✨ Erschaffen, 🎒 Meins, ▶ Spielen) und ein Pfad zurück. Einfach / Profi:
+  Einfach zeigt das Wichtigste groß und ruhig, Profi alle Werkzeuge. Studio und Spiel sprechen Deutsch und Englisch.
+- 🏭 Forge: schreib, was du willst („Holzhaus mit Pool“, „Wachturm aus dunklem Stein“, „Brücke“, „Stadion“), wähle eine
+  Variante, 📍 Setzen. Ja/Nein-Optionen (Carport, Pool, Laternen …) sind Chips. Im Spiel: /bau <Wunsch>, /bau höher.
+- Im Spiel: Türen, Lampen, Truhen, Betten und Sitze reagieren auf einen Klick; Klassisch v2 (scharfe Pixel, Kanten);
+  🌦 Wetter und Klänge; 📜 Rechtliches; schnellerer Start dank gespeicherter Texturen.
 
 NEU IN v0.39 — 🧱 Klassisch, 🛋️ Modern Living, keine Sackgassen
 - Blöcke: Klassisch. Jeder Block ist wieder ein eigener Würfel: Hügel als Stufen, jede Wand mit Blockkante, Glas mit
