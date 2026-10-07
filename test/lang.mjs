@@ -92,6 +92,9 @@ await ev(() => VR.game.ui.showDeath('fall')); await step(1);
 check(await text('#death h1') === 'Ohje …' && await text('#deathmsg') === 'Du bist zu hart gelandet.', 'the death screen is German');
 await ev(() => { VR.game.ui.show(null); VR.game.chat('/give diamond 3'); }); await step(1);
 check(/3 × Diamond bekommen/.test(await ev(() => [...document.querySelectorAll('#chatlog div')].map(d => d.textContent).slice(-1)[0])), '/give answers in German (item names stay English)');
+// to the nearest village, so someone is there to talk to
+await ev(() => { const g = VR.game, V = g.villages, p = g.player; const nv = V && V.nearestSite ? V.nearestSite(p.pos[0], p.pos[2]) : null; if (nv) p.safeTeleport(nv.site.x + 0.5, nv.site.y + 2, nv.site.z + 0.5); });
+for (let i = 0; i < 60; i++) { await step(10); await wait(500); if (await ev(() => VR.game.villages && VR.game.villages.agents.length > 0)) break; }
 const talk = await ev(() => {
   const g = VR.game, V = g.villages; if (!V || !V.agents.length) return { none: true };
   const a = V.agents.find(x => !x.kid) || V.agents[0];
