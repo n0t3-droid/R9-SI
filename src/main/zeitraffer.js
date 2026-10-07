@@ -282,6 +282,7 @@
     }
     if (n) w.pool.pump();
   }
+  function meshed(S) { for (const e of S.cols.values()) for (const s of e.rc.sec) if (s.dirty || s.pending) return false; return true; }
   // the replay's own frame (instead of the game's while it runs)
   Z.frame = function (g, dt) {
     const S = Z.S, w = g.world;
@@ -307,7 +308,8 @@
       else if (RC.phase === 'end' && RC.t - RC.tEnd >= Z.cfg.endS) recFinish(S, false);
     }
     // the clock
-    if (S.phase === 'intro') { S.introT += dt; if (S.introT >= INTRO_S && !RC) { S.phase = 'play'; S.playing = true; } }
+    // (the intro waits under the title until the land as it was is meshed — at most 6 s on a slow machine)
+    if (S.phase === 'intro') { S.introT += dt; if (S.introT >= INTRO_S && !RC && (S.introT > 6 || meshed(S))) { S.phase = 'play'; S.playing = true; } }
     else if (S.playing) {
       S.clock = Math.min(S.T.total, S.clock + dt * 1000 * S.speed);
       const k = moveTo(S, S.T.index(S.clock));
@@ -388,7 +390,13 @@
     else if (Z.from === 'meins' && VR.Start && VR.Start.meins) VR.Start.meins(Z.meinsFrom || 'pause');
     else g.ui.resume();
   };
-  function hud(on) { const h = document.getElementById('hud'); const g = VR.game; if (h) h.style.visibility = on && !(g && g.hideHud) ? 'visible' : 'hidden'; }
+  // the HUD and the villagers' name tags step aside while the replay runs
+  function hud(on) {
+    const g = VR.game, h = document.getElementById('hud'), f = document.getElementById('folk'), l = document.getElementById('lockhint');
+    if (h) h.style.visibility = on && !(g && g.hideHud) ? 'visible' : 'hidden';
+    if (f) f.style.visibility = on ? '' : 'hidden';
+    if (l && !on) l.style.display = 'none';
+  }
   // built only far away: fly there (your own choice), then it opens by itself once the land is loaded
   Z.goFar = function () {
     const g = VR.game, f = Z.far; if (!g || !f || !g.player) return;
