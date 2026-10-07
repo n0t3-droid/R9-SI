@@ -184,4 +184,51 @@ await section(4, 'worlds as cards, 🗑 asks twice, the picker, ＋ Neue Welt in
   check(await ev(() => !document.documentElement.classList.contains('pro')), 'back to Einfach');
 });
 
+// ---- the R9 Studio
+const booted = async (houses) => { for (let i = 0; i < 700; i++) { await wait(500); const st = await safe(() => ({ boot: document.getElementById('studio').classList.contains('boot'), houses: window.__studio ? window.__studio.HOUSE.size : -1, tex: !!(window.__studioCore && window.__studioCore.texInfo()) })); if (st && !st.boot && st.tex && st.houses >= (houses || 1)) return true; } return false; };
+const inStudio = async (id, maxS = 300) => { for (let i = 0; i < maxS * 2; i++) { await wait(500); if (await safe((id) => { const WM = window.VR && VR.StudioWorld; return !!(WM && WM.world && WM.world.id === id && !WM.loading && WM.cols.size && document.getElementById('playBtn')); }, id)) return true; } return false; };
+
+await section(5, 'the Studio: four tiles in the header, the mode bar waits behind Profi, no 🔌 banner', async () => {
+  await page.goto(URL0 + '/studio.html', NAV);
+  for (let i = 0; i < 120; i++) { await wait(500); if (await safe(() => !!(window.VR && VR.StudioStart && document.querySelectorAll('.tile').length))) break; }
+  const t = await ev(() => ({ n: document.querySelectorAll('.tile').length, tiles: [...document.querySelectorAll('.tile')].map(x => ({ tile: x.dataset.tile, label: (x.querySelector('.lbl') || x).textContent.trim(), w: x.getBoundingClientRect().width, h: x.getBoundingClientRect().height })), play: !!document.querySelector('.tile#playBtn'), modes: document.querySelector('nav.modes').getClientRects().length, nMode: document.querySelectorAll('nav.modes button[data-mode]').length, bar: !!document.getElementById('bridgeBar'), pro: document.getElementById('studio').classList.contains('pro'), sw: !!document.querySelector('#proSwitch [data-pro="1"]'), lang: document.documentElement.lang }));
+  console.log('  studio', JSON.stringify(t));
+  check(t.n === 4 && t.tiles.map(x => x.tile).join() === 'play,bauen,erschaffen,meins', 'exactly four .tile: ▶ · 🏗 · ✨ · 🎒');
+  check(t.tiles.every(x => x.w >= 160 && x.h >= 44), 'each at least 160 px wide and 44 px tall in the header');
+  check(t.play && /^▶/.test(t.tiles[0].label), 'the ▶ tile is #playBtn and reads „' + t.tiles[0].label + '"');
+  check(t.tiles[1].label === '🏗 Bauen' && t.tiles[2].label === '✨ Erschaffen' && t.tiles[3].label === '🎒 Meins', 'German labels');
+  check(!t.pro && t.modes === 0 && t.nMode === 6, 'Einfach: nav.modes is hidden (its 6 mode buttons wait)');
+  check(t.sw && !t.bar && t.lang === 'de', 'the Profi switch is in the header, no 🔌 banner, lang = de');
+  await ev(() => VR.UIPrefs.set({ pro: true })); await wait(150);
+  const p = await ev(() => ({ pro: document.getElementById('studio').classList.contains('pro'), modes: [...document.querySelectorAll('nav.modes button[data-mode]')].filter(b => b.getClientRects().length > 0).map(b => b.dataset.mode), proT: document.querySelector('.tabs .proT').classList.contains('on'), tabs: [...document.querySelectorAll('#right .tabs .tab')].filter(t => t.getClientRects().length > 0).length, mem: localStorage.getItem('r9si.studio.pro') }));
+  console.log('  profi', JSON.stringify(p));
+  check(p.pro && p.modes.join() === 'arch,furn,facade,parts,craft,world', 'Profi: the six mode buttons show (' + p.modes.join(' · ') + ')');
+  check(p.proT && p.tabs === 5 && p.mem === '1', 'the ⚙ Profi of the right side is the same switch (five tabs, r9si.studio.pro = 1)');
+  await booted(1);
+  await shot('start_studio_profi');
+  await page.click('.tabs .proT'); await wait(150);
+  const e = await ev(() => ({ pro: document.getElementById('studio').classList.contains('pro'), modes: document.querySelector('nav.modes').getClientRects().length, ui: JSON.parse(localStorage.getItem('r9si.ui')).pro, sw: (document.querySelector('#proSwitch button.on') || {}).textContent }));
+  check(!e.pro && e.modes === 0 && e.ui === false && /Einfach/.test(e.sw || ''), '⚙ Profi again → Einfach everywhere (r9si.ui.pro = false, the mode bar gone)');
+  await shot('start_studio_einfach');
+  // the standalone Studio: ▶ reads 🎮 Zum Spiel, no 🔌 banner
+  await page.goto(URL0 + '/studio_artifact.html', NAV);
+  for (let i = 0; i < 120; i++) { await wait(500); if (await safe(() => !!(window.VR && VR.StudioStart && document.querySelectorAll('.tile').length))) break; }
+  const sa = await ev(() => ({ n: document.querySelectorAll('.tile').length, play: (document.querySelector('.tile[data-tile="play"] .lbl') || {}).textContent, bar: !!document.getElementById('bridgeBar'), playId: !!document.getElementById('playBtn') }));
+  console.log('  standalone', JSON.stringify(sa));
+  check(sa.n === 4 && /Zum Spiel/.test(sa.play || '') && !sa.bar && !sa.playId, 'standalone: four tiles, ▶ reads „🎮 Zum Spiel", no 🔌 banner, no #playBtn');
+});
+
+await section(9, 'routes: #ding/<id> opens the thing, an unknown one only says so', async () => {
+  await page.goto(URL0 + '/studio.html#ding/h:99', NAV);
+  check(await booted(1), 'the Studio boots on a link to a house that does not exist');
+  let toast = '';
+  for (let i = 0; i < 20 && !toast; i++) { await wait(500); toast = await ev(() => (document.getElementById('pjToast') || {}).textContent || ''); }
+  check(/nicht/.test(toast), 'it says the thing is not here (' + toast + ')');
+  await page.goto(URL0 + '/studio.html#ding/h:3', NAV);
+  check(await booted(4), 'the Studio boots on #ding/h:3');
+  let sc = null;
+  for (let i = 0; i < 60; i++) { await wait(500); sc = await ev(() => { const S = window.__st; return S.scene ? { type: S.scene.type, index: S.scene.index, mode: S.mode } : null; }); if (sc && sc.type === 'house' && sc.index === 3) break; }
+  check(sc && sc.type === 'house' && sc.index === 3 && sc.mode === 'arch', '#ding/h:3 shows Bel Portale (' + JSON.stringify(sc) + ')');
+});
+
 await done();

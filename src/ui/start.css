@@ -107,3 +107,41 @@ html:not(.pro) #title #mphosts:not(.has), html:not(.pro) #title .splash { displa
 #hints .x:hover { color: var(--st-ink); border-color: var(--st-acc); }
 @keyframes hintIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { #hints.on { animation: none; } }
+
+/* ---- the R9 Studio's header: tiles, breadcrumb, the switch; the mode bar on its own row in Profi ---- */
+#studio { grid-template-rows: auto auto 1fr; }
+#studio header { flex-wrap: wrap; row-gap: 6px; column-gap: 14px; padding: 7px 14px; min-height: 0; }
+#studio header .brand { order: 0; }
+#studio #tiles { order: 1; display: flex; gap: 8px; flex-wrap: wrap; }
+#studio .tile { aspect-ratio: auto; min-width: 160px; min-height: 52px; flex-direction: row; justify-content: flex-start; gap: 10px; padding: 4px 14px 4px 10px; border-radius: 14px; font-size: 15px; box-shadow: none; background: linear-gradient(180deg, #121a27, #0d131c); border-color: var(--st-line); }
+#studio .tile .pic { width: 30px; height: 30px; filter: none; }
+#studio .tile .lbl { white-space: nowrap; }
+#studio .tile .sub2 { display: none; }
+#studio .tile:hover, #studio .tile:focus-visible { transform: none; box-shadow: 0 0 0 2px var(--st-acc-dim); }
+#studio .tile.on { border-color: var(--st-acc); background: linear-gradient(180deg, rgba(58, 230, 255, 0.16), #0d131c); color: #fff; }
+#studio .tile.pulse { animation: none; }
+#studio #navCrumb { order: 2; flex: 1 1 160px; min-width: 0; display: none; align-items: center; gap: 6px; font-size: 12.5px; color: var(--mute); overflow: hidden; white-space: nowrap; }
+#studio #navCrumb.on { display: flex; }
+#studio #navCrumb .back { min-width: 44px; min-height: 40px; border-radius: 12px; font-size: 18px; color: var(--acc); border-color: rgba(56, 230, 255, 0.45); }
+#studio #navCrumb .c { overflow: hidden; text-overflow: ellipsis; }
+#studio #navCrumb .c.cur { color: var(--txt); font-weight: 600; }
+#studio #navCrumb .sep { color: var(--dim); }
+#studio #proSwitch { order: 3; margin-left: auto; }
+#studio .proswitch button { min-width: 76px; min-height: 40px; font-size: 13px; }
+#studio header .sys { order: 4; margin-left: 0; max-width: 32vw; }
+#studio nav.modes { order: 10; flex-basis: 100%; }
+#studio:not(.pro) nav.modes { display: none; }
+@media (max-width: 1100px) { #studio header .sys { display: none; } #studio .tile { min-width: 0; padding-right: 10px; } }
+@media (max-width: 760px) { #studio header .brand { display: none; } #studio #tiles { width: 100%; } #studio .tile { flex: 1; min-width: 0; flex-direction: column; gap: 2px; font-size: 12px; padding: 4px; } #studio .tile .pic { width: 24px; height: 24px; } }
+/* a Bauteil, large (👁 Ansehen on a p: card) */
+#dingView { position: fixed; inset: 0; z-index: 85; display: none; place-items: center; background: rgba(3, 5, 8, 0.6); backdrop-filter: blur(3px); }
+#dingView.on { display: grid; }
+#dingView .box { width: min(520px, 92vw); padding: 18px 20px; border-radius: 16px; background: var(--panel); border: 1px solid var(--line2); box-shadow: 0 30px 80px -30px #000; text-align: center; }
+#dingView h3 { margin: 0 0 10px; font-size: 17px; }
+#dingView .pic { min-height: 120px; display: grid; place-items: center; font-size: 64px; }
+#dingView .pic img { max-width: 100%; max-height: 50vh; border-radius: 10px; }
+#dingView .meta { margin: 8px 0; color: var(--mute); font: 12px var(--mono); }
+#dingView .crow { display: flex; justify-content: center; }
+#studio .tile.gamelink.playb { color: var(--st-ink); background: linear-gradient(180deg, #121a27, #0d131c); border-color: var(--st-line); box-shadow: none; font: 700 15px var(--st-font); padding: 4px 14px 4px 10px; }
+#studio .tile.gamelink.playb:hover { background: linear-gradient(180deg, #162033, #0d131c); box-shadow: 0 0 0 2px var(--st-acc-dim); }
+#studio .tile.gamelink.playb .pic { color: var(--acc2); }
