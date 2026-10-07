@@ -347,7 +347,7 @@
       <button id="gnToSite" class="cbtn" style="display:${WM.world && PLACE_RE.test(Gs.text) ? '' : 'none'}">🏘 ${L('gn.toSite', 'Das ist ein ganzer Ort — im Gelände planen')}</button>
       ${z ? `<div class="gnNote">${z.kind === 'house' ? '🏠' : '🧩'} <b>${esc(z.name || '')}</b>${z.notes ? ' — ' + esc(z.notes) : ''}</div>` : ''}
       ${z && z.kind === 'house' ? `<button data-mode="house" class="cbtn">🏠 ${L('gn.tune', 'Im Baukasten anpassen')}</button>` : ''}
-      <p class="dim">${L('gn.how2', 'Das Genie kennt {n} Dinge — Fahrzeuge, Schiffe, Tiere, Figuren, Gebäude, Pflanzen, Essen, Schriftzüge — und baut Häuser mit Zimmern. Farben, Größe und Extras sagst du einfach dazu. Alles passiert hier im Spiel: ohne Konto, ohne Limit.', { n: B ? B.LIB.length + '+' : '170+' })}</p>`;
+      <p class="dim">${L('gn.how2', 'Das Genie kennt {n} Dinge — Fahrzeuge, Schiffe, Tiere, Figuren, Gebäude, Pflanzen, Essen, Schriftzüge — und baut Häuser mit Zimmern. Farben, Größe und Extras sagst du einfach dazu. Alles passiert hier: ohne Konto, ohne Limit.', { n: B ? B.LIB.length + '+' : '170+' })}</p>`;
   }
   function draw() {
     const el = $('#imagine'); if (!el) return;
@@ -383,7 +383,7 @@
         <div class="imActs"><button id="stBuild" class="cbtn pri" ${SITE && SITE.placed && (SITE.placed.houses.length || SITE.plan.paths.length) && !(GN() && GN().busy()) ? '' : 'disabled'}>✓ ${L('st.build', 'Bauen')}</button><button id="stHere" class="cbtn" title="${L('st.hereT', 'Das Gebiet neu ausmessen — dort, wo die Kamera jetzt hinschaut')}">📍 ${L('st.here', 'Hier ausmessen')}</button></div>
         <p class="dim">${L('st.how2', 'Gebaut wird erst mit ✓ Bauen: der Boden unter jedem Haus wird geebnet, Wege folgen dem Gelände, über Wasser werden es Stege. Alles ist ein Schritt — ⟲ Zurück in der Werkbank nimmt es wieder weg.')}</p></div></div></div>` : `<canvas id="imPrev" width="420" height="320" title="${L('im.rotate', 'Ziehen dreht')}"></canvas><div id="imInfo" class="dim"></div>
         <div class="imActs">${WM.world ? `<button id="imOk" class="cbtn pri" disabled>✓ ${L('im.ok', 'In die Werkbank')}</button>` : ''}<button id="imLib" class="cbtn${WM.world ? '' : ' pri'}">🧩 ${L('im.lib', 'Als Bauteil')}</button>${WM.world ? '' : `<button class="cbtn" data-exp="schem" title="${L('wb.expSchem', 'Für WorldEdit, Amulet, Axiom, MCEdit')}">⬇ .schem</button><button class="cbtn" data-exp="vox" title="${L('wb.expVox', 'Für MagicaVoxel')}">⬇ .vox</button><button class="cbtn" data-exp="json" title="${L('wb.expJson', 'Als R9-Bauteil')}">⬇ .json</button>`}</div>
-        ${WM.world ? '' : `<p class="dim">${L('im.noWorld', 'Keine Welt offen: behalte es als Bauteil oder speichere es als Datei. Im Spiel (Pause → R9 Studio) setzt du es mit der Werkbank in deine Welt.')}</p>`}
+        ${WM.world ? '' : `<p class="dim">${window.__R9_STANDALONE ? L('im.noWorldSA', 'Keine Welt hier: behalte es als 🧩 Bauteil oder speichere es als Datei — 📦 Mitnehmen bringt deine Bauteile ins Spiel, dort setzt du sie mit der Werkbank in deine Welt (⏸ → 🧰 R9 Studio).') : L('im.noWorld2', 'Keine Welt offen: behalte es als 🧩 Bauteil oder speichere es als Datei — oder öffne eine Welt (◍ Welt), dann setzt du es mit der Werkbank hinein.')}</p>`}
         ${how ? `<p class="dim">${how}</p>` : ''}</div></div></div>`}`;
     IM.shown = false;
     // wiring

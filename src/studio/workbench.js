@@ -103,17 +103,24 @@
     for (const c of map.values()) { const old = WM.getBlock(c[0], c[1], c[2]); if (old === c[3]) continue; list.push([c[0], c[1], c[2], c[3]]); undo.push([c[0], c[1], c[2], old]); }
     if (!list.length) { if (label) tip(L('wb.nothing', 'Nichts zu ändern'), false); return 0; }
     applyLocal(list);
-    send(list);
+    const sent = send(list);
     WM.editT = Date.now();          // 🕘: this world was worked on
     if (!(opts && opts.noUndo)) { WB.undo.push({ list, undo, label: label || '' }); if (WB.undo.length > 120) WB.undo.shift(); WB.redo = []; }
-    if (label) tip(label + ' · ' + fmtN(list.length) + ' ' + L('wb.blocks', 'Blöcke'), true);
+    if (label) tip(label + ' · ' + fmtN(list.length) + ' ' + L('wb.blocks', 'Blöcke') + (sent ? '' : ' — ⚠ ' + L('wb.onlyHere', 'nur hier: Browser-Speicher voll')), sent);
     later();
     // 📍 something new in the world (not an ⟲): where ▶ Spielen takes you
     if (!(opts && opts.noUndo) && WB.onEdit) { try { WB.onEdit(list, label || ''); } catch (e) { console.warn('landing', e); } }
     return list.length;
   }
+  // → the game (a batch in the browser's storage); a full storage keeps it here only — and says so, never "✓ im Spiel"
   function send(list) {
-    if (!E.push(WM.world.id, E.pack(list))) C.sys(L('wb.full', 'Browser-Speicher voll — die Änderung ist nur im Studio zu sehen'), 'err');
+    if (E.push(WM.world.id, E.pack(list))) return true;
+    if (WB.lostWorld !== WM.world.id) { WB.lost = 0; WB.lostWorld = WM.world.id; }
+    WB.lost += list.length;
+    C.full('edits');
+    C.sys('⚠ ' + L('wb.full2', 'Browser-Speicher voll — {n} Änderungen nur hier im Studio, das Spiel bekommt sie nicht', { n: fmtN(WB.lost) }), 'err');
+    later();
+    return false;
   }
   function undo(redo) {
     const from = redo ? WB.redo : WB.undo, to = redo ? WB.undo : WB.redo, e = from.pop();
@@ -125,7 +132,7 @@
   function regionCheck() {
     if (WB.region === WM.region) return;
     if (!WM.region || WM.loading || !WM.world) return;
-    WB.region = WM.region; WB.undo = []; WB.redo = []; WB.sel = null; WB.mask = null; WB.hover = null; WB.stroke = null;
+    WB.region = WM.region; WB.undo = []; WB.redo = []; WB.sel = null; WB.mask = null; WB.hover = null; WB.stroke = null; WB.lost = 0;
     E.prune(WM.world.id);
     const all = []; for (const b of E.pending(WM.world.id)) for (const c of E.unpack(b)) all.push(c);
     if (all.length) applyLocal(all);
@@ -317,15 +324,22 @@
     if (b.mode === 'paint' || b.mode === 'add' || b.mode === 'carve') {
       if (b.mode !== 'carve' && !t) { tip(L('wb.noBlock', 'Wähle unten einen Block'), false); return; }
       const s = t ? t.defaultState : 0;
+      // what a painted cell becomes: the held block with the old one's turn, half, axis … where it has them
+      const maps = st.maps || (st.maps = new Map());
+      const paintAs = (cur) => {
+        const ct = T.type[cur]; if (!VR.WorldStyle || !t || ct === t.id) return s;
+        let m = maps.get(ct); if (m === undefined) { const ft = R.types[ct]; m = ft ? VR.WorldStyle.compile([[ft.name, t.name]]) : null; maps.set(ct, m); }
+        return m ? m[cur] : s;
+      };
       for (let y = cy - r; y <= cy + r; y++) for (let z = cz - r; z <= cz + r; z++) for (let x = cx - r; x <= cx + r; x++) {
         const d2 = (x - cx) ** 2 + (y - cy) ** 2 + (z - cz) ** 2; if (d2 > r2 || !inRegion(x, y, z)) continue;
         const cur = WM.getBlock(x, y, z);
         if (b.mode === 'carve') { if (cur) put(x, y, z, 0); continue; }
         if (b.mode === 'paint') {
           // the skin: solid blocks with an open side
-          if (!cur || cur === s) continue;
+          if (!cur || cur === s || T.type[cur] === t.id) continue;
           let open = false; for (let d = 0; d < 6 && !open; d++) { const n = WM.getBlock(x + DX[d], y + DY[d], z + DZ[d]); if (!n || !(T.flags[n] & F.OPAQUE)) open = true; }
-          if (open) put(x, y, z, s);
+          if (open) put(x, y, z, paintAs(cur));
           continue;
         }
         // add: air next to something
@@ -358,6 +372,7 @@
     for (const [k, c] of st.cells) { const u = st.undo.get(k); if (u[3] === c[3]) continue; list.push(c); undo.push(u); }
     if (!list.length) return;
     send(list);
+    WM.editT = Date.now();
     WB.undo.push({ list, undo, label: '🖌 ' + L(BRUSH.find(b => b[0] === WB.brush.mode)[2], BRUSH.find(b => b[0] === WB.brush.mode)[3]) }); WB.redo = [];
     later();
   }
@@ -374,7 +389,7 @@
     const def = c.name && !/^Kopie /.test(c.name) ? c.name : L('wb.libDefault', 'Bauteil {n}', { n });
     const name = (window.prompt ? window.prompt(L('wb.libName', 'Name für das Bauteil'), def) : null) || def;
     items.unshift({ id: 'b' + Date.now().toString(36), name, t: Date.now(), sx: c.sx, sy: c.sy, sz: c.sz, dy: c.dy || 0, pal, rle: CU.b64(CU.vrle(idx)) });
-    if (!libSave(items)) { tip(L('wb.full', 'Browser-Speicher voll — die Änderung ist nur im Studio sichtbar'), false); return; }
+    if (!libSave(items)) { C.full('library'); tip('⚠ ' + L('wb.libFull', 'Nicht behalten — der Browser-Speicher ist voll'), false); return; }
     c.name = name; tip('🧩 ' + name, true); C.parts();
   }
   function libClip(it) {
@@ -553,7 +568,8 @@
       d.onclick = () => { hot()[slot()] = id; if (CRF().useRecent) CRF().useRecent(id); drawBar(); for (const x of document.querySelectorAll('#list .tile')) x.classList.toggle('on', x.dataset.id === id); C.parts(); };
       if (FV) {
         const fb = document.createElement('button'); const on = FV.has(id); fb.className = 'favb sm' + (on ? ' on' : ''); fb.textContent = on ? '★' : '☆'; fb.title = on ? L('fav.off', 'Aus den Favoriten nehmen') : L('fav.onR', 'Zu den Favoriten (Rechtsklick geht auch)');
-        const tog = (ev) => { ev.stopPropagation(); ev.preventDefault(); const now = FV.toggle(id); fb.classList.toggle('on', now); fb.textContent = now ? '★' : '☆'; tip((now ? '★ ' : '☆ ') + nameOf(id), true); if (WB.cat === 'fav') C.list(); else { const b = el.querySelector('[data-wcat="fav"]'); if (b) b.textContent = '★ ' + L('wb.cat.fav', 'Favoriten') + (FV.list().length ? ' ' + FV.list().filter(x => inAll.has(x)).length : ''); } };
+        // (a ☆ the storage refused holds for this page only: said so, never shown as done)
+        const tog = (ev) => { ev.stopPropagation(); ev.preventDefault(); const now = FV.toggle(id); fb.classList.toggle('on', now); fb.textContent = now ? '★' : '☆'; if (FV.ok === false) tip('⚠ ' + nameOf(id) + ' — ' + L('fav.unsaved', 'nur bis zum Schließen: Browser-Speicher voll'), false); else tip((now ? '★ ' : '☆ ') + nameOf(id), true); if (WB.cat === 'fav') C.list(); else { const b = el.querySelector('[data-wcat="fav"]'); if (b) b.textContent = '★ ' + L('wb.cat.fav', 'Favoriten') + (FV.list().length ? ' ' + FV.list().filter(x => inAll.has(x)).length : ''); } };
         fb.onclick = tog; d.oncontextmenu = tog; d.appendChild(fb);
       }
       el.appendChild(d);
@@ -569,8 +585,10 @@
     const note = (html, cls) => { const p = document.createElement('div'); p.className = 'note' + (cls ? ' ' + cls : ''); p.innerHTML = html; el.appendChild(p); };
     H('🧰 ' + L('wb.title', 'Werkbank'), esc(WM.world.name));
     // where the changes are: in the game already, or waiting for it
-    const live = WB.pendingN ? `<span class="warn">⏳ ${L('wb.pending', '{n} Änderungen warten aufs Spiel', { n: WB.pendingN })}</span> — ${L('wb.pendingHow', 'es baut sie, sobald die Welt dort offen ist')}` : `<span class="good">✓ ${L('wb.inGame', 'Alles ist im Spiel')}</span>`;
-    note(live);
+    const lost = WB.lost && WB.lostWorld === WM.world.id ? WB.lost : 0;
+    const live = lost ? `<span class="warn">⚠ ${lost === 1 ? L('wb.lost1', '1 Änderung nur hier im Studio') : L('wb.lost', '{n} Änderungen nur hier im Studio', { n: fmtN(lost) })}</span> — ${L('wb.lostHow', 'der Browser-Speicher ist voll, das Spiel bekommt sie nicht. 🧹 Platz schaffen (oben), dann neu machen.')}`
+      : WB.pendingN ? `<span class="warn">⏳ ${L('wb.pending', '{n} Änderungen warten aufs Spiel', { n: WB.pendingN })}</span> — ${L('wb.pendingHow', 'es baut sie, sobald die Welt dort offen ist')}` : `<span class="good">✓ ${L('wb.inGame', 'Alles ist im Spiel')}</span>`;
+    note(live, 'wbLive');
     row(btn('⟲ ' + L('wb.undo', 'Zurück'), '', () => undo(false), 'Strg+Z'), btn('⟳ ' + L('wb.redo', 'Vor'), '', () => undo(true), 'Strg+Y'));
     // ✨ make something new: a house from the Baukasten, anything from the Genie, a picture as blocks
     if (WM.imagine) {

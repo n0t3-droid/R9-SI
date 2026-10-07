@@ -203,22 +203,21 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
         case 'settings': this.prevScreen = this.screen; this.showSettings(); break;
         case 'studio': try { location.href = 'studio.html' + (location.search || ''); } catch (e) { /* no studio page next to this one */ } break;
         case 'studioimport': {
-          // designs exported from the separate R9 Studio page (its storage is not this page's): paste, merge, apply
+          // a 📦 r9-paket from the separate R9 Studio page (its storage is not this page's) — the file (📂) or its text
+          // pasted (the older text export too): favourites, designs and Bauteile are merged in (VR.Pack)
           const n = $('#studionote'); if (!n || !VR.Custom) break;
           if (n.querySelector('textarea')) break;
-          const ta = document.createElement('textarea'); ta.className = 'studioxfer'; ta.placeholder = 'Im R9 Studio: Crafter → Export, dann hier einfügen …';
+          const ta = document.createElement('textarea'); ta.className = 'studioxfer'; ta.placeholder = 'Im R9 Studio: 📦 Mitnehmen — dann hier die Datei wählen (📂) oder ihren Text einfügen …';
           const ok = document.createElement('button'); ok.className = 'btn tiny'; ok.textContent = 'Übernehmen';
-          ok.onclick = () => {
-            try {
-              const d = JSON.parse(ta.value); if (!d || (!d.houses && !d.models && !Array.isArray(d.favs))) throw new Error('kein Studio-Export');
-              const cur = VR.Custom.load() || { v: 1, houses: {}, models: {} };
-              Object.assign(cur.houses = cur.houses || {}, d.houses || {}); Object.assign(cur.models = cur.models || {}, d.models || {});
-              // ★ favourites come along (added to the ones here)
-              let nf = 0; if (Array.isArray(d.favs) && VR.Favs) for (const id of d.favs.slice(0, 300).reverse()) if (typeof id === 'string' && R.byName[id] && VR.Favs.add(id)) nf++;
-              g.reloadCustom(cur); this.titleNote('Designs übernommen: ' + Object.keys(d.houses || {}).length + ' Häuser, ' + Object.keys(d.models || {}).length + ' Items' + (nf ? ', ' + nf + ' ★ Favoriten' : '') + '.');
-            } catch (e) { this.titleNote('Import fehlgeschlagen: ' + e.message); }
-          };
-          n.appendChild(ta); n.appendChild(ok); ta.focus();
+          ok.onclick = () => this.studioTake(ta.value);
+          const file = document.createElement('button'); file.className = 'btn tiny'; file.dataset.act = 'studiofile'; file.textContent = '📂 Datei';
+          n.appendChild(ta); n.appendChild(ok); n.appendChild(file); ta.focus();
+          break;
+        }
+        case 'studiofile': {
+          let inp = document.getElementById('studioFileIn');
+          if (!inp) { inp = document.createElement('input'); inp.type = 'file'; inp.id = 'studioFileIn'; inp.accept = '.json,application/json'; inp.style.display = 'none'; document.body.appendChild(inp); inp.onchange = () => { const f = inp.files && inp.files[0]; inp.value = ''; if (f) f.text().then((t) => this.studioTake(t), () => this.titleNote('Import fehlgeschlagen: Datei nicht lesbar')); }; }
+          inp.click();
           break;
         }
         case 'studioreset': {
@@ -409,9 +408,19 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
     studioNote() {
       const n = $('#studionote'); if (!n || !VR.Custom) return;
       const c = VR.Custom.count();
-      if (!c.houses && !c.models) { n.innerHTML = '<button class="btn tiny" data-act="studioimport" title="Designs aus dem separaten R9 Studio (Export) übernehmen">Designs importieren</button>'; return; }
+      if (!c.houses && !c.models) { n.innerHTML = '<button class="btn tiny" data-act="studioimport" title="Ein 📦 R9-Paket aus dem eigenständigen R9 Studio übernehmen: Favoriten, Designs, Bauteile">📥 R9-Paket übernehmen</button>'; return; }
       const names = Object.values(VR.CUSTOM.houses || {}).map(h => h.name).filter(Boolean).slice(0, 3).join(', ');
       n.innerHTML = `<b>R9 Studio</b> · ${c.houses} eigene${c.houses === 1 ? 's Haus' : ' Häuser'}${names ? ' (' + names + ')' : ''} · ${c.models} eigene${c.models === 1 ? 's Item' : ' Items'} aktiv <button class="btn tiny" data-act="studioimport">Import</button><button class="btn tiny" data-act="studioreset">Originale</button>`;
+    }
+    // a 📦 r9-paket (or the older text export): ★ added (blocks and items, blueprints too), the newer design wins,
+    // Bauteile added unless the same — then the designs are applied here
+    studioTake(text) {
+      const g = this.game, pk = VR.Pack ? VR.Pack.read(text) : null;
+      if (!pk) { this.titleNote('Import fehlgeschlagen: kein R9-Paket'); return false; }
+      const r = VR.Pack.merge(pk);
+      g.reloadCustom();
+      this.titleNote((r.ok ? 'Übernommen: ' : 'Nicht alles übernommen (Browser-Speicher voll): ') + r.text + '.');
+      return r.ok;
     }
     titleNote(msg) { const n = $('#titlenote'); if (!n) return; n.textContent = msg || ''; clearTimeout(this.titleNoteT); if (msg) this.titleNoteT = setTimeout(() => { n.textContent = ''; }, 12000); }
     buildMpPanel() {

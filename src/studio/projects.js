@@ -26,9 +26,10 @@
   const IC = (n, sz, cls) => (window.__studioIcons ? window.__studioIcons.svg(n, sz, cls) : '');
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = C.fmt;
+  const SA = !!C.SA;   // the standalone Studio: "💾 gespeichert", never "im Spiel"
 
   // ---------------------------------------------------------------- storage: when the browser's storage is full, pictures go first
-  let warned = false;
+  let warned = false, failAt = 0;
   const thumbMem = new Map();
   const ls = {
     raw(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
@@ -41,7 +42,9 @@
         let freed = false; while (!freed && lv < 2) freed = prune(lv++);
         if (!freed) break;
       }
-      if (!warned) { warned = true; C.sys('⚠ ' + L('pj.full', 'Browser-Speicher voll — „Ins Spiel“ oder Export sichert deine Arbeit'), 'err'); }
+      if (!warned) { warned = true; C.sys('⚠ ' + L('pj.full2', 'Browser-Speicher voll — Entwürfe und Bilder sind nur bis zum Schließen da'), 'err'); }
+      failAt = Date.now();
+      if (C.full) C.full('projects');
       return false;
     },
     del(k) { try { localStorage.removeItem(k); } catch (e) { /* */ } },
@@ -199,8 +202,8 @@
   }
   PJ.ago = ago;
   function chip(s) {
-    if (s.status === 'wip') return `<span class="st wip" title="${esc(L('pj.wipT', 'In Arbeit — automatisch gespeichert, noch nicht im Spiel'))}">✎ ${s.n ? fmt(s.n) : L('pj.wip', 'in Arbeit')}</span>`;
-    if (s.status === 'game') return `<span class="st ok" title="${esc(L('pj.gameT', 'So steht es im Spiel'))}">✓ ${L('pj.game', 'im Spiel')}</span>`;
+    if (s.status === 'wip') return `<span class="st wip" title="${esc(SA ? L('pj.wipTSA', 'In Arbeit — automatisch gesichert, noch nicht gespeichert') : L('pj.wipT', 'In Arbeit — automatisch gespeichert, noch nicht im Spiel'))}">✎ ${s.n ? fmt(s.n) : L('pj.wip', 'in Arbeit')}</span>`;
+    if (s.status === 'game') return SA ? `<span class="st ok" title="${esc(L('pj.gameTSA', 'Gespeichert in diesem Studio — 📦 Mitnehmen bringt es ins Spiel'))}">💾 ${L('pj.savedSA', 'gespeichert')}</span>` : `<span class="st ok" title="${esc(L('pj.gameT', 'So steht es im Spiel'))}">✓ ${L('pj.game', 'im Spiel')}</span>`;
     if (s.status === 'built') return `<span class="st ok">✓ ${L('pj.built', 'gebaut')}</span>`;
     if (s.status === 'plan') return `<span class="st plan">${L('pj.plan', 'geplant')}</span>`;
     return '';
@@ -226,8 +229,11 @@
     el.innerHTML = `<div class="hubBox" role="dialog" aria-label="${esc(L('pj.title', 'Weitermachen'))}">
       <header><span class="t">${IC('clock', 20)} ${L('pj.title', 'Weitermachen')}</span><div class="hubF"></div><input class="hubQ" placeholder="${esc(L('pj.search', 'Suchen …'))}" autocomplete="off" spellcheck="false"><button class="x" data-a="close" title="${esc(L('pj.close', 'Schließen (Esc)'))}">${IC('close', 18)}</button></header>
       <div class="hubBody"></div>
-      <footer><span class="lbl">${L('pj.new', 'Neu')}</span><div class="new"></div><span class="boot"></span><span class="keys"><kbd>Strg</kbd>+<kbd>O</kbd> ${L('pj.keys', 'öffnet diese Seite überall')}</span></footer></div>`;
+      <footer><span class="lbl">${L('pj.new', 'Neu')}</span><div class="new"></div><span class="boot"></span><div class="xfer"><button data-pack="out" title="${esc(L('br.outT', 'Favoriten, Designs und Bauteile als eine Datei — für das Spiel oder ein anderes Studio'))}">📦 ${L('br.out', 'Mitnehmen')}</button><button data-pack="in" title="${esc(L('br.inT', 'Ein R9-Paket (.json) übernehmen — oder die Datei einfach hierher ziehen'))}">📥 ${L('br.in', 'Übernehmen')}</button></div><span class="keys"><kbd>Strg</kbd>+<kbd>O</kbd> ${L('pj.keys', 'öffnet diese Seite überall')}</span></footer></div>`;
     ($('#studio') || document.body).appendChild(el);
+    // 📦 everything in one file · 📥 a file from the other Studio (bridge.js)
+    el.querySelector('[data-pack="out"]').onclick = () => { if (VR.StudioBridge) VR.StudioBridge.exportPack(); };
+    el.querySelector('[data-pack="in"]').onclick = () => { if (VR.StudioBridge) VR.StudioBridge.pickFile(); };
     el.addEventListener('mousedown', (e) => { if (e.target === el) show(false); });
     el.querySelector('[data-a="close"]').onclick = () => show(false);
     const q = el.querySelector('.hubQ');
@@ -351,7 +357,7 @@
     const b = $('nav.modes [data-hub] .hubN'); if (!b) return;
     let n = 0; for (const p of Object.values(reg().items)) if (p && !p.hide && !p.done && (p.kind === 'house' || p.kind === 'item') && PJ.hasData(p.id)) n++;
     b.textContent = n ? String(n) : '';
-    b.title = n ? L('pj.badge', '{n} in Arbeit (noch nicht im Spiel)', { n }) : '';
+    b.title = n ? (SA ? L('pj.badgeSA', '{n} in Arbeit (noch nicht gespeichert)', { n }) : L('pj.badge', '{n} in Arbeit (noch nicht im Spiel)', { n })) : '';
   }
   function show(on) {
     on = on === undefined ? !HUB.on : !!on;
@@ -383,9 +389,12 @@
     if (mod && k === 'o') { e.preventDefault(); e.stopImmediatePropagation(); show(); return; }
     if (mod && k === 's') {
       e.preventDefault(); e.stopImmediatePropagation();
+      const t0 = Date.now();
       PJ.flush({ thumbs: true, now: true });
+      // nothing claims what did not happen: a full storage says so instead of ✓
+      if (failAt >= t0) { const CR0 = VR.Crafter, m0 = '⚠ ' + L('pj.notSaved', 'Nicht gesichert — der Browser-Speicher ist voll · 🧹 Platz schaffen (oben)'); if (CR0 && CR0.on && CR0.tip) CR0.tip(m0, false); else toast(m0); return; }
       const CR = VR.Crafter, msg = '✓ ' + L('pj.saved', 'Gespeichert — alles wird auch automatisch gesichert');
-      if (CR && CR.on && CR.tip) CR.tip(msg + (CR.kind ? ' · ' + L('pj.saved2', '„Ins Spiel“ bringt es ins Spiel') : ''), true); else toast(msg);
+      if (CR && CR.on && CR.tip) CR.tip(msg + (CR.kind ? ' · ' + (SA ? L('pj.saved2SA', '💾 Speichern behält es fest') : L('pj.saved2', '„Ins Spiel“ bringt es ins Spiel')) : ''), true); else toast(msg);
       return;
     }
     if (!HUB.on) return;

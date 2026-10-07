@@ -54,7 +54,7 @@
   function applyDraft(n) {
     ST.draft = sigOf(n) === sigOf(saved()) ? null : n;
     WM.styleDraft = ST.draft;
-    try { if (ST.draft) localStorage.setItem(DRAFT_KEY(WM.world.id), JSON.stringify(ST.draft)); else localStorage.removeItem(DRAFT_KEY(WM.world.id)); } catch (e) { /* the draft stays in memory */ }
+    try { if (ST.draft) localStorage.setItem(DRAFT_KEY(WM.world.id), JSON.stringify(ST.draft)); else localStorage.removeItem(DRAFT_KEY(WM.world.id)); } catch (e) { C.full('style'); /* the draft stays in memory */ }
     ST.glowKey = '';
     redraw();
   }
@@ -76,13 +76,30 @@
   // into the world: the game takes it at once when the world is open there, otherwise when it opens
   function commit() {
     const c = cur(), st = WS.next(WM.style, c.rules, c.water);
-    if (!WS.save(WM.world.id, st)) { C.sys(L('ws.saveFail', 'Speichern fehlgeschlagen (Browser-Speicher)'), 'err'); return; }
+    if (!WS.save(WM.world.id, st)) { C.full('style'); C.sys('⚠ ' + L('ws.saveFail2', 'Nicht in der Welt — der Browser-Speicher ist voll'), 'err'); WM.tipW(L('ws.saveFail2', 'Nicht in der Welt — der Browser-Speicher ist voll'), false); return; }
     WM.style = st; ST.draft = null; WM.styleDraft = null;
     try { localStorage.removeItem(DRAFT_KEY(WM.world.id)); } catch (e) { /* */ }
     C.sys(L('ws.done.sys', 'Welt-Stil übergeben — {n} Ersetzungen', { n: c.rules.length }), 'ok');
     WM.tipW(L('ws.done', '✓ In der Welt — was du gebaut hast, bleibt'), true);
     redraw();
   }
+  // ▶ Spielen takes the preview along: into the world open here, or (another world) its stored preview → { n, ok }
+  ST.keepNow = function (otherId) {
+    if (!otherId) {
+      if (!ST.draft || !WM.world) return { n: 0, ok: true };
+      const c = cur(), st = WS.next(WM.style, c.rules, c.water);
+      if (!WS.save(WM.world.id, st)) { C.full('style'); return { n: 0, ok: false }; }
+      WM.style = st; ST.draft = null; WM.styleDraft = null;
+      try { localStorage.removeItem(DRAFT_KEY(WM.world.id)); } catch (e) { /* */ }
+      return { n: c.rules.length + (c.water ? 1 : 0), ok: true };
+    }
+    let d = null; try { d = JSON.parse(localStorage.getItem(DRAFT_KEY(otherId)) || 'null'); } catch (e) { d = null; }
+    if (!d || !Array.isArray(d.rules)) return { n: 0, ok: true };
+    const rules = d.rules.filter(r => Array.isArray(r) && !WS.check(r[0], r[1])), water = typeof d.water === 'string' ? d.water : null;
+    if (!WS.save(otherId, WS.next(WS.load(otherId), rules, water))) { C.full('style'); return { n: 0, ok: false }; }
+    try { localStorage.removeItem(DRAFT_KEY(otherId)); } catch (e) { /* */ }
+    return { n: rules.length + (water ? 1 : 0), ok: true };
+  };
   function resetAll() {
     if (ST.confirm > Date.now()) { ST.confirm = 0; setDraft({ rules: [], water: null }, '↺ ' + L('ws.reset.done', 'Alles wie im Original — ⬆ In die Welt übernimmt es')); return; }
     ST.confirm = Date.now() + 3000; C.parts(); setTimeout(() => { if (ST.confirm && ST.confirm <= Date.now()) { ST.confirm = 0; if (active()) C.parts(); } }, 3100);

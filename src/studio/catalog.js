@@ -18,7 +18,8 @@
   const FV = () => VR.Favs;
   const L = (k, de, v) => (VR.I18N && VR.I18N.t ? VR.I18N.t(k, v, de) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const CAT = VR.StudioCatalog = { cat: 'all', sel: null, pick: null, lastHouse: null };
+  const CAT = VR.StudioCatalog = { cat: 'all', sel: null, pick: null, lastHouse: null, edit: false, restore: null };
+  const SA = !!C.SA;
 
   // ---------------------------------------------------------------- every block, by what it is for
   const KINDS = [['fav', '★', 'Favoriten'], ['all', '', 'Alle'], ['roof', '🏠', 'Dach'], ['light', '💡', 'Licht'], ['glass', '🪟', 'Fenster & Glas'], ['door', '🚪', 'Türen'], ['wall', '🧱', 'Wände'], ['floor', '🟫', 'Böden'], ['stairs', '🪜', 'Treppen & Stufen'], ['rail', '🏛', 'Geländer & Säulen'], ['garden', '🌳', 'Garten & Natur'], ['deco', '🪴', 'Deko & Dinge'], ['color', '🎨', 'Farben'], ['other', '…', 'Sonstiges']];
@@ -54,7 +55,9 @@
     }
     return ENT;
   }
-  const disp = (id) => { const t = R.byName[id]; if (VM.MODELS[id]) return VM.MODELS[id].display; return t ? (t.display || (t.o && t.o.display) || id) : id; };
+  // a whole catalogue house as a favourite: blueprint_<i>
+  const houseOf = (id) => { const m = /^blueprint_(\d+)$/.exec(id || ''); if (!m) return null; const h = C.HOUSES.find(x => x.i === +m[1]); return h || null; };
+  const disp = (id) => { const t = R.byName[id]; if (VM.MODELS[id]) return VM.MODELS[id].display; const h = houseOf(id); if (h) return h.name; if (t) return t.display || (t.o && t.o.display) || id; return VR.ITEMS && VR.ITEMS[id] ? VR.ITEMS[id].name || id : id; };
   const kindLabel = (k) => { const e = KINDS.find(x => x[0] === k); return e ? (e[1] ? e[1] + ' ' : '') + L('cat.' + k, e[2]) : k; };
   CAT.kindsOf = (id) => { entries(); const e = BYID.get(id); return e ? e.kinds : []; };
 
@@ -143,16 +146,20 @@
       S.mode = 'parts'; S.cat = CAT.cat || 'all'; S.from = CAT.openFrom || null; CAT.openFrom = null;
       for (const b of $$('nav.modes button')) b.classList.toggle('on', b.dataset.mode === 'parts');
       C.chips(); C.list();
+      // back from the Crafter to a favourite model or house shown here
+      if (CAT.restore) { const r = CAT.restore; CAT.restore = null; r(); return; }
       const first = $('#list .card[data-bid]'), id = CAT.sel || (first ? first.dataset.bid : entries()[0] && entries()[0].id);
       if (id) select(id);
     },
   };
+  // ★ every favourite this Studio can show: blocks, furniture, whole houses, items (newest first)
+  const favAll = () => { entries(); return (FV() ? FV().list() : []).filter(id => BYID.has(id) || VM.MODELS[id] || houseOf(id) || (VR.ITEMS && VR.ITEMS[id])); };
   wrap('chips', function () {
     if (S.mode !== 'parts') return false;
     const el = $('#chips'); el.innerHTML = '';
-    const E = entries(), favs = new Set(FV() ? FV().list() : []);
+    const E = entries();
     for (const [id, ic, de] of KINDS) {
-      const n = id === 'all' ? E.length : id === 'fav' ? E.filter(e => favs.has(e.id)).length : E.filter(e => e.kinds.includes(id)).length;
+      const n = id === 'all' ? E.length : id === 'fav' ? favAll().length : E.filter(e => e.kinds.includes(id)).length;
       if (!n && id !== 'fav' && id !== 'all') continue;
       const b = document.createElement('button'); b.className = S.cat === id ? 'on' : ''; b.dataset.pcat = id;
       b.innerHTML = (ic ? ic + ' ' : '') + esc(L('cat.' + id, de)) + '<b>' + n + '</b>';
@@ -165,12 +172,13 @@
     if (S.mode !== 'parts') return false;
     const el = $('#list'); el.innerHTML = ''; el.classList.remove('houses', 'palette');
     const f = (S.filter || '').trim(), favs = new Set(FV() ? FV().list() : []);
+    if (S.cat === 'fav' && !f) { favList(el, lazyObs(el)); return true; }
     let arr = entries().filter(e => (S.cat === 'all' ? true : S.cat === 'fav' ? favs.has(e.id) : e.kinds.includes(S.cat)));
     if (f) { const hit = CAT.search(entries().map(e => e.id), f); arr = hit.map(id => BYID.get(id)); }
     if (S.cat === 'fav') { const order = FV() ? FV().list() : []; arr.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); }
     let k = 0;
     // the pictures are made when a card scrolls into view (hundreds of canvases at once would weigh on a small PC)
-    if (!lazyIO && 'IntersectionObserver' in window) lazyIO = new IntersectionObserver((es) => { for (const en of es) if (en.isIntersecting) { const c = en.target; lazyIO.unobserve(c); const ph = c.querySelector('.th.ph'); if (ph) { const cv = picture(c.dataset.bid, 128, 84); cv.className = 'th'; ph.replaceWith(cv); } } }, { root: el, rootMargin: '300px' });
+    lazyObs(el);
     for (const e of arr.slice(0, 800)) {
       const c = document.createElement('div'); c.className = 'card blk' + (CAT.sel === e.id && S.scene && S.scene.type === 'block' ? ' on' : ''); c.dataset.bid = e.id; c.style.animationDelay = (Math.min(k++, 24) * 18) + 'ms';
       if (lazyIO) { const ph = document.createElement('div'); ph.className = 'th ph'; c.appendChild(ph); lazyIO.observe(c); } else { const cv = picture(e.id, 128, 84); cv.className = 'th'; c.appendChild(cv); }
@@ -179,14 +187,54 @@
       c.onclick = () => select(e.id);
       el.appendChild(c);
     }
-    if (!arr.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = S.cat === 'fav' ? L('cat.noFav', 'Noch keine Favoriten — der ☆ an einem Teil legt es hierher, und dann findest du es überall wieder: im Crafter, in der Werkbank, im Spiel.') : L('cat.none', 'nichts gefunden'); el.appendChild(d); }
+    if (!arr.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = S.cat === 'fav' ? noFavText() : L('cat.none', 'nichts gefunden'); el.appendChild(d); }
     return true;
   });
+  // the pictures are made when a card scrolls into view (blocks: the game's icon; furniture: a rendered thumbnail)
+  function lazyObs(el) {
+    if (!lazyIO && 'IntersectionObserver' in window) lazyIO = new IntersectionObserver((es) => { for (const en of es) if (en.isIntersecting) { const c = en.target; lazyIO.unobserve(c); const ph = c.querySelector('.th.ph'); if (ph) { const cv = picture(c.dataset.bid || c.dataset.pic, 128, 84); cv.className = 'th'; ph.replaceWith(cv); } } }, { root: el, rootMargin: '300px' });
+    return lazyIO;
+  }
+  const noFavText = () => (SA ? L('cat.noFavSA', 'Noch keine Favoriten — der ☆ an einem Teil, einem Möbel oder einem Haus legt es hierher. Sie gelten überall in diesem Studio; 📦 Mitnehmen bringt sie ins Spiel.')
+    : L('cat.noFav2', 'Noch keine Favoriten — der ☆ an einem Teil, einem Möbel oder einem Haus legt es hierher, und dann findest du es überall wieder: im Crafter, in der Werkbank, im Spiel.'));
+  // ★ Favoriten in Teile: every favourite — blocks, furniture, whole houses — with its picture and ✏️
+  function favList(el, lazy) {
+    const ids = favAll();
+    if (!ids.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = noFavText(); el.appendChild(d); return; }
+    let k = 0;
+    for (const id of ids) {
+      const blk = BYID.get(id), mod = VM.MODELS[id], hs = houseOf(id);
+      const c = document.createElement('div'); c.className = 'card blk fav' + (S.scene && ((S.scene.type === 'block' && S.scene.name === id) || (S.scene.type === 'model' && S.scene.name === id) || (hs && S.scene.type === 'house' && S.scene.index === hs.i)) ? ' on' : '');
+      c.dataset.fid = id; if (blk) c.dataset.bid = id; c.style.animationDelay = (Math.min(k++, 24) * 18) + 'ms';
+      let pic = null;
+      if (hs) { const rec = C.HOUSE.get(hs.i); if (rec && rec.thumb) { pic = document.createElement('canvas'); pic.width = rec.thumb.width; pic.height = rec.thumb.height; pic.getContext('2d').drawImage(rec.thumb, 0, 0); } }
+      if (!pic && lazy && !hs) { pic = document.createElement('div'); pic.className = 'th ph'; c.dataset.pic = id; c.appendChild(pic); lazy.observe(c); }
+      else { if (!pic) pic = picture(id, 128, 84); pic.className = 'th'; c.appendChild(pic); }
+      const kind = hs ? '🏠 ' + L('cat.house', 'Haus') : mod ? (C.isFacade(id) ? '▤ ' + L('mode.facade', 'Fassade') : '▣ ' + L('mode.furn', 'Möbel')) : blk ? blk.kinds.filter(x => x !== 'other').map(kindLabel).join(' · ') || id : L('cat.item', 'Gegenstand');
+      c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n" title="${esc(disp(id))}">${esc(disp(id))}</div><div class="s">${esc(kind)}</div></div>`);
+      c.appendChild(favButton(id, () => { C.chips(); C.list(); }));
+      if (blk || mod || hs) {
+        const e = document.createElement('button'); e.className = 'editb'; e.textContent = '✏️'; e.title = L('cat.edit', 'Bearbeiten');
+        // (the card it was opened from is shown first: ← back returns to it)
+        e.onclick = (ev) => { ev.stopPropagation(); for (const x of $$('#list .card[data-fid]')) x.classList.toggle('on', x === c); if (hs) { C.selectHouse(hs.i); C.editHouse(hs.i); } else if (mod) { C.selectModel(id); C.editModel(id); } else { CAT.edit = true; select(id); } };
+        c.appendChild(e);
+      }
+      c.onclick = () => { for (const x of $$('#list .card[data-fid]')) x.classList.toggle('on', x === c); if (blk) select(id); else if (mod) C.selectModel(id); else if (hs) C.selectHouse(hs.i); };
+      el.appendChild(c);
+    }
+  }
   // a ☆ on a card: a click makes it a favourite (or not), the card is not selected by it
   function favButton(id, after) {
     const b = document.createElement('button'); const on = FV() && FV().has(id);
-    b.className = 'favb' + (on ? ' on' : ''); b.textContent = on ? '★' : '☆'; b.title = on ? L('fav.off', 'Aus den Favoriten nehmen') : L('fav.on', 'Zu den Favoriten — überall wiederzufinden');
-    b.onclick = (ev) => { ev.stopPropagation(); if (!FV()) return; const now = FV().toggle(id); b.classList.toggle('on', now); b.textContent = now ? '★' : '☆'; b.title = now ? L('fav.off', 'Aus den Favoriten nehmen') : L('fav.on', 'Zu den Favoriten — überall wiederzufinden'); C.sys(now ? '★ ' + disp(id) + ' — ' + L('fav.added', 'bei den Favoriten') : '☆ ' + disp(id) + ' — ' + L('fav.removed', 'nicht mehr bei den Favoriten'), 'ok'); if (after) after(now); };
+    const onT = SA ? L('fav.onSA', 'Zu den Favoriten — überall im Studio wiederzufinden') : L('fav.on', 'Zu den Favoriten — überall wiederzufinden');
+    b.className = 'favb' + (on ? ' on' : ''); b.textContent = on ? '★' : '☆'; b.title = on ? L('fav.off', 'Aus den Favoriten nehmen') : onT;
+    b.onclick = (ev) => {
+      ev.stopPropagation(); if (!FV()) return;
+      const now = FV().toggle(id); b.classList.toggle('on', now); b.textContent = now ? '★' : '☆'; b.title = now ? L('fav.off', 'Aus den Favoriten nehmen') : onT;
+      if (FV().ok === false) C.sys('⚠ ' + disp(id) + ' — ' + L('fav.unsaved', 'nur bis zum Schließen: Browser-Speicher voll'), 'err');
+      else C.sys(now ? '★ ' + disp(id) + ' — ' + L('fav.added', 'bei den Favoriten') : '☆ ' + disp(id) + ' — ' + L('fav.removed', 'nicht mehr bei den Favoriten'), 'ok');
+      if (after) after(now);
+    };
     return b;
   }
   CAT.favButton = favButton;
@@ -210,20 +258,54 @@
   CAT.use = function (id) {
     const CR = VR.Crafter; if (!CR) return;
     CR.hot[CR.slot] = id; CR.recent = [id].concat((CR.recent || []).filter(x => x !== id)).slice(0, 40);
-    const idx = S.from && Number.isFinite(S.from.index) ? S.from.index : S.scene && S.scene.type === 'house' ? S.scene.index : CAT.lastHouse;
+    // a house it came from (or one shown in Architektur) → that house in the Crafter
+    const here = S.from && Number.isFinite(S.from.index) ? S.from.index : S.scene && S.scene.type === 'house' && S.mode === 'arch' ? S.scene.index : null;
+    // a world open in the Welt mode → the Werkbank's hand (the same hotbar), right there in the world
+    const WM = VR.StudioWorld;
+    if (here === null && WM && WM.world && WM.region && WM.wb) {
+      WM.tab = 'bench'; C.setMode('world');
+      C.sys('✋ ' + disp(id) + ' — ' + L('cat.inHandWb', 'liegt in der Hand der Werkbank: Rechtsklick setzt es'), 'ok');
+      return;
+    }
+    const idx = here !== null ? here : CAT.lastHouse;
     if (Number.isFinite(idx)) CR.want = { kind: 'house', idx };
     C.setMode('craft');
-    C.sys('✋ ' + disp(id) + ' — ' + L('cat.inHand', 'liegt in der Hand: Klick setzt es'), 'ok');
+    C.sys('✋ ' + disp(id) + ' — ' + L('cat.inHand2', 'liegt in der Hand: Rechtsklick setzt es'), 'ok');
   };
   // the buttons the right side shows for one block or model
-  CAT.actions = function (el, id) {
+  CAT.actions = function (el, id, opt) {
+    const isModel = !!(opt && opt.model);
     const r = document.createElement('div'); r.className = 'crow catAct';
+    if (!isModel) {
+      const eb = document.createElement('button'); eb.className = 'cbtn pri' + (CAT.edit ? ' on' : ''); eb.dataset.act = 'edit'; eb.innerHTML = '✏️ ' + L('cat.edit', 'Bearbeiten'); eb.title = L('cat.editT', 'Varianten: dasselbe in anderen Farben und Materialien — und 🎨 alles davon in einem Haus ersetzen');
+      eb.onclick = () => { CAT.edit = !CAT.edit; C.parts(); };
+      r.appendChild(eb);
+    }
     const fb = favButton(id, () => { if (S.mode === 'parts') { C.chips(); if (S.cat === 'fav') C.list(); else { const cb = [...$$('#list .card[data-bid]')].find(c => c.dataset.bid === id); if (cb) { const s = cb.querySelector('.favb'); const on = FV().has(id); s.classList.toggle('on', on); s.textContent = on ? '★' : '☆'; } } } });
     fb.className = 'cbtn' + (FV() && FV().has(id) ? ' on' : ''); fb.textContent = (FV() && FV().has(id) ? '★ ' : '☆ ') + L('fav.btn', 'Favorit');
     const fbClick = fb.onclick; fb.onclick = (ev) => { fbClick(ev); const on = FV().has(id); fb.className = 'cbtn' + (on ? ' on' : ''); fb.textContent = (on ? '★ ' : '☆ ') + L('fav.btn', 'Favorit'); };
-    const ub = document.createElement('button'); ub.className = 'cbtn pri'; ub.innerHTML = '✋ ' + L('cat.use', 'Benutzen'); ub.title = L('cat.useT', 'In die Hand nehmen und im Crafter damit bauen'); ub.onclick = () => CAT.use(id);
+    const ub = document.createElement('button'); ub.className = 'cbtn'; ub.innerHTML = '✋ ' + L('cat.use', 'Benutzen'); ub.title = L('cat.useT', 'In die Hand nehmen und im Crafter damit bauen'); ub.onclick = () => CAT.use(id);
     r.appendChild(ub); r.appendChild(fb); el.appendChild(r);
+    if (!isModel && CAT.edit) editBox(el, id);
   };
+  // ✏️ for a block: the Varianten (a click selects one) and 🎨 — all of it in a house where it is used, replaced
+  function editBox(el, id) {
+    const V = VR.Variants; if (!V) return;
+    const fam = V.family(id), ids = fam.length ? fam : V.similar(id, 24);
+    const show = ids.length > 64 ? ids.slice(0, 64).concat(ids.slice(0, 64).includes(id) ? [] : [id]) : ids;
+    if (show.length > 1) el.appendChild(V.strip(show, id, (v) => { CAT.edit = true; select(v); }, '✏️ ' + (fam.length ? L('var.variants', 'Varianten') : L('var.similar', 'Ähnliche')) + ' <b>' + ids.length + '</b>'));
+    else { const n = document.createElement('div'); n.className = 'note dim'; n.textContent = L('var.noneHere', 'Von diesem Block gibt es keine Varianten.'); el.appendChild(n); }
+    // 🎨 the houses it is in: replace all of it there (the same as 🎨 in "Verbaut in")
+    const used = []; for (const rec of C.HOUSE.values()) { const hit = rec.data.blocks.find(([n]) => n === id); if (hit) used.push(rec); }
+    if (!used.length) return;
+    const row = document.createElement('div'); row.className = 'varHouses'; row.innerHTML = `<span>🎨 ${esc(L('var.inHouse', 'Alles davon ersetzen in:'))}</span>`;
+    for (const rec of used) {
+      const b = document.createElement('button'); b.className = 'cbtn mini'; b.dataset.house = rec.index; b.textContent = rec.name;
+      b.onclick = () => { for (const x of $$('#partsBody .varPick')) x.remove(); row.after(V.picker({ id, houseName: rec.name, onPick: (to) => VR.Crafter.replaceIn(rec.index, id, to) })); };
+      row.appendChild(b);
+    }
+    el.appendChild(row);
+  }
 
   // ---------------------------------------------------------------- 🎯 tap a house: find what is there
   const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
@@ -398,5 +480,5 @@
     r.appendChild(find); r.appendChild(use); r.appendChild(fb); el.appendChild(r);
   };
   // favourites changed elsewhere (the game, another tab): the open catalogue follows
-  if (FV()) FV().on(() => { if (S.mode === 'parts' || S.mode === 'furn' || S.mode === 'facade') { C.chips(); if (S.cat === 'fav') C.list(); } });
+  if (FV()) FV().on(() => { if (S.mode === 'parts' || S.mode === 'furn' || S.mode === 'facade' || S.mode === 'arch') { C.chips(); if (S.cat === 'fav') C.list(); } });
 })();
