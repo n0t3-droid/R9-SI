@@ -899,8 +899,9 @@
       if (!P.vox) return;
       const far = 260, dx = this.cx - cam.x, dz = this.cz - cam.z;
       if (dx * dx + dz * dz > far * far) return;
-      // one light for all of it, read four times a second at the top of the site
-      if (this.t - this.lightT > 0.25) { this.lightT = this.t; const w = site.g.world, l = w && w.getLight ? w.getLight(Math.floor(this.cx), Math.floor(this.oy + this.deck + 2), Math.floor(this.cz)) : 0xf000; this.light[0] = Math.max(0.35, (l >>> 12) / 15); this.light[1] = ((l >> 8) & 15) / 15; this.light[2] = ((l >> 4) & 15) / 15; this.light[3] = (l & 15) / 15; }
+      // one light for all of it, read four times a second in the open air by the deck (outside the scaffold's corner:
+      // never inside the finished building while the scaffold folds down along it)
+      if (this.t - this.lightT > 0.25) { this.lightT = this.t; const w = site.g.world, R0 = this.ring, k = this.ring ? this.level() * 4 : 0, lx = R0 ? this.ox + R0[k] - 2 : this.cx, lz = R0 ? this.oz + R0[k + 2] - 2 : this.cz, l = w && w.getLight ? w.getLight(Math.floor(lx), Math.floor(this.oy + Math.max(0, this.deck) + 1.5), Math.floor(lz)) : 0xf000; this.light[0] = Math.max(0.35, (l >>> 12) / 15); this.light[1] = ((l >> 8) & 15) / 15; this.light[2] = ((l >> 4) & 15) / 15; this.light[3] = (l & 15) / 15; }
       const G = gpu(r);
       if (this.scaffold && this.inst && P.voxInst) this.drawScaffold(r, E, cam, G);
       if (this.crane && this.crane.rise > 0.01) this.drawCrane(r, E, cam, G);
