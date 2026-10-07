@@ -84,8 +84,11 @@ function run(OX, OZ) {
   return bad;
 }
 const only = process.env.OX !== undefined;
+let problems = 0;
 for (let OX = only ? +process.env.OX : 0; OX < (only ? +process.env.OX + 1 : 16); OX++) for (let OZ = only ? +process.env.OZ : 0; OZ < (only ? +process.env.OZ + 1 : 16); OZ++) {
   const bad = run(OX, OZ);
-  if (bad.length) console.log(`OX=${OX} OZ=${OZ}: ${bad.length} seam problems: ${bad.slice(0, 4).join(' | ')}`);
+  if (bad.length) { problems += bad.length; console.log(`OX=${OX} OZ=${OZ}: ${bad.length} seam problems: ${bad.slice(0, 4).join(' | ')}`); }
 }
 console.log('done');
+console.log(problems ? 'FAILED ' + problems : 'ALL OK');
+process.exit(problems ? 1 : 0);

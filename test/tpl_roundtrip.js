@@ -92,4 +92,5 @@ for (const [index, skin, mirror] of [[0, 'signus', false], [4, 'lake', true], [7
   console.log(`  v1 (${cells.length} cells) → v2 upgrade identical: ${r2.tpl.rle === rIn.tpl.rle}`);
 }
 C.apply(null);
-console.log(fails ? 'FAIL ' + fails : 'OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

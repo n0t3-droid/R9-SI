@@ -20,6 +20,7 @@ for (let i = 0; i < 60; i++) { await wait(1000); if (await ev(() => VR.game.stat
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; });
 
 
+let fails = 0; const verify = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 // ---- 1. every required block exists
 const REQUIRED = ['stucco_white', 'stucco_cream', 'stacked_stone', 'roof_charcoal', 'roof_charcoal_stairs', 'wood_slat', 'garage_door', 'window_black', 'window_warm', 'glass_rail', 'concrete_smooth', 'paver_grey', 'granite_paver', 'marble_white', 'marble_dark', 'oak_herringbone', 'subway_tile', 'dark_tile', 'travertine', 'deck_wood', 'pool_tile', 'white_trim', 'black_metal', 'charcoal_panel', 'terrazzo',
   'vx_sofa_charcoal', 'vx_sofa_cream', 'vx_coffee_table', 'vx_coffee_table_marble', 'vx_tv_wall', 'vx_kitchen_island', 'vx_kitchen_sink', 'vx_kitchen_hob', 'vx_upper_cabinet', 'vx_fridge', 'vx_dining_table', 'vx_dining_chair', 'vx_wardrobe', 'vx_nightstand', 'vx_bathtub', 'vx_shower', 'vx_toilet', 'vx_vanity', 'vx_mirror', 'vx_bookshelf', 'vx_art_warm', 'vx_art_cool', 'vx_art_gold', 'vx_tall_plant', 'vx_pendant', 'vx_pendant_brass', 'vx_chandelier', 'vx_sconce', 'vx_led_strip', 'vx_led_cove', 'vx_spot', 'vx_bollard', 'vx_pillar_white', 'vx_column_classic', 'vx_balustrade', 'vx_railing_black', 'vx_railing_lit', 'vx_urn', 'vx_fountain', 'vx_car_black', 'vx_car_red', 'vx_car_white'];
@@ -30,6 +31,8 @@ const check = await ev((names) => {
   out.icons = icons; out.errs = errs.slice(0, 10); return out;
 }, REQUIRED);
 console.log('required blocks:', REQUIRED.length, 'missing:', check.missing.length ? check.missing.join(', ') : 'none', '| states painted:', check.icons, 'errors:', check.errs.length ? check.errs.join(' | ') : 'none');
+verify(check.missing.length === 0, 'every required block exists');
+verify(check.errs.length === 0, 'every block paints its icon and boxes');
 
 // ---- 2. build the showcase
 await ev(() => { const g = VR.game, p = g.player; p.flying = true; p.teleport(p.pos[0] + 66, 100, p.pos[2] + 4); });
@@ -122,4 +125,7 @@ await view('hk_bath', [x0 + 19.5, y0 + 1.5, z0 + 6.5], -0.25, -0.08, 12500);
 await view('hk_outside', [x0 + 40, y0 + 5, z0 - 6], Math.PI, -0.3, 6000);
 await view('hk_front', [x0 + 12, y0 + 3, z0 + 30], 0, -0.1, 12500);
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
+verify(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

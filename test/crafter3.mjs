@@ -126,5 +126,7 @@ await wait(900);
 await shot('cr3_5_player_paint');
 await ev(() => { VR.Crafter.player.locked = false; VR.Crafter.player.exit(); });
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
-console.log(fails ? 'FAIL ' + fails : 'OK');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

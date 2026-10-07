@@ -86,5 +86,5 @@ check(fin(q.pos) && Number.isFinite(q.yaw) && q.health === 20 && q.food === 20 &
 const r = new V.Player(game); r.mode = 'creative';
 r.load({ pos: [8.2, 90.5, -3.1], yaw: 1.5, pitch: -0.2, health: 13, food: 9, sat: 2, inv: { slots: [{ id: 'stone', n: 3 }], sel: 2 } });
 check(r.pos[0] === 8.2 && r.pos[1] === 90.5 && r.pos[2] === -3.1 && r.yaw === 1.5 && r.pitch === -0.2 && r.health === 13 && r.food === 9 && r.sat === 2 && r.inv.sel === 2 && r.inv.slots[0].id === 'stone', 'a good save loads exactly as before');
-console.log(fail ? `FAIL ${fail}` : 'OK — physics and player guards');
+console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);

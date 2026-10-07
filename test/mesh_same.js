@@ -47,5 +47,6 @@ for (const look of ['classic', 'seamless']) {
   console.log(`${look}: ${all.length} sections, ${verts} verts, ${ms.toFixed(0)} ms (cold) · hash ${hex} ${write ? '' : ok ? 'OK' : 'MISMATCH, expected ' + EXPECT[look]}`);
 }
 if (write) { console.log('record in test/mesh_same.js: EXPECT =', JSON.stringify(res)); process.exit(0); }
-console.log(fail ? 'FAIL — the mesher output changed' : 'OK — the mesher writes the same vertices as before');
+console.log(fail ? `  ✗ the mesher output changed in ${fail} of 2 looks` : '  ✓ the mesher writes the same vertices as before');
+console.log(fail ? 'FAILED ' + fail : 'ALL OK');
 process.exit(fail ? 1 : 0);

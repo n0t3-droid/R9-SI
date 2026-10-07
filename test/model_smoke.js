@@ -22,4 +22,6 @@ for (const name of names) {
 }
 const ms = Date.now() - t0;
 console.log('models', names.length, 'parts', parts, 'states', n, 'avg quads/state', (quads / n).toFixed(1), 'max', maxQ, '(' + maxName + ')', 'volume data', (bytes / 1048576).toFixed(1) + ' MB', 'paint+mesh', (ms / n).toFixed(2), 'ms/state');
-console.log(errs.length ? 'ERRORS ' + errs.slice(0, 8).join(' | ') : 'OK');
+if (errs.length) console.log('  ✗ ' + errs.slice(0, 8).join(' | '));
+console.log(errs.length ? 'FAILED ' + errs.length : 'ALL OK');
+process.exit(errs.length ? 1 : 0);

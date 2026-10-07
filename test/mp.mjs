@@ -6,6 +6,7 @@ await new Promise(r => setTimeout(r, 800));
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
 const logs = [];
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const mk = async (tag) => {
   const page = await ctx.newPage();
   page.on('console', m => { const t = m.type(); const s = m.text(); if (t === 'error' || /error|fail|mp /i.test(s)) logs.push(`[${tag} ${t}] ${s.slice(0, 500)}`); });
@@ -42,31 +43,44 @@ await ev(A, () => { const mp = VR.game.mp; mp._helloN = 0; const o = mp.onHello.
 await ev(B, () => { VR.game.settings.look = 'seamless'; VR.game.applySettings('look'); });
 await ev(B, () => { const mp = VR.game.mp; mp._welN = 0; const o = mp.onWelcome.bind(mp); mp.onWelcome = (m) => { mp._welN++; mp._welLast = JSON.stringify(m).slice(0, 400); return o(m); }; const h = VR.game.mp.hostList()[0]; VR.game.mp.join(h); });
 for (let i = 0; i < 160; i++) { await step(A, 5); await step(B, 10); const st = await ev(B, () => VR.game.state); if (st === 'play') break; await wait(200); }
-console.log('B joined', JSON.stringify(await ev(B, () => ({ state: VR.game.state, role: VR.game.mp.role, guest: !!VR.game.meta.guest, name: VR.game.meta.name, pos: VR.game.player.pos.map(Math.round), mods: VR.game.mp.modKeys.size }))));
+const joined = await ev(B, () => ({ state: VR.game.state, role: VR.game.mp.role, guest: !!VR.game.meta.guest, name: VR.game.meta.name, pos: VR.game.player.pos.map(Math.round), mods: VR.game.mp.modKeys.size }));
+console.log('B joined', JSON.stringify(joined));
+check(joined.state === 'play' && joined.guest, 'the guest joins the host world');
 await both(12);
 const lk1 = await ev(B, () => ({ look: VR.LOOK.mode, own: VR.game.settings.look, host: VR.game.hostLook }));
-console.log((lk1.look === 'classic' ? '  ✓ ' : '  ✗ ') + 'the guest sees the host\'s block look: ' + JSON.stringify(lk1));
+check(lk1.look === 'classic', 'the guest sees the host\'s block look: ' + JSON.stringify(lk1));
 // the host switches to Nahtlos: the guest follows within a few seconds (the look rides along with the env sync)
 await ev(A, () => VR.game.chat('/look seamless'));
 await both(14);
 const lk2 = await ev(B, () => ({ look: VR.LOOK.mode, host: VR.game.hostLook, smooth: !!(VR.R.T.flags[VR.R.byName.grass_block.defaultState] & VR.F.SMOOTH) }));
-console.log((lk2.look === 'seamless' && lk2.smooth ? '  ✓ ' : '  ✗ ') + 'the host\'s switch reaches the guest: ' + JSON.stringify(lk2));
+check(lk2.look === 'seamless' && lk2.smooth, 'the host\'s switch reaches the guest: ' + JSON.stringify(lk2));
 await ev(A, () => VR.game.chat('/look classic'));
 await both(14);
-console.log('guest look back with the host', await ev(B, () => VR.LOOK.mode));
+const lk3 = await ev(B, () => VR.LOOK.mode);
+console.log('guest look back with the host', lk3);
+check(lk3 === 'classic', 'the guest is back on the host\'s classic look');
 // the pre-join gold pillar reached the guest?
-console.log('diff applied', JSON.stringify(await ev(B, (e) => { const w = VR.game.world; return [0, 1, 2, 3].map(k => w.getBlock(e[0], e[1] + k, e[2]) === e[3]); }, edit0)));
+const diff = await ev(B, (e) => { const w = VR.game.world; return [0, 1, 2, 3].map(k => w.getBlock(e[0], e[1] + k, e[2]) === e[3]); }, edit0);
+console.log('diff applied', JSON.stringify(diff));
+check(diff.every(Boolean), 'the host\'s pre-join edit reached the guest as a diff');
 // live edits both ways
 const eb = await ev(B, () => { const g = VR.game, p = g.player, w = g.world; const x = Math.floor(p.pos[0]) - 2, z = Math.floor(p.pos[2]) - 2, y = Math.floor(p.pos[1]) + 1; const s = VR.R.byName.diamond_block.defaultState; w.setBlock(x, y, z, s, 0); return [x, y, z, s]; });
 const ea = await ev(A, () => { const g = VR.game, p = g.player, w = g.world; const x = Math.floor(p.pos[0]) + 2, z = Math.floor(p.pos[2]) - 3, y = Math.floor(p.pos[1]) + 1; const s = VR.R.byName.emerald_block.defaultState; w.setBlock(x, y, z, s, 0); return [x, y, z, s]; });
 await both(8);
-console.log('guest→host edit', await ev(A, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], eb));
-console.log('host→guest edit', await ev(B, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], ea));
+const gh = await ev(A, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], eb);
+console.log('guest→host edit', gh);
+check(gh, 'a live edit goes from the guest to the host');
+const hg = await ev(B, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], ea);
+console.log('host→guest edit', hg);
+check(hg, 'a live edit goes from the host to the guest');
 // edits high above the generated terrain (columns grow past y 255) travel both ways
 const hb = await ev(B, () => { const g = VR.game, p = g.player, w = g.world; const x = Math.floor(p.pos[0]) + 1, z = Math.floor(p.pos[2]) + 1, s = VR.R.byName.vollton_coral.defaultState; w.setBlock(x, 333, z, s, 0); return [x, 333, z, s]; });
 const ha = await ev(A, () => { const g = VR.game, p = g.player, w = g.world; const x = Math.floor(p.pos[0]) - 1, z = Math.floor(p.pos[2]) + 2, s = VR.R.byName.vollton_cobalt.defaultState; w.setBlock(x, 600, z, s, 0); return [x, 600, z, s]; });
 await both(8);
-console.log('tall edits: guest→host y333', await ev(A, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], hb), '· host→guest y600', await ev(B, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], ha));
+const tall1 = await ev(A, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], hb);
+const tall2 = await ev(B, (e) => VR.game.world.getBlock(e[0], e[1], e[2]) === e[3], ha);
+console.log('tall edits: guest→host y333', tall1, '· host→guest y600', tall2);
+check(tall1 && tall2, 'edits above the generated terrain (y 333 and y 600) travel both ways');
 console.log('A sees', JSON.stringify(await ev(A, () => VR.game.mp.players())));
 console.log('B sees', JSON.stringify(await ev(B, () => VR.game.mp.players())));
 // chat
@@ -94,11 +108,18 @@ for (let i = 0; i < 20; i++) { const n = await ev(B, () => VR.game.mp.hostList()
 await ev(B, () => { const h = VR.game.mp.hostList()[0]; if (h) VR.game.mp.join(h); });
 for (let i = 0; i < 160; i++) { await step(A, 5); await step(B, 10); const st = await ev(B, () => VR.game.state); if (st === 'play') break; await wait(200); }
 await both(6);
-console.log('rejoined, pocket kept', JSON.stringify(await ev(B, () => ({ state: VR.game.state, slot30: VR.game.player.inv.slots[30] }))));
+const rej = await ev(B, () => ({ state: VR.game.state, slot30: VR.game.player.inv.slots[30] }));
+console.log('rejoined, pocket kept', JSON.stringify(rej));
+check(rej.state === 'play' && !!rej.slot30 && rej.slot30.id === 'diamond' && rej.slot30.n === 7, 'the guest rejoins and the host kept their pocket (7 diamonds)');
 // the host closes the world: the guest is brought back to the title screen
 await ev(A, () => VR.game.quitToTitle());
 for (let i = 0; i < 20; i++) { await step(B, 10); await wait(500); if (await ev(B, () => VR.game.state) === 'title') break; }
-console.log('host closed', JSON.stringify(await ev(B, () => ({ state: VR.game.state, role: VR.game.mp.role, hosts: VR.game.mp.hostList().length }))));
+const closed = await ev(B, () => ({ state: VR.game.state, role: VR.game.mp.role, hosts: VR.game.mp.hostList().length }));
+console.log('host closed', JSON.stringify(closed));
+check(closed.state === 'title', 'the guest is brought back to the title screen when the host closes the world');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 40)) console.log(l);
 await browser.close();
 srv.kill();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

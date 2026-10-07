@@ -13,7 +13,7 @@ for (const f of ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'te
 const R = VR.R, T = R.T, F = VR.F;
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
-if (typeof VR.setLook !== 'function' || !VR.LOOK) { console.log('  ✗ VR.setLook / VR.LOOK missing'); console.log('FAIL 1'); process.exit(1); }
+if (typeof VR.setLook !== 'function' || !VR.LOOK) { console.log('  ✗ VR.setLook / VR.LOOK missing'); console.log('FAILED 1'); process.exit(1); }
 check(VR.LOOK.mode === 'classic', 'the default look is Klassisch (' + VR.LOOK.mode + ')');
 const st = (n, pr) => { const t = R.byName[n]; if (!t) throw new Error('no block ' + n); return pr ? t.state(Object.assign({}, t.decode(t.defaultState), pr)) : t.defaultState; };
 const PAD = VR.MESH_PAD, PS = VR.MESH_PS, PSS = PS * PS;
@@ -271,5 +271,5 @@ console.log('(g) worker messages');
   }
 }
 VR.setLook('classic');
-console.log(fails ? 'FAIL ' + fails : 'OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
