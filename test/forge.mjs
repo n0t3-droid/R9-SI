@@ -94,6 +94,7 @@ const plan = await sev(async ([px, pz]) => {
   WM.change(() => { const p = Object.assign({}, gp, { id: 'forge-a', status: 'draft', t: Date.now() }); delete p.ok; WM.plans.push(p); WM.sel = p.id; });
   WM.tool = null; WM.ghost = null; WM.refresh();
   const p = WM.plans.find(q => q.id === 'forge-a');
+  { const S = window.__st, L = WM.placeOf(p, m).lot; if (S.scene) { S.scene.center = [(L[0] + L[2] + 1) / 2, p.F + m.top * 0.4, (L[1] + L[3] + 1) / 2]; S.cam.dist = m.top * 1.9 + 30; S.cam.pitch = 0.32; } }   // (the camera on the new tower)
   return { p: { kind: p.kind, dna: p.dna, x: p.ox, y: p.F, z: p.oz, r: p.r }, lot: m.lot, top: m.top, ops: m.ops, level: m.level };
 }, [W.pos[0], W.pos[2]]);
 console.log('planned', JSON.stringify(plan));
