@@ -92,3 +92,18 @@ html:not(.pro) #title #mphosts:not(.has), html:not(.pro) #title .splash { displa
 .proswitch { display: inline-flex; border: 1px solid var(--st-line); border-radius: 12px; overflow: hidden; background: var(--st-bg); }
 .proswitch button { min-width: 88px; min-height: 40px; border: 0; background: transparent; color: var(--st-ink); font: 600 var(--st-fs) var(--st-font); cursor: pointer; }
 .proswitch button.on { background: rgba(58, 240, 255, 0.18); color: #fff; box-shadow: inset 0 0 0 1px var(--st-acc); }
+
+/* ---- 🧭 hints: one line, bottom centre, pictograms, ✕ — hidden while a menu is open ---- */
+#hints { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); display: none; z-index: 30; pointer-events: auto; max-width: min(92vw, 760px); }
+#hints.on { display: block; animation: hintIn .3s ease-out; }
+#ui:has(.screen.on) #hints { display: none; }
+#hints .hint { display: flex; align-items: center; gap: 14px; padding: 10px 14px 10px 16px; border-radius: 16px; border: 1px solid var(--st-line); background: var(--st-bg2); color: var(--st-ink); font: 600 calc(var(--st-fs) * 1.1) var(--st-font); box-shadow: 0 16px 50px rgba(0, 0, 0, 0.55); }
+#hints .picto { display: inline-flex; align-items: center; gap: 4px; color: var(--st-acc); }
+#hints kbd { font: 700 15px var(--st-font); color: var(--st-ink); min-width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0 6px; border: 1px solid var(--st-line); border-bottom-width: 3px; border-radius: 7px; background: rgba(255, 255, 255, 0.06); }
+#hints .mouse { display: inline-grid; place-items: center; width: 30px; height: 30px; }
+#hints .finger { font-size: 22px; }
+#hints .txt { flex: 1; line-height: 1.25; }
+#hints .x { min-width: 44px; min-height: 44px; border-radius: 12px; border: 1px solid var(--st-line); background: transparent; color: var(--st-mute); font: 700 18px var(--st-font); cursor: pointer; }
+#hints .x:hover { color: var(--st-ink); border-color: var(--st-acc); }
+@keyframes hintIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (prefers-reduced-motion: reduce) { #hints.on { animation: none; } }

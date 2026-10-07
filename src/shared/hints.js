@@ -28,7 +28,7 @@
     if (box && box.parent !== null && (box.isConnected === undefined || box.isConnected)) return box;
     box = document.createElement('div'); box.setAttribute('id', 'hints'); if (box.id !== undefined) box.id = 'hints';
     box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite');
-    document.body.appendChild(box);
+    (H.host || document.body).appendChild(box);
     return box;
   }
   H.show = function (id, o) {
