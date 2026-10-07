@@ -27,7 +27,7 @@ check(!!P && typeof P.make === 'function' && typeof P.read === 'function' && typ
 if (!P) { console.log('FAILED ' + fails); process.exit(1); }
 store.clear();
 F.add('stone'); F.add('blueprint_3'); F.add(sofa);
-CU.save({ v: 1, houses: { 7: { v: 2, name: 'Palais Royal', index: 7, skin: 'classic', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AgE=' }, n: 1, t: 100 } }, models: {} });
+CU.save({ v: 1, houses: { 7: { v: 2, name: 'Palais Étoile', index: 7, skin: 'classic', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AgE=' }, n: 1, t: 100 } }, models: {} });
 localStorage.setItem('r9si.library', JSON.stringify({ v: 1, items: [lib('b1', 'Turm', 'AgE=')], t: 1 }));
 const pk = P.make('standalone');
 check(pk.r9pack === 1 && pk.from === 'standalone' && pk.at > 0, 'r9pack 1, from standalone, a time');
@@ -54,11 +54,11 @@ check(P.summary({ favs: ['a'], studio: { houses: { 1: {} }, models: {} }, lib: [
 console.log('4 · merging');
 store.clear(); F.sync();
 F.add('oak_planks'); F.add('stone');          // here: [stone, oak_planks]
-CU.save({ v: 1, houses: { 3: { v: 2, index: 3, name: 'Bel Portale', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AgE=' }, t: 100 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 1], rle: 'AQA=', t: 500 } } });
+CU.save({ v: 1, houses: { 3: { v: 2, index: 3, name: 'Villa Belfronte', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AgE=' }, t: 100 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 1], rle: 'AQA=', t: 500 } } });
 localStorage.setItem('r9si.library', JSON.stringify({ v: 1, items: [lib('b1', 'Turm', 'AgE=')], t: 1 }));
 const inc = P.read(JSON.stringify({ r9pack: 1, at: 9, from: 'standalone',
   favs: ['glass', 'stone', 'blueprint_2'],
-  studio: { houses: { 3: { v: 2, index: 3, name: 'Bel Portale', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AQE=' }, t: 200 }, 5: { v: 2, index: 5, name: 'Toscana', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AAE=' }, t: 50 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 2], rle: 'AQA=', t: 400 } } },
+  studio: { houses: { 3: { v: 2, index: 3, name: 'Villa Belfronte', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AQE=' }, t: 200 }, 5: { v: 2, index: 5, name: 'Torre Ocra', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AAE=' }, t: 50 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 2], rle: 'AQA=', t: 400 } } },
   lib: [lib('zz', 'Turm (Kopie)', 'AgE='), lib('b1', 'Brücke', 'AwE=')] }));
 const r = P.merge(inc);
 const fl = F.list();

@@ -115,7 +115,7 @@ await section('3 · Architektur: ☆ and ✏️ on every house card, a ★ Favor
   });
   console.log('  arch', JSON.stringify(r));
   check(r.n === 11 && r.favb && r.editb, 'all 11 house cards have ☆ and ✏️');
-  check(r.favs.join() === 'blueprint_3', '☆ on Bel Portale makes blueprint_3 a favourite (the game\'s ★ tab knows that id)');
+  check(r.favs.join() === 'blueprint_3', '☆ on Villa Belfronte makes blueprint_3 a favourite (the game\'s ★ tab knows that id)');
   check(/Favoriten/.test(r.chip || '') && r.shown.join() === '3', 'the ★ Favoriten chip in Architektur shows it (' + r.shown.join() + ')');
   check(r.craft.mode === 'craft' && r.craft.kind === 'house' && r.craft.idx === 3, '✏️ on the card opens that house in the Crafter');
   check(/^← Architektur/.test(r.crumb || '') && r.back.mode === 'arch' && r.back.scene === 'house' && r.back.idx === 3, '"' + r.crumb + '" returns to that house');
@@ -167,7 +167,7 @@ await section('5 · a block: ✏️ → Varianten; "Verbaut in" ⚒ and 🎨', a
   check(r.sel === 'vx_roof_red' && r.strip, 'a click on a variant selects it (the strip stays open)');
   check(r.rows.some(x => x.h === '7') && r.rows.length && r.rows.every(x => x.craft && x.paint), '"Verbaut in": every house row has ⚒ and 🎨 (' + r.rows.map(x => x.h).join(',') + ')');
   await shot('deadends_1_block');
-  // 🎨 on Palais Royal: pick the red roof → all slate roofs there are red, as one undo step, turned as before
+  // 🎨 on Palais Étoile: pick the red roof → all slate roofs there are red, as one undo step, turned as before
   const p = await ev(async () => {
     const sleep = (ms) => new Promise(res => setTimeout(res, ms)), S = window.__st, CR = VR.Crafter, R = VR.R, T = R.T;
     const b = document.querySelector('#partsBody .part[data-house="7"] [data-act="usedPaint"]'); if (b) b.click(); await sleep(200);
@@ -187,7 +187,7 @@ await section('5 · a block: ✏️ → Varianten; "Verbaut in" ⚒ and 🎨', a
   console.log('  🎨', JSON.stringify(p));
   before = p.base;
   check(p.pick && p.pick.length === 11 && p.pick.includes('vx_roof_red') && !p.pick.includes('vx_roof_slate'), '🎨 offers the Varianten to choose from (the other 11 roof colours)');
-  check(p.mode === 'craft' && p.idx === 7 && p.base && p.base.slate.n > 50 && p.now.slate.n === 0 && p.now.red.n === p.base.red.n + p.base.slate.n, '🎨 → Rotes Dach: every slate roof of Palais Royal is red now (' + (p.base && p.base.slate.n) + ' → 0)');
+  check(p.mode === 'craft' && p.idx === 7 && p.base && p.base.slate.n > 50 && p.now.slate.n === 0 && p.now.red.n === p.base.red.n + p.base.slate.n, '🎨 → Rotes Dach: every slate roof of Palais Étoile is red now (' + (p.base && p.base.slate.n) + ' → 0)');
   check(p.now && p.now.red.f === p.base.slate.f, 'each roof piece keeps its direction (facings ' + (p.now && p.now.red.f) + ')');
   check(p.undo === 1 && p.undone && p.undone.slate === p.base.slate.n && p.undone.red === p.base.red.n && p.dirty, 'ONE undo step takes all of it back; the house waits for "Ins Spiel"');
   await shot('deadends_2_painted');
@@ -200,7 +200,7 @@ await section('5 · a block: ✏️ → Varianten; "Verbaut in" ⚒ and 🎨', a
     return { mode: S.mode, idx: CR.house && CR.house.index, hand: CR.hot[CR.slot], tool: CR.tool };
   });
   console.log('  ⚒', JSON.stringify(k));
-  check(k.mode === 'craft' && k.idx === 7 && k.hand === 'vx_roof_slate' && k.tool === 'paint', '⚒ opens Palais Royal in the Crafter with the slate roof in the hand, 🖌 Malen ready');
+  check(k.mode === 'craft' && k.idx === 7 && k.hand === 'vx_roof_slate' && k.tool === 'paint', '⚒ opens Palais Étoile in the Crafter with the slate roof in the hand, 🖌 Malen ready');
 });
 
 await section('6 · a full browser storage: the banner, no ✓, 🧹 Platz schaffen', async () => {
@@ -351,7 +351,7 @@ await section('8 · a world: Welt → Häuser ★, placing with buttons, ✋ Ben
     return out;
   }, W.P);
   console.log('  world', JSON.stringify(r));
-  check(/Favoriten/.test(r.grp || '') && /Bel Portale/.test(r.firstCard || ''), 'Welt → Häuser: ★ Favoriten first, with Bel Portale (' + r.firstCard + ')');
+  check(/Favoriten/.test(r.grp || '') && /Villa Belfronte/.test(r.firstCard || ''), 'Welt → Häuser: ★ Favoriten first, with Villa Belfronte (' + r.firstCard + ')');
   check(!r.pencil && /✏️/.test(r.own || '') && /dein Design/.test(r.own || ''), 'your own design (the facade-only Villa R9 160) is marked ✏️, no ✎ left (' + r.own + ')');
   check(r.wrot[0] && r.wrot[2] === ((r.wrot[1] + 1) & 3), 'placing: ↻ Drehen as a button (R)');
   check(r.wfac[0] && r.wfac[1] !== r.wfac[2], 'placing: ◐ Fassade as a button (F): ' + r.wfac[1] + ' → ' + r.wfac[2]);

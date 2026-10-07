@@ -34,6 +34,7 @@
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F;
   const PROTO = 1;
+  const NOTICE = 'r9si.mpNotice';   // 👥 the one-time name notice: '1' = answered (✓ OK or a nickname), 'off' = „Mehrspieler aus“ — once per browser
   const TOPICS = ['hello', 'welcome', 'mods', 'req', 'diff', 'blk', 'edit', 'env', 'chat', 'summon', 'pdata', 'bye'];
   VR.MP_TOPICS = TOPICS;
   const unkey = (k) => [Math.floor(k / 65536) - 32768, (k % 65536) - 32768];
@@ -64,23 +65,66 @@
     get isHost() { return this.role === 'host'; }
     get isClient() { return this.role === 'client' || this.role === 'joining'; }
     get active() { return this.role === 'host' || this.role === 'client'; }
-    myName() { const s = this.g.settings; return cleanName(s.playerName) || cleanName(this.T && this.T.me && this.T.me.name) || 'Explorer'; }
+    // the name the others see: 'Explorer' until the one-time notice is answered — the claude.ai profile name is never
+    // sent before that; afterwards the nickname (settings.playerName), else the profile name
+    myName() { return this.noticeOk() ? this.nameIfShown() : 'Explorer'; }
+    nameIfShown() { const s = this.g.settings; return cleanName(s.playerName) || cleanName(this.T && this.T.me && this.T.me.name) || 'Explorer'; }
     myPeer() { const p = this.T && this.T.myPeer ? this.T.myPeer() : null; if (p) return p; if (this.room) { const me = this.room.peers().find(q => q.sameTab); if (me) return me.peer; } return this.peerFallback || null; }
+
+    // ---------------------------------------------------------------- 👥 privacy by default
+    // Until the player answers the one-time notice („👥 Mitspieler sehen deinen Namen: X — ✓ OK · ✎ Spitzname ·
+    // Mehrspieler aus“; src/main/legal.js shows it as a card) the lobby sees the name „Explorer“ and no profile name.
+    // „Mehrspieler aus“ = no presence at all, and from the next start no connection ('r9si.mp' = 'off'; Settings →
+    // Game turns it back on). „Friends can join my worlds“ off = no presence at all.
+    noticeOk() { if (this.noticeMem) return true; try { return localStorage.getItem(NOTICE) === '1'; } catch (e) { return false; } }
+    confirmNotice() {
+      this.noticeMem = true;
+      try { localStorage.setItem(NOTICE, '1'); } catch (e) { /* this page only */ }
+      this.setLobby(); this.syncNotice();
+      const g = this.g;
+      if (g.state === 'play' && g.meta && !g.meta.guest) this.startHosting();
+    }
+    syncNotice() { if (VR.Legal && VR.Legal.syncNotice) VR.Legal.syncNotice(this.g); }
+    turnOff() {
+      try { localStorage.setItem('r9si.mp', 'off'); if (localStorage.getItem(NOTICE) !== '1') localStorage.setItem(NOTICE, 'off'); } catch (e) { /* this page only */ }   // (a confirmed answer is never overwritten: the notice is once per browser)
+      const g = this.g, T = this.T, guest = this.isClient;
+      this.ready = false; this.status = 'off';        // (from here setLobby sends nothing)
+      if (this.role === 'host') this.stopHosting(); else if (this.role) this.leave();
+      if (T && T.lobby) T.lobby.presence({ v: null, n: null, host: null, pl: null, role: null, ss: null }).catch(() => { });
+      if (this.lobbyUnsub) { try { this.lobbyUnsub(); } catch (e) { /* gone */ } this.lobbyUnsub = null; }
+      this.T = null; this.online = []; this.lobbyHosts = []; this.lobbyOn = false;
+      this.syncNotice();
+      if (guest && g.meta && g.meta.guest && (g.state === 'play' || g.state === 'loading')) g.leaveGuestWorld();
+    }
+    turnOn() {
+      try { if (localStorage.getItem('r9si.mp') === 'off') localStorage.removeItem('r9si.mp'); } catch (e) { /* */ }
+      if (this.ready || this.status === 'connecting') return Promise.resolve();
+      this.status = 'connecting';
+      return this.init();
+    }
 
     // ---------------------------------------------------------------- start-up & lobby
     async init() {
       try { this.T = await VR.Net.open(); } catch (e) { this.T = null; }
-      if (!this.T) { this.status = 'unavailable'; if (this.g.ui && this.g.ui.renderHosts) this.g.ui.renderHosts(); return; }
+      if (!this.T) { this.status = VR.Net.isOff && VR.Net.isOff() ? 'off' : 'unavailable'; if (this.g.ui && this.g.ui.renderHosts) this.g.ui.renderHosts(); return; }
+      if (this.status === 'off') { this.T = null; return; }   // switched off while connecting
       this.ready = true; this.status = 'ready';
       const L = this.T.lobby;
-      L.onPeers((ch) => this.lobbyChanged(ch.peers), () => { });
+      this.lobbyUnsub = L.onPeers((ch) => this.lobbyChanged(ch.peers), () => { });
       this.setLobby();
+      this.syncNotice();
       if (this.g.ui && this.g.ui.renderHosts) this.g.ui.renderHosts();
     }
     setLobby() {
       if (!this.ready) return;
       const g = this.g;
+      // 👥 „Friends can join my worlds“ off and no session running: nobody sees you in the lobby, the name included
+      if (g.settings.mpHost === false && !this.role) {
+        if (this.lobbyOn) { this.lobbyOn = false; this.T.lobby.presence({ v: null, n: null, host: null }).catch(() => { }); }
+        return;
+      }
       const host = this.role === 'host' && g.meta ? { s: this.session, w: cleanName(g.meta.name) || 'World', m: g.meta.mode, t: Date.now() } : null;
+      this.lobbyOn = true;
       this.T.lobby.presence({ v: PROTO, n: this.myName(), host }).catch(() => { });
     }
     lobbyChanged(peers) {

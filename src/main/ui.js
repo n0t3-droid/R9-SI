@@ -373,6 +373,7 @@
       { const b = $('#studiolive'); if (b) b.style.display = this.game.meta && this.game.meta.guest ? 'none' : ''; }
       this.buildZenPanel();
       this.buildMpPanel();
+      if (VR.Legal && !$('#pause [data-legal]')) { const q = $('#pause [data-act="quit"]'); if (q) q.after(VR.Legal.button('btn small')); }   // 📜 Impressum · Datenschutz (src/main/legal.js)
       const g = this.game;
       $('#pausenote').textContent = T('g.pause.note', { name: g.meta.name, seed: g.meta.seed });
     }
@@ -430,7 +431,9 @@
     buildMpPanel() {
       const g = this.game, mp = g.mp, box = $('#mppanel'); if (!box) return;
       box.innerHTML = '';
+      if (VR.Legal && mp && mp.status === 'off') { box.appendChild(VR.Legal.mpNotice(g, true)); return; }   // 👥 Mehrspieler aus: one line and „Mehrspieler an“ (src/main/legal.js)
       const head = el('div', 'subtitle', esc(T('g.mp.title'))); box.appendChild(head);
+      if (VR.Legal && mp && mp.ready && !mp.noticeOk()) box.appendChild(VR.Legal.mpNotice(g));   // 👥 the one-time name notice above the panel until it is answered
       if (!mp || mp.status === 'connecting') { box.appendChild(el('div', 'note', esc(T('g.mp.connecting')))); return; }
       if (!mp.ready) { box.appendChild(el('div', 'note', T('g.mp.off'))); return; }
       const list = mp.players();
@@ -473,6 +476,7 @@
       const st = $('#settabs'); st.innerHTML = '';
       for (const [k, n] of tabs) { const b = el('button', k === this.settingsTab ? 'on' : ''); b.textContent = n; b.dataset.tab = k; b.onclick = () => { this.settingsTab = k; this.showSettings(); }; st.appendChild(b); }
       const S = this.game.settings, body = $('#setbody');
+      if (VR.Legal && !$('#settings [data-legal]')) { const d = $('#settings [data-act="setback"]'); if (d) d.after(VR.Legal.button('btn small')); }   // 📜 next to Done (src/main/legal.js)
       body.innerHTML = '';
       const slider = (key, label, min, max, step, fmt, onch) => {
         const d = el('div', 'field'); d.innerHTML = `<label>${esc(label)}: <span class="val">${esc(fmt(S[key]))}</span></label><input type="range" min="${min}" max="${max}" step="${step}" value="${S[key]}">`;
@@ -544,6 +548,7 @@
           row(T('g.set.skin'), Folk.SKIN, 'skin', (c) => hex(c));
           body.appendChild(el('div', 'hr'));
         }
+        if (VR.Legal && this.game.mp) body.appendChild(VR.Legal.mpToggle(this.game));   // 👥 Mehrspieler an / aus and the name notice (src/main/legal.js)
         if (S.mpHost === undefined) S.mpHost = true;
         toggle('mpHost', T('g.set.mpHost'));
         toggle('showCoords', T('g.set.showCoords')); toggle('minimap', T('g.set.minimap')); toggle('toasts', T('g.set.toasts'));

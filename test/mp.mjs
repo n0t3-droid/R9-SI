@@ -25,6 +25,10 @@ for (let i = 0; i < 120; i++) { await wait(500); if (await ev(A, () => VR.game &
 for (const p of [A, B]) await ev(p, () => { const g = VR.game; g.settings.renderDist = 5; g.settings.dynRes = false; g.settings.horizon = 1; g.applySettings('*'); });
 await ev(A, () => { VR.game.settings.playerName = 'R9'; });
 await ev(B, () => { VR.game.settings.playerName = 'Buddy'; });
+// 👥 both answer the one-time name notice (before it the lobby sees „Explorer“ only; test/legal.mjs checks the card)
+console.log('notice before', JSON.stringify(await ev(A, () => ({ ok: VR.game.mp.noticeOk(), card: !!document.getElementById('r9mpcard') }))));
+await ev(A, () => VR.game.mp.confirmNotice());
+await ev(B, () => VR.game.mp.confirmNotice());
 // host creates a world
 await ev(A, () => VR.game.createWorld({ name: 'Our World', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: '424242', cheats: true, kit: true }));
 for (let i = 0; i < 60; i++) { await wait(1000); if (await ev(A, () => VR.game.state) === 'play') break; }
