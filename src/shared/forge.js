@@ -102,14 +102,20 @@
     for (let i = 0; i < g.blocks.length; i++) mix(g.blocks[i]);
     return h >>> 0;
   };
-  // every non-keep cell as [u, y, v, state] (y relative to the placement floor) — what the game's placer builds
-  Forge.ops = function (g) {
-    const b = g.blocks, sx = g.sx, sz = g.sz;
-    let n = 0; for (let i = 0; i < b.length; i++) if (b[i] !== KEEP) n++;
+  // every non-keep cell as [u, y, v, state] (y relative to the placement floor) — what the game's placer builds.
+  // clearTo: the placer of a levelled lot clears rows 0 … clearTo itself, so air there needs no op (a stadium sends a
+  // fifth of its cells, the main thread compares a fifth)
+  Forge.ops = function (g, clearTo) {
+    const b = g.blocks, sx = g.sx, sz = g.sz, c0 = clearTo === undefined ? -1 : clearTo;
+    const skip = (s, y) => s === KEEP || (s === 0 && y >= 0 && y <= c0);
+    let n = 0;
+    for (let y = 0; y < g.sy; y++) { const yy = y + g.dy, row = y * sz * sx; for (let i = 0; i < sz * sx; i++) if (!skip(b[row + i], yy)) n++; }
     const ops = new Int32Array(n * 4); let k = 0;
-    for (let y = 0; y < g.sy; y++) for (let z = 0; z < sz; z++) for (let x = 0; x < sx; x++) { const s = b[(y * sz + z) * sx + x]; if (s === KEEP) continue; ops[k++] = x; ops[k++] = y + g.dy; ops[k++] = z; ops[k++] = s; }
+    for (let y = 0; y < g.sy; y++) for (let z = 0; z < sz; z++) for (let x = 0; x < sx; x++) { const s = b[(y * sz + z) * sx + x]; if (skip(s, y + g.dy)) continue; ops[k++] = x; ops[k++] = y + g.dy; ops[k++] = z; ops[k++] = s; }
     return ops;
   };
+  // the rows the game's levelling clears on a lot anyway (blueprints.js planAt: the piece's volume up to 24 rows)
+  Forge.CLEARED = (top) => Math.min(top + 2, 23);
   // [start, end) chunks of at most `max` cells
   Forge.slices = function (n, max) { const out = []; for (let i = 0; i < n; i += max) out.push([i, Math.min(n, i + max)]); if (!out.length) out.push([0, 0]); return out; };
 
