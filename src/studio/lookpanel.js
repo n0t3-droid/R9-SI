@@ -131,7 +131,8 @@
       // Farbe: the block's own colour (its texture's detail stays)
       const cur = E.look.rc || null, ti = C.texInfo();
       let base = '#888888';
-      if (ti && ti.avgColor) { const lay = R.T.tex[t.defaultState * 6 + 2] & 0xfff, a = ti.avgColor, g = (v) => Math.round(Math.pow(Math.max(0, Math.min(1, v)), 1 / 2.2) * 255); base = toHex((g(a[lay * 4]) << 16) | (g(a[lay * 4 + 1]) << 8) | g(a[lay * 4 + 2])); }
+      // (the table holds the texture's average colour as stored: sRGB 0..1)
+      if (ti && ti.avgColor) { const lay = R.T.tex[t.defaultState * 6 + 2] & 0xfff, a = ti.avgColor, g = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255); base = toHex((g(a[lay * 4]) << 16) | (g(a[lay * 4 + 1]) << 8) | g(a[lay * 4 + 2])); }
       const r = colorRow(tx('live.st.color', null, '🎨 Farbe', '🎨 Colour'), cur || base, (v) => { E.look.rc = v; sw.querySelectorAll('i').forEach(x => x.classList.remove('on')); preview(); }, 'rc');
       const none = document.createElement('button'); none.className = 'cbtn mini' + (cur ? '' : ' on'); none.dataset.act = 'noColor'; none.textContent = tx('live.st.noColor', null, '✕ wie gebaut', '✕ as built');
       none.title = tx('live.st.noColorT', null, 'Ohne eigene Farbe — die Farben der Textur', 'No colour of its own — the texture\'s colours');
