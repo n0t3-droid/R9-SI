@@ -84,7 +84,7 @@
     const W = WM(), P = PJ();
     if (!st) return;
     if (st.mode === 'craft') C.setMode('arch', true);
-    else if (st.mode === 'world' && W) { if (st.tab) W.tab = st.tab; if (S.mode !== 'world') C.setMode('world'); else W.refresh(); }
+    else if (st.mode === 'world' && W) { if (st.tab) W.tab = st.tab; W.karteSel = st.sel || null; W.karteScroll = st.scroll || 0; if (S.mode !== 'world') C.setMode('world'); else { C.chips(); C.list(); C.parts(); } }
     else if (st.mode && S.mode !== st.mode) C.setMode(st.mode, true);
     if (st.cat && st.cat !== S.cat && st.mode !== 'world') { S.cat = st.cat; C.chips(); C.list(); }
     if (st.scene && st.mode !== 'world') { if (st.scene.type === 'house' && Number.isFinite(st.scene.index)) C.selectHouse(st.scene.index); else if (st.scene.type === 'model' && st.scene.name) C.selectModel(st.scene.name); else if (st.scene.type === 'block' && st.scene.name && VR.StudioCatalog) VR.StudioCatalog.select(st.scene.name); }
@@ -97,8 +97,8 @@
   SS.stateNow = stateNow; SS.restoreTo = restoreTo;
   const baseLabel = () => { const P = PJ(); if (P && P.isOpen && P.isOpen()) return tx('start.meins', null, '🎒 Meins', '🎒 Mine'); return MODE_NAME()[S.mode] || ''; };
   // a layer: what was open comes back with ←
-  function layer(kind, label, extra) {
-    const st = stateNow();
+  function layer(kind, label, extra, sel) {
+    const st = stateNow(); if (sel) st.sel = sel;
     if (NAV()) NAV().push(Object.assign({ kind, label, base: baseLabel(), restore: () => restoreTo(st) }, extra || {}));
   }
   SS.layer = layer;
@@ -115,7 +115,7 @@
   SS.view = function (id, opt) {
     const d = D() && D().parse(id); if (!d || !known(id)) { toast(tx('st.gone', null, 'Das gibt es hier nicht (mehr).', 'That is not here (any more).')); return false; }
     const P = PJ();
-    if (!(opt && opt.noLayer)) layer('view', D().name(id));
+    if (!(opt && opt.noLayer)) layer('view', D().name(id), null, id);
     if (P && P.isOpen && P.isOpen()) P.show(false);
     if (d.kind === 'h') { C.setMode('arch', true); C.selectHouse(+d.key); }
     else if (d.kind === 'm') { C.setMode(C.isFacade(d.key) ? 'facade' : 'furn', true); C.selectModel(d.key); }
@@ -171,8 +171,8 @@
   SS.edit = function (id) {
     const d = D() && D().parse(id); if (!d || !known(id)) { toast(tx('st.gone', null, 'Das gibt es hier nicht (mehr).', 'That is not here (any more).')); return false; }
     const P = PJ();
-    if (d.kind === 'h' || d.kind === 'm' || d.kind === 'p') layer('editor', '✏️', { escapable: false });
-    else layer('editor', '✏️');
+    if (d.kind === 'h' || d.kind === 'm' || d.kind === 'p') layer('editor', '✏️', { escapable: false }, id);
+    else layer('editor', '✏️', null, id);
     if (P && P.isOpen && P.isOpen()) P.show(false);
     if (d.kind === 'h') C.editHouse(+d.key);
     else if (d.kind === 'm') C.editModel(d.key);
@@ -203,7 +203,7 @@
     } else if (S.mode !== 'world' || W.tab !== 'karte') { W.tab = 'karte'; C.setMode('world'); W.refresh(); }
     if (NAV()) NAV().clear();
     W.tool = d.kind === 'h' ? W.houseItem(+d.key) : { kind: 'model', name: d.key };
-    W.ghost = null; W.sel = null; W.meshFor(W.tool); W.refresh();
+    W.ghost = null; W.sel = null; W.karteSel = null; W.meshFor(W.tool); W.refresh();
     if (W.tipW) W.tipW(tx('karte.aim', null, 'Zeig auf den Boden — Klick setzt es · R dreht · Esc fertig', 'Point at the ground — a click places it · R turns · Esc done'), true);
     return true;
   };
@@ -232,7 +232,7 @@
     const own = Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {}).filter(n => VR.VM.MODELS[n] && !C.isFacade(n)).length, nFurn = Object.keys(VR.VM.MODELS).filter(n => !C.isFacade(n)).length;
     for (const [id, label, n] of [['fav', '★ ' + tx('st.favs', null, 'Favoriten', 'Favourites'), favN], ['house', '🏠 ' + tx('st.houses', null, 'Häuser', 'Houses'), C.HOUSES.length], ['furn', '🪑 ' + tx('st.furn', null, 'Möbel', 'Furniture'), own ? own + ' ✏️ · ' + nFurn : nFurn], ['worlds', '🌍 ' + tx('start.worldsTitle', null, 'Welten', 'Worlds'), W.worlds ? W.worlds.length : '']]) {
       const b = document.createElement('button'); b.className = cat === id && id !== 'worlds' ? 'on' : ''; b.dataset.kcat = id; b.innerHTML = label + '<b>' + n + '</b>';
-      b.onclick = () => { if (id === 'worlds') { W.keepNow && 0; W.world = null; C.setScene(null); W.tab = 'karte'; if (NAV()) NAV().clear(); C.setMode('world'); W.list().then(() => W.refresh()); return; } W.karteCat = id; W.refresh(); };
+      b.onclick = () => { if (id === 'worlds') { W.world = null; C.setScene(null); W.tab = 'karte'; if (NAV()) NAV().clear(); C.setMode('world'); W.list().then(() => W.refresh()); return; } W.karteCat = id; W.karteScroll = 0; C.chips(); C.list(); C.parts(); };
       el.appendChild(b);
     }
     return true;
@@ -240,7 +240,9 @@
   // the cards: ★ first, then the houses or the furniture (own designs first); a tap on the picture = 📍 Setzen
   wrap('list', function () {
     if (!karte()) return false;
-    const W = WM(), Dg = D(), el = $('#list'); el.innerHTML = ''; el.classList.remove('palette'); el.classList.add('houses', 'dings');
+    const W = WM(), Dg = D(), el = $('#list');
+    const keepScroll = W.karteScroll !== undefined && W.karteScroll !== null ? W.karteScroll : el.scrollTop; W.karteScroll = null;
+    el.innerHTML = ''; el.classList.remove('palette'); el.classList.add('houses', 'dings');
     const favIds = (VR.Favs ? VR.Favs.list() : []).map(f => Dg.fromFav(f)).filter(id => id && /^[hm]:/.test(id) && known(id) && !(id[0] === 'm' && C.isFacade(id.slice(2))));
     const cat = prefs().pro ? (W.karteCat || 'house') : (W.karteCat || (favIds.length ? 'fav' : 'house'));
     let ids = [];
@@ -249,10 +251,11 @@
     else { const own = Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {}).filter(n => VR.VM.MODELS[n] && !C.isFacade(n)).map(n => 'm:' + n); const all = Object.keys(VR.VM.MODELS).filter(n => !C.isFacade(n)).map(n => 'm:' + n); ids = favIds.filter(id => id[0] === 'm').concat(own.filter(id => !favIds.includes(id))).concat(all.filter(id => !favIds.includes(id) && !own.includes(id))); }
     const f = (S.filter || '').toLowerCase();
     if (f) ids = ids.filter(id => (id + ' ' + Dg.name(id)).toLowerCase().includes(f));
-    const cur = toolId();
+    const cur = toolId(), lit = W.karteSel || null;
     if (!ids.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = cat === 'fav' ? tx('st.noFavs', null, 'Noch keine Favoriten — der ☆ an einer Karte legt sie hierher.', 'No favourites yet — ☆ on a card puts them here.') : tx('cat.none', null, 'nichts gefunden', 'nothing found'); el.appendChild(d); return true; }
     let k = 0;
-    for (const id of ids.slice(0, 400)) { const c = Dg.render(id, { picW: 280, picH: 160, on: id === cur, onOpen: () => SS.set(id) }); c.style.animationDelay = (Math.min(k++, 24) * 18) + 'ms'; el.appendChild(c); }
+    for (const id of ids.slice(0, 400)) { const c = Dg.render(id, { picW: 280, picH: 160, on: id === cur || id === lit, onOpen: () => SS.set(id) }); c.style.animationDelay = (Math.min(k++, 24) * 18) + 'ms'; el.appendChild(c); }
+    if (keepScroll) el.scrollTop = keepScroll;
     return true;
   });
   // with something in hand: a click places it — left or right button; a drag turns the view (Shift / middle: pan);
@@ -352,6 +355,8 @@
   // ---------------------------------------------------------------- wiring
   function init() {
     if (PJ()) PJ().decorate = decorate;
+    // the Crafter's own ✕ / „← …" pops the editor layer it was opened as
+    if (VR.Crafter && VR.Crafter.back) { const orig = VR.Crafter.back; VR.Crafter.back = function () { const N = NAV(); if (N && N.top() && N.top().kind === 'editor') { N.pop(); return; } return orig.apply(this, arguments); }; }
     handlers();
     if (WM()) WM().placeNow = placeNow;
     tiles(); proSwitch(); labels();
