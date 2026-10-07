@@ -179,12 +179,14 @@
       }).catch((e) => { this.err = e; if (typeof console !== 'undefined') console.warn('Zeitraffer: history not written', e); });
       return this.q;
     }
-    // the ring buffer: the oldest segments go until the world holds at most maxN changes and maxBytes
+    // the ring buffer: the oldest segments go until the world holds at most maxN changes and maxBytes (the newest one
+    // always stays — a single edit bigger than the whole limit is kept on its own)
     async cap() {
       const list = await this.be.idx(this.w);
       let n = 0, by = 0; for (const [, v] of list) { n += v.n; by += v.bytes; }
       const open = this.cur && this.cur.id;
-      for (const [id, v] of list) {
+      for (let k = 0; k < list.length - 1; k++) {
+        const [id, v] = list[k];
         if (n <= this.o.maxN && by <= this.o.maxBytes) break;
         if (id === open) break;
         await this.be.del(this.w, id);
