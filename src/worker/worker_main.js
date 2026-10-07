@@ -140,7 +140,8 @@
         if (VR.setLook) VR.setLook(m.mode);
       } else if (m.type === 'textures') {
         const R = VR.R, mk = VR.textureMasks();
-        const out = VR.buildTextureArrays({ names: R.texNames, cubeMask: mk.cube, cutoutMask: mk.cut, bevel: m.bevel === undefined ? 1 : m.bevel, bevelAll: !!m.bevelAll });
+        // bevelAll = the Klassisch look (the rim on the seamless materials; v2: chunky natural recipes, the outline on every cube and leaf)
+        const out = VR.buildTextureArrays({ names: R.texNames, cubeMask: mk.cube, cutoutMask: mk.cut, leafMask: mk.leaf, bevel: m.bevel === undefined ? 1 : m.bevel, bevelAll: !!m.bevelAll, classic: m.classic !== undefined ? !!m.classic : !!m.bevelAll });
         const noise = VR.buildNoiseTexture();
         const tr = [noise.buffer, out.avgColor.buffer];
         for (const a of out.albedo) tr.push(a.buffer); for (const a of out.material) tr.push(a.buffer);

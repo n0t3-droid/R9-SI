@@ -53,10 +53,12 @@
   // mottling. "seamless" (Nahtlos): natural ground as smooth slopes (F.SMOOTH), panorama frames and VX pieces that
   // join their neighbours, patterns running across blocks, seamless modern materials, macro mottling.
   // Main thread, workers and the Studio each call VR.setLook; the mesher, physics and the VX painter follow.
-  const LOOK = VR.LOOK = { mode: 'classic', ground: false, ctm: false, rim: true, vxJoin: false, macro: false };
+  // vary (Klassisch v2): every natural block and every leaf block gets its own shade and tile flip in the shader
+  // (the mesher marks their faces), and the cube textures are built chunky with a one-texel outline (tex_build.js).
+  const LOOK = VR.LOOK = { mode: 'classic', ground: false, ctm: false, rim: true, vxJoin: false, macro: false, vary: true };
   VR.setLook = function (mode) {
     const m = mode === 'seamless' ? 'seamless' : 'classic', seam = m === 'seamless', changed = LOOK.mode !== m;
-    LOOK.mode = m; LOOK.ground = seam; LOOK.ctm = seam; LOOK.rim = !seam; LOOK.vxJoin = seam; LOOK.macro = seam;
+    LOOK.mode = m; LOOK.ground = seam; LOOK.ctm = seam; LOOK.rim = !seam; LOOK.vxJoin = seam; LOOK.macro = seam; LOOK.vary = !seam;
     // smooth ground: the SMOOTH flag of the natural ground states (o.smooth) is on in Nahtlos only
     const TF = R.T && R.T.flags, sm = R.smoothStates;
     if (TF && sm) for (let i = 0; i < sm.length; i++) { if (seam) TF[sm[i]] |= F.SMOOTH; else TF[sm[i]] &= ~F.SMOOTH; }
