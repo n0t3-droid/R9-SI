@@ -28,6 +28,8 @@
   WM.benchUI = true;
   const active = () => WM.on && S.mode === 'world' && !!WM.world && WM.tab === 'bench';
   const tip = (t, ok) => WM.tipW(t, ok);
+  // what goes out is the player's to share: one line with every export (src/main/legal.js), no dialog
+  const shareHint = () => (VR.Legal ? VR.Legal.shareHint() : '');
 
   // ---------------------------------------------------------------- the hotbar (the Crafter's, shared across the Studio)
   const hot = () => CRF().hot || (CRF().hot = []);
@@ -436,14 +438,14 @@
           const data = plain ? bytes : VR.Schem.zip([{ name, data: bytes }]), req = new HW.Object();
           req.filename = fname; req.data = new HW.Uint8Array(data);
           await dl.save(req);
-          tip('⬇ ' + fname, true); return;
+          tip('⬇ ' + fname + (shareHint() ? ' — ' + shareHint() : ''), true); return;
         }
       } catch (e) { if (e && e.code === 'declined') return; console.warn('save', e); }
     }
     try {
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: mime || 'application/octet-stream' })); a.download = name;
       document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
-      tip('⬇ ' + name, true);
+      tip('⬇ ' + name + (shareHint() ? ' — ' + shareHint() : ''), true);
     } catch (e) { tip(L('wb.noSave', 'Speichern geht hier nicht'), false); }
   }
   async function exportClip(kind) {
@@ -633,6 +635,7 @@
       row(btn('📋 ' + L('wb.o.paste', 'Einfügen') + ' · V', WB.tool === 'paste' ? 'pri' : '', () => setTool('paste')), btn('↻ ' + L('wb.h.turn', 'drehen'), '', () => { turnClip(c); C.parts(); }, 'R'), btn('⇋ ' + L('wb.h.mirror', 'spiegeln'), '', () => { mirrorClip(c); C.parts(); }, 'M'));
       row(btn('🧩 ' + L('wb.toLib', 'Als Bauteil behalten'), '', libAdd));
       row(btn('⬇ .schem', '', () => exportClip('schem'), L('wb.expSchem', 'Für WorldEdit, Amulet, Axiom, MCEdit')), btn('⬇ .vox', '', () => exportClip('vox'), L('wb.expVox', 'Für MagicaVoxel')), btn('⬇ .json', '', () => exportClip('json'), L('wb.expJson', 'Als R9-Bauteil')));
+      if (shareHint()) note(esc(shareHint()), 'dim share');
     }
     H('📂 ' + L('wb.files', 'Dateien & Bilder'));
     row(btn('📂 ' + L('wb.open', 'Öffnen …'), '', openFile, '.schem · .nbt · .litematic · .vox · .json · Bild'));

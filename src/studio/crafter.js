@@ -1413,6 +1413,7 @@
     // everything in one file: 📦 Mitnehmen (to the other Studio, to the game) · 📥 Übernehmen (a file from there)
     const BR = VR.StudioBridge;
     if (BR) row(btn(`📦 <span>${L('br.out', 'Mitnehmen')}</span>`, '', () => BR.exportPack(), L('br.outT', 'Favoriten, Designs und Bauteile als eine Datei — für das Spiel oder ein anderes Studio')), btn(`📥 <span>${L('br.in', 'Übernehmen')}</span>`, '', () => BR.pickFile(), L('br.inT', 'Ein R9-Paket (.json) übernehmen — oder die Datei einfach hierher ziehen')));
+    if (BR && VR.Legal) { const p = document.createElement('div'); p.className = 'note dim share'; p.textContent = VR.Legal.shareHint(); el.appendChild(p); }   // one line, no dialog (src/main/legal.js)
   }
 
   // ================================================================ ITEM CRAFTER (voxel models)

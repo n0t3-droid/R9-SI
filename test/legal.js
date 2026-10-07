@@ -118,5 +118,12 @@ const bj = read('build.js');
 check(/src\/main\/legal\.js/.test(bj) && /src\/ui\/legal\.css/.test(bj), 'build.js reads src/main/legal.js and src/ui/legal.css');
 check(/\$\{legal\}\s*\n<script>\$\{guard\(mainSrc\)\}<\/script>/.test(bj) && /<script>\$\{guard\(studioLibs\)\}<\/script>\s*\n\$\{legal\}/.test(bj), 'in the game before its own scripts (its Esc comes first), in the Studio after the libraries');
 
+console.log('8 · the share hint at every export (one line, no dialog)');
+const br = read('src/studio/bridge.js'), wb = read('src/studio/workbench.js'), crf = read('src/studio/crafter.js');
+check(/VR\.Legal\.shareHint\(\)/.test(br) && /sum\.text[^\n]*\+ share\(\), true\)/.test(br), '📦 Mitnehmen (the Crafter, 🕘 Weitermachen, the standalone\'s banner — all call exportPack): the line after saving');
+check((wb.match(/'⬇ ' \+ \w+ \+ \(shareHint\(\)/g) || []).length === 2, '⬇ .schem / .vox / .json (the Werkbank, Bild → 3D): the line after saving, both ways of saving');
+check(/note\(esc\(shareHint\(\)\), 'dim share'\)/.test(wb), 'and a line under the ⬇ buttons (Bauteile go out there too)');
+check(/VR\.Legal\.shareHint\(\)/.test(crf), 'the Crafter: a line under 📦 Mitnehmen / 📥 Übernehmen');
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
