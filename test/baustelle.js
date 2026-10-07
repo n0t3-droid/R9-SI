@@ -228,7 +228,7 @@ check(WB.writes.every(c => c.length <= 8000), 'no write over 8 000 cells (larges
   runUntil(G, 1 / 30, () => !!G.B.slices, 5);
   const site = G.B.slices, sh = site && site.show;
   check(!!sh && sh.scaffold && !!sh.inst && sh.inst.bays.length > 0, 'the tower gets a scaffold (' + (sh && sh.inst ? sh.inst.bays.length / 4 + ' bays, ' + sh.K + ' levels' : 'none') + ')');
-  check(!!(sh && sh.crane) && sh.crane.Lj >= 10 && sh.crane.mastTop > sh.top, 'and a crane taller than it (' + (sh && sh.crane ? 'mast top ' + sh.crane.mastTop + ', jib ' + sh.crane.Lj : 'none') + ')');
+  check(!!(sh && sh.crane) && sh.crane.Lj >= 10 && sh.crane.top0 > sh.top && sh.crane.mastTop < sh.crane.top0, 'and a crane that climbs with it, taller than it at the end (' + (sh && sh.crane ? 'mast top now ' + sh.crane.mastTop + ', at the end ' + sh.crane.top0 + ', jib ' + sh.crane.Lj : 'none') + ')');
   check(!folk || (sh && sh.crew.length === 3), 'a crew of three builders on Balanced (' + (sh ? sh.crew.length : 0) + ')');
   let deckOk = 0, deckN = 0, onDeck = 0, onN = 0, worked = 0, hauled = 0;
   const seen = new Set();

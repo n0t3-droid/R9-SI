@@ -326,6 +326,7 @@
       this.siteSwallow = true;
       return true;
     };
+    BP.siteOutlines = function (out) { const S = this.slices; if (S instanceof Site && S.show && S.show.outline && !S.tiny && S.o.nStruct && (S.phase === 'earth' || S.phase === 'build')) out.push(S.show.outline); };
     BP.drawSites = function (r, E, cam) { const L = this.sites; if (!L || !L.length || !BS.draw) return; BS.draw(this, r, E, cam); };
   }
 
@@ -405,9 +406,9 @@
     // the climbing screen of a tall one: a closed orange panel with a white band outside the scaffold
     screen() {
       const M = new MeshBuf();
-      M.box(0.01, 0.02, 1.3, 1.99, 1.98, 1.34, C.orange, { skip: 3 });
-      M.box(0.01, 0.86, 1.341, 1.99, 1.12, 1.35, C.white, { skip: 47 });
-      M.box(0.01, 1.84, 1.341, 1.99, 1.98, 1.35, C.black, { skip: 47 });
+      for (let i = 0; i < 5; i++) M.box(0.04 + i * 0.4, 0.04, 1.3, 0.3 + i * 0.4, 1.96, 1.34, C.orange, { skip: 12 });
+      M.box(0.01, 0.9, 1.341, 1.99, 1.08, 1.36, C.white, { skip: 47 });
+      M.box(0.01, 1.86, 1.341, 1.99, 1.97, 1.36, C.black, { skip: 47 });
       return M.pack();
     },
     // the scaffold's corner square (1.3 × 1.3): standards, planks, toe boards and rails on both outer sides
@@ -437,6 +438,15 @@
       const M = new MeshBuf(), a = 0.72, t = 0.07;
       for (const [x, z] of [[-a, -a], [a, -a], [a, a], [-a, a]]) M.box(x - t, 0, z - t, x + t, 2, z + t, C.yellow, { skip: 12 });
       for (const [x0, z0, x1, z1] of [[-a, -a, a, -a], [a, -a, a, a], [a, a, -a, a], [-a, a, -a, -a]]) { M.beam(x0, 0.05, z0, x1, 0.05, z1, 0.08, C.yellowD); M.beam(x0, 0.08, z0, x1, 1.95, z1, 0.06, C.yellow); }
+      return M.pack();
+    },
+    // the barrier (a panel two blocks long): feet, posts, a red and white board, a lamp on every other one
+    fence() {
+      const M = new MeshBuf();
+      for (const x of [0.06, 1.94]) { M.box(x - 0.2, 0, -0.14, x + 0.2, 0.14, 0.14, C.concrete); M.box(x - 0.04, 0.14, -0.04, x + 0.04, 1.05, 0.04, C.steel, { skip: 12 }); }
+      for (let i = 0; i < 8; i++) M.box(0.06 + i * 0.235, 0.62, -0.025, 0.06 + (i + 1) * 0.235, 0.86, 0.025, i & 1 ? C.white : C.red);
+      M.box(0.06, 0.25, -0.02, 1.94, 0.3, 0.02, C.steelD, { skip: 3 });
+      M.box(1.88, 1.05, -0.07, 2.0, 1.17, 0.07, 0xFFB020, { e: true });
       return M.pack();
     },
     trolley() { const M = new MeshBuf(); M.box(-0.55, -0.35, -0.6, 0.55, 0, 0.6, C.grey); M.box(-0.2, -0.5, -0.3, 0.2, -0.35, 0.3, C.black); return M.pack(); },
@@ -479,7 +489,7 @@
     if (BS.gpuFor === gl && BS.gpuSet) return BS.gpuSet;
     const up = (m) => { const o = VR.VoxGPU.upload(gl, m); o.data = null; return o; };
     const G = {};
-    for (const k of ['bay', 'brace', 'screen', 'deck', 'mast', 'trolley', 'cable', 'hook', 'pallet', 'cubes', 'blink']) G[k] = up(BS.MOD[k]());
+    for (const k of ['bay', 'brace', 'screen', 'deck', 'mast', 'fence', 'trolley', 'cable', 'hook', 'pallet', 'cubes', 'blink']) G[k] = up(BS.MOD[k]());
     G.corner = up(BS.MOD.corner(false)); G.deckCorner = up(BS.MOD.corner(true));
     BS.gpuFor = gl; BS.gpuSet = G;
     return G;
@@ -527,8 +537,11 @@
       this.hits = 0; this.knockT = -1; this.motor = 0;
       const S = g.settings || {};
       this.preset = S.preset || 'balanced';
+      // the plan's volume as a blueprint ghost while it is built (gadgets.js outlines)
+      this.outline = { x: sb[0], y: sb[1], z: sb[2], boxes: [[0, 0, 0, sb[3] + 1 - sb[0], sb[4] + 1 - sb[1], sb[5] + 1 - sb[2]]], color: [0.35, 0.95, 1, 0.5] };
       if (this.scaffold) {
         this.rings();
+        this.fence();
         if (VR.Folk && VR.FolkAnim) this.makeCrew();
         if (this.top - site.F > 12 && this.preset !== 'potato') this.makeCrane();
       }
@@ -556,6 +569,20 @@
       }
       bayStart[K] = bays.length / 4; braceStart[K] = braces.length / 4;
       this.inst = { bays: new Float32Array(bays), braces: new Float32Array(braces), corners: new Float32Array(corners), bayStart, braceStart };
+    }
+    // the barrier around the site on the ground (a gap where the crew comes in, toward the player), each panel on the
+    // ground under it
+    fence() {
+      const R = this.ring, g = this.site.g, w = g.world, p = g.player && g.player.pos, D = 5.2, out = [];
+      const X0 = R[0] - D, X1 = R[1] + D, Z0 = R[2] - D, Z1 = R[3] + D;
+      const gx = p ? p[0] - this.ox : 0, gz = p ? p[2] - this.oz : 1e9;   // (the gate: the panels nearest the player stay open)
+      const near = [];
+      const side = (L, rot, fx) => { const n = Math.max(1, Math.round(L / 2)), wd = L / n, enc = rot + 4 * Math.round(wd / 2 * 256); for (let i = 0; i < n; i++) { const q = fx(i * wd), mx = q[0] + (rot === 0 ? wd / 2 : rot === 2 ? -wd / 2 : 0), mz = q[1] + (rot === 1 ? -wd / 2 : rot === 3 ? wd / 2 : 0); near.push([(mx - gx) ** 2 + (mz - gz) ** 2, out.length]); const y = w && w.topAt ? w.topAt(Math.floor(this.ox + mx), Math.floor(this.oz + mz)) + 1 - this.oy : 0; out.push(q[0], Math.abs(y) < 6 ? y : 0, q[1], enc); } };
+      side(X1 - X0, 0, (d) => [X0 + d, Z1]); side(Z1 - Z0, 1, (d) => [X1, Z1 - d]); side(X1 - X0, 2, (d) => [X1 - d, Z0]); side(Z1 - Z0, 3, (d) => [X0, Z0 + d]);
+      near.sort((a, b) => a[0] - b[0]);
+      const gap = new Set(near.slice(0, 2).map(q => q[1]));
+      const keep = []; for (let i = 0; i < out.length; i += 4) if (!gap.has(i)) keep.push(out[i], out[i + 1], out[i + 2], out[i + 3]);
+      this.fenceInst = new Float32Array(keep);
     }
     // a point on the deck's walk around level k at s (0…1): out = [x, z, the yaw that faces the wall, the walk's length]
     ringPoint(k, s, out) {
@@ -605,9 +632,10 @@
       const yard = [bx + sx * 6 + out[0] / ol * 1.5, bz + sz * 6 + out[1] / ol * 1.5];
       const toC = Math.atan2(-(this.cz - bz), this.cx - bx);
       const mast = new Float32Array(n * 4); for (let i = 0; i < n; i++) { mast[i * 4] = bx - this.ox; mast[i * 4 + 1] = by - this.oy + i * 2; mast[i * 4 + 2] = bz - this.oz; mast[i * 4 + 3] = 0; }
-      this.crane = { bx, by, bz, n, mastTop, Lj, Lc, yard, yardY: (w && w.topAt ? w.topAt(Math.floor(yard[0]), Math.floor(yard[1])) + 1 : this.oy), mast,
+      this.crane = { slew0: Math.atan2(out[1], out[0]), bx, by, bz, n, mastTop, Lj, Lc, yard, yardY: (w && w.topAt ? w.topAt(Math.floor(yard[0]), Math.floor(yard[1])) + 1 : this.oy), mast,
         slew: toC, slewV: 0, slewT: toC, r: Lj * 0.5, rT: Lj * 0.5, hook: mastTop - 4, hookT: mastTop - 4, st: 'rest', tm: 0.5, load: false, col: [0.8, 0.8, 0.8],
-        sway: 0, swayV: 0, rise: 0, top: null, aimX: 0, aimZ: 0, aimY: 0 };
+        sway: 0, swayV: 0, rise: 0, top: null, aimX: 0, aimZ: 0, aimY: 0, segs: Math.min(n, 4), top0: mastTop };
+      this.crane.mastTop = by + this.crane.segs * 2; this.crane.hook = this.crane.hookT = this.crane.mastTop - 4;
     }
     // ---- events from the job
     start() {
@@ -633,10 +661,10 @@
         if (this.tiny) for (let i = 0; i < 24; i++) sparkle(P, x + (rnd() - 0.5) * 2, this.oy + rnd() * Math.max(1, this.H), z + (rnd() - 0.5) * 2);
         else confetti(P, x, y, z, [70, 140, 240][clamp((g.settings && g.settings.particles) | 0, 0, 2)], Math.max(4, (this.ring ? Math.max(this.ring[1] - this.ring[0], this.ring[3] - this.ring[2]) : 8) * 0.5));
       }
-      for (const b of this.crew) if (b.mode !== 'gone') { b.mode = 'cheer'; b.timer = 1.6 + rnd() * 0.4; }
+      for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } if (b.mode === 'walkin') { b.mode = 'leave'; continue; } b.mode = 'cheer'; b.timer = 1.6 + rnd() * 0.4; }
       if (g.ui && g.ui.hint && !this.tiny && this.site.kind !== 'blueprint') g.ui.hint(T('g.bau.done', { name: this.site.name }, '✨ {name} steht!', '✨ {name} is done!'), 2600);
     }
-    onCancel() { this.cancelT = 0; for (const b of this.crew) if (b.mode !== 'gone') { b.mode = 'ride'; b.timer = 0.8; } }
+    onCancel() { this.cancelT = 0; for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } b.mode = b.mode === 'walkin' ? 'leave' : 'ride'; b.timer = 0.8; } }
     // ---- every frame
     tick(dt) {
       const site = this.site; this.t += dt;
@@ -744,6 +772,10 @@
       // slewing (eased), the trolley, the hook; the load swings a little behind the jib's turn
       const err = wrapA(c.slewT - c.slew), want = clamp(err * 1.9, -0.62, 0.62), acc = (want - c.slewV) * Math.min(1, dt * 2.6);
       c.slewV += acc; c.slew = wrapA(c.slew + c.slewV * dt);
+      // (a climbing crane: the mast grows with the building, a few blocks over its deck; at the end it is all there)
+      const segs = building ? Math.min(c.n, Math.max(4, Math.ceil((this.oy + this.deck + 10 - c.by) / 2))) : c.n;
+      if (segs > c.segs) c.segs = segs;
+      c.mastTop = c.by + c.segs * 2;
       c.r += clamp(c.rT - c.r, -3.4 * dt, 3.4 * dt);
       const hv = Math.max(10, (c.mastTop - c.yardY) / 2);   // (a tall one hoists fast: the show is minutes of building in seconds)
       c.hook += clamp(c.hookT - c.hook, -hv * dt, hv * dt);
@@ -804,9 +836,9 @@
       if (this.gl === gl && this.vaos) return;
       this.gl = gl; const I = this.inst, V = this.vaos = {};
       const buf = (a) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, a.length ? a : new Float32Array(4), gl.STATIC_DRAW); return b; };
-      this.bufs = { bays: buf(I.bays), braces: buf(I.braces), corners: buf(I.corners) };
+      this.bufs = { bays: buf(I.bays), braces: buf(I.braces), corners: buf(I.corners), fence: buf(this.fenceInst || new Float32Array(0)) };
       V.bay = instVAO(gl, G.bay, this.bufs.bays); V.screen = instVAO(gl, G.screen, this.bufs.bays); V.deck = instVAO(gl, G.deck, this.bufs.bays);
-      V.brace = instVAO(gl, G.brace, this.bufs.braces); V.corner = instVAO(gl, G.corner, this.bufs.corners); V.deckCorner = instVAO(gl, G.deckCorner, this.bufs.corners);
+      V.fence = instVAO(gl, G.fence, this.bufs.fence); V.brace = instVAO(gl, G.brace, this.bufs.braces); V.corner = instVAO(gl, G.corner, this.bufs.corners); V.deckCorner = instVAO(gl, G.deckCorner, this.bufs.corners);
       if (this.crane) { this.bufs.mast = buf(this.crane.mast); V.mast = instVAO(gl, G.mast, this.bufs.mast); }
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
@@ -829,6 +861,7 @@
         drawInst(gl, V.corner, B.corners, G.corner, low * 4, top * 4);
         if (this.band < 1e9) drawInst(gl, V.screen, B.bays, G.screen, I.bayStart[Math.max(low, top - 3)], I.bayStart[top]);
       }
+      if (this.fenceInst && this.endT === undefined) drawInst(gl, V.fence, B.fence, G.fence, 0, this.fenceInst.length / 4);
       if (deckOn) {
         gl.uniformMatrix4fv(p.u.u_model, false, this.model(this.ox, this.oy + this.deck - kd * 2, this.oz, cam));
         drawInst(gl, V.deck, B.bays, G.deck, I.bayStart[kd], I.bayStart[kd + 1]);
@@ -838,7 +871,7 @@
     }
     drawCrane(r, E, cam, G) {
       const gl = r.gl, c = this.crane, P = r.P;
-      const shown = Math.max(1, Math.round(c.n * c.rise)), topY = c.by + shown * 2;
+      const shown = Math.max(1, Math.round(c.segs * c.rise)), topY = c.by + shown * 2;
       if (!VR.mat4.boxInFrustum(r.planes, c.bx - c.Lj - cam.x, c.by - cam.y, c.bz - c.Lj - cam.z, c.bx + c.Lj - cam.x, topY + 6 - cam.y, c.bz + c.Lj - cam.z)) return;
       this.ensureGL(r, G);
       // the mast (instanced segments)
@@ -872,6 +905,14 @@
       if (c.load) {
         this.one(gl, G.pallet, this.model(hx, hy - 1.95, hz, cam, c.slew));
         this.uniforms(gl, p, c.col); this.one(gl, G.cubes, this.model(hx, hy - 1.95, hz, cam, c.slew)); this.uniforms(gl, p, null);
+      }
+      // the piles at the yard (the loads come from there)
+      if (c.rise > 0.5) {
+        if (!c.pileCol) { c.pileCol = [0.8, 0.78, 0.74]; this.loadColor(c.pileCol); }
+        for (let i = 0; i < 2; i++) {
+          const px = c.yard[0] + (i ? 1.7 : -1.7) * Math.cos(c.slew0), pz = c.yard[1] + (i ? 1.7 : -1.7) * Math.sin(c.slew0), py = c.yardY + 0.12;
+          this.one(gl, G.pallet, this.model(px, py, pz, cam, c.slew0)); this.uniforms(gl, p, c.pileCol); this.one(gl, G.cubes, this.model(px, py, pz, cam, c.slew0)); this.uniforms(gl, p, null);
+        }
       }
       // the red light on top blinks
       if ((this.t % 1.2) < 0.55) this.one(gl, G.blink, this.model(c.bx, topY + 4.6, c.bz, cam));

@@ -27,6 +27,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 
 | File | Kind | Coverage | Typical (s) | Recorded runs | Release set |
 |---|---|---|---|---|---|
+| baustelle.js | node | 🏗 Baustelle: the order of a real build (removals top-down, then the fill and the structure bottom-up), 6–20 s, the finished world equals Sofort's, one undo step (also in the middle), a save in the middle finishes it, a crash rebuilds it, ⏩, guests told every cell, the show's deck, crew and crane, mesh windings. | 3 † | – | yes |
 | frame_cost.js | node | Main-thread budgets per frame: mesh scheduling, visibility walk, buildJob against the v0.39 loop (timing). | 6 † | – | no (timing) |
 | gen_same.js | node | Generated terrain is unchanged when the generator loops are tuned (hash of blocks, biomes and tints). | 7 † | – | yes |
 | genie_brain.js | node | The Genie without Claude: wishes become houses and things (geometry and words). | 4 (4–5) | 2/2 | yes |
@@ -55,6 +56,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | vx_cache.js | node | The mini-voxel painter's piece cache is bounded and keeps what is in use. | 5 † | – | yes |
 | vx_cells.js | node | The first packs' models are built from src/shared/voxcells.js and register as before. | 4 † | – | yes |
 | worker_jobs.js | node | Worker job handling in node with a fake self: a mesh job answers with the quads of meshSection. | 6 † | – | yes |
+| baustelle.mjs | browser | 🏗 Baustelle (German UI): /bau Hochhaus 20 Stockwerke grows in front of the player (scaffold, builders, crane, HUD), the same blocks as Sofort, one Z takes it back, ⏩ Fertig by mouse; screenshots baustelle_1..4 (10 / 40 / 80 % / done). | – | – | yes |
 | blocklook.mjs | browser | v0.39 block look: the same scene in Klassisch and Nahtlos (hill, stucco house, glass, mini-voxel cottage), switched live. | 312 (175–448) | 2/2 | yes |
 | blueprint.mjs | browser | Blueprints: /haus puts a villa in hand; the ghost lot sits on a slope; the build levels the ground; undo restores the land. | – | – | no |
 | bridge.mjs | browser | v0.39 the standalone Studio (another origin, own storage) and the game: banner, Zum Spiel, Mitnehmen, Speichern. | 750 (290–1209) | 2/4 | yes |
