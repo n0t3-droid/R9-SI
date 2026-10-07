@@ -31,21 +31,31 @@
       { k: 'r', label: 'Dach', min: 0, max: 1, def: 1 },
     ],
     styles: Object.keys(LS).map(id => ({ id, name: LS[id].name })),
-    lot: (P) => [P.params.p + 4, P.params.p + 5],
+    lot: (P) => lookLot(P.params.p),
     describe: (P) => [P.params.h + ' hoch', P.params.k ? 'massiv' : 'Gitter', 'Plattform ' + P.params.p].concat(P.params.r ? ['Dach'] : []),
   }, function (P, env) {
     const { h, k, p, r } = P.params, S = LS[P.style] || LS.holz;
-    const s = 5, W = p + 4, D = p + 5, dy = -1, K = Forge.kit(W, h + 10, D, dy);
-    const ox = (W - s) >> 1, oz = 2, cx = ox + 2, cz = oz + 2;              // the 5 × 5 shaft, one apron row in front
-    K.box(0, 0, 0, W - 1, 0, D - 1, 'grass_block'); K.box(ox - 1, 0, oz - 1, ox + s, 0, oz + s, k ? 'stone_bricks' : 'gravel'); K.box(cx - 1, 0, 0, cx + 1, 0, oz, 'paver_grey');
+    const s = 5, [W, D] = lookLot(p), dy = -1, K = Forge.kit(W, h + 10, D, dy);
+    const ox = (W - s) >> 1, oz = 3, cx = ox + 2, cz = oz + 2;              // the 5 × 5 shaft (the lattice's top), an apron in front
+    // a lattice leans in like the real ones: its legs stand on a 9 × 9 square and meet the 5 × 5 shaft at 70 % of the height
+    const hs = (y) => (k ? 2 : 2 + Math.round(2 * Math.max(0, 1 - y / Math.max(4, h * 0.7))));
+    K.box(0, 0, 0, W - 1, 0, D - 1, 'grass_block'); K.box(cx - hs(0) - 1, 0, cz - hs(0) - 1, cx + hs(0) + 1, 0, cz + hs(0) + 1, k ? 'stone_bricks' : 'gravel'); K.box(cx - 1, 0, 0, cx + 1, 0, cz - hs(0), 'paver_grey');
     K.box(0, 1, 0, W - 1, h + 9, D - 1, 0);
     const top = h;                                                         // the platform's floor row
     if (k === 0) {
-      // four legs, a ring every four rows, X bracing on every face
-      for (const [lx, lz] of [[ox, oz], [ox + 4, oz], [ox, oz + 4], [ox + 4, oz + 4]]) K.col(lx, lz, 1, top - 1, S.leg, S.legPr);
-      for (let y = 4; y < top; y += 4) for (let i = 1; i < 4; i++) { K.set(ox + i, y, oz, S.ring); K.set(ox + i, y, oz + 4, S.ring); K.set(ox, y, oz + i, S.ring); K.set(ox + 4, y, oz + i, S.ring); }
-      for (let y = 1; y < top - 1; y++) { const i = ((y - 1) % 4), a = 1 + (i < 2 ? i : 3 - i), bq = 3 - (i < 2 ? i : 3 - i); if (y % 4 === 0) continue; for (const q of [a, bq]) { K.set(ox + q, y, oz, S.brace, S.bracePr); K.set(ox + q, y, oz + 4, S.brace, S.bracePr); K.set(ox, y, oz + q, S.brace, S.bracePr); K.set(ox + 4, y, oz + q, S.brace, S.bracePr); } }
-      K.box(ox + 1, 1, oz, ox + 3, 2, oz, 0);                              // the way in at the front
+      // four leaning legs (a bend block where they step in), a ring every four rows, X bracing in every panel
+      for (let y = 1; y < top; y++) for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        K.set(cx + sx * hs(y), y, cz + sz * hs(y), S.leg, S.legPr);
+        if (hs(y + 1) !== hs(y) && y + 1 < top) K.set(cx + sx * hs(y + 1), y, cz + sz * hs(y + 1), S.leg, S.legPr);
+      }
+      const face = (y, a, b, name, pr) => { const q = hs(y); for (let i = a; i <= b; i++) { K.set(cx + i, y, cz - q, name, pr); K.set(cx + i, y, cz + q, name, pr); K.set(cx - q, y, cz + i, name, pr); K.set(cx + q, y, cz + i, name, pr); } };
+      for (let y = 4; y < top; y += 4) face(y, -hs(y) + 1, hs(y) - 1, S.ring);
+      for (let y = 1; y < top - 1; y++) {
+        if (y % 4 === 0) continue;
+        const q = hs(y), t = ((y - 1) % 4) / 2, span = 2 * q - 2, a = -q + 1 + Math.round(t * span), b = q - 1 - Math.round(t * span);
+        for (const i of [a, b]) { K.set(cx + i, y, cz - q, S.brace, S.bracePr); K.set(cx + i, y, cz + q, S.brace, S.bracePr); K.set(cx - q, y, cz + i, S.brace, S.bracePr); K.set(cx + q, y, cz + i, S.brace, S.bracePr); }
+      }
+      for (let y = 1; y <= 2; y++) K.box(cx - 1, y, cz - hs(y), cx + 1, y, cz - hs(y), 0);   // the way in at the front
     } else {
       K.shell(ox, 1, oz, ox + 4, top - 1, oz + 4, S.wall);
       for (let y = 4; y < top - 2; y += 5) { K.set(ox + 2, y, oz, 'vx_window_arch', { facing: 0 }); K.set(ox + 2, y, oz + 4, 'vx_window_arch', { facing: 2 }); K.set(ox, y, oz + 2, 'vx_window_arch', { facing: 3 }); K.set(ox + 4, y, oz + 2, 'vx_window_arch', { facing: 1 }); }
@@ -63,7 +73,7 @@
     for (const [x, z] of [[cx - half, cz - half], [cx + half, cz + half]]) K.set(x, top + 1, z, S.lamp);
     if (r) {
       const ry = top + 4;
-      for (const [x, z] of [[cx - half + 1, cz - half + 1], [cx + half - 1, cz - half + 1], [cx - half + 1, cz + half - 1], [cx + half - 1, cz + half - 1]]) K.col(x, z, top + 1, ry - 1, S.post, S.legPr);
+      for (const [x, z] of [[cx - half, cz - half], [cx + half, cz - half], [cx - half, cz + half], [cx + half, cz + half]]) K.col(x, z, top + 1, ry - 1, S.post, S.legPr);   // posts on the platform's corners (the stair keeps its way out)
       if (S.roof === 'vx_dome_glass') { for (let z = cz - half; z <= cz + half; z++) for (let x = cx - half; x <= cx + half; x++) K.set(x, ry, z, 'vx_tech_band'); K.set(cx, ry + 1, cz, 'vx_dome_glass'); }
       else {
         let rr = half + 1, y = ry;
@@ -73,9 +83,11 @@
         }
       }
     }
-    K.grid.meta = { name: 'Aussichtsturm', doors: [[k ? ox + 1 : ox + 2, 1 + dy, oz]], floors: [0, top + dy], top: (r ? top + 4 + half + 2 : top + 2) + dy, platform: top + dy, lot: [W, D], anchor: [cx, 0] };
+    K.grid.meta = { name: 'Aussichtsturm', doors: [[k ? ox + 1 : cx, 1 + dy, k ? oz : cz - hs(1)]], floors: [0, top + dy], top: (r ? top + 4 + half + 2 : top + 2) + dy, platform: top + dy, lot: [W, D], anchor: [cx, 0] };
     return K.grid;
   });
+  // the lookout's lot: room for the lattice's 9 × 9 foot (and the roof's overhang), an apron in front
+  function lookLot(p) { const half = (p + 2) >> 1; return [Math.max(p + 4, 9), 6 + Math.max(4, half + 1)]; }
 
   // ---------------------------------------------------------------- 🏛
   const HS = {
@@ -285,9 +297,9 @@
     styles: Object.keys(SS).map(id => ({ id, name: SS[id].name })),
     lot: (P) => [P.params.w, P.params.l],
     title: (P) => (P.params.k ? 'Leichtathletikstadion' : 'Fußballstadion'),
-    describe: (P) => [P.params.l + ' × ' + P.params.w, P.params.t + ' Ränge'].concat(P.params.r ? ['Dach'] : []),
+    describe: (P) => [P.params.l + ' × ' + P.params.w, tiersOf(P.params) + ' Ränge'].concat(P.params.r ? ['Dach'] : []),
   }, function (P, env) {
-    const { l, w, t, r, k } = P.params, S = SS[P.style] || SS.beton, rng = Forge.rng(P, 'stadium');
+    const { l, w, r, k } = P.params, t = tiersOf(P.params), S = SS[P.style] || SS.beton, rng = Forge.rng(P, 'stadium');
     const dy = -1, depth = 2 * t + 4, H = t + (r ? 8 : 3) + 2, K = Forge.kit(w, H + 16, l, dy);
     const px0 = depth, px1 = w - 1 - depth, pz0 = depth, pz1 = l - 1 - depth, cx = (w - 1) / 2, cz = (l - 1) / 2;
     K.box(0, 0, 0, w - 1, 0, l - 1, 'grass_block'); K.box(0, 1, 0, w - 1, H + 15, l - 1, 0);
@@ -333,4 +345,6 @@
     void rng;
     return K.grid;
   });
+  // as many tiers as the lot leaves a pitch for: at least 20 wide and 30 long inside the stands
+  function tiersOf(p) { return Math.max(2, Math.min(p.t, Math.floor(((p.w - 20) / 2 - 4) / 2), Math.floor(((p.l - 30) / 2 - 4) / 2))); }
 })(VR);

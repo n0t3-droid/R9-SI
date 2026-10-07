@@ -177,30 +177,36 @@
       }
       sideUnits(K, S, rng, IR, core, y, SH, k, apartments, rects[k], glassAt, info);
     }
-    // ---- the crown
+    // ---- the crown (never on the stair head and the way out of its door: the roof stays reachable)
     const rc = (RT[0] + RT[2]) >> 1, rv = (RT[1] + RT[3]) >> 1;
+    const head = (x, v) => x >= CU0 - 1 && x <= CU0 + 2 && v >= CV0 - 3 && v <= CV1 + 1;
+    const KC = (x, y, v, name, pr) => { if (!head(x, v)) K.set(x, y, v, name, pr); };
     if (c === 1) {
       // the roof garden: lawn islands, hedges, loungers, a sofa group, lamps
-      for (let v = rv; v <= RT[3] - 2; v++) for (let x = RT[0] + 2; x <= RT[2] - 2; x++) { if (x >= CU0 - 2 && x <= CU0 + 3 && v >= CV0 - 2) continue; if (x === rc || x === rc + 1) continue; K.set(x, roofY, v, 'grass_block'); }
+      for (let v = rv; v <= RT[3] - 2; v++) for (let x = RT[0] + 2; x <= RT[2] - 2; x++) { if (x >= CU0 - 2 && x <= CU0 + 3 && v >= CV0 - 2) continue; if (x === rc || x === rc + 1) continue; KC(x, roofY, v, 'grass_block'); }
       const px = RT[0] + 3, pv = RT[1] + 3;
-      if (K.fits('vm_garden_lounger_teak', px, roofY + 1, pv, 1)) K.model('vm_garden_lounger_teak', px, roofY + 1, pv, 1);
-      if (K.fits('vm_garden_lounger_teak', px, roofY + 1, pv + 2, 1)) K.model('vm_garden_lounger_teak', px, roofY + 1, pv + 2, 1);
-      if (K.fits('vm_garden_sofa_rope', RT[2] - 4, roofY + 1, RT[1] + 2, 2)) K.model('vm_garden_sofa_rope', RT[2] - 4, roofY + 1, RT[1] + 2, 2);
-      if (K.fits('vm_garden_firetable_concrete', RT[2] - 4, roofY + 1, RT[1] + 4, 0)) K.model('vm_garden_firetable_concrete', RT[2] - 4, roofY + 1, RT[1] + 4, 0);
-      for (const [x, v] of [[RT[0] + 2, RT[3] - 2], [RT[2] - 2, RT[3] - 2], [RT[0] + 2, RT[1] + 2], [RT[2] - 2, RT[1] + 2]]) if (K.get(x, roofY + 1, v) === 0) K.set(x, roofY + 1, v, 'vx_garden_lamp');
-      for (let x = RT[0] + 3; x <= RT[2] - 3; x += 4) if (K.get(x, roofY + 1, RT[3] - 3) === 0 && !(Math.abs(x - CU0 - 0.5) <= 3)) K.set(x, roofY + 1, RT[3] - 3, 'vx_bush');
+      const put = (name, x, v, f) => { if (!K.fits(name, x, roofY + 1, v, f)) return; for (const [dx, , dz] of VR.VM && VR.VM.MODELS[name] ? VR.VM.footprint(VR.VM.MODELS[name], f) : [[0, 0, 0]]) if (head(x + dx, v + dz)) return; K.model(name, x, roofY + 1, v, f); };
+      put('vm_garden_lounger_teak', px, pv, 1); put('vm_garden_lounger_teak', px, pv + 2, 1);
+      put('vm_garden_sofa_rope', RT[2] - 4, RT[1] + 2, 2); put('vm_garden_firetable_concrete', RT[2] - 4, RT[1] + 4, 0);
+      for (const [x, v] of [[RT[0] + 2, RT[3] - 2], [RT[2] - 2, RT[3] - 2], [RT[0] + 2, RT[1] + 2], [RT[2] - 2, RT[1] + 2]]) if (K.get(x, roofY + 1, v) === 0) KC(x, roofY + 1, v, 'vx_garden_lamp');
+      for (let x = RT[0] + 3; x <= RT[2] - 3; x += 4) if (K.get(x, roofY + 1, RT[3] - 3) === 0 && !(Math.abs(x - CU0 - 0.5) <= 3)) KC(x, roofY + 1, RT[3] - 3, 'vx_bush');
     } else if (c === 2) {
       // the helipad: a disc of landing pad with a hazard ring, lights at the corners
-      const r = Math.min(4, Math.floor(Math.min(RT[2] - RT[0], RT[3] - RT[1]) / 2) - 2), hx = rc, hv = Math.max(RT[1] + r + 1, rv - 2);
-      for (let v = hv - r - 1; v <= hv + r + 1; v++) for (let x = hx - r - 1; x <= hx + r + 1; x++) { const dd = Math.hypot(x - hx, v - hv); if (dd <= r - 0.5) K.set(x, roofY, v, 'landing_pad'); else if (dd <= r + 0.8) K.set(x, roofY, v, 'hazard_stripes'); }
-      for (const [x, v] of [[RT[0] + 1, RT[1] + 1], [RT[2] - 1, RT[1] + 1], [RT[0] + 1, RT[3] - 1], [RT[2] - 1, RT[3] - 1]]) K.set(x, roofY + 1, v, 'vx_lamppost_tech');
-      K.set(hx, roofY + 1, hv - r - 1, 'vx_lamppost_tech'); K.set(hx, roofY + 1, hv + r + 1, 'vx_lamppost_tech');
+      // (in front of the stair head when the roof is deep enough, else centred and cut around it)
+      const front = (CV0 - 4) - (RT[1] + 1) + 1, r = Math.max(2, Math.min(4, Math.floor(Math.min(RT[2] - RT[0] - 2, front >= 7 ? front : RT[3] - RT[1]) / 2) - 1));
+      const hx = rc, hv = front >= 2 * r + 3 ? RT[1] + 2 + r : Math.max(RT[1] + r + 1, rv - 2);
+      for (let v = hv - r - 1; v <= hv + r + 1; v++) for (let x = hx - r - 1; x <= hx + r + 1; x++) { const dd = Math.hypot(x - hx, v - hv); if (dd <= r - 0.5) KC(x, roofY, v, 'landing_pad'); else if (dd <= r + 0.8) KC(x, roofY, v, 'hazard_stripes'); }
+      for (const [x, v] of [[RT[0] + 1, RT[1] + 1], [RT[2] - 1, RT[1] + 1], [RT[0] + 1, RT[3] - 1], [RT[2] - 1, RT[3] - 1]]) KC(x, roofY + 1, v, 'vx_lamppost_tech');
+      KC(hx, roofY + 1, hv - r - 1, 'vx_lamppost_tech'); KC(hx, roofY + 1, hv + r + 1, 'vx_lamppost_tech');
     } else if (c === 3) {
       // the spire: a mast on a three-by-three base, a beacon on top
-      K.box(rc - 1, roofY + 1, rv - 1, rc + 1, roofY + 2, rv + 1, S.spandrel); K.col(rc, rv, roofY + 3, roofY + crownH - 1, 'black_metal'); K.set(rc, roofY + crownH, rv, 'vx_lamppost_tech'); K.set(rc, roofY + Math.round(crownH / 2), rv, 'neon_white');
-      for (const [x, v] of [[rc - 1, rv - 1], [rc + 1, rv + 1]]) K.set(x, roofY + 3, v, 'vx_lamppost_tech');
+      // (in the middle of the roof, or in front of the stair head when that is where the middle is)
+      const sv = head(rc - 1, rv + 2) || head(rc + 1, rv + 2) ? Math.max(RT[1] + 2, CV0 - 5) : rv;
+      for (let v = sv - 1; v <= sv + 1; v++) for (let x = rc - 1; x <= rc + 1; x++) { KC(x, roofY + 1, v, S.spandrel); KC(x, roofY + 2, v, S.spandrel); }
+      K.col(rc, sv, roofY + 3, roofY + crownH - 1, 'black_metal'); K.set(rc, roofY + crownH, sv, 'vx_lamppost_tech'); K.set(rc, roofY + Math.round(crownH / 2), sv, 'neon_white');
+      for (const [x, v] of [[rc - 1, sv - 1], [rc + 1, sv + 1]]) KC(x, roofY + 3, v, 'vx_lamppost_tech');
     } else {
-      for (const [x, v] of [[RT[0] + 1, RT[1] + 1], [RT[2] - 1, RT[1] + 1], [RT[0] + 1, RT[3] - 1], [RT[2] - 1, RT[3] - 1]]) K.set(x, roofY + 1, v, 'vx_tech_planter');
+      for (const [x, v] of [[RT[0] + 1, RT[1] + 1], [RT[2] - 1, RT[1] + 1], [RT[0] + 1, RT[3] - 1], [RT[2] - 1, RT[3] - 1]]) KC(x, roofY + 1, v, 'vx_tech_planter');
     }
     // ---- the forecourt: bollards, planters, lamps, a bike rack
     const dcu = (rects[0][0] + rects[0][2]) >> 1;
