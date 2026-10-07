@@ -26,6 +26,9 @@ try {
   // Balanced for the look (a two-core machine boots on Very Low, which has no wet ground); the audio starts as a click would start it
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.renderDist = 7; g.settings.dynRes = false; g.applySettings('renderDist'); g.audio.resume(); });
   await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.setTime(6000); });
+  // the test drives the loop itself: game.loop() schedules its own animation frame, so every manual call would start
+  // another chain of frames; the browser's own chain is ended here (its last callback finds no requestAnimationFrame)
+  await ev(() => { window.requestAnimationFrame = () => 0; });
 
   // the game loop without drawing (the world, the sky, the sound and the rain's bookkeeping all run); the
   // renderer's render() is skipped while window.__norender is set, as in smoke.mjs
@@ -81,8 +84,9 @@ try {
   await ev((w) => VR.game.chat('/wetter ' + w), 'gewitter');
   await loops(360);
   const b0 = await state();
-  const w = await watch(1200);                  // 60 s of game time
-  check(w.strikes - b0.strikes >= 2, `gewitter: ${w.strikes - b0.strikes} bolts in 60 s (every 8–25 s)`);
+  const w = await watch(1800);                  // 60 s of game time
+  const bolts = w.strikes - b0.strikes;
+  check(bolts >= 2 && bolts <= 9, `gewitter: ${bolts} bolts in 60 s (every 8–25 s: 2 to 9 in a minute)`);
   check(w.maxFlash > 0.3, `gewitter: the sky flashes (highest flash ${w.maxFlash.toFixed(2)})`);
   check(w.thunders > b0.thunders, `gewitter: thunder is heard (${w.thunders - b0.thunders} rumbles)`);
 
