@@ -84,7 +84,7 @@
     'g.hud.shotNote': 'Rechtsklick aufs Bild → Bild speichern · Klick schließt',
     'g.hud.fps': '{n} fps',
     // ---- Pause-Menü
-    'g.pause.title': '⏸ Pause',
+    'g.pause.title': 'Pause',
     'g.pause.resume': '▶ Weiterspielen',
     'g.pause.bauen': '🏗 Bauen',
     'g.pause.bauenTip': 'Häuser und Möbel auf die Karte setzen — das Spiel baut sie',

@@ -84,7 +84,7 @@
     'g.hud.shotNote': 'Right-click the picture → Save image · click to close',
     'g.hud.fps': '{n} fps',
     // ---- pause menu
-    'g.pause.title': '⏸ Paused',
+    'g.pause.title': 'Paused',
     'g.pause.resume': '▶ Play on',
     'g.pause.bauen': '🏗 Build',
     'g.pause.bauenTip': 'Place houses and furniture on the map — the game builds them',
