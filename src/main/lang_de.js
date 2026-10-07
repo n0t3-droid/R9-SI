@@ -899,5 +899,7 @@
     'g.zr.days': 'in {d} Tagen',
     'g.zr.built': 'Gebaut in R9-SI',
     'g.zr.keys': 'Leertaste ⏯ · ← → spulen · + − Tempo · Esc zurück',
+    'g.zr.tipT': '📽 Zeitraffer',
+    'g.zr.tip': 'Sieh zu, wie es entstand — Pause-Menü (Esc) → 📽 Zeitraffer',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

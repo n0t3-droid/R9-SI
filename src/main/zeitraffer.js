@@ -415,6 +415,13 @@
     Z.pending = { t: 0, from: null, id: w.id };
     g.loadWorld(w);
   };
+  // once a session has some building in it: one toast says where the time-lapse is (once per world session)
+  Z.tip = function (g) {
+    const r = g.zeitRec; if (!r || r.tipped || r.count < 300 || (g.ui && g.ui.screen) || !(g.ui && g.ui.toast)) return;
+    r.tipped = true;
+    if (g.settings && g.settings.toasts === false) return;
+    g.ui.toast(tx('g.zr.tipT', null, '📽 Zeitraffer', '📽 Time-lapse'), tx('g.zr.tip', null, 'Sieh zu, wie es entstand — Pause-Menü (Esc) → 📽 Zeitraffer', 'Watch how it came to be — pause menu (Esc) → 📽 Time-lapse'));
+  };
   Z.poll = function (g, dt) {
     const P = Z.pending; if (!P) return;
     if (P.id && g.meta && g.meta.id !== P.id) { Z.pending = null; return; }
@@ -637,7 +644,7 @@
     const saveMeta = G.saveMeta;
     G.saveMeta = function () { if (this.zeitRec) this.zeitRec.flush(); return saveMeta.call(this); };
     const playFrame = G.playFrame;
-    G.playFrame = function (dt) { if (Z.active) { Z.frame(this, dt); return; } if (Z.pending) Z.poll(this, dt); return playFrame.call(this, dt); };
+    G.playFrame = function (dt) { if (Z.active) { Z.frame(this, dt); return; } if (Z.pending) Z.poll(this, dt); if (this.zeitRec && !this.zeitRec.tipped) Z.tip(this); return playFrame.call(this, dt); };
     // /zeitraffer (Profi, like every command)
     const chat = G.chat;
     G.chat = function (text) {

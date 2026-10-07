@@ -899,5 +899,7 @@
     'g.zr.days': 'in {d} days',
     'g.zr.built': 'Built in R9-SI',
     'g.zr.keys': 'Space ⏯ · ← → scrub · + − speed · Esc back',
+    'g.zr.tipT': '📽 Time-lapse',
+    'g.zr.tip': 'Watch how it came to be — pause menu (Esc) → 📽 Time-lapse',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
