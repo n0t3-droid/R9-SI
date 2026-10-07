@@ -246,5 +246,112 @@ console.log('f · the axis guide');
   check(M.GUIDE_FLOATS <= 4 * 18 * 3 + 64, 'the guide buffer is small (' + M.GUIDE_FLOATS + ' floats)');
 }
 
+console.log('g · in the game: the hand, its copies, the world edit path (src/main/mirrorbuild.js on a small fake world)');
+{
+  globalThis.window = globalThis; globalThis.document = { getElementById: () => null, addEventListener() {} };
+  for (const f of ['place', 'player', 'mirrorbuild', 'game']) require(ROOT + '/src/main/' + f + '.js');
+  // a fake world with the game's listener chain (a guest / the host would send what onBlockChanged hears)
+  const blocks = new Map(), K = (x, y, z) => x + ',' + y + ',' + z, sent = [];
+  const world = {
+    listeners: [{ onBlockChanged: (x, y, z, old, s) => sent.push([x, y, z, s]) }],
+    getBlock: (x, y, z) => blocks.get(K(x, y, z)) || 0,
+    setBlock(x, y, z, s, flags) { const old = this.getBlock(x, y, z); if (old === s) return false; if (s) blocks.set(K(x, y, z), s); else blocks.delete(K(x, y, z)); if (!(flags & 2)) for (const l of this.listeners) l.onBlockChanged(x, y, z, old, s); return true; },
+    getLight: () => 0, col: () => ({}), isLoaded: () => true,
+  };
+  const sounds = { place: 0, dig: 0 }, hints = [];
+  const game = {
+    world, settings: {}, state: 'play', mp: null,
+    audio: { play() {}, place() { sounds.place++; }, dig() { sounds.dig++; } }, particles: { breakBlock() {}, hitBlock() {} },
+    ui: { blocking: false, chatLine() {}, hint: (t) => hints.push(String(t)) },
+    entityBlocks: () => false, breakMulti: VR.Game.prototype.breakMulti,
+  };
+  const p = game.player = new VR.Player(game);
+  p.mode = 'creative'; p.pos = [10.5, 64, 22.5];
+  const mb = game.mirror = new VR.MirrorBuild(game);
+  const Y = 64, st = (n) => R.byName[n].defaultState;
+  const floor = () => { blocks.clear(); for (let x = -2; x <= 22; x++) for (let z = -2; z <= 24; z++) blocks.set(K(x, Y - 1, z), st('stone')); };
+  const look = (pt) => { const e = p.eyePos(), d = [pt[0] - e[0], pt[1] - e[1], pt[2] - e[2]]; p.yaw = Math.atan2(-d[0], -d[2]); p.pitch = Math.atan2(d[1], Math.hypot(d[0], d[2])); };
+  // the hand places `name` on top of the floor block (x, Y-1, z), the player looking north (stairs and doors face north)
+  const place = (name, x, z, top) => { p.yaw = 0; p.pitch = -0.5; const y = top === undefined ? Y - 1 : top, s = blocks.get(K(x, y, z)) || 0; return p.placeFromHit(R.byName[name], { x, y, z, face: 2, state: s, px: x + 0.5, py: y + 1, pz: z + 0.5 }); };
+  const at = (x, y, z) => { const s = world.getBlock(x, y, z); return s ? P(s) : null; };
+  const nOf = (name) => { let n = 0; const id = R.byName[name].id; for (const s of blocks.values()) if (R.T.type[s] === id) n++; return n; };
+  floor();
+  // the centre: the top of block (10, 63, 10) in its middle → on the block; near its west edge → between 9 and 10
+  look([10.5, Y, 10.5]); mb.set('xz');
+  check(mb.mode === 'xz' && mb.c2x === 21 && mb.c2z === 21 && mb.gy === Y, 'switched on, the centre is the block pointed at (doubled 21, 21; the guide on its top, y ' + mb.gy + ')');
+  look([10.06, Y, 10.5]); mb.set('x', true);
+  check(mb.c2x === 20 && mb.c2z === 21, 'aimed near its west edge: between blocks 9 and 10 in x (' + mb.c2x + ', ' + mb.c2z + ')');
+  look([10.5, Y, 10.5]); mb.set('xz', true);
+  // stairs: 4-fach → four, facings mirrored, the hand's sound once, every copy through world.setBlock (sent like any edit)
+  sent.length = 0; sounds.place = 0;
+  check(place('oak_stairs', 12, 13) === true, 'the hand places a stair');
+  const sf = [[12, 13], [8, 13], [12, 7], [8, 7]].map(([x, z]) => at(x, Y, z));
+  check(sf.every(s => s && s.name === 'oak_stairs'), '4-fach: four stairs (12|13, 8|13, 12|7, 8|7)');
+  check(sf.map(s => s && s.facing).join(' ') === 'north north south south', 'their facings: north, north (X), south (Z), south (half turn) — ' + sf.map(s => s && s.facing).join(' '));
+  check(sent.length === 4 && sounds.place === 1, 'four world edits that go out like any edit (' + sent.length + '), one sound (' + sounds.place + ')');
+  // a door: four whole doors, the hinge mirrored
+  sent.length = 0;
+  check(place('oak_door', 13, 12) === true, 'the hand places a door');
+  const dd = [[13, 12], [7, 12], [13, 8], [7, 8]].map(([x, z]) => [at(x, Y, z), at(x, Y + 1, z)]);
+  check(dd.every(([a, b]) => a && b && a.name === 'oak_door' && b.name === 'oak_door' && a.half === 'bottom' && b.half === 'top' && a.facing === b.facing && a.hinge === b.hinge), '4-fach: four doors, each with both halves');
+  check(dd.map(([a]) => a.facing + '/' + a.hinge).join(' ') === 'north/left north/right south/right south/left', 'door facings and hinges: north/left, north/right (X), south/right (Z), south/left (half turn) — ' + dd.map(([a]) => a && a.facing + '/' + a.hinge).join(' '));
+  check(sent.length === 8, 'eight door cells went out (' + sent.length + ')');
+  // breaking one copy takes the other three too (the mirror of a copy is the original and the other copies)
+  sounds.dig = 0;
+  p.breakBlock(8, Y, 7, world.getBlock(8, Y, 7), false, true);
+  check(nOf('oak_stairs') === 0 && sounds.dig === 1, 'breaking one stair (a copy) breaks all four, one sound (' + nOf('oak_stairs') + ' left)');
+  p.breakBlock(7, Y + 1, 12, world.getBlock(7, Y + 1, 12), false, true);
+  check(nOf('oak_door') === 0, 'breaking a door\'s upper half breaks all four doors, both halves (' + nOf('oak_door') + ' cells left)');
+  // a blaster's break is not mirrored (only the hand's)
+  place('stone_bricks', 12, 13); p.breakBlock(12, Y, 13, world.getBlock(12, Y, 13), true);
+  check(nOf('stone_bricks') === 3, 'a break that is not by hand (a blaster\'s) is not mirrored (3 copies stay)');
+  floor();
+  // skipped copies: a cell taken by another block, the player standing in one; a stair placed into the gap later
+  blocks.set(K(8, Y, 13), st('oak_planks')); p.pos = [12.5, Y, 7.5]; sent.length = 0; const sk = mb.stats.skipped;
+  place('oak_stairs', 12, 13);
+  check(at(8, Y, 13).name === 'oak_planks' && !at(12, Y, 7) && at(8, Y, 7) && at(8, Y, 7).name === 'oak_stairs' && mb.stats.skipped === sk + 2, 'a copy never overwrites another block and never lands in the player (2 skipped, 1 placed)');
+  p.pos = [10.5, Y, 22.5];
+  // a slab on a slab: the copies become double slabs too
+  floor(); mb.set('x');
+  place('oak_slab', 12, 13);
+  check(at(8, Y, 13) && at(8, Y, 13).type === 'bottom', 'X: a slab and its copy');
+  p.placeFromHit(R.byName.oak_slab, { x: 12, y: Y, z: 13, face: 2, state: world.getBlock(12, Y, 13), px: 12.5, py: Y + 0.5, pz: 13.5 });
+  check(at(12, Y, 13).type === 'double' && at(8, Y, 13).type === 'double', 'a slab on the slab: both double');
+  // 8-fach: eight blocks; a sofa (VM model) in 4-fach: four whole sofas
+  floor(); mb.set('r8');
+  place('stone_bricks', 12, 13);
+  check(nOf('stone_bricks') === 8, '8-fach: eight blocks from one (' + nOf('stone_bricks') + ')');
+  floor(); mb.set('xz');
+  place('vm_sofa_charcoal', 13, 14);
+  check(nOf('vm_sofa_charcoal') === 12, '4-fach: a 3-wide sofa four times, whole (' + nOf('vm_sofa_charcoal') + ' cells)');
+  // far from the centre (more than 96 blocks along x or z): nothing is mirrored, a hint says why
+  floor(); blocks.set(K(130, Y - 1, 13), st('stone')); hints.length = 0;
+  place('stone_bricks', 130, 13);
+  check(nOf('stone_bricks') === 1 && hints.some(h => /Spiegel|mirror/.test(h)), 'an edit 120 blocks from the centre is not mirrored, a hint says so');
+  // off: single again; Überleben: no copies, the mode switches off, the key gives the kind hint
+  floor(); mb.set(null);
+  place('oak_stairs', 12, 13);
+  check(nOf('oak_stairs') === 1 && mb.guide() === null, 'aus: one stair, no guide');
+  look([10.5, Y, 10.5]); mb.set('xz'); const G = mb.guide();
+  check(G && G.parts[0].n === 12 && G.parts[1].n === 12 && G.parts[2].n === 12 && G.ox === 10.5 && G.oz === 10.5 && G.oy === Y, 'on: the guide (2 lines × halo, core, plane) stands at the centre on the ground');
+  const v0 = G.ver; mb.update(0.1); mb.guide();
+  check(G.ver === v0 && mb.guide() === G, 'every frame the same guide object, not rebuilt (no allocation per frame)');
+  p.mode = 'survival'; floor();
+  place('oak_stairs', 12, 13);
+  check(nOf('oak_stairs') === 1, 'Überleben: no copies');
+  mb.update(0.1);
+  check(mb.mode === null, 'in Überleben the mirror goes off');
+  hints.length = 0; mb.key();
+  check(mb.mode === null && hints.length === 1 && /Kreativ|Creative/.test(hints[0]), 'the key in Überleben: a kind hint (' + hints[0] + ')');
+  p.mode = 'creative'; mb.command(['8']);
+  check(mb.mode === 'r8', '/spiegel 8 → 8-fach');
+  mb.command(['aus']);
+  check(mb.mode === null, '/spiegel aus → off');
+  mb.key(); mb.key(); mb.key();
+  check(mb.mode === 'xz', 'the key three times: X → Z → 4-fach');
+  mb.key(); mb.key();
+  check(mb.mode === null, 'two more: 8-fach → aus');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

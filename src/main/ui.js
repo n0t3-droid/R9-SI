@@ -263,6 +263,7 @@
         case 'zenTime': g.zenFreezeTime = !g.zenFreezeTime; this.buildZenPanel(); break;
         case 'zenWeather': g.zenFreezeWeather = !g.zenFreezeWeather; if (g.zenFreezeWeather) { g.env.rainTarget = 0; } this.buildZenPanel(); break;
         case 'zenNoclip': g.player.noclip = !g.player.noclip; if (g.player.noclip) g.player.flying = true; this.buildZenPanel(); break;
+        case 'mirror': if (g.mirror) g.mirror.cycle(); this.buildZenPanel(); break;   // 🪞 the next mirror mode (the centre: where you were looking)
       }
     }
     resume() { this.show(null); const g = this.game; g.input.captured = true; g.input.requestLock(); }
@@ -466,6 +467,7 @@
         <div class="row gap"><button class="btn small${on(g.zenFreezeTime)}" data-act="zenTime" style="flex:1">${esc(T(g.zenFreezeTime ? 'g.zen.timeOn' : 'g.zen.timeOff'))}</button>
         <button class="btn small${on(g.zenFreezeWeather)}" data-act="zenWeather" style="flex:1">${esc(T(g.zenFreezeWeather ? 'g.zen.wxOn' : 'g.zen.wxOff'))}</button>
         <button class="btn small${on(g.player.noclip)}" data-act="zenNoclip" style="flex:1">${esc(T(g.player.noclip ? 'g.zen.ghostOn' : 'g.zen.ghostOff'))}</button></div>
+        ${g.mirror ? `<button class="btn small${on(g.mirror.mode)}" data-act="mirror" title="${esc(T('g.mirror.tip'))}">${esc(g.mirror.pauseLabel())}</button>` : ''}
         <div class="field"><label>${esc(T('g.zen.tod'))}</label><input type="range" min="0" max="23999" step="100" id="zentod" value="${Math.round(g.env.timeOfDay)}"></div>`;
       $('#zentod').oninput = (e) => { g.env.setTime(+e.target.value); };
     }
