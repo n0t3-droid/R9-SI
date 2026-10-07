@@ -409,6 +409,7 @@ void main() {
 
   S.TERRAIN_FS = `
 uniform float u_mipScale;
+uniform float u_wet;
 uniform sampler2DArray u_albedo;
 uniform sampler2DArray u_material;
 uniform sampler2D u_noise;
@@ -570,6 +571,8 @@ void main() {
   vec3 direct = lc * ndl * sh * outdoors;
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
+  // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
+  if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
   vec3 col = alb.rgb * lighting;
 #ifndef LITE
   // specular highlights (sun glints on smooth surfaces)

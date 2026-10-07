@@ -8,15 +8,17 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true },
-    low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false },
-    balanced: { renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false },
-    high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false },
-    ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false },
+    potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false },
+    low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true },
+    balanced: { renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true },
+    high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true },
+    ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic' }, PRESETS.balanced);
+  // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
+  // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -46,7 +48,7 @@
     applyPreset(p) { this.settings.preset = p; Object.assign(this.settings, PRESETS[p]); this.applySettings('*'); this.saveSettings(); }
     applySettings(key) {
       const S = this.settings, r = this.renderer;
-      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite'].includes(key)) S.preset = 'custom';
+      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround'].includes(key)) S.preset = 'custom';
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -60,6 +62,9 @@
       if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
       if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; }
       if (this.audio) this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient });
+      // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
+      if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
+      if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
       if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
@@ -175,6 +180,8 @@
       this.input = new VR.Input(this.canvas);
       this.audio = new VR.Audio();
       this.env = new VR.Env();
+      this.ambience = VR.Ambience ? new VR.Ambience(this.audio) : null;
+      this.env.wx.onThunder = (d) => { if (this.ambience) this.ambience.thunder(d); };
       this.store = new VR.Store();
       this.ui = new VR.UI(this);
       this.mp = VR.MP ? new VR.MP(this) : null;
@@ -256,6 +263,7 @@
       this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5 }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
       this.world.fancyLeaves = this.settings.fancyLeaves;
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
+      this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
       this.env.setTime(12800 + Math.random() * 1200); // golden hour → dusk: planets rising
       this.pool.direct(0, { type: 'spawn', dim: 'overworld' }, null, (m) => {
         const p = m.pos || [0.5, 100, 0.5];
@@ -308,6 +316,7 @@
       this.player.mode = meta.mode;
       this.env.setTime(meta.time || 1000);
       this.env.day = meta.day || 0;
+      this.env.wx.setSeed(meta.seed);                   // the world's weather: the same for the host and every guest
       this.zenFreezeTime = !!meta.zenFreezeTime; this.zenFreezeWeather = !!meta.zenFreezeWeather;
       const entry = this.pendingEntry || 'title'; this.pendingEntry = null;
       if (meta.player) this.player.load(meta.player);
@@ -497,7 +506,8 @@
       this.world.fancyLeaves = this.settings.fancyLeaves;
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
-      this.env.setTime(meta.time); this.env.day = meta.day; this.env.rainTarget = +wel.rain || 0;
+      this.env.setTime(meta.time); this.env.day = meta.day;
+      this.env.wx.setSeed(meta.seed); this.env.wx.force(VR.WX.KINDS.includes(wel.wx) ? wel.wx : null);   // the host's forced weather, if any
       this.zenFreezeTime = false; this.zenFreezeWeather = false;
       const sp = Array.isArray(wel.spawn) ? wel.spawn : [0.5, 100, 0.5, 0, 0];
       this.player.teleport(sp[0] + 1.2, sp[1], sp[2] + 0.6);
@@ -719,7 +729,7 @@
       const b = w ? VR.BIOMES[w.biomeAt(Math.floor(pos[0]), Math.floor(pos[2]))] : null;
       const eye = w ? w.getLight(Math.floor(pos[0]), Math.floor(pos[1]), Math.floor(pos[2])) : 0xf000;
       const hz = this.horizon && this.horizon.enabled() ? this.horizon.radius : 0;
-      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather }, extra || {}));
+      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather }, extra || {}));
     }
     titleFrame(dt) {
       const c = this.titleCam, w = this.world;
@@ -843,7 +853,7 @@
       const crack = p.breaking && t ? { x: t.x, y: t.y, z: t.z, boxes: t.boxes || VR.PHYS.selection(t.state), layer: R.texIndex['destroy#' + Math.min(9, Math.floor(p.breaking.p * 10))] } : null;
       // precipitation (heights around camera)
       let precip = null;
-      if (E.rain > 0.01 && (this.dim === 'overworld' || this.dim === 'drift')) {
+      if ((E.rain > 0.01 || E.snow > 0.01) && (this.dim === 'overworld' || this.dim === 'drift')) {
         // height field for rain occlusion: refreshed when the camera moved a few blocks or every ~20 frames
         if (!this.hmap) { this.hmap = new Uint8Array(128 * 128); this.hmapAt = null; }
         let dirty = false;
@@ -853,9 +863,12 @@
           this.hmapAt = [hx, hz]; dirty = true;
         }
         const b = VR.BIOMES[w.biomeAt(Math.floor(cam.x), Math.floor(cam.z))];
-        const snow = b && (b.precip === 'snow' || (b.temp - Math.max(0, cam.y - 90) * 0.0025) < 0.15);
+        // snow where the weather says snow, and where it is cold enough for rain to fall as snow
+        const coldHere = b && (b.precip === 'snow' || (b.temp - Math.max(0, cam.y - 90) * 0.0025) < 0.15);
         const dry = b && b.precip === 'none';
-        precip = { amount: dry ? 0 : E.rain, snow, heights: this.hmap, hx: this.hmapAt[0], hz: this.hmapAt[1], hox: this.hmapAt[0], hoz: this.hmapAt[1], dirty };
+        const snow = E.snow > E.rain || (coldHere && E.rain > 0.01);
+        // the particle budget follows the Particles setting: Very Low draws about a third of the drops
+        precip = { amount: dry ? 0 : Math.max(E.rain, E.snow), snow, budget: [0.3, 0.6, 1][S.particles | 0] || 1, heights: this.hmap, hx: this.hmapAt[0], hz: this.hmapAt[1], hox: this.hmapAt[0], hoz: this.hmapAt[1], dirty };
       }
       this.damageFlash = Math.max(0, this.damageFlash - dt * 2.5);
       // R9 Smart Quality: keeps the picture sharp when the frame rate drops
@@ -872,8 +885,8 @@
       });
       if (this.cockpit) this.cockpit.updateHud(dt);
       // audio
-      this.audio.loop('rain', precip && !precip.snow ? E.rain * 0.35 : 0);
-      this.audio.loop('wind', Math.max(0, (cam.y - 90) / 120) * 0.25 + (p.flying ? Math.hypot(p.vel[0], p.vel[2]) / 40 : 0));
+      // ambience (ambience.js): the wind, the rain and thunder, the birds, crickets and water of this place
+      if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0, underwater: underwater || inLava });
       const skyAtEye = (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12);
       this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true });
       // HUD
@@ -894,7 +907,8 @@
       return `R9-SI  ${Math.round(this.fps || 0)} fps  scale ${Math.round(r.q.scale * 100)}%  js ${(this.jsMs || 0).toFixed(1)} ms${r.gpuMs !== undefined ? '  gpu ' + r.gpuMs.toFixed(1) + ' ms' : ''}  smart ${aq.stack ? 'G' + aq.g + ' C' + aq.c + (aq.gpuBound ? ' gpu-bound' : aq.cpuBound ? ' cpu-bound' : '') : 'off'}\n` +
         `XYZ ${p.pos[0].toFixed(2)} / ${p.pos[1].toFixed(2)} / ${p.pos[2].toFixed(2)}\nChunk ${x >> 4} ${z >> 4}  Facing ${['N', 'E', 'S', 'W'][VR.Place.playerFacing(p.yaw)]}\n` +
         `Biome ${b ? b.name : '?'}  Light sky ${l >>> 12} rgb ${(l >> 8) & 15},${(l >> 4) & 15},${l & 15}\n` +
-        `Time ${Math.floor(this.env.timeOfDay)} day ${this.env.day}  rain ${E.rain.toFixed(2)}\n` +
+        `Time ${Math.floor(this.env.timeOfDay)} day ${this.env.day}  rain ${E.rain.toFixed(2)}  snow ${E.snow.toFixed(2)}  wind ${E.wind.toFixed(1)}\n` +
+        `Weather ${this.env.wx.info()}  fog ${this.env.wx.v.fog.toFixed(2)}  bolts ${this.env.wx.strikes}  slot ends in ${Math.max(0, Math.round((this.env.wx.slotEnd - this.env.wx.ticks) / 1200))} min` + (this.ambience ? `\nAmbience ${this.ambience.info()}` : '') + '\n' +
         `Sections ${r.stats.sections} draws ${r.stats.draws} tris ${(r.stats.tris / 1000).toFixed(0)}k  GPU ${r.gpuMemoryMB().toFixed(0)} MB\n` +
         `Columns ${w.cols.size} pending ${w.pending.size} jobs ${this.pool.busy}` + (this.horizon && this.horizon.enabled() ? `  Horizon ${this.horizon.stats.tiles} tiles ${this.horizon.stats.drawn} drawn ${(this.horizon.stats.tris / 1000).toFixed(0)}k tris ${this.horizon.stats.mb.toFixed(0)} MB` : '') + '\n' +
         (ts ? `Target ${ts.name} ${JSON.stringify(ts.decode(t.state))}` : '');
@@ -1074,6 +1088,20 @@
       const info = I.langs.find(l => l[0] === code);
       say(info ? T('g.cmd.langSoon', { name: info[1] }) : T('g.cmd.lang', { name: T('g.lang.name') }), '#ffd27a');
     }
+    // /wetter <klar|bewölkt|nebel|regen|gewitter|schnee|auto>: the sky now, or auto = the world's own schedule again
+    wetterCommand(a) {
+      const say = (m, c) => this.ui.chatLine(m, c || '#cfe6ff'), wx = this.env.wx;
+      if (this.mp && this.mp.isClient) { say('Das Wetter bestimmt der Gastgeber.', '#ffcf8a'); return; }
+      const word = (a || []).join(' ').trim();
+      if (!word) { say('Wetter: ' + wx.info() + ' · /wetter klar|bewölkt|nebel|regen|gewitter|schnee|auto'); return; }
+      const kind = VR.WX.parse(word);
+      if (kind === null) { say('Das Wetter kenne ich nicht. Nimm: klar · bewölkt · nebel · regen · gewitter · schnee · auto', '#ff8a8a'); return; }
+      if (kind === 'auto') { wx.force(null); say('Wetter: wie es der Zeitplan der Welt will.'); return; }
+      wx.force(kind);
+      const shown = wx.clamp(kind);     // the Wetter setting (Audio › Atmosphäre) wins over the command
+      say('Wetter: ' + VR.WX.label(shown));
+      if (shown !== kind) say('Die Einstellung Wetter (Audio › Atmosphäre) lässt nur ' + VR.WX.label(shown) + ' zu.', '#ffcf8a');
+    }
     chat(text) {
       if (!text.startsWith('/')) { if (this.mp && this.mp.active) this.mp.chat(text); else this.ui.chatLine('<' + T('g.chat.you') + '> ' + text); return; }
       { // commands everyone may use, cheats or not
@@ -1096,7 +1124,7 @@
       switch (cmd) {
         case 'help': say(T('g.cmd.help1')); say(T('g.cmd.help2')); say(T('g.cmd.help3')); say(T('g.cmd.help4')); say(T('g.cmd.help5')); say(T('g.cmd.helpHome')); break;
         case 'time': { const v = a[0] === 'set' ? a[1] : a[0]; const n = TIMES[v] !== undefined ? TIMES[v] : parseInt(v, 10); if (!isNaN(n)) { this.env.setTime(n); say(T('g.cmd.time', { n })); } break; }
-        case 'weather': if (a[0] === 'clear') { this.env.rainTarget = 0; this.env.rain = 0; } else if (a[0] === 'rain' || a[0] === 'thunder') { this.env.rainTarget = 1; this.env.thunder = a[0] === 'thunder' ? 1 : 0; this.env.weatherTimer = 12000; } say(T('g.cmd.weather', { w: a[0] })); break;
+        case 'wetter': case 'weather': this.wetterCommand(a); break;
         case 'gamemode': case 'gm': { const m = { s: 'survival', c: 'creative', z: 'zen', 0: 'survival', 1: 'creative', survival: 'survival', creative: 'creative', zen: 'zen' }[a[0]]; if (m) { p.setMode(m); say(T('g.cmd.gamemode', { m: T('g.mode.' + m) })); } break; }
         case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); if (p.teleport(v[0], v[1], v[2])) say(T('g.cmd.tp')); else say(T('g.cmd.tpBad'), '#ff8a8a'); } break;
         case 'give': { const id = a[0], n = parseInt(a[1] || '1', 10) || 1; if (VR.itemDef(id)) { p.inv.add(id, n); say(T('g.cmd.gave', { n, item: VR.itemName(id) })); } else say(T('g.cmd.noItem', { id }), '#ff8a8a'); break; }

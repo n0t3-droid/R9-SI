@@ -518,6 +518,21 @@
         slider('volSfx', T('g.set.volSfx'), 0, 1, 0.05, pct);
         slider('volMusic', T('g.set.volMusic'), 0, 1, 0.05, pct);
         slider('volAmbient', T('g.set.volAmbient'), 0, 1, 0.05, pct);
+        // 🌦 Atmosphäre (A1): the sky's weather, the sounds of nature and the wet ground in the rain
+        body.appendChild(el('div', 'note', '<div class="hr"></div><b>🌦 Atmosphäre</b>'));
+        const atmSeg = (key, label, opts) => {
+          const f = el('div', 'field'); f.innerHTML = `<label>${label}</label>`;
+          const sg = el('div', 'seg');
+          for (const [v, t, tip] of opts) {
+            const b = el('button', S[key] === v ? 'on' : '', t); b.title = tip || ''; b.dataset.set = key + ':' + v;
+            b.onclick = () => { S[key] = v; this.game.applySettings(key); this.game.saveSettings(); this.showSettings(); };
+            sg.appendChild(b);
+          }
+          f.appendChild(sg); body.appendChild(f);
+        };
+        atmSeg('wx', 'Wetter', [['normal', 'Normal', 'Der Himmel wechselt zwischen klar, bewölkt, Nebel, Regen, Gewitter und Schnee'], ['calm', 'Ruhig', 'Nur klar und bewölkt: kein Regen, kein Gewitter, kein Nebel, kein Schnee'], ['off', 'Aus', 'Immer klarer Himmel ohne Wetter-Effekte und Blitze']]);
+        atmSeg('natSound', 'Natur-Klänge', [['synth', 'Synthetisch', 'Wind, Vögel am Tag, Grillen in der Nacht, Wasser — synthetisch erzeugt'], ['off', 'Aus', 'Keine Natur-Klänge (Regen und Donner bleiben, wenn das Wetter an ist)']]);
+        toggle('wetGround', 'Nasser Boden bei Regen');
       } else if (this.settingsTab === 'lang') {
         this.buildLangPanel(body);
       } else {
