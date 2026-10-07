@@ -35,9 +35,11 @@
     return /^blueprint_\d{1,2}$/.test(id);
   };
   // a house design: a template (v2), the changed cells (v1) or only a facade / mirror choice
-  const houseOK = (h) => !!obj(h) && ((obj(h.tpl) && typeof h.tpl.rle === 'string') || (Array.isArray(h.cells) && Array.isArray(h.pal)) || typeof h.skin === 'string' || h.mirror === true);
-  const modelOK = (m) => !!obj(m) && typeof m.rle === 'string' && Array.isArray(m.pal) && [m.W, m.H, m.D, m.res].every(Number.isFinite);
-  const libOK = (it) => !!obj(it) && [it.sx, it.sy, it.sz].every(v => Number.isInteger(v) && v > 0 && v <= 1024) && Array.isArray(it.pal) && typeof it.rle === 'string';
+  const b64OK = (s) => { if (typeof s !== 'string' || s.length > 4e6) return false; try { return !!(VR.Custom && VR.Custom.unb64 ? VR.Custom.unb64(s) : atob(s)); } catch (e) { return false; } };
+  const tplOK = (t) => obj(t) && Array.isArray(t.pal) && Array.isArray(t.box) && t.box.length >= 4 && t.box.every(Number.isFinite) && b64OK(t.rle);
+  const houseOK = (h) => !!obj(h) && (tplOK(h.tpl) || (Array.isArray(h.cells) && Array.isArray(h.pal)) || typeof h.skin === 'string' || h.mirror === true);
+  const modelOK = (m) => !!obj(m) && b64OK(m.rle) && Array.isArray(m.pal) && [m.W, m.H, m.D, m.res].every(Number.isFinite);
+  const libOK = (it) => !!obj(it) && [it.sx, it.sy, it.sz].every(v => Number.isInteger(v) && v > 0 && v <= 1024) && it.sx * it.sy * it.sz <= (1 << 22) && Array.isArray(it.pal) && b64OK(it.rle);
 
   // ---------------------------------------------------------------- out
   P.make = function (from) {
@@ -57,8 +59,8 @@
     const out = { r9pack: 1, at: +d.at || 0, from: d.from === 'standalone' ? 'standalone' : d.from === 'game' ? 'game' : '', favs: [], studio: { v: 1, houses: {}, models: {} }, lib: [] };
     const seen = new Set();
     for (const id of Array.isArray(favs) ? favs.slice(0, 300) : []) if (P.idOK(id) && !seen.has(id)) { seen.add(id); out.favs.push(id); }
-    for (const [k, h] of Object.entries(obj(houses) || {})) if (/^\d{1,2}$/.test(k) && houseOK(h)) out.studio.houses[k] = copy(h);
-    for (const [k, m] of Object.entries(obj(models) || {})) if (/^[a-z0-9_]{1,80}$/.test(k) && modelOK(m)) out.studio.models[k] = copy(m);
+    for (const [k, h] of Object.entries(obj(houses) || {})) if (/^\d{1,2}$/.test(k) && houseOK(h)) out.studio.houses[String(+k)] = Object.assign(copy(h), { name: String(h.name || '').slice(0, 60) });
+    for (const [k, m] of Object.entries(obj(models) || {})) if (/^[a-z0-9_]{1,80}$/.test(k) && VR.VM && Object.prototype.hasOwnProperty.call(VR.VM.MODELS, k) && modelOK(m)) out.studio.models[k] = copy(m);
     for (const it of Array.isArray(lib) ? lib.slice(0, 500) : []) if (libOK(it)) out.lib.push(Object.assign(copy(it), { name: String(it.name || 'Bauteil').slice(0, 60) }));
     return out;
   };

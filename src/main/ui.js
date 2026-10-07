@@ -409,7 +409,8 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
       const n = $('#studionote'); if (!n || !VR.Custom) return;
       const c = VR.Custom.count();
       if (!c.houses && !c.models) { n.innerHTML = '<button class="btn tiny" data-act="studioimport" title="Ein 📦 R9-Paket aus dem eigenständigen R9 Studio übernehmen: Favoriten, Designs, Bauteile">📥 R9-Paket übernehmen</button>'; return; }
-      const names = Object.values(VR.CUSTOM.houses || {}).map(h => h.name).filter(Boolean).slice(0, 3).join(', ');
+      const escH = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+      const names = Object.values(VR.CUSTOM.houses || {}).map(h => h.name).filter(Boolean).slice(0, 3).map(escH).join(', ');
       n.innerHTML = `<b>R9 Studio</b> · ${c.houses} eigene${c.houses === 1 ? 's Haus' : ' Häuser'}${names ? ' (' + names + ')' : ''} · ${c.models} eigene${c.models === 1 ? 's Item' : ' Items'} aktiv <button class="btn tiny" data-act="studioimport">Import</button><button class="btn tiny" data-act="studioreset">Originale</button>`;
     }
     // a 📦 r9-paket (or the older text export): ★ added (blocks and items, blueprints too), the newer design wins,
