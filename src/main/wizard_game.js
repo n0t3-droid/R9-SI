@@ -84,7 +84,7 @@
     blue.planT = 0; blue.tryBuild(S.plan);
     p.flying = false;
     p.safeTeleport(S.landing.pos[0], S.landing.pos[1], S.landing.pos[2], { keep: true, yaw: S.landing.yaw, pitch: S.landing.pitch });
-    g.revealPending = { box: S.landing.box, label: name };
+    g.revealPending = { box: S.landing.box, label: name }; g.landedBy = 'new';   // (in front of the new thing, like ▶ from the Studio)
     toast(kept ? tx('wiz.spotToast', { n: name }, '✨ {n} entsteht an deinem Platz', '✨ {n} appears at your spot') : tx('bh.toast.full', null, '⚠ Gebaut, aber nicht gemerkt — Browser-Speicher voll', '⚠ Built, but not kept — browser storage full'), !kept);
     return true;
   }
