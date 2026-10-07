@@ -84,8 +84,9 @@ await step(2); await draw(true);
 await page.screenshot({ path: SHOTS + '/wonder_found.png', timeout: 180000 });
 const fadeAt = Date.now(); let gone = false; for (let i = 0; i < 30 && !gone; i++) { await page.waitForTimeout(200); gone = await ev(() => { const b = document.getElementById('wbanner'); return !b.classList.contains('on'); }); }
 check(gone && Date.now() - fadeAt < 4500, 'the banner fades after its moment');
-// ---- /bau after it: a plan of that wonder where you look
-await ev(() => { const g = VR.game, p = g.player; p.flying = true; p.teleport(p.pos[0] + 90, p.pos[1] + 6, p.pos[2]); p.pitch = -0.7; });
+// ---- /bau after it: a plan of that wonder where you look (95 blocks back towards the spawn, looking that way: away
+// from the gallery further out)
+await ev(([s, h]) => { const g = VR.game, p = g.player, sp = g.worldSpawn(), dx = sp[0] - s.x, dz = sp[2] - s.z, L = Math.hypot(dx, dz) || 1; p.flying = true; p.teleport(s.x + dx / L * 95, h[1] + 8, s.z + dz / L * 95); p.yaw = Math.atan2(-dx, -dz); p.pitch = -0.7; }, [first, heart]);
 await settle(30);
 await ev((nm) => VR.game.chat('/bau ' + nm), nameDe);
 const planned = await ev(() => (VR.game.gadgets.blue.plans || []).filter(q => /^wonder:/.test(q.dna)).map(q => q.dna + ' ' + q.status));
@@ -93,25 +94,46 @@ check(planned.length === p0 + 1 && planned.some(d => d.startsWith('wonder:' + fi
 const cx = await ev(() => { const g = VR.game; return { open: !!g.codex, list: g.codex.list().filter(e => e.catKey === 'wonders').map(e => (e.found ? '✓ ' : '· ') + e.name) }; });
 check(cx.list.length === 8 && cx.list.filter(s => s[0] === '✓').length === 1, 'the codex category ✨ Wunder: ' + cx.list.join(' | '));
 // ---- the gallery: all eight, next to each other (forge plans like /bau's), photographed by day — two by night
+// (each on a dry, gentle spot: a spot in a lake or on a cliff moves on along the line; a wider view for the pictures)
+await ev(() => { const g = VR.game; g.settings.renderDist = 8; g.applySettings('renderDist'); });
 const TYPES8 = await ev(() => VR.Wonders.TYPES.map(t => t.id));
-const base = await ev((s) => { const g = VR.game, sp = g.worldSpawn(), dx = s.x - sp[0], dz = s.z - sp[2], L = Math.hypot(dx, dz) || 1; return { x: s.x + dx / L * 110, z: s.z + dz / L * 110, ax: -dz / L, az: dx / L, y: s.y }; }, first);
+const base = await ev((s) => { const g = VR.game, sp = g.worldSpawn(), dx = s.x - sp[0], dz = s.z - sp[2], L = Math.hypot(dx, dz) || 1; return { x: s.x + dx / L * 120, z: s.z + dz / L * 120, ax: -dz / L, az: dx / L, fx: dx / L, fz: dz / L, y: s.y }; }, first);
+const land = (x, z, LW, LD) => ev(([x, z, LW, LD]) => {
+  const g = VR.game, w = g.world, R = VR.R; let wet = 0, n = 0, lo = 1e9, hi = -1e9, miss = 0;
+  for (let a = 0; a <= 6; a++) for (let b = 0; b <= 6; b++) {
+    const px = Math.round(x - LW / 2 + LW * a / 6), pz = Math.round(z - LD / 2 + LD * b / 6);
+    if (!w.col(px >> 4, pz >> 4)) { miss++; continue; }
+    for (let y = 230; y > 1; y--) { const st = w.getBlock(px, y, pz); if (!st) continue; const nm = R.types[R.T.type[st]].name; if (/leaves|log|grass$|fern|flower|bush|vine|snow$|lily|kelp|seagrass|tulip|poppy|dandelion|orchid|allium|bluet|daisy|cornflower|lilac|peony|rose/.test(nm) && !/grass_block/.test(nm)) continue; n++; if (/water|ice/.test(nm)) wet++; lo = Math.min(lo, y); hi = Math.max(hi, y); break; }
+  }
+  return { wet: n ? wet / n : 1, relief: hi - lo, miss };
+}, [x, z, LW, LD]);
 const shots = [];
+let along = 0;
 for (let k = 0; k < TYPES8.length; k++) {
-  const type = TYPES8[k], gx = Math.round(base.x + base.ax * (k - 3.5) * 82), gz = Math.round(base.z + base.az * (k - 3.5) * 82);
-  await ev(([x, z, y]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x + 0.5, y + 60, z - 70); }, [gx, gz, base.y]);
-  await settle(40);
+  const type = TYPES8[k], lot = await ev((t) => VR.Forge.meta(VR.Wonders.dna(t, 1)).lot, type);
+  let gx = 0, gz = 0, spot = null;
+  for (let tries = 0; tries < 6; tries++) {
+    gx = Math.round(base.x + base.ax * along); gz = Math.round(base.z + base.az * along);
+    await ev(([x, z, y]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x + 0.5, y + 70, z + 0.5); p.pitch = -1.2; }, [gx, gz, base.y]);
+    await settle(40);
+    spot = await land(gx, gz, lot[0] + 6, lot[1] + 6);
+    if (spot.wet <= 0.06 && spot.relief <= 14) break;
+    console.log('  (' + type + ': the spot at ' + gx + ' ' + gz + ' is ' + JSON.stringify(spot) + ' — further along)');
+    along += 70;
+  }
+  along += 86;
   const pl = await ev(([type, x, z, k]) => {
     const g = VR.game, B = g.gadgets.blue, W = VR.Wonders, dna = W.dna(type, 0x5eed + k), M = VR.Forge.meta(dna), LW = M.lot[0], LD = M.lot[1];
-    const hs = []; for (let a = 0; a <= 6; a++) for (let b = 0; b <= 6; b++) hs.push(B.groundAt(Math.round(x - LW / 2 + LW * a / 6), Math.round(z - LD / 2 + LD * b / 6), 200, 20));
+    const hs = []; for (let a = 0; a <= 6; a++) for (let b = 0; b <= 6; b++) hs.push(B.groundAt(Math.round(x - LW / 2 + LW * a / 6), Math.round(z - LD / 2 + LD * b / 6), 220, 10));
     hs.sort((p1, p2) => p1 - p2);
     const F0 = hs[hs.length >> 1] + 1, pl = { id: 'gal-' + type, kind: 'forge', dna, ox: x - (LW >> 1), oz: z - (LD >> 1), F: F0, r: 0, status: 'pending', t: Date.now() };
     if (!B.plans) B.loadPlans(); B.plans.push(pl); B.planT = 0;
     return { dna, F: F0, lot: M.lot };
   }, [type, gx, gz, k]);
   let built = false; for (let i = 0; i < 300 && !built; i++) { await step(5); built = await ev((id) => { const q = (VR.game.gadgets.blue.plans || []).find(p => p.id === id); return !!(q && q.status === 'built'); }, 'gal-' + type); if (!built) await page.waitForTimeout(40); }
-  const top = await ev((dna) => VR.Forge.meta(dna) && VR.game.gadgets.blue.cache.get('f:' + dna) ? VR.game.gadgets.blue.cache.get('f:' + dna).top : 40, pl.dna);
-  // the camera: in front of it and a little to the side, high enough to see all of it
-  await ev(([x, z, F0, top, lot]) => { const g = VR.game, p = g.player; const d = Math.max(lot[0], lot[1]) * 0.75 + top * 0.55 + 14, px = x + d * 0.42, pz = z - d * 0.92; p.flying = true; p.noclip = true; p.teleport(px, F0 + Math.max(8, top * 0.42), pz); p.yaw = Math.atan2(-(x - px), -(z - pz)); p.pitch = -0.1 - Math.min(0.15, 6 / d); }, [gx, gz, pl.F, top, pl.lot]);
+  const top = await ev((dna) => { const c = VR.game.gadgets.blue.cache.get('f:' + dna); return c ? c.top : 40; }, pl.dna);
+  // the camera: in front of it (its entrance faces −z) and a little to the side, far enough to see all of it
+  await ev(([x, z, F0, top, lot]) => { const g = VR.game, p = g.player; const d = Math.max(lot[0], lot[1]) * 0.6 + top * 0.5 + 12, px = x + d * 0.42, pz = z - d * 0.92; p.flying = true; p.noclip = true; p.teleport(px, F0 + Math.max(8, top * 0.4), pz); p.yaw = Math.atan2(-(x - px), -(z - pz)); p.pitch = -0.08 - Math.min(0.14, 6 / d); }, [gx, gz, pl.F, top, pl.lot]);
   await settle(60); await step(4);
   await ev(() => VR.game.env.setTime(5200)); await step(2); await draw(false);
   await page.screenshot({ path: SHOTS + '/wonder_' + type + '.png', timeout: 180000 });
@@ -122,7 +144,7 @@ for (let k = 0; k < TYPES8.length; k++) {
     shots.push(type + ' night');
     await ev(() => VR.game.env.setTime(5200)); await step(2);
   }
-  console.log('  photographed ' + type + ' (' + pl.dna + ', F ' + pl.F + ', built ' + built + ', ' + ((Date.now() - T0) / 1000).toFixed(0) + ' s)');
+  console.log('  photographed ' + type + ' (' + pl.dna + ', F ' + pl.F + ', land ' + JSON.stringify(spot) + ', built ' + built + ', ' + ((Date.now() - T0) / 1000).toFixed(0) + ' s)');
 }
 check(shots.filter(s => !/not built/.test(s)).length === 10, 'all eight wonders built and photographed, two by night too: ' + shots.join(' · '));
 await finish();
