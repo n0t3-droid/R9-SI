@@ -132,7 +132,7 @@
     // the job's tick (blueprints.js tickSlices): Sofort in slices, the Baustelle by its clock, a write at most every 0.1 s
     write(dt) {
       const g = this.g, w = g.world;
-      if (this.w !== w) { if (this.B.slices === this) this.B.slices = null; this.phase = 'gone'; return; }   // another world now
+      if (this.w !== w) { if (this.B.slices === this) this.B.slices = null; this.phase = 'gone'; BS.hudOff(); return; }   // another world now
       if (!w || g.state !== 'play' || (this.phase !== 'earth' && this.phase !== 'build')) return;
       if (this.mode === 'instant') {
         this.st -= dt; if (this.st > 0) return;
@@ -170,6 +170,7 @@
       const B = this.B, w = this.w;
       if (B.slices === this) B.slices = null;
       this.phase = 'done';
+      BS.hudOff();
       if (this.touched.size && w.relightColumns) w.relightColumns([...this.touched.values()]);
       const n = this.list.length;
       if (this.kind === 'plan' && this.pl) B.planDone(this.pl, this.name, n, this.undo);
@@ -193,7 +194,7 @@
       tell(this.g, this.list, this.undo, 0, running ? this.at : this.list.length, true);
       if (!running) { if (this.phase === 'done' && this.show) this.show.onCancel(); return; }   // (taken back while it still celebrates: the party ends)
       if (this.B.slices === this) this.B.slices = null;
-      this.phase = 'cancel';
+      this.phase = 'cancel'; BS.hudOff();
       if (this.kind === 'plan' && this.pl) this.markBuilt();
       else if (this.kind === 'werkbank') this.batchesDone(false);
       if (this.touched.size && this.w.relightColumns) this.w.relightColumns([...this.touched.values()]);
@@ -507,6 +508,7 @@
   // ---------------------------------------------------------------- one site's show
   const PI = Math.PI, TAU = PI * 2, SND = { vol: 1 };
   const wrapA = (a) => { while (a > PI) a -= TAU; while (a < -PI) a += TAU; return a; };
+  const arrived = (c) => Math.abs(wrapA(c.slewT - c.slew)) < 0.05 && Math.abs(c.r - c.rT) < 0.3 && Math.abs(c.slewV) < 0.1;   // (the jib and the trolley are where they should be)
   class Show {
     constructor(site) {
       this.site = site; const o = site.o, g = site.g;
@@ -626,7 +628,7 @@
     onDone() {
       this.doneT = 0;
       const g = this.site.g, P = g.particles, x = this.cx, y = this.top + 1, z = this.cz;
-      this.sound(this.tiny ? 'twinkle' : 'fanfare', x, y, z, 1);
+      this.sound(this.tiny ? 'twinkle' : 'fanfare', x, this.oy + 2, z, 1);   // (heard from the street, not from the roof)
       if (P) {
         if (this.tiny) for (let i = 0; i < 24; i++) sparkle(P, x + (rnd() - 0.5) * 2, this.oy + rnd() * Math.max(1, this.H), z + (rnd() - 0.5) * 2);
         else confetti(P, x, y, z, [70, 140, 240][clamp((g.settings && g.settings.particles) | 0, 0, 2)], Math.max(4, (this.ring ? Math.max(this.ring[1] - this.ring[0], this.ring[3] - this.ring[2]) : 8) * 0.5));
@@ -727,14 +729,13 @@
       const deckY = this.oy + this.deck;
       if (building && c.rise >= 1) {
         c.tm -= dt;
-        const at = () => Math.abs(wrapA(c.slewT - c.slew)) < 0.05 && Math.abs(c.r - c.rT) < 0.3 && Math.abs(c.slewV) < 0.1;
         switch (c.st) {
           case 'rest': if (c.tm <= 0) c.st = 'toYard'; break;
-          case 'toYard': c.slewT = Math.atan2(-(c.yard[1] - c.bz), c.yard[0] - c.bx); c.rT = clamp(Math.hypot(c.yard[0] - c.bx, c.yard[1] - c.bz), 2.5, c.Lj - 1); c.hookT = c.mastTop - 4; if (at()) c.st = 'down'; break;
+          case 'toYard': c.slewT = Math.atan2(-(c.yard[1] - c.bz), c.yard[0] - c.bx); c.rT = clamp(Math.hypot(c.yard[0] - c.bx, c.yard[1] - c.bz), 2.5, c.Lj - 1); c.hookT = c.mastTop - 4; if (arrived(c)) c.st = 'down'; break;
           case 'down': c.hookT = c.yardY + 1.9; if (Math.abs(c.hook - c.hookT) < 0.12) { c.st = 'attach'; c.tm = 0.6; } break;
           case 'attach': if (c.tm <= 0) { c.load = true; this.loadColor(c.col); c.st = 'lift'; } break;
           case 'lift': c.hookT = Math.min(c.mastTop - 3, Math.max(deckY + 6, c.yardY + 6)); if (Math.abs(c.hook - c.hookT) < 0.3 || c.hook > deckY + 5) { this.aim(c); c.st = 'toDrop'; } break;
-          case 'toDrop': c.hookT = Math.min(c.mastTop - 3, Math.max(deckY + 5, c.hook)); c.slewT = Math.atan2(-(c.aimZ - c.bz), c.aimX - c.bx); c.rT = clamp(Math.hypot(c.aimX - c.bx, c.aimZ - c.bz), 2.5, c.Lj - 1); if (at()) c.st = 'lower'; break;
+          case 'toDrop': c.hookT = Math.min(c.mastTop - 3, Math.max(deckY + 5, c.hook)); c.slewT = Math.atan2(-(c.aimZ - c.bz), c.aimX - c.bx); c.rT = clamp(Math.hypot(c.aimX - c.bx, c.aimZ - c.bz), 2.5, c.Lj - 1); if (arrived(c)) c.st = 'lower'; break;
           case 'lower': c.hookT = deckY + 2.05; if (Math.abs(c.hook - c.hookT) < 0.15) { c.st = 'release'; c.tm = 0.5; } break;
           case 'release': if (c.tm <= 0) { c.load = false; if (site.g.particles) dust(site.g.particles, c.aimX, deckY + 0.3, c.aimZ, 2); this.sound('clang', c.aimX, deckY, c.aimZ, 0.5); c.st = 'up'; } break;
           case 'up': c.hookT = Math.min(c.mastTop - 3, deckY + 7); if (Math.abs(c.hook - c.hookT) < 0.4 || c.hook >= c.mastTop - 3.5) c.st = 'toYard'; break;
@@ -854,28 +855,29 @@
       gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
       this.uniforms(gl, p, null);
       if (!c.top || c.topKey !== c.Lj) { if (c.top && c.top.vbo) { gl.deleteBuffer(c.top.vbo); gl.deleteVertexArray(c.top.vao); } c.top = VR.VoxGPU.upload(gl, BS.MOD.top(c.Lj, c.Lc)); c.topKey = c.Lj; }
-      const draw = (mesh, M) => { gl.uniformMatrix4fv(p.u.u_model, false, M); gl.bindVertexArray(mesh.vao); gl.drawArrays(gl.TRIANGLES, 0, mesh.count); };
-      draw(c.top, this.model(c.bx, topY, c.bz, cam, c.slew));
+      this.dp = p;
+      this.one(gl, c.top, this.model(c.bx, topY, c.bz, cam, c.slew));
       // the trolley; the cables swing (a pendulum across the jib, pushed by its turns); the hook and the load hang at their end
       const cs = Math.cos(c.slew), sn = Math.sin(c.slew), tx = c.bx + cs * c.r, tz = c.bz - sn * c.r, ty = topY + 0.55;
       const hookY = Math.min(c.hook, ty - 1.2) - (c.mastTop - topY), len = Math.max(0.6, ty - hookY), ph = c.sway;
       const tX = sn, tZ = cs, sp = Math.sin(ph), cp = Math.cos(ph);   // (the jib's sideways direction)
       const hx = tx + tX * sp * len, hy = ty - cp * len, hz = tz + tZ * sp * len;
-      draw(G.trolley, this.model(tx, ty, tz, cam, c.slew));
+      this.one(gl, G.trolley, this.model(tx, ty, tz, cam, c.slew));
       // the cable's frame: x along the jib, y up the cable (its length), z across
       const m = this.mm; m.fill(0); m[15] = 1;
       m[0] = cs; m[2] = -sn; m[4] = -tX * sp * len; m[5] = cp * len; m[6] = -tZ * sp * len; m[8] = tX * cp; m[9] = sp; m[10] = tZ * cp;
       m[12] = tx - cam.x; m[13] = ty - cam.y; m[14] = tz - cam.z;
-      draw(G.cable, m);
-      draw(G.hook, this.model(hx, hy, hz, cam, c.slew));
+      this.one(gl, G.cable, m);
+      this.one(gl, G.hook, this.model(hx, hy, hz, cam, c.slew));
       if (c.load) {
-        draw(G.pallet, this.model(hx, hy - 1.95, hz, cam, c.slew));
-        this.uniforms(gl, p, c.col); draw(G.cubes, this.model(hx, hy - 1.95, hz, cam, c.slew)); this.uniforms(gl, p, null);
+        this.one(gl, G.pallet, this.model(hx, hy - 1.95, hz, cam, c.slew));
+        this.uniforms(gl, p, c.col); this.one(gl, G.cubes, this.model(hx, hy - 1.95, hz, cam, c.slew)); this.uniforms(gl, p, null);
       }
       // the red light on top blinks
-      if ((this.t % 1.2) < 0.55) draw(G.blink, this.model(c.bx, topY + 4.6, c.bz, cam));
+      if ((this.t % 1.2) < 0.55) this.one(gl, G.blink, this.model(c.bx, topY + 4.6, c.bz, cam));
       gl.bindVertexArray(null);
     }
+    one(gl, mesh, M) { gl.uniformMatrix4fv(this.dp.u.u_model, false, M); gl.bindVertexArray(mesh.vao); gl.drawArrays(gl.TRIANGLES, 0, mesh.count); }
     drawCrew(r, E, cam, ent) {
       const g = this.site.g, gl = r.gl, FD = g.folkDist || g.folkBase || 100;
       let p = null;
@@ -927,6 +929,9 @@
     const a = B.g.audio; if (a && a.loop) { let m = 0; for (const s of B.sites) if (s.show && s.show.crane && s.show.motor) m = Math.max(m, s.show.near(s.show.crane.bx, s.show.crane.mastTop, s.show.crane.bz)); if (m > 0.02 || B.motorOn) { a.loop('crane', m * 0.32, 0.6); B.motorOn = m > 0.02; } }
   };
   // ---------------------------------------------------------------- the HUD: 🏗 name · 42 % ▰▰▱ ⏩ Fertig (top centre)
+  BS.hudOff = function () { const el = BS.hudEl; if (el && el.style.display !== 'none') el.style.display = 'none'; };
+  // the world goes (to the title, another world): the bar goes, the sites' GPU things are freed
+  BS.reset = function (B) { BS.hudOff(); const L = B && B.sites; if (L) { for (const s of L) if (s.show) s.show.dispose(); L.length = 0; } };
   BS.hud = function (B) {
     if (typeof document === 'undefined') return;
     const g = B.g, S = B.slices, on = S instanceof Site && S.show && (S.phase === 'earth' || S.phase === 'build') && g.state === 'play' && !g.hideHud && !g.photo && (!g.ui || !g.ui.screen || g.ui.screen === 'pause');
@@ -937,11 +942,11 @@
       el.innerHTML = '<div class="bh-row"><span class="bh-t"></span><button class="bh-skip" type="button"></button></div><div class="bh-bar"><i></i></div>';
       const root = document.getElementById('ui') || document.body; root.appendChild(el);
       el.querySelector('.bh-skip').addEventListener('click', (e) => { e.stopPropagation(); const blue = VR.game && VR.game.gadgets && VR.game.gadgets.blue; if (blue && blue.siteSkip) blue.siteSkip(); });
-      BS.hudKey = null;
+      BS.hudS = null;
     }
-    const pc = Math.floor(S.progress * 100), key = S.name + '|' + pc + '|' + (VR.I18N ? VR.I18N.lang : '');
-    if (key !== BS.hudKey) {
-      BS.hudKey = key;
+    const pc = Math.floor(S.progress * 100), lang = VR.I18N ? VR.I18N.lang : '';
+    if (pc !== BS.hudP || S !== BS.hudS || lang !== BS.hudL) {
+      BS.hudP = pc; BS.hudS = S; BS.hudL = lang;
       el.querySelector('.bh-t').textContent = T('g.bau.progress', { name: S.name, p: pc }, '🏗 {name} · {p} % gebaut', '🏗 {name} · {p} % built');
       const b = el.querySelector('.bh-skip'); b.textContent = T('g.bau.skip', null, '⏩ Fertig', '⏩ Finish'); b.title = T('g.bau.skipTip', null, 'Sofort fertig bauen (auch: Klick auf die Baustelle oder /bau fertig)', 'Finish at once (also: click the site or /bau fertig)');
       el.querySelector('.bh-bar i').style.width = pc + '%';

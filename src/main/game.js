@@ -282,6 +282,7 @@
       if (this.traffic) this.traffic.t = 2.5;
     }
     teardownWorld() {
+      if (VR.Baustelle && VR.Baustelle.reset) VR.Baustelle.reset(this.gadgets && this.gadgets.blue);   // (a construction site's bar and meshes go with the world)
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
       this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false;
