@@ -154,10 +154,11 @@
   } }));
   // wall lamps (they hang on the wall behind them, +z)
   for (const f of ['black', 'white']) def('light', 'wall', 'updown_' + f, 'Wall Lamp Up-Down · ' + f, Object.assign({}, LAMP, { mount: 'wall', res: 32, size: [1, 1, 1], col: f, light: [12, 11, 8], build: (b) => {
-    const m = f === 'white' ? M.gloss(P.white) : M.metal(P.black);
-    b.box(6.5, 7.5, 15.5, 9.5, 12.5, 16, m); b.box(7.5, 9.5, 12.5, 8.5, 10.5, 15.5, m);
-    b.cyl('y', 8, 11, 1.8, 6.5, 13.5, m);
-    b.cyl('y', 8, 11, 1.3, 6, 6.5, M.light(0xFFF0D4)); b.cyl('y', 8, 11, 1.3, 13.5, 14, M.light(0xFFF0D4));
+    // a round plate on the wall, a short arm and a drum shade; the light leaves both ends (glowing caps top and bottom)
+    const m = f === 'white' ? M.gloss(P.white) : M.metal(P.black), glow = M.light(0xFFF0D4);
+    b.pbox(5.5, 5.5, 15, 10.5, 14.5, 16, 0.5, m); b.box(7.5, 9.5, 12, 8.5, 10.5, 15.5, m);
+    b.lathe(8, 11, [[4, 1.5], [5, 2.4], [8, 2.7], [11, 2.7], [14, 2.4], [15, 1.5]], m);
+    b.cyl('y', 8, 11, 1.3, 3.5, 4, glow); b.cyl('y', 8, 11, 1.3, 15, 15.5, glow);
   } }));
   def('light', 'wall', 'swingarm_brass', 'Wall Lamp Swing Arm · brass', Object.assign({}, LAMP, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'brass', light: [12, 10, 7], build: (b) => {
     const m = M.metal(P.brass);
@@ -167,8 +168,9 @@
     b.cyl('y', 6, 4.5, 2, 6, 6.5, M.light(glowW));
   } }));
   def('light', 'wall', 'ledbar_white', 'Wall Lamp LED Bar · white', Object.assign({}, LAMP, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'white', light: [12, 12, 11], build: (b) => {
-    b.box(1, 11.5, 14, 15, 13, 16, M.gloss(P.white)); b.box(7, 10, 15.5, 9, 11.5, 16, M.gloss(P.white));
-    b.box(1.5, 11, 14.5, 14.5, 11.5, 15.5, M.light(0xFFF6EA));
+    // a white housing on two wall feet, with the glowing diffuser on its front face
+    b.box(1, 11, 15, 15, 13.5, 16, M.gloss(P.white)); b.box(3, 10, 15.5, 4.5, 11, 16, M.gloss(P.white)); b.box(11.5, 10, 15.5, 13, 11, 16, M.gloss(P.white));
+    b.box(1.5, 11.25, 14, 14.5, 12.25, 15, M.light(0xFFF6EA));
   } }));
 
   // ================================================================ SMART HOME
