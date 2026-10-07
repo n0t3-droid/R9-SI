@@ -114,7 +114,7 @@
       for (const s of this.sites) { const e = this.st[s.key]; if (e && e.status !== 'building') continue; const d = Math.hypot(s.x - p.pos[0], s.z - p.pos[2]); if (d < bd) { bd = d; best = s; } }
       if (!best) return;
       const L = this.lotOf(best); if (!L) { this.st[best.key] = { type: best.type, status: 'blocked', why: 'dna' }; return; }
-      if (!this.loaded(L.x0 - 20, L.z0 - 20, L.x1 + 20, L.z1 + 20)) return;
+      if (!this.loaded(L.x0 - 4, L.z0 - 4, L.x1 + 4, L.z1 + 4)) return;          // the lot and its verge (a short render distance: when you are closer)
       const prior = this.st[best.key], F0 = prior && prior.status === 'building' && prior.at ? prior.at[1] : this.floorOf(L, best.y);
       if (F0 < 2 || F0 + 130 >= VR.MAXY) { this.st[best.key] = { type: best.type, status: 'blocked', why: 'height' }; return; }
       const pl = { id: 'wonder-' + best.key, kind: 'forge', dna: L.dna, ox: L.ox, oz: L.oz, F: F0, r: L.r };
