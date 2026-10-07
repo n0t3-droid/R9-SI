@@ -177,11 +177,12 @@
     if (mod) out.push(typeof mod === 'string' ? T('cr.modS', 'geändert: {m}', 'modified: {m}', { m: mod }, want) : T('cr.mod', 'geändert: als Voxelmodell umgesetzt', 'modified: turned into a voxel model', null, want));
     return out.join(' · ');
   }
-  // the computed blocks as [type, text] pairs (text already in the language; the owner's details as given)
+  // the computed blocks as [type, plain text] pairs in the language (items() escapes them for the page — import
+  // titles, authors and links come from other people's files); the owner block: its lines, already safe for `html`
   function special(type, want, html) {
-    const lang = langOf(want), V = vars(lang, html);
+    const lang = langOf(want), V = vars(lang, html), e = (s) => (html ? esc(s) : s);
     if (type === 'warn') return L.incomplete() ? [['warn', T('warn', '⚠ Vor dem öffentlichen Start ausfüllen: Name, Anschrift und E-Mail sind noch Platzhalter (OWNER in src/main/legal.js). Nichts erfinden — ohne echte Angaben ist das Impressum unvollständig.', '⚠ To fill in before the public launch: name, address and e-mail are still placeholders (OWNER in src/main/legal.js). Never invent them — without real details the Impressum is incomplete.', null, want)]] : [];
-    if (type === 'owner') return [['owner', [V.name, detail('address', lang, html, true), T('imp.country', 'Deutschland', 'Germany', null, want), T('imp.contact', 'Kontakt:', 'Contact:', null, want) + ' ' + V.email]]];
+    if (type === 'owner') return [['owner', [V.name, detail('address', lang, html, true), e(T('imp.country', 'Deutschland', 'Germany', null, want)), e(T('imp.contact', 'Kontakt:', 'Contact:', null, want)) + ' ' + V.email]]];
     if (type === 'imports') {
       const list = importList(); if (!list) return [];
       const out = [['h', T('cr.imp', 'Importierte Dinge', 'Imported things', null, want)]];
@@ -198,7 +199,7 @@
   function items(sec, want, html) {
     const lang = langOf(want), V = vars(lang, html), out = [];
     for (const b of TX[norm(sec)].blocks) {
-      if (b.length === 1) { out.push(...special(b[0], want, html)); continue; }
+      if (b.length === 1) { for (const [type, t] of special(b[0], want, html)) out.push([type, type === 'owner' || !html ? t : linkify(esc(t))]); continue; }
       const t = raw(b[1], b[2], b[3], want);
       out.push([b[0], html ? fill(linkify(esc(t)), V) : fill(t, V)]);
     }
@@ -227,7 +228,7 @@
       else if (type === 'h2') out.push(`<h2>${t}</h2>`);
       else if (type === 'h') out.push(`<h3>${t}</h3>`);
       else if (type === 'small') out.push(`<p class="lg-small">${t}</p>`);
-      else if (type === 'warn') out.push(`<p class="lg-warn">${esc(t)}</p>`);
+      else if (type === 'warn') out.push(`<p class="lg-warn">${t}</p>`);
       else if (type === 'owner') out.push(`<address class="lg-owner">${t.join('<br>')}</address>`);
       else out.push(`<p>${t}</p>`);
     }
