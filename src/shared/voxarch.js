@@ -972,10 +972,32 @@
   const meshGrid = (cull, solidNb) => meshGridN(G, 8, cull, solidNb);
   VX.meshGrid = meshGrid; VX.meshGridN = meshGridN;
 
-  // cache: state → Map(key → quads)
-  const cache = new Map();
+  // cache: state → Map(key → quads), in two generations. A painted piece is ~5 KB of quads; the old single map held
+  // 40 000 of them (200 MB in every worker) and then forgot everything at once — every piece in sight painted again
+  // (meshing 6× slower until the cache was warm). Now a full generation is set aside as the old one and a fresh one
+  // starts; a piece found in the old generation moves to the new. Memory stays under 2 × CAP pieces and the pieces
+  // in use stay warm across the rollover.
+  const CAP = 12000;
+  let cache = new Map(), cacheOld = new Map();
   let cacheN = 0;
-  VX.clearCache = () => { cache.clear(); cacheN = 0; lodCache.clear(); lodN = 0; };
+  const lookup = (s, key) => {
+    const m = cache.get(s);
+    const q = m && m.get(key);
+    if (q !== undefined) return q;
+    const mo = cacheOld.get(s);
+    const qo = mo && mo.get(key);
+    if (qo === undefined) return undefined;
+    store(s, key, qo);   // found in the old generation: it is in use, bring it over
+    return qo;
+  };
+  const store = (s, key, quads) => {
+    if (cacheN >= CAP) { cacheOld = cache; cache = new Map(); cacheN = 0; }
+    let m = cache.get(s);
+    if (!m) { m = new Map(); cache.set(s, m); }
+    m.set(key, quads); cacheN++;
+  };
+  VX.clearCache = () => { cache = new Map(); cacheOld = new Map(); cacheN = 0; lodCache.clear(); lodN = 0; };
+  VX.cacheStats = () => ({ cur: cacheN, cap: CAP, old: [...cacheOld.values()].reduce((a, m) => a + m.size, 0) });
   VX.stats = { hits: 0, miss: 0 };
 
   // ---------------------------------------------------------------- far boxes
@@ -1068,9 +1090,7 @@
     for (let d = 0; d < 6; d++) ncBits |= c.nc[d] << (d * 3);
     const varBits = c.px | (c.py << 1) | (c.pz << 2) | (c.h << 3);
     const key = ncBits + c.ext * 262144 + cull * 16777216 + varBits * 1073741824 + extra * 34359738368;
-    let m = cache.get(s);
-    if (!m) { m = new Map(); cache.set(s, m); }
-    let quads = m.get(key);
+    let quads = lookup(s, key);
     // lighting: faces take the light of the block they look into; faces looking into solid blocks
     // (window reveals, trims) use the brightest neighbour
     let aS = 0, aR = 0, aG = 0, aB = 0;
@@ -1101,9 +1121,8 @@
     if (!quads) {
       paintState(s, c);
       quads = sp.res >= 16 ? meshGridN(VX.gridFor(sp.res), sp.res, cull, cull) : meshGrid(cull, cull);
-      m.set(key, quads);
+      store(s, key, quads);
       VX.stats.miss++;
-      if (++cacheN > 40000) { cache.clear(); cacheN = 0; }
     } else VX.stats.hits++;
     if (!quads.length) return;
     // far LOD: the piece's bounding box in its average colour (one face per side instead of dozens of quads)
