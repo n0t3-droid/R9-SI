@@ -1,0 +1,6 @@
+/* ============================================================================
+   W1 · the start screen, the Ding cards, the hints — shared by the game (index.html, after style.css) and the
+   R9 Studio (studio.html, after studio.css). One accent colour, big calm tiles, large readable text; the Einfach
+   screens scale their text with --ui-scale (1.15 = 18 px, „Große Schrift" 1.3).
+   ============================================================================ */
+:root { --ui-scale: 1.15; --tile: 160px; --st-acc: #3af0ff; --st-acc-dim: rgba(58, 240, 255, 0.35); --st-ink: #eef4ff; --st-mute: #9fb0cc; --st-bg: rgba(8, 12, 24, 0.72); --st-bg2: rgba(14, 20, 38, 0.9); --st-line: rgba(140, 200, 255, 0.22); --st-font: 'Rajdhani', 'Sora', 'Segoe UI', system-ui, sans-serif; }
