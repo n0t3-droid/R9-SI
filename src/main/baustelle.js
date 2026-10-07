@@ -221,7 +221,7 @@
       if (E && id && this.batches) for (const bid of this.batches) E.markDone(id, bid);
       if (g.player && g.player.unstick) g.player.unstick();
       const w = this.w;
-      if (typeof setTimeout !== 'undefined') { clearTimeout(B.editSave); B.editSave = setTimeout(() => { if (g.world === w && w.saveAll) w.saveAll(); }, 800); }
+      if (typeof setTimeout !== 'undefined') { clearTimeout(B.editSave); const save = () => { if (B.siteBusy()) { B.editSave = setTimeout(save, 1000); return; } if (g.world === w && w.saveAll) w.saveAll(); }; B.editSave = setTimeout(save, 800); }   // (not while the next site builds)
       if (toast && g.ui && g.ui.toast) { const n = this.list.length; g.ui.toast('R9 Studio', VR.I18N ? VR.I18N.tx('g.studio.edits', { n: n.toLocaleString() }, '{n} Blöcke aus der Werkbank', '{n} blocks from the Werkbank') : n + ' blocks from the Werkbank'); }
     }
   }
@@ -666,6 +666,9 @@
       if (P) {
         if (this.tiny) for (let i = 0; i < 24; i++) sparkle(P, x + (rnd() - 0.5) * 2, this.oy + rnd() * Math.max(1, this.H), z + (rnd() - 0.5) * 2);
         else confetti(P, x, y, z, [70, 140, 240][clamp((g.settings && g.settings.particles) | 0, 0, 2)], Math.max(4, (this.ring ? Math.max(this.ring[1] - this.ring[0], this.ring[3] - this.ring[2]) : 8) * 0.5));
+        // a glint runs up the corners of the new building
+        if (!this.tiny && this.sw) for (let i = 0; i < 48; i++) { const cx = this.ox + (i & 1 ? this.sw : 0), cz = this.oz + (i & 2 ? this.sd : 0); SPARKLE.col[0] = 1; SPARKLE.col[1] = 0.92; SPARKLE.col[2] = 0.6; P.spawn(cx + (rnd() - 0.5) * 0.4, this.oy + rnd() * Math.max(2, this.H) * 0.3, cz + (rnd() - 0.5) * 0.4, 0, 4 + rnd() * Math.max(4, this.H / 3), 0, SPARKLE); }
+        SPARKLE.col[2] = 1;
       }
       for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } if (b.mode === 'walkin') { b.mode = 'leave'; continue; } b.mode = 'cheer'; b.timer = 1.6 + rnd() * 0.4; }
       if (g.ui && g.ui.hint && !this.tiny && this.site.kind !== 'blueprint') g.ui.hint(T('g.bau.done', { name: this.site.name }, '✨ {name} steht!', '✨ {name} is done!'), 2600);
@@ -933,7 +936,10 @@
         const dx = b.pos[0] - cam.x, dy = b.pos[1] - cam.y, dz = b.pos[2] - cam.z, d2 = dx * dx + dz * dz;
         if (d2 > FD * FD) continue;
         if (!VR.mat4.boxInFrustum(r.planes, dx - 1, dy - 0.5, dz - 1, dx + 1, dy + 2.2, dz + 1)) continue;
-        const model = VR.Folk.model(gl, b.look, d2 > 24 * 24); if (!model) continue;
+        // (a builder's model is made the first time it is drawn: at most one new one a frame, no hitch on a small PC)
+        const far = d2 > 24 * 24, mk = far ? 'lo' : 'hi';
+        if (!b[mk]) { if (BS.madeThisFrame) continue; BS.madeThisFrame = true; b[mk] = true; }
+        const model = VR.Folk.model(gl, b.look, far); if (!model) continue;
         if (!p) p = ent.beginVox(r, E);
         const L = this.light, lt = b.lt || (b.lt = { sky: 1, bl: [0, 0, 0] }); lt.sky = Math.max(0.45, L[0]); lt.bl[0] = L[1]; lt.bl[1] = L[2]; lt.bl[2] = L[3];
         ent.drawModel(r, p, model, b.pos, cam, b.yaw, b.poseOut, lt, b.opts);
@@ -970,7 +976,7 @@
   }
   // ---------------------------------------------------------------- every site of a world, drawn in the opaque pass
   BS.draw = function (B, r, E, cam) {
-    const ent = B.g.entities;
+    const ent = B.g.entities; BS.madeThisFrame = false;
     for (const s of B.sites) if (s.show && s.phase !== 'gone') s.show.draw(r, E, cam, ent);
     // the crane's motor: the loudest one
     const a = B.g.audio; if (a && a.loop) { let m = 0; for (const s of B.sites) if (s.show && s.show.crane && s.show.motor) m = Math.max(m, s.show.near(s.show.crane.bx, s.show.crane.mastTop, s.show.crane.bz)); if (m > 0.02 || B.motorOn) { a.loop('crane', m * 0.32, 0.6); B.motorOn = m > 0.02; } }
