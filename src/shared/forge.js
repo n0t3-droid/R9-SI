@@ -292,7 +292,7 @@
   Forge.describe = function (dna, short) {
     const P = Forge.parse(dna); if (!P) return '';
     const t = Forge.TYPES[P.type], st = t.style(P.style);
-    const parts = t.describe ? t.describe(P, st) : [];
+    const parts = (t.describe ? t.describe(P, st) : []).filter(Boolean);
     const head = (short ? t.icon + ' ' : '') + t.name;
     return short ? head + (parts[0] ? ' · ' + parts[0] : '') : [head].concat(parts, st ? [st.name] : []).join(' · ');
   };
