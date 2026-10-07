@@ -353,6 +353,11 @@ const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
     const o2 = await Zt.open(null);
     check(!o2 && fakeUI.mode === 'empty' && !Zt.active, 'a world without history: the message „Noch nichts aufgenommen …“, nothing swapped');
     Zt.close();
+    // when it does not run: a guest, friends in the world, riding something
+    const b1 = Zt.blocked(Object.assign({}, g, { meta: { id: 'x', guest: true } }));
+    const b2 = Zt.blocked(Object.assign({}, g, { mp: { isHost: true, remote: new Map([['p', {}]]) } }));
+    const b3 = Zt.blocked(Object.assign({}, g, { gadgets: { controlling: true } }));
+    check(/own worlds/.test(b1 || '') && /friends/.test(b2 || '') && /Get out/.test(b3 || '') && Zt.blocked(g) === null, 'it says why it waits: a guest\'s world, friends in the world, riding something — and runs otherwise');
   }
   console.log(fails ? 'FAILED ' + fails : 'ALL OK');
   process.exit(fails ? 1 : 0);
