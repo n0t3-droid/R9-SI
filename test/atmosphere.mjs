@@ -23,6 +23,8 @@ try {
   await ev(() => { const g = VR.game; g.settings.renderDist = 7; g.settings.dynRes = false; g.applySettings('renderDist'); });
   await ev(`VR.game.createWorld({name:'Atmo',mode:'survival',difficulty:'normal',type:'default',seed:'424242',cheats:true,kit:true})`);
   for (let i = 0; i < 60; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
+  // Balanced for the look (a two-core machine boots on Very Low, which has no wet ground); the audio starts as a click would start it
+  await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.renderDist = 7; g.settings.dynRes = false; g.applySettings('renderDist'); g.audio.resume(); });
   await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.setTime(6000); });
 
   // the game loop without drawing (the world, the sky, the sound and the rain's bookkeeping all run); the
