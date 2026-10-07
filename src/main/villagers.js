@@ -221,43 +221,19 @@
   V.buildModel = buildModel;
 
   // ---------------------------------------------------------------- dialogue library
+  // The lines live in the language tables (lang_de.js / lang_en.js) as g.folk.<key> lists; V.say picks one by a
+  // hash and fills {name} placeholders. V.lines(key) is the list in the player's language.
   const pick = (arr, h) => arr[(h >>> 0) % arr.length];
   V.pick = pick;
-  V.lines = {
-    hello: ['Hi there!', 'Hello, traveler!', 'Oh! Hello!', 'Good to see you!', 'Welcome, welcome!', 'Hey! Nice day, huh?', 'Greetings, friend!'],
-    helloBack: ['Welcome back, {p}!', '{p}! You came back!', 'Hi again, {p}!', 'There\'s our favourite traveler!'],
-    morning: ['Good morning, {n}!', 'Morning, {n}! Sleep well?', 'Rise and shine, {n}!', 'What a sunrise!'],
-    evening: ['Lovely evening, {n}.', 'Look at that sky…', 'Time to head home soon.', 'The lamps look so pretty tonight.'],
-    night: ['Shh… everyone\'s sleeping.', 'The stars are so bright.', 'Can\'t sleep either?'],
-    family: ['Love you, {n}!', 'Did you eat, {n}?', 'Come here, you!', 'I\'m proud of you, {n}.', 'Want to go to the plaza later, {n}?'],
-    kidParent: ['Mom! Dad! Look at me!', 'Can I play a bit longer?', 'I found a shiny rock!', 'I love you!', 'Carry me?'],
-    parentKid: ['Careful, {n}!', 'Home before dark, {n}!', 'Did you feed the sheep, {n}?', 'That\'s my {n}!'],
-    friends: ['How\'s the family, {n}?', 'Did you hear about {fact}?', 'Nice weather for it.', 'Ha! Good one, {n}.', 'Tea later, {n}?', 'See you at the plaza!'],
-    farm: ['The wheat looks golden today.', 'Grow, little sprouts!', 'Another fine harvest!', 'A bit of rain would be nice.', 'Mind the crops, please!'],
-    bake: ['Fresh bread, still warm!', 'Mmm, smell that?', 'Cinnamon or honey today?', 'Who wants a bun?'],
-    forge: ['*clang* *clang*', 'Hot iron, stand back!', 'This hammer\'s older than me.', 'Almost done…'],
-    read: ['Fascinating…', 'Did you know the rings of our planet are ice?', 'Shh, I\'m reading.', 'So many stories, so little time.'],
-    build: ['One more wall!', 'Measure twice, cut once.', 'The {s} house is coming along!', 'Hand me that plank?'],
-    garden: ['Hello little flowers.', 'These roses are thriving!', 'Gardens make the soul grow.'],
-    patrol: ['All quiet.', 'I\'ll keep watch tonight.', 'Nothing gets past me.', 'Stay close to the lamps.'],
-    play: ['Tag, you\'re it!', 'Can\'t catch me!', 'Wheee!', 'Let\'s play hide and seek!', 'I\'m a starship pilot! Vrrrm!'],
-    rain: ['Good for the crops!', 'I love the sound of rain.', 'Umbrella weather!'],
-    ship: ['Look! A ship!', 'Where do you think they\'re going?', 'One day I\'ll fly one of those!', 'Wow, look at it go!'],
-    meteor: ['A shooting star! Make a wish!', 'Did you see that?!'],
-    danger: ['Monsters! Get inside!', 'Everyone, to your homes!', 'Stay back!'],
-    hurt: ['Ow! Hey!', 'Why would you do that?!', 'Ouch… that wasn\'t nice.'],
-    thanks: ['For me? Thank you!', 'You\'re too kind!', 'Oh, I love it!', 'You shouldn\'t have!'],
-    sleep: ['Zzz…', 'Mmm… five more minutes…', 'Zzz… stars…'],
-    eat: ['Delicious!', 'Pass the bread, please.', 'Who cooked this? It\'s amazing!'],
-    build_done: ['The new house is finished! Welcome, {s} family!', 'We did it! A new home!'],
-    repair: ['Oops, a hole in the {s} house. I\'ll fix it!', 'Good as new!'],
-  };
+  V.lines = function (key) { const I = VR.I18N; const arr = I && I.list ? I.list('g.folk.' + key) : []; return arr.length ? arr : (I && I.list ? I.list('g.folk.hello') : ['Hello!']); };
   V.say = function (key, h, vars) {
-    const arr = V.lines[key] || V.lines.hello;
-    let s = pick(arr, h);
+    let s = pick(V.lines(key), h);
     if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m);
     return s;
   };
+  // a text of the tables (a role's title, a trait, a like): the English word when the key is unknown
+  V.T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
+  V.roleTitle = (role) => V.T('g.role.' + role, null, ROLES[role] ? ROLES[role].title : role);
 
   // ---------------------------------------------------------------- pathfinding on the block grid
   // Node = feet cell. Walkable when the two cells above the ground are free (doors & gates count as free)

@@ -59,6 +59,7 @@
     return { pos: [Math.floor(cx) + 0.5, y1 + 1, Math.floor(cz) + 0.5], yaw: 0, pitch: -0.3, box: box.slice(), label };
   }
   WM.viewpoint = viewpoint;
+  WM.landingBox = (el) => section(el);   // (W1: the Karte view's panel shows it too)
 
   // ---------------------------------------------------------------- the newest thing set into the world
   function note(box, label) {
@@ -87,8 +88,8 @@
     const g = host(), live = !!(g && g.meta && g.meta.id === WM.world.id && g.player);
     if (live) { g.player.spawn = p.slice(); g.player.spawnBed = null; }
     if (!stored) C.full('spawn');
-    if (!stored && !live) { WM.tipW && WM.tipW('⚠ ' + L('land.spawnFail', 'Spawnpunkt nicht gespeichert — der Browser-Speicher ist voll'), false); C.parts(); return false; }
-    WM.tipW && WM.tipW('📍 ' + L('land.spawnSet', 'Spawnpunkt gesetzt') + ' · ' + fmtP(p), true);
+    if (!stored && !live) { WM.tipW && WM.tipW('⚠ ' + L('land.spawnFail', 'Mein Platz nicht gespeichert — der Browser-Speicher ist voll'), false); C.parts(); return false; }
+    WM.tipW && WM.tipW('📍 ' + L('land.spawnSet', 'Mein Platz ist jetzt hier') + ' · ' + fmtP(p), true);
     play.label(); C.parts();
     return true;
   };
@@ -111,18 +112,18 @@
     if (r && WM.on && S.mode === 'world' && WM.world && !WM.loading) section();
     return r;
   };
-  function section() {
-    const el = $('#partsBody'); if (!el || el.querySelector('.landBox')) return;
+  function section(into) {
+    const el = into || $('#partsBody'); if (!el || el.querySelector('.landBox')) return;
     const box = document.createElement('div'); box.className = 'landBox';
     const sp = spawnOf(), last = lastOf(), nw = freshOf(WM.world);
     const row = (cls, ic, txt, p, extra) => `<div class="landRow ${cls}"><i></i><span class="t">${ic} ${txt}<small>${fmtP(p)}</small></span>${extra || ''}${p ? `<button class="cbtn mini" data-look="${p.slice(0, 3).join(',')}" title="${esc(L('land.look', 'Ansehen'))}">👁</button>` : ''}</div>`;
     box.innerHTML = `<div class="ph">📍 ${esc(L('land.title', 'Wo du landest'))}</div>`
-      + row('sp', '📍', esc(L('land.spawn', 'Spawnpunkt')), sp, `<button class="cbtn mini${WM.spawnArm ? ' on' : ''}" data-spawn title="${esc(L('land.setT', 'Danach auf den Boden klicken'))}">${WM.spawnArm ? esc(L('land.click', 'Klick auf den Boden …')) : '📍 ' + esc(L('land.set', 'Setzen'))}</button>`)
+      + row('sp', '📍', esc(L('land.spawn', 'Mein Platz')), sp, `<button class="cbtn mini${WM.spawnArm ? ' on' : ''}" data-spawn title="${esc(L('land.setT', 'Danach auf den Boden klicken'))}">${WM.spawnArm ? esc(L('land.click', 'Klick auf den Boden …')) : '📍 ' + esc(L('land.set', 'Mein Platz ist hier'))}</button>`)
       + row('la', '🧍', esc(L('land.last', 'Zuletzt warst du hier')), last)
       + (nw ? row('nw', '✨', esc(L('land.newIs', 'Neu: {l}', { l: nw.label || '' })), nw.pos) : '')
-      + `<div class="note dim">${nw ? L('land.goNew', '▶ Spielen stellt dich <b>vor das Neue</b>.') : host() ? L('land.goStay', '▶ Spielen: du spielst weiter, wo du warst.') : L('land.goSpawn', '▶ Spielen bringt dich <b>an deinen Spawnpunkt</b>.')}</div>`;
+      + `<div class="note dim">${nw ? L('land.goNew', '▶ Spielen stellt dich <b>vor das Neue</b>.') : host() ? L('land.goStay', '▶ Spielen: du spielst weiter, wo du warst.') : L('land.goSpawn', '▶ Spielen bringt dich <b>an deinen Platz</b>.')}</div>`;
     el.prepend(box);
-    const sb = box.querySelector('[data-spawn]'); if (sb) sb.onclick = () => { WM.spawnArm = !WM.spawnArm; if (WM.spawnArm && WM.tool) { WM.tool = null; WM.ghost = null; } WM.tipW && WM.tipW(WM.spawnArm ? '📍 ' + L('land.armed', 'Klick auf den Boden: dort ist dein Spawnpunkt (Rechtsklick: abbrechen)') : '', !!WM.spawnArm); WM.refresh ? WM.refresh() : C.parts(); };
+    const sb = box.querySelector('[data-spawn]'); if (sb) sb.onclick = () => { WM.spawnArm = !WM.spawnArm; if (WM.spawnArm && WM.tool) { WM.tool = null; WM.ghost = null; } WM.tipW && WM.tipW(WM.spawnArm ? '📍 ' + L('land.armed', 'Klick auf den Boden: dort ist dein Platz (Rechtsklick: abbrechen)') : '', !!WM.spawnArm); WM.refresh ? WM.refresh() : C.parts(); };
     for (const b of box.querySelectorAll('[data-look]')) b.onclick = () => { const p = b.dataset.look.split(',').map(Number), sc = S.scene; if (sc && sc.type === 'world') { sc.center = [p[0], p[1] + 1, p[2]]; S.cam.dist = 34; } };
   }
 
@@ -149,12 +150,13 @@
       const w = play.target(), g = host();
       let t = '▶ ' + L('land.play', 'Spielen'), tip = L('land.playT', 'Ins Spiel');
       if (w) {
-        if (freshOf(w)) { t += ' · ✨ ' + L('land.atNew', 'beim Neuen'); tip = L('land.atNewT', 'Du stehst vor dem, was du gerade gesetzt hast'); }
+        if (freshOf(w)) { t += ' · ' + L('land.atNew', 'beim Neuen'); tip = L('land.atNewT', 'Du stehst vor dem, was du gerade gesetzt hast'); }
         else if (g && g.meta && g.meta.id === w.id) { t = '▶ ' + L('land.goOn', 'Weiterspielen'); tip = L('land.goOnT', 'Zurück ins Spiel, wo du warst'); }
-        else { t += ' · 📍 ' + L('land.atSpawn', 'am Spawnpunkt'); tip = L('land.atSpawnT', 'Du landest an deinem Spawnpunkt'); }
+        else { t += ' · 📍 ' + L('land.atSpawn', 'an meinem Platz'); tip = L('land.atSpawnT', 'Du landest an deinem Platz'); }
         tip += ' — „' + (w.name || 'Welt') + '“';
       }
-      if (b.textContent !== t) b.textContent = t;
+      const lbl = b.querySelector && b.querySelector('.lbl') || b;   // (W1: the ▶ tile keeps its picture)
+      if (lbl.textContent !== t) lbl.textContent = t;
       b.title = tip;
     },
     async go() {

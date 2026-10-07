@@ -1,8 +1,8 @@
 // v0.39 📦 the bridge between the standalone R9 Studio (published as its own artifact: another web origin, its own
 // storage — it can never reach the game's) and the game:
-// · the standalone says so: a banner ("nicht mit deinem Spiel verbunden", 🎮 Zum Spiel, 📦 Mitnehmen, ✕), 💾 Speichern
-//   instead of "Ins Spiel", no message claims "im Spiel", the brand without "▶ Spielen", the Welt mode explains where
-//   the worlds are;
+// · the standalone says so: the ▶ tile reads 🎮 Zum Spiel (W1: the four tiles are the front door, no 🔌 banner), 💾
+//   Speichern instead of "Ins Spiel", no message claims "im Spiel", the brand without "▶ Spielen", the Welt mode explains
+//   where the worlds are;
 // · 📦 Mitnehmen saves favourites + designs + Werkbank Bauteile as ONE file (r9-paket-YYYY-MM-DD.json);
 // · in the game's Studio 📥 Übernehmen (🕘 Weitermachen, or dropping the file anywhere) shows what is in it and takes it
 //   over; the game sees it; the game's title screen takes the same file's text (item ids like blueprint_2 included).
@@ -40,22 +40,22 @@ await section('1 · the standalone says it is not connected', async () => {
   check(await up(sa, true), 'the standalone Studio is up, every catalogue house built');
   SOFA = await sev(() => Object.keys(VR.VM.MODELS).find(n => /^vm_sofa/.test(n)));
   const r = await sev(() => {
-    const bar = document.getElementById('bridgeBar'), vis = (e) => !!e && e.getClientRects().length > 0;
-    return { flags: [window.__R9_STANDALONE === true, window.__R9_GAME_URL], bar: vis(bar) ? bar.textContent : null, btns: bar ? [...bar.querySelectorAll('[data-act]')].map(b => b.dataset.act) : [], brand: document.querySelector('.brand .v').textContent, play: !!document.getElementById('playBtn') };
+    const bar = document.getElementById('bridgeBar'), vis = (e) => !!e && e.getClientRects().length > 0, tile = document.querySelector('#tiles .tile[data-tile="play"]');
+    return { flags: [window.__R9_STANDALONE === true, window.__R9_GAME_URL], bar: vis(bar) ? bar.textContent : null, tiles: document.querySelectorAll('#tiles .tile').length, tile: tile ? tile.querySelector('.lbl').textContent.trim() : null, gameBtn: !!document.getElementById('gameBtn'), brand: document.querySelector('.brand .v').textContent, play: !!document.getElementById('playBtn') };
   });
-  console.log('  bar', JSON.stringify(r));
+  console.log('  front door', JSON.stringify(r));
   check(r.flags[0] && r.flags[1] === GAME_URL, 'the standalone build knows it is standalone and where the game is');
-  check(r.bar && /nicht mit deinem Spiel verbunden/.test(r.bar) && /⏸ → 🧰 R9 Studio/.test(r.bar), 'a banner: "Dieses Studio ist nicht mit deinem Spiel verbunden — … (⏸ → 🧰 R9 Studio)"');
-  check(['game', 'pack', 'hide'].every(a => r.btns.includes(a)), 'with 🎮 Zum Spiel, 📦 Mitnehmen and ✕');
+  check(!r.bar && r.tiles === 4 && r.tile === '🎮 Zum Spiel' && r.gameBtn, 'no 🔌 banner (W1): the four tiles are the front door, ▶ reads „🎮 Zum Spiel"');
   check(!/Spielen/.test(r.brand) && !r.play, 'the brand without "▶ Spielen" (' + r.brand + '), no ▶ button');
   // 🎮 Zum Spiel: a new tab with the game, or (blocked) the link to copy
   const g = await sev(async () => {
     const calls = []; const real = window.open; window.open = (...a) => { calls.push(a); return null; };
-    document.querySelector('#bridgeBar [data-act="game"]').click(); await new Promise(r => setTimeout(r, 100));
-    const first = !document.querySelector('#bridgeBar .gameLink');   // one click: the tab opens, no link box yet
-    document.querySelector('#bridgeBar [data-act="game"]').click(); await new Promise(r => setTimeout(r, 100));   // a second click soon after: it evidently did not open
+    const tile = document.querySelector('#tiles .tile[data-tile="play"]');
+    tile.click(); await new Promise(r => setTimeout(r, 100));
+    const first = !document.querySelector('#tiles .gameLink');   // one click: the tab opens, no link box yet
+    tile.click(); await new Promise(r => setTimeout(r, 100));   // a second click soon after: it evidently did not open
     window.open = real;
-    const inp = document.querySelector('#bridgeBar input');
+    const inp = document.querySelector('.gameLink input');
     return { calls, first, link: inp ? inp.value : null };
   });
   check(g.calls.length === 2 && g.calls[0][0] === GAME_URL && g.calls[0][1] === '_blank' && /noopener/.test(g.calls[0][2] || '') && g.first, '🎮 Zum Spiel opens the game in a new tab (noopener), no link box on the first click');
@@ -104,7 +104,7 @@ await section('2 · honest labels: 💾 Speichern, no "im Spiel"', async () => {
   check(r.saved && /gespeichert/i.test(r.itemTip) && !/im Spiel/.test(r.itemTip) && !/im Spiel/.test(r.hud), 'saved: "' + r.itemTip + '" — nothing says "im Spiel"');
   check(r.houseBtn && /💾 Speichern/.test(r.houseBtn[0]) && r.houseBtn[1] === 'Gespeichert in diesem Studio — 📦 Mitnehmen bringt es ins Spiel', 'the house\'s button: 💾 Speichern');
   check(/💾 gespeichert/.test(r.hub) && !/im Spiel/.test(r.hub), '🕘 shows "💾 gespeichert", never "im Spiel"');
-  check(r.worldBtn && /Welten/.test(r.world) && /⏸ → 🧰 R9 Studio/.test(r.world), 'Welt explains that the worlds live in the game (⏸ → 🧰 R9 Studio), with 🎮 Zum Spiel: ' + r.world.slice(0, 160));
+  check(r.worldBtn && /Welten/.test(r.world) && /⏸ → 🏗 Bauen/.test(r.world), 'Welt explains that the worlds live in the game (⏸ → 🏗 Bauen), with 🎮 Zum Spiel: ' + r.world.slice(0, 160));
   check(!/Im Spiel \(Pause → R9 Studio\)/.test(r.create) && /Mitnehmen/.test(r.create), '✨ Erschaffen promises no game it cannot reach');
   check(/Genie/.test(r.genie) && !/im Spiel/.test(r.genie), '✨ Genie: no "hier im Spiel" in a Studio that is not the game');
 });
@@ -122,7 +122,12 @@ await section('3 · 📦 Mitnehmen: one file with favourites, designs and Bautei
     // a Bauteil (as "🧩 Als Bauteil behalten" keeps one)
     localStorage.setItem('r9si.library', JSON.stringify({ v: 1, t: Date.now(), items: [{ id: 'bt1', name: 'Säule', t: Date.now(), sx: 1, sy: 3, sz: 1, dy: 0, pal: [0, 'air', ['stone']], rle: VR.Custom.b64(VR.Custom.vrle(Uint16Array.from([2, 2, 2]))) }] }));
   });
-  const [dl] = await Promise.all([sa.waitForEvent('download', { timeout: 30000 }), sev(() => document.querySelector('#bridgeBar [data-act="pack"]').click())]);
+  // 📦 Alles mitnehmen lives in 🎒 Meins (W1: the hub's footer)
+  await sev(() => VR.Projects.show(true)); await sa.waitForTimeout(300);
+  const outBtn = await sev(() => (document.querySelector('#hub footer [data-pack="out"]') || {}).textContent || '');
+  check(/Alles mitnehmen/.test(outBtn), '🎒 Meins offers „📦 Alles mitnehmen" (' + outBtn.trim() + ')');
+  const [dl] = await Promise.all([sa.waitForEvent('download', { timeout: 30000 }), sev(() => document.querySelector('#hub footer [data-pack="out"]').click())]);
+  await sev(() => VR.Projects.show(false));
   file = SP + '/' + dl.suggestedFilename();
   await dl.saveAs(file);
   pack = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -131,9 +136,6 @@ await section('3 · 📦 Mitnehmen: one file with favourites, designs and Bautei
   check(pack.r9pack === 1 && pack.from === 'standalone' && pack.at > 0, 'r9pack 1, from the standalone');
   check(pack.favs.join() === 'vx_led_cove,blueprint_2', 'the favourites (a house among them): ' + pack.favs.join(', '));
   check(pack.studio && pack.studio.models && pack.studio.models[SOFA] && pack.lib.length === 1 && pack.lib[0].name === 'Säule', 'the sofa design and the Bauteil are in it');
-  // ✕: the banner goes for this session
-  const h = await sev(async () => { document.querySelector('#bridgeBar [data-act="hide"]').click(); await new Promise(r => setTimeout(r, 100)); const b = document.getElementById('bridgeBar'); return !b || !b.getClientRects().length; });
-  check(h, '✕ hides the banner');
 });
 
 // ---------------------------------------------------------------- the game's Studio (the game's origin)
@@ -201,13 +203,13 @@ await section('6 · the game\'s title screen takes the file\'s text too', async 
     const b = document.querySelector('#studionote [data-act="studioimport"]'); if (b) b.click(); await sleep(100);
     const ta = document.querySelector('#studionote textarea'); ta.value = text;
     const file = !!document.querySelector('#studionote [data-act="studiofile"]');
-    const ok = [...document.querySelectorAll('#studionote button')].find(x => /Übernehmen/.test(x.textContent)); if (ok) ok.click(); await sleep(300);
+    const ok = document.querySelector('#studionote button.take'); if (ok) ok.click(); await sleep(300);   // (Übernehmen · Bring in)
     return { favs: VR.Favs.list(), model: !!(VR.CUSTOM && VR.CUSTOM.models && VR.CUSTOM.models[sofa]), lib: JSON.parse(localStorage.getItem('r9si.library') || '{"items":[]}').items.length, note: (document.getElementById('titlenote') || {}).textContent || '', file };
   }, [fs.readFileSync(file, 'utf8'), SOFA]);
   console.log('  title', JSON.stringify(r));
   check(ok && r.favs.join() === 'vx_led_cove,blueprint_2', 'the title import keeps every favourite, the house (blueprint_2) too: ' + r.favs.join(', '));
   check(r.model && r.lib === 1, 'the design and the Bauteil come along');
-  check(/übernommen/i.test(r.note) && r.file, 'it says what it took (' + r.note + '), and offers 📂 a file too');
+  check(/übernommen|brought in/i.test(r.note) && /favourite|Favorit/i.test(r.note) && r.file, 'it says what it took, in the player\'s language (' + r.note + '), and offers 📂 a file too');
   await ctx2.close();
 });
 await done();

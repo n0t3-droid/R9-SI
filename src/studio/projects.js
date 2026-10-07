@@ -220,14 +220,14 @@
     return `<div class="pj${hero ? ' hero' : ''}${p.done ? ' done' : ''}${p.pin ? ' pinned' : ''}" data-id="${esc(p.id)}" tabindex="0" role="button" aria-label="${esc(PJ.nameOf(p))}">`
       + `<div class="im">${img}<span class="kd">${K.icon || ''}</span>${chip(s)}<span class="go">${IC('play', hero ? 46 : 34)}</span>${acts}</div>`
       + `<div class="tx"><b class="nm" title="${esc(PJ.nameOf(p))}">${esc(PJ.nameOf(p))}</b><span class="tm">${esc(ago(p.t))}</span><span class="sb">${sub}</span>`
-      + (hero ? `<button class="cbtn pri big" data-a="go">${IC('play', 18)} ${L('pj.go', 'Weitermachen')}</button>` : '')
+      + (hero ? `<button class="cbtn pri big" data-a="go">${IC('play', 18)} ${L('pj.weiter', 'Weiter')}</button>` : '')
       + `</div></div>`;
   }
   function ensureEl() {
     let el = $('#hub'); if (el) return el;
     el = document.createElement('div'); el.id = 'hub';
-    el.innerHTML = `<div class="hubBox" role="dialog" aria-label="${esc(L('pj.title', 'Weitermachen'))}">
-      <header><span class="t">${IC('clock', 20)} ${L('pj.title', 'Weitermachen')}</span><div class="hubF"></div><input class="hubQ" placeholder="${esc(L('pj.search', 'Suchen …'))}" autocomplete="off" spellcheck="false"><button class="x" data-a="close" title="${esc(L('pj.close', 'Schließen (Esc)'))}">${IC('close', 18)}</button></header>
+    el.innerHTML = `<div class="hubBox" role="dialog" aria-label="${esc('🎒 ' + L('pj.meins', 'Meins'))}">
+      <header><span class="t">🎒 ${L('pj.meins', 'Meins')}</span><div class="hubF"></div><input class="hubQ" placeholder="${esc(L('pj.search', 'Suchen …'))}" autocomplete="off" spellcheck="false"><button class="x" data-a="close" title="${esc(L('pj.close', 'Schließen (Esc)'))}">${IC('close', 18)}</button></header>
       <div class="hubBody"></div>
       <footer><span class="lbl">${L('pj.new', 'Neu')}</span><div class="new"></div><span class="boot"></span><div class="xfer"><button data-pack="out" title="${esc(L('br.outT', 'Favoriten, Designs und Bauteile als eine Datei — für das Spiel oder ein anderes Studio'))}">📦 ${L('br.out', 'Mitnehmen')}</button><button data-pack="in" title="${esc(L('br.inT', 'Ein R9-Paket (.json) übernehmen — oder die Datei einfach hierher ziehen'))}">📥 ${L('br.in', 'Übernehmen')}</button></div><span class="keys"><kbd>Strg</kbd>+<kbd>O</kbd> ${L('pj.keys', 'öffnet diese Seite überall')}</span></footer></div>`;
     ($('#studio') || document.body).appendChild(el);
@@ -321,11 +321,12 @@
     if (pinned.length) h += `<h4>${IC('pin', 13)} ${L('pj.pinned', 'Angeheftet')}</h4><div class="grid">${pinned.map(x => card(x)).join('')}</div>`;
     if (rest.length) h += `<h4>${IC('clock', 13)} ${hero ? L('pj.recent', 'Zuletzt') : L('pj.found', 'Gefunden')}</h4><div class="grid">${rest.map(x => card(x)).join('')}</div>`;
     if (done.length) h += `<h4 class="tog" data-toggle-done>${IC('check', 13)} ${L('pj.doneN', 'Fertig')} <b>${done.length}</b> <span>${HUB.doneOpen ? '▾' : '▸'}</span></h4>` + (HUB.doneOpen || q ? `<div class="grid">${done.map(x => card(x)).join('')}</div>` : '');
-    if (!shown.length) h += q ? `<div class="empty"><i>⌕</i><b>${L('pj.none', 'Nichts gefunden')}</b></div>` : `<div class="empty"><i>${IC('clock', 54)}</i><b>${L('pj.empty', 'Noch nichts angefangen')}</b><span>${L('pj.emptyT', 'Alles, was du im Crafter umbaust oder erschaffst, landet hier automatisch — mit Bild, auch wenn du es nicht fertig machst.')}</span></div>`;
+    if (!shown.length) h += q ? `<div class="empty"><i>⌕</i><b>${L('pj.none', 'Nichts gefunden')}</b></div>` : `<div class="empty"><i>🎒</i><b>${L('pj.empty2', 'Noch nichts hier')}</b><span>${L('pj.emptyT2', '✨ Erschaffen macht dein erstes Ding — alles, was du umbaust oder erschaffst, landet hier von selbst, mit Bild.')}</span></div>`;
     const body = el.querySelector('.hubBody');
     const ae = document.activeElement, keep = ae && body.contains(ae) && ae.closest('.pj') ? ae.closest('.pj').dataset.id : null;
     body.innerHTML = h;
-    if (keep) { const c = body.querySelector(`.pj[data-id="${cssId(keep)}"]`); if (c) c.focus(); }     // the card you were on keeps the focus
+    if (PJ.decorate) { try { PJ.decorate(body, { q, f: HUB.f }); } catch (e) { console.warn('decorate', e); } }   // (W1: the Ding cards' actions, ★ and Bauteile)
+    if (keep) { const c = body.querySelector(`.pj[data-id="${cssId(keep)}"]`); if (c) c.focus({ preventScroll: true }); }     // the card you were on keeps the focus (and the page its scroll)
     clearTimeout(liveT); fillLive(body, 0);
     bootLine();
   }
@@ -368,7 +369,7 @@
     if (on) {
       renderBody();
       const first = el.querySelector('.hubBody .pj');
-      setTimeout(() => { if (HUB.on) (first || el.querySelector('.hubQ')).focus(); }, 30);
+      setTimeout(() => { if (HUB.on) (first || el.querySelector('.hubQ')).focus({ preventScroll: true }); }, 30);   // (← brings the page back scrolled as it was: the focus must not move it)
     } else { clearTimeout(liveT); clearTimeout(bootT); if (document.activeElement && el.contains(document.activeElement)) document.activeElement.blur(); }
     badge();
   }

@@ -78,7 +78,7 @@ const s1 = await ev(async ([X, Y, Z]) => {
 }, W.P0);
 console.log('  pause', JSON.stringify(s1));
 const S1 = [X + 8.5, Y, Z + 0.5];
-check(s1.btn && /spawn/i.test(s1.btn) && hdist(s1.spawn, S1) < 0.6 && !s1.bed, '📍 in the pause menu sets the spawn point where you stand (' + s1.spawn + ')');
+check(s1.btn && /spawn|Platz|spot/i.test(s1.btn) && hdist(s1.spawn, S1) < 0.6 && !s1.bed, '📍 in the pause menu sets the spawn point (mein Platz) where you stand (' + s1.spawn + ')');
 check(await atTitle(), 'saved and back at the title');
 
 console.log('3 · the Studio sets a stone block onto your last position');
@@ -92,7 +92,7 @@ console.log('  labels', JSON.stringify([lab0, lab1]), n3);
 await ev(() => { const S = window.__st; S.cam.pitch = 0.55; S.cam.dist = 40; });
 await wait(1200);
 await page.screenshot({ path: '/home/claude/vr/test/shots/spawn_1_studio.png', timeout: 120000 });
-check(/Spawn/i.test(lab0 || '') && /Neu/i.test(lab1 || '') && n3 === 100, '▶ says where you will land: "' + lab0 + '" → after setting something: "' + lab1 + '"');
+check(/Spawn|Platz/i.test(lab0 || '') && /Neu/i.test(lab1 || '') && n3 === 100, '▶ says where you will land: "' + lab0 + '" → after setting something: "' + lab1 + '"');
 
 console.log('4 · from the title you play on where you were — never inside the stone');
 await page.goto(URL0 + '/index.html');
@@ -146,7 +146,7 @@ check(await inGame(W.id), '▶ starts the world');
 await wait(800);
 const p6 = await me();
 console.log('  spawn', lab6, JSON.stringify(p6));
-check(/Spawn/i.test(lab6 || '') && hdist(p6.pos, S1) <= 1.5 && !p6.wall, 'nothing new: at the spawn point from the pause menu (' + p6.pos + ')');
+check(/Spawn|Platz/i.test(lab6 || '') && hdist(p6.pos, S1) <= 1.5 && !p6.wall, 'nothing new: at the spawn point from the pause menu (' + p6.pos + ')');
 await ev(() => VR.game.quitToTitle()); await atTitle();
 
 console.log('7 · 📍 in the Studio');

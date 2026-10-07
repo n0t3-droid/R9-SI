@@ -9,6 +9,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const M = VR.M;
   const lerp = (a, b, t) => a + (b - a) * t;
   const ease = (t) => t * t * (3 - 2 * t);
@@ -33,7 +35,7 @@
     ui() {
       if (this.dom) return this.dom;
       const d = document.createElement('div'); d.id = 'cine';
-      d.innerHTML = '<div class="bar top"></div><div class="bar bot"></div><div class="fade"></div><div class="cap"></div><div class="hintc">Esc — stop</div>';
+      d.innerHTML = '<div class="bar top"></div><div class="bar bot"></div><div class="fade"></div><div class="cap"></div><div class="hintc">' + T('g.chat.directorStop') + '</div>';
       document.getElementById('app').appendChild(d);
       this.dom = d; return d;
     }

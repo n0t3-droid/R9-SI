@@ -7,6 +7,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const mat4 = VR.mat4, M = VR.M, PH = VR.PHYS, R = VR.R, F = VR.F;
   const TAU = Math.PI * 2, QT = Math.PI / 2;
   const IDENT = mat4.create();
@@ -149,7 +151,7 @@
         s.pos[1] = y !== null ? y : Math.floor(p.pos[1]);
         g.audio.play('warp');
         g.particles.explosion(x + 0.5, s.pos[1] + m.height * 0.5, z + 0.5, 0.8);
-        g.ui.chatLine(`${m.name} (${m.label}) has landed. Right-click it to board.`, '#9affd8');
+        g.ui.chatLine(T('g.star.landed', { name: m.name, label: m.label }), '#9affd8');
       });
       return d;
     }
@@ -185,7 +187,7 @@
       if (gad) gad.riding = { type: 'starship', ship: s };
       p.flying = false; p.target = null; p.breaking = null; p.yaw = s.yaw; p.pitch = 0;
       g.audio.play('door');
-      g.ui.hint(`${s.d.meta.name} · W thrust · mouse steer · Space/Shift up/down · G autopilot to a village · V land`, 4000);
+      g.ui.hint(T('g.star.hint', { name: s.d.meta.name }), 4000);
       g.codex && g.codex.event && g.codex.event('ship');
     }
     drive(dt, input, blocked) {
@@ -199,7 +201,7 @@
       const agile = m.arch === 'racer' || m.arch === 'interceptor' ? 2.4 : m.arch === 'freighter' || m.arch === 'cruiser' ? 0.9 : m.arch === 'carrier' ? 0.45 : 1.6;
       let wantYaw = p.yaw, steer = !k('AltLeft');
       // autopilot: any flight key hands the controls back
-      if (this.auto && (fw || st || up)) this.stopAuto('Autopilot off — you have the controls.');
+      if (this.auto && (fw || st || up)) this.stopAuto(T('g.star.autoOff'));
       if (this.auto) {
         const a = this.autoDrive(dt, s, m, agile);
         if (a === 'landed') return;
@@ -257,10 +259,10 @@
     toggleAuto() {
       const g = this.g, s = this.pilot; if (!s) return;
       const list = this.autoTargets();
-      if (!list.length) { g.ui.hint('Autopilot: no other village within 900 blocks yet — fly on and try again', 2600); return; }
+      if (!list.length) { g.ui.hint(T('g.star.noVillage'), 2600); return; }
       // G cycles through the villages, nearest first, then switches the autopilot off
       let i = 0;
-      if (this.auto) { i = list.findIndex(v => v.id === this.auto.site.id) + 1; if (i <= 0 || i >= Math.min(list.length, 6)) { this.stopAuto('Autopilot off.'); return; } }
+      if (this.auto) { i = list.findIndex(v => v.id === this.auto.site.id) + 1; if (i <= 0 || i >= Math.min(list.length, 6)) { this.stopAuto(T('g.star.autoOff2')); return; } }
       this.startAuto(list[i]);
     }
     startAuto(site) {
@@ -288,7 +290,7 @@
         let top = 0; for (let i = cand.length * 5; i < H.length; i++) top = Math.max(top, H[i]);
         A.cruise = M.clamp(Math.max(top + 34, (best ? best[1] : site.y) + 45), 100, 236);
       });
-      g.ui.chatLine(`Autopilot engaged → ${site.name} (${(L / 1000).toFixed(1)} km). G: next village · any flight key takes the controls · V lands now.`, '#9affd8');
+      g.ui.chatLine(T('g.star.auto', { site: site.name, km: (L / 1000).toFixed(1) }), '#9affd8');
       g.audio && g.audio.tone && g.audio.tone(660, 0.08, 0.1, 'triangle', true);
     }
     stopAuto(msg) { if (!this.auto) return; this.auto = null; if (msg) this.g.ui.hint(msg, 2200); }
@@ -369,10 +371,10 @@
           if (c && c.ready) {
             const name = site.name;
             this.auto = null;
-            if (this.land() !== false && !this.pilot) { g.ui.chatLine(`Welcome to ${name}!`, '#ffd98a'); g.ui.hint(`Welcome to ${name}!`, 3000); if (g.codex && g.codex.event) g.codex.event('autopilot'); return 'landed'; }
+            if (this.land() !== false && !this.pilot) { g.ui.chatLine(T('g.star.welcome', { name }), '#ffd98a'); g.ui.hint(T('g.star.welcome', { name }), 3000); if (g.codex && g.codex.event) g.codex.event('autopilot'); return 'landed'; }
             // no room: try another field
             this.auto = A; A.tries++; A.refined = false; A.refineT = 0; A.finalYaw = undefined;
-            if (A.tries > 4) { this.stopAuto('Autopilot: no room to land — take the controls (V lands)'); return null; }
+            if (A.tries > 4) { this.stopAuto(T('g.star.autoNoRoom')); return null; }
             const a = Math.random() * Math.PI * 2; A.spot = [tgt[0] + Math.cos(a) * 14, tgt[1], tgt[2] + Math.sin(a) * 14];
           }
         }
@@ -399,7 +401,7 @@
       if (y === null || s.pos[1] - y > 40) y = Math.round(s.pos[1]); // hover-park in the sky
       let ok = false;
       for (let k = 0; k < 8 && !ok; k++) { if (!this.hits(s, s.pos[0], y + k, s.pos[2], s.yaw)) { y += k; ok = true; } }
-      if (!ok) { s.pos = old[0]; s.yaw = old[1]; s.pitch = old[2]; s.roll = old[3]; this.rotOf(s); g.ui.hint('No room to land here', 1800); return false; }
+      if (!ok) { s.pos = old[0]; s.yaw = old[1]; s.pitch = old[2]; s.roll = old[3]; this.rotOf(s); g.ui.hint(T('g.star.noRoom'), 1800); return false; }
       s.pos[1] = y; s.vel = [0, 0, 0]; s.state = 'parked'; s.gear = 1; this.rotOf(s);
       this.pilot = null;
       if (g.gadgets) g.gadgets.riding = null;
@@ -429,8 +431,8 @@
     hudText() {
       const s = this.pilot; if (!s || !s.d.meta) return null;
       const sp = Math.hypot(s.vel[0], s.vel[1], s.vel[2]), hd = ((Math.round(-s.yaw * 180 / Math.PI) % 360) + 360) % 360;
-      const ap = this.auto ? `<br><b style="color:#9affd8">AUTOPILOT → ${this.auto.site.name.toUpperCase()} · ${(this.auto.dist / 1000).toFixed(2)} km</b>` : '';
-      return `<b>${Math.round(sp)} m/s</b> · ALT ${Math.round(s.pos[1])} · HDG ${hd}° · ${s.d.meta.name}${ap}<br><small>W/S thrust · mouse steer · A/D strafe · Space/Shift climb · Ctrl boost · LMB lasers · F5 view · <b>G autopilot</b> · <b>V land</b></small>`;
+      const ap = this.auto ? T('g.star.autoHud', { site: this.auto.site.name.toUpperCase(), km: (this.auto.dist / 1000).toFixed(2) }) : '';
+      return T('g.star.hud', { v: Math.round(sp), alt: Math.round(s.pos[1]), hd, name: s.d.meta.name, ap });
     }
     camera(cam) {
       const g = this.g, s = this.pilot, p = g.player, m = s.d.meta;
