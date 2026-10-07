@@ -82,7 +82,9 @@
 
   // ---------------------------------------------------------------- the builder
   // L: lot builder, lot: {w, d, F}, o: {rng, ground(u, v), beds, family?, skin?, storeys?}
-  PLAN.build = function (L, lot, o) {
+  // The builder is a generator that yields between its phases, so one house is never a single long call (the planner
+  // runs it in slices, see VG.planAdvance). PLAN.build runs it to the end for the callers that build a house at once.
+  PLAN.buildSteps = function* (L, lot, o) {
     const cat = (o.index !== undefined && PLAN.CATALOGUE[o.index]) || (o.family && PLAN.CATALOGUE.find(c => c.make === PLAN.templates[o.family])) || PLAN.pick(lot.w, lot.d, o.rng);
     if (!cat) return null;
     // R9 Studio: a catalogue house the player re-built in the Crafter — build exactly the variant it was edited on,
@@ -143,8 +145,9 @@
       else { for (let y = Math.min(gy, yardY) - 2; y < yardY; y++) P(u, y, v, 'dirt'); P(u, yardY, v, 'grass_block'); for (let y = yardY + 1; y <= F + 2; y++) P(u, y, v, null); }
     }
     hbox(-1, -3, F + 1, w, d + 2, top + 9, null);
+    yield;
     // ---- per floor: slabs, walls, rooms
-    H.floors.forEach((fl, fi) => {
+    for (const [fi, fl] of H.floors.entries()) {
       const y0 = F + fl.y, map = new Map(); roomAt.push(map);
       const rc = fl.rect || [0, 0, w - 1, d - 1]; fl.rect = rc;
       for (const r of fl.rooms) { r.fi = fi; r.doors = r.doors || []; r.windows = r.windows || []; r.w = r.u1 - r.u0 + 1; r.d = r.v1 - r.v0 + 1; for (let v = r.v0; v <= r.v1; v++) for (let u = r.u0; u <= r.u1; u++) map.set(u + ',' + v, r); if (r.zones) for (const z of r.zones) { z.parent = r; z.fi = fi; z.doors = r.doors; z.windows = r.windows; z.w = z.u1 - z.u0 + 1; z.d = z.v1 - z.v0 + 1; } }
@@ -161,12 +164,13 @@
         hp(u, y0, v, ring ? (fi === 0 ? skin.plinth : skin.band) : r ? floorOf(r, skin) : 'floor_oak');
         for (let y = y0 + 1; y <= y0 + SH - 1; y++) hp(u, y, v, ring ? wall : r ? null : 'stucco_white');
       }
-    });
+      yield;
+    }
     // top ceiling (white underside) inside the walls
     const TR = H.floors[H.floors.length - 1].rect;
     for (let v = TR[1] + 1; v < TR[3]; v++) for (let u = TR[0] + 1; u < TR[2]; u++) hp(u, top, v, 'floor_oak');
     // ---- openings between rooms
-    H.floors.forEach((fl, fi) => {
+    for (const [fi, fl] of H.floors.entries()) {
       const y0 = F + fl.y;
       for (const r of fl.rooms) {
         for (const key of [r.to, r.to2]) {
@@ -187,9 +191,10 @@
           }
         }
       }
-    });
+    }
+    yield;
     // ---- windows on the outside walls
-    H.floors.forEach((fl, fi) => {
+    for (const [fi, fl] of H.floors.entries()) {
       const y0 = F + fl.y;
       for (const r of fl.rooms) {
         const sides = [], rc = fl.rect;
@@ -244,7 +249,8 @@
         if (r.balcony && fi > 0 && r.v1 === D) { const y0b = y0; const bu = r.u0 + 1; for (const u of [bu, bu + 1]) { gdoor(u, y0b + 1, d - 1, 2, u - bu); for (let y = y0b + 3; y <= y0b + SH - 1; y++) hp(u, y, d - 1, glass); r.doors.push({ u, v: D, side: 2 }); } }
         if (r.terrace && fi > 0 && garageW >= 7) { const gs = mirrored ? 3 : 1, uw = gs === 1 ? w - 1 : 0, ur = gs === 1 ? W : 1; if ((gs === 1 && r.u1 === W) || (gs === 3 && r.u0 === 1)) { const v = r.v0 + 2; gdoor(uw, y0 + 1, v, gs, 0); r.doors.push({ u: ur, v, side: gs }); r.windows = r.windows.filter(wn => !(wn.side === gs && wn.v === v)); } }
       }
-    });
+      yield;
+    }
     // ---- entrance: glass double door, side lights, canopy, sconces, the step
     const E = H.entry;
     for (let k = 0; k < E.n; k++) {
@@ -262,6 +268,7 @@
     if (VM && VM.MODELS.vm_house_sign) { hp(E.u + E.n, F + 3, -1, 'vm_house_sign', { facing: 0 }); if (!H.features.portico && E.u - 2 >= 0) hp(E.u - 2, F + 1, -1, 'vm_letterbox', { facing: 0 }); }
     for (let k = 0; k < E.n; k++) hp(E.u + k, F, -1, skin.plinth + '_stairs', { facing: 2, half: 0 });
     info.door = [H.u0 + E.u + (E.n >> 1), F + 1, H.v0]; info.outside = [H.u0 + E.u + (E.n >> 1), F, H.v0 - 2]; info.inside = [H.u0 + E.u + (E.n >> 1), F + 1, H.v0 + (H.stairs && H.stairs.double ? 1 : 2)];
+    yield;
     // ---- stairs & voids
     const G0 = H.floors[0].rooms, U1 = H.floors[1] ? H.floors[1].rooms : [];
     if (H.stairs) {
@@ -286,6 +293,7 @@
       for (let u = a; u <= c2; u++) for (let y = Y1 + 1; y <= top - 1; y++) hp(u, y, 0, glass);
       hp((a + c2) >> 1, top - 1, (b + d2) >> 1, 'vx_chandelier'); info.lights.push([H.u0 + ((a + c2) >> 1), top - 1, H.v0 + ((b + d2) >> 1)]);
     }
+    yield;
     // ---- signature features
     const FT = H.features;
     if (FT.erker) {
@@ -322,6 +330,7 @@
         const rr = roomAt[1].get(((a + b) >> 1) + ',1'); if (rr) { const du = (a + b) >> 1; gdoor(du, Y1 + 1, 0, 0, 0); rr.doors.push({ u: du, v: 1, side: 0 }); rr.windows = rr.windows.filter(wn => !(wn.side === 0 && wn.u === du)); }
       }
     }
+    yield;
     if (FT.towers) for (const [tu, tv] of FT.towers) {
       // octagonal corner tower through both storeys: the house corner opens into it, windows on the outward faces
       const ring = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (a || b) ring.push([tu + a, tv + b]);
@@ -336,6 +345,7 @@
       pyramid(hp, tu, tv, top + 3, 'slate');
       hp(tu, Y1 - 1, tv, 'vx_pendant_brass'); hp(tu, top - 1, tv, 'vx_pendant_brass');
     }
+    yield;
     if (FT.roundTower) {
       const [tu, tv] = FT.roundTower;
       const inner = (u, v) => u >= 1 && u <= W && v >= 1 && v <= D;
@@ -354,6 +364,7 @@
       pyramid(hp, tu, tv, top + 4, 'terracotta');
       hp(tu, Y1 - 1, tv, 'vx_pendant_brass'); hp(tu, top - 1, tv, 'vx_pendant_brass'); hp(tu, top + 3, tv, 'vx_pendant_brass');
     }
+    yield;
     if (FT.colonnade) {
       // six two-storey marble columns in front of the garden facade, a balcony between the wall and the columns, an entablature
       const cols = []; for (let u = 1; u <= w - 2; u += 3) cols.push(u);
@@ -374,6 +385,7 @@
       hp((lg.u0 + lg.u1) >> 1, Y1 - 1, d, 'vx_pendant_brass');
       const k2 = U1.find(r => r.u0 === 1 && r.v1 === D); if (k2) { const bu = k2.u0 + 1; for (const u of [bu, bu + 1]) { gdoor(u, Y1 + 1, d - 1, 2, u - bu); for (let y = Y1 + 3; y <= top - 1; y++) hp(u, y, d - 1, glass); k2.doors.push({ u, v: D, side: 2 }); } }
     }
+    yield;
     if (skin.quoins || FT.quoins) for (const [u, v] of [[0, 0], [w - 1, 0], [0, d - 1], [w - 1, d - 1]]) for (let y = F + 1; y < top; y++) if ((y - F) & 1) hp(u, y, v, skin.trim);
     if (H.features.cantilever && H.floors[1]) {
       // Black Label: the upper floor pushes a glass box out over the entrance canopy
@@ -387,8 +399,10 @@
       for (let u = 0; u < w; u++) hp(u, Y1 + 1, 0, roomAt[1].get(u + ',1') && u > 0 && u < w - 1 ? glass : skin.accent);
       for (let y = F + 1; y <= Y1 - 1; y++) hp(E.u + E.n + 2 < w - 1 ? E.u + E.n + 2 : E.u - 3, y, 0, 'wood_slat', { axis: 1 });
     }
+    yield;
     // ---- roof
     roof(hp, H, skin, F, top, info, rng, SH, garageW ? (mirrored ? 3 : 1) : 0);
+    yield;
     // ---- garage or carport, driveway, front garden
     const gs = mirrored ? -1 : 1;                              // garage side (+u or −u of the house)
     const gu0 = gs > 0 ? H.u1 + 1 : 0, gu1 = gs > 0 ? H.u1 + garageW : H.u0 - 1;   // lot coordinates
@@ -396,11 +410,17 @@
     else if (cat.carport) carport(P, H, gu0, gu1, F, skin, rng, info);
     frontGarden(P, H, lot, F, skin, rng, info, cat, gu0, gu1);
     backGarden(P, H, lot, F, skin, rng, info, cat, garageW, gs);
+    yield;
     if (FT.poolHall) poolHall(hp, H, FT.poolHall, F, skin, rng, info);
+    yield;
     // ---- furnish every room (and every zone of the open-plan rooms)
     const ctx = { hp, H, F, skin, info, rng, W, D, roomAt, SH };
-    H.floors.forEach((fl) => { for (const r of fl.rooms) { if (r.zones) for (const z of r.zones) PLAN.furnish(ctx, z, r); else PLAN.furnish(ctx, r, null); } });
+    for (const fl of H.floors) for (const r of fl.rooms) {
+      if (r.zones) for (const z of r.zones) { PLAN.furnish(ctx, z, r); yield; }
+      else { PLAN.furnish(ctx, r, null); yield; }
+    }
     info.roofTop = Math.max(info.roofTop, top + 7);
+    yield;
     if (custom) {
       if (tpl) VR.Custom.applyTemplate(custom, L0, F, info, cap); else VR.Custom.applyHouse(custom, L, F, info);
       if (custom.top) info.roofTop = Math.max(info.roofTop, F + custom.top + 1);
@@ -408,6 +428,10 @@
     }
     info.beds = info.beds.slice(0, 3);   // a villa houses a family of up to three, not one villager per bed
     return info;
+  };
+  PLAN.build = function (L, lot, o) {
+    const it = PLAN.buildSteps(L, lot, o);
+    for (;;) { const r = it.next(); if (r.done) return r.value; }
   };
 
   function floorOf(r, skin) {
