@@ -296,6 +296,61 @@ section('park', () => {
   }
 });
 
+// ---------------------------------------------------------------- the game's placer (blueprints.js) in node: /bau puts
+// a plan where you look, the worker's job (Forge.job) builds the piece, the lot is levelled, a big one goes in slices with
+// one undo step, a person walks to every floor of what stands in the world, "/bau höher" takes it back and builds it
+// taller on the same spot; a bridge over a valley reads the ground under it
+section('place', () => {
+  VR.ITEMS = VR.ITEMS || {};
+  require('../src/main/blueprints.js');
+  const store = new Map(); global.localStorage = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) };
+  const S = (n) => R.byName[n].defaultState, GY = 63;
+  let groundAt = () => GY;                                           // the land: flat at 63, or a valley for the bridge
+  const edits = new Map(), K3 = (x, y, z) => x + ',' + y + ',' + z;
+  const world = {
+    getBlock: (x, y, z) => { const k = K3(x, y, z); if (edits.has(k)) return edits.get(k); const gy = groundAt(x, z); return y > gy ? 0 : y === gy ? S('grass_block') : y > gy - 4 ? S('dirt') : S('stone'); },
+    col: () => ({ ready: true }), bulkSet: (list) => { for (const [x, y, z, s] of list) edits.set(K3(x, y, z), s); },
+  };
+  const toasts = [], chat = [];
+  const gad = { wand: { undo: [] }, applyEdit(list, undo) { world.bulkSet(list); if (undo) this.wand.undo.push(undo); }, undo() { const u = this.wand.undo.pop(); if (u) world.bulkSet(u); }, noteBlock() {} };
+  const player = { creative: true, pos: [0.5, GY + 1, 0.5], yaw: Math.PI, pitch: -0.08, eye: 1.6, eyePos() { return [this.pos[0], this.pos[1] + 1.6, this.pos[2]]; }, lookDir() { const cp = Math.cos(this.pitch); return [-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp]; }, unstick() {} };
+  const g = gad.g = { world, meta: { id: 'w1' }, state: 'play', player, ui: { hint() {}, toast: (a, b) => toasts.push(b), chatLine: (t) => chat.push(t) }, pool: { direct: (i, msg, tr, cb) => cb(Forge.job(msg)) } };
+  const B = new VR.Blueprints(gad);
+  let slices = 0, maxSlice = 0;
+  const run = () => { for (let i = 0; i < 400; i++) { if (B.slices) { const a = B.slices.at; B.tickSlices(0.06); if (B.slices) { slices++; maxSlice = Math.max(maxSlice, B.slices.at - a); } else slices++; } else B.tickPlans(0.6); if (B.plans && B.plans.every(p => p.status === 'built' || p.failed) && !B.slices) break; } };
+  const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
+  // the built piece read back from the world into a lot-local grid, then walked from its door
+  const readBack = (pl, bp) => { const W = bp.lot[0], D = bp.lot[1], y0 = bp.bottom, sy = bp.top - y0 + 3, gr = { sx: W, sy, sz: D, dy: y0, blocks: new Uint16Array(W * sy * D) }; for (let y = 0; y < sy; y++) for (let v = 0; v < D; v++) for (let u = 0; u < W; u++) { const q = ROT[pl.r & 3](u, v); gr.blocks[(y * D + v) * W + u] = world.getBlock(pl.ox + q[0], pl.F + y0 + y, pl.oz + q[1]); } return gr; };
+  const levels = (pl) => { const bp = B.planPiece(pl), gr = readBack(pl, bp), d = bp.doors[0], wk = Forge.walkable(gr, [d[0], d[1] - gr.dy, d[2] + 1], {}); const want = bp.floors.concat([bp.roof]).map(y => y - gr.dy + 1); return { hit: want.filter(y => wk.floors.includes(y)).length, want: want.length, bp }; };
+  B.forgeCommand('Hochhaus 30 Stockwerke Glas'.split(' '));
+  const pl = B.plans.find(p => p.kind === 'forge');
+  check(pl && /^tower:f30/.test(pl.dna) && pl.status === 'pending' && JSON.parse(store.get('r9si.plans.w1')).plans.length === 1, '/bau Hochhaus 30 Stockwerke Glas → a plan where you look, stored for the Studio: ' + (pl && pl.dna) + ' at ' + (pl && [pl.ox, pl.F, pl.oz, pl.r].join(' · ')));
+  run();
+  check(pl.status === 'built' && slices >= 3 && maxSlice <= 8000 && /Hochhaus gebaut/.test(toasts.join(' ')), 'the game built it in ' + slices + ' slices of at most ' + maxSlice + ' cells: ' + toasts.join(' · '));
+  check(gad.wand.undo.length === 1 && gad.wand.undo[0].length > 16000, 'one undo step for the whole tower (' + (gad.wand.undo[0] || []).length + ' cells)');
+  const L1 = levels(pl);
+  check(L1.hit === L1.want && L1.want === 31, 'in the world a person walks from the door to all 30 floors and the roof: ' + L1.hit + '/' + L1.want);
+  check(world.getBlock(pl.ox + 3, GY, pl.oz + 3) !== S('grass_block') && world.getBlock(pl.ox - 1, GY + 1, pl.oz - 1) === 0, 'the lot is paved, the verge around it clear');
+  B.forgeCommand(['höher']);
+  const pl2 = B.plans.find(p => p.kind === 'forge' && p.status === 'pending');
+  check(pl2 && /^tower:f38/.test(pl2.dna) && pl2.ox === pl.ox && pl2.oz === pl.oz && gad.wand.undo.length === 0 && world.getBlock(pl.ox + 10, GY + 100, pl.oz + 10) === 0, '/bau höher takes the tower back (one Z) and plans it taller on the same spot: ' + (pl2 && pl2.dna));
+  run();
+  const L2 = levels(pl2);
+  check(pl2.status === 'built' && L2.hit === L2.want && L2.want === 39 && JSON.parse(store.get('r9si.plans.w1')).plans.map(p => p.status).join() === 'built', 'the taller one stands, every floor reached (' + L2.hit + '/' + L2.want + '), the Studio sees one built plan');
+  const nPlans = B.plans.length; B.forgeCommand(['Wackelpudding']);
+  check(/ändert nichts|changes nothing/.test(chat[chat.length - 1]) && B.plans.length === nPlans, 'words that name nothing and change nothing: a hint, no plan: ' + chat[chat.length - 1]);
+  // a bridge over a valley, placed on the near bank: the ground is read under it, the piers stand on the valley floor
+  edits.clear(); groundAt = (x, z) => (z >= 10 && z <= 40 ? GY - 10 : GY); player.pos = [200.5, GY + 1, -6]; player.yaw = Math.PI; player.pitch = -0.4;
+  B.forgeCommand('Bogenbrücke 40 lang aus Stein'.split(' '));
+  const br = B.plans.find(p => p.kind === 'forge' && /^bridge/.test(p.dna));
+  run();
+  const bpb = br && B.planPiece(br);
+  let piers = 0; if (bpb) for (let z = 10; z <= 40; z++) { const q = ROT[br.r & 3](bpb.lot[0] >> 1, 0); const s = world.getBlock(br.ox + q[0], GY - 9, z); if (s && s !== S('grass_block')) piers++; }
+  check(br && br.status === 'built' && piers >= 2, 'a Bogenbrücke over a valley: built from the bank (' + (br && br.dna) + '), piers or arches down on the valley floor in ' + piers + ' rows');
+  const deckOK = br && (() => { let ok = 0; for (let z = br.oz; z < br.oz + 40; z++) if (world.getBlock(br.ox + 2, br.F, z)) ok++; return ok; })();
+  check(deckOK >= 38, 'its deck spans the valley at the height of the bank: ' + deckOK + '/40 cells');
+});
+
 // ---------------------------------------------------------------- the sweep: random parameter sets of every type with
 // floors (a fixed seed — the same sets every run): the stairs reach every floor, the roof, the wall walk, the tower tops,
 // the keep's battlements, the stadium's pitch and its top walkway; the lookout's platform; the halls are walkable

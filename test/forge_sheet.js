@@ -5,13 +5,14 @@
 //   node test/forge_sheet.js            every type
 //   node test/forge_sheet.js tower      one type
 //   node test/forge_sheet.js 'tower:f30,glas#3' 'bridge:l60,k2,stahl#1'   any DNAs onto forge_pick.png
-//   SIZE=420 for bigger cells; VIEW=front|side|back for other angles
+//   SIZE=420 for bigger cells; VIEW=front|side|back|top|low for other angles; CUT=n cuts everything above row n (relative to the
+//   floor) away — a look into the rooms
 const sharp = require('/home/claude/.npm-global/lib/node_modules/sharp');
 require('./load_shared.js');
 for (const f of ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_build']) { try { require('../src/main/' + f + '.js'); } catch (e) { /* optional */ } }
 const Forge = VR.Forge, R = VR.R, T = R.T, KEEP = 0xFFFF;
 const args = process.argv.slice(2);
-const SIZE = +(process.env.SIZE || 330), LABEL = 34, COLS = +(process.env.COLS || 4), VIEW = process.env.VIEW || 'front';
+const SIZE = +(process.env.SIZE || 330), LABEL = 34, COLS = +(process.env.COLS || 4), VIEW = process.env.VIEW || 'front', CUT = process.env.CUT ? +process.env.CUT : null;
 // ---- face colours from the texture build (average colour + coverage per layer)
 let AVG = null;
 function textures() {
@@ -63,6 +64,7 @@ function render(g, size, ground) {
     if (x < 0 || z < 0 || x >= W || z >= D) return y <= gnd(Math.max(0, Math.min(W - 1, x)), Math.max(0, Math.min(D - 1, z))) ? -2 : 0;
     if (y < 0) return -2;
     if (y >= H) return 0;
+    if (CUT !== null && y > floorY + CUT) return 0;
     const s = g.blocks[(y * D + z) * W + x];
     if (s === KEEP) return y <= gnd(x, z) ? -2 : 0;
     return s;
