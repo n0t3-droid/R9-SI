@@ -203,13 +203,13 @@ await section('6 · the game\'s title screen takes the file\'s text too', async 
     const b = document.querySelector('#studionote [data-act="studioimport"]'); if (b) b.click(); await sleep(100);
     const ta = document.querySelector('#studionote textarea'); ta.value = text;
     const file = !!document.querySelector('#studionote [data-act="studiofile"]');
-    const ok = [...document.querySelectorAll('#studionote button')].find(x => /Übernehmen/.test(x.textContent)); if (ok) ok.click(); await sleep(300);
+    const ok = document.querySelector('#studionote button.take'); if (ok) ok.click(); await sleep(300);   // (Übernehmen · Bring in)
     return { favs: VR.Favs.list(), model: !!(VR.CUSTOM && VR.CUSTOM.models && VR.CUSTOM.models[sofa]), lib: JSON.parse(localStorage.getItem('r9si.library') || '{"items":[]}').items.length, note: (document.getElementById('titlenote') || {}).textContent || '', file };
   }, [fs.readFileSync(file, 'utf8'), SOFA]);
   console.log('  title', JSON.stringify(r));
   check(ok && r.favs.join() === 'vx_led_cove,blueprint_2', 'the title import keeps every favourite, the house (blueprint_2) too: ' + r.favs.join(', '));
   check(r.model && r.lib === 1, 'the design and the Bauteil come along');
-  check(/übernommen/i.test(r.note) && r.file, 'it says what it took (' + r.note + '), and offers 📂 a file too');
+  check(/übernommen|brought in/i.test(r.note) && /favourite|Favorit/i.test(r.note) && r.file, 'it says what it took, in the player\'s language (' + r.note + '), and offers 📂 a file too');
   await ctx2.close();
 });
 await done();
