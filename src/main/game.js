@@ -769,7 +769,7 @@
         if (this.revealPending && !p.hold && !this.studioOpen && !this.ui.screen && (this.revealWait = (this.revealWait || 0) + dt) > 0.4) { this.revealWait = 0; this.reveal(); }
         else { if (gad) gad.preUpdate(dt, input, p); p.update(dt, input); }
       }
-      if (this.sim && !(this.mp && this.mp.isClient)) this.sim.update(dt);
+      if (this.sim) this.sim.update(dt, !!(this.mp && this.mp.isClient));   // a guest: only the sliding doors (the host runs the world)
       if (this.entities) this.entities.update(dt);
       if (this.villages) this.villages.update(dt);
       if (gad) gad.tick(dt);
@@ -964,6 +964,8 @@
         if (this.sim) this.sim.onBlockChanged(x, y, z, s, ns);
         return true;
       }
+      // the sliding glass doors of modern houses and shops: a right click opens the whole door (it closes by itself)
+      if (t.o.vx && t.o.vx.kind === 'mdoor' && this.sim && this.sim.slideOpen(x, y, z, s)) return true;
       if (k === 'lever') { const ns = t.with(s, 'powered', t.get(s, 'powered') ? 0 : 1); w.setBlock(x, y, z, ns, 4); this.audio.play('click'); return true; }
       if (k === 'button') { if (t.get(s, 'powered')) return true; w.setBlock(x, y, z, t.with(s, 'powered', 1), 4); this.audio.play('click'); if (this.sim) this.sim.schedule(x, y, z, t.o.pulse || 20, 'unpress'); return true; }
       // Modern Living (voxmodern.js): a lamp switches on / off — every part of the model at once; a cupboard opens one
@@ -975,6 +977,7 @@
           const facing = t.get(s, 'facing');
           cells.forEach(([bx, by, bz], i) => { const bs = w.getBlock(bx, by, bz); if (R.T.type[bs] === t.id && t.get(bs, 'facing') === facing && t.get(bs, 'part') === i) w.setBlock(bx, by, bz, t.with(bs, 'lit', lit), 4); });
           this.audio.play('click');
+          if (t.o.bed && this.sleep) this.sleep(x, y, z);   // an LED bed is a bed as well: spawn point, sleep at night
           return true;
         }
         if (t.o.ui === 'chest' && this.openContainer) { this.openContainer(cells[0][0], cells[0][1], cells[0][2], t); return true; }
