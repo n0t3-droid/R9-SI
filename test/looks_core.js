@@ -211,5 +211,18 @@ const MESH0 = mesh();
   check(sameTables(T0) && specJSON() === SPEC0, 'and everything back');
 }
 
+// ---------------------------------------------------------------- 8 · the forged textures never depend on a look
+{
+  require('../src/main/tex_layout.js');
+  const key = () => { const m = V.textureMasks(); return [m.cube.join(''), m.cut.join(''), m.leaf.join(''), m.block.join('')].join('|'); };
+  const k0 = key();
+  const d = { looks: { stone_bricks: { tex: 'polished_andesite' }, stone_brick_slab: { tex: { top: 'stone', side: 'stone' } }, oak_planks: { rc: '#e6cfa4' }, glass: { rc: '#ff0000' } } };
+  const r = L.addVariant(d, { src: 'oak_leaves', name: 'Laub', look: { rc: '#ff8800' } }); const r2 = L.addVariant(r.data, { src: 'stone_brick_slab', name: 'Platte', look: { tex: 'polished_andesite' } });
+  L.apply(r2.data);
+  check(key() === k0, 'cube / cut-out / leaf / block masks (the texture cache key) are the same with looks and variants');
+  L.apply({ looks: {} });
+  check(key() === k0 && sameTables(T0), 'and after ↺ Original');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

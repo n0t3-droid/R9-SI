@@ -140,6 +140,7 @@
   const origRC = (s) => { const o = SNAP.get(s); return o ? o.rc : T_().rc[s]; };
   const origTex = (s, f) => { const o = SNAP.get(s); return o ? o.tex[f] : T_().tex[s * 6 + f]; };
   const origModel = (s) => { const o = SNAP.get(s); return o ? o.model : R.models[s]; };
+  L.origTex = origTex; L.origModel = origModel;
   function restoreType(t) {
     const T = T_();
     for (let s = t.base; s < t.base + t.nstates; s++) { const o = SNAP.get(s); if (!o) continue; T.rc[s] = o.rc; T.tex.set(o.tex, s * 6); R.models[s] = o.model; SNAP.delete(s); }
@@ -437,23 +438,43 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
   return col * (dot(alb, vec3(0.2126, 0.7152, 0.0722)) / max(al, 0.004));
 }
 `;
-  // the table: the linear luminance average of every layer (level 0; cut-outs over their solid texels) — built on the
-  // main thread from the albedo the renderer already has, only when a look recolours something
+  // the table: the linear luminance average of a layer (level 0; a cut-out over its solid texels) — filled on the main
+  // thread from the albedo the renderer already has, only for the layers a recoloured block uses (a few, in µs)
   let LUT = null;
-  L.lumTable = function (albedo0, layers, N, cutMask) {
+  L.lumFill = function (out, albedo0, N, cutMask, layers) {
     if (!LUT) { LUT = new Float32Array(256); for (let i = 0; i < 256; i++) { const c = i / 255; LUT[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); } }
-    const out = new Float32Array(4096), px = N * N;
-    for (let l = 0; l < Math.min(layers, 4096); l++) {
+    const px = N * N;
+    for (const l of layers) {
+      if (!(l >= 0 && l < 4096) || (l + 1) * px * 4 > albedo0.length) continue;
       const off = l * px * 4, cut = !!(cutMask && cutMask[l]);
       let sum = 0, w = 0;
       for (let i = 0; i < px; i++) {
-        const o = off + i * 4, a = albedo0[o + 3];
-        if (cut && a < 128) continue;
+        const o = off + i * 4;
+        if (cut && albedo0[o + 3] < 128) continue;
         sum += 0.2126 * LUT[albedo0[o]] + 0.7152 * LUT[albedo0[o + 1]] + 0.0722 * LUT[albedo0[o + 2]]; w++;
       }
       out[l] = w ? sum / w : 0.5;
     }
     return out;
+  };
+  L.lumTable = function (albedo0, layers, N, cutMask) { const all = []; for (let l = 0; l < Math.min(layers, 4096); l++) all.push(l); return L.lumFill(new Float32Array(4096).fill(0.5), albedo0, N, cutMask, all); };
+  // the texture layers recoloured faces can draw with: their table rows, their models' faces, animation frames, the
+  // snowy grass side
+  L.rcLayers = function () {
+    const T = T_(), out = new Set(), add = (v) => { const l = v & 0xfff; out.add(l); const m = R.texMeta[l]; if (m && m.anim) for (let f = 1; f < m.anim; f++) out.add(l + f); };
+    for (let s = 1; s < T.rc.length; s++) {
+      if (!T.rc[s]) continue;
+      for (let f = 0; f < 6; f++) add(T.tex[s * 6 + f]);
+      const m = R.models[s]; if (m) for (const fc of m) add(fc.tex);
+    }
+    if (out.size && R.texIndex.grass_snow_side !== undefined) out.add(R.texIndex.grass_snow_side);
+    return [...out];
+  };
+  // the empty slots' name in the page's language (the registry names them before the language tables load)
+  L.relabel = function () {
+    slotInit();
+    const n = tx('live.var.missing', null, 'Fehlende Variante', 'Missing variant');
+    for (let k = 0; k < SLOTT.length; k++) { if (O0[k]) O0[k].display = n; if (!SLOTT[k].o.variantOf) { SLOTT[k].display = n; SLOTT[k].itemDef = null; } }
   };
   // does any look recolour (the table is only needed then)
   L.usesRC = function () { for (const n in CUR.looks) if (CUR.looks[n].rc) return true; for (const k in CUR.slots) if (CUR.slots[k].look && CUR.slots[k].look.rc) return true; return false; };

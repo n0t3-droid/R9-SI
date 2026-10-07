@@ -534,6 +534,8 @@
         const s = t.defaultState, shape = R.T.shape[s];
         const tint = icons.tintOf(s) || [1, 1, 1];
         const opaqueLayer = R.T.layer[s] === 0;
+        // a recoloured block (B1 „🎨 Aussehen"): every face in its colour (|shade| 3 in the mesh shader)
+        const rc = R.T.rc ? R.T.rc[s] : 0, rcCol = rc && VR.Looks ? ((c) => [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255])(VR.Looks.from565(rc)) : null;
         const faces = [];
         if (shape === SH.CUBE) for (let f = 0; f < 6; f++) { const fp = VR.MODEL.facePos(f, [0, 0, 0, 16, 16, 16]).map(v => v / 16); faces.push({ p: fp, uv: [0, 0, 0, 16, 16, 16, 16, 0], tex: R.T.tex[s * 6 + f], dir: f, tint: 1 }); }
         else if (R.models[s]) for (const f of R.models[s]) faces.push(f);
@@ -544,8 +546,8 @@
           const layer = f.tex & 0xfff;
           // opaque textures carry the tint mask in alpha (grass sides): tint every face, the mask decides
           const opq = opaqueLayer && !crossLike;
-          const useT = R.T.tint[s] && (opq || shape !== SH.CUBE || f.dir === 2 || !t.o.soil) ? tint : [1, 1, 1];
-          const sh = opq ? -1 : 1;
+          const useT = rcCol || (R.T.tint[s] && (opq || shape !== SH.CUBE || f.dir === 2 || !t.o.soil) ? tint : [1, 1, 1]);
+          const sh = (opq ? -1 : 1) * (rcCol ? 3 : 1);
           const idx = [0, 1, 2, 0, 2, 3];
           for (const k of idx) push(f.p[k * 3] - 0.5, f.p[k * 3 + 1] - 0.5, f.p[k * 3 + 2] - 0.5, f.uv[k * 2] / 16, f.uv[k * 2 + 1] / 16, layer, N[0], N[1], N[2], useT, sh);
           if (f.double) for (const k of [0, 2, 1, 0, 3, 2]) push(f.p[k * 3] - 0.5, f.p[k * 3 + 1] - 0.5, f.p[k * 3 + 2] - 0.5, f.uv[k * 2] / 16, f.uv[k * 2 + 1] / 16, layer, -N[0], -N[1], -N[2], useT, sh);
@@ -593,6 +595,7 @@
       const gl = r.gl, p = r.P.mesh;
       gl.useProgram(p.p); r.common(p, E);
       gl.uniformMatrix4fv(p.u.u_viewProj, false, viewProj || r.viewProj);
+      if (p.u.u_avgLum && r.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, r.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, r.texAlbedo); gl.uniform1i(p.u.u_albedo, 0);
       gl.uniform1f(p.u.u_flash, 0);
       return p;

@@ -190,6 +190,10 @@
       } else if (m.type === 'look') {
         // the block look (Klassisch / Nahtlos): the next meshes follow it (the main thread re-meshes)
         if (VR.setLook) VR.setLook(m.mode);
+      } else if (m.type === 'looks') {
+        // B1 „🎨 Aussehen": this browser's looks and variant slots (a guest: the host's) — the same apply as on the main
+        // thread; the world's style is compiled again (a rule may lead to a variant whose props just arrived)
+        if (VR.Looks) { VR.Looks.apply(m.data); if (STYLE) setStyle(STYLE); }
       } else if (m.type === 'textures') {
         const R = VR.R, mk = VR.textureMasks();
         // bevelAll = the Klassisch look (the rim on the seamless materials; v2: chunky natural recipes, the outline on every cube and leaf)

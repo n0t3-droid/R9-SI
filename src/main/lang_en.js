@@ -866,5 +866,19 @@
     'g.forge.busy': 'Still building — a moment.',
     'g.forge.look': 'Look at the ground where it should stand.',
     'g.forge.building': 'building',
+    // ---- B1 live loop: 🎨 looks and ⧉ variants (live.*; the same texts are written at the call)
+    'live.title': '🎨 Looks',
+    'live.noTarget': '✏️ Point at a block, then change its look.',
+    'live.guest': 'In a friend\'s world, their looks apply.',
+    'live.notHere': '{n}: its look cannot be changed.',
+    'live.pause.look': '✏️ Change look',
+    'live.pause.lookTip': 'Colour and material in the R9 Studio — for all your worlds',
+    'live.bh.look': 'Change look',
+    'live.restored': '{n} variants restored from this world',
+    'live.mp.noPack': 'The host\'s looks did not load — you see your own.',
+    'live.var.full': 'All {n} variant slots are taken — change a variant, or the block "for all".',
+    'live.var.big': 'Too big for a variant.',
+    'live.var.bad': 'This cannot have a variant.',
+    'live.var.missing': 'Missing variant',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

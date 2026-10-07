@@ -62,7 +62,7 @@
       const nw = this.spawn(w.idx);
       this.workers[i] = nw;
       this.replaced++;
-      for (const t of ['init', 'custom', 'style', 'look', 'lodinit']) { const m = this.state.get(t); if (m) nw.postMessage(m); }
+      for (const t of ['init', 'custom', 'looks', 'style', 'look', 'lodinit']) { const m = this.state.get(t); if (m) nw.postMessage(m); }
       console.warn('Worker', w.idx, 'did not answer for', (this.stuckMs / 1000) | 0, 's — replaced');
       this.failWorker(w, 'replaced');
     }
