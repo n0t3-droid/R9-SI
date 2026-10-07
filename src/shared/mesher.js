@@ -13,6 +13,7 @@
   const PAD = VR.MESH_PAD = 2, PS = VR.MESH_PS = 16 + PAD * 2, PSS = PS * PS;
   const P = (x, y, z) => (y + PAD) * PSS + (z + PAD) * PS + (x + PAD);
   const DOFF = [1, -1, PSS, -PSS, PS, -PS];
+  const FLUID_SIDES = [0, 1, 4, 5];   // the side faces of a fluid block (mesher order: +x, -x, +z, -z)
   const KIND = VR.VKIND = { NONE: 0, WATER: 1, LAVA: 2, PORTAL: 3, STARS: 4, ANIM: 5, WATERFLOW: 6, AETHER: 7 };
   const ENC = (p) => Math.round((p + 4) * 2048);
 
@@ -128,16 +129,31 @@
       }
     }
     const bright = (k) => { const l = cornerLight[k]; return Math.max(l >>> 12, (l >> 8) & 15, (l >> 4) & 15, l & 15) * 4 - cornerAO[k] * 3; };
-    // emit a cube face (single block or merged box) --------------------------------
-    function emitCubeQuad(buf, d, box, w, h, w3, w5base, lights, aos, tint) {
-      const pos = MD.facePos(d, box);
-      const uvs = [0, 0, 0, h * 16, w * 16, h * 16, w * 16, 0];
+    // the four corners of face d of the box (x0,y0,z0)-(x1,y1,z1) in block units, order TL, BL, BR, TR (the same
+    // corners MD.facePos gives for the box in 1/16 units) — written into one scratch array: the emit helpers below run
+    // for every face of a section and never allocate (cutting the garbage of a mesh job by half)
+    const FP = new Float64Array(12);
+    function facePosInto(d, x0, y0, z0, x1, y1, z1) {
+      switch (d) {
+        case 2: FP[0] = x0; FP[1] = y1; FP[2] = z0; FP[3] = x0; FP[4] = y1; FP[5] = z1; FP[6] = x1; FP[7] = y1; FP[8] = z1; FP[9] = x1; FP[10] = y1; FP[11] = z0; break;
+        case 3: FP[0] = x0; FP[1] = y0; FP[2] = z1; FP[3] = x0; FP[4] = y0; FP[5] = z0; FP[6] = x1; FP[7] = y0; FP[8] = z0; FP[9] = x1; FP[10] = y0; FP[11] = z1; break;
+        case 4: FP[0] = x0; FP[1] = y1; FP[2] = z1; FP[3] = x0; FP[4] = y0; FP[5] = z1; FP[6] = x1; FP[7] = y0; FP[8] = z1; FP[9] = x1; FP[10] = y1; FP[11] = z1; break;
+        case 5: FP[0] = x1; FP[1] = y1; FP[2] = z0; FP[3] = x1; FP[4] = y0; FP[5] = z0; FP[6] = x0; FP[7] = y0; FP[8] = z0; FP[9] = x0; FP[10] = y1; FP[11] = z0; break;
+        case 0: FP[0] = x1; FP[1] = y1; FP[2] = z1; FP[3] = x1; FP[4] = y0; FP[5] = z1; FP[6] = x1; FP[7] = y0; FP[8] = z0; FP[9] = x1; FP[10] = y1; FP[11] = z0; break;
+        default: FP[0] = x0; FP[1] = y1; FP[2] = z0; FP[3] = x0; FP[4] = y0; FP[5] = z0; FP[6] = x0; FP[7] = y0; FP[8] = z1; FP[9] = x0; FP[10] = y1; FP[11] = z1; break;
+      }
+    }
+    // emit a cube face (single block or merged box, corners in block units) --------------------------------
+    // lights / aos: four values per corner (the faceCorners scratch arrays, read before the next face), or null
+    function emitCubeQuad(buf, d, x0, y0, z0, x1, y1, z1, w, h, w3, w5base, lights, aos, tint) {
+      facePosInto(d, x0, y0, z0, x1, y1, z1);
+      const uw = w * 16, vh = h * 16;
       let start = 0;
       if (aos && (bright(0) + bright(2) < bright(1) + bright(3))) start = 1;
       buf.ensure(4);
       for (let kk = 0; kk < 4; kk++) {
         const k = (kk + start) & 3;
-        buf.v(pos[k * 3] / 16, pos[k * 3 + 1] / 16, pos[k * 3 + 2] / 16, w3, uvs[k * 2], uvs[k * 2 + 1], w5base | ((aos ? aos[k] : 0) << 3), lights ? lights[k] : 0, tint);
+        buf.v(FP[k * 3], FP[k * 3 + 1], FP[k * 3 + 2], w3, k >= 2 ? uw : 0, (k === 1 || k === 2) ? vh : 0, w5base | ((aos ? aos[k] : 0) << 3), lights ? lights[k] : 0, tint);
       }
     }
     // ---- R9 Smooth Ground: the natural surface as a height field (see physics.js P.smoothCorners) ----
@@ -154,9 +170,8 @@
     };
     // a cube face whose top vertices follow the corner heights (the sloped top itself, or a side under a sloped top)
     function emitSlopeQuad(buf, d, x, y, z, w3, w5base, lights, aos, tint) {
-      const box = [x * 16, y * 16, z * 16, x * 16 + 16, y * 16 + 16, z * 16 + 16];
-      const pos = MD.facePos(d, box);
-      const uvs = [0, 0, 0, 16, 16, 16, 16, 0];
+      const x1 = x + 1, y1 = y + 1, z1 = z + 1;
+      facePosInto(d, x, y, z, x1, y1, z1);
       let start = 0;
       // the top splits along the diagonal whose ends are closer in height (the crease follows the terrain)
       if (d === 2) start = Math.abs(smC[0] - smC[2]) <= Math.abs(smC[1] - smC[3]) ? 0 : 1;
@@ -164,9 +179,9 @@
       buf.ensure(4);
       for (let kk = 0; kk < 4; kk++) {
         const k = (kk + start) & 3;
-        let py = pos[k * 3 + 1] / 16;
-        if (pos[k * 3 + 1] === box[4]) py = smC[(pos[k * 3] === box[3] ? (pos[k * 3 + 2] === box[5] ? 2 : 3) : (pos[k * 3 + 2] === box[5] ? 1 : 0))];
-        buf.v(pos[k * 3] / 16, py, pos[k * 3 + 2] / 16, w3, uvs[k * 2], uvs[k * 2 + 1], w5base | ((aos ? aos[k] : 0) << 3), lights ? lights[k] : 0, tint);
+        let py = FP[k * 3 + 1];
+        if (py === y1) py = smC[(FP[k * 3] === x1 ? (FP[k * 3 + 2] === z1 ? 2 : 3) : (FP[k * 3 + 2] === z1 ? 1 : 0))];
+        buf.v(FP[k * 3], py, FP[k * 3 + 2], w3, k >= 2 ? 16 : 0, (k === 1 || k === 2) ? 16 : 0, w5base | ((aos ? aos[k] : 0) << 3), lights ? lights[k] : 0, tint);
       }
     }
     const texW3 = (texv, flags, d, state) => {
@@ -203,7 +218,7 @@
     }
 
     // ---- greedy opaque cubes ----
-    const mstate = new Uint16Array(256), mlight = new Uint16Array(256), mtint = new Uint16Array(256), mflag = new Uint8Array(256);
+    const mstate = new Uint16Array(256), mlight = new Uint16Array(256), mtint = new Uint16Array(256), mflag = new Uint8Array(256), mergedLight = new Uint16Array(4);
     for (let d = 0; d < 6; d++) {
       const ax = DAXIS[d]; // slice axis
       for (let s = 0; s < 16; s++) {
@@ -229,7 +244,7 @@
               if (ca < y + 1 - 1e-6 && cb < y + 1 - 1e-6 && PH.surfaceTop(blockAt, nx, y, nz) === y) continue;
             }
             faceCorners(bi, d);
-            emitSlopeQuad(bufs[0], d, x, y, z, texW3(TTEX[b * 6 + d], fl, d, b), d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (d === 2 ? 1 << 13 : 0), cornerLight.slice(), cornerAO.slice(), tintAt(TTINT[b], x, z, b));
+            emitSlopeQuad(bufs[0], d, x, y, z, texW3(TTEX[b * 6 + d], fl, d, b), d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (d === 2 ? 1 << 13 : 0), cornerLight, cornerAO, tintAt(TTINT[b], x, z, b));
             continue;
           }
           faceCorners(bi, d);
@@ -245,10 +260,7 @@
           const uniform = cornerLight[0] === cornerLight[1] && cornerLight[1] === cornerLight[2] && cornerLight[2] === cornerLight[3] && !cornerAO[0] && !cornerAO[1] && !cornerAO[2] && !cornerAO[3];
           const w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0);
           if (uniform && texv === TTEX[b * 6 + d]) { mflag[mi] = 1; mstate[mi] = b; mlight[mi] = cornerLight[0]; mtint[mi] = tint; }
-          else {
-            const box = [x * 16, y * 16, z * 16, x * 16 + 16, y * 16 + 16, z * 16 + 16];
-            emitCubeQuad(bufs[0], d, box, 1, 1, texW3(texv, fl, d, b), w5, cornerLight.slice(), cornerAO.slice(), tint);
-          }
+          else emitCubeQuad(bufs[0], d, x, y, z, x + 1, y + 1, z + 1, 1, 1, texW3(texv, fl, d, b), w5, cornerLight, cornerAO, tint);
         }
         // merge
         for (let v = 0; v < 16; v++) for (let u = 0; u < 16;) {
@@ -263,13 +275,12 @@
             h++;
           }
           for (let hh = 0; hh < h; hh++) for (let k = 0; k < w; k++) mflag[(v + hh) * 16 + u + k] = 2;
-          let box;
-          if (ax === 0) box = [s * 16, v * 16, u * 16, s * 16 + 16, (v + h) * 16, (u + w) * 16];
-          else if (ax === 1) box = [u * 16, s * 16, v * 16, (u + w) * 16, s * 16 + 16, (v + h) * 16];
-          else box = [u * 16, v * 16, s * 16, (u + w) * 16, (v + h) * 16, s * 16 + 16];
           const fl = TF[st0];
-          const lts = [li0, li0, li0, li0];
-          emitCubeQuad(bufs[0], d, box, w, h, texW3(TTEX[st0 * 6 + d], fl, d, st0), d | ((fl & F.EMISSIVE) ? 1 << 12 : 0), lts, null, ti0);
+          mergedLight[0] = li0; mergedLight[1] = li0; mergedLight[2] = li0; mergedLight[3] = li0;
+          const w3 = texW3(TTEX[st0 * 6 + d], fl, d, st0), w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0);
+          if (ax === 0) emitCubeQuad(bufs[0], d, s, v, u, s + 1, v + h, u + w, w, h, w3, w5, mergedLight, null, ti0);
+          else if (ax === 1) emitCubeQuad(bufs[0], d, u, s, v, u + w, s + 1, v + h, w, h, w3, w5, mergedLight, null, ti0);
+          else emitCubeQuad(bufs[0], d, u, v, s, u + w, v + h, s + 1, w, h, w3, w5, mergedLight, null, ti0);
           u += w;
         }
       }
@@ -311,12 +322,11 @@
           const tint = tintAt(TTINT[b], x, z, b);
           let w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0);
           if (fl & F.WAVELEAF) w5 |= 1 << 7;
-          const box = [x * 16, y * 16, z * 16, x * 16 + 16, y * 16 + 16, z * 16 + 16];
           let texv = TTEX[b * 6 + d];
           // panorama glass: the frame variant from the same glass around this face (top, right, bottom, left);
           // Klassisch: variant 0, the full frame on every block
           if (cmode === 1) { texv = ctm + (ctmJoin ? joinMask(d) : 0); w5 |= 1 << 14; }
-          emitCubeQuad(bufs[layer], d, box, 1, 1, texW3(texv, fl, d, b), w5, cornerLight.slice(), cornerAO.slice(), tint);
+          emitCubeQuad(bufs[layer], d, x, y, z, x + 1, y + 1, z + 1, 1, 1, texW3(texv, fl, d, b), w5, cornerLight, cornerAO, tint);
         }
         continue;
       }
@@ -569,9 +579,23 @@
       const lv = R.types[type].get(s, 'level');
       return lv;
     }
+    // a fluid block with the same fluid (or something opaque) on all six sides shows no face: the body of a lake or an
+    // ocean is left here before any work is done (it is most of the fluid blocks of a section)
+    function fluidHidden(bi, type, isLava) {
+      const above = B[bi + PSS];
+      if (!(TTYPE[above] === type || (!isLava && (TF[above] & F.WATER)) || (TF[above] & F.OPAQUE))) return false;
+      const below = B[bi - PSS];
+      if (!(TTYPE[below] === type || (TF[below] & F.OPAQUE) || (!isLava && (TF[below] & F.WATER)))) return false;
+      for (let k = 0; k < 4; k++) {
+        const nb = B[bi + DOFF[FLUID_SIDES[k]]];
+        if (!((TF[nb] & F.OPAQUE) || TTYPE[nb] === type || (!isLava && (TF[nb] & F.WATER) && (TF[nb] & F.FLUID)))) return false;
+      }
+      return true;
+    }
     function meshFluid(x, y, z, bi, b) {
       const type = TTYPE[b], t = R.types[type];
       const isLava = (TF[b] & F.LAVA) !== 0;
+      if (fluidHidden(bi, type, isLava)) return;
       const lvl = t.get(b, 'level');
       const aboveSame = TTYPE[B[bi + PSS]] === type || (!isLava && (TF[B[bi + PSS]] & F.WATER));
       const heightOf = (s) => {
