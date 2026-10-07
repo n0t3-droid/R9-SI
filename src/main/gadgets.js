@@ -588,7 +588,10 @@
       if (this.riding) return;
       const s = g.world.getBlock(x, y, z), t = R.types[R.T.type[s]];
       const f = t && t.has('facing') ? t.get(s, 'facing') : 0;
-      this.riding = { type: 'seat', x, y, z };
+      // the seat's floor is the model's lowest cell (its anchor) whichever part was clicked: the top half of a two-block chair
+      // seats the player as low as its foot. x, y, z stay the clicked block, the seat's own cell (driveSeat checks it)
+      const base = VR.VM && t && t.has('part') && VR.VM.MODELS[t.name] ? VR.VM.partCells(VR.VM.MODELS[t.name], f, t.get(s, 'part'), x, y, z)[0][1] : y;
+      this.riding = { type: 'seat', x, y, z, base };
       p.yaw = -f * QT; p.pitch = 0; p.flying = false; p.target = null; p.breaking = null;
       g.ui.hint('Seated · Shift to stand up', 2200);
     }
@@ -596,7 +599,7 @@
       const r = this.riding, g = this.g, p = g.player;
       const s = g.world.getBlock(r.x, r.y, r.z), t = R.types[R.T.type[s]];
       if ((!blocked && (input.hit('ShiftLeft') || input.hit('ShiftRight') || input.hit('KeyV'))) || !t || !(t.o.kind === 'seat' || t.o.seat)) { this.dismount(); return; }
-      p.pos = [r.x + 0.5, r.y + 0.4, r.z + 0.5]; p.vel = [0, 0, 0]; p.fallStart = null;
+      p.pos = [r.x + 0.5, r.base + 0.4, r.z + 0.5]; p.vel = [0, 0, 0]; p.fallStart = null;
     }
     dismount() {
       const g = this.g, p = g.player, r = this.riding;
@@ -612,7 +615,7 @@
         const spot = this.freeSpot(g.trams ? g.trams.exitSpot(r) : [[p.pos[0], p.pos[1] + 1, p.pos[2]]]);
         p.teleport(spot[0], spot[1], spot[2]);
       } else if (r.type === 'seat') {
-        const spot = this.freeSpot([[r.x + 0.5, r.y + 0.4, r.z + 0.5], [r.x + 0.5, r.y + 1, r.z + 0.5], [r.x + 1.5, r.y, r.z + 0.5], [r.x - 0.5, r.y, r.z + 0.5], [r.x + 0.5, r.y, r.z + 1.5], [r.x + 0.5, r.y, r.z - 0.5]]);
+        const spot = this.freeSpot([[r.x + 0.5, r.base + 0.4, r.z + 0.5], [r.x + 0.5, r.base + 1, r.z + 0.5], [r.x + 1.5, r.base, r.z + 0.5], [r.x - 0.5, r.base, r.z + 0.5], [r.x + 0.5, r.base, r.z + 1.5], [r.x + 0.5, r.base, r.z - 0.5]]);
         p.teleport(spot[0], spot[1], spot[2]);
       }
       g.ui.vehicleHud(null);
@@ -1214,7 +1217,7 @@
       if (!r) return null;
       if (r.type === 'starship') return g.starships && g.starships.pilot ? g.starships.camera(cam) : null;
       if (r.type === 'tram') return g.trams ? g.trams.camera(cam, r) : null;
-      if (r.type === 'seat') { if (g.camMode !== 0) return null; return Object.assign(cam, { x: r.x + 0.5, y: r.y + 1.45, z: r.z + 0.5, roll: 0, fixed: true }); }
+      if (r.type === 'seat') { if (g.camMode !== 0) return null; return Object.assign(cam, { x: r.x + 0.5, y: r.base + 1.45, z: r.z + 0.5, roll: 0, fixed: true }); }
       if (r.type === 'bike') {
         const b = r.bike;
         if (g.camMode === 0) return Object.assign(cam, { x: b.pos[0] - Math.sin(b.yaw) * 0.15, y: b.pos[1] + 1.5, z: b.pos[2] - Math.cos(b.yaw) * 0.15, roll: b.roll * 0.4, fixed: true, fov: cam.fov * (1 + Math.min(0.12, Math.abs(b.spd) / 250)) });
@@ -1281,7 +1284,7 @@
       if (this.riding && this.riding.type === 'seat' && g.camMode !== 0) {
         const rr = this.riding, s = g.world.getBlock(rr.x, rr.y, rr.z), t = R.types[R.T.type[s]];
         const f = t && t.has('facing') ? t.get(s, 'facing') : 0;
-        this.drawRider(r, prog, [rr.x + 0.5, rr.y + 0.38 - 0.75, rr.z + 0.5], cam, -f * QT, ents.lightAt(rr.x, rr.y + 1, rr.z), 0);
+        this.drawRider(r, prog, [rr.x + 0.5, rr.base + 0.38 - 0.75, rr.z + 0.5], cam, -f * QT, ents.lightAt(rr.x, rr.base + 1, rr.z), 0);
       }
       if (g.trams) g.trams.draw(r, E, cam, prog);
       // turret heads
