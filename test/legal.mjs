@@ -76,7 +76,8 @@ check(await clickIn('#r9mpcard', '✓ OK'), '✓ OK clicked');
 await wait(400);
 r = await ev(() => ({ pres: __mp.pres, flag: localStorage.getItem('r9si.mpNotice'), card: !!document.getElementById('r9mpcard') }));
 check(r.pres.some(p => p.n === 'Erika Mustermann') && r.flag === '1' && !r.card, 'after ✓ OK the lobby sees the name, the answer is kept (r9si.mpNotice = 1), the card is gone');
-check(__mp.realNameAt > __mp.noticeAt, 'the name went out only after the notice');
+const times = await ev(() => ({ noticeAt: __mp.noticeAt, realNameAt: __mp.realNameAt }));
+check(times.realNameAt > times.noticeAt, 'the name went out only after the notice');
 await page.reload();
 t = await toTitle();
 r = await ev(() => ({ pres: __mp.pres, card: !!document.getElementById('r9mpcard') }));
@@ -114,7 +115,7 @@ await ev(() => { VR.game.ui.act('settings'); VR.game.ui.settingsTab = 'game'; VR
 r = await ev(() => { const cb = document.querySelector('#setbody [data-mp-toggle]'); return { cb: !!cb, checked: cb && cb.checked, legal: document.querySelectorAll('#settings [data-legal]').length }; });
 check(r.cb && r.checked === false, 'Settings → Game: 👥 Mehrspieler, unchecked');
 check(r.legal === 1, '📜 next to Done in the settings (once)');
-await ev(() => document.querySelector('#setbody [data-mp-toggle]').click());
+await ev(() => document.querySelector('#setbody [data-mp-toggle]')?.click());
 for (let i = 0; i < 20 && (await ev(() => VR.game.mp.status)) !== 'ready'; i++) await wait(250);
 await wait(300);
 r = await ev(() => ({ status: VR.game.mp.status, used: __mp.used, off: localStorage.getItem('r9si.mp'), inline: !!document.querySelector('#setbody .mpnotice'), card: !!document.getElementById('r9mpcard'), named: __mp.pres.filter(p => p.n && p.n !== 'Explorer').length }));
@@ -142,7 +143,7 @@ r = await ev(() => ({ role: VR.game.mp.role, named: __mp.pres.some(p => p.n === 
 check(r.role === 'host' && r.named && !/Mitspieler sehen deinen Namen/.test(r.panel), 'now the host’s name goes out with the world, and the panel is the usual one');
 check(await ev(() => !!document.querySelector('#pause [data-legal]')), '📜 in the pause menu');
 await shot('legal_pause');
-await ev(() => document.querySelector('#pause [data-legal]').click());
+await ev(() => document.querySelector('#pause [data-legal]')?.click());
 await wait(300);
 const sec = () => ev(() => ({ open: !!document.querySelector('#r9legal.on'), sec: VR.Legal.section(), body: (document.querySelector('#r9legal .lg-body') || {}).textContent || '', tabs: [...document.querySelectorAll('#r9legal .lg-tabs button')].map(b => b.textContent), on: ((document.querySelector('#r9legal .lg-tabs .on') || {}).textContent), copy: (document.querySelector('#r9legal .lg-copy') || {}).textContent }));
 r = await sec();
@@ -155,14 +156,14 @@ for (const [tab, word] of [['Datenschutz', 'Datenschutzerklärung für R9-SI'], 
   check(r.on === tab && r.body.includes(word), tab + ': „' + word + '“');
 }
 // 📋 Kopieren copies the tab that is open, and only that
-await ev(() => document.querySelector('#r9legal .lg-copy').click()); await wait(400);
+await ev(() => document.querySelector('#r9legal .lg-copy')?.click()); await wait(400);
 r = await ev(() => ({ copied: VR.Legal.copied || '', msg: (document.querySelector('#r9legal .lg-msg') || {}).textContent || '' }));
 check(r.copied.startsWith('HINWEIS') && r.copied.includes('NOT AN OFFICIAL MINECRAFT PRODUCT') && !r.copied.includes('DATENSCHUTZ'), '📋 Kopieren on „Hinweis“ copies that tab as plain text (' + r.copied.length + ' chars) — „' + r.msg + '“');
-await ev(() => document.querySelector('#r9legal [data-lang="en"]').click()); await wait(150);
+await ev(() => document.querySelector('#r9legal [data-lang="en"]')?.click()); await wait(150);
 await clickIn('#r9legal .lg-tabs', 'Privacy'); await wait(150); r = await sec();
 check(r.tabs.join('|') === 'Impressum|Privacy|Credits|Notice' && r.body.includes('Privacy policy for R9-SI') && r.body.includes('Other players see your name') && r.copy === '📋 Copy', 'EN: Privacy policy, the tabs and the button in English');
 await shot('legal_privacy_en');
-await ev(() => document.querySelector('#r9legal [data-lang="de"]').click()); await wait(150);
+await ev(() => document.querySelector('#r9legal [data-lang="de"]')?.click()); await wait(150);
 await ev(() => { VR.Credits = { list: () => [{ name: 'Hirsch', kind: 'ding', src: { title: 'Deer', author: 'Kenney', url: 'https://kenney.nl/assets/deer', license: 'CC BY 4.0', tier: 'by' } }] }; });
 await clickIn('#r9legal .lg-tabs', 'Credits'); await wait(150); r = await sec();
 check(/Importierte Dinge/.test(r.body) && r.body.includes('„Deer“ von Kenney') && await ev(() => !!document.querySelector('#r9legal a[href="https://kenney.nl/assets/deer"]')), 'Credits lists VR.Credits (with links)');
@@ -171,7 +172,7 @@ r = await ev(() => ({ open: !!document.querySelector('#r9legal.on'), screen: VR.
 check(!r.open && r.screen === 'pause', 'Esc closes the overlay — and only it: the pause menu stays (' + JSON.stringify(r) + ')');
 await ev(() => VR.game.ui.act('settings')); await wait(150);
 check(await ev(() => document.querySelectorAll('#settings [data-legal]').length === 1), '📜 next to Done in the settings (once)');
-await ev(() => document.querySelector('#settings [data-legal]').click()); await wait(200);
+await ev(() => document.querySelector('#settings [data-legal]')?.click()); await wait(200);
 check(await ev(() => !!document.querySelector('#r9legal.on') && VR.Legal.section() === 'impressum'), 'and it opens the Impressum');
 await page.keyboard.press('Escape'); await wait(200);
 check(await ev(() => !document.querySelector('#r9legal.on') && VR.game.ui.screen === 'settings'), 'Esc: back in the settings');
@@ -180,7 +181,7 @@ console.log('5 · Join before the answer: the friend’s hello carries „Explor
 await clearMp(); await page.reload(); t = await toTitle();
 r = await ev(() => ({ hosts: VR.game.mp.hostList().length, join: !!document.querySelector('#mphosts .mphost button'), card: !!document.getElementById('r9mpcard') }));
 check(r.hosts === 1 && r.join && r.card, 'a friend’s world is listed with Join, the card is up');
-await ev(() => document.querySelector('#mphosts .mphost button').click());
+await ev(() => document.querySelector('#mphosts .mphost button')?.click());
 await wait(1500);
 r = await ev(() => ({ hello: __mp.emits.filter(e => e[0] === 'hello').map(e => e[1].n), role: VR.game.mp.role, profile: JSON.stringify(__mp.emits).includes('Erika') }));
 check(r.hello.length >= 1 && r.hello.every(n => n === 'Explorer') && !r.profile, 'the hello says „Explorer“, never the profile name (' + JSON.stringify(r) + ')');
@@ -193,7 +194,7 @@ await sp.goto(STUDIO);
 for (let i = 0; i < 60; i++) { await wait(500); if (await sp.evaluate(() => !!document.querySelector('#studio > header [data-legal]') && !!window.VR && !!VR.StudioBridge).catch(() => false)) break; }
 r = await sp.evaluate(() => { const b = document.querySelector('#studio > header [data-legal]'); return { btn: !!b, text: b ? b.textContent : '', visible: !!(b && b.offsetParent !== null) }; });
 check(r.btn && r.visible && /📜/.test(r.text), 'the Studio\'s header has 📜 (' + r.text + ')');
-await sp.evaluate(() => document.querySelector('#studio > header [data-legal]').click()); await wait(300);
+await sp.evaluate(() => document.querySelector('#studio > header [data-legal]')?.click()); await wait(300);
 check(await sp.evaluate(() => !!document.querySelector('#r9legal.on') && /Angaben gemäß § 18/.test(document.querySelector('#r9legal .lg-body').textContent)), 'it opens the Impressum in the Studio');
 await sp.screenshot({ path: '/home/claude/vr/test/shots/legal_studio.png', timeout: 120000 }).catch(() => { });
 await sp.keyboard.press('Escape'); await wait(200);
