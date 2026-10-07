@@ -190,9 +190,10 @@ await section('4b', '🎒 Meins in the game: your things as cards with the five 
   await ensureWorld();
   await ev(() => { VR.Favs.add('oak_planks'); });
   await page.click('#title .tile[data-tile="meins"]'); await wait(500);
-  const m = await ev(() => { const c = document.querySelector('#meins .ding[data-ding="b:oak_planks"]'); return { on: document.getElementById('meins').classList.contains('on'), card: !!c, acts: c ? [...c.querySelectorAll('.dacts button')].map(b => b.textContent) : [], chips: [...document.querySelectorAll('#meins .mchips button')].map(b => b.textContent), worlds: document.querySelectorAll('#meins .wcard').length, h: document.querySelector('#meins h2').textContent }; });
+  const m = await ev(() => { const c = document.querySelector('#meins .ding[data-ding="b:oak_planks"]'); return { on: document.getElementById('meins').classList.contains('on'), card: !!c, acts: c ? [...c.querySelectorAll('.dacts button')].map(b => b.textContent) : [], chips: [...document.querySelectorAll('#meins .mchips button')].map(b => b.textContent), worlds: document.querySelectorAll('#meins .wcard').length, h: document.querySelector('#meins h2').textContent, pic: !!(c && c.querySelector('.pic.has canvas')) }; });
   console.log('  meins', JSON.stringify(m));
   check(m.on && m.card && m.acts.length === 5 && ['👁', '✏️', '★', '📍', '📦'].every((g, i) => m.acts[i].startsWith(g)), 'the favourite oak planks: 👁 ✏️ ★ 📍 📦');
+  check(m.pic, 'its picture is painted at once (the game\'s own icon, no placeholder)');
   check(/Meins/.test(m.h) && m.chips.length >= 5 && m.worlds >= 1, '„🎒 Meins" with chips and the worlds as cards');
   await shot('start_meins_game');
   await page.click('#meins [data-act="meinsback"]'); await wait(300);

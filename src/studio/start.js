@@ -242,7 +242,7 @@
     if (!karte()) return false;
     const W = WM(), Dg = D(), el = $('#list');
     const keepScroll = W.karteScroll !== undefined && W.karteScroll !== null ? W.karteScroll : el.scrollTop; W.karteScroll = null;
-    el.innerHTML = ''; el.classList.remove('palette'); el.classList.add('houses', 'dings');
+    el.classList.remove('palette'); el.classList.add('houses', 'dings');
     const favIds = (VR.Favs ? VR.Favs.list() : []).map(f => Dg.fromFav(f)).filter(id => id && /^[hm]:/.test(id) && known(id) && !(id[0] === 'm' && C.isFacade(id.slice(2))));
     const cat = prefs().pro ? (W.karteCat || 'house') : (W.karteCat || (favIds.length ? 'fav' : 'house'));
     let ids = [];
@@ -252,9 +252,15 @@
     const f = (S.filter || '').toLowerCase();
     if (f) ids = ids.filter(id => (id + ' ' + Dg.name(id)).toLowerCase().includes(f));
     const cur = toolId(), lit = W.karteSel || null;
+    // the same cards as before (a click set something, R turned it): only the lit one changes — no re-render, no flicker,
+    // the scroll stays
+    const key = cat + '|' + f + '|' + ids.slice(0, 400).join(',');
+    if (el.dataset.karteKey === key && el.querySelector('.ding')) { for (const c of el.querySelectorAll('.ding')) c.classList.toggle('on', c.dataset.ding === cur || c.dataset.ding === lit); if (el.scrollTop !== keepScroll) el.scrollTop = keepScroll; return true; }
+    el.innerHTML = ''; el.dataset.karteKey = key;
     if (!ids.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = cat === 'fav' ? tx('st.noFavs', null, 'Noch keine Favoriten — der ☆ an einer Karte legt sie hierher.', 'No favourites yet — ☆ on a card puts them here.') : tx('cat.none', null, 'nichts gefunden', 'nothing found'); el.appendChild(d); return true; }
     let k = 0;
     for (const id of ids.slice(0, 400)) { const c = Dg.render(id, { picW: 280, picH: 160, on: id === cur || id === lit, onOpen: () => SS.set(id) }); c.style.animationDelay = (Math.min(k++, 24) * 18) + 'ms'; el.appendChild(c); }
+    Dg.fillNow(el, 6);
     if (keepScroll) el.scrollTop = keepScroll;
     return true;
   });
@@ -344,7 +350,7 @@
       const h4 = document.createElement('h4'); h4.textContent = title; body.appendChild(h4);
       const g = document.createElement('div'); g.className = 'grid dings';
       for (const x of items.slice(0, 120)) g.appendChild(Dg.render(x.id, { picW: 240, picH: 150, setLabel: SA ? tx('st.merken', null, '🎒 Merken', '🎒 Keep') : undefined, onOpen: () => SS.view(x.id) }));
-      body.appendChild(g);
+      body.appendChild(g); Dg.fillNow(g, 8);
     };
     if (favs.length || parts.length) { const e = body.querySelector('.empty'); if (e) e.remove(); }
     grid('★ ' + tx('st.favs', null, 'Favoriten', 'Favourites'), favs);

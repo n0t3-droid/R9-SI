@@ -326,7 +326,7 @@
     const ae = document.activeElement, keep = ae && body.contains(ae) && ae.closest('.pj') ? ae.closest('.pj').dataset.id : null;
     body.innerHTML = h;
     if (PJ.decorate) { try { PJ.decorate(body, { q, f: HUB.f }); } catch (e) { console.warn('decorate', e); } }   // (W1: the Ding cards' actions, ★ and Bauteile)
-    if (keep) { const c = body.querySelector(`.pj[data-id="${cssId(keep)}"]`); if (c) c.focus(); }     // the card you were on keeps the focus
+    if (keep) { const c = body.querySelector(`.pj[data-id="${cssId(keep)}"]`); if (c) c.focus({ preventScroll: true }); }     // the card you were on keeps the focus (and the page its scroll)
     clearTimeout(liveT); fillLive(body, 0);
     bootLine();
   }
@@ -369,7 +369,7 @@
     if (on) {
       renderBody();
       const first = el.querySelector('.hubBody .pj');
-      setTimeout(() => { if (HUB.on) (first || el.querySelector('.hubQ')).focus(); }, 30);
+      setTimeout(() => { if (HUB.on) (first || el.querySelector('.hubQ')).focus({ preventScroll: true }); }, 30);   // (← brings the page back scrolled as it was: the focus must not move it)
     } else { clearTimeout(liveT); clearTimeout(bootT); if (document.activeElement && el.contains(document.activeElement)) document.activeElement.blur(); }
     badge();
   }

@@ -251,6 +251,7 @@
     const ws = chip === 'all' || chip === 'worlds' ? await ST.listWorlds() : [];
     if (!items.length && !ws.length) { body.appendChild(el('div', 'note', esc(chip === 'worlds' ? tx('start.noWorlds', null, 'Noch keine Welt — ＋ Neue Welt macht eine.', 'No world yet — ＋ New world makes one.') : tx('meins.empty', null, 'Noch nichts hier — ✨ Erschaffen macht dein erstes Ding.', 'Nothing here yet — ✨ Create makes your first thing.')))); return; }
     for (const x of items.slice(0, 200)) body.appendChild(Dg.render(x.id, { picW: 220, picH: 120 }));
+    Dg.fillNow(body, 24);   // (the first screen of cards has its pictures at once; the rest as they scroll in)
     if (ws.length) {
       body.appendChild(el('div', 'grp', '🌍 ' + esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))));
       for (const w of ws) {

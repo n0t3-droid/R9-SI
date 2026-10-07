@@ -100,6 +100,12 @@
     if (!io) io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { io.unobserve(e.target); if (e.target.__fill) { const f = e.target.__fill; e.target.__fill = null; f(); } } }, { rootMargin: '240px' });
     el.__fill = fill; io.observe(el);
   };
+  // the first cards of a list get their picture at once (the observer paints the rest as they scroll into view):
+  // a slow machine shows no placeholders on the first screen
+  D.fillNow = function (root, n) {
+    let k = 0;
+    for (const el of (root || document).querySelectorAll('.ding')) { if (k >= (n || 12)) break; if (el.__fill) { const f = el.__fill; el.__fill = null; if (io) io.unobserve(el); f(); } k++; }
+  };
   // the card: picture ≥ 56 px, name, one state line, the actions in their fixed order
   D.render = function (id, opts) {
     opts = opts || {};
