@@ -402,7 +402,8 @@
       // built where you stand? you step out to the nearest free spot instead of being stuck in it
       if (g.player && g.player.unstick) g.player.unstick();
       // into the save right away (the Studio reads the world from it)
-      clearTimeout(this.editSave); this.editSave = setTimeout(() => { if (g.world === w && w.saveAll) w.saveAll(); }, 800);
+      // (while a construction site builds the save waits — it would finish the site at once)
+      clearTimeout(this.editSave); const save = () => { if (this.siteBusy && this.siteBusy()) { this.editSave = setTimeout(save, 1000); return; } if (g.world === w && w.saveAll) w.saveAll(); }; this.editSave = setTimeout(save, 800);
       if (n && g.ui && g.ui.toast) g.ui.toast('R9 Studio', VR.I18N ? VR.I18N.tx('g.studio.edits', { n: n.toLocaleString() }, '{n} Blöcke aus der Werkbank', '{n} blocks from the Werkbank') : n + ' blocks from the Werkbank');
     }
 
