@@ -21,6 +21,8 @@
   const BR = VR.StudioBridge = {};
   // a word where it is seen: the Crafter's tip when it is open, else a toast; the status line always
   const say = (t, ok) => { const CR = VR.Crafter; if (CR && CR.on && CR.tip) CR.tip(t, ok); else if (VR.Projects && VR.Projects.toast) VR.Projects.toast(t); C.sys(t, ok === false ? 'err' : 'ok'); };
+  // what goes out is the player's to share: one line with every export (src/main/legal.js), no dialog
+  const share = () => (VR.Legal ? ' — ' + VR.Legal.shareHint() : '');
 
   // ---------------------------------------------------------------- 📦 out
   async function saveFile(name, text) {
@@ -47,7 +49,7 @@
     if (!ok) return false;
     // a Crafter draft is not a design yet: say so
     const CR = VR.Crafter, open = !!(CR && CR.on && ((CR.house && CR.house.dirty) || (CR.item && CR.item.dirty)));
-    say('📦 ' + name + ' · ' + sum.text + (open ? ' · ✎ ' + (SA ? L('br.draftSA', 'der offene Entwurf fehlt — erst 💾 Speichern') : L('br.draft', 'der offene Entwurf fehlt — erst „Ins Spiel“')) : ''), true);
+    say('📦 ' + name + ' · ' + sum.text + (open ? ' · ✎ ' + (SA ? L('br.draftSA', 'der offene Entwurf fehlt — erst 💾 Speichern') : L('br.draft', 'der offene Entwurf fehlt — erst „Ins Spiel“')) : '') + share(), true);
     return true;
   };
 
