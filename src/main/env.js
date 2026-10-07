@@ -86,6 +86,7 @@
       const gray = (c, k) => { const l = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11; return mix3(c, [l, l, l], k); };
       zen = gray(zen, cov * 0.75); hor = gray(hor, cov * 0.7);
       zen = zen.map(v => v * (1 - cov * 0.45)); hor = hor.map(v => v * (1 - cov * 0.4));
+      if (S.storm > 0) { const k = 1 - 0.35 * S.storm; zen = zen.map(v => v * k); hor = hor.map(v => v * k); }   // a storm darkens the sky
       E.zenith = zen; E.horizon = hor; E.sunset = sunset.map(v => v * (1 - cov * 0.8));
       const sunI = M.smoothstep(-0.05, 0.3, sy);
       const warm = 1 - M.smoothstep(0.05, 0.6, sy);
@@ -93,6 +94,7 @@
       E.moonColor = [0.14 * (1 - cov * 0.6) * dark, 0.18 * (1 - cov * 0.6) * dark, 0.3 * (1 - cov * 0.5) * dark];
       E.ambSky = mix3([0.06 * dark, 0.075 * dark, 0.15 * dark], mix3([0.36, 0.44, 0.66], [0.46, 0.36, 0.52], horizonness * 0.6), day).map(v => v * (1 - cov * 0.35) + cov * 0.08);
       if (blue > 0) E.ambSky = mix3(E.ambSky, [0.07, 0.1, 0.22], blue * 0.5);
+      if (S.storm > 0) E.ambSky = E.ambSky.map(v => v * (1 - 0.25 * S.storm));
       E.fogColor = mix3(hor, [0.5, 0.55, 0.62], cov * 0.4);
       // fog is a pale veil by day, dark at night
       if (S.fog > 0) E.fogColor = mix3(E.fogColor, mix3(hor, [0.74, 0.77, 0.82].map(v => v * (0.08 + 0.92 * day)), 0.65), S.fog * 0.6);
@@ -168,7 +170,7 @@
         E.bolt = [this.boltDir[0], this.boltTop, this.boltDir[1], vis * this.boltK];
       } else E.bolt = [0, 0, 0, 0];
       // lightning flash
-      if (this.flash > 0) { this.flash -= dt * 3; const f = Math.max(0, this.flash); E.ambSky = E.ambSky.map(v => v + f * 1.8); E.zenith = E.zenith.map(v => v + f * 0.6); }
+      if (this.flash > 0) { this.flash -= dt * 3; const f = Math.max(0, this.flash); E.ambSky = E.ambSky.map((v, i) => v + f * [0.75, 0.82, 1.0][i]); E.zenith = E.zenith.map((v, i) => v + f * [0.22, 0.25, 0.32][i]); E.horizon = E.horizon.map((v, i) => v + f * [0.3, 0.33, 0.4][i]); }
       // eye adaptation
       const target = 1 + (1 - (o.eyeSky === undefined ? 1 : o.eyeSky)) * 0.9 + night * 0.35;
       this.exposure += (target - this.exposure) * Math.min(1, dt * 1.5);
