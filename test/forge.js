@@ -26,7 +26,7 @@ section('core', () => {
   for (const t of Forge.types) {
     const d = Forge.dna(t.id, {}, 1, t.styles[0].id), q = Forge.parse(d);
     check(Forge.dna(q.type, q.params, q.seed, q.style) === d, 'round trip ' + t.id + ': ' + d);
-    check(t.params.length >= 2 && t.params.length <= 8 && t.styles.length >= 3 && t.styles.length <= 6, t.id + ' has 2–8 params (' + t.params.length + ') and 3–6 styles (' + t.styles.length + ')');
+    check(t.params.length >= 4 && t.params.length <= 8 && t.styles.length >= 3 && t.styles.length <= 5, t.id + ' has 4–8 params (' + t.params.length + ') and 3–5 styles (' + t.styles.length + ')');
     for (const pr of t.params) check(pr.def >= pr.min && pr.def <= pr.max && /^[a-z]$/.test(pr.k) && pr.label, t.id + ' param ' + pr.k + ' well formed');
   }
   const cl = Forge.parse('tower:f999,zzz,w1');
@@ -53,6 +53,17 @@ section('core', () => {
   check(tx('blau') === null && tx('') === null, 'no type → null');
   check(px('Wolkenkratzer 12 Etagen Backstein').style === 'backstein' && px('Wolkenkratzer 12 Etagen Backstein').params.f === 12, 'DE: Wolkenkratzer Backstein');
   check(px('Hochhaus Hochhaus 7 Stockwerke #abcd').seed === 0xabcd, 'a #hex seed in the text');
+  // typos in the type word still name it; nothing else is guessed
+  check(/^tower:f20/.test(tx('Hochaus 20 Stockwerke') || '') && /^tower:/.test(tx('Wolkenkrazer aus Glas') || '') && /^bridge:/.test(tx('Hängebrüke') || '') && /^castle:/.test(tx('Ritterbrug') || '') && tx('Hund') === null, 'typos: Hochaus, Wolkenkrazer, Hängebrüke, Ritterbrug → ' + [tx('Hochaus 20 Stockwerke'), tx('Wolkenkrazer aus Glas'), tx('Hängebrüke'), tx('Ritterbrug')].join(' '));
+  check(Forge.parse('lookout:p4#1').params.p === 5 && Forge.parse('lookout:#1').params.p === 5 && Forge.parse('lookout:p7#1').params.p === 7 && Forge.parse('lookout:p3#1').params.p === 3, 'stepped parameters sit on their grid (3 · 5 · 7)');
+  // the ✨ Genie's reading of words (VR.GenieBrain, the Studio's) and the Forge's own copy (the game's worker) agree
+  try {
+    require('../src/studio/genie_brain.js');
+    const GB = VR.GenieBrain, phrases = ['Hochhaus 40 Stockwerke mit Dachgarten', 'modern house two floors flat roof', 'Brücke 60 lang', 'Hängebrücke über 80 Blöcke', 'Große Burg aus Sandstein mit Bergfried', 'Grüner Park mit Teich und Brunnen', 'Wolkenkratzer, 12 Etagen; Backstein!', 'Fußgängerbrücke aus Holz', 'Haus ohne Balkon, mit Pool', 'Aussichtsturm 30 hoch aus Holz', 'Zaun 30 lang', 'skyscraper glass', 'Rescue tower', 'Bürohochhaus „Tellus“ mit Helipad', 'Raumschiff Frachter mit Hangar'];
+    const withGB = phrases.map(s => Forge.fromText(s)); const keep = VR.GenieBrain; VR.GenieBrain = null; const own = phrases.map(s => Forge.fromText(s)); VR.GenieBrain = keep;
+    const diff = phrases.filter((s, i) => withGB[i] !== own[i] || GB.norm(s) !== Forge.ownNorm(s));
+    check(diff.length === 0, 'the Genie\'s parser and the Forge\'s copy read ' + phrases.length + ' wishes the same' + (diff.length ? ': ' + diff.join(' | ') : ''));
+  } catch (e) { check(false, 'genie_brain.js loads in node: ' + e.message); }
   // tweak
   const t0 = 'tower:f20,glas#1';
   check(Forge.parse(Forge.tweak(t0, 'höher')).params.f > 20 && Forge.parse(Forge.tweak(t0, 'niedriger')).params.f < 20, 'tweak höher / niedriger');
@@ -177,6 +188,14 @@ section('bridge', () => {
     check(below === 0, dna + ' nothing written into the ground under a pier (' + below + ')');
     if (k === 2) { let top = 0; for (let y = g.sy - 1; y > deckY; y--) { if (count(g, (s) => s && s !== 0xFFFF, y, y) > 0) { top = y; break; } } check(top - deckY >= 8, dna + ' towers rise ≥ 8 over the deck: ' + (top - deckY)); }
   }
+  // the deck is walkable from one bank to the other (headroom cleared over it), also where it cuts into a hill
+  for (const dna of ['bridge:l60,k1,stein#3', 'bridge:l80,k2,stahl#4', 'bridge:l30,w3,k0,holz#5']) {
+    for (const [nm, gp] of [['valley', prof], ['into a hill', (u, v) => (v > 20 ? 3 : -6)]]) {
+      const g = Forge.build(dna, { ground: gp }), wk = Forge.walkable(g, [g.sx >> 1, -g.dy + 1, 0], {});
+      check(wk.reach.has((g.sx >> 1) + ',' + (-g.dy + 1) + ',' + (g.sz - 1)), dna + ' (' + nm + '): you walk the deck from bank to bank');
+    }
+  }
+  check(count(Forge.build('bridge:l30,r1,holz#1'), (s) => nameOf(s) === 'asphalt_dash') === 0 && count(Forge.build('bridge:l30,r1,stahl#1'), (s) => nameOf(s) === 'asphalt_dash') > 0, 'a centre line only on asphalt');
   const deep = Forge.build('bridge:l30,k0,stahl#1', { ground: () => -60, depth: 48 });
   check(deep.dy >= -48, 'piers never go deeper than the box depth (dy ' + deep.dy + ')');
   const flat = Forge.build('bridge:l30,k0,stahl#1');
@@ -188,6 +207,19 @@ section('bridge', () => {
     let bad = 0, cols = 0;
     for (let v = 0; v < g.sz; v++) { const gy = prof(0, v) - g.dy; let lowest = -1; for (let y = 0; y < g.sy; y++) { const s = cell(g, g.sx >> 1, y, v); if (s && s !== 0xFFFF) { lowest = y; break; } } if (lowest < 0) continue; cols++; if (Math.abs(lowest - (gy + 1)) > 0) bad++; }
     check(cols >= 20 && bad === 0, dna + ' every segment stands on its ground (' + cols + ' columns, ' + bad + ' floating/buried)');
+  }
+  // up a hill (the ground above the placement floor) and down again: every column on its ground, the top steps in level
+  // runs (never more than one block of zigzag between neighbours inside a run), pillars stand over both runs they join
+  const hill = (u, v) => Math.round(6 * Math.sin(v / 9)) - 1;
+  for (const st of Forge.type('wall').styles) for (const k of [0, 2]) {
+    const dna = Forge.dna('wall', { l: 48, h: 3, k, g: 1 }, 4, st.id), g = Forge.build(dna, { ground: hill });
+    let bad = 0, cols = 0, jag = 0; const tops = [];
+    for (let v = 0; v < g.sz; v++) {
+      let lo = -1, hi = -1; for (let y = 0; y < g.sy; y++) { const s = cell(g, 1, y, v); if (s && s !== 0xFFFF) { if (lo < 0) lo = y; hi = y; } }
+      tops.push(hi); if (lo < 0) continue; cols++; if (lo !== hill(1, v) + 1 - g.dy) bad++;
+    }
+    for (let v = 1; v < g.sz; v++) if (tops[v] >= 0 && tops[v - 1] >= 0 && Math.abs(tops[v] - tops[v - 1]) > 4) jag++;   // (a pillar and its cap stand two over the higher run)
+    check(cols >= 44 && bad === 0 && jag === 0 && g.meta.top >= 5 + 3, dna + ' over a hill: ' + cols + ' columns, ' + bad + ' off the ground, ' + jag + ' jumps over 4, top ' + g.meta.top);
   }
 });
 
@@ -212,19 +244,41 @@ section('civic', () => {
     check(t < 400 && !cell(g, gx, -g.dy + 1, 0) && !cell(g, gx, -g.dy + 2, 0), dna + ' gate open (' + t.toFixed(0) + ' ms)');
     const wk = Forge.walkable(g, [gx, -g.dy + 1, -1 + 1], {});
     check(wk.floors.includes(M.walk - g.dy + 1), dna + ' wall walk reachable without ladders: ' + JSON.stringify(wk.floors.filter(y => y > 2).slice(0, 6)) + ' walk ' + (M.walk - g.dy + 1));
-    check(M.top - 0 > 8 + 4, dna + ' towers rise over the wall: top ' + M.top);
-    if (k) check(count(g, isModel) >= 10, dna + ' the keep is furnished: ' + count(g, isModel));
+    check(M.towerTop - M.walk >= 4 && wk.floors.includes(M.towerTop - g.dy + 1), dna + ' the corner towers rise over the wall and their spiral stairs reach the top (' + (M.towerTop - g.dy + 1) + ')');
+    if (k) {
+      check(count(g, isModel) >= 10, dna + ' the keep is furnished: ' + count(g, isModel));
+      const kf = M.keep.floors.filter(y => wk.floors.includes(y - g.dy + 1));
+      check(M.keep.roof > M.towerTop && kf.length === M.keep.floors.length && wk.floors.includes(M.keep.roof - g.dy + 1), dna + ' the keep is the tallest tower, its stair reaches every floor (' + kf.length + '/' + M.keep.floors.length + ') and the battlements at ' + M.keep.roof);
+    }
   }
-  if (Forge.type('stadium')) for (const st of Forge.type('stadium').styles) { const dna = Forge.dna('stadium', {}, 1, st.id), g = Forge.build(dna); check(g.sx > 40 && count(g, (s) => nameOf(s) === 'grass_block') > 600, dna + ' has a pitch'); }
+  for (const st of Forge.type('stadium').styles) for (const P0 of [{}, { t: 12, r: 0, k: 1 }, { l: 50, w: 40, t: 4 }]) {
+    const dna = Forge.dna('stadium', P0, 1, st.id), t = ms(() => Forge.build(dna), 1), g = Forge.build(dna), M = g.meta, d = M.doors[0];
+    check(g.sx >= 40 && count(g, (s) => nameOf(s) === 'grass_block') > 600 && t < 400, dna + ' has a pitch (' + t.toFixed(0) + ' ms)');
+    const wk = Forge.walkable(g, [d[0], d[1] - g.dy, d[2]], {});
+    check(wk.floors.includes(M.floors[0] - g.dy + 1) && wk.floors.includes(M.floors[1] - g.dy + 1), dna + ' from the entrance down the tiers to the pitch and along the top walkway: ' + JSON.stringify(wk.floors));
+  }
+  check(Forge.describe('hall:m0,holz#1').startsWith('Halle · Werkhalle') && Forge.describe('hall:holz#1').startsWith('Halle · Markthalle'), 'a hall says what it is: ' + Forge.describe('hall:m0,holz#1'));
 });
 
 // ---------------------------------------------------------------- 🚀 🌳
 section('park', () => {
-  for (const st of Forge.type('shuttle').styles) for (const a of [0, 1, 5]) {
-    const dna = Forge.dna('shuttle', { a, p: a & 1 }, 21, st.id), g = Forge.build(dna);
-    check(count(g, (s) => s === 0) === 0 && count(g, (s) => s && s !== 0xFFFF) > 200, dna + ' only keep + ship cells (' + count(g, (s) => s && s !== 0xFFFF) + ')');
-    check(count(g, (s) => nameOf(s) === 'helm') >= 1 && g.meta.name, dna + ' has a helm and a name: ' + g.meta.name);
+  // 🚀 a ship of the game's starship generator on its pad, a gangway up to where the ship opens (or a hatch cut through
+  // the hull), and from the foot of the gangway a person walks aboard to the helm
+  let aboard = 0, tried = 0;
+  for (const st of Forge.type('shuttle').styles) for (const a of [0, 1, 2, 3, 5, 6]) {
+    const dna = Forge.dna('shuttle', { a, p: a & 1 ? 0 : 1, h: a === 3 ? 1 : 0, s: 1, g: 1 }, 21, st.id), t = ms(() => Forge.build(dna), 1), g = Forge.build(dna), M = g.meta;
+    check(count(g, (s) => s && s !== 0xFFFF) > 200 && count(g, (s) => nameOf(s) === 'helm') === 1 && M.name && t < 300, dna + ' a whole ship with its helm: ' + M.name + ' (' + t.toFixed(0) + ' ms)');
+    check(M.lot[0] === g.sx && M.lot[1] === g.sz && Forge.meta(dna).lot.join() === M.lot.join(), dna + ' the lot is known before the build: ' + M.lot.join(' × '));
+    tried++;
+    if (!M.hatch) continue;
+    const d = M.doors[0], wk = Forge.walkable(g, [d[0], d[1] - g.dy, d[2]], {}), [hx, hy, hz] = M.helm;
+    let near = false; for (const k of wk.reach) { const [x, y, z] = k.split(',').map(Number); if (Math.max(Math.abs(x - hx), Math.abs(z - hz)) <= 2 && Math.abs(y - (hy - g.dy)) <= 1) { near = true; break; } }
+    check(near, dna + ' up the gangway and aboard to the helm (hatch ' + JSON.stringify(M.hatch) + ')');
+    if (near) aboard++;
   }
+  check(aboard >= tried * 0.7 && Forge.build('shuttle:sf#15').meta.hatch, 'most ships get a gangway you walk aboard (' + aboard + '/' + tried + '), the shuttle always');
+  check(count(Forge.build('shuttle:sf,s1#5'), (s) => nameOf(s) === 'vx_console') >= 2 && count(Forge.build('shuttle:sf,s0#5'), (s) => nameOf(s) === 'vx_console') === 0, 'the ground station has its consoles');
+  check(count(Forge.build('shuttle:sf,h1#5'), (s) => nameOf(s) === 'vx_tech_trim') > count(Forge.build('shuttle:sf,h0#5'), (s) => nameOf(s) === 'vx_tech_trim') + 20, 'the hangar stands over the pad');
   check(Forge.hash(Forge.build('shuttle:a0,sf#5')) === Forge.hash(Forge.build('shuttle:a0,sf#5')), 'deterministic shuttle');
   for (const st of Forge.type('park').styles) for (const [p, f] of [[1, 1], [0, 0]]) {
     const dna = Forge.dna('park', { w: 32, d: 28, t: 2, p, f }, 13, st.id), g = Forge.build(dna), M = g.meta;

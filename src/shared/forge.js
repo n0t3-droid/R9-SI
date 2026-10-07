@@ -58,7 +58,7 @@
     const out = { type: t.id, params: {}, style: t.style(P.style) ? P.style : t.styles[0].id, seed: (P.seed >>> 0) || 1 };
     for (const p of t.params) {
       let v = P.params && P.params[p.k] !== undefined && Number.isFinite(+P.params[p.k]) ? +P.params[p.k] : p.def;
-      if (p.step) v = Math.round(v / p.step) * p.step;
+      if (p.step) v = p.min + Math.round((v - p.min) / p.step) * p.step;   // on the grid min, min + step, … (3, 5, 7)
       out.params[p.k] = clamp(Math.round(v), p.min, p.max);
     }
     return out;
@@ -113,14 +113,16 @@
   Forge.slices = function (n, max) { const out = []; for (let i = 0; i < n; i += max) out.push([i, Math.min(n, i + max)]); if (!out.length) out.push([0, 0]); return out; };
 
   // ---------------------------------------------------------------- words
-  // lower case, umlauts folded, punctuation spaced — as the Genie reads
-  const norm = (t) => String(t || '').toLowerCase()
+  // lower case, umlauts folded ("Brücke", "Bruecke", "Brucke" are one word), punctuation spaced — the ✨ Genie's reading
+  // (VR.GenieBrain.norm, in the Studio) and this copy of it (the game's worker, node) say the same word for word
+  const ownNorm = (t) => String(t || '').toLowerCase()
     .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss').replace(/[éèê]/g, 'e').replace(/[àâá]/g, 'a').replace(/[óô]/g, 'o')
     .replace(/(\d)\s*[x×*]\s*(\d)/g, '$1 x $2')
-    .replace(/\bblue/g, 'blau').replace(/(statue|uell|uett|true|glue|value|avenue|canoe)/g, (m) => m.toUpperCase())
+    .replace(/\bblue/g, 'blau').replace(/(statue|uell|uett|fondue|revue|true|glue|value|rescue|tissue|avenue|shoe|canoe|oboe|poet|aero|israel)/g, (m) => m.toUpperCase())
     .replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/(^|[^aeq])ue/g, '$1u').toLowerCase()
-    .replace(/[,;:.!?()\n]+/g, ' , ').replace(/[^a-z0-9#,\s]/g, ' ').replace(/\s+/g, ' ').trim();
-  Forge.norm = norm;
+    .replace(/[,;:.!?()\n]+/g, ' , ').replace(/[^a-z0-9#,\s]/g, ' ').replace(/\s+/g, ' ').replace(/^( ?, ?)+|( ?, ?)+$/g, '').trim();
+  const norm = (t) => (VR.GenieBrain && VR.GenieBrain.norm ? VR.GenieBrain.norm(t) : ownNorm(t));
+  Forge.norm = norm; Forge.ownNorm = ownNorm;
   const NUMW = { ein: 1, eine: 1, einen: 1, einem: 1, einer: 1, eins: 1, one: 1, a: 1, zwei: 2, two: 2, drei: 3, three: 3, vier: 4, four: 4, funf: 5, five: 5, sechs: 6, six: 6, sieben: 7, seven: 7, acht: 8, eight: 8, neun: 9, nine: 9, zehn: 10, ten: 10, elf: 11, eleven: 11, zwolf: 12, twelve: 12, funfzehn: 15, fifteen: 15, zwanzig: 20, twenty: 20, dreissig: 30, thirty: 30, vierzig: 40, forty: 40, funfzig: 50, fifty: 50, sechzig: 60, sixty: 60, hundert: 100, hundred: 100, dutzend: 12 };
   const numOf = (w) => (/^\d+$/.test(w) ? +w : NUMW[w] !== undefined ? NUMW[w] : null);
   // a stem list → one regex: long stems may end a compound ("Bürohochhaus"), short ones start a word; German plural endings allowed
@@ -155,8 +157,32 @@
   Forge.typeOf = function (n) {
     let best = null;
     for (const id in TYPE_RE) { if (!Forge.TYPES[id]) continue; for (const h of hits(n, TYPE_RE[id])) if (!best || h.at < best.at || (h.at === best.at && h.len > best.len)) best = { id, at: h.at, len: h.len }; }
-    return best;
+    return best || fuzzyType(n);
   };
+  // a typo in the type word ("Hochaus", "Wolkenkrazer", "Hängebrüke"): one letter off — two in long words — still names
+  // it (the first letter has to be right; only when no type word is written correctly)
+  function editDist(a, b, lim) {
+    if (Math.abs(a.length - b.length) > lim) return lim + 1;
+    let prev = []; for (let j = 0; j <= b.length; j++) prev.push(j);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i]; let low = i;
+      for (let j = 1; j <= b.length; j++) { cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); if (cur[j] < low) low = cur[j]; }
+      if (low > lim) return lim + 1;
+      prev = cur;
+    }
+    return prev[b.length];
+  }
+  function fuzzyType(n) {
+    let best = null, at = 0;
+    for (const t of n.split(' ')) {
+      if (t.length >= 5 && /^[a-z]+$/.test(t)) {
+        const lim = t.length < 8 ? 1 : 2;
+        for (const id in TYPE_WORDS) { if (!Forge.TYPES[id]) continue; for (const w of TYPE_WORDS[id]) { if (w.length < 5 || w.includes(' ') || w[0] !== t[0]) continue; const d = editDist(t, w, lim); if (d <= lim && (!best || d < best.d)) best = { id, at, len: t.length, d, said: t, meant: w }; } }
+      }
+      at += t.length + 1;
+    }
+    return best;
+  }
   // materials: generic words → style ids (a type takes the first of its own styles named, else the first generic one it has)
   const MAT_WORDS = [['glas', ['glas', 'glass', 'glasfassade', 'verglast', 'curtain wall', 'glasturm']], ['beton', ['beton', 'concrete', 'sichtbeton', 'zement', 'brutalist']], ['backstein', ['backstein', 'ziegel', 'klinker', 'brick', 'bricks', 'ziegelstein', 'mauerwerk', 'rotklinker']], ['holz', ['holz', 'wood', 'wooden', 'timber', 'holzern', 'bretter', 'planken', 'balken']], ['sandstein', ['sandstein', 'sandstone', 'kalkstein', 'limestone', 'travertin']], ['stein', ['stein', 'stone', 'granit', 'granite', 'naturstein', 'bruchstein', 'steinern', 'marmor', 'marble']], ['fels', ['fels', 'felsen', 'rock', 'feldstein', 'fieldstone', 'kopfstein', 'cobble']], ['dunkel', ['dunkel', 'dark', 'schwarz', 'black', 'finster', 'grim']], ['tech', ['tech', 'techno', 'sci fi', 'scifi', 'futuristisch', 'futuristic', 'starforge', 'raumstation', 'hightech', 'neon']], ['stahl', ['stahl', 'steel', 'metall', 'metal', 'eisen', 'iron']], ['metall', ['metall', 'metal', 'eisen', 'iron', 'stahl', 'steel', 'gitter']], ['weiss', ['weiss', 'white', 'putz', 'stucco', 'plaster', 'hell', 'bright']], ['anthrazit', ['anthrazit', 'anthracite', 'graphit', 'schwarz', 'black', 'dunkel', 'dark', 'grau', 'grey', 'gray']], ['japan', ['japan', 'japanisch', 'japanese', 'zen', 'kirsch', 'cherry', 'asiatisch', 'asian']], ['stadt', ['stadt', 'urban', 'city', 'stadtisch', 'modern']], ['landhaus', ['landhaus', 'rustikal', 'rustic', 'country', 'landlich', 'dorf', 'village']], ['wild', ['wild', 'wiese', 'meadow', 'natur', 'nature', 'wald', 'forest']]];
   const MAT_RE = MAT_WORDS.map(([id, stems]) => ({ id, re: stemRe(stems) }));
@@ -280,7 +306,8 @@
     for (let k = 1; k < (n || 9); k++) {
       seed = (((seed ^ (k * 0x9e3779b9)) * 1103515245 + 12345) >>> 0) & 0xffff; if (!seed) seed = k;
       const P = { type: B.type, params: Object.assign({}, B.params), style: B.style, seed };
-      if (k % 2 === 1 && dims.length) { const p = dims[(k >> 1) % dims.length], step = p.step || Math.max(1, Math.round((p.max - p.min) / 12)), dir = ((k >> 1) & 1) ? 1 : -1; P.params[p.k] = clamp(P.params[p.k] + dir * step, p.min, p.max); if (P.params[p.k] === B.params[p.k]) P.params[p.k] = clamp(P.params[p.k] - dir * step, p.min, p.max); }
+      // the nudge is relative (a sixth of the value, at least a 24th of the range): 30 floors → 25 / 35, 12 → 9 / 15
+      if (k % 2 === 1 && dims.length) { const p = dims[(k >> 1) % dims.length], v = B.params[p.k], step = Math.max(p.step || 1, Math.round(v / 6), Math.round((p.max - p.min) / 24)), dir = ((k >> 1) & 1) ? 1 : -1; P.params[p.k] = clamp(v + dir * step, p.min, p.max); if (P.params[p.k] === v) P.params[p.k] = clamp(v - dir * step, p.min, p.max); }
       if (k % 3 === 0 && t.styles.length > 1) { const i = t.styles.findIndex(s => s.id === B.style); P.style = t.styles[(i + (k / 3)) % t.styles.length].id; }
       let d = Forge.dna(P); let guard = 0;
       while (seen.has(d) && guard++ < 16) { P.seed = (P.seed + 1) & 0xffff || 1; d = Forge.dna(P); }
