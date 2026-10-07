@@ -69,9 +69,12 @@
     let d = TPL.get(t); if (d) return d;
     const W = t.box[0] | 0, D = t.box[1] | 0, y0 = t.box[2] | 0, y1 = t.box[3] | 0, H = y1 - y0 + 1, u0 = t.off ? t.off[0] | 0 : 0, v0 = t.off ? t.off[1] | 0 : 0;
     if (!(W > 0 && D > 0 && H > 0) || W * D * H > 8e6) return null;
-    const idx = C.unvrle(C.unb64(t.rle), W * D * H);
-    const st = new Int32Array(t.pal.length);
-    for (let k = 0; k < t.pal.length; k++) { const e = t.pal[k]; st[k] = e === 'keep' ? -2 : e === 'air' ? 0 : C.fromPortable(e); }
+    let idx, st;
+    try {
+      idx = C.unvrle(C.unb64(t.rle), W * D * H);
+      st = new Int32Array(t.pal.length);
+      for (let k = 0; k < t.pal.length; k++) { const e = t.pal[k]; st[k] = e === 'keep' ? -2 : e === 'air' ? 0 : C.fromPortable(e); }
+    } catch (e) { TPL.set(t, null); return null; }   // a corrupted design builds the original house, never a broken town
     d = { W, D, y0, y1, H, u0, v0, idx, st, rot: [] };
     TPL.set(t, d);
     return d;

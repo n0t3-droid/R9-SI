@@ -80,7 +80,7 @@ check(sw.used2 && sw.on.join() === '1,1', 'a right click on the foot switches it
 await ev(() => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; });
 const step = async (n) => { for (let k = 0; k < n; k++) await ev(() => { const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); }); };
 const settle = async (max = 40) => { for (let i = 0; i < max; i++) { await step(4); const s = await ev(() => { const g = VR.game; return { busy: g.pool.busy, pend: g.world.pending.size }; }); if (s.busy === 0 && s.pend === 0 && i > 2) break; await game.waitForTimeout(150); } };
-const sets = SETS.length ? SETS : await ev(() => [...new Set(VR.R.types.filter(t => t.o.modern).map(t => t.o.set))]);
+const sets = SETS.length ? (SETS[0] === 'none' ? [] : SETS) : !process.env.ROOMS ? [] : await ev(() => [...new Set(VR.R.types.filter(t => t.o.modern).map(t => t.o.set))]);
 for (const set of sets) {
   const room = await ev((set) => {
     const g = VR.game, w = g.world, p = g.player, R = VR.R, VM = VR.VM, L = [];

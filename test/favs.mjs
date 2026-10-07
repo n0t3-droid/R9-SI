@@ -90,7 +90,7 @@ console.log('  game again', JSON.stringify(g3));
 check(g3.favs.join() === s1.favs.join() && g3.slots.join() === s1.favs.join(), 'back in the game, its open ★ tab has them: ' + g3.slots.join(', '));
 await studio.bringToFront();
 // the game is not needed any more: let its page rest (two pages drawing in software rendering share two CPUs here)
-await game.goto('about:blank');
+try { await game.goto('about:blank', { timeout: 90000 }); } catch (e) { console.log('  (the game page did not rest: ' + e.message.split('\n')[0] + ')'); }
 
 console.log('3 · the Crafter, the World and the Werkbank');
 const s2 = await sev(async () => {

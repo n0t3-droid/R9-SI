@@ -130,7 +130,7 @@
 
   // ---------------------------------------------------------------- 🔌 the standalone says it is not connected
   BR.toGame = function (anchor) {
-    let w = null; try { w = window.open(GAME_URL, '_blank', 'noopener'); } catch (e) { w = null; }
+    let w = null; try { w = window.open(GAME_URL, '_blank'); if (w) { try { w.opener = null; } catch (e) { /* */ } } } catch (e) { w = null; }
     if (w) return;
     // (noopener hands nothing back — and a blocked one neither): the link, ready to copy
     const host = (anchor && anchor.closest && anchor.closest('#bridgeBar, .note, .crow')) || $('#bridgeBar') || $('#partsBody');

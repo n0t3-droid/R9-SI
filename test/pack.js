@@ -54,17 +54,17 @@ check(P.summary({ favs: ['a'], studio: { houses: { 1: {} }, models: {} }, lib: [
 console.log('4 · merging');
 store.clear(); F.sync();
 F.add('oak_planks'); F.add('stone');          // here: [stone, oak_planks]
-CU.save({ v: 1, houses: { 3: { v: 2, index: 3, name: 'Bel Portale', tpl: { rle: 'x' }, t: 100 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 1], rle: 'AQA=', t: 500 } } });
+CU.save({ v: 1, houses: { 3: { v: 2, index: 3, name: 'Bel Portale', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AgE=' }, t: 100 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 1], rle: 'AQA=', t: 500 } } });
 localStorage.setItem('r9si.library', JSON.stringify({ v: 1, items: [lib('b1', 'Turm', 'AgE=')], t: 1 }));
 const inc = P.read(JSON.stringify({ r9pack: 1, at: 9, from: 'standalone',
   favs: ['glass', 'stone', 'blueprint_2'],
-  studio: { houses: { 3: { v: 2, index: 3, name: 'Bel Portale', tpl: { rle: 'y' }, t: 200 }, 5: { v: 2, index: 5, name: 'Toscana', tpl: { rle: 'z' }, t: 50 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 2], rle: 'AQA=', t: 400 } } },
+  studio: { houses: { 3: { v: 2, index: 3, name: 'Bel Portale', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AQE=' }, t: 200 }, 5: { v: 2, index: 5, name: 'Toscana', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AAE=' }, t: 50 } }, models: { [sofa]: { v: 1, W: 2, H: 1, D: 1, res: 16, pal: [0, 2], rle: 'AQA=', t: 400 } } },
   lib: [lib('zz', 'Turm (Kopie)', 'AgE='), lib('b1', 'Brücke', 'AwE=')] }));
 const r = P.merge(inc);
 const fl = F.list();
 check(fl.join() === 'glass,blueprint_2,stone,oak_planks', '★ union, the new ones first in the file\'s order: ' + fl.join(', '));
 const st = CU.load();
-check(st.houses[3].t === 200 && st.houses[3].tpl.rle === 'y' && st.houses[5] && st.models[sofa].t === 500, 'designs: the newer one wins (house 3 from the file, the sofa stays as it is here), house 5 is new');
+check(st.houses[3].t === 200 && st.houses[3].tpl.rle === 'AQE=' && st.houses[5] && st.models[sofa].t === 500, 'designs: the newer one wins (house 3 from the file, the sofa stays as it is here), house 5 is new');
 const libs = JSON.parse(localStorage.getItem('r9si.library')).items;
 check(libs.length === 2 && libs[0].name === 'Turm' && libs[1].name === 'Brücke' && libs[1].id !== 'b1', 'Bauteile: the identical one is not doubled, the other is appended (with an id of its own)');
 check(r && r.ok === true && r.favs === 2 && r.houses.added === 1 && r.houses.replaced === 1 && r.models.added === 0 && r.models.kept === 1 && r.lib.added === 1 && r.lib.same === 1, 'the result counts it: ' + JSON.stringify(r && { favs: r.favs, houses: r.houses, models: r.models, lib: r.lib }));
@@ -81,5 +81,17 @@ check(r3 && r3.ok === false, 'a write that fails is reported (ok: false), not cl
 check(F.ok === false || F.ok === true, 'VR.Favs says whether its last save worked (F.ok)');
 globalThis.__full = true; F.add('sand'); const okAfter = F.ok; globalThis.__full = false;
 check(okAfter === false, 'a favourite that could not be stored: F.ok is false');
+
+// ---- v0.39 review: a crafted or broken file never reaches the villa builder, and names cannot carry markup
+{
+  const bad = JSON.stringify({ r9pack: 1, favs: [], studio: { houses: { 3: { v: 2, index: 3, name: '<img src=x onerror=alert(1)>', tpl: { box: [1, 1, 0, 0], pal: ['keep'], rle: '***not-base64***' } }, 4: { v: 2, index: 4, name: 'ok', tpl: { box: [1, 1, 0, 0], off: [0, 0], pal: ['keep', 'air', ['stone']], rle: 'AgE=' } }, '07': { v: 2, index: 7, skin: 'glas' } }, models: { __proto__: { rle: 'AQA=', pal: [0], W: 1, H: 1, D: 1, res: 16 }, constructor: { rle: 'AQA=', pal: [0], W: 1, H: 1, D: 1, res: 16 } } }, lib: [{ name: 'huge', sx: 1024, sy: 1024, sz: 1024, pal: [0], rle: 'AQA=' }, { name: 'bad', sx: 2, sy: 2, sz: 2, pal: [0], rle: '!!' }] });
+  const pk = P.read(bad);
+  check(pk && !pk.studio.houses[3] && pk.studio.houses[4] && pk.studio.houses[7] && pk.studio.houses[7].skin === 'glas', 'a template with broken base64 is dropped, a sound one and a skin-only design stay (house 07 → 7)');
+  check(Object.keys(pk.studio.models).length === 0 && Object.getPrototypeOf(pk.studio.models) === Object.prototype, 'model keys that are not models of this game (__proto__, constructor) are ignored');
+  check(pk.lib.length === 0, 'a Bauteil of 1024³ cells or with broken base64 is dropped');
+  check(pk.studio.houses[4].name === 'ok', 'names are kept as plain strings');
+  const t = { box: [1, 1, 0, 0], pal: ['keep'], rle: '***' };
+  check(VR.Custom.tplData({ tpl: t }) === null && VR.Custom.tplData({ tpl: t }) === null, 'a corrupted template builds the original house (tplData → null, twice, no throw)');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

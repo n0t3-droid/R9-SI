@@ -233,7 +233,7 @@
     if (CR.want) {
       const w = CR.want; CR.want = null;
       const p = w.kind === 'item' ? openItem(w.name) : openHouse(w.idx);
-      if (w.then) Promise.resolve(p).then(() => { if (S.mode === 'craft' && (w.kind === 'item' ? CR.item && CR.item.name === w.name : CR.house && CR.house.index === w.idx)) w.then(); });
+      if (w.then) Promise.resolve(p).then(() => { if (S.mode === 'craft' && (w.kind === 'item' ? CR.item && CR.item.name === w.name : CR.house && CR.house.index === w.idx)) w.then(); }).catch((e) => console.warn('Crafter: want', e));
       return p;
     }
     const sc = S.scene;
