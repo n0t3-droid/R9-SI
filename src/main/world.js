@@ -137,6 +137,15 @@
     terminate() { for (const w of this.workers) w.terminate(); this.workers = []; this.started.clear(); this.cb.clear(); }
   }
   VR.WorkerPool = WorkerPool;
+  // The number of workers: one generation/mesh worker on a 2-core machine (the main thread needs the other core), two
+  // on 3–4 cores, cores − 2 above that (at most 6). The quality preset caps it: potato 2, low 3 (less terrain to make
+  // at those render distances, and every worker keeps caches of its own — up to ~120 MB of pieces each).
+  VR.poolSize = function (cores, preset) {
+    const c = cores >= 1 ? Math.floor(cores) : 4;
+    const base = c <= 2 ? 1 : c <= 4 ? 2 : Math.min(c - 2, 6);
+    const cap = preset === 'potato' ? 2 : preset === 'low' ? 3 : 6;
+    return Math.max(1, Math.min(base, cap));
+  };
 
   // ----------------------------------------------------------------- column / section
   class Section {

@@ -179,7 +179,7 @@
         // the Studio changed this world's style (another tab of the same page)
         if (e.key && VR.WorldStyle && this.meta && !this.meta.guest && e.key === VR.WorldStyle.key(this.meta.id)) this.applyStyle();
       });
-      const n = Math.max(2, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+      const n = VR.poolSize(navigator.hardwareConcurrency || 4, this.settings.preset);
       const src = document.getElementById('worker-src').textContent;
       this.pool = new VR.WorkerPool(src, n);
       this.pool.maxInflight = 2;
