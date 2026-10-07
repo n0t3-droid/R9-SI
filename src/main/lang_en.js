@@ -875,6 +875,7 @@
     'live.pause.lookTip': 'Colour and material in the R9 Studio — for all your worlds',
     'live.bh.look': 'Change look',
     'live.restored': '{n} variants restored from this world',
+    'live.restored1': 'One variant restored from this world',
     'live.mp.noPack': 'The host\'s looks did not load — you see your own.',
     'live.var.full': 'All {n} variant slots are taken — change a variant, or the block "for all".',
     'live.var.big': 'Too big for a variant.',

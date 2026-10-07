@@ -875,6 +875,7 @@
     'live.pause.lookTip': 'Farbe und Material im R9 Studio — für alle deine Welten',
     'live.bh.look': 'Aussehen ändern',
     'live.restored': '{n} Varianten aus dieser Welt wiederhergestellt',
+    'live.restored1': 'Eine Variante aus dieser Welt wiederhergestellt',
     'live.mp.noPack': 'Looks des Hosts nicht geladen — du siehst deine eigenen.',
     'live.var.full': 'Alle {n} Variantenplätze sind belegt — ändere eine Variante oder den Block „Für alle".',
     'live.var.big': 'Zu groß für eine Variante.',
