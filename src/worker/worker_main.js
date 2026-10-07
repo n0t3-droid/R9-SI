@@ -10,17 +10,19 @@
   const STYLE_ON = (dim) => !!(STYLE && VR.WorldStyle && (dim === 'overworld' || dim === 'flat'));
   function setStyle(st) { STYLE = st && (st.sv || (st.rules && st.rules.length) || st.water) ? st : null; STYLE_MAP = STYLE && VR.WorldStyle ? VR.WorldStyle.compile(STYLE.rules) : null; }
   const getGen = (dim) => gens[dim] || (gens[dim] = VR.makeGen(dim, seed, opts));
-  // expand quads (4 verts) into triangle lists (6 verts) for drawArrays/multiDraw
+  // expand quads (4 verts) into triangle lists (6 verts) for drawArrays/multiDraw: vertices 0 1 2, then 0 2 3
+  // (plain index loops: three subarray views per quad were a third of a mesh job's garbage, and three times slower)
   function toTris(q) {
     const nq = q.length >> 5, out = new Uint16Array(nq * 48);
     for (let i = 0; i < nq; i++) {
       const s = i * 32, d = i * 48;
-      out.set(q.subarray(s, s + 24), d);
-      out.set(q.subarray(s, s + 8), d + 24);
-      out.set(q.subarray(s + 16, s + 32), d + 32);
+      for (let k = 0; k < 24; k++) out[d + k] = q[s + k];
+      for (let k = 0; k < 8; k++) out[d + 24 + k] = q[s + k];
+      for (let k = 0; k < 16; k++) out[d + 32 + k] = q[s + 16 + k];
     }
     return out;
   }
+  VR.quadsToTris = toTris;
   // light + mesh an arbitrary block grid (ships / contraptions)
   function shipMesh(m) {
     const { sx, sy, sz, blocks } = m;
