@@ -89,8 +89,8 @@
       { k: 'p', label: 'Landeplatz', min: 0, max: 1, def: 1 },
     ],
     styles: PAL.map(([id, , name]) => ({ id, name, words: [name.toLowerCase(), id] })),
-    lot: (P) => { const bp = design(P); return [bp.sx + (P.params.p ? 4 : 0), bp.sz + (P.params.p ? 4 : 0)]; },
-    describe: (P) => [['Shuttle', 'Interceptor', 'Gunship', 'Racer', 'Dropship', 'Frachter', 'Kreuzer', 'Träger'][P.params.a]].concat(P.params.p ? ['Landeplatz'] : []),
+    lot: (P) => { if (!VR.ShipGen) return [21 + (P.params.p ? 4 : 0), 30 + (P.params.p ? 4 : 0)]; const bp = design(P); return [bp.sx + (P.params.p ? 4 : 0), bp.sz + (P.params.p ? 4 : 0)]; },
+    describe: (P) => [['', 'Interceptor', 'Gunship', 'Racer', 'Dropship', 'Frachter', 'Kreuzer', 'Träger'][P.params.a]].concat(P.params.p ? ['Landeplatz'] : []),
   }, function (P, env) {
     const bp = design(P), pad = P.params.p ? 2 : 0;
     const dy = -1, W = bp.sx + pad * 2, D = bp.sz + pad * 2, K = Forge.kit(W, bp.sy + 3, D, dy);
