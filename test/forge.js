@@ -151,7 +151,7 @@ section('house', () => {
 
 // ---------------------------------------------------------------- 🌉 🧱
 section('bridge', () => {
-  const prof = (u, v) => -3 - Math.round(6 * Math.sin(v / 7));
+  const prof = (u, v) => Math.min(-1, -3 - Math.round(6 * Math.sin(v / 7)));   // the ground under the deck (never above it)
   const br = Forge.type('bridge');
   for (const st of br.styles) for (const k of [0, 1, 2]) {
     const dna = Forge.dna('bridge', { l: 48, w: 5, k, m: 1 }, 5, st.id), g = Forge.build(dna, { ground: prof, depth: 48 }), M = g.meta;
@@ -161,17 +161,18 @@ section('bridge', () => {
     check(gaps === 0, dna + ' deck continuous (' + gaps + ' gaps)');
     let rails = 0; for (let v = 0; v < g.sz; v++) for (const x of [0, g.sx - 1]) { const s = cell(g, x, deckY + 1, v); if (s && s !== 0xFFFF) rails++; }
     check(rails >= 2 * (g.sz - 4), dna + ' railings on both edges: ' + rails);
-    // every pier reaches the ground: below the deck, every column that has a block right under the deck is solid down to ground+1 and stops there
-    let piers = 0, bad = 0, below = 0;
+    // every pier (a column that touches the ground) is solid from the ground up to the deck, nothing is written into the
+    // ground itself, and no stretch of twenty cells goes without one
+    let piers = 0, bad = 0, below = 0; const pierV = new Set();
     for (let v = 0; v < g.sz; v++) for (let x = 0; x < g.sx; x++) {
-      const gy = prof(x, v);
-      let any = false; for (let y = deckY - 1; y > deckY - 40 && y >= 0; y--) { const s = cell(g, x, y, v); if (s && s !== 0xFFFF) any = true; }
-      if (!any) continue;
-      piers++;
-      for (let y = deckY - 1; y >= deckY + gy + 1 && y >= 0; y--) { const s = cell(g, x, y, v); if (!s || s === 0xFFFF) { bad++; break; } }
-      for (let y = deckY + gy; y >= 0; y--) { const s = cell(g, x, y, v); if (s && s !== 0xFFFF && !(k === 1 && M.name)) { below++; break; } }
+      const gy = prof(x, v), base = deckY + gy + 1;
+      for (let y = deckY + gy - 1; y >= 0; y--) { const s = cell(g, x, y, v); if (s && s !== 0xFFFF) { below++; break; } }   // (the top ground block may carry a girder)
+      const sb = cell(g, x, base, v); if (!sb || sb === 0xFFFF) continue;
+      piers++; pierV.add(v);
+      for (let y = base; y <= deckY - 1; y++) { const s = cell(g, x, y, v); if (!s || s === 0xFFFF) { bad++; break; } }
     }
-    check(piers > 0 && bad === 0, dna + ' piers are solid from the deck down to the ground (' + piers + ' columns, ' + bad + ' broken)');
+    let gap = 0; for (let v0 = 0; v0 + 20 <= g.sz; v0++) { let any = false; for (let v = v0; v < v0 + 20; v++) if (pierV.has(v)) any = true; if (!any) gap++; }
+    check(piers > 0 && bad === 0 && gap === 0, dna + ' piers reach the ground without gaps (' + piers + ' columns, ' + bad + ' broken, ' + gap + ' stretches without a pier)');
     check(below === 0, dna + ' nothing written into the ground under a pier (' + below + ')');
     if (k === 2) { let top = 0; for (let y = g.sy - 1; y > deckY; y--) { if (count(g, (s) => s && s !== 0xFFFF, y, y) > 0) { top = y; break; } } check(top - deckY >= 8, dna + ' towers rise ≥ 8 over the deck: ' + (top - deckY)); }
   }
