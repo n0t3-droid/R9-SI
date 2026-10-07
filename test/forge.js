@@ -3,7 +3,7 @@
 // every storey; houses have a reachable door and furnished rooms; bridges keep a continuous deck, railings and piers
 // down to the ground profile; parks, castles, halls, lookouts, walls and shuttles hold what they promise.
 //   node test/forge.js            everything
-//   ONLY=core node test/forge.js  one section (core · kit · tower · house · bridge · civic · park · place)
+//   ONLY=core node test/forge.js  one section (core · kit · tower · house · bridge · civic · park · sweep)
 require('./load_shared.js');
 const Forge = VR.Forge, R = VR.R, T = R.T, F = VR.F;
 const ONLY = process.env.ONLY || '';
@@ -291,6 +291,31 @@ section('park', () => {
     check(wk.reach.size > g.sx * g.sz * 0.3, dna + ' walkable from the gate across the park: ' + wk.reach.size);
     check(count(g, (s) => /bench/.test(nameOf(s))) >= 4, dna + ' benches');
   }
+});
+
+// ---------------------------------------------------------------- the sweep: random parameter sets of every type with
+// floors (a fixed seed — the same sets every run): the stairs reach every floor, the roof, the wall walk, the tower tops,
+// the keep's battlements, the stadium's pitch and its top walkway; the lookout's platform; the halls are walkable
+section('sweep', () => {
+  const rng = new VR.RNG(12345), pick = (t) => { const P = {}; for (const p of t.params) P[p.k] = p.min + rng.int(p.max - p.min + 1); return P; };
+  const missing = (g, from, ys) => { const wk = Forge.walkable(g, from, {}); return ys.filter(y => !wk.floors.includes(y)); };
+  const bad = { tower: [], house: [], castle: [], stadium: [], lookout: [], hall: [] }, N = { tower: 40, house: 40, castle: 14, stadium: 12, lookout: 24, hall: 12 };
+  let slow = 0;
+  for (const id in N) for (let i = 0; i < N[id]; i++) {
+    const t = Forge.type(id), P = pick(t); if (id === 'tower') P.f = 4 + rng.int(44);
+    const dna = Forge.dna(id, P, 1 + i, t.styles[i % t.styles.length].id), g = Forge.build(dna), M = g.meta, d = M.doors[0], up = (y) => y - g.dy + 1;
+    if (M.ms > 400) slow++;
+    let miss;
+    if (id === 'tower') miss = missing(g, [d[0], d[1] - g.dy, d[2] + 1], M.floors.map(up).concat([up(M.roof)]));
+    else if (id === 'house') miss = missing(g, [d[0], d[1] - g.dy, d[2] - 1], M.floors.map(up));
+    else if (id === 'castle') miss = missing(g, [g.sx >> 1, -g.dy + 1, 0], [up(M.walk), up(M.towerTop)].concat(M.keep ? M.keep.floors.map(up).concat([up(M.keep.roof)]) : []));
+    else if (id === 'stadium') miss = missing(g, [d[0], d[1] - g.dy, d[2]], M.floors.map(up));
+    else if (id === 'lookout') miss = missing(g, [d[0], d[1] - g.dy, d[2] - 1], [up(M.platform)]);
+    else { const wk = Forge.walkable(g, [d[0], d[1] - g.dy, d[2] - 1], {}); miss = wk.reach.size > g.sx * g.sz / 3 ? [] : ['floor']; }
+    if (miss.length) bad[id].push(dna + ' (' + miss.join(',') + ')');
+  }
+  for (const id in N) check(!bad[id].length, N[id] + ' random ' + id + 's: every level reached on foot' + (bad[id].length ? ' — not: ' + bad[id].slice(0, 4).join(' · ') : ''));
+  check(slow === 0, 'every one of them built in under 400 ms (' + slow + ' slower)');
 });
 
 console.log(fails ? 'FAILED ' + fails + ' of ' + n : 'ALL OK (' + n + ' checks)');
