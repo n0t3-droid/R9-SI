@@ -329,7 +329,8 @@
     // a leaf crown; under its rim, lanterns and glow berries hang (lights in the canopy at night)
     const blob = (x0, y0, z0, r, kinds) => {
       const R0 = Math.ceil(r);
-      for (let yy = -R0; yy <= R0; yy++) for (let z = -R0; z <= R0; z++) for (let x = -R0; x <= R0; x++) { const d = Math.hypot(x, yy * 1.35, z); if (d > r + (rng.next() - 0.5) * 1.2) continue; leaf(x0 + x, y0 + yy, z0 + z, kinds[(Math.abs(x * 3 + yy * 5 + z * 7)) % kinds.length]); }
+      // (a few glowing blossoms in its outer shell: pale lights all through the canopy at night)
+      for (let yy = -R0; yy <= R0; yy++) for (let z = -R0; z <= R0; z++) for (let x = -R0; x <= R0; x++) { const d = Math.hypot(x, yy * 1.35, z), e = r + (rng.next() - 0.5) * 1.2; if (d > e) continue; const kind = kinds[(Math.abs(x * 3 + yy * 5 + z * 7)) % kinds.length]; if (d > e - 1.3 && rng.next() < 0.035) { const s0 = K.get(x0 + x, y0 + yy, z0 + z); if (s0 === 0xFFFF || s0 === 0) K.set(x0 + x, y0 + yy, z0 + z, 'pearl_mire_light'); } else leaf(x0 + x, y0 + yy, z0 + z, kind); }
       for (let k = 0; k < 10; k++) {
         const a = rng.next() * Math.PI * 2, d = r * (0.45 + rng.next() * 0.4), x = x0 + Math.round(Math.cos(a) * d), z = z0 + Math.round(Math.sin(a) * d);
         let yy = y0; while (yy > y0 - R0 - 1 && K.get(x, yy - 1, z) !== 0xFFFF) yy--;
