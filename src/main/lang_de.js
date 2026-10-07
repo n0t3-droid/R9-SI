@@ -811,7 +811,7 @@
     'hand.title': '🖐 In der Hand',
     // ---- W1: Hinweise (einer nach dem anderen)
     'hint.moveTouch': '👆 ziehen = umschauen · 🕹 laufen',
-    'hint.move': '🖱 bewegen = umschauen · W A S D = gehen',
+    'hint.move': '🖱 bewegen = umschauen · W A S D = laufen',
     'hint.fly': 'Leertaste 2× = fliegen',
     'hint.close': 'Ausblenden',
     // ---- W1 im R9 Studio: die Kopfzeile, die Karte, der Zurück-Stapel

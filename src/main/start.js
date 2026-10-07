@@ -322,7 +322,7 @@
     if (keys || d > 1.5) { H.done('move'); hintState.lastPos = p.pos.slice(); hintState.standAt = now; }
     if (p.flying) H.done('fly');
     const st = H.read();
-    if (!st.done.move) { if (now - hintState.standAt > 5000 && H.want('move')) H.show('move', touch() ? { text: tx('hint.moveTouch', null, '👆 ziehen = umschauen · 🕹 laufen', '👆 drag = look around · 🕹 walk'), picto: ['finger'] } : { text: tx('hint.move', null, '🖱 bewegen = umschauen · W A S D = gehen', '🖱 move = look around · W A S D = walk'), picto: ['mouse', 'W', 'A', 'S', 'D'] }); return; }
+    if (!st.done.move) { if (now - hintState.standAt > 5000 && H.want('move')) H.show('move', touch() ? { text: tx('hint.moveTouch', null, '👆 ziehen = umschauen · 🕹 laufen', '👆 drag = look around · 🕹 walk'), picto: ['finger'] } : { text: tx('hint.move', null, '🖱 bewegen = umschauen · W A S D = laufen', '🖱 move = look around · W A S D = walk'), picto: ['mouse', 'W', 'A', 'S', 'D'] }); return; }
     if (!st.done.fly && p.mode !== 'survival' && H.want('fly')) H.show('fly', { text: tx('hint.fly', null, 'Leertaste 2× = fliegen', 'Space twice = fly'), picto: ['Space', 'Space'] });
   }
   // a Ding set from the start screen (📍 Setzen on a card) is in your hand when the world opens — your own world,
