@@ -159,6 +159,11 @@
       this.muffle.frequency.setTargetAtTime(muffled ? 800 : 20000, t, 0.3);
       this.busGain.gain.setTargetAtTime(muffled ? 0.355 : 1, t, 0.3);   // −9 dB indoors
     }
+    // one line for the F3 overlay: the layer levels and what the place reads as
+    info() {
+      const S = this.S, g = (k) => (this.L && this.L[k] ? this.L[k].g.gain.value.toFixed(2) : '–');
+      return `wind ${g('wind')} rain ${g('rain')} birds ${g('birds')} crickets ${g('crickets')} water ${g('water')} · trees ${S.trees} water ${S.water} valley ${S.valley.toFixed(2)}${S.indoors ? ' · indoors' : ''}`;
+    }
     // a bolt's thunder, delay seconds after the flash: far away it is quieter and duller
     thunder(delay) {
       const c = this.ctx;
