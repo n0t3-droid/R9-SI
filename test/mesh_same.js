@@ -5,7 +5,7 @@
 //   bash test/wt_run.sh mesh_same.js
 const V = require('./load_shared.js');
 const PAD = V.MESH_PAD || 1, PS = V.MESH_PS || 18, PSS = PS * PS;
-const EXPECT = { classic: '5a821a5c64', seamless: '78cb0c3268' };
+const EXPECT = { classic: '03c11a5c64', seamless: '78cb0c3268' };   // classic: Klassisch v2 (per-block variation, the normal map turning with the tile); the gfx branch's own mesher writes exactly this — the faster mesher keeps it
 function fnv(h, a) { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; }
 function jobs(opts, CX, CZ) {
   const g = V.makeGen('overworld', 12345, opts);
