@@ -519,7 +519,7 @@
         slider('volMusic', T('g.set.volMusic'), 0, 1, 0.05, pct);
         slider('volAmbient', T('g.set.volAmbient'), 0, 1, 0.05, pct);
         // 🌦 Atmosphäre (A1): the sky's weather, the sounds of nature and the wet ground in the rain
-        body.appendChild(el('div', 'note', '<div class="hr"></div><b>🌦 Atmosphäre</b>'));
+        body.appendChild(el('div', 'note', '<div class="hr"></div><b>' + esc(T('g.atm.title')) + '</b>'));
         const atmSeg = (key, label, opts) => {
           const f = el('div', 'field'); f.innerHTML = `<label>${label}</label>`;
           const sg = el('div', 'seg');
@@ -530,9 +530,9 @@
           }
           f.appendChild(sg); body.appendChild(f);
         };
-        atmSeg('wx', 'Wetter', [['normal', 'Normal', 'Der Himmel wechselt zwischen klar, bewölkt, Nebel, Regen, Gewitter und Schnee'], ['calm', 'Ruhig', 'Nur klar und bewölkt: kein Regen, kein Gewitter, kein Nebel, kein Schnee'], ['off', 'Aus', 'Immer klarer Himmel ohne Wetter-Effekte und Blitze']]);
-        atmSeg('natSound', 'Natur-Klänge', [['synth', 'Synthetisch', 'Wind, Vögel am Tag, Grillen in der Nacht, Wasser — synthetisch erzeugt'], ['off', 'Aus', 'Keine Natur-Klänge (Regen und Donner bleiben, wenn das Wetter an ist)']]);
-        toggle('wetGround', 'Nasser Boden bei Regen');
+        atmSeg('wx', esc(T('g.atm.wx')), [['normal', T('g.atm.normal'), T('g.atm.normalTip')], ['calm', T('g.atm.calm'), T('g.atm.calmTip')], ['off', T('g.atm.off'), T('g.atm.offTip')]]);
+        atmSeg('natSound', esc(T('g.atm.nat')), [['synth', T('g.atm.synth'), T('g.atm.synthTip')], ['off', T('g.atm.off'), T('g.atm.natOffTip')]]);
+        toggle('wetGround', T('g.atm.wet'));
       } else if (this.settingsTab === 'lang') {
         this.buildLangPanel(body);
       } else {

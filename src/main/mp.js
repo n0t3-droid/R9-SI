@@ -327,7 +327,7 @@
     async join(host) {
       const g = this.g;
       if (!this.ready || this.role) return false;
-      g.ui.loading('Joining ' + host.name + '…', 0.05);
+      g.ui.loading(T('g.mp.join', { name: host.name }), 0.05);
       const room = this.sessionRoom();
       if (!room) { g.ui.show('title'); g.ui.titleNote && g.ui.titleNote('Could not reach ' + host.name); return false; }
       this.role = 'joining'; this.room = room; this.session = host.session; this.hostPeer = host.peer;
