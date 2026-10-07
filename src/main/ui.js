@@ -381,9 +381,9 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
       if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;   // typing a nickname there: not now
       const mp = this.game.mp;
       box.innerHTML = '';
+      if (mp && mp.status === 'off' && VR.Legal) { box.appendChild(VR.Legal.mpNotice(this.game)); return; }   // 👥 Mehrspieler aus: one line and „Mehrspieler an“ (src/main/legal.js)
       const head = el('div', 'mphead');
       if (!mp || mp.status === 'connecting') { head.innerHTML = '<span class="dot wait"></span><b>Multiplayer</b> · connecting…'; box.appendChild(head); return; }
-      if (mp.status === 'off' && VR.Legal) { head.innerHTML = '<span class="dot off"></span><b>Multiplayer</b>'; box.appendChild(head); box.appendChild(VR.Legal.mpNotice(this.game)); return; }   // 👥 Mehrspieler aus (src/main/legal.js)
       if (!mp.ready) { head.innerHTML = '<span class="dot off"></span><b>Multiplayer</b> · not available here'; box.appendChild(head); box.appendChild(el('div', 'note', MP_OFF_HTML)); return; }
       const online = mp.online || [];
       head.innerHTML = '<span class="dot"></span><b>Multiplayer</b> · ' + (online.length ? online.length + ' friend' + (online.length > 1 ? 's' : '') + ' online: ' + online.map(o => esc(o.name)).join(', ') : 'no friends online yet');
