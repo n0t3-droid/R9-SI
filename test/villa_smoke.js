@@ -31,5 +31,8 @@ for (const cat of PLAN.CATALOGUE) for (const mirror of [false, true]) for (const
   if (errs.length) bad++;
   if (mirror && skinId === cat.skins[0]) console.log('     rooms:', rooms);
 }
-console.log('unknown blocks:', [...unknown.entries()].map(([k, v]) => k + '×' + v).join(', ') || 'none');
-console.log(bad ? 'FAIL ' + bad : 'OK');
+const unk = [...unknown.entries()].map(([k, v]) => k + '×' + v).join(', ');
+console.log('unknown blocks:', unk || 'none');
+if (unk) bad++;   // a block name the registry does not know is a failure
+console.log(bad ? 'FAILED ' + bad : 'ALL OK');
+process.exit(bad ? 1 : 0);

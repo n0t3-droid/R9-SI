@@ -210,5 +210,7 @@ const saved = await ev(() => { const d = JSON.parse(localStorage.getItem('r9si.s
 console.log('saved', JSON.stringify(saved));
 check(saved && saved.off && saved.off[1] <= -3, 'the design reaches into the ring in front of the lot');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
-console.log(fails ? 'FAIL ' + fails : 'OK');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

@@ -55,5 +55,5 @@ check(st3.cur + st3.old <= 2 * CAP, `after ${firstN + CAP * 2} pieces the cache 
 VX.clearCache();
 const st4 = VX.cacheStats();
 check(st4.cur === 0 && st4.old === 0, 'clearCache empties both generations (a look switch repaints everything)');
-console.log(fail ? `FAIL ${fail}` : 'OK — the VX piece cache is bounded and keeps what is in use');
+console.log(fail ? `FAILED ${fail}` : 'ALL OK');
 process.exit(fail ? 1 : 0);

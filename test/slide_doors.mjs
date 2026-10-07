@@ -28,8 +28,12 @@ await ev((a) => { const p = VR.game.player; p.teleport(a[0] + 1, a[1], a[2] + 9)
 await step(40);
 const s2 = await state();
 console.log('closed:', s0, '· near:', s1, '· after leaving:', s2);
-const ok = s0 === '00|00' && s1 === '11|11' && s2 === '00|00';
+let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
+check(s0 === '00|00', 'the doors are closed at first');
+check(s1 === '11|11', 'they open as the player comes close');
+check(s2 === '00|00', 'and close again after the player leaves');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 5)) console.log(l);
-console.log(ok ? 'OK' : 'FAIL');
+check(!logs.some(l => /pageerror\]/.test(l)), 'no page errors');
 await browser.close();
-process.exit(ok ? 0 : 1);
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);
