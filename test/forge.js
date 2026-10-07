@@ -392,15 +392,17 @@ section('sweep', () => {
     const dna = Forge.dna(id, P, 1 + i, t.styles[i % t.styles.length].id), g = Forge.build(dna), M = g.meta, d = M.doors[0], up = (y) => y - g.dy + 1;
     const c0 = process.cpuUsage(); Forge.build(dna); const cu = process.cpuUsage(c0); if ((cu.user + cu.system) / 1000 > 400) slow++;
     let miss;
-    if (id === 'tower') miss = missing(Forge.asPlaced(g), [d[0], -g.dy, 0], M.floors.map(up).concat([up(M.roof)]));   // from the street
-    else if (id === 'house') miss = missing(g, [d[0], d[1] - g.dy, d[2] - 1], M.floors.map(up));
-    else if (id === 'castle') miss = missing(g, [g.sx >> 1, -g.dy + 1, 0], [up(M.walk), up(M.towerTop)].concat(M.keep ? M.keep.floors.map(up).concat([up(M.keep.roof)]) : []));
-    else if (id === 'stadium') miss = missing(g, [d[0], d[1] - g.dy, d[2]], M.floors.map(up));
-    else if (id === 'lookout') miss = missing(g, [d[0], d[1] - g.dy, d[2] - 1], [up(M.platform)]);
-    else { const wk = Forge.walkable(g, [d[0], d[1] - g.dy, d[2] - 1], {}); miss = wk.reach.size > g.sx * g.sz / 3 ? [] : ['floor']; }
+    // every walk starts in the street at the lot's front edge, with the lot as the game leaves it (levelled: cleared)
+    const gp = Forge.asPlaced(g), street = [d[0], -g.dy, 0];
+    if (id === 'tower') miss = missing(gp, street, M.floors.map(up).concat([up(M.roof)]));
+    else if (id === 'house') miss = missing(gp, street, M.floors.map(up));
+    else if (id === 'castle') miss = missing(gp, [g.sx >> 1, -g.dy, 0], [up(M.walk), up(M.towerTop)].concat(M.keep ? M.keep.floors.map(up).concat([up(M.keep.roof)]) : []));
+    else if (id === 'stadium') miss = missing(gp, street, M.floors.map(up));
+    else if (id === 'lookout') miss = missing(gp, street, [up(M.platform)]);
+    else { const wk = Forge.walkable(gp, street, {}); miss = wk.reach.size > g.sx * g.sz / 3 ? [] : ['floor']; }
     if (miss.length) bad[id].push(dna + ' (' + miss.join(',') + ')');
   }
-  for (const id in N) check(!bad[id].length, N[id] + ' random ' + id + 's: every level reached on foot' + (bad[id].length ? ' — not: ' + bad[id].slice(0, 4).join(' · ') : ''));
+  for (const id in N) check(!bad[id].length, N[id] + ' random ' + id + 's: from the street every level reached on foot' + (bad[id].length ? ' — not: ' + bad[id].slice(0, 4).join(' · ') : ''));
   check(slow === 0, 'every one of them built in under 400 ms (' + slow + ' slower)');
 });
 
