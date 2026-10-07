@@ -186,4 +186,17 @@ await settle(60);
 const saved = await ev(async (pick) => { const g = VR.game; await g.saveMeta(); await g.world.saveAll(); const cols = new Map(); let ok = 0; for (const [x, y, z, o, n] of pick) { const k = (x >> 4) + ',' + (z >> 4); if (!cols.has(k)) cols.set(k, await g.store.loadColumn(g.world.dim, x >> 4, z >> 4)); const b = cols.get(k); if (b && b[(y << 8) | ((z & 15) << 4) | (x & 15)] === n) ok++; } return { ok, n: pick.length }; }, H.pick);
 check(saved.ok === saved.n, 'the saved world has the finished house (' + saved.ok + '/' + saved.n + ' cells from the save)');
 await shot('zeitraffer_6_back');
+// ---- 🎒 Meins: the world's card has 📽 (not the worlds screen's); it plays, Esc returns to 🎒 Meins
+await ev(() => { if (VR.game.ui.screen !== 'pause') VR.game.ui.pause(); });
+await page.click('#pause [data-act="meins"]'); await wait(500);
+const mz = await ev((id) => { const b = document.querySelector('#meins .wcard[data-id="' + id + '"] [data-w="zeit"]'); return b ? b.textContent : null; }, W.id);
+check(mz === '📽 Zeitraffer', '🎒 Meins: the world\'s card has „📽 Zeitraffer“ (' + mz + ')');
+if (mz) {
+  await page.click('#meins .wcard[data-id="' + W.id + '"] [data-w="zeit"]');
+  for (let i = 0; i < 80; i++) { await wait(250); if (await ev(() => VR.Zeit.active)) break; }
+  const ok = await ev(() => VR.Zeit.active && VR.Zeit.from === 'meins');
+  await page.keyboard.press('Escape'); await step(2);
+  const back2 = await ev(() => ({ active: VR.Zeit.active, screen: VR.game.ui.screen, zr: [...VR.game.world.cols.values()].some(c => c.zr) }));
+  check(ok && !back2.active && !back2.zr && back2.screen === 'meins', '📽 from 🎒 Meins plays; Esc returns to 🎒 Meins (' + back2.screen + ')');
+}
 await finish();
