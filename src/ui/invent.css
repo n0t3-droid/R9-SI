@@ -77,6 +77,9 @@
 #invent .erf-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 6px; min-height: 108px; border-radius: 18px; border: 2px solid var(--erf-edge); background: var(--erf-card); color: var(--st-ink); cursor: pointer; touch-action: pan-y; -webkit-touch-callout: none; transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s; }
 #invent .erf-card canvas { width: 64px; height: 64px; image-rendering: pixelated; pointer-events: none; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45)); }
 #invent .erf-card .erf-name { font-weight: 700; font-size: calc(var(--st-fs) * 0.78); line-height: 1.1; text-align: center; overflow-wrap: anywhere; max-width: 100%; pointer-events: none; }
+#invent .erf-card .erf-name, #invent .erf-tile .erf-name, #invent .erf-tl, #invent .erf-slot .erf-name { -webkit-hyphens: auto; hyphens: auto; }
+#invent .erf-card.long .erf-name { font-size: calc(var(--st-fs) * 0.62); }
+#invent .erf-slot.long .erf-name { font-size: calc(var(--st-fs) * 0.62); }
 #invent .erf-card:hover { transform: translateY(-3px); border-color: var(--erf-a); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(255, 201, 77, 0.18); }
 #invent .erf-card.used { border-color: rgba(255, 201, 77, 0.55); opacity: 0.5; }
 #invent .erf-card.hint { border-color: var(--erf-a); animation: erfPulse 1.2s ease-in-out infinite; }
@@ -129,11 +132,12 @@
 #invent .erf-bkc { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 8px; font-weight: 800; font-size: calc(var(--st-fs) * 1.05); }
 #invent .erf-bkc i { font-style: normal; }
 #invent .erf-bkc span { color: var(--st-mute); font-weight: 600; font-size: 0.82em; }
-#invent .erf-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
-#invent .erf-tile { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 3px; min-height: 92px; border-radius: 14px; border: 2px solid var(--erf-edge); background: var(--erf-card); color: var(--st-ink); cursor: pointer; }
+#invent .erf-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 8px; }
+#invent .erf-tile { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 6px; min-height: 92px; border-radius: 14px; border: 2px solid var(--erf-edge); background: var(--erf-card); color: var(--st-ink); cursor: pointer; }
 #invent .erf-tile:hover { border-color: var(--erf-a); }
 #invent .erf-tile canvas { width: 52px; height: 52px; image-rendering: pixelated; pointer-events: none; }
-#invent .erf-tile .erf-name { font-weight: 700; font-size: calc(var(--st-fs) * 0.72); line-height: 1.1; text-align: center; overflow-wrap: anywhere; max-width: 100%; pointer-events: none; }
+#invent .erf-tile .erf-name { font-weight: 700; font-size: max(12px, calc(var(--st-fs) * 0.8)); line-height: 1.1; text-align: center; overflow-wrap: anywhere; max-width: 100%; pointer-events: none; }
+#invent .erf-tile .erf-tl { font-weight: 500; font-size: max(11.5px, calc(var(--st-fs) * 0.7)); line-height: 1.25; text-align: center; color: var(--st-mute); overflow-wrap: anywhere; max-width: 100%; pointer-events: none; }
 #invent .erf-tile.locked { cursor: default; background: rgba(12, 18, 38, 0.7); border-style: dashed; }
 #invent .erf-tile.locked:hover { border-color: var(--erf-edge); }
 #invent .erf-tile.locked canvas { filter: brightness(0) opacity(0.34); }

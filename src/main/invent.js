@@ -152,6 +152,7 @@
       if (cat !== 'all' && catOf(k) !== cat) continue;
       const b = cardEl(k), nm = nameOf(k);
       b.querySelector('.erf-name').textContent = nm; b.setAttribute('aria-label', nm);
+      b.classList.toggle('long', nm.length > 11);   // (a long word gets smaller letters rather than being cut in two)
       frag.appendChild(b);
     }
     tray.textContent = ''; tray.appendChild(frag);
@@ -173,7 +174,7 @@
   function renderSlots() {
     $$('.erf-slot', root).forEach((s, i) => {
       const k = slots[i], cv = s.querySelector('canvas'), nm = s.querySelector('.erf-name');
-      s.classList.toggle('full', !!k);
+      s.classList.toggle('full', !!k); s.classList.toggle('long', !!k && nameOf(k).length > 11);
       s.setAttribute('aria-label', T(i ? 'erf.slotB' : 'erf.slotA') + (k ? ': ' + nameOf(k) : ''));
       nm.textContent = k ? nameOf(k) : '';
       if (k) { if (cv.dataset.k !== k) { cv.dataset.k = k; if (!paintNow(cv, Inv.idOf(k))) paintLater(cv, Inv.idOf(k)); } }
@@ -347,9 +348,11 @@
       const grid = el('div', 'erf-tiles');
       for (const x of list) {
         const have = Inv.has(x.k), t = have ? el('button', 'erf-tile') : el('div', 'erf-tile locked');
-        if (have) { t.type = 'button'; t.dataset.k = x.k; t.setAttribute('aria-label', nameOf(x.k)); } else { t.setAttribute('role', 'img'); t.setAttribute('aria-label', T('erf.locked')); }
+        const tx = have ? Inv.text(x.k) : null;
+        if (have) { t.type = 'button'; t.dataset.k = x.k; t.setAttribute('aria-label', nameOf(x.k) + (tx.line ? ': ' + tx.line : '')); } else { t.setAttribute('role', 'img'); t.setAttribute('aria-label', T('erf.locked')); }
         const cv = doc.createElement('canvas'); cv.width = 64; cv.height = 64; cv.dataset.id = x.id; cv.setAttribute('aria-hidden', 'true');
         t.appendChild(cv); t.appendChild(el('span', 'erf-name', have ? esc(nameOf(x.k)) : '???'));
+        if (have && tx.line) t.appendChild(el('span', 'erf-tl', esc(tx.line)));   // (the found ones tell their line; the rest stay a silhouette)
         grid.appendChild(t);
         if (io) io.observe(cv); else paintLater(cv, x.id, 64);
       }
