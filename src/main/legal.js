@@ -337,6 +337,12 @@
     e.stopImmediatePropagation();
     if (e.key === 'Escape') { e.preventDefault(); L.close(); return; }
     const a = document.activeElement;
+    if (e.key === 'Tab') {   // the keyboard stays in the box (a modal dialog)
+      const f = [...root.querySelectorAll('button, a[href], [tabindex="0"], textarea')].filter(x => x.offsetParent !== null);
+      const i = f.indexOf(a);
+      if (f.length && (i < 0 || (e.shiftKey ? i === 0 : i === f.length - 1))) { e.preventDefault(); (e.shiftKey ? f[f.length - 1] : f[0]).focus(); }
+      return;
+    }
     if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && a && a.dataset && a.dataset.sec) {
       e.preventDefault();
       const i = (SECTIONS.indexOf(a.dataset.sec) + (e.key === 'ArrowRight' ? 1 : SECTIONS.length - 1)) % SECTIONS.length;
@@ -366,7 +372,7 @@
   // mp.js decides (noticeOk / confirmNotice / turnOff / turnOn); this is what the player sees: in the title's
   // multiplayer box, the pause menu's and the settings — „👥 Mitspieler sehen deinen Namen: X — ✓ OK · Spitzname… ·
   // Mehrspieler aus", or with multiplayer off: one line and „Mehrspieler an"
-  let nick = false;
+  let nick = false, nickDraft = null, nickFocus = false;   // (the box is re-drawn often: a half-typed name stays, the focus is set once)
   const elx = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const btnx = (cls, text, fn) => { const b = elx('button', cls, text); b.type = 'button'; b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); fn(); }); return b; };
   function refresh(g) {
@@ -397,24 +403,26 @@
     if (mp.noticeAsk) box.appendChild(elx('div', 'mpn-ask', T('mp.ask', 'Erst bestätigen — dann kannst du beitreten.', 'Confirm first — then you can join.')));
     const r = elx('div', 'mpn-b');
     if (nick) {
-      const inp = elx('input', 'mpn-nick'); inp.type = 'text'; inp.maxLength = 24; inp.placeholder = T('mp.nickPh', 'Spitzname', 'Nickname'); inp.value = (g.settings && g.settings.playerName) || '';
+      const inp = elx('input', 'mpn-nick'); inp.type = 'text'; inp.maxLength = 24; inp.placeholder = T('mp.nickPh', 'Spitzname', 'Nickname'); inp.value = nickDraft != null ? nickDraft : (g.settings && g.settings.playerName) || '';
+      inp.addEventListener('input', () => { nickDraft = inp.value; });
       inp.setAttribute('aria-label', T('mp.nickPh', 'Spitzname', 'Nickname'));
       const take = () => {
         const v = inp.value.replace(/[<>]/g, '').trim().slice(0, 24);
         if (!v) { inp.focus(); return; }
         g.settings.playerName = v; if (g.saveSettings) g.saveSettings();
-        nick = false; mp.confirmNotice(); refresh(g);
+        nick = false; nickDraft = null; mp.confirmNotice(); refresh(g);
       };
-      inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); take(); } else if (e.key === 'Escape') { e.preventDefault(); nick = false; refresh(g); } });
+      const cancel = () => { nick = false; nickDraft = null; refresh(g); };
+      inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') { e.preventDefault(); take(); } else if (e.key === 'Escape') { e.preventDefault(); cancel(); } });
       r.appendChild(inp);
       r.appendChild(btnx(small + ' primary', '✓', take));
-      r.appendChild(btnx(small, '✕', () => { nick = false; refresh(g); }));
+      r.appendChild(btnx(small, '✕', cancel));
       box.appendChild(r);
-      setTimeout(() => { if (inp.isConnected) inp.focus(); }, 0);
+      setTimeout(() => { if (nickFocus && inp.isConnected && inp.offsetParent !== null) { nickFocus = false; inp.focus(); } }, 0);
       return box;
     }
     r.appendChild(btnx(small + ' primary', '✓ OK', () => { mp.confirmNotice(); refresh(g); }));
-    r.appendChild(btnx(small, T('mp.nick', 'Spitzname…', 'Nickname…'), () => { nick = true; refresh(g); }));
+    r.appendChild(btnx(small, T('mp.nick', 'Spitzname…', 'Nickname…'), () => { nick = true; nickFocus = true; refresh(g); }));
     r.appendChild(btnx(small, T('mp.off', 'Mehrspieler aus', 'Multiplayer off'), () => { mp.turnOff(); refresh(g); }));
     const more = btnx(small + ' mpn-more', '📜', () => L.open('datenschutz')); more.title = T('mp.more', 'Datenschutz: was beim Zusammenspielen ausgetauscht wird', 'Privacy: what is exchanged when playing together');
     r.appendChild(more);
