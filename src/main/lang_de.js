@@ -168,6 +168,7 @@
     'g.title.takenFull': 'Nicht alles übernommen (Browser-Speicher voll): {what}.',
     'g.title.resetSure': 'Sicher? Nochmal klicken',
     'g.title.resetDone': 'Alle Studio-Designs entfernt — die Originale sind zurück.',
+    'g.title.splashes': ['Jetzt mit Gasriesen und Ringen!', 'Kristalltürme voraus!', 'Der Äther fließt hell!', 'Zen-Bauen: ganz in Ruhe!', 'Flieg dein eigenes Shuttle!', 'Endlos schöne Welten!', 'Voxel, aber kosmisch!', 'Vorsicht, Lavaflüsse!', 'Heute Nacht: Sternschnuppen!', 'Bau etwas Schönes!'],
     // ---- was ein R9-Paket mitgebracht hat
     'g.pack.fav1': '1 Favorit',
     'g.pack.favN': '{n} Favoriten',

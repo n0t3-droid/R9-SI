@@ -168,6 +168,7 @@
     'g.title.takenFull': 'Not everything came in (browser storage full): {what}.',
     'g.title.resetSure': 'Sure? Click again',
     'g.title.resetDone': 'All Studio designs removed — the originals are back.',
+    'g.title.splashes': ['Now with ringed gas giants!', 'Crystal spires ahead!', 'Aether flows bright!', 'Zen Builder mode!', 'Fly your own shuttle!', 'Endless procedural beauty!', 'Voxels, but make it cosmic!', 'Mind the lava rivers!', 'Meteor showers tonight!', 'Build something beautiful!'],
     // ---- what an R9 pack brought along
     'g.pack.fav1': '1 favourite',
     'g.pack.favN': '{n} favourites',
