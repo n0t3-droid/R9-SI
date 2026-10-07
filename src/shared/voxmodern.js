@@ -461,18 +461,20 @@
   def('living', 'pouf', 'boucle', 'Pouf · bouclé', Object.assign({}, LIV, { size: [1, 1, 1], col: 'cream', build: (b) => { b.lathe(8, 8, [[0, 3.6], [0.5, 4.2], [6, 4.4], [7, 3.8], [7.5, 2.5]], M.fabric(FABRIC.boucle.col)); } }));
   def('living', 'pouf', 'leather', 'Pouf · leather cube', Object.assign({}, LIV, { size: [1, 1, 1], col: 'rust', build: (b) => { b.cushion(4, 0, 4, 12, 7, 12, 1, M.leather(FABRIC.cognac.col), true); } }));
   def('living', 'pouf', 'knit', 'Pouf · chunky knit', Object.assign({}, LIV, { res: 16, size: [1, 1, 1], col: 'mustard', build: (b) => {
-    b.lathe(8, 8, [[0, 3.8], [0.5, 4.3], [5.5, 4.4], [6.5, 3.6], [7, 2]], M.fabric(P.mustard));
-    for (const y of [2, 4]) b.recolor(0, y, 0, 16, y + 1, 16, M.fabric(sh(P.mustard, 0.86)));
+    // a drum pouf in chunky knit: a rounded edge, two darker rib bands and a lighter top
+    b.lathe(8, 8, [[0, 4.2], [0.5, 4.7], [1.5, 4.8], [6, 4.8], [6.7, 4.5], [7, 3.8]], M.fabric(P.mustard));
+    for (const y of [2, 4]) b.recolor(0, y, 0, 16, y + 1, 16, M.fabric(sh(P.mustard, 0.84)));
+    b.recolor(0, 6, 0, 16, 7, 16, M.fabric(sh(P.mustard, 1.08)));
   } }));
   // lounge chairs
   def('living', 'lounge', 'shell', 'Lounge Chair · walnut shell', Object.assign({}, LIV, { size: [1, 1, 1], col: 'walnut', sound: 'wood', build: (b) => {
-    const wd = M.wood(P.walnut), le = M.leather(0x1E1F22), m = M.metal(P.black);
-    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; b.rod(8, 0.5, 8, 8 + Math.cos(a) * 6, 0.5, 8 + Math.sin(a) * 6, 0.5, m); }
-    b.cyl('y', 8, 8, 0.8, 0.5, 4, m);
-    b.extrude([[2, 4], [12, 3.5], [12.5, 4.5], [2.5, 5.5]], 'x', 2, 14, wd);                           // seat shell (z, y)
-    b.extrude([[11.5, 4], [12.5, 3.5], [15.5, 14.5], [14.5, 15]], 'x', 2, 14, wd);                     // back shell
-    b.cushion(2.5, 5, 2, 13.5, 7, 12, 0.8, le, true); b.extrude([[10.5, 6], [12.5, 5.5], [14.5, 14], [12.5, 14.5]], 'x', 2.5, 13.5, le);
-    b.box(1, 8.5, 3, 2.5, 9.5, 11, wd); b.box(13.5, 8.5, 3, 15, 9.5, 11, wd); b.box(1.5, 5, 10, 2.5, 8.5, 11, wd); b.box(13.5, 5, 10, 14.5, 8.5, 11, wd);
+    // a low club chair: a walnut tub with a leather seat cushion (seat at 7.5), a curved back, arms and four splayed legs
+    const wd = M.wood(P.walnut), le = M.leather(0x1E1F22);
+    for (const [x, z, fx, fz] of [[3, 4.5, 1.5, 2.5], [13, 4.5, 14.5, 2.5], [3, 11.5, 1.5, 13.5], [13, 11.5, 14.5, 13.5]]) b.rod(x, 3.5, z, fx, 0.5, fz, 0.6, wd);
+    b.rbox(2, 3.5, 2.5, 14, 5.5, 13, 1, wd);
+    b.extrude([[11.5, 5], [13.5, 4.5], [15, 13.5], [14, 15], [12.5, 13.5], [11.5, 7]], 'x', 2.5, 13.5, wd);   // the curved back (z, y)
+    b.cushion(2.5, 5.5, 3, 13.5, 7.5, 12.5, 1, le, true);
+    b.rbox(1, 5, 3.5, 3, 9, 12.5, 0.75, wd); b.rbox(13, 5, 3.5, 15, 9, 12.5, 0.75, wd);
   } }));
   def('living', 'lounge', 'cocktail', 'Cocktail Chair · bouclé', Object.assign({}, LIV, { size: [1, 1, 1], col: 'cream', build: (b) => {
     const f = M.fabric(FABRIC.boucle.col), fd = M.fabric(sh(FABRIC.boucle.col, 0.93));
@@ -528,8 +530,13 @@
     b.lathe(20, 8, [[6.5, 1.6], [7.5, 2.2], [9, 1.2]], M.gloss(P.white), 0.4); b.rbox(9, 6.5, 6, 15, 7.5, 10, 0.4, M.wood(P.oak));
   } }));
   def('living', 'nesting', 'brass', 'Nesting Tables · brass', Object.assign({}, TB, { size: [1, 1, 1], col: 'brass', build: (b) => {
+    // two round side tables side by side, a white marble one (top at 8) and a black one (top at 6), each on three brass legs
+    // under a brass ring at the edge of the top
     const br = M.metal(P.brass);
-    for (const [cx, cz, r, h, top] of [[6, 6, 4.5, 8, 0xEAEAEC], [10.5, 10.5, 4, 6, 0x2A2C30]]) { b.cyl('y', cx, cz, r, h - 1, h, M.marble(top)); for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4; b.box(cx + Math.cos(a) * (r - 1) - 0.25, 0, cz + Math.sin(a) * (r - 1) - 0.25, cx + Math.cos(a) * (r - 1) + 0.25, h - 1, cz + Math.sin(a) * (r - 1) + 0.25, br); } }
+    for (const [cx, cz, r, h, top] of [[5.5, 5.5, 4.4, 8, 0xEAEAEC], [11.5, 11.5, 3.3, 6, 0x2A2C30]]) {
+      b.cyl('y', cx, cz, r, h - 0.75, h, M.marble(top)); b.tube('y', cx, cz, r, 0.5, h - 1.25, h - 0.75, br);
+      for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4; b.rod(cx + Math.cos(a) * (r - 1), h - 1.25, cz + Math.sin(a) * (r - 1), cx + Math.cos(a) * (r - 1.6), 0.5, cz + Math.sin(a) * (r - 1.6), 0.4, br); }
+    }
   } }));
   def('living', 'rug', 'stripe', 'Rug · striped wool', Object.assign({}, TB, { cats: ['living', 'deco'], res: 16, size: [2, 1, 3], col: 'cream', sound: 'wool', hard: 0.2, solid: false, build: (b) => {
     b.box(0, 0, 0, 32, 1, 48, M.fabric(0xE8E2D4)); b.recolor(1, 0, 1, 31, 1, 2, M.fabric(0x2B2E33)); b.recolor(1, 0, 46, 31, 1, 47, M.fabric(0x2B2E33)); b.recolor(1, 0, 1, 2, 1, 47, M.fabric(0x2B2E33)); b.recolor(30, 0, 1, 31, 1, 47, M.fabric(0x2B2E33));
