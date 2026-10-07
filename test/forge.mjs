@@ -61,6 +61,9 @@ await studio.click('#list .fvar[data-i="1"]'); await studio.waitForTimeout(600);
 const picked = await sev(() => ({ sel: VR.StudioForge.sel, dna: VR.StudioForge.variants[VR.StudioForge.sel], scene: window.__st.scene && window.__st.scene.type, hash: location.hash }));
 check(picked.sel === 1 && picked.scene === 'clip' && /^#forge\//.test(picked.hash) && /^tower:/.test(picked.dna), 'variant 2 picked, shown in the middle: ' + JSON.stringify(picked));
 await studio.screenshot({ path: '/home/claude/vr/test/shots/forge_1_variants.png', timeout: 180000 });
+// 🧩 Als Bauteil: the picked variant goes into the Werkbank's library (every world, every session)
+const piece = await sev(async () => { const FM = VR.StudioForge, WB = VR.StudioWorld.wb; for (let i = 0; i < 100 && !(FM.meshes.get(FM.variants[FM.sel]) || {}).ready; i++) await new Promise(r => setTimeout(r, 200)); const n0 = WB.libLoad().length, ok = FM.asPiece(), items = WB.libLoad(); return { ok, n: items.length - n0, name: items[0] && items[0].name, size: items[0] && [items[0].sx, items[0].sy, items[0].sz] }; });
+check(piece.ok && piece.n === 1 && /Hochhaus/.test(piece.name || ''), '🧩 Als Bauteil keeps the variant in the library: ' + JSON.stringify(piece));
 // a slider rebuilds the nine (the floors), words change it, the same wish brings the same nine back
 await sev(() => { const r = document.querySelector('#partsBody input[data-fp="f"]'); r.value = 8; r.dispatchEvent(new Event('input')); });
 await studio.waitForTimeout(600);
