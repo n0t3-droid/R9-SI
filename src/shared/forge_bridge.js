@@ -55,8 +55,13 @@
       const edge = x === 0 || x === w - 1; if (edge && Math.round(env.ground(x, v)) < 1) continue;
       for (let y = deck + 1; y <= deck + 3; y++) if (!(y === deck + 1 && edge)) K.air(x, y, v);
     }
-    // the ends: a step up from the bank onto the deck, abutments filled to the ground
-    for (let x = 0; x < w; x++) { K.set(x, deck, 0, r ? S.deck : S.path); K.set(x, deck, l - 1, r ? S.deck : S.path); }
+    // the ends: a step up from the bank onto the deck (the deck lies one over the bank it starts from), abutments filled
+    // to the ground; the railings end in a post (or a lamp) at both ends
+    for (let x = 0; x < w; x++) {
+      const edge = x === 0 || x === w - 1;
+      if (edge) { K.set(x, deck, 0, S.kerb); K.set(x, deck, l - 1, S.kerb); continue; }
+      K.set(x, deck, 0, S.ring, { facing: 2, half: 0 }); K.set(x, deck, l - 1, S.ring, { facing: 0, half: 0 });
+    }
     for (const v of [0, 1, l - 2, l - 1]) for (let x = 0; x < w; x++) for (let y = deck - 1; y >= deck + G(x, v) + 1; y--) pierMat(x, y, v);
     // ---- the structure under the deck
     if (k === 0) {
