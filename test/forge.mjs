@@ -1,5 +1,5 @@
 // 🏭 Forge end to end: the game creates and saves a world; the Studio opens 🏭 Forge, reads „Hochhaus 30 Stockwerke
-// Glas" from the text field, builds nine variants, the second one is picked (sliders and words change it, the same wish
+// Glas" from the text field, builds nine variants, the first one is picked (sliders and words change it, the same wish
 // brings it back), „📍 Setzen" without a world only hints, with the world open it arms the World mode's ghost, the
 // tower is placed near the player and handed over; the open game rebuilds it from the DNA in slices (bottom up, one undo
 // step), marks the plan built; a person walks from the door over the stairs to every floor and onto the roof in the
@@ -11,7 +11,7 @@ import path from 'path';
 // the pages from this checkout's dist, on a port the system hands out (a stale server of another test on a fixed or
 // random port would serve another branch's pages)
 const DIST = '/home/claude/vr/dist', TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.css': 'text/css' };
-const srv = http.createServer((q, a) => { const f = path.join(DIST, decodeURIComponent(q.url.split('?')[0]).replace(/^\/+/, '') || 'index.html'); if (!f.startsWith(DIST) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { a.writeHead(404); a.end(); return; } a.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(a); });
+const srv = http.createServer((q, a) => { if (q.url === '/favicon.ico') { a.writeHead(204); a.end(); return; } const f = path.join(DIST, decodeURIComponent(q.url.split('?')[0]).replace(/^\/+/, '') || 'index.html'); if (!f.startsWith(DIST) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { a.writeHead(404); a.end(); return; } a.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(a); });
 await new Promise(r => srv.listen(0, '127.0.0.1', r));
 const URL0 = `http://127.0.0.1:${srv.address().port}`;
 console.log('serving', DIST, 'at', URL0);
@@ -57,9 +57,9 @@ check(await sev(() => document.querySelectorAll('#list .fvar').length === 9), 'n
 for (let i = 0; i < 160; i++) { await studio.waitForTimeout(500); if (await sev(() => document.querySelectorAll('#list .fvar canvas.done').length >= 9)) break; }
 const done = await sev(() => document.querySelectorAll('#list .fvar canvas.done').length);
 check(done >= 9, 'every variant got its picture (' + done + '/9)');
-await studio.click('#list .fvar[data-i="1"]'); await studio.waitForTimeout(600);
+await studio.click('#list .fvar[data-i="0"]'); await studio.waitForTimeout(600);
 const picked = await sev(() => ({ sel: VR.StudioForge.sel, dna: VR.StudioForge.variants[VR.StudioForge.sel], scene: window.__st.scene && window.__st.scene.type, hash: location.hash }));
-check(picked.sel === 1 && picked.scene === 'clip' && /^#forge\//.test(picked.hash) && /^tower:/.test(picked.dna), 'variant 2 picked, shown in the middle: ' + JSON.stringify(picked));
+check(picked.sel === 0 && picked.scene === 'clip' && /^#forge\//.test(picked.hash) && /^tower:/.test(picked.dna), 'the first variant picked, shown in the middle: ' + JSON.stringify(picked));
 await studio.screenshot({ path: '/home/claude/vr/test/shots/forge_1_variants.png', timeout: 180000 });
 // 🧩 Als Bauteil: the picked variant goes into the Werkbank's library (every world, every session)
 const piece = await sev(async () => { const FM = VR.StudioForge, WB = VR.StudioWorld.wb; for (let i = 0; i < 100 && !(FM.meshes.get(FM.variants[FM.sel]) || {}).ready; i++) await new Promise(r => setTimeout(r, 200)); const n0 = WB.libLoad().length, ok = FM.asPiece(), items = WB.libLoad(); return { ok, n: items.length - n0, name: items[0] && items[0].name, size: items[0] && [items[0].sx, items[0].sy, items[0].sz] }; });
@@ -73,7 +73,7 @@ await sev(() => VR.StudioForge.setText('mit Helipad'));
 check(/c2/.test(await sev(() => VR.StudioForge.dna)) && /f8\b/.test(await sev(() => VR.StudioForge.dna)), '„mit Helipad“ tweaks the DNA and keeps the rest: ' + await sev(() => VR.StudioForge.dna));
 await sev(() => VR.StudioForge.setText('höher'));
 check(+(/f(\d+)/.exec(await sev(() => VR.StudioForge.dna)) || [0, 0])[1] > 8, '„höher“ adds floors: ' + await sev(() => VR.StudioForge.dna));
-await wish(); await studio.click('#list .fvar[data-i="1"]'); await studio.waitForTimeout(300);
+await wish(); await studio.click('#list .fvar[data-i="0"]'); await studio.waitForTimeout(300);
 check(await sev(() => VR.StudioForge.variants[VR.StudioForge.sel]) === picked.dna, 'the same wish brings the same variants back (deterministic): ' + picked.dna);
 // ---- 📍 Setzen without a world: a hint, no crash; then open the world and place it
 await sev(() => VR.StudioForge.place());
