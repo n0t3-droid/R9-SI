@@ -978,9 +978,15 @@
     b.box(10, 21.5, 6, 22, 28.5, 6.5, M.light(0x4A6A8A)); b.sphere(16, 26, 6, 2, M.light(0xD8B8A0));
   } }));
   def('office', 'panel', 'felt', 'Acoustic Panels · felt hex', Object.assign({}, OF, { cats: ['office', 'deco'], size: [2, 1, 1], col: 'sage', mount: 'wall', solid: false, sound: 'wool', build: (b) => {
+    // a honeycomb of flat-top hexagons (pitch 2.85, staggered columns) in three felt tones on a dark backing board,
+    // the board showing through the seams between the tiles
+    const pitch = 2.85, dx = 1.5 * pitch, dy = Math.sqrt(3) * pitch, tones = [P.sage, P.olive, P.cream];
     const hex = (cx, cy, r) => { const p = []; for (let k = 0; k < 6; k++) p.push([cx + Math.cos(k * Math.PI / 3) * r, cy + Math.sin(k * Math.PI / 3) * r]); return p; };
-    const cols = [P.sage, P.olive, P.cream, P.sage, 0x7E8A76, P.olive, P.cream];
-    let k = 0; for (let c = 0; c < 6; c++) for (let r = 0; r < 2; r++) { const cx = 3.5 + c * 5, cy = 4.5 + r * 6 + (c % 2) * 3; if (cy + 2.6 > 16) continue; b.extrude(hex(cx, cy, 2.8), 'z', 14.5 - (k % 3) * 0.5, 16, M.fabric(cols[k++ % cols.length])); }
+    b.box(0.5, 0.5, 15, 31.5, 15.5, 16, M.matte(0x3B3F3A));
+    for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) {
+      const cy = 3.07 + r * dy + (c % 2) * dy / 2; if (cy + dy / 2 > 16) continue;
+      b.extrude(hex(5.3125 + c * dx, cy, 2.5), 'z', 14.5, 16, M.fabric(tones[(c + r) % 3]));
+    }
   } }));
   def('office', 'laptopdesk', 'walnut', 'Laptop Desk · walnut', Object.assign({}, OF, { size: [1, 1, 1], col: 'walnut', ui: 'chest', build: (b) => {
     const w = M.wood(P.walnut);
