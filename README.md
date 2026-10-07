@@ -96,6 +96,29 @@ Stilhaus) — a 25-block-wide palace with a twin-column portico, balustrade balc
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🧱 Klassisch, 🛋️ Modern Living, no dead ends in the Studio (v0.39)
+**Blöcke: Klassisch** — the game now looks like a block game again: every block is its own cube. Hills are one-block
+terraces instead of smooth slopes, every wall material shows a thin edge per block (the modern renders and Vollton
+too), panorama glass has a frame on every pane, timber, brick, plank and roof patterns start fresh at each block, and
+rugs, windows and holo screens no longer melt into their neighbours. The old look stays as **Nahtlos** in the settings
+(*Blöcke: Klassisch / Nahtlos*, or `/look`), switches live, and in multiplayer the host's choice rides along. Saved
+worlds and houses stay exactly as they were — nothing stored depends on the look.
+
+**🛋️ Modern Living — 236 new pieces** in twelve sets: Licht (lamps that switch on and off), Smart Home, Küche, Wohnen,
+Schlafen, Bad, Pflanzen, Büro & Technik, Garten & Pool, Mobilität (e-bikes, wallboxes), Laden & Café and Deko & Kunst.
+They have their own **Modern Living** tab in the creative inventory and a **✨ Modern** chip in the Studio's 🧱 Teile.
+Every piece is built only when it is first used, so the game starts as fast as before; cupboards open as containers,
+lamps toggle with a right click. They register after every existing block, so old worlds keep their ids.
+
+**The Studio without dead ends.** ✏️ Bearbeiten on every card (Teile, Möbel, ★, houses, the World) opens the right
+editor and ← brings you back to where you were; ☆ on whole houses (the same ★ as the game's); *Verbaut in* rows open
+the house with the part glowing (⚒) or replace every one of it in one undo step (🎨); blocks offer **Varianten** (the
+family in other colours and materials); ▶ Spielen takes planned houses and Welt-Stil drafts along; messages say what
+really happens (a house design reaches new towns — standing houses stay), a failed save is never shown as ✓, and a
+full browser storage shows ⚠ with 🧹 Platz schaffen. The developer tabs hide behind ⚙ Profi. The **standalone Studio**
+(its own page, not linked to a game) says so, offers 🎮 Zum Spiel and 📦 Mitnehmen — one *r9-paket* file with your
+favourites, designs and Bauteile that the game's title screen and the game's Studio take in (📥, or drop the file).
+
 ### 📍 Where you land, ▶ Spielen from the Studio (v0.38)
 **▶ Spielen** (the Studio's top bar, in the Studio that belongs to the game) opens the world you are working on directly —
 no title screen in between — and puts you where it makes sense: if you set something new into the world in the Studio
