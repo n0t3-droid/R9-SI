@@ -323,9 +323,16 @@
     if (keys || d > 1.5) { H.done('move'); hintState.lastPos = p.pos.slice(); hintState.standAt = now; }
     if (p.flying) H.done('fly');
     const st = H.read();
-    if (!st.done.move) { if (now - hintState.standAt > 5000 && H.want('move')) H.show('move', touch() ? { text: tx('hint.moveTouch', null, '👆 ziehen = umschauen · 🕹 laufen', '👆 drag = look around · 🕹 walk'), picto: ['finger'] } : { text: tx('hint.move', null, '🖱 bewegen = umschauen · W A S D = laufen', '🖱 move = look around · W A S D = walk'), picto: ['mouse', 'W', 'A', 'S', 'D'] }); return; }
-    if (!st.done.fly && p.mode !== 'survival' && H.want('fly')) H.show('fly', { text: tx('hint.fly', null, 'Leertaste 2× = fliegen', 'Space twice = fly'), picto: ['Space', 'Space'] });
+    if (!st.done.move) { if (now - hintState.standAt > 5000 && H.want('move')) H.show('move', hintOf('move')); return; }
+    if (!st.done.fly && p.mode !== 'survival' && H.want('fly')) H.show('fly', hintOf('fly'));
   }
+  // a hint's line and pictograms (again when the language changes while it shows)
+  function hintOf(id) {
+    if (id === 'move') return touch() ? { text: tx('hint.moveTouch', null, '👆 ziehen = umschauen · 🕹 laufen', '👆 drag = look around · 🕹 walk'), picto: ['finger'] } : { text: tx('hint.move', null, '🖱 bewegen = umschauen · W A S D = laufen', '🖱 move = look around · W A S D = walk'), picto: ['mouse', 'W', 'A', 'S', 'D'] };
+    if (id === 'fly') return { text: tx('hint.fly', null, 'Leertaste 2× = fliegen', 'Space twice = fly'), picto: ['Space', 'Space'] };
+    return null;
+  }
+  if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { const H = VR.Hints, id = H && H.current(), h = id && hintOf(id); if (h && H.retext) H.retext(h.text); });
   // a Ding set from the start screen (📍 Setzen on a card) is in your hand when the world opens — your own world,
   // Creative or Zen (never a free item in Survival); r9si.hand is read once
   ST.handAllowed = (meta) => !!(meta && !meta.guest && (meta.mode === 'creative' || meta.mode === 'zen'));
