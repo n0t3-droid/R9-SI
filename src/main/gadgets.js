@@ -1210,6 +1210,7 @@
         if (c && o) out.push({ x: o[0], y: o[1], z: o[2], boxes: [[0, 0, 0, c.sx, c.sy, c.sz]], color: [1, 0.35, 0.9, 0.8] });
       }
       if (d && d.use === 'blueprint' && this.blue) this.blue.outlines(out);
+      if (this.blue && this.blue.siteOutlines) this.blue.siteOutlines(out);   // 🏗 the plan's volume while it is built (baustelle.js)
       if (this.scanData) for (const gr of this.scanData.groups) out.push(gr);
       return out;
     }
