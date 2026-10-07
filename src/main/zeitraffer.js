@@ -123,7 +123,7 @@
       g, w, C, T, cols, ring, tok, cursor: 0, clock: 0, speed: ZR.speedFor(T.total), playing: false, phase: 'intro', introT: 0,
       gold: true, center: bb.c, radius: bb.r, burst: { c: bb.c.slice(), r: bb.r, t: -1e9 }, relightAt: 0, fps: 0, lastNow: 0, sparkAt: 0, soundAt: 0, uiAt: 0,
       styleEpoch: w.styleEpoch || 0, world: g.meta.name || '', span: spanText(C),
-      saved: { ticks: g.env.ticks, freeze: g.zenFreezeTime, freezeW: g.zenFreezeWeather, forced: g.env.wx ? g.env.wx.forced : null, hideHud: g.hideHud, camMode: g.camMode },
+      saved: { ticks: g.env.ticks, freeze: g.zenFreezeTime, freezeW: g.zenFreezeWeather, forced: g.env.wx ? g.env.wx.forced : null, wxv: g.env.wx && g.env.wx.v ? Object.assign({}, g.env.wx.v) : null, wxk: g.env.wx ? g.env.wx.kind : null, hideHud: g.hideHud, camMode: g.camMode },
     };
     S.set = setter(cols);
     g.env.setTime(GOLD); if (g.env.wx) g.env.wx.force('klar');
@@ -376,7 +376,8 @@
       w.lastCol = null; w.visDirty = true; if (rr) rr.visDirty = true;
       if ((w.styleEpoch || 0) !== S.styleEpoch && !w.dead) w.restyle();
       const sv = S.saved;
-      g.env.ticks = sv.ticks; g.zenFreezeTime = sv.freeze; g.zenFreezeWeather = sv.freezeW; if (g.env.wx) g.env.wx.forced = sv.forced;
+      g.env.ticks = sv.ticks; g.zenFreezeTime = sv.freeze; g.zenFreezeWeather = sv.freezeW;
+      if (g.env.wx) { g.env.wx.forced = sv.forced; if (sv.wxv) Object.assign(g.env.wx.v, sv.wxv); if (sv.wxk) g.env.wx.kind = sv.wxk; }   // (the sky exactly as it was, no easing back)
       g.hideHud = sv.hideHud; g.camMode = sv.camMode;
       if (g.director && g.director.orbitReset) g.director.orbitReset();
       g.last = performance.now();
