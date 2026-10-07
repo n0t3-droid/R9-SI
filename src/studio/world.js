@@ -576,7 +576,7 @@
     kv.innerHTML = `<span>Art</span><b>${esc(w.type || 'default')} · Seed ${w.seed >>> 0}</b><span>Gegend</span><b>${N} × ${N} Chunks (${N * 16} × ${N * 16} Blöcke)${WM.loading ? ' · lädt ' + Math.round(100 * WM.loading.done / Math.max(1, WM.loading.total)) + ' %' : ''}</b><span>Plan</span><b>${drafts} Entwurf · ${pend} übergeben · ${built} gebaut</b>`;
     el.appendChild(kv);
     const dt = dirty();
-    row(btn(`⬆ In die Welt übernehmen${drafts ? ' (' + drafts + ')' : ''}`, 'pri' + (dt ? ' glow' : ''), () => commit(), 'Gibt den Plan ans Spiel — es baut alles, sobald die Gegend geladen ist'));
+    row(btn(`📍 Alle setzen${drafts ? ' (' + drafts + ')' : ''}`, 'pri' + (dt ? ' glow' : ''), () => commit(), 'Gibt den Plan ans Spiel — es baut alles, sobald die Gegend geladen ist'));   // (W1 §6: one word — the Karte view sets at once)
     if (dt) note('Änderungen sind noch nicht beim Spiel — <b>Übernehmen</b> gibt sie weiter.', 'warn');
     row(btn('⟳ Gegend neu laden', '', () => openWorld(WM.world), 'Liest die Welt neu (nachdem das Spiel gespeichert hat)'), btn('◂ Andere Welt', '', () => { keepWorld(true); WM.world = null; freeRegion(); C.setScene(null); refresh(); listWorlds().then(refresh); }));
     row(btn('⟲ Rückgängig', '', () => undo(false), 'Strg+Z'), btn('⟳ Wiederholen', '', () => undo(true), 'Strg+Y'));

@@ -146,10 +146,181 @@
     else if (h.startsWith('#ding/')) { const id = decodeURIComponent(h.slice(6)).replace(/\/edit$/, ''), edit = /\/edit$/.test(h); ready(() => { if (!known(id)) { toast(tx('st.gone', null, 'Das gibt es hier nicht (mehr).', 'That is not here (any more).')); return; } if (edit && D().handlers.edit) D().handlers.edit(id); else SS.view(id, { noLayer: true }); }); }
   }
 
+  // ---------------------------------------------------------------- the Ding cards' handlers on this page
+  function handlers() {
+    const Dg = D(); if (!Dg) return;
+    Dg.houseNames = {}; for (const h of C.HOUSES) Dg.houseNames[h.i] = h.name;
+    Dg.handlers = {
+      view: (id) => SS.view(id),
+      edit: (id) => SS.edit(id),
+      set: (id) => SS.set(id),
+      share: (id) => Dg.share(id),
+      canSet: (id) => (SA ? true : /^[hm]:/.test(id)),
+      canEdit: (id) => (/^p:/.test(id) ? !!prefs().pro : true),
+      pic: (id, w, h) => {
+        const d = Dg.parse(id); if (!d) return null;
+        const copy = (th) => { if (!th) return null; const c = document.createElement('canvas'); c.width = th.width; c.height = th.height; c.getContext('2d').drawImage(th, 0, 0); return c; };
+        if (d.kind === 'h') { const rec = C.HOUSE.get(+d.key); return rec && rec.thumb ? copy(rec.thumb) : null; }
+        if (d.kind === 'm') return VR.VM.MODELS[d.key] ? copy(C.thumbOf(d.key)) : null;
+        if (d.kind === 'b' && VR.StudioCatalog) return VR.StudioCatalog.picture(d.key, w || 128, h || 84);
+        return null;
+      },
+    };
+  }
+  // ✏️ Bearbeiten: the right editor, as a layer (← comes back here)
+  SS.edit = function (id) {
+    const d = D() && D().parse(id); if (!d || !known(id)) { toast(tx('st.gone', null, 'Das gibt es hier nicht (mehr).', 'That is not here (any more).')); return false; }
+    const P = PJ();
+    if (d.kind === 'h' || d.kind === 'm' || d.kind === 'p') layer('editor', '✏️', { escapable: false });
+    else layer('editor', '✏️');
+    if (P && P.isOpen && P.isOpen()) P.show(false);
+    if (d.kind === 'h') C.editHouse(+d.key);
+    else if (d.kind === 'm') C.editModel(d.key);
+    else if (d.kind === 'b') { if (VR.StudioCatalog) { VR.StudioCatalog.edit = true; VR.StudioCatalog.open('block', d.key); } }
+    else if (d.kind === 'p') { const W = WM(); if (W && W.world) { W.tab = 'bench'; C.setMode('world'); W.refresh(); } else toast(tx('st.pieceNeedsWorld', null, 'Ein Bauteil bearbeitest du in der Werkbank einer Welt (🏗 Bauen, Profi).', 'A piece is edited in a world\'s workbench (🏗 Bauen, Profi).')); }
+    else if (P) P.open(d.key);
+    light();
+    return true;
+  };
+  // 📍 Setzen: the Karte view with it in hand (standalone: 🎒 Merken = a favourite)
+  SS.set = async function (id) {
+    const Dg = D(), W = WM(), P = PJ();
+    if (SA) { const on = Dg.toggleFav(id); toast((on ? '★ ' : '☆ ') + Dg.name(id)); return on; }
+    const d = Dg.parse(id); if (!d || !/^[hm]$/.test(d.kind) || !W) return false;
+    if (P && P.isOpen && P.isOpen()) P.show(false);
+    if (!W.world) {
+      if (!W.worlds && W.list) { try { await W.list(); } catch (e) { /* */ } }
+      const last = W.worlds && W.worlds[0];
+      if (!last) { toast(tx('st.firstWorld', null, 'Erst eine Welt: ▶ Losspielen im Spiel', 'A world first: ▶ Play in the game')); return false; }
+      await W.openId(last.id, 'karte');
+    } else if (S.mode !== 'world' || W.tab !== 'karte') { W.tab = 'karte'; C.setMode('world'); W.refresh(); }
+    if (NAV()) NAV().clear();
+    W.tool = d.kind === 'h' ? W.houseItem(+d.key) : { kind: 'model', name: d.key };
+    W.ghost = null; W.sel = null; W.meshFor(W.tool); W.refresh();
+    if (W.tipW) W.tipW(tx('karte.aim', null, 'Zeig auf den Boden — Klick setzt es · R dreht · Esc fertig', 'Point at the ground — a click places it · R turns · Esc done'), true);
+    return true;
+  };
+
+  // ---------------------------------------------------------------- the Karte tab of the Welt mode
+  const karte = () => { const W = WM(); return !!(W && W.on && S.mode === 'world' && W.world && W.tab === 'karte'); };
+  const toolId = () => { const W = WM(); return W && W.tool ? (W.tool.kind === 'house' ? 'h:' + W.tool.index : 'm:' + W.tool.name) : null; };
+  const newId = () => 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+  function wrap(name, fn) { const prev = HOOK[name]; HOOK[name] = function (...a) { const r = fn.apply(null, a); if (r !== false) return r; return prev ? prev.apply(null, a) : false; }; }
+  // the chips: Einfach → ★ · 🏠 Häuser · 🪑 Möbel · 🌍 Welten; Profi → the world's tabs with 🗺 Karte first
+  const prevChips = HOOK.chips;
+  HOOK.chips = function (...a) {
+    const W = WM(); if (!W || !W.on || S.mode !== 'world' || !W.world) return prevChips ? prevChips.apply(null, a) : false;
+    const el = $('#chips');
+    const favN = (VR.Favs ? VR.Favs.list() : []).map(f => D().fromFav(f)).filter(id => id && /^[hm]:/.test(id) && known(id)).length;
+    if (prefs().pro) {
+      // the world's own tabs, 🗺 Karte in front of them
+      const r = prevChips ? prevChips.apply(null, a) : false;
+      const b = document.createElement('button'); b.className = W.tab === 'karte' ? 'on' : ''; b.dataset.kcat = 'karte'; b.innerHTML = tx('st.karte', null, '🗺 Karte', '🗺 Map') + '<b>' + W.plans.filter(p => p.status !== 'built').length + '</b>'; b.onclick = () => { W.tab = 'karte'; W.refresh(); };
+      el.insertBefore(b, el.firstChild);
+      return r;
+    }
+    el.innerHTML = '';
+    if (W.tab !== 'karte') { W.tab = 'karte'; }
+    const cat = W.karteCat || (favN ? 'fav' : 'house');
+    const own = Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {}).filter(n => VR.VM.MODELS[n] && !C.isFacade(n)).length, nFurn = Object.keys(VR.VM.MODELS).filter(n => !C.isFacade(n)).length;
+    for (const [id, label, n] of [['fav', '★ ' + tx('st.favs', null, 'Favoriten', 'Favourites'), favN], ['house', '🏠 ' + tx('st.houses', null, 'Häuser', 'Houses'), C.HOUSES.length], ['furn', '🪑 ' + tx('st.furn', null, 'Möbel', 'Furniture'), own ? own + ' ✏️ · ' + nFurn : nFurn], ['worlds', '🌍 ' + tx('start.worldsTitle', null, 'Welten', 'Worlds'), W.worlds ? W.worlds.length : '']]) {
+      const b = document.createElement('button'); b.className = cat === id && id !== 'worlds' ? 'on' : ''; b.dataset.kcat = id; b.innerHTML = label + '<b>' + n + '</b>';
+      b.onclick = () => { if (id === 'worlds') { W.keepNow && 0; W.world = null; C.setScene(null); W.tab = 'karte'; if (NAV()) NAV().clear(); C.setMode('world'); W.list().then(() => W.refresh()); return; } W.karteCat = id; W.refresh(); };
+      el.appendChild(b);
+    }
+    return true;
+  };
+  // the cards: ★ first, then the houses or the furniture (own designs first); a tap on the picture = 📍 Setzen
+  wrap('list', function () {
+    if (!karte()) return false;
+    const W = WM(), Dg = D(), el = $('#list'); el.innerHTML = ''; el.classList.remove('palette'); el.classList.add('houses', 'dings');
+    const favIds = (VR.Favs ? VR.Favs.list() : []).map(f => Dg.fromFav(f)).filter(id => id && /^[hm]:/.test(id) && known(id) && !(id[0] === 'm' && C.isFacade(id.slice(2))));
+    const cat = prefs().pro ? (W.karteCat || 'house') : (W.karteCat || (favIds.length ? 'fav' : 'house'));
+    let ids = [];
+    if (cat === 'fav') ids = favIds;
+    else if (cat === 'house') ids = favIds.filter(id => id[0] === 'h').concat(C.HOUSES.map(h => 'h:' + h.i).filter(id => !favIds.includes(id)));
+    else { const own = Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {}).filter(n => VR.VM.MODELS[n] && !C.isFacade(n)).map(n => 'm:' + n); const all = Object.keys(VR.VM.MODELS).filter(n => !C.isFacade(n)).map(n => 'm:' + n); ids = favIds.filter(id => id[0] === 'm').concat(own.filter(id => !favIds.includes(id))).concat(all.filter(id => !favIds.includes(id) && !own.includes(id))); }
+    const f = (S.filter || '').toLowerCase();
+    if (f) ids = ids.filter(id => (id + ' ' + Dg.name(id)).toLowerCase().includes(f));
+    const cur = toolId();
+    if (!ids.length) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = cat === 'fav' ? tx('st.noFavs', null, 'Noch keine Favoriten — der ☆ an einer Karte legt sie hierher.', 'No favourites yet — ☆ on a card puts them here.') : tx('cat.none', null, 'nichts gefunden', 'nothing found'); el.appendChild(d); return true; }
+    let k = 0;
+    for (const id of ids.slice(0, 400)) { const c = Dg.render(id, { picW: 280, picH: 160, on: id === cur, onOpen: () => SS.set(id) }); c.style.animationDelay = (Math.min(k++, 24) * 18) + 'ms'; el.appendChild(c); }
+    return true;
+  });
+  // with something in hand: a click places it — left or right button; a drag turns the view (Shift / middle: pan);
+  // the hover (the ghost) stays world.js's
+  let kp = null;
+  wrap('pointer', function (e, type) {
+    const W = WM(); if (!karte() || !W.tool) { kp = null; return false; }
+    if (type === 'down') { kp = { x: e.clientX, y: e.clientY, b: e.button, shift: e.shiftKey, moved: false }; try { C.view().setPointerCapture(e.pointerId); } catch (er) { /* */ } return true; }
+    if (type === 'move') {
+      if (!kp) return false;
+      const dx = e.clientX - kp.x, dy = e.clientY - kp.y;
+      if (!kp.moved && Math.hypot(dx, dy) < 5) return true;
+      kp.moved = true; kp.x = e.clientX; kp.y = e.clientY;
+      if (kp.shift || kp.b === 1) C.CAM.pan(dx, dy); else C.CAM.rotate(dx, dy);
+      return true;
+    }
+    if (type === 'up') { const q = kp; kp = null; if (q && !q.moved && (q.b === 0 || q.b === 2)) W.placeNow(); return true; }
+    if (type === 'leave') { kp = null; return false; }
+    return false;
+  });
+  // the piece in hand goes where the ghost stands and is handed to the game at once (status pending); the tool stays
+  function placeNow() {
+    const W = WM(), Dg = D(); if (!W || !W.tool) return null;
+    const m = W.meshFor(W.tool), gp = W.ghost;
+    if (!m || !gp || !gp.ok) { if (W.tipW) W.tipW(tx('karte.noGround', null, 'Zeig auf den Boden', 'Point at the ground'), false); return null; }
+    let plan = null;
+    W.change(() => { plan = Object.assign({}, gp, { id: newId(), status: 'draft', t: Date.now(), from: 'map' }); delete plan.ok; W.plans.push(plan); W.sel = plan.id; });
+    if (!plan) return null;
+    const r = W.commit(true);
+    const name = Dg ? Dg.name(toolId()) : (m.title || '');
+    if (W.tipW) W.tipW(r.ok ? tx('karte.set', { n: name }, '✓ {n} gesetzt — ▶ bringt dich hin', '✓ {n} placed — ▶ takes you there') : tx('karte.full', null, '⚠ Gesetzt, aber nicht gemerkt — Browser-Speicher voll', '⚠ Placed, but not kept — browser storage full'), r.ok);
+    return W.plans.find(p => p.id === plan.id) || plan;
+  }
+  // the right side: where you land, the chosen card, the keys as buttons — no ⬆, no key list
+  wrap('parts', function () {
+    if (!karte()) return false;
+    const W = WM(), Dg = D(), el = $('#partsBody'); el.innerHTML = ''; el.classList.remove('empty');
+    if (W.landingBox && !W.loading) W.landingBox(el);
+    const H = (t, b) => { const d = document.createElement('div'); d.className = 'ph'; d.innerHTML = t + (b !== undefined ? ' <b>' + b + '</b>' : ''); el.appendChild(d); };
+    const btn = (label, fn, cls) => { const b = document.createElement('button'); b.className = 'cbtn ' + (cls || ''); b.textContent = label; b.onclick = fn; return b; };
+    const row = (...bs) => { const r = document.createElement('div'); r.className = 'crow'; for (const b of bs) r.appendChild(b); el.appendChild(r); };
+    const note = (t, cls) => { const p = document.createElement('div'); p.className = 'note' + (cls ? ' ' + cls : ''); p.textContent = t; el.appendChild(p); };
+    const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const pend = W.plans.filter(p => p.status === 'pending').length, built = W.plans.filter(p => p.status === 'built').length;
+    H(tx('st.karte', null, '🗺 Karte', '🗺 Map'), esc(W.world.name));
+    note((W.loading ? tx('st.loading', { p: Math.round(100 * W.loading.done / Math.max(1, W.loading.total)) }, 'Die Gegend lädt … {p} %', 'The land is loading … {p} %') + ' · ' : '') + tx('st.planLine', { p: pend, b: built }, '{p} gesetzt · {b} gebaut', '{p} placed · {b} built'), 'dim');
+    const tid = toolId();
+    if (tid) {
+      H(tx('ding.set', null, '📍 Setzen', '📍 Place'));
+      const card = Dg.render(tid, { compact: true, picW: 280, picH: 120 }); card.classList.add('inhand'); el.appendChild(card);
+      note(W.meshFor(W.tool) ? tx('karte.how', null, 'Zeig auf den Boden: jeder Klick setzt es — das Spiel baut es, ▶ bringt dich hin.', 'Point at the ground: every click places it — the game builds it, ▶ takes you there.') : tx('st.preparing', null, 'wird vorbereitet …', 'preparing …'));
+      const rb = btn('↻ ' + tx('st.turn', null, 'Drehen · R', 'Turn · R'), () => { W.rot = (W.rot + 1) & 3; W.ghost = null; W.refresh(); }); rb.dataset.act = 'wrot';
+      const own = W.tool.kind === 'house' && VR.Custom && VR.Custom.houseFor(W.tool.index);
+      const fb = W.tool.kind === 'house' && !own ? btn('◐ ' + tx('st.facade', null, 'Fassade · F', 'Facade · F'), () => { const rec = C.HOUSE.get(W.tool.index), skins = rec ? rec.data.skins.filter((v, j, a) => a.indexOf(v) === j) : [W.tool.skin]; const list = []; for (const mi of [false, true]) for (const sk of skins) list.push([sk, mi]); const k = list.findIndex(([sk, mi]) => sk === W.tool.skin && mi === !!W.tool.mirror); const [sk, mi] = list[(k + 1) % list.length]; W.tool.skin = sk; W.tool.mirror = mi; W.ghost = null; W.refresh(); }) : null; if (fb) fb.dataset.act = 'wfac';
+      if (fb) row(rb, fb); else row(rb);
+      row(btn('✕ ' + tx('st.done', null, 'Fertig · Esc', 'Done · Esc'), () => { W.tool = null; W.ghost = null; W.refresh(); }));
+    } else {
+      const sel = W.plans.find(p => p.id === W.sel);
+      if (sel && sel.status !== 'built') {
+        const sid = sel.kind === 'house' ? 'h:' + sel.index : 'm:' + sel.name;
+        H(tx('st.selected', null, 'Ausgewählt', 'Selected'), esc(Dg.name(sid)));
+        row(btn('↻ ' + tx('st.turn', null, 'Drehen · R', 'Turn · R'), () => { const m = W.meshFor(sel); if (m) W.change(() => W.rotate(sel, m)); }), btn('✕ ' + tx('st.remove', null, 'Weg damit', 'Remove'), () => { W.change(() => { W.plans = W.plans.filter(q => q !== sel); W.sel = null; }); W.commit(true); }));
+        note(sel.status === 'pending' ? tx('st.pendingNote', null, 'Das Spiel baut es, sobald die Gegend geladen ist.', 'The game builds it as soon as that land is loaded.') : '', 'dim');
+      } else note(tx('st.karteHint', null, 'Tipp auf ein Bild links — dann auf den Boden.', 'Tap a picture on the left — then the ground.'));
+    }
+    return true;
+  });
+  // Esc puts the tool away on the Karte too (world.js's key hook does it); R turns (world.js)
+
   // ---------------------------------------------------------------- wiring
   function init() {
+    handlers();
+    if (WM()) WM().placeNow = placeNow;
     tiles(); proSwitch(); labels();
-    if (VR.UIPrefs) VR.UIPrefs.on(() => labels());
+    if (VR.UIPrefs) VR.UIPrefs.on(() => { labels(); const W = WM(); if (W && W.on && S.mode === 'world') { C.chips(); C.list(); C.parts(); } });   // (Einfach ↔ Profi changes the Welt mode's chips)
     if (VR.I18N && VR.I18N.on) VR.I18N.on(() => labels());
     // the mode bar (Profi): a mode switch drops the layers
     for (const b of $$('nav.modes button[data-mode]')) if (!b.disabled) b.onclick = () => { if (NAV()) NAV().clear(); C.setMode(b.dataset.mode); };

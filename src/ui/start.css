@@ -145,3 +145,26 @@ html:not(.pro) #title #mphosts:not(.has), html:not(.pro) #title .splash { displa
 #studio .tile.gamelink.playb { color: var(--st-ink); background: linear-gradient(180deg, #121a27, #0d131c); border-color: var(--st-line); box-shadow: none; font: 700 15px var(--st-font); padding: 4px 14px 4px 10px; }
 #studio .tile.gamelink.playb:hover { background: linear-gradient(180deg, #162033, #0d131c); box-shadow: 0 0 0 2px var(--st-acc-dim); }
 #studio .tile.gamelink.playb .pic { color: var(--acc2); }
+
+/* ---- the Ding cards (the Karte view, 🎒 Meins) ---- */
+.ding { position: relative; display: flex; flex-direction: column; border: 1px solid var(--st-line); border-radius: 14px; background: linear-gradient(180deg, rgba(14, 20, 38, 0.92), rgba(9, 13, 26, 0.92)); overflow: hidden; cursor: pointer; transition: border-color .15s, box-shadow .2s; animation: rise .35s cubic-bezier(.2, .8, .2, 1) both; }
+.ding:hover { border-color: var(--st-acc-dim); }
+.ding.on { border-color: var(--st-acc); box-shadow: 0 0 0 1px var(--st-acc-dim), 0 0 24px -8px var(--st-acc-dim); }
+.ding .pic { display: grid; place-items: center; min-height: 96px; max-height: 160px; font-size: 44px; background: radial-gradient(60% 60% at 50% 55%, #141c28, #0a0e14); color: var(--st-mute); }
+.ding .pic canvas, .ding .pic img { display: block; width: 100%; height: 100%; max-height: 160px; object-fit: cover; }
+.ding .cap { padding: 8px 10px 4px; }
+.ding .cap .n { font: 700 var(--st-fs) var(--st-font); line-height: 1.2; color: var(--st-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ding .cap .st { font: 500 calc(var(--st-fs) * 0.78) var(--st-font); color: var(--st-mute); min-height: 1.2em; }
+.ding .dacts { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px 8px; }
+.ding .dacts button { flex: 1 1 auto; min-height: 36px; padding: 0 8px; border-radius: 10px; border: 1px solid var(--st-line); background: rgba(255, 255, 255, 0.04); color: var(--st-ink); font: 600 calc(var(--st-fs) * 0.8) var(--st-font); white-space: nowrap; cursor: pointer; transition: border-color .12s, background .12s; }
+.ding .dacts button:hover { border-color: var(--st-acc); background: rgba(58, 240, 255, 0.1); }
+.ding .dacts button.fav.on { color: #ffd34d; border-color: rgba(255, 211, 77, 0.55); }
+.ding .dacts button.set { border-color: rgba(58, 240, 255, 0.45); }
+.ding.compact { cursor: default; }
+.ding.compact .pic { min-height: 80px; max-height: 120px; }
+#studio .ding .dacts button { min-height: 34px; font-size: 11.5px; padding: 0 6px; }
+#studio .ding .cap .n { font-size: 13px; }
+#studio .ding .cap .st { font-size: 10.5px; }
+#list.dings { grid-template-columns: 1fr; }
+#studio:not(.pro) #worldHelp { display: none !important; }
+#partsBody .ding.inhand { margin: 4px 0 8px; }
