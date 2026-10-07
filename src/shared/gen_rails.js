@@ -267,12 +267,20 @@
     }
   };
 
+  // the cells RG.apply reads for a chunk: its 7 x 7 window and the 5 x 5 around each of its sites (nearestOther). The
+  // worker computes them in slices before the job runs (VG.cellNeeds), nearest first.
+  VG.cellNeeds.push((g, cx, cz) => {
+    const CELL = VG.cell(g), ci = Math.floor((cx * 16 + 8) / CELL), cj = Math.floor((cz * 16 + 8) / CELL), out = [];
+    for (let r = 0; r <= 5; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) if (Math.max(Math.abs(di), Math.abs(dj)) === r) out.push([ci + di, cj + dj]);
+    return out;
+  });
+
   const OG = VR.OverworldGen && VR.OverworldGen.prototype;
   if (OG) {
     const prevGen = OG.generate;
     OG.generate = function (cx, cz) {
       const out = prevGen.call(this, cx, cz);
-      if (this.singleBiome < 0) { try { RG.apply(this, cx, cz, out); } catch (e) { if (!this._railErr) { this._railErr = 1; console.warn('rail gen', e); } } }
+      if (this.singleBiome < 0) { try { RG.apply(this, cx, cz, out); } catch (e) { if (VG.probe && e === VG.probe) throw e; if (!this._railErr) { this._railErr = 1; console.warn('rail gen', e); } } }
       return out;
     };
   }

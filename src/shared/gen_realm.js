@@ -83,13 +83,43 @@
   // every value of a corner that a block's climate interpolates (a later layer — the Heartland — adds its own here,
   // so one pass over the four corners serves them all)
   const KEYS = OG.CLIMATE_KEYS = ['c', 'e', 'w', 't', 'h', 'pv', 'H', 'river', 'mountain', 'windswept', 'swampy', 'inland', 'plateau', 'ember', 'prism', 'canyon'];
-  OG.climateAt = function (x, z) {
+  // written out field by field (the same sums as a loop over KEYS, the same order): a loop reads and writes every value
+  // by a computed name, which cost more than the rest of a column (800 climates a column)
+  // a block's climate (climateAt): the fields the layers interpolate
+  class Climate {
+    constructor() {
+      this.c = 0; this.e = 0; this.w = 0; this.t = 0; this.h = 0; this.pv = 0; this.H = 0; this.river = 0; this.mountain = 0;
+      this.windswept = 0; this.swampy = 0; this.inland = 0; this.plateau = 0; this.ember = 0; this.prism = 0; this.canyon = 0;
+      this.heart = 0; this.hz1 = 0; this.hz2 = 0; this.hz3 = 0;
+    }
+  }
+  // out (optional): the object to write the climate into (a caller that reads it at once passes its own)
+  OG.climateAt = function (x, z, out) {
     const X0 = Math.floor(x / 4) * 4, Z0 = Math.floor(z / 4) * 4;
     const fx = (x - X0) / 4, fz = (z - Z0) / 4;
     const a = this.corner(X0, Z0), b = this.corner(X0 + 4, Z0), c = this.corner(X0, Z0 + 4), d = this.corner(X0 + 4, Z0 + 4);
     const w00 = (1 - fx) * (1 - fz), w10 = fx * (1 - fz), w01 = (1 - fx) * fz, w11 = fx * fz;
-    const o = {};
-    for (const k of KEYS) o[k] = (a[k] || 0) * w00 + (b[k] || 0) * w10 + (c[k] || 0) * w01 + (d[k] || 0) * w11;
+    const o = out || new Climate();
+    o.c = (a.c || 0) * w00 + (b.c || 0) * w10 + (c.c || 0) * w01 + (d.c || 0) * w11;
+    o.e = (a.e || 0) * w00 + (b.e || 0) * w10 + (c.e || 0) * w01 + (d.e || 0) * w11;
+    o.w = (a.w || 0) * w00 + (b.w || 0) * w10 + (c.w || 0) * w01 + (d.w || 0) * w11;
+    o.t = (a.t || 0) * w00 + (b.t || 0) * w10 + (c.t || 0) * w01 + (d.t || 0) * w11;
+    o.h = (a.h || 0) * w00 + (b.h || 0) * w10 + (c.h || 0) * w01 + (d.h || 0) * w11;
+    o.pv = (a.pv || 0) * w00 + (b.pv || 0) * w10 + (c.pv || 0) * w01 + (d.pv || 0) * w11;
+    o.H = (a.H || 0) * w00 + (b.H || 0) * w10 + (c.H || 0) * w01 + (d.H || 0) * w11;
+    o.river = (a.river || 0) * w00 + (b.river || 0) * w10 + (c.river || 0) * w01 + (d.river || 0) * w11;
+    o.mountain = (a.mountain || 0) * w00 + (b.mountain || 0) * w10 + (c.mountain || 0) * w01 + (d.mountain || 0) * w11;
+    o.windswept = (a.windswept || 0) * w00 + (b.windswept || 0) * w10 + (c.windswept || 0) * w01 + (d.windswept || 0) * w11;
+    o.swampy = (a.swampy || 0) * w00 + (b.swampy || 0) * w10 + (c.swampy || 0) * w01 + (d.swampy || 0) * w11;
+    o.inland = (a.inland || 0) * w00 + (b.inland || 0) * w10 + (c.inland || 0) * w01 + (d.inland || 0) * w11;
+    o.plateau = (a.plateau || 0) * w00 + (b.plateau || 0) * w10 + (c.plateau || 0) * w01 + (d.plateau || 0) * w11;
+    o.ember = (a.ember || 0) * w00 + (b.ember || 0) * w10 + (c.ember || 0) * w01 + (d.ember || 0) * w11;
+    o.prism = (a.prism || 0) * w00 + (b.prism || 0) * w10 + (c.prism || 0) * w01 + (d.prism || 0) * w11;
+    o.canyon = (a.canyon || 0) * w00 + (b.canyon || 0) * w10 + (c.canyon || 0) * w01 + (d.canyon || 0) * w11;
+    o.heart = (a.heart || 0) * w00 + (b.heart || 0) * w10 + (c.heart || 0) * w01 + (d.heart || 0) * w11;
+    o.hz1 = (a.hz1 || 0) * w00 + (b.hz1 || 0) * w10 + (c.hz1 || 0) * w01 + (d.hz1 || 0) * w11;
+    o.hz2 = (a.hz2 || 0) * w00 + (b.hz2 || 0) * w10 + (c.hz2 || 0) * w01 + (d.hz2 || 0) * w11;
+    o.hz3 = (a.hz3 || 0) * w00 + (b.hz3 || 0) * w10 + (c.hz3 || 0) * w01 + (d.hz3 || 0) * w11;
     return o;
   };
   const origBiome = OG.biomeFor;
@@ -122,12 +152,12 @@
   // are rarer, heights vary from 125 to 195. Outlines are domain-warped so no island is a disc.
   const ICELL = 72;
   OG.islandCell = function (i, j) {
-    const cache = this._isleCells || (this._isleCells = new Map());
-    const key = (i + 32768) * 65536 + (j + 32768);
-    let c = cache.get(key);
-    if (c !== undefined) return c;
-    if (cache.size > 4000) cache.clear();
-    c = null;
+    // by i, then j: Smi keys (a double key is boxed at every lookup)
+    const cache = this._isleCells || (this._isleCells = { rows: new Map(), n: 0 });
+    let row = cache.rows.get(i);
+    if (row !== undefined) { const hit = row.get(j); if (hit !== undefined) return hit; }
+    if (cache.n > 4000) { cache.rows.clear(); cache.n = 0; row = undefined; }
+    let c = null;
     const h = (k) => (M.hash2(i * 7 + k, j * 13 - k, this.seed + 31337) >>> 0) / 4294967296;
     const x = i * ICELL + 14 + h(1) * (ICELL - 28), z = j * ICELL + 14 + h(2) * (ICELL - 28);
     const region = this.nIsleR.n2(x, z);
@@ -135,7 +165,8 @@
       const big = Math.pow(h(4), 1.6);
       c = { x, z, r: 8 + big * 24, y: 128 + h(5) * 64, dome: 1.5 + h(6) * 4, deep: 1.0 + h(7) * 1.1, seed: (h(8) * 1000) | 0, falls: big > 0.15 ? 1 + Math.floor(h(9) * 2.99) : (h(9) < 0.4 ? 1 : 0) };
     }
-    cache.set(key, c);
+    if (row === undefined) { row = new Map(); cache.rows.set(i, row); }
+    row.set(j, c); cache.n++;
     return c;
   };
   // the column of one island at (x, z): its top and bottom, or null outside its (domain-warped) outline
@@ -197,13 +228,14 @@
     const S = states();
     const blocks = out.blocks, biome = out.biome;
     const x0 = cx * 16, z0 = cz * 16;
+    const cls = VR.OverworldGen.climateOf(out);   // the columns' climates, as generate made them (the same values as climateAt)
     const rng = new VR.RNG(M.hash2(cx, cz, g.seed + 777));
     const T = R.T;
     const bands = g.realmBands || (g.realmBands = (() => { const r = new VR.RNG(g.seed ^ 0xbadc0de); const arr = new Uint16Array(256); const pal = [S.ochre, S.ochre, S.umber, S.terraOrange, S.terraRed, S.ochre, S.terraBrown, S.umber, S.terraYellow]; for (let y = 0; y < 256; y++) arr[y] = pal[r.int(pal.length)]; for (let i = 0; i < 30; i++) { const y = r.int(256); for (let k = 0; k < 2 + r.int(3) && y + k < 256; k++) arr[y + k] = r.chance(0.5) ? S.ochre : S.umber; } return arr; })());
     for (let col = 0; col < 256; col++) {
       const lx = col & 15, lz = col >> 4, x = x0 + lx, z = z0 + lz;
       const key = B[biome[col]].key;
-      const cl = g.climateAt(x, z);
+      const cl = cls ? cls[col] : g.climateAt(x, z);
       if (key === 'ember_canyons' || cl.ember > 0.45) {
         // lava rivers in canyon floors, dry above
         for (let y = SEA; y > 20; y--) {

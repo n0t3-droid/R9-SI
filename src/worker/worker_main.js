@@ -78,10 +78,16 @@
     if (!VG || !(g instanceof VR.OverworldGen) || !(g.singleBiome < 0)) return out;
     // the site cells the job reads come first: a cold cell is computed in a turn of its own (VG.site); the plans below
     // read the cells, so they are looked at once every cell is there
+    // every layer's cells (VG.cellNeeds: the village's 3 x 3, the rails' window): a cold window of ~120 cells would
+    // otherwise be searched inside the job, unsliced. The origin cell goes first when a cell beside it is cold (the
+    // home city's search reads it first in any case).
     let cells = [];
-    if (m.type === 'gen' || m.type === 'relight') cells = VG.cellsFor(g, m.cx, m.cz);
+    if (m.type === 'gen' || m.type === 'relight') for (const f of VG.cellNeeds) cells = cells.concat(f(g, m.cx, m.cz));
     else if (m.type === 'lod' && m.dim === 'overworld' && VR.LOD) cells = VR.LOD.tileCells(g, m);
-    for (const [i, j] of cells) if (!VG.siteKnown(g, i, j)) out.push({ cell: true, i, j });
+    const seenC = new Set();
+    const addCell = (i, j) => { const k = (i + 4096) * 8192 + (j + 4096); if (seenC.has(k) || VG.siteKnown(g, i, j)) return; seenC.add(k); out.push({ cell: true, i, j }); };
+    if (cells.some(([i, j]) => Math.abs(i) <= 1 && Math.abs(j) <= 1 && !VG.siteKnown(g, i, j))) addCell(0, 0);
+    for (const [i, j] of cells) addCell(i, j);
     if (out.length) return out;
     let chunks = false, plans = [];
     if (m.type === 'gen') { chunks = true; plans = VG.sitesFor(g, m.cx, m.cz).map(s => [s, false]); }
@@ -97,7 +103,7 @@
   const needReady = (g, n) => n.cell ? VR.VillageGen.siteKnown(g, n.i, n.j) : n.temple ? !!g._temple : VR.VillageGen.planReady(g, n.site, n.lod);
   // one slice of the work a need stands for
   function advance(g, n) {
-    if (n.cell) { VR.VillageGen.site(g, n.i, n.j); return; }
+    if (n.cell) { VR.VillageGen.siteAdvance(g, n.i, n.j, PLAN_SLICE_MS); return; }
     if (n.temple) { VR.TempleGen.advance(g, PLAN_SLICE_MS); return; }
     if (!g._temple && VR.Heart && VR.Heart.on(g) && n.site.home) { VR.TempleGen.advance(g, PLAN_SLICE_MS); return; }
     VR.VillageGen.planAdvance(g, n.site, PLAN_SLICE_MS, n.lod);
@@ -277,7 +283,7 @@
       const pr = VG.probe = { miss: null };
       run(m);
       VG.probe = null;
-      if (pr.miss) park(m, g, pr.miss.temple ? { temple: true } : { site: pr.miss.site, lod: pr.miss.lod });
+      if (pr.miss) park(m, g, pr.miss.cell ? { cell: true, i: pr.miss.i, j: pr.miss.j } : pr.miss.temple ? { temple: true } : { site: pr.miss.site, lod: pr.miss.lod });
     } catch (err) {
       VG.probe = null;
       self.postMessage({ type: 'error', id: m.id, msg: String(err && err.stack || err) });

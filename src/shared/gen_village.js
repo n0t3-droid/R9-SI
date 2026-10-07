@@ -419,11 +419,9 @@
   const siteKey = (i, j) => (i + 1048576) * 2097152 + (j + 1048576);
   // whether a site cell is computed already (a cold cell costs its terrain samples: worker_main.js computes it in a turn)
   VG.siteKnown = (g, i, j) => !!g._vilSites && g._vilSites.has(siteKey(i, j));
-  VG.site = function (g, i, j) {
-    const key = siteKey(i, j);
-    if (!g._vilSites) g._vilSites = new Map();
-    if (g._vilSites.has(key)) return g._vilSites.get(key);
-    if (g._vilSites.size > 600) g._vilSites.clear();
+  // The search of a cell is a generator, siteSteps: one candidate spot per step (the home city tries up to 80), so a
+  // worker builds a cold cell in slices (VG.siteAdvance). VG.site runs it to the end (the cache is g._vilSites).
+  VG.siteSteps = function* (g, i, j) {
     let site = null;
     const { CELL: VCELL, M: MG } = PAR(g);
     const rng = new VR.RNG(M.hash2(i, j, g.seed + 90210));
@@ -431,6 +429,7 @@
     const home = g.vgen >= 2 && ((i === 0 && j === 0) || (Math.abs(i) <= 1 && Math.abs(j) <= 1 && !VG.site(g, 0, 0) && !g._homeFound));
     if (g.singleBiome < 0 && (home || rng.chance(0.8))) {
       for (let k = 0; k < (home ? 80 : 10) && !site; k++) {
+        yield;   // one candidate per step
         const relax = home && k >= 40 ? 1.6 : 1;
         const x = i * VCELL + MG + rng.int(VCELL - 2 * MG), z = j * VCELL + MG + rng.int(VCELL - 2 * MG);
         const cl = g.climateAt(x, z);
@@ -462,9 +461,47 @@
         if (home) g._homeFound = true;
       }
     }
-    g._vilSites.set(key, site);
     return site;
   };
+  // the cached site of a cell, else its search run to the end. In a worker job that needs the cell (VG.probe set) the
+  // run ends instead, and the job waits for the cell's slices (worker_main.js).
+  VG.site = function (g, i, j) {
+    const key = siteKey(i, j);
+    if (!g._vilSites) g._vilSites = new Map();
+    if (g._vilSites.has(key)) return g._vilSites.get(key);
+    if (VG.probe) { VG.probe.miss = { cell: true, i, j }; throw VG.probe; }
+    if (g._vilSites.size > 600) g._vilSites.clear();
+    const it = VG.siteSteps(g, i, j);
+    let r;
+    do { r = it.next(); } while (!r.done);
+    g._vilSites.set(key, r.value);
+    return r.value;
+  };
+  // one slice of a cell's search (a worker turn, about ms long): the site (null: none) when the search is done, else undefined
+  VG.siteAdvance = function (g, i, j, ms) {
+    const key = siteKey(i, j);
+    if (!g._vilSites) g._vilSites = new Map();
+    if (g._vilSites.has(key)) return g._vilSites.get(key);
+    if (!g._siteBuild) g._siteBuild = new Map();
+    let it = g._siteBuild.get(key);
+    if (!it) {
+      if (g._siteBuild.size >= 4) g._siteBuild.delete(g._siteBuild.keys().next().value);
+      it = VG.siteSteps(g, i, j); g._siteBuild.set(key, it);
+    }
+    const t0 = performance.now();
+    let r;
+    try { do { r = it.next(); } while (!r.done && performance.now() - t0 < ms); }
+    catch (e) { g._siteBuild.delete(key); throw e; }
+    if (!r.done) return undefined;
+    g._siteBuild.delete(key);
+    if (g._vilSites.size > 600) g._vilSites.clear();
+    g._vilSites.set(key, r.value);
+    return r.value;
+  };
+  // the cells a chunk's generation reads, by layer (VG.cellNeeds: each layer adds its list; the worker computes the
+  // cells of a job's needs in slices before the job runs). The village's own: its 3 x 3 cells.
+  VG.cellNeeds = [];
+  VG.cellNeeds.push((g, cx, cz) => VG.cellsFor(g, cx, cz));
   VG.near = function (g, x, z, pad) {
     const { CELL: VCELL, RAD } = PAR(g);
     const ci = Math.floor(x / VCELL), cj = Math.floor(z / VCELL);
