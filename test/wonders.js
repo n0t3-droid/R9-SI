@@ -157,6 +157,7 @@ section('game', () => {
     setBlock(x, y, z, s) { const c = this.col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; c.modified = true; },
     bulkSet(list, notify, defer) { const touched = new Set(); for (const [x, y, z, s] of list) { if (y < 0 || y >= HI) continue; const c = this.col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; c.modified = true; touched.add(c); } if (defer) { for (const c of touched) defer.add(c); return touched.size; } this.relights++; return touched.size; },
     relightColumns() { this.relights++; },
+    marks: [], markDirty(x, y, z) { this.marks.push([x >> 4, y >> 4, z >> 4, this.relights]); },
   };
   const sounds = [], chat = [], unlocked = [], guestCells = [];
   let listSites = [];
@@ -178,6 +179,8 @@ section('game', () => {
   const ea = wg.st.a || {};
   check(ea.status === 'built' && rising >= 25 && rising <= 60, 'the Sternwarte rose over ' + (rising / 10).toFixed(1) + ' s and stands: ' + JSON.stringify({ status: ea.status, at: ea.at, heart: ea.heart }));
   check(world.relights === 2, 'its columns were lit twice: once cleared, once risen (not once per slice): ' + world.relights);
+  { const during = world.marks.filter(m => m[3] === 1), rows = new Set(during.map(m => m[1])), per = during.length / Math.max(1, rows.size);
+    check(rows.size >= 2 && during.length > 0 && Math.max(...during.map(m => m[1])) > Math.min(...during.map(m => m[1])), 'while it rises, the sections of the rising band are meshed again (it is seen growing): ' + during.length + ' marks over section rows ' + [...rows].sort((a, b) => a - b).join(',') + ' (' + per.toFixed(0) + ' per row)'); }
   check(ea.heart && T.emit[world.getBlock(ea.heart[0], ea.heart[1], ea.heart[2])] > 0, 'the heart in the world is a glowing block: ' + (ea.heart && nameOf(world.getBlock(ea.heart[0], ea.heart[1], ea.heart[2]))));
   check(sounds.includes('wonder') && chat.some(t => /erhebt sich/.test(t)), 'a chime and a line in the chat while it rises');
   check(guestCells.length > 2000 && !gad.wand.undo.length, 'with friends its blocks go out to them (' + guestCells.length + ' cells); no undo step (the wonder is the world\'s)');
