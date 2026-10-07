@@ -261,3 +261,11 @@ SO BENUTZT DU DAS STUDIO
   „Ohne Textur“ zeigt die reine Voxel-Form.
 - Rechts „Modell“: die Definition — ändern und ▶ Ausführen. „Datei“: die ganze voxfurn.js.
 - Was du hier änderst, gilt nur in diesem Browser (zum Ausprobieren).
+
+RECHTLICHES
+- R9-SI und R9 Studio sind ein eigenständiges, unabhängiges Werk: ein eigenes Voxelspiel, inspiriert vom Genre der
+  Block-Sandbox-Spiele, mit keiner anderen Spielefirma verbunden und von keiner genehmigt, gesponsert oder unterstützt.
+  NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. Minecraft ist eine Marke
+  von Mojang; WorldEdit, Amulet, Axiom, Litematica, MCEdit und MagicaVoxel sind Namen bzw. Marken ihrer Inhaber und
+  stehen hier nur für die Dateiformate, die das Studio liest und schreibt.
+- 📜 oben rechts: Impressum, Datenschutz, Credits (die Schriften unter der SIL Open Font License) und dieser Hinweis.

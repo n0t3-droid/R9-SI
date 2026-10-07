@@ -146,5 +146,18 @@ const studioHouses = [...read('src/studio/studio.js').matchAll(/\{ i: (\d+), nam
 check(studioHouses.length === 11 && studioHouses.every(([i, n]) => want[i] === n), 'the Studio\'s house list has the same names at the same indices');
 check(/signus: 'Weiß · Anthrazit'/.test(read('src/studio/studio.js')) && /blacklabel: 'Schwarzkubus'/.test(read('src/studio/studio.js')), 'the skins shown in the Studio: „Weiß · Anthrazit“, „Schwarzkubus“');
 
+console.log('10 · the independence disclaimer, the reworded lines, the milestone titles');
+const MOJ = 'NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.';
+const rd = read('README.md'), nt = read('src/studio/notes.md');
+check(/not affiliated with, endorsed, sponsored or approved by any other game\s+company/.test(rd) && rd.includes(MOJ), 'README: an independent work, not affiliated with or endorsed by any other game company — and the brand owner\'s line');
+check(rd.split(MOJ).length - 1 >= 2, 'README: the line also under the Files paragraph that names the file formats');
+check(/mit keiner anderen Spielefirma verbunden/.test(nt) && nt.includes(MOJ), 'notes.md (the Studio\'s Log): the same, in German');
+check(!/researched from the block wiki|everyone who opens the game's link/.test(rd), 'README: the roster and multiplayer lines the audit flagged are reworded');
+const OTHER = ['Stone Age', 'Hot Stuff', 'Diamonds!', 'Sweet Dreams', 'Steinzeit', 'Heiße Sache', 'Heiße Angelegenheit', 'Diamanten!', 'Süße Träume'];
+const cfiles = ['src/main/codex.js'].concat(fs.readdirSync(path.join(ROOT, 'src/main')).filter(f => /^lang_\w+\.js$/.test(f)).map(f => 'src/main/' + f));
+const chits = []; for (const f of cfiles) { const s = read(f); for (const w of OTHER) if (s.includes(w)) chits.push(f + ': ' + w); }
+check(!chits.length, 'no codex milestone title of another game (' + cfiles.join(', ') + ')' + (chits.length ? ': ' + chits.join(' · ') : ''));
+check(['stone', 'furnace', 'diamond', 'sleep'].every(id => read('src/main/codex.js').includes(`['${id}', `)), 'the milestone ids are kept (saved worlds\' codex)');
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
