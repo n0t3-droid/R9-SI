@@ -126,10 +126,14 @@
     reloadCustom(data) {
       if (!VR.Custom) return;
       if (data) VR.Custom.save(data);
+      // only furniture / facade designs change what already stands (every piece is re-meshed); a house design is for
+      // the towns built from now on — saving one must not re-mesh the whole world
+      const sig = (d) => { const m = (d && d.models) || {}; return JSON.stringify(Object.keys(m).sort().map(k => [k, m[k] && m[k].t, m[k] && m[k].rle ? m[k].rle.length : 0])); };
+      const before = this.customSig !== undefined ? this.customSig : sig(VR.CUSTOM);
       VR.Custom.apply(data || VR.Custom.load());
+      const after = this.customSig = sig(VR.CUSTOM);
       if (this.pool) this.pool.broadcast({ type: 'custom', custom: VR.CUSTOM });
-      if (this.icons) { this.icons.cache.clear(); }
-      this.remeshAll();
+      if (after !== before) { if (this.icons) this.icons.cache.clear(); this.remeshAll(); }
       if (this.gadgets && this.gadgets.blue) this.gadgets.blue.reset();
       const n = VR.Custom.count();
       if (this.ui && this.ui.toast && this.state === 'play') this.ui.toast('R9 Studio', `${n.houses} eigene Häuser · ${n.models} eigene Items übernommen`);

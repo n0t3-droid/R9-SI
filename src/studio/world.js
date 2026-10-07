@@ -25,6 +25,7 @@
   const PLAN_KEY = (id) => 'r9si.plans.' + id, DRAFT_KEY = (id) => 'r9si.draft.' + id;
   const WM = VR.StudioWorld = { on: false, store: null, worlds: null, world: null, cols: new Map(), gpu: [], loading: null, meshes: new Map(), plans: [], sel: null, tool: null, ghost: null, rot: 0, undo: [], redo: [], tab: 'houses', hover: null, msg: '' };
   const HOUSES = C.HOUSES, hname = (i) => { const h = HOUSES.find(x => x.i === i); return h ? h.name : 'Haus ' + i; };
+  const SA = !!C.SA, GAME_URL = window.__R9_GAME_URL || '';
 
   // ---------------------------------------------------------------- storage: the game's worlds, the plans
   const lsGet = (k) => { try { const t = localStorage.getItem(k); return t ? JSON.parse(t) : null; } catch (e) { return null; } };
@@ -51,25 +52,48 @@
   let draftT = 0;
   function saveDrafts() {
     clearTimeout(draftT);
-    draftT = setTimeout(() => { if (WM.world) lsSet(DRAFT_KEY(WM.world.id), { v: 1, plans: WM.plans.filter(p => p.status === 'draft') }); }, 250);
+    draftT = setTimeout(() => { if (WM.world && !lsSet(DRAFT_KEY(WM.world.id), { v: 1, plans: WM.plans.filter(p => p.status === 'draft') })) C.full('plans'); }, 250);
   }
   // hand the plan to the game: every unbuilt piece becomes pending; pieces the game already built stay built
-  function commit() {
-    if (!WM.world) return;
+  // (quiet: ▶ Spielen does it on the way out) → { n, ok }
+  function commit(quiet) {
+    if (!WM.world) return { n: 0, ok: true };
     const id = WM.world.id, stored = (lsGet(PLAN_KEY(id)) || { plans: [] }).plans || [];
     const built = new Map(stored.filter(p => p.status === 'built').map(p => [p.id, p]));
     const out = [...built.values()];
     let n = 0, newest = null;
     for (const p of WM.plans) { if (built.has(p.id)) continue; if (p.status === 'built') continue; out.push(Object.assign({}, p, { status: 'pending', t: p.t || Date.now() })); n++; if (!newest || (p.t || 0) >= (newest.t || 0)) newest = p; }
-    if (!lsSet(PLAN_KEY(id), { v: 1, world: id, plans: out, t: Date.now() })) { C.sys('Speichern fehlgeschlagen (Browser-Speicher)', 'err'); return; }
+    if (!lsSet(PLAN_KEY(id), { v: 1, world: id, plans: out, t: Date.now() })) { C.full('plans'); C.sys('⚠ Nicht übergeben — der Browser-Speicher ist voll', 'err'); if (!quiet) tip('Nicht übergeben: der Browser-Speicher ist voll', false); return { n: 0, ok: false }; }
     if (n) WM.editT = Date.now();
     lsSet(DRAFT_KEY(id), { v: 1, plans: [] });
     // 📍 the newest piece is where ▶ Spielen takes you
     if (newest && WM.onCommit) { const m = meshFor(newest); if (m) { const L = placeOf(newest, m).lot; WM.onCommit([L[0], newest.F, L[1], L[2], newest.F + Math.max(3, m.top || 8), L[3]], newest.kind === 'house' ? hname(newest.index) : ((VM.MODELS[newest.name] || {}).display || newest.name)); } }
     loadPlans(); refresh();
     C.sys(n ? `${n} Teil${n === 1 ? '' : 'e'} an die Welt übergeben — das Spiel baut sie, sobald die Gegend geladen ist` : 'Nichts Neues zu übernehmen', 'ok');
-    tip(n ? `✓ Übergeben: ${n} — öffne „${WM.world.name}“ im Spiel` : 'Nichts Neues', true);
+    if (!quiet) tip(n ? `✓ Übergeben: ${n} — öffne „${WM.world.name}“ im Spiel` : 'Nichts Neues', true);
+    return { n, ok: true };
   }
+  // ▶ Spielen takes everything along: the plan's drafts (and pieces moved since) go to the game, the 🎨 Stil preview
+  // into the world — for the world open here (with the 📍 landing in front of the newest piece), else from what is
+  // stored for that world. → { plans, style, ok }
+  WM.keepNow = function (id) {
+    const out = { plans: 0, style: 0, ok: true };
+    const here = WM.world && (!id || WM.world.id === id);
+    if (here) {
+      clearTimeout(draftT);
+      if (dirty()) { const r = commit(true); out.plans = r.n; if (!r.ok) out.ok = false; }
+    } else if (id) {
+      const drafts = (lsGet(DRAFT_KEY(id)) || { plans: [] }).plans || [];
+      if (drafts.length) {
+        const stored = (lsGet(PLAN_KEY(id)) || { plans: [] }).plans || [], seen = new Set(stored.map(p => p.id));
+        const add = drafts.filter(p => p && !seen.has(p.id)).map(p => Object.assign({}, p, { status: 'pending', t: p.t || Date.now() }));
+        if (add.length && lsSet(PLAN_KEY(id), { v: 1, world: id, plans: stored.concat(add), t: Date.now() })) { lsSet(DRAFT_KEY(id), { v: 1, plans: [] }); out.plans = add.length; }
+        else if (add.length) { out.ok = false; C.full('plans'); }
+      }
+    }
+    if (WM.st && WM.st.keepNow) { const r = WM.st.keepNow(here ? null : id); out.style = r.n; if (!r.ok) out.ok = false; }
+    return out;
+  };
   // the game marks pieces as built (another tab): pick that up
   window.addEventListener('storage', (e) => { if (WM.world && e.key === PLAN_KEY(WM.world.id)) { const keep = WM.sel; loadPlans(); WM.sel = WM.plans.some(p => p.id === keep) ? keep : null; refresh(); } });
 
@@ -155,7 +179,9 @@
   // a catalogue house as a tool: the facade the Architektur view shows for it (or the player's design)
   function houseItem(i) {
     const rec = C.HOUSE.get(i), d = rec && rec.data;
-    return { kind: 'house', index: i, skin: d ? d.skin : (VR.VillageGen.plan2.CATALOGUE[i].skins[0]), mirror: d ? !!d.mirrored : false };
+    // (before the Architektur view has built it, the worker picks the facade: the Studio's page has no villa catalogue)
+    const PL = VR.VillageGen && VR.VillageGen.plan2, cat = PL && PL.CATALOGUE[i];
+    return { kind: 'house', index: i, skin: d ? d.skin : cat ? cat.skins[0] : undefined, mirror: d ? !!d.mirrored : false };
   }
   function cycleFacade(it) {
     if (it.kind !== 'house' || designOf(it.index)) return false;
@@ -417,7 +443,7 @@
     const own = Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {});
     const nFurn = Object.keys(VM.MODELS).filter(n => !C.isFacade(n)).length;
     const nStyle = WM.styleDraft ? WM.styleDraft.rules.length : WM.style && WM.style.rules ? WM.style.rules.length : 0;
-    const tabs = [['bench', '🧰 Werkbank', WM.wb && WM.wb.pendingN ? '⏳' + WM.wb.pendingN : ''], ['houses', 'Häuser', HOUSES.length], ['furn', 'Möbel', own.length ? own.length + ' ✎ · ' + nFurn : nFurn], ['plan', 'Plan', WM.plans.length], ['style', '🎨 Stil', nStyle || ''], ['worlds', 'Welten', WM.worlds ? WM.worlds.length : '']];
+    const tabs = [['bench', '🧰 Werkbank', WM.wb && WM.wb.pendingN ? '⏳' + WM.wb.pendingN : ''], ['houses', 'Häuser', HOUSES.length], ['furn', 'Möbel', own.length ? own.length + ' ✏️ · ' + nFurn : nFurn], ['plan', 'Plan', WM.plans.length], ['style', '🎨 Stil', nStyle || ''], ['worlds', 'Welten', WM.worlds ? WM.worlds.length : '']];
     for (const [id, label, n] of tabs) { if ((id === 'style' && !WM.styleUI) || (id === 'bench' && !WM.benchUI)) continue; const b = document.createElement('button'); b.className = WM.tab === id ? 'on' : ''; b.innerHTML = label + '<b>' + n + '</b>'; b.onclick = () => { if (id === 'worlds') { keepWorld(true); WM.world = null; freeRegion(); C.setScene(null); refresh(); listWorlds().then(refresh); return; } WM.tab = id; refresh(); }; el.appendChild(b); }
     return true;
   });
@@ -426,7 +452,18 @@
     if (!WM.world) {
       const h = document.createElement('div'); h.className = 'grp'; h.textContent = 'Deine Welten'; el.appendChild(h);
       if (!WM.worlds) { const d = document.createElement('div'); d.className = 'note dim'; d.textContent = 'Welten werden gelesen …'; el.appendChild(d); return true; }
-      if (!WM.worlds.length) { const d = document.createElement('div'); d.className = 'note'; d.innerHTML = 'Noch keine Welt gespeichert. Lege im Spiel eine Welt an — das Studio im Spiel (Titel → R9 Studio) sieht dieselben Welten.'; el.appendChild(d); return true; }
+      if (!WM.worlds.length) {
+        const d = document.createElement('div'); d.className = 'note';
+        if (SA) {
+          // this Studio is its own page with its own storage: the worlds are in the game's
+          d.innerHTML = 'Deine Welten leben im Spiel — dieses Studio ist nicht mit ihm verbunden. Im Spiel: <b>⏸ → 🧰 R9 Studio</b>, dort planst und baust du direkt in deiner Welt.';
+          el.appendChild(d);
+          const b = document.createElement('button'); b.className = 'cbtn pri'; b.dataset.act = 'game'; b.textContent = '🎮 Zum Spiel';
+          b.onclick = () => { if (VR.StudioBridge) VR.StudioBridge.toGame(b); else if (GAME_URL) window.open(GAME_URL, '_blank', 'noopener'); };
+          const r = document.createElement('div'); r.className = 'crow'; r.appendChild(b); el.appendChild(r);
+        } else { d.innerHTML = 'Noch keine Welt gespeichert. Lege im Spiel eine Welt an — das Studio im Spiel (⏸ → 🧰 R9 Studio) sieht dieselben Welten.'; el.appendChild(d); }
+        return true;
+      }
       for (const w of WM.worlds) {
         const c = document.createElement('div'); c.className = 'card world';
         const pos = w.player && w.player.pos ? w.player.pos.map(v => Math.round(v)).join(' · ') : 'Spawn';
@@ -439,15 +476,23 @@
     }
     const f = S.filter;
     if (WM.tab === 'houses') {
-      for (const h of HOUSES) {
-        if (f && !(h.name + ' ' + h.sub).toLowerCase().includes(f)) continue;
+      const CATL = VR.StudioCatalog, favL = VR.Favs ? VR.Favs.list() : [];
+      const card = (h) => {
+        if (f && !(h.name + ' ' + h.sub).toLowerCase().includes(f)) return;
         const rec = C.HOUSE.get(h.i), own = designOf(h.i);
-        const c = document.createElement('div'); c.className = 'card house' + (WM.tool && WM.tool.kind === 'house' && WM.tool.index === h.i ? ' on' : '');
+        const c = document.createElement('div'); c.className = 'card house' + (WM.tool && WM.tool.kind === 'house' && WM.tool.index === h.i ? ' on' : ''); c.dataset.house = h.i;
         if (rec && rec.thumb) { const cc = rec.thumb.cloneNode(true); cc.getContext('2d').drawImage(rec.thumb, 0, 0); cc.className = 'th'; c.appendChild(cc); } else { const ph = document.createElement('div'); ph.className = 'th'; c.appendChild(ph); }
-        c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n">${h.name}${own ? ' <span class="star" title="dein Design">✎</span>' : ''}</div><div class="s">${own ? 'dein Design' : h.sub}</div></div>`);
-        c.onclick = () => { WM.tool = houseItem(h.i); WM.ghost = null; WM.sel = null; meshFor(WM.tool); refresh(); tip('Zeig auf den Boden — Klick setzt, R dreht, F Fassade, Esc fertig', true); };
+        c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n">${h.name}${own ? ' <span class="star" title="dein Design">✏️</span>' : ''}</div><div class="s">${own ? 'dein Design' : h.sub}</div></div>`);
+        c.onclick = () => { WM.tool = houseItem(h.i); WM.ghost = null; WM.sel = null; meshFor(WM.tool); refresh(); tip('Zeig auf den Boden — Klick setzt, R / ↻ dreht, F / ◐ Fassade, Esc fertig', true); };
+        if (CATL && CATL.favButton) c.appendChild(CATL.favButton(C.favHouse(h.i), () => { listSig = ''; refresh(); }));
+        const e = document.createElement('button'); e.className = 'editb'; e.textContent = '✏️'; e.title = 'Bearbeiten — im Crafter umbauen'; e.onclick = (ev) => { ev.stopPropagation(); C.editHouse(h.i); }; c.appendChild(e);
         el.appendChild(c);
-      }
+      };
+      const grp = (t) => { const g = document.createElement('div'); g.className = 'grp'; g.textContent = t; el.appendChild(g); };
+      // ★ your favourite houses first (the same ★ as in Architektur and in the game's ★ tab)
+      const favH = favL.map(id => /^blueprint_(\d+)$/.exec(id)).filter(Boolean).map(m => HOUSES.find(h => h.i === +m[1])).filter(Boolean);
+      if (favH.length) { grp('★ Favoriten'); for (const h of favH) card(h); grp('Alle Häuser'); }
+      for (const h of HOUSES) card(h);
       return true;
     }
     if (WM.tab === 'furn') {
@@ -458,8 +503,9 @@
         const md = VM.MODELS[n]; if (f && !(n + ' ' + md.display).toLowerCase().includes(f)) return;
         const c = document.createElement('div'); c.className = 'card' + (WM.tool && WM.tool.kind === 'model' && WM.tool.name === n ? ' on' : '');
         const th = C.THUMB.get(n); if (th) { const cc = th.cloneNode(true); cc.getContext('2d').drawImage(th, 0, 0); cc.className = 'th'; c.appendChild(cc); } else { const ph = document.createElement('div'); ph.className = 'th'; c.appendChild(ph); thq.push([c, n]); }
-        c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n">${esc(md.display)}${star ? ' <span class="star" title="dein Design">✎</span>' : ''}</div><div class="s">${md.W}×${md.H}×${md.D}</div></div>`);
+        c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n">${esc(md.display)}${star ? ' <span class="star" title="dein Design">✏️</span>' : ''}</div><div class="s">${md.W}×${md.H}×${md.D}</div></div>`);
         if (CATL && CATL.favButton) c.appendChild(CATL.favButton(n, () => refresh()));
+        { const e = document.createElement('button'); e.className = 'editb'; e.textContent = '✏️'; e.title = 'Bearbeiten — im Crafter verschönern'; e.onclick = (ev) => { ev.stopPropagation(); C.editModel(n); }; c.appendChild(e); }
         c.onclick = () => { WM.tool = { kind: 'model', name: n }; WM.ghost = null; WM.sel = null; meshFor(WM.tool); refresh(); tip('Zeig auf den Boden — Klick setzt, R dreht, Esc fertig', true); };
         el.appendChild(c);
       };
@@ -485,7 +531,7 @@
     return true;
   });
   // ★ changed elsewhere (Teile, the Crafter, the game in another tab): the furniture list follows
-  if (VR.Favs) VR.Favs.on(() => { if (WM.on && WM.tab === 'furn') refresh(); });
+  if (VR.Favs) VR.Favs.on(() => { if (WM.on && (WM.tab === 'furn' || WM.tab === 'houses')) refresh(); });
   // furniture thumbnails, a couple per frame while the list is open
   const thq = [];
   (function pump() {
@@ -511,7 +557,7 @@
     if (!WM.world) {
       H('Welt-Modus');
       note('Öffne links eine deiner R9-SI-Welten. Das Studio zeigt die Gegend um deine letzte Position — dort setzt du Häuser und Möbel, drehst, klonst und verschiebst sie, und <b>In die Welt übernehmen</b> gibt den Plan ans Spiel: Es baut alles, sobald die Gegend geladen ist.');
-      if (!window.__R9_IN_GAME) note('Dieses Studio läuft getrennt vom Spiel und sieht deshalb keine Welten. Öffne es über <b>Spiel → Titel → R9 Studio</b>.', 'warn');
+      if (!window.__R9_IN_GAME) note('Dieses Studio läuft getrennt vom Spiel und sieht deshalb keine Welten. Im Spiel: <b>⏸ → 🧰 R9 Studio</b>.', 'warn');
       if (WM.imagine) {
         H('✨ Erschaffen');
         const mk = document.createElement('div'); mk.className = 'wbMake';
@@ -530,7 +576,7 @@
     kv.innerHTML = `<span>Art</span><b>${esc(w.type || 'default')} · Seed ${w.seed >>> 0}</b><span>Gegend</span><b>${N} × ${N} Chunks (${N * 16} × ${N * 16} Blöcke)${WM.loading ? ' · lädt ' + Math.round(100 * WM.loading.done / Math.max(1, WM.loading.total)) + ' %' : ''}</b><span>Plan</span><b>${drafts} Entwurf · ${pend} übergeben · ${built} gebaut</b>`;
     el.appendChild(kv);
     const dt = dirty();
-    row(btn(`⬆ In die Welt übernehmen${drafts ? ' (' + drafts + ')' : ''}`, 'pri' + (dt ? ' glow' : ''), commit, 'Gibt den Plan ans Spiel — es baut alles, sobald die Gegend geladen ist'));
+    row(btn(`⬆ In die Welt übernehmen${drafts ? ' (' + drafts + ')' : ''}`, 'pri' + (dt ? ' glow' : ''), () => commit(), 'Gibt den Plan ans Spiel — es baut alles, sobald die Gegend geladen ist'));
     if (dt) note('Änderungen sind noch nicht beim Spiel — <b>Übernehmen</b> gibt sie weiter.', 'warn');
     row(btn('⟳ Gegend neu laden', '', () => openWorld(WM.world), 'Liest die Welt neu (nachdem das Spiel gespeichert hat)'), btn('◂ Andere Welt', '', () => { keepWorld(true); WM.world = null; freeRegion(); C.setScene(null); refresh(); listWorlds().then(refresh); }));
     row(btn('⟲ Rückgängig', '', () => undo(false), 'Strg+Z'), btn('⟳ Wiederholen', '', () => undo(true), 'Strg+Y'));
@@ -538,7 +584,11 @@
     if (WM.tool) {
       const m = meshFor(WM.tool), nm = WM.tool.kind === 'house' ? hname(WM.tool.index) : (VM.MODELS[WM.tool.name] || {}).display;
       H('Setzen', esc(nm || ''));
-      note(m ? `Zeig auf den Boden: Klick setzt · <b>R</b>/Shift+Rad dreht · ${WM.tool.kind === 'house' ? (designOf(WM.tool.index) ? '<b>✎ dein Design</b>' : '<b>F</b> Fassade (' + esc(WM.tool.skin) + (WM.tool.mirror ? ', gespiegelt' : '') + ')') : ''} · <b>Esc</b> / Rechtsklick fertig` : 'wird vorbereitet …');
+      note(m ? `Zeig auf den Boden: Klick setzt · <b>R</b>/Shift+Rad dreht · ${WM.tool.kind === 'house' ? (designOf(WM.tool.index) ? '<b>✏️ dein Design</b>' : '<b>F</b> Fassade (' + esc(WM.tool.skin) + (WM.tool.mirror ? ', gespiegelt' : '') + ')') : ''} · <b>Esc</b> / Rechtsklick fertig` : 'wird vorbereitet …');
+      // the keys as buttons too: ↻ (R), ◐ (F)
+      const rb = btn('↻ Drehen · R', '', () => { rotateCurrent(); refresh(); }); rb.dataset.act = 'wrot';
+      const fb = WM.tool.kind === 'house' && !designOf(WM.tool.index) ? btn('◐ Fassade · F', '', () => { if (cycleFacade(WM.tool)) { WM.ghost = null; refresh(); } }) : null; if (fb) fb.dataset.act = 'wfac';
+      if (fb) row(rb, fb); else row(rb);
       row(btn('✕ Fertig', '', () => { WM.tool = null; WM.ghost = null; refresh(); }));
     } else if (p) {
       const m = meshFor(p), nm = p.kind === 'house' ? hname(p.index) : (VM.MODELS[p.name] || {}).display;
@@ -554,7 +604,7 @@
     }
     H('So geht’s');
     note('<b>Häuser</b>/<b>Möbel</b> links wählen → auf den Boden zeigen → Klick. Gesetztes anklicken: <b>ziehen</b> verschiebt, <b>Alt+Ziehen</b> klont, <b>R</b> dreht, <b>Strg+D</b> klont, <b>Bild↑/↓</b> Höhe, <b>Pfeile</b> 1 Block, <b>Entf</b> löscht. Kamera: Ziehen dreht, Shift+Ziehen schiebt, Rad zoomt, <b>WASD/Q/E</b> fährt.');
-    note(window.__R9_IN_GAME ? 'Nach <b>Übernehmen</b> baut das Spiel jedes Teil, sobald seine Gegend geladen ist — ist die Welt gerade im Spiel offen, sofort. Das Gelände wird dabei angepasst wie bei den Bauplänen.' : 'Achtung: Dieses Studio teilt den Speicher nicht mit dem Spiel — öffne es über das Spiel.', window.__R9_IN_GAME ? '' : 'warn');
+    note(window.__R9_IN_GAME ? 'Nach <b>Übernehmen</b> (oder ▶ Spielen) baut das Spiel jedes Teil, sobald seine Gegend geladen ist — ist die Welt gerade im Spiel offen, sofort. Das Gelände wird dabei angepasst wie bei den Bauplänen.' : 'Achtung: Dieses Studio teilt den Speicher nicht mit dem Spiel — im Spiel: ⏸ → 🧰 R9 Studio.', window.__R9_IN_GAME ? '' : 'warn');
     return true;
   });
   HOOK_WRAP('hud', function () {
@@ -570,7 +620,7 @@
   let listSig = '', listTab = '';
   function refresh() {
     if (!WM.on) return;
-    const sig = [WM.world ? WM.world.id : '-', WM.tab, WM.worlds ? WM.worlds.length : -1, WM.tool ? meshKey(WM.tool) : '', S.filter, C.HOUSE.size, WM.tab === 'plan' ? JSON.stringify(WM.plans.map(p => [p.id, p.ox, p.oz, p.F, p.r, p.status])) + WM.sel : '', Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {}).length, WM.tab === 'furn' && VR.Favs ? VR.Favs.list().join(',') : ''].join('|');
+    const sig = [WM.world ? WM.world.id : '-', WM.tab, WM.worlds ? WM.worlds.length : -1, WM.tool ? meshKey(WM.tool) : '', S.filter, C.HOUSE.size, WM.tab === 'plan' ? JSON.stringify(WM.plans.map(p => [p.id, p.ox, p.oz, p.F, p.r, p.status])) + WM.sel : '', Object.keys((VR.CUSTOM && VR.CUSTOM.models) || {}).length, (WM.tab === 'furn' || WM.tab === 'houses') && VR.Favs ? VR.Favs.list().join(',') : ''].join('|');
     if (sig !== listSig) {
       const tabKey = (WM.world ? WM.world.id : '-') + '|' + WM.tab;
       $('#list').classList.toggle('still', tabKey === listTab);

@@ -57,7 +57,10 @@
   };
 
   // ---------------------------------------------------------------- houses
-  C.houseFor = function (index) { const h = VR.CUSTOM && VR.CUSTOM.houses && VR.CUSTOM.houses[index]; return h && ((h.tpl && h.tpl.rle) || (h.cells && h.cells.length)) ? h : null; };
+  C.houseFor = function (index) { const h = VR.CUSTOM && VR.CUSTOM.houses && VR.CUSTOM.houses[index]; return h && ((h.tpl && h.tpl.rle) || (h.cells && h.cells.length) || C.skinOnly(h)) ? h : null; };
+  // a design that only chose the facade (skin) or the mirrored plan: the house is built in that variant, block for
+  // block as the villa builder makes it (v0.39 — before, such a choice never reached the game)
+  C.skinOnly = function (h) { return !!h && !(h.tpl && h.tpl.rle) && !(h.cells && h.cells.length) && (typeof h.skin === 'string' || h.mirror === true); };
   // the decoded template of a v2 design (cached per loaded design): box W × D, y0..y1 relative to the floor,
   // idx = palette index per cell (y, v, u order), st = palette as states (-2 keep, 0 air, -1 unknown block)
   const TPL = new WeakMap();
@@ -133,6 +136,7 @@
   };
   // v1: lay the stored edits of catalogue house `index` onto a freshly built lot (L: rotated lot builder, F: floor level)
   C.applyHouse = function (h, L, F, info) {
+    if (!Array.isArray(h.cells) || !Array.isArray(h.pal)) return 0;      // a facade-only design: nothing to lay down
     const pal = h.pal.map(C.fromPortable), r = L.r || 0;
     const gone = new Set();
     for (const c of h.cells) {
