@@ -335,11 +335,16 @@
       else if (k2 < 2 * t + 3) { K.set(x, y, z, S.tier); if (k2 === 2 * t + 1 && (x + z) % 7 === 0) K.set(x, y + 1, z, 'vx_lamppost_black'); }
       else { K.col(x, z, y, y + 2, S.wall); if ((x + z) % 4 === 0 && d > 1) K.set(x, y + 1, z, S.glass); }
     }
-    // four entrances through the outer wall and the walkway (the stand floor at the walkway is the top tier's height)
+    // four entrances at ground level: a tunnel three wide under the walkway and the upper tiers, out between the lower
+    // tiers onto the pitch's edge (the tiers are stairs and seats: from there you climb to the top walkway)
     const topY = 1 + Math.floor((2 * t - 1) / 2);
     for (const [x, z, dx, dz] of [[Math.round(cx), 0, 0, 1], [Math.round(cx), l - 1, 0, -1], [0, Math.round(cz), 1, 0], [w - 1, Math.round(cz), -1, 0]]) {
-      for (let i = 0; i < 4; i++) for (let a = -1; a <= 1; a++) { const xx = x + dx * i + (dz ? a : 0), zz = z + dz * i + (dx ? a : 0); K.box(xx, topY + 1, zz, xx, topY + 3, zz, 0); K.set(xx, topY, zz, S.tier); }
-      for (let a = -2; a <= 2; a += 4) { const xx = x + (dz ? a : 0), zz = z + (dx ? a : 0); K.col(xx, zz, topY + 1, topY + 4, S.mast); }
+      for (let i = 0; i < Math.max(w, l); i++) {
+        const cxx = x + dx * i, czz = z + dz * i; if (dist(cxx, czz) < 1) break;   // the pitch
+        for (let a = -1; a <= 1; a++) { const xx = cxx + (dz ? a : 0), zz = czz + (dx ? a : 0); K.set(xx, 0, zz, S.tier); K.box(xx, 1, zz, xx, 3, zz, 0); }
+        if (i % 4 === 2 && K.get(cxx, 4, czz) !== 0) K.set(cxx, 3, czz, 'vx_hex_light');   // lights in the tunnel's roof
+      }
+      for (let a = -2; a <= 2; a += 4) { const xx = x + (dz ? a : 0), zz = z + (dx ? a : 0); K.col(xx, zz, 1, Math.max(4, topY + 1), S.mast); }   // the portal
     }
     // the roof: a cantilevered band over the upper tiers on columns, glass at its inner edge; floodlight masts at the corners
     if (r) {
@@ -350,7 +355,7 @@
     for (const [x, z] of [[2, 2], [w - 3, 2], [2, l - 3], [w - 3, l - 3]]) { K.col(x, z, 1, topY + 12, S.mast); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) K.set(x + a, topY + 13, z + b, 'light_panel'); K.set(x, topY + 14, z, 'vx_lamppost_tech'); }
     // the scoreboard at one end
     for (let x = Math.round(cx) - 3; x <= Math.round(cx) + 3; x++) for (let y = topY + 3; y <= topY + 5; y++) K.set(x, y, 1, S.screen, { facing: 2 });
-    K.grid.meta = { name: k ? 'Leichtathletikstadion' : 'Fußballstadion', doors: [[Math.round(cx), topY + 1 + dy, 0]], floors: [dy, topY + dy], top: topY + 14 + dy, lot: [w, l], anchor: [w >> 1, 0] };
+    K.grid.meta = { name: k ? 'Leichtathletikstadion' : 'Fußballstadion', doors: [[Math.round(cx), 1 + dy, 0]], floors: [dy, topY + dy], top: topY + 14 + dy, lot: [w, l], anchor: [w >> 1, 0] };
     void rng;
     return K.grid;
   });
