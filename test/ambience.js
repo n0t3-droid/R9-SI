@@ -192,6 +192,11 @@ check(amb.L && ['wind', 'rain', 'water', 'birds', 'crickets'].every(k => amb.L[k
   const ctxS = { w, eye: [0.5, 66, 0.5], E: env(), biome: B('meadow'), speed: 0, dim: 'overworld', underwater: false };
   const c0 = w.calls; run(amb, 10, ctxS); const perSec = (w.calls - c0) / 10;
   check(perSec < 1500, 'the world is sampled about twice a second (' + Math.round(perSec) + ' block reads a second)');
+  // both switches off: nothing to read, so the world is not touched at all (the Very Low budget)
+  amb.setOptions({ nature: false, weather: false });
+  const c1 = w.calls; run(amb, 10, ctxS);
+  check(w.calls - c1 === 0, 'both switches off: the world is not read (' + (w.calls - c1) + ' block reads)');
+  amb.setOptions({ nature: true, weather: true });
 }
 
 console.log(fails ? fails + ' FAILED' : 'ALL OK');

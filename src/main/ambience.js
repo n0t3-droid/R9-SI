@@ -116,7 +116,7 @@
       this.timer -= dt;
       if (this.timer > 0) return;
       this.timer = EVERY;
-      this.sample(o);
+      if (this.opt.nature || this.opt.weather) this.sample(o);   // both switches off: nothing to read, the gains just fall silent
       this.mix(o);
     }
     sample(o) {
