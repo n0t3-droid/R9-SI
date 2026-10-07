@@ -115,6 +115,8 @@ for (const set of sets) {
 }
 const after = await ev(() => { const pack = VR.R.types.filter(t => t.o.modern); return { compiled: pack.filter(t => VR.VM.MODELS[t.name].compiled).length, stats: VR.VM.stats, heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1 }; });
 console.log('  after the galleries', JSON.stringify(after));
+// the pre-warm (game.startPrewarm, 10 s into play, idle slices): what it has built in this run (logged, not checked: idle time depends on the machine)
+console.log('  pre-warm', JSON.stringify(await ev(() => { const p = VR.game.prewarm; return p ? { built: p.built, skipped: p.skipped, left: p.left(), done: p.done() } : null; })));
 
 // ---------------------------------------------------------------- the Studio
 console.log('4 · the R9 Studio');
