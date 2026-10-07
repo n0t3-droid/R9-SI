@@ -70,6 +70,15 @@
         for (const [dx, dyy, dz] of VM.footprint(m, f || 0)) { const x = u + dx, yy = y + dyy, z = v + dz; if (!inside(x, yy, z) || blocks[idx(x, yy, z)] !== 0) return false; if (dyy === 0 && !solidish(K.get(x, yy - 1, z))) return false; }
         return true;
       },
+      // a parked car (2 wide × 4 long × 2 tall, 16 parts): (u, v) is the front-left corner, along v when facing 0 / 2
+      car(u, v, y, facing, name) {
+        const along = (facing & 1) === 0;
+        for (let p = 0; p < 16; p++) {
+          const px = p & 1, py = (p >> 1) & 1, pz = p >> 2, du = along ? px : pz, dv = along ? pz : px;
+          const uu = facing === 2 ? u + 1 - du : facing === 3 ? u + 3 - du : u + du, vv = facing === 0 ? v + 3 - dv : facing === 1 ? v + 1 - dv : v + dv;
+          K.set(uu, y + py, vv, name || 'vx_car_black', { facing, part: 'p' + p });
+        }
+      },
       // a simple tree: trunk of logs, a leaf crown (persistent leaves)
       tree(x, y, z, kind, rng, big) {
         const k = kind || 'oak', log = k + '_log', leaf = k + '_leaves';
@@ -88,24 +97,28 @@
       },
       // the straight scissor stair: floor k rises SH steps in column x (even k, toward +v) or x + 1 (odd k, toward −v);
       // landings at z − 1 and z + SH on every floor. Fills under the steps, clears the headroom and the slab over the
-      // last three steps. Returns the landing cells per floor and the whole stairwell box.
-      stairwell(x, y0, z, floors, SH, stairName, fillName, railName) {
+      // last three steps. alongU turns it: the run advances along u, the two columns are z and z + 1. Returns the
+      // landing cells per floor and the whole stairwell box.
+      stairwell(x, y0, z, floors, SH, stairName, fillName, railName, alongU) {
         const landings = [], cells = [];
-        for (let k = 0; k < floors; k++) landings.push([x, y0 + k * SH + 1, z - 1]);
+        const AT = alongU ? (c, a) => [a, c] : (c, a) => [c, a];     // (across, along) → (x, z)
+        const across0 = alongU ? z : x, along0 = alongU ? x : z;
+        const FWD = alongU ? 1 : 2, BACK = alongU ? 3 : 0;
+        for (let k = 0; k < floors; k++) { const [lx, lz] = AT(across0, along0 - 1); landings.push([lx, y0 + k * SH + 1, lz]); }
         for (let k = 0; k < floors - 1; k++) {
-          const c = x + (k & 1), base = y0 + k * SH;
+          const c = across0 + (k & 1), base = y0 + k * SH;
           for (let i = 0; i < SH; i++) {
-            const zi = (k & 1) ? z + SH - 1 - i : z + i, yi = base + 1 + i, facing = (k & 1) ? 0 : 2;
-            for (let yy = base + 1; yy < yi; yy++) K.set(c, yy, zi, fillName);
-            K.set(c, yi, zi, stairName, { facing, half: 0 });
-            K.air(c, yi + 1, zi); K.air(c, yi + 2, zi);
-            cells.push([c, yi, zi]);
+            const ai = (k & 1) ? along0 + SH - 1 - i : along0 + i, yi = base + 1 + i, facing = (k & 1) ? BACK : FWD, [cx, cz] = AT(c, ai);
+            for (let yy = base + 1; yy < yi; yy++) K.set(cx, yy, cz, fillName);
+            K.set(cx, yi, cz, stairName, { facing, half: 0 });
+            K.air(cx, yi + 1, cz); K.air(cx, yi + 2, cz);
+            cells.push([cx, yi, cz]);
           }
-          // the slab of the floor above over the last three steps is open, with a railing on the open side
-          for (let i = Math.max(0, SH - 3); i < SH - 1; i++) { const zi = (k & 1) ? z + SH - 1 - i : z + i; K.air(c, base + SH, zi); }
-          if (railName) { const oc = (k & 1) ? x - 1 : x + 2; for (let i = Math.max(0, SH - 3); i < SH; i++) { const zi = (k & 1) ? z + SH - 1 - i : z + i; if (K.get(oc, base + SH + 1, zi) === 0 && solidish(K.get(oc, base + SH, zi))) K.set(oc, base + SH + 1, zi, railName); } }
+          for (let i = Math.max(0, SH - 3); i < SH - 1; i++) { const ai = (k & 1) ? along0 + SH - 1 - i : along0 + i, [cx, cz] = AT(c, ai); K.air(cx, base + SH, cz); }
+          if (railName) { const oc = (k & 1) ? across0 - 1 : across0 + 2; for (let i = Math.max(0, SH - 3); i < SH; i++) { const ai = (k & 1) ? along0 + SH - 1 - i : along0 + i, [cx, cz] = AT(oc, ai); if (K.get(cx, base + SH + 1, cz) === 0 && solidish(K.get(cx, base + SH, cz))) K.set(cx, base + SH + 1, cz, railName); } }
         }
-        return { landings, cells, box: [x, y0, z - 1, x + 1, y0 + floors * SH, z + SH] };
+        const [bx0, bz0] = AT(across0, along0 - 1), [bx1, bz1] = AT(across0 + 1, along0 + SH);
+        return { landings, cells, box: [bx0, y0, bz0, bx1, y0 + floors * SH, bz1] };
       },
       // a spiral stair in a (2r+1)² well around a centre post: three steps per side, one block up each
       spiral(cx, y0, cz, height, stairName, fillName, postName) {
