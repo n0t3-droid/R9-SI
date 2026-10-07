@@ -394,7 +394,7 @@
         if (pend) {
           this.pending.delete(c.key);
           const x0 = c.cx * 16, z0 = c.cz * 16, w = this.g.world;
-          for (const [i, s] of pend) w.setBlock(x0 + (i & 15), i >> 8, z0 + ((i >> 4) & 15), s, 0);
+          for (const [i, s] of pend) w.setBlock(x0 + (i & 15), i >> 8, z0 + ((i >> 4) & 15), s, VR.SB_EDIT | VR.SB_GUEST);   // (a friend's building, recorded for 📽)
         }
       }
     }
@@ -459,7 +459,7 @@
         const u8 = VR.Net.unb64(part[2]), a = new Int32Array(u8.buffer, 0, u8.length >> 2);
         const k = VR.ckey(cx, cz), col = w.col(cx, cz);
         if (col) {
-          for (let i = 0; i + 1 < a.length; i += 2) { const idx = a[i], s = a[i + 1]; if (s < nStates) w.setBlock(cx * 16 + (idx & 15), idx >> 8, cz * 16 + ((idx >> 4) & 15), s, 0); }
+          for (let i = 0; i + 1 < a.length; i += 2) { const idx = a[i], s = a[i + 1]; if (s < nStates) w.setBlock(cx * 16 + (idx & 15), idx >> 8, cz * 16 + ((idx >> 4) & 15), s, VR.SB_EDIT | VR.SB_GUEST); }
         } else {
           let pm = this.pending.get(k); if (!pm) { pm = new Map(); this.pending.set(k, pm); }
           let o = this.out.get(k); if (!o) { o = new Map(); this.out.set(k, o); }

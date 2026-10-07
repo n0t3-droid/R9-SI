@@ -471,7 +471,7 @@
       if (R.T.flags[s] & F.UNBREAK && !this.creative) return;
       if (t.o.kind === 'door' || (t.o.tall && t.has('half')) || t.o.kind === 'bed' || t.o.kind === 'model' || t.o.vxModel) g.breakMulti && g.breakMulti(x, y, z, s);
       const fluidIn = (R.T.flags[s] & F.WATERLOG) ? R.byName.water.defaultState : 0;
-      world.setBlock(x, y, z, fluidIn, 4);
+      world.setBlock(x, y, z, fluidIn, 4 | VR.SB_EDIT);   // (SB_EDIT: a building change, recorded for 📽)
       if (VR.CUT_OF && (VR.CUT_OF[t.name] || VR.SMOOTH_OF[t.name] || (R.T.flags[s] & F.SMOOTH)) && g.sim && g.sim.cutAround) g.sim.cutAround(x, y, z);
       g.audio && g.audio.dig(s, true);
       g.particles && g.particles.breakBlock(x, y, z, s);
@@ -518,7 +518,7 @@
       const T = R.T;
       // slab merge
       const merged = VR.Place.slabMerge(type, t.state, t.face, t.py - t.y);
-      if (merged >= 0) { world.setBlock(t.x, t.y, t.z, merged, 4); this.afterPlace(type, t.x, t.y, t.z, merged); return true; }
+      if (merged >= 0) { world.setBlock(t.x, t.y, t.z, merged, 4 | VR.SB_EDIT); this.afterPlace(type, t.x, t.y, t.z, merged); return true; }
       let x = t.x, y = t.y, z = t.z;
       if (!(T.flags[t.state] & F.REPLACE)) { x += VR.DX[t.face]; y += VR.DY[t.face]; z += VR.DZ[t.face]; }
       if (y < 0 || y >= VR.MAXY) return false;
@@ -526,7 +526,7 @@
       if (cur && !(T.flags[cur] & F.REPLACE)) {
         // merge into slab at target position
         const m2 = VR.Place.slabMerge(type, cur, t.face === 2 ? 2 : t.face === 3 ? 3 : -1, 0);
-        if (m2 >= 0) { world.setBlock(x, y, z, m2, 4); this.afterPlace(type, x, y, z, m2); return true; }
+        if (m2 >= 0) { world.setBlock(x, y, z, m2, 4 | VR.SB_EDIT); this.afterPlace(type, x, y, z, m2); return true; }
         return false;
       }
       const ctx = { world, face: t.face, x, y, z, fx: t.px - t.x, fy: t.py - t.y, fz: t.pz - t.z, yaw: this.yaw, pitch: this.pitch };
@@ -545,7 +545,7 @@
       // waterlogging: keep water in waterloggable blocks placed into water
       for (const p of list) {
         const prev = world.getBlock(p.x, p.y, p.z);
-        world.setBlock(p.x, p.y, p.z, p.state, 4);
+        world.setBlock(p.x, p.y, p.z, p.state, 4 | VR.SB_EDIT);
         if (prev && (T.flags[prev] & F.WATER) && (T.flags[p.state] & F.WATERLOG) === 0 && g.onFluidDisplaced) g.onFluidDisplaced(p.x, p.y, p.z, prev);
       }
       this.afterPlace(type, list[0].x, list[0].y, list[0].z, list[0].state);
