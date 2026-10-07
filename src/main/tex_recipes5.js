@@ -115,7 +115,7 @@
   REC.oak_wide = () => seamless(TX.planks([0xb08a5c, 0xbc9768, 0xc8a374, 0xd2ae80, 0xdcb98c], { boards: 3, seed: 5151 }));
   REC.micro_cement = () => smooth(TX.natural([0xa8a49c, 0xb4b0a8, 0xbfbbb3, 0xc8c4bc], { period: 5, oct: 3, seed: 5152, contrast: 0.45, shades: 5 }), 0.7);
   REC.walnut_panel = () => { const img = seamless(TX.planks([0x4a3020, 0x5c3c28, 0x6e4830, 0x7e5438], { boards: 4, seed: 5153 })); return smooth(img, 0.35); };
-  // ---- villa facades (Stadtvillen & Stilhaus villas): white clinker, warm mediterranean stucco, sand stucco, bossed stone base
+  // ---- villa facades (Stadtvillen & the classic villas): white clinker, warm mediterranean stucco, sand stucco, bossed stone base
   REC.white_clinker = () => { const img = TX.bricks([0xe2e0da, 0xebe9e3, 0xf2f0ea, 0xf8f6f1], 0xbfbdb6, { rows: 8, per: 2, seed: 5160, shades: 5 }); img.forEach((x, y, i) => { img.ro[i] = 0.8; }); return img; };
   REC.stucco_ochre = () => smooth(TX.natural([0xd9b27a, 0xe2bd86, 0xe9c794, 0xf0d2a4], { period: 3, oct: 3, seed: 5161, contrast: 0.55, shades: 5 }), 0.9);
   REC.stucco_sand = () => smooth(TX.natural([0xd8cdb4, 0xe1d7c0, 0xe9e0cc, 0xf0e8d8], { period: 3, oct: 3, seed: 5162, contrast: 0.5, shades: 5 }), 0.9);

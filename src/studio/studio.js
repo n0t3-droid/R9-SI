@@ -20,18 +20,18 @@
     { i: 0, name: 'Villa R9 180', sub: 'Stadtvilla 18×16 · Doppelgarage · Walmdach', fam: 'stadtvilla' },
     { i: 1, name: 'Villa R9 160', sub: 'Stadtvilla 16×15 · Doppelgarage', fam: 'stadtvilla' },
     { i: 2, name: 'Villa R9 140', sub: 'Stadtvilla 14×14 · Doppelgarage', fam: 'stadtvilla' },
-    { i: 3, name: 'Bel Portale', sub: 'Klassizistisch · Portikus · Ecktürme · Mansarddach', fam: 'belportale' },
-    { i: 4, name: 'Sanssoucis', sub: 'Villa am See · Säulenfront · Doppeltreppe · Pool', fam: 'sanssoucis' },
-    { i: 5, name: 'Toscana', sub: 'Mediterran · Rundturm · Loggia · Terracotta', fam: 'toscana' },
+    { i: 3, name: 'Villa Belfronte', sub: 'Klassizistisch · Portikus · Ecktürme · Mansarddach', fam: 'belportale' },
+    { i: 4, name: 'Beau Lac', sub: 'Am See · Säulenfront · Doppeltreppe · Pool', fam: 'sanssoucis' },
+    { i: 5, name: 'Torre Ocra', sub: 'Mediterran · Rundturm · Loggia · Terracotta', fam: 'toscana' },
     { i: 6, name: 'Bungalow R9', sub: 'Eingeschossig · Walmdach · Garage', fam: 'bungalow' },
-    { i: 7, name: 'Palais Royal', sub: 'Palast · Doppeltreppe · Schwimmhalle · Kino', fam: 'palais' },
+    { i: 7, name: 'Palais Étoile', sub: 'Palast · Doppeltreppe · Schwimmhalle · Kino', fam: 'palais' },
     { i: 8, name: 'Villa R9 130', sub: 'Stadtvilla 13×13 · Doppelgarage', fam: 'stadtvilla' },
     { i: 9, name: 'Villa R9 130 Carport', sub: 'Stadtvilla 13×13 · Carport', fam: 'stadtvilla' },
     { i: 10, name: 'Villa R9 Compact', sub: 'Stadtvilla 13×13 · ohne Garage', fam: 'stadtvilla' },
   ];
-  const FAMS = [['all', 'Alle'], ['stadtvilla', 'Stadtvilla'], ['belportale', 'Klassik'], ['sanssoucis', 'See'], ['toscana', 'Toscana'], ['bungalow', 'Bungalow'], ['palais', 'Palais']];
+  const FAMS = [['all', 'Alle'], ['stadtvilla', 'Stadtvilla'], ['belportale', 'Klassik'], ['sanssoucis', 'See'], ['toscana', 'Turm'], ['bungalow', 'Bungalow'], ['palais', 'Palais']];
   const SKIN_COL = { signus: '#f1efe9', grey: '#9ea4ab', sand: '#e2d3b0', mediterran: '#efd9b5', bauhaus: '#2b2f36', klinker: '#f4f1ea', pult: '#e8e4dc', blacklabel: '#1b1d22', classic: '#f0e4c8', lake: '#f6f3ee', toscana: '#d9a35f', glas: '#fbfbf8', glasnacht: '#3a3d42' };
-  const SKIN_NAME = { signus: 'Signus · weiß/anthrazit', grey: 'Grau', sand: 'Sand', mediterran: 'Mediterran', bauhaus: 'Bauhaus · Flachdach', klinker: 'Klinker', pult: 'Pultdach', blacklabel: 'Black Label', classic: 'Klassik', lake: 'See', toscana: 'Toscana', glas: 'Glashaus · Vollton weiß', glasnacht: 'Glashaus · Anthrazit' };
+  const SKIN_NAME = { signus: 'Weiß · Anthrazit', grey: 'Grau', sand: 'Sand', mediterran: 'Mediterran', bauhaus: 'Bauhaus · Flachdach', klinker: 'Klinker', pult: 'Pultdach', blacklabel: 'Schwarzkubus', classic: 'Klassik', lake: 'See', toscana: 'Ocker · Terracotta', glas: 'Glashaus · Vollton weiß', glasnacht: 'Glashaus · Anthrazit' };
   // furniture categories (a model may sit in several)
   const CATS = [
     ['all', 'Alle', null],

@@ -376,14 +376,14 @@
     }
     if (skin.quoins || FT.quoins) for (const [u, v] of [[0, 0], [w - 1, 0], [0, d - 1], [w - 1, d - 1]]) for (let y = F + 1; y < top; y++) if ((y - F) & 1) hp(u, y, v, skin.trim);
     if (H.features.cantilever && H.floors[1]) {
-      // Black Label: the upper floor pushes a glass box out over the entrance canopy
+      // the black cube (Schwarzkubus): the upper floor pushes a glass box out over the entrance canopy
       const c = H.features.cantilever, rr = roomAt[1].get(((c.u0 + c.u1) >> 1) + ',1');
       for (let u = c.u0 - 1; u <= c.u1 + 1; u++) { hp(u, Y1, -1, skin.accent); hp(u, top, -1, skin.accent); for (let y = Y1 + 1; y <= top - 1; y++) { hp(u, y, -1, (u === c.u0 - 1 || u === c.u1 + 1) ? skin.accent : glass); hp(u, y, 0, null); } hp(u, top, 0, skin.accent); }
       if (rr) rr.windows = rr.windows.filter(wn => wn.side !== 0);
       hp(c.u0 - 1, Y1 - 1, -1, 'vx_led_cove', { facing: 0 }); hp(c.u1 + 1, Y1 - 1, -1, 'vx_led_cove', { facing: 0 });
     }
     if (skin.id === 'bauhaus') {
-      // Black Label: an anthracite band around the upper floor's front and a slatted feature wall beside the entrance
+      // the black cube: an anthracite band around the upper floor's front and a slatted feature wall beside the entrance
       for (let u = 0; u < w; u++) hp(u, Y1 + 1, 0, roomAt[1].get(u + ',1') && u > 0 && u < w - 1 ? glass : skin.accent);
       for (let y = F + 1; y <= Y1 - 1; y++) hp(E.u + E.n + 2 < w - 1 ? E.u + E.n + 2 : E.u - 3, y, 0, 'wood_slat', { axis: 1 });
     }

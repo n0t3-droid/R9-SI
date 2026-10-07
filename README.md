@@ -59,9 +59,10 @@ their afternoons on the park benches, and everybody sleeps in their own bed at n
 you about their job, their day and their family.
 
 ### Real villas at real scale — the house catalogue (v0.22)
-Homes in modern towns are no longer small painted boxes: every one comes from a **researched floor plan at real
-scale**, built by a planner and furnished by an interior designer:
-- **Stadtvillen** after the Kern-Haus range (Signus 8.98 × 10.23 m, Karat 12.60 × 11.85 m — scaled 13 × 13 to
+Homes in modern towns are no longer small painted boxes: every one comes from a **floor plan at real scale** — our
+own, inspired by typical German Stadtvillen and prefab-house layouts — built by a planner and furnished by an
+interior designer:
+- **Stadtvillen** (from about 9 × 10 m to 12.5 × 12 m — scaled 13 × 13 to
   18 × 16 blocks, two full storeys): a Diele with the stair, Gäste-WC and HWR beside it, a study at the street, the
   open Wohnen/Essen/Küche across the whole garden side behind floor-to-ceiling glass and terrace doors; upstairs two
   children's rooms at the street, the gallery over the hall, the master bedroom with a dressing wall and a balcony,
@@ -69,14 +70,14 @@ scale**, built by a planner and furnished by an interior designer:
   voxel pieces in anthracite slate or terracotta, with a white soffit) — or, in the Bauhaus variant, a flat roof with
   a glass-railed roof terrace. Skins: white/anthracite, grey, sand, mediterranean (terracotta, columns, arches,
   royal palms), Bauhaus, white clinker.
-- **Bel Portale** (after Stilhaus): the classicist Stadtvilla — a 6 m twin-column portico with a pediment, two
+- **Villa Belfronte**: the classicist Stadtvilla — a 6 m twin-column portico with a pediment, two
   octagonal corner towers, balustrade balconies on columns, a mansard roof with dormers, a double-height foyer with
   the stair and a two-storey glass front, the living room with a stone fireplace and a piano, a winter-garden
   dining room, a library.
-- **Sanssoucis** (after Stilhaus' "Villa am See"): white clinker with quoins on a bossed stone base, natural slate
+- **Beau Lac**, the villa by the lake: white clinker with quoins on a bossed stone base, natural slate
   roof, six two-storey marble columns across the garden front with a balustraded balcony between, a curved
   balustraded terrace with a fountain, the grand checkered hall with a double staircase and chandelier.
-- **Toscana**: an ochre mediterranean villa with a round tower under a terracotta cone, arched windows, an arcaded
+- **Torre Ocra**: an ochre mediterranean villa with a round tower under a terracotta cone, arched windows, an arcaded
   loggia with a terrace above, palms.
 Every house has a **double garage (42 m²)** with a roof terrace reached from the bedroom above, or a carport, a
 driveway, a front garden with path lights and a mailbox, and a back garden with a travertine terrace, a pergola
@@ -87,12 +88,12 @@ house. Towns grew to a 120-block radius with ring roads at 40 and 82 so the vill
 crossings** at every junction, **bus shelters** and benches along the ring roads. A **Royal Palm sapling** is a new
 item: plant it (or bone-meal it) and a tall royal palm grows. Parked cars are off for now.
 
-**OKAL-style variants (v0.23):** the **Pultdach** house (a stepped mono-pitch roof with glazed clerestory bands,
-high at the street), **Black Label** cubes (anthracite bands, a glass box cantilevered over the entrance, and on half
+**More variants (v0.23):** the **Pultdach** house (a stepped mono-pitch roof with glazed clerestory bands,
+high at the street), **Schwarzkubus** cubes (anthracite bands, a glass box cantilevered over the entrance, and on half
 of them a **Staffelgeschoss** — the upper floor steps back over the garage side, the rest becomes a railed roof
 terrace) and a single-storey **Bungalow** under a hip roof (two children's rooms, master with dressing wall, bath,
-utility, the open living/dining/kitchen along the garden). And the rarest lot of all: the **Palais Royal** (v0.24, after
-Stilhaus) — a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins and a mansard roof, a
+utility, the open living/dining/kitchen along the garden). And the rarest lot of all: the **Palais Étoile** (v0.24) —
+a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins and a mansard roof, a
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
