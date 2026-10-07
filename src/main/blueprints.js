@@ -157,7 +157,7 @@
     buildAt(at) {
       const { list, undo } = this.planAt(at);
       if (!list.length) return 0;
-      this.gad.applyEdit(list, undo);
+      this.gad.applyEdit(list, undo, VR.EDIT.PLAN);
       return list.length;
     }
     // the highest ground block of a column between two heights (−1 below yLo when there is none)
@@ -332,7 +332,7 @@
         const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : pl.kind === 'forge' ? (bp.name || 'Forge') : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
         // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back
         if (list.length > SLICE_MAX) { list.sort((a, b) => a[1] - b[1]); this.slices = { pl, name, list, undo, at: 0, t: 0, w }; pl.status = 'building'; return; }
-        if (list.length) this.gad.applyEdit(list, undo);
+        if (list.length) this.gad.applyEdit(list, undo, VR.EDIT.PLAN);
         this.planDone(pl, name, list.length, list.length ? undo : null);
         break;   // one piece per half second keeps the frame smooth
       }
@@ -345,7 +345,7 @@
       S.t -= dt; if (S.t > 0) return;
       S.t = SLICE_T;
       const end = Math.min(S.list.length, S.at + SLICE_STEP), chunk = S.list.slice(S.at, end);
-      if (chunk.length) { w.bulkSet(chunk, false); for (const [x, y, z, s] of chunk) this.gad.noteBlock(x, y, z, s); }
+      if (chunk.length) { w.bulkSet(chunk, false, VR.EDIT.PLAN); for (const [x, y, z, s] of chunk) this.gad.noteBlock(x, y, z, s); }
       S.at = end;
       if (S.at < S.list.length) return;
       this.slices = null;
@@ -383,7 +383,7 @@
         if (!ready) continue;
         const list = [], undo = [];
         for (const [x, y, z, s] of E.unpack(b)) { const old = w.getBlock(x, y, z); if (old === s) continue; list.push([x, y, z, s]); undo.push([x, y, z, old]); }
-        if (list.length) this.gad.applyEdit(list, undo);
+        if (list.length) this.gad.applyEdit(list, undo, VR.EDIT.BENCH);
         E.markDone(id, bid);
         n += list.length; nb++;
         if (n > 60000) break;    // a big one per quarter second keeps the frame smooth
