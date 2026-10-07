@@ -39,6 +39,9 @@
       for (let d = 0; d < 6; d++) this.neighborUpdate(x + DX6[d], y + DY6[d], z + DZ6[d]);
       this.neighborUpdate(x, y, z);
       if (this.isVolt(old) || this.isVolt(s) || this.voltNear(x, y, z)) this.schedule(x, y, z, 1, 'volt');
+      // a pressed button pops back after its pulse — also one a guest pressed in a multiplayer world (it stayed down)
+      const bt = s && R.types[R.T.type[s]];
+      if (bt && bt.o.kind === 'button' && bt.get(s, 'powered')) this.schedule(x, y, z, bt.o.pulse || 20, 'unpress');
     }
     neighborUpdate(x, y, z) {
       const w = this.game.world, s = w.getBlock(x, y, z);
@@ -481,6 +484,7 @@
     checkPlates() {
       const g = this.game, w = g.world, p = g.player;
       const bodies = [p.pos]; if (g.entities) for (const m of g.entities.mobs) bodies.push(m.pos);
+      if (g.mp && g.mp.active) for (const f of g.mp.players()) if (f.pos) bodies.push(f.pos);   // the friends in a multiplayer world step on them too
       const now = new Set();
       for (const pos of bodies) {
         const x = Math.floor(pos[0]), y = Math.floor(pos[1] + 0.05), z = Math.floor(pos[2]);
