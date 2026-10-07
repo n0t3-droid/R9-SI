@@ -23,7 +23,7 @@
 
   // ---------------------------------------------------------------- every block, by what it is for
   const KINDS = [['fav', '★', 'Favoriten'], ['all', '', 'Alle'], ['roof', '🏠', 'Dach'], ['light', '💡', 'Licht'], ['glass', '🪟', 'Fenster & Glas'], ['door', '🚪', 'Türen'], ['wall', '🧱', 'Wände'], ['floor', '🟫', 'Böden'], ['stairs', '🪜', 'Treppen & Stufen'], ['rail', '🏛', 'Geländer & Säulen'], ['garden', '🌳', 'Garten & Natur'], ['deco', '🪴', 'Deko & Dinge'], ['color', '🎨', 'Farben'], ['other', '…', 'Sonstiges']];
-  KINDS.splice(2, 0, ['modern', '✨', 'Modern']);   // the Modern Living pack (voxmodern.js): its models show here with their pictures
+  KINDS.splice(2, 0, ['modern', '🛋', 'Modern']);   // (W1 §6: ✨ is for Erschaffen only)   // the Modern Living pack (voxmodern.js): its models show here with their pictures
   const RX = [
     ['roof', /roof|(^|_)hip(_|$)|ridge|gutter|downpipe|shingle|thatch|chimney|(^|_)eaves?(_|$)|dormer|skylight|soffit|fascia/],
     ['glass', /glass|window|_pane$|_panes$|skylight|panorama/],
