@@ -23,6 +23,12 @@
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
   const NEAR = 160, FOUND = 4, ASK_R = 1300, STEP = 0.1;
   const ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+  // meta.wonders[key].status: 'building' (rising, or cut short by leaving the world) · 'built' · 'found' (built and
+  // discovered; .found is the time) · 'blocked' (a person's work on the lot, or no room: never built)
+  const STANDS = (e) => !!e && (e.status === 'built' || e.status === 'found');
+  // the turning light's motes and the sparkles: one options object each, filled anew per mote (particles.js copies it)
+  const BEAMO = { life: 0.14, size: 0.12, grav: 0, col: [1, 0.95, 0.75], emis: 1, drag: 0, collide: false, uv: [0, 0, 1, 1] };
+  const SPARKO = { life: 1, size: 0.16, grav: -0.4, col: null, emis: 1, drag: 0.6, collide: false, uv: [0, 0, 1, 1] };
   // the sparkle colours of each wonder
   const GLOW = { kristall: [0.78, 0.55, 1], regenbogen: [1, 0.85, 0.4], sternwarte: [1, 0.86, 0.45], riesenbaum: [0.7, 1, 0.55], wolkenturm: [1, 0.95, 0.8], labyrinth: [0.6, 1, 0.8], pyramide: [1, 0.78, 0.3], mondtempel: [0.65, 0.85, 1] };
   // what changes on its own in untouched land (no person needed): plants, leaves, water, snow, fire — and grass ↔ dirt
@@ -56,6 +62,7 @@
       this.sites = []; this.siteAt = null; this.asking = false; this.more = false; this.askT = 0;
       this.planT = 1; this.findT = 0.5; this.compT = 0; this.beamA = 0;
       this.job = null; this.rise = null; this.hearts = new Map();
+      this.beams = []; for (const k in this.st) { const e = this.st[k]; if (e && e.beam && STANDS(e)) this.beams.push(e.beam); }
     }
     get on() { const g = this.g; return !!(VR.Wonders && g.world && g.dim === 'overworld' && g.meta && g.meta.type !== 'flat'); }
     spawn() { const ws = this.g.worldSpawn ? this.g.worldSpawn() : [0.5, 64, 0.5]; return [ws[0], ws[2]]; }
@@ -203,13 +210,15 @@
       const n = Math.min(16, chunk.length);
       for (let k = 0; k < n; k++) {
         const c = chunk[(Math.random() * chunk.length) | 0];
-        P.spawn(c[0] + Math.random(), c[1] + 1.05, c[2] + Math.random(), (Math.random() - 0.5) * 0.6, 0.8 + Math.random() * 1.6, (Math.random() - 0.5) * 0.6, { life: 0.9 + Math.random() * 0.9, size: k < 4 ? 0.45 : 0.16, grav: -0.4, col, emis: 1, drag: 0.6, collide: false });
+        SPARKO.life = 0.9 + Math.random() * 0.9; SPARKO.size = k < 4 ? 0.45 : 0.16; SPARKO.col = col;
+        P.spawn(c[0] + Math.random(), c[1] + 1.05, c[2] + Math.random(), (Math.random() - 0.5) * 0.6, 0.8 + Math.random() * 1.6, (Math.random() - 0.5) * 0.6, SPARKO);
       }
     }
     finishRise() {
       const S = this.rise, g = this.g, w = g.world, key = S.J.site.key;
       w.relightColumns([...S.defer]);
-      const e = this.st[key]; e.status = 'built'; e.builtAt = Date.now();
+      const e = this.st[key]; e.status = e.found ? 'found' : 'built'; e.builtAt = Date.now();
+      if (e.beam) this.beams.push(e.beam);
       this.rise = null; this.job = null;
       if (g.player && g.player.unstick) g.player.unstick();
       const P = g.particles, h = e.heart;
@@ -234,7 +243,7 @@
     // the heart of a site's wonder: known when this page built it; else (a guest, or one the host built) its column is
     // searched for the glowing block the wonder has there
     heartOf(s) {
-      const e = this.st[s.key]; if (e && e.heart && e.status === 'built') return e.heart;
+      const e = this.st[s.key]; if (e && e.heart && STANDS(e)) return e.heart;
       if (e && e.status === 'building') return null;
       const c = this.hearts.get(s.key); if (c) return c.h;
       const b = this.blue(), L = this.lotOf(s); if (!b || !L) return null;
@@ -248,7 +257,7 @@
     }
     found(s, h) {
       const g = this.g, name = this.name(s.type);
-      this.st[s.key] = Object.assign(this.st[s.key] || { type: s.type, seed: s.seed, r: s.r, status: 'built', heart: h }, { found: Date.now() });
+      this.st[s.key] = Object.assign(this.st[s.key] || { type: s.type, seed: s.seed, r: s.r, heart: h }, { status: 'found', found: Date.now() });
       this.banner(T('g.wonder.found', { name }));
       if (g.audio) g.audio.play('fanfare');
       if (g.codex && g.codex.unlock) g.codex.unlock('w:' + s.type, true);
@@ -284,16 +293,15 @@
       }
       if (text !== this.compText) { this.compText = text; el.textContent = text; el.style.display = text ? 'block' : 'none'; }
     }
-    // the Wolkenleuchtturm's light turns at night: a beam of glowing motes sweeping round its lantern room
+    // the Wolkenleuchtturm's light turns at night: a beam of glowing motes sweeping round its lantern room (no allocation)
     beam(dt, E) {
-      const P = this.g.particles, p = this.g.player; if (!P || !p || !E || !(E.night > 0.35)) return;
+      const P = this.g.particles, p = this.g.player; if (!P || !p || !E || !(E.night > 0.35) || !this.beams.length) return;
       this.beamA += dt * 1.1;
-      for (const k in this.st) {
-        const e = this.st[k]; if (!e.beam || e.status !== 'built') continue;
-        const b = e.beam; if (Math.abs(b[0] - p.pos[0]) > 260 || Math.abs(b[2] - p.pos[2]) > 260) continue;
-        for (const side of [0, Math.PI]) {
-          const a = this.beamA + side, dx = Math.cos(a), dz = Math.sin(a);
-          for (let i = 0; i < 4; i++) { const d = 3 + Math.random() * 46; P.spawn(b[0] + dx * d, b[1] + (Math.random() - 0.5) * 0.6, b[2] + dz * d, 0, 0, 0, { life: 0.14, size: 0.12 + d * 0.012, grav: 0, col: [1, 0.95, 0.75], emis: 1, drag: 0, collide: false }); }
+      for (let j = 0; j < this.beams.length; j++) {
+        const b = this.beams[j]; if (Math.abs(b[0] - p.pos[0]) > 260 || Math.abs(b[2] - p.pos[2]) > 260) continue;
+        for (let side = 0; side < 2; side++) {
+          const a = this.beamA + side * Math.PI, dx = Math.cos(a), dz = Math.sin(a);
+          for (let i = 0; i < 4; i++) { const d = 3 + Math.random() * 46; BEAMO.size = 0.12 + d * 0.012; P.spawn(b[0] + dx * d, b[1] + (Math.random() - 0.5) * 0.6, b[2] + dz * d, 0, 0, 0, BEAMO); }
         }
       }
     }
