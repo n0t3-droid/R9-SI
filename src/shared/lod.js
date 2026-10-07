@@ -152,8 +152,8 @@
     let vm = VQ.get(site.id); if (vm) return vm;
     if (VQ.size > 28) VQ.delete(VQ.keys().next().value);
     const VG = VR.VillageGen, VX = VR.VX;
-    let plan = g._vilPlans && g._vilPlans.get(site.id);
-    if (!plan) { const keep = g._vilPlans; g._vilPlans = new Map(); try { plan = VG.plan(g, site); } finally { g._vilPlans = keep; } }
+    // the town's plan: the chunks' (kept) or the horizon's own (g._vilLodPlans), released once the mesh is cached
+    const plan = VG.plan(g, site, true);
     const RADp = (VG.siteRad ? VG.siteRad(g, site) : VG.rad(g)) + 3, W = RADp * 2 + 1, gx0 = site.x - RADp, gz0 = site.z - RADp;
     // which building owns each column (footprint incl. eaves & chimney); the plaza well is one more "building"
     const boxes = plan.homes.concat(plan.work).map(b => b.box).filter(Boolean);
@@ -209,6 +209,7 @@
     }
     vm = { q: Int32Array.from(q), pal, n: q.length / 8 };
     VQ.set(site.id, vm);
+    if (g._vilLodPlans) g._vilLodPlans.delete(site.id);
     return vm;
   }
   // village sites whose houses reach into [x0, x1) x [z0, z1)
@@ -222,6 +223,26 @@
     return res;
   }
   LOD.villageMesh = villageMesh;
+  // the site cells a tile's villages are looked up in (villagesNear's cells; the worker computes the cold ones first)
+  LOD.tileCells = function (g, job) {
+    const VG = VR.VillageGen; if (!VG || g.singleBiome >= 0 || job.level > 1) return [];
+    const L = job.level, step = 4 << L, n = 32, T = n * step;
+    const x0 = job.tx * n * step, z0 = job.tz * n * step, x1 = x0 + T, z1 = z0 + T;
+    const C = VG.cell(g), pad = VG.rad(g) + 8, out = [];
+    for (let j = Math.floor((z0 - pad) / C); j <= Math.floor((z1 + pad) / C); j++) for (let i = Math.floor((x0 - pad) / C); i <= Math.floor((x1 + pad) / C); i++) out.push([i, j]);
+    return out;
+  };
+  // the town plans a tile needs that are not built yet (the worker builds them before the tile, see worker_main.js):
+  // the villages whose plaza lies in the tile and whose mesh is not cached
+  LOD.plansNeeded = function (g, job) {
+    const VG = VR.VillageGen;
+    if (!VG || !g.computeClimate || !g.n3 || job.level > 1) return [];
+    const L = job.level, step = 4 << L, n = 32, T = n * step;
+    const x0 = job.tx * n * step, z0 = job.tz * n * step;
+    let vs = [];
+    try { vs = villagesNear(g, x0, z0, x0 + T, z0 + T); } catch (e) { vs = []; }
+    return vs.filter(st => st.x >= x0 && st.x < x0 + T && st.z >= z0 && st.z < z0 + T && !VQ.has(st.id) && !VG.planReady(g, st, true));
+  };
 
   // ---------------------------------------------------------------- one tile
   LOD.build = function (g, job) {
@@ -444,7 +465,7 @@
     // ---- villages whose plaza lies in this tile (each village is drawn by exactly one tile per level)
     for (const st of vsites) {
       if (st.x < x0 || st.x >= x0 + T || st.z < z0 || st.z >= z0 + T) continue;
-      let vm = null; try { vm = villageMesh(g, st); } catch (e) { vm = null; }
+      let vm = null; try { vm = villageMesh(g, st); } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; vm = null; }
       if (!vm) continue;
       const qd = vm.q;
       for (let o = 0; o < qd.length; o += 8) {

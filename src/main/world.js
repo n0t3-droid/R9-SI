@@ -69,6 +69,9 @@
     onMsg(w, m) {
       if (m.type === 'log') { console.log('[worker]', m.msg); return; }
       if (!this.workers.includes(w)) return;   // a late word from a worker already replaced
+      // a job waits for a town plan the worker is building a slice at a time (worker_main.js): it keeps its slot, and
+      // its time out restarts (the plan is progressing, the worker is not stuck)
+      if (m.type === 'waiting') { const st = this.started.get(m.id); if (st) st.t0 = performance.now(); return; }
       w.inflight = Math.max(0, w.inflight - 1);
       const st = this.started.get(m.id);
       if (st) { this.started.delete(m.id); if (!st.direct) { const ms = m.ms !== undefined ? m.ms : Math.min(400, (performance.now() - st.t0) / Math.max(1, st.q)); this.laneMs[st.lane] += ms; } }

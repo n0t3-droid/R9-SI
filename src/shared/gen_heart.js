@@ -195,7 +195,7 @@
       }
     }
     // designed structures (each module registers a per-chunk builder)
-    for (const fn of HEART.builders) { try { fn(g, cx, cz, out); } catch (e) { if (!g._heartErr) { g._heartErr = 1; console.warn('heartland gen', e); } } }
+    for (const fn of HEART.builders) { try { fn(g, cx, cz, out); } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; if (!g._heartErr) { g._heartErr = 1; console.warn('heartland gen', e); } } }
   };
   HEART.builders = [];
   const prevGen = OG.generate;

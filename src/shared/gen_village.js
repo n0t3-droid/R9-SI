@@ -415,8 +415,12 @@
   VG.cell = (g) => PAR(g).CELL; VG.rad = (g) => PAR(g).RAD;
   VG.siteRad = (g, site) => (site && site.rad) || PAR(g).RAD;
   const BAD = /ocean|river|beach|shore|swamp|mangrove|mushroom|peaks|ice_spikes|deep_dark|frozen_river|stony/;
+  // a site cell's key (exact pairing: the old xor hash collided for mirrored cells)
+  const siteKey = (i, j) => (i + 1048576) * 2097152 + (j + 1048576);
+  // whether a site cell is computed already (a cold cell costs its terrain samples: worker_main.js computes it in a turn)
+  VG.siteKnown = (g, i, j) => !!g._vilSites && g._vilSites.has(siteKey(i, j));
   VG.site = function (g, i, j) {
-    const key = (i + 1048576) * 2097152 + (j + 1048576); // exact pairing (the old xor hash collided for mirrored cells)
+    const key = siteKey(i, j);
     if (!g._vilSites) g._vilSites = new Map();
     if (g._vilSites.has(key)) return g._vilSites.get(key);
     if (g._vilSites.size > 600) g._vilSites.clear();
@@ -491,11 +495,21 @@
   // ---------------------------------------------------------------- planning
   // plan: ops bucketed per chunk + a JSON-friendly summary for the game (homes, beds, work, farms, lots…)
   const KINDS_CIVIC = ['hall', 'bakery', 'smithy', 'library', 'clinic', 'workshop'];
-  VG.plan = function (g, site) {
-    if (!g._vilPlans) g._vilPlans = new Map();
-    const cached = g._vilPlans.get(site.id);
-    if (cached) return cached;
-    if (g._vilPlans.size > 8) g._vilPlans.delete(g._vilPlans.keys().next().value);
+  // A town's plan is built by planSteps, a generator that yields between its steps: VG.planAdvance runs it a slice
+  // at a time, so a job never holds the worker for the whole plan (1.6–2.5 s for a modern town). The steps and their
+  // order are unchanged, so the plan is the same whichever way it is built (test/town_slices.js).
+  // an append-only list of k-number tuples in blocks of at most 16384 tuples: a block is a plain array (the values are
+  // kept exactly), a new one starts when the current one is full, so an append copies at most one block
+  const tupleList = (k) => {
+    const L = { blocks: [], cur: null, lim: 16384 * k };
+    L.push = (a, b, c, d, e) => {
+      let c0 = L.cur;
+      if (c0 === null || c0.length >= L.lim) { c0 = L.cur = []; L.blocks.push(c0); }
+      if (k === 5) c0.push(a, b, c, d, e); else c0.push(a, b, c, d);
+    };
+    return L;
+  };
+  const planSteps = function* (g, site) {
     const rng = new VR.RNG(site.seed);
     const S = STYLES[site.style] || STYLES.meadow;
     const RAD = VG.siteRad(g, site), V2 = g.vgen >= 2;
@@ -505,9 +519,8 @@
     const oi = (x, z) => { const lx = x - cx + RAD, lz = z - cz + RAD; return (lx < 0 || lz < 0 || lx >= SZ || lz >= SZ) ? -1 : lz * SZ + lx; };
     const hcache = new Map();
     const ground = (x, z) => { const k = x * 65536 + z; let h = hcache.get(k); if (h === undefined) { h = g.surfaceY(x, z); hcache.set(k, h); } return h; };
-    // op storage
-    const ops = [];      // x,y,z,state
-    const fills = [];    // x,z,y0,y1,state
+    // op storage: x,y,z,state and x,z,y0,y1,state (tupleList: blocks, so no step copies a whole town's ops)
+    const ops = tupleList(4), fills = tupleList(5);
     const put = (x, y, z, s) => { ops.push(x, y, z, s); };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) fills.push(x, z, y0, y1, s); };
     const AIR = 0;
@@ -579,6 +592,7 @@
       stalls.push([x - (f === 3 ? 1 : -1), py + 1, z, f]);
     }
     plan.plaza.seats = seats; plan.plaza.stalls = stalls;
+    yield;
     // ---- roads
     const nR = HOME ? 6 : S.modern ? 4 : V2 ? 4 + rng.int(3) : 3 + rng.int(3);
     const a0 = HOME ? Math.PI / 2 : S.modern ? Math.PI / 4 : rng.next() * Math.PI * 2;
@@ -604,6 +618,7 @@
     const zebra = new Map();   // "x,z" → axis: zebra crossings at the plaza exits and where the ring roads cross the radials
     const zebraAt = (px, pz, nx, nz, pa) => { const ax = Math.abs(Math.cos(pa)) >= Math.abs(Math.sin(pa)) ? 1 : 0; for (let wv = -1; wv <= 1; wv++) zebra.set(Math.round(px + nx * wv) + ',' + Math.round(pz + nz * wv), ax); };
     for (let r = 0; r < nR; r++) {
+      yield;
       let ang = a0 + r * Math.PI * 2 / nR + (HOME && r === 0 ? 0 : (rng.next() - 0.5) * 0.5);
       const L = HOME ? (r === 0 ? 140 : 70 + rng.int(24)) : S.modern ? RAD - 6 : V2 ? 54 + rng.int(20) : 30 + rng.int(20);
       const pts = [];
@@ -687,6 +702,7 @@
         seg.push([ix, iz, an + Math.PI / 2]);
       }
       for (const pts of segs) {
+        yield;
         if (pts.length < 12) continue;
         const pin = pts.map(p => roadY.get(p[0] + ',' + p[1]));
         const hs = pts.map((p, k) => pin[k] !== undefined ? pin[k] : ground(p[0], p[1]));
@@ -731,7 +747,9 @@
       }
     }
     const lineS = S.pathLine ? st(S.pathLine) : 0, walkS = S.sidewalk ? st(S.sidewalk) : 0;
+    let steps = 0;
     for (const [x, z, y, walk] of roadCells) {
+      if ((++steps & 255) === 0) yield;
       const gy = ground(x, z);
       if (gy < y) fill(x, z, gy + 1, y - 1, st(site.style === 'desert' ? 'sandstone' : 'dirt'));
       fill(x, z, y + 1, Math.max(y + 4, gy + 2), AIR);
@@ -799,6 +817,7 @@
     const pickStead = () => { if (!stead) return null; const opts = []; if (farmsLeft > 0) opts.push('farm', 'farm'); for (const k in stead) if (stead[k] > 0) opts.push(k); return opts.length ? opts[rng.int(opts.length)] : null; };
     const usedKinds = new Set(), kindFails = {};
     for (const [k, ri] of order) {
+      yield;
       for (const side of [1, -1]) {
         if (lots.length > (S.modern ? 96 : V2 ? 70 : 22)) break;
         const rp = roads[ri].pts[k];
@@ -814,13 +833,15 @@
         const dims = mdims ? mdims[kind === 'home' || kind === 'lot' ? rng.int(mdims.length) : 0].slice() : V2 ? ({ farm: [9 + rng.int(2) * 2, 11 + rng.int(4)], hall: [11, 8], garden: [6, 6], home: S.tech ? [7 + rng.int(5), 7 + rng.int(5)] : [6 + rng.int(3), 6 + rng.int(3)], lot: [6 + rng.int(2), 6 + rng.int(2)], market: [14, 11], base: [15, 22], barn: [9, 7], pasture: [9 + rng.int(3), 8 + rng.int(3)], orchard: [9 + rng.int(3), 9 + rng.int(2)], windmill: [5, 5] }[kind] || [8, 6 + rng.int(2)])
           : kind === 'farm' ? [7 + rng.int(2) * 2, 9 + rng.int(3)] : kind === 'hall' ? [9, 7] : kind === 'garden' ? [5, 5] : kind === 'home' || kind === 'lot' ? [5 + rng.int(3), 5 + rng.int(3)] : [7, 5 + rng.int(2)];
         let lot = tryLot(kind, dims[0], dims[1], roads[ri], k, side);
+        yield;
         if (!lot && mdims && mdims.length > 1) {
           // smaller variants of a modern building, largest first (homes: the whole catalogue below the picked size)
           const smaller = mdims.filter(dm => dm[0] * dm[1] < dims[0] * dims[1]).sort((p, q) => q[0] * q[1] - p[0] * p[1]);
-          for (const dm of (kind === 'home' || kind === 'lot' ? smaller : [mdims[mdims.length - 1]])) { lot = tryLot(kind, dm[0], dm[1], roads[ri], k, side); if (lot) break; }
+          for (const dm of (kind === 'home' || kind === 'lot' ? smaller : [mdims[mdims.length - 1]])) { lot = tryLot(kind, dm[0], dm[1], roads[ri], k, side); yield; if (lot) break; }
         }
         if (!lot && kind === kindsQueue[0]) { kindFails[kind] = (kindFails[kind] || 0) + 1; if (kindFails[kind] >= 6) { kindsQueue.push(kindsQueue.shift()); kindFails[kind] = 0; } }
         if (!lot && (kind === 'farm' || kind === 'lot' || kind === 'garden' || kind === 'park' || (stead && stead[kind] !== undefined))) { kind = 'home'; lot = MODERN ? (VG.modern.DIMS.home.length ? tryLot(kind, VG.modern.DIMS.home[VG.modern.DIMS.home.length - 1][0], VG.modern.DIMS.home[VG.modern.DIMS.home.length - 1][1], roads[ri], k, side) : null) : V2 ? tryLot(kind, 6 + rng.int(2), 6 + rng.int(2), roads[ri], k, side) : tryLot(kind, 5 + rng.int(2), 5 + rng.int(2), roads[ri], k, side); }
+        yield;
         if (!lot) continue;
         if (kind === kindsQueue[0]) kindsQueue.shift();
         if (kind === 'farm') farmsLeft--; if (kind === 'lot') reserve--; if (stead && stead[kind] !== undefined) stead[kind]--; usedKinds.add(kind);
@@ -1080,6 +1101,7 @@
     };
     let homeSeed = site.seed;
     for (const lot of lots) {
+      yield;
       const L = makeLot(put, lot.ox, lot.oz, lot.r);
       const lg = (u, v) => { const q = ROT[lot.r](u, v); return ground(lot.ox + q[0], lot.oz + q[1]); };
       // clear the air volume over the lot and fill the ground up to the floor
@@ -1140,7 +1162,7 @@
       }
       if (MODERN && lot.kind !== 'barn') {
         const mk = lot.kind === 'lot' ? 'home' : lot.kind;
-        const info = VG.modern.build(mk, L, lot, { rng: lrng, ground: lg, beds: 2 + lrng.int(3), put, palms: site.style === 'savanna', F: lot.F });
+        const info = yield* VG.modern.buildSteps(mk, L, lot, { rng: lrng, ground: lg, beds: 2 + lrng.int(3), put, palms: site.style === 'savanna', F: lot.F });
         if (info) {
           if (mk === 'park') { plan.work.push({ kind: 'garden', spot: (() => { const q = ROT[lot.r](info.spot[0], info.spot[2]); return [lot.ox + q[0], info.spot[1], lot.oz + q[1]]; })(), seats: info.seats.map(p => { const q = ROT[lot.r](p[0], p[2]); return [lot.ox + q[0], p[1], lot.oz + q[1], (p[3] + lot.r) & 3]; }) }); continue; }
           const sm = recordInfo(lot, info);
@@ -1213,24 +1235,79 @@
     // ---- bucket ops per chunk
     const chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
-    for (let i = 0; i < fills.length; i += 5) bucket(fills[i], fills[i + 1]).f.push(fills[i], fills[i + 1], fills[i + 2], fills[i + 3], fills[i + 4]);
-    for (let i = 0; i < ops.length; i += 4) bucket(ops[i], ops[i + 2]).o.push(ops[i], ops[i + 1], ops[i + 2], ops[i + 3]);
+    let nF = 0, nO = 0;
+    for (const blk of fills.blocks) for (let i = 0; i < blk.length; i += 5) { if (++nF % 4000 === 0) yield; bucket(blk[i], blk[i + 1]).f.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3], blk[i + 4]); }
+    for (const blk of ops.blocks) for (let i = 0; i < blk.length; i += 4) { if (++nO % 5000 === 0) yield; bucket(blk[i], blk[i + 2]).o.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3]); }
     plan.chunks = chunks;
     plan.center = [cx, py + 1, cz];
-    g._vilPlans.set(site.id, plan);
     return plan;
   };
 
-  // apply a village's ops to one generated chunk (fills first, then block ops in order)
-  VG.apply = function (g, cx, cz, out) {
-    const { CELL: VCELL, RAD } = PAR(g);
+  // The plan drivers. planAdvance runs a town's plan for about ms (returns the plan when it is done, else null);
+  // VG.plan runs it to the end. Plans of the chunks are kept in g._vilPlans (up to 9, as before); the horizon's
+  // (lod) in g._vilLodPlans until the horizon has built the town's mesh (a few at a time). In a worker job VG.probe
+  // is set: a plan that is not there ends the run with probe.miss set, and the job waits for it (worker_main.js).
+  const planGot = (g, site, lod) => (g._vilPlans && g._vilPlans.get(site.id)) || (lod && g._vilLodPlans && g._vilLodPlans.get(site.id)) || null;
+  VG.planReady = (g, site, lod) => !!planGot(g, site, lod);
+  VG.planAdvance = function (g, site, ms, lod) {
+    const have = planGot(g, site, lod);
+    if (have) return have;
+    if (!g._vilBuild) g._vilBuild = new Map();
+    let it = g._vilBuild.get(site.id);
+    if (!it) {
+      if (g._vilBuild.size >= 4) g._vilBuild.delete(g._vilBuild.keys().next().value);
+      it = planSteps(g, site); g._vilBuild.set(site.id, it);
+    }
+    const t0 = performance.now();
+    let r;
+    try { do { r = it.next(); } while (!r.done && performance.now() - t0 < ms); }
+    catch (e) { g._vilBuild.delete(site.id); throw e; }
+    if (!r.done) return null;
+    g._vilBuild.delete(site.id);
+    const plan = r.value;
+    if (lod) {
+      if (!g._vilLodPlans) g._vilLodPlans = new Map();
+      if (g._vilLodPlans.size > 4) g._vilLodPlans.delete(g._vilLodPlans.keys().next().value);
+      g._vilLodPlans.set(site.id, plan);
+    } else {
+      if (!g._vilPlans) g._vilPlans = new Map();
+      if (g._vilPlans.size > 8) g._vilPlans.delete(g._vilPlans.keys().next().value);
+      g._vilPlans.set(site.id, plan);
+    }
+    return plan;
+  };
+  VG.plan = function (g, site, lod) {
+    const have = planGot(g, site, lod);
+    if (have) return have;
+    if (VG.probe) { VG.probe.miss = { site, lod: !!lod }; throw VG.probe; }
+    return VG.planAdvance(g, site, Infinity, lod);
+  };
+
+  // the site cells a chunk's column reads: its 3 x 3 neighbourhood of cells
+  VG.cellsFor = function (g, cx, cz) {
+    const VCELL = PAR(g).CELL;
+    const ci = Math.floor((cx * 16 + 8) / VCELL), cj = Math.floor((cz * 16 + 8) / VCELL), out = [];
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) out.push([ci + di, cj + dj]);
+    return out;
+  };
+  // the village sites whose footprint reaches a chunk: the ones VG.apply plans for it (same order)
+  VG.sitesFor = function (g, cx, cz) {
+    const { RAD } = PAR(g);
     const x0 = cx * 16, z0 = cz * 16;
-    const ci = Math.floor((x0 + 8) / VCELL), cj = Math.floor((z0 + 8) / VCELL);
-    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-      const site = VG.site(g, ci + di, cj + dj);
+    const res = [];
+    for (const [si, sj] of VG.cellsFor(g, cx, cz)) {
+      const site = VG.site(g, si, sj);
       if (!site) continue;
       const SR = site.rad || RAD;
       if (x0 + 16 < site.x - SR - 2 || x0 > site.x + SR + 2 || z0 + 16 < site.z - SR - 2 || z0 > site.z + SR + 2) continue;
+      res.push(site);
+    }
+    return res;
+  };
+  // apply a village's ops to one generated chunk (fills first, then block ops in order)
+  VG.apply = function (g, cx, cz, out) {
+    const x0 = cx * 16, z0 = cz * 16;
+    for (const site of VG.sitesFor(g, cx, cz)) {
       const plan = VG.plan(g, site);
       const b = plan.chunks.get(cx + ',' + cz);
       if (b) {
@@ -1266,7 +1343,7 @@
     const prevGen = OG.generate;
     OG.generate = function (cx, cz) {
       const out = prevGen.call(this, cx, cz);
-      if (this.singleBiome < 0) { try { VG.apply(this, cx, cz, out); } catch (e) { if (!this._vilErr) { this._vilErr = 1; console.warn('village gen', e); } } }
+      if (this.singleBiome < 0) { try { VG.apply(this, cx, cz, out); } catch (e) { if (VG.probe && e === VG.probe) throw e; if (!this._vilErr) { this._vilErr = 1; console.warn('village gen', e); } } }
       return out;
     };
     // no trees inside villages (they plant their own gardens)
