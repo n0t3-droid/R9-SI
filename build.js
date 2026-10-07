@@ -18,7 +18,8 @@ const ROOT = __dirname;
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'biomes', 'gen_common', 'gen_overworld', 'gen_realm', 'shipgen', 'starship', 'gen_village', 'gen_city', 'gen_modern', 'gen_plan', 'gen_villa', 'gen_villa_rooms', 'gen_rails', 'gen_citadel', 'gen_heart', 'gen_temple', 'gen_isles', 'gen_canyon', 'gen_hills', 'gen_station', 'lod', 'gen_dims', 'light_local', 'mesher', 'physics', 'custom', 'style', 'edits'];
 const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_build'];
-const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'game'];
+// i18n first: the language module and the game's two tables (de, en) are there before any text is drawn
+const MAIN = ['i18n', 'lang_en', 'lang_de', 'gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'game'];
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const js = (dir, list) => list.filter(f => exists(`src/${dir}/${f}.js`)).map(f => `/* ${dir}/${f}.js */\n` + read(`src/${dir}/${f}.js`)).join('\n');
 const shared = js('shared', SHARED);
@@ -42,7 +43,7 @@ fs.writeFileSync(path.join(ROOT, 'dist/artifact.html'), `<title>R9-SI</title>${f
 // packs, the VX material textures. Worker (the game's own worker + a studio extension): block textures, whole
 // catalogue houses built with the villa generator, lit and meshed with the game's mesher.
 const STUDIO_MAIN = ['core', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'physics', 'custom', 'style', 'edits', 'schem'];
-const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']);
+const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['i18n', 'tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']);   // i18n: the language module (its choice is shared with the game)
 const studioWorkerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js') + '\n' + read('src/studio/studio_worker.js');
 const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js') + '\n' + read('src/shared/voxmodern.js');
 const notes = exists('src/studio/notes.md') ? read('src/studio/notes.md') : '';
