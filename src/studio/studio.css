@@ -668,3 +668,28 @@ nav.modes button.hubm.on { color: var(--txt); background: #2a2110; box-shadow: 0
 .fstyles .fstyle { padding: 4px 10px; font-size: 11px; border-radius: 20px; color: var(--mute); background: transparent; border: 1px solid var(--line); }
 .fstyles .fstyle.on { color: var(--acc); background: rgba(56, 230, 255, 0.08); border-color: rgba(56, 230, 255, 0.45); }
 .note .mono { font: 10px var(--mono); }
+
+/* ---- 🎨 Aussehen (B1 live loop, lookpanel.js): colours, material, surface, ⧉ variants */
+.lookBox { margin: 8px 0 10px; padding: 10px 10px 6px; border: 1px solid var(--line2); border-radius: 10px; background: rgba(8, 12, 18, 0.72); }
+.lookBox .lookH { margin-top: 0; }
+.lookBox .lookH small { font: 10px var(--font); letter-spacing: 0; text-transform: none; color: var(--dim); }
+.lookRow { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.lookRow .lk { flex: 0 0 104px; font-size: 12px; color: var(--mute); }
+.lookRow input[type=color] { width: 46px; height: 28px; padding: 1px 2px; border-radius: 6px; cursor: pointer; background: #090d13; }
+.lookRow .seg { display: inline-flex; gap: 3px; flex: 1; flex-wrap: wrap; }
+.lookPats { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 8px 0 6px; }
+.lookPats .lk { flex: 0 0 100%; font-size: 12px; color: var(--mute); }
+.lookSw { display: flex; gap: 4px; flex-wrap: wrap; margin: 2px 0 8px 112px; }
+.lookSw i { width: 20px; height: 20px; border-radius: 5px; border: 1px solid var(--line2); cursor: pointer; }
+.lookSw i.on { box-shadow: 0 0 0 2px var(--acc); }
+.lookSurf { margin: 6px 0; }
+.lookQ { width: 100%; padding: 5px 8px; margin: 4px 0; font-size: 12px; }
+.lookDonors { display: flex; flex-wrap: wrap; gap: 4px; }
+.lookDonors .vt { width: 40px; height: 40px; padding: 2px; border-radius: 8px; display: grid; place-items: center; background: #0b1119; }
+.lookDonors .vt canvas { width: 34px; height: 34px; image-rendering: pixelated; }
+.lookMsg { min-height: 1.4em; }
+.lookMsg.warn { color: var(--warn) !important; }
+.lookVar { margin-top: 6px; }
+.lookName { flex: 1; padding: 5px 8px; font-size: 12px; }
+.lookMat { background: #090d13; color: var(--txt); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font-size: 12px; }
+.lookPick { margin: 6px 0 2px; }
