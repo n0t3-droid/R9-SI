@@ -565,10 +565,13 @@
         }
         // 🏗 Bauen: Sofort or Baustelle — planned buildings at once, or built in front of you (baustelle.js)
         {
-          const f = el('div', 'field'); f.innerHTML = '<label></label>'; f.firstChild.textContent = T('g.bau.setting');
+          const X = (k, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, null, de, en) : de);
+          const f = el('div', 'field'); f.innerHTML = '<label></label>'; f.firstChild.textContent = X('g.bau.setting', '🏗 Bauen', '🏗 Building');
           const sg = el('div', 'seg'), cur = S.bau === 'instant' ? 'instant' : 'site';
-          for (const [v, k, tip] of [['site', 'g.bau.site', 'g.bau.siteTip'], ['instant', 'g.bau.instant', 'g.bau.instantTip']]) {
-            const b = el('button', cur === v ? 'on' : ''); b.textContent = T(k); b.title = T(tip); b.dataset.set = 'bau:' + v;
+          const L = { site: [X('g.bau.site', 'Baustelle', 'Construction site'), X('g.bau.siteTip', 'Geplante Bauten entstehen vor deinen Augen: Gerüst, Bauleute, Kran, Konfetti', 'Planned buildings rise before your eyes: scaffolding, builders, a crane, confetti')],
+            instant: [X('g.bau.instant', 'Sofort', 'Instant'), X('g.bau.instantTip', 'Geplante Bauten stehen sofort da (am leichtesten für langsame PCs)', 'Planned buildings appear at once (lightest for slow PCs)')] };
+          for (const v of ['site', 'instant']) {
+            const b = el('button', cur === v ? 'on' : ''); b.textContent = L[v][0]; b.title = L[v][1]; b.dataset.set = 'bau:' + v;
             b.onclick = () => { S.bau = v; S.bauSet = true; this.game.saveSettings(); this.showSettings(); };
             sg.appendChild(b);
           }
