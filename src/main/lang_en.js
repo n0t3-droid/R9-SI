@@ -866,5 +866,20 @@
     'g.forge.busy': 'Still building — a moment.',
     'g.forge.look': 'Look at the ground where it should stand.',
     'g.forge.building': 'building',
+    // ---- 🏗 Construction site (baustelle.js): planned buildings rise before your eyes
+    'g.bau.setting': '🏗 Building',
+    'g.bau.instant': 'Instant',
+    'g.bau.site': 'Construction site',
+    'g.bau.instantTip': 'Planned buildings appear at once (lightest for slow PCs)',
+    'g.bau.siteTip': 'Planned buildings rise before your eyes: scaffolding, builders, a crane, confetti',
+    'g.bau.start': '🏗 Construction site',
+    'g.bau.startSub': '{name} is being built — click it: done at once',
+    'g.bau.progress': '🏗 {name} · {p} % built',
+    'g.bau.skip': '⏩ Finish',
+    'g.bau.skipTip': 'Finish at once (also: click the site or /bau fertig)',
+    'g.bau.done': '✨ {name} is done!',
+    'g.bau.cancel': 'Construction stopped — all taken back',
+    'g.bau.none': 'Nothing is being built right now.',
+    'g.bau.bench': 'Workbench',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
