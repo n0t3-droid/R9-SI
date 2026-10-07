@@ -86,7 +86,7 @@ await section('2b', 'hints 2 and 3: one at a time, dismissed by doing the thing;
   for (let i = 0; i < 20 && !on; i++) { await wait(500); on = await ev(() => { const h = document.getElementById('hints'); return !!(h && h.classList.contains('on')); }); }
   const h2 = await ev(() => ({ cur: VR.Hints.current(), txt: (document.getElementById('hints') || {}).textContent || '', kbd: document.querySelectorAll('#hints kbd').length }));
   console.log('  hint 2', JSON.stringify(h2));
-  check(on && h2.cur === 'move' && /W A S D/.test(h2.txt) && h2.kbd >= 4, 'after standing a while: „🖱 bewegen = umschauen · W A S D = gehen" with key caps');
+  check(on && h2.cur === 'move' && /W A S D/.test(h2.txt) && h2.kbd >= 4, 'after standing a while: „🖱 bewegen = umschauen · W A S D = laufen" with key caps');
   await page.keyboard.down('w'); await wait(700); await page.keyboard.up('w');
   await wait(400);
   const h3 = await ev(() => ({ st: JSON.parse(localStorage.getItem('r9si.hints')), cur: VR.Hints.current() }));
