@@ -221,15 +221,15 @@ await section(5, 'the Studio: four tiles in the header, the mode bar waits behin
   check(t.tiles.every(x => x.w >= 160 && x.h >= 44), 'each at least 160 px wide and 44 px tall in the header');
   check(t.play && /^▶/.test(t.tiles[0].label), 'the ▶ tile is #playBtn and reads „' + t.tiles[0].label + '"');
   check(t.tiles[1].label === '🏗 Bauen' && t.tiles[2].label === '✨ Erschaffen' && t.tiles[3].label === '🎒 Meins', 'German labels');
-  check(!t.pro && t.modes === 0 && t.nMode === 6, 'Einfach: nav.modes is hidden (its 6 mode buttons wait)');
+  check(!t.pro && t.modes === 0 && t.nMode === 7, 'Einfach: nav.modes is hidden (its 7 mode buttons wait, 🏭 Forge among them)');
   check(t.sw && !t.bar && t.lang === 'de', 'the Profi switch is in the header, no 🔌 banner, lang = de');
-  check(await ev(() => { const b = document.getElementById('legalBtn'); return !!b && b.hidden && !b.getClientRects().length; }), 'no 📜 in the header while there is no VR.Legal');
-  check(await ev(() => { VR.Legal = { open: () => { window.__legal = 1; } }; VR.StudioStart.legal(); const b = document.getElementById('legalBtn'); b.click(); const r = b.getClientRects().length > 0 && window.__legal === 1; delete VR.Legal; VR.StudioStart.legal(); return r && b.hidden; }), 'with VR.Legal the 📜 shows and opens it');
+  check(await ev(() => { const b = document.getElementById('legalBtn'); return !!(VR.Legal && b && !b.hidden && b.getClientRects().length); }), 'the 📜 is in the header (VR.Legal is part of the page)');
+  check(await ev(() => { const real = VR.Legal; VR.Legal = { open: () => { window.__legal = 1; } }; VR.StudioStart.legal(); const b = document.getElementById('legalBtn'); b.click(); const r = b.getClientRects().length > 0 && window.__legal === 1; delete VR.Legal; VR.StudioStart.legal(); const gone = b.hidden; VR.Legal = real; VR.StudioStart.legal(); return r && gone && !b.hidden; }), 'the 📜 opens VR.Legal, hides without it and comes back with it');
   check(await ev(() => [...document.querySelectorAll('#studio header button')].filter(b => b.getClientRects().length).every(b => { const r = b.getBoundingClientRect(); return r.height >= 44 && r.width >= 44; })), 'every header button is at least 44 × 44 px');
   await ev(() => VR.UIPrefs.set({ pro: true })); await wait(150);
   const p = await ev(() => ({ pro: document.getElementById('studio').classList.contains('pro'), modes: [...document.querySelectorAll('nav.modes button[data-mode]')].filter(b => b.getClientRects().length > 0).map(b => b.dataset.mode), proT: document.querySelector('.tabs .proT').classList.contains('on'), tabs: [...document.querySelectorAll('#right .tabs .tab')].filter(t => t.getClientRects().length > 0).length, mem: localStorage.getItem('r9si.studio.pro') }));
   console.log('  profi', JSON.stringify(p));
-  check(p.pro && p.modes.join() === 'arch,furn,facade,parts,craft,world', 'Profi: the six mode buttons show (' + p.modes.join(' · ') + ')');
+  check(p.pro && p.modes.join() === 'arch,furn,facade,parts,craft,world,forge', 'Profi: the seven mode buttons show (' + p.modes.join(' · ') + ')');
   check(await ev(() => ![...document.querySelectorAll('nav.modes [data-hub], nav.modes [data-create]')].some(b => b.getClientRects().length)), 'the mode bar does not repeat the tiles (no 🕘 Weitermachen, no second ✨)');
   check(p.proT && p.tabs === 5 && p.mem === '1', 'the ⚙ Profi of the right side is the same switch (five tabs, r9si.studio.pro = 1)');
   await booted(1);
@@ -441,7 +441,7 @@ await section(12, 'keyboard, 📜 and English: Tab lands on ▶, Enter and Esc, 
   const small = await ev(() => [...document.querySelectorAll('#title button, #title .lp-btn')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim().slice(0, 18), w: Math.round(r.width), h: Math.round(r.height) }; }).filter(x => x.w < 44 || x.h < 44));
   check(!small.length, 'every button on the start screen is at least 44 × 44 px' + (small.length ? ': ' + JSON.stringify(small) : ''));
   // 📜 Impressum & Datenschutz: only when VR.Legal is there
-  check(await ev(() => { const b = document.querySelector('#title [data-act="legal"]'); return !!b && !b.getClientRects().length; }), 'without VR.Legal there is no 📜 button');
+  check(await ev(() => { const real = VR.Legal; delete VR.Legal; VR.Start.texts(); const b = document.querySelector('#title [data-act="legal"]'); const hidden = !!b && !b.getClientRects().length; VR.Legal = real; VR.Start.texts(); return hidden && b.getClientRects().length > 0; }), 'without VR.Legal there is no 📜 button, with it there is');
   await ev(() => { VR.Legal = { open: (t) => { window.__legal = t || 'open'; } }; VR.Start.texts(); });
   const lg = await ev(() => { const b = document.querySelector('#title [data-act="legal"]'); const r = b.getBoundingClientRect(); return { shown: b.getClientRects().length > 0, text: b.textContent, h: r.height }; });
   check(lg.shown && /Impressum/.test(lg.text) && lg.h >= 44, 'with VR.Legal: „' + lg.text + '" on the start screen');
