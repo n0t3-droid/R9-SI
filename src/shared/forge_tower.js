@@ -207,7 +207,7 @@
     for (const x of [1, w - 2]) K.set(x, 1, 0, S.lamp);
     K.set(dcu - 5 >= 0 ? dcu - 5 : 0, 1, 1, 'vx_tech_planter'); K.set(Math.min(w - 1, dcu + 4), 1, 1, 'vx_tech_planter');
     if (w >= 16 && K.fits('vm_mobility_bikerack_steel', w - 5, 1, 1, 0)) K.model('vm_mobility_bikerack_steel', w - 5, 1, 1, 0);
-    K.grid.meta = { name: apartments ? 'Wohnturm' : 'Hochhaus', doors, floors: floorsY, sh: SH, top: roofY + crownH - BASE, lot: [w, d], anchor: [w >> 1, 0], units: info.units, rooms: info.rooms, landings: sw.landings };
+    K.grid.meta = { name: apartments ? 'Wohnturm' : 'Hochhaus', doors, floors: floorsY, roof: roofY - BASE, sh: SH, top: roofY + crownH - BASE, lot: [w, d], anchor: [w >> 1, 0], units: info.units, rooms: info.rooms, landings: sw.landings };
     return K.grid;
   }
   const ringOf = (r) => { const out = []; for (let x = r[0]; x <= r[2]; x++) { out.push([x, r[1]]); out.push([x, r[3]]); } for (let v = r[1] + 1; v < r[3]; v++) { out.push([r[0], v]); out.push([r[2], v]); } return out; };

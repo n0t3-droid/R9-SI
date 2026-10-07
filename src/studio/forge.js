@@ -60,9 +60,7 @@
     const dna = current(); if (!dna) return false;
     if (!WM || !WM.world) { C.sys(L('fg.noWorld', 'Erst eine Welt öffnen (◍ Welt) — dann setzt du es hinein. Ohne Welt: 🧩 Als Bauteil.'), 'err'); tip(L('fg.noWorldTip', 'Öffne zuerst eine Welt (◍ Welt)'), false); return false; }
     C.setMode('world');
-    if (WM.tab !== 'houses' && WM.tab !== 'bench') { WM.tab = 'houses'; }
-    WM.toolForge(dna);
-    return true;
+    return WM.toolForge(dna);
   };
   // 🧩 the grid as a Werkbank piece (built by the worker; keep-world cells stay transparent)
   FM.asPiece = function () {
@@ -101,10 +99,11 @@
       C.hud(); pump();
     });
   }
-  // the scene of a built variant: its sections in grid space (one block of air around the structure)
+  // the scene of a built variant: its sections in grid space (one block of air around the structure), framed whole —
+  // a 160-high tower as much as a 120-long bridge (the camera stands span × 2.4 away with a 43° view)
   function sceneOf(m, dna) {
     const b = m.bounds, sx = b[3] - b[0] + 3, sy = b[4] - b[1] + 3, sz = b[5] - b[2] + 3;
-    return { type: 'clip', name: dna, gpu: m.gpu, off: [0, 0, 0], center: [sx / 2, Math.min(sy / 2, 28 + sy * 0.15), sz / 2], span: Math.max(sx, sz, sy * 0.55) * 0.72, groundY: 1, noGrid: false, instances: [] };
+    return { type: 'clip', name: dna, gpu: m.gpu, off: [0, 0, 0], center: [sx / 2, sy * 0.46, sz / 2], span: Math.max(sx * 0.62, sz * 0.62, sy * 0.58, 6), groundY: 1, noGrid: false, instances: [] };
   }
   const camOf = () => ({ yaw: 0.72, pitch: 0.42, dist: 0 });
   function paint(dna) {

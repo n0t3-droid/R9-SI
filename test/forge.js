@@ -111,6 +111,7 @@ section('tower', () => {
     const wk = Forge.walkable(g, [M.doors[0][0], M.doors[0][1] - g.dy, M.doors[0][2] + 1], {});
     const hit = M.floors.filter(y => wk.floors.includes(y - g.dy + 1));
     check(hit.length === M.floors.length, dna + ' staircase reaches every floor without ladders: ' + hit.length + '/' + M.floors.length);
+    check(M.roof === M.floors[M.floors.length - 1] + M.sh && wk.floors.includes(M.roof - g.dy + 1), dna + ' … and goes on up onto the roof (' + (M.roof - g.dy + 1) + ')');
     const perFloor = M.floors.map(y => count(g, (s, x, yy, z) => isGlass(s) && (x === 0 || z === 0 || x === g.sx - 1 || z === g.sz - 1 || true), y - g.dy + 1, y - g.dy + M.sh - 1));
     check(perFloor.every(k => k >= 4), dna + ' glass on every storey: ' + perFloor.slice(0, 4).join('/') + '…');
     const furn = M.floors.slice(1).map(y => count(g, isModel, y - g.dy + 1, y - g.dy + M.sh - 1));

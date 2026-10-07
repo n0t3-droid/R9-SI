@@ -70,7 +70,7 @@
     if (n) WM.editT = Date.now();
     lsSet(DRAFT_KEY(id), { v: 1, plans: [] });
     // 📍 the newest piece is where ▶ Spielen takes you
-    if (newest && WM.onCommit) { const m = meshFor(newest); if (m) { const L = placeOf(newest, m).lot; WM.onCommit([L[0], newest.F, L[1], L[2], newest.F + Math.max(3, m.top || 8), L[3]], nameOf(newest)); } }
+    if (newest && WM.onCommit) { const m = meshFor(newest); if (m) { const L = placeOf(newest, m).lot; WM.onCommit([L[0], newest.F, L[1], L[2], newest.F + Math.max(3, m.top || 8), L[3]], nameOf(newest), lotBased(newest) ? FRONT[newest.r & 3] : null); } }
     loadPlans(); refresh();
     C.sys(n ? `${n} Teil${n === 1 ? '' : 'e'} an die Welt übergeben — das Spiel baut sie, sobald die Gegend geladen ist` : 'Nichts Neues zu übernehmen', 'ok');
     if (!quiet) tip(n ? `✓ Übergeben: ${n} — öffne „${WM.world.name}“ im Spiel` : 'Nichts Neues', true);
@@ -711,7 +711,8 @@
   }
   WM.rayFromMouse = rayFromMouse; WM.tipW = tip; WM.regionBox = regionBox; WM.nameOf = nameOf;
   // 🏭 Forge: a structure by its DNA as the tool in hand (the Studio's Forge mode calls this with „📍 Setzen")
-  WM.toolForge = function (dna) { if (!WM.world) return false; WM.tool = { kind: 'forge', dna }; WM.ghost = null; WM.sel = null; meshFor(WM.tool); refresh(); tip('Zeig auf den Boden — Klick setzt, R / ↻ dreht, Esc fertig', true); return true; };
+  // (the 🧰 Werkbank and 🎨 Stil tabs put their own tools in hand: a piece is set from the Häuser tab)
+  WM.toolForge = function (dna) { if (!WM.world) return false; if (WM.tab === 'bench' || WM.tab === 'style' || WM.tab === 'worlds') WM.tab = 'houses'; WM.tool = { kind: 'forge', dna }; WM.ghost = null; WM.sel = null; meshFor(WM.tool); refresh(); tip('Zeig auf den Boden — Klick setzt, R / ↻ dreht, Esc fertig', true); return true; };
   WM.open = openWorld; WM.commit = commit; WM.list = listWorlds; WM.meshFor = meshFor; WM.houseItem = houseItem; WM.ghostAt = ghostAt; WM.pickGround = pickGround; WM.change = change; WM.clone = clonePlan; WM.rotate = rotatePlan; WM.refresh = refresh; WM.N = N; WM.getBlock = getBlock; WM.groundAt = groundAt; WM.placeOf = placeOf;
   // deep link: #world
   // deep links: #world · #world/<id> (the game's world list: "Plan in R9 Studio")
