@@ -348,6 +348,15 @@
       if ((this.gcT = (this.gcT || 0) - dt) <= 0) { this.gcT = 20; this.gc(); }
       // keep parked ships' gear down & designs fresh; ramps, doors and the kneel move
       for (const s of this.ships) { if (s.state === 'parked') s.gear = 1; s.d.last = performance.now(); if (this.cabin && s.d.meta && s.d.meta.cabin) this.cabin.animate(s, dt); }
+      // the furnished cabin and cockpit of every shuttle near you are built ahead (in a worker, once per design), so
+      // they are there the moment a ramp opens or you step aboard — not a few frames after the first look inside
+      if (p && g.cockpit && g.cockpit.cabinKit && (this.kitT = (this.kitT || 0) - dt) <= 0) {
+        this.kitT = 0.5;
+        for (const s of this.ships) {
+          const m = s.d.meta; if (!m || !m.cabin || !s.d.walk || Math.abs(s.pos[0] - p.pos[0]) > 90 || Math.abs(s.pos[2] - p.pos[2]) > 90) continue;
+          g.cockpit.cabinKit(s); if (m.cockpit) g.cockpit.kit(this.flightOf(s));
+        }
+      }
       // on foot in the world: up a lowered ramp or a stair → aboard
       if (p && this.cabin && !(g.gadgets && g.gadgets.riding) && !p.dead) this.tryWalkIn(p);
       // on foot inside a parked ship's hull (a world saved while walking aboard, a teleport): out beside it
@@ -442,7 +451,13 @@
       const list = extra && extra.length ? this.ships.concat(extra) : this.ships;
       if (!list.length) return;
       const cam = r.cam, walker = this.cabin && this.cabin.w ? this.cabin.w.s : null;
-      let prog = null, pilotRoom = null, cabinShip = null;
+      const pilotView = !!(this.pilot && g.camMode === 0 && this.pilot.flight && this.pilot.flight.view === 0);
+      const open = (s) => s.hatch && (s.hatch.ramp > 0.02 || s.hatch.door > 0.02);
+      // one furnished cockpit a frame: the one you fly, else the one you walk in, else the nearest shuttle you can look
+      // into through an open hatch (its rear bulkhead and sliding door close off the cabin's front)
+      let roomShip = pilotView ? this.pilot : walker;
+      if (!roomShip && g.cockpit) { let bd = 45 * 45; for (const s of list) { const m = s.d.meta; if (!m || !m.cabin || !m.cockpit || !open(s)) continue; const d2 = (s.pos[0] - cam.x) ** 2 + (s.pos[2] - cam.z) ** 2; if (d2 < bd) { bd = d2; roomShip = s; } } }
+      let prog = null, cabinShip = null;
       for (const s of list) {
         if (!s.d.gpu || s.hidden) continue;
         const m = s.d.meta, rad = Math.max(m.length, m.width, m.height) * 0.6;
@@ -452,21 +467,21 @@
         if (layer !== 'opaque' && !s.d.gpu.glass) continue;
         if (!prog) prog = this.begin(r, E, layer);
         // flying it from the cockpit: you sit in its furnished room (no hull clipping any more); until the worker has
-        // furnished it, the generator's stand-in seats and dash stay. Walking aboard, the cockpit and the cabin are
-        // furnished too (and the cabin whenever you are close to a shuttle with a hatch open)
-        const inside = s === this.pilot && g.camMode === 0 && s.flight && s.flight.view === 0, walking = s === walker;
-        const room = (inside || walking) && !!m.cockpit && !!(g.cockpit && g.cockpit.ready(s.flight || this.flightOf(s)));
-        const near = s.hatch && (s.hatch.ramp > 0.02 || s.hatch.door > 0.02) && dx * dx + dz * dz < 45 * 45;
-        // (from the pilot seat you only see the cabin through the open cockpit door)
+        // furnished it, the generator's stand-in seats and dash stay. A shuttle's furnished cabin is drawn whenever you
+        // can see into it — walking aboard, from the pilot seat through the open cockpit door, from outside while a
+        // hatch is open (it is culled only with the ramp and the doors shut and you outside)
+        const inside = pilotView && s === this.pilot, walking = s === walker;
+        const near = open(s) && dx * dx + dz * dz < 45 * 45;
         const aboard = !!(m.cabin && g.cockpit && (walking || near || (inside && s.hatch && s.hatch.cdoor > 0.02)) && g.cockpit.cabinReady(s));
+        const room = s === roomShip && !!m.cockpit && !!(g.cockpit && g.cockpit.ready(s.flight || this.flightOf(s)));
         if (prog.u.u_clipNear) r.gl.uniform1f(prog.u.u_clipNear, 0);
         this.drawOne(r, prog, s, cam, layer, this.lightAt(s.pos[0], s.pos[1] + m.height + 1, s.pos[2]), 1, false, room, aboard);
-        if (layer === 'opaque') { if (inside) pilotRoom = s; if (aboard && (!cabinShip || walking)) cabinShip = s; }
+        if (layer === 'opaque' && aboard && (!cabinShip || walking)) cabinShip = s;
       }
       if (prog) this.end(r, layer);
       if (layer !== 'opaque' || !g.cockpit) return;
-      if (pilotRoom && g.cockpit.drawRoom) g.cockpit.drawRoom(r, E, pilotRoom.flight);
-      if (walker && walker.d.meta.cockpit && g.cockpit.drawRoomOf) g.cockpit.drawRoomOf(r, E, this.flightOf(walker));
+      if (roomShip && pilotView && g.cockpit.drawRoom) g.cockpit.drawRoom(r, E, roomShip.flight);
+      else if (roomShip && roomShip.d.meta && roomShip.d.meta.cockpit && g.cockpit.drawRoomOf) g.cockpit.drawRoomOf(r, E, this.flightOf(roomShip));
       if (cabinShip && g.cockpit.drawCabin) g.cockpit.drawCabin(r, E, cabinShip);
     }
     // a ship's flight model (made the first time someone steps aboard: its switches, hatches and panels live there)
