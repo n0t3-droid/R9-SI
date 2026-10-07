@@ -25,6 +25,60 @@
   }
   const BASE = [[-1, 22], [-0.6, 26], [-0.4, 38], [-0.24, 50], [-0.15, 58], [-0.09, 62], [-0.04, 65], [0.1, 68], [0.3, 74], [0.55, 84], [1, 96]];
 
+  // trees per 16 x 16 chunk by biome key (features)
+  const TREE_DENS = {
+        forest: 9, flower_forest: 3, birch_forest: 9, old_growth_birch_forest: 9, dark_forest: 14, pale_garden: 10, taiga: 9, old_growth_pine_taiga: 10, old_growth_spruce_taiga: 11,
+        snowy_taiga: 6, jungle: 14, sparse_jungle: 4, bamboo_jungle: 6, savanna: 1.2, savanna_plateau: 1.5, windswept_savanna: 1, plains: 0.12, sunflower_plains: 0.1, meadow: 0.12,
+        cherry_grove: 3, grove: 6, swamp: 2, mangrove_swamp: 7, snowy_plains: 0.2, wooded_badlands: 4, windswept_forest: 7, windswept_hills: 0.6, windswept_gravelly_hills: 0.5,
+        dappled_forest: 10, mushroom_fields: 0.6, snowy_slopes: 0.3, river: 0, beach: 0
+      };
+  // the plants of each biome: [block name, chance per column] in order of the rolls (vegetation)
+  const FLORA = {
+        plains: [['short_grass', 0.28], ['tall_grass', 0.04], ['dandelion', 0.01], ['poppy', 0.01], ['oxeye_daisy', 0.004], ['azure_bluet', 0.004], ['cornflower', 0.004], ['red_tulip', 0.002], ['bush', 0.004]],
+        sunflower_plains: [['short_grass', 0.25], ['sunflower', 0.05], ['tall_grass', 0.03]],
+        forest: [['short_grass', 0.12], ['leaf_litter', 0.05], ['bush', 0.02], ['dandelion', 0.006], ['poppy', 0.006], ['lily_of_the_valley', 0.003], ['brown_mushroom', 0.002], ['fern', 0.02]],
+        flower_forest: [['short_grass', 0.08], ['allium', 0.03], ['azure_bluet', 0.03], ['red_tulip', 0.02], ['orange_tulip', 0.02], ['white_tulip', 0.02], ['pink_tulip', 0.02], ['oxeye_daisy', 0.03], ['cornflower', 0.03], ['lily_of_the_valley', 0.03], ['lilac', 0.01], ['rose_bush', 0.01], ['peony', 0.01]],
+        birch_forest: [['short_grass', 0.12], ['wildflowers', 0.08], ['bush', 0.01]], old_growth_birch_forest: [['short_grass', 0.12], ['wildflowers', 0.1], ['fern', 0.03]],
+        dark_forest: [['short_grass', 0.1], ['brown_mushroom', 0.01], ['red_mushroom', 0.006], ['leaf_litter', 0.04]],
+        pale_garden: [['pale_moss_carpet', 0.25], ['moon_eye', 0.02], ['short_grass', 0.03]],
+        taiga: [['fern', 0.12], ['large_fern', 0.03], ['short_grass', 0.08], ['sweet_berry_bush', 0.006]],
+        old_growth_pine_taiga: [['fern', 0.15], ['large_fern', 0.05], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['sweet_berry_bush', 0.004]],
+        old_growth_spruce_taiga: [['fern', 0.15], ['large_fern', 0.05], ['red_mushroom', 0.004]],
+        snowy_taiga: [['fern', 0.05], ['sweet_berry_bush', 0.002]], grove: [], snowy_plains: [['short_grass', 0.02]],
+        jungle: [['short_grass', 0.2], ['fern', 0.1], ['tall_grass', 0.05], ['large_fern', 0.03], ['melon', 0.006]],
+        sparse_jungle: [['short_grass', 0.2], ['fern', 0.1], ['melon', 0.004]],
+        bamboo_jungle: [['bamboo', 0.12], ['short_grass', 0.1], ['podzol_patch', 0]],
+        savanna: [['short_grass', 0.25], ['tall_grass', 0.15]], savanna_plateau: [['short_grass', 0.25], ['tall_grass', 0.12]], windswept_savanna: [['short_grass', 0.2]],
+        desert: [['dead_bush', 0.006], ['short_dry_grass', 0.012], ['tall_dry_grass', 0.004], ['cactus', 0.006]],
+        badlands: [['dead_bush', 0.01], ['short_dry_grass', 0.01], ['cactus', 0.004]], wooded_badlands: [['short_grass', 0.08], ['dead_bush', 0.01]], eroded_badlands: [['dead_bush', 0.01]],
+        swamp: [['short_grass', 0.1], ['blue_orchid', 0.01], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['firefly_bush', 0.004], ['lily_pad', 0.05]],
+        mangrove_swamp: [['short_grass', 0.05], ['lily_pad', 0.03], ['firefly_bush', 0.003]],
+        meadow: [['short_grass', 0.3], ['tall_grass', 0.06], ['dandelion', 0.02], ['poppy', 0.02], ['allium', 0.02], ['azure_bluet', 0.02], ['oxeye_daisy', 0.02], ['cornflower', 0.02], ['wildflowers', 0.04]],
+        cherry_grove: [['pink_petals', 0.3], ['short_grass', 0.08]],
+        dappled_forest: [['leaf_litter', 0.18], ['red_shrub', 0.05], ['short_grass', 0.08], ['brown_mushroom', 0.01], ['bush', 0.01]],
+        mushroom_fields: [['red_mushroom', 0.01], ['brown_mushroom', 0.01]],
+        windswept_hills: [['short_grass', 0.1]], windswept_forest: [['short_grass', 0.1], ['fern', 0.05]],
+        river: [['sugar_cane', 0.04]], beach: [['sugar_cane', 0.02]],
+};
+  // the middle biomes by temperature (rows) and humidity (columns), and their variants (weirdness > 0.35): the tables
+  // are made on the first use (after every layer's biomes are registered), not on every call
+  let BIOME_TABLES = null;
+  function biomeTables() {
+    return BIOME_TABLES || (BIOME_TABLES = {
+      MID: [
+        [BI.snowy_plains, BI.snowy_plains, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga],
+        [BI.plains, BI.plains, BI.forest, BI.taiga, BI.old_growth_spruce_taiga],
+        [BI.flower_forest, BI.plains, BI.forest, BI.birch_forest, BI.dark_forest],
+        [BI.savanna, BI.savanna, BI.forest, BI.jungle, BI.jungle],
+        [BI.desert, BI.desert, BI.desert, BI.desert, BI.desert]],
+      VAR: [
+        [BI.ice_spikes, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga, BI.snowy_taiga],
+        [BI.dappled_forest, BI.dappled_forest, BI.forest, BI.taiga, BI.old_growth_pine_taiga],
+        [BI.sunflower_plains, BI.plains, BI.forest, BI.old_growth_birch_forest, BI.pale_garden],
+        [BI.savanna, BI.savanna, BI.plains, BI.sparse_jungle, BI.bamboo_jungle],
+        [BI.desert, BI.desert, BI.badlands, BI.wooded_badlands, BI.eroded_badlands]] });
+  }
+
   class OverworldGen {
     constructor(seed, opts) {
       opts = opts || {};
@@ -165,21 +219,10 @@
       // swamps
       if (cl.swampy > 0.5 && height < 67 && ti >= 2 && ti <= 3 && hi >= 2) return ti === 3 ? BI.mangrove_swamp : BI.swamp;
       // middle biomes
-      const MID = [
-        [BI.snowy_plains, BI.snowy_plains, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga],
-        [BI.plains, BI.plains, BI.forest, BI.taiga, BI.old_growth_spruce_taiga],
-        [BI.flower_forest, BI.plains, BI.forest, BI.birch_forest, BI.dark_forest],
-        [BI.savanna, BI.savanna, BI.forest, BI.jungle, BI.jungle],
-        [BI.desert, BI.desert, BI.desert, BI.desert, BI.desert]];
-      const VAR = [
-        [BI.ice_spikes, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga, BI.snowy_taiga],
-        [BI.dappled_forest, BI.dappled_forest, BI.forest, BI.taiga, BI.old_growth_pine_taiga],
-        [BI.sunflower_plains, BI.plains, BI.forest, BI.old_growth_birch_forest, BI.pale_garden],
-        [BI.savanna, BI.savanna, BI.plains, BI.sparse_jungle, BI.bamboo_jungle],
-        [BI.desert, BI.desert, BI.badlands, BI.wooded_badlands, BI.eroded_badlands]];
       const useVar = cl.w > 0.35;
       if (ti === 4 && height > 80 && hi >= 2) return hi >= 4 ? BI.eroded_badlands : hi >= 3 ? BI.wooded_badlands : BI.badlands;
-      return (useVar ? VAR : MID)[ti][hi];
+      const T = biomeTables();
+      return (useVar ? T.VAR : T.MID)[ti][hi];
     }
     caveBiomeFor(cl, y, x, z) {
       if (this.singleBiome >= 0) return -1;
@@ -221,7 +264,8 @@
       const H = new Float32Array(256), climate = new Array(256), biome = new Uint8Array(256);
       const dcol = new Float32Array(33);
       let maxY = 0;
-      const solidMask = new Uint8Array(65536); // 1 = terrain solid
+      const solidMask = this._solid || (this._solid = new Uint8Array(65536)); // 1 = terrain solid
+      solidMask.fill(0);
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         const ci = lx >> 2, cj = lz >> 2, fx = (lx & 3) / 4, fz = (lz & 3) / 4;
         const a = cor[cj * 5 + ci], b = cor[cj * 5 + ci + 1], c = cor[(cj + 1) * 5 + ci], d = cor[(cj + 1) * 5 + ci + 1];
@@ -602,12 +646,7 @@
       const T = GEN.TREES, SS = GEN.STRUCT;
       const S = GEN.S();
       // how many trees
-      const dens = {
-        forest: 9, flower_forest: 3, birch_forest: 9, old_growth_birch_forest: 9, dark_forest: 14, pale_garden: 10, taiga: 9, old_growth_pine_taiga: 10, old_growth_spruce_taiga: 11,
-        snowy_taiga: 6, jungle: 14, sparse_jungle: 4, bamboo_jungle: 6, savanna: 1.2, savanna_plateau: 1.5, windswept_savanna: 1, plains: 0.12, sunflower_plains: 0.1, meadow: 0.12,
-        cherry_grove: 3, grove: 6, swamp: 2, mangrove_swamp: 7, snowy_plains: 0.2, wooded_badlands: 4, windswept_forest: 7, windswept_hills: 0.6, windswept_gravelly_hills: 0.5,
-        dappled_forest: 10, mushroom_fields: 0.6, snowy_slopes: 0.3, river: 0, beach: 0
-      }[key0] || 0;
+      const dens = TREE_DENS[key0] || 0;
       let n = Math.floor(dens) + (rng.next() < dens % 1 ? 1 : 0);
       for (let i = 0; i < n; i++) {
         const x = fx0 + rng.int(16), z = fz0 + rng.int(16);
@@ -663,33 +702,6 @@
       const S = GEN.S();
       const x0 = cx * 16, z0 = cz * 16;
       const put = (bi, s) => { blocks[bi] = s; };
-      const FL = {
-        plains: [['short_grass', 0.28], ['tall_grass', 0.04], ['dandelion', 0.01], ['poppy', 0.01], ['oxeye_daisy', 0.004], ['azure_bluet', 0.004], ['cornflower', 0.004], ['red_tulip', 0.002], ['bush', 0.004]],
-        sunflower_plains: [['short_grass', 0.25], ['sunflower', 0.05], ['tall_grass', 0.03]],
-        forest: [['short_grass', 0.12], ['leaf_litter', 0.05], ['bush', 0.02], ['dandelion', 0.006], ['poppy', 0.006], ['lily_of_the_valley', 0.003], ['brown_mushroom', 0.002], ['fern', 0.02]],
-        flower_forest: [['short_grass', 0.08], ['allium', 0.03], ['azure_bluet', 0.03], ['red_tulip', 0.02], ['orange_tulip', 0.02], ['white_tulip', 0.02], ['pink_tulip', 0.02], ['oxeye_daisy', 0.03], ['cornflower', 0.03], ['lily_of_the_valley', 0.03], ['lilac', 0.01], ['rose_bush', 0.01], ['peony', 0.01]],
-        birch_forest: [['short_grass', 0.12], ['wildflowers', 0.08], ['bush', 0.01]], old_growth_birch_forest: [['short_grass', 0.12], ['wildflowers', 0.1], ['fern', 0.03]],
-        dark_forest: [['short_grass', 0.1], ['brown_mushroom', 0.01], ['red_mushroom', 0.006], ['leaf_litter', 0.04]],
-        pale_garden: [['pale_moss_carpet', 0.25], ['moon_eye', 0.02], ['short_grass', 0.03]],
-        taiga: [['fern', 0.12], ['large_fern', 0.03], ['short_grass', 0.08], ['sweet_berry_bush', 0.006]],
-        old_growth_pine_taiga: [['fern', 0.15], ['large_fern', 0.05], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['sweet_berry_bush', 0.004]],
-        old_growth_spruce_taiga: [['fern', 0.15], ['large_fern', 0.05], ['red_mushroom', 0.004]],
-        snowy_taiga: [['fern', 0.05], ['sweet_berry_bush', 0.002]], grove: [], snowy_plains: [['short_grass', 0.02]],
-        jungle: [['short_grass', 0.2], ['fern', 0.1], ['tall_grass', 0.05], ['large_fern', 0.03], ['melon', 0.006]],
-        sparse_jungle: [['short_grass', 0.2], ['fern', 0.1], ['melon', 0.004]],
-        bamboo_jungle: [['bamboo', 0.12], ['short_grass', 0.1], ['podzol_patch', 0]],
-        savanna: [['short_grass', 0.25], ['tall_grass', 0.15]], savanna_plateau: [['short_grass', 0.25], ['tall_grass', 0.12]], windswept_savanna: [['short_grass', 0.2]],
-        desert: [['dead_bush', 0.006], ['short_dry_grass', 0.012], ['tall_dry_grass', 0.004], ['cactus', 0.006]],
-        badlands: [['dead_bush', 0.01], ['short_dry_grass', 0.01], ['cactus', 0.004]], wooded_badlands: [['short_grass', 0.08], ['dead_bush', 0.01]], eroded_badlands: [['dead_bush', 0.01]],
-        swamp: [['short_grass', 0.1], ['blue_orchid', 0.01], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['firefly_bush', 0.004], ['lily_pad', 0.05]],
-        mangrove_swamp: [['short_grass', 0.05], ['lily_pad', 0.03], ['firefly_bush', 0.003]],
-        meadow: [['short_grass', 0.3], ['tall_grass', 0.06], ['dandelion', 0.02], ['poppy', 0.02], ['allium', 0.02], ['azure_bluet', 0.02], ['oxeye_daisy', 0.02], ['cornflower', 0.02], ['wildflowers', 0.04]],
-        cherry_grove: [['pink_petals', 0.3], ['short_grass', 0.08]],
-        dappled_forest: [['leaf_litter', 0.18], ['red_shrub', 0.05], ['short_grass', 0.08], ['brown_mushroom', 0.01], ['bush', 0.01]],
-        mushroom_fields: [['red_mushroom', 0.01], ['brown_mushroom', 0.01]],
-        windswept_hills: [['short_grass', 0.1]], windswept_forest: [['short_grass', 0.1], ['fern', 0.05]],
-        river: [['sugar_cane', 0.04]], beach: [['sugar_cane', 0.02]],
-      };
       for (let col = 0; col < 256; col++) {
         const key = BIOMES[biome[col]].key;
         let y = 254; while (y > 1 && blocks[(y << 8) | col] === 0) y--;
@@ -718,7 +730,7 @@
           } else if ((key === 'swamp' || key === 'mangrove_swamp') && depth <= 2 && rng.chance(0.08)) blocks[ai] = st('lily_pad');
           continue;
         }
-        const list = FL[key]; if (!list) continue;
+        const list = FLORA[key]; if (!list) continue;
         const soilOk = ground === S.grass || ground === S.podzol || ground === S.coarse || ground === S.dirt || ground === S.mud || ground === S.moss || ground === S.mycelium;
         const sandOk = ground === S.sand || ground === S.redsand || R.T.type[ground] === R.byName.terracotta.id || (R.types[R.T.type[ground]] && /terracotta$/.test(R.types[R.T.type[ground]].name));
         for (const [name, p] of list) {
