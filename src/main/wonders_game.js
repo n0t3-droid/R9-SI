@@ -84,6 +84,9 @@
     // the sites around the player (the worker computes the cells it has time for; more → ask again soon)
     refresh(dt) {
       const g = this.g, p = g.player; if (!p || !g.pool || this.asking) return;
+      // the first list waits until the land around you has loaded (at most 8 s): its first cell — the spawn's, with
+      // the village sites the worker works out for it — takes the worker a few hundred ms, better not in the loading
+      if (!this.siteAt && (this.waitT = (this.waitT || 0) + dt) < 8 && g.world.pending && g.world.pending.size > 0) return;
       this.askT -= dt;
       const moved = !this.siteAt || Math.hypot(p.pos[0] - this.siteAt[0], p.pos[2] - this.siteAt[1]) > 200;
       if (this.askT > 0 || (!moved && !this.more)) return;
