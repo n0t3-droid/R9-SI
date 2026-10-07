@@ -440,8 +440,15 @@
         pl = Object.assign({}, again, { id: 'f' + Date.now().toString(36), dna, ox: again.ox + a0[0] - a1[0], oz: again.oz + a0[1] - a1[1], status: 'pending', t: Date.now() });
         this.plans = this.plans.filter(q => q.id !== again.id); this.storePlans((ps) => ps.filter(q => q.id !== again.id));
       } else {
-        const meta = Fg.meta(dna), at = this.locate(p, { lot: meta.lot, top: 40 });
+        let meta = Fg.meta(dna), at = this.locate(p, { lot: meta.lot, top: 40 });
         if (!at) { say(T('g.forge.look', null, 'Schau auf den Boden, wo es stehen soll.', 'Look at the ground where it should stand.'), '#ff8a8a'); return true; }
+        // a bridge without a length spans what is in front of it: down into the gap and up onto the far bank (+2)
+        if (meta.type === 'bridge' && !/\d/.test(text)) {
+          const d = ROT[at.r](0, 1), q0 = ROT[at.r](meta.lot[0] >> 1, 0);
+          let dip = -1, len = 0;
+          for (let v = 1; v <= 120 && !len; v++) { const gy = this.groundAt(at.ox + q0[0] + d[0] * v, at.oz + q0[1] + d[1] * v, at.F + 40, at.F - DEPTH); if (dip < 0 && gy < at.F - 2) dip = v; else if (dip >= 0 && gy >= at.F - 1) len = v + 2; }
+          if (len) { const P = Fg.parse(dna); P.params.l = Math.max(10, Math.min(120, len)); dna = Fg.dna(P); meta = Fg.meta(dna); at = this.locate(p, { lot: meta.lot, top: 40 }); }
+        }
         if (!at.ok) { say(at.why, '#ff8a8a'); return true; }
         pl = { id: 'f' + Date.now().toString(36), kind: 'forge', dna, ox: at.ox, oz: at.oz, F: at.F, r: at.r, status: 'pending', t: Date.now() };
       }
