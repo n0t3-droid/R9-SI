@@ -90,18 +90,22 @@
     const cc = C.c;
     let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
     for (let i = 0; i < cc.length; i += 4) { const x = cc[i], y = cc[i + 1], z = cc[i + 2]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
-    const pad = opts.pad === undefined ? 3 : opts.pad;
-    // the scale: whole pixels per half-width (gapless cubes); too big → cells merged k at a time
-    let k = 1, u = 0, dx, dy, dz;
+    const pad = opts.pad === undefined ? 3 : opts.pad, AW = W - 2 * pad, AH = H - 2 * pad;
+    // the scale: cubes in whole pixels (u per half-width, h tall: gapless) — the next whole size up is drawn and the
+    // picture then shrunk to fit (so it always fills its frame); too big even at one pixel → cells merged k at a time
+    let k = 1, u = 1, h = 2, dx, dy, dz;
+    const content = (uu, hh) => [(dx + dz) * 2 * uu, (dx + dz) * uu + dy * hh];
     for (;;) {
       dx = Math.ceil((x1 - x0 + 1) / k); dy = Math.ceil((y1 - y0 + 1) / k); dz = Math.ceil((z1 - z0 + 1) / k);
-      u = Math.floor(Math.min((W - 2 * pad) / (2 * (dx + dz)), (H - 2 * pad) / ((dx + dz) + HR * dy)));
-      if (opts.maxU) u = Math.min(u, opts.maxU);
-      if (u >= 1 || k > 64) break;
+      const us = Math.min(AW / (2 * (dx + dz)), AH / ((dx + dz) + HR * dy));
+      if (us >= 0.5 || k > 64) { u = Math.max(1, Math.ceil(us - 1e-6)); if (opts.maxU) u = Math.min(u, opts.maxU); break; }
       k++;
     }
-    u = Math.max(1, u);
-    const h = Math.max(1, Math.round(HR * u));
+    h = Math.max(1, Math.round(HR * u));
+    // the drawing: at (u, h) on a canvas of its own size when it has to shrink, else straight into the picture
+    const [cw0, ch0] = content(u, h), fit = Math.min(1, AW / cw0, AH / ch0);
+    const DW = fit < 0.999 ? cw0 + 2 : W, DH = fit < 0.999 ? ch0 + 2 : H;
+    const draw = fit < 0.999 ? { w: DW, h: DH, data: new Uint8ClampedArray(DW * DH * 4) } : img;
     // the merged grid: per cell the state of its highest block (the roof is what you see)
     const N = dx * dy * dz, occ = new Uint16Array(N), topY = new Int32Array(N).fill(-2147483647);
     const SX = dx, SXZ = dx * dz;
@@ -135,22 +139,35 @@
     for (let i = 1; i <= nb; i++) cnt[i] += cnt[i - 1];
     const order = new Int32Array(nv);
     for (let i = 0; i < nv; i++) order[cnt[vis[i * 4 + 2] - kmin]++] = i;
-    // where the picture's origin goes: centred
+    // where the drawing's origin goes: centred
     const spanX = (dx + dz) * 2 * u, top = -dz * u - dy * h, bot = dx * u;
-    const OX = Math.floor((W - spanX) / 2), OY = Math.floor((H - (bot - top)) / 2) - top;
-    const sp = sprite(u, h), D = img.data, edges = u >= 3 && !opts.noEdges, spx = sp.x, spy = sp.y, spf = sp.f, spe = sp.e;
+    const OX = Math.floor((DW - spanX) / 2), OY = Math.floor((DH - (bot - top)) / 2) - top;
+    const sp = sprite(u, h), DD = draw.data, edges = u >= 3 && !opts.noEdges, spx = sp.x, spy = sp.y, spf = sp.f, spe = sp.e;
     for (let q = 0; q < nv; q++) {
       const vi = order[q] * 4, j = vis[vi], show = vis[vi + 1], s = occ[j];
       const x = j % SX, z = ((j / SX) | 0) % dz, y = (j / SXZ) | 0;
       const bx = OX + (x + z) * 2 * u, by = OY + (x - z) * u - y * h, cb = s * 12;
       for (let p = 0; p < sp.n; p++) {
         const f = spf[p]; if (!(show & (1 << f))) continue;
-        const X = bx + spx[p], Y = by + spy[p]; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
-        const o = (Y * W + X) * 4, c = cb + f * 4, e = edges && spe[p] ? 0.86 : 1, ca = RG[c + 3];
-        if (ca >= 255) { D[o] = RG[c] * e; D[o + 1] = RG[c + 1] * e; D[o + 2] = RG[c + 2] * e; D[o + 3] = 255; }
-        else { const a = ca / 255, b = 1 - a, a0 = D[o + 3] / 255, ao = a + a0 * b, n = ao || 1; D[o] = (RG[c] * e * a + D[o] * a0 * b) / n; D[o + 1] = (RG[c + 1] * e * a + D[o + 1] * a0 * b) / n; D[o + 2] = (RG[c + 2] * e * a + D[o + 2] * a0 * b) / n; D[o + 3] = ao * 255; }
+        const X = bx + spx[p], Y = by + spy[p]; if (X < 0 || Y < 0 || X >= DW || Y >= DH) continue;
+        const o = (Y * DW + X) * 4, c = cb + f * 4, e = edges && spe[p] ? 0.86 : 1, ca = RG[c + 3];
+        if (ca >= 255) { DD[o] = RG[c] * e; DD[o + 1] = RG[c + 1] * e; DD[o + 2] = RG[c + 2] * e; DD[o + 3] = 255; }
+        else { const a = ca / 255, b = 1 - a, a0 = DD[o + 3] / 255, ao = a + a0 * b, n = ao || 1; DD[o] = (RG[c] * e * a + DD[o] * a0 * b) / n; DD[o + 1] = (RG[c + 1] * e * a + DD[o + 1] * a0 * b) / n; DD[o + 2] = (RG[c + 2] * e * a + DD[o + 2] * a0 * b) / n; DD[o + 3] = ao * 255; }
       }
     }
+    // shrunk into the picture: each pixel the average of what falls on it (premultiplied), centred
+    if (draw !== img) {
+      const tw = Math.max(1, Math.round(DW * fit)), th = Math.max(1, Math.round(DH * fit)), ox = Math.floor((W - tw) / 2), oy = Math.floor((H - th) / 2);
+      const acc = new Float32Array(tw * th * 5), sx = tw / DW, sy = th / DH;
+      for (let y = 0; y < DH; y++) { const ty = Math.min(th - 1, (y * sy) | 0); for (let x = 0; x < DW; x++) { const o = (y * DW + x) * 4, t = (ty * tw + Math.min(tw - 1, (x * sx) | 0)) * 5, a = DD[o + 3] / 255; acc[t] += DD[o] * a; acc[t + 1] += DD[o + 1] * a; acc[t + 2] += DD[o + 2] * a; acc[t + 3] += a; acc[t + 4]++; } }
+      const D2 = img.data;
+      for (let y = 0; y < th; y++) for (let x = 0; x < tw; x++) {
+        const t = (y * tw + x) * 5, n = acc[t + 4]; if (!n || !acc[t + 3]) continue;
+        const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= W || Y >= H) continue;
+        const o = (Y * W + X) * 4; D2[o] = acc[t] / acc[t + 3]; D2[o + 1] = acc[t + 1] / acc[t + 3]; D2[o + 2] = acc[t + 2] / acc[t + 3]; D2[o + 3] = 255 * acc[t + 3] / n;
+      }
+    }
+    const D = img.data;
     // a soft dark line around it: the shape reads on any background
     if (opts.outline !== false) {
       const A = new Uint8Array(W * H); for (let i = 0; i < W * H; i++) A[i] = D[i * 4 + 3] > 40 ? 1 : 0;
@@ -159,7 +176,7 @@
         if ((x > 0 && A[i - 1]) || (x < W - 1 && A[i + 1]) || (y > 0 && A[i - W]) || (y < H - 1 && A[i + W])) { const o = i * 4; D[o] = 12; D[o + 1] = 16; D[o + 2] = 28; D[o + 3] = 110; }
       }
     }
-    img.k = k; img.u = u;
+    img.k = k; img.u = u; img.fit = fit;
     return img;
   };
 
