@@ -1518,12 +1518,13 @@
   // stems fan out of a tall ceramic vase; each plume is a soft spindle along its stem
   def('deco', 'vase', 'pampas', 'Floor Vase · pampas grass', Object.assign({}, DK, { res: 16, size: [1, 2, 1], col: 'cream', build: (b) => {
     b.lathe(8, 8, [[0, 2.4], [1.5, 3.3], [6, 3.5], [9, 2.6], [11, 1.6], [12.5, 1.5], [13, 1.8]], M.matte(0xE8E2D4));
-    for (let k = 0; k < 9; k++) {
-      const a = k * Math.PI * 2 / 9 + 0.3, s = 3 + (k % 3) * 1.6, base = [8, 12.5, 8], tip = [8 + Math.cos(a) * s, 30 - s * 1.3 - (k % 2) * 1.5, 8 + Math.sin(a) * s * 0.8];
+    // six stems fanning out of the neck, each ending in a feathery plume: soft overlapping puffs that shrink towards the tip
+    const plumes = [0xE8D8B8, 0xDCC8A0, 0xF0E4CC];
+    for (let k = 0; k < 6; k++) {
+      const a = k * Math.PI * 2 / 6 + 0.3, s = 2.4 + (k % 3) * 1.4, base = [8, 12.5, 8], tip = [8 + Math.cos(a) * s, 28.5 - (k % 2) * 2 - (k % 3) * 0.8, 8 + Math.sin(a) * s * 0.8];
       const at = (t) => base.map((v, i) => v + (tip[i] - v) * t);
-      b.rod(...base, ...at(0.5), 0.6, M.plant(0xB8A070));
-      const plume = M.fabric(k % 2 ? 0xE8D8B8 : 0xDCC8A0);
-      b.rod(...at(0.5), ...at(0.9), 1.4, plume); b.rod(...at(0.45), ...at(1), 0.9, plume);
+      b.rod(...base, ...tip, 0.6, M.plant(0xB8A070));
+      [[0.55, 1.6], [0.7, 1.45], [0.85, 1.25], [1, 1]].forEach(([t, rr], j) => { const c = at(t); b.ellipsoid(c[0], c[1], c[2], rr, rr * 1.2, rr, M.fabric(plumes[(k + j) % 3])); });
     }
   } }));
   // three ceramics on a travertine tray: a sage bottle, a cream moon vase, a terracotta cylinder with a dried branch
@@ -1571,8 +1572,11 @@
   def('deco', 'bust', 'marble', 'Bust · white marble', Object.assign({}, DK, { res: 16, size: [1, 2, 1], col: 'white', sound: 'stone', hard: 1, build: (b) => {
     const m = M.marble(0xEEEDEA);
     b.box(4, 0, 4, 12, 15, 12, M.stone(0x3A3C40)); b.box(3.5, 14, 3.5, 12.5, 15, 12.5, M.stone(0x2E3034));
-    b.ellipsoid(8, 18, 8.5, 4.5, 3, 3, m); b.cyl('y', 8, 8.5, 1.5, 19, 22, m); b.ellipsoid(8, 25, 8, 2.75, 3.5, 3, m); b.ellipsoid(8, 26.5, 9, 2.75, 2.25, 2.5, M.marble(0xE2E0DA));
-    b.box(7.5, 24.5, 4.5, 8.5, 26, 5.5, m);
+    // the torso in elliptic layers (chest, shoulders, a slope into the neck), a neck, and an egg-shaped head with a nose
+    for (const [y0, y1, rx, rz] of [[15, 17, 4.9, 3.6], [17, 19, 5.5, 3.8], [19, 20.5, 5.8, 3.9], [20.5, 21.5, 5.2, 3.6], [21.5, 22.5, 3.6, 3.0]]) ellRingFill(b, 8, 8.2, rx, rz, y0, y1, m);
+    b.cyl('y', 8, 8.2, 1.6, 22, 24.5, m);
+    b.lathe(8, 8.2, [[23.6, 0], [24.4, 2.0], [25.5, 2.7], [27, 2.95], [28.5, 2.75], [29.5, 2.0], [30.1, 0.6], [30.3, 0]], m);
+    b.box(7.5, 26, 4, 8.5, 27.5, 5.5, m);
   } }));
   def('deco', 'macrame', 'wall', 'Macramé · wall hanging', Object.assign({}, DK, { res: 16, size: [1, 2, 1], col: 'cream', mount: 'wall', solid: false, sound: 'wool', build: (b) => {
     const c = M.fabric(0xEDE6D8), cd = M.fabric(0xD8CDB8);
