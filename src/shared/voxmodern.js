@@ -1047,9 +1047,9 @@
   def('garden', 'poolfloat', 'flamingo', 'Pool Float · flamingo', Object.assign({}, GA, { res: 16, size: [1, 1, 1], col: 'blush', solid: false, sound: 'wool', hard: 0.2, build: (b) => {
     const pk = M.gloss(0xF28AB0);
     torus(b, 8, 1.75, 8.5, 4.4, 1.75, pk);
-    const neck = [[8, 2.5, 4.5], [8, 5.5, 3.6], [8, 8.5, 4.4], [8, 10.5, 6], [8, 12.5, 6.2], [8, 13.5, 5]];
-    for (let k = 0; k + 1 < neck.length; k++) b.rod(...neck[k], ...neck[k + 1], 0.9, pk);
-    b.ellipsoid(8, 13.5, 4.8, 1.3, 1.2, 1.7, pk);                                                       // the head
+    const neck = [[8, 2.5, 4.5], [8, 5.5, 3.8], [8, 8.5, 4.6], [8, 10.5, 5.8], [8, 12.5, 6], [8, 13.5, 5]];
+    for (let k = 0; k + 1 < neck.length; k++) b.rod(...neck[k], ...neck[k + 1], 0.7, pk);              // a slender S-neck
+    b.ellipsoid(8, 13.5, 4.8, 1.4, 1.25, 1.8, pk);                                                      // the head
     b.rod(8, 13.5, 3.5, 8, 12.5, 2.5, 0.6, M.gloss(0xF6F2EA)); b.rod(8, 12.5, 2.5, 8, 11.5, 2.5, 0.5, M.gloss(0x1E2024));   // the beak, its black tip
     for (const x of [6, 9]) b.box(x, 13, 4, x + 1, 14, 5, M.gloss(0x1E2024));                            // eyes
     b.extrude([[12, 2.5], [15.5, 6], [15.5, 4.5], [14.5, 2.5]], 'x', 7, 9, pk);                          // the tail
@@ -1101,7 +1101,12 @@
     const m = M.metal(P.anthracite);
     for (const [x, z] of [[1, 1], [45, 1], [1, 45], [45, 45]]) b.box(x, 0, z, x + 2, 45, z + 2, m);
     for (const z of [1, 45]) b.box(1, 41, z, 47, 45, z + 2, m); for (const x of [1, 45]) b.box(x, 41, 1, x + 2, 45, 47, m);
-    for (let z = 4; z < 45; z += 3) b.box(3, 43, z, 45, 44, z + 2, M.metal(sh(P.anthracite, 1.15)));
+    // open louvres: blades tilted about 26 degrees on the beam line, with sky between them (each a parallelogram in z-y)
+    const cs = Math.cos(0.45), sn = Math.sin(0.45), hw = 2.2, t = 1.3, bl = M.metal(sh(P.anthracite, 1.15));
+    for (let z = 6; z < 40; z += 6) {
+      const cz = z + 2.2, A = [cz - cs * hw, 43 - sn * hw], B = [cz + cs * hw, 43 + sn * hw], nz = -sn * t / 2, ny = cs * t / 2;
+      b.extrude([[A[0] + nz, A[1] + ny], [B[0] + nz, B[1] + ny], [B[0] - nz, B[1] - ny], [A[0] - nz, A[1] - ny]], 'x', 3, 45, bl);
+    }
     for (const z of [3, 44]) b.box(3, 40, z, 45, 41, z + 1, M.light(0xFFE2B0)); for (const x of [3, 44]) b.box(x, 40, 4, x + 1, 41, 44, M.light(0xFFE2B0));
   } }));
   // a square parasol, 3 m: a weighted base and the pole in the middle column, the canopy over all nine cells 2 m up
@@ -1147,7 +1152,11 @@
     for (const x of [6, 15, 24]) { b.box(x, 7.5, 10, x + 1, 15.5, 11, M.wood(P.oak)); b.sphere(x + 0.5, 11, 10.5, 2, M.plant(P.leaf)); b.box(x + 1.5, 9.5, 9, x + 2.5, 10.5, 10, M.gloss(0xD8322A)); b.box(x - 1.5, 12, 10, x - 0.5, 13, 11, M.gloss(0xD8322A)); b.box(x + 1, 13, 11, x + 2, 14, 12, M.gloss(0xE89A2A)); }
   } }));
   def('garden', 'bollard', 'black', 'Garden Light · bollard', Object.assign({}, GA, { size: [1, 1, 1], col: 'black', toggle: true, light: [12, 10, 7], sound: 'metal', solid: false, build: (b) => {
-    b.box(5.5, 0, 5.5, 10.5, 9, 10.5, M.metal(P.black)); b.box(5.5, 9, 5.5, 10.5, 11, 10.5, M.light(0xFFE2B0)); b.box(5, 11, 5, 11, 12, 11, M.metal(P.black));
+    // a round bollard: a black drum on a flared foot, a glowing band just proud of the drum under its head, a domed cap
+    const k = M.metal(P.black);
+    b.lathe(8, 8, [[0, 3.1], [1.2, 2.5]], k); b.cyl('y', 8, 8, 2.5, 1.2, 8.5, k);
+    b.cyl('y', 8, 8, 2.75, 8.5, 9.5, M.light(0xFFE2B0));
+    b.cyl('y', 8, 8, 2.5, 9.5, 10.5, k); b.lathe(8, 8, [[10.5, 2.9], [11.2, 2.6], [11.7, 1.6], [12, 0]], k);
   } }));
   def('garden', 'mower', 'robot', 'Robot Mower · with dock', Object.assign({}, GA, { size: [1, 1, 1], col: 'anthracite', sound: 'metal', build: (b) => {
     b.pbox(3, 0.5, 2, 13, 3.5, 11, 2, M.gloss(0x3A3D44)); b.pbox(4, 3.5, 3, 12, 4, 10, 1.5, M.gloss(0xF07E1E)); b.box(6, 4, 4, 10, 4.5, 6, M.gloss(0x111214)); b.box(7.5, 4, 3.5, 8.5, 4.5, 4, M.light(0x4AE08A));
@@ -1155,12 +1164,20 @@
     b.box(3, 0, 12, 13, 0.5, 16, M.gloss(0x3A3D44)); b.box(6, 0.5, 14, 10, 4, 15.5, M.gloss(0x3A3D44)); b.box(7, 3, 13.5, 9, 3.5, 14, M.light(0x4AE08A));
   } }));
   def('garden', 'hammock', 'stand', 'Hammock · on a stand', Object.assign({}, GA, { cats: ['garden', 'seat'], size: [3, 1, 1], col: 'sand', seat: true, sound: 'wool', build: (b) => {
-    const w = M.wood(0xA8865A), cloth = M.fabric(0xE8D8B8), str = M.fabric(0xC09A6A);
-    let px = 1, py = 14;
-    for (let k = 1; k <= 24; k++) { const t = k / 24, x = 1 + t * 46, y = 1 + (1 - Math.sin(t * Math.PI)) * 13; b.rod(px, py, 8, x, y, 8, 0.75, w); px = x; py = y; }   // the curved stand, low in the middle
-    b.box(16, 0, 3, 18, 1.5, 13, w); b.box(30, 0, 3, 32, 1.5, 13, w);
-    for (let x = 6; x < 42; x += 0.5) { const t = (x - 24) / 18, y = 6 + t * t * 6; b.box(x, y, 4.5, x + 0.5, y + 0.5, 11.5, ((x * 2) | 0) % 6 < 3 ? cloth : str); }
-    b.rod(3, 11, 8, 6, 12, 8, 0.35, str); b.rod(45, 11, 8, 42, 12, 8, 0.35, str); b.cushion(7, 7.5, 5, 12, 9.5, 11, 1, M.fabric(P.sage), false);
+    // two A-frame stands, each with a crossbar at 12 and a brace low down; one band of cloth hung from the crossbars,
+    // sagging between them, in stripes, with a cushion in the sag
+    const w = M.wood(0xA8865A), cloth = M.fabric(0xE8D8B8), str = M.fabric(0xC9A87A);
+    for (const xe of [3, 45]) {
+      b.rod(xe, 12, 2.5, xe, 12, 13.5, 0.7, w);                                                       // the crossbar
+      b.rod(xe, 12.5, 8, xe, 0.8, 1.5, 0.7, w); b.rod(xe, 12.5, 8, xe, 0.8, 14.5, 0.7, w);           // the A-frame legs
+      b.rod(xe, 4.5, 3.6, xe, 4.5, 12.4, 0.5, w);                                                     // the brace
+    }
+    const sag = (x) => 5 + 7 * ((x - 24) / 21) ** 2, poly = [];
+    for (let x = 3.5; x <= 44.5; x += 0.5) poly.push([x, sag(x) + 1]);
+    for (let x = 44.5; x >= 3.5; x -= 0.5) poly.push([x, sag(x)]);
+    b.extrude(poly, 'z', 5, 11, cloth);
+    for (const x0 of [9, 15, 21, 27, 33]) b.recolor(x0, 0, 5, x0 + 1.5, 16, 11, str);                // stripes across the cloth
+    b.cushion(19, 6, 6, 29, 8.5, 10.5, 1.2, M.fabric(P.sage), false);
   } }));
   def('garden', 'eggchair', 'rattan', 'Hanging Egg Chair · rattan', Object.assign({}, GA, { cats: ['garden', 'seat'], res: 16, size: [1, 2, 1], col: 'sand', seat: true, sound: 'wood', build: (b) => {
     const m = M.metal(P.black), r = M.wood(0xC8A878), rd = M.wood(0xA8885A);
