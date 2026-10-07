@@ -26,7 +26,7 @@
     { id: 'regenbogen', icon: '🌈', de: 'Regenbogenbrücke', en: 'Rainbow Arch', prefer: /river|flower|sunflower|meadow|lush/, coast: true, lot: [17, 62] },
     { id: 'sternwarte', icon: '🔭', de: 'Sternwarte', en: 'Star Observatory', prefer: /windswept|hills|plateau|slopes|grove|meadow/, lot: [41, 45] },
     { id: 'riesenbaum', icon: '🌳', de: 'Riesenbaum', en: 'Giant Tree', prefer: /forest|jungle|taiga|dappled|pale_garden/, lot: [57, 57] },
-    { id: 'leuchtturm', icon: '🗼', de: 'Wolkenleuchtturm', en: 'Cloud Lighthouse', prefer: /beach|shore|stony|windswept/, coast: true, lot: [37, 41] },
+    { id: 'wolkenturm', icon: '🗼', de: 'Wolkenleuchtturm', en: 'Cloud Lighthouse', prefer: /beach|shore|stony|windswept/, coast: true, lot: [37, 41] },
     { id: 'labyrinth', icon: '🌿', de: 'Labyrinthgarten', en: 'Maze Garden', prefer: /plains|meadow|sky_meadow|flower|savanna_plateau/, lot: [61, 61] },
     { id: 'pyramide', icon: '☀️', de: 'Sonnenpyramide', en: 'Golden Sun Pyramid', prefer: /desert|savanna|badlands|ember/, lot: [51, 57] },
     { id: 'mondtempel', icon: '🌙', de: 'Mondtempel', en: 'Moonlight Temple', prefer: /snow|ice|frozen|taiga|grove|tundra|cold/, lot: [45, 55] },
@@ -35,11 +35,12 @@
   W.dna = (type, seed) => 'wonder:' + type + '#' + ((seed >>> 0) & 0xffffffff || 1).toString(16);
   // a name as people write it ("Sternwarte", "die sternwarte", "star observatory", "Kristall-Kathedrale") → the type id
   const fold = (s) => String(s || '').toLowerCase().replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss').replace(/[^a-z]/g, '');
+  // (a lighthouse or a tower alone stays the Forge's lookout: only the wonder's own names and words that belong to no
+  // Forge type name a wonder)
   W.byName = function (text) {
     const f = fold(text); if (f.length < 4) return null;
-    for (const t of W.TYPES) for (const nm of [t.de, t.en, t.id]) { const k = fold(nm); if (f === k || f.includes(k)) return t.id; }
-    // the main word alone ("Kathedrale", "Pyramide", "Labyrinth", "Leuchtturm", "lighthouse", "maze")
-    const WORDS = { kristall: ['kathedrale', 'cathedral', 'kristalle'], regenbogen: ['regenbogen', 'rainbow'], sternwarte: ['observatorium', 'observatory', 'teleskop', 'telescope'], riesenbaum: ['baumriese', 'giantree', 'riesenbaume'], leuchtturm: ['leuchtturm', 'lighthouse'], labyrinth: ['labyrinth', 'irrgarten', 'maze'], pyramide: ['pyramide', 'pyramid'], mondtempel: ['mondtempel', 'moontemple', 'moonlight'] };
+    for (const t of W.TYPES) { if (f === t.id) return t.id; for (const nm of [t.de, t.en]) { const k = fold(nm); if (f === k || f.includes(k)) return t.id; } }
+    const WORDS = { kristall: ['kathedrale', 'cathedral', 'kristallkirche'], regenbogen: ['regenbogen', 'rainbow'], sternwarte: ['observatorium', 'observatory', 'teleskop', 'telescope'], riesenbaum: ['baumriese', 'giantree', 'riesenbaume'], wolkenturm: ['wolkenturm', 'cloudtower', 'cloudlighthouse'], labyrinth: ['labyrinth', 'irrgarten', 'maze'], pyramide: ['pyramide', 'pyramid'], mondtempel: ['mondtempel', 'moontemple', 'moonlight'] };
     for (const id in WORDS) for (const w of WORDS[id]) if (f.includes(w)) return id;
     return null;
   };
@@ -222,8 +223,27 @@
     out.sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
     return out;
   };
-  // the worker's job: {x, z, r, spawn} → {type:'wonders', list}
-  W.job = function (g, m) { return { type: 'wonders', id: m.id, list: W.near(g, m.x, m.z, Math.min(3000, m.r || 1500), m.spawn).map(s => Object.assign({}, s)) }; };
+  // the worker's job: {x, z, r, spawn, budget?} → {type:'wonders', list, more}. A cold cell costs its terrain samples
+  // (20–60 ms): with a budget (ms) the job computes the nearest cells it has time for and says more = true — the game
+  // asks again a moment later, the worker's other jobs run in between
+  W.job = function (g, m) {
+    const r = Math.min(3000, m.r || 1500), list = [];
+    if (!usable(g)) return { type: 'wonders', id: m.id, list, more: false };
+    const R0 = Math.ceil(r / W.CELL), ci = Math.floor(m.x / W.CELL), cj = Math.floor(m.z / W.CELL), cells = [];
+    for (let dj = -R0; dj <= R0; dj++) for (let di = -R0; di <= R0; di++) {
+      const i = ci + di, j = cj + dj, nx = Math.max(i * W.CELL, Math.min(m.x, (i + 1) * W.CELL)), nz = Math.max(j * W.CELL, Math.min(m.z, (j + 1) * W.CELL));
+      const d = Math.hypot(nx - m.x, nz - m.z); if (d <= r) cells.push([d, i, j]);
+    }
+    cells.sort((a, b) => a[0] - b[0]);
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now()), t0 = now();
+    let more = false;
+    for (const [, i, j] of cells) {
+      if (m.budget && now() - t0 > m.budget && !(g._wonders && g._wonders.map.has(keyOf(i, j)))) { more = true; continue; }
+      const s = W.site(g, i, j, m.spawn); if (s && Math.hypot(s.x - m.x, s.z - m.z) <= r) list.push(Object.assign({}, s));
+    }
+    list.sort((a, b) => Math.hypot(a.x - m.x, a.z - m.z) - Math.hypot(b.x - m.x, b.z - m.z));
+    return { type: 'wonders', id: m.id, list, more };
+  };
   // a site's wonder: the Forge DNA and its build (the game builds it through its forge plans)
   W.dnaOf = (s) => W.dna(s.type, s.seed);
   W.build = function (type, seed, env) { return VR.Forge.build(W.dna(type, seed), env); };

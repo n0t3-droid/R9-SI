@@ -623,8 +623,9 @@
       if (!(flags & 2)) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       return true;
     }
-    // bulk edit without per-block light updates; columns are relit in workers afterwards
-    bulkSet(list, notify) {
+    // bulk edit without per-block light updates; columns are relit in workers afterwards — or, with defer (a Set), not
+    // yet: the touched columns go into it and the caller relights them once (a wonder rising in thirty slices)
+    bulkSet(list, notify, defer) {
       const touched = new Map();
       const T = R.T;
       for (const [x, y, z, state] of list) {
@@ -644,6 +645,7 @@
         touched.set(c.key, c);
         if (notify) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       }
+      if (defer) { for (const c of touched.values()) defer.add(c); return touched.size; }
       this.relightColumns([...touched.values()]);
       return touched.size;
     }

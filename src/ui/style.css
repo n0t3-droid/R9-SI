@@ -201,3 +201,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 #langseg button { flex: 0 1 180px; }
 /* right-to-left languages (the language module sets html dir=rtl): texts in panels, chat and hints follow */
 [dir=rtl] .panel, [dir=rtl] #chatlog, [dir=rtl] #hint, [dir=rtl] #toasts, [dir=rtl] #vehiclehud { direction: rtl; unicode-bidi: plaintext; }
+/* ✨ Wunder der Welt (wonders_game.js): the discovery banner in the middle of the screen, the Wunderkompass at the top */
+#wbanner { position: absolute; left: 50%; top: 33%; transform: translate(-50%, -50%) scale(.9); z-index: 40; pointer-events: none; opacity: 0; text-align: center; white-space: nowrap; font-family: var(--display); font-weight: 900; font-size: clamp(24px, 4.2vw, 52px); letter-spacing: 1px; color: #fff4d2; text-shadow: 0 0 22px rgba(255, 200, 110, .95), 0 0 6px rgba(255, 236, 180, .9), 0 4px 0 rgba(20, 12, 40, .55); padding: 14px 34px; border-radius: 22px; background: radial-gradient(ellipse at center, rgba(40, 24, 70, .55), rgba(10, 8, 24, 0) 72%); transition: opacity .45s ease-out, transform .7s cubic-bezier(.2, 1.4, .4, 1); }
+#wbanner.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#wbanner.off { opacity: 0; transform: translate(-50%, -50%) scale(1.04); transition: opacity .7s ease-in, transform .7s ease-in; }
+#wcompass { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); display: none; padding: 4px 13px; border-radius: 14px; background: rgba(8, 12, 28, .5); border: 1px solid rgba(255, 220, 150, .35); color: #ffe7a6; font-family: var(--font); font-weight: 700; font-size: 15px; letter-spacing: .3px; text-shadow: 0 1px 3px #000; white-space: nowrap; }

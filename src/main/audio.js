@@ -101,6 +101,10 @@
         case 'warp': { const o = this.tone(80, 0.4, 2.2, 'sawtooth', true); if (o) o.frequency.exponentialRampToValueAtTime(1600, t + 2); break; }
         case 'meteor': { const src = c.createBufferSource(); src.buffer = this.noise; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(200, t + 2.5); const g = c.createGain(); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.6); src.connect(f); f.connect(g); g.connect(this.sfx); src.start(t, 0, 2.7); break; }
         case 'toast': this.tone(988, 0.1, 0.25, 'sine', true); this.tone(1319, 0.08, 0.35, 'sine', true, t + 0.08); break;
+        // ✨ a wonder rises: a slow, soft rising chime (a pentatonic arpeggio, bells with a long tail)
+        case 'wonder': [523, 659, 784, 988, 1175, 1319, 1568].forEach((f, i) => { this.tone(f, 0.07, 2.4, 'sine', true, t + i * 0.32); this.tone(f * 2.01, 0.02, 1.6, 'sine', true, t + i * 0.32 + 0.01); }); break;
+        // ✨ a wonder found: a bright little fanfare (a rising triad, then the chord held)
+        case 'fanfare': [[523, 0], [659, 0.12], [784, 0.24], [1047, 0.42]].forEach(([f, d]) => { this.tone(f, 0.16, d < 0.4 ? 0.3 : 1.6, 'triangle', true, t + d); this.tone(f * 0.5, 0.06, d < 0.4 ? 0.3 : 1.6, 'sawtooth', false, t + d); }); [1047, 1319, 1568].forEach((f) => this.tone(f, 0.08, 1.8, 'sine', true, t + 0.42)); break;
       }
     }
     // continuous loops: name → {gain, filter}; level 0..1
