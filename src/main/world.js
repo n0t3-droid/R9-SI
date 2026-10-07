@@ -69,6 +69,9 @@
     onMsg(w, m) {
       if (m.type === 'log') { console.log('[worker]', m.msg); return; }
       if (!this.workers.includes(w)) return;   // a late word from a worker already replaced
+      // a job waits for a town plan the worker is building a slice at a time (worker_main.js): it keeps its slot, and
+      // its time out restarts (the plan is progressing, the worker is not stuck)
+      if (m.type === 'waiting') { const st = this.started.get(m.id); if (st) st.t0 = performance.now(); return; }
       w.inflight = Math.max(0, w.inflight - 1);
       const st = this.started.get(m.id);
       if (st) { this.started.delete(m.id); if (!st.direct) { const ms = m.ms !== undefined ? m.ms : Math.min(400, (performance.now() - st.t0) / Math.max(1, st.q)); this.laneMs[st.lane] += ms; } }
@@ -137,6 +140,15 @@
     terminate() { for (const w of this.workers) w.terminate(); this.workers = []; this.started.clear(); this.cb.clear(); }
   }
   VR.WorkerPool = WorkerPool;
+  // The number of workers: one generation/mesh worker on a 2-core machine (the main thread needs the other core), two
+  // on 3–4 cores, cores − 2 above that (at most 6). The quality preset caps it: potato 2, low 3 (less terrain to make
+  // at those render distances, and every worker keeps caches of its own — up to ~120 MB of pieces each).
+  VR.poolSize = function (cores, preset) {
+    const c = cores >= 1 ? Math.floor(cores) : 4;
+    const base = c <= 2 ? 1 : c <= 4 ? 2 : Math.min(c - 2, 6);
+    const cap = preset === 'potato' ? 2 : preset === 'low' ? 3 : 6;
+    return Math.max(1, Math.min(base, cap));
+  };
 
   // ----------------------------------------------------------------- column / section
   class Section {
