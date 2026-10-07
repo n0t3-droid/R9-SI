@@ -154,7 +154,8 @@
     } else {
       // Pultdach: three flat levels stepping up toward the street, the risers glazed as clerestory bands
       const RY = (v) => v <= Math.floor(d * 0.3) ? top + 2 : v <= Math.floor(d * 0.62) ? top + 1 : top;
-      for (let v = -1; v <= d; v++) for (let u = -1; u <= w; u++) { const edge = u === -1 || u === w || v === -1 || v === d, yy = RY(Math.max(0, Math.min(d - 1, v))); K.set(hx(u), yy, hz(v), edge ? S.trim : 'roof_charcoal'); K.set(hx(u), yy + 1, hz(v), 'roof_charcoal_slab', { type: 0 }); }
+      // (one block thick with a slim fascia: the overhang is a top slab, so the roof's edge reads thin like a modern one)
+      for (let v = -1; v <= d; v++) for (let u = -1; u <= w; u++) { const edge = u === -1 || u === w || v === -1 || v === d, yy = RY(Math.max(0, Math.min(d - 1, v))); if (edge) K.set(hx(u), yy, hz(v), 'roof_charcoal_slab', { type: 1 }); else K.set(hx(u), yy, hz(v), 'roof_charcoal'); }
       for (let v = 0; v < d; v++) { const yy = RY(v); for (let y2 = top; y2 < yy; y2++) { wall(hx(0), y2, hz(v)); wall(hx(w - 1), y2, hz(v)); } }
       for (let u = 0; u < w; u++) for (let y2 = top; y2 < RY(0); y2++) { if (u === 0 || u === w - 1) wall(hx(u), y2, hz(0)); else K.set(hx(u), y2, hz(0), S.glass); }
       for (let v = 1; v < d; v++) if (RY(v) < RY(v - 1)) for (let u = 1; u < w - 1; u++) for (let y2 = RY(v); y2 < RY(v - 1); y2++) K.set(hx(u), y2, hz(v), S.glass);
