@@ -235,8 +235,69 @@
         return false;
     }
   };
-  // 🎒 Meins (filled in by meins.js's part of this file later): the screen with your things
-  ST.meins = function (from) { const ui = ST.ui; if (!ui) return; ST.meinsFrom = from || 'title'; if (ST.renderMeins) ST.renderMeins(); ui.show('meins'); };
+  // ---------------------------------------------------------------- 🎒 Meins: your things as cards (and the worlds)
+  ST.meins = function (from) { const ui = ST.ui; if (!ui) return; ST.meinsFrom = from || 'title'; ui.show('meins'); ST.renderMeins(); };
+  ST.meinsChip = 'all';
+  const CHIPS = () => [['all', tx('meins.all', null, 'Alles', 'All')], ['fav', '★ ' + tx('meins.fav', null, 'Favoriten', 'Favourites')], ['house', '🏠 ' + tx('meins.house', null, 'Häuser', 'Houses')], ['furn', '🪑 ' + tx('meins.furn', null, 'Möbel', 'Furniture')], ['parts', '🧱 ' + tx('meins.parts', null, 'Bauteile', 'Pieces')], ['worlds', '🌍 ' + tx('start.worldsTitle', null, 'Welten', 'Worlds')]];
+  const chipOf = (id) => { const k = id[0]; return k === 'h' || k === 'k' || k === 's' ? 'house' : k === 'm' || k === 'g' ? 'furn' : k === 'p' ? 'parts' : 'other'; };
+  ST.renderMeins = async function () {
+    const Dg = VR.Ding, chips = $('#meins .mchips'), body = $('#meins .mbody'); if (!Dg || !chips || !body) return;
+    dingHandlers();
+    chips.innerHTML = '';
+    for (const [k, label] of CHIPS()) { const b = el('button', k === ST.meinsChip ? 'on' : '', esc(label)); b.onclick = () => { ST.meinsChip = k; ST.renderMeins(); }; chips.appendChild(b); }
+    body.innerHTML = '';
+    const all = Dg.list().filter(x => Dg.parse(x.id));
+    const chip = ST.meinsChip, items = chip === 'all' ? all : chip === 'fav' ? all.filter(x => Dg.isFav(x.id)) : chip === 'worlds' ? [] : all.filter(x => chipOf(x.id) === chip);
+    const ws = chip === 'all' || chip === 'worlds' ? await ST.listWorlds() : [];
+    if (!items.length && !ws.length) { body.appendChild(el('div', 'note', esc(chip === 'worlds' ? tx('start.noWorlds', null, 'Noch keine Welt — ＋ Neue Welt macht eine.', 'No world yet — ＋ New world makes one.') : tx('meins.empty', null, 'Noch nichts hier — ✨ Erschaffen macht dein erstes Ding.', 'Nothing here yet — ✨ Create makes your first thing.')))); return; }
+    for (const x of items.slice(0, 200)) body.appendChild(Dg.render(x.id, { picW: 220, picH: 120 }));
+    if (ws.length) {
+      body.appendChild(el('div', 'grp', '🌍 ' + esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))));
+      for (const w of ws) {
+        const c = el('div', 'wcard'); c.dataset.id = w.id; c.style.gridColumn = '1 / -1';
+        c.innerHTML = `<div class="wtxt"><div class="wn"></div><div class="wm"></div></div><div class="wacts"></div>`;
+        $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
+        $('.wm', c).textContent = (w.mode === 'zen' ? tx('start.zen', null, 'Zen-Baumeister', 'Zen Builder') : w.mode === 'creative' ? tx('start.creative', null, 'Kreativ', 'Creative') : tx('start.survival', null, 'Überleben', 'Survival')) + (w.lastPlayed ? ' · ' + new Date(w.lastPlayed).toLocaleDateString(VR.I18N ? VR.I18N.locale() : undefined) : '');
+        for (const [k, de, en, cls] of [['play', '▶ Spielen', '▶ Play', 'primary'], ['bauen', '🏗 Bauen', '🏗 Build', ''], ['rename', '✎ Name', '✎ Name', ''], ['del', '🗑 Löschen', '🗑 Delete', 'danger']]) { const b = el('button', 'btn small ' + cls); b.dataset.act = 'w:' + k; b.dataset.w = k; b.dataset.id = w.id; b.textContent = tx('start.w.' + k, null, de, en); $('.wacts', c).appendChild(b); }
+        body.appendChild(c);
+      }
+    }
+  };
+  // the cards' actions on this page: 👁 and ✏️ open the R9 Studio on the thing, 📍 puts it in your hand (in play now,
+  // else when ▶ opens the world), 📦 makes the one-thing pack
+  function dingHandlers() {
+    const Dg = VR.Ding; if (!Dg || Dg.handlers.__game) return;
+    const studio = (h) => { try { location.href = 'studio.html' + (location.search || '') + h; } catch (e) { /* no studio page next to this one */ } };
+    Dg.handlers = {
+      __game: true,
+      view: (id) => studio('#ding/' + id),
+      edit: (id) => studio('#ding/' + id + '/edit'),
+      canSet: (id) => /^[bmh]:/.test(id),
+      canEdit: (id) => !/^p:/.test(id) || prefs().pro,
+      set: (id) => {
+        const g = game(), d = Dg.parse(id); if (!g || !d) return false;
+        const item = d.kind === 'h' ? 'blueprint_' + d.key : d.key;
+        if (g.state === 'play' && g.player && ST.handAllowed(g.meta) && VR.itemDef(item)) {
+          const inv = g.player.inv; inv.slots[inv.sel] = { id: item, n: VR.maxStack(item) }; inv.changed = true; g.ui.updateHUD(true);
+          g.ui.resume(); g.ui.hint(tx('hand.toast', { n: VR.itemName(item) }, '{n} — Rechtsklick setzt es', '{n} — right click places it'), 2600);
+          return true;
+        }
+        if (g.state === 'play') { g.ui.hint(tx('hand.noSurvival', null, 'Setzen geht in deiner eigenen Welt im Kreativ- oder Zen-Modus', 'Placing works in your own world in Creative or Zen'), 2600); return false; }
+        try { localStorage.setItem('r9si.hand', JSON.stringify({ v: 1, ding: id, world: null, t: Date.now() })); } catch (e) { /* */ }
+        ST.play();
+        return true;
+      },
+      pic: (id, w, h) => {
+        const g = game(), d = Dg.parse(id); if (!g || !g.icons || !d) return null;
+        const item = d.kind === 'h' ? 'blueprint_' + d.key : d.kind === 'b' || d.kind === 'm' ? d.key : null;
+        if (!item || !VR.itemDef(item)) return null;
+        const c = document.createElement('canvas'); c.width = 64; c.height = 64; c.style.imageRendering = 'pixelated'; c.style.objectFit = 'contain'; c.style.width = '64px'; c.style.height = '64px';
+        try { g.icons.paint(c, item, 64); } catch (e) { return null; }
+        return c;
+      },
+    };
+  }
+  ST.dingHandlers = dingHandlers;
 
   // ---------------------------------------------------------------- 🧭 hints 2 and 3, and the Ding in your hand
   // polled four times a second (no per-frame work, nothing in the game loop): after 5 s standing in the world the move
@@ -285,6 +346,7 @@
   const origShow = UI.prototype.show;
   UI.prototype.show = function (id) { origShow.call(this, id); if (id === 'title') ST.render(); };
   UI.prototype.showWorlds = function () { return ST.worlds(this); };
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && ST.ui && ST.ui.screen === 'meins') { e.preventDefault(); e.stopImmediatePropagation(); ST.act('meinsback', null, ST.ui); } }, true);
   const origPause = UI.prototype.pause;
   UI.prototype.pause = function () { if (this.game.state !== 'play') return; pauseMenu(); origPause.call(this); };
   // chat commands are a Profi thing (Einfach: the chat stays, a /command gets the note)

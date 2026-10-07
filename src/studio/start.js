@@ -155,7 +155,7 @@
       edit: (id) => SS.edit(id),
       set: (id) => SS.set(id),
       share: (id) => Dg.share(id),
-      canSet: (id) => (SA ? true : /^[hm]:/.test(id)),
+      canSet: (id) => (SA ? true : /^[hmb]:/.test(id)),   // (h: m: → the Karte; b: → into your hand in the game; k: g: p: s: come with W2's wizard)
       canEdit: (id) => (/^p:/.test(id) ? !!prefs().pro : true),
       pic: (id, w, h) => {
         const d = Dg.parse(id); if (!d) return null;
@@ -186,8 +186,15 @@
   SS.set = async function (id) {
     const Dg = D(), W = WM(), P = PJ();
     if (SA) { const on = Dg.toggleFav(id); toast((on ? '★ ' : '☆ ') + Dg.name(id)); return on; }
-    const d = Dg.parse(id); if (!d || !/^[hm]$/.test(d.kind) || !W) return false;
+    const d = Dg.parse(id); if (!d || !/^[hmb]$/.test(d.kind) || !W) return false;
     if (P && P.isOpen && P.isOpen()) P.show(false);
+    if (d.kind === 'b') {
+      // a block: into your hand — ▶ opens the world with it (the game reads r9si.hand once)
+      const target = W.play && W.play.target ? W.play.target() : null;
+      try { localStorage.setItem('r9si.hand', JSON.stringify({ v: 1, ding: id, world: target ? target.id : null, t: Date.now() })); } catch (e) { toast(tx('karte.full', null, '⚠ Gesetzt, aber nicht gemerkt — Browser-Speicher voll', '⚠ Placed, but not kept — browser storage full')); return false; }
+      if (W.play && W.play.go) W.play.go();
+      return true;
+    }
     if (!W.world) {
       if (!W.worlds && W.list) { try { await W.list(); } catch (e) { /* */ } }
       const last = W.worlds && W.worlds[0];
@@ -315,8 +322,36 @@
   });
   // Esc puts the tool away on the Karte too (world.js's key hook does it); R turns (world.js)
 
+  // ---------------------------------------------------------------- 🎒 Meins: the hub's cards get the five actions; ★ and Bauteile join
+  function decorate(body) {
+    const Dg = D(), P = PJ(); if (!Dg || !P) return;
+    const shown = new Set();
+    const dingOf = (p) => (!p ? null : p.kind === 'house' ? 'h:' + (p.ref && p.ref.index) : p.kind === 'item' ? 'm:' + (p.ref && p.ref.name) : p.kind === 'kit' ? 'k:' + p.id : p.kind === 'genie' ? 'g:' + p.id : p.kind === 'site' ? 's:' + p.id : null);
+    for (const card of body.querySelectorAll('.pj')) {
+      const p = P.get(card.dataset.id), id = dingOf(p); if (!id || !Dg.parse(id)) continue;
+      shown.add(id); card.classList.add('ding'); card.dataset.ding = id;
+      const tmp = Dg.render(id, { setLabel: SA ? tx('st.merken', null, '🎒 Merken', '🎒 Keep') : undefined }), acts = tmp.querySelector('.dacts');
+      const tx0 = card.querySelector('.tx'); if (acts && tx0) tx0.appendChild(acts);
+    }
+    // everything else you have: ★ favourites, then the Bauteile
+    const rest = Dg.list().filter(x => !shown.has(x.id) && known(x.id));
+    const favs = rest.filter(x => x.id[0] !== 'p'), parts = rest.filter(x => x.id[0] === 'p');
+    const grid = (title, items) => {
+      if (!items.length) return;
+      const h4 = document.createElement('h4'); h4.textContent = title; body.appendChild(h4);
+      const g = document.createElement('div'); g.className = 'grid dings';
+      for (const x of items.slice(0, 120)) g.appendChild(Dg.render(x.id, { picW: 240, picH: 150, setLabel: SA ? tx('st.merken', null, '🎒 Merken', '🎒 Keep') : undefined, onOpen: () => SS.view(x.id) }));
+      body.appendChild(g);
+    };
+    if (favs.length || parts.length) { const e = body.querySelector('.empty'); if (e) e.remove(); }
+    grid('★ ' + tx('st.favs', null, 'Favoriten', 'Favourites'), favs);
+    grid('🧱 ' + tx('st.parts', null, 'Bauteile', 'Pieces'), parts);
+    if (SA) { const out = document.querySelector('#hub footer [data-pack="out"]'); if (out) out.textContent = '📦 ' + tx('st.takeAll', null, 'Alles mitnehmen', 'Take everything along'); }
+  }
+
   // ---------------------------------------------------------------- wiring
   function init() {
+    if (PJ()) PJ().decorate = decorate;
     handlers();
     if (WM()) WM().placeNow = placeNow;
     tiles(); proSwitch(); labels();
