@@ -669,9 +669,10 @@
   // ================================================================ BAD — vanities, showers, WCs, ladders, mirrors, tubs
   const BA = { cats: ['bath'], res: 32, sound: 'stone', hard: 1 };
   // a vessel basin on a top at y (centre cx, cz) and a wall tap above it
+  // (a round bowl: a white rim and wall, a grey-blue floor and a drain, so it reads as a basin, not a cupcake)
   function vessel(b, cx, cz, y, tapMat) {
-    b.lathe(cx, cz, [[y, 2.2], [y + 0.5, 3], [y + 2, 3.4], [y + 2.5, 3.4]], M.gloss(P.white), 0.5); b.cyl('y', cx, cz, 2.8, y, y + 0.5, M.gloss(P.white));
-    b.cyl('y', cx, cz, 0.5, y + 0.5, y + 0.75, M.metal(0x6A7078));
+    b.lathe(cx, cz, [[y, 2.4], [y + 0.6, 3.1], [y + 1.6, 3.5], [y + 2.2, 3.6], [y + 2.5, 3.6]], M.gloss(P.white), 0.6);
+    b.cyl('y', cx, cz, 2.6, y, y + 0.4, M.gloss(0xB4C2CC)); b.cyl('y', cx, cz, 0.55, y + 0.4, y + 0.9, M.metal(0x6A7078));
     b.rod(cx, y + 3.5, 16, cx, y + 3.5, cz + 1.5, 0.5, tapMat); b.box(cx - 1, y + 2.75, 15.5, cx + 1, y + 4.5, 16, tapMat); b.box(cx + 1.5, y + 3.25, 15, cx + 2, y + 4, 16, tapMat);
   }
   for (const [k, label, body, top, tapM] of [['oak', 'oak', () => M.wood(P.oak), () => M.stone(0x3A3C40), () => M.metal(P.black)], ['white', 'white', () => M.gloss(P.white), () => M.marble(0xEEEDEA), () => M.chrome()]]) def('bath', 'doublevanity', k, 'Double Vanity · ' + label, Object.assign({}, BA, { size: [2, 1, 1], col: k === 'oak' ? 'oak' : 'white', ui: 'chest', mount: 'wall', build: (b) => {
@@ -701,10 +702,14 @@
     b.rod(10, 18, 15, 10, 26, 14.5, 0.4, br); b.cyl('z', 10, 26.5, 0.9, 13.5, 14.5, br);
   } }));
   for (const [k, label, c] of [['white', 'rimless white', P.white], ['black', 'matte black', 0x2A2C30]]) def('bath', 'wc', k, 'WC · ' + label, Object.assign({}, BA, { size: [1, 1, 1], col: k, build: (b) => {
+    // a wall behind it with the flush plate, an oval bowl up to its rim, a seat ring on top, the water dug into the bowl
     const m = k === 'white' ? M.gloss(c) : M.matte(c);
     b.box(1, 0, 13, 15, 16, 16, M.stone(0xD8D4CC)); b.box(5.5, 11, 12.5, 10.5, 13.5, 13, M.metal(k === 'white' ? 0x2A2C30 : P.brass));
-    b.pbox(4, 5.5, 3, 12, 9, 13, 3.5, m); b.pbox(4.5, 4, 5, 11.5, 5.5, 13, 3, m); b.pbox(5.25, 8, 4, 10.75, 9, 11, 2.5, 0); b.pbox(5.25, 7, 4, 10.75, 8, 11, 2.5, M.gloss(0xDDE8EE));
-    b.pbox(4, 9, 3, 12, 9.5, 12.5, 3.5, m);
+    ellRingFill(b, 8, 9, 2.7, 3.8, 0, 2.4, m);                         // the pedestal, set back from the bowl
+    ellRingFill(b, 8, 8.6, 3.5, 4.4, 2.4, 5.6, m);                     // the bowl, to its rim
+    ellRingFill(b, 8, 8.6, 4.2, 5.0, 5.6, 6.5, m);                     // the seat ring
+    ellRingFill(b, 8, 8.6, 2.6, 3.4, 4.6, 6.6, 0);                     // dug out: the opening through seat and bowl
+    ellRingFill(b, 8, 8.6, 2.6, 3.4, 4.6, 4.9, M.gloss(0x9ED0EC));     // the water
     b.box(13.5, 7, 12, 14, 8, 13, M.metal(P.black)); b.cyl('x', 7.5, 10.5, 1.4, 13.5, 15.5, M.matte(0xF6F4EE));   // a roll holder
   } }));
   for (const [k, wood] of [['oak', () => M.wood(P.oak)], ['black', () => M.metal(P.black)]]) def('bath', 'ladder', k, 'Towel Ladder · ' + k, Object.assign({}, BA, { size: [1, 2, 1], col: k, sound: 'wood', build: (b) => {
@@ -719,7 +724,11 @@
     b.box(1, 2.5, 12.5, 15, 3, 15.5, M.light(0xF4F6FF)); b.box(1, 15, 12.5, 15, 15.5, 15.5, M.light(0xF4F6FF));
   } }));
   def('bath', 'mirror', 'round', 'Mirror · round backlit', Object.assign({}, BA, { size: [1, 1, 1], col: 'chrome', mount: 'wall', toggle: true, light: [10, 10, 10], sound: 'glass', solid: false, build: (b) => {
-    b.cyl('z', 8, 9, 6, 15.5, 16, M.light(0xF4F6FF)); b.cyl('z', 8, 9, 5.5, 14.5, 15.5, M.gloss(0xC8DCE8));
+    // a round backlit mirror: the glow spills out behind a chrome frame that stands proud of the glass, with a glint
+    b.tube('z', 8, 9, 6.6, 1, 15.25, 16, M.light(0xF4F6FF));                  // the halo, behind the frame
+    b.tube('z', 8, 9, 6, 1, 14, 15.25, M.chrome());                           // the chrome frame
+    b.cyl('z', 8, 9, 5, 14.5, 15.25, M.gloss(0xC8DCE8));                      // the glass
+    b.rod(5.2, 11.5, 14.5, 7.4, 10.2, 14.5, 0.4, M.gloss(0xFFFFFF));          // a glint across it
   } }));
   def('bath', 'washertower', 'white', 'Washer Tower · white', Object.assign({}, BA, { size: [1, 2, 1], col: 'white', ui: 'chest', sound: 'metal', build: (b) => {
     for (const y0 of [0.5, 14]) {
