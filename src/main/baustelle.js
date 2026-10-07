@@ -550,9 +550,15 @@
     rings() {
       const o = this.site.o, H = o.H, LB = o.layerBox, K = this.K = Math.max(1, Math.ceil(H / 2) + 1), sb = o.sbox;
       const ring = this.ring = new Float32Array(K * 4);
+      // every column's height (a low wall, a fence, a lamp in the yard is not scaffolded: a level takes the columns
+      // that reach at least its rail)
+      const L = this.site.list, colH = new Map(), y0 = o.yMin;
+      for (let i = o.nEarth; i < L.length; i++) { const e = L[i], k = e[0] + ',' + e[2], h = e[1] - y0; if (!(colH.get(k) >= h)) colH.set(k, h); }
+      const cols = []; for (const [k, h] of colH) { const c = k.indexOf(','); cols.push(+k.slice(0, c), +k.slice(c + 1), h); }
       for (let k = 0; k < K; k++) {
         let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
-        for (let h = 2 * k - 1; h <= 2 * k + 2; h++) { if (h < 0 || h >= H) continue; const b = h * 4; if (LB[b] > LB[b + 1]) continue; if (LB[b] < x0) x0 = LB[b]; if (LB[b + 1] > x1) x1 = LB[b + 1]; if (LB[b + 2] < z0) z0 = LB[b + 2]; if (LB[b + 3] > z1) z1 = LB[b + 3]; }
+        for (let i = 0; i < cols.length; i += 3) { if (cols[i + 2] < 2 * k + 2) continue; const x = cols[i], z = cols[i + 1]; if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+        if (x0 === Infinity) for (let h = 2 * k - 1; h <= 2 * k + 2; h++) { if (h < 0 || h >= H) continue; const b = h * 4; if (LB[b] > LB[b + 1]) continue; if (LB[b] < x0) x0 = LB[b]; if (LB[b + 1] > x1) x1 = LB[b + 1]; if (LB[b + 2] < z0) z0 = LB[b + 2]; if (LB[b + 3] > z1) z1 = LB[b + 3]; }
         if (x0 === Infinity) { if (k) { ring[k * 4] = ring[k * 4 - 4]; ring[k * 4 + 1] = ring[k * 4 - 3]; ring[k * 4 + 2] = ring[k * 4 - 2]; ring[k * 4 + 3] = ring[k * 4 - 1]; continue; } x0 = sb[0]; x1 = sb[3]; z0 = sb[2]; z1 = sb[5]; }
         ring[k * 4] = x0 - this.ox; ring[k * 4 + 1] = x1 + 1 - this.ox; ring[k * 4 + 2] = z0 - this.oz; ring[k * 4 + 3] = z1 + 1 - this.oz;
       }
