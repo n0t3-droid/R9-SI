@@ -35,7 +35,7 @@
     const T = R.T, s = t.defaultState, fl = T.flags[s], F = VR.F;
     if (fl & (F.FLUID | F.WATER | F.LAVA)) return false;
     if (/log$|_wood$|leaves$|sapling$|_stem$|hyphae$/.test(t.name)) return true;       // trees
-    if (fl & F.SMOOTH) return false;                                                     // natural ground
+    if (t.o.smooth) return false;                                                        // natural ground (F.SMOOTH is off in the Klassisch look)
     if (t.o.ore || /^(stone|deepslate|dirt|grass_block|sand|red_sand|gravel|clay|snow_block|ice|packed_ice|bedrock|netherrack|end_stone|tuff|calcite|mud|podzol|mycelium)$/.test(t.name)) return false;
     return true;
   };

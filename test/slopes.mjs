@@ -13,7 +13,8 @@ const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(
 const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: `/home/claude/vr/test/shots/${name}.png`, timeout: 120000 }); console.log('shot', name); };
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 console.log('title', await ev(() => VR.game && VR.game.state));
-await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.applySettings('*'); }, process.env.PRESET || 'high');
+// the smooth ground in this test belongs to the Nahtlos look (LOOK=classic photographs the same scene in Klassisch)
+await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.look = lk; g.applySettings('*'); }, [process.env.PRESET || 'high', process.env.LOOK || 'seamless']);
 await ev(`VR.game.createWorld({name:'Slopes',mode:'creative',difficulty:'peaceful',type:'default',seed:'424242',cheats:true,kit:true})`);
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 console.log('world', await ev(() => VR.game.state));

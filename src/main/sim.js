@@ -540,7 +540,9 @@
       }
       if (hd && hd.tool === 'hoe' && (t.name === 'grass_block' || t.name === 'dirt') && !w.getBlock(x, y + 1, z)) { w.setBlock(x, y, z, R.byName.farmland.defaultState, 4); g.audio.place(s); p.damageHeld(1); return true; }
       if (hd && hd.tool === 'axe' && /_log$/.test(t.name) && R.byName['stripped_' + t.name]) { const st = R.byName['stripped_' + t.name]; w.setBlock(x, y, z, st.with(st.defaultState, 'axis', t.get(s, 'axis')), 4); g.audio.place(s); p.damageHeld(1); return true; }
-      if (hd && hd.tool === 'shovel' && t.name === 'grass_block_cut' && !w.getBlock(x, y + 1, z) && R.byName.dirt_path) { w.setBlock(x, y, z, R.byName.dirt_path.defaultState, 4); g.audio.place(s); p.damageHeld(1); return true; }
+      // the shovel makes a path of cut grass — and of any grass in the Klassisch look, where natural ground keeps its
+      // cube shape anyway (no cut / smooth toggle there: it would change nothing you can see)
+      if (hd && hd.tool === 'shovel' && (t.name === 'grass_block_cut' || (t.name === 'grass_block' && VR.LOOK && !VR.LOOK.ground)) && !w.getBlock(x, y + 1, z) && R.byName.dirt_path) { w.setBlock(x, y, z, R.byName.dirt_path.defaultState, 4); g.audio.place(s); p.damageHeld(1); return true; }
       if (hd && hd.tool === 'shovel' && this.toggleCut(x, y, z, s, p, false)) return true;
       if (t.o.ui === 'chest' || /chest$|barrel|cargo_crate/.test(t.name)) { g.openContainer && g.openContainer(x, y, z, t); return true; }
       if (/furnace|smoker/.test(t.name)) { g.openFurnace && g.openFurnace(x, y, z, t); return true; }
@@ -554,6 +556,7 @@
     // ground back into the landscape (sneak + right-click: the connected cut blocks around the hit, up to ~160)
     toggleCut(x, y, z, s, p, smooth) {
       const g = this.game, w = g.world, t = R.types[R.T.type[s]]; if (!t) return false;
+      if (VR.LOOK && !VR.LOOK.ground) return false;   // Klassisch: every block is a cube already (dug ground still turns cut: cutAround)
       if (!smooth) {
         const toName = VR.CUT_OF[t.name]; if (!toName) return false;
         const to = R.byName[toName]; if (!to) return false;
