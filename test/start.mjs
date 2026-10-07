@@ -184,6 +184,21 @@ await section(4, 'worlds as cards, 🗑 asks twice, the picker, ＋ Neue Welt in
   check(await ev(() => !document.documentElement.classList.contains('pro')), 'back to Einfach');
 });
 
+await section('4b', '🎒 Meins in the game: your things as cards with the five actions', async () => {
+  if (!(await safe(() => !!(window.VR && VR.game)))) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); }
+  if (!(await ev(() => VR.game.state === 'title'))) { await ev(() => VR.game.quitToTitle()); await atTitle(); }
+  await ensureWorld();
+  await ev(() => { VR.Favs.add('oak_planks'); });
+  await page.click('#title .tile[data-tile="meins"]'); await wait(500);
+  const m = await ev(() => { const c = document.querySelector('#meins .ding[data-ding="b:oak_planks"]'); return { on: document.getElementById('meins').classList.contains('on'), card: !!c, acts: c ? [...c.querySelectorAll('.dacts button')].map(b => b.textContent) : [], chips: [...document.querySelectorAll('#meins .mchips button')].map(b => b.textContent), worlds: document.querySelectorAll('#meins .wcard').length, h: document.querySelector('#meins h2').textContent }; });
+  console.log('  meins', JSON.stringify(m));
+  check(m.on && m.card && m.acts.length === 5 && ['👁', '✏️', '★', '📍', '📦'].every((g, i) => m.acts[i].startsWith(g)), 'the favourite oak planks: 👁 ✏️ ★ 📍 📦');
+  check(/Meins/.test(m.h) && m.chips.length >= 5 && m.worlds >= 1, '„🎒 Meins" with chips and the worlds as cards');
+  await shot('start_meins_game');
+  await page.click('#meins [data-act="meinsback"]'); await wait(300);
+  check(await ev(() => document.getElementById('title').classList.contains('on')), '„← Zurück" returns to the start screen');
+});
+
 // ---- the R9 Studio
 const booted = async (houses) => { for (let i = 0; i < 700; i++) { await wait(500); const st = await safe(() => ({ boot: document.getElementById('studio').classList.contains('boot'), houses: window.__studio ? window.__studio.HOUSE.size : -1, tex: !!(window.__studioCore && window.__studioCore.texInfo()) })); if (st && !st.boot && st.tex && st.houses >= (houses || 1)) return true; } return false; };
 const inStudio = async (id, maxS = 300) => { for (let i = 0; i < maxS * 2; i++) { await wait(500); if (await safe((id) => { const WM = window.VR && VR.StudioWorld; return !!(WM && WM.world && WM.world.id === id && !WM.loading && WM.cols.size && document.getElementById('playBtn')); }, id)) return true; } return false; };
@@ -271,6 +286,33 @@ await section(7, 'Profi keeps its Plan tab — „📍 Alle setzen"', async () =
   const btn = await ev(() => [...document.querySelectorAll('#partsBody button')].map(b => b.textContent.trim()).find(t => /Alle setzen|übernehmen/.test(t)));
   check(/^📍 Alle setzen/.test(btn || ''), 'the Plan tab\'s button reads „📍 Alle setzen (n)" (' + btn + ')');
   await ev(() => VR.UIPrefs.set({ pro: false })); await wait(200);
+});
+
+await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: card, 📦 Teilen one thing', async () => {
+  await page.goto(URL0 + '/studio.html', NAV);
+  check(await booted(1), 'the Studio is up');
+  // a Baukasten house (a k: thing), a favourite block
+  await ev(() => VR.StudioWorld.imagine.open(null, 'house')); await wait(900);
+  await page.click('#imagine [data-hs="style"][data-v="modern"]'); await wait(2500);
+  await ev(() => { VR.StudioWorld.imagine.close(); VR.Favs.add('oak_planks'); });
+  const kit = await ev(() => Object.values(JSON.parse(localStorage.getItem('r9si.projects')).items).find(p => p.kind === 'kit'));
+  check(!!kit, 'a Baukasten house exists (' + (kit && kit.id) + ')');
+  await page.click('#tiles .tile[data-tile="meins"]'); await wait(700);
+  const h = await ev((kid) => { const c = document.querySelector('#hub .pj.ding[data-id="' + kid + '"]'); const fav = document.querySelector('#hub .ding[data-ding="b:oak_planks"]'); return { on: !!document.querySelector('#hub.on'), head: (document.querySelector('#hub header .t') || {}).textContent, kcard: !!c, kacts: c ? [...c.querySelectorAll('.dacts button')].map(b => b.dataset.da) : [], favSection: [...document.querySelectorAll('#hub h4')].map(x => x.textContent.trim()), favCard: !!fav, favActs: fav ? [...fav.querySelectorAll('.dacts button')].map(b => b.textContent) : [], meinsOn: document.querySelector('#tiles .tile[data-tile="meins"]').classList.contains('on') }; }, kit.id);
+  console.log('  hub', JSON.stringify(h));
+  check(h.on && /Meins/.test(h.head || '') && h.meinsOn, '🎒 opens Meins (the 🎒 tile lit)');
+  check(h.kcard && h.kacts.join() === 'view,edit,fav', 'the k: card: 👁 ✏️ ☆ (📍 and 📦 come with the wizard, W2 — absent, not greyed)');
+  check(h.favCard && h.favActs.length === 5 && h.favSection.some(x => /Favoriten/.test(x)), 'a ★ Favoriten section with the oak planks card and all five actions');
+  await page.click('#hub .pj.ding[data-id="' + kit.id + '"] [data-da="fav"]'); await wait(200);
+  const favs = await ev(() => JSON.parse(localStorage.getItem('r9si.favs')).items);
+  check(favs.includes('k:' + kit.id), '☆ on the k: card reaches r9si.favs (' + favs.join(',') + ')');
+  await ev(() => { VR.Ding.download = (name, text) => { window.__pack = { name, text }; return Promise.resolve(true); }; });
+  await page.click('#hub .ding[data-ding="b:oak_planks"] [data-da="share"]'); await wait(300);
+  const pk = await ev(() => { const p = window.__pack; if (!p) return null; const s = VR.Pack.summary(VR.Pack.read(p.text)); return { name: p.name, total: s.favs + s.houses + s.models + s.lib, favs: VR.Pack.read(p.text).favs }; });
+  check(pk && pk.total === 1 && pk.favs.join() === 'oak_planks' && /oak-planks/.test(pk.name), '📦 Teilen yields a one-entry pack (' + (pk && pk.name) + ')');
+  await shot('start_meins_studio');
+  await page.keyboard.press('Escape'); await wait(200);
+  check(await ev(() => !document.querySelector('#hub.on')), 'Esc closes it');
 });
 
 await section(9, 'routes: #ding/<id> opens the thing, an unknown one only says so', async () => {

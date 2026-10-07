@@ -168,3 +168,12 @@ html:not(.pro) #title #mphosts:not(.has), html:not(.pro) #title .splash { displa
 #list.dings { grid-template-columns: 1fr; }
 #studio:not(.pro) #worldHelp { display: none !important; }
 #partsBody .ding.inhand { margin: 4px 0 8px; }
+/* the game's cards: a pixel icon, not a photo */
+#meins .ding .pic { min-height: 88px; max-height: 110px; }
+#meins .ding .pic canvas { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
+#meins .ding .pic img { max-height: 110px; }
+/* the hub's extra sections (the Studio's Meins) */
+#hub .grid.dings { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+#hub .pj .dacts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+#hub .pj .dacts button { flex: 1 1 auto; min-height: 32px; padding: 0 6px; border-radius: 8px; font-size: 11px; white-space: nowrap; }
+#hub .pj .dacts button.fav.on { color: #ffd34d; border-color: rgba(255, 211, 77, 0.55); }
