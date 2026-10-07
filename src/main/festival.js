@@ -8,11 +8,13 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js): T a text, TL a list of lines
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const Vs = VR.Villages;
   if (!Vs) return;
   const P = Vs.prototype;
   const TAU = Math.PI * 2;
-  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const pick = (arr) => (arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : '');
   const hashId = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   const FEST0 = 11200, FEST1 = 14800, FIRE0 = 13200, FIRE1 = 14650;
   const COLS = [[1, 0.25, 0.3], [0.3, 1, 0.45], [0.35, 0.55, 1], [1, 0.8, 0.25], [0.8, 0.4, 1], [0.3, 1, 1], [1, 0.45, 0.8], [1, 1, 1]];
@@ -93,7 +95,7 @@
       a.steer = [cx + Math.cos(th) * r, cz + Math.sin(th) * r];
       a.lookAt = null;
       a.pose = 'stand';
-      if (Math.random() < dt * 0.025 && this.near(a, 22)) a.say(a.kid ? pick(['Wheee!', 'Dance with me!', 'Round and round!', 'Look at the lanterns!', 'Fireworks! Fireworks!']) : pick(['Happy Lantern Festival!', 'What a night!', 'Round we go!', 'Mind my toes!', 'I love this song!']), 2.2);
+      if (Math.random() < dt * 0.025 && this.near(a, 22)) a.say(pick(TL(a.kid ? 'g.fest.kid' : 'g.fest.adult')), 2.2);
     } else if (role === 'music') {
       const b = vil.plan.bell || [pz.x - PR + 1, pz.y, pz.z + PR - 1];
       const k = F.roles.size ? [...F.roles.entries()].filter(e => e[1] === 'music').findIndex(e => e[0] === a) : 0;
@@ -116,7 +118,7 @@
         if (Math.hypot(a.pos[0] - sx, a.pos[2] - sz) > 0.6) a.steer = [sx, sz];
         a.lookAt = [cx, pz.y + 1, cz]; a.pose = 'stand';
       }
-      if (Math.random() < dt * 0.02 && this.near(a, 20)) a.say(pick(['Just like when I was young.', 'Look at them go!', 'The lanterns are lovely this year.', 'Ahh, the old songs.']), 2.6);
+      if (Math.random() < dt * 0.02 && this.near(a, 20)) a.say(pick(TL('g.fest.elder')), 2.6);
     }
   };
   P.festPose = function (a, t, Q) {
@@ -150,8 +152,8 @@
     if (this.festivalDay(vil) && dPl < 120) {
       vil.festTold = vil.festTold || {};
       const day = g.env.day || 0;
-      if (tod < FEST0 && tod > 500 && vil.festTold.am !== day) { vil.festTold.am = day; if (g.ui && g.settings.toasts !== false) g.ui.toast('Festival tonight!', `${vil.name} celebrates the Lantern Festival at dusk — lanterns, dancing & fireworks.`, null); }
-      if (on && vil.festTold.pm !== day) { vil.festTold.pm = day; if (g.ui) g.ui.chatLine(`🏮 The Lantern Festival has begun in ${vil.name}! Head to the plaza.`, '#ffd98a'); }
+      if (tod < FEST0 && tod > 500 && vil.festTold.am !== day) { vil.festTold.am = day; if (g.ui && g.settings.toasts !== false) g.ui.toast(T('g.fest.toastTitle'), T('g.fest.toast', { v: vil.name }), null); }
+      if (on && vil.festTold.pm !== day) { vil.festTold.pm = day; if (g.ui) g.ui.chatLine(T('g.fest.begun', { v: vil.name }), '#ffd98a'); }
     }
     if (!on) { if (vil.fest && vil.fest.rockets.length) this.stepRockets(vil.fest, dt, vil); return; }
     const F = this.festState(vil);
@@ -159,7 +161,7 @@
       F.opened = true;
       if (g.codex && g.codex.event) g.codex.event('festival');
       const mayor = vil.agents.find(a => !a.kid && F.roles.get(a) === 'dance') || vil.agents[0];
-      if (mayor) mayor.say('Welcome, everyone, to the Lantern Festival!', 4.5);
+      if (mayor) mayor.say(T('g.fest.mayor'), 4.5);
     }
     const cx = pz.x + 0.5, cz = pz.z + 0.5, y = pz.y, PR = pz.r || 4;
     // sky lanterns from dusk on
@@ -247,7 +249,7 @@
       F.cheerT = 5;
       const fans = this.agents.filter(a => a.act && a.act.type === 'festival');
       const a = fans[Math.floor(Math.random() * fans.length)];
-      if (a) a.say(a.kid ? pick(['Ooooh!', 'Wow!!', 'Another one!', 'So pretty!']) : pick(['Aaah!', 'Beautiful!', 'Bravo!', 'Look at that one!']), 1.8);
+      if (a) a.say(pick(TL(a.kid ? 'g.fest.fwKid' : 'g.fest.fwAdult')), 1.8);
     }
   };
   P.fwSound = function (kind, dist) {

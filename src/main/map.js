@@ -4,6 +4,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R;
   const MS = 128; // minimap sample size (blocks)
 
@@ -241,7 +243,7 @@
         if (d.btn === 2) {
           let bi = -1, bd = 14 * 14;
           gad.waypoints.forEach((wp, i) => { const sx = (wp.x + 0.5 - this.center[0]) / this.scale + c.width / 2, sy = (wp.z + 0.5 - this.center[1]) / this.scale + c.height / 2; const dd = (sx - px) ** 2 + (sy - py) ** 2; if (dd < bd) { bd = dd; bi = i; } });
-          if (bi >= 0) { const wp = gad.waypoints.splice(bi, 1)[0]; this.g.ui.chatLine('Removed ' + wp.name, '#cfe6ff'); }
+          if (bi >= 0) { const wp = gad.waypoints.splice(bi, 1)[0]; this.g.ui.chatLine(T('g.map.removed', { name: wp.name }), '#cfe6ff'); }
         } else if (d.btn === 0) {
           const x = Math.floor(wx), z = Math.floor(wz), h = this.heightAt(x, z);
           gad.addWaypoint(x, h >= 0 ? h + 1 : 64, z);

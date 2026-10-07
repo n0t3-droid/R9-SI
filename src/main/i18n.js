@@ -27,6 +27,20 @@
   };
   // the fallback text is German in the Studio, English in the game: English users must never see German
   I.tx = function (key, vars, de, en) { const d = I.dict[I.lang]; if (d && d[key] !== undefined) return fill(d[key], vars); if (I.lang === 'de') return fill(de !== undefined ? de : en, vars); const e = I.dict.en && I.dict.en[key]; return fill(e !== undefined ? e : (en !== undefined ? en : de), vars); };
+  // a list of lines (villager talk, loading tips): the table holds an array — the English list when the chosen
+  // language has none, an empty list when nobody has it
+  I.list = function (key) { const d = I.dict[I.lang], v = d && d[key]; if (Array.isArray(v)) return v; const e = I.dict.en && I.dict.en[key]; return Array.isArray(e) ? e : []; };
+  // the languages with a table (the game: de and en); the others are "soon"
+  I.ready = (code) => !!(I.dict[code] && Object.keys(I.dict[code]).length);
+  // static texts in a page: data-t (text), data-th (HTML), data-tt (title) are filled from the tables — again on
+  // every language change (the game calls it from a listener)
+  I.retext = function (root) {
+    if (typeof document === 'undefined') return;
+    root = root || document;
+    for (const e of root.querySelectorAll('[data-t]')) e.textContent = I.t(e.dataset.t);
+    for (const e of root.querySelectorAll('[data-th]')) e.innerHTML = I.t(e.dataset.th);
+    for (const e of root.querySelectorAll('[data-tt]')) e.title = I.t(e.dataset.tt);
+  };
   I.info = (code) => LANGS.find(l => l[0] === code) || LANGS[1];
   I.locale = () => I.info(I.lang)[2];
   I.rtl = () => I.info(I.lang)[3] === 'rtl';
@@ -52,24 +66,37 @@
   // another tab (the Studio next to the game) changed the language
   if (typeof window !== 'undefined') window.addEventListener('storage', (e) => { if (e.key === 'r9si.lang' && e.newValue && e.newValue !== I.lang) I.set(e.newValue); });
   I.apply();
-  // a small language picker: a globe button with the code, a list of native names
+  // a small language picker: a globe button with the code, a list of native names (opts.ready: only the languages
+  // with a table — the others would read English anyway). Keyboard: Enter opens, the arrows walk, Esc closes.
   I.picker = function (opts) {
     opts = opts || {};
     const wrap = document.createElement('div'); wrap.className = 'langpick' + (opts.cls ? ' ' + opts.cls : '');
     const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'lp-btn'; btn.title = 'Language · Sprache · Langue · Idioma · 语言';
-    const list = document.createElement('div'); list.className = 'lp-list';
+    btn.setAttribute('aria-haspopup', 'true'); btn.setAttribute('aria-expanded', 'false');
+    const list = document.createElement('div'); list.className = 'lp-list'; list.setAttribute('role', 'group'); list.setAttribute('aria-label', btn.title);
+    const langs = () => { const r = opts.ready ? LANGS.filter(l => I.ready(l[0])) : LANGS; return r.length ? r : LANGS; };
+    const open = (on) => { wrap.classList.toggle('open', on); btn.setAttribute('aria-expanded', String(on)); };
     const draw = () => {
-      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><b>' + I.lang.toUpperCase() + '</b>';
+      btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></svg><b>' + I.lang.toUpperCase() + '</b>';
+      btn.setAttribute('aria-label', btn.title + ': ' + I.info(I.lang)[1]);
       list.innerHTML = '';
-      for (const [code, name] of LANGS) {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'lp-item' + (code === I.lang ? ' on' : '');
-        b.innerHTML = '<i>' + code.toUpperCase() + '</i><span></span>'; b.lastChild.textContent = name;
-        b.onclick = (e) => { e.stopPropagation(); wrap.classList.remove('open'); I.set(code); };
+      for (const [code, name] of langs()) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'lp-item' + (code === I.lang ? ' on' : ''); b.lang = code;
+        b.setAttribute('aria-pressed', String(code === I.lang));
+        b.innerHTML = '<i aria-hidden="true">' + code.toUpperCase() + '</i><span></span>'; b.lastChild.textContent = name;
+        b.onclick = (e) => { e.stopPropagation(); open(false); I.set(code); try { btn.focus({ preventScroll: true }); } catch (er) { /* */ } };
         list.appendChild(b);
       }
     };
-    btn.onclick = (e) => { e.stopPropagation(); wrap.classList.toggle('open'); };
-    document.addEventListener('click', () => wrap.classList.remove('open'));
+    btn.onclick = (e) => { e.stopPropagation(); const on = !wrap.classList.contains('open'); open(on); if (on && e.detail === 0) { const c = list.querySelector('.on') || list.firstChild; if (c) c.focus({ preventScroll: true }); } };
+    wrap.addEventListener('keydown', (e) => {
+      if (!wrap.classList.contains('open')) return;
+      const items = [...list.querySelectorAll('.lp-item')], k = items.indexOf(document.activeElement);
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); open(false); btn.focus({ preventScroll: true }); }
+      else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); e.stopPropagation(); const n = items[(k + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length] || items[0]; if (n) n.focus({ preventScroll: true }); }
+    });
+    wrap.addEventListener('focusout', (e) => { if (e.relatedTarget && !wrap.contains(e.relatedTarget)) open(false); });   // (Tab moved on; a click elsewhere closes it below)
+    document.addEventListener('click', () => open(false));
     wrap.appendChild(btn); wrap.appendChild(list); draw();
     I.on(draw);
     return wrap;

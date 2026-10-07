@@ -939,11 +939,13 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     $('#copy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText($('#src').value); $('#msg').textContent = 'kopiert'; $('#msg').className = 'ok'; };
     for (const t of $$('.tab')) t.onclick = () => { for (const x of $$('.tab')) x.classList.toggle('on', x === t); for (const p of $$('.pane')) p.classList.toggle('on', p.id === t.dataset.pane); };
     // ⚙ Profi: the model source, the whole file, the log and the model language are tools for developers
+    // (W1: one switch for everything — r9si.ui via VR.UIPrefs, which keeps r9si.studio.pro mirrored)
     { const pb = $('.tabs .proT'); let pro = false; try { pro = localStorage.getItem('r9si.studio.pro') === '1'; } catch (e) { /* */ }
       const set = (on) => { pro = on; $('#studio').classList.toggle('pro', on); if (pb) { pb.classList.toggle('on', on); pb.title = on ? 'Entwickler-Reiter ausblenden' : 'Werkzeuge für Entwickler: Modell-Quelle, ganze Datei, Log, Modell-Sprache'; }
         if (!on && $('.tab.on.pro')) { for (const x of $$('.tab')) x.classList.toggle('on', x.dataset.pane === 'parts'); for (const p of $$('.pane')) p.classList.toggle('on', p.id === 'parts'); } };
+      if (VR.UIPrefs) { pro = VR.UIPrefs.get().pro; VR.UIPrefs.on((p) => set(p.pro)); }
       set(pro);
-      if (pb) pb.onclick = () => { set(!pro); try { localStorage.setItem('r9si.studio.pro', pro ? '1' : '0'); } catch (e) { /* */ } }; }
+      if (pb) pb.onclick = () => { if (VR.UIPrefs) VR.UIPrefs.set({ pro: !VR.UIPrefs.get().pro }); else { set(!pro); try { localStorage.setItem('r9si.studio.pro', pro ? '1' : '0'); } catch (e) { /* */ } } }; }
     // deep link: #h/<index> · #m/<model> · else the first house
     const h = (location.hash || '').slice(1);
     if (h.startsWith('m/') && VM.MODELS[h.slice(2)]) { setMode(isFacade(h.slice(2)) ? 'facade' : 'furn', true); selectModel(h.slice(2)); }

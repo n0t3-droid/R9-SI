@@ -16,7 +16,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const step = async (n) => { for (let k = 0; k < n; k += 10) { await ev((m) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { this.setupCamera(F.cam); }; } for (let i = 0; i < m; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } }, Math.min(10, n - k)); await wait(5); } };
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-await ev(() => { const g = VR.game; g.settings.renderDist = 4; g.applySettings('*'); });
+await ev(() => { const g = VR.game; g.settings.renderDist = 4; g.applySettings('*'); if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); });   // (W1: the Werkbank button is a Profi thing; Einfach has 🏗 Bauen → the Karte)
 await ev(`VR.game.createWorld({name:'Livewelt',mode:'creative',difficulty:'peaceful',type:'flat',seed:'77',cheats:true,kit:false})`);
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { window.requestAnimationFrame = () => 0; });

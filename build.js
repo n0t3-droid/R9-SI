@@ -18,7 +18,12 @@ const ROOT = __dirname;
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxcells', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'biomes', 'gen_common', 'gen_overworld', 'gen_realm', 'shipgen', 'starship', 'gen_village', 'gen_city', 'gen_modern', 'gen_plan', 'gen_villa', 'gen_villa_rooms', 'gen_rails', 'gen_citadel', 'gen_heart', 'gen_temple', 'gen_isles', 'gen_canyon', 'gen_hills', 'gen_station', 'lod', 'gen_dims', 'light_local', 'mesher', 'physics', 'custom', 'style', 'edits'];
 const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_layout', 'tex_build'];
-const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'tex_cache', 'game'];
+const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'tex_cache', 'game', 'start'];
+// the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
+// (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
+// Profi), the hints, the Ding cards, the tiles
+const LANG = ['i18n', 'lang_en', 'lang_de'];
+const UI_SHARED = ['uiprefs', 'hints', 'ding', 'tiles'];
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const js = (dir, list) => list.filter(f => exists(`src/${dir}/${f}.js`)).map(f => `/* ${dir}/${f}.js */\n` + read(`src/${dir}/${f}.js`)).join('\n');
 const shared = js('shared', SHARED);
@@ -27,10 +32,11 @@ const workerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/work
 // recipes come from, the recipes, the forge) and of the cache itself. Any change there forges the textures again, once;
 // a change on the main thread alone (the UI, the game's own logic) keeps the cached textures.
 const texHash = require('crypto').createHash('sha256').update(workerSrc).update(js('main', ['tex_cache'])).digest('hex').slice(0, 16);
-const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + js('main', MAIN) + `
+const uiShared = js('main', LANG) + '\n' + js('shared', UI_SHARED);
+const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + uiShared + '\n' + js('main', MAIN) + `
 window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.game.boot(); } catch (e) { console.error(e); document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;position:fixed;top:0;left:0;z-index:99">' + (e && e.stack || e) + '</pre>'); } });
 `;
-const css = read('src/ui/style.css');
+const css = read('src/ui/style.css') + '\n' + (exists('src/ui/start.css') ? read('src/ui/start.css') : '');
 const guard = (s) => s.replace(/<\/script/gi, '<\\/script');
 const fonts = `<style>${read('src/ui/fonts/game_fonts.css')}</style>`;   // embedded (OFL): no request to Google's servers leaves the player's browser
 const body = `<div id="app"><canvas id="gl" tabindex="0"></canvas><div id="ui"></div></div>
@@ -46,16 +52,19 @@ fs.writeFileSync(path.join(ROOT, 'dist/artifact.html'), `<title>R9-SI</title>${f
 // packs, the VX material textures. Worker (the game's own worker + a studio extension): block textures, whole
 // catalogue houses built with the villa generator, lit and meshed with the game's mesher.
 const STUDIO_MAIN = ['core', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxcells', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'physics', 'custom', 'style', 'edits', 'schem'];
-const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']);
+const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']) + '\n' + uiShared;   // (uiShared: the language module and its tables — the choice is shared with the game)
 const studioWorkerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js') + '\n' + read('src/studio/studio_worker.js');
 const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js') + '\n' + read('src/shared/voxmodern.js');
 const notes = exists('src/studio/notes.md') ? read('src/studio/notes.md') : '';
-const studioCss = read('src/studio/studio.css');
+const studioCss = read('src/studio/studio.css') + '\n' + (exists('src/ui/start.css') ? read('src/ui/start.css') : '');
 const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 const studioFonts = `<style>${read('src/ui/fonts/studio_fonts.css')}</style>`;   // embedded (OFL), see src/ui/fonts/LICENSES.md
 const studioBody = `<div id="studio" class="boot">
 <header>
   <div class="brand"><span class="sig">R9</span><span class="t">MODEL STUDIO</span><span class="v">v4.0<!--PLAYTAG--></span></div>
+  <div id="tiles"></div>
+  <div id="navCrumb"></div>
+  <div id="proSwitch" class="proswitch"></div>
   <nav class="modes"><button data-hub class="hubm" title="Weitermachen — alles, was du angefangen hast (Strg+O)"><i>🕘</i>Weitermachen<b class="hubN"></b></button><button data-mode="arch" class="on"><i>◈</i>Architektur</button><button data-mode="furn"><i>▣</i>Möbel</button><button data-mode="facade"><i>▤</i>Fassade</button><button data-mode="parts" title="Alle Blöcke des Spiels: Dächer, Licht, Fenster, Türen, Wände, Böden … mit ★ Favoriten"><i>🧱</i>Teile</button><button data-mode="craft" class="craftm"><i>⚒</i>Crafter</button><button data-mode="world" class="worldm"><i>◍</i>Welt</button><button data-create class="createm" title="Ein Haus aus dem Baukasten, alles Mögliche vom Genie, Bilder als Blöcke — alles hier, ohne Konto"><i>✨</i>Erschaffen</button></nav>
   <!--GAMELINK-->
   <div class="sys"><span class="dot" id="sysDot"></span><span id="sysText">boot</span></div>
@@ -108,11 +117,13 @@ const studioBody = `<div id="studio" class="boot">
 <script>${guard(read('src/studio/variants.js'))}</script>
 <script>${guard(read('src/studio/spawn.js'))}</script>
 <script>${guard(read('src/studio/space.js'))}</script>
-<script>${guard(read('src/studio/bridge.js'))}</script>`;
+<script>${guard(read('src/studio/bridge.js'))}</script>
+${['nav', 'start'].filter(f => exists('src/studio/' + f + '.js')).map(f => `<script>${guard(read('src/studio/' + f + '.js'))}</script>`).join('\n')}`;
 const studioHead = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>`;
 // two studios: studio.html sits next to the game (same origin → "Update ins Spiel" lands directly in the game; a link back
 // to the game), studio_artifact.html is the standalone published Model Studio (export / import bridge)
-const inGame = studioBody.replace('<!--GAMELINK-->', '<button id="playBtn" class="gamelink playb" title="Ins Spiel">▶ Spielen</button>').replace('<!--PLAYTAG-->', ' · ▶ Spielen').replace('<script type="text/js-worker"', '<script>window.__R9_IN_GAME = true;</script>\n<script type="text/js-worker"');
+// (W1: the ▶ tile in the header is the play button, #playBtn — src/studio/start.js gives it the id in the Studio that belongs to the game)
+const inGame = studioBody.replace('<!--PLAYTAG-->', ' · ▶ Spielen').replace('<script type="text/js-worker"', '<script>window.__R9_IN_GAME = true;</script>\n<script type="text/js-worker"');
 // the standalone Studio is its own artifact (another web origin, its own storage): it says so, and knows where the game is
 const GAME_URL = 'https://claude.ai/artifact/EP9fJV6R8Grw4ev5RVUP4r';
 const standalone = studioBody.replace('<!--PLAYTAG-->', '').replace('<script type="text/js-worker"', `<script>window.__R9_STANDALONE = true; window.__R9_GAME_URL = '${GAME_URL}';</script>\n<script type="text/js-worker"`);

@@ -6,6 +6,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F, SH = VR.SHAPE;
   const TICK = 0.05;
   // a string key: packing x, z (±2^25) and y into one number lost the low bits (y) beyond 2^53
@@ -589,7 +591,7 @@
         const to = R.byName[toName]; if (!to) return false;
         w.setBlock(x, y, z, to.state(t.decode(s)), 5);
         g.audio.place(s); p.damageHeld(1);
-        this.say('Kantig — der Block hält seine Würfelform. Shift + Spaten glättet wieder.');
+        this.say(T('g.sim.hard'));
         return true;
       }
       if (!VR.SMOOTH_OF[t.name]) return false;
@@ -609,7 +611,7 @@
         }
       }
       g.audio.place(s); p.damageHeld(1);
-      this.say(n > 1 ? `Weich — ${n} Blöcke fügen sich wieder in den Hang.` : 'Weich — der Block fügt sich wieder in den Hang.');
+      this.say(n > 1 ? T('g.sim.softN', { n }) : T('g.sim.soft1'));
       return true;
     }
     say(text) { const g = this.game; if (g.ui && g.ui.chatLine) g.ui.chatLine(text, '#9ad8ff'); }

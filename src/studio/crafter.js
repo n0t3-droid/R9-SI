@@ -1385,7 +1385,7 @@
     // unfinished work that never went into the game is listed too
     const drafts = P ? P.list().filter(x => x.s.status === 'wip' && ((x.p.kind === 'house' && !(st.houses || {})[x.p.ref.index]) || (x.p.kind === 'item' && !(st.models || {})[x.p.ref.name]))) : [];
     H(IC('palette', 15) + ' ' + L('cr.designs', 'Meine Designs'), hs.length + ms.length + drafts.length);
-    if (P) row(btn(IC('clock', 18) + `<span>${L('pj.title', 'Weitermachen')}</span><kbd>Strg+O</kbd>`, 'hubBtn', () => P.show(true), L('pj.tip', 'Alles, was du angefangen hast — mit Bild, das Letzte zuerst')));
+    if (P) row(btn(`<span>🎒 ${L('pj.meins', 'Meins')}</span><kbd>Strg+O</kbd>`, 'hubBtn', () => P.show(true), L('pj.tip', 'Alles, was du angefangen hast — mit Bild, das Letzte zuerst')));   // (W1 §6: 🕘 Weitermachen is 🎒 Meins)
     if (!hs.length && !ms.length && !drafts.length) { const p = document.createElement('div'); p.className = 'note dim'; p.textContent = L('cr.designs.none', 'Noch keine.'); el.appendChild(p); }
     const when = (t) => new Date(t || 0).toLocaleString(VR.I18N && VR.I18N.locale ? VR.I18N.locale() : 'de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
     const wip = (id) => (P && P.hasData(id) ? ` · <span class="warn">✎ ${L('pj.wip', 'in Arbeit')}</span>` : '');

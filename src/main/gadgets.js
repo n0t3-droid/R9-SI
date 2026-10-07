@@ -8,6 +8,8 @@
   'use strict';
   const R = VR.R, F = VR.F, PH = VR.PHYS, mat4 = VR.mat4, M = VR.M;
   const TAU = Math.PI * 2, QT = Math.PI / 2;
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const wrapA = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
   const DIRN = ['north', 'east', 'south', 'west'];
   const F6V = [[0, 0, -1], [1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 1, 0], [0, -1, 0]];
@@ -193,7 +195,7 @@
           const t = p.target, aim = t ? [t.px - o[0], t.py - o[1], t.pz - o[2]] : d;
           if (g.entities) g.entities.fireBolt(o, aim, 80, hdef.dmg || 7, p, [1, 0.3, 0.45]);
           g.particles.spark(o[0], o[1], o[2], [1, 0.4, 0.5], 4, 1.5);
-          this.heat += 0.085; if (this.heat >= 1) { this.overheat = 1.4; this.heat = 1; g.audio.play('zap'); g.ui.hint('Blaster overheated!', 1200); }
+          this.heat += 0.085; if (this.heat >= 1) { this.overheat = 1.4; this.heat = 1; g.audio.play('zap'); g.ui.hint(T('g.laser.hot'), 1200); }
           p.handSwing = 0.35;
         }
         return lmbHold || lmbClick ? true : false;
@@ -310,11 +312,11 @@
     wandFill(mode, blockType) {
       const g = this.g, w = g.world, p = g.player;
       const B = this.wandBox();
-      if (!B) { g.ui.hint('Set two corners first: LMB and RMB with the Builder Wand', 2500); return; }
+      if (!B) { g.ui.hint(T('g.wand.corners2'), 2500); return; }
       const vol = (B[3] - B[0] + 1) * (B[4] - B[1] + 1) * (B[5] - B[2] + 1);
-      if (vol > 1000000) { g.ui.hint('Selection too large (max 1,000,000 blocks)', 2500); return; }
+      if (vol > 1000000) { g.ui.hint(T('g.wand.tooBig'), 2500); return; }
       let type = blockType || null;
-      if (mode !== 'clear' && !type) { type = this.wandBlock(); if (!type) { g.ui.hint('Put a block in the hotbar slot right of the wand', 2500); return; } }
+      if (mode !== 'clear' && !type) { type = this.wandBlock(); if (!type) { g.ui.hint(T('g.wand.noBlock'), 2500); return; } }
       const state = mode === 'clear' ? 0 : type.defaultState;
       let budget = Infinity;
       if (!p.creative && state) budget = p.inv.count(type.name);
@@ -330,11 +332,11 @@
         list.push([x, y, z, state]); undo.push([x, y, z, old]);
         if (state) budget--;
       }
-      if (!list.length) { g.ui.hint('Nothing to change', 1500); return; }
+      if (!list.length) { g.ui.hint(T('g.wand.nothing'), 1500); return; }
       this.applyEdit(list, undo);
       if (!p.creative && state) p.inv.remove(type.name, list.length);
       g.audio.place(state || 1);
-      g.ui.hint(`${mode === 'clear' ? 'Cleared' : 'Placed'} ${list.length.toLocaleString()} blocks · Z to undo`, 2200);
+      g.ui.hint(T('g.wand.placed', { what: T(mode === 'clear' ? 'g.wand.cleared' : 'g.wand.set'), n: list.length.toLocaleString() }), 2200);
       g.codex && g.codex.event && g.codex.event('wand');
     }
     applyEdit(list, undo) {
@@ -345,20 +347,20 @@
     }
     undo() {
       const u = this.wand.undo.pop();
-      if (!u) { this.g.ui.hint('Nothing to undo', 1500); return; }
+      if (!u) { this.g.ui.hint(T('g.wand.noUndo'), 1500); return; }
       this.g.world.bulkSet(u, false);
       for (const [x, y, z, s] of u) this.noteBlock(x, y, z, s);
-      this.g.ui.hint(`Undid ${u.length.toLocaleString()} changes`, 1800);
+      this.g.ui.hint(T('g.wand.undid', { n: u.length.toLocaleString() }), 1800);
     }
     wandCopy() {
       const g = this.g, w = g.world, B = this.wandBox();
-      if (!B) { g.ui.hint('Set two corners first', 2000); return; }
+      if (!B) { g.ui.hint(T('g.wand.corners'), 2000); return; }
       const sx = B[3] - B[0] + 1, sy = B[4] - B[1] + 1, sz = B[5] - B[2] + 1;
-      if (sx * sy * sz > 1000000) { g.ui.hint('Selection too large to copy', 2000); return; }
+      if (sx * sy * sz > 1000000) { g.ui.hint(T('g.wand.copyBig'), 2000); return; }
       const data = new Uint16Array(sx * sy * sz);
       for (let y = 0; y < sy; y++) for (let z = 0; z < sz; z++) for (let x = 0; x < sx; x++) data[(y * sz + z) * sx + x] = w.getBlock(B[0] + x, B[1] + y, B[2] + z);
       this.wand.clip = { sx, sy, sz, data };
-      g.ui.hint(`Copied ${sx}×${sy}×${sz} · V to paste at the block you look at · R to rotate`, 2600);
+      g.ui.hint(T('g.wand.copied', { sx, sy, sz }), 2600);
     }
     pasteOrigin() {
       const p = this.g.player, t = p.target, c = this.wand.clip;
@@ -369,7 +371,7 @@
     }
     wandPaste() {
       const g = this.g, w = g.world, c = this.wand.clip, o = this.pasteOrigin();
-      if (!c) { g.ui.hint('Copy something first (C)', 2000); return; }
+      if (!c) { g.ui.hint(T('g.wand.noCopy'), 2000); return; }
       if (!o) return;
       const list = [], undo = [];
       for (let y = 0; y < c.sy; y++) for (let z = 0; z < c.sz; z++) for (let x = 0; x < c.sx; x++) {
@@ -381,10 +383,10 @@
         list.push([X, Y, Z, s]); undo.push([X, Y, Z, old]);
       }
       if (!list.length) return;
-      if (!g.player.creative) { g.ui.hint('Pasting needs Creative or Zen Builder', 2200); return; }
+      if (!g.player.creative) { g.ui.hint(T('g.wand.pasteMode'), 2200); return; }
       this.applyEdit(list, undo);
       g.audio.place(list[0][3]);
-      g.ui.hint(`Pasted ${list.length.toLocaleString()} blocks · Z to undo`, 2000);
+      g.ui.hint(T('g.wand.pasted', { n: list.length.toLocaleString() }), 2000);
     }
     wandRotate() {
       const c = this.wand.clip; if (!c) return;
@@ -394,7 +396,7 @@
         out[(y * nsz + nz) * nsx + nx] = rotateState(c.data[(y * c.sz + z) * c.sx + x], 1);
       }
       this.wand.clip = { sx: nsx, sy: c.sy, sz: nsz, data: out };
-      this.g.ui.hint('Clipboard rotated 90°', 1400);
+      this.g.ui.hint(T('g.wand.rotated'), 1400);
     }
     shape(kind, type, r, h, hollow) {
       const g = this.g, w = g.world, p = g.player, t = p.target;
@@ -445,17 +447,17 @@
       g.audio.play('warp');
       for (let i = 0; i < 40; i++) { const a = i / 40 * TAU; g.particles.spawn(p.pos[0] + Math.cos(a) * 0.6, p.pos[1] + 1, p.pos[2] + Math.sin(a) * 0.6, Math.cos(a) * 9, 0, Math.sin(a) * 9, { life: 0.8, size: 0.06, grav: 0, col: [0.3, 1, 1], emis: 1, drag: 0.5, collide: false }); }
       const keys = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
-      this.say(keys.length ? 'Geo scan: ' + keys.map(k => `${counts[k]} ${k}`).join(' · ') : 'Geo scan: no ores within 22 blocks.', '#9affd8');
+      this.say(keys.length ? T('g.scan.found', { list: keys.map(k => `${counts[k]} ${k}`).join(' · ') }) : T('g.scan.none'), '#9affd8');
     }
 
     // ================================================================ waypoints
     addWaypoint(x, y, z, name) {
       if (this.waypoints.length >= 40) this.waypoints.shift();
       const n = this.waypoints.length;
-      const wp = { x, y, z, name: name || ('Waypoint ' + (n + 1)), col: WP_COLORS[n % WP_COLORS.length] };
+      const wp = { x, y, z, name: name || T('g.wp.name', { n: n + 1 }), col: WP_COLORS[n % WP_COLORS.length] };
       this.waypoints.push(wp);
       this.meta.waypoints = this.waypoints;
-      this.say(`◆ ${wp.name} set at ${x} ${y} ${z}`, wp.col);
+      this.say(T('g.wp.set', { name: wp.name, x, y, z }), wp.col);
       this.g.audio.play('toast');
       return wp;
     }
@@ -475,7 +477,7 @@
       const g = this.g, p = g.player;
       this.drone = { pos: p.eyePos(), vel: [0, 0, 0] };
       g.photoMode(true);
-      g.ui.hint('Photo drone · WASD fly · Space/Shift up/down · Ctrl fast · LMB capture · V exit', 4500);
+      g.ui.hint(T('g.drone.hint'), 4500);
       g.codex && g.codex.event && g.codex.event('drone');
     }
     driveDrone(dt, input, blocked) {
@@ -517,7 +519,7 @@
       b.rider = pl; pl.flying = false; pl.target = null; pl.breaking = null;
       pl.yaw = b.yaw;
       g.audio.play('click');
-      g.ui.hint('Hoverbike — W to ride, Shift to get off', 3000);
+      g.ui.hint(T('g.bike.hint'), 3000);
       g.codex && g.codex.event && g.codex.event('bike');
     }
     groundBelow(x, y, z, depth) {
@@ -593,7 +595,7 @@
       const base = VR.VM && t && t.has('part') && VR.VM.MODELS[t.name] ? VR.VM.partCells(VR.VM.MODELS[t.name], f, t.get(s, 'part'), x, y, z)[0][1] : y;
       this.riding = { type: 'seat', x, y, z, base };
       p.yaw = -f * QT; p.pitch = 0; p.flying = false; p.target = null; p.breaking = null;
-      g.ui.hint('Seated · Shift to stand up', 2200);
+      g.ui.hint(T('g.seat.hint'), 2200);
     }
     driveSeat(dt, input, blocked) {
       const r = this.riding, g = this.g, p = g.player;
@@ -651,22 +653,22 @@
           const k = K3(nx, ny, nz);
           if (seen.has(k)) continue;
           seen.add(k);
-          if (!w.col(nx >> 4, nz >> 4)) { fail = 'The ship reaches into unexplored terrain.'; break; }
+          if (!w.col(nx >> 4, nz >> 4)) { fail = T('g.ship.unexplored'); break; }
           const s = w.getBlock(nx, ny, nz);
           if (!s || (T.flags[s] & F.FLUID) || EX[T.type[s]]) continue;
           cells.push(nx, ny, nz, s); q.push(nx, ny, nz);
           if (nx < x0) x0 = nx; if (nx > x1) x1 = nx; if (ny < y0) y0 = ny; if (ny > y1) y1 = ny; if (nz < z0) z0 = nz; if (nz > z1) z1 = nz;
-          if (cells.length / 4 > LIMIT) { fail = 'This ship is fused to a building or too big (max 12,000 blocks). Separate it with air or Landing Pads.'; break; }
-          if (x1 - x0 > 96 || z1 - z0 > 96 || y1 - y0 > 64) { fail = 'This ship is fused to a large structure. Separate it with air or Landing Pads.'; break; }
+          if (cells.length / 4 > LIMIT) { fail = T('g.ship.fused'); break; }
+          if (x1 - x0 > 96 || z1 - z0 > 96 || y1 - y0 > 64) { fail = T('g.ship.fusedBig'); break; }
         }
       }
       if (fail) { this.say(fail, '#ff9a8a'); return; }
-      if (cells.length / 4 < 2) { this.say('The helm must be part of a ship — build a hull around it.', '#ff9a8a'); return; }
+      if (cells.length / 4 < 2) { this.say(T('g.ship.noHull'), '#ff9a8a'); return; }
       // big launches need a second click so a ship fused to a building never takes off by surprise
       const n = cells.length / 4, key = x + ',' + y + ',' + z;
       if (n > 2500 && !(this.confirmHelm && this.confirmHelm.key === key && performance.now() - this.confirmHelm.t < 6000)) {
         this.confirmHelm = { key, t: performance.now() };
-        this.say(`This ship has ${n.toLocaleString()} blocks (${x1 - x0 + 1}×${y1 - y0 + 1}×${z1 - z0 + 1}). Right-click the helm again to launch everything connected to it.`, '#ffd08a');
+        this.say(T('g.ship.confirm', { n: n.toLocaleString(), sx: x1 - x0 + 1, sy: y1 - y0 + 1, sz: z1 - z0 + 1 }), '#ffd08a');
         return;
       }
       this.confirmHelm = null;
@@ -691,8 +693,8 @@
       p.flying = false; p.target = null; p.breaking = null; p.pitch = 0;
       p.yaw = S.yaw0;
       this.requestShipMesh(S);
-      this.say(`Helm engaged · ${S.count} blocks · ${S.thrusters.length} thrusters · top speed ${Math.round(S.maxSpeed)} m/s`, '#9affd8');
-      g.ui.hint('Ship systems online — steer with the mouse, V to land', 3500);
+      this.say(T('g.ship.engaged', { n: S.count, t: S.thrusters.length, v: Math.round(S.maxSpeed) }), '#9affd8');
+      g.ui.hint(T('g.ship.online'), 3500);
     }
     buildShip(sx, sy, sz, blocks, facing, helmL) {
       const T = R.T;
@@ -744,7 +746,7 @@
     onShipMesh(S, m) {
       const g = this.g;
       if (this.ship !== S || S.state !== 'meshing') return;
-      if (m.type !== 'shipmesh') { this.say('Ship systems failed to start.', '#ff9a8a'); this.ship = null; this.riding = null; return; }
+      if (m.type !== 'shipmesh') { this.say(T('g.ship.failed'), '#ff9a8a'); this.ship = null; this.riding = null; return; }
       S.gpu = g.renderer.uploadShip(m.sections);
       // lift the blocks out of the world
       const c = S.worldCells, list = [];
@@ -869,7 +871,7 @@
         if (list) { at = [base[0] + dx, base[1] + dy, base[2] + dz]; break outer; }
       }
       if (!list) {
-        if (!force) { g.ui.hint('No room to land here — move away from terrain and try again', 2600); g.audio.play('zap'); return false; }
+        if (!force) { g.ui.hint(T('g.ship.noRoom'), 2600); g.audio.play('zap'); return false; }
         at = base; list = place(base[0], base[1], base[2], false);
       }
       const touched = new Set();
@@ -896,7 +898,7 @@
       p.teleport(spot[0], spot[1], spot[2]);
       g.ui.vehicleHud(null);
       if (this.meta.flyingShip) delete this.meta.flyingShip;
-      this.say('Ship landed.', '#9affd8');
+      this.say(T('g.ship.landed'), '#9affd8');
       return true;
     }
     finishLanding(dt) {
@@ -944,7 +946,7 @@
       const dist = Math.ceil(Math.max(b.z1 - b.z0, b.x1 - b.x0) / 2) + 5;
       const cx = Math.floor(p.pos[0] + fx * dist), cz = Math.floor(p.pos[2] + fz * dist);
       let base = 0;
-      for (let u = b.x0; u <= b.x1; u += 2) for (let v = b.z0; v <= b.z1; v += 2) { const [dx, dz] = VR.rotXZ(u, v, dir); if (!w.col((cx + dx) >> 4, (cz + dz) >> 4)) { g.ui.hint('Not enough loaded ground here — try again after moving a little', 2500); return false; } base = Math.max(base, w.topAt(cx + dx, cz + dz)); }
+      for (let u = b.x0; u <= b.x1; u += 2) for (let v = b.z0; v <= b.z1; v += 2) { const [dx, dz] = VR.rotXZ(u, v, dir); if (!w.col((cx + dx) >> 4, (cz + dz) >> 4)) { g.ui.hint(T('g.ship.noGround'), 2500); return false; } base = Math.max(base, w.topAt(cx + dx, cz + dz)); }
       base = Math.min(base + 1, 254 - b.h);
       const seen = new Map(), undo = [];
       const put = (x, y, z, s) => { if (y < 0 || y >= VR.MAXY || !w.col(x >> 4, z >> 4)) return; const k = K3(x, y, z); if (!seen.has(k)) undo.push([x, y, z, w.getBlock(x, y, z)]); seen.set(k, [x, y, z, s]); };
@@ -953,7 +955,7 @@
       this.applyEdit([...seen.values()], undo);
       g.audio.play('warp');
       g.particles.explosion(cx + 0.5, base + b.h * 0.5, cz + 0.5, 0.8);
-      this.say(`${bp.name} (${bp.label}) is ready. Climb aboard and right-click the Ship Helm.`, '#9affd8');
+      this.say(T('g.ship.ready', { name: bp.name, label: bp.label }), '#9affd8');
       return true;
     }
     summonShuttle(p) { if (VR.ShipGen) return this.summonDesign(VR.ShipGen.design((Math.random() * 4294967295) >>> 0, 'shuttle'), p); return this.summonShuttleClassic(p); }
@@ -978,7 +980,7 @@
       this.applyEdit(fin, undo);
       g.audio.play('warp');
       g.particles.explosion(cx + 0.5, base + 4, cz + 0.5, 0.6);
-      this.say('A shuttle materialises! Board through the side door and right-click the Ship Helm.', '#9affd8');
+      this.say(T('g.ship.shuttle'), '#9affd8');
     }
 
     // ================================================================ turrets
@@ -1046,7 +1048,7 @@
         st.mobs = st.mobs.filter((m) => !m.dead && g.entities && g.entities.mobs.indexOf(m) >= 0);
         if (!st.mobs.length) {
           st.active = false; g.raidActive = false;
-          if (st.killed) { this.say('Raid repelled! The outpost frequencies fall silent.', '#9affd8'); g.addXP && g.addXP(20); g.codex && g.codex.event && g.codex.event('raid'); }
+          if (st.killed) { this.say(T('g.raid.won'), '#9affd8'); g.addXP && g.addXP(20); g.codex && g.codex.event && g.codex.event('raid'); }
         } else if (E.night < 0.25 || p.mode !== 'survival') { for (const m of st.mobs) m.dead = true; st.mobs = []; st.active = false; g.raidActive = false; }
         return;
       }
@@ -1072,9 +1074,9 @@
       }
       st.active = st.mobs.length > 0; st.lastDay = g.env.day; st.killed = false;
       g.raidActive = st.active;
-      const dirs = ['east', 'south-east', 'south', 'south-west', 'west', 'north-west', 'north', 'north-east'];
+      const dirs = ['e', 'se', 's', 'sw', 'w', 'nw', 'n', 'ne'];
       const di = Math.round(((a % TAU) + TAU) % TAU / (TAU / 8)) % 8;
-      this.say(`⚠ Raider drones inbound from the ${dirs[di]}!`, '#ffae6a');
+      this.say(T('g.raid.inbound', { dir: T('g.dir.' + dirs[di]) }), '#ffae6a');
       g.audio.play('warp');
     }
     onMobKilled(m) { if (m.raid) this.raid.killed = true; }
@@ -1113,7 +1115,7 @@
       const d = [tx - pos[0], ty - pos[1], tz - pos[2]], L = Math.hypot(d[0], d[1], d[2]);
       this.meteors.push({ pos, vel: [d[0] / L * 58, d[1] / L * 58, d[2] / L * 58], t: 0 });
       g.audio.play('meteor');
-      this.say('☄ A meteor tears through the sky!', '#ffcf8a');
+      this.say(T('g.meteor'), '#ffcf8a');
       return true;
     }
     impact(at, m) {
@@ -1169,29 +1171,29 @@
       if (this.drone) return null;
       // in the cockpit the heads-up display shows the numbers; keep only the key hints
       const ck = g.cockpit && g.cockpit.active();
-      if (ck && r && (r.type === 'starship' || (r.type === 'ship' && this.ship && this.ship.state !== 'meshing'))) return g.cockpit.activeT < 9 ? '<small>W/S thrust · mouse steer · A/D strafe · Space/Shift climb · Ctrl boost · LMB lasers · F5 view' + (r.type === 'starship' ? ' · <b>G autopilot</b>' : '') + ' · <b>V land</b></small>' : null;
+      if (ck && r && (r.type === 'starship' || (r.type === 'ship' && this.ship && this.ship.state !== 'meshing'))) return g.cockpit.activeT < 9 ? '<small>' + T('g.ship.keys') + (r.type === 'starship' ? ' · <b>' + T('g.ship.keyAuto') + '</b>' : '') + ' · <b>' + T('g.ship.keyLand') + '</b></small>' : null;
       if (r && r.type === 'starship') return g.starships ? g.starships.hudText() : null;
       if (r && r.type === 'ship' && this.ship) {
         const S = this.ship;
-        if (S.state === 'meshing') return '<b>SHIP SYSTEMS</b> · spooling up…';
+        if (S.state === 'meshing') return T('g.ship.spooling');
         const sp = Math.hypot(S.vel[0], S.vel[1], S.vel[2]);
         const hd = ((Math.round(-(S.yaw0 + S.psi) * 180 / Math.PI) % 360) + 360) % 360;
-        return `<b>${Math.round(sp)} m/s</b> · ALT ${Math.round(S.pos[1])} · HDG ${hd}° · ${S.count} blocks<br><small>W/S thrust · A/D strafe · Space/Shift climb · Ctrl boost · LMB lasers · Alt free-look · F5 view · <b>V land</b></small>`;
+        return T('g.ship.hud', { v: Math.round(sp), alt: Math.round(S.pos[1]), hd, n: S.count });
       }
-      if (r && r.type === 'bike') return `<b>${Math.round(Math.abs(r.bike.spd || 0))} m/s</b> · HOVERBIKE<br><small>Shift to get off · Space hop · Ctrl boost</small>`;
+      if (r && r.type === 'bike') return T('g.bike.hud', { v: Math.round(Math.abs(r.bike.spd || 0)) });
       if (r && r.type === 'seat') return null;
       if (r && r.type === 'tram') return g.trams ? g.trams.hud(r) : null;
       const h = p.inv.held, d = h ? VR.itemDef(h.id) : null;
       if (d && d.use === 'wand') {
         const B = this.wandBox(), blk = this.wandBlock();
-        const sz = B ? `${B[3] - B[0] + 1}×${B[4] - B[1] + 1}×${B[5] - B[2] + 1}` : (this.wand.a ? 'corner A set' : 'no selection');
-        return `<b>BUILDER WAND</b> · ${sz} · block: ${blk ? blk.display : '—'}<br><small>LMB/RMB corners · F fill · H hollow · G walls · X clear · C copy · V paste · R rotate · Z undo</small>`;
+        const sz = B ? `${B[3] - B[0] + 1}×${B[4] - B[1] + 1}×${B[5] - B[2] + 1}` : T(this.wand.a ? 'g.wand.cornerA' : 'g.wand.noSel');
+        return T('g.wand.hud', { sz, blk: blk ? blk.display : '—' });
       }
       if (d && d.use === 'blueprint' && this.blue) return this.blue.hud(d);
-      if (d && d.use === 'laser') return this.overheat > 0 ? '<b style="color:#ff6a6a">OVERHEATED</b>' : (this.heat > 0.05 ? `HEAT ${'▮'.repeat(Math.ceil(this.heat * 10))}${'▯'.repeat(10 - Math.ceil(this.heat * 10))}` : null);
+      if (d && d.use === 'laser') return this.overheat > 0 ? '<b style="color:#ff6a6a">' + T('g.laser.overheated') + '</b>' : (this.heat > 0.05 ? `${T('g.laser.heat')}${'▮'.repeat(Math.ceil(this.heat * 10))}${'▯'.repeat(10 - Math.ceil(this.heat * 10))}` : null);
       const jet = (p.inv.armor[1] && p.inv.armor[1].id === 'jetpack') || (h && h.id === 'jetpack');
-      if (jet && (!p.onGround || this.jetFuel < 1) && !p.creative) return `JETPACK ${'▮'.repeat(Math.ceil(this.jetFuel * 10))}${'▯'.repeat(10 - Math.ceil(this.jetFuel * 10))}`;
-      if (jet && !p.onGround) return 'JETPACK · hold Space';
+      if (jet && (!p.onGround || this.jetFuel < 1) && !p.creative) return `${T('g.jet.fuel')}${'▮'.repeat(Math.ceil(this.jetFuel * 10))}${'▯'.repeat(10 - Math.ceil(this.jetFuel * 10))}`;
+      if (jet && !p.onGround) return T('g.jet.hold');
       return null;
     }
     outlines() {
@@ -1322,15 +1324,15 @@
     // ================================================================ chat commands
     command(cmd, a) {
       const g = this.g, p = g.player, say = (t, c) => this.say(t, c || '#cfe6ff');
-      const blockArg = (n) => { if (!n || n === 'air') return null; const t = R.byName[n]; if (!t) { say('Unknown block: ' + n, '#ff8a8a'); return undefined; } return t; };
-      const needCreative = () => { if (!p.creative) { say('That command needs Creative or Zen Builder.', '#ff8a8a'); return false; } return true; };
+      const blockArg = (n) => { if (!n || n === 'air') return null; const t = R.byName[n]; if (!t) { say(T('g.cmd.noBlock', { n }), '#ff8a8a'); return undefined; } return t; };
+      const needCreative = () => { if (!p.creative) { say(T('g.cmd.needCreative'), '#ff8a8a'); return false; } return true; };
       switch (cmd) {
         case 'shuttle': if (needCreative()) this.summonShuttle(p); return true;
         case 'ship': {
           if (!needCreative()) return true;
           if (!a[0]) { g.ui.openShipyard(); return true; }
           const arch = VR.Starship && VR.Starship.ARCH[a[0]] ? a[0] : null;
-          if (!arch) { say('Ship types: ' + (VR.Starship ? VR.Starship.archetypes.join(', ') : 'none'), '#ff8a8a'); return true; }
+          if (!arch) { say(T('g.cmd.shipTypes', { list: VR.Starship ? VR.Starship.archetypes.join(', ') : '—' }), '#ff8a8a'); return true; }
           const seed = a[1] ? (parseInt(a[1], 10) >>> 0) : (Math.random() * 4294967295) >>> 0;
           if (g.starships) g.starships.placeInFront(seed, arch, null, p); return true;
         }
@@ -1340,22 +1342,22 @@
           const seed = a[1] ? (parseInt(a[1], 10) >>> 0) : (Math.random() * 4294967295) >>> 0;
           this.summonDesign(VR.ShipGen.design(seed, arch), p); return true;
         }
-        case 'traffic': if (g.traffic) { g.traffic.spawnFlight(a[0] ? { arch: a[0] } : {}); say('Incoming traffic.'); } return true;
-        case 'bike': this.spawnVehicle('hoverbike', p.pos[0] - Math.sin(p.yaw) * 2.5, p.pos[1] + 0.5, p.pos[2] - Math.cos(p.yaw) * 2.5, p.yaw); say('Hoverbike delivered.'); return true;
-        case 'meteor': { const d = p.lookDir(); if (!this.spawnMeteor(p.pos[0] + d[0] * 40, p.pos[2] + d[2] * 40)) say('Look toward loaded terrain.', '#ff8a8a'); return true; }
-        case 'raid': if (p.mode !== 'survival') say('Raids only happen in Survival.', '#ff8a8a'); else this.startRaid(); return true;
+        case 'traffic': if (g.traffic) { g.traffic.spawnFlight(a[0] ? { arch: a[0] } : {}); say(T('g.cmd.traffic')); } return true;
+        case 'bike': this.spawnVehicle('hoverbike', p.pos[0] - Math.sin(p.yaw) * 2.5, p.pos[1] + 0.5, p.pos[2] - Math.cos(p.yaw) * 2.5, p.yaw); say(T('g.cmd.bike')); return true;
+        case 'meteor': { const d = p.lookDir(); if (!this.spawnMeteor(p.pos[0] + d[0] * 40, p.pos[2] + d[2] * 40)) say(T('g.cmd.meteorNo'), '#ff8a8a'); return true; }
+        case 'raid': if (p.mode !== 'survival') say(T('g.cmd.raidNo'), '#ff8a8a'); else this.startRaid(); return true;
         case 'wp': case 'waypoint': { const name = a.join(' ').trim(); this.addWaypoint(Math.floor(p.pos[0]), Math.floor(p.pos[1]), Math.floor(p.pos[2]), name || undefined); return true; }
-        case 'wpclear': this.waypoints.length = 0; say('Waypoints cleared.'); return true;
+        case 'wpclear': this.waypoints.length = 0; say(T('g.cmd.wpclear')); return true;
         case 'pos1': case 'pos2': { const t = p.target; const v = t ? [t.x, t.y, t.z] : [Math.floor(p.pos[0]), Math.floor(p.pos[1]) - 1, Math.floor(p.pos[2])]; this.wand[cmd === 'pos1' ? 'a' : 'b'] = v; say(`${cmd} = ${v.join(' ')}`); return true; }
         case 'fill': case 'set': case 'walls': case 'hollow': { if (!needCreative()) return true; const t = blockArg(a[0]); if (t === undefined) return true; this.wandFill(t ? (cmd === 'set' ? 'fill' : cmd) : 'clear', t); return true; }
         case 'clear': if (needCreative()) this.wandFill('clear'); return true;
         case 'replace': {
           if (!needCreative()) return true;
           const from = blockArg(a[0]), to = blockArg(a[1]); if (from === undefined || to === undefined || !from) return true;
-          const B = this.wandBox(); if (!B) { say('Select an area with the Builder Wand first.', '#ff8a8a'); return true; }
+          const B = this.wandBox(); if (!B) { say(T('g.cmd.wandFirst'), '#ff8a8a'); return true; }
           const w = g.world, list = [], undo = [];
           for (let y = B[1]; y <= B[4]; y++) for (let z = B[2]; z <= B[5]; z++) for (let x = B[0]; x <= B[3]; x++) { const s = w.getBlock(x, y, z); if (s && R.T.type[s] === from.id) { list.push([x, y, z, to ? to.defaultState : 0]); undo.push([x, y, z, s]); } }
-          if (list.length) this.applyEdit(list, undo); say(`Replaced ${list.length} blocks.`); return true;
+          if (list.length) this.applyEdit(list, undo); say(T('g.cmd.replaced', { n: list.length })); return true;
         }
         case 'copy': this.wandCopy(); return true;
         case 'paste': this.wandPaste(); return true;
@@ -1366,7 +1368,7 @@
           const t = blockArg(a[0]); if (t === undefined) return true;
           const r0 = parseInt(a[1] || '4', 10) || 4, h = parseInt(a[2] || '1', 10) || 1;
           const n = this.shape(cmd.indexOf('sphere') >= 0 ? 'sphere' : 'cyl', t, r0, h, cmd[0] === 'h');
-          say(`Built ${n} blocks · /undo to revert`); return true;
+          say(T('g.cmd.built', { n })); return true;
         }
         case 'land': if (this.ship) this.landShip(false); return true;
         case 'haus': case 'house': case 'blueprint': return this.blue ? this.blue.command(a) : false;

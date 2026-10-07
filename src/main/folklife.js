@@ -6,10 +6,12 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js): T a text, TL a list of lines
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const Vs = VR.Villages, Folk = VR.Folk, R = VR.R, F = VR.F;
   if (!Vs || !Folk) return;
   const P = Vs.prototype;
-  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const pick = (arr) => (arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : '');
   const TAU = Math.PI * 2;
 
   // ---------------------------------------------------------------- steering on open ground
@@ -45,7 +47,7 @@
   P.playArea = function (vil) { const pz = vil.plan.plaza; return { cx: pz.x + 0.5, cz: pz.z + 0.5, y: pz.y, R: (pz.r || 5) + 5 }; };
   P.playTag = function (a, act, vil, G, dt) {
     const A = this.playArea(vil);
-    if (!G.it || !G.kids.includes(G.it)) { G.it = pick(G.kids); G.itWait = this.time + 2; if (G.it && this.near(G.it, 24)) G.it.say(pick(['I\'m it! Run!', 'Ready or not!', 'You can\'t hide from me!']), 2.2); }
+    if (!G.it || !G.kids.includes(G.it)) { G.it = pick(G.kids); G.itWait = this.time + 2; if (G.it && this.near(G.it, 24)) G.it.say(pick(TL('g.play.it')), 2.2); }
     const it = G.it;
     if (a === it) {
       if (this.time < G.itWait) { a.eyesClosed = true; a.lookAt = [A.cx, A.y + 1, A.cz]; return; }
@@ -55,7 +57,7 @@
       a.steer = [best.pos[0], best.pos[2]];
       if (bd < 0.85 * 0.85 && Math.abs(best.pos[1] - a.pos[1]) < 1.3) {
         G.it = best; G.itWait = this.time + 1.8; a.taggedT = this.time + 3;
-        if (this.near(a, 24)) { a.say('Tag! You\'re it!', 2); best.say(pick(['Aww! I\'m it!', 'Got me!', 'No fair!']), 2); if (this.g.audio) this.g.audio.tone(880, 0.05, 0.12, 'triangle', true); }
+        if (this.near(a, 24)) { a.say(T('g.play.tag'), 2); best.say(pick(TL('g.play.tagged')), 2); if (this.g.audio) this.g.audio.tone(880, 0.05, 0.12, 'triangle', true); }
       }
       return;
     }
@@ -67,7 +69,7 @@
       if (od > A.R * 0.7) { const side = (ox * fz - oz * fx) > 0 ? 1 : -1; fx = fx * 0.3 - oz / od * side - ox / od * 0.5; fz = fz * 0.3 + ox / od * side - oz / od * 0.5; }
       const l = Math.hypot(fx, fz) || 1;
       a.steer = [a.pos[0] + fx / l * 4, a.pos[2] + fz / l * 4];
-      if (Math.random() < dt * 0.35 && this.near(a, 18)) a.say(pick(['Can\'t catch me!', 'Too slow!', 'Hehe!', 'Nyah nyah!', 'Wheee!']), 1.5);
+      if (Math.random() < dt * 0.35 && this.near(a, 18)) a.say(pick(TL('g.play.run')), 1.5);
     } else {
       if (!act.wander || act.wt < this.time) { const an = Math.random() * TAU, r = Math.random() * A.R * 0.8; act.wander = [A.cx + Math.cos(an) * r, A.cz + Math.sin(an) * r]; act.wt = this.time + 2 + Math.random() * 3; }
       if (Math.hypot(a.pos[0] - act.wander[0], a.pos[2] - act.wander[1]) > 0.8) a.steer = act.wander; else { a.steer = null; a.lookAt = it.pos; }
@@ -101,17 +103,17 @@
         a.eyesClosed = true; a.lookAt = [A.cx, A.y + 1.2, A.cz];
         if (!this.goTo(a, base[0], base[1], base[2], 2.2)) return;
         const n = Math.floor((this.time - G.t0) / 1.1) + 1;
-        if (n !== G.lastN && n <= 10) { G.lastN = n; if (this.near(a, 22)) a.say(n < 10 ? n + '…' : 'Ready or not, here I come!', 1.3); }
+        if (n !== G.lastN && n <= 10) { G.lastN = n; if (this.near(a, 22)) a.say(n < 10 ? n + '…' : T('g.play.ready'), 1.3); }
         if (this.time - G.t0 > 11.5) G.phase = 'seek';
         return;
       }
       const hid = G.kids.filter(o => o !== a && !G.found.has(o));
-      if (!hid.length) { if (this.near(a, 22)) a.say('Found everyone! Again, again!', 3); G.seeker = null; G.until = Math.min(G.until, this.time + 25); return; }
+      if (!hid.length) { if (this.near(a, 22)) a.say(T('g.play.foundAll'), 3); G.seeker = null; G.until = Math.min(G.until, this.time + 25); return; }
       const tgt = hid[0], sp = G.spots.get(tgt) || [Math.floor(tgt.pos[0]), Math.floor(tgt.pos[1]), Math.floor(tgt.pos[2])];
       if (this.goTo(a, sp[0], sp[1], sp[2], 1.9)) {
         G.found.add(tgt);
-        if (this.near(a, 22)) { a.say(pick(['Found you, ' + tgt.p.name + '!', 'Gotcha!', 'I see you!']), 2); tgt.say(pick(['Aww!', 'Hehe, you found me!', 'How did you know?!']), 2); }
-      } else if (Math.random() < dt * 0.12 && this.near(a, 16)) a.say(pick(['Where are you…?', 'I can hear you giggling!', 'Hmm…']), 1.8);
+        if (this.near(a, 22)) { a.say(pick(TL('g.play.found')).replace('{n}', tgt.p.name), 2); tgt.say(pick(TL('g.play.caught')), 2); }
+      } else if (Math.random() < dt * 0.12 && this.near(a, 16)) a.say(pick(TL('g.play.seek')), 1.8);
       return;
     }
     if (G.found.has(a)) {
@@ -121,7 +123,7 @@
     }
     let spot = G.spots.get(a);
     if (!spot) { spot = this.hideSpot(vil, a); G.spots.set(a, spot); }
-    if (this.goTo(a, spot[0], spot[1], spot[2], 0.9)) { a.pose = 'crouch'; a.lookAt = null; act.run = false; if (Math.random() < dt * 0.04 && this.near(a, 8)) a.say('Shh…', 1.5); }
+    if (this.goTo(a, spot[0], spot[1], spot[2], 0.9)) { a.pose = 'crouch'; a.lookAt = null; act.run = false; if (Math.random() < dt * 0.04 && this.near(a, 8)) a.say(T('g.play.shh'), 1.5); }
   };
   P.playHop = function (a, act, vil, G, dt) {
     const A = this.playArea(vil);
@@ -129,7 +131,7 @@
     if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.1)) {
       a.lookAt = [A.cx, A.y + 1, A.cz];
       if (a.onGround && Math.random() < dt * 2.4) a.vel[1] = 5.6;
-      if (Math.random() < dt * 0.08 && this.near(a, 14)) a.say(pick(['One, two, three, hop!', 'Wheee!', 'Look how high I jump!', 'Skip, skip, skip!']), 1.8);
+      if (Math.random() < dt * 0.08 && this.near(a, 14)) a.say(pick(TL('g.play.hop')), 1.8);
     }
   };
 
@@ -217,9 +219,9 @@
     if (type === 'hike') { const spots = this.hikeSpots(vil); if (!spots.length) { if (!shore) return null; type = 'boat'; } else dest = pick(spots); }
     const O = vil.outing = { type, fam, agents, leader, dest, shore, phase: 'go', t0: this.time, boat: null };
     for (const a of agents) this.setAct(a, { type: 'outing', o: O });
-    if (this.near(leader, 40)) leader.say(type === 'boat' ? pick(['Who wants to go sailing?', 'Boat trip! Grab your hats!', 'Let\'s go out on the water!']) : pick(['Family hike! Everyone ready?', 'Let\'s go up the hill for a picnic!', 'Come on, kids — adventure time!']), 3.5);
+    if (this.near(leader, 40)) leader.say(pick(TL(type === 'boat' ? 'g.out.boat' : 'g.out.hike')), 3.5);
     const kid = agents.find(o => o.kid);
-    if (kid) setTimeout(() => { if (kid.act && kid.act.type === 'outing' && this.near(kid, 40)) kid.say(pick(['Yay!!', 'Can I lead the way?', 'Race you there!']), 2.2); }, 1500);
+    if (kid) setTimeout(() => { if (kid.act && kid.act.type === 'outing' && this.near(kid, 40)) kid.say(pick(TL('g.out.kidYay')), 2.2); }, 1500);
     return O;
   };
   P.endOuting = function (vil) {
@@ -249,9 +251,9 @@
     if (O.type === 'hike') {
       const D = O.dest;
       if (O.phase === 'go') {
-        if (a === O.leader) { act.run = false; if (this.goTo(a, D.x, D.y, D.z, 2.2)) { O.phase = 'picnic'; O.t1 = this.time; if (this.near(a, 40)) a.say(pick(['Here we are! What a view!', 'Picnic time!', 'Look how small our village looks from up here!']), 3.5); } }
+        if (a === O.leader) { act.run = false; if (this.goTo(a, D.x, D.y, D.z, 2.2)) { O.phase = 'picnic'; O.t1 = this.time; if (this.near(a, 40)) a.say(pick(TL('g.out.arrive')), 3.5); } }
         else this.followLeader(a, O, k);
-        if (Math.random() < dt * 0.03 && this.near(a, 24)) a.say(a.kid ? pick(['Are we there yet?', 'Look, a butterfly!', 'I\'m the fastest!', 'Carry me?']) : pick(['Watch your step!', 'Stay close, everyone.', 'Almost there!']), 2.2);
+        if (Math.random() < dt * 0.03 && this.near(a, 24)) a.say(pick(TL(a.kid ? 'g.out.kidWalk' : 'g.out.adultWalk')), 2.2);
         return;
       }
       if (O.phase === 'picnic') {
@@ -260,9 +262,9 @@
         const sx = Math.floor(D.x + Math.cos(an) * r), sz = Math.floor(D.z + Math.sin(an) * r);
         if (a.pose === 'sitground' || this.goTo(a, sx, D.y, sz, 0.9)) {
           if (a.pose !== 'sitground') { a.pose = 'sitground'; a.path = null; a.vel = [0, 0, 0]; a.yaw = Math.atan2(-(D.x + 0.5 - a.pos[0]), -(D.z + 0.5 - a.pos[2])) + Math.PI; }
-          if (Math.random() < dt * 0.05 && this.near(a, 26)) a.say(a.kid ? pick(['Mmm, sandwiches!', 'Can we come back tomorrow?', 'Look! A starship!', 'I can see our house!']) : pick(['Isn\'t this lovely?', 'The sky is so big out here.', 'We should do this more often.', 'Pass the apples, dear.']), 2.8);
+          if (Math.random() < dt * 0.05 && this.near(a, 26)) a.say(pick(TL(a.kid ? 'g.out.kidPicnic' : 'g.out.adultPicnic')), 2.8);
         }
-        if (this.time - O.t1 > 40 + (O.fam.id % 4) * 5) { O.phase = 'back'; if (this.near(O.leader, 40)) O.leader.say('Time to head home!', 2.5); }
+        if (this.time - O.t1 > 40 + (O.fam.id % 4) * 5) { O.phase = 'back'; if (this.near(O.leader, 40)) O.leader.say(T('g.out.home'), 2.5); }
         return;
       }
       if (O.phase === 'back') {
@@ -298,7 +300,7 @@
     O.boat = b; O.phase = 'sail'; O.route = [[S.water[0] + 0.5, S.water[2] + 0.5]].concat(S.loop, S.loop.slice(0, 1), [[S.water[0] + 0.5, S.water[2] + 0.5], [L[0] + 0.5, L[2] + 0.5]]);
     O.agents.forEach((a, i) => { a.inBoat = b; a.seat = i; a.pose = 'sit'; a.path = null; a.steer = null; a.vel = [0, 0, 0]; });
     vil.boats = (vil.boats || []).filter(x => x !== b);
-    if (this.near(O.leader, 40)) { O.leader.say(pick(['All aboard!', 'Hold on tight!', 'Off we go!']), 2.5); if (this.g.audio) this.g.audio.play('door'); }
+    if (this.near(O.leader, 40)) { O.leader.say(pick(TL('g.out.aboard')), 2.5); if (this.g.audio) this.g.audio.play('door'); }
   };
   const SEATS = [[0.32, -0.55], [-0.32, -0.55], [0.3, 0.3], [-0.3, 0.3], [0, 1.05], [0, -1.2]];
   P.updateBoats = function (dt) {
@@ -317,7 +319,7 @@
           b.vel += ((Math.abs(dy) > 1 ? 0.8 : vmax) - b.vel) * Math.min(1, dt * 0.8);
           b.pos[0] += -Math.sin(b.yaw) * b.vel * dt; b.pos[2] += -Math.cos(b.yaw) * b.vel * dt;
           if (d < 1.4) b.wp++;
-          if (Math.random() < dt * 0.05) { const who = pick(O.agents); if (this.near(who, 40)) who.say(who.kid ? pick(['Faster, faster!', 'I see fish!', 'Wave at them!', 'Can I steer?']) : pick(['Feel that breeze!', 'Look at the water sparkle.', 'Hold on, little one!']), 2.4); }
+          if (Math.random() < dt * 0.05) { const who = pick(O.agents); if (this.near(who, 40)) who.say(pick(TL(who.kid ? 'g.out.kidBoat' : 'g.out.adultBoat')), 2.4); }
           if (Math.random() < dt * 3 && b.vel > 1) this.g.particles.spawn(b.pos[0] + Math.sin(b.yaw) * 1.4 + (Math.random() - 0.5) * 0.8, b.pos[1] + 0.05, b.pos[2] + Math.cos(b.yaw) * 1.4 + (Math.random() - 0.5) * 0.8, 0, 0.3, 0, { life: 1.1, size: 0.12, grav: 0.2, col: [0.92, 0.96, 1], drag: 1, grow: 0.5, collide: false });
         }
       }
@@ -325,7 +327,7 @@
         // step ashore
         const sh = O.shore.shore;
         O.agents.forEach((a, i) => { a.inBoat = null; a.pose = 'stand'; a.pos = [sh[0] + 0.5 + ((i % 3) - 1) * 0.7, sh[1] + 0.05, sh[2] + 0.5 + (Math.floor(i / 3) - 0.5) * 0.7]; a.vel = [0, 0, 0]; });
-        if (this.near(O.leader, 40)) O.leader.say(pick(['What a trip!', 'Everybody out — carefully!', 'Home sweet home.']), 2.5);
+        if (this.near(O.leader, 40)) O.leader.say(pick(TL('g.out.back')), 2.5);
         this.endOuting(vil);
       }
       // seat passengers
