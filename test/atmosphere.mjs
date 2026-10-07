@@ -57,6 +57,19 @@ try {
     await page.screenshot({ path: `/home/claude/vr/test/shots/${name}.png`, timeout: 120000 });
   };
 
+  // the pictures need open sky: the spawn is inside a hall, so the player flies up above its roof (creative, in the air)
+  const up = await ev(() => {
+    const g = VR.game, w = g.world, p = g.player, x = Math.floor(p.pos[0]), z = Math.floor(p.pos[2]);
+    let y0 = -1;
+    for (let y = Math.floor(p.pos[1]) + 1; y < 240; y++) if ((w.getLight(x, y, z) >>> 12) >= 15 && !w.getBlock(x, y, z) && !w.getBlock(x, y + 1, z)) { y0 = y; break; }
+    p.setMode('creative');
+    if (y0 > 0) p.teleport(x + 0.5, y0 + 3, z + 0.5);
+    p.flying = true;
+    return y0;
+  });
+  check(up > 0, `an open sky above the spawn (y ${up})`);
+  await loops(120);
+
   // ---- the states: each one settles for ~24 s of game time, renders, and shows its own look
   await loops(240);
   const STATES = [['klar', 'klar'], ['bewoelkt', 'bewölkt'], ['nebel', 'nebel'], ['regen', 'regen'], ['gewitter', 'gewitter'], ['schnee', 'schnee']];
@@ -138,21 +151,23 @@ try {
 
   // ---- Very Low: the extra game-loop time of the weather, alternating blocks of 200 frames
   await ev(() => VR.game.applyPreset('potato'));
+  // the mean over a block of frames (the browser's timer steps 0.1 ms, so single frames are too coarse)
   const frames = (n) => ev((n) => {
-    const g = VR.game; window.__norender = true; const t = [];
-    for (let i = 0; i < n; i++) { g.last = performance.now() - 33; const a = performance.now(); g.loop(a); t.push(performance.now() - a); }
-    t.sort((x, y) => x - y); return { median: t[n >> 1], p90: t[Math.floor(n * 0.9)] };
+    const g = VR.game; window.__norender = true;
+    const a = performance.now();
+    for (let i = 0; i < n; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
+    return (performance.now() - a) / n;
   }, n);
   const quietOn = () => ev(() => { const g = VR.game; g.settings.wx = 'off'; g.applySettings('wx'); g.settings.natSound = 'off'; g.applySettings('natSound'); g.env.wx.force(null); });
   const rainOn = () => ev(() => { const g = VR.game; g.settings.wx = 'normal'; g.applySettings('wx'); g.settings.natSound = 'synth'; g.applySettings('natSound'); g.env.wx.force('regen'); });
   const quiet = [], rainy = [];
   await quietOn(); await loops(120);
-  for (let r = 0; r < 2; r++) {
-    await quietOn(); await loops(20); quiet.push(await frames(200));
-    await rainOn(); await loops(600); rainy.push(await frames(200));
+  for (let r = 0; r < 3; r++) {
+    await quietOn(); await loops(20); quiet.push(await frames(300));
+    await rainOn(); await loops(600); rainy.push(await frames(300));
   }
-  const med = (a) => a.reduce((s, v) => s + v.median, 0) / a.length;
-  const dq = med(quiet), dr = med(rainy), delta = dr - dq;
+  const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length;
+  const dq = mean(quiet), dr = mean(rainy), delta = dr - dq;
   const drops = await ev(() => { const g = VR.game, R = g.renderer; return { count: R.rainCount, budget: [0.3, 0.6, 1][VR.game.settings.particles | 0] }; });
   check(delta <= 0.5, `Very Low: the weather costs ${delta.toFixed(3)} ms a frame (quiet ${dq.toFixed(3)} ms, rain ${dr.toFixed(3)} ms; drops ${Math.floor(drops.count * drops.budget)} of ${drops.count}); CPU only`);
   const potato = await ev(() => ({ wetGround: VR.game.settings.wetGround, preset: VR.game.settings.preset, particles: VR.game.settings.particles }));
