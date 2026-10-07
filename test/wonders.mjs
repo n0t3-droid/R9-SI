@@ -80,10 +80,14 @@ for (let i = 0; i < 30; i++) { await step(3); found = await ev((k) => { const g 
 check(found && found.found, 'standing by its heart discovers it');
 check(found && found.banner && found.banner.on && found.banner.text === '✨ Wunder entdeckt: ' + nameDe, 'the big banner: ' + JSON.stringify(found && found.banner));
 check(found && found.codex, 'the codex has its page under ✨ Wunder');
+// the picture: drawing a frame here takes a while, so the banner is shown once more for it (the moment itself was checked)
 await step(2); await draw(true);
+const fadeAt = Date.now();
+await ev((t) => VR.game.wonders.banner(t), found && found.banner ? found.banner.text : '');
+await page.waitForTimeout(800);
 await page.screenshot({ path: SHOTS + '/wonder_found.png', timeout: 180000 });
-const fadeAt = Date.now(); let gone = false; for (let i = 0; i < 30 && !gone; i++) { await page.waitForTimeout(200); gone = await ev(() => { const b = document.getElementById('wbanner'); return !b.classList.contains('on'); }); }
-check(gone && Date.now() - fadeAt < 4500, 'the banner fades after its moment');
+let gone = false; for (let i = 0; i < 40 && !gone; i++) { gone = await ev(() => { const b = document.getElementById('wbanner'); return !b.classList.contains('on'); }); if (!gone) await page.waitForTimeout(200); }
+check(gone && Date.now() - fadeAt >= 2300 && Date.now() - fadeAt < 6000, 'the banner fades after its moment (' + ((Date.now() - fadeAt) / 1000).toFixed(1) + ' s)');
 // ---- /bau after it: a plan of that wonder where you look (95 blocks back towards the spawn, looking that way: away
 // from the gallery further out)
 await ev(([s, h]) => { const g = VR.game, p = g.player, sp = g.worldSpawn(), dx = sp[0] - s.x, dz = sp[2] - s.z, L = Math.hypot(dx, dz) || 1; p.flying = true; p.teleport(s.x + dx / L * 95, h[1] + 8, s.z + dz / L * 95); p.yaw = Math.atan2(-dx, -dz); p.pitch = -0.7; }, [first, heart]);
