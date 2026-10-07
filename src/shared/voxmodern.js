@@ -1240,8 +1240,10 @@
   } }));
   def('mobility', 'wallbox', 'ev', 'Wallbox · EV charger', Object.assign({}, MO, { size: [1, 1, 1], col: 'white', mount: 'wall', solid: false, build: (b) => {
     b.pbox(4.5, 6, 13.5, 11.5, 14, 16, 1, M.gloss(P.white)); b.cyl('z', 8, 11, 1.6, 13, 13.5, M.gloss(0x1E2024)); b.tube('z', 8, 11, 1.6, 0.5, 12.5, 13, M.light(0x4AE08A));
-    for (let k = 0; k < 4; k++) b.tube('z', 8, 3.5, 2.6 - k * 0.1, 0.5, 14 - k * 0.6, 14.5 - k * 0.6, M.matte(0x1E2024));   // the coiled cable
-    b.rod(8, 6, 14.5, 8, 4, 14.5, 0.5, M.matte(0x1E2024)); b.box(11.5, 8, 14, 13, 10.5, 16, M.gloss(0x1E2024));
+    // the cable: one neat lead from the holder on the side, down the wall and out to a plug on the floor
+    b.box(11.5, 8, 14, 13, 10.5, 16, M.gloss(0x1E2024));
+    b.rod(12.25, 8, 14.3, 12.25, 4.5, 14.3, 0.55, M.matte(0x1E2024)); b.rod(12.25, 4.5, 14.3, 12.5, 1.8, 13, 0.55, M.matte(0x1E2024));
+    b.rbox(11.5, 0.5, 11.5, 13.5, 2.5, 13.5, 0.6, M.matte(0x1E2024));
   } }));
   def('mobility', 'charger', 'pillar', 'Charging Pillar · EV', Object.assign({}, MO, { size: [1, 2, 1], col: 'white', light: [3, 7, 10], hard: 1.5, build: (b) => {
     b.box(3, 0, 4, 13, 1, 12, M.concrete(0x8E8E8A)); b.pbox(4.5, 1, 5, 11.5, 27, 11, 1, M.gloss(P.white)); b.box(4.5, 26, 5, 11.5, 27.5, 11, M.light(0x5CC8F0));
@@ -1292,10 +1294,13 @@
     b.extrude([[0, 28], [32, 26], [32, 27.5], [0, 29.5]], 'z', 0.5, 15.5, M.plant(0x6A8A4A)); for (let k = 0; k < 14; k++) b.sphere(2 + k * 2.2, 29 - k * 0.14, 3 + (k * 5) % 10, 0.75, M.plant([0xE8B83A, 0xD87AA0, 0x8AA05A][k % 3]));
   } }));
   def('mobility', 'rack', 'skate', 'Skateboard & Helmet · wall rack', Object.assign({}, MO, { cats: ['mobility', 'deco'], size: [1, 1, 1], col: 'walnut', mount: 'wall', solid: false, sound: 'wood', build: (b) => {
-    b.box(2, 9, 15, 14, 10.5, 16, M.wood(P.walnut)); for (const x of [4, 12]) b.box(x - 0.5, 8.5, 13, x + 0.5, 10, 15, M.metal(P.black));
-    b.pbox(1, 6.5, 12.5, 15, 7, 15, 1, M.wood(0xC8A878)); b.box(1.5, 7, 12.5, 14.5, 7.25, 15, M.matte(0x1E2024));
-    for (const x of [3, 13]) { b.cyl('y', x, 13, 0.75, 6, 6.5, M.gloss(0xF2E8D0)); b.cyl('y', x, 14.5, 0.75, 6, 6.5, M.gloss(0xF2E8D0)); }
-    b.ellipsoid(8, 12.5, 13, 3.5, 3, 3, M.gloss(P.terracotta)); b.cut(0, 10.5, 0, 16, 12, 16); b.box(5, 10.5, 12, 11, 11, 14, M.matte(0x2A2C30));
+    // a skateboard hung upright on two wall brackets, nose up, its top in grip tape; a helmet with a flat base on a shelf
+    const stadium = (cx, cy, hw, hl) => { const p = []; for (let k = 0; k <= 12; k++) { const a = Math.PI * k / 12; p.push([cx + hw * Math.cos(a), cy + hl + hw * Math.sin(a)]); } for (let k = 0; k <= 12; k++) { const a = Math.PI + Math.PI * k / 12; p.push([cx + hw * Math.cos(a), cy - hl + hw * Math.sin(a)]); } return p; };
+    for (const yb of [3, 11]) b.box(6, yb, 14.5, 10, yb + 1, 16, M.metal(P.black));
+    b.extrude(stadium(8, 8, 1.6, 4.8), 'z', 13.5, 14.5, M.wood(0xD2B07A));
+    b.recolor(6, 9.5, 13.5, 10, 14.5, 14.5, M.matte(0x1E2024));
+    b.ellipsoid(12.5, 11.8, 13.4, 2.5, 2.6, 2.5, M.gloss(P.terracotta)); b.cut(10, 0, 10, 15.5, 10, 16);
+    b.box(10, 9, 14.5, 15.5, 10, 16, M.wood(P.walnut));
   } }));
 
   // ================================================================ LADEN & CAFÉ — the coffee bar, the shop floor, the bakery
