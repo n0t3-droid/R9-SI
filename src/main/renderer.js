@@ -540,6 +540,7 @@
       v3('u_fogColor', E.fogColor); v3('u_blockLightTint', E.blockTint); v3('u_planetDir', E.planetDir); v3('u_planet2Dir', E.planet2Dir); v3('u_ringNormal', E.ringNormal);
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
       if (u.u_rain) gl.uniform1f(u.u_rain, E.rain);
+      if (u.u_wet) gl.uniform1f(u.u_wet, E.wet || 0);     // wet ground (weather.js via env): the terrain's top faces darken in the rain
       if (u.u_time) gl.uniform1f(u.u_time, E.time);
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
@@ -934,7 +935,8 @@
       }
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
       gl.bindVertexArray(this.rainVAO);
-      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, Math.floor(this.rainCount * Math.min(1, F.precip.amount)));
+      // the drop budget of the Partikel setting (potato draws about a third of the drops; see game.js)
+      gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, Math.floor(this.rainCount * Math.min(1, F.precip.amount) * (F.precip.budget || 1)));
       gl.depthMask(true); gl.disable(gl.BLEND);
     }
     drawParticles(P, E) {
