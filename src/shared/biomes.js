@@ -8,6 +8,9 @@
   // id, key, name, temp, downfall, grass, foliage, water, sky, fog(optional), flags
   function b(key, name, temp, down, grass, foliage, water, sky, o) {
     const e = Object.assign({ id: B.length, key, name, temp, down, grass, foliage, water, sky, fog: null, precip: temp < 0.15 ? 'snow' : (down <= 0.0 ? 'none' : 'rain') }, o || {});
+    // the weather climate (A1, main/weather.js weighs the kinds by it): cold snows, dry stays fair, wet storms more;
+    // the Underforge and the Hollow have no sky to rain from
+    if (!e.wx) e.wx = e.forge || e.hollow ? 'none' : temp < 0.15 ? 'cold' : down <= 0.0 ? 'dry' : down >= 0.85 ? 'wet' : 'temperate';
     B.push(e); BI[key] = e.id; return e;
   }
   const OW = 0x3F76E4;
