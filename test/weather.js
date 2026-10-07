@@ -79,6 +79,17 @@ const only = (seen, allowed) => Object.keys(seen).every(k => allowed.includes(k)
   const calm = KINDS_OF('wet', 'calm', 40), off = KINDS_OF('wet', 'off', 40);
   check(only(calm, ['klar', 'bewoelkt']), 'Ruhig never rains, storms, snows or fogs');
   check(only(off, ['klar']), 'Aus is always clear');
+  // the switch also wins over a /wetter command: Aus is clear, Ruhig is at most cloudy; Normal shows the command again
+  const ctx = { ticks: 12000, day: 5, biome: B('meadow'), dim: 'overworld', lowK: 0 };
+  const cmd = new VR.Weather({}); cmd.setSeed(SEED);
+  cmd.setMode('off'); cmd.force('gewitter'); for (let i = 0; i < 20; i++) cmd.update(0.5, ctx);
+  check(cmd.kind === 'klar', 'Aus: a /wetter gewitter still shows clear sky (got ' + cmd.kind + ')');
+  cmd.setMode('calm'); cmd.force('regen'); for (let i = 0; i < 20; i++) cmd.update(0.5, ctx);
+  check(cmd.kind === 'bewoelkt', 'Ruhig: a /wetter regen shows cloudy (got ' + cmd.kind + ')');
+  cmd.force('bewoelkt'); cmd.update(0.5, ctx);
+  check(cmd.kind === 'bewoelkt', 'Ruhig keeps a /wetter bewölkt');
+  cmd.setMode('normal'); cmd.force('regen'); for (let i = 0; i < 20; i++) cmd.update(0.5, ctx);
+  check(cmd.kind === 'regen', 'on Normal the command shows its rain again');
 }
 
 // ---- Nebel: only at dawn (22 000–3 000 ticks), and in some days only
