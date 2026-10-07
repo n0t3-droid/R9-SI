@@ -37,14 +37,23 @@
       });
     }
     tx(store, mode) { return this.db.transaction(store, mode).objectStore(store); }
+    // the database stopped working (the browser closed the connection — storage evicted, a private window cleaned
+    // up): the game goes on in memory and says so once, instead of failing every save from then on
+    lost(e) {
+      if (!this.ok) return;
+      this.ok = false; this.db = null;
+      console.warn('saving stopped working — the game continues, changes stay in memory', e);
+      try { window.dispatchEvent(new CustomEvent('r9-storage-lost')); } catch (err) { /* no page here */ }
+    }
     p(req) { return new Promise((res, rej) => { req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); }
     async listWorlds() {
       if (!this.ok) return [...this.mem.worlds.values()];
-      try { return await this.p(this.tx('worlds', 'readonly').getAll()); } catch (e) { return []; }
+      try { const list = await this.p(this.tx('worlds', 'readonly').getAll()); for (const m of this.mem.worlds.values()) if (!list.some(w => w && w.id === m.id)) list.push(m); return list; } catch (e) { return [...this.mem.worlds.values()]; }
     }
     async saveWorld(meta) {
-      if (!this.ok) { this.mem.worlds.set(meta.id, meta); return; }
-      try { await this.p(this.tx('worlds', 'readwrite').put(meta)); } catch (e) { console.warn('saveWorld', e); }
+      this.mem.worlds.set(meta.id, meta);   // kept here too: the list and the reload work on when the database does not
+      if (!this.ok) return;
+      try { await this.p(this.tx('worlds', 'readwrite').put(meta)); } catch (e) { console.warn('saveWorld', e); if (!this.db || /InvalidState|closed/i.test(String(e && e.name || e))) this.lost(e); }
     }
     async deleteWorld(id) {
       this.mem.worlds.delete(id);
@@ -71,13 +80,15 @@
       col.modified = false;
       const k = this.key(dim, col.cx, col.cz);
       if (!this.ok) { this.mem.chunks.set(k, rec); return Promise.resolve(); }
-      try { return this.p(this.tx('chunks', 'readwrite').put(rec, k)).catch(e => console.warn(e)); } catch (e) { return Promise.resolve(); }
+      // a save that fails (the storage is full, the connection is gone) leaves the column modified: the next autosave
+      // tries again, nothing is quietly lost; the record is kept in memory meanwhile
+      const failed = (e) => { console.warn('saveColumn', e); col.modified = true; this.mem.chunks.set(k, rec); };
+      try { return this.p(this.tx('chunks', 'readwrite').put(rec, k)).then(() => { this.mem.chunks.delete(k); }, failed); } catch (e) { this.lost(e); failed(e); return Promise.resolve(); }
     }
     async loadColumn(dim, cx, cz) {
       const k = this.key(dim, cx, cz);
-      let rec = null;
-      if (!this.ok) rec = this.mem.chunks.get(k);
-      else { try { rec = await this.p(this.tx('chunks', 'readonly').get(k)); } catch (e) { rec = null; } }
+      let rec = this.mem.chunks.get(k) || null;   // a record whose save failed is still here
+      if (!rec && this.ok) { try { rec = await this.p(this.tx('chunks', 'readonly').get(k)); } catch (e) { rec = null; } }
       if (!rec) return null;
       // columns taller than the generated 256 (the player built higher) carry their height
       let len = rec.h ? rec.h << 8 : 0;
