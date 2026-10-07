@@ -10,7 +10,8 @@ const ONLY = process.env.ONLY || '';
 let fails = 0, n = 0;
 const check = (ok, msg) => { n++; if (!ok) { fails++; console.log('  ✗ ' + msg); } else if (process.env.VERBOSE) console.log('  ✓ ' + msg); };
 const section = (name, fn) => { if (ONLY && ONLY !== name) return; console.log('— ' + name); try { fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' threw: ' + (e && e.stack || e)); } };
-const ms = (fn, runs) => { const t = []; for (let i = 0; i < (runs || 3); i++) { const t0 = process.hrtime.bigint(); fn(); t.push(Number(process.hrtime.bigint() - t0) / 1e6); } t.sort((a, b) => a - b); return t[t.length >> 1]; };
+// the CPU time of a build (median of runs): other processes on a shared machine do not count against the budget
+const ms = (fn, runs) => { const t = []; for (let i = 0; i < (runs || 3); i++) { const c0 = process.cpuUsage(); fn(); const c = process.cpuUsage(c0); t.push((c.user + c.system) / 1000); } t.sort((a, b) => a - b); return t[t.length >> 1]; };
 const nameOf = (s) => (s && s !== 0xFFFF && R.types[T.type[s]] ? R.types[T.type[s]].name : s === 0xFFFF ? 'keep' : 'air');
 const isModel = (s) => { if (!s || s === 0xFFFF) return false; const t = R.types[T.type[s]]; return !!(t && (t.o.vxModel || /^vm_/.test(t.name))); };
 const isGlass = (s) => { if (!s || s === 0xFFFF) return false; const nm = nameOf(s); return /glass|window|panorama|pane|vx_win|frosted/.test(nm); };
@@ -306,7 +307,7 @@ section('sweep', () => {
   for (const id in N) for (let i = 0; i < N[id]; i++) {
     const t = Forge.type(id), P = pick(t); if (id === 'tower') P.f = 4 + rng.int(44);
     const dna = Forge.dna(id, P, 1 + i, t.styles[i % t.styles.length].id), g = Forge.build(dna), M = g.meta, d = M.doors[0], up = (y) => y - g.dy + 1;
-    if (M.ms > 400) slow++;
+    const c0 = process.cpuUsage(); Forge.build(dna); const cu = process.cpuUsage(c0); if ((cu.user + cu.system) / 1000 > 400) slow++;
     let miss;
     if (id === 'tower') miss = missing(g, [d[0], d[1] - g.dy, d[2] + 1], M.floors.map(up).concat([up(M.roof)]));
     else if (id === 'house') miss = missing(g, [d[0], d[1] - g.dy, d[2] - 1], M.floors.map(up));

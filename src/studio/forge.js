@@ -56,7 +56,8 @@
   FM.setParam = function (k, v) { const P = Fg.parse(current()); if (!P) return; P.params[k] = +v; setBase(Fg.dna(P), false); };
   FM.setStyle = function (id) { const P = Fg.parse(current()); if (!P) return; P.style = id; setBase(Fg.dna(P), false); };
   FM.reseed = function () { const P = Fg.parse(current()); if (!P) return; P.seed = ((P.seed * 1103515245 + 12345) >>> 0) & 0xffff || 1; setBase(Fg.dna(P), false); };
-  FM.select = function (i) { FM.sel = Math.max(0, Math.min(FM.variants.length - 1, i)); showSelected(); C.list(); C.parts(); C.hud(); };
+  // (a picked variant that is not built yet goes to the front of the queue: what you look at comes first)
+  FM.select = function (i) { FM.sel = Math.max(0, Math.min(FM.variants.length - 1, i)); const d = FM.variants[FM.sel], qi = FM.queue.indexOf(d); if (qi > 0) { FM.queue.splice(qi, 1); FM.queue.unshift(d); } showSelected(); C.list(); C.parts(); C.hud(); };
   // 📍 into the open world (the World mode holds it as a ghost), else a hint
   FM.place = function () {
     const dna = current(); if (!dna) return false;
