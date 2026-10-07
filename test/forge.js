@@ -56,6 +56,10 @@ section('core', () => {
   check(px('Hochhaus Hochhaus 7 Stockwerke #abcd').seed === 0xabcd, 'a #hex seed in the text');
   // typos in the type word still name it; nothing else is guessed
   check(/^tower:f20/.test(tx('Hochaus 20 Stockwerke') || '') && /^tower:/.test(tx('Wolkenkrazer aus Glas') || '') && /^bridge:/.test(tx('Hängebrüke') || '') && /^castle:/.test(tx('Ritterbrug') || '') && tx('Hund') === null, 'typos: Hochaus, Wolkenkrazer, Hängebrüke, Ritterbrug → ' + [tx('Hochaus 20 Stockwerke'), tx('Wolkenkrazer aus Glas'), tx('Hängebrüke'), tx('Ritterbrug')].join(' '));
+  // the words people use: compounds, inflected adjectives, articles that are no numbers, height words, units read once
+  const want = [['a tall glass skyscraper with a helipad', 'tower:f34,glas,c2'], ['Leichtathletikstadion', 'stadium:beton,k1'], ['kleines Holzhaus mit Pultdach', 'house:w9,d10,holz,r1'], ['Werkhalle', 'hall:holz,m0'], ['Hecke 3 hoch', 'wall:stein,k2'], ['Burg aus dunklem Stein', 'castle:dunkel'], ['cargo spaceship with hangar', 'shuttle:sf,a5,h1'], ['Holzsteg 30 lang', 'bridge:l30,holz,r0'], ['Steinmauer 30 lang', 'wall:l30,stein'], ['Betonhochhaus 12 Etagen', 'tower:f12,beton'], ['Felsenburg', 'castle:fels'], ['ein hohes Haus', 'house:f3,weiss'], ['niedriger Wachturm', 'lookout:h15,holz'], ['eine Mauer 2 hoch 50 lang', 'wall:l50,h2,stein'], ['a house with one floor', 'house:f1,weiss'], ['Japanischer Garten mit Teich', 'park:japan']];
+  const got = want.map(([w]) => (tx(w) || 'null').replace(/#.*/, ''));
+  check(want.every(([, d], i) => got[i] === d), 'how people say it: ' + want.map(([w, d], i) => got[i] === d ? '✓' : '✗ ' + w + ' → ' + got[i] + ' (want ' + d + ')').join(' '));
   check(Forge.parse('lookout:p4#1').params.p === 5 && Forge.parse('lookout:#1').params.p === 5 && Forge.parse('lookout:p7#1').params.p === 7 && Forge.parse('lookout:p3#1').params.p === 3, 'stepped parameters sit on their grid (3 · 5 · 7)');
   // the ✨ Genie's reading of words (VR.GenieBrain, the Studio's) and the Forge's own copy (the game's worker) agree
   try {
