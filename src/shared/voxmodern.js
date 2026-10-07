@@ -154,10 +154,11 @@
   } }));
   // wall lamps (they hang on the wall behind them, +z)
   for (const f of ['black', 'white']) def('light', 'wall', 'updown_' + f, 'Wall Lamp Up-Down · ' + f, Object.assign({}, LAMP, { mount: 'wall', res: 32, size: [1, 1, 1], col: f, light: [12, 11, 8], build: (b) => {
-    const m = f === 'white' ? M.gloss(P.white) : M.metal(P.black);
-    b.box(6.5, 7.5, 15.5, 9.5, 12.5, 16, m); b.box(7.5, 9.5, 12.5, 8.5, 10.5, 15.5, m);
-    b.cyl('y', 8, 11, 1.8, 6.5, 13.5, m);
-    b.cyl('y', 8, 11, 1.3, 6, 6.5, M.light(0xFFF0D4)); b.cyl('y', 8, 11, 1.3, 13.5, 14, M.light(0xFFF0D4));
+    // a round plate on the wall, a short arm and a drum shade; the light leaves both ends (glowing caps top and bottom)
+    const m = f === 'white' ? M.gloss(P.white) : M.metal(P.black), glow = M.light(0xFFF0D4);
+    b.pbox(5.5, 5.5, 15, 10.5, 14.5, 16, 0.5, m); b.box(7.5, 9.5, 12, 8.5, 10.5, 15.5, m);
+    b.lathe(8, 11, [[4, 1.5], [5, 2.4], [8, 2.7], [11, 2.7], [14, 2.4], [15, 1.5]], m);
+    b.cyl('y', 8, 11, 1.3, 3.5, 4, glow); b.cyl('y', 8, 11, 1.3, 15, 15.5, glow);
   } }));
   def('light', 'wall', 'swingarm_brass', 'Wall Lamp Swing Arm · brass', Object.assign({}, LAMP, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'brass', light: [12, 10, 7], build: (b) => {
     const m = M.metal(P.brass);
@@ -167,8 +168,9 @@
     b.cyl('y', 6, 4.5, 2, 6, 6.5, M.light(glowW));
   } }));
   def('light', 'wall', 'ledbar_white', 'Wall Lamp LED Bar · white', Object.assign({}, LAMP, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'white', light: [12, 12, 11], build: (b) => {
-    b.box(1, 11.5, 14, 15, 13, 16, M.gloss(P.white)); b.box(7, 10, 15.5, 9, 11.5, 16, M.gloss(P.white));
-    b.box(1.5, 11, 14.5, 14.5, 11.5, 15.5, M.light(0xFFF6EA));
+    // a white housing on two wall feet, with the glowing diffuser on its front face
+    b.box(1, 11, 15, 15, 13.5, 16, M.gloss(P.white)); b.box(3, 10, 15.5, 4.5, 11, 16, M.gloss(P.white)); b.box(11.5, 10, 15.5, 13, 11, 16, M.gloss(P.white));
+    b.box(1.5, 11.25, 14, 14.5, 12.25, 15, M.light(0xFFF6EA));
   } }));
 
   // ================================================================ SMART HOME
@@ -192,8 +194,12 @@
     b.box(5, 8, 15, 11, 12.5, 16, M.gloss(P.white)); screenUI(b, 5.5, 8.5, 10.5, 12, 14.5, 'tiles');
   } }));
   def('smart', 'thermostat', 'round', 'Smart Thermostat · round', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'chrome', solid: false, build: (b) => {
-    b.cyl('z', 8, 9.5, 1.7, 14.5, 16, M.chrome()); b.cyl('z', 8, 9.5, 1.3, 14, 14.5, M.gloss(0x0E1218));
-    b.tube('z', 8, 9.5, 1.0, 0.5, 13.5, 14, M.light(0xFF8A3A)); b.box(7.5, 9, 13.5, 8.5, 10, 14, M.light(0xFFC08A));
+    // a round chrome dial on a white backplate: a dark glass face with a glowing ring and a readout
+    b.cyl('z', 8, 8.5, 2.7, 15.25, 16, M.gloss(0xE8E6E0));
+    b.cyl('z', 8, 8.5, 2.3, 14.25, 15.25, M.chrome());
+    b.cyl('z', 8, 8.5, 1.9, 13.75, 14.25, M.gloss(0x0E1218));
+    b.tube('z', 8, 8.5, 1.85, 0.4, 13.75, 14.25, M.light(0xFF8A3A));
+    b.box(7.25, 7.75, 13.75, 8.75, 9.25, 14.25, M.light(0xFFC08A));
   } }));
   def('smart', 'router', 'wifi', 'WiFi Router · black', Object.assign({}, SM, { res: 32, size: [1, 1, 1], col: 'black', build: (b) => {
     b.pbox(4, 0.5, 5.5, 12, 2, 10.5, 0.5, M.gloss(P.black)); b.box(4.5, 0, 6, 11.5, 0.5, 10, M.matte(0x2A2C30));
@@ -204,8 +210,11 @@
     b.lathe(8, 8, [[0, 2], [0.5, 2.2], [4, 2.2], [4.5, 1.8]], M.gloss(P.white)); b.cyl('y', 8, 8, 0.5, 4.5, 5, M.light(0x5CC8F0));
   } }));
   def('smart', 'doorbell', 'video', 'Video Doorbell · black', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'black', solid: false, build: (b) => {
-    b.pbox(7, 7.5, 15, 9, 12, 16, 0.5, M.gloss(P.black));
-    b.cyl('z', 8, 11, 0.5, 14.5, 15, M.glass(0x3A4A5A)); b.tube('z', 8, 8.5, 0.8, 0.5, 14.5, 15, M.light(0x5CC8F0));
+    // a black plate on the wall: a glass lens in a glowing ring, a steel call button and the status light
+    b.pbox(6, 3.5, 15, 10, 14, 16, 1.2, M.gloss(P.black));
+    b.cyl('z', 8, 9, 1.3, 14, 15, M.glass(0x3A4A5A)); b.tube('z', 8, 9, 1.9, 0.5, 14, 15, M.light(0x5CC8F0));
+    b.cyl('z', 8, 5.8, 0.9, 14, 15, M.metal(P.steel));
+    b.box(7.5, 12.3, 14.5, 8.5, 12.9, 15, M.light(0x4AE08A));
   } }));
   def('smart', 'camera', 'dome', 'Security Camera · dome', Object.assign({}, SM, { mount: 'ceiling', res: 32, size: [1, 1, 1], col: 'white', solid: false, build: (b) => {
     b.cyl('y', 8, 8, 3, 15, 16, M.gloss(P.white)); b.lathe(8, 8, [[12.5, 1.6], [13.5, 2.4], [14.5, 2.6], [15, 2.6]], M.glass(0x2A3440));
@@ -243,8 +252,11 @@
     b.box(0.5, 12.5, 8.5, 15.5, 13, 15.5, M.metal(P.graphite));
   } }));
   def('smart', 'battery', 'wall', 'Home Battery · 10 kwh', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 2, 1], col: 'white', hard: 1.5, build: (b) => {
-    b.pbox(2, 2, 13, 14, 21, 16, 1, M.gloss(P.white)); b.box(2.5, 1, 14, 13.5, 2, 15.5, M.metal(P.graphite));
-    b.box(7.5, 5, 12.5, 8.5, 18, 13, M.light(0xE8F4FF)); b.box(6.5, 17.5, 12.5, 9.5, 18, 13, M.light(0x4AE08A));
+    // a white wall unit on a dark plinth: a raised front panel, cooling slats under it, three status lights on top
+    b.pbox(2, 2, 13, 14, 21, 16, 1, M.gloss(P.white)); b.box(2.5, 0.5, 13.5, 13.5, 2, 15.5, M.metal(P.graphite));
+    b.box(3.5, 14, 12, 12.5, 16.5, 13, M.gloss(0xE4E2DC));
+    for (let k = 0; k < 4; k++) b.box(4.5, 6 + k * 1.5, 12, 11.5, 6.6 + k * 1.5, 13, M.metal(P.graphite));
+    for (const x of [5.5, 8, 10.5]) b.box(x - 0.5, 18.3, 12.5, x + 0.5, 19.2, 13.2, M.light(0x4AE08A));
   } }));
   def('smart', 'inverter', 'hybrid', 'Solar Inverter · hybrid', Object.assign({}, SM, { mount: 'wall', res: 32, size: [1, 1, 1], col: 'stone', hard: 1.2, build: (b) => {
     b.pbox(3.5, 5, 13, 12.5, 15, 16, 0.5, M.gloss(P.stone)); b.box(4, 13.5, 12.5, 12, 14.5, 13, M.matte(P.graphite));
@@ -318,9 +330,13 @@
     b.lathe(8, 4.75, [[0.5, 0.7], [1.5, 0.8]], M.gloss(P.white));
   } }));
   def('kitchen', 'kettle', 'white', 'Kettle · white', Object.assign({}, AP, { col: 'white', build: (b) => {
-    b.cyl('y', 8, 8, 2.2, 0, 0.5, M.gloss(P.black)); b.lathe(8, 8, [[0.5, 2.1], [3, 2.1], [4.5, 1.6], [5, 1]], M.gloss(P.white));
-    b.cyl('y', 8, 8, 0.6, 5, 5.5, M.gloss(P.black)); b.rod(10, 1.5, 8, 11.5, 2.5, 8, 0.5, M.gloss(P.white)); b.rod(11.5, 2.5, 8, 11.5, 4.5, 8, 0.5, M.gloss(P.white)); b.rod(11.5, 4.5, 8, 9.5, 5, 8, 0.5, M.gloss(P.white));
-    b.rod(6, 3, 8, 4.5, 4.5, 8, 0.5, M.gloss(P.white));
+    // a smooth electric kettle: a black base, a rounded white belly and shoulder, a spout, a loop handle and a black lid
+    const w = M.gloss(P.white), k = M.gloss(P.black);
+    b.cyl('y', 8, 8, 2.6, 0, 0.8, k);
+    b.lathe(8, 8, [[0.8, 2.5], [2, 2.9], [5, 3.0], [6.8, 2.7], [7.8, 2.1], [8.6, 1.5]], w);
+    b.cyl('y', 8, 8, 1.5, 8.6, 9, k); b.cyl('y', 8, 8, 0.5, 9, 9.8, k);
+    b.rod(11, 2.5, 8, 13.5, 5, 8, 0.7, w); b.rod(13.5, 5, 8, 13.8, 5.6, 8, 0.7, w);
+    b.tube('z', 4.1, 5.6, 2.2, 0.7, 7.25, 8.75, k);
   } }));
   def('kitchen', 'toaster', 'cream', 'Toaster · cream', Object.assign({}, AP, { col: 'cream', build: (b) => {
     b.rbox(4.5, 0, 6, 11.5, 4.5, 10, 1, M.gloss(0xEDE3CC)); b.cut(5.5, 3.5, 7, 10.5, 4.5, 7.5); b.cut(5.5, 3.5, 8.5, 10.5, 4.5, 9);
@@ -369,9 +385,13 @@
     b.rbox(22, 15, 6, 29, 15.5, 12, 0.25, M.wood(P.walnut)); for (const [x, z] of [[24, 8], [27, 9.5]]) b.lathe(x, z, [[15.5, 1], [17, 1.1]], M.gloss(P.white));
   } }));
   def('kitchen', 'hood', 'island', 'Island Hood · black', Object.assign({}, AP, { col: 'black', mount: 'ceiling', toggle: true, light: [11, 10, 8], build: (b) => {
-    for (const [x, z] of [[4, 4], [12, 4], [4, 12], [12, 12]]) b.box(x - 0.25, 10, z - 0.25, x + 0.25, 16, z + 0.25, M.metal(P.black));
-    b.pbox(2, 7, 2, 14, 10, 14, 0.5, M.metal(P.black)); b.box(2.5, 6.5, 2.5, 13.5, 7, 13.5, M.metal(0x4A4E54));
-    for (const x of [5, 11]) b.box(x - 1, 6.5, 7, x + 1, 7, 9, M.light(0xFFF0D4));
+    // a canopy that slopes in toward the front (steel), a flue up to the ceiling, two lights under the steel lip
+    const k = M.metal(P.black), st = M.metal(0x4A4E54);
+    b.box(6, 10, 7, 10, 16, 9, k);                                                         // the flue
+    b.extrude([[2, 10], [14, 10], [12, 5], [4, 5]], 'x', 2, 14, k);
+    b.recolor(2, 5, 8.5, 14, 10, 14, st);                                                  // the sloping front is steel
+    b.extrude([[4, 5], [12, 5], [11.5, 4.5], [4.5, 4.5]], 'x', 2.5, 13.5, st);
+    for (const x of [5, 11]) b.box(x - 1, 3.5, 6.5, x + 1, 4.5, 9, M.light(0xFFF0D4));
   } }));
   for (const [k, seat, frame] of [['oak', M.leather(0x8A5A3A), M.wood(P.oak)], ['black', M.fabric(P.cream), M.metal(P.black)]]) def('kitchen', 'stool', k, 'Counter Stool · ' + k, Object.assign({}, AP, { col: k === 'oak' ? 'oak' : 'black', seat: true, sound: 'wood', build: (b) => {
     for (const [x, z] of [[4, 4], [11, 4], [4, 11], [11, 11]]) b.box(x, 0, z, x + 1, 10, z + 1, frame);
@@ -441,18 +461,20 @@
   def('living', 'pouf', 'boucle', 'Pouf · bouclé', Object.assign({}, LIV, { size: [1, 1, 1], col: 'cream', build: (b) => { b.lathe(8, 8, [[0, 3.6], [0.5, 4.2], [6, 4.4], [7, 3.8], [7.5, 2.5]], M.fabric(FABRIC.boucle.col)); } }));
   def('living', 'pouf', 'leather', 'Pouf · leather cube', Object.assign({}, LIV, { size: [1, 1, 1], col: 'rust', build: (b) => { b.cushion(4, 0, 4, 12, 7, 12, 1, M.leather(FABRIC.cognac.col), true); } }));
   def('living', 'pouf', 'knit', 'Pouf · chunky knit', Object.assign({}, LIV, { res: 16, size: [1, 1, 1], col: 'mustard', build: (b) => {
-    b.lathe(8, 8, [[0, 3.8], [0.5, 4.3], [5.5, 4.4], [6.5, 3.6], [7, 2]], M.fabric(P.mustard));
-    for (const y of [2, 4]) b.recolor(0, y, 0, 16, y + 1, 16, M.fabric(sh(P.mustard, 0.86)));
+    // a drum pouf in chunky knit: a rounded edge, two darker rib bands and a lighter top
+    b.lathe(8, 8, [[0, 4.2], [0.5, 4.7], [1.5, 4.8], [6, 4.8], [6.7, 4.5], [7, 3.8]], M.fabric(P.mustard));
+    for (const y of [2, 4]) b.recolor(0, y, 0, 16, y + 1, 16, M.fabric(sh(P.mustard, 0.84)));
+    b.recolor(0, 6, 0, 16, 7, 16, M.fabric(sh(P.mustard, 1.08)));
   } }));
   // lounge chairs
   def('living', 'lounge', 'shell', 'Lounge Chair · walnut shell', Object.assign({}, LIV, { size: [1, 1, 1], col: 'walnut', sound: 'wood', build: (b) => {
-    const wd = M.wood(P.walnut), le = M.leather(0x1E1F22), m = M.metal(P.black);
-    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; b.rod(8, 0.5, 8, 8 + Math.cos(a) * 6, 0.5, 8 + Math.sin(a) * 6, 0.5, m); }
-    b.cyl('y', 8, 8, 0.8, 0.5, 4, m);
-    b.extrude([[2, 4], [12, 3.5], [12.5, 4.5], [2.5, 5.5]], 'x', 2, 14, wd);                           // seat shell (z, y)
-    b.extrude([[11.5, 4], [12.5, 3.5], [15.5, 14.5], [14.5, 15]], 'x', 2, 14, wd);                     // back shell
-    b.cushion(2.5, 5, 2, 13.5, 7, 12, 0.8, le, true); b.extrude([[10.5, 6], [12.5, 5.5], [14.5, 14], [12.5, 14.5]], 'x', 2.5, 13.5, le);
-    b.box(1, 8.5, 3, 2.5, 9.5, 11, wd); b.box(13.5, 8.5, 3, 15, 9.5, 11, wd); b.box(1.5, 5, 10, 2.5, 8.5, 11, wd); b.box(13.5, 5, 10, 14.5, 8.5, 11, wd);
+    // a low club chair: a walnut tub with a leather seat cushion (seat at 7.5), a curved back, arms and four splayed legs
+    const wd = M.wood(P.walnut), le = M.leather(0x1E1F22);
+    for (const [x, z, fx, fz] of [[3, 4.5, 1.5, 2.5], [13, 4.5, 14.5, 2.5], [3, 11.5, 1.5, 13.5], [13, 11.5, 14.5, 13.5]]) b.rod(x, 3.5, z, fx, 0.5, fz, 0.6, wd);
+    b.rbox(2, 3.5, 2.5, 14, 5.5, 13, 1, wd);
+    b.extrude([[11.5, 5], [13.5, 4.5], [15, 13.5], [14, 15], [12.5, 13.5], [11.5, 7]], 'x', 2.5, 13.5, wd);   // the curved back (z, y)
+    b.cushion(2.5, 5.5, 3, 13.5, 7.5, 12.5, 1, le, true);
+    b.rbox(1, 5, 3.5, 3, 9, 12.5, 0.75, wd); b.rbox(13, 5, 3.5, 15, 9, 12.5, 0.75, wd);
   } }));
   def('living', 'lounge', 'cocktail', 'Cocktail Chair · bouclé', Object.assign({}, LIV, { size: [1, 1, 1], col: 'cream', build: (b) => {
     const f = M.fabric(FABRIC.boucle.col), fd = M.fabric(sh(FABRIC.boucle.col, 0.93));
@@ -508,8 +530,13 @@
     b.lathe(20, 8, [[6.5, 1.6], [7.5, 2.2], [9, 1.2]], M.gloss(P.white), 0.4); b.rbox(9, 6.5, 6, 15, 7.5, 10, 0.4, M.wood(P.oak));
   } }));
   def('living', 'nesting', 'brass', 'Nesting Tables · brass', Object.assign({}, TB, { size: [1, 1, 1], col: 'brass', build: (b) => {
+    // two round side tables side by side, a white marble one (top at 8) and a black one (top at 6), each on three brass legs
+    // under a brass ring at the edge of the top
     const br = M.metal(P.brass);
-    for (const [cx, cz, r, h, top] of [[6, 6, 4.5, 8, 0xEAEAEC], [10.5, 10.5, 4, 6, 0x2A2C30]]) { b.cyl('y', cx, cz, r, h - 1, h, M.marble(top)); for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4; b.box(cx + Math.cos(a) * (r - 1) - 0.25, 0, cz + Math.sin(a) * (r - 1) - 0.25, cx + Math.cos(a) * (r - 1) + 0.25, h - 1, cz + Math.sin(a) * (r - 1) + 0.25, br); } }
+    for (const [cx, cz, r, h, top] of [[5.5, 5.5, 4.4, 8, 0xEAEAEC], [11.5, 11.5, 3.3, 6, 0x2A2C30]]) {
+      b.cyl('y', cx, cz, r, h - 0.75, h, M.marble(top)); b.tube('y', cx, cz, r, 0.5, h - 1.25, h - 0.75, br);
+      for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4; b.rod(cx + Math.cos(a) * (r - 1), h - 1.25, cz + Math.sin(a) * (r - 1), cx + Math.cos(a) * (r - 1.6), 0.5, cz + Math.sin(a) * (r - 1.6), 0.4, br); }
+    }
   } }));
   def('living', 'rug', 'stripe', 'Rug · striped wool', Object.assign({}, TB, { cats: ['living', 'deco'], res: 16, size: [2, 1, 3], col: 'cream', sound: 'wool', hard: 0.2, solid: false, build: (b) => {
     b.box(0, 0, 0, 32, 1, 48, M.fabric(0xE8E2D4)); b.recolor(1, 0, 1, 31, 1, 2, M.fabric(0x2B2E33)); b.recolor(1, 0, 46, 31, 1, 47, M.fabric(0x2B2E33)); b.recolor(1, 0, 1, 2, 1, 47, M.fabric(0x2B2E33)); b.recolor(30, 0, 1, 31, 1, 47, M.fabric(0x2B2E33));
@@ -642,9 +669,10 @@
   // ================================================================ BAD — vanities, showers, WCs, ladders, mirrors, tubs
   const BA = { cats: ['bath'], res: 32, sound: 'stone', hard: 1 };
   // a vessel basin on a top at y (centre cx, cz) and a wall tap above it
+  // (a round bowl: a white rim and wall, a grey-blue floor and a drain, so it reads as a basin, not a cupcake)
   function vessel(b, cx, cz, y, tapMat) {
-    b.lathe(cx, cz, [[y, 2.2], [y + 0.5, 3], [y + 2, 3.4], [y + 2.5, 3.4]], M.gloss(P.white), 0.5); b.cyl('y', cx, cz, 2.8, y, y + 0.5, M.gloss(P.white));
-    b.cyl('y', cx, cz, 0.5, y + 0.5, y + 0.75, M.metal(0x6A7078));
+    b.lathe(cx, cz, [[y, 2.4], [y + 0.6, 3.1], [y + 1.6, 3.5], [y + 2.2, 3.6], [y + 2.5, 3.6]], M.gloss(P.white), 0.6);
+    b.cyl('y', cx, cz, 2.6, y, y + 0.4, M.gloss(0xB4C2CC)); b.cyl('y', cx, cz, 0.55, y + 0.4, y + 0.9, M.metal(0x6A7078));
     b.rod(cx, y + 3.5, 16, cx, y + 3.5, cz + 1.5, 0.5, tapMat); b.box(cx - 1, y + 2.75, 15.5, cx + 1, y + 4.5, 16, tapMat); b.box(cx + 1.5, y + 3.25, 15, cx + 2, y + 4, 16, tapMat);
   }
   for (const [k, label, body, top, tapM] of [['oak', 'oak', () => M.wood(P.oak), () => M.stone(0x3A3C40), () => M.metal(P.black)], ['white', 'white', () => M.gloss(P.white), () => M.marble(0xEEEDEA), () => M.chrome()]]) def('bath', 'doublevanity', k, 'Double Vanity · ' + label, Object.assign({}, BA, { size: [2, 1, 1], col: k === 'oak' ? 'oak' : 'white', ui: 'chest', mount: 'wall', build: (b) => {
@@ -674,10 +702,14 @@
     b.rod(10, 18, 15, 10, 26, 14.5, 0.4, br); b.cyl('z', 10, 26.5, 0.9, 13.5, 14.5, br);
   } }));
   for (const [k, label, c] of [['white', 'rimless white', P.white], ['black', 'matte black', 0x2A2C30]]) def('bath', 'wc', k, 'WC · ' + label, Object.assign({}, BA, { size: [1, 1, 1], col: k, build: (b) => {
+    // a wall behind it with the flush plate, an oval bowl up to its rim, a seat ring on top, the water dug into the bowl
     const m = k === 'white' ? M.gloss(c) : M.matte(c);
     b.box(1, 0, 13, 15, 16, 16, M.stone(0xD8D4CC)); b.box(5.5, 11, 12.5, 10.5, 13.5, 13, M.metal(k === 'white' ? 0x2A2C30 : P.brass));
-    b.pbox(4, 5.5, 3, 12, 9, 13, 3.5, m); b.pbox(4.5, 4, 5, 11.5, 5.5, 13, 3, m); b.pbox(5.25, 8, 4, 10.75, 9, 11, 2.5, 0); b.pbox(5.25, 7, 4, 10.75, 8, 11, 2.5, M.gloss(0xDDE8EE));
-    b.pbox(4, 9, 3, 12, 9.5, 12.5, 3.5, m);
+    ellRingFill(b, 8, 9, 2.7, 3.8, 0, 2.4, m);                         // the pedestal, set back from the bowl
+    ellRingFill(b, 8, 8.6, 3.5, 4.4, 2.4, 5.6, m);                     // the bowl, to its rim
+    ellRingFill(b, 8, 8.6, 4.2, 5.0, 5.6, 6.5, m);                     // the seat ring
+    ellRingFill(b, 8, 8.6, 2.6, 3.4, 4.6, 6.6, 0);                     // dug out: the opening through seat and bowl
+    ellRingFill(b, 8, 8.6, 2.6, 3.4, 4.6, 4.9, M.gloss(0x9ED0EC));     // the water
     b.box(13.5, 7, 12, 14, 8, 13, M.metal(P.black)); b.cyl('x', 7.5, 10.5, 1.4, 13.5, 15.5, M.matte(0xF6F4EE));   // a roll holder
   } }));
   for (const [k, wood] of [['oak', () => M.wood(P.oak)], ['black', () => M.metal(P.black)]]) def('bath', 'ladder', k, 'Towel Ladder · ' + k, Object.assign({}, BA, { size: [1, 2, 1], col: k, sound: 'wood', build: (b) => {
@@ -692,7 +724,11 @@
     b.box(1, 2.5, 12.5, 15, 3, 15.5, M.light(0xF4F6FF)); b.box(1, 15, 12.5, 15, 15.5, 15.5, M.light(0xF4F6FF));
   } }));
   def('bath', 'mirror', 'round', 'Mirror · round backlit', Object.assign({}, BA, { size: [1, 1, 1], col: 'chrome', mount: 'wall', toggle: true, light: [10, 10, 10], sound: 'glass', solid: false, build: (b) => {
-    b.cyl('z', 8, 9, 6, 15.5, 16, M.light(0xF4F6FF)); b.cyl('z', 8, 9, 5.5, 14.5, 15.5, M.gloss(0xC8DCE8));
+    // a round backlit mirror: the glow spills out behind a chrome frame that stands proud of the glass, with a glint
+    b.tube('z', 8, 9, 6.6, 1, 15.25, 16, M.light(0xF4F6FF));                  // the halo, behind the frame
+    b.tube('z', 8, 9, 6, 1, 14, 15.25, M.chrome());                           // the chrome frame
+    b.cyl('z', 8, 9, 5, 14.5, 15.25, M.gloss(0xC8DCE8));                      // the glass
+    b.rod(5.2, 11.5, 14.5, 7.4, 10.2, 14.5, 0.4, M.gloss(0xFFFFFF));          // a glint across it
   } }));
   def('bath', 'washertower', 'white', 'Washer Tower · white', Object.assign({}, BA, { size: [1, 2, 1], col: 'white', ui: 'chest', sound: 'metal', build: (b) => {
     for (const y0 of [0.5, 14]) {
@@ -733,6 +769,25 @@
     return h - 0.5;
   }
   const LEAF = 0x3E7D44, LEAF2 = 0x5A9A4E, LEAFD = 0x2E5A34;
+  // a flat leaf blade from base B along U (length L, widest about the middle at W) in the plane of U and V: rasterised
+  // voxel by voxel in a band at least one voxel thick, so it can lean any way without breaking up
+  function leafBlade(b, B, U, V, L, W, m) {
+    const S = b.S, ul = Math.hypot(U[0], U[1], U[2]), u = U.map(c => c / ul);
+    const dv = V[0] * u[0] + V[1] * u[1] + V[2] * u[2], vv = V.map((c, i) => c - u[i] * dv), vl = Math.hypot(vv[0], vv[1], vv[2]), v = vv.map(c => c / vl);
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const h = (Math.abs(n[0]) + Math.abs(n[1]) + Math.abs(n[2])) / 2 + 0.01;   // half the band
+    const lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
+    for (const s of [0, L]) for (const a of [-W / 2, W / 2]) for (const d of [-h, h]) for (let k = 0; k < 3; k++) {
+      const c = B[k] + u[k] * s + v[k] * a + n[k] * d; lo[k] = Math.min(lo[k], c); hi[k] = Math.max(hi[k], c);
+    }
+    for (let z = Math.floor(lo[2] * S); z < Math.ceil(hi[2] * S); z++) for (let y = Math.floor(lo[1] * S); y < Math.ceil(hi[1] * S); y++) for (let x = Math.floor(lo[0] * S); x < Math.ceil(hi[0] * S); x++) {
+      const p = [(x + 0.5) / S - B[0], (y + 0.5) / S - B[1], (z + 0.5) / S - B[2]];
+      const s = p[0] * u[0] + p[1] * u[1] + p[2] * u[2];
+      if (s < 0 || s > L) continue;
+      const a = p[0] * v[0] + p[1] * v[1] + p[2] * v[2], d = p[0] * n[0] + p[1] * n[1] + p[2] * n[2], q = s / L;
+      if (Math.abs(a) <= (W / 2) * 2 * Math.sqrt(q * (1 - q)) && Math.abs(d) <= h) b.set(x, y, z, m);
+    }
+  }
   const PLANTS = [
     ['fig', 'Fiddle Leaf Fig', 2, (b, y) => {
       b.lathe(8, 8, [[y, 1], [20, 0.8]], M.wood(0x6A5A44)); b.rod(8, 17, 8, 5.5, 22, 7, 0.8, M.wood(0x6A5A44)); b.rod(8, 19, 8, 10.5, 24, 9, 0.8, M.wood(0x6A5A44));
@@ -746,12 +801,15 @@
       for (const [x, z, h] of L) { b.box(x, y, z, x + 1, y + h, z + 1, M.plant(LEAFD)); b.box(x, y + 1, z, x + 1, y + h - 2, z + 1, M.plant(0x4E7A3A)); b.box(x, y + h - 2, z, x + 1, y + h - 1, z + 1, M.plant(0xB8B04A)); }
     }],
     ['strelitzia', 'Bird of Paradise', 2, (b, y) => {
-      for (let k = 0; k < 9; k++) {
-        const a = k * 0.72 + 0.3, r = 2.5 + (k % 3) * 1.5, top = 17 + (k % 4) * 2.8, tx = 8 + Math.cos(a) * r, tz = 8 + Math.sin(a) * r;
-        b.rod(8, y, 8, tx, top - 4, tz, 0.75, M.plant(0x4E7A3A));
-        if (Math.abs(Math.cos(a)) > Math.abs(Math.sin(a))) b.ellipsoid(tx, top, tz, 0.8, 4.5, 2.3, M.plant(k % 3 ? LEAF : LEAF2)); else b.ellipsoid(tx, top, tz, 2.3, 4.5, 0.8, M.plant(k % 3 ? LEAFD : LEAF));
+      // broad paddle leaves on long stalks fanning out of the pot; the flower stands above them on its own stalk
+      for (let k = 0; k < 8; k++) {
+        const a = k * 0.8 + 0.3, r = 1.6 + (k % 3) * 0.7, top = 17 + (k % 4) * 2.4, ca = Math.cos(a), sa = Math.sin(a), tx = 8 + ca * r, tz = 8 + sa * r;
+        b.rod(8, y, 8, tx, top, tz, 0.75, M.plant(0x4E7A3A));
+        leafBlade(b, [tx, top, tz], [ca * 0.87, 0.49, sa * 0.87], [-sa, 0, ca], 5, 4.2, M.plant(k % 2 ? LEAF : LEAF2));
       }
-      b.extrude([[10, 23], [13.5, 24.5], [12, 23.5]], 'z', 8, 9, M.matte(0xF08A2A)); b.extrude([[10, 23.5], [12.5, 26], [11, 23.5]], 'z', 8, 9, M.matte(0x5A6AD8));   // the flower
+      b.rod(8, y, 8, 9.5, 27, 9, 0.6, M.plant(0x4E7A3A));
+      b.extrude([[9, 26.4], [13.2, 28.8], [14.6, 27.8], [11, 25.8]], 'z', 8.5, 9.5, M.matte(0xF08A2A));    // the orange bract
+      b.extrude([[11.2, 27.2], [15.4, 30.2], [14.2, 28.3], [11.8, 26.8]], 'z', 8.5, 9.5, M.matte(0x5A6AD8)); // the blue petals
     }],
     ['palm', 'Kentia Palm', 2, (b, y) => {
       for (let k = 0; k < 7; k++) {
@@ -761,9 +819,13 @@
       }
     }],
     ['rubber', 'Rubber Plant', 2, (b, y) => {
-      b.lathe(8, 8, [[y, 1], [27, 0.8]], M.plant(0x5A4A3A));
-      for (let k = 0; k < 14; k++) { const a = k * 2.2, h = y + 3 + k * 1.45, cx = 8 + Math.cos(a) * 2.6, cz = 8 + Math.sin(a) * 2.6, ax = Math.abs(Math.cos(a)) > 0.7; b.ellipsoid(cx, h, cz, ax ? 2.6 : 1.5, 0.75, ax ? 1.5 : 2.6, M.plant(k % 2 ? 0x2A4430 : 0x36553A)); }
-      b.ellipsoid(8, 27.5, 8, 1, 1.8, 1, M.plant(0x8A3A3A));
+      // a stem with big glossy leaves spiralling up it, each a flat blade leaning out and up, two greens; a red bud on top
+      b.lathe(8, 8, [[y, 1], [27.5, 0.7]], M.plant(0x5A4A3A));
+      for (let k = 0; k < 9; k++) {
+        const a = k * 2.4, h = y + 2.5 + k * 2.2, ca = Math.cos(a), sa = Math.sin(a), phi = 0.55 - k * 0.04;
+        leafBlade(b, [8 + ca * 0.5, h, 8 + sa * 0.5], [ca * Math.cos(phi), Math.sin(phi), sa * Math.cos(phi)], [-sa, 0, ca], 5.8, 3.6, M.gloss(k % 2 ? 0x2F6B3C : 0x3F7F48));
+      }
+      b.ellipsoid(8, 27.8, 8, 1, 1.6, 1, M.plant(0x8A3A3A));
     }],
     ['zz', 'ZZ Plant', 1, (b, y) => {
       for (let k = 0; k < 6; k++) {
@@ -916,9 +978,15 @@
     b.box(10, 21.5, 6, 22, 28.5, 6.5, M.light(0x4A6A8A)); b.sphere(16, 26, 6, 2, M.light(0xD8B8A0));
   } }));
   def('office', 'panel', 'felt', 'Acoustic Panels · felt hex', Object.assign({}, OF, { cats: ['office', 'deco'], size: [2, 1, 1], col: 'sage', mount: 'wall', solid: false, sound: 'wool', build: (b) => {
+    // a honeycomb of flat-top hexagons (pitch 2.85, staggered columns) in three felt tones on a dark backing board,
+    // the board showing through the seams between the tiles
+    const pitch = 2.85, dx = 1.5 * pitch, dy = Math.sqrt(3) * pitch, tones = [P.sage, P.olive, P.cream];
     const hex = (cx, cy, r) => { const p = []; for (let k = 0; k < 6; k++) p.push([cx + Math.cos(k * Math.PI / 3) * r, cy + Math.sin(k * Math.PI / 3) * r]); return p; };
-    const cols = [P.sage, P.olive, P.cream, P.sage, 0x7E8A76, P.olive, P.cream];
-    let k = 0; for (let c = 0; c < 6; c++) for (let r = 0; r < 2; r++) { const cx = 3.5 + c * 5, cy = 4.5 + r * 6 + (c % 2) * 3; if (cy + 2.6 > 16) continue; b.extrude(hex(cx, cy, 2.8), 'z', 14.5 - (k % 3) * 0.5, 16, M.fabric(cols[k++ % cols.length])); }
+    b.box(0.5, 0.5, 15, 31.5, 15.5, 16, M.matte(0x3B3F3A));
+    for (let c = 0; c < 6; c++) for (let r = 0; r < 3; r++) {
+      const cy = 3.07 + r * dy + (c % 2) * dy / 2; if (cy + dy / 2 > 16) continue;
+      b.extrude(hex(5.3125 + c * dx, cy, 2.5), 'z', 14.5, 16, M.fabric(tones[(c + r) % 3]));
+    }
   } }));
   def('office', 'laptopdesk', 'walnut', 'Laptop Desk · walnut', Object.assign({}, OF, { size: [1, 1, 1], col: 'walnut', ui: 'chest', build: (b) => {
     const w = M.wood(P.walnut);
@@ -979,9 +1047,9 @@
   def('garden', 'poolfloat', 'flamingo', 'Pool Float · flamingo', Object.assign({}, GA, { res: 16, size: [1, 1, 1], col: 'blush', solid: false, sound: 'wool', hard: 0.2, build: (b) => {
     const pk = M.gloss(0xF28AB0);
     torus(b, 8, 1.75, 8.5, 4.4, 1.75, pk);
-    const neck = [[8, 2.5, 4.5], [8, 5.5, 3.6], [8, 8.5, 4.4], [8, 10.5, 6], [8, 12.5, 6.2], [8, 13.5, 5]];
-    for (let k = 0; k + 1 < neck.length; k++) b.rod(...neck[k], ...neck[k + 1], 0.9, pk);
-    b.ellipsoid(8, 13.5, 4.8, 1.3, 1.2, 1.7, pk);                                                       // the head
+    const neck = [[8, 2.5, 4.5], [8, 5.5, 3.8], [8, 8.5, 4.6], [8, 10.5, 5.8], [8, 12.5, 6], [8, 13.5, 5]];
+    for (let k = 0; k + 1 < neck.length; k++) b.rod(...neck[k], ...neck[k + 1], 0.7, pk);              // a slender S-neck
+    b.ellipsoid(8, 13.5, 4.8, 1.4, 1.25, 1.8, pk);                                                      // the head
     b.rod(8, 13.5, 3.5, 8, 12.5, 2.5, 0.6, M.gloss(0xF6F2EA)); b.rod(8, 12.5, 2.5, 8, 11.5, 2.5, 0.5, M.gloss(0x1E2024));   // the beak, its black tip
     for (const x of [6, 9]) b.box(x, 13, 4, x + 1, 14, 5, M.gloss(0x1E2024));                            // eyes
     b.extrude([[12, 2.5], [15.5, 6], [15.5, 4.5], [14.5, 2.5]], 'x', 7, 9, pk);                          // the tail
@@ -1033,7 +1101,12 @@
     const m = M.metal(P.anthracite);
     for (const [x, z] of [[1, 1], [45, 1], [1, 45], [45, 45]]) b.box(x, 0, z, x + 2, 45, z + 2, m);
     for (const z of [1, 45]) b.box(1, 41, z, 47, 45, z + 2, m); for (const x of [1, 45]) b.box(x, 41, 1, x + 2, 45, 47, m);
-    for (let z = 4; z < 45; z += 3) b.box(3, 43, z, 45, 44, z + 2, M.metal(sh(P.anthracite, 1.15)));
+    // open louvres: blades tilted about 26 degrees on the beam line, with sky between them (each a parallelogram in z-y)
+    const cs = Math.cos(0.45), sn = Math.sin(0.45), hw = 2.2, t = 1.3, bl = M.metal(sh(P.anthracite, 1.15));
+    for (let z = 6; z < 40; z += 6) {
+      const cz = z + 2.2, A = [cz - cs * hw, 43 - sn * hw], B = [cz + cs * hw, 43 + sn * hw], nz = -sn * t / 2, ny = cs * t / 2;
+      b.extrude([[A[0] + nz, A[1] + ny], [B[0] + nz, B[1] + ny], [B[0] - nz, B[1] - ny], [A[0] - nz, A[1] - ny]], 'x', 3, 45, bl);
+    }
     for (const z of [3, 44]) b.box(3, 40, z, 45, 41, z + 1, M.light(0xFFE2B0)); for (const x of [3, 44]) b.box(x, 40, 4, x + 1, 41, 44, M.light(0xFFE2B0));
   } }));
   // a square parasol, 3 m: a weighted base and the pole in the middle column, the canopy over all nine cells 2 m up
@@ -1079,7 +1152,11 @@
     for (const x of [6, 15, 24]) { b.box(x, 7.5, 10, x + 1, 15.5, 11, M.wood(P.oak)); b.sphere(x + 0.5, 11, 10.5, 2, M.plant(P.leaf)); b.box(x + 1.5, 9.5, 9, x + 2.5, 10.5, 10, M.gloss(0xD8322A)); b.box(x - 1.5, 12, 10, x - 0.5, 13, 11, M.gloss(0xD8322A)); b.box(x + 1, 13, 11, x + 2, 14, 12, M.gloss(0xE89A2A)); }
   } }));
   def('garden', 'bollard', 'black', 'Garden Light · bollard', Object.assign({}, GA, { size: [1, 1, 1], col: 'black', toggle: true, light: [12, 10, 7], sound: 'metal', solid: false, build: (b) => {
-    b.box(5.5, 0, 5.5, 10.5, 9, 10.5, M.metal(P.black)); b.box(5.5, 9, 5.5, 10.5, 11, 10.5, M.light(0xFFE2B0)); b.box(5, 11, 5, 11, 12, 11, M.metal(P.black));
+    // a round bollard: a black drum on a flared foot, a glowing band just proud of the drum under its head, a domed cap
+    const k = M.metal(P.black);
+    b.lathe(8, 8, [[0, 3.1], [1.2, 2.5]], k); b.cyl('y', 8, 8, 2.5, 1.2, 8.5, k);
+    b.cyl('y', 8, 8, 2.75, 8.5, 9.5, M.light(0xFFE2B0));
+    b.cyl('y', 8, 8, 2.5, 9.5, 10.5, k); b.lathe(8, 8, [[10.5, 2.9], [11.2, 2.6], [11.7, 1.6], [12, 0]], k);
   } }));
   def('garden', 'mower', 'robot', 'Robot Mower · with dock', Object.assign({}, GA, { size: [1, 1, 1], col: 'anthracite', sound: 'metal', build: (b) => {
     b.pbox(3, 0.5, 2, 13, 3.5, 11, 2, M.gloss(0x3A3D44)); b.pbox(4, 3.5, 3, 12, 4, 10, 1.5, M.gloss(0xF07E1E)); b.box(6, 4, 4, 10, 4.5, 6, M.gloss(0x111214)); b.box(7.5, 4, 3.5, 8.5, 4.5, 4, M.light(0x4AE08A));
@@ -1087,12 +1164,20 @@
     b.box(3, 0, 12, 13, 0.5, 16, M.gloss(0x3A3D44)); b.box(6, 0.5, 14, 10, 4, 15.5, M.gloss(0x3A3D44)); b.box(7, 3, 13.5, 9, 3.5, 14, M.light(0x4AE08A));
   } }));
   def('garden', 'hammock', 'stand', 'Hammock · on a stand', Object.assign({}, GA, { cats: ['garden', 'seat'], size: [3, 1, 1], col: 'sand', seat: true, sound: 'wool', build: (b) => {
-    const w = M.wood(0xA8865A), cloth = M.fabric(0xE8D8B8), str = M.fabric(0xC09A6A);
-    let px = 1, py = 14;
-    for (let k = 1; k <= 24; k++) { const t = k / 24, x = 1 + t * 46, y = 1 + (1 - Math.sin(t * Math.PI)) * 13; b.rod(px, py, 8, x, y, 8, 0.75, w); px = x; py = y; }   // the curved stand, low in the middle
-    b.box(16, 0, 3, 18, 1.5, 13, w); b.box(30, 0, 3, 32, 1.5, 13, w);
-    for (let x = 6; x < 42; x += 0.5) { const t = (x - 24) / 18, y = 6 + t * t * 6; b.box(x, y, 4.5, x + 0.5, y + 0.5, 11.5, ((x * 2) | 0) % 6 < 3 ? cloth : str); }
-    b.rod(3, 11, 8, 6, 12, 8, 0.35, str); b.rod(45, 11, 8, 42, 12, 8, 0.35, str); b.cushion(7, 7.5, 5, 12, 9.5, 11, 1, M.fabric(P.sage), false);
+    // two A-frame stands, each with a crossbar at 12 and a brace low down; one band of cloth hung from the crossbars,
+    // sagging between them, in stripes, with a cushion in the sag
+    const w = M.wood(0xA8865A), cloth = M.fabric(0xE8D8B8), str = M.fabric(0xC9A87A);
+    for (const xe of [3, 45]) {
+      b.rod(xe, 12, 2.5, xe, 12, 13.5, 0.7, w);                                                       // the crossbar
+      b.rod(xe, 12.5, 8, xe, 0.8, 1.5, 0.7, w); b.rod(xe, 12.5, 8, xe, 0.8, 14.5, 0.7, w);           // the A-frame legs
+      b.rod(xe, 4.5, 3.6, xe, 4.5, 12.4, 0.5, w);                                                     // the brace
+    }
+    const sag = (x) => 5 + 7 * ((x - 24) / 21) ** 2, poly = [];
+    for (let x = 3.5; x <= 44.5; x += 0.5) poly.push([x, sag(x) + 1]);
+    for (let x = 44.5; x >= 3.5; x -= 0.5) poly.push([x, sag(x)]);
+    b.extrude(poly, 'z', 5, 11, cloth);
+    for (const x0 of [9, 15, 21, 27, 33]) b.recolor(x0, 0, 5, x0 + 1.5, 16, 11, str);                // stripes across the cloth
+    b.cushion(19, 6, 6, 29, 8.5, 10.5, 1.2, M.fabric(P.sage), false);
   } }));
   def('garden', 'eggchair', 'rattan', 'Hanging Egg Chair · rattan', Object.assign({}, GA, { cats: ['garden', 'seat'], res: 16, size: [1, 2, 1], col: 'sand', seat: true, sound: 'wood', build: (b) => {
     const m = M.metal(P.black), r = M.wood(0xC8A878), rd = M.wood(0xA8885A);
@@ -1155,8 +1240,10 @@
   } }));
   def('mobility', 'wallbox', 'ev', 'Wallbox · EV charger', Object.assign({}, MO, { size: [1, 1, 1], col: 'white', mount: 'wall', solid: false, build: (b) => {
     b.pbox(4.5, 6, 13.5, 11.5, 14, 16, 1, M.gloss(P.white)); b.cyl('z', 8, 11, 1.6, 13, 13.5, M.gloss(0x1E2024)); b.tube('z', 8, 11, 1.6, 0.5, 12.5, 13, M.light(0x4AE08A));
-    for (let k = 0; k < 4; k++) b.tube('z', 8, 3.5, 2.6 - k * 0.1, 0.5, 14 - k * 0.6, 14.5 - k * 0.6, M.matte(0x1E2024));   // the coiled cable
-    b.rod(8, 6, 14.5, 8, 4, 14.5, 0.5, M.matte(0x1E2024)); b.box(11.5, 8, 14, 13, 10.5, 16, M.gloss(0x1E2024));
+    // the cable: one neat lead from the holder on the side, down the wall and out to a plug on the floor
+    b.box(11.5, 8, 14, 13, 10.5, 16, M.gloss(0x1E2024));
+    b.rod(12.25, 8, 14.3, 12.25, 4.5, 14.3, 0.55, M.matte(0x1E2024)); b.rod(12.25, 4.5, 14.3, 12.5, 1.8, 13, 0.55, M.matte(0x1E2024));
+    b.rbox(11.5, 0.5, 11.5, 13.5, 2.5, 13.5, 0.6, M.matte(0x1E2024));
   } }));
   def('mobility', 'charger', 'pillar', 'Charging Pillar · EV', Object.assign({}, MO, { size: [1, 2, 1], col: 'white', light: [3, 7, 10], hard: 1.5, build: (b) => {
     b.box(3, 0, 4, 13, 1, 12, M.concrete(0x8E8E8A)); b.pbox(4.5, 1, 5, 11.5, 27, 11, 1, M.gloss(P.white)); b.box(4.5, 26, 5, 11.5, 27.5, 11, M.light(0x5CC8F0));
@@ -1207,10 +1294,13 @@
     b.extrude([[0, 28], [32, 26], [32, 27.5], [0, 29.5]], 'z', 0.5, 15.5, M.plant(0x6A8A4A)); for (let k = 0; k < 14; k++) b.sphere(2 + k * 2.2, 29 - k * 0.14, 3 + (k * 5) % 10, 0.75, M.plant([0xE8B83A, 0xD87AA0, 0x8AA05A][k % 3]));
   } }));
   def('mobility', 'rack', 'skate', 'Skateboard & Helmet · wall rack', Object.assign({}, MO, { cats: ['mobility', 'deco'], size: [1, 1, 1], col: 'walnut', mount: 'wall', solid: false, sound: 'wood', build: (b) => {
-    b.box(2, 9, 15, 14, 10.5, 16, M.wood(P.walnut)); for (const x of [4, 12]) b.box(x - 0.5, 8.5, 13, x + 0.5, 10, 15, M.metal(P.black));
-    b.pbox(1, 6.5, 12.5, 15, 7, 15, 1, M.wood(0xC8A878)); b.box(1.5, 7, 12.5, 14.5, 7.25, 15, M.matte(0x1E2024));
-    for (const x of [3, 13]) { b.cyl('y', x, 13, 0.75, 6, 6.5, M.gloss(0xF2E8D0)); b.cyl('y', x, 14.5, 0.75, 6, 6.5, M.gloss(0xF2E8D0)); }
-    b.ellipsoid(8, 12.5, 13, 3.5, 3, 3, M.gloss(P.terracotta)); b.cut(0, 10.5, 0, 16, 12, 16); b.box(5, 10.5, 12, 11, 11, 14, M.matte(0x2A2C30));
+    // a skateboard hung upright on two wall brackets, nose up, its top in grip tape; a helmet with a flat base on a shelf
+    const stadium = (cx, cy, hw, hl) => { const p = []; for (let k = 0; k <= 12; k++) { const a = Math.PI * k / 12; p.push([cx + hw * Math.cos(a), cy + hl + hw * Math.sin(a)]); } for (let k = 0; k <= 12; k++) { const a = Math.PI + Math.PI * k / 12; p.push([cx + hw * Math.cos(a), cy - hl + hw * Math.sin(a)]); } return p; };
+    for (const yb of [3, 11]) b.box(6, yb, 14.5, 10, yb + 1, 16, M.metal(P.black));
+    b.extrude(stadium(8, 8, 1.6, 4.8), 'z', 13.5, 14.5, M.wood(0xD2B07A));
+    b.recolor(6, 9.5, 13.5, 10, 14.5, 14.5, M.matte(0x1E2024));
+    b.ellipsoid(12.5, 11.8, 13.4, 2.5, 2.6, 2.5, M.gloss(P.terracotta)); b.cut(10, 0, 10, 15.5, 10, 16);
+    b.box(10, 9, 14.5, 15.5, 10, 16, M.wood(P.walnut));
   } }));
 
   // ================================================================ LADEN & CAFÉ — the coffee bar, the shop floor, the bakery
@@ -1428,12 +1518,13 @@
   // stems fan out of a tall ceramic vase; each plume is a soft spindle along its stem
   def('deco', 'vase', 'pampas', 'Floor Vase · pampas grass', Object.assign({}, DK, { res: 16, size: [1, 2, 1], col: 'cream', build: (b) => {
     b.lathe(8, 8, [[0, 2.4], [1.5, 3.3], [6, 3.5], [9, 2.6], [11, 1.6], [12.5, 1.5], [13, 1.8]], M.matte(0xE8E2D4));
-    for (let k = 0; k < 9; k++) {
-      const a = k * Math.PI * 2 / 9 + 0.3, s = 3 + (k % 3) * 1.6, base = [8, 12.5, 8], tip = [8 + Math.cos(a) * s, 30 - s * 1.3 - (k % 2) * 1.5, 8 + Math.sin(a) * s * 0.8];
+    // six stems fanning out of the neck, each ending in a feathery plume: soft overlapping puffs that shrink towards the tip
+    const plumes = [0xE8D8B8, 0xDCC8A0, 0xF0E4CC];
+    for (let k = 0; k < 6; k++) {
+      const a = k * Math.PI * 2 / 6 + 0.3, s = 2.4 + (k % 3) * 1.4, base = [8, 12.5, 8], tip = [8 + Math.cos(a) * s, 28.5 - (k % 2) * 2 - (k % 3) * 0.8, 8 + Math.sin(a) * s * 0.8];
       const at = (t) => base.map((v, i) => v + (tip[i] - v) * t);
-      b.rod(...base, ...at(0.5), 0.6, M.plant(0xB8A070));
-      const plume = M.fabric(k % 2 ? 0xE8D8B8 : 0xDCC8A0);
-      b.rod(...at(0.5), ...at(0.9), 1.4, plume); b.rod(...at(0.45), ...at(1), 0.9, plume);
+      b.rod(...base, ...tip, 0.6, M.plant(0xB8A070));
+      [[0.55, 1.6], [0.7, 1.45], [0.85, 1.25], [1, 1]].forEach(([t, rr], j) => { const c = at(t); b.ellipsoid(c[0], c[1], c[2], rr, rr * 1.2, rr, M.fabric(plumes[(k + j) % 3])); });
     }
   } }));
   // three ceramics on a travertine tray: a sage bottle, a cream moon vase, a terracotta cylinder with a dried branch
@@ -1481,8 +1572,11 @@
   def('deco', 'bust', 'marble', 'Bust · white marble', Object.assign({}, DK, { res: 16, size: [1, 2, 1], col: 'white', sound: 'stone', hard: 1, build: (b) => {
     const m = M.marble(0xEEEDEA);
     b.box(4, 0, 4, 12, 15, 12, M.stone(0x3A3C40)); b.box(3.5, 14, 3.5, 12.5, 15, 12.5, M.stone(0x2E3034));
-    b.ellipsoid(8, 18, 8.5, 4.5, 3, 3, m); b.cyl('y', 8, 8.5, 1.5, 19, 22, m); b.ellipsoid(8, 25, 8, 2.75, 3.5, 3, m); b.ellipsoid(8, 26.5, 9, 2.75, 2.25, 2.5, M.marble(0xE2E0DA));
-    b.box(7.5, 24.5, 4.5, 8.5, 26, 5.5, m);
+    // the torso in elliptic layers (chest, shoulders, a slope into the neck), a neck, and an egg-shaped head with a nose
+    for (const [y0, y1, rx, rz] of [[15, 17, 4.9, 3.6], [17, 19, 5.5, 3.8], [19, 20.5, 5.8, 3.9], [20.5, 21.5, 5.2, 3.6], [21.5, 22.5, 3.6, 3.0]]) ellRingFill(b, 8, 8.2, rx, rz, y0, y1, m);
+    b.cyl('y', 8, 8.2, 1.6, 22, 24.5, m);
+    b.lathe(8, 8.2, [[23.6, 0], [24.4, 2.0], [25.5, 2.7], [27, 2.95], [28.5, 2.75], [29.5, 2.0], [30.1, 0.6], [30.3, 0]], m);
+    b.box(7.5, 26, 4, 8.5, 27.5, 5.5, m);
   } }));
   def('deco', 'macrame', 'wall', 'Macramé · wall hanging', Object.assign({}, DK, { res: 16, size: [1, 2, 1], col: 'cream', mount: 'wall', solid: false, sound: 'wool', build: (b) => {
     const c = M.fabric(0xEDE6D8), cd = M.fabric(0xD8CDB8);
