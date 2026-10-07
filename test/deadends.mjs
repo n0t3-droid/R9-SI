@@ -296,6 +296,7 @@ let W = null;
 await section('8 · a world: Welt → Häuser ★, placing with buttons, ✋ Benutzen → the Werkbank, a full storage there', async () => {
   await page.goto(URL0 + '/index.html', NAV);
   check(await atTitle(), 'the game is at its title');
+  await ev(() => { if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); });   // (W1: the Werkbank, ✋ Benutzen and the Plan tab are Profi things)
   // (render distance 6: a planned house and the ground around it are loaded from where you land, 24 blocks in front of it)
   await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 0; g.applySettings('*'); g.saveSettings(); });
   await ev(`VR.game.createWorld({name:'Sackgasse',mode:'creative',difficulty:'peaceful',seed:'4711',type:'flat',cheats:true,kit:false})`);
