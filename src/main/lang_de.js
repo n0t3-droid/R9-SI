@@ -858,5 +858,13 @@
     'karte.how': 'Zeig auf den Boden: jeder Klick setzt es — das Spiel baut es, ▶ bringt dich hin.',
     'nav.back': 'Zurück, wo du warst (Esc)',
     'cat.none': 'nichts gefunden',
+    'g.forge.help': '🏭 /bau <Wunsch> — „/bau Hochhaus 30 Stockwerke Glas“, „/bau Hängebrücke 60 lang“, „/bau Burg mit Bergfried“ · danach „/bau höher“, „/bau mehr Glas“, „/bau aus Stein“',
+    'g.forge.creative': 'Die Forge baut in Kreativ und Zen.',
+    'g.forge.what': 'Sag, was es sein soll: Hochhaus, Haus, Brücke, Turm, Halle, Burg, Stadion, Raumschiff, Park oder Mauer.',
+    'g.forge.same': 'Das ändert nichts — sag „höher“, „breiter“, „mehr Glas“, „aus Stein“ … oder etwas Neues: „/bau Brücke 40 lang“.',
+    'g.forge.moved': 'Seit der letzten Forge hat sich etwas geändert — sag ein neues Ganzes: „/bau Hochhaus …“',
+    'g.forge.busy': 'Noch im Bau — gleich.',
+    'g.forge.look': 'Schau auf den Boden, wo es stehen soll.',
+    'g.forge.building': 'wird gebaut',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

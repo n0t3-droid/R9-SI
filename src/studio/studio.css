@@ -646,3 +646,25 @@ nav.modes button.hubm.on { color: var(--txt); background: #2a2110; box-shadow: 0
 #packDlg .crow .cbtn { flex: 1; }
 /* a file held over the Studio */
 #studio.packdrop::after { content: '📥 R9-Paket hier ablegen'; position: fixed; inset: 0; z-index: 85; display: grid; place-items: center; font: 600 22px var(--font); color: var(--acc); background: rgba(3, 5, 8, 0.5); border: 3px dashed rgba(56, 230, 255, 0.5); pointer-events: none; }
+
+/* 🏭 Forge: the type row, the 3 × 3 variant grid, the parameter sliders and material chips */
+#chips button.fgt { font-size: 12px; padding: 3px 8px; }
+#list.forge { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+#list.forge .card .th { height: 84px; background: #0a0e14; }
+#list.forge .card .th:not(.done) { background: repeating-linear-gradient(135deg, #0e141d 0 8px, #0a0e14 8px 16px); }
+#list.forge .card .cap { padding: 5px 7px 6px; }
+#list.forge .card .cap .n { font-size: 11px; }
+.ftextrow .ftext { flex: 1; min-width: 0; padding: 8px 10px; font: 13px var(--font); color: var(--txt); background: #0a0e14; border: 1px solid var(--line2); border-radius: var(--r); outline: none; }
+.ftextrow .ftext:focus { border-color: rgba(56, 230, 255, 0.55); box-shadow: 0 0 0 2px rgba(56, 230, 255, 0.12); }
+.fparams { display: grid; gap: 6px; margin: 8px 0; }
+.fparam { display: grid; grid-template-columns: 92px 28px 1fr; align-items: center; gap: 8px; font: 11px var(--mono); color: var(--mute); }
+.fparam b { color: var(--txt); font-weight: 500; text-align: right; }
+.fparam input[type=range] { width: 100%; accent-color: var(--acc); }
+.fparam select { grid-column: 2 / 4; padding: 4px 6px; font: 11px var(--font); color: var(--txt); background: #0a0e14; border: 1px solid var(--line2); border-radius: 6px; }
+.fbools { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0 2px; }
+.fbools .fbool { padding: 4px 10px; font-size: 11px; border-radius: 20px; color: var(--mute); background: transparent; border: 1px dashed var(--line2); }
+.fbools .fbool.on { color: #9fe8c4; background: rgba(80, 230, 160, 0.08); border: 1px solid rgba(80, 230, 160, 0.45); }
+.fstyles { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 8px; }
+.fstyles .fstyle { padding: 4px 10px; font-size: 11px; border-radius: 20px; color: var(--mute); background: transparent; border: 1px solid var(--line); }
+.fstyles .fstyle.on { color: var(--acc); background: rgba(56, 230, 255, 0.08); border-color: rgba(56, 230, 255, 0.45); }
+.note .mono { font: 10px var(--mono); }

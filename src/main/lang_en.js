@@ -858,5 +858,13 @@
     'karte.how': 'Point at the ground: every click places it — the game builds it, ▶ takes you there.',
     'nav.back': 'Back where you were (Esc)',
     'cat.none': 'nothing found',
+    'g.forge.help': '🏭 /bau <wish> — “/bau skyscraper 30 floors glass”, “/bau suspension bridge 60 long”, “/bau castle with keep” · then “/bau taller”, “/bau more glass”, “/bau stone”',
+    'g.forge.creative': 'The Forge builds in Creative and Zen Builder.',
+    'g.forge.what': 'Say what it should be: high-rise, house, bridge, tower, hall, castle, stadium, spaceship, park or wall.',
+    'g.forge.same': 'That changes nothing — say “taller”, “wider”, “more glass”, “stone” … or something new: “/bau bridge 40 long”.',
+    'g.forge.moved': 'Something changed since the last Forge build — say a whole new wish: “/bau skyscraper …”',
+    'g.forge.busy': 'Still building — a moment.',
+    'g.forge.look': 'Look at the ground where it should stand.',
+    'g.forge.building': 'building',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
