@@ -106,7 +106,8 @@
   // a 160-high tower as much as a 120-long bridge (the camera stands span × 2.4 away with a 43° view)
   function sceneOf(m, dna) {
     const b = m.bounds, sx = b[3] - b[0] + 3, sy = b[4] - b[1] + 3, sz = b[5] - b[2] + 3;
-    return { type: 'clip', name: dna, gpu: m.gpu, off: [0, 0, 0], center: [sx / 2, sy * 0.46, sz / 2], span: Math.max(sx * 0.62, sz * 0.62, sy * 0.58, 6), groundY: 1, noGrid: false, instances: [] };
+    // (the camera looks down a little: the centre sits over the middle, so a tall one keeps its crown in the picture)
+    return { type: 'clip', name: dna, gpu: m.gpu, off: [0, 0, 0], center: [sx / 2, sy * 0.55, sz / 2], span: Math.max(sx * 0.62, sz * 0.62, sy * 0.6, 6), groundY: 1, noGrid: false, instances: [] };
   }
   const camOf = () => ({ yaw: 0.72, pitch: 0.42, dist: 0 });
   function paint(dna) {
