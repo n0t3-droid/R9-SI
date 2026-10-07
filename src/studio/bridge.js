@@ -133,7 +133,7 @@
     let w = null; try { w = window.open(GAME_URL, '_blank'); if (w) { try { w.opener = null; } catch (e) { /* */ } } } catch (e) { w = null; }
     if (w) return;
     // (noopener hands nothing back — and a blocked one neither): the link, ready to copy
-    const host = (anchor && anchor.closest && anchor.closest('#bridgeBar, .note, .crow')) || $('#bridgeBar') || $('#partsBody');
+    const host = (anchor && anchor.closest && anchor.closest('#bridgeBar, .note, .crow, #tiles')) || $('#bridgeBar') || $('#partsBody');   // (W1: the ▶ tile asks too)
     if (!host) return;
     let box = host.querySelector('.gameLink');
     if (!box) {
@@ -150,7 +150,7 @@
     let hidden = false; try { hidden = sessionStorage.getItem('r9si.bridge.hide') === '1'; } catch (e) { /* */ }
     const bars = $('#bars'); if (hidden || !bars || $('#bridgeBar')) return;
     const b = document.createElement('div'); b.id = 'bridgeBar';
-    b.innerHTML = `<span class="t">🔌 ${esc(L('br.bar', 'Dieses Studio ist nicht mit deinem Spiel verbunden — live geht es im Studio im Spiel (⏸ → 🧰 R9 Studio).'))}</span>`
+    b.innerHTML = `<span class="t">🔌 ${esc(L('br.bar', 'Dieses Studio ist nicht mit deinem Spiel verbunden — live geht es im Studio im Spiel (⏸ → 🏗 Bauen).'))}</span>`
       + `<button class="cbtn mini pri" data-act="game" title="${esc(L('br.gameT', 'Das Spiel in einem neuen Tab öffnen'))}">🎮 ${esc(L('br.game', 'Zum Spiel'))}</button>`
       + `<button class="cbtn mini" data-act="pack" title="${esc(L('br.outT', 'Favoriten, Designs und Bauteile als eine Datei — für das Spiel oder ein anderes Studio'))}">📦 ${esc(L('br.out', 'Mitnehmen'))}</button>`
       + `<button class="x" data-act="hide" title="${esc(L('br.hide', 'Ausblenden, bis du das Studio wieder öffnest'))}">✕</button>`;

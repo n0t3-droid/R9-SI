@@ -456,12 +456,12 @@
         const d = document.createElement('div'); d.className = 'note';
         if (SA) {
           // this Studio is its own page with its own storage: the worlds are in the game's
-          d.innerHTML = 'Deine Welten leben im Spiel — dieses Studio ist nicht mit ihm verbunden. Im Spiel: <b>⏸ → 🧰 R9 Studio</b>, dort planst und baust du direkt in deiner Welt.';
+          d.innerHTML = 'Deine Welten leben im Spiel — dieses Studio ist nicht mit ihm verbunden. Im Spiel: <b>⏸ → 🏗 Bauen</b>, dort setzt du direkt in deine Welt.';
           el.appendChild(d);
           const b = document.createElement('button'); b.className = 'cbtn pri'; b.dataset.act = 'game'; b.textContent = '🎮 Zum Spiel';
           b.onclick = () => { if (VR.StudioBridge) VR.StudioBridge.toGame(b); else if (GAME_URL) window.open(GAME_URL, '_blank', 'noopener'); };
           const r = document.createElement('div'); r.className = 'crow'; r.appendChild(b); el.appendChild(r);
-        } else { d.innerHTML = 'Noch keine Welt gespeichert. Lege im Spiel eine Welt an — das Studio im Spiel (⏸ → 🧰 R9 Studio) sieht dieselben Welten.'; el.appendChild(d); }
+        } else { d.innerHTML = 'Noch keine Welt gespeichert. Lege im Spiel eine Welt an — das Studio im Spiel (⏸ → 🏗 Bauen) sieht dieselben Welten.'; el.appendChild(d); }
         return true;
       }
       for (const w of WM.worlds) {
@@ -556,8 +556,8 @@
     const note = (html, cls) => { const p = document.createElement('div'); p.className = 'note' + (cls ? ' ' + cls : ''); p.innerHTML = html; el.appendChild(p); };
     if (!WM.world) {
       H('Welt-Modus');
-      note('Öffne links eine deiner R9-SI-Welten. Das Studio zeigt die Gegend um deine letzte Position — dort setzt du Häuser und Möbel, drehst, klonst und verschiebst sie, und <b>In die Welt übernehmen</b> gibt den Plan ans Spiel: Es baut alles, sobald die Gegend geladen ist.');
-      if (!window.__R9_IN_GAME) note('Dieses Studio läuft getrennt vom Spiel und sieht deshalb keine Welten. Im Spiel: <b>⏸ → 🧰 R9 Studio</b>.', 'warn');
+      note('Öffne links eine deiner R9-SI-Welten. Das Studio zeigt die Gegend um deine letzte Position — dort setzt du Häuser und Möbel, drehst, klonst und verschiebst sie: <b>📍 Setzen</b> gibt sie ans Spiel, es baut alles, sobald die Gegend geladen ist.');   // (W1 §6: one word)
+      if (!window.__R9_IN_GAME) note('Dieses Studio läuft getrennt vom Spiel und sieht deshalb keine Welten. Im Spiel: <b>⏸ → 🏗 Bauen</b>.', 'warn');
       if (WM.imagine) {
         H('✨ Erschaffen');
         const mk = document.createElement('div'); mk.className = 'wbMake';
@@ -577,7 +577,7 @@
     el.appendChild(kv);
     const dt = dirty();
     row(btn(`📍 Alle setzen${drafts ? ' (' + drafts + ')' : ''}`, 'pri' + (dt ? ' glow' : ''), () => commit(), 'Gibt den Plan ans Spiel — es baut alles, sobald die Gegend geladen ist'));   // (W1 §6: one word — the Karte view sets at once)
-    if (dt) note('Änderungen sind noch nicht beim Spiel — <b>Übernehmen</b> gibt sie weiter.', 'warn');
+    if (dt) note('Änderungen sind noch nicht beim Spiel — <b>📍 Alle setzen</b> gibt sie weiter.', 'warn');
     row(btn('⟳ Gegend neu laden', '', () => openWorld(WM.world), 'Liest die Welt neu (nachdem das Spiel gespeichert hat)'), btn('◂ Andere Welt', '', () => { keepWorld(true); WM.world = null; freeRegion(); C.setScene(null); refresh(); listWorlds().then(refresh); }));
     row(btn('⟲ Rückgängig', '', () => undo(false), 'Strg+Z'), btn('⟳ Wiederholen', '', () => undo(true), 'Strg+Y'));
     const p = selPlan();
@@ -604,7 +604,7 @@
     }
     H('So geht’s');
     note('<b>Häuser</b>/<b>Möbel</b> links wählen → auf den Boden zeigen → Klick. Gesetztes anklicken: <b>ziehen</b> verschiebt, <b>Alt+Ziehen</b> klont, <b>R</b> dreht, <b>Strg+D</b> klont, <b>Bild↑/↓</b> Höhe, <b>Pfeile</b> 1 Block, <b>Entf</b> löscht. Kamera: Ziehen dreht, Shift+Ziehen schiebt, Rad zoomt, <b>WASD/Q/E</b> fährt.');
-    note(window.__R9_IN_GAME ? 'Nach <b>Übernehmen</b> (oder ▶ Spielen) baut das Spiel jedes Teil, sobald seine Gegend geladen ist — ist die Welt gerade im Spiel offen, sofort. Das Gelände wird dabei angepasst wie bei den Bauplänen.' : 'Achtung: Dieses Studio teilt den Speicher nicht mit dem Spiel — im Spiel: ⏸ → 🧰 R9 Studio.', window.__R9_IN_GAME ? '' : 'warn');
+    note(window.__R9_IN_GAME ? 'Nach <b>📍 Alle setzen</b> (oder ▶ Spielen) baut das Spiel jedes Teil, sobald seine Gegend geladen ist — ist die Welt gerade im Spiel offen, sofort. Das Gelände wird dabei angepasst wie bei den Bauplänen.' : 'Achtung: Dieses Studio teilt den Speicher nicht mit dem Spiel — im Spiel: ⏸ → 🏗 Bauen.', window.__R9_IN_GAME ? '' : 'warn');
     return true;
   });
   HOOK_WRAP('hud', function () {
