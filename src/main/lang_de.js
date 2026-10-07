@@ -866,5 +866,20 @@
     'g.forge.busy': 'Noch im Bau — gleich.',
     'g.forge.look': 'Schau auf den Boden, wo es stehen soll.',
     'g.forge.building': 'wird gebaut',
+    // ---- 🏗 Baustelle (baustelle.js): geplante Bauten entstehen vor deinen Augen
+    'g.bau.setting': '🏗 Bauen',
+    'g.bau.instant': 'Sofort',
+    'g.bau.site': 'Baustelle',
+    'g.bau.instantTip': 'Geplante Bauten stehen sofort da (am leichtesten für langsame PCs)',
+    'g.bau.siteTip': 'Geplante Bauten entstehen vor deinen Augen: Gerüst, Bauleute, Kran, Konfetti',
+    'g.bau.start': '🏗 Baustelle',
+    'g.bau.startSub': '{name} entsteht — Klick drauf: sofort fertig',
+    'g.bau.progress': '🏗 {name} · {p} % gebaut',
+    'g.bau.skip': '⏩ Fertig',
+    'g.bau.skipTip': 'Sofort fertig bauen (auch: Klick auf die Baustelle oder /bau fertig)',
+    'g.bau.done': '✨ {name} steht!',
+    'g.bau.cancel': 'Baustelle abgebrochen — alles zurück',
+    'g.bau.none': 'Gerade wird nichts gebaut.',
+    'g.bau.bench': 'Werkbank',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -180,6 +180,7 @@
     // item logic while on foot. true = consumed this frame's mouse input ('keep' keeps the breaking state)
     update(dt, input, p, hdef) {
       const g = this.g;
+      if (this.blue && this.blue.siteClick && this.blue.siteClick(input, p)) { this.mineT = null; return true; }   // 🖱 a click on a construction site: done at once
       if (!hdef) { this.mineT = null; return false; }
       const lmbHold = input.dragLook ? input.holdAction(0) : input.mouse.down[0];
       const lmbClick = input.dragLook ? input.clickAction(0) : input.mouse.clicked[0];
@@ -350,6 +351,8 @@
       if (!u) { this.g.ui.hint(T('g.wand.noUndo'), 1500); return; }
       this.g.world.bulkSet(u, false);
       for (const [x, y, z, s] of u) this.noteBlock(x, y, z, s);
+      // (the step of a construction site: a running one stops, the guests hear of it — baustelle.js)
+      if (u.onUndo) { try { u.onUndo(u); } catch (e) { console.warn('undo', e); } }
       this.g.ui.hint(T('g.wand.undid', { n: u.length.toLocaleString() }), 1800);
     }
     wandCopy() {

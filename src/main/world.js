@@ -403,6 +403,8 @@
       for (const l of this.listeners) if (l.onColumnLoaded) l.onColumnLoaded(c);
     }
     unloadColumn(c) {
+      // (a construction site in it is finished first — baustelle.js: the save holds the whole building)
+      for (const l of this.listeners) if (l.onColumnUnloading) l.onColumnUnloading(c);
       // a saved column comes back from the save when the player returns (it was regenerated before: edits vanished)
       if (c.modified && this.store) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
       for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s);
@@ -438,7 +440,12 @@
         void i;
       });
     }
-    saveAll() { if (!this.store) return Promise.resolve(); const ps = []; for (const c of this.cols.values()) if (c.modified) { ps.push(this.store.saveColumn(this.dim, c)); this.savedKeys.add(c.key); } return Promise.all(ps); }
+    saveAll() {
+      if (!this.store) return Promise.resolve();
+      // the listeners finish what is half done first (a construction site: the save holds the whole building)
+      for (const l of this.listeners) if (l.onBeforeSave) l.onBeforeSave(this);
+      const ps = []; for (const c of this.cols.values()) if (c.modified) { ps.push(this.store.saveColumn(this.dim, c)); this.savedKeys.add(c.key); } return Promise.all(ps);
+    }
     destroy() { this.dead = true; for (const c of this.cols.values()) for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s); this.cols.clear(); }
 
     // ---------- meshing ----------
@@ -646,6 +653,34 @@
       }
       this.relightColumns([...touched.values()]);
       return touched.size;
+    }
+    // 🏗 the Baustelle's write (baustelle.js): cells a … b of a list, a layer at a time — blocks, height map, sun-shadow
+    // columns and the sections to remesh, without the whole-column relight bulkSet does (that twenty times a second
+    // would remesh the world twenty times a second): the touched columns (collected in `touched`, key → column) are
+    // relit once when the building stands. A cell opened to the sky gets the sky's light at once, so a hill dug away
+    // from the top never shows black faces meanwhile; returns how many cells changed.
+    buildSet(list, a, b, touched) {
+      const T = R.T, flags = T.flags, filter = T.filter, MASK = F.SOLID | F.FLUID | F.LEAVES;
+      let n = 0;
+      for (let k = a; k < b; k++) {
+        const e = list[k], x = e[0], y = e[1], z = e[2], state = e[3];
+        if (y < 0 || y >= VR.MAXY) continue;
+        const c = this.col(x >> 4, z >> 4); if (!c) continue;
+        if (y >= c.H) { if (!state) continue; this.growColumn(c, y); }
+        const i = (y << 8) | ((z & 15) << 4) | (x & 15);
+        const old = c.blocks[i]; if (old === state) continue;
+        c.blocks[i] = state; c.modified = true; n++;
+        const s = c.sec[y >> 4];
+        if (!old && state) s.count++; else if (old && !state) s.count--;
+        const col = i & 255;
+        if (state && (flags[state] & MASK) && y > c.height[col]) c.height[col] = y;
+        else if (y === c.height[col] && !(state && (flags[state] & MASK))) { let yy = y - 1; while (yy > 0 && !(c.blocks[(yy << 8) | col] && (flags[c.blocks[(yy << 8) | col]] & MASK))) yy--; c.height[col] = yy; }
+        if (y + 1 >= c.sh[col * 2 + 1]) { this.shadowCol(c, col); this.shDirty.add(c.key); }
+        if (!state && filter[old] > 0) c.light[i] = y > c.height[col] ? (c.light[i] & 0x0fff) | 0xf000 : (y + 1 < c.H ? c.light[i + 256] : 0xf000);
+        this.markDirtyAround(x, y, z);
+        if (touched) touched.set(c.key, c);
+      }
+      return n;
     }
     relightColumns(cols) {
       for (const c of cols) {

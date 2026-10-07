@@ -143,20 +143,25 @@
       if (!at) return;
       if (!p.creative) { this.hint(T('g.bp.mode'), 2600); return; }
       if (!at.ok) { this.hint(at.why, 2200); return; }
-      const t0 = performance.now(), n = this.buildAt(at);
+      const P = this.plan(), name = P.CATALOGUE[i].name;
+      const t0 = performance.now(), n = this.buildAt(at, name + (at.bp.custom ? ' ★' : ''));
       if (!n) { this.hint(T('g.bp.standing'), 1600); return; }
       g.audio.place(R.byName.stone.defaultState);
       g.particles && g.particles.spark && g.particles.spark(at.ox + 0.5, at.F + 1, at.oz + 0.5, [0.5, 0.9, 1], 30, 4);
-      const P = this.plan(), name = P.CATALOGUE[i].name;
-      this.hint(T('g.bp.built', { name: name + (at.bp.custom ? ' ★' : ''), n: n.toLocaleString() }), 3200);
+      // (a construction site says so itself; at once: how many blocks)
+      if (!this.siteStarted) this.hint(T('g.bp.built', { name: name + (at.bp.custom ? ' ★' : ''), n: n.toLocaleString() }), 3200);
       g.codex && g.codex.event && g.codex.event('blueprint');
       this.lastMs = performance.now() - t0;
     }
     // level the ground under a lot and lay the house down (at: a placement from locate() or a Studio plan);
     // returns how many blocks changed (all of it one undo step)
-    buildAt(at) {
+    buildAt(at, name) {
+      this.siteStarted = null;
+      if (this.slices && this.finishSites) this.finishSites('next');   // (a site still building is finished first: this one reads the ground it leaves)
       const { list, undo } = this.planAt(at);
       if (!list.length) return 0;
+      // 🏗 Baustelle (baustelle.js): built in front of the player — or at once, as below
+      if (name !== undefined && this.siteFor && this.siteFor({ kind: 'blueprint', name, list, undo, F: at.F })) return list.length;
       this.gad.applyEdit(list, undo);
       return list.length;
     }
@@ -311,6 +316,7 @@
     // the lot of a plan before its piece exists (a Forge plan knows it from its DNA): [W, D] or null
     planLot(pl) { if (pl.kind === 'forge') { const m = VR.Forge && VR.Forge.meta(pl.dna); return m ? m.lot : null; } return null; }
     tickPlans(dt) {
+      if (this.siteTick) this.siteTick(dt);   // 🏗 the construction sites' show (baustelle.js)
       if (this.slices) { this.tickSlices(dt); return; }
       this.planT = (this.planT || 0) - dt; if (this.planT > 0) return;
       this.planT = 0.5;
@@ -330,6 +336,8 @@
         if (pl.F < 1 || pl.F + bp.top + 8 >= VR.MAXY) { pl.failed = true; continue; }   // (a flat world's floor at y 4 is fine)
         const { list, undo } = direct ? this.opsAt(bp, r, pl.ox, pl.oz, pl.F) : this.planAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true });
         const P = this.plan(), name = pl.kind === 'model' ? ((VR.VM.MODELS[pl.name] || {}).display || pl.name) : pl.kind === 'forge' ? (bp.name || 'Forge') : (P && P.CATALOGUE[pl.index] ? P.CATALOGUE[pl.index].name : 'House');
+        // 🏗 Baustelle (baustelle.js): built in front of the player — or Sofort, as below, and the session hears of it
+        if (list.length && this.siteFor && this.siteFor({ kind: 'plan', pl, name, list, undo, F: pl.F })) return;
         // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back
         if (list.length > SLICE_MAX) { list.sort((a, b) => a[1] - b[1]); this.slices = { pl, name, list, undo, at: 0, t: 0, w }; pl.status = 'building'; return; }
         if (list.length) this.gad.applyEdit(list, undo);
@@ -340,6 +348,7 @@
     // the slices of a big piece: one chunk per tick, the undo of all of them as one step at the end
     tickSlices(dt) {
       const S = this.slices, g = this.g, w = g.world;
+      if (VR.Baustelle && S instanceof VR.Baustelle.Site) { S.write(dt); return; }   // (a Baustelle or Sofort job of baustelle.js)
       if (S.w !== w) { this.slices = null; return; }     // another world now: that one rebuilds the plan when it is back
       if (!w || g.state !== 'play') return;
       S.t -= dt; if (S.t > 0) return;
@@ -370,6 +379,7 @@
     tickEdits(dt) {
       this.editT = (this.editT || 0) - dt; if (this.editT > 0) return;
       this.editT = 0.25;
+      if (this.editsSite && this.editsSite()) return;   // 🏗 the Werkbank's changes as a construction site (baustelle.js)
       const E = VR.Edits, id = this.editWorld(), g = this.g, w = g.world;
       if (!E || !id || !w || g.state !== 'play') return;
       const ids = E.list(id); if (!ids.length) return;
@@ -423,6 +433,8 @@
       const T = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : en);
       const text = a.join(' ').trim();
       if (!Fg) { say('No Forge in this build.', '#ff8a8a'); return true; }
+      // „/bau fertig": the construction site that is building now is done at once (⏩)
+      if (/^(fertig|sofort|skip|done|finish|⏩)$/i.test(text) && this.siteSkip) { if (!this.siteSkip()) say(T('g.bau.none', null, 'Gerade wird nichts gebaut.', 'Nothing is being built right now.')); return true; }
       if (!this.plans) this.loadPlans();
       if (!text) { say(T('g.forge.help', null, '🏭 /bau <Wunsch> — „/bau Hochhaus 30 Stockwerke Glas“, „/bau Hängebrücke 60 lang“, „/bau Burg mit Bergfried“ · danach „/bau höher“, „/bau mehr Glas“, „/bau aus Stein“', '🏭 /bau <wish> — “/bau skyscraper 30 floors glass”, “/bau suspension bridge 60 long”, “/bau castle with keep” · then “/bau taller”, “/bau more glass”, “/bau stone”')); return true; }
       if (!p.creative) { say(T('g.forge.creative', null, 'Die Forge baut in Kreativ und Zen.', 'The Forge builds in Creative and Zen Builder.'), '#ff8a8a'); return true; }
@@ -435,9 +447,14 @@
         if (again.dna === dna) { say(T('g.forge.same', null, 'Das ändert nichts — sag „höher“, „breiter“, „mehr Glas“, „aus Stein“ … oder etwas Neues: „/bau Brücke 40 lang“.', 'That changes nothing — say “taller”, “wider”, “more glass”, “stone” … or something new: “/bau bridge 40 long”.')); return true; }
         // the last one goes (one Z, while nothing changed since), the changed one takes its place
         const u = this.gad.wand.undo;
-        if (again.status === 'built' && !(this.lastForge.undo && u[u.length - 1] === this.lastForge.undo)) { say(T('g.forge.moved', null, 'Seit der letzten Forge hat sich etwas geändert — sag ein neues Ganzes: „/bau Hochhaus …“', 'Something changed since the last Forge build — say a whole new wish: “/bau skyscraper …”'), '#ff8a8a'); return true; }
-        if (this.slices && this.slices.pl.id === again.id) { say(T('g.forge.busy', null, 'Noch im Bau — gleich.', 'Still building — a moment.')); return true; }
-        if (again.status === 'built') this.gad.undo();
+        let stopped = false;
+        if (this.slices && this.slices.pl && this.slices.pl.id === again.id) {
+          // still building: its step is the newest (the site's undo is there from the first cell on) — Z stops it
+          if (!this.slices.undo || u[u.length - 1] !== this.slices.undo || !this.slices.undo.onUndo) { say(T('g.forge.busy', null, 'Noch im Bau — gleich.', 'Still building — a moment.')); return true; }
+          this.gad.undo(); stopped = true;
+        }
+        if (!stopped && again.status === 'built' && !(this.lastForge.undo && u[u.length - 1] === this.lastForge.undo)) { say(T('g.forge.moved', null, 'Seit der letzten Forge hat sich etwas geändert — sag ein neues Ganzes: „/bau Hochhaus …“', 'Something changed since the last Forge build — say a whole new wish: “/bau skyscraper …”'), '#ff8a8a'); return true; }
+        if (!stopped && again.status === 'built') this.gad.undo();
         // the same front centre (a wider one grows to both sides, a longer bridge further out)
         const r = again.r & 3, a0 = ROT[r](Fg.meta(again.dna).lot[0] >> 1, 0), a1 = ROT[r](Fg.meta(dna).lot[0] >> 1, 0);
         pl = Object.assign({}, again, { id: 'f' + Date.now().toString(36), dna, ox: again.ox + a0[0] - a1[0], oz: again.oz + a0[1] - a1[1], status: 'pending', t: Date.now() });
