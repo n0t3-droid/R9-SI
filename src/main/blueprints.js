@@ -164,7 +164,7 @@
     groundAt(x, z, yHi, yLo) { tables(); const w = this.g.world, T = R.T; for (let y = yHi; y >= yLo; y--) { const s = w.getBlock(x, y, z); if (s && GROUND[T.type[s]]) return y; } return yLo - 1; }
     // the changes a placement makes (and how to undo them), without applying them: { list, undo }
     planAt(at) {
-      const g = this.g, w = g.world, T = R.T;
+      const g = this.g, w = at.world || g.world, T = R.T;
       tables();
       const bp = at.bp, r = at.r, F0 = at.F;
       // a box over the lot + verge (+ whatever the house puts outside its lot) and DEPTH below … CLEAR above the floor
@@ -240,8 +240,8 @@
       return { list, undo };
     }
     // the changes of a piece laid down as it is (no levelling): models, bridges, walls, shuttles
-    opsAt(bp, r, ox, oz, F) {
-      const w = this.g.world, list = [], undo = [];
+    opsAt(bp, r, ox, oz, F, wo) {
+      const w = wo || this.g.world, list = [], undo = [];
       for (let k = 0; k < bp.ops.length; k += 4) {
         const q = ROT[r](bp.ops[k], bp.ops[k + 2]), x = ox + q[0], y = F + bp.ops[k + 1], z = oz + q[1], s = bp.ops[k + 3] ? VR.Custom.rotState(bp.ops[k + 3], r) : 0;
         if (y < 0 || y >= VR.MAXY) continue;
@@ -365,6 +365,9 @@
       // a Forge piece is built from the ground under it: the ground has to be there before the worker is asked
       const pre = this.planLot(pl); if (pre && !colsReady(pre[0], pre[1], MARGIN)) return 'wait';
       if (pl.settle && !pl.settled && pre) this.settlePlan(pl, pre, this.levelOf(pl));
+      // ✏️ → 🔁 An seiner Stelle: the old one's blocks go in the same step (its piece has to be there too)
+      let gone = null;
+      if (pl.replaces) { const old = (this.plans || []).find(q => q.id === pl.replaces && q.status === 'built'); if (old) { const bp0 = this.planPiece(old); if (bp0) gone = { old, bp: bp0 }; else if (!old.failed) return 'wait'; } }
       const bp = this.planPiece(pl);
       if (!bp) { if (pl.kind === 'model' && !(VR.VM && VR.VM.MODELS[pl.name])) pl.failed = true; return pl.failed ? 'failed' : 'wait'; }
       const W = bp.lot[0], D = bp.lot[1], direct = bp.model || (pl.kind === 'forge' && !bp.level);
@@ -372,7 +375,9 @@
       if (!colsReady(W, D, M)) return 'wait';
       if (pl.settle && !pl.settled) this.settlePlan(pl, bp.lot, !direct);
       if (pl.F < 1 || pl.F + bp.top + 8 >= VR.MAXY) { pl.failed = true; return 'failed'; }   // (a flat world's floor at y 4 is fine)
-      let { list, undo } = direct ? this.opsAt(bp, r, pl.ox, pl.oz, pl.F) : this.planAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true });
+      const wo = gone ? this.without(gone) : null;
+      let { list, undo } = direct ? this.opsAt(bp, r, pl.ox, pl.oz, pl.F, wo) : this.planAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true, world: wo });
+      if (wo) ({ list, undo } = wo.merge(list, undo));
       const name = this.planName(pl, bp);
       // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back
       // (the cells and their undo sorted together: a build stopped half way is put back exactly)
@@ -415,6 +420,34 @@
       if (F >= 1) { pl.F = F; pl.settled = true; this.storePlans((ps) => ps.map(q => (q.id === pl.id ? Object.assign({}, q, { F, settled: true }) : q))); }
       return F;
     }
+    // the world as it would be without a built plan's own blocks (those that still stand as it set them — what the player
+    // changed since stays): a stand-in for planAt / opsAt; merge() folds the removal into their changes, one undo step
+    without(gone) {
+      const w = this.g.world, old = gone.old, bp = gone.bp, r0 = (old.r | 0) & 3, rm = new Map(), key = (x, y, z) => x + ',' + y + ',' + z;
+      for (let k = 0; k < bp.ops.length; k += 4) {
+        const s = bp.ops[k + 3]; if (!s) continue;
+        const q = ROT[r0](bp.ops[k], bp.ops[k + 2]), x = old.ox + q[0], y = old.F + bp.ops[k + 1], z = old.oz + q[1];
+        if (y < 0 || y >= VR.MAXY) continue;
+        const was = w.getBlock(x, y, z); if (was && was === VR.Custom.rotState(s, r0)) rm.set(key(x, y, z), [x, y, z, was]);
+      }
+      return {
+        n: rm.size,
+        getBlock: (x, y, z) => (rm.has(key(x, y, z)) ? 0 : w.getBlock(x, y, z)),
+        merge(list, undo) {
+          const out = new Map();
+          for (const [k, c] of rm) out.set(k, [c[0], c[1], c[2], 0, c[3]]);
+          for (let i = 0; i < list.length; i++) { const c = list[i], k = key(c[0], c[1], c[2]), e = out.get(k); if (e) e[3] = c[3]; else out.set(k, [c[0], c[1], c[2], c[3], undo[i][3]]); }
+          const L = [], U = [];
+          for (const e of out.values()) if (e[3] !== e[4]) { L.push([e[0], e[1], e[2], e[3]]); U.push([e[0], e[1], e[2], e[4]]); }
+          return { list: L, undo: U };
+        },
+      };
+    }
+    // a plan's status, here and in the browser's storage (🔁: the replaced one is 'replaced'; Z makes it 'built' again)
+    setStatus(id, status) {
+      if (this.plans) for (const q of this.plans) if (q.id === id) q.status = status;
+      return this.storePlans((ps) => ps.map(q => (q.id === id ? Object.assign({}, q, { status }) : q)));
+    }
     // stop a sliced build that is still going (Z right after the click): what was built of it goes back, nothing is kept
     cancelSlices(id) {
       const S = this.slices; if (!S || (id && S.pl.id !== id)) return false;
@@ -451,6 +484,7 @@
       // (the plans may have been read again meanwhile — the Studio handed over more: that copy is built too)
       if (this.plans) for (const q of this.plans) if (q.id === pl.id) q.status = 'built';
       this.markPlan(pl.id, 'built');
+      if (pl.replaces) this.setStatus(pl.replaces, 'replaced');
       if (g.player && g.player.unstick) g.player.unstick();
       // (what the 🖐 Bauhand set says so itself; the plans from the Studio and the wizard get the toast)
       if (this.onBuilt) { try { this.onBuilt(pl, name, n, undo); } catch (e) { console.warn('onBuilt', e); } }
