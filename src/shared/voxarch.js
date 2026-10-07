@@ -719,7 +719,7 @@
     if (clsOf) return;
     R = VR.R; T = R.T; SH = VR.SHAPE; F = VR.F;
     const n = T.type.length;
-    clsOf = new Uint8Array(n); fullMask = new Uint8Array(n); specOf = new Array(n).fill(null); borderOf = new Uint8Array(n); shutterOf = new Uint8Array(n);
+    clsOf = new Uint8Array(n); fullMask = new Uint8Array(n).fill(NOMASK); specOf = new Array(n).fill(null); borderOf = new Uint8Array(n); shutterOf = new Uint8Array(n);
     VX.WALLSPECS = [WALL_DEFAULT];
     for (let s = 1; s < n; s++) {
       const fl = T.flags[s], shp = T.shape[s];
@@ -733,27 +733,37 @@
       else if ((fl & F.OPAQUE)) clsOf[s] = SOLID;
       else { const t = R.types[T.type[s]]; clsOf[s] = t && t.o.kind === 'door' ? DOOR : (fl & F.SOLID) && !(fl & (F.PLANT | F.FLUID | F.REPLACE)) ? OTHER : AIR; }
     }
-    // full-face masks from a neutral paint (all neighbours solid)
-    const cc = neutralCtx();
-    for (let s = 1; s < n; s++) {
-      if (!specOf[s] || specOf[s].lazy) continue;   // lazy models (voxmodel.js) build on first use, not here: no full faces
-      fillCtxFromState(cc, s);
-      paintState(s, cc);
-      let m = 0;
-      const NN = specOf[s].res || 8, GR = VX.gridFor(NN), IX = NN === 32 ? I32 : NN === 16 ? I16 : I;
+  }
+  VX.init = init;
+  // the full-face mask of a VX state — which of its six faces a neutral paint (all neighbours solid) fills completely,
+  // so the neighbour's face against it is culled. Found on first use, one state at a time: painting every one of the
+  // 5000+ VX states at init took 0.7 s on a fast machine (2 s on a small one) — on the main thread the first time
+  // the player looked at or bumped into a VX block, as one frozen frame. Lazy models (voxmodel.js) are built here
+  // the first time a neighbour asks, in the worker that meshes them.
+  const NOMASK = 255;
+  const maskCtx = neutralCtx();
+  function maskOf(s) {
+    const m = fullMask[s];
+    if (m !== NOMASK) return m;
+    const sp = specOf[s];
+    let out = 0;
+    if (sp) {
+      fillCtxFromState(maskCtx, s);
+      paintState(s, maskCtx);
+      const NN = sp.res || 8, GR = VX.gridFor(NN), IX = NN === 32 ? I32 : NN === 16 ? I16 : I;
       for (let d = 0; d < 6; d++) {
         let full = true;
         for (let a = 0; a < NN && full; a++) for (let b = 0; b < NN; b++) {
-          const p = d === 0 ? [NN - 1, a, b] : d === 1 ? [0, a, b] : d === 2 ? [a, NN - 1, b] : d === 3 ? [a, 0, b] : d === 4 ? [a, b, NN - 1] : [a, b, 0];
-          const v = GR[IX(p[0], p[1], p[2])];
+          const x = d === 0 ? NN - 1 : d === 1 ? 0 : a, y = d === 2 ? NN - 1 : d === 3 ? 0 : (d < 2 ? a : b), z = d === 4 ? NN - 1 : d === 5 ? 0 : b;
+          const v = GR[IX(x, y, z)];
           if (!(v & PRESENT) || (v & GLASS)) { full = false; break; }
         }
-        if (full) m |= 1 << d;
+        if (full) out |= 1 << d;
       }
-      fullMask[s] = m;
     }
+    fullMask[s] = out;
+    return out;
   }
-  VX.init = init;
   function neutralCtx() { return { nc: [SOLID, SOLID, SOLID, SOLID, SOLID, SOLID], ns: [0, 0, 0, 0, 0, 0], ext: 0, px: 0, py: 0, pz: 0, h: 0, x: 0, facing: 0, facing2: 0, shape: 0, part: 0, axis: 0, head: 0, icon: 0, eave: 0, sideA: 0, sideB: 0, ridgeTop: 0, borderSpec: null }; }
   function fillCtxFromState(c, s) {
     const t = R.types[T.type[s]];
@@ -775,7 +785,7 @@
     if (fn) fn(sp, c); else G.fill(0);
   }
   VX.cls = (s) => { init(); return clsOf[s]; };
-  VX.full = (s) => { init(); return fullMask[s]; };
+  VX.full = (s) => { init(); return maskOf(s); };
   VX.spec = (s) => { init(); return specOf[s]; };
 
   // ---------------------------------------------------------------- context for a block in a padded section
@@ -1032,7 +1042,7 @@
     for (let d = 0; d < 6; d++) {
       const ns = nbS[d];
       if (!ns) continue;
-      if (T.shape[ns] === SH.VOXEL) { if ((fullMask[ns] >> OPP[d]) & 1) cull |= 1 << d; }
+      if (T.shape[ns] === SH.VOXEL) { if ((maskOf(ns) >> OPP[d]) & 1) cull |= 1 << d; }
       else if (T.flags[ns] & F.OPAQUE) cull |= 1 << d;
     }
     if (sp.kind === 'roof') {
