@@ -14,7 +14,7 @@ function makeCtx() {
   const nodes = [];
   // a parameter keeps its last value and the highest value ever set on it (an envelope's peak)
   const param = (v) => {
-    const p = { value: v, peak: v };
+    const p = { value: v, peak: -Infinity };            // the default value is not an envelope's peak
     const set = (x) => { p.value = x; if (x > p.peak) p.peak = x; };
     p.setValueAtTime = set; p.linearRampToValueAtTime = set; p.exponentialRampToValueAtTime = set; p.setTargetAtTime = set;
     return p;
@@ -155,7 +155,9 @@ check(amb.L && ['wind', 'rain', 'water', 'birds', 'crickets'].every(k => amb.L[k
   amb.setOptions({ nature: false, weather: true }); run(amb, 3, ctxS);
   check(['wind', 'water', 'birds', 'crickets'].every(k => gainOf(amb, k) < 0.001) && gainOf(amb, 'rain') > 0.3, 'Natur-Klänge aus: nature is silent, the rain still falls');
   amb.setOptions({ nature: true, weather: false }); run(amb, 3, ctxS);
-  check(gainOf(amb, 'rain') < 0.001 && gainOf(amb, 'crickets') > 0.05, 'Wetter aus: the rain is silent, the crickets sing');
+  check(gainOf(amb, 'rain') < 0.001, 'Wetter aus: the rain is silent');
+  run(amb, 3, { ...ctxS, E: env({ night: 1 }) });
+  check(gainOf(amb, 'crickets') > 0.05, 'Wetter aus: the crickets still sing on a dry night');
   const before2 = ctx.nodes.length; amb.thunder(2); check(ctx.nodes.length === before2, 'Wetter aus: no thunder');
   amb.setOptions({ nature: false, weather: false }); run(amb, 3, ctxS);
   check(['wind', 'rain', 'water', 'birds', 'crickets'].every(k => gainOf(amb, k) < 0.001), 'both off: silence');
@@ -175,7 +177,7 @@ check(amb.L && ['wind', 'rain', 'water', 'birds', 'crickets'].every(k => amb.L[k
   const farFreq = far.find(n => n.kind === 'filter') ? far.find(n => n.kind === 'filter').frequency.value : -1;
   check(near.some(n => n.kind === 'source' && n.started) && far.some(n => n.kind === 'source' && n.started), 'each bolt starts a thunder rumble');
   check(nearGain > farGain && nearFreq > farFreq && farFreq > 0, 'a far bolt is quieter and duller (' + nearGain.toFixed(2) + '/' + farGain.toFixed(2) + ', ' + Math.round(nearFreq) + '/' + Math.round(farFreq) + ' Hz)');
-  check(ctx.nodes.length - beforeN <= 12, 'a thunder uses few nodes (' + (ctx.nodes.length - beforeN) + ')');
+  check(near.length <= 3 && far.length <= 3 && near.length >= 3, 'each thunder adds three short-lived nodes (' + near.length + ' and ' + far.length + ')');
 }
 // ---- no growth: the graph stays the same size however long it plays
 {
