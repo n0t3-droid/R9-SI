@@ -118,8 +118,10 @@ async function sheet(tag, items) {
     const img = render(g, SIZE - 8, it.ground);
     const cx = (k % cols) * SIZE, cy = Math.floor(k / cols) * (SIZE + LABEL);
     comps.push({ input: img, raw: { width: SIZE - 8, height: SIZE - 8, channels: 4 }, left: cx + 4, top: cy + 4 });
-    svg += `<text x="${cx + SIZE / 2}" y="${cy + SIZE + 12}" font-family="DejaVu Sans, sans-serif" font-size="12" text-anchor="middle" fill="#222">${esc(Forge.describe(it.dna))}</text>`;
-    svg += `<text x="${cx + SIZE / 2}" y="${cy + SIZE + 26}" font-family="DejaVu Sans Mono, monospace" font-size="9.5" text-anchor="middle" fill="#777">${esc(it.dna)} · ${g.sx}×${g.sy}×${g.sz} · ${g.meta.n.toLocaleString()} · ${g.meta.ms.toFixed(0)} ms build · ${Date.now() - t0} ms</text>`;
+    // labels that fit their cell: the description shortened to ~SIZE/6.6 characters, the DNA line in a smaller font
+    const fit = (t, n) => (t.length > n ? t.slice(0, n - 1) + '…' : t), fs = Math.max(9, Math.min(12, SIZE / 30));
+    svg += `<text x="${cx + SIZE / 2}" y="${cy + SIZE + 12}" font-family="DejaVu Sans, sans-serif" font-size="${fs}" text-anchor="middle" fill="#222">${esc(fit(Forge.describe(it.dna), Math.round(SIZE / (fs * 0.56))))}</text>`;
+    svg += `<text x="${cx + SIZE / 2}" y="${cy + SIZE + 26}" font-family="DejaVu Sans Mono, monospace" font-size="${fs * 0.75}" text-anchor="middle" fill="#777">${esc(fit(it.dna + ' · ' + g.sx + '×' + g.sy + '×' + g.sz + ' · ' + g.meta.n.toLocaleString() + ' · ' + g.meta.ms.toFixed(0) + ' ms', Math.round(SIZE / (fs * 0.46))))}</text>`;
     console.log('  ' + it.dna + ' · ' + g.sx + '×' + g.sy + '×' + g.sz + ' · ' + g.meta.n + ' cells · build ' + g.meta.ms.toFixed(0) + ' ms');
   });
   svg += '</svg>';
@@ -129,17 +131,18 @@ async function sheet(tag, items) {
   console.log('sheet', file, items.length, 'structures');
 }
 // what each sheet shows: every style, plus the parameters that change the shape
-const hill = (u, v) => -3 - Math.round(6 * Math.sin(v / 7));
+const hill = (u, v) => Math.round(6 * Math.sin(v / 9)) - 1;                         // up over the floor and down again
 const valley = (u, v) => -Math.round(10 * Math.sin(Math.PI * v / 59)) - 2;
+const bank = (u, v) => (v > 44 ? 3 : -Math.round(9 * Math.sin(Math.PI * v / 44)) - 2);  // a valley, then a higher bank
 const SHEETS = {
   tower: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('tower', { f: [16, 24, 10, 32, 20][i % 5], w: [20, 18, 24, 22, 20][i % 5], d: [18, 18, 20, 22, 20][i % 5], c: i % 4, u: i & 1, s: i % 3 }, 3 + i, s.id) })).concat([{ dna: 'tower:f48,w26,d24,glas,c3#9' }, { dna: 'tower:f6,w16,d16,backstein,p0,s0,c1,u1#4' }, { dna: 'tower:f40,w30,d30,tech,s2,c2#5' }]),
   house: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('house', { f: 1 + (i % 3), r: i & 1, g: i % 3, t: 1, c: (i + 1) & 1, b: 1, p: i & 1 }, 11 + i, s.id) })).concat([{ dna: 'house:f2,w17,d12,weiss,g2,t1,c1,b1,p1#21' }, { dna: 'house:f3,w13,d10,anthrazit,r1,g2,t1#22' }, { dna: 'house:f1,w15,d11,holz,r1,g1,t1,c1#23' }]),
-  bridge: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('bridge', { l: 60, w: 5 + (i & 1) * 2, k: i % 3, r: i & 1, m: 1 }, 5 + i, s.id), env: { ground: valley }, ground: valley })).concat([{ dna: 'bridge:l80,w7,k2,r1,m1,stahl#8', env: { ground: valley }, ground: valley }, { dna: 'bridge:l40,w4,k1,stein#9', env: { ground: hill }, ground: hill }, { dna: 'bridge:l30,w3,k0,holz#2', env: { ground: hill }, ground: hill }]),
-  wall: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('wall', { l: 40, h: 2 + (i % 3), k: i % 3, g: 1 }, 2 + i, s.id), env: { ground: hill }, ground: hill })),
+  bridge: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('bridge', { l: 60, w: 5 + (i & 1) * 2, k: i % 3, r: i & 1, m: 1 }, 5 + i, s.id), env: { ground: valley }, ground: valley })).concat([{ dna: 'bridge:l80,w7,k2,r1,m1,stahl#8', env: { ground: valley }, ground: valley }, { dna: 'bridge:l60,w5,k1,stein#9', env: { ground: bank }, ground: bank }, { dna: 'bridge:l30,w3,k0,holz#2', env: { ground: valley }, ground: valley }]),
+  wall: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('wall', { l: 48, h: 2 + (i % 3), k: i % 3, g: 1 }, 2 + i, s.id), env: { ground: hill }, ground: hill })).concat([{ dna: 'wall:l48,h3,k0,stein#7', env: { ground: hill }, ground: hill }]),
   lookout: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('lookout', { h: 16 + i * 6, k: i & 1, p: 5 + (i & 1) * 2, r: i & 1 }, 4 + i, s.id) })),
   hall: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('hall', { l: 32 + i * 4, w: 16 + i * 2, h: 8 + i, c: 1, m: i & 1 }, 6 + i, s.id) })),
   castle: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('castle', { w: 36 + i * 4, d: 32 + i * 2, h: 7 + i, t: i & 1, k: 1 }, 8 + i, s.id) })),
-  shuttle: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('shuttle', { a: i % 6, p: i & 1 }, 21 + i, s.id) })),
+  shuttle: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('shuttle', { a: [0, 1, 2, 3, 5][i], p: 1, h: i === 3 ? 1 : 0, s: i & 1 ? 0 : 1, g: 1 }, 21 + i, s.id) })).concat([{ dna: 'shuttle:sf,a6,h1#16' }, { dna: 'shuttle:as,a5,p0,s1#15' }, { dna: 'shuttle:nw,a4#15' }]),
   park: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('park', { w: 32, d: 28, t: 1 + (i % 3), p: i & 1, f: (i + 1) & 1 }, 13 + i, s.id) })),
   stadium: (t) => t.styles.map((s, i) => ({ dna: Forge.dna('stadium', {}, 1 + i, s.id) })),
 };

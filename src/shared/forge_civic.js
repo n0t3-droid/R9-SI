@@ -96,7 +96,8 @@
     ],
     styles: Object.keys(HS).map(id => ({ id, name: HS[id].name })),
     lot: (P) => [P.params.w, P.params.l + 2],
-    describe: (P) => [P.params.m ? 'Markthalle' : 'Werkhalle', P.params.l + ' × ' + P.params.w].concat(P.params.c ? ['Säulen'] : []),
+    title: (P) => (P.params.m ? 'Markthalle' : 'Werkhalle'),
+    describe: (P) => [P.params.l + ' × ' + P.params.w, 'Traufe ' + P.params.h].concat(P.params.c ? ['Säulen'] : []),
   }, function (P, env) {
     const { l, w, h, c, m } = P.params, S = HS[P.style] || HS.holz, rng = Forge.rng(P, 'hall');
     const dy = -1, W = w, D = l + 2, ridge = h + Math.floor(((w - 1) >> 1) / 2) + 1, K = Forge.kit(W, ridge + 4, D, dy);
@@ -283,7 +284,8 @@
     ],
     styles: Object.keys(SS).map(id => ({ id, name: SS[id].name })),
     lot: (P) => [P.params.w, P.params.l],
-    describe: (P) => [P.params.l + ' × ' + P.params.w, P.params.t + ' Ränge', P.params.k ? 'Laufbahn' : 'Fußball'].concat(P.params.r ? ['Dach'] : []),
+    title: (P) => (P.params.k ? 'Leichtathletikstadion' : 'Fußballstadion'),
+    describe: (P) => [P.params.l + ' × ' + P.params.w, P.params.t + ' Ränge'].concat(P.params.r ? ['Dach'] : []),
   }, function (P, env) {
     const { l, w, t, r, k } = P.params, S = SS[P.style] || SS.beton, rng = Forge.rng(P, 'stadium');
     const dy = -1, depth = 2 * t + 4, H = t + (r ? 8 : 3) + 2, K = Forge.kit(w, H + 16, l, dy);

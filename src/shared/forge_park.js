@@ -99,7 +99,8 @@
     ],
     styles: PAL.map(([id, , name]) => ({ id, name, words: [name.toLowerCase(), id] })),
     lot: (P) => { if (!VR.ShipGen) return [21 + 6 + (P.params.s ? STATION : 0), 34]; return layout(P).lot; },
-    describe: (P) => [ANAMES[P.params.a]].concat(P.params.p ? ['Landeplatz'] : [], P.params.h ? ['Hangar'] : [], P.params.s ? ['Bodenstation'] : [], P.params.g && (!VR.ShipGen || layout(P).hatch) ? ['Gangway'] : []),
+    title: (P) => ANAMES[P.params.a],
+    describe: (P) => [].concat(P.params.p ? ['Landeplatz'] : [], P.params.h ? ['Hangar'] : [], P.params.s ? ['Bodenstation'] : [], P.params.g && (!VR.ShipGen || layout(P).hatch) ? ['Gangway'] : []),
   }, function (P, env) {
     const L = layout(P), bp = L.bp, { W, D, ox, oz, pad } = L, { h, s, g, m } = P.params;
     const top = bp.sy + 1 + (h ? 4 : 0), dy = -1, K = Forge.kit(W, top + 4, D, dy);

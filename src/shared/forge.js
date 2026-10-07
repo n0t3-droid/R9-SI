@@ -22,7 +22,8 @@
 
   // ---------------------------------------------------------------- the registry
   // def: {id, icon, name, en, params:[{k, label, min, max, def, step?, dim?, words?:{value: [stems]}}], styles:[{id, name, words:[stems]}],
-  //       level (the game levels the lot), terrain (the build wants a ground profile), sh (storey height), lot(P) → [W, D], describe(P) → [parts]}
+  //       level (the game levels the lot), terrain (the build wants a ground profile), sh (storey height), lot(P) → [W, D],
+  //       title(P) → what this one is called (Hängebrücke, Werkhalle …; else name), describe(P) → [parts]}
   Forge.register = function (def, build) {
     if (Forge.TYPES[def.id]) { Forge.types.splice(Forge.types.indexOf(Forge.TYPES[def.id]), 1); }
     const t = Object.assign({ level: true, terrain: false, params: [], styles: [] }, def);
@@ -320,7 +321,7 @@
     const P = Forge.parse(dna); if (!P) return '';
     const t = Forge.TYPES[P.type], st = t.style(P.style);
     const parts = (t.describe ? t.describe(P, st) : []).filter(Boolean);
-    const head = (short ? t.icon + ' ' : '') + t.name;
+    const head = (short ? t.icon + ' ' : '') + (t.title ? t.title(P) : t.name);   // what it is, by its parameters
     return short ? head + (parts[0] ? ' · ' + parts[0] : '') : [head].concat(parts, st ? [st.name] : []).join(' · ');
   };
 })(VR);

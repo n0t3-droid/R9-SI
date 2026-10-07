@@ -36,6 +36,7 @@
     ],
     styles: Object.keys(STYLES).map(id => ({ id, name: STYLES[id].name })),
     lot: (P) => [P.params.w, P.params.d],
+    title: (P) => (P.params.u ? 'Wohnturm' : 'Hochhaus'),
     describe: (P) => [P.params.f + ' Stockwerke', P.params.w + ' × ' + P.params.d, P.params.u ? 'Wohnungen' : 'Büros', ['Flachdach', 'Dachgarten', 'Helipad', 'Spitze'][P.params.c]],
   };
 

@@ -31,7 +31,8 @@
     ],
     styles: Object.keys(B).map(id => ({ id, name: B[id].name })),
     lot: (P) => [P.params.w, P.params.l],
-    describe: (P) => [P.params.l + ' lang', ['Balkenbrücke', 'Bogenbrücke', 'Hängebrücke'][P.params.k], P.params.r ? 'Straße' : 'Fußweg'].concat(P.params.m ? ['Laternen'] : []),
+    title: (P) => ['Balkenbrücke', 'Bogenbrücke', 'Hängebrücke'][P.params.k],
+    describe: (P) => [P.params.l + ' lang', P.params.w + ' breit', P.params.r ? 'Straße' : 'Fußweg'].concat(P.params.m ? ['Laternen'] : []),
   }, function (P, env) {
     const { l, w, k, r, m } = P.params, S = B[P.style] || B.stahl;
     const G = (u, v) => Math.max(-env.depth, Math.min(-1, Math.round(env.ground(u, v))));
@@ -125,7 +126,7 @@
     sandstein: { name: 'Sandstein', body: 'sandstone', top: 'sandstone_wall', pillar: 'smooth_sandstone', cap: 'smooth_sandstone_slab', fence: 'iron_bars', post: 'smooth_sandstone', lamp: 'vx_lamppost' },
   };
   Forge.register({
-    id: 'wall', icon: '🧱', name: 'Mauer', en: 'Wall', level: false, terrain: true, sh: 1,
+    id: 'wall', icon: '🧱', name: 'Mauer/Zaun', en: 'Wall/fence', level: false, terrain: true, sh: 1,
     params: [
       { k: 'l', label: 'Länge', min: 4, max: 120, def: 24, dim: true },
       { k: 'h', label: 'Höhe', min: 1, max: 6, def: 3, dim: true },
@@ -134,7 +135,8 @@
     ],
     styles: Object.keys(WS).map(id => ({ id, name: WS[id].name })),
     lot: (P) => [3, P.params.l],
-    describe: (P) => [['', 'Zaun', 'Hecke'][P.params.k], P.params.l + ' lang', P.params.h + ' hoch'].concat(P.params.g ? ['mit Tor'] : []),
+    title: (P) => ['Mauer', 'Zaun', 'Hecke'][P.params.k],
+    describe: (P) => [P.params.l + ' lang', P.params.h + ' hoch'].concat(P.params.g ? ['mit Tor'] : []),
   }, function (P, env) {
     const { l, h, k, g } = P.params, S = WS[P.style] || WS.stein;
     // the ground under every segment, down into a valley or up a hill (the placer samples 40 over and 48 under the floor)
