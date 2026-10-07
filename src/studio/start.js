@@ -51,8 +51,9 @@
   function legal() {
     const ok = !!(VR.Legal && typeof VR.Legal.open === 'function');
     let b = $('#legalBtn');
-    if (!b) { const head = $('#studio header'); if (!head) return; b = document.createElement('button'); b.type = 'button'; b.id = 'legalBtn'; b.className = 'cbtn'; b.textContent = '📜'; b.onclick = () => { if (VR.Legal && VR.Legal.open) VR.Legal.open(); }; const sys = head.querySelector('.sys'); head.insertBefore(b, sys || null); }
-    b.hidden = !ok; b.title = tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); b.setAttribute('aria-label', b.title);
+    if (!b) { const head = $('#studio header'); if (!head) return; b = document.createElement('button'); b.type = 'button'; b.id = 'legalBtn'; b.className = 'cbtn'; b.dataset.legal = 'short'; b.textContent = '📜'; b.onclick = () => { if (VR.Legal && VR.Legal.open) VR.Legal.open('impressum'); }; const sys = head.querySelector('.sys'); head.insertBefore(b, sys || null); }   // (data-legal: VR.Legal adds no second one)
+    const LG = VR.Legal;
+    b.hidden = !ok; b.title = LG && typeof LG.tip === 'function' ? LG.tip() : tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); b.setAttribute('aria-label', LG && typeof LG.label === 'function' ? LG.label() : b.title);
   }
   SS.legal = legal;
   // which tile is lit: 🏗 on the Karte, 🎒 while Meins is open, ✨ while the dialog is open

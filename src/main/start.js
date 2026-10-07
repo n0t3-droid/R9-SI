@@ -61,7 +61,7 @@
     // (the strip comes after the tiles in the page: the first Tab lands on ▶; it still shows top right — on a phone on top)
     box.appendChild(strip);
     const f2 = el('div', 'foot'); if (gpu) f2.appendChild(gpu); else f2.appendChild(el('span', '', '')).id = 'gpuinfo';
-    const lg = el('button', 'lnk legal'); lg.type = 'button'; lg.dataset.act = 'legal'; lg.hidden = true; f2.appendChild(lg);
+    const lg = el('button', 'lnk legal'); lg.type = 'button'; lg.dataset.act = 'legal'; lg.dataset.legal = 'start'; lg.hidden = true; f2.appendChild(lg);   // (data-legal: VR.Legal adds no second one)
     f2.appendChild(el('span', 'credit', '')); box.appendChild(f2);
     title.appendChild(box);
     if (VR.Hints) VR.Hints.host = ui.root;
@@ -91,7 +91,8 @@
     $('#title [data-act="newworld"]').textContent = tx('start.newWorld', null, '＋ Neue Welt', '＋ New world');
     $('#title [data-act="settings"]').textContent = tx('start.settings', null, '⚙ Einstellungen', '⚙ Settings');
     const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.setAttribute('aria-label', aa.title); aa.setAttribute('aria-pressed', String(p.scale >= 1.3)); aa.classList.toggle('on', p.scale >= 1.3);
-    for (const b of document.querySelectorAll('#ui [data-act="legal"]')) { b.hidden = !legalOK(); b.textContent = tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); }
+    // (VR.Legal's own words when it has them — the overlay and its buttons say the same)
+    for (const b of document.querySelectorAll('#ui [data-act="legal"]')) { const LG = VR.Legal; b.hidden = !legalOK(); b.textContent = LG && typeof LG.label === 'function' ? LG.label() : tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); if (LG && typeof LG.tip === 'function') b.title = LG.tip(); }
     pauseTexts();
     for (const b of document.querySelectorAll('#proSwitch button, .proswitch button')) { const on = (b.dataset.pro === '1') === !!p.pro; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); b.textContent = b.dataset.pro === '1' ? tx('start.pro', null, 'Profi', 'Pro') : tx('start.einfach', null, 'Einfach', 'Simple'); b.title = b.dataset.pro === '1' ? tx('start.proT', null, 'Alles: Werkbank, Crafter, Welten-Formular, Befehle, Entwickler-Reiter', 'Everything: workbench, crafter, the world form, commands, developer tabs') : tx('start.einfachT', null, 'Nur das Nötige, groß und klar', 'Only what you need, big and clear'); }
     { const h = $('#meins .mhead h2'), bk = $('#meins [data-act="meinsback"]'); if (h) h.textContent = tl('meins'); if (bk) bk.textContent = tx('start.back', null, '← Zurück', '← Back'); }
@@ -193,7 +194,7 @@
       <button type="button" class="btn pro" data-act="photo" data-t="g.pause.photo"></button>
       <button type="button" class="btn" data-act="settings" data-t="g.pause.settings"></button>
       <button type="button" class="btn" data-act="quit" data-t="g.pause.quit"></button>
-      <div class="row prorow"><div class="proswitch" role="group"><button type="button" class="lnk" data-act="pro" data-pro="0"></button><button type="button" class="lnk" data-act="pro" data-pro="1"></button></div><button type="button" class="lnk legal" data-act="legal" hidden></button></div>
+      <div class="row prorow"><div class="proswitch" role="group"><button type="button" class="lnk" data-act="pro" data-pro="0"></button><button type="button" class="lnk" data-act="pro" data-pro="1"></button></div><button type="button" class="lnk legal" data-act="legal" data-legal="pause" hidden></button></div>
       <div class="note" style="text-align:center" id="pausenote"></div>`;
     if (VR.I18N && VR.I18N.retext) VR.I18N.retext(panel);
     texts();
@@ -235,7 +236,7 @@
       case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
-      case 'legal': if (legalOK()) VR.Legal.open(); return true;
+      case 'legal': if (legalOK()) VR.Legal.open('impressum'); return true;
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;
       case 'scale': if (VR.UIPrefs) VR.UIPrefs.set({ scale: prefs().scale >= 1.3 ? 1.15 : 1.3 }); return true;
