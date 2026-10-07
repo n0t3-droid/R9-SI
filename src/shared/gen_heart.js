@@ -165,10 +165,11 @@
     cover: new Set([st('snow_block'), st('calcite'), st('packed_ice'), st('ice'), st('gravel'), st('powder_snow'), st('stone'), st('cobblestone'), st('andesite'), st('diorite'), st('granite'), st('tuff'), st('deepslate')].filter(Boolean)), snowT: R.byName.snow ? R.byName.snow.id : -1 });
   HEART.post = function (g, cx, cz, out) {
     const S = states(), blocks = out.blocks, x0 = cx * 16, z0 = cz * 16;
+    const cls = VR.OverworldGen.climateOf(out);   // the columns' climates, as generate made them
     const T = R.T;
     for (let col = 0; col < 256; col++) {
       const x = x0 + (col & 15), z = z0 + (col >> 4);
-      const cl = g.climateAt(x, z);
+      const cl = cls ? cls[col] : g.climateAt(x, z);
       if (cl.heart < 0.5) continue;
       // the station peaks: dark blue-grey rock shot through with glowing aether veins (the trailer's cyan-veined mountains)
       if (cl.hz3 > 0.45 && g.nAether) {
@@ -239,29 +240,24 @@
   // the home city is fixed north of the temple
   const VG = VR.VillageGen;
   if (VG) {
-    const prevVSite = VG.site;
-    VG.site = function (g, i, j) {
+    // (a generator like the village's search: the cell's cache and its slices are VG.site / VG.siteAdvance's)
+    const prevSteps = VG.siteSteps;
+    VG.siteSteps = function* (g, i, j) {
       if (HEART.on(g)) {
         g._homeFound = true; // the home city is placed here, never by the random site search
-        if (!g._vilSites) g._vilSites = new Map();
-        const key = (i + 1048576) * 2097152 + (j + 1048576);
-        if (g._vilSites.has(key)) return g._vilSites.get(key);
         const { CELL } = VG.par(g);
-        let site;
         const C = HEART.CITY;
         if (Math.floor(C.x / CELL) === i && Math.floor(C.z / CELL) === j) {
           const rng = new VR.RNG(M.hash2(7, 7, g.seed + 90210));
-          site = { id: i + '_' + j, i, j, x: C.x, z: C.z, y: HEART.PLAT + 1, style: 'tech', biome: 'sky_meadow', seed: rng.int(1 << 30), name: null, home: true, rad: C.rad };
+          const site = { id: i + '_' + j, i, j, x: C.x, z: C.z, y: HEART.PLAT + 1, style: 'tech', biome: 'sky_meadow', seed: rng.int(1 << 30), name: null, home: true, rad: C.rad };
           site.name = 'Nova Haven';
           g._homeFound = true;
-        } else {
-          const x = i * CELL + CELL / 2, z = j * CELL + CELL / 2;
-          site = Math.hypot(x, z) < 720 ? null : prevVSite.call(this, g, i, j); // the Heartland has one city: Nova Haven
+          return site;
         }
-        g._vilSites.set(key, site);
-        return site;
+        const x = i * CELL + CELL / 2, z = j * CELL + CELL / 2;
+        if (Math.hypot(x, z) < 720) return null; // the Heartland has one city: Nova Haven
       }
-      return prevVSite.call(this, g, i, j);
+      return yield* prevSteps.call(this, g, i, j);
     };
   }
 })(VR);

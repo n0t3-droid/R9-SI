@@ -18,7 +18,69 @@
     }
     return pts[pts.length - 1][1];
   }
+  // the cave field n at (fx, fz) inside a cell: bilinear over the cell's four corners in grid index i00 (i00 + 1: +x, + 5: +z)
+  function cornerLerp(grid, i00, n, fx, fz) {
+    const g000 = grid[i00][n], g100 = grid[i00 + 1][n], g010 = grid[i00 + 5][n], g110 = grid[i00 + 6][n];
+    return (g000 * (1 - fx) + g100 * fx) * (1 - fz) + (g010 * (1 - fx) + g110 * fx) * fz;
+  }
   const BASE = [[-1, 22], [-0.6, 26], [-0.4, 38], [-0.24, 50], [-0.15, 58], [-0.09, 62], [-0.04, 65], [0.1, 68], [0.3, 74], [0.55, 84], [1, 96]];
+
+  // trees per 16 x 16 chunk by biome key (features)
+  const TREE_DENS = {
+        forest: 9, flower_forest: 3, birch_forest: 9, old_growth_birch_forest: 9, dark_forest: 14, pale_garden: 10, taiga: 9, old_growth_pine_taiga: 10, old_growth_spruce_taiga: 11,
+        snowy_taiga: 6, jungle: 14, sparse_jungle: 4, bamboo_jungle: 6, savanna: 1.2, savanna_plateau: 1.5, windswept_savanna: 1, plains: 0.12, sunflower_plains: 0.1, meadow: 0.12,
+        cherry_grove: 3, grove: 6, swamp: 2, mangrove_swamp: 7, snowy_plains: 0.2, wooded_badlands: 4, windswept_forest: 7, windswept_hills: 0.6, windswept_gravelly_hills: 0.5,
+        dappled_forest: 10, mushroom_fields: 0.6, snowy_slopes: 0.3, river: 0, beach: 0
+      };
+  // the plants of each biome: [block name, chance per column] in order of the rolls (vegetation)
+  const FLORA = {
+        plains: [['short_grass', 0.28], ['tall_grass', 0.04], ['dandelion', 0.01], ['poppy', 0.01], ['oxeye_daisy', 0.004], ['azure_bluet', 0.004], ['cornflower', 0.004], ['red_tulip', 0.002], ['bush', 0.004]],
+        sunflower_plains: [['short_grass', 0.25], ['sunflower', 0.05], ['tall_grass', 0.03]],
+        forest: [['short_grass', 0.12], ['leaf_litter', 0.05], ['bush', 0.02], ['dandelion', 0.006], ['poppy', 0.006], ['lily_of_the_valley', 0.003], ['brown_mushroom', 0.002], ['fern', 0.02]],
+        flower_forest: [['short_grass', 0.08], ['allium', 0.03], ['azure_bluet', 0.03], ['red_tulip', 0.02], ['orange_tulip', 0.02], ['white_tulip', 0.02], ['pink_tulip', 0.02], ['oxeye_daisy', 0.03], ['cornflower', 0.03], ['lily_of_the_valley', 0.03], ['lilac', 0.01], ['rose_bush', 0.01], ['peony', 0.01]],
+        birch_forest: [['short_grass', 0.12], ['wildflowers', 0.08], ['bush', 0.01]], old_growth_birch_forest: [['short_grass', 0.12], ['wildflowers', 0.1], ['fern', 0.03]],
+        dark_forest: [['short_grass', 0.1], ['brown_mushroom', 0.01], ['red_mushroom', 0.006], ['leaf_litter', 0.04]],
+        pale_garden: [['pale_moss_carpet', 0.25], ['moon_eye', 0.02], ['short_grass', 0.03]],
+        taiga: [['fern', 0.12], ['large_fern', 0.03], ['short_grass', 0.08], ['sweet_berry_bush', 0.006]],
+        old_growth_pine_taiga: [['fern', 0.15], ['large_fern', 0.05], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['sweet_berry_bush', 0.004]],
+        old_growth_spruce_taiga: [['fern', 0.15], ['large_fern', 0.05], ['red_mushroom', 0.004]],
+        snowy_taiga: [['fern', 0.05], ['sweet_berry_bush', 0.002]], grove: [], snowy_plains: [['short_grass', 0.02]],
+        jungle: [['short_grass', 0.2], ['fern', 0.1], ['tall_grass', 0.05], ['large_fern', 0.03], ['melon', 0.006]],
+        sparse_jungle: [['short_grass', 0.2], ['fern', 0.1], ['melon', 0.004]],
+        bamboo_jungle: [['bamboo', 0.12], ['short_grass', 0.1], ['podzol_patch', 0]],
+        savanna: [['short_grass', 0.25], ['tall_grass', 0.15]], savanna_plateau: [['short_grass', 0.25], ['tall_grass', 0.12]], windswept_savanna: [['short_grass', 0.2]],
+        desert: [['dead_bush', 0.006], ['short_dry_grass', 0.012], ['tall_dry_grass', 0.004], ['cactus', 0.006]],
+        badlands: [['dead_bush', 0.01], ['short_dry_grass', 0.01], ['cactus', 0.004]], wooded_badlands: [['short_grass', 0.08], ['dead_bush', 0.01]], eroded_badlands: [['dead_bush', 0.01]],
+        swamp: [['short_grass', 0.1], ['blue_orchid', 0.01], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['firefly_bush', 0.004], ['lily_pad', 0.05]],
+        mangrove_swamp: [['short_grass', 0.05], ['lily_pad', 0.03], ['firefly_bush', 0.003]],
+        meadow: [['short_grass', 0.3], ['tall_grass', 0.06], ['dandelion', 0.02], ['poppy', 0.02], ['allium', 0.02], ['azure_bluet', 0.02], ['oxeye_daisy', 0.02], ['cornflower', 0.02], ['wildflowers', 0.04]],
+        cherry_grove: [['pink_petals', 0.3], ['short_grass', 0.08]],
+        dappled_forest: [['leaf_litter', 0.18], ['red_shrub', 0.05], ['short_grass', 0.08], ['brown_mushroom', 0.01], ['bush', 0.01]],
+        mushroom_fields: [['red_mushroom', 0.01], ['brown_mushroom', 0.01]],
+        windswept_hills: [['short_grass', 0.1]], windswept_forest: [['short_grass', 0.1], ['fern', 0.05]],
+        river: [['sugar_cane', 0.04]], beach: [['sugar_cane', 0.02]],
+};
+  // the middle biomes by temperature (rows) and humidity (columns), and their variants (weirdness > 0.35): the tables
+  // are made on the first use (after every layer's biomes are registered), not on every call
+  let BIOME_TABLES = null;
+  function biomeTables() {
+    return BIOME_TABLES || (BIOME_TABLES = {
+      MID: [
+        [BI.snowy_plains, BI.snowy_plains, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga],
+        [BI.plains, BI.plains, BI.forest, BI.taiga, BI.old_growth_spruce_taiga],
+        [BI.flower_forest, BI.plains, BI.forest, BI.birch_forest, BI.dark_forest],
+        [BI.savanna, BI.savanna, BI.forest, BI.jungle, BI.jungle],
+        [BI.desert, BI.desert, BI.desert, BI.desert, BI.desert]],
+      VAR: [
+        [BI.ice_spikes, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga, BI.snowy_taiga],
+        [BI.dappled_forest, BI.dappled_forest, BI.forest, BI.taiga, BI.old_growth_pine_taiga],
+        [BI.sunflower_plains, BI.plains, BI.forest, BI.old_growth_birch_forest, BI.pale_garden],
+        [BI.savanna, BI.savanna, BI.plains, BI.sparse_jungle, BI.bamboo_jungle],
+        [BI.desert, BI.desert, BI.badlands, BI.wooded_badlands, BI.eroded_badlands]] });
+  }
+
+  // the climates of a chunk's columns, by the output of generate (the layers' post passes read them: no second lookup)
+  const CLIMATE_OF = new WeakMap();
 
   class OverworldGen {
     constructor(seed, opts) {
@@ -46,8 +108,10 @@
       this.stripN = new VR.Simplex(s ^ 0xe7f809);
       this.caveBN = new F(s ^ 0xf8091a, 2, 1 / 180, 0.5);
       this.aqN = new VR.Simplex(s ^ 0x091a2b);
-      this.corners = new Map();
-      this.caveGrid = new Map();
+      this.corners = new Map();      // by X, then by Z (a Smi key each: a double key is boxed at every lookup)
+      this.nCorners = 0;
+      this.caveGrid = new Map();     // by X, then by Z and Y
+      this.nCave = 0;
       // badlands terracotta bands (hoodoo layers)
       const rng = new VR.RNG(s ^ 0x5eed);
       const cols = ['orange', 'yellow', 'brown', 'red', 'white', 'light_gray'];
@@ -58,15 +122,15 @@
 
     // ---------------- climate & height at a corner (multiples of 4) ----------------
     corner(X, Z) {
-      const key = (X + 2000000) * 4000001 + (Z + 2000000);
-      let c = this.corners.get(key);
-      if (c) return c;
-      if (this.corners.size > 60000) this.corners.clear();
-      c = this.computeClimate(X, Z);
+      let row = this.corners.get(X);
+      if (row !== undefined) { const hit = row.get(Z); if (hit !== undefined) return hit; }
+      if (this.nCorners > 60000) { this.corners.clear(); this.nCorners = 0; row = undefined; }
+      const c = this.computeClimate(X, Z);
       // the density column (33 noise samples) is computed on first use (densOf): climate-only lookups (biome
       // maps, structure site searches, the far horizon) never pay for it
       c.X = X; c.Z = Z; c.dens = null;
-      this.corners.set(key, c);
+      if (row === undefined) { row = new Map(); this.corners.set(X, row); }
+      row.set(Z, c); this.nCorners++;
       return c;
     }
     densOf(c) {
@@ -160,21 +224,10 @@
       // swamps
       if (cl.swampy > 0.5 && height < 67 && ti >= 2 && ti <= 3 && hi >= 2) return ti === 3 ? BI.mangrove_swamp : BI.swamp;
       // middle biomes
-      const MID = [
-        [BI.snowy_plains, BI.snowy_plains, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga],
-        [BI.plains, BI.plains, BI.forest, BI.taiga, BI.old_growth_spruce_taiga],
-        [BI.flower_forest, BI.plains, BI.forest, BI.birch_forest, BI.dark_forest],
-        [BI.savanna, BI.savanna, BI.forest, BI.jungle, BI.jungle],
-        [BI.desert, BI.desert, BI.desert, BI.desert, BI.desert]];
-      const VAR = [
-        [BI.ice_spikes, BI.snowy_plains, BI.snowy_taiga, BI.snowy_taiga, BI.snowy_taiga],
-        [BI.dappled_forest, BI.dappled_forest, BI.forest, BI.taiga, BI.old_growth_pine_taiga],
-        [BI.sunflower_plains, BI.plains, BI.forest, BI.old_growth_birch_forest, BI.pale_garden],
-        [BI.savanna, BI.savanna, BI.plains, BI.sparse_jungle, BI.bamboo_jungle],
-        [BI.desert, BI.desert, BI.badlands, BI.wooded_badlands, BI.eroded_badlands]];
       const useVar = cl.w > 0.35;
       if (ti === 4 && height > 80 && hi >= 2) return hi >= 4 ? BI.eroded_badlands : hi >= 3 ? BI.wooded_badlands : BI.badlands;
-      return (useVar ? VAR : MID)[ti][hi];
+      const T = biomeTables();
+      return (useVar ? T.VAR : T.MID)[ti][hi];
     }
     caveBiomeFor(cl, y, x, z) {
       if (this.singleBiome >= 0) return -1;
@@ -189,15 +242,16 @@
 
     // ---------------- cave fields on 4x4x4 grid ----------------
     caveSample(X, Y, Z) {
-      const key = ((X / 4 + 500000) * 1000003 + (Z / 4 + 500000)) * 70 + (Y / 4);
-      let v = this.caveGrid.get(key);
-      if (v) return v;
-      if (this.caveGrid.size > 200000) this.caveGrid.clear();
-      v = new Float32Array(3);
+      const inner = (Z / 4 + 500000) * 70 + (Y / 4);
+      let row = this.caveGrid.get(X);
+      if (row !== undefined) { const hit = row.get(inner); if (hit !== undefined) return hit; }
+      if (this.nCave > 200000) { this.caveGrid.clear(); this.nCave = 0; row = undefined; }
+      const v = new Float32Array(3);
       v[0] = this.cheese.n3(X, Y * 1.55, Z);
       v[1] = this.sp1.n3(X, Y * 1.3, Z);
       v[2] = this.sp2.n3(X + 777, Y * 1.3, Z - 777);
-      this.caveGrid.set(key, v);
+      if (row === undefined) { row = new Map(); this.caveGrid.set(X, row); }
+      row.set(inner, v); this.nCave++;
       return v;
     }
 
@@ -216,7 +270,8 @@
       const H = new Float32Array(256), climate = new Array(256), biome = new Uint8Array(256);
       const dcol = new Float32Array(33);
       let maxY = 0;
-      const solidMask = new Uint8Array(65536); // 1 = terrain solid
+      const solidMask = this._solid || (this._solid = new Uint8Array(65536)); // 1 = terrain solid
+      solidMask.fill(0);
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         const ci = lx >> 2, cj = lz >> 2, fx = (lx & 3) / 4, fz = (lz & 3) / 4;
         const a = cor[cj * 5 + ci], b = cor[cj * 5 + ci + 1], c = cor[(cj + 1) * 5 + ci], d = cor[(cj + 1) * 5 + ci + 1];
@@ -268,7 +323,9 @@
       this.freeze(blocks, cx, cz, biome);
       // tints
       const tints = this.tints(cx, cz);
-      return { blocks, biome, caveBiome, tints, chests };
+      const out = { blocks, biome, caveBiome, tints, chests };
+      CLIMATE_OF.set(out, climate);
+      return out;
     }
 
     carveCaves(blocks, cx, cz, H, climate, biome) {
@@ -279,7 +336,7 @@
       const ny = Math.min(64, Math.ceil((maxH + 4) / 4));
       const grid = new Array(25 * (ny + 1));
       for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) for (let k = 0; k <= ny; k++) grid[(k * 5 + j) * 5 + i] = this.caveSample(x0 + i * 4, k * 4, z0 + j * 4);
-      const v = new Float32Array(3);
+      const lo = new Float64Array(3), hi = new Float64Array(3);   // a field's values in the cell's two layers (k, k + 1)
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         const col = lz * 16 + lx, h = H[col], cl = climate[col];
         const underWater = h < SEA + 1;
@@ -288,30 +345,35 @@
         const protect = entrance ? 0 : (underWater ? 10 : 5);
         const ci = lx >> 2, cj = lz >> 2, fx = (lx & 3) / 4, fz = (lz & 3) / 4;
         const top = Math.min(h - protect, ny * 4 - 1);
+        let kc = -1, i00 = 0, aqY = -1000, aqV = 0;
         for (let y = 5; y <= top; y++) {
           const bi = (y << 8) | col;
           const b = blocks[bi];
           if (b !== S.stone && b !== S.deep) continue;
+          // the four blocks of a cell layer share the xz interpolation of the layer's corners: computed once per cell
           const k = y >> 2, fy = (y & 3) / 4;
-          for (let n = 0; n < 3; n++) {
-            const g000 = grid[(k * 5 + cj) * 5 + ci][n], g100 = grid[(k * 5 + cj) * 5 + ci + 1][n], g010 = grid[(k * 5 + cj + 1) * 5 + ci][n], g110 = grid[(k * 5 + cj + 1) * 5 + ci + 1][n];
-            const g001 = grid[((k + 1) * 5 + cj) * 5 + ci][n], g101 = grid[((k + 1) * 5 + cj) * 5 + ci + 1][n], g011 = grid[((k + 1) * 5 + cj + 1) * 5 + ci][n], g111 = grid[((k + 1) * 5 + cj + 1) * 5 + ci + 1][n];
-            const a0 = (g000 * (1 - fx) + g100 * fx) * (1 - fz) + (g010 * (1 - fx) + g110 * fx) * fz;
-            const a1 = (g001 * (1 - fx) + g101 * fx) * (1 - fz) + (g011 * (1 - fx) + g111 * fx) * fz;
-            v[n] = a0 * (1 - fy) + a1 * fy;
+          if (k !== kc) {
+            kc = k; i00 = (k * 5 + cj) * 5 + ci;
+            for (let n = 0; n < 3; n++) { lo[n] = cornerLerp(grid, i00, n, fx, fz); hi[n] = cornerLerp(grid, i00 + 25, n, fx, fz); }
           }
           const depth = h - y;
-          let thr = 0.36 + (y > 60 ? (y - 60) * 0.004 : 0) + (depth < 12 ? (12 - depth) * 0.02 : 0);
-          const cheese = v[0] > thr;
-          const r = v[1] * v[1] + v[2] * v[2];
-          const width = 0.0026 + (y < 40 ? 0.0012 : 0) + (entrance ? 0.0015 : 0);
-          const spag = r < width;
+          const thr = 0.36 + (y > 60 ? (y - 60) * 0.004 : 0) + (depth < 12 ? (12 - depth) * 0.02 : 0);
+          const cheese = Math.fround(lo[0] * (1 - fy) + hi[0] * fy) > thr;
+          // the spaghetti fields only matter where the cheese does not carve the block already
+          let spag = false;
+          if (!cheese) {
+            const v1 = Math.fround(lo[1] * (1 - fy) + hi[1] * fy), v2 = Math.fround(lo[2] * (1 - fy) + hi[2] * fy);
+            const r = v1 * v1 + v2 * v2;
+            const width = 0.0026 + (y < 40 ? 0.0012 : 0) + (entrance ? 0.0015 : 0);
+            spag = r < width;
+          }
           if (cheese || spag) {
             if (y < 11) blocks[bi] = S.lava;
             else if (y < 40 && cheese) {
               // aquifer: regional water level
               const ax = Math.floor((x0 + lx) / 48), ay = Math.floor(y / 20), az = Math.floor((z0 + lz) / 48);
-              const hv = M.hash3(ax, ay, az, this.seed + 99) / 4294967296;
+              if (ay !== aqY) { aqY = ay; aqV = M.hash3(ax, ay, az, this.seed + 99) / 4294967296; }
+              const hv = aqV;
               if (hv < 0.3 && y <= ay * 20 + 6 + Math.floor(hv * 30)) blocks[bi] = S.water; else blocks[bi] = 0;
             } else blocks[bi] = 0;
           }
@@ -593,12 +655,7 @@
       const T = GEN.TREES, SS = GEN.STRUCT;
       const S = GEN.S();
       // how many trees
-      const dens = {
-        forest: 9, flower_forest: 3, birch_forest: 9, old_growth_birch_forest: 9, dark_forest: 14, pale_garden: 10, taiga: 9, old_growth_pine_taiga: 10, old_growth_spruce_taiga: 11,
-        snowy_taiga: 6, jungle: 14, sparse_jungle: 4, bamboo_jungle: 6, savanna: 1.2, savanna_plateau: 1.5, windswept_savanna: 1, plains: 0.12, sunflower_plains: 0.1, meadow: 0.12,
-        cherry_grove: 3, grove: 6, swamp: 2, mangrove_swamp: 7, snowy_plains: 0.2, wooded_badlands: 4, windswept_forest: 7, windswept_hills: 0.6, windswept_gravelly_hills: 0.5,
-        dappled_forest: 10, mushroom_fields: 0.6, snowy_slopes: 0.3, river: 0, beach: 0
-      }[key0] || 0;
+      const dens = TREE_DENS[key0] || 0;
       let n = Math.floor(dens) + (rng.next() < dens % 1 ? 1 : 0);
       for (let i = 0; i < n; i++) {
         const x = fx0 + rng.int(16), z = fz0 + rng.int(16);
@@ -606,7 +663,7 @@
         const y = this.surfaceY(x, z) + 1;
         if (y <= SEA + 1 && key0 !== 'mangrove_swamp' && key0 !== 'swamp') continue;
         if (y <= SEA - 1) continue;
-        const cl = this.climateAt(x, z);
+        const cl = this._treeCl = this.climateAt(x, z, this._treeCl);
         const bio = this.biomeFor(cl, y - 1), key = BIOMES[bio].key;
         if (key.indexOf('ocean') >= 0 || key === 'river' || key === 'beach' || key === 'stony_shore' || key === 'desert') continue;
         this.tree(w, key, x, y, z, rng);
@@ -654,33 +711,6 @@
       const S = GEN.S();
       const x0 = cx * 16, z0 = cz * 16;
       const put = (bi, s) => { blocks[bi] = s; };
-      const FL = {
-        plains: [['short_grass', 0.28], ['tall_grass', 0.04], ['dandelion', 0.01], ['poppy', 0.01], ['oxeye_daisy', 0.004], ['azure_bluet', 0.004], ['cornflower', 0.004], ['red_tulip', 0.002], ['bush', 0.004]],
-        sunflower_plains: [['short_grass', 0.25], ['sunflower', 0.05], ['tall_grass', 0.03]],
-        forest: [['short_grass', 0.12], ['leaf_litter', 0.05], ['bush', 0.02], ['dandelion', 0.006], ['poppy', 0.006], ['lily_of_the_valley', 0.003], ['brown_mushroom', 0.002], ['fern', 0.02]],
-        flower_forest: [['short_grass', 0.08], ['allium', 0.03], ['azure_bluet', 0.03], ['red_tulip', 0.02], ['orange_tulip', 0.02], ['white_tulip', 0.02], ['pink_tulip', 0.02], ['oxeye_daisy', 0.03], ['cornflower', 0.03], ['lily_of_the_valley', 0.03], ['lilac', 0.01], ['rose_bush', 0.01], ['peony', 0.01]],
-        birch_forest: [['short_grass', 0.12], ['wildflowers', 0.08], ['bush', 0.01]], old_growth_birch_forest: [['short_grass', 0.12], ['wildflowers', 0.1], ['fern', 0.03]],
-        dark_forest: [['short_grass', 0.1], ['brown_mushroom', 0.01], ['red_mushroom', 0.006], ['leaf_litter', 0.04]],
-        pale_garden: [['pale_moss_carpet', 0.25], ['moon_eye', 0.02], ['short_grass', 0.03]],
-        taiga: [['fern', 0.12], ['large_fern', 0.03], ['short_grass', 0.08], ['sweet_berry_bush', 0.006]],
-        old_growth_pine_taiga: [['fern', 0.15], ['large_fern', 0.05], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['sweet_berry_bush', 0.004]],
-        old_growth_spruce_taiga: [['fern', 0.15], ['large_fern', 0.05], ['red_mushroom', 0.004]],
-        snowy_taiga: [['fern', 0.05], ['sweet_berry_bush', 0.002]], grove: [], snowy_plains: [['short_grass', 0.02]],
-        jungle: [['short_grass', 0.2], ['fern', 0.1], ['tall_grass', 0.05], ['large_fern', 0.03], ['melon', 0.006]],
-        sparse_jungle: [['short_grass', 0.2], ['fern', 0.1], ['melon', 0.004]],
-        bamboo_jungle: [['bamboo', 0.12], ['short_grass', 0.1], ['podzol_patch', 0]],
-        savanna: [['short_grass', 0.25], ['tall_grass', 0.15]], savanna_plateau: [['short_grass', 0.25], ['tall_grass', 0.12]], windswept_savanna: [['short_grass', 0.2]],
-        desert: [['dead_bush', 0.006], ['short_dry_grass', 0.012], ['tall_dry_grass', 0.004], ['cactus', 0.006]],
-        badlands: [['dead_bush', 0.01], ['short_dry_grass', 0.01], ['cactus', 0.004]], wooded_badlands: [['short_grass', 0.08], ['dead_bush', 0.01]], eroded_badlands: [['dead_bush', 0.01]],
-        swamp: [['short_grass', 0.1], ['blue_orchid', 0.01], ['brown_mushroom', 0.005], ['dead_bush', 0.004], ['firefly_bush', 0.004], ['lily_pad', 0.05]],
-        mangrove_swamp: [['short_grass', 0.05], ['lily_pad', 0.03], ['firefly_bush', 0.003]],
-        meadow: [['short_grass', 0.3], ['tall_grass', 0.06], ['dandelion', 0.02], ['poppy', 0.02], ['allium', 0.02], ['azure_bluet', 0.02], ['oxeye_daisy', 0.02], ['cornflower', 0.02], ['wildflowers', 0.04]],
-        cherry_grove: [['pink_petals', 0.3], ['short_grass', 0.08]],
-        dappled_forest: [['leaf_litter', 0.18], ['red_shrub', 0.05], ['short_grass', 0.08], ['brown_mushroom', 0.01], ['bush', 0.01]],
-        mushroom_fields: [['red_mushroom', 0.01], ['brown_mushroom', 0.01]],
-        windswept_hills: [['short_grass', 0.1]], windswept_forest: [['short_grass', 0.1], ['fern', 0.05]],
-        river: [['sugar_cane', 0.04]], beach: [['sugar_cane', 0.02]],
-      };
       for (let col = 0; col < 256; col++) {
         const key = BIOMES[biome[col]].key;
         let y = 254; while (y > 1 && blocks[(y << 8) | col] === 0) y--;
@@ -709,7 +739,7 @@
           } else if ((key === 'swamp' || key === 'mangrove_swamp') && depth <= 2 && rng.chance(0.08)) blocks[ai] = st('lily_pad');
           continue;
         }
-        const list = FL[key]; if (!list) continue;
+        const list = FLORA[key]; if (!list) continue;
         const soilOk = ground === S.grass || ground === S.podzol || ground === S.coarse || ground === S.dirt || ground === S.mud || ground === S.moss || ground === S.mycelium;
         const sandOk = ground === S.sand || ground === S.redsand || R.T.type[ground] === R.byName.terracotta.id || (R.types[R.T.type[ground]] && /terracotta$/.test(R.types[R.T.type[ground]].name));
         for (const [name, p] of list) {
@@ -811,5 +841,7 @@
       return [0.5, 100, 0.5];
     }
   }
+  // the climates of a chunk's columns, as generate made them (the post passes of the layers read them)
+  OverworldGen.climateOf = (out) => CLIMATE_OF.get(out);
   VR.OverworldGen = OverworldGen;
 })(VR);

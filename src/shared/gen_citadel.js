@@ -272,7 +272,7 @@
   const prevGen = OG.generate;
   OG.generate = function (cx, cz) {
     const out = prevGen.call(this, cx, cz);
-    if (this.singleBiome < 0) { try { CIT.apply(this, cx, cz, out); } catch (e) { if (!this._citErr) { this._citErr = 1; console.warn('citadel gen', e); } } }
+    if (this.singleBiome < 0) { try { CIT.apply(this, cx, cz, out); } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; if (!this._citErr) { this._citErr = 1; console.warn('citadel gen', e); } } }
     return out;
   };
   // the far-horizon description: tapered boxes per tier (body), glowing slits and rings
