@@ -583,7 +583,8 @@
       const X0 = R[0] - D, X1 = R[1] + D, Z0 = R[2] - D, Z1 = R[3] + D;
       const gx = p ? p[0] - this.ox : 0, gz = p ? p[2] - this.oz : 1e9;   // (the gate: the panels nearest the player stay open)
       const near = [];
-      const side = (L, rot, fx) => { const n = Math.max(1, Math.round(L / 2)), wd = L / n, enc = rot + 4 * Math.round(wd / 2 * 256); for (let i = 0; i < n; i++) { const q = fx(i * wd), mx = q[0] + (rot === 0 ? wd / 2 : rot === 2 ? -wd / 2 : 0), mz = q[1] + (rot === 1 ? -wd / 2 : rot === 3 ? wd / 2 : 0); near.push([(mx - gx) ** 2 + (mz - gz) ** 2, out.length]); const y = w && w.topAt ? w.topAt(Math.floor(this.ox + mx), Math.floor(this.oz + mz)) + 1 - this.oy : 0; out.push(q[0], Math.abs(y) < 6 ? y : 0, q[1], enc); } };
+      // (a panel over a wall, a roof or a pit next door is left out: the barrier stands only on open ground)
+      const side = (L, rot, fx) => { const n = Math.max(1, Math.round(L / 2)), wd = L / n, enc = rot + 4 * Math.round(wd / 2 * 256); for (let i = 0; i < n; i++) { const q = fx(i * wd), mx = q[0] + (rot === 0 ? wd / 2 : rot === 2 ? -wd / 2 : 0), mz = q[1] + (rot === 1 ? -wd / 2 : rot === 3 ? wd / 2 : 0); const y = w && w.topAt ? w.topAt(Math.floor(this.ox + mx), Math.floor(this.oz + mz)) + 1 - this.oy : 0; if (!(Math.abs(y) < 4)) continue; near.push([(mx - gx) ** 2 + (mz - gz) ** 2, out.length]); out.push(q[0], y, q[1], enc); } };
       side(X1 - X0, 0, (d) => [X0 + d, Z1]); side(Z1 - Z0, 1, (d) => [X1, Z1 - d]); side(X1 - X0, 2, (d) => [X1 - d, Z0]); side(Z1 - Z0, 3, (d) => [X0, Z0 + d]);
       near.sort((a, b) => a[0] - b[0]);
       const gap = new Set(near.slice(0, 2).map(q => q[1]));
