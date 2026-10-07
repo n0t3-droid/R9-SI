@@ -178,6 +178,14 @@ const only = (seen, allowed) => Object.keys(seen).every(k => allowed.includes(k)
 check(WX.parse('klar') === 'klar' && WX.parse('Bewölkt') === 'bewoelkt' && WX.parse('nebel') === 'nebel', 'German words');
 check(WX.parse('rain') === 'regen' && WX.parse('thunder') === 'gewitter' && WX.parse('clear') === 'klar' && WX.parse('snow') === 'schnee', 'English and the old /weather words');
 check(WX.parse('auto') === 'auto' && WX.parse('normal') === 'auto' && WX.parse('quatsch') === null, 'auto returns to the schedule; unknown words are refused');
+// the words the /wetter and /weather help lines advertise (v0.40): the German list and the English list map one to one
+const DE_LIST = ['klar', 'bewölkt', 'nebel', 'regen', 'gewitter', 'schnee', 'auto'], DE_KINDS = ['klar', 'bewoelkt', 'nebel', 'regen', 'gewitter', 'schnee', 'auto'];
+const EN_LIST = ['clear', 'cloudy', 'fog', 'rain', 'storm', 'snow', 'auto'];
+check(DE_LIST.every((w, i) => WX.parse(w) === DE_KINDS[i]), 'the German words of /wetter: klar · bewölkt · nebel · regen · gewitter · schnee · auto');
+check(EN_LIST.every((w, i) => WX.parse(w) === DE_KINDS[i]) && WX.parse('Cloudy') === 'bewoelkt' && WX.parse(' STORM ') === 'gewitter', 'the English words of /weather: clear · cloudy · fog · rain · storm · snow · auto (any case, spaces)');
+check(WX.parse('bewölkt') === 'bewoelkt', 'a decomposed umlaut (o + combining diaeresis) reads as bewölkt');
+check(['constructor', 'toString', '__proto__', 'hasOwnProperty'].every(w => WX.parse(w) === null), 'prototype names are refused, not read from the object');
+check(WX.parse('') === null && WX.parse(undefined) === null, 'an empty word is refused');
 
 // ---- freeze keeps the kind; clearNow lasts until the next slot; no seed means no weather
 {

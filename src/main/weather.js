@@ -104,11 +104,16 @@
     schnee: 'schnee', snow: 'schnee',
     auto: 'auto', normal: 'auto', zeit: 'auto', plan: 'auto', schedule: 'auto',
   };
-  function parse(word) { const w = String(word || '').trim().toLowerCase(); return WORDS[w] !== undefined ? WORDS[w] : null; }
-  const LABEL = { klar: ['klar', 'clear'], bewoelkt: ['bewölkt', 'cloudy'], nebel: ['Nebel', 'fog'], regen: ['Regen', 'rain'], gewitter: ['Gewitter', 'thunderstorm'], schnee: ['Schnee', 'snow'] };
+  // an English or German word (any case, NFC): an own key only, so "constructor" or "toString" are refused
+  function parse(word) { const w = String(word || '').trim().normalize('NFC').toLowerCase(); return Object.prototype.hasOwnProperty.call(WORDS, w) ? WORDS[w] : null; }
+  // the names of the states: the tables hold them (g.wx.*); the German and English texts are written here too
+  const LABEL = {
+    klar: ['g.wx.klar', 'klar', 'clear'], bewoelkt: ['g.wx.bewoelkt', 'bewölkt', 'cloudy'], nebel: ['g.wx.nebel', 'Nebel', 'fog'],
+    regen: ['g.wx.regen', 'Regen', 'rain'], gewitter: ['g.wx.gewitter', 'Gewitter', 'thunderstorm'], schnee: ['g.wx.schnee', 'Schnee', 'snow'],
+  };
   function label(kind) {
     const L = LABEL[kind]; if (!L) return String(kind);
-    return VR.I18N && VR.I18N.tx ? VR.I18N.tx('wx.' + kind, null, L[0], L[1]) : L[0];
+    return VR.I18N && VR.I18N.tx ? VR.I18N.tx(L[0], null, L[1], L[2]) : L[1];
   }
   // the flash of a bolt: a sharp first stroke and a second, weaker flicker a tenth of a second later
   function flashAt(t) {
@@ -189,7 +194,7 @@
       const delay = 0.5 + this.rng() * 3.5;
       this.thunders.push({ at: this.clock + delay, delay });
     }
-    info() { return label(this.kind) + (this.forced ? ' (Befehl)' : ''); }
+    info() { return label(this.kind) + (this.forced ? (VR.I18N && VR.I18N.tx ? VR.I18N.tx('g.wx.cmd', null, ' (Befehl)', ' (command)') : ' (Befehl)') : ''); }
   }
 
   VR.WX = { KINDS, VIS, WEIGHTS, FOG_DAY, DAY, climateOf, slotAt, slotLen, kindAt, fogDay, hash01, parse, label, flashAt };

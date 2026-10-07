@@ -173,7 +173,7 @@
         if (this.glLost) return;
         this.glLost = true;
         console.warn('WebGL context lost — saving and reloading');
-        try { this.ui && this.ui.loading && this.ui.loading('Graphics were lost — saving…', 0.5); } catch (err) { /* the page may be half gone */ }
+        try { this.ui && this.ui.loading && this.ui.loading(T('g.gfx.lost'), 0.5); } catch (err) { /* the page may be half gone */ }
         const save = this.state === 'play' && this.meta && !this.meta.guest && this.world ? Promise.all([this.saveMeta(), this.world.saveAll()]) : Promise.resolve();
         Promise.race([save.catch(() => {}), new Promise((r) => setTimeout(r, 4000))]).then(() => { try { location.reload(); } catch (err) { /* nothing more to do */ } });
       }, false);
@@ -218,7 +218,7 @@
         const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: rim0, classic: rim0 }, null, res));
         tex = await forge(0);
         if (tex.type !== 'textures') { console.warn('textures failed once:', tex.msg); tex = await forge(this.pool.workers.length > 1 ? 1 : 0); }
-        if (tex.type !== 'textures') { this.fatal('The block textures could not be built (' + (tex.msg || 'worker failed') + '). Close other tabs and reload.'); return; }
+        if (tex.type !== 'textures') { this.fatal(T('g.tex.failed', { why: tex.msg || T('g.tex.worker') })); return; }
         if (tkey) VR.TexCache.put(tkey, tex);
       }
       this.texMs = Math.round(performance.now() - tTex0);
@@ -1088,19 +1088,19 @@
       const info = I.langs.find(l => l[0] === code);
       say(info ? T('g.cmd.langSoon', { name: info[1] }) : T('g.cmd.lang', { name: T('g.lang.name') }), '#ffd27a');
     }
-    // /wetter <klar|bewölkt|nebel|regen|gewitter|schnee|auto>: the sky now, or auto = the world's own schedule again
+    // /wetter <klar|bewölkt|nebel|regen|gewitter|schnee|auto> (/weather <clear|cloudy|fog|rain|storm|snow|auto>): the sky now, or auto = the world's own schedule again
     wetterCommand(a) {
       const say = (m, c) => this.ui.chatLine(m, c || '#cfe6ff'), wx = this.env.wx;
-      if (this.mp && this.mp.isClient) { say('Das Wetter bestimmt der Gastgeber.', '#ffcf8a'); return; }
+      if (this.mp && this.mp.isClient) { say(T('g.wx.host'), '#ffcf8a'); return; }
       const word = (a || []).join(' ').trim();
-      if (!word) { say('Wetter: ' + wx.info() + ' · /wetter klar|bewölkt|nebel|regen|gewitter|schnee|auto'); return; }
+      if (!word) { say(T('g.wx.now', { w: wx.info() })); return; }
       const kind = VR.WX.parse(word);
-      if (kind === null) { say('Das Wetter kenne ich nicht. Nimm: klar · bewölkt · nebel · regen · gewitter · schnee · auto', '#ff8a8a'); return; }
-      if (kind === 'auto') { wx.force(null); say('Wetter: wie es der Zeitplan der Welt will.'); return; }
+      if (kind === null) { say(T('g.wx.unknown'), '#ff8a8a'); return; }
+      if (kind === 'auto') { wx.force(null); say(T('g.wx.auto')); return; }
       wx.force(kind);
-      const shown = wx.clamp(kind);     // the Wetter setting (Audio › Atmosphäre) wins over the command
-      say('Wetter: ' + VR.WX.label(shown));
-      if (shown !== kind) say('Die Einstellung Wetter (Audio › Atmosphäre) lässt nur ' + VR.WX.label(shown) + ' zu.', '#ffcf8a');
+      const shown = wx.clamp(kind);     // the Wetter setting (Ton › Atmosphäre) wins over the command
+      say(T('g.cmd.weather', { w: VR.WX.label(shown) }));
+      if (shown !== kind) say(T('g.wx.limited', { w: VR.WX.label(shown), tab: T('g.set.audio') }), '#ffcf8a');
     }
     chat(text) {
       if (!text.startsWith('/')) { if (this.mp && this.mp.active) this.mp.chat(text); else this.ui.chatLine('<' + T('g.chat.you') + '> ' + text); return; }
