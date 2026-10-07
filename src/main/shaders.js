@@ -26,6 +26,11 @@ uniform vec3 u_planetDir;
 uniform vec3 u_planet2Dir;
 uniform vec3 u_ringNormal;
 uniform float u_skyMagic;    // how strongly the cosmic sky shows by day
+// A1 Atmosphäre (all zero = today's look): x wet ground, y overcast, z rainbow, w moon phase (0 new … 0.5 full)
+uniform vec4 u_wx;
+uniform vec4 u_fogH;         // the valley fog layer: x camera y, y layer top, z density (0 = none), w milky sky
+uniform vec4 u_bolt;         // a lightning bolt: xz toward it, y tan of its top's elevation, w brightness
+uniform vec4 u_glow;         // a village's glow at night: xz toward it, y all-around share, w strength
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -198,7 +203,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
   col += u_sunColor * pow(toSun, 60.0) * 0.45 * (1.0 - u_rain);
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   if (withSun) {
-    float clear = 1.0 - u_rain;
+    float clear = (1.0 - u_rain) * (1.0 - u_wx.y);
     // cosmic layer: the nebula owns the night; by day only a faint veil stays in the blue,
     // while the ringed giant and its moon keep hanging in the daylight sky
     float magicDay = u_skyMagic * (1.0 - u_night);
@@ -236,12 +241,13 @@ vec3 skyColor(vec3 dir, bool withSun) {
       vec3 up = abs(u_moonDir.y) < 0.99 ? vec3(0,1,0) : vec3(1,0,0);
       vec3 mx = normalize(cross(up, u_moonDir)), my = cross(u_moonDir, mx);
       vec2 mp = vec2(dot(dir, mx), dot(dir, my)) / 0.04;
-      float phase = fract(u_time / 1200.0 / 8.0);
-      float lit = smoothstep(-0.1, 0.1, mp.x * cos(phase * 6.2831) + 0.35 * sin(phase * 6.2831));
+      // the phase (A1: one eighth a day): the sun's side of a sphere — crescents, half and gibbous moons
+      float ph = u_wx.w * 6.2831, mz = sqrt(max(0.0, 1.0 - dot(mp, mp)));
+      float lit = smoothstep(-0.06, 0.06, mp.x * sin(ph) - mz * cos(ph));
       float crater = 0.78 + 0.22 * vnoise(mp * 4.0 + 10.0);
       col += vec3(0.85, 0.9, 1.0) * 3.2 * crater * mix(0.06, 1.0, lit) * clear * smoothstep(1.0, 0.95, length(mp));
     }
-    col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night;
+    col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night * (0.3 + 0.35 * (1.0 - cos(u_wx.w * 6.2831)));
     // stars
     float starK = max(u_night, cosmic * 0.45);
     if (starK > 0.02 && dir.y > -0.1) {
@@ -265,6 +271,49 @@ vec3 skyColor(vec3 dir, bool withSun) {
         float band = pow(max(0.0, sin(dir.x * 6.0 + dir.z * 3.0 + vnoise(dir.xz * 2.0 + u_time * 0.03) * 4.0)), 8.0);
         col += vec3(0.1, 0.9, 0.5) * a * band * u_night * 0.8 + vec3(0.5, 0.2, 0.9) * a * band * band * u_night * 0.4;
       }
+    }
+    // A1: the rainbow after rain — 42° around the point opposite the sun, red outside, violet inside, a faint
+    // second bow at 51° with its colours turned round (only while the ground is wet and the sun out)
+    if (u_wx.z > 0.001 && dir.y > -0.02) {
+      float ang = degrees(acos(clamp(dot(dir, -u_sunDir), -1.0, 1.0)));
+      float p1 = (ang - 39.6) / 2.6, p2 = (53.6 - ang) / 4.2;
+      vec3 bow = vec3(0.0);
+      if (p1 > -0.3 && p1 < 1.3) bow += clamp(abs(fract(0.78 * (1.0 - p1) + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0) * smoothstep(-0.25, 0.08, p1) * (1.0 - smoothstep(0.92, 1.25, p1));
+      if (p2 > -0.3 && p2 < 1.3) bow += clamp(abs(fract(0.78 * (1.0 - p2) + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0) * smoothstep(-0.25, 0.08, p2) * (1.0 - smoothstep(0.92, 1.25, p2)) * 0.3;
+      float sky = max(col.r, max(col.g, col.b));
+      col += bow * u_wx.z * (0.25 + 0.75 * sky) * smoothstep(-0.02, 0.08, dir.y);
+      col *= 1.0 + 0.25 * u_wx.z * smoothstep(40.0, 30.0, ang) * step(0.0, dir.y);   // brighter inside the bow
+    }
+    // A1: a lightning bolt — a jagged channel from the cloud base to the ground, with one fork
+    if (u_bolt.w > 0.001 && dir.y > -0.03) {
+      float hl = max(length(dir.xz), 1e-4);
+      vec2 dh = dir.xz / hl, bd = normalize(u_bolt.xz);
+      float da = atan(dh.x * bd.y - dh.y * bd.x, dot(dh, bd));
+      float e = dir.y / hl, top = u_bolt.y;
+      if (abs(da) < 0.2 && e < top) {
+        float sd = floor(u_bolt.x * 997.0 + u_bolt.z * 613.0);
+        float g1 = e * 26.0 / max(top, 0.05), g2 = e * 90.0 / max(top, 0.05);
+        float off = (mix(hash12(vec2(floor(g1), sd)), hash12(vec2(floor(g1) + 1.0, sd)), fract(g1)) - 0.5) * 0.05
+                  + (mix(hash12(vec2(floor(g2), sd + 7.0)), hash12(vec2(floor(g2) + 1.0, sd + 7.0)), fract(g2)) - 0.5) * 0.012;
+        float d = abs(da - off);
+        float ch = exp(-d * d * 1.2e6) * 3.0 + exp(-d * 260.0) * 0.35;
+        // the fork: leaves the channel at 60 % of the height and drifts aside on the way down
+        float fe = e / max(top, 0.05);
+        if (fe < 0.6 && fe > 0.18) {
+          float g3 = e * 70.0 / max(top, 0.05);
+          float fo = off + (0.6 - fe) * 0.09 + (mix(hash12(vec2(floor(g3), sd + 3.0)), hash12(vec2(floor(g3) + 1.0, sd + 3.0)), fract(g3)) - 0.5) * 0.014;
+          float d2 = abs(da - fo);
+          ch += (exp(-d2 * d2 * 2.5e6) * 1.6 + exp(-d2 * 320.0) * 0.15) * smoothstep(0.18, 0.3, fe);
+        }
+        col += vec3(0.82, 0.88, 1.0) * ch * u_bolt.w * 6.0 * smoothstep(top, top * 0.85, e);
+      }
+    }
+    // A1: a village's lights glow on the haze over it at night
+    if (u_glow.w > 0.001) {
+      float hl = max(length(dir.xz), 1e-4);
+      float az = dot(dir.xz / hl, normalize(u_glow.xz + vec2(1e-5)));
+      float dome = mix(pow(max(az, 0.0), 6.0), 1.0, u_glow.y) * exp(-max(dir.y, 0.0) * 7.0) * smoothstep(-0.1, 0.02, dir.y);
+      col += vec3(1.0, 0.55, 0.22) * dome * u_glow.w * 0.5;
     }
   }
   return col;
@@ -315,8 +364,27 @@ vec3 applyFog(vec3 col, vec3 rel, float dist) {
   float hd = max(length(rel.xz), abs(rel.y) * 0.35);
   float f = smoothstep(u_fog.x, u_fog.y, hd);
   f = max(f, (1.0 - exp(-dist * u_fog.z)) * 0.85);
+  // A1 Nebel: a fog layer lies in the valleys — dense below its top, thinning above it (5 blocks); the fog met along
+  // the ray is the integral of that density between the eye's and the point's height
+  if (u_fogH.z > 0.0) {
+    float y0 = u_fogH.x - u_fogH.y, y1 = y0 + rel.y;
+    float G0 = y0 <= 0.0 ? y0 : 5.0 * (1.0 - exp(-y0 * 0.2)), G1 = y1 <= 0.0 ? y1 : 5.0 * (1.0 - exp(-y1 * 0.2));
+    float od = (abs(rel.y) > 0.02 ? (G1 - G0) / rel.y : exp(-max(y0, 0.0) * 0.2)) * u_fogH.z * dist;
+    f = 1.0 - (1.0 - f) * exp(-od);
+  }
   if (u_fog.w > 0.5) { f = 1.0 - exp(-dist * 0.07); fc = u_fogColor; }
   return mix(col, fc, clamp(f, 0.0, 1.0));
+}
+// A1: rain-wet ground — up faces outdoors a little darker and glossy: a sun glint and a faint sky sheen
+vec3 wetLook(vec3 col, vec3 N, vec3 n, vec3 V, vec3 L, vec3 lc, float outdoors, float sh) {
+  float w = u_wx.x * outdoors * smoothstep(0.5, 0.9, N.y);
+  if (w <= 0.0) return col;
+  col *= 1.0 - 0.15 * w;
+  float nh = max(dot(normalize(mix(n, N, 0.6)), normalize(L + V)), 0.0);
+  col += lc * (pow(nh, 48.0) * 0.4 + pow(nh, 400.0) * 3.0) * sh * w;
+  vec3 R = reflect(-V, N);
+  col += mix(u_skyHorizon, u_skyZenith, clamp(R.y, 0.0, 1.0)) * pow(1.0 - max(dot(N, V), 0.0), 4.0) * w * 0.4;
+  return col;
 }
 `;
 
@@ -556,6 +624,7 @@ void main() {
     float sp = pow(max(dot(n, H), 0.0), mix(160.0, 12.0, rough)) * (1.0 - rough) * 1.6;
     col += lc * sp * sh * outdoors * (1.0 + u_rain * 1.5);
   }
+  col = wetLook(col, N, n, V, L, lc, outdoors, sh);   // A1: wet after rain
 #endif
   if (emis > 0.02 || emissiveFace) {
     float e = emissiveFace ? max(emis, 0.85) : emis;
@@ -823,6 +892,7 @@ void main() {
   vec4 p = u_invViewProj * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
   vec3 dir = normalize(p.xyz / p.w);
   vec3 col = skyColor(dir, true);
+  col = mix(col, u_fogColor, u_fogH.w * (0.5 + 0.5 * (1.0 - smoothstep(-0.05, 0.6, dir.y))));   // A1: thick fog
   if (u_fog.w > 0.5) col = u_fogColor;
   o = vec4(col, 1.0);
 }`;
@@ -859,7 +929,7 @@ void main() {
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
   float ndl = max(dot(v_n, L), 0.0);
-  vec3 base = mix(vec3(0.97, 0.98, 1.0), vec3(0.42, 0.44, 0.48), u_rain);
+  vec3 base = mix(vec3(0.97, 0.98, 1.0), vec3(0.42, 0.44, 0.48), max(u_rain, u_wx.y * 0.85));
   float shade = v_n.y > 0.5 ? 1.0 : v_n.y < -0.5 ? 0.58 : mix(0.66, 0.9, v_h);
   vec3 col = base * (u_ambSky * 1.05 * shade + lc * ndl * 0.6) + u_sunset * 0.35 * shade;
   // silver lining toward the sun
@@ -1406,24 +1476,27 @@ uniform float u_snow;
 uniform sampler2D u_heights;             // 128x128 top heights around camera
 uniform vec2 u_heightOrigin;             // world xz of heights texel 0
 uniform vec3 u_right;
+uniform vec2 u_windV;                    // A1: the wind (blocks a second) — drops drift and lean with it
 out float v_a;
 out vec2 v_c;
 out float v_snow;
 void main() {
   float R = 24.0;
-  vec2 xz = (a_seed.xy - 0.5) * 2.0 * R;
-  vec2 wxz = floor(u_camPos.xz) + xz;
   float fallSpeed = mix(14.0, 1.6, u_snow);
   float H = 36.0;
   float yy = mod(-u_time * fallSpeed * (0.8 + a_seed.z * 0.4) + a_seed.z * 97.0, H) - H * 0.4;
+  vec2 wv = u_windV * (u_snow > 0.5 ? 1.4 : 1.0);
+  vec2 xz = mod(a_seed.xy * 2.0 * R + wv * (H * 0.6 - yy) / fallSpeed, 2.0 * R) - R;
+  vec2 wxz = floor(u_camPos.xz) + xz;
   vec3 wp = vec3(wxz.x + 0.5, u_camPos.y + yy, wxz.y + 0.5);
   if (u_snow > 0.5) { wp.x += sin(u_time * 1.3 + a_seed.z * 20.0) * 0.6; wp.z += cos(u_time * 1.1 + a_seed.z * 17.0) * 0.6; }
-  vec2 hu = (wxz - u_heightOrigin + 0.5) / 128.0;
+  vec2 hu = (floor(wp.xz) - u_heightOrigin + 0.5) / 128.0;
   float top = texture(u_heights, hu).r * 255.0;
   v_a = step(top + 1.0, wp.y) * (1.0 - smoothstep(R * 0.6, R, length(xz)));
   vec3 rel = wp - u_camPos;
   vec2 size = u_snow > 0.5 ? vec2(0.07, 0.07) : vec2(0.02, 0.45);
-  vec3 p = rel + u_right * a_corner.x * size.x + vec3(0.0, 1.0, 0.0) * a_corner.y * size.y;
+  vec3 axis = normalize(vec3(-wv.x, fallSpeed, -wv.y));
+  vec3 p = rel + u_right * a_corner.x * size.x + axis * a_corner.y * size.y;
   v_c = a_corner;
   v_snow = u_snow;
   gl_Position = u_viewProj * vec4(p, 1.0);
