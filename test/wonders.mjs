@@ -98,6 +98,12 @@ const planned = await ev(() => (VR.game.gadgets.blue.plans || []).filter(q => /^
 check(planned.length === p0 + 1 && planned.some(d => d.startsWith('wonder:' + first.type + '#')), '„/bau ' + nameDe + '“ after finding it plans one: ' + planned.join(', '));
 const cx = await ev(() => { const g = VR.game; return { open: !!g.codex, list: g.codex.list().filter(e => e.catKey === 'wonders').map(e => (e.found ? '✓ ' : '· ') + e.name) }; });
 check(cx.list.length === 8 && cx.list.filter(s => s[0] === '✓').length === 1, 'the codex category ✨ Wunder: ' + cx.list.join(' | '));
+// ---- the map: the found one as ✨ with its name, the ones not found yet within 1 km as „?"
+const mk = await ev(() => { const g = VR.game, m = g.wonders.marks(); g.map.scale = 4; g.map.openBig(); return { found: m.filter(q => q.found).map(q => q.name), open: m.filter(q => !q.found).length, screen: g.ui.screen }; });
+await page.waitForTimeout(300);
+await page.screenshot({ path: SHOTS + '/wonder_map.png', timeout: 180000 });
+check(mk.screen === 'mapscreen' && mk.found.length === 1 && mk.found[0] === nameDe, 'the map: ✨ ' + mk.found.join(', ') + ' and ' + mk.open + ' „?" within 1 km');
+await ev(() => VR.game.ui.show(null));
 // ---- the gallery: all eight, next to each other (forge plans like /bau's), photographed by day — two by night
 // (each on a dry, gentle spot: a spot in a lake or on a cliff moves on along the line; a wider view for the pictures)
 await ev(() => { const g = VR.game; g.settings.renderDist = 8; g.applySettings('renderDist'); });
