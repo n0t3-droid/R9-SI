@@ -21,7 +21,7 @@ const GAME_URL = 'https://claude.ai/artifact/EP9fJV6R8Grw4ev5RVUP4r';
 // (big single-file pages on a busy 2-CPU box: do not wait for 'load', the test waits for the page itself)
 const NAV = { waitUntil: 'domcontentloaded', timeout: 180000 };
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 880 }, acceptDownloads: true });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 880 }, acceptDownloads: true, locale: 'de-DE' });
 const logs = [];
 const watch = (pg, tag) => { pg.on('pageerror', e => logs.push(`[${tag} pageerror] ` + (e.stack || e.message).slice(0, 900))); pg.on('console', m => { if (m.type() === 'error' && !/favicon|404|ERR_|net::/i.test(m.text())) logs.push(`[${tag}] ` + m.text().slice(0, 300)); }); pg.on('dialog', d => d.accept('Test')); };
 let fails = 0;
@@ -194,7 +194,7 @@ await section('5 · the game sees it', async () => {
 });
 
 await section('6 · the game\'s title screen takes the file\'s text too', async () => {
-  const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const ctx2 = await browser.newContext({ viewport: { width: 1280, height: 800 }, locale: 'de-DE' });
   const game = await ctx2.newPage(); watch(game, 'title');
   await game.goto(GAME + '/index.html', NAV);
   let ok = false; for (let i = 0; i < 240 && !ok; i++) { await game.waitForTimeout(500); try { ok = await game.evaluate(() => !!(VR.game && VR.game.state === 'title')); } catch (e) { /* */ } }
