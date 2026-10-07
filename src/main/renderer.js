@@ -526,16 +526,16 @@
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
       v3('u_fogColor', E.fogColor); v3('u_blockLightTint', E.blockTint); v3('u_planetDir', E.planetDir); v3('u_planet2Dir', E.planet2Dir); v3('u_ringNormal', E.ringNormal);
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
-      if (u.u_rain) gl.uniform1f(u.u_rain, E.rain);
-      if (u.u_time) gl.uniform1f(u.u_time, E.time);
-      if (u.u_night) gl.uniform1f(u.u_night, E.night);
-      if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
-      if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
       // A1 Atmosphäre: wet ground / overcast / rainbow / moon phase, the valley fog (with the eye's height), the
       // lightning bolt, the village glow (all zero: today's look)
       const v4 = (n, a) => { if (u[n] && a) gl.uniform4f(u[n], a[0], a[1], a[2], a[3]); };
       v4('u_wx', E.wx); v4('u_bolt', E.bolt); v4('u_glow', E.glow);
       if (u.u_fogH && E.fogH) gl.uniform4f(u.u_fogH, this.cam ? this.cam.y : 0, E.fogH[1], E.fogH[2], E.fogH[3]);
+      if (u.u_rain) gl.uniform1f(u.u_rain, E.rain);
+      if (u.u_time) gl.uniform1f(u.u_time, E.time);
+      if (u.u_night) gl.uniform1f(u.u_night, E.night);
+      if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
+      if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
     }
     bindTerrainTextures(p) {
       const gl = this.gl;
