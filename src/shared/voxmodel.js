@@ -297,6 +297,50 @@
     return out;
   };
 
+  // ---------------------------------------------------------------- pre-warm (idle time; the game starts it, test/prewarm.js)
+  // Builds the lazy models one per idle slice, largest volume first, so the first paint or pick of a model does not stall
+  // a frame: a slice builds only while the browser has more than `reserve` ms left (8), and only from `notBefore` on (the
+  // game sets it 10 s into play). It stops when every model is built, or while the page is hidden (start() again when it
+  // shows). The idle request, the clock, the visibility and the build are injectable (the tests use fakes).
+  const defaultIdle = (cb) => typeof requestIdleCallback === 'function' ? requestIdleCallback(cb) : setTimeout(() => cb({ timeRemaining: () => 12 }), 250);
+  const defaultCancel = (h) => typeof cancelIdleCallback === 'function' ? cancelIdleCallback(h) : clearTimeout(h);
+  VM.prewarm = function (o) {
+    o = o || {};
+    const now = o.now || (() => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now()));
+    const idle = o.idle || defaultIdle, cancel = o.cancel || defaultCancel, build = o.build || materialize;
+    const hidden = o.hidden || (() => typeof document !== 'undefined' && !!document.hidden);
+    const reserve = o.reserve === undefined ? 8 : o.reserve;
+    const size = (m) => m.VW * m.VH * m.VD;
+    const queue = (o.models || Object.values(MODELS)).filter(m => m && m.lazy && !m.compiled)
+      .sort((a, b) => (size(b) - size(a)) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    const trim = () => { while (queue.length && queue[0].compiled) queue.shift(); };   // built meanwhile (a paint, a pick)
+    let notBefore = o.notBefore || 0, stopped = false, done = false, pending = false, handle = null;
+    const ctl = {
+      built: 0, skipped: 0,
+      // (re)start: a new notBefore when given; a no-op while a slice is pending or once everything is built
+      start(at) { if (at !== undefined) notBefore = at; if (done) return ctl; stopped = false; if (!pending) schedule(); return ctl; },
+      stop() { stopped = true; if (pending) { pending = false; cancel(handle); handle = null; } return ctl; },
+      left() { return queue.filter(m => !m.compiled).length; },
+      done() { return done; },
+    };
+    function schedule() { pending = true; handle = idle(step); }
+    function step(deadline) {
+      pending = false; handle = null;
+      if (stopped || done) return;
+      if (hidden()) { stopped = true; return; }
+      if (now() < notBefore) { schedule(); return; }
+      trim();
+      if (!queue.length) { done = true; return; }
+      if (deadline && deadline.timeRemaining() > reserve) {
+        const m = queue.shift();
+        try { build(m); ctl.built++; } catch (e) { console.warn('VM pre-warm failed', m.name, e); }
+      } else ctl.skipped++;
+      trim();
+      if (queue.length) schedule(); else done = true;
+    }
+    return ctl;
+  };
+
   // rotate part offsets around the model's vertical axis, q quarter-turns (same sense as VX.rotateGrid)
   function rotOffset(px, pz, W, D, q) { let x = px, z = pz, w = W, d = D; for (let r = 0; r < q; r++) { const t = x; x = d - 1 - z; z = t; const tw = w; w = d; d = tw; } return [x, z]; }
   VM.rotOffset = rotOffset;
