@@ -130,8 +130,11 @@
 
   // ---------------------------------------------------------------- 🔌 the standalone says it is not connected
   BR.toGame = function (anchor) {
-    let w = null; try { w = window.open(GAME_URL, '_blank'); if (w) { try { w.opener = null; } catch (e) { /* */ } } } catch (e) { w = null; }
-    if (w) return;
+    // noopener: the game never gets a handle on this page (and the browser hands none back, so success cannot be seen);
+    // the link to copy appears when it evidently did not work — a second click within a few seconds, or an error
+    let failed = false; try { window.open(GAME_URL, '_blank', 'noopener,noreferrer'); } catch (e) { failed = true; }
+    const again = BR.lastGo && Date.now() - BR.lastGo < 6000; BR.lastGo = Date.now();
+    if (!failed && !again) { say('🎮 ' + L('br.opened', 'Das Spiel öffnet sich in einem neuen Tab — klick nochmal, wenn nicht'), true); return; }
     // (noopener hands nothing back — and a blocked one neither): the link, ready to copy
     const host = (anchor && anchor.closest && anchor.closest('#bridgeBar, .note, .crow, #tiles')) || $('#bridgeBar') || $('#partsBody');   // (W1: the ▶ tile asks too)
     if (!host) return;
