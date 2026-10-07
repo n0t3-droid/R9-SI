@@ -5,11 +5,16 @@
 // step), marks the plan built; a person walks from the door over the stairs to every floor and onto the roof in the
 // built blocks; ▶ Spielen lands you in front of its entrance, looking at it — no pageerror on either page.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
-import { spawn } from 'child_process';
-const PORT = 8765 + Math.floor(Math.random() * 200);
-const srv = spawn('python3', ['-m', 'http.server', String(PORT), '--bind', '127.0.0.1', '--directory', '/home/claude/vr/dist'], { stdio: 'ignore' });
-await new Promise(r => setTimeout(r, 900));
-const URL0 = `http://127.0.0.1:${PORT}`;
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+// the pages from this checkout's dist, on a port the system hands out (a stale server of another test on a fixed or
+// random port would serve another branch's pages)
+const DIST = '/home/claude/vr/dist', TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.png': 'image/png', '.css': 'text/css' };
+const srv = http.createServer((q, a) => { const f = path.join(DIST, decodeURIComponent(q.url.split('?')[0]).replace(/^\/+/, '') || 'index.html'); if (!f.startsWith(DIST) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { a.writeHead(404); a.end(); return; } a.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(a); });
+await new Promise(r => srv.listen(0, '127.0.0.1', r));
+const URL0 = `http://127.0.0.1:${srv.address().port}`;
+console.log('serving', DIST, 'at', URL0);
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const ctx = await browser.newContext({ viewport: { width: 1360, height: 820 } });
 const logs = [], fails = [];
@@ -17,7 +22,7 @@ const check = (ok, msg) => { if (!ok) fails.push(msg); console.log((ok ? '  ✓ 
 const watch = (pg, tag) => { pg.on('pageerror', e => logs.push(`[${tag} pageerror] ` + (e.stack || e.message).slice(0, 900))); pg.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) logs.push(`[${tag}] ` + m.text().slice(0, 300)); }); };
 const crashed = async (e) => { console.log('✗ crashed: ' + String(e && e.message || e).slice(0, 600)); fails.push('crash'); try { await finish(); } catch (e2) { process.exit(1); } };
 process.on('unhandledRejection', crashed); process.on('uncaughtException', crashed);
-const finish = async () => { console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l); check(!logs.some(l => /pageerror/.test(l)), 'no pageerror on either page'); await browser.close(); srv.kill(); console.log(fails.length ? 'FAILED ' + fails.length : 'ALL OK'); process.exit(fails.length ? 1 : 0); };
+const finish = async () => { console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l); check(!logs.some(l => /pageerror/.test(l)), 'no pageerror on either page'); await browser.close(); srv.close(); console.log(fails.length ? 'FAILED ' + fails.length : 'ALL OK'); process.exit(fails.length ? 1 : 0); };
 const game = await ctx.newPage(); watch(game, 'game');
 await game.goto(URL0 + '/index.html');
 const gev = (fn, a) => game.evaluate(fn, a);
