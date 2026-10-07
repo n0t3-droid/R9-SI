@@ -1,24 +1,26 @@
 // ============================================================================
-// The house catalogue — real villas at real scale. Every home in a modern town
-// is built from a researched floor plan, not painted by hand:
-//  · STADTVILLA (after the Kern-Haus Stadtvillen: Signus 8.98 × 10.23 m, Karat
-//    12.60 × 11.85 m, two full storeys under a 22° hip roof): Diele with the
-//    stair, Gäste-WC and HWR beside it, a study at the front, the open
-//    Wohnen/Essen/Küche across the whole garden side behind floor-to-ceiling
-//    glass and terrace doors; upstairs Kind 1 + 2 at the street, Flur/Galerie
-//    over the hall, the master with a dressing zone and a balcony on the garden
-//    side, a big family bath, a guest room with its own shower bath. Skins:
-//    white/anthracite (Signus), grey, mediterranean with terracotta, Bauhaus
-//    flat roof (Black Label), clinker, sand.
-//  · BEL PORTALE (Stilhaus): classicist Stadtvilla — 6 m twin-column portico
-//    with a pediment, two octagonal corner towers, balustrade balconies, a
-//    mansard roof with dormers, the double-height foyer with the stair, a
-//    polygonal living room with a fireplace wall, a winter-garden dining room.
-//  · SANSSOUCIS (Stilhaus "Villa am See"): white clinker on a bossed stone base,
+// The house catalogue — villas at real scale. Every home in a modern town is
+// built from a floor plan of its own, inspired by typical German Stadtvillen
+// and prefab-house layouts, not painted by hand:
+//  · STADTVILLA (from about 9 × 10 m to 12.5 × 12 m, two full storeys under a
+//    22° hip roof): Diele with the stair, Gäste-WC and HWR beside it, a study at
+//    the front, the open Wohnen/Essen/Küche across the whole garden side behind
+//    floor-to-ceiling glass and terrace doors; upstairs Kind 1 + 2 at the
+//    street, Flur/Galerie over the hall, the master with a dressing zone and a
+//    balcony on the garden side, a big family bath, a guest room with its own
+//    shower bath. Skins: white/anthracite, grey, mediterranean with terracotta,
+//    Bauhaus flat roof, the black cube (Schwarzkubus), clinker, sand.
+//  · VILLA BELFRONTE: classicist Stadtvilla — 6 m twin-column portico with a
+//    pediment, two octagonal corner towers, balustrade balconies, a mansard
+//    roof with dormers, the double-height foyer with the stair, a polygonal
+//    living room with a fireplace wall, a winter-garden dining room.
+//  · BEAU LAC, the villa by the lake: white clinker on a bossed stone base,
 //    natural slate roof, six 6 m marble columns across two storeys on the
 //    garden front, a curved balustraded terrace, the double staircase, a pool.
-//  · TOSCANA (Stilhaus): ochre mediterranean villa with a round tower, arched
-//    windows, an arcaded loggia and terracotta roofs.
+//  · TORRE OCRA: ochre mediterranean villa with a round tower, arched windows,
+//    an arcaded loggia and terracotta roofs.
+// The names are the game's own; the skin and family ids stay as they are (they
+// are saved in designs and favourites: blueprint_<index>).
 // Every house has a double garage (42 m²) or carport and driveway, a garden
 // with a travertine terrace, pergola, outdoor dining, BBQ, loungers, a pool on
 // the big lots, lawns, beds, hedges and trees — and every room is furnished by
@@ -98,15 +100,15 @@
     else U.rooms.push(R('guest', r0, gd, W, D, { to: 'gallery' }));
     H.floors.push(G, U);
     H.features = { canopy: true, erker: o.rng.chance(0.5) ? { side: 3, v0: 2, v1: 4 } : null, balcony: o.rng.chance(0.65) ? { u0: 1, u1: fu1, deep: 2 } : null, garageDoor: { v0: 4, v1: fd } };
-    // Staffelgeschoss (OKAL Staffel): the upper floor drops the garage-side column, the rest becomes a roof terrace
+    // Staffelgeschoss: the upper floor drops the garage-side column, the rest becomes a roof terrace
     if (o.staffel) { U.rooms = U.rooms.filter(r => r.u0 < r0); U.rect = [0, 0, r0 - 1, d - 1]; H.staffel = true; }
     if (o.cantilever) { H.features.cantilever = { u0: fu0, u1: fu1 }; H.features.canopy = false; }
     H.floors[0].rooms[0].id = 'study';
     return H;
   }
 
-  // ================================================================ BEL PORTALE (17 × 15): the classicist Stadtvilla
-  function tBelPortale(o) {
+  // ================================================================ VILLA BELFRONTE (17 × 15): the classicist Stadtvilla
+  function tPortico(o) {
     const w = 17, d = 15, W = 15, D = 13;
     const H = { family: 'belportale', w, d, storeys: 2, floors: [], stairs: { u: 9, v0: 2, n: 3 }, entry: { u: 7, n: 2 }, voidRect: [7, 1, 8, 4] };
     H.floors.push({ y: 0, rooms: [
@@ -131,8 +133,8 @@
     return H;
   }
 
-  // ================================================================ SANSSOUCIS (18 × 14): the villa by the lake
-  function tSanssoucis(o) {
+  // ================================================================ BEAU LAC (18 × 14): the villa by the lake
+  function tLake(o) {
     const w = 18, d = 14, W = 16, D = 12;
     const H = { family: 'sanssoucis', w, d, storeys: 2, floors: [], stairs: { double: true, u0: 8, u1: 10, v0: 2, n: 3 }, entry: { u: 8, n: 2 }, voidRect: [8, 1, 10, 4] };
     H.floors.push({ y: 0, rooms: [
@@ -156,8 +158,8 @@
     return H;
   }
 
-  // ================================================================ TOSCANA (15 × 13): the mediterranean villa with a round tower
-  function tToscana(o) {
+  // ================================================================ TORRE OCRA (15 × 13): the mediterranean villa with a round tower
+  function tTower(o) {
     const w = 15, d = 13, W = 13, D = 11;
     const H = { family: 'toscana', w, d, storeys: 2, floors: [], stairs: { u: 8, v0: 2, n: 3 }, entry: { u: 7, n: 1 } };
     H.floors.push({ y: 0, rooms: [
@@ -179,7 +181,7 @@
     return H;
   }
 
-  // ================================================================ PALAIS ROYAL (25 × 15 + the swimming hall): Stilhaus' palace
+  // ================================================================ PALAIS ÉTOILE (25 × 15 + the swimming hall): the palace
   function tPalais(o) {
     const w = 25, d = 15, W = 23, D = 13;
     const H = { family: 'palais', w, d, storeys: 2, floors: [], stairs: { double: true, u0: 11, u1: 13, v0: 2, n: 3 }, entry: { u: 11, n: 3 }, voidRect: [11, 1, 13, 4] };
@@ -205,7 +207,7 @@
     return H;
   }
 
-  // ================================================================ BUNGALOW (17 × 14, one storey under a hip roof — OKAL Bungalow / Stilhaus Primavera)
+  // ================================================================ BUNGALOW (17 × 14, one storey under a hip roof)
   function tBungalow(o) {
     const w = 17, d = 14, W = 15, D = 12;
     const H = { family: 'bungalow', w, d, storeys: 1, floors: [], stairs: null, entry: { u: 7, n: 1 } };
@@ -278,9 +280,9 @@
     { lot: [25, 22], make: (o) => tStadtvilla(18, 16, o), garage: true, garden: 6, skins: STADT_SKINS },
     { lot: [23, 21], make: (o) => tStadtvilla(16, 15, o), garage: true, garden: 6, skins: STADT_SKINS },
     { lot: [21, 20], make: (o) => tStadtvilla(14, 14, o), garage: true, garden: 6, skins: STADT_SKINS },
-    { lot: [24, 23], make: tBelPortale, garage: true, garden: 6, skins: ['classic'], front: 2 },
-    { lot: [25, 23], make: tSanssoucis, garage: true, garden: 9, skins: ['lake'] },
-    { lot: [22, 19], make: tToscana, garage: true, garden: 6, skins: ['toscana'] },
+    { lot: [24, 23], make: tPortico, garage: true, garden: 6, skins: ['classic'], front: 2 },
+    { lot: [25, 23], make: tLake, garage: true, garden: 9, skins: ['lake'] },
+    { lot: [22, 19], make: tTower, garage: true, garden: 6, skins: ['toscana'] },
     { lot: [24, 20], make: tBungalow, garage: true, garden: 6, skins: ['signus', 'grey', 'sand', 'mediterran', 'klinker', 'glas'] },
     { lot: [32, 27], make: tPalais, garage: true, garden: 10, skins: ['classic'], front: 2 },
     { lot: [20, 19], make: (o) => tStadtvilla(13, 13, o), garage: true, garden: 6, skins: STADT_SKINS },
@@ -297,7 +299,7 @@
   }
   PLAN.DIMS = PLAN.CATALOGUE.map(c => c.lot.slice());
   // names (the Studio's catalogue order) and the blueprint icon of each house
-  const NAMES = [['Villa R9 180', 'villa'], ['Villa R9 160', 'villa'], ['Villa R9 140', 'villa'], ['Bel Portale', 'portico'], ['Sanssoucis', 'colonnade'], ['Toscana', 'tower'], ['Bungalow R9', 'bungalow'], ['Palais Royal', 'palace'], ['Villa R9 130', 'villa'], ['Villa R9 130 Carport', 'villa'], ['Villa R9 Compact', 'compact']];
+  const NAMES = [['Villa R9 180', 'villa'], ['Villa R9 160', 'villa'], ['Villa R9 140', 'villa'], ['Villa Belfronte', 'portico'], ['Beau Lac', 'colonnade'], ['Torre Ocra', 'tower'], ['Bungalow R9', 'bungalow'], ['Palais Étoile', 'palace'], ['Villa R9 130', 'villa'], ['Villa R9 130 Carport', 'villa'], ['Villa R9 Compact', 'compact']];
   PLAN.CATALOGUE.forEach((c, i) => { c.name = NAMES[i] ? NAMES[i][0] : 'Villa ' + (i + 1); c.icon = NAMES[i] ? NAMES[i][1] : 'villa'; });
   // blueprints: every catalogue house as an item (main.blueprints.js builds it where the player points)
   if (VR.defItem) PLAN.CATALOGUE.forEach((c, i) => VR.defItem('blueprint_' + i, { name: 'Blueprint · ' + c.name, cat: 'blueprints', stack: 1, use: 'blueprint', house: i, texKey: 'blueprint:' + c.icon }));
@@ -309,7 +311,7 @@
     return fits[0] || null;
   };
   PLAN.dims = function (rng) { return PLAN.DIMS[rng.int(PLAN.DIMS.length)].slice(); };
-  PLAN.templates = { stadtvilla: tStadtvilla, belportale: tBelPortale, sanssoucis: tSanssoucis, toscana: tToscana, bungalow: tBungalow, palais: tPalais };
+  PLAN.templates = { stadtvilla: tStadtvilla, belportale: tPortico, sanssoucis: tLake, toscana: tTower, bungalow: tBungalow, palais: tPalais };   // (the keys are the saved family ids)
   PLAN.shared = shared;
   if (VG.modern && VG.modern.DIMS) VG.modern.DIMS.home = PLAN.DIMS.slice();   // the town planner draws home lots from the catalogue
 })(VR);

@@ -54,8 +54,8 @@ NEU IN v0.37 — 🧱 Teile, 🎯 Finden, ★ Favoriten, alles ohne Konto
 
 
 STUDIO v2
-- Architektur: alle 11 Katalog-Häuser (Villa R9 180/160/140/130, Bel Portale, Sanssoucis, Toscana, Bungalow,
-  Palais Royal …) werden beim Start vom Villenbauer des Spiels gebaut, beleuchtet und mit dem Spiel-Mesher
+- Architektur: alle 11 Katalog-Häuser (Villa R9 180/160/140/130, Villa Belfronte, Beau Lac, Torre Ocra, Bungalow,
+  Palais Étoile …) werden beim Start vom Villenbauer des Spiels gebaut, beleuchtet und mit dem Spiel-Mesher
   gerendert — komplett mit Garten, Pool, Garage. Unten links: Schnitt (Erdgeschoss / Etage zeigt die Räume von
   oben), Skin-Farben und Spiegeln bauen das Haus live neu.
 - Bausteine (rechts): alles, woraus ein Haus besteht — jedes Möbel- und Fassadenmodell mit Stückzahl (Klick
@@ -261,3 +261,11 @@ SO BENUTZT DU DAS STUDIO
   „Ohne Textur“ zeigt die reine Voxel-Form.
 - Rechts „Modell“: die Definition — ändern und ▶ Ausführen. „Datei“: die ganze voxfurn.js.
 - Was du hier änderst, gilt nur in diesem Browser (zum Ausprobieren).
+
+RECHTLICHES
+- R9-SI und R9 Studio sind ein eigenständiges, unabhängiges Werk: ein eigenes Voxelspiel, inspiriert vom Genre der
+  Block-Sandbox-Spiele, mit keiner anderen Spielefirma verbunden und von keiner genehmigt, gesponsert oder unterstützt.
+  NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. Minecraft ist eine Marke
+  von Mojang; WorldEdit, Amulet, Axiom, Litematica, MCEdit und MagicaVoxel sind Namen bzw. Marken ihrer Inhaber und
+  stehen hier nur für die Dateiformate, die das Studio liest und schreibt.
+- 📜 oben rechts: Impressum, Datenschutz, Credits (die Schriften unter der SIL Open Font License) und dieser Hinweis.
