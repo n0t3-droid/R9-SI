@@ -7,7 +7,7 @@ for t in "$@"; do
   t0=$(date +%s)
   f=test/$t
   if [ -n "$DIST" ] && [[ $t == *.mjs ]]; then mkdir -p $SP/tsnap; sed -e "s#/home/claude/vr/dist#$DIST#g" -e "s#require('\./#require('/home/claude/vr/test/#g" test/$t > $SP/tsnap/$t; f=$SP/tsnap/$t; fi
-  if [[ $t == *.mjs ]]; then out=$(timeout 900 node $f 2>&1); else out=$(timeout 600 node $f 2>&1); fi
+  if [[ $t == *.mjs ]]; then out=$(flock /tmp/r9_browser.lock timeout 900 node $f 2>&1); else out=$(timeout 600 node $f 2>&1); fi
   rc=$?
   t1=$(date +%s)
   last=$(echo "$out" | grep -E "ALL OK|FAILED|^OK|FAIL|✗" | tail -3 | tr '\n' ' ')
