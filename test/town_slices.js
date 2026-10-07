@@ -133,7 +133,7 @@ async function main() {
   const cancelled = await until(() => answers(jobB.id).length >= 1, 'the cancelled job', 60000);
   check(cancelled && answers(jobB.id)[0].type === 'cancelled', 'after init the waiting job is answered cancelled');
   check(!replies.some((r) => r.type === 'error'), 'no job failed');
-  console.log(fail ? `FAIL ${fail}` : 'OK — the town plans are built in slices and the replies are the generator\'s');
+  console.log(fail ? `FAILED ${fail}` : 'the town plans are built in slices and the replies are the generator\'s\nALL OK');
   process.exit(fail ? 1 : 0);
 }
 main().catch((err) => { console.error(err); process.exit(1); });

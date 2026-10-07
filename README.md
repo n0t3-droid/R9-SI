@@ -103,6 +103,41 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🚪 Doors that open, 🏭 R9 Forge, 🌦 weather, one front door for all ages (v0.40)
+**Doors, switches and beds just work.** A quick click opens a door (wooden, iron with power, modern hinged, the
+generated houses' doors), a held click toggles it once instead of flickering, and the player walks through. Villagers
+open a door on their way and close it behind them; a guest's door, button or pressure plate stays as the guest left it
+in the host's world. Lamps, chests, beds and seats react to one click and never place a block by accident.
+
+**Klassisch v2.** Crisp pixels up close (no more smeared texels), every block lit alike with a one-texel outline as
+strong as its texture is busy, chunky matte leaves, still water per block, and the forged textures are kept in the
+browser (IndexedDB), so every start after the first skips the texture forge.
+
+**One front door.** The start screen has four big tiles — ▶ Losspielen (one click into a world), 🏗 Bauen, ✨ Erschaffen
+and 🎒 Meins — worlds as picture cards, a simple create form and a language picker. **Einfach / Profi**: Einfach keeps the
+pause menu, the Studio and the commands calm and large (44 px targets, readable text over the sky); Profi shows every
+tool. The whole game speaks **German and English** (`/sprache`), hints come one at a time, and the Studio has the same
+four tiles in its header with a breadcrumb back.
+
+**🏭 R9 Forge.** Say what you want — „ein Holzhaus mit Pool“, „Wachturm aus dunklem Stein“, „Brücke“, „Stadion“,
+„Raumschiff mit Hangar“ — and the Forge offers variants to place in the Studio (📍 Setzen) or right in the game with
+`/bau <Wunsch>` where you look. `/bau höher`, `mehr Glas`, `aus Stein` rebuild the last one changed on the same spot;
+a bridge without a length spans the gap in front of you. Towers are walkable from the street to the roof, stadiums
+have tunnels to the pitch, castles a market in the bailey. Everything is built in slices with one undo step.
+
+**🌦 Weather and sound.** Klar, bewölkt, Nebel (at dawn), Regen, Gewitter (bolts with thunder a moment later) and Schnee
+in cold places, scheduled from the world seed so host and guests share the sky. A synthesized soundscape — wind, rain,
+thunder, birds among trees by day, crickets on warm nights, water nearby — muffled indoors and under water, from twelve
+audio nodes. Both have a switch in ⚙ → 🌦 Atmosphäre and `/wetter`.
+
+**📜 Legal and privacy.** Impressum, privacy notice and credits in the pause menu, the settings and the Studio header;
+in multiplayer no name leaves the browser before a one-time notice; fonts are embedded (no requests to third
+parties); catalogue houses and milestones carry names of their own.
+
+**Steadier on low-end PCs.** The worker pool is sized from the CPU cores and the preset, town plans are built in
+slices, lazy models are pre-warmed in idle time (never in the first 10 s), a lost WebGL context saves and reloads.
+And 26 Modern Living pieces got their real shapes (lamps, basins, WC, mirror, lounge chair, kettle, wallbox, hammock …).
+
 ### 🧱 Klassisch, 🛋️ Modern Living, no dead ends in the Studio (v0.39)
 **Blöcke: Klassisch** — the game now looks like a block game again: every block is its own cube. Hills are one-block
 terraces instead of smooth slopes, every wall material shows a thin edge per block (the modern renders and Vollton
