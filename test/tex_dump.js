@@ -1,5 +1,5 @@
 const V=require('./load_shared.js');
-for (const f of ['tex_core','tex_recipes1','tex_recipes2','tex_recipes3','tex_items','tex_build']) require('../src/main/'+f+'.js');
+for (const f of ['tex_core','tex_recipes1','tex_recipes2','tex_recipes3','tex_items','tex_layout','tex_build']) require('../src/main/'+f+'.js');
 const R=V.R;
 const L=R.texNames.length;
 const cube=new Uint8Array(L), cut=new Uint8Array(L);

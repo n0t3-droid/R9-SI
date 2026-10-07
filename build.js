@@ -17,13 +17,17 @@ const fs = require('fs'), path = require('path');
 const ROOT = __dirname;
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
 const SHARED = ['core', 'folkanim', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxcells', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks4', 'items', 'groceries', 'biomes', 'gen_common', 'gen_overworld', 'gen_realm', 'shipgen', 'starship', 'gen_village', 'gen_city', 'gen_modern', 'gen_plan', 'gen_villa', 'gen_villa_rooms', 'gen_rails', 'gen_citadel', 'gen_heart', 'gen_temple', 'gen_isles', 'gen_canyon', 'gen_hills', 'gen_station', 'lod', 'gen_dims', 'light_local', 'mesher', 'physics', 'custom', 'style', 'edits'];
-const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_build'];
-const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'game'];
+const TEX = ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_layout', 'tex_build'];
+const MAIN = ['gl', 'shaders', 'renderer', 'horizon', 'world', 'env', 'input', 'place', 'player', 'storage', 'audio', 'particles', 'trails', 'trams', 'icons', 'voxmodels', 'entities', 'sim', 'crafting', 'gadgets', 'blueprints', 'starships', 'cockpit', 'traffic', 'villagers', 'folkmodel', 'villages', 'folklife', 'folkacts', 'festival', 'homes', 'shop', 'director', 'codex', 'map', 'net', 'mp', 'favs', 'pack', 'landing', 'ui', 'tex_cache', 'game'];
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const js = (dir, list) => list.filter(f => exists(`src/${dir}/${f}.js`)).map(f => `/* ${dir}/${f}.js */\n` + read(`src/${dir}/${f}.js`)).join('\n');
 const shared = js('shared', SHARED);
 const workerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js');
-const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + js('main', MAIN) + `
+// the texture cache's key (tex_cache.js): a hash of the worker's bundle (the shared code the block registry and the
+// recipes come from, the recipes, the forge) and of the cache itself. Any change there forges the textures again, once;
+// a change on the main thread alone (the UI, the game's own logic) keeps the cached textures.
+const texHash = require('crypto').createHash('sha256').update(workerSrc).update(js('main', ['tex_cache'])).digest('hex').slice(0, 16);
+const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + js('main', MAIN) + `
 window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.game.boot(); } catch (e) { console.error(e); document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;position:fixed;top:0;left:0;z-index:99">' + (e && e.stack || e) + '</pre>'); } });
 `;
 const css = read('src/ui/style.css');

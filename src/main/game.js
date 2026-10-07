@@ -76,10 +76,12 @@
       if (this.tex && this.texRim !== VR.LOOK.rim) this.reloadTextures();
       return true;
     }
-    // rebuild the block textures in a worker and upload them into the existing texture arrays; the icons follow
+    // the block textures of the current look, uploaded into the existing texture arrays; the icons follow. The look's
+    // textures come from the texture cache when they are there (tex_cache.js), else from a worker, and are kept for next time
     reloadTextures() {
-      const rim = VR.LOOK.rim, req = this.texReq = (this.texReq || 0) + 1;
-      this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: rim, classic: rim }, null, (tex) => {   // classic: Klassisch v2 (chunky natural recipes, the outline on every cube)
+      const rim = VR.LOOK.rim, req = this.texReq = (this.texReq || 0) + 1, t0 = performance.now();
+      const tkey = VR.TexCache ? VR.TexCache.key({ bevel: 1, bevelAll: rim }) : null;
+      const upload = (tex, fromCache) => {
         const r = this.renderer, gl = r && r.gl;
         if (req !== this.texReq || tex.type !== 'textures' || !gl || !r.texAlbedo || tex.layers !== r.layers) return;
         for (const [t, lv] of [[r.texAlbedo, tex.albedo], [r.texMaterial, tex.material]]) {
@@ -87,10 +89,19 @@
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
+        this.texFromCache = fromCache; this.texMs = Math.round(performance.now() - t0);
         if (VR.LOOK.rim !== rim) { this.reloadTextures(); return; }   // switched again while these were built: once more
         if (this.icons) { this.icons.alb = tex.albedo[0]; this.icons.cache.clear(); this.icons.faceCache.clear(); }
         if (this.player && this.player.inv) this.player.inv.changed = true;
         if (this.ui && this.ui.updateHUD && this.state === 'play') this.ui.updateHUD(true);
+      };
+      const forge = () => this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: rim, classic: rim }, null, (tex) => {   // classic: Klassisch v2 (chunky natural recipes, the outline on every cube)
+        if (tkey) VR.TexCache.put(tkey, tex);   // kept for the next look switch and the next start
+        upload(tex, false);
+      });
+      (tkey ? VR.TexCache.get(tkey) : Promise.resolve(null)).then((tex) => {
+        if (req !== this.texReq) return;   // another look was asked for meanwhile
+        if (tex) upload(tex, true); else forge();
       });
     }
     lookCommand(arg) {
@@ -187,14 +198,22 @@
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
-      // the textures are forged in a worker; a worker that fails (out of memory on a very small machine) is tried
-      // once more on another, then the game says so instead of waiting forever behind the loading screen
-      const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim), classic: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
-      let tex = await forge(0);
-      if (tex.type !== 'textures') { console.warn('textures failed once:', tex.msg); tex = await forge(this.pool.workers.length > 1 ? 1 : 0); }
-      if (tex.type !== 'textures') { this.fatal('The block textures could not be built (' + (tex.msg || 'worker failed') + '). Close other tabs and reload.'); return; }
+      // the block textures: the last start with this build and look kept them (tex_cache.js; a read slower than 500 ms is
+      // a miss), else they are forged in a worker and kept for the next start. A worker that fails (out of memory on a very
+      // small machine) is tried once more on another, then the game says so instead of waiting forever behind the loading screen
+      const rim0 = !!(VR.LOOK && VR.LOOK.rim), tkey = VR.TexCache ? VR.TexCache.key({ bevel: 1, bevelAll: rim0 }) : null, tTex0 = performance.now();
+      let tex = tkey ? await VR.TexCache.get(tkey) : null;
+      this.texFromCache = !!tex;
+      if (!tex) {
+        const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: rim0, classic: rim0 }, null, res));
+        tex = await forge(0);
+        if (tex.type !== 'textures') { console.warn('textures failed once:', tex.msg); tex = await forge(this.pool.workers.length > 1 ? 1 : 0); }
+        if (tex.type !== 'textures') { this.fatal('The block textures could not be built (' + (tex.msg || 'worker failed') + '). Close other tabs and reload.'); return; }
+        if (tkey) VR.TexCache.put(tkey, tex);
+      }
+      this.texMs = Math.round(performance.now() - tTex0);
       if (tex.missing && tex.missing.length) console.warn('Missing textures:', tex.missing);
-      this.tex = tex; this.texRim = !!(VR.LOOK && VR.LOOK.rim);
+      this.tex = tex; this.texRim = rim0;
       tex.noise = tex.noise;
       this.renderer.init(tex);
       this.icons = new VR.Icons(tex);
