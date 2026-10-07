@@ -493,6 +493,13 @@ void main() {
   float mipK = u_mipScale > 0.0 ? u_mipScale : 1.0;
   vec2 dx = dFdx(uv) * mipK, dy = dFdy(uv) * mipK;
   if (rot == 1u || rot == 3u) { dx = dx.yx; dy = dy.yx; }
+  // Klassisch: crisp texels up close, as in the original game — the sample snaps to its texel's centre and only the
+  // last pixel before a texel edge blends into the next texel (with anisotropic filtering many GPUs magnify linearly,
+  // which smeared the chunky pixels and the block outline into soft bands); texels smaller than a pixel pass as they are
+  if (u_blockVar > 0.5) {
+    vec2 tx = fu * 32.0, tw = max((abs(dx) + abs(dy)) * 32.0, vec2(1e-3));
+    fu = (floor(tx) + 0.5 + clamp((fract(tx) - 0.5) / tw, -0.5, 0.5)) / 32.0;
+  }
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;

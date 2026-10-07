@@ -266,6 +266,8 @@
       const chunked = classic && img.chunky && (isCube || isLeaf || isBlock);
       if (chunked) pixelate(img);
       const hCell = chunked ? img.h.slice() : null;
+      // chunky leaves are matte: on their flat facets a sun glint would cover whole texels and bleach the canopy
+      if (chunked && isLeaf) for (let i = 0; i < N * N; i++) img.ro[i] = Math.max(img.ro[i], 0.85);
       // Klassisch v2: the outline on every cube texture (the seamless materials have their stronger edge line), leaf
       // and natural block-like model
       const outlined = classic && ((isCube && !img.noBevel) || isLeaf || isBlock);
