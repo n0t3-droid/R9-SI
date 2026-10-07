@@ -18,6 +18,11 @@
     }
     return pts[pts.length - 1][1];
   }
+  // the cave field n at (fx, fz) inside a cell: bilinear over the cell's four corners in grid index i00 (i00 + 1: +x, + 5: +z)
+  function cornerLerp(grid, i00, n, fx, fz) {
+    const g000 = grid[i00][n], g100 = grid[i00 + 1][n], g010 = grid[i00 + 5][n], g110 = grid[i00 + 6][n];
+    return (g000 * (1 - fx) + g100 * fx) * (1 - fz) + (g010 * (1 - fx) + g110 * fx) * fz;
+  }
   const BASE = [[-1, 22], [-0.6, 26], [-0.4, 38], [-0.24, 50], [-0.15, 58], [-0.09, 62], [-0.04, 65], [0.1, 68], [0.3, 74], [0.55, 84], [1, 96]];
 
   class OverworldGen {
@@ -279,7 +284,7 @@
       const ny = Math.min(64, Math.ceil((maxH + 4) / 4));
       const grid = new Array(25 * (ny + 1));
       for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) for (let k = 0; k <= ny; k++) grid[(k * 5 + j) * 5 + i] = this.caveSample(x0 + i * 4, k * 4, z0 + j * 4);
-      const v = new Float32Array(3);
+      const lo = new Float64Array(3), hi = new Float64Array(3);   // a field's values in the cell's two layers (k, k + 1)
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         const col = lz * 16 + lx, h = H[col], cl = climate[col];
         const underWater = h < SEA + 1;
@@ -288,24 +293,28 @@
         const protect = entrance ? 0 : (underWater ? 10 : 5);
         const ci = lx >> 2, cj = lz >> 2, fx = (lx & 3) / 4, fz = (lz & 3) / 4;
         const top = Math.min(h - protect, ny * 4 - 1);
+        let kc = -1, i00 = 0;
         for (let y = 5; y <= top; y++) {
           const bi = (y << 8) | col;
           const b = blocks[bi];
           if (b !== S.stone && b !== S.deep) continue;
+          // the four blocks of a cell layer share the xz interpolation of the layer's corners: computed once per cell
           const k = y >> 2, fy = (y & 3) / 4;
-          for (let n = 0; n < 3; n++) {
-            const g000 = grid[(k * 5 + cj) * 5 + ci][n], g100 = grid[(k * 5 + cj) * 5 + ci + 1][n], g010 = grid[(k * 5 + cj + 1) * 5 + ci][n], g110 = grid[(k * 5 + cj + 1) * 5 + ci + 1][n];
-            const g001 = grid[((k + 1) * 5 + cj) * 5 + ci][n], g101 = grid[((k + 1) * 5 + cj) * 5 + ci + 1][n], g011 = grid[((k + 1) * 5 + cj + 1) * 5 + ci][n], g111 = grid[((k + 1) * 5 + cj + 1) * 5 + ci + 1][n];
-            const a0 = (g000 * (1 - fx) + g100 * fx) * (1 - fz) + (g010 * (1 - fx) + g110 * fx) * fz;
-            const a1 = (g001 * (1 - fx) + g101 * fx) * (1 - fz) + (g011 * (1 - fx) + g111 * fx) * fz;
-            v[n] = a0 * (1 - fy) + a1 * fy;
+          if (k !== kc) {
+            kc = k; i00 = (k * 5 + cj) * 5 + ci;
+            for (let n = 0; n < 3; n++) { lo[n] = cornerLerp(grid, i00, n, fx, fz); hi[n] = cornerLerp(grid, i00 + 25, n, fx, fz); }
           }
           const depth = h - y;
-          let thr = 0.36 + (y > 60 ? (y - 60) * 0.004 : 0) + (depth < 12 ? (12 - depth) * 0.02 : 0);
-          const cheese = v[0] > thr;
-          const r = v[1] * v[1] + v[2] * v[2];
-          const width = 0.0026 + (y < 40 ? 0.0012 : 0) + (entrance ? 0.0015 : 0);
-          const spag = r < width;
+          const thr = 0.36 + (y > 60 ? (y - 60) * 0.004 : 0) + (depth < 12 ? (12 - depth) * 0.02 : 0);
+          const cheese = Math.fround(lo[0] * (1 - fy) + hi[0] * fy) > thr;
+          // the spaghetti fields only matter where the cheese does not carve the block already
+          let spag = false;
+          if (!cheese) {
+            const v1 = Math.fround(lo[1] * (1 - fy) + hi[1] * fy), v2 = Math.fround(lo[2] * (1 - fy) + hi[2] * fy);
+            const r = v1 * v1 + v2 * v2;
+            const width = 0.0026 + (y < 40 ? 0.0012 : 0) + (entrance ? 0.0015 : 0);
+            spag = r < width;
+          }
           if (cheese || spag) {
             if (y < 11) blocks[bi] = S.lava;
             else if (y < 40 && cheese) {
