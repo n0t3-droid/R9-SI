@@ -72,6 +72,7 @@
       VR.setLook(mode); this.lookSent = mode;
       if (this.pool) this.pool.broadcast({ type: 'look', mode });
       this.remeshAll();
+      if (this.gadgets && this.gadgets.blue) this.gadgets.blue.reset();   // the ghosts of blueprints in hand follow the look
       if (this.tex && this.texRim !== VR.LOOK.rim) this.reloadTextures();
       return true;
     }
@@ -86,6 +87,7 @@
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
+        if (VR.LOOK.rim !== rim) { this.reloadTextures(); return; }   // switched again while these were built: once more
         if (this.icons) { this.icons.alb = tex.albedo[0]; this.icons.cache.clear(); this.icons.faceCache.clear(); }
         if (this.player && this.player.inv) this.player.inv.changed = true;
         if (this.ui && this.ui.updateHUD && this.state === 'play') this.ui.updateHUD(true);
@@ -952,7 +954,8 @@
         const cells = VR.VM.partCells(VR.VM.MODELS[t.name], t.get(s, 'facing'), t.get(s, 'part'), x, y, z);
         if (t.o.toggle && t.has('lit')) {
           const lit = t.get(s, 'lit') ? 0 : 1;
-          for (const [bx, by, bz] of cells) { const bs = w.getBlock(bx, by, bz); if (R.T.type[bs] === t.id) w.setBlock(bx, by, bz, t.with(bs, 'lit', lit), 4); }
+          const facing = t.get(s, 'facing');
+          cells.forEach(([bx, by, bz], i) => { const bs = w.getBlock(bx, by, bz); if (R.T.type[bs] === t.id && t.get(bs, 'facing') === facing && t.get(bs, 'part') === i) w.setBlock(bx, by, bz, t.with(bs, 'lit', lit), 4); });
           this.audio.play('click');
           return true;
         }

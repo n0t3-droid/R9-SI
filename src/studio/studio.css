@@ -196,7 +196,6 @@ nav.modes button.craftm.on { background: linear-gradient(180deg, #1a2a20, #14201
 #partsBody .design .ic { color: var(--acc2); }
 #partsBody .design .n { flex: 1; min-width: 0; }
 #partsBody .design small { display: block; color: var(--dim); font: 10px var(--mono); }
-#partsBody textarea.xfer { width: 100%; height: 110px; margin: 6px 0; font: 10px var(--mono); }
 #houseTools button.craft { color: var(--acc2); border-color: rgba(157, 255, 106, 0.45); }
 #houseTools .lbl.mine { color: var(--acc2); border-color: rgba(157, 255, 106, 0.45); }
 
