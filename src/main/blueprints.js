@@ -28,10 +28,12 @@
     const ROCK = /^(stone|andesite|granite|diorite|tuff|deepstone|deepslate|calcite|dripstone_block|basalt|smooth_basalt|blackstone|netherrack|end_stone)$/;
     for (const t of R.types) {
       if (!t || !t.name) continue;
-      const nat = t.cat === 'nature' || /^Natural/.test(t.group || '') || ROCK.test(t.name) || /_log$|_stem$|_leaves$/.test(t.name);
+      // a variant (B1 „⧉ Als Variante") is what its source is — a Welt-Stil rule may have made the terrain of it
+      const o = t.o && t.o.variantOf && R.byName[t.o.variantOf] ? R.byName[t.o.variantOf] : t;
+      const nat = o.cat === 'nature' || /^Natural/.test(o.group || '') || ROCK.test(o.name) || /_log$|_stem$|_leaves$/.test(o.name);
       NAT[t.id] = nat ? 1 : 0;
       const s = t.defaultState, fl = R.T.flags[s];
-      GROUND[t.id] = (fl & F.SOLID) && (fl & F.FULL) && !(fl & F.LEAVES) && !/_log$|_stem$|_wood$/.test(t.name) ? 1 : 0;
+      GROUND[t.id] = (fl & F.SOLID) && (fl & F.FULL) && !(fl & F.LEAVES) && !/_log$|_stem$|_wood$/.test(o.name) ? 1 : 0;
     }
   }
 
@@ -49,8 +51,8 @@
       const P = this.plan(); if (!P) return;
       P.CATALOGUE.forEach((c, i) => { const it = VR.ITEMS['blueprint_' + i]; if (it) it.name = 'Blueprint · ' + c.name + (VR.Custom && VR.Custom.houseFor(i) ? ' ★' : ''); });
     }
-    // the Studio saved new designs: every cached house is stale
-    reset() { this.cache.clear(); this.pending.clear(); this.names(); }
+    // the Studio saved new designs (or a look or a variant changed, B1): every cached house is stale, the tables too
+    reset() { NAT = null; GROUND = null; this.cache.clear(); this.pending.clear(); this.names(); }
     // the facades a house offers: every skin, plain and mirrored (a design has exactly its own)
     variants(i) {
       const P = this.plan(), cat = P && P.CATALOGUE[i]; if (!cat) return [];
