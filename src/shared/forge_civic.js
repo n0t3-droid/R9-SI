@@ -83,10 +83,10 @@
     stahl: { name: 'Stahl', wall: 'charcoal_panel', pier: 'black_metal', glass: 'window_black', roof: 'charcoal_panel', slab: 'charcoal_panel_slab', truss: 'black_metal', floor: 'concrete_smooth', column: 'black_metal', lamp: 'vx_lamppost_black', sky: true },
     backstein: { name: 'Backstein', wall: 'vx_redbrick', pier: 'bricks', glass: 'window_warm', roof: 'roof_charcoal', slab: 'roof_charcoal_slab', truss: 'vx_beam_dark', trussPr: { axis: 1 }, floor: 'vx_floor_stone', column: 'vx_column_classic', lamp: 'vx_lantern', sky: false },
     stein: { name: 'Stein', wall: 'vx_sandstone', pier: 'smooth_sandstone', glass: 'window_black', roof: 'slate_roof', slab: 'slate_roof_slab', truss: 'vx_beam_dark', trussPr: { axis: 1 }, floor: 'vx_floor_checker', column: 'vx_column_classic', lamp: 'vx_lantern', sky: false },
-    tech: { name: 'Tech', wall: 'vx_tech_white', pier: 'vx_tech_trim', glass: 'vx_glass_wall', glassPr: { facing: 0 }, roof: 'vx_tech_white', slab: 'charcoal_panel_slab', truss: 'vx_tech_band', floor: 'vx_floor_plaza', column: 'vx_tech_trim', lamp: 'vx_hex_light', sky: true },
+    tech: { name: 'Tech', wall: 'vx_tech_white', pier: 'vx_tech_trim', glass: 'vx_glass_wall', glassPr: { facing: 0 }, roof: 'charcoal_panel', slab: 'charcoal_panel_slab', truss: 'vx_tech_band', floor: 'vx_floor_plaza', column: 'vx_tech_trim', lamp: 'vx_hex_light', sky: true },
   };
   Forge.register({
-    id: 'hall', icon: '🏛', name: 'Markthalle', en: 'Market hall', level: true, sh: 1,
+    id: 'hall', icon: '🏛', name: 'Halle', en: 'Hall', level: true, sh: 1,
     params: [
       { k: 'l', label: 'Länge', min: 20, max: 60, def: 32, dim: true },
       { k: 'w', label: 'Breite', min: 12, max: 30, def: 18, dim: true },
@@ -96,7 +96,7 @@
     ],
     styles: Object.keys(HS).map(id => ({ id, name: HS[id].name })),
     lot: (P) => [P.params.w, P.params.l + 2],
-    describe: (P) => [P.params.l + ' × ' + P.params.w, P.params.m ? 'Marktstände' : 'Werkhalle'].concat(P.params.c ? ['Säulen'] : []),
+    describe: (P) => [P.params.m ? 'Markthalle' : 'Werkhalle', P.params.l + ' × ' + P.params.w].concat(P.params.c ? ['Säulen'] : []),
   }, function (P, env) {
     const { l, w, h, c, m } = P.params, S = HS[P.style] || HS.holz, rng = Forge.rng(P, 'hall');
     const dy = -1, W = w, D = l + 2, ridge = h + Math.floor(((w - 1) >> 1) / 2) + 1, K = Forge.kit(W, ridge + 4, D, dy);
@@ -178,9 +178,12 @@
     describe: (P) => [P.params.w + ' × ' + P.params.d, 'Mauer ' + P.params.h + ' hoch', P.params.t ? 'Rundtürme' : 'Ecktürme'].concat(P.params.k ? ['Bergfried'] : []),
   }, function (P, env) {
     const { w, d, h, t, k } = P.params, S = CS[P.style] || CS.stein, rng = Forge.rng(P, 'castle');
-    const dy = -1, TW = 7, towerH = h + 5, K = Forge.kit(w, towerH + 8 + (k ? 6 : 0), d, dy), cx = w >> 1;
+    // the keep (Bergfried) is the castle's tallest tower: its battlements stand a few rows over the corner towers' tops
+    const TW = 7, towerH = h + 5, KSH = 4, KF = Math.max(3, Math.ceil((towerH + 5) / KSH)), ktop = KF * KSH;
+    const KROOMS = ['salon', 'master', 'dining', 'library', 'study', 'guest', 'bedroom'];   // the knights' hall, the lord's chamber with a bath, …
+    const dy = -1, K = Forge.kit(w, Math.max(towerH + 8, k ? ktop + 7 : 0), d, dy), cx = w >> 1;
     const stone = (x, y, z) => K.set(x, y, z, rng.chance(0.12) ? S.wall2 : S.wall);
-    K.box(0, 0, 0, w - 1, 0, d - 1, 'grass_block'); K.box(0, 1, 0, w - 1, towerH + 7 + (k ? 6 : 0), d - 1, 0);
+    K.box(0, 0, 0, w - 1, 0, d - 1, 'grass_block'); K.box(0, 1, 0, w - 1, K.sy - 1, d - 1, 0);
     // ---- the curtain wall: two thick, the walk on top (row h − 1), merlons outside every other cell, a low parapet inside
     const inWall = (x, z) => x < 2 || z < 2 || x >= w - 2 || z >= d - 2;
     for (let z = 0; z < d; z++) for (let x = 0; x < w; x++) {
@@ -233,10 +236,10 @@
     K.set(w - 3, 1, d - TW - 3, 'vx_stove', { facing: 3 }); K.set(w - 4, 1, d - TW - 3, 'anvil'); K.set(w - 3, 1, d - TW - 4, 'vx_barrel'); K.set(w - 4, 1, d - TW - 5, 'vx_crate');
     for (let z = 4; z < d - 4; z += 6) { K.set(2, 1, z, S.lamp); K.set(w - 3, 1, z, S.lamp); }
     for (let x = 4; x < w - 4; x += 6) K.set(x, h + 1, 1, S.lamp);
-    // ---- the keep: 11 × 11 at the back, three floors with a scissor stair, battlements, furnished
+    // ---- the keep: 11 × 11 at the back, four to six floors with a scissor stair up onto its battlements, furnished
     const doors = [[cx, 1 + dy, 0]];
     if (k) {
-      const kw = 11, kd = 11, kx = cx - 5, kz = d - 3 - kd, SH = 4, KF = 3, ktop = KF * SH, KW = S.keepWall;
+      const kw = 11, kd = 11, kx = cx - 5, kz = d - 3 - kd, SH = KSH, KW = S.keepWall;
       for (let z = kz; z < kz + kd; z++) for (let x = kx; x < kx + kw; x++) {
         const ring = x === kx || x === kx + kw - 1 || z === kz || z === kz + kd - 1;
         for (let kf = 0; kf < KF; kf++) { const y0 = kf * SH; K.set(x, y0, z, ring ? S.wall : 'vx_floor_oak'); for (let y = y0 + 1; y < y0 + SH; y++) { if (ring) K.set(x, y, z, KW); else K.air(x, y, z); } }
@@ -245,12 +248,12 @@
       }
       for (let kf = 0; kf < KF; kf++) { const y = 2 + kf * SH; for (const [x, z, f] of [[kx, kz + 5, 3], [kx + kw - 1, kz + 5, 1], [kx + 3, kz + kd - 1, 2], [kx + 7, kz + kd - 1, 2], [kx + 3, kz, 0], [kx + 7, kz, 0]]) K.set(x, y, z, 'vx_window_arch', { facing: f }); }
       K.box(kx + 5, 1, kz, kx + 5, 2, kz, 0); K.door(kx + 5, 1, kz, 2, 'spruce_door', 0); K.set(kx + 4, 3, kz, S.lamp); K.set(kx + 6, 3, kz, S.lamp);
-      K.stairwell(kx + 1, 0, kz + 2, KF, SH, S.stair, S.wall, 'oak_fence', false);
+      const ksw = K.stairwell(kx + 1, 0, kz + 2, KF + 1, SH, S.stair, S.wall, 'oak_fence', false);   // every floor and up onto the battlements
       const rooms = [];
       const mkR = (fi, type, u0, v0, u1, v1, dr) => ({ fi, type, u0, v0, u1, v1, doors: dr, windows: [] });
       for (let kf = 0; kf < KF; kf++) {
         const stairDoors = []; for (let z = 1; z <= 6; z++) for (let x = 1; x <= 2; x++) stairDoors.push({ u: x, v: z, side: 0 });
-        const r = mkR(kf, kf === 0 ? 'salon' : kf === 1 ? 'master' : 'study', 1, 1, kw - 2, kd - 2, stairDoors.concat(kf === 0 ? [{ u: 5, v: 1, side: 0 }] : []));
+        const r = mkR(kf, KROOMS[Math.min(kf, KROOMS.length - 1)], 1, 1, kw - 2, kd - 2, stairDoors.concat(kf === 0 ? [{ u: 5, v: 1, side: 0 }] : []));
         if (kf === 1) r.zones = [{ u0: 1, v0: 1, u1: 4, v1: kd - 2, type: 'master' }, { u0: 5, v0: 1, u1: kw - 2, v1: kd - 2, type: 'bath' }];
         rooms.push(r);
       }
@@ -259,7 +262,7 @@
       K.furnish(H, 0, 'classic', rng, SH);
       K.set(kx + 5, ktop + 2, kz + 5, S.post); K.set(kx + 5, ktop + 3, kz + 5, S.banner); K.set(kx + 5, ktop + 4, kz + 5, S.banner);
     }
-    K.grid.meta = { name: 'Burg', doors, floors: [0], top: towerH + 7 + dy, walk: h - 1 + dy, lot: [w, d], anchor: [cx, 0] };
+    K.grid.meta = { name: 'Burg', doors, floors: [0], top: K.sy - 1 + dy, walk: h - 1 + dy, towerTop: towerH + dy, keep: k ? { floors: Array.from({ length: KF }, (_, i) => i * KSH + dy), roof: ktop + dy } : null, lot: [w, d], anchor: [cx, 0] };
     return K.grid;
   });
   // ---------------------------------------------------------------- 🏟

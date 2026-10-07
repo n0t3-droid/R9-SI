@@ -44,10 +44,15 @@
       const edge = x === 0 || x === w - 1;
       let mat = r ? S.deck : S.path, pr;
       if (r && w >= 5 && edge) mat = S.kerb;
-      else if (r && w >= 5 && x === (w >> 1) && (v & 1)) { mat = 'asphalt_dash'; pr = { axis: 2 }; }
+      else if (r && w >= 5 && S.deck === 'asphalt' && x === (w >> 1) && (v & 1)) { mat = 'asphalt_dash'; pr = { axis: 2 }; }
       K.set(x, deck, v, mat, pr);
       K.set(x, deck - 1, v, S.girder);
       if (edge) K.set(x, deck + 1, v, m && v % 8 === 4 ? S.lamp : S.rail);
+    }
+    // three rows of headroom over the deck (a branch or a bank in the way is cut back; the railings stay)
+    for (let v = 0; v < l; v++) for (let x = 0; x < w; x++) {
+      const edge = x === 0 || x === w - 1; if (edge && Math.round(env.ground(x, v)) < 1) continue;
+      for (let y = deck + 1; y <= deck + 3; y++) if (!(y === deck + 1 && edge)) K.air(x, y, v);
     }
     // the ends: a step up from the bank onto the deck, abutments filled to the ground
     for (let x = 0; x < w; x++) { K.set(x, deck, 0, r ? S.deck : S.path); K.set(x, deck, l - 1, r ? S.deck : S.path); }
@@ -132,23 +137,34 @@
     describe: (P) => [['', 'Zaun', 'Hecke'][P.params.k], P.params.l + ' lang', P.params.h + ' hoch'].concat(P.params.g ? ['mit Tor'] : []),
   }, function (P, env) {
     const { l, h, k, g } = P.params, S = WS[P.style] || WS.stein;
-    const G = (v) => Math.max(-env.depth, Math.min(-1, Math.round(env.ground(1, v))));
-    let minG = -1; for (let v = 0; v < l; v++) minG = Math.min(minG, G(v));
-    const dy = minG + 1, K = Forge.kit(3, h + 3 - dy, l, dy), X = 1;
+    // the ground under every segment, down into a valley or up a hill (the placer samples 40 over and 48 under the floor)
+    const G = (v) => Math.max(-env.depth, Math.min(40, Math.round(env.ground(1, v))));
+    let minG = 99, maxG = -99; for (let v = 0; v < l; v++) { minG = Math.min(minG, G(v)); maxG = Math.max(maxG, G(v)); }
+    const dy = minG + 1, K = Forge.kit(3, maxG - minG + h + 3, l, dy), X = 1;
     const gate = g && l >= 8 ? [(l >> 1) - 1, l >> 1] : [];
+    // a wall or hedge steps like a real one on a slope: level runs between pillars, a new run every six and wherever the
+    // ground has moved two from where the run began; each run is h over its highest ground, so the top never zigzags
+    const run = new Int16Array(l), runTop = []; let r0 = 0;
+    for (let v = 0; v < l; v++) { if (v > 0 && (v - r0 >= 6 || Math.abs(G(v) - G(r0)) >= 2 || gate.includes(v) !== gate.includes(v - 1))) r0 = v; run[v] = r0; }
+    for (let v = 0; v < l; v++) runTop[run[v]] = Math.max(runTop[run[v]] === undefined ? -99 : runTop[run[v]], G(v) + 1 + h);   // exclusive top, world rows
+    const topAt = (v) => runTop[run[v]] - dy;
     for (let v = 0; v < l; v++) {
-      const base = G(v) + 1 - dy, pillar = k !== 2 && (v % 6 === 0 || v === l - 1 || gate.includes(v - 1) || gate.includes(v + 1));
+      const base = G(v) + 1 - dy, pillar = k !== 2 && (run[v] === v || v === l - 1 || gate.includes(v - 1) || gate.includes(v + 1));
       if (gate.includes(v)) { K.set(X, base, v, 'oak_fence_gate', { facing: 1, open: 0 }); if (k === 0 && h >= 3) for (let y = base + 2; y < base + h; y++) K.set(X, y, v, S.body); continue; }
-      if (k === 2) { for (let y = base; y < base + h; y++) K.set(X, y, v, 'vx_hedge'); continue; }
+      if (k === 2) { for (let y = base; y < topAt(v); y++) K.set(X, y, v, 'vx_hedge'); continue; }
       if (k === 1) {
         if (pillar) { for (let y = base; y < base + Math.max(2, h); y++) K.set(X, y, v, S.post, S.pillarPr); K.set(X, base + Math.max(2, h), v, v % 12 === 0 ? S.lamp : S.cap, v % 12 === 0 ? undefined : { type: 0 }); }
         else for (let y = base; y < base + Math.max(1, h - 1); y++) K.set(X, y, v, y === base && S.fence === 'vx_fence_wood' ? S.fence : S.fence === 'vx_fence_wood' ? 'oak_fence' : S.fence);
         continue;
       }
-      if (pillar) { for (let y = base; y < base + h + 1; y++) K.set(X, y, v, S.pillar, S.pillarPr); K.set(X, base + h + 1, v, v % 12 === 0 && h >= 2 ? S.lamp : S.cap, v % 12 === 0 && h >= 2 ? undefined : { type: 0 }); }
-      else { for (let y = base; y < base + h - 1; y++) K.set(X, y, v, S.body); K.set(X, base + Math.max(0, h - 1), v, h > 1 ? S.top : S.body); }
+      if (pillar) {
+        // a pillar stands one over the higher of the two runs it joins, a lamp on every other one
+        const pt = Math.max(topAt(v), v > 0 ? topAt(v - 1) : 0, v < l - 1 && !gate.includes(v + 1) ? topAt(v + 1) : 0) + 1, lamp = h >= 2 && (v % 12 === 0 || v === l - 1);
+        for (let y = base; y < pt; y++) K.set(X, y, v, S.pillar, S.pillarPr);
+        K.set(X, pt, v, lamp ? S.lamp : S.cap, lamp ? undefined : { type: 0 });
+      } else { const tp = topAt(v); for (let y = base; y < tp - 1; y++) K.set(X, y, v, S.body); K.set(X, tp - 1, v, h > 1 ? S.top : S.body); }
     }
-    K.grid.meta = { name: ['Mauer', 'Zaun', 'Hecke'][k], doors: gate.length ? [[X, G(gate[0]) + 1, gate[0]]] : [], floors: [], top: h + 2 + minG, lot: [3, l], anchor: [1, 0] };
+    K.grid.meta = { name: ['Mauer', 'Zaun', 'Hecke'][k], doors: gate.length ? [[X, G(gate[0]) + 1, gate[0]]] : [], floors: [], top: h + 2 + maxG, lot: [3, l], anchor: [1, 0] };
     return K.grid;
   });
 })(VR);
