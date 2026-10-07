@@ -16,7 +16,7 @@ require(path.join(ROOT, 'src/main/legal.js'));
 const L = globalThis.VR && VR.Legal;
 
 console.log('1 · the module');
-check(!!L && ['open', 'close', 'isOpen', 'text', 'plain', 'html', 'button', 'shareHint', 'incomplete', 'mpNotice', 'mpToggle'].every(k => typeof L[k] === 'function'), 'VR.Legal: open / close / isOpen / text / plain / html / button / shareHint / incomplete / mpNotice / mpToggle');
+check(!!L && ['open', 'close', 'isOpen', 'text', 'plain', 'html', 'button', 'shareHint', 'incomplete', 'mpNotice', 'mpToggle', 'syncNotice', 'copy'].every(k => typeof L[k] === 'function'), 'VR.Legal: open / close / isOpen / text / plain / html / button / shareHint / incomplete / mpNotice / mpToggle / syncNotice / copy');
 if (!L) { console.log('FAILED ' + (fails + 1)); process.exit(1); }
 check(JSON.stringify(L.SECTIONS) === JSON.stringify(['impressum', 'datenschutz', 'credits', 'hinweis']), 'four sections: Impressum · Datenschutz · Credits · Hinweis');
 check(L.open('impressum') === false && !L.isOpen(), 'without a page (no document) open() does nothing and says so');
@@ -43,20 +43,20 @@ check(/Teile nur, was dir gehört/.test(L.shareHint('de')) && /Share only what i
 console.log('3 · the owner: placeholders until filled in, never invented');
 const O = L.OWNER;
 check(O && 'name' in O && 'address' in O && 'email' in O, 'VR.Legal.OWNER has name, address, email');
-const shipped = { name: O.name, address: O.address, email: O.email };
-const filled = !!(O.name && O.address && O.email);
+const shipped = { name: O.name, address: O.address, email: O.email, year: O.year };
+const filled = !!(O.name && O.address && O.email && O.year);
 if (!filled) {
   const imp = T('impressum', 'de');
   check(imp.includes('[Name]') && imp.includes('[Anschrift]') && imp.includes('[E-Mail]'), 'Impressum (de): the placeholders [Name] [Anschrift] [E-Mail]');
   check(T('impressum', 'en').includes('[Name]') && T('impressum', 'en').includes('[Address]') && T('impressum', 'en').includes('[E-mail]'), 'Impressum (en): [Name] [Address] [E-mail]');
   check(L.incomplete() && /Vor dem öffentlichen Start ausfüllen/.test(imp) && /fill in before the public launch/i.test(T('impressum', 'en')), 'a visible note: they must be filled in before the launch');
-  check(T('datenschutz', 'de').includes('[Name]') && T('credits', 'de').includes('© 2026 [Name]'), 'the Datenschutz (Verantwortlicher) and the Credits (©) use the same placeholders');
+  check(T('datenschutz', 'de').includes('[Name]') && T('credits', 'de').includes('© [Jahr] [Name]'), 'the Datenschutz (Verantwortlicher) and the Credits (©) use the same placeholders, [Jahr] included');
   const h = L.html('impressum');
   check((h.match(/<mark class="lg-ph"/g) || []).length >= 3, 'in the page the placeholders are marked (<mark class="lg-ph">)');
 } else console.log('  · OWNER is filled in — the placeholder checks are skipped');
-Object.assign(O, { name: 'Erika Beispiel', address: 'Teststraße 1, 12345 Musterort', email: 'test@example.org' });
+Object.assign(O, { name: 'Erika Beispiel', address: 'Teststraße 1, 12345 Musterort', email: 'test@example.org', year: '2026' });
 const imp2 = T('impressum', 'de');
-check(!L.incomplete() && imp2.includes('Erika Beispiel') && imp2.includes('Teststraße 1') && imp2.includes('12345 Musterort') && imp2.includes('test@example.org') && !/\[Name\]|\[Anschrift\]|\[E-Mail\]|Vor dem öffentlichen Start/.test(imp2), 'filled in: the details show, the placeholders and the note are gone');
+check(!L.incomplete() && T('credits', 'de').includes('© 2026 Erika Beispiel') && imp2.includes('Erika Beispiel') && imp2.includes('Teststraße 1') && imp2.includes('12345 Musterort') && imp2.includes('test@example.org') && !/\[Name\]|\[Anschrift\]|\[E-Mail\]|Vor dem öffentlichen Start/.test(imp2), 'filled in: the details show, the placeholders and the note are gone');
 check(/Erika Beispiel, Teststraße 1, 12345 Musterort, E-Mail: test@example.org/.test(T('datenschutz', 'de')), 'the Verantwortlicher in one line');
 check(!/<mark class="lg-ph"/.test(L.html('impressum')) && L.html('impressum').includes('Teststraße 1<br>12345 Musterort'), 'the address breaks into lines in the page');
 Object.assign(O, shipped);
@@ -164,6 +164,26 @@ const cfiles = ['src/main/codex.js'].concat(fs.readdirSync(path.join(ROOT, 'src/
 const chits = []; for (const f of cfiles) { const s = read(f); for (const w of OTHER) if (s.includes(w)) chits.push(f + ': ' + w); }
 check(!chits.length, 'no codex milestone title of another game (' + cfiles.join(', ') + ')' + (chits.length ? ': ' + chits.join(' · ') : ''));
 check(['stone', 'furnace', 'diamond', 'sleep'].every(id => read('src/main/codex.js').includes(`['${id}', `)), 'the milestone ids are kept (saved worlds\' codex)');
+
+console.log('11 · the multiplayer name: „Explorer“ until the notice is answered (static: the code paths)');
+const MP = read('src/main/mp.js'), UI = read('src/main/ui.js');
+check(/myName\(\) \{ return this\.noticeOk\(\) \? this\.nameIfShown\(\) : 'Explorer'; \}/.test(MP), 'mp.js: myName() is „Explorer“ until noticeOk() — every outgoing name (presence, hello, welcome, chat) goes through it');
+check((MP.match(/T\.me\.name/g) || []).length === 1 && /nameIfShown\(\) \{[^\n]*T\.me\.name/.test(MP), 'the claude.ai profile name is read in one place only (nameIfShown), never sent directly');
+check(/noticeOk\(\) \{[^\n]*r9si\.mpNotice|NOTICE = 'r9si\.mpNotice'/.test(MP) && /localStorage\.setItem\(NOTICE, '1'\)/.test(MP), 'the answer is remembered in localStorage „r9si.mpNotice“');
+check(/mp\.status === 'off'|status = 'off'/.test(MP) && /setItem\('r9si\.mp', 'off'\)/.test(MP), '„Mehrspieler aus“ sets r9si.mp = off (no connection from the next start)');
+check(/setItem\(NOTICE, 'off'\)/.test(MP) && /getItem\(NOTICE\) !== '1'/.test(MP), '„Mehrspieler aus“ is remembered as the choice in r9si.mpNotice (\'off\'), a confirmed answer is never overwritten');
+const rh = UI.slice(UI.indexOf('renderHosts() {'), UI.indexOf('\n    }', UI.indexOf('renderHosts() {')));
+check(rh.length > 200 && !/Legal|noticeOk/.test(rh), 'the title\'s own multiplayer box (renderHosts) is untouched — the notice is a card, not part of the title screen');
+check(/VR\.Legal\.button\(/.test(UI) && (UI.match(/data-legal/g) || []).length >= 2, 'the 📜 button: pause menu and settings (the title screen has none)');
+check(/mpNotice\(g\)|mpNotice\(this\.game\)/.test(UI), 'the pause menu\'s 👥 panel and the settings show the notice while it is unanswered');
+const DS = T('datenschutz', 'de');
+check(/„Explorer“/.test(DS) && /Bis dahin wird als Name nur/.test(DS), 'the Datenschutz says what is sent before the answer: „Explorer“ only');
+check(/only the name "Explorer" is sent/.test(T('datenschutz', 'en')), 'the same in English');
+const LG = read('src/main/legal.js');
+check(/class="lg-copy"[^\n]*<\/button><span class="lg-msg"/.test(LG) && /L\.copy\(cur\)/.test(LG) && /L\.text\(s\)/.test(LG), '📋 Kopieren: one button in each tab’s footer, copying that tab');
+check(!/L\.mpHint|noticeAsk|noticeHinted/.test(LG + MP + UI), 'no leftovers of the title-box notice (mpHint, noticeAsk, noticeHinted)');
+check(/Kopieren/.test(LG) && /copyT/.test(LG), 'the button is labelled „📋 Kopieren“ (DE)');
+check(/#r9mpcard/.test(read('src/ui/legal.css')) && /#r9legal \.lg-foot/.test(read('src/ui/legal.css')), 'the card and the footer have their styles');
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
