@@ -309,6 +309,7 @@
   let CUR = L.empty();
   const HOOKS = [];
   L.on = (fn) => { HOOKS.push(fn); };
+  L.ver = 0;   // counts the applies that changed something (caches keyed by block colour compare it: lod.js)
   L.current = () => CUR;
   const sig = (o) => (o ? JSON.stringify(o) : '');
   // → the ids of the block types whose look changed (the caller re-meshes what holds them)
@@ -331,6 +332,7 @@
     return [...changed];
   };
   function refresh(changed, vx, slotCh, opts) {
+    L.ver++;
     for (const id of changed) { const t = R.types[id]; if (t) t.itemDef = null; }
     if (vx && VR.VX) { if (slotCh.length && VR.VX.refreshStates) for (const k of slotCh) { const t = SLOTT[k]; if (t) VR.VX.refreshStates(t.base, t.nstates); } if (VR.VX.clearCache) VR.VX.clearCache(); }
     if (VR.meshCacheClear) VR.meshCacheClear();
