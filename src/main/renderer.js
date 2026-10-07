@@ -531,6 +531,11 @@
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
+      // A1 Atmosphäre: wet ground / overcast / rainbow / moon phase, the valley fog (with the eye's height), the
+      // lightning bolt, the village glow (all zero: today's look)
+      const v4 = (n, a) => { if (u[n] && a) gl.uniform4f(u[n], a[0], a[1], a[2], a[3]); };
+      v4('u_wx', E.wx); v4('u_bolt', E.bolt); v4('u_glow', E.glow);
+      if (u.u_fogH && E.fogH) gl.uniform4f(u.u_fogH, this.cam ? this.cam.y : 0, E.fogH[1], E.fogH[2], E.fogH[3]);
     }
     bindTerrainTextures(p) {
       const gl = this.gl;
@@ -664,7 +669,7 @@
     // ------------------------------------------------ clouds
     updateClouds(E, cam) {
       const cell = 12, R = (this.q.clouds >= 2 ? 44 : 30) + (this.q.horizon ? 20 : 0); // cells radius
-      const wind = E.time * 0.9;
+      const wind = E.cloudX !== undefined ? E.cloudX : E.time * 0.9;   // the clouds drift with the wind (A1)
       const ocx = Math.floor((cam.x + wind) / cell), ocz = Math.floor(cam.z / cell);
       const cov = Math.round(E.cloudCover * 20) / 20;
       const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + R;
@@ -912,6 +917,7 @@
       gl.uniform1f(p.u.u_snow, F.precip.snow ? 1 : 0);
       gl.uniform3f(p.u.u_right, this.camRight[0], this.camRight[1], this.camRight[2]);
       gl.uniform3f(p.u.u_ambSky, E.ambSky[0], E.ambSky[1], E.ambSky[2]);
+      if (p.u.u_windV) gl.uniform2f(p.u.u_windV, E.windV ? E.windV[0] : 0, E.windV ? E.windV[1] : 0);
       // upload heights
       if (F.precip.heights) {
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texHeights);
@@ -1061,7 +1067,7 @@
         const cx = m[0] * c[0] + m[4] * c[1] + m[8] * c[2] + m[12], cy = m[1] * c[0] + m[5] * c[1] + m[9] * c[2] + m[13], cw = m[3] * c[0] + m[7] * c[1] + m[11] * c[2] + m[15];
         if (cw > 0) {
           const sx = (cx / cw) * 0.5 + 0.5, sy = (cy / cw) * 0.5 + 0.5;
-          const fade = Math.max(0, 1 - Math.max(Math.abs(sx - 0.5), Math.abs(sy - 0.5)) * 1.6) * Math.min(1, L[1] * 4) * (1 - E.rain);
+          const fade = Math.max(0, 1 - Math.max(Math.abs(sx - 0.5), Math.abs(sy - 0.5)) * 1.6) * Math.min(1, L[1] * 4) * (1 - Math.max(E.rain, E.wx ? E.wx[1] : 0));
           if (fade > 0.02) {
             raysOn = true;
             const p = this.P.rays; gl.useProgram(p.p);
