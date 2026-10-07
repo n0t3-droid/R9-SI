@@ -161,6 +161,33 @@ console.log('5 · a Forge plan waits for the worker, then builds');
   check(pl.status === 'built' && n > 100, 'the park stands (' + n + ' blocks)');
 }
 
+console.log('5b · 🔁 An seiner Stelle: the new one replaces the old one in one step');
+{
+  store.clear();
+  // the old one: a 3 × 3 × 1 stone slab with a glass post at (1, 1, 1) and (1, 2, 1); the new one: a 2 × 1 × 2 plank floor
+  const slab = [];
+  for (let z = 0; z < 3; z++) for (let x = 0; x < 3; x++) slab.push([x, 0, z, STONE]);
+  slab.push([1, 1, 1, GLASS], [1, 2, 1, GLASS]);
+  putLib([libItem('old', 3, 3, 3, slab, 0), libItem('neu', 2, 1, 2, [[0, 0, 0, PLANKS], [1, 0, 0, PLANKS], [0, 0, 1, STONE], [1, 0, 1, PLANKS]], 0)]);
+  const world = makeWorld(), { blue, undo } = makeGame(world);
+  blue.loadPlans();
+  const a = { id: 'pr1', kind: 'piece', piece: 'p:old', ox: 30, oz: 30, F: 4, r: 0, status: 'pending', t: 1, ding: 'p:old' };
+  blue.plans.push(a); blue.storePlans((ps) => ps.concat([a]));
+  check(blue.tryBuild(a) === 'built' && world.getBlock(31, 6, 31) === GLASS, 'the old one stands');
+  world.set(32, 4, 32, PLANKS);   // the player changed one of its blocks since: that one stays
+  const b = { id: 'pr2', kind: 'piece', piece: 'p:neu', ox: 30, oz: 30, F: 4, r: 0, status: 'pending', t: 2, ding: 'p:neu', replaces: 'pr1' };
+  blue.plans.push(b); blue.storePlans((ps) => ps.concat([b]));
+  const n0 = undo.length, res = blue.tryBuild(b);
+  check(res === 'built' && undo.length === n0 + 1, 'built in one undo step (' + res + ')');
+  check(world.getBlock(30, 4, 30) === PLANKS && world.getBlock(30, 4, 31) === STONE && world.getBlock(31, 4, 31) === PLANKS, 'the new one stands (a stone cell where the old one had stone too)');
+  check(world.getBlock(31, 5, 31) === 0 && world.getBlock(31, 6, 31) === 0 && world.getBlock(32, 4, 30) === 0 && world.getBlock(30, 4, 32) === 0, 'the old one\'s other blocks are gone');
+  check(world.getBlock(32, 4, 32) === PLANKS, 'what the player changed since stays');
+  check(blue.plans.find(q => q.id === 'pr1').status === 'replaced' && plansOf().find(q => q.id === 'pr1').status === 'replaced', 'the old plan is „replaced"');
+  world.bulkSet(undo.pop());
+  check(world.getBlock(31, 6, 31) === GLASS && world.getBlock(32, 4, 30) === STONE && world.getBlock(30, 4, 30) === STONE && world.getBlock(31, 4, 31) === STONE, 'its undo brings the old one back exactly');
+  check(typeof blue.setStatus === 'function' && blue.setStatus('pr1', 'built') && plansOf().find(q => q.id === 'pr1').status === 'built', 'setStatus puts the old plan back to built');
+}
+
 console.log('6 · the browser storage is full');
 {
   store.clear();
