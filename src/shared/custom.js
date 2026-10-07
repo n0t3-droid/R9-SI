@@ -154,6 +154,8 @@
 
   // ---------------------------------------------------------------- models
   const orig = {};   // name → the compiled original (vol, pal, bounds) so an override can be undone in a live page
+  // a model made anew under the same name (a variant slot's model, looks.js): its original is the new one
+  C.forget = function (name) { delete orig[name]; };
   C.applyModel = function (name, ov) {
     const VM = VR.VM, m = VM && VM.MODELS[name]; if (!m) return false;
     if (!orig[name]) orig[name] = { vol: m.vol, pal: m.pal, col: m.col, vox: m.vox, bounds: m.parts.map(p => p.bounds.slice()) };

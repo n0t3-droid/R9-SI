@@ -67,6 +67,8 @@
     cache.set(key, m);
     return m;
   };
+  // a variant slot filled or emptied (looks.js): its props changed — the maps are built again
+  WS.clearCache = () => cache.clear();
   WS.applyGen = function (blocks, map) { if (!map) return blocks; for (let i = 0; i < blocks.length; i++) { const s = blocks[i]; if (s) blocks[i] = map[s]; } return blocks; };
   // a saved column (player edits kept): cells that still hold what the generator made under the old rules take the new
   WS.reconcile = function (saved, raw, oldMap, newMap) {

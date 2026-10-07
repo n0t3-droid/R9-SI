@@ -183,14 +183,16 @@
     const o = obj(tex) || {};
     return { top: pick(o.top, 'top'), side: pick(o.side, 'side'), bottom: pick(o.bottom || o.top, 'bottom') };
   }
+  // the states a type really has (a variant: its source's; the rest of its slot stays the grey cube)
+  const usedStates = (t) => { if (slotIndex(t) < 0) return t.nstates; const src = t.o.variantOf && R.byName[t.o.variantOf]; return src ? Math.min(src.nstates, t.nstates) : 0; };
   function applyTex(t, lk) {
-    if (L.kindOf(t.name) !== 'tex' && !(slotIndex(t) >= 0 && t.o.variantOf && R.T.shape[t.defaultState] !== SH.VOXEL)) return false;
+    if (L.kindOf(t.name) !== 'tex') return false;
     const T = T_(), rc = lk.rc ? L.to565(L.hex2int(lk.rc)) : 0;
     const dl = lk.tex && cubeLike(t) ? donorLayers(lk.tex) : null;
     const anyTex = dl && (dl.top >= 0 || dl.side >= 0 || dl.bottom >= 0);
     if (!rc && !anyTex) return false;
-    const slab = t.o.kind === 'slab', MD = VR.MODEL;
-    for (let s = t.base; s < t.base + t.nstates; s++) {
+    const slab = t.o.kind === 'slab', MD = VR.MODEL, n = usedStates(t);
+    for (let s = t.base; s < t.base + n; s++) {
       if (rc) { snap(s); T.rc[s] = rc; }
       if (!anyTex) continue;
       snap(s);
