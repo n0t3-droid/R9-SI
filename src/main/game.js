@@ -60,6 +60,7 @@
       if (this.audio) this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
+      if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
       this.applyLook();
     }
     // ---------------------------------------------------------------- the block look (v0.39)

@@ -44,6 +44,8 @@
 
 /* 📜 buttons: the game's (.btn small) take the game's look; the Studio's header has its own small one */
 .r9legal-btn { white-space: nowrap; }
+#settings .r9legal-btn { margin-left: 8px; }
+#pause .r9legal-btn { font-size: 14px; opacity: 0.9; }
 #studio header .lg-hdr { order: 5; flex: none; font-size: 12px; padding: 5px 11px; border-radius: 999px; color: var(--mute, #93a2bb); background: transparent; }
 #studio header .lg-hdr:hover { color: var(--txt, #e4ebf7); }
 

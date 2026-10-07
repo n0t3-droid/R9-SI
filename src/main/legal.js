@@ -386,7 +386,7 @@
     if (mp.status === 'off') {
       box.classList.add('off');
       box.appendChild(elx('div', 'mpn-t', '👥 ' + T('mp.offLine', 'Mehrspieler ist aus — das Spiel sendet nichts.', 'Multiplayer is off — the game sends nothing.')));
-      const r = elx('div', 'mpn-b'); r.appendChild(btnx(small, T('mp.on', 'Mehrspieler an', 'Turn multiplayer on'), () => { mp.turnOn(); refresh(g); })); box.appendChild(r);
+      const r = elx('div', 'mpn-b'); r.appendChild(btnx(small, T('mp.on', 'Mehrspieler an', 'Turn multiplayer on'), () => { Promise.resolve(mp.turnOn()).then(() => refresh(g), () => refresh(g)); refresh(g); })); box.appendChild(r);
       return box;
     }
     if (mp.noticeAsk) box.classList.add('ask');
@@ -428,7 +428,7 @@
     const lab = elx('label', 'row gap note'); lab.style.margin = '6px 0';
     const cb = elx('input'); cb.type = 'checkbox'; cb.checked = mp.status !== 'off'; cb.dataset.mpToggle = '1';
     lab.appendChild(cb); lab.appendChild(document.createTextNode(' 👥 ' + T('mp.toggle', 'Mehrspieler (mit eingeladenen Freunden) — aus: das Spiel sendet nichts', 'Multiplayer (with invited friends) — off: the game sends nothing')));
-    cb.addEventListener('change', () => { if (cb.checked) mp.turnOn(); else mp.turnOff(); refresh(g); });
+    cb.addEventListener('change', () => { if (cb.checked) Promise.resolve(mp.turnOn()).then(() => refresh(g), () => refresh(g)); else mp.turnOff(); refresh(g); });
     wrap.appendChild(lab);
     if (mp.ready && mp.noticeOk && !mp.noticeOk()) wrap.appendChild(L.mpNotice(g));
     return wrap;

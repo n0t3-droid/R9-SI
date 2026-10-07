@@ -371,20 +371,24 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
       { const b = $('#studiolive'); if (b) b.style.display = this.game.meta && this.game.meta.guest ? 'none' : ''; }
       this.buildZenPanel();
       this.buildMpPanel();
+      if (VR.Legal && !$('#pause [data-legal]')) { const q = $('#pause [data-act="quit"]'); if (q) q.after(VR.Legal.button('btn small')); }   // 📜 Impressum · Datenschutz (src/main/legal.js)
       const g = this.game;
       $('#pausenote').textContent = `${g.meta.name} · seed ${g.meta.seed}`;
     }
     // ---------------------------------------------------------------- multiplayer menus
     renderHosts() {
       const box = $('#mphosts'); if (!box) return;
+      if (box.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;   // typing a nickname there: not now
       const mp = this.game.mp;
       box.innerHTML = '';
       const head = el('div', 'mphead');
       if (!mp || mp.status === 'connecting') { head.innerHTML = '<span class="dot wait"></span><b>Multiplayer</b> · connecting…'; box.appendChild(head); return; }
+      if (mp.status === 'off' && VR.Legal) { head.innerHTML = '<span class="dot off"></span><b>Multiplayer</b>'; box.appendChild(head); box.appendChild(VR.Legal.mpNotice(this.game)); return; }   // 👥 Mehrspieler aus (src/main/legal.js)
       if (!mp.ready) { head.innerHTML = '<span class="dot off"></span><b>Multiplayer</b> · not available here'; box.appendChild(head); box.appendChild(el('div', 'note', MP_OFF_HTML)); return; }
       const online = mp.online || [];
       head.innerHTML = '<span class="dot"></span><b>Multiplayer</b> · ' + (online.length ? online.length + ' friend' + (online.length > 1 ? 's' : '') + ' online: ' + online.map(o => esc(o.name)).join(', ') : 'no friends online yet');
       box.appendChild(head);
+      if (VR.Legal && mp.noticeOk && !mp.noticeOk()) box.appendChild(VR.Legal.mpNotice(this.game));   // 👥 the one-time name notice: nothing named goes out before it
       const list = mp.hostList().filter(h => !h.isMe);
       if (!list.length) {
         const d = document.createElement('details'); d.className = 'invitebox';
@@ -426,6 +430,7 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
     titleNote(msg) { const n = $('#titlenote'); if (!n) return; n.textContent = msg || ''; clearTimeout(this.titleNoteT); if (msg) this.titleNoteT = setTimeout(() => { n.textContent = ''; }, 12000); }
     buildMpPanel() {
       const g = this.game, mp = g.mp, box = $('#mppanel'); if (!box) return;
+      if (VR.Legal && mp && (mp.status === 'off' || (mp.ready && mp.noticeOk && !mp.noticeOk()))) { box.innerHTML = ''; box.appendChild(VR.Legal.mpNotice(g, true)); return; }   // 👥 Mehrspieler aus / the name notice first (src/main/legal.js)
       box.innerHTML = '';
       const head = el('div', 'subtitle', '👥 Multiplayer'); box.appendChild(head);
       if (!mp || mp.status === 'connecting') { box.appendChild(el('div', 'note', 'Connecting…')); return; }
@@ -470,6 +475,7 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
       const st = $('#settabs'); st.innerHTML = '';
       for (const [k, n] of tabs) { const b = el('button', k === this.settingsTab ? 'on' : '', n); b.onclick = () => { this.settingsTab = k; this.showSettings(); }; st.appendChild(b); }
       const S = this.game.settings, body = $('#setbody');
+      if (VR.Legal && !$('#settings [data-legal]')) { const d = $('#settings [data-act="setback"]'); if (d) d.after(VR.Legal.button('btn small')); }   // 📜 next to Done (src/main/legal.js)
       body.innerHTML = '';
       const row = (label, html) => { const d = el('div', 'kv'); d.innerHTML = `<div>${label}</div><div>${html}</div>`; body.appendChild(d); return d; };
       const slider = (key, label, min, max, step, fmt, onch) => {
@@ -539,6 +545,7 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
           row('Skin', Folk.SKIN, 'skin', (c) => hex(c));
           body.appendChild(el('div', 'hr'));
         }
+        if (VR.Legal && this.game.mp) body.appendChild(VR.Legal.mpToggle(this.game));   // 👥 Mehrspieler an / aus and the name notice (src/main/legal.js)
         if (S.mpHost === undefined) S.mpHost = true;
         toggle('mpHost', 'Friends can join my worlds (claude.ai version)');
         toggle('showCoords', 'Show coordinates'); toggle('minimap', 'Minimap'); toggle('toasts', 'Discovery toasts');
