@@ -17,7 +17,7 @@ bash test/regress.sh "" smoke.mjs               # named tests only
 
 ## Release regression set
 
-17 node tests and 31 browser tests (48 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
+18 node tests and 32 browser tests (50 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`) plus `invent.mjs`; the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js`, `tex_check.js` and `inventions.js`, which were added after those runs and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
 
 Typical time of a full release run: about 127 min of browser tests (median of the recorded passing runs, plus the wait for the lock) and about 72 s of node tests.
 
@@ -34,6 +34,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | heart_gen.js | node | Heartland generator smoke test: climate and biome at key points, temple, chunk timings; every chunk has blocks. | 3 † | – | no |
 | housekit.js | node | The Haus-Baukasten: every roof, wall, window and extra builds; doors, stairs and furniture land where they belong. | 2 (2–2) | 3/3 | yes |
 | id_snapshot.js | node | Every shipped block type keeps its state-id range (saved worlds store raw ids). | 1 † | – | yes |
+| inventions.js | node | 💡 Erfinderwerkstatt data: 167 inventions from six start cards, every result an existing item id, unique pairs, every card reachable, texts in German and English, rewards by mode, codex entries, build wiring. | 2 † | – | yes |
 | light_same.js | node | Column light equals the v0.39 algorithm's output (the reference is kept in the test). | 6 † | – | yes |
 | look_classic.js | node | Klassisch block look (the default): each block a cube with its own edges and patterns; mesh checks. | 5 † | – | no |
 | mesh_same.js | node | Mesher output is unchanged when its loops are tuned: every vertex stream, for two looks. | 13 † | – | yes |
@@ -72,6 +73,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | home_kit.mjs | browser | Village Life and Supermarket kit showcase: a supermarket interior and a farm yard; every block exists. | – | – | no |
 | house_genie.mjs | browser | v0.35 Erschaffen: the Haus-Baukasten and the Genie end to end, including the 'not granted' case. | 199 (174–858) | 7/8 | yes |
 | imagine.mjs | browser | v0.35 picture to 3D: a picture becomes a Blockbild with the background removed; files round-trip. | 74 (64–75) | 4/4 | yes |
+| invent.mjs | browser | 💡 Erfinden (de-DE): opens from the pause menu and with key I; Feuer + Stein gives an invention that joins the cards; a wrong pair wobbles; 💡 Tipp; the creative item lands in the inventory; progress survives a reload; no page errors. | – | – | yes |
 | life_kit.mjs | browser | Village Life and Supermarket kit showcase: the same builds; every block exists and door boxes match open or closed. | – | – | no |
 | modern_kit.mjs | browser | v0.30 modern building set: Vollton colours, panorama glass with connected frames, the nine modern doors. | 114 (114–114) | 1/1 | yes |
 | modern_pack.mjs | browser | Modern Living in the browser: the creative tab shows the whole pack; icons are painted a few per frame. | 1256 (1188–1323) | 2/4 | yes |
