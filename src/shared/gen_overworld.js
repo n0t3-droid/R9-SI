@@ -209,7 +209,9 @@
       const rng = new VR.RNG(M.hash2(cx, cz, this.seed));
       // 5x5 corners
       const cor = [];
-      for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) { const cc = this.corner(x0 + i * 4, z0 + j * 4); this.densOf(cc); cor.push(cc); }
+      let yLim = 0;   // above this the density of every corner is plain H − y (densOf): nothing up there can be solid
+      for (let j = 0; j <= 4; j++) for (let i = 0; i <= 4; i++) { const cc = this.corner(x0 + i * 4, z0 + j * 4); this.densOf(cc); cor.push(cc); const yl = cc.H + cc.A * 1.2 + 8; if (yl > yLim) yLim = yl; }
+      const yStart = Math.min(255, (Math.floor(yLim / 8) + 1) * 8 - 1);   // the last block of the highest density sample that may be positive
       // per-column density profile + climate
       const H = new Float32Array(256), climate = new Array(256), biome = new Uint8Array(256);
       const dcol = new Float32Array(33);
@@ -222,7 +224,7 @@
         for (let i = 0; i <= 32; i++) dcol[i] = a.dens[i] * w00 + b.dens[i] * w10 + c.dens[i] * w01 + d.dens[i] * w11;
         const col = lz * 16 + lx;
         let top = 0;
-        for (let y = 255; y >= 1; y--) {
+        for (let y = yStart; y >= 1; y--) {
           const i = y >> 3, f = (y & 7) / 8;
           const dv = dcol[i] * (1 - f) + dcol[i + 1] * f;
           if (dv > 0) { solidMask[(y << 8) | col] = 1; if (!top) top = y; }

@@ -110,17 +110,22 @@
     return c;
   };
   const HKEYS = ['heart', 'hz1', 'hz2', 'hz3'];
-  const prevClimateAt = OG.climateAt;
-  OG.climateAt = function (x, z) {
-    const o = prevClimateAt.call(this, x, z);
-    if (!HEART.on(this)) { o.heart = 0; return o; }
-    const X0 = Math.floor(x / 4) * 4, Z0 = Math.floor(z / 4) * 4;
-    const fx = (x - X0) / 4, fz = (z - Z0) / 4;
-    const a = this.corner(X0, Z0), b = this.corner(X0 + 4, Z0), c = this.corner(X0, Z0 + 4), d = this.corner(X0 + 4, Z0 + 4);
-    const w00 = (1 - fx) * (1 - fz), w10 = fx * (1 - fz), w01 = (1 - fx) * fz, w11 = fx * fz;
-    for (const k of HKEYS) o[k] = (a[k] || 0) * w00 + (b[k] || 0) * w10 + (c[k] || 0) * w01 + (d[k] || 0) * w11;
-    return o;
-  };
+  // the Heartland's values ride along in the realm's one pass over the corners (every corner carries them — zero
+  // outside the Heartland — so a second lookup of the four corners per block, 800 blocks a column, is spared)
+  if (OG.CLIMATE_KEYS) { for (const k of HKEYS) if (!OG.CLIMATE_KEYS.includes(k)) OG.CLIMATE_KEYS.push(k); }
+  else {
+    const prevClimateAt = OG.climateAt;
+    OG.climateAt = function (x, z) {
+      const o = prevClimateAt.call(this, x, z);
+      if (!HEART.on(this)) { o.heart = 0; return o; }
+      const X0 = Math.floor(x / 4) * 4, Z0 = Math.floor(z / 4) * 4;
+      const fx = (x - X0) / 4, fz = (z - Z0) / 4;
+      const a = this.corner(X0, Z0), b = this.corner(X0 + 4, Z0), c = this.corner(X0, Z0 + 4), d = this.corner(X0 + 4, Z0 + 4);
+      const w00 = (1 - fx) * (1 - fz), w10 = fx * (1 - fz), w01 = (1 - fx) * fz, w11 = fx * fz;
+      for (const k of HKEYS) o[k] = (a[k] || 0) * w00 + (b[k] || 0) * w10 + (c[k] || 0) * w01 + (d[k] || 0) * w11;
+      return o;
+    };
+  }
   const prevBiome = OG.biomeFor;
   OG.biomeFor = function (cl, height) {
     if (cl.heart > 0.5) {
