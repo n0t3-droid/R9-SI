@@ -959,6 +959,7 @@
           const facing = t.get(s, 'facing');
           cells.forEach(([bx, by, bz], i) => { const bs = w.getBlock(bx, by, bz); if (R.T.type[bs] === t.id && t.get(bs, 'facing') === facing && t.get(bs, 'part') === i) w.setBlock(bx, by, bz, t.with(bs, 'lit', lit), 4); });
           this.audio.play('click');
+          if (t.o.bed && this.sleep) this.sleep(x, y, z);   // an LED bed is a bed as well: spawn point, sleep at night
           return true;
         }
         if (t.o.ui === 'chest' && this.openContainer) { this.openContainer(cells[0][0], cells[0][1], cells[0][2], t); return true; }
