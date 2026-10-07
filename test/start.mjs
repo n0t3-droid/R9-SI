@@ -218,6 +218,61 @@ await section(5, 'the Studio: four tiles in the header, the mode bar waits behin
   check(sa.n === 4 && /Zum Spiel/.test(sa.play || '') && !sa.bar && !sa.playId, 'standalone: four tiles, ▶ reads „🎮 Zum Spiel", no 🔌 banner, no #playBtn');
 });
 
+await section(6, 'the Karte view: cards left, 📍 Setzen = the ghost, every click commits', async () => {
+  if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
+  await page.goto(URL0 + '/studio.html#world/' + encodeURIComponent(WORLD) + '/karte', NAV);
+  check(await inStudio(WORLD), 'the Studio opens the world');
+  const k0 = await ev(() => ({ tab: VR.StudioWorld.tab, mode: window.__st.mode, chips: [...document.querySelectorAll('#chips button')].map(b => b.dataset.kcat || b.textContent.trim()), help: (document.getElementById('worldHelp') || {}).getClientRects ? document.getElementById('worldHelp').getClientRects().length : 0, bauenOn: document.querySelector('#tiles .tile[data-tile="bauen"]').classList.contains('on') }));
+  console.log('  karte', JSON.stringify(k0));
+  check(k0.tab === 'karte' && k0.mode === 'world' && k0.bauenOn, 'on the Karte tab, the 🏗 tile lit');
+  check(k0.chips.includes('house') && k0.chips.includes('furn') && k0.chips.includes('fav') && !k0.chips.some(c => /Werkbank|Stil|Plan/.test(c)), 'Einfach chips: ★ · 🏠 Häuser · 🪑 Möbel (no Werkbank, Stil, Plan)');
+  await page.click('#chips button[data-kcat="house"]'); await wait(300);
+  const k1 = await ev(() => { const cards = [...document.querySelectorAll('#list .ding')]; const first = cards[0]; return { n: cards.length, acts: first ? [...first.querySelectorAll('.dacts button')].map(b => ({ t: b.textContent, da: b.dataset.da, dis: b.disabled })) : [], id: first && first.dataset.ding, commitBtn: [...document.querySelectorAll('#partsBody button')].some(b => /übernehmen|In die Welt/i.test(b.textContent)), pic: first && first.querySelector('.pic').getBoundingClientRect().height }; });
+  console.log('  cards', JSON.stringify(k1));
+  check(k1.n >= 11 && /^h:\d+$/.test(k1.id || ''), 'eleven house cards (first: ' + k1.id + ')');
+  check(k1.acts.length === 5 && ['👁', '✏️', '☆', '📍', '📦'].every((g, i) => k1.acts[i] && k1.acts[i].t.startsWith(g)) && k1.acts.every(a => !a.dis), 'the five actions in order, none disabled');
+  check(k1.pic >= 56, 'the picture is at least 56 px (' + k1.pic + ')');
+  check(!k1.commitBtn, 'no „⬆ In die Welt übernehmen" anywhere');
+  await page.click('#list .ding [data-da="set"]'); await wait(200);
+  check(await ev(() => !!(VR.StudioWorld.tool && VR.StudioWorld.tool.kind === 'house')), '📍 Setzen puts the house in hand (the ghost)');
+  let mesh = false; for (let i = 0; i < 240 && !mesh; i++) { await wait(500); mesh = await ev(() => !!VR.StudioWorld.meshFor(VR.StudioWorld.tool)); }
+  check(mesh, 'its mesh is ready');
+  const box = await ev(() => { const r = document.getElementById('view').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, l: r.left, t: r.top }; });
+  const plans = () => ev((id) => { const d = JSON.parse(localStorage.getItem('r9si.plans.' + id) || '{"plans":[]}'); return d.plans.map(p => p.status); }, WORLD);
+  const n0 = (await plans()).length;
+  await page.mouse.move(box.x, box.y); await wait(150);
+  await page.mouse.click(box.x, box.y); await wait(600);
+  const k2 = await ev(() => ({ tool: !!VR.StudioWorld.tool, tip: (document.getElementById('worldTip') || {}).textContent || '', plans: VR.StudioWorld.plans.map(p => p.status) }));
+  const st = await plans();
+  console.log('  placed', JSON.stringify(k2), JSON.stringify(st));
+  check(st.length === n0 + 1 && st[st.length - 1] === 'pending', 'one click: the plan is in r9si.plans as pending — no further button (' + st.join(',') + ')');
+  check(k2.tool && /gesetzt/.test(k2.tip), 'the house stays in hand; the tip says „gesetzt" (' + k2.tip + ')');
+  // nothing under the pointer: nothing happens, the tool stays
+  await ev(() => { VR.StudioWorld.ghost = null; VR.StudioWorld.hover = null; });
+  await page.mouse.down(); await page.mouse.up(); await wait(300);
+  const k3 = await ev(() => ({ tool: !!VR.StudioWorld.tool, tip: (document.getElementById('worldTip') || {}).textContent || '' }));
+  check((await plans()).length === n0 + 1 && k3.tool && /Boden/.test(k3.tip), 'a click with no ground under the pointer places nothing and says „Zeig auf den Boden" (' + k3.tip + ')');
+  // the right mouse button places too (the owner's decision 1)
+  await page.mouse.move(box.x + 60, box.y + 20); await wait(150);
+  await page.mouse.click(box.x + 60, box.y + 20, { button: 'right' }); await wait(600);
+  const st2 = await plans();
+  check(st2.length === n0 + 2 && await ev(() => !!VR.StudioWorld.tool), 'the right button places as well, the tool stays (' + st2.length + ' plans)');
+  await page.keyboard.press('Escape'); await wait(200);
+  check(await ev(() => VR.StudioWorld.tool === null), 'Esc puts it away');
+  await shot('start_karte');
+});
+
+await section(7, 'Profi keeps its Plan tab — „📍 Alle setzen"', async () => {
+  if (!(await ev(() => !!(VR.StudioWorld && VR.StudioWorld.world)))) { check(false, 'no world open'); return; }
+  await ev(() => VR.UIPrefs.set({ pro: true })); await wait(200);
+  const chips = await ev(() => [...document.querySelectorAll('#chips button')].map(b => b.textContent.trim()));
+  check(chips.some(c => /Karte/.test(c)) && chips.some(c => /Werkbank/.test(c)) && chips.some(c => /Plan/.test(c)), 'Profi chips: Karte · Werkbank · Häuser · Möbel · Plan · Stil · Welten (' + chips.join(' | ') + ')');
+  await ev(() => { VR.StudioWorld.tab = 'plan'; VR.StudioWorld.refresh(); }); await wait(300);
+  const btn = await ev(() => [...document.querySelectorAll('#partsBody button')].map(b => b.textContent.trim()).find(t => /Alle setzen|übernehmen/.test(t)));
+  check(/^📍 Alle setzen/.test(btn || ''), 'the Plan tab\'s button reads „📍 Alle setzen (n)" (' + btn + ')');
+  await ev(() => VR.UIPrefs.set({ pro: false })); await wait(200);
+});
+
 await section(9, 'routes: #ding/<id> opens the thing, an unknown one only says so', async () => {
   await page.goto(URL0 + '/studio.html#ding/h:99', NAV);
   check(await booted(1), 'the Studio boots on a link to a house that does not exist');
