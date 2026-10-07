@@ -7,6 +7,7 @@
   const REC = VR.TEXREC = {};      // exact names
   const PRE = VR.TEXPRE = {};      // prefix handlers: prefix → fn(parts)
   const hh = TX.hash;
+  const K = TX.chunky;   // Klassisch: built chunky (16×16-style texels)
 
   // ---------------- palettes ----------------
   const PAL = VR.PAL = {
@@ -66,7 +67,7 @@
   };
 
   // ---------------- basic rock & soil ----------------
-  REC.stone = () => TX.natural(PAL.stone, { period: 4, oct: 3, speck: 0.03, seed: 1, cracks: 0 });
+  REC.stone = () => K(TX.natural(PAL.stone, { period: 4, oct: 3, speck: 0.03, seed: 1, cracks: 0 }));
   REC.cobblestone = () => {
     const img = new TX.Img(), P = TX.pal(PAL.stone, 6);
     img.forEach((x, y, i) => {
@@ -78,7 +79,7 @@
       if (edge < 0.14) { f = 0.05; h = 0.1; }
       img.set(x, y, TX.ramp(P, Math.max(0, Math.min(0.999, f))), 1); img.h[i] = h; img.ro[i] = 0.88;
     });
-    return img;
+    return K(img);
   };
   REC.mossy_cobblestone = () => { const img = REC.cobblestone(); TX.moss(img, 0.42, 71); return img; };
   REC.smooth_stone = () => { const img = TX.natural(PAL.stone, { period: 2, oct: 2, contrast: 0.6, seed: 3, bias: 0.12 }); TX.bevel(img, 0, 0, N - 1, N - 1, 0.12, 0.2); return img; };
@@ -87,14 +88,14 @@
   REC.cracked_stone_bricks = () => TX.bricks(PAL.stone, 0x3d3f42, { rows: 4, per: 2, seed: 5, cracks: 6 });
   REC.mossy_stone_bricks = () => TX.bricks(PAL.stone, 0x3d3f42, { rows: 4, per: 2, seed: 5, moss: 0.38 });
   REC.chiseled_stone_bricks = () => TX.chiseled(REC.smooth_stone(), 'ring');
-  REC.granite = () => TX.natural(PAL.granite, { period: 4, oct: 3, speck: 0.08, speck2: 0.03, seed: 7, contrast: 1.4 });
+  REC.granite = () => K(TX.natural(PAL.granite, { period: 4, oct: 3, speck: 0.08, speck2: 0.03, seed: 7, contrast: 1.4 }));
   REC.polished_granite = () => TX.polished(PAL.granite, { seed: 7 });
-  REC.diorite = () => TX.natural(PAL.diorite, { period: 4, oct: 3, speck: 0.12, speckDark: true, seed: 9, contrast: 1.2 });
+  REC.diorite = () => K(TX.natural(PAL.diorite, { period: 4, oct: 3, speck: 0.12, speckDark: true, seed: 9, contrast: 1.2 }));
   REC.polished_diorite = () => TX.polished(PAL.diorite, { seed: 9 });
-  REC.andesite = () => TX.natural(PAL.andesite, { period: 5, oct: 3, speck: 0.1, speck2: 0.04, seed: 11, contrast: 1.3 });
+  REC.andesite = () => K(TX.natural(PAL.andesite, { period: 5, oct: 3, speck: 0.1, speck2: 0.04, seed: 11, contrast: 1.3 }));
   REC.polished_andesite = () => TX.polished(PAL.andesite, { seed: 11 });
-  REC.deepstone = () => TX.natural(PAL.deep, { period: 4, oct: 3, bands: 0.9, bandWarp: 4, seed: 13, speck: 0.03 });
-  REC.deepstone_top = () => { const img = TX.natural(PAL.deep, { period: 4, oct: 3, seed: 14, cells: 3, cellEdge: 0.05 }); return img; };
+  REC.deepstone = () => K(TX.natural(PAL.deep, { period: 4, oct: 3, bands: 0.9, bandWarp: 4, seed: 13, speck: 0.03 }));
+  REC.deepstone_top = () => { const img = TX.natural(PAL.deep, { period: 4, oct: 3, seed: 14, cells: 3, cellEdge: 0.05 }); return K(img); };
   REC.cobbled_deepstone = () => { const img = REC.cobblestone(); const P = TX.pal(PAL.deep, 6); img.forEach((x, y, i) => { img.set(x, y, TX.ramp(P, Math.min(0.999, TX.lum(img.get(x, y)) * 1.5))); }); return img; };
   REC.polished_deepstone = () => TX.polished(PAL.deep, { seed: 15 });
   REC.chiseled_deepstone = () => TX.chiseled(TX.polished(PAL.deep, { seed: 16 }), 'face');
@@ -102,17 +103,17 @@
   REC.cracked_deepstone_bricks = () => TX.bricks(PAL.deep, 0x16161b, { rows: 4, per: 2, seed: 17, cracks: 7 });
   REC.deepstone_tiles = () => TX.tiles(PAL.deep, 0x131318, 4, { seed: 18 });
   REC.cracked_deepstone_tiles = () => TX.tiles(PAL.deep, 0x131318, 4, { seed: 18, cracks: 7 });
-  REC.tuff = () => TX.natural(PAL.tuff, { period: 4, oct: 3, speck: 0.06, speck2: 0.05, seed: 19 });
+  REC.tuff = () => K(TX.natural(PAL.tuff, { period: 4, oct: 3, speck: 0.06, speck2: 0.05, seed: 19 }));
   REC.polished_tuff = () => TX.polished(PAL.tuff, { seed: 19 });
   REC.chiseled_tuff = () => TX.chiseled(TX.polished(PAL.tuff, { seed: 20 }), 'layers');
   REC.chiseled_tuff_top = () => TX.chiseled(TX.polished(PAL.tuff, { seed: 20 }), 'diamond');
   REC.tuff_bricks = () => TX.bricks(PAL.tuff, 0x303129, { rows: 4, per: 2, seed: 21, offset: false });
   REC.chiseled_tuff_bricks = () => TX.chiseled(TX.bricks(PAL.tuff, 0x303129, { rows: 2, per: 1, seed: 22 }), 'bars');
   REC.chiseled_tuff_bricks_top = () => TX.chiseled(TX.polished(PAL.tuff, { seed: 22 }), 'ring');
-  REC.calcite = () => TX.natural(PAL.calcite, { period: 3, oct: 3, speck: 0.04, speckDark: true, seed: 23, contrast: 1.1 });
-  REC.dripstone_block = () => TX.natural(PAL.drip, { period: 4, oct: 3, bands: 1.6, bandWarp: 3, seed: 25 });
-  REC.bedrock = () => TX.natural(PAL.bedrock, { period: 6, oct: 2, contrast: 2.2, seed: 27, cells: 5, cellEdge: 0.08 });
-  REC.obsidian = () => { const img = TX.natural(PAL.obsidian, { period: 3, oct: 3, contrast: 1.8, seed: 29, rough: 0.15 }); img.forEach((x, y, i) => { if (hh(x, y, 5) < 0.02) img.set(x, y, C(0x6a4aa8)); }); return img; };
+  REC.calcite = () => K(TX.natural(PAL.calcite, { period: 3, oct: 3, speck: 0.04, speckDark: true, seed: 23, contrast: 1.1 }));
+  REC.dripstone_block = () => K(TX.natural(PAL.drip, { period: 4, oct: 3, bands: 1.6, bandWarp: 3, seed: 25 }));
+  REC.bedrock = () => K(TX.natural(PAL.bedrock, { period: 6, oct: 2, contrast: 2.2, seed: 27, cells: 5, cellEdge: 0.08 }));
+  REC.obsidian = () => { const img = TX.natural(PAL.obsidian, { period: 3, oct: 3, contrast: 1.8, seed: 29, rough: 0.15 }); img.forEach((x, y, i) => { if (hh(x, y, 5) < 0.02) img.set(x, y, C(0x6a4aa8)); }); return K(img); };
   REC.weeping_obsidian = () => { const img = REC.obsidian(); img.forEach((x, y, i) => { const f = TX.fbm(x, y, 4, 2, 33); if (f > 0.62) { img.set(x, y, TX.mix(C(0x7a2ae0), C(0xc07aff), (f - 0.62) * 3)); img.em[i] = (f - 0.62) * 2.2; } }); return img; };
   REC.glowing_obsidian = () => { const img = REC.obsidian(); img.forEach((x, y, i) => { const f = TX.fbm(x, y, 4, 2, 34); img.set(x, y, TX.mix(C(0x5a0e08), C(0xff5a1a), Math.max(0, f - 0.3) * 1.6)); img.em[i] = Math.max(0, f - 0.4) * 1.8; }); return img; };
   REC.gravel = () => {
@@ -123,26 +124,26 @@
       if (c[1] - c[0] < 0.1) f *= 0.4;
       img.set(x, y, TX.ramp(P, Math.max(0, Math.min(0.999, f))), 1); img.h[i] = 0.3 + (1 - c[0]) * 0.6; img.ro[i] = 0.9;
     });
-    return img;
+    return K(img);
   };
-  REC.dirt = () => TX.natural(PAL.dirt, { period: 4, oct: 3, speck: 0.07, speckDark: true, speck2: 0.03, seed: 53, rough: 0.95 });
+  REC.dirt = () => K(TX.natural(PAL.dirt, { period: 4, oct: 3, speck: 0.07, speckDark: true, speck2: 0.03, seed: 53, rough: 0.95 }));
   REC.coarse_dirt = () => { const img = REC.dirt(); const g = REC.gravel(); img.forEach((x, y, i) => { if (TX.fbm(x, y, 8, 2, 55) > 0.58) { img.set(x, y, TX.mix(g.get(x, y), C(0x6f5a48), 0.4)); img.h[i] = g.h[i]; } }); return img; };
   REC.rooted_dirt = () => { const img = REC.dirt(); for (let k = 0; k < 7; k++) { let x = hh(k, 1, 57) * N, y = 0; const col = C(0x9c7b54); for (let t = 0; t < 40; t++) { TX.dot(img, Math.floor(x), Math.floor(y), col, 0.8); y += 0.8; x += Math.sin(t * 0.5 + k) * 0.7; } } return img; };
-  REC.mud = () => TX.natural(PAL.mud, { period: 3, oct: 3, seed: 59, rough: 0.35, speck: 0.03 });
-  REC.packed_mud = () => { const img = TX.natural(PAL.packedmud, { period: 4, oct: 3, seed: 61, speck: 0.08, speckDark: true }); for (let k = 0; k < 18; k++) { const x = Math.floor(hh(k, 1, 62) * N), y = Math.floor(hh(k, 2, 62) * N); for (let t = 0; t < 4; t++) TX.dot(img, x + t, y + (t >> 1), C(0xc9a26a), 0.6); } return img; };
+  REC.mud = () => K(TX.natural(PAL.mud, { period: 3, oct: 3, seed: 59, rough: 0.35, speck: 0.03 }));
+  REC.packed_mud = () => { const img = TX.natural(PAL.packedmud, { period: 4, oct: 3, seed: 61, speck: 0.08, speckDark: true }); for (let k = 0; k < 18; k++) { const x = Math.floor(hh(k, 1, 62) * N), y = Math.floor(hh(k, 2, 62) * N); for (let t = 0; t < 4; t++) TX.dot(img, x + t, y + (t >> 1), C(0xc9a26a), 0.6); } return K(img); };
   REC.mud_bricks = () => TX.bricks(PAL.packedmud, 0x5a4232, { rows: 4, per: 2, seed: 63, speck: 0.05 });
-  REC.clay = () => TX.natural(PAL.clay, { period: 3, oct: 2, seed: 65, contrast: 0.9, speck: 0.04, speckDark: true });
-  REC.sand = () => TX.natural(PAL.sand, { period: 6, oct: 2, speck: 0.15, speck2: 0.05, seed: 67, contrast: 1.0, rough: 0.95 });
-  REC.red_sand = () => TX.natural(PAL.redsand, { period: 6, oct: 2, speck: 0.15, speck2: 0.05, seed: 69, contrast: 1.0 });
+  REC.clay = () => K(TX.natural(PAL.clay, { period: 3, oct: 2, seed: 65, contrast: 0.9, speck: 0.04, speckDark: true }));
+  REC.sand = () => K(TX.natural(PAL.sand, { period: 6, oct: 2, speck: 0.15, speck2: 0.05, seed: 67, contrast: 1.0, rough: 0.95 }));
+  REC.red_sand = () => K(TX.natural(PAL.redsand, { period: 6, oct: 2, speck: 0.15, speck2: 0.05, seed: 69, contrast: 1.0 }));
   REC.buried_sand = () => { const img = REC.sand(); TX.cracks(img, 3, 71, C(0x9c8a5c)); for (const [x, y] of [[12, 14], [13, 14], [18, 19]]) TX.dot(img, x, y, C(0xd8b84a)); return img; };
   REC.buried_gravel = () => { const img = REC.gravel(); TX.cracks(img, 3, 73, C(0x4a4642)); return img; };
-  REC.gloom_sand = () => { const img = TX.natural(PAL.gloomsand, { period: 5, oct: 3, seed: 75, contrast: 1.4 }); for (let k = 0; k < 4; k++) { const cx = 4 + hh(k, 1, 76) * 24, cy = 4 + hh(k, 2, 76) * 24; TX.disc(img, cx, cy, 2.6, (d) => TX.scale(C(0x2a1d14), 0.7 + d * 0.3)); for (let t = 0; t < 3; t++) img.H(Math.floor(cx) + t - 1, Math.floor(cy), 0.1); } return img; };
-  REC.gloom_soil = () => TX.natural(PAL.gloomsoil, { period: 4, oct: 3, seed: 77, speck: 0.06 });
-  REC.snow = () => { const img = TX.natural(PAL.snow, { period: 4, oct: 2, contrast: 0.7, seed: 79, speck: 0.03, rough: 0.6 }); img.forEach((x, y, i) => { if (hh(x, y, 80) < 0.015) img.em[i] = 0.25; }); return img; };
+  REC.gloom_sand = () => { const img = TX.natural(PAL.gloomsand, { period: 5, oct: 3, seed: 75, contrast: 1.4 }); for (let k = 0; k < 4; k++) { const cx = 4 + hh(k, 1, 76) * 24, cy = 4 + hh(k, 2, 76) * 24; TX.disc(img, cx, cy, 2.6, (d) => TX.scale(C(0x2a1d14), 0.7 + d * 0.3)); for (let t = 0; t < 3; t++) img.H(Math.floor(cx) + t - 1, Math.floor(cy), 0.1); } return K(img); };
+  REC.gloom_soil = () => K(TX.natural(PAL.gloomsoil, { period: 4, oct: 3, seed: 77, speck: 0.06 }));
+  REC.snow = () => { const img = TX.natural(PAL.snow, { period: 4, oct: 2, contrast: 0.7, seed: 79, speck: 0.03, rough: 0.6 }); img.forEach((x, y, i) => { if (hh(x, y, 80) < 0.015) img.em[i] = 0.25; }); return K(img); };
   REC.powder_snow = () => { const img = TX.natural([0xd3e2f0, 0xe5eef8, 0xf5f9fe], { period: 8, oct: 2, contrast: 0.9, seed: 81, rough: 0.9 }); img.forEach((x, y, i) => img.alpha(x, y, 0.92)); return img; };
   REC.ice = () => { const img = TX.natural([0x6e97d6, 0x88acdf, 0xa5c2ea], { period: 3, oct: 2, contrast: 0.8, seed: 83, rough: 0.08 }); TX.cracks(img, 4, 84, C(0xd8e8ff)); img.forEach((x, y, i) => img.alpha(x, y, 0.62)); TX.bevel(img, 0, 0, N - 1, N - 1, 0.1, 0.1); return img; };
-  REC.packed_ice = () => { const img = TX.natural([0x7ea3de, 0x98b8e8, 0xb2cbf0], { period: 3, oct: 2, contrast: 1.0, seed: 85, rough: 0.12 }); TX.cracks(img, 6, 86, C(0xe2eeff)); return img; };
-  REC.blue_ice = () => { const img = TX.natural([0x4a7fd6, 0x6495e2, 0x7eabee], { period: 3, oct: 2, contrast: 1.0, seed: 87, rough: 0.05 }); TX.cracks(img, 5, 88, C(0xbcd8ff)); return img; };
+  REC.packed_ice = () => { const img = TX.natural([0x7ea3de, 0x98b8e8, 0xb2cbf0], { period: 3, oct: 2, contrast: 1.0, seed: 85, rough: 0.12 }); TX.cracks(img, 6, 86, C(0xe2eeff)); return K(img); };
+  REC.blue_ice = () => { const img = TX.natural([0x4a7fd6, 0x6495e2, 0x7eabee], { period: 3, oct: 2, contrast: 1.0, seed: 87, rough: 0.05 }); TX.cracks(img, 5, 88, C(0xbcd8ff)); return K(img); };
   REC.magma = () => {
     const img = new TX.Img(), P = TX.pal([0x2c0d07, 0x4a1409, 0x681e0c], 4), G = TX.pal([0xb0300a, 0xff6a1a, 0xffc04a], 4);
     img.forEach((x, y, i) => {
@@ -151,21 +152,21 @@
       else { img.set(x, y, TX.ramp(P, Math.min(0.999, TX.fbm(x, y, 8, 2, 92))), 1); img.h[i] = 0.7; }
       img.ro[i] = 0.7;
     });
-    return img;
+    return K(img);
   };
   REC.bone_block_side = () => { const img = TX.natural(PAL.bone, { period: 2, oct: 2, contrast: 0.6, seed: 93, stretchY: 0.2 }); for (let x = 0; x < N; x += 8) for (let y = 0; y < N; y++) img.mul(x, y, 0.85); return img; };
   REC.bone_block_top = () => { const img = REC.bone_block_side(); for (const [cx, cy] of [[8, 8], [24, 8], [8, 24], [24, 24]]) TX.disc(img, cx, cy, 3, (d) => TX.scale(C(0xa8a08a), 0.8 + d * 0.2)); return img; };
 
   // ---------------- surface stones ----------------
   const sandstoneSide = (pal, s) => { const img = TX.natural(pal, { period: 4, oct: 3, bands: 1.2, bandWarp: 2, seed: s, contrast: 1.0 }); for (let x = 0; x < N; x++) { img.mul(x, 0, 1.12); img.mul(x, N - 1, 0.78); } return img; };
-  REC.sandstone = () => sandstoneSide(PAL.sandstone, 101);
-  REC.sandstone_top = () => TX.natural(PAL.sandstone, { period: 4, oct: 2, contrast: 0.7, seed: 102, bias: 0.1 });
-  REC.sandstone_bottom = () => TX.natural(PAL.sandstone, { period: 4, oct: 3, contrast: 1.1, seed: 103, speck: 0.05 });
+  REC.sandstone = () => K(sandstoneSide(PAL.sandstone, 101));
+  REC.sandstone_top = () => K(TX.natural(PAL.sandstone, { period: 4, oct: 2, contrast: 0.7, seed: 102, bias: 0.1 }));
+  REC.sandstone_bottom = () => K(TX.natural(PAL.sandstone, { period: 4, oct: 3, contrast: 1.1, seed: 103, speck: 0.05 }));
   REC.chiseled_sandstone = () => TX.chiseled(REC.sandstone_top(), 'sun');
   REC.cut_sandstone = () => { const img = REC.sandstone_top(); for (let x = 0; x < N; x++) { img.mul(x, 10, 0.8); img.mul(x, 21, 0.8); } TX.bevel(img, 0, 0, N - 1, N - 1, 0.1, 0.2); return img; };
-  REC.red_sandstone = () => sandstoneSide(PAL.redsandstone, 104);
-  REC.red_sandstone_top = () => TX.natural(PAL.redsandstone, { period: 4, oct: 2, contrast: 0.7, seed: 105, bias: 0.1 });
-  REC.red_sandstone_bottom = () => TX.natural(PAL.redsandstone, { period: 4, oct: 3, contrast: 1.1, seed: 106, speck: 0.05 });
+  REC.red_sandstone = () => K(sandstoneSide(PAL.redsandstone, 104));
+  REC.red_sandstone_top = () => K(TX.natural(PAL.redsandstone, { period: 4, oct: 2, contrast: 0.7, seed: 105, bias: 0.1 }));
+  REC.red_sandstone_bottom = () => K(TX.natural(PAL.redsandstone, { period: 4, oct: 3, contrast: 1.1, seed: 106, speck: 0.05 }));
   REC.chiseled_red_sandstone = () => TX.chiseled(REC.red_sandstone_top(), 'rune');
   REC.cut_red_sandstone = () => { const img = REC.red_sandstone_top(); for (let x = 0; x < N; x++) { img.mul(x, 10, 0.8); img.mul(x, 21, 0.8); } TX.bevel(img, 0, 0, N - 1, N - 1, 0.1, 0.2); return img; };
   REC.bricks = () => TX.bricks([0x6e2e22, 0x8f3e2d, 0xa9523b, 0xbf6a4f], 0xa9a097, { rows: 4, per: 2, seed: 107 });
@@ -185,24 +186,24 @@
   REC.abyssal_tidestone = () => { const img = TX.tiles(PAL.abyss, 0x0d1f1c, 4, { seed: 143, rough: 0.35 }); for (let k = 0; k < 16; k++) TX.dot(img, 4 + (k % 4) * 8, 4 + (k >> 2) * 8, C(0x5ac8b0)); return img; };
   REC.tide_lantern = () => { const img = new TX.Img(); const P = TX.pal([0x8ad8d0, 0xc8f4ee, 0xf2fffd], 4); img.forEach((x, y, i) => { const c = TX.cells(x, y, 3, 145); const f = 1 - c[0] * 0.6; img.set(x, y, TX.ramp(P, Math.min(0.999, f)), 1); img.em[i] = 0.55 + f * 0.45; img.ro[i] = 0.1; img.h[i] = f; }); TX.bevel(img, 0, 0, N - 1, N - 1, 0.25, 0.3); return img; };
   // ---------------- underforge / hollow ----------------
-  REC.emberrock = () => TX.natural(PAL.ember, { period: 5, oct: 3, speck: 0.12, speck2: 0.06, seed: 151, contrast: 1.6, cells: 6, cellEdge: 0.04 });
+  REC.emberrock = () => K(TX.natural(PAL.ember, { period: 5, oct: 3, speck: 0.12, speck2: 0.06, seed: 151, contrast: 1.6, cells: 6, cellEdge: 0.04 }));
   REC.ember_bricks = () => TX.bricks(PAL.ember.map(v => v), 0x14060a, { rows: 4, per: 2, seed: 152 });
   REC.cracked_ember_bricks = () => TX.bricks(PAL.ember, 0x14060a, { rows: 4, per: 2, seed: 152, cracks: 6 });
   REC.chiseled_ember_bricks = () => TX.chiseled(TX.bricks(PAL.ember, 0x14060a, { rows: 2, per: 1, seed: 153 }), 'face');
   REC.red_ember_bricks = () => TX.bricks([0x480a0c, 0x6c1214, 0x8e1c1c, 0xa82a26], 0x1a0404, { rows: 4, per: 2, seed: 154 });
-  REC.scoria = () => TX.natural(PAL.scoria, { period: 4, oct: 3, speck: 0.08, seed: 155, contrast: 1.6 });
-  REC.scoria_top = () => TX.natural(PAL.scoria, { period: 4, oct: 3, seed: 156, cells: 5, cellEdge: 0.05 });
+  REC.scoria = () => K(TX.natural(PAL.scoria, { period: 4, oct: 3, speck: 0.08, seed: 155, contrast: 1.6 }));
+  REC.scoria_top = () => K(TX.natural(PAL.scoria, { period: 4, oct: 3, seed: 156, cells: 5, cellEdge: 0.05 }));
   REC.polished_scoria = () => TX.polished(PAL.scoria, { seed: 157 });
   REC.chiseled_polished_scoria = () => TX.chiseled(REC.polished_scoria(), 'face');
   REC.polished_scoria_bricks = () => TX.bricks(PAL.scoria, 0x0d0b0e, { rows: 4, per: 2, seed: 158 });
   REC.cracked_polished_scoria_bricks = () => TX.bricks(PAL.scoria, 0x0d0b0e, { rows: 4, per: 2, seed: 158, cracks: 6 });
   REC.gilded_scoria = () => { const img = REC.scoria(); img.forEach((x, y, i) => { const f = TX.fbm(x, y, 4, 3, 159); if (f > 0.63) { img.set(x, y, TX.mix(C(0xc98a14), C(0xffe06a), (f - 0.63) * 3)); img.ro[i] = 0.25; img.h[i] = 0.8; } }); return img; };
-  REC.basalt = () => TX.natural(PAL.basalt, { period: 4, oct: 3, stretchY: 0.15, seed: 161, contrast: 1.4 });
-  REC.basalt_top = () => { const img = TX.natural(PAL.basalt, { period: 4, oct: 2, seed: 162 }); TX.bevel(img, 1, 1, N - 2, N - 2, 0.1, 0.1); return img; };
+  REC.basalt = () => K(TX.natural(PAL.basalt, { period: 4, oct: 3, stretchY: 0.15, seed: 161, contrast: 1.4 }));
+  REC.basalt_top = () => { const img = TX.natural(PAL.basalt, { period: 4, oct: 2, seed: 162 }); TX.bevel(img, 1, 1, N - 2, N - 2, 0.1, 0.1); return K(img); };
   REC.polished_basalt = () => { const img = TX.natural(PAL.basalt, { period: 2, oct: 2, stretchY: 0.1, seed: 163, contrast: 0.9 }); for (let x = 0; x < N; x += 8) for (let y = 0; y < N; y++) img.mul(x, y, 0.8); return img; };
   REC.polished_basalt_top = () => { const img = TX.polished(PAL.basalt, { seed: 164 }); TX.disc(img, 15.5, 15.5, 6, (d) => TX.ramp(TX.pal(PAL.basalt, 4), 0.3 + d * 0.5)); return img; };
-  REC.smooth_basalt = () => TX.natural(PAL.basalt, { period: 3, oct: 2, seed: 165, contrast: 0.8, rough: 0.6 });
-  REC.voidstone = () => { const img = TX.natural(PAL.voidstone, { period: 4, oct: 3, seed: 171, contrast: 1.2 }); for (let k = 0; k < 10; k++) TX.disc(img, hh(k, 1, 172) * 32, hh(k, 2, 172) * 32, 1.5, (d) => TX.scale(C(0xa9a57c), 0.8 + d * 0.2)); return img; };
+  REC.smooth_basalt = () => K(TX.natural(PAL.basalt, { period: 3, oct: 2, seed: 165, contrast: 0.8, rough: 0.6 }));
+  REC.voidstone = () => { const img = TX.natural(PAL.voidstone, { period: 4, oct: 3, seed: 171, contrast: 1.2 }); for (let k = 0; k < 10; k++) TX.disc(img, hh(k, 1, 172) * 32, hh(k, 2, 172) * 32, 1.5, (d) => TX.scale(C(0xa9a57c), 0.8 + d * 0.2)); return K(img); };
   REC.voidstone_bricks = () => TX.bricks(PAL.voidstone, 0x6e6a4c, { rows: 4, per: 2, seed: 173 });
   REC.lilacite_block = () => TX.tiles(PAL.lilac, 0x5a3a63, 2, { seed: 175, mortarW: 1 });
   REC.lilacite_pillar = () => { const img = TX.natural(PAL.lilac, { period: 2, oct: 2, stretchY: 0.1, seed: 176, contrast: 0.8 }); for (let x = 0; x < N; x += 6) for (let y = 0; y < N; y++) img.mul(x, y, 0.8); return img; };
@@ -224,10 +225,10 @@
 
   // ---------------- wood ----------------
   PRE.planks = (w) => { const P = WOOD[w]; const img = TX.planks(P.planks, { seed: 200 + w.length * 7, nails: w === 'bamboo' ? false : true }); if (w === 'bamboo') { for (let y = 0; y < N; y++) for (let x = 0; x < N; x += 8) img.mul(x, y, 0.8); } if (P.glow) img.forEach((x, y, i) => { if (hh(x, y, 9) < 0.01) { img.set(x, y, C(P.glow)); img.em[i] = 0.6; } }); return img; };
-  PRE.log = (w) => { const P = WOOD[w]; const img = TX.bark(P.bark, { seed: 300 + w.length * 11, marks: P.marks ? 0.12 : 0 }); if (P.marks) img.forEach((x, y) => { if (hh(Math.floor(x / 4), Math.floor(y / 2), 311 + w.length) < 0.18) img.set(x, y, C(P.marks)); }); if (P.glow) img.forEach((x, y, i) => { if (TX.fbm(x, y, 8, 2, 317) > 0.7) { img.set(x, y, TX.mix(C(P.glow), [1, 1, 1], 0.2)); img.em[i] = 0.7; } }); return img; };
-  PRE.log_top = (w) => { const P = WOOD[w]; return TX.logTop(P.ring, P.bark, { seed: 400 + w.length * 13 }); };
-  PRE.stripped_log = (w) => { const P = WOOD[w]; return TX.bark(P.stripped, { seed: 500 + w.length * 17 }); };
-  PRE.stripped_log_top = (w) => { const P = WOOD[w]; return TX.logTop(P.ring, P.stripped, { seed: 600 + w.length * 19 }); };
+  PRE.log = (w) => { const P = WOOD[w]; const img = TX.bark(P.bark, { seed: 300 + w.length * 11, marks: P.marks ? 0.12 : 0 }); if (P.marks) img.forEach((x, y) => { if (hh(Math.floor(x / 4), Math.floor(y / 2), 311 + w.length) < 0.18) img.set(x, y, C(P.marks)); }); if (P.glow) img.forEach((x, y, i) => { if (TX.fbm(x, y, 8, 2, 317) > 0.7) { img.set(x, y, TX.mix(C(P.glow), [1, 1, 1], 0.2)); img.em[i] = 0.7; } }); return K(img); };
+  PRE.log_top = (w) => { const P = WOOD[w]; return K(TX.logTop(P.ring, P.bark, { seed: 400 + w.length * 13 })); };
+  PRE.stripped_log = (w) => { const P = WOOD[w]; return K(TX.bark(P.stripped, { seed: 500 + w.length * 17 })); };
+  PRE.stripped_log_top = (w) => { const P = WOOD[w]; return K(TX.logTop(P.ring, P.stripped, { seed: 600 + w.length * 19 })); };
   PRE.door_bottom = (w) => { const P = WOOD[w] || WOOD.oak; const img = TX.planks(P.planks, { boards: 8, seed: 700 + w.length }); TX.bevel(img, 0, 0, N - 1, N - 1, 0.25, 0.35); TX.bevel(img, 4, 2, 27, 27, -0.15, -0.1); for (const [x, y] of [[25, 2], [26, 2], [25, 3], [26, 3]]) img.set(x, y, C(0x3a3a3a)); return img; };
   PRE.door_top = (w) => {
     const P = WOOD[w] || WOOD.oak; const img = TX.planks(P.planks, { boards: 8, seed: 701 + w.length }); TX.bevel(img, 0, 0, N - 1, N - 1, 0.25, 0.35);
@@ -262,7 +263,7 @@
       flowering_azalea: [[0x3d5a1c, 0x587a28, 0x76983a, 0x92b24e], { cells: 7, flowers: 0.08, flowerCol: 0xd66ad8 }],
     };
     const m = map[k] || map.oak;
-    return TX.leaves(m[0], Object.assign({ seed: 800 + k.length * 3 }, m[1]));
+    return K(TX.leaves(m[0], Object.assign({ seed: 800 + k.length * 3 }, m[1])));
   };
 
   // ---------------- ores ----------------
@@ -299,7 +300,7 @@
   PRE.raw_block = (m) => {
     const pals = { copper: [0x7a3a1c, 0xa8542a, 0xd07a44, 0xe89a62], iron: [0x7a5a44, 0xa07c62, 0xc29e82, 0xd8b89c], gold: [0x9a6e10, 0xc8981e, 0xe8c040, 0xf8dc70] };
     const img = TX.natural(pals[m], { period: 4, oct: 3, seed: 960 + m.length, cells: 5, cellEdge: 0.07, contrast: 1.5, rough: 0.5 });
-    return img;
+    return K(img);
   };
   // copper variants: copper:<variant>:<stage>
   const COPPER_PALS = [[0x8a3e22, 0xc0643a, 0xe08858, 0xf2aa7a], [0x8a5a3a, 0xa87a5a, 0x9a9a74, 0x8ab08a], [0x4a7a5a, 0x5a9a78, 0x6ab090, 0x88c8a8], [0x2e6a58, 0x3a8a70, 0x4aa888, 0x62c0a0]];
@@ -351,7 +352,7 @@
   PRE.concrete = (c) => TX.flat(CH(c), { seed: 1100 + c.length, noise: 0.06, rough: 0.7 });
   PRE.concrete_powder = (c) => { const img = TX.flat(CH(c), { seed: 1200 + c.length, noise: 0.1, grain: 0.22, rough: 0.95 }); return img; };
   PRE.terracotta = (c) => { const base = TX.mix(C(CH(c)), C(0x9a644c), 0.45); const img = TX.flat(TX.scale(base, 0.92), { seed: 1300 + c.length, noise: 0.12, grain: 0.06, rough: 0.9 }); return img; };
-  REC.terracotta = () => TX.natural(PAL.terracotta, { period: 4, oct: 2, seed: 1301, contrast: 0.7 });
+  REC.terracotta = () => K(TX.natural(PAL.terracotta, { period: 4, oct: 2, seed: 1301, contrast: 0.7 }));
   PRE.glazed = (c) => {
     const img = new TX.Img(), base = C(CH(c)), dark = TX.scale(base, 0.5), light = TX.mix(base, [1, 1, 1], 0.55), accent = TX.mix(base, C(0xf2d060), 0.4);
     const s = 1400 + VR.COLORS.indexOf(c) * 7;

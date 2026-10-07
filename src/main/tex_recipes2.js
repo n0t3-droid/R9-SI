@@ -6,12 +6,13 @@
   'use strict';
   const TX = VR.TX, N = TX.N, C = TX.C, REC = VR.TEXREC, PRE = VR.TEXPRE, PAL = VR.PAL, WOOD = VR.WOODPAL;
   const hh = TX.hash;
+  const K = TX.chunky;   // Klassisch: built chunky (16×16-style texels)
   const GL8 = [0x2d2d2d, 0x505050, 0x7a7a7a, 0xa6a6a6, 0xcccccc];   // grayscale (tinted) greens
   const stem = (img, x, y0, y1, col, w) => { for (let y = y0; y <= y1; y++) { TX.dot(img, x, y, col, 0.6); if (w) TX.dot(img, x + 1, y, TX.scale(col, 0.8), 0.6); } };
   const leafAt = (img, x, y, dir, col, len) => { for (let i = 0; i < (len || 4); i++) { TX.dot(img, x + dir * i, y - (i >> 1), TX.scale(col, 0.9 + i * 0.04)); TX.dot(img, x + dir * i, y - (i >> 1) + 1, TX.scale(col, 0.75)); } };
 
   // ---------------- grass & soil tops ----------------
-  REC.grass_top = () => { const img = TX.natural([0x5c5c5c, 0x7e7e7e, 0x9c9c9c, 0xb8b8b8], { period: 8, oct: 3, seed: 2001, contrast: 1.1, speck: 0.08, speck2: 0.05, rough: 0.9 }); return img; };
+  REC.grass_top = () => { const img = TX.natural([0x5c5c5c, 0x7e7e7e, 0x9c9c9c, 0xb8b8b8], { period: 8, oct: 3, seed: 2001, contrast: 1.1, speck: 0.08, speck2: 0.05, rough: 0.9 }); return K(img); };
   function sideWithFringe(base, fringeCol, depth, tintMask, seed) {
     const img = base.clone();
     const P = typeof fringeCol[0] === 'number' && fringeCol.length > 3 ? TX.pal(fringeCol, 4) : null;
@@ -27,33 +28,33 @@
   }
   REC.grass_side = () => sideWithFringe(REC.dirt(), GL8, 5, true, 2003);
   REC.grass_snow_side = () => { const img = sideWithFringe(REC.dirt(), [0xdfe8f0, 0xeef4fa, 0xfafdff, 0xffffff], 7, false, 2005); img.forEach((x, y, i) => img.alpha(x, y, 1)); return img; };
-  REC.mycelium_top = () => { const img = TX.natural([0x5a4a5c, 0x6f5d72, 0x857289, 0x9a879c], { period: 6, oct: 3, seed: 2007, speck: 0.1, speck2: 0.05 }); return img; };
+  REC.mycelium_top = () => { const img = TX.natural([0x5a4a5c, 0x6f5d72, 0x857289, 0x9a879c], { period: 6, oct: 3, seed: 2007, speck: 0.1, speck2: 0.05 }); return K(img); };
   REC.mycelium_side = () => sideWithFringe(REC.dirt(), [0x5a4a5c, 0x6f5d72, 0x857289, 0x9a879c], 4, false, 2009);
-  REC.podzol_top = () => TX.natural([0x4a3218, 0x5f4220, 0x76552c, 0x8a6938], { period: 6, oct: 3, seed: 2011, speck: 0.12, speck2: 0.06 });
+  REC.podzol_top = () => K(TX.natural([0x4a3218, 0x5f4220, 0x76552c, 0x8a6938], { period: 6, oct: 3, seed: 2011, speck: 0.12, speck2: 0.06 }));
   REC.podzol_side = () => sideWithFringe(REC.dirt(), [0x4a3218, 0x5f4220, 0x76552c, 0x8a6938], 4, false, 2013);
-  REC.dirt_path_top = () => TX.natural([0x7a5f38, 0x8f7244, 0xa38552, 0xb49763], { period: 6, oct: 2, seed: 2015, contrast: 1.0, speck: 0.05 });
+  REC.dirt_path_top = () => K(TX.natural([0x7a5f38, 0x8f7244, 0xa38552, 0xb49763], { period: 6, oct: 2, seed: 2015, contrast: 1.0, speck: 0.05 }));
   REC.dirt_path_side = () => { const img = sideWithFringe(REC.dirt(), [0x7a5f38, 0x8f7244, 0xa38552, 0xb49763], 3, false, 2017); for (let x = 0; x < N; x++) img.alpha(x, 0, 0), img.alpha(x, 1, 0); return img; };
-  REC.farmland = () => { const img = TX.natural([0x5a3d22, 0x6e4c2c, 0x805a36], { period: 4, oct: 2, seed: 2019 }); for (let y = 0; y < N; y++) if (y % 8 < 2) for (let x = 0; x < N; x++) { img.mul(x, y, 0.7); img.H(x, y, 0.3); } return img; };
+  REC.farmland = () => { const img = TX.natural([0x5a3d22, 0x6e4c2c, 0x805a36], { period: 4, oct: 2, seed: 2019 }); for (let y = 0; y < N; y++) if (y % 8 < 2) for (let x = 0; x < N; x++) { img.mul(x, y, 0.7); img.H(x, y, 0.3); } return K(img); };
   REC.farmland_wet = () => { const img = REC.farmland(); img.forEach((x, y, i) => { img.mul(x, y, 0.62); img.ro[i] = 0.35; }); return img; };
-  const mycelTop = (pal, s) => TX.natural(pal, { period: 6, oct: 3, seed: s, speck: 0.14, speck2: 0.08, contrast: 1.4 });
+  const mycelTop = (pal, s) => K(TX.natural(pal, { period: 6, oct: 3, seed: s, speck: 0.14, speck2: 0.08, contrast: 1.4 }));
   REC.crimson_mycel = () => mycelTop([0x5a0e14, 0x86161e, 0xa8242a, 0xc83a36], 2021);
   REC.crimson_mycel_side = () => sideWithFringe(REC.emberrock(), [0x5a0e14, 0x86161e, 0xa8242a, 0xc83a36], 4, false, 2023);
   REC.teal_mycel = () => mycelTop([0x0e4a44, 0x166a60, 0x22887a, 0x36a898], 2025);
   REC.teal_mycel_side = () => sideWithFringe(REC.emberrock(), [0x0e4a44, 0x166a60, 0x22887a, 0x36a898], 4, false, 2027);
-  REC.moss = () => TX.natural(PAL.moss, { period: 6, oct: 3, seed: 2029, speck: 0.08, speck2: 0.06, rough: 0.95 });
-  REC.pale_moss = () => TX.natural(PAL.palemoss, { period: 6, oct: 3, seed: 2031, speck: 0.08, rough: 0.95 });
-  REC.echo_moss = () => { const img = TX.natural(PAL.echo, { period: 5, oct: 3, seed: 2033, contrast: 1.5 }); img.forEach((x, y, i) => { if (hh(x, y, 2034) < 0.03) { img.set(x, y, C(0x3ae0e8)); img.em[i] = 0.8; } }); return img; };
-  REC.skyroot_soil = () => { const img = TX.natural([0x3e2a4a, 0x523a60, 0x684c78, 0x7c5e8c], { period: 5, oct: 3, seed: 2035, speck: 0.06 }); for (let k = 0; k < 6; k++) { let x = hh(k, 1, 2036) * N; for (let y = 0; y < N; y++) { x += Math.sin(y * 0.4 + k) * 0.6; TX.dot(img, Math.floor(x), y, C(0x8a6a4a), 0.7); } } return img; };
+  REC.moss = () => K(TX.natural(PAL.moss, { period: 6, oct: 3, seed: 2029, speck: 0.08, speck2: 0.06, rough: 0.95 }));
+  REC.pale_moss = () => K(TX.natural(PAL.palemoss, { period: 6, oct: 3, seed: 2031, speck: 0.08, rough: 0.95 }));
+  REC.echo_moss = () => { const img = TX.natural(PAL.echo, { period: 5, oct: 3, seed: 2033, contrast: 1.5 }); img.forEach((x, y, i) => { if (hh(x, y, 2034) < 0.03) { img.set(x, y, C(0x3ae0e8)); img.em[i] = 0.8; } }); return K(img); };
+  REC.skyroot_soil = () => { const img = TX.natural([0x3e2a4a, 0x523a60, 0x684c78, 0x7c5e8c], { period: 5, oct: 3, seed: 2035, speck: 0.06 }); for (let k = 0; k < 6; k++) { let x = hh(k, 1, 2036) * N; for (let y = 0; y < N; y++) { x += Math.sin(y * 0.4 + k) * 0.6; TX.dot(img, Math.floor(x), y, C(0x8a6a4a), 0.7); } } return K(img); };
 
   // ---------------- realm rocks ----------------
   PAL.dusk = [0x2e2438, 0x42344f, 0x584669, 0x6f5a82];
   PAL.ochre = [0x7a3a14, 0x9c4f1c, 0xbd6a2a, 0xd8883c];
-  REC.duskrock = () => TX.natural(PAL.dusk, { period: 4, oct: 3, seed: 2041, speck: 0.05, speck2: 0.03, contrast: 1.3 });
+  REC.duskrock = () => K(TX.natural(PAL.dusk, { period: 4, oct: 3, seed: 2041, speck: 0.05, speck2: 0.03, contrast: 1.3 }));
   REC.polished_duskrock = () => TX.polished(PAL.dusk, { seed: 2042 });
   REC.duskrock_bricks = () => TX.bricks(PAL.dusk, 0x1c1624, { rows: 4, per: 2, seed: 2043 });
-  REC.ochre_rock = () => TX.natural(PAL.ochre, { period: 4, oct: 3, bands: 1.1, bandWarp: 3, seed: 2044, contrast: 1.2 });
-  REC.ember_ochre = () => TX.natural([0x5a1c10, 0x7e2a16, 0xa03a1e, 0xc0522a], { period: 4, oct: 3, bands: 0.8, bandWarp: 3, seed: 2045, contrast: 1.2 });
-  REC.umber_rock = () => TX.natural([0x3c2a20, 0x523a2c, 0x684c3a, 0x7c5e48], { period: 4, oct: 3, seed: 2046, speck: 0.05, contrast: 1.2 });
+  REC.ochre_rock = () => K(TX.natural(PAL.ochre, { period: 4, oct: 3, bands: 1.1, bandWarp: 3, seed: 2044, contrast: 1.2 }));
+  REC.ember_ochre = () => K(TX.natural([0x5a1c10, 0x7e2a16, 0xa03a1e, 0xc0522a], { period: 4, oct: 3, bands: 0.8, bandWarp: 3, seed: 2045, contrast: 1.2 }));
+  REC.umber_rock = () => K(TX.natural([0x3c2a20, 0x523a2c, 0x684c3a, 0x7c5e48], { period: 4, oct: 3, seed: 2046, speck: 0.05, contrast: 1.2 }));
   REC.ochre_bricks = () => TX.bricks(PAL.ochre, 0x3a1a0a, { rows: 4, per: 2, seed: 2047 });
   // duskrock shot through with thin glowing aether cracks (the Mountain Station's peaks)
   REC.dusk_aether = () => { const img = REC.duskrock(); img.forEach((x, y, i) => { const v = Math.abs(Math.sin(x * 0.35 + y * 0.12 + TX.fbm(x, y, 4, 3, 2049) * 6)); if (v < 0.09) { img.set(x, y, TX.mix(C(0x7af4ff), C(0x2a90e0), v * 11)); img.em[i] = 0.85 - v * 4; img.ro[i] = 0.2; } }); return img; };
@@ -124,7 +125,7 @@
   REC.hanging_roots = () => hanging([0x5a4028, 0x7a5a3a, 0x9a7a52], 2211);
   REC.pale_hanging_moss = () => hanging([0x7a8274, 0x9aa294, 0xbac0b2], 2212, 9);
   REC.leaf_litter = () => { const img = TX.sprite(); const P = TX.pal([0x5a4a2a, 0x8a6a3a, 0xb08a4a, 0xd0aa60], 4); for (let k = 0; k < 40; k++) { const x = hh(k, 1, 2213) * N, y = hh(k, 2, 2213) * N; TX.disc(img, x, y, 1.6 + hh(k, 3, 2213), (d) => TX.ramp(P, 0.2 + hh(k, 4, 2213) * 0.7)); } return img; };
-  REC.azalea_top = () => { const img = TX.natural([0x3d5a1c, 0x587a28, 0x76983a, 0x92b24e], { period: 6, oct: 2, seed: 2214 }); return img; };
+  REC.azalea_top = () => { const img = TX.natural([0x3d5a1c, 0x587a28, 0x76983a, 0x92b24e], { period: 6, oct: 2, seed: 2214 }); return K(img); };
   REC.azalea_side = () => { const img = TX.leaves([0x3d5a1c, 0x587a28, 0x76983a, 0x92b24e], { seed: 2215, holes: 0.15 }); for (let y = 16; y < N; y++) for (let x = 0; x < N; x++) img.alpha(x, y, 0); return img; };
   REC.flowering_azalea_top = () => { const img = REC.azalea_top(); for (let k = 0; k < 14; k++) TX.disc(img, hh(k, 1, 2216) * 32, hh(k, 2, 2216) * 32, 1.8, () => C(0xd66ad8)); return img; };
   REC.flowering_azalea_side = () => { const img = REC.azalea_side(); for (let k = 0; k < 8; k++) TX.disc(img, hh(k, 1, 2217) * 32, hh(k, 2, 2217) * 14, 1.5, () => C(0xd66ad8)); return img; };
@@ -246,16 +247,16 @@
   REC.sugar_cane = () => { const img = TX.sprite(); for (const x0 of [6, 15, 24]) for (let y = 0; y < N; y++) { const c = y % 10 === 0 ? 0.6 : 0.85; TX.dot(img, x0, y, C(0x9a9a9a).map(v => v * c)); TX.dot(img, x0 + 1, y, C(0xbababa).map(v => v * c)); } leafAt(img, 8, 12, 1, C(0xaaaaaa), 5); leafAt(img, 23, 22, -1, C(0xaaaaaa), 5); return img; };
   PRE.sweet_berry_bush = (age) => { age = +age; const img = REC.bush(); img.forEach((x, y) => { if (img.ga(x, y) > 0.5) img.set(x, y, TX.mix(C(0x1a4a2a), C(0x3a8a4a), TX.lum(img.get(x, y)))); }); if (age >= 2) for (let k = 0; k < (age === 3 ? 9 : 4); k++) TX.disc(img, 6 + hh(k, 1, 2260) * 20, 8 + hh(k, 2, 2260) * 20, 1.6, () => C(0xd81a3a)); return img; };
   PRE.ashwart = (age) => { age = +age; const img = TX.sprite(); for (let k = 0; k < 4 + age; k++) TX.disc(img, 6 + hh(k, 1, 2261) * 20, 30 - hh(k, 2, 2261) * (6 + age * 5), 2 + age * 0.3, () => TX.mix(C(0x6a1414), C(0xb82a2a), hh(k, 3, 2261))); return img; };
-  REC.hay_side = () => { const img = TX.natural(PAL.hay, { period: 8, oct: 2, stretchY: 0.15, seed: 2262 }); for (const y of [7, 8, 23, 24]) for (let x = 0; x < N; x++) img.set(x, y, C(0x6a4a14)); return img; };
-  REC.hay_top = () => { const img = TX.natural(PAL.hay, { period: 6, oct: 2, seed: 2263 }); return img; };
+  REC.hay_side = () => { const img = TX.natural(PAL.hay, { period: 8, oct: 2, stretchY: 0.15, seed: 2262 }); for (const y of [7, 8, 23, 24]) for (let x = 0; x < N; x++) img.set(x, y, C(0x6a4a14)); return K(img); };
+  REC.hay_top = () => { const img = TX.natural(PAL.hay, { period: 6, oct: 2, seed: 2263 }); return K(img); };
   // ---------------- fungi ----------------
   const mushroom = (cap, dots) => { const img = TX.sprite(); stem(img, 15, 18, 31, C(0xe8dcc0), true); TX.disc(img, 16, 16, 7, (d, x, y) => y > 17 ? null : (dots && hh(x, y, 3) < 0.15 ? C(0xffffff) : TX.scale(C(cap), 0.85 + (1 - d) * 0.25))); TX.outline(img, 0.7); return img; };
   REC.brown_mushroom = () => mushroom(0x9a6a44, false);
   REC.red_mushroom = () => mushroom(0xd81e1e, true);
   REC.shelf_mushroom = () => TX.natural([0x8a4a1a, 0xb86a2a, 0xd88a3a], { period: 4, oct: 2, bands: 3, bandWarp: 1, seed: 2270 });
   REC.shelf_mushroom_under = () => TX.flat(0xe8d8b0);
-  REC.brown_mushroom_block = () => TX.natural([0x7a5234, 0x9a6a44, 0xb07c52], { period: 4, oct: 2, seed: 2271 });
-  REC.red_mushroom_block = () => { const img = TX.natural([0xa81414, 0xc81e1e, 0xe02a2a], { period: 4, oct: 2, seed: 2272 }); for (let k = 0; k < 7; k++) TX.disc(img, hh(k, 1, 2273) * 32, hh(k, 2, 2273) * 32, 2.5, () => C(0xf4f0e8)); return img; };
+  REC.brown_mushroom_block = () => K(TX.natural([0x7a5234, 0x9a6a44, 0xb07c52], { period: 4, oct: 2, seed: 2271 }));
+  REC.red_mushroom_block = () => { const img = TX.natural([0xa81414, 0xc81e1e, 0xe02a2a], { period: 4, oct: 2, seed: 2272 }); for (let k = 0; k < 7; k++) TX.disc(img, hh(k, 1, 2273) * 32, hh(k, 2, 2273) * 32, 2.5, () => C(0xf4f0e8)); return K(img); };
   REC.mushroom_stem = () => TX.natural([0xc8bca0, 0xdcd2b8, 0xece4cc], { period: 3, oct: 2, stretchY: 0.3, seed: 2274 });
   REC.mushroom_inside = () => TX.natural([0xc8a878, 0xdcc090, 0xe8d4a8], { period: 4, oct: 2, seed: 2275, speck: 0.2 });
   REC.glow_lichen = () => { const img = TX.sprite(); for (let k = 0; k < 30; k++) TX.disc(img, hh(k, 1, 2276) * 32, hh(k, 2, 2276) * 32, 1.4 + hh(k, 3, 2276), (d) => TX.mix(C(0xc8f0c0), C(0x7aa87a), d)); for (let i = 0; i < N * N; i++) if (img.c[i * 4 + 3] > 0.5 && img.c[i * 4 + 1] > 0.85) img.em[i] = 0.7; return img; };
@@ -265,8 +266,8 @@
   REC.crimson_roots = () => TX.blades([0x5a0a14, 0x8a141e, 0xb8202a, 0xe04038], { count: 10, minH: 10, varH: 14, seed: 2277 });
   REC.teal_roots = () => TX.blades([0x0a4a44, 0x147066, 0x1e9a88, 0x3ac8b0], { count: 10, minH: 10, varH: 14, seed: 2278 });
   REC.ember_sprouts = () => TX.blades([0x0a5a50, 0x1a8a78, 0x3ab8a0], { count: 16, minH: 4, varH: 8, seed: 2279 });
-  REC.crimson_wart_block = () => TX.natural([0x6a0a14, 0x8e141e, 0xb01e28, 0xd02e30], { period: 5, oct: 3, seed: 2280, contrast: 1.4 });
-  REC.teal_wart_block = () => TX.natural([0x0a4a44, 0x126a60, 0x1a8a7a, 0x2aa894], { period: 5, oct: 3, seed: 2281, contrast: 1.4 });
+  REC.crimson_wart_block = () => K(TX.natural([0x6a0a14, 0x8e141e, 0xb01e28, 0xd02e30], { period: 5, oct: 3, seed: 2280, contrast: 1.4 }));
+  REC.teal_wart_block = () => K(TX.natural([0x0a4a44, 0x126a60, 0x1a8a7a, 0x2aa894], { period: 5, oct: 3, seed: 2281, contrast: 1.4 }));
   REC.lumishroom = () => { const img = new TX.Img(); const P = TX.pal([0xa8401a, 0xf07a2a, 0xffb04a, 0xfff0a0], 5); img.forEach((x, y, i) => { const c = TX.cells(x, y, 4, 2282); const f = 1 - c[0]; img.set(x, y, TX.ramp(P, Math.min(0.999, f)), 1); img.em[i] = 0.6 + f * 0.4; img.h[i] = f; }); return img; };
   REC.weeping_vines = () => hanging([0x7a0e1a, 0xa81a26, 0xd02a32], 2283, 5);
   REC.weeping_vines_tip = () => hanging([0x7a0e1a, 0xa81a26, 0xd02a32], 2284, 3);

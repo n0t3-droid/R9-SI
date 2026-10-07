@@ -53,10 +53,13 @@
   // mottling. "seamless" (Nahtlos): natural ground as smooth slopes (F.SMOOTH), panorama frames and VX pieces that
   // join their neighbours, patterns running across blocks, seamless modern materials, macro mottling.
   // Main thread, workers and the Studio each call VR.setLook; the mesher, physics and the VX painter follow.
-  const LOOK = VR.LOOK = { mode: 'classic', ground: false, ctm: false, rim: true, vxJoin: false, macro: false };
+  // vary (Klassisch v2): every natural block and every leaf block gets its own shade in the shader (the mesher marks
+  // their faces), the normal map turns with the random tile rotation, and the cube textures are built with a
+  // one-texel outline, the natural ones chunky (tex_build.js).
+  const LOOK = VR.LOOK = { mode: 'classic', ground: false, ctm: false, rim: true, vxJoin: false, macro: false, vary: true };
   VR.setLook = function (mode) {
     const m = mode === 'seamless' ? 'seamless' : 'classic', seam = m === 'seamless', changed = LOOK.mode !== m;
-    LOOK.mode = m; LOOK.ground = seam; LOOK.ctm = seam; LOOK.rim = !seam; LOOK.vxJoin = seam; LOOK.macro = seam;
+    LOOK.mode = m; LOOK.ground = seam; LOOK.ctm = seam; LOOK.rim = !seam; LOOK.vxJoin = seam; LOOK.macro = seam; LOOK.vary = !seam;
     // smooth ground: the SMOOTH flag of the natural ground states (o.smooth) is on in Nahtlos only
     const TF = R.T && R.T.flags, sm = R.smoothStates;
     if (TF && sm) for (let i = 0; i < sm.length; i++) { if (seam) TF[sm[i]] |= F.SMOOTH; else TF[sm[i]] &= ~F.SMOOTH; }
@@ -307,6 +310,9 @@
     const smooth = [];   // natural ground states: smooth slopes in the Nahtlos look (VR.setLook)
     // natural ground and its cut twins: one-block terraces a walking body steps up in the Klassisch look (physics.js)
     const terrace = R.terrace = new Uint8Array(n);
+    // the natural blocks of the creative "nature" tab (ores, snow, clay, ice …): Klassisch gives each one its own
+    // shade, like the random-rotation ground, the mottled rock and the leaves (mesher.js, w3 bit 15)
+    const natural = R.natural = new Uint8Array(n);
     // air (state 0)
     T.type[0] = 65535; T.flags[0] = F.REPLACE | F.INVISIBLE; T.shape[0] = S.NONE; T.filter[0] = 0;
     for (const t of R.types) {
@@ -337,6 +343,7 @@
         if (T.layer[s] === 2) fl |= F.TRANS;
         if (get('smooth', false) && opaque) { smooth.push(s); if (LOOK.ground) fl |= F.SMOOTH; }
         if ((get('smooth', false) || o.cutOf) && opaque) terrace[s] = 1;
+        if (t.cat === 'nature' && full && T.layer[s] === 0) natural[s] = 1;
         T.flags[s] = fl;
         const light = get('light', null);
         if (light) T.emit[s] = VR.packLight(light[0], light[1], light[2]);
