@@ -145,9 +145,10 @@
   const NUMW = { ein: 1, eine: 1, einen: 1, einem: 1, einer: 1, eins: 1, one: 1, a: 1, zwei: 2, two: 2, drei: 3, three: 3, vier: 4, four: 4, funf: 5, five: 5, sechs: 6, six: 6, sieben: 7, seven: 7, acht: 8, eight: 8, neun: 9, nine: 9, zehn: 10, ten: 10, elf: 11, eleven: 11, zwolf: 12, twelve: 12, funfzehn: 15, fifteen: 15, zwanzig: 20, twenty: 20, dreissig: 30, thirty: 30, vierzig: 40, forty: 40, funfzig: 50, fifty: 50, sechzig: 60, sixty: 60, hundert: 100, hundred: 100, dutzend: 12 };
   const numOf = (w) => (/^\d+$/.test(w) ? +w : NUMW[w] !== undefined ? NUMW[w] : null);
   // a stem list → one regex: long stems may end a compound ("Bürohochhaus"), short ones start a word; German plural endings allowed
+  // ("~haus": a short stem that may end a compound too — Holzhaus, Wachturm; at the same start the longer word wins)
   function stemRe(stems) {
-    const one = (s) => s.replace(/ /g, ' ?');
-    const long = stems.filter(s => s.length >= 5).map(one), short = stems.filter(s => s.length < 5).map(s => '\\b' + one(s));
+    const one = (s) => s.replace(/^~/, '').replace(/ /g, ' ?');
+    const long = stems.filter(s => s.length >= 5 || s[0] === '~').map(one), short = stems.filter(s => s.length < 5 && s[0] !== '~').map(s => '\\b' + one(s));
     const parts = [];
     if (long.length) parts.push('(?:' + long.join('|') + ')(?:s|e|en|n|es|er|ern)?\\b');
     if (short.length) parts.push('(?:' + short.join('|') + ')(?:s|e|en|n|es|er|ern)?\\b');
@@ -162,20 +163,26 @@
   // type words — the earliest match wins, at the same start the longest ("Hochhaus" beats "haus", "Markthalle" beats "halle")
   const TYPE_WORDS = {
     tower: ['hochhaus', 'hochhauser', 'wolkenkratzer', 'skyscraper', 'skyscrapers', 'tower block', 'high rise', 'highrise', 'buroturm', 'wohnturm', 'wohnblock', 'burohaus', 'office tower', 'apartment tower', 'apartment block', 'hotelturm', 'turmhaus', 'hochhausturm'],
-    lookout: ['aussichtsturm', 'aussichtsturme', 'wachturm', 'watchtower', 'lookout', 'lookout tower', 'turm', 'tower', 'leuchtturm', 'funkturm'],
-    house: ['haus', 'house', 'home', 'villa', 'bungalow', 'einfamilienhaus', 'wohnhaus', 'gartenhaus', 'kubus', 'cube', 'stadtvilla', 'ferienhaus', 'strandhaus'],
-    bridge: ['brucke', 'brucken', 'bridge', 'viadukt', 'viaduct', 'hangebrucke', 'bogenbrucke', 'balkenbrucke', 'steg', 'footbridge', 'suspension bridge', 'arch bridge'],
+    lookout: ['aussichtsturm', 'aussichtsturme', 'wachturm', 'watchtower', 'lookout', 'lookout tower', '~turm', 'tower', 'leuchtturm', 'funkturm'],
+    house: ['~haus', 'house', 'home', 'villa', 'bungalow', 'einfamilienhaus', 'wohnhaus', 'gartenhaus', 'kubus', 'cube', 'stadtvilla', 'ferienhaus', 'strandhaus'],
+    bridge: ['brucke', 'brucken', 'bridge', 'viadukt', 'viaduct', 'hangebrucke', 'bogenbrucke', 'balkenbrucke', '~steg', 'footbridge', 'suspension bridge', 'arch bridge'],
     hall: ['halle', 'markthalle', 'hall', 'market hall', 'lagerhalle', 'warehouse', 'depot', 'bahnhofshalle', 'werkhalle', 'fabrikhalle', 'hangar'],
-    castle: ['burg', 'schloss', 'castle', 'festung', 'fortress', 'kastell', 'burgen', 'ritterburg'],
+    castle: ['~burg', 'schloss', 'castle', 'festung', 'fortress', 'kastell', 'burgen', 'ritterburg'],
     shuttle: ['shuttle', 'raumschiff', 'spaceship', 'starship', 'raumfahre', 'schiff', 'ship', 'raumjager', 'frachter', 'freighter', 'gunship', 'dropship', 'interceptor'],
-    park: ['park', 'garten', 'garden', 'grunanlage', 'spielplatz', 'playground', 'stadtpark', 'parkanlage'],
-    wall: ['mauer', 'wall', 'zaun', 'fence', 'hecke', 'hedge', 'stadtmauer', 'gartenzaun', 'lattenzaun', 'gartenmauer', 'steinmauer'],
-    stadium: ['stadion', 'arena', 'stadium', 'fussballstadion'],
+    park: ['~park', 'garten', 'garden', 'grunanlage', 'spielplatz', 'playground', 'stadtpark', 'parkanlage'],
+    wall: ['mauer', 'wall', '~zaun', 'fence', 'hecke', 'hedge', 'stadtmauer', 'gartenzaun', 'lattenzaun', 'gartenmauer', 'steinmauer'],
+    stadium: ['stadion', 'arena', 'stadium', 'fussballstadion', 'leichtathletikstadion', 'sportplatz', 'sports ground'],
   };
   const TYPE_RE = {}; for (const k in TYPE_WORDS) TYPE_RE[k] = stemRe(TYPE_WORDS[k]);
   Forge.typeOf = function (n) {
     let best = null;
     for (const id in TYPE_RE) { if (!Forge.TYPES[id]) continue; for (const h of hits(n, TYPE_RE[id])) if (!best || h.at < best.at || (h.at === best.at && h.len > best.len)) best = { id, at: h.at, len: h.len }; }
+    // a compound ending ("…haus", "…turm") inside a word that is one letter off a longer type word is that word misspelt:
+    // "Hochaus" is a Hochhaus, "Holzhaus" stays a house
+    if (best && best.at > 0 && n[best.at - 1] !== ' ') {
+      const s0 = n.lastIndexOf(' ', best.at) + 1, e0 = n.indexOf(' ', best.at), word = n.slice(s0, e0 < 0 ? n.length : e0), fz = fuzzyType(word, 1);
+      if (fz && fz.meant.length > best.len && fz.id !== best.id) return Object.assign(fz, { at: s0 });
+    }
     return best || fuzzyType(n);
   };
   // a typo in the type word ("Hochaus", "Wolkenkrazer", "Hängebrüke"): one letter off — two in long words — still names
@@ -191,11 +198,11 @@
     }
     return prev[b.length];
   }
-  function fuzzyType(n) {
+  function fuzzyType(n, maxLim) {
     let best = null, at = 0;
     for (const t of n.split(' ')) {
       if (t.length >= 5 && /^[a-z]+$/.test(t)) {
-        const lim = t.length < 8 ? 1 : 2;
+        const lim = Math.min(maxLim || 2, t.length < 8 ? 1 : 2);
         for (const id in TYPE_WORDS) { if (!Forge.TYPES[id]) continue; for (const w of TYPE_WORDS[id]) { if (w.length < 5 || w.includes(' ') || w[0] !== t[0]) continue; const d = editDist(t, w, lim); if (d <= lim && (!best || d < best.d)) best = { id, at, len: t.length, d, said: t, meant: w }; } }
       }
       at += t.length + 1;
@@ -203,13 +210,14 @@
     return best;
   }
   // materials: generic words → style ids (a type takes the first of its own styles named, else the first generic one it has)
-  const MAT_WORDS = [['glas', ['glas', 'glass', 'glasfassade', 'verglast', 'curtain wall', 'glasturm']], ['beton', ['beton', 'concrete', 'sichtbeton', 'zement', 'brutalist']], ['backstein', ['backstein', 'ziegel', 'klinker', 'brick', 'bricks', 'ziegelstein', 'mauerwerk', 'rotklinker']], ['holz', ['holz', 'wood', 'wooden', 'timber', 'holzern', 'bretter', 'planken', 'balken']], ['sandstein', ['sandstein', 'sandstone', 'kalkstein', 'limestone', 'travertin']], ['stein', ['stein', 'stone', 'granit', 'granite', 'naturstein', 'bruchstein', 'steinern', 'marmor', 'marble']], ['fels', ['fels', 'felsen', 'rock', 'feldstein', 'fieldstone', 'kopfstein', 'cobble']], ['dunkel', ['dunkel', 'dark', 'schwarz', 'black', 'finster', 'grim']], ['tech', ['tech', 'techno', 'sci fi', 'scifi', 'futuristisch', 'futuristic', 'starforge', 'raumstation', 'hightech', 'neon']], ['stahl', ['stahl', 'steel', 'metall', 'metal', 'eisen', 'iron']], ['metall', ['metall', 'metal', 'eisen', 'iron', 'stahl', 'steel', 'gitter']], ['weiss', ['weiss', 'white', 'putz', 'stucco', 'plaster', 'hell', 'bright']], ['anthrazit', ['anthrazit', 'anthracite', 'graphit', 'schwarz', 'black', 'dunkel', 'dark', 'grau', 'grey', 'gray']], ['japan', ['japan', 'japanisch', 'japanese', 'zen', 'kirsch', 'cherry', 'asiatisch', 'asian']], ['stadt', ['stadt', 'urban', 'city', 'stadtisch', 'modern']], ['landhaus', ['landhaus', 'rustikal', 'rustic', 'country', 'landlich', 'dorf', 'village']], ['wild', ['wild', 'wiese', 'meadow', 'natur', 'nature', 'wald', 'forest']]];
-  const MAT_RE = MAT_WORDS.map(([id, stems]) => ({ id, re: stemRe(stems) }));
+  const MAT_WORDS = [['glas', ['glas', 'glass', 'glasfassade', 'verglast', 'curtain wall', 'glasturm']], ['beton', ['beton', 'concrete', 'sichtbeton', 'zement', 'brutalist']], ['backstein', ['backstein', 'ziegel', 'klinker', 'brick', 'bricks', 'ziegelstein', 'mauerwerk', 'rotklinker']], ['holz', ['holz', 'wood', 'wooden', 'timber', 'holzern', 'bretter', 'planken', 'balken']], ['sandstein', ['sandstein', 'sandstone', 'kalkstein', 'limestone', 'travertin']], ['stein', ['stein', 'stone', 'granit', 'granite', 'naturstein', 'bruchstein', 'steinern', 'marmor', 'marble']], ['fels', ['fels', 'felsen', 'rock', 'feldstein', 'fieldstone', 'kopfstein', 'cobble']], ['dunkel', ['dunkel', 'dunkle', 'dunklen', 'dunklem', 'dunkler', 'dunkles', 'dark', 'schwarz', 'black', 'finster', 'grim']], ['tech', ['tech', 'techno', 'sci fi', 'scifi', 'futuristisch', 'futuristic', 'starforge', 'raumstation', 'hightech', 'neon']], ['stahl', ['stahl', 'steel', 'metall', 'metal', 'eisen', 'iron']], ['metall', ['metall', 'metal', 'eisen', 'iron', 'stahl', 'steel', 'gitter']], ['weiss', ['weiss', 'white', 'putz', 'stucco', 'plaster', 'hell', 'bright']], ['anthrazit', ['anthrazit', 'anthracite', 'graphit', 'schwarz', 'black', 'dunkel', 'dark', 'grau', 'grey', 'gray']], ['japan', ['japan', 'japanisch', 'japanese', 'zen', 'kirsch', 'cherry', 'asiatisch', 'asian']], ['stadt', ['stadt', 'urban', 'city', 'stadtisch', 'modern']], ['landhaus', ['landhaus', 'rustikal', 'rustic', 'country', 'landlich', 'dorf', 'village']], ['wild', ['wild', 'wiese', 'meadow', 'natur', 'nature', 'wald', 'forest']]];
+  // (a material may also begin a compound: "Holzhaus", "Glasturm", "Steinmauer", "Stadtpark")
+  const MAT_RE = MAT_WORDS.map(([id, stems]) => ({ id, re: stemRe(stems), pre: new RegExp('\\b(?:' + stems.map(x => x.replace(/ /g, ' ?')).join('|') + ')', 'g') }));
   function styleOf(n, t) {
     let best = null;
-    for (const s of t.styles) { const re = s.re || (s.re = stemRe(s.words || [s.id])); for (const h of hits(n, re)) if (!best || h.at < best.at) best = { id: s.id, at: h.at }; }
-    if (best) return best.id;
-    for (const m of MAT_RE) { if (!t.style(m.id)) continue; for (const h of hits(n, m.re)) if (!best || h.at < best.at) best = { id: m.id, at: h.at }; }
+    const take = (id, h) => { if (!best || h.at < best.at || (h.at === best.at && h.len > best.len)) best = { id, at: h.at, len: h.len }; };
+    for (const s of t.styles) { const re = s.re || (s.re = stemRe(s.words || [s.id])); for (const h of hits(n, re)) take(s.id, h); }
+    for (const m of MAT_RE) { if (!t.style(m.id)) continue; for (const h of hits(n, m.re)) take(m.id, h); for (const h of hits(n, m.pre)) take(m.id, h); }
     return best ? best.id : null;
   }
   // numbers that go with a unit word: "40 Stockwerke", "60 lang", "zwei Etagen", "30 hoch", "über 80 Blöcke"
@@ -229,41 +237,48 @@
     house: [['r', 0, ['flachdach', 'flat roof', 'flat']], ['r', 1, ['pultdach', 'pult', 'shed roof', 'mono pitch', 'monopitch', 'schragdach', 'sloped roof']], ['t', 1, ['terrasse', 'terrace', 'patio', 'veranda', 'deck']], ['c', 1, ['carport', 'garage', 'stellplatz', 'parkplatz']], ['b', 1, ['balkon', 'balkone', 'balcony', 'balconies']], ['p', 1, ['pool', 'schwimmbad', 'swimming pool', 'schwimmbecken']], ['g', 2, ['panorama', 'panoramafenster', 'glasfront', 'viel glas', 'bodentief', 'bodentiefe', 'floor to ceiling', 'glass front', 'glass walls', 'glaswande', 'ganz aus glas']], ['g', 0, ['kleine fenster', 'small windows', 'wenig glas', 'little glass', 'normale fenster']]],
     bridge: [['k', 2, ['hangebrucke', 'hange', 'suspension', 'seile', 'kabel', 'cables', 'cable', 'pylon', 'pylone']], ['k', 1, ['bogen', 'bogenbrucke', 'arch', 'arched', 'arches', 'viadukt', 'viaduct', 'aquadukt']], ['k', 0, ['balken', 'balkenbrucke', 'beam', 'girder', 'trager', 'flach', 'flat']], ['r', 1, ['strasse', 'strassen', 'road', 'autos', 'auto', 'cars', 'car', 'autobahn', 'fahrbahn', 'highway', 'verkehr']], ['r', 0, ['weg', 'fussweg', 'fussganger', 'path', 'footpath', 'footbridge', 'steg', 'pedestrian', 'holzsteg', 'walkway']], ['m', 1, ['laterne', 'laternen', 'lampe', 'lampen', 'lamps', 'lamp', 'lights', 'licht', 'beleuchtet', 'lit']], ['m', 0, ['unbeleuchtet', 'ohne licht', 'dark']]],
     lookout: [['k', 0, ['gitter', 'lattice', 'fachwerk', 'stahlfachwerk', 'gerust', 'truss', 'offen', 'open']], ['k', 1, ['massiv', 'solid', 'gemauert', 'stein', 'stone', 'rund', 'round', 'leuchtturm']], ['r', 1, ['dach', 'roof', 'uberdacht', 'covered', 'hutte']], ['r', 0, ['ohne dach', 'no roof', 'offene plattform', 'open platform']], ['p', 7, ['grosse plattform', 'big platform', 'large platform', 'breite plattform']]],
-    hall: [['m', 1, ['markt', 'market', 'stande', 'stalls', 'stall', 'marktstande', 'markthalle', 'bazaar', 'basar', 'verkauf', 'laden']], ['m', 0, ['leer', 'empty', 'lager', 'lagerhalle', 'depot', 'warehouse', 'hangar', 'werkstatt', 'workshop']], ['c', 1, ['saulen', 'saule', 'columns', 'column', 'pfeiler', 'pillars', 'arkaden']], ['c', 0, ['stutzenfrei', 'ohne saulen', 'no columns', 'freitragend']]],
+    hall: [['m', 1, ['markt', 'market', 'stande', 'stalls', 'stall', 'marktstande', 'markthalle', 'bazaar', 'basar', 'verkauf', 'laden']], ['m', 0, ['leer', 'empty', 'lager', 'lagerhalle', 'depot', 'warehouse', 'hangar', 'werkstatt', 'workshop', 'werkhalle', 'fabrikhalle', 'fabrik', 'factory', 'industriehalle', 'industrie', 'produktion', 'maschinen']], ['c', 1, ['saulen', 'saule', 'columns', 'column', 'pfeiler', 'pillars', 'arkaden']], ['c', 0, ['stutzenfrei', 'ohne saulen', 'no columns', 'freitragend']]],
     castle: [['k', 1, ['bergfried', 'keep', 'donjon', 'palas', 'wohnturm', 'hauptturm', 'burgfried']], ['k', 0, ['ohne bergfried', 'no keep', 'ringmauer', 'nur mauern']], ['t', 1, ['rund', 'runde', 'round', 'rundturm', 'rundturme', 'round towers']], ['t', 0, ['eckig', 'eckige', 'square', 'quadratisch', 'viereckig', 'square towers']]],
-    shuttle: [['a', 0, ['shuttle', 'fahre', 'raumfahre', 'transporter']], ['a', 1, ['interceptor', 'jager', 'raumjager', 'fighter', 'abfangjager']], ['a', 2, ['gunship', 'kanonenboot', 'kampfschiff', 'warship']], ['a', 3, ['racer', 'renner', 'rennschiff', 'racing']], ['a', 4, ['dropship', 'lander', 'landungsschiff', 'landefahre']], ['a', 5, ['frachter', 'freighter', 'cargo', 'frachtschiff', 'transportschiff', 'hauler']], ['p', 1, ['landeplatz', 'landing pad', 'pad', 'plattform', 'platform', 'landebahn']]],
+    shuttle: [['a', 0, ['shuttle', 'fahre', 'raumfahre', 'transporter']], ['a', 1, ['interceptor', 'jager', 'raumjager', 'fighter', 'abfangjager']], ['a', 2, ['gunship', 'kanonenboot', 'kampfschiff', 'warship']], ['a', 3, ['racer', 'renner', 'rennschiff', 'racing']], ['a', 4, ['dropship', 'lander', 'landungsschiff', 'landefahre']], ['a', 5, ['frachter', 'freighter', 'cargo', 'frachtschiff', 'transportschiff', 'hauler']], ['p', 1, ['landeplatz', 'landing pad', 'pad', 'plattform', 'platform', 'landebahn']], ['h', 1, ['hangar', 'halle', 'uberdacht', 'covered', 'dach', 'roof']], ['s', 1, ['bodenstation', 'station', 'kontrollraum', 'leitstand', 'control', 'tankstelle', 'fuel']], ['g', 1, ['gangway', 'rampe', 'ramp', 'treppe', 'stairs', 'einstieg']], ['m', 1, ['leuchtfeuer', 'beacons', 'beacon', 'lichter', 'lights', 'lampen']]],
     park: [['p', 1, ['teich', 'pond', 'see', 'lake', 'weiher', 'wasser', 'water', 'ententeich']], ['f', 1, ['brunnen', 'fountain', 'springbrunnen', 'wasserspiel']], ['t', 3, ['viele baume', 'many trees', 'wald', 'forest', 'waldchen', 'dicht', 'dense', 'baumreich']], ['t', 1, ['wenige baume', 'few trees', 'wiese', 'meadow', 'rasen', 'lawn', 'licht', 'offen', 'open']]],
     wall: [['k', 1, ['zaun', 'fence', 'lattenzaun', 'gartenzaun', 'holzzaun', 'picket', 'gitterzaun', 'eisenzaun']], ['k', 2, ['hecke', 'hedge', 'buchsbaum', 'buchs', 'hedgerow']], ['k', 0, ['mauer', 'wall', 'stadtmauer', 'steinmauer', 'gartenmauer', 'ziegelmauer']], ['g', 1, ['tor', 'gate', 'tur', 'door', 'gartentor', 'durchgang', 'opening', 'eingang']]],
-    stadium: [['r', 1, ['dach', 'roof', 'uberdacht', 'covered']], ['r', 0, ['offen', 'open', 'ohne dach']]],
+    stadium: [['r', 1, ['dach', 'roof', 'uberdacht', 'covered']], ['r', 0, ['offen', 'open', 'ohne dach']], ['k', 1, ['leichtathletik', 'leichtathletikstadion', 'laufbahn', 'athletics', 'running track', 'tartanbahn', 'olympia', 'olympic']], ['k', 0, ['fussball', 'fussballstadion', 'football', 'soccer', 'fussballfeld']]],
   };
   const FEAT_RE = {}; for (const id in FEATS) FEAT_RE[id] = FEATS[id].map(([k, v, stems]) => ({ k, v, re: stemRe(stems) }));
-  // size words: klein ×0.62 · groß ×1.4 · riesig ×2
+  // size words: klein ×0.62 · groß ×1.4 · riesig ×2 — and "hoch / tall / niedrig" for the height alone
   function sizeWord(n) {
-    if (/\b(riesig\w*|riesen\w*|gigantisch\w*|enorm\w*|huge|giant|gigantic|massiv\w*|monumental\w*|mega)\b/.test(n)) return 2;
-    if (/\b(winzig\w*|mini|tiny|klitzeklein\w*)\b/.test(n)) return 0.45;
-    if (/\b(klein|kleine|kleinen|kleiner|kleines|small|little|niedrig\w*|low|flach\w*)\b/.test(n)) return 0.62;
-    if (/\b(gross|grosse|grossen|grosser|grosses|big|large|hoch|hohe|hoher|hohes|tall|machtig\w*|mighty|grand)\b/.test(n)) return 1.4;
-    return 1;
+    if (/\b(riesig\w*|riesen\w*|gigantisch\w*|enorm\w*|huge|giant|gigantic|massiv\w*|monumental\w*|mega)\b/.test(n)) return { k: 2 };
+    if (/\b(winzig\w*|mini|tiny|klitzeklein\w*)\b/.test(n)) return { k: 0.45 };
+    if (/\b(klein|kleine|kleinen|kleiner|kleines|small|little)\b/.test(n)) return { k: 0.62 };
+    if (/\b(niedrig\w*|low|flach|flache|flaches|flacher)\b/.test(n)) return { k: 0.62, up: true };
+    if (/\b(gross|grosse|grossen|grosser|grosses|big|large|machtig\w*|mighty|grand)\b/.test(n)) return { k: 1.4 };
+    if (/\b(hoch|hohe|hohen|hoher|hohes|tall|high)\b/.test(n)) return { k: 1.4, up: true };
+    return { k: 1 };
   }
-  // the parameters a size word scales (the type's main dimensions)
+  // the parameters a size word scales (the type's main dimensions), and its height alone
   const SIZE_KEYS = { tower: ['f', 'w', 'd'], house: ['w', 'd'], bridge: ['l'], lookout: ['h'], hall: ['l', 'w'], castle: ['w', 'd'], shuttle: [], park: ['w', 'd'], wall: ['l'], stadium: ['l', 'w'] };
+  const UP_KEYS = { tower: ['f'], house: ['f'], lookout: ['h'], hall: ['h'], castle: ['h'], wall: ['h'], stadium: ['t'] };
   // the words of a wish applied to a parameter set
   function applyWords(n, raw, P, t) {
     const toks = n.split(' ');
     const set = (k, v) => { if (t.byKey[k]) P.params[k] = v; };
-    // numbers with units
+    // numbers with units ("a tall …" and "ein hoher …" are no numbers: an article counts only for floors — "ein Stockwerk")
+    let rest = n;
+    const pinned = new Set();
     for (const [key, re] of UNITS) {
       const m = re.exec(n); if (!m) continue;
-      if (key === 'n') { set('w', +m[1]); set('d', +m[2]); continue; }
+      if (key === 'n') { set('w', +m[1]); set('d', +m[2]); pinned.add('w'); pinned.add('d'); rest = rest.replace(m[0], ' '); continue; }
       const v = numOf(m[1]); if (v === null) continue;
+      if (!/^\d+$/.test(m[1]) && (m[1] === 'a' || ((key !== 'f' && key !== 'f2') && v < 2))) continue;
+      rest = rest.replace(m[0], ' '); pinned.add(key === 'f2' ? 'f' : key);
       if (key === 'f' || key === 'f2') { if (t.byKey.f) set('f', v); else if (t.id === 'lookout') set('h', v * 4); continue; }
       if (key === 'h') { if (t.byKey.h) set('h', v); else if (t.id === 'tower') set('f', Math.max(4, Math.round(v / 4))); continue; }
       if (key === 'l') { if (t.byKey.l) set('l', v); else if (t.byKey.d && !t.byKey.w) set('d', v); continue; }
       set(key, v);
     }
-    // size words (only where no number pinned that parameter)
-    const k = sizeWord(n);
-    if (k !== 1) for (const key of SIZE_KEYS[t.id] || []) { const p = t.byKey[key]; if (!p) continue; const re = UNITS.find(u => u[0] === key); if (re && re[1].test(n)) continue; const base = P.params[key] !== undefined ? P.params[key] : p.def; P.params[key] = clamp(Math.round(base * (key === 'f' && k > 1 ? Math.min(k, 1.6) : k)), p.min, p.max); }
+    // size words (only where no number pinned that parameter; the words a unit used — "3 hoch" — are not read again)
+    const sw = sizeWord(rest), k = sw.k;
+    if (k !== 1) for (const key of (sw.up ? UP_KEYS : SIZE_KEYS)[t.id] || []) { const p = t.byKey[key]; if (!p || pinned.has(key) || (key === 'f' && pinned.has('h'))) continue; const base = P.params[key] !== undefined ? P.params[key] : p.def; P.params[key] = clamp(Math.round(base * (key === 'f' && k > 1 ? Math.min(k, 1.6) : k)), p.min, p.max); }
     // features (negation within three words: "ohne Balkon", "kein Pool")
     for (const f of FEAT_RE[t.id] || []) for (const h of hits(n, f.re)) {
       const neg = negated(toks, tokAt(n, h.at)), p = t.byKey[f.k]; if (!p) continue;
