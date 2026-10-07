@@ -567,6 +567,10 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     W.onmessage = (e) => { const m = e.data; if (m.type === 'log') { console.log('[worker]', m.msg); return; } if (m.part) { const p = wpart.get(m.id); if (p) p(m); return; } const cb = wcb.get(m.id); if (cb) { wcb.delete(m.id); wpart.delete(m.id); cb(m); } };
     W.onerror = (e) => { console.error('worker', e.message || e); sys('Worker-Fehler: ' + (e.message || ''), 'err'); };
     W.postMessage({ type: 'init', seed: 1, opts: {}, custom: VR.Custom ? (VR.Custom.load() || null) : null });
+    // the block look from the game's settings (Klassisch / Nahtlos): here as in the game, before the first texture and mesh
+    let look = 'classic'; try { look = JSON.parse(localStorage.getItem('r9si.settings') || '{}').look === 'seamless' ? 'seamless' : 'classic'; } catch (e) { /* default */ }
+    if (VR.setLook) VR.setLook(look);
+    W.postMessage({ type: 'look', mode: look });
   }
   const call = (msg, tr) => new Promise((res) => { msg.id = wid++; wcb.set(msg.id, res); W.postMessage(msg, tr || []); });
   // a call whose answer comes in parts (onPart for each, the promise for the last)
@@ -575,7 +579,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
   async function forgeTextures() {
     log('Texturen schmieden (Blöcke, Fassaden, Böden …)');
     const t0 = performance.now();
-    const tex = await call({ type: 'textures', bevel: 1 });
+    const tex = await call({ type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) });
     if (tex.type !== 'textures') { log('Texturen', 'FEHLER'); sys('Texturen fehlgeschlagen', 'err'); return false; }
     uploadGameTextures(tex);
     log('Texturen schmieden', fmt(tex.layers) + ' Layer · ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s');

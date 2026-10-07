@@ -32,18 +32,19 @@
   const LXP = [0, 4, 1, 5], LXM = [1, 5, 0, 4], LZP = [4, 1, 5, 0];
 
   // ---------------------------------------------------------------- wall patterns
-  // big two-by-two panels with carved seams; optional light strip + accent plate
+  // big two-by-two panels with carved seams; optional light strip + accent plate. Klassisch: every block is one whole
+  // panel (seams and bevel on its own edges; strips, accent and vent folded into it — the vent only without an accent)
   PAT.techpanel = (s, u, v, c, d) => {
-    const along = (d === 0 || d === 1) ? c.pz : c.px;
-    const U = along * 8 + u, V = c.py * 8 + v;
-    if (s.strip !== undefined && (V === s.strip || (s.strip2 !== undefined && V === s.strip2))) { setP(s.glow || T.cyan, T.darkD, EMIS, 0); return; }
+    const along = (d === 0 || d === 1) ? c.pz : c.px, per = !VR.LOOK.vxJoin;
+    const U = along * 8 + u, V = c.py * 8 + v, E = per ? 7 : 15, at = per ? (p) => p & 7 : (p) => p;
+    if (s.strip !== undefined && (V === at(s.strip) || (s.strip2 !== undefined && V === at(s.strip2)))) { setP(s.glow || T.cyan, T.darkD, EMIS, 0); return; }
     if (s.bandV !== undefined && v >= s.bandV && v <= s.bandV + 1) { setP(v === s.bandV ? s.band : sh(s.band, 1.15), T.darkD, s.bandGlow ? EMIS : GLOSS, 0); return; }
     if (U === 0 || V === 0) { setP(-1, s.col2, 0, 0); return; }
     let k = 1;
-    if (U === 1 || V === 15) k = 1.045; else if (U === 15 || V === 1) k = 0.93;
+    if (U === 1 || V === E) k = 1.045; else if (U === E || V === 1) k = 0.93;
     let col = sh(s.col, k), f = s.gloss ? GLOSS : 0;
-    if (s.accent && V >= 12 && V <= 13 && U >= 3 && U <= 6) { col = s.accent; f = s.accentGlow ? EMIS : 0; }
-    if (s.vent && V >= 3 && V <= 6 && U >= 9 && U <= 13) col = (V & 1) ? s.col2 : sh(s.col, 0.85);
+    if (s.accent && V >= at(12) && V <= at(13) && U >= 3 && U <= 6) { col = s.accent; f = s.accentGlow ? EMIS : 0; }
+    if (s.vent && !(per && s.accent) && V >= at(3) && V <= at(6) && U >= at(9) && U <= at(13)) col = (V & 1) ? s.col2 : sh(s.col, 0.85);
     setP(col, sh(s.col, 0.78), f, 0);
   };
   // hexagon relief (voronoi of a hex lattice, ~6 voxels across)
@@ -128,8 +129,10 @@
   // in the plane of a facing piece: local +x, -x, up, down (+ what is in front)
   const plane4 = (c, sp, s, nbS) => { const q = c.facing & 3; return (same(nbS[LXP[q]], sp) ? 1 : 0) | (same(nbS[LXM[q]], sp) ? 2 : 0) | (same(nbS[2], sp) ? 4 : 0) | (same(nbS[3], sp) ? 8 : 0); };
   VX.ctxHook.floor = (c, sp, s, nbS) => (sp.pat === 'line' || sp.pat === 'pad') ? flat4(c, sp, s, nbS) : 0;
-  VX.ctxHook.holo = plane4;
+  // holo screens and glass walls merge into one big pane in the Nahtlos look; Klassisch: each block its own framed pane
+  VX.ctxHook.holo = (c, sp, s, nbS) => VR.LOOK.vxJoin ? plane4(c, sp, s, nbS) : 0;
   VX.ctxHook.glasswall = (c, sp, s, nbS) => {
+    if (!VR.LOOK.vxJoin) return 0;
     // plane: facing parity 0 → along x, 1 → along z
     const alongX = (c.facing & 1) === 0;
     return (same(nbS[alongX ? 0 : 4], sp) ? 1 : 0) | (same(nbS[alongX ? 1 : 5], sp) ? 2 : 0) | (same(nbS[2], sp) ? 4 : 0) | (same(nbS[3], sp) ? 8 : 0);
@@ -172,7 +175,7 @@
     // content: one widget per block, picked from the block's place in the screen and its position hash
     const lo = (!L_ ? 2 : 0), hi = (!R_ ? 5 : 7), bo = (!D_ ? 2 : 0), to = (!U_ ? 5 : 7);
     const P = (u, v, col) => { if (u >= lo && u <= hi && v >= bo && v <= to && !(get(u, v, 5) & PRESENT)) put(u, v, 5, col || glow, EMIS | HOLO); };
-    const widget = !L_ ? 0 : (hh(c.px + c.h * 2, c.py, c.pz, 55) % 5);
+    const widget = !L_ && VR.LOOK.vxJoin ? 0 : (hh(c.px + c.h * 2, c.py, c.pz, 55) % 5);   // Klassisch: every screen its own widget
     const cu = (lo + hi) / 2, cv = (bo + to) / 2;
     if (widget === 0) { // radar: ring, crosshair, blip
       for (let v = 0; v < 8; v++) for (let u = 0; u < 8; u++) { const r = Math.hypot(u - cu, v - cv); if (Math.abs(r - 2.2) < 0.55) P(u, v); }

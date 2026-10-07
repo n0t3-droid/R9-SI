@@ -26,6 +26,24 @@
     return img;
   }
 
+  // the Klassisch look's edge on the seamless materials (stucco, Vollton, marble, tiles …): a darker border two texels
+  // wide (one pixel of a 16-pixel block) and a groove — the gentle rim of stylize() vanishes on bright surfaces (tone
+  // mapping and bloom swallow a few percent). The brighter the material, the darker its border: a sunlit white wall
+  // sits on the tone curve's shoulder, where only a strong line still shows (measured in the game: ~9 grey levels on
+  // white stucco in the sun, ~24 on grey stucco up close). Mips fade it out with distance.
+  function edgeLine(img, strength) {
+    const s = strength;
+    let lum = 0; for (let i = 0; i < N * N; i++) lum += 0.2126 * img.c[i * 4] + 0.7152 * img.c[i * 4 + 1] + 0.0722 * img.c[i * 4 + 2];
+    lum = Math.min(1, lum / (N * N));
+    const k0 = (0.14 + 0.22 * lum) * s, k1 = (0.08 + 0.12 * lum) * s;   // white: ×0.65 / ×0.81 · dark: ×0.82 / ×0.9
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const e = Math.min(x, y, N - 1 - x, N - 1 - y);
+      if (e > 1) continue;
+      const i = y * N + x, m = 1 - (e === 0 ? k0 : k1);
+      img.h[i] -= (e === 0 ? 0.2 : 0.1) * s;
+      img.c[i * 4] *= m; img.c[i * 4 + 1] *= m; img.c[i * 4 + 2] *= m;
+    }
+  }
   // soft bevel + edge definition for cube faces (normal-mapped groove, gentle AO rim)
   function stylize(img, strength) {
     const s = strength;
@@ -84,7 +102,20 @@
     return out;
   }
 
-  // Build all layers. opts: {names, cubeMask (Uint8Array per layer), cutoutMask, bevel (0..1)}
+  // which layers are faces of full opaque cubes (they get the rim) and which are cut-out (alpha-coverage mips)
+  VR.textureMasks = function () {
+    const R = VR.R, T = R.T, L = R.texNames.length;
+    const cube = new Uint8Array(L), cut = new Uint8Array(L);
+    for (let s = 0; s < T.shape.length; s++) {
+      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 0 && (T.flags[s] & VR.F.FULL)) for (let f = 0; f < 6; f++) cube[T.tex[s * 6 + f] & 0xfff] = 1;
+      if (T.layer[s] === 1) for (let f = 0; f < 6; f++) cut[T.tex[s * 6 + f] & 0xfff] = 1;
+    }
+    for (let s = 0; s < R.models.length; s++) { const md = R.models[s]; if (md && T.layer[s] === 1) for (const f of md) cut[f.tex & 0xfff] = 1; }
+    if (VR.CUTOUT_TEX) for (const n of VR.CUTOUT_TEX) { const i = R.texIndex[n]; if (i !== undefined) cut[i] = 1; }
+    return { cube, cut };
+  };
+  // Build all layers. opts: {names, cubeMask (Uint8Array per layer), cutoutMask, bevel (0..1), bevelAll (the Klassisch
+  // look: the seamless materials get the rim too, so every block shows its edges)}
   VR.buildTextureArrays = function (opts) {
     const names = opts.names, L = names.length;
     const albedo = [], material = [];
@@ -96,7 +127,8 @@
       let img = null;
       try { img = resolve(names[l]); } catch (e) { img = null; missing.push(names[l] + ' (error: ' + e.message + ')'); }
       if (!img) { if (!missing.length || missing[missing.length - 1].indexOf(names[l]) !== 0) missing.push(names[l]); img = missingTex(); }
-      if (opts.cubeMask && opts.cubeMask[l] && opts.bevel > 0 && !img.noBevel) stylize(img, opts.bevel);   // seamless materials (stucco, marble…) opt out
+      // seamless materials (stucco, marble…) opt out of the rim — in the Klassisch look they get the edge line instead
+      if (opts.cubeMask && opts.cubeMask[l] && opts.bevel > 0) { if (!img.noBevel) stylize(img, opts.bevel); else if (opts.bevelAll) edgeLine(img, opts.bevel); }
       TX.toArrays(img, alb0, mat0, 0);
       albedo[0].set(alb0, l * N * N * 4); material[0].set(mat0, l * N * N * 4);
       // mips

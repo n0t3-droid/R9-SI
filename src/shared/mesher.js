@@ -89,6 +89,9 @@
     if (!CTMK) ctmTables();
     const B = job.blocks, L = job.light, GR = job.grass, FO = job.foliage, WA = job.water;
     const fancy = job.fancyLeaves !== false, smooth = job.smooth !== false;
+    // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
+    // mottling; smooth ground follows the F.SMOOTH flags VR.setLook sets
+    const LK = VR.LOOK, ctmJoin = !LK || LK.ctm, macroOn = !LK || LK.macro;
     const bufs = [new Buf(4096), new Buf(1024), new Buf(1024)];
     // world sections keep their mini-voxel pieces apart from the plain terrain: a detailed buffer drawn up close
     // and a far buffer of averaged boxes (ships and previews merge everything into the opaque stream as before)
@@ -170,7 +173,7 @@
       const layer = texv & 0xfff, rot = (texv >> 12) & 3;
       let w3 = layer | (rot << 12);
       if (flags & F.RANDROT) { const top = TTEX[state * 6 + 2] & 0xfff; if (d >= 2 && d <= 3 || layer === top) w3 |= 1 << 14; }
-      if (flags & F.MACRO) w3 |= 1 << 15;
+      if ((flags & F.MACRO) && macroOn) w3 |= 1 << 15;
       return w3;
     };
 
@@ -310,8 +313,9 @@
           if (fl & F.WAVELEAF) w5 |= 1 << 7;
           const box = [x * 16, y * 16, z * 16, x * 16 + 16, y * 16 + 16, z * 16 + 16];
           let texv = TTEX[b * 6 + d];
-          // panorama glass: the frame variant from the same glass around this face (top, right, bottom, left)
-          if (cmode === 1) { texv = ctm + joinMask(d); w5 |= 1 << 14; }
+          // panorama glass: the frame variant from the same glass around this face (top, right, bottom, left);
+          // Klassisch: variant 0, the full frame on every block
+          if (cmode === 1) { texv = ctm + (ctmJoin ? joinMask(d) : 0); w5 |= 1 << 14; }
           emitCubeQuad(bufs[layer], d, box, 1, 1, texW3(texv, fl, d, b), w5, cornerLight.slice(), cornerAO.slice(), tint);
         }
         continue;
@@ -378,7 +382,7 @@
         let w5base = (f.dir & 7) | (kind << 8) | ((fflags & FF.EMIT) || (fl & F.EMISSIVE) ? 1 << 12 : 0) | (!f.shade ? 1 << 11 : 0);
         if ((fflags & FF.WAVELEAF) || (fl & F.WAVELEAF)) w5base |= 1 << 7;
         const tint = f.tint ? (f.tint >= 8 && f.tint < 256 ? tintAt(f.tint, x, z, b) : (f.tint > 255 ? hex565(f.tint) : tintAt(f.tint, x, z, b))) : blockTint;
-        const w3 = (texv & 0xffff) | ((fl & F.MACRO) ? 1 << 15 : 0);
+        const w3 = (texv & 0xffff) | ((fl & F.MACRO) && macroOn ? 1 << 15 : 0);
         const p = f.p, uv = f.uv;
         buf.ensure(f.double ? 8 : 4);
         const tall = t.o.tall && t.has('half') && t.get(b, 'half') === 1;

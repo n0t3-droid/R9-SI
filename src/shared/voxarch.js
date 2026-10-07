@@ -98,7 +98,10 @@
   // pattern(u, v, C, d) sets P0 (colour at depth 0 or -1 = carved) and P1 (colour at depth 1)
   let P0 = 0, P1 = 0, PF0 = 0, PF1 = 0;
   const PAT = {};
-  PAT.plaster = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, 0.985 + ((c.h & 1) ? 0.03 : 0)); };
+  // flat walls (plaster, adobe) in the Klassisch look: a slightly darker line on each block's low edges (u 0, v 0),
+  // so the wall shows its blocks like every other block does
+  const blockSeam = (u, v) => (u === 0 || v === 0) && !VR.LOOK.vxJoin;
+  PAT.plaster = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.985 + ((c.h & 1) ? 0.03 : 0)) * (blockSeam(u, v) ? 0.93 : 1)); };
   PAT.timber = (s, u, v, c, d) => {
     // posts every two blocks, rails at the block top, a diagonal brace across each two-block panel
     const along = (d === 0 || d === 1) ? c.pz : c.px;
@@ -137,7 +140,7 @@
     if (edge) { P0 = -1; P1 = s.col2; } else { P0 = sh(mix(s.col, (id >> 12) & 1 ? 0x8A8070 : s.col, 0.3), k); P1 = sh(s.col, k * 0.8); }
   };
   PAT.sandstone = (s, u, v, c) => { const line = v === 3 || v === 7; P0 = line ? -1 : sh(s.col, v < 3 ? 1.0 : 0.97); P1 = sh(s.col, 0.82); };
-  PAT.adobe = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, 0.98 + (c.h & 1) * 0.03); };
+  PAT.adobe = (s, u, v, c) => { P0 = -1; P1 = sh(s.col, (0.98 + (c.h & 1) * 0.03) * (blockSeam(u, v) ? 0.93 : 1)); };
   PAT.hull = (s, u, v, c) => {
     const seam = u === 0 || v === 0;
     const stripe = s.stripe && ((c.py + (c.h >> 1)) & 3) === 1 && (v === 3 || v === 4);
@@ -245,10 +248,12 @@
         fput(d, u, v, 1, P1, PF1);
       }
     }
-    // opening (merges with stacked / side-by-side windows); 7-wide so the mullion cross is centred
-    const up = c.nc[2] === WIN, dn = c.nc[3] === WIN;
+    // opening (merges with stacked / side-by-side windows in the Nahtlos look; Klassisch: every window block is a whole
+    // window with its own frame, sill and wall strip); 7-wide so the mullion cross is centred
+    const J = VR.LOOK.vxJoin;
+    const up = J && c.nc[2] === WIN, dn = J && c.nc[3] === WIN;
     const sides = f === 0 ? [1, 0] : [5, 4];
-    const lf = c.nc[sides[0]] === WIN, rt = c.nc[sides[1]] === WIN;
+    const lf = J && c.nc[sides[0]] === WIN, rt = J && c.nc[sides[1]] === WIN;
     const u0 = lf ? 0 : 1, u1 = 7, v0 = dn ? 0 : 1, v1 = 7;
     const at = (u, v, dp) => f === 0 ? [u, v, dp] : [dp, v, u];
     const P = (u, v, dp, col, fl) => { const p = at(u, v, dp); put(p[0], p[1], p[2], col, fl); };
@@ -359,12 +364,12 @@
     for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) {
       let cc = s.col, fl = s.flags || 0;
       switch (s.pat) {
-        case 'planks': { const X = c.px * 8 + x, b = (c.pz * 8 + z) >> 1; const seam = (X + (b & 1) * 5 + (hh(b, c.h, 0, 3) & 7)) % 16 === 0; cc = seam ? sh(s.col, 0.72) : sh(s.col, 0.94 + (hh(b, c.h, 2, 5) & 3) * 0.03); if ((z & 1) === 1) cc = sh(cc, 0.93); break; }
+        case 'planks': { const X = c.px * 8 + x, b = (c.pz * 8 + z) >> 1; const seam = (X + (b & 1) * 5 + (hh(b, c.h, 0, 3) & 7)) % 16 === 0 || (x === 0 && !VR.LOOK.vxJoin); cc = seam ? sh(s.col, 0.72) : sh(s.col, 0.94 + (hh(b, c.h, 2, 5) & 3) * 0.03); if ((z & 1) === 1) cc = sh(cc, 0.93); break; }   // Klassisch: the boards end at every block edge
         case 'tiles': cc = (x === 0 || z === 0) ? s.col2 : sh(s.col, 0.97 + (c.h & 1) * 0.04); break;
         case 'checker': cc = ((x >> 2) + (z >> 2) + c.px + c.pz) & 1 ? s.col : s.col2; fl |= GLOSS; break;
         case 'stone': PF0 = 0; PAT.fieldstone(FOUND_TOP, x, z, c, 2); cc = P0 < 0 ? s.col2 : P0; break;
         case 'metal': cc = (x === 0 || z === 0) ? s.col2 : ((x + z) & 3) === 0 ? sh(s.col, 0.8) : s.col; fl |= GLOSS; if (x === 4 && z === 4 && (c.h & 1)) { cc = C.cyan; fl |= EMIS; } break;
-        case 'marble': cc = mix(s.col, s.col2, (hh(x >> 1, z >> 1, c.h, 7) & 7) === 0 ? 0.6 : 0); fl |= GLOSS; break;
+        case 'marble': cc = mix(s.col, s.col2, (hh(x >> 1, z >> 1, c.h, 7) & 7) === 0 ? 0.6 : 0); if ((x === 0 || z === 0) && !VR.LOOK.vxJoin) cc = sh(cc, 0.9); fl |= GLOSS; break;   // Klassisch: a seam at every block edge
         default: { const fp = VX.floorPat[s.pat]; if (fp) { const r = fp(s, c, x, z); cc = r[0]; fl = r[1]; if (r[2]) { put(x, 7, z, cc, fl); continue; } } }
       }
       if (cc < 0) { del(x, 7, z); put(x, 6, z, s.col2 || sh(s.col, 0.7)); continue; }
@@ -776,6 +781,10 @@
   // ---------------------------------------------------------------- context for a block in a padded section
   const ctx = neutralCtx();
   const nbS = [0, 0, 0, 0, 0, 0];
+  // the building surfaces whose patterns (timber braces, boards, panels, floor planks, rug motifs …) run across blocks
+  // from the world position: in the Klassisch look every block of them is painted as if it stood at an even position,
+  // so each block carries the whole pattern on its own (furniture and plants keep their per-position variety)
+  const PERBLOCK = { wall: 1, window: 1, floor: 1, roof: 1, rug: 1 };
   // build context; returns the extra-bits key part
   function buildCtx(s, sp, B, bi, DOFF, L, wx, wy, wz) {
     const c = ctx;
@@ -787,7 +796,8 @@
     c.px = wx & 1; c.py = wy & 1; c.pz = wz & 1; c.h = hh(wx, wy, wz, 77) & 3;
     fillCtxFromState(c, s);
     let x = 0;
-    const k = sp.kind;
+    const k = sp.kind, join = VR.LOOK.vxJoin;
+    if (!join && PERBLOCK[k]) { c.px = 0; c.py = 0; c.pz = 0; }
     if (k === 'wall') {
       // shutter colours of in-plane neighbouring windows: bits [face0 lo, hi | face4 lo, hi] per plane
       // for faces 0/1 (plane along z): neighbours 5 (-z) and 4 (+z) → k=0,1 at bits 0..5 ; faces 4/5 (plane x): neighbours 1,0 → bits 6..11
@@ -825,7 +835,8 @@
       const con = (d) => { const ns = nbS[d], cl = clsOf[ns]; return cl === SOLID || cl === WALL || cl === WIN || (specOf[ns] && (specOf[ns].kind === 'fence' || specOf[ns].kind === 'lamppost')) || cl === DOOR ? 1 : 0; };
       x = con(5) | (con(0) << 1) | (con(4) << 2) | (con(1) << 3);
     } else if (k === 'rug') {
-      const same = (d) => specOf[nbS[d]] && specOf[nbS[d]].kind === 'rug' ? 1 : 0;
+      // Nahtlos: rugs side by side join into one big rug · Klassisch: every rug block has its own border
+      const same = (d) => join && specOf[nbS[d]] && specOf[nbS[d]].kind === 'rug' ? 1 : 0;
       x = same(0) | (same(1) << 1) | (same(4) << 2) | (same(5) << 3);
     } else if (VX.ctxHook[k]) x = VX.ctxHook[k](c, sp, s, nbS, B, bi, DOFF) & 0x3ffff;
     c.x = x;
@@ -1089,14 +1100,16 @@
     if (M.far && quads.lod === undefined) quads.lod = lodFromQuads(quads);
     if (M.far && quads.lod) emitFar(M, x, y, z, quads.lod, cull);
     const bufs = M.bufs, smooth = sp.res >= 16;   // fine models get smooth lacquer surfaces instead of the bevel tile
+    const macro = VR.LOOK.macro;
     for (let q = 0; q < quads.length; q += RS) {
       const d = quads[q], col = quads[q + 1] & 0xffff, fl = quads[q + 2];
       const glass = (fl & 2) !== 0;
       const buf = glass ? bufs[2] : bufs[0];
       const matId = (fl >> 4) & 7;
       const matLayer = matId && M.layerMat ? M.layerMat[matId] : 0;
-      // material quads: texture layer + upright rotation (bit 12) + world-scale variation (bit 15; not on metal)
-      const layer = glass ? M.layerGlass : matLayer ? matLayer | ((fl & 128) ? 4096 : 0) | (matId !== 5 ? 32768 : 0) : (fl & 8) && M.layerHolo ? M.layerHolo : (fl & 4) ? (smooth && M.layerSmoothGloss ? M.layerSmoothGloss : M.layerGloss) : (smooth && M.layerSmooth ? M.layerSmooth : M.layerTile);
+      // material quads: texture layer + upright rotation (bit 12) + world-scale variation (bit 15; not on metal, not
+      // in the Klassisch look)
+      const layer = glass ? M.layerGlass : matLayer ? matLayer | ((fl & 128) ? 4096 : 0) | (matId !== 5 && macro ? 32768 : 0) : (fl & 8) && M.layerHolo ? M.layerHolo : (fl & 4) ? (smooth && M.layerSmoothGloss ? M.layerSmoothGloss : M.layerGloss) : (smooth && M.layerSmooth ? M.layerSmooth : M.layerTile);
       const w5base = d | ((fl & 1) ? 1 << 12 : 0);
       const light = lightFor[d];
       buf.ensure(4);

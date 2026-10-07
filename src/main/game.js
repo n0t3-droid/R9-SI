@@ -12,7 +12,9 @@
     high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false },
     ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false },
   };
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true }, PRESETS.balanced);
+  // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
+  // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic' }, PRESETS.balanced);
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -58,6 +60,59 @@
       if (this.audio) this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
+      this.applyLook();
+    }
+    // ---------------------------------------------------------------- the block look (v0.39)
+    // Klassisch / Nahtlos (Settings → Graphics → Blöcke, /look): the registry flags here and in every worker, a re-mesh,
+    // and the cube textures with or without the rim on the seamless materials. A guest sees the host's look.
+    lookMode() { const m = (this.meta && this.meta.guest && this.hostLook) || this.settings.look; return m === 'seamless' ? 'seamless' : 'classic'; }
+    applyLook() {
+      const mode = this.lookMode();
+      if (!VR.setLook || this.lookSent === mode) return false;
+      VR.setLook(mode); this.lookSent = mode;
+      if (this.pool) this.pool.broadcast({ type: 'look', mode });
+      this.remeshAll();
+      if (this.tex && this.texRim !== VR.LOOK.rim) this.reloadTextures();
+      return true;
+    }
+    // rebuild the block textures in a worker and upload them into the existing texture arrays; the icons follow
+    reloadTextures() {
+      const rim = VR.LOOK.rim, req = this.texReq = (this.texReq || 0) + 1;
+      this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: rim }, null, (tex) => {
+        const r = this.renderer, gl = r && r.gl;
+        if (req !== this.texReq || tex.type !== 'textures' || !gl || !r.texAlbedo || tex.layers !== r.layers) return;
+        for (const [t, lv] of [[r.texAlbedo, tex.albedo], [r.texMaterial, tex.material]]) {
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+          for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
+        }
+        Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
+        if (this.icons) { this.icons.alb = tex.albedo[0]; this.icons.cache.clear(); this.icons.faceCache.clear(); }
+        if (this.player && this.player.inv) this.player.inv.changed = true;
+        if (this.ui && this.ui.updateHUD && this.state === 'play') this.ui.updateHUD(true);
+      });
+    }
+    lookCommand(arg) {
+      const say = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
+      const m = { classic: 'classic', klassisch: 'classic', seamless: 'seamless', nahtlos: 'seamless' }[String(arg || '').toLowerCase()];
+      if (!m) { say(this.lookText('label') + ': ' + this.lookText(this.settings.look === 'seamless' ? 'seamless' : 'classic') + ' · /look classic | seamless'); return; }
+      this.settings.look = m; this.applySettings('look'); this.saveSettings();
+      say(this.lookText(m + 'Say'), '#9affd8');
+      if (this.meta && this.meta.guest && this.hostLook && this.hostLook !== m) say(this.lookText('host'), '#ffd27a');
+    }
+    // the look's words in the player's language (German or English; the other languages read the English). Without
+    // the language module (i18n.js) German players are told by the Studio's language choice, else by the browser's.
+    lookText(k) {
+      const L = {
+        label: ['Blöcke', 'Blocks'], classic: ['Klassisch', 'Classic'], seamless: ['Nahtlos', 'Seamless'],
+        classicTip: ['Wie im Original: jeder Block mit eigenen Kanten, Hügel in Blockstufen, Glas und Muster pro Block', 'Like the original: every block with its own edges, hills in one-block steps, glass and patterns per block'],
+        seamlessTip: ['Sanfte Hänge, verbundene Panoramafenster und Wandteile, nahtlose Putz- und Volltonflächen', 'Smooth slopes, joined panorama windows and wall pieces, seamless plaster and Vollton surfaces'],
+        classicSay: ['Blöcke: Klassisch — jeder Block mit eigenen Kanten, Hügel in Stufen.', 'Blocks: Classic — every block with its own edges, hills in steps.'],
+        seamlessSay: ['Blöcke: Nahtlos — sanfte Hänge, verbundenes Glas, nahtlose Materialien.', 'Blocks: Seamless — smooth slopes, joined glass, seamless materials.'],
+        host: ['In dieser Welt gilt der Look des Hosts.', "In this world the host's look applies."],
+      }[k] || [k, k];
+      if (VR.I18N) return VR.I18N.tx('g.look.' + k, null, L[0], L[1]);
+      let de = false; try { const s = localStorage.getItem('r9si.lang'); de = s ? s === 'de' : /^de\b/i.test(navigator.language || ''); } catch (e) { /* storage blocked */ }
+      return de ? L[0] : L[1];
     }
     // the player's hero look (Settings → Character); a random one is rolled on first start
     heroOpts() {
@@ -112,9 +167,11 @@
       this.pool.maxInflight = 2;
       this.titleSeed = 0x7a3c21 ^ (Math.floor(Math.random() * 6) * 0x1111);
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
-      const tex = await new Promise((res) => this.pool.direct(0, { type: 'textures', bevel: 1 }, null, res));
+      // the block look before the first texture and the first mesh
+      if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
+      const tex = await new Promise((res) => this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
       if (tex.missing && tex.missing.length) console.warn('Missing textures:', tex.missing);
-      this.tex = tex;
+      this.tex = tex; this.texRim = !!(VR.LOOK && VR.LOOK.rim);
       tex.noise = tex.noise;
       this.renderer.init(tex);
       this.icons = new VR.Icons(tex);
@@ -381,6 +438,7 @@
       const W = wel.w || {};
       const meta = { id: 'guest-' + String(W.id || 'x').replace(/[^a-z0-9]/gi, '').slice(0, 30), guest: true, name: (W.name || 'World') + ' · with ' + (mp.hostName || 'friend'), seed: (W.seed >>> 0), mode: ['survival', 'creative', 'zen'].includes(W.mode) ? W.mode : 'creative', difficulty: W.difficulty || 'normal', type: W.type || 'default', cheats: !!W.cheats, keep: !!W.keep, kit: true, time: +wel.time || 1000, day: +wel.day || 0, dim: 'overworld', worldSpawn: Array.isArray(wel.home) ? wel.home : null, vgen: +W.vgen || 1 };
       this.meta = meta;
+      this.hostLook = wel.look === 'seamless' || wel.look === 'classic' ? wel.look : null; this.applyLook();   // the host's block look
       this.difficulty = meta.difficulty; this.keepInventory = meta.keep;
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       // the host's world style, as multiplayer allows it (buildings, furniture, trees — the land stays shared)
@@ -421,6 +479,7 @@
     }
     leaveGuestWorld(msg) {
       if (this.mp) this.mp.clearSession();
+      this.hostLook = null; this.applyLook();   // back to my own block look
       try { if (this.starships) this.starships.shutdown(); if (this.gadgets) this.gadgets.shutdown(); } catch (e) { console.warn(e); }
       this.input.releaseLock();
       this.startTitle();
@@ -950,6 +1009,7 @@
         const [c0, ...a0] = text.slice(1).split(/\s+/);
         const say0 = (m, c) => this.ui.chatLine(m, c || '#cfe6ff');
         if (c0 === 'home') { this.goHome(); return; }
+        if (c0 === 'look') { this.lookCommand(a0[0]); return; }
         if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0('To the world spawn.'); return; }
         if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0('Home & friends: /home · /sethome · /spawn · /players · /tphost (guest) · /call <name> (host)'); return; }
         if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0('Home set here.'); return; }
