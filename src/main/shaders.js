@@ -1045,19 +1045,34 @@ void main() {
 }`;
 
   // ------------------------------------------------------------ micro-voxel models (creatures, turrets, ships' props)
+  // INST (the Baustelle's scaffold and crane mast, baustelle.js): one mesh drawn many times — per instance an offset
+  // (xyz) and w = quarter turns about y + 4 × (the stretch along x × 256; 0 = none)
   S.VOX_VS = `
 layout(location=0) in vec3 a_pos;
 layout(location=1) in vec3 a_normal;
 layout(location=2) in vec4 a_color;
+#ifdef INST
+layout(location=3) in vec4 a_inst;
+#endif
 uniform mat4 u_viewProj;
 uniform mat4 u_model;
 out vec3 v_n;
 out vec4 v_color;
 out vec3 v_rel;
 void main() {
-  vec4 wp = u_model * vec4(a_pos, 1.0);
+  vec3 p = a_pos, nn = a_normal;
+#ifdef INST
+  float sx = floor(a_inst.w / 4.0 + 0.001) / 256.0;
+  if (sx > 0.0) p.x *= sx;
+  int r = int(mod(a_inst.w, 4.0) + 0.5);
+  if (r == 1) { p = vec3(p.z, p.y, -p.x); nn = vec3(nn.z, nn.y, -nn.x); }
+  else if (r == 2) { p = vec3(-p.x, p.y, -p.z); nn = vec3(-nn.x, nn.y, -nn.z); }
+  else if (r == 3) { p = vec3(-p.z, p.y, p.x); nn = vec3(-nn.z, nn.y, nn.x); }
+  p += a_inst.xyz;
+#endif
+  vec4 wp = u_model * vec4(p, 1.0);
   v_rel = wp.xyz;
-  v_n = normalize(mat3(u_model) * a_normal);
+  v_n = normalize(mat3(u_model) * nn);
   v_color = vec4(pow(a_color.rgb, vec3(2.2)), a_color.a);
   gl_Position = u_viewProj * wp;
 }`;
