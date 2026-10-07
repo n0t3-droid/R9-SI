@@ -3,7 +3,7 @@
 // every storey; houses have a reachable door and furnished rooms; bridges keep a continuous deck, railings and piers
 // down to the ground profile; parks, castles, halls, lookouts, walls and shuttles hold what they promise.
 //   node test/forge.js            everything
-//   ONLY=core node test/forge.js  one section (core · kit · tower · house · bridge · civic · park · sweep)
+//   ONLY=core node test/forge.js  one section (core · budget · kit · tower · house · bridge · civic · park · place · sweep)
 require('./load_shared.js');
 const Forge = VR.Forge, R = VR.R, T = R.T, F = VR.F;
 const ONLY = process.env.ONLY || '';
@@ -86,6 +86,20 @@ section('core', () => {
   check(m && m.type === 'bridge' && m.lot[1] === 40 && m.terrain === true && m.level === false, 'meta without a build: ' + JSON.stringify(m));
   const mt = Forge.meta('tower:f10,w20,d16,glas#1');
   check(mt.lot[0] === 20 && mt.lot[1] === 16 && mt.level === true && !mt.terrain, 'tower meta: ' + JSON.stringify(mt));
+});
+
+// ---------------------------------------------------------------- budgets: every type × every style, defaults and maxima
+section('budget', () => {
+  let worst = { ms: 0 }, big = { mb: 0 }, bad = [];
+  for (const t of Forge.types) for (const st of t.styles) for (const mx of [false, true]) {
+    const P = {}; if (mx) for (const p of t.params) if (p.dim) P[p.k] = p.max;
+    const dna = Forge.dna(t.id, P, 7, st.id), cpu = ms(() => Forge.build(dna), 1), g = Forge.build(dna), M = g.meta, mb = g.blocks.length * 2 / 1e6, m = Forge.meta(dna);
+    if (cpu > worst.ms) worst = { ms: cpu, dna }; if (mb > big.mb) big = { mb, dna };
+    if (!(M.lot[0] === g.sx && M.lot[1] === g.sz && m.lot.join() === M.lot.join() && Forge.hash(Forge.build(dna)) === Forge.hash(g))) bad.push(dna);
+  }
+  check(!bad.length, 'every type × style (defaults and the largest): lot known before the build = the grid, deterministic' + (bad.length ? ' — not: ' + bad.join(' ') : ''));
+  check(worst.ms < 1000, 'the slowest of them builds in ' + worst.ms.toFixed(0) + ' ms CPU (' + worst.dna + ')');
+  check(big.mb < 16, 'the largest grid is ' + big.mb.toFixed(1) + ' MB (' + big.dna + ')');
 });
 
 // ---------------------------------------------------------------- the kit: stairwell, furnishing, walkability
