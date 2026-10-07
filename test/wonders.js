@@ -198,7 +198,7 @@ section('game', () => {
   check(nPlans() === p0 && /entdeckt/.test(chat[chat.length - 1]), '/bau Sternwarte before finding it: ' + chat[chat.length - 1]);
   // ---- the discovery: within four blocks of the heart
   const h = ea.heart; player.pos = [h[0] + 0.5, h[1] - 0.5 + 0.0, h[2] + 3.4]; tick(4);
-  check(!!(wg.st.a && wg.st.a.found), 'standing by its heart discovers it');
+  check(!!(wg.st.a && wg.st.a.found && wg.st.a.status === 'found'), 'standing by its heart discovers it (status ' + (wg.st.a && wg.st.a.status) + ')');
   const ban = document.body.children.find(c => c.textContent && /Wunder entdeckt: Sternwarte/.test(c.textContent));
   check(!!ban && ban.classList.contains('on'), 'a big banner: ' + (ban && ban.textContent));
   check(sounds.includes('fanfare') && unlocked.includes('w:sternwarte:quiet') && chat.some(t => /\/bau Sternwarte/.test(t)), 'a fanfare, the codex page (no small toast), the gift in the chat');
@@ -224,7 +224,7 @@ section('game', () => {
   check(VR.WonderNatural(S('grass_block'), S('dirt')) && VR.WonderNatural(S('oak_leaves', { persistent: 0, distance: 3 }), 0) && !VR.WonderNatural(S('stone'), 0) && !VR.WonderNatural(0, S('oak_planks')) && !VR.WonderNatural(S('dirt'), S('cobblestone')), 'what counts as nature: grass ↔ dirt, leaves falling — not stone dug out, not planks or cobble set');
   // ---- the record travels with the world
   const meta2 = {}; wg.beforeSave(meta2);
-  check(meta2.wonders && meta2.wonders.a.found && meta2.wonders.b.status === 'blocked' && meta2.wonders.c.status === 'built', 'meta.wonders is saved with the world: ' + Object.keys(meta2.wonders || {}).map(k => k + ':' + meta2.wonders[k].status + (meta2.wonders[k].found ? '+found' : '')).join(' '));
+  check(meta2.wonders && meta2.wonders.a.found && meta2.wonders.a.status === 'found' && meta2.wonders.b.status === 'blocked' && meta2.wonders.c.status === 'built', 'meta.wonders is saved with the world: ' + Object.keys(meta2.wonders || {}).map(k => k + ':' + meta2.wonders[k].status + (meta2.wonders[k].found ? '+found' : '')).join(' '));
   // the main thread's share for every wonder: levelling its lot (blueprints.js planAt) and the cells that rise
   const perf = [];
   for (const t of VR.Wonders.TYPES) {
