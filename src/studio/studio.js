@@ -537,7 +537,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
   function hud() {
     if (HOOK.hud && HOOK.hud()) return;
     const sc = S.scene; if (!sc) { $('#hudName').textContent = '—'; $('#hudMeta').textContent = ''; return; }
-    if (sc.type === 'model') { const m = sc.model; $('#hudName').textContent = m.display; $('#hudMeta').innerHTML = `<b>${m.W}×${m.H}×${m.D}</b> Blöcke · <b>${m.parts.length}</b> Teile · <b>${fmt(m.vox)}</b> Voxel · 1/${m.res} · <b>${fmt(sc.mesh.quads)}</b> Flächen · ${sc.ms.toFixed(0)} ms`; }
+    if (sc.type === 'model') { const m = sc.model; $('#hudName').textContent = VR.dispName(m.display); $('#hudMeta').innerHTML = `<b>${m.W}×${m.H}×${m.D}</b> Blöcke · <b>${m.parts.length}</b> Teile · <b>${fmt(m.vox)}</b> Voxel · 1/${m.res} · <b>${fmt(sc.mesh.quads)}</b> Flächen · ${sc.ms.toFixed(0)} ms`; }
     else if (sc.type === 'house') { const d = sc.data; $('#hudName').textContent = sc.name; $('#hudMeta').innerHTML = `<b>${d.house[2]}×${d.house[3]}</b> Haus auf <b>${d.lot[0]}×${d.lot[1]}</b> · <b>${d.storeys}</b> Etagen · <b>${SKIN_NAME[d.skin] ? SKIN_NAME[d.skin].split(' ·')[0] : d.skin}</b>${d.mirrored ? ' · gespiegelt' : ''} · <b>${fmt(d.blocksTotal)}</b> Blöcke · <b>${d.models.length}</b> Modelle`; }
     else { const t = R.byName[sc.name]; $('#hudName').textContent = t ? (t.display || t.o.display || sc.name) : sc.name; $('#hudMeta').innerHTML = `Block <b>${sc.name}</b>`; }
   }
