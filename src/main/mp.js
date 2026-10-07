@@ -32,6 +32,7 @@
   'use strict';
   const R = VR.R, F = VR.F;
   const PROTO = 1;
+  const NOTICE = 'r9si.mpNotice';   // 👥 the one-time name notice was answered (✓ OK or a nickname) — once per browser
   const TOPICS = ['hello', 'welcome', 'mods', 'req', 'diff', 'blk', 'edit', 'env', 'chat', 'summon', 'pdata', 'bye'];
   VR.MP_TOPICS = TOPICS;
   const unkey = (k) => [Math.floor(k / 65536) - 32768, (k % 65536) - 32768];
@@ -65,20 +66,58 @@
     myName() { const s = this.g.settings; return cleanName(s.playerName) || cleanName(this.T && this.T.me && this.T.me.name) || 'Explorer'; }
     myPeer() { const p = this.T && this.T.myPeer ? this.T.myPeer() : null; if (p) return p; if (this.room) { const me = this.room.peers().find(q => q.sameTab); if (me) return me.peer; } return this.peerFallback || null; }
 
+    // ---------------------------------------------------------------- 👥 privacy by default
+    // No name leaves the browser before the player answered the one-time notice („👥 Mitspieler sehen deinen Namen:
+    // X — ✓ OK · Spitzname… · Mehrspieler aus", src/main/legal.js shows it): until then the lobby gets nothing, no
+    // world is hosted and no join is sent. „Mehrspieler aus" = no presence at all, and from the next start no
+    // connection ('r9si.mp' = 'off'; Settings → Game turns it back on).
+    noticeOk() { if (this.noticeMem) return true; try { return localStorage.getItem(NOTICE) === '1'; } catch (e) { return false; } }
+    confirmNotice() {
+      this.noticeMem = true; this.noticeAsk = false;
+      try { localStorage.setItem(NOTICE, '1'); } catch (e) { /* this page only */ }
+      this.setLobby();
+      const g = this.g;
+      if (g.state === 'play' && g.meta && !g.meta.guest) this.startHosting();
+    }
+    turnOff() {
+      try { localStorage.setItem('r9si.mp', 'off'); } catch (e) { /* this page only */ }
+      const g = this.g, T = this.T, guest = this.isClient;
+      this.ready = false; this.status = 'off';        // (from here setLobby sends nothing)
+      if (this.role === 'host') this.stopHosting(); else if (this.role) this.leave();
+      if (T && T.lobby) T.lobby.presence({ v: null, n: null, host: null, pl: null, role: null, ss: null }).catch(() => { });
+      if (this.lobbyUnsub) { try { this.lobbyUnsub(); } catch (e) { /* gone */ } this.lobbyUnsub = null; }
+      this.T = null; this.online = []; this.lobbyHosts = []; this.lobbyNamed = false; this.noticeAsk = false;
+      if (guest && g.meta && g.meta.guest && (g.state === 'play' || g.state === 'loading')) g.leaveGuestWorld();
+    }
+    turnOn() {
+      try { if (localStorage.getItem('r9si.mp') === 'off') localStorage.removeItem('r9si.mp'); } catch (e) { /* */ }
+      if (this.ready || this.status === 'connecting') return Promise.resolve();
+      this.status = 'connecting';
+      return this.init();
+    }
+
     // ---------------------------------------------------------------- start-up & lobby
     async init() {
       try { this.T = await VR.Net.open(); } catch (e) { this.T = null; }
-      if (!this.T) { this.status = 'unavailable'; if (this.g.ui && this.g.ui.renderHosts) this.g.ui.renderHosts(); return; }
+      if (!this.T) { this.status = VR.Net.isOff && VR.Net.isOff() ? 'off' : 'unavailable'; if (this.g.ui && this.g.ui.renderHosts) this.g.ui.renderHosts(); return; }
+      if (this.status === 'off') { this.T = null; return; }   // switched off while connecting
       this.ready = true; this.status = 'ready';
       const L = this.T.lobby;
-      L.onPeers((ch) => this.lobbyChanged(ch.peers), () => { });
+      this.lobbyUnsub = L.onPeers((ch) => this.lobbyChanged(ch.peers), () => { });
       this.setLobby();
       if (this.g.ui && this.g.ui.renderHosts) this.g.ui.renderHosts();
     }
     setLobby() {
       if (!this.ready) return;
       const g = this.g;
+      // 👥 a name only after the notice, and only while friends may join or a session runs (Settings → Game:
+      // „Friends can join" off = nobody sees you on their title screen); before that the lobby gets nothing at all
+      if (!this.noticeOk() || (g.settings.mpHost === false && !this.role)) {
+        if (this.lobbyNamed) { this.lobbyNamed = false; this.T.lobby.presence({ v: null, n: null, host: null }).catch(() => { }); }
+        return;
+      }
       const host = this.role === 'host' && g.meta ? { s: this.session, w: cleanName(g.meta.name) || 'World', m: g.meta.mode, t: Date.now() } : null;
+      this.lobbyNamed = true;
       this.T.lobby.presence({ v: PROTO, n: this.myName(), host }).catch(() => { });
     }
     lobbyChanged(peers) {
@@ -139,6 +178,8 @@
     async startHosting() {
       const g = this.g;
       if (!this.ready || this.role || !g.meta || g.meta.guest || g.settings.mpHost === false) return;
+      // 👥 hosting shows your name to friends: it waits for the notice (pause menu → 👥, or the title's box)
+      if (!this.noticeOk()) { if (!this.noticeHinted && this.online.length && g.ui && VR.Legal) { this.noticeHinted = true; g.ui.chatLine(VR.Legal.mpHint(), '#ffd27a'); } return; }
       if (g.dim !== 'overworld' && g.dim !== 'flat') return;
       const sess = ('w-' + String(g.meta.id).toLowerCase().replace(/[^a-z0-9]/g, '')).slice(0, 40);
       const room = this.sessionRoom();
@@ -280,6 +321,8 @@
     async join(host) {
       const g = this.g;
       if (!this.ready || this.role) return false;
+      // 👥 the host would see your name: first the notice (it lights up in the title's multiplayer box)
+      if (!this.noticeOk()) { this.noticeAsk = true; if (g.ui && g.ui.renderHosts) g.ui.renderHosts(); return false; }
       g.ui.loading('Joining ' + host.name + '…', 0.05);
       const room = this.sessionRoom();
       if (!room) { g.ui.show('title'); g.ui.titleNote && g.ui.titleNote('Could not reach ' + host.name); return false; }

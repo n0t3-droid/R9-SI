@@ -120,9 +120,11 @@
 
   // ---------------------------------------------------------------- pick a road
   VR.Net = {
+    // ?mp=… (development, tests) wins over 'r9si.mp'; 'off' = „Mehrspieler aus": no connection at all
+    mode() { let mode = null; try { const q = new URLSearchParams(location.search); mode = q.get('mp'); if (!mode) mode = localStorage.getItem('r9si.mp'); } catch (e) { mode = null; } return mode; },
+    isOff() { return VR.Net.mode() === 'off'; },
     async open() {
-      let mode = null;
-      try { const q = new URLSearchParams(location.search); mode = q.get('mp'); if (!mode) mode = localStorage.getItem('r9si.mp'); } catch (e) { mode = null; }
+      const mode = VR.Net.mode();
       if (mode === 'off') return null;
       if (mode && mode.startsWith('local')) return openLocal(mode.slice(6) || 'dev');
       return await openRoom();
