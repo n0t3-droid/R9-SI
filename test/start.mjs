@@ -373,4 +373,19 @@ await section(10, '← restores where you were: ✏️ from a card → the edito
   await page.keyboard.press('Escape'); await wait(200);
 });
 
+await section(11, 'a phone-sized screen: the start screen fits, no sideways scroll', async () => {
+  const ph = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'de-DE', isMobile: true, hasTouch: true });
+  const pp = await ph.newPage();
+  pp.on('pageerror', e => logs.push('[pageerror phone] ' + (e.stack || e.message).slice(0, 600)));
+  await pp.goto(URL0 + '/index.html', NAV);
+  let ok = false; for (let i = 0; i < 300 && !ok; i++) { await pp.waitForTimeout(500); ok = await pp.evaluate(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false); }
+  check(ok, 'the game starts on a phone-sized screen');
+  const m = await pp.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth, tiles: [...document.querySelectorAll('#title .tile')].map(t => { const r = t.getBoundingClientRect(); return { w: r.width, h: r.height, right: r.right, left: r.left }; }), fs: getComputedStyle(document.querySelector('#title .tile .lbl')).fontSize }));
+  console.log('  phone', JSON.stringify(m));
+  check(m.sw <= m.iw && m.tiles.every(t => t.right <= 390 && t.left >= 0), 'nothing sticks out sideways');
+  check(m.tiles.length === 4 && m.tiles.every(t => t.w >= 150 && t.h >= 150), 'four tiles, each at least 150 px');
+  await pp.screenshot({ path: '/home/claude/vr/test/shots/start_phone.png', fullPage: false });
+  await ph.close();
+});
+
 await done();
