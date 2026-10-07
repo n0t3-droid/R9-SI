@@ -241,6 +241,31 @@ const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
     check(keep(grid) === keep(world), 'back to the middle and forward again = the world now');
     await r.close();
   }
+  // ---------------------------------------------------------------- (g2) a full history: 2 M changes read back in time
+  {
+    const be = new Z.MemBackend(); let now = 7e12;
+    const r = new Z.Rec('wBig', be, { checkMs: 1e9 }); r.now = () => (now += 50);
+    for (let b = 0; b < 2000; b++) { r.begin(Z.K.PLAN, 'overworld'); const x0 = ri(-600, 600), z0 = ri(-600, 600); for (let i = 0; i < 1000; i++) r.add(x0 + (i & 15), 64 + (i >> 8), z0 + ((i >> 4) & 15), 0, 1 + (b % 900)); r.end(); }
+    await r.close();
+    const segs = await r.snapshot(), bytes = segs.reduce((a, s) => a + s.b.length, 0);
+    const t0 = Date.now(), sc = Z.scan(segs, 'overworld'), t1 = Date.now();
+    const area = Z.pickArea(sc.cols, { maxCols: 64, radius: 4 }), t2 = Date.now();
+    const C = Z.collect(segs, 'overworld', (cx, cz) => area.keys.has(V.ckey(cx, cz)), 1500000), t3 = Date.now();
+    const T = Z.timeline(C), t4 = Date.now();
+    console.log('    2 M changes in ' + segs.length + ' segments, ' + (bytes / 1048576).toFixed(1) + ' MB: scan ' + (t1 - t0) + ' ms, pickArea ' + (t2 - t1) + ' ms, collect ' + (t3 - t2) + ' ms (' + C.n + ' in the place), timeline ' + (t4 - t3) + ' ms');
+    check(sc.n === 2000000 && (t1 - t0) + (t3 - t2) < 4000, 'a full history (2 M changes, ' + (bytes / 1048576).toFixed(1) + ' MB) is read and sorted into the place in ' + ((t1 - t0) + (t2 - t1) + (t3 - t2) + (t4 - t3)) + ' ms');
+    check(T.total > 0 && C.n > 0 && C.n <= 1500000, 'the place of a full history: ' + C.n + ' changes, ' + (T.total / 1000).toFixed(0) + ' s at ×1');
+  }
+  // a cut-off segment (a write torn by a crash) is read up to where it breaks, nothing throws
+  {
+    const W = new Z.Writer(0); W.batch(1, Z.K.HAND, 'overworld', 0); for (let i = 0; i < 50; i++) W.change(i * 3, 70, i, 0, 5 + i);
+    const seg = W.record(1); seg.b = seg.b.subarray(0, seg.b.length - 3);
+    let n = 0, ok = true; try { Z.decode(seg, { batch() {}, change() { n++; } }); } catch (e) { ok = false; }
+    const junk = { t0: 0, dims: ['overworld'], b: new Uint8Array([200, 1, 2, 3]) };
+    let ok2 = true; try { Z.decode(junk, { batch() {}, change() {} }); } catch (e) { ok2 = false; }
+    check(ok && ok2 && n >= 45 && n < 50, 'a torn or foreign segment: read up to the break (' + n + ' of 50), no exception');
+  }
+
   // ---------------------------------------------------------------- (h) the replay engine (zeitraffer.js) with a fake game
   //  open: the busiest place's columns are swapped for copies showing the land as it was (the originals untouched,
   //  aside); play: the copies become the finished build; a save meanwhile writes no copy; close: the originals are

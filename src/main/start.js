@@ -137,15 +137,17 @@
     panel.innerHTML = `<h2>🌍 ${esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))}</h2><div class="worldlist" id="worldlist"></div><div class="row gap wrow"><button class="btn primary" data-act="newworld">${esc(tx('start.newWorld', null, '＋ Neue Welt', '＋ New world'))}</button><button class="btn" data-act="back">${esc(tx('start.back', null, '← Zurück', '← Back'))}</button></div>`;
     panel.onclick = (e) => { const arm = $('#worlds .wcard button.arm'); if (arm && !arm.contains(e.target)) { arm.classList.remove('arm'); arm.textContent = tx('start.del', null, '🗑 Löschen', '🗑 Delete'); } };
   }
-  // one world, one card: ▶ · 🏗 · ✎ · 🗑 (the worlds screen and 🎒 Meins); seed and time are a Profi detail
-  function worldCard(w) {
+  // one world, one card: ▶ · 🏗 · ✎ · 🗑 (the worlds screen and 🎒 Meins; 🎒 Meins adds 📽 Zeitraffer); seed and time
+  // are a Profi detail
+  function worldCard(w, zeit) {
     const c = el('div', 'wcard'); c.dataset.id = w.id;
     c.innerHTML = `<div class="wtxt"><div class="wn"></div><div class="wm"></div></div><div class="wacts"></div>`;
     $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
     const when = w.lastPlayed ? new Date(w.lastPlayed).toLocaleString(VR.I18N ? VR.I18N.locale() : undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
     $('.wm', c).innerHTML = esc(modeName(w.mode)) + (when ? ' · ' + esc(when) : '') + `<span class="pro"> · Seed ${w.seed >>> 0}</span>`;
     const acts = $('.wacts', c);
-    const BTN = [['play', tx('start.w.play', null, '▶ Spielen', '▶ Play'), 'primary'], ['bauen', tx('start.w.bauen', null, '🏗 Bauen', '🏗 Build'), ''], ['zeit', tx('meins.zeit', null, '📽 Zeitraffer', '📽 Time-lapse'), ''], ['rename', tx('start.w.rename', null, '✎ Name', '✎ Rename'), ''], ['del', tx('start.del', null, '🗑 Löschen', '🗑 Delete'), 'danger']];
+    const BTN = [['play', tx('start.w.play', null, '▶ Spielen', '▶ Play'), 'primary'], ['bauen', tx('start.w.bauen', null, '🏗 Bauen', '🏗 Build'), ''], ['rename', tx('start.w.rename', null, '✎ Name', '✎ Rename'), ''], ['del', tx('start.del', null, '🗑 Löschen', '🗑 Delete'), 'danger']];
+    if (zeit) BTN.splice(2, 0, ['zeit', tx('meins.zeit', null, '📽 Zeitraffer', '📽 Time-lapse'), '']);
     for (const [k, label, cls] of BTN) { const b = el('button', 'btn small ' + cls); b.type = 'button'; b.dataset.act = 'w:' + k; b.dataset.w = k; b.dataset.id = w.id; b.textContent = label; if (k === 'rename' || k === 'del') b.setAttribute('aria-label', label + ' · ' + (w.name || '')); acts.appendChild(b); }
     return c;
   }
@@ -277,7 +279,7 @@
     Dg.fillNow(body, 24);   // (the first screen of cards has its pictures at once; the rest as they scroll in)
     if (ws.length) {
       body.appendChild(el('div', 'grp', '🌍 ' + esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))));
-      for (const w of ws) { const c = worldCard(w); c.style.gridColumn = '1 / -1'; body.appendChild(c); }
+      for (const w of ws) { const c = worldCard(w, true); c.style.gridColumn = '1 / -1'; body.appendChild(c); }
     }
   };
   // the cards' actions on this page: 👁 and ✏️ open the R9 Studio on the thing, 📍 puts it in your hand (in play now,
