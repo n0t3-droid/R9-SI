@@ -8,7 +8,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const mat4 = VR.mat4, M = VR.M, PH = VR.PHYS, R = VR.R, F = VR.F;
   const TAU = Math.PI * 2, QT = Math.PI / 2;
   const IDENT = mat4.create();

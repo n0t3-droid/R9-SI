@@ -7,7 +7,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const M = VR.M;
   const TAU = Math.PI * 2;
   const TYPES = [['interceptor', 30], ['racer', 12], ['gunship', 16], ['freighter', 16], ['dropship', 10], ['shuttle', 10], ['cruiser', 6], ['carrier', 2.5]];

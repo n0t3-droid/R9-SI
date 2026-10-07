@@ -8,7 +8,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const mat4 = VR.mat4;
   const CAR = 6, GAP = 0.5, BOGIE = 2.2, VMAX = 13, ACC = 2.4, DWELL = 10;
   const OFF = CAR / 2 + GAP / 2;

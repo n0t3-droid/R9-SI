@@ -9,7 +9,7 @@
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // the player's language (lang_de.js / lang_en.js): T a text, TL a list of lines; static panels carry data-t keys
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k)), TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const SPLASHES =['Now with ringed gas giants!', 'Crystal spires ahead!', 'Aether flows bright!', 'Zen Builder mode!', 'Fly your own shuttle!', 'Endless procedural beauty!', 'Voxels, but make it cosmic!', 'Mind the lava rivers!', 'Meteor showers tonight!', 'Build something beautiful!'];
   // the loading tips: TL('g.load.tips')
 const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game and click <b>Share</b> (top right).</li><li>Enter your friend\'s <b>email</b> and choose <b>Contributor</b> (or Editor), then send.</li><li>Your friend signs in to Claude <b>with that email</b> and opens the same link (the email is only a notice).</li><li>Start or load a world — it shows up on their title screen with a <b>Join</b> button.</li></ol>';
@@ -553,9 +553,10 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
     // "soon" — shown unless the simple mode (r9si.ui.pro = 0) hides them
     buildLangPanel(body) {
       const I = VR.I18N; if (!I) return;
-      const cur = I.lang === 'de' ? 'de' : 'en';
+      const ready = I.langs.filter(l => I.ready(l[0])).map(l => l[0]);   // the languages with a table (de, en)
+      const cur = ready.includes(I.lang) ? I.lang : 'en';
       const seg = el('div', 'seg'); seg.id = 'langseg';
-      for (const code of ['de', 'en']) {
+      for (const code of ready) {
         const b = el('button', cur === code ? 'on' : ''); b.dataset.lang = code; b.textContent = I.info(code)[1]; b.lang = code;
         b.onclick = () => { if (I.lang !== code) I.set(code); else this.showSettings(); };
         seg.appendChild(b);
@@ -564,7 +565,7 @@ const INVITE_HTML = '<ol class="invite"><li>On <b>claude.ai</b>, open this game 
       let showSoon = true; try { const v = localStorage.getItem('r9si.ui.pro'); if (v !== null) showSoon = v === '1'; } catch (e) { /* storage blocked */ }
       if (showSoon) {
         const soon = el('div', 'row gap langsoon'); soon.style.flexWrap = 'wrap';
-        for (const [code, name] of I.langs) { if (code === 'de' || code === 'en') continue; const b = el('button', 'btn tiny'); b.disabled = true; b.lang = code; b.textContent = name + ' · ' + T('g.lang.soon'); soon.appendChild(b); }
+        for (const [code, name] of I.langs) { if (ready.includes(code)) continue; const b = el('button', 'btn tiny'); b.disabled = true; b.lang = code; b.textContent = name + ' · ' + T('g.lang.soon'); soon.appendChild(b); }
         body.appendChild(soon);
       }
       body.appendChild(el('div', 'note', esc(T('g.lang.note'))));

@@ -7,7 +7,7 @@
 (function (VR) {
   'use strict';
   // the player's language (lang_de.js / lang_en.js)
-  const T = (k, v) => (VR.I18N ? VR.I18N.t(k, v) : k);
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F, SH = VR.SHAPE;
   const TICK = 0.05;
   // a string key: packing x, z (±2^25) and y into one number lost the low bits (y) beyond 2^53
