@@ -15,6 +15,11 @@
 (function (VR) {
   'use strict';
   const Forge = VR.Forge = { types: [], TYPES: {}, gens: {}, KEEP: 0xFFFF };
+  // the words a shape says (titles, describe): the tables (g.fg.*) when the language module is there, else the German
+  Forge.tx = function (key, vars, de, en) {
+    if (VR.I18N && VR.I18N.tx) return VR.I18N.tx(key, vars, de, en);
+    return String(de).replace(/\{(\w+)\}/g, (m, k) => (vars && vars[k] !== undefined ? vars[k] : m));
+  };
   const KEEP = 0xFFFF;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
