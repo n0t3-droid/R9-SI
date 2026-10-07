@@ -228,10 +228,10 @@
     }
     // the source keeps what is stored for it (an unsaved preview of it goes back)
     if (!commit(r.data)) { say(tx('live.st.full', null, '⚠ Nicht gespeichert — der Browser-Speicher ist voll', '⚠ Not saved — the browser storage is full'), false); return null; }
-    LP.edit = null;
-    say(tx('live.st.varNew', { n: nameOf(r.name), k: r.k + 1, m: L.SLOTS }, '⧉ {n} ist da — Platz {k} von {m}', '⧉ {n} is here — slot {k} of {m}'));
-    if (isModel) { LP.model = r.name; C.setMode(C.isFacade(src) ? 'facade' : 'furn', true); C.selectModel(r.name); }
-    else if (VR.StudioCatalog) { VR.StudioCatalog.edit = true; VR.StudioCatalog.open('block', r.name, S.from || null); }
+    // the panel opens on the new variant and says so (its draft first: leaving the source keeps the message)
+    const msg = tx('live.st.varNew', { n: nameOf(r.name), k: r.k + 1, m: L.SLOTS }, '⧉ {n} ist da — Platz {k} von {m}', '⧉ {n} is here — slot {k} of {m}');
+    if (isModel) { LP.edit = null; LP.model = r.name; C.setMode(C.isFacade(src) ? 'facade' : 'furn', true); C.selectModel(r.name); say(msg); }
+    else { begin(r.name); say(msg); if (VR.StudioCatalog) { VR.StudioCatalog.edit = true; VR.StudioCatalog.open('block', r.name, S.from || null); } }
     return r;
   }
   LP.asVariant = asVariant;

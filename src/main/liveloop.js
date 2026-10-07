@@ -49,6 +49,7 @@
   LL.tick = function (g) {
     const p = g.player;
     if (p && g.ui && !g.ui.blocking && g.state === 'play') LL.lastTarget = p.target ? { x: p.target.x, y: p.target.y, z: p.target.z, state: p.target.state } : null;
+    if (!LL.bh && VR.Bauhand) LL.hookBauhand(g);
     const S = LL.scan; if (!S || !g.world) return;
     const w = g.world, t0 = performance.now();
     let n = 0;
@@ -131,10 +132,16 @@
     b.title = tx('live.pause.lookTip', null, 'Farbe und Material im R9 Studio — für alle deine Welten', 'Colour and material in the R9 Studio — for all your worlds');
   };
   LL.fromPause = function (g) { return LL.editTarget(LL.lastTarget, g); };
-  // the Bauhand (W2) owns the B key; its target card gets a ✏️ action from here
+  // the Bauhand (W2) owns the B key; its target card gets „🎨 Aussehen ändern" from here (spec §5: „🎨 Aussehen von
+  // ‹Block›" — the card shows the name; its own ✏️ Bearbeiten opens the Crafter). Hooked at boot, or when it appears.
   LL.hookBauhand = function (g) {
     const B = VR.Bauhand; if (LL.bh || !B || typeof B.addAction !== 'function') return false;
-    try { B.addAction({ id: 'look', icon: '✏️', label: tx('live.bh.look', null, 'Aussehen ändern', 'Change look'), when: (t) => LL.canEdit(t, g), run: (t) => LL.editTarget(t, g) }); LL.bh = true; } catch (e) { console.warn('bauhand action', e); }
+    try {
+      B.addAction({ id: 'look', order: 15, icon: '🎨', label: () => tx('live.bh.look', null, 'Aussehen ändern', 'Change look'),
+        when: (t) => LL.canEdit(t, g),
+        run: (t) => { if (typeof B.close === 'function') B.close(); LL.editTarget(t, g); } });
+      LL.bh = true;
+    } catch (e) { console.warn('bauhand action', e); }
     return LL.bh;
   };
 
@@ -158,7 +165,8 @@
     if (!r.restored.length) return false;
     if (!L.save(r.data)) console.warn('looks: the restored variants could not be stored (storage full)');
     LL.apply(g, { noPack: true });
-    if (g.ui && g.ui.toast) g.ui.toast(tx('live.title', null, '🎨 Aussehen', '🎨 Looks'), tx('live.restored', { n: r.restored.length }, '{n} Varianten aus dieser Welt wiederhergestellt', '{n} variants restored from this world'));
+    const n = r.restored.length;
+    if (g.ui && g.ui.toast) g.ui.toast(tx('live.title', null, '🎨 Aussehen', '🎨 Looks'), n === 1 ? tx('live.restored1', null, 'Eine Variante aus dieser Welt wiederhergestellt', 'One variant restored from this world') : tx('live.restored', { n }, '{n} Varianten aus dieser Welt wiederhergestellt', '{n} variants restored from this world'));
     return true;
   };
 
