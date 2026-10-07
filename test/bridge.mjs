@@ -52,12 +52,14 @@ await section('1 · the standalone says it is not connected', async () => {
   const g = await sev(async () => {
     const calls = []; const real = window.open; window.open = (...a) => { calls.push(a); return null; };
     document.querySelector('#bridgeBar [data-act="game"]').click(); await new Promise(r => setTimeout(r, 100));
+    const first = !document.querySelector('#bridgeBar .gameLink');   // one click: the tab opens, no link box yet
+    document.querySelector('#bridgeBar [data-act="game"]').click(); await new Promise(r => setTimeout(r, 100));   // a second click soon after: it evidently did not open
     window.open = real;
     const inp = document.querySelector('#bridgeBar input');
-    return { calls, link: inp ? inp.value : null };
+    return { calls, first, link: inp ? inp.value : null };
   });
-  check(g.calls.length === 1 && g.calls[0][0] === GAME_URL && g.calls[0][1] === '_blank' && /noopener/.test(g.calls[0][2] || ''), '🎮 Zum Spiel opens the game in a new tab (noopener)');
-  check(g.link === GAME_URL, 'when no tab could open, the link is there to copy');
+  check(g.calls.length === 2 && g.calls[0][0] === GAME_URL && g.calls[0][1] === '_blank' && /noopener/.test(g.calls[0][2] || '') && g.first, '🎮 Zum Spiel opens the game in a new tab (noopener), no link box on the first click');
+  check(g.link === GAME_URL, 'a second click soon after (no tab came): the link is there to copy');
 });
 
 await section('2 · honest labels: 💾 Speichern, no "im Spiel"', async () => {
