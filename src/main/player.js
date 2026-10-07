@@ -389,14 +389,37 @@
         if (t && (t.cat || (VR.SMOOTH_OF && VR.SMOOTH_OF[t.name]))) this.pickBlock((VR.SMOOTH_OF && VR.SMOOTH_OF[t.name]) || t.name);
       }
       // --- use / place ---
+      // a click uses what the crosshair is on (a door, a lever, a bed, a chest, a lamp …) or the held item, or places the
+      // held block. Holding the button keeps PLACING (a row of blocks) — never a use: a held click on a door used to open
+      // it and shut it again 0.22 s later, as if nothing had happened.
       const rmbClick = input.dragLook ? input.clickAction(2) : input.mouse.clicked[2];
       const rmbHold = !input.dragLook && input.mouse.down[2] && this.placeCooldown <= 0 && this.placeHeld;
-      if (rmbClick || rmbHold) {
-        this.placeHeld = true;
-        if (this.use(hdef, held)) { this.placeCooldown = 0.22; this.handSwing = 1; }
-        else this.placeCooldown = 0.22;
+      if (rmbClick) {
+        this.placed = false;
+        const ok = this.use(hdef, held);
+        if (ok) this.handSwing = 1;
+        this.placeCooldown = 0.22;
+        this.placeHeld = !ok || this.placed;   // after a use the held button rests until it is let go
+      } else if (rmbHold) {
+        if (this.placeRepeat(hdef, held)) this.handSwing = 1;
+        this.placeCooldown = 0.22;
       }
       if (!input.mouse.down[2]) this.placeHeld = false;
+    }
+    // the held button builds on: the held block only — never onto what a click would use, never an item (food, bucket …)
+    placeRepeat(hdef, held) {
+      const t = this.target;
+      if (!t || !held || (hdef && (hdef.food || hdef.heal || hdef.use))) return false;
+      const type = R.byName[held.id];
+      if (!type || (!this.sneaking && this.usable(t.state))) return false;
+      return this.placeFromHit(type, t);
+    }
+    // would a right click use this block (open, switch, sit, sleep, open a container …) rather than build onto it?
+    usable(s) {
+      const t = R.types[R.T.type[s]]; if (!t) return false;
+      const o = t.o, k = o.kind;
+      return !!(R.T.flags[s] & F.INTERACT) || k === 'door' || k === 'trapdoor' || k === 'gate' || k === 'lever' || k === 'button' || k === 'bed' || k === 'seat' || k === 'helm' || k === 'beacon' ||
+        !!(o.ui || o.toggle || o.bed || o.seat || (o.vx && o.vx.kind === 'mdoor')) || /chest$|barrel|cargo_crate|furnace|smoker|crafting_table|note_block|repeater/.test(t.name);
     }
     breakTime(s, hdef) {
       const T = R.T, hard = T.hard[s];
@@ -467,7 +490,7 @@
       if (hdef && hdef.use && g.useItem && g.useItem(hdef, held, t, this)) return true;
       const type = R.byName[held.id];
       if (!type || !t) return false;
-      return this.placeFromHit(type, t);
+      return (this.placed = this.placeFromHit(type, t));
     }
     placeFromHit(type, t) {
       const g = this.game, world = g.world;
