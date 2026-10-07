@@ -34,7 +34,8 @@
       };
       this.res = {};
       this.chip = null; this.chipSig = -1;
-      if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { this.chipSig = -1; });
+      // the language switches live: the chip is written again (one listener for every world of the session)
+      if (!MirrorBuild.langHooked && VR.I18N && VR.I18N.on) { MirrorBuild.langHooked = true; VR.I18N.on(() => { const m = VR.game && VR.game.mirror; if (m) m.chipSig = -1; }); }
     }
     // the mirror works: a mode, a player in Kreativ or Zen
     active() { const p = this.g.player; return !!(this.mode && p && p.creative && !p.dead); }
