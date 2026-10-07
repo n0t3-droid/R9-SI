@@ -79,7 +79,7 @@
     // rebuild the block textures in a worker and upload them into the existing texture arrays; the icons follow
     reloadTextures() {
       const rim = VR.LOOK.rim, req = this.texReq = (this.texReq || 0) + 1;
-      this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: rim }, null, (tex) => {
+      this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: rim, classic: rim }, null, (tex) => {   // classic: Klassisch v2 (chunky natural recipes, the outline on every cube)
         const r = this.renderer, gl = r && r.gl;
         if (req !== this.texReq || tex.type !== 'textures' || !gl || !r.texAlbedo || tex.layers !== r.layers) return;
         for (const [t, lv] of [[r.texAlbedo, tex.albedo], [r.texMaterial, tex.material]]) {
@@ -175,7 +175,7 @@
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
-      const tex = await new Promise((res) => this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
+      const tex = await new Promise((res) => this.pool.direct(0, { type: 'textures', bevel: 1, bevelAll: !!(VR.LOOK && VR.LOOK.rim), classic: !!(VR.LOOK && VR.LOOK.rim) }, null, res));
       if (tex.missing && tex.missing.length) console.warn('Missing textures:', tex.missing);
       this.tex = tex; this.texRim = !!(VR.LOOK && VR.LOOK.rim);
       tex.noise = tex.noise;

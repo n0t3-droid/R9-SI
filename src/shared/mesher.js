@@ -90,8 +90,10 @@
     const B = job.blocks, L = job.light, GR = job.grass, FO = job.foliage, WA = job.water;
     const fancy = job.fancyLeaves !== false, smooth = job.smooth !== false;
     // the block look (registry.js): Klassisch draws every panorama glass block with its full frame and no world-space
-    // mottling; smooth ground follows the F.SMOOTH flags VR.setLook sets
-    const LK = VR.LOOK, ctmJoin = !LK || LK.ctm, macroOn = !LK || LK.macro;
+    // mottling; smooth ground follows the F.SMOOTH flags VR.setLook sets. w3 bit 15 is the macro mottling in Nahtlos —
+    // in Klassisch (which never mottles) it marks the faces of natural blocks and leaves for the shader's per-block
+    // shade and tile flip, so neighbouring blocks of one material never read as one surface (Klassisch v2)
+    const LK = VR.LOOK, ctmJoin = !LK || LK.ctm, macroOn = !LK || LK.macro, varyOn = !!(LK && LK.vary && !macroOn);
     const bufs = [new Buf(4096), new Buf(1024), new Buf(1024)];
     // world sections keep their mini-voxel pieces apart from the plain terrain: a detailed buffer drawn up close
     // and a far buffer of averaged boxes (ships and previews merge everything into the opaque stream as before)
@@ -174,6 +176,7 @@
       let w3 = layer | (rot << 12);
       if (flags & F.RANDROT) { const top = TTEX[state * 6 + 2] & 0xfff; if (d >= 2 && d <= 3 || layer === top) w3 |= 1 << 14; }
       if ((flags & F.MACRO) && macroOn) w3 |= 1 << 15;
+      else if (varyOn && (flags & (F.RANDROT | F.LEAVES))) w3 |= 1 << 15;
       return w3;
     };
 

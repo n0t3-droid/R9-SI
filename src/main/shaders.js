@@ -422,6 +422,7 @@ uniform vec3 u_camFrac;
 uniform float u_emissiveBoost;
 uniform float u_normalStrength;
 uniform float u_holoLayer;
+uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade and tile flip (Nahtlos: macro mottling)
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -478,6 +479,7 @@ void main() {
   vec2 fu = ((v_w5 >> 14u) & 1u) == 1u ? ctmUV(uv, v_w5) : fract(uv);
   vec2 cell = floor(uv);
   vec3 cellF = floor(v_localPos - NORMALS[face] * 0.02) + vec3(u_camInt);
+  bool flip = false;
   if (((v_w3 >> 14u) & 1u) == 1u) {
 #ifdef MODEL
     float h = 0.0;
@@ -485,8 +487,11 @@ void main() {
     float h = hash13(cellF);
 #endif
     rot = (rot + uint(h * 4.0)) & 3u;
+    // Klassisch v2: the tile is mirrored on half of the blocks too (8 variants, as the original's random tiles)
+    flip = u_blockVar > 0.5 && fract(h * 4.0) > 0.5;
   }
   if (rot == 1u) fu = vec2(fu.y, 1.0 - fu.x); else if (rot == 2u) fu = vec2(1.0 - fu.x, 1.0 - fu.y); else if (rot == 3u) fu = vec2(1.0 - fu.y, fu.x);
+  if (flip) fu.x = 1.0 - fu.x;
   if (kind == 5u) layer += mod(floor(u_time * 12.0 + cellF.x * 3.0 + cellF.z * 7.0), 8.0);
   // R9 Super Resolution renders below screen size: pick the texture detail of the full-size image
   float mipK = u_mipScale > 0.0 ? u_mipScale : 1.0;
@@ -503,13 +508,23 @@ void main() {
 #else
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
-#ifndef LITE
   if (((v_w3 >> 15u) & 1u) == 1u) {
-    vec2 wp = v_localPos.xz + vec2(u_camInt.xz);
-    float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
-    alb.rgb *= 0.9 + m * 0.2;
-  }
+#ifdef MODEL
+    bool own = false;   // a ship's blocks move with it: no world cell to hash
+#else
+    bool own = u_blockVar > 0.5;
 #endif
+    // Klassisch v2: every natural block its own shade (±5 %), all its faces alike — a field of one material is
+    // many blocks, never one surface
+    if (own) alb.rgb *= 0.95 + 0.1 * hash13(cellF + vec3(3.7, 1.3, 7.1));
+#ifndef LITE
+    else {
+      vec2 wp = v_localPos.xz + vec2(u_camInt.xz);
+      float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
+      alb.rgb *= 0.9 + m * 0.2;
+    }
+#endif
+  }
   // normal (smooth ground slopes: the true surface normal from the position derivatives)
   vec3 N = NORMALS[face];
   if (((v_w5 >> 13u) & 1u) == 1u) { vec3 gn = normalize(cross(dFdx(v_rel), dFdy(v_rel))); if (gn.y < 0.0) gn = -gn; N = gn; }
@@ -899,6 +914,7 @@ uniform vec3 u_camFrac;
 uniform ivec3 u_camInt;
 uniform float u_emissiveBoost;
 uniform float u_lodNear;
+uniform float u_blockVar;     // Klassisch: per-block shades and the block grid instead of the macro mottling
 ${'__COMMON__'}
 in vec3 v_rel;
 in vec3 v_col;
@@ -961,11 +977,23 @@ void main() {
     if (v_face == 2u) col += lc * (pow(max(dot(n, H), 0.0), 700.0) * 30.0 + pow(max(dot(n, H), 0.0), 60.0) * 0.4) * (1.0 - u_rain);
   } else {
     vec3 alb = v_col;
-    float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
-    alb *= 0.9 + m * 0.2;
-    // per-block speckle so the big cells read as many small blocks
-    vec3 bp = floor(vec3(wp.x, v_rel.y + u_camFrac.y + float(u_camInt.y), wp.y) - N * 0.02);
-    alb *= 0.93 + hash13(bp) * 0.14;
+    vec3 wp3 = vec3(wp.x, v_rel.y + u_camFrac.y + float(u_camInt.y), wp.y) - N * 0.02;
+    vec3 bp = floor(wp3);
+    if (u_blockVar > 0.5) {
+      // Klassisch v2: no mottling — every block its own shade, and the block grid as far as a pixel can still show
+      // it (a line a texel wide, softened over one pixel; further out it fades into the per-block shades)
+      alb *= 0.92 + hash13(bp) * 0.16;
+      vec3 fr = wp3 - bp;
+      vec2 g = v_face <= 1u ? fr.zy : v_face <= 3u ? fr.xz : fr.xy;
+      vec2 e = min(g, 1.0 - g);
+      float px = max(length(fwidth(wp3)), 1e-3);
+      alb *= 1.0 - 0.12 * (1.0 - smoothstep(0.03, 0.03 + px, min(e.x, e.y)));
+    } else {
+      float m = texture(u_noise, wp / 96.0).r * 0.7 + texture(u_noise, wp / 23.0).g * 0.3;
+      alb *= 0.9 + m * 0.2;
+      // per-block speckle so the big cells read as many small blocks
+      alb *= 0.93 + hash13(bp) * 0.14;
+    }
     float faceShade = v_face == 2u ? 1.0 : v_face == 3u ? 0.55 : (v_face <= 1u ? 0.78 : 0.88);
     float ndl = max(dot(N, L), 0.0);
     vec3 amb = u_ambSky * mix(0.62, 1.0, faceShade);

@@ -30,7 +30,7 @@
     H(x, y, v) { this.h[this.i(x, y)] = v; }
     gH(x, y) { return this.h[this.i(x, y)]; }
     clear(a) { for (let i = 0; i < NN; i++) { this.c[i * 4] = 0; this.c[i * 4 + 1] = 0; this.c[i * 4 + 2] = 0; this.c[i * 4 + 3] = a || 0; } }
-    copy(o) { this.c.set(o.c); this.h.set(o.h); this.ro.set(o.ro); this.em.set(o.em); return this; }
+    copy(o) { this.c.set(o.c); this.h.set(o.h); this.ro.set(o.ro); this.em.set(o.em); if (o.chunky) this.chunky = true; return this; }
     clone() { return new Img().copy(this); }
     rough(v) { this.ro.fill(v); return this; }
     forEach(fn) { for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) fn(x, y, y * N + x); }
@@ -89,6 +89,10 @@
     }
     return [d1 / cs, d2 / cs, id];
   };
+
+  // the Klassisch look builds this recipe chunky (16×16-style texels, see tex_build.js pixelate) — the natural
+  // ground, rock, wood, leaves; the built materials keep their fine lines. Nahtlos ignores the mark.
+  TX.chunky = (img) => { img.chunky = true; return img; };
 
   // ------------------------------------------------------------------------------
   // Generic generators
