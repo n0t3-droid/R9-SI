@@ -494,11 +494,11 @@ void main() {
   vec2 dx = dFdx(uv) * mipK, dy = dFdy(uv) * mipK;
   if (rot == 1u || rot == 3u) { dx = dx.yx; dy = dy.yx; }
   // Klassisch: crisp texels up close, as in the original game — the sample snaps to its texel's centre and only the
-  // last pixel before a texel edge blends into the next texel (with anisotropic filtering many GPUs magnify linearly,
+  // half pixel on either side of a texel edge blends across it (with anisotropic filtering many GPUs magnify linearly,
   // which smeared the chunky pixels and the block outline into soft bands); texels smaller than a pixel pass as they are
   if (u_blockVar > 0.5) {
-    vec2 tx = fu * 32.0, tw = max((abs(dx) + abs(dy)) * 32.0, vec2(1e-3));
-    fu = (floor(tx) + 0.5 + clamp((fract(tx) - 0.5) / tw, -0.5, 0.5)) / 32.0;
+    vec2 tx = fu * 32.0, seam = floor(tx + 0.5), tw = max((abs(dx) + abs(dy)) * 32.0, vec2(1e-3));
+    fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
   }
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #ifdef CUTOUT
@@ -623,7 +623,7 @@ uniform ivec3 u_camInt;
 uniform vec3 u_camFrac;
 uniform vec3 u_waterFogColor;
 uniform float u_underwater;
-uniform float u_blockVar;     // Klassisch: still water reads per block (a chunky ripple pattern per block and a faint seam)
+uniform float u_blockVar;     // Klassisch: still water reads per block (chunky ripples, a faint seam), glass texels crisp
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -767,7 +767,13 @@ void main() {
   // gradients of the continuous uv: fract() jumps at every block edge and would pick the 1×1 mip there (a seam line)
   // connected-frame glass (flag bit 14) is one tile per face: clamp inside it, so an edge pixel never wraps onto the frame of the opposite edge
   if (((v_w5 >> 14u) & 1u) == 1u) fu = ctmUV(v_uv, v_w5);
-  vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dFdx(v_uv), dFdy(v_uv));
+  vec2 gdx = dFdx(v_uv), gdy = dFdy(v_uv);
+  // Klassisch: crisp texels up close, as on the opaque blocks (each glass block's frame drawn sharp)
+  if (u_blockVar > 0.5) {
+    vec2 tx = fu * 32.0, seam = floor(tx + 0.5), tw = max((abs(gdx) + abs(gdy)) * 32.0, vec2(1e-3));
+    fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
+  }
+  vec4 alb = textureGrad(u_albedo, vec3(fu, layer), gdx, gdy);
   alb.rgb *= v_tint;
   vec3 n = NORMALS[face];
 #ifdef MODEL

@@ -171,6 +171,22 @@ console.log('(f) shaders');
   check(/uniform float u_blockVar;/.test(terrain) && /u_blockVar > 0\.5/.test(terrain) && /hash13\(cellF/.test(terrain), 'the block fragment path shades every natural block by a hash of its world cell when u_blockVar is on');
   check(/if \(u_blockVar > 0\.5\) \{ if \(rot == 1u\) nxy = vec2\(-nxy\.y, nxy\.x\); else if \(rot == 2u\) nxy = -nxy; else if \(rot == 3u\) nxy = vec2\(nxy\.y, -nxy\.x\); \}/.test(terrain), 'Klassisch turns the normal map with the tile rotation');
   check(!/flip/.test(terrain), 'no tile is mirrored (mirrored neighbours read as one symmetric patch)');
+  // crisp texels: the sample snaps to the texel centre up close (whatever the sampler's anisotropy does), with a
+  // one-pixel blend at the texel edge; a texel smaller than a pixel passes unchanged
+  {
+    const snapSrc = /if \(u_blockVar > 0\.5\) \{\s*vec2 tx = fu \* 32\.0, seam = floor\(tx \+ 0\.5\), tw = max\(\(abs\(dx\) \+ abs\(dy\)\) \* 32\.0, vec2\(1e-3\)\);\s*fu = \(seam \+ clamp\(\(tx - seam\) \/ tw, -0\.5, 0\.5\)\) \/ 32\.0;/;
+    check(snapSrc.test(terrain), 'Klassisch snaps the block texture sample to its texel centre up close');
+    // the shader's formula in JS: t = fu·32, seam = the nearest texel edge, t' = seam + clamp((t − seam) / w, ±½)
+    const snap = (f, w) => { const t = f * 32, seam = Math.floor(t + 0.5); return (seam + Math.max(-0.5, Math.min(0.5, (t - seam) / w))) / 32; };
+    // a texel 10 pixels wide: inside it (more than half a pixel from its edges) the sample sits on its centre …
+    const centre = [0.1, 0.37, 0.5, 0.93, 0.3123].every(f => { const t = f * 32, d = Math.min(t % 1, 1 - t % 1); return d < 0.05 || Math.abs(snap(f, 0.1) * 32 - (Math.floor(t) + 0.5)) < 1e-9; });
+    // … within half a pixel of an edge it ramps across it (here 0.02 texels before the edge of texel 9: 30 % into texel 10's blend)
+    const ramp = Math.abs(snap(9.98 / 32, 0.1) * 32 - 9.8) < 1e-9;
+    // a texel one pixel wide: the coordinate passes unchanged
+    const same = [0.1, 0.37, 0.5, 0.93].every(f => Math.abs(snap(f, 1) - f) < 1e-9);
+    check(centre && ramp && same, `the snap: texel centres when a texel spans 10 pixels (${centre}), a half-pixel ramp at its edge (${ramp}), the coordinate unchanged at a texel a pixel (${same})`);
+    check(/vec2 tx = fu \* 32\.0, seam = floor\(tx \+ 0\.5\), tw = max\(\(abs\(gdx\) \+ abs\(gdy\)\) \* 32\.0/.test(sh.slice(sh.indexOf('S.TRANS_FS'), sh.indexOf('S.SHADOW_VS'))), 'the glass is snapped the same way');
+  }
   // the normal turn is the inverse of the uv turn: a height field sampled through the turned uv has its gradient turned back
   {
     const turn = (r, f) => r === 1 ? [f[1], 1 - f[0]] : r === 2 ? [1 - f[0], 1 - f[1]] : r === 3 ? [1 - f[1], f[0]] : f;
