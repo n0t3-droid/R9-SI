@@ -330,9 +330,13 @@
     b.lathe(8, 4.75, [[0.5, 0.7], [1.5, 0.8]], M.gloss(P.white));
   } }));
   def('kitchen', 'kettle', 'white', 'Kettle · white', Object.assign({}, AP, { col: 'white', build: (b) => {
-    b.cyl('y', 8, 8, 2.2, 0, 0.5, M.gloss(P.black)); b.lathe(8, 8, [[0.5, 2.1], [3, 2.1], [4.5, 1.6], [5, 1]], M.gloss(P.white));
-    b.cyl('y', 8, 8, 0.6, 5, 5.5, M.gloss(P.black)); b.rod(10, 1.5, 8, 11.5, 2.5, 8, 0.5, M.gloss(P.white)); b.rod(11.5, 2.5, 8, 11.5, 4.5, 8, 0.5, M.gloss(P.white)); b.rod(11.5, 4.5, 8, 9.5, 5, 8, 0.5, M.gloss(P.white));
-    b.rod(6, 3, 8, 4.5, 4.5, 8, 0.5, M.gloss(P.white));
+    // a smooth electric kettle: a black base, a rounded white belly and shoulder, a spout, a loop handle and a black lid
+    const w = M.gloss(P.white), k = M.gloss(P.black);
+    b.cyl('y', 8, 8, 2.6, 0, 0.8, k);
+    b.lathe(8, 8, [[0.8, 2.5], [2, 2.9], [5, 3.0], [6.8, 2.7], [7.8, 2.1], [8.6, 1.5]], w);
+    b.cyl('y', 8, 8, 1.5, 8.6, 9, k); b.cyl('y', 8, 8, 0.5, 9, 9.8, k);
+    b.rod(11, 2.5, 8, 13.5, 5, 8, 0.7, w); b.rod(13.5, 5, 8, 13.8, 5.6, 8, 0.7, w);
+    b.tube('z', 4.1, 5.6, 2.2, 0.7, 7.25, 8.75, k);
   } }));
   def('kitchen', 'toaster', 'cream', 'Toaster · cream', Object.assign({}, AP, { col: 'cream', build: (b) => {
     b.rbox(4.5, 0, 6, 11.5, 4.5, 10, 1, M.gloss(0xEDE3CC)); b.cut(5.5, 3.5, 7, 10.5, 4.5, 7.5); b.cut(5.5, 3.5, 8.5, 10.5, 4.5, 9);
@@ -381,9 +385,13 @@
     b.rbox(22, 15, 6, 29, 15.5, 12, 0.25, M.wood(P.walnut)); for (const [x, z] of [[24, 8], [27, 9.5]]) b.lathe(x, z, [[15.5, 1], [17, 1.1]], M.gloss(P.white));
   } }));
   def('kitchen', 'hood', 'island', 'Island Hood · black', Object.assign({}, AP, { col: 'black', mount: 'ceiling', toggle: true, light: [11, 10, 8], build: (b) => {
-    for (const [x, z] of [[4, 4], [12, 4], [4, 12], [12, 12]]) b.box(x - 0.25, 10, z - 0.25, x + 0.25, 16, z + 0.25, M.metal(P.black));
-    b.pbox(2, 7, 2, 14, 10, 14, 0.5, M.metal(P.black)); b.box(2.5, 6.5, 2.5, 13.5, 7, 13.5, M.metal(0x4A4E54));
-    for (const x of [5, 11]) b.box(x - 1, 6.5, 7, x + 1, 7, 9, M.light(0xFFF0D4));
+    // a canopy that slopes in toward the front (steel), a flue up to the ceiling, two lights under the steel lip
+    const k = M.metal(P.black), st = M.metal(0x4A4E54);
+    b.box(6, 10, 7, 10, 16, 9, k);                                                         // the flue
+    b.extrude([[2, 10], [14, 10], [12, 5], [4, 5]], 'x', 2, 14, k);
+    b.recolor(2, 5, 8.5, 14, 10, 14, st);                                                  // the sloping front is steel
+    b.extrude([[4, 5], [12, 5], [11.5, 4.5], [4.5, 4.5]], 'x', 2.5, 13.5, st);
+    for (const x of [5, 11]) b.box(x - 1, 3.5, 6.5, x + 1, 4.5, 9, M.light(0xFFF0D4));
   } }));
   for (const [k, seat, frame] of [['oak', M.leather(0x8A5A3A), M.wood(P.oak)], ['black', M.fabric(P.cream), M.metal(P.black)]]) def('kitchen', 'stool', k, 'Counter Stool · ' + k, Object.assign({}, AP, { col: k === 'oak' ? 'oak' : 'black', seat: true, sound: 'wood', build: (b) => {
     for (const [x, z] of [[4, 4], [11, 4], [4, 11], [11, 11]]) b.box(x, 0, z, x + 1, 10, z + 1, frame);
