@@ -165,7 +165,7 @@
       const jump = k('Space'), sneak = k('ShiftLeft') || k('ShiftRight');
       if ((input.dbl('KeyW') || k('ControlLeft')) && fw > 0 && !sneak && (this.food > 6 || this.creative)) this.sprinting = true;
       if (fw <= 0 || sneak || (this.hitWall && !this.flying)) this.sprinting = false;
-      if (this.creative && !typing && input.dbl('Space')) { this.flying = !this.flying; this.vel[1] = 0; }
+      if (this.creative && !typing && input.dbl('Space')) { this.flying = !this.flying; this.vel[1] = 0; if (this.flying && VR.Hints) VR.Hints.done('fly'); }   // (the fly hint leaves with the flight, not on the next 250 ms tick)
       if (this.flying && this.onGround && !jump && this.vel[1] < 0 && !this.noclip) this.flying = false;
       this.sneaking = sneak && !this.flying;
       const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw);
