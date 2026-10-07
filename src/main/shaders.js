@@ -296,14 +296,14 @@ vec3 skyColor(vec3 dir, bool withSun) {
         float off = (mix(hash12(vec2(floor(g1), sd)), hash12(vec2(floor(g1) + 1.0, sd)), fract(g1)) - 0.5) * 0.05
                   + (mix(hash12(vec2(floor(g2), sd + 7.0)), hash12(vec2(floor(g2) + 1.0, sd + 7.0)), fract(g2)) - 0.5) * 0.012;
         float d = abs(da - off);
-        float ch = exp(-d * d * 1.2e6) * 3.0 + exp(-d * 260.0) * 0.35;
+        float ch = exp(-d * d * 8.0e4) * 3.0 + exp(-d * 90.0) * 0.3;
         // the fork: leaves the channel at 60 % of the height and drifts aside on the way down
         float fe = e / max(top, 0.05);
         if (fe < 0.6 && fe > 0.18) {
           float g3 = e * 70.0 / max(top, 0.05);
           float fo = off + (0.6 - fe) * 0.09 + (mix(hash12(vec2(floor(g3), sd + 3.0)), hash12(vec2(floor(g3) + 1.0, sd + 3.0)), fract(g3)) - 0.5) * 0.014;
           float d2 = abs(da - fo);
-          ch += (exp(-d2 * d2 * 2.5e6) * 1.6 + exp(-d2 * 320.0) * 0.15) * smoothstep(0.18, 0.3, fe);
+          ch += (exp(-d2 * d2 * 1.8e5) * 1.6 + exp(-d2 * 140.0) * 0.12) * smoothstep(0.18, 0.3, fe);
         }
         col += vec3(0.82, 0.88, 1.0) * ch * u_bolt.w * 6.0 * smoothstep(top, top * 0.85, e);
       }
