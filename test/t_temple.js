@@ -25,6 +25,36 @@ check(at(0, Y + 8, 20) === st('portal_veil'), 'the portal veil fills the opening
 check(at(7, Y + 5, 20) !== st('portal_veil'), 'the veil stops inside the frame (x 7 is frame, not veil)');
 check(at(0, Y, 44) === st('temple_light_bar') && at(0, Y, 36) === st('temple_light_bar'), 'the runway carries orange light bars down its centre (every 8 blocks)');
 check(at(0, Y, 45) === st('vx_floor_deck'), 'between the light bars the runway is dark deck plate');
+// the veil in the mesher: its faces go to the translucent pass as the PORTAL kind (the shader's veil branch), and each
+// corner carries its distance to the veil's rim (u = distance × 16): 0 on the frame, about 6 in the middle of the gate
+{
+  const PAD = V.MESH_PAD, PS = V.MESH_PS, PSS = PS * PS;
+  const veilLayer = R.T.tex[st('portal_veil') * 6] & 0xfff;
+  const meshAt = (CX, CZ, sy) => {
+    const cols = {};
+    for (let cz = -1; cz <= 1; cz++) for (let cx = -1; cx <= 1; cx++) { const c = g.generate(CX + cx, CZ + cz); c.light = V.computeColumnLight(c.blocks, true); cols[cx + ',' + cz] = c; }
+    const blocks = new Uint16Array(PSS * PS), light = new Uint16Array(PSS * PS), z2 = new Uint16Array(PSS);
+    for (let y = -PAD; y < 16 + PAD; y++) for (let z = -PAD; z < 16 + PAD; z++) for (let x = -PAD; x < 16 + PAD; x++) {
+      const wy = sy * 16 + y, c = cols[Math.floor(x / 16) + ',' + Math.floor(z / 16)], lx = ((x % 16) + 16) % 16, lz = ((z % 16) + 16) % 16;
+      const pi = (y + PAD) * PSS + (z + PAD) * PS + (x + PAD), i = (wy << 8) | (lz << 4) | lx; blocks[pi] = c.blocks[i]; light[pi] = c.light[i];
+    }
+    return V.meshSection({ blocks, light, grass: z2, foliage: z2, water: z2, sy, ox: CX * 16, oz: CZ * 16, smooth: true, fancyLeaves: true, vxLod: true });
+  };
+  // the gate (x −6 … 6, y 81 … 93, z 20) lies in the chunks x −1 and 0 of the chunk row z 1, in section 5 (y 80 … 95)
+  const verts = [];
+  for (const CX of [-1, 0]) {
+    const r = meshAt(CX, 1, 5), a = r.trans || [];
+    for (let o = 0; o < a.length; o += 8) if ((a[o + 3] & 0xfff) === veilLayer) verts.push({ x: a[o] / 2048 - 4 + CX * 16, y: a[o + 1] / 2048 - 4 + 80, z: a[o + 2] / 2048 - 4 + 16, kind: (a[o + 5] >> 8) & 7, d: (a[o + 4] & 255) / 16 });
+  }
+  check(verts.length > 300, `the veil's faces are in the translucent pass (${verts.length} vertices)`);
+  check(verts.every(v => v.kind === 3), `every veil face is the PORTAL kind, so the shader's veil branch draws it (${verts.filter(v => v.kind !== 3).length} are not)`);
+  const front = verts.filter(v => Math.abs(v.z - 21) < 1e-3 || Math.abs(v.z - 20) < 1e-3);
+  const dMax = Math.max(...front.map(v => v.d)), dMin = Math.min(...front.map(v => v.d));
+  check(dMin === 0 && dMax >= 5 && dMax <= 7.5, `the rim distance runs from 0 at the frame to the middle of the gate (${dMin} … ${dMax})`);
+  const at0 = (x, y) => front.filter(v => Math.abs(v.x - x) < 1e-3 && Math.abs(v.y - y) < 1e-3).map(v => v.d);
+  check(at0(0, 81).every(d => d === 0) && at0(0, 82).every(d => d === 1), `on the bottom row the corners on the floor are 0, the ones a block up are 1 (${at0(0, 81)} / ${at0(0, 82)})`);
+  check(at0(0, 87).every(d => d >= 5.5), `the middle of the gate is far from the rim (${at0(0, 87)})`);
+}
 console.log('the Hangar Hall, shot E');
 const HZ = -10;
 check(at(5, Y, HZ) === st('vx_floor_plaza_line') && at(8, Y, HZ) === st('vx_floor_plaza_line'), 'the octagon rings around the pad (radius 5 and 8) are light lines');
@@ -47,6 +77,12 @@ const zc = HEART.TEMPLE.back - 4;
 check(at(0, Y + 4, zc) === 0 && at(0, Y + 7, zc) === 0, 'the corridor is open air from the back door (7 high)');
 check([-4, 4].every(x => [Y + 2, Y + 5].every(y => at(x, y, zc) === st('vx_tech_hex') || at(x, y, zc) === st('vx_tech_dark_strip'))), 'both corridor walls are the hangar panels');
 check(at(0, Y + 8, zc) === st('vx_hex_light_cyan') || at(0, Y + 8, zc) === st('vx_tech_gray'), 'the corridor ceiling carries the hex light row');
+// the corridor's city end is the portal as a window (t3_04): a veil in a 7 × 7 octagon, framed by orange light bars
+const zx = HEART.TEMPLE.back - 9;
+check(at(0, Y + 1, zx) === st('portal_veil') && at(0, Y + 4, zx) === st('portal_veil') && at(3, Y + 4, zx) === st('portal_veil') && at(-3, Y + 4, zx) === st('portal_veil') && at(0, Y + 7, zx) === st('portal_veil'), 'the corridor ends in a veil across its opening');
+check(at(3, Y + 1, zx) === st('temple_light_bar') && at(-3, Y + 7, zx) === st('temple_light_bar'), 'the veil is an octagon: its corners are orange light bars');
+check([-4, 4].every(x => [Y + 1, Y + 4, Y + 6].every(y => at(x, y, zx) === st('temple_light_bar'))) && at(0, Y + 8, zx) === st('temple_light_bar'), 'an orange light frame runs round the veil');
+check(at(0, Y + 4, zx + 1) === 0 && at(0, Y + 4, zx - 1) !== st('portal_veil'), 'the veil is one block thick');
 console.log('spawns the temple hands to its chunks');
 const pad = tp.base.pad;
 const builder = HEART.builders.find(f => f.toString().includes('tp.base.pad'));
@@ -63,6 +99,7 @@ const g5 = V.makeGen('overworld', 4242, { vgen: 5 }), B5 = TG.build(g5).chunks;
 const at5 = (x, y, z) => atIn(B5, x, y, z);
 check(at5(0, Y, 36) !== st('temple_light_bar') && at5(0, Y, 44) !== st('temple_light_bar'), 'vgen 5: no landing-strip lights on the runway');
 check(at5(-4, Y + 2, zc) !== st('vx_tech_hex') && at5(4, Y + 2, zc) !== st('vx_tech_hex'), 'vgen 5: the back-door path has no hex walls');
+check(at5(0, Y + 4, zx) !== st('portal_veil'), 'vgen 5: no veil at the end of the back-door path');
 const spawnsOld = (cx, cz) => { const out = { blocks: new Uint16Array(65536) }; builder(g5, cx, cz, out); return out.spawns || []; };
 check(spawnsOld(pcx, pcz).every(s => s[0] !== 'starship' || s.length === 6), 'vgen 5: the pad ship keeps its seed\'s archetype (no hangar flag)');
 check(crew.every(([x, , z]) => spawnsOld(x >> 4, z >> 4).every(s => s[0] !== 'hallcrew')), 'vgen 5: no hall crew');
@@ -79,5 +116,6 @@ check(on.crew === 2, 'a crew member that loads twice is placed once');
 check(on.n > 20, `with Animierte Anzeigen on, the consoles blink near the hall (${on.n} blinks in 3 s)`);
 check(off.n === 0, 'with Animierte Anzeigen off nothing blinks');
 check(far.n === 0, 'far from the hall nothing blinks (no cost in the city)');
+
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);

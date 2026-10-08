@@ -24,9 +24,10 @@
   const T = HEART.TEMPLE, Y = HEART.PLAT;                  // floor block level (stand on Y + 1)
   TEMPLE.Y = Y;
   // the Hangar Hall's crew (TRAILER.md shot E): two heroes in blue and orange armour stand in front of the console rows,
-  // facing the pad, with their blasters up. [x, y, z, yaw, suit, hair, hairstyle, skin] (hall.js shows them)
+  // facing the pad, with their blasters up, mirror images about the hall's axis x 0.5 (clear of the stools at x ±6).
+  // [x, y, z, yaw, suit, hair, hairstyle, skin] (hall.js shows them and walks them out to the corridor's city end)
   const yawTo = (x, z, tx, tz) => Math.atan2(-(tx - x), -(tz - z));
-  TEMPLE.crew = (Y) => [[-4.9, Y + 1, 0.5, yawTo(-4.9, 0.5, 0.5, -9.5), 0, 1, 0, 0], [4.9, Y + 1, 0.5, yawTo(4.9, 0.5, 0.5, -9.5), 6, 4, 2, 1]];
+  TEMPLE.crew = (Y) => [[-3.9, Y + 1, 0.5, yawTo(-3.9, 0.5, 0.5, -9.5), 0, 1, 0, 0], [4.9, Y + 1, 0.5, yawTo(4.9, 0.5, 0.5, -9.5), 6, 4, 2, 1]];
   // the blinking lights on the console tops (x, y, z) — the console rows at x ±7, z −4 … +6 (hall.js blinks them)
   TEMPLE.consoleLights = (Y) => { const out = []; for (const sx of [-1, 1]) for (let z = -4; z <= 6; z += 2) out.push([sx * 7 + 0.5, Y + 2.1, z + 0.5]); return out; };
   // footprint (with the plaza) in world coordinates — reserved from villages, trees and random features
@@ -294,6 +295,13 @@
       }
       for (let x = -2; x <= 2; x++) put(x, Y + 8, z, K.GRAY);
       put(0, Y + 8, z, z % 4 === 0 ? K.HEXLC : K.GRAY);
+      // the city end (t3_04, the portal as a window): a veil across the opening, cut to an octagon by light-bar corners,
+      // in a frame of orange light bars — from inside the corridor the palm city shows through its clear middle
+      if (z === T.back - 9) {
+        for (let y = Y + 1; y <= Y + 7; y++) for (let x = -3; x <= 3; x++) put(x, y, z, (Math.abs(x) === 3 && (y === Y + 1 || y === Y + 7)) ? K.BAR : K.VEIL);
+        for (const sx of [-1, 1]) for (let y = Y + 1; y <= Y + 7; y++) put(sx * 4, y, z, K.BAR);
+        for (let x = -2; x <= 2; x++) put(x, Y + 8, z, K.BAR);
+      }
     }
     // ---- the plaza & runway
     for (let x = -60; x <= 60; x++) for (let z = 21; z <= 140; z++) {
