@@ -17,7 +17,7 @@ bash test/regress.sh "" smoke.mjs               # named tests only
 
 ## Release regression set
 
-17 node tests and 31 browser tests (48 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
+19 node tests and 32 browser tests (51 in all), listed as "yes" below. The B1 additions are `looks_core.js`, `variants_core.js` (node) and `liveloop.mjs` (browser). The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
 
 Typical time of a full release run: about 127 min of browser tests (median of the recorded passing runs, plus the wait for the lock) and about 72 s of node tests.
 
@@ -36,6 +36,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | id_snapshot.js | node | Every shipped block type keeps its state-id range (saved worlds store raw ids). | 1 † | – | yes |
 | light_same.js | node | Column light equals the v0.39 algorithm's output (the reference is kept in the test). | 6 † | – | yes |
 | look_classic.js | node | Klassisch block look (the default): each block a cube with its own edges and patterns; mesh checks. | 5 † | – | no |
+| looks_core.js | node | B1 „🎨 Aussehen“ core: the colour table, the VX colour roles and materials on the specs in place, the recolour of textured blocks (mesher tint, bit 15), Oberfläche, and Original byte-identical (every table, spec and mesh stream). | 2 † | – | yes |
 | mesh_same.js | node | Mesher output is unchanged when its loops are tuned: every vertex stream, for two looks. | 13 † | – | yes |
 | model_smoke.js | node | Every VM model compiles, paints and meshes; boxes exist; reports the mesh cost per state. | 80 † | – | no |
 | modern_pack.js | node | Modern Living pack: ids append-only after the older states, every item registered after Vollton, set counts and palette. | 10 † | – | yes |
@@ -51,6 +52,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | tex_check.js | node | Every texture name of the main bundle resolves to a recipe and builds an image (1832 names). | 3 † | – | yes |
 | tpl_roundtrip.js | node | Design format v2: a Crafter grid becomes a template (VR.Custom.makeTemplate) and the edits survive. | 5 † | – | no |
 | variants.js | node | Edit, then Varianten (VR.Variants): the same block family in other colours and shapes. | 1 † | – | no |
+| variants_core.js | node | B1 „⧉ Als Variante“ core: 256 variant slots of 64 states, filled from their source the same way on every thread; stairs, doors, furniture models and VX walls; surplus states and a lost source. | 1 † | – | yes |
 | villa_smoke.js | node | Every catalogue house builds (both mirror states): block names, room overlaps, door reachability. | 2 † | – | no |
 | vx_cache.js | node | The mini-voxel painter's piece cache is bounded and keeps what is in use. | 5 † | – | yes |
 | vx_cells.js | node | The first packs' models are built from src/shared/voxcells.js and register as before. | 4 † | – | yes |
@@ -73,6 +75,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | house_genie.mjs | browser | v0.35 Erschaffen: the Haus-Baukasten and the Genie end to end, including the 'not granted' case. | 199 (174–858) | 7/8 | yes |
 | imagine.mjs | browser | v0.35 picture to 3D: a picture becomes a Blockbild with the background removed; files round-trip. | 74 (64–75) | 4/4 | yes |
 | life_kit.mjs | browser | Village Life and Supermarket kit showcase: the same builds; every block exists and door boxes match open or closed. | – | – | no |
+| liveloop.mjs | browser | B1 Live-Schleife in Chromium (German UI): pause menu → Studio over the game; ✓ Für alle remeshes only the wall; ⧉ Als Variante fills a slot and a placed variant survives a reload; a guest gets the host's looks and gives them back on leaving. Shots in test/shots/live_*.png. | n/a | – | yes |
 | modern_kit.mjs | browser | v0.30 modern building set: Vollton colours, panorama glass with connected frames, the nine modern doors. | 114 (114–114) | 1/1 | yes |
 | modern_pack.mjs | browser | Modern Living in the browser: the creative tab shows the whole pack; icons are painted a few per frame. | 1256 (1188–1323) | 2/4 | yes |
 | mp.mjs | browser | Two players, one world: host and guest in two pages; look sync, edits both ways, tall edits, summon, leave and rejoin, host closes. | 392 (141–642) | 2/2 | yes |
