@@ -16,7 +16,7 @@ await ctx.addInitScript(() => {
   const rec = window.__mp = { used: [], pres: [], emits: [], realNameAt: 0, noticeAt: 0 };
   const mine = {};
   const me = () => ({ peer: 'p_me', by: 'u_me', isMe: true, sameTab: true, kind: 'viewer', guest: false, presence: Object.freeze(Object.assign({}, mine)), updatedAt: Date.now() });
-  const friend = { peer: 'p_fr', by: 'u_fr', isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: { v: 1, n: 'Buddy', host: { s: 'w-buddy', w: 'Buddys Welt', m: 'creative', t: Date.now() } }, updatedAt: Date.now() };
+  const friend = { peer: 'p_fr', by: 'u_fr', isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: { v: 2, n: 'Buddy', host: { s: 'w-buddy', w: 'Buddys Welt', m: 'creative', t: Date.now() } }, updatedAt: Date.now() };
   const fns = [];
   const peers = () => [me(), friend];
   const lobby = {
