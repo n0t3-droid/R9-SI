@@ -351,6 +351,8 @@
   // a Ding set from the start screen (📍 Setzen on a card) is in your hand when the world opens — your own world,
   // Creative or Zen (never a free item in Survival); r9si.hand is read once
   ST.handAllowed = (meta) => !!(meta && !meta.guest && (meta.mode === 'creative' || meta.mode === 'zen'));
+  // (B1: ✋ In die Hand from the Studio over the game puts it into the selected slot right away — liveloop.js)
+  ST.handIn = (g) => handIn(g);
   function handIn(g) {
     let h = null; try { h = JSON.parse(localStorage.getItem('r9si.hand') || 'null'); } catch (e) { h = null; }
     if (!h) return;

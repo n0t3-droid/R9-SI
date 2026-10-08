@@ -4,6 +4,8 @@
 (function (VR) {
   'use strict';
   const S = VR.SHADERS = {};
+  // Phase B1 „🎨 Aussehen": the recolour half every block shader shares with the Studio (src/shared/looks.js)
+  const LOOK = (VR.Looks && VR.Looks.GLSL) || 'uniform highp sampler2D u_avgLum;\nbool lookOn(uint w5) { return false; }\nvec3 lookRecolor(vec3 alb, float layer, vec3 col) { return alb; }\n';
 
   // ------------------------------------------------------------ common sky/fog
   S.COMMON = `
@@ -429,6 +431,7 @@ uniform mat3 u_normalMat;
 uniform float u_clipNear;
 #endif
 ${'__COMMON__'}
+${LOOK}
 in vec3 v_rel;
 in vec2 v_uv;
 flat in uint v_w3;
@@ -507,11 +510,15 @@ void main() {
 #endif
   vec4 mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
   vec3 tint = v_tint;
+  // a recoloured block (B1): the texture's detail in its own colour, the whole face (the tint mask of a grass side too)
+  if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, tint);
+  else {
 #ifdef CUTOUT
   alb.rgb *= tint;
 #else
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
+  }
   if (((v_w3 >> 15u) & 1u) == 1u) {
 #ifdef MODEL
     bool own = false;   // a ship's blocks move with it: no world cell to hash
@@ -637,6 +644,7 @@ uniform float u_shadowTexel;
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
+${LOOK}
 in vec3 v_rel;
 in vec2 v_uv;
 flat in uint v_w3;
@@ -777,7 +785,7 @@ void main() {
     fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
   }
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), gdx, gdy);
-  alb.rgb *= v_tint;
+  if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, v_tint); else alb.rgb *= v_tint;
   vec3 n = NORMALS[face];
 #ifdef MODEL
   n = u_normalMat * n;
@@ -1373,6 +1381,7 @@ uniform vec3 u_blockLight;
 uniform float u_flash;
 uniform float u_noFog;
 ${'__COMMON__'}
+${LOOK}
 in vec3 v_uvl;
 in vec3 v_n;
 in vec4 v_color;
@@ -1380,10 +1389,12 @@ in vec3 v_rel;
 out vec4 o;
 void main() {
   vec4 a = texture(u_albedo, v_uvl);
-  // negative shade = opaque block texture whose alpha is the tint mask (grass sides); positive = alpha-tested
+  // negative shade = opaque block texture whose alpha is the tint mask (grass sides); positive = alpha-tested;
+  // |shade| 3 = a recoloured block (B1): the texture's detail in the colour (v_color)
   bool opq = v_color.a < 0.0;
   if (!opq && a.a < 0.5) discard;
-  if (opq) a.rgb = mix(a.rgb, a.rgb * v_color.rgb, a.a); else a.rgb *= v_color.rgb;
+  if (abs(v_color.a) > 2.5) a.rgb = lookRecolor(a.rgb, v_uvl.z, v_color.rgb);
+  else if (opq) a.rgb = mix(a.rgb, a.rgb * v_color.rgb, a.a); else a.rgb *= v_color.rgb;
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
@@ -1393,7 +1404,7 @@ void main() {
   vec3 light = u_ambSky * sk * shade + lc * ndl * smoothstep(0.55, 0.95, u_sky) * 0.9 + pow(u_blockLight, vec3(1.7)) * 1.35 * u_blockLightTint + 0.02;
   float shK = abs(v_color.a);
   vec3 col = a.rgb * light * min(shK, 1.0);
-  if (shK > 1.5) col = a.rgb * (1.3 + u_night * 0.6); // emissive voxel faces (|shade| = 2)
+  if (shK > 1.5 && shK < 2.5) col = a.rgb * (1.3 + u_night * 0.6); // emissive voxel faces (|shade| = 2)
   col = mix(col, vec3(1.0, 0.25, 0.2), u_flash * 0.55);
   if (u_noFog < 0.5) col = applyFog(col, v_rel, length(v_rel));
   o = vec4(col, 1.0);

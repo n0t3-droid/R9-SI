@@ -97,6 +97,7 @@
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
+        if (VR.LiveLoop) VR.LiveLoop.updateLum(this);   // the recolour table follows the textures of the look
         this.texFromCache = fromCache; this.texMs = Math.round(performance.now() - t0);
         if (VR.LOOK.rim !== rim) { this.reloadTextures(); return; }   // switched again while these were built: once more
         if (this.icons) { this.icons.alb = tex.albedo[0]; this.icons.cache.clear(); this.icons.faceCache.clear(); }
@@ -156,6 +157,7 @@
       if (this.pool) this.pool.broadcast({ type: 'custom', custom: VR.CUSTOM });
       if (after !== before) { if (this.icons) this.icons.cache.clear(); this.remeshAll(); }
       if (this.gadgets && this.gadgets.blue) this.gadgets.blue.reset();
+      if (this.mp && this.mp.isHost && this.mp.sendPack) this.mp.sendPack(null);   // friends see the new model looks too (B1)
       const n = VR.Custom.count();
       if (this.ui && this.ui.toast && this.state === 'play') this.ui.toast('R9 Studio', T('g.studio.designs', { h: n.houses, m: n.models }));
       if (this.ui && this.ui.studioNote) this.ui.studioNote();
@@ -199,6 +201,8 @@
         if (e.key && VR.Edits && this.meta && !this.meta.guest && e.key === VR.Edits.listKey(this.meta.id) && this.gadgets && this.gadgets.blue) this.gadgets.blue.editT = 0;
         // the Studio changed this world's style (another tab of the same page)
         if (e.key && VR.WorldStyle && this.meta && !this.meta.guest && e.key === VR.WorldStyle.key(this.meta.id)) this.applyStyle();
+        // B1 „🎨 Aussehen": a block's look or a variant changed in the Studio (also the one over the game) — live, no reload
+        if (VR.LiveLoop) VR.LiveLoop.onStorage(this, e);
       });
       const n = VR.poolSize(navigator.hardwareConcurrency || 4, this.settings.preset);
       const src = document.getElementById('worker-src').textContent;
@@ -208,6 +212,8 @@
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
+      // the looks and variants of this browser (B1, looks.js): here and in every worker before the first mesh
+      if (VR.LiveLoop) VR.LiveLoop.boot(this);
       // the block textures: the last start with this build and look kept them (tex_cache.js; a read slower than 500 ms is
       // a miss), else they are forged in a worker and kept for the next start. A worker that fails (out of memory on a very
       // small machine) is tried once more on another, then the game says so instead of waiting forever behind the loading screen
@@ -226,6 +232,7 @@
       this.tex = tex; this.texRim = rim0;
       tex.noise = tex.noise;
       this.renderer.init(tex);
+      if (VR.LiveLoop) VR.LiveLoop.updateLum(this);
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
       this.trails = VR.Trails ? new VR.Trails(this) : null;
@@ -307,6 +314,8 @@
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
       this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style });
+      // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
+      if (VR.LiveLoop) VR.LiveLoop.openWorld(this, meta);
       const dim = meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld');
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
@@ -406,7 +415,8 @@
       if (fr) { fr.classList.remove('on'); setTimeout(() => { if (!this.studioOpen && fr) fr.src = 'about:blank'; }, 60); }
       this.studioOpen = false;
       this.last = performance.now();
-      // what the Studio did, in the world now
+      // what the Studio did, in the world now (a look missed by the storage event too)
+      if (VR.LiveLoop) VR.LiveLoop.apply(this);
       const b = this.gadgets && this.gadgets.blue;
       if (b) { b.loadPlans(); for (let i = 0; i < 10; i++) { b.editT = 0; b.tickEdits(0); } b.planT = 0; }
       this.applyStyle(true);
@@ -538,6 +548,7 @@
     leaveGuestWorld(msg) {
       if (this.mp) this.mp.clearSession();
       this.hostLook = null; this.applyLook();   // back to my own block look
+      if (VR.LiveLoop) VR.LiveLoop.endSession(this);   // and my own looks and variants (B1)
       try { if (this.starships) this.starships.shutdown(); if (this.gadgets) this.gadgets.shutdown(); } catch (e) { console.warn(e); }
       this.input.releaseLock();
       this.startTitle();
@@ -563,6 +574,7 @@
       m.player = this.player.toJSON(); m.time = this.env.ticks; m.day = this.env.day; m.lastPlayed = Date.now(); m.dim = this.dim;
       m.zenFreezeTime = this.zenFreezeTime; m.zenFreezeWeather = this.zenFreezeWeather;
       if (this.codex && this.codex.toJSON) m.codex = this.codex.toJSON();
+      if (VR.LiveLoop) VR.LiveLoop.metaVars(this, m);   // the variants its saved columns contain (B1)
       if (this.gadgets) this.gadgets.beforeSave(m);
       if (this.starships) this.starships.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
@@ -804,6 +816,7 @@
     playFrame(dt) {
       const g = this, p = this.player, w = this.world, input = this.input;
       this.time += dt;
+      if (VR.LiveLoop) VR.LiveLoop.tick(this);   // a look changed: the sections that show it are meshed again, a few a frame
       this.handleKeys();
       const gad = this.gadgets, driving = gad && gad.controlling;
       if (this.entities && !this.ui.blocking && !driving) this.entities.playerAttack();

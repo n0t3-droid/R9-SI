@@ -2,8 +2,8 @@
 // Section mesher (worker). Input: 20^3 padded blocks+light (16 + 2 on every side), 20^2 tints.
 // Output: 3 vertex streams (opaque, cutout, translucent) of 8 x u16 per vertex:
 //  w0..2 pos (section-local, (p+4)*2048), w3 layer|rot<<12|randrot<<14|macro<<15,
-//  w4 u|v<<8 (1/16 units), w5 face|ao<<3|sway<<5|leaf<<7|kind<<8|noshade<<11|emit<<12|uw<<13,
-//  w6 light (sky<<12|r<<8|g<<4|b), w7 tint rgb565
+//  w4 u|v<<8 (1/16 units), w5 face|ao<<3|sway<<5|leaf<<7|kind<<8|noshade<<11|emit<<12|uw<<13|ctm<<14|look<<15,
+//  w6 light (sky<<12|r<<8|g<<4|b), w7 tint rgb565 (a recoloured face, w5 bit 15: the block's own colour, T.rc)
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -59,6 +59,8 @@
     const n = R.types.length; CTMK = new Int32Array(n); CTML = new Uint8Array(n);
     for (const t of R.types) if (t.o.ctm) { CTMK[t.id] = 0x10000 | t.o.ctm; CTML[t.id] = 1; }
   }
+  // a look or a variant changed the tables (looks.js): the parts built from them are made again
+  VR.meshCacheClear = function () { partCache.clear(); CTMK = null; CTML = null; };
 
   // Stairs/fence/wall/pane part caches per type
   const partCache = new Map();
@@ -91,7 +93,7 @@
   }
 
   VR.meshSection = function (job) {
-    const T = R.T, TF = T.flags, TSH = T.shape, TL = T.layer, TTEX = T.tex, TTINT = T.tint, TTYPE = T.type;
+    const T = R.T, TF = T.flags, TSH = T.shape, TL = T.layer, TTEX = T.tex, TTINT = T.tint, TTYPE = T.type, TRC = T.rc;
     if (!CTMK) ctmTables();
     const B = job.blocks, L = job.light, GR = job.grass, FO = job.foliage, WA = job.water;
     const fancy = job.fancyLeaves !== false, smooth = job.smooth !== false;
@@ -253,7 +255,7 @@
               if (ca < y + 1 - 1e-6 && cb < y + 1 - 1e-6 && PH.surfaceTop(blockAt, nx, y, nz) === y) continue;
             }
             faceCorners(bi, d);
-            emitSlopeQuad(bufs[0], d, x, y, z, texW3(TTEX[b * 6 + d], fl, d, b), d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (d === 2 ? 1 << 13 : 0), cornerLight, cornerAO, tintAt(TTINT[b], x, z, b));
+            emitSlopeQuad(bufs[0], d, x, y, z, texW3(TTEX[b * 6 + d], fl, d, b), d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (d === 2 ? 1 << 13 : 0) | (TRC[b] ? 32768 : 0), cornerLight, cornerAO, TRC[b] || tintAt(TTINT[b], x, z, b));
             continue;
           }
           faceCorners(bi, d);
@@ -265,9 +267,9 @@
             if (ab && at && (at.name === 'snow' || at.name === 'snow_block' || at.name === 'powder_snow')) texv = R.texIndex['grass_snow_side'];
           }
           if (t.o.mushInside !== undefined && t.o.fungusCap) { const nt = R.types[TTYPE[nb]]; if (nt && nt.o.mushInside !== undefined) texv = t.o.mushInside; }
-          const tint = tintAt(TTINT[b], x, z, b);
+          const rcb = TRC[b], tint = rcb || tintAt(TTINT[b], x, z, b);
           const uniform = cornerLight[0] === cornerLight[1] && cornerLight[1] === cornerLight[2] && cornerLight[2] === cornerLight[3] && !cornerAO[0] && !cornerAO[1] && !cornerAO[2] && !cornerAO[3];
-          const w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0);
+          const w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (rcb ? 32768 : 0);
           if (uniform && texv === TTEX[b * 6 + d]) { mflag[mi] = 1; mstate[mi] = b; mlight[mi] = cornerLight[0]; mtint[mi] = tint; }
           else emitCubeQuad(bufs[0], d, x, y, z, x + 1, y + 1, z + 1, 1, 1, texW3(texv, fl, d, b), w5, cornerLight, cornerAO, tint);
         }
@@ -286,7 +288,7 @@
           for (let hh = 0; hh < h; hh++) for (let k = 0; k < w; k++) mflag[(v + hh) * 16 + u + k] = 2;
           const fl = TF[st0];
           mergedLight[0] = li0; mergedLight[1] = li0; mergedLight[2] = li0; mergedLight[3] = li0;
-          const w3 = texW3(TTEX[st0 * 6 + d], fl, d, st0), w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0);
+          const w3 = texW3(TTEX[st0 * 6 + d], fl, d, st0), w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (TRC[st0] ? 32768 : 0);
           if (ax === 0) emitCubeQuad(bufs[0], d, s, v, u, s + 1, v + h, u + w, w, h, w3, w5, mergedLight, null, ti0);
           else if (ax === 1) emitCubeQuad(bufs[0], d, u, s, v, u + w, s + 1, v + h, w, h, w3, w5, mergedLight, null, ti0);
           else emitCubeQuad(bufs[0], d, u, v, s, u + w, v + h, s + 1, w, h, w3, w5, mergedLight, null, ti0);
@@ -328,8 +330,10 @@
           if ((fl & F.LEAVES) && (TF[nb] & F.LEAVES) && !fancy) continue;
           if (layer === 2 && (TF[nb] & F.TRANS) && same(nb)) continue;
           faceCorners(bi, d);
-          const tint = tintAt(TTINT[b], x, z, b);
-          let w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0);
+          // a recoloured block (never connected glass: there bit 15 belongs to the frame mask)
+          const rcb = cmode === 1 ? 0 : TRC[b];
+          const tint = rcb || tintAt(TTINT[b], x, z, b);
+          let w5 = d | ((fl & F.EMISSIVE) ? 1 << 12 : 0) | (rcb ? 32768 : 0);
           if (fl & F.WAVELEAF) w5 |= 1 << 7;
           let texv = TTEX[b * 6 + d];
           // panorama glass: the frame variant from the same glass around this face (top, right, bottom, left);
@@ -361,7 +365,7 @@
 
     function emitModel(faces, x, y, z, bi, b, t, layer, fl) {
       const tintCode = TTINT[b];
-      const blockTint = tintAt(tintCode, x, z, b);
+      const rcb = TRC[b], blockTint = rcb || tintAt(tintCode, x, z, b);
       const own = L[bi];
       // plant offset jitter for small plants
       let ox = 0, oz = 0, oy = 0;
@@ -400,7 +404,10 @@
         if (meta && meta.anim) kind = KIND.ANIM;
         let w5base = (f.dir & 7) | (kind << 8) | ((fflags & FF.EMIT) || (fl & F.EMISSIVE) ? 1 << 12 : 0) | (!f.shade ? 1 << 11 : 0);
         if ((fflags & FF.WAVELEAF) || (fl & F.WAVELEAF)) w5base |= 1 << 7;
-        const tint = f.tint ? (f.tint >= 8 && f.tint < 256 ? tintAt(f.tint, x, z, b) : (f.tint > 255 ? hex565(f.tint) : tintAt(f.tint, x, z, b))) : blockTint;
+        // a recoloured block: every plain face in its colour (water, lava, portal and star faces keep theirs)
+        const look = rcb && (kind === 0 || kind === KIND.ANIM);
+        if (look) w5base |= 32768;
+        const tint = look ? rcb : f.tint ? (f.tint >= 8 && f.tint < 256 ? tintAt(f.tint, x, z, b) : (f.tint > 255 ? hex565(f.tint) : tintAt(f.tint, x, z, b))) : (rcb ? tintAt(tintCode, x, z, b) : blockTint);
         const w3 = (texv & 0xffff) | ((fl & F.MACRO) && macroOn ? 1 << 15 : 0);
         const p = f.p, uv = f.uv;
         buf.ensure(f.double ? 8 : 4);

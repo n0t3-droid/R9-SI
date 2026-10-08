@@ -36,8 +36,11 @@
       const T = R.T, A = this.g.tex.avgColor;
       const layer = T.tex[s * 6 + 2] & 0xfff;
       let r = A[layer * 4], gg = A[layer * 4 + 1], b = A[layer * 4 + 2];
-      const tint = T.tint[s];
-      if (tint) {
+      const tint = T.tint[s], rc = T.rc ? T.rc[s] : 0;
+      if (rc && VR.Looks) {
+        // a block with its own colour (B1 „🎨 Aussehen"): on average it is that colour (0..1 like the table)
+        const c = VR.Looks.from565(rc); r = ((c >> 16) & 255) / 255; gg = ((c >> 8) & 255) / 255; b = (c & 255) / 255;
+      } else if (tint) {
         const v = tint === 1 ? c.grass[ci] : tint === 3 ? c.water[ci] : c.foliage[ci];
         const k = tint === 3 ? 1.1 : 1.35;
         r *= ((v >> 11) & 31) / 31 * k; gg *= ((v >> 5) & 63) / 63 * k; b *= (v & 31) / 31 * k;

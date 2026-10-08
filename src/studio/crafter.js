@@ -39,6 +39,7 @@
   const FV = () => VR.Favs;
   // ★ favourites that can be placed here (the same list as in Teile, the Werkbank, the World and the game)
   const favItems = () => { if (!itemsByCat) buildItems(); return FV() ? FV().list().filter(id => itemSet.has(id)) : []; };
+  CR.resetItems = () => { itemsByCat = null; itemSet = null; };   // a variant came or went (B1, lookpanel.js)
   function buildItems() {
     itemsByCat = { all: [] };
     for (const t of R.types) {
