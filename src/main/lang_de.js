@@ -930,7 +930,7 @@
     'start.cw.cancel': 'Abbrechen',
     'start.newWorldName': 'Neue Welt',
     'start.cmdPro': 'Befehle gibt es im Profi-Modus (Start · Profi).',
-    'start.cmdHelp': 'Befehle: /bau <Wunsch> (z. B. „/bau Holzhaus mit Pool“) · /home · /sethome · /look klassisch | nahtlos · /wetter · /sprache — alle weiteren im Profi-Modus.',
+    'start.cmdHelp': 'Befehle: /bau <Wunsch> (z. B. „/bau Holzhaus mit Pool“) · /home · /sethome · /look klassisch | nahtlos · /wetter · /sprache — alle weiteren im Profi-Modus. (/bau und /wetter nicht im Überleben ohne Cheats.)',
     // ---- W1: 🎒 Meins
     'meins.all': 'Alles',
     'meins.fav': 'Favoriten',

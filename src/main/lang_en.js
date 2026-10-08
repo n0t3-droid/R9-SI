@@ -930,7 +930,7 @@
     'start.cw.cancel': 'Cancel',
     'start.newWorldName': 'New World',
     'start.cmdPro': 'Commands come with Pro (start screen · Pro).',
-    'start.cmdHelp': 'Commands: /bau <wish> (e.g. “/bau wooden house with pool”) · /home · /sethome · /look classic | seamless · /wetter · /lang — all others with Pro.',
+    'start.cmdHelp': 'Commands: /bau <wish> (e.g. “/bau wooden house with pool”) · /home · /sethome · /look classic | seamless · /wetter · /lang — all others with Pro. (/bau and /wetter: not in survival without cheats.)',
     // ---- W1: 🎒 Mine
     'meins.all': 'All',
     'meins.fav': 'Favourites',
