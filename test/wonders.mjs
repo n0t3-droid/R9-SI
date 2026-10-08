@@ -178,8 +178,10 @@ check(shots.filter(s => !/not built/.test(s)).length === 10, 'all eight wonders 
 const sp = await ctx.newPage(); sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 600)));
 await sp.goto(URL0 + '/studio.html', { timeout: 120000 });
 for (let i = 0; i < 240; i++) { await sp.waitForTimeout(500); if (await sp.evaluate(() => !document.getElementById('studio').classList.contains('boot') && !!(window.__studio && window.__studio.HOUSE.size >= 1))) break; }
-await sp.click('nav.modes button[data-mode="forge"]', { timeout: 60000 }).catch(() => { /* checked below */ });
+await sp.click('nav.modes button[data-mode="forge"]', { timeout: 60000 }).catch(e => console.log('  (studio click: ' + String(e.message).slice(0, 160) + ')'));
+await sp.waitForFunction(() => !!(window.__st && window.__st.mode === 'forge'), null, { timeout: 20000 }).catch(() => { /* reported below */ });
 await sp.waitForTimeout(1200);
 const chips = await sp.evaluate(() => [...document.querySelectorAll('#chips button[data-ftype^="wonder:"]')].map(b => b.textContent.trim()));
+if (!chips.includes('✨ ' + nameDe)) console.log('  (studio state: ' + await sp.evaluate(() => { let stored = null; try { stored = localStorage.getItem('r9si.wonderGifts'); } catch (e) { stored = 'blocked'; } return JSON.stringify({ mode: window.__st && window.__st.mode, wonders: !!(window.VR && VR.Wonders), gifts: window.VR && VR.Wonders && VR.Wonders.gifts ? VR.Wonders.gifts().map(g => g.type) : null, stored, chips: document.querySelectorAll('#chips button').length, fgt: document.querySelectorAll('#chips button.fgt').length }); }) + ')');
 check(chips.includes('✨ ' + nameDe), 'the Studio’s Forge offers „✨ ' + nameDe + '“ as a chip: ' + JSON.stringify(chips));
 await finish();
