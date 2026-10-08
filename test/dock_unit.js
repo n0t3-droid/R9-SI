@@ -29,11 +29,14 @@ step(s, 4.5);
 check(s.dock.phase === 'park', 'arrived: it parks on the apron (' + s.dock.phase + ')');
 const d0 = Math.hypot(s.pos[0] - hover[0], s.pos[1] - hover[1], s.pos[2] - hover[2]);
 check(d0 < 0.25, 'parked at the hover point over the apron (' + d0.toFixed(2) + ' m off, bob only)');
-const yaw0 = s.heading;
+// on the apron the craft turns round to face the plaza (its nose away from the portal), then lifts off with no snap
+const offPortal = (h) => Math.abs(Math.atan2(Math.sin(h - Math.PI), Math.cos(h - Math.PI)));
 step(s, 5);
-check(s.dock.phase === 'park' && Math.abs(s.heading - yaw0) < 1e-9, 'idles for its parking time with its heading kept (' + s.dock.parkT.toFixed(1) + ' s)');
-step(s, 6);
+check(s.dock.phase === 'park' && offPortal(s.heading) < 0.05, 'idles on the apron turned to face the plaza (' + offPortal(s.heading).toFixed(3) + ' rad from the portal, parked ' + s.dock.parkT.toFixed(1) + ' s)');
+let turn = 0, hp = s.heading;
+for (let i = 0; i < 6 * 60; i++) { s.age += 1 / 60; T.flyDock(s, 1 / 60); turn = Math.max(turn, Math.abs(Math.atan2(Math.sin(s.heading - hp), Math.cos(s.heading - hp)))); hp = s.heading; }
 check(s.dock.phase === 'out', 'lifts off after 9–15 s (phase ' + s.dock.phase + ')');
+check(turn < 0.1, 'the lift-off does not snap the craft round (largest turn in one frame ' + turn.toFixed(3) + ' rad)');
 step(s, 2);
 check(s.pos[1] > hover[1] + 3 || s.pos[2] > hover[2] + 5, 'leaves the apron: climbing or moving away (' + s.pos.map(v => v.toFixed(1)).join(', ') + ')');
 step(s, 12);
