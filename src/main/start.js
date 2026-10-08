@@ -52,7 +52,7 @@
     const tiles = el('div', 'tiles');
     for (const k of TILES) { const b = el('button', 'tile ' + k); b.type = 'button'; b.dataset.act = 'tile'; b.dataset.tile = k; b.innerHTML = `<span class="pic" aria-hidden="true">${SVG[k]}</span><span class="lbl"></span><span class="sub2"></span>`; tiles.appendChild(b); }
     box.appendChild(tiles);
-    const sub = el('div', 'sub'); const w = el('button', 'lnk'); w.type = 'button'; w.dataset.act = 'worlds'; const n = el('button', 'lnk'); n.type = 'button'; n.dataset.act = 'newworld'; sub.appendChild(w); sub.appendChild(el('span', 'dot', '·')).setAttribute('aria-hidden', 'true'); sub.appendChild(n); box.appendChild(sub);
+    const sub = el('div', 'sub'); const w = el('button', 'lnk'); w.type = 'button'; w.dataset.act = 'worlds'; const n = el('button', 'lnk'); n.type = 'button'; n.dataset.act = 'newworld'; sub.appendChild(w); sub.appendChild(el('span', 'dot', '·')).setAttribute('aria-hidden', 'true'); const tr = el('button', 'lnk'); tr.type = 'button'; tr.dataset.act = 'trailer'; sub.appendChild(tr); sub.appendChild(el('span', 'dot', '·')).setAttribute('aria-hidden', 'true'); sub.appendChild(n); box.appendChild(sub);
     const foot = el('div', 'below');
     foot.appendChild(el('div', 'studionote', '')).id = 'studionote';
     foot.appendChild(el('div', 'mphosts', '')).id = 'mphosts';
@@ -89,6 +89,7 @@
     }
     $('#title [data-act="worlds"]').textContent = tx('start.worlds', null, 'Andere Welt', 'Another world');
     $('#title [data-act="newworld"]').textContent = tx('start.newWorld', null, '＋ Neue Welt', '＋ New world');
+    const trb = $('#title [data-act="trailer"]'); if (trb) { trb.textContent = tx('start.trailer', null, '🎬 Trailer', '🎬 Trailer'); trb.title = tx('start.trailerT', null, 'Der Trailer von R9-SI: eine Fahrt durch die Welt, mit Schiffen und Helden — Esc beendet ihn', 'The R9-SI trailer: a ride through the world, with ships and heroes — Esc ends it'); }
     $('#title [data-act="settings"]').textContent = tx('start.settings', null, '⚙ Einstellungen', '⚙ Settings');
     const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.setAttribute('aria-label', aa.title); aa.setAttribute('aria-pressed', String(p.scale >= 1.3)); aa.classList.toggle('on', p.scale >= 1.3);
     // (VR.Legal's own words when it has them — the overlay and its buttons say the same)
@@ -103,7 +104,9 @@
   ST.listWorlds = async function () {
     const g = game(); if (!g || !g.store) return [];
     let ws = []; try { ws = await g.store.listWorlds(); } catch (e) { ws = []; }
-    ST.worldsCache = ws.filter(w => w && w.id && !w.guest).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
+    // (a temporary trailer world is never listed; one left by a closed window is removed on the start screen)
+    if (g.state === 'title' && !g.trailerAfterLoad) for (const w of ws) if (w && w.tmp && w.id) { try { g.store.deleteWorld(w.id).catch(() => {}); } catch (e) { /* */ } }
+    ST.worldsCache = ws.filter(w => w && w.id && !w.guest && !w.tmp).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
     return ST.worldsCache;
   };
 
@@ -122,6 +125,16 @@
     const ws = await ST.listWorlds(), base = tx('start.myWorld', null, 'Meine Welt', 'My World');
     const n = ws.filter(w => String(w.name || '').startsWith(base)).length;
     g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
+    return true;
+  };
+  // 🎬 Trailer: the game's own trailer. On the start screen it runs in a temporary world (the Heartland at the origin,
+  // removed again when the ride ends); in the pause menu it runs in the world you are in
+  ST.trailer = async function () {
+    const g = game(); if (!g) return false;
+    if (g.state === 'play') { if (g.director) g.director.play('trailer'); return true; }
+    if (g.state !== 'title') return false;
+    g.trailerAfterLoad = true;
+    try { await g.createWorld({ name: tx('start.trailerWorld', null, '🎬 Trailer', '🎬 Trailer'), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: false, tmp: true }); } catch (e) { g.trailerAfterLoad = false; console.warn('Trailer', e); }
     return true;
   };
   ST.bauen = async function () {
@@ -194,6 +207,7 @@
           <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
           <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
           <button type="button" class="btn" data-act="zeitraffer" data-t="g.pause.zeit" data-tt="g.pause.zeitTip"></button>
+          <button type="button" class="btn" data-act="trailer" data-t="g.pause.trailer" data-tt="g.pause.trailerTip"></button>
           <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
         </div>
         <div class="pgrp pside">
@@ -251,6 +265,7 @@
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
       case 'zeitraffer': if (VR.Zeit) VR.Zeit.open(ui.screen === 'pause' ? 'pause' : null); return true;
+      case 'trailer': ST.trailer(); return true;
       case 'legal': if (legalOK()) VR.Legal.open('impressum'); return true;
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;

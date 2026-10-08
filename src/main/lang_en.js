@@ -889,6 +889,9 @@
     'start.firstT': 'Makes your first world and takes you in',
     'start.worlds': 'Another world',
     'start.newWorld': '＋ New world',
+    'start.trailer': '🎬 Trailer',
+    'start.trailerT': 'The R9-SI trailer: a ride through the world, with ships and heroes — Esc ends it',
+    'start.trailerWorld': '🎬 Trailer',
     'start.settings': '⚙ Settings',
     'start.scaleT': 'Large text',
     'start.legal': '📜 Legal notice & privacy',
@@ -1010,6 +1013,8 @@
     // ---- 📽 Time-lapse (zeitraffer.js)
     'g.pause.zeit': '📽 Time-lapse',
     'g.pause.zeitTip': 'Watch how your world was built — block by block',
+    'g.pause.trailer': '🎬 Trailer',
+    'g.pause.trailerTip': 'The trailer plays in this world — Esc ends it',
     'meins.zeit': '📽 Time-lapse',
     'g.zr.title': '📽 Time-lapse',
     'g.zr.loading': 'Preparing the time-lapse …',
