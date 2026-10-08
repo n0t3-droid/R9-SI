@@ -65,7 +65,7 @@ const Bf = await place('before', idx.glas, 'glas');
 if (A) {
   const probe = await ev(([ox, oz, F]) => {
     const w = VR.game.world, R = VR.R, nm = (x, y, z) => { const s = w.getBlock(x, y, z); return s ? R.types[R.T.type[s]].name : 'air'; };
-    return { bay: nm(ox + 5, F + 3, oz + 5), pad: nm(ox + 12, F + 1, oz + 16), tread: nm(ox + 5, F + 1, oz + 19), glass: nm(ox + 9, F + 3, oz + 20), band: nm(ox + 12, F + 6, oz + 4), door: nm(ox + 12, F + 1, oz + 5) };
+    return { bay: nm(ox + 5, F + 3, oz + 5), pad: nm(ox + 12, F + 1, oz + 16), tread: nm(ox + 4, F + 1, oz + 19), glass: nm(ox + 9, F + 3, oz + 20), band: nm(ox + 12, F + 6, oz + 4), door: nm(ox + 12, F + 1, oz + 5) };
   }, [A.ox, A.oz, A.F]);
   console.log('probe', JSON.stringify(probe));
   check(probe.bay === 'vx_nova_window' && probe.pad === 'vm_nova_pad' && probe.tread === 'vm_nova_tread' && probe.glass === 'panorama_white' && probe.band === 'vx_nova_band' && /door/.test(probe.door), 'Villa Nova stands in the world: the bay window, the pad, a stair tread, the glass wall, the slab edge, the door');

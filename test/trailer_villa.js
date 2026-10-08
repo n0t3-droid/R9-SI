@@ -127,22 +127,29 @@ const [pu, pv] = NOVA.PAD;
 let pad = 0; for (let v = pv; v < pv + 3; v++) for (let u = pu; u < pu + 3; u++) if (nm(u, 1, v) === 'vm_nova_pad') pad++;
 let ringN = 0; for (const [u, v] of ring([pu - 1, pv - 1, pu + 3, pv + 3])) if (nm(u, 0, v) === 'vx_floor_plaza_line') ringN++;
 check(pad === 9 && ringN === 16, 'the light pad (3 × 3, ' + pad + ' cells) on the hall floor and the cyan ring round it in the floor (' + ringN + ' of 16)');
-let stairsOk = 0;
+// the stairs: two blocks deep in front of the glass wall, from the side walls up toward the middle (the V of t1_29 / t1_30)
+let stairsOk = 0; const SV0 = NOVA.STAIR_V, EU0 = NOVA.ENTRY;
 for (const st of NOVA.STAIRS) {
-  let ok = true;
-  for (let k = 1; k <= 7; k++) {
-    const v = G.v1 - k;
-    for (let du = 0; du <= 1; du++) {
-      if (nm(st.u + du, k, v) !== 'vm_nova_tread') ok = false;
-      for (let h = 1; h <= 2; h++) { const n2 = nm(st.u + du, k + h, v); if (n2 && n2 !== 'vx_spot') ok = false; }
-    }
+  let ok = true; const uk = (k) => st.u + st.du * (k - 1);
+  for (let k = 1; k <= U.y; k++) for (let dv = 0; dv <= 1; dv++) {
+    // the tread row of the piece (parts 0, 1) one block up and one along per piece; over it only its own glass cheeks
+    const s = at(uk(k), k, SV0 + dv); if (nameOf(s) !== 'vm_nova_tread' || propOf(s, 'part') > 1) ok = false;
+    for (let h = 1; h <= 2; h++) { const s2 = at(uk(k), k + h, SV0 + dv), n2 = nameOf(s2); if (n2 && !(n2 === 'vm_nova_tread' && propOf(s2, 'part') > 1) && n2 !== 'vx_spot') ok = false; }
   }
-  // the top tread lands on the first floor: its floor at the arrival, air above it
-  if (!at(st.u, U.y, G.v1 - 8) || at(st.u, U.y + 1, G.v1 - 8)) ok = false;
+  // it runs toward the middle in front of the glass wall, and the top tread lands on the first floor: its floor next to the
+  // top tread, air over that
+  if (Math.abs(uk(U.y) - EU0) >= Math.abs(st.u - EU0) || SV0 + 2 !== G.v1) ok = false;
+  if (!at(uk(U.y) + st.du, U.y, SV0) || at(uk(U.y) + st.du, U.y + 1, SV0)) ok = false;
   if (ok) stairsOk++;
 }
-check(stairsOk === 2, 'two floating stairs: seven tread cells each, one up and one forward, two cells of head room over every tread, the first floor open over them and its floor at the top (' + stairsOk + ' of 2)');
-let cove = 0; for (let v = 13; v <= 18; v++) for (let u = 8; u <= 16; u++) { const s = at(u, G.slab, v); if (nameOf(s) === 'vx_nova_band' && propOf(s, 'glow') === 1) cove++; }
+check(stairsOk === 2, 'two floating glass stairs in front of the glass wall, from the side walls up toward the middle: seven tread pieces each, one up and one along, nothing but their glass cheeks in the two cells over every tread, the first floor\'s floor at the top (' + stairsOk + ' of 2)');
+// the cheeks: the stringer pane and the handrail join from one piece to the next (the model's voxels on its two sides)
+{ const m = VM.MODELS.vm_nova_tread; VM.materialize(m); const Rs = m.res / 16; let joins = 0;
+  for (const x of [1, 31]) { const X = Math.floor(x * Rs); const top = (z) => { let y = -1; for (let yy = 0; yy < m.VH; yy++) if (m.get(X, yy, Math.min(m.VD - 1, Math.floor(z * Rs)))) y = yy; return y / Rs; };
+    // the top edge rises one block over the piece's depth: its height at the back is one block above its height at the front
+    if (Math.abs(top(15.9) - top(0) - 16) <= 1.5 && top(0) >= 23 && top(0) <= 27) joins++; }
+  check(joins === 2, 'the glass cheeks on both sides of the tread piece rise one block over its depth, a block over the nosing line (' + joins + ' of 2)'); }
+let cove = 0; for (let v = 12; v <= 17; v++) for (let u = 8; u <= 16; u++) { const s = at(u, G.slab, v); if (nameOf(s) === 'vx_nova_band' && propOf(s, 'glow') === 1) cove++; }
 check(cove >= 20 && !at(12, G.slab, 15), 'the cove in the hall ceiling: a recess ringed by a cyan light line (' + cove + ' ring cells)');
 
 // ---------------------------------------------------------------- 6 · the garden
