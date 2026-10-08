@@ -2,7 +2,7 @@
 // with a four-minute time constant after it stops; with the wetGround setting off (Very Low) no puddle and no wet
 // reaches the shader. The rain itself is the weather's (weather.js): the test forces it.
 const V = require('./load_shared.js');
-require('../src/main/weather.js'); require('../src/main/env.js');
+require('../src/main/skybodies.js'); require('../src/main/weather.js'); require('../src/main/env.js');   // (env.update reads VR.SkyBodies since t-clouds)
 let bad = 0;
 const ok = (c, msg) => { if (!c) { bad++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const on = { dim: 'overworld', biome: null, eyeSky: 1, wetOn: true, lowK: 0, freezeWeather: false, freezeTime: true };
