@@ -34,10 +34,11 @@
 ## Tasks
 
 - [x] Plan (this file)
-- [ ] 1 · Node test `test/baustelle.js` (fails first): order (removals top-down before placements bottom-up, layers never go down), pace (6–20 s for /bau Hochhaus 20 Stockwerke), completeness (identical final world vs Sofort), undo in one step (after and during the build), resume after a reload (save mid-build = finished world + plan built; crash mid-build = rebuilt identically)
-- [ ] 2 · `World.buildSet`, `onBeforeSave` / `onColumnUnloading` hooks
-- [ ] 3 · `src/main/baustelle.js`: order, pace, the write job (`siteFor`, `tickSlices`, finish, cancel, MP), Werkbank batches merged into one site
-- [ ] 4 · Hooks: blueprints.js (`siteFor` before the slice lines, `tickSlices` delegates, `/bau fertig`), gadgets.js (undo hook, click skip, draw), game.js (save, autosave, unload, draw, settings), ui.js (setting), audio.js (sounds), entities.js (no allocation), shaders/renderer (`voxInst`), lang tables
-- [ ] 5 · The show: scaffold, deck, builders, crane, effects, HUD
+- [x] 1 · Node test `test/baustelle.js` (fails first): order (removals top-down before placements bottom-up, layers never go down), pace (6–20 s for /bau Hochhaus 20 Stockwerke), completeness (identical final world vs Sofort), undo in one step (after and during the build), resume after a reload (save mid-build = finished world + plan built; crash mid-build = rebuilt identically)
+- [x] 2 · `World.buildSet`, `onBeforeSave` / `onColumnUnloading` hooks
+- [x] 3 · `src/main/baustelle.js`: order, pace, the write job (`siteFor`, `tickSlices`, finish, cancel, MP), Werkbank batches merged into one site
+- [x] 4 · Hooks: blueprints.js (`siteFor` before the slice lines, `tickSlices` delegates, `/bau fertig`), gadgets.js (undo hook, click skip, draw), game.js (save, autosave, unload, draw, settings), ui.js (setting), audio.js (sounds), entities.js (no allocation), shaders/renderer (`voxInst`), lang tables
+- [x] 5 · The show: scaffold, deck, builders, crane, effects, HUD
 - [ ] 6 · Browser test `test/baustelle.mjs` + screenshots `test/shots/baustelle_1..4.png` (10 %, 40 %, 80 %, done) — look at them, make it look great
 - [ ] 7 · Regression: node set, forge.mjs, world_mode.mjs, spawn.mjs; perf numbers
+- [x] Show fixes (this session): builders climb the ladder up the scaffold's outer side and reach the deck while it rises (the arrival is checked after the climb move); node test `test/baustelle.js` ALL OK (50 checks, 0 of 2166 frames hover, 454/454 deck frames)
