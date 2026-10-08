@@ -66,4 +66,23 @@ icon lighting in the inventory, switching street lamps by time of day (lamps are
 
 ## Numbers
 
-(filled in during the work: see the commit messages and `test/architecture.js` output)
+Measured on the 2-CPU machine while other agents' browser tests ran (load 7–12). Node timings use CPU time
+(`process.cpuUsage`), the minimum of several runs; wall time under this load was 2–3 times larger and noisier.
+
+- **Plan cost, 12 villages (seed 424242, `test/architecture.js` section 6 and a min-of-5 CPU probe):** vgen 5 1.27–1.44 s
+  in all, vgen 6 1.20–1.22 s. The two versions differ by less than the run-to-run noise (single sites range from 0.67×
+  to 1.77× between them). Block ops that place a block: 416,416 (vgen 5) → 423,938 (vgen 6), +1.8%: the gutters and
+  downpipes of the village homes, the street pieces of the modern towns.
+- **Placement grammar, 2000 homes 7×7 (min of 4):** the old interior 0.061–0.077 ms per home, the grammar 0.092–0.111 ms
+  (about +0.03 ms per home; a 40-home village about +1 ms of CPU, once per chunk generation).
+- **Layout kept:** every village (12/12) and modern town (2/2 in the test; the 7 nearest checked) has the same houses
+  and roads at vgen 6 as at vgen 5.
+- **Beds:** village homes without a bed: vgen 5 0 of 323; vgen 6 67 of 323 before the bed fix, 0 of 323 after it.
+  Homes without a table: 47 → 0; without seats: 47 → 7.
+- **Render cost (browser, `test/cost_before_after.mjs`: the villa's front, a modern street and a village home inside, 960×540,
+  `renderer.stats` after one real frame, the preset's own settings with the smart-quality ladder off):** measured in the
+  browser run that is queued at the time of writing (the numbers go in when it is in). An earlier partly loaded run
+  (55 draws on Very Low, 134 on High) is not used: its views were not settled. The frame ms are noisy on this machine and
+  are not compared.
+- **Before and after (pre-F6 build 205d00c against this build, the same three views, `test/cost_before_after.mjs`):**
+  see the probe output below (filled in when the run is in).
