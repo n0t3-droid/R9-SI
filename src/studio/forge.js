@@ -17,6 +17,7 @@
   const Fg = VR.Forge; if (!Fg) return;
   const WM = VR.StudioWorld;
   // words: VR.I18N.tx (the g.fgs.* entries of lang_de.js and lang_en.js); without the language module the German call-site text
+  const W = (s) => (VR.I18N && VR.I18N.word ? VR.I18N.word(s) : s);   // a forge word (German) in the language of the moment
   const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const FM = VR.StudioForge = { on: false, type: 'tower', dna: null, variants: [], sel: 0, text: '', meshes: new Map(), ver: 0, busy: 0, queue: [], lastSeed: 1 };
@@ -130,7 +131,7 @@
   function wrap(name, fn) { const prev = HOOK[name]; HOOK[name] = function (...a) { if (FM.on && S.mode === 'forge') { const r = fn.apply(null, a); if (r !== false) return r; } return prev ? prev.apply(null, a) : false; }; }
   wrap('chips', function () {
     const el = $('#chips'); el.innerHTML = '';
-    for (const t of Fg.types) { const b = document.createElement('button'); b.className = 'fgt' + (FM.type === t.id ? ' on' : ''); b.dataset.ftype = t.id; b.textContent = t.icon + ' ' + t.name; b.title = t.name; b.onclick = () => FM.setType(t.id); el.appendChild(b); }
+    for (const t of Fg.types) { const b = document.createElement('button'); b.className = 'fgt' + (FM.type === t.id ? ' on' : ''); b.dataset.ftype = t.id; b.textContent = t.icon + ' ' + W(t.name); b.title = W(t.name); b.onclick = () => FM.setType(t.id); el.appendChild(b); }
     return true;
   });
   wrap('list', function () {
@@ -140,7 +141,7 @@
       const c = document.createElement('div'); c.className = 'card fvar' + (i === FM.sel ? ' on' : ''); c.dataset.dna = dna; c.dataset.i = i;
       const cv = document.createElement('canvas'); cv.width = PREV_W; cv.height = PREV_H; cv.className = 'th'; c.appendChild(cv);
       const P = Fg.parse(dna), t = Fg.type(P.type), st = t.style(P.style);
-      c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n">${i === 0 ? '★ ' : ''}${esc(Fg.describe(dna, true).replace(/^\S+ /, ''))}</div><div class="s">${esc(st ? st.name : '')} · #${P.seed.toString(16)}</div></div>`);
+      c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n">${i === 0 ? '★ ' : ''}${esc(Fg.describe(dna, true).replace(/^\S+ /, ''))}</div><div class="s">${esc(st ? W(st.name) : '')} · #${P.seed.toString(16)}</div></div>`);
       c.onclick = () => FM.select(i);
       el.appendChild(c);
       paint(dna);
@@ -165,25 +166,25 @@
     const dna = current();
     if (!dna) { note(tx('g.fgs.intro', null, 'Ein Symbol oben, ein Satz hier — die Forge baut neun Varianten, du wählst eine, stellst sie ein und setzt sie in deine Welt. Alles hier, ohne Konto.', 'A symbol above, a sentence here — the Forge builds nine variants, you pick one, adjust it and set it into your world. All here, no account.'), 'dim'); return true; }
     const P = Fg.parse(dna), t = Fg.type(P.type), m = FM.meshes.get(dna);
-    H(t.icon + ' ' + esc(t.name), m && m.ready ? m.n.toLocaleString('de-DE') + ' ' + tx('g.fgs.cells', null, 'Zellen', 'cells') : '…');
+    H(t.icon + ' ' + esc(W(t.name)), m && m.ready ? m.n.toLocaleString('de-DE') + ' ' + tx('g.fgs.cells', null, 'Zellen', 'cells') : '…');
     note(esc(Fg.describe(dna)) + ' <span class="dim mono">' + esc(dna) + '</span>');
     // the parameters: a slider (or a choice) per parameter, every change rebuilds the nine after a short pause
     const pf = document.createElement('div'); pf.className = 'fparams';
     // yes / no things (Carport, Pool, Laternen, Dach …) as chips that switch: ✓ on, ✗ off
     const bools = t.params.filter(pr => pr.min === 0 && pr.max === 1 && !pr.names), br = document.createElement('div'); br.className = 'fbools';
-    for (const pr of bools) { const on = P.params[pr.k] === 1, b = document.createElement('button'); b.className = 'fbool' + (on ? ' on' : ''); b.dataset.fp = pr.k; b.textContent = (on ? '✓ ' : '✗ ') + pr.label; b.title = pr.label + (on ? ' — an (Klick: aus)' : ' — aus (Klick: an)'); b.onclick = () => FM.setParam(pr.k, on ? 0 : 1); br.appendChild(b); }
+    for (const pr of bools) { const on = P.params[pr.k] === 1, b = document.createElement('button'); b.className = 'fbool' + (on ? ' on' : ''); b.dataset.fp = pr.k; b.textContent = (on ? '✓ ' : '✗ ') + W(pr.label); b.title = W(pr.label) + (on ? ' — an (Klick: aus)' : ' — aus (Klick: an)'); b.onclick = () => FM.setParam(pr.k, on ? 0 : 1); br.appendChild(b); }
     for (const pr of t.params) {
       if (bools.includes(pr)) continue;
       const line = document.createElement('label'); line.className = 'fparam';
       const v = P.params[pr.k];
       if (pr.names) {
-        line.innerHTML = `<span>${esc(pr.label)}</span>`;
+        line.innerHTML = `<span>${esc(W(pr.label))}</span>`;
         const sel = document.createElement('select'); sel.dataset.fp = pr.k;
-        for (let i = pr.min; i <= pr.max; i++) { const o = document.createElement('option'); o.value = i; o.textContent = pr.names[i - pr.min] || String(i); if (i === v) o.selected = true; sel.appendChild(o); }
+        for (let i = pr.min; i <= pr.max; i++) { const o = document.createElement('option'); o.value = i; o.textContent = W(pr.names[i - pr.min]) || String(i); if (i === v) o.selected = true; sel.appendChild(o); }
         sel.onchange = () => FM.setParam(pr.k, +sel.value);
         line.appendChild(sel);
       } else {
-        line.innerHTML = `<span>${esc(pr.label)}</span><b>${v}</b>`;
+        line.innerHTML = `<span>${esc(W(pr.label))}</span><b>${v}</b>`;
         const r = document.createElement('input'); r.type = 'range'; r.min = pr.min; r.max = pr.max; r.step = pr.step || 1; r.value = v; r.dataset.fp = pr.k;
         r.oninput = () => { line.querySelector('b').textContent = r.value; clearTimeout(paramT); paramT = setTimeout(() => FM.setParam(pr.k, +r.value), 250); };
         line.appendChild(r);
@@ -194,7 +195,7 @@
     if (bools.length) el.appendChild(br);
     // materials
     const sr = document.createElement('div'); sr.className = 'fstyles';
-    for (const st of t.styles) { const b = document.createElement('button'); b.className = 'fstyle' + (st.id === P.style ? ' on' : ''); b.dataset.fstyle = st.id; b.textContent = st.name; b.onclick = () => FM.setStyle(st.id); sr.appendChild(b); }
+    for (const st of t.styles) { const b = document.createElement('button'); b.className = 'fstyle' + (st.id === P.style ? ' on' : ''); b.dataset.fstyle = st.id; b.textContent = W(st.name); b.onclick = () => FM.setStyle(st.id); sr.appendChild(b); }
     el.appendChild(sr);
     row(btn('🎲 ' + tx('g.fgs.other', null, 'Andere', 'Others'), '', FM.reseed, tx('g.fgs.otherTip', null, 'Neun andere Varianten', 'Nine other variants')), btn('⬆ ' + tx('g.fgs.taller', null, 'Höher', 'Taller'), '', () => FM.setText('höher')), btn('↔ ' + tx('g.fgs.wider', null, 'Breiter', 'Wider'), '', () => FM.setText('breiter')));
     // where it goes

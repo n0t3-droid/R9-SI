@@ -24,6 +24,8 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   Forge.tx = tx;
+  // a forge word (German) in the language of the moment: VR.I18N.word looks it up in the g.fgw.* entries
+  Forge.word = (s) => (VR.I18N && VR.I18N.word ? VR.I18N.word(s) : s);
 
   // ---------------------------------------------------------------- the registry
   // def: {id, icon, name, en, params:[{k, label, min, max, def, step?, dim?, words?:{value: [stems]}}], styles:[{id, name, words:[stems]}],
@@ -369,7 +371,7 @@
     const P = Forge.parse(dna); if (!P) return '';
     const t = Forge.TYPES[P.type], st = t.style(P.style);
     const parts = (t.describe ? t.describe(P, st) : []).filter(Boolean);
-    const head = (short ? t.icon + ' ' : '') + (t.title ? t.title(P) : t.name);   // what it is, by its parameters
-    return short ? head + (parts[0] ? ' · ' + parts[0] : '') : [head].concat(parts, st ? [st.name] : []).join(' · ');
+    const head = (short ? t.icon + ' ' : '') + (t.title ? t.title(P) : Forge.word(t.name));   // what it is, by its parameters
+    return short ? head + (parts[0] ? ' · ' + parts[0] : '') : [head].concat(parts, st ? [Forge.word(st.name)] : []).join(' · ');
   };
 })(VR);
