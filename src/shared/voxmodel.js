@@ -314,7 +314,8 @@
   // a frame: a slice builds only while the browser has more than `reserve` ms left (8), and only from `notBefore` on (the
   // game sets it 10 s into play). It stops when every model is built, or while the page is hidden (start() again when it
   // shows). The idle request, the clock, the visibility and the build are injectable (the tests use fakes).
-  const defaultIdle = (cb) => typeof requestIdleCallback === 'function' ? requestIdleCallback(cb) : setTimeout(() => cb({ timeRemaining: () => 12 }), 250);
+  // (without requestIdleCallback a slice gets 12 ms, counted down from its start, so a slice still ends in time)
+  const defaultIdle = (cb) => typeof requestIdleCallback === 'function' ? requestIdleCallback(cb) : setTimeout(() => { const t0 = Date.now(); cb({ timeRemaining: () => Math.max(0, 12 - (Date.now() - t0)) }); }, 250);
   const defaultCancel = (h) => typeof cancelIdleCallback === 'function' ? cancelIdleCallback(h) : clearTimeout(h);
   VM.prewarm = function (o) {
     o = o || {};
@@ -344,8 +345,11 @@
       trim();
       if (!queue.length) { done = true; return; }
       if (deadline && deadline.timeRemaining() > reserve) {
-        const m = queue.shift();
-        try { build(m); ctl.built++; } catch (e) { console.warn('VM pre-warm failed', m.name, e); }
+        // a build may need several slices (a voxel picture is drawn a voxel at a time): build(m, more) returns false while
+        // it is not finished, and then the model stays first in the queue; more() says whether this slice has time left
+        const m = queue[0];
+        try { if (build(m, () => deadline.timeRemaining() > reserve) !== false) { queue.shift(); ctl.built++; } }
+        catch (e) { queue.shift(); console.warn('VM pre-warm failed', m.name, e); }
       } else ctl.skipped++;
       trim();
       if (queue.length) schedule(); else done = true;

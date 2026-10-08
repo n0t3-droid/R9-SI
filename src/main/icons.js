@@ -247,7 +247,8 @@
   VR.iconWarm = function (icons, ids, o) {
     const VM = VR.VM;
     const items = ids.map(id => { const m = VM && VM.MODELS[id]; return { name: id, lazy: true, compiled: false, VW: m ? m.VW : 1, VH: m ? m.VH : 1, VD: m ? m.VD : 1 }; });
-    const pw = VM.prewarm(Object.assign({}, o || {}, { models: items, build: (w) => { icons.get(w.name); w.compiled = true; } }));
+    // a picture is drawn in the idle slices that have time for it (stepIcon); it is counted once it is complete
+    const pw = VM.prewarm(Object.assign({}, o || {}, { models: items, build: (w, more) => { const done = icons.stepIcon(w.name, more); if (done) w.compiled = true; return done; } }));
     pw.start();
     return pw;
   };
