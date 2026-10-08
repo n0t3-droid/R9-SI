@@ -131,11 +131,11 @@
       E.exposure = this.exposure * (o.exposureMul || 1) * 0.94 * Math.pow(2, W.exp);
       E.grade = mix3([1.02, 1.0, 0.97], [0.92, 0.97, 1.08], night);
       E.saturation = 1.17 - rain * 0.2;
-      // F1 · Licht & Luft: the sky's turbidity (fog and rain whiten the horizon a little: the mist lies low, the sky above
-      // stays blue), the weather on the sky (atmos.js skyWeather: rain greys it, overcast and storms dim it — v0.41's
+      // F1 · Licht & Luft: the sky's turbidity (fog whitens the horizon a little: the mist lies low, the sky above stays
+      // blue; the rain's sky keeps the clear sky's gradient, greyed — dark above, lighter at the horizon), the weather on the sky (atmos.js skyWeather: rain greys it, overcast and storms dim it — v0.41's
       // palette factors), the biome's tint on the sky, the moon's phase (eight days a cycle: new = dark, full = bright),
       // the cloud shadows on the ground, and the grade's lift (warm at the horizon line, blue at night)
-      E.skyT = 2.3 + 0.6 * rain + 0.5 * (W.fog || 0);
+      E.skyT = 2.3 + 0.5 * (W.fog || 0);
       E.skyWx = VR.Atmos ? VR.Atmos.skyWeather(rain, W.dark || 0) : [0, 1];
       E.skyOvercast = Math.min(1, rain + (W.dark || 0));
       { const m = (bsky[0] + bsky[1] + bsky[2]) / 3 || 1; E.skyTint = bsky.map((v) => 1 + (v / m - 1) * 0.25); }

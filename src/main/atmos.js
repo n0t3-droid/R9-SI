@@ -19,6 +19,15 @@
   const PI = Math.PI;
   const LUT_W = 64, LUT_H = 32;
   const SKY_SCALE = 0.06;    // Perez luminance (kcd/m²) → game HDR: a clear noon zenith lands near 0.2 (v0.41 palette)
+  // the look's numbers (the shaders get them as uniforms, so test/f1_look.mjs can try variants at run time):
+  //   scale: luminance to HDR; horizonA: the horizon's brightening (× the Perez A term: more = a deeper zenith against
+  //   the same horizon once the scale is lowered); broad, band, sharp: the glow's wide warm lobe around the sun, its
+  //   warm band along the horizon, its tight bright lobe (v0.41's 1.3, 0.45, 0.45)
+  //   horXY: the horizon's chromaticity (a pale blue)
+  //   chP: the power of cos θ along which the chroma goes from the horizon's to the zenith's (small: blue down low)
+  // (tuned on the six weather scenes against v0.41 and the trailer: a deeper zenith, the blue held up high, a warm
+  // peach-pink band along the horizon — TRAILER.md §2.1 "horizon peach/pink → mid violet-blue → zenith deep blue")
+  const K = { scale: 0.05, horizonA: 0.9, broad: 1.3, band: 0.8, sharp: 0.45, horXY: [0.285, 0.28], chP: 0.7 };
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -39,7 +48,7 @@
   // The sun-side term warms the sky near a low sun (its light comes the long way through the air): C grows and the
   // lobe narrows (D) as the sun nears the horizon line — orange-yellow beside the rising sun, neutral 30° away.
   const CH_P = 0.42;
-  const XY_ZEN = [0.212, 0.198], XY_HOR = [0.262, 0.274], XY_TWI = [0.228, 0.186], XY_WHITE = [0.3127, 0.3290];
+  const XY_ZEN = [0.212, 0.198], XY_TWI = [0.228, 0.186], XY_WHITE = [0.3127, 0.3290];
   const ONE3 = [1, 1, 1];
   const whiten = (xy, T) => { const h = clamp((T - 2) / 8, 0, 1) * 0.25; return [xy[0] + (XY_WHITE[0] - xy[0]) * h, xy[1] + (XY_WHITE[1] - xy[1]) * h]; };
   // the zenith's chromaticity: deep blue by day, violet-blue while the sun is within ~20° of the horizon line
@@ -47,7 +56,7 @@
     const w = 1 - smooth(0.02, 0.35, se);
     return whiten([XY_ZEN[0] + (XY_TWI[0] - XY_ZEN[0]) * w, XY_ZEN[1] + (XY_TWI[1] - XY_ZEN[1]) * w], T);
   };
-  const horizonXY = (T) => whiten(XY_HOR, T);
+  const horizonXY = (T) => whiten(K.horXY, T);
 
   // zenith luminance in kcd/m² (Preetham's χ fit); clamped at 0 where the fit runs past the sun's grazing angle
   const zenithLum = (T, th) => {
@@ -81,7 +90,7 @@
     const th = Math.min(Math.acos(se), PI / 2 - 0.01);
     const oc = 1 - 0.85 * clamp(opt.overcast || 0, 0, 1);
     const cY = s.cY;
-    cY[0] = 0.1787 * T - 1.4630; cY[1] = -0.3554 * T + 0.4275 - HORIZON_DIM; cY[2] = (-0.0227 * T + 5.3251) * SUN_GLOW * oc;
+    cY[0] = (0.1787 * T - 1.4630) * K.horizonA; cY[1] = -0.3554 * T + 0.4275 - HORIZON_DIM; cY[2] = (-0.0227 * T + 5.3251) * SUN_GLOW * oc;
     cY[3] = 0.1206 * T - 2.5771 - AUREOLE_FALL; cY[4] = (-0.0670 * T + 0.3703) * oc;
     const cs = Math.cos(th);
     // the zenith's chromaticity (deep blue by day, violet-blue while the sun is low) and the horizon's, whitened by T
@@ -92,7 +101,7 @@
     s.T = T; s.sun[0] = sun[0]; s.sun[1] = sun[1]; s.sun[2] = sun[2]; s.th = th;
     s.Yz = zenithLum(T, th);
     s.xz = zx + (XY_WHITE[0] - zx) * hw; s.yz = zy + (XY_WHITE[1] - zy) * hw;
-    s.xh = XY_HOR[0] + (XY_WHITE[0] - XY_HOR[0]) * hw; s.yh = XY_HOR[1] + (XY_WHITE[1] - XY_HOR[1]) * hw;
+    s.xh = K.horXY[0] + (XY_WHITE[0] - K.horXY[0]) * hw; s.yh = K.horXY[1] + (XY_WHITE[1] - K.horXY[1]) * hw;
     // the normalisers: the view at the zenith looking at the sun (γ = θs)
     s.FY0 = perez(cY, 1, th, cs); s.SX0 = 1 + s.sx[0] * Math.exp(s.sx[1] * th); s.SY0 = 1 + s.sy[0] * Math.exp(s.sy[1] * th);
     // how much of each part is on: the day shape fades out at dusk, the twilight colours hang on the sun's set,
@@ -101,7 +110,8 @@
     s.twiK = smooth(-0.32, -0.02, se) * (1 - smooth(0.06, 0.22, se));
     s.nightK = smooth(-0.06, -0.30, se);
     s.tint = opt.tint || ONE3;
-    s.scale = opt.scale === undefined ? SKY_SCALE : opt.scale;
+    s.chP = K.chP;
+    s.scale = opt.scale === undefined ? K.scale : opt.scale;
     return s;
   }
 
@@ -114,7 +124,7 @@
     const cg = clamp(cG, -1, 1), g = Math.acos(cg);
     let r = 0, gr = 0, b = 0;
     if (s.dayK > 0) {
-      const w = Math.pow(ct, CH_P);
+      const w = Math.pow(ct, s.chP);
       const Y = s.Yz * perez(s.cY, ct, g, cg) / s.FY0 * s.scale;
       const x = chroma(s.xh, s.xz - s.xh, s.sx, w, g) / s.SX0;
       const y = Math.max(0.01, chroma(s.yh, s.yz - s.yh, s.sy, w, g) / s.SY0);
@@ -146,21 +156,23 @@
   // colour and the low sun's (sunset) colour — v0.41's terms, the eternal dusk's glow; cT, cG as in radiance()
   function glow(cT, cG, P) {
     const toSun = Math.max(cG, 0), h = Math.max(cT, 0);
-    const a = (Math.pow(toSun, 7) * 1.3 + Math.pow(1 - h, 5) * 0.45) * (0.3 + 0.7 * toSun);
-    const c = Math.pow(toSun, 60) * 0.45 * (1 - P.rain);
+    const a = (Math.pow(toSun, 7) * K.broad + Math.pow(1 - h, 5) * K.band) * (0.3 + 0.7 * toSun);
+    const c = Math.pow(toSun, 60) * K.sharp * (1 - P.rain);
     return [P.sunset[0] * a + P.sunColor[0] * c, P.sunset[1] * a + P.sunColor[1] * c, P.sunset[2] * a + P.sunColor[2] * c];
   }
-  // the weather on the sky (env.js skyWx = [grey, dim]): rain greys it, overcast and storms dim it
-  function weather(c, P) {
+  // the weather on the sky (env.js skyWx = [grey, dim]): rain greys it, overcast and storms dim it, and the rain's
+  // horizon keeps a lighter band (the showers' far edge — v0.41's rain sky had it: the far land stands out against it)
+  function weather(c, P, cT) {
     const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-    return [(c[0] + (l - c[0]) * P.grey) * P.dim, (c[1] + (l - c[1]) * P.grey) * P.dim, (c[2] + (l - c[2]) * P.grey) * P.dim];
+    const k = P.dim * (1 + 0.45 * P.grey * Math.pow(1 - clamp(cT === undefined ? 1 : cT, 0, 1), 16));
+    return [(c[0] + (l - c[0]) * P.grey) * k, (c[1] + (l - c[1]) * P.grey) * k, (c[2] + (l - c[2]) * P.grey) * k];
   }
   // what the sky pass and the aerial perspective see toward a direction: the radiance (formula or table), the glow
   // (glowK: 1 for the sky, HAZE_GLOW for the haze over the land — calmer, so looking sunward does not wash the land
   // out), then the weather. P = airParams(E).
   function air(s, cT, cG, P, glowK) {
     const c = radiance(s, cT, cG), gl = glow(cT, cG, P), k = glowK === undefined ? 1 : glowK;
-    return weather([c[0] + gl[0] * k, c[1] + gl[1] * k, c[2] + gl[2] * k], P);
+    return weather([c[0] + gl[0] * k, c[1] + gl[1] * k, c[2] + gl[2] * k], P, cT);
   }
   // the frame's parameters of air() from the environment (env.js E)
   function airParams(E) {
@@ -229,29 +241,30 @@
     return cur + (target - cur) * (1 - Math.exp(-Math.max(0, dt) / tau));
   }
   // the exposure a scene wants from its log-average luminance (the scene × env.js's exposure, so the two adaptations do
-  // not stack): inside a dead zone of ±DEAD stops around the key nothing changes — the weather keeps its own
+  // not stack): inside a dead zone around the key (1.6 stops below, 1 above) nothing changes — the weather keeps its own
   // brightness (an overcast day is darker than a clear one, a snowfield brighter); outside it the exposure follows a
   // part (power) of the difference, kept within ±0.5 stops. night (0..1) lowers the key: the night stays dark.
   function exposureTarget(logLum, night, o) {
     const E = Object.assign({}, EXPOSURE, o || {});
     const key = E.key * (1 + (E.nightKey - 1) * clamp(night || 0, 0, 1));
-    const lum = Math.exp(clamp(logLum, -12, 6)), lo = key * Math.pow(2, -E.dead), hi = key * Math.pow(2, E.dead);
+    const lum = Math.exp(clamp(logLum, -12, 6)), lo = key * Math.pow(2, -E.deadDark), hi = key * Math.pow(2, E.deadBright);
     const t = lum < lo ? Math.pow(lo / lum, E.power) : lum > hi ? Math.pow(hi / lum, E.power) : 1;
     return clamp(t, E.lo, E.hi);
   }
   // the GPU exposure's constants (renderer.js updateExposure, shaders.js EXPOSE_FS): the key is the log-average
-  // luminance of a clear noon scene (exposed by env.js) that wants exposure 1; dead: the half-width of the dead zone in
-  // stops; power: the part of the difference beyond it; lo/hi: ±0.5 stops around 1; nightKey: the key's share at night;
-  // tauUp/tauDown: seconds to ease toward a brighter or a darker target
-  const EXPOSURE = { key: 0.4, dead: 1, power: 0.5, lo: Math.SQRT1_2, hi: Math.SQRT2, nightKey: 0.25, tauUp: 2.0, tauDown: 3.0 };
+  // luminance of a clear noon scene (exposed by env.js) that wants exposure 1; deadDark/deadBright: the dead zone in
+  // stops below and above it (a storm at noon is about 1.2 stops under the clear day and keeps its gloom); power: the
+  // part of the difference beyond it; lo/hi: ±0.5 stops around 1; nightKey: the key's share at night; tauUp/tauDown:
+  // seconds to ease toward a brighter or a darker target
+  const EXPOSURE = { key: 0.4, deadDark: 1.6, deadBright: 1, power: 0.5, lo: Math.SQRT1_2, hi: Math.SQRT2, nightKey: 0.25, tauUp: 2.0, tauDown: 3.0 };
 
   // the state packed for the shaders (the same numbers as radiance(), with the normalisers folded in):
   //   per: the Perez coefficients of Y (5), then for x and y each: the horizon value, the zenith's difference, the
-  //   sun-side C and D, and a spare (15 floats); k: kY (scale and normaliser), 1/SX0, 1/SY0, dayK; k2: twiK, nightK; tint
+  //   sun-side C and D, and (x) the chroma gradient's power, (y) a spare (15 floats); k: kY (scale and normaliser), 1/SX0, 1/SY0, dayK; k2: twiK, nightK; tint
   function glParams(s, out) {
     const o = out || { per: new Float32Array(15), k: [0, 0, 0, 0], k2: [0, 0], tint: [1, 1, 1] };
     o.per.set(s.cY, 0);
-    o.per[5] = s.xh; o.per[6] = s.xz - s.xh; o.per[7] = s.sx[0]; o.per[8] = s.sx[1]; o.per[9] = 0;
+    o.per[5] = s.xh; o.per[6] = s.xz - s.xh; o.per[7] = s.sx[0]; o.per[8] = s.sx[1]; o.per[9] = s.chP;
     o.per[10] = s.yh; o.per[11] = s.yz - s.yh; o.per[12] = s.sy[0]; o.per[13] = s.sy[1]; o.per[14] = 0;
     o.k[0] = s.Yz * s.scale / s.FY0; o.k[1] = 1 / s.SX0; o.k[2] = 1 / s.SY0; o.k[3] = s.dayK;
     o.k2[0] = s.twiK; o.k2[1] = s.nightK;
@@ -259,5 +272,5 @@
     return o;
   }
 
-  VR.Atmos = { SKY_SCALE, LUT_W, LUT_H, CH_P, TW_ZEN, EXPOSURE, HAZE_GLOW, FOG_MIX, HAZE_K, sunDir, prepare, radiance, glow, weather, air, haze, airParams, skyWeather, lutUV, buildLUT, sampleLUT, easeExposure, exposureTarget, zenithLum, zenithXY, horizonXY, glParams };
+  VR.Atmos = { SKY_SCALE, K, LUT_W, LUT_H, CH_P, TW_ZEN, EXPOSURE, HAZE_GLOW, FOG_MIX, HAZE_K, sunDir, prepare, radiance, glow, weather, air, haze, airParams, skyWeather, lutUV, buildLUT, sampleLUT, easeExposure, exposureTarget, zenithLum, zenithXY, horizonXY, glParams };
 })(VR);

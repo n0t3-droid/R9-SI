@@ -36,6 +36,7 @@ uniform vec4 u_skyK;
 uniform vec2 u_skyK2;
 uniform vec3 u_skyTint;
 uniform vec2 u_skyWx;         // atmos.js skyWeather: how much the rain greys the sky, how much the overcast dims it
+uniform vec3 u_skyGlow;       // atmos.js K: the glow's wide lobe, its horizon band, its tight lobe
 uniform sampler2D u_atmoLUT;  // Very Low: the same radiance baked into a 64×32 table (ATMO_LUT)
 uniform float u_moonPh;       // the terminator: cos(2π·phase), 1 at new moon, −1 at full
 uniform float u_moonIllum;    // how much moonlight the phase gives (0..1)
@@ -217,7 +218,7 @@ float pzY(float ct, float g, float cg) { return (1.0 + u_skyPer[0] * exp(u_skyPe
 float pzX(float w, float g) { return (u_skyPer[5] + u_skyPer[6] * w) * (1.0 + u_skyPer[7] * exp(u_skyPer[8] * g)); }
 float pzC(float w, float g) { return (u_skyPer[10] + u_skyPer[11] * w) * (1.0 + u_skyPer[12] * exp(u_skyPer[13] * g)); }
 // the sky's radiance from the view's zenith cosine ct and the cosine cg of the angle to the sun: the Perez daylight with
-// our chroma fit (kY·F_Y; x and y from the horizon's pale blue to the zenith's deep blue along ct^0.42, times the
+// our chroma fit (kY·F_Y; x and y from the horizon's pale blue to the zenith's deep blue along ct^p, times the
 // sun-side term → XYZ → linear sRGB), the twilight colour order (orange low on the sun side, rose and magenta above, a
 // violet-blue zenith), the dark blue night base. The same sum as src/main/atmos.js radiance().
 vec3 atmoFormula(float ct, float cg) {
@@ -225,7 +226,7 @@ vec3 atmoFormula(float ct, float cg) {
   float g = acos(clamp(cg, -1.0, 1.0));
   vec3 col = vec3(0.0);
   if (u_skyK.w > 0.0) {
-    float w = pow(c, 0.42);
+    float w = pow(c, u_skyPer[9]);
     float Y = u_skyK.x * pzY(c, g, cg);
     float x = u_skyK.y * pzX(w, g);
     float y = max(0.01, u_skyK.z * pzC(w, g));
@@ -259,15 +260,15 @@ vec3 atmoRad(float ct, float cg) {
 // colour and the low sun's (sunset) colour: the eternal dusk's glow, v0.41's terms (atmos.js glow)
 vec3 atmoGlow(float ct, float cg) {
   float toSun = max(cg, 0.0), h = max(ct, 0.0);
-  return u_sunset * ((pow(toSun, 7.0) * 1.3 + pow(1.0 - h, 5.0) * 0.45) * (0.3 + 0.7 * toSun)) + u_sunColor * (pow(toSun, 60.0) * 0.45 * (1.0 - u_rain));
+  return u_sunset * ((pow(toSun, 7.0) * u_skyGlow.x + pow(1.0 - h, 5.0) * u_skyGlow.y) * (0.3 + 0.7 * toSun)) + u_sunColor * (pow(toSun, 60.0) * u_skyGlow.z * (1.0 - u_rain));
 }
 // the air toward a direction (atmos.js air): the radiance (formula or table) with the glow (glowK: 1 for the sky, 0.45
-// for the haze over the land), then the weather — rain greys it, overcast and storms dim it; below the horizon the
-// ground's dimmer horizon colour
+// for the haze over the land), then the weather — rain greys it (and keeps a lighter band at the horizon), overcast and
+// storms dim it; below the horizon the ground's dimmer horizon colour
 vec3 atmoAir(vec3 dir, float glowK) {
   float cg = dot(dir, u_sunDir);
   vec3 col = atmoRad(max(dir.y, -1.0), cg) + atmoGlow(dir.y, cg) * glowK;
-  col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), u_skyWx.x) * u_skyWx.y;
+  col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), u_skyWx.x) * (u_skyWx.y * (1.0 + 0.45 * u_skyWx.x * pow(1.0 - clamp(dir.y, 0.0, 1.0), 16.0)));
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   return col;
 }
@@ -313,13 +314,15 @@ vec3 skyColor(vec3 dir, bool withSun) {
       mn = moonlet(dir, u_moon3.xyz, u_moon3.w, u_sunDir, 21.9);
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
     }
+    // the sun: a disc of 1.2° (drawn larger than the real 0.27°, as the eye remembers it, and as v0.41 drew it) with
+    // limb darkening (1 − 0.6 (1 − μ)), and v0.41's bright halo around it (pow 900) — the bloom spreads it further
     float sd = dot(dir, u_sunDir);
-    float kk = (1.0 - sd) / (1.0 - 0.99996);
+    float kk = (1.0 - sd) / (1.0 - 0.99978);
     if (kk < 1.0) {
       float mu = sqrt(max(0.0, 1.0 - kk));
-      col += u_sunColor * 42.0 * (1.0 - 0.6 * (1.0 - mu)) * smoothstep(1.0, 0.9, kk) * clear;
+      col += u_sunColor * 24.0 * (1.0 - 0.6 * (1.0 - mu)) * smoothstep(1.0, 0.82, kk) * clear;
     }
-    col += u_sunColor * (0.35 * pow(max(sd, 0.0), 1500.0) + 0.05 * pow(max(sd, 0.0), 90.0)) * clear;
+    col += u_sunColor * (2.2 * pow(max(sd, 0.0), 900.0) + 0.05 * pow(max(sd, 0.0), 90.0)) * clear;
     float md = dot(dir, u_moonDir);
     if (md > 0.9992) {
       vec3 up = abs(u_moonDir.y) < 0.99 ? vec3(0,1,0) : vec3(1,0,0);
@@ -1504,7 +1507,7 @@ void main() {
 }`;
   // the adaptive exposure (F1, atmos.js exposureTarget): the scene's log-average luminance from 8×8 samples (the
   // centre weighted: what the eye looks at) times env.js's exposure (so the two adaptations do not stack); inside a dead
-  // zone of ±1 stop around the key nothing changes (an overcast day stays darker than a clear one, a snowfield
+  // zone around the key (1.6 stops below, 1 above) nothing changes (an overcast day stays darker than a clear one, a snowfield
   // brighter), beyond it the exposure follows half the difference, within ±0.5 stops of 1; a lower key at night (the
   // night stays dark). Eased slowly (2 s up, 3 s down). The 1×1 target holds (exposure, log-average, target): the
   // composite reads .r, the tests read all three.
@@ -1512,9 +1515,9 @@ void main() {
 uniform sampler2D u_scene;
 uniform sampler2D u_prev;
 uniform float u_dt;
-uniform vec4 u_expParams;   // lo, hi, power, dead zone (stops)
+uniform vec4 u_expParams;   // lo, hi, power, the dead zone above the key (stops)
 uniform vec4 u_expKey;      // key, env.js's exposure, night (0..1), the key's share at night
-uniform vec2 u_expTau;      // seconds to ease up, down
+uniform vec3 u_expTau;      // seconds to ease up, down; the dead zone below the key (stops)
 in vec2 v_uv;
 out vec4 o;
 void main() {
@@ -1526,7 +1529,7 @@ void main() {
   }
   float lum = exp(s / ws);
   float key = u_expKey.x * mix(1.0, u_expKey.w, u_expKey.z);
-  float lo = key * exp2(-u_expParams.w), hi = key * exp2(u_expParams.w);
+  float lo = key * exp2(-u_expTau.z), hi = key * exp2(u_expParams.w);
   float t = lum < lo ? pow(lo / lum, u_expParams.z) : lum > hi ? pow(hi / lum, u_expParams.z) : 1.0;
   float target = clamp(t, u_expParams.x, u_expParams.y);
   float prev = texture(u_prev, vec2(0.5)).r;
