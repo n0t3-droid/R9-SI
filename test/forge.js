@@ -5,6 +5,7 @@
 //   node test/forge.js            everything
 //   ONLY=core node test/forge.js  one section (core · budget · kit · tower · house · bridge · civic · park · place · sweep)
 require('./load_shared.js');
+require('../src/main/world.js'); // the game's edit kinds (VR.EDIT) that the placing code reads
 const Forge = VR.Forge, R = VR.R, T = R.T, F = VR.F;
 const ONLY = process.env.ONLY || '';
 let fails = 0, n = 0;
