@@ -41,18 +41,18 @@ async function bootTitle(url, preset, high) {
 const stepGame = (d, render) => ev(([dd, r]) => { const g = VR.game; window.__norender = !r; g.last = performance.now() - dd * 1000; const t0 = performance.now(); g.loop(performance.now()); return performance.now() - t0; }, [d, !!render]);
 // the loop is driven by hand (bootTitle replaces the animation frames), so every wait steps it: the world loads, the ride starts
 const waitFor = async (cond, maxMs) => { const t0 = Date.now(); while (Date.now() - t0 < maxMs) { if (await ev(cond)) return true; await stepGame(DT, false); await sleep(10); } return !!(await ev(cond)); };
-// a picture: two rendered loops, then the screenshot
-const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: `/home/claude/vr/test/shots/${name}.png`, timeout: 180000 }); log('  shot ' + name); };
+// a picture: two rendered loops of 1 ms each (a picture does not move the ride), then the screenshot
+const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 1; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: `/home/claude/vr/test/shots/${name}.png`, timeout: 180000 }); log('  shot ' + name); };
 const state = () => ev(() => {
   const g = VR.game, d = g.director;
   if (!d || !d.active) return { active: false, state: g.state };
   const s = VR.Cine.SHOTS[d.si];
-  return { active: true, state: g.state, si: d.si, id: s ? s.id : (d.si < 0 ? 'pre' : '?'), kind: s ? s.kind || 'shot' : '?', phase: d.phase, t: d.t, dur: s ? s.dur : 0, tod: g.env.timeOfDay, want: s ? s.tod : undefined, pend: g.world ? g.world.pending.size : -1, hud: document.getElementById('hud').style.visibility, cine: document.getElementById('cine').classList.contains('on'), cap: document.querySelector('#cine .cap').textContent };
+  return { active: true, state: g.state, si: d.si, id: s ? s.id : (d.si < 0 ? 'pre' : '?'), kind: s ? s.kind || 'shot' : '?', phase: d.phase, t: d.t, dur: s ? s.dur : 0, tod: g.env.timeOfDay, want: s ? s.tod : undefined, pend: g.world ? g.world.pending.size : -1, hud: document.getElementById('hud').style.visibility, cine: document.getElementById('cine').classList.contains('on'), cap: document.querySelector('#cine .cap').textContent, ships: d.myShips.length, actors: d.actors.length, rnd: g.traffic ? g.traffic.ships.filter((x) => !x.scripted && !x.dead).length : 0 };
 });
 // the ride, from the moment it is on until it ends: records the frame times of the run and the shots' lengths
 const KEYS = { A: [1.0], B: [2.0], C: [1.0, 2.0], D: [0.75, 1.5], E: [0.75, 4.75, 7.75], F: [1.75, 4.75, 6.75], G: [0.5, 3.0], A2: [1.0], D2: [1.0], F2: [2.5], F3: [2.5], G2: [1.5] };
 async function ride(pictures, maxSteps = 9000) {
-  const rec = { ms: [], order: [], lastT: {}, firstPend: {}, todBad: [], hudBad: 0, cineBad: 0, caps: [], frames: 0 };
+  const rec = { ms: [], order: [], lastT: {}, firstPend: {}, todBad: [], hudBad: 0, cineBad: 0, caps: [], frames: 0, ships: {}, actors: {}, rnd: 0 };
   const done = new Set();
   let prevId = null;
   for (let i = 0; i < maxSteps; i++) {
@@ -65,6 +65,7 @@ async function ride(pictures, maxSteps = 9000) {
       if (st.hud !== 'hidden') rec.hudBad++;
       if (!st.cine) rec.cineBad++;
       rec.lastT[st.id] = st.t;
+      rec.ships[st.id] = Math.max(rec.ships[st.id] || 0, st.ships); rec.actors[st.id] = Math.max(rec.actors[st.id] || 0, st.actors); rec.rnd = Math.max(rec.rnd, st.rnd);
       if (!(st.id in rec.firstPend)) { rec.firstPend[st.id] = st.pend; if (st.want !== undefined && Math.abs(st.tod - st.want) > 2) rec.todBad.push(st.id + ' ' + st.tod + '≠' + st.want); }
       // the picture at the key second of the shot, taken right here (the ride goes on between the steps)
       if (pictures && KEYS[st.id]) for (let n = 0; n < KEYS[st.id].length; n++) { const key = st.id + ':' + n; if (!done.has(key) && st.t >= KEYS[st.id][n]) { done.add(key); await shot(`cinema_${st.id}${n ? '_' + n : ''}`); } }
@@ -109,10 +110,15 @@ async function ridePasses() {
   if (ok) {
     const rec = await ride(true);
     check(JSON.stringify(rec.order) === JSON.stringify(EXPECT), 'the shots run in order: ' + rec.order.join(' '));
-    const want = await ev(() => VR.Cine.SHOTS.map((s) => [s.id, s.dur]));
+    const want = await ev(() => VR.Cine.SHOTS.map((s) => [s.id, s.dur, (s.ships || []).length, (s.actors || []).length]));
     let lenOk = true, lens = [];
     for (const [id, dur] of want) { if (id === 'title' || id === 'end') continue; const t = rec.lastT[id]; lens.push(id + ' ' + (t === undefined ? '—' : t.toFixed(2)) + '/' + dur); if (t === undefined || Math.abs(t - dur) > 0.12) lenOk = false; }
     check(lenOk, 'every shot runs its length: ' + lens.join(', '));
+    const noShip = want.filter(([id, , n]) => n > 0 && !(rec.ships[id] >= 1)).map(([id]) => id);
+    check(noShip.length === 0, 'the scripted ships fly in every shot that has them' + (noShip.length ? ' — none in: ' + noShip.join(', ') : ''));
+    const noHero = want.filter(([id, , , h]) => h > 0 && !(rec.actors[id] >= 1)).map(([id]) => id);
+    check(noHero.length === 0, 'the heroes stand in every shot that has them' + (noHero.length ? ' — none in: ' + noHero.join(', ') : ''));
+    check(rec.rnd === 0, 'no random sky traffic flies through the ride (' + rec.rnd + ' ships at most)');
     check(rec.todBad.length === 0, 'the time of day is set per shot' + (rec.todBad.length ? ' — off: ' + rec.todBad.join(', ') : ''));
     check(rec.hudBad === 0 && rec.cineBad === 0, 'the HUD is hidden and the letterbox is on in all ' + rec.frames + ' frames of the ride');
     const cut = Object.entries(rec.firstPend).filter(([id]) => id !== 'title' && id !== 'end');
@@ -138,6 +144,7 @@ async function ridePasses() {
   const on = await waitFor(() => !!VR.game.director.active, 10000);
   check(on, 'the pause menu\'s 🎬 Trailer starts the ride in this world');
   for (let i = 0; i < 60; i++) { await stepGame(DT, false); await sleep(5); }
+  check(await ev(() => VR.game.director.si >= 0 && VR.game.director.t > 0.5), 'the ride from the pause menu runs (3 s in)');
   await ev(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', key: 'Escape' })));
   for (let i = 0; i < 6; i++) { await stepGame(DT, false); await sleep(10); }
   const after = await ev(() => { const g = VR.game, p = g.player; return { active: g.director.active, state: g.state, pos: p.pos.slice(), yaw: p.yaw, pitch: p.pitch, hud: document.getElementById('hud').style.visibility, tod: g.env.timeOfDay }; });
