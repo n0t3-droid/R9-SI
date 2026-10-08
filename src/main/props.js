@@ -535,8 +535,9 @@
     for (const [x, z] of [[4.6, 4.2], [43.4, 4.2], [4.6, 11.8], [43.4, 11.8]]) F.cyl(x, z, 0, 11.1, 0.75, 1.25, { seg: 12 });
     F.rbox(4.6, 9.4, 3.4, 43.4, 11.1, 4.6, 0.25).rbox(4.6, 9.4, 11.4, 43.4, 11.1, 12.6, 0.25).rbox(3.6, 9.4, 4.2, 5.6, 11.1, 11.8, 0.25).rbox(42.4, 9.4, 4.2, 44.4, 11.1, 11.8, 0.25);
     setting(F, 12, 8, 12.9); setting(F, 36, 8, 12.9);
-    F.m(MAT.gloss, COL.dark).lathe(24, 8, [[12.9, 1.6], [13.6, 2.5], [15.2, 2.2], [16.4, 1.4], [17, 1.7]], { seg: 14, capBot: true });
-    F.m(MAT.leaf, COL.leaf).sphere(24, 18.6, 8, 2.8, 2.4, 2.8, { seg: 6, lump: 0.35, seed: 5 });
+    F.m(MAT.gloss, 0xE8E2D4).lathe(24, 8, [[12.9, 1.4], [13.3, 2.6], [14.4, 3.6], [14.6, 3.7], [14.5, 3.3], [13.6, 2.4], [13.5, 0.01]], { seg: 18, capBot: true });
+    F.m(MAT.gloss, 0x9AC24A).sphere(23, 14.6, 7.4, 1.15, 1.1, 1.15, { seg: 7 }).sphere(25.2, 14.6, 8.2, 1.1, 1.05, 1.1, { seg: 7 });
+    F.m(MAT.gloss, 0xE8C43A).sphere(24.2, 14.7, 9.4, 1.0, 0.9, 1.0, { seg: 7 }); F.m(MAT.gloss, 0xC8442A).sphere(24, 15.8, 7.9, 1.05, 1.0, 1.05, { seg: 7 });
     F.m(MAT.wood, WOOD.oak); F.far(0, 11, 1, 48, 13, 15); F.m(MAT.wood, shd(WOOD.oak, 0.9)); for (const [x, z] of [[4.6, 4.2], [43.4, 4.2], [4.6, 11.8], [43.4, 11.8]]) F.far(x - 1, 0, z - 1, x + 1, 11, z + 1);
     F.shadow(-1, 0, 49, 16);
   });
@@ -723,7 +724,7 @@
   MD('planter', [1, 1, 1], (F) => {
     F.m(MAT.matte, 0x6E7076).rbox(2, 0, 2, 14, 7, 14, 1.4, { skip: B_BOT });
     F.m(MAT.matte, COL.soil).box(3, 6.6, 3, 13, 7.05, 13);
-    F.m(MAT.leaf, 0x3E7A3A).sphere(8, 10.8, 8, 4.8, 4.6, 4.8, { seg: 9, lump: 0.22, seed: 11 });
+    F.m(MAT.leaf, 0x3E7A3A).sphere(8, 10.8, 8, 4.8, 4.6, 4.8, { seg: 12, lump: 0.12, seed: 11 });
     F.m(MAT.matte, 0x6E7076); F.far(2, 0, 2, 14, 7, 14); F.m(MAT.leaf, 0x3E7A3A); F.far(3.4, 6.2, 3.4, 12.6, 15.4, 12.6);
     F.shadow(1, 1, 15, 15);
   });
@@ -731,11 +732,13 @@
   MD('monstera', [1, 2, 1], (F) => {
     F.m(MAT.gloss, 0xE8E6E0).lathe(8, 8, [[0, 4.1], [0.6, 4.6], [7.4, 5.6], [8.2, 5.4], [8.2, 4.9], [7.5, 4.8]], { seg: 18, capBot: true });
     F.m(MAT.matte, COL.soil).lathe(8, 8, [[7.4, 4.85], [7.4, 0.01]], { seg: 18 });
-    for (let k = 0; k < 7; k++) {
-      const a = k * 1.9 + 0.4, r = 1.9 + (k % 3) * 0.75, y = 12 + k * 2.4, ca = Math.cos(a), sa = Math.sin(a), bx = 8 + ca * r, bz = 8 + sa * r;
-      F.m(MAT.leaf, COL.stem).tube([[8 + ca * 0.6, 7.4, 8 + sa * 0.6], [8 + ca * r * 0.45, y - 3, 8 + sa * r * 0.45], [bx, y, bz]], 0.42, 0.3, { seg: 5, caps: 0 });
-      const dir = norm3([ca, 0.18 + 0.1 * (k % 2), sa]), side = norm3([-sa, 0, ca]);
-      F.m(MAT.leaf, k & 1 ? COL.leaf : 0x4C9A48).leaf([bx, y, bz], dir, side, 7.4 - (k % 3) * 0.5, 6.8 - (k % 3) * 0.4, 1.8, PR.ATL.monstera);
+    // the petioles rise from the soil and arch out; each blade hangs from its petiole's tip, its midrib pointing out and
+    // down, its face up and out (as a monstera holds its leaves)
+    for (let k = 0; k < 9; k++) {
+      const a = k * 2.4 + 0.4, r = 1.8 + (k % 3) * 0.8, y = 15 + (k % 5) * 2.6 + (k > 4 ? 1.2 : 0), ca = Math.cos(a), sa = Math.sin(a), bx = 8 + ca * r, bz = 8 + sa * r;
+      F.m(MAT.leaf, COL.stem).tube([[8 + ca * 0.5, 7.4, 8 + sa * 0.5], [8 + ca * r * 0.35, 7.4 + (y - 7.4) * 0.6, 8 + sa * r * 0.35], [bx, y, bz]], 0.38, 0.26, { seg: 5, caps: 0 });
+      const el = -0.3 - 0.08 * (k % 4), dir = norm3([ca * Math.cos(el), Math.sin(el), sa * Math.cos(el)]), side = norm3([-sa, 0, ca]), big = 1 - 0.06 * (k % 4);
+      F.m(MAT.leaf, k & 1 ? COL.leaf : 0x4C9A48).leaf([bx, y, bz], dir, side, 7.6 * big, 7.2 * big, 1.2, PR.ATL.monstera);
     }
     F.m(MAT.gloss, 0xE8E6E0); F.far(2.6, 0, 2.6, 13.4, 8.2, 13.4); F.m(MAT.leaf, COL.leaf); F.far(1.5, 10, 1.5, 14.5, 25.5, 14.5);
     F.shadow(1.5, 1.5, 14.5, 14.5);
@@ -747,10 +750,11 @@
     F.m(MAT.wood, 0x6A5A48).tube([[8, 8, 8], [7.5, 13, 8.3], [8.4, 17, 7.8], [8, 19.5, 8]], 1.5, 0.9, { seg: 8, caps: 2 });
     const tips = [[5, 25.5, 6.5], [11, 26, 9.6], [7.2, 27.5, 11], [10, 25, 5.2]];
     for (const t of tips) F.tube([[8, 19, 8], [(8 + t[0]) / 2, (19 + t[1]) / 2 + 0.6, (8 + t[2]) / 2], t], 0.7, 0.35, { seg: 6, caps: 2 });
-    for (let k = 0; k < 16; k++) {
-      const t = tips[k % 4], a = k * 2.39, el = 0.35 + 0.5 * hash(k, 0, 0, 33), dir = norm3([Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)]);
-      const side = norm3(cross(dir, [0, 1, 0])), b = [t[0] + Math.cos(a) * 0.8, t[1] - 1 + (k % 3), t[2] + Math.sin(a) * 0.8];
-      F.m(MAT.leaf, 0xFFFFFF).leaf(b, dir, side, 5.0, 4.4, 1.0, PR.ATL.olive);
+    for (let k = 0; k < 10; k++) { const t = tips[k % 4], a = k * 2.1; F.m(MAT.leaf, k & 1 ? 0x7E9670 : 0x8FA680).sphere(t[0] + Math.cos(a) * 1.6, t[1] + 0.6 + (k % 3) * 0.9, t[2] + Math.sin(a) * 1.6, 2.4, 1.6, 2.2, { seg: 6, lump: 0.35, seed: 40 + k }); }
+    for (let k = 0; k < 30; k++) {
+      const t = tips[k % 4], a = k * 2.39, el = 0.15 + 0.6 * hash(k, 0, 0, 33), dir = norm3([Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el)]);
+      const side = norm3(cross(dir, [0, 1, 0])), b = [t[0] + Math.cos(a) * 1.4, t[1] + (k % 3) * 0.8, t[2] + Math.sin(a) * 1.4];
+      F.m(MAT.leaf, 0xFFFFFF).leaf(b, dir, side, 4.6, 4.2, 0.9, PR.ATL.olive);
     }
     F.m(MAT.matte, COL.concrete); F.far(2, 0, 2, 14, 9, 14); F.m(MAT.leaf, 0x8A9A78); F.far(0.5, 19, 0.5, 15.5, 31, 15.5);
     F.shadow(1, 1, 15, 15);
