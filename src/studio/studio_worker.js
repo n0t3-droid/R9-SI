@@ -402,6 +402,10 @@
       // a Forge structure (🏭) from its DNA on flat ground: every non-keep cell, lot-local
       const Fg = VR.Forge, g = Fg.build(m.dna);
       ops = Fg.ops(g); W = g.sx; D = g.sz; name = Fg.describe(m.dna, true); forgeMeta = g.meta;
+    } else if (m.kind === 'piece') {
+      // (W2) a Bauteil from the page's library (the ✨ wizard's Baukasten houses and Genie things): its cells come along
+      ops = m.ops instanceof Int32Array ? m.ops : Int32Array.from(m.ops || []); W = Math.max(1, m.W | 0); D = Math.max(1, m.D | 0); name = m.title || 'Bauteil';
+      forgeMeta = { level: !!m.level, terrain: false, doors: null };
     } else if (m.kind === 'house') {
       const cat = PLAN && PLAN.CATALOGUE[m.index]; if (!cat) throw new Error('unknown house ' + m.index);
       W = cat.lot[0]; D = cat.lot[1]; name = cat.name;

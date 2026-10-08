@@ -292,11 +292,13 @@
       __game: true,
       view: (id) => studio('#ding/' + id),
       edit: (id) => studio('#ding/' + id + '/edit'),
-      canSet: (id) => /^[bmh]:/.test(id),
+      canSet: (id) => /^[bmhfp]:/.test(id) || (/^[kg]:/.test(id) && !!(VR.Bauhand && VR.Bauhand.pieceOf && VR.Bauhand.pieceOf(id))),   // (W2: everything but a place goes into the 🖐 Bauhand; a project as its Bauteil)
       canEdit: (id) => !/^p:/.test(id) || prefs().pro,
       set: (id) => {
         const g = game(), d = Dg.parse(id); if (!g || !d) return false;
         const item = d.kind === 'h' ? 'blueprint_' + d.key : d.key;
+        // (W2) a thing (not a block) goes into the 🖐 Bauhand: the ghost, a click places it
+        if (g.state === 'play' && g.player && ST.handAllowed(g.meta) && d.kind !== 'b' && VR.Bauhand) { g.ui.resume(); return VR.Bauhand.hold(id, { from: 'card' }); }
         if (g.state === 'play' && g.player && ST.handAllowed(g.meta) && VR.itemDef(item)) {
           const inv = g.player.inv; inv.slots[inv.sel] = { id: item, n: VR.maxStack(item) }; inv.changed = true; g.ui.updateHUD(true);
           g.ui.resume(); g.ui.hint(tx('hand.toast', { n: VR.itemName(item) }, '{n} — Rechtsklick setzt es', '{n} — right click places it'), 2600);
@@ -358,6 +360,10 @@
     if (!h) return;
     try { localStorage.removeItem('r9si.hand'); } catch (e) { /* */ }
     const d = VR.Ding && VR.Ding.parse(h.ding); if (!d || !ST.handAllowed(g.meta) || (h.world && h.world !== g.meta.id)) return;
+    // (W2) ✨ „An meinem Platz" from the start screen with no world yet: it is planned now, in front of the spawn point
+    if (h.spot && VR.Wizard && VR.Wizard.spotHere) { VR.Wizard.spotHere(h.ding, h.name); return; }
+    // a thing (not a block) is in the 🖐 Bauhand: its ghost, one click places it
+    if (d.kind !== 'b' && VR.Bauhand && VR.Bauhand.hold(h.ding, { name: h.name, from: h.from || 'card' })) return;
     const id = d.kind === 'h' ? 'blueprint_' + d.key : d.kind === 'b' || d.kind === 'm' ? d.key : null;
     if (!id || !VR.itemDef(id) || !g.player) return;
     const inv = g.player.inv; inv.slots[inv.sel] = { id, n: VR.maxStack(id) }; inv.changed = true;
