@@ -103,6 +103,45 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🖐 Bauhand, ✨ Assistent, 📽 Zeitraffer, 🪞 Spiegel, 🎨 Aussehen, 🔊 Klang (v0.41)
+**🖐 Bauhand (B).** A ring of what you hold and what you point at: pick a house, a piece, a vehicle or furniture, a cyan
+ghost snaps to the ground and shows its footprint, a click places it as a plan the game builds — Z takes it back.
+**✨ Assistent** — three steps for every age: *Was?* (big icons: Haus, Hochhaus, Burg, Brücke, Park, Möbel, Fahrzeug,
+Tier, Figur, Natur …), *Wie?* (six variants, or say it in words) and *Wohin?* (vor mir · an meinem Platz · auf der
+Karte), in the game (pause menu, the ring) and in the Studio (✨ Erschaffen opens it).
+
+**📽 Zeitraffer.** The game records how your world was built (your hand, the Werkbank, plans, the Forge) in a small
+database of its own; *📽 Zeitraffer* in the pause menu or 🎒 Meins flies to your biggest build and plays it back from
+the bare land at ×10 … ×1000 with a scrubber, a golden-hour switch, and **⏺ Video** records it as a WebM with a title
+and an end card to save and share. Esc brings you back exactly where you were.
+
+**🪞 Spiegel-Bauen (⇧M).** Mirror building for symmetric houses and round towers: X, Z, 4-fach and 8-fach around the
+block you look at, glowing axis lines on the ground, every block you place or break is mirrored with its facing (stairs,
+doors with hinges, beds, logs …); a chip in the HUD, `/spiegel` in Profi.
+
+**🎨 Aussehen.** Every block can look the way you want: ✏️ on a block card in the Studio, or *✏️ Aussehen ändern* in the
+pause menu for what you point at — colour and material pickers with a live preview, in the game **and** the Studio at
+once, *Original wiederherstellen*, or *Als Variante* (256 slots) so the original stays; worlds keep a backup of the
+variants they use, and in multiplayer the host's looks reach the guests.
+
+**🔊 Klang.** Footsteps by material (grass, stone, wood, sand, snow, gravel, metal, carpet, water), satisfying place and
+break sounds per material, breaking crackle, soft UI sounds, positional audio for mobs, villagers and doors, reverb in
+rooms and caves, muffling under water — and a calm generative music layer seeded by the day (its own slider). All
+synthesized, no recordings.
+
+**⚙ Steuerung & Einstellungen.** Rebind every key (conflicts shown, reset), raw mouse input and optional smoothing, a
+gamepad (standard mapping), touch controls on phones (stick, big buttons), sprint toggle or hold, auto-jump in
+Einfach, a one-tap *Kindersicher* mode on the start screen; the settings in three groups (Bild · Klang · Spiel) with a
+line of explanation and a cost badge (🟢 🟡 🔴) per graphics option, a live preview, and **Automatik** — a 3 s
+benchmark that picks the preset for your machine.
+
+**🔭 Sichtweite & 🌤 Himmel.** New chunks fade in, the far horizon has a soft edge against the near terrain, streaming
+has a per-frame budget and the quality governor never lowers your view distance; the trailer's sky — the ringed gas
+giant with its slanted ring, moons, the nebula veil, puffy cumulus around the citadel's spires and fog banks under the
+sky isles — is in. **Deutsch überall**: every text of the game and the Studio in German and English, German furniture
+names, `/wetter`. Worldgen is twice as fast (the realm's climate per field, cave fields per layer, cached tables).
+The ✨ Modern Living tab opens without a hitch: voxel pictures are drawn in 6 ms slices and warmed in idle time.
+
 ### 🚪 Doors that open, 🏭 R9 Forge, 🌦 weather, one front door for all ages (v0.40)
 **Doors, switches and beds just work.** A quick click opens a door (wooden, iron with power, modern hinged, the
 generated houses' doors), a held click toggles it once instead of flickering, and the player walks through. Villagers

@@ -20,7 +20,9 @@ check(JSON.stringify(D.parse('h:3')) === '{"kind":"h","key":"3"}' && D.parse('x:
 check(D.of('m', sofa) === 'm:' + sofa, 'of("m", name)');
 check(D.favId('h:3') === 'blueprint_3' && D.favId('b:oak_planks') === 'oak_planks' && D.favId('m:' + sofa) === sofa && D.favId('k:kabc') === 'k:kabc', 'favId: h: → blueprint_<i>, b:/m: → the bare name, the rest as they are');
 check(D.fromFav('oak_planks') === 'b:oak_planks' && D.fromFav(sofa) === 'm:' + sofa && D.fromFav('blueprint_3') === 'h:3' && D.fromFav('p:x7') === 'p:x7' && D.fromFav('no_such_thing_zz') === null, 'fromFav: a block, a model, a blueprint, a new id, junk');
-check(D.name('h:3') === 'Villa Belfronte' && D.name('b:oak_planks') === 'Oak Planks' && D.name('m:' + sofa) === VR.VM.MODELS[sofa].display, 'name(): the catalogue house, the block, the model');
+const house3 = VR.VillageGen && VR.VillageGen.plan2 && VR.VillageGen.plan2.CATALOGUE[3] ? VR.VillageGen.plan2.CATALOGUE[3].name : null;
+const sofaName = VR.VM.MODELS[sofa].display || (VR.itemName ? VR.itemName(sofa) : sofa), sofaShown = VR.dispName ? VR.dispName(sofaName) : sofaName;
+check(!!house3 && D.name('h:3') === house3 && D.name('b:oak_planks') === 'Oak Planks' && D.name('m:' + sofa) === sofaShown, 'name(): the catalogue house (' + house3 + '), the block, the model (' + D.name('m:' + sofa) + ')');
 
 console.log('2 · favourites and packs know the new ids');
 store.clear(); VR.Favs.sync();

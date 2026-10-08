@@ -138,7 +138,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
   }
 
   // ---------------------------------------------------------------- WebGL: two pipelines (VM models · game sections), one context
-  let gl, progVM, progSec, locVM = {}, locSec = {}, texAlb, texMat, texAlbG, texMatG, fbo = null;
+  let gl, progVM, progSec, locVM = {}, locSec = {}, texAlb, texMat, texAlbG, texMatG, texLum = null, fbo = null;
   const VS = `#version 300 es
   layout(location=0) in vec3 p; layout(location=1) in vec3 n; layout(location=2) in vec3 c; layout(location=3) in vec2 uv; layout(location=4) in float ao; layout(location=5) in float face; layout(location=6) in float layer; layout(location=7) in float flags;
   uniform mat4 u_vp; uniform vec3 u_off; out vec3 vN; out vec3 vC; out vec2 vUV; out float vAO; flat out int vFace; flat out float vLayer; flat out int vFlags; out vec3 vP;
@@ -188,6 +188,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
   }`;
   const SFS = `#version 300 es
   precision highp float; precision highp sampler2DArray;
+  ${(VR.Looks && VR.Looks.GLSL) || 'uniform highp sampler2D u_avgLum; bool lookOn(uint w5) { return false; } vec3 lookRecolor(vec3 a, float l, vec3 c) { return a; }'}
   in vec3 v_p; in vec2 v_uv; flat in uint v_w3; flat in uint v_w5; in float v_sky; in vec3 v_block; in float v_ao; in vec3 v_tint;
   uniform sampler2DArray u_alb; uniform sampler2DArray u_mat; uniform vec3 u_light; uniform vec3 u_eye; uniform float u_clipY; uniform float u_cutout; uniform float u_flat; uniform float u_alpha; uniform vec2 u_rc; uniform vec3 u_mul;
   out vec4 o;
@@ -217,7 +218,8 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     vec4 alb = texture(u_alb, vec3(fu, layer));
     if (u_cutout > 0.5 && alb.a < 0.5) discard;
     vec4 mat = texture(u_mat, vec3(fu, layer));
-    if (u_cutout > 0.5) alb.rgb *= v_tint; else alb.rgb = mix(alb.rgb, alb.rgb * v_tint, alb.a);
+    // a recoloured block (B1 „🎨 Aussehen", the game's own formula: src/shared/looks.js)
+    if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, v_tint); else if (u_cutout > 0.5) alb.rgb *= v_tint; else alb.rgb = mix(alb.rgb, alb.rgb * v_tint, alb.a);
     if (u_flat > 0.5) { alb.rgb = vec3(0.75); mat = vec4(0.5, 0.5, 0.85, 0.0); }
     vec3 N = rY(NORMALS[face]);
     if (((v_w5 >> 13u) & 1u) == 1u) { vec3 gn = normalize(cross(dFdx(v_p), dFdy(v_p))); if (gn.y < 0.0) gn = -gn; N = gn; }
@@ -254,7 +256,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     progVM = program(VS, FS); progSec = program(SVS, SFS);
     for (const u of ['u_vp', 'u_off', 'u_light', 'u_eye', 'u_alb', 'u_mat', 'u_flat', 'u_galpha']) locVM[u] = gl.getUniformLocation(progVM, u);
     gl.useProgram(progVM); gl.uniform1f(locVM.u_galpha, 0.45);
-    for (const u of ['u_vp', 'u_origin', 'u_alb', 'u_mat', 'u_light', 'u_eye', 'u_clipY', 'u_cutout', 'u_flat', 'u_alpha', 'u_pre', 'u_rc', 'u_t', 'u_mul']) locSec[u] = gl.getUniformLocation(progSec, u);
+    for (const u of ['u_vp', 'u_origin', 'u_alb', 'u_mat', 'u_light', 'u_eye', 'u_clipY', 'u_cutout', 'u_flat', 'u_alpha', 'u_pre', 'u_rc', 'u_t', 'u_mul', 'u_avgLum']) locSec[u] = gl.getUniformLocation(progSec, u);
     vbo = gl.createBuffer(); vboG = gl.createBuffer();
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
     buildVxTextures();
@@ -286,7 +288,13 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     };
     texAlbG = mk(tex.albedo, true); texMatG = mk(tex.material, false);
     texInfo = tex;
+    // the average luminance per layer for recoloured blocks (64 × 64 R32F; filled for the layers a look uses: setAvgLum)
+    texLum = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texLum);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, 64, 64, 0, gl.RED, gl.FLOAT, new Float32Array(4096).fill(0.5));
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    if (VR.LookPanel && VR.LookPanel.texReady) VR.LookPanel.texReady();
   }
+  function setAvgLum(table) { if (!gl || !texLum || !table) return; gl.bindTexture(gl.TEXTURE_2D, texLum); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.FLOAT, table); }
   function uploadVM(mesh) {
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ARRAY_BUFFER, vboG); gl.bufferData(gl.ARRAY_BUFFER, mesh.glass, gl.STATIC_DRAW);
@@ -359,6 +367,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
       gl.useProgram(progSec); gl.uniformMatrix4fv(locSec.u_vp, false, new Float32Array(vp)); gl.uniform3f(locSec.u_light, light[0], light[1], light[2]); gl.uniform3f(locSec.u_eye, eye[0], eye[1], eye[2]);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, texAlbG); gl.uniform1i(locSec.u_alb, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, texMatG); gl.uniform1i(locSec.u_mat, 1);
+      if (texLum && locSec.u_avgLum) { gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, texLum); gl.uniform1i(locSec.u_avgLum, 2); gl.activeTexture(gl.TEXTURE0); }
       gl.uniform1f(locSec.u_clipY, opts.clipY !== undefined ? opts.clipY : 1e9); gl.uniform1f(locSec.u_flat, S.flat ? 1 : 0); gl.uniform1f(locSec.u_alpha, 1);
       const xf = (pre, rc, t, mul) => { gl.uniform3f(locSec.u_pre, pre[0], pre[1], pre[2]); gl.uniform2f(locSec.u_rc, rc[0], rc[1]); gl.uniform3f(locSec.u_t, t[0], t[1], t[2]); gl.uniform3f(locSec.u_mul, mul[0], mul[1], mul[2]); };
       const ID3 = [0, 0, 0], ID2 = [1, 0], ONE = [1, 1, 1];
@@ -575,6 +584,8 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     let look = 'classic'; try { look = JSON.parse(localStorage.getItem('r9si.settings') || '{}').look === 'seamless' ? 'seamless' : 'classic'; } catch (e) { /* default */ }
     if (VR.setLook) VR.setLook(look);
     W.postMessage({ type: 'look', mode: look });
+    // the looks and variant slots of this browser (B1): the worker meshes blocks and houses with them
+    if (VR.Looks) W.postMessage({ type: 'looks', data: VR.Looks.current() });
   }
   const call = (msg, tr) => new Promise((res) => { msg.id = wid++; wcb.set(msg.id, res); W.postMessage(msg, tr || []); });
   // a call whose answer comes in parts (onPart for each, the promise for the last)
@@ -621,10 +632,20 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     if (S.scene && S.scene.type === 'house' && S.scene.index === i) { const keep = { yaw: S.cam.yaw, pitch: S.cam.pitch, dist: S.cam.dist, cut: S.cutLevel }; setScene(sceneHouse(rec)); S.cam.yaw = keep.yaw; S.cam.pitch = keep.pitch; S.cam.dist = keep.dist; if (keep.cut) { S.cutLevel = keep.cut; S.clipY = rec.data.floorY + keep.cut * rec.data.storeyH - 1.05; houseTools(); } parts(); }
     sys(`${Object.keys(VM.MODELS).length} Modelle · ${HOUSE.size} Häuser`, 'ok');
   }
+  // a block whose look changed (B1): its preview is meshed again
+  // (the block on screen keeps its old buffers until the new mesh is there: freeing them at once left the view binding
+  // deleted buffers — INVALID_OPERATION, a black view — for as long as the worker took)
+  let staleGpu = null;
+  function forgetBlock(name) {
+    const b = BLOCKS.get(name); if (!b) return;
+    BLOCKS.delete(name);
+    if (S.scene && S.scene.type === 'block' && S.scene.gpu === b.gpu) { if (staleGpu && staleGpu !== b.gpu) freeSections(staleGpu); staleGpu = b.gpu; } else freeSections(b.gpu);
+  }
   async function showBlock(name) {
     let b = BLOCKS.get(name);
     if (!b) { const m = await call({ type: 'blockmesh', name }); if (m.type !== 'blockmesh') return; b = { gpu: uploadSections(m.sections) }; BLOCKS.set(name, b); }
     setScene(sceneBlock(name, b.gpu));
+    if (staleGpu && staleGpu !== b.gpu) { freeSections(staleGpu); staleGpu = null; }
     parts();
   }
 
@@ -635,6 +656,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     for (const d of VM.DEFS) { try { const m = VM.compile(d.name, d.o); if (m.parts.length) { m.display = d.display; m.def = d; out[d.name] = m; } } catch (e) { console.warn(d.name, e); } }
     VM.MODELS = out;
     if (VR.Custom) { try { VR.Custom.apply(VR.Custom.load()); } catch (e) { console.warn('studio designs', e); } }
+    if (VR.Looks && VR.Looks.remodel) { try { VR.Looks.remodel(); } catch (e) { console.warn('model variants', e); } }   // (B1: var_k models from these)
     return out;
   }
   function thumbOf(name) {
@@ -675,6 +697,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
   }
   function selectHouse(i) {
     const rec = HOUSE.get(i); S.from = null; crumb();
+    if (rec && rec.stale) { rec.stale = false; rebuildHouse(i, { skin: rec.data.skin, mirror: rec.data.mirrored }); }   // a look changed since it was built (B1)
     for (const el of $$('#list .card')) el.classList.toggle('on', el.dataset.house === String(i));
     if (!rec) { S.pendingHouse = i; return; }
     S.pendingHouse = null;
@@ -737,7 +760,8 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
       return;
     }
     const favs = VR.Favs ? VR.Favs.list() : [];
-    let names = Object.keys(VM.MODELS).filter(n => S.mode === 'facade' ? isFacade(n) : !isFacade(n)).filter(n => (S.cat === 'all' || (S.cat === 'fav' ? favs.includes(n) : catsOf(n).includes(S.cat))) && (!f || n.includes(f) || VM.MODELS[n].display.toLowerCase().includes(f) || catsOf(n).join(' ').includes(f)));
+    const hiddenVar = (n) => { const t = R.byName[n]; return !!(t && t.o && Number.isInteger(t.o.varSlot) && !t.cat); };   // (B1: a hidden or empty variant slot)
+    let names = Object.keys(VM.MODELS).filter(n => !hiddenVar(n)).filter(n => S.mode === 'facade' ? isFacade(n) : !isFacade(n)).filter(n => (S.cat === 'all' || (S.cat === 'fav' ? favs.includes(n) : catsOf(n).includes(S.cat))) && (!f || n.includes(f) || VM.MODELS[n].display.toLowerCase().includes(f) || catsOf(n).join(' ').includes(f)));
     if (S.cat === 'fav') names = names.sort((a, b) => favs.indexOf(a) - favs.indexOf(b));
     const groups = new Map();
     for (const n of names) { const g = VM.MODELS[n].display.split(' ·')[0].replace(/\s*\d+"?$/, ''); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(n); }
@@ -962,6 +986,6 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     });
   }
   window.__st = S; window.__studio = { HOUSE, THUMB, selectHouse, selectModel, setMode, renderThumb };
-  window.__studioCore = { SA, full, editHouse, editModel, favHouse, CAM, post: (m) => W && W.postMessage(m), S, HOOK, HOUSES, HOUSE, THUMB, $, $$, fmt, call: (m, tr) => call(m, tr), callP: (m, p, tr) => callP(m, p, tr), MODES, renderThumb: (sc, w, h, cam) => renderThumb(sc, w, h, cam), thumbOf: (n) => thumbOf(n), uploadSections, freeSections, camFor, drawLines, quadMesh, freeQuadMesh, drawQuadMesh, setScene, sceneHouse, sceneModel, meshModel, uploadVM, buildGrid, hud, houseTools, parts, list, chips, sys, crumb, setMode, selectHouse, selectModel, rebuildHouse, isFacade, catsOf, CATS, FCATS, showBlock, swatch, blockDisplay, texInfo: () => texInfo, view: () => $('#view'), gl: () => gl };
+  window.__studioCore = { SA, full, editHouse, editModel, favHouse, CAM, post: (m) => W && W.postMessage(m), S, HOOK, HOUSES, HOUSE, THUMB, $, $$, fmt, call: (m, tr) => call(m, tr), callP: (m, p, tr) => callP(m, p, tr), MODES, renderThumb: (sc, w, h, cam) => renderThumb(sc, w, h, cam), thumbOf: (n) => thumbOf(n), uploadSections, freeSections, camFor, drawLines, quadMesh, freeQuadMesh, drawQuadMesh, setScene, sceneHouse, sceneModel, meshModel, uploadVM, buildGrid, hud, houseTools, parts, list, chips, sys, crumb, setMode, selectHouse, selectModel, rebuildHouse, isFacade, catsOf, CATS, FCATS, showBlock, forgetBlock, setAvgLum, BLOCKS, swatch, blockDisplay, texInfo: () => texInfo, view: () => $('#view'), gl: () => gl };
   window.addEventListener('load', ui);
 })();

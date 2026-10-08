@@ -270,7 +270,10 @@
     const used = new Set();
     const take = (u, v) => { const k = u + ',' + v; if (used.has(k)) return false; used.add(k); return true; };
     take(du, 1); // keep the entrance free
-    if (kind === 'home' || kind === 'farmhouse' || kind === 'clinic') {
+    if (o.detail && kind === 'home' && VR.Detail) {
+      // vgen 6: the placement grammar furnishes every storey room by room (gen_detail.js); the lamp and planters outside too
+      VR.Detail.homeInterior(L, info, { w, d, floors, F, du, S, rng, seed: o.seed, alongU, top });
+    } else if (kind === 'home' || kind === 'farmhouse' || kind === 'clinic') {
       // beds along the back wall on the top storey (head against the wall)
       const by = floors > 1 ? F + 5 : Y;
       const nb = Math.min(o.beds || 2, w - 2);
@@ -558,8 +561,16 @@
     const ground = (x, z) => { const k = x * 65536 + z; let h = hcache.get(k); if (h === undefined) { h = g.surfaceY(x, z); hcache.set(k, h); } return h; };
     // op storage: x,y,z,state and x,z,y0,y1,state (tupleList: blocks, so no step copies a whole town's ops)
     const ops = tupleList(4), fills = tupleList(5);
+    const crownCands = [];   // the shared palm crowns (vgen 7): [x, base, z, h, kind, road], placed by the crown pass
+    const palms = [], drops = [];   // every palm placed: [kind, road, x, z, trunk h] (the node test counts them); the crowns no spot fits
     const put = (x, y, z, s) => { ops.push(x, y, z, s); };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) fills.push(x, z, y0, y1, s); };
+    // F6: towns made from vgen 6 on carry the detail layer (gen_detail.js); older towns are planned exactly as before
+    const detOn = !!(VR.Detail && VR.Detail.on(g));
+    const detP = (x, y, z, nm, pr) => put(x, y, z, typeof nm === 'number' ? nm : st(nm, pr));
+    // the street decor draws from its own rng and runs after every lot is placed (it only takes cells nothing else
+    // took), so a town keeps its roads and houses exactly as at vgen 5 and only gains the street pieces
+    const detRng = new VR.RNG((site.seed ^ 0x2545f491) >>> 0), decorJobs = [];
     const AIR = 0;
     if (HOME) { const B = VR.TempleGen.box; for (let x = B.x0 - 2; x <= B.x1 + 2; x++) for (let z = B.z0 - 2; z <= B.z1 + 2; z++) { const o = oi(x, z); if (o >= 0) occ[o] = 7; } }
     const plan = { rad: RAD, id: site.id, name: site.name, style: site.style, x: cx, z: cz, y: site.y, seed: site.seed, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: null, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null };
@@ -591,7 +602,9 @@
     } else if (S.tech) {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) put(cx + dx, py, cz + dz, st('vx_floor_pad'));
       put(cx, py + 1, cz, st('vx_holo_table'));
-      for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) VG.palm(put, cx + dx, py + 1, cz + dz, 4 + ((dx + dz + site.seed) & 1));
+      // vgen 7: the corner palms stand in planters, so no trunk stands on the paving (no plant on a plaza)
+      const pc = VR.Plants && VR.Plants.on(g) ? 4 : 3;   // vgen 7: the 7-block crowns stand 4 out, so their footprints do not meet
+      for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const dx = sx * pc, dz = sz * pc; if (VR.Plants && VR.Plants.on(g)) { const ph = 7 + ((dx + dz + site.seed) & 1); put(cx + dx, py + 1, cz + dz, st('vx_tech_planter')); VR.Plants.palm(put, cx + dx, py + 2, cz + dz, ph); palms.push(['plaza', -1, cx + dx, cz + dz, ph]); } else { const ph = 4 + ((dx + dz + site.seed) & 1); VG.palm(put, cx + dx, py + 1, cz + dz, ph); palms.push(['plaza', -1, cx + dx, cz + dz, ph]); } }
       for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(cx + dx, py + 1, cz + dz, st('vx_tech_planter'));
     } else if (S.crystals) {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (dx || dz) put(cx + dx, py + 1, cz + dz, wellMat); }
@@ -691,7 +704,7 @@
           // street trees on the sidewalk line, alternating sides
           const side = (k / 10 | 0) % 2 ? -1 : 1;
           const tx = Math.round(px + nx * 3 * side), tz = Math.round(pz + nz * 3 * side), o2 = oi(tx, tz);
-          if (o2 >= 0 && occ[o2] === 0) { occ[o2] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st('grass_block')); fill(tx, tz, ty + 1, ty + 8, AIR); const f = ['apple', 'cherry', 'plum', 'orange'][(tx + tz) & 3]; put(tx, ty + 1, tz, st('vx_fruit_trunk')); put(tx, ty + 2, tz, st('vx_fruit_trunk')); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(tx + a, ty + 3, tz + b, st('vx_fruit_crown_' + f)); if (Math.abs(a) + Math.abs(b) <= 1) put(tx + a, ty + 4, tz + b, st('vx_fruit_crown_' + f)); } }
+          if (o2 >= 0 && occ[o2] === 0) { occ[o2] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st(detOn && S.modern ? 'dirt' : 'grass_block')); if (detOn && S.modern) decorJobs.push(() => VR.Detail.treeGrate({ P: detP, occ, oi, ground, plan }, tx, ty, tz, st, fill)); fill(tx, tz, ty + 1, ty + 8, AIR); const f = ['apple', 'cherry', 'plum', 'orange'][(tx + tz) & 3]; put(tx, ty + 1, tz, st('vx_fruit_trunk')); put(tx, ty + 2, tz, st('vx_fruit_trunk')); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(tx + a, ty + 3, tz + b, st('vx_fruit_crown_' + f)); if (Math.abs(a) + Math.abs(b) <= 1) put(tx + a, ty + 4, tz + b, st('vx_fruit_crown_' + f)); } }
         }
         if (S.pathLine) {
           if (S.tech) {
@@ -709,7 +722,8 @@
           const tx = Math.round(px + nx * 3 * side), tz = Math.round(pz + nz * 3 * side);
           let free = true;
           for (let a = -1; a <= 1 && free; a++) for (let b = -1; b <= 1; b++) { const o2 = oi(tx + a, tz + b); if (o2 < 0 || (occ[o2] !== 0 && occ[o2] !== 4)) { free = false; break; } }
-          if (free) { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) occ[oi(tx + a, tz + b)] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st('grass_block')); fill(tx, tz, ty + 1, ty + 14, AIR); VG.palm(put, tx, ty + 1, tz, 7 + ((tx + tz) & 3) + ((tx * 7 + tz) % 3 === 0 ? 2 : 0)); }
+          if (free) { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) occ[oi(tx + a, tz + b)] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st('grass_block')); if (VR.Plants && VR.Plants.on(g)) crownCands.push([tx, ty + 1, tz, 7 + ((tx + tz) & 3), 'street', r]);   // vgen 7: the avenue's shared crown (the crown pass places it; no air column is cleared under it)
+          else { const ph = 7 + ((tx + tz) & 3) + ((tx * 7 + tz) % 3 === 0 ? 2 : 0); fill(tx, tz, ty + 1, ty + 14, AIR); VG.palm(put, tx, ty + 1, tz, ph); palms.push(['street', r, tx, tz, ph]); } }
         }
         road.pts.push([px, ry + 1, pz]);
         if (S.modern) { const dist = Math.hypot(px - cx, pz - cz); if (k === 4 || ringR.some(Rr => Math.abs(Math.round(dist) - Rr) === 4)) zebraAt(px, pz, nx, nz, pa); }
@@ -720,6 +734,7 @@
           if (o >= 0 && occ[o] === 0) { occ[o] = 6; const gy = ground(lx, lz); const ly = Math.max(gy, ry); fill(lx, lz, gy + 1, ly, st('dirt')); put(lx, ly + 1, lz, st(S.lamp, { head: 0 })); put(lx, ly + 2, lz, st(S.lamp, { head: 1 })); fill(lx, lz, ly + 3, ly + 5, AIR); plan.lamps.push([lx, ly + 2, lz]); }
         }
       }
+      if (detOn && S.modern) decorJobs.push(() => VR.Detail.roadDecor({ P: detP, occ, oi, ground, st, fill, AIR, rng: detRng, plan }, pts, sm, S));
       roads.push(road);
       plan.roads.push(road.pts.filter((_, k) => k % 3 === 0));
     }
@@ -1033,10 +1048,20 @@
       const yard = {};
       if (S.tech) {
         // the trailer's lawns: a trimmed hedge along the street with a gap at the path, bushes and ferns, a palm in a corner
-        for (let u = -1; u <= w; u++) if (Math.abs(u - du) > 1) at(u, -2, lrng.chance(0.85) ? 'vx_hedge' : 'vx_bush');
+        for (let u = -1; u <= w; u++) if (Math.abs(u - du) > 1) at(u, -2, lrng.chance(0.85) || (VR.Plants && VR.Plants.on(g)) ? 'vx_hedge' : 'vx_bush');
         for (let v = -1; v <= d; v++) { if (lrng.chance(0.5)) at(-2, v, 'vx_hedge'); if (lrng.chance(0.5)) at(w + 1, v, 'vx_hedge'); }
-        if (lrng.chance(0.6)) { const pu = lrng.chance(0.5) ? -2 : w + 1, pv = d; if (yardFree(lot, pu, pv)) { claim(lot, pu, pv); const [px, pz] = wxz(lot, pu, pv); VG.palm(put, px, y, pz, 6 + lrng.int(4)); } }
-        for (const [u, v] of [[-2, 1], [w + 1, 2], [1, d + 1], [w - 2, d + 1]]) if (lrng.chance(0.5)) at(u, v, lrng.pick(['vx_bush', 'vx_fern_lush', 'vx_bush_light', 'vx_tech_planter']));
+        // a palm in the back corner. vgen 7: its shared crown goes to the crown pass, which keeps it where no house wall, roof
+        // or light strip is inside the 7×7 crown (else the palm moves up to RMAX cells): the same spots and draws as vgen 5
+        if (lrng.chance(0.6)) {
+          const shp = VR.Plants && VR.Plants.on(g), pu = lrng.chance(0.5) ? -2 : w + 1, pv = d;
+          if (yardFree(lot, pu, pv)) {
+            claim(lot, pu, pv);
+            const [px, pz] = wxz(lot, pu, pv), hy = 6 + lrng.int(4);
+            if (shp) crownCands.push([px, y, pz, hy + 1, 'yard', -1]);
+            else { VG.palm(put, px, y, pz, hy); palms.push(['yard', -1, px, pz, hy]); }
+          }
+        }
+        for (const [u, v] of [[-2, 1], [w + 1, 2], [1, d + 1], [w - 2, d + 1]]) if (lrng.chance(0.5)) { const pk = lrng.pick(['vx_bush', 'vx_fern_lush', 'vx_bush_light', 'vx_tech_planter']); at(u, v, VR.Plants && VR.Plants.on(g) ? 'vx_tech_planter' : pk); }   // vgen 7: the paved forecourts keep their planters (no bush stands on a plaza)
         if (lrng.chance(0.35)) { const u = lrng.chance(0.5) ? -2 : w + 1; if (at(u, 3, 'vx_sofa_white', { facing: u < 0 ? 1 : 3 })) yard.seat = W3(lot, u, y, 3).concat([(lot.r + (u < 0 ? 1 : 3)) & 3]); }
         yard.spot = W3(lot, w + 1, y, d);
         if (homeSm) homeSm.yard = yard;
@@ -1187,11 +1212,21 @@
         for (let u = 0; u < lot.w; u++) for (let v = 0; v < lot.d; v++) {
           const edge = u === 0 || v === 0 || u === lot.w - 1 || v === lot.d - 1;
           L.P(u, lot.F, v, edge ? S.path : 'grass_block');
-          if (!edge && (u + v) % 2 === 0) L.P(u, lot.F + 1, v, S.tech ? (lrng.chance(0.5) ? 'vx_fern_lush' : 'vx_fern') : 'vx_planter');
+          if (!edge && (u + v) % 2 === 0) {
+            const fern = S.tech && lrng.chance(0.5);   // drawn in every vgen, so the lots stay the same; vgen 7 plants no fern here
+            if (!(S.palms && VR.Plants && VR.Plants.on(g) && u === lot.w - 2 && v === lot.d - 2)) L.P(u, lot.F + 1, v, S.tech && !(VR.Plants && VR.Plants.on(g)) ? (fern ? 'vx_fern_lush' : 'vx_fern') : 'vx_planter');   // vgen 7: the palm's trunk cell stays free
+          }
         }
         const mid = lot.w >> 1;
         L.P(mid, lot.F + 1, lot.d >> 1, S.bench || 'vx_bench', { facing: 0 });
-        if (S.palms) { const q = ROT[lot.r](lot.w - 2, lot.d - 2); VG.palm(put, lot.ox + q[0], lot.F + 1, lot.oz + q[1], 4); }
+        if (S.palms) { const q = ROT[lot.r](lot.w - 2, lot.d - 2), gx = lot.ox + q[0], gz = lot.oz + q[1]; if (VR.Plants && VR.Plants.on(g)) crownCands.push([gx, lot.F + 1, gz, 7, 'garden', -1]); else { VG.palm(put, gx, lot.F + 1, gz, 4); palms.push(['garden', -1, gx, gz, 4]); } }
+        // vgen 7: the lawn's tufts and flowers, not on the palm's trunk cell (the lawn is ground, the trunk stands there)
+        if (VR.Plants && VR.Plants.on(g)) for (let u = 1; u < lot.w - 1; u++) for (let v = 1; v < lot.d - 1; v++) {
+          const hv = M.hash2(lot.ox + u, lot.oz + v, site.seed + 613) >>> 0;   // a hash of the cell, not the lot's draws (vgen 5's lots stay the same)
+          if (hv % 100 < 14 && !(S.palms && u === lot.w - 2 && v === lot.d - 2)) L.P(u, lot.F + 1, v, (hv >> 8) % 5 < 3 ? 'vm_tuft_grass' : 'vm_flower_cluster', { part: 'p000', facing: 0 });
+        }
+        // vgen 7: half the gardens have a blossom bush (the trailer's round topiary with white and pink flowers) in the corner by the lamp
+        if (VR.Plants && VR.Plants.on(g) && (M.hash2(lot.ox, lot.oz, site.seed + 727) >>> 0) % 2 === 0) L.P(1, lot.F + 1, 1, 'vm_bush_blossom', { part: 'p000', facing: 0 });
         L.P(0, lot.F + 1, 0, S.lamp, { head: 0 }); L.P(0, lot.F + 2, 0, S.lamp, { head: 1 });
         if (S.crystals) L.P(mid, lot.F + 1, lot.d - 1, 'vx_crystal_' + lrng.pick(['violet', 'azure', 'rose']));
         plan.work.push({ kind: 'garden', spot: (() => { const q = ROT[lot.r](mid, (lot.d >> 1) - 1); return [lot.ox + q[0], lot.F + 1, lot.oz + q[1]]; })() });
@@ -1215,7 +1250,7 @@
       const tower = !!(S.tech && VG.techTower && kind === 'home' && lot.w >= 7 && lot.d >= 7);
       const floors = tower ? Math.min(4, 2 + (lot.w >= 9 && lot.d >= 9 ? lrng.int(2) : 0) + (lrng.chance(0.35) ? 1 : 0)) : kind === 'hall' ? 2 : (kind === 'home' && lot.w >= 6 && lrng.chance(0.4)) ? 2 : (S.tall && lot.w >= 5 && lrng.chance(0.65)) ? 2 : 1;
       const beds = kind === 'home' ? 2 + lrng.int(Math.max(1, Math.min(4, lot.w - 3))) : kind === 'clinic' ? 2 : 0;
-      const bopt = { w: lot.w, d: lot.d, floors, F: lot.F, style: site.style, rng: lrng, kind, beds, ground: lg, walls: kind === 'smithy' ? (S.tech ? 'vx_tech_gray' : S.base === 'vx_sandstone' ? 'vx_sandstone' : 'vx_stonebrick') : walls, window: win, roof, wood: S.wood, chimney: !S.noChimney && kind !== 'library' && kind !== 'clinic' && kind !== 'barn', seed: homeSeed & 255, pitched: kind === 'barn' };
+      const bopt = { detail: detOn, w: lot.w, d: lot.d, floors, F: lot.F, style: site.style, rng: lrng, kind, beds, ground: lg, walls: kind === 'smithy' ? (S.tech ? 'vx_tech_gray' : S.base === 'vx_sandstone' ? 'vx_sandstone' : 'vx_stonebrick') : walls, window: win, roof, wood: S.wood, chimney: !S.noChimney && kind !== 'library' && kind !== 'clinic' && kind !== 'barn', seed: homeSeed & 255, pitched: kind === 'barn' };
       if (lot.kind === 'lot') {
         // reserved plot: foundation + fence posts + material crates; the real house is built by villagers later
         const rec = [];
@@ -1269,12 +1304,66 @@
         }
       }
     }
+    // the street decor of a modern town, last: the free cells left after every lot and road
+    for (const job of decorJobs) job();
+    // ---- the shared palm crowns (vgen 7), placed last. A candidate's trunk stands on free land (no road, plaza, path or HOME)
+    // on the soil of its cell (the soil the fills raised above the planned base is climbed, up to CLIMB blocks; the ground
+    // lying lower is stepped down onto, up to DESCEND blocks), with air up the trunk, and its 7×7 crown holds only air or
+    // leaves at the two crown rows: a crown may overhang a street, a lawn, a path or a hedge, and may replace an older palm's
+    // crown. A house wall, a roof or a light strip inside the crown moves the palm to the first spot that fits, at the
+    // candidate's height and up to RMAX cells away (the spot itself first); only when no spot fits, the trunk grows (up to
+    // CROWN_HMAX blocks). The blocks are read as the chunks will see them (VG.apply): the terrain, then the fills, then the
+    // ops; the crowns placed here are read back, so two crowns never share a block of the same row.
+    if (crownCands.length) {
+      const LEAF = VR.Plants.leafStates(), SOIL = VR.Plants.soilStates(), NAT = -1, CROWN_HMAX = 16, CLIMB = 8, DESCEND = 3, RMAX = 4;
+      const near = new Set();   // the cells a candidate can read: its 7×7 and the moves up to RMAX cells
+      for (const c of crownCands) for (let dx = -RMAX - 3; dx <= RMAX + 3; dx++) for (let dz = -RMAX - 3; dz <= RMAX + 3; dz++) near.add((c[0] + dx) + ',' + (c[2] + dz));
+      const opsAt = new Map(), fillsAt = new Map();
+      for (const blk of ops.blocks) for (let i = 0; i < blk.length; i += 4) { const k = blk[i] + ',' + blk[i + 2]; if (near.has(k)) { let l = opsAt.get(k); if (!l) opsAt.set(k, l = []); l.push(blk[i + 1], blk[i + 3]); } }
+      for (const blk of fills.blocks) for (let i = 0; i < blk.length; i += 5) { const k = blk[i] + ',' + blk[i + 1]; if (near.has(k)) { let l = fillsAt.get(k); if (!l) fillsAt.set(k, l = []); l.push(blk[i + 2], blk[i + 3], blk[i + 4]); } }
+      const blockAt = (x, y, z) => {
+        const k = x + ',' + z, o = opsAt.get(k);
+        if (o) for (let i = o.length - 2; i >= 0; i -= 2) if (o[i] === y) return o[i + 1];
+        const f = fillsAt.get(k);
+        if (f) for (let i = f.length - 3; i >= 0; i -= 3) if (y >= f[i] && y <= f[i + 1]) return f[i + 2];
+        return y <= ground(x, z) ? NAT : AIR;
+      };
+      const open = (s) => s === AIR || (s >= 0 && LEAF[s] === 1);
+      const soil = (s) => s === NAT || (s >= 0 && SOIL[s] === 1);
+      // the trunk's base on a cell (-1: no fit): the planned surface, climbed over the soil the fills raised above it, stepped down over a lower ground
+      const fits = (x, base0, z, h) => {
+        const o = oi(x, z); if (o < 0) return -1;
+        const oc = occ[o]; if (oc !== 0 && oc !== 3 && oc !== 4 && oc !== 6) return -1;   // free land: no road, plaza, path or HOME
+        let y = base0 - 1;
+        for (let k = 0; k < CLIMB && soil(blockAt(x, y + 1, z)); k++) y++;
+        for (let k = 0; k < DESCEND && blockAt(x, y, z) === AIR; k++) y--;                // the ground lies lower here: the trunk steps down onto it
+        if (blockAt(x, y, z) === AIR) return -1;                                          // the trunk stands on something solid
+        const base = y + 1;
+        for (let t = base; t < base + h; t++) if (blockAt(x, t, z) !== AIR) return -1;   // air up the trunk
+        for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let t = base + h; t <= base + h + 1; t++) if (!open(blockAt(x + dx, t, z + dz))) return -1;
+        return base;
+      };
+      // a placed block is also read back, so the next candidates see the crowns and trunks placed before them
+      const putRec = (x, y, z, s) => { put(x, y, z, s); const k = x + ',' + z; let l = opsAt.get(k); if (!l) opsAt.set(k, l = []); l.push(y, s); };
+      for (const [px, base0, pz, h0, kind, road] of crownCands) {
+        let done = false;
+        // the spot first (ring 0), then the cells one to RMAX away, at the candidate's height; a taller trunk only when no spot fits
+        for (let h = h0; h <= CROWN_HMAX && !done; h++) for (let ring = 0; ring <= RMAX && !done; ring++) for (let dx = -ring; dx <= ring && !done; dx++) for (let dz = -ring; dz <= ring && !done; dz++) {
+          if (Math.max(Math.abs(dx), Math.abs(dz)) !== ring) continue;   // the ring's cells only
+          const x = px + dx, z = pz + dz;
+          const base = fits(x, base0, z, h); if (base < 0) continue;
+          VR.Plants.palm(putRec, x, base, z, h); palms.push([kind, road, x, z, h]); done = true;
+        }
+        if (!done) drops.push([kind, road, px, pz, base0, h0]);
+      }
+    }
     // ---- bucket ops per chunk
     const chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
     let nF = 0, nO = 0;
     for (const blk of fills.blocks) for (let i = 0; i < blk.length; i += 5) { if (++nF % 4000 === 0) yield; bucket(blk[i], blk[i + 1]).f.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3], blk[i + 4]); }
     for (const blk of ops.blocks) for (let i = 0; i < blk.length; i += 4) { if (++nO % 5000 === 0) yield; bucket(blk[i], blk[i + 2]).o.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3]); }
+    plan.palms = palms; plan.crownDrops = drops;
     plan.chunks = chunks;
     plan.center = [cx, py + 1, cz];
     return plan;

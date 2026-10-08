@@ -18,12 +18,12 @@
 
   // the trailer: keys = [time, camera position, look-at]; ships = scripted flights (arch, from, via, to, offset, delay)
   const TRAILER = [
-    { name: 'Ember Canyon', dur: 5.5, fov: 78, tod: 11400, keys: [[0, [-70, 168, 720], [0, 96, 330]], [5.5, [40, 132, 400], [0, 88, 140]]],
-      ships: [{ arch: 'shuttle', A: [-85, 176, 760], C: [-5, 154, 560], B: [85, 120, 340], dur: 6.5, delay: 0 }, { arch: 'interceptor', A: [-115, 170, 780], C: [-25, 154, 560], B: [65, 118, 330], dur: 6.2, delay: 0.3, off: [-9, -2, 12] }, { arch: 'interceptor', A: [-55, 184, 790], C: [25, 162, 570], B: [105, 124, 350], dur: 6.2, delay: 0.5, off: [9, 3, 14] }] },
-    { name: 'The Spire Citadel', dur: 5, fov: 70, tod: 11700, keys: [[0, [-372, 200, 440], [-420, 200, 380]], [5, [-282, 214, 566], [-420, 190, 380]]],
-      ships: [{ arch: 'gunship', A: [-560, 230, 520], C: [-450, 236, 470], B: [-300, 246, 380], dur: 7, delay: 0.2 }, { arch: 'interceptor', A: [-570, 226, 535], C: [-455, 232, 482], B: [-305, 240, 392], dur: 7, delay: 0.4, off: [-8, -3, 10] }] },
-    { name: 'Sky Isles', dur: 5.5, fov: 76, tod: 12000, keys: [[0, [140, 190, 320], [270, 160, 200]], [5.5, [400, 178, 30], [360, 150, 90]]],
-      ships: [{ arch: 'shuttle', A: [165, 186, 300], C: [300, 176, 150], B: [440, 170, -10], dur: 6, delay: 0 }] },
+    { name: 'Ember Canyon', dur: 5.5, fov: 78, tod: 11400, keys: [[0, [-70, 132, 600], [0, 84, 340]], [5.5, [40, 132, 400], [0, 88, 140]]], planets: { az: -0.9, el: 12 },
+      ships: [{ arch: 'shuttle', A: [-103, 136, 613], C: [-18, 136, 462], B: [68, 136, 311], dur: 6.5, delay: 0 }, { arch: 'interceptor', A: [-183, 151, 456], C: [-25, 154, 480], B: [95, 118, 150], dur: 6.2, delay: 0.3, off: [-9, -2, 12] }, { arch: 'interceptor', A: [-123, 165, 466], C: [25, 162, 490], B: [150, 124, 190], dur: 6.2, delay: 0.5, off: [9, 3, 14] }] },
+    { name: 'The Spire Citadel', dur: 5, fov: 70, tod: 11700, planets: { az: -2.72, el: 5, az2: -2.9, el2: 14 }, keys: [[0, [-372, 200, 440], [-420, 200, 380]], [5, [-282, 214, 566], [-420, 190, 380]]],
+      ships: [{ arch: 'gunship', A: [-520, 230, 400], C: [-450, 236, 470], B: [-300, 246, 380], dur: 7, delay: 0.2 }, { arch: 'interceptor', A: [-530, 226, 415], C: [-455, 232, 482], B: [-305, 240, 392], dur: 7, delay: 0.4, off: [-8, -3, 10] }] },
+    { name: 'Sky Isles', dur: 5.5, fov: 76, tod: 12000, keys: [[0, [140, 190, 320], [330, 150, 140]], [5.5, [400, 178, 30], [360, 150, 90]]], planets: { az: -0.2, el: 18 },
+      ships: [{ arch: 'shuttle', A: [116, 189, 338], C: [277, 172, 168], B: [437, 155, -3], dur: 6, delay: 0 }] },
     { name: 'The Gate Temple', dur: 4.5, fov: 74, tod: 12000, keys: [[0, [6, 98, 175], [0, 88, 40]], [4.5, [8, 88, 64], [0, 86, 20]]],
       ships: [{ arch: 'shuttle', A: [0, 108, 200], C: [0, 96, 120], B: [0, 84, 52], dur: 5.5, delay: 0 }] },
     { name: 'Hangar Hall', dur: 6, fov: 72, tod: 12000, keys: [[0, [0, 83.6, 17], [0, 84, -40]], [6, [0, 83.6, -22], [0, 84.5, -40]]] },
@@ -57,7 +57,7 @@
     }
     stop() {
       const g = this.g; if (!this.active) return;
-      this.active = false; this.phase = 'idle';
+      this.active = false; this.phase = 'idle'; g.env.planetsOverride = null; this.shipDs = null;
       const s = this.saved; if (s) { g.player.pos = s.pos; g.player.yaw = s.yaw; g.player.pitch = s.pitch; g.player.flying = s.flying; g.hideHud = s.hideHud; g.camMode = s.camMode; g.zenFreezeTime = s.freeze; if (s.tod !== undefined && g.env.setTime) g.env.setTime(s.tod); }
       g.player.noClip = false; g.player.vel = [0, 0, 0];
       document.getElementById('hud').style.visibility = g.hideHud ? 'hidden' : 'visible';
@@ -65,14 +65,25 @@
       for (const sh of (this.myShips || [])) sh.dead = true;
       this.myShips = null;
     }
-    // scripted ship flights through the traffic system (designed asynchronously, so they are queued a moment ahead)
+    // the scripted ships' designs are built while the shot loads (the worker takes seconds); the ships are launched when
+    // the shot runs, from the cached designs, so each one flies from the shot's first frame and is never late
+    prebuildShips(shot) {
+      const SS = this.g.starships;
+      this.shipWait = 0; this.shipDs = [];
+      if (!SS || !shot.ships) return;
+      for (const sp of shot.ships) {
+        this.shipWait++;
+        this.shipDs.push(SS.design(this.shipSeed(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, () => { this.shipWait--; }));
+      }
+    }
+    shipSeed(sp) { if (sp._seed === undefined) sp._seed = M.hash2 ? M.hash2(sp.A[0] | 0, sp.B[2] | 0, 77) >>> 0 : (Math.random() * 4294967295) >>> 0; return sp._seed; }
+    // scripted ship flights through the traffic system
     launchShips(shot) {
       const g = this.g, T = g.traffic, SS = g.starships;
       if (!T || !SS || !shot.ships) return;
       this.myShips = this.myShips || [];
       for (const sp of shot.ships) {
-        const seed = (M.hash2 ? M.hash2(sp.A[0] | 0, sp.B[2] | 0, 77) >>> 0 : (Math.random() * 4294967295) >>> 0);
-        SS.design(seed, VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, (d) => {
+        SS.design(this.shipSeed(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, (d) => {
           if (!this.active) return;
           const len = Math.hypot(sp.B[0] - sp.A[0], sp.B[1] - sp.A[1], sp.B[2] - sp.A[2]);
           const ship = { d, A: sp.A.slice(), B: sp.B.slice(), C: sp.C.slice(), off: sp.off || [0, 0, 0], t: -(sp.delay || 0) / sp.dur, dur: sp.dur, speed: len / sp.dur, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: sp.A.slice(), arch: d.meta.arch, big: false, fire: 99, defender: false, circle: null, life: 0, scripted: true };
@@ -91,6 +102,9 @@
     }
     update(dt) {
       const g = this.g; if (!this.active) return;
+      // the scripted ships' designs stay in the starship cache while the shot runs (its garbage collection frees designs
+      // that no ship uses for a minute: a design built during the load would otherwise be built again at the launch)
+      for (const d of this.shipDs || []) if (d) d.last = performance.now();
       if (g.input.hit('Escape') || (this.opts && this.opts.skipAny && this.phase === 'run' && (g.input.pressed.size || g.input.mouse.clicked.some(Boolean)))) { this.stop(); return; }
       const d = this.ui(), fadeEl = d.querySelector('.fade');
       if (this.phase === 'next') {
@@ -101,17 +115,18 @@
         const c = this.camAt(shot, 0);
         g.player.pos = [c.pos[0], c.pos[1] - g.player.eye, c.pos[2]]; g.player.yaw = c.yaw; g.player.pitch = c.pitch; g.player.vel = [0, 0, 0];
         if (shot.tod !== undefined) g.env.setTime(shot.tod);
+        g.env.planetsOverride = shot.planets || null;
         d.querySelector('.cap').textContent = shot.capAt ? '' : (shot.caption || '');
         d.querySelector('.cap').classList.toggle('big', !!shot.caption && !shot.capSmall);
-        this.launchShips(shot);
+        this.prebuildShips(shot);
         this.fade = 1;
       }
       const shot = this.shots[this.si];
       if (this.phase === 'load') {
         // hold on black until the chunks around the camera are in (or 6 s have passed)
         this.loadT += dt;
-        const w = g.world, ready = w.pending.size === 0 && g.pool.busy < 3 && (!g.horizon || !g.horizon.inflight);
-        if ((ready && this.loadT > (this.opts && this.opts.quick ? 0.15 : 0.4)) || this.loadT > 6) { this.phase = 'run'; }
+        const w = g.world, ready = w.pending.size === 0 && g.pool.busy < 3 && (!g.horizon || !g.horizon.inflight) && this.shipWait <= 0;
+        if ((ready && this.loadT > (this.opts && this.opts.quick ? 0.15 : 0.4)) || this.loadT > 6) { this.phase = 'run'; this.launchShips(shot); }
         const c = this.camAt(shot, 0); g.player.pos = [c.pos[0], c.pos[1] - g.player.eye, c.pos[2]]; g.player.yaw = c.yaw; g.player.pitch = c.pitch;
         fadeEl.style.opacity = 1;
         return;

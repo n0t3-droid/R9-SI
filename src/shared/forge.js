@@ -141,7 +141,7 @@
     let env = null;
     if (m.ground && meta.terrain) { const W = m.W, D = m.D, gr = m.ground; env = { ground: (u, v) => { const g = gr[Math.max(0, Math.min(D - 1, v)) * W + Math.max(0, Math.min(W - 1, u))]; return g === 99 ? -1 : g; }, depth: 48 }; }
     const g = Forge.build(m.dna, env), M = g.meta, ops = Forge.ops(g, M.level ? Forge.CLEARED(M.top) : undefined);
-    return { type: 'forge', id: m.id, dna: m.dna, ops, lot: M.lot, house: [0, 0, g.sx, g.sz], top: M.top, bottom: g.dy, level: M.level, terrain: M.terrain, name: M.name, n: M.n, doors: M.doors, floors: M.floors, roof: M.roof === undefined ? null : M.roof, ms: M.ms };
+    return { type: 'forge', id: m.id, dna: m.dna, ops, lot: M.lot, house: [0, 0, g.sx, g.sz], top: M.top, bottom: g.dy, level: M.level, terrain: M.terrain, name: M.name, n: M.n, doors: M.doors, floors: M.floors, roof: M.roof === undefined ? null : M.roof, heart: M.heart || null, beam: M.beam || null, ms: M.ms };
   };
   // [start, end) chunks of at most `max` cells
   Forge.slices = function (n, max) { const out = []; for (let i = 0; i < n; i += max) out.push([i, Math.min(n, i + max)]); if (!out.length) out.push([0, 0]); return out; };

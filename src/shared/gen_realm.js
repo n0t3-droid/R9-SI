@@ -54,6 +54,7 @@
     g.nCrack = new Fr(s ^ 0xd29f6b, 2, 1 / 70, 0.5);
     g.nCrack2 = new Fr(s ^ 0xe3a07c, 2, 1 / 44, 0.5);
   }
+  VR.realmNoise = realmNoise;   // (the vents of the Ember Canyon read the crack noise: gen_canyon.js)
 
   // ---------------- climate & terrain shaping ----------------
   const origCompute = OG.computeClimate;
@@ -237,10 +238,12 @@
       const key = B[biome[col]].key;
       const cl = cls ? cls[col] : g.climateAt(x, z);
       if (key === 'ember_canyons' || cl.ember > 0.45) {
-        // lava rivers in canyon floors, dry above
+        // lava rivers in canyon floors, dry above; the Heartland's river channel runs cyan aether instead (the trailer's
+        // glowing river, TRAILER.md §2.2)
+        const aetherRiver = cl.heart > 0.5 && cl.river > 0.5;
         for (let y = SEA; y > 20; y--) {
           const i = (y << 8) | col, b = blocks[i];
-          if (b === S.water) blocks[i] = y <= 59 ? S.lava : 0;
+          if (b === S.water) blocks[i] = y <= 59 ? (aetherRiver ? S.aether : S.lava) : 0;
         }
         // banded ochre walls
         const top = topSolid(blocks, col);

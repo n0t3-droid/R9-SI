@@ -26,8 +26,13 @@
   const WM = VR.StudioWorld = { on: false, store: null, worlds: null, world: null, cols: new Map(), gpu: [], loading: null, meshes: new Map(), plans: [], sel: null, tool: null, ghost: null, rot: 0, undo: [], redo: [], tab: 'houses', hover: null, msg: '' };
   const HOUSES = C.HOUSES, hname = (i) => { const h = HOUSES.find(x => x.i === i); return h ? h.name : 'Haus ' + i; };
   // the name of a plan or tool: a catalogue house, a Forge structure (🏭, by its DNA) or a furniture model
-  const nameOf = (p) => p.kind === 'house' ? hname(p.index) : p.kind === 'forge' ? (VR.Forge ? VR.Forge.describe(p.dna, true) : '🏭 ' + p.dna) : ((VM.MODELS[p.name] || {}).display || p.name);
-  const lotBased = (p) => p.kind !== 'model';   // houses and Forge structures stand on a lot (the anchor is the front centre)
+  const nameOf = (p) => p.kind === 'house' ? hname(p.index) : p.kind === 'forge' ? (VR.Forge ? VR.Forge.describe(p.dna, true) : '🏭 ' + p.dna) : p.kind === 'piece' ? ((libItem(p.piece) || {}).name || '🧩') : ((VM.MODELS[p.name] || {}).display || p.name);
+  // (W2) a Bauteil from r9si.library (the ✨ wizard's Baukasten houses and Genie things): a levelled one (a house) stands on a
+  // lot like a catalogue house, the rest like furniture (the anchor is its corner)
+  // (read again at most once a second: plans ask for their name and anchor every frame)
+  let libC = null, libT = 0;
+  const libItem = (id) => { const now = Date.now(); if (!libC || now - libT > 1000) { libC = VR.Pack && VR.Pack.libLoad ? VR.Pack.libLoad() : []; libT = now; } const key = String(id || '').replace(/^p:/, ''); return libC.find(it => it && it.id === key) || null; };
+  const lotBased = (p) => (p.kind === 'piece' ? !!((libItem(p.piece) || {}).origin || {}).level : p.kind !== 'model');   // houses and Forge structures stand on a lot (the anchor is the front centre)
   const SA = !!C.SA, GAME_URL = window.__R9_GAME_URL || '';
 
   // ---------------------------------------------------------------- storage: the game's worlds, the plans
@@ -163,15 +168,17 @@
   function variantOf(it) {
     if (it.kind === 'house') { const d = designOf(it.index); if (d) return { custom: true, stamp: d.t || 1 }; return { skin: it.skin, mirror: !!it.mirror }; }
     if (it.kind === 'forge') return { dna: it.dna };
+    if (it.kind === 'piece') { const li = libItem(it.piece); return { stamp: li ? li.t || 1 : 0 }; }
     const md = VR.CUSTOM && VR.CUSTOM.models && VR.CUSTOM.models[it.name];
     return { stamp: md ? md.t || 1 : 0 };
   }
-  const meshKey = (it) => { const v = variantOf(it); return it.kind === 'house' ? `h:${it.index}:${v.custom ? 'c' + v.stamp : v.skin + ':' + (v.mirror ? 1 : 0)}` : it.kind === 'forge' ? `f:${it.dna}` : `m:${it.name}:${v.stamp}`; };
+  const meshKey = (it) => { const v = variantOf(it); return it.kind === 'house' ? `h:${it.index}:${v.custom ? 'c' + v.stamp : v.skin + ':' + (v.mirror ? 1 : 0)}` : it.kind === 'forge' ? `f:${it.dna}` : it.kind === 'piece' ? `p:${it.piece}:${v.stamp}` : `m:${it.name}:${v.stamp}`; };
   function meshFor(it) {
     const k = meshKey(it); let m = WM.meshes.get(k);
     if (m) return m.ready ? m : null;
     m = { ready: false }; WM.meshes.set(k, m);
-    const v = variantOf(it), msg = it.kind === 'house' ? { type: 'place_mesh', kind: 'house', index: it.index } : it.kind === 'forge' ? { type: 'place_mesh', kind: 'forge', dna: it.dna } : { type: 'place_mesh', kind: 'model', name: it.name };
+    const v = variantOf(it), msg = it.kind === 'house' ? { type: 'place_mesh', kind: 'house', index: it.index } : it.kind === 'forge' ? { type: 'place_mesh', kind: 'forge', dna: it.dna } : it.kind === 'piece' ? pieceMsg(it.piece) : { type: 'place_mesh', kind: 'model', name: it.name };
+    if (!msg) { WM.meshes.delete(k); return null; }
     if (it.kind === 'house' && !v.custom) { msg.skin = v.skin; msg.mirror = v.mirror; }
     C.call(msg).then((r) => {
       if (r.type !== 'place_mesh') { console.error(r.msg); WM.meshes.delete(k); C.sys('Konnte ' + (it.name || it.index) + ' nicht vorbereiten', 'err'); return; }
@@ -179,6 +186,14 @@
       r.sections = null; refresh();
     });
     return null;
+  }
+  // a Bauteil's cells for the worker (lot-local, y from the floor + its own height offset; keep cells stay the world's)
+  function pieceMsg(id) {
+    const it = libItem(id), CU = VR.Custom; if (!it || !CU) return null;
+    let idx = null; try { idx = CU.unvrle(CU.unb64(it.rle), it.sx * it.sy * it.sz); } catch (e) { idx = null; } if (!idx) return null;
+    const pal = it.pal.map((q, i) => (i === 0 ? -1 : i === 1 ? 0 : CU.fromPortable(q))), cells = [], dy = it.dy | 0;
+    for (let y = 0; y < it.sy; y++) for (let z = 0; z < it.sz; z++) for (let x = 0; x < it.sx; x++) { const q = idx[(y * it.sz + z) * it.sx + x]; if (!q) continue; const st = pal[q]; if (st === undefined || st < 0) continue; cells.push(x, y + dy, z, st); }
+    return { type: 'place_mesh', kind: 'piece', ops: Int32Array.from(cells), W: it.sx, D: it.sz, title: it.name || 'Bauteil', level: !!(it.origin && it.origin.level) };
   }
   // a catalogue house as a tool: the facade the Architektur view shows for it (or the player's design)
   function houseItem(i) {
@@ -221,6 +236,7 @@
     const r = (best + WM.rot) & 3;
     const p = { kind: it.kind, index: it.index, name: it.name, skin: it.skin, mirror: it.mirror, r, ox: 0, oz: 0, F: hit.y + VR.DY[hit.face] };
     if (it.kind === 'forge') p.dna = it.dna;
+    if (it.kind === 'piece') p.piece = it.piece;
     if (lotBased(it)) { const q = ROT[r](m.lot[0] >> 1, 0); p.ox = ax - q[0]; p.oz = az - q[1]; } else { p.ox = ax; p.oz = az; }
     if (hit.face !== 2) settle(p, m);
     return p;
@@ -529,7 +545,7 @@
       const d = document.createElement('div'); d.className = 'design' + (p.id === WM.sel ? ' on' : '');
       const nm = nameOf(p);
       const st = p.status === 'built' ? '<span class="good">im Spiel gebaut</span>' : p.status === 'pending' ? '<span class="pend">übergeben · wartet aufs Spiel</span>' : 'Entwurf';
-      d.innerHTML = `<span class="ic">${p.kind === 'house' ? '◈' : p.kind === 'forge' ? '🏭' : '▣'}</span><span class="n">${esc(nm)}<small>${p.ox} · ${p.F} · ${p.oz} · ${p.r * 90}° · ${st}</small></span>`;
+      d.innerHTML = `<span class="ic">${p.kind === 'house' ? '◈' : p.kind === 'forge' ? '🏭' : p.kind === 'piece' ? '🧩' : '▣'}</span><span class="n">${esc(nm)}<small>${p.ox} · ${p.F} · ${p.oz} · ${p.r * 90}° · ${st}</small></span>`;
       d.onclick = () => { WM.sel = p.id; const m = meshFor(p); if (m && S.scene) { const L = placeOf(p, m).lot; S.scene.center = [(L[0] + L[2] + 1) / 2, p.F + 2, (L[1] + L[3] + 1) / 2]; } refresh(); };
       el.appendChild(d);
     }
@@ -713,6 +729,9 @@
   // 🏭 Forge: a structure by its DNA as the tool in hand (the Studio's Forge mode calls this with „📍 Setzen")
   // (the 🧰 Werkbank and 🎨 Stil tabs put their own tools in hand: a piece is set from the Häuser tab)
   WM.toolForge = function (dna) { if (!WM.world) return false; if (WM.tab === 'bench' || WM.tab === 'style' || WM.tab === 'worlds') WM.tab = 'houses'; WM.tool = { kind: 'forge', dna }; WM.ghost = null; WM.sel = null; meshFor(WM.tool); refresh(); tip('Zeig auf den Boden — Klick setzt, R / ↻ dreht, Esc fertig', true); return true; };
+  // (W2) a Bauteil (the ✨ wizard's Baukasten house or Genie thing) as the tool in hand
+  WM.toolPiece = function (id) { libC = null; if (!WM.world || !libItem(id)) return false; WM.tool = { kind: 'piece', piece: 'p:' + String(id).replace(/^p:/, '') }; WM.ghost = null; WM.sel = null; meshFor(WM.tool); refresh(); return true; };
+  WM.libItem = libItem;
   WM.open = openWorld; WM.commit = commit; WM.list = listWorlds; WM.meshFor = meshFor; WM.houseItem = houseItem; WM.ghostAt = ghostAt; WM.pickGround = pickGround; WM.change = change; WM.clone = clonePlan; WM.rotate = rotatePlan; WM.refresh = refresh; WM.N = N; WM.getBlock = getBlock; WM.groundAt = groundAt; WM.placeOf = placeOf;
   // deep link: #world
   // deep links: #world · #world/<id> (the game's world list: "Plan in R9 Studio")

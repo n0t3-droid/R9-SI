@@ -11,6 +11,8 @@
 //      both tables, the German and English texts written at a tx() call are the tables' texts (the Studio reads the
 //      same tables, so both pages say the same words), no W1 key in the tables is unused, and no older Studio
 //      L('key', '…') text is changed by a table key of the same name
+//  (g) W2 — the 🖐 Bauhand and the ✨ wizard (src/main/{bauhand,wizard_game}.js, src/shared/{wizard,wizkinds}.js,
+//      src/studio/wizard.js): the same rules for their bh. / wiz. keys, the [key, de, en] labels included
 const fs = require('fs'), path = require('path');
 const SRC = path.join(__dirname, '..', 'src', 'main');
 let fails = 0;
@@ -165,6 +167,38 @@ const old = deKeys.filter(k => (Array.isArray(de[k]) ? de[k] : [de[k]]).some(s =
 check(!old.length, 'no old word (Nach Hause, Spawnpunkt, Zen-Baumeister, Weitermachen …) in the de table' + (old.length ? ': ' + old.join(', ') : ''));
 check(de['g.pause.resume'] === de['start.play'] && de['g.pause.bauen'] === de['start.bauen'] && de['g.pause.meins'] === de['start.meins'] && en['g.pause.resume'] === en['start.play'] && en['g.pause.meins'] === en['start.meins'], 'the pause menu and the start screen use the same words (▶ Weiterspielen, 🏗 Bauen, 🎒 Meins)');
 check(de['ding.edit'] === '✏️ Bearbeiten' && de['ding.set'] === '📍 Setzen' && de['ding.share'] === '📦 Teilen' && de['ding.fav'] === 'Favorit' && de['g.pause.spawn'] === '📍 Mein Platz ist hier' && de['g.pause.home'] === '🏠 Zu meinem Platz', 'the card actions and „mein Platz" read as in the spec');
+
+// ---------------------------------------------------------------- (g) W2: the 🖐 Bauhand and the ✨ wizard (game and Studio)
+// every key they use (tx() calls and the [key, de, en] labels of the tiles, chips and starters) is in both tables with
+// the texts written there; no bh. / wiz. key in the tables is unused; keys are only put together by the label helpers
+const W2 = ['src/main/bauhand.js', 'src/main/wizard_game.js', 'src/shared/wizard.js', 'src/shared/wizkinds.js', 'src/studio/wizard.js', 'src/main/start.js'];
+const W2PRE = /^(bh|wiz)\./, w2used = new Set(), w2miss = [], w2diff = [], w2dyn = [];
+for (const f of W2) {
+  if (!fs.existsSync(path.join(ROOT, f))) { w2miss.push(f + ' (no file)'); continue; }
+  const src = fs.readFileSync(path.join(ROOT, f), 'utf8');
+  for (const c of calls(src, 'tx')) {
+    if (c.key === undefined) { if (!/^(k|key|T\[k\]\[0\]|[cst]\.label\[0\])$/.test(c.keyRaw || '')) w2dyn.push(f + ':' + c.line + ' ' + c.keyRaw); continue; }
+    if (!W2PRE.test(c.key)) continue;
+    w2used.add(c.key);
+    if (!(c.key in de) || !(c.key in en)) { w2miss.push(c.key); continue; }
+    if (c.de !== undefined && c.de !== de[c.key]) w2diff.push(f + ':' + c.line + ' ' + c.key + ' de ' + JSON.stringify(c.de) + ' ≠ ' + JSON.stringify(de[c.key]));
+    if (c.en !== undefined && c.en !== en[c.key]) w2diff.push(f + ':' + c.line + ' ' + c.key + ' en ' + JSON.stringify(c.en) + ' ≠ ' + JSON.stringify(en[c.key]));
+  }
+  for (const m of src.matchAll(/\[\s*'([a-z]+\.[\w.]+)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*,\s*'((?:[^'\\]|\\.)*)'\s*\]/g)) {
+    const [, k] = m, d = m[2].replace(/\\(.)/g, '$1'), e = m[3].replace(/\\(.)/g, '$1'); if (!W2PRE.test(k)) continue; w2used.add(k);
+    if (!(k in de) || !(k in en)) { w2miss.push(k); continue; }
+    if (d !== de[k] || e !== en[k]) w2diff.push(f + ' ' + k + ' [' + d + ' | ' + e + '] ≠ [' + de[k] + ' | ' + en[k] + ']');
+  }
+}
+console.log('  W2: ' + w2used.size + ' keys');
+check(w2used.size > 100, 'the Bauhand and the wizard read the tables (' + w2used.size + ' keys)');
+check(!w2miss.length, 'every W2 key is in both tables' + (w2miss.length ? ': ' + [...new Set(w2miss)].slice(0, 15).join(', ') : ''));
+check(!w2diff.length, 'the W2 texts written at a call are the tables\' texts' + (w2diff.length ? ':\n      ' + w2diff.slice(0, 12).join('\n      ') : ''));
+check(!w2dyn.length, 'no W2 key is put together at run time' + (w2dyn.length ? ': ' + w2dyn.join(', ') : ''));
+const w2dead = enKeys.filter(k => W2PRE.test(k) && !w2used.has(k));
+check(!w2dead.length, 'no unused bh. / wiz. key in the tables' + (w2dead.length ? ': ' + w2dead.join(', ') : ''));
+check(de['wiz.step.was'] === 'Was?' && de['wiz.step.wie'] === 'Wie?' && de['wiz.step.wohin'] === 'Wohin?' && de['wiz.w.hand'] === 'Vor mir' && de['wiz.w.spot'] === 'An meinem Platz' && de['wiz.w.map'] === 'Auf der Karte', 'the wizard\'s steps and ways read as the spec says (Was? › Wie? › Wohin? · Vor mir · An meinem Platz · Auf der Karte)');
+check(/Klick setzt/.test(de['bh.strip.place']) && /Kreativ/.test(de['bh.survival']) && /zurück/.test(de['bh.toast.set']), 'the Bauhand\'s strip, its Survival card and its toast (Klick setzt · Kreativ · zurück)');
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

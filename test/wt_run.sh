@@ -10,9 +10,10 @@ b=$(basename "$1"); to=${2:-900}
 TMP=$ROOT/.tmp_tests; mkdir -p "$TMP" "$ROOT/test/shots"
 sed -e "s#/home/claude/vr#$ROOT#g" -e "s#require('\./#require('$ROOT/test/#g" "$ROOT/test/$b" > "$TMP/$b"
 if [[ $b == *.mjs ]]; then kind=browser; else kind=node; fi
+# the release lane: R9_EXCLUSIVE=1 (the coordinator's release regression) runs on its own third slot, one test at a
+# time, so a release never queues behind the agents' tests (a blocking wait on both slots sat for hours once)
 if [ "$kind" = browser ] && [ "${R9_EXCLUSIVE:-0}" = 1 ]; then
-  exec 8>/tmp/r9_browser_0.lock; flock 8
-  exec 9>/tmp/r9_browser_1.lock; flock 9
+  exec 8>/tmp/r9_browser_rel.lock; flock 8
   exec timeout "$to" node "$TMP/$b"
 fi
 # (node tests: one slot while the browsers are the bottleneck — the 2 CPUs go to the two browsers first)

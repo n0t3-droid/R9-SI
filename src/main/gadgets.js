@@ -180,6 +180,7 @@
     // item logic while on foot. true = consumed this frame's mouse input ('keep' keeps the breaking state)
     update(dt, input, p, hdef) {
       const g = this.g;
+      if (this.blue && this.blue.siteClick && this.blue.siteClick(input, p)) { this.mineT = null; return true; }   // 🖱 a click on a construction site: done at once
       if (!hdef) { this.mineT = null; return false; }
       const lmbHold = input.dragLook ? input.holdAction(0) : input.mouse.down[0];
       const lmbClick = input.dragLook ? input.clickAction(0) : input.mouse.clicked[0];
@@ -351,6 +352,8 @@
       if (!u) { this.g.ui.hint(T('g.wand.noUndo'), 1500); return; }
       this.g.world.bulkSet(u, false, VR.EDIT.UNDO);
       for (const [x, y, z, s] of u) this.noteBlock(x, y, z, s);
+      // (the step of a construction site: a running one stops, the guests hear of it — baustelle.js)
+      if (u.onUndo) { try { u.onUndo(u); } catch (e) { console.warn('undo', e); } }
       this.g.ui.hint(T('g.wand.undid', { n: u.length.toLocaleString() }), 1800);
     }
     wandCopy() {
@@ -887,7 +890,7 @@
         if (list) { at = [base[0] + dx, base[1] + dy, base[2] + dz]; break outer; }
       }
       if (!list) {
-        if (!force) { g.ui.hint(T('g.ship.noRoom'), 2600); g.audio.play('zap'); return false; }
+        if (!force) { g.ui.hint(T('g.ship.noRoom'), 2600); g.audio.play('bonk'); return false; }
         at = base; list = place(base[0], base[1], base[2], false);
       }
       const touched = new Set();
@@ -1228,6 +1231,7 @@
         if (c && o) out.push({ x: o[0], y: o[1], z: o[2], boxes: [[0, 0, 0, c.sx, c.sy, c.sz]], color: [1, 0.35, 0.9, 0.8] });
       }
       if (d && d.use === 'blueprint' && this.blue) this.blue.outlines(out);
+      if (this.blue && this.blue.siteOutlines) this.blue.siteOutlines(out);   // 🏗 the plan's volume while it is built (baustelle.js)
       if (this.scanData) for (const gr of this.scanData.groups) out.push(gr);
       return out;
     }

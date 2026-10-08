@@ -64,7 +64,7 @@
       this.shadowMat = mat4.create(); this.shadowBase = mat4.create(); this.shadowCam = [0, 0, 0];
       this.frameNo = 0;
       this.stats = { draws: 0, tris: 0, sections: 0, shadowDraws: 0, ms: 0 };
-      this.q = { scale: 1, shadows: 2048, shadowDist: 64, bloom: true, rays: true, fxaa: true, clouds: 2, water: 2, bevel: 1, particles: 1, renderDist: 10, magic: 0.8 };
+      this.q = { scale: 1, shadows: 2048, shadowDist: 64, bloom: true, rays: true, fxaa: true, clouds: 2, water: 2, bevel: 1, particles: 1, renderDist: 10, magic: 0.8, matTier: 0 };
       this.visList = []; this.visDirty = true; this.visKey = '';
       this.firsts = new Int32Array(512); this.counts = new Int32Array(512); this.origins = new Float32Array(512 * 4);
       this.tmpM = mat4.create(); this.tmpM2 = mat4.create();
@@ -91,11 +91,20 @@
       this.setAniso(4);
       // noise
       this.texNoise = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: tex.noise, wrap: gl.REPEAT, filter: gl.LINEAR });
+      // the average luminance per texture layer (64 × 64, R32F) for recoloured blocks (B1 „🎨 Aussehen", looks.js) —
+      // filled by the game for the layers a look uses; never part of the cached textures
+      this.texAvgLum = GL.tex2D(64, 64, gl.R32F, gl.RED, gl.FLOAT, { data: new Float32Array(4096).fill(0.5), filter: gl.NEAREST });
+      // F2: the material family of every texture layer (tex_mat.js), one byte per layer, one row: the detail layer and the
+      // material response read it (padded to 4 bytes: the upload's row alignment)
+      const famBytes = new Uint8Array((tex.layers + 3) & ~3);
+      if (VR.R && VR.R.texNames && VR.matFamilies && VR.R.texNames.length === tex.layers) famBytes.set(VR.matFamilies(VR.R.texNames));
+      this.texFam = GL.tex2D(tex.layers, 1, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: famBytes, wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
       this.buildPrograms();
       this.buildStatic();
+      this.initPuffs();
       // origins UBO
       if (this.multi) {
         this.ubo = gl.createBuffer();
@@ -105,6 +114,11 @@
       }
       this.emptyVAO = gl.createVertexArray();
       this.resize(true);
+    }
+    setAvgLum(table) {
+      const gl = this.gl; if (!this.texAvgLum || !table) return;
+      gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.FLOAT, table);
     }
     setAniso(level) {
       const gl = this.gl, ext = GL.ext.aniso;
@@ -117,16 +131,18 @@
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs)
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh]));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT']));
-      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh]));
+      // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE']));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE']));
+      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE']));
       P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL']);
       P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT']);
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
-      P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky');
+      P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky', this.q.lite ? ['LITE'] : []);   // LITE: two-octave nebula, no dust (Very Low)
       P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud');
+      P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff');   // t-clouds: cumulus, fog banks, anchors (balanced and above)
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
       P.down = GL.program(S.FS_VS, S.DOWN_FS, 'down');
       P.up = GL.program(S.FS_VS, S.UP_FS, 'up');
@@ -137,6 +153,7 @@
       P.copy = GL.program(S.FS_VS, S.COPY_FS, 'copy');
       P.mesh = GL.program(S.MESH_VS, S.MESH_FS, 'mesh');
       P.vox = GL.program(S.VOX_VS, S.VOX_FS, 'vox');
+      P.voxInst = GL.program(S.VOX_VS, S.VOX_FS, 'voxInst', ['INST']);   // (the Baustelle's scaffold: one mesh, many instances)
       P.part = GL.program(S.PART_VS, S.PART_FS, 'part');
       P.line = GL.program(S.LINE_VS, S.LINE_FS, 'line');
       P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain');
@@ -500,6 +517,8 @@
     setupCamera(cam) {
       const aspect = this.W / this.H;
       mat4.perspective(this.proj, cam.fov, aspect, 0.06, cam.far || 1200);
+      if (!this.projNJ) this.projNJ = mat4.create();
+      this.projNJ.set(this.proj);     // before the sub-pixel jitter: the reflection must not wobble
       const v = this.view;
       // the upscaler only runs when the scene really is rendered below screen size; at 100 % the picture stays native (+ FXAA)
       const tsr = !!(this.q.tsr && this.histFB0 && this.w < this.W - 2);
@@ -539,12 +558,27 @@
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
       v3('u_fogColor', E.fogColor); v3('u_blockLightTint', E.blockTint); v3('u_planetDir', E.planetDir); v3('u_planet2Dir', E.planet2Dir); v3('u_ringNormal', E.ringNormal);
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
+      // the grade's knobs (env.js VR.Grade): the cosmic veil, the sun's disc in HDR, the Klassisch block edges
+      if (u.u_nebula) gl.uniform1f(u.u_nebula, E.nebula !== undefined ? E.nebula : 1);
+      if (u.u_sunDisc) gl.uniform1f(u.u_sunDisc, E.sunDisc !== undefined ? E.sunDisc : 16);
+      if (u.u_gridK) gl.uniform1f(u.u_gridK, E.gridK !== undefined ? E.gridK : 0.12);
       if (u.u_rain) gl.uniform1f(u.u_rain, E.rain);
       if (u.u_wet) gl.uniform1f(u.u_wet, E.wet || 0);     // wet ground (weather.js via env): the terrain's top faces darken in the rain
+      // F2: the material detail tier (0 Very Low … 3 High) and the puddles (env.js: they fill in the rain and dry over minutes)
+      if (u.u_matTier) gl.uniform1f(u.u_matTier, this.q.matTier || 0);
+      if (u.u_puddle) gl.uniform1f(u.u_puddle, E.puddle || 0);
       if (u.u_time) gl.uniform1f(u.u_time, E.time);
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
+      // the sky bodies (skybodies.js): directions and angular radii of the giant, the blue planet and the four moons
+      const B = E.bodies;
+      if (B) {
+        const v4 = (n, a) => { if (u[n]) gl.uniform4f(u[n], a[0], a[1], a[2], a[3]); };
+        v4('u_giant', [B.giant[0], B.giant[1], B.giant[2], B.radius.giant]);
+        v4('u_blue', [B.blue[0], B.blue[1], B.blue[2], B.radius.blue]);
+        for (let mi = 0; mi < 4; mi++) v4('u_moon' + mi, B.moons[mi]);
+      }
       // the block look (Klassisch v2): natural blocks shaded per block, normal maps turned with the tile, still water
       // and the far terrain per block
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
@@ -554,6 +588,8 @@
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); if (p.u.u_albedo) gl.uniform1i(p.u.u_albedo, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texMaterial); if (p.u.u_material) gl.uniform1i(p.u.u_material, 1);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
+      if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
+      gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {
@@ -588,7 +624,7 @@
           gl.bufferSubData(gl.UNIFORM_BUFFER, 0, org, 0, cnt * 4);
           GL.ext.multiDraw.multiDrawArraysWEBGL(gl.TRIANGLES, firsts, 0, counts, 0, cnt);
         } else {
-          for (let i = 0; i < cnt; i++) { gl.uniform3f(prog.u.u_origin, org[i * 4], org[i * 4 + 1], org[i * 4 + 2]); gl.drawArrays(gl.TRIANGLES, firsts[i], counts[i]); }
+          for (let i = 0; i < cnt; i++) { gl.uniform3f(prog.u.u_origin, org[i * 4], org[i * 4 + 1], org[i * 4 + 2]); if (prog.u.u_fade) gl.uniform1f(prog.u.u_fade, org[i * 4 + 3]); gl.drawArrays(gl.TRIANGLES, firsts[i], counts[i]); }
         }
         this.stats.draws += this.multi ? 1 : cnt;
         cnt = 0;
@@ -597,11 +633,15 @@
         const s = list[reverse ? n - 1 - k : k];
         const m = s.mesh[layer];
         if (!m) continue;
+        // a chunk section in its fade-in (s.fade, 0..1) is dithered in by the terrain shader; one not shown yet (0) is
+        // skipped: it is invisible and casts no shadow. Sections without a fade (ships, props) are whole.
+        const fade = s.fade === undefined ? 1 : s.fade;
+        if (fade <= 0) continue;
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
         firsts[cnt] = m.off; counts[cnt] = m.count;
-        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = 0;
+        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = fade;
         cnt++;
         this.stats.tris += m.count / 3;
       }
@@ -729,6 +769,8 @@
     }
     drawClouds(E) {
       if (!this.q.clouds || E.dimId !== 0 && E.dimId !== 3) return;
+      // balanced and above (t-clouds): the cumulus as sprites, the fog banks under the Sky Isles and the citadel's anchors
+      if (this.q.clouds >= 2 && E.dimId === 0) { this.drawPuffs(E); return; }
       const gl = this.gl, cam = this.cam;
       const { cell, wind } = this.updateClouds(E, cam);
       if (!this.cloudCount) return;
@@ -750,6 +792,66 @@
       gl.depthFunc(gl.LEQUAL);
       gl.depthMask(true);
       gl.disable(gl.BLEND);
+    }
+
+    // ------------------------------------------------ puffs (t-clouds, balanced and above): sprites, see clouds.js
+    initPuffs() {
+      const gl = this.gl;
+      this.puffCorner = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.puffCorner);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+      // 0: the fog banks and anchors (world space), 1: the cumulus (cloud space, drawn at − wind)
+      this.puffVAO = [0, 1].map(() => {
+        const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.puffCorner); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1);
+        gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1);
+        gl.bindVertexArray(null);
+        return { vao, buf, n: 0 };
+      });
+      this.puffKey = ''; this.puffCount = 0;
+    }
+    updatePuffs(E, cam) {
+      const cov = Math.round(E.cloudCover * 20) / 20, wind = E.time * 0.9, cell = VR.Clouds.CELL;
+      const ocx = Math.floor((cam.x + wind) / cell), ocz = Math.floor(cam.z / cell);
+      const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + Math.floor(cam.x / 96) + ',' + Math.floor(cam.z / 96);
+      if (key === this.puffKey) return;
+      this.puffKey = key;
+      const f = VR.Clouds.field(cam, wind, { cover: cov }), gl = this.gl;
+      const lists = [VR.Clouds.pack(f.fog), VR.Clouds.pack(f.cumulus)];
+      for (let i = 0; i < 2; i++) {
+        const v = this.puffVAO[i];
+        gl.bindBuffer(gl.ARRAY_BUFFER, v.buf); gl.bufferData(gl.ARRAY_BUFFER, lists[i], gl.DYNAMIC_DRAW);
+        v.n = lists[i].length / VR.Clouds.SPRITE_FLOATS;
+      }
+    }
+    drawPuffs(E) {
+      const gl = this.gl, cam = this.cam;
+      if (!this.cloudAtlas) this.cloudAtlas = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: VR.Clouds.atlas(), filter: gl.LINEAR });
+      this.updatePuffs(E, cam);
+      const p = this.P.puff, u = p.u;
+      gl.useProgram(p.p); this.common(p, E);
+      gl.uniformMatrix4fv(u.u_viewProj, false, this.viewProj);
+      // the billboard axes of the game's camera (player.lookDir: yaw 0 looks along −z)
+      const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      const right = [cy, 0, -sy], up = [sy * sp, cp, cy * sp];
+      gl.uniform3f(u.u_camRight, right[0], right[1], right[2]); gl.uniform3f(u.u_camUp, up[0], up[1], up[2]);
+      const L = E.sunDir, lx = L[0] * right[0] + L[2] * right[2], ly = L[0] * up[0] + L[1] * up[1] + L[2] * up[2];
+      const ll = Math.hypot(lx, ly) || 1, sk = Math.min(1, Math.max(0, (L[1] + 0.12) / 0.24));
+      gl.uniform2f(u.u_sunScreen, lx / ll, ly / ll); gl.uniform1f(u.u_sunK, sk * sk * (3 - 2 * sk));
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
+      this.tex(0, this.cloudAtlas, u.u_cloudTex);
+      const fog = this.puffVAO[0], cu = this.puffVAO[1];
+      // the fade radius: the fog banks are fixed in the world (they reach 300 blocks from the islands), the cumulus fades at
+      // the edge of its window (clouds.js RANGE cells), so no cloud pops in or out at the window's edge
+      gl.uniform1f(u.u_fogK, 1); gl.uniform1f(u.u_cloudR, 640); gl.uniform3f(u.u_origin, -cam.x, -cam.y, -cam.z);
+      if (fog.n) { gl.bindVertexArray(fog.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, fog.n); }
+      gl.uniform1f(u.u_fogK, 0); gl.uniform1f(u.u_cloudR, VR.Clouds.RANGE * VR.Clouds.CELL * 1.04);
+      gl.uniform3f(u.u_origin, -E.time * 0.9 - cam.x, -cam.y, -cam.z);
+      if (cu.n) { gl.bindVertexArray(cu.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, cu.n); }
+      this.puffCount = fog.n + cu.n;
+      gl.bindVertexArray(null); gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE); gl.depthFunc(gl.LEQUAL);
     }
 
     // ------------------------------------------------ ships (block grids with a model matrix)
@@ -832,7 +934,9 @@
       gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
       {
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
+        if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
+        if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);   // t-clouds: cirrus from balanced up
         this.fs(p);
       }
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
@@ -846,7 +950,7 @@
           gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
           gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
           gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
-          if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind);
+          if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
           if (p.u.u_emissiveBoost) gl.uniform1f(p.u.u_emissiveBoost, E.emissiveBoost);
           if (p.u.u_normalStrength) gl.uniform1f(p.u.u_normalStrength, this.q.normals === 0 ? 0 : 1);
           if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, this.jit && !this.q.lite ? Math.sqrt(Math.max(0.35, this.w / this.W)) : 1);   // lite: natural mips (cheaper texture reads on weak GPUs)
@@ -868,6 +972,10 @@
       if (F.horizon) F.horizon.draw(this, E);
       // voxel models & meshes
       if (F.drawOpaque) F.drawOpaque(this, E);
+      // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
+      this.reflOn = false;
+      this.stats.reflMs = 0;
+      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) { const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; }
       // ---------------- copy scene for refraction
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
@@ -884,12 +992,13 @@
         this.bindTerrainTextures(p);
         this.tex(4, this.copyCol, p.u.u_sceneColor);
         this.tex(5, this.copyDepth, p.u.u_sceneDepth);
+        this.waterUniforms(p, E);
         gl.uniform2f(p.u.u_screen, this.w, this.h);
         gl.uniform2f(p.u.u_nearFar, 0.06, F.cam.far || 1200);
         gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
         gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
         gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
-        if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind);
+        if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
         if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, F.underwater ? 1 : 0);
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
@@ -918,6 +1027,127 @@
       this.post(F, E);
       this.gpuTimerEnd();
       this.stats.ms = performance.now() - t0;
+    }
+
+    // ------------------------------------------------ planar water reflection (F7)
+    // the water surface on the centre ray: its height in blocks, or null when solid ground or nothing comes first
+    waterPlane(world, cam) {
+      const R = VR.R, F = VR.F, fw = this.camFwd;
+      if (!fw || !R || !R.T) return null;
+      // the steep ray (the bottom of the picture, where the water usually is) first, then the centre
+      for (const k of [0.6, 0.3, 0]) {
+        let dx = fw[0], dy = fw[1] - k, dz = fw[2];
+        const l = Math.hypot(dx, dy, dz); dx /= l; dy /= l; dz /= l;
+        for (let t = 0.6; t < 90; t += 0.6) {
+          const x = Math.floor(cam.x + dx * t), y = Math.floor(cam.y + dy * t), z = Math.floor(cam.z + dz * t);
+          if (y < 0 || y > 511) continue;
+          const s = world.getBlock(x, y, z);
+          if (!s) continue;
+          const fl = R.T.flags[s];
+          if (fl & F.WATER) {
+            if (R.T.flags[world.getBlock(x, y + 1, z)] & F.WATER) break;   // inside a body, not its surface
+            const lv = R.types[R.T.type[s]].get(s, 'level');
+            return y + (lv === 0 ? 0.875 : lv >= 8 ? 1 : (8 - lv) / 9);     // the mesher's surface heights
+          }
+          if (fl & F.OPAQUE) break;
+        }
+      }
+      return null;
+    }
+    // the reflection target: a quarter of the frame on tier 1, half on tier 2 (made when first needed, kept until the
+    // size or the colour format changes)
+    ensureReflection() {
+      const gl = this.gl, k = this.q.water >= 2 ? 0.5 : 0.25;
+      const rw = Math.max(16, Math.floor(this.w * k)), rh = Math.max(9, Math.floor(this.h * k));
+      if (this.reflFB && rw === this.reflW && rh === this.reflH && this.reflHdr === this.hdr) return true;
+      if (this.reflFB) gl.deleteFramebuffer(this.reflFB);
+      if (this.reflCol) gl.deleteTexture(this.reflCol);
+      if (this.reflDepth) gl.deleteTexture(this.reflDepth);
+      this.reflFB = null;
+      const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+      this.reflCol = GL.tex2D(rw, rh, cfmt, gl.RGBA, ctype, { filter: gl.LINEAR });
+      this.reflDepth = GL.tex2D(rw, rh, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
+      this.reflFB = GL.fbo([this.reflCol], this.reflDepth);
+      this.reflW = rw; this.reflH = rh; this.reflHdr = this.hdr;
+      return !!this.reflFB;
+    }
+    // the mirrored pass: the sky (its directions mirrored, see u_skyOff), the opaque and cut-out sections above the
+    // water within reach, and the horizon on tier 2. Lengyel's oblique near plane clips what lies under the water.
+    reflectPass(F, E, world, vis, camPos) {
+      const gl = this.gl, WW = VR.WaterWave, M4 = VR.mat4, cam = this.cam;
+      if (!this.ensureReflection()) return false;
+      const plane = this.waterPlane(world, cam);
+      if (plane === null || cam.y < plane + 0.02) return false;
+      const d = plane - cam.y;                                    // the plane, camera-relative
+      if (!this.mirM) { this.mirM = M4.create(); this.clipC = M4.create(); this.projR = M4.create(); this.viewProjR = M4.create(); this.invViewProjR = M4.create(); this.planesR = new Float32Array(24); }
+      WW.mirrorY(this.mirM, d);
+      WW.planeInView(this.clipC, this.view, d);
+      WW.obliqueProj(this.projR, this.projNJ, this.clipC);
+      M4.mul(this.tmpM, this.view, this.mirM);
+      M4.mul(this.viewProjR, this.projR, this.tmpM);
+      M4.frustum(this.planesR, this.viewProjR);
+      M4.invert(this.invViewProjR, this.viewProjR);
+      // the sections that can show in the mirror: their top is above the water and they are within reach
+      const reach = this.q.water >= 2 ? 160 : 96, reach2 = reach * reach, list = this.reflList || (this.reflList = []);
+      list.length = 0;
+      for (const sec of vis) {
+        if (sec.oy - cam.y + 16 <= d) continue;
+        if (sec.oy - cam.y > 40) continue;     // the high sky (clouds): their mirror images read as stray cubes on the water
+        const dx = sec.ox + 8 - cam.x, dz = sec.oz + 8 - cam.z;
+        if (dx * dx + dz * dz > reach2) continue;
+        list.push(sec);
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.reflFB);
+      gl.viewport(0, 0, this.reflW, this.reflH);
+      gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+      {
+        const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
+        gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProjR);
+        if (p.u.u_skyOff) gl.uniform3f(p.u.u_skyOff, 0, 2 * d, 0);
+        this.fs(p);
+        if (p.u.u_skyOff) gl.uniform3f(p.u.u_skyOff, 0, 0, 0);
+      }
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      gl.frontFace(gl.CW);                                        // the mirror turns every triangle inside out
+      const savedVP = this.viewProj, savedPlanes = this.planes;
+      this.viewProj = this.viewProjR; this.planes = this.planesR;
+      const dr0 = this.stats.draws;
+      for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
+        gl.useProgram(p.p);
+        this.common(p, E);
+        this.bindTerrainTextures(p);
+        gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProjR);
+        gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
+        gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
+        if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind);
+        if (p.u.u_emissiveBoost) gl.uniform1f(p.u.u_emissiveBoost, E.emissiveBoost);
+        if (p.u.u_normalStrength) gl.uniform1f(p.u.u_normalStrength, this.q.normals === 0 ? 0 : 1);
+        if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, 1);
+        if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
+        if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        if (layer === 1) gl.disable(gl.CULL_FACE);
+        this.drawSections(list, layer, p, camPos, this.planesR, false);
+        gl.enable(gl.CULL_FACE);
+      }
+      this.stats.reflSecs = list.length; this.stats.reflDraws = this.stats.draws - dr0;     // (test/water.mjs reports them)
+      if (this.q.water >= 2 && F.horizon) F.horizon.draw(this, E);
+      this.viewProj = savedVP; this.planes = savedPlanes;
+      gl.frontFace(gl.CCW);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
+      gl.viewport(0, 0, this.w, this.h);
+      this.reflOn = true;
+      return true;
+    }
+    // the water's uniforms in the translucent pass (surface waves, reflection, caustics, wind)
+    waterUniforms(p, E) {
+      const gl = this.gl, u = p.u;
+      if (u.u_windDir) { const wd = E.windDir || [1, 0]; gl.uniform2f(u.u_windDir, wd[0], wd[1]); }
+      if (u.u_stormK) gl.uniform1f(u.u_stormK, VR.WaterWave.stormK(E.wind));
+      if (u.u_waterTier) gl.uniform1f(u.u_waterTier, this.q.water | 0);
+      if (u.u_reflOn) gl.uniform1f(u.u_reflOn, this.reflOn ? 1 : 0);
+      if (u.u_reflTex) this.tex(8, this.reflOn && this.reflCol ? this.reflCol : this.texNoise, u.u_reflTex);
     }
 
     drawPrecip(F, E) {
@@ -967,6 +1197,8 @@
         const c = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]];
         for (const [a, bb] of [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]) pts.push(...c[a], ...c[bb]);
       }
+      // (W2: plain segments too — the Bauhand's dashed lot and its footprint grid: x y z x y z …, from o.x o.y o.z)
+      if (o.lines) { const n = o.lines.length - (o.lines.length % 6); for (let i = 0; i < n && pts.length < 4096 * 3; i++) pts.push(o.lines[i]); }
       if (pts.length > 4096 * 3) pts.length = 4096 * 3;
       gl.useProgram(p.p);
       gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
@@ -1110,7 +1342,7 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.raysFB); gl.viewport(0, 0, this.raysW, this.raysH);
             this.tex(0, this.copyDepth, p.u.u_depth); this.tex(1, this.sceneCol, p.u.u_color);
             gl.uniform2f(p.u.u_sunScreen, sx, sy);
-            gl.uniform1f(p.u.u_raysStrength, fade * (E.sunDir[1] > 0 ? 0.55 : 0.2));
+            gl.uniform1f(p.u.u_raysStrength, fade * (E.sunDir[1] > 0 ? (E.rays !== undefined ? E.rays : 0.55) : 0.2));
             this.fs(p);
           }
         }
@@ -1126,11 +1358,19 @@
       gl.uniform1f(p.u.u_exposure, E.exposure);
       gl.uniform1f(p.u.u_bloomStrength, useBloom ? (E.bloomStrength || 0.06) : 0);
       gl.uniform1f(p.u.u_useRays, raysOn ? 1 : 0);
-      gl.uniform1f(p.u.u_vignette, F.photo ? F.photo.vignette : 0.55);
+      gl.uniform1f(p.u.u_vignette, F.photo ? F.photo.vignette : (E.vignette !== undefined ? E.vignette : 0.55));
       gl.uniform1f(p.u.u_saturation, (F.photo && F.photo.saturation) || E.saturation || 1.12);
+      if (p.u.u_contrast) gl.uniform1f(p.u.u_contrast, E.contrast || 0);
       gl.uniform3f(p.u.u_grade, E.grade[0], E.grade[1], E.grade[2]);
       if (p.u.u_vivid) gl.uniform1f(p.u.u_vivid, E.vivid === undefined ? 0 : E.vivid);
       gl.uniform1f(p.u.u_underwaterFx, F.underwater ? 1 : 0);
+      if (p.u.u_shafts) {
+        const sun = E.sunDir[1] > 0 ? E.sunDir[1] : 0, on = F.underwater && this.q.water >= 2 ? 1 : 0;
+        gl.uniform1f(p.u.u_shafts, on * (1 - E.rain) * Math.min(1, sun * 3));
+        gl.uniform3f(p.u.u_shaftCol, 0.35 * sun + 0.1, 0.75 * sun + 0.1, 0.9 * sun + 0.1);
+        gl.uniformMatrix4fv(p.u.u_invVP, false, this.invVPNJ);
+      }
+      if (p.u.u_crossing) gl.uniform1f(p.u.u_crossing, F.crossing || 0);
       gl.uniform1f(p.u.u_time, E.time);
       gl.uniform1f(p.u.u_damage, F.damage || 0);
       gl.uniform1f(p.u.u_portal, F.portal || 0);

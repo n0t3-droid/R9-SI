@@ -5,6 +5,7 @@
 (function (VR) {
   'use strict';
   const R = VR.R, F = VR.F, PH = VR.PHYS, mat4 = VR.mat4, SH = VR.SHAPE;
+  const IDENT = mat4.create();   // (drawModel starts from it: no new matrix per model drawn)
   const MOBS = VR.MOBS = {
     glimmer_deer: { model: 'glimmer_deer', hp: 10, speed: 3.2, w: 0.45, h: 1.4, drops: [['raw_beef', 1, 2], ['crystal_shard_azure', 0, 1]], xp: 2, biomes: /prism|crystal|forest|meadow|birch|taiga|grove/, group: [2, 4] },
     moss_boar: { model: 'moss_boar', hp: 12, speed: 2.8, w: 0.5, h: 0.95, drops: [['raw_porkchop', 1, 3], ['leather', 0, 1]], xp: 2, biomes: /forest|jungle|taiga|dark|swamp|plains|savanna/, group: [2, 3] },
@@ -16,6 +17,10 @@
     void_stalker: { model: 'void_stalker', hp: 40, speed: 4.2, w: 0.3, h: 2.7, hostile: true, dmg: 6, drops: [['nether_star_shard', 0, 1], ['amethyst_shard', 1, 2]], xp: 10, teleports: true },
     raider_drone: { model: 'raider_drone', hp: 14, speed: 6, w: 0.45, h: 0.9, hostile: true, fly: 'hover', dmg: 3, ranged: true, drops: [['energy_cell', 0, 1], ['iron_ingot', 0, 1]], xp: 6 },
     hover_drone: { model: 'hover_drone', hp: 20, speed: 7, w: 0.3, h: 0.6, fly: 'hover', friendly: true, drops: [], xp: 0 },
+    // 🐾 companions (src/main/companions.js, rules in src/shared/pets.js): peaceful, never hurt by you, rare in the wild
+    glimmer_fox: { model: 'glimmer_fox', hp: 10, speed: 3.6, w: 0.3, h: 0.72, drops: [], xp: 0, companion: true, biomes: /meadow|plains|forest|birch|flower|sunflower|cherry|taiga|grove/ },
+    moss_cat: { model: 'moss_cat', hp: 10, speed: 3.0, w: 0.26, h: 0.62, drops: [], xp: 0, companion: true, biomes: /meadow|plains|forest|jungle|swamp|grove|taiga|flower|birch/ },
+    crystal_pup: { model: 'crystal_pup', hp: 10, speed: 3.8, w: 0.28, h: 0.7, drops: [], xp: 0, companion: true, biomes: /crystal|prism|beach|river|meadow|plains|shore/ },
   };
   VR.MOB_EGGS && VR.MOB_EGGS.forEach((m) => { if (!MOBS[m]) MOBS[m] = MOBS.glimmer_deer; });
 
@@ -58,8 +63,8 @@
       this.spawnT -= dt;
       if (this.spawnT > 0) return;
       this.spawnT = 1.2;
-      const counts = { passive: 0, hostile: 0, ambient: 0 };
-      for (const m of this.mobs) counts[m.def.hostile ? 'hostile' : m.def.ambient ? 'ambient' : 'passive']++;
+      const counts = { passive: 0, hostile: 0, ambient: 0, wild: 0 };
+      for (const m of this.mobs) { if (m.pet) continue; counts[m.def.hostile ? 'hostile' : m.def.ambient ? 'ambient' : m.def.companion ? 'wild' : 'passive']++; }
       const E = g.env.E, night = E.night > 0.5;
       const zen = p.mode === 'zen';
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -89,8 +94,13 @@
           this.summon(kind, x + 0.5, top + 1, z + 0.5); counts.hostile++;
           continue;
         }
+        // 🐾 a wild companion is rare: meadows, a little more often near a village; never in zen (the zen check above)
+        if (counts.wild < 3 && !night && g.dim === 'overworld' && (ground === VR.GEN.S().grass || ground === VR.GEN.S().podzol)) {
+          const opts = Object.keys(MOBS).filter(k => MOBS[k].companion && MOBS[k].biomes.test(key));
+          if (opts.length && Math.random() < (this.nearVillage(x, z) ? 0.01 : 0.003)) { this.summon(opts[Math.floor(Math.random() * opts.length)], x + 0.5, top + 1, z + 0.5); counts.wild++; continue; }
+        }
         if (counts.passive < 14 && !night && (ground === VR.GEN.S().grass || ground === VR.GEN.S().sand || ground === VR.GEN.S().podzol)) {
-          const opts = Object.keys(MOBS).filter(k => !MOBS[k].hostile && !MOBS[k].ambient && MOBS[k].biomes && MOBS[k].biomes.test(key));
+          const opts = Object.keys(MOBS).filter(k => !MOBS[k].hostile && !MOBS[k].ambient && !MOBS[k].companion && MOBS[k].biomes && MOBS[k].biomes.test(key));
           if (!opts.length) continue;
           const kind = opts[Math.floor(Math.random() * opts.length)];
           const [g0, g1] = MOBS[kind].group || [1, 2];
@@ -100,6 +110,7 @@
         }
       }
     }
+    nearVillage(x, z) { const V = this.game.villages; if (!V || !V.sites) return false; for (const s of V.sites) if (Math.abs(s.x - x) < 80 && Math.abs(s.z - z) < 80) return true; return false; }
     // ---------------------------------------------------------------- items
     dropStack(stack, fromPlayer, at) {
       const p = this.game.player;
@@ -127,7 +138,7 @@
         m.age += dt;
         const dx = m.pos[0] - p.pos[0], dz = m.pos[2] - p.pos[2], d2 = dx * dx + dz * dz;
         if (m.dead) { m.deathT += dt; if (m.deathT > 0.8) { this.onMobDeath(m); this.mobs.splice(i, 1); } continue; }
-        if (d2 > 140 * 140 || (!w.isLoaded(Math.floor(m.pos[0]), Math.floor(m.pos[2])))) { this.mobs.splice(i, 1); continue; }
+        if (!m.pet && (d2 > 140 * 140 || (!w.isLoaded(Math.floor(m.pos[0]), Math.floor(m.pos[2]))))) { this.mobs.splice(i, 1); continue; }
         if (m.def.hostile && p.mode === 'zen') { this.mobs.splice(i, 1); continue; }
         m.hurt = Math.max(0, m.hurt - dt);
         this.ai(m, dt, d2);
@@ -204,6 +215,7 @@
       if (m.pos[1] < -20) m.dead = true;
     }
     ai(m, dt, d2) {
+      if (m.pet) { if (this.game.companions) this.game.companions.steer(m, dt, d2); return; }
       const g = this.game, p = g.player, def = m.def, A = m.ai, w = g.world;
       A.t -= dt; A.cool -= dt; A.flee -= dt;
       let tx = null, tz = null, speed = def.speed;
@@ -324,6 +336,12 @@
       if (!hit) return;
       const blockDist = p.target ? p.target.dist : 99;
       if (hit.dist > blockDist) return;
+      if (hit.ent.def && hit.ent.def.companion) {
+        const C = g.companions;
+        if (rclick && C) { C.onUse(hit.ent, p, input.keys.has('ShiftLeft') || input.keys.has('ShiftRight')); input.mouse.clicked[2] = false; input.mouse.releasedBtn[2] = false; p.placeCooldown = 0.3; }
+        else if (click && C) { C.pat(hit.ent); input.mouse.clicked[0] = false; input.mouse.releasedBtn[0] = false; p.breakCooldown = 0.35; p.handSwing = 1; }
+        return;
+      }
       if (rclick && hit.ent.onUse) { hit.ent.onUse(p); input.mouse.clicked[2] = false; input.mouse.releasedBtn[2] = false; p.placeCooldown = 0.3; return; }
       if (click && hit.ent.onHit) { hit.ent.onHit(p.pos); p.handSwing = 1; input.mouse.clicked[0] = false; input.mouse.releasedBtn[0] = false; p.breakCooldown = 0.35; return; }
       if (!click || !hit.ent.def) return;
@@ -338,11 +356,11 @@
       input.mouse.clicked[0] = false; input.mouse.releasedBtn[0] = false; p.breakCooldown = 0.35;
     }
     hurtMob(m, dmg, from) {
-      if (m.dead || m.hurt > 0.3) return;
+      if (m.dead || m.hurt > 0.3 || m.def.companion) return;
       m.hp -= dmg; m.hurt = 0.5;
       if (from) { const dx = m.pos[0] - from[0], dz = m.pos[2] - from[2], l = Math.hypot(dx, dz) || 1; m.vel[0] += dx / l * 7; m.vel[2] += dz / l * 7; if (!m.def.fly) m.vel[1] = 5.5; }
       if (!m.def.hostile) m.ai.flee = 5;
-      this.game.audio.play('hurt');
+      this.game.audio.play('hurt', { at: m.pos });
       if (m.hp <= 0) { m.dead = true; this.game.particles.spark(m.pos[0], m.pos[1] + m.h * 0.5, m.pos[2], [1, 1, 1], 14, 3, 0); }
     }
     onMobDeath(m) {
@@ -416,7 +434,7 @@
       gl.uniform3f(p.u.u_tint, 1, 1, 1);
       gl.uniform1f(p.u.u_noFog, opts.noFog ? 1 : 0);
       const base = this.mm;
-      base.set(mat4.create());
+      base.set(IDENT);
       if (opts.baseMat) base.set(opts.baseMat);
       else {
         mat4.translate(base, base, pos[0] - cam.x, pos[1] - cam.y, pos[2] - cam.z);
@@ -447,6 +465,7 @@
       }
     }
     pose(m, t) {
+      if (m.def && m.def.companion && VR.Companions) return VR.Companions.poseOf(m, t);
       const gait = m.def ? VR.getVoxModel(this.game.renderer.gl, m.def.model).def.gait : 'biped';
       const s = Math.sin(m.walk * 3) * 0.7 * (m.walkAmt || 0);
       const P = {};
@@ -534,6 +553,8 @@
         const s = t.defaultState, shape = R.T.shape[s];
         const tint = icons.tintOf(s) || [1, 1, 1];
         const opaqueLayer = R.T.layer[s] === 0;
+        // a recoloured block (B1 „🎨 Aussehen"): every face in its colour (|shade| 3 in the mesh shader)
+        const rc = R.T.rc ? R.T.rc[s] : 0, rcCol = rc && VR.Looks ? ((c) => [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255])(VR.Looks.from565(rc)) : null;
         const faces = [];
         if (shape === SH.CUBE) for (let f = 0; f < 6; f++) { const fp = VR.MODEL.facePos(f, [0, 0, 0, 16, 16, 16]).map(v => v / 16); faces.push({ p: fp, uv: [0, 0, 0, 16, 16, 16, 16, 0], tex: R.T.tex[s * 6 + f], dir: f, tint: 1 }); }
         else if (R.models[s]) for (const f of R.models[s]) faces.push(f);
@@ -544,8 +565,8 @@
           const layer = f.tex & 0xfff;
           // opaque textures carry the tint mask in alpha (grass sides): tint every face, the mask decides
           const opq = opaqueLayer && !crossLike;
-          const useT = R.T.tint[s] && (opq || shape !== SH.CUBE || f.dir === 2 || !t.o.soil) ? tint : [1, 1, 1];
-          const sh = opq ? -1 : 1;
+          const useT = rcCol || (R.T.tint[s] && (opq || shape !== SH.CUBE || f.dir === 2 || !t.o.soil) ? tint : [1, 1, 1]);
+          const sh = (opq ? -1 : 1) * (rcCol ? 3 : 1);
           const idx = [0, 1, 2, 0, 2, 3];
           for (const k of idx) push(f.p[k * 3] - 0.5, f.p[k * 3 + 1] - 0.5, f.p[k * 3 + 2] - 0.5, f.uv[k * 2] / 16, f.uv[k * 2 + 1] / 16, layer, N[0], N[1], N[2], useT, sh);
           if (f.double) for (const k of [0, 2, 1, 0, 3, 2]) push(f.p[k * 3] - 0.5, f.p[k * 3 + 1] - 0.5, f.p[k * 3 + 2] - 0.5, f.uv[k * 2] / 16, f.uv[k * 2 + 1] / 16, layer, -N[0], -N[1], -N[2], useT, sh);
@@ -593,6 +614,7 @@
       const gl = r.gl, p = r.P.mesh;
       gl.useProgram(p.p); r.common(p, E);
       gl.uniformMatrix4fv(p.u.u_viewProj, false, viewProj || r.viewProj);
+      if (p.u.u_avgLum && r.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, r.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, r.texAlbedo); gl.uniform1i(p.u.u_albedo, 0);
       gl.uniform1f(p.u.u_flash, 0);
       return p;
@@ -618,6 +640,14 @@
         mat4.translate(M, M, dx, dy + 0.18 + Math.sin(it.age * 2.5) * 0.06, dz);
         mat4.rotY(M, M, it.spin);
         const sc = mesh.block ? 0.28 : 0.42;
+        // F6: a flat dark silhouette on the ground under the item (quality dropShadow: off on Very Low)
+        if (r.q && r.q.dropShadow && dx * dx + dz * dz < 28 * 28) {
+          const gy = this.game.world.topAt(Math.floor(it.pos[0]), Math.floor(it.pos[2])) + 1 - cam.y + 0.025;
+          const S = this.tmpShadow || (this.tmpShadow = mat4.create());
+          S.set(mat4.create());
+          mat4.translate(S, S, dx, gy, dz); mat4.rotY(S, S, it.spin); mat4.scale(S, S, sc * 0.95, 0.02, sc * 0.95);
+          this.drawMesh(r, p, mesh, S, { sky: 0, bl: [0, 0, 0] });
+        }
         mat4.scale(M, M, sc, sc, sc);
         this.drawMesh(r, p, mesh, M, this.lightAt(it.pos[0], it.pos[1] + 0.3, it.pos[2]));
         if (it.stack.n > 1) { const M2 = mat4.create(); M2.set(M); mat4.translate(M2, M2, 0.18, 0.12, 0.18); this.drawMesh(r, p, mesh, M2, this.lightAt(it.pos[0], it.pos[1] + 0.3, it.pos[2])); }
@@ -645,12 +675,14 @@
       const inv = mat4.invert(mat4.create(), r.view);
       const light = this.lightAt(pl.pos[0], pl.pos[1] + pl.eye, pl.pos[2]);
       const swing = pl.handSwing, sw = Math.sin(swing * Math.PI), sw2 = Math.sin(Math.sqrt(Math.max(0, swing)) * Math.PI);
-      const bobX = Math.sin(pl.bob * 2) * 0.03 * pl.bobAmt, bobY = Math.abs(Math.cos(pl.bob * 2)) * 0.035 * pl.bobAmt;
+      // the walk sways the arm (presence.js: by the speed) and a placed block pushes it forward (pushAt; a break, half)
+      const PR = VR.Presence, hs = PR.handSwayAt(Math.hypot(pl.vel[0], pl.vel[2]), pl.bob * 2), pk = PR.pushAt(pl.pushT) * (pl.pushAmp || 0);
+      const bobX = Math.sin(pl.bob * 2) * 0.03 * pl.bobAmt + hs.x, bobY = Math.abs(Math.cos(pl.bob * 2)) * 0.035 * pl.bobAmt + hs.y;
       const t = g.time || 0, idle = Math.sin(t * 1.3) * 0.006;
       const held = pl.inv.held;
       // camera-space arm: shoulder below the bottom-right corner, fist reaching toward the view centre
       const S = [0.64 + bobX, -0.8 - bobY + idle, -0.16];
-      const F = [0.32 + bobX - sw2 * 0.17, -0.38 - bobY + idle - sw * 0.1 + sw2 * 0.05, -0.8 - sw * 0.16];
+      const F = [0.32 + bobX - sw2 * 0.17, -0.38 - bobY + idle - sw * 0.1 + sw2 * 0.05 + pk * 0.03, -0.8 - sw * 0.16 - pk * 0.08];
       if (held) { F[0] += 0.02; F[1] -= 0.02; }
       const d = [F[0] - S[0], F[1] - S[1], F[2] - S[2]];
       const dl = Math.hypot(d[0], d[1], d[2]); d[0] /= dl; d[1] /= dl; d[2] /= dl;

@@ -37,9 +37,12 @@ const warm = await ev(() => { const t = performance.now(); VR.VX.spec(1); return
 console.log('  VX.init (the older blocks, before the tab)', warm, 'ms');
 const tab = await ev(async () => {
   const g = VR.game, ui = g.ui;
-  // time the icon painting itself, per frame
-  const paint = g.icons.paint.bind(g.icons); let inFrame = 0, maxIn = 0, n = 0; const tick = () => { maxIn = Math.max(maxIn, inFrame); inFrame = 0; };
-  g.icons.paint = (cv, id, size) => { const t = performance.now(); paint(cv, id, size); inFrame += performance.now() - t; n++; };
+  // time the icon work itself, per frame: the palette pump's ready step (stepIcon: the voxel slices and any lazy build of a
+  // model) and paint. A call made inside a timed one (paint → get → stepIcon) is counted once, in the outer one.
+  const icons = g.icons, paint = icons.paint.bind(icons), step = icons.stepIcon.bind(icons);
+  let inFrame = 0, maxIn = 0, sumIn = 0, n = 0, depth = 0; const tick = () => { maxIn = Math.max(maxIn, inFrame); inFrame = 0; };
+  const timed = (f) => (...a) => { if (depth) return f(...a); depth++; const t = performance.now(); try { return f(...a); } finally { const dt = performance.now() - t; depth--; inFrame += dt; sumIn += dt; n++; } };
+  icons.paint = timed(paint); icons.stepIcon = timed(step);
   ui.openInventory('creative');
   const btn = [...document.querySelectorAll('#invpanel .tabs button')].find(b => /Modern Living/.test(b.textContent));
   if (!btn) return { tab: false };
@@ -48,9 +51,9 @@ const tab = await ev(async () => {
   const painted = () => slots.filter(s => { const c = s.querySelector('canvas'), d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) return true; return false; }).length;
   let frames = 0;
   for (let k = 0; k < 400 && painted() < slots.length; k++) { await new Promise(r => requestAnimationFrame(r)); tick(); frames++; }
-  tick(); g.icons.paint = paint;
+  tick(); icons.paint = paint; icons.stepIcon = step;
   const ids = slots.map(s => s.dataset.id), pack = VR.R.types.filter(t => t.o.modern).map(t => t.name);
-  return { tab: true, label: btn.textContent, slots: slots.length, all: pack.every(n => ids.includes(n)), painted: painted(), clickMs: Math.round(clickMs), frames, maxIconMsPerFrame: Math.round(maxIn), icons: n };
+  return { tab: true, label: btn.textContent, slots: slots.length, all: pack.every(n => ids.includes(n)), painted: painted(), clickMs: Math.round(clickMs), frames, maxIconMsPerFrame: Math.round(maxIn), sumIconMs: Math.round(sumIn), icons: n };
 });
 console.log('  tab', JSON.stringify(tab));
 check(tab.tab && tab.all && tab.slots === boot.pack, 'the "' + tab.label + '" tab shows every item of the pack (' + tab.slots + ')');

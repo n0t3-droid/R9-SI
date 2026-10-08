@@ -36,8 +36,11 @@
       const T = R.T, A = this.g.tex.avgColor;
       const layer = T.tex[s * 6 + 2] & 0xfff;
       let r = A[layer * 4], gg = A[layer * 4 + 1], b = A[layer * 4 + 2];
-      const tint = T.tint[s];
-      if (tint) {
+      const tint = T.tint[s], rc = T.rc ? T.rc[s] : 0;
+      if (rc && VR.Looks) {
+        // a block with its own colour (B1 „🎨 Aussehen"): on average it is that colour (0..1 like the table)
+        const c = VR.Looks.from565(rc); r = ((c >> 16) & 255) / 255; gg = ((c >> 8) & 255) / 255; b = (c & 255) / 255;
+      } else if (tint) {
         const v = tint === 1 ? c.grass[ci] : tint === 3 ? c.water[ci] : c.foliage[ci];
         const k = tint === 3 ? 1.1 : 1.35;
         r *= ((v >> 11) & 31) / 31 * k; gg *= ((v >> 5) & 63) / 63 * k; b *= (v & 31) / 31 * k;
@@ -117,6 +120,16 @@
           ctx.restore();
         }
         for (const a of vils.agents) { const dx = a.pos[0] - p.pos[0], dz = a.pos[2] - p.pos[2]; if (dx * dx + dz * dz > 48 * 48) continue; ctx.fillStyle = '#7ad8ff'; ctx.fillRect(dx - 0.7, dz - 0.7, 1.4, 1.4); }
+      }
+      // ✨ wonders (found: ✨, not found yet within 1 km: ?)
+      if (g.wonders) for (const m of g.wonders.marks()) {
+        let dx = m.x + 0.5 - p.pos[0], dz = m.z + 0.5 - p.pos[2];
+        const L = Math.hypot(dx, dz), lim = (W / 2 - 9) / sc;
+        if (L > lim) { dx *= lim / L; dz *= lim / L; }
+        ctx.save(); ctx.translate(dx, dz); ctx.rotate(-p.yaw); ctx.scale(1 / sc, 1 / sc);
+        ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030';
+        ctx.strokeText(m.found ? '✨' : '?', 0, 0); ctx.fillStyle = m.found ? '#ffe7a6' : '#d9c6ff'; ctx.fillText(m.found ? '✨' : '?', 0, 0);
+        ctx.restore();
       }
       // friends playing with you
       if (g.mp && g.mp.active) for (const q of g.mp.players()) {
@@ -213,6 +226,15 @@
         ctx.beginPath(); ctx.moveTo(sx - 7, sy + 6); ctx.lineTo(sx - 7, sy - 1); ctx.lineTo(sx, sy - 8); ctx.lineTo(sx + 7, sy - 1); ctx.lineTo(sx + 7, sy + 6); ctx.closePath(); ctx.fill(); ctx.stroke();
         ctx.strokeStyle = '#000'; ctx.strokeText(v.name, sx + 11, sy); ctx.fillStyle = '#ffe6a8'; ctx.fillText(v.name, sx + 11, sy);
       }
+      // ✨ wonders: the found ones with their names, the ones not found yet within 1 km as „?"
+      if (g.wonders) for (const m of g.wonders.marks()) {
+        const [sx, sy] = toScr(m.x + 0.5, m.z + 0.5);
+        if (sx < -40 || sy < -20 || sx > W + 40 || sy > H + 20) continue;
+        ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = '#1a1030';
+        ctx.strokeText(m.found ? '✨' : '?', sx, sy); ctx.fillStyle = m.found ? '#ffe7a6' : '#d9c6ff'; ctx.fillText(m.found ? '✨' : '?', sx, sy);
+        if (m.found) { ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'left'; ctx.strokeText(m.name, sx + 12, sy); ctx.fillStyle = '#ffe7a6'; ctx.fillText(m.name, sx + 12, sy); }
+      }
+      ctx.textAlign = 'left';
       // player
       const [px, py] = toScr(p.pos[0], p.pos[2]);
       ctx.save(); ctx.translate(px, py); ctx.rotate(-p.yaw);
