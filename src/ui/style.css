@@ -95,6 +95,14 @@ html.einfach #mirrorchip { font-size: 15px; padding: 7px 13px; bottom: 52px; }  
 #compass { position: absolute; right: 12px; top: 198px; width: 180px; text-align: center; font-family: var(--display); font-size: 11px; color: var(--muted); display: none; }
 #vehiclehud { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); display: none; font-family: var(--display); font-size: 13px; letter-spacing: 1px; color: var(--accent); text-align: center; text-shadow: 0 0 8px rgba(58,240,255,.6), 0 1px 2px #000; white-space: nowrap; }
 #vehiclehud small { display: block; margin-top: 4px; font-family: var(--font); font-size: 13px; letter-spacing: .3px; color: #cfe6ff; text-shadow: 0 1px 2px #000; }
+/* 🏗 the construction site's bar (baustelle.js): top centre, over the pause screen too (⏩ can be clicked there) */
+#bauhud { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; display: none; pointer-events: none; min-width: 270px; max-width: 72vw; background: rgba(6, 9, 20, 0.66); border: 1px solid var(--line2); border-radius: 12px; padding: 7px 10px 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+#bauhud .bh-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+#bauhud .bh-t { font-family: var(--display); font-size: 13px; letter-spacing: .5px; color: #ffe2a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+#bauhud .bh-skip { pointer-events: auto; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: #1d1d1f; background: linear-gradient(#ffd75a, #f0a830); border: 0; border-radius: 8px; padding: 4px 11px; white-space: nowrap; }
+#bauhud .bh-skip:hover { filter: brightness(1.08); }
+#bauhud .bh-bar { margin-top: 6px; height: 6px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+#bauhud .bh-bar i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(135deg, #f2b90f 0 7px, #26282c 7px 14px); transition: width .15s linear; }
 #shot { position: absolute; right: 16px; bottom: 16px; z-index: 40; display: none; background: var(--panel2); border: 1px solid var(--line2); border-radius: 12px; padding: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.55); cursor: pointer; animation: toastIn .3s ease-out; }
 #shot img { display: block; width: min(320px, 60vw); border-radius: 8px; user-select: auto; -webkit-user-select: auto; }
 #shot .note { font-size: 12px; margin-top: 6px; text-align: center; }

@@ -1853,5 +1853,21 @@
     'g.pet.m.coming': 'kommt',
     'g.pet.pfeifen': '🐾 Pfeifen',
     'g.pet.pfeifenTip': 'Alle Begleiter, die sitzen oder schlafen, kommen zu dir.',
+    // ---- 🏗 Baustelle (baustelle.js): geplante Bauten entstehen vor deinen Augen
+    'g.bau.settingTip': 'Geplante Bauten: sofort da, oder sie entstehen vor deinen Augen (Gerüst, Bauleute, Kran, Konfetti).',
+    'g.bau.setting': '🏗 Bauen',
+    'g.bau.instant': 'Sofort',
+    'g.bau.site': 'Baustelle',
+    'g.bau.instantTip': 'Geplante Bauten stehen sofort da (am leichtesten für langsame PCs)',
+    'g.bau.siteTip': 'Geplante Bauten entstehen vor deinen Augen: Gerüst, Bauleute, Kran, Konfetti',
+    'g.bau.start': '🏗 Baustelle',
+    'g.bau.startSub': '{name} entsteht — Klick drauf: sofort fertig',
+    'g.bau.progress': '🏗 {name} · {p} % gebaut',
+    'g.bau.skip': '⏩ Fertig',
+    'g.bau.skipTip': 'Sofort fertig bauen (auch: Klick auf die Baustelle oder /bau fertig)',
+    'g.bau.done': '✨ {name} steht!',
+    'g.bau.cancel': 'Baustelle abgebrochen — alles zurück',
+    'g.bau.none': 'Gerade wird nichts gebaut.',
+    'g.bau.bench': 'Werkbank',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
