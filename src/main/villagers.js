@@ -82,13 +82,13 @@
   // (the saved choice is an index: the two trailer suits keep the places 0 and 6 of the first list)
   // c: the armour, a: the accent (orange on the blue hero), w: the white panels, helm: the helmet with its cyan visor
   V.HERO_SUITS = [
-    { name: 'Blau', c: 0x2452D8, a: 0xF07E1E, w: 0xF4F6FA, helm: 1 },
+    { name: 'Blau', tx: ['g.hero.blau', 'Blau', 'Blue'], c: 0x2452D8, a: 0xF07E1E, w: 0xF4F6FA, helm: 1 },
     { name: 'Ember Red', c: 0xC8402E, a: 0xF2F2EC },
     { name: 'Jungle Green', c: 0x3A8A4A, a: 0xF0C040 },
     { name: 'Violet Star', c: 0x7048C0, a: 0x3AF0FF },
     { name: 'Arctic White', c: 0xE4E8EE, a: 0x2F8AE0 },
     { name: 'Shadow', c: 0x2E323C, a: 0xFF4AA0 },
-    { name: 'Orange', c: 0xF07E1E, a: 0x2452D8, w: 0xF4F6FA, helm: 1 },
+    { name: 'Orange', tx: ['g.hero.orange', 'Orange', 'Orange'], c: 0xF07E1E, a: 0x2452D8, w: 0xF4F6FA, helm: 1 },
     { name: 'Teal Wave', c: 0x1F9A9A, a: 0xFFE04A },
   ];
   const clampI = (v, n) => { v = v | 0; return v < 0 ? 0 : v >= n ? n - 1 : v; };
