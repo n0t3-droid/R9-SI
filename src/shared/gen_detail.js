@@ -214,14 +214,19 @@
       return true;
     };
     const n = pts.length;
-    // a glass bus shelter once per road, a little way out, on the side that is free
+    // one glass bus shelter per town, a little way out from the kerb of the first road long enough: the first free spot
+    // along the road (its middle first, then nearer the ends), on either side; the glass faces the road
     if (S.modern && n > 40 && !plan.shelterDone) {
-      const k = Math.floor(n * 0.45), [px, pz, pa] = pts[k], ry = sm[k];
-      const nx = -Math.sin(pa), nz = Math.cos(pa), sd = rng.chance(0.5) ? 1 : -1;
-      const cx = px + nx * 3 * sd, cz = pz + nz * 3 * sd;
-      const f = dirOf(-nx * sd, -nz * sd);                    // the glass faces the road
-      const ty = Math.max(ground(Math.round(cx), Math.round(cz)), ry);
-      if (placeModel('vm_mobility_busshelter_glass', f, cx, cz, ty)) { plan.shelterDone = true; det.shelters++; }
+      const sd0 = rng.chance(0.5) ? 1 : -1;
+      for (const fr of [0.45, 0.35, 0.55, 0.25, 0.65, 0.15, 0.75]) for (const sd of [sd0, -sd0]) {
+        if (plan.shelterDone) break;
+        const k = Math.floor(n * fr), [px, pz, pa] = pts[k], ry = sm[k];
+        const nx = -Math.sin(pa), nz = Math.cos(pa);
+        const cx = px + nx * 3 * sd, cz = pz + nz * 3 * sd;
+        const f = dirOf(-nx * sd, -nz * sd);
+        const ty = Math.max(ground(Math.round(cx), Math.round(cz)), ry);
+        if (placeModel('vm_mobility_busshelter_glass', f, cx, cz, ty)) { plan.shelterDone = true; det.shelters++; }
+      }
     }
     for (let k = 4; k < n - 4; k++) {
       const [px, pz, pa] = pts[k], ry = sm[k];

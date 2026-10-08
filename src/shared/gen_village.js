@@ -566,6 +566,9 @@
     // F6: towns made from vgen 6 on carry the detail layer (gen_detail.js); older towns are planned exactly as before
     const detOn = !!(VR.Detail && VR.Detail.on(g));
     const detP = (x, y, z, nm, pr) => put(x, y, z, typeof nm === 'number' ? nm : st(nm, pr));
+    // the street decor draws from its own rng and runs after every lot is placed (it only takes cells nothing else
+    // took), so a town keeps its roads and houses exactly as at vgen 5 and only gains the street pieces
+    const detRng = new VR.RNG((site.seed ^ 0x2545f491) >>> 0), decorJobs = [];
     const AIR = 0;
     if (HOME) { const B = VR.TempleGen.box; for (let x = B.x0 - 2; x <= B.x1 + 2; x++) for (let z = B.z0 - 2; z <= B.z1 + 2; z++) { const o = oi(x, z); if (o >= 0) occ[o] = 7; } }
     const plan = { rad: RAD, id: site.id, name: site.name, style: site.style, x: cx, z: cz, y: site.y, seed: site.seed, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: null, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null };
@@ -697,7 +700,7 @@
           // street trees on the sidewalk line, alternating sides
           const side = (k / 10 | 0) % 2 ? -1 : 1;
           const tx = Math.round(px + nx * 3 * side), tz = Math.round(pz + nz * 3 * side), o2 = oi(tx, tz);
-          if (o2 >= 0 && occ[o2] === 0) { occ[o2] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st(detOn && S.modern ? 'dirt' : 'grass_block')); if (detOn && S.modern) VR.Detail.treeGrate({ P: detP, occ, oi, ground, plan }, tx, ty, tz, st, fill); fill(tx, tz, ty + 1, ty + 8, AIR); const f = ['apple', 'cherry', 'plum', 'orange'][(tx + tz) & 3]; put(tx, ty + 1, tz, st('vx_fruit_trunk')); put(tx, ty + 2, tz, st('vx_fruit_trunk')); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(tx + a, ty + 3, tz + b, st('vx_fruit_crown_' + f)); if (Math.abs(a) + Math.abs(b) <= 1) put(tx + a, ty + 4, tz + b, st('vx_fruit_crown_' + f)); } }
+          if (o2 >= 0 && occ[o2] === 0) { occ[o2] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st(detOn && S.modern ? 'dirt' : 'grass_block')); if (detOn && S.modern) decorJobs.push(() => VR.Detail.treeGrate({ P: detP, occ, oi, ground, plan }, tx, ty, tz, st, fill)); fill(tx, tz, ty + 1, ty + 8, AIR); const f = ['apple', 'cherry', 'plum', 'orange'][(tx + tz) & 3]; put(tx, ty + 1, tz, st('vx_fruit_trunk')); put(tx, ty + 2, tz, st('vx_fruit_trunk')); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(tx + a, ty + 3, tz + b, st('vx_fruit_crown_' + f)); if (Math.abs(a) + Math.abs(b) <= 1) put(tx + a, ty + 4, tz + b, st('vx_fruit_crown_' + f)); } }
         }
         if (S.pathLine) {
           if (S.tech) {
@@ -726,7 +729,7 @@
           if (o >= 0 && occ[o] === 0) { occ[o] = 6; const gy = ground(lx, lz); const ly = Math.max(gy, ry); fill(lx, lz, gy + 1, ly, st('dirt')); put(lx, ly + 1, lz, st(S.lamp, { head: 0 })); put(lx, ly + 2, lz, st(S.lamp, { head: 1 })); fill(lx, lz, ly + 3, ly + 5, AIR); plan.lamps.push([lx, ly + 2, lz]); }
         }
       }
-      if (detOn && S.modern) VR.Detail.roadDecor({ P: detP, occ, oi, ground, st, fill, AIR, rng, plan }, pts, sm, S);
+      if (detOn && S.modern) decorJobs.push(() => VR.Detail.roadDecor({ P: detP, occ, oi, ground, st, fill, AIR, rng: detRng, plan }, pts, sm, S));
       roads.push(road);
       plan.roads.push(road.pts.filter((_, k) => k % 3 === 0));
     }
@@ -1276,6 +1279,8 @@
         }
       }
     }
+    // the street decor of a modern town, last: the free cells left after every lot and road
+    for (const job of decorJobs) job();
     // ---- bucket ops per chunk
     const chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
