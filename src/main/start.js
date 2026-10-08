@@ -399,7 +399,7 @@
   // the cheat-like chat commands are a Profi thing (Einfach: the chat stays, /give, /time, /tp … get the note). The
   // friendly ones work in Einfach too: the language, the way home, the block look, the weather and 🏭 /bau — they change
   // nothing a world's rules forbid (survival without cheats still refuses /bau and /wetter after this gate)
-  ST.einfachCmd = (text) => /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call)(\s|$)/i.test(text);
+  ST.einfachCmd = (text) => /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call|pfeifen)(\s|$)/i.test(text);
   if (VR.Game) {
     const origChat = VR.Game.prototype.chat;
     VR.Game.prototype.chat = function (text) {
