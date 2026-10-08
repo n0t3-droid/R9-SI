@@ -812,9 +812,11 @@ float propSun() {
 }
 #endif
 void main() {
-  vec4 t = texture(u_tex, v_uv);
+  bool solid = v_uv.x > 1.5;                       // the trunk, the bulb, the nuts: no atlas lookup
+  vec4 t = solid ? vec4(1.0) : texture(u_tex, v_uv);
   if (t.a < 0.5) discard;                          // the cutout: leaflets and gaps
   vec3 alb = t.rgb * v_col;
+  if (solid && v_uv.x < 2.5 && v_uv.y > 0.6) { float rg = fract(v_uv.y); alb *= 0.78 + 0.22 * smoothstep(0.04, 0.3, rg) * (1.0 - smoothstep(0.72, 0.97, rg)); }   // the bark rings
   vec3 N = gl_FrontFacing ? normalize(v_n) : -normalize(v_n);   // two-sided: a frond is lit from both faces
   float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;

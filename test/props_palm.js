@@ -18,7 +18,7 @@ check(Array.from(palm.verts).every(Number.isFinite), 'no NaN or infinity in the 
 check(Array.from(palm.idx).every(i => i < palm.nv), 'every index is a vertex of the palm');
 // 2. the bounds: the trunk reaches its hidden depth, the crown rises a little above the origin, the fronds spread wide
 check(palm.min[1] <= -PR.TRUNK_D + 0.01, 'the trunk reaches its depth (y min ' + palm.min[1].toFixed(2) + ')');
-check(palm.max[1] > 0.4 && palm.max[1] < 1.2, 'the crown rises just above the trunk top (y max ' + palm.max[1].toFixed(2) + ')');
+check(palm.max[1] > 1.0 && palm.max[1] < 3.0, 'the young fronds and the spear leaves rise above the trunk top (y max ' + palm.max[1].toFixed(2) + ')');
 let maxR = 0, minY = Infinity, frondVerts = 0, trunkTop = 0;
 const ids = new Set();
 for (let i = 0; i < palm.nv; i++) {
@@ -33,10 +33,23 @@ check(minY <= -1.2, 'the fronds droop below the crown (lowest green tip y ' + mi
 check(trunkTop > 0, 'the trunk has its top ring at the crown');
 const frondIds = [...ids].sort((a, b) => a - b);
 check(frondIds.join(',') === Array.from({ length: 17 }, (_, i) => i).join(','), 'frond slots 0–14 (green, dead), 15 (trunk, bulb), 16 (coconuts) all present');
-// the tips: each green frond's tip hangs below its base, the dead ones hang straight down
-let droop = 0;
-for (let k = 0; k < PR.FROND_N; k++) { const tip = PR.frondPoint(k, 1), mid = PR.frondPoint(k, 0.5); if (tip[1] < mid[1] - 0.5 && Math.hypot(tip[0], tip[2]) > 4.5) droop++; }
-check(droop === PR.FROND_N, 'every green frond droops from its middle to a tip 4.5+ blocks out (' + droop + ' of ' + PR.FROND_N + ')');
+// the fronds fan out round the crown in tiers and arch under their weight: every green frond's tip is lower than its
+// highest point; the low ones (leaving the crown under 0.4 rad) reach 4.5+ blocks out and hang their tips below the crown,
+// the high ones (over 0.6 rad) rise above it; the azimuths cover the whole circle (no gap wider than 70°)
+let arch = 0, low = 0, lowOk = 0, high = 0, highOk = 0; const azs = [];
+for (let k = 0; k < PR.FROND_N; k++) {
+  const a = PR.frondAxis(k), tip = PR.frondPoint(k, 1); let top = -Infinity;
+  for (let i = 0; i <= 20; i++) top = Math.max(top, PR.frondPoint(k, i / 20)[1]);
+  if (tip[1] < top - 0.05) arch++;
+  if (a.el < 0.4) { low++; if (Math.hypot(tip[0], tip[2]) > 4.5 && tip[1] < -0.6) lowOk++; }
+  if (a.el > 0.6) { high++; if (tip[1] > 0.4) highOk++; }
+  azs.push(((a.az % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI));
+}
+azs.sort((a, b) => a - b); let gap = 2 * Math.PI - azs[azs.length - 1] + azs[0]; for (let i = 1; i < azs.length; i++) gap = Math.max(gap, azs[i] - azs[i - 1]);
+check(arch === PR.FROND_N, 'every green frond arches under its weight (' + arch + ' of ' + PR.FROND_N + ')');
+check(low >= 3 && lowOk === low, 'the low fronds reach 4.5+ blocks out and hang below the crown (' + lowOk + ' of ' + low + ')');
+check(high >= 3 && highOk === high, 'the young fronds rise above the crown (' + highOk + ' of ' + high + ')');
+check(gap < 70 * Math.PI / 180, 'the fronds fan out all round the crown (largest gap ' + (gap * 180 / Math.PI).toFixed(0) + '°)');
 let dead = 0;
 for (let k = PR.DEAD_FIRST; k < PR.DEAD_FIRST + 2; k++) { const tip = PR.frondPoint(k, 1); if (tip[1] < -1.5 && Math.hypot(tip[0], tip[2]) < 2.5) dead++; }
 check(dead === 2, 'the two dead fronds hang under the crown, close to the trunk (' + dead + ' of 2)');
