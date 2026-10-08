@@ -261,5 +261,5 @@ section('gift', () => {
   delete globalThis.localStorage;
 });
 
-console.log(fails ? 'FAILED ' + fails + ' of ' + n : 'ALL OK (' + n + ' checks)');
+console.log((fails ? 'FAILED ' + fails + ' of ' + n : 'ALL OK (' + n + ' checks)') + '\n' + (fails ? 'FAILED ' + fails : 'ALL OK'));
 process.exit(fails ? 1 : 0);
