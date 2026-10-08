@@ -206,7 +206,11 @@
         const sh = shape(x, z); if (!sh || sh.isle !== I || !free(x, z)) continue;
         if (I.temple && Math.abs(x - I.x) < 12 && Math.abs(z - I.z - 2) < 12) continue;
         if (I.hoodoo && Math.abs(x - I.x) < 9 && Math.abs(z - I.z) < 9) continue;
-        if (rng.chance(0.7)) GEN.TREES.roundTree(w, x, sh.top + 1, z, rng); else put(x, sh.top + 1, z, rng.chance(0.5) ? K.BUSH : K.FERN);
+        if (VR.Plants && VR.Plants.on(g)) {   // vgen 7: the trailer's round trees (voxel crowns, dense leaf balls), tufts and flower clusters
+          const r = rng.next();
+          if (r < 0.45) { const big = rng.chance(0.4), o = big ? 2 : 1; for (const [px, py, pz, st] of VR.Plants.parts(big ? 'vm_tree_round_l' : 'vm_tree_round_s', x - o, sh.top + 1, z - o, 0)) put(px, py, pz, st); }
+          else put(x, sh.top + 1, z, VR.R.S(r < 0.75 ? 'vm_tuft_grass' : 'vm_flower_cluster', { part: 'p000', facing: 0 }));
+        } else if (rng.chance(0.7)) GEN.TREES.roundTree(w, x, sh.top + 1, z, rng); else put(x, sh.top + 1, z, rng.chance(0.5) ? K.BUSH : K.FERN);
       }
       const nC = 1 + rng.int(3);
       for (let k = 0; k < nC; k++) {
