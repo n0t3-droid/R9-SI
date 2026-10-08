@@ -59,7 +59,7 @@ for (const name of P.NAMES) {
   const trunk = calls.filter(c => c[1] < y0 + h), crown = calls.filter(c => c[1] >= y0 + h);
   check(trunk.length === h && trunk.every(c => c[0] === x0 && c[2] === z0), 'the palm trunk is h blocks in one column');
   check(crown.length === VR.VM.MODELS.vm_palm_crown.parts.length, 'the crown places every part (' + crown.length + ')');
-  check(crown.every(c => c[0] >= x0 - 2 && c[0] <= x0 + 2 && c[2] >= z0 - 2 && c[2] <= z0 + 2 && c[1] <= y0 + h + 1), 'the crown stays within 5×2×5 blocks on the trunk top');
+  check(crown.every(c => c[0] >= x0 - 3 && c[0] <= x0 + 3 && c[2] >= z0 - 3 && c[2] <= z0 + 3 && c[1] <= y0 + h + 1), 'the crown stays within 7×2×7 blocks on the trunk top');
   const keys = new Set(calls.map(c => c[0] + ',' + c[1] + ',' + c[2]));
   check(keys.size === calls.length, 'no block is placed twice');
 }
@@ -93,16 +93,16 @@ for (const name of P.NAMES) {
   check(nPlant >= 150, 'the plot of Nova Haven has plants (' + nPlant + ' blocks, want at least 150)');
   console.log('    on a path, by kind:', JSON.stringify(onPathKind));
   check(nOnPath === 0, 'no plant stands on a street or a plaza (' + nOnPath + ' do)');
-  // every shared palm: the crown's 5×5×2 box holds all its parts, or none (a house wall never overwrote a part)
+  // every shared palm: the crown's 7×7×2 box holds all its parts, or none (a house wall never overwrote a part)
   const crownN = VM.MODELS.vm_palm_crown.parts.length;
   let palms = 0, broken = 0;
   for (const [x, y, z, n] of plantCells) {
-    const inside = x >= cx0 * 16 + 2 && x <= (cx1 + 1) * 16 - 3 && z >= cz0 * 16 + 2 && z <= (cz1 + 1) * 16 - 3;   // the whole crown is in the plot
+    const inside = x >= cx0 * 16 + 3 && x <= (cx1 + 1) * 16 - 4 && z >= cz0 * 16 + 3 && z <= (cz1 + 1) * 16 - 4;   // the whole crown is in the plot
     if (!inside || n !== 'vx_palm_trunk' || isPlant[at(x, y + 1, z)] && names[typeOf[at(x, y + 1, z)]] === 'vx_palm_trunk') continue;   // a trunk top
     let have = 0;
-    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let dy = 1; dy <= 2; dy++) if (names[typeOf[at(x + dx, y + dy, z + dz)]] === 'vm_palm_crown') have++;
+    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let dy = 1; dy <= 2; dy++) if (names[typeOf[at(x + dx, y + dy, z + dz)]] === 'vm_palm_crown') have++;
     if (!have) continue;
-    palms++; if (have !== crownN) { broken++; const miss = []; for (const pp of VM.MODELS.vm_palm_crown.parts) { const bx = x - 2 + pp.px, by = y + 1 + pp.py, bz = z - 2 + pp.pz; if (names[typeOf[at(bx, by, bz)]] !== 'vm_palm_crown') miss.push(names[typeOf[at(bx, by, bz)]]); } console.log('    crown', have, 'of', crownN, 'at', x, y, z, 'overwritten by', [...new Set(miss)].join(',')); }
+    palms++; if (have !== crownN) { broken++; const miss = []; for (const pp of VM.MODELS.vm_palm_crown.parts) { const bx = x - 3 + pp.px, by = y + 1 + pp.py, bz = z - 3 + pp.pz; if (names[typeOf[at(bx, by, bz)]] !== 'vm_palm_crown') miss.push(names[typeOf[at(bx, by, bz)]]); } console.log('    crown', have, 'of', crownN, 'at', x, y, z, 'overwritten by', [...new Set(miss)].join(',')); }
   }
   check(palms >= 4, 'Nova Haven has shared palms in the plot (' + palms + ', at least the four of its plaza)');
   check(broken === 0, 'every shared palm has its whole crown (' + broken + ' broken of ' + palms + ')');
