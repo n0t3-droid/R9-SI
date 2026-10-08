@@ -243,5 +243,21 @@ section('game', () => {
   check(!wg2.st.d && !wg2.job && !wg2.rise, 'a guest in a friend\'s world does not build (the host does)');
 });
 
+// ---- the gift: a wonder found on this device is kept for the Studio's ✨ chip (storage guarded; a bad store keeps none)
+section('gift', () => {
+  const store = {};
+  globalThis.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  W.giveGift('sternwarte', 0x2b1d); W.giveGift('sternwarte', 99); W.giveGift('nope', 5); W.giveGift('kristall', 0);
+  const gl = W.gifts();
+  check(gl.length === 2 && gl.some(x => x.type === 'sternwarte' && x.seed === 0x2b1d) && gl.some(x => x.type === 'kristall' && x.seed === 1), 'a found wonder is a gift kept across worlds (the first seed holds; an unknown type or a zero seed is refused): ' + JSON.stringify(gl));
+  check(W.gifts().every(x => W.type(x.type) && x.seed > 0 && typeof x.de === 'string'), 'every gift names a real wonder and its seed');
+  globalThis.localStorage = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+  let threw = false; try { W.giveGift('labyrinth', 3); threw = W.gifts().length !== 0; } catch (e) { threw = true; }
+  check(!threw, 'blocked storage: nothing is kept and nothing is thrown');
+  globalThis.localStorage = { getItem: () => '{not json', setItem: () => {} };
+  check(W.gifts().length === 0, 'a corrupt store reads as no gifts');
+  delete globalThis.localStorage;
+});
+
 console.log(fails ? 'FAILED ' + fails + ' of ' + n : 'ALL OK (' + n + ' checks)');
 process.exit(fails ? 1 : 0);

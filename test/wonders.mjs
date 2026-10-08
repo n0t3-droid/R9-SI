@@ -87,6 +87,7 @@ for (let i = 0; i < 30; i++) { await step(3); found = await ev((k) => { const g 
 check(found && found.found, 'standing by its heart discovers it');
 check(found && found.banner && found.banner.on && found.banner.text === '✨ Wunder entdeckt: ' + nameDe, 'the big banner: ' + JSON.stringify(found && found.banner));
 check(found && found.codex, 'the codex has its page under ✨ Wunder');
+check(await ev((t) => VR.Wonders.gifts().some(x => x.type === t), first.type), 'the find is kept on this device as a gift (the Studio’s ✨ chip)');
 // the picture: drawing a frame here takes a while, so the banner is shown once more for it (the moment itself was checked)
 await step(2); await draw(true);
 const fadeAt = Date.now();
@@ -165,4 +166,12 @@ for (let k = 0; k < TYPES8.length; k++) {
   console.log('  photographed ' + type + ' (' + pl.dna + ', F ' + pl.F + ', land ' + JSON.stringify(spot) + ', built ' + built + ', ' + ((Date.now() - T0) / 1000).toFixed(0) + ' s)');
 }
 check(shots.filter(s => !/not built/.test(s)).length === 10, 'all eight wonders built and photographed, two by night too: ' + shots.join(' · '));
+// ---- the Studio's 🏭 Forge (same origin, so the same device store): the found wonder is a ✨ chip that builds anywhere
+const sp = await ctx.newPage(); sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 600)));
+await sp.goto(URL0 + '/studio.html', { timeout: 120000 });
+for (let i = 0; i < 120; i++) { if (await sp.evaluate(() => !!document.querySelector('[data-mode="forge"]'))) break; await sp.waitForTimeout(500); }
+await sp.click('[data-mode="forge"]', { timeout: 60000 }).catch(() => { /* checked below */ });
+await sp.waitForTimeout(1200);
+const chips = await sp.evaluate(() => [...document.querySelectorAll('#chips button[data-ftype^="wonder:"]')].map(b => b.textContent.trim()));
+check(chips.includes('✨ ' + nameDe), 'the Studio’s Forge offers „✨ ' + nameDe + '“ as a chip: ' + JSON.stringify(chips));
 await finish();
