@@ -179,6 +179,7 @@ check(await ev(() => !document.querySelector('#r9legal.on') && VR.game.ui.screen
 
 console.log('5 · Join before the answer: the friend’s hello carries „Explorer“');
 await clearMp(); await page.reload(); t = await toTitle();
+for (let i = 0; i < 40 && !(await ev(() => VR.game.mp && VR.game.mp.hostList().length >= 1)); i++) await wait(250);   // (the lobby's peers arrive a moment after the title)
 r = await ev(() => ({ hosts: VR.game.mp.hostList().length, join: !!document.querySelector('#mphosts .mphost button'), card: !!document.getElementById('r9mpcard') }));
 check(r.hosts === 1 && r.join && r.card, 'a friend’s world is listed with Join, the card is up');
 await ev(() => document.querySelector('#mphosts .mphost button')?.click());
