@@ -180,6 +180,7 @@
     'g.pack.libN': '{n} building pieces',
     'g.pack.replaced': '({n} replaced)',
     'g.pack.nothing': 'nothing new',
+    'g.pack.empty': 'empty',
     'g.pack.kept': '{n} newer here, kept',
     // ---- settings
     'g.set.title': 'Settings',

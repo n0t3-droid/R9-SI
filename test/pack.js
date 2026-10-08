@@ -48,7 +48,7 @@ check(junk && !Object.keys(junk.studio.houses).length && !Object.keys(junk.studi
 
 console.log('3 · the summary');
 const s0 = P.summary({ favs: ['a', 'b', 'c', 'd'], studio: { houses: { 1: {}, 2: {} }, models: { m: {} } }, lib: [1, 2, 3] });
-check(s0.text === '4 Favoriten · 2 Häuser · 1 Möbel · 3 Bauteile', 'says what is in it: ' + s0.text);
+check(s0.text === '4 Favoriten · 2 Häuser · 1 Möbelstück · 3 Bauteile', 'says what is in it: ' + s0.text);
 check(P.summary({ favs: ['a'], studio: { houses: { 1: {} }, models: {} }, lib: [1] }).text === '1 Favorit · 1 Haus · 1 Bauteil', 'singular, and what is not there is not mentioned');
 
 console.log('4 · merging');
@@ -93,5 +93,18 @@ check(okAfter === false, 'a favourite that could not be stored: F.ok is false');
   const t = { box: [1, 1, 0, 0], pal: ['keep'], rle: '***' };
   check(VR.Custom.tplData({ tpl: t }) === null && VR.Custom.tplData({ tpl: t }) === null, 'a corrupted template builds the original house (tplData → null, twice, no throw)');
 }
+// the summary in German and English (i18n2): the g.pack.* entries of the tables; the German text is unchanged
+console.log('6 · the summary in German and English');
+check(P.summary({ favs: [], studio: {}, lib: [] }).text === 'leer', 'an empty pack says leer (German, no language module)');
+require('../src/main/i18n.js');
+require('../src/main/lang_de.js');
+require('../src/main/lang_en.js');
+const big = { favs: ['a', 'b', 'c', 'd'], studio: { houses: { 1: {}, 2: {} }, models: { m: {} } }, lib: [1, 2, 3] };
+VR.I18N.lang = 'en';
+check(P.summary(big).text === '4 favourites · 2 houses · 1 piece of furniture · 3 building pieces', 'English summary: ' + P.summary(big).text);
+check(P.summary({ favs: ['a'], studio: { houses: { 1: {} }, models: {} }, lib: [1] }).text === '1 favourite · 1 house · 1 building piece', 'English singular: ' + P.summary({ favs: ['a'], studio: { houses: { 1: {} }, models: {} }, lib: [1] }).text);
+check(P.summary({ favs: [], studio: {}, lib: [] }).text === 'empty', 'an empty pack says empty (English)');
+VR.I18N.lang = 'de';
+check(P.summary(big).text === '4 Favoriten · 2 Häuser · 1 Möbelstück · 3 Bauteile', 'German again after the switch: ' + P.summary(big).text);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
