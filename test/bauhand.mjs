@@ -4,7 +4,7 @@
 // (nothing changed), the wheel turns it (the hotbar stays), Survival shows the card and no ring („Kreativ"), a sofa in view
 // gets its card and ✏️ opens the Crafter on it (#craft/m/vm_sofa…), standing on the spot: a red ghost and a click that
 // changes nothing (LMB never breaks); B does nothing in chat, on a screen, in a vehicle; Esc puts it away; no page errors.
-// Screenshots: w2_ring, w2_ghost, w2_placed, w2_ghost_bad, w2_survival. ONLY=1,3 runs only those sections.
+// Screenshots: w2_ring, w2_ghost, w2_placed, w2_ghost_bad, w2_card, w2_survival (each after a 600 ms settle). ONLY=1,3 runs only those sections.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import { spawn } from 'child_process';
 const PORT = 8765 + Math.floor(Math.random() * 200);
@@ -80,6 +80,7 @@ await section(2, 'key 1 holds the first; the ghost on the ground ahead', async (
   check(A && A.ok, 'a cyan ghost where the player looks (' + (A && (A.why || 'ok')) + ')');
   const chip = await safe(() => { const c = document.querySelector('#bhChip'); return c ? { t: c.textContent, ok: c.classList.contains('ok') } : null; });
   check(chip && chip.ok && /✓/.test(chip.t), 'the chip at the crosshair: ✓ and the name (' + (chip && chip.t) + ')');
+  await wait(600); // the strip and the chip finish their 0.2 s rise before the picture
   await shot('w2_ghost');
 });
 
@@ -100,6 +101,7 @@ await section(3, 'a click places it as one built plan; the toast says Z takes it
   check(st.undo === undo0 + 1, 'one undo step');
   check(/zurück/.test(st.toast || st.last), 'the toast says Z takes it back („' + (st.toast || st.last) + '")');
   check(st.holding, 'the bench stays in the hand');
+  await wait(600);
   await shot('w2_placed');
 });
 
@@ -139,6 +141,7 @@ await section(6, 'standing on the spot: a red ghost, a click changes nothing (LM
   check(a && !a.ok && a.why === 'step', 'aiming at your own feet: not ok, „Tritt einen Schritt zurück"');
   const chip = await safe(() => { const c = document.querySelector('#bhChip'); return c ? { t: c.textContent, bad: c.classList.contains('bad') } : null; });
   check(chip && chip.bad && /Schritt zurück/.test(chip.t), 'the chip is red and says why (' + (chip && chip.t) + ')');
+  await wait(600);
   await shot('w2_ghost_bad');
   const s0 = a ? await boxState(a) : [], n0 = (await plans()).length, gy = await ground();
   await page.mouse.click(640, 360, { button: 'left' }); await wait(700);
@@ -190,6 +193,7 @@ await section(8, 'a sofa in view: its card, ✏️ opens the Crafter on it', asy
   const card = await until(() => { const c = document.querySelector('#bauhand.on .bh-card'); return c && c.querySelector('.bh-cname') ? { name: c.querySelector('.bh-cname').textContent, acts: [...c.querySelectorAll('.bh-act')].map(b => b.dataset.act) } : null; }, null, 10);
   console.log('  card', JSON.stringify(card));
   check(card && card.acts.includes('edit'), 'its card on top of the ring, with ✏️ (' + (card && card.acts.join(' ')) + ')');
+  await wait(600); // the card and the ring finish fading before the picture
   await shot('w2_card');
   if (!card) return;
   await page.click('#bauhand .bh-card [data-act="edit"]');
@@ -207,6 +211,7 @@ await section(9, 'Survival: the card and the way to Zen, no ring', async () => {
   console.log('  survival', JSON.stringify(s));
   check(s && s.slots === 0 && s.surv, 'no ring in Survival');
   check(s && /Kreativ/.test(s.msg) && s.zen, 'the text says „Kreativ" and offers „Zen einschalten"');
+  await wait(600);
   await shot('w2_survival');
   await page.keyboard.press('Escape'); await wait(300);
   await ev(() => { const g = VR.game; g.player.setMode('zen'); });
