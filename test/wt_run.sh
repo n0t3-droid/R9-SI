@@ -7,4 +7,11 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd -P)
 b=$(basename "$1"); to=${2:-900}
 TMP=$ROOT/.tmp_tests; mkdir -p "$TMP" "$ROOT/test/shots"
 sed -e "s#/home/claude/vr#$ROOT#g" -e "s#require('\./#require('$ROOT/test/#g" "$ROOT/test/$b" > "$TMP/$b"
-if [[ $b == *.mjs ]]; then exec flock /tmp/r9_browser.lock timeout "$to" node "$TMP/$b"; else exec timeout "$to" node "$TMP/$b"; fi
+# Node tests take one of two slots (/tmp/r9_node_0.lock, _1): at most two run at once next to the one browser test,
+# so a dozen agents on an 8 GB machine never run it out of memory (that restarted the container once).
+if [[ $b == *.mjs ]]; then exec flock /tmp/r9_browser.lock timeout "$to" node "$TMP/$b"; fi
+for i in $(seq 1 600); do
+  for s in 0 1; do exec 9>"/tmp/r9_node_$s.lock"; if flock -n 9; then exec timeout "$to" node "$TMP/$b"; fi; exec 9>&-; done
+  sleep 1
+done
+exec flock /tmp/r9_node_0.lock timeout "$to" node "$TMP/$b"
