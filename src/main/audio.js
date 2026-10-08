@@ -281,12 +281,12 @@
         const src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
         const f = c.createBiquadFilter();
         const g = c.createGain(); g.gain.value = 0;
-        const cfg = { rain: ['highpass', 1200, 0.2], wind: ['bandpass', 400, 0.8], jet: ['bandpass', 900, 1.2], engine: ['lowpass', 300, 4], flyby: ['lowpass', 420, 2.5], water: ['bandpass', 600, 0.6], fire: ['bandpass', 1500, 0.5], cave: ['lowpass', 180, 1] }[name] || ['lowpass', 500, 1];
+        const cfg = { rain: ['highpass', 1200, 0.2], wind: ['bandpass', 400, 0.8], jet: ['bandpass', 900, 1.2], engine: ['lowpass', 300, 4], flyby: ['lowpass', 420, 2.5], water: ['bandpass', 600, 0.6], fire: ['bandpass', 1500, 0.5], cave: ['lowpass', 180, 1], hum: ['bandpass', 180, 2.5] }[name] || ['lowpass', 500, 1];
         f.type = cfg[0]; f.frequency.value = cfg[1]; f.Q.value = cfg[2];
         src.connect(f); f.connect(g); g.connect(name === 'jet' || name === 'engine' || name === 'flyby' ? this.sfx : this.amb);
         src.start();
         let osc = null;
-        if (name === 'engine' || name === 'jet' || name === 'flyby') { osc = c.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 55; const og = c.createGain(); og.gain.value = 0.25; osc.connect(og); og.connect(f); osc.start(); }
+        if (name === 'engine' || name === 'jet' || name === 'flyby' || name === 'hum') { osc = c.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 55; const og = c.createGain(); og.gain.value = 0.25; osc.connect(og); og.connect(f); osc.start(); }
         L = this.loops[name] = { src, f, g, osc, base: cfg[1] };
       }
       L.g.gain.setTargetAtTime(level, c.currentTime, 0.25);

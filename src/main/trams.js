@@ -1,9 +1,16 @@
 // ============================================================================
-// Sky trams: a two-car tram shuttles along every sky-rail viaduct between the
-// stations of two towns (the lines come from the world generator, see
-// gen_rails.js). Their timetable follows a clock, so a tram is always where it
-// should be when you arrive. Right-click a car to ride; Shift gets you off at
-// a station (or onto the roof between stations).
+// Sky trams: a two-car tram shuttles along every rail line the world places —
+// the sky-rail viaducts between towns, the Canyon Loop and the Heartland's
+// citadel viaducts (the lines come from the world generator: gen_rails.js and
+// its providers). Their timetable follows a clock, so a tram is always where it
+// should be when you arrive. A tram stops at each end (its station) and waits
+// there. Riding (the state machine, see board()):
+//   · right-click a car while it waits at a station: you board
+//   · right-click (or Shift) at a station: you get off onto the platform
+//   · Shift while it moves: the hint; Shift again climbs onto the roof
+//   · a tram that is still moving cannot be boarded
+// At dusk and at night the headlights glint, and a soft rail hum swells as a tram
+// comes near (both cost a few particles and one audio loop, nothing per block).
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -11,6 +18,7 @@
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const mat4 = VR.mat4;
   const CAR = 6, GAP = 0.5, BOGIE = 2.2, VMAX = 13, ACC = 2.4, DWELL = 10;
+  const HUM_NEAR = 70, GLINT_NEAR = 140;   // the hum swells within 70 blocks of a tram; headlight glints within 140
   const OFF = CAR / 2 + GAP / 2;
   const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 
@@ -95,6 +103,8 @@
       return [p[0] - hx, p[1], p[2] - hz, p[0] + hx, p[1] + 3.2, p[2] + hz];
     }
     onUse() { const g = VR.game; if (g && g.trams) g.trams.board(this); }
+    // the nose's forward and right vectors (the seats and the headlights use them)
+    forward() { return [-Math.sin(this.yaw), -Math.cos(this.yaw)]; }
   }
 
   class Trams {
@@ -106,6 +116,7 @@
       this.clock = E ? ((E.day || 0) * 24000 + (E.ticks || 0)) / 20 : 0;
       this.pollT = 0; this.pollAt = null; this.busy = false;
       this.announce = null;
+      this.glowT = 0;
     }
     destroy() { this.lines.clear(); this.cars.length = 0; }
     poll(dt) {
@@ -144,11 +155,44 @@
           g.audio && g.audio.play && g.audio.play('click');
         }
       }
+      this.atmosphere(dt, p);
+    }
+    // the rail hum (one audio loop, its level by the nearest car) and the headlight glints at dusk and night (a few
+    // particles every 20th of a second for the cars near the player)
+    atmosphere(dt, p) {
+      const g = this.g, E = g.env, night = E ? (E.night || 0) : 0;
+      let near = 1e9;
+      for (const c of this.cars) { const d = Math.hypot(c.pos[0] - p.pos[0], c.pos[2] - p.pos[2]); if (d < near) near = d; }
+      if (g.audio && g.audio.loop) g.audio.loop('hum', near < HUM_NEAR ? (1 - near / HUM_NEAR) * 0.09 : 0, 0.4);
+      if (night < 0.12 || !g.particles) return;
+      this.glowT -= dt;
+      if (this.glowT > 0) return;
+      this.glowT = 0.05;
+      const col = [1, 0.93, 0.74];
+      for (const c of this.cars) {
+        const dx = c.pos[0] - p.pos[0], dz = c.pos[2] - p.pos[2];
+        if (dx * dx + dz * dz > GLINT_NEAR * GLINT_NEAR) continue;
+        const F = c.forward(), R = [Math.cos(c.yaw), -Math.sin(c.yaw)], y = c.pos[1] + 0.9;
+        for (const side of [-0.85, 0.85]) {
+          const hx = c.pos[0] + F[0] * 2.95 + R[0] * side, hz = c.pos[2] + F[1] * 2.95 + R[1] * side;
+          g.particles.glow(hx, y, hz, col, 0.12, 0.3, 0);
+          g.particles.glow(hx + F[0] * 3.2, y, hz + F[1] * 3.2, col, 0.1, 0.2, 0);
+        }
+      }
     }
     // ---------------------------------------------------------------- riding (through the gadgets' riding slot)
+    // the state machine: idle → (right-click a car that waits at a station) → riding; riding → (right-click or Shift at a
+    // station) → off onto the platform; a car that moves can't be boarded (and a click while riding it asks you to wait)
     board(car) {
       const g = this.g, gd = g.gadgets, p = g.player;
-      if (!gd || gd.riding || p.dead) return;
+      if (!gd || p.dead) return;
+      const r = gd.riding;
+      if (r) {
+        if (r.type !== 'tram') return;
+        if (r.car.line.stop) gd.dismount(); else g.ui.hint(T('g.tram.moving'), 2200);
+        return;
+      }
+      if (!car.line.stop) { g.ui.hint(T('g.tram.wait'), 2200); return; }
       gd.riding = { type: 'tram', car, seat: car.idx === 0 ? 1.1 : -1.1 };
       p.flying = false; p.target = null; p.breaking = null;
       const L = car.line, to = L.v > 0 || (L.stop === 1) ? L.names[1] : L.names[0];
@@ -164,7 +208,10 @@
       if (!this.lines.has(c.line.key)) { g.gadgets.dismount(); return; }
       const sp = this.seatPos(r);
       p.pos = sp; p.vel = [0, 0, 0]; p.fallStart = null; p.onGround = true;
-      if (!blocked && (input.hit('ShiftLeft') || input.hit('ShiftRight') || input.hit('KeyV'))) {
+      if (blocked) return;
+      const mouse = input.mouse, rc = mouse && (input.dragLook ? input.clickAction(2) : mouse.clicked[2]);
+      if (rc) { mouse.clicked[2] = false; if (mouse.releasedBtn) mouse.releasedBtn[2] = false; this.board(c); return; }
+      if (input.hit('ShiftLeft') || input.hit('ShiftRight') || input.hit('KeyV')) {
         if (c.line.stop) { g.gadgets.dismount(); return; }
         if (r.roofAsk && this.clock - r.roofAsk < 2.5) { g.gadgets.dismount(); return; }
         r.roofAsk = this.clock;
@@ -216,4 +263,6 @@
     }
   }
   VR.Trams = Trams;
+  // the line and the car, for the node tests (tram_sched.js) — the game itself builds them through Trams
+  Trams.Line = Line; Trams.Car = Car;
 })(VR);
