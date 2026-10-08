@@ -6,6 +6,8 @@
 //  - SHOTS: outdoors above the plaza at 06:00 (ticks 0), 12:00 (6000), 18:30 (12500), 23:00 (17000); then inside a
 //    lit stone room (two torches, a glowing block, a window) built beside the spawn, at 18:30 and 23:00. On Very Low
 //    and High → test/shots/light_<preset>_<clock>.png and light_<preset>_inside_<clock>.png. LOOK at them.
+//  - RD (default 6) caps the render distance of both presets: at 14 chunks (High) the default world takes too long to
+//    generate on the shared machine. The shader tiers, shadows and effects are the preset's own.
 //  - no page errors; every test ends with ALL OK / FAILED n.
 // usage: TAG=f1base MODE=measure|shots|all PRESETS=potato,high FRAMES=8 DIST=<folder holding index.html> bash test/wt_run.sh light.mjs 1800
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -16,6 +18,7 @@ const PRESETS = (process.env.PRESETS || 'potato,high').split(',');
 const FRAMES = +(process.env.FRAMES || 8);
 const SEED = process.env.SEED || '1';
 const DIST = process.env.DIST || '/home/claude/vr/dist';
+const RD = +(process.env.RD || 6);   // render distance (chunks) of the measured scene, the same cap on both builds
 const SHOTS = '/home/claude/vr/test/shots';
 const CLOCKS = [['0600', 0], ['1200', 6000], ['1830', 12500], ['2300', 17000]];
 const INSIDE = [['1830', 12500], ['2300', 17000]];
@@ -53,7 +56,7 @@ try {
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   const results = {};
   for (const preset of PRESETS) {
-    await ev(([p]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.applySettings('*'); }, [preset]);
+    await ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.renderDist = rd; g.settings.dynRes = false; g.applySettings('*'); }, [preset, RD]);
     await ev(`VR.game.createWorld({name:'Light ${preset}',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
     for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
     await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.env.rainTarget = 0; g.hideHud = true; const hd = document.getElementById('hud'); if (hd) hd.style.display = 'none'; });
