@@ -747,8 +747,18 @@
       const d = PR.furnDef(kind), md = d && PR.FURN[d.model];
       if (!md) return (byKind[kind] = -1);
       let i = S.findIndex(sl => sl.key === d.model);
-      if (i < 0) { i = S.length; S.push({ key: d.model, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null }); }
+      if (i < 0) { i = S.length; S.push({ key: d.model, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null }); this.furnWarm(d.model); }
       return (byKind[kind] = i);
+    }
+    // a new model is built in an idle tick, one a tick, when its first piece arrives with a section (a cold build takes
+    // up to some 50 ms: in the draw it would stall the frame the house comes into view); the draw builds what is not
+    // ready yet itself
+    furnWarm(key) {
+      const Q = this.furnQ || (this.furnQ = []);
+      Q.push(key);
+      if (this.furnT) return;
+      const tick = () => { this.furnT = 0; const k = Q.shift(); if (k !== undefined && VR.Props) VR.Props.furnModel(k); if (Q.length) this.furnT = setTimeout(tick, 16); };
+      this.furnT = setTimeout(tick, 16);
     }
     // a mesh on the GPU: its vertices, indices and an instance buffer in one vertex array (the layout of props.js)
     propVao(m) {
