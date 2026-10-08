@@ -424,7 +424,7 @@
       if ((this.gcT = (this.gcT || 0) - dt) <= 0) { this.gcT = 20; this.gc(); }
       // keep parked ships' gear down & designs fresh
       for (const s of this.ships) { if (s.state === 'parked') s.gear = 1; s.d.last = performance.now(); }
-      if (g.settings && g.settings.anim !== false) for (const s of this.ships) if (s.hangar && s.state === 'parked') this.hangarFx(s);
+      if (g.settings && g.settings.anim !== false) for (const s of this.ships) if (s.hangar && s.state === 'parked' && !s.hidden) this.hangarFx(s);
       void p;
     }
     // the hangar shuttle's idle glow: its thrusters burn on the pad (a flying ship's engine trail at low thrust) and dust
@@ -442,7 +442,8 @@
     }
     refreshNear(force) {
       const p = this.g.player; if (!p) { this.near = []; return; }
-      this.near = this.ships.filter(s => s.state === 'parked' && s.d.occ && Math.abs(s.pos[0] - p.pos[0]) < 60 && Math.abs(s.pos[2] - p.pos[2]) < 60);
+      // (a hidden ship — the hangar's shuttle while it is out flying, hangarflight.js — is not there to bump into)
+      this.near = this.ships.filter(s => s.state === 'parked' && !s.hidden && s.d.occ && Math.abs(s.pos[0] - p.pos[0]) < 60 && Math.abs(s.pos[2] - p.pos[2]) < 60);
       void force;
     }
     hudText() {
@@ -469,6 +470,7 @@
       mat4.rotY(m, m, s.yaw);
       if (s.pitch) mat4.rotX(m, m, s.pitch);
       if (s.roll) mat4.rotZ(m, m, s.roll);
+      if (s.scale && s.scale !== 1) mat4.scale(m, m, s.scale, s.scale, s.scale);   // a ship drawn smaller (hangarflight.js)
       if (stretch && stretch !== 1) { const k = 1 / Math.sqrt(stretch); mat4.scale(m, m, k, k, stretch); }
       mat4.scale(m, m, 1 / res, 1 / res, 1 / res);
       mat4.translate(m, m, md.origin[0] * res, md.origin[1] * res, md.origin[2] * res);

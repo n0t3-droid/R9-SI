@@ -117,5 +117,111 @@ check(on.n > 20, `with Animierte Anzeigen on, the consoles blink near the hall (
 check(off.n === 0, 'with Animierte Anzeigen off nothing blinks');
 check(far.n === 0, 'far from the hall nothing blinks (no cost in the city)');
 
+// ---------------------------------------------------------------- the crew's walk to the corridor's city end (t2_20, t1_21)
+console.log('the crew walks out to the corridor\'s city end and back (hall.js Hall.patrol)');
+{
+  const padShip = V.Starship.build(pad.seed, 'shuttle', {});
+  const occ = padShip.occ, org = padShip.meta.origin;
+  // the parked hangar shuttle (pad x 0, z −10, yaw 0): is the world point inside one of its occupied cells?
+  const inShip = (x, y, z) => { const i = Math.floor(x - pad.x - org[0]), j = Math.floor(y - pad.y - org[1]), k = Math.floor(z - pad.z - org[2]); return i >= 0 && j >= 0 && k >= 0 && i < occ.bx && j < occ.by && k < occ.bz && !!occ.occ[(j * occ.bz + k) * occ.bx + i]; };
+  for (const [side, c] of [[1, crew.find(q => q[0] > 0)], [-1, crew.find(q => q[0] < 0)]]) {
+    const P0 = VR.Hall.patrol(0, side, c[3]), T = P0.T;
+    let bad = null, blocked = null, maxV = 0, prev = null, exitT = 0, consoleT = 0, exitYaw = 0, deepest = 0;
+    for (let t = 0; t < T; t += 0.05) {
+      const p = VR.Hall.patrol(t, side, c[3]);
+      if (prev) maxV = Math.max(maxV, Math.hypot(p.x - prev.x, p.z - prev.z) / 0.05);
+      prev = p;
+      deepest = Math.min(deepest, p.z);
+      if (p.phase === 'exit') { exitT += 0.05; exitYaw = p.yaw; }
+      if (p.phase === 'console') { consoleT += 0.05; if (p.x !== c[0] || p.z !== c[2] || p.yaw !== c[3]) bad = bad || `console spot ${p.x},${p.z}`; }
+      // the body (0.35 m about its middle, 1.9 m tall) stands in air on a floor, clear of the parked shuttle
+      for (const dx of [-0.35, 0.35]) for (const dz of [-0.35, 0.35]) {
+        const bx = Math.floor(p.x + dx), bz = Math.floor(p.z + dz);
+        if (at(bx, Y + 1, bz) !== 0 || at(bx, Y + 2, bz) !== 0) blocked = blocked || `t ${t.toFixed(1)} (${p.x.toFixed(1)}, ${p.z.toFixed(1)}): ${at(bx, Y + 1, bz)}/${at(bx, Y + 2, bz)}`;
+        if (!at(bx, Y, bz)) blocked = blocked || `t ${t.toFixed(1)}: no floor at (${bx}, ${bz})`;
+        for (const y of [Y + 1.1, Y + 1.9]) if (inShip(p.x + dx, y, p.z + dz)) bad = bad || `t ${t.toFixed(1)} (${p.x.toFixed(1)}, ${p.z.toFixed(1)}) walks into the parked shuttle`;
+      }
+    }
+    check(!blocked, `side ${side}: every step stands in air on the floor (${blocked || 'hall, back door, corridor'})`);
+    check(!bad, `side ${side}: the walk keeps clear of the parked shuttle and starts at the console spot (${bad || 'ok'})`);
+    check(maxV <= 1.7, `side ${side}: a walking pace (${maxV.toFixed(2)} m/s at most)`);
+    check(consoleT >= 15, `side ${side}: ${consoleT.toFixed(0)} s at the consoles, facing the pad`);
+    check(deepest <= HEART.TEMPLE.back - 6 && exitT >= 10 && Math.abs(exitYaw) < 1e-6, `side ${side}: ${exitT.toFixed(0)} s at the corridor's city end (z ${deepest}), looking out north at the city`);
+  }
+}
+
+// ---------------------------------------------------------------- the Gate Temple's shuttle (hangarflight.js)
+console.log('the shuttle\'s loop: down the runway, in through the mouth, onto the pad and round again (hangarflight.js)');
+new Function('VR', fs.readFileSync(path.join(__dirname, '../src/main/hangarflight.js'), 'utf8'))(VR);
+{
+  const HF = VR.HangarFlight, S = HF.SCALE, span = 7.5 * S, len = 11.75 * S, tall = 8 * S, turnR = Math.hypot(span, len);
+  const OPEN = [3, 4, 5, 6, 6, 6, 6, 6, 6, 6, 5, 4, 3];
+  for (const variant of ['hall', 'apron']) {
+    const plan = HF.plan(variant), T = plan.T, dt = 1 / 60;
+    let jump = 0, vmax = 0, prev = null, lowPass = Infinity, overRunway = Infinity, mouthBad = null, hallBad = null, touch = null, dwell = 0, best = 0, dwellAt = null, phases = new Set();
+    for (let t = 0; t < T; t += dt) {
+      const s = HF.at(plan, t), p = s.pos;
+      phases.add(s.phase);
+      if (prev) { const v = Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]) / dt; vmax = Math.max(vmax, v); if (v > 40) jump++; }
+      prev = p.slice();
+      const ox = Math.abs(p[0] - HF.AX);
+      // low over the plaza on the way in, never scraping it
+      if (ox < 6 && p[2] > 40 && p[2] < 140) overRunway = Math.min(overRunway, p[1] - HF.DECK);
+      if (ox < 6 && p[2] > 40 && p[2] < 80 && (s.phase === 'air' || s.phase === 'in') && Math.cos(s.yaw) > 0.9) lowPass = Math.min(lowPass, -(p[1] - HF.DECK));
+      // through the mouth: the hull inside the octagon's rows
+      if (p[2] > 19 && p[2] < 22 + len && p[2] - len < 21) {
+        for (let y = Math.floor(p[1]); y <= Math.floor(p[1] + tall); y++) { const o = OPEN[y - HF.DECK]; if (o === undefined || ox + span > o + 0.5) mouthBad = mouthBad || `t ${t.toFixed(1)}: row y ${y} (half-width ${o}) vs hull ${(ox + span).toFixed(2)}`; }
+      }
+      // in the hall: within its walls (half-width 10.5 about x 0.5) and under the chamfers (y 91); turning, its whole circle
+      if (p[2] < 19) { const r = s.phase === 'turn' ? turnR : span; if (ox + r > 10.5 || p[1] + tall > 91) hallBad = hallBad || `t ${t.toFixed(1)} ${s.phase}: reach ${(ox + r).toFixed(2)}, top ${(p[1] + tall).toFixed(1)}`; }
+      // the apron variant stays outside: its nose (or its turning circle) never reaches the temple's face (z 21)
+      if (variant === 'apron' && p[2] < 70) { const reach = s.phase === 'turn' ? turnR : len; if (p[2] - reach < 21.5) touch = touch || `t ${t.toFixed(1)}: z ${(p[2] - reach).toFixed(2)}`; }
+      // the dwell on the pad: gear down, standing still on the deck
+      if (Math.abs(p[1] - HF.DECK) < 0.01 && s.speed < 0.05 && s.gear > 0.99) { dwell += dt; best = Math.max(best, dwell); dwellAt = p.slice(); } else dwell = 0;
+    }
+    const e = HF.at(plan, T - 1e-4).pos, b = HF.at(plan, 0).pos;
+    check(Math.hypot(e[0] - b[0], e[1] - b[1], e[2] - b[2]) < 0.05 && !jump, `${variant}: one closed loop of ${T.toFixed(0)} s without a jump (end to start ${Math.hypot(e[0] - b[0], e[1] - b[1], e[2] - b[2]).toFixed(3)} m)`);
+    check(vmax <= 32, `${variant}: at most ${vmax.toFixed(1)} m/s (a shuttle, not a fighter)`);
+    check(overRunway >= 2.5 && -lowPass <= 8, `${variant}: over the runway it never drops below ${overRunway.toFixed(1)} m; its last 40 m in it skims the plaza at ${(-lowPass).toFixed(1)} m at most (t3_03)`);
+    check(best >= 4.5 && dwellAt && Math.abs(dwellAt[2] - (variant === 'hall' ? HF.PADZ : HF.APRONZ)) < 0.01, `${variant}: ${best.toFixed(1)} s on the ${variant === 'hall' ? 'pad' : 'runway in front of the mouth'} with its gear down (z ${dwellAt && dwellAt[2]})`);
+    check(['in', 'settle', 'pad', 'lift', 'turn', 'out', 'air'].every(q => phases.has(q)), `${variant}: in, settle, pad, lift, turn, out and the air loop (${[...phases].join(' ')})`);
+    if (variant === 'hall') { check(!mouthBad, `hall: the hull passes the 13 × 13 mouth without touching its frame (${mouthBad || 'clear'})`); check(!hallBad, `hall: inside, the shuttle and its turn stay clear of the walls and the chamfers (${hallBad || 'clear'})`); }
+    else check(!touch, `apron: it lands and turns in front of the temple without touching it (${touch || 'clear'})`);
+  }
+  // high over the canyon's mesas in every world (the Heartland's composition is the same, its mesas vary with the seed)
+  const plan = HF.plan('hall');
+  let clear = Infinity, where = null;
+  for (const seed of [4242, 1, 777, 31337, 2026]) {
+    const gs = V.makeGen('overworld', seed, { vgen: 6 });
+    for (let t = plan.ground; t < plan.T; t += 0.25) { const p = HF.at(plan, t).pos; if (p[2] < 145) continue; const gy = gs.surfaceY(Math.floor(p[0]), Math.floor(p[2])); if (p[1] - gy < clear) { clear = p[1] - gy; where = [seed, Math.round(p[0]), Math.round(p[2])]; } }
+  }
+  check(clear >= 10, `over the canyon it keeps ${clear.toFixed(1)} m above the ground at least (seed ${where[0]}, at ${where[1]}, ${where[2]})`);
+
+  // the actor in a game: Animierte Anzeigen and the distance decide whether anything runs
+  const veil = st('portal_veil');
+  const mkGame = (o) => {
+    const calls = { design: 0, trail: 0, part: 0, draw: 0 };
+    const meta = { exhaust: [[-0.95, 3.35, 11.6, 0.72], [0.95, 3.35, 11.6, 0.72], [0, 2.25, 11.6, 0.72]], length: 23, width: 15, height: 8, bounds: [-7.5, 0, -11.25, 7.5, 8, 11.75] };
+    const home = { hangar: true, state: 'parked', pos: [0, 81, -10], hidden: false, hitbox: () => [-7.5, 81.3, -21.25, 7.5, 89, 1.75] };
+    const other = o.other ? { state: 'parked', pos: [0, 81, -10], hidden: false } : null;
+    const SS = { ships: other ? [other] : [home], pilot: null, designs: new Map(), design(seed, arch, pal) { calls.design++; const d = { key: seed + ':' + arch + ':' + pal, meta, gpu: { hull: {}, glass: {} } }; this.designs.set(d.key, d); return d; }, begin: () => ({ u: {} }), drawOne: () => { calls.draw++; }, end: () => {}, lightAt: () => ({ sky: 1, bl: [0, 0, 0] }) };
+    const g = { state: 'play', dim: 'overworld', settings: { anim: o.anim }, player: { pos: o.player || [0.5, 81, 0] }, world: { getBlock: (x, y, z) => (o.temple !== false && x === 0 && y === 81 && z === 20 ? veil : 0) }, starships: SS, trails: { engine: () => { calls.trail++; } }, particles: { spawn: () => { calls.part++; } } };
+    return { g, calls, home, SS };
+  };
+  const runA = (o, secs) => { const m = mkGame(o), a = new HF.Actor(m.g); for (let t = 0; t < secs; t += 1 / 30) a.update(1 / 30); return Object.assign(m, { a }); };
+  const r1 = runA({ anim: true }, 6);
+  check(r1.calls.design === 1 && r1.a.active && r1.a.variant === 'hall' && r1.home.hidden && r1.calls.trail > 0, `near the temple with the animation on: the shuttle flies (design built once, engines ${r1.calls.trail}, the parked one is out flying: hidden ${r1.home.hidden})`);
+  const r2 = runA({ anim: false }, 6);
+  check(r2.calls.design === 0 && !r2.a.active && r2.calls.trail === 0 && r2.calls.part === 0 && !r2.home.hidden, 'Animierte Anzeigen off (Very Low): nothing is built, flown or spent; the parked shuttle stays on the pad');
+  const r3 = runA({ anim: true, player: [0.5, 81, -200] }, 6);
+  check(r3.calls.design === 0 && !r3.a.active && r3.calls.trail === 0, 'in the city, 220 blocks from the mouth: nothing runs (no cost)');
+  const r4 = runA({ anim: true, temple: false }, 6);
+  check(!r4.a.active && r4.calls.design === 0, 'no Gate Temple (another world type): no shuttle');
+  const r5 = runA({ anim: true, other: true }, 6);
+  check(r5.a.variant === 'apron' && r5.SS.ships.every(s => !s.hidden), 'another ship on the pad (an older world\'s pad ship): it lands on the runway instead and hides nothing');
+  // switching the animation off again brings the parked shuttle back
+  r1.g.settings.anim = false; r1.g.player.pos = [30, 81, 40]; r1.a.update(1 / 30);
+  check(!r1.home.hidden && !r1.a.active, 'the animation switched off: the parked shuttle is back on its pad');
+}
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
