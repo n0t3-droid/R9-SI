@@ -19,6 +19,9 @@ uniform vec3 u_skyHorizon;
 uniform vec3 u_sunset;
 uniform vec3 u_fogColor;
 uniform vec4 u_fog;          // start, end, density, underwater
+uniform float u_nebula;      // the cosmic veil's strength (the trailer's grade, env.js VR.Grade.nebula)
+uniform float u_sunDisc;     // the sun's disc in HDR (VR.Grade.sunDisc): bright enough to read, not to flood the bloom
+uniform float u_gridK;       // Klassisch: how far the block edges darken (VR.Grade.gridK)
 uniform float u_rain;
 uniform float u_time;
 uniform float u_night;
@@ -234,7 +237,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
     if (planetsK > 0.01) {
       // the blue deepens to violet where the nebula shows, so its colours read by day as in the trailer
       col = mix(col, col * vec3(0.6, 0.48, 0.9) + vec3(0.02, 0.0, 0.05), cosmic * (1.0 - u_night) * 0.7);
-      col += nebula(dir) * cosmic * mix(1.3, 0.9, u_night);   // by day the veil reads as the trailer's magenta and cyan
+      col += nebula(dir) * cosmic * mix(1.3, 0.9, u_night) * u_nebula;   // by day the veil reads as the trailer's magenta and cyan; u_nebula: the grade's knob (t-look)
       vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
       col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)
@@ -252,7 +255,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
     }
     float sd = dot(dir, u_sunDir);
-    col += u_sunColor * 16.0 * smoothstep(0.99945, 0.99972, sd) * clear;
+    col += u_sunColor * u_sunDisc * smoothstep(0.99945, 0.99972, sd) * clear;
     col += u_sunColor * pow(max(sd, 0.0), 900.0) * 3.0 * clear;
     float md = dot(dir, u_moonDir);
     if (md > 0.9992) {
@@ -1307,7 +1310,7 @@ void main() {
       vec2 g = v_face <= 1u ? fr.zy : v_face <= 3u ? fr.xz : fr.xy;
       vec2 e = min(g, 1.0 - g);
       float px = max(length(fwidth(wp3)), 1e-3);
-      float k = 0.12 * (1.0 - smoothstep(0.12, 0.3, px));
+      float k = u_gridK * (1.0 - smoothstep(0.12, 0.3, px));
       float cover = min(1.0, 4.0 * (0.03 + 0.5 * px));
       alb *= (1.0 - k * (1.0 - smoothstep(0.03, 0.03 + px, min(e.x, e.y)))) / (1.0 - k * cover);
     } else {
@@ -1495,6 +1498,7 @@ uniform float u_bloomStrength;
 uniform float u_useRays;
 uniform float u_vignette;
 uniform float u_saturation;
+uniform float u_contrast;   // the trailer's contrast: a soft S-curve (0 = off; env.js VR.Grade.contrast)
 uniform vec3 u_grade;
 uniform float u_underwaterFx;
 uniform float u_time;
@@ -1556,11 +1560,15 @@ void main() {
   c = tonemap(c * u_grade);
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(l), c, u_saturation);
+  // contrast (t-look): a soft S-curve through the mid-tones — the shadows go a little deeper, the lights a little
+  // higher, the ends stay where they are. Clamped first, so no negative value reaches the gamma below
+  c = clamp(c, 0.0, 1.0);
+  c = mix(c, c * c * (3.0 - 2.0 * c), u_contrast);
   vec2 vc = v_uv - 0.5;
   c *= 1.0 - dot(vc, vc) * u_vignette;
   if (u_damage > 0.0) c = mix(c, vec3(0.7, 0.05, 0.05), u_damage * (0.3 + 0.7 * smoothstep(0.2, 0.75, length(vc))) * 0.55);
   if (u_portal > 0.0) c = mix(c, vec3(0.9, 0.45, 0.15), u_portal * 0.35);
-  c = pow(c, vec3(1.0 / 2.2));
+  c = pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
   o = vec4(c, 1.0);
