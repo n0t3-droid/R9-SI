@@ -342,7 +342,7 @@
       m.hp -= dmg; m.hurt = 0.5;
       if (from) { const dx = m.pos[0] - from[0], dz = m.pos[2] - from[2], l = Math.hypot(dx, dz) || 1; m.vel[0] += dx / l * 7; m.vel[2] += dz / l * 7; if (!m.def.fly) m.vel[1] = 5.5; }
       if (!m.def.hostile) m.ai.flee = 5;
-      this.game.audio.play('hurt');
+      this.game.audio.play('hurt', { at: m.pos });
       if (m.hp <= 0) { m.dead = true; this.game.particles.spark(m.pos[0], m.pos[1] + m.h * 0.5, m.pos[2], [1, 1, 1], 14, 3, 0); }
     }
     onMobDeath(m) {
