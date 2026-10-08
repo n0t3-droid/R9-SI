@@ -17,7 +17,7 @@ bash test/regress.sh "" smoke.mjs               # named tests only
 
 ## Release regression set
 
-17 node tests and 31 browser tests (48 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
+18 node tests and 32 browser tests (50 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
 
 Typical time of a full release run: about 127 min of browser tests (median of the recorded passing runs, plus the wait for the lock) and about 72 s of node tests.
 
@@ -71,6 +71,8 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | height.mjs | browser | Endless height: a tower to y 470 (columns grow above 255), a platform at y 450, and a save and load round trip. | 69 (69–69) | 1/1 | yes |
 | home_kit.mjs | browser | Village Life and Supermarket kit showcase: a supermarket interior and a farm yard; every block exists. | – | – | no |
 | house_genie.mjs | browser | v0.35 Erschaffen: the Haus-Baukasten and the Genie end to end, including the 'not granted' case. | 199 (174–858) | 7/8 | yes |
+| horizon.mjs | browser | F8 · Sichtweite: a 20 s flight at 3 km (each frame timed; no frame above 2× the median among the frames that upload), a sky-probe hole check every 2 s, 3 km vistas on Very Low and High (screenshots in test/shots). | – | – | yes |
+| horizon_stream.js | node | F8 streaming: the 300 ms fade curve and 4×4 dither, no hole through the soft far mask (exhaustive and bilinear), the upload budget (never over, strict priority, a forced item after four drains), the streaming rung. | 1 † | – | yes |
 | imagine.mjs | browser | v0.35 picture to 3D: a picture becomes a Blockbild with the background removed; files round-trip. | 74 (64–75) | 4/4 | yes |
 | life_kit.mjs | browser | Village Life and Supermarket kit showcase: the same builds; every block exists and door boxes match open or closed. | – | – | no |
 | modern_kit.mjs | browser | v0.30 modern building set: Vollton colours, panorama glass with connected frames, the nine modern doors. | 114 (114–114) | 1/1 | yes |
@@ -126,7 +128,7 @@ No summary line, no exit code, not run by `regress.sh`. They print numbers, writ
 | hang2.mjs | browser | like hang.mjs, in batches of frames |
 | heroes.mjs | browser | hero looks in third person, each suit with and without a blaster |
 | homes.mjs | browser | builds a little house near a village; a family should move in |
-| horizon.mjs | browser | the far horizon settles; screenshots and its state |
+| horizon_cost.mjs | browser | F8 cost of the far horizon per configuration (preset:level): CPU ms in update and draw, triangles, MB, frame time; prints COST lines. A measurement, not a regression test. |
 | islands.mjs | browser | sky islands near spawn, from the side and from above |
 | kit.mjs | browser | Voxel Tech kit showcase: a hangar, a control room, a tropical plaza (screenshots) |
 | load_shared.js | node | helper: loads the shared modules for the node tests (not a test) |
