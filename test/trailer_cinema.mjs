@@ -85,7 +85,8 @@ const startTrailer = async () => { await ev(() => { const b = document.querySele
 // ---------------------------------------------------------------- BEFORE: the v0.41 director, its pictures
 async function beforePass() {
   await bootTitle(BEFORE_URL, process.env.PRESET || 'high', true);
-  await ev(() => { const g = VR.game; g.createWorld && g.createWorld({ name: 'Trailer', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: process.env.SEED || '4242', cheats: true, kit: true }); });
+  const SEED = process.env.SEED || '4242';   // (a Node value: the browser code below cannot read process.env)
+  await ev((seed) => { const g = VR.game; g.createWorld && g.createWorld({ name: 'Trailer', mode: 'creative', difficulty: 'peaceful', type: 'default', seed, cheats: true, kit: true }); }, SEED);
   await waitFor(() => VR.game.state === 'play', 90000);
   const LET = ['A', 'B', 'C', 'D', 'E', 'F'], targets = [0.8, 2.4, 3.8];
   const started = await ev(() => VR.game.director ? VR.game.director.play('trailer') : false);

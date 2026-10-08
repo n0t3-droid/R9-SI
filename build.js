@@ -33,7 +33,7 @@ const workerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/work
 // a change on the main thread alone (the UI, the game's own logic) keeps the cached textures.
 const texHash = require('crypto').createHash('sha256').update(workerSrc).update(js('main', ['tex_cache'])).digest('hex').slice(0, 16);
 const uiShared = js('main', LANG) + '\n' + js('shared', UI_SHARED);
-const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + uiShared + '\n' + js('main', MAIN) + `
+const mainSrc = shared + '\n' + js('main', TEX.filter(t => t !== 'tex_build')) + '\n' + `VR.TEX_SRC_HASH = "${texHash}";\n` + uiShared + '\n' + js('shared', ['cine']) + '\n' + js('main', MAIN) + `
 window.addEventListener('load', function () { try { VR.game = new VR.Game(); VR.game.boot(); } catch (e) { console.error(e); document.body.insertAdjacentHTML('beforeend', '<pre style="color:#f88;position:fixed;top:0;left:0;z-index:99">' + (e && e.stack || e) + '</pre>'); } });
 `;
 const css = read('src/ui/style.css') + '\n' + (exists('src/ui/start.css') ? read('src/ui/start.css') : '');
