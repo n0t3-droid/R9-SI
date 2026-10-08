@@ -155,7 +155,7 @@ section('game', () => {
     col(cx, cz) { let c = cols.get(ck(cx, cz)); if (!c) { c = { cx, cz, key: ck(cx, cz), ready: true, saved: false, modified: false, blocks: pristine() }; cols.set(c.key, c); } return c; },
     getBlock(x, y, z) { if (y < 0 || y >= HI) return 0; return this.col(x >> 4, z >> 4).blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; },
     setBlock(x, y, z, s) { const c = this.col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; c.modified = true; },
-    bulkSet(list, notify, defer) { const touched = new Set(); for (const [x, y, z, s] of list) { if (y < 0 || y >= HI) continue; const c = this.col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; c.modified = true; touched.add(c); } if (defer) { for (const c of touched) defer.add(c); return touched.size; } this.relights++; return touched.size; },
+    bulkSet(list, notify, kind, defer) { if (kind && typeof kind === 'object' && typeof kind.add === 'function') { defer = kind; kind = undefined; } const touched = new Set(); for (const [x, y, z, s] of list) { if (y < 0 || y >= HI) continue; const c = this.col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; c.modified = true; touched.add(c); } if (defer) { for (const c of touched) defer.add(c); return touched.size; } this.relights++; return touched.size; },
     relightColumns() { this.relights++; },
     marks: [], markDirty(x, y, z) { this.marks.push([x >> 4, y >> 4, z >> 4, this.relights]); },
   };
