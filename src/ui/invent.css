@@ -5,7 +5,7 @@
    ============================================================================ */
 :root { --erf-a: #ffc94d; --erf-a2: #ff8f3d; --erf-card: linear-gradient(180deg, #2a3560 0%, #19223f 100%); --erf-edge: rgba(160, 190, 255, 0.22); }
 
-#invent { align-items: stretch; justify-content: center; background: radial-gradient(110% 60% at 50% -8%, rgba(255, 190, 80, 0.2), rgba(5, 8, 18, 0) 62%), rgba(4, 7, 16, 0.93); color: var(--st-ink); font-family: var(--st-font); -webkit-user-select: none; user-select: none; }
+#invent { align-items: stretch; justify-content: center; background: radial-gradient(110% 60% at 50% -8%, rgba(255, 190, 80, 0.2), rgba(5, 8, 18, 0) 62%), rgba(4, 7, 16, 0.97); color: var(--st-ink); font-family: var(--st-font); -webkit-user-select: none; user-select: none; }
 #invent .erf { position: relative; width: min(1240px, 100%); height: 100%; margin: 0 auto; }
 #invent .erf-under { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 12px; min-height: 0; }
 #invent button { font-family: var(--st-font); touch-action: manipulation; }
@@ -21,6 +21,16 @@
 #invent .erf-cn { font-weight: 700; font-size: calc(var(--st-fs) * 0.9); white-space: nowrap; }
 #invent .erf-bar { display: block; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 #invent .erf-bar b { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--erf-a), var(--erf-a2)); transition: width 0.5s; }
+/* a phone: the chapter's name and the count sit on the first row with 「← Zurück」, the title takes the second */
+@media (max-width: 520px) {
+  #invent .erf-head { grid-template-columns: auto 1fr; grid-template-areas: "back count" "ttl ttl"; gap: 4px 10px; }
+  #invent .erf-back { grid-area: back; }
+  #invent .erf-count { grid-area: count; min-width: 0; width: 136px; justify-self: end; }
+  #invent .erf-cn { font-size: calc(var(--st-fs) * 0.8); }
+  #invent .erf-ttl { grid-area: ttl; }
+  #invent .erf-ttl h2 { font-size: calc(var(--st-fs) * 1.3); }
+  #invent .erf-sub { display: none; }
+}
 
 /* ---- the two halves: workbench + tools · chips + cards (one column on a phone, two on a wide screen) ---- */
 #invent .erf-main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -68,7 +78,7 @@
 
 /* ---- the chapters and the cards ---- */
 #invent .erf-chips { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; flex: 0 0 auto; scrollbar-width: thin; }
-#invent .erf-chip { flex: 0 0 auto; min-height: 44px; padding: 0 13px; border-radius: 22px; border: 1px solid var(--st-line); background: var(--st-bg); color: var(--st-ink); font-weight: 600; font-size: calc(var(--st-fs) * 0.9); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+#invent .erf-chip { flex: 0 0 auto; min-width: 44px; justify-content: center; min-height: 44px; padding: 0 13px; border-radius: 22px; border: 1px solid var(--st-line); background: var(--st-bg); color: var(--st-ink); font-weight: 600; font-size: calc(var(--st-fs) * 0.9); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 #invent .erf-chip i { font-style: normal; }
 #invent .erf-chip.on { border-color: var(--erf-a); background: rgba(255, 201, 77, 0.17); }
 @media (max-width: 520px) { #invent .erf-chip:not(.on) span { display: none; } #invent .erf-chip { padding: 0 12px; } }
@@ -91,7 +101,7 @@
 #invent .erf-ghost canvas { width: 80px; height: 80px; image-rendering: pixelated; }
 
 /* ---- the layer: the invention, the book, the question ---- */
-#invent .erf-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px; overflow: auto; background: rgba(3, 5, 12, 0.86); z-index: 5; }
+#invent .erf-layer { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px; overflow: auto; background: rgba(3, 5, 12, 0.94); z-index: 5; }
 #invent .erf-layer[hidden] { display: none; }
 #invent .erf-rv { width: min(470px, 94vw); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 8px; margin: auto; }
 #invent .erf-rays { position: absolute; left: 50%; top: 38%; width: 130vmin; height: 130vmin; transform: translate(-50%, -50%); background: repeating-conic-gradient(from 0deg, rgba(255, 214, 102, 0.17) 0deg 8deg, rgba(255, 214, 102, 0) 8deg 22deg); -webkit-mask: radial-gradient(circle, #000 10%, transparent 60%); mask: radial-gradient(circle, #000 10%, transparent 60%); animation: erfSpin 26s linear infinite; pointer-events: none; }
@@ -121,6 +131,16 @@
 #invent .erf-cc.out canvas { width: 40px; height: 40px; }
 #invent .erf-cn2 { position: absolute; right: 1px; bottom: 0; font-style: normal; font-weight: 800; font-size: 13px; line-height: 1; color: #fff; text-shadow: 0 1px 2px #000; }
 #invent .erf-carrow, #invent .erf-cplus { font-size: 22px; color: var(--erf-a); }
+
+/* a phone or a short window: the invention, its line and „Weiter“ fit without scrolling (360 × 640 checked) */
+@media (max-width: 520px), (max-height: 700px) {
+  #invent .erf-rv { gap: 7px; }
+  #invent .erf-big { width: clamp(118px, 30vmin, 170px); }
+  #invent .erf-rn { font-size: calc(var(--st-fs) * 1.7); }
+  #invent .erf-craft { padding: 6px 10px; }
+  #invent .erf-cc { width: 36px; height: 36px; }
+  #invent .erf-cc.out { width: 44px; height: 44px; }
+}
 
 /* the book */
 #invent .erf-layer.book { align-items: stretch; }

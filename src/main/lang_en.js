@@ -400,7 +400,7 @@
     'erf.toInv': '💡 New in your inventory',
     'erf.invFull': 'Your inventory is full. Make room, then take it from the book.',
     'erf.take': '🎒 Take it',
-    'erf.codexNote': 'The codex remembers this invention.',
+    'erf.codexNote': 'Now in the codex!',
     'erf.recipe': 'How to craft it:',
     'erf.onlyInvent': 'You can only get this by inventing!',
     'erf.all': 'All',
