@@ -564,7 +564,7 @@ void main() {
     wetK = u_wet * up;
     if (u_puddle > 0.001 && up > 0.001) {
       float low = texture(u_noise, wpM.xz * 0.012).r * 0.65 + texture(u_noise, wpM.xz * 0.05).g * 0.35;
-      pud = u_puddle * up * (1.0 - smoothstep(0.42, 0.55, low));
+      pud = u_puddle * up * (1.0 - smoothstep(0.38, 0.44, low));   // the hollows only: about a sixth of a flat ground in a full rain
     }
     float edgeD = min(min(fu.x, 1.0 - fu.x), min(fu.y, 1.0 - fu.y));
     float fade = (1.0 - smoothstep(8.0, 12.0, length(v_rel))) * mix(0.1, 1.0, smoothstep(0.0, 0.045, edgeD));
@@ -604,7 +604,7 @@ void main() {
   if (fam == 3) rough = 0.97;                             // fabric: matte, no highlight
   rough = mix(rough, 0.25 * rough + 0.03, wetK * 0.85);   // wet: smoother
   rough = mix(rough, 0.03, pud);                          // a puddle is a mirror
-  alb.rgb *= (1.0 + dAlb) * (1.0 - 0.4 * pud);
+  alb.rgb *= (1.0 + dAlb) * (1.0 - 0.55 * pud);
   float emis = mat.a;
   // lighting
   float sky = v_sky;
@@ -641,7 +641,7 @@ void main() {
     vec3 envC = matEnv(reflect(-V, n));
     float fresW = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
     if (fam == 4) col = mix(col, alb.rgb * envC * (0.3 + 0.7 * v_sky) * 1.25, 0.8);
-    col = mix(col, envC, outdoors * clamp(wetK * (0.1 + 0.9 * fresW) + pud * (0.45 + 0.55 * fresW), 0.0, 0.9));
+    col = mix(col, envC, outdoors * clamp(wetK * (0.1 + 0.9 * fresW) + pud * (0.6 + 0.4 * fresW), 0.0, 0.9));
     if (fam == 2 && u_matTier > 2.5 && ndl > 0.0) { vec3 Hs = normalize(L + V); col += lc * pow(max(dot(n, Hs), 0.0), 22.0) * 0.1 * sh * outdoors; }
   }
   if (emis > 0.02 || emissiveFace) {

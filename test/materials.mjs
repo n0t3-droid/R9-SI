@@ -25,7 +25,8 @@ const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(
 const shot = async (name, frames = 3) => { await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames); await page.screenshot({ path: `/home/claude/vr/test/shots/${TAG}_${name}.png`, timeout: 180000 }); console.log('shot', name); };
 const look = async (pos, yaw, pitch) => ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; }, [pos, yaw, pitch]);
 // the median wall time of a frame (the GL work finished) for the current view, 12 frames after 3 warm-ups
-const frameMs = () => ev(() => { const g = VR.game, gl = g.renderer.gl, t = []; window.__norender = false; for (let i = 0; i < 15; i++) { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); if (i >= 3) t.push(performance.now() - t0); } window.__norender = true; t.sort((a, b) => a - b); return t[t.length >> 1]; });
+// (gl.finish alone returned before the GPU was done in the first run: the one-texel readPixels is the sync that waits)
+const frameMs = () => ev(() => { const g = VR.game, gl = g.renderer.gl, t = [], px = new Uint8Array(4); window.__norender = false; for (let i = 0; i < 15; i++) { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); if (i >= 3) t.push(performance.now() - t0); } window.__norender = true; t.sort((a, b) => a - b); return t[t.length >> 1]; });
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 
@@ -51,7 +52,8 @@ const base = await ev(() => {
 const [ox, y0, oz] = base;
 await settle(60);
 const NEAR = [ox + 2.5, y0 + 2.4, oz + 3], FAR = [ox + 2.5, y0 + 3.5, oz + 30];
-const views = { near: [NEAR, 0, -0.2], far: [FAR, 0, -0.12] };
+// (the near view looks down so that the whole two-high wall is in the frame, the stone patch in front of it)
+const views = { near: [NEAR, 0, -0.5], far: [FAR, 0, -0.12] };
 
 // the tiers: Very Low (potato, tier 0) and High (tier 3); the rain in the same scene
 const run = async (preset, wx) => {
