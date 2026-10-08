@@ -154,7 +154,10 @@
       // look
       if (cap) { const sens = input.sensitivity || 0.0024; w.yaw -= input.mouse.dx * sens; w.pitch = clamp(w.pitch - input.mouse.dy * sens * (input.invertY ? -1 : 1), -1.5, 1.5); }
       // walk
-      const k = (c) => live && input.down(c), fw = (k('KeyW') ? 1 : 0) - (k('KeyS') ? 1 : 0), st = (k('KeyD') ? 1 : 0) - (k('KeyA') ? 1 : 0);
+      const k = (c) => live && input.down(c);
+      let fw = (k('KeyW') ? 1 : 0) - (k('KeyS') ? 1 : 0), st = (k('KeyD') ? 1 : 0) - (k('KeyA') ? 1 : 0);
+      // the gamepad's walk stick and the touch stick are analog (input.padMove, F5): they add to the keys, as on foot
+      if (live && input.padMove) { fw = clamp(fw + input.padMove.fwd, -1, 1); st = clamp(st + input.padMove.str, -1, 1); }
       const run = k('ControlLeft') || input.dbl && input.dbl('KeyW');
       const cy = Math.cos(w.yaw), sy = Math.sin(w.yaw);
       let wx = -sy * fw + cy * st, wz = -cy * fw - sy * st; const wl = Math.hypot(wx, wz); if (wl > 1) { wx /= wl; wz /= wl; }
