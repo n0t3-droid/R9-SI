@@ -333,6 +333,7 @@
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
+      this.mirror = VR.MirrorBuild ? new VR.MirrorBuild(this) : null;   // 🪞 Spiegel-Bauen (off in every new session)
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
@@ -520,6 +521,7 @@
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
+      this.mirror = VR.MirrorBuild ? new VR.MirrorBuild(this) : null;   // 🪞 Spiegel-Bauen (off in every new session)
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
@@ -816,6 +818,7 @@
       if (this.entities) this.entities.update(dt);
       if (this.villages) this.villages.update(dt);
       if (gad) gad.tick(dt);
+      if (this.mirror) this.mirror.update(dt);
       if (this.starships) this.starships.update(dt);
       if (this.traffic) this.traffic.update(dt);
       if (this.director) this.director.update(dt);
@@ -879,6 +882,7 @@
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
+        guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
         drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
         drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
@@ -928,6 +932,8 @@
         return;
       }
       if (i.hit('KeyE') && this.player && !this.player.dead) { if (ui.screen === 'inventory') ui.closeInventory(); else if (!ui.screen) ui.openInventory(); return; }
+      // ⇧M: 🪞 Spiegel-Bauen (aus → X → Z → 4-fach → 8-fach → aus); M alone stays the Weltkarte
+      if (i.hit('KeyM') && (i.down('ShiftLeft') || i.down('ShiftRight'))) { if (!ui.screen && this.mirror) this.mirror.key(); return; }
       if (i.hit('KeyM') && this.map) { if (ui.screen === 'mapscreen') { ui.resume(); return; } if (!ui.screen) { this.map.openBig(); return; } }
       // F over an item in the inventory: ★ favourite (shared with the R9 Studio)
       if (ui.screen === 'inventory' && i.hit('KeyF') && ui.hoverId && ui.toggleFav) { ui.toggleFav(ui.hoverId); return; }
@@ -1113,6 +1119,7 @@
         if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0(T('g.cmd.spawn')); return; }
         if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0(T('g.cmd.helpHome')); return; }
         if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0(T('g.cmd.sethome')); return; }
+        if (c0 === 'spiegel' || c0 === 'mirror') { if (this.mirror) this.mirror.command(a0); return; }   // 🪞 x|z|4|8|aus (Überleben: a kind hint)
         if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? T('g.cmd.players', { list: L.map(q => q.name + (q.host ? ' ' + T('g.mp.hostTag') : '') + ' ' + Math.round(q.dist) + 'm').join(', ') }) : T('g.cmd.onlyYou')); return; }
         if (c0 === 'tphost' && this.mp && this.mp.isClient) { this.mp.teleportToHost(); return; }
         if (c0 === 'call' && this.mp && this.mp.isHost) { const n = (a0.join(' ') || '').toLowerCase(); const q = this.mp.players().find(x => !n || x.name.toLowerCase().startsWith(n)); if (q) this.mp.summon(q.peer); else say0(T('g.cmd.noPlayer', { name: n }), '#ff8a8a'); return; }
