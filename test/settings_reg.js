@@ -77,5 +77,12 @@ check(d.renderDist === 10 && d.fov === 75 && d.rawInput === true && d.mouseSmoot
 check(!('bench' in d) && !('keys' in d) && d.autoJump === 'auto', 'defaults(): actions have no default; auto-jump follows the mode');
 check(S.items('img', 'auto').map(x => x.key).join() === 'preset,bench', 'the Automatik section holds the preset and the Automatik button, in that order');
 
+console.log('g · the ship (flight.js)');
+const ms = S.byKey('mouseSteer'), cs = S.byKey('camShake');
+check(!!ms && ms.g === 'play' && ms.sec === 'steer' && ms.t === 'switch' && ms.def === false, 'Maus lenkt Schiffe: a switch in Spiel · Steuerung, off by default (the mouse looks, the right button steers)');
+check(!!cs && cs.g === 'play' && cs.sec === 'steer' && cs.t === 'switch' && cs.def === true, 'Kamerawackeln im Schiff: a switch in Spiel · Steuerung, on by default');
+check(d.mouseSteer === false && d.camShake === true, 'defaults() has both, as the game\'s own table');
+check(!!ms && !!cs && DE[ms.lab].length <= 40 && DE[cs.lab].length <= 40 && hasBoth(ms.tip) && hasBoth(cs.tip), 'short labels (the explanation is the tip)');
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 if (fails) process.exit(1);
