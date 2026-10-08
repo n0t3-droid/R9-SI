@@ -310,11 +310,12 @@
   };
   // Mooskätzchen: a moss-coated kitten with pointed ears, a yellow flower or two, a long striped tail
   M.moss_cat = () => {
-    const moss = 0x6e9e4c, moss2 = 0x8fbf5e, moss3 = 0x4f7a34, cream = 0xf2ecd6, pink = 0xf0a0a8, eye = 0x9be85a, flower = 0xffe27a, inner = 0xf0b0c0, paw = 0x2f4a22;
+    // a deep moss coat (it reads against the grass), light moss flecks, a cream belly and muzzle, glowing green eyes
+    const moss = 0x3d4d30, moss2 = 0xb9e27e, moss3 = 0x2a3824, cream = 0xf6f0de, pink = 0xf08ca0, eye = 0xe8ff5a, flower = 0xffd84a, inner = 0xf5a3b5, paw = 0x2a3822;
     const dot = (x, y, z) => ((x * 7 + y * 3 + z * 5) % 11 === 0 ? moss2 : (y === 5 && z % 3 === 0 ? flower : moss));
     return {
       h: 0.62, w: 0.26, parts: {
-        body: part(7, 6, 11, [3, 3, 5], (g) => { g.ell(3, 3, 5, 3.0, 2.6, 4.8, dot, { shade: 0.1 }); }),
+        body: part(7, 6, 11, [3, 3, 5], (g) => { g.ell(3, 3, 5, 3.0, 2.6, 4.8, (x, y, z) => (y <= 0 ? cream : dot(x, y, z)), { shade: 0.1 }); }),
         head: part(8, 8, 8, [4, 4, 4], (g) => {
           g.ell(4, 4, 4, 3.2, 3.0, 3.0, (x, y, z) => (z <= 2 && y <= 4 && x >= 2 && x <= 5 ? cream : moss), { shade: 0.08 });
           g.set(2, 4, 1, eye); g.set(5, 4, 1, eye); g.set(4, 3, 1, pink); g.set(4, 2, 1, cream);
@@ -345,15 +346,15 @@
           g.ell(4, 4, 4, 3.3, 3.1, 3.0, (x, y, z) => (z <= 3 && y <= 3 && x >= 2 && x <= 5 ? cream : fur), { shade: 0.05 });
           g.set(2, 5, 1, eye); g.set(5, 5, 1, eye); g.set(4, 3, 0, nose); g.set(4, 3, 1, nose);
         }),
-        ear_l: part(2, 5, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 0, 1, cry2); g.box(0, 1, 0, 1, 2, 1, cry, { emis: 1 }); g.box(0, 3, 0, 0, 4, 0, 0xe8fbff, { emis: 1 }); }),
-        ear_r: part(2, 5, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 0, 1, cry2); g.box(0, 1, 0, 1, 2, 1, cry, { emis: 1 }); g.box(0, 3, 0, 0, 4, 0, 0xe8fbff, { emis: 1 }); }),
+        ear_l: part(2, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 0, 1, cry2); g.box(0, 1, 0, 1, 2, 1, cry, { emis: 1 }); g.set(0, 3, 0, 0xe8fbff, 1); }),
+        ear_r: part(2, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 0, 1, cry2); g.box(0, 1, 0, 1, 2, 1, cry, { emis: 1 }); g.set(0, 3, 0, 0xe8fbff, 1); }),
         tail: part(2, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 2, 1, fur); g.box(0, 3, 0, 1, 3, 1, cry, { emis: 1 }); }),
         leg_fl: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
         leg_fr: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
         leg_bl: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
         leg_br: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
       },
-      layout: { body: [0, 5.5, 0], head: [0, 10, -5], ear_l: [-2.2, 11.2, -4.6], ear_r: [2.2, 11.2, -4.6], tail: [0, 6.4, 5], leg_fl: [-2.4, 5, -3.4], leg_fr: [2.4, 5, -3.4], leg_bl: [-2.4, 5, 3.4], leg_br: [2.4, 5, 3.4] },
+      layout: { body: [0, 5.5, 0], head: [0, 10, -5], ear_l: [-1.9, 12.2, -4.4], ear_r: [1.9, 12.2, -4.4], tail: [0, 6.4, 5], leg_fl: [-2.4, 5, -3.4], leg_fr: [2.4, 5, -3.4], leg_bl: [-2.4, 5, 3.4], leg_br: [2.4, 5, 3.4] },
       gait: 'quad',
     };
   };
