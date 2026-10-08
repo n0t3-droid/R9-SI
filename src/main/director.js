@@ -18,12 +18,12 @@
 
   // the trailer: keys = [time, camera position, look-at]; ships = scripted flights (arch, from, via, to, offset, delay)
   const TRAILER = [
-    { name: 'Ember Canyon', dur: 5.5, fov: 78, tod: 11400, keys: [[0, [-70, 168, 720], [0, 96, 330]], [5.5, [40, 132, 400], [0, 88, 140]]],
-      ships: [{ arch: 'shuttle', A: [-85, 176, 760], C: [-5, 154, 560], B: [85, 120, 340], dur: 6.5, delay: 0 }, { arch: 'interceptor', A: [-115, 170, 780], C: [-25, 154, 560], B: [65, 118, 330], dur: 6.2, delay: 0.3, off: [-9, -2, 12] }, { arch: 'interceptor', A: [-55, 184, 790], C: [25, 162, 570], B: [105, 124, 350], dur: 6.2, delay: 0.5, off: [9, 3, 14] }] },
-    { name: 'The Spire Citadel', dur: 5, fov: 70, tod: 11700, keys: [[0, [-372, 200, 440], [-420, 200, 380]], [5, [-282, 214, 566], [-420, 190, 380]]],
-      ships: [{ arch: 'gunship', A: [-560, 230, 520], C: [-450, 236, 470], B: [-300, 246, 380], dur: 7, delay: 0.2 }, { arch: 'interceptor', A: [-570, 226, 535], C: [-455, 232, 482], B: [-305, 240, 392], dur: 7, delay: 0.4, off: [-8, -3, 10] }] },
-    { name: 'Sky Isles', dur: 5.5, fov: 76, tod: 12000, keys: [[0, [140, 190, 320], [270, 160, 200]], [5.5, [400, 178, 30], [360, 150, 90]]],
-      ships: [{ arch: 'shuttle', A: [165, 186, 300], C: [300, 176, 150], B: [440, 170, -10], dur: 6, delay: 0 }] },
+    { name: 'Ember Canyon', dur: 5.5, fov: 78, tod: 11400, keys: [[0, [-70, 132, 600], [0, 84, 340]], [5.5, [40, 132, 400], [0, 88, 140]]], planets: { az: -0.9, el: 12 },
+      ships: [{ arch: 'shuttle', A: [-153, 157, 436], C: [-5, 154, 470], B: [120, 118, 170], dur: 6.5, delay: 0 }, { arch: 'interceptor', A: [-183, 151, 456], C: [-25, 154, 480], B: [95, 118, 150], dur: 6.2, delay: 0.3, off: [-9, -2, 12] }, { arch: 'interceptor', A: [-123, 165, 466], C: [25, 162, 490], B: [150, 124, 190], dur: 6.2, delay: 0.5, off: [9, 3, 14] }] },
+    { name: 'The Spire Citadel', dur: 5, fov: 70, tod: 11700, planets: { az: -2.72, el: 5, az2: -2.9, el2: 14 }, keys: [[0, [-372, 200, 440], [-420, 200, 380]], [5, [-282, 214, 566], [-420, 190, 380]]],
+      ships: [{ arch: 'gunship', A: [-520, 230, 400], C: [-450, 236, 470], B: [-300, 246, 380], dur: 7, delay: 0.2 }, { arch: 'interceptor', A: [-530, 226, 415], C: [-455, 232, 482], B: [-305, 240, 392], dur: 7, delay: 0.4, off: [-8, -3, 10] }] },
+    { name: 'Sky Isles', dur: 5.5, fov: 76, tod: 12000, keys: [[0, [140, 190, 320], [330, 150, 140]], [5.5, [400, 178, 30], [360, 150, 90]]], planets: { az: -0.2, el: 18 },
+      ships: [{ arch: 'shuttle', A: [165, 186, 300], C: [300, 176, 150], B: [560, 165, -150], dur: 6, delay: 0 }] },
     { name: 'The Gate Temple', dur: 4.5, fov: 74, tod: 12000, keys: [[0, [6, 98, 175], [0, 88, 40]], [4.5, [8, 88, 64], [0, 86, 20]]],
       ships: [{ arch: 'shuttle', A: [0, 108, 200], C: [0, 96, 120], B: [0, 84, 52], dur: 5.5, delay: 0 }] },
     { name: 'Hangar Hall', dur: 6, fov: 72, tod: 12000, keys: [[0, [0, 83.6, 17], [0, 84, -40]], [6, [0, 83.6, -22], [0, 84.5, -40]]] },
@@ -57,7 +57,7 @@
     }
     stop() {
       const g = this.g; if (!this.active) return;
-      this.active = false; this.phase = 'idle';
+      this.active = false; this.phase = 'idle'; g.env.planetsOverride = null;
       const s = this.saved; if (s) { g.player.pos = s.pos; g.player.yaw = s.yaw; g.player.pitch = s.pitch; g.player.flying = s.flying; g.hideHud = s.hideHud; g.camMode = s.camMode; g.zenFreezeTime = s.freeze; if (s.tod !== undefined && g.env.setTime) g.env.setTime(s.tod); }
       g.player.noClip = false; g.player.vel = [0, 0, 0];
       document.getElementById('hud').style.visibility = g.hideHud ? 'hidden' : 'visible';
@@ -112,6 +112,7 @@
         const c = this.camAt(shot, 0);
         g.player.pos = [c.pos[0], c.pos[1] - g.player.eye, c.pos[2]]; g.player.yaw = c.yaw; g.player.pitch = c.pitch; g.player.vel = [0, 0, 0];
         if (shot.tod !== undefined) g.env.setTime(shot.tod);
+        g.env.planetsOverride = shot.planets || null;
         d.querySelector('.cap').textContent = shot.capAt ? '' : (shot.caption || '');
         d.querySelector('.cap').classList.toggle('big', !!shot.caption && !shot.capSmall);
         this.prebuildShips(shot);
