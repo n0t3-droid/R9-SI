@@ -118,6 +118,13 @@
     return Math.min(1, f);
   }
   const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+  // the wind's heading (radians): a base direction from the world seed and two slow turns of a few minutes, so the
+  // sea and the grass lean one way for a while and then swing round (water.js and the plants read it)
+  const windHeading = (seed, clock) => {
+    const s = seed == null ? 0 : seed >>> 0;
+    const base = hash01(s, 0x77, 1, 0) * Math.PI * 2, p1 = hash01(s, 0x78, 2, 0) * Math.PI * 2, p2 = hash01(s, 0x79, 3, 0) * Math.PI * 2;
+    return base + 0.55 * Math.sin(clock / 97 + p1) + 0.25 * Math.sin(clock / 41 + p2);
+  };
 
   class Weather {
     // o.onThunder(delay): called delay seconds after each bolt (the sound follows the light)
@@ -130,6 +137,7 @@
       this.inStorm = false; this.bolt = 0; this.strikes = 0; this.sinceStrike = 1e9; this.flash = 0; this.thunders = [];
       this.rng = makeRng(0);
       this.v = { rain: 0, snow: 0, fog: 0, cloud: VIS.klar.cloud, sun: 1, dark: 0, exp: 0, wind: 1 };
+      this.windAngle = 0; this.windDir = [1, 0];     // the heading of the wind (unit vector), see windHeading
     }
     // the world's seed (null: no world, e.g. the title screen): new seed, no forced state, no bolts pending
     setSeed(seed) {
@@ -148,6 +156,8 @@
     update(dt, c) {
       dt = Math.min(Math.max(+dt || 0, 0), 1);             // a stalled frame must not jump the weather
       this.clock += dt;
+      this.windAngle = windHeading(this.seed, this.clock);
+      this.windDir = [Math.cos(this.windAngle), Math.sin(this.windAngle)];
       const day = c.day | 0, ticks = c.ticks || 0;
       const A = day * DAY + (((ticks % DAY) + DAY) % DAY);
       this.ticks = A;
