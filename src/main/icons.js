@@ -5,10 +5,37 @@
   'use strict';
   const R = VR.R, SH = VR.SHAPE, F = VR.F;
   const TINTS = { 1: 0x7fbf55, 2: 0x5fa83a, 3: 0x3f76e4, 4: 0x80a755, 5: 0x619961, 6: 0xb38a55, 7: 0x7fbf2f };
+  // A voxel block's icon (Voxel Architecture blocks, the Modern Living pack): the visible faces of the 8³ grid in painter's
+  // order, one voxel per step. The generator yields after every voxel, so the palette's pump can stop between two voxels and
+  // go on in the next frame (Icons.stepIcon). Run to the end it makes the same canvas calls, in the same order, as the
+  // one-go drawing it replaced (test/icon_draw_same.js).
+  function* voxelIconSteps(ctx, s) {
+    const G = VR.VX.iconGrid(s);
+    if (!G) return;
+    const P = VR.VX.PRESENT, E = VR.VX.EMIS, GL = VR.VX.GLASS;
+    const at = (x, y, z) => (x < 0 || y < 0 || z < 0 || x > 7 || y > 7 || z > 7) ? 0 : G[(y * 8 + z) * 8 + x];
+    const open = (v) => !(v & P) || (v & GL);
+    const S = (X, Y, Z) => [32 + 28 * (X - Z) / 8, 3 + 14 * (X + Z) / 8 + 29 * (1 - Y / 8)];
+    const order = [];
+    for (let y = 0; y < 8; y++) for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) if (at(x, y, z) & P) order.push([x + y + z, x, y, z]);
+    order.sort((a, b) => a[0] - b[0]);
+    const poly = (pts, col) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.fill(); ctx.stroke(); };
+    const rgb = (v, k) => { const e = (v & E) ? 1.25 : 1; return `rgb(${Math.min(255, ((v >> 16) & 255) * k * e) | 0},${Math.min(255, ((v >> 8) & 255) * k * e) | 0},${Math.min(255, (v & 255) * k * e) | 0})`; };
+    for (const [, x, y, z] of order) {
+      const v = at(x, y, z);
+      const glass = (v & GL) !== 0;
+      const col = (k) => glass ? `rgba(190,230,255,${0.35 + k * 0.2})` : rgb(v, k);
+      if (open(at(x, y + 1, z)) || (glass && !(at(x, y + 1, z) & GL))) poly([S(x, y + 1, z), S(x + 1, y + 1, z), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(1));
+      if (open(at(x, y, z + 1)) || (glass && !(at(x, y, z + 1) & GL))) poly([S(x, y, z + 1), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(0.8));
+      if (open(at(x + 1, y, z)) || (glass && !(at(x + 1, y, z) & GL))) poly([S(x + 1, y, z), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x + 1, y + 1, z)], col(0.64));
+      yield;
+    }
+  }
+  VR.voxelIconSteps = voxelIconSteps;
   class Icons {
     constructor(tex) {
       this.alb = tex.albedo[0]; this.N = tex.size;
-      this.cache = new Map(); this.faceCache = new Map();
+      this.cache = new Map(); this.faceCache = new Map(); this.jobs = new Map();
     }
     tintOf(state) {
       const code = R.T.tint[state];
@@ -39,21 +66,39 @@
       this.faceCache.set(key, c);
       return c;
     }
-    // returns a 64x64 canvas
+    // returns a 64x64 canvas (a voxel icon that stepIcon is still drawing is finished here)
     get(id) {
-      let c = this.cache.get(id);
-      if (c) return c;
-      c = document.createElement('canvas'); c.width = 64; c.height = 64;
-      const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
-      const t = R.byName[id];
-      if (t && !VR.ITEMS[id]) this.drawBlock(ctx, t);
-      else {
-        const d = VR.ITEMS[id];
-        if (d) ctx.drawImage(this.face(d.tex, null, 1, false), 4, 4, 56, 56);
+      this.stepIcon(id, () => true);
+      return this.cache.get(id);
+    }
+    // draws the icon of an item while more() says so; at least one step per call, so every call makes progress. True once
+    // the icon is complete and cached. A voxel block is drawn one voxel per step (iconperf: the palette pump slices it across
+    // frames), everything else in one go. A failing draw is not cached, and its error goes to the caller, as before.
+    stepIcon(id, more) {
+      if (this.cache.has(id)) return true;
+      let job = this.jobs.get(id);
+      if (!job) {
+        const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        const t = R.byName[id];
+        if (t && !VR.ITEMS[id] && VR.VX && R.T.shape[t.defaultState] === SH.VOXEL) {
+          job = { c, steps: voxelIconSteps(ctx, t.defaultState) };
+          this.jobs.set(id, job);
+        } else {
+          if (t && !VR.ITEMS[id]) this.drawBlock(ctx, t);
+          else {
+            const d = VR.ITEMS[id];
+            if (d) ctx.drawImage(this.face(d.tex, null, 1, false), 4, 4, 56, 56);
+          }
+          this.cache.set(id, c);
+          return true;
+        }
       }
-      this.cache.set(id, c);
-      return c;
+      try {
+        do { if (job.steps.next().done) { this.jobs.delete(id); this.cache.set(id, job.c); return true; } } while (more());
+      } catch (e) { this.jobs.delete(id); throw e; }
+      return false;
     }
     drawBlock(ctx, t) {
       const s = t.defaultState, T = R.T;
@@ -95,28 +140,8 @@
         void l2; void r2;
       }
     }
-    // mini-voxel sculpture icon (Voxel Architecture blocks)
-    drawVoxels(ctx, s) {
-      const G = VR.VX.iconGrid(s);
-      if (!G) return;
-      const P = VR.VX.PRESENT, E = VR.VX.EMIS, GL = VR.VX.GLASS;
-      const at = (x, y, z) => (x < 0 || y < 0 || z < 0 || x > 7 || y > 7 || z > 7) ? 0 : G[(y * 8 + z) * 8 + x];
-      const open = (v) => !(v & P) || (v & GL);
-      const S = (X, Y, Z) => [32 + 28 * (X - Z) / 8, 3 + 14 * (X + Z) / 8 + 29 * (1 - Y / 8)];
-      const order = [];
-      for (let y = 0; y < 8; y++) for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) if (at(x, y, z) & P) order.push([x + y + z, x, y, z]);
-      order.sort((a, b) => a[0] - b[0]);
-      const poly = (pts, col) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.fill(); ctx.stroke(); };
-      const rgb = (v, k) => { const e = (v & E) ? 1.25 : 1; return `rgb(${Math.min(255, ((v >> 16) & 255) * k * e) | 0},${Math.min(255, ((v >> 8) & 255) * k * e) | 0},${Math.min(255, (v & 255) * k * e) | 0})`; };
-      for (const [, x, y, z] of order) {
-        const v = at(x, y, z);
-        const glass = (v & GL) !== 0;
-        const col = (k) => glass ? `rgba(190,230,255,${0.35 + k * 0.2})` : rgb(v, k);
-        if (open(at(x, y + 1, z)) || (glass && !(at(x, y + 1, z) & GL))) poly([S(x, y + 1, z), S(x + 1, y + 1, z), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(1));
-        if (open(at(x, y, z + 1)) || (glass && !(at(x, y, z + 1) & GL))) poly([S(x, y, z + 1), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(0.8));
-        if (open(at(x + 1, y, z)) || (glass && !(at(x + 1, y, z) & GL))) poly([S(x + 1, y, z), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x + 1, y + 1, z)], col(0.64));
-      }
-    }
+    // mini-voxel sculpture icon (Voxel Architecture blocks), drawn in one go
+    drawVoxels(ctx, s) { const it = voxelIconSteps(ctx, s); while (!it.next().done); }
     thin(s) {
       const bb = VR.PHYS.selection(s)[0];
       if (!bb) return true;
@@ -175,11 +200,12 @@
 })(VR);
 
 // The palette's icon pump (ui.js, the creative tab) and the idle warm of the Modern Living pictures (game.startPrewarm).
-// (iconperf) a palette of hundreds of icons paints a few per frame: a frame paints until `budget` ms are used (the check
-// comes before each paint, so the last one may run over). A model still to be built is one such paint: its build (at most
-// ~15 ms for the pack since the speed-ups) is counted like any other, so a frame's icon work is at most the budget plus one
-// paint. (Giving every cold model a frame of its own made a cold tab of 236 models take 236+ frames.) A canvas that has left
-// the page is dropped without a paint. The paint, the clock and the frames are injectable (test/icon_pump.js).
+// (iconperf) a palette of hundreds of icons paints a few per frame: a frame paints until `budget` ms are used. A voxel
+// picture is drawn in slices (ready = Icons.stepIcon: one voxel per step) and painted once it is complete, so the work in
+// a frame is the budget plus one step. The one step that cannot be cut is a model's build (a few ms typically, up to ~30 ms
+// in node for the heaviest pack model); it is counted like any other. (Giving every cold model a frame of its own made a
+// cold tab of 236 models take 236+ frames.) A canvas that has left the page is dropped without a paint. The paint, the
+// clock, the frames and the ready step are injectable (test/icon_pump.js).
 (function (VR) {
   'use strict';
   class IconPump {
@@ -190,6 +216,9 @@
       this.now = o.now || (() => performance.now());
       this.raf = o.raf || ((cb) => requestAnimationFrame(cb));
       this.connected = o.connected || ((cv) => cv.isConnected !== false);
+      // ready(id, more) draws the item's picture while more() says the frame has time, true once it is complete (the
+      // icons' stepIcon); by default every item is ready at once
+      this.ready = o.ready || (() => true);
       this.q = []; this.handle = 0;
     }
     get pending() { return this.q.length; }
@@ -203,6 +232,8 @@
         const [cv, id] = q[0];
         if (!this.connected(cv)) { q.shift(); continue; }
         if (n && this.now() - t0 >= this.budget) break;
+        // a voxel picture is drawn in slices while this frame has time; an unfinished one waits for the next frame
+        if (!this.ready(id, () => this.now() - t0 < this.budget)) break;
         q.shift(); this.paint(cv, id); n++;
       }
       if (q.length) this.start();
