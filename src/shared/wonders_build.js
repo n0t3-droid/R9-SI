@@ -396,7 +396,7 @@
     // the gallery: a ring platform with a railing; the lantern room: glass round the light, a red cap, a golden finial
     const gy = towerTop;
     H.disc(cx, cz, TR + 2, gy, 'smooth_stone'); H.ring(cx, cz, TR + 2, gy + 1, 'vx_railing_black'); H.ring(cx, cz, TR + 2, gy - 1, 'vollton_signal_red');
-    for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2, x = cx + Math.round(Math.cos(a) * (TR + 2)), z = cz + Math.round(Math.sin(a) * (TR + 2)); K.set(x, gy + 2, z, 'vx_lantern'); }
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, x = cx + Math.round(Math.cos(a) * (TR + 2)), z = cz + Math.round(Math.sin(a) * (TR + 2)); K.set(x, gy + 2, z, 'vx_lantern'); }
     for (const [x, y, z] of steps) if (y >= gy - 2) K.air(x, gy, z);
     steps.forEach(([x, y, z], i) => { if (y === gy) K.set(x, y, z, 'stone_brick_stairs', { facing: [1, 1, 2, 2, 3, 3, 0, 0][i & 7], half: 0 }); });
     for (let y = gy + 1; y <= gy + 5; y++) H.ring(cx, cz, TR - 0.5, y, y === gy + 5 ? 'neon_white' : 'glass');
@@ -465,6 +465,9 @@
       if (ways === 1) K.set(x0 + 1, f, z0 + 1, 'vx_lantern_crystal');
       if ((i + j * 3) % 5 === 0) K.set(x0 + 3, f + 3, z0 + 3, 'vx_garden_lamp');
     }
+    // more light for the night: a crystal lamp on the north-west corner of every third or fourth cell (the corner is
+    // beside the way, never on its middle — the paths stay open)
+    for (let j = 0; j < C; j++) for (let i = 0; i < C; i++) if (!plaza(i, j) && (i * 2 + j * 3) % 4 === 0) K.set(1 + i * S, f, 1 + j * S, 'vx_lantern_crystal');
     // the rotunda over the fountain: eight white columns, a ring, a dome of gold and glass, a crystal light on top —
     // seen from outside the maze, where its heart is
     const RR = 5;
