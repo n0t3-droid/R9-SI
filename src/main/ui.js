@@ -734,10 +734,9 @@
       pal.onmousedown = (e) => { if (e.target === pal && this.cursor) { this.cursor = null; this.updateCursor(); } };
     }
     // palette icons paint in small batches, about 6 ms per frame (VR.IconPump): a tab of hundreds of models (each builds its
-    // voxels on first use) never stalls a frame on a small PC; a model still to be built gets a frame of its own; slots that
-    // left the page are skipped
+    // voxels on first use) never stalls a frame on a small PC; slots that left the page are skipped
     iconPump() {
-      return this._palPump || (this._palPump = new VR.IconPump({ paint: (cv, id) => this.game.icons.paint(cv, id), cold: (id) => this.game.icons.cold(id) }));
+      return this._palPump || (this._palPump = new VR.IconPump({ paint: (cv, id) => this.game.icons.paint(cv, id) }));
     }
     // ★ marks on the palette slots
     markFavs(pal) {

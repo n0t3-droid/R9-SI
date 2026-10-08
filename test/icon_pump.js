@@ -1,7 +1,7 @@
 // The palette's icon pump (src/main/icons.js, VR.IconPump) and the idle warm of the Modern Living pictures (VR.iconWarm).
 // Frames and idle callbacks are fakes: the clock moves only with the paints, frames run when the test says so.
-// Frame rules: a frame paints until 6 ms are used (the check is before each paint); a model that still has to be built
-// gets a frame of its own; a detached canvas is dropped without a paint. The warm builds nothing before notBefore (10 s
+// Frame rules: a frame paints until 6 ms are used (the check is before each paint), so a model still to be built is one
+// paint like the others; a detached canvas is dropped without a paint. The warm builds nothing before notBefore (10 s
 // of play), one picture per idle slice with more than 8 ms left, largest model first, and stops while the page is hidden.
 require('./load_shared.js');
 require('/home/claude/vr/src/main/icons.js');
@@ -22,37 +22,47 @@ const canvas = () => ({ isConnected: true });
 // 1 · a frame paints until 6 ms are used: 2 ms paints give 3 per frame, then the rest
 {
   const e = frameEnv(), painted = [];
-  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += 2; }, cold: () => false });
+  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += 2; } });
   for (let i = 0; i < 10; i++) pump.add(canvas(), 'w' + i);
   const sizes = [];
   for (let k = 0; k < 20 && pump.pending; k++) { const b = painted.length; e.runFrame(); sizes.push(painted.length - b); }
   check(sizes.join() === '3,3,3,1' && painted.join() === 'w0,w1,w2,w3,w4,w5,w6,w7,w8,w9', 'frames paint 3, 3, 3, 1 items of 2 ms (' + sizes.join(',') + ')');
 }
 
-// 2 · a model still to be built is painted alone in its frame, and the frame before it is closed
+// 2 · a model still to be built is one paint like the others: its frame holds it, then the budget closes the frame
 {
   const e = frameEnv(), painted = [], cold = new Set(['c']);
-  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += cold.has(id) ? 30 : 1; }, cold: (id) => cold.has(id) });
+  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += cold.has(id) ? 30 : 1; } });
   for (const id of ['w1', 'c', 'w2', 'w3']) pump.add(canvas(), id);
   const frames = [];
   for (let k = 0; k < 20 && pump.pending; k++) { const b = painted.length; e.runFrame(); frames.push(painted.slice(b).join('+')); }
-  check(frames.join(' | ') === 'w1 | c | w2+w3', 'a cold model gets a frame of its own (' + frames.join(' | ') + ')');
+  check(frames.join(' | ') === 'w1+c | w2+w3', 'a cold model shares the frame before it and closes it (' + frames.join(' | ') + ')');
 }
 
-// 3 · a cold model at the head of the queue starts the frame; a cold model never shares a frame with a paint before it
+// 3 · a frame closes once 6 ms are used: 4 ms paints go two to a frame (at most one paint runs past the budget)
 {
   const e = frameEnv(), painted = [];
-  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += 1; }, cold: (id) => id === 'c' });
+  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += 4; } });
+  for (const id of ['a', 'b', 'c', 'd', 'e']) pump.add(canvas(), id);
+  const frames = [];
+  for (let k = 0; k < 10 && pump.pending; k++) { const b = painted.length; e.runFrame(); frames.push(painted.slice(b).join('+')); }
+  check(frames.join(' | ') === 'a+b | c+d | e', 'frames of 4 ms paints: two per frame (' + frames.join(' | ') + ')');
+}
+
+// 3b · an expensive build (30 ms) fills its frame; the paint behind it waits for the next frame
+{
+  const e = frameEnv(), painted = [];
+  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += id === 'c' ? 30 : 1; } });
   pump.add(canvas(), 'c'); pump.add(canvas(), 'w');
   const frames = [];
   for (let k = 0; k < 5 && pump.pending; k++) { const b = painted.length; e.runFrame(); frames.push(painted.slice(b).join('+')); }
-  check(frames.join(' | ') === 'c | w', 'cold first, then the warm one in the next frame (' + frames.join(' | ') + ')');
+  check(frames.join(' | ') === 'c | w', 'a 30 ms build alone in its frame, the next paint after it (' + frames.join(' | ') + ')');
 }
 
 // 4 · detached canvases are dropped without a paint
 {
   const e = frameEnv(), painted = [];
-  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += 1; }, cold: () => false });
+  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: (cv, id) => { painted.push(id); e.t += 1; } });
   pump.add({ isConnected: false }, 'x'); pump.add(canvas(), 'y'); pump.add({ isConnected: false }, 'z');
   e.runFrame();
   check(painted.join() === 'y' && pump.pending === 0, 'a detached canvas is dropped without a paint (painted ' + painted.join() + ')');
@@ -61,7 +71,7 @@ const canvas = () => ({ isConnected: true });
 // 5 · one frame loop however many items and start() calls, and nothing is scheduled once the queue is empty
 {
   const e = frameEnv();
-  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: () => { e.t += 1; }, cold: () => false });
+  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, paint: () => { e.t += 1; } });
   pump.add(canvas(), 'a'); pump.add(canvas(), 'b'); pump.start(); pump.start();
   check(e.frames.length === 1, 'a single frame loop (' + e.frames.length + ' pending frame callbacks)');
   e.runFrame();
