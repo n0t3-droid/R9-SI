@@ -1,4 +1,12 @@
-Stand: 8. Okt 2026 · Studio v4.1 — 🏭 Forge, Einfach/Profi, Deutsch; ✏️ überall, ☆ Häuser, 📦 Mitnehmen, ✨ Modern, Klassisch; ▶ Spielen und 📍 Spawnpunkt; 🧱 Teile, 🎯 Finden, ★ Favoriten; ✨ Genie ohne Claude
+Stand: 9. Okt 2026 · Studio v4.2 — ✨ Assistent, 🎨 Aussehen, 🏭 Forge, Einfach/Profi, Deutsch; ✏️ überall, ☆ Häuser, 📦 Mitnehmen, ✨ Modern, Klassisch; ▶ Spielen und 📍 Spawnpunkt; 🧱 Teile, 🎯 Finden, ★ Favoriten; ✨ Genie ohne Claude
+
+NEU IN v0.41 — ✨ Assistent, 🎨 Aussehen, 🖐 Bauhand
+- ✨ Erschaffen öffnet den Assistenten: Was? (große Symbole) › Wie? (sechs Varianten oder ein Satz) › Wohin? — im Spiel
+  (Pausemenü, Bauhand-Ring mit B) und hier im Studio. Gesetzt wird als Plan; Z nimmt es zurück.
+- 🎨 Aussehen: ✏️ auf einer Block-Karte — Farbe und Material mit Live-Vorschau, gleichzeitig im Spiel; Original
+  wiederherstellen; Als Variante (256 Plätze), das Original bleibt. Gäste sehen die Looks des Hosts.
+- Deutsch überall: Möbelnamen (Dreisitzer · Anthrazit), alle Studio-Texte in Deutsch und Englisch.
+- Im Spiel: 📽 Zeitraffer mit Video, 🪞 Spiegel-Bauen (⇧M), 🔊 Klang, Tasten belegen, Gamepad, Touch, Automatik.
 
 NEU IN v0.40 — 🏭 Forge, eine Tür für alle, Türen gehen auf
 - Eine Tür: oben vier Kacheln (🏗 Bauen, ✨ Erschaffen, 🎒 Meins, ▶ Spielen) und ein Pfad zurück. Einfach / Profi:
