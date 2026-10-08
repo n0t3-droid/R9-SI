@@ -8,11 +8,13 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant' },
-    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site' },
-    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site' },
-    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
-    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
+    // far: F-Far's ring 1 (the forms out to that many chunks, ~1 km on High and Ultra; 0 = none) · rdMax: the top of the
+    // render-distance slider (32 on Ultra, 24 elsewhere as before)
+    potato: { far: 0, rdMax: 24, upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant' },
+    low: { far: 0, rdMax: 24, upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site' },
+    balanced: { far: 0, rdMax: 24, upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site' },
+    high: { far: 64, rdMax: 24, upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
+    ultra: { far: 64, rdMax: 32, upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
@@ -42,6 +44,10 @@
       const out = Object.assign({}, VR.Settings ? VR.Settings.defaults() : {}, DEFAULTS, s);
       // 🏗 Bauen (Sofort / Baustelle): settings saved before it follow their preset (Very Low builds at once)
       if (s.bau === undefined && s.preset) out.bau = (PRESETS[s.preset] || PRESETS.balanced).bau;
+      // F-Far: settings saved before the rings follow their preset; a custom one gets ring 1 when it sees at least as far
+      // as High (renderDist 14) and is not the lite look of a weak PC
+      if (s.far === undefined && s.preset) out.far = PRESETS[s.preset] ? PRESETS[s.preset].far : ((s.renderDist || 0) >= 14 && !s.lite ? 64 : 0);
+      if (s.rdMax === undefined && s.preset) out.rdMax = PRESETS[s.preset] ? PRESETS[s.preset].rdMax : 24;
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -111,6 +117,10 @@
       if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water });
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
+      // F-Far: ring 1 as the preset asked (the governor never lowers it: no rung touches it); the render distance stays
+      // within the slider's top (32 on Ultra, 24 elsewhere)
+      S.renderDist = Math.max(3, Math.min(S.rdMax || 24, S.renderDist));
+      if (this.horizon && this.horizon.setFar) this.horizon.setFar(S.far || 0);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
       if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
       if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
@@ -1304,7 +1314,7 @@
         case 'kill': p.damage(1000, 'void'); break;
         case 'fly': p.flySpeed = Math.max(0.2, Math.min(8, parseFloat(a[0]) || 1)); say(T('g.cmd.fly', { v: p.flySpeed })); break;
         case 'trailer': case 'cinema': if (this.director && this.director.play('trailer')) say(T('g.cmd.trailer')); else say(T('g.cmd.noTrailer')); break;
-        case 'render': this.settings.renderDist = Math.max(3, Math.min(24, parseInt(a[0], 10) || 8)); this.applySettings('renderDist'); say(T('g.cmd.render', { n: this.settings.renderDist })); break;
+        case 'render': this.settings.renderDist = Math.max(3, Math.min(this.settings.rdMax || 24, parseInt(a[0], 10) || 8)); this.applySettings('renderDist'); say(T('g.cmd.render', { n: this.settings.renderDist })); break;
         case 'freeze': this.zenFreezeTime = !this.zenFreezeTime; say(T(this.zenFreezeTime ? 'g.cmd.freezeOn' : 'g.cmd.freezeOff')); break;
         case 'locate': this.pool.direct(0, { type: 'locate', dim: this.dim, biome: a[0], x: Math.floor(p.pos[0]), z: Math.floor(p.pos[2]) }, null, (m) => { if (m.pos) say(T('g.cmd.located', { what: a[0], x: m.pos[0], y: m.pos[1], z: m.pos[2], y2: m.pos[1] + 2 })); else say(T('g.cmd.notFound'), '#ff8a8a'); }); break;
         case 'summon': if (this.entities && this.entities.summon) { if (!this.entities.summon(a[0], p.pos[0] + Math.sin(-p.yaw) * 3, p.pos[1], p.pos[2] - Math.cos(p.yaw) * 3)) say(T('g.cmd.noMob'), '#ff8a8a'); } break;
@@ -1313,4 +1323,5 @@
     }
   }
   VR.Game = Game;
+  Game.PRESETS = PRESETS;   // (the quality presets, read by the tests: test/far_presets.js)
 })(VR);

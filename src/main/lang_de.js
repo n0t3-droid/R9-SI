@@ -367,7 +367,7 @@
     'g.set.sec.steer': 'Steuerung',
     'g.set.sec.play': 'Spielen',
     'g.set.preset.tip': 'Eine Stufe stellt alles auf einmal ein: „Sehr niedrig“ für alte Laptops, „Ultra“ für starke Grafikkarten.',
-    'g.set.renderDist.tip': 'Wie weit du mit allen Details siehst, in Chunks zu 16 Blöcken. Die Weite kostet am meisten.',
+    'g.set.renderDist.tip': 'Wie weit du alles im Detail siehst (Ring 0, in Chunks zu 16 Blöcken). Auf Hoch und Ultra zeigt Ring 1 dahinter bis etwa 1 km die Formen – Hügel, Städte, Türme –, Ring 2 den Horizont. Die Weite kostet am meisten.',
     'g.set.horizon.tip': 'Das Land dahinter, als grobes Gelände bis 5 km.',
     'g.set.shadows.tip': 'Schatten von Sonne und Blöcken; höhere Stufen sind schärfer und weicher.',
     'g.set.sunShadows.tip': 'Weiche Schatten der Sonne über das ganze Gelände.',
