@@ -47,6 +47,23 @@ const BLUE = '#3f63a8', RED = '#b5423a';
 
 // ---------------------------------------------------------------- 0 the host: a flat Creative world with an oak wall
 const A = await ctx.newPage(); watch(A, 'A');
+// (diagnostic) in the Studio frame every WebGL2 call is checked: the first failing calls are listed with the panel picture
+await A.addInitScript(() => {
+  if (!/studio\.html/.test(location.pathname)) return;
+  const ERR = { 1280: 'INVALID_ENUM', 1281: 'INVALID_VALUE', 1282: 'INVALID_OPERATION', 1285: 'OUT_OF_MEMORY', 1286: 'INVALID_FRAMEBUFFER_OPERATION' };
+  const orig = HTMLCanvasElement.prototype.getContext; window.__glerrs = [];
+  HTMLCanvasElement.prototype.getContext = function (kind, ...rest) {
+    const gl = Reflect.apply(orig, this, [kind, ...rest]);
+    if (!gl || kind !== 'webgl2' || gl.__wrapped) return gl;
+    gl.__wrapped = true; const proto = Object.getPrototypeOf(gl);
+    for (const k of Object.getOwnPropertyNames(proto)) {
+      const d = Object.getOwnPropertyDescriptor(proto, k); if (k === 'getError' || !d || typeof d.value !== 'function') continue;
+      const f = d.value;
+      gl[k] = function (...a) { const r = Reflect.apply(f, gl, a); const e = Reflect.apply(proto.getError, gl, []); if (e && window.__glerrs.length < 30) { const desc = a.map(x => (x && x.constructor && !/Number|String|Boolean/.test(x.constructor.name)) ? x.constructor.name + (x.length !== undefined ? '[' + x.length + ']' : '') : String(x)).join(', '); window.__glerrs.push(k + '(' + desc.slice(0, 140) + ') → ' + (ERR[e] || e)); } return r; };
+    }
+    return gl;
+  };
+});
 await A.goto(URL0);
 check(await waitState(A, 'title'), 'the game starts');
 const lang = await ev(A, () => ({ lang: VR.I18N && VR.I18N.lang, nav: navigator.language }));
@@ -119,7 +136,7 @@ check(pv.studio === pv.want && pv.scene === 'block:oak_planks', 'the Studio prev
 check(pv.game === 0 && !pv.stored, 'the game does not take a preview (nothing stored yet)');
 await A.screenshot({ path: '/home/claude/vr/test/shots/live_studio_panel_early.png', timeout: 180000 });   // (diagnostic: the view before the Studio's idle work)
 await wait(1500);   // (the Studio's own frames draw the block again)
-console.log('  studio gl', await ev(A, () => { const fw = document.getElementById('studioFrame').contentWindow, v = fw.document.getElementById('view'), gl = v.getContext('webgl2'); return JSON.stringify({ viewport: gl && Array.from(gl.getParameter(gl.VIEWPORT)), fbo: !!(gl && gl.getParameter(gl.FRAMEBUFFER_BINDING)), canvas: [v.width, v.height], css: [v.clientWidth, v.clientHeight], dpr: fw.devicePixelRatio, err: gl && gl.getError() }); }));
+console.log('  studio gl', await ev(A, () => { const fw = document.getElementById('studioFrame').contentWindow, v = fw.document.getElementById('view'), gl = v.getContext('webgl2'); return JSON.stringify({ viewport: gl && Array.from(gl.getParameter(gl.VIEWPORT)), fbo: !!(gl && gl.getParameter(gl.FRAMEBUFFER_BINDING)), canvas: [v.width, v.height], css: [v.clientWidth, v.clientHeight], dpr: fw.devicePixelRatio, err: gl && gl.getError(), glerrs: (fw.__glerrs || []).slice(0, 12) }); }));
 const pPanel = await A.screenshot({ path: '/home/claude/vr/test/shots/live_studio_panel.png', timeout: 180000 }).then(() => '/home/claude/vr/test/shots/live_studio_panel.png');
 console.log('  shot ' + pPanel);
 console.log('  studio cam', await ev(A, () => { const fw = document.getElementById('studioFrame').contentWindow, st = fw.__st; return JSON.stringify({ cam: st && st.cam, scene: st && st.scene && { type: st.scene.type, name: st.scene.name, span: st.scene.span, center: st.scene.center, off: st.scene.off }, view: (() => { const v = fw.document.getElementById('view'); return v && [v.width, v.height, v.clientWidth, v.clientHeight]; })() }); }));
