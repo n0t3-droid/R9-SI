@@ -193,6 +193,7 @@
     // 🚀 in a ship (flight.js): its keys by their default names (a rebound action moves its ship key along)
     body.appendChild(el('h3', '', esc(T('g.keys.ship.title'))));
     body.appendChild(el('div', 'note', esc(T('g.keys.ship.text'))));
+    body.appendChild(el('div', 'note', esc(T('g.keys.ship.pad'))));   // (the pad in a ship: VR.Pad.ship)
   };
   function slotOf(id, code) { const S = VR.Binds.current.slots(id); return S[0] === code ? 0 : 1; }
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

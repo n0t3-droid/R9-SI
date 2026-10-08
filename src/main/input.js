@@ -40,6 +40,8 @@
       this.padPrev = null; this.pad = null; this.padHeld = [false, false, false];
       this.menuOpen = false;         // set by the game: menus take the pad as focus moves, not as game keys
       this.capture = null;           // the next key goes to this callback (the key-binding screen)
+      // 🚀 piloting a ship: the pad answers flight.js's own key names (VR.Pad.ship), held and pressed this frame
+      this.shipPad = { keys: [], mouse: [false, false, false] }; this.shipDown = new Set(); this.shipPressed = new Set();
       this.bind();
     }
     bind() {
@@ -60,7 +62,7 @@
         if (this.captured && (k === 'Space' || k.startsWith('Arrow') || k === 'Tab' || k === 'F3' || k === 'F1' || k === 'F2' || k === 'F5' || k === 'Slash' || (e.ctrlKey && (k === 'KeyW' || k === 'KeyS' || k === 'KeyD')))) e.preventDefault();
       });
       window.addEventListener('keyup', (e) => { this.keys.delete(e.code); this.released.add(e.code); });
-      window.addEventListener('blur', () => { this.keys.clear(); this.mouse.down = [false, false, false]; this.padDown.clear(); this.tDown.clear(); this.padHeld = [false, false, false]; });
+      window.addEventListener('blur', () => { this.keys.clear(); this.mouse.down = [false, false, false]; this.padDown.clear(); this.tDown.clear(); this.shipDown.clear(); this.padHeld = [false, false, false]; });
       c.addEventListener('contextmenu', (e) => e.preventDefault());
       c.addEventListener('mousedown', (e) => {
         if (!this.enabled) return;
@@ -108,8 +110,8 @@
       if (id && ((a1 && a1.has(id)) || (a2 && a2.has(id)))) return true;
       return !!pset && pset.has(name);
     }
-    down(k) { return this.anyOf(k, this.keys, this.padDown, this.tDown, this.vPhys); }
-    hit(k) { return this.anyOf(k, this.pressed, this.padPressed, this.tPressed, this.vPhys); }
+    down(k) { return this.anyOf(k, this.keys, this.padDown, this.tDown, this.vPhys) || (this.shipDown.size !== 0 && this.shipDown.has(k)); }
+    hit(k) { return this.anyOf(k, this.pressed, this.padPressed, this.tPressed, this.vPhys) || (this.shipPressed.size !== 0 && this.shipPressed.has(k)); }
     dbl(k) { return this.anyOf(k, this.doubleTap, null, null, null); }
     // the next key pressed goes to cb (the key-binding screen); cb gets e.code, Escape cancels there
     captureNext(cb) { this.capture = cb; }
@@ -169,28 +171,37 @@
         if (menu && pad.menu.indexOf('back') >= 0) this.vPhys.add('Escape');
       }
       const live = !!pad && pad.connected && !menu;     // the pad drives the game only when no menu is open
-      this.padDown = live ? new Set(pad.down) : new Set();
-      if (live) for (const a of pad.pressed) this.padPressed.add(a);
+      // 🚀 in a ship the pad flies it (VR.Pad.ship): flight.js's key names, RB / R3 the mouse buttons; the walking
+      // actions, the walk stick and the hotbar wait until the player gets out (Start and the look stick stay)
+      const ship = live && !!(VR.game && VR.game.flight) && !!VR.Pad.ship;
+      this.padDown = live && !ship ? new Set(pad.down) : new Set();
+      if (live && !ship) for (const a of pad.pressed) this.padPressed.add(a);
+      const sp = this.shipPad;
+      if (ship) VR.Pad.ship(pad, sp); else { sp.keys.length = 0; sp.mouse[0] = false; sp.mouse[1] = false; sp.mouse[2] = false; }
+      for (let i = 0; i < sp.keys.length; i++) if (!this.shipDown.has(sp.keys[i])) this.shipPressed.add(sp.keys[i]);
+      this.shipDown.clear(); for (let i = 0; i < sp.keys.length; i++) this.shipDown.add(sp.keys[i]);
       for (let b = 0; b < 3; b++) {
-        const on = live && !!pad.mouseDown[b];
+        const on = live && !!(ship ? sp.mouse[b] : pad.mouseDown[b]);
         if (on && !this.padHeld[b]) { this.mouse.down[b] = true; this.mouse.clicked[b] = true; }
         if (!on && this.padHeld[b]) { this.mouse.down[b] = false; this.mouse.releasedBtn[b] = true; }
         this.padHeld[b] = on;
       }
       if (live) {
-        this.mouse.wheel += pad.wheel;
-        if (pad.dpad.indexOf('left') >= 0) this.mouse.wheel -= 1;
-        if (pad.dpad.indexOf('right') >= 0) this.mouse.wheel += 1;
+        if (!ship) {
+          this.mouse.wheel += pad.wheel;
+          if (pad.dpad.indexOf('left') >= 0) this.mouse.wheel -= 1;
+          if (pad.dpad.indexOf('right') >= 0) this.mouse.wheel += 1;
+        }
         this.mouse.dx += pad.look[0] * LOOK_PAD * k; this.mouse.dy += pad.look[1] * LOOK_PAD * k;
       }
       const tm = menu ? { fwd: 0, str: 0 } : (this.touchMove || { fwd: 0, str: 0 });
-      const pf = live ? -pad.move[1] : 0, ps = live ? pad.move[0] : 0;
+      const pf = live && !ship ? -pad.move[1] : 0, ps = live && !ship ? pad.move[0] : 0;
       this.padMove = { fwd: clamp(pf + tm.fwd, -1, 1), str: clamp(ps + tm.str, -1, 1) };
     }
     endFrame() {
       if (this.tRelease.size) { for (const id of this.tRelease) this.tDown.delete(id); this.tRelease.clear(); }
       this.pressed.clear(); this.released.clear(); this.doubleTap.clear();
-      this.padPressed.clear(); this.tPressed.clear(); this.vPhys.clear();
+      this.padPressed.clear(); this.tPressed.clear(); this.vPhys.clear(); this.shipPressed.clear();
       this.mouse.dx = 0; this.mouse.dy = 0; this.mouse.wheel = 0;
       this.mouse.clicked = [false, false, false]; this.mouse.releasedBtn = [false, false, false];
     }
