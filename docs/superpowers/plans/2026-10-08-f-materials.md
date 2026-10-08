@@ -60,8 +60,12 @@ Spec: docs/superpowers/specs/2026-10-08-realism-wave-design.md, section F2. Bran
 
 Forge (node, test/tex_materials.js, one process, 1832 layers, on the shared 2-CPU machine): 3716 ms with the relief,
 of which the relief calls are 117 ms; 3420 ms without. The rest of the difference is the re-encoding of the relieved
-layers. The scratch baseline (scratchpad/f2/base.js, not in the repo) gave 2905 ms on average and 2220 ms in one later
-run: the spread here is 30–50 %, so the forge is reported as "the relief is about 3 % of it", not as a ratio.
+layers. A second node run (the final regression) gave 2036 ms with the relief, of which 35 ms are the relief calls, and
+1455 ms without. So the relief calls are 2–4 % of the forge, but the whole forge with the relief was 9 % slower in one
+run and 40 % in the other: the re-encoding of the relieved layers (toArrays and cell normals run again) is most of
+the difference, and the machine noise is the rest. The plan's "less than 15 % of the forge" is therefore not shown
+reliably by these runs. The scratch baseline (scratchpad/f2/base.js, not in the repo) gave 2905 ms on average and
+2220 ms in one later run.
 
 Render (test/materials.mjs, MEASURE, SwiftShader, 1280×720, the gallery's near view, median of 12 frames after 3
 warm-ups, gl.finish plus a one-texel readPixels). Deviation from the spec: the measured scene is the flat-world
