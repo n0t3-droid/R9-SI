@@ -353,6 +353,7 @@
     'g.keys.pad.text': 'Left stick: move · Right stick: look · A: jump · B: sneak (in menus: back) · X: undo · Y: inventory · LB/RB: hotbar · LT: place · RT: break (hold) · View: map · stick click: sprint · R3: camera · Start: pause · D-pad: choose in menus',
     'g.keys.ship.title': '🚀 Ships',
     'g.keys.ship.text': 'W/S throttle · A/D turn · Space/Shift climb · B boost · X hover · the mouse looks, right button steers · C view · F gear · L lights · R ramp · G autopilot · V land / get out · hold Q look back',
+    'g.keys.ship.pad': 'Gamepad in a ship: left stick steer and climb · RT/LT throttle · A boost · B hover · X gear · Y view · LB look back · RB button or guns · D-pad: up autopilot, down land / get out, left lights, right ramp',
     'g.set.preview': 'Preview',
     'g.set.cost.title': 'What it costs: 🟢 little · 🟡 some · 🔴 a lot',
     'start.kidsWorld': 'Kids world',

@@ -5,6 +5,7 @@
 //   A jump · B sneak (menus: back) · X undo · Y inventory · View map · Start pause (Escape)
 //   LB / RB turn the hotbar · LT place (right button) · RT break (left button, held)
 //   stick click sprint · R3 camera · D-pad: menu focus, and left / right turn the hotbar
+//   in a ship (VR.game.flight) ship(polled) gives the ship's keys instead (input.js): see ship() below
 // poll(list, prev) → { connected, index, id, move[x,y], look[x,y], down[], pressed[],
 //   released[], physPressed[], mouseDown[3], mouseClicked[3], wheel, dpad[], menu[], buttons[] }
 // stick(x, y, dz) · rumbleFor(fallBlocks) → { strong, weak, duration } | null
@@ -83,6 +84,24 @@
     }
     return out;
   }
+  // 🚀 in a ship (flight.js asks for its keys by their default names): the left stick turns (A / D) and climbs or sinks
+  // (Space / Shift), RT / LT the throttle (W / S), A boost (B), B hover (X), X gear (F), Y view (C), LB look back (Q),
+  // the D-pad: up autopilot (G), down land / get out (V), left lights (L), right ramp (R); RB is the left mouse button
+  // (the control you aim at, or the guns), R3 the middle one. Start and the look stick stay as they are (input.js).
+  // out = { keys: [], mouse: [3] } is filled in place: no allocation per frame
+  const SHIP_BTN = [[0, 'KeyB'], [1, 'KeyX'], [2, 'KeyF'], [3, 'KeyC'], [4, 'KeyQ'], [6, 'KeyS'], [7, 'KeyW'], [12, 'KeyG'], [13, 'KeyV'], [14, 'KeyL'], [15, 'KeyR']];
+  const SHIP_STICK = 0.45;
+  function ship(p, out) {
+    const o = out || { keys: [], mouse: [false, false, false] };
+    o.keys.length = 0; o.mouse[0] = false; o.mouse[1] = false; o.mouse[2] = false;
+    if (!p || !p.connected) return o;
+    const b = p.buttons || [], mx = p.move ? p.move[0] : 0, my = p.move ? p.move[1] : 0;
+    if (mx < -SHIP_STICK) o.keys.push('KeyA'); else if (mx > SHIP_STICK) o.keys.push('KeyD');
+    if (my < -SHIP_STICK) o.keys.push('Space'); else if (my > SHIP_STICK) o.keys.push('ShiftLeft');
+    for (let i = 0; i < SHIP_BTN.length; i++) if (b[SHIP_BTN[i][0]]) o.keys.push(SHIP_BTN[i][1]);
+    o.mouse[0] = !!b[5]; o.mouse[1] = !!b[11];
+    return o;
+  }
   // the rumble for a landing: nothing for a step, a firmer and longer buzz for a longer fall
   function rumbleFor(h) {
     if (!Number.isFinite(h) || h < 0.9) return null;
@@ -114,5 +133,5 @@
     if (!a || typeof a.playEffect !== 'function') return false;
     try { a.playEffect('dual-rumble', { startDelay: 0, duration: plan.duration, weakMagnitude: plan.weak, strongMagnitude: plan.strong }); last = g; return true; } catch (e) { return false; }
   }
-  VR.Pad = { MAP, DZ, stick, poll, rumbleFor, navNearest, vibrate, pickPad, last: () => last };
+  VR.Pad = { MAP, DZ, stick, poll, ship, rumbleFor, navNearest, vibrate, pickPad, last: () => last };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

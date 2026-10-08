@@ -353,6 +353,7 @@
     'g.keys.pad.text': 'Linker Stick: gehen · Rechter Stick: umsehen · A: springen · B: schleichen (im Menü: zurück) · X: rückgängig · Y: Inventar · LB/RB: Schnellleiste · LT: setzen · RT: abbauen (halten) · Ansicht: Karte · Stick-Klick: sprinten · R3: Kamera · Start: Pause · Steuerkreuz: im Menü wählen',
     'g.keys.ship.title': '🚀 Schiffe',
     'g.keys.ship.text': 'W/S Schub · A/D Kurve · Leertaste/Shift hoch/runter · B Boost · X Schweben · Maus schaut, Rechtsklick lenkt · C Ansicht · F Fahrwerk · L Licht · R Rampe · G Autopilot · V landen / aussteigen · Q halten: zurückschauen',
+    'g.keys.ship.pad': 'Gamepad im Schiff: linker Stick lenken und steigen · RT/LT Schub · A Boost · B Schweben · X Fahrwerk · Y Ansicht · LB zurückschauen · RB Knopf oder Waffen · Steuerkreuz: hoch Autopilot, runter landen / aussteigen, links Licht, rechts Rampe',
     'g.set.preview': 'Vorschau',
     'g.set.cost.title': 'Was es kostet: 🟢 kaum · 🟡 etwas · 🔴 viel',
     'start.kidsWorld': 'Kinderwelt',
