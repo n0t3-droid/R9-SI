@@ -161,12 +161,13 @@
     put(EU, 0, EV - 1, M.plinth + '_stairs', { facing: 2, half: 0 }); put(EU, 1, EV - 1, null);
     for (let v = G.v0; v <= G.v0 + 1; v++) for (let u = EU - 1; u <= EU + 1; u++) for (let y = 1; y <= 4; y++) put(u, y, v, null);
     info.door = [EU, F + 1, EV]; info.outside = [EU, F, EV - 3]; info.inside = [EU, F + 1, G.v0 + 2];
-    // ground floor, sides: a tall window and a band each, with lintels; back: the glass wall (below)
+    // ground floor, sides: a tall window with a lintel and a box bay with a 3 × 3 window each (t1_24: every box has its
+    // window); back: the glass wall (below)
     for (const s of [1, 3]) {
       const fixed = s === 1 ? G.u1 : G.u0, lin = s === 1 ? G.u1 - 1 : G.u0 + 1;
-      win(s, 8, 9, 2, 4, fixed); lintel(s, 8, 9, 5, fixed); win(s, 13, 15, 4, 4, fixed); lintel(s, 13, 15, 5, fixed);
+      win(s, 8, 9, 2, 4, fixed); lintel(s, 8, 9, 5, fixed);
       for (let v = 8; v <= 9; v++) for (let y = 2; y <= 4; y++) put(lin, y, v, null);
-      for (let v = 13; v <= 15; v++) put(lin, 4, v, null);
+      bay(G, s, 12, 16, 1, 5, 13, 15, 2, 4);
     }
     // first floor, front (v 9): two hanging boxes with 2 × 2 windows and the orange underglow, a glass door to the terrace
     bay(U, 0, 6, 9, U.y + 2, U.y + 4, 7, 8, U.y + 3, U.y + 4, { hang: true });

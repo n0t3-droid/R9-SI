@@ -62,16 +62,16 @@ check(fT.v0 - fU.v0 >= 2 && fT.u0 - fU.u0 >= 2 && fU.u1 - fT.u1 >= 2, 'the top f
 // the slab zones: rings of vx_nova_band, two rows, the outer ring past the walls below
 const slabRect = (Rr, ov) => [Rr.u0 - ov[1], Rr.v0 - ov[0], Rr.u1 + ov[1], Rr.v1 + ov[2]];
 const ring = (r) => { const out = []; for (let v = r[1]; v <= r[3]; v++) for (let u = r[0]; u <= r[2]; u++) if (u === r[0] || u === r[2] || v === r[1] || v === r[3]) out.push([u, v]); return out; };
-let slabs = 0, edgeCells = 0, edgeLit = 0, under = 0;
+let slabs = 0, edgeCells = 0, edgeLit = 0, under = 0, free = 0;
 for (const [Rr, ov] of [[G, OVER.G], [U, OVER.U], [Tt, OVER.T]]) {
   const r = slabRect(Rr, ov), cells = ring(r);
   const lower = cells.filter(([u, v]) => nm(u, Rr.slab, v) === 'vx_nova_band').length, upper = cells.filter(([u, v]) => nm(u, Rr.slab + 1, v) === 'vx_nova_band').length;
   if (lower === cells.length && upper === cells.length && r[1] < Rr.v0 && r[0] < Rr.u0) slabs++;
-  for (const [u, v] of cells) { edgeCells++; const g = propOf(at(u, Rr.slab, v), 'glow'); if (g === 1 || g === 3) edgeLit++; if (g === 3 && !at(u, Rr.slab - 1, v)) under++; }
+  for (const [u, v] of cells) { edgeCells++; const g = propOf(at(u, Rr.slab, v), 'glow'); if (g === 1 || g === 3) edgeLit++; if (!at(u, Rr.slab - 1, v)) { free++; if (g === 3) under++; } }
 }
 check(slabs === 3, 'three slab zones, each two blocks of slab edge all round and cantilevering past the walls below (' + slabs + ')');
 check(edgeLit === edgeCells && edgeCells > 150, 'a cyan light line on every slab-edge cell (' + edgeLit + ' of ' + edgeCells + ')');
-check(under >= edgeCells * 0.9, 'and the orange underglow under the edge where it hangs free (' + under + ' of ' + edgeCells + ')');
+check(under === free && free >= edgeCells * 0.8, 'and the orange underglow under the edge wherever it hangs free (' + under + ' of ' + free + ' free edge cells; ' + edgeCells + ' in all)');
 // balusters on every terrace edge (no railing on the ledge behind a flush back wall)
 const terraceRing = (r, above) => ring(r).filter(([u, v]) => !(u >= above.u0 && u <= above.u1 && v >= above.v0 && v <= above.v1) && !(v > above.v1 && u >= above.u0 && u <= above.u1));
 let railN = 0, railOk = 0;
