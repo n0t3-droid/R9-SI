@@ -25,12 +25,22 @@ const buildAll = (lk) => { VR.setLook(lk); const mk = VR.textureMasks(); return 
 
 // ---------------------------------------------------------------- (a) Nahtlos unchanged
 console.log('(a) Nahtlos textures unchanged');
-const SEAMLESS_HASH = 'de94a4ad';   // FNV-1a over every albedo level, then every material level, of the v0.39 Nahtlos build
+// test/tex_ref.json: per texture name, FNV-1a over the layer in every albedo level, then every material level, of the
+// v0.39 Nahtlos build (written from v0.41 by the same code). New textures may come (they are laid out among the old
+// ones, so the layer indices move); every v0.39 texture must still be there and unchanged.
 {
   const { tex } = buildAll('seamless');
-  let h = 2166136261 >>> 0;
-  for (const a of tex.albedo) h = fnv(h, a); for (const a of tex.material) h = fnv(h, a);
-  check(h.toString(16) === SEAMLESS_HASH, `the Nahtlos texture arrays hash as in v0.39 (${h.toString(16)}, ${tex.layers} layers)`);
+  const ref = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'tex_ref.json'), 'utf8'));
+  const idx = new Map(R.texNames.map((n, i) => [n, i]));
+  const changed = [], missing = [];
+  for (const name of Object.keys(ref)) {
+    const l = idx.get(name); if (l === undefined) { missing.push(name); continue; }
+    let h = 2166136261 >>> 0;
+    tex.albedo.forEach((a, lv) => { const n = tex.size >> lv; h = fnv(h, a.subarray(l * n * n * 4, (l + 1) * n * n * 4)); });
+    tex.material.forEach((a, lv) => { const n = tex.size >> lv; h = fnv(h, a.subarray(l * n * n * 4, (l + 1) * n * n * 4)); });
+    if (h.toString(16) !== ref[name]) changed.push(name);
+  }
+  check(missing.length === 0 && changed.length === 0, `the Nahtlos textures of v0.39 are all there and unchanged (${tex.layers} layers, ${Object.keys(ref).length} pinned${missing.length ? ', missing: ' + missing.slice(0, 8).join(' ') : ''}${changed.length ? ', changed: ' + changed.slice(0, 12).join(' ') + (changed.length > 12 ? ' +' + (changed.length - 12) : '') : ''})`);
 }
 
 // ---------------------------------------------------------------- (b) the border on every opaque cube texture
