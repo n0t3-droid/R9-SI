@@ -23,7 +23,7 @@ check(Y === HEART.PLAT, `the temple floor sits at the plateau (y ${Y} = ${HEART.
 check(at(0, Y + 1, 20) === st('portal_veil'), 'the portal opening (centre, bottom row) is the portal veil');
 check(at(0, Y + 8, 20) === st('portal_veil'), 'the portal veil fills the opening up to row 8');
 check(at(7, Y + 5, 20) !== st('portal_veil'), 'the veil stops inside the frame (x 7 is frame, not veil)');
-check(at(0, Y, 44) === st('temple_light_bar') && at(0, Y, 36) === st('temple_light_bar'), 'the runway carries orange light bars down its centre (every 8 blocks)');
+check([-1, 0, 1].every(x => at(x, Y, 44) === st('neon_amber') && at(x, Y, 36) === st('neon_amber')), 'the runway carries amber neon bars across its centre line every 8 blocks (their tops glow)');
 check(at(0, Y, 45) === st('vx_floor_deck'), 'between the light bars the runway is dark deck plate');
 // the veil in the mesher: its faces go to the translucent pass as the PORTAL kind (the shader's veil branch), and each
 // corner carries its distance to the veil's rim (u = distance × 16): 0 on the frame, about 6 in the middle of the gate
@@ -97,7 +97,7 @@ check(crewSpawns.length === 2, `the crew comes with the chunks they stand in (${
 console.log('older worlds (vgen 5) keep the temple they were made with');
 const g5 = V.makeGen('overworld', 4242, { vgen: 5 }), B5 = TG.build(g5).chunks;
 const at5 = (x, y, z) => atIn(B5, x, y, z);
-check(at5(0, Y, 36) !== st('temple_light_bar') && at5(0, Y, 44) !== st('temple_light_bar'), 'vgen 5: no landing-strip lights on the runway');
+check(at5(0, Y, 36) !== st('neon_amber') && at5(0, Y, 44) !== st('neon_amber'), 'vgen 5: no landing-strip lights on the runway');
 check(at5(-4, Y + 2, zc) !== st('vx_tech_hex') && at5(4, Y + 2, zc) !== st('vx_tech_hex'), 'vgen 5: the back-door path has no hex walls');
 check(at5(0, Y + 4, zx) !== st('portal_veil'), 'vgen 5: no veil at the end of the back-door path');
 const spawnsOld = (cx, cz) => { const out = { blocks: new Uint16Array(65536) }; builder(g5, cx, cz, out); return out.spawns || []; };
