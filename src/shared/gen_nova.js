@@ -339,6 +339,15 @@
     band([EU + 0.5, G.v1 + 2], [EU + 0.5, G.v1 + 4], PAT, 1.55); disc(PAT[0], PAT[1], 2.3);
     const lineSet = lines();
     for (const k of paved) { const [u, v] = k.split(',').map(Number); put(u, yard, v, lineSet.has(k) ? M.line : M.path); }
+    // the lawns: grass tufts here and there, flower clusters along the paths' edges (every third lawn cell beside a line);
+    // everything placed later (hedges, beds, mounds, trees) takes its cell over
+    const hsh = (u, v) => { let h = Math.imul(u * 374761393 + v * 668265263, 1274126177); h ^= h >>> 15; return (h >>> 0) % 6; };
+    for (let v = 1; v < D - 1; v++) for (let u = 1; u < W - 1; u++) {
+      if (!lawnAt(u, v)) continue;
+      const byLine = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([du, dv]) => lineSet.has((u + du) + ',' + (v + dv)));
+      if (byLine && (u + 2 * v) % 3 === 0) model(u, 0, v, 'vm_flower_cluster', 0);
+      else if (!byLine && hsh(u, v) === 0) model(u, 0, v, 'vm_tuft_grass', 0);
+    }
     // hedges: along the street (with the path's gap), along both sides and the back
     for (let u = 0; u < W; u++) if (!isPath(u, 0)) put(u, 0, 0, M.hedge);
     for (let v = 1; v < D; v++) { put(0, 0, v, M.hedge); put(W - 1, 0, v, M.hedge); }
