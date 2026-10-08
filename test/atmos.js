@@ -58,6 +58,14 @@ console.log('sky model');
   const satOf = (c) => (c[2] - c[0]) / Math.max(1e-4, c[2] + c[0]);
   const clear = skyAt(6000, dirAt(2, 90), 2.0), hazy = skyAt(6000, dirAt(2, 90), 6.0);
   check(satOf(hazy) < satOf(clear), `hazy horizon carries less blue than a clear one (blue share ${satOf(clear).toFixed(3)} clear, ${satOf(hazy).toFixed(3)} hazy)`);
+  // the clear noon day at the shipped turbidity (env.js: 2.3 in clear weather): the zenith keeps v0.41's deep blue, the
+  // horizon away from the sun stays blue (not white), and the horizon is about 2-4 times brighter than the zenith
+  const blueShare = (c) => c[2] / Math.max(1e-6, c[0] + c[1] + c[2]);
+  const zen23 = skyAt(6000, zenith, 2.3), hor23 = skyAt(6000, dirAt(1, 180), 2.3);
+  check(blueShare(zen23) >= 0.6, `noon zenith keeps its blue (blue share ${blueShare(zen23).toFixed(3)}; v0.41's palette ${(0.68 / 0.97).toFixed(2)})`);
+  check(blueShare(hor23) >= 0.3, `noon horizon away from the sun is not white (blue share ${blueShare(hor23).toFixed(3)})`);
+  const horRatio = lum(hor23) / lum(zen23);
+  check(horRatio >= 2 && horRatio <= 4, `noon horizon-to-zenith luminance ratio in [2, 4] (${horRatio.toFixed(2)}; v0.41's palette ≈ 2.9)`);
   // everything finite and non-negative over a sweep of times and directions
   let bad = 0;
   for (let t = 0; t < 24000; t += 750) for (let k = 0; k < 24; k++) {

@@ -14,23 +14,29 @@
   'use strict';
   const PI = Math.PI;
   const LUT_W = 64, LUT_H = 32;
-  const SKY_SCALE = 0.085;   // Perez luminance (kcd/m²) → game HDR: a clear noon zenith lands near 0.35
+  const SKY_SCALE = 0.06;    // Perez luminance (kcd/m²) → game HDR: a clear noon zenith lands near 0.2 (v0.41 palette)
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
   // Perez coefficients A..E as linear functions of the turbidity T (Preetham et al. 1999, their Table 1)
-  const LUM = (T) => [0.1787 * T - 1.4630, -0.3554 * T + 0.4275, -0.0227 * T + 5.3251, 0.1206 * T - 2.5771, -0.0670 * T + 0.3703];
-  const CHX = (T) => [-0.0193 * T - 0.2592, -0.0665 * T + 0.0008, -0.0004 * T + 0.2125, -0.0641 * T - 0.8989, -0.0033 * T + 0.0452];
-  const CHY = (T) => [-0.0167 * T - 0.2608, -0.0950 * T + 0.0092, -0.0079 * T + 0.2102, -0.0441 * T - 1.6537, -0.0109 * T + 0.0529];
-  // zenith chromaticity: rows for T², T, 1 — each row holds the coefficients of θs³, θs², θs, 1 (Preetham, Table 2)
-  const MX = [[0.00166, -0.00375, 0.00209, 0], [-0.02903, 0.06377, -0.03202, 0.00394], [0.11693, -0.21196, 0.06052, 0.25886]];
-  const MY = [[0.00275, -0.00610, 0.00317, 0], [-0.04214, 0.08970, -0.04153, 0.00516], [0.15346, -0.26756, 0.06670, 0.26688]];
-  const zenithChroma = (M, T, th) => {
-    const p = [th * th * th, th * th, th, 1];
-    const row = (r) => r[0] * p[0] + r[1] * p[1] + r[2] * p[2] + r[3] * p[3];
-    return T * T * row(M[0]) + T * row(M[1]) + row(M[2]);
+  // (C, the sun's aureole, is damped to 40 %: the published value makes the horizon glow white on the sun side)
+  const LUM = (T) => [0.1787 * T - 1.4630, -0.3554 * T + 0.4275, (-0.0227 * T + 5.3251) * SUN_GLOW, 0.1206 * T - 2.5771, -0.0670 * T + 0.3703];
+  const SUN_GLOW = 0.4;
+  // Chromaticity (our own fit, same form): the published Preetham chroma whitens the horizon (x 0.32 there against 0.24
+  // overhead at this turbidity), so the sky keeps its hue down to the horizon instead: the zenith is a deep blue, the
+  // horizon a paler one (about the luminance ratio of v0.41's palette), the sun's warm side keeps the C and D terms.
+  // Turbidity whitens the zenith chroma toward the white point (zenithXY) and so the horizon with it.
+  const CHX = (T) => [-0.3116, -0.5, 0.10, -1.0, 0];
+  const CHY = (T) => [-0.3973, -0.5, 0.10, -1.2, 0];
+  // the zenith's hue goes warm as the sun nears the horizon (the long path through the air, as Preetham's θs fit has it)
+  const XY_ZEN = [0.215, 0.205], XY_WHITE = [0.3127, 0.3290], XY_WARM = [0.36, 0.35];
+  const zenithXY = (T, se) => {
+    const h = clamp((T - 2) / 8, 0, 1) * 0.5, w = 1 - smooth(0.02, 0.35, se);
+    const x = XY_ZEN[0] + (XY_WARM[0] - XY_ZEN[0]) * w, y = XY_ZEN[1] + (XY_WARM[1] - XY_ZEN[1]) * w;
+    return [x + (XY_WHITE[0] - x) * h, y + (XY_WHITE[1] - y) * h];
   };
+
   // zenith luminance in kcd/m² (Preetham's χ fit); clamped at 0 where the fit runs past the sun's grazing angle
   const zenithLum = (T, th) => {
     const chi = (4 / 9 - T / 120) * (PI - 2 * th);
@@ -62,7 +68,7 @@
       T, sun: [sun[0], sun[1], sun[2]], th,
       cY, cX, cC,
       Yz: zenithLum(T, th),
-      xz: zenithChroma(MX, T, th), yz: zenithChroma(MY, T, th),
+      xz: zenithXY(T, se)[0], yz: zenithXY(T, se)[1],
       // the normalisers: the view at the zenith looking at the sun (γ = θs)
       FY0: perez(cY, 1, th, cs), FX0: perez(cX, 1, th, cs), FC0: perez(cC, 1, th, cs),
       // how much of each part is on: the day shape fades out at dusk, the twilight colours hang on the sun's set,
@@ -154,9 +160,12 @@
   // partial adaptation (power < 1) keeps the picture recognisable, and the range keeps a cave and a noon from
   // turning into a silhouette or a white sheet
   function exposureTarget(logLum, key, lo, hi, power) {
-    const k = key === undefined ? 0.18 : key, p = power === undefined ? 0.5 : power;
-    return clamp(Math.pow(k / Math.exp(clamp(logLum, -12, 6)), p), lo, hi);
+    const E = EXPOSURE, k = key === undefined ? E.key : key, p = power === undefined ? E.power : power;
+    return clamp(Math.pow(k / Math.exp(clamp(logLum, -12, 6)), p), lo === undefined ? E.lo : lo, hi === undefined ? E.hi : hi);
   }
+  // the GPU exposure's constants (renderer.js updateExposure, shaders.js EXPOSE_FS): the key is the scene's log-average
+  // luminance that a clear noon wants at exposure 1; the range is ±0.5 stops around 1; the power is the partial share
+  const EXPOSURE = { key: 0.3, power: 0.3, lo: Math.SQRT1_2, hi: Math.SQRT2 };
 
   // the state packed for the shaders (the same numbers as radiance(), with the normalisers folded in):
   //   per: the five Perez coefficients of Y, x and y (15 floats); k: kY, kx, ky (scale and normalisers) and dayK;
@@ -172,5 +181,5 @@
     };
   }
 
-  VR.Atmos = { SKY_SCALE, LUT_W, LUT_H, sunDir, prepare, radiance, lutUV, buildLUT, sampleLUT, easeExposure, exposureTarget, zenithLum, zenithChroma, glParams };
+  VR.Atmos = { SKY_SCALE, LUT_W, LUT_H, EXPOSURE, sunDir, prepare, radiance, lutUV, buildLUT, sampleLUT, easeExposure, exposureTarget, zenithLum, zenithXY, glParams };
 })(VR);
