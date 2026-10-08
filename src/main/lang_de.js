@@ -878,6 +878,7 @@
     'g.tram.to': 'Schwebebahn nach {name} · Shift steigt an einer Station aus',
     'g.tram.nextTown': 'der nächsten Stadt',
     'g.tram.moving': 'Die Bahn fährt · noch einmal Shift klettert aufs Dach',
+    'g.tram.wait': 'Die Bahn fährt noch · warte, bis sie an der Station hält',
     'g.tram.hudStop': '<b>SCHWEBEBAHN</b> · in {name} · Abfahrt in {s} s<br><small>Shift aussteigen · F5 Ansicht</small>',
     'g.tram.hudGo': '<b>SCHWEBEBAHN</b> → {name} · {s} s<br><small>Shift an einer Station steigt aus · F5 Ansicht</small>',
     'g.tram.next': 'nächste Stadt',

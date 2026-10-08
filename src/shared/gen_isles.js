@@ -56,10 +56,25 @@
   ISLES.build = function (g) {
     if (g._islesOps) return g._islesOps;
     const K = mats(), L = ISLES.list(g);
-    const chunks = new Map();
+    const chunks = new Map(), tracks = [];
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
     const put = (x, y, z, s) => { bucket(x, z).o.push(x, y, z, s); };
+    // (vgen ≥ 6) a bridge's track: a rail on the deck's centre, one block up (on the island's top where the island carries
+    // the bridge); its shapes ramp like the village lines'; the points become the bridge's tram line (ISLES.trackLines)
+    const bridgeTrack = (A, B, ia, ib, tr, dx, dz) => {
+      const alongX = Math.abs(dx) >= Math.abs(dz), dir = alongX ? Math.sign(dx) : Math.sign(dz), pts = [];
+      for (let i = 0; i < tr.length; i++) {
+        const [x, y, z] = tr[i], prev = tr[Math.max(0, i - 1)][1], next = tr[Math.min(tr.length - 1, i + 1)][1];
+        let shp = alongX ? 1 : 0;
+        if (next > y) shp = alongX ? (dir > 0 ? 2 : 3) : (dir > 0 ? 5 : 4);
+        else if (prev > y) shp = alongX ? (dir > 0 ? 3 : 2) : (dir > 0 ? 4 : 5);
+        put(x, y + 1, z, st('rail', { shape: shp }));
+        const last = pts[pts.length - 1];
+        if (last && last[0] === x && last[1] === z) last[2] = y + 1; else pts.push([x, z, y + 1]);
+      }
+      tracks.push({ key: 'isle-' + ia + '-' + ib, names: ['Isle ' + A.name, 'Isle ' + B.name], pts });
+    };
     const shape = (x, z) => { let best = null; for (const I of L) { const sh = g.islandShape(I, x, z); if (sh && (!best || sh.top > best.top)) best = sh; } return best; };
     const rng = new VR.RNG(g.seed ^ 0x151e);
     const placed = new Map();
@@ -110,7 +125,7 @@
       const nearest = (I, p) => I.ring.reduce((best, q) => (Math.hypot(q[0] - p[0], q[1] - p[1]) < Math.hypot(best[0] - p[0], best[1] - p[1]) ? q : best), I.ring[0]);
       road([nearest(A, pa), [pa[0], pa[1]]], false); road([nearest(B, pb), [pb[0], pb[1]]], false);
       const len = Math.max(1, Math.round(Math.hypot(pb[0] - pa[0], pb[1] - pa[1])));
-      const dx = (pb[0] - pa[0]) / len, dz = (pb[1] - pa[1]) / len, nx = -dz, nz = dx;
+      const dx = (pb[0] - pa[0]) / len, dz = (pb[1] - pa[1]) / len, nx = -dz, nz = dx, tr = [];
       for (let t = 0; t <= len; t++) {
         const x = pa[0] + dx * t, z = pa[1] + dz * t, y = Math.round(pa[2] + (pb[2] - pa[2]) * t / len);
         for (let v = -2; v <= 2; v++) {
@@ -122,7 +137,10 @@
           if (t % 6 === 0 && Math.abs(v) === 1) for (let k = 1; k <= 12; k++) put(px, y - k, pz, K.LOG); // trestle posts into the void
         }
         if (t % 12 === 6) { const px = Math.round(x + nx * 2), pz = Math.round(z + nz * 2); put(px, y + 1, pz, K.LAMP0); put(px, y + 2, pz, K.LAMP1); }
+        const cx = Math.round(x), cz = Math.round(z), sh = shape(cx, cz);
+        tr.push([cx, sh && sh.top >= y - 1 && t > 2 && t < len - 2 ? Math.max(y, sh.top) : y, cz]);
       }
+      if (g.vgen >= 6) bridgeTrack(A, B, ia, ib, tr, dx, dz);
     }
     // ---- the Isle Temple on the centre island: three stepped tiers of slate stone, an octagon door, a beacon
     {
@@ -200,9 +218,26 @@
         put(x, y + h, z, K.CRY(c, true)); put(x + 1, y + h - 3, z, K.CRY(c, false)); put(x - 1, y, z, K.CRY(c, false));
       }
     }
-    g._islesOps = chunks;
+    g._islesOps = chunks; g._isleTracks = tracks;
     return chunks;
   };
+
+  // (vgen ≥ 6) every bridge between two isles is a tram line, from rim to rim (its track is laid by ISLES.build)
+  ISLES.trackLines = function (g, x, z, r) {
+    if (!(g.vgen >= 6) || !HEART.on(g) || Math.abs(x - C.x) > 240 + r || Math.abs(z - C.z) > 240 + r) return null;
+    ISLES.build(g);
+    const out = [];
+    for (const t of g._isleTracks || []) {
+      let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+      for (const q of t.pts) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+      if (Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)) > r) continue;
+      const P = new Int32Array(t.pts.length * 3);
+      t.pts.forEach((q, i) => { P[i * 3] = q[0]; P[i * 3 + 1] = q[2]; P[i * 3 + 2] = q[1]; });
+      out.push({ key: t.key, pts: P, tech: true, names: t.names });
+    }
+    return out;
+  };
+  if (VR.RailGen && VR.RailGen.providers) VR.RailGen.providers.push(ISLES.trackLines);
 
   HEART.builders.push(function (g, cx, cz, out) {
     const x0 = cx * 16, z0 = cz * 16;
