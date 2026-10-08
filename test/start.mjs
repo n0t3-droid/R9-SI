@@ -21,12 +21,13 @@ page.on('dialog', d => d.accept('Test'));
 const ev = (fn, a) => page.evaluate(fn, a);
 const wait = (ms) => page.waitForTimeout(ms);
 const safe = async (fn, a) => { try { return await ev(fn, a); } catch (e) { return null; } };
+const until = async (fn, a, maxS = 30) => { for (let i = 0; i < maxS * 4; i++) { const r = await safe(fn, a); if (r) return r; await wait(250); } return null; };
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const shot = (n) => page.screenshot({ path: `/home/claude/vr/test/shots/${n}.png`, timeout: 180000 }).catch(() => {});
 const ONLY = (process.env.ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
 const want = (n) => !ONLY.length || ONLY.includes(String(n));
-const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).slice(0, 400)); } };
+const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).split('\n').filter(l => l.trim()).slice(0, 12).join(' | ').slice(0, 1200)); } };
 const done = async () => { console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l); check(!logs.some(l => /pageerror/.test(l)), 'no page errors'); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await browser.close(); srv.kill(); process.exit(fails ? 1 : 0); };
 // ---- helpers: the game
 const atTitle = async (maxS = 150) => { for (let i = 0; i < maxS * 2; i++) { await wait(500); if (await safe(() => !!(window.VR && VR.game && VR.game.state === 'title'))) return true; } return false; };
@@ -218,15 +219,15 @@ await section(5, 'the Studio: four tiles in the header, the mode bar waits behin
   check(t.tiles.every(x => x.w >= 160 && x.h >= 44), 'each at least 160 px wide and 44 px tall in the header');
   check(t.play && /^▶/.test(t.tiles[0].label), 'the ▶ tile is #playBtn and reads „' + t.tiles[0].label + '"');
   check(t.tiles[1].label === '🏗 Bauen' && t.tiles[2].label === '✨ Erschaffen' && t.tiles[3].label === '🎒 Meins', 'German labels');
-  check(!t.pro && t.modes === 0 && t.nMode === 6, 'Einfach: nav.modes is hidden (its 6 mode buttons wait)');
+  check(!t.pro && t.modes === 0 && t.nMode === 7, 'Einfach: nav.modes is hidden (its 7 mode buttons wait; 🏭 Forge is the seventh)');
   check(t.sw && !t.bar && t.lang === 'de', 'the Profi switch is in the header, no 🔌 banner, lang = de');
-  check(await ev(() => { const b = document.getElementById('legalBtn'); return !!b && b.hidden && !b.getClientRects().length; }), 'no 📜 in the header while there is no VR.Legal');
-  check(await ev(() => { VR.Legal = { open: () => { window.__legal = 1; } }; VR.StudioStart.legal(); const b = document.getElementById('legalBtn'); b.click(); const r = b.getClientRects().length > 0 && window.__legal === 1; delete VR.Legal; VR.StudioStart.legal(); return r && b.hidden; }), 'with VR.Legal the 📜 shows and opens it');
+  check(await ev(() => { const b = document.getElementById('legalBtn'); return !!b && !b.hidden && b.getClientRects().length > 0; }), '📜 in the Studio header (the legal notice is on both pages)');
+  check(await ev(() => { const keep = VR.Legal; let r = false; try { VR.Legal = { open: () => { window.__legal = 1; } }; VR.StudioStart.legal(); const b = document.getElementById('legalBtn'); window.__legal = 0; b.click(); r = b.getClientRects().length > 0 && window.__legal === 1; VR.Legal = undefined; VR.StudioStart.legal(); r = r && b.hidden; } finally { VR.Legal = keep; VR.StudioStart.legal(); } return r; }), 'the 📜 opens VR.Legal, and it is hidden when VR.Legal is not there');
   check(await ev(() => [...document.querySelectorAll('#studio header button')].filter(b => b.getClientRects().length).every(b => { const r = b.getBoundingClientRect(); return r.height >= 44 && r.width >= 44; })), 'every header button is at least 44 × 44 px');
   await ev(() => VR.UIPrefs.set({ pro: true })); await wait(150);
   const p = await ev(() => ({ pro: document.getElementById('studio').classList.contains('pro'), modes: [...document.querySelectorAll('nav.modes button[data-mode]')].filter(b => b.getClientRects().length > 0).map(b => b.dataset.mode), proT: document.querySelector('.tabs .proT').classList.contains('on'), tabs: [...document.querySelectorAll('#right .tabs .tab')].filter(t => t.getClientRects().length > 0).length, mem: localStorage.getItem('r9si.studio.pro') }));
   console.log('  profi', JSON.stringify(p));
-  check(p.pro && p.modes.join() === 'arch,furn,facade,parts,craft,world', 'Profi: the six mode buttons show (' + p.modes.join(' · ') + ')');
+  check(p.pro && p.modes.join() === 'arch,furn,facade,parts,craft,world,forge', 'Profi: the seven mode buttons show (' + p.modes.join(' · ') + ')');
   check(await ev(() => ![...document.querySelectorAll('nav.modes [data-hub], nav.modes [data-create]')].some(b => b.getClientRects().length)), 'the mode bar does not repeat the tiles (no 🕘 Weitermachen, no second ✨)');
   check(p.proT && p.tabs === 5 && p.mem === '1', 'the ⚙ Profi of the right side is the same switch (five tabs, r9si.studio.pro = 1)');
   await booted(1);
@@ -302,7 +303,13 @@ await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: car
   await page.goto(URL0 + '/studio.html', NAV);
   check(await booted(1), 'the Studio is up');
   // a Baukasten house (a k: thing), a favourite block  (the hub may have opened by itself: something to continue)
-  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); VR.StudioWorld.imagine.open(null, 'house'); }); await wait(900);
+  // (the Baukasten form draws a moment after the panel opens, and the Genie can take the panel over once: open it again until the style row is there)
+  for (let k = 0; k < 6; k++) {
+    await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); VR.StudioWorld.imagine.open(null, 'house'); }); await wait(900);
+    if (await ev(() => !!document.querySelector('#imagine [data-hs="style"][data-v="modern"]'))) break;
+  }
+  // (the hub opens by itself when something is unfinished, and it sits above the Baukasten: close it first)
+  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); }); await wait(300);
   await page.click('#imagine [data-hs="style"][data-v="modern"]'); await wait(2500);
   await ev(() => { VR.StudioWorld.imagine.close(); VR.Favs.add('oak_planks'); });
   const kit = await ev(() => Object.values(JSON.parse(localStorage.getItem('r9si.projects')).items).find(p => p.kind === 'kit'));
@@ -342,8 +349,9 @@ await section(10, '← restores where you were: ✏️ from a card → the edito
   if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
   await page.goto(URL0 + '/studio.html?r=' + Date.now() + '#world/' + encodeURIComponent(WORLD) + '/karte', NAV);   // (a fresh query: a hash-only change would not reload the Studio)
   check(await inStudio(WORLD), 'the Karte view');
-  await page.click('#chips button[data-kcat="furn"]'); await wait(400);
-  const id3 = await ev(() => { const l = document.getElementById('list'); l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding; });
+  await page.click('#chips button[data-kcat="furn"]');
+  // (the cards come in a moment: a slow frame rate draws them later than a fixed wait would)
+  const id3 = await until(() => { const l = document.getElementById('list'); if (!l || l.querySelectorAll('.ding').length < 4) return null; l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding ? c.dataset.ding : null; }, null, 30);
   const editBtn = page.locator(`#list .ding[data-ding="${id3}"] [data-da="edit"]`);
   await editBtn.scrollIntoViewIfNeeded();   // (a click scrolls its target into view first: measure after that)
   const before = await ev((id) => { const l = document.getElementById('list'); return { id, scroll: l.scrollTop, scene: window.__st.scene && window.__st.scene.type, center: window.__st.scene.center.slice() }; }, id3);
@@ -438,7 +446,8 @@ await section(12, 'keyboard, 📜 and English: Tab lands on ▶, Enter and Esc, 
   const small = await ev(() => [...document.querySelectorAll('#title button, #title .lp-btn')].filter(b => b.getClientRects().length).map(b => { const r = b.getBoundingClientRect(); return { t: b.textContent.trim().slice(0, 18), w: Math.round(r.width), h: Math.round(r.height) }; }).filter(x => x.w < 44 || x.h < 44));
   check(!small.length, 'every button on the start screen is at least 44 × 44 px' + (small.length ? ': ' + JSON.stringify(small) : ''));
   // 📜 Impressum & Datenschutz: only when VR.Legal is there
-  check(await ev(() => { const b = document.querySelector('#title [data-act="legal"]'); return !!b && !b.getClientRects().length; }), 'without VR.Legal there is no 📜 button');
+  await ev(() => { VR.Legal = undefined; VR.Start.texts(); });   // (the real VR.Legal is in this build: take it away for this check)
+  check(await ev(() => { const b = document.querySelector('#title [data-act="legal"]'); return !b || !b.getClientRects().length; }), 'without VR.Legal there is no 📜 button');
   await ev(() => { VR.Legal = { open: (t) => { window.__legal = t || 'open'; } }; VR.Start.texts(); });
   const lg = await ev(() => { const b = document.querySelector('#title [data-act="legal"]'); const r = b.getBoundingClientRect(); return { shown: b.getClientRects().length > 0, text: b.textContent, h: r.height }; });
   check(lg.shown && /Impressum/.test(lg.text) && lg.h >= 44, 'with VR.Legal: „' + lg.text + '" on the start screen');
