@@ -418,6 +418,8 @@
       if (!this.studioOpen) return;
       const fr = document.getElementById('studioFrame');
       if (fr) { fr.classList.remove('on'); setTimeout(() => { if (!this.studioOpen && fr) fr.src = 'about:blank'; }, 60); }
+      // the keys belong to the game again: the Studio's frame kept the focus, so B, Esc and the hotbar did nothing until a click
+      if (fr && document.activeElement === fr) { try { fr.blur(); window.focus(); } catch (e) { /* no focus here */ } }
       this.studioOpen = false;
       this.last = performance.now();
       // what the Studio did, in the world now (a look missed by the storage event too)
