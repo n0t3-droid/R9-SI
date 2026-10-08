@@ -25,7 +25,7 @@
   PR.BIT_FIXED = 15;        // mask bit: the trunk and the crownshaft (always drawn)
   PR.BIT_COCO = 16;         // mask bit: the coconuts
   // the palm's colours (sRGB), linearised by lin() like the terrain's tints
-  const PAL = { bark: 0x8C7256, shaft: 0x6A8E4A, nut: 0x5E4026, leafA: 0x2F8A34, leafB: 0x62C24C, tip: 0xC2DC5A, dead: 0x9A7440, spear: 0x9CCB5A };
+  const PAL = { bark: 0x9C8264, shaft: 0x6A8E4A, nut: 0x5E4026, leafA: 0x3A9A3C, leafB: 0x72CC52, tip: 0xC8E060, dead: 0x9A7440, spear: 0xA4D460 };
   const lin = (c, k) => [Math.pow(((c >> 16) & 255) / 255, 2.2) * k, Math.pow(((c >> 8) & 255) / 255, 2.2) * k, Math.pow((c & 255) / 255, 2.2) * k];
   const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const norm3 = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };

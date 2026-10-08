@@ -831,6 +831,8 @@ void main() {
   float sh = 1.0;
 #endif
   vec3 lighting = u_ambSky * skyL * 0.92 + lc * ndl * sh * outdoors + blockL * 0.9 + vec3(0.012, 0.012, 0.016);
+  // a frond lets the light through: lit from behind it glows a warmer green (the trunk does not)
+  if (!solid) lighting += lc * max(dot(-N, L), 0.0) * 0.45 * sh * outdoors * vec3(1.0, 1.05, 0.7);
   vec3 col = alb * lighting;
   col = applyFog(col, v_rel, length(v_rel));
   o_col = vec4(col, 1.0);
