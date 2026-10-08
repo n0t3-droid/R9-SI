@@ -141,8 +141,9 @@
       E.moonIllum = (1 - Math.cos(2 * Math.PI * ph)) * 0.5;
       E.moonColor = E.moonColor.map((v) => v * (0.25 + 0.75 * E.moonIllum));
       E.cloudSh = Math.min(1, Math.max(0, (E.cloudCover - 0.3) * 1.4));
-      const twi = 1 - M.smoothstep(0.0, 0.3, Math.abs(sy));
-      E.lift = [0.014 * twi + 0.002 * night, 0.004 * twi, 0.004 * twi + 0.008 * night];
+      // the grade's lift is zero by day: warm only while the sun is near the horizon (dawn, dusk), blue only at night
+      const twi = 1 - M.smoothstep(0.02, 0.14, Math.abs(sy));
+      E.lift = [0.012 * twi + 0.002 * night, 0.003 * twi, 0.003 * twi + 0.008 * night];
       E.vivid = 0.6;
       E.bloomThreshold = 0.95; E.bloomStrength = 0.075 + night * 0.04;
       return E;
