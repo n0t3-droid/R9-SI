@@ -226,16 +226,28 @@
     }
     yield;
 
+    // ---- the stair to the top floor: the same glass treads, two wide, rising toward the back from the gallery's front
+    //      (u 15–16, v 12 at the first floor) to the studio (v 17, the top floor's floor); the slab opens above it
+    const SU = NOVA.STAIR2.u, SV = NOVA.STAIR2.v;
+    for (let k = 1; k <= 6; k++) {
+      const v = SV + k - 1, y = U.y + k;
+      for (let h = 1; h <= 2; h++) for (let du = 0; du <= 1; du++) if (y + h <= T.y) put(SU + du, y + h, v, null);
+      model(SU, y, v, 'vm_nova_tread', 0);
+    }
+    for (let v = SV + 3; v <= SV + 4; v++) put(SU - 1, T.y + 1, v, M.glassRail);
+    for (let du = 0; du <= 1; du++) put(SU + du, T.y + 1, SV + 2, M.glassRail);
+    yield;
+
     // ---- the first floor: a gallery with a bed at the back, sofas at the front, plants and spots
     model(11, U.y + 1, 17, 'vm_bed_white', 0); info.beds.push([12, F + U.y + 1, 18, 0]);
-    for (const u of [9, 15]) put(u, U.y + 1, 18, 'vx_tech_planter');
-    for (let u = 10; u <= 14; u++) if (u !== EU) { put(u, U.y + 1, 11, 'vx_sofa_white', { facing: 2 }); info.seats.push([u, F + U.y + 1, 11, 2]); }
+    put(9, U.y + 1, 18, 'vx_tech_planter'); put(14, U.y + 1, 19, 'vx_tech_planter');
+    for (let u = 9; u <= 14; u++) if (u !== EU) { put(u, U.y + 1, 11, 'vx_sofa_white', { facing: 2 }); info.seats.push([u, F + U.y + 1, 11, 2]); }
     model(U.u0 + 1, U.y + 1, U.v1 - 1, 'vm_plant_palm_concrete', 0);
-    for (const [u, v] of [[8, 12], [16, 12], [12, 15], [8, 18], [16, 18]]) put(u, U.y + U.clear, v, M.spot);
-    // the top floor: a studio
-    for (let u = 10; u <= 14; u++) { put(u, T.y + 1, 18, 'vx_sofa_white', { facing: 0 }); info.seats.push([u, F + T.y + 1, 18, 0]); }
-    put(9, T.y + 1, 15, 'vx_tech_planter'); put(15, T.y + 1, 15, 'vx_tech_planter');
-    for (const [u, v] of [[10, 16], [14, 16]]) put(u, T.y + T.clear, v, M.spot);
+    for (const [u, v] of [[8, 12], [12, 15], [8, 18], [13, 18]]) put(u, U.y + U.clear, v, M.spot);
+    // the top floor: a studio with a lounge looking out to the roof garden
+    for (let u = 9; u <= 13; u++) { put(u, T.y + 1, 18, 'vx_sofa_white', { facing: 0 }); info.seats.push([u, F + T.y + 1, 18, 0]); }
+    put(9, T.y + 1, 15, 'vx_tech_planter'); put(13, T.y + 1, 15, 'vx_tech_planter');
+    for (const [u, v] of [[10, 16], [13, 17]]) put(u, T.y + T.clear, v, M.spot);
     yield;
 
     // ---- the roof gardens: lawn beds, a round tree and blossom bushes on the first floor's roof, planters, the dome
