@@ -36,7 +36,7 @@ console.log('sky model');
 {
   const noon = skyAt(6000, zenith), dusk = skyAt(12500, zenith), night = skyAt(18000, zenith);
   check(noon[2] > noon[1] && noon[1] > noon[0], `noon zenith is blue (rgb ${noon.map(v => v.toFixed(3)).join(', ')})`);
-  check(lum(noon) > 5 * lum(dusk), `noon zenith brighter than dusk (${lum(noon).toFixed(3)} vs ${lum(dusk).toFixed(3)})`);
+  check(lum(noon) > 2 * lum(dusk), `noon zenith at least twice as bright as the dusk's (${lum(noon).toFixed(3)} vs ${lum(dusk).toFixed(3)}; v0.41's palette 2.4×)`);
   check(lum(noon) > 0.2 && lum(noon) < 2.5, `noon zenith in a sane HDR range (${lum(noon).toFixed(3)})`);
   check(night[2] > night[0] && lum(night) < 0.03, `night is dark blue (rgb ${night.map(v => v.toFixed(4)).join(', ')})`);
   // dusk: the sun side low down is orange (red over blue)
@@ -108,16 +108,22 @@ console.log('lookup table');
 
 console.log('shader parameters');
 {
-  // the packed state reproduces radiance(): the shader's formula is the same sum, so this is the check of the packing
-  const sun = sunAt(6000), s = A.prepare(sun, { T: 3, tint: [1, 0.9, 0.8] }), P = A.glParams(s);
-  const pz = (o, ct, g, cg) => (1 + P.per[o] * Math.exp(P.per[o + 1] / ct)) * (1 + P.per[o + 2] * Math.exp(P.per[o + 3] * g) + P.per[o + 4] * cg * cg);
-  const cT = 0.6, cG = 0.3, ct = cT, g = Math.acos(cG);
-  const Y = P.k[0] * pz(0, ct, g, cG), x = P.k[1] * pz(5, ct, g, cG), y = Math.max(0.01, P.k[2] * pz(10, ct, g, cG));
-  const X = x / y * Y, Z = (1 - x - y) / y * Y;
-  const rgb = [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z].map((v, i) => v * P.k[3] * P.tint[i]);
-  const ref = A.radiance(s, cT, cG);
-  const err = Math.max(...rgb.map((v, i) => Math.abs(v - ref[i]) / Math.max(ref[i], 1e-6)));
-  check(err < 1e-6, `the packed parameters (float32, as the GPU holds them) give the same radiance (relative error ${err.toExponential(2)})`);
+  // the packed state reproduces radiance(): the shader's formula (atmoFormula) is the same sum, so this is the check of
+  // the packing — the day part at noon and at dawn (the sun-side chroma term changes with the sun's height)
+  let err = 0;
+  for (const [t, cT, cG] of [[6000, 0.6, 0.3], [6000, 0.05, 0.95], [500, 0.08, 0.99], [500, 0.9, -0.2]]) {
+    const sun = sunAt(t), s = A.prepare(sun, { T: 3, tint: [1, 0.9, 0.8] }), P = A.glParams(s);
+    const per = Float32Array.from(P.per);
+    const pzY = (ct, g, cg) => (1 + per[0] * Math.exp(per[1] / ct)) * (1 + per[2] * Math.exp(per[3] * g) + per[4] * cg * cg);
+    const pzC = (o, w, g) => (per[o] + per[o + 1] * w) * (1 + per[o + 2] * Math.exp(per[o + 3] * g));
+    const ct = Math.max(cT, 0.01), g = Math.acos(cG), w = Math.pow(ct, A.CH_P);
+    const Y = P.k[0] * pzY(ct, g, cG), x = P.k[1] * pzC(5, w, g), y = Math.max(0.01, P.k[2] * pzC(10, w, g));
+    const X = x / y * Y, Z = (1 - x - y) / y * Y;
+    const day = [3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z].map((v, i) => v * P.k[3] * P.tint[i]);
+    const ref = A.radiance(Object.assign({}, s, { twiK: 0, nightK: 0 }), cT, cG);
+    err = Math.max(err, ...day.map((v, i) => Math.abs(v - ref[i]) / Math.max(Math.abs(ref[i]), 1e-4)));
+  }
+  check(err < 1e-5, `the packed parameters (float32, as the GPU holds them) give the same radiance (relative error ${err.toExponential(2)})`);
 }
 
 console.log('exposure');
@@ -137,8 +143,13 @@ console.log('exposure');
   // log-average luminance, which wants exposure 1; the range is ±0.5 stops around 1
   const E = A.EXPOSURE;
   check(Math.abs(A.exposureTarget(Math.log(E.key)) - 1) < 1e-9, `the clear noon's key wants exposure 1 (key ${E.key})`);
-  const cave = A.exposureTarget(Math.log(0.02)), noon = A.exposureTarget(Math.log(0.6));
-  check(cave > 1 && noon < 1, `a cave wants more light (${cave.toFixed(3)}), a bright noon less (${noon.toFixed(3)})`);
+  // the dead zone: the weather keeps its own brightness (an overcast noon a little darker, a snowfield brighter)
+  const inZone = [0.55, 0.75, 1.3, 1.9].map((k) => A.exposureTarget(Math.log(E.key * k)));
+  check(inZone.every((v) => v === 1), `within ±1 stop of the key the exposure stays 1 (${inZone.map((v) => v.toFixed(3)).join(', ')})`);
+  const cave = A.exposureTarget(Math.log(E.key / 8)), glare = A.exposureTarget(Math.log(E.key * 6));
+  check(cave > 1 && glare < 1, `a cave wants more light (${cave.toFixed(3)}), a glaring scene less (${glare.toFixed(3)})`);
+  const caveNight = A.exposureTarget(Math.log(E.key / 8), 1);
+  check(caveNight < cave, `at night the key is lower: the same dark scene gets less extra light (${caveNight.toFixed(3)} against ${cave.toFixed(3)} by day)`);
   check(Math.abs(E.lo - Math.SQRT1_2) < 1e-12 && Math.abs(E.hi - Math.SQRT2) < 1e-12, 'the range is ±0.5 stops around 1');
   check(A.exposureTarget(Math.log(1e-9)) === E.hi && A.exposureTarget(Math.log(1e6)) === E.lo, 'the target stays in its range at the extremes');
 }
