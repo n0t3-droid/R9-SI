@@ -45,7 +45,8 @@
   D.name = function (id) {
     const p = D.parse(id); if (!p) return String(id || '');
     if (p.kind === 'h') return D.houseName(+p.key);
-    if (p.kind === 'm') { const m = VR.VM && VR.VM.MODELS && VR.VM.MODELS[p.key]; return m ? m.display : p.key; }
+    // (a compiled model keeps no display name: the block registry has it, as for every block)
+    if (p.kind === 'm') { const m = VR.VM && VR.VM.MODELS && VR.VM.MODELS[p.key]; if (m && m.display) return m.display; const n = VR.itemName ? VR.itemName(p.key) : null; return n || p.key; }
     if (p.kind === 'b') { if (VR.itemName) { const n = VR.itemName(p.key); if (n) return n; } const t = VR.R && VR.R.byName && VR.R.byName[p.key]; return t ? (t.display || (t.o && t.o.display) || p.key) : p.key; }
     if (p.kind === 'p') { const it = libItem(p.key); return it ? it.name || tx('ding.piece', null, 'Bauteil', 'Piece') : p.key; }
     if (p.kind === 'f') { const Fg = VR.Forge; return Fg && Fg.parse(p.key) ? String(Fg.describe(p.key, true)).replace(/^\S+\s/, '') : p.key; }
