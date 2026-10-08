@@ -93,7 +93,7 @@
       actors: [
         { look: { suit: 0, hair: 1, hs: 0, skin: 0, tool: 'blaster' }, pos: [-1.2, 81, -48], yaw: 0, walk: [[0, -1.2, 81, -48], [7.5, -1.2, 81, -70]] },
         { look: { suit: 0, hair: 3, hs: 1, skin: 1, tool: 'blaster' }, pos: [1.2, 81, -48], yaw: 0, walk: [[0, 1.2, 81, -48], [7.5, 1.2, 81, -70]] }] },
-    // ---- G · the white interior: glass walls, floating glass stairs, a cyan pad (placed at the palm city's glass villa)
+    // ---- G · the white interior, not built yet: the camera frames the palm city's street there (plan §6, the known gaps)
     { id: 'G', name: 'White House', dur: 3.5, fov: 70, tod: 12700,
       cam: [[0, -60, 84.6, -150, -60, 84.4, -180], [3.5, -66, 84.6, -160, -60, 84.6, -190]] },
     // ---- the second cut: A2 (trailer 3, the canyon low over the spires), D2 (the plaza from behind the shuttle)
@@ -111,7 +111,7 @@
         { look: { suit: 0, hair: 3, hs: 1, skin: 1, tool: 'blaster' }, pos: [1.2, 81, -132], yaw: 0, walk: [[0, 1.2, 81, -132], [5, 1.2, 81, -150]] }] },
     { id: 'F3', name: 'The terraces', dur: 5.5, fov: 74, tod: 12800,
       cam: [[0, -8, 92, -140, -60, 95, -178], [5.5, -30, 104, -212, -70, 104, -256]] },
-    // ---- G2 (trailers 2 and 3): the white house from the glass hall to the stairs
+    // ---- G2 (trailers 2 and 3): the white house's glass hall and stairs, not built yet either (see G)
     { id: 'G2', name: 'Glass stairs', dur: 3.5, fov: 70, tod: 12700,
       cam: [[0, -60, 84.6, -150, -60, 84.4, -180], [3.5, -64, 84.6, -158, -62, 84.6, -186]] },
     { id: 'end', kind: 'title', dur: 2.6, caption: 'R9-SI' },
