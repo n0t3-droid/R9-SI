@@ -37,7 +37,9 @@ run_test() { # <name> <timeout seconds>; returns 0 only for exit code 0 and ALL 
   bash "$ROOT/test/wt_run.sh" "$t" "$to" > "$log" 2>&1
   rc=$?
   t1=$(date +%s)
-  s=$(grep -E '^(ALL OK|FAILED [0-9]+)$' "$log" | tail -1)
+  # a summary is a line of its own: ALL OK, ALL OK (n checks) or FAILED n (… of n checks)
+  s=$(grep -E '^(ALL OK( \(.*\))?|FAILED [0-9]+.*)$' "$log" | tail -1)
+  case "$s" in "ALL OK"*) s="ALL OK" ;; "FAILED "*) s=$(printf '%s' "$s" | grep -oE 'FAILED [0-9]+' | head -1) ;; esac
   [ -n "$s" ] || s="no summary"
   line="$t $rc $((t1 - t0)) $s"
   echo "$line" | tee -a "$RESULTS"

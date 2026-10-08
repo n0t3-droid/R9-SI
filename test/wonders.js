@@ -168,6 +168,8 @@ section('game', () => {
   const gad = { g, wand: { undo: [] }, applyEdit(list, undo) { world.bulkSet(list); if (undo) this.wand.undo.push(undo); }, undo() { const u = this.wand.undo.pop(); if (u) world.bulkSet(u); }, noteBlock() {} };
   g.gadgets = gad; gad.blue = new VR.Blueprints(gad);
   const wg = g.wonders = new VR.WondersGame(g, g.meta);
+  // the main thread's share of the planning, in CPU time (the wall clock of a loaded machine says little about the code)
+  let planCpu = 0; const realPlanAt = gad.blue.planAt; gad.blue.planAt = function (...a) { const c0 = process.cpuUsage(); try { return realPlanAt.apply(this, a); } finally { const cu = process.cpuUsage(c0); planCpu += (cu.user + cu.system) / 1000; } };
   const site = (key, type, x, z, r) => ({ key, i: 0, j: 0, x, z, y: GY + 1, type, seed: 0x2b1d, r: r || 0, first: false });
   const A = site('a', 'sternwarte', 400, 300), B = site('b', 'pyramide', -400, 300, 1), C = site('c', 'mondtempel', 0, -500, 2);
   // ---- a clean lot: planned when you come near, rises in slices, its light computed twice (cleared, then risen)
@@ -184,7 +186,7 @@ section('game', () => {
   check(ea.heart && T.emit[world.getBlock(ea.heart[0], ea.heart[1], ea.heart[2])] > 0, 'the heart in the world is a glowing block: ' + (ea.heart && nameOf(world.getBlock(ea.heart[0], ea.heart[1], ea.heart[2]))));
   check(sounds.includes('wonder') && chat.some(t => /erhebt sich/.test(t)), 'a chime and a line in the chat while it rises');
   check(guestCells.length > 2000 && !gad.wand.undo.length, 'with friends its blocks go out to them (' + guestCells.length + ' cells); no undo step (the wonder is the world\'s)');
-  check(wg.planMs < 400, 'planning its lot on the main thread: ' + (wg.planMs || 0).toFixed(0) + ' ms');
+  check(planCpu > 0 && planCpu < 400, 'planning its lot on the main thread (CPU): ' + planCpu.toFixed(0) + ' ms');
   // ---- the Wunderkompass and the map: the nearest one not found yet
   const comp = () => (wg.compEl ? (wg.compEl.style.display === 'none' ? '' : wg.compEl.textContent) : '');
   wg.compT = 0; tick(1);
