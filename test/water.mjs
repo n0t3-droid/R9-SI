@@ -19,22 +19,29 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const report = {};
 
-// the frame cost, run inside the page: `warm` frames first, then n frames with the GPU drained after each one (a
-// failing frame rejects, so a broken build shows as an error rather than a silent wait; each frame is logged)
+// the frame cost, run inside the page: `warm` frames first, then n frames with the GPU drained after each one. The
+// game's own requestAnimationFrame loop is paused meanwhile (it would render in between and double the work), and a
+// failing frame rejects, so a broken build shows as an error rather than a silent wait; each frame is logged
 const measure = (n, warm = 2) => new Promise((res, rej) => {
   const g = VR.game, gl = g.renderer.gl;
+  const raf = window.requestAnimationFrame;
+  window.requestAnimationFrame = () => 0;
+  const finish = (fn, v) => { window.requestAnimationFrame = raf; fn(v); };
   let k = -warm, sum = 0, refl = 0, draws = 0, tris = 0;
   const frame = () => {
     try {
-      const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish();
+      console.log('[cost] start frame ' + k);
+      const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now());
+      console.log('[cost] looped frame ' + k + ' ' + (performance.now() - t0).toFixed(0) + ' ms');
+      gl.finish();
       const dt = performance.now() - t0;
       console.log('[cost] frame ' + k + ' ' + dt.toFixed(0) + ' ms');
       if (k < 0) { k++; setTimeout(frame, 0); return; }
       const st = g.renderer.stats || {};
       sum += dt; refl += st.reflMs || 0; draws += st.draws || 0; tris += st.tris || 0;
       if (++k < n) setTimeout(frame, 0);
-      else res({ ms: +(sum / n).toFixed(1), reflMs: +(refl / n).toFixed(2), draws: Math.round(draws / n), tris: Math.round(tris / n), reflSecs: st.reflSecs || 0, reflDraws: st.reflDraws || 0 });
-    } catch (e) { rej(e); }
+      else finish(res, { ms: +(sum / n).toFixed(1), reflMs: +(refl / n).toFixed(2), draws: Math.round(draws / n), tris: Math.round(tris / n), reflSecs: st.reflSecs || 0, reflDraws: st.reflDraws || 0 });
+    } catch (e) { finish(rej, e); }
   };
   frame();
 });
