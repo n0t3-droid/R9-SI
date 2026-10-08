@@ -133,8 +133,11 @@
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) d[j * N + i] = density((i + 0.5) / N * 2 - 1, (j + 0.5) / N * 2 - 1, seed);
       for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
         const i0 = Math.max(0, i - 1), i1 = Math.min(N - 1, i + 1), j0 = Math.max(0, j - 1), j1 = Math.min(N - 1, j + 1);
+        // the outward normal, faded to zero where the density is flat (inside the body, outside the cloud): no hard seam
+        // between a flat core and a sloped edge
         let nx = -(d[j * N + i1] - d[j * N + i0]), ny = -(d[j1 * N + i] - d[j0 * N + i]);
-        const len = Math.hypot(nx, ny) || 1; nx /= len; ny /= len;
+        const len = Math.hypot(nx, ny), k = len / Math.sqrt(len * len + 0.0036), L1 = len || 1;
+        nx = nx / L1 * k; ny = ny / L1 * k;
         const o = ((oy + j) * S + (ox + i)) * 4;
         out[o] = Math.round(d[j * N + i] * 255);
         out[o + 1] = Math.round((nx * 0.5 + 0.5) * 255);

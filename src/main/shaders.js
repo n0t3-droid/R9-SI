@@ -976,8 +976,15 @@ in float v_dist;
 in float v_near;
 out vec4 o;
 void main() {
-  vec2 at = vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5 + v_uv * 0.5;
+  // the sample stays inside its own quarter of the atlas (half a texel in from the edge): no seam from the neighbour
+  vec2 at = vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5 + clamp(v_uv, vec2(0.5 / 128.0), vec2(1.0 - 0.5 / 128.0)) * 0.5;
   vec4 t = texture(u_cloudTex, at);
+  if (u_fogK > 0.5) {
+    // the mist: a soft silhouette (the atlas's lobes have crisp edges; five taps soften them for the fog banks)
+    vec2 e = vec2(0.02, 0.02);
+    t = t * 0.4 + 0.15 * (texture(u_cloudTex, at + vec2(e.x, 0.0)) + texture(u_cloudTex, at - vec2(e.x, 0.0)) +
+                          texture(u_cloudTex, at + vec2(0.0, e.y)) + texture(u_cloudTex, at - vec2(0.0, e.y)));
+  }
   float d = t.r;
   if (d < 0.02) discard;
   vec2 n = t.gb * 2.0 - 1.0;
