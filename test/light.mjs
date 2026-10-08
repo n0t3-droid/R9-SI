@@ -82,15 +82,21 @@ const LOOK_PROBE = ({ body }) => {
   const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
   const buf = new Uint8Array(W * H * 4);
   gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+  // per band: mean luminance, HSV saturation, perceptual chroma (OKLab C: a violet-blue and a pure blue of the same
+  // colourfulness score alike), the share of clipped pixels (a channel ≥ 0.98), the mean colour
+  const lin = (v) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
   const band = (y0, y1) => {
-    let n = 0, L = 0, S = 0, clip = 0, r0 = 0, g0 = 0, b0 = 0;
+    let n = 0, L = 0, S = 0, C = 0, clip = 0, r0 = 0, g0 = 0, b0 = 0;
     for (let y = y0; y < y1; y++) for (let x = 0; x < W; x += 2) {
       const i = (y * W + x) * 4, r = buf[i] / 255, gg = buf[i + 1] / 255, b = buf[i + 2] / 255;
       const mx = Math.max(r, gg, b), mn = Math.min(r, gg, b);
       L += 0.2126 * r + 0.7152 * gg + 0.0722 * b; S += mx > 0.02 ? (mx - mn) / mx : 0; if (mx >= 0.98) clip++;
+      const lr = lin(r), lg = lin(gg), lb = lin(b);
+      const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb), m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb), q = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+      C += Math.hypot(1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * q, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q);
       r0 += r; g0 += gg; b0 += b; n++;
     }
-    return { lum: +(L / n).toFixed(4), sat: +(S / n).toFixed(4), clip: +(clip / n).toFixed(4), rgb: [r0 / n, g0 / n, b0 / n].map(v => +v.toFixed(3)) };
+    return { lum: +(L / n).toFixed(4), sat: +(S / n).toFixed(4), chroma: +(C / n).toFixed(4), clip: +(clip / n).toFixed(4), rgb: [r0 / n, g0 / n, b0 / n].map(v => +v.toFixed(3)) };
   };
   // readPixels rows start at the bottom: the sky band is the top third of the picture
   const res = { W, H, sky: band(Math.floor(H * 0.66), H), land: band(0, Math.floor(H * 0.34)), all: band(0, H) };
@@ -251,7 +257,12 @@ const buildRoom = (gr) => ev(([gx, gy, gz]) => {
 try {
   if (MODE === 'look' || MODE === 'all') {
     // v0.41's numbers: the committed reference (measured with this probe on the v0.41 build), or measured again
-    const REFL = process.env.REFRESH ? await lookAt(REFDIST, 'v041') : JSON.parse(fs.readFileSync(REF, 'utf8'));
+    let REFL;
+    if (process.env.REFRESH) {
+      REFL = await lookAt(REFDIST, 'v041');
+      REFL.note = 'v0.41 (9bf1448) measured by test/light.mjs LOOK on the git archive build; MODE=look REFRESH=1 REFDIST=<dist> measures again';
+      fs.writeFileSync(REF, JSON.stringify(REFL, null, 1));
+    } else REFL = JSON.parse(fs.readFileSync(REF, 'utf8'));
     const L = await lookAt(DIST, TAG);
     const S = L.scenes, R0 = REFL.scenes, K = S.klar, RK = R0.klar;
     check(LOOK_SCENES.every((k) => S[k] && S[k].all && R0[k] && R0[k].all), `look: the six scenes measured (clear noon ${K.all.lum} against v0.41's ${RK.all.lum})`);
@@ -260,9 +271,11 @@ try {
     check(Math.abs(K.gpuExposure - 1) <= 0.05, `clear noon: the exposure is 1 (${K.gpuExposure}; the scene's log-average ${K.sceneLum})`);
     check(Math.abs(K.all.lum / RK.all.lum - 1) <= 0.10, `clear noon: the mean luminance within 10 % of v0.41's (${K.all.lum} against ${RK.all.lum})`);
     check(L.body.body.contrast >= REFL.body.body.contrast, `the gas giant stands out at least as much as in v0.41 (contrast ${L.body.body.contrast} against ${REFL.body.body.contrast})`);
-    const satLow = LOOK_SCENES.filter((k) => !(S[k].sky.sat >= 0.9 * R0[k].sky.sat && S[k].land.sat >= 0.9 * R0[k].land.sat));
-    check(satLow.length === 0, `saturation floor: no scene loses more than 10 % of v0.41's saturation in the sky or the land band${satLow.length ? ' (' + satLow.map((k) => `${k}: sky ${S[k].sky.sat}/${R0[k].sky.sat}, land ${S[k].land.sat}/${R0[k].land.sat}`).join('; ') + ')' : ''}`);
-    check(K.sky.sat >= RK.sky.sat, `the clear sky at least as saturated as v0.41's (${K.sky.sat} against ${RK.sky.sat})`);
+    // colourfulness: the perceptual chroma when the reference has it (REFRESH=1 measures it), else the HSV saturation
+    const cf = (b) => (RK.sky.chroma !== undefined ? b.chroma : b.sat), cfName = RK.sky.chroma !== undefined ? 'chroma' : 'saturation';
+    const satLow = LOOK_SCENES.filter((k) => !(cf(S[k].sky) >= 0.9 * cf(R0[k].sky) && cf(S[k].land) >= 0.9 * cf(R0[k].land)));
+    check(satLow.length === 0, `${cfName} floor: no scene loses more than 10 % of v0.41's in the sky or the land band${satLow.length ? ' (' + satLow.map((k) => `${k}: sky ${cf(S[k].sky)}/${cf(R0[k].sky)}, land ${cf(S[k].land)}/${cf(R0[k].land)}`).join('; ') + ')' : ''}`);
+    check(cf(K.sky) >= cf(RK.sky), `the clear sky at least as colourful as v0.41's (${cfName} ${cf(K.sky)} against ${cf(RK.sky)})`);
     const clipHi = LOOK_SCENES.filter((k) => !(S[k].all.clip <= R0[k].all.clip + 0.02));
     check(clipHi.length === 0, `no bleaching: no scene clips more than v0.41 (+2 points)${clipHi.length ? ' (' + clipHi.map((k) => `${k} ${S[k].all.clip}/${R0[k].all.clip}`).join('; ') + ')' : ''}`);
     check(S.regen.all.lum < K.all.lum && S.gewitter.all.lum < K.all.lum && S.gewitter.all.lum <= S.regen.all.lum + 0.01, `the weather keeps its mood: rain (${S.regen.all.lum}) and storm (${S.gewitter.all.lum}) darker than the clear day (${K.all.lum})`);
