@@ -205,6 +205,9 @@
       if (stairCell(u, v) || (u >= cu0 - 1 && u <= cu1 + 1 && v >= cv0 - 1 && v <= cv1 + 1) || v === PV) continue;
       put(u, G.clear, v, M.spot); info.lights.push([u, F + G.clear, v]);
     }
+    // a lowered soffit along a side wall of the hall with a cyan line round its open edges (t1_29: on the right as one
+    // looks at the glass wall, the −u side)
+    for (let v = PV + 1; v <= cv1; v++) for (let u = G.u0 + 2; u <= G.u0 + 3; u++) put(u, G.clear, v, M.fascia, { glow: 1 });
     // the partition between the foyer and the hall: glass with an open middle
     for (let u = G.u0 + 2; u <= G.u1 - 2; u++) { if (Math.abs(u - EU) <= 1) continue; for (let y = 1; y <= G.clear; y++) put(u, y, PV, M.partition, { facing: 0 }); }
     // the pad with a ring of cyan light on the floor round it, white benches beside it
@@ -297,8 +300,8 @@
     for (let u = 0; u < W; u++) if (!isPath(u, 0)) put(u, 0, 0, M.hedge);
     for (let v = 1; v < D; v++) { put(0, 0, v, M.hedge); put(W - 1, 0, v, M.hedge); }
     for (let u = 1; u < W - 1; u++) put(u, 0, D - 1, M.hedge);
-    // round blossom bushes by the entrance, round trees on the lawn, flowers and ferns along the facade
-    for (const u of [EU - 5, EU + 5]) model(u, 0, G.v0 - 3, 'vm_bush_blossom', 0);
+    // clipped light-green balls by the entrance (t1_26), a round tree on the lawn, flowers and ferns along the facade
+    for (const u of [EU - 5, EU + 5]) put(u, 0, G.v0 - 3, 'vx_bush_light');
     model(17, 0, 1, 'vm_tree_round_s', 0);
     for (let u = G.u0; u <= G.u1; u++) {
       if (isPath(u, G.v0 - 2) || isPath(u, G.v0 - 1)) continue;

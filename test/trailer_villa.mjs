@@ -75,7 +75,7 @@ if (A) {
 // hc: the middle of the house's street front (lot ox + house u0 + w/2, oz + house v0); eye → target
 const CAMS = {
   front: { t: 12350, eye: [5, 2.0, -21], at: [0, 6.5, 6] },
-  corner: { t: 12600, eye: [-12.5, 2.3, -6.5], at: [-6.5, 3.4, 0] },
+  corner: { t: 12600, eye: [11.5, 2.4, -5.7], at: [0.5, 4.2, 0.5] },
   garden: { t: 12350, eye: [19, 9, -15], at: [0, 6, 7] },
   stair: { t: 6000, eye: [0, 2.6, 5.4], at: [0, 3.0, 14] },
   pad: { t: 6000, eye: [0, 5.0, 5.6], at: [0, 1.2, 11.5] },
