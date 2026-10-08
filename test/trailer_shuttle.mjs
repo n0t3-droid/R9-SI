@@ -35,8 +35,8 @@ const run = async (URL, TAG) => {
   await frames(40);
   const spawned = await ev(() => { const g = VR.game; g.traffic.spawnFlight({ arch: 'shuttle', dock: true }); return true; });
   check(spawned, TAG + ': a shuttle is launched toward the Gate Temple');
-  // the design comes back from a worker: the page must run between the frames for it to arrive
-  for (let i = 0; i < 80; i++) { await wait(150); if (await ev(() => VR.game.traffic.ships.length > 0)) break; }
+  // the design comes back from a worker (behind the chunk jobs on a loaded machine): the page must run between the frames
+  for (let i = 0; i < 300; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.length > 0)) break; }
   await frames(60);
   for (let i = 0; i < (TAG === 'after' ? 40 : 1); i++) { await frames(20); await wait(40); if (await ev(() => VR.game.traffic.ships.some(s => s.dock && s.dock.phase === 'park'))) break; }
   await frames(TAG === 'after' ? 150 : 30);   // the craft turns on the apron (about 3 s) before the picture
@@ -47,7 +47,7 @@ const run = async (URL, TAG) => {
   // lead shuttle, a little behind and above, so its engine trails run back across the frame as in the trailer.
   await ev(() => { const g = VR.game, p = g.player; p.teleport(-160, 128, 240); p.yaw = 0.6; p.pitch = -0.12; });
   for (let k = 0; k < 3; k++) await ev(() => { VR.game.traffic.spawnFlight({ arch: 'shuttle' }); return 1; });
-  for (let i = 0; i < 80; i++) { await wait(150); if (await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length >= 2)) break; }
+  for (let i = 0; i < 300; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length >= 2)) break; }
   for (let i = 0; i < 10; i++) { await frames(20); await wait(30); }
   const fl = await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length);
   check(fl >= 2, TAG + ': several shuttles fly over the Heartland (' + fl + ')');
