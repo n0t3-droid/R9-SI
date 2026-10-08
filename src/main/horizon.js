@@ -36,7 +36,8 @@
       const g = this.g, w = g.world, r = g.renderer;
       this.drawList.length = 0;
       if (!this.enabled() || !r) return;
-      if (!this.maskTex) { const gl = r.gl; this.maskTex = VR.GL.tex2D(64, 64, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.mask, filter: gl.NEAREST }); }
+      // the mask is filtered linearly: the cut between far tiles and chunks is a soft band over a chunk (F8), not a step
+      if (!this.maskTex) { const gl = r.gl; this.maskTex = VR.GL.tex2D(64, 64, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.mask, filter: gl.LINEAR }); }
       if (!this.sentAvg && g.tex && g.tex.avgColor) { g.pool.broadcast({ type: 'lodinit', avg: g.tex.avgColor }); this.sentAvg = true; }
       const wk = w.seed + ':' + (w.genOpts && w.genOpts.worldType || '') + ':' + (w.genOpts && w.genOpts.vgen || 1);
       if (wk !== this.worldKey) { this.reset(); this.worldKey = wk; }
@@ -132,18 +133,21 @@
       }, d / S - L * 0.6);
     }
     // chunks that are really drawn → LOD fragments there are discarded
+    // each texel holds its chunk column's fade (0..255; 255 = whole, 0 = not shown): the far tiles are cut where the chunk
+    // keeps the pixel (shaders.js LOD_FS, the same dither thresholds as the chunk's fade-in). Rebuilt every frame while a
+    // column is fading, every sixth frame otherwise.
     updateMask(cam) {
       const w = this.g.world, gl = this.g.renderer.gl;
       const ccx = Math.floor(cam.x) >> 4, ccz = Math.floor(cam.z) >> 4;
       const key = ccx + ',' + ccz;
-      if (key === this.maskKey && (this.maskT = this.maskT + 1) % 6 !== 0) return;
+      const fading = !!(w.fading && w.fading.size);
+      if (!fading && key === this.maskKey && (this.maskT = this.maskT + 1) % 6 !== 0) return;
       this.maskKey = key;
       const m = this.mask; m.fill(0);
       for (const c of w.cols.values()) {
         const dx = c.cx - ccx, dz = c.cz - ccz;
         if (dx < -32 || dz < -32 || dx > 31 || dz > 31 || !c.ready) continue;
-        let ok = true; for (let s = 0; s < c.sec.length; s++) if (!c.sec[s].meshed) { ok = false; break; }
-        if (ok) m[(dz + 32) * 64 + dx + 32] = 255;
+        if (c.fade > 0) m[(dz + 32) * 64 + dx + 32] = Math.round(255 * c.fade);
       }
       gl.bindTexture(gl.TEXTURE_2D, this.maskTex);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.UNSIGNED_BYTE, m);
@@ -161,8 +165,9 @@
       // a flight outrunning the loader): then the horizon fills the view right down to the ground
       const w = this.g.world, rd = (w && w.renderDist) || 8;
       const cc = w && w.col(Math.floor(cam.x) >> 4, Math.floor(cam.z) >> 4);
-      let under = !!cc;
-      if (cc) for (let s = 0; s < cc.sec.length && under; s++) if (!cc.sec[s].meshed) under = false;
+      // (F8) "whole" means the column has finished its fade-in: while it dissolves in, the far tile stays under it, or the
+      // near cut would leave a gap for those 300 ms
+      const under = !!cc && cc.shownAt >= 0 && cc.fade >= 1;
       gl.uniform1f(p.u.u_lodNear, under ? Math.max(24, Math.min(80, rd * 8)) : 4);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.maskTex); gl.uniform1i(p.u.u_mask, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, r.texNoise); gl.uniform1i(p.u.u_noise, 1);
