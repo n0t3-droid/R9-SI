@@ -67,6 +67,9 @@
       const nw = this.spawn(w.idx);
       this.workers[i] = nw;
       this.replaced++;
+      // a machine this slow (a weak PC, a crowded test box) is not a dead worker: each replacement doubles the patience,
+      // up to five minutes, so the same long job is not killed again and again in a loop
+      this.stuckMs = Math.min(300000, this.stuckMs * 2);
       for (const t of ['init', 'custom', 'looks', 'style', 'look', 'lodinit']) { const m = this.state.get(t); if (m) nw.postMessage(m); }
       console.warn('Worker', w.idx, 'did not answer for', (this.stuckMs / 1000) | 0, 's — replaced');
       this.failWorker(w, 'replaced');
