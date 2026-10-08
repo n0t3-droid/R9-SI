@@ -122,28 +122,32 @@
     const win = (s, a0, a1, y0, y1, fixed) => { for (let a = a0; a <= a1; a++) for (let y = y0; y <= y1; y++) put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.win, { facing: FACE[s] }); };
     // a lintel: a nova band with its orange line right above a window (the line runs along the band's foot)
     const lintel = (s, a0, a1, y, fixed) => { for (let a = a0; a <= a1; a++) put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.fascia, { glow: 2 }); };
-    // a box bay on side s over [a0, a1], pushed out one block from y0 to y1, one window [w0, w1] × [wy0, wy1] in its face
-    // with a lintel over it. A box standing on the ground gets an orange line at its foot (the cell in front, the line on
-    // the box's face at the top of the plinth course); a hanging box (o.hang) has a nova band as its lowest row, whose
-    // underside glows orange. The wall behind the window opens into the room.
+    // a box bay on side s over [a0, a1], pushed out o.depth blocks (one by default) from y0 to y1, one window [w0, w1] ×
+    // [wy0, wy1] in its face with a lintel over it. A box standing on the ground gets an orange line at its foot (the cell
+    // in front, the line on the box's face at the top of the plinth course); a hanging box (o.hang) has a nova band as its
+    // lowest row, whose underside glows orange (t2_23: the upper boxes hang over the terrace below). Behind the window the
+    // box's inner layers and the wall open into the room.
     const bay = (R, s, a0, a1, y0, y1, w0, w1, wy0, wy1, o2) => {
       o2 = o2 || {};
-      const out = s === 0 ? R.v0 - 1 : s === 2 ? R.v1 + 1 : s === 1 ? R.u1 + 1 : R.u0 - 1;
-      const fr = s === 0 ? out - 1 : s === 2 ? out + 1 : s === 1 ? out + 1 : out - 1;
-      for (let a = a0; a <= a1; a++) {
-        const u = (s & 1) ? out : a, v = (s & 1) ? a : out;
+      const dep = o2.depth || 1, outK = (k) => (s === 0 ? R.v0 - k : s === 2 ? R.v1 + k : s === 1 ? R.u1 + k : R.u0 - k);
+      const out = outK(dep), fr = s === 0 ? out - 1 : s === 2 ? out + 1 : s === 1 ? out + 1 : out - 1;
+      for (let k = 1; k <= dep; k++) for (let a = a0; a <= a1; a++) {
+        const o = outK(k), u = (s & 1) ? o : a, v = (s & 1) ? a : o;
         if (R === G && !o2.hang) put(u, 0, v, M.plinth);
         for (let y = y0; y <= y1; y++) put(u, y, v, M.bay);
         if (o2.hang) put(u, y0, v, M.fascia, { glow: 2 });
-        else { const fu = (s & 1) ? fr : a, fv = (s & 1) ? a : fr; put(fu, y0, fv, M.base, { facing: (s + 2) & 3 }); }
+        else if (k === dep) { const fu = (s & 1) ? fr : a, fv = (s & 1) ? a : fr; put(fu, y0, fv, M.base, { facing: (s + 2) & 3 }); }
       }
       if (w1 >= w0) {
         win(s, w0, w1, wy0, wy1, out);
         if (wy1 < y1) lintel(s, w0, w1, wy1 + 1, out);
-        // the wall behind the window opens into the room (and the ground floor's white lining)
-        for (let a = w0; a <= w1; a++) for (let y = wy0; y <= wy1; y++) for (let k = 0; k <= (R === G ? 1 : 0); k++) {
-          const u = (s & 1) ? (s === 1 ? R.u1 - k : R.u0 + k) : a, v = (s & 1) ? a : (s === 0 ? R.v0 + k : R.v1 - k);
-          put(u, y, v, null);
+        // the box's inner layers and the wall behind the window open into the room (and the ground floor's white lining)
+        for (let a = w0; a <= w1; a++) for (let y = wy0; y <= wy1; y++) {
+          for (let k = 1; k < dep; k++) { const o = outK(k); put((s & 1) ? o : a, y, (s & 1) ? a : o, null); }
+          for (let k = 0; k <= (R === G ? 1 : 0); k++) {
+            const u = (s & 1) ? (s === 1 ? R.u1 - k : R.u0 + k) : a, v = (s & 1) ? a : (s === 0 ? R.v0 + k : R.v1 - k);
+            put(u, y, v, null);
+          }
         }
       }
     };
@@ -169,21 +173,26 @@
       for (let v = 8; v <= 9; v++) for (let y = 2; y <= 4; y++) put(lin, y, v, null);
       bay(G, s, 12, 16, 1, 5, 13, 15, 2, 4);
     }
-    // first floor, front (v 9): two hanging boxes with 2 × 2 windows and the orange underglow, a glass door to the terrace
-    bay(U, 0, 6, 9, U.y + 2, U.y + 4, 7, 8, U.y + 3, U.y + 4, { hang: true });
-    bay(U, 0, 15, 18, U.y + 2, U.y + 4, 16, 17, U.y + 3, U.y + 4, { hang: true });
+    // first floor, front (v 9): two boxes standing two blocks out over the terrace, hanging free of it with the orange
+    // glow under them (t2_23), each with a 3 × 2 window; a glass door to the terrace between them
+    bay(U, 0, 5, 9, U.y + 2, U.y + 4, 6, 8, U.y + 3, U.y + 4, { hang: true, depth: 2 });
+    bay(U, 0, 15, 19, U.y + 2, U.y + 4, 16, 18, U.y + 3, U.y + 4, { hang: true, depth: 2 });
     put(EU, U.y + 1, U.v0, M.door, { facing: 0, half: 0, hinge: 0, open: 0 }); put(EU, U.y + 2, U.v0, M.door, { facing: 0, half: 1, hinge: 0, open: 0 });
     win(0, EU - 1, EU - 1, U.y + 1, U.y + 3, U.v0); win(0, EU + 1, EU + 1, U.y + 1, U.y + 3, U.v0); win(0, EU, EU, U.y + 3, U.y + 3, U.v0); lintel(0, EU - 1, EU + 1, U.y + 4, U.v0);
-    // first floor, sides and back
-    for (const s of [1, 3]) { const fixed = s === 1 ? U.u1 : U.u0; win(s, 11, 12, U.y + 2, U.y + 3, fixed); lintel(s, 11, 12, U.y + 4, fixed); win(s, 17, 18, U.y + 2, U.y + 3, fixed); lintel(s, 17, 18, U.y + 4, fixed); }
+    // first floor, sides and back: on the right a box standing out over the terrace like the front ones (the composition
+    // is not symmetric: the top box sits at the left, t1_24)
+    win(3, 11, 12, U.y + 2, U.y + 3, U.u0); lintel(3, 11, 12, U.y + 4, U.u0); win(3, 17, 18, U.y + 2, U.y + 3, U.u0); lintel(3, 17, 18, U.y + 4, U.u0);
+    win(1, 10, 11, U.y + 2, U.y + 3, U.u1); lintel(1, 10, 11, U.y + 4, U.u1);
+    bay(U, 1, 13, 17, U.y + 2, U.y + 4, 14, 16, U.y + 3, U.y + 4, { hang: true, depth: 2 });
     win(2, 7, 9, U.y + 2, U.y + 3, U.v1); win(2, 15, 17, U.y + 2, U.y + 3, U.v1); win(2, 11, 13, U.y + 3, U.y + 3, U.v1);
     for (const [a0, a1] of [[7, 9], [11, 13], [15, 17]]) lintel(2, a0, a1, U.y + 4, U.v1);
-    // top floor: a band across the front, windows on the sides and the back, the door to the roof garden
-    win(0, 9, 11, T.y + 2, T.y + 3, T.v0); win(0, 14, 15, T.y + 2, T.y + 3, T.v0); lintel(0, 9, 11, T.y + 4, T.v0); lintel(0, 14, 15, T.y + 4, T.v0);
-    put(13, T.y + 1, T.v0, M.door, { facing: 0, half: 0, hinge: 0, open: 0 }); put(13, T.y + 2, T.v0, M.door, { facing: 0, half: 1, hinge: 0, open: 0 });
-    win(0, 13, 13, T.y + 3, T.y + 3, T.v0); lintel(0, 13, 13, T.y + 4, T.v0);
-    for (const s of [1, 3]) { const fixed = s === 1 ? T.u1 : T.u0; win(s, 15, 17, T.y + 2, T.y + 3, fixed); lintel(s, 15, 17, T.y + 4, fixed); }
-    win(2, 10, 14, T.y + 2, T.y + 3, T.v1); lintel(2, 10, 14, T.y + 4, T.v1);
+    // top floor — the box at the left (t1_24): one glazed front in one orange frame with the door to the roof terrace in
+    // it, a big window to the roof garden on the right, windows on the left and the back
+    win(0, T.u0 + 1, T.u1 - 1, T.y + 1, T.y + 3, T.v0); lintel(0, T.u0 + 1, T.u1 - 1, T.y + 4, T.v0);
+    put(T.u0 + 5, T.y + 1, T.v0, M.door, { facing: 0, half: 0, hinge: 0, open: 0 }); put(T.u0 + 5, T.y + 2, T.v0, M.door, { facing: 0, half: 1, hinge: 0, open: 0 });
+    win(1, 15, 18, T.y + 1, T.y + 3, T.u1); lintel(1, 15, 18, T.y + 4, T.u1);
+    win(3, 15, 17, T.y + 2, T.y + 3, T.u0); lintel(3, 15, 17, T.y + 4, T.u0);
+    win(2, T.u0 + 2, T.u1 - 2, T.y + 2, T.y + 3, T.v1); lintel(2, T.u0 + 2, T.u1 - 2, T.y + 4, T.v1);
     yield;
 
     // ---- the glass wall to the back garden (the hall): one clear sheet floor to ceiling (vx_nova_glass joins in both looks)
@@ -257,23 +266,27 @@
     //      sofas at the front, plants and spots
     model(U.u0 + 1, U.y + 1, 13, 'vm_bed_white', 0); info.beds.push([U.u0 + 2, F + U.y + 1, 14, 0]);
     for (const [u, v] of [[U.u0 + 1, U.v0 + 1], [U.u1 - 1, U.v0 + 1], [U.u1 - 1, U.v1 - 1]]) put(u, U.y + 1, v, 'vx_tech_planter');
-    for (let u = 9; u <= 14; u++) if (u !== EU) { put(u, U.y + 1, 11, 'vx_sofa_white', { facing: 2 }); info.seats.push([u, F + U.y + 1, 11, 2]); }
+    // (the sofas keep the way from the terrace door to the foot of the top stair free)
+    for (const u of [6, 7, 8, 9, 15, 16, 17, 18]) { put(u, U.y + 1, 11, 'vx_sofa_white', { facing: 2 }); info.seats.push([u, F + U.y + 1, 11, 2]); }
     model(U.u0 + 1, U.y + 1, U.v1 - 1, 'vm_plant_palm_concrete', 0);
-    for (const [u, v] of [[7, 12], [12, 13], [7, 16], [12, 17], [18, 13]]) put(u, U.y + U.clear, v, M.spot);
-    // the top floor: a studio with a lounge looking out to the roof garden
-    for (let u = 9; u <= 13; u++) { put(u, T.y + 1, 18, 'vx_sofa_white', { facing: 0 }); info.seats.push([u, F + T.y + 1, 18, 0]); }
-    put(9, T.y + 1, 15, 'vx_tech_planter'); put(13, T.y + 1, 15, 'vx_tech_planter');
-    for (const [u, v] of [[10, 16], [13, 17]]) put(u, T.y + T.clear, v, M.spot);
+    for (const [u, v] of [[7, 12], [7, 16], [16, 13], [16, 17], [18, 15]]) put(u, U.y + U.clear, v, M.spot);
+    // the top floor: a studio with a lounge looking out through the glazed front
+    for (let u = T.u0 + 1; u <= T.u0 + 4; u++) { put(u, T.y + 1, 18, 'vx_sofa_white', { facing: 0 }); info.seats.push([u, F + T.y + 1, 18, 0]); }
+    put(T.u0 + 1, T.y + 1, 14, 'vx_tech_planter'); put(T.u0 + 1, T.y + 1, 19, 'vx_tech_planter');
+    for (const [u, v] of [[T.u0 + 3, 15], [T.u0 + 3, 18]]) put(u, T.y + T.clear, v, M.spot);
     yield;
 
-    // ---- the roof gardens: lawn beds, a round tree and blossom bushes on the first floor's roof, planters, the dome
-    const ry = U.slab + 2;
-    for (const [u0, u1, v0, v1] of [[uS[0] + 1, T.u0 - 1, uS[1] + 1, uS[1] + 2], [T.u1 + 1, uS[2] - 1, uS[1] + 1, uS[1] + 2]]) for (let v = v0; v <= v1; v++) for (let u = u0; u <= u1; u++) put(u, U.slab + 1, v, 'grass_block');
+    // ---- the roof garden beside the top box (t2_23, t1_24: the big round bush on the roof): lawn on the first floor's
+    //      roof right of the top box, the large round tree rising to the top box's roof, blossom bushes, loungers on the
+    //      terrace in front of the top box, a small round tree at its corner; planters and the dome on the top box's roof
+    const ry = U.slab + 2, gu0 = T.u1 + 2, gu1 = U.u1, gv0 = U.v0 + 2, gv1 = U.v1 - 1;
+    for (let v = gv0; v <= gv1; v++) for (let u = gu0; u <= gu1; u++) put(u, U.slab + 1, v, 'grass_block');
+    modelAt(gu0, ry, gv0 + 2, 'vm_tree_round_l', 0);
+    for (const [u, v] of [[gu1, gv0], [gu1, gv1], [gu0, gv1]]) model(u, ry, v, 'vm_bush_blossom', 0);
     model(uS[0] + 1, ry, uS[1] + 1, 'vm_tree_round_s', 0);
-    for (const u of [T.u1 + 2, T.u1 + 3]) model(u, ry, uS[1] + 1, 'vm_bush_blossom', 0);
-    put(T.u0 - 1, ry, T.v0 + 2, 'vx_tech_planter');
-    model(T.u1 + 2, ry, T.v0 + 3, 'vm_lounger', 0);
-    for (let k = 0; k < 2; k++) for (let j = 0; j < 2; j++) put(11 + k, T.slab + 2, 16 + j, 'vx_dome_white');
+    for (const u of [T.u0 + 3, T.u0 + 5]) model(u, ry, uS[1] + 2, 'vm_lounger', 0);
+    put(T.u1, ry, uS[1] + 1, 'vx_tech_planter');
+    for (let k = 0; k < 2; k++) for (let j = 0; j < 2; j++) put(T.u0 + 3 + k, T.slab + 2, 16 + j, 'vx_dome_white');
     put(T.u0 + 1, T.slab + 2, T.v0 + 1, 'vx_tech_planter'); put(T.u1 - 1, T.slab + 2, T.v1 - 1, 'vx_tech_planter');
     // the ground floor's terrace: planters at its corners, blossom bushes, loungers
     const ty = G.slab + 2;
@@ -343,7 +356,8 @@
     for (const u of [EU - 3, EU + 3]) put(u, 0, G.v0 - 2, 'vx_tech_planter');
     // palms: the shared crown on a ringed trunk (VR.Plants.palm), the trunk from the ground at y0
     const palm = (u, v, h, y0) => { y0 = y0 | 0; for (let k = 0; k < h; k++) put(u, y0 + k, v, 'vx_palm_trunk'); model(u - 3, y0 + h, v - 3, 'vm_palm_crown', 0); };
-    palm(3, 2, 10); palm(21, 2, 9);
+    // (the front palms' crowns stay inside the lot: 7 × 7 round the trunk, above the terrace's balusters)
+    palm(3, 3, 12); palm(21, 3, 11);
     // the back garden: two green mounds left and right (the hills behind the glass in t1_29), a palm on each, the palm in
     // the patio in a planter, round trees and blossom bushes, loungers on the lawn
     const mound = (cu, cv, ru, rv, h) => {

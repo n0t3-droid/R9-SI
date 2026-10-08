@@ -54,11 +54,20 @@ console.log('3 · the masses');
 const NOVA = PLAN.NOVA, { G, U, T: Tt, OVER } = NOVA;
 const WALLS = new Set(['vollton_stone_grey', 'vollton_light_grey', 'vollton_mid_grey', 'vx_nova_window', 'vx_nova_band', 'door_glass_white', 'panorama_white', 'vx_beam_white']);
 // the footprint of a storey: the bounding box of wall cells at its middle height (gardens, crowns and bushes excluded)
-const footprint = (y) => { let u0 = 99, v0 = 99, u1 = -99, v1 = -99; for (let v = -4; v < D + 4; v++) for (let u = -4; u < W + 4; u++) if (WALLS.has(nm(u, y, v))) { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); } return { u0, v0, u1, v1 }; };
+// (the storey's own walls: grey stone, its windows and doors — the light-grey box bays standing out of it are counted apart)
+const STOREY = new Set(['vollton_stone_grey', 'vollton_mid_grey']);
+const footprint = (y) => { let u0 = 99, v0 = 99, u1 = -99, v1 = -99; for (let v = -4; v < D + 4; v++) for (let u = -4; u < W + 4; u++) if (STOREY.has(nm(u, y, v))) { u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); } return { u0, v0, u1, v1 }; };
 const fG = footprint(3), fU = footprint(U.y + 3), fT = footprint(Tt.y + 3);
 console.log('    footprints  G ' + JSON.stringify(fG) + '  U ' + JSON.stringify(fU) + '  T ' + JSON.stringify(fT));
 check(fU.v0 - fG.v0 >= 2 && fU.u0 - fG.u0 >= 2 && fG.u1 - fU.u1 >= 2, 'the first floor stands back from the ground floor at the front (' + (fU.v0 - fG.v0) + ') and the sides (' + (fU.u0 - fG.u0) + ', ' + (fG.u1 - fU.u1) + ')');
-check(fT.v0 - fU.v0 >= 2 && fT.u0 - fU.u0 >= 2 && fU.u1 - fT.u1 >= 2, 'the top floor stands back from the first floor at the front (' + (fT.v0 - fU.v0) + ') and the sides (' + (fT.u0 - fU.u0) + ', ' + (fU.u1 - fT.u1) + ')');
+// t1_24 / t2_23: the top is a box at one side and the roof garden with a big round tree beside it, not a centred tier
+check(fT.v0 - fU.v0 >= 3 && fT.u0 - fU.u0 >= 1 && fT.u0 - fU.u0 <= 2 && fU.u1 - fT.u1 >= 6, 'the top storey is a box at the left, set back at the front (' + (fT.v0 - fU.v0) + ') and on the left (' + (fT.u0 - fU.u0) + '), the right of the first floor\'s roof left to the roof garden (' + (fU.u1 - fT.u1) + ')');
+{ let tree = 0, grass = 0; for (const [k, s] of A.rec) { const [x, y, z] = k.split(',').map(Number); if (y - F === U.slab + 2 && nameOf(s) === 'vm_tree_round_l' && propOf(s, 'part') === 0 && x > fT.u1) tree++; if (y - F === U.slab + 1 && nameOf(s) === 'grass_block' && x > fT.u1 && x <= fU.u1) grass++; }
+  check(tree === 1 && grass >= 30, 'the roof garden beside the top box: lawn (' + grass + ' cells) and the big round tree (' + tree + ') rising to the top box\'s roof'); }
+// the first floor's boxes stand two blocks out over the terrace below and hang free of it (the orange glow under them)
+{ let boxes = 0; for (const [a0, a1] of [[5, 9], [15, 19]]) { let ok = true; for (let a = a0; a <= a1; a++) for (const v of [U.v0 - 1, U.v0 - 2]) { if (nm(a, U.y + 3, v) !== 'vollton_light_grey' && nm(a, U.y + 3, v) !== 'vx_nova_window' && nm(a, U.y + 3, v) !== '') ok = false; const lo = at(a, U.y + 2, v); if (nameOf(lo) !== 'vx_nova_band' || propOf(lo, 'glow') !== 2 || at(a, U.y + 1, v)) ok = false; } if (ok) boxes++; }
+  let side = 0; for (let v = 13; v <= 17; v++) for (const u of [U.u1 + 1, U.u1 + 2]) { const lo = at(u, U.y + 2, v); if (nameOf(lo) === 'vx_nova_band' && propOf(lo, 'glow') === 2 && !at(u, U.y + 1, v)) side++; }
+  check(boxes === 2 && side === 10, 'the first floor\'s front boxes stand two blocks out over the terrace and hang free with the orange glow under them (' + boxes + ' of 2), and the box on its right side (' + side + ' of 10 cells)'); }
 // the slab zones: rings of vx_nova_band, two rows, the outer ring past the walls below
 const slabRect = (Rr, ov) => [Rr.u0 - ov[1], Rr.v0 - ov[0], Rr.u1 + ov[1], Rr.v1 + ov[2]];
 const ring = (r) => { const out = []; for (let v = r[1]; v <= r[3]; v++) for (let u = r[0]; u <= r[2]; u++) if (u === r[0] || u === r[2] || v === r[1] || v === r[3]) out.push([u, v]); return out; };
@@ -103,8 +112,10 @@ for (const [key, cells] of planes) {
   }
 }
 check(comps >= 20 && rects === comps, 'every window is one closed rectangle in one wall plane (or a glazed screen round a door): ' + rects + ' of ' + comps + ' windows, ' + winCells.length + ' cells');
-const frontOf = (Rr, yy) => compList.filter(c => c.key === '0:' + Rr.v0 || c.key === '0:' + (Rr.v0 - 1)).filter(c => c.y0 >= yy && c.y1 <= yy + Rr.clear).length;
-check(frontOf(G, 1) >= 4 && frontOf(U, U.y + 1) >= 3 && frontOf(Tt, Tt.y + 1) >= 2, 'every storey\'s front is glazed (ground ' + frontOf(G, 1) + ', first ' + frontOf(U, U.y + 1) + ', top ' + frontOf(Tt, Tt.y + 1) + ' windows)');
+// (in the wall or in the face of a box standing one or two blocks out of it)
+const frontWins = (Rr, yy) => compList.filter(c => [0, 1, 2].some(k => c.key === '0:' + (Rr.v0 - k))).filter(c => c.y0 >= yy && c.y1 <= yy + Rr.clear);
+const frontOf = (Rr, yy) => frontWins(Rr, yy).length, topGlass = frontWins(Tt, Tt.y + 1).reduce((n, c) => n + c.n, 0);
+check(frontOf(G, 1) >= 4 && frontOf(U, U.y + 1) >= 3 && frontOf(Tt, Tt.y + 1) >= 1 && topGlass >= 15, 'every storey\'s front is glazed (ground ' + frontOf(G, 1) + ', first ' + frontOf(U, U.y + 1) + ' windows; the top box one glazed front of ' + topGlass + ' cells)');
 // the frame joins: a 2 × 3 cluster (VR.Nova.winCell with its neighbour bits) has frame cells only on its outer ring
 const N = V.Nova; let inner = 0, outer = 0;
 for (let bx = 0; bx < 2; bx++) for (let by = 0; by < 3; by++) {

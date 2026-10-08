@@ -326,12 +326,12 @@
     LOT: [25, 31],                                                     // the street on the v = 0 side; ten rows of garden behind the house
     G: { u0: 2, v0: 6, u1: 22, v1: 20, y: 0, clear: 5, slab: 6 },    // ground floor: floor block y 0, rooms 1..5, slab zone 6..7
     U: { u0: 4, v0: 9, u1: 20, v1: 20, y: 7, clear: 4, slab: 12 },   // first floor: floor y 7 (the slab's top row), rooms 8..11
-    T: { u0: 7, v0: 13, u1: 17, v1: 20, y: 13, clear: 4, slab: 18 },  // top floor: floor y 13, rooms 14..17, roof 18..19
+    T: { u0: 5, v0: 13, u1: 13, v1: 20, y: 13, clear: 4, slab: 18 },  // top floor, a box at the left: floor y 13, rooms 14..17, roof 18..19
     OVER: { G: [2, 1, 1], U: [1, 1, 1], T: [1, 1, 1] },               // each slab's overhang past the walls below: [front, sides, back]
     // the floating stairs from the hall: two blocks deep in front of the glass wall (v 18–19), from the side walls up
     // toward the middle — the foot at u, one block along du per block up (the V of the trailer's hall, t1_29 / t1_30)
     STAIRS: [{ u: 4, du: 1 }, { u: 20, du: -1 }], STAIR_V: 18,
-    STAIR2: { u: 15, v: 12 },                                          // the stair from the first floor to the top floor
+    STAIR2: { u: 11, v: 12 },                                          // the stair from the first floor to the top floor (inside the top box)
     PAD: [11, 14], ENTRY: 12, PARTITION: 10,
   };
   // the plan: one open storey per level (the foyer and the hall below, the gallery, the studio), house-local frame
