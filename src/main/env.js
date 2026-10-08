@@ -34,7 +34,6 @@
     update(dt, o) {
       // o: {dim, biome, eyeSky(0..1), underwater, waterColor, renderDist, freezeTime, freezeWeather, lowK, wetOn}
       const E = this.E;
-      E.dt = dt;
       this.anim += dt;
       if (!o.freezeTime) this.ticks += dt * 20;
       if (this.ticks >= 24000) { this.ticks -= 24000; this.day++; }
@@ -137,18 +136,6 @@
       E.exposure = this.exposure * (o.exposureMul || 1) * 0.94 * Math.pow(2, W.exp);
       E.grade = mix3([1.02, 1.0, 0.97], [0.92, 0.97, 1.08], night);
       E.saturation = 1.17 - rain * 0.2;
-      // F1 · Licht & Luft: the sky's turbidity (haze and rain whiten it), the biome's tint on the sky, the moon's phase
-      // (eight days a cycle: new = dark, full = bright), the cloud shadows on the ground, and the grade's lift (warm at
-      // the horizon line, blue at night)
-      E.skyT = 2.3 + 3.2 * rain + 1.4 * (W.fog || 0);
-      { const m = (bsky[0] + bsky[1] + bsky[2]) / 3 || 1; E.skyTint = bsky.map((v) => 1 + (v / m - 1) * 0.25); }
-      const ph = (((this.day % 8) + 8) % 8) / 8;
-      E.moonPh = Math.cos(2 * Math.PI * ph);
-      E.moonIllum = (1 - Math.cos(2 * Math.PI * ph)) * 0.5;
-      E.moonColor = E.moonColor.map((v) => v * (0.25 + 0.75 * E.moonIllum));
-      E.cloudSh = Math.min(1, Math.max(0, (E.cloudCover - 0.3) * 1.4));
-      const twi = 1 - M.smoothstep(0.0, 0.3, Math.abs(sy));
-      E.lift = [0.014 * twi + 0.002 * night, 0.004 * twi, 0.004 * twi + 0.008 * night];
       E.vivid = 0.6;
       E.bloomThreshold = 0.95; E.bloomStrength = 0.075 + night * 0.04;
       return E;
