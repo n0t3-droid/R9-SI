@@ -23,7 +23,7 @@
   PR.BIT_FIXED = 15;        // mask bit: the trunk and the crownshaft (always drawn)
   PR.BIT_COCO = 16;         // mask bit: the coconuts
   // the palm's colours (sRGB), linearised by lin() like the terrain's tints
-  const PAL = { bark: 0x6A4A2A, shaft: 0x5E8A4A, nut: 0x5E4026, leafA: 0x2F8A34, leafB: 0x5FC24E, tip: 0xB8D85A, dead: 0x9A7440 };
+  const PAL = { bark: 0x7A5A3A, shaft: 0x5E8A4A, nut: 0x5E4026, leafA: 0x2F8A34, leafB: 0x5FC24E, tip: 0xB8D85A, dead: 0x9A7440 };
   const lin = (c, k) => [Math.pow(((c >> 16) & 255) / 255, 2.2) * k, Math.pow(((c >> 8) & 255) / 255, 2.2) * k, Math.pow((c & 255) / 255, 2.2) * k];
   const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const norm3 = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
@@ -40,7 +40,7 @@
   // ---------------------------------------------------------------- the frond curves (the mesh and the silhouette use them)
   // the azimuth and the length of a frond slot: green fronds spread evenly with a little jitter, the dead ones hang at random
   PR.frondAxis = function (k) {
-    if (k < PR.DEAD_FIRST) return { az: ((k + 0.3 * (hash(k, 0, 0, 101) - 0.5)) / PR.FROND_N) * TAU, len: 4.7 + 0.5 * hash(k, 0, 0, 102), dead: false };
+    if (k < PR.DEAD_FIRST) return { az: ((k + 0.3 * (hash(k, 0, 0, 101) - 0.5)) / PR.FROND_N) * TAU, len: 4.9 + 0.7 * hash(k, 0, 0, 102), dead: false };
     return { az: hash(k, 0, 0, 103) * TAU, len: 2.6, dead: true };
   };
   // a point on frond slot k at t (0 = the crown's centre, 1 = the tip): out rises a little, then the tip droops under its weight
@@ -48,7 +48,7 @@
     const a = PR.frondAxis(k), o = out || [0, 0, 0];
     if (!a.dead) {
       const r = 0.2 + a.len * t;
-      o[0] = r * Math.cos(a.az); o[1] = 0.3 + 1.0 * t - 3.2 * t * t; o[2] = r * Math.sin(a.az);
+      o[0] = r * Math.cos(a.az); o[1] = 0.35 + 1.2 * t - 4.35 * t * t; o[2] = r * Math.sin(a.az);
     } else {
       const r = 0.25 + 0.35 * a.len * t;
       o[0] = r * Math.cos(a.az); o[1] = 0.1 - 1.9 * t * t; o[2] = r * Math.sin(a.az);
@@ -98,7 +98,7 @@
     // the trunk: eleven rings down to −D, tapering (0.24 at the crown, 0.48 at −D), bark rings banded every two blocks
     const trunk = [];
     for (let j = 0; j <= RINGS; j++) {
-      const s = D * j / RINGS, bend = (s / D) * (s / D), r = 0.24 + 0.012 * s, ring = [];
+      const s = D * j / RINGS, bend = (s / D) * (s / D), r = 0.3 + 0.012 * s, ring = [];
       for (let k = 0; k < SIDES; k++) {
         const f = (k / SIDES) * TAU, c = Math.cos(f), sn = Math.sin(f);
         const sh = (j & 1 ? 0.88 : 1) * (k & 1 ? 0.94 : 1);
@@ -117,7 +117,7 @@
       const a = PR.frondAxis(k), dead = a.dead, ring = [], P = [0, 0, 0];
       for (let i = 0; i <= 6; i++) {
         const t = i / 6, p = PR.frondPoint(k, t, P), sx = -Math.sin(a.az), sz = Math.cos(a.az);
-        const W = (dead ? 0.3 : 0.62) * Math.pow(1 - t, 0.5) * Math.min(1, t * 5), up = 0.12 * W;
+        const W = (dead ? 0.3 : 0.8) * Math.pow(1 - t, 0.5) * Math.min(1, t * 5), up = 0.12 * W;
         const col = dead ? lin(PAL.dead, 0.85 + 0.2 * hash(k, i, 0, 7))
           : lerp3(lin(PAL.leafA, 1), lin(PAL.leafB, 1), hash(k, 0, 0, 8)).map((c, q) => c * (1 - 0.3 * t) + lin(PAL.tip, 1)[q] * 0.3 * t);
         const sway = dead ? 0.25 * t : 0.35 + 0.65 * t;
