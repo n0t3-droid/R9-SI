@@ -3,7 +3,7 @@
 // plants may cost at most 6 % more per frame on the palm avenue and the palm road (the two spots with most of them),
 // measured as SwiftShader CPU frames on this machine (a comparison of two builds in one run, not a GPU timing).
 //   bash test/wt_run.sh plants_cost.mjs      · SEED=4242 (the trailer_plants.mjs town) · N=6 frames per spot
-import { chromium } from 'playwright';
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 const SEED = process.env.SEED || '4242', N = +(process.env.N || 6);
 const DIST = process.env.DIST || '/home/claude/vr/dist/index.html';
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
