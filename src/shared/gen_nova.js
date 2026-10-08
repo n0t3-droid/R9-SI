@@ -47,6 +47,13 @@
     const put = (u, y, v, name, pr) => P(u, F + y, v, name, pr);
     const box = (u0, y0, v0, u1, y1, v1, name, pr) => { for (let y = y0; y <= y1; y++) for (let v = v0; v <= v1; v++) for (let u = u0; u <= u1; u++) put(u, y, v, name, pr); };
     const model = (u, y, v, name, f) => { if (VM && VM.MODELS[name]) VM.put((uu, yy, vv, n, pr) => P(uu, yy, vv, n, pr), u, F + y, v, name, f || 0); };
+    // a model placed by the corner of its footprint (the smallest u and v it covers), whatever its facing
+    const modelAt = (u, y, v, name, f) => {
+      const m = VM && VM.MODELS[name]; if (!m) return;
+      const fp = VM.footprint(m, f || 0); let du = 0, dv = 0;
+      for (const c of fp) { du = Math.min(du, c[0]); dv = Math.min(dv, c[2]); }
+      model(u - du, y, v - dv, name, f);
+    };
     const info = { beds: [], seats: [], work: [], door: null, outside: null, inside: null, chimney: null, table: null, lights: [], roofTop: F + 22, skin: 'nova', family: 'trailer', cars: [], desks: [] };
 
     // ---- the ground under the lot: lawn at the yard level (F − 1), the house on a stone footing
@@ -178,21 +185,22 @@
     win(2, 10, 14, T.y + 2, T.y + 3, T.v1); lintel(2, 10, 14, T.y + 4, T.v1);
     yield;
 
-    // ---- the glass wall to the back garden (the hall), mullions every five blocks, a garden door at its end
+    // ---- the glass wall to the back garden (the hall), mullions every five blocks, the garden door in the middle (between
+    //      the high ends of the stairs, where the way under them is free)
     for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) put(u, y, G.v1, (u - 2) % 5 === 0 ? M.mullion : M.glass, (u - 2) % 5 === 0 ? { axis: 0 } : undefined);
     for (let y = 1; y <= G.clear; y++) { put(G.u0 + 1, y, G.v1, M.wall); put(G.u1 - 1, y, G.v1, M.wall); }
-    put(G.u1 - 2, 1, G.v1, M.door, { facing: 2, half: 0, hinge: 1, open: 0 }); put(G.u1 - 2, 2, G.v1, M.door, { facing: 2, half: 1, hinge: 1, open: 0 });
+    put(EU, 1, G.v1, M.door, { facing: 2, half: 0, hinge: 1, open: 0 }); put(EU, 2, G.v1, M.door, { facing: 2, half: 1, hinge: 1, open: 0 });
     yield;
 
     // ---- the hall: the cove ring in the ceiling, spots, the partition, the pad, benches, plants
-    const PV = NOVA.PARTITION;
-    const cu0 = 9, cu1 = 15, cv0 = 14, cv1 = 17;                       // the cove: a recess one block up into the slab
+    const PV = NOVA.PARTITION, SV0 = NOVA.STAIR_V;
+    const cu0 = 9, cu1 = 15, cv0 = 13, cv1 = 16;                       // the cove over the pad: a recess one block up into the slab
     for (let v = cv0 - 1; v <= cv1 + 1; v++) for (let u = cu0 - 1; u <= cu1 + 1; u++) {
       const inner = u >= cu0 && u <= cu1 && v >= cv0 && v <= cv1;
       put(u, G.slab, v, inner ? null : M.fascia, inner ? undefined : { glow: 1 });
     }
     // spots in a grid under the ceiling (not over the stairs, not in the cove)
-    const stairCell = (u, v) => NOVA.STAIRS.some(st => u >= st.u && u <= st.u + 1 && v >= 13 && v <= 19);
+    const stairCell = (u, v) => v >= SV0 && v <= SV0 + 1;
     for (let v = G.v0 + 2; v <= G.v1 - 1; v += 3) for (let u = EU - 6; u <= EU + 6; u += 3) {
       if (stairCell(u, v) || (u >= cu0 - 1 && u <= cu1 + 1 && v >= cv0 - 1 && v <= cv1 + 1) || v === PV) continue;
       put(u, G.clear, v, M.spot); info.lights.push([u, F + G.clear, v]);
@@ -204,25 +212,26 @@
     for (let v = pv - 1; v <= pv + 3; v++) for (let u = pu - 1; u <= pu + 3; u++) if (u === pu - 1 || u === pu + 3 || v === pv - 1 || v === pv + 3) put(u, 0, v, M.line);
     model(pu, 1, pv, 'vm_nova_pad', 0); info.table = [pu + 1, F + 1, pv + 1];
     for (const u of [pu - 3, pu + 5]) for (let v = pv; v <= pv + 2; v++) { put(u, 1, v, 'vollton_white_slab', { type: 'bottom' }); info.seats.push([u, F + 1, v, u < pu ? 1 : 3]); }
-    // plants: potted palms in the back corners, tropical planters in the foyer
-    model(G.u0 + 2, 1, G.v1 - 1, 'vm_plant_palm_concrete', 0); model(G.u1 - 2, 1, G.v1 - 3, 'vm_plant_palm_concrete', 0);
+    // plants: potted palms in the hall's front corners, tropical planters in the foyer
+    model(G.u0 + 2, 1, PV + 1, 'vm_plant_palm_concrete', 0); model(G.u1 - 2, 1, PV + 1, 'vm_plant_palm_concrete', 0);
     for (const u of [EU - 3, EU + 3]) put(u, 1, G.v0 + 2, 'vx_tech_planter');
     put(G.u0 + 2, 1, G.v0 + 2, 'vx_tech_planter'); put(G.u1 - 2, 1, G.v0 + 2, 'vx_tech_planter');
     yield;
 
-    // ---- the floating stairs: two blocks wide along the side walls, one tread cell per block up and one block forward,
-    //      from the glass wall (v 19, y 1) to the first floor (v 13, y 7); the ceiling and the first floor open above them
+    // ---- the floating glass stairs: two blocks deep in front of the glass wall (v 18–19), one block up and one along per
+    //      piece, from the side walls (y 1) up toward the middle (y 7, the first floor's floor) — the V of the trailer's
+    //      hall seen against the garden; the ceiling and the first floor open over them, glass railings round the openings
     for (const st of NOVA.STAIRS) {
-      for (let k = 1; k <= 7; k++) {
-        const v = G.v1 - k, y = k;
-        // head room: two cells above every tread
-        for (let h = 1; h <= 2; h++) for (let du = 0; du <= 1; du++) if (y + h <= U.y) put(st.u + du, y + h, v, null);
-        model(st.u + 1, y, v, 'vm_nova_tread', 2);
+      const uk = (k) => st.u + st.du * (k - 1);
+      for (let k = 1; k <= U.y; k++) {
+        const u = uk(k);
+        // head room: two cells over every tread (the piece's own glass cheeks stand in them)
+        for (let h = 1; h <= 2; h++) for (let dv = 0; dv <= 1; dv++) if (k + h <= U.y) put(u, k + h, SV0 + dv, null);
+        modelAt(u, k, SV0, 'vm_nova_tread', st.du > 0 ? 3 : 1);
       }
-      // a glass railing round the opening in the first floor (its open side and its back)
-      const open = st.u === 5 ? st.u + 2 : st.u - 1;
-      for (let v = 14; v <= 16; v++) put(open, U.y + 1, v, M.glassRail);
-      for (let du = 0; du <= 1; du++) put(st.u + du, U.y + 1, 16, M.glassRail);
+      // upstairs: a glass railing along the opening's front and across its low end
+      for (let k = U.y - 3; k <= U.y - 1; k++) put(uk(k), U.y + 1, SV0 - 1, M.glassRail);
+      for (let dv = 0; dv <= 1; dv++) put(uk(U.y - 3), U.y + 1, SV0 + dv, M.glassRail);
     }
     yield;
 
@@ -238,12 +247,13 @@
     for (let du = 0; du <= 1; du++) put(SU + du, T.y + 1, SV + 2, M.glassRail);
     yield;
 
-    // ---- the first floor: a gallery with a bed at the back, sofas at the front, plants and spots
-    model(11, U.y + 1, 17, 'vm_bed_white', 0); info.beds.push([12, F + U.y + 1, 18, 0]);
-    put(9, U.y + 1, 18, 'vx_tech_planter'); put(14, U.y + 1, 19, 'vx_tech_planter');
+    // ---- the first floor: a gallery round the stair heads (the landing between them at the back), a bed on the left,
+    //      sofas at the front, plants and spots
+    model(U.u0 + 1, U.y + 1, 13, 'vm_bed_white', 0); info.beds.push([U.u0 + 2, F + U.y + 1, 14, 0]);
+    for (const [u, v] of [[U.u0 + 1, U.v0 + 1], [U.u1 - 1, U.v0 + 1], [U.u1 - 1, U.v1 - 1]]) put(u, U.y + 1, v, 'vx_tech_planter');
     for (let u = 9; u <= 14; u++) if (u !== EU) { put(u, U.y + 1, 11, 'vx_sofa_white', { facing: 2 }); info.seats.push([u, F + U.y + 1, 11, 2]); }
     model(U.u0 + 1, U.y + 1, U.v1 - 1, 'vm_plant_palm_concrete', 0);
-    for (const [u, v] of [[8, 12], [12, 15], [8, 18], [13, 18]]) put(u, U.y + U.clear, v, M.spot);
+    for (const [u, v] of [[7, 12], [12, 13], [7, 16], [12, 17], [18, 13]]) put(u, U.y + U.clear, v, M.spot);
     // the top floor: a studio with a lounge looking out to the roof garden
     for (let u = 9; u <= 13; u++) { put(u, T.y + 1, 18, 'vx_sofa_white', { facing: 0 }); info.seats.push([u, F + T.y + 1, 18, 0]); }
     put(9, T.y + 1, 15, 'vx_tech_planter'); put(13, T.y + 1, 15, 'vx_tech_planter');
