@@ -62,7 +62,9 @@ for (let i = 0; i < 1500; i++) {
 // with the renderer on, the first 5 dropped, median and mean of the rest
 const cost = await ev(() => {
   window.__norender = false; const g = VR.game, ts = [];
-  for (let i = 0; i < 35; i++) { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); g.renderer.gl.finish(); if (i >= 5) ts.push(performance.now() - t0); }
+  // each frame ends with a 1-pixel readPixels: it waits for the GPU's queue (gl.finish alone may return early in Chrome)
+  const gl = g.renderer.gl, px = new Uint8Array(4);
+  for (let i = 0; i < 35; i++) { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); if (i >= 5) ts.push(performance.now() - t0); }
   window.__norender = true; ts.sort((a, b) => a - b);
   return { median: +ts[ts.length >> 1].toFixed(1), mean: +(ts.reduce((a, b) => a + b, 0) / ts.length).toFixed(1) };
 });
