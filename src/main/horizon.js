@@ -135,14 +135,15 @@
     // chunks that are really drawn → LOD fragments there are discarded
     // each texel holds its chunk column's fade (0..255; 255 = whole, 0 = not shown): the far tiles are cut where the chunk
     // keeps the pixel (shaders.js LOD_FS, the same dither thresholds as the chunk's fade-in). Rebuilt every frame while a
-    // column is fading, every sixth frame otherwise.
+    // column is fading, at once after a column unloads (a stale texel would cut the far tile with no chunk under it), and
+    // every sixth frame otherwise.
     updateMask(cam) {
       const w = this.g.world, gl = this.g.renderer.gl;
       const ccx = Math.floor(cam.x) >> 4, ccz = Math.floor(cam.z) >> 4;
       const key = ccx + ',' + ccz;
-      const fading = !!(w.fading && w.fading.size);
-      if (!fading && key === this.maskKey && (this.maskT = this.maskT + 1) % 6 !== 0) return;
-      this.maskKey = key;
+      const fading = !!(w.fading && w.fading.size), epoch = w.colEpoch || 0;
+      if (!fading && key === this.maskKey && epoch === this.maskEpoch && (this.maskT = this.maskT + 1) % 6 !== 0) return;
+      this.maskKey = key; this.maskEpoch = epoch;
       const m = this.mask; m.fill(0);
       for (const c of w.cols.values()) {
         const dx = c.cx - ccx, dz = c.cz - ccz;

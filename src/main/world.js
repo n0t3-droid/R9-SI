@@ -188,6 +188,7 @@
       // their 300 ms fade-in are listed in `fading`, and the streaming rung is set by the governor (game.js)
       this.uploadQ = new VR.Stream.UploadScheduler({ msPerByte: 2e-6 });
       this.fading = new Set(); this.streamRung = 0; this.viewDir = null;
+      this.colEpoch = 0;   // counts the unloads: the far mask (horizon.js) is rebuilt right after one, never a stale cut
       this.listeners = [];
       this.frame = 0;
       this.stats = { gen: 0, mesh: 0, genMs: 0, meshMs: 0 };
@@ -414,7 +415,7 @@
       // a saved column comes back from the save when the player returns (it was regenerated before: edits vanished)
       if (c.modified && this.store) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
       for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s);
-      this.cols.delete(c.key); this.fading.delete(c);
+      this.cols.delete(c.key); this.fading.delete(c); this.colEpoch++;
       this.lastCol = null;
       this.shDirty.delete(c.key); this.shGone.add(c.key);
       for (const l of this.listeners) if (l.onColumnUnloaded) l.onColumnUnloaded(c);
