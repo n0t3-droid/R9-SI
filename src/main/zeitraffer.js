@@ -283,6 +283,8 @@
     if (n) w.pool.pump();
   }
   function meshed(S) { for (const e of S.cols.values()) for (const s of e.rc.sec) if (s.dirty || s.pending) return false; return true; }
+  // the picture is the land as it was: nothing of the copies waits to be lit or meshed
+  function settled(S) { if (!meshed(S)) return false; for (const e of S.cols.values()) if (e.touched || e.inflight) return false; return true; }
   // the replay's own frame (instead of the game's while it runs)
   Z.frame = function (g, dt) {
     const S = Z.S, w = g.world;
@@ -303,7 +305,9 @@
     const RC = S.rec;
     if (RC) {
       RC.t = (now - RC.t0) / 1000;
-      if (RC.phase === 'title' && RC.t >= Z.cfg.titleS) { RC.phase = 'body'; S.playing = true; S.phase = 'play'; }
+      // the lead: black until the land as it was is what the picture shows (the copies are lit and meshed again first)
+      if (RC.phase === 'lead') { if (RC.t >= 0.5 && (settled(S) || RC.t >= 6)) { RC.phase = 'title'; RC.t0 = now; RC.t = 0; } }
+      else if (RC.phase === 'title' && RC.t >= Z.cfg.titleS) { RC.phase = 'body'; S.playing = true; S.phase = 'play'; }
       else if (RC.phase === 'body' && S.cursor >= S.C.n && S.clock >= S.T.total) { RC.phase = 'end'; RC.tEnd = RC.t; }
       else if (RC.phase === 'end' && RC.t - RC.tEnd >= Z.cfg.endS) recFinish(S, false);
     }
@@ -450,7 +454,7 @@
     } catch (e) { console.warn('Zeitraffer video', e); Z.ui.note(tx('g.zr.recNo', null, 'Dieser Browser kann keine Videos aufnehmen.', 'This browser cannot record videos.')); return false; }
     const chunks = [];
     S.clock = 0; moveTo(S, 0); S.phase = 'play'; S.playing = false;
-    const RC = S.rec = { cv, ctx, mr, W, H, hd, mime, chunks, phase: 'title', t: 0, t0: performance.now(), tEnd: 0, stream, cancelled: false };
+    const RC = S.rec = { cv, ctx, mr, W, H, hd, mime, chunks, phase: 'lead', t: 0, t0: performance.now(), tEnd: 0, stream, cancelled: false };
     mr.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
     mr.onstop = () => {
       try { for (const tk of stream.getTracks()) tk.stop(); } catch (e) { /* */ }
@@ -475,6 +479,7 @@
   // one frame of the video: the view cut to 16:9, the cards over it
   function compose(S, g) {
     const RC = S.rec, ctx = RC.ctx, W = RC.W, H = RC.H, src = g.canvas, sw = src.width, sh = src.height;
+    if (RC.phase === 'lead') { ctx.fillStyle = '#05070e'; ctx.fillRect(0, 0, W, H); return; }
     if (!sw || !sh) return;
     let cw = sw, chh = Math.round(sw * H / W); if (chh > sh) { chh = sh; cw = Math.round(sh * W / H); }
     try { ctx.drawImage(src, (sw - cw) >> 1, (sh - chh) >> 1, cw, chh, 0, 0, W, H); } catch (e) { return; }
@@ -512,7 +517,7 @@
     let host = null, HW = window;
     try { if (window.claude && window.claude.use) host = window.claude; else if (window.parent !== window && window.parent.claude && window.parent.claude.use) { host = window.parent.claude; HW = window.parent; } } catch (e) { host = null; }
     if (host) {
-      try { const dl = await host.use('downloads'); if (dl) { const req = new HW.Object(); req.filename = name; req.data = blob; await dl.save(req); return { how: 'downloads', name }; } }
+      try { const dl = await host.use('downloads'); if (dl) { const req = new HW.Object(); req.filename = name; req.data = new HW.Uint8Array(await blob.arrayBuffer()); await dl.save(req); return { how: 'downloads', name }; } }
       catch (e) { if (e && e.code === 'declined') return { how: 'declined', name }; console.warn('Zeitraffer downloads', e); }
     }
     /*DL*/try { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); return { how: 'download', name }; } catch (e) { /* the preview stays */ }/*/DL*/
@@ -592,8 +597,8 @@
       video(blob, RC) {
         if (!U.on) return;
         U.show('video');
-        const mb = (blob.size / 1048576).toLocaleString(loc(), { maximumFractionDigits: 1 });
-        q('.zr-mt').textContent = tx('g.zr.recDone', { mb, s: Math.round(RC.t) }, '🎬 Dein Video ist fertig — {mb} MB, {s} s', '🎬 Your video is ready — {mb} MB, {s} s');
+        const size = blob.size >= 1048576 ? (blob.size / 1048576).toLocaleString(loc(), { maximumFractionDigits: 1 }) + ' MB' : Math.max(1, Math.round(blob.size / 1024)).toLocaleString(loc()) + ' KB';
+        q('.zr-mt').textContent = tx('g.zr.recDone', { size, s: Math.round(RC.t) }, '🎬 Dein Video ist fertig — {size}, {s} s', '🎬 Your video is ready — {size}, {s} s');
         const v = document.createElement('video'); v.muted = true; v.loop = true; v.autoplay = true; v.playsInline = true; v.controls = true;
         try { v.src = URL.createObjectURL(blob); } catch (e) { /* no preview */ }
         q('.zr-mv').appendChild(v);
