@@ -29,7 +29,7 @@ const spawned = await ev(() => { const g = VR.game; g.traffic.spawnFlight({ arch
 check(spawned, 'a shuttle is launched toward the Gate Temple');
 await frames(60);
 await ev(() => { const g = VR.game; g.player.pos[1] = 84; });
-for (let i = 0; i < 40; i++) { await frames(20); if (await ev(() => VR.game.traffic.ships.some(s => s.dock && s.dock.phase === 'park'))) break; }
+for (let i = 0; i < (TAG === "after" ? 40 : 1); i++) { await frames(20); if (await ev(() => VR.game.traffic.ships.some(s => s.dock && s.dock.phase === "park"))) break; }
 await frames(30);
 const parked = await ev(() => VR.game.traffic.ships.filter(s => s.dock && s.dock.phase === 'park').map(s => ({ y: +s.pos[1].toFixed(2), z: +s.pos[2].toFixed(1) })));
 check(TAG !== 'after' || parked.length > 0, 'the shuttle parks on the apron (' + JSON.stringify(parked) + ')');

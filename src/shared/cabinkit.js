@@ -117,10 +117,10 @@
         // with a ship on it, on a beam from the lens; thin glowing tubes (metres, so it is the same size on Very Low)
         const H = [], hy = 0.3, hr = 0.16, TAU = Math.PI * 2, rad = (p) => { const l = Math.hypot(p[0], p[1] - hy, p[2]) || 1; return [p[0] / l, (p[1] - hy) / l, p[2] / l]; };
         const loop = (n, fn, w, col) => { const p = []; for (let a = 0; a < n; a++) p.push(fn(a / n * TAU)); H.push({ p, n: p.map(rad), w, h: w, col, em: 1, loop: true }); };
-        for (const la of [-0.9, 0, 0.9]) loop(12, (t) => [Math.cos(t) * hr * Math.cos(la), hy + hr * Math.sin(la), Math.sin(t) * hr * Math.cos(la)], 0.012, glow);
-        for (const lo of [0, Math.PI / 3, Math.PI * 2 / 3]) loop(14, (t) => [Math.cos(t) * hr * Math.cos(lo), hy + hr * Math.sin(t), Math.cos(t) * hr * Math.sin(lo)], 0.01, glow);
+        for (const la of [-0.9, 0, 0.9]) loop(10, (t) => [Math.cos(t) * hr * Math.cos(la), hy + hr * Math.sin(la), Math.sin(t) * hr * Math.cos(la)], 0.012, glow);
+        for (const lo of [0, Math.PI / 3, Math.PI * 2 / 3]) loop(12, (t) => [Math.cos(t) * hr * Math.cos(lo), hy + hr * Math.sin(t), Math.cos(t) * hr * Math.sin(lo)], 0.01, glow);
         const tilt = 0.38, orb = (t) => [Math.cos(t) * 0.29, hy + Math.sin(t) * 0.29 * Math.sin(tilt), Math.sin(t) * 0.29 * Math.cos(tilt)];
-        loop(20, orb, 0.008, 0xffd88a);
+        loop(16, orb, 0.008, 0xffd88a);
         H.push({ p: [orb(0), orb(0.22)], n: [rad(orb(0)), rad(orb(0.22))], w: 0.03, h: 0.022, col: K.amber, em: 1 });
         H.push({ p: [[0, 0.01, 0], [0, hy - hr - 0.01, 0]], n: [[1, 0, 0], [1, 0, 0]], w: 0.014, h: 0.014, col: glow, em: 1 });
         parts.holo = { tubes: H, at: [cx, ht + 0.05, cz] };

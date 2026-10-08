@@ -83,6 +83,8 @@ check(rs.ramp === 1 && Math.abs(rs.kneel - 0.5) < 1e-6, 'the ramp is down, the s
 // a look at it from behind, a little to the side
 await ev((C) => { const g = VR.game, s = window.__S, cb = g.starships.cabin, p = g.player; const e = cb.toWorld(s, [3.2, 0, C.zT + 8.5]); p.teleport(e[0], g.world.topAt(Math.floor(e[0]), Math.floor(e[2])) + 1, e[2]); p.yaw = s.yaw + 0.33; p.pitch = -0.1; }, C);
 await step(20);
+// the furnished cabin is built by a worker: wait until its kit is ready (it is drawn only then)
+for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.cockpit.cabinReady(window.__S))) break; await step(10); await wait(60); }
 const r0 = await shot('cab_ramp');
 check(r0.cab > 0, 'with the ramp down the furnished cabin shows through it (' + r0.cab + ' triangles)');
 // walk up to the ramp's foot and aboard
