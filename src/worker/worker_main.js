@@ -170,7 +170,8 @@
         const o = toTris(r.opaque), c = toTris(r.cutout), t = toTris(r.trans);
         const vx = r.vx ? toTris(r.vx) : null, vxFar = r.vxFar ? toTris(r.vxFar) : null;
         const tr = [o.buffer, c.buffer, t.buffer]; if (vx) tr.push(vx.buffer); if (vxFar) tr.push(vxFar.buffer);
-        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, opaque: o, cutout: c, trans: t, vx, vxFar, vis: r.vis, ms: performance.now() - t0 }, tr);
+        const pr = r.props || null; if (pr) tr.push(pr.buffer);   // smooth props: six ints an instance (mesher.js)
+        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, ms: performance.now() - t0 }, tr);
       } else if (m.type === 'lightonly') {
         const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
         const light = VR.computeColumnLight(m.blocks, sky);
