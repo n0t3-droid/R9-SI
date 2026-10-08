@@ -7,6 +7,9 @@
   'use strict';
   const GL = VR.GL, S = VR.SHADERS, mat4 = VR.mat4;
   const VSTRIDE = 16;
+  // F1: the sky table's texture unit — its own (unit 7 is the Klassisch look's u_avgLum in the terrain and model
+  // programs, 8 the water's reflection in v0.42; a shared unit made the Very Low haze sample the wrong texture)
+  const ATMO_UNIT = 11;
 
   // ----------------------------------------------------------------- arena allocator
   class Arena {
@@ -569,15 +572,17 @@
     // table, rebuilt when the sun has moved about half a degree, or the turbidity or the tint has changed
     updateAtmo(E) {
       const A = VR.Atmos, gl = this.gl, sun = E.sunDir;
-      const T = E.skyT === undefined ? 2.5 : E.skyT, tint = E.skyTint || [1, 1, 1];
-      const st = A.prepare(sun, { T, tint });
-      this.atmoP = A.glParams(st);
+      const T = E.skyT === undefined ? 2.5 : E.skyT, tint = E.skyTint || [1, 1, 1], oc = E.skyOvercast || 0;
+      const o = this.atmoOpt || (this.atmoOpt = {});
+      o.T = T; o.tint = tint; o.overcast = oc;
+      const st = this.atmoS = A.prepare(sun, o, this.atmoS);
+      this.atmoP = A.glParams(st, this.atmoP);
       if (!this.q.atmoLUT || !this.atmoTex) return;
       const k = this.atmoKey;
-      if (k && 1 - (k[0] * sun[0] + k[1] * sun[1] + k[2] * sun[2]) < 3.8e-5 && Math.abs(k[3] - T) < 0.02 && Math.abs(k[4] - tint[0]) + Math.abs(k[5] - tint[1]) + Math.abs(k[6] - tint[2]) < 0.002) return;
-      gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, A.LUT_W, A.LUT_H, gl.RGBA, gl.FLOAT, A.buildLUT(st));
-      this.atmoKey = [sun[0], sun[1], sun[2], T, tint[0], tint[1], tint[2]];
+      if (k && 1 - (k[0] * sun[0] + k[1] * sun[1] + k[2] * sun[2]) < 3.8e-5 && Math.abs(k[3] - T) < 0.02 && Math.abs(k[4] - tint[0]) + Math.abs(k[5] - tint[1]) + Math.abs(k[6] - tint[2]) < 0.002 && Math.abs(k[7] - oc) < 0.02) return;
+      gl.activeTexture(gl.TEXTURE0 + ATMO_UNIT); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, A.LUT_W, A.LUT_H, gl.RGBA, gl.FLOAT, A.buildLUT(st, this.atmoBuf || (this.atmoBuf = new Float32Array(A.LUT_W * A.LUT_H * 4))));
+      this.atmoKey = [sun[0], sun[1], sun[2], T, tint[0], tint[1], tint[2], oc];
     }
     // the exposure (F1): this frame's log-average luminance of the scene, eased toward the middle grey (EXPOSE_FS, 1×1)
     updateExposure(E) {
@@ -587,8 +592,9 @@
       this.tex(0, this.sceneCol, p.u.u_scene); this.tex(1, this.expTex[this.expCur], p.u.u_prev);
       gl.uniform1f(p.u.u_dt, Math.min(0.25, E.dt || 0.016));
       const EX = VR.Atmos.EXPOSURE;
-      gl.uniform3f(p.u.u_expParams, EX.lo, EX.hi, EX.power);   // ±0.5 stops around 1, partial adaptation (atmos.js)
-      if (p.u.u_expKey) gl.uniform1f(p.u.u_expKey, EX.key);
+      gl.uniform4f(p.u.u_expParams, EX.lo, EX.hi, EX.power, EX.dead);   // ±0.5 stops around 1, a dead zone of ±1 stop (atmos.js)
+      gl.uniform4f(p.u.u_expKey, EX.key, E.exposure || 1, E.night || 0, EX.nightKey);
+      gl.uniform2f(p.u.u_expTau, EX.tauUp, EX.tauDown);
       this.fs(p);
       this.expCur = dst;
     }
@@ -624,7 +630,8 @@
         if (u.u_skyK2) gl.uniform2f(u.u_skyK2, this.atmoP.k2[0], this.atmoP.k2[1]);
         if (u.u_skyTint) gl.uniform3f(u.u_skyTint, this.atmoP.tint[0], this.atmoP.tint[1], this.atmoP.tint[2]);
       }
-      if (u.u_atmoLUT && this.atmoTex) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex); gl.uniform1i(u.u_atmoLUT, 7); }
+      if (u.u_atmoLUT && this.atmoTex) { gl.activeTexture(gl.TEXTURE0 + ATMO_UNIT); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex); gl.uniform1i(u.u_atmoLUT, ATMO_UNIT); }
+      if (u.u_skyWx) { const wx = E.skyWx || [0, 1]; gl.uniform2f(u.u_skyWx, wx[0], wx[1]); }
       if (u.u_moonPh) gl.uniform1f(u.u_moonPh, E.moonPh || 0);
       if (u.u_moonIllum) gl.uniform1f(u.u_moonIllum, E.moonIllum === undefined ? 1 : E.moonIllum);
       if (u.u_cloudSh) gl.uniform1f(u.u_cloudSh, this.q.cloudSh ? (E.cloudSh || 0) : 0);
@@ -1017,7 +1024,7 @@
       // sky (F1): drawn after the land, at the far plane, so only the pixels nothing covers take the sky (early depth test)
       this.mark('sky');
       {
-        gl.disable(gl.CULL_FACE); gl.depthMask(false);
+        gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.disable(gl.CULL_FACE); gl.depthMask(false);
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
         if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);

@@ -28,12 +28,14 @@ uniform vec3 u_planetDir;
 uniform vec3 u_planet2Dir;
 uniform vec3 u_ringNormal;
 uniform float u_skyMagic;    // how strongly the cosmic sky shows by day
-// the daylight sky (F1 · atmos.js): the Perez luminance and the xy fits (their five coefficients each), the scale and
-// normalisers kY, kx, ky with dayK, the twilight and night weights, the biome tint; the moon's phase and light
+// the daylight sky (F1 · atmos.js): the Perez luminance (five coefficients), the chroma x and y (horizon value, the
+// zenith's difference, the sun-side C and D), the scale and normalisers kY, 1/sx0, 1/sy0 with dayK, the twilight and
+// night weights, the biome tint, the weather on the sky (grey, dim); the moon's phase and light
 uniform float u_skyPer[15];
 uniform vec4 u_skyK;
 uniform vec2 u_skyK2;
 uniform vec3 u_skyTint;
+uniform vec2 u_skyWx;         // atmos.js skyWeather: how much the rain greys the sky, how much the overcast dims it
 uniform sampler2D u_atmoLUT;  // Very Low: the same radiance baked into a 64×32 table (ATMO_LUT)
 uniform float u_moonPh;       // the terminator: cos(2π·phase), 1 at new moon, −1 at full
 uniform float u_moonIllum;    // how much moonlight the phase gives (0..1)
@@ -212,19 +214,21 @@ vec3 meteors(vec3 dir) {
 }
 
 float pzY(float ct, float g, float cg) { return (1.0 + u_skyPer[0] * exp(u_skyPer[1] / ct)) * (1.0 + u_skyPer[2] * exp(u_skyPer[3] * g) + u_skyPer[4] * cg * cg); }
-float pzX(float ct, float g, float cg) { return (1.0 + u_skyPer[5] * exp(u_skyPer[6] / ct)) * (1.0 + u_skyPer[7] * exp(u_skyPer[8] * g) + u_skyPer[9] * cg * cg); }
-float pzC(float ct, float g, float cg) { return (1.0 + u_skyPer[10] * exp(u_skyPer[11] / ct)) * (1.0 + u_skyPer[12] * exp(u_skyPer[13] * g) + u_skyPer[14] * cg * cg); }
+float pzX(float w, float g) { return (u_skyPer[5] + u_skyPer[6] * w) * (1.0 + u_skyPer[7] * exp(u_skyPer[8] * g)); }
+float pzC(float w, float g) { return (u_skyPer[10] + u_skyPer[11] * w) * (1.0 + u_skyPer[12] * exp(u_skyPer[13] * g)); }
 // the sky's radiance from the view's zenith cosine ct and the cosine cg of the angle to the sun: the Perez daylight with
-// the xy fit (kY·F_Y, kx·F_x, ky·F_y → XYZ → linear sRGB), the twilight colour order (orange low on the sun side, rose
-// and magenta above, violet higher), the dark blue night base. The same sum as src/main/atmos.js radiance().
+// our chroma fit (kY·F_Y; x and y from the horizon's pale blue to the zenith's deep blue along ct^0.42, times the
+// sun-side term → XYZ → linear sRGB), the twilight colour order (orange low on the sun side, rose and magenta above, a
+// violet-blue zenith), the dark blue night base. The same sum as src/main/atmos.js radiance().
 vec3 atmoFormula(float ct, float cg) {
   float c = max(ct, 0.01);
   float g = acos(clamp(cg, -1.0, 1.0));
   vec3 col = vec3(0.0);
   if (u_skyK.w > 0.0) {
+    float w = pow(c, 0.42);
     float Y = u_skyK.x * pzY(c, g, cg);
-    float x = u_skyK.y * pzX(c, g, cg);
-    float y = max(0.01, u_skyK.z * pzC(c, g, cg));
+    float x = u_skyK.y * pzX(w, g);
+    float y = max(0.01, u_skyK.z * pzC(w, g));
     float X = x / y * Y, Z = (1.0 - x - y) / y * Y;
     col = vec3(3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z) * u_skyK.w * u_skyTint;
   }
@@ -233,7 +237,7 @@ vec3 atmoFormula(float ct, float cg) {
     float side = smoothstep(-0.2, 0.95, cg);
     vec3 low = mix(vec3(0.80, 0.30, 0.52), vec3(1.00, 0.42, 0.14), side);
     vec3 high = mix(vec3(0.30, 0.22, 0.52), vec3(0.62, 0.30, 0.50), side);
-    col += (low * band + high * upper * 0.55) * (0.9 * u_skyK2.x);
+    col += (low * band + high * upper * 0.55) * (0.9 * u_skyK2.x) + vec3(0.060, 0.050, 0.200) * ((1.0 - upper) * u_skyK2.x);
   }
   if (u_skyK2.y > 0.0) col += mix(vec3(0.030, 0.040, 0.085), vec3(0.010, 0.016, 0.042), sqrt(max(ct, 0.0))) * u_skyK2.y;
   return max(col, vec3(0.0));
@@ -251,10 +255,19 @@ vec3 atmoRad(float ct, float cg) {
   return atmoFormula(ct, cg);
 #endif
 }
-// the air toward a direction: the radiance with the rain's grey, and the ground's dimmer below the horizon
-vec3 atmoAir(vec3 dir) {
-  vec3 col = atmoRad(max(dir.y, -1.0), dot(dir, u_sunDir));
-  if (u_rain > 0.0) col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), u_rain * 0.45);
+// the warm light around the sun (forward scattering on the haze) and the warm band along the horizon, in the sun's
+// colour and the low sun's (sunset) colour: the eternal dusk's glow, v0.41's terms (atmos.js glow)
+vec3 atmoGlow(float ct, float cg) {
+  float toSun = max(cg, 0.0), h = max(ct, 0.0);
+  return u_sunset * ((pow(toSun, 7.0) * 1.3 + pow(1.0 - h, 5.0) * 0.45) * (0.3 + 0.7 * toSun)) + u_sunColor * (pow(toSun, 60.0) * 0.45 * (1.0 - u_rain));
+}
+// the air toward a direction (atmos.js air): the radiance (formula or table) with the glow (glowK: 1 for the sky, 0.45
+// for the haze over the land), then the weather — rain greys it, overcast and storms dim it; below the horizon the
+// ground's dimmer horizon colour
+vec3 atmoAir(vec3 dir, float glowK) {
+  float cg = dot(dir, u_sunDir);
+  vec3 col = atmoRad(max(dir.y, -1.0), cg) + atmoGlow(dir.y, cg) * glowK;
+  col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), u_skyWx.x) * u_skyWx.y;
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   return col;
 }
@@ -265,7 +278,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
     c += nebula(dir) * 0.8;
     return c;
   }
-  vec3 col = atmoAir(dir);
+  vec3 col = atmoAir(dir, 1.0);
   float toSun = max(dot(dir, u_sunDir), 0.0);
   if (withSun) {
     float clear = 1.0 - u_rain;
@@ -404,12 +417,15 @@ vec3 applyFog(vec3 col, vec3 rel, float dist) {
   if (u_fog.w > 0.5) { f = 1.0 - exp(-dist * 0.07); return mix(col, u_fogColor, clamp(f, 0.0, 1.0)); }
   f = clamp(f, 0.0, 1.0);
   if (u_dim == 1 || u_dim == 2) return mix(col, u_fogColor, f);
-  // aerial perspective (F1): the air keeps less of the far things' red and blue differently (blue scatters out first),
-  // and adds the sky seen along the view — distant land turns toward the sky's colour instead of a flat grey
-  vec3 sky = atmoAir(vec3(dir.x, max(dir.y, 0.0), dir.z));
-  // the haze keeps 60 % of the sky's chroma at the sky's own luminance: the full blue made the far grass grey-blue
-  // (saturation −17 % against v0.41 in the clear noon), while the luminance and the density stay as they are
-  sky = mix(vec3(dot(sky, vec3(0.2126, 0.7152, 0.0722))), sky, 0.6);
+  if (f < 0.004) return col;   // the near land: no visible haze, no haze work (a coherent branch: whole tiles take it)
+  // aerial perspective (F1, atmos.js haze): the far land keeps less of its blue than of its red (blue scatters out
+  // first) and takes on the air seen along the view — the sky's own colour with a calmer glow (looking sunward does not
+  // wash the land out), 35 % of the fog colour's hue at the air's luminance (biome fog, the rain's grey), a little
+  // darker than the sky at the horizon so a far ridge stays a readable silhouette; looking down, darker still (v0.41)
+  vec3 sky = atmoAir(vec3(dir.x, max(dir.y, 0.0), dir.z), 0.45) * 0.93;
+  float sl = dot(sky, vec3(0.2126, 0.7152, 0.0722)), fl = max(dot(u_fogColor, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
+  sky = mix(sky, u_fogColor * (sl / fl), 0.35);
+  if (dir.y < 0.0) sky *= 1.0 - 0.4 * clamp(-dir.y * 2.0, 0.0, 1.0);
   vec3 tr = pow(vec3(1.0 - f), vec3(0.9, 1.0, 1.22));
   return col * tr + sky * (1.0 - tr);
 }
@@ -1025,12 +1041,13 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); v_uv = p; 
   S.SKY_FS = `
 uniform mat4 u_invViewProj;
 uniform float u_skyProbe;    // test hook (test/horizon.mjs): 1 paints the sky magenta, so a hole below the horizon shows
+uniform vec3 u_skyOff;     // the mirror camera's offset in the planar reflection (renderer.js), zero otherwise
 ${'__COMMON__'}
 in vec2 v_uv;
 out vec4 o;
 void main() {
   vec4 p = u_invViewProj * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
-  vec3 dir = normalize(p.xyz / p.w);
+  vec3 dir = normalize(p.xyz / p.w - u_skyOff);
   vec3 col = skyColor(dir, true);
   if (u_fog.w > 0.5) col = u_fogColor;
   if (u_skyProbe > 0.5) col = vec3(1.0, 0.0, 1.0);
@@ -1485,28 +1502,37 @@ void main() {
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
   o = vec4(c, 1.0);
 }`;
-  // the adaptive exposure (F1): a log average of the scene's luminance from 16 samples, the target (key 0.44, the clear
-  // noon's log average, partial: power 0.3) kept within ±0.5 stops of 1 (0.707…1.414), so a bright day is never
-  // bleached and a dark cave gets a little light; eased slowly — up in 2 s, down in 3 s (the eyes take their time)
+  // the adaptive exposure (F1, atmos.js exposureTarget): the scene's log-average luminance from 8×8 samples (the
+  // centre weighted: what the eye looks at) times env.js's exposure (so the two adaptations do not stack); inside a dead
+  // zone of ±1 stop around the key nothing changes (an overcast day stays darker than a clear one, a snowfield
+  // brighter), beyond it the exposure follows half the difference, within ±0.5 stops of 1; a lower key at night (the
+  // night stays dark). Eased slowly (2 s up, 3 s down). The 1×1 target holds (exposure, log-average, target): the
+  // composite reads .r, the tests read all three.
   S.EXPOSE_FS = `
 uniform sampler2D u_scene;
 uniform sampler2D u_prev;
 uniform float u_dt;
-uniform vec3 u_expParams;   // lo, hi, power
-uniform float u_expKey;     // the log-average luminance that wants exposure 1 (atmos.js EXPOSURE.key)
+uniform vec4 u_expParams;   // lo, hi, power, dead zone (stops)
+uniform vec4 u_expKey;      // key, env.js's exposure, night (0..1), the key's share at night
+uniform vec2 u_expTau;      // seconds to ease up, down
 in vec2 v_uv;
 out vec4 o;
 void main() {
-  float s = 0.0;
-  for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) {
-    vec3 c = texture(u_scene, (vec2(float(i), float(j)) + 0.5) / 4.0).rgb;
-    s += log(dot(c, vec3(0.2126, 0.7152, 0.0722)) + 0.02);
+  float s = 0.0, ws = 0.0;
+  for (int j = 0; j < 8; j++) for (int i = 0; i < 8; i++) {
+    vec2 uv = (vec2(float(i), float(j)) + 0.5) / 8.0, d = uv - 0.5;
+    float w = 1.0 - dot(d, d) * 1.6;
+    s += log(dot(texture(u_scene, uv).rgb, vec3(0.2126, 0.7152, 0.0722)) * u_expKey.y + 0.002) * w; ws += w;
   }
-  float target = clamp(pow(u_expKey / exp(s / 16.0), u_expParams.z), u_expParams.x, u_expParams.y);
+  float lum = exp(s / ws);
+  float key = u_expKey.x * mix(1.0, u_expKey.w, u_expKey.z);
+  float lo = key * exp2(-u_expParams.w), hi = key * exp2(u_expParams.w);
+  float t = lum < lo ? pow(lo / lum, u_expParams.z) : lum > hi ? pow(hi / lum, u_expParams.z) : 1.0;
+  float target = clamp(t, u_expParams.x, u_expParams.y);
   float prev = texture(u_prev, vec2(0.5)).r;
-  float tau = target > prev ? 2.0 : 3.0;
+  float tau = target > prev ? u_expTau.x : u_expTau.y;
   float cur = prev + (target - prev) * (1.0 - exp(-u_dt / tau));
-  o = vec4(cur, cur, cur, 1.0);
+  o = vec4(cur, lum, target, 1.0);
 }`;
   // R9 Super Resolution: temporal upscaling. The scene is rendered at a lower resolution with a
   // different sub-pixel offset every frame; this pass reprojects last frame's full-resolution result
