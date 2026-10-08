@@ -230,6 +230,34 @@ check(WB.writes.every(c => c.length <= 8000), 'no write over 8 000 cells (larges
   check(!!sh && sh.scaffold && !!sh.inst && sh.inst.bays.length > 0, 'the tower gets a scaffold (' + (sh && sh.inst ? sh.inst.bays.length / 4 + ' bays, ' + sh.K + ' levels' : 'none') + ')');
   check(!!(sh && sh.crane) && sh.crane.Lj >= 10 && sh.crane.top0 > sh.top && sh.crane.mastTop < sh.crane.top0, 'and a crane that climbs with it, taller than it at the end (' + (sh && sh.crane ? 'mast top now ' + sh.crane.mastTop + ', at the end ' + sh.crane.top0 + ', jib ' + sh.crane.Lj : 'none') + ')');
   check(!folk || (sh && sh.crew.length === 3), 'a crew of three builders on Balanced (' + (sh ? sh.crew.length : 0) + ')');
+  // the builders never hover: every frame of every builder is on the ground (walking in, walking off), on the ladder
+  // (climbing up or down the scaffold's outer side), or on the deck inside the scaffold (not out over the lawn)
+  if (folk) {
+    const W2 = makeWorld(), G2 = makeGame(W2, 'site', planOf());
+    let frames = 0, hover = 0, climb = 0, worst = null, ladder = null, started = false;
+    runUntil(G2, 1 / 30, () => {
+      const site2 = (G2.B.sites || [])[0], s2 = site2 && site2.show;
+      if (s2) started = true;
+      if (!s2) return started;                  // the site is gone: the run ends
+      ladder = ladder || s2.ladder || null;
+      for (const b of s2.crew) {
+        if (b.mode === 'gone' || b.delay > 0) continue;
+        const x = b.pos[0], y = b.pos[1], z = b.pos[2], gy = W2.topAt(Math.floor(x), Math.floor(z)) + 1;
+        const onGround = Math.abs(y - gy) < 0.3, L = s2.ladder;
+        const onLadder = !!L && Math.hypot(x - L.x, z - L.z) < 0.8;
+        const r = s2.ring, inBox = x > s2.ox + r[0] - 2.5 && x < s2.ox + r[1] + 2.5 && z > s2.oz + r[2] - 2.5 && z < s2.oz + r[3] + 2.5;
+        const onDeck = inBox && Math.abs(y - (s2.oy + s2.deck + 0.11)) < 0.3;
+        frames++;
+        if (!(onGround || onLadder || onDeck)) { hover++; if (!worst) worst = [b.mode, +x.toFixed(1), +y.toFixed(2), +z.toFixed(1), +gy.toFixed(1)]; }
+        if (onLadder && y > gy + 0.5 && y < s2.oy + s2.deck - 0.5) climb++;
+      }
+      return false;
+    }, 60);
+    check(!!ladder, 'the scaffold has a ladder on the side toward the gate (' + (ladder ? JSON.stringify(ladder) : 'none') + ')');
+    check(frames > 200, 'the builders are on the site (' + frames + ' frames of builders)');
+    check(hover === 0, 'the builders never hover: ' + hover + ' of ' + frames + ' frames off the ground, the ladder and the deck' + (worst ? ' (first: ' + JSON.stringify(worst) + ')' : ''));
+    check(climb > 0, 'they climb the ladder up to the deck (' + climb + ' frames on the way up)');
+  }
   let deckOk = 0, deckN = 0, onDeck = 0, onN = 0, worked = 0, hauled = 0;
   const seen = new Set();
   runUntil(G, 1 / 30, () => {
