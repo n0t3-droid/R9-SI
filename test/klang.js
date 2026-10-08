@@ -21,7 +21,7 @@ function makeCtx() {
     return p;
   };
   const node = (kind, extra) => {
-    const n = Object.assign({ kind, outs: [], startAt: -1, stopAt: -1, connect(d) { this.outs.push(d); return d; }, disconnect() {}, start(t) { this.startAt = t === undefined ? ctx.currentTime : t; }, stop(t) { this.stopAt = t === undefined ? ctx.currentTime : t; } }, extra);
+    const n = Object.assign({ kind, outs: [], startAt: -1, stopAt: -1, connect(d) { this.outs.push(d); return d; }, disconnect(d) { this.outs = d ? this.outs.filter(x => x !== d) : []; }, start(t) { this.startAt = t === undefined ? ctx.currentTime : t; }, stop(t) { this.stopAt = t === undefined ? ctx.currentTime : t; } }, extra);
     ctx.nodes.push(n); return n;
   };
   ctx.destination = node('destination', {});
@@ -31,7 +31,8 @@ function makeCtx() {
   ctx.createBiquadFilter = () => node('filter', { type: 'lowpass', frequency: param(350), Q: param(1), gain: param(0) });
   ctx.createStereoPanner = () => node('panner', { pan: param(0) });
   ctx.createOscillator = () => node('osc', { type: 'sine', frequency: param(440), detune: param(0) });
-  ctx.createConvolver = () => node('convolver', { buffer: null });
+  // a ConvolverNode takes its buffer once: a second non-null buffer throws, as in the browser
+  ctx.createConvolver = () => { const n = node('convolver', {}); let buf = null; Object.defineProperty(n, 'buffer', { get() { return buf; }, set(v) { if (v && buf) throw new Error('InvalidStateError: a ConvolverNode takes its buffer once'); buf = v; }, enumerable: true }); return n; };
   ctx.createDynamicsCompressor = () => node('comp', { threshold: param(-24), ratio: param(12), knee: param(30), attack: param(0.003), release: param(0.25) });
   return ctx;
 }
@@ -176,9 +177,12 @@ console.log('space');
   a.listen([0.5, 66, 0.5], 0, world(2), false);
   check(a.room.gain.value > 0.3 && a.room.gain.value <= 1, 'indoors the room send is on (' + a.room.gain.value.toFixed(2) + ')');
   check(a.state().indoors === true && a.state().cave === false, 'indoors, not a cave');
+  const rOld = a.rev;
   a.listen([0.5, 30, 0.5], 0, world(1), false);
+  check(a.room.gain.value === 0, 'entering a cave mutes the room send while the impulse is swapped');
   ctx.currentTime += 0.2; a.listen([0.5, 30, 0.5], 0, world(1), false);
   check(a.state().cave === true && a.rev.buffer === a.irCave && a.irCave.length > a.irRoom.length, 'in a cave the convolver takes the longer impulse (' + a.irCave.length + ' against ' + a.irRoom.length + ' samples)');
+  check(a.rev !== rOld && rOld.buffer === a.irRoom && a.room.outs.length === 1 && a.room.outs[0] === a.rev && a.musRev.outs.length === 1 && a.musRev.outs[0] === a.rev, 'the cave impulse is a new convolver: the room and music sends feed only it, the old one keeps the room impulse');
   check(a.room.gain.value > 0.3, 'and the room send is back up after the swap');
   // underwater: the world's sound is lowpassed
   a.listen([0.5, 66, 0.5], 0, world(15), true);
@@ -264,5 +268,5 @@ console.log('budget');
   console.log('    (events: ' + Object.keys(total).map(k => k + ' ' + total[k]).join(', ') + ')');
 }
 
-console.log(fails ? fails + ' FAILED' : 'ALL OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

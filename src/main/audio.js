@@ -63,14 +63,12 @@
       this.amb = c.createGain(); this.amb.gain.value = this.vol.ambient; this.amb.connect(this.master);
       this.mus = c.createGain(); this.mus.gain.value = this.vol.music; this.mus.connect(this.master);
       this.musDuck = c.createGain(); this.musDuck.gain.value = 1; this.musDuck.connect(this.mus);   // a hostile mob ducks it
-      // one convolver: the room's impulse, or the cave's while the send is muted (swapped in listen)
-      this.rev = c.createConvolver();
+      // one convolver at a time: the room's impulse, or the cave's while the send is muted (swapped in listen)
       this.irRoom = impulse(c, 1.3, 0.9, false, 0.004, 0x51ed1);
       this.irCave = impulse(c, 2.6, 2.4, true, 0.03, 0xca7e);
-      this.rev.buffer = this.irRoom;
-      this.room.connect(this.rev);
-      this.revGain = c.createGain(); this.revGain.gain.value = 0.35; this.rev.connect(this.revGain); this.revGain.connect(this.master);
-      this.musRev = c.createGain(); this.musRev.gain.value = 0.6; this.mus.connect(this.musRev); this.musRev.connect(this.rev);
+      this.revGain = c.createGain(); this.revGain.gain.value = 0.35; this.revGain.connect(this.master);
+      this.musRev = c.createGain(); this.musRev.gain.value = 0.6; this.mus.connect(this.musRev);
+      this.rev = null; this.setRev(this.irRoom);
       // noise buffer (the source of every hit, step and crackle)
       const nb = c.createBuffer(1, c.sampleRate * 2, c.sampleRate), nd = nb.getChannelData(0);
       for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
@@ -82,8 +80,18 @@
     count(name) { this.counts[name] = (this.counts[name] | 0) + 1; }
     prune() { const live = this.live, now = this.ctx ? this.ctx.currentTime : 0; let k = 0; for (let i = 0; i < live.length; i++) if (live[i] > now) live[k++] = live[i]; live.length = k; return k; }
     stats() { return { voices: this.prune(), counts: this.counts, notes: this.noteCount }; }
-    // the state the tests and the overlay read: the room, the lowpass under water, the music duck
-    state() { return { indoors: this.L.sky < 4 || this.L.underwater, cave: !!this.cave, underwater: this.L.underwater, muffle: this.sfxMuffle ? this.sfxMuffle.frequency.value : 0, room: this.room ? this.room.gain.value : 0, duck: this.musDuck ? this.musDuck.gain.value : 1 }; }
+    // the state the tests and the overlay read: the targets the ear has set (the audio params follow them over a few
+    // tenths of a second of audio time, so these read at once, also before the audio clock has moved)
+    state() { return { indoors: this.L.sky < 4 || this.L.underwater, cave: !!this.cave, underwater: this.L.underwater, muffle: this.muT < 0 ? 20000 : this.muT, room: this.roomT < 0 ? 0 : this.roomT, duck: this.music.duckT }; }
+
+    // the room's convolver. A ConvolverNode takes its buffer once, so the cave's impulse is played by a new node; the old
+    // one is cut off (listen mutes the room send for 90 ms before the swap, so its tail has gone by then)
+    setRev(buf) {
+      const c = this.ctx;
+      if (this.rev) { this.room.disconnect(); this.musRev.disconnect(); this.rev.disconnect(); }
+      this.rev = c.createConvolver(); this.rev.buffer = buf;
+      this.room.connect(this.rev); this.musRev.connect(this.rev); this.rev.connect(this.revGain);
+    }
 
     // ---------------- the listener: where the ear is, which way it faces, and the place's flags (per frame, numbers only)
     listen(eye, yaw, w, underwater) {
@@ -94,7 +102,7 @@
       const indoors = L.sky < 4 || L.underwater, cave = indoors && eye[1] < 60;
       // the room: when the cave changes, the send is muted, the impulse is swapped 90 ms later, then the send returns
       if (cave !== this.cave) { this.cave = cave; this.room.gain.setTargetAtTime(0, t, 0.02); this.irAt = t + 0.09; this.roomT = -1; }
-      if (this.irAt && t >= this.irAt) { this.rev.buffer = this.cave ? this.irCave : this.irRoom; this.irAt = 0; }
+      if (this.irAt && t >= this.irAt) { this.setRev(this.cave ? this.irCave : this.irRoom); this.irAt = 0; }
       if (!this.irAt) {                                   // automation is sent only when a target changes (Very Low: no per-frame cost)
         const want = this.cave ? CAVE_SEND : indoors ? ROOM_SEND : 0;
         if (want !== this.roomT) { this.roomT = want; this.room.gain.setTargetAtTime(want, t, 0.25); }
