@@ -119,7 +119,7 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
     alb = mix(alb, vec3(0.25, 0.85, 0.9), storm * 0.8);
     float diff = max(dot(N, L), 0.0);
     float rim = pow(1.0 - zz, 3.0);
-    vec3 col = alb * (diff * 1.25 + 0.035) + vec3(0.4, 0.6, 1.0) * rim * 0.35 * (0.3 + diff);
+    vec3 col = alb * (diff * 1.25 + 0.3) + vec3(0.4, 0.6, 1.0) * rim * 0.35 * (0.3 + diff);   // 0.3: the shade side keeps its bands
     float edge = smoothstep(1.0, 0.985, sqrt(r2));
     res = vec4(col, edge);
   }
@@ -209,7 +209,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
   vec3 col = mix(u_skyHorizon, u_skyZenith, pow(h, 0.42));
   float dayK = 1.0 - u_night;
   col = mix(col, u_skyHorizon * vec3(1.16, 1.1, 1.02) + vec3(0.035, 0.04, 0.03) * dayK, pow(1.0 - h, 16.0) * 0.6 * dayK);
-  col += vec3(0.0, 0.012, 0.03) * pow(1.0 - abs(dir.y - 0.35), 6.0) * dayK;
+  col += vec3(0.0, 0.012, 0.03) * pow(max(1.0 - abs(dir.y - 0.35), 0.0), 6.0) * dayK;   // (max: pow of a negative base is NaN below the horizon)
   float toSun = max(dot(dir, u_sunDir), 0.0);
   float horizonBand = pow(1.0 - h, 5.0);
   col += u_sunset * (pow(toSun, 7.0) * 1.3 + horizonBand * 0.45) * (0.3 + 0.7 * toSun);
@@ -224,18 +224,18 @@ vec3 skyColor(vec3 dir, bool withSun) {
     // golden hour: the nebula fades in early, high in the sky, while the sun still lights the land
     float golden = (1.0 - smoothstep(0.02, 0.4, u_sunDir.y)) * step(-0.05, u_sunDir.y);
     // TRAILER.md §2.1: the nebula veil stays at ~45 % by day (stronger high up and through the long golden hours)
-    float cosmic = clamp(u_night + magicDay * (0.3 + 0.25 * smoothstep(0.2, 0.9, dir.y) + golden * 0.5 * smoothstep(0.05, 0.5, dir.y)), 0.0, 1.0) * clear * horizonFade;
+    float cosmic = clamp(u_night + magicDay * (0.4 + 0.25 * smoothstep(0.2, 0.9, dir.y) + golden * 0.5 * smoothstep(0.05, 0.5, dir.y)), 0.0, 1.0) * clear * horizonFade;
     float planetsK = clamp(u_night + magicDay * 0.7, 0.0, 1.0) * clear * horizonFade;
     if (planetsK > 0.01) {
       // the blue deepens to violet where the nebula shows, so its colours read by day as in the trailer
       col = mix(col, col * vec3(0.6, 0.48, 0.9) + vec3(0.02, 0.0, 0.05), cosmic * (1.0 - u_night) * 0.7);
-      col += nebula(dir) * cosmic * 0.9;
+      col += nebula(dir) * cosmic * mix(1.3, 0.9, u_night);   // by day the veil reads as the trailer's magenta and cyan
       vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
-      col = mix(col, gg.rgb * (0.35 + 0.65 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.6, 1.0, u_night) * clear);
+      col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)
       vec4 rp = rockyPlanet(dir, u_planet2Dir, u_blue.w, u_sunDir);
       col += rp.rgb * (1.0 - rp.a) * planetsK * 0.6;
-      col = mix(col, rp.rgb * (0.45 + 0.55 * u_night) + col * 0.2, rp.a * mix(0.6, 1.0, u_night) * clear);
+      col = mix(col, rp.rgb * (0.7 + 0.3 * u_night) + col * 0.2, rp.a * mix(0.85, 1.0, u_night) * clear);
       // the giant's moons ride along with it; a fourth drifts near the blue planet (skybodies.js: places and radii)
       vec4 mn = moonlet(dir, u_moon0.xyz, u_moon0.w, u_sunDir, 0.0);
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
@@ -265,9 +265,9 @@ vec3 skyColor(vec3 dir, bool withSun) {
       vec2 q = dir.xz / (dir.y + 0.1);
       float a = vnoise(vec2(q.x * 0.55 + q.y * 0.3, q.y * 4.2 + 3.0) + vec2(u_time * 0.0025, 0.0));
       float b = vnoise(vec2(q.x * 0.4 - 7.0, q.y * 9.0 - 1.0));
-      float st = smoothstep(0.56, 0.86, a * 0.66 + b * 0.5) * smoothstep(0.12, 0.34, dir.y) * (1.0 - smoothstep(0.62, 0.92, dir.y));
+      float st = smoothstep(0.6, 0.92, a * 0.66 + b * 0.5) * smoothstep(0.12, 0.34, dir.y) * (1.0 - smoothstep(0.62, 0.92, dir.y));
       vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
-      col = mix(col, cir, st * u_cirrus * 0.42 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
+      col = mix(col, cir, st * u_cirrus * 0.12 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
     }
     // stars
     float starK = max(u_night, cosmic * 0.45);
@@ -953,10 +953,13 @@ out vec2 v_uv;
 out float v_alpha;
 out float v_var;
 out float v_dist;
+out float v_near;
 void main() {
   vec3 rel = u_origin + a_c.xyz;
   vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
   v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x; v_var = a_p.z; v_dist = length(rel.xz);
+  // a sprite the camera is inside (the citadel's anchors) or almost touches fades out: no white wall in front of the lens
+  v_near = smoothstep(2.0, 24.0, length(rel) - a_c.w);
   gl_Position = u_viewProj * vec4(p, 1.0);
 }`;
   S.PUFF_FS = `
@@ -970,6 +973,7 @@ in vec2 v_uv;
 in float v_alpha;
 in float v_var;
 in float v_dist;
+in float v_near;
 out vec4 o;
 void main() {
   vec2 at = vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5 + v_uv * 0.5;
@@ -979,14 +983,16 @@ void main() {
   vec2 n = t.gb * 2.0 - 1.0;
   float lit = clamp(0.5 + 0.6 * dot(n, u_sunScreen) * u_sunK, 0.0, 1.0) * mix(0.72, 1.0, v_uv.y);
   vec3 ambC = u_ambSky * 1.15 + u_moonColor * 0.5 * (1.0 - u_sunK);
-  vec3 litC = ambC + u_sunColor * 0.3 * u_sunK;
-  vec3 shadeC = u_ambSky * 0.8 + vec3(0.02, 0.03, 0.05);
-  vec3 col = mix(shadeC, litC, lit) + u_sunset * 0.22 * (1.0 - lit);
+  // sunlit tops white (a little warm at dusk), the shade a blue-lilac grey; by night both are the moon's light
+  vec3 litC = mix(ambC * 1.3, vec3(1.0, 0.95, 0.9) * 1.2, u_sunK);
+  vec3 shadeC = mix(u_ambSky * 0.8 + vec3(0.02, 0.03, 0.05), vec3(0.5, 0.48, 0.62), u_sunK);
+  vec3 col = mix(shadeC, litC, lit) + u_sunset * 0.18 * (1.0 - lit);
   col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))), u_rain * 0.6);
   col = mix(col, u_skyHorizon * 1.1 + ambC * 0.5, u_fogK * 0.45);
   float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
   col = mix(col, u_skyHorizon, smoothstep(260.0, 600.0, v_dist) * 0.5);
-  o = vec4(col, d * v_alpha * fade);
+  float solid = mix(smoothstep(0.1, 0.55, d), d, u_fogK);   // cumulus: the edge is soft, the body solid; fog banks: soft mist
+  o = vec4(col, solid * v_alpha * fade * v_near);
 }`;
 
   // ------------------------------------------------------------ far-terrain horizon (LOD tiles)
