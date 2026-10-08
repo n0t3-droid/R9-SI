@@ -150,6 +150,7 @@ html.einfach #mirrorchip { font-size: 15px; padding: 7px 13px; bottom: 52px; }  
 .tktrade { display: flex; align-items: center; gap: 6px; }
 .tktrade canvas { width: 24px; height: 24px; image-rendering: pixelated; }
 
+#petchip { position: absolute; left: 12px; bottom: 44px; max-width: 46vw; font: 600 13px var(--font); color: #ffe6f4; background: rgba(40, 10, 34, .62); border: 1px solid rgba(255, 150, 210, .45); border-radius: 8px; padding: 4px 10px; text-shadow: 0 1px 2px #000; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #lockhint { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); padding: 8px 16px; border-radius: 12px; background: rgba(8, 12, 28, 0.72); color: #e8f0ff; font: 600 15px var(--font); letter-spacing: 0.3px; pointer-events: none; display: none; box-shadow: 0 0 0 1px rgba(58, 240, 255, 0.35); z-index: 6; }
 /* piloting in first person: the instrument panel and HUD take over */
 #hud #hotbar, #hud #stats, #hud #xpbar, #hud #xplvl, #hud #crosshair, #hud #itemname, #hud #air { transition: opacity .35s; }

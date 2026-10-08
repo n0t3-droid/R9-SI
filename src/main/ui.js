@@ -93,6 +93,7 @@
         <div id="toasts"></div>
         <div id="chatlog"></div>
         <div id="modebadge"></div>
+        <div id="petchip" style="display:none"></div>
         <div id="hint"></div>
         <canvas id="minimap" width="180" height="180"></canvas><div id="compass"></div>
         <div id="vehiclehud"></div>

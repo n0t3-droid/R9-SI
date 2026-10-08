@@ -603,6 +603,7 @@
         a.held = typeof pl.h === 'string' ? pl.h.slice(0, 40) : null;
         a.mode = pl.m; a.hp = num(pl.hp, 20); a.host = p.presence.role === 'host';
         a.veh = pl.v && typeof pl.v === 'object' ? pl.v : null;
+        a.co = Array.isArray(pl.co) ? pl.co.slice(0, 3) : null;   // 🐾 their companions (drawn by companions.js)
         const lk = Array.isArray(pl.lk) && pl.lk.length >= 4 && pl.lk.every(v => typeof v === 'number') ? pl.lk.join(',') : null;
         if (lk !== a.lk) { a.lk = lk; a.look = null; }
         a.seen = performance.now();
@@ -617,7 +618,7 @@
         p: [Math.round(p.pos[0] * 100) / 100, Math.round(p.pos[1] * 100) / 100, Math.round(p.pos[2] * 100) / 100],
         r: [Math.round(p.yaw * 1000) / 1000, Math.round(p.pitch * 1000) / 1000],
         f: (p.flying ? 1 : 0) | (p.sneaking ? 2 : 0) | (p.handSwing > 0 ? 4 : 0) | (p.dead ? 8 : 0),
-        h: p.inv && p.inv.held ? p.inv.held.id : null, m: p.mode, hp: Math.round(p.health), v: veh,
+        h: p.inv && p.inv.held ? p.inv.held.id : null, m: p.mode, hp: Math.round(p.health), v: veh, co: g.companions ? g.companions.presence() : null,
         lk: (() => { const o = g.heroOpts ? g.heroOpts() : null; return o ? [o.suit | 0, o.hair | 0, o.hs | 0, o.skin | 0, o.lashes ? 1 : 0] : null; })(),
       };
       const s = JSON.stringify(pl);
@@ -687,6 +688,7 @@
         const pose = Folk.heroPose ? Folk.heroPose({ walk: a.walk, walkAmt: a.walkAmt, swing: a.swing, pitch: a.pitch, fly: a.fly, sneak: a.sneak, aim: tool === 'blaster' }) : this.pose(a, t);
         ent.drawModel(r, p, model, a.pos, cam, a.yaw, pose, light, { hide: { lids: true, mouth: true } });
       }
+      if (g.companions) g.companions.drawRemote(r, p, cam, this.remote);   // the friends' 🐾 (same vox program)
     }
     pose(a, t) {
       const wa = a.walkAmt, ph = a.walk * 3, s = Math.sin(ph) * 0.7 * wa;
