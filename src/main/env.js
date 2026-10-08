@@ -88,8 +88,11 @@
       // celestial bodies ride the same sky rotation
       // the planets never set (TRAILER.md §2.1): the ringed giant circles at ~33° elevation, the blue
       // planet higher up on the other side; both drift slowly around the sky with the day
-      const pa = th * 0.5 + 0.55;
-      E.planetDir = norm([Math.cos(pa) * 0.84, 0.55, Math.sin(pa) * 0.84]);
+      // a trailer shot can pin the planets (director.js: shot.planets = {az, el, az2, el2}, elevations in degrees): the
+      // ringed giant then sits where the owner's frame has it, whatever the hour
+      const PO = this.planetsOverride || null;
+      const pa = PO && PO.az !== undefined ? PO.az : th * 0.5 + 0.55;
+      E.planetDir = norm([Math.cos(pa) * 0.84, PO && PO.el !== undefined ? 0.84 * Math.tan(PO.el * Math.PI / 180) : 0.55, Math.sin(pa) * 0.84]);
       {
         // keep the rings seen at a slant (never face-on): ring normal ~70° away from the line of sight, tilted diagonally
         const P = E.planetDir, upd = P[1];
@@ -99,8 +102,8 @@
         const Np = [Y[0] * c + X[0] * sn, Y[1] * c + X[1] * sn, Y[2] * c + X[2] * sn];
         E.ringNormal = norm([Np[0] * 0.94 - P[0] * 0.34, Np[1] * 0.94 - P[1] * 0.34, Np[2] * 0.94 - P[2] * 0.34]);
       }
-      const pb = th * 0.5 + 0.55 + 2.4;
-      E.planet2Dir = norm([Math.cos(pb) * 0.62, 0.78, Math.sin(pb) * 0.62]);
+      const pb = PO && PO.az2 !== undefined ? PO.az2 : th * 0.5 + 0.55 + 2.4;
+      E.planet2Dir = norm([Math.cos(pb) * 0.62, PO && PO.el2 !== undefined ? 0.62 * Math.tan(PO.el2 * Math.PI / 180) : 0.78, Math.sin(pb) * 0.62]);
       // dimension overrides
       const rd = (o.renderDist || 8) * 16;
       let fogStart = rd * 0.62, fogEnd = rd * 1.0, dens = 0.0002 + rain * 0.0035;
