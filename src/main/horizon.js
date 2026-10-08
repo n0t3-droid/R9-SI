@@ -144,11 +144,14 @@
       const fading = !!(w.fading && w.fading.size), epoch = w.colEpoch || 0;
       if (!fading && key === this.maskKey && epoch === this.maskEpoch && (this.maskT = this.maskT + 1) % 6 !== 0) return;
       this.maskKey = key; this.maskEpoch = epoch;
+      // only the chunks the renderer draws (renderer.collectVisible: within renderDist + ½) cut the far tiles: a shown column
+      // beyond that (kept loaded while the player moves on) is not drawn, so a cut there would leave a hole
+      const rd = w.renderDist || 8, rdHalf2 = (rd + 0.5) * (rd + 0.5);
       const m = this.mask; m.fill(0);
       for (const c of w.cols.values()) {
         const dx = c.cx - ccx, dz = c.cz - ccz;
         if (dx < -32 || dz < -32 || dx > 31 || dz > 31 || !c.ready) continue;
-        if (c.fade > 0) m[(dz + 32) * 64 + dx + 32] = Math.round(255 * c.fade);
+        if (c.fade > 0 && dx * dx + dz * dz <= rdHalf2) m[(dz + 32) * 64 + dx + 32] = Math.round(255 * c.fade);
       }
       gl.bindTexture(gl.TEXTURE_2D, this.maskTex);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.UNSIGNED_BYTE, m);
