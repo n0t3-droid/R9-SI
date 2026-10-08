@@ -91,7 +91,9 @@
     // the Gate Temple's apron: where a docking craft sets down (the runway's deck in front of the portal)
     dockPoint() { const H = VR.Heart; return H ? [H.TEMPLE.x, H.PLAT + 1, H.TEMPLE.front + 10] : null; }
     // docking: the craft comes in over the plaza, settles on the apron with its wingmen beside it, idles there for
-    // 9–15 s, then lifts off and leaves the way it came (the same curves in reverse)
+    // 9–15 s, then lifts off and leaves the way it came (the same curves in reverse). On the apron it turns round to
+    // face the plaza (the portal behind it, as in the trailer's shot D), so it lifts off nose first and does not snap
+    // round; its wingmen swing over the leader's back while it turns.
     flyDock(s, dt) {
       const D = s.dock;
       if (D.phase === 'park') { D.parkT += dt; if (D.parkT >= D.parkDur) this.dockLeave(s); }
@@ -100,19 +102,26 @@
         if (s.t < 0) return;   // a wingman waits for its turn
         if (s.t >= 1) {
           if (D.phase === 'out') { s.dead = true; this.flash(s, false); return; }
-          s.t = 1; D.phase = 'park'; D.parkT = 0;
+          s.t = 1; D.phase = 'park'; D.parkT = 0; D.h0 = s.heading;
           if (!s.arrived) { s.arrived = true; this.dockDust(s); }
         }
       }
       const t = Math.min(1, s.t), P = this.bez(s, t);
+      let lift = 0;
       if (D.phase !== 'park') {
         const P2 = this.bez(s, Math.min(1, t + 0.01)), yaw = Math.atan2(-(P2[0] - P[0]), -(P2[2] - P[2]));
         if (s.prevYaw !== null) { let dy = yaw - s.prevYaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU; s.roll += (M.clamp(dy / Math.max(dt, 1e-3) * 2.5, -0.6, 0.6) - s.roll) * Math.min(1, dt * 2); }
         s.prevYaw = yaw; s.heading = yaw;
-      } else s.roll += (0 - s.roll) * Math.min(1, dt * 2);
+      } else {
+        const turn = Math.atan2(Math.sin(Math.PI - s.heading), Math.cos(Math.PI - s.heading));
+        s.heading += turn * Math.min(1, dt * 1.2);
+        const done = Math.min(1, Math.abs(Math.atan2(Math.sin(s.heading - D.h0), Math.cos(s.heading - D.h0))) / Math.PI);
+        if (Math.hypot(s.off[0], s.off[2]) > 0.5) lift = 6 * Math.sin(Math.PI * done);   // a wingman rises over the leader while it turns
+        s.roll += (0 - s.roll) * Math.min(1, dt * 2);
+      }
       const c = Math.cos(s.heading), sn = Math.sin(s.heading);
       const bob = D.phase === 'park' ? 0.1 * Math.sin(s.age * 1.3) : Math.sin(s.age * 0.7) * 0.6;
-      s.pos = [P[0] + s.off[0] * c + s.off[2] * sn, P[1] + s.off[1] + bob, P[2] - s.off[0] * sn + s.off[2] * c];
+      s.pos = [P[0] + s.off[0] * c + s.off[2] * sn, P[1] + s.off[1] + bob + lift, P[2] - s.off[0] * sn + s.off[2] * c];
     }
     dockLeave(s) {
       const D = s.dock, dp = this.dockPoint();
