@@ -343,7 +343,14 @@
       if (!this.shadowFB) { this.shadowSize = 0; this.q.shadows = 0; }
     }
     setQuality(q) {
-      this.qBase = Object.assign(this.qBase || {}, q);
+      // F1 · Licht & Luft, from the chosen settings (not from the smart-quality overrides, so a passing override never
+      // rebuilds the programs): the sky table on Very Low (lite), the shadow filter by the chosen map size (1024: the
+      // 3×3 PCF, 2048 and up: the rotated 16-tap disc), the cloud shadows on the ground from Balanced up
+      const f1 = {};
+      if (q.lite !== undefined) f1.atmoLUT = !!q.lite;
+      if (q.shadows !== undefined) f1.shadowQ = q.shadows >= 2048 ? 3 : q.shadows > 0 ? 2 : 0;
+      if (q.shadows !== undefined && q.lite !== undefined) f1.cloudSh = !q.lite && q.shadows > 0;
+      this.qBase = Object.assign(this.qBase || {}, f1, q);
       this.applyQ(true);
     }
     // R9 Smart Quality: the game lays temporary overrides (shadow cadence, ray/cloud/VX-detail cuts, a
