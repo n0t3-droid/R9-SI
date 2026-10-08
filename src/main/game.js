@@ -18,7 +18,7 @@
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
   // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
   // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 75, sens: 1, invertY: false, viewBob: true, airLife: true, turnInertia: false, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
   // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
   const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
   const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];
@@ -119,6 +119,7 @@
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
       if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
+      if (this.airLife) this.airLife.setOn(S.airLife !== false, VR.AirLife.tierOf(S));
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
       if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
       this.applyLook();
@@ -289,6 +290,7 @@
       if (VR.LiveLoop) VR.LiveLoop.updateLum(this);
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
+      this.airLife = new VR.AirLife(this);   // the living air (F3 · Da-Sein): caps per tier, see airlife.js
       this.trails = VR.Trails ? new VR.Trails(this) : null;
       this.vents = VR.Vents ? new VR.Vents(this) : null;
       this.director = VR.Director ? new VR.Director(this) : null;
@@ -991,17 +993,21 @@
       const E = this.envFor(eye, dt, { underwater: underwater || inLava, waterColor: inLava ? [0.9, 0.3, 0.05] : waterColor, freezeTime: this.zenFreezeTime && p.mode !== 'survival', freezeWeather: this.zenFreezeWeather && p.mode !== 'survival' });
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
+      if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
       this.particles.update(dt, eye);
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
       this.waterFx(dt, p, eye, underwater, inLava, E);
       if (this.trails) this.trails.update(dt);
       if (this.vents) this.vents.update(dt, eye);
       // camera
-      const S = this.settings;
+      // (F3 · Da-Sein, presence.js: the head bob, the landing dip, the optional turn inertia, the view nudge of a block set
+      // or taken, the sprint FOV — every curve is bounded and eased; the raycast and the crosshair keep the true look)
+      const S = this.settings, PR = VR.Presence;
       const bob = S.viewBob && !p.flying ? p.bobAmt : 0;
-      const bx = Math.sin(p.bob * 2) * 0.035 * bob, by = Math.abs(Math.cos(p.bob * 2)) * 0.05 * bob;
       const swim = this.swimBob(p, underwater, E);
-      let cam = { x: eye[0] + Math.cos(p.yaw) * bx, y: eye[1] + by + (p.stepSmooth || 0) + swim, z: eye[2] - Math.sin(p.yaw) * bx, yaw: p.yaw, pitch: p.pitch, roll: bob * Math.sin(p.bob * 2) * 0.004, fov: (S.fov * (1 + p.fovKick)) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
+      const bb = PR.bobAt(p.bob * 2, bob), dip = PR.dipAt(p.dipT, p.dipAmp);
+      p.viewYaw = PR.turnFollow(p.viewYaw, p.yaw, dt, !!S.turnInertia);
+      let cam = { x: eye[0] + Math.cos(p.viewYaw) * bb.x, y: eye[1] + bb.y - dip + (p.stepSmooth || 0) + swim, z: eye[2] - Math.sin(p.viewYaw) * bb.x, yaw: p.viewYaw, pitch: p.pitch + PR.nudgeAt(p.nudgeT, p.nudgeAmp), roll: PR.rollAt(p.bob * 2, bob), fov: PR.fovDeg(S.fov, p.fovKick) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
       if (this.vehicleCam) { const vc = this.vehicleCam(cam); if (vc) cam = vc; }
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {

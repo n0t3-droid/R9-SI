@@ -4,6 +4,7 @@
 // corrupt save) stands on solid ground again instead of vanishing.
 //   bash test/wt_run.sh phys_guard.js
 const V = require('./load_shared.js');
+require('../src/main/presence.js');   // the camera curves (F3 · Da-Sein) are used by the player
 require('../src/main/player.js');
 const R = V.R, PH = V.PHYS;
 let fail = 0;

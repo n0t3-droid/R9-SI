@@ -54,6 +54,7 @@
     { key: 'bloom', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.bloom', tip: 'g.set.bloom.tip', cost: 'mid', def: true },
     { key: 'fancyLeaves', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.fancyLeaves', tip: 'g.set.fancyLeaves.tip', cost: 'mid', def: true },
     { key: 'wetGround', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.wetGround', tip: 'g.set.wetGround.tip', cost: 'low', def: true },
+    { key: 'airLife', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.airLife', tip: 'g.set.airLife.tip', cost: 'low', def: true },
     { key: 'showFps', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.showFps', tip: 'g.set.showFps.tip', def: false },
     { key: 'bench', g: 'img', sec: 'auto', t: 'action', lab: 'g.set.bench', tip: 'g.set.bench.tip', act: 'bench' },
     // ---- Klang
@@ -64,12 +65,13 @@
     { key: 'wx', g: 'snd', sec: 'air', t: 'choice', lab: 'g.set.wx', tip: 'g.set.wx.tip', def: 'normal', opts: [['normal', 'g.set.wx.normal', 'g.set.wx.normal.tip'], ['calm', 'g.set.wx.calm', 'g.set.wx.calm.tip'], ['off', 'g.set.wx.off', 'g.set.wx.off.tip']] },
     { key: 'natSound', g: 'snd', sec: 'air', t: 'choice', lab: 'g.set.natSound', tip: 'g.set.natSound.tip', def: 'synth', opts: [['synth', 'g.set.natSound.synth', 'g.set.natSound.synth.tip'], ['off', 'g.set.natSound.off', 'g.set.natSound.off.tip']] },
     // ---- Spiel · Steuerung
-    { key: 'fov', g: 'play', sec: 'steer', t: 'slider', lab: 'g.set.fov', tip: 'g.set.fov.tip', def: 72, min: 50, max: 110, step: 1, fmt: 'deg' },
+    { key: 'fov', g: 'play', sec: 'steer', t: 'slider', lab: 'g.set.fov', tip: 'g.set.fov.tip', def: 75, min: 50, max: 110, step: 1, fmt: 'deg' },
     { key: 'sens', g: 'play', sec: 'steer', t: 'slider', lab: 'g.set.sens', tip: 'g.set.sens.tip', def: 1, min: 0.2, max: 3, step: 0.05, fmt: 'pct' },
     { key: 'rawInput', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.rawInput', tip: 'g.set.rawInput.tip', def: true },
     { key: 'mouseSmooth', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.mouseSmooth', tip: 'g.set.mouseSmooth.tip', def: false },
     { key: 'invertY', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.invertY', tip: 'g.set.invertY.tip', def: false },
     { key: 'viewBob', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.viewBob', tip: 'g.set.viewBob.tip', def: true },
+    { key: 'turnInertia', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.turnInertia', tip: 'g.set.turnInertia.tip', def: false },
     { key: 'sprintMode', g: 'play', sec: 'steer', t: 'choice', lab: 'g.set.sprintMode', tip: 'g.set.sprintMode.tip', def: 'hold', opts: [['hold', 'g.set.sprintMode.hold', 'g.set.sprintMode.hold.tip'], ['toggle', 'g.set.sprintMode.toggle', 'g.set.sprintMode.toggle.tip']] },
     { key: 'autoJump', g: 'play', sec: 'steer', t: 'choice', lab: 'g.set.autoJump', tip: 'g.set.autoJump.tip', def: 'auto', opts: [['auto', 'g.set.autoJump.auto', 'g.set.autoJump.auto.tip'], ['on', 'g.set.autoJump.on', 'g.set.autoJump.on.tip'], ['off', 'g.set.autoJump.off', 'g.set.autoJump.off.tip']] },
     { key: 'touch', g: 'play', sec: 'steer', t: 'choice', lab: 'g.set.touch', tip: 'g.set.touch.tip', def: 'auto', opts: [['auto', 'g.set.touch.auto', 'g.set.touch.auto.tip'], ['on', 'g.set.touch.on', 'g.set.touch.on.tip'], ['off', 'g.set.touch.off', 'g.set.touch.off.tip']] },
