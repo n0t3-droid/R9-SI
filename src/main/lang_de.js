@@ -888,7 +888,7 @@
     'g.zr.recStop': '⏹ Fertig',
     'g.zr.recNo': 'Dieser Browser kann keine Videos aufnehmen.',
     'g.zr.recOn': '⏺ Aufnahme {t}',
-    'g.zr.recDone': '🎬 Dein Video ist fertig — {mb} MB, {s} s',
+    'g.zr.recDone': '🎬 Dein Video ist fertig — {size}, {s} s',
     'g.zr.save': '⬇ Speichern',
     'g.zr.saved': '⬇ {name} — gespeichert',
     'g.zr.saveNo': 'Speichern geht hier nicht — rechte Maustaste auf das Video: „Video speichern unter …“',

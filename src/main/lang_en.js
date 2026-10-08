@@ -888,7 +888,7 @@
     'g.zr.recStop': '⏹ Finish',
     'g.zr.recNo': 'This browser cannot record videos.',
     'g.zr.recOn': '⏺ Recording {t}',
-    'g.zr.recDone': '🎬 Your video is ready — {mb} MB, {s} s',
+    'g.zr.recDone': '🎬 Your video is ready — {size}, {s} s',
     'g.zr.save': '⬇ Save',
     'g.zr.saved': '⬇ {name} — saved',
     'g.zr.saveNo': "Saving doesn't work here — right-click the video: “Save video as …”",
