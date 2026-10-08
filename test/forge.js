@@ -406,5 +406,5 @@ section('sweep', () => {
   check(slow === 0, 'every one of them built in under 400 ms (' + slow + ' slower)');
 });
 
-console.log(fails ? 'FAILED ' + fails + ' of ' + n : 'ALL OK (' + n + ' checks)');
+console.log((fails ? 'FAILED ' + fails + ' of ' + n : 'ALL OK (' + n + ' checks)') + '\n' + (fails ? 'FAILED ' + fails : 'ALL OK'));
 process.exit(fails ? 1 : 0);
