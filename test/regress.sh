@@ -2,7 +2,7 @@
 # The release regression set: the node tests first, then the browser tests one at a time. Each test runs through
 # test/wt_run.sh, so browser tests wait for the machine-wide browser lock. A failing test never stops the run.
 #
-# usage: bash test/regress.sh [results file] [test names...]
+# usage: bash test/regress.sh [results file] [test names...]   (R9_EXCLUSIVE=1 holds both browser slots: the release run)
 #   results file  default .tmp_tests/regress.txt of this checkout ("" keeps the default when names follow)
 #   test names    run only these (*.js = node, *.mjs = browser) instead of the whole set
 #   REGRESS_ONLY  node | browser  runs only that part of the set
@@ -17,8 +17,12 @@ RESULTS=${1:-$ROOT/.tmp_tests/regress.txt}
 mkdir -p "$(dirname "$RESULTS")" "$ROOT/.tmp_tests" || exit 2
 : > "$RESULTS" || exit 2
 
-NODE_SET="genie_brain.js genie_raster.js housekit.js schem_io.js style_core.js gen_same.js id_snapshot.js light_same.js mesh_same.js phys_guard.js pool_recover.js store_fail.js vx_cache.js vx_cells.js worker_jobs.js modern_pack.js tex_check.js zeitraffer.js"
-BROWSER_SET="smoke.mjs spawn.mjs studio_live.mjs catalog.mjs favs.mjs house_genie.mjs site_plan.mjs create_standalone.mjs imagine.mjs projects.mjs crafter3.mjs player2.mjs workbench.mjs world_style.mjs crafter2.mjs world_mode.mjs studio_drag.mjs tpl_upgrade.mjs crafter.mjs deadends.mjs bridge.mjs blocklook.mjs modern_pack.mjs mp.mjs slopes.mjs terrain_edit.mjs glass_conn.mjs modern_kit.mjs height.mjs ship_test.mjs star_test.mjs zeitraffer.mjs"
+# The sets are found, not listed: every test/*.js and test/*.mjs that prints the summary line ("ALL OK") is a real test
+# and part of the regression — so a new test joins by following the convention, and no two branches fight over a
+# list. A showcase or a profiling script that must not run here says so with a line containing "regress: skip".
+is_test() { grep -q "ALL OK" "$1" && ! grep -q "regress: skip" "$1"; }
+NODE_SET=$(for f in "$ROOT"/test/*.js; do is_test "$f" && basename "$f"; done | sort | tr '\n' ' ')
+BROWSER_SET=$(for f in "$ROOT"/test/*.mjs; do is_test "$f" && basename "$f"; done | sort | tr '\n' ' ')
 
 if [ $# -gt 0 ]; then LIST="$*"; else LIST="$NODE_SET $BROWSER_SET"; fi
 NODES=(); BROWSERS=()

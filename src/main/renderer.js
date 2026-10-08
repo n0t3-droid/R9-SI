@@ -808,7 +808,7 @@
       const t0 = performance.now();
       this.frameNo++;
       this.gpuTimerBegin();
-      this.stats.draws = 0; this.stats.tris = 0;
+      this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
@@ -907,6 +907,7 @@
       // selection outline + crack
       if (F.outline) this.drawOutline(F.outline);
       if (F.outlines) for (const o of F.outlines) this.drawOutline(o);
+      if (F.guide) this.drawGuide(F.guide);
       if (F.crack) this.drawCrack(F.crack);
       // first-person hand (separate depth range)
       if (F.drawHand) { gl.clear(gl.DEPTH_BUFFER_BIT); F.drawHand(this, E); }
@@ -979,6 +980,29 @@
       gl.drawArrays(gl.LINES, 0, pts.length / 3);
       gl.disable(gl.BLEND);
       if (o.xray) gl.enable(gl.DEPTH_TEST);
+    }
+    // 🪞 the mirror's axis (mirrorbuild.js): translucent triangles with the outline's line program, in a small buffer of
+    // its own that is filled only when the mirror changes (G.ver) — per frame three draws, no upload, no allocation;
+    // depth-tested (walls hide it), no depth writes (it never hides anything)
+    drawGuide(G) {
+      const gl = this.gl, p = this.P.line, cam = this.cam, parts = G.parts;
+      if (!this.guideVBO) {
+        this.guideVBO = gl.createBuffer(); this.guideVAO = gl.createVertexArray();
+        gl.bindVertexArray(this.guideVAO); gl.bindBuffer(gl.ARRAY_BUFFER, this.guideVBO); gl.bufferData(gl.ARRAY_BUFFER, G.verts.byteLength, gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 12, 0);
+        gl.bindVertexArray(null); this.guideVer = -1;
+      }
+      gl.bindVertexArray(this.guideVAO);
+      if (this.guideVer !== G.ver || this.guideOf !== G) { gl.bindBuffer(gl.ARRAY_BUFFER, this.guideVBO); gl.bufferSubData(gl.ARRAY_BUFFER, 0, G.verts); this.guideVer = G.ver; this.guideOf = G; }   // (a new world brings a new guide)
+      gl.useProgram(p.p);
+      gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
+      gl.uniform3f(p.u.u_offset, G.ox - cam.x, G.oy - cam.y, G.oz - cam.z);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+      let n = 0;
+      for (let i = 0; i < parts.length; i++) { const q = parts[i]; if (!q.n) continue; gl.uniform4f(p.u.u_color, q.c[0], q.c[1], q.c[2], q.c[3]); gl.drawArrays(gl.TRIANGLES, q.at, q.n); n += q.n; }
+      gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
+      gl.bindVertexArray(null);
+      this.stats.guide = n;   // (test/mirror.mjs: the axis was drawn)
     }
     drawCrack(c) {
       const gl = this.gl, p = this.P.decal, cam = this.cam;

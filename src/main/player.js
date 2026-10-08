@@ -392,7 +392,7 @@
         const t = this.target;
         const s = t.state;
         if (this.creative) {
-          if (this.breakCooldown <= 0) { this.breakBlock(t.x, t.y, t.z, s, false); this.breakCooldown = input.dragLook ? 0 : 0.22; this.handSwing = 1; }
+          if (this.breakCooldown <= 0) { this.breakBlock(t.x, t.y, t.z, s, false, true); this.breakCooldown = input.dragLook ? 0 : 0.22; this.handSwing = 1; }
         } else {
           if (!this.breaking || this.breaking.x !== t.x || this.breaking.y !== t.y || this.breaking.z !== t.z) this.breaking = { x: t.x, y: t.y, z: t.z, p: 0 };
           const time = this.breakTime(s, hdef);
@@ -400,7 +400,7 @@
           this.handSwing = 1;
           this.breaking.sound = (this.breaking.sound || 0) - dt;
           if (this.breaking.sound <= 0) { this.breaking.sound = 0.25; g.audio && g.audio.dig(s, false); g.particles && g.particles.hitBlock(t, s); }
-          if (this.breaking.p >= 1) { this.breakBlock(t.x, t.y, t.z, s, true); this.breaking = null; this.breakCooldown = 0.12; }
+          if (this.breaking.p >= 1) { this.breakBlock(t.x, t.y, t.z, s, true, true); this.breaking = null; this.breakCooldown = 0.12; }
         }
       } else this.breaking = null;
       if (!input.mouse.down[0]) this.breakCooldown = 0;
@@ -464,15 +464,13 @@
       if (!o.needTool) return true;
       return !!(hdef && hdef.tool === o.tool && (hdef.tier || 0) >= (o.tier || 1));
     }
-    breakBlock(x, y, z, s, survival) {
-      const g = this.game, world = g.world;
+    // hand: broken by the player's hand (🪞 Spiegel-Bauen mirrors those, not a blaster's)
+    breakBlock(x, y, z, s, survival, hand) {
+      const g = this.game;
       const t = R.types[R.T.type[s]];
       if (!t) return;
       if (R.T.flags[s] & F.UNBREAK && !this.creative) return;
-      if (t.o.kind === 'door' || (t.o.tall && t.has('half')) || t.o.kind === 'bed' || t.o.kind === 'model' || t.o.vxModel) g.breakMulti && g.breakMulti(x, y, z, s);
-      const fluidIn = (R.T.flags[s] & F.WATERLOG) ? R.byName.water.defaultState : 0;
-      world.setBlock(x, y, z, fluidIn, 4 | VR.SB_EDIT);   // (SB_EDIT: a building change, recorded for 📽)
-      if (VR.CUT_OF && (VR.CUT_OF[t.name] || VR.SMOOTH_OF[t.name] || (R.T.flags[s] & F.SMOOTH)) && g.sim && g.sim.cutAround) g.sim.cutAround(x, y, z);
+      this.removeBlock(x, y, z, s);
       g.audio && g.audio.dig(s, true);
       g.particles && g.particles.breakBlock(x, y, z, s);
       g.onBlockBroken && g.onBlockBroken(x, y, z, s, this);
@@ -482,6 +480,17 @@
         this.exhaust += 0.005;
         this.damageHeld(1);
       }
+      if (hand && g.mirror) g.mirror.onBreak(x, y, z, s, this);
+    }
+    // the world part of breaking a block: a door's other half, a bed's other part, a model's other parts go too, water
+    // stays in a waterlogged block, natural ground around is cut — also what each 🪞 mirrored copy of a break does
+    removeBlock(x, y, z, s) {
+      const g = this.game, t = R.types[R.T.type[s]];
+      if (!t) return;
+      if (t.o.kind === 'door' || (t.o.tall && t.has('half')) || t.o.kind === 'bed' || t.o.kind === 'model' || t.o.vxModel) g.breakMulti && g.breakMulti(x, y, z, s);
+      const fluidIn = (R.T.flags[s] & F.WATERLOG) ? R.byName.water.defaultState : 0;
+      g.world.setBlock(x, y, z, fluidIn, 4 | VR.SB_EDIT);   // (SB_EDIT: a building change, recorded for 📽)
+      if (VR.CUT_OF && (VR.CUT_OF[t.name] || VR.SMOOTH_OF[t.name] || (R.T.flags[s] & F.SMOOTH)) && g.sim && g.sim.cutAround) g.sim.cutAround(x, y, z);
     }
     damageHeld(n) {
       const h = this.inv.held; if (!h) return;
@@ -535,27 +544,31 @@
       // natural ground placed by hand is crisp (its cut twin): voxels build like voxels; Shift + shovel smooths a patch into the landscape
       if (VR.CUT_OF && VR.CUT_OF[type.name]) { const cut = R.byName[VR.CUT_OF[type.name]]; if (cut) for (const p of list) p.state = cut.state(type.decode(p.state)); }
       // collision check with player
-      for (const p of list) {
-        const boxes = VR.PHYS.collision(p.state, null);
-        for (const b of boxes) {
-          if (p.x + b[3] > this.pos[0] - W && p.x + b[0] < this.pos[0] + W && p.y + b[4] > this.pos[1] && p.y + b[1] < this.pos[1] + H && p.z + b[5] > this.pos[2] - W && p.z + b[2] < this.pos[2] + W && !this.noclip) return false;
-        }
-        if (g.entityBlocks && g.entityBlocks(p.x, p.y, p.z, p.state)) return false;
-      }
+      for (const p of list) if (this.placeBlocked(p.x, p.y, p.z, p.state)) return false;
       // waterlogging: keep water in waterloggable blocks placed into water
       for (const p of list) {
         const prev = world.getBlock(p.x, p.y, p.z);
         world.setBlock(p.x, p.y, p.z, p.state, 4 | VR.SB_EDIT);
         if (prev && (T.flags[prev] & F.WATER) && (T.flags[p.state] & F.WATERLOG) === 0 && g.onFluidDisplaced) g.onFluidDisplaced(p.x, p.y, p.z, prev);
       }
-      this.afterPlace(type, list[0].x, list[0].y, list[0].z, list[0].state);
+      this.afterPlace(type, list[0].x, list[0].y, list[0].z, list[0].state, list);
       return true;
     }
-    afterPlace(type, x, y, z, s) {
+    // would this block hit the player (unless a ghost) or a creature? — the hand's test, and each 🪞 mirrored copy's
+    placeBlocked(x, y, z, state) {
+      const g = this.game;
+      if (!this.noclip) for (const b of VR.PHYS.collision(state, null)) {
+        if (x + b[3] > this.pos[0] - W && x + b[0] < this.pos[0] + W && y + b[4] > this.pos[1] && y + b[1] < this.pos[1] + H && z + b[5] > this.pos[2] - W && z + b[2] < this.pos[2] + W) return true;
+      }
+      return !!(g.entityBlocks && g.entityBlocks(x, y, z, state));
+    }
+    // list: every cell this placement set (a door's two halves, a model's parts); 🪞 Spiegel-Bauen copies them
+    afterPlace(type, x, y, z, s, list) {
       const g = this.game;
       g.audio && g.audio.place(s);
       if (!this.creative) this.inv.consumeHeld(1);
       g.onBlockPlaced && g.onBlockPlaced(x, y, z, s, this);
+      if (g.mirror) g.mirror.onPlace(list || [{ x, y, z, state: s }], this);
     }
     toJSON() { return { pos: this.pos, yaw: this.yaw, pitch: this.pitch, mode: this.mode, health: this.health, food: this.food, sat: this.sat, air: this.air, xp: this.xp, level: this.level, flying: this.flying, inv: this.inv.toJSON(), spawn: this.spawn, spawnBed: this.spawnBed || null }; }
     load(o) {
