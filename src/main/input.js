@@ -1,5 +1,5 @@
 // ============================================================================
-// Input: keyboard, mouse (pointer lock with drag-to-look fallback), wheel, touch
+// Input: keyboard, mouse (pointer lock with drag-to-look fallback), wheel, touch, gamepad
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -21,6 +21,7 @@
       this.lockFailed = false;       // permanent: pointer lock not available at all
       this.lockFails = 0;            // consecutive failed attempts (a click retries)
       this.dragStart = null;
+      this.padKeys = new Set(); this.padBtn = [false, false, false]; this.padT = 0; this.padActive = false;
       this.bind();
     }
     bind() {
@@ -109,6 +110,51 @@
       this.pressed.clear(); this.released.clear(); this.doubleTap.clear();
       this.mouse.dx = 0; this.mouse.dy = 0; this.mouse.wheel = 0;
       this.mouse.clicked = [false, false, false]; this.mouse.releasedBtn = [false, false, false];
+      // the gamepad's state for the next frame
+      try { this.pollPad(); } catch (e) { this.pollPad = () => { }; }
+    }
+    // ---- gamepad (standard mapping): sticks and buttons become the keys and mouse moves the game reads anyway.
+    // On foot: left stick walks (WASD), right stick looks, A jump, B sneak, RT break / use, LT place, X inventory (E),
+    // Y camera (F5), LB drop (Q), d-pad left/right the hotbar (wheel), Start pauses.
+    // In a ship: left stick turns (A/D) and climbs (Space/Shift), RT/LT push the throttle (W/S), the right stick looks
+    // around the cockpit (click it to re-centre), A boost (B), B hover (X), X gear (F), Y view (C), LB look back (Q),
+    // RB the left mouse button (the control you aim at, or the guns), d-pad: up autopilot (G), down land / get out (V),
+    // left lights (L), right ramp (R).
+    pollPad() {
+      const list = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : null;
+      let gp = null; if (list) for (const p of list) if (p && p.connected && p.buttons && p.buttons.length >= 16) { gp = p; break; }
+      const now = performance.now(), dt = Math.min(0.1, Math.max(0, (now - (this.padT || now)) / 1000)); this.padT = now;
+      const want = new Set(), btn = [false, false, false];
+      if (gp && this.captured && this.enabled) {
+        const B = (i) => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.4)), ax = (i) => { const v = gp.axes[i] || 0; return Math.abs(v) < 0.18 ? 0 : v; };
+        const ship = !!(VR.game && VR.game.flight), lx = ax(0), ly = ax(1), rx = ax(2), ry = ax(3);
+        if (lx || ly || rx || ry || gp.buttons.some(b => b && b.pressed)) this.padActive = true;
+        if (ship) {
+          if (lx < -0.45) want.add('KeyA'); if (lx > 0.45) want.add('KeyD');
+          if (ly < -0.45) want.add('Space'); if (ly > 0.45) want.add('ShiftLeft');
+          if (B(7)) want.add('KeyW'); if (B(6)) want.add('KeyS');
+          if (B(0)) want.add('KeyB'); if (B(1)) want.add('KeyX'); if (B(2)) want.add('KeyF'); if (B(3)) want.add('KeyC'); if (B(4)) want.add('KeyQ');
+          if (B(12)) want.add('KeyG'); if (B(13)) want.add('KeyV'); if (B(14)) want.add('KeyL'); if (B(15)) want.add('KeyR');
+          if (B(5)) btn[0] = true; if (B(11)) btn[1] = true;
+        } else {
+          if (lx < -0.45) want.add('KeyA'); if (lx > 0.45) want.add('KeyD'); if (ly < -0.45) want.add('KeyW'); if (ly > 0.45) want.add('KeyS');
+          if (B(0)) want.add('Space'); if (B(1)) want.add('ShiftLeft'); if (B(2)) want.add('KeyE'); if (B(3)) want.add('F5'); if (B(4)) want.add('KeyQ'); if (B(10)) want.add('ControlLeft');
+          if (B(7) || B(5)) btn[0] = true; if (B(6)) btn[2] = true;
+          if (B(14) && !this.padKeys.has('PadL')) this.mouse.wheel -= 1; if (B(15) && !this.padKeys.has('PadR')) this.mouse.wheel += 1;
+          if (B(14)) want.add('PadL'); if (B(15)) want.add('PadR');
+        }
+        if (B(9)) want.add('Escape');
+        // the right stick looks (a curve for fine aim), like a mouse moving
+        const k = 950 * dt;
+        this.mouse.dx += Math.sign(rx) * Math.pow(Math.abs(rx), 1.7) * k; this.mouse.dy += Math.sign(ry) * Math.pow(Math.abs(ry), 1.7) * k;
+      }
+      for (const c of want) if (!this.padKeys.has(c)) { this.padKeys.add(c); if (!c.startsWith('Pad')) { this.keys.add(c); this.pressed.add(c); } }
+      for (const c of [...this.padKeys]) if (!want.has(c)) { this.padKeys.delete(c); if (!c.startsWith('Pad')) { this.keys.delete(c); this.released.add(c); } }
+      for (let b = 0; b < 3; b++) {
+        if (btn[b] && !this.padBtn[b]) { this.mouse.down[b] = true; this.mouse.clicked[b] = true; }
+        else if (!btn[b] && this.padBtn[b]) { this.mouse.down[b] = false; this.mouse.releasedBtn[b] = true; }
+        this.padBtn[b] = btn[b];
+      }
     }
   }
   VR.Input = Input;

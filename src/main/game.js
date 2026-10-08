@@ -18,7 +18,7 @@
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
   // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
   // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -278,7 +278,7 @@
     teardownWorld() {
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
-      this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false;
+      this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false; this.flight = null; this.flightWind = 0;
       if (this.traffic) { this.traffic.destroy(); this.traffic = null; }
       if (this.starships) { this.starships.destroy(); this.starships = null; }
       if (this.villages) { this.villages.destroy(); this.villages = null; }
@@ -890,7 +890,7 @@
       if (this.cockpit) this.cockpit.updateHud(dt);
       // audio
       // ambience (ambience.js): the wind, the rain and thunder, the birds, crickets and water of this place
-      if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0, underwater: underwater || inLava });
+      if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: (p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0) + (this.flightWind || 0) * 40, underwater: underwater || inLava });
       const skyAtEye = (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12);
       this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true });
       // HUD
@@ -944,10 +944,12 @@
       if (i.hit('F1')) { this.hideHud = !this.hideHud; document.getElementById('hud').style.visibility = this.hideHud ? 'hidden' : 'visible'; }
       if (i.hit('F2')) this.screenshot();
       if (i.hit('F3')) { this.debugOn = !this.debugOn; if (!this.debugOn) ui.debug(null); }
-      if (i.hit('F5')) this.camMode = (this.camMode + 1) % 3;
+      // piloting a ship: F5 / C cycle the ship's own views and Q looks back (flight.js) — nothing gets dropped
+      const piloting = !!this.flight;
+      if (i.hit('F5') && !piloting) this.camMode = (this.camMode + 1) % 3;
       if (i.hit('KeyP')) this.photoMode(true);
-      if (i.hit('KeyQ') && this.player.inv.held) this.dropHeld(i.down('ControlLeft'));
-      this.zoom = i.down('KeyC') && this.player.inv.held && this.player.inv.held.id === 'spyglass';
+      if (i.hit('KeyQ') && this.player.inv.held && !piloting) this.dropHeld(i.down('ControlLeft'));
+      this.zoom = !piloting && i.down('KeyC') && this.player.inv.held && this.player.inv.held.id === 'spyglass';
     }
     screenshot() {
       // grab the next rendered frame; show it in an overlay (downloads are blocked inside embedded viewers)

@@ -182,8 +182,21 @@
       } else if (m.type === 'starship') {
         const r = VR.Starship.build(m.seed, m.arch, { palette: m.palette, allow: m.allow, preview: m.preview });
         const tr = [r.hull.data.buffer, r.glass.data.buffer, r.gear.data.buffer, r.occ.occ.buffer];
+        if (r.interior) tr.push(r.interior.data.buffer);
+        if (r.extra) for (const k in r.extra) tr.push(r.extra[k].data.buffer);
+        if (r.walk) tr.push(r.walk.bits.buffer, r.walk.hull.buffer);
         if (r.preview) tr.push(r.preview.rgba.buffer);
-        post({ type: 'starship', id: m.id, meta: r.meta, hull: r.hull, glass: r.glass, gear: r.gear, occ: r.occ, preview: r.preview || null }, tr);
+        post({ type: 'starship', id: m.id, meta: r.meta, hull: r.hull, glass: r.glass, gear: r.gear, interior: r.interior || null, extra: r.extra || null, walk: r.walk || null, occ: r.occ, preview: r.preview || null }, tr);
+      } else if (m.type === 'cockpit') {
+        // the furnished cockpit of a ship (cockpitkit.js): meshes + controls, built here so boarding never stutters
+        const r = VR.CockpitKit.job(m), tr = r.transfer; delete r.transfer;
+        r.type = 'cockpit'; r.id = m.id;
+        post(r, tr);
+      } else if (m.type === 'cabin') {
+        // the furnished cabin & cargo bay of a shuttle (cabinkit.js)
+        const r = VR.CabinKit.job(m), tr = r.transfer; delete r.transfer;
+        r.type = 'cabin'; r.id = m.id;
+        post(r, tr);
       } else if (m.type === 'lodinit') {
         if (VR.LOD) VR.LOD.setAvg(m.avg);
         return;
