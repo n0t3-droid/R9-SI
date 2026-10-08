@@ -12,16 +12,21 @@
   // models that are not cubes — a top over the whole footprint, a side over the whole width and ¾ of the height:
   // the dirt path and the farmland (Klassisch: chunky and outlined like the ground around them, when their recipe
   // is a natural one)
+  // (B1 „🎨 Aussehen": the tables as shipped — a look that borrows another block's textures, and the variant slots,
+  // never change which layers are cube faces or cut-outs, so the forged and cached textures never depend on a look)
   VR.textureMasks = function () {
-    const R = VR.R, T = R.T, L = R.texNames.length;
+    const R = VR.R, T = R.T, L = R.texNames.length, LK = VR.Looks;
     const cube = new Uint8Array(L), cut = new Uint8Array(L), leaf = new Uint8Array(L), block = new Uint8Array(L);
-    for (let s = 0; s < T.shape.length; s++) {
-      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 0 && (T.flags[s] & VR.F.FULL)) for (let f = 0; f < 6; f++) cube[T.tex[s * 6 + f] & 0xfff] = 1;
-      if (T.layer[s] === 1) for (let f = 0; f < 6; f++) cut[T.tex[s * 6 + f] & 0xfff] = 1;
-      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 1 && (T.flags[s] & VR.F.LEAVES)) for (let f = 0; f < 6; f++) leaf[T.tex[s * 6 + f] & 0xfff] = 1;
+    const slot0 = LK && LK.slotRange ? LK.slotRange()[0] : -1, nS = slot0 > 0 ? slot0 : T.shape.length;
+    const tx = LK && LK.origTex ? (s, f) => LK.origTex(s, f) : (s, f) => T.tex[s * 6 + f];
+    const model = LK && LK.origModel ? (s) => LK.origModel(s) : (s) => R.models[s];
+    for (let s = 0; s < nS; s++) {
+      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 0 && (T.flags[s] & VR.F.FULL)) for (let f = 0; f < 6; f++) cube[tx(s, f) & 0xfff] = 1;
+      if (T.layer[s] === 1) for (let f = 0; f < 6; f++) cut[tx(s, f) & 0xfff] = 1;
+      if (T.shape[s] === VR.SHAPE.CUBE && T.layer[s] === 1 && (T.flags[s] & VR.F.LEAVES)) for (let f = 0; f < 6; f++) leaf[tx(s, f) & 0xfff] = 1;
     }
-    for (let s = 0; s < R.models.length; s++) {
-      const md = R.models[s]; if (!md) continue;
+    for (let s = 0; s < Math.min(nS, R.models.length); s++) {
+      const md = model(s); if (!md) continue;
       if (T.layer[s] === 1) for (const f of md) cut[f.tex & 0xfff] = 1;
       if (T.layer[s] !== 0) continue;
       for (const f of md) {

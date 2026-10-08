@@ -67,6 +67,8 @@
     return out;
   }
 
+  // a variant slot filled or emptied (looks.js): its states' boxes are worked out again
+  P.forget = function (s0, n) { for (let s = s0; s < s0 + n; s++) { colCache.delete(s); selCache.delete(s); } };
   // Collision boxes (block-local units). nb optional neighbor accessor for connected shapes.
   P.collision = function (state, nb) {
     if (!state) return EMPTY;

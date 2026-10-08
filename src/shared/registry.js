@@ -300,10 +300,12 @@
   // ---- Finalize tables -----------------------------------------------------------
   R.finalize = function () {
     const n = R.stateCount;
+    // rc (Phase B1 „🎨 Aussehen", looks.js): a block's own colour as RGB565, 0 = none — the mesher writes it as the
+    // vertex tint and marks the face (w5 bit 15); the shaders draw the texture's detail in that colour
     const T = R.T = {
       type: new Uint16Array(n), flags: new Uint32Array(n), emit: new Uint16Array(n), filter: new Uint8Array(n),
       shape: new Uint8Array(n), layer: new Uint8Array(n), tex: new Uint16Array(n * 6), tint: new Uint8Array(n),
-      hard: new Float32Array(n), blast: new Float32Array(n), height: new Uint8Array(n),
+      hard: new Float32Array(n), blast: new Float32Array(n), height: new Uint8Array(n), rc: new Uint16Array(n),
     };
     R.models = new Array(n).fill(null);
     R.stateInfo = new Array(n).fill(null);

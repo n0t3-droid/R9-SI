@@ -81,8 +81,9 @@ const [ox, y0, oz] = base;
 const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; }, [pos, yaw, pitch]); await settle(30); await step(6); await shot(TAG + '_' + name); };
 for (const lk of LOOKS) {
   const t0 = Date.now();
-  // the first look was set before the world was made; the next ones come by chat command, as a player types it
-  const sw = await ev((lk) => { const g = VR.game, before = VR.LOOK.mode; g.chat('/look ' + lk); return { before, now: VR.LOOK.mode, saved: JSON.parse(localStorage.getItem('r9si.settings') || '{}').look }; }, lk);
+  // the first look was set before the world was made; the next ones come from Settings → Graphics → Blöcke, as a player in
+  // Einfach switches them (the chat's /look is a Profi command: start.js lets only /lang through in Einfach)
+  const sw = await ev((lk) => { const g = VR.game, u = g.ui, before = VR.LOOK.mode; u.settingsTab = 'graphics'; u.showSettings(); const b = document.querySelector('#setbody [data-look=' + lk + ']'); if (b) b.click(); u.show(null); return { before, now: VR.LOOK.mode, saved: JSON.parse(localStorage.getItem('r9si.settings') || '{}').look, button: !!b }; }, lk);
   // the textures come back from the worker: wait for them (the rim follows the look)
   for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim)) break; await step(2); await wait(100); }
   await settle(80);

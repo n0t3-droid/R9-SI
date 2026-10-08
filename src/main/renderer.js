@@ -91,6 +91,9 @@
       this.setAniso(4);
       // noise
       this.texNoise = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: tex.noise, wrap: gl.REPEAT, filter: gl.LINEAR });
+      // the average luminance per texture layer (64 × 64, R32F) for recoloured blocks (B1 „🎨 Aussehen", looks.js) —
+      // filled by the game for the layers a look uses; never part of the cached textures
+      this.texAvgLum = GL.tex2D(64, 64, gl.R32F, gl.RED, gl.FLOAT, { data: new Float32Array(4096).fill(0.5), filter: gl.NEAREST });
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
@@ -105,6 +108,11 @@
       }
       this.emptyVAO = gl.createVertexArray();
       this.resize(true);
+    }
+    setAvgLum(table) {
+      const gl = this.gl; if (!this.texAvgLum || !table) return;
+      gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.FLOAT, table);
     }
     setAniso(level) {
       const gl = this.gl, ext = GL.ext.aniso;
@@ -554,6 +562,7 @@
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); if (p.u.u_albedo) gl.uniform1i(p.u.u_albedo, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texMaterial); if (p.u.u_material) gl.uniform1i(p.u.u_material, 1);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
+      if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {
