@@ -51,14 +51,12 @@
   const SUN_GLOW = 0.15, HORIZON_DIM = 0.14, AUREOLE_FALL = 0.8;
   // Chromaticity (our own fit): the published Preetham chroma whitens the sky from ~30° down (x 0.32 at the horizon
   // against 0.24 overhead), so the picture went pale. Here the chroma runs from the zenith's deep blue to the horizon's
-  // pale blue along (cos θ)^0.42 — the blue holds down to a few degrees above the horizon, then pales (the gradient of
-  // v0.41's palette, which the trailer's sky also has) — times a Perez sun-side term (C e^{Dγ}: a little warmer toward
-  // the sun). Turbidity whitens both ends toward the white point (by a quarter of the way at most, in a storm). While
-  // the sun is low the zenith turns violet-blue (XY_TWI, the palette's dusk zenith), never orange: the warm colours of
-  // dawn and dusk sit low on the sun's side (the twilight term), the zenith stays blue as in the real sky.
-  // The sun-side term warms the sky near a low sun (its light comes the long way through the air): C grows and the
-  // lobe narrows (D) as the sun nears the horizon line — orange-yellow beside the rising sun, neutral 30° away.
-  const CH_P = 0.42;
+  // pale lavender along (cos θ)^K.chP — the blue holds high, then pales toward the horizon (the gradient of v0.41's
+  // palette and of the trailer's sky) — times a Perez sun-side term (C e^{Dγ}: whiter and warmer beside the sun).
+  // Turbidity whitens both ends toward the white point (by a quarter of the way at most, in thick fog). While the sun is
+  // low the zenith turns violet-blue (XY_TWI, the palette's dusk zenith), never orange: the warm colours of dawn and
+  // dusk sit low on the sun's side (the twilight term and the sun-side term, which grows and narrows as the sun nears
+  // the horizon line — orange-yellow beside the rising sun, neutral 30° away), the zenith stays blue as in the real sky.
   const XY_ZEN = [0.212, 0.198], XY_TWI = [0.228, 0.186], XY_WHITE = [0.3127, 0.3290];
   const ONE3 = [1, 1, 1];
   const whiten = (xy, T) => { const h = clamp((T - 2) / 8, 0, 1) * 0.25; return [xy[0] + (XY_WHITE[0] - xy[0]) * h, xy[1] + (XY_WHITE[1] - xy[1]) * h]; };
@@ -295,5 +293,5 @@
     return o;
   }
 
-  VR.Atmos = { SKY_SCALE, K, LUT_W, LUT_H, CH_P, TW_ZEN, EXPOSURE, HAZE_GLOW, FOG_MIX, HAZE_K, sunDir, prepare, radiance, glow, weather, air, haze, airParams, skyWeather, lutUV, buildLUT, sampleLUT, easeExposure, exposureTarget, zenithLum, zenithXY, horizonXY, glParams };
+  VR.Atmos = { SKY_SCALE, K, LUT_W, LUT_H, TW_ZEN, EXPOSURE, HAZE_GLOW, FOG_MIX, HAZE_K, sunDir, prepare, radiance, glow, weather, air, haze, airParams, skyWeather, lutUV, buildLUT, sampleLUT, easeExposure, exposureTarget, zenithLum, zenithXY, horizonXY, glParams };
 })(VR);
