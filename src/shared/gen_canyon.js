@@ -62,6 +62,37 @@
     };
   }
 
+  // the lava vents: where the two crack seams of the mesa tops cross (the noise gen_realm draws the seams with). Smoke
+  // columns rise from them at run time (vents.js); computed once per world, a couple of dozen points at most.
+  // one grid point (x, z) of the vent lattice: a vent [x, y, z] on a mesa top, or null
+  CAN.ventAt = function (g, x, z) {
+    if (Math.abs(g.nCrack.n2(x, z)) > 0.025 || Math.abs(g.nCrack2.n2(x, z)) > 0.025) return null;
+    const cl = g.climateAt(x, z);
+    if (cl.heart < 0.5 || cl.ember < 0.6 || cl.canyon > 0.3) return null;
+    const h = g.surfaceY(x, z);
+    if (h < 88 || h > 120) return null;
+    return [x, h + 1, z];
+  };
+  // every vent of the canyon box (a lattice of 4 blocks; the chunks carry their own, see ventsIn)
+  CAN.vents = function (g) {
+    if (g._canyonVents) return g._canyonVents;
+    VR.realmNoise(g);
+    const out = [], B = CAN.box;
+    for (let x = B.x0 + 4; x <= B.x1 - 4; x += 4) for (let z = B.z0 + 4; z <= B.z1 - 4; z += 4) { const v = CAN.ventAt(g, x, z); if (v) out.push(v); }
+    g._canyonVents = out;
+    return out;
+  };
+  // the vents of one chunk: the lattice points that fall inside it (the chunk generator writes them as spawns)
+  CAN.ventsIn = function (g, cx, cz) {
+    VR.realmNoise(g);
+    const out = [], B = CAN.box, x0 = cx * 16, z0 = cz * 16;
+    for (let x = B.x0 + 4; x <= B.x1 - 4; x += 4) {
+      if (x < x0 || x >= x0 + 16) continue;
+      for (let z = B.z0 + 4; z <= B.z1 - 4; z += 4) { if (z < z0 || z >= z0 + 16) continue; const v = CAN.ventAt(g, x, z); if (v) out.push(v); }
+    }
+    return out;
+  };
+
   // ---------------------------------------------------------------- ops
   function mats() {
     return {
@@ -70,6 +101,7 @@
       LAMP0: st('vx_lamppost_tech', { head: 0 }), LAMP1: st('vx_lamppost_tech', { head: 1 }), BEACON: st('beacon_red'), LBEACON: st('launch_beacon'), ANT: st('antenna'), TURRET: st('turret'),
       HULLG: st('hull_plating_gray'), PANEL: st('tech_panel'), PANELA: st('tech_panel_amber'), RAILING: st('vx_tech_railing'), VIEW: st('viewport'),
       DUSK: st('duskrock_bricks'), OCHRE: st('ochre_bricks'), MAG: st('neon_magenta'), CRYV: st('violet_crystal_cluster', { facing: 4, size: 1 }), CRYVB: st('violet_crystal_block'), COBBLE: st('mossy_cobblestone') || st('cobblestone'),
+      CRYB: (c) => st(c + '_crystal_block'), CRY: (c, big) => st(c + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 }),
     };
   }
   CAN.build = function (g) {
@@ -151,6 +183,26 @@
       for (let t = 2; t <= 5; t++) put(x, h + HT + t, z, t === 5 ? K.BEACON : K.ANT);
       put(x + 3, h + 1, z + 3, K.LBEACON);
     });
+    // ---- giant crystal clusters on the mesa tops (TRAILER.md §3.5: 8–22 tall, magenta, azure, verdant, rose): a column
+    // of crystal blocks (their light makes the ground round it glow), two shorter shards and a cluster on top
+    {
+      const crng = new VR.RNG(g.seed ^ 0xc41e), B = CAN.box, gems = [];
+      const COL = ['violet', 'azure', 'verdant', 'rose'];
+      for (let k = 0; k < 1400 && gems.length < 14; k++) {
+        const x = B.x0 + 8 + crng.int(B.x1 - B.x0 - 16), z = B.z0 + 8 + crng.int(B.z1 - B.z0 - 16);
+        const h = g.surfaceY(x, z);
+        if (h < 90 || h > 112) continue;
+        const cl = g.climateAt(x, z);
+        if (cl.ember < 0.6 || cl.canyon > 0.2) continue;
+        if (nearLine(x, z, 12) || sites.some(s => Math.hypot(s[0] - x, s[1] - z) < 14) || gems.some(s => Math.hypot(s[0] - x, s[1] - z) < 40)) continue;
+        let flat = true; for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) if (Math.abs(g.surfaceY(x + dx, z + dz) - h) > 2) flat = false;
+        if (!flat) continue;
+        const c = COL[crng.int(COL.length)], H = 9 + crng.int(12);
+        for (const [dx, dz, hh] of [[0, 0, H], [1, 0, H - 4], [0, 1, H - 6]]) for (let t = 0; t < hh; t++) put(x + dx, h + 1 + t, z + dz, K.CRYB(c));
+        put(x, h + 1 + H, z, K.CRY(c, true)); put(x + 1, h + H - 3, z, K.CRY(c, false)); put(x, h + H - 5, z + 1, K.CRY(c, false));
+        gems.push([x, z, h]);
+      }
+    }
     // ---- the ruin village: seven broken houses of dusk & ochre bricks, magenta windows, a crystal well
     {
       let cx = -125, cz = 330, best = null;
@@ -200,5 +252,7 @@
     // the tram line announces itself from the chunk holding its first point
     const Ln = CAN.line(g), P0 = Ln.pts[0];
     if (Math.round(P0[0]) >= x0 && Math.round(P0[0]) < x0 + 16 && Math.round(P0[1]) >= z0 && Math.round(P0[1]) < z0 + 16) { if (!out.spawns) out.spawns = []; out.spawns.push(['railway', Ln.key, Math.round(P0[0]), Ln.Y[0], Math.round(P0[1])]); }
+    // the lava vents of this chunk: the smoke columns of the canyon rise from them (vents.js, on the client)
+    for (const v of CAN.ventsIn(g, cx, cz)) { if (!out.spawns) out.spawns = []; out.spawns.push(['vent', v[0], v[1], v[2]]); }
   });
 })(VR);
