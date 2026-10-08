@@ -627,6 +627,12 @@ uniform vec3 u_camFrac;
 uniform vec3 u_waterFogColor;
 uniform float u_underwater;
 uniform float u_blockVar;     // Klassisch: still water reads per block (chunky ripples, a faint seam), glass texels crisp
+uniform sampler2D u_reflTex;  // F7: the planar reflection of the water (renderer.js), valid when u_reflOn > 0.5
+uniform float u_reflOn;
+uniform float u_waterTier;    // 0 Very Low (sky-LUT reflection only, no caustics), 1 and 2: caustics on the floor
+uniform vec2 u_windDir;       // the wind's heading (weather.js), the swell runs with it
+uniform float u_stormK;       // the storm factor of the waves (water_wave.js)
+${(VR.WaterWave ? VR.WaterWave.glsl() : '')}
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -670,6 +676,36 @@ vec3 waveNormal(vec2 p) {
   float hz = texture(u_noise, (a + vec2(0.0, e)) / 16.0).b * 0.6 + texture(u_noise, (b + vec2(0.0, e)) / 16.0).b * 0.4;
   return normalize(vec3((h0 - hx) * 1.6, 1.0, (h0 - hz) * 1.6));
 }
+// the flow of a river (the mesher's slope rule, w3 bits 12-13): down the slope in one of four directions
+vec2 flowDir(uint w3) {
+  uint r = (w3 >> 12u) & 3u;
+  return r == 0u ? vec2(0.0, -1.0) : r == 1u ? vec2(1.0, 0.0) : r == 2u ? vec2(0.0, 1.0) : vec2(-1.0, 0.0);
+}
+// rain rings: the slope of the surface where drops land (one hashed spot per block, each ring grows and fades)
+vec2 ringN(vec2 p, float t) {
+  vec2 g = floor(p), acc = vec2(0.0);
+  for (int j = -1; j <= 0; j++) for (int i = -1; i <= 0; i++) {
+    vec2 cell = g + vec2(float(i), float(j));
+    float h1 = hash12(cell), h2 = hash12(cell + vec2(17.3, 5.1));
+    float age = fract(t * 0.6 + h1 * 7.0);
+    float rad = age * 0.45;
+    vec2 dv = p - (cell + vec2(h1, h2));
+    float dd = length(dv), e = dd - rad;
+    acc += dv / max(dd, 1e-3) * (cos(e * 40.0) * exp(-e * e * 90.0) * (1.0 - age));
+  }
+  return acc * 0.25;
+}
+// caustics: the light network that the surface throws onto a shallow floor (warped sines, bright where the
+// fold lines cross; our own construction)
+float causticAt(vec2 p, float t) {
+  vec2 q = p * 0.7;
+  float c = 0.0;
+  for (int i = 0; i < 3; i++) {
+    q += 0.55 * vec2(sin(q.y * 1.4 + t * 0.6 + float(i)), sin(q.x * 1.2 - t * 0.5 + float(i) * 1.9));
+    c += 1.0 - abs(sin(q.x * 2.2) * sin(q.y * 2.2));
+  }
+  return pow(c / 3.0, 5.0);
+}
 void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
@@ -692,13 +728,25 @@ void main() {
     // facing the camera may shade — the other one z-fights and would mirror the sky at fresnel = 1
     if (dot(NORMALS[face], V) < 0.0) discard;
     vec3 wp = v_localPos + vec3(u_camInt);
-    // Klassisch: the ripples in 16 chunky pixels per block, like the ground's texels
-    vec3 n = face == 2u || face == 3u ? waveNormal(u_blockVar > 0.5 ? (floor(wp.xz * 16.0) + 0.5) / 16.0 : wp.xz) : NORMALS[face];
-    if (face == 3u) n = -n;
-    if (kind == 6u && face != 2u) n = normalize(NORMALS[face] + vec3(sin(wp.y * 6.0 - u_time * 6.0) * 0.08, 0.0, 0.0));
     vec3 wcol = v_tint;
     float sceneD = texture(u_sceneDepth, suv).r;
     float thick = max(0.0, linDepth(sceneD) - linDepth(gl_FragCoord.z));
+    // the surface: three Gerstner octaves (water_wave.js, the same functions the bob uses on the CPU). The body of
+    // water sets the size (a pond is calm, the sea rolls, the shore flattens), the air the storm; a river runs with
+    // its flow. Klassisch quantises the ripples to 16 px per block, like the ground's texels
+    vec3 n = NORMALS[face];
+    float ak = waterBody(thick) * u_stormK;
+    vec2 wq = u_blockVar > 0.5 ? (floor(wp.xz * 16.0) + 0.5) / 16.0 : wp.xz;
+    if (face == 2u) {
+      float wh = 0.0;
+      n = gerstnerN(wq, u_time, kind == 6u ? flowDir(v_w3) : u_windDir, kind == 6u ? ak * 0.6 : ak, wh);
+    } else if (kind == 6u) {
+      // a falling sheet (waterfall): streaks run down the face
+      vec3 tg = (face == 0u || face == 1u) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+      float streak = sin(dot(wp, tg) * 9.0 + sin(wp.y * 2.0) * 1.3 - u_time * 1.5);
+      n = normalize(NORMALS[face] + tg * streak * 0.14);
+    }
+    if (face == 2u && u_rain > 0.02 && u_waterTier > 0.5) { vec2 g = ringN(wp.xz, u_time) * u_rain; n = normalize(vec3(n.x + g.x, n.y, n.z + g.y)); }
     vec2 off = n.xz * 0.035 * clamp(thick * 0.3, 0.0, 1.0) * (1.0 - u_underwater * 0.6);
     vec3 refr = texture(u_sceneColor, clamp(suv + off, 0.001, 0.999)).rgb;
     float sd2 = texture(u_sceneDepth, clamp(suv + off, 0.001, 0.999)).r;
@@ -724,24 +772,43 @@ void main() {
       seamK = (1.0 - smoothstep(0.08, 0.25, pxW)) * (1.0 - smoothstep(0.03, 0.03 + pxW, min(e.x, e.y)));
     }
     vec3 deep = body * (u_ambSky * skyL * 0.74 + blockL * 0.45 + lc * 0.095 * v_sky) + body * 0.012;
-    vec3 under = mix(refr * mix(vec3(1.0), vec3(0.26, 0.6, 0.92) + vec3(0.0, 0.04, 0.0) * bandN, 0.72), deep, clamp(absorb, 0.0, 0.96));
+    // the biome's water colour sets what the water keeps of the light (clear lagoon turquoise, murky swamp green,
+    // the cold sea's deep blue): its hue, brightest channel 1, mixed into the absorption
+    vec3 bioN = wcol / max(max(wcol.r, max(wcol.g, wcol.b)), 1e-3);
+    vec3 absCol = mix(vec3(0.26, 0.6, 0.92) + vec3(0.0, 0.04, 0.0) * bandN, bioN * vec3(0.62, 0.9, 1.0), 0.75);
+    vec3 under = mix(refr * mix(vec3(1.0), absCol, 0.72), deep, clamp(absorb, 0.0, 0.96));
+    // caustics (tier >= 1): the sun's light network on the floor seen through shallow water
+    if (u_waterTier > 0.5 && face == 2u && thick < 6.0 && sunUp > 0.001) {
+      vec3 D = -V;
+      vec2 fl = wp.xz + D.xz / max(-D.y, 0.25) * thick * 0.75;
+      under += u_sunColor * sunUp * causticAt(fl, u_time) * 0.22 * exp(-thick * 0.3) * (1.0 - u_rain);
+    }
     vec3 R = reflect(-V, n);
     R.y = abs(R.y);
     vec3 refl = skyColor(R, false) * mix(0.25, 1.0, skyL);
     refl = mix(refl, refl * vec3(0.62, 0.84, 1.0) + body * 0.25, 0.4);
+    if (u_reflOn > 0.5) {
+      // the planar reflection (renderer.js): the mirrored near world and sky, shifted by the slope of the surface
+      vec3 pr = texture(u_reflTex, clamp(suv + n.xz * vec2(0.22, 0.4), 0.001, 0.999)).rgb;
+      refl = pr * vec3(0.86, 0.94, 1.0) + body * 0.1;
+    }
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
     fres = min(fres * 0.85, 0.66);
     if (u_underwater > 0.5) { fres = face == 3u ? 0.0 : fres * 0.3; }
     vec3 col = mix(under * (1.0 - 0.22 * seamK), refl, clamp(fres, 0.0, 1.0));
-    // sun glints
+    // sun sparkle: a GGX lobe whose width follows the slope (steep water glitters wider and dimmer), plus a sheen
     vec3 H = normalize(L + V);
-    float sp = pow(max(dot(n, H), 0.0), 700.0) * 30.0 + pow(max(dot(n, H), 0.0), 60.0) * 0.4;
+    float nh = max(dot(n, H), 0.0);
+    float a = 0.02 + 0.09 * clamp(length(n.xz) * 2.0, 0.0, 1.0), a2 = a * a;
+    float dd = nh * nh * (a2 - 1.0) + 1.0;
+    float sp = (a2 / (3.14159 * dd * dd)) * (0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0)) * 1.6 + pow(nh, 60.0) * 0.4;
     col += lc * sp * (sp > 0.004 ? shadowAt(NORMALS[face], L) : 1.0) * smoothstep(0.6, 1.0, v_sky) * (1.0 - u_rain);
     // shore foam
     float foam = (1.0 - smoothstep(0.0, 0.45, thick)) * (0.6 + 0.4 * sin(wp.x * 3.0 + wp.z * 2.0 + u_time * 2.0));
     col = mix(col, vec3(0.9) * (u_ambSky * skyL + blockL + lc * 0.3), clamp(foam, 0.0, 1.0) * 0.45 * float(face == 2u));
     col = applyFog(col, v_rel, dist);
-    o_col = vec4(col, 1.0);
+    // the depth-fade edge: where the water is a few centimetres deep it lets the shore through, so no edge cuts
+    o_col = vec4(col, face == 2u ? mix(0.55, 1.0, smoothstep(0.03, 0.7, thick)) : 1.0);
     return;
   }
   if (kind == 7u) {
@@ -856,12 +923,13 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); v_uv = p; 
 
   S.SKY_FS = `
 uniform mat4 u_invViewProj;
+uniform vec3 u_skyOff;     // the mirror camera's offset in the planar reflection (renderer.js), zero otherwise
 ${'__COMMON__'}
 in vec2 v_uv;
 out vec4 o;
 void main() {
   vec4 p = u_invViewProj * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
-  vec3 dir = normalize(p.xyz / p.w);
+  vec3 dir = normalize(p.xyz / p.w - u_skyOff);
   vec3 col = skyColor(dir, true);
   if (u_fog.w > 0.5) col = u_fogColor;
   o = vec4(col, 1.0);
@@ -1196,6 +1264,10 @@ uniform vec2 u_screen;
 uniform vec2 u_sceneTexel;
 uniform float u_sharpen;
 uniform float u_vivid;      // 0 = filmic (brights fade to white), 1 = hue-preserving (glows stay coloured)
+uniform float u_shafts;     // F7: underwater light shafts (tier 2), 0 above the water
+uniform float u_crossing;   // F7: the surface passing the eye (1 at the moment, fading): a ripple across the picture
+uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed in the world
+uniform vec3 u_shaftCol;
 in vec2 v_uv;
 out vec4 o;
 // HDR → 0..1 for the sharpening weights (keeps bright lights from ringing)
@@ -1216,6 +1288,7 @@ vec3 tonemap(vec3 x) {
 void main() {
   vec2 uv = v_uv;
   if (u_underwaterFx > 0.0) uv += vec2(sin(uv.y * 28.0 + u_time * 2.2), cos(uv.x * 22.0 + u_time * 1.7)) * 0.0022 * u_underwaterFx;
+  if (u_crossing > 0.0) uv += vec2(sin(uv.y * 36.0 + u_time * 11.0), cos(uv.x * 28.0 - u_time * 9.0)) * 0.006 * u_crossing;
   if (u_portal > 0.0) { vec2 c = uv - 0.5; float a = u_portal * 1.5 * (1.0 - length(c)); uv = 0.5 + mat2(cos(a), -sin(a), sin(a), cos(a)) * c; }
   vec3 c;
   if (u_sharpen > 0.0) {
@@ -1230,6 +1303,15 @@ void main() {
   } else c = texture(u_scene, uv).rgb;
   c += texture(u_bloom, uv).rgb * u_bloomStrength;
   if (u_useRays > 0.5) c += texture(u_rays, uv).rgb;
+  if (u_shafts > 0.0) {
+    // light shafts: columns of light from the surface, where the view ray points up toward it, drifting slowly
+    vec4 wr = u_invVP * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
+    vec3 rd = normalize(wr.xyz / wr.w);
+    vec2 P = rd.xz / max(0.2, -rd.y) * 4.0;
+    float s1 = 0.5 + 0.5 * sin(P.x * 2.3 + 0.9 * sin(P.y * 1.7 + u_time * 0.3));
+    float s2 = 0.5 + 0.5 * sin(P.y * 2.9 - u_time * 0.25 + 1.4 * sin(P.x * 1.3));
+    c += u_shaftCol * pow(s1 * s2, 3.0) * smoothstep(-0.2, 0.5, rd.y) * u_shafts * 0.25;
+  }
   c *= u_exposure;
   c = tonemap(c * u_grade);
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
