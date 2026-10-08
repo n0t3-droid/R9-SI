@@ -115,5 +115,5 @@ else { check(talk.opts.includes('Wie geht’s dir?') && talk.opts.includes('Tsch
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 check(!logs.some(l => l.startsWith('[pageerror]')), 'no page errors');
 await browser.close();
-console.log(fails ? 'FAIL ' + fails : 'OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
