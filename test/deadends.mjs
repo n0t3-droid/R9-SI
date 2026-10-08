@@ -249,7 +249,7 @@ await section('7 · the small ones: 🗑 asks twice, ↻ on screen, ✋ Benutzen
     CR.vApply([[i0 % it.VW, Math.floor(i0 / (it.VW * it.VD)), Math.floor(i0 / it.VW) % it.VD, VR.VM.M.matte(0x20d020) >>> 0]]);
     document.querySelector('#partsBody [data-act="save"]').click(); await sleep(300);
     out.saved = !!(CR.store().models || {})[sofa];
-    const del = () => [...document.querySelectorAll('#partsBody .design')].find(d => d.textContent.includes(VR.VM.MODELS[sofa].display.split(' ·')[0])) ;
+    const del = () => [...document.querySelectorAll('#partsBody .design')].find(d => d.textContent.includes((VR.dispName ? VR.dispName(VR.VM.MODELS[sofa].display) : VR.VM.MODELS[sofa].display).split(' ·')[0]));   // (the card shows the player's language: VR.dispName since i18n2)
     const d1 = del(), tb = d1 && d1.querySelector('[data-act="del"]');
     if (tb) { tb.dataset.probe = '1'; tb.click(); } await sleep(100);
     out.after1 = !!(CR.store().models || {})[sofa];
