@@ -24,6 +24,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F, PH = VR.PHYS, mat4 = VR.mat4;
   const TAU = Math.PI * 2, DEG = Math.PI / 180;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -111,7 +113,7 @@
       // up in the air the engines are running; on the ground the ship waits cold
       if (this.state !== 'landed') { this.power = 'running'; this.startT = TUNE.startTime; }
       this.spool = this.running ? 0.25 : 0;
-      if (!this.running && g.ui && g.ui.hint) g.ui.hint('Systems cold — flip POWER and press START in the cockpit, or just push W', 4500);
+      if (!this.running && g.ui && g.ui.hint) g.ui.hint(T('g.fl.cold'), 4500);
     }
     leave() {
       const g = this.g;
@@ -123,15 +125,15 @@
     }
     // ---- cockpit systems
     setPower(on) {
-      if (on) { if (this.power === 'off') { this.power = 'on'; this.sfx('switch'); this.say('Power on — START spins up the engines'); } return true; }
+      if (on) { if (this.power === 'off') { this.power = 'on'; this.sfx('switch'); this.say(T('g.fl.powerOn')); } return true; }
       if (this.power === 'off') return true;
-      if (this.state !== 'landed') { this.say('Not while flying!'); this.sfx('deny'); return false; }
+      if (this.state !== 'landed') { this.say(T('g.fl.notFlying')); this.sfx('deny'); return false; }
       this.power = 'off'; this.startT = 0; this.throttle = 0; this.boost = false; this.auto = null; this.sfx('switch');
       return true;
     }
     startEngines() {
       if (this.power === 'running' || this.power === 'starting') return true;
-      if (this.power === 'off') { this.say('No power — open the guard and flip POWER first'); this.sfx('deny'); return false; }
+      if (this.power === 'off') { this.say(T('g.fl.noPower')); this.sfx('deny'); return false; }
       this.power = 'starting'; this.startT = 0; this.sfx('spool');
       return true;
     }
@@ -203,19 +205,19 @@
       if (!this.running && (thrIn > 0 || climbK > 0 || wheel < 0)) this.autoStart();
       // any flight input hands the controls back (autopilot, assisted landing)
       const mouseFly = this.steering && (dx || dy);
-      if (this.auto && (thrIn || turnK || climbK || x0 || wheel || mouseFly)) this.stopAuto('Autopilot off — you have the controls.');
+      if (this.auto && (thrIn || turnK || climbK || x0 || wheel || mouseFly)) this.stopAuto(T('g.fl.autoOff'));
       if (this.state === 'landing' && (thrIn > 0 || turnK || climbK > 0 || x0 || wheel < 0 || mouseFly)) this.state = 'flying';
       if (!this.auto) { this.ctl.turn = turn; this.ctl.climb = climb; this.ctl.strafe = 0; this.ctl.speed = null; }
       return null;
     }
     toggleGear() {
-      if (this.state === 'landed') { this.say('Gear stays down on the ground'); return; }
+      if (this.state === 'landed') { this.say(T('g.fl.gearGround')); return; }
       this.gearAuto = false; this.gearHigh = false; this.gearDown = !this.gearDown;
       this.sfx('servo');
     }
     setLights(on) { this.lights = !!on; this.sfx('switch'); }
     setRamp(open) {
-      if (open && this.speed > TUNE.rampMax) { this.say(`Ramp locked above ${TUNE.rampMax} m/s`); this.sfx('deny'); return false; }
+      if (open && this.speed > TUNE.rampMax) { this.say(T('g.fl.rampLocked', { v: TUNE.rampMax })); this.sfx('deny'); return false; }
       this.rampOpen = !!open; this.sfx('servo'); return true;
     }
     assistLand(on) {
@@ -223,7 +225,7 @@
       if (this.state === 'landed') return;
       this.state = 'landing'; this.throttle = 0; this.boost = false; this.holdAlt = null;
       if (this.auto && !this.auto.landing) this.stopAuto(null);
-      this.say('Landing — V again to cancel');
+      this.say(T('g.fl.landing'));
     }
     say(t) { const ui = this.g.ui; if (ui && ui.hint) ui.hint(t, 1800); }
     sfx(n, o) { const a = this.g.audio; if (a) a.play(n, o); }
@@ -235,7 +237,7 @@
       for (let i = 0; i < 3; i++) { if (!isFinite(p[i])) p[i] = this.lastGood ? this.lastGood[i] : 100; if (!isFinite(v[i])) v[i] = 0; }
       // boost: B burns the energy bar (≈ 5 s), it refills a moment after you let go
       const wantB = this.boostWant && this.state === 'flying';
-      if (wantB && !this.boost && this.energy > 0.15) { this.boost = true; this.fovKick = 0.07; this.bump = Math.max(this.bump, 0.5); this.sfx('boost'); }
+      if (wantB && !this.boost && this.energy > 0.15) { this.boost = true; this.fovKick = 0.09; this.bump = Math.max(this.bump, 0.5); this.sfx('boost'); }
       if (this.boost && (!wantB || this.energy <= 0)) { this.boost = false; this.boostCool = 0.8; }
       if (this.boost) this.energy = Math.max(0, this.energy - dt / TUNE.boostTime);
       else { this.boostCool -= dt; if (this.boostCool <= 0) this.energy = Math.min(1, this.energy + dt / TUNE.boostRefill); }
@@ -279,7 +281,7 @@
       if (this.steering && dh) this.headYaw = clamp(this.headYaw - dh, -TUNE.headYaw, TUNE.headYaw);
       // ---- vertical: Space/Shift climb up to 14 m/s, otherwise hold the altitude
       let vyT;
-      if (this.state === 'landing') vyT = -10;
+      if (this.state === 'landing') vyT = this.flareSink();
       else if (Math.abs(this.ctl.climb) > 0.01) { vyT = this.ctl.climb * TUNE.climb; this.holdAlt = null; }
       else { if (this.holdAlt === null) this.holdAlt = p[1] + vy * 0.3; vyT = clamp((this.holdAlt - p[1]) * 2.2, -TUNE.climb, TUNE.climb); }
       if (p[1] + (b.height || 4) > 252 && vyT > 0) vyT = 0;
@@ -302,7 +304,9 @@
       const acc = (vF - vF0) / dt;
       const bankK = clamp(0.25 + sp / 20, 0.25, 1);
       const rollT = clamp(this.yawRate / (TUNE.turnCruise * (this.b.agility || 1)), -1, 1) * TUNE.bank * bankK;
-      const pitchT = clamp(v[1] / TUNE.climb * 0.12 - acc * 0.006, -0.18, 0.18);
+      let pitchT = clamp(v[1] / TUNE.climb * 0.12 - acc * 0.006, -0.18, 0.18);
+      // the flare: the nose comes up over the last 9 m of the approach
+      if (this.state === 'landing' && alt !== null && alt < 9) pitchT = clamp(pitchT + 0.1 * (1 - Math.max(0, alt) / 9), -0.18, 0.2);
       this.attitude(dt, rollT, pitchT);
       this.suspension(dt);
       this.lastGood = p.slice();
@@ -381,9 +385,15 @@
       if (A && A.landing) {
         this.auto = null;
         const g = this.g, name = A.site.name;
-        g.ui.chatLine(`Welcome to ${name}! V to get out.`, '#ffd98a'); g.ui.hint(`Welcome to ${name}!`, 3000);
+        g.ui.chatLine(T('g.fl.welcomeChat', { name }), '#ffd98a'); g.ui.hint(T('g.fl.welcome', { name }), 3000);
         if (g.codex && g.codex.event) g.codex.event('autopilot');
       }
+    }
+    // the approach glides down at up to 10 m/s, then the flare: the sink eases off as the gear nears the ground
+    // (a 1.4 s time constant), so the touchdown is soft and nothing bounces
+    flareSink() {
+      const a = this.alt;
+      return a === null ? -6 : -clamp(0.7 * a + 0.5, 0.5, 10);
     }
     unstick() {
       const b = this.b, p = b.pos, h = b.heading;
@@ -412,10 +422,10 @@
       if (!c) return null;
       const top = c.height[((zi & 15) << 4) | (xi & 15)];
       if (top + 1 <= y) return top + 1;
-      const T = R.T;
+      const BT = R.T;
       for (let yy = Math.min(Math.floor(y), VR.MAXY - 1); yy > y - depth && yy >= 0; yy--) {
         const s = c.blocks[(yy << 8) | ((zi & 15) << 4) | (xi & 15)];
-        if (s && (T.flags[s] & (F.SOLID | F.FLUID)) && !(T.flags[s] & F.REPLACE)) return yy + 1;
+        if (s && (BT.flags[s] & (F.SOLID | F.FLUID)) && !(BT.flags[s] & F.REPLACE)) return yy + 1;
       }
       return -1e9;
     }
@@ -478,7 +488,7 @@
       this.shake[0] = n(9.3, 1.7, 2.9) * A * 0.006; this.shake[1] = n(11.7, 0.3, 4.1) * A * 0.006; this.shake[2] = n(7.9, 2.2, 1.3) * A * 0.007; this.shake[3] = n(13.1, 3.1, 0.7) * A * 0.02;
       // FOV: up to +10 % with speed, a kick when the boost lights
       const vmax = cr * TUNE.boostK;
-      this.fovKick += ((this.boost ? 0.02 : 0) - this.fovKick) * k1(1.8, dt);
+      this.fovKick += ((this.boost ? 0.05 : 0) - this.fovKick) * k1(1.8, dt);
       this.fovK = 1 + 0.1 * clamp((sp - cr * 0.25) / (vmax - cr * 0.25), 0, 1) + this.fovKick;
       // acceleration (for the chase camera's lag)
       for (let i = 0; i < 3; i++) { const a = (v[i] - this.lastV[i]) / dt; this.accSm[i] += (clamp(a, -40, 40) - this.accSm[i]) * k1(4, dt); this.lastV[i] = v[i]; }
@@ -490,12 +500,14 @@
       const thrust = clamp(this.spool, 0.1, 1.45), boost = this.boost;
       const ex = b.exhaust || [];
       const dir = this.dirWorld([0, 0, 1]);
+      // the plume: cyan-white at cruise (the trailer's long luminous trails), orange-white flames while hovering
+      const hot = !boost && sp < this.cruise * 0.3;
       for (let i = 0; i < ex.length; i++) {
         const e = ex[i];
-        if (TR && this.spool > 0.05) TR.engine('fl' + this.id + ':' + i, this.toWorld([e[0], e[1], e[2] + 0.3]), sp, { thrust: Math.min(1.3, thrust), size: (e[3] || 0.5) * (boost ? 1.45 : 1), col: boost ? [0.35, 0.72, 1] : [0.55, 0.5, 1], minor: i > 1 });
+        if (TR && this.spool > 0.05) TR.engine('fl' + this.id + ':' + i, this.toWorld([e[0], e[1], e[2] + 0.3]), sp, { thrust: Math.min(1.3, thrust), size: (e[3] || 0.5) * (boost ? 1.45 : 1), col: hot ? [1, 0.6, 0.28] : boost ? [0.42, 0.85, 1] : [0.52, 0.92, 1], minor: i > 1 });
         if (!P || this.state === 'landed' || !this.running || Math.random() > (low ? 0.25 : 0.35) + thrust * 0.5) continue;
         const wp = this.toWorld([e[0] + (Math.random() - 0.5) * e[3], e[1] + (Math.random() - 0.5) * e[3], e[2] + 0.2]), vv = 6 + thrust * 16 + (boost ? 14 : 0), v = b.vel;
-        P.spawn(wp[0], wp[1], wp[2], dir[0] * vv + v[0] * 0.7, dir[1] * vv + v[1] * 0.7, dir[2] * vv + v[2] * 0.7, { life: 0.14 + thrust * 0.2 + (boost ? 0.12 : 0), size: (e[3] || 0.5) * (0.5 + thrust * 0.45) * (boost ? 1.3 : 1), grav: 0, col: boost ? [0.5, 0.82, 1] : [1, 0.62, 0.28], emis: 1, drag: 2, grow: 0.7, collide: false });
+        P.spawn(wp[0], wp[1], wp[2], dir[0] * vv + v[0] * 0.7, dir[1] * vv + v[1] * 0.7, dir[2] * vv + v[2] * 0.7, { life: 0.14 + thrust * 0.2 + (boost ? 0.12 : 0), size: (e[3] || 0.5) * (0.5 + thrust * 0.45) * (boost ? 1.3 : 1), grav: 0, col: boost ? [0.6, 0.9, 1] : hot ? [1, 0.7, 0.35] : [0.48, 0.82, 1], emis: 1, drag: 2, grow: 0.7, collide: false });
       }
       // engine wash: dust (or spray) blown off the ground below 8 m
       if (this.alt !== null && this.alt < TUNE.cushion && this.state !== 'landed' && P) {
@@ -624,14 +636,18 @@
     // ---------------------------------------------------------------- autopilot: fly me to the next village
     autoTargets() {
       const g = this.g, V = g.villages, p = this.b.pos; if (!V || !V.list) return [];
-      return V.list().filter(v => Math.hypot(v.x - p[0], v.z - p[2]) > 140).sort((a, c) => Math.hypot(a.x - p[0], a.z - p[2]) - Math.hypot(c.x - p[0], c.z - p[2]));
+      const list = V.list().filter(v => Math.hypot(v.x - p[0], v.z - p[2]) > 140);
+      // the Gate Temple's apron is a landing site too: the autopilot docks on the runway in front of the portal
+      const H = VR.Heart;
+      if (H && Math.hypot(H.TEMPLE.x - p[0], H.TEMPLE.front + 10 - p[2]) > 140) list.push({ id: 'temple', name: T('g.fl.templeName'), x: H.TEMPLE.x, z: H.TEMPLE.front + 10, y: H.PLAT + 1, dock: true });
+      return list.sort((a, c) => Math.hypot(a.x - p[0], a.z - p[2]) - Math.hypot(c.x - p[0], c.z - p[2]));
     }
     toggleAuto() {
       const g = this.g, list = this.autoTargets();
-      if (!list.length) { g.ui.hint('Autopilot: no other village within 900 blocks yet — fly on and try again', 2600); return; }
+      if (!list.length) { g.ui.hint(T('g.fl.noVillage'), 2600); return; }
       // G cycles through the villages, nearest first, then switches the autopilot off
       let i = 0;
-      if (this.auto) { i = list.findIndex(v => v.id === this.auto.site.id) + 1; if (i <= 0 || i >= Math.min(list.length, 6)) { this.stopAuto('Autopilot off.'); return; } }
+      if (this.auto) { i = list.findIndex(v => v.id === this.auto.site.id) + 1; if (i <= 0 || i >= Math.min(list.length, 6)) { this.stopAuto(T('g.fl.autoOff2')); return; } }
       this.startAuto(list[i]);
     }
     startAuto(site) {
@@ -640,6 +656,8 @@
       const dx = site.x - p[0], dz = site.z - p[2], L = Math.hypot(dx, dz) || 1;
       const RAD = site.rad || (VR.VillageGen && VR.VillageGen.RAD) || 58;
       const A = this.auto = { site, spot: null, cruise: Math.max(p[1] + 18, site.y + 60, 120), t: 0, tries: 0, climb: 0, dist: L, eta: 0, refined: false, landing: false };
+      // a dock site (the temple's apron) is a known field: no survey, the spot is the apron itself
+      if (site.dock) { A.spot = [site.x + 0.5, site.y, site.z + 0.5]; A.refined = true; }
       if (this.state !== 'flying') { this.state = 'flying'; this.holdAlt = null; }
       // touch down just outside the houses, on the side we arrive from
       const base = Math.atan2(-dx, -dz), cand = [];
@@ -658,22 +676,22 @@
         let top = 0; for (let i = cand.length * 5; i < Hh.length; i++) top = Math.max(top, Hh[i]);
         A.cruise = clamp(Math.max(top + 34, (best ? best[1] : site.y) + 45), 100, 236);
       });
-      g.ui.chatLine(`Autopilot engaged → ${site.name} (${(L / 1000).toFixed(1)} km). G: next village · any flight key takes the controls · V lands now.`, '#9affd8');
+      g.ui.chatLine(T('g.fl.auto', { site: site.name, km: (L / 1000).toFixed(1) }), '#9affd8');
       if (g.audio && g.audio.tone) g.audio.tone(660, 0.08, 0.1, 'triangle', true);
     }
     stopAuto(msg) { if (!this.auto) return; this.auto = null; this.ctl.speed = null; this.ctl.strafe = 0; if (msg) this.g.ui.hint(msg, 2200); }
     // near the destination, pick a real landing field from the loaded chunks: flat, dry, no trees or houses
     refineSpot(A) {
-      const g = this.g, w = g.world, T = R.T, VG = VR.VillageGen, site = A.site, RAD = site.rad || (VG && VG.RAD) || 58, p = this.b.pos;
+      const g = this.g, w = g.world, BT = R.T, VG = VR.VillageGen, site = A.site, RAD = site.rad || (VG && VG.RAD) || 58, p = this.b.pos;
       const ext = this.b.extent || [6, 8], hx = Math.ceil(ext[0]) + 1, hz = Math.ceil(ext[1]) + 1;
       const BAD = /leaves|log|wood|vx_|glass|fence|door|wheat|carrot|potato|beet|farmland|planks|bed|lamp|torch|chest|landing_pad|hazard|crystal|ice$/;
       const ground = (x, z) => {
         const c = w.col(x >> 4, z >> 4); if (!c || !c.ready) return null;
         let y = c.height[((z & 15) << 4) | (x & 15)];
-        for (let k = 0; k < 3 && y > 1; k++) { const bl = w.getBlock(x, y, z); if (bl && (T.flags[bl] & F.SOLID)) break; y--; }
+        for (let k = 0; k < 3 && y > 1; k++) { const bl = w.getBlock(x, y, z); if (bl && (BT.flags[bl] & F.SOLID)) break; y--; }
         const bl = w.getBlock(x, y, z);
-        if (!bl || (T.flags[bl] & (F.WATER | F.LAVA))) return -1;
-        const t = R.types[T.type[bl]];
+        if (!bl || (BT.flags[bl] & (F.WATER | F.LAVA))) return -1;
+        const t = R.types[BT.type[bl]];
         if (t && BAD.test(t.name)) return -1;
         return y;
       };

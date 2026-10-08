@@ -21,6 +21,8 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const mat4 = VR.mat4, DEG = Math.PI / 180, TAU = Math.PI * 2;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
@@ -165,12 +167,12 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
         x.font = '8px monospace'; x.fillStyle = '#9ad8ff'; x.fillText(label, tx + 18, TH - 12);
       };
       tape(4, I.speed, 2, 'M/S', I.boost);
-      tape(TW - 40, I.alt, 2, 'HÖHE', false);
+      tape(TW - 40, I.alt, 2, T('g.cock.alt'), false);
       // radar height & vertical speed, mode line
       x.font = 'bold 9px monospace'; x.textAlign = 'center';
       if (I.agl !== null && I.agl < 60) { x.fillStyle = I.agl < 8 ? '#ffb040' : '#7affb0'; x.fillText('R ' + (I.agl < 10 ? I.agl.toFixed(1) : Math.round(I.agl)), cx, TH - 22); }
       x.fillStyle = '#9ad8ff'; x.fillText((I.vs >= 0 ? '▲ ' : '▼ ') + Math.abs(I.vs).toFixed(1), cx, TH - 10);
-      const mode = I.state === 'landed' ? 'GELANDET' : I.state === 'landing' ? 'LANDUNG' : I.auto ? 'AUTOPILOT' : I.boost ? 'BOOST' : Math.abs(I.speed) < 0.5 ? 'SCHWEBEN' : '';
+      const mode = I.state === 'landed' ? T('g.cock.landed') : I.state === 'landing' ? T('g.cock.landing') : I.auto ? T('g.cock.autopilot') : I.boost ? T('g.cock.boost') : Math.abs(I.speed) < 0.5 ? T('g.cock.hover') : '';
       if (mode) { x.fillStyle = I.boost ? '#7ad8ff' : '#9affd8'; x.fillText(mode, cx, 12); }
     }
     navTile(x, I, b, g, fl) {
@@ -194,7 +196,7 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
       x.font = 'bold 9px monospace'; x.textAlign = 'center'; x.textBaseline = 'middle';
       for (let d = 0; d < 360; d += 30) {
         const a = d * DEG + hd, sx = cx + Math.sin(a) * (R0 + 8), sy = cy - Math.cos(a) * (R0 + 8);
-        const lbl = d === 0 ? 'N' : d === 90 ? 'O' : d === 180 ? 'S' : d === 270 ? 'W' : '';
+        const lbl = d === 0 ? 'N' : d === 90 ? T('g.cock.east') : d === 180 ? 'S' : d === 270 ? 'W' : '';
         if (lbl) { x.fillStyle = lbl === 'N' ? '#ff6a5a' : '#9ad8ff'; x.fillText(lbl, sx, sy); }
         else { x.strokeStyle = 'rgba(154,216,255,0.6)'; x.beginPath(); x.moveTo(cx + Math.sin(a) * (R0 + 2), cy - Math.cos(a) * (R0 + 2)); x.lineTo(cx + Math.sin(a) * (R0 + 5), cy - Math.cos(a) * (R0 + 5)); x.stroke(); }
       }
@@ -209,6 +211,20 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
         x.fillStyle = sel ? '#9affd8' : '#ffd88a';
         if (q[2]) { x.beginPath(); x.arc(q[0], q[1], 2.5, 0, TAU); x.fill(); }
         else { x.fillRect(q[0] - 2.5, q[1] - 2.5, 5, 5); x.fillText(v.name.slice(0, 10).toUpperCase(), q[0], q[1] - 7); }
+      }
+      // the Heartland's landmarks: the Gate Temple, the sky isles, the Spire Citadel and the Mountain Station
+      const H = VR.Heart;
+      if (H) {
+        const LM = [[H.TEMPLE.x, H.TEMPLE.front + 10, 'g.fl.lmTemple'], [H.ISLES.x, H.ISLES.z, 'g.fl.lmIsles'], [H.CITADEL.x, H.CITADEL.z, 'g.fl.lmCitadel'], [H.STATION.x, H.STATION.z, 'g.fl.lmStation']];
+        const ta = x.textAlign; x.textAlign = 'center';
+        for (const [lx, lz, key] of LM) {
+          if (Math.hypot(lx - p[0], lz - p[2]) > 1400) continue;
+          const q = toS(lx, lz);
+          x.fillStyle = '#5af4ff';
+          x.beginPath(); x.moveTo(q[0], q[1] - 3.5); x.lineTo(q[0] + 3.5, q[1]); x.lineTo(q[0], q[1] + 3.5); x.lineTo(q[0] - 3.5, q[1]); x.closePath(); x.fill();
+          x.fillText(T(key), q[0], q[1] - 7);
+        }
+        x.textAlign = ta;
       }
       // autopilot route
       if (I.auto) {
@@ -420,7 +436,7 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
       };
       switch (c.id) {
         case 'power': guarded('guard_power', () => fl.setPower(fl.power === 'off')); break;
-        case 'weapons': guarded('guard_weapons', () => { fl.armed = !fl.armed; snd('switch'); if (fl.armed) snd('zap'); if (this.g.ui) this.g.ui.hint(fl.armed ? 'Weapons armed — left click fires' : 'Weapons safe', 1600); }); break;
+        case 'weapons': guarded('guard_weapons', () => { fl.armed = !fl.armed; snd('switch'); if (fl.armed) snd('zap'); if (this.g.ui) this.g.ui.hint(fl.armed ? T('g.cock.armed') : T('g.cock.safe'), 1600); }); break;
         case 'start': A.press.btn_start = 0.2; snd('button'); fl.startEngines(); break;
         case 'auto': A.press.btn_auto = 0.2; snd('button'); if (!fl.running) fl.autoStart(); fl.toggleAuto(); break;
         case 'lights': fl.setLights(!fl.lights); break;
