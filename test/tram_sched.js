@@ -150,6 +150,7 @@ const glints = [], humLevels = [];
 game.particles = { glow: (x, y, z, col, life, size) => glints.push([x, y, z, size]) };
 game.audio = { play() {}, loop: (name, level) => { if (name === 'hum') humLevels.push(level); } };
 T.lines.set(line.key, line);   // (d) took the line off the network; the atmosphere needs it on the network again
+game.settings = { particles: 2 };   // the glints' cost tier: balanced and up (Very Low has particles 0 and no glints)
 stopAt(-line.off + DWELL + 3); tick(0.1);
 const carAt = line.cars[1].pos;
 player.pos = [carAt[0], carAt[1], carAt[2] + 20];
@@ -157,6 +158,9 @@ game.env.night = 0; glints.length = 0; humLevels.length = 0; T.glowT = 0; tick(0
 check(glints.length === 0, 'no headlight glints in daylight');
 game.env.night = 1; T.glowT = 0; glints.length = 0; tick(0.06);
 check(glints.length === 2 * 2 * 2, 'at night each car in reach has two lamps, each with a glint ahead (' + glints.length + ' glints)');
+game.settings.particles = 0; T.glowT = 0; glints.length = 0; tick(0.06);
+check(glints.length === 0, 'Very Low (particles 0) has no headlight glints at night');
+game.settings.particles = 2;
 const near = humLevels[humLevels.length - 1];
 player.pos = [carAt[0], carAt[1], carAt[2] + 40]; tick(0.06);
 const mid = humLevels[humLevels.length - 1];

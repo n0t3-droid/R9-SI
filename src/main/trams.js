@@ -164,7 +164,8 @@
       let near = 1e9;
       for (const c of this.cars) { const d = Math.hypot(c.pos[0] - p.pos[0], c.pos[2] - p.pos[2]); if (d < near) near = d; }
       if (g.audio && g.audio.loop) g.audio.loop('hum', near < HUM_NEAR ? (1 - near / HUM_NEAR) * 0.09 : 0, 0.4);
-      if (night < 0.12 || !g.particles) return;
+      // the glints are a cost tier of their own: none on Very Low (the particles setting is 0 there)
+      if (night < 0.12 || !g.particles || !(g.settings && g.settings.particles > 0)) return;
       this.glowT -= dt;
       if (this.glowT > 0) return;
       this.glowT = 0.05;
