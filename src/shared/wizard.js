@@ -382,6 +382,5 @@
     }
     if (k === 'Enter' && ae && ae.tagName === 'BUTTON' && ae.closest('#wizard')) { e.preventDefault(); ae.click(); }
   }, true);
-  if (hasDoc) window.addEventListener('keyup', (e) => { if (S && !(document.activeElement && /INPUT|TEXTAREA/.test(document.activeElement.tagName))) e.stopPropagation(); }, true);
   if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { if (S) render(); });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
