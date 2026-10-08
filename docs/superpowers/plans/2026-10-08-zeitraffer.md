@@ -120,22 +120,29 @@ README.md / ROADMAP.md untouched.
 
 ## Tasks
 
-- [ ] **1 · Recorder + format (node, test first).** `test/zeitraffer.js`: round trip of random changes (positions,
+- [x] **1 · Recorder + format (node, test first).** `test/zeitraffer.js`: round trip of random changes (positions,
   states, kinds, dims, times, ticks); packing sizes (fill, house, hand); runs; ring-buffer cap with small limits (the
   newest changes survive as a contiguous suffix); persistence format (seg / idx records, check-points, reopen continues);
   world choke points in node (a `World` with a fake pool: `setBlock` with `SB_EDIT`, `bulkSet` with kinds, an UNDO
   batch mirrors its edit); cost per change < 0.1 ms; scan (counts per column) and timeline (gaps capped, bursts
   spread, monotonic); start-state reconstruction (undo newest→oldest, then forward = current). Then `zeit_rec.js`.
-- [ ] **2 · Choke points.** world.js hooks + call sites; save guards; history deleted with the world.
-- [ ] **3 · Replay engine + camera.** `zeitraffer.js` (area pick, copies, undo, light, swap, playback, relight
+- [x] **2 · Choke points.** world.js hooks + call sites; save guards; history deleted with the world.
+- [x] **3 · Replay engine + camera.** `zeitraffer.js` (area pick, copies, undo, light, swap, playback, relight
   throttle, restore), `director.js` orbit rig.
-- [ ] **4 · UI.** Overlay (⏯, scrubber, speeds, 🌅, ⏺, ✕, time label, counts), pause-menu button, 🎒 Meins world
+- [x] **4 · UI.** Overlay (⏯, scrubber, speeds, 🌅, ⏺, ✕, time label, counts), pause-menu button, 🎒 Meins world
   cards (a world not open: it opens and the replay starts when it is ready), texts in both tables, styles.
-- [ ] **5 · ⏺ Video.** Recording canvas, cards, MediaRecorder, downloads capability / Blob fallback.
-- [ ] **6 · Browser test** `test/zeitraffer.mjs` (German UI): hand placements and `/bau`, a fill and `/undo`; 📽 from
+- [x] **5 · ⏺ Video.** Recording canvas, cards, MediaRecorder, downloads capability / Blob fallback.
+- [x] **6 · Browser test** `test/zeitraffer.mjs` (German UI): hand placements and `/bau`, a fill and `/undo`; 📽 from
   the pause menu; the replay shows the land as it was (the tower's cells empty), the scrubber's middle a part, the end
   the finished build; ⏯ advances; ⏺ gives a `video/webm` Blob > 0 bytes (or the fallback when headless has no
   MediaRecorder — said so); Esc: the original columns are back, the player and the sky as before; no page errors.
   Screenshots looked at.
 - [ ] **7 · Regression.** `REGRESS_ONLY=node bash test/regress.sh`, test/lang.js, test/id_snapshot.js, the browser
   tests the change touches (smoke.mjs, blueprint-adjacent: forge.mjs, workbench.mjs).
+
+## Status (after the machine restart)
+
+- Tasks 1–5 were written by the first session (commits 4d5b23f … 04e0579, dc04baa, 094a793, 7f59afc, 004d8e0, 04072a2, 99ac89c). This session ran them for the first time and fixed what the runs showed.
+- Task 6: `test/zeitraffer.mjs` ALL OK on the final build (27 checks, no page errors). Pictures looked at: `test/shots/zeitraffer_1_start.png` (the land as it was), `_2_mid` (34 of 81 cells built), `_3_end` (finished), `_4_rec` (the recording overlay), `_4b_card_title` and `_4c_card_end` (the video's own cards, drawn on the recording canvas), `_5_video` (the preview: a black lead frame, the size in KB), `_6_back` (the pause menu again).
+- Video: a black lead until the copies are lit and meshed, then the title card, the body, the end card. The download goes as bytes to the host's `downloads`; a Blob `<a download>` otherwise.
+- Task 7: `REGRESS_ONLY=node` ALL OK (18 tests, `zeitraffer.js` included); `test/lang.js` OK; `test/id_snapshot.js` ALL OK; `test/smoke.mjs` ALL OK on the final build. `test/forge.mjs` and `test/workbench.mjs` fail in the same checks on the base commit 49c086d (checked in a copy of that commit), so they are not caused by this branch.
