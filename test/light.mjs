@@ -8,9 +8,10 @@
 //    no more clipping than v0.41, the weather's mood (rain and storm darker than the clear day), the exposure ±0.5 stops
 //    and 1 at the clear noon, the fog's density (the foggy land's luminance near v0.41's).
 //  - MEASURE: the fixed scene (default world, seed 1, the Heartland plaza at the spawn, 12:00 = ticks 6000, frozen
-//    time and weather, 1280×720) on Very Low (potato) and High in one world: per pass time (renderer.prof: gl.finish()
-//    around every pass, so the SwiftShader work counts; relative costs only), draws, tris, sections, full-screen
-//    passes. BOTH=1 measures the v0.41 copy (REFDIST) first, in the same session: the before/after cost table.
+//    time and weather, 1280×720) on Very Low (potato) and High in one world: the frame time (FRAMES frames, then a 1×1
+//    read of the canvas, which waits for the GPU: SwiftShader's work counts; relative costs only), the per-pass
+//    submission time (renderer.prof), draws, tris, sections, full-screen passes. BOTH=1 measures the v0.41 copy
+//    (REFDIST) first, in the same session: the before/after cost table.
 //  - SHOTS: outdoors above the plaza at 06:00, 12:00, 18:30, 23:00; inside a lit stone room (two torches, a glowing
 //    block, a window) at 18:30 and 23:00; Very Low and High → test/shots/light_<tag>_<preset>_<clock>.png. LOOK at them.
 //  - RD (default 6) caps the render distance of both presets (High's 14 chunks take too long on the shared machine);
@@ -64,7 +65,7 @@ const settle = async (max = 120) => {
   }
 };
 const toTitle = async (dist) => {
-  await page.goto('file://' + dist + '/index.html');
+  await page.goto('file://' + dist + '/index.html', { timeout: 180000 });
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 };
 
@@ -171,13 +172,25 @@ const lookAt = async (dist, tag) => {
 };
 
 // ---- MEASURE and SHOTS: one world per build, the presets switched in it
+// the frame time: FRAMES frames, then a 1×1 read of the canvas — the read waits until the GPU (SwiftShader) has drawn
+// every frame (WebGL's finish() is a flush in Chromium: it does not wait), so the time is the real work, CPU and GPU
+const timed = (n) => ev((m) => {
+  const g = VR.game, R = g.renderer, gl = R.gl, px = new Uint8Array(4);
+  window.__norender = false;
+  const sync = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+  sync();
+  const t0 = performance.now();
+  for (let i = 0; i < m; i++) { g.last = performance.now() - 33; g.loop(performance.now()); }
+  sync();
+  window.__norender = true;
+  return (performance.now() - t0) / m;
+}, n);
 const measure = async (btag, preset) => {
   await ev(() => { const g = VR.game; g.env.setTime(6000); });
   await drive(3, true);                      // warm-up: shaders compile, first chunks upload
+  await timed(2);
   await ev(() => { const R = VR.game.renderer; R.prof = {}; });
-  const t0 = await ev(() => performance.now());
-  await drive(FRAMES, true);                 // gl.finish() ends each frame: the SwiftShader work counts
-  const wall = ((await ev(() => performance.now())) - t0) / FRAMES;
+  const wall = await timed(FRAMES);
   const r = await ev((n) => {
     const R = VR.game.renderer, P = R.prof || {}; const out = { passes: {}, fsPerFrame: (P.fs || 0) / n, W: R.w, H: R.h, shadowRes: R.shadowSize || 0 };
     for (const k of Object.keys(P)) if (k !== 'cur' && k !== 't' && k !== 'fs') out.passes[k] = +(P[k] / n).toFixed(3);
@@ -188,7 +201,7 @@ const measure = async (btag, preset) => {
     return out;
   }, FRAMES);
   r.wallMs = +wall.toFixed(2);
-  console.log(`[${btag} ${preset}] ${r.W}x${r.H} wall ${r.wallMs} ms/frame (gl.finish-bounded), passes ${r.total} ms, draws ${r.stats.draws}, tris ${r.stats.tris}, sections ${r.stats.sections}, fs passes ${r.fsPerFrame}`);
+  console.log(`[${btag} ${preset}] ${r.W}x${r.H} ${r.wallMs} ms/frame (CPU + GPU, synced by a canvas read), submission per pass ${r.total} ms, draws ${r.stats.draws}, tris ${r.stats.tris}, sections ${r.stats.sections}, full-screen passes ${r.fsPerFrame}`);
   console.log('   ' + Object.entries(r.passes).map(([k, v]) => `${k} ${v}`).join(' · '));
   check(r.wallMs > 0 && Number.isFinite(r.wallMs), `${btag} ${preset}: the frames measured (${r.wallMs} ms per frame)`);
   return r;

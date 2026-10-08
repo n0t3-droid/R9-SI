@@ -71,9 +71,10 @@
       this.visList = []; this.visDirty = true; this.visKey = '';
       this.firsts = new Int32Array(512); this.counts = new Int32Array(512); this.origins = new Float32Array(512 * 4);
       this.tmpM = mat4.create(); this.tmpM2 = mat4.create();
-      this.prof = null;   // pass profiling (test/light.mjs sets {}): the time of each pass, GPU work included
+      this.prof = null;   // pass profiling (test/light.mjs sets {}): the time each pass takes to submit
     }
-    // profiling: the pass named by the previous mark ends here (gl.finish() makes its GPU work part of the time)
+    // profiling: the pass named by the previous mark ends here (CPU time: WebGL's finish() is a flush in Chromium, it
+    // does not wait for the GPU — test/light.mjs times whole frames against a canvas read for the GPU's share)
     mark(name) {
       const P = this.prof; if (!P) return;
       this.gl.finish();
