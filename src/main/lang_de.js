@@ -180,6 +180,7 @@
     'g.pack.libN': '{n} Bauteile',
     'g.pack.replaced': '({n} ersetzt)',
     'g.pack.nothing': 'nichts Neues',
+    'g.pack.empty': 'leer',
     'g.pack.kept': '{n} hier neuer, behalten',
     // ---- Einstellungen
     'g.set.title': 'Einstellungen',
