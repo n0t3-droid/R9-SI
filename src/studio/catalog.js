@@ -135,6 +135,18 @@
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; iq.push([cv, id]); return cv;
   }
   CAT.picture = picture;
+  // (iconperf) the ✨ Modern pictures are also made in idle time, 10 s after the Studio is up, one per idle slice (VR.warmQueue):
+  // a thumbnail costs 40-200 ms on a busy machine (the mesher runs once per part, then the GPU read-back), so the chip finds
+  // them made instead of making them in its frames. They go into C.THUMB, the cache the chip reads.
+  (function warmModern(tries) {
+    const st = $('#studio');
+    if (!(st && !st.classList.contains('boot') && C.texInfo() && VR.warmQueue && C.thumbOf && C.THUMB)) { if ((tries || 0) < 400) setTimeout(() => warmModern((tries || 0) + 1), 700); return; }
+    const ids = Object.keys(VM.MODELS).filter(id => R.byName[id] && R.byName[id].o.modern && !C.THUMB.has(id));
+    if (!ids.length) return;
+    const w = VR.warmQueue(ids, (id) => { C.thumbOf(id); }, { notBefore: performance.now() + 10000 });
+    w.start();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) w.start(); });
+  })();
 
   // ---------------------------------------------------------------- hooks: answer while it is about us, else pass on
   function wrap(name, fn) { const prev = HOOK[name]; HOOK[name] = function (...a) { const r = fn.apply(null, a); if (r) return r; return prev ? prev.apply(null, a) : false; }; }

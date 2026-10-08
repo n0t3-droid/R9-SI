@@ -221,4 +221,11 @@
     return pw;
   };
 
+  // the same warm for any list of ids (the Studio's ✨ Modern thumbnails, studio/catalog.js): build(id) once per id, one per
+  // idle slice, in the order given (VM.prewarm sorts by size, so each id gets a size that keeps that order). Not started:
+  // the caller starts it, and starts it again when the page shows.
+  VR.warmQueue = function (ids, build, o) {
+    const items = ids.map((id, i) => ({ name: id, lazy: true, compiled: false, VW: ids.length - i, VH: 1, VD: 1 }));
+    return VR.VM.prewarm(Object.assign({}, o || {}, { models: items, build: (w) => { build(w.name); w.compiled = true; } }));
+  };
 })(VR);

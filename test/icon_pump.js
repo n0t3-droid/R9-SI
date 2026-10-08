@@ -3,6 +3,7 @@
 // Frame rules: a frame paints until 6 ms are used (the check is before each paint), so a model still to be built is one
 // paint like the others; a detached canvas is dropped without a paint. The warm builds nothing before notBefore (10 s
 // of play), one picture per idle slice with more than 8 ms left, largest model first, and stops while the page is hidden.
+// VR.warmQueue is the same warm for any list of ids (the Studio's Modern thumbnails), in the order given.
 require('./load_shared.js');
 require('/home/claude/vr/src/main/icons.js');
 const VM = VR.VM;
@@ -116,6 +117,24 @@ const want = [...pick].sort((a, b) => (vol(b) - vol(a)) || (a < b ? -1 : a > b ?
   check(got.length === 0 && env.pending() === 0, 'a hidden page stops the warm');
   env.isHidden = false; w.start(); env.slice(30);
   check(got.join() === pick[0] && w.done(), 'shown again: the warm resumes and finishes');
+}
+
+// 8 · VR.warmQueue (the Studio's ✨ Modern thumbnails, studio/catalog.js): build(id) once per id, in the order given, one
+// per idle slice, nothing before notBefore, a second start() does not double the queue, a failing build does not stop it
+{
+  const env = idleEnv(), got = [];
+  const ids = ['vm_b_one', 'vm_a_two', 'vm_c_three'];
+  const w = VR.warmQueue(ids, (id) => { if (id === 'vm_a_two' && got.length === 1 && !w.failed) { w.failed = true; throw new Error('test failure'); } got.push(id); }, { notBefore: 10000, now: env.now, idle: env.idle, cancel: env.cancel, hidden: env.hidden });
+  check(got.length === 0 && env.pending() === 0 && !w.done(), 'a queue does not start by itself');
+  w.start(); w.start();
+  env.t = 4000; env.slice(30);
+  check(got.length === 0 && env.pending() === 1, 'nothing before notBefore (asked again, one idle request only)');
+  const warn = console.warn; console.warn = () => {};
+  env.t = 10000; env.slice(30);
+  check(got.join() === 'vm_b_one', 'one id per idle slice from 10 s on: ' + got.join());
+  env.slice(30); env.slice(30); env.slice(30);
+  console.warn = warn;
+  check(got.join() === 'vm_b_one,vm_c_three' && w.failed && w.done() && env.pending() === 0, 'a failing build is skipped, the rest is built once each in the order given: ' + got.join(' · '));
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
