@@ -57,7 +57,7 @@
     }
     stop() {
       const g = this.g; if (!this.active) return;
-      this.active = false; this.phase = 'idle'; g.env.planetsOverride = null;
+      this.active = false; this.phase = 'idle'; g.env.planetsOverride = null; this.shipDs = null;
       const s = this.saved; if (s) { g.player.pos = s.pos; g.player.yaw = s.yaw; g.player.pitch = s.pitch; g.player.flying = s.flying; g.hideHud = s.hideHud; g.camMode = s.camMode; g.zenFreezeTime = s.freeze; if (s.tod !== undefined && g.env.setTime) g.env.setTime(s.tod); }
       g.player.noClip = false; g.player.vel = [0, 0, 0];
       document.getElementById('hud').style.visibility = g.hideHud ? 'hidden' : 'visible';
@@ -69,11 +69,11 @@
     // the shot runs, from the cached designs, so each one flies from the shot's first frame and is never late
     prebuildShips(shot) {
       const SS = this.g.starships;
-      this.shipWait = 0;
+      this.shipWait = 0; this.shipDs = [];
       if (!SS || !shot.ships) return;
       for (const sp of shot.ships) {
         this.shipWait++;
-        SS.design(this.shipSeed(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, () => { this.shipWait--; });
+        this.shipDs.push(SS.design(this.shipSeed(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, () => { this.shipWait--; }));
       }
     }
     shipSeed(sp) { if (sp._seed === undefined) sp._seed = M.hash2 ? M.hash2(sp.A[0] | 0, sp.B[2] | 0, 77) >>> 0 : (Math.random() * 4294967295) >>> 0; return sp._seed; }
@@ -102,6 +102,9 @@
     }
     update(dt) {
       const g = this.g; if (!this.active) return;
+      // the scripted ships' designs stay in the starship cache while the shot runs (its garbage collection frees designs
+      // that no ship uses for a minute: a design built during the load would otherwise be built again at the launch)
+      for (const d of this.shipDs || []) if (d) d.last = performance.now();
       if (g.input.hit('Escape') || (this.opts && this.opts.skipAny && this.phase === 'run' && (g.input.pressed.size || g.input.mouse.clicked.some(Boolean)))) { this.stop(); return; }
       const d = this.ui(), fadeEl = d.querySelector('.fade');
       if (this.phase === 'next') {
