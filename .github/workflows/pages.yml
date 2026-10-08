@@ -1,0 +1,39 @@
+# Builds the game and the Studio from the sources and publishes dist/ to GitHub Pages on every push to master.
+# Enable once in the repository: Settings → Pages → Source: "GitHub Actions". The game is then at
+# https://<user>.github.io/R9-SI/ (index.html) and the Studio at …/R9-SI/studio.html — single-player; playing
+# together needs the copy on claude.ai (its room service), the game says so itself.
+name: Pages
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node build.js
+      - run: node test/id_snapshot.js && node test/lang.js
+      - run: cp -r dist site && printf 'User-agent: *\nAllow: /\n' > site/robots.txt && rm -f site/artifact.html site/studio_artifact.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
