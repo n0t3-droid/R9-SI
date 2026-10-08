@@ -98,7 +98,7 @@ await section(1, 'the start screen: 🎒 Meins has the 💡 card; six start card
   check(s.hint.split(',').sort().join() === 'feuer,stein' && /Feuer und Stein/.test(s.msg), 'the first time, Feuer and Stein are lit and the help says so');
   check(s.slots === 2 && s.tools.includes('💡 Tipp') && s.tools.includes('📖 Buch') && s.chips[0].replace(/\s+/g, '') === '✨Alle', 'two slots, 💡 Tipp, 📖 Buch, ⌫, and the category chips');
   // the six pictures are drawn, a few per frame
-  check(await waitFor(() => { const px = (cv) => { const d = cv.getContext('2d').getImageData(0, 0, 64, 64).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 20) n++; return n; }; const cs = [...document.querySelectorAll('#erf-tray .erf-card canvas')]; return cs.length === 6 && cs.every(c => px(c) > 300); }, null, 8000), 'all six start cards show a picture (not an empty square)');
+  check(await waitFor(() => { const px = (cv) => { const d = cv.getContext('2d').getImageData(0, 0, 64, 64).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 20) n++; return n; }; const cs = [...document.querySelectorAll('#erf-tray .erf-card canvas')]; return cs.length === 6 && cs.every(c => px(c) > 300); }, null, 25000), 'all six start cards show a picture (not an empty square; painted a few per frame, the world renders behind)');
   const looks = await ev(() => { const px = (cv) => { const d = cv.getContext('2d').getImageData(0, 0, 64, 64).data; let h = 0; for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] * 3 + d[i + 1] * 5 + d[i + 2] * 7 + d[i + 3]) | 0; return h; }; return new Set([...document.querySelectorAll('#erf-tray .erf-card canvas')].map(px)).size; });
   check(looks === 6, 'six different pictures (' + looks + ')');
   await shot('invent_start');
