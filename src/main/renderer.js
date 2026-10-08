@@ -734,21 +734,22 @@
       for (let i = 0; i < n; i++) {
         const o = i * 6;
         kind[i] = props[o + 3];
-        slot[i] = props[o + 3] >= PR.FURN0 ? this.furnSlotOf(props[o + 3]) : -1;
+        slot[i] = props[o + 3] >= PR.FURN0 ? this.furnSlotOf(props[o + 3], props[o + 4]) : -1;
         PR.anchorData(props[o + 3], props[o], props[o + 1], props[o + 2], props[o + 5], data, i * PR.INST, props[o + 4]);
       }
       sec.propN = n; sec.propData = data; sec.propKind = kind; sec.propSlot = slot;
       this.propSecs.add(sec);
     }
     // the slot of a furniture kind: its model, its reach (for the frustum), its two instance lists (near, far)
-    furnSlotOf(kind) {
+    furnSlotOf(kind, facing) {
       const PR = VR.Props, S = this.furnSlots || (this.furnSlots = []), byKind = this.furnByKind || (this.furnByKind = {});
-      if (byKind[kind] !== undefined) return byKind[kind];
-      const d = PR.furnDef(kind), md = d && PR.FURN[d.model];
-      if (!md) return (byKind[kind] = -1);
-      let i = S.findIndex(sl => sl.key === d.model);
-      if (i < 0) { i = S.length; S.push({ key: d.model, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null }); this.furnWarm(d.model); }
-      return (byKind[kind] = i);
+      const ck = kind * 4 + (((facing | 0) >> 2) & 3);   // (a joining sofa's row bits choose its variant)
+      if (byKind[ck] !== undefined) return byKind[ck];
+      const key = PR.furnKey(kind, facing | 0), md = key && PR.FURN[key];
+      if (!md) return (byKind[ck] = -1);
+      let i = S.findIndex(sl => sl.key === key);
+      if (i < 0) { i = S.length; S.push({ key, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null }); this.furnWarm(key); }
+      return (byKind[ck] = i);
     }
     // a new model is built in an idle tick, one a tick, when its first piece arrives with a section (a cold build takes
     // up to some 50 ms: in the draw it would stall the frame the house comes into view); the draw builds what is not

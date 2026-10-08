@@ -117,5 +117,19 @@ const streamsOf = (r) => ['opaque', 'cutout', 'trans', 'vx', 'vxFar'].map(k => (
   check(both.props && both.props.length === furn.props.length, 'plants and furniture together give the same furniture anchors');
 }
 
+// 6. the villages' pieces: a row of three white sofas facing north joins (the row bits on each anchor's facing), a bed
+// gives one anchor at its foot (part 0)
+{
+  const place = (put) => { for (const x of [4, 5, 6]) put(x, 1, 8, R.S('vx_sofa_white', { facing: 0 })); put(10, 1, 6, R.S('vx_bed_blue', { facing: 0, part: 0 })); put(10, 1, 5, R.S('vx_bed_blue', { facing: 0, part: 1 })); };
+  const r = VR.meshSection(section(place, (VR.PROP_GROUP || {}).furniture || 2));
+  const L = r.props ? Array.from({ length: r.props.length / 6 }, (_, i) => Array.from(r.props.slice(i * 6, i * 6 + 6))) : [];
+  const sofa = VR.PROP_FURN0 + VR.PROP_FURN.indexOf('vx_sofa_white'), bed = VR.PROP_FURN0 + VR.PROP_FURN.indexOf('vx_bed_blue');
+  const at = (x) => (L.find(a => a[3] === sofa && a[0] === x) || [])[4];
+  check(at(4) === 4 && at(5) === 12 && at(6) === 8, 'the sofa row: the west end joins east (bit 2), the middle both ways, the east end west (' + [at(4), at(5), at(6)].join(',') + ')');
+  const beds = L.filter(a => a[3] === bed);
+  check(beds.length === 1 && beds[0][0] === 10 && beds[0][2] === 6, 'the bed gives one anchor, at its foot (' + beds.map(a => a.slice(0, 3).join(',')).join(' ') + ')');
+  check(streamsOf(r).every(x => x === 0), 'the village pieces give no voxel geometry with the furniture asked for');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

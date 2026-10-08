@@ -60,26 +60,33 @@
     ['grey', 'navy', 'sage', 'white', 'rose'].map(c => 'vm_bed_' + c),
     ['vm_floor_lamp', 'vm_arc_lamp', 'vm_pendant'],
     [].concat(...KCOL.map(c => KUNIT.map(u => 'vm_kitchen_' + c + '_' + u))), ['vm_island'],
-    ['vm_bookshelf', 'vm_planter', 'vm_monstera', 'vm_olive', 'vm_lowboard', 'vm_tv', 'vm_coffee_table_glass', 'vm_coffee_table', 'vm_nightstand']);
+    ['vm_bookshelf', 'vm_planter', 'vm_monstera', 'vm_olive', 'vm_lowboard', 'vm_tv', 'vm_coffee_table_glass', 'vm_coffee_table', 'vm_nightstand'],
+    // the villages' and the towns' own pieces (voxarch.js, voxtech.js, voxhome.js): the beds (foot and head), the table,
+    // the chair, the modular sofas (a row joins: a sofa's arms stand only at the row's ends)
+    ['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'white', 'teal'].map(c => 'vx_bed_' + c), ['vx_table', 'vx_chair'],
+    ['white', 'charcoal', 'cream', 'taupe', 'blue', 'orange'].map(c => 'vx_sofa_' + c));
+  // the sofas that join their neighbours in a row (voxtech.js ctxHook.sofa: the same kind and family): the group number
+  const PROP_JOIN = { vx_sofa_white: 1, vx_sofa_charcoal: 1, vx_sofa_cream: 1, vx_sofa_taupe: 1, vx_sofa_blue: 2, vx_sofa_orange: 3 };
+  const LXP = [0, 4, 1, 5], LXM = [1, 5, 0, 4];   // the neighbour (DOFF index) on a piece's local +x and −x for its facing
   // the prop groups (job.smoothProps is a mask of them; true is the plants alone): 1 the plants (palms), 2 the furniture
   const PROP_GROUP = VR.PROP_GROUP = { plants: 1, furniture: 2 };
   let PROPT = null;
   function propTables() {
-    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n), group = new Uint8Array(n);
+    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n), group = new Uint8Array(n), join = new Uint8Array(n);
     const furn = new Map(PROP_FURN.map((nm, i) => [nm, i]));
     for (const t of R.types) {
       const o = t.o || {}, fi = furn.get(t.name);
       if (!o.prop && !o.propStem && fi === undefined) continue;
       for (let s = t.base; s < t.base + t.nstates; s++) {
         facing[s] = t.has('facing') ? t.get(s, 'facing') & 3 : 0;
-        if (fi !== undefined) { kind[s] = PROP_FURN0 + fi; group[s] = PROP_GROUP.furniture; anchor[s] = !t.has('part') || t.get(s, 'part') === 0 ? 1 : 0; continue; }
+        if (fi !== undefined) { kind[s] = PROP_FURN0 + fi; group[s] = PROP_GROUP.furniture; anchor[s] = !t.has('part') || t.get(s, 'part') === 0 ? 1 : 0; join[s] = PROP_JOIN[t.name] || 0; continue; }
         kind[s] = PROP_KIND[o.prop] || 0;
         stem[s] = PROP_KIND[o.propStem] || 0;
         group[s] = PROP_GROUP.plants;
         anchor[s] = (o.propAnchor === 'all' || (o.propAnchor && t.has('part') && t.getV(s, 'part') === o.propAnchor)) ? 1 : 0;
       }
     }
-    PROPT = { kind, anchor, stem, facing, group };
+    PROPT = { kind, anchor, stem, facing, group, join };
   }
 
   class Buf {
@@ -359,7 +366,13 @@
       if (propOn && (PROPT.group[b] & propMask)) {
         // a prop block: its geometry is the smooth prop's. The anchor goes to the list: the block that anchors the prop
         // (its bottom face is the trunk's top), or the air above a trunk top that no prop of its kind covers
-        if (PROPT.anchor[b]) propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[b], PROPT.facing[b], L[bi]);
+        if (PROPT.anchor[b]) {
+          // a sofa in a row: bit 2 a neighbour of its group on its local +x, bit 3 on its local −x (its arms go there)
+          let f = PROPT.facing[b];
+          const jg = PROPT.join[b];
+          if (jg) f |= (PROPT.join[B[bi + DOFF[LXP[f]]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[LXM[f]]]] === jg ? 8 : 0);
+          propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[b], f, L[bi]);
+        }
         else if (PROPT.stem[b] && PROPT.kind[B[bi + DOFF[2]]] !== PROPT.kind[b]) propOut.push(job.ox + x, sy * 16 + y + 1, job.oz + z, PROPT.stem[b], 0, L[bi + DOFF[2]]);
         continue;
       }

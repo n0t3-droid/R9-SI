@@ -10,7 +10,7 @@
 // with OLD_DIST naming a build from before the pass (the commit ea240cf), the Very Low (potato) frame cost of both builds
 // (AGENTS.md rule 5: the new build at most 6 % slower; Very Low has no prop pass).
 // Writes test/shots/trailer_props_<place>_{before,after}.png for the places avenue, garden, road (the town), living,
-// dining (the villa), show, showclose (the showroom).
+// dining (the villa), show, showclose (the showroom), village (the villages' own pieces: joined sofas, table, chairs, bed).
 //   nohup bash test/wt_run.sh trailer_props.mjs 3000 > .tmp_tests/trailer_props.log 2>&1 &
 //   OLD_DIST=/path/to/old/dist/index.html  (optional, the potato comparison) · ONLY=town|villa (one half) · N frames
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -33,7 +33,11 @@ const TOWN = [
 const VILLA = { n: 0, ox: -256, oz: -128, y0: 86 };
 const SX = VILLA.ox - 30, SZ = VILLA.oz + 4, SY = VILLA.y0;
 // the showroom (probed: no two pieces share a cell): [name, x, dy, z, facing] — the anchor (part 0) of each piece
-const SHOW = [['vm_bookshelf', 0, 0, 0, 2], ['vm_bookshelf', 1, 0, 0, 2], ['vm_kitchen_white_tall', 3, 0, 0, 2], ['vm_kitchen_white_sink', 4, 0, 0, 2], ['vm_kitchen_white_hob', 5, 0, 0, 2], ['vm_kitchen_white_cabinet', 6, 0, 0, 2], ['vm_kitchen_white_upper', 4, 2, 0, 2], ['vm_kitchen_white_upper', 6, 2, 0, 2], ['vm_lowboard', 10, 0, 0, 2], ['vm_tv', 9, 1, 0, 2], ['vm_floor_lamp', 12, 0, 0, 2], ['vm_monstera', 13, 0, 0, 2], ['vm_arc_lamp', 16, 0, 0, 2], ['vm_planter', 17, 0, 0, 2], ['vm_bed_grey', 1, 0, 3, 2], ['vm_nightstand', 2, 0, 3, 2], ['vm_armchair_cream', 4, 0, 4, 2], ['vm_sofa_navy', 8, 0, 4, 2], ['vm_coffee_table_glass', 8, 0, 6, 2], ['vm_dining_table_oak', 13, 0, 4, 2], ['vm_dining_chair_oak', 11, 0, 3, 2], ['vm_dining_chair_oak', 13, 0, 3, 2], ['vm_dining_chair_oak', 12, 0, 5, 0], ['vm_dining_chair_oak', 10, 0, 4, 1], ['vm_dining_chair_oak', 14, 0, 4, 3], ['vm_pendant', 11, 3, 4, 0], ['vm_pendant', 13, 3, 4, 0], ['vm_olive', 16, 0, 4, 2]];
+const SHOW = [['vm_bookshelf', 0, 0, 0, 2], ['vm_bookshelf', 1, 0, 0, 2], ['vm_kitchen_white_tall', 3, 0, 0, 2], ['vm_kitchen_white_sink', 4, 0, 0, 2], ['vm_kitchen_white_hob', 5, 0, 0, 2], ['vm_kitchen_white_cabinet', 6, 0, 0, 2], ['vm_kitchen_white_upper', 4, 2, 0, 2], ['vm_kitchen_white_upper', 6, 2, 0, 2], ['vm_lowboard', 10, 0, 0, 2], ['vm_tv', 9, 1, 0, 2], ['vm_floor_lamp', 12, 0, 0, 2], ['vm_monstera', 13, 0, 0, 2], ['vm_arc_lamp', 16, 0, 0, 2], ['vm_planter', 17, 0, 0, 2], ['vm_bed_grey', 1, 0, 3, 2], ['vm_nightstand', 2, 0, 3, 2], ['vm_armchair_cream', 4, 0, 4, 2], ['vm_sofa_navy', 8, 0, 4, 2], ['vm_coffee_table_glass', 8, 0, 6, 2], ['vm_dining_table_oak', 13, 0, 4, 2], ['vm_dining_chair_oak', 11, 0, 3, 2], ['vm_dining_chair_oak', 13, 0, 3, 2], ['vm_dining_chair_oak', 12, 0, 5, 0], ['vm_dining_chair_oak', 10, 0, 4, 1], ['vm_dining_chair_oak', 14, 0, 4, 3], ['vm_pendant', 11, 3, 4, 0], ['vm_pendant', 13, 3, 4, 0], ['vm_olive', 16, 0, 4, 2],
+  // the villages' pieces to the right: a row of three white sofas (they join: arms at the ends), a table with two chairs,
+  // a blue bed (its head east of its foot)
+  ['vx_sofa_white', 20, 0, 1, 2], ['vx_sofa_white', 21, 0, 1, 2], ['vx_sofa_white', 22, 0, 1, 2], ['vx_table', 24, 0, 2, 0], ['vx_chair', 24, 0, 1, 2], ['vx_chair', 25, 0, 2, 3],
+  ['vx_bed_blue', 26, 0, 4, 1, 0], ['vx_bed_blue', 27, 0, 4, 1, 1]];
 const INSIDE = [
   // the villa's open-plan room at eye height (feet on the floor): the living group in front, the dining tables and the kitchen behind
   ['living', [-220.5, 87, -106.5], { yaw: 0.7854, pitch: -0.1 }, DAY],
@@ -41,6 +45,7 @@ const INSIDE = [
   // the showroom: all ten kinds from eight blocks, then the living group up close at dusk (the lamps glow)
   ['show', [SX + 9, SY, SZ + 11.5], [SX + 9, SY + 1, SZ + 2.5], DAY],
   ['showclose', [SX + 7, SY + 0.2, SZ + 8.6], [SX + 7, SY + 0.5, SZ + 4.5], 13200],
+  ['village', [SX + 23.5, SY, SZ + 9.5], [SX + 23.5, SY + 0.5, SZ + 2], DAY],
 ];
 const ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'];
 let fails = 0;
@@ -157,13 +162,14 @@ async function buildSite(P) {
     const info = PLAN.build(L, lot, { rng: new VR.RNG(1000 + V.n * 17), ground: () => y0 - 1, beds: 3 });
     for (let k = 0; k < rec.length; k += 4) w.setBlock(rec[k], rec[k + 1], rec[k + 2], rec[k + 3], 0);
     // the showroom
-    for (let x = SX - 2; x <= SX + 19; x++) for (let z = SZ - 1; z <= SZ + 8; z++) w.setBlock(x, SY - 1, z, S('marble_white'), 0);
-    for (let x = SX - 2; x <= SX + 19; x++) for (let y = SY; y <= SY + 3; y++) w.setBlock(x, y, SZ - 1, S('stucco_white'), 0);
+    for (let x = SX - 2; x <= SX + 29; x++) for (let z = SZ - 1; z <= SZ + 8; z++) w.setBlock(x, SY - 1, z, S('marble_white'), 0);
+    for (let x = SX - 2; x <= SX + 29; x++) for (let y = SY; y <= SY + 3; y++) w.setBlock(x, y, SZ - 1, S('stucco_white'), 0);
     for (let x = SX + 10; x <= SX + 14; x++) w.setBlock(x, SY + 4, SZ + 4, S('white_concrete'), 0);
     let placed = 0;
-    for (const [name, x, dy, z, f] of show) {
-      if (!VM.MODELS[name]) continue;
-      VM.put((xx, yy, zz, nm, pr) => w.setBlock(xx, yy, zz, S(nm, pr), 0), SX + x, SY + dy, SZ + z, name, f);
+    for (const [name, x, dy, z, f, part] of show) {
+      if (VM.MODELS[name]) VM.put((xx, yy, zz, nm, pr) => w.setBlock(xx, yy, zz, S(nm, pr), 0), SX + x, SY + dy, SZ + z, name, f);
+      else if (R.byName[name]) w.setBlock(SX + x, SY + dy, SZ + z, S(name, R.byName[name].has('part') ? { facing: f, part: part | 0 } : { facing: f }), 0);
+      else continue;
       placed++;
     }
     return { cleared: n, villa: rec.length / 4, family: info.plan.family, skin: info.skin, placed };

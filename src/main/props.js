@@ -833,6 +833,66 @@
     F.shadow(0.5, 1.5, 15.5, 15.5);
   });
 
+  // ---------------------------------------------------------------- the villages' pieces (voxarch / voxtech / voxhome)
+  // the cosy bed (two cells: the head north of the foot when it faces north; the foot is its anchor): a wooden frame on
+  // short legs, a headboard with a rail, a low footboard, the mattress, the blanket (the piece's colour) over the foot
+  // and turned down at the pillow, a soft pillow
+  MD('vbed', [1, 1, 2], (F) => {
+    F.m(MAT.wood, 0xFFFFFF, 2);
+    F.rbox(0.4, 2.6, 0.4, 15.6, 6, 31.6, 0.6, { skip: B_BOT });
+    for (const [x, z] of [[1.6, 1.6], [14.4, 1.6], [1.6, 30.4], [14.4, 30.4]]) F.cyl(x, z, 0, 2.7, 0.9, 1.05, { seg: 8 });
+    F.rbox(0, 2.6, 0, 16, 14.6, 1.8, 0.7).rbox(-0.2, 14.2, -0.2, 16.2, 15.4, 2.0, 0.55);
+    F.m(MAT.wood, 0xE0E0E0, 2).rbox(0, 2.6, 30.2, 16, 9.2, 32, 0.6);
+    F.m(MAT.fabric, 0xF4F2EC).rbox(0.9, 5.8, 1.8, 15.1, 9.2, 30.2, 1.2, { skip: B_BOT, seam: 0.74 });
+    F.m(MAT.fabric, 0xFFFFFF, 1).rbox(0.5, 8.6, 10.4, 15.5, 10.6, 30.6, 1.3, { mid: 3, bulge: { 3: 0.45 }, seam: 0.88 });
+    F.m(MAT.fabric, 0xE4E4E4, 1).rbox(0.7, 9.4, 8.6, 15.3, 11.6, 12.6, 1.1, { mid: 2, bulge: { 3: 0.3 }, seam: 0.86 });
+    F.m(MAT.fabric, 0xFAF8F2).rbox(2.4, 9, 2.4, 13.6, 12.2, 7.6, 1.8, { mid: 3, bulge: { 3: 0.5, 4: 0.4, 5: 0.4 }, seam: 0.86 });
+    F.m(MAT.wood, 0xFFFFFF, 2); F.far(0, 0, 0, 16, 15, 2); F.far(0, 2.6, 2, 16, 9.2, 32); F.m(MAT.fabric, 0xFFFFFF, 1); F.far(0.5, 9.2, 10.4, 15.5, 10.6, 30.6);
+    F.shadow(-1, -1, 17, 33);
+  });
+  // the wooden table: a top with soft edges on four tapered legs and an apron, a small vase with a flower
+  MD('vtable', [1, 1, 1], (F) => {
+    F.m(MAT.wood, 0xA87A48).rbox(0.4, 12, 0.4, 15.6, 13.8, 15.6, 0.5, { seg: 2 });
+    F.m(MAT.wood, 0x8E6638);
+    for (const [x, z] of [[2.4, 2.4], [13.6, 2.4], [2.4, 13.6], [13.6, 13.6]]) F.cyl(x, z, 0, 12, 0.7, 1.0, { seg: 10 });
+    F.rbox(2.4, 10.4, 1.9, 13.6, 12, 2.9, 0.2).rbox(2.4, 10.4, 13.1, 13.6, 12, 14.1, 0.2).rbox(1.9, 10.4, 2.4, 2.9, 12, 13.6, 0.2).rbox(13.1, 10.4, 2.4, 14.1, 12, 13.6, 0.2);
+    F.m(MAT.gloss, 0xF0EDE4).lathe(10.6, 6, [[13.8, 0.8], [14.4, 1.4], [16.0, 1.2], [17.2, 0.6], [17.6, 0.75]], { seg: 12, capBot: true });
+    F.m(MAT.leaf, COL.stem).rod(10.6, 17.2, 6, 10.9, 19.8, 6.2, 0.18, { seg: 4 }); F.m(MAT.gloss, 0xE86A4A).sphere(10.9, 20.2, 6.2, 0.75, 0.6, 0.75, { seg: 5 });
+    F.m(MAT.gloss, 0xF0EDE4).lathe(5.6, 9.6, [[13.8, 1.6], [14.1, 2.6], [14.3, 2.7], [14.25, 0.01]], { seg: 14, capBot: true });
+    F.m(MAT.wood, 0xA87A48); F.far(0.4, 12, 0.4, 15.6, 13.8, 15.6); F.m(MAT.wood, 0x8E6638); F.far(1.8, 0, 1.8, 3, 12, 3); F.far(13, 0, 1.8, 14.2, 12, 3); F.far(1.8, 0, 13, 3, 12, 14.2); F.far(13, 0, 13, 14.2, 12, 14.2);
+    F.shadow(-0.5, -0.5, 16.5, 16.5);
+  });
+  // the wooden chair: tapered legs, a seat with a red cushion, a back of two posts, three slats and a top rail
+  MD('vchair', [1, 1, 1], (F) => {
+    F.m(MAT.wood, 0x9A6A3A);
+    for (const [x, z] of [[3, 3], [13, 3]]) F.cyl(x, z, 0, 6.6, 0.65, 0.85, { seg: 8 });
+    for (const [x, z] of [[3, 13.2], [13, 13.2]]) F.cyl(x, z, 0, 15.6, 0.85, 0.65, { seg: 8 });
+    F.rod(3, 3, 3, 3, 3, 13.2, 0.35, { seg: 6 }).rod(13, 3, 3, 13, 3, 13.2, 0.35, { seg: 6 });
+    F.rbox(2, 6.4, 2, 14, 7.6, 14, 0.5);
+    for (const x of [5.6, 8, 10.4]) F.cyl(x, 13.2, 7.6, 13.8, 0.4, 0.4, { seg: 6 });
+    F.rbox(2.4, 13.6, 12.4, 13.6, 15.6, 14, 0.5);
+    F.m(MAT.fabric, 0xC0443A).rbox(2.8, 7.6, 2.8, 13.2, 9.2, 12.2, 1.3, { mid: 3, bulge: { 3: 0.45 }, seam: 0.8 });
+    F.m(MAT.wood, 0x9A6A3A); F.far(2, 0, 2, 14, 7.6, 14); F.far(2.4, 7.6, 12.4, 13.6, 15.6, 14);
+    F.shadow(1, 1, 15, 15);
+  });
+  // the modular sofa, one seat wide: a base and a back frame that run on into the next seat of a row, a seat cushion and a
+  // back cushion, an arm on each end of the row that is open (variant bits: 1 a neighbour on +x, 2 on −x), a pillow
+  for (let j = 0; j < 4; j++) MD('vsofa:' + j, [1, 1, 1], (F) => {
+    const R = j & 1, L = j & 2, x0 = L ? 0 : 3.4, x1 = R ? 16 : 12.6;
+    F.m(MAT.metal, COL.black); for (const [x, z] of [[2.2, 3], [13.8, 3], [2.2, 14.4], [13.8, 14.4]]) F.cyl(x, z, 0, 1.6, 0.6, 0.75, { seg: 6 });
+    F.m(MAT.fabric, 0xE2E2E2, 1);
+    F.rbox(L ? -0.05 : 0, 1.5, 1.6, R ? 16.05 : 16, 6.6, 16, L || R ? 0.6 : 1.2, { skip: B_BOT, seam: 0.88 });
+    F.rbox(L ? -0.05 : 0, 6, 12.6, R ? 16.05 : 16, 14.2, 16, 1.4, { bulge: { 3: 0.2 } });
+    if (!L) F.rbox(0, 6, 1.6, 3.6, 11.6, 16, 1.5, { bulge: { 3: 0.3 } });
+    if (!R) F.rbox(12.4, 6, 1.6, 16, 11.6, 16, 1.5, { bulge: { 3: 0.3 } });
+    F.m(MAT.fabric, 0xFFFFFF, 1).rbox(x0 + 0.2, 6.4, 2, x1 - 0.2, 9.6, 12.8, 1.4, { mid: 3, bulge: { 3: 0.5, 4: 0.25 }, seam: 0.8 });
+    F.turn([['x', 0.12]], [(x0 + x1) / 2, 9.2, 15.6]); F.rbox(x0 + 0.2, 9.2, 10.6, x1 - 0.2, 15.2, 14.8, 1.7, { mid: 3, bulge: { 4: 0.55 }, seam: 0.8 }); F.turn(null);
+    if (!(L && R)) pillow(F, L ? 11.2 : 4.8, 9.6, 9.6, 4.6, 0.3, L ? -0.2 : 0.2);
+    F.m(MAT.fabric, 0xE2E2E2, 1); F.far(0, 1.5, 1.6, 16, 6.6, 16); F.far(0, 6, 12.6, 16, 14.6, 16); F.far(x0, 6.4, 2, x1, 9.6, 12.6);
+    if (!L) F.far(0, 6, 1.6, 3.6, 11.6, 12.6); if (!R) F.far(12.4, 6, 1.6, 16, 11.6, 12.6);
+    F.shadow(L ? 0 : -1, 0.6, R ? 16 : 17, 17);
+  });
+
   // ---------------------------------------------------------------- the pieces: block type → model and its two colours
   // (the voxel pieces' palette: the fabric, the pillows of a sofa; the duvet and the frame of a bed; a kitchen's front)
   const FAB = { charcoal: 0x3A3D44, cream: 0xECE6D8, taupe: 0xA89482, sage: 0x8FA38E, navy: 0x2F3F60 };
@@ -851,6 +911,12 @@
     vm_lowboard: { model: 'lowboard' }, vm_tv: { model: 'tv' }, vm_coffee_table_glass: { model: 'ctable_glass' }, vm_coffee_table: { model: 'ctable_marble' }, vm_nightstand: { model: 'nightstand' },
   });
   for (const [c, hex, wood] of [['white', 0xF2F2EE, false], ['black', 0x25272B, false], ['oak', 0xC8A878, true]]) for (const u of ['cabinet', 'sink', 'hob', 'oven', 'tall', 'upper']) FDEF['vm_kitchen_' + c + '_' + u] = { model: 'kitchen:' + u + (wood ? ':w' : ''), a: hex };
+  // the villages' pieces: the beds' blankets on an oak frame (the foot, part 0, is the anchor: the model's cell 0, 1), the
+  // sofas' fabric and pillows (a sofa's variant comes with its row: furnKey)
+  const BEDC = { red: 0xC0443A, blue: 0x3F6AC0, green: 0x4E9A56, yellow: 0xE8B83A, purple: 0x8A5AC8, pink: 0xF08FB0, white: 0xECEAE4, teal: 0x2F9C98 };
+  for (const k in BEDC) FDEF['vx_bed_' + k] = { model: 'vbed', a: BEDC[k], b: 0x8A5E32, cell: [0, 1] };
+  FDEF.vx_table = { model: 'vtable' }; FDEF.vx_chair = { model: 'vchair' };
+  for (const [k, col, pil] of [['white', 0xECEEF2, 0xFF7A1A], ['charcoal', 0x3A3D44, 0xE8D8B8], ['cream', 0xEDE6D6, 0x3A3D44], ['taupe', 0xA89482, 0xF2F2EE], ['blue', 0x3A5AB8, 0x3AD8FF], ['orange', 0xE8782A, 0xF2F0EA]]) FDEF['vx_sofa_' + k] = { model: 'vsofa', a: col, b: pil, join: true };
   // a model's meshes, built on first use and kept
   const FCACHE = {};
   PR.furnModel = function (key) {
@@ -864,11 +930,13 @@
   // the furniture kind of a block name, and back (kind = VR.PROP_FURN0 + the name's index in VR.PROP_FURN, mesher.js)
   PR.FURN0 = VR.PROP_FURN0 || 16;
   PR.furnDef = function (kind) { const L = VR.PROP_FURN, nm = L && L[kind - PR.FURN0]; return nm ? FDEF[nm] || null : null; };
+  // the model of a piece: its definition's model, a joining sofa's with the row bits of its anchor (facing bits 2, 3)
+  PR.furnKey = function (kind, facing) { const d = PR.furnDef(kind); if (!d) return null; return d.join ? d.model + ':' + ((facing >> 2) & 3) : d.model; };
   // the centre of a piece on the floor (world) from its anchor (part 0) and facing, and its turn (yaw): the model's
   // q quarter turns are VM.footprint's (part 0 lands where rotOffset(0, 0) says in the turned box)
-  PR.furnPlace = function (size, wx, wy, wz, facing, out) {
+  PR.furnPlace = function (size, wx, wy, wz, facing, out, cell) {
     const q = facing & 3, W = size[0], D = size[2];
-    let x = 0, z = 0, w = W, d = D;
+    let x = cell ? cell[0] : 0, z = cell ? cell[1] : 0, w = W, d = D;
     for (let r = 0; r < q; r++) { const t = x; x = d - 1 - z; z = t; const tw = w; w = d; d = tw; }
     out[0] = wx - x + w / 2; out[1] = wy; out[2] = wz - z + d / 2; out[3] = q * Math.PI / 2;
     return out;
@@ -886,8 +954,8 @@
   PR.anchorData = function (kind, wx, wy, wz, light, out, off, facing) {
     const o = off | 0;
     if (kind >= PR.FURN0) {
-      const d = PR.furnDef(kind), md = d && FM[d.model];
-      PR.furnPlace(md ? md.size : [1, 1, 1], wx, wy, wz, facing | 0, PLACE);
+      const d = PR.furnDef(kind), key = PR.furnKey(kind, facing | 0), md = key && FM[key];
+      PR.furnPlace(md ? md.size : [1, 1, 1], wx, wy, wz, facing | 0, PLACE, d && d.cell);
       out[o] = PLACE[0]; out[o + 1] = PLACE[1]; out[o + 2] = PLACE[2]; out[o + 3] = PLACE[3];
       const a = lin(d && d.a !== undefined ? d.a : 0xFFFFFF, 1);
       out[o + 4] = a[0]; out[o + 5] = a[1]; out[o + 6] = a[2]; out[o + 7] = d && d.b !== undefined ? d.b : 0xFFFFFF;
@@ -919,7 +987,7 @@
   PR.models = function (kind) {
     if (kind === PR.KIND.palm) return { near: PR.palm(), far: PR.cross() };
     if (kind === PR.KIND.palm_trunk) return { near: PR.palm(), far: null };
-    if (kind >= PR.FURN0) { const d = PR.furnDef(kind); return d ? PR.furnModel(d.model) : null; }
+    if (kind >= PR.FURN0) { const key = PR.furnKey(kind, 0); return key ? PR.furnModel(key) : null; }
     return null;
   };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
