@@ -281,7 +281,7 @@
       this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false;
       if (this.traffic) { this.traffic.destroy(); this.traffic = null; }
       if (this.starships) { this.starships.destroy(); this.starships = null; }
-      if (this.villages) { this.villages.destroy(); this.villages = null; }
+      if (this.villages) { this.villages.destroy(); this.villages = null; } if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(null);
       if (this.trams) { this.trams.destroy(); this.trams = null; }
       if (this.horizon) this.horizon.reset();
       if (this.furnaces) this.furnaces.clear();
@@ -339,7 +339,7 @@
       if (this.starships) this.starships.destroy();
       this.starships = VR.Starships ? new VR.Starships(this) : null;
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
-      this.villages = VR.Villages ? new VR.Villages(this, meta) : null;
+      this.villages = VR.Villages ? new VR.Villages(this, meta) : null; if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(this);
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
       this.world.listeners.push(this);
@@ -527,7 +527,7 @@
       if (this.starships) this.starships.destroy();
       this.starships = VR.Starships ? new VR.Starships(this) : null;
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
-      this.villages = VR.Villages ? new VR.Villages(this, meta) : null;
+      this.villages = VR.Villages ? new VR.Villages(this, meta) : null; if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(this);
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
       this.world.listeners.push(this);
@@ -817,6 +817,7 @@
       if (this.sim) this.sim.update(dt, !!(this.mp && this.mp.isClient));   // a guest: only the sliding doors (the host runs the world)
       if (this.entities) this.entities.update(dt);
       if (this.villages) this.villages.update(dt);
+      if (VR.Crowd && VR.Crowd.update) VR.Crowd.update(dt);   // the heroes and the crowd's budget (src/shared/folkcrowd.js)
       if (gad) gad.tick(dt);
       if (this.mirror) this.mirror.update(dt);
       if (this.starships) this.starships.update(dt);
@@ -883,7 +884,7 @@
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
-        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
+        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
         drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
       });
