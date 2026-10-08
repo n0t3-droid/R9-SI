@@ -52,12 +52,20 @@ for (const b of isleOps.values()) for (let i = 0; i < b.o.length; i += 4) {
   if (/_crystal_block$/.test(n) && y < 140 && y > 60) hang++;
 }
 check(hang >= 12, `hanging crystal blocks under the Sky Isles: ${hang} (want ≥ 12)`);
+// the rail loop C → N → NE → E → S → C rides a stone-arch viaduct: its rails and its stone deck and piers (TRAILER §3.6)
+let rails = 0, stone = 0;
+for (const b of isleOps.values()) for (let i = 0; i < b.o.length; i += 4) {
+  const n = nameOf(b.o[i + 3]);
+  if (n === 'vx_tech_railing') rails++; else if (n === 'spire_stone') stone++;
+}
+check(rails >= 200, `rail-loop railings of the Sky Isles viaduct: ${rails} (want ≥ 200)`);
+check(stone >= 1500, `stone deck, piers and arches of the Sky Isles viaduct: ${stone} blocks (want ≥ 1500)`);
 
 // 5 · the Heartland citadel (TRAILER §3.7): a red tip beacon spawn on every spire and watch tower (vents.js blinks them;
 // the spawn must sit on a beacon cell), and the giant crystals at its foot (azure 25 tall, violet 16)
 const H = VR.Heart.CITADEL;
 const nameCache = new Map(), nm = (s) => { let n = nameCache.get(s); if (n === undefined) { n = nameOf(s); nameCache.set(s, n); } return n; };
-let beacons = 0, onCell = 0, azure = 0, violet = 0;
+let beacons = 0, onCell = 0, azure = 0, violet = 0, flankLava = 0, steam = 0;
 for (let cx = Math.floor((H.x - 80) / 16); cx <= Math.floor((H.x + 80) / 16); cx++) for (let cz = Math.floor((H.z - 80) / 16); cz <= Math.floor((H.z + 80) / 16); cz++) {
   const out = g.generate(cx, cz);
   for (const s of out.spawns || []) if (s[0] === 'beacon') {
@@ -65,11 +73,14 @@ for (let cx = Math.floor((H.x - 80) / 16); cx <= Math.floor((H.x + 80) / 16); cx
     const lx = s[1] - cx * 16, lz = s[3] - cz * 16;
     for (let dy = -2; dy <= 2; dy++) { const y = s[2] + dy; if (y >= 0 && y < 256 && lx >= 0 && lx < 16 && lz >= 0 && lz < 16 && /beacon_red$/.test(nm(out.blocks[(y << 8) | (lz << 4) | lx]))) { onCell++; break; } }
   }
+  for (const s of out.spawns || []) if (s[0] === 'vent') steam++;
   // a crystal column is one (x, z) of a chunk: its blocks, counted per chunk, are its height
   const cols = new Map();
   for (let i = 0; i < out.blocks.length; i++) {
     const s = out.blocks[i]; if (!s) continue;
-    const n = nm(s); if (n !== 'azure_crystal_block' && n !== 'violet_crystal_block') continue;
+    const n = nm(s);
+    if (n === 'lava' && (i >> 8) > 62) flankLava++;   // the streams run on the flanks, above the canyon floor
+    if (n !== 'azure_crystal_block' && n !== 'violet_crystal_block') continue;
     const key = n + ':' + (i & 255); cols.set(key, (cols.get(key) || 0) + 1);
   }
   for (const [key, hgt] of cols) { if (key[0] === 'a') azure = Math.max(azure, hgt); else violet = Math.max(violet, hgt); }
@@ -78,6 +89,8 @@ check(beacons >= 6, `red tip beacon spawns on the Heartland citadel: ${beacons} 
 check(onCell === beacons, `every beacon spawn sits on a red beacon cell (±2): ${onCell} of ${beacons}`);
 check(azure >= 22, `giant azure crystal at the citadel foot: ${azure} blocks tall (want ≥ 22)`);
 check(violet >= 14, `giant violet crystal at the citadel foot: ${violet} blocks tall (want ≥ 14)`);
+check(flankLava >= 150, `lava streams down the citadel's flanks: ${flankLava} blocks above the canyon floor (want ≥ 150, three streams)`);
+check(steam >= 3, `steam vents where the streams leave the plinth: ${steam} (want ≥ 3)`);
 console.log(`(${(Date.now() - t0)} ms)`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

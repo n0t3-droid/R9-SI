@@ -38,6 +38,11 @@ const capture = async (name) => {
     const s = await ev(() => ({ busy: VR.game.pool.busy, pend: VR.game.world.pending.size }));
     if (s.busy === 0 && s.pend === 0 && i > 3) break;
   }
+  // what is in the air at this moment: the director's scripted ships (state, GPU mesh, position) and the sky traffic
+  const air = await ev(() => { const g = VR.game, D = g.director, c = g.renderer && g.renderer.cam ? g.renderer.cam : null; return {
+    cam: c ? [c.x, c.y, c.z].map(v => Math.round(v)) : null, traffic: g.traffic ? g.traffic.ships.length : -1,
+    mine: (D.myShips || []).map(s => ({ t: +s.t.toFixed(2), gpu: !!(s.d && s.d.gpu), pos: s.pos.map(v => Math.round(v)) })) }; });
+  console.log('  air', name, JSON.stringify(air));
   await shot(name);
   await ev(() => { delete VR.game.director.update; });
 };
@@ -53,5 +58,14 @@ for (let i = 0; i < 1500; i++) {
   if (!done.has(name + '1') && st.t >= 1.2) { done.add(name + '1'); console.log('  ', JSON.stringify(st)); await capture(`trailer_${name}_1_${TAG}`); }
   else if (!done.has(name + '2') && st.t >= st.dur - 0.6) { done.add(name + '2'); console.log('  ', JSON.stringify(st)); await capture(`trailer_${name}_2_${TAG}`); }
 }
+// the frame cost at the last picture, on this machine (swiftshader: compare builds and presets, not absolute ms): 35 frames
+// with the renderer on, the first 5 dropped, median and mean of the rest
+const cost = await ev(() => {
+  window.__norender = false; const g = VR.game, ts = [];
+  for (let i = 0; i < 35; i++) { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); g.renderer.gl.finish(); if (i >= 5) ts.push(performance.now() - t0); }
+  window.__norender = true; ts.sort((a, b) => a - b);
+  return { median: +ts[ts.length >> 1].toFixed(1), mean: +(ts.reduce((a, b) => a + b, 0) / ts.length).toFixed(1) };
+});
+console.log('COST', TAG, process.env.PRESET || 'high', JSON.stringify(cost));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 16)) console.log(l);
 await browser.close();
