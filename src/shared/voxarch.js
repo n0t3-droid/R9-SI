@@ -1129,6 +1129,8 @@
     if (M.far && quads.lod === undefined) quads.lod = lodFromQuads(quads);
     if (M.far && quads.lod) emitFar(M, x, y, z, quads.lod, cull);
     const bufs = M.bufs, smooth = sp.res >= 16;   // fine models get smooth lacquer surfaces instead of the bevel tile
+    // wind: a model part's sway level (voxplants.js: the crown and the leaves move, the trunk's base stays) in the w5 sway bits
+    const swayB = sp.model && sp.model.partSway ? ((sp.model.partSway[c.part | 0] | 0) & 3) << 5 : 0;
     const macro = VR.LOOK.macro;
     for (let q = 0; q < quads.length; q += RS) {
       const d = quads[q], col = quads[q + 1] & 0xffff, fl = quads[q + 2];
@@ -1139,7 +1141,7 @@
       // material quads: texture layer + upright rotation (bit 12) + world-scale variation (bit 15; not on metal, not
       // in the Klassisch look)
       const layer = glass ? M.layerGlass : matLayer ? matLayer | ((fl & 128) ? 4096 : 0) | (matId !== 5 && macro ? 32768 : 0) : (fl & 8) && M.layerHolo ? M.layerHolo : (fl & 4) ? (smooth && M.layerSmoothGloss ? M.layerSmoothGloss : M.layerGloss) : (smooth && M.layerSmooth ? M.layerSmooth : M.layerTile);
-      const w5base = d | ((fl & 1) ? 1 << 12 : 0);
+      const w5base = d | ((fl & 1) ? 1 << 12 : 0) | swayB;
       const light = lightFor[d];
       buf.ensure(4);
       for (let k = 0; k < 4; k++) {
