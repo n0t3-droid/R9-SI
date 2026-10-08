@@ -32,21 +32,30 @@ if (helm) {
   check(await ev(() => !!VR.game.gadgets.ship && VR.game.gadgets.ship.state === 'flying'), 'the ship lifts off (state flying)');
   console.log(await ev(() => { const S = VR.game.gadgets.ship, R = VR.R; const h = {}; for (let i = 0; i < S.all.length; i += 4) { const n = R.types[R.T.type[S.all[i + 3]]].name; h[n] = (h[n] || 0) + 1; } return JSON.stringify(h); }));
   console.log(await ev(() => { const S = VR.game.gadgets.ship; return JSON.stringify({ state: S.state, count: S.count, thr: S.thrusters.length, max: S.maxSpeed.toFixed(1), turn: S.turnRate.toFixed(2), sx: S.sx, sy: S.sy, sz: S.sz, cells: S.cells.length / 3, pos: S.pos }); }));
-  await ev(() => { VR.game.camMode = 1; });
+  await ev(() => { const g = VR.game; if (g.flight) g.flight.setView(1); });
   await step(20);
   await shot('s2_ship_chase');
-  // fly up and forward
+  // fly up and forward (the mouse only looks around now: turn with A/D); the ship waits cold: Space powers it up and
+  // spins the engines up (3 s) before it climbs
   await ev(() => { const i = VR.game.input; i.captured = true; i.keys.add('Space'); });
-  await step(40);
-  await ev(() => { const i = VR.game.input; i.keys.delete('Space'); i.keys.add('KeyW'); i.mouse.dx = 120; });
-  await step(60);
+  const y0 = await ev(() => { const S = VR.game.gadgets.ship, f = VR.game.flight; return { power: f && f.power, y: S.pos[1] }; });
+  await step(130);
+  const y1 = await ev(() => { const S = VR.game.gadgets.ship, f = VR.game.flight; return { power: f && f.power, y: S.pos[1] }; });
+  console.log(y1.power === 'running' && y1.y > y0.y + 2 ? '  ✓ cold → Space starts the engines → it climbs' : '  ✗ cold start', JSON.stringify(y0), '→', JSON.stringify(y1));
+  await ev(() => { const i = VR.game.input; i.keys.delete('Space'); i.keys.add('KeyW'); i.keys.add('KeyD'); });
+  await step(30);
+  await ev(() => { VR.game.input.keys.delete('KeyD'); });
+  await step(30);
   await shot('s3_ship_flying');
   console.log(await ev(() => { const S = VR.game.gadgets.ship; return JSON.stringify({ pos: S.pos.map(v => +v.toFixed(1)), vel: S.vel.map(v => +v.toFixed(1)), psi: S.psi.toFixed(2), roll: S.roll.toFixed(2) }); }));
-  await ev(() => { VR.game.camMode = 0; });
+  await ev(() => { const g = VR.game; if (g.flight) g.flight.setView(0); });
   await step(10);
   await shot('s4_cockpit');
-  await ev(() => { const i = VR.game.input; i.keys.delete('KeyW'); });
+  await ev(() => { const i = VR.game.input; i.keys.delete('KeyW'); i.pressed.add('KeyX'); });
   await step(60);
+  // V flies it down; V again once landed puts the blocks back on the grid and you get out
+  await ev(() => { VR.game.input.pressed.add('KeyV'); });
+  for (let i = 0; i < 30; i++) { await step(20); if (await ev(() => !VR.game.flight || VR.game.flight.state === 'landed')) break; }
   await ev(() => { VR.game.input.pressed.add('KeyV'); });
   await step(2);
   console.log('after land:', await ev(() => { const g = VR.game, S = g.gadgets.ship; return JSON.stringify({ ship: S && S.state, riding: !!g.gadgets.riding, pos: g.player.pos.map(v => +v.toFixed(1)) }); }));

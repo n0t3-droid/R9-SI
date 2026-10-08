@@ -23,19 +23,32 @@ check(await ev(() => VR.game.starships.ships.length > 0), 'ships are parked at t
 await shot('st1_parked');
 // walk on it? check proxy collision
 console.log('near', await ev(() => VR.game.starships.near.length));
-// board & fly
-await ev(() => { const g = VR.game, s = g.starships.ships[0]; if (s) g.starships.board(s, g.player); g.camMode = 1; const i = g.input; i.captured = true; i.keys.add('Space'); });
+// board & fly: a parked ship waits cold and dark — Space (like W) powers it up and spins the engines up (3 s), then it climbs
+// (the outpost's ship — the nearest one; the world's spawn has a shuttle of its own far away)
+await ev(() => { const g = VR.game, p = g.player, d2 = (q) => (q.pos[0] - p.pos[0]) ** 2 + (q.pos[2] - p.pos[2]) ** 2, s = g.starships.ships.slice().sort((a, b) => d2(a) - d2(b))[0]; if (s) g.starships.board(s, g.player); if (g.flight) g.flight.setView(1); const i = g.input; i.captured = true; i.keys.add('Space'); });
+const fl0 = await ev(() => { const f = VR.game.flight; return f ? { power: f.power, y: VR.game.starships.pilot.pos[1] } : null; });
+console.log('boarded', JSON.stringify(fl0));
+await step(45);
+const fl1 = await ev(() => { const f = VR.game.flight; return f ? { power: f.power, y: VR.game.starships.pilot.pos[1] } : null; });
+await step(75);
+const fl2 = await ev(() => { const f = VR.game.flight; return f ? { power: f.power, y: VR.game.starships.pilot.pos[1] } : null; });
+console.log('spool-up', JSON.stringify(fl1), '→', JSON.stringify(fl2));
+console.log(fl0 && fl0.power === 'off' && fl1.power === 'starting' && fl2.power === 'running' && fl2.y > fl0.y + 2 ? '  ✓ cold → Space starts the engines → it climbs' : '  ✗ cold start (' + JSON.stringify([fl0, fl1, fl2]) + ')');
+// the mouse only looks around now: turn with A/D (or hold the right button and move the mouse)
+await ev(() => { const i = VR.game.input; i.keys.delete('Space'); i.keys.add('KeyW'); i.keys.add('KeyD'); });
 await step(30);
-await ev(() => { const i = VR.game.input; i.keys.delete('Space'); i.keys.add('KeyW'); i.mouse.dx = 60; });
-await step(30);
+await ev(() => { VR.game.input.keys.delete('KeyD'); });
 await shot('st2_flying');
-console.log('pilot', await ev(() => { const s = VR.game.starships.pilot; return s ? JSON.stringify({ pos: s.pos.map(v => +v.toFixed(1)), vel: s.vel.map(v => +v.toFixed(1)), gear: s.gear.toFixed(2) }) : 'none'; }));
+console.log('pilot', await ev(() => { const s = VR.game.starships.pilot; return s ? JSON.stringify({ pos: s.pos.map(v => +v.toFixed(1)), vel: s.vel.map(v => +v.toFixed(1)), gear: s.gear.toFixed(2), roll: s.roll.toFixed(2) }) : 'none'; }));
 check(await ev(() => !!VR.game.starships.pilot), 'the player flies the ship (the pilot seat is taken)');
-await ev(() => { VR.game.camMode = 0; });
+await ev(() => { const g = VR.game; if (g.flight) g.flight.setView(0); });
 await step(3);
 await shot('st3_cockpit');
-await ev(() => { const i = VR.game.input; i.keys.delete('KeyW'); });
+await ev(() => { const i = VR.game.input; i.keys.delete('KeyW'); i.pressed.add('KeyX'); });
 await step(20);
+// V: the assisted landing flies the ship down onto its gear; V again (landed) gets you out
+await ev(() => { VR.game.input.pressed.add('KeyV'); });
+for (let i = 0; i < 30; i++) { await step(20); if (await ev(() => !VR.game.flight || VR.game.flight.state === 'landed')) break; }
 await ev(() => { VR.game.input.pressed.add('KeyV'); });
 await step(2);
 console.log('landed', await ev(() => { const g = VR.game; return JSON.stringify({ pilot: !!g.starships.pilot, riding: !!g.gadgets.riding, ships: g.starships.ships.map(s => s.state + '@' + s.pos.map(v => Math.round(v)).join(',')) }); }));

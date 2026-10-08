@@ -117,40 +117,50 @@
     G.box(x - (foot || 0.4), x + (foot || 0.4), 0, 0.26, z - 0.5, z + 0.5, pad, 1);
     G.box(x - 0.26, x + 0.26, y1 - 0.5, y1, z - 0.26, z + 0.26, st, 1);
   }
-  // cockpit cavity with a seat and a glowing dashboard, glass canopy over it
-  function cockpit(G, S, zFront, zBack, floorY, halfW, canopyY) {
-    const seat = pack([150, 42, 42]), seat2 = pack([95, 28, 30]), dash = pack(mul(S.trim, 0.9)), scr = pack(S.glow, 1), scr2 = pack(S.core, 1), floor = pack(mul(S.trim, 0.8));
-    // hollow out the inside, keeping a one-voxel shell
+  // the cockpit: a room carved into the hull (a floor, a dash along the front, one or two seats) whose roof — and the
+  // nose ahead of it — is glazed above the dash line: the big canopy you look through. A slim sill marks where glass
+  // meets hull. The furniture is a coarse stand-in (part 2), drawn whenever the detailed 1/16 m cockpit (cockpit.js,
+  // placed by meta.cockpit) isn't; collisions only see the hull.
+  function cockpitRoom(G, S, o) {
+    // (everything on the voxel grid, so the furnished cockpit sits exactly on the deck and against the walls)
+    const R = G.R, q = (v) => Math.round(v * R) / R, zNose = q(o.zNose), zf = q(o.zf), zb = q(o.zb), floor = q(o.floor), rim = q(o.rim), hw = q(o.hw), gw = o.glassW || 99, v1 = 1 / R;
+    const glass = pack(S.glass, 0, 1), sill = pack(mul(S.trim, 1.25)), deck = pack(mul(S.trim, 0.85));
+    const carve = (x, y, z) => (z >= zf && z <= zb && ((Math.abs(x) <= hw && y >= floor) || (y > rim && Math.abs(x) < gw))) || (z >= zNose && z < zf && y > rim && Math.abs(x) < gw);
     const rm = [];
-    G.each(-halfW, halfW, floorY, canopyY + 3, zFront, zBack, (x, y, z, i, j, k) => { if (G.get(i, j, k) && G.get(i + 1, j, k) && G.get(i - 1, j, k) && G.get(i, j + 1, k) && G.get(i, j - 1, k) && G.get(i, j, k + 1) && G.get(i, j, k - 1)) rm.push(i, j, k); });
+    G.each(-gw - 6, gw + 6, floor, floor + 7, zNose, zb, (x, y, z, i, j, k) => {
+      if (!carve(x, y, z)) return;
+      if (G.get(i, j, k) && G.get(i + 1, j, k) && G.get(i - 1, j, k) && G.get(i, j + 1, k) && G.get(i, j - 1, k) && G.get(i, j, k + 1) && G.get(i, j, k - 1)) rm.push(i, j, k);
+    });
     for (let n = 0; n < rm.length; n += 3) G.set(rm[n], rm[n + 1], rm[n + 2], 0);
-    G.box(-halfW, halfW, floorY - 0.26, floorY, zFront, zBack, floor);
-    // dashboard along the front
-    G.box(-halfW, halfW, floorY, floorY + 0.75, zFront, zFront + 0.5, (x, y, z) => (y > floorY + 0.5 && (Math.floor((x + 5) * 4) % 3 !== 0) ? (Math.floor((x + 5) * 4) % 5 === 0 ? scr2 : scr) : dash));
-    // seat
-    const sz = zFront + (zBack - zFront) * 0.55;
-    G.box(-0.4, 0.4, floorY, floorY + 0.5, sz - 0.4, sz + 0.4, seat);
-    G.box(-0.4, 0.4, floorY + 0.5, floorY + 1.4, sz + 0.26, sz + 0.52, seat2);
-    S.meta.eye = [0, floorY + 1.25, sz - 0.1];
-    S.meta.seat = [0, floorY + 0.5, sz];
-  }
-  function canopy(G, S, zFront, zBack, yMin, test) {
-    // turn outer skin cells above yMin into framed glass; test(x,y,z) limits the region
-    const glass = pack(S.glass, 0, 1), frame = pack(mul(S.trim, 1.1));
-    const i0 = 0, i1 = G.nx - 1;
-    for (let j = G.iy(yMin); j < G.ny; j++) for (let k = Math.max(0, G.iz(zFront)); k <= Math.min(G.nz - 1, G.iz(zBack)); k++) for (let i = i0; i <= i1; i++) {
-      const v = G.get(i, j, k); if (!v || (v & GLASSF)) continue;
-      const x = G.cx(i), y = G.cy(j), z = G.cz(k);
-      if (test && !test(x, y, z)) continue;
-      let open = !G.get(i, j + 1, k) || !G.get(i - 1, j, k) || !G.get(i + 1, j, k) || !G.get(i, j, k - 1);
-      // skin that faces the cockpit cavity counts too
-      if (!open) continue;
-      const bar = Math.abs(x) < 0.13 || (Math.floor((z - zFront) * G.R) % Math.round(G.R * 1.25) === 0);
-      G.set(i, j, k, bar ? frame : glass);
+    // glaze the skin above the dash line, a sill along its foot and a frame along its back edge
+    let top = rim;
+    G.each(-gw - 6, gw + 6, rim, rim + 7, zNose - v1, zb + v1, (x, y, z, i, j, k) => {
+      const v = G.get(i, j, k); if (!v || G.part[G.idx(i, j, k)] || Math.abs(x) >= gw) return;
+      if (y <= rim + v1 || z > zb) { G.set(i, j, k, sill); return; }
+      G.set(i, j, k, glass); if (y > top) top = y;
+    });
+    // deck plates
+    G.box(-hw, hw, floor - v1, floor, zf, zb, deck);
+    // stand-in furniture (part 2): dash with glowing screens, seats
+    const dash = pack(mul(S.trim, 0.9)), scr = pack(S.glow, 1), seatC = pack(o.seatCol || [150, 42, 42]), seat2 = pack(mul(o.seatCol || [150, 42, 42], 0.65));
+    G.box(-hw, hw, floor, rim, zf, zf + 0.5, (x, y) => (y > rim - 0.5 && y < rim - 0.2 && Math.abs(x) < hw - 0.2 && Math.floor((x + 5) * 4) % 3 ? scr : dash), 2);
+    const sz = zf + (o.seatZ || 1.75), seats = o.seats === 2 ? [-0.55, 0.55] : [0];
+    for (const sx of seats) {
+      G.box(sx - 0.26, sx + 0.26, floor, floor + 0.5, sz - 0.26, sz + 0.26, seatC, 2);
+      G.box(sx - 0.26, sx + 0.26, floor + 0.5, floor + 1.3, sz + 0.26, sz + 0.52, seat2, 2);
     }
-    // make everything in the canopy region between skin and cavity glass so you can see out
+    const px = seats[0], eye = [px, floor + 1.2, sz - 0.14];
+    S.meta.eye = eye; S.meta.seat = [px, floor + 0.5, sz];
+    // the glazed roof as a height map (inner glass surface over the room and the nose), for the detailed cockpit's frame
+    const step = 0.25, nx = Math.ceil(2 * Math.min(gw, hw + 2) / step), nz = Math.ceil((zb - zNose) / step) + 1, x0 = -nx * step / 2, roof = new Array(nx * nz).fill(0);
+    for (let c = 0; c < nz; c++) for (let a = 0; a < nx; a++) {
+      const x = x0 + (a + 0.5) * step, z = zNose + (c + 0.5) * step;
+      let best = 0;
+      for (let y = rim + 6; y > rim; y -= v1) { const v = G.get(G.ix(x), G.iy(y), G.iz(z)); if (v && (v & GLASSF)) { best = y - 0.5 * v1; } else if (best) break; }
+      roof[c * nx + a] = +best.toFixed(3);
+    }
+    S.meta.cockpit = { hw, floor, rim, zNose, zf, zb, seats: seats.map(x => [x, sz]), eye, top: +(top + 0.5 * v1).toFixed(3), roof: { x0, z0: zNose, step, nx, nz, h: roof }, glassW: Math.min(gw, 99) };
   }
-
   // ---------------------------------------------------------------- archetypes (metres; y = 0 ground)
   const ARCHS = {};
   ARCHS.shuttle = (G, S, rng) => {
@@ -168,8 +178,9 @@
       return hullC;
     });
     // aft engine housing
-    G.box(-W * 0.95, W * 0.95, cy - H * 0.8, cy + H * 0.75, z1 - 2.4, z1 - 0.8, (x, y, z) => (Math.abs(y - cy) < 0.2 ? acc : hull2));
-    for (const [ex, ey] of [[-0.95, cy + 0.35], [0.95, cy + 0.35], [0, cy - 0.75]]) engine(G, S, ex, ey, 0.72, z1 + 0.2, 1.4);
+    // (it reaches down to the deck so the cargo bay runs flat to the ramp; the engines sit round the ramp's opening)
+    G.box(-W * 0.95, W * 0.95, gearH - 0.1, cy + H * 0.75, z1 - 2.4, z1 - 0.8, (x, y, z) => (Math.abs(y - cy) < 0.2 ? acc : hull2));
+    for (const [ex, ey, er] of [[-1.55, cy - 0.35, 0.5], [1.55, cy - 0.35, 0.5], [0, cy + 1.05, 0.45]]) engine(G, S, ex, ey, er, z1 + 0.2, 1.4);
     // delta wings with striped leading edges
     wing(G, W * 0.8, rng.range(4.6, 5.8), (s) => z0 + L * 0.42 + s * 0.95, (s) => Math.max(1.2, L * 0.42 - s * 1.25), (s) => 0.62 - s * 0.05, (s) => cy - H * 0.55 + s * 0.04,
       (x, y, z, s, u) => (u < 0.12 ? acc : u > 0.86 ? dark : (Math.floor(u * 6) % 2 && s > 0.3 ? hull2 : hullC)));
@@ -179,13 +190,16 @@
       const h = (y - (cy + H * 0.6)); const lead = fz0 + h * 1.1; if (z < lead || z > z1 - 1 - h * 0.25) return;
       G.set(i, j, k, h > 2.9 ? pack(S.glow, 1) : (Math.abs(z - lead) < 0.4 ? acc : (h > 1.6 && h < 2.0 ? acc2 : hullC)));
     });
-    cockpit(G, S, z0 + L * 0.13, z0 + L * 0.28, cy - 0.35, 0.75, cy + 0.35);
-    canopy(G, S, z0 + L * 0.1, z0 + L * 0.3, cy + 0.1);
-    // side windows row & cargo bay door seams
-    for (let z = z0 + L * 0.34; z < z1 - 4; z += 1.25) for (const sx of [-1, 1]) G.each(sx * (W + 0.3), sx * (W + 0.3), cy + 0.3, cy + 0.7, z, z + 0.5, (x, y, zz, i, j, k) => { for (let ii = i; ii >= 0 && ii < G.nx; ii -= sx) { if (G.get(ii, j, k)) { G.set(ii, j, k, pack(S.glass, 0, 1)); break; } } });
+    // (glazed almost to the tip: the nose must not rise into the pilots' view)
+    cockpitRoom(G, S, { zNose: z0 + 0.25, zf: z0 + L * 0.1, zb: z0 + L * 0.29, floor: cy - 0.85, rim: cy, hw: 1.15, seats: 2 });
+    // side windows row (none where the side door goes: port, 1.65–2.95 m behind the cockpit)
+    const zDoor = Math.round((z0 + L * 0.29) * G.R) / G.R + 2.3;
+    for (let z = z0 + L * 0.34; z < z1 - 4; z += 1.25) for (const sx of [-1, 1]) if (!(sx < 0 && z + 0.5 > zDoor - 0.75 && z < zDoor + 0.75)) G.each(sx * (W + 0.3), sx * (W + 0.3), cy + 0.3, cy + 0.7, z, z + 0.5, (x, y, zz, i, j, k) => { for (let ii = i; ii >= 0 && ii < G.nx; ii -= sx) { if (G.get(ii, j, k)) { G.set(ii, j, k, pack(S.glass, 0, 1)); break; } } });
     S.meta.gearParts = [[-1.1, z0 + L * 0.2], [1.1, z0 + L * 0.2], [-2.2, z0 + L * 0.66], [2.2, z0 + L * 0.66]];
     for (const [x, z] of S.meta.gearParts) gear(G, S, x, z, cy - H * 0.55);
     antenna(G, S, 0.6, cy + H - 0.1, z0 + L * 0.45, 0.9);
+    // the walkable inside: cabin & cargo bay, the side door with its stair, the rear ramp (shipcabin.js)
+    if (VR.ShipCabin) VR.ShipCabin.carve(G, S, { zb: S.meta.cockpit.zb, cfloor: S.meta.cockpit.floor, zT: z1 - 0.8, W, Hh: H, cy, side: -1, hull2: S.hull2, trim: S.trim }, { pack, mul, GLASSF });
   };
   ARCHS.interceptor = (G, S, rng) => {
     const L = rng.range(13, 17), z0 = -L / 2, z1 = L / 2, W = rng.range(1.2, 1.5), H = 1.15, gearH = 1.0, cy = gearH + H;
@@ -211,8 +225,7 @@
     // twin or single tail
     const twin = rng.chance(0.5);
     for (const fx of twin ? [-0.6, 0.6] : [0]) G.each(fx - 0.14, fx + 0.14, cy + H * 0.5, cy + H + 1.6, z1 - 4, z1 - 0.8, (x, y, z, i, j, k) => { const h = y - (cy + H * 0.5); if (z < z1 - 4 + h * 1.2) return; G.set(i, j, k, h > 1.35 ? acc : hullC); });
-    cockpit(G, S, z0 + L * 0.2, z0 + L * 0.38, cy - 0.45, 0.5, cy + 0.1);
-    canopy(G, S, z0 + L * 0.16, z0 + L * 0.42, cy - 0.1);
+    cockpitRoom(G, S, { zNose: z0 + L * 0.1, zf: z0 + L * 0.2, zb: z0 + L * 0.38, floor: cy - 0.75, rim: cy - 0.05, hw: 0.55, seats: 1, seatZ: 1.3 });
     S.meta.gearParts = [[0, z0 + L * 0.22], [-1.1, z0 + L * 0.62], [1.1, z0 + L * 0.62]];
     for (const [x, z] of S.meta.gearParts) gear(G, S, x, z, cy - H * 0.55, 0.3);
   };
@@ -226,8 +239,7 @@
     engine(G, S, 0, cy, er * 0.85, z1 + 0.3, 0.6);
     wing(G, 0.6, rng.range(1.6, 2.4), (s) => z0 + 2 + s * 0.8, () => 1.1, () => 0.26, () => cy - 0.1, () => acc);
     wing(G, er * 0.8, rng.range(1.8, 2.8), (s) => z1 - 4.2 + s * 1.1, (s) => 2.6 - s * 0.5, () => 0.3, (s) => cy + s * 0.35, (x, y, z, s) => (s > 0.85 ? glow : hullC));
-    cockpit(G, S, z0 + L * 0.3, z0 + L * 0.45, cy - 0.5, 0.42, cy + 0.2);
-    canopy(G, S, z0 + L * 0.27, z0 + L * 0.5, cy);
+    cockpitRoom(G, S, { zNose: z0 + L * 0.1, zf: z0 + L * 0.3, zb: z0 + L * 0.46, floor: cy - 0.65, rim: cy, hw: 0.45, seats: 1, seatZ: 1.2 });
     S.meta.gearParts = [[0, z0 + L * 0.3], [-0.9, z1 - 3.4], [0.9, z1 - 3.4]];
     for (const [x, z] of S.meta.gearParts) gear(G, S, x, z, cy - 0.7, 0.3);
   };
@@ -248,8 +260,7 @@
     // chin turret
     ellipsoid(G, 0, cy - H * 0.85, z0 + L * 0.2, 0.7, 0.45, 0.7, () => dark);
     for (const sx of [-0.22, 0.22]) cannon(G, S, sx, cy - H * 0.9, z0 + L * 0.2 - 0.3, 1.6);
-    cockpit(G, S, z0 + L * 0.1, z0 + L * 0.27, cy - 0.6, 0.8, cy + 0.2);
-    canopy(G, S, z0 + L * 0.07, z0 + L * 0.3, cy + 0.1, (x) => Math.abs(x) < W);
+    cockpitRoom(G, S, { zNose: z0 + L * 0.05, zf: z0 + L * 0.1, zb: z0 + L * 0.27, floor: cy - 0.85, rim: cy - 0.05, hw: 1.15, seats: 2, glassW: W });
     S.meta.gearParts = [[-0.9, z0 + L * 0.3], [0.9, z0 + L * 0.3], [-bx, z1 - 3], [bx, z1 - 3]];
     for (const [x, z] of S.meta.gearParts) gear(G, S, x, z, cy - H * 0.6);
   };
@@ -260,8 +271,7 @@
       (x, y, z, t, P) => { const rx = Math.abs(x) / P.w; if (rx > 0.86) return acc; if ((y - P.cy) / P.h < -0.5) return hull2; return (Math.floor(Math.abs(x) * 1.6) % 3 === 0 && y > P.cy) ? hull2 : hullC; });
     for (const sx of [-1, 1]) G.each(sx * 2.2 - 0.14, sx * 2.2 + 0.14, cy + H * 0.7, cy + H + 2.2, z1 - 5, z1 - 1, (x, y, z, i, j, k) => { const h = y - (cy + H * 0.7); if (z < z1 - 5 + h * 1.1) return; G.set(i, j, k, h > 1.9 ? pack(S.glow, 1) : acc); });
     for (const ex of [-2.8, -1.1, 1.1, 2.8]) engine(G, S, ex, cy - 0.2, 0.55, z1 + 0.2, 1.2);
-    cockpit(G, S, z0 + L * 0.12, z0 + L * 0.26, cy - 0.6, 0.9, cy + 0.1);
-    canopy(G, S, z0 + L * 0.08, z0 + L * 0.3, cy + 0.05, (x) => Math.abs(x) < 2.2);
+    cockpitRoom(G, S, { zNose: z0 + L * 0.06, zf: z0 + L * 0.12, zb: z0 + L * 0.27, floor: cy - 0.8, rim: cy - 0.05, hw: 1.15, seats: 2, glassW: 2.2 });
     // side door outline & portholes
     for (const sx of [-1, 1]) for (let z = z0 + L * 0.4; z < z1 - 3; z += 1.5) G.each(sx * W, sx * W, cy - 0.1, cy + 0.35, z, z + 0.5, (x, y, zz, i, j, k) => { for (let ii = i; ii >= 0 && ii < G.nx; ii -= sx) if (G.get(ii, j, k)) { G.set(ii, j, k, pack(S.core, 1)); break; } });
     S.meta.gearParts = [[-2, z0 + L * 0.3], [2, z0 + L * 0.3], [-3, z1 - 4], [3, z1 - 4]];
@@ -307,8 +317,7 @@
     // turrets
     for (const tz of [z0 + L * 0.25, z0 + L * 0.38]) { ellipsoid(G, 0, cy + H * 0.95, tz, 0.8, 0.5, 0.8, () => dark); for (const sx of [-0.25, 0.25]) cannon(G, S, sx, cy + H * 1.05, tz - 0.3, 1.8); }
     for (const [ex, ey] of [[0, cy], [-1.3, cy - 0.3], [1.3, cy - 0.3], [0, cy + 1.2]]) engine(G, S, ex, ey, 0.62, z1 + 0.2, 1.6);
-    cockpit(G, S, z0 + L * 0.12, z0 + L * 0.22, cy - 0.9, 0.8, cy);
-    canopy(G, S, z0 + L * 0.1, z0 + L * 0.24, cy - 0.1);
+    cockpitRoom(G, S, { zNose: z0 + L * 0.08, zf: z0 + L * 0.12, zb: z0 + L * 0.22, floor: cy - 1.0, rim: cy - 0.1, hw: 1.1, seats: 2 });
     for (let z = z0 + L * 0.25; z < z1 - 4; z += 0.75) for (const sx of [-1, 1]) if (rng.chance(0.55)) G.each(sx * (W + 0.3), sx * (W + 0.3), cy + 0.4, cy + 0.6, z, z + 0.3, (x, y, zz, i, j, k) => { for (let ii = i; ii >= 0 && ii < G.nx; ii -= sx) if (G.get(ii, j, k)) { G.set(ii, j, k, pack(S.core, 1)); break; } });
     S.meta.gearParts = [[-1.6, z0 + L * 0.3], [1.6, z0 + L * 0.3], [-1.6, z1 - 6], [1.6, z1 - 6]];
     for (const [x, z] of S.meta.gearParts) gear(G, S, x, z, cy - H + 0.4, 0.55);
@@ -451,7 +460,9 @@
   function occupancy(G) {
     const R = G.R, bx = Math.ceil(G.nx / R), by = Math.ceil(G.ny / R), bz = Math.ceil(G.nz / R);
     const occ = new Uint8Array(bx * by * bz), cnt = new Uint16Array(bx * by * bz);
-    for (let j = 0; j < G.ny; j++) for (let k = 0; k < G.nz; k++) for (let i = 0; i < G.nx; i++) { const v = G.d[G.idx(i, j, k)]; if (v && !G.part[G.idx(i, j, k)]) cnt[(Math.floor(j / R) * bz + Math.floor(k / R)) * bx + Math.floor(i / R)]++; }
+    // (a walkable cabin's rooms count as solid: G.hollow, shipcabin.js)
+    const hol = G.hollow || null;
+    for (let j = 0; j < G.ny; j++) for (let k = 0; k < G.nz; k++) for (let i = 0; i < G.nx; i++) { const n = G.idx(i, j, k), v = G.d[n], p = G.part[n]; if ((v && (!p || p === 3 || p === 4)) || (hol && hol[n])) cnt[(Math.floor(j / R) * bz + Math.floor(k / R)) * bx + Math.floor(i / R)]++; }
     const th = R * R * R * 0.3;
     for (let n = 0; n < occ.length; n++) occ[n] = cnt[n] >= th ? 1 : 0;
     return { bx, by, bz, occ };
@@ -543,6 +554,9 @@
         origin: [G.x0, G.y0, G.z0], dims: [G.nx, G.ny, G.nz],
         bounds: [G.cx(i0) - 0.5 / R, 0, G.cz(k0) - 0.5 / R, G.cx(i1) + 0.5 / R, G.cy(j1) + 0.5 / R, G.cz(k1) + 0.5 / R],
         eye: S.meta.eye || [0, 3, -3], seat: S.meta.seat || [0, 2, -3], exhaust: S.meta.exhaust, guns: S.meta.guns,
+        gear: (S.meta.gearParts || []).map(q => [q[0], q[1]]),   // landing feet [x, z] (pads at y = 0)
+        cockpit: S.meta.cockpit || null,                          // the room for the furnished cockpit (cockpit.js)
+        cabin: S.meta.cabin || null,                              // the walkable deck behind it (shipcabin.js, cabin.js)
       };
       meta.length = +(meta.bounds[5] - meta.bounds[2]).toFixed(1); meta.width = +(meta.bounds[3] - meta.bounds[0]).toFixed(1); meta.height = +meta.bounds[4].toFixed(1);
       meta.speed = Math.round(Math.min(90, 26 + meta.exhaust.length * 7 * 40 / Math.max(20, meta.length * meta.width * 0.6)));
@@ -550,9 +564,18 @@
       const hullM = meshGrid(G, (c, p) => !(c & GLASSF) && p === 0, (c, nb, np) => !(nb & GLASSF) && np === 0);
       const glassM = meshGrid(G, (c) => !!(c & GLASSF), () => true);
       const gearM = meshGrid(G, (c, p) => p === 1, (c, nb) => !(nb & GLASSF));
+      // the cockpit's stand-in furniture (drawn whenever the detailed cockpit isn't)
+      const intM = meshGrid(G, (c, p) => p === 2 && !(c & GLASSF), (c, nb, np) => !(nb & GLASSF) && np !== 1);
       const occ = occupancy(G);
-      meta.tris = (hullM.count + glassM.count + gearM.count) / 3;
-      const res = { meta, hull: hullM, glass: glassM, gear: gearM, occ };
+      meta.tris = (hullM.count + glassM.count + gearM.count + intM.count) / 3;
+      const res = { meta, hull: hullM, glass: glassM, gear: gearM, interior: intM, occ };
+      // a walkable inside: the ramp, the side door's plug, its stair and the cabin's coarse furniture move / hide on their own
+      if (meta.cabin) {
+        const own = (pp) => (c, nb, np) => !(nb & GLASSF) && np === pp;
+        res.extra = { ramp: meshGrid(G, (c, p) => p === 3, own(3)), door: meshGrid(G, (c, p) => p === 4, own(4)), stair: meshGrid(G, (c, p) => p === 5, own(5)), cabin: meshGrid(G, (c, p) => p === 6, (c, nb, np) => !(nb & GLASSF) && (np === 6 || np === 0)) };
+        res.walk = VR.ShipCabin.walkGrid(G);
+        for (const k in res.extra) meta.tris += res.extra[k].count / 3;
+      }
       if (opts.preview) res.preview = isoPreview(G, opts.preview[0], opts.preview[1]);
       if (opts.debugGrid) res.grid = G;
       return res;

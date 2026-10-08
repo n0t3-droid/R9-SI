@@ -40,6 +40,7 @@
   const unkey = (k) => [Math.floor(k / 65536) - 32768, (k % 65536) - 32768];
   const cleanName = (s) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 24);
   const num = (v, d) => (typeof v === 'number' && isFinite(v) ? v : d);
+  const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
   const MAXB64 = 3600; // base64 chars per message part (leaves room for JSON around it)
 
   class MP {
@@ -577,7 +578,10 @@
     publish(force) {
       const g = this.g, p = g.player; if (!this.room || !p) return;
       const S = g.starships && g.starships.pilot;
-      const veh = S && S.d && S.d.meta ? { s: S.d.seed, a: S.d.arch || null, pa: S.d.palette || null, y: Math.round(S.yaw * 1000) / 1000, pi: Math.round((S.pitch || 0) * 1000) / 1000, ro: Math.round((S.roll || 0) * 1000) / 1000, p: S.pos.map(v => Math.round(v * 100) / 100) } : null;
+      // the ship you fly: design, pose — and its gear, ramp, lights and thrust, so friends see them move
+      const FL = S && S.flight;
+      const veh = S && S.d && S.d.meta ? { s: S.d.seed, a: S.d.arch || null, pa: S.d.palette || null, y: Math.round(S.yaw * 1000) / 1000, pi: Math.round((S.pitch || 0) * 1000) / 1000, ro: Math.round((S.roll || 0) * 1000) / 1000, p: S.pos.map(v => Math.round(v * 100) / 100),
+        g: FL ? Math.round(FL.gear * 10) / 10 : 1, r: FL ? Math.round(FL.ramp * 10) / 10 : 0, l: FL && FL.lights ? 1 : 0, t: FL ? Math.round(FL.spool * 10) / 10 : 0, b: FL && FL.boost ? 1 : 0 } : null;
       const pl = {
         n: this.myName(),
         p: [Math.round(p.pos[0] * 100) / 100, Math.round(p.pos[1] * 100) / 100, Math.round(p.pos[2] * 100) / 100],
@@ -674,21 +678,32 @@
         const v = a.veh; if (!a.has || !v) { a.ship = null; continue; }
         const d = S.design(v.s >>> 0, v.a || null, v.pa || null);
         if (!d || !d.meta || !d.gpu) continue;
-        if (!a.ship || a.ship.d !== d) a.ship = { d, pos: null, yaw: 0, pitch: 0, roll: 0, vel: [0, 0, 0], gear: 0, state: 'remote', rot: null };
+        if (!a.ship || a.ship.d !== d) a.ship = { d, pos: null, yaw: 0, pitch: 0, roll: 0, vel: [0, 0, 0], gear: num(v.g, 1), ramp: num(v.r, 0), state: 'remote', rot: null };
         const sh = a.ship;
         const tp = Array.isArray(v.p) ? [num(v.p[0], a.tp[0]), num(v.p[1], a.tp[1]), num(v.p[2], a.tp[2])] : a.tp;
         if (!sh.pos) sh.pos = tp.slice();
         for (let i = 0; i < 3; i++) sh.pos[i] += (tp[i] - sh.pos[i]) * 0.3;
         let dy = num(v.y, 0) - sh.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
         sh.yaw += dy * 0.3; sh.pitch = num(v.pi, 0); sh.roll = num(v.ro, 0);
+        // gear, ramp, lights and thrust move smoothly toward what the pilot set
+        sh.gear += (clamp01(num(v.g, 1)) - sh.gear) * 0.25; sh.ramp = (sh.ramp || 0) + (clamp01(num(v.r, 0)) - (sh.ramp || 0)) * 0.25;
+        sh.lights = !!v.l; sh.thrust = Math.max(0, Math.min(1.45, num(v.t, 0.7))); sh.boost = !!v.b;
+        // (the renderer swings a shuttle's ramp by its hatch state)
+        if (d.meta.cabin) { const H = sh.hatch || (sh.hatch = { ramp: 0, rampOpen: false, door: 0, doorOpen: false, cdoor: 0, cdoorOpen: false, kneel: 0 }); H.ramp = sh.ramp; H.rampOpen = sh.ramp > 0.5; }
         S.rotOf(sh);
         const g = this.g, m = d.meta;
+        // the lights on: strobes on the wingtips, about once a second
+        const tnow = performance.now();
+        if (sh.lights && g.particles && d.wingtips && tnow > (sh.strobeAt || 0)) {
+          sh.strobeAt = tnow + 1100; const R4 = sh.rot;
+          d.wingtips.forEach((q, i) => g.particles.spawn(sh.pos[0] + R4[0] * q[0] + R4[4] * q[1] + R4[8] * q[2], sh.pos[1] + R4[1] * q[0] + R4[5] * q[1] + R4[9] * q[2], sh.pos[2] + R4[2] * q[0] + R4[6] * q[1] + R4[10] * q[2], 0, 0, 0, { life: 0.12, size: 0.5, grav: 0, col: i ? [0.4, 1, 0.5] : [1, 0.3, 0.3], emis: 1, drag: 0, collide: false }));
+        }
         if (g.trails && m.exhaust) {
           const R3 = sh.rot, now = performance.now();
           if (sh.lastP) { const dtm = Math.max(1, now - sh.lastT) / 1000; const v = Math.hypot(sh.pos[0] - sh.lastP[0], sh.pos[1] - sh.lastP[1], sh.pos[2] - sh.lastP[2]) / dtm; sh.spd = (sh.spd || 0) + (v - (sh.spd || 0)) * 0.1; }
           sh.lastP = sh.pos.slice(); sh.lastT = now;
           const sp = sh.spd || 0;
-          for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei], l = [e[0], e[1], e[2] + 0.3]; g.trails.engine('mp' + a.peer + ei, [sh.pos[0] + R3[0] * l[0] + R3[4] * l[1] + R3[8] * l[2], sh.pos[1] + R3[1] * l[0] + R3[5] * l[1] + R3[9] * l[2], sh.pos[2] + R3[2] * l[0] + R3[6] * l[1] + R3[10] * l[2]], sp, { thrust: 0.7, size: e[3], col: [0.55, 0.5, 1] }); }
+          if (sh.thrust > 0.05) for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei], l = [e[0], e[1], e[2] + 0.3]; g.trails.engine('mp' + a.peer + ei, [sh.pos[0] + R3[0] * l[0] + R3[4] * l[1] + R3[8] * l[2], sh.pos[1] + R3[1] * l[0] + R3[5] * l[1] + R3[9] * l[2], sh.pos[2] + R3[2] * l[0] + R3[6] * l[1] + R3[10] * l[2]], sp, { thrust: Math.min(1.3, sh.thrust), size: e[3] * (sh.boost ? 1.45 : 1), col: sh.boost ? [0.35, 0.72, 1] : [0.55, 0.5, 1], minor: ei > 1 }); }
         }
         out.push(sh);
       }

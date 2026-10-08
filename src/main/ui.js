@@ -514,7 +514,8 @@
         slider('fov', T('g.set.fov'), 50, 110, 1, (v) => v + '°');
         slider('sens', T('g.set.sens'), 0.2, 3, 0.05, pct);
         toggle('invertY', T('g.set.invertY')); toggle('viewBob', T('g.set.viewBob'));
-        body.appendChild(el('div', 'note', T('g.set.keys')));
+        toggle('mouseSteer', T('g.set.mouseSteer')); toggle('camShake', T('g.set.camShake'));
+        body.appendChild(el('div', 'note', T('g.set.keys') + T('g.set.keysShip')));
       } else if (this.settingsTab === 'audio') {
         slider('volMaster', T('g.set.volMaster'), 0, 1, 0.05, pct);
         slider('volSfx', T('g.set.volSfx'), 0, 1, 0.05, pct);
