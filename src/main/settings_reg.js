@@ -78,6 +78,7 @@
     { key: 'kids', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.kids', tip: 'g.set.kids.tip', def: false },
     { key: 'showCoords', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.showCoords', tip: 'g.set.showCoords.tip', def: false },
     { key: 'minimap', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.minimap', tip: 'g.set.minimap.tip', def: true },
+    { key: 'wonderCompass', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.wonderCompass', tip: 'g.set.wonderCompass.tip', def: true },   // ✨ the Wunderkompass (wonders_game.js)
     { key: 'toasts', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.toasts', tip: 'g.set.toasts.tip', def: true },
     { key: 'mpHost', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.mpHost', tip: 'g.set.mpHost.tip', def: true },
   ];

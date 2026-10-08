@@ -132,6 +132,12 @@
   wrap('chips', function () {
     const el = $('#chips'); el.innerHTML = '';
     for (const t of Fg.types) { const b = document.createElement('button'); b.className = 'fgt' + (FM.type === t.id ? ' on' : ''); b.dataset.ftype = t.id; b.textContent = t.icon + ' ' + FW(t.name); b.title = FW(t.name); b.onclick = () => FM.setType(t.id); el.appendChild(b); }
+    // ✨ the wonders found on this device (wonders_game.js → Wonders.giveGift): each one builds anywhere, as it stands
+    if (VR.Wonders && VR.Wonders.gifts) for (const w of VR.Wonders.gifts()) {
+      const b = document.createElement('button'), nm = VR.I18N ? VR.I18N.t('g.wonder.n.' + w.type, null, w.de) : w.de;
+      b.className = 'fgt' + (FM.dna && FM.dna.indexOf('wonder:' + w.type + '#') === 0 ? ' on' : ''); b.dataset.ftype = 'wonder:' + w.type;
+      b.textContent = '✨ ' + nm; b.title = nm; b.onclick = () => setBase(VR.Wonders.dna(w.type, w.seed)); el.appendChild(b);
+    }
     return true;
   });
   wrap('list', function () {
