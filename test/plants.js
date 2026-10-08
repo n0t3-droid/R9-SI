@@ -93,14 +93,15 @@ for (const name of P.NAMES) {
   check(nPlant >= 150, 'the plot of Nova Haven has plants (' + nPlant + ' blocks, want at least 150)');
   console.log('    on a path, by kind:', JSON.stringify(onPathKind));
   check(nOnPath === 0, 'no plant stands on a street or a plaza (' + nOnPath + ' do)');
-  // every shared palm: the crown's 7×7×2 box holds all its parts, or none (a house wall never overwrote a part)
+  // every shared palm: each part of its crown stands at its place on the trunk top, or the palm has none of its parts (a house
+  // wall never overwrote a part); another palm's crown may stand in the box's empty corners, so the parts are tested one by one
   const crownN = VM.MODELS.vm_palm_crown.parts.length;
   let palms = 0, broken = 0;
   for (const [x, y, z, n] of plantCells) {
     const inside = x >= cx0 * 16 + 3 && x <= (cx1 + 1) * 16 - 4 && z >= cz0 * 16 + 3 && z <= (cz1 + 1) * 16 - 4;   // the whole crown is in the plot
     if (!inside || n !== 'vx_palm_trunk' || isPlant[at(x, y + 1, z)] && names[typeOf[at(x, y + 1, z)]] === 'vx_palm_trunk') continue;   // a trunk top
     let have = 0;
-    for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) for (let dy = 1; dy <= 2; dy++) if (names[typeOf[at(x + dx, y + dy, z + dz)]] === 'vm_palm_crown') have++;
+    for (const pp of VM.MODELS.vm_palm_crown.parts) if (names[typeOf[at(x - 3 + pp.px, y + 1 + pp.py, z - 3 + pp.pz)]] === 'vm_palm_crown') have++;
     if (!have) continue;
     palms++; if (have !== crownN) { broken++; const miss = []; for (const pp of VM.MODELS.vm_palm_crown.parts) { const bx = x - 3 + pp.px, by = y + 1 + pp.py, bz = z - 3 + pp.pz; if (names[typeOf[at(bx, by, bz)]] !== 'vm_palm_crown') miss.push(names[typeOf[at(bx, by, bz)]]); } console.log('    crown', have, 'of', crownN, 'at', x, y, z, 'overwritten by', [...new Set(miss)].join(',')); }
   }
