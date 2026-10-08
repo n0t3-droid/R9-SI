@@ -17,7 +17,7 @@ bash test/regress.sh "" smoke.mjs               # named tests only
 
 ## Release regression set
 
-17 node tests and 31 browser tests (48 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
+20 node tests and 31 browser tests (51 in all), listed as "yes" below. The three icon tests (`icon_same.js`, `icon_perf.js`, `icon_pump.js`) are new with the icon pass and have no recorded runs yet. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
 
 Typical time of a full release run: about 127 min of browser tests (median of the recorded passing runs, plus the wait for the lock) and about 72 s of node tests.
 
@@ -33,6 +33,9 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | genie_raster.js | node | Genie answer parser and the shape-to-block rasteriser (geometry only). | 1 (1–1) | 3/3 | yes |
 | heart_gen.js | node | Heartland generator smoke test: climate and biome at key points, temple, chunk timings; every chunk has blocks. | 3 † | – | no |
 | housekit.js | node | The Haus-Baukasten: every roof, wall, window and extra builds; doors, stairs and furniture land where they belong. | 2 (2–2) | 3/3 | yes |
+| icon_perf.js | node | Modern Living icon work stays cheap: every pack model builds in under 60 ms on first use, the pack's icons take under 150 ms in all, the cloth extrude under 60 ms for ten builds. | 2 † | – | yes |
+| icon_pump.js | node | The palette's icon pump: 6 ms of paints per frame, a model still to be built gets a frame of its own, detached slots skipped; the idle warm starts after 10 s of play, one picture per slice, largest first. | 1 † | – | yes |
+| icon_same.js | node | Every VM model keeps its voxels and its 8³ icon cell for cell (baseline test/icon_same.json, from before the icon pass and extrude speed-ups). | 3 † | – | yes |
 | id_snapshot.js | node | Every shipped block type keeps its state-id range (saved worlds store raw ids). | 1 † | – | yes |
 | light_same.js | node | Column light equals the v0.39 algorithm's output (the reference is kept in the test). | 6 † | – | yes |
 | look_classic.js | node | Klassisch block look (the default): each block a cube with its own edges and patterns; mesh checks. | 5 † | – | no |
