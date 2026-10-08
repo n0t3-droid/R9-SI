@@ -39,6 +39,29 @@
   const hex565 = (h) => VR.rgb565((h >> 16) & 255, (h >> 8) & 255, h & 255);
   const AETHER_TINT = VR.rgb565(90, 240, 255);
 
+  // ---- smooth props (job.smoothProps; src/main/props.js draws them). The blocks whose type has `prop` get no voxel
+  // geometry when the job asks for smooth props, and each prop instance is one anchor of six ints: world x, y, z, kind,
+  // facing, light. Type options (read from the registry once per size): `prop` names the prop a block belongs to,
+  // `propAnchor` ('all', or a part name) marks the block that anchors it (the palm crown's bottom centre part), and
+  // `propStem` names the prop a trunk top draws alone when no prop of its kind stands above it (player-built trunks).
+  // The kinds are numbers: a new prop kind is one entry here and one model in props.js.
+  const PROP_KIND = VR.PROP_KIND = { palm: 1, palm_trunk: 2 };
+  let PROPT = null;
+  function propTables() {
+    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n);
+    for (const t of R.types) {
+      const o = t.o || {};
+      if (!o.prop && !o.propStem) continue;
+      for (let s = t.base; s < t.base + t.nstates; s++) {
+        kind[s] = PROP_KIND[o.prop] || 0;
+        stem[s] = PROP_KIND[o.propStem] || 0;
+        anchor[s] = (o.propAnchor === 'all' || (o.propAnchor && t.has('part') && t.getV(s, 'part') === o.propAnchor)) ? 1 : 0;
+        facing[s] = t.has('facing') ? t.get(s, 'facing') & 3 : 0;
+      }
+    }
+    PROPT = { kind, anchor, stem, facing };
+  }
+
   class Buf {
     constructor(n) { this.a = new Uint16Array(n * 8); this.n = 0; }
     ensure(k) { if ((this.n + k) * 8 > this.a.length) { const b = new Uint16Array(Math.max(this.a.length * 2, (this.n + k) * 8 + 4096)); b.set(this.a); this.a = b; } }
@@ -104,6 +127,10 @@
     // material never read as one surface (Klassisch v2)
     const LK = VR.LOOK, ctmJoin = !LK || LK.ctm, macroOn = !LK || LK.macro, varyOn = !!(LK && LK.vary && !macroOn);
     const NAT = R.natural;
+    // smooth props: the prop blocks give no voxel geometry; their anchors are collected in propOut (job.smoothProps only)
+    const propOn = !!job.smoothProps;
+    if (propOn && (!PROPT || PROPT.kind.length !== R.stateCount + 1)) propTables();
+    const propOut = propOn ? [] : null;
     const bufs = [takeBuf(0, 4096), takeBuf(1, 1024), takeBuf(2, 1024)];
     // world sections keep their mini-voxel pieces apart from the plain terrain: a detailed buffer drawn up close
     // and a far buffer of averaged boxes (ships and previews merge everything into the opaque stream as before)
@@ -308,6 +335,13 @@
       if (!b) continue;
       const shape = TSH[b], fl = TF[b], layer = TL[b];
       if (shape === SH.NONE) continue;
+      if (propOn && PROPT.kind[b]) {
+        // a prop block: its geometry is the smooth prop's. The anchor goes to the list: the block that anchors the prop
+        // (its bottom face is the trunk's top), or the air above a trunk top that no prop of its kind covers
+        if (PROPT.anchor[b]) propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[b], PROPT.facing[b], L[bi]);
+        else if (PROPT.stem[b] && PROPT.kind[B[bi + DOFF[2]]] !== PROPT.kind[b]) propOut.push(job.ox + x, sy * 16 + y + 1, job.oz + z, PROPT.stem[b], 0, L[bi + DOFF[2]]);
+        continue;
+      }
       if (shape === SH.CUBE) {
         if (layer === 0 && (fl & F.OPAQUE)) continue; // done by greedy
         // non-opaque cube (glass, leaves, ice, slime, lava-like)
@@ -689,6 +723,7 @@
 
     const res = { opaque: bufs[0].out(), cutout: bufs[1].out(), trans: bufs[2].out(), vis: visMask };
     if (vxSplit) { res.vx = bufs[3].out(); res.vxFar = bufs[4].out(); }
+    if (propOut) res.props = Int32Array.from(propOut);   // six ints per prop instance (see propTables)
     return res;
   };
   // pair index for faces a<b (6 faces → 15 pairs)
