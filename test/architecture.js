@@ -122,6 +122,8 @@ console.log(`     zone pieces: kitchen ${kitchenN}, living ${livingN}, bedroom $
 const OLD = { '-5,-4': '62bfd954', '-5,-2': 'ee11f573', '-5,-1': '67b384d0', '-5,0': '34a521e', '-5,2': 'c0e601f4', '-4,-5': 'aa74af3e', '-4,-4': 'd2a3aed5', '-4,-1': 'e2e4e6a1', '-4,1': 'ce9dab52', '-4,2': '240e5d0d', '-4,3': 'f23c10f5', '-4,5': '926a0100' };
 const SEED = 424242;
 function planHash(p) { let h = 2166136261 >>> 0; for (const k of [...p.chunks.keys()].sort()) { const b = p.chunks.get(k); h = fnv(h, b.f); h = fnv(h, b.o); } return hex(h); }
+// the layout of a village or a town: its houses (doors, in order) and its road lengths; the detail must not move them
+const layoutOf = (p) => p.homes.map(h => h.door.join(',')).join(';') + '|' + p.roads.map(r => r.length).join(',');
 {
   const g = new VR.OverworldGen(SEED >>> 0, { vgen: 5 });
   const seen = {}; let mism = [];
@@ -134,6 +136,13 @@ function planHash(p) { let h = 2166136261 >>> 0; for (const k of [...p.chunks.ke
     seen[key] = planHash(p);
   }
   check(n === 12 && mism.length === 0, `vgen 5 village plans unchanged (12 sites${mism.length ? ', differ at ' + mism.join(' ') : ''})`);
+  // and at vgen 6 every village keeps its houses and roads: the detail changes what stands in them, not where
+  let same = 0, nn = 0;
+  for (let i = -5; i <= 5 && nn < 12; i++) for (let j = -5; j <= 5 && nn < 12; j++) {
+    const s = VG.site(g, i, j); if (!s) continue; nn++;
+    if (layoutOf(VG.plan(new VR.OverworldGen(SEED >>> 0, { vgen: 6 }), s)) === layoutOf(VG.plan(new VR.OverworldGen(SEED >>> 0, { vgen: 5 }), s))) same++;
+  }
+  check(nn === 12 && same === nn, `vgen 6 keeps the houses and roads of every village (${same}/${nn} sites)`);
 }
 
 // ---------------------------------------------------------------- 4. modern towns: street pieces at vgen 6 only
@@ -142,7 +151,7 @@ function planHash(p) { let h = 2166136261 >>> 0; for (const k of [...p.chunks.ke
   const count = (plan) => { const c = { shelter: 0, bike: 0, grate: 0, bin: 0 }; for (const [, b] of plan.chunks) for (let i = 0; i < b.o.length; i += 4) { const nm = nameOf(b.o[i + 3]); if (nm === SHELTER) c.shelter++; else if (nm === BIKE) c.bike++; else if (nm === GRATE) c.grate++; } return c; };
   const g6 = new VR.OverworldGen(SEED >>> 0, { vgen: 6 });
   const g5 = new VR.OverworldGen(SEED >>> 0, { vgen: 5 });
-  let modern = 0, ok6 = 0, ok5 = 0, same6 = 0;
+  let modern = 0, ok6 = 0, ok5 = 0, same6 = 0, sameLayout = 0;
   const lines = [];
   for (let i = -6; i <= 6 && modern < 2; i++) for (let j = -6; j <= 6 && modern < 2; j++) {
     const s = VG.site(g6, i, j);
@@ -153,6 +162,7 @@ function planHash(p) { let h = 2166136261 >>> 0; for (const k of [...p.chunks.ke
     if (c6.shelter >= 1 && c6.bike >= 2 && c6.grate >= 4) ok6++;
     if (c5.shelter === 0 && c5.bike === 0 && c5.grate === 0) ok5++;
     if (planHash(p6) === planHash(p6b)) same6++;
+    if (layoutOf(p6) === layoutOf(p5)) sameLayout++;
     lines.push(`site ${i},${j}: vgen 6 shelters ${c6.shelter} e-bikes ${c6.bike} grates ${c6.grate} · vgen 5 ${c5.shelter}/${c5.bike}/${c5.grate}`);
   }
   console.log('     ' + lines.join('\n     '));
@@ -160,6 +170,7 @@ function planHash(p) { let h = 2166136261 >>> 0; for (const k of [...p.chunks.ke
   check(ok6 === modern && modern > 0, `modern towns at vgen 6 have bus shelters, e-bikes and tree grates (${ok6}/${modern})`);
   check(ok5 === modern && modern > 0, `modern towns at vgen 5 have none of them (${ok5}/${modern})`);
   check(same6 === modern && modern > 0, `modern towns at vgen 6 are deterministic (${same6}/${modern})`);
+  check(sameLayout === modern && modern > 0, `modern towns at vgen 6 keep the houses and roads of vgen 5 (${sameLayout}/${modern})`);
 }
 
 // ---------------------------------------------------------------- 6. timings (printed)
