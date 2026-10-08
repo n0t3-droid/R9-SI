@@ -733,6 +733,115 @@ void main() {
   o_col = vec4(col, 1.0);
 }`;
 
+  // ------------------------------------------------------------ smooth props (t-smooth, props.js): instanced palms
+  // One vertex shader for the full palm, the far cross and the shadow pass. Instance: origin (camera-relative), yaw ·
+  // scale, lean, wind phase, frond mask · sky and block light. The mask hides the fronds a palm does not carry (a
+  // collapsed vertex draws nothing); the wind is the terrain's wind (u_wind, u_windDir) with the same gusts.
+  S.PROP_VS = `
+layout(location=0) in vec3 a_pos;
+layout(location=1) in vec3 a_nrm;
+layout(location=2) in vec2 a_uv;
+layout(location=3) in vec3 a_col;
+layout(location=4) in float a_bend;
+layout(location=5) in float a_sway;
+layout(location=6) in float a_frond;
+layout(location=7) in vec4 a_inst0;
+layout(location=8) in vec4 a_inst1;
+layout(location=9) in vec4 a_inst2;
+uniform mat4 u_viewProj;
+uniform float u_time;
+uniform float u_wind;
+uniform vec2 u_windDir;
+#ifdef SHADOWS
+uniform mat4 u_shadowMat;
+out vec4 v_shadow;
+#endif
+out vec2 v_uv;
+out vec3 v_col;
+out vec3 v_n;
+out vec3 v_rel;
+out float v_sky;
+out vec3 v_block;
+void main() {
+  float on = mod(floor(a_inst1.w / exp2(a_frond)), 2.0) >= 1.0 ? 1.0 : 0.0;
+  float sc = a_inst1.x, ph = a_inst1.z;
+  vec3 p = a_pos * sc;
+  p.x += a_inst1.y * a_bend;                       // the lean: the top stays, the trunk bends with its depth
+  float gust = 0.6 + 0.4 * sin(u_time * 0.31 + ph * 0.23);
+  float amp = u_wind * a_sway * sc * 0.16 * gust;
+  float c = cos(a_inst0.w), s = sin(a_inst0.w);
+  vec3 q = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z);
+  vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
+  float w1 = 0.65 + 0.35 * sin(u_time * 1.7 + ph);
+  float w2 = 0.3 * sin(u_time * 2.6 + ph * 1.3 + p.y * 0.7);
+  q.xz += u_windDir * (amp * w1) + vec2(-u_windDir.y, u_windDir.x) * (amp * w2);
+  vec3 rel = q * on + a_inst0.xyz;
+  v_uv = a_uv; v_col = a_col; v_n = nq; v_rel = rel; v_sky = a_inst2.x; v_block = a_inst2.yzw;
+#ifdef SHADOWS
+  v_shadow = u_shadowMat * vec4(rel + nq * 0.04, 1.0);
+#endif
+  gl_Position = u_viewProj * vec4(rel, 1.0);
+}`;
+  S.PROP_FS = `
+uniform sampler2D u_tex;
+#ifdef SHADOWS
+uniform highp sampler2DShadow u_shadowMap;
+uniform float u_shadowTexel;
+in vec4 v_shadow;
+#endif
+${'__COMMON__'}
+in vec2 v_uv;
+in vec3 v_col;
+in vec3 v_n;
+in vec3 v_rel;
+in float v_sky;
+in vec3 v_block;
+layout(location=0) out vec4 o_col;
+#ifdef SHADOWS
+// the sun's visibility from the shadow map: the terrain's four taps (no heightmap rays for the palms)
+float propSun() {
+  vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
+  if (sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0) return 1.0;
+  float t = u_shadowTexel, b = 0.0006;
+  float s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - b));
+  return s * 0.25;
+}
+#endif
+void main() {
+  vec4 t = texture(u_tex, v_uv);
+  if (t.a < 0.5) discard;                          // the cutout: leaflets and gaps
+  vec3 alb = t.rgb * v_col;
+  vec3 N = gl_FrontFacing ? normalize(v_n) : -normalize(v_n);   // two-sided: a frond is lit from both faces
+  float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
+  vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
+  float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
+  vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
+  vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
+  float ndl = clamp((dot(N, L) + 0.35) / 1.35, 0.0, 1.0);   // foliage: a soft wrap-around light
+  float outdoors = smoothstep(0.55, 0.95, v_sky);
+#ifdef SHADOWS
+  float sh = outdoors > 0.0 ? propSun() : 1.0;
+#else
+  float sh = 1.0;
+#endif
+  vec3 lighting = u_ambSky * skyL * 0.92 + lc * ndl * sh * outdoors + blockL * 0.9 + vec3(0.012, 0.012, 0.016);
+  vec3 col = alb * lighting;
+  col = applyFog(col, v_rel, length(v_rel));
+  o_col = vec4(col, 1.0);
+}`;
+  // the shadow pass: the same vertices, the cutout only
+  S.PROP_SHADOW_FS = `
+uniform sampler2D u_tex;
+in vec2 v_uv;
+layout(location=0) out vec4 o_col;
+void main() {
+  if (texture(u_tex, v_uv).a < 0.5) discard;
+  o_col = vec4(1.0);
+}`;
+
   // ------------------------------------------------------------ translucent (water / glass / ice)
   S.TRANS_FS = `
 uniform sampler2DArray u_albedo;
