@@ -230,6 +230,7 @@
     'g.set.rays': 'God rays',
     'g.set.fxaa': 'Anti-aliasing (FXAA — only used when Super Resolution is off)',
     'g.set.fancyLeaves': 'Fancy leaves',
+    'g.set.anim': 'Animated displays (screens, portal, lights)',
     'g.set.dynRes': 'Smart quality (keeps the picture sharp: trims shadows, rays and detail radius first when FPS drop, never blurs)',
     'g.set.lite': 'Lite materials (flat surfaces without normal maps & glints — fastest shading)',
     'g.set.showFps': 'Show FPS',

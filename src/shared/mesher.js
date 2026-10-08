@@ -398,6 +398,7 @@
         const texv = f.tex;
         const meta = R.texMeta[texv & 0xfff];
         if (meta && meta.anim) kind = KIND.ANIM;
+        if (meta && meta.veil) kind = KIND.PORTAL;   // the portal veil: its own swirl in the translucent shader (shaders.js TRANS_FS)
         let w5base = (f.dir & 7) | (kind << 8) | ((fflags & FF.EMIT) || (fl & F.EMISSIVE) ? 1 << 12 : 0) | (!f.shade ? 1 << 11 : 0);
         if ((fflags & FF.WAVELEAF) || (fl & F.WAVELEAF)) w5base |= 1 << 7;
         const tint = f.tint ? (f.tint >= 8 && f.tint < 256 ? tintAt(f.tint, x, z, b) : (f.tint > 255 ? hex565(f.tint) : tintAt(f.tint, x, z, b))) : blockTint;

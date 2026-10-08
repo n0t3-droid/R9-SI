@@ -507,7 +507,7 @@
         slider('clouds', T('g.set.clouds'), 0, 2, 1, pickV('g.set.cloudsV'));
         slider('particles', T('g.set.particles'), 0, 2, 1, pickV('g.set.particlesV'));
         slider('magic', T('g.set.magic'), 0, 1, 0.05, pct);
-        for (const k of ['sunShadows', 'sharpen', 'tsr', 'bloom', 'rays', 'fxaa', 'fancyLeaves', 'dynRes', 'lite', 'showFps']) toggle(k, T('g.set.' + k));
+        for (const k of ['sunShadows', 'sharpen', 'tsr', 'bloom', 'rays', 'fxaa', 'fancyLeaves', 'anim', 'dynRes', 'lite', 'showFps']) toggle(k, T('g.set.' + k));
         const r = this.game.renderer;
         const note = el('div', 'note', T('g.set.gpuNote', { gpu: esc(VR.GL.rendererName || ''), r: r ? r.w + '×' + r.h : '?', s: r ? r.W + '×' + r.H : '?', tsr: S.tsr ? T('g.set.gpuTsr') : '', dyn: S.dynRes ? T('g.set.gpuDyn') : '' })); note.style.marginTop = '10px'; body.appendChild(note);
       } else if (this.settingsTab === 'controls') {

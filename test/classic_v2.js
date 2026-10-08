@@ -25,7 +25,10 @@ const buildAll = (lk) => { VR.setLook(lk); const mk = VR.textureMasks(); return 
 
 // ---------------------------------------------------------------- (a) Nahtlos unchanged
 console.log('(a) Nahtlos textures unchanged');
-const SEAMLESS_HASH = 'de94a4ad';   // FNV-1a over every albedo level, then every material level, of the v0.39 Nahtlos build
+// v0.41 (t-temple): the portal_veil layer changed on purpose (tex_recipes4.js REC.portal_veil: one soft sheet with no
+// ring per block, which had drawn a grid of circles; the shader does the swirl). Proof: a per-layer FNV of the 1832
+// Nahtlos layers at HEAD and now differs in that one layer (portal_veil); every other layer is equal.
+const SEAMLESS_HASH = '37504010';   // FNV-1a over every albedo level, then every material level, of the Nahtlos build
 {
   const { tex } = buildAll('seamless');
   let h = 2166136261 >>> 0;
