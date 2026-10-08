@@ -72,12 +72,24 @@ try {
 
   // ---- the states: each one settles for ~24 s of game time, renders, and shows its own look
   await loops(240);
+  // the world around the view loaded first (on a loaded machine the streaming lags, and an unsettled view shows the
+  // coarse far tiles near by: the pictures would not compare with the reference shots)
+  const settle = async (max) => {
+    for (let i = 0; i < max; i++) {
+      await loops(10);
+      const st = await ev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty }; });
+      if (st.busy === 0 && st.pend === 0 && st.dirty === 0 && i > 3) return;
+      await wait(80);
+    }
+  };
+  await settle(150);
   const STATES = [['klar', 'klar'], ['bewoelkt', 'bewölkt'], ['nebel', 'nebel'], ['regen', 'regen'], ['gewitter', 'gewitter'], ['schnee', 'schnee']];
   const rows = [];
   for (const [kind, word] of STATES) {
     const k0 = logs.length;
     await ev((w) => VR.game.chat('/wetter ' + w), word);
     await loops(720);
+    await settle(40);
     const s = await state();
     await glErrors();
     await view('atmo_' + kind);
