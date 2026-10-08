@@ -873,7 +873,7 @@
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
       this.reflOn = false;
       this.stats.reflMs = 0;
-      if (world && this.q.water > 0 && !F.underwater) { const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; }
+      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) { const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; }
       // ---------------- copy scene for refraction
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
