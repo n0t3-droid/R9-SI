@@ -1089,5 +1089,6 @@
     'g.fgw.sofas_sessel': 'Sofas & armchairs',
     'g.fgw.tische': 'Tables',
     'g.fgw.schraenke_stauraum': 'Cabinets & storage',
+    'g.studio.backTo': '← back to {name}',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -712,7 +712,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     const el = $('#crumb'); el.innerHTML = '';
     if (HOOK.crumb && HOOK.crumb(el)) return;
     if (!S.from) return;
-    const b = document.createElement('button'); b.textContent = '← zurück zu ' + S.from.name;
+    const b = document.createElement('button'); b.textContent = VR.I18N && VR.I18N.tx ? VR.I18N.tx('g.studio.backTo', { name: S.from.name }, '← zurück zu {name}', '← back to {name}') : '← zurück zu ' + S.from.name;
     b.onclick = () => { const i = S.from.index; S.from = null; setMode('arch'); selectHouse(i); };
     el.appendChild(b);
   }

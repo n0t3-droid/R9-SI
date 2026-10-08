@@ -1089,5 +1089,6 @@
     'g.fgw.sofas_sessel': 'Sofas & Sessel',
     'g.fgw.tische': 'Tische',
     'g.fgw.schraenke_stauraum': 'Schränke & Stauraum',
+    'g.studio.backTo': '← zurück zu {name}',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
