@@ -33,6 +33,7 @@
     ];
     // bridges between neighbours (island indices)
     ISLES.LINKS = [[0, 1], [0, 3], [0, 4], [0, 6], [1, 2], [3, 4], [6, 5], [2, 3]];
+    ISLES.LOOP = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 4]];   // the rail loop C → N → NE → E → S → C rides a stone viaduct
     g._isles = L;
     return L;
   };
@@ -51,6 +52,7 @@
       WALL: st('temple_stone'), SMOOTH: st('temple_stone_smooth'), BAND: st('temple_stone_band'), SLIT: st('temple_slit'), BAR: st('temple_light_bar'), FRAME: st('vx_portal_frame', { facing: 0 }), BEACON: st('beacon_red'),
       OCHRE: st('ochre_rock'), UMBER: st('umber_rock'), TERRA: st('orange_terracotta'), TERRAB: st('brown_terracotta'), GRASS: st('grass_block'), DIRT: st('dirt'),
       CRY: (c, big) => st(c + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 }), CRYB: (c) => st(c + '_crystal_block'), FERN: st('vx_fern_lush'), BUSH: st('vx_bush'),
+      VSTONE: st('spire_stone'), VRAIL: st('vx_tech_railing'), VLINE: st('vx_floor_plaza_line'),
     };
   }
   ISLES.build = function (g) {
@@ -102,6 +104,30 @@
       for (let r = I.r * 0.5; r < I.r * 1.4; r += 1) { const px = Math.round(I.x + Math.cos(a) * r), pz = Math.round(I.z + Math.sin(a) * r); const sh = shape(px, pz); if (sh && sh.isle === I) best = [px, pz, sh.top]; else if (best) break; }
       return best;
     };
+    // the rail loop (TRAILER §3.6: "one stone-arch viaduct carrying the Isles rail loop"): a 5-wide stone deck with rails
+    // and a cyan line, piers 3 wide every 10 blocks, a round arch of stone in every span; where the land carries the deck
+    // the viaduct is not built
+    const VIA_H = 6;
+    const viaduct = (pa, pb, len, dx, dz, nx, nz) => {
+      for (let t = 0; t <= len; t++) {
+        const x = pa[0] + dx * t, z = pa[1] + dz * t, y = Math.round(pa[2] + (pb[2] - pa[2]) * t / len);
+        const rise = Math.round(VIA_H * (1 - Math.sin(Math.PI * (t % 10) / 10)));   // the arch's rise under the deck
+        const landAt = (px, pz) => { const sh = shape(px, pz); return !!sh && sh.top >= y - 1; };
+        for (let v = -2; v <= 2; v++) {
+          const px = Math.round(x + nx * v), pz = Math.round(z + nz * v);
+          if (t > 2 && t < len - 2 && landAt(px, pz)) continue;
+          put(px, y, pz, K.VSTONE);
+          if (Math.abs(v) === 2) put(px, y + 1, pz, K.VRAIL); else if (v === 0) put(px, y + 1, pz, K.VLINE);
+          put(px, y - 1 - rise, pz, K.VSTONE); put(px, y - 2 - rise, pz, K.VSTONE);   // the arch ring
+        }
+        if (t % 10 === 0) for (let v = -1; v <= 1; v++) {   // a pier: from the deck down into the void
+          const px = Math.round(x + nx * v), pz = Math.round(z + nz * v);
+          if (landAt(px, pz)) continue;
+          for (let yy = y - 1; yy >= y - 12; yy--) put(px, yy, pz, K.VSTONE);
+        }
+        if (t % 20 === 10) { const px = Math.round(x + nx * 2), pz = Math.round(z + nz * 2); put(px, y + 1, pz, K.LAMP0); put(px, y + 2, pz, K.LAMP1); }
+      }
+    };
     for (const [ia, ib] of ISLES.LINKS) {
       const A = L[ia], B = L[ib];
       const pa = rimPoint(A, B), pb = rimPoint(B, A);
@@ -111,6 +137,7 @@
       road([nearest(A, pa), [pa[0], pa[1]]], false); road([nearest(B, pb), [pb[0], pb[1]]], false);
       const len = Math.max(1, Math.round(Math.hypot(pb[0] - pa[0], pb[1] - pa[1])));
       const dx = (pb[0] - pa[0]) / len, dz = (pb[1] - pa[1]) / len, nx = -dz, nz = dx;
+      if (ISLES.LOOP.some(([p, q]) => (p === ia && q === ib) || (p === ib && q === ia))) { viaduct(pa, pb, len, dx, dz, nx, nz); continue; }
       for (let t = 0; t <= len; t++) {
         const x = pa[0] + dx * t, z = pa[1] + dz * t, y = Math.round(pa[2] + (pb[2] - pa[2]) * t / len);
         for (let v = -2; v <= 2; v++) {
