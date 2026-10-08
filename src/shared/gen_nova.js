@@ -369,16 +369,22 @@
     palm(3, 3, 12); palm(21, 3, 11);
     // the back garden: two green mounds left and right (the hills behind the glass in t1_29), a palm on each, the palm in
     // the patio in a planter, round trees and blossom bushes, loungers on the lawn
+    // (green all over: the body is moss, and grass only on a top whose four sides are covered — a grass block's side
+    //  is dirt, and on the steps' edges it read as brown cliffs)
     const mound = (cu, cv, ru, rv, h) => {
-      const top = {};
+      const top = {}, at = (u, v) => top[u + ',' + v] | 0;
       for (let v = Math.floor(cv - rv); v <= Math.ceil(cv + rv); v++) for (let u = Math.floor(cu - ru); u <= Math.ceil(cu + ru); u++) {
         if (u < 1 || u >= W - 1 || v <= G.v1 + 2 || v >= D - 1 || isPath(u, v)) continue;
         const d = Math.hypot((u + 0.5 - cu) / ru, (v + 0.5 - cv) / rv); if (d >= 1) continue;
-        const hh = Math.round(h * Math.sqrt(1 - d * d)); if (hh < 1) continue;
-        for (let y = 0; y < hh - 1; y++) put(u, y, v, 'moss_block');   // (green sides: no dirt cliff shows)
-        put(u, hh - 1, v, 'grass_block'); top[u + ',' + v] = hh;
+        const hh = Math.round(h * Math.sqrt(1 - d * d)); if (hh >= 1) top[u + ',' + v] = hh;
       }
-      return (u, v) => top[u + ',' + v] | 0;
+      for (const k in top) {
+        const [u, v] = k.split(',').map(Number), hh = top[k];
+        for (let y = 0; y < hh - 1; y++) put(u, y, v, 'moss_block');
+        const covered = at(u + 1, v) >= hh && at(u - 1, v) >= hh && at(u, v + 1) >= hh && at(u, v - 1) >= hh;
+        put(u, hh - 1, v, covered ? 'grass_block' : 'moss_block');
+      }
+      return at;
     };
     const mL = mound(4.2, G.v1 + 6.5, 4.8, 4.0, 4.6), mR = mound(20.8, G.v1 + 6.5, 4.8, 4.0, 4.6);
     palm(4, G.v1 + 6, 10, mL(4, G.v1 + 6)); palm(20, G.v1 + 7, 11, mR(20, G.v1 + 7));

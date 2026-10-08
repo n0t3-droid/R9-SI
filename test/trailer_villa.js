@@ -207,9 +207,10 @@ check(cF.cells >= 20 && cF.bad === 0 && cF.comps === 2, 'the front path\'s light
 check(cB.cells >= 20 && cB.bad === 0 && cB.comps <= 2, 'the back garden\'s path and terrace: the light lines unbroken too (' + cB.cells + ' line cells, ' + cB.comps + ' chains, ' + cB.bad + ' odd cells)');
 // the back garden (t1_29 / t1_30 through the glass: lawn, palms, round trees, green mounds, a curved path)
 const backRows = D - 1 - G.v1;
-let mound = 0, moundTop = 0, cliff = 0; for (let v = G.v1 + 1; v < D; v++) for (let u = 0; u < W; u++) for (let y = 0; y <= 4; y++) { const n2 = nm(u, y, v); if (n2 === 'grass_block') { mound++; moundTop = Math.max(moundTop, y + 1); } if (n2 === 'dirt') cliff++; }
-// (green hills: a mound's body is moss under the grass, no dirt side shows — run 2 showed brown cliffs)
-check(cliff === 0, 'the mounds are green all over: no dirt in their sides (' + cliff + ')');
+let mound = 0, moundTop = 0, cliff = 0; for (let v = G.v1 + 1; v < D; v++) for (let u = 0; u < W; u++) for (let y = 0; y <= 4; y++) { const n2 = nm(u, y, v); if (n2 === 'grass_block' || n2 === 'moss_block') { mound++; moundTop = Math.max(moundTop, y + 1); } if (n2 === 'dirt') cliff++; if (n2 === 'grass_block' && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([du, dv]) => !nm(u + du, y, v + dv))) cliff++; }
+// (green hills: a mound's body is moss, grass only on tops whose sides are all covered — run 2 showed brown cliffs, run 3
+// the dirt sides of the grass on the steps' edges)
+check(cliff === 0, 'the mounds are green all over: no dirt and no grass block\'s dirt side in their faces (' + cliff + ')');
 let backPalms = 0; for (const [k, s] of A.rec) if (nameOf(s) === 'vm_palm_crown' && propOf(s, 'part') === 0) { const [x, y, z] = k.split(',').map(Number); if (z + 3 > G.v1 + 1 && nameOf(A.rec.get((x + 3) + ',' + (y - 1) + ',' + (z + 3))) === 'vx_palm_trunk') backPalms++; }
 const backPath = (() => { const door = [NOVA.ENTRY, G.v1 + 1]; const sn = new Set([door.join()]), st = [door]; let far = 0; while (st.length) { const [u, v] = st.pop(); far = Math.max(far, v - G.v1); for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = u + du, b = v + dv, k = a + ',' + b; if (b > G.v1 && b < D && a >= 0 && a < W && !sn.has(k) && pathAt(a, b)) { sn.add(k); st.push([a, b]); } } } return far; })();
 check(backRows >= 10 && mound >= 30 && moundTop >= 2 && backPalms >= 3 && backPath >= 6, 'the back garden: ' + backRows + ' rows behind the glass wall, green mounds (' + mound + ' cells, ' + moundTop + ' high), ' + backPalms + ' palms, the path from the garden door ' + backPath + ' rows back');
