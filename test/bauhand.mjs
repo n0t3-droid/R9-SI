@@ -111,10 +111,11 @@ await section(4, 'the wheel turns it, the hotbar stays', async () => {
   console.log('  wheel', JSON.stringify({ s0, s1 }));
   check(s1 && s1.rot === (s0.rot + 1) % 4, 'holding.rot + 1 (' + s0.rot + ' → ' + (s1 && s1.rot) + ')');
   check(s1 && s1.sel === s0.sel, 'the hotbar selection is unchanged (' + s0.sel + ')');
-  // R turns it too, the ↻ in the strip as well
-  await page.keyboard.press('r'); await wait(500);
-  const s2 = await ev(() => VR.Bauhand.holding && VR.Bauhand.holding.rot);
-  check(s1 && s2 === (s1.rot + 1) % 4, 'R turns it once more (' + s2 + ')');
+  // R turns it too, the ↻ in the strip as well (the key acts on the press; the test polls for the turn, a slow frame is no fault)
+  await page.keyboard.press('r');
+  const s2 = await until((r1) => { const H = VR.Bauhand.holding; return H && H.rot !== r1 ? { rot: H.rot } : null; }, s1 ? s1.rot : 0, 10);
+  console.log('  R ' + JSON.stringify({ s2, fps: await safe(() => Math.round((VR.game.fps || 0) * 10) / 10) }));
+  check(!!s1 && !!s2 && s2.rot === (s1.rot + 1) % 4, 'R turns it once more (' + (s2 ? s2.rot : 'none') + ')');
 });
 
 await section(5, 'Z takes exactly that placement back', async () => {
@@ -148,8 +149,10 @@ await section(6, 'standing on the spot: a red ghost, a click changes nothing (LM
 
 await section(7, 'B and Esc: put away; B does nothing in chat, on a screen, in a vehicle', async () => {
   if (!(await safe(() => VR.Bauhand.state === 'holding'))) { await ev(() => VR.Bauhand.hold('m:vm_bench', { name: 'Bank' })); await wait(300); }
-  await page.keyboard.press('Escape'); await wait(600);
-  check(await safe(() => VR.Bauhand.state !== 'holding' && !VR.Bauhand.holding), 'Esc puts it away');
+  await page.keyboard.press('Escape');
+  const away = await until(() => (VR.Bauhand.state !== 'holding' && !VR.Bauhand.holding ? { state: VR.Bauhand.state } : null), null, 10);
+  check(!!away, 'Esc puts it away (' + (away ? away.state : 'still holding') + ')');
+  check(await safe(() => !VR.game.ui.screen && VR.game.state === 'play'), 'Esc does not pause the game (the hand takes the key)');
   await ev(() => { VR.game.ui.resume && VR.game.ui.resume(); }); await wait(400);
   const r = await ev(() => {
     const BH = VR.Bauhand, hit = (k) => k === 'KeyB';
