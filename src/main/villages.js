@@ -1260,10 +1260,13 @@
         if (d2 > FD * FD) continue;
         if (!VR.mat4.boxInFrustum(r.planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
         const far = d2 > (FD < 100 ? 16 : 24) * (FD < 100 ? 16 : 24);
-        const model = Folk.model(gl, a.p.look, far);
+        // the model is looked up once per agent and LOD (the key is built from the look only once)
+        const mk = far ? 1 : 0;
+        const model = a.mdl && a.mdl[mk] ? a.mdl[mk] : ((a.mdl = a.mdl || [null, null])[mk] = Folk.model(gl, a.p.look, far));
         if (!model) continue;
         const light = ent.lightAt(a.pos[0], a.pos[1] + 1.2, a.pos[2]);
-        const pose = this.pose(a, t);
+        // the budget (src/shared/folkcrowd.js): a villager far from the eye is posed every 2nd, 4th or 8th frame; between two its last pose holds
+        const pose = (!VR.Crowd || VR.Crowd.due(a, d2) || !a.poseOut) ? this.pose(a, t) : a.poseOut;
         const sleeping = a.pose === 'sleep';
         if (a.shadeT === undefined || t - a.shadeT > 0.25) { a.shade = ent.sunShade(a.pos, 1.2); a.shadeT = t; }   // terrain-shadow ray only 4× a second per villager
         const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: a.kid ? 0.82 : 1, shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn } };
@@ -1280,7 +1283,7 @@
     // the body pose: FolkAnim clips (crossfaded) under the parametric walk cycle, then the head look-at, blinking and
     // the talking mouth layered on top. [rx, ry, rz, ox, oy, oz] per joint; +X swings a limb forward (models face -z)
     pose(a, t) {
-      const dt = Math.min(0.1, t - (a.poseT || t)); a.poseT = t;
+      const dt = Math.min(0.5, t - (a.poseT || t)); a.poseT = t;   // (0.5: a far villager waits a few frames for its pose, see folkcrowd.js)
       const FA = VR.FolkAnim;
       const run = !!(a.act && a.act.run) || (a.kid && a.act && a.act.type === 'play');
       const wa = a.walkAmt, ph = a.walk * 3;
