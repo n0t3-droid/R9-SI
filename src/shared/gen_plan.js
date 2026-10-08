@@ -328,7 +328,8 @@
     U: { u0: 4, v0: 9, u1: 20, v1: 20, y: 7, clear: 4, slab: 12 },   // first floor: floor y 7 (the slab's top row), rooms 8..11
     T: { u0: 7, v0: 13, u1: 17, v1: 20, y: 13, clear: 4, slab: 18 },  // top floor: floor y 13, rooms 14..17, roof 18..19
     OVER: { G: [2, 1, 1], U: [1, 1, 1], T: [1, 1, 1] },               // each slab's overhang past the walls below: [front, sides, back]
-    STAIRS: [{ u: 5 }, { u: 18 }],                                     // the floating stairs, two blocks wide each
+    STAIRS: [{ u: 5 }, { u: 18 }],                                     // the floating stairs from the hall, two blocks wide each
+    STAIR2: { u: 15, v: 12 },                                          // the stair from the first floor to the top floor
     PAD: [11, 15], ENTRY: 12, PARTITION: 10,
   };
   // the plan: one open storey per level (the foyer and the hall below, the gallery, the studio), house-local frame
