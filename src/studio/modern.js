@@ -21,6 +21,6 @@
   // new chips (after "Alle" and before the older ones)
   const L = VM.MODERN_CATS, add = [['modern', '✨ Modern Living', { test: (n) => !!packOf(n) }]];
   const used = new Set(); for (const t of R.types) if (t.o.modern && t.o.cats) for (const c of t.o.cats) used.add(c);
-  for (const id of ['living', 'smart', 'plant', 'storage', 'mobility', 'shop']) if (used.has(id)) add.push([id, L[id], { test: (n) => has(n, [id]) }]);
+  for (const id of ['living', 'smart', 'plant', 'storage', 'mobility', 'shop']) if (used.has(id)) add.push([id, VR.I18N && VR.I18N.word ? VR.I18N.word(L[id]) : L[id], { test: (n) => has(n, [id]) }]);
   C.CATS.splice(1, 0, ...add);
 })();
