@@ -45,6 +45,9 @@ console.log('studio', JSON.stringify(await sev(() => ({ boot: document.getElemen
 const hasNav = await sev(() => !!document.querySelector('nav.modes button[data-mode="forge"]'));
 check(hasNav, 'the header has a 🏭 Forge button');
 if (!hasNav) await finish();
+// (the mode bar is Profi's: the Einfach Studio hides it, so switch Profi on the way a user does — the ⚙ Profi tab button)
+await studio.evaluate(() => { const b = document.querySelector('.tabs .proT'); if (b && !document.getElementById('studio').classList.contains('pro')) b.click(); });
+await studio.waitForTimeout(300);
 await studio.click('nav.modes button[data-mode="forge"]'); await studio.waitForTimeout(600);
 check(await sev(() => window.__st.mode === 'forge' && document.querySelectorAll('#chips button.fgt').length >= 10), 'Forge mode: an icon per type in the chip row (' + await sev(() => [...document.querySelectorAll('#chips button.fgt')].map(b => b.textContent.split(' ')[0]).join(' ')) + ')');
 const WISH = 'Hochhaus 30 Stockwerke Glas';
