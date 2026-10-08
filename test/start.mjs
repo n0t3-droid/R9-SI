@@ -305,7 +305,13 @@ await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: car
   await page.goto(URL0 + '/studio.html', NAV);
   check(await booted(1), 'the Studio is up');
   // a Baukasten house (a k: thing), a favourite block  (the hub may have opened by itself: something to continue)
-  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); VR.StudioWorld.imagine.open(null, 'house'); }); await wait(900);
+  // (the Baukasten form draws a moment after the panel opens, and the Genie can take the panel over once: open it again until the style row is there)
+  for (let k = 0; k < 6; k++) {
+    await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); VR.StudioWorld.imagine.open(null, 'house'); }); await wait(900);
+    if (await ev(() => !!document.querySelector('#imagine [data-hs="style"][data-v="modern"]'))) break;
+  }
+  // (the hub opens by itself when something is unfinished, and it sits above the Baukasten: close it first)
+  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); }); await wait(300);
   await page.click('#imagine [data-hs="style"][data-v="modern"]'); await wait(2500);
   await ev(() => { VR.StudioWorld.imagine.close(); VR.Favs.add('oak_planks'); });
   const kit = await ev(() => Object.values(JSON.parse(localStorage.getItem('r9si.projects')).items).find(p => p.kind === 'kit'));
@@ -345,6 +351,8 @@ await section(10, '← restores where you were: ✏️ from a card → the edito
   if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
   await page.goto(URL0 + '/studio.html?r=' + Date.now() + '#world/' + encodeURIComponent(WORLD) + '/karte', NAV);   // (a fresh query: a hash-only change would not reload the Studio)
   check(await inStudio(WORLD), 'the Karte view');
+  // (the hub may have opened by itself and sit over the chips: close it, as §8 does)
+  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); }); await wait(300);
   await page.click('#chips button[data-kcat="furn"]'); await wait(400);
   const id3 = await ev(() => { const l = document.getElementById('list'); l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding; });
   const editBtn = page.locator(`#list .ding[data-ding="${id3}"] [data-da="edit"]`);
