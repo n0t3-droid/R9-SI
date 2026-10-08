@@ -76,11 +76,12 @@ check(PR.furnModel('sofa') === PR.furnModel('sofa'), 'a model is built once and 
 const list = VR.PROP_FURN || [];
 check(list.length >= 50, 'the mesher lists the furniture blocks (' + list.length + ')');
 let sized = 0, missing = [];
+// (a VX32 piece's size is its model's; a village piece is one block, the bed two — its foot and its head)
 for (let i = 0; i < list.length; i++) {
-  const name = list[i], d = PR.furnDef(PR.FURN0 + i), vm = VM.MODELS[name];
-  if (!d || !PR.FURN[d.model] || !vm || !R.byName[name]) { missing.push(name); continue; }
-  const sz = PR.FURN[d.model].size;
-  if (sz[0] === vm.W && sz[1] === vm.H && sz[2] === vm.D) sized++; else missing.push(name + ' size ' + sz + ' vs ' + [vm.W, vm.H, vm.D]);
+  const name = list[i], d = PR.furnDef(PR.FURN0 + i), vm = VM.MODELS[name], t = R.byName[name], key = PR.furnKey(PR.FURN0 + i, 0);
+  if (!d || !PR.FURN[key] || !t) { missing.push(name); continue; }
+  const want = vm ? [vm.W, vm.H, vm.D] : t.has('part') && t.o.kind === 'bed' ? [1, 1, 2] : [1, 1, 1], sz = PR.FURN[key].size;
+  if (sz[0] === want[0] && sz[1] === want[1] && sz[2] === want[2]) sized++; else missing.push(name + ' size ' + sz + ' vs ' + want);
 }
 check(!missing.length && sized === list.length, `every furniture block has a model of its voxel piece's size (${sized} of ${list.length}${missing.length ? ': ' + missing.slice(0, 6).join(', ') : ''})`);
 check(PR.furnDef(PR.FURN0 + list.indexOf('vm_sofa_navy')).a === 0x2F3F60 && PR.furnDef(PR.FURN0 + list.indexOf('vm_bed_rose')).b === 0xD9C6A5, 'the colours come from the voxel pieces (a navy sofa, a rose bed on ash)');
@@ -99,6 +100,21 @@ for (const name of ['vm_sofa_navy', 'vm_chaise_cream', 'vm_bed_grey', 'vm_arc_la
   }
 }
 check(placeOk === placeAll, `the centre and turn of a piece match its cells for every facing (${placeOk} of ${placeAll})`);
+// the village bed: its anchor is the foot, its head lies one cell along its facing (gen_city: foot at v, head at v + 1 for
+// facing 2); the centre is between the two cells
+{
+  const DIR = [[0, -1], [1, 0], [0, 1], [-1, 0]], d = PR.FDEF.vx_bed_red; let ok = 0;
+  for (let f = 0; f < 4; f++) { const o = PR.furnPlace(PR.FURN.vbed.size, 40, 70, 20, f, [0, 0, 0, 0], d.cell); const hx = 40 + DIR[f][0], hz = 20 + DIR[f][1]; if (Math.abs(o[0] - ((40 + hx) / 2 + 0.5)) < 1e-9 && Math.abs(o[2] - ((20 + hz) / 2 + 0.5)) < 1e-9) ok++; }
+  check(ok === 4, 'a village bed\'s centre lies between its foot and its head for every facing (' + ok + ' of 4)');
+}
+// the modular sofa: its variant follows the row bits of its anchor (bit 2 a neighbour on +x, bit 3 on −x)
+{
+  const k = PR.FURN0 + list.indexOf('vx_sofa_white');
+  check(PR.furnKey(k, 2) === 'vsofa:0' && PR.furnKey(k, 2 | 4) === 'vsofa:1' && PR.furnKey(k, 2 | 8) === 'vsofa:2' && PR.furnKey(k, 2 | 12) === 'vsofa:3', 'a sofa in a row takes the variant of its neighbours (no arm where the row goes on)');
+  const arms = (key) => { const m = PR.furnModel(key).near; let lo = 0, hi = 0; for (let i = 0; i < m.nv; i++) { const o = i * S; if (m.verts[o + 1] > 0.68 && m.verts[o + 1] < 0.76 && m.verts[o + 2] < 0.1) { if (m.verts[o] < -0.4) lo++; if (m.verts[o] > 0.4) hi++; } } return [lo > 0, hi > 0]; };
+  const a0 = arms('vsofa:0'), a1 = arms('vsofa:1'), a2 = arms('vsofa:2'), a3 = arms('vsofa:3');
+  check(a0[0] && a0[1] && a1[0] && !a1[1] && !a2[0] && a2[1] && !a3[0] && !a3[1], 'the arms stand only at the row\'s open ends (' + [a0, a1, a2, a3].map(a => a.map(Number).join('')).join(' ') + ')');
+}
 // the turn: a quarter turn of the model takes its front (−z) to +x, as VM.footprint turns its cells
 {
   const yaw = Math.PI / 2, c = Math.cos(yaw), s = Math.sin(yaw), fz = [0, 0, -1], q = [c * fz[0] - s * fz[2], s * fz[0] + c * fz[2]];
