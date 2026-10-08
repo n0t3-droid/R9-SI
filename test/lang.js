@@ -200,5 +200,5 @@ check(!w2dead.length, 'no unused bh. / wiz. key in the tables' + (w2dead.length 
 check(de['wiz.step.was'] === 'Was?' && de['wiz.step.wie'] === 'Wie?' && de['wiz.step.wohin'] === 'Wohin?' && de['wiz.w.hand'] === 'Vor mir' && de['wiz.w.spot'] === 'An meinem Platz' && de['wiz.w.map'] === 'Auf der Karte', 'the wizard\'s steps and ways read as the spec says (Was? › Wie? › Wohin? · Vor mir · An meinem Platz · Auf der Karte)');
 check(/Klick setzt/.test(de['bh.strip.place']) && /Kreativ/.test(de['bh.survival']) && /zurück/.test(de['bh.toast.set']), 'the Bauhand\'s strip, its Survival card and its toast (Klick setzt · Kreativ · zurück)');
 
-console.log(fails ? 'FAIL ' + fails : 'OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
