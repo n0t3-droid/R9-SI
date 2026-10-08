@@ -3,7 +3,7 @@
    picture tiles, six big variant pictures, three big ways into the world; the one accent colour of start.css; quick,
    calm motion (none with reduced motion); every target ≥ 44 px; one column on a phone.
    ============================================================================ */
-#wizard { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 12px; background: radial-gradient(circle at 50% 40%, rgba(16, 24, 48, 0.72), rgba(3, 5, 12, 0.88)); font-family: var(--st-font); color: var(--st-ink); }
+#wizard { position: fixed; inset: 0; z-index: 60; display: none; pointer-events: auto; align-items: center; justify-content: center; padding: 12px; background: radial-gradient(circle at 50% 40%, rgba(16, 24, 48, 0.72), rgba(3, 5, 12, 0.88)); font-family: var(--st-font); color: var(--st-ink); }
 #wizard.on { display: flex; animation: wzFade .18s ease-out; }
 @keyframes wzFade { from { opacity: 0; } to { opacity: 1; } }
 #wizard .wz-panel { position: relative; width: min(96vw, 1060px); max-height: 94vh; overflow: auto; padding: 14px 22px 22px; border-radius: 28px; border: 1px solid var(--st-line); background: linear-gradient(180deg, rgba(22, 32, 62, 0.97), rgba(9, 13, 28, 0.98)); box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06); animation: wzRise .22s cubic-bezier(.2, 1.2, .4, 1); }
@@ -22,7 +22,7 @@
 #wizard .wz-steps li + li::after { content: '›'; position: absolute; left: -16px; color: var(--st-mute); font-size: 20px; }
 #wizard .wz-q { margin: 8px 2px 12px; font: 800 calc(var(--st-fs) * 1.35) var(--st-font); letter-spacing: .3px; display: flex; align-items: center; gap: 10px; }
 /* Was?: the tiles */
-#wizard .wz-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+#wizard .wz-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; }
 #wizard .wz-tile { position: relative; min-height: 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 8px; border-radius: 22px; border: 2px solid var(--st-line); background: linear-gradient(180deg, rgba(36, 50, 92, 0.9), rgba(12, 17, 34, 0.94)); color: var(--st-ink); cursor: pointer; animation: wzPop .28s cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: calc(var(--i, 0) * 18ms); transition: transform .12s, border-color .12s, box-shadow .15s; }
 @keyframes wzPop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
 #wizard .wz-tile:hover, #wizard .wz-tile:focus-visible { border-color: var(--st-acc); box-shadow: 0 0 0 3px var(--st-acc-dim), 0 12px 36px rgba(0, 0, 0, 0.45); transform: translateY(-3px); outline: none; }
