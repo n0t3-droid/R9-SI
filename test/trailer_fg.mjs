@@ -56,6 +56,15 @@ async function runPage(tag, dist) {
     await step(6);
     await shot(name, 3);
   }
+  // the cost of the look at the Very Low preset (potato), at the avenue: ms per frame over 30 frames (swiftshader here,
+  // so the number is for comparing the two builds on the same machine, not for a real GPU)
+  try {
+    await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
+    await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; }, SHOTS[0].slice(1));
+    await settle(40);
+    const ms = await ev(() => { const g = VR.game; window.__norender = false; const t0 = performance.now(); const N = 30; for (let i = 0; i < N; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; return (performance.now() - t0) / N; });
+    console.log(`measure ${tag} potato: ${ms.toFixed(1)} ms per frame at F1 (1280x720, swiftshader)`);
+  } catch (e) { console.log(`measure ${tag} failed: ${String(e.message || e).slice(0, 200)}`); }
   console.log(`--- ${tag} logs (${logs.length})`); for (const l of logs.slice(0, 12)) console.log(l);
   await ctx.close();
   return logs.filter(l => l.startsWith('[pageerror]')).length;
