@@ -65,14 +65,25 @@
       for (const sh of (this.myShips || [])) sh.dead = true;
       this.myShips = null;
     }
-    // scripted ship flights through the traffic system (designed asynchronously, so they are queued a moment ahead)
+    // the scripted ships' designs are built while the shot loads (the worker takes seconds); the ships are launched when
+    // the shot runs, from the cached designs, so each one flies from the shot's first frame and is never late
+    prebuildShips(shot) {
+      const SS = this.g.starships;
+      this.shipWait = 0;
+      if (!SS || !shot.ships) return;
+      for (const sp of shot.ships) {
+        this.shipWait++;
+        SS.design(this.shipSeed(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, () => { this.shipWait--; });
+      }
+    }
+    shipSeed(sp) { if (sp._seed === undefined) sp._seed = M.hash2 ? M.hash2(sp.A[0] | 0, sp.B[2] | 0, 77) >>> 0 : (Math.random() * 4294967295) >>> 0; return sp._seed; }
+    // scripted ship flights through the traffic system
     launchShips(shot) {
       const g = this.g, T = g.traffic, SS = g.starships;
       if (!T || !SS || !shot.ships) return;
       this.myShips = this.myShips || [];
       for (const sp of shot.ships) {
-        const seed = (M.hash2 ? M.hash2(sp.A[0] | 0, sp.B[2] | 0, 77) >>> 0 : (Math.random() * 4294967295) >>> 0);
-        SS.design(seed, VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, (d) => {
+        SS.design(this.shipSeed(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, (d) => {
           if (!this.active) return;
           const len = Math.hypot(sp.B[0] - sp.A[0], sp.B[1] - sp.A[1], sp.B[2] - sp.A[2]);
           const ship = { d, A: sp.A.slice(), B: sp.B.slice(), C: sp.C.slice(), off: sp.off || [0, 0, 0], t: -(sp.delay || 0) / sp.dur, dur: sp.dur, speed: len / sp.dur, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: sp.A.slice(), arch: d.meta.arch, big: false, fire: 99, defender: false, circle: null, life: 0, scripted: true };
@@ -103,15 +114,15 @@
         if (shot.tod !== undefined) g.env.setTime(shot.tod);
         d.querySelector('.cap').textContent = shot.capAt ? '' : (shot.caption || '');
         d.querySelector('.cap').classList.toggle('big', !!shot.caption && !shot.capSmall);
-        this.launchShips(shot);
+        this.prebuildShips(shot);
         this.fade = 1;
       }
       const shot = this.shots[this.si];
       if (this.phase === 'load') {
         // hold on black until the chunks around the camera are in (or 6 s have passed)
         this.loadT += dt;
-        const w = g.world, ready = w.pending.size === 0 && g.pool.busy < 3 && (!g.horizon || !g.horizon.inflight);
-        if ((ready && this.loadT > (this.opts && this.opts.quick ? 0.15 : 0.4)) || this.loadT > 6) { this.phase = 'run'; }
+        const w = g.world, ready = w.pending.size === 0 && g.pool.busy < 3 && (!g.horizon || !g.horizon.inflight) && this.shipWait <= 0;
+        if ((ready && this.loadT > (this.opts && this.opts.quick ? 0.15 : 0.4)) || this.loadT > 6) { this.phase = 'run'; this.launchShips(shot); }
         const c = this.camAt(shot, 0); g.player.pos = [c.pos[0], c.pos[1] - g.player.eye, c.pos[2]]; g.player.yaw = c.yaw; g.player.pitch = c.pitch;
         fadeEl.style.opacity = 1;
         return;
