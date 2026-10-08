@@ -2,9 +2,10 @@
 // game: a flat creative world, the house placed through the blueprint path the 🖐 Bauhand uses (g.gadgets.blue: the
 // worker builds the catalogue house, planAt levels the lot, buildAt lays it down, Sofort), and next to it the closest
 // house of the catalogue before this branch (Villa R9 140 in the Glashaus skin) at the same cameras:
-//   front  (t3_05)  the facade from the street            corner (t1_26)  the box bay and the slab edge at dusk
-//   garden (t2_23)  the stepped house from the garden       stair  (t1_29)  the white hall: the stairs, the pad, the glass wall
-//   pad    (t1_30)  the pad and the stairs from above
+//   front  (t3_05)  the house from the street at dusk       corner (t1_26)  the box bay, the palm, the slab edge at dusk
+//   garden (t2_23)  up the path with the cyan lines to the house       stair  (t1_29)  the white hall: the stairs, the pad, the glass wall
+//   pad    (t1_30)  the pad and the stairs                  foyer  (t3_10)  through the glass partition into the hall
+// (outside at 13300 — dusk, the stars out, t-city's time — through a 45–50° lens like the trailer's; inside at noon, 62–70°)
 // → test/shots/trailer_villa_<shot>.png (after) and trailer_villa_<shot>_before.png, plus a few views of the villa alone
 // (back, foyer, aerial, front_day). Then the Very Low (potato) frame cost at the front camera, both houses, alternating.
 // Checks: both houses stand (probes: a nova window in the bay, the pad, a stair tread, the glass wall), every picture is
@@ -65,31 +66,34 @@ const Bf = await place('before', idx.glas, 'glas');
 if (A) {
   const probe = await ev(([ox, oz, F]) => {
     const w = VR.game.world, R = VR.R, nm = (x, y, z) => { const s = w.getBlock(x, y, z); return s ? R.types[R.T.type[s]].name : 'air'; };
-    return { bay: nm(ox + 5, F + 3, oz + 5), pad: nm(ox + 12, F + 1, oz + 16), tread: nm(ox + 4, F + 1, oz + 19), glass: nm(ox + 9, F + 3, oz + 20), band: nm(ox + 12, F + 6, oz + 4), door: nm(ox + 12, F + 1, oz + 5) };
+    return { bay: nm(ox + 5, F + 3, oz + 5), pad: nm(ox + 12, F + 1, oz + 16), tread: nm(ox + 4, F + 1, oz + 19), glass: nm(ox + 9, F + 3, oz + 20), band: nm(ox + 12, F + 6, oz + 4), door: nm(ox + 12, F + 1, oz + 5), top: nm(ox + 7, F + 15, oz + 13), tree: nm(ox + 17, F + 14, oz + 15) };
   }, [A.ox, A.oz, A.F]);
   console.log('probe', JSON.stringify(probe));
-  check(probe.bay === 'vx_nova_window' && probe.pad === 'vm_nova_pad' && probe.tread === 'vm_nova_tread' && probe.glass === 'panorama_white' && probe.band === 'vx_nova_band' && /door/.test(probe.door), 'Villa Nova stands in the world: the bay window, the pad, a stair tread, the glass wall, the slab edge, the door');
+  check(probe.bay === 'vx_nova_window' && probe.pad === 'vm_nova_pad' && probe.tread === 'vm_nova_tread' && probe.glass === 'vx_nova_glass' && probe.band === 'vx_nova_band' && /door/.test(probe.door) && probe.top === 'vx_nova_window' && probe.tree === 'vm_tree_round_l', 'Villa Nova stands in the world: the bay window, the pad, a stair tread, the glass sheet, the slab edge, the door, the top box\'s glazed front, the roof garden\'s tree');
 }
 
 // ---------------------------------------------------------------- the cameras (relative to the house's front centre, eye heights)
 // hc: the middle of the house's street front (lot ox + house u0 + w/2, oz + house v0); eye → target
+const DUSK = +(process.env.TOD || 13300);
 const CAMS = {
-  front: { t: 12350, eye: [5, 2.0, -21], at: [0, 6.5, 6] },
-  corner: { t: 12600, eye: [11.5, 2.4, -5.7], at: [0.5, 4.2, 0.5] },
-  garden: { t: 12350, eye: [19, 9, -15], at: [0, 6, 7] },
-  stair: { t: 6000, eye: [0, 2.6, 5.4], at: [0, 3.0, 14] },
-  pad: { t: 6000, eye: [0, 2.4, 5.0], at: [0, 1.8, 11] },
+  front: { t: DUSK, fov: 45, eye: [8, 2.4, -24], at: [-2, 7, 6] },
+  corner: { t: DUSK, fov: 50, eye: [-1.0, 1.8, -7.5], at: [-7.5, 4.0, -0.5] },
+  garden: { t: DUSK, fov: 50, eye: [-8, 4.2, -16], at: [0, 3.5, 0] },
+  stair: { t: 6000, fov: 70, eye: [0, 3.0, 5.2], at: [0, 3.4, 14] },
+  pad: { t: 6000, fov: 62, eye: [0, 2.4, 5.2], at: [0, 1.6, 11] },
+  foyer: { t: 6000, fov: 66, eye: [0.5, 2.4, 2.4], at: [0, 2.6, 14] },
 };
 const EXTRA = {
-  back: { t: 6500, eye: [0, 3.2, 25], at: [0, 5, 10] },
-  foyer: { t: 6000, eye: [-3, 2.6, 2.4], at: [2, 3.0, 14] },
-  aerial: { t: 11800, eye: [24, 26, -20], at: [0, 6, 8] },
-  front_day: { t: 9000, eye: [5, 2.0, -21], at: [0, 6.5, 6] },
+  back: { t: 6500, fov: 60, eye: [0, 3.0, 28], at: [0, 5, 12] },
+  aerial: { t: DUSK, fov: 50, eye: [26, 28, -24], at: [0, 6, 9] },
+  front_day: { t: 9000, fov: 45, eye: [8, 2.4, -24], at: [-2, 7, 6] },
+  garden_noon: { t: 7000, fov: 50, eye: [-8, 4.2, -16], at: [0, 3.5, 0] },
+  roof: { t: DUSK, fov: 55, eye: [0, 20, -12], at: [0, 13, 10] },
 };
 const aim = async (H, cam) => {
   const hc = [H.ox + H.house[0] + H.house[2] / 2, H.oz + H.house[1]];
   const eye = [hc[0] + cam.eye[0], H.F + cam.eye[1], hc[1] + cam.eye[2]], at = [hc[0] + cam.at[0], H.F + cam.at[1], hc[1] + cam.at[2]];
-  await ev(([eye, at, t]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(eye[0], eye[1] - 1.62, eye[2]); p.yaw = Math.atan2(-(at[0] - eye[0]), -(at[2] - eye[2])); p.pitch = Math.atan2(at[1] - eye[1], Math.hypot(at[0] - eye[0], at[2] - eye[2])); p.fovKick = 0; g.env.setTime(t); const e = g.entities; if (e && e.mobs) e.mobs.length = 0; }, [eye, at, cam.t]);
+  await ev(([eye, at, t, fov]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(eye[0], eye[1] - 1.62, eye[2]); p.yaw = Math.atan2(-(at[0] - eye[0]), -(at[2] - eye[2])); p.pitch = Math.atan2(at[1] - eye[1], Math.hypot(at[0] - eye[0], at[2] - eye[2])); p.fovKick = 0; g.settings.fov = fov; g.env.setTime(t); const e = g.entities; if (e && e.mobs) e.mobs.length = 0; }, [eye, at, cam.t, cam.fov || 72]);
   await settle(40); await step(6);
 };
 let pics = 0, want = 0;
