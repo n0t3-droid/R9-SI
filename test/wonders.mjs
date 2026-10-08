@@ -90,12 +90,12 @@ check(found && found.codex, 'the codex has its page under ✨ Wunder');
 check(await ev((t) => VR.Wonders.gifts().some(x => x.type === t), first.type), 'the find is kept on this device as a gift (the Studio’s ✨ chip)');
 // the picture: drawing a frame here takes a while, so the banner is shown once more for it (the moment itself was checked)
 await step(2); await draw(true);
-const fadeAt = Date.now();
-await ev((t) => VR.game.wonders.banner(t), found && found.banner ? found.banner.text : '');
+// (the moment is timed in the page: the banner's class leaves „on“ when its timer fires — a screenshot here takes its own time)
+await ev((t) => { const b = document.getElementById('wbanner'); window.__bannerOff = null; const t0 = performance.now(); new MutationObserver((muts, mo) => { if (!b.classList.contains('on')) { window.__bannerOff = performance.now() - t0; mo.disconnect(); } }).observe(b, { attributes: true, attributeFilter: ['class'] }); VR.game.wonders.banner(t); }, found && found.banner ? found.banner.text : '');
 await page.waitForTimeout(800);
 await page.screenshot({ path: SHOTS + '/wonder_found.png', timeout: 180000 });
-let gone = false; for (let i = 0; i < 40 && !gone; i++) { gone = await ev(() => { const b = document.getElementById('wbanner'); return !b.classList.contains('on'); }); if (!gone) await page.waitForTimeout(200); }
-check(gone && Date.now() - fadeAt >= 2300 && Date.now() - fadeAt < 6000, 'the banner fades after its moment (' + ((Date.now() - fadeAt) / 1000).toFixed(1) + ' s)');
+let off = null; for (let i = 0; i < 80 && off === null; i++) { off = await ev(() => window.__bannerOff); if (off === null) await page.waitForTimeout(200); }
+check(off !== null && off >= 2300 && off < 4000, 'the banner fades after its moment (' + (off === null ? 'never' : (off / 1000).toFixed(1) + ' s') + ')');
 // ---- /bau after it: a plan of that wonder where you look (95 blocks back towards the spawn, looking that way: away
 // from the gallery further out)
 await ev(([s, h]) => { const g = VR.game, p = g.player, sp = g.worldSpawn(), dx = sp[0] - s.x, dz = sp[2] - s.z, L = Math.hypot(dx, dz) || 1; p.flying = true; p.teleport(s.x + dx / L * 95, h[1] + 8, s.z + dz / L * 95); p.yaw = Math.atan2(-dx, -dz); p.pitch = -0.7; }, [first, heart]);
@@ -126,21 +126,29 @@ const land = (x, z, LW, LD) => ev(([x, z, LW, LD]) => {
   return { wet: n ? wet / n : 1, relief: hi - lo, miss };
 }, [x, z, LW, LD]);
 const shots = [];
-let along = 0;
+let centre = 0;                                   // along the line: where the next gallery spot is looked for
+const OFFS = [0, 70, -70, 140, -140, 210, -210, 280, -280, 350, -350, 420];   // both ways along the line, then further
 for (let k = 0; k < TYPES8.length; k++) {
   const type = TYPES8[k], lot = await ev((t) => VR.Forge.meta(VR.Wonders.dna(t, 1)).lot, type);
-  let gx = 0, gz = 0, spot = null;
-  for (let tries = 0; tries < 6; tries++) {
-    gx = Math.round(base.x + base.ax * along); gz = Math.round(base.z + base.az * along);
+  let gx = 0, gz = 0, spot = null, pick = null, ok = false;
+  for (const o of OFFS) {
+    const a = centre + o; gx = Math.round(base.x + base.ax * a); gz = Math.round(base.z + base.az * a);
     await ev(([x, z, y]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x + 0.5, y + 70, z + 0.5); p.pitch = -1.2; }, [gx, gz, base.y]);
     await settle(40);
     spot = await land(gx, gz, lot[0] + 6, lot[1] + 6);
     spot.site = await ev(([x, z]) => Math.round(Math.min(1e4, ...VR.game.wonders.sites.map(q => Math.hypot(q.x - x, q.z - z)))), [gx, gz]);
-    if (spot.wet <= 0.06 && spot.relief <= 14 && spot.site >= 110) break;
+    ok = spot.wet <= 0.06 && spot.relief <= 14 && spot.site >= 110;
+    const score = spot.wet * 10 + spot.relief / 14 + (spot.site < 110 ? 5 : 0) + Math.abs(o) / 400;
+    if (!pick || score < pick.score) pick = { gx, gz, spot, score, a };
+    if (ok) break;
     console.log('  (' + type + ': the spot at ' + gx + ' ' + gz + ' is ' + JSON.stringify(spot) + ' — further along)');
-    along += 70;
   }
-  along += 86;
+  if (!ok) {                                      // none was dry and gentle: the best of those looked at
+    gx = pick.gx; gz = pick.gz; spot = pick.spot;
+    await ev(([x, z, y]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x + 0.5, y + 70, z + 0.5); p.pitch = -1.2; }, [gx, gz, base.y]);
+    await settle(40);
+  }
+  centre = pick.a + 86;
   const pl = await ev(([type, x, z, k]) => {
     const g = VR.game, B = g.gadgets.blue, W = VR.Wonders, dna = W.dna(type, 0x5eed + k), M = VR.Forge.meta(dna), LW = M.lot[0], LD = M.lot[1];
     const hs = []; for (let a = 0; a <= 6; a++) for (let b = 0; b <= 6; b++) hs.push(B.groundAt(Math.round(x - LW / 2 + LW * a / 6), Math.round(z - LD / 2 + LD * b / 6), 220, 10));
@@ -154,14 +162,14 @@ for (let k = 0; k < TYPES8.length; k++) {
   // the camera: in front of it (its entrance faces −z) and a little to the side, far enough to see all of it
   await ev(([x, z, F0, top, lot]) => { const g = VR.game, p = g.player; const d = Math.max(lot[0], lot[1]) * 0.6 + top * 0.5 + 12, px = x + d * 0.42, pz = z - d * 0.92; p.flying = true; p.noclip = true; p.teleport(px, F0 + Math.max(8, top * 0.4), pz); p.yaw = Math.atan2(-(x - px), -(z - pz)); p.pitch = -0.08 - Math.min(0.14, 6 / d); }, [gx, gz, pl.F, top, pl.lot]);
   await settle(60); await step(4);
-  await ev(() => VR.game.env.setTime(5200)); await step(2); await draw(false);
+  await ev(() => VR.game.env.setTime(5200)); await step(40); await draw(false);
   await page.screenshot({ path: SHOTS + '/wonder_' + type + '.png', timeout: 180000 });
   shots.push(type + (built ? '' : ' (not built)'));
   if (type === 'kristall' || type === 'mondtempel') {
     await ev(() => VR.game.env.setTime(18400)); await step(6); await draw(false);
     await page.screenshot({ path: SHOTS + '/wonder_' + type + '_night.png', timeout: 180000 });
     shots.push(type + ' night');
-    await ev(() => VR.game.env.setTime(5200)); await step(2);
+    await ev(() => VR.game.env.setTime(5200)); await step(40);
   }
   console.log('  photographed ' + type + ' (' + pl.dna + ', F ' + pl.F + ', land ' + JSON.stringify(spot) + ', built ' + built + ', ' + ((Date.now() - T0) / 1000).toFixed(0) + ' s)');
 }
@@ -169,8 +177,8 @@ check(shots.filter(s => !/not built/.test(s)).length === 10, 'all eight wonders 
 // ---- the Studio's 🏭 Forge (same origin, so the same device store): the found wonder is a ✨ chip that builds anywhere
 const sp = await ctx.newPage(); sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 600)));
 await sp.goto(URL0 + '/studio.html', { timeout: 120000 });
-for (let i = 0; i < 120; i++) { if (await sp.evaluate(() => !!document.querySelector('[data-mode="forge"]'))) break; await sp.waitForTimeout(500); }
-await sp.click('[data-mode="forge"]', { timeout: 60000 }).catch(() => { /* checked below */ });
+for (let i = 0; i < 240; i++) { await sp.waitForTimeout(500); if (await sp.evaluate(() => !document.getElementById('studio').classList.contains('boot') && !!(window.__studio && window.__studio.HOUSE.size >= 1))) break; }
+await sp.click('nav.modes button[data-mode="forge"]', { timeout: 60000 }).catch(() => { /* checked below */ });
 await sp.waitForTimeout(1200);
 const chips = await sp.evaluate(() => [...document.querySelectorAll('#chips button[data-ftype^="wonder:"]')].map(b => b.textContent.trim()));
 check(chips.includes('✨ ' + nameDe), 'the Studio’s Forge offers „✨ ' + nameDe + '“ as a chip: ' + JSON.stringify(chips));
