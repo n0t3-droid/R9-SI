@@ -28,10 +28,11 @@
     { i: 8, name: 'Villa R9 130', sub: 'Stadtvilla 13×13 · Doppelgarage', fam: 'stadtvilla' },
     { i: 9, name: 'Villa R9 130 Carport', sub: 'Stadtvilla 13×13 · Carport', fam: 'stadtvilla' },
     { i: 10, name: 'Villa R9 Compact', sub: 'Stadtvilla 13×13 · ohne Garage', fam: 'stadtvilla' },
+    { i: 11, name: 'Villa Nova', sub: VR.I18N && VR.I18N.tx ? VR.I18N.tx('g.bp.nova.sub', null, 'Die Villa aus dem Trailer · Terrassen · Glastreppen · Lichtsockel', 'The villa from the trailer · terraces · glass stairs · light pad') : 'Die Villa aus dem Trailer · Terrassen · Glastreppen · Lichtsockel', fam: 'trailer' },
   ];
-  const FAMS = [['all', 'Alle'], ['stadtvilla', 'Stadtvilla'], ['belportale', 'Klassik'], ['sanssoucis', 'See'], ['toscana', 'Turm'], ['bungalow', 'Bungalow'], ['palais', 'Palais']];
-  const SKIN_COL = { signus: '#f1efe9', grey: '#9ea4ab', sand: '#e2d3b0', mediterran: '#efd9b5', bauhaus: '#2b2f36', klinker: '#f4f1ea', pult: '#e8e4dc', blacklabel: '#1b1d22', classic: '#f0e4c8', lake: '#f6f3ee', toscana: '#d9a35f', glas: '#fbfbf8', glasnacht: '#3a3d42' };
-  const SKIN_NAME = { signus: 'Weiß · Anthrazit', grey: 'Grau', sand: 'Sand', mediterran: 'Mediterran', bauhaus: 'Bauhaus · Flachdach', klinker: 'Klinker', pult: 'Pultdach', blacklabel: 'Schwarzkubus', classic: 'Klassik', lake: 'See', toscana: 'Ocker · Terracotta', glas: 'Glashaus · Vollton weiß', glasnacht: 'Glashaus · Anthrazit' };
+  const FAMS = [['all', 'Alle'], ['stadtvilla', 'Stadtvilla'], ['belportale', 'Klassik'], ['sanssoucis', 'See'], ['toscana', 'Turm'], ['bungalow', 'Bungalow'], ['palais', 'Palais'], ['trailer', 'Trailer']];
+  const SKIN_COL = { signus: '#f1efe9', grey: '#9ea4ab', sand: '#e2d3b0', mediterran: '#efd9b5', bauhaus: '#2b2f36', klinker: '#f4f1ea', pult: '#e8e4dc', blacklabel: '#1b1d22', classic: '#f0e4c8', lake: '#f6f3ee', toscana: '#d9a35f', glas: '#fbfbf8', glasnacht: '#3a3d42', nova: '#9a9ea3' };
+  const SKIN_NAME = { signus: 'Weiß · Anthrazit', grey: 'Grau', sand: 'Sand', mediterran: 'Mediterran', bauhaus: 'Bauhaus · Flachdach', klinker: 'Klinker', pult: 'Pultdach', blacklabel: 'Schwarzkubus', classic: 'Klassik', lake: 'See', toscana: 'Ocker · Terracotta', glas: 'Glashaus · Vollton weiß', glasnacht: 'Glashaus · Anthrazit', nova: 'Nova · Stein, Orange, Türkis' };
   // furniture categories (a model may sit in several)
   const CATS = [
     ['all', 'Alle', null],

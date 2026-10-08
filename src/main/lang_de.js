@@ -1111,6 +1111,7 @@
     'g.tram.hudGo': '<b>SCHWEBEBAHN</b> → {name} · {s} s<br><small>Shift an einer Station steigt aus · F5 Ansicht</small>',
     'g.tram.next': 'nächste Stadt',
     // ---- Baupläne (Villen in der Hand)
+    'g.bp.nova.sub': 'Die Villa aus dem Trailer · Terrassen · Glastreppen · Lichtsockel',
     'g.bp.failed': 'Bauplan fehlgeschlagen: {why}',
     'g.bp.oneFacade': 'Dein eigenes Design hat eine Fassade — ändere sie im R9 Studio',
     'g.bp.mode': 'Baupläne bauen nur im Kreativ- oder Zen-Modus',
