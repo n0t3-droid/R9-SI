@@ -23,14 +23,17 @@ async function measure(url, label) {
   const wait = (ms) => page.waitForTimeout(ms);
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(15); } };
-  const place = async (pos, tgt) => {
+  // a quality preset for a measured view: the smart-quality ladder is off (applyPreset turns dynRes on again)
+  const setPreset = (p) => ev((p) => { const g = VR.game; g.settings.dynRes = false; if (g.aq && g.aq.stack.length) g.aqReset(g.aq, g.settings, g.world); g.applyPreset(p); g.settings.dynRes = false; }, p);
+  const place = async (pos, tgt, maxMs = 300000) => {
     await ev(([pos, tgt]) => { const p = VR.game.player; p.teleport(pos[0], pos[1], pos[2]); p.flying = true; const dx = tgt[0] - pos[0], dy = tgt[1] - pos[1] - 1.6, dz = tgt[2] - pos[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, [pos, tgt]);
     // the chunks of a new place come from the workers, slowly on a loaded machine: the five columns round it in, and the
     // drawn sections unchanged over three real frames
     let last = -1, still = 0;
-    for (let i = 0; i < 40 && still < 2; i++) {
-      await step(12); await wait(150);
-      const idle = await ev(([x, z]) => { const W = VR.game.world, r = VR.game.settings.renderDist - 0.5, cx = x >> 4, cz = z >> 4, R = Math.ceil(r); for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) { if (i * i + j * j > r * r) continue; const c = W.col(cx + i, cz + j); if (!c) return false; for (const s of c.sec) if (s.dirty || s.pending) return false; } return true; }, [Math.floor(pos[0]), Math.floor(pos[2])]);
+    const t0 = Date.now();   // a time budget: renderDist 14 needs minutes of worker time on this machine
+    while (still < 2 && Date.now() - t0 < maxMs) {
+      await step(12); await wait(400);
+      const idle = await ev(([x, z]) => { const W = VR.game.world, r = W.renderDist - 0.5, cx = x >> 4, cz = z >> 4, R = Math.ceil(r); for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) { if (i * i + j * j > r * r) continue; const c = W.col(cx + i, cz + j); if (!c) return false; for (const s of c.sec) if (s.dirty || s.pending) return false; } return true; }, [Math.floor(pos[0]), Math.floor(pos[2])]);
       if (!idle) { still = 0; continue; }
       const n = await ev(() => { window.__norender = false; const g = VR.game; g.last = performance.now() - 33; g.loop(performance.now()); g.renderer.gl.finish(); window.__norender = true; return g.renderer.stats.sections; });
       still = n >= 8 && n === last ? still + 1 : 0; last = n;
@@ -72,7 +75,7 @@ async function measure(url, label) {
   if (found.home) { const H = found.home, [dx, dz] = dirFrom(H.door, H.inside); views.push({ name: 'village home inside', pos: [H.inside[0], H.inside[1], H.inside[2]], tgt: [H.inside[0] + dx * 5, H.inside[1] + 1.1, H.inside[2] + dz * 5] }); }
   const res = {};
   for (const preset of ['potato', 'high']) {
-    await ev((p) => { VR.game.applyPreset(p); }, preset);
+    await setPreset(preset);
     await step(20); await wait(200);
     for (const v of views) { const settled = await place(v.pos, v.tgt); res[`${v.name} | ${preset}`] = { ...(await oneFrame()), settled }; }
   }
