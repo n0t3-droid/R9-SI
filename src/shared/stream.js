@@ -46,9 +46,10 @@
   class UploadScheduler {
     constructor(opts) { this.items = []; this.msPerByte = (opts && opts.msPerByte) || 2e-6; this.last = null; }
     get size() { return this.items.length; }
-    push(item) { this.items.push({ key: item.key, bytes: item.bytes || 0, dx: item.dx || 0, dz: item.dz || 0, run: item.run, age: 0 }); }
+    // an item: run() does the upload; bytes size its estimate; x, z (absolute blocks) or dx, dz (relative) place it
+    push(item) { this.items.push({ key: item.key, col: item.col, x: item.x, z: item.z, bytes: item.bytes || 0, dx: item.dx || 0, dz: item.dz || 0, run: item.run, age: 0 }); }
     // drops the queued items the predicate rejects (a column unloaded while its mesh waited)
-    prune(keep) { this.items = this.items.filter(it => keep(it.key)); }
+    prune(keep) { this.items = this.items.filter(it => keep(it)); }
     drain(budgetMs, clock, vx, vz) {
       const now = clock || (() => 0);
       const order = this.items.map((it) => ({ it, p: S.viewPrio(it.dx, it.dz, vx || 0, vz || 0) }));
