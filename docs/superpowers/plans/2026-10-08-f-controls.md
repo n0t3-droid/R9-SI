@@ -107,3 +107,9 @@ not reach that state. F5 adds no draw call and no render pass by design (the con
 - Touch and gamepad are verified in emulation (Playwright touch, a simulated pad), not on hardware.
 - The jump check reads a rise of 5.00 blocks after one tap, while the jump impulse (9.1 blocks/s at gravity 30) gives
   about 1.4 blocks. Not analysed: the check passes on any rise above 0.2 blocks without flight.
+- test/start.mjs section 8 (🎒 Meins in the Studio) fails on this build and passes on the untouched build. After
+  `VR.StudioWorld.imagine.open(null, 'house')` the Baukasten style chips (`#imagine [data-hs="style"][data-v="modern"]`)
+  are not in the DOM when clicked (locator timeout; the other 129 checks pass, no page errors). The cause is not found:
+  the Studio sources and the bundle differ from the base only by the added lang keys, so the difference is probably
+  stored state or timing. A diagnostic (fresh context, innerHTML writes to #imagine, mode and element count over time)
+  was queued on the shared browser slots and had not run when this round ended.
