@@ -415,6 +415,7 @@
   VG.cell = (g) => PAR(g).CELL; VG.rad = (g) => PAR(g).RAD;
   VG.siteRad = (g, site) => (site && site.rad) || PAR(g).RAD;
   const BAD = /ocean|river|beach|shore|swamp|mangrove|mushroom|peaks|ice_spikes|deep_dark|frozen_river|stony/;
+  const TECH_P = { jungle: 0.6, savanna: 0.3, meadow: 0.22, cherry: 0.22, prism: 0.15 }, TECH_P6 = { jungle: 0.6, savanna: 0.4, meadow: 0.34, cherry: 0.3, prism: 0.3, desert: 0.2 };
   // a site cell's key (exact pairing: the old xor hash collided for mirrored cells)
   const siteKey = (i, j) => (i + 1048576) * 2097152 + (j + 1048576);
   // whether a site cell is computed already (a cold cell costs its terrain samples: worker_main.js computes it in a turn)
@@ -450,7 +451,8 @@
         if (g.nearestOutpost) { const o = g.nearestOutpost(x, z); if (o && (o.x - x) ** 2 + (o.z - z) ** 2 < 125 * 125) continue; }
         let style = VG.styleFor(bk.key, cl);
         // tropical tech cities: most jungle sites, a share of the warm and temperate ones
-        const techP = { jungle: 0.6, savanna: 0.3, meadow: 0.22, cherry: 0.22, prism: 0.15 }[style] || 0;
+        // (vgen 6: the palm city — Nova Haven's style — is placed in more of the endless world's green and warm sites)
+        const techP = ((g.vgen >= 6 ? TECH_P6 : TECH_P)[style]) || 0;
         if (techP && ((M.hash2(i, j, g.seed + 777) >>> 0) % 1000) < techP * 1000) style = 'tech';
         // rich modern towns: most meadow / cherry / savanna sites in vgen-3 worlds (the Heartland keeps its tech city)
         if (g.vgen >= 4 && VG.modern && (style === 'meadow' || style === 'cherry' || style === 'savanna') && ((M.hash2(i, j, g.seed + 991) >>> 0) % 100) < (style === 'meadow' ? 70 : 45)) style = 'modern';

@@ -266,8 +266,8 @@
     startTitle() {
       this.state = 'title';
       this.teardownWorld();
-      this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5 }, custom: VR.CUSTOM });
-      this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5 }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
+      this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 6 }, custom: VR.CUSTOM });
+      this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 6 }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
       this.world.fancyLeaves = this.settings.fancyLeaves;
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
       this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
@@ -299,7 +299,7 @@
     async createWorld(o) {
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
-      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: 5 }; // vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells
+      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: 6 }; // vgen 6: the trailer's look beyond the Heartland (terraced hills, green mesa caps, lava vents, giant crystals, rail corridors; gen_trailer.js) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
     }
