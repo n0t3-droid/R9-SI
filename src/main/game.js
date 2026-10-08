@@ -8,11 +8,11 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant', smoothPlants: 0 },
-    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site', smoothPlants: 1 },
-    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site', smoothPlants: 2 },
-    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2 },
-    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2 },
+    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant', smoothPlants: 0, smoothFurn: 0 },
+    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site', smoothPlants: 1, smoothFurn: 1 },
+    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
+    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
+    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
@@ -95,10 +95,12 @@
       return VR.WaterWave.sample(p.pos[0], p.pos[2], E.time, E.windDir[0], E.windDir[1], VR.WaterWave.ampK(4, E.wind)).h * 0.7;
     }
 
+    // t-smooth: the prop groups the mesher hands to the prop pass (mesher.js PROP_GROUP: 1 the palms, 2 the furniture)
+    propMask() { const S = this.settings; return ((S.smoothPlants | 0) > 0 ? 1 : 0) | (S.smoothFurn ? 2 : 0); }
     applySettings(key) {
       const S = this.settings, r = this.renderer;
       if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
-      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'smoothPlants'].includes(key)) S.preset = 'custom';
+      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -107,10 +109,11 @@
       if (S.dropShadow === undefined) S.dropShadow = PRESETS[S.preset] ? PRESETS[S.preset].dropShadow : 1;
       if (S.lampGlow === undefined) S.lampGlow = PRESETS[S.preset] ? PRESETS[S.preset].lampGlow : 1;
       if (S.smoothPlants === undefined) S.smoothPlants = PRESETS[S.preset] ? PRESETS[S.preset].smoothPlants : 2;   // t-smooth: Glatte Pflanzen (0 off · 1 simple · 2 full)
+      if (S.smoothFurn === undefined) S.smoothFurn = PRESETS[S.preset] ? PRESETS[S.preset].smoothFurn : 1;   // t-smooth: Echte Möbel (0 the voxel pieces · 1 smooth)
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
-      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water });
-      if (this.world) { const wp = (S.smoothPlants | 0) > 0; if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
+      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water });
+      if (this.world) { const wp = this.propMask(); if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
@@ -324,7 +327,7 @@
       this.teardownWorld();
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5 }, custom: VR.CUSTOM });
       this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5 }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = (this.settings.smoothPlants | 0) > 0;
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
       this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
       this.env.setTime(12800 + Math.random() * 1200); // golden hour → dusk: planets rising
@@ -379,7 +382,7 @@
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: this.store, savedKeys, renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = (this.settings.smoothPlants | 0) > 0;
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time || 1000);
@@ -576,7 +579,7 @@
       const dim = meta.type === 'flat' ? 'flat' : 'overworld';
       this.dim = dim;
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: null, savedKeys: new Set(), renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = (this.settings.smoothPlants | 0) > 0;
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time); this.env.day = meta.day;

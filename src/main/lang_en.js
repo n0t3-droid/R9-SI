@@ -392,6 +392,8 @@
     'g.set.fancyLeaves.tip': 'Leaves with gaps and depth instead of flat cards.',
     'g.set.smoothPlants.tip': 'Palms with real fronds instead of block crowns, slim and soft as in the trailer. Off = the block look.',
     'g.set.smoothPlantsV': ['Off', 'Simple', 'Full'],
+    'g.set.smoothFurn': 'Real furniture',
+    'g.set.smoothFurn.tip': 'Sofas, beds, lamps, kitchens and plants as round, soft furniture of fabric, wood, metal and glass instead of block furniture; lamp shades glow. Off = the block look.',
     'g.set.wetGround': 'Wet ground in rain',
     'g.set.wetGround.tip': 'The ground darkens and gleams in the rain.',
     'g.set.showFps.tip': 'Shows frames per second at the top left.',

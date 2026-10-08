@@ -392,6 +392,8 @@
     'g.set.fancyLeaves.tip': 'Blätter mit Lücken und Tiefe statt flacher Karten.',
     'g.set.smoothPlants.tip': 'Palmen mit echten Wedeln statt Blockkronen, schlank und weich wie im Trailer. Aus = Blockbild.',
     'g.set.smoothPlantsV': ['Aus', 'Einfach', 'Voll'],
+    'g.set.smoothFurn': 'Echte Möbel',
+    'g.set.smoothFurn.tip': 'Sofas, Betten, Lampen, Küchen und Pflanzen als runde, weiche Möbel aus Stoff, Holz, Metall und Glas statt Würfelmöbel; Lampenschirme leuchten. Aus = Blockbild.',
     'g.set.wetGround': 'Nasser Boden bei Regen',
     'g.set.wetGround.tip': 'Der Boden wird im Regen dunkel und glänzt.',
     'g.set.showFps.tip': 'Zeigt die Bilder pro Sekunde oben links.',
