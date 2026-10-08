@@ -19,6 +19,9 @@
   // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
   // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
   const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
+  const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
+  const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -35,7 +38,8 @@
     loadSettings() {
       let s = {};
       try { s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); } catch (e) { s = {}; }
-      const out = Object.assign({}, DEFAULTS, s);
+      // the registry's defaults (F5 · Steuerung & Einstellungen) fill the keys the older table does not have
+      const out = Object.assign({}, VR.Settings ? VR.Settings.defaults() : {}, DEFAULTS, s);
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -60,7 +64,7 @@
       if (this.horizon) this.horizon.setLevel(S.horizon);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
       if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
-      if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; }
+      if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
       if (this.audio) this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient });
       // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
@@ -184,6 +188,7 @@
       this.env.wx.onThunder = (d) => { if (this.ambience) this.ambience.thunder(d); };
       this.store = new VR.Store();
       this.ui = new VR.UI(this);
+      if (VR.Touch) VR.Touch.mount(this);   // the touch layer (F5): shown only on a touch screen, in a game with no menu
       this.mp = VR.MP ? new VR.MP(this) : null;
       if (this.mp) this.mp.init();
       this.ui.loading(T('g.load.textures'), 0.05);
@@ -596,14 +601,78 @@
       this.fpsAcc = (this.fpsAcc || 0) + dt; this.fpsN = (this.fpsN || 0) + 1;
       if (this.fpsAcc > 0.5) { this.fps = this.fpsN / this.fpsAcc; this.fpsAcc = 0; this.fpsN = 0; }
       try {
+        // F5 · Steuerung: menus and the chat take the pad as focus, not as game keys; the pad and the touch layer are
+        // read once per frame, then the menu focus and the touch buttons follow
+        this.input.menuOpen = this.state !== 'play' || !!(this.ui && (this.ui.screen || this.ui.typing || this.ui.blocking)) || !!this.studioOpen;
+        this.input.beginFrame(dt);
+        if (VR.PadNav) VR.PadNav.frame(this);
+        if (VR.Touch) VR.Touch.frame(this);
         if (this.cockpit && this.state !== 'play') this.cockpit.updateHud(0, true);
         if (this.state === 'title') this.titleFrame(dt);
         else if (this.state === 'loading') this.loadingFrame(dt);
         else if (this.state === 'play') { if (!this.studioOpen) this.playFrame(dt); }
         if (this.mp) this.mp.update(dt);
+        if (this.bench) this.benchTick();
+        this.capturePreview();   // the settings' live preview: the frame just drawn, if one was asked for
       } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine(T('g.chat.error', { msg: e.message }), '#ff8a8a'); } }
       this.input.endFrame();
       this.jsMs += (performance.now() - tj0 - this.jsMs) * 0.08;
+    }
+    // ---------------------------------------------------------------- F5 · Steuerung & Einstellungen
+    // the settings' preview thumbnail: the frame two frames after a graphics change (the new setting has taken effect)
+    requestPreview() { this.previewAt = this.frame + 2; }
+    capturePreview() {
+      if (!this.previewAt || this.frame < this.previewAt) return;
+      this.previewAt = 0;
+      const c = this.ui && this.ui.previewCtx;
+      if (!c || !this.canvas || !this.canvas.width) return;
+      try { c.drawImage(this.canvas, 0, 0, c.canvas.width, c.canvas.height); } catch (e) { /* no picture this frame */ }
+    }
+    // ⚡ Automatik: 3 s of frame times on the scene the player stands in (the first half second is warm-up), then the
+    // table in bench.js picks the preset and the view distance for 60 fps (30 on a weak machine)
+    benchStart() {
+      if (this.bench) return false;
+      this.bench = { t: 0, last: 0, dts: [], was: { preset: this.settings.preset, renderDist: this.settings.renderDist } };
+      if (this.ui && this.ui.benchBegin) this.ui.benchBegin();
+      return true;
+    }
+    // wall-clock time between two frames (the loop's dt is clamped for the physics; a slow machine must still finish in 3 s)
+    benchTick() {
+      const b = this.bench; if (!b) return;
+      const now = performance.now();
+      if (b.last) { const d = now - b.last; b.t += d; if (b.t > 500 && d > 0) b.dts.push(d); }
+      b.last = now;
+      if (b.t >= 3000) this.benchFinish();
+    }
+    benchFinish() {
+      const b = this.bench; if (!b || !VR.Bench) return null;
+      this.bench = null;
+      const S = this.settings, sum = VR.Bench.summarize(b.dts);
+      const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist), target: 60 });
+      if (d.action !== 'none') {
+        Object.assign(S, PRESETS[d.preset]); S.preset = d.preset; S.renderDist = d.renderDist;
+        this.applySettings('*'); this.saveSettings();
+      }
+      this.benchResult = Object.assign({}, d, { n: sum.n, median: sum.median, p90: sum.p90, measured: sum.fps, before: b.was, when: Date.now() });
+      if (this.ui && this.ui.benchDone) this.ui.benchDone(this.benchResult);
+      return this.benchResult;
+    }
+    // the quality governor made visible: the ⚙ line lists the steps it has taken (GPU ladder, then CPU ladder)
+    aqWhat() {
+      const aq = this.aq; if (!aq) return '';
+      const out = [];
+      for (let i = 0; i < Math.min(AQ_G.length, aq.g | 0); i++) out.push(T(AQ_G[i]));
+      for (let i = 0; i < Math.min(AQ_C.length, aq.c | 0); i++) out.push(T(AQ_C[i]));
+      return out.join(' · ');
+    }
+    aqChanged() {
+      if (typeof document === 'undefined') return;
+      const aq = this.aq, on = !!(aq && aq.stack && aq.stack.length) && this.state === 'play';
+      let h = document.getElementById('aqhint');
+      if (!h) { h = document.createElement('div'); h.id = 'aqhint'; h.setAttribute('role', 'status'); h.hidden = true; (document.getElementById('ui') || document.body).appendChild(h); }
+      h.hidden = !on;
+      if (on) { h.textContent = T('g.aq.hint'); h.title = T('g.aq.tip', { what: this.aqWhat() }); }
+      if (this.ui && this.ui.screen === 'settings' && VR.SettingsPanel) VR.SettingsPanel.aqLine(this.ui);
     }
     // ---------------------------------------------------------------- R9 Smart Quality
     // The old "dynamic resolution" blurred the picture whenever the frame rate dropped — and near villages
@@ -617,6 +686,7 @@
     // Every step is probed: if it does not buy frame rate it is undone and the other ladder is tried.
     // Everything is undone again when the frame rate has been fine for a while. The user's settings never change.
     smartQuality(dt, S, w) {
+      if (this.bench) return;   // the Automatik run measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
       const aq = this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null });
       if (!S.dynRes || !this.fps) {
@@ -722,6 +792,7 @@
         else if (aq.hzBase >= 0) { hz.setLevel(aq.hzBase); aq.hzBase = -1; }
       }
       aq.over = o;
+      this.aqChanged();
     }
     farFor(w, extra) { const hf = this.horizon ? this.horizon.farPlane() : 0; return Math.max(w.renderDist * 16 + (extra || 200), hf); }
     envFor(pos, dt, extra) {
