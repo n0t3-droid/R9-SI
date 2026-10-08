@@ -253,7 +253,8 @@
   }
   // the game built a plan of the hand (now or after its slices): the toast says what and how many
   function onBuilt(pl, name, n, undo) {
-    if (BH.last && BH.last.id === pl.id) { BH.last.undo = undo || null; BH.last.sliced = false; BH.last.n = n; }
+    // (the hand's own name: the plan's name is the model's registry name, „Bed Bench“ for the bench)
+    if (BH.last && BH.last.id === pl.id) { BH.last.undo = undo || null; BH.last.sliced = false; BH.last.n = n; if (BH.last.name) name = BH.last.name; }
     if (pl.from === 'hand' && pl.replaces) toast(tx('wiz.hereToast', { n: name }, '🔁 {n} steht jetzt dort · Z nimmt es zurück', '🔁 {n} stands there now · Z takes it back'));
     else if (pl.from === 'hand') {
       const big = n > 400;
@@ -640,26 +641,39 @@
   if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { labels(); const Hh = VR.Hints, id = Hh && Hh.current(); const m = { [HN.bauhand]: H4, [HN.ring]: H5, [HN.undo]: H6, [HN.change]: H7 }[id]; if (m && Hh.retext) Hh.retext(m().text); if (BH.state === 'open') { renderRing(); renderCard(); } if (BH.state === 'holding') stripText(); });
 
   // ---------------------------------------------------------------- hooks into the game
-  // B and the keys of the ring and the hand: one dispatcher, before the game's own keys
+  // B: one dispatcher, before the game's own keys (in the frame; the ring and the hand take their keys on the press)
   BH.keys = function (g) {
     const i = g.input, ui = g.ui;
     if (ui.typing) return false;
-    // (Esc in pointer lock: the browser took the lock and the hand put it away — the same key does not pause the game too)
-    if (BH.awayAt && i.hit('Escape')) { const recent = performance.now() - BH.awayAt < 600; BH.awayAt = 0; if (recent) return true; }
     if (i.hit('KeyB')) {
       if (ui.screen || g.studioOpen || (g.gadgets && g.gadgets.controlling) || (VR.Wizard && VR.Wizard.isOpen && VR.Wizard.isOpen())) return false;   // (a menu, the Studio, a vehicle, the wizard: B does nothing)
       BH.toggle(); return true;
     }
-    if (BH.state === 'holding') {
-      if (ui.screen) return false;
-      if (i.hit('Escape')) { BH.putAway(); return true; }
-      if (i.hit('KeyZ')) { BH.undo(); return true; }
-      if (i.hit('KeyR')) { BH.rotate(1); return true; }
-      if (i.hit('Enter') || i.hit('NumpadEnter')) { BH.place(); return true; }
-      for (let k = 1; k <= 9; k++) if (i.hit('Digit' + k)) { BH.putAway(true); return false; }   // (the hotbar takes over)
-    }
     return false;
   };
+  // while holding, the keys act on the press itself, not on the next frame: a slow frame (a busy tab, a weak
+  // graphics card) does not eat R or Esc. R turns, Z takes back, Enter places, Esc puts the hand away (the game does
+  // not pause too), a digit puts it away and the hotbar takes that key. Auto-repeat is ignored; a field, a menu, the
+  // wizard, the legal box or the Studio keep their keys. Layout: the letter of the label counts (Z on a German keyboard).
+  function holdKey(e) {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const g = game(); if (!g || !g.ui || !g.input) return;
+    const c = e.code || '', k = (e.key || '').toLowerCase();
+    const stop = () => { e.preventDefault(); e.stopPropagation(); };
+    // Esc in pointer lock: the browser took the lock and the hand went away a moment ago — that Esc is not a pause either
+    if (c === 'Escape' && BH.awayAt) { const recent = performance.now() - BH.awayAt < 600; BH.awayAt = 0; if (recent) { stop(); return; } }
+    if (BH.state !== 'holding' || !BH.holding || g.state !== 'play') return;
+    const ui = g.ui, ae = document.activeElement;
+    if (ui.typing || ui.screen || g.studioOpen || (ae && /INPUT|TEXTAREA|SELECT/.test(ae.tagName))) return;
+    if (VR.Wizard && VR.Wizard.isOpen && VR.Wizard.isOpen()) return;
+    if (VR.Legal && VR.Legal.isOpen && VR.Legal.isOpen()) return;
+    if (c === 'Escape') { stop(); BH.putAway(); return; }
+    if (k === 'z' || (c === 'KeyZ' && !/^[a-z]$/.test(k))) { stop(); BH.undo(); return; }
+    if (k === 'r' || (c === 'KeyR' && !/^[a-z]$/.test(k))) { stop(); BH.rotate(1); return; }
+    if (c === 'Enter' || c === 'NumpadEnter') { stop(); BH.place(); return; }
+    if (/^Digit[1-9]$/.test(c)) BH.putAway(true);   // (not stopped: the hotbar takes the digit)
+  }
+  if (hasDoc) window.addEventListener('keydown', holdKey, true);
   // the ring's keys come straight from the page (no frame later): 1–8, the arrows, Enter, Esc, B
   if (hasDoc) window.addEventListener('keydown', (e) => {
     if (BH.state !== 'open') return;
