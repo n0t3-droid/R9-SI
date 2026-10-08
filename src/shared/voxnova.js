@@ -7,11 +7,11 @@
 //    turquoise glass (lighter at the top, a faint course line every half block).
 //    The frame also closes against whatever is not a nova window (a door), so the
 //    glazed screen round the entrance door is the same block.
-//  · vm_nova_tread — a VX32 stair piece, two blocks wide and three high: two glass
+//  · vm_nova_tread — a VX16 stair piece, two blocks wide and three high: two glass
 //    treads (a rise of half a block each) with glowing cyan front edges, and on
-//    both sides a slanted glass cheek with a steel handrail; stacked one up and one
+//    both sides a stepped glass cheek with a steel cap; stacked one up and one
 //    along per piece the treads make the floating stair and the cheeks join into
-//    two straight glass stringers.
+//    two glass stringers.
 //  · vm_nova_pad — a VX32 3 × 1 × 3 white plinth with rounded corners, a recessed
 //    glowing blue top with a cyan ring emblem and a cyan light line at its foot.
 // All three are registered LATE (VR.BL.late, after the plants), so every older block
@@ -114,26 +114,28 @@
   VX.boxHook.novaband = () => [[0, 0, 0, 1, 1, 1]];
   VX.iconHook.novaband = (c) => { c.x = 1 | (0b110011 << 2); };
 
-  // ---------------------------------------------------------------- the floating glass stair (2 × 3 × 1, VX32)
-  // model units: 16 per block; facing 0 = the front (−z) is the low end, the treads rise toward +z. The lowest row holds
-  // the two treads; the two rows over it hold the glass cheeks: on both sides a slanted pane from half a block under the
-  // nosing line to a block over it with a steel handrail on its top edge — stacked one up and one along, the panes of
-  // the pieces join into one straight glass stringer (a pane wholly inside the piece's own cells: no other block needed)
+  // ---------------------------------------------------------------- the floating glass stair (2 × 3 × 1, VX16)
+  // model units: 16 per block (res 16: one voxel per unit); facing 0 = the front (−z) is the low end, the treads rise
+  // toward +z. The lowest row holds the two treads; the two rows over it hold the glass cheeks: on both sides a pane
+  // from half a block under the nosing line to a block over it, in steps of two units (eight a block — a staircase of
+  // glass, cheap to mesh: a smooth slant costs ten times the quads), capped with a steel line. Stacked one up and one
+  // along, the cheeks of the pieces join into one glass stringer (a pane wholly inside the piece's own cells).
   const NAMES = N.NAMES = [];
   const def = (name, display, o) => { VM.define(name, display, Object.assign({ res: 32, sound: 'glass', hard: 1, cat: 'vtech', cats: ['vtech'] }, o, { late: true, lazy: true })); NAMES.push(name); return name; };
+  N.CHEEK = { step: 2, below: 8, above: 16, cap: 2 };   // the cheek against the nosing line y = z + 8 (model units)
   def('vm_nova_tread', 'Glass Stair Tread', {
     // (only the tread row glows: parts 0 and 1)
-    size: [2, 3, 1], col: 0xBFE6FF, light: (p) => (p.part < 2 ? [2, 7, 9] : null),
+    size: [2, 3, 1], res: 16, col: 0xBFE6FF, light: (p) => (p.part < 2 ? [2, 7, 9] : null),
     build(b, M) {
-      const glass = M.glass(0xCFF6FA), pane = M.glass(0xB4ECF4), led = M.light(COL.cyan), rail = M.metal(COL.steel);
-      for (const [y0, z0] of [[6.5, 0], [14.5, 8]]) {
-        b.box(1.5, y0, z0, 30.5, y0 + 1.5, z0 + 8, glass);              // the glass tread, 1.5 thick, half a block deep
-        b.box(1.5, y0, z0, 30.5, y0 + 1.5, z0 + 1, led);                // its glowing front edge
-        b.box(1.5, y0 - 0.5, z0 + 1, 30.5, y0, z0 + 1.5, led);          // a thin glow line under the edge
+      const glass = M.glass(0xCFF6FA), pane = M.glass(0xB4ECF4), led = M.light(COL.cyan), cap = M.metal(0xC8D0D8), C = N.CHEEK;
+      for (const [y0, z0] of [[7, 0], [15, 8]]) {
+        b.box(1, y0, z0, 31, y0 + 1, z0 + 8, glass);                    // the glass tread, half a block deep
+        b.box(1, y0, z0, 31, y0 + 1, z0 + 1, led);                      // its glowing front edge
       }
-      for (const [x0, x1] of [[0.5, 1.5], [30.5, 31.5]]) {
-        b.extrude([[0, 0], [16, 16], [16, 40], [0, 24]], 'x', x0, x1, pane);   // the cheek: the nosing line is y = z + 8
-        b.rod((x0 + x1) / 2, 24.8, 0, (x0 + x1) / 2, 40.8, 16, 0.8, rail);    // the handrail along its top edge
+      for (const [x0, x1] of [[0, 1], [31, 32]]) for (let z = 0; z < 16; z += C.step) {
+        const y0 = z + 8 - C.below, y1 = z + 8 + C.above;
+        b.box(x0, y0, z, x1, y1 - C.cap, z + C.step, pane);             // the glass cheek
+        b.box(x0, y1 - C.cap, z, x1, y1, z + C.step, cap);              // its steel cap
       }
     },
   });
