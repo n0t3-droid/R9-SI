@@ -163,6 +163,7 @@ await section('4 · 📥 Übernehmen in the game\'s Studio', async () => {
   // 🕘 Weitermachen → 📥 Übernehmen → pick the file → ✓ Übernehmen
   await gev(() => VR.Projects.show(true));
   await gs.waitForTimeout(300);
+  console.log('  hub', JSON.stringify(await gev(() => { const h = document.getElementById('hub'), b = document.querySelector('#hub [data-pack="in"]'); return { hub: !!h, cls: h && h.className, btn: !!b, shown: !!(b && b.getClientRects().length), bridge: !!(VR.StudioBridge && VR.StudioBridge.pickFile), input: !!document.getElementById('packFile'), open: VR.Projects.isOpen && VR.Projects.isOpen() }; })));
   const [fc] = await Promise.all([gs.waitForEvent('filechooser', { timeout: 15000 }), gev(() => document.querySelector('#hub [data-pack="in"]').click())]);
   await fc.setFiles(file);
   for (let i = 0; i < 30 && !(await gev(() => !!document.querySelector('#packDlg.on'))); i++) await gs.waitForTimeout(100);
