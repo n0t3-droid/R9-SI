@@ -891,8 +891,9 @@
       // audio
       // ambience (ambience.js): the wind, the rain and thunder, the birds, crickets and water of this place
       if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0, underwater: underwater || inLava });
+      this.audio.listen(eye, p.yaw, w, underwater || inLava);   // the ear: where it is and which way it faces (F4 · Klang)
       const skyAtEye = (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12);
-      this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true });
+      this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true, day: this.env.day, mobs: this.entities ? this.entities.mobs : null, agents: this.villages ? this.villages.agents : null });
       // HUD
       this.ui.updateHUD();
       if (this.debugOn) this.ui.debug(this.debugText(cam, E));

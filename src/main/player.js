@@ -282,7 +282,7 @@
       const hs = Math.hypot(v[0], v[2]);
       if (this.onGround && hs > 0.1 && !this.flying) { this.bob += hs * dt * 1.55; this.bobAmt = Math.min(1, this.bobAmt + dt * 4); this.stepDist += hs * dt; }
       else this.bobAmt = Math.max(0, this.bobAmt - dt * 4);
-      if (this.stepDist > 2.2) { this.stepDist = 0; g.audio && g.audio.step(this.blockBelow()); }
+      if (this.stepDist > 2.2) { this.stepDist = 0; g.audio && g.audio.step(this.blockBelow(), { speed: hs, crouch: this.sneaking, sprint: this.sprinting }); }
       const kick = (this.sprinting ? 0.1 : 0) + (this.flying && this.sprinting ? 0.08 : 0);
       this.fovKick += (kick - this.fovKick) * Math.min(1, dt * 6);
       if (this.stepSmooth) { this.stepSmooth *= Math.exp(-dt * 14); if (Math.abs(this.stepSmooth) < 0.01) this.stepSmooth = 0; }
