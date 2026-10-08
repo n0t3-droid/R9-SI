@@ -118,4 +118,81 @@
     info.solar = false;
     return info;
   };
+
+  // ---------------------------------------------------------------- the glass villa (vgen 6): the trailer's white interior
+  // o: as techTower (w, d ≥ 7; the front at v = 0). Two storeys, open plan. The ground room has a white gloss floor and
+  // glass walls to the garden (the back and the left side), a round cyan-ringed pad at its centre with a holo table, two
+  // white lounge sofas, planters and a kitchen; floating glass steps rise along the right wall to the gallery (the upper
+  // storey, with two beds). Cove strips of light run round the top course of the walls and cyan lights hang under the
+  // steps. Layout (lot-local, F = the floor): ground room F+1..F+4, gallery floor F+5, gallery F+6..F+8, roof F+9.
+  VG.glassVilla = function (L, o) {
+    const P = L.P, rng = o.rng, w = Math.max(7, o.w), d = Math.max(7, o.d), F = o.F;
+    const S = VG.STYLES.tech;
+    const info = { beds: [], seats: [], work: [], door: null, inside: null, chimney: null, lights: [], kind: o.kind, roofTop: F + 10 };
+    const FLOOR = 'white_concrete', WALL = 'vx_tech_white', GLASS = 'vx_glass_wall', COVE = 'vx_tech_white_strip';
+    const du = w >> 1, cv = d >> 1, uS = w - 2;   // the steps run along the right wall (u = w − 2), from the front (v = 1)
+    // foundation and the white gloss floor
+    for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) {
+      const gy = o.ground(u, v);
+      for (let y = gy + 1; y < F; y++) P(u, y, v, S.base);
+      P(u, F, v, FLOOR);
+    }
+    // walls of both storeys: glass to the garden (back and left), white elsewhere, a cove strip on each top course
+    const walls = (y0, y1) => {
+      for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) {
+        if (!(u === 0 || u === w - 1 || v === 0 || v === d - 1)) continue;
+        const back = v === d - 1, left = u === 0 && v !== 0;
+        for (let y = y0; y <= y1; y++) {
+          if (y === y1) { P(u, y, v, COVE); continue; }
+          if (v === 0 && u > du + 1 && u < w - 1) { P(u, y, v, GLASS, { facing: 0 }); continue; }   // the front's glass panel
+          if (back) P(u, y, v, GLASS, { facing: 0 });
+          else if (left) P(u, y, v, GLASS, { facing: 1 });
+          else P(u, y, v, WALL);
+        }
+      }
+    };
+    walls(F + 1, F + 4);
+    // the gallery floor (the ground room's ceiling) and the gallery storey with its own walls and roof garden
+    for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) P(u, F + 5, v, FLOOR);
+    walls(F + 6, F + 8);
+    for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) {
+      P(u, F + 9, v, (u === 0 || u === w - 1 || v === 0 || v === d - 1) ? COVE : WALL);
+      if (u === 0 || u === w - 1 || v === 0 || v === d - 1) P(u, F + 10, v, 'vx_tech_railing');
+    }
+    for (const [u, v] of [[1, 1], [w - 2, 1], [1, d - 2], [w - 2, d - 2]]) if (rng.chance(0.85)) P(u, F + 10, v, 'vx_tech_planter');
+    P(du, F + 10, cv, 'vx_dome_white');
+    // the door and the steps out, as in the Palm City's towers
+    P(du, F + 1, 0, 'birch_door', { facing: 2, half: 0, hinge: 0, open: 0 });
+    P(du, F + 2, 0, 'birch_door', { facing: 2, half: 1, hinge: 0, open: 0 });
+    info.door = [du, F + 1, 0]; info.outside = [du, F + 1, -1]; info.inside = [du, F + 1, 1];
+    const gyD = o.ground(du, -1);
+    for (let y = gyD + 1; y <= F; y++) P(du, y, -1, y === F ? S.floor : S.base);
+    P(du, F + 1, -1, null); P(du, F + 2, -1, null);
+    for (const u of [du - 2, du + 2]) if (u >= 0 && u < w) P(u, F + 1, -1, rng.chance(0.5) ? 'vx_fern_lush' : 'vx_tech_planter');
+    // the round pad: a cyan ring of pads at the centre, the holo table on it, a hex light hanging over
+    for (let u = du - 1; u <= du + 1; u++) for (let v = cv - 1; v <= cv + 1; v++) P(u, F, v, 'vx_floor_pad');
+    P(du, F + 1, cv, 'vx_holo_table'); info.table = [du, F + 1, cv];
+    P(du, F + 4, cv, 'vx_hex_light', { head: 1 }); info.lights.push([du, F + 4, cv]);
+    // the floating glass steps: each one rises a block and steps a block further in, cantilevered from the wall; a cyan
+    // light hangs under each step; the top step is the gallery's floor
+    for (let k = 0; k <= 4; k++) {
+      P(uS, F + 1 + k, 1 + k, 'glass');
+      if (k >= 1 && k <= 3) P(uS, F + k, 1 + k, 'vx_hex_light_cyan', { head: 1 });
+    }
+    // the ground room's furniture: two white lounge sofas on the pad's sides, a kitchen by the back glass, plants
+    P(2, F + 1, cv, 'vx_sofa_white', { facing: 1 }); info.seats.push([2, F + 1, cv, 1]);
+    P(w - 5, F + 1, cv, 'vx_sofa_white', { facing: 3 }); info.seats.push([w - 5, F + 1, cv, 3]);
+    P(1, F + 1, d - 3, 'vx_stove', { facing: 3 }); info.work.push(['stove', 1, F + 1, d - 3]);
+    P(1, F + 1, d - 4, 'vx_counter', { facing: 3 });
+    P(1, F + 1, 1, 'vx_fern_lush'); P(du + 2, F + 1, d - 2, 'vx_tech_planter');
+    // the gallery: two white beds at the back, a desk and a lounge; a hex light over the stair
+    const by = F + 6, bedU = [2, 4];
+    for (let i = 0; i < 2; i++) { const u = bedU[i]; P(u, by, d - 3, 'vx_bed_white', { facing: 2, part: 0 }); P(u, by, d - 2, 'vx_bed_white', { facing: 2, part: 1 }); info.beds.push([u, by, d - 3, 2]); }
+    P(du + 1, by, 2, 'vx_tech_desk', { facing: 2 }); P(w - 3, by, 2, 'vx_sofa_blue', { facing: 0 });
+    P(uS - 1, F + 8, 3, 'vx_hex_light', { head: 1 });   // hangs from the roof slab (F+9)
+    // the stair's top step, set in the gallery floor, and the gallery's opening over it
+    P(uS, F + 5, 5, 'glass');
+    info.solar = false;
+    return info;
+  };
 })(VR);

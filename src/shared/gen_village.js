@@ -370,6 +370,16 @@
     put(x + 1, y + h, z, st('vx_palm_frond', { facing: 1 })); put(x - 1, y + h, z, st('vx_palm_frond', { facing: 3 }));
     put(x, y + h, z + 1, st('vx_palm_frond', { facing: 2 })); put(x, y + h, z - 1, st('vx_palm_frond', { facing: 0 }));
   };
+  // a tall palm with real fronds (vgen 6, the Palm City): a straight trunk, the crown, and four fronds that run out
+  // `reach` blocks each and droop one block per block, so the chain reads as one arching frond (a frond block's tip
+  // faces its `facing`: 0 −z, 1 +x, 2 +z, 3 −x), plus four short diagonal fronds that fill the crown
+  VG.palmTall = function (put, x, y, z, h, reach) {
+    const R = Math.max(1, reach || 3), top = y + h;
+    for (let k = 0; k < h; k++) put(x, y + k, z, st('vx_palm_trunk'));
+    put(x, top, z, st('vx_palm_crown'));
+    for (const [dx, dz, f] of [[1, 0, 1], [-1, 0, 3], [0, 1, 2], [0, -1, 0]]) for (let k = 1; k <= R; k++) put(x + dx * k, top - (k - 1), z + dz * k, st('vx_palm_frond', { facing: f }));
+    for (const [dx, dz, f] of [[1, 1, 2], [-1, -1, 0], [1, -1, 0], [-1, 1, 2]]) put(x + dx, top, z + dz, st('vx_palm_frond', { facing: f }));
+  };
 
   // ---------------------------------------------------------------- farm plot (local, front at v=0)
   function farm(L, o) {
@@ -559,6 +569,9 @@
     // op storage: x,y,z,state and x,z,y0,y1,state (tupleList: blocks, so no step copies a whole town's ops)
     const ops = tupleList(4), fills = tupleList(5);
     const put = (x, y, z, s) => { ops.push(x, y, z, s); };
+    // vgen 6: the street palms are set last, so a house's porch can never clear a trunk (the late ops are bucketed after the rest)
+    const lateOps = tupleList(4);
+    const putLate = (x, y, z, s) => { lateOps.push(x, y, z, s); };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) fills.push(x, z, y0, y1, s); };
     const AIR = 0;
     if (HOME) { const B = VR.TempleGen.box; for (let x = B.x0 - 2; x <= B.x1 + 2; x++) for (let z = B.z0 - 2; z <= B.z1 + 2; z++) { const o = oi(x, z); if (o >= 0) occ[o] = 7; } }
@@ -591,7 +604,7 @@
     } else if (S.tech) {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) put(cx + dx, py, cz + dz, st('vx_floor_pad'));
       put(cx, py + 1, cz, st('vx_holo_table'));
-      for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) VG.palm(put, cx + dx, py + 1, cz + dz, 4 + ((dx + dz + site.seed) & 1));
+      for (const [dx, dz] of [[-3, -3], [3, -3], [-3, 3], [3, 3]]) { if (g.vgen >= 6) VG.palmTall(put, cx + dx, py + 1, cz + dz, 7 + ((dx + dz + site.seed) & 3), 2); else VG.palm(put, cx + dx, py + 1, cz + dz, 4 + ((dx + dz + site.seed) & 1)); }
       for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(cx + dx, py + 1, cz + dz, st('vx_tech_planter'));
     } else if (S.crystals) {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (dx || dz) put(cx + dx, py + 1, cz + dz, wellMat); }
@@ -708,8 +721,9 @@
           const side = (k / 9 | 0) % 2 ? -1 : 1;
           const tx = Math.round(px + nx * 3 * side), tz = Math.round(pz + nz * 3 * side);
           let free = true;
-          for (let a = -1; a <= 1 && free; a++) for (let b = -1; b <= 1; b++) { const o2 = oi(tx + a, tz + b); if (o2 < 0 || (occ[o2] !== 0 && occ[o2] !== 4)) { free = false; break; } }
-          if (free) { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) occ[oi(tx + a, tz + b)] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st('grass_block')); fill(tx, tz, ty + 1, ty + 14, AIR); VG.palm(put, tx, ty + 1, tz, 7 + ((tx + tz) & 3) + ((tx * 7 + tz) % 3 === 0 ? 2 : 0)); }
+          // (vgen 6: a palm keeps off the lots' margins too — a house's porch clears its margin, and the palm's trunk went with it)
+          for (let a = -1; a <= 1 && free; a++) for (let b = -1; b <= 1; b++) { const o2 = oi(tx + a, tz + b); if (o2 < 0 || (occ[o2] !== 0 && (occ[o2] !== 4 || g.vgen >= 6))) { free = false; break; } }
+          if (free) { for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) occ[oi(tx + a, tz + b)] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st('grass_block')); fill(tx, tz, ty + 1, ty + 14, AIR); { const ph = 7 + ((tx + tz) & 3) + ((tx * 7 + tz) % 3 === 0 ? 2 : 0); if (g.vgen >= 6) VG.palmTall(putLate, tx, ty + 1, tz, ph + 2, 3); else VG.palm(put, tx, ty + 1, tz, ph); } }
         }
         road.pts.push([px, ry + 1, pz]);
         if (S.modern) { const dist = Math.hypot(px - cx, pz - cz); if (k === 4 || ringR.some(Rr => Math.abs(Math.round(dist) - Rr) === 4)) zebraAt(px, pz, nx, nz, pa); }
@@ -1035,7 +1049,7 @@
         // the trailer's lawns: a trimmed hedge along the street with a gap at the path, bushes and ferns, a palm in a corner
         for (let u = -1; u <= w; u++) if (Math.abs(u - du) > 1) at(u, -2, lrng.chance(0.85) ? 'vx_hedge' : 'vx_bush');
         for (let v = -1; v <= d; v++) { if (lrng.chance(0.5)) at(-2, v, 'vx_hedge'); if (lrng.chance(0.5)) at(w + 1, v, 'vx_hedge'); }
-        if (lrng.chance(0.6)) { const pu = lrng.chance(0.5) ? -2 : w + 1, pv = d; if (yardFree(lot, pu, pv)) { claim(lot, pu, pv); const [px, pz] = wxz(lot, pu, pv); VG.palm(put, px, y, pz, 6 + lrng.int(4)); } }
+        if (lrng.chance(0.6)) { const pu = lrng.chance(0.5) ? -2 : w + 1, pv = d; if (yardFree(lot, pu, pv)) { claim(lot, pu, pv); const [px, pz] = wxz(lot, pu, pv); if (g.vgen >= 6) VG.palmTall(put, px, y, pz, 9 + lrng.int(4), 2); else VG.palm(put, px, y, pz, 6 + lrng.int(4)); } }
         for (const [u, v] of [[-2, 1], [w + 1, 2], [1, d + 1], [w - 2, d + 1]]) if (lrng.chance(0.5)) at(u, v, lrng.pick(['vx_bush', 'vx_fern_lush', 'vx_bush_light', 'vx_tech_planter']));
         if (lrng.chance(0.35)) { const u = lrng.chance(0.5) ? -2 : w + 1; if (at(u, 3, 'vx_sofa_white', { facing: u < 0 ? 1 : 3 })) yard.seat = W3(lot, u, y, 3).concat([(lot.r + (u < 0 ? 1 : 3)) & 3]); }
         yard.spot = W3(lot, w + 1, y, d);
@@ -1191,7 +1205,7 @@
         }
         const mid = lot.w >> 1;
         L.P(mid, lot.F + 1, lot.d >> 1, S.bench || 'vx_bench', { facing: 0 });
-        if (S.palms) { const q = ROT[lot.r](lot.w - 2, lot.d - 2); VG.palm(put, lot.ox + q[0], lot.F + 1, lot.oz + q[1], 4); }
+        if (S.palms) { const q = ROT[lot.r](lot.w - 2, lot.d - 2); if (g.vgen >= 6 && S.tech) VG.palmTall(put, lot.ox + q[0], lot.F + 1, lot.oz + q[1], 8, 2); else VG.palm(put, lot.ox + q[0], lot.F + 1, lot.oz + q[1], 4); }
         L.P(0, lot.F + 1, 0, S.lamp, { head: 0 }); L.P(0, lot.F + 2, 0, S.lamp, { head: 1 });
         if (S.crystals) L.P(mid, lot.F + 1, lot.d - 1, 'vx_crystal_' + lrng.pick(['violet', 'azure', 'rose']));
         plan.work.push({ kind: 'garden', spot: (() => { const q = ROT[lot.r](mid, (lot.d >> 1) - 1); return [lot.ox + q[0], lot.F + 1, lot.oz + q[1]]; })() });
@@ -1230,7 +1244,9 @@
         plan.lots.push(summary);
         continue;
       }
-      const info = tower ? VG.techTower(L, bopt) : building(L, bopt);
+      // vgen 6: about one tower in four is a glass villa (the trailer's white interior); the choice is the lot's own hash
+      const glass = tower && g.vgen >= 6 && !!VG.glassVilla && ((M.hash2(lot.ox, lot.oz, site.seed + 611) >>> 0) % 4) === 0;
+      const info = tower ? (glass ? VG.glassVilla(L, bopt) : VG.techTower(L, bopt)) : building(L, bopt);
       const sm = recordInfo(lot, info);
       if (info.chimney) plan.chimneys.push(sm.chimney);
       for (const l of sm.lights) plan.lamps.push(l);
@@ -1274,7 +1290,7 @@
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
     let nF = 0, nO = 0;
     for (const blk of fills.blocks) for (let i = 0; i < blk.length; i += 5) { if (++nF % 4000 === 0) yield; bucket(blk[i], blk[i + 1]).f.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3], blk[i + 4]); }
-    for (const blk of ops.blocks) for (let i = 0; i < blk.length; i += 4) { if (++nO % 5000 === 0) yield; bucket(blk[i], blk[i + 2]).o.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3]); }
+    for (const blk of ops.blocks.concat(lateOps.blocks)) for (let i = 0; i < blk.length; i += 4) { if (++nO % 5000 === 0) yield; bucket(blk[i], blk[i + 2]).o.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3]); }
     plan.chunks = chunks;
     plan.center = [cx, py + 1, cz];
     return plan;
