@@ -107,21 +107,25 @@
         }
       }
       const t = Math.min(1, s.t), P = this.bez(s, t);
-      let lift = 0;
+      let lift = 0, trail = 1;   // how far a wingman sits behind its leader: all of it on the approach, none on the apron
       if (D.phase !== 'park') {
         const P2 = this.bez(s, Math.min(1, t + 0.01)), yaw = Math.atan2(-(P2[0] - P[0]), -(P2[2] - P[2]));
         if (s.prevYaw !== null) { let dy = yaw - s.prevYaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU; s.roll += (M.clamp(dy / Math.max(dt, 1e-3) * 2.5, -0.6, 0.6) - s.roll) * Math.min(1, dt * 2); }
         s.prevYaw = yaw; s.heading = yaw;
+        if (D.phase === 'out') trail = 0;   // leaving, the wingmen keep their places beside the leader
       } else {
         const turn = Math.atan2(Math.sin(Math.PI - s.heading), Math.cos(Math.PI - s.heading));
         s.heading += turn * Math.min(1, dt * 1.2);
         const done = Math.min(1, Math.abs(Math.atan2(Math.sin(s.heading - D.h0), Math.cos(s.heading - D.h0))) / Math.PI);
+        // the formation closes up beside the leader as it turns: behind it now would be inside the temple's hall
+        trail = 1 - done;
         if (Math.hypot(s.off[0], s.off[2]) > 0.5) lift = 6 * Math.sin(Math.PI * done);   // a wingman rises over the leader while it turns
         s.roll += (0 - s.roll) * Math.min(1, dt * 2);
       }
       const c = Math.cos(s.heading), sn = Math.sin(s.heading);
       const bob = D.phase === 'park' ? 0.1 * Math.sin(s.age * 1.3) : Math.sin(s.age * 0.7) * 0.6;
-      s.pos = [P[0] + s.off[0] * c + s.off[2] * sn, P[1] + s.off[1] + bob + lift, P[2] - s.off[0] * sn + s.off[2] * c];
+      const ox = s.off[0], oz = s.off[2] * trail;
+      s.pos = [P[0] + ox * c + oz * sn, P[1] + s.off[1] + bob + lift, P[2] - ox * sn + oz * c];
     }
     dockLeave(s) {
       const D = s.dock, dp = this.dockPoint();

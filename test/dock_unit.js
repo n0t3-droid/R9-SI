@@ -48,7 +48,9 @@ const w0 = w.pos.slice();
 step(w, 0.2);
 check(w.t < 0 && w.pos.every((v, i) => v === w0[i]), 'a wingman that has not started stays where it was');
 step(w, 9.5);   // it starts 0.5 of its flight late (3 s): 9 s of flight in all
+step(w, 6);   // parked for about 6 s: its turn to face the plaza is done by then
 check(w.dock.phase === 'park' || w.dock.phase === 'out', 'the wingman reaches the apron after its start (' + w.dock.phase + ')');
+check(Math.abs(w.pos[2] - hover[2]) < 0.5 && Math.abs(w.pos[0] - hover[0]) > 3, 'parked, the wingman sits beside its leader, not behind it in the temple (' + (w.pos[0] - hover[0]).toFixed(1) + ' m across, ' + (w.pos[2] - hover[2]).toFixed(2) + ' m along)');
 
 // ---- the landing flare: the sink eases off as the gear nears the ground (no bounce, a soft touchdown)
 const flare = (a) => VR.Flight.prototype.flareSink.call({ alt: a });
