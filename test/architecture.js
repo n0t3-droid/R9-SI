@@ -47,7 +47,7 @@ for (const style of ['meadow', 'taiga', 'desert', 'cherry', 'jungle', 'prism']) 
   const bad1 = [];
   for (const p of furn) {
     if (!(p.u >= 1 && p.u <= w - 2 && p.v >= 1 && p.v <= d - 2)) bad1.push('wall ' + p.n + '@' + p.u + ',' + p.v);
-    if (p.u === du && (p.v === 1 || p.v === 2)) bad1.push('door ' + p.n + '@' + p.u + ',' + p.v);
+    if (p.y === H.F + 1 && p.u === du && (p.v === 1 || p.v === 2)) bad1.push('door ' + p.n + '@' + p.u + ',' + p.v);   // the door is on the ground storey
     const got = H.rec.get(p.u + ',' + p.y + ',' + p.v);
     if (!got || nameOf(got) !== p.n) bad1.push('missing ' + p.n + '@' + p.u + ',' + p.y + ',' + p.v);
   }
