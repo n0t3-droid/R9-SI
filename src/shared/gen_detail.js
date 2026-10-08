@@ -173,6 +173,20 @@
     P(lampU, F + 1, -1, S.lamp || 'vx_lamppost', { head: 0 }); P(lampU, F + 2, -1, S.lamp || 'vx_lamppost', { head: 1 });
     info.outDetail.push({ u: lampU, y: F + 1, v: -1, n: S.lamp || 'vx_lamppost' });
     for (const pu of [du - 1, du + 1]) if (pu >= 0 && pu <= w - 1) { P(pu, F + 1, -1, planter); info.outDetail.push({ u: pu, y: F + 1, v: -1, n: planter }); }
+    // gutters under the eaves of the long sides (the villas' own gutter and downpipe models), one downpipe at the end
+    // of the front run; the gutter is broken over the doorway, where the walk and the lamp are
+    if (VR.VM && VR.VM.MODELS && VR.VM.MODELS.vm_gutter) {
+      const ye = (C.top || F + 4) - 2, G = (u, v, f) => P(u, ye, v, 'vm_gutter', { facing: f });
+      if (C.alongU) {
+        for (let u = 0; u < w; u++) { if (u >= du - 1 && u <= du + 2) continue; G(u, -1, 0); G(u, d, 2); }
+        P(0, ye, -1, 'vm_downpipe_top', { facing: 0 });
+        for (let y = ye - 1; y >= F; y--) P(0, y, -1, 'vm_downpipe', { facing: 0 });
+      } else {
+        for (let v = 0; v < d; v++) { G(-1, v, 3); G(w, v, 1); }
+        P(-1, ye, d - 1, 'vm_downpipe_top', { facing: 3 });
+        for (let y = ye - 1; y >= F; y--) P(-1, y, d - 1, 'vm_downpipe', { facing: 3 });
+      }
+    }
     return info;
   };
 
@@ -186,7 +200,8 @@
     const side = (k) => (k & 1 ? -1 : 1);
     const cellsOk = (cells) => cells.every(([x, z]) => { const o = oi(x, z); return o >= 0 && occ[o] === 0; });
     const mark = (cells) => { for (const [x, z] of cells) occ[oi(x, z)] = 6; };
-    const placeModel = (name, f, cx, cz, y) => {
+    // a model centred on (cx, cz) with its floor at ty: every cell of its footprint is ground up to ty (no piece floats)
+    const placeModel = (name, f, cx, cz, ty) => {
       const offs = VG.modelCells ? VG.modelCells(name, f) : [[0, 0]];
       let mx = 0, mz = 0; for (const [dx, dz] of offs) { mx += dx; mz += dz; }
       mx /= offs.length; mz /= offs.length;
@@ -194,7 +209,8 @@
       const cells = offs.map(([dx, dz]) => [ax + dx, az + dz]);
       if (!cellsOk(cells)) return false;
       mark(cells);
-      VR.VM.put(P, ax, y, az, name, f);
+      for (const [x, z] of cells) { const gy = ground(x, z); if (ty > gy) fill(x, z, gy + 1, ty, st('dirt')); }
+      VR.VM.put(P, ax, ty + 1, az, name, f);
       return true;
     };
     const n = pts.length;
@@ -205,8 +221,7 @@
       const cx = px + nx * 3 * sd, cz = pz + nz * 3 * sd;
       const f = dirOf(-nx * sd, -nz * sd);                    // the glass faces the road
       const ty = Math.max(ground(Math.round(cx), Math.round(cz)), ry);
-      fill(Math.round(cx), Math.round(cz), ground(Math.round(cx), Math.round(cz)) + 1, ty, st('dirt'));
-      if (placeModel('vm_mobility_busshelter_glass', f, Math.round(cx), Math.round(cz), ty + 1)) { plan.shelterDone = true; det.shelters++; }
+      if (placeModel('vm_mobility_busshelter_glass', f, cx, cz, ty)) { plan.shelterDone = true; det.shelters++; }
     }
     for (let k = 4; k < n - 4; k++) {
       const [px, pz, pa] = pts[k], ry = sm[k];
@@ -220,8 +235,7 @@
         const ty = Math.max(ground(Math.round(cx), Math.round(cz)), ry);
         const offs = VG.modelCells ? VG.modelCells('vm_mobility_ebike_city', f) : [[0, 0]];
         if (offs.length && (ty - ground(Math.round(cx), Math.round(cz))) <= 2) {
-          fill(Math.round(cx), Math.round(cz), ground(Math.round(cx), Math.round(cz)) + 1, ty, st('dirt'));
-          if (placeModel('vm_mobility_ebike_city', f, Math.round(cx), Math.round(cz), ty + 1)) det.ebikes++;
+          if (placeModel('vm_mobility_ebike_city', f, cx, cz, ty)) det.ebikes++;
         }
       }
       // a barrel bin by a lamp post on the kerb (every 11th point)
