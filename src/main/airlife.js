@@ -49,16 +49,21 @@
   const isFlower = (w, x, y, z) => typeIs('flower', FLOWER, R.T.type[w.getBlock(x, y, z)]);
   const isGrass = (w, x, y, z) => typeIs('grass', GRASS, R.T.type[w.getBlock(x, y, z)]);
 
-  // a point in the air the sun reaches although it is under a roof: a sunbeam through a window or a hole. Null when the
-  // point is outdoors (the sky is above it), or when a solid block stands between it and the sun.
+  // a point in a sunbeam indoors: air, walled in (an opaque block within 10 blocks in all four horizontal directions),
+  // and lit, i.e. the ray from it toward the sun meets no opaque block on the way up (it passes through a hole or a
+  // window). Null otherwise. The sun ray is marched up to 40 blocks, so a low sun still meets the roof.
   function sunPoint(w, ex, ey, ez, sd) {
     const x = ex + (Math.random() * 2 - 1) * 7, z = ez + (Math.random() * 2 - 1) * 7, y = ey + (Math.random() * 2 - 1) * 2.5;
-    const top = w.topAt(Math.floor(x), Math.floor(z));
-    if (!(y < top + 0.5)) return null;
-    const T = R.T.flags;
-    for (let s = 0.5; s < 48; s += 0.5) {
-      const b = w.getBlock(Math.floor(x + sd[0] * s), Math.floor(y + sd[1] * s), Math.floor(z + sd[2] * s));
-      if (T[b] & F.OPAQUE) return null;
+    const T = R.T.flags, bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
+    if (T[w.getBlock(bx, by, bz)] & F.SOLID) return null;
+    for (let s = 0.75; s <= 40; s += 0.75) {
+      if (T[w.getBlock(Math.floor(x + sd[0] * s), Math.floor(y + sd[1] * s), Math.floor(z + sd[2] * s))] & F.OPAQUE) return null;
+    }
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (let d = 0; d < 4; d++) {
+      let hit = false;
+      for (let s = 1; s <= 10 && !hit; s++) hit = !!(T[w.getBlock(bx + dirs[d][0] * s, by, bz + dirs[d][1] * s)] & F.OPAQUE);
+      if (!hit) return null;
     }
     return [x, y, z];
   }
@@ -73,6 +78,7 @@
       this.tier = 2; this.on = true; this.time = 0;
       this.acc = { mote: 0, pollen: 0, leaf: 0, snow: 0 };
       this.ff = []; this.bf = []; this.flocks = []; this.flowers = []; this.flowerT = 0; this.birdT = 25;
+      this.drawn = { mote: 0, pollen: 0, firefly: 0, leaf: 0, snow: 0, butterfly: 0, bird: 0 };   // particles made per kind (the test reads them)
       this.ms = 0;            // the CPU time of an update (a moving average, ms): the cost the test reads
     }
     setOn(on, tier) {
@@ -99,13 +105,13 @@
 
       // ---- dust motes in the sunbeams indoors (stateful: they drift about 6 s)
       if (sunUp && !rain && cap.mote > 0 && !outdoor) {
-        this.acc.mote = Math.min(3, this.acc.mote + cap.mote / 6 * dt);
-        for (let k = 0; k < 6 && this.acc.mote >= 1; k++) {
+        this.acc.mote = Math.min(3, this.acc.mote + cap.mote / 4 * dt);
+        for (let k = 0; k < 8 && this.acc.mote >= 1; k++) {
           const p = sunPoint(w, eye[0], eye[1], eye[2], sd);
           if (!p) continue;
-          this.acc.mote -= 1;
-          spawn(p[0], p[1], p[2], (Math.random() - 0.5) * 0.1 + dir[0] * wind * 0.02, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.1 + dir[1] * wind * 0.02,
-            [1.0, 0.96, 0.82], 0.03 + Math.random() * 0.025, { life: 6 + Math.random() * 3, grav: 0, drag: 0.4, emis: 0.6, collide: false, fade: true });
+          this.acc.mote -= 1; this.drawn.mote++;
+          spawn(p[0], p[1], p[2], (Math.random() - 0.5) * 0.08 + dir[0] * wind * 0.015, (Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.08 + dir[1] * wind * 0.015,
+            [1.0, 0.97, 0.86], 0.011 + Math.random() * 0.012, { life: 6 + Math.random() * 3, grav: 0, drag: 0.4, emis: 0.9, collide: false, fade: true });
         }
       } else this.acc.mote = 0;
 
@@ -116,9 +122,9 @@
           const x = eye[0] + (Math.random() * 2 - 1) * 9, z = eye[2] + (Math.random() * 2 - 1) * 9;
           const top = w.topAt(Math.floor(x), Math.floor(z));
           if (!isGrass(w, Math.floor(x), top, Math.floor(z))) continue;
-          this.acc.pollen -= 1;
+          this.acc.pollen -= 1; this.drawn.pollen++;
           spawn(x, top + 1 + Math.random() * 1.6, z, dir[0] * wind * 0.25 + (Math.random() - 0.5) * 0.12, (Math.random() - 0.5) * 0.05, dir[1] * wind * 0.25 + (Math.random() - 0.5) * 0.12,
-            [1.0, 0.93, 0.5], 0.03 + Math.random() * 0.02, { life: 5 + Math.random() * 4, grav: 0.05, drag: 0.5, emis: 0.15, collide: false });
+            [0.92, 0.84, 0.38], 0.011 + Math.random() * 0.009, { life: 5 + Math.random() * 4, grav: 0.05, drag: 0.5, emis: 0.3, collide: false });
         }
       } else this.acc.pollen = 0;
 
@@ -131,7 +137,7 @@
           if (!(R.T.flags[w.getBlock(fx, top, fz)] & F.LEAVES) || top < eye[1] + 2) continue;   // a canopy above
           const y = eye[1] + 0.5 + Math.random() * (top - eye[1] - 1.5);
           if (R.T.flags[w.getBlock(fx, Math.floor(y), fz)] & F.SOLID) continue;
-          this.acc.leaf -= 1;
+          this.acc.leaf -= 1; this.drawn.leaf++;
           const pc = PALETTE_LEAF[(Math.random() * PALETTE_LEAF.length) | 0];
           spawn(x, y, z, dir[0] * wind * 1.4 + (Math.random() - 0.5), -0.3, dir[1] * wind * 1.4 + (Math.random() - 0.5), pc, 0.09 + Math.random() * 0.05,
             { life: 8 + Math.random() * 4, grav: 0.9, drag: 1.3, collide: true, fade: false });
@@ -142,7 +148,7 @@
       if (outdoor && snow > 0.12 && cap.snow > 0) {
         this.acc.snow = Math.min(6, this.acc.snow + cap.snow / 9 * snow * dt);
         for (let k = 0; k < 8 && this.acc.snow >= 1; k++) {
-          this.acc.snow -= 1;
+          this.acc.snow -= 1; this.drawn.snow++;
           const x = eye[0] + (Math.random() * 2 - 1) * 16, z = eye[2] + (Math.random() * 2 - 1) * 16, y = eye[1] + 5 + Math.random() * 8;
           spawn(x, y, z, dir[0] * wind * 0.7 + (Math.random() - 0.5) * 0.4, -0.5 - Math.random() * 0.4, dir[1] * wind * 0.7 + (Math.random() - 0.5) * 0.4,
             [0.96, 0.97, 1.0], 0.05 + Math.random() * 0.03, { life: 12, grav: 1.6, drag: 1.1, collide: true, fade: false });
@@ -162,8 +168,8 @@
         if (f.life <= 0 || d2(f.x, f.z, eye) > 26 * 26) { this.ff.splice(i, 1); continue; }
         const s = this.time * 0.31 + f.ph;
         f.x += (Math.sin(s) * 0.35 + f.wx) * dt; f.z += (Math.cos(s * 1.1) * 0.35 + f.wz) * dt; f.y += Math.sin(this.time * 0.7 + f.ph) * 0.12 * dt;
-        const b = Math.pow(Math.max(0, Math.sin(this.time * f.fr + f.ph)), 10);   // on for a moment, then dark
-        if (b > 0.04) spawn(f.x, f.y, f.z, 0, 0, 0, [0.85 * b * 0.7, 1.0 * b * 0.7, 0.35 * b * 0.7], 0.08, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 1, collide: false, fade: false });
+        const b = Math.pow(Math.max(0, Math.sin(this.time * f.fr + f.ph)), 5);   // a glow that swells and dies away
+        if (b > 0.04) { this.drawn.firefly++; spawn(f.x, f.y, f.z, 0, 0, 0, [0.9 * b, 1.0 * b, 0.4 * b], 0.14 + 0.06 * b, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 1, collide: false, fade: false }); }
       }
 
       // ---- butterflies over the flowers by day (agents: they wander around a flower)
@@ -190,7 +196,7 @@
         const t = this.time * b.sp + b.ph;
         const x = b.hx + Math.sin(t * 1.3) * 1.8 + Math.cos(t * 0.5) * 0.8, z = b.hz + Math.cos(t * 1.1) * 1.8;
         const y = b.hy + 0.6 + Math.sin(t * 2.7) * 0.35 + Math.sin(t * 0.6) * 0.4;
-        spawn(x, y, z, 0, 0, 0, b.col.map(c => c * 0.9), 0.13, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0.25, collide: false, fade: false });
+        this.drawn.butterfly++; spawn(x, y, z, 0, 0, 0, b.col.map(c => c * 0.9), 0.13, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0.25, collide: false, fade: false });
       }
 
       // ---- a flock of 5–9 birds crossing the sky now and then (agents in a V; the wings flap)
@@ -200,7 +206,7 @@
         if (this.birdT <= 0 && this.birds() + n <= cap.bird) {
           this.birdT = 50 + Math.random() * 70;
           const a = Math.random() * Math.PI * 2, Dx = Math.cos(a), Dz = Math.sin(a);
-          this.flocks.push({ x: eye[0] - Dx * 75, y: eye[1] + 22 + Math.random() * 18, z: eye[2] - Dz * 75, dx: Dx, dz: Dz, speed: 9 + Math.random() * 3, n, ph: Math.random() * 6.28, life: 26 });
+          this.flocks.push({ x: eye[0] - Dx * 55, y: eye[1] + 20 + Math.random() * 16, z: eye[2] - Dz * 55, dx: Dx, dz: Dz, speed: 9 + Math.random() * 3, n, ph: Math.random() * 6.28, life: 22 });
         }
       } else if (!sunUp || rain) this.flocks.length = 0;
       for (let fi = this.flocks.length - 1; fi >= 0; fi--) {
@@ -212,11 +218,11 @@
         for (let i = 0; i < fl.n; i++) {
           const li = i - (fl.n - 1) / 2, ai = Math.abs(li);
           const bx = fl.x + Rx * li * 1.7 - fl.dx * ai * 1.1, bz = fl.z + Rz * li * 1.7 - fl.dz * ai * 1.1, by = fl.y + 0.25 * ai;
-          const flap = Math.sin(this.time * 8 + i * 0.9 + fl.ph) * 0.45;
-          const col = [0.1, 0.1, 0.12];
-          spawn(bx, by, bz, 0, 0, 0, col, 0.8, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0, collide: false, fade: false });
-          spawn(bx + Rx * 0.55, by + flap, bz + Rz * 0.55, 0, 0, 0, col, 0.55, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0, collide: false, fade: false });
-          spawn(bx - Rx * 0.55, by + flap, bz - Rz * 0.55, 0, 0, 0, col, 0.55, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0, collide: false, fade: false });
+          const flap = Math.sin(this.time * 8 + i * 0.9 + fl.ph) * 0.45; this.drawn.bird++;
+          const col = [0.14, 0.14, 0.16];
+          spawn(bx, by, bz, 0, 0, 0, col, 0.3, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0, collide: false, fade: false });
+          spawn(bx + Rx * 0.6, by + flap, bz + Rz * 0.6, 0, 0, 0, col, 0.22, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0, collide: false, fade: false });
+          spawn(bx - Rx * 0.6, by + flap, bz - Rz * 0.6, 0, 0, 0, col, 0.22, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 0, collide: false, fade: false });
         }
       }
       const ms = performance.now() - t0;
