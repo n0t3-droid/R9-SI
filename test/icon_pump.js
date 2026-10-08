@@ -98,7 +98,7 @@ const want = [...pick].sort((a, b) => (vol(b) - vol(a)) || (a < b ? -1 : a > b ?
 // 6 · nothing before notBefore; then one picture per idle slice, largest first, each once; done means no more slices
 {
   const env = idleEnv(), got = [];
-  const icons = { get: (id) => { got.push(id); return {}; } };
+  const icons = { stepIcon: (id) => { got.push(id); return true; } };
   const w = VR.iconWarm(icons, pick, { notBefore: 10000, now: env.now, idle: env.idle, cancel: env.cancel, hidden: env.hidden });
   env.t = 4000; env.slice(30);
   check(got.length === 0 && env.pending() === 1, 'no picture 4 s into play (asked again)');
@@ -110,7 +110,7 @@ const want = [...pick].sort((a, b) => (vol(b) - vol(a)) || (a < b ? -1 : a > b ?
 // 7 · a slice needs more than 8 ms left; a hidden page stops the warm and show starts it again
 {
   const env = idleEnv(), got = [];
-  const icons = { get: (id) => { got.push(id); return {}; } };
+  const icons = { stepIcon: (id) => { got.push(id); return true; } };
   const w = VR.iconWarm(icons, [pick[0]], { notBefore: 0, now: env.now, idle: env.idle, cancel: env.cancel, hidden: env.hidden });
   env.slice(8); check(got.length === 0 && env.pending() === 1, 'with 8 ms left nothing is painted');
   env.isHidden = true; env.slice(30);
@@ -150,6 +150,21 @@ const want = [...pick].sort((a, b) => (vol(b) - vol(a)) || (a < b ? -1 : a > b ?
   pump.add(canvas(), 'a'); pump.add(canvas(), 'b');
   for (let k = 0; k < 10 && pump.pending; k++) e.runFrame();
   check(painted.join() === 'a@2,b@9' && pump.pending === 0 && e.rafCalls === 2, 'a sliced picture waits for its frames and is painted when complete: ' + painted.join(' · ') + ' in ' + e.rafCalls + ' frames');
+}
+
+// 10 · a picture that takes several idle slices (a voxel picture, a voxel at a time): a slice draws while it has more than
+// 8 ms left, the model is counted once the picture is complete, and the warm then goes on
+{
+  const env = idleEnv(), steps = [], need = 3, calls = { n: 0 };
+  let done = 0;
+  const icons = { stepIcon: (id, more) => { calls.n++; do { steps.push(id); if (steps.filter(x => x === id).length >= need) { done++; return true; } } while (more()); return false; } };
+  const w = VR.iconWarm(icons, [pick[0]], { notBefore: 0, now: env.now, idle: env.idle, cancel: env.cancel, hidden: env.hidden });
+  // a slice's time left is read by the warm first (9 ms), then by each more() (9 ms, then 8 ms): so two steps in the first slice
+  const slice = (vals) => { let h; while ((h = env.queue.shift()) && h.off); if (!h) return false; let i = 0; h.cb({ timeRemaining: () => vals[Math.min(i++, vals.length - 1)] }); return true; };
+  slice([9, 9, 8]);
+  check(done === 0 && calls.n === 1 && steps.length === 2 && w.left() === 1, 'a picture needs 3 steps: the first slice gives it 2 (' + steps.length + ' steps, not counted yet)');
+  slice([9, 9]);
+  check(done === 1 && w.left() === 0 && w.done() && calls.n === 2, 'the second slice finishes it, counted once, and the warm is done (' + calls.n + ' slices)');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
