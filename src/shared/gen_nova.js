@@ -41,7 +41,7 @@
       wall: 'vollton_stone_grey', bay: 'vollton_light_grey', plinth: 'vollton_mid_grey', fascia: 'vx_nova_band', ceiling: 'vollton_white',
       floor: 'vollton_white_gloss', inner: 'vollton_white', terrace: 'vx_floor_plaza', rail: 'vx_balustrade', win: 'vx_nova_window', glass: 'panorama_white',
       mullion: 'vx_beam_white', base: 'vx_led_strip', door: 'door_glass_white', path: 'vx_floor_plaza', line: 'vx_floor_plaza_line',
-      hedge: 'vx_hedge', partition: 'vx_glass_wall', spot: 'vx_spot', glassRail: 'vx_tech_railing',
+      hedge: 'vx_hedge', partition: 'vx_nova_glass', sheet: 'vx_nova_glass', spot: 'vx_spot', glassRail: 'vx_tech_railing',
     }, S);
     const NOVA = PLAN.NOVA, { G, U, T, OVER } = NOVA, VM = VR.VM, W = lot.w, D = lot.d;
     const put = (u, y, v, name, pr) => P(u, F + y, v, name, pr);
@@ -186,9 +186,10 @@
     win(2, 10, 14, T.y + 2, T.y + 3, T.v1); lintel(2, 10, 14, T.y + 4, T.v1);
     yield;
 
-    // ---- the glass wall to the back garden (the hall), mullions every five blocks, the garden door in the middle (between
-    //      the high ends of the stairs, where the way under them is free)
-    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) put(u, y, G.v1, (u - 2) % 5 === 0 ? M.mullion : M.glass, (u - 2) % 5 === 0 ? { axis: 0 } : undefined);
+    // ---- the glass wall to the back garden (the hall): one clear sheet floor to ceiling (vx_nova_glass joins in both looks)
+    //      with a slim mullion every five blocks, the garden door in the middle (between the high ends of the stairs,
+    //      where the way under them is free)
+    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) put(u, y, G.v1, M.sheet, { facing: 0, post: (u - 2) % 5 === 0 ? 1 : 0 });
     for (let y = 1; y <= G.clear; y++) { put(G.u0 + 1, y, G.v1, M.wall); put(G.u1 - 1, y, G.v1, M.wall); }
     put(EU, 1, G.v1, M.door, { facing: 2, half: 0, hinge: 1, open: 0 }); put(EU, 2, G.v1, M.door, { facing: 2, half: 1, hinge: 1, open: 0 });
     yield;
@@ -209,8 +210,9 @@
     // a lowered soffit along a side wall of the hall with a cyan line round its open edges (t1_29: on the right as one
     // looks at the glass wall, the −u side)
     for (let v = PV + 1; v <= cv1; v++) for (let u = G.u0 + 2; u <= G.u0 + 3; u++) put(u, G.clear, v, M.fascia, { glow: 1 });
-    // the partition between the foyer and the hall: glass with an open middle
-    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) { if (Math.abs(u - EU) <= 1) continue; for (let y = 1; y <= G.clear; y++) put(u, y, PV, M.partition, { facing: 0 }); }
+    // the partition between the foyer and the hall: clear glass sheets (t3_10) with a mullion in the middle of each, the
+    //      middle open
+    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) { if (Math.abs(u - EU) <= 1) continue; for (let y = 1; y <= G.clear; y++) put(u, y, PV, M.partition, { facing: 0, post: Math.abs(u - EU) === 5 ? 1 : 0 }); }
     // the pad with a ring of cyan light on the floor round it, white benches beside it
     const [pu, pv] = NOVA.PAD;
     for (let v = pv - 1; v <= pv + 3; v++) for (let u = pu - 1; u <= pu + 3; u++) if (u === pu - 1 || u === pu + 3 || v === pv - 1 || v === pv + 3) put(u, 0, v, M.line);

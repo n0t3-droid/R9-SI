@@ -348,7 +348,7 @@
   // the skin: grey stone, a white fascia with a cyan line, nova windows (voxnova.js), white balusters, a white hall
   SKINS.nova = { id: 'nova', wall: 'vollton_stone_grey', bay: 'vollton_light_grey', plinth: 'vollton_mid_grey', fascia: 'vx_nova_band', ceiling: 'vollton_white',
     floor: 'vollton_white_gloss', inner: 'vollton_white', terrace: 'vx_floor_plaza', rail: 'vx_balustrade', win: 'vx_nova_window', glass: 'panorama_white', mullion: 'vx_beam_white',
-    base: 'vx_led_strip', door: 'door_glass_white', path: 'vx_floor_plaza', line: 'vx_floor_plaza_line', hedge: 'vx_hedge', partition: 'vx_glass_wall',
+    base: 'vx_led_strip', door: 'door_glass_white', path: 'vx_floor_plaza', line: 'vx_floor_plaza_line', hedge: 'vx_hedge', partition: 'vx_nova_glass', sheet: 'vx_nova_glass',
     spot: 'vx_spot', glassRail: 'vx_tech_railing', band: 'vx_nova_band', trim: 'vx_nova_band', roof: 'flat', hip: 'slate', column: 'vx_beam_white', canopy: 'vx_nova_band', floorL: 'vollton_white_gloss', floorH: 'vollton_white_gloss' };
   PLAN.CATALOGUE.push({ lot: NOVA.LOT.slice(), make: tTrailerVilla, build: (L, lot, o) => PLAN.buildNova(L, lot, o), garage: false, garden: 0, front: 0, skins: ['nova'], special: true, family: 'trailer', name: 'Villa Nova', icon: 'villa' });
   PLAN.TRAILER = PLAN.CATALOGUE.length - 1;
