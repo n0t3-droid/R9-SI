@@ -100,6 +100,7 @@
         case 'break_tool': this.noiseHit(PROFILE.metal, 1, 0.3, 1); break;
         case 'warp': { const o = this.tone(80, 0.4, 2.2, 'sawtooth', true); if (o) o.frequency.exponentialRampToValueAtTime(1600, t + 2); break; }
         case 'meteor': { const src = c.createBufferSource(); src.buffer = this.noise; const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.setValueAtTime(3000, t); f.frequency.exponentialRampToValueAtTime(200, t + 2.5); const g = c.createGain(); g.gain.setValueAtTime(0.5, t); g.gain.exponentialRampToValueAtTime(0.001, t + 2.6); src.connect(f); f.connect(g); g.connect(this.sfx); src.start(t, 0, 2.7); break; }
+        case 'pet': this.tone(1318, 0.08, 0.1, 'sine', false, t); this.tone(1760, 0.07, 0.16, 'sine', true, t + 0.09); break;
         case 'toast': this.tone(988, 0.1, 0.25, 'sine', true); this.tone(1319, 0.08, 0.35, 'sine', true, t + 0.08); break;
       }
     }

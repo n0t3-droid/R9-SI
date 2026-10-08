@@ -279,6 +279,7 @@
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
       this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false;
+      if (this.companions) { this.companions.destroy(); this.companions = null; }
       if (this.traffic) { this.traffic.destroy(); this.traffic = null; }
       if (this.starships) { this.starships.destroy(); this.starships = null; }
       if (this.villages) { this.villages.destroy(); this.villages = null; }
@@ -330,6 +331,7 @@
       this.landOnEntry(entry, !meta.player);
       this.sim = VR.Sim ? new VR.Sim(this) : null;
       this.entities = VR.Entities ? new VR.Entities(this) : null;
+      this.companions = VR.Companions && this.entities ? new VR.Companions(this, meta) : null;   // 🐾 yours, from the saved world
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
@@ -517,6 +519,7 @@
       this.giveKit(meta);
       this.sim = VR.Sim ? new VR.Sim(this) : null;
       this.entities = VR.Entities ? new VR.Entities(this) : null;
+      this.companions = VR.Companions && this.entities ? new VR.Companions(this, null) : null;   // a guest: the host's world keeps the host's companions
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
@@ -563,6 +566,7 @@
       if (this.codex && this.codex.toJSON) m.codex = this.codex.toJSON();
       if (this.gadgets) this.gadgets.beforeSave(m);
       if (this.starships) this.starships.beforeSave(m);
+      if (this.companions) this.companions.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
       return this.store.saveWorld(m);
     }
@@ -813,6 +817,7 @@
         else { if (gad) gad.preUpdate(dt, input, p); p.update(dt, input); }
       }
       if (this.sim) this.sim.update(dt, !!(this.mp && this.mp.isClient));   // a guest: only the sliding doors (the host runs the world)
+      if (this.companions) this.companions.update(dt);
       if (this.entities) this.entities.update(dt);
       if (this.villages) this.villages.update(dt);
       if (gad) gad.tick(dt);
@@ -1112,6 +1117,7 @@
         if (c0 === 'lang' || c0 === 'sprache') { this.langCommand(a0[0]); return; }
         if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0(T('g.cmd.spawn')); return; }
         if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0(T('g.cmd.helpHome')); return; }
+        if (c0 === 'pfeifen') { if (this.companions) this.companions.call(); else say0(T('g.pet.none')); return; }
         if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0(T('g.cmd.sethome')); return; }
         if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? T('g.cmd.players', { list: L.map(q => q.name + (q.host ? ' ' + T('g.mp.hostTag') : '') + ' ' + Math.round(q.dist) + 'm').join(', ') }) : T('g.cmd.onlyYou')); return; }
         if (c0 === 'tphost' && this.mp && this.mp.isClient) { this.mp.teleportToHost(); return; }
