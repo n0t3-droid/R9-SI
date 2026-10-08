@@ -42,6 +42,9 @@ vec2 ctmUV(vec2 uv, uint w5) {
 }
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float hash13(vec3 p3){ p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
+// 4x4 ordered dither in [0, 15/16] (McGuire's closed form): the chunks' fade-in and the far tiles' cut use the same thresholds
+float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
 float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   return mix(mix(hash12(i), hash12(i+vec2(1,0)), f.x), mix(hash12(i+vec2(0,1)), hash12(i+vec2(1,1)), f.x), f.y); }
 float vnoise3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -341,6 +344,11 @@ layout(std140) uniform Origins { vec4 u_origins[512]; };
 #else
 uniform vec3 u_origin;
 #endif
+#ifdef FADE
+#ifndef MULTIDRAW
+uniform float u_fade;
+#endif
+#endif
 #ifdef SHADOWS
 uniform mat4 u_shadowMat;
 out vec4 v_shadow;
@@ -358,7 +366,17 @@ out vec3 v_block;
 out float v_ao;
 out vec3 v_tint;
 out vec3 v_localPos;
+#ifdef FADE
+flat out float v_fade;
+#endif
 void main() {
+#ifdef FADE
+#ifdef MULTIDRAW
+  v_fade = u_origins[gl_DrawID].w;
+#else
+  v_fade = u_fade;
+#endif
+#endif
 #ifdef MULTIDRAW
   vec3 org = u_origins[gl_DrawID].xyz;
 #else
@@ -438,6 +456,9 @@ in vec3 v_block;
 in float v_ao;
 in vec3 v_tint;
 in vec3 v_localPos;
+#ifdef FADE
+flat in float v_fade;
+#endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 const vec3 TANG[6] = vec3[6](vec3(0,0,-1), vec3(0,0,1), vec3(1,0,0), vec3(1,0,0), vec3(1,0,0), vec3(-1,0,0));
@@ -469,6 +490,9 @@ float shadowAt(vec3 N, vec3 L) {
 void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
+#endif
+#ifdef FADE
+  if (v_fade < 1.0 && bayer4(gl_FragCoord.xy) >= v_fade) discard;
 #endif
   uint face = v_w5 & 7u;
   uint kind = (v_w5 >> 8u) & 7u;
@@ -646,6 +670,9 @@ in vec3 v_block;
 in float v_ao;
 in vec3 v_tint;
 in vec3 v_localPos;
+#ifdef FADE
+flat in float v_fade;
+#endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 float linDepth(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
@@ -673,6 +700,9 @@ vec3 waveNormal(vec2 p) {
 void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
+#endif
+#ifdef FADE
+  if (v_fade < 1.0 && bayer4(gl_FragCoord.xy) >= v_fade) discard;
 #endif
   uint face = v_w5 & 7u;
   uint kind = (v_w5 >> 8u) & 7u;
@@ -809,10 +839,25 @@ layout(std140) uniform Origins { vec4 u_origins[512]; };
 #else
 uniform vec3 u_origin;
 #endif
+#ifdef FADE
+#ifndef MULTIDRAW
+uniform float u_fade;
+#endif
+#endif
 out vec2 v_uv;
 flat out uint v_w3;
 flat out uint v_w5;
+#ifdef FADE
+flat out float v_fade;
+#endif
 void main() {
+#ifdef FADE
+#ifdef MULTIDRAW
+  v_fade = u_origins[gl_DrawID].w;
+#else
+  v_fade = u_fade;
+#endif
+#endif
 #ifdef MULTIDRAW
   vec3 org = u_origins[gl_DrawID].xyz;
 #else
@@ -856,6 +901,7 @@ void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); v_uv = p; 
 
   S.SKY_FS = `
 uniform mat4 u_invViewProj;
+uniform float u_skyProbe;    // test hook (test/horizon.mjs): 1 paints the sky magenta, so a hole below the horizon shows
 ${'__COMMON__'}
 in vec2 v_uv;
 out vec4 o;
@@ -864,6 +910,7 @@ void main() {
   vec3 dir = normalize(p.xyz / p.w);
   vec3 col = skyColor(dir, true);
   if (u_fog.w > 0.5) col = u_fogColor;
+  if (u_skyProbe > 0.5) col = vec3(1.0, 0.0, 1.0);
   o = vec4(col, 1.0);
 }`;
 
@@ -963,7 +1010,12 @@ void main() {
   // real chunks are drawn here: the far terrain steps aside
   vec2 cl = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz & 15);
   ivec2 ch = ivec2(floor(cl / 16.0)) + 32;
-  if (ch.x >= 0 && ch.y >= 0 && ch.x < 64 && ch.y < 64 && texelFetch(u_mask, ch, 0).r > 0.5) discard;
+  // the mask carries each chunk column's fade (0..1, 300 ms in): the tile is cut where the chunk keeps the pixel, and the
+  // soft edge (bilinear) makes the cut fade over a chunk; min() with the nearest fade keeps the cut under the chunk's own
+  // threshold, so a pixel is always drawn by one of the two (no holes)
+  float cover = 0.0;
+  if (ch.x >= 0 && ch.y >= 0 && ch.x < 64 && ch.y < 64) cover = min(texelFetch(u_mask, ch, 0).r, textureLod(u_mask, (cl / 16.0 + 32.0) / 64.0, 0.0).r);
+  if (cover > 0.0 && bayer4(gl_FragCoord.xy) < cover) discard;
   // never right in front of the eyes: coarse cells only stand in at a distance
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
   vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
