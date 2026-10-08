@@ -406,7 +406,7 @@
   if (VR.Game) {
     const origChat = VR.Game.prototype.chat;
     VR.Game.prototype.chat = function (text) {
-      if (typeof text === 'string' && /^\/help(\s|$)/i.test(text) && !prefs().pro) { this.ui.chatLine(tx('start.cmdHelp', null, 'Befehle: /bau <Wunsch> (z. B. „/bau Holzhaus mit Pool“) · /home · /sethome · /look klassisch | nahtlos · /wetter · /sprache — alle weiteren im Profi-Modus.', 'Commands: /bau <wish> (e.g. “/bau wooden house with pool”) · /home · /sethome · /look classic | seamless · /wetter · /lang — all others with Pro.'), '#cfe6ff'); return; }
+      if (typeof text === 'string' && /^\/help(\s|$)/i.test(text) && !prefs().pro) { this.ui.chatLine(tx('start.cmdHelp', null, 'Befehle: /bau <Wunsch> (z. B. „/bau Holzhaus mit Pool“) · /home · /sethome · /look klassisch | nahtlos · /wetter · /sprache — alle weiteren im Profi-Modus. (/bau und /wetter nicht im Überleben ohne Cheats.)', 'Commands: /bau <wish> (e.g. “/bau wooden house with pool”) · /home · /sethome · /look classic | seamless · /wetter · /lang — all others with Pro. (/bau and /wetter: not in survival without cheats.)'), '#cfe6ff'); return; }
       if (typeof text === 'string' && text.startsWith('/') && !prefs().pro && !ST.einfachCmd(text)) { this.ui.chatLine(tx('start.cmdPro', null, 'Befehle gibt es im Profi-Modus (Start · Profi).', 'Commands come with Pro (start screen · Pro).'), '#ffd27a'); return; }
       return origChat.call(this, text);
     };
