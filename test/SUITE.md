@@ -33,7 +33,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | genie_raster.js | node | Genie answer parser and the shape-to-block rasteriser (geometry only). | 1 (1–1) | 3/3 | yes |
 | heart_gen.js | node | Heartland generator smoke test: climate and biome at key points, temple, chunk timings; every chunk has blocks. | 3 † | – | no |
 | housekit.js | node | The Haus-Baukasten: every roof, wall, window and extra builds; doors, stairs and furniture land where they belong. | 2 (2–2) | 3/3 | yes |
-| icon_perf.js | node | Modern Living icon work stays cheap: every pack model builds in under 60 ms on first use, the pack's icons take under 150 ms in all, the cloth extrude under 60 ms for ten builds. | 2 † | – | yes |
+| icon_perf.js | node | Modern Living icon work stays cheap, in CPU time (the wall clock fails under load): every pack model builds in under 60 ms on first use, the pack's icons take under 150 ms in all (best of three runs), the cloth extrude under 60 ms for ten builds. | 2 † | – | yes |
 | icon_pump.js | node | The palette's icon pump: 6 ms of paints per frame, a voxel picture drawn in slices and painted once complete, detached slots skipped; the idle warm starts after 10 s of play, one picture per slice, largest first. | 1 † | – | yes |
 | icon_draw_same.js | node | The voxel icons' canvas calls are the same as the drawing they replaced, in one go and one voxel per step (679 items, 913,770 calls; the Modern pack 236 of 236); stepIcon paints the same picture. | – | – | yes |
 | icon_same.js | node | Every VM model keeps its voxels and its 8³ icon cell for cell (baseline test/icon_same.json, from before the icon pass and extrude speed-ups). | 3 † | – | yes |
@@ -78,7 +78,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | imagine.mjs | browser | v0.35 picture to 3D: a picture becomes a Blockbild with the background removed; files round-trip. | 74 (64–75) | 4/4 | yes |
 | life_kit.mjs | browser | Village Life and Supermarket kit showcase: the same builds; every block exists and door boxes match open or closed. | – | – | no |
 | modern_kit.mjs | browser | v0.30 modern building set: Vollton colours, panorama glass with connected frames, the nine modern doors. | 114 (114–114) | 1/1 | yes |
-| modern_pack.mjs | browser | Modern Living in the browser: the creative tab shows the whole pack; icons are painted a few per frame. | 1256 (1188–1323) | 2/4 | yes |
+| modern_pack.mjs | browser | Modern Living in the browser: the creative tab shows the whole pack; icons are painted a few per frame (the icon work of one frame, the pump's step and paint, under 120 ms). | 1256 (1188–1323) | 2/4 | yes |
 | mp.mjs | browser | Two players, one world: host and guest in two pages; look sync, edits both ways, tall edits, summon, leave and rejoin, host closes. | 392 (141–642) | 2/2 | yes |
 | player2.mjs | browser | v0.33.2 player mode: crosshair and held block; walking off the property stops at the fence; doors open and the player walks through. | 44 (39–383) | 6/6 | yes |
 | projects.mjs | browser | v0.36 Weitermachen: the Crafter draft is kept two seconds after a change and reopens exactly; never reaches the game before Ins Spiel. | 304 (290–325) | 6/7 | yes |
