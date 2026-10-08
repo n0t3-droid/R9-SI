@@ -273,6 +273,7 @@
       this.banner(T('g.wonder.found', { name }));
       if (g.audio) g.audio.play('fanfare');
       if (g.codex && g.codex.unlock) g.codex.unlock('w:' + s.type, true);
+      if (VR.Wonders && VR.Wonders.giveGift) VR.Wonders.giveGift(s.type, s.seed);   // the gift: the Studio's ✨ chip (any world)
       if (g.ui && g.ui.chatLine) g.ui.chatLine(T('g.wonder.gift', { name }), '#ffe7a6');
       const P = g.particles; if (P) { P.spark(h[0] + 0.5, h[1] + 1, h[2] + 0.5, GLOW[s.type] || [1, 0.9, 0.5], 80, 7); for (let k = 0; k < 24; k++) P.glow(h[0] + 0.5 + (Math.random() - 0.5) * 3, h[1] + 0.5 + Math.random() * 2, h[2] + 0.5 + (Math.random() - 0.5) * 3, GLOW[s.type] || [1, 0.9, 0.5], 2.2, 0.12, 0.6); }
       if (!g.meta.guest) Promise.resolve().then(() => g.saveMeta()).catch(() => { /* the autosave keeps it */ });

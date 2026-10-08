@@ -247,6 +247,18 @@
   // a site's wonder: the Forge DNA and its build (the game builds it through its forge plans)
   W.dnaOf = (s) => W.dna(s.type, s.seed);
   W.build = function (type, seed, env) { return VR.Forge.build(W.dna(type, seed), env); };
+  // the gift: every wonder found on this device (a viewer's convenience, kept across worlds): {type: seed} in
+  // localStorage. The Studio's Forge offers each as a ✨ chip (it builds anywhere). Storage that is blocked or full just
+  // keeps nothing.
+  const GIFT_KEY = 'r9si.wonderGifts';
+  W.gifts = function () {
+    try { const o = JSON.parse(localStorage.getItem(GIFT_KEY) || '{}') || {}; return W.TYPES.filter(t => o[t.id] > 0).map(t => ({ type: t.id, seed: o[t.id] >>> 0, de: t.de })); }
+    catch (e) { return []; }
+  };
+  W.giveGift = function (type, seed) {
+    try { const o = JSON.parse(localStorage.getItem(GIFT_KEY) || '{}') || {}; if (!(o[type] > 0) && W.type(type)) { o[type] = (seed >>> 0) || 1; localStorage.setItem(GIFT_KEY, JSON.stringify(o)); } }
+    catch (e) { /* no storage: the wonder is still found in this world */ }
+  };
 
   // ---------------------------------------------------------------- the hidden Forge type
   // registered like any Forge structure (Forge.parse / build / meta / job), then taken out of the Forge's list: the
