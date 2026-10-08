@@ -20,9 +20,12 @@
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
   // Perez coefficients A..E as linear functions of the turbidity T (Preetham et al. 1999, their Table 1)
-  // (C, the sun's aureole, is damped to 40 %: the published value makes the horizon glow white on the sun side)
-  const LUM = (T) => [0.1787 * T - 1.4630, -0.3554 * T + 0.4275, (-0.0227 * T + 5.3251) * SUN_GLOW, 0.1206 * T - 2.5771, -0.0670 * T + 0.3703];
-  const SUN_GLOW = 0.4;
+  // (C, the sun's aureole, is damped to 40 %: the published value makes the horizon glow white on the sun side;
+  // B, the horizon brightening, is lowered by HORIZON_DIM: the published fit puts the horizon at 1.19 × v0.41's
+  // luminance and its blue above 1, so the sky band clipped in blue; with it the 1° horizon is 10 % under v0.41's
+  // and the 30° luminance within 4 % of it)
+  const SUN_GLOW = 0.4, HORIZON_DIM = 0.14;
+  const LUM = (T) => [0.1787 * T - 1.4630, -0.3554 * T + 0.4275 - HORIZON_DIM, (-0.0227 * T + 5.3251) * SUN_GLOW, 0.1206 * T - 2.5771, -0.0670 * T + 0.3703];
   // Chromaticity (our own fit, same form): the published Preetham chroma whitens the horizon (x 0.32 there against 0.24
   // overhead at this turbidity), so the sky keeps its hue down to the horizon instead: the zenith is a deep blue, the
   // horizon a paler one (about the luminance ratio of v0.41's palette), the sun's warm side keeps the C and D terms.
@@ -165,7 +168,7 @@
   }
   // the GPU exposure's constants (renderer.js updateExposure, shaders.js EXPOSE_FS): the key is the scene's log-average
   // luminance that a clear noon wants at exposure 1; the range is ±0.5 stops around 1; the power is the partial share
-  const EXPOSURE = { key: 0.3, power: 0.3, lo: Math.SQRT1_2, hi: Math.SQRT2 };
+  const EXPOSURE = { key: 0.44, power: 0.3, lo: Math.SQRT1_2, hi: Math.SQRT2 };
 
   // the state packed for the shaders (the same numbers as radiance(), with the normalisers folded in):
   //   per: the five Perez coefficients of Y, x and y (15 floats); k: kY, kx, ky (scale and normalisers) and dayK;
