@@ -219,6 +219,7 @@
   // natural ones of the block-like models, kept through the mips)}
   VR.buildTextureArrays = function (opts) {
     const names = opts.names, L = names.length;
+    const relief = opts.relief !== false;   // F2: the family relief of the opaque cubes (tex_mat.js); false only in the tests
     const classic = opts.classic !== undefined ? !!opts.classic : !!opts.bevelAll;
     const own = classic && (!opts.leafMask || !opts.blockMask) && VR.R && VR.R.texNames === names ? VR.textureMasks() : null;
     const leafMask = opts.leafMask || (own && own.leaf), blockMask = opts.blockMask || (own && own.block);
@@ -236,7 +237,7 @@
       // Klassisch v2: the natural recipes chunky (before the rim, which stays one texel)
       const chunked = classic && img.chunky && (isCube || isLeaf || isBlock);
       if (chunked) pixelate(img);
-      const hCell = chunked ? img.h.slice() : null;
+      let hCell = chunked ? img.h.slice() : null;
       // chunky leaves are matte: on their flat facets a sun glint would cover whole texels and bleach the canopy
       if (chunked && isLeaf) for (let i = 0; i < N * N; i++) img.ro[i] = Math.max(img.ro[i], 0.85);
       // Klassisch v2: the outline on every cube texture (the seamless materials have their stronger edge line), leaf
@@ -248,6 +249,18 @@
       if (outlined) outline(img, 1, isLeaf, chunked);
       TX.toArrays(img, alb0, mat0, 0);
       if (chunked) cellNormals(mat0, hCell, isLeaf ? 1 : 0.45);
+      // F2: an opaque cube whose normal map is nearly flat as written gets its family's micro relief (stone grain, wood
+      // fibres, weave, brushing, plaster pits) in the height field, and its normal map is written again. Albedo, roughness
+      // and glow do not change; the recipes with their own relief (bricks, planks, tiles, leaves, logs) are not touched.
+      if (relief && isCube && VR.matRelief) {
+        const fam = VR.matFamily(names[l]);
+        for (let g = 1, k = 0; k < 3 && VR.matNormalRms(mat0) < VR.MAT_MIN_RMS; k++, g *= 3) {
+          VR.matRelief(img, fam, l, g);
+          if (chunked) hCell = img.h.slice();
+          TX.toArrays(img, alb0, mat0, 0);
+          if (chunked) cellNormals(mat0, hCell, isLeaf ? 1 : 0.45);
+        }
+      }
       albedo[0].set(alb0, l * N * N * 4); material[0].set(mat0, l * N * N * 4);
       // mips
       let fa = new Float32Array(N * N * 4), fm = new Float32Array(N * N * 4);
