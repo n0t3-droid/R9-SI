@@ -693,8 +693,10 @@
       return true;
     }
     // bulk edit without per-block light updates; columns are relit in workers afterwards. kind (VR.EDIT): a building
-    // change, recorded as one batch for 📽
-    bulkSet(list, notify, kind) {
+    // change, recorded as one batch for 📽 — or, with defer (a Set), the touched columns go into it and the caller
+    // relights them once (a wonder rising in thirty slices). bulkSet(list, notify, kindOrDefer, defer)
+    bulkSet(list, notify, kind, defer) {
+      if (kind && typeof kind === 'object' && typeof kind.add === 'function') { defer = kind; kind = undefined; }
       const touched = new Map();
       const T = R.T, Z = kind ? this.zr : null;
       let zb = false;
@@ -717,6 +719,7 @@
         if (notify) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       }
       if (zb) Z.end();
+      if (defer) { for (const c of touched.values()) defer.add(c); return touched.size; }
       this.relightColumns([...touched.values()]);
       return touched.size;
     }

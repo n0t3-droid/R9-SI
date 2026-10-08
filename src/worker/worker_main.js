@@ -228,6 +228,10 @@
           for (let di = -R0; di <= R0; di++) for (let dj = -R0; dj <= R0; dj++) { const s = VG.site(g, ci + di, cj + dj); if (s && Math.hypot(s.x - m.x, s.z - m.z) <= m.r) list.push({ id: s.id, name: s.name, style: s.style, x: s.x, y: s.y, z: s.z, rad: VG.siteRad ? VG.siteRad(g, s) : VG.rad(g) }); }
         }
         post({ type: 'villages', id: m.id, list });
+      } else if (m.type === 'wonders') {
+        // ✨ the wonder sites around a point (wonders.js): the cells it has time for, nearest first (m.budget ms)
+        const g = getGen(m.dim);
+        post(VR.Wonders ? VR.Wonders.job(g, m) : { type: 'wonders', id: m.id, list: [] });
       } else if (m.type === 'railways') {
         const g = getGen(m.dim), RG = VR.RailGen;
         const lines = RG && g.climateAt && g.singleBiome < 0 ? RG.near(g, m.x, m.z, m.r) : [];

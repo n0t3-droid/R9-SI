@@ -557,9 +557,12 @@
       if (!Fg) { say('No Forge in this build.', '#ff8a8a'); return true; }
       if (!this.plans) this.loadPlans();
       if (!text) { say(T('g.forge.help', null, '🏭 /bau <Wunsch> — „/bau Hochhaus 30 Stockwerke Glas“, „/bau Hängebrücke 60 lang“, „/bau Burg mit Bergfried“ · danach „/bau höher“, „/bau mehr Glas“, „/bau aus Stein“', '🏭 /bau <wish> — “/bau skyscraper 30 floors glass”, “/bau suspension bridge 60 long”, “/bau castle with keep” · then “/bau taller”, “/bau more glass”, “/bau stone”')); return true; }
+      // ✨ a wonder of the world (wonders.js): once found in this world, /bau <its name> builds it — before that, a kind word
+      const wonder = VR.Wonders ? VR.Wonders.byName(text) : null, wseed = wonder && g.wonders ? g.wonders.foundSeed(wonder) : 0;
+      if (wonder && !wseed) { say(VR.I18N ? VR.I18N.t('g.wonder.locked', { name: g.wonders ? g.wonders.name(wonder) : wonder }) : wonder, '#ffe7a6'); return true; }
       if (!p.creative) { say(T('g.forge.creative', null, 'Die Forge baut in Kreativ und Zen.', 'The Forge builds in Creative and Zen Builder.'), '#ff8a8a'); return true; }
-      const last = this.lastForge && this.plans && this.plans.find(q => q.id === this.lastForge.id), named = Fg.typeOf(Fg.norm(text));
-      let dna = named ? Fg.fromText(text) : null, again = null;
+      const last = this.lastForge && this.plans && this.plans.find(q => q.id === this.lastForge.id), named = wonder ? null : Fg.typeOf(Fg.norm(text));
+      let dna = wonder ? VR.Wonders.dna(wonder, wseed) : named ? Fg.fromText(text) : null, again = null;
       if (!dna && last) { dna = Fg.tweak(last.dna, text); again = last; }
       if (!dna) { say(T('g.forge.what', null, 'Sag, was es sein soll: Hochhaus, Haus, Brücke, Turm, Halle, Burg, Stadion, Raumschiff, Park oder Mauer.', 'Say what it should be: high-rise, house, bridge, tower, hall, castle, stadium, spaceship, park or wall.'), '#ff8a8a'); return true; }
       let pl;
