@@ -22,7 +22,7 @@ const SHOTS = [
   ['F6_palms', [-12, 81.2, -141], 0.785, 0.7],
   ['G1_interior', [40.5, 85.2, -131.4], 1.0, -0.10],
   ['G2_interior', [38.5, 85.2, -131.4], 0, -0.12],
-  ['H1_hills', [0.5, 82.2, -166.5], 0, 0],
+  ['H1_hills', [0.5, 92.2, -160.5], 0, 0.02],
   ['H2_hills', [-90.5, 88.2, -186.5], 0.4, -0.04],
 ];
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
