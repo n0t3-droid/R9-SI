@@ -68,6 +68,15 @@
       this.visList = []; this.visDirty = true; this.visKey = '';
       this.firsts = new Int32Array(512); this.counts = new Int32Array(512); this.origins = new Float32Array(512 * 4);
       this.tmpM = mat4.create(); this.tmpM2 = mat4.create();
+      this.prof = null;   // pass profiling (test/light.mjs sets {}): the time of each pass, GPU work included
+    }
+    // profiling: the pass named by the previous mark ends here (gl.finish() makes its GPU work part of the time)
+    mark(name) {
+      const P = this.prof; if (!P) return;
+      this.gl.finish();
+      const t = performance.now();
+      if (P.cur) P[P.cur] = (P[P.cur] || 0) + (t - P.t);
+      P.cur = name; P.t = t;
     }
 
     // ------------------------------------------------ setup
@@ -94,6 +103,13 @@
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
+      // F1: the sky table (Very Low; rebuilt by updateAtmo) and the exposure (1×1, ping-pong; float targets when the device has them)
+      this.atmoTex = GL.tex2D(64, 32, gl.RGBA16F, gl.RGBA, gl.FLOAT, { data: new Float32Array(64 * 32 * 4), filter: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE });
+      this.atmoKey = null;
+      this.expTex = [0, 1].map(() => GL.tex2D(1, 1, gl.RGBA16F, gl.RGBA, gl.FLOAT, { data: new Float32Array([1, 1, 1, 1]), filter: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE }));
+      this.expFB = this.hdr ? this.expTex.map((t) => GL.fbo([t])) : [null, null];
+      this.expOK = !!(this.expFB[0] && this.expFB[1]);
+      this.expCur = 0;
       this.buildPrograms();
       this.buildStatic();
       // origins UBO
@@ -114,7 +130,10 @@
     }
     buildPrograms() {
       const md = this.multi ? ['MULTIDRAW'] : [];
-      const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs)
+      // F1: shadow tiers (SHQ2 = 3×3 PCF on balanced, SHQ3 = a rotated 16-tap disc on high and ultra, else one hard tap)
+      // and the sky table on Very Low (ATMO_LUT: the sky formula baked into a 64×32 texture)
+      const sq = this.q.shadowQ | 0, atmo = this.q.atmoLUT ? ['ATMO_LUT'] : [];
+      const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(sq === 3 ? ['SHQ3'] : sq === 2 ? ['SHQ2'] : []).concat(atmo);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs)
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh]));
@@ -125,7 +144,8 @@
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
-      P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky');
+      P.sky = GL.program(S.SKY_VS, S.SKY_FS, 'sky', atmo);
+      P.expose = GL.program(S.FS_VS, S.EXPOSE_FS, 'expose');
       P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud');
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
       P.down = GL.program(S.FS_VS, S.DOWN_FS, 'down');
@@ -322,8 +342,9 @@
     }
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
+      const prevTier = (this.q.shadowQ | 0) * 2 + (this.q.atmoLUT ? 1 : 0);
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || (this.q.shadowQ | 0) * 2 + (this.q.atmoLUT ? 1 : 0) !== prevTier) this.buildPrograms();
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
       this.resize(full || this.q.scale !== prevScale);
@@ -532,6 +553,33 @@
     }
 
     // ------------------------------------------------ uniforms
+    // ------------------------------------------------ sky and light (F1)
+    // the sky state of this frame (atmos.js): the packed Perez numbers for the analytic sky, and on Very Low the 64×32
+    // table, rebuilt when the sun has moved about half a degree, or the turbidity or the tint has changed
+    updateAtmo(E) {
+      const A = VR.Atmos, gl = this.gl, sun = E.sunDir;
+      const T = E.skyT === undefined ? 2.5 : E.skyT, tint = E.skyTint || [1, 1, 1];
+      const st = A.prepare(sun, { T, tint });
+      this.atmoP = A.glParams(st);
+      if (!this.q.atmoLUT || !this.atmoTex) return;
+      const k = this.atmoKey;
+      if (k && 1 - (k[0] * sun[0] + k[1] * sun[1] + k[2] * sun[2]) < 3.8e-5 && Math.abs(k[3] - T) < 0.02 && Math.abs(k[4] - tint[0]) + Math.abs(k[5] - tint[1]) + Math.abs(k[6] - tint[2]) < 0.002) return;
+      gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, A.LUT_W, A.LUT_H, gl.RGBA, gl.FLOAT, A.buildLUT(st));
+      this.atmoKey = [sun[0], sun[1], sun[2], T, tint[0], tint[1], tint[2]];
+    }
+    // the exposure (F1): this frame's log-average luminance of the scene, eased toward the middle grey (EXPOSE_FS, 1×1)
+    updateExposure(E) {
+      const gl = this.gl, p = this.P.expose, dst = 1 - this.expCur;
+      gl.useProgram(p.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.expFB[dst]); gl.viewport(0, 0, 1, 1);
+      this.tex(0, this.sceneCol, p.u.u_scene); this.tex(1, this.expTex[this.expCur], p.u.u_prev);
+      gl.uniform1f(p.u.u_dt, Math.min(0.25, E.dt || 0.016));
+      gl.uniform3f(p.u.u_expParams, 0.8, 1.35, 0.3);
+      this.fs(p);
+      this.expCur = dst;
+    }
+
     common(p, E) {
       const gl = this.gl, u = p.u;
       const v3 = (n, a) => { if (u[n]) gl.uniform3f(u[n], a[0], a[1], a[2]); };
@@ -548,6 +596,17 @@
       // the block look (Klassisch v2): natural blocks shaded per block, normal maps turned with the tile, still water
       // and the far terrain per block
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
+      // F1 sky and light: the packed sky (formula or table), the moon's phase, the cloud shadows on the ground
+      if (this.atmoP) {
+        if (u.u_skyPer) gl.uniform1fv(u.u_skyPer, this.atmoP.per);
+        if (u.u_skyK) gl.uniform4f(u.u_skyK, this.atmoP.k[0], this.atmoP.k[1], this.atmoP.k[2], this.atmoP.k[3]);
+        if (u.u_skyK2) gl.uniform2f(u.u_skyK2, this.atmoP.k2[0], this.atmoP.k2[1]);
+        if (u.u_skyTint) gl.uniform3f(u.u_skyTint, this.atmoP.tint[0], this.atmoP.tint[1], this.atmoP.tint[2]);
+      }
+      if (u.u_atmoLUT && this.atmoTex) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex); gl.uniform1i(u.u_atmoLUT, 7); }
+      if (u.u_moonPh) gl.uniform1f(u.u_moonPh, E.moonPh || 0);
+      if (u.u_moonIllum) gl.uniform1f(u.u_moonIllum, E.moonIllum === undefined ? 1 : E.moonIllum);
+      if (u.u_cloudSh) gl.uniform1f(u.u_cloudSh, this.q.cloudSh ? (E.cloudSh || 0) : 0);
     }
     bindTerrainTextures(p) {
       const gl = this.gl;
@@ -798,7 +857,7 @@
     }
 
     // ------------------------------------------------ fullscreen helpers
-    fs(p) { const gl = this.gl; gl.bindVertexArray(this.emptyVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); void p; }
+    fs(p) { const gl = this.gl; gl.bindVertexArray(this.emptyVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); void p; if (this.prof) this.prof.fs = (this.prof.fs || 0) + 1; }
     tex(unit, t, loc) { const gl = this.gl; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); if (loc) gl.uniform1i(loc, unit); }
 
     // ------------------------------------------------ main frame
@@ -807,15 +866,18 @@
       const gl = this.gl, E = F.env, world = F.world;
       const t0 = performance.now();
       this.frameNo++;
+      this.updateAtmo(E);
       this.gpuTimerBegin();
       this.stats.draws = 0; this.stats.tris = 0;
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
+      this.mark('cull');
       // visibility
       const vis = world ? this.collectVisible(world, F.cam) : [];
       this.stats.sections = vis.length;
       if (world) this.updateHmap(world);
+      this.mark('shadow');
       // shadows
       const shadowOn = world && (this.frameNo % (this.q.shadowEvery || 1) === 0 || !this.shadowValid) ? this.renderShadows(world, E) : this.shadowValid;
       this.shadowValid = shadowOn;
@@ -828,15 +890,9 @@
       gl.depthMask(true);
       gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-      // sky
-      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
-      {
-        const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
-        gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
-        this.fs(p);
-      }
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
       gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      this.mark('terrain');
       // terrain opaque + cutout
       if (world) {
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
@@ -864,18 +920,32 @@
           gl.enable(gl.CULL_FACE);
         }
       }
+      this.mark('horizon');
       // far-terrain horizon (cut away where real chunks are drawn)
       if (F.horizon) F.horizon.draw(this, E);
+      this.mark('objects');
       // voxel models & meshes
       if (F.drawOpaque) F.drawOpaque(this, E);
+      // sky (F1): drawn after the land, at the far plane, so only the pixels nothing covers take the sky (early depth test)
+      this.mark('sky');
+      {
+        gl.disable(gl.CULL_FACE); gl.depthMask(false);
+        const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
+        gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
+        this.fs(p);
+        gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      }
+      this.mark('copy');
       // ---------------- copy scene for refraction
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
       gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
       gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
+      this.mark('clouds');
       // clouds (behind translucent terrain; depth tested)
       this.drawClouds(E);
+      this.mark('trans');
       // translucent terrain
       if (world) {
         const p = this.P.trans;
@@ -900,6 +970,7 @@
         gl.enable(gl.CULL_FACE);
       }
       if (F.drawTranslucent) F.drawTranslucent(this, E);
+      this.mark('fx');
       // precipitation
       if (F.precip && F.precip.amount > 0.01) this.drawPrecip(F, E);
       // particles
@@ -908,14 +979,18 @@
       if (F.outline) this.drawOutline(F.outline);
       if (F.outlines) for (const o of F.outlines) this.drawOutline(o);
       if (F.crack) this.drawCrack(F.crack);
+      this.mark('hand');
       // first-person hand (separate depth range)
       if (F.drawHand) { gl.clear(gl.DEPTH_BUFFER_BIT); F.drawHand(this, E); }
+      this.mark('tsr');
       // ---------------- R9 Super Resolution
       this.upTex = null;
       if (this.jit) this.superRes(F);
+      this.mark('post');
       // ---------------- post
       this.post(F, E);
       this.gpuTimerEnd();
+      this.mark(null);
       this.stats.ms = performance.now() - t0;
     }
 
@@ -1043,6 +1118,8 @@
     post(F, E) {
       const gl = this.gl;
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
+      // the adaptive exposure (F1): this frame's scene luminance eased in; the composite reads it
+      if (this.expOK && this.P.expose) this.updateExposure(E);
       const useBloom = this.q.bloom && this.hdr;
       // bloom
       if (useBloom) {
@@ -1099,10 +1176,12 @@
       this.tex(0, this.upTex || this.sceneCol, p.u.u_scene);
       this.tex(1, useBloom ? this.bloom[0].tex : this.sceneCol, p.u.u_bloom);
       this.tex(2, this.raysTex, p.u.u_rays);
+      this.tex(3, this.expTex[this.expCur], p.u.u_expTex);
+      if (p.u.u_lift) { const L = E.lift || [0, 0, 0]; gl.uniform3f(p.u.u_lift, L[0], L[1], L[2]); }
       gl.uniform1f(p.u.u_exposure, E.exposure);
       gl.uniform1f(p.u.u_bloomStrength, useBloom ? (E.bloomStrength || 0.06) : 0);
       gl.uniform1f(p.u.u_useRays, raysOn ? 1 : 0);
-      gl.uniform1f(p.u.u_vignette, F.photo ? F.photo.vignette : 0.55);
+      gl.uniform1f(p.u.u_vignette, F.photo ? F.photo.vignette : 0.3);
       gl.uniform1f(p.u.u_saturation, (F.photo && F.photo.saturation) || E.saturation || 1.12);
       gl.uniform3f(p.u.u_grade, E.grade[0], E.grade[1], E.grade[2]);
       if (p.u.u_vivid) gl.uniform1f(p.u.u_vivid, E.vivid === undefined ? 0 : E.vivid);
