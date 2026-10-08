@@ -121,6 +121,11 @@
     }
     // the shuttle's canopy glass (the translucent pass)
     drawTrans(r, E) { if (this.flight) this.flight.draw(r, E, 'trans'); }
+    // put the crew at time pt of their walk, facing where they go there (a camera director, the picture tests)
+    jump(pt) {
+      this.pt = pt;
+      for (const c of this.crew) { const p = Hall.patrol(pt, c.side, c.yaw); c.cur[0] = p.x; c.cur[1] = p.z; c.cur[2] = p.yaw; c.walk = p.walk; c.moving = p.moving; }
+    }
     destroy() { if (this.flight) this.flight.destroy(); }
   };
 })(VR);

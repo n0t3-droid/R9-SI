@@ -183,7 +183,7 @@
       const SS = g.starships;
       if (!this.d || !SS.designs.has(this.d.key)) { this.d = SS.design(HF.SEED, 'shuttle', HF.PALETTE); this.inst.d = this.d; }
       this.d.last = performance.now();
-      let snap = false;
+      let snap = !!this.snap; this.snap = false;
       if (!this.active) {
         // (re)starting: the shuttle is far out over the canyon, half way round its loop
         this.active = true; snap = true;
@@ -245,6 +245,13 @@
       SS.drawOne(r, prog, I, cam, layer, SS.lightAt(I.pos[0], I.pos[1] + m.height * HF.SCALE + 1, I.pos[2]), 1, false);
       SS.end(r, layer);
       this.draws = (this.draws || 0) + 1;
+    }
+    // put the shuttle at time t of its loop (a camera director, the picture tests): the angles snap to the path there and
+    // its engine plumes start afresh (no streak from where it was)
+    jump(t) {
+      this.t = t; this.snap = true;
+      const T = this.g.trails;
+      if (T && T.map) for (const k of [...T.map.keys()]) if (k.startsWith(this.tid)) T.map.delete(k);
     }
     destroy() { this.showHome(); this.active = false; }
   };
