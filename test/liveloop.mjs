@@ -97,7 +97,8 @@ await photo(A);
 let wOK = false;
 for (let i = 0; i < 400 && !wOK; i++) {
   await step(A, 10);
-  wOK = await ev(A, ([px, py, pz]) => { const w = VR.game.world; for (let x = px - 4; x <= px + 4; x += 4) for (let y = py; y <= py + 4; y += 4) { const s = w.sectionAt(x >> 4, y >> 4, (pz - 4) >> 4); if (!s || !(s.meshVer > 0) || s.dirty || s.pending) return false; } return true; }, [px, py, pz]);
+  // (F8: a column is drawn only once every one of its sections is meshed and its fade-in is through — the wall's columns must be SHOWN, not just meshed)
+  wOK = await ev(A, ([px, py, pz]) => { const w = VR.game.world; for (let x = px - 4; x <= px + 4; x += 4) { const c = w.col(x >> 4, (pz - 4) >> 4); if (!c || !(c.shownAt >= 0) || c.fade < 1) return false; for (let y = py; y <= py + 4; y += 4) { const s = w.sectionAt(x >> 4, y >> 4, (pz - 4) >> 4); if (!s || !(s.meshVer > 0) || s.dirty || s.pending) return false; } } return true; }, [px, py, pz]);
   if (!wOK) await wait(40);
 }
 check(wOK, 'the wall is meshed (' + JSON.stringify(await busy(A)) + ')');

@@ -633,11 +633,19 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     sys(`${Object.keys(VM.MODELS).length} Modelle · ${HOUSE.size} Häuser`, 'ok');
   }
   // a block whose look changed (B1): its preview is meshed again
-  function forgetBlock(name) { const b = BLOCKS.get(name); if (b) { freeSections(b.gpu); BLOCKS.delete(name); } }
+  // (the block on screen keeps its old buffers until the new mesh is there: freeing them at once left the view binding
+  // deleted buffers — INVALID_OPERATION, a black view — for as long as the worker took)
+  let staleGpu = null;
+  function forgetBlock(name) {
+    const b = BLOCKS.get(name); if (!b) return;
+    BLOCKS.delete(name);
+    if (S.scene && S.scene.type === 'block' && S.scene.gpu === b.gpu) { if (staleGpu && staleGpu !== b.gpu) freeSections(staleGpu); staleGpu = b.gpu; } else freeSections(b.gpu);
+  }
   async function showBlock(name) {
     let b = BLOCKS.get(name);
     if (!b) { const m = await call({ type: 'blockmesh', name }); if (m.type !== 'blockmesh') return; b = { gpu: uploadSections(m.sections) }; BLOCKS.set(name, b); }
     setScene(sceneBlock(name, b.gpu));
+    if (staleGpu && staleGpu !== b.gpu) { freeSections(staleGpu); staleGpu = null; }
     parts();
   }
 
