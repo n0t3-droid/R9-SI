@@ -969,6 +969,9 @@ void main() {
     vec3 R = reflect(-V, nrm); R.y = abs(R.y);
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(nrm, V), 0.0), 5.0);
     col = mix(col, skyColor(R, false) * 0.8 + glow * 0.3, fres * 0.35);
+    // cyan-white foam where the aether meets its banks (the water's shore foam, TRAILER §2.2)
+    float foamA = (1.0 - smoothstep(0.0, 0.5, thick)) * (0.55 + 0.45 * sin(wp.x * 3.1 + wp.z * 2.3 + u_time * 2.4));
+    col = mix(col, vec3(0.8, 1.0, 1.0) * (1.2 + veins * 0.6), clamp(foamA, 0.0, 1.0) * 0.7 * float(face == 2u));
     col = applyFog(col, v_rel, dist);
     o_col = vec4(col, 1.0);
     return;

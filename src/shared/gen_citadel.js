@@ -273,6 +273,22 @@
     return out;
   };
   if (VR.RailGen && VR.RailGen.providers) VR.RailGen.providers.push(CIT.trackLines);
+  // ---------------------------------------------------------------- the Heartland's lava streams
+  // three lava streams run down the citadel mountain's flanks from the plinth rim (TRAILER §3.7: "three lava streams at its
+  // foot"): a meandering channel of lava on the surface, two blocks wide, with basalt rims; where a stream leaves the
+  // plinth a vent smokes (vents.js)
+  const STREAM_ANG = [1.2, 2.6, 4.2];
+  function streamAt(s, x, z) {
+    const dx = x - s.x, dz = z - s.z, r = Math.hypot(dx, dz);
+    if (r < s.R + 2 || r > s.R + 84) return null;
+    const th = Math.atan2(dz, dx);
+    for (let k = 0; k < 3; k++) {
+      const a = STREAM_ANG[k] + 0.12 * Math.sin(r * 0.09 + 2.1 * k);
+      const d = Math.abs(Math.atan2(Math.sin(th - a), Math.cos(th - a))) * r;   // blocks from the channel's centreline
+      if (d < 2.2) return { k, r, d, lava: d < 1.2 };
+    }
+    return null;
+  }
 
   // ---------------------------------------------------------------- per chunk
   CIT.apply = function (g, cx, cz, out) {
@@ -285,21 +301,34 @@
       const nearSite = s.x + s.R + 44 > x0 && s.x - s.R - 44 < x0 + 16 && s.z + s.R + 44 > z0 && s.z - s.R - 44 < z0 + 16;
       if (nearSite) {
         terrace(g, w, s, P, x0, z0);
+        if (s.home) {
+          for (let x = x0; x < x0 + 16; x++) for (let z = z0; z < z0 + 16; z++) {
+            const hit = streamAt(s, x, z); if (!hit) continue;
+            const gy = g.surfaceY(x, z); if (gy <= SEA + 2) continue;   // the streams stop where the canyon floor begins
+            w.set(x, gy, z, hit.lava ? st('lava') : st('basalt'));
+            if (hit.lava) w.set(x, gy - 1, z, st('basalt'));
+            if (hit.lava && hit.d < 0.6 && hit.r >= s.R + 3 && hit.r < s.R + 5) { if (!out.spawns) out.spawns = []; out.spawns.push(['vent', x, gy + 1, z]); }
+          }
+        }
         for (const T of s.towers) {
           const reach = T.r + 3 + (T.kind === 'watch' ? 8 : 0);
           if (T.x + reach < x0 || T.x - reach > x0 + 16 || T.z + reach < z0 || T.z - reach > z0 + 16) continue;
           if (T.kind === 'watch') watchTower(w, T, s.y + 1, P, g); else spire(w, T, s.y + 1, P, g);
+          // the red tip beacon of every spire and watch tower: vents.js makes it blink (the spawn sits on the beacon cell)
+          if (T.kind !== 'pin' && T.x >= x0 && T.x < x0 + 16 && T.z >= z0 && T.z < z0 + 16) { if (!out.spawns) out.spawns = []; out.spawns.push(['beacon', T.x, s.y + 1 + T.h + (T.kind === 'watch' ? 15 : 1), T.z]); }
         }
         // crystal groves on the slopes around the terrace
         const crng = new VR.RNG(s.seed ^ 0x51);
         for (let k = 0; k < 16; k++) {
           const a = crng.next() * Math.PI * 2, d = s.R + 4 + crng.next() * 26;
           const px = Math.round(s.x + Math.cos(a) * d), pz = Math.round(s.z + Math.sin(a) * d);
-          const big = crng.chance(0.35), cc = ['violet', 'azure', 'verdant', 'rose', 'amber'][(s.cry + k) % 5];
+          // the Heartland citadel's foot carries three giant crystals (TRAILER §3.7: azure 25 tall, violet 16, verdant 12)
+          const giant = s.home && k < 3 ? [25, 16, 12][k] : 0;
+          const big = giant > 0 || crng.chance(0.35), cc = giant ? ['azure', 'violet', 'verdant'][k] : ['violet', 'azure', 'verdant', 'rose', 'amber'][(s.cry + k) % 5];
           if (px < x0 - 3 || px > x0 + 19 || pz < z0 - 3 || pz > z0 + 19) continue;
           const gy = g.surfaceY(px, pz);
           if (gy <= SEA + 2) continue;
-          const hh = big ? 7 + crng.int(8) : 3 + crng.int(4), blk = st(cc + '_crystal_block'), cl = st(cc + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 });
+          const hh = giant || (big ? 7 + crng.int(8) : 3 + crng.int(4)), blk = st(cc + '_crystal_block'), cl = st(cc + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 });
           for (let t = 0; t < hh; t++) { w.set(px, gy + 1 + t, pz, blk); if (big && t < hh - 3) { w.set(px + 1, gy + 1 + t, pz, blk); w.set(px, gy + 1 + t, pz + 1, blk); if (t < hh - 6) w.set(px + 1, gy + 1 + t, pz + 1, blk); } }
           w.set(px, gy + 1 + hh, pz, cl);
         }
