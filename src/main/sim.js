@@ -141,7 +141,7 @@
           const nb = w.getBlock(x + DX6[d], y + DY6[d], z + DZ6[d]);
           if (T.flags[nb] & F.WATER && (T.flags[nb] & F.FLUID)) {
             w.setBlock(x, y, z, lvl === 0 ? R.byName.obsidian.defaultState : R.byName.cobblestone.defaultState, 4);
-            this.game.particles.smoke(x + 0.5, y + 1, z + 0.5, 6); this.game.audio.play('zap');
+            this.game.particles.smoke(x + 0.5, y + 1, z + 0.5, 6); this.game.audio.play('zap', { at: [x + 0.5, y + 1, z + 0.5] });
             return;
           }
         }
@@ -436,7 +436,7 @@
         const on = powered() ? 1 : 0, pk = key3(x, y, z);
         if (on === (this.doorPow.has(pk) ? 1 : 0)) return;
         if (on) this.doorPow.add(pk); else this.doorPow.delete(pk);
-        if (t.has('open') && t.get(s, 'open') !== on) { w.setBlock(x, y, z, t.with(s, 'open', on), 4); if (k === 'door') { const oy = t.get(s, 'half') ? -1 : 1; const o2 = w.getBlock(x, y + oy, z); if (T.type[o2] === t.id) w.setBlock(x, y + oy, z, t.with(o2, 'open', on), 4); } g.audio.play('door'); }
+        if (t.has('open') && t.get(s, 'open') !== on) { w.setBlock(x, y, z, t.with(s, 'open', on), 4); if (k === 'door') { const oy = t.get(s, 'half') ? -1 : 1; const o2 = w.getBlock(x, y + oy, z); if (T.type[o2] === t.id) w.setBlock(x, y + oy, z, t.with(o2, 'open', on), 4); } g.audio.play('door', { at: [x + 0.5, y + 0.5, z + 0.5] }); }
       }
       else if (t.name === 'tnt') { if (powered()) this.primeTNT(x, y, z); }
       else if (t.name === 'volt_torch') {
@@ -518,7 +518,7 @@
         if (Math.hypot(x + 0.5 - b[0], z + 0.5 - b[2]) <= 1.9 && y <= b[1] + 1.8 && y + 1 >= b[1]) {
           // near: the whole door group opens (and stays open while someone is here)
           const cells = this.slideGroup(x, y, z, s);
-          if (!t.get(s, 'open') && this.setSlides(cells, 1) && g.audio) g.audio.play('door');
+          if (!t.get(s, 'open') && this.setSlides(cells, 1) && g.audio) g.audio.play('door', { at: [cells[0][0] + 0.5, cells[0][1] + 0.5, cells[0][2] + 0.5] });
           for (const c of cells) { const ck = c.join(','); open.set(ck, Math.max(now, open.get(ck) || 0)); }
         } else if (t.get(s, 'open') && !open.has(k)) open.set(k, now + 28);   // left open (a friend's click, a save): closes a little later when nobody is near
       }
@@ -527,7 +527,7 @@
         open.delete(k);
         const c = k.split(',').map(Number), d = Math.hypot(c[0] + 0.5 - q[0], c[2] + 0.5 - q[2]);
         if (d > 32 && !bodies.some(b => Math.hypot(c[0] + 0.5 - b[0], c[2] + 0.5 - b[2]) <= 32)) continue;
-        if (this.setSlides([c], 0) && d < 12 && g.audio && (c[1] === Math.floor(q[1]) || Math.random() < 0.3)) g.audio.play('door');
+        if (this.setSlides([c], 0) && d < 12 && g.audio && (c[1] === Math.floor(q[1]) || Math.random() < 0.3)) g.audio.play('door', { at: [c[0] + 0.5, c[1] + 0.5, c[2] + 0.5] });
       }
     }
     // a right click opens the whole sliding door as well — and keeps it open long enough (2 s) to walk up to it from a few
@@ -535,7 +535,7 @@
     slideOpen(x, y, z, s) {
       if (!this.isSlide(s)) return false;
       const g = this.game, open = this.slides || (this.slides = new Map()), cells = this.slideGroup(x, y, z, s);
-      if (this.setSlides(cells, 1) && g.audio) g.audio.play('door');
+      if (this.setSlides(cells, 1) && g.audio) g.audio.play('door', { at: [cells[0][0] + 0.5, cells[0][1] + 0.5, cells[0][2] + 0.5] });
       for (const c of cells) { const ck = c.join(','); open.set(ck, Math.max(this.tick + 28, open.get(ck) || 0)); }
       return true;
     }
@@ -567,11 +567,11 @@
         if (t.o.sapling) { this.growTree(x, y, z, t.o.sapling); if (!p.creative) p.inv.consumeHeld(1); return true; }
         if (t.name === 'grass_block') { for (let k = 0; k < 18; k++) { const ax = x + ((Math.random() * 7) | 0) - 3, az = z + ((Math.random() * 7) | 0) - 3; if (R.T.type[w.getBlock(ax, y, az)] === t.id && !w.getBlock(ax, y + 1, az)) w.setBlock(ax, y + 1, az, Math.random() < 0.85 ? R.byName.short_grass.defaultState : R.byName[['poppy', 'dandelion', 'cornflower', 'allium'][(Math.random() * 4) | 0]].defaultState, 4); } if (!p.creative) p.inv.consumeHeld(1); return true; }
       }
-      if (hd && hd.tool === 'hoe' && (t.name === 'grass_block' || t.name === 'dirt') && !w.getBlock(x, y + 1, z)) { w.setBlock(x, y, z, R.byName.farmland.defaultState, 4); g.audio.place(s); p.damageHeld(1); return true; }
-      if (hd && hd.tool === 'axe' && /_log$/.test(t.name) && R.byName['stripped_' + t.name]) { const st = R.byName['stripped_' + t.name]; w.setBlock(x, y, z, st.with(st.defaultState, 'axis', t.get(s, 'axis')), 4); g.audio.place(s); p.damageHeld(1); return true; }
+      if (hd && hd.tool === 'hoe' && (t.name === 'grass_block' || t.name === 'dirt') && !w.getBlock(x, y + 1, z)) { w.setBlock(x, y, z, R.byName.farmland.defaultState, 4 | VR.SB_EDIT); g.audio.place(s); p.damageHeld(1); return true; }
+      if (hd && hd.tool === 'axe' && /_log$/.test(t.name) && R.byName['stripped_' + t.name]) { const st = R.byName['stripped_' + t.name]; w.setBlock(x, y, z, st.with(st.defaultState, 'axis', t.get(s, 'axis')), 4 | VR.SB_EDIT); g.audio.place(s); p.damageHeld(1); return true; }
       // the shovel makes a path of cut grass — and of any grass in the Klassisch look, where natural ground keeps its
       // cube shape anyway (no cut / smooth toggle there: it would change nothing you can see)
-      if (hd && hd.tool === 'shovel' && (t.name === 'grass_block_cut' || (t.name === 'grass_block' && VR.LOOK && !VR.LOOK.ground)) && !w.getBlock(x, y + 1, z) && R.byName.dirt_path) { w.setBlock(x, y, z, R.byName.dirt_path.defaultState, 4); g.audio.place(s); p.damageHeld(1); return true; }
+      if (hd && hd.tool === 'shovel' && (t.name === 'grass_block_cut' || (t.name === 'grass_block' && VR.LOOK && !VR.LOOK.ground)) && !w.getBlock(x, y + 1, z) && R.byName.dirt_path) { w.setBlock(x, y, z, R.byName.dirt_path.defaultState, 4 | VR.SB_EDIT); g.audio.place(s); p.damageHeld(1); return true; }
       if (hd && hd.tool === 'shovel' && this.toggleCut(x, y, z, s, p, false)) return true;
       if (t.o.ui === 'chest' || /chest$|barrel|cargo_crate/.test(t.name)) { g.openContainer && g.openContainer(x, y, z, t); return true; }
       if (/furnace|smoker/.test(t.name)) { g.openFurnace && g.openFurnace(x, y, z, t); return true; }
@@ -589,7 +589,7 @@
       if (!smooth) {
         const toName = VR.CUT_OF[t.name]; if (!toName) return false;
         const to = R.byName[toName]; if (!to) return false;
-        w.setBlock(x, y, z, to.state(t.decode(s)), 5);
+        w.setBlock(x, y, z, to.state(t.decode(s)), 5 | VR.SB_EDIT);
         g.audio.place(s); p.damageHeld(1);
         this.say(T('g.sim.hard'));
         return true;
@@ -603,7 +603,7 @@
         const cs = w.getBlock(cx, cy, cz), ct = R.types[R.T.type[cs]];
         if (!ct || !VR.SMOOTH_OF[ct.name]) continue;
         const to = R.byName[VR.SMOOTH_OF[ct.name]];
-        w.setBlock(cx, cy, cz, to.state(ct.decode(cs)), 5); n++;
+        w.setBlock(cx, cy, cz, to.state(ct.decode(cs)), 5 | VR.SB_EDIT); n++;
         for (let d = 0; d < 6; d++) {
           const nx = cx + VR.DX[d], ny = cy + VR.DY[d], nz = cz + VR.DZ[d];
           if (Math.abs(nx - x) > 6 || Math.abs(ny - y) > 4 || Math.abs(nz - z) > 6) continue;
@@ -623,7 +623,7 @@
         const ns = w.getBlock(nx, ny, nz); if (!ns) continue;
         const nt = R.types[R.T.type[ns]]; if (!nt || !VR.CUT_OF[nt.name]) continue;
         const to = R.byName[VR.CUT_OF[nt.name]]; if (!to) continue;
-        w.setBlock(nx, ny, nz, to.state(nt.decode(ns)), 5);
+        w.setBlock(nx, ny, nz, to.state(nt.decode(ns)), 5 | VR.SB_EDIT);
       }
     }
     onColumnLoaded() { /* reserved */ }

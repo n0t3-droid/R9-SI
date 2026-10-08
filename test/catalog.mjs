@@ -5,7 +5,7 @@
 // the game's creative inventory ★ tab).
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl', '--allow-file-access-from-files'] });
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 880 } });
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 880 }, locale: 'de-DE' });   // (the Studio follows the browser's language since i18n2: the checks read German)
 const page = await ctx.newPage();
 const logs = [];
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 900)));

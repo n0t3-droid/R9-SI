@@ -52,6 +52,11 @@
     const tiles = el('div', 'tiles');
     for (const k of TILES) { const b = el('button', 'tile ' + k); b.type = 'button'; b.dataset.act = 'tile'; b.dataset.tile = k; b.innerHTML = `<span class="pic" aria-hidden="true">${SVG[k]}</span><span class="lbl"></span><span class="sub2"></span>`; tiles.appendChild(b); }
     box.appendChild(tiles);
+    // 🧸 Kindersicher (F5): one tap into a peaceful Zen world, the child-safe settings on
+    const kids = el('button', 'btn kids'); kids.type = 'button'; kids.dataset.act = 'kids';
+    kids.textContent = tx('g.set.kids', null, '🧸 Kindersicher', '🧸 Child-safe');
+    kids.title = tx('g.set.kids.tip', null, 'Zen ohne Gegner und mit automatischem Springen. Ein Tipp auf dem Startbildschirm reicht.', 'Zen without enemies and with auto-jump. One tap on the start screen is enough.');
+    box.appendChild(kids);
     const sub = el('div', 'sub'); const w = el('button', 'lnk'); w.type = 'button'; w.dataset.act = 'worlds'; const n = el('button', 'lnk'); n.type = 'button'; n.dataset.act = 'newworld'; sub.appendChild(w); sub.appendChild(el('span', 'dot', '·')).setAttribute('aria-hidden', 'true'); sub.appendChild(n); box.appendChild(sub);
     const foot = el('div', 'below');
     foot.appendChild(el('div', 'studionote', '')).id = 'studionote';
@@ -90,6 +95,7 @@
     $('#title [data-act="worlds"]').textContent = tx('start.worlds', null, 'Andere Welt', 'Another world');
     $('#title [data-act="newworld"]').textContent = tx('start.newWorld', null, '＋ Neue Welt', '＋ New world');
     $('#title [data-act="settings"]').textContent = tx('start.settings', null, '⚙ Einstellungen', '⚙ Settings');
+    { const kb = $('#title [data-act="kids"]'); if (kb) { kb.textContent = tx('g.set.kids', null, '🧸 Kindersicher', '🧸 Child-safe'); kb.title = tx('g.set.kids.tip', null, 'Zen ohne Gegner und mit automatischem Springen. Ein Tipp auf dem Startbildschirm reicht.', 'Zen without enemies and with auto-jump. One tap on the start screen is enough.'); } }
     const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.setAttribute('aria-label', aa.title); aa.setAttribute('aria-pressed', String(p.scale >= 1.3)); aa.classList.toggle('on', p.scale >= 1.3);
     // (VR.Legal's own words when it has them — the overlay and its buttons say the same)
     for (const b of document.querySelectorAll('#ui [data-act="legal"]')) { const LG = VR.Legal; b.hidden = !legalOK(); b.textContent = LG && typeof LG.label === 'function' ? LG.label() : tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); if (LG && typeof LG.tip === 'function') b.title = LG.tip(); }
@@ -124,6 +130,16 @@
     g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
     return true;
   };
+  // 🧸 Kindersicher: a peaceful Zen world (no hostile creatures) — the last one of that kind, or a new "Kinderwelt"
+  ST.kids = async function () {
+    const g = game(); if (!g || g.state !== 'title') return false;
+    g.settings.kids = true; g.saveSettings();
+    const ws = await ST.listWorlds();
+    const zen = ws.find(w => w && w.mode === 'zen' && w.difficulty === 'peaceful');
+    if (zen) { g.loadWorld(zen); return true; }
+    g.createWorld({ name: tx('start.kidsWorld', null, 'Kinderwelt', 'Kids world'), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
+    return true;
+  };
   ST.bauen = async function () {
     const ws = await ST.listWorlds();
     const h = ws.length ? '#world/' + encodeURIComponent(ws[0].id) + '/karte' : '#bauen';
@@ -137,8 +153,9 @@
     panel.innerHTML = `<h2>🌍 ${esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))}</h2><div class="worldlist" id="worldlist"></div><div class="row gap wrow"><button class="btn primary" data-act="newworld">${esc(tx('start.newWorld', null, '＋ Neue Welt', '＋ New world'))}</button><button class="btn" data-act="back">${esc(tx('start.back', null, '← Zurück', '← Back'))}</button></div>`;
     panel.onclick = (e) => { const arm = $('#worlds .wcard button.arm'); if (arm && !arm.contains(e.target)) { arm.classList.remove('arm'); arm.textContent = tx('start.del', null, '🗑 Löschen', '🗑 Delete'); } };
   }
-  // one world, one card: ▶ · 🏗 · ✎ · 🗑 (the worlds screen and 🎒 Meins); seed and time are a Profi detail
-  function worldCard(w) {
+  // one world, one card: ▶ · 🏗 · ✎ · 🗑 (the worlds screen and 🎒 Meins; 🎒 Meins adds 📽 Zeitraffer); seed and time
+  // are a Profi detail
+  function worldCard(w, zeit) {
     const c = el('div', 'wcard'); c.dataset.id = w.id;
     c.innerHTML = `<div class="wtxt"><div class="wn"></div><div class="wm"></div></div><div class="wacts"></div>`;
     $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
@@ -146,6 +163,7 @@
     $('.wm', c).innerHTML = esc(modeName(w.mode)) + (when ? ' · ' + esc(when) : '') + `<span class="pro"> · Seed ${w.seed >>> 0}</span>`;
     const acts = $('.wacts', c);
     const BTN = [['play', tx('start.w.play', null, '▶ Spielen', '▶ Play'), 'primary'], ['bauen', tx('start.w.bauen', null, '🏗 Bauen', '🏗 Build'), ''], ['rename', tx('start.w.rename', null, '✎ Name', '✎ Rename'), ''], ['del', tx('start.del', null, '🗑 Löschen', '🗑 Delete'), 'danger']];
+    if (zeit) BTN.splice(2, 0, ['zeit', tx('meins.zeit', null, '📽 Zeitraffer', '📽 Time-lapse'), '']);
     for (const [k, label, cls] of BTN) { const b = el('button', 'btn small ' + cls); b.type = 'button'; b.dataset.act = 'w:' + k; b.dataset.w = k; b.dataset.id = w.id; b.textContent = label; if (k === 'rename' || k === 'del') b.setAttribute('aria-label', label + ' · ' + (w.name || '')); acts.appendChild(b); }
     return c;
   }
@@ -161,6 +179,7 @@
     const g = game(), id = b.dataset.id, w = (ST.worldsCache || []).find(x => x.id === id); if (!w) return;
     if (k === 'play') { g.loadWorld(w); return; }
     if (k === 'bauen') { try { location.href = 'studio.html' + (location.search || '') + '#world/' + encodeURIComponent(id) + '/karte'; } catch (e) { /* */ } return; }
+    if (k === 'zeit') { if (VR.Zeit) VR.Zeit.openWorld(w); return; }   // 📽: in this world now, or it opens and plays
     if (k === 'rename') {
       const card = b.closest('.wcard'), nm = $('.wn', card); if (!nm || $('input', nm)) return;
       const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 40; inp.value = w.name || ''; nm.textContent = ''; nm.appendChild(inp); inp.focus(); inp.select();
@@ -190,6 +209,7 @@
           <button type="button" class="btn primary" data-act="resume" data-t="g.pause.resume"></button>
           <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
           <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
+          <button type="button" class="btn" data-act="zeitraffer" data-t="g.pause.zeit" data-tt="g.pause.zeitTip"></button>
           <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
         </div>
         <div class="pgrp pside">
@@ -243,9 +263,11 @@
     switch (a) {
       case 'tile': { const k = b && b.dataset.tile; if (k === 'play') ST.play(); else if (k === 'bauen') ST.bauen(); else if (k === 'erschaffen') ST.erschaffen(); else if (k === 'meins') ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true; }
       case 'worlds': ST.worlds(ui); return true;
+      case 'kids': ST.kids(); return true;
       case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
+      case 'zeitraffer': if (VR.Zeit) VR.Zeit.open(ui.screen === 'pause' ? 'pause' : null); return true;
       case 'legal': if (legalOK()) VR.Legal.open('impressum'); return true;
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;
@@ -274,7 +296,7 @@
     Dg.fillNow(body, 24);   // (the first screen of cards has its pictures at once; the rest as they scroll in)
     if (ws.length) {
       body.appendChild(el('div', 'grp', '🌍 ' + esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))));
-      for (const w of ws) { const c = worldCard(w); c.style.gridColumn = '1 / -1'; body.appendChild(c); }
+      for (const w of ws) { const c = worldCard(w, true); c.style.gridColumn = '1 / -1'; body.appendChild(c); }
     }
   };
   // the cards' actions on this page: 👁 and ✏️ open the R9 Studio on the thing, 📍 puts it in your hand (in play now,
@@ -287,11 +309,13 @@
       __game: true,
       view: (id) => studio('#ding/' + id),
       edit: (id) => studio('#ding/' + id + '/edit'),
-      canSet: (id) => /^[bmh]:/.test(id),
+      canSet: (id) => /^[bmhfp]:/.test(id) || (/^[kg]:/.test(id) && !!(VR.Bauhand && VR.Bauhand.pieceOf && VR.Bauhand.pieceOf(id))),   // (W2: everything but a place goes into the 🖐 Bauhand; a project as its Bauteil)
       canEdit: (id) => !/^p:/.test(id) || prefs().pro,
       set: (id) => {
         const g = game(), d = Dg.parse(id); if (!g || !d) return false;
         const item = d.kind === 'h' ? 'blueprint_' + d.key : d.key;
+        // (W2) a thing (not a block) goes into the 🖐 Bauhand: the ghost, a click places it
+        if (g.state === 'play' && g.player && ST.handAllowed(g.meta) && d.kind !== 'b' && VR.Bauhand) { g.ui.resume(); return VR.Bauhand.hold(id, { from: 'card' }); }
         if (g.state === 'play' && g.player && ST.handAllowed(g.meta) && VR.itemDef(item)) {
           const inv = g.player.inv; inv.slots[inv.sel] = { id: item, n: VR.maxStack(item) }; inv.changed = true; g.ui.updateHUD(true);
           g.ui.resume(); g.ui.hint(tx('hand.toast', { n: VR.itemName(item) }, '{n} — Rechtsklick setzt es', '{n} — right click places it'), 2600);
@@ -346,11 +370,17 @@
   // a Ding set from the start screen (📍 Setzen on a card) is in your hand when the world opens — your own world,
   // Creative or Zen (never a free item in Survival); r9si.hand is read once
   ST.handAllowed = (meta) => !!(meta && !meta.guest && (meta.mode === 'creative' || meta.mode === 'zen'));
+  // (B1: ✋ In die Hand from the Studio over the game puts it into the selected slot right away — liveloop.js)
+  ST.handIn = (g) => handIn(g);
   function handIn(g) {
     let h = null; try { h = JSON.parse(localStorage.getItem('r9si.hand') || 'null'); } catch (e) { h = null; }
     if (!h) return;
     try { localStorage.removeItem('r9si.hand'); } catch (e) { /* */ }
     const d = VR.Ding && VR.Ding.parse(h.ding); if (!d || !ST.handAllowed(g.meta) || (h.world && h.world !== g.meta.id)) return;
+    // (W2) ✨ „An meinem Platz" from the start screen with no world yet: it is planned now, in front of the spawn point
+    if (h.spot && VR.Wizard && VR.Wizard.spotHere) { VR.Wizard.spotHere(h.ding, h.name); return; }
+    // a thing (not a block) is in the 🖐 Bauhand: its ghost, one click places it
+    if (d.kind !== 'b' && VR.Bauhand && VR.Bauhand.hold(h.ding, { name: h.name, from: h.from || 'card' })) return;
     const id = d.kind === 'h' ? 'blueprint_' + d.key : d.kind === 'b' || d.kind === 'm' ? d.key : null;
     if (!id || !VR.itemDef(id) || !g.player) return;
     const inv = g.player.inv; inv.slots[inv.sel] = { id, n: VR.maxStack(id) }; inv.changed = true;
@@ -401,7 +431,7 @@
   if (VR.Game) {
     const origChat = VR.Game.prototype.chat;
     VR.Game.prototype.chat = function (text) {
-      if (typeof text === 'string' && /^\/help(\s|$)/i.test(text) && !prefs().pro) { this.ui.chatLine(tx('start.cmdHelp', null, 'Befehle: /bau <Wunsch> (z. B. „/bau Holzhaus mit Pool“) · /home · /sethome · /look klassisch | nahtlos · /wetter · /sprache — alle weiteren im Profi-Modus.', 'Commands: /bau <wish> (e.g. “/bau wooden house with pool”) · /home · /sethome · /look classic | seamless · /wetter · /lang — all others with Pro.'), '#cfe6ff'); return; }
+      if (typeof text === 'string' && /^\/help(\s|$)/i.test(text) && !prefs().pro) { this.ui.chatLine(tx('start.cmdHelp', null, 'Befehle: /bau <Wunsch> (z. B. „/bau Holzhaus mit Pool“) · /home · /sethome · /look klassisch | nahtlos · /wetter · /sprache — alle weiteren im Profi-Modus. (/bau und /wetter nicht im Überleben ohne Cheats.)', 'Commands: /bau <wish> (e.g. “/bau wooden house with pool”) · /home · /sethome · /look classic | seamless · /wetter · /lang — all others with Pro. (/bau and /wetter: not in survival without cheats.)'), '#cfe6ff'); return; }
       if (typeof text === 'string' && text.startsWith('/') && !prefs().pro && !ST.einfachCmd(text)) { this.ui.chatLine(tx('start.cmdPro', null, 'Befehle gibt es im Profi-Modus (Start · Profi).', 'Commands come with Pro (start screen · Pro).'), '#ffd27a'); return; }
       return origChat.call(this, text);
     };

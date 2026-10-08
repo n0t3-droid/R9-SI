@@ -20,9 +20,10 @@ console.log('pack', pack.length, 'items · load', loadMs, 'ms');
 {
   const snap = JSON.parse(fs.readFileSync('/home/claude/vr/test/id_snapshot.json', 'utf8'));
   // the snapshot lists the pack's items too (since v0.39), so "shipped before the pack" means the non-pack entries only
-  const packSet = new Set(names);
+  // — and not the variant slots (B1), which come after the pack (blocks_var.js)
+  const packSet = new Set(names), slot = (n) => /^var_\d+$/.test(n);
   let bad = 0, end = 1;
-  for (const [name, base, n] of snap) { if (!packSet.has(name)) end = Math.max(end, base + n); const t = R.byName[name]; if (!t || t.base !== base || t.nstates !== n) { if (bad++ < 5) console.log('    shifted: ' + name); } }
+  for (const [name, base, n] of snap) { if (!packSet.has(name) && !slot(name)) end = Math.max(end, base + n); const t = R.byName[name]; if (!t || t.base !== base || t.nstates !== n) { if (bad++ < 5) console.log('    shifted: ' + name); } }
   check(!bad, 'id snapshot: all ' + snap.length + ' shipped types keep their state ids');
   const first = pack.length ? Math.min(...pack.map(t => t.base)) : 0;
   check(pack.length > 0 && first >= end, 'the pack is appended after the last shipped state (' + (end - 1) + '), first pack state ' + first);

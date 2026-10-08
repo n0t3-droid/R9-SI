@@ -127,6 +127,27 @@
       if (shot.capAt && this.t >= shot.capAt && !this.capShown) { this.capShown = true; d.querySelector('.cap').textContent = shot.caption; }
       if (this.t >= shot.dur) { this.phase = 'next'; this.capShown = false; }
     }
+    // 📽 Zeitraffer (zeitraffer.js): the camera circles the build. o.center / o.radius: the whole build; o.focus /
+    // o.extent: where it is changing now and how big that burst is — the camera drifts there and frames it; o.end: the
+    // slower, wider orbit over the finished build; o.ground(x, z): the ground height (the camera stays above it).
+    // Spring-damped, so a jump of the focus becomes a glide. Returns the camera {x, y, z, yaw, pitch, fov}.
+    orbit(dt, o) {
+      const R = Math.max(6, o.radius || 12), X = Math.max(5, o.extent || R);
+      const s = this.orb || (this.orb = { a: Number.isFinite(o.angle) ? o.angle : 0.7, f: (o.focus || o.center).slice(), d: R * 2.3 + 14, el: 0.45, lift: 0 });
+      const k = 1 - Math.exp(-dt * (o.end ? 0.8 : 1.5));
+      const tg = o.focus || o.center;
+      for (let i = 0; i < 3; i++) s.f[i] += (tg[i] - s.f[i]) * k;
+      const want = o.end ? R * 2.3 + 14 : Math.min(R * 2.3 + 14, X * 2 + 16);
+      s.d += (want - s.d) * k * 0.7;
+      s.a += dt * (o.end ? 0.09 : 0.14);
+      s.el += ((o.end ? 0.5 : 0.42) - s.el) * k;
+      const ce = Math.cos(s.el), x = s.f[0] + Math.sin(s.a) * s.d * ce, z = s.f[2] + Math.cos(s.a) * s.d * ce;
+      let y = s.f[1] + Math.sin(s.el) * s.d;
+      if (o.ground) { const need = Math.max(0, o.ground(x, z) + 3 - y); s.lift += (need - s.lift) * Math.min(1, k * 3); y += s.lift; }
+      const dx = s.f[0] - x, dy = s.f[1] - y, dz = s.f[2] - z;
+      return { x, y, z, yaw: Math.atan2(-dx, -dz), pitch: Math.atan2(dy, Math.hypot(dx, dz)), fov: (o.fov || 62) * Math.PI / 180, roll: 0, fixed: true };
+    }
+    orbitReset() { this.orb = null; }
     // the fixed camera handed to the renderer
     cam(base) {
       if (!this.active) return null;

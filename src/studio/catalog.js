@@ -19,11 +19,13 @@
   const L = (k, de, v) => (VR.I18N && VR.I18N.t ? VR.I18N.t(k, v, de) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   const esc = (t) => String(t == null ? '' : t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const CAT = VR.StudioCatalog = { cat: 'all', sel: null, pick: null, lastHouse: null, edit: false, restore: null };
+  const TX = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
   const SA = !!C.SA;
 
   // ---------------------------------------------------------------- every block, by what it is for
   const KINDS = [['fav', '★', 'Favoriten'], ['all', '', 'Alle'], ['roof', '🏠', 'Dach'], ['light', '💡', 'Licht'], ['glass', '🪟', 'Fenster & Glas'], ['door', '🚪', 'Türen'], ['wall', '🧱', 'Wände'], ['floor', '🟫', 'Böden'], ['stairs', '🪜', 'Treppen & Stufen'], ['rail', '🏛', 'Geländer & Säulen'], ['garden', '🌳', 'Garten & Natur'], ['deco', '🪴', 'Deko & Dinge'], ['color', '🎨', 'Farben'], ['other', '…', 'Sonstiges']];
-  KINDS.splice(2, 0, ['modern', '🛋', 'Modern']);   // (W1 §6: ✨ is for Erschaffen only)   // the Modern Living pack (voxmodern.js): its models show here with their pictures
+  KINDS.splice(2, 0, ['modern', '🛋', 'Modern']);
+  KINDS.splice(2, 0, ['var', '⧉', 'Varianten']);   // (B1: your variants — an edited copy of a block, its own id)   // (W1 §6: ✨ is for Erschaffen only)   // the Modern Living pack (voxmodern.js): its models show here with their pictures
   const RX = [
     ['roof', /roof|(^|_)hip(_|$)|ridge|gutter|downpipe|shingle|thatch|chimney|(^|_)eaves?(_|$)|dormer|skylight|soffit|fascia/],
     ['glass', /glass|window|_pane$|_panes$|skylight|panorama/],
@@ -43,6 +45,8 @@
     ENT = []; BYID = new Map();
     for (const t of R.types) {
       if (!t || !t.cat || t.o.noItem || t.o.cutOf || t.name === 'air') continue;
+      // a variant (B1): with its source's kinds, and in ⧉ Varianten
+      if (t.o.variantOf) { if (VM.MODELS[t.name] && !t.o.modern) continue; const se = BYID.get(t.o.variantOf); const e = { id: t.name, t, kinds: ['var'].concat(se ? se.kinds.filter(k => k !== 'other') : t.o.modern ? ['modern'] : []) }; ENT.push(e); BYID.set(t.name, e); continue; }
       if (t.o.modern && VM.MODELS[t.name]) { const e = { id: t.name, t, kinds: t.o.toggle ? ['modern', 'light'] : ['modern'] }; ENT.push(e); BYID.set(t.name, e); continue; }
       if (VM.MODELS[t.name]) continue;   // furniture and facade pieces live in Möbel and Fassade
       if (t.o.kind === 'model' && t.has && t.has('part') && !(VX.spec && VX.spec(t.defaultState))) continue;
@@ -57,9 +61,12 @@
   }
   // a whole catalogue house as a favourite: blueprint_<i>
   const houseOf = (id) => { const m = /^blueprint_(\d+)$/.exec(id || ''); if (!m) return null; const h = C.HOUSES.find(x => x.i === +m[1]); return h || null; };
-  const disp = (id) => { const t = R.byName[id]; if (VM.MODELS[id]) return VM.MODELS[id].display; const h = houseOf(id); if (h) return h.name; if (t) return t.display || (t.o && t.o.display) || id; return VR.ITEMS && VR.ITEMS[id] ? VR.ITEMS[id].name || id : id; };
+  const disp = (id) => { const t = R.byName[id]; if (VM.MODELS[id]) return VR.dispName(VM.MODELS[id].display); const h = houseOf(id); if (h) return h.name; if (t) return t.display || (t.o && t.o.display) || id; return VR.ITEMS && VR.ITEMS[id] ? VR.ITEMS[id].name || id : id; };
   const kindLabel = (k) => { const e = KINDS.find(x => x[0] === k); return e ? (e[1] ? e[1] + ' ' : '') + L('cat.' + k, e[2]) : k; };
   CAT.kindsOf = (id) => { entries(); const e = BYID.get(id); return e ? e.kinds : []; };
+  // a variant came or went (B1): the list is made again; a look changed: the pictures
+  CAT.resetEntries = () => { ENT = null; BYID = null; toksOf.clear(); };
+  CAT.iconsClear = () => { if (icons) { icons.cache.clear(); icons.faceCache.clear(); } };
 
   // ---------------------------------------------------------------- search: whole words first, German words too
   // ("lampe", "dach", "fenster", "weiß" find what is called lamp, roof, window, white); "led" is not "chiseled"
@@ -135,6 +142,18 @@
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; iq.push([cv, id]); return cv;
   }
   CAT.picture = picture;
+  // (iconperf) the ✨ Modern pictures are also made in idle time, 10 s after the Studio is up, one per idle slice (VR.warmQueue):
+  // a thumbnail costs 40-200 ms on a busy machine (the mesher runs once per part, then the GPU read-back), so the chip finds
+  // them made instead of making them in its frames. They go into C.THUMB, the cache the chip reads.
+  (function warmModern(tries) {
+    const st = $('#studio');
+    if (!(st && !st.classList.contains('boot') && C.texInfo() && VR.warmQueue && C.thumbOf && C.THUMB)) { if ((tries || 0) < 400) setTimeout(() => warmModern((tries || 0) + 1), 700); return; }
+    const ids = Object.keys(VM.MODELS).filter(id => R.byName[id] && R.byName[id].o.modern && !C.THUMB.has(id));
+    if (!ids.length) return;
+    const w = VR.warmQueue(ids, (id) => { C.thumbOf(id); }, { notBefore: performance.now() + 10000 });
+    w.start();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) w.start(); });
+  })();
 
   // ---------------------------------------------------------------- hooks: answer while it is about us, else pass on
   function wrap(name, fn) { const prev = HOOK[name]; HOOK[name] = function (...a) { const r = fn.apply(null, a); if (r) return r; return prev ? prev.apply(null, a) : false; }; }
@@ -142,6 +161,7 @@
   // ---------------------------------------------------------------- the 🧱 Teile mode
   let lazyIO = null;
   C.MODES.parts = {
+    leave() { if (VR.LookPanel) VR.LookPanel.leave(null); },
     enter() {
       S.mode = 'parts'; S.cat = CAT.cat || 'all'; S.from = CAT.openFrom || null; CAT.openFrom = null;
       for (const b of $$('nav.modes button')) b.classList.toggle('on', b.dataset.mode === 'parts');
@@ -162,7 +182,7 @@
       const n = id === 'all' ? E.length : id === 'fav' ? favAll().length : E.filter(e => e.kinds.includes(id)).length;
       if (!n && id !== 'fav' && id !== 'all') continue;
       const b = document.createElement('button'); b.className = S.cat === id ? 'on' : ''; b.dataset.pcat = id;
-      b.innerHTML = (ic ? ic + ' ' : '') + esc(L('cat.' + id, de)) + '<b>' + n + '</b>';
+      b.innerHTML = (ic ? ic + ' ' : '') + esc(id === 'var' ? TX('live.st.varChip', null, 'Varianten', 'Variants') : L('cat.' + id, de)) + '<b>' + n + '</b>';
       b.onclick = () => { S.cat = CAT.cat = id; C.chips(); C.list(); };
       el.appendChild(b);
     }
@@ -184,6 +204,8 @@
       if (lazyIO) { const ph = document.createElement('div'); ph.className = 'th ph'; c.appendChild(ph); lazyIO.observe(c); } else { const cv = picture(e.id, 128, 84); cv.className = 'th'; c.appendChild(cv); }
       c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n" title="${esc(disp(e.id))}">${esc(disp(e.id))}</div><div class="s">${esc(e.kinds.filter(x => x !== 'other').map(kindLabel).join(' · ') || e.id)}</div></div>`);
       c.appendChild(favButton(e.id, () => { if (S.cat === 'fav') C.list(); C.chips(); }));
+      // ✏️ the block's 🎨 Aussehen (B1: colour, material, Als Variante)
+      if (VR.LookPanel && VR.Looks && VR.Looks.kindOf(e.id)) { const eb = document.createElement('button'); eb.className = 'editb'; eb.dataset.act = 'lookCard'; eb.textContent = '✏️'; eb.title = TX('live.st.editCard', null, 'Aussehen ändern — Farbe, Material, Variante', 'Change its look — colour, material, variant'); eb.onclick = (ev) => { ev.stopPropagation(); CAT.edit = true; select(e.id); }; c.appendChild(eb); }
       c.onclick = () => select(e.id);
       el.appendChild(c);
     }
@@ -239,6 +261,7 @@
   }
   CAT.favButton = favButton;
   async function select(id) {
+    if (VR.LookPanel) VR.LookPanel.leave(id);   // an unsaved 🎨 preview of another block goes back
     CAT.sel = id;
     for (const c of $$('#list .card[data-bid]')) c.classList.toggle('on', c.dataset.bid === id);
     const card = [...$$('#list .card[data-bid]')].find(c => c.dataset.bid === id); if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
@@ -286,6 +309,8 @@
     const fbClick = fb.onclick; fb.onclick = (ev) => { fbClick(ev); const on = FV().has(id); fb.className = 'cbtn' + (on ? ' on' : ''); fb.textContent = (on ? '★ ' : '☆ ') + L('fav.btn', 'Favorit'); };
     const ub = document.createElement('button'); ub.className = 'cbtn pro'; ub.innerHTML = '✋ ' + L('cat.use', 'Benutzen'); ub.title = L('cat.useT', 'In die Hand nehmen und im Crafter damit bauen'); ub.onclick = () => CAT.use(id);
     r.appendChild(ub); r.appendChild(fb); el.appendChild(r);
+    // 🎨 Aussehen (B1): the block's colour and material (✏️ opens it), a model's colours and materials
+    if (VR.LookPanel) { if (isModel) VR.LookPanel.modelBox(el, id); else if (CAT.edit) VR.LookPanel.box(el, id); }
     if (!isModel && CAT.edit) editBox(el, id);
   };
   // ✏️ for a block: the Varianten (a click selects one) and 🎨 — all of it in a house where it is used, replaced

@@ -37,7 +37,7 @@ console.log(`     world: ${ncol} columns, ${ncol * 16} sections`);
   world.scheduleMeshes(0, 4, 0, 0, 0, [8, 70, 8]);
   const first = pool.submitted.slice();
   let h = 2166136261 >>> 0; for (const [k, sy] of first) { h = fnv(h, k); h = fnv(h, sy); }
-  const EXPECT = 'e54b7c79';
+  const EXPECT = '47f25156';   // since F8 (v0.41) the job starts share the frame's streaming budget: 10 nearest sections on Balanced, not 24 (was e54b7c79)
   check(first.length > 0 && first.length <= 8 + 2 * 8, `one frame of scheduling asks for ${first.length} sections (the per-frame budget)`);
   check(h.toString(16).padStart(8, '0') === EXPECT, `the nearest ones first, the same ones as before (hash ${h.toString(16).padStart(8, '0')}, expected ${EXPECT})`);
   // the per-frame cost while the whole world is dirty: the submitted ones are 'pending' again next frame

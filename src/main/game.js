@@ -8,17 +8,20 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false },
-    low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true },
-    balanced: { renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true },
-    high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true },
-    ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true },
+    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false },
+    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true },
+    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true },
+    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true },
+    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
   // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
   // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
   const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
+  const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
+  const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -35,7 +38,8 @@
     loadSettings() {
       let s = {};
       try { s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); } catch (e) { s = {}; }
-      const out = Object.assign({}, DEFAULTS, s);
+      // the registry's defaults (F5 · Steuerung & Einstellungen) fill the keys the older table does not have
+      const out = Object.assign({}, VR.Settings ? VR.Settings.defaults() : {}, DEFAULTS, s);
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -55,12 +59,12 @@
       if (S.tsr === undefined) S.tsr = true;
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
-      if (r) r.setQuality({ scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite, atmoLUT: !!S.lite, shadowQ: [0, 2, 3, 3][S.shadows | 0] || 0, cloudSh: !S.lite && (S.shadows | 0) >= 1 });
+      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite, atmoLUT: !!S.lite, shadowQ: [0, 2, 3, 3][S.shadows | 0] || 0, cloudSh: !S.lite && (S.shadows | 0) >= 1 });
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
       if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
-      if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; }
+      if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
       if (this.audio) this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient });
       // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
@@ -97,6 +101,7 @@
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
+        if (VR.LiveLoop) VR.LiveLoop.updateLum(this);   // the recolour table follows the textures of the look
         this.texFromCache = fromCache; this.texMs = Math.round(performance.now() - t0);
         if (VR.LOOK.rim !== rim) { this.reloadTextures(); return; }   // switched again while these were built: once more
         if (this.icons) { this.icons.alb = tex.albedo[0]; this.icons.cache.clear(); this.icons.faceCache.clear(); }
@@ -156,6 +161,7 @@
       if (this.pool) this.pool.broadcast({ type: 'custom', custom: VR.CUSTOM });
       if (after !== before) { if (this.icons) this.icons.cache.clear(); this.remeshAll(); }
       if (this.gadgets && this.gadgets.blue) this.gadgets.blue.reset();
+      if (this.mp && this.mp.isHost && this.mp.sendPack) this.mp.sendPack(null);   // friends see the new model looks too (B1)
       const n = VR.Custom.count();
       if (this.ui && this.ui.toast && this.state === 'play') this.ui.toast('R9 Studio', T('g.studio.designs', { h: n.houses, m: n.models }));
       if (this.ui && this.ui.studioNote) this.ui.studioNote();
@@ -173,7 +179,7 @@
         if (this.glLost) return;
         this.glLost = true;
         console.warn('WebGL context lost — saving and reloading');
-        try { this.ui && this.ui.loading && this.ui.loading('Graphics were lost — saving…', 0.5); } catch (err) { /* the page may be half gone */ }
+        try { this.ui && this.ui.loading && this.ui.loading(T('g.gfx.lost'), 0.5); } catch (err) { /* the page may be half gone */ }
         const save = this.state === 'play' && this.meta && !this.meta.guest && this.world ? Promise.all([this.saveMeta(), this.world.saveAll()]) : Promise.resolve();
         Promise.race([save.catch(() => {}), new Promise((r) => setTimeout(r, 4000))]).then(() => { try { location.reload(); } catch (err) { /* nothing more to do */ } });
       }, false);
@@ -184,6 +190,7 @@
       this.env.wx.onThunder = (d) => { if (this.ambience) this.ambience.thunder(d); };
       this.store = new VR.Store();
       this.ui = new VR.UI(this);
+      if (VR.Touch) VR.Touch.mount(this);   // the touch layer (F5): shown only on a touch screen, in a game with no menu
       this.mp = VR.MP ? new VR.MP(this) : null;
       if (this.mp) this.mp.init();
       this.ui.loading(T('g.load.textures'), 0.05);
@@ -199,6 +206,8 @@
         if (e.key && VR.Edits && this.meta && !this.meta.guest && e.key === VR.Edits.listKey(this.meta.id) && this.gadgets && this.gadgets.blue) this.gadgets.blue.editT = 0;
         // the Studio changed this world's style (another tab of the same page)
         if (e.key && VR.WorldStyle && this.meta && !this.meta.guest && e.key === VR.WorldStyle.key(this.meta.id)) this.applyStyle();
+        // B1 „🎨 Aussehen": a block's look or a variant changed in the Studio (also the one over the game) — live, no reload
+        if (VR.LiveLoop) VR.LiveLoop.onStorage(this, e);
       });
       const n = VR.poolSize(navigator.hardwareConcurrency || 4, this.settings.preset);
       const src = document.getElementById('worker-src').textContent;
@@ -208,6 +217,8 @@
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
+      // the looks and variants of this browser (B1, looks.js): here and in every worker before the first mesh
+      if (VR.LiveLoop) VR.LiveLoop.boot(this);
       // the block textures: the last start with this build and look kept them (tex_cache.js; a read slower than 500 ms is
       // a miss), else they are forged in a worker and kept for the next start. A worker that fails (out of memory on a very
       // small machine) is tried once more on another, then the game says so instead of waiting forever behind the loading screen
@@ -218,7 +229,7 @@
         const forge = (wi) => new Promise((res) => this.pool.direct(wi, { type: 'textures', bevel: 1, bevelAll: rim0, classic: rim0 }, null, res));
         tex = await forge(0);
         if (tex.type !== 'textures') { console.warn('textures failed once:', tex.msg); tex = await forge(this.pool.workers.length > 1 ? 1 : 0); }
-        if (tex.type !== 'textures') { this.fatal('The block textures could not be built (' + (tex.msg || 'worker failed') + '). Close other tabs and reload.'); return; }
+        if (tex.type !== 'textures') { this.fatal(T('g.tex.failed', { why: tex.msg || T('g.tex.worker') })); return; }
         if (tkey) VR.TexCache.put(tkey, tex);
       }
       this.texMs = Math.round(performance.now() - tTex0);
@@ -226,6 +237,7 @@
       this.tex = tex; this.texRim = rim0;
       tex.noise = tex.noise;
       this.renderer.init(tex);
+      if (VR.LiveLoop) VR.LiveLoop.updateLum(this);
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
       this.trails = VR.Trails ? new VR.Trails(this) : null;
@@ -307,6 +319,8 @@
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
       this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style });
+      // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
+      if (VR.LiveLoop) VR.LiveLoop.openWorld(this, meta);
       const dim = meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld');
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
@@ -333,6 +347,7 @@
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
+      this.mirror = VR.MirrorBuild ? new VR.MirrorBuild(this) : null;   // 🪞 Spiegel-Bauen (off in every new session)
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
@@ -405,7 +420,8 @@
       if (fr) { fr.classList.remove('on'); setTimeout(() => { if (!this.studioOpen && fr) fr.src = 'about:blank'; }, 60); }
       this.studioOpen = false;
       this.last = performance.now();
-      // what the Studio did, in the world now
+      // what the Studio did, in the world now (a look missed by the storage event too)
+      if (VR.LiveLoop) VR.LiveLoop.apply(this);
       const b = this.gadgets && this.gadgets.blue;
       if (b) { b.loadPlans(); for (let i = 0; i < 10; i++) { b.editT = 0; b.tickEdits(0); } b.planT = 0; }
       this.applyStyle(true);
@@ -520,6 +536,7 @@
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
+      this.mirror = VR.MirrorBuild ? new VR.MirrorBuild(this) : null;   // 🪞 Spiegel-Bauen (off in every new session)
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
@@ -536,6 +553,7 @@
     leaveGuestWorld(msg) {
       if (this.mp) this.mp.clearSession();
       this.hostLook = null; this.applyLook();   // back to my own block look
+      if (VR.LiveLoop) VR.LiveLoop.endSession(this);   // and my own looks and variants (B1)
       try { if (this.starships) this.starships.shutdown(); if (this.gadgets) this.gadgets.shutdown(); } catch (e) { console.warn(e); }
       this.input.releaseLock();
       this.startTitle();
@@ -561,6 +579,7 @@
       m.player = this.player.toJSON(); m.time = this.env.ticks; m.day = this.env.day; m.lastPlayed = Date.now(); m.dim = this.dim;
       m.zenFreezeTime = this.zenFreezeTime; m.zenFreezeWeather = this.zenFreezeWeather;
       if (this.codex && this.codex.toJSON) m.codex = this.codex.toJSON();
+      if (VR.LiveLoop) VR.LiveLoop.metaVars(this, m);   // the variants its saved columns contain (B1)
       if (this.gadgets) this.gadgets.beforeSave(m);
       if (this.starships) this.starships.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
@@ -596,14 +615,78 @@
       this.fpsAcc = (this.fpsAcc || 0) + dt; this.fpsN = (this.fpsN || 0) + 1;
       if (this.fpsAcc > 0.5) { this.fps = this.fpsN / this.fpsAcc; this.fpsAcc = 0; this.fpsN = 0; }
       try {
+        // F5 · Steuerung: menus and the chat take the pad as focus, not as game keys; the pad and the touch layer are
+        // read once per frame, then the menu focus and the touch buttons follow
+        this.input.menuOpen = this.state !== 'play' || !!(this.ui && (this.ui.screen || this.ui.typing || this.ui.blocking)) || !!this.studioOpen;
+        this.input.beginFrame(dt);
+        if (VR.PadNav) VR.PadNav.frame(this);
+        if (VR.Touch) VR.Touch.frame(this);
         if (this.cockpit && this.state !== 'play') this.cockpit.updateHud(0, true);
         if (this.state === 'title') this.titleFrame(dt);
         else if (this.state === 'loading') this.loadingFrame(dt);
         else if (this.state === 'play') { if (!this.studioOpen) this.playFrame(dt); }
         if (this.mp) this.mp.update(dt);
+        if (this.bench) this.benchTick();
+        this.capturePreview();   // the settings' live preview: the frame just drawn, if one was asked for
       } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine(T('g.chat.error', { msg: e.message }), '#ff8a8a'); } }
       this.input.endFrame();
       this.jsMs += (performance.now() - tj0 - this.jsMs) * 0.08;
+    }
+    // ---------------------------------------------------------------- F5 · Steuerung & Einstellungen
+    // the settings' preview thumbnail: the frame two frames after a graphics change (the new setting has taken effect)
+    requestPreview() { this.previewAt = this.frame + 2; }
+    capturePreview() {
+      if (!this.previewAt || this.frame < this.previewAt) return;
+      this.previewAt = 0;
+      const c = this.ui && this.ui.previewCtx;
+      if (!c || !this.canvas || !this.canvas.width) return;
+      try { c.drawImage(this.canvas, 0, 0, c.canvas.width, c.canvas.height); } catch (e) { /* no picture this frame */ }
+    }
+    // ⚡ Automatik: 3 s of frame times on the scene the player stands in (the first half second is warm-up), then the
+    // table in bench.js picks the preset and the view distance for 60 fps (30 on a weak machine)
+    benchStart() {
+      if (this.bench) return false;
+      this.bench = { t: 0, last: 0, dts: [], was: { preset: this.settings.preset, renderDist: this.settings.renderDist } };
+      if (this.ui && this.ui.benchBegin) this.ui.benchBegin();
+      return true;
+    }
+    // wall-clock time between two frames (the loop's dt is clamped for the physics; a slow machine must still finish in 3 s)
+    benchTick() {
+      const b = this.bench; if (!b) return;
+      const now = performance.now();
+      if (b.last) { const d = now - b.last; b.t += d; if (b.t > 500 && d > 0) b.dts.push(d); }
+      b.last = now;
+      if (b.t >= 3000) this.benchFinish();
+    }
+    benchFinish() {
+      const b = this.bench; if (!b || !VR.Bench) return null;
+      this.bench = null;
+      const S = this.settings, sum = VR.Bench.summarize(b.dts);
+      const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist), target: 60 });
+      if (d.action !== 'none') {
+        Object.assign(S, PRESETS[d.preset]); S.preset = d.preset; S.renderDist = d.renderDist;
+        this.applySettings('*'); this.saveSettings();
+      }
+      this.benchResult = Object.assign({}, d, { n: sum.n, median: sum.median, p90: sum.p90, measured: sum.fps, before: b.was, when: Date.now() });
+      if (this.ui && this.ui.benchDone) this.ui.benchDone(this.benchResult);
+      return this.benchResult;
+    }
+    // the quality governor made visible: the ⚙ line lists the steps it has taken (GPU ladder, then CPU ladder)
+    aqWhat() {
+      const aq = this.aq; if (!aq) return '';
+      const out = [];
+      for (let i = 0; i < Math.min(AQ_G.length, aq.g | 0); i++) out.push(T(AQ_G[i]));
+      for (let i = 0; i < Math.min(AQ_C.length, aq.c | 0); i++) out.push(T(AQ_C[i]));
+      return out.join(' · ');
+    }
+    aqChanged() {
+      if (typeof document === 'undefined') return;
+      const aq = this.aq, on = !!(aq && aq.stack && aq.stack.length) && this.state === 'play';
+      let h = document.getElementById('aqhint');
+      if (!h) { h = document.createElement('div'); h.id = 'aqhint'; h.setAttribute('role', 'status'); h.hidden = true; (document.getElementById('ui') || document.body).appendChild(h); }
+      h.hidden = !on;
+      if (on) { h.textContent = T('g.aq.hint'); h.title = T('g.aq.tip', { what: this.aqWhat() }); }
+      if (this.ui && this.ui.screen === 'settings' && VR.SettingsPanel) VR.SettingsPanel.aqLine(this.ui);
     }
     // ---------------------------------------------------------------- R9 Smart Quality
     // The old "dynamic resolution" blurred the picture whenever the frame rate dropped — and near villages
@@ -617,6 +700,7 @@
     // Every step is probed: if it does not buy frame rate it is undone and the other ladder is tried.
     // Everything is undone again when the frame rate has been fine for a while. The user's settings never change.
     smartQuality(dt, S, w) {
+      if (this.bench) return;   // the Automatik run measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
       const aq = this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null });
       if (!S.dynRes || !this.fps) {
@@ -683,19 +767,17 @@
         (o) => { o.clouds = Math.min(S.clouds, 1); o.vxLod = Math.max(16, Math.round((S.vxLod || 48) * 0.4)); },
         (o) => { o.scale = Math.max(floor, S.scale - 0.1); o.sharpen = Math.max(S.sharpen ? 0.35 : 0, 0.45); },
         (o) => { o.scale = Math.max(floor - 0.08, S.scale - 0.2); o.sharpen = 0.55; },
-        (o) => { o.hz = 1; },
-        (o) => { o.rd = 1; },
-        (o) => { o.rd = 2; },
       ];
       return list;
     }
     aqCpuRungs(S) {
       return [
+        // F8: the streaming rate goes first (uploads per frame), the view distance never (no rd / hz rungs)
+        (o) => { o.stream = 1; },
+        (o) => { o.stream = 2; },
         (o) => { o.sim = 1; },
         (o) => { o.folkDist = 56; },
         (o) => { o.mesh = 3; o.folkDist = 44; },
-        (o) => { o.rd = 1; },
-        (o) => { o.rd = 2; },
       ];
     }
     aqPush(aq, kind, S, w) { if (kind === 'g') aq.g++; else aq.c++; aq.stack.push(kind); this.aqApply(aq, S, w); if (VR.AQ_TRACE) console.log('aq push', kind, aq.stack.join(''), 'fps', (aq.fpsWin || this.fps || 0).toFixed(0), 't', this.time.toFixed(1)); }
@@ -714,6 +796,7 @@
       const rd = Math.max(5, rdBase - (o.rd || 0));
       if (w && w.renderDist !== rd) w.renderDist = rd;
       if (w) w.meshBudget = o.mesh || 6;
+      if (w) w.streamRung = o.stream || 0;   // F8: the upload rate (world.uploadBudget)
       this.folkDist = Math.min(this.folkBase || 100, o.folkDist || 100);
       this.simSlow = !!o.sim || !!this.slowBase;
       const hz = this.horizon;
@@ -722,6 +805,7 @@
         else if (aq.hzBase >= 0) { hz.setLevel(aq.hzBase); aq.hzBase = -1; }
       }
       aq.over = o;
+      this.aqChanged();
     }
     farFor(w, extra) { const hf = this.horizon ? this.horizon.farPlane() : 0; return Math.max(w.renderDist * 16 + (extra || 200), hf); }
     envFor(pos, dt, extra) {
@@ -797,11 +881,15 @@
       if (this.prewarm) this.prewarm.stop();
       this.prewarm = VR.VM.prewarm({ notBefore: performance.now() + 10000 });
       this.prewarm.start();
-      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden && this.prewarm) this.prewarm.start(); }); }
+      // (iconperf) the Modern Living pictures are made the same way (VR.iconWarm): the tab then opens without a build
+      if (this.iconWarm) this.iconWarm.stop();
+      if (VR.iconWarm && this.icons) this.iconWarm = VR.iconWarm(this.icons, this.creativeItems('vmodern'), { notBefore: performance.now() + 10000 });
+      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (this.prewarm) this.prewarm.start(); if (this.iconWarm) this.iconWarm.start(); } }); }
     }
     playFrame(dt) {
       const g = this, p = this.player, w = this.world, input = this.input;
       this.time += dt;
+      if (VR.LiveLoop) VR.LiveLoop.tick(this);   // a look changed: the sections that show it are meshed again, a few a frame
       this.handleKeys();
       const gad = this.gadgets, driving = gad && gad.controlling;
       if (this.entities && !this.ui.blocking && !driving) this.entities.playerAttack();
@@ -816,11 +904,13 @@
       if (this.entities) this.entities.update(dt);
       if (this.villages) this.villages.update(dt);
       if (gad) gad.tick(dt);
+      if (this.mirror) this.mirror.update(dt);
       if (this.starships) this.starships.update(dt);
       if (this.traffic) this.traffic.update(dt);
       if (this.director) this.director.update(dt);
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
+      w.viewDir = [-Math.sin(p.yaw), -Math.cos(p.yaw)];   // the way the player looks (flat): uploads ahead come first
       w.update(p.pos[0], p.pos[1], p.pos[2], performance.now());
       const eye = p.eyePos();
       const headState = w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2]));
@@ -879,6 +969,7 @@
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
+        guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
         drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
         drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
@@ -887,8 +978,9 @@
       // audio
       // ambience (ambience.js): the wind, the rain and thunder, the birds, crickets and water of this place
       if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0, underwater: underwater || inLava });
+      this.audio.listen(eye, p.yaw, w, underwater || inLava);   // the ear: where it is and which way it faces (F4 · Klang)
       const skyAtEye = (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12);
-      this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true });
+      this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true, day: this.env.day, mobs: this.entities ? this.entities.mobs : null, agents: this.villages ? this.villages.agents : null });
       // HUD
       this.ui.updateHUD();
       if (this.debugOn) this.ui.debug(this.debugText(cam, E));
@@ -928,6 +1020,8 @@
         return;
       }
       if (i.hit('KeyE') && this.player && !this.player.dead) { if (ui.screen === 'inventory') ui.closeInventory(); else if (!ui.screen) ui.openInventory(); return; }
+      // ⇧M: 🪞 Spiegel-Bauen (aus → X → Z → 4-fach → 8-fach → aus); M alone stays the Weltkarte
+      if (i.hit('KeyM') && (i.down('ShiftLeft') || i.down('ShiftRight'))) { if (!ui.screen && this.mirror) this.mirror.key(); return; }
       if (i.hit('KeyM') && this.map) { if (ui.screen === 'mapscreen') { ui.resume(); return; } if (!ui.screen) { this.map.openBig(); return; } }
       // F over an item in the inventory: ★ favourite (shared with the R9 Studio)
       if (ui.screen === 'inventory' && i.hit('KeyF') && ui.hoverId && ui.toggleFav) { ui.toggleFav(ui.hoverId); return; }
@@ -1041,7 +1135,7 @@
           let x = t.x, y = t.y, z = t.z;
           if (!(R.T.flags[t.state] & F.REPLACE)) { x += VR.DX[t.face]; y += VR.DY[t.face]; z += VR.DZ[t.face]; }
           const fl = R.byName[def.fluid]; if (!fl) return false;
-          w.setBlock(x, y, z, fl.defaultState, 4);
+          w.setBlock(x, y, z, fl.defaultState, 4 | VR.SB_EDIT);
           this.audio.play('splash');
           if (!p.creative) { stack.id = 'bucket'; p.inv.changed = true; }
           return true;
@@ -1066,15 +1160,15 @@
     }
     breakMulti(x, y, z, s) {
       const w = this.world, t = R.types[R.T.type[s]];
-      if (t.o.kind === 'door' || t.o.tall) { const oy = t.get(s, 'half') ? -1 : 1; if (R.T.type[w.getBlock(x, y + oy, z)] === t.id) w.setBlock(x, y + oy, z, 0, 4); }
+      if (t.o.kind === 'door' || t.o.tall) { const oy = t.get(s, 'half') ? -1 : 1; if (R.T.type[w.getBlock(x, y + oy, z)] === t.id) w.setBlock(x, y + oy, z, 0, 4 | VR.SB_EDIT); }
       if ((t.o.kind === 'model' || t.o.vxModel) && VR.VM && VR.VM.MODELS[t.name]) {
         // a VX16 model: find its anchor from the broken part's offset, then clear every part
         const f = t.get(s, 'facing'), pi = t.get(s, 'part'), m = VR.VM.MODELS[t.name], fp = VR.VM.footprint(m, f);
         const me = fp.find(o => o[3] === pi) || [0, 0, 0, 0];
         const ax = x - me[0], ay = y - me[1], az = z - me[2];
-        for (const [dx, dy, dz] of fp) { const bx = ax + dx, by = ay + dy, bz = az + dz; if (bx === x && by === y && bz === z) continue; if (R.T.type[w.getBlock(bx, by, bz)] === t.id) w.setBlock(bx, by, bz, 0, 4); }
+        for (const [dx, dy, dz] of fp) { const bx = ax + dx, by = ay + dy, bz = az + dz; if (bx === x && by === y && bz === z) continue; if (R.T.type[w.getBlock(bx, by, bz)] === t.id) w.setBlock(bx, by, bz, 0, 4 | VR.SB_EDIT); }
       }
-      if (t.o.kind === 'bed') { const f = t.get(s, 'facing'), head = t.get(s, 'part'); const d = head ? -1 : 1; const ox = x + VR.HF_DX[f] * d, oz = z + VR.HF_DZ[f] * d; if (R.T.type[w.getBlock(ox, y, oz)] === t.id) w.setBlock(ox, y, oz, 0, 4); }
+      if (t.o.kind === 'bed') { const f = t.get(s, 'facing'), head = t.get(s, 'part'); const d = head ? -1 : 1; const ox = x + VR.HF_DX[f] * d, oz = z + VR.HF_DZ[f] * d; if (R.T.type[w.getBlock(ox, y, oz)] === t.id) w.setBlock(ox, y, oz, 0, 4 | VR.SB_EDIT); }
     }
 
     // ---------------------------------------------------------------- chat & commands
@@ -1088,19 +1182,19 @@
       const info = I.langs.find(l => l[0] === code);
       say(info ? T('g.cmd.langSoon', { name: info[1] }) : T('g.cmd.lang', { name: T('g.lang.name') }), '#ffd27a');
     }
-    // /wetter <klar|bewölkt|nebel|regen|gewitter|schnee|auto>: the sky now, or auto = the world's own schedule again
+    // /wetter <klar|bewölkt|nebel|regen|gewitter|schnee|auto> (/weather <clear|cloudy|fog|rain|storm|snow|auto>): the sky now, or auto = the world's own schedule again
     wetterCommand(a) {
       const say = (m, c) => this.ui.chatLine(m, c || '#cfe6ff'), wx = this.env.wx;
-      if (this.mp && this.mp.isClient) { say('Das Wetter bestimmt der Gastgeber.', '#ffcf8a'); return; }
+      if (this.mp && this.mp.isClient) { say(T('g.wx.host'), '#ffcf8a'); return; }
       const word = (a || []).join(' ').trim();
-      if (!word) { say('Wetter: ' + wx.info() + ' · /wetter klar|bewölkt|nebel|regen|gewitter|schnee|auto'); return; }
+      if (!word) { say(T('g.wx.now', { w: wx.info() })); return; }
       const kind = VR.WX.parse(word);
-      if (kind === null) { say('Das Wetter kenne ich nicht. Nimm: klar · bewölkt · nebel · regen · gewitter · schnee · auto', '#ff8a8a'); return; }
-      if (kind === 'auto') { wx.force(null); say('Wetter: wie es der Zeitplan der Welt will.'); return; }
+      if (kind === null) { say(T('g.wx.unknown'), '#ff8a8a'); return; }
+      if (kind === 'auto') { wx.force(null); say(T('g.wx.auto')); return; }
       wx.force(kind);
-      const shown = wx.clamp(kind);     // the Wetter setting (Audio › Atmosphäre) wins over the command
-      say('Wetter: ' + VR.WX.label(shown));
-      if (shown !== kind) say('Die Einstellung Wetter (Audio › Atmosphäre) lässt nur ' + VR.WX.label(shown) + ' zu.', '#ffcf8a');
+      const shown = wx.clamp(kind);     // the Wetter setting (Ton › Atmosphäre) wins over the command
+      say(T('g.cmd.weather', { w: VR.WX.label(shown) }));
+      if (shown !== kind) say(T('g.wx.limited', { w: VR.WX.label(shown), tab: T('g.set.audio') }), '#ffcf8a');
     }
     chat(text) {
       if (!text.startsWith('/')) { if (this.mp && this.mp.active) this.mp.chat(text); else this.ui.chatLine('<' + T('g.chat.you') + '> ' + text); return; }
@@ -1113,6 +1207,7 @@
         if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0(T('g.cmd.spawn')); return; }
         if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0(T('g.cmd.helpHome')); return; }
         if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0(T('g.cmd.sethome')); return; }
+        if (c0 === 'spiegel' || c0 === 'mirror') { if (this.mirror) this.mirror.command(a0); return; }   // 🪞 x|z|4|8|aus (Überleben: a kind hint)
         if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? T('g.cmd.players', { list: L.map(q => q.name + (q.host ? ' ' + T('g.mp.hostTag') : '') + ' ' + Math.round(q.dist) + 'm').join(', ') }) : T('g.cmd.onlyYou')); return; }
         if (c0 === 'tphost' && this.mp && this.mp.isClient) { this.mp.teleportToHost(); return; }
         if (c0 === 'call' && this.mp && this.mp.isHost) { const n = (a0.join(' ') || '').toLowerCase(); const q = this.mp.players().find(x => !n || x.name.toLowerCase().startsWith(n)); if (q) this.mp.summon(q.peer); else say0(T('g.cmd.noPlayer', { name: n }), '#ff8a8a'); return; }

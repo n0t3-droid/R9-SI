@@ -100,6 +100,9 @@
       this.setAniso(4);
       // noise
       this.texNoise = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: tex.noise, wrap: gl.REPEAT, filter: gl.LINEAR });
+      // the average luminance per texture layer (64 × 64, R32F) for recoloured blocks (B1 „🎨 Aussehen", looks.js) —
+      // filled by the game for the layers a look uses; never part of the cached textures
+      this.texAvgLum = GL.tex2D(64, 64, gl.R32F, gl.RED, gl.FLOAT, { data: new Float32Array(4096).fill(0.5), filter: gl.NEAREST });
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
@@ -112,6 +115,7 @@
       this.expCur = 0;
       this.buildPrograms();
       this.buildStatic();
+      this.initPuffs();
       // origins UBO
       if (this.multi) {
         this.ubo = gl.createBuffer();
@@ -121,6 +125,11 @@
       }
       this.emptyVAO = gl.createVertexArray();
       this.resize(true);
+    }
+    setAvgLum(table) {
+      const gl = this.gl; if (!this.texAvgLum || !table) return;
+      gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.FLOAT, table);
     }
     setAniso(level) {
       const gl = this.gl, ext = GL.ext.aniso;
@@ -136,17 +145,19 @@
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(sq === 3 ? ['SHQ3'] : sq === 2 ? ['SHQ2'] : []).concat(atmo);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs)
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh]));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT']));
-      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh]));
+      // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE']));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE']));
+      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE']));
       P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL']);
       P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT']);
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
-      P.sky = GL.program(S.SKY_VS, S.SKY_FS, 'sky', atmo);
+      P.sky = GL.program(S.SKY_VS, S.SKY_FS, 'sky', atmo.concat(this.q.lite ? ['LITE'] : []));   // LITE: two-octave nebula, no dust (Very Low)
       P.expose = GL.program(S.FS_VS, S.EXPOSE_FS, 'expose');
       P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud');
+      P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff');   // t-clouds: cumulus, fog banks, anchors (balanced and above)
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
       P.down = GL.program(S.FS_VS, S.DOWN_FS, 'down');
       P.up = GL.program(S.FS_VS, S.UP_FS, 'up');
@@ -593,6 +604,14 @@
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
+      // the sky bodies (skybodies.js): directions and angular radii of the giant, the blue planet and the four moons
+      const B = E.bodies;
+      if (B) {
+        const v4 = (n, a) => { if (u[n]) gl.uniform4f(u[n], a[0], a[1], a[2], a[3]); };
+        v4('u_giant', [B.giant[0], B.giant[1], B.giant[2], B.radius.giant]);
+        v4('u_blue', [B.blue[0], B.blue[1], B.blue[2], B.radius.blue]);
+        for (let mi = 0; mi < 4; mi++) v4('u_moon' + mi, B.moons[mi]);
+      }
       // the block look (Klassisch v2): natural blocks shaded per block, normal maps turned with the tile, still water
       // and the far terrain per block
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
@@ -613,6 +632,7 @@
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); if (p.u.u_albedo) gl.uniform1i(p.u.u_albedo, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texMaterial); if (p.u.u_material) gl.uniform1i(p.u.u_material, 1);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
+      if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {
@@ -647,7 +667,7 @@
           gl.bufferSubData(gl.UNIFORM_BUFFER, 0, org, 0, cnt * 4);
           GL.ext.multiDraw.multiDrawArraysWEBGL(gl.TRIANGLES, firsts, 0, counts, 0, cnt);
         } else {
-          for (let i = 0; i < cnt; i++) { gl.uniform3f(prog.u.u_origin, org[i * 4], org[i * 4 + 1], org[i * 4 + 2]); gl.drawArrays(gl.TRIANGLES, firsts[i], counts[i]); }
+          for (let i = 0; i < cnt; i++) { gl.uniform3f(prog.u.u_origin, org[i * 4], org[i * 4 + 1], org[i * 4 + 2]); if (prog.u.u_fade) gl.uniform1f(prog.u.u_fade, org[i * 4 + 3]); gl.drawArrays(gl.TRIANGLES, firsts[i], counts[i]); }
         }
         this.stats.draws += this.multi ? 1 : cnt;
         cnt = 0;
@@ -656,11 +676,15 @@
         const s = list[reverse ? n - 1 - k : k];
         const m = s.mesh[layer];
         if (!m) continue;
+        // a chunk section in its fade-in (s.fade, 0..1) is dithered in by the terrain shader; one not shown yet (0) is
+        // skipped: it is invisible and casts no shadow. Sections without a fade (ships, props) are whole.
+        const fade = s.fade === undefined ? 1 : s.fade;
+        if (fade <= 0) continue;
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
         firsts[cnt] = m.off; counts[cnt] = m.count;
-        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = 0;
+        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = fade;
         cnt++;
         this.stats.tris += m.count / 3;
       }
@@ -788,6 +812,8 @@
     }
     drawClouds(E) {
       if (!this.q.clouds || E.dimId !== 0 && E.dimId !== 3) return;
+      // balanced and above (t-clouds): the cumulus as sprites, the fog banks under the Sky Isles and the citadel's anchors
+      if (this.q.clouds >= 2 && E.dimId === 0) { this.drawPuffs(E); return; }
       const gl = this.gl, cam = this.cam;
       const { cell, wind } = this.updateClouds(E, cam);
       if (!this.cloudCount) return;
@@ -809,6 +835,66 @@
       gl.depthFunc(gl.LEQUAL);
       gl.depthMask(true);
       gl.disable(gl.BLEND);
+    }
+
+    // ------------------------------------------------ puffs (t-clouds, balanced and above): sprites, see clouds.js
+    initPuffs() {
+      const gl = this.gl;
+      this.puffCorner = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.puffCorner);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+      // 0: the fog banks and anchors (world space), 1: the cumulus (cloud space, drawn at − wind)
+      this.puffVAO = [0, 1].map(() => {
+        const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.puffCorner); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1);
+        gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1);
+        gl.bindVertexArray(null);
+        return { vao, buf, n: 0 };
+      });
+      this.puffKey = ''; this.puffCount = 0;
+    }
+    updatePuffs(E, cam) {
+      const cov = Math.round(E.cloudCover * 20) / 20, wind = E.time * 0.9, cell = VR.Clouds.CELL;
+      const ocx = Math.floor((cam.x + wind) / cell), ocz = Math.floor(cam.z / cell);
+      const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + Math.floor(cam.x / 96) + ',' + Math.floor(cam.z / 96);
+      if (key === this.puffKey) return;
+      this.puffKey = key;
+      const f = VR.Clouds.field(cam, wind, { cover: cov }), gl = this.gl;
+      const lists = [VR.Clouds.pack(f.fog), VR.Clouds.pack(f.cumulus)];
+      for (let i = 0; i < 2; i++) {
+        const v = this.puffVAO[i];
+        gl.bindBuffer(gl.ARRAY_BUFFER, v.buf); gl.bufferData(gl.ARRAY_BUFFER, lists[i], gl.DYNAMIC_DRAW);
+        v.n = lists[i].length / VR.Clouds.SPRITE_FLOATS;
+      }
+    }
+    drawPuffs(E) {
+      const gl = this.gl, cam = this.cam;
+      if (!this.cloudAtlas) this.cloudAtlas = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: VR.Clouds.atlas(), filter: gl.LINEAR });
+      this.updatePuffs(E, cam);
+      const p = this.P.puff, u = p.u;
+      gl.useProgram(p.p); this.common(p, E);
+      gl.uniformMatrix4fv(u.u_viewProj, false, this.viewProj);
+      // the billboard axes of the game's camera (player.lookDir: yaw 0 looks along −z)
+      const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      const right = [cy, 0, -sy], up = [sy * sp, cp, cy * sp];
+      gl.uniform3f(u.u_camRight, right[0], right[1], right[2]); gl.uniform3f(u.u_camUp, up[0], up[1], up[2]);
+      const L = E.sunDir, lx = L[0] * right[0] + L[2] * right[2], ly = L[0] * up[0] + L[1] * up[1] + L[2] * up[2];
+      const ll = Math.hypot(lx, ly) || 1, sk = Math.min(1, Math.max(0, (L[1] + 0.12) / 0.24));
+      gl.uniform2f(u.u_sunScreen, lx / ll, ly / ll); gl.uniform1f(u.u_sunK, sk * sk * (3 - 2 * sk));
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
+      this.tex(0, this.cloudAtlas, u.u_cloudTex);
+      const fog = this.puffVAO[0], cu = this.puffVAO[1];
+      // the fade radius: the fog banks are fixed in the world (they reach 300 blocks from the islands), the cumulus fades at
+      // the edge of its window (clouds.js RANGE cells), so no cloud pops in or out at the window's edge
+      gl.uniform1f(u.u_fogK, 1); gl.uniform1f(u.u_cloudR, 640); gl.uniform3f(u.u_origin, -cam.x, -cam.y, -cam.z);
+      if (fog.n) { gl.bindVertexArray(fog.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, fog.n); }
+      gl.uniform1f(u.u_fogK, 0); gl.uniform1f(u.u_cloudR, VR.Clouds.RANGE * VR.Clouds.CELL * 1.04);
+      gl.uniform3f(u.u_origin, -E.time * 0.9 - cam.x, -cam.y, -cam.z);
+      if (cu.n) { gl.bindVertexArray(cu.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, cu.n); }
+      this.puffCount = fog.n + cu.n;
+      gl.bindVertexArray(null); gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE); gl.depthFunc(gl.LEQUAL);
     }
 
     // ------------------------------------------------ ships (block grids with a model matrix)
@@ -868,7 +954,7 @@
       this.frameNo++;
       this.updateAtmo(E);
       this.gpuTimerBegin();
-      this.stats.draws = 0; this.stats.tris = 0;
+      this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
@@ -931,7 +1017,9 @@
       {
         gl.disable(gl.CULL_FACE); gl.depthMask(false);
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
+        if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
+        if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);   // t-clouds: cirrus from balanced up
         this.fs(p);
         gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
       }
@@ -978,6 +1066,7 @@
       // selection outline + crack
       if (F.outline) this.drawOutline(F.outline);
       if (F.outlines) for (const o of F.outlines) this.drawOutline(o);
+      if (F.guide) this.drawGuide(F.guide);
       if (F.crack) this.drawCrack(F.crack);
       this.mark('hand');
       // first-person hand (separate depth range)
@@ -1041,6 +1130,8 @@
         const c = [[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]];
         for (const [a, bb] of [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]]) pts.push(...c[a], ...c[bb]);
       }
+      // (W2: plain segments too — the Bauhand's dashed lot and its footprint grid: x y z x y z …, from o.x o.y o.z)
+      if (o.lines) { const n = o.lines.length - (o.lines.length % 6); for (let i = 0; i < n && pts.length < 4096 * 3; i++) pts.push(o.lines[i]); }
       if (pts.length > 4096 * 3) pts.length = 4096 * 3;
       gl.useProgram(p.p);
       gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
@@ -1054,6 +1145,29 @@
       gl.drawArrays(gl.LINES, 0, pts.length / 3);
       gl.disable(gl.BLEND);
       if (o.xray) gl.enable(gl.DEPTH_TEST);
+    }
+    // 🪞 the mirror's axis (mirrorbuild.js): translucent triangles with the outline's line program, in a small buffer of
+    // its own that is filled only when the mirror changes (G.ver) — per frame three draws, no upload, no allocation;
+    // depth-tested (walls hide it), no depth writes (it never hides anything)
+    drawGuide(G) {
+      const gl = this.gl, p = this.P.line, cam = this.cam, parts = G.parts;
+      if (!this.guideVBO) {
+        this.guideVBO = gl.createBuffer(); this.guideVAO = gl.createVertexArray();
+        gl.bindVertexArray(this.guideVAO); gl.bindBuffer(gl.ARRAY_BUFFER, this.guideVBO); gl.bufferData(gl.ARRAY_BUFFER, G.verts.byteLength, gl.DYNAMIC_DRAW);
+        gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 12, 0);
+        gl.bindVertexArray(null); this.guideVer = -1;
+      }
+      gl.bindVertexArray(this.guideVAO);
+      if (this.guideVer !== G.ver || this.guideOf !== G) { gl.bindBuffer(gl.ARRAY_BUFFER, this.guideVBO); gl.bufferSubData(gl.ARRAY_BUFFER, 0, G.verts); this.guideVer = G.ver; this.guideOf = G; }   // (a new world brings a new guide)
+      gl.useProgram(p.p);
+      gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
+      gl.uniform3f(p.u.u_offset, G.ox - cam.x, G.oy - cam.y, G.oz - cam.z);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+      let n = 0;
+      for (let i = 0; i < parts.length; i++) { const q = parts[i]; if (!q.n) continue; gl.uniform4f(p.u.u_color, q.c[0], q.c[1], q.c[2], q.c[3]); gl.drawArrays(gl.TRIANGLES, q.at, q.n); n += q.n; }
+      gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE);
+      gl.bindVertexArray(null);
+      this.stats.guide = n;   // (test/mirror.mjs: the axis was drawn)
     }
     drawCrack(c) {
       const gl = this.gl, p = this.P.decal, cam = this.cam;

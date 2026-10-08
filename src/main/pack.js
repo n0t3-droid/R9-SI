@@ -29,6 +29,7 @@
   // ---------------------------------------------------------------- what may come in
   // a favourite: a block of this game (furniture included), an item, or a whole catalogue house (blueprint_<i>)
   P.idOK = (id) => {
+    if (typeof id === 'string' && /^f:[a-z]+:[a-z0-9,]{0,100}#[0-9a-f]{1,8}$/i.test(id)) return true;   // a Forge thing by its DNA (W2)
     if (typeof id !== 'string' || !id || id.length > 80 || !/^[a-z0-9_:.-]+$/i.test(id) || id === 'air') return false;
     if (VR.R && VR.R.byName[id]) return true;
     if (VR.ITEMS && VR.ITEMS[id]) return true;
@@ -73,15 +74,15 @@
   };
 
   // ---------------------------------------------------------------- what is in it (one line)
-  const n = (k, one, many) => k + ' ' + (k === 1 ? one : many);
   P.summary = function (pk) {
     const s = { favs: (pk.favs || []).length, houses: Object.keys((pk.studio && pk.studio.houses) || {}).length, models: Object.keys((pk.studio && pk.studio.models) || {}).length, lib: (pk.lib || []).length };
     const parts = [];
-    if (s.favs) parts.push(n(s.favs, 'Favorit', 'Favoriten'));
-    if (s.houses) parts.push(n(s.houses, 'Haus', 'Häuser'));
-    if (s.models) parts.push(n(s.models, 'Möbel', 'Möbel'));
-    if (s.lib) parts.push(n(s.lib, 'Bauteil', 'Bauteile'));
-    s.text = parts.length ? parts.join(' · ') : 'leer';
+    // the same words as the report (g.pack.*), in the player's language
+    if (s.favs) parts.push(s.favs === 1 ? tx('g.pack.fav1', null, '1 Favorit', '1 favourite') : tx('g.pack.favN', { n: s.favs }, '{n} Favoriten', '{n} favourites'));
+    if (s.houses) parts.push(s.houses === 1 ? tx('g.pack.house1', null, '1 Haus', '1 house') : tx('g.pack.houseN', { n: s.houses }, '{n} Häuser', '{n} houses'));
+    if (s.models) parts.push(s.models === 1 ? tx('g.pack.model1', null, '1 Möbelstück', '1 piece of furniture') : tx('g.pack.modelN', { n: s.models }, '{n} Möbel', '{n} pieces of furniture'));
+    if (s.lib) parts.push(s.lib === 1 ? tx('g.pack.lib1', null, '1 Bauteil', '1 building piece') : tx('g.pack.libN', { n: s.lib }, '{n} Bauteile', '{n} building pieces'));
+    s.text = parts.length ? parts.join(' · ') : tx('g.pack.empty', null, 'leer', 'empty');
     return s;
   };
 

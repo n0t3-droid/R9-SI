@@ -21,12 +21,13 @@ page.on('dialog', d => d.accept('Test'));
 const ev = (fn, a) => page.evaluate(fn, a);
 const wait = (ms) => page.waitForTimeout(ms);
 const safe = async (fn, a) => { try { return await ev(fn, a); } catch (e) { return null; } };
+const until = async (fn, a, maxS = 30) => { for (let i = 0; i < maxS * 4; i++) { const r = await safe(fn, a); if (r) return r; await wait(250); } return null; };
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const shot = (n) => page.screenshot({ path: `/home/claude/vr/test/shots/${n}.png`, timeout: 180000 }).catch(() => {});
 const ONLY = (process.env.ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
 const want = (n) => !ONLY.length || ONLY.includes(String(n));
-const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).slice(0, 400)); } };
+const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).split('\n').filter(l => l.trim()).slice(0, 12).join(' | ').slice(0, 1200)); } };
 const done = async () => { console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l); check(!logs.some(l => /pageerror/.test(l)), 'no page errors'); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await browser.close(); srv.kill(); process.exit(fails ? 1 : 0); };
 // ---- helpers: the game
 const atTitle = async (maxS = 150) => { for (let i = 0; i < maxS * 2; i++) { await wait(500); if (await safe(() => !!(window.VR && VR.game && VR.game.state === 'title'))) return true; } return false; };
@@ -305,8 +306,14 @@ await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: car
   await page.goto(URL0 + '/studio.html', NAV);
   check(await booted(1), 'the Studio is up');
   // a Baukasten house (a k: thing), a favourite block  (the hub may have opened by itself: something to continue)
-  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); VR.StudioWorld.imagine.open(null, 'house'); }); await wait(900);
-  await page.click('#imagine [data-hs="style"][data-v="modern"]'); await wait(2500);
+  // (the Baukasten form draws a moment after the panel opens, and the Genie can take the panel over once: open it again until the style row is there)
+  for (let k = 0; k < 6; k++) {
+    await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); VR.StudioWorld.imagine.open(null, 'house'); }); await wait(900);
+    if (await ev(() => !!document.querySelector('#imagine [data-hs="style"][data-v="modern"]'))) break;
+  }
+  // (the hub opens by itself when something is unfinished, and it sits above the Baukasten: close it first)
+  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); }); await wait(300);
+  await page.$eval('#imagine [data-hs="style"][data-v="modern"]', (b) => b.click()); await wait(2500);   // (a JS click: under load the dialog's layout keeps moving and the pointer click never finds it stable)
   await ev(() => { VR.StudioWorld.imagine.close(); VR.Favs.add('oak_planks'); });
   const kit = await ev(() => Object.values(JSON.parse(localStorage.getItem('r9si.projects')).items).find(p => p.kind === 'kit'));
   check(!!kit, 'a Baukasten house exists (' + (kit && kit.id) + ')');
@@ -314,7 +321,7 @@ await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: car
   const h = await ev((kid) => { const c = document.querySelector('#hub .pj.ding[data-id="' + kid + '"]'); const fav = document.querySelector('#hub .ding[data-ding="b:oak_planks"]'); return { on: !!document.querySelector('#hub.on'), head: (document.querySelector('#hub header .t') || {}).textContent, kcard: !!c, kacts: c ? [...c.querySelectorAll('.dacts button')].map(b => b.dataset.da) : [], favSection: [...document.querySelectorAll('#hub h4')].map(x => x.textContent.trim()), favCard: !!fav, favActs: fav ? [...fav.querySelectorAll('.dacts button')].map(b => b.textContent) : [], meinsOn: document.querySelector('#tiles .tile[data-tile="meins"]').classList.contains('on') }; }, kit.id);
   console.log('  hub', JSON.stringify(h));
   check(h.on && /Meins/.test(h.head || '') && h.meinsOn, '🎒 opens Meins (the 🎒 tile lit)');
-  check(h.kcard && h.kacts.join() === 'view,edit,fav', 'the k: card: 👁 ✏️ ☆ (📍 and 📦 come with the wizard, W2 — absent, not greyed)');
+  check(h.kcard && h.kacts.join() === 'view,edit,fav,set', 'the k: card: 👁 ✏️ ☆ 📍 (W2: 📍 puts its Bauteil on the Karte; 📦 comes with B1 — absent, not greyed)');
   check(h.favCard && h.favActs.length === 5 && h.favSection.some(x => /Favoriten/.test(x)), 'a ★ Favoriten section with the oak planks card and all five actions');
   await page.click('#hub .pj.ding[data-id="' + kit.id + '"] [data-da="fav"]'); await wait(200);
   const favs = await ev(() => JSON.parse(localStorage.getItem('r9si.favs')).items);
@@ -345,8 +352,9 @@ await section(10, '← restores where you were: ✏️ from a card → the edito
   if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
   await page.goto(URL0 + '/studio.html?r=' + Date.now() + '#world/' + encodeURIComponent(WORLD) + '/karte', NAV);   // (a fresh query: a hash-only change would not reload the Studio)
   check(await inStudio(WORLD), 'the Karte view');
-  await page.click('#chips button[data-kcat="furn"]'); await wait(400);
-  const id3 = await ev(() => { const l = document.getElementById('list'); l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding; });
+  await page.$eval('#chips button[data-kcat="furn"]', (b) => b.click());   // (as above)
+  // (the cards come in a moment: a slow frame rate draws them later than a fixed wait would)
+  const id3 = await until(() => { const l = document.getElementById('list'); if (!l || l.querySelectorAll('.ding').length < 4) return null; l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding ? c.dataset.ding : null; }, null, 30);
   const editBtn = page.locator(`#list .ding[data-ding="${id3}"] [data-da="edit"]`);
   await editBtn.scrollIntoViewIfNeeded();   // (a click scrolls its target into view first: measure after that)
   const before = await ev((id) => { const l = document.getElementById('list'); return { id, scroll: l.scrollTop, scene: window.__st.scene && window.__st.scene.type, center: window.__st.scene.center.slice() }; }, id3);
