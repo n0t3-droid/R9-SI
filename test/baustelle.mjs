@@ -56,31 +56,34 @@ check(plan.scaffold && plan.bays > 100 && plan.crane && plan.crew === 3, 'the sc
 const measure = () => ev((b) => { const w = VR.game.world; let h = 2166136261 >>> 0, n = 0; for (let y = b.y0; y <= b.y1; y++) for (let z = b.z0; z <= b.z1; z++) for (let x = b.x0; x <= b.x1; x++) { const s = w.getBlock(x, y, z); if (s && y >= b.F) n++; h = Math.imul(h ^ (s & 0xffff), 16777619) >>> 0; } return { h, n }; }, Object.assign({ F: plan.F }, box));
 // ---- the screenshots: a camera that frames what stands (and the crane), the HUD's bar on top; the build waits meanwhile
 let shot = 0;
-async function photo(label) {
+async function photo(label, finale) {
   shot++;
   // (the build and the show hold still while the camera moves and the meshes catch up: the picture is of this moment)
   await ev(() => { const g = VR.game, B = g.gadgets.blue, S = B.slices; if (S && !S.__frozen) { S.__frozen = true; S.write = function () { }; } if (!window.__fz) { window.__fz = { tick: B.siteTick, pu: g.particles.update }; B.siteTick = function () { }; g.particles.update = function (dt, eye) { return window.__fz.pu.call(this, 0, eye); }; } });
-  const cam = await ev(([pl]) => {
+  // the first-person hand is not in a site's picture (its held block would cover the building); it comes back after
+  await ev(() => { const E = VR.game.entities; if (E && E.drawHand) { window.__hand = E.drawHand; E.drawHand = null; } });
+  const cam = await ev(([pl, finale]) => {
     const g = VR.game, p = g.player, B = g.gadgets.blue, site = (B.sites || [])[0], sh = site && site.show;
     const front = sh ? Math.max(8, sh.deck + 3) : pl.H; const sb = pl.sbox;
     const cx = (sb[0] + sb[3] + 1) / 2, cz = (sb[2] + sb[5] + 1) / 2, top = pl.F + front + (sh && sh.crane ? 8 : 2);
-    const d = Math.min(100, Math.max(26, (top - pl.F) * 0.95 + 8)), ang = -0.62;   // from the front left (the player's side), a little from above
+    // (the finale: a camera a street away looks up at the roof — the Richtbaum, the confetti, the crew cheering)
+    const d = finale ? 42 : Math.min(100, Math.max(26, (top - pl.F) * 0.95 + 8)), ang = -0.62;   // from the front left (the player's side), a little from above
     const dx = Math.sin(ang), dz = Math.cos(ang);
-    p.flying = true; p.noclip = true; p.teleport(cx + dx * d, pl.F + (top - pl.F) * 0.42 + 3, cz + dz * d);
-    p.yaw = Math.atan2(-(cx - p.pos[0]), -(cz - p.pos[2])); p.pitch = Math.atan2(pl.F + (top - pl.F) * 0.45 - (p.pos[1] + 1.6), d) ;
+    const aimY = finale ? pl.F + pl.H + 4 : pl.F + (top - pl.F) * 0.45, camY = finale ? pl.F + pl.H - 10 : pl.F + (top - pl.F) * 0.42 + 3;
+    p.flying = true; p.noclip = true; p.teleport(cx + dx * d, camY, cz + dz * d);
+    p.yaw = Math.atan2(-(cx - p.pos[0]), -(cz - p.pos[2])); p.pitch = Math.atan2(aimY - (p.pos[1] + 1.6), d);
     return { d: Math.round(d), y: Math.round(p.pos[1]) };
-  }, [plan]);
+  }, [plan, !!finale]);
   await settle(50); await step(4);
   await ev(() => { window.__norender = false; const g = VR.game; const h = document.getElementById('hud'); if (h) h.style.visibility = 'hidden'; for (let i = 0; i < 3; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__glErr = g.renderer.gl.getError(); window.__norender = true; });
   const file = '/home/claude/vr/test/shots/baustelle_' + shot + '.png';
   await game.screenshot({ path: file, timeout: 180000 });
-  await ev(() => { const g = VR.game, B = g.gadgets.blue, h = document.getElementById('hud'); if (h) h.style.visibility = ''; const S = B.slices; if (S && S.__frozen) { delete S.write; delete S.__frozen; } if (window.__fz) { B.siteTick = window.__fz.tick; g.particles.update = window.__fz.pu; delete window.__fz; } });
+  await ev(() => { const g = VR.game, B = g.gadgets.blue, h = document.getElementById('hud'); if (h) h.style.visibility = ''; const S = B.slices; if (S && S.__frozen) { delete S.write; delete S.__frozen; } if (window.__fz) { B.siteTick = window.__fz.tick; g.particles.update = window.__fz.pu; delete window.__fz; } if (window.__hand) { g.entities.drawHand = window.__hand; delete window.__hand; } });
   const gl = await ev(() => window.__glErr);
   console.log('  📷 ' + file + ' · ' + label + ' · camera ' + JSON.stringify(cam) + ' · gl error ' + gl);
   return gl;
 }
 // ---- the build: progress over time, the world grows, the deck rises; photos at 10 / 40 / 80 %
-const t0 = await ev(() => VR.game.time);
 const samples = [], targets = [0.1, 0.4, 0.8];
 let glErr = 0, hud = null;
 for (let i = 0; i < 1400; i++) {
@@ -91,22 +94,28 @@ for (let i = 0; i < 1400; i++) {
   if (targets.length && s.p >= targets[0] && !s.done) { targets.shift(); glErr |= await photo(Math.round(s.p * 100) + ' % gebaut'); }
   if (s.done) break;
 }
-const t1 = await ev(() => VR.game.time), status = await ev((id) => JSON.parse(localStorage.getItem('r9si.plans.' + VR.game.meta.id)).plans.find(p => p.id === id).status, plan.id);
+// the site's own clock (the photos hold it still; the game's clock runs on through them)
+const sc = await ev((id) => { const S = (VR.game.gadgets.blue.sites || []).find(x => x.pl && x.pl.id === id); return S ? { t: S.t, T: S.T } : null; }, plan.id);
+const status = await ev((id) => JSON.parse(localStorage.getItem('r9si.plans.' + VR.game.meta.id)).plans.find(p => p.id === id).status, plan.id);
 console.log('samples', JSON.stringify(samples.map(s => [+(s.p * 100).toFixed(0), s.n, s.deck, s.crew, s.crane])));
-check(status === 'built', 'the tower is built (plan ' + status + ', ' + (t1 - t0).toFixed(1) + ' s of game time)');
-check(t1 - t0 >= 6 && t1 - t0 <= 22, 'it took 6–20 s of game time (' + (t1 - t0).toFixed(1) + ' s)');
+check(status === 'built', 'the tower is built (plan ' + status + ')');
+check(!!sc && sc.T >= 6 && sc.T <= 20 && Math.abs(sc.t - sc.T) < 0.6, 'it takes 6–20 s on its own clock: ' + (sc ? sc.t.toFixed(1) + ' of ' + sc.T.toFixed(1) + ' s' : 'no site') + ' (the photos do not count)');
 const grow = samples.length >= 8 && samples.every((s, i) => !i || s.n >= samples[i - 1].n) && samples[samples.length - 1].n > samples[0].n * 4;
 check(grow, 'the world grows over time: ' + samples.map(s => s.n).join(' → '));
 check(samples.some(s => s.crew > 0) && samples.some(s => /lower|toDrop|lift|down/.test(s.crane)), 'builders hammer on the deck, the crane hauls');
 check(!!hud && /Hochhaus/.test(hud) && /gebaut/.test(hud) && /Fertig/.test(hud), 'the HUD: ' + hud);
 // the finale: confetti in the air, the builders cheer — the done photo
 await step(30);
-glErr |= await photo('fertig');
+glErr |= await photo('fertig', true);
 check(!glErr, 'no GL error while drawing the site');
 const finale = await ev(() => { const g = VR.game, B = g.gadgets.blue, sh = B.sites && B.sites[0] && B.sites[0].show; return { confetti: g.particles.n, cheer: sh ? sh.crew.filter(b => b.state === 'cheer' || b.mode === 'cheer').length : -1, tree: sh && sh.tree ? [sh.tree.x, sh.tree.y, sh.tree.z] : null, top: sh ? sh.top : 0, office: sh && sh.office ? [sh.office.x, sh.office.y, sh.office.z] : null }; });
 check(finale.confetti > 50, 'confetti and fireworks fly (' + finale.confetti + ' particles)');
 check(!!finale.tree && finale.tree[1] >= finale.top - 3, 'Richtfest: a topping-out tree on the roof (' + JSON.stringify(finale.tree) + ', top ' + finale.top + '), the site office ' + JSON.stringify(finale.office));
 const MB = await measure();
+// the celebration ends: the scaffold folds away, the crane comes down, the builders walk off (about 8 s)
+await step(400);
+const left =await ev(() => (VR.game.gadgets.blue.sites || []).length);
+check(left === 0, 'the scaffold folds away and the builders walk off (' + left + ' site left)');
 // one Z takes all of it back
 await ev(() => VR.game.gadgets.undo());
 const M0 = await measure();
