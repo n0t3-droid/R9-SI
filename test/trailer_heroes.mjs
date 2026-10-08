@@ -95,8 +95,8 @@ await setCam([0, 81, 15], [0, 82.5, -10]);
 await settle();
 await frames(20);
 const hallCrew = await crew([
-  { id: 'blau', suit: 0, pos: [-5, 81, 0], yaw: Math.PI, act: 'hold' },
-  { id: 'orange', suit: 6, pos: [5, 81, 0], yaw: Math.PI, act: 'hold' },
+  { id: 'blau', suit: 0, pos: [-5, 81, 2], yaw: Math.PI, act: 'hold' },
+  { id: 'orange', suit: 6, pos: [5, 81, 2], yaw: Math.PI, act: 'hold' },
 ]);
 await frames(30);
 await shot('hall');
@@ -106,8 +106,8 @@ metric({ scene: 'hall', crewPlaced: hallCrew, crewInView: await crewInView(), ..
 await setCam([0, 81, -24], [0, 82.5, -70]);
 await settle();
 const exitCrew = await crew([
-  { id: 'blau', suit: 0, pos: [-1.6, 81, -46], yaw: Math.PI, act: 'hold' },
-  { id: 'orange', suit: 6, pos: [1.6, 81, -46], yaw: Math.PI, act: 'hold' },
+  { id: 'blau', suit: 0, pos: [-1.6, 81, -40], yaw: Math.PI, act: 'hold' },
+  { id: 'orange', suit: 6, pos: [1.6, 81, -40], yaw: Math.PI, act: 'hold' },
 ]);
 await frames(30);
 await shot('exit');
@@ -147,24 +147,40 @@ if (plaza) {
 }
 
 // ---------------------------------------------------------------- Very Low: the cost of a frame and of the crowd
-// The street's view, first without the crew (the base has none: this is the comparison), then with the two heroes
-// placed in view (the worst case: both drawn and posed). The crowd update is timed with the two heroes.
+// The street's view on Very Low: the crowd there is the base's crowd; the two heroes are placed in it for the rounds below.
 if (plaza) await setCam([plaza[0] + 11, plaza[1] + 2, plaza[2] + 11], [plaza[0], plaza[1] + 1.2, plaza[2]]);
 await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
 await settle(60);
 await crew([]);
 metric({ scene: 'verylow_people', preset: 'potato', ...(await inView()) });
 await timed(4);
-const vlMs = await timed(8);
-metric({ scene: 'verylow_frame', ms: +vlMs.toFixed(1), preset: 'potato', heroes: 0 });
-if (TAG !== 'base' && plaza) {
-  await crew([
-    { id: 'blau', suit: 0, pos: [plaza[0] - 1.6, plaza[1], plaza[2]], yaw: Math.PI, act: 'hold' },
-    { id: 'orange', suit: 6, pos: [plaza[0] + 1.6, plaza[1], plaza[2]], yaw: Math.PI, act: 'hold' },
-  ]);
-  await timed(4);
-  const vlHeroMs = await timed(8);
-  metric({ scene: 'verylow_frame_heroes', ms: +vlHeroMs.toFixed(1), preset: 'potato', heroes: 2 });
+// Rounds, one after the other: three frames without the two heroes, then three with them, four times. A busy machine
+// slows both alike, so the medians compare the same conditions. The crowd's own draw (its JS side) is timed on its own.
+await ev(() => { const C = VR.Crowd; if (!C || !C.draw || C.__timedDraw) return; const d = C.draw; window.__crowdMs = 0; C.draw = function (r, E, cam) { const t0 = performance.now(); d.call(this, r, E, cam); window.__crowdMs += performance.now() - t0; }; C.__timedDraw = true; });
+const med = (a) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[s.length >> 1] : -1; };
+const heroesHere = plaza ? [
+  { id: 'blau', suit: 0, pos: [plaza[0] - 1.6, plaza[1], plaza[2]], yaw: Math.PI, act: 'hold' },
+  { id: 'orange', suit: 6, pos: [plaza[0] + 1.6, plaza[1], plaza[2]], yaw: Math.PI, act: 'hold' },
+] : [];
+const crowdNow = () => ev(() => window.__crowdMs || 0);
+const off = [], on = [], crowdOff = [], crowdOn = [];
+const round = async (list, ms, cr) => {
+  await crew(list);
+  const c0 = await crowdNow();
+  const t = await timed(3);
+  const c1 = await crowdNow();
+  ms.push(t); cr.push((c1 - c0) / 3);
+};
+await timed(4);
+if (TAG !== 'base' && plaza) { await crew(heroesHere); await timed(4); }
+for (let r = 0; r < 4; r++) {
+  await round([], off, crowdOff);
+  if (TAG !== 'base' && plaza) await round(heroesHere, on, crowdOn);
+}
+metric({ scene: 'verylow_frame', ms: +med(off).toFixed(1), rounds: off.map(x => +x.toFixed(1)), preset: 'potato', heroes: 0 });
+if (on.length) {
+  metric({ scene: 'verylow_frame_heroes', ms: +med(on).toFixed(1), rounds: on.map(x => +x.toFixed(1)), preset: 'potato', heroes: 2 });
+  metric({ scene: 'verylow_crowd_draw', heroesOff: +med(crowdOff).toFixed(3), heroesOn: +med(crowdOn).toFixed(3), preset: 'potato' });
   const crowdMs = await ev(() => { const C = VR.Crowd; if (!C || !C.update) return -1; const t0 = performance.now(); for (let i = 0; i < 200; i++) C.update(1 / 30); return (performance.now() - t0) / 200; });
   metric({ scene: 'verylow_crowd_update', ms: +crowdMs.toFixed(3), preset: 'potato', heroes: 2 });
 }
