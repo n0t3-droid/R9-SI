@@ -592,9 +592,9 @@
       this.tex(0, this.sceneCol, p.u.u_scene); this.tex(1, this.expTex[this.expCur], p.u.u_prev);
       gl.uniform1f(p.u.u_dt, Math.min(0.25, E.dt || 0.016));
       const EX = VR.Atmos.EXPOSURE;
-      gl.uniform4f(p.u.u_expParams, EX.lo, EX.hi, EX.power, EX.dead);   // ±0.5 stops around 1, a dead zone of ±1 stop (atmos.js)
+      gl.uniform4f(p.u.u_expParams, EX.lo, EX.hi, EX.power, EX.deadBright);   // ±0.5 stops around 1, the dead zone (atmos.js)
       gl.uniform4f(p.u.u_expKey, EX.key, E.exposure || 1, E.night || 0, EX.nightKey);
-      gl.uniform2f(p.u.u_expTau, EX.tauUp, EX.tauDown);
+      gl.uniform3f(p.u.u_expTau, EX.tauUp, EX.tauDown, EX.deadDark);
       this.fs(p);
       this.expCur = dst;
     }
@@ -632,6 +632,7 @@
       }
       if (u.u_atmoLUT && this.atmoTex) { gl.activeTexture(gl.TEXTURE0 + ATMO_UNIT); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex); gl.uniform1i(u.u_atmoLUT, ATMO_UNIT); }
       if (u.u_skyWx) { const wx = E.skyWx || [0, 1]; gl.uniform2f(u.u_skyWx, wx[0], wx[1]); }
+      if (u.u_skyGlow) { const K = VR.Atmos.K; gl.uniform3f(u.u_skyGlow, K.broad, K.band, K.sharp); }
       if (u.u_moonPh) gl.uniform1f(u.u_moonPh, E.moonPh || 0);
       if (u.u_moonIllum) gl.uniform1f(u.u_moonIllum, E.moonIllum === undefined ? 1 : E.moonIllum);
       if (u.u_cloudSh) gl.uniform1f(u.u_cloudSh, this.q.cloudSh ? (E.cloudSh || 0) : 0);
