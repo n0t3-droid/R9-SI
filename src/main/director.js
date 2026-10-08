@@ -44,7 +44,7 @@
       this.opts = o || {};
       this.shots = name === 'trailer' ? C.SHOTS : name;
       if (!this.shots || !this.shots.length) return false;
-      this.prepare(this.shots);
+      this.designs.clear(); this.prepare(this.shots);      // (the designs are taken from the starships' cache again)
       this.active = true; this.si = -1; this.t = 0; this.fade = 1; this.phase = 'next';
       this.saved = { pos: g.player.pos.slice(), yaw: g.player.yaw, pitch: g.player.pitch, flying: g.player.flying, hideHud: g.hideHud, camMode: g.camMode, tod: g.env.timeOfDay, freeze: g.zenFreezeTime, noClip: g.player.noClip };
       g.hideHud = true; document.getElementById('hud').style.visibility = 'hidden'; g.camMode = 0; g.zoom = false;
@@ -88,8 +88,10 @@
       const SS = this.g.starships, key = sp.arch + ':' + this.seedOf(sp);
       if (!SS || this.designs.has(key)) return this.designs.get(key) || null;
       this.designs.set(key, null);
-      SS.design(this.seedOf(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, (d) => { this.designs.set(key, d); });
-      return null;
+      // (the starships' cache frees a design that nobody has flown for a minute: the callback marks it fresh, and update()
+      // keeps the designs of the ride fresh)
+      SS.design(this.seedOf(sp), VR.Starship && VR.Starship.ARCH[sp.arch] ? sp.arch : 'shuttle', null, (d) => { d.last = performance.now(); this.designs.set(key, d); });
+      return this.designs.get(key) || null;
     }
     // scripted flights through the traffic (the shot's start is the run's first frame; t0 delays the flight inside it)
     launchShips(shot) {
@@ -179,6 +181,7 @@
         if (g.trailerAfterLoad && g.state === 'play' && g.player) { g.trailerAfterLoad = false; this.play('trailer', { fromTitle: true }); }
         return;
       }
+      const now = performance.now(); for (const d of this.designs.values()) if (d) d.last = now;   // the ride's ships stay in the starships' cache
       if (g.input.hit('Escape') || (this.opts && this.opts.skipAny && this.phase === 'run' && (g.input.pressed.size || g.input.mouse.clicked.some(Boolean)))) { this.stop(); return; }
       dt = Math.min(dt, 0.25);
       if (this.phase === 'next') this.enter(this.si + 1);
