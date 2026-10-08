@@ -290,6 +290,7 @@
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
       this.trails = VR.Trails ? new VR.Trails(this) : null;
+      this.vents = VR.Vents ? new VR.Vents(this) : null;
       this.director = VR.Director ? new VR.Director(this) : null;
       this.cockpit = VR.Cockpit ? new VR.Cockpit(this) : null;
       this.horizon = VR.Horizon ? new VR.Horizon(this) : null;
@@ -994,6 +995,7 @@
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
       this.waterFx(dt, p, eye, underwater, inLava, E);
       if (this.trails) this.trails.update(dt);
+      if (this.vents) this.vents.update(dt, eye);
       // camera
       const S = this.settings;
       const bob = S.viewBob && !p.flying ? p.bobAmt : 0;

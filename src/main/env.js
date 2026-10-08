@@ -106,6 +106,21 @@
       // the bodies (skybodies.js): the giant with its ring, the blue planet and the moons, with their angular radii
       const SB = VR.SkyBodies.at(th);
       E.planetDir = SB.giant; E.ringNormal = SB.ring; E.planet2Dir = SB.blue; E.bodies = SB;
+      // a trailer shot can pin the planets (director.js: shot.planets = {az, el, az2, el2}, elevations in degrees): the
+      // ringed giant then sits where the owner's frame has it, whatever the hour (the ring keeps its slant)
+      const PO = this.planetsOverride || null;
+      if (PO) {
+        if (PO.az !== undefined) E.planetDir = norm([Math.cos(PO.az) * 0.84, PO.el !== undefined ? 0.84 * Math.tan(PO.el * Math.PI / 180) : E.planetDir[1], Math.sin(PO.az) * 0.84]);
+        if (PO.az2 !== undefined) E.planet2Dir = norm([Math.cos(PO.az2) * 0.62, PO.el2 !== undefined ? 0.62 * Math.tan(PO.el2 * Math.PI / 180) : E.planet2Dir[1], Math.sin(PO.az2) * 0.62]);
+        if (PO.az !== undefined) {
+          const P = E.planetDir, upd = P[1];
+          const Y = norm([-P[0] * upd, 1 - P[1] * upd, -P[2] * upd]);
+          const X = norm([Y[1] * P[2] - Y[2] * P[1], Y[2] * P[0] - Y[0] * P[2], Y[0] * P[1] - Y[1] * P[0]]);
+          const c = Math.cos(0.45), sn = Math.sin(0.45);
+          const Np = [Y[0] * c + X[0] * sn, Y[1] * c + X[1] * sn, Y[2] * c + X[2] * sn];
+          E.ringNormal = norm([Np[0] * 0.94 - P[0] * 0.34, Np[1] * 0.94 - P[1] * 0.34, Np[2] * 0.94 - P[2] * 0.34]);
+        }
+      }
       // dimension overrides
       const rd = (o.renderDist || 8) * 16;
       let fogStart = rd * 0.62, fogEnd = rd * 1.0, dens = 0.0002 + rain * 0.0035;
