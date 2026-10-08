@@ -1,0 +1,88 @@
+/* F5 · Steuerung & Einstellungen: the three settings groups, cost badges, the live preview, the Automatik box, the key
+   screen, the touch layer, the governor's line and the gamepad focus. Phone widths: a 16 px gutter, targets of at least
+   44 px, no horizontal page scroll. */
+
+/* ---- settings: the group body, the rows and their one-line tips */
+#settings .panel { max-height: 94vh; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain; }
+#setbody { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.setsec { margin: 4px 0 2px; }
+.setsec h3 { font-family: var(--display); font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 16px 0 4px; }
+.setrow { margin: 8px 0 10px; min-width: 0; }
+.setrow .sethead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.setrow .sethead label { font-size: 15px; color: var(--text); text-transform: none; letter-spacing: .3px; flex: 1 1 auto; min-width: 0; }
+.setrow .val { font-family: var(--display); font-size: 13px; color: var(--gold); min-width: 3.5em; text-align: right; }
+.setrow input[type=range] { width: 100%; min-height: 32px; margin: 4px 0 0; accent-color: var(--accent); }
+.setrow.sw .swl { display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; min-height: 40px; }
+.setrow.sw .swl input { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+.setrow.sw .swl .lab { flex: 1 1 auto; min-width: 0; }
+.setrow.sw { display: flex; flex-direction: column; }
+.setrow.sw .cost { align-self: flex-start; margin-left: 32px; }
+.setip { font-size: 13px; color: var(--muted); margin-top: 3px; line-height: 1.35; }
+.setrow .seg button { min-height: 42px; }
+.setrow.act .btn { width: 100%; min-height: 44px; }
+.setrow.act .btn.pri { border-color: rgba(58, 240, 255, 0.7); }
+.cost { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .3px; white-space: nowrap; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); background: var(--slot); color: var(--text); }
+.cost-low { border-color: rgba(92, 240, 138, 0.5); }
+.cost-mid { border-color: rgba(255, 209, 102, 0.55); }
+.cost-high { border-color: rgba(255, 90, 106, 0.6); }
+.gpunote { margin-top: 12px; }
+
+/* the live preview: the frame after a graphics change, small and at the top of the Bild group */
+.pvwrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 4px 0 10px; }
+.pv { width: 100%; max-width: 360px; height: auto; aspect-ratio: 16 / 9; border-radius: 10px; border: 1px solid var(--line2); background: #000; }
+.pvnote { font-size: 12px; color: var(--muted); }
+.aqline { font-size: 13px; color: var(--gold); text-align: center; padding: 4px 10px; border: 1px dashed rgba(255, 209, 102, 0.5); border-radius: 8px; }
+.aqline[hidden] { display: none; }
+
+/* ⚡ Automatik: the box at the top of the Bild group, with the progress and the result */
+#benchbox { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin: 4px 0 10px; padding: 10px 12px; border: 1px solid rgba(58, 240, 255, 0.6); border-radius: 10px; background: rgba(58, 240, 255, 0.08); color: var(--text); font-size: 15px; line-height: 1.35; }
+#benchbox b { font-family: var(--display); font-size: 12px; letter-spacing: 1px; color: var(--accent); font-weight: 600; }
+#benchbox .bt { flex: 1 1 200px; min-width: 0; }
+#benchbox.run { animation: benchpulse 1s ease-in-out infinite alternate; }
+@keyframes benchpulse { from { box-shadow: 0 0 0 rgba(58, 240, 255, 0); } to { box-shadow: 0 0 16px rgba(58, 240, 255, 0.35); } }
+@media (prefers-reduced-motion: reduce) { #benchbox.run { animation: none; } }
+
+/* ---- the key-binding screen */
+.keytop { flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.keymsg { min-height: 1.5em; font-size: 14px; color: var(--accent); margin: 6px 0; }
+.keymsg .btn.tiny { margin-left: 8px; min-height: 36px; }
+.keywarn { font-size: 14px; color: var(--gold); border: 1px solid rgba(255, 209, 102, 0.5); border-radius: 8px; padding: 6px 10px; margin: 6px 0; }
+.keyrow { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-height: 48px; padding: 4px 0; border-bottom: 1px solid rgba(120, 200, 255, 0.12); }
+.klab { flex: 1 1 130px; min-width: 0; font-size: 15px; }
+.kslots { display: flex; gap: 6px; flex: none; }
+.key { min-width: 64px; min-height: 44px; padding: 4px 10px; font-family: var(--display); font-size: 13px; letter-spacing: .5px; color: var(--text); background: var(--slot); border: 1px solid var(--line2); border-radius: 8px; cursor: pointer; }
+.key.empty { color: var(--muted); border-style: dashed; }
+.key.wait { border-color: var(--gold); color: var(--gold); }
+.key:hover, .key:focus-visible { border-color: var(--accent); }
+.kwarn { font-size: 13px; color: var(--gold); flex-basis: 100%; }
+.kreset { min-width: 44px; min-height: 40px; margin-left: 0; }
+
+/* the 🧸 Kindersicher button under the start tiles */
+.btn.kids { display: block; margin: 14px auto 4px; min-height: 44px; border-color: rgba(92, 240, 138, 0.6); }
+
+/* the on-screen governor line over the picture: "⚙ passt an" */
+#aqhint { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 25; padding: 4px 12px; border-radius: 999px; font-size: 13px; color: var(--gold); background: rgba(9, 13, 26, 0.72); border: 1px solid rgba(255, 209, 102, 0.45); pointer-events: none; white-space: nowrap; }
+#aqhint[hidden] { display: none; }
+
+/* the gamepad's focus in a menu */
+.padfocus { outline: 3px solid var(--gold) !important; outline-offset: 2px; }
+
+/* ---- the touch layer: a left stick and five big buttons, shown on a touch screen in a game with no menu */
+#touch { position: fixed; inset: 0; pointer-events: none; z-index: 30; }
+#touch .tstick { position: absolute; left: 18px; bottom: 22px; width: 150px; height: 150px; border-radius: 50%; background: rgba(120, 200, 255, 0.08); border: 2px solid rgba(120, 200, 255, 0.35); touch-action: none; pointer-events: auto; -webkit-user-select: none; user-select: none; }
+#touch .tstick.on { border-color: var(--accent); background: rgba(58, 240, 255, 0.1); }
+#touch .tstick i { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%; background: rgba(58, 240, 255, 0.35); border: 2px solid rgba(58, 240, 255, 0.75); }
+#touch .tbtns { position: absolute; right: 14px; bottom: 22px; display: grid; grid-template-columns: repeat(2, 84px); gap: 10px; pointer-events: auto; }
+#touch .tb { min-width: 0; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: var(--font); font-weight: 700; font-size: 13px; color: var(--text); background: rgba(16, 22, 42, 0.78); border: 2px solid var(--line2); border-radius: 16px; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#touch .tb .ti { font-size: 22px; line-height: 1; }
+#touch .tb.on { background: rgba(58, 240, 255, 0.32); border-color: var(--accent); }
+#touch .tb-sprint { grid-column: 1 / span 2; min-height: 48px; flex-direction: row; gap: 8px; }
+/* the hotbar moves up above the buttons while the touch layer shows */
+#ui.touchon #hotbar { bottom: 240px; }   /* above the stick and the button cluster */
+@media (max-width: 700px) {
+  #settings .panel { padding: 14px 16px; }
+  .setrow .sethead label { font-size: 16px; }
+  .tabs button { min-height: 42px; }
+  .keyrow { min-height: 52px; }
+  .key { min-height: 46px; }
+}
