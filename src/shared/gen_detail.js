@@ -82,7 +82,8 @@
         wants.push({ at: 'corner', name: plantB, zone: 'living' });
         wants.push({ at: 'corner', name: 'vx_floorlamp', zone: 'living' });
         if (floors === 1) {
-          wants.push({ at: 'wall', side: 2, names: [col(BEDS)], bed: true, deep: 2, prefer: 'mid', zone: 'bedroom' });
+          // a one-storey house sleeps on the ground floor: its bed is placed before the table and may stand on any wall
+          wants.splice(2, 0, { at: 'wall', names: [col(BEDS)], bed: true, deep: 2, prefer: 'mid', zone: 'bedroom' });
           wants.push({ at: 'wall', names: ['vx_nightstand'], prefer: 'end', zone: 'bedroom' });
           wants.push({ at: 'wall', names: ['vx_wardrobe'], prefer: 'end', zone: 'bedroom' });
         }
