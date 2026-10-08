@@ -64,7 +64,12 @@ const hb = heart ? await ev((h) => { const s = VR.game.world.getBlock(h[0], h[1]
 check(hb && hb.emit > 0, 'its heart glows: ' + JSON.stringify(hb));
 await settle(80);
 // a picture of the first wonder in its land, from where you come
-await ev(([s, h]) => { const g = VR.game, p = g.player, sp = g.worldSpawn(); const dx = sp[0] - s.x, dz = sp[2] - s.z, L = Math.hypot(dx, dz) || 1, side = [-dz / L, dx / L], d = 58; const x = s.x + dx / L * d + side[0] * 22, z = s.z + dz / L * d + side[1] * 22; p.flying = true; p.noclip = true; p.teleport(x, h[1] + 16, z); p.yaw = Math.atan2(-(s.x - x), -(s.z - z)); p.pitch = -0.12; }, [first, heart]);
+await ev(([s, h, k]) => {
+  const g = VR.game, p = g.player, sp = g.worldSpawn(), e = g.wonders.st[k], c = g.gadgets.blue.cache.get('f:' + VR.Wonders.dnaOf(s)), top = c ? c.top : 40, lot = c ? Math.max(c.lot[0], c.lot[1]) : 50, F0 = e && e.at ? e.at[1] : h[1];
+  const dx = sp[0] - s.x, dz = sp[2] - s.z, L = Math.hypot(dx, dz) || 1, side = [-dz / L, dx / L], d = lot * 0.6 + top * 0.5 + 14;
+  const x = s.x + dx / L * d * 0.92 + side[0] * d * 0.4, z = s.z + dz / L * d * 0.92 + side[1] * d * 0.4;
+  p.flying = true; p.noclip = true; p.teleport(x, F0 + Math.max(8, top * 0.4), z); p.yaw = Math.atan2(-(s.x - x), -(s.z - z)); p.pitch = -0.08 - Math.min(0.14, 6 / d);
+}, [first, heart, first.key]);
 await settle(40); await step(4); await draw(true);
 await page.screenshot({ path: SHOTS + '/wonder_first.png', timeout: 180000 });
 // ---- /bau before the discovery: a kind word, no plan
