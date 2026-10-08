@@ -7,6 +7,10 @@
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 const SEED = process.env.SEED || '424242';
 const BASE = process.env.BASE_DIST || '';
+// the view distance of both tiers is held at RD (default 4, the Very Low value, which the game loads as 5 chunks): the High
+// tier's own 14 needs tens of minutes of worker time per view on this loaded machine. So the High numbers are the High
+// quality switches (shadows, bloom, rays, scale, item shadows, lamp halos) at the same view distance as Very Low.
+const RD = +(process.env.RD || 4);
 const ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'];
 let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
@@ -24,7 +28,7 @@ async function measure(url, label) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(15); } };
   // a quality preset for a measured view: the smart-quality ladder is off (applyPreset turns dynRes on again)
-  const setPreset = (p) => ev((p) => { const g = VR.game; g.settings.dynRes = false; if (g.aq && g.aq.stack.length) g.aqReset(g.aq, g.settings, g.world); g.applyPreset(p); g.settings.dynRes = false; }, p);
+  const setPreset = (p) => ev(([p, rd]) => { const g = VR.game; g.settings.dynRes = false; if (g.aq && g.aq.stack.length) g.aqReset(g.aq, g.settings, g.world); g.applyPreset(p); g.settings.renderDist = rd; g.applySettings('renderDist'); g.settings.dynRes = false; }, [p, RD]);
   const place = async (pos, tgt, maxMs = 300000) => {
     await ev(([pos, tgt]) => { const p = VR.game.player; p.teleport(pos[0], pos[1], pos[2]); p.flying = true; const dx = tgt[0] - pos[0], dy = tgt[1] - pos[1] - 1.6, dz = tgt[2] - pos[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, [pos, tgt]);
     // the chunks of a new place come from the workers, slowly on a loaded machine: the five columns round it in, and the
