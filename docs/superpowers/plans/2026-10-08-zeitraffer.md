@@ -137,7 +137,7 @@ README.md / ROADMAP.md untouched.
   the finished build; ⏯ advances; ⏺ gives a `video/webm` Blob > 0 bytes (or the fallback when headless has no
   MediaRecorder — said so); Esc: the original columns are back, the player and the sky as before; no page errors.
   Screenshots looked at.
-- [ ] **7 · Regression.** `REGRESS_ONLY=node bash test/regress.sh`, test/lang.js, test/id_snapshot.js, the browser
+- [x] **7 · Regression.** `REGRESS_ONLY=node bash test/regress.sh`, test/lang.js, test/id_snapshot.js, the browser
   tests the change touches (smoke.mjs, blueprint-adjacent: forge.mjs, workbench.mjs).
 
 ## Status (after the machine restart)
