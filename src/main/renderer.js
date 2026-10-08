@@ -558,6 +558,10 @@
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
       v3('u_fogColor', E.fogColor); v3('u_blockLightTint', E.blockTint); v3('u_planetDir', E.planetDir); v3('u_planet2Dir', E.planet2Dir); v3('u_ringNormal', E.ringNormal);
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
+      // the grade's knobs (env.js VR.Grade): the cosmic veil, the sun's disc in HDR, the Klassisch block edges
+      if (u.u_nebula) gl.uniform1f(u.u_nebula, E.nebula !== undefined ? E.nebula : 1);
+      if (u.u_sunDisc) gl.uniform1f(u.u_sunDisc, E.sunDisc !== undefined ? E.sunDisc : 16);
+      if (u.u_gridK) gl.uniform1f(u.u_gridK, E.gridK !== undefined ? E.gridK : 0.12);
       if (u.u_rain) gl.uniform1f(u.u_rain, E.rain);
       if (u.u_wet) gl.uniform1f(u.u_wet, E.wet || 0);     // wet ground (weather.js via env): the terrain's top faces darken in the rain
       // F2: the material detail tier (0 Very Low … 3 High) and the puddles (env.js: they fill in the rain and dry over minutes)
@@ -1338,7 +1342,7 @@
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.raysFB); gl.viewport(0, 0, this.raysW, this.raysH);
             this.tex(0, this.copyDepth, p.u.u_depth); this.tex(1, this.sceneCol, p.u.u_color);
             gl.uniform2f(p.u.u_sunScreen, sx, sy);
-            gl.uniform1f(p.u.u_raysStrength, fade * (E.sunDir[1] > 0 ? 0.55 : 0.2));
+            gl.uniform1f(p.u.u_raysStrength, fade * (E.sunDir[1] > 0 ? (E.rays !== undefined ? E.rays : 0.55) : 0.2));
             this.fs(p);
           }
         }
@@ -1354,8 +1358,9 @@
       gl.uniform1f(p.u.u_exposure, E.exposure);
       gl.uniform1f(p.u.u_bloomStrength, useBloom ? (E.bloomStrength || 0.06) : 0);
       gl.uniform1f(p.u.u_useRays, raysOn ? 1 : 0);
-      gl.uniform1f(p.u.u_vignette, F.photo ? F.photo.vignette : 0.55);
+      gl.uniform1f(p.u.u_vignette, F.photo ? F.photo.vignette : (E.vignette !== undefined ? E.vignette : 0.55));
       gl.uniform1f(p.u.u_saturation, (F.photo && F.photo.saturation) || E.saturation || 1.12);
+      if (p.u.u_contrast) gl.uniform1f(p.u.u_contrast, E.contrast || 0);
       gl.uniform3f(p.u.u_grade, E.grade[0], E.grade[1], E.grade[2]);
       if (p.u.u_vivid) gl.uniform1f(p.u.u_vivid, E.vivid === undefined ? 0 : E.vivid);
       gl.uniform1f(p.u.u_underwaterFx, F.underwater ? 1 : 0);
