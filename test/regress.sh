@@ -17,8 +17,8 @@ RESULTS=${1:-$ROOT/.tmp_tests/regress.txt}
 mkdir -p "$(dirname "$RESULTS")" "$ROOT/.tmp_tests" || exit 2
 : > "$RESULTS" || exit 2
 
-NODE_SET="genie_brain.js genie_raster.js housekit.js schem_io.js style_core.js gen_same.js id_snapshot.js light_same.js mesh_same.js phys_guard.js pool_recover.js store_fail.js vx_cache.js vx_cells.js worker_jobs.js modern_pack.js tex_check.js"
-BROWSER_SET="smoke.mjs spawn.mjs studio_live.mjs catalog.mjs favs.mjs house_genie.mjs site_plan.mjs create_standalone.mjs imagine.mjs projects.mjs crafter3.mjs player2.mjs workbench.mjs world_style.mjs crafter2.mjs world_mode.mjs studio_drag.mjs tpl_upgrade.mjs crafter.mjs deadends.mjs bridge.mjs blocklook.mjs modern_pack.mjs mp.mjs slopes.mjs terrain_edit.mjs glass_conn.mjs modern_kit.mjs height.mjs ship_test.mjs star_test.mjs"
+NODE_SET="klang.js genie_brain.js genie_raster.js housekit.js schem_io.js style_core.js gen_same.js id_snapshot.js light_same.js mesh_same.js phys_guard.js pool_recover.js store_fail.js vx_cache.js vx_cells.js worker_jobs.js modern_pack.js tex_check.js"
+BROWSER_SET="sound.mjs smoke.mjs spawn.mjs studio_live.mjs catalog.mjs favs.mjs house_genie.mjs site_plan.mjs create_standalone.mjs imagine.mjs projects.mjs crafter3.mjs player2.mjs workbench.mjs world_style.mjs crafter2.mjs world_mode.mjs studio_drag.mjs tpl_upgrade.mjs crafter.mjs deadends.mjs bridge.mjs blocklook.mjs modern_pack.mjs mp.mjs slopes.mjs terrain_edit.mjs glass_conn.mjs modern_kit.mjs height.mjs ship_test.mjs star_test.mjs"
 
 if [ $# -gt 0 ]; then LIST="$*"; else LIST="$NODE_SET $BROWSER_SET"; fi
 NODES=(); BROWSERS=()
