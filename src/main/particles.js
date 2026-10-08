@@ -20,7 +20,7 @@
     }
     spawn(x, y, z, vx, vy, vz, o) {
       if (this.n >= CAP) return -1;
-      if (this.budget < 1 && Math.random() > this.budget) return -1;
+      if (this.budget < 1 && !o.force && Math.random() > this.budget) return -1;   // force: a spawn the budget does not thin (the living air has its own caps, airlife.js)
       const i = this.n++;
       this.p[i * 3] = x; this.p[i * 3 + 1] = y; this.p[i * 3 + 2] = z;
       this.v[i * 3] = vx; this.v[i * 3 + 1] = vy; this.v[i * 3 + 2] = vz;

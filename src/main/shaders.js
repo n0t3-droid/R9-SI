@@ -371,6 +371,8 @@ uniform vec3 u_camFrac;
 uniform ivec3 u_camInt;
 uniform float u_time;
 uniform float u_wind;
+uniform vec2 u_windDir;                  // the wind's direction in x and z (weather.js, F3 · Da-Sein)
+uniform float u_gust;                    // 0..1: a gust swells the sway by up to half
 #ifdef MULTIDRAW
 layout(std140) uniform Origins { vec4 u_origins[512]; };
 #else
@@ -428,9 +430,10 @@ void main() {
     vec3 ap = wp + vec3(u_camInt);
     float t = u_time * 1.6;
     float ph = ap.x * 0.37 + ap.z * 0.29;
-    float amp = (sway > 0u ? float(sway) / 3.0 * 0.11 : 0.025) * u_wind;
-    rel.x += sin(t + ph) * amp + sin(t * 2.3 + ph * 1.7) * amp * 0.35;
-    rel.z += cos(t * 0.9 + ph * 1.3) * amp * 0.8;
+    float amp = (sway > 0u ? float(sway) / 3.0 * 0.11 : 0.025) * u_wind * (1.0 + 0.5 * u_gust);
+    float along = sin(t + ph) * amp + sin(t * 2.3 + ph * 1.7) * amp * 0.35;   // with the wind
+    float across = cos(t * 0.9 + ph * 1.3) * amp * 0.8;                       // across it (presence.js windOffset mirrors this)
+    rel.xz += u_windDir * along + vec2(-u_windDir.y, u_windDir.x) * across;
     if (leaf > 0u) rel.y += sin(t * 1.7 + ph * 2.1) * 0.015 * u_wind;
   }
   uint kind = (a_w5 >> 8u) & 7u;
