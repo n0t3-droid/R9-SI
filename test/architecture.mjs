@@ -75,20 +75,23 @@ const found = await ev(() => {
 });
 console.log('plan', JSON.stringify(found).slice(0, 900));
 const dirFrom = (a, b) => { const dx = b[0] - a[0], dz = b[2] - a[2], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; };
-const place = async (pos, tgt, tod, name) => {
+// a quality preset for a measured view: the smart-quality ladder is off (applyPreset turns dynRes on again), so the view is the preset's own
+const setPreset = (p) => ev((p) => { const g = VR.game; g.settings.dynRes = false; if (g.aq && g.aq.stack.length) g.aqReset(g.aq, g.settings, g.world); g.applyPreset(p); g.settings.dynRes = false; }, p);
+const place = async (pos, tgt, tod, name, maxMs = 300000) => {
   await ev(([pos, tgt]) => { const p = VR.game.player; p.teleport(pos[0], pos[1], pos[2]); p.flying = true; const dx = tgt[0] - pos[0], dy = tgt[1] - pos[1] - 1.6, dz = tgt[2] - pos[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); }, [pos, tgt]);
   // the chunks of a new place come from the workers, slowly on a loaded machine: wait until the five columns round it are in
   // and the number of drawn sections has stopped changing (real frames, so the renderer's count is current)
   let last = -1, still = 0, n = 0;
-  for (let i = 0; i < 40 && still < 2; i++) {
-    await step(12); await wait(150);
+  const t0 = Date.now();   // a time budget, not a round count: renderDist 14 needs minutes of worker time on this machine
+  while (still < 2 && Date.now() - t0 < maxMs) {
+    await step(12); await wait(400);
     // the work is done when every column within the loaded circle is in and none of its sections waits for a worker or a mesh
-    const idle = await ev(([x, z]) => { const W = VR.game.world, r = VR.game.settings.renderDist - 0.5, cx = x >> 4, cz = z >> 4, R = Math.ceil(r); for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) { if (i * i + j * j > r * r) continue; const c = W.col(cx + i, cz + j); if (!c) return false; for (const s of c.sec) if (s.dirty || s.pending) return false; } return true; }, [Math.floor(pos[0]), Math.floor(pos[2])]);
+    const idle = await ev(([x, z]) => { const W = VR.game.world, r = W.renderDist - 0.5, cx = x >> 4, cz = z >> 4, R = Math.ceil(r); for (let i = -R; i <= R; i++) for (let j = -R; j <= R; j++) { if (i * i + j * j > r * r) continue; const c = W.col(cx + i, cz + j); if (!c) return false; for (const s of c.sec) if (s.dirty || s.pending) return false; } return true; }, [Math.floor(pos[0]), Math.floor(pos[2])]);
     if (!idle) { still = 0; continue; }
     n = await realFrame();   // the meshes reach the GPU in a real frame: two equal counts in a row are the settled view
     still = n >= 8 && n === last ? still + 1 : 0; last = n;
   }
-  console.log('  ' + name + ': player at ' + (await ev(() => VR.game.player.pos.map(v => +v.toFixed(1)))).join(' ') + ', drawn sections ' + n + ', settled ' + (still >= 2));
+  console.log('  ' + name + ': player at ' + (await ev(() => VR.game.player.pos.map(v => +v.toFixed(1)))).join(' ') + ', drawn sections ' + n + ', settled ' + (still >= 2) + ' after ' + Math.round((Date.now() - t0) / 1000) + ' s');
   await shot(name, tod);
 };
 
@@ -110,7 +113,7 @@ if (found.villa) {
   check(V.beds >= 1 && V.seats >= 1, `villa in the plan has beds (${V.beds}) and seats (${V.seats})`);
   // the same view on Very Low (potato) and on High: what the frame costs (the item shadows and lamp halos switch off on potato)
   for (const preset of ['potato', 'high']) {
-    await ev((p) => { VR.game.applyPreset(p); }, preset);
+    await setPreset(preset);
     await step(20); await wait(200);
     await place(out, doorC, 6000, 'arch_cost_' + preset);
     costs[preset] = await oneFrame();
@@ -128,11 +131,11 @@ if (found.villa) {
     return [x, y + 0.2, z];
   }, [out, doorC]);
   for (const preset of ['potato', 'high']) {
-    await ev((p) => { VR.game.applyPreset(p); }, preset);
+    await setPreset(preset);
     await step(20); await wait(200);
     await place(out, itemTgt, 18600, 'arch_item_night_' + preset);
   }
-  await ev(() => VR.game.applyPreset('balanced'));
+  await setPreset('balanced');
 } else check(false, 'a modern town with a villa exists near the spawn');
 
 // the modern street (the same town as the villa, so no long move): the bus shelter with the nearest e-bike, by day and by night
