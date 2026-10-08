@@ -12,6 +12,7 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  const tx = (...a) => VR.Forge.tx(...a);
   const Forge = VR.Forge; if (!Forge || !Forge.kit) return;
   const PS = {
     stadt: { name: 'Stadt', path: 'paver_grey', edge: 'granite_paver', lamp: 'vx_lamppost_black', bench: 'vx_bench', trees: ['oak', 'birch'], bed: ['vx_flowerbed_tulips', 'vx_flowerbed_roses', 'vx_flowerbed'], plinth: 'granite_paver' },
@@ -30,7 +31,7 @@
     ],
     styles: Object.keys(PS).map(id => ({ id, name: PS[id].name })),
     lot: (P) => [P.params.w, P.params.d],
-    describe: (P) => [P.params.w + ' × ' + P.params.d, ['wenige', 'einige', 'viele'][P.params.t - 1] + ' Bäume'].concat(P.params.p ? ['Teich'] : [], P.params.f ? ['Brunnen'] : []),
+    describe: (P) => [P.params.w + ' × ' + P.params.d, [tx('g.fg.treesFew', null, 'wenige Bäume', 'a few trees'), tx('g.fg.treesSome', null, 'einige Bäume', 'some trees'), tx('g.fg.treesMany', null, 'viele Bäume', 'many trees')][P.params.t - 1]].concat(P.params.p ? [tx('g.fg.pond', null, 'Teich', 'pond')] : [], P.params.f ? [tx('g.fg.fountain', null, 'Brunnen', 'fountain')] : []),
   }, function (P, env) {
     const { w, d, t, p, f } = P.params, S = PS[P.style] || PS.stadt, rng = Forge.rng(P, 'park');
     const dy = -1, K = Forge.kit(w, 12, d, dy), cx = w >> 1, cz = d >> 1, ins = 3;
@@ -99,8 +100,8 @@
     ],
     styles: PAL.map(([id, , name]) => ({ id, name, words: [name.toLowerCase(), id] })),
     lot: (P) => { if (!VR.ShipGen) return [21 + 6 + (P.params.s ? STATION : 0), 34]; return layout(P).lot; },
-    title: (P) => ANAMES[P.params.a],
-    describe: (P) => [].concat(P.params.p ? ['Landeplatz'] : [], P.params.h ? ['Hangar'] : [], P.params.s ? ['Bodenstation'] : [], P.params.g && (!VR.ShipGen || layout(P).hatch) ? ['Gangway'] : []),
+    title: (P) => [tx('g.fg.sh.shuttle', null, 'Shuttle', 'Shuttle'), tx('g.fg.sh.interceptor', null, 'Interceptor', 'Interceptor'), tx('g.fg.sh.gunship', null, 'Gunship', 'Gunship'), tx('g.fg.sh.racer', null, 'Racer', 'Racer'), tx('g.fg.sh.dropship', null, 'Dropship', 'Dropship'), tx('g.fg.sh.freighter', null, 'Frachter', 'Freighter'), tx('g.fg.sh.cruiser', null, 'Kreuzer', 'Cruiser'), tx('g.fg.sh.carrier', null, 'Träger', 'Carrier')][P.params.a],
+    describe: (P) => [].concat(P.params.p ? [tx('g.fg.pad', null, 'Landeplatz', 'landing pad')] : [], P.params.h ? [tx('g.fg.hangar', null, 'Hangar', 'hangar')] : [], P.params.s ? [tx('g.fg.ground', null, 'Bodenstation', 'ground station')] : [], P.params.g && (!VR.ShipGen || layout(P).hatch) ? [tx('g.fg.gangway', null, 'Gangway', 'gangway')] : []),
   }, function (P, env) {
     const L = layout(P), bp = L.bp, { W, D, ox, oz, pad } = L, { h, s, g, m } = P.params;
     const top = bp.sy + 1 + (h ? 4 : 0), dy = -1, K = Forge.kit(W, top + 4, D, dy);

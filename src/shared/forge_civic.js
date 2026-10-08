@@ -12,6 +12,7 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  const tx = (...a) => VR.Forge.tx(...a);
   const Forge = VR.Forge; if (!Forge || !Forge.kit) return;
   const DIR = Forge.DIR;
   // ---------------------------------------------------------------- 🗼
@@ -32,7 +33,7 @@
     ],
     styles: Object.keys(LS).map(id => ({ id, name: LS[id].name })),
     lot: (P) => lookLot(P.params.p),
-    describe: (P) => [P.params.h + ' hoch', P.params.k ? 'massiv' : 'Gitter', 'Plattform ' + P.params.p].concat(P.params.r ? ['Dach'] : []),
+    describe: (P) => [tx('g.fg.high', { n: P.params.h }, '{n} hoch', '{n} high'), P.params.k ? tx('g.fg.solid', null, 'massiv', 'solid') : tx('g.fg.lattice', null, 'Gitter', 'lattice'), tx('g.fg.platform', { p: P.params.p }, 'Plattform {p}', 'platform {p}')].concat(P.params.r ? [tx('g.fg.roof', null, 'Dach', 'roof')] : []),
   }, function (P, env) {
     const { h, k, p, r } = P.params, S = LS[P.style] || LS.holz;
     const s = 5, [W, D] = lookLot(p), dy = -1, K = Forge.kit(W, h + 10, D, dy);
@@ -108,8 +109,8 @@
     ],
     styles: Object.keys(HS).map(id => ({ id, name: HS[id].name })),
     lot: (P) => [P.params.w, P.params.l + 2],
-    title: (P) => (P.params.m ? 'Markthalle' : 'Werkhalle'),
-    describe: (P) => [P.params.l + ' × ' + P.params.w, 'Traufe ' + P.params.h].concat(P.params.c ? ['Säulen'] : []),
+    title: (P) => (P.params.m ? tx('g.fg.market', null, 'Markthalle', 'Market hall') : tx('g.fg.works', null, 'Werkhalle', 'Workshop hall')),
+    describe: (P) => [P.params.l + ' × ' + P.params.w, tx('g.fg.eaves', { h: P.params.h }, 'Traufe {h}', 'eaves {h}')].concat(P.params.c ? [tx('g.fg.columns', null, 'Säulen', 'columns')] : []),
   }, function (P, env) {
     const { l, w, h, c, m } = P.params, S = HS[P.style] || HS.holz, rng = Forge.rng(P, 'hall');
     const dy = -1, W = w, D = l + 2, ridge = h + Math.floor(((w - 1) >> 1) / 2) + 1, K = Forge.kit(W, ridge + 4, D, dy);
@@ -188,7 +189,7 @@
     ],
     styles: Object.keys(CS).map(id => ({ id, name: CS[id].name })),
     lot: (P) => [P.params.w, P.params.d],
-    describe: (P) => [P.params.w + ' × ' + P.params.d, 'Mauer ' + P.params.h + ' hoch', P.params.t ? 'Rundtürme' : 'Ecktürme'].concat(P.params.k ? ['Bergfried'] : []),
+    describe: (P) => [P.params.w + ' × ' + P.params.d, tx('g.fg.wallH', { h: P.params.h }, 'Mauer {h} hoch', 'wall {h} high'), P.params.t ? tx('g.fg.roundTowers', null, 'Rundtürme', 'round towers') : tx('g.fg.cornerTowers', null, 'Ecktürme', 'corner towers')].concat(P.params.k ? [tx('g.fg.keep', null, 'Bergfried', 'keep')] : []),
   }, function (P, env) {
     const { w, d, h, t, k } = P.params, S = CS[P.style] || CS.stein, rng = Forge.rng(P, 'castle');
     // the keep (Bergfried) is the castle's tallest tower: its battlements stand a few rows over the corner towers' tops
@@ -305,8 +306,8 @@
     ],
     styles: Object.keys(SS).map(id => ({ id, name: SS[id].name })),
     lot: (P) => [P.params.w, P.params.l],
-    title: (P) => (P.params.k ? 'Leichtathletikstadion' : 'Fußballstadion'),
-    describe: (P) => [P.params.l + ' × ' + P.params.w, tiersOf(P.params) + ' Ränge'].concat(P.params.r ? ['Dach'] : []),
+    title: (P) => (P.params.k ? tx('g.fg.athletics', null, 'Leichtathletikstadion', 'Athletics stadium') : tx('g.fg.football', null, 'Fußballstadion', 'Football stadium')),
+    describe: (P) => [P.params.l + ' × ' + P.params.w, tx('g.fg.tiers', { n: tiersOf(P.params) }, '{n} Ränge', '{n} tiers')].concat(P.params.r ? [tx('g.fg.roof', null, 'Dach', 'roof')] : []),
   }, function (P, env) {
     const { l, w, r, k } = P.params, t = tiersOf(P.params), S = SS[P.style] || SS.beton;
     const dy = -1, depth = 2 * t + 4, H = t + (r ? 8 : 3) + 2, K = Forge.kit(w, H + 16, l, dy);
