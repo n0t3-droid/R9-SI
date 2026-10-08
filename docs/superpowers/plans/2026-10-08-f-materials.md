@@ -69,7 +69,15 @@ gallery (seed 31), not the Heartland plaza (that needs the 'default' world type 
 The first run gave 0.3–0.6 ms frames, too fast for a full frame, so the timing was redone with the readPixels sync.
 - after (69cfebf): Very Low tier 0 dry 1611.6 ms, tier 1 forced 1611.2 ms · High tier 0 forced 3344.6 ms, tier 3
   3420.8 ms (+2.3 %) · rain: Very Low 1531.7 ms, High tier 3 3493.6 ms. Draws 2 and 1156 tris in every case.
-- before (the build of 205d00c, DIST=scratchpad/f2/base/dist, TAG=materials_base): pending.
+- before (the build of 205d00c, DIST=scratchpad/f2/base/dist, TAG=materials_base, the same test): Very Low dry near
+  2388.9 ms (tris 1040), High dry near 4558.1 ms; rain Very Low 1560.1 ms, High 3063.8 ms. That build has no tiers
+  and no puddle state, so its two puddle checks fail there (NaN) by design, and its shots are the before look.
+- Noise, which decides what these numbers can say: the same Very Low config reads 1611.6 ms in the after run and
+  2388.9 ms in the before run (−33 %), and two identical configs in one run differ by 2–5 % (Very Low tier 0 against
+  tier 1 forced: 2388.9 and 2447.7 ms). The triangle counts differ too (1156 after, 1040 before: the chunks loaded
+  at the time of the measure). So this run does not show the Very Low normal map to be free, and the tier 3 cost
+  (+2.3 % inside one run) is inside the noise. A paired run (two builds interleaved in one browser run) would be
+  needed for "Very Low never slower"; it was not done.
 
 Shots (test/shots/materials_<preset>_<dry|rain>_<near|far>.png; potato = Very Low, high = High):
 - High dry near: the two-high wall reads as stone (chunky speckle), oak planks (seams, grain), red wool (matte, no
