@@ -177,6 +177,7 @@
   class World {
     constructor(game, o) {
       this.game = game;
+      if (game.vents) game.vents.reset();   // a new world brings its own vents (vents.js)
       this.dim = o.dim || 'overworld';
       this.seed = o.seed >>> 0;
       this.genOpts = o.genOpts || {};
@@ -391,6 +392,7 @@
       this.shDirty.add(c.key); this.shGone.delete(c.key);
       c.ready = true;
       c.spawns = m.spawns && m.spawns.length ? m.spawns : null;
+      if (c.spawns && this.game.vents) this.game.vents.absorb(c.spawns);   // the lava vents of the canyon (vents.js)
       this.cols.set(k, c);
       this.lastCol = null;
       if (m.be) for (const [k2, v] of m.be) c.blockEntities.set(k2, v);
