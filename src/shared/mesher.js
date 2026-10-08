@@ -46,20 +46,40 @@
   // `propStem` names the prop a trunk top draws alone when no prop of its kind stands above it (player-built trunks).
   // The kinds are numbers: a new prop kind is one entry here and one model in props.js.
   const PROP_KIND = VR.PROP_KIND = { palm: 1, palm_trunk: 2 };
+  // smooth furniture: the furniture pack's pieces (voxfurn.js) that a smooth model of props.js draws — the ten kinds the
+  // villas show most (sofas and their chaise, armchairs, dining tables and chairs, beds, the tripod and the arc lamp,
+  // the pendant, the kitchen units and the island, the bookcase, the planters, the TV lowboard and the wall TV) and the
+  // coffee tables and nightstands beside them. A type's kind is PROP_FURN0 + its index in this list (the list lives
+  // only in a running game: nothing of it is saved); its anchor is the model's part 0 (the cell VM.put places first),
+  // its facing the model's turn. No block definition changes.
+  const FCOL = ['charcoal', 'cream', 'taupe', 'sage', 'navy'], KCOL = ['white', 'black', 'oak'], KUNIT = ['cabinet', 'sink', 'hob', 'oven', 'tall', 'upper'];
+  const PROP_FURN0 = VR.PROP_FURN0 = 16;
+  const PROP_FURN = VR.PROP_FURN = [].concat(
+    FCOL.map(c => 'vm_sofa_' + c), FCOL.map(c => 'vm_chaise_' + c), FCOL.map(c => 'vm_armchair_' + c),
+    ['vm_dining_table_oak', 'vm_dining_table', 'vm_dining_chair_oak', 'vm_dining_chair'],
+    ['grey', 'navy', 'sage', 'white', 'rose'].map(c => 'vm_bed_' + c),
+    ['vm_floor_lamp', 'vm_arc_lamp', 'vm_pendant'],
+    [].concat(...KCOL.map(c => KUNIT.map(u => 'vm_kitchen_' + c + '_' + u))), ['vm_island'],
+    ['vm_bookshelf', 'vm_planter', 'vm_monstera', 'vm_olive', 'vm_lowboard', 'vm_tv', 'vm_coffee_table_glass', 'vm_coffee_table', 'vm_nightstand']);
+  // the prop groups (job.smoothProps is a mask of them; true is the plants alone): 1 the plants (palms), 2 the furniture
+  const PROP_GROUP = VR.PROP_GROUP = { plants: 1, furniture: 2 };
   let PROPT = null;
   function propTables() {
-    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n);
+    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n), group = new Uint8Array(n);
+    const furn = new Map(PROP_FURN.map((nm, i) => [nm, i]));
     for (const t of R.types) {
-      const o = t.o || {};
-      if (!o.prop && !o.propStem) continue;
+      const o = t.o || {}, fi = furn.get(t.name);
+      if (!o.prop && !o.propStem && fi === undefined) continue;
       for (let s = t.base; s < t.base + t.nstates; s++) {
+        facing[s] = t.has('facing') ? t.get(s, 'facing') & 3 : 0;
+        if (fi !== undefined) { kind[s] = PROP_FURN0 + fi; group[s] = PROP_GROUP.furniture; anchor[s] = !t.has('part') || t.get(s, 'part') === 0 ? 1 : 0; continue; }
         kind[s] = PROP_KIND[o.prop] || 0;
         stem[s] = PROP_KIND[o.propStem] || 0;
+        group[s] = PROP_GROUP.plants;
         anchor[s] = (o.propAnchor === 'all' || (o.propAnchor && t.has('part') && t.getV(s, 'part') === o.propAnchor)) ? 1 : 0;
-        facing[s] = t.has('facing') ? t.get(s, 'facing') & 3 : 0;
       }
     }
-    PROPT = { kind, anchor, stem, facing };
+    PROPT = { kind, anchor, stem, facing, group };
   }
 
   class Buf {
@@ -127,8 +147,9 @@
     // material never read as one surface (Klassisch v2)
     const LK = VR.LOOK, ctmJoin = !LK || LK.ctm, macroOn = !LK || LK.macro, varyOn = !!(LK && LK.vary && !macroOn);
     const NAT = R.natural;
-    // smooth props: the prop blocks give no voxel geometry; their anchors are collected in propOut (job.smoothProps only)
-    const propOn = !!job.smoothProps;
+    // smooth props: the prop blocks of the groups job.smoothProps asks for give no voxel geometry; their anchors are
+    // collected in propOut (job.smoothProps only: a mask of PROP_GROUP, true = the plants)
+    const propMask = job.smoothProps === true ? PROP_GROUP.plants : (job.smoothProps | 0), propOn = propMask !== 0;
     if (propOn && (!PROPT || PROPT.kind.length !== R.stateCount + 1)) propTables();
     const propOut = propOn ? [] : null;
     const bufs = [takeBuf(0, 4096), takeBuf(1, 1024), takeBuf(2, 1024)];
@@ -335,7 +356,7 @@
       if (!b) continue;
       const shape = TSH[b], fl = TF[b], layer = TL[b];
       if (shape === SH.NONE) continue;
-      if (propOn && PROPT.kind[b]) {
+      if (propOn && (PROPT.group[b] & propMask)) {
         // a prop block: its geometry is the smooth prop's. The anchor goes to the list: the block that anchors the prop
         // (its bottom face is the trunk's top), or the air above a trunk top that no prop of its kind covers
         if (PROPT.anchor[b]) propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[b], PROPT.facing[b], L[bi]);

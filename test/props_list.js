@@ -93,5 +93,29 @@ const streamsOf = (r) => ['opaque', 'cutout', 'trans', 'vx', 'vxFar'].map(k => (
   check(wrong === 0, 'every anchor has a known kind');
 }
 
+// 5. the furniture (job.smoothProps is a mask: 1 the plants, 2 the furniture, true = the plants): a sofa, a bed, a lamp
+// and a dining chair placed by VM.put give one anchor each (their part 0, with its facing and light) and no voxel
+// geometry when the mask asks for the furniture; with the plants alone they are meshed as before
+{
+  const G = VR.PROP_GROUP || { plants: 1, furniture: 2 };
+  const L = [['vm_sofa_navy', 2, 1, 3, 2], ['vm_bed_grey', 9, 1, 3, 1], ['vm_floor_lamp', 13, 1, 12, 0], ['vm_dining_chair_oak', 4, 1, 10, 3]];
+  const place = (put) => { for (const [nm, x, y, z, f] of L) VM.put((xx, yy, zz, n2, pr) => put(xx, yy, zz, R.S(n2, pr)), x, y, z, nm, f); };
+  const plantsOnly = VR.meshSection(section(place, G.plants)), legacy = VR.meshSection(section(place, true)), none = VR.meshSection(section(place));
+  const furn = VR.meshSection(section(place, G.furniture)), both = VR.meshSection(section(place, G.plants | G.furniture));
+  const geo = (r) => streamsOf(r).reduce((a, b) => a + b, 0);
+  check(geo(plantsOnly) > 0 && geo(plantsOnly) === geo(none) && geo(legacy) === geo(none), 'with the plants alone (or true) the furniture is meshed as voxels, as without the option (' + geo(none) + ' words)');
+  check(plantsOnly.props && plantsOnly.props.length === 0, 'and gives no furniture anchors');
+  check(geo(furn) === 0 && geo(both) === 0, 'with the furniture asked for, the pieces give no voxel geometry');
+  const n = furn.props ? furn.props.length / 6 : 0;
+  check(n === L.length, 'one anchor per piece (' + n + ' of ' + L.length + ')');
+  let ok = 0;
+  for (const [nm, x, y, z, f] of L) {
+    const kind = VR.PROP_FURN0 + VR.PROP_FURN.indexOf(nm);
+    for (let i = 0; i < n; i++) { const a = furn.props.slice(i * 6, i * 6 + 6); if (a[0] === x && a[1] === y && a[2] === z && a[3] === kind && a[4] === f && a[5] === 0xF000) ok++; }
+  }
+  check(ok === L.length, 'each anchor is the piece\'s part 0 with its kind, its facing and its light (' + ok + ' of ' + L.length + ')');
+  check(both.props && both.props.length === furn.props.length, 'plants and furniture together give the same furniture anchors');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
