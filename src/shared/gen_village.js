@@ -1213,6 +1213,8 @@
         if (S.palms) { const q = ROT[lot.r](lot.w - 2, lot.d - 2); if (VR.Plants && VR.Plants.on(g)) crownCands.push([lot.ox + q[0], lot.F + 1, lot.oz + q[1], 7]); else VG.palm(put, lot.ox + q[0], lot.F + 1, lot.oz + q[1], 4); }
         // vgen 7: the lawn's tufts and flowers, not on the palm's trunk cell (the lawn is ground, the trunk stands there)
         if (VR.Plants && VR.Plants.on(g)) for (let u = 1; u < lot.w - 1; u++) for (let v = 1; v < lot.d - 1; v++) if (lrng.chance(0.14) && !(S.palms && u === lot.w - 2 && v === lot.d - 2)) L.P(u, lot.F + 1, v, lrng.chance(0.6) ? 'vm_tuft_grass' : 'vm_flower_cluster', { part: 'p000', facing: 0 });
+        // vgen 7: half the gardens have a blossom bush (the trailer's round topiary with white and pink flowers) in the corner by the lamp
+        if (VR.Plants && VR.Plants.on(g) && lrng.chance(0.5)) L.P(1, lot.F + 1, 1, 'vm_bush_blossom', { part: 'p000', facing: 0 });
         L.P(0, lot.F + 1, 0, S.lamp, { head: 0 }); L.P(0, lot.F + 2, 0, S.lamp, { head: 1 });
         if (S.crystals) L.P(mid, lot.F + 1, lot.d - 1, 'vx_crystal_' + lrng.pick(['violet', 'azure', 'rose']));
         plan.work.push({ kind: 'garden', spot: (() => { const q = ROT[lot.r](mid, (lot.d >> 1) - 1); return [lot.ox + q[0], lot.F + 1, lot.oz + q[1]]; })() });
