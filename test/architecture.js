@@ -137,12 +137,15 @@ const layoutOf = (p) => p.homes.map(h => h.door.join(',')).join(';') + '|' + p.r
   }
   check(n === 12 && mism.length === 0, `vgen 5 village plans unchanged (12 sites${mism.length ? ', differ at ' + mism.join(' ') : ''})`);
   // and at vgen 6 every village keeps its houses and roads: the detail changes what stands in them, not where
-  let same = 0, nn = 0;
+  let same = 0, nn = 0, homes6 = 0, noBed6 = 0;
   for (let i = -5; i <= 5 && nn < 12; i++) for (let j = -5; j <= 5 && nn < 12; j++) {
     const s = VG.site(g, i, j); if (!s) continue; nn++;
-    if (layoutOf(VG.plan(new VR.OverworldGen(SEED >>> 0, { vgen: 6 }), s)) === layoutOf(VG.plan(new VR.OverworldGen(SEED >>> 0, { vgen: 5 }), s))) same++;
+    const p6 = VG.plan(new VR.OverworldGen(SEED >>> 0, { vgen: 6 }), s);
+    if (layoutOf(p6) === layoutOf(VG.plan(new VR.OverworldGen(SEED >>> 0, { vgen: 5 }), s))) same++;
+    for (const h of p6.homes) if (!h.skin && h.inside) { homes6++; if (!h.beds || !h.beds.length) noBed6++; }
   }
   check(nn === 12 && same === nn, `vgen 6 keeps the houses and roads of every village (${same}/${nn} sites)`);
+  check(homes6 > 0 && noBed6 === 0, `every village home at vgen 6 has a bed (${homes6 - noBed6}/${homes6}; one-storey houses sleep downstairs)`);
 }
 
 // ---------------------------------------------------------------- 4. modern towns: street pieces at vgen 6 only
