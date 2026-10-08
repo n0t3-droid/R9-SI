@@ -99,7 +99,7 @@
     const d = (c, k) => sh(c, k);
     return {
       skin: SKIN[clampI(o.skin, SKIN.length)], hair: HAIR[clampI(o.hair, HAIR.length)], hs: V.HAIR_STYLES[clampI(o.hs, V.HAIR_STYLES.length)], age: 'adult', role: 'hero',
-      shirt: su.c, pants: d(su.c, 0.8), shoes: su.a, suit2: su.a, suit3: su.w || 0xF4F6FA, helm: su.helm ? 1 : 0, beard: false, freckles: false, eye: 0x2A4A7A,
+      shirt: su.c, pants: d(su.c, 0.8), shoes: su.a, suit2: su.a, suit3: su.w || 0, helm: su.helm ? 1 : 0, beard: false, freckles: false, eye: 0x2A4A7A,
       kidHat: null, elderHat: null, dress: false, dressCol: 0, emblem: 0, lashes: !!o.lashes, tool: o.tool || null,
     };
   };
