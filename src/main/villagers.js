@@ -74,18 +74,21 @@
       lashes: (r(16) & 1) === 1,
     };
   };
-  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':');
+  // (the helmet and the white panels join the key only when a suit has them: the villagers' keys stay as they were)
+  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '');
 
   // ---------------------------------------------------------------- heroes (players): armour suits from the trailer
   V.SKIN = SKIN; V.HAIR = HAIR; V.HAIR_STYLES = STYLES_H.slice(0, 9);
+  // (the saved choice is an index: the two trailer suits keep the places 0 and 6 of the first list)
+  // c: the armour, a: the accent (orange on the blue hero), w: the white panels, helm: the helmet with its cyan visor
   V.HERO_SUITS = [
-    { name: 'Nova Blue', c: 0x2F55C8, a: 0xFF7A1A },
+    { name: 'Blau', c: 0x2452D8, a: 0xF07E1E, w: 0xF4F6FA, helm: 1 },
     { name: 'Ember Red', c: 0xC8402E, a: 0xF2F2EC },
     { name: 'Jungle Green', c: 0x3A8A4A, a: 0xF0C040 },
     { name: 'Violet Star', c: 0x7048C0, a: 0x3AF0FF },
     { name: 'Arctic White', c: 0xE4E8EE, a: 0x2F8AE0 },
     { name: 'Shadow', c: 0x2E323C, a: 0xFF4AA0 },
-    { name: 'Solar Orange', c: 0xE8782A, a: 0x2F55C8 },
+    { name: 'Orange', c: 0xF07E1E, a: 0x2452D8, w: 0xF4F6FA, helm: 1 },
     { name: 'Teal Wave', c: 0x1F9A9A, a: 0xFFE04A },
   ];
   const clampI = (v, n) => { v = v | 0; return v < 0 ? 0 : v >= n ? n - 1 : v; };
@@ -96,7 +99,7 @@
     const d = (c, k) => sh(c, k);
     return {
       skin: SKIN[clampI(o.skin, SKIN.length)], hair: HAIR[clampI(o.hair, HAIR.length)], hs: V.HAIR_STYLES[clampI(o.hs, V.HAIR_STYLES.length)], age: 'adult', role: 'hero',
-      shirt: su.c, pants: d(su.c, 0.8), shoes: su.a, suit2: su.a, beard: false, freckles: false, eye: 0x2A4A7A,
+      shirt: su.c, pants: d(su.c, 0.8), shoes: su.a, suit2: su.a, suit3: su.w || 0xF4F6FA, helm: su.helm ? 1 : 0, beard: false, freckles: false, eye: 0x2A4A7A,
       kidHat: null, elderHat: null, dress: false, dressCol: 0, emblem: 0, lashes: !!o.lashes, tool: o.tool || null,
     };
   };
