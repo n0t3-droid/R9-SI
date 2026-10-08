@@ -134,7 +134,10 @@
         const key = s[2] + ',' + s[3] + ',' + s[4];
         if (this.spawned.has(key)) continue;
         this.spawned.add(key); this.meta.starshipSpawns = [...this.spawned];
-        this.spawn(s[1], null, null, [s[2], s[3], s[4]], -((s[5] || 0) & 3) * QT, key);
+        // the Gate Temple's pad: a shuttle that stays parked there, its thrusters burning (hangarFx)
+        const hangar = s[6] === 'hangar';
+        const ship = this.spawn(s[1], hangar ? 'shuttle' : null, null, [s[2], s[3], s[4]], -((s[5] || 0) & 3) * QT, key);
+        if (hangar && ship) ship.hangar = true;
       }
     }
     placeInFront(seed, arch, palette, p) {
@@ -421,7 +424,21 @@
       if ((this.gcT = (this.gcT || 0) - dt) <= 0) { this.gcT = 20; this.gc(); }
       // keep parked ships' gear down & designs fresh
       for (const s of this.ships) { if (s.state === 'parked') s.gear = 1; s.d.last = performance.now(); }
+      if (g.settings && g.settings.anim !== false) for (const s of this.ships) if (s.hangar && s.state === 'parked') this.hangarFx(s);
       void p;
+    }
+    // the hangar shuttle's idle glow: its thrusters burn on the pad (a flying ship's engine trail at low thrust) and dust
+    // lifts off the pad under them (Animierte Anzeigen; only near the player)
+    hangarFx(s) {
+      const g = this.g, m = s.d.meta, pl = g.player;
+      if (!m || !m.exhaust || !pl || Math.abs(s.pos[0] - pl.pos[0]) > 48 || Math.abs(s.pos[2] - pl.pos[2]) > 48) return;
+      if (!s.tid) s.tid = 'hg' + (Math.random() * 1e9 | 0);
+      if (g.trails) for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, s.toWorld([e[0], e[1], e[2] + 0.3]), 0, { thrust: 0.5, size: e[3], col: [1, 0.72, 0.35], minor: ei > 1 }); }
+      // the dust lies on the pad and drifts out from under the hull (it does not climb through the hull)
+      if (g.particles && Math.random() < 0.3) for (const e of m.exhaust) {
+        const wp = s.toWorld([e[0], e[1], e[2]]);
+        g.particles.spawn(wp[0] + (Math.random() - 0.5) * e[3] * 2, s.pos[1] + 0.15, wp[2] + (Math.random() - 0.5) * e[3] * 2, (Math.random() - 0.5) * 2.5, 0.05 + Math.random() * 0.2, (Math.random() - 0.5) * 2.5, { life: 0.8 + Math.random() * 0.6, size: 0.12 + e[3] * 0.2, grav: -0.15, col: [0.62, 0.56, 0.48], emis: 0, drag: 1.5, grow: 1.4, collide: false });
+      }
     }
     refreshNear(force) {
       const p = this.g.player; if (!p) { this.near = []; return; }

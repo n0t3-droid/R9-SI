@@ -230,6 +230,7 @@
     'g.set.rays': 'Sonnenstrahlen',
     'g.set.fxaa': 'Kantenglättung (FXAA — nur ohne Super Resolution)',
     'g.set.fancyLeaves': 'Schöne Blätter',
+    'g.set.anim': 'Animierte Anzeigen (Bildschirme, Portal, Lichter)',
     'g.set.dynRes': 'Schlaue Qualität (hält das Bild scharf: bei wenig FPS zuerst weniger Schatten, Strahlen und Details — nie unscharf)',
     'g.set.lite': 'Einfache Materialien (flache Flächen ohne Relief & Glanz — am schnellsten)',
     'g.set.showFps': 'FPS anzeigen',

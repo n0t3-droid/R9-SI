@@ -26,6 +26,9 @@ uniform vec3 u_planetDir;
 uniform vec3 u_planet2Dir;
 uniform vec3 u_ringNormal;
 uniform float u_skyMagic;    // how strongly the cosmic sky shows by day
+uniform float u_animOn;      // Animierte Anzeigen (settings.anim): 1 animates the holo displays, the portal veil and the hall's light pulses
+uniform float u_pulseA;      // texture layers of the Hangar Hall's pulsing wall strips (-1 when not loaded)
+uniform float u_pulseB;
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -593,6 +596,29 @@ void main() {
     float sweep = smoothstep(0.88, 1.0, fract(hp.y * 0.35 - u_time * 0.4));
     float flick = 0.93 + 0.07 * sin(u_time * 31.0 + hash13(floor(hp * 4.0)) * 40.0);
     col *= scan * flick + sweep * 0.9;
+    if (u_animOn > 0.5) {
+      // Animierte Anzeigen: a radar per 3 × 3 m panel (a sweep that turns, range rings, a crosshair, blips) and
+      // scrolling readout bars on the rest of the screen, all in the panel's own plane so it reads as one display
+      vec2 pl = face <= 1u ? hp.zy : (face <= 3u ? hp.xz : hp.xy);
+      vec2 cc = (floor(pl / 3.0) + 0.5) * 3.0, d = pl - cc;
+      float rr = length(d), ang = atan(d.y, d.x);
+      float hc = hash12(floor(pl / 3.0));
+      float da = mod(ang - (u_time * (0.5 + hc) + hc * 6.28) + 3.14159, 6.28318) - 3.14159;
+      float inR = step(rr, 1.25);
+      float wedge = clamp(1.0 - abs(da) / 0.8, 0.0, 1.0) * inR;
+      float rings = ((1.0 - smoothstep(0.0, 0.05, abs(rr - 0.45))) + (1.0 - smoothstep(0.0, 0.05, abs(rr - 0.9)))) * inR;
+      float cross = ((1.0 - smoothstep(0.0, 0.03, abs(d.x))) + (1.0 - smoothstep(0.0, 0.03, abs(d.y)))) * inR * 0.5;
+      float blip = step(0.97, hash12(floor(pl * 3.0) + floor(u_time * 1.5))) * step(rr, 1.1);
+      float rowF = pl.y * 6.0, row = floor(rowF);
+      float bar = step(0.55, hash12(vec2(row, floor(pl.x * 3.0 + u_time * 2.0 * (0.6 + fract(row * 0.37)))))) * step(0.3, fract(rowF)) * (1.0 - step(0.75, fract(rowF)));
+      vec3 ink = vec3(0.35, 0.95, 1.0);
+      col = col * 0.42 + ink * (wedge * 0.85 + rings * 0.55 + cross + blip * 1.4) + ink * bar * (1.0 - inR) * 0.75;
+    }
+  }
+  if (u_animOn > 0.5 && u_pulseA > -0.5 && (abs(layer - u_pulseA) < 0.5 || abs(layer - u_pulseB) < 0.5)) {
+    // the Hangar Hall's wall strips: a light that runs along the wall (the same phase wherever the walls meet)
+    vec3 pp = v_localPos + vec3(u_camInt);
+    col *= 0.8 + 0.2 * (0.5 + 0.5 * sin(u_time * 2.2 - pp.z * 0.8 - pp.x * 0.4));
   }
   if (kind == 3u) { // portal swirl
     vec2 p = vec2(v_localPos.x + v_localPos.z, v_localPos.y);
@@ -686,6 +712,28 @@ void main() {
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
   float skyL = v_sky * v_sky;
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
+  if (kind == 3u) {
+    // ---------------- portal veil (Animierte Anzeigen): an energy field whose two swirl layers drift in world space,
+    // so neighbouring veil blocks join; still when the animation is off. The texture gives a soft alpha and the swirl
+    // lifts it, so the palm city shows through the opening.
+    vec3 wp = v_localPos + vec3(u_camInt);
+    vec2 pp = face <= 1u ? wp.zy : (face <= 3u ? wp.xz : wp.xy);
+    // still with the animation off (Very Low): a flat swirl, so no noise is spent on the veil there
+    float swirl = 0.4;
+    if (u_animOn > 0.5) {
+      float s1 = vnoise(pp * 1.6 + vec2(u_time * 0.9, -u_time * 0.6));
+      float s2 = vnoise(pp * 4.2 - vec2(u_time * 1.7, u_time * 1.1));
+      swirl = smoothstep(0.32, 0.92, s1 * 0.6 + s2 * 0.5);
+    }
+    vec4 va = textureGrad(u_albedo, vec3(fu, layer), dFdx(fu), dFdy(fu));
+    // a deeper blue and dimmer than before: the veil is see-through, not a lit panel (the swirl lifts it a little)
+    vec3 veilCol = mix(vec3(0.05, 0.34, 0.92), vec3(0.6, 0.88, 1.0), swirl * swirl);
+    vec3 vcol = veilCol * (0.6 + 0.45 * swirl) * (0.85 + 0.3 * va.r);
+    float dv = length(v_rel);
+    vcol = applyFog(vcol, v_rel, dv);
+    o_col = vec4(vcol, clamp(va.a * (0.45 + 0.75 * swirl), 0.0, 1.0));
+    return;
+  }
   if (kind == 1u || kind == 6u) {
     // ---------------- water ----------------
     // every water surface exists twice (one copy per side, for looking up from below); only the copy
