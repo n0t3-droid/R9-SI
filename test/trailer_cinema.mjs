@@ -50,7 +50,7 @@ const state = () => ev(() => {
   return { active: true, state: g.state, si: d.si, id: s ? s.id : (d.si < 0 ? 'pre' : '?'), kind: s ? s.kind || 'shot' : '?', phase: d.phase, t: d.t, dur: s ? s.dur : 0, tod: g.env.timeOfDay, want: s ? s.tod : undefined, pend: g.world ? g.world.pending.size : -1, hud: document.getElementById('hud').style.visibility, cine: document.getElementById('cine').classList.contains('on'), cap: document.querySelector('#cine .cap').textContent, ships: d.myShips.length, actors: d.actors.length, rnd: g.traffic ? g.traffic.ships.filter((x) => !x.scripted && !x.dead).length : 0 };
 });
 // the ride, from the moment it is on until it ends: records the frame times of the run and the shots' lengths
-const KEYS = { A: [1.0], B: [2.0], C: [1.0, 2.0], D: [0.75, 1.5], E: [0.75, 4.75, 7.75], F: [1.75, 4.75, 6.75], G: [0.5, 3.0], A2: [1.0], D2: [1.0], F2: [2.5], F3: [2.5], G2: [1.5] };
+const KEYS = { title: [1.2], A: [1.0], B: [2.0], C: [1.0, 2.0], D: [0.75, 1.5], E: [0.75, 4.75, 7.75], F: [1.75, 4.75, 6.75], G: [0.5, 3.0], A2: [1.0], D2: [1.0], F2: [2.5], F3: [2.5], G2: [1.5], end: [1.2] };
 async function ride(pictures, maxSteps = 9000) {
   const rec = { ms: [], order: [], lastT: {}, firstPend: {}, todBad: [], hudBad: 0, cineBad: 0, caps: [], frames: 0, ships: {}, actors: {}, rnd: 0 };
   const done = new Set();
@@ -67,9 +67,10 @@ async function ride(pictures, maxSteps = 9000) {
       rec.lastT[st.id] = st.t;
       rec.ships[st.id] = Math.max(rec.ships[st.id] || 0, st.ships); rec.actors[st.id] = Math.max(rec.actors[st.id] || 0, st.actors); rec.rnd = Math.max(rec.rnd, st.rnd);
       if (!(st.id in rec.firstPend)) { rec.firstPend[st.id] = st.pend; if (st.want !== undefined && Math.abs(st.tod - st.want) > 2) rec.todBad.push(st.id + ' ' + st.tod + '≠' + st.want); }
-      // the picture at the key second of the shot, taken right here (the ride goes on between the steps)
-      if (pictures && KEYS[st.id]) for (let n = 0; n < KEYS[st.id].length; n++) { const key = st.id + ':' + n; if (!done.has(key) && st.t >= KEYS[st.id][n]) { done.add(key); await shot(`cinema_${st.id}${n ? '_' + n : ''}`); } }
     }
+    // the pictures: at the key second of each shot (its run) and of each title card (the card's own clock); taken right
+    // here, the ride goes on between the steps
+    if (pictures && KEYS[st.id] && (st.phase === 'run' || (st.kind === 'title' && st.phase === 'card'))) for (let n = 0; n < KEYS[st.id].length; n++) { const key = st.id + ':' + n; if (!done.has(key) && st.t >= KEYS[st.id][n]) { done.add(key); await shot(`cinema_${st.id}${n ? '_' + n : ''}`); } }
     const ms = await stepGame(DT, false);
     if (st.phase === 'run') rec.ms.push(ms);
     await sleep(st.phase === 'load' || st.phase === 'card' ? 25 : 3);
