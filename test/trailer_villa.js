@@ -121,8 +121,11 @@ check(lint >= comps * 0.8, 'lintels (a light band with an orange line) over the 
 
 // ---------------------------------------------------------------- 5 · the hall
 console.log('5 · the hall');
-let glass = 0; for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) if (/^panorama_white$|^vx_beam_white$|^door_glass_white$/.test(nm(u, y, G.v1))) glass++;
-check(glass === (G.u1 - G.u0 - 3) * G.clear, 'the glass wall to the garden fills the back of the hall floor to ceiling (' + glass + ' cells)');
+let glass = 0, posts = 0; for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) { const n2 = nm(u, y, G.v1); if (/^vx_nova_glass$|^door_glass_white$/.test(n2)) glass++; if (n2 === 'vx_nova_glass' && propOf(at(u, y, G.v1), 'post') === 1) posts++; }
+check(glass === (G.u1 - G.u0 - 3) * G.clear && posts >= 2 * G.clear, 'the glass wall to the garden: one clear sheet (vx_nova_glass) floor to ceiling with slim mullions (' + glass + ' cells, ' + posts + ' mullion cells) and the garden door');
+// the partition between the foyer and the hall: clear glass, the middle open
+let part = 0, partOpen = 0; for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) { const n2 = nm(u, y, NOVA.PARTITION); if (n2 === 'vx_nova_glass') part++; else if (!n2) partOpen++; }
+check(part >= 10 * G.clear && partOpen === 3 * G.clear, 'the glass partition between the foyer and the hall: clear sheets (' + part + ' cells) with the open middle (' + partOpen + ')');
 const [pu, pv] = NOVA.PAD;
 let pad = 0; for (let v = pv; v < pv + 3; v++) for (let u = pu; u < pu + 3; u++) if (nm(u, 1, v) === 'vm_nova_pad') pad++;
 let ringN = 0; for (const [u, v] of ring([pu - 1, pv - 1, pu + 3, pv + 3])) if (nm(u, 0, v) === 'vx_floor_plaza_line') ringN++;
@@ -176,8 +179,23 @@ check(lines >= 16 && lineEdge > 0, 'a cyan light line along both of its edges: e
 console.log('7 · the new pieces');
 // (from the checkout's test folder: test/wt_run.sh runs a copy of this file from .tmp_tests)
 const snap = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'test', 'id_snapshot.json'), 'utf8'));
-const shippedEnd = Math.max(...snap.map(r => r[1] + r[2])), NEW = ['vx_nova_window', 'vx_nova_band', 'vm_nova_tread', 'vm_nova_pad'];
+const shippedEnd = Math.max(...snap.map(r => r[1] + r[2])), NEW = ['vx_nova_window', 'vx_nova_band', 'vm_nova_tread', 'vm_nova_pad', 'vx_nova_glass'];
 check(NEW.every(n => R.byName[n] && R.byName[n].base >= shippedEnd), 'the new pieces come after every shipped state id (' + NEW.map(n => n + ' ' + (R.byName[n] ? R.byName[n].base : '?')).join(', ') + ')');
+// the glass sheet (t1_29, t3_10: clear floor-to-ceiling glass) joins its neighbours in BOTH looks: a 3 × 2 sheet is clear
+// glass everywhere but a slim frame on its outer ring; the post state stands a slim mullion in the middle of its cell
+{ const gt = R.byName.vx_nova_glass; let inner = 0, frame = 0, glassN = 0, post = 0;
+  for (let bx = 0; bx < 3; bx++) for (let by = 0; by < 2; by++) {
+    const m = (bx < 2 ? 1 : 0) | (bx > 0 ? 2 : 0) | (by < 1 ? 4 : 0) | (by > 0 ? 8 : 0) | (bx === 1 ? 16 : 0);
+    for (let v = 0; v < 16; v++) for (let u = 0; u < 16; u++) {
+      const w = N && N.glassCell ? N.glassCell(u, v, m) : { kind: '?' }, X = bx * 16 + u, Y = by * 16 + v, edge = Math.min(X, 47 - X, Y, 31 - Y);
+      if (w.kind === 'frame') { if (edge >= 1) inner++; else frame++; }
+      else if (w.kind === 'post') { if (bx === 1 && Math.abs(u - 7.5) <= 1) post++; else inner++; }
+      else if (w.kind === 'glass') { if (edge < 1) inner++; else glassN++; }
+      else inner++;
+    }
+  }
+  // (the mullion: two voxels wide over the sheet's height but the frame rows at its top and bottom: 2 × 30)
+  check(gt && gt.base >= shippedEnd && inner === 0 && frame > 0 && glassN > 1000 && post === 60,'the glass sheet joins in both looks: a 3 × 2 sheet is clear glass (' + glassN + ' cells) in one slim frame (' + frame + ') with a slim mullion in its post cell (' + post + '), ' + inner + ' misplaced'); }
 for (const n of ['vm_nova_tread', 'vm_nova_pad']) { const m = VM.MODELS[n]; VM.materialize(m); const scan = VM.scanParts(m).map(p => p.px + ',' + p.py + ',' + p.pz).join(' '), decl = m.parts.map(p => p.px + ',' + p.py + ',' + p.pz).join(' '); check(scan === decl, n + ' builds to its declared cells (' + m.parts.length + ' parts)'); }
 // every state of the new pieces paints and meshes (a one-block section around it) under 1000 quads
 let maxQ = 0, worst = '', meshed = 0;
