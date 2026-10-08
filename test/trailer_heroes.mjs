@@ -147,15 +147,26 @@ if (plaza) {
 }
 
 // ---------------------------------------------------------------- Very Low: the cost of a frame and of the crowd
+// The street's view, first without the crew (the base has none: this is the comparison), then with the two heroes
+// placed in view (the worst case: both drawn and posed). The crowd update is timed with the two heroes.
 if (plaza) await setCam([plaza[0] + 11, plaza[1] + 2, plaza[2] + 11], [plaza[0], plaza[1] + 1.2, plaza[2]]);
 await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
 await settle(60);
+await crew([]);
+metric({ scene: 'verylow_people', preset: 'potato', ...(await inView()) });
 await timed(4);
 const vlMs = await timed(8);
-metric({ scene: 'verylow_frame', ms: +vlMs.toFixed(1), preset: 'potato' });
-if (TAG !== 'base') {
+metric({ scene: 'verylow_frame', ms: +vlMs.toFixed(1), preset: 'potato', heroes: 0 });
+if (TAG !== 'base' && plaza) {
+  await crew([
+    { id: 'blau', suit: 0, pos: [plaza[0] - 1.6, plaza[1], plaza[2]], yaw: Math.PI, act: 'hold' },
+    { id: 'orange', suit: 6, pos: [plaza[0] + 1.6, plaza[1], plaza[2]], yaw: Math.PI, act: 'hold' },
+  ]);
+  await timed(4);
+  const vlHeroMs = await timed(8);
+  metric({ scene: 'verylow_frame_heroes', ms: +vlHeroMs.toFixed(1), preset: 'potato', heroes: 2 });
   const crowdMs = await ev(() => { const C = VR.Crowd; if (!C || !C.update) return -1; const t0 = performance.now(); for (let i = 0; i < 200; i++) C.update(1 / 30); return (performance.now() - t0) / 200; });
-  metric({ scene: 'verylow_crowd_update', ms: +crowdMs.toFixed(3) });
+  metric({ scene: 'verylow_crowd_update', ms: +crowdMs.toFixed(3), preset: 'potato', heroes: 2 });
 }
 await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.applySettings('*'); });
 
