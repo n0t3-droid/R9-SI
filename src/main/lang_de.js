@@ -224,6 +224,8 @@
     'g.set.sens': 'Maus-Tempo',
     'g.set.invertY': 'Maus hoch/runter umkehren',
     'g.set.viewBob': 'Wackeln beim Laufen',
+    'g.set.turnInertia': 'Kamera-Trägheit beim Drehen (ganz leicht)',
+    'g.set.airLife': 'Lebendige Luft: Staub, Pollen, Glühwürmchen, Blätter, Schnee, Vögel',
     'g.set.keys': '<div class="hr"></div>WASD laufen · Leertaste springen / hochfliegen · Shift schleichen / runterfliegen · Strg oder 2× W sprinten · 2× Leertaste Fliegen an/aus (Kreativ)<br>Linksklick abbauen · Rechtsklick setzen / benutzen · Mittelklick Block aufnehmen · 1-9 / Mausrad Schnellleiste · E Inventar · Q wegwerfen · T Chat · / Befehl<br>F1 HUD aus · F2 Foto · F3 Debug · F5 Kamera · M Karte · N Wegpunkt · P Foto-Modus · B Builder-Wand-Hilfe · V Fahrzeug · G Autopilot<br>Bauplan in der Hand (Kreativ → Baupläne, /haus): Rechtsklick baut die Villa, wohin du schaust · R drehen · F Fassade · Z rückgängig',
     'g.set.volMaster': 'Gesamt',
     'g.set.volSfx': 'Effekte',

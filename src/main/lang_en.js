@@ -224,6 +224,8 @@
     'g.set.sens': 'Mouse sensitivity',
     'g.set.invertY': 'Invert mouse Y',
     'g.set.viewBob': 'View bobbing',
+    'g.set.turnInertia': 'Camera inertia when turning (very slight)',
+    'g.set.airLife': 'Living air: dust, pollen, fireflies, leaves, snow, birds',
     'g.set.keys': '<div class="hr"></div>WASD move · Space jump / fly up · Shift sneak / fly down · Ctrl or double-tap W sprint · double-tap Space toggle flight (creative)<br>LMB break · RMB place / use · MMB pick block · 1-9 / wheel hotbar · E inventory · Q drop · T chat · / command<br>F1 hide HUD · F2 screenshot · F3 debug · F5 camera · M map · N waypoint · P photo mode · B builder wand panel · V vehicle · G ship autopilot<br>Blueprint in hand (Creative → Blueprints, /haus): RMB build the villa where you look · R turn · F facade · Z undo',
     'g.set.volMaster': 'Master',
     'g.set.volSfx': 'Effects',

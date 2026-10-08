@@ -645,12 +645,14 @@
       const inv = mat4.invert(mat4.create(), r.view);
       const light = this.lightAt(pl.pos[0], pl.pos[1] + pl.eye, pl.pos[2]);
       const swing = pl.handSwing, sw = Math.sin(swing * Math.PI), sw2 = Math.sin(Math.sqrt(Math.max(0, swing)) * Math.PI);
-      const bobX = Math.sin(pl.bob * 2) * 0.03 * pl.bobAmt, bobY = Math.abs(Math.cos(pl.bob * 2)) * 0.035 * pl.bobAmt;
+      // the walk sways the arm (presence.js: by the speed) and a placed block pushes it forward (pushAt; a break, half)
+      const PR = VR.Presence, hs = PR.handSwayAt(Math.hypot(pl.vel[0], pl.vel[2]), pl.bob * 2), pk = PR.pushAt(pl.pushT) * (pl.pushAmp || 0);
+      const bobX = Math.sin(pl.bob * 2) * 0.03 * pl.bobAmt + hs.x, bobY = Math.abs(Math.cos(pl.bob * 2)) * 0.035 * pl.bobAmt + hs.y;
       const t = g.time || 0, idle = Math.sin(t * 1.3) * 0.006;
       const held = pl.inv.held;
       // camera-space arm: shoulder below the bottom-right corner, fist reaching toward the view centre
       const S = [0.64 + bobX, -0.8 - bobY + idle, -0.16];
-      const F = [0.32 + bobX - sw2 * 0.17, -0.38 - bobY + idle - sw * 0.1 + sw2 * 0.05, -0.8 - sw * 0.16];
+      const F = [0.32 + bobX - sw2 * 0.17, -0.38 - bobY + idle - sw * 0.1 + sw2 * 0.05 + pk * 0.03, -0.8 - sw * 0.16 - pk * 0.08];
       if (held) { F[0] += 0.02; F[1] -= 0.02; }
       const d = [F[0] - S[0], F[1] - S[1], F[2] - S[2]];
       const dl = Math.hypot(d[0], d[1], d[2]); d[0] /= dl; d[1] /= dl; d[2] /= dl;

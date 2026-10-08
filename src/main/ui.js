@@ -509,9 +509,9 @@
         const r = this.game.renderer;
         const note = el('div', 'note', T('g.set.gpuNote', { gpu: esc(VR.GL.rendererName || ''), r: r ? r.w + '×' + r.h : '?', s: r ? r.W + '×' + r.H : '?', tsr: S.tsr ? T('g.set.gpuTsr') : '', dyn: S.dynRes ? T('g.set.gpuDyn') : '' })); note.style.marginTop = '10px'; body.appendChild(note);
       } else if (this.settingsTab === 'controls') {
-        slider('fov', T('g.set.fov'), 50, 110, 1, (v) => v + '°');
+        slider('fov', T('g.set.fov'), 60, 110, 1, (v) => v + '°');
         slider('sens', T('g.set.sens'), 0.2, 3, 0.05, pct);
-        toggle('invertY', T('g.set.invertY')); toggle('viewBob', T('g.set.viewBob'));
+        toggle('invertY', T('g.set.invertY')); toggle('viewBob', T('g.set.viewBob')); toggle('turnInertia', T('g.set.turnInertia')); toggle('airLife', T('g.set.airLife'));
         body.appendChild(el('div', 'note', T('g.set.keys')));
       } else if (this.settingsTab === 'audio') {
         slider('volMaster', T('g.set.volMaster'), 0, 1, 0.05, pct);
