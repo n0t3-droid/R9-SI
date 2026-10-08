@@ -52,6 +52,11 @@
     const tiles = el('div', 'tiles');
     for (const k of TILES) { const b = el('button', 'tile ' + k); b.type = 'button'; b.dataset.act = 'tile'; b.dataset.tile = k; b.innerHTML = `<span class="pic" aria-hidden="true">${SVG[k]}</span><span class="lbl"></span><span class="sub2"></span>`; tiles.appendChild(b); }
     box.appendChild(tiles);
+    // 🧸 Kindersicher (F5): one tap into a peaceful Zen world, the child-safe settings on
+    const kids = el('button', 'btn kids'); kids.type = 'button'; kids.dataset.act = 'kids';
+    kids.textContent = tx('g.set.kids', null, '🧸 Kindersicher', '🧸 Child-safe');
+    kids.title = tx('g.set.kids.tip', null, 'Zen ohne Gegner und mit automatischem Springen. Ein Tipp auf dem Startbildschirm reicht.', 'Zen without enemies and with auto-jump. One tap on the start screen is enough.');
+    box.appendChild(kids);
     const sub = el('div', 'sub'); const w = el('button', 'lnk'); w.type = 'button'; w.dataset.act = 'worlds'; const n = el('button', 'lnk'); n.type = 'button'; n.dataset.act = 'newworld'; sub.appendChild(w); sub.appendChild(el('span', 'dot', '·')).setAttribute('aria-hidden', 'true'); sub.appendChild(n); box.appendChild(sub);
     const foot = el('div', 'below');
     foot.appendChild(el('div', 'studionote', '')).id = 'studionote';
@@ -122,6 +127,16 @@
     const ws = await ST.listWorlds(), base = tx('start.myWorld', null, 'Meine Welt', 'My World');
     const n = ws.filter(w => String(w.name || '').startsWith(base)).length;
     g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
+    return true;
+  };
+  // 🧸 Kindersicher: a peaceful Zen world (no hostile creatures) — the last one of that kind, or a new "Kinderwelt"
+  ST.kids = async function () {
+    const g = game(); if (!g || g.state !== 'title') return false;
+    g.settings.kids = true; g.saveSettings();
+    const ws = await ST.listWorlds();
+    const zen = ws.find(w => w && w.mode === 'zen' && w.difficulty === 'peaceful');
+    if (zen) { g.loadWorld(zen); return true; }
+    g.createWorld({ name: tx('start.kidsWorld', null, 'Kinderwelt', 'Kids world'), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
     return true;
   };
   ST.bauen = async function () {
@@ -243,6 +258,7 @@
     switch (a) {
       case 'tile': { const k = b && b.dataset.tile; if (k === 'play') ST.play(); else if (k === 'bauen') ST.bauen(); else if (k === 'erschaffen') ST.erschaffen(); else if (k === 'meins') ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true; }
       case 'worlds': ST.worlds(ui); return true;
+      case 'kids': ST.kids(); return true;
       case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
