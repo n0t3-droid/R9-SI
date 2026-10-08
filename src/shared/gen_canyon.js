@@ -46,9 +46,22 @@
     g._canyonLine = { key: 'heart-loop', pts: P, Y: Yl, ground, tech: true, names: ['Gate Plaza East', 'Gate Plaza West'] };
     return g._canyonLine;
   };
+  // the track's block points: rounded, one point per block and 8-connected (the spline's samples are about a block apart,
+  // so neighbours repeat or skip a block; the gaps are filled in along the way)
   CAN.describe = function (Ln) {
-    const n = Ln.pts.length, P = new Int32Array(n * 3);
-    for (let i = 0; i < n; i++) { P[i * 3] = Math.round(Ln.pts[i][0]); P[i * 3 + 1] = Ln.Y[i]; P[i * 3 + 2] = Math.round(Ln.pts[i][1]); }
+    const n = Ln.pts.length, out = [];
+    let lx = NaN, lz = NaN, ly = 0;
+    for (let i = 0; i < n; i++) {
+      const x = Math.round(Ln.pts[i][0]), z = Math.round(Ln.pts[i][1]), y = Ln.Y[i];
+      if (out.length) {
+        const steps = Math.max(Math.abs(x - lx), Math.abs(z - lz));
+        for (let k = 1; k < steps; k++) out.push([Math.round(lx + (x - lx) * k / steps), Math.round(ly + (y - ly) * k / steps), Math.round(lz + (z - lz) * k / steps)]);
+        if (steps === 0) { out[out.length - 1][1] = y; ly = y; continue; }
+      }
+      out.push([x, y, z]); lx = x; lz = z; ly = y;
+    }
+    const P = new Int32Array(out.length * 3);
+    out.forEach((q, i) => { P[i * 3] = q[0]; P[i * 3 + 1] = q[1]; P[i * 3 + 2] = q[2]; });
     return { key: Ln.key, pts: P, tech: true, names: Ln.names };
   };
   // the tram system learns about the loop through the same channel as the viaduct lines
