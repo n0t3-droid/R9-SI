@@ -90,7 +90,7 @@
     constructor() {
       this.c = 0; this.e = 0; this.w = 0; this.t = 0; this.h = 0; this.pv = 0; this.H = 0; this.river = 0; this.mountain = 0;
       this.windswept = 0; this.swampy = 0; this.inland = 0; this.plateau = 0; this.ember = 0; this.prism = 0; this.canyon = 0;
-      this.heart = 0; this.hz1 = 0; this.hz2 = 0; this.hz3 = 0;
+      this.heart = 0; this.hz1 = 0; this.hz2 = 0; this.hz3 = 0; this.terr = 0;
     }
   }
   // out (optional): the object to write the climate into (a caller that reads it at once passes its own)
@@ -120,6 +120,7 @@
     o.hz1 = (a.hz1 || 0) * w00 + (b.hz1 || 0) * w10 + (c.hz1 || 0) * w01 + (d.hz1 || 0) * w11;
     o.hz2 = (a.hz2 || 0) * w00 + (b.hz2 || 0) * w10 + (c.hz2 || 0) * w01 + (d.hz2 || 0) * w11;
     o.hz3 = (a.hz3 || 0) * w00 + (b.hz3 || 0) * w10 + (c.hz3 || 0) * w01 + (d.hz3 || 0) * w11;
+    o.terr = (a.terr || 0) * w00 + (b.terr || 0) * w10 + (c.terr || 0) * w01 + (d.terr || 0) * w11;   // the terraced hills (gen_trailer.js, vgen 6)
     return o;
   };
   const origBiome = OG.biomeFor;
@@ -152,6 +153,7 @@
   // are rarer, heights vary from 125 to 195. Outlines are domain-warped so no island is a disc.
   const ICELL = 72;
   OG.islandCell = function (i, j) {
+    realmNoise(this);
     // by i, then j: Smi keys (a double key is boxed at every lookup)
     const cache = this._isleCells || (this._isleCells = { rows: new Map(), n: 0 });
     let row = cache.rows.get(i);
@@ -729,5 +731,6 @@
     for (const [u, v] of [[-2, -4], [2, -4], [-2, 5], [2, 5]]) P(u, 0, v, S.hullDark);
     void rng;
   }
+  VR.RealmSpire = spire;   // the crystal spire, for the endless world's giant clusters (gen_trailer.js)
   VR.buildShuttle = buildShuttle;
 })(VR);
