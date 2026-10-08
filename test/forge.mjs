@@ -16,7 +16,7 @@ await new Promise(r => srv.listen(0, '127.0.0.1', r));
 const URL0 = `http://127.0.0.1:${srv.address().port}`;
 console.log('serving', DIST, 'at', URL0);
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const ctx = await browser.newContext({ viewport: { width: 1360, height: 820 } });
+const ctx = await browser.newContext({ viewport: { width: 1360, height: 820 }, locale: 'de-DE' });   // (the German names: „Hochhaus“)
 const logs = [], fails = [];
 const check = (ok, msg) => { if (!ok) fails.push(msg); console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 const watch = (pg, tag) => { pg.on('pageerror', e => logs.push(`[${tag} pageerror] ` + (e.stack || e.message).slice(0, 900))); pg.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) logs.push(`[${tag}] ` + m.text().slice(0, 300)); }); };
