@@ -313,7 +313,7 @@ await section(8, '🎒 Meins in the Studio: the hub as cards — ☆ on a k: car
   }
   // (the hub opens by itself when something is unfinished, and it sits above the Baukasten: close it first)
   await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); }); await wait(300);
-  await page.click('#imagine [data-hs="style"][data-v="modern"]'); await wait(2500);
+  await page.$eval('#imagine [data-hs="style"][data-v="modern"]', (b) => b.click()); await wait(2500);   // (a JS click: under load the dialog's layout keeps moving and the pointer click never finds it stable)
   await ev(() => { VR.StudioWorld.imagine.close(); VR.Favs.add('oak_planks'); });
   const kit = await ev(() => Object.values(JSON.parse(localStorage.getItem('r9si.projects')).items).find(p => p.kind === 'kit'));
   check(!!kit, 'a Baukasten house exists (' + (kit && kit.id) + ')');
@@ -352,7 +352,7 @@ await section(10, '← restores where you were: ✏️ from a card → the edito
   if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
   await page.goto(URL0 + '/studio.html?r=' + Date.now() + '#world/' + encodeURIComponent(WORLD) + '/karte', NAV);   // (a fresh query: a hash-only change would not reload the Studio)
   check(await inStudio(WORLD), 'the Karte view');
-  await page.click('#chips button[data-kcat="furn"]');
+  await page.$eval('#chips button[data-kcat="furn"]', (b) => b.click());   // (as above)
   // (the cards come in a moment: a slow frame rate draws them later than a fixed wait would)
   const id3 = await until(() => { const l = document.getElementById('list'); if (!l || l.querySelectorAll('.ding').length < 4) return null; l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding ? c.dataset.ding : null; }, null, 30);
   const editBtn = page.locator(`#list .ding[data-ding="${id3}"] [data-da="edit"]`);
