@@ -63,7 +63,7 @@
     // proportions (model units = 1/32 block)
     // the trailer heroes are chunkier: shorter legs, broader shoulders, the same torso (two blocks tall in all)
     const hero = L.role === 'hero';
-    const legH = kid ? 13 : elder ? 22 : hero ? 22 : 24, bodyH = kid ? 13 : 18, armLen = kid ? 13 : hero ? 18 : 19, handH = kid ? 4 : 5;
+    const legH = kid ? 13 : elder ? 22 : hero ? 22 : 24, bodyH = kid ? 13 : hero ? 19 : 18, armLen = kid ? 13 : hero ? 18 : 19, handH = kid ? 4 : 5;
     const bw = kid ? 6 : hero ? 8 : 7, bz0 = kid ? -3 : -4, bz1 = kid ? 2 : 3;
     const legW = kid ? 2 : 3, legX = kid ? 3 : 4, armX = bw + 3;
     const HT = kid || hero ? 14 : 13;   // head y ∈ [0, HT] (the heroes' heads are a little bigger)
@@ -156,17 +156,18 @@
     } else if (hsty === 'afro') {
       head.ell(0, HT - 2, 1.5, 10.5, 9, 9.5, hcF, (x, y, z) => !(z <= -5 && y < HT - 1 && Math.abs(x) <= 7) && !(y < eyeY - 1));
     }
-    // the trailer's helmet: a shell over the top and the back in the suit's armour colour, a cyan visor across the eyes
-    // (a glowing line on dark glass) and a crest in the accent colour (the blue hero's is orange, the orange hero's blue)
+    // the trailer's helmet (the frames: a cap over the top and the back, the face and the eyes below it, as in t1_16 and
+    // t1_21): a shell in the suit's armour colour down to the brow, a thin cyan visor line along the brow (emissive) and
+    // a crest in the accent colour (the blue hero's is orange, the orange hero's blue)
     if (helm) {
       const shell = (x, y, z) => mul(shirt, 0.9 + H3(x, y, z, 33) * 0.12);
       for (let y = 0; y <= HT + 1; y++) for (let z = -6; z <= 6; z++) for (let x = -7; x <= 7; x++) {
         if (!head.has(x, y, z)) continue;
-        if (y >= eyeY + 2 || (z >= 1 && y >= eyeY - 1)) head.set(x, y, z, shell);
+        if (y >= eyeY + 4 || (z >= 1 && y >= eyeY - 1)) head.set(x, y, z, shell);
       }
       for (let z = -5; z <= 5; z++) for (let x = -6; x <= 6; x++) if (!(Math.abs(x) >= 6 && Math.abs(z) >= 5)) head.set(x, HT + 1, z, shell);
       for (let z = -5; z <= 4; z++) for (let x = -1; x <= 1; x++) head.set(x, HT + 2, z, L.suit2 || 0xFF7A1A);
-      for (let x = -6; x <= 6; x++) { head.set(x, eyeY, -6, 0x1B2A44); head.set(x, eyeY + 1, -6, 0x3AF0FF, 1); }
+      for (let x = -6; x <= 6; x++) head.set(x, eyeY + 3, -6, 0x3AF0FF, 1);
     }
     // beard & moustache
     if (L.beard && !kid) {
@@ -322,7 +323,11 @@
         // (the white panel is the trailer suits' only: suit3 is set for them; the other suits keep the centre line)
         for (let y = 5; y <= top - 1; y++) for (let x = -5; x <= 5; x++) { front(x, y, (Math.abs(x) >= 4 && y >= top - 3) ? P2 : (L.suit3 && Math.abs(x) <= 2 && y >= 5 && y <= 12) ? white(x, y, 0) : (x === 0 && y < 9) ? mul(P1, 0.82) : plate(x, y, 0)); back(x, y, (y === top - 2) ? P2 : plate(x, y, 1)); }
         for (let y = 3; y <= top - 1; y++) for (let z = bz0; z <= bz1; z++) for (const sx of [-bw, bw]) body.paint(sx, y, z, (z === 0 || z === -1) ? P2 : ((y & 3) === 0 ? mul(P1, 0.84) : P1));
-        for (let y = 9; y <= 11; y++) for (let x = -1; x <= 1; x++) body.set(x, y, bz0 - 2, (x === 0 && y === 10) ? 0xFFFFFF : 0x3AF0FF, 1);
+        // the glowing chest plate of the frames: a bright cyan-white panel (emissive) in an accent frame, out on the chest
+        for (let y = 8; y <= 12; y++) for (let x = -3; x <= 3; x++) {
+          const edge = Math.abs(x) === 3 || y === 8 || y === 12;
+          body.set(x, y, bz0 - 2, edge ? P2 : (y === 10 && x === 0) ? 0xFFFFFF : 0x7FF4FF, edge ? 0 : 1);
+        }
         for (let x = -4; x <= 4; x++) body.set(x, top, bz0 - 1, D);
         for (let x = -bw; x <= bw; x++) front(x, 2, D);
         for (let z = bz0; z <= bz1; z++) { body.set(-bw - 1, 2, z, D); body.set(bw + 1, 2, z, D); }
@@ -380,7 +385,9 @@
       if (acc === 'armor') a.rbox(-3, -4, -3, 3, 1, 3, (x, y, z) => mul(0x5E6E5E, 0.9 + H3(x, y, z, 21) * 0.16), { top: true });
       if (acc === 'suit') {
         const P2 = L.suit2 || 0xFF7A1A;
-        a.rbox(-3, -5, -3, 3, 1, 3, (x, y, z) => y >= 0 ? mul(shirt, 1.08) : y === -5 ? P2 : shirt, { top: true });
+        // the shoulder pads of the frames: a chunky accent cap over the shoulder that stands out from the torso
+        const P3 = L.suit3 || 0;   // the trailer suits' white panel, a small inset on the pad's outer edge
+        a.rbox(-4, -6, -4, 4, 1, 4, (x, y, z) => y >= 0 ? mul(shirt, 1.08) : y === -6 ? P2 : (y === -5 && P3 && Math.abs(x) === 4 && z === 0) ? P3 : shirt, { top: true });
         for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, -Math.round(sleeveLen * 0.55), z, P2);
       }
       if (acc === 'flight') for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, -5, z, 0xFF7A1A);
