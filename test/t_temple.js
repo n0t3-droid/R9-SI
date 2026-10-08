@@ -222,6 +222,27 @@ new Function('VR', fs.readFileSync(path.join(__dirname, '../src/main/hangarfligh
   // switching the animation off again brings the parked shuttle back
   r1.g.settings.anim = false; r1.g.player.pos = [30, 81, 40]; r1.a.update(1 / 30);
   check(!r1.home.hidden && !r1.a.active, 'the animation switched off: the parked shuttle is back on its pad');
+
+  // the draw paths, with stand-ins for the renderer (a slip there would only show in the browser)
+  const planes = new Float32Array(24); for (let i = 0; i < 6; i++) planes[i * 4 + 3] = 1;
+  const r = { cam: { x: 0.5, y: 84, z: 60 }, planes, gl: { uniform1f() {} } };
+  const m = mkGame({ anim: true }), a = new HF.Actor(m.g);
+  for (let t = 0; t < 1; t += 1 / 30) a.update(1 / 30);
+  const inLeg = a.plan.legs.find(l => l.name === 'in');
+  a.jump(inLeg.t0 + inLeg.T * 0.3); a.update(1 / 30);
+  const st0 = HF.at(a.plan, a.t);
+  check(Math.abs(a.inst.yaw - st0.yaw) < 1e-9 && Math.abs(a.inst.pos[2] - st0.pos[2]) < 1e-9, `jump: the shuttle is put on its path at once (z ${a.inst.pos[2].toFixed(1)}, yaw ${a.inst.yaw.toFixed(2)})`);
+  const before = m.calls.draw; a.draw(r, {}, 'opaque'); a.draw(r, {}, 'trans');
+  check(m.calls.draw - before === 2 && m.calls.trail > 0 && m.calls.part > 0, `the shuttle is drawn (hull and canopy) with its engines (${m.calls.trail}) and jets and dust (${m.calls.part})`);
+  // the hall: the crew walks (a stride pose) and is drawn where the walk puts it
+  const drawn = [];
+  VR.Folk.model = () => ({}); VR.Folk.heroPose = (o) => ({ head: [0, 0, 0, 0, 0, 0], body: [0, 0, 0, 0, 0, 0], walk: o.walk, walkAmt: o.walkAmt });
+  const hg = { time: 3, player: { pos: [0.5, Y + 1, -30] }, settings: { anim: true }, particles: { glow() {} }, entities: { beginVox: () => ({}), lightAt: () => ({}), drawModel: (rr, p, model, pos, cam, yaw, pose) => drawn.push({ pos: pos.slice(), yaw, pose }) } };
+  const h = new VR.Hall(hg); h.onColumnLoaded(hall0);
+  h.jump(64.3); h.update(1 / 30); h.draw(r, {}, { x: 0.5, y: Y + 3, z: -41.5 });
+  check(drawn.length === 2 && drawn.every(d => d.pos[2] < -42 && d.pose.walkAmt === 1 && d.pose.walk > 0 && Math.abs(d.yaw) < 0.3), `the crew is drawn walking out through the corridor, facing the city (${drawn.map(d => d.pos.map(v => v.toFixed(1)).join(',')).join(' / ')})`);
+  drawn.length = 0; hg.settings.anim = false; h.update(1 / 30); h.draw(r, {}, { x: 0.5, y: Y + 3, z: 10 });
+  check(drawn.length === 2 && drawn.every(d => Math.abs(d.pos[2] - 0.5) < 1e-9 && !d.pose.walkAmt), 'animation off: the crew stands at the consoles, still');
 }
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
