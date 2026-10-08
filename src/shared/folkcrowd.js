@@ -33,6 +33,35 @@
     return true;
   };
 
+  // ------------------------------------------------------------------ the street: the people in view at dusk
+  // The Palm City at dusk is not a mob. Each person walks home at its own time (C.homeAt, between dusk[0] and dusk[1]:
+  // the streets empty gradually); one adult in plazaShare goes to the plaza, at most seats people sit on its benches at
+  // a time, at most kids children run their games at a time (the others roam, running), a stroller pairs up with a
+  // neighbour now and then, and at most C.streetCap(preset) people are drawn in view: the nearest ones (the villagers'
+  // draw in src/main/villages.js). The numbers are pinned by test/t_heroes2.js.
+  C.STREET = { dusk: [11100, 12400], plazaShare: 8, seats: 3, kids: 4, pairShare: 0.35, cap: { potato: 8, low: 12 }, capDefault: 16 };
+  C.streetCap = function (preset) { const c = C.STREET.cap[preset]; return c === undefined ? C.STREET.capDefault : c; };
+  // a number in [0, 1) from a seed and a salt: the same person has the same numbers in every session
+  C.unit = function (seed, salt) {
+    let h = Math.imul((seed | 0) ^ Math.imul((salt | 0) + 0x632BE5AB, 0x9E3779B1), 0x85EBCA6B);
+    h = Math.imul(h ^ (h >>> 15), 0xC2B2AE35); h ^= h >>> 13;
+    return (h >>> 0) / 4294967296;
+  };
+  // the time of day at which the person walks home
+  C.homeAt = function (seed) { const d = C.STREET.dusk; return d[0] + C.unit(seed, 77) * (d[1] - d[0]); };
+  // the activities that happen indoors: their people are drawn (the walls hide them) but do not count toward the cap
+  C.INDOOR = { home: 1, sleep: 1, breakfast: 1, lunch: 1, school: 1, learn: 1, office: 1, cafe: 1 };
+  // one person in plazaShare goes to the plaza's benches and its ring (decided once per person)
+  C.plazaPerson = function (seed) { return C.unit(seed, 31) * C.STREET.plazaShare < 1; };
+  // keeps the cap smallest squared distances of the people in view, in order, in buf (no allocation); n = how many
+  // are kept so far; returns the new count. The threshold is buf[cap − 1] once n reaches cap.
+  C.keepNearest = function (buf, n, cap, d2) {
+    if (n < cap) { let i = n++; while (i > 0 && buf[i - 1] > d2) { buf[i] = buf[i - 1]; i--; } buf[i] = d2; return n; }
+    if (d2 >= buf[cap - 1]) return n;
+    let i = cap - 1; while (i > 0 && buf[i - 1] > d2) { buf[i] = buf[i - 1]; i--; } buf[i] = d2;
+    return n;
+  };
+
   // ------------------------------------------------------------------ heroes
   // (the body turns slowly and the head leads the look)
   C.HERO = { look: 14, turn: 2.5, lookTurn: 7, stride: 1.2, phase: 5.2, speed: 1.9, wave: { range: 7, time: 2.6, cool: 25 } };
@@ -42,7 +71,7 @@
   C.newHero = function (o, look) {
     const yaw = o.yaw || 0;
     const h = { id: o.id || 'hero' + C.heroes.length, pos: [o.pos[0], o.pos[1], o.pos[2]], yaw, yawT: yaw, look, walk: null, walkAmt: 0, ph: o.ph || 0,
-      state: 'hold', waveT: 0, waveCD: 0, headYaw: 0, headPitch: 0, bAcc: 0, pose: null, mdl: null };
+      state: 'hold', waveT: 0, waveCD: 0, headYaw: 0, headPitch: 0, bAcc: 0, pose: null, mdl: null, aim: o.act === 'aim' || o.aim === true };
     if (o.walk) h.walk = { to: [o.walk.to[0], o.walk.to[o.walk.to.length - 1]], speed: o.walk.speed || C.HERO.speed };
     return h;
   };
@@ -83,6 +112,8 @@
     const P = FA.pose(h, h.state === 'wave' ? 'wave_l' : 'hold', acc, h.ph, h.walkAmt, false, h.poseOut || (h.poseOut = {}), H.stride);
     const w = 0.65 * h.walkAmt;                              // while striding the blaster stays up, roughly where it was held
     P.arm_r[0] += (0.95 - P.arm_r[0]) * w; P.fore_r[0] += (0.4 - P.fore_r[0]) * w;
+    // 'aim' (the crew of the hall and the walk out): the blaster is raised to the chest and pointed ahead
+    if (h.aim) { P.arm_r[0] += (1.25 - P.arm_r[0]) * 0.85; P.fore_r[0] += (0.25 - P.fore_r[0]) * 0.85; }
     P.head[0] += h.headPitch; P.head[1] += h.headYaw;
     h.pose = P;
     return P;
