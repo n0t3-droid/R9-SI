@@ -123,8 +123,6 @@
       const vol = (bb[3] - bb[0]) * (bb[4] - bb[1]) * (bb[5] - bb[2]);
       return vol < 0.2;
     }
-    // true while painting this id would first build a lazy model (no picture cached yet): VR.IconPump gives it a frame of its own
-    cold(id) { if (this.cache.has(id)) return false; const m = VR.VM && VR.VM.MODELS[id]; return !!(m && m.lazy && !m.compiled); }
     // draw into target canvas element
     paint(el, id, size) {
       const c = this.get(id);
@@ -178,15 +176,16 @@
 
 // The palette's icon pump (ui.js, the creative tab) and the idle warm of the Modern Living pictures (game.startPrewarm).
 // (iconperf) a palette of hundreds of icons paints a few per frame: a frame paints until `budget` ms are used (the check
-// comes before each paint, so the last one may run over), and a model that still has to be built (Icons.cold) gets a frame
-// of its own: its build is that frame's cost and no other paint shares it. A canvas that has left the page is dropped
-// without a paint. The paint, the clock and the frames are injectable (test/icon_pump.js).
+// comes before each paint, so the last one may run over). A model still to be built is one such paint: its build (at most
+// ~15 ms for the pack since the speed-ups) is counted like any other, so a frame's icon work is at most the budget plus one
+// paint. (Giving every cold model a frame of its own made a cold tab of 236 models take 236+ frames.) A canvas that has left
+// the page is dropped without a paint. The paint, the clock and the frames are injectable (test/icon_pump.js).
 (function (VR) {
   'use strict';
   class IconPump {
     constructor(o) {
       o = o || {};
-      this.paint = o.paint; this.cold = o.cold || (() => false);
+      this.paint = o.paint;
       this.budget = o.budget === undefined ? 6 : o.budget;
       this.now = o.now || (() => performance.now());
       this.raf = o.raf || ((cb) => requestAnimationFrame(cb));
@@ -203,10 +202,8 @@
       while (q.length) {
         const [cv, id] = q[0];
         if (!this.connected(cv)) { q.shift(); continue; }
-        const cold = this.cold(id);
-        if (n && (cold || this.now() - t0 >= this.budget)) break;
+        if (n && this.now() - t0 >= this.budget) break;
         q.shift(); this.paint(cv, id); n++;
-        if (cold) break;
       }
       if (q.length) this.start();
     }
@@ -223,4 +220,5 @@
     pw.start();
     return pw;
   };
+
 })(VR);
