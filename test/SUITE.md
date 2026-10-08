@@ -17,7 +17,7 @@ bash test/regress.sh "" smoke.mjs               # named tests only
 
 ## Release regression set
 
-17 node tests and 31 browser tests (48 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
+The sets are found, not listed: every test/*.js and test/*.mjs that prints the summary line (`ALL OK`) runs in the regression; a script that must not (a showcase, a profiler) carries a line with `regress: skip`. The table below is the state of 8 Oct 2026 and is informational.
 
 Typical time of a full release run: about 127 min of browser tests (median of the recorded passing runs, plus the wait for the lock) and about 72 s of node tests.
 
@@ -33,10 +33,15 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | genie_raster.js | node | Genie answer parser and the shape-to-block rasteriser (geometry only). | 1 (1–1) | 3/3 | yes |
 | heart_gen.js | node | Heartland generator smoke test: climate and biome at key points, temple, chunk timings; every chunk has blocks. | 3 † | – | no |
 | housekit.js | node | The Haus-Baukasten: every roof, wall, window and extra builds; doors, stairs and furniture land where they belong. | 2 (2–2) | 3/3 | yes |
+| icon_perf.js | node | Modern Living icon work stays cheap, in CPU time (the wall clock fails under load): every pack model builds in under 60 ms on first use, the pack's icons take under 150 ms in all (best of three runs), the cloth extrude under 60 ms for ten builds. | 2 † | – | yes |
+| icon_pump.js | node | The palette's icon pump: 6 ms of paints per frame, a voxel picture drawn in slices and painted once complete, detached slots skipped; the idle warm starts after 10 s of play, one picture per slice, largest first. | 1 † | – | yes |
+| icon_draw_same.js | node | The voxel icons' canvas calls are the same as the drawing they replaced, in one go and one voxel per step (679 items, 913,770 calls; the Modern pack 236 of 236); stepIcon paints the same picture. | – | – | yes |
+| icon_same.js | node | Every VM model keeps its voxels and its 8³ icon cell for cell (baseline test/icon_same.json, from before the icon pass and extrude speed-ups). | 3 † | – | yes |
 | id_snapshot.js | node | Every shipped block type keeps its state-id range (saved worlds store raw ids). | 1 † | – | yes |
 | light_same.js | node | Column light equals the v0.39 algorithm's output (the reference is kept in the test). | 6 † | – | yes |
 | look_classic.js | node | Klassisch block look (the default): each block a cube with its own edges and patterns; mesh checks. | 5 † | – | no |
 | mesh_same.js | node | Mesher output is unchanged when its loops are tuned: every vertex stream, for two looks. | 13 † | – | yes |
+| mirror.js | node | 🪞 Spiegel-Bauen: mirrored positions (on / between blocks, 4- and 8-fach) and states for every directional kind — every state of every type under all seven transforms, the group laws —, doors, beds and VM models as whole pieces; the game's hand and VR.MirrorBuild on a fake world (copies, skips, breaks, ⇧M, /spiegel). | 1 † | – | yes |
 | model_smoke.js | node | Every VM model compiles, paints and meshes; boxes exist; reports the mesh cost per state. | 80 † | – | no |
 | modern_pack.js | node | Modern Living pack: ids append-only after the older states, every item registered after Vollton, set counts and palette. | 10 † | – | yes |
 | pack.js | node | r9-paket (VR.Pack): favourites, designs and Werkbank parts travel as one file. | 1 † | – | no |
@@ -55,6 +60,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | vx_cache.js | node | The mini-voxel painter's piece cache is bounded and keeps what is in use. | 5 † | – | yes |
 | vx_cells.js | node | The first packs' models are built from src/shared/voxcells.js and register as before. | 4 † | – | yes |
 | worker_jobs.js | node | Worker job handling in node with a fake self: a mesh job answers with the quads of meshSection. | 6 † | – | yes |
+| zeitraffer.js | node | 📽 Zeitraffer recorder (zeit_rec.js): packing round trip and sizes, check-points and seals, the ring buffer (2 M / 20 MB), the r9si-history record format, the world.js choke points (SB_EDIT, bulkSet kinds, undo), cost per change, scan/collect/timeline on a 2 M history, torn segments; the replay engine with a fake game (swap, the land as it was, play, seek, restore). | 3 † | – | yes |
 | blocklook.mjs | browser | v0.39 block look: the same scene in Klassisch and Nahtlos (hill, stucco house, glass, mini-voxel cottage), switched live. | 312 (175–448) | 2/2 | yes |
 | blueprint.mjs | browser | Blueprints: /haus puts a villa in hand; the ghost lot sits on a slope; the build levels the ground; undo restores the land. | – | – | no |
 | bridge.mjs | browser | v0.39 the standalone Studio (another origin, own storage) and the game: banner, Zum Spiel, Mitnehmen, Speichern. | 750 (290–1209) | 2/4 | yes |
@@ -73,8 +79,9 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | house_genie.mjs | browser | v0.35 Erschaffen: the Haus-Baukasten and the Genie end to end, including the 'not granted' case. | 199 (174–858) | 7/8 | yes |
 | imagine.mjs | browser | v0.35 picture to 3D: a picture becomes a Blockbild with the background removed; files round-trip. | 74 (64–75) | 4/4 | yes |
 | life_kit.mjs | browser | Village Life and Supermarket kit showcase: the same builds; every block exists and door boxes match open or closed. | – | – | no |
+| mirror.mjs | browser | 🪞 Spiegel-Bauen in German (de-DE): ⇧M → 4-fach (the chip), a stair and a door by the hand four times (facings, hinges), a broken stair takes its copies, the pause menu's 🪞 button, the axis drawn (pixels on the ground), aus → one; a symmetric house in 4-fach and a lantern ring in 8-fach, shot as mirror_1..3.png. | – | – | no |
 | modern_kit.mjs | browser | v0.30 modern building set: Vollton colours, panorama glass with connected frames, the nine modern doors. | 114 (114–114) | 1/1 | yes |
-| modern_pack.mjs | browser | Modern Living in the browser: the creative tab shows the whole pack; icons are painted a few per frame. | 1256 (1188–1323) | 2/4 | yes |
+| modern_pack.mjs | browser | Modern Living in the browser: the creative tab shows the whole pack; icons are painted a few per frame (the icon work of one frame, the pump's step and paint, under 120 ms). | 1256 (1188–1323) | 2/4 | yes |
 | mp.mjs | browser | Two players, one world: host and guest in two pages; look sync, edits both ways, tall edits, summon, leave and rejoin, host closes. | 392 (141–642) | 2/2 | yes |
 | player2.mjs | browser | v0.33.2 player mode: crosshair and held block; walking off the property stops at the fence; doors open and the player walks through. | 44 (39–383) | 6/6 | yes |
 | projects.mjs | browser | v0.36 Weitermachen: the Crafter draft is kept two seconds after a change and reopens exactly; never reaches the game before Ins Spiel. | 304 (290–325) | 6/7 | yes |
@@ -95,6 +102,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | workbench.mjs | browser | v0.35 Welt to Werkbank: the game saves a world and the Studio opens it; fill, replace, copy, paste, carve, raise ground, undo and redo go to the game. | 112 (107–118) | 5/5 | yes |
 | world_mode.mjs | browser | Studio World mode end to end: the game saves a world with a player-built tower; the Studio opens the region. | 583 (543–654) | 6/6 | yes |
 | world_style.mjs | browser | v0.34 Welt to Stil: the Studio opens the region, lists what it is made of and applies rules (grass to moss, oak to spruce planks). | 254 (236–1265) | 6/6 | yes |
+| zeitraffer.mjs | browser | 📽 Zeitraffer end to end (German UI): hand, wand + /undo and /bau Haus are recorded in r9si-history; 📽 from the pause menu shows the place as it was, half built, finished; scrubber, ⏯; ⏺ gives a video/webm Blob and a .webm download; Esc restores everything; 📽 from 🎒 Meins. | – † | – | yes |
 
 ## Debug, profiling and screenshot scripts
 

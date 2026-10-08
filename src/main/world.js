@@ -7,6 +7,11 @@
   const R = VR.R, F = VR.F;
   const ckey = VR.ckey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
   const PAD = 2, PS = 16 + PAD * 2, PSS = PS * PS;   // the mesher's padded section (mesher.js MESH_PAD)
+  // 📽 Zeitraffer: every building change passes one of two doors here — setBlock with SB_EDIT (the player's hand;
+  // SB_GUEST: a friend's edit at the host) and bulkSet with a kind (tools, blueprints and plans, the Werkbank, undo).
+  // Both hand (x, y, z, old, new) of each real change to world.zr (zeit_rec.js), which only the player's own worlds have.
+  VR.SB_EDIT = 8; VR.SB_GUEST = 16;
+  VR.EDIT = { HAND: 1, TOOL: 2, PLAN: 3, BENCH: 4, UNDO: 5, GUEST: 6 };
 
   // ----------------------------------------------------------------- worker pool
   // Two lanes share the workers: lane 0 is the terrain around the player (generate, light, mesh), lane 1 the far
@@ -62,7 +67,7 @@
       const nw = this.spawn(w.idx);
       this.workers[i] = nw;
       this.replaced++;
-      for (const t of ['init', 'custom', 'style', 'look', 'lodinit']) { const m = this.state.get(t); if (m) nw.postMessage(m); }
+      for (const t of ['init', 'custom', 'looks', 'style', 'look', 'lodinit']) { const m = this.state.get(t); if (m) nw.postMessage(m); }
       console.warn('Worker', w.idx, 'did not answer for', (this.stuckMs / 1000) | 0, 's — replaced');
       this.failWorker(w, 'replaced');
     }
@@ -162,6 +167,7 @@
       this.H = 256;                   // storage height (blocks/light hold H × 256 cells; grows where the player builds higher)
       this.sh = new Uint8Array(512);  // per column: top of the sun-blocking layer, bottom of it (heightmap shadows)
       this.sec = []; for (let i = 0; i < 16; i++) this.sec.push(new Section());
+      this.shownAt = -1; this.fade = 0;   // F8: when the column was shown (all sections meshed) and its fade-in (0..1)
       this.ready = false; this.modified = false; this.lastSeen = 0; this.blockEntities = new Map();
       this.seamed = 0; // bitmask of neighbor seams done (1 N,2 E,4 S,8 W)
     }
@@ -183,6 +189,10 @@
       this.store = o.store;           // persistence (may be null)
       this.savedKeys = o.savedKeys || new Set();
       this.renderDist = o.renderDist || 8;
+      // F8 · Sichtweite: finished meshes wait in a queue and go up a few milliseconds a frame (uploadBudget), columns in
+      // their 300 ms fade-in are listed in `fading`, and the streaming rung is set by the governor (game.js)
+      this.uploadQ = new VR.Stream.UploadScheduler({ msPerByte: 2e-6 });
+      this.fading = new Set(); this.streamRung = 0; this.viewDir = null;
       this.listeners = [];
       this.frame = 0;
       this.stats = { gen: 0, mesh: 0, genMs: 0, meshMs: 0 };
@@ -277,6 +287,8 @@
     // discounted for columns ahead. Requests that drift out of range are cancelled before a worker touches them.
     update(px, py, pz, now) {
       this.frame++;
+      this.stepFades(now);
+      this.drainUploads(px, pz);
       const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4;
       this.center = [pcx, pcz];
       const rd = this.renderDist, loadR = rd + 1;
@@ -385,6 +397,7 @@
       for (let col = 0; col < 256; col++) this.shadowCol(c, col);
       this.shDirty.add(c.key); this.shGone.delete(c.key);
       c.ready = true;
+      this.checkShown(c, performance.now());   // a column with nothing to mesh is shown at once
       c.spawns = m.spawns && m.spawns.length ? m.spawns : null;
       this.cols.set(k, c);
       this.lastCol = null;
@@ -404,9 +417,10 @@
     }
     unloadColumn(c) {
       // a saved column comes back from the save when the player returns (it was regenerated before: edits vanished)
-      if (c.modified && this.store) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
+      // (a 📽 replay copy — c.zr — is never saved)
+      if (c.modified && this.store && !c.zr) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
       for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s);
-      this.cols.delete(c.key);
+      this.cols.delete(c.key); this.fading.delete(c);
       this.lastCol = null;
       this.shDirty.delete(c.key); this.shGone.add(c.key);
       for (const l of this.listeners) if (l.onColumnUnloaded) l.onColumnUnloaded(c);
@@ -438,8 +452,47 @@
         void i;
       });
     }
-    saveAll() { if (!this.store) return Promise.resolve(); const ps = []; for (const c of this.cols.values()) if (c.modified) { ps.push(this.store.saveColumn(this.dim, c)); this.savedKeys.add(c.key); } return Promise.all(ps); }
+    saveAll() { if (!this.store) return Promise.resolve(); const ps = []; for (const c of this.cols.values()) if (c.modified && !c.zr) { ps.push(this.store.saveColumn(this.dim, c)); this.savedKeys.add(c.key); } return Promise.all(ps); }
     destroy() { this.dead = true; for (const c of this.cols.values()) for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s); this.cols.clear(); }
+
+    // ---------- streaming: the fade-in and the upload budget (F8 · Sichtweite) ----------
+    // A column is shown once every one of its sections is meshed (or known empty). From then on it fades in over 300 ms:
+    // the terrain shader dithers its sections in and the far tiles under it are cut by the same thresholds (horizon.js,
+    // shaders.js), so nothing pops and no hole shows. Until it is shown its sections stay invisible (fade 0) and the far
+    // tiles stand in for it.
+    checkShown(c, now) {
+      if (c.shownAt >= 0) return;
+      for (let i = 0; i < c.sec.length; i++) if (!c.sec[i].meshed) return;
+      c.shownAt = now; c.fade = 0; this.fading.add(c);
+      for (let i = 0; i < c.sec.length; i++) c.sec[i].fade = 0;
+    }
+    stepFades(now) {
+      if (!this.fading.size) return;
+      for (const c of this.fading) {
+        const f = Math.round(255 * VR.Stream.fadeCurve(now - c.shownAt)) / 255;   // 8-bit: the value the far mask holds
+        if (f === c.fade) continue;
+        c.fade = f;
+        for (let i = 0; i < c.sec.length; i++) c.sec[i].fade = f;
+        if (f >= 1) this.fading.delete(c);
+      }
+    }
+    // the upload budget of one frame, in ms: the preset's (renderer.q.upload) times the streaming rung the governor set
+    uploadBudget() {
+      const base = (this.renderer && this.renderer.q && this.renderer.q.upload) || 2.5;
+      return base * VR.Stream.streamScale(this.streamRung);
+    }
+    // uploads go up in view-priority order (the nearest and the ones ahead first) within the budget; the rest waits. A
+    // column unloaded while its upload waited drops out of the queue.
+    drainUploads(px, pz) {
+      const q = this.uploadQ;
+      if (!q.size) return;
+      q.prune(it => !this.dead && this.cols.get(it.key) === it.col);
+      for (const it of q.items) { it.dx = it.x - px; it.dz = it.z - pz; }
+      const vd = this.viewDir || [0, 0];
+      const r = q.drain(this.uploadBudget(), () => performance.now(), vd[0], vd[1]);
+      this.stats.uploadMs = r.spentMs; this.stats.uploadQueue = r.left;
+      this.stats.uploaded = (this.stats.uploaded || 0) + r.ran;
+    }
 
     // ---------- meshing ----------
     // Dirty sections inside the render radius (around the player and around the loading centre ahead) are meshed
@@ -451,6 +504,9 @@
       const room = nw * 10 - (this.meshInflight || 0);      // ~two frames of mesh work per worker in flight, never more
       let budget = Math.min(room, 8 + nw * 8);
       if (this.meshBudget <= 3) budget = Math.min(budget, this.meshBudget * 2);   // smart quality asked for less main-thread work
+      // F8: a job starts on the main thread (its padded block copy), so the starts share the frame's streaming budget too:
+      // four jobs per millisecond of the upload budget (6 on Very Low), fewer as the governor drops the streaming rung
+      budget = Math.min(budget, Math.max(2, Math.round(this.uploadBudget() * 4)));
       if (budget <= 0) return;                               // the workers are full: not even a look around (most frames while the world streams in)
       const rd = this.renderDist, r2 = (rd + 0.5) * (rd + 0.5);
       if (lcx === undefined) { lcx = pcx; lcz = pcz; }
@@ -514,8 +570,10 @@
       s.dirty = false;
       // empty section with empty neighbors above/below → no geometry
       if (s.count === 0) {
+        s.uTok = (s.uTok || 0) + 1;   // a queued upload of an older mesh must not bring it back
         if (s.hasMesh) this.renderer.freeSection(s);
         s.vis = 0x7fff; s.meshVer = s.ver; s.meshed = true; s.vxDropped = false;
+        this.checkShown(c, performance.now());
         return;
       }
       const detail = urgent || this.wantDetail(c, sy, pos || (this.lastPos ? this.lastPos : null));
@@ -538,11 +596,20 @@
         s.fails = 0;
         this.stats.mesh++; this.stats.meshMs += m.ms || 0;
         s.vis = m.vis;
-        this.renderer.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar);
-        if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
-        s.meshVer = ver; s.meshed = true;
-        if (s.ver !== ver) s.dirty = true;
-        this.visDirty = true;
+        const tok = s.uTok = (s.uTok || 0) + 1;   // only the newest queued mesh of a section is uploaded
+        // the upload waits in the streaming queue (drainUploads spends the frame's budget on it, in view order): meshing
+        // itself never blocks, and FIFO order holds for one section, so an older mesh never lands after a newer one
+        const bl = (a) => (a ? (a.byteLength !== undefined ? a.byteLength : a.length * 4) : 0);
+        this.uploadQ.push({ key: c.key, col: c, x: c.cx * 16 + 8, z: c.cz * 16 + 8, bytes: bl(m.opaque) + bl(m.cutout) + bl(m.trans) + bl(m.vx) + bl(m.vxFar), run: () => {
+          if (this.dead || this.cols.get(c.key) !== c || s.uTok !== tok) return;
+          this.renderer.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar);
+          if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
+          s.meshVer = ver; s.meshed = true;
+          s.fade = c.shownAt >= 0 ? c.fade : 0;
+          if (s.ver !== ver) s.dirty = true;
+          this.checkShown(c, performance.now());
+          this.visDirty = true;
+        } });
       }, urgent ? -1e9 : (prio || 0));
     }
     // the padded section for the mesher: 20³ blocks and light (16 + 2 of the neighbours on every side), 20² tints.
@@ -597,7 +664,8 @@
     }
 
     // ---------- block set ----------
-    // flags: 1 = no light update, 2 = no neighbor notify, 4 = urgent remesh
+    // flags: 1 = no light update, 2 = no neighbor notify, 4 = urgent remesh, 8 = a building change (VR.SB_EDIT:
+    // recorded for 📽), 16 = by a friend (VR.SB_GUEST)
     setBlock(x, y, z, state, flags) {
       if (y < 0 || y >= VR.MAXY) return false;
       const c = this.col(x >> 4, z >> 4);
@@ -608,6 +676,7 @@
       if (old === state) return false;
       c.blocks[i] = state;
       c.modified = true;
+      if ((flags & 8) && this.zr) this.zr.one(x, y, z, old, state, this.dim, (flags & 16) ? 6 : 1);
       const s = c.sec[y >> 4];
       if (!old && state) s.count++; else if (old && !state) s.count--;
       // heightmap
@@ -623,10 +692,12 @@
       if (!(flags & 2)) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       return true;
     }
-    // bulk edit without per-block light updates; columns are relit in workers afterwards
-    bulkSet(list, notify) {
+    // bulk edit without per-block light updates; columns are relit in workers afterwards. kind (VR.EDIT): a building
+    // change, recorded as one batch for 📽
+    bulkSet(list, notify, kind) {
       const touched = new Map();
-      const T = R.T;
+      const T = R.T, Z = kind ? this.zr : null;
+      let zb = false;
       for (const [x, y, z, state] of list) {
         if (y < 0 || y >= VR.MAXY) continue;
         const c = this.col(x >> 4, z >> 4); if (!c) continue;
@@ -634,6 +705,7 @@
         const i = (y << 8) | ((z & 15) << 4) | (x & 15);
         const old = c.blocks[i]; if (old === state) continue;
         c.blocks[i] = state; c.modified = true;
+        if (Z) { if (!zb) { Z.begin(kind, this.dim); zb = true; } Z.add(x, y, z, old, state); }
         const s = c.sec[y >> 4];
         if (!old && state) s.count++; else if (old && !state) s.count--;
         const col = i & 255;
@@ -644,6 +716,7 @@
         touched.set(c.key, c);
         if (notify) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       }
+      if (zb) Z.end();
       this.relightColumns([...touched.values()]);
       return touched.size;
     }

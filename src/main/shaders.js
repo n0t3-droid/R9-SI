@@ -4,6 +4,8 @@
 (function (VR) {
   'use strict';
   const S = VR.SHADERS = {};
+  // Phase B1 „🎨 Aussehen": the recolour half every block shader shares with the Studio (src/shared/looks.js)
+  const LOOK = (VR.Looks && VR.Looks.GLSL) || 'uniform highp sampler2D u_avgLum;\nbool lookOn(uint w5) { return false; }\nvec3 lookRecolor(vec3 alb, float layer, vec3 col) { return alb; }\n';
 
   // ------------------------------------------------------------ common sky/fog
   S.COMMON = `
@@ -35,6 +37,13 @@ uniform vec3 u_skyTint;
 uniform sampler2D u_atmoLUT;  // Very Low: the same radiance baked into a 64×32 table (ATMO_LUT)
 uniform float u_moonPh;       // the terminator: cos(2π·phase), 1 at new moon, −1 at full
 uniform float u_moonIllum;    // how much moonlight the phase gives (0..1)
+uniform vec4 u_giant;        // gas giant: direction (xyz), angular radius (w) — skybodies.js
+uniform vec4 u_blue;         // blue-green planet: direction, radius
+uniform vec4 u_moon0;        // four grey moons: direction, radius
+uniform vec4 u_moon1;
+uniform vec4 u_moon2;
+uniform vec4 u_moon3;
+uniform float u_cirrus;      // high cirrus streaks: 1 on balanced and above, 0 on Very Low (the sky pass only)
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -51,6 +60,9 @@ vec2 ctmUV(vec2 uv, uint w5) {
 }
 float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 float hash13(vec3 p3){ p3 = fract(p3 * .1031); p3 += dot(p3, p3.zyx + 31.32); return fract((p3.x + p3.y) * p3.z); }
+// 4x4 ordered dither in [0, 15/16] (McGuire's closed form): the chunks' fade-in and the far tiles' cut use the same thresholds
+float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(0.5, a.y * 0.75))); }
+float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
 float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   return mix(mix(hash12(i), hash12(i+vec2(1,0)), f.x), mix(hash12(i+vec2(0,1)), hash12(i+vec2(1,1)), f.x), f.y); }
 float vnoise3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
@@ -58,6 +70,7 @@ float vnoise3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   float b = mix(mix(hash13(i+vec3(0,0,1)), hash13(i+vec3(1,0,1)), f.x), mix(hash13(i+vec3(0,1,1)), hash13(i+vec3(1,1,1)), f.x), f.y);
   return mix(a, b, f.z); }
 float fbm3(vec3 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += vnoise3(p) * a; p = p * 2.03 + 17.1; a *= 0.5; } return v / 0.9375; }
+float fbm3L(vec3 p){ return vnoise3(p) * 0.6667 + vnoise3(p * 2.03 + 17.1) * 0.3333; }   // two octaves, the same scale as fbm3 (Very Low)
 
 // ---- cosmic sky: nebula band, ringed gas giant, second planet, meteors ----
 vec3 nebula(vec3 dir) {
@@ -65,13 +78,23 @@ vec3 nebula(vec3 dir) {
   float b = dot(dir, G);
   float band = exp(-b * b * 7.0);
   vec3 p = dir * 2.6;
+#ifdef LITE
+  float n1 = fbm3L(p + vec3(0.0, u_time * 0.0015, 0.0));
+  float n2 = fbm3L(p * 2.1 + 11.0);
+  float dust = 0.0;
+#else
   float n1 = fbm3(p + vec3(0.0, u_time * 0.0015, 0.0));
   float n2 = fbm3(p * 2.1 + 11.0);
   float dust = smoothstep(0.42, 0.78, fbm3(p * 3.7 - 3.0));
+#endif
   vec3 col = mix(vec3(0.22, 0.06, 0.46), vec3(0.10, 0.36, 1.0), smoothstep(0.3, 0.7, n1));
   col = mix(col, vec3(1.0, 0.30, 0.68), smoothstep(0.48, 0.78, n2) * 0.9);
   // cyan gas lobes and bright pink cores, as in the trailer
+#ifdef LITE
+  float n3 = n1 * 0.6 + n2 * 0.4;
+#else
   float n3 = fbm3(p * 1.6 - 5.0);
+#endif
   col = mix(col, vec3(0.15, 0.95, 1.0), smoothstep(0.6, 0.85, n3) * 0.55);
   col += vec3(1.0, 0.55, 0.85) * smoothstep(0.72, 0.9, n2 * 0.6 + n1 * 0.5) * 0.9;
   vec3 coreDir = normalize(vec3(0.62, 0.42, -0.66));
@@ -110,7 +133,7 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
     alb = mix(alb, vec3(0.25, 0.85, 0.9), storm * 0.8);
     float diff = max(dot(N, L), 0.0);
     float rim = pow(1.0 - zz, 3.0);
-    vec3 col = alb * (diff * 1.25 + 0.035) + vec3(0.4, 0.6, 1.0) * rim * 0.35 * (0.3 + diff);
+    vec3 col = alb * (diff * 1.25 + 0.3) + vec3(0.4, 0.6, 1.0) * rim * 0.35 * (0.3 + diff);   // 0.3: the shade side keeps its bands
     float edge = smoothstep(1.0, 0.985, sqrt(r2));
     res = vec4(col, edge);
   }
@@ -243,6 +266,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
     return c;
   }
   vec3 col = atmoAir(dir);
+  float toSun = max(dot(dir, u_sunDir), 0.0);
   if (withSun) {
     float clear = 1.0 - u_rain;
     // cosmic layer: the nebula owns the night; by day only a faint veil stays in the blue,
@@ -252,27 +276,27 @@ vec3 skyColor(vec3 dir, bool withSun) {
     // golden hour: the nebula fades in early, high in the sky, while the sun still lights the land
     float golden = (1.0 - smoothstep(0.02, 0.4, u_sunDir.y)) * step(-0.05, u_sunDir.y);
     // TRAILER.md §2.1: the nebula veil stays at ~45 % by day (stronger high up and through the long golden hours)
-    float cosmic = clamp(u_night + magicDay * (0.3 + 0.25 * smoothstep(0.2, 0.9, dir.y) + golden * 0.5 * smoothstep(0.05, 0.5, dir.y)), 0.0, 1.0) * clear * horizonFade;
+    float cosmic = clamp(u_night + magicDay * (0.4 + 0.25 * smoothstep(0.2, 0.9, dir.y) + golden * 0.5 * smoothstep(0.05, 0.5, dir.y)), 0.0, 1.0) * clear * horizonFade;
     float planetsK = clamp(u_night + magicDay * 0.7, 0.0, 1.0) * clear * horizonFade;
     if (planetsK > 0.01) {
       // the blue deepens to violet where the nebula shows, so its colours read by day as in the trailer
       col = mix(col, col * vec3(0.6, 0.48, 0.9) + vec3(0.02, 0.0, 0.05), cosmic * (1.0 - u_night) * 0.7);
-      col += nebula(dir) * cosmic * 0.9;
-      vec4 gg = gasGiant(dir, u_planetDir, 0.14, u_sunDir);
-      col = mix(col, gg.rgb * (0.35 + 0.65 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.6, 1.0, u_night) * clear);
+      col += nebula(dir) * cosmic * mix(1.3, 0.9, u_night);   // by day the veil reads as the trailer's magenta and cyan
+      vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
+      col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)
-      vec4 rp = rockyPlanet(dir, u_planet2Dir, 0.085, u_sunDir);
+      vec4 rp = rockyPlanet(dir, u_planet2Dir, u_blue.w, u_sunDir);
       col += rp.rgb * (1.0 - rp.a) * planetsK * 0.6;
-      col = mix(col, rp.rgb * (0.45 + 0.55 * u_night) + col * 0.2, rp.a * mix(0.6, 1.0, u_night) * clear);
-      // the giant's moons ride along with it; a fourth drifts near the blue planet
-      vec3 PD = u_planetDir;
-      vec3 PX = normalize(cross(abs(PD.y) < 0.95 ? vec3(0, 1, 0) : vec3(1, 0, 0), PD)), PY = cross(PD, PX);
-      for (int mi = 0; mi < 4; mi++) {
-        float fm = float(mi);
-        vec3 MC = mi < 3 ? normalize(PD + PX * (0.34 + fm * 0.13) * (mi == 1 ? -1.0 : 1.0) + PY * (0.16 - fm * 0.14)) : normalize(u_planet2Dir + vec3(0.26, -0.12, 0.1));
-        vec4 mn = moonlet(dir, MC, 0.02 + fm * 0.006, u_sunDir, fm * 7.3);
-        col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
-      }
+      col = mix(col, rp.rgb * (0.7 + 0.3 * u_night) + col * 0.2, rp.a * mix(0.85, 1.0, u_night) * clear);
+      // the giant's moons ride along with it; a fourth drifts near the blue planet (skybodies.js: places and radii)
+      vec4 mn = moonlet(dir, u_moon0.xyz, u_moon0.w, u_sunDir, 0.0);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
+      mn = moonlet(dir, u_moon1.xyz, u_moon1.w, u_sunDir, 7.3);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
+      mn = moonlet(dir, u_moon2.xyz, u_moon2.w, u_sunDir, 14.6);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
+      mn = moonlet(dir, u_moon3.xyz, u_moon3.w, u_sunDir, 21.9);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
     }
     float sd = dot(dir, u_sunDir);
     float kk = (1.0 - sd) / (1.0 - 0.99996);
@@ -294,6 +318,15 @@ vec3 skyColor(vec3 dir, bool withSun) {
       }
     }
     col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night;
+    // high cirrus (t-clouds): thin streaks across the day sky, lit like the day; u_cirrus is 0 on Very Low
+    if (u_cirrus > 0.0 && dir.y > 0.12) {
+      vec2 q = dir.xz / (dir.y + 0.1);
+      float a = vnoise(vec2(q.x * 0.55 + q.y * 0.3, q.y * 4.2 + 3.0) + vec2(u_time * 0.0025, 0.0));
+      float b = vnoise(vec2(q.x * 0.4 - 7.0, q.y * 9.0 - 1.0));
+      float st = smoothstep(0.6, 0.92, a * 0.66 + b * 0.5) * smoothstep(0.12, 0.34, dir.y) * (1.0 - smoothstep(0.62, 0.92, dir.y));
+      vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
+      col = mix(col, cir, st * u_cirrus * 0.12 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
+    }
     // stars
     float starK = max(u_night, cosmic * 0.45);
     if (starK > 0.02 && dir.y > -0.1) {
@@ -398,6 +431,11 @@ layout(std140) uniform Origins { vec4 u_origins[512]; };
 #else
 uniform vec3 u_origin;
 #endif
+#ifdef FADE
+#ifndef MULTIDRAW
+uniform float u_fade;
+#endif
+#endif
 #ifdef SHADOWS
 uniform mat4 u_shadowMat;
 out vec4 v_shadow;
@@ -415,7 +453,17 @@ out vec3 v_block;
 out float v_ao;
 out vec3 v_tint;
 out vec3 v_localPos;
+#ifdef FADE
+flat out float v_fade;
+#endif
 void main() {
+#ifdef FADE
+#ifdef MULTIDRAW
+  v_fade = u_origins[gl_DrawID].w;
+#else
+  v_fade = u_fade;
+#endif
+#endif
 #ifdef MULTIDRAW
   vec3 org = u_origins[gl_DrawID].xyz;
 #else
@@ -487,6 +535,7 @@ uniform mat3 u_normalMat;
 uniform float u_clipNear;
 #endif
 ${'__COMMON__'}
+${LOOK}
 in vec3 v_rel;
 in vec2 v_uv;
 flat in uint v_w3;
@@ -496,6 +545,9 @@ in vec3 v_block;
 in float v_ao;
 in vec3 v_tint;
 in vec3 v_localPos;
+#ifdef FADE
+flat in float v_fade;
+#endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 const vec3 TANG[6] = vec3[6](vec3(0,0,-1), vec3(0,0,1), vec3(1,0,0), vec3(1,0,0), vec3(1,0,0), vec3(-1,0,0));
@@ -547,6 +599,9 @@ void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
 #endif
+#ifdef FADE
+  if (v_fade < 1.0 && bayer4(gl_FragCoord.xy) >= v_fade) discard;
+#endif
   uint face = v_w5 & 7u;
   uint kind = (v_w5 >> 8u) & 7u;
   bool noshade = ((v_w5 >> 11u) & 1u) == 1u;
@@ -584,11 +639,15 @@ void main() {
 #endif
   vec4 mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
   vec3 tint = v_tint;
+  // a recoloured block (B1): the texture's detail in its own colour, the whole face (the tint mask of a grass side too)
+  if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, tint);
+  else {
 #ifdef CUTOUT
   alb.rgb *= tint;
 #else
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
+  }
   if (((v_w3 >> 15u) & 1u) == 1u) {
 #ifdef MODEL
     bool own = false;   // a ship's blocks move with it: no world cell to hash
@@ -716,6 +775,7 @@ uniform float u_shadowTexel;
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
+${LOOK}
 in vec3 v_rel;
 in vec2 v_uv;
 flat in uint v_w3;
@@ -725,6 +785,9 @@ in vec3 v_block;
 in float v_ao;
 in vec3 v_tint;
 in vec3 v_localPos;
+#ifdef FADE
+flat in float v_fade;
+#endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 float linDepth(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
@@ -752,6 +815,9 @@ vec3 waveNormal(vec2 p) {
 void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
+#endif
+#ifdef FADE
+  if (v_fade < 1.0 && bayer4(gl_FragCoord.xy) >= v_fade) discard;
 #endif
   uint face = v_w5 & 7u;
   uint kind = (v_w5 >> 8u) & 7u;
@@ -856,7 +922,7 @@ void main() {
     fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
   }
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), gdx, gdy);
-  alb.rgb *= v_tint;
+  if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, v_tint); else alb.rgb *= v_tint;
   vec3 n = NORMALS[face];
 #ifdef MODEL
   n = u_normalMat * n;
@@ -888,10 +954,25 @@ layout(std140) uniform Origins { vec4 u_origins[512]; };
 #else
 uniform vec3 u_origin;
 #endif
+#ifdef FADE
+#ifndef MULTIDRAW
+uniform float u_fade;
+#endif
+#endif
 out vec2 v_uv;
 flat out uint v_w3;
 flat out uint v_w5;
+#ifdef FADE
+flat out float v_fade;
+#endif
 void main() {
+#ifdef FADE
+#ifdef MULTIDRAW
+  v_fade = u_origins[gl_DrawID].w;
+#else
+  v_fade = u_fade;
+#endif
+#endif
 #ifdef MULTIDRAW
   vec3 org = u_origins[gl_DrawID].xyz;
 #else
@@ -938,6 +1019,7 @@ out vec2 v_uv;
 void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); v_uv = p; gl_Position = vec4(p * 2.0 - 1.0, 1.0, 1.0); }`;
   S.SKY_FS = `
 uniform mat4 u_invViewProj;
+uniform float u_skyProbe;    // test hook (test/horizon.mjs): 1 paints the sky magenta, so a hole below the horizon shows
 ${'__COMMON__'}
 in vec2 v_uv;
 out vec4 o;
@@ -946,6 +1028,7 @@ void main() {
   vec3 dir = normalize(p.xyz / p.w);
   vec3 col = skyColor(dir, true);
   if (u_fog.w > 0.5) col = u_fogColor;
+  if (u_skyProbe > 0.5) col = vec3(1.0, 0.0, 1.0);
   o = vec4(col, 1.0);
 }`;
 
@@ -991,6 +1074,70 @@ void main() {
   float fade = 1.0 - smoothstep(u_cloudR * 0.55, u_cloudR * 0.97, length(v_rel.xz));
   col = mix(col, skyColor(V, false), clamp(dist / (u_cloudR * 1.7), 0.0, 1.0) * 0.55);
   o = vec4(col, u_cloudAlpha * fade);
+}`;
+
+  // ------------------------------------------------------------ puffs (t-clouds): cumulus, fog banks, anchors as billboards
+  // a sprite is a camera-facing quad with the cloud texture (clouds.js atlas): R = density, G/B = the outward normal, so the
+  // sunward rim is lit and the base stays darker. Drawn far to near, depth tested but not written.
+  S.PUFF_VS = `
+layout(location=0) in vec2 a_corner;   // -1..1: the quad
+layout(location=1) in vec4 a_c;        // centre x, y, z (relative to the origin uniform), radius
+layout(location=2) in vec4 a_p;        // alpha, squash (vertical), atlas variant, -
+uniform mat4 u_viewProj;
+uniform vec3 u_origin;                 // −camera (and −wind for the drifting cumulus)
+uniform vec3 u_camRight;
+uniform vec3 u_camUp;
+out vec2 v_uv;
+out float v_alpha;
+out float v_var;
+out float v_dist;
+out float v_near;
+void main() {
+  vec3 rel = u_origin + a_c.xyz;
+  vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
+  v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x; v_var = a_p.z; v_dist = length(rel.xz);
+  // a sprite the camera is inside (the citadel's anchors) or almost touches fades out: no white wall in front of the lens
+  v_near = smoothstep(2.0, 24.0, length(rel) - a_c.w);
+  gl_Position = u_viewProj * vec4(p, 1.0);
+}`;
+  S.PUFF_FS = `
+${'__COMMON__'}
+uniform sampler2D u_cloudTex;
+uniform vec2 u_sunScreen;   // the sun's direction in the camera's plane (unit length; 0 at night)
+uniform float u_sunK;       // 0..1 while the sun is up
+uniform float u_fogK;       // 1 for the fog banks (greyer, hazier), 0 for the cumulus
+uniform float u_cloudR;     // the window's radius: the sprites fade out toward it
+in vec2 v_uv;
+in float v_alpha;
+in float v_var;
+in float v_dist;
+in float v_near;
+out vec4 o;
+void main() {
+  // the sample stays inside its own quarter of the atlas (half a texel in from the edge): no seam from the neighbour
+  vec2 at = vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5 + clamp(v_uv, vec2(0.5 / 128.0), vec2(1.0 - 0.5 / 128.0)) * 0.5;
+  vec4 t = texture(u_cloudTex, at);
+  if (u_fogK > 0.5) {
+    // the mist: a soft silhouette (the atlas's lobes have crisp edges; five taps soften them for the fog banks)
+    vec2 e = vec2(0.02, 0.02);
+    t = t * 0.4 + 0.15 * (texture(u_cloudTex, at + vec2(e.x, 0.0)) + texture(u_cloudTex, at - vec2(e.x, 0.0)) +
+                          texture(u_cloudTex, at + vec2(0.0, e.y)) + texture(u_cloudTex, at - vec2(0.0, e.y)));
+  }
+  float d = t.r;
+  if (d < 0.02) discard;
+  vec2 n = t.gb * 2.0 - 1.0;
+  float lit = clamp(0.5 + 0.6 * dot(n, u_sunScreen) * u_sunK, 0.0, 1.0) * mix(0.72, 1.0, v_uv.y);
+  vec3 ambC = u_ambSky * 1.15 + u_moonColor * 0.5 * (1.0 - u_sunK);
+  // sunlit tops white (a little warm at dusk), the shade a blue-lilac grey; by night both are the moon's light
+  vec3 litC = mix(ambC * 1.3, vec3(1.0, 0.95, 0.9) * 1.2, u_sunK);
+  vec3 shadeC = mix(u_ambSky * 0.8 + vec3(0.02, 0.03, 0.05), vec3(0.5, 0.48, 0.62), u_sunK);
+  vec3 col = mix(shadeC, litC, lit) + u_sunset * 0.18 * (1.0 - lit);
+  col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))), u_rain * 0.6);
+  col = mix(col, u_skyHorizon * 1.1 + ambC * 0.5, u_fogK * 0.45);
+  float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
+  col = mix(col, u_skyHorizon, smoothstep(260.0, 600.0, v_dist) * 0.5);
+  float solid = mix(smoothstep(0.1, 0.55, d), d, u_fogK);   // cumulus: the edge is soft, the body solid; fog banks: soft mist
+  o = vec4(col, solid * v_alpha * fade * v_near);
 }`;
 
   // ------------------------------------------------------------ far-terrain horizon (LOD tiles)
@@ -1045,7 +1192,12 @@ void main() {
   // real chunks are drawn here: the far terrain steps aside
   vec2 cl = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz & 15);
   ivec2 ch = ivec2(floor(cl / 16.0)) + 32;
-  if (ch.x >= 0 && ch.y >= 0 && ch.x < 64 && ch.y < 64 && texelFetch(u_mask, ch, 0).r > 0.5) discard;
+  // the mask carries each chunk column's fade (0..1, 300 ms in): the tile is cut where the chunk keeps the pixel, and the
+  // soft edge (bilinear) makes the cut fade over a chunk; min() with the nearest fade keeps the cut under the chunk's own
+  // threshold, so a pixel is always drawn by one of the two (no holes)
+  float cover = 0.0;
+  if (ch.x >= 0 && ch.y >= 0 && ch.x < 64 && ch.y < 64) cover = min(texelFetch(u_mask, ch, 0).r, textureLod(u_mask, (cl / 16.0 + 32.0) / 64.0, 0.0).r);
+  if (cover > 0.0 && bayer4(gl_FragCoord.xy) < cover) discard;
   // never right in front of the eyes: coarse cells only stand in at a distance
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
   vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
@@ -1479,6 +1631,7 @@ uniform vec3 u_blockLight;
 uniform float u_flash;
 uniform float u_noFog;
 ${'__COMMON__'}
+${LOOK}
 in vec3 v_uvl;
 in vec3 v_n;
 in vec4 v_color;
@@ -1486,10 +1639,12 @@ in vec3 v_rel;
 out vec4 o;
 void main() {
   vec4 a = texture(u_albedo, v_uvl);
-  // negative shade = opaque block texture whose alpha is the tint mask (grass sides); positive = alpha-tested
+  // negative shade = opaque block texture whose alpha is the tint mask (grass sides); positive = alpha-tested;
+  // |shade| 3 = a recoloured block (B1): the texture's detail in the colour (v_color)
   bool opq = v_color.a < 0.0;
   if (!opq && a.a < 0.5) discard;
-  if (opq) a.rgb = mix(a.rgb, a.rgb * v_color.rgb, a.a); else a.rgb *= v_color.rgb;
+  if (abs(v_color.a) > 2.5) a.rgb = lookRecolor(a.rgb, v_uvl.z, v_color.rgb);
+  else if (opq) a.rgb = mix(a.rgb, a.rgb * v_color.rgb, a.a); else a.rgb *= v_color.rgb;
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
@@ -1499,7 +1654,7 @@ void main() {
   vec3 light = u_ambSky * sk * shade + lc * ndl * smoothstep(0.55, 0.95, u_sky) * 0.9 + pow(u_blockLight, vec3(1.7)) * 1.35 * u_blockLightTint + 0.02;
   float shK = abs(v_color.a);
   vec3 col = a.rgb * light * min(shK, 1.0);
-  if (shK > 1.5) col = a.rgb * (1.3 + u_night * 0.6); // emissive voxel faces (|shade| = 2)
+  if (shK > 1.5 && shK < 2.5) col = a.rgb * (1.3 + u_night * 0.6); // emissive voxel faces (|shade| = 2)
   col = mix(col, vec3(1.0, 0.25, 0.2), u_flash * 0.55);
   if (u_noFog < 0.5) col = applyFog(col, v_rel, length(v_rel));
   o = vec4(col, 1.0);

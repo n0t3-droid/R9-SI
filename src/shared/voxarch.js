@@ -721,20 +721,32 @@
     const n = T.type.length;
     clsOf = new Uint8Array(n); fullMask = new Uint8Array(n).fill(NOMASK); specOf = new Array(n).fill(null); borderOf = new Uint8Array(n); shutterOf = new Uint8Array(n);
     VX.WALLSPECS = [WALL_DEFAULT];
-    for (let s = 1; s < n; s++) {
-      const fl = T.flags[s], shp = T.shape[s];
-      if (shp === SH.VOXEL) {
-        const t = R.types[T.type[s]], sp = t.o.vx;
-        specOf[s] = sp;
-        clsOf[s] = KIND[sp.kind].cls;
-        if (sp.kind === 'wall') { let i = VX.WALLSPECS.indexOf(sp); if (i < 0) { i = VX.WALLSPECS.length; VX.WALLSPECS.push(sp); } borderOf[s] = i; }
-        if (sp.kind === 'window') shutterOf[s] = sp.shutter || 0;
-      } else if (!s) clsOf[s] = AIR;
-      else if ((fl & F.OPAQUE)) clsOf[s] = SOLID;
-      else { const t = R.types[T.type[s]]; clsOf[s] = t && t.o.kind === 'door' ? DOOR : (fl & F.SOLID) && !(fl & (F.PLANT | F.FLUID | F.REPLACE)) ? OTHER : AIR; }
-    }
+    for (let s = 1; s < n; s++) classify(s);
+  }
+  // a state's class, spec, wall material index and shutter colour (init, and a variant slot filled later)
+  function classify(s) {
+    const fl = T.flags[s], shp = T.shape[s];
+    specOf[s] = null; borderOf[s] = 0; shutterOf[s] = 0;
+    if (shp === SH.VOXEL) {
+      const t = R.types[T.type[s]], sp = t.o.vx;
+      specOf[s] = sp;
+      clsOf[s] = KIND[sp.kind].cls;
+      if (sp.kind === 'wall') { let i = VX.WALLSPECS.indexOf(sp); if (i < 0) { i = VX.WALLSPECS.length; VX.WALLSPECS.push(sp); } borderOf[s] = i < 256 ? i : 0; }
+      if (sp.kind === 'window') shutterOf[s] = sp.shutter || 0;
+    } else if (!s) clsOf[s] = AIR;
+    else if ((fl & F.OPAQUE)) clsOf[s] = SOLID;
+    else { const t = R.types[T.type[s]]; clsOf[s] = t && t.o.kind === 'door' ? DOOR : (fl & F.SOLID) && !(fl & (F.PLANT | F.FLUID | F.REPLACE)) ? OTHER : AIR; }
   }
   VX.init = init;
+  // states whose table rows changed after init (a variant slot filled or emptied, looks.js): their class and spec
+  // again, and every cached piece, mask and box of theirs forgotten
+  VX.refreshStates = function (s0, n) {
+    if (!clsOf) return;
+    for (let s = s0; s < s0 + n && s < clsOf.length; s++) {
+      classify(s); fullMask[s] = NOMASK;
+      cache.delete(s); cacheOld.delete(s); lodCache.delete(s); bcache.delete(s * 2); bcache.delete(s * 2 + 1);
+    }
+  };
   // the full-face mask of a VX state — which of its six faces a neutral paint (all neighbours solid) fills completely,
   // so the neighbour's face against it is culled. Found on first use, one state at a time: painting every one of the
   // 5000+ VX states at init took 0.7 s on a fast machine (2 s on a small one) — on the main thread the first time

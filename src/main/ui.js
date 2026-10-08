@@ -24,7 +24,7 @@
       this.blocking = false; this.typing = false;
       this.screen = null;
       this.hudSlots = [];
-      this.settingsTab = 'graphics';
+      this.settingsTab = 'img'; this.settingsKeys = false; this.benchMsg = null;
       this.build();
     }
     build() {
@@ -188,6 +188,7 @@
     show(id) {
       for (const s of this.root.querySelectorAll('.screen')) s.classList.toggle('on', s.id === id);
       this.screen = id;
+      if (id !== 'settings') this.settingsKeys = false;   // the key screen opens again from the group, next time
       const g = this.game;
       this.blocking = !!id && id !== 'hud';
       g.input.captured = !this.blocking && g.state === 'play';
@@ -244,6 +245,7 @@
         case 'delete': if (this.selWorld) { if (b.dataset.confirm) { g.store.deleteWorld(this.selWorld.id).then(() => this.showWorlds()); } else { b.dataset.confirm = '1'; b.textContent = 'Click again to delete'; } } break;
         case 'resume': this.resume(); break;
         case 'studiolive': if (!g.openStudio()) this.hint(T('g.pause.studioGuest'), 2400); break;
+        case 'lookedit': if (VR.LiveLoop) VR.LiveLoop.fromPause(g); break;   // ✏️ Aussehen ändern (B1)
         case 'sethome': if (g.setSpawnHere()) { this.hint(T('g.pause.spawnSet'), 2600); if (this.chatLine) this.chatLine(T('g.pause.spawnSetChat'), '#9affd8'); } break;
         case 'quit': g.quitToTitle(); break;
         case 'respawn': g.player.respawn(); this.resume(); break;
@@ -263,6 +265,7 @@
         case 'zenTime': g.zenFreezeTime = !g.zenFreezeTime; this.buildZenPanel(); break;
         case 'zenWeather': g.zenFreezeWeather = !g.zenFreezeWeather; if (g.zenFreezeWeather) { g.env.rainTarget = 0; } this.buildZenPanel(); break;
         case 'zenNoclip': g.player.noclip = !g.player.noclip; if (g.player.noclip) g.player.flying = true; this.buildZenPanel(); break;
+        case 'mirror': if (g.mirror) g.mirror.cycle(); this.buildZenPanel(); break;   // 🪞 the next mirror mode (the centre: where you were looking)
       }
     }
     resume() { this.show(null); const g = this.game; g.input.captured = true; g.input.requestLock(); }
@@ -371,6 +374,7 @@
       if (this.game.state !== 'play') return;
       this.show('pause');
       { const b = $('#studiolive'); if (b) b.style.display = this.game.meta && this.game.meta.guest ? 'none' : ''; }
+      if (VR.LiveLoop) VR.LiveLoop.pauseMenu(this);   // ✏️ Aussehen ändern — what the crosshair pointed at (B1)
       this.buildZenPanel();
       this.buildMpPanel();
       if (VR.Legal && !$('#pause [data-legal]')) { const q = $('#pause [data-act="quit"]'); if (q) q.after(VR.Legal.button('btn small')); }   // 📜 Impressum · Datenschutz (src/main/legal.js)
@@ -466,109 +470,91 @@
         <div class="row gap"><button class="btn small${on(g.zenFreezeTime)}" data-act="zenTime" style="flex:1">${esc(T(g.zenFreezeTime ? 'g.zen.timeOn' : 'g.zen.timeOff'))}</button>
         <button class="btn small${on(g.zenFreezeWeather)}" data-act="zenWeather" style="flex:1">${esc(T(g.zenFreezeWeather ? 'g.zen.wxOn' : 'g.zen.wxOff'))}</button>
         <button class="btn small${on(g.player.noclip)}" data-act="zenNoclip" style="flex:1">${esc(T(g.player.noclip ? 'g.zen.ghostOn' : 'g.zen.ghostOff'))}</button></div>
+        ${g.mirror ? `<button class="btn small${on(g.mirror.mode)}" data-act="mirror" title="${esc(T('g.mirror.tip'))}">${esc(g.mirror.pauseLabel())}</button>` : ''}
         <div class="field"><label>${esc(T('g.zen.tod'))}</label><input type="range" min="0" max="23999" step="100" id="zentod" value="${Math.round(g.env.timeOfDay)}"></div>`;
       $('#zentod').oninput = (e) => { g.env.setTime(+e.target.value); };
     }
-    // ---------------------------------------------------------------- settings
-    showSettings() {
+    // ---------------------------------------------------------------- settings (F5 · Steuerung & Einstellungen)
+    // three groups — Bild · Klang · Spiel — rendered from the registry (settings_reg.js) by settings_panel.js; the key
+    // screen opens from the Spiel group. group: 'img' | 'snd' | 'play' (no argument keeps the group that is open)
+    showSettings(group) {
+      if (group) { this.settingsTab = group; this.settingsKeys = false; }
       this.show('settings');
-      const tabs = [['graphics', T('g.set.graphics')], ['controls', T('g.set.controls')], ['audio', T('g.set.audio')], ['game', T('g.set.game')], ['lang', T('g.lang.title')]];
+      const cur = this.settingsKeys ? 'play' : this.settingsTab;
       const st = $('#settabs'); st.innerHTML = '';
-      for (const [k, n] of tabs) { const b = el('button', k === this.settingsTab ? 'on' : ''); b.textContent = n; b.dataset.tab = k; b.onclick = () => { this.settingsTab = k; this.showSettings(); }; st.appendChild(b); }
-      const S = this.game.settings, body = $('#setbody');
-      if (VR.Legal && !$('#settings [data-legal]')) { const d = $('#settings [data-act="setback"]'); if (d) d.after(VR.Legal.button('btn small')); }   // 📜 next to Done (src/main/legal.js)
-      body.innerHTML = '';
-      const slider = (key, label, min, max, step, fmt, onch) => {
-        const d = el('div', 'field'); d.innerHTML = `<label>${esc(label)}: <span class="val">${esc(fmt(S[key]))}</span></label><input type="range" min="${min}" max="${max}" step="${step}" value="${S[key]}">`;
-        const inp = d.querySelector('input'), val = d.querySelector('.val');
-        inp.oninput = () => { S[key] = +inp.value; val.textContent = fmt(S[key]); if (onch) onch(); this.game.applySettings(key); };
-        body.appendChild(d);
-      };
-      const toggle = (key, label) => { const d = el('label', 'row gap note', `<input type="checkbox" ${S[key] ? 'checked' : ''}> ${esc(label)}`); d.style.margin = '6px 0'; d.querySelector('input').onchange = (e) => { S[key] = e.target.checked; this.game.applySettings(key); }; body.appendChild(d); };
-      const pct = (v) => Math.round(v * 100) + '%', pickV = (key) => (v) => TL(key)[v] || '';
-      if (this.settingsTab === 'graphics') {
-        const seg = el('div', 'seg');
-        const PRESET = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultra: 'g.set.pUltra' };
-        for (const p of ['potato', 'low', 'balanced', 'high', 'ultra']) { const b = el('button', S.preset === p ? 'on' : ''); b.textContent = T(PRESET[p]); b.title = p === 'potato' ? T('g.set.pVeryLowTip') : ''; b.onclick = () => { this.game.applyPreset(p); this.showSettings(); }; seg.appendChild(b); }
-        const f = el('div', 'field'); f.innerHTML = '<label></label>'; f.firstChild.textContent = T('g.set.preset'); f.appendChild(seg); body.appendChild(f);
-        // the block look (also /look): Klassisch / Classic — every block on its own, like the original game — or Nahtlos / Seamless
-        const lk = el('div', 'seg'), cur = S.look === 'seamless' ? 'seamless' : 'classic', LT = (k) => this.game.lookText(k);
-        for (const k of ['classic', 'seamless']) {
-          const b = el('button', cur === k ? 'on' : ''); b.textContent = LT(k); b.title = LT(k + 'Tip'); b.dataset.look = k;
-          b.onclick = () => { S.look = k; this.game.applySettings('look'); this.game.saveSettings(); this.showSettings(); }; lk.appendChild(b);
-        }
-        const lf = el('div', 'field'); lf.innerHTML = '<label></label>'; lf.firstChild.textContent = LT('label'); lf.appendChild(lk); body.appendChild(lf);
-        slider('renderDist', T('g.set.renderDist'), 3, 24, 1, (v) => T('g.set.chunks', { v, m: v * 16 }));
-        slider('horizon', T('g.set.horizon'), 0, 4, 1, pickV('g.set.horizonV'));
-        slider('scale', T('g.set.scale'), 0.4, 1, 0.05, pct);
-        slider('shadows', T('g.set.shadows'), 0, 3, 1, pickV('g.set.shadowsV'));
-        slider('clouds', T('g.set.clouds'), 0, 2, 1, pickV('g.set.cloudsV'));
-        slider('particles', T('g.set.particles'), 0, 2, 1, pickV('g.set.particlesV'));
-        slider('magic', T('g.set.magic'), 0, 1, 0.05, pct);
-        for (const k of ['sunShadows', 'sharpen', 'tsr', 'bloom', 'rays', 'fxaa', 'fancyLeaves', 'dynRes', 'lite', 'showFps']) toggle(k, T('g.set.' + k));
-        const r = this.game.renderer;
-        const note = el('div', 'note', T('g.set.gpuNote', { gpu: esc(VR.GL.rendererName || ''), r: r ? r.w + '×' + r.h : '?', s: r ? r.W + '×' + r.H : '?', tsr: S.tsr ? T('g.set.gpuTsr') : '', dyn: S.dynRes ? T('g.set.gpuDyn') : '' })); note.style.marginTop = '10px'; body.appendChild(note);
-      } else if (this.settingsTab === 'controls') {
-        slider('fov', T('g.set.fov'), 50, 110, 1, (v) => v + '°');
-        slider('sens', T('g.set.sens'), 0.2, 3, 0.05, pct);
-        toggle('invertY', T('g.set.invertY')); toggle('viewBob', T('g.set.viewBob'));
-        body.appendChild(el('div', 'note', T('g.set.keys')));
-      } else if (this.settingsTab === 'audio') {
-        slider('volMaster', T('g.set.volMaster'), 0, 1, 0.05, pct);
-        slider('volSfx', T('g.set.volSfx'), 0, 1, 0.05, pct);
-        slider('volMusic', T('g.set.volMusic'), 0, 1, 0.05, pct);
-        slider('volAmbient', T('g.set.volAmbient'), 0, 1, 0.05, pct);
-        // 🌦 Atmosphäre (A1): the sky's weather, the sounds of nature and the wet ground in the rain
-        body.appendChild(el('div', 'note', '<div class="hr"></div><b>🌦 Atmosphäre</b>'));
-        const atmSeg = (key, label, opts) => {
-          const f = el('div', 'field'); f.innerHTML = `<label>${label}</label>`;
-          const sg = el('div', 'seg');
-          for (const [v, t, tip] of opts) {
-            const b = el('button', S[key] === v ? 'on' : '', t); b.title = tip || ''; b.dataset.set = key + ':' + v;
-            b.onclick = () => { S[key] = v; this.game.applySettings(key); this.game.saveSettings(); this.showSettings(); };
-            sg.appendChild(b);
-          }
-          f.appendChild(sg); body.appendChild(f);
-        };
-        atmSeg('wx', 'Wetter', [['normal', 'Normal', 'Der Himmel wechselt zwischen klar, bewölkt, Nebel, Regen, Gewitter und Schnee'], ['calm', 'Ruhig', 'Nur klar und bewölkt: kein Regen, kein Gewitter, kein Nebel, kein Schnee'], ['off', 'Aus', 'Immer klarer Himmel ohne Wetter-Effekte und Blitze']]);
-        atmSeg('natSound', 'Natur-Klänge', [['synth', 'Synthetisch', 'Wind, Vögel am Tag, Grillen in der Nacht, Wasser — synthetisch erzeugt'], ['off', 'Aus', 'Keine Natur-Klänge (Regen und Donner bleiben, wenn das Wetter an ist)']]);
-        toggle('wetGround', 'Nasser Boden bei Regen');
-      } else if (this.settingsTab === 'lang') {
-        this.buildLangPanel(body);
-      } else {
-        const nf = el('div', 'field'); nf.innerHTML = '<label></label><input type="text" maxlength="24">'; nf.firstChild.textContent = T('g.set.name'); nf.lastChild.placeholder = T('g.set.namePh');
-        const ni = nf.querySelector('input'); ni.value = S.playerName || ''; ni.onchange = () => { S.playerName = ni.value.replace(/[<>]/g, '').trim().slice(0, 24); this.game.saveSettings(); if (this.game.mp) this.game.mp.setLobby(); };
-        ni.addEventListener('keydown', (e) => e.stopPropagation());
-        body.appendChild(nf);
-        // ---- your hero (third person with F5, and what friends see)
-        const Folk = VR.Folk;
-        if (Folk && Folk.HERO_SUITS) {
-          const H = this.game.heroOpts();
-          const hex = (c) => '#' + ('000000' + (c >>> 0).toString(16)).slice(-6);
-          const row = (label, items, key, paint) => {
-            const f = el('div', 'field'); f.innerHTML = '<label></label>'; f.firstChild.textContent = label;
-            const wrap = el('div', 'row gap'); wrap.style.flexWrap = 'wrap';
-            items.forEach((it, i) => {
-              const b = el('button', 'swatch' + ((H[key] | 0) === i ? ' on' : ''), paint ? '' : esc(it));
-              if (paint) b.style.background = paint(it); b.title = typeof it === 'object' && it.name ? it.name : String(it);
-              b.onclick = () => { H[key] = i; this.game.saveSettings(); if (this.game.mp) this.game.mp.publish(true); this.showSettings(); };
-              wrap.appendChild(b);
-            });
-            f.appendChild(wrap); body.appendChild(f);
-          };
-          body.appendChild(el('div', 'note', T('g.set.heroNote')));
-          row(T('g.set.suit'), Folk.HERO_SUITS, 'suit', (su) => `linear-gradient(135deg, ${hex(su.c)} 0 62%, ${hex(su.a)} 62% 100%)`);
-          row(T('g.set.hair'), Folk.HAIR, 'hair', (c) => hex(c));
-          row(T('g.set.hairStyle'), Folk.HAIR_STYLES, 'hs', null);
-          row(T('g.set.skin'), Folk.SKIN, 'skin', (c) => hex(c));
-          body.appendChild(el('div', 'hr'));
-        }
-        if (VR.Legal && this.game.mp) body.appendChild(VR.Legal.mpToggle(this.game));   // 👥 Mehrspieler an / aus and the name notice (src/main/legal.js)
-        if (S.mpHost === undefined) S.mpHost = true;
-        toggle('mpHost', T('g.set.mpHost'));
-        toggle('showCoords', T('g.set.showCoords')); toggle('minimap', T('g.set.minimap')); toggle('toasts', T('g.set.toasts'));
-        body.appendChild(el('div', 'note', esc(T('g.set.storageNote'))));
+      for (const g of (VR.Settings ? VR.Settings.GROUPS : [])) {
+        const b = el('button', g.id === cur ? 'on' : '');
+        b.textContent = (g.icon ? g.icon + ' ' : '') + T(g.lab); b.dataset.tab = g.id;
+        b.onclick = () => this.showSettings(g.id);
+        st.appendChild(b);
       }
+      if (VR.Legal && !$('#settings [data-legal]')) { const d = $('#settings [data-act="setback"]'); if (d) d.after(VR.Legal.button('btn small')); }   // 📜 next to Done (src/main/legal.js)
+      const body = $('#setbody');
+      body.innerHTML = '';
+      if (this.settingsKeys) { if (VR.SettingsPanel) VR.SettingsPanel.keys(this, body); return; }
+      if (this.benchMsg && this.settingsTab === 'img') body.appendChild(this.benchBox());
+      if (this.settingsTab === 'play') this.buildLangPanel(body);
+      if (VR.SettingsPanel) VR.SettingsPanel.render(this, body, this.settingsTab);
+      if (this.settingsTab === 'play') this.buildPlayExtras(body);
+    }
+    // the buttons of the settings rows: the key screen, the Automatik run
+    settingsAct(name) {
+      if (name === 'keys') { this.settingsKeys = true; this.showSettings(); }
+      else if (name === 'bench') { if (!this.game.bench) this.game.benchStart(); }
+    }
+    benchBox() {
+      const m = this.benchMsg || {}, box = el('div', 'benchbox' + (m.run ? ' run' : ''));
+      box.id = 'benchbox'; box.setAttribute('role', 'status');
+      box.innerHTML = `<b>⚡ ${esc(T('g.bench.title'))}</b> <span class="bt">${esc(m.text || '')}</span>`;
+      return box;
+    }
+    benchBegin() { this.benchMsg = { run: true, text: T('g.bench.run', { s: 3 }) }; if (this.screen === 'settings') this.showSettings(); }
+    benchDone(r) {
+      const PN = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultra: 'g.set.pUltra' };
+      let text;
+      if (!r || r.action === 'none') text = T('g.bench.none');
+      else {
+        const v = { m: Math.round(r.measured || 0), fps: r.fps, p: T(PN[r.preset] || 'g.set.preset'), v: r.renderDist };
+        text = T(r.weak ? 'g.bench.weak' : 'g.bench.done', v);
+      }
+      this.benchMsg = { run: false, text };
+      if (this.screen === 'settings') this.showSettings();
+      else if (this.game.state === 'play' && this.toast) this.toast('⚡ ' + T('g.bench.title'), text);
+    }
+    // Spiel, below the registry's rows: your name, your hero, the multiplayer switch and the storage note
+    buildPlayExtras(body) {
+      const S = this.game.settings;
+      body.appendChild(el('div', 'hr'));
+      const nf = el('div', 'field'); nf.innerHTML = '<label></label><input type="text" maxlength="24">'; nf.firstChild.textContent = T('g.set.name'); nf.lastChild.placeholder = T('g.set.namePh');
+      const ni = nf.querySelector('input'); ni.value = S.playerName || ''; ni.onchange = () => { S.playerName = ni.value.replace(/[<>]/g, '').trim().slice(0, 24); this.game.saveSettings(); if (this.game.mp) this.game.mp.setLobby(); };
+      ni.addEventListener('keydown', (e) => e.stopPropagation());
+      body.appendChild(nf);
+      // ---- your hero (third person with F5, and what friends see)
+      const Folk = VR.Folk;
+      if (Folk && Folk.HERO_SUITS) {
+        const H = this.game.heroOpts();
+        const hex = (c) => '#' + ('000000' + (c >>> 0).toString(16)).slice(-6);
+        const row = (label, items, key, paint) => {
+          const f = el('div', 'field'); f.innerHTML = '<label></label>'; f.firstChild.textContent = label;
+          const wrap = el('div', 'row gap'); wrap.style.flexWrap = 'wrap';
+          items.forEach((it, i) => {
+            const b = el('button', 'swatch' + ((H[key] | 0) === i ? ' on' : ''), paint ? '' : esc(it));
+            if (paint) b.style.background = paint(it); b.title = typeof it === 'object' && it.name ? it.name : String(it);
+            b.onclick = () => { H[key] = i; this.game.saveSettings(); if (this.game.mp) this.game.mp.publish(true); this.showSettings(); };
+            wrap.appendChild(b);
+          });
+          f.appendChild(wrap); body.appendChild(f);
+        };
+        body.appendChild(el('div', 'note', T('g.set.heroNote')));
+        row(T('g.set.suit'), Folk.HERO_SUITS, 'suit', (su) => `linear-gradient(135deg, ${hex(su.c)} 0 62%, ${hex(su.a)} 62% 100%)`);
+        row(T('g.set.hair'), Folk.HAIR, 'hair', (c) => hex(c));
+        row(T('g.set.hairStyle'), Folk.HAIR_STYLES, 'hs', null);
+        row(T('g.set.skin'), Folk.SKIN, 'skin', (c) => hex(c));
+        body.appendChild(el('div', 'hr'));
+      }
+      if (VR.Legal && this.game.mp) body.appendChild(VR.Legal.mpToggle(this.game));   // 👥 Mehrspieler an / aus and the name notice (src/main/legal.js)
+      if (S.mpHost === undefined) S.mpHost = true;
+      body.appendChild(el('div', 'note', esc(T('g.set.storageNote'))));
     }
     // 🌐 the language: Deutsch / English switch live (also /lang de|en); the other languages of the module are
     // "soon" — shown in Profi, Einfach hides them (r9si.ui.pro)
@@ -725,25 +711,18 @@
         // ☆ in the corner (on hover): a favourite, the same as in the R9 Studio
         if (VR.Favs) { const fb = el('span', 'favS'); fb.onmousedown = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleFav(id); }; s.appendChild(fb); }
         frag.appendChild(s);
-        // paint lazily, a few per frame (pumpIcons)
-        (this._iconQ || (this._iconQ = [])).push([s.firstChild, id]);
+        // paint lazily, a few per frame (the palette's icon pump, VR.IconPump in icons.js)
+        this.iconPump().add(s.firstChild, id);
       }
       pal.appendChild(frag);
-      this.pumpIcons();
       this.markFavs(pal);
       if (this.creativeTab === 'fav' && !items.length) { const n = el('div', 'note', T('g.inv.noFavs')); n.style.gridColumn = '1 / -1'; n.style.padding = '10px 4px'; pal.appendChild(n); }
       pal.onmousedown = (e) => { if (e.target === pal && this.cursor) { this.cursor = null; this.updateCursor(); } };
     }
-    // palette icons paint in small batches, about 6 ms per frame: a tab of hundreds of models (each builds its voxels
-    // on first use) never stalls a frame on a small PC; slots that left the screen are skipped
-    pumpIcons() {
-      if (this._iconPump) return;
-      const step = () => {
-        const q = this._iconQ || [], t0 = performance.now();
-        while (q.length && performance.now() - t0 < 6) { const [cv, id] = q.shift(); if (cv.isConnected) this.game.icons.paint(cv, id); }
-        this._iconPump = q.length ? requestAnimationFrame(step) : 0;
-      };
-      this._iconPump = requestAnimationFrame(step);
+    // palette icons paint in small batches, about 6 ms per frame (VR.IconPump): a tab of hundreds of models (each builds its
+    // voxels on first use) never stalls a frame on a small PC; slots that left the page are skipped
+    iconPump() {
+      return this._palPump || (this._palPump = new VR.IconPump({ paint: (cv, id) => this.game.icons.paint(cv, id), ready: (id, more) => this.game.icons.stepIcon(id, more) }));
     }
     // ★ marks on the palette slots
     markFavs(pal) {

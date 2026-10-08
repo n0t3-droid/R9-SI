@@ -13,6 +13,7 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  const tx = (...a) => VR.Forge.tx(...a);
   const Forge = VR.Forge; if (!Forge || !Forge.kit) return;
   const B = {
     stahl: { name: 'Stahl', pier: 'concrete_smooth', girder: 'black_metal', deck: 'asphalt', path: 'paver_grey', rail: 'vx_railing_black', lamp: 'vx_lamppost_black', tower: 'black_metal', cable: 'iron_chain', arch: 'concrete_smooth', ring: 'concrete_smooth_stairs', kerb: 'paver_grey' },
@@ -31,8 +32,8 @@
     ],
     styles: Object.keys(B).map(id => ({ id, name: B[id].name })),
     lot: (P) => [P.params.w, P.params.l],
-    title: (P) => ['Balkenbrücke', 'Bogenbrücke', 'Hängebrücke'][P.params.k],
-    describe: (P) => [P.params.l + ' lang', P.params.w + ' breit', P.params.r ? 'Straße' : 'Fußweg'].concat(P.params.m ? ['Laternen'] : []),
+    title: (P) => [tx('g.fg.beamBridge', null, 'Balkenbrücke', 'Beam bridge'), tx('g.fg.archBridge', null, 'Bogenbrücke', 'Arch bridge'), tx('g.fg.suspBridge', null, 'Hängebrücke', 'Suspension bridge')][P.params.k],
+    describe: (P) => [tx('g.fg.long', { n: P.params.l }, '{n} lang', '{n} long'), tx('g.fg.wide', { n: P.params.w }, '{n} breit', '{n} wide'), P.params.r ? tx('g.fg.road', null, 'Straße', 'road') : tx('g.fg.footpath', null, 'Fußweg', 'footpath')].concat(P.params.m ? [tx('g.fg.lamps', null, 'Laternen', 'lamps')] : []),
   }, function (P, env) {
     const { l, w, k, r, m } = P.params, S = B[P.style] || B.stahl;
     const G = (u, v) => Math.max(-env.depth, Math.min(-1, Math.round(env.ground(u, v))));
@@ -140,8 +141,8 @@
     ],
     styles: Object.keys(WS).map(id => ({ id, name: WS[id].name })),
     lot: (P) => [3, P.params.l],
-    title: (P) => ['Mauer', 'Zaun', 'Hecke'][P.params.k],
-    describe: (P) => [P.params.l + ' lang', P.params.h + ' hoch'].concat(P.params.g ? ['mit Tor'] : []),
+    title: (P) => [tx('g.fg.wall', null, 'Mauer', 'Wall'), tx('g.fg.fence', null, 'Zaun', 'Fence'), tx('g.fg.hedge', null, 'Hecke', 'Hedge')][P.params.k],
+    describe: (P) => [tx('g.fg.long', { n: P.params.l }, '{n} lang', '{n} long'), tx('g.fg.high', { n: P.params.h }, '{n} hoch', '{n} high')].concat(P.params.g ? [tx('g.fg.gate', null, 'mit Tor', 'with gate')] : []),
   }, function (P, env) {
     const { l, h, k, g } = P.params, S = WS[P.style] || WS.stein;
     // the ground under every segment, down into a valley or up a hill (the placer samples 40 over and 48 under the floor)

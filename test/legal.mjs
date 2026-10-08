@@ -111,7 +111,7 @@ t = await toTitle();
 r = await ev(() => ({ used: __mp.used, pres: __mp.pres.length, status: VR.game.mp.status, card: !!document.getElementById('r9mpcard') }));
 check(!r.used.includes('room') && !r.used.includes('user') && r.pres === 0 && r.status === 'off' && !r.card, 'the next start: no connection at all, no presence, no card (' + JSON.stringify(r) + ')');
 // Settings → Game turns it back on; the notice is still to be answered (card and settings)
-await ev(() => { VR.game.ui.act('settings'); VR.game.ui.settingsTab = 'game'; VR.game.ui.showSettings(); });
+await ev(() => { VR.game.ui.act('settings'); VR.game.ui.showSettings('play'); });   // (F5: the Spiel group)
 r = await ev(() => { const cb = document.querySelector('#setbody [data-mp-toggle]'); return { cb: !!cb, checked: cb && cb.checked, legal: document.querySelectorAll('#settings [data-legal]').length }; });
 check(r.cb && r.checked === false, 'Settings → Game: 👥 Mehrspieler, unchecked');
 check(r.legal === 1, '📜 next to Done in the settings (once)');

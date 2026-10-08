@@ -27,7 +27,7 @@ check(boot.setting === 'classic' && boot.look === 'classic' && boot.rim === true
 const ctl = await ev(() => {
   const u = VR.game.ui, I = VR.I18N, was = I ? I.lang : localStorage.getItem('r9si.lang'), out = {};
   const set = (lang) => { if (I) I.set(lang); else if (lang) localStorage.setItem('r9si.lang', lang); else localStorage.removeItem('r9si.lang'); };
-  for (const lang of ['de', 'en']) { set(lang); u.settingsTab = 'graphics'; u.showSettings(); const bs = [...document.querySelectorAll('#setbody [data-look]')]; out[lang] = { lab: bs.length ? bs[0].closest('.field').querySelector('label').textContent : '', r: bs.map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join() }; }
+  for (const lang of ['de', 'en']) { set(lang); u.showSettings('img'); const bs = [...document.querySelectorAll('#setbody [data-set^="look:"]')]; out[lang] = { lab: bs.length ? bs[0].closest('.setrow').querySelector('label').textContent : '', r: bs.map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join() }; }
   set(was); u.show('title'); return out;
 });
 check(ctl.de.lab === 'Blöcke' && ctl.de.r === 'Klassisch*,Nahtlos' && ctl.en.lab === 'Blocks' && ctl.en.r === 'Classic*,Seamless', 'Settings → Graphics shows "Blöcke: Klassisch / Nahtlos" (English: "Blocks: Classic / Seamless") with Klassisch on: ' + JSON.stringify(ctl));
@@ -81,8 +81,9 @@ const [ox, y0, oz] = base;
 const look = async (name, pos, yaw, pitch) => { await ev(([pos, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(pos[0], pos[1], pos[2]); p.yaw = yaw; p.pitch = pitch; }, [pos, yaw, pitch]); await settle(30); await step(6); await shot(TAG + '_' + name); };
 for (const lk of LOOKS) {
   const t0 = Date.now();
-  // the first look was set before the world was made; the next ones come by chat command, as a player types it
-  const sw = await ev((lk) => { const g = VR.game, before = VR.LOOK.mode; g.chat('/look ' + lk); return { before, now: VR.LOOK.mode, saved: JSON.parse(localStorage.getItem('r9si.settings') || '{}').look }; }, lk);
+  // the first look was set before the world was made; the next ones come from Settings → Graphics → Blöcke, as a player in
+  // Einfach switches them (the chat's /look is a Profi command: start.js lets only /lang through in Einfach)
+  const sw = await ev((lk) => { const g = VR.game, u = g.ui, before = VR.LOOK.mode; u.showSettings('img'); const b = document.querySelector('#setbody [data-set="look:' + lk + '"]'); if (b) b.click(); u.show(null); return { before, now: VR.LOOK.mode, saved: JSON.parse(localStorage.getItem('r9si.settings') || '{}').look, button: !!b }; }, lk);
   // the textures come back from the worker: wait for them (the rim follows the look)
   for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim)) break; await step(2); await wait(100); }
   await settle(80);
@@ -109,7 +110,7 @@ for (const lk of LOOKS) {
   check(sv.used && sv.now === (lk === 'classic' ? 'dirt_path' : 'grass_block_cut'), `${lk}: the shovel on grass makes ${sv.now}`);
 }
 // back with the settings button (Esc → Settings → Graphics → Blöcke: Klassisch)
-const back = await ev(() => { const g = VR.game, u = g.ui; u.settingsTab = 'graphics'; u.showSettings(); const b = document.querySelector('#setbody [data-look=classic]'); if (b) b.click(); const on = document.querySelector('#setbody [data-look].on'); return { look: VR.LOOK.mode, setting: g.settings.look, on: on && on.dataset.look }; });
+const back = await ev(() => { const g = VR.game, u = g.ui; u.showSettings('img'); const b = document.querySelector('#setbody [data-set="look:classic"]'); if (b) b.click(); const on = document.querySelector('#setbody [data-set^="look:"].on'); return { look: VR.LOOK.mode, setting: g.settings.look, on: on && on.dataset.look }; });
 for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim)) break; await step(2); await wait(100); }
 const back2 = await ev(() => ({ rim: VR.game.texRim, icons: VR.game.icons.cache.size >= 0 }));
 check(back.look === 'classic' && back.setting === 'classic' && back.on === 'classic' && back2.rim === true, 'the settings button switches back to Klassisch (textures with the rim again): ' + JSON.stringify([back, back2]));

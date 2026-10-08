@@ -21,7 +21,10 @@
 //   chat    anyone         {t}
 //   summon  host → guest   {to, p, f}               "come here"
 //   pdata   guest → host   {p}                      guest's inventory etc. (kept in the host's save)
+//   pack    host → guest   {to?, id, part, of, b64} the Studio-Paket (B1): the host's looks, variants and model looks,
+//                                                   in parts; no `to` = a change for everyone (looks.js packMake)
 //   bye     anyone         {}                       leaving (host: session ends)
+// PROTO 2 (B1): the registry has the 256 variant slots; a guest of another version is refused.
 // Block edits are packed per column as Uint16 pairs (index y<<8|z<<4|x, state).
 // Transport: every session runs in the page's LOBBY room (the one room every
 // admitted viewer can use — named rooms may be closed to invited guests);
@@ -33,9 +36,9 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const R = VR.R, F = VR.F;
-  const PROTO = 1;
+  const PROTO = 2;
   const NOTICE = 'r9si.mpNotice';   // 👥 the one-time name notice: '1' = answered (✓ OK or a nickname), 'off' = „Mehrspieler aus“ — once per browser
-  const TOPICS = ['hello', 'welcome', 'mods', 'req', 'diff', 'blk', 'edit', 'env', 'chat', 'summon', 'pdata', 'bye'];
+  const TOPICS = ['hello', 'welcome', 'mods', 'req', 'diff', 'blk', 'edit', 'env', 'chat', 'summon', 'pdata', 'pack', 'bye'];
   VR.MP_TOPICS = TOPICS;
   const unkey = (k) => [Math.floor(k / 65536) - 32768, (k % 65536) - 32768];
   const cleanName = (s) => String(s || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 24);
@@ -153,6 +156,7 @@
       on('chat', (m) => this.onChat(m));
       on('summon', (m) => this.onSummon(m));
       on('pdata', (m) => this.onPdata(m));
+      on('pack', (m) => this.onPack(m));
       on('bye', (m) => this.onBye(m));
       this.subs.push(room.onPeers((ch) => this.peersChanged(ch), () => { }));
     }
@@ -212,6 +216,7 @@
       // what is still queued goes out now (up to a burst), then the room is left
       if (this.room) { for (const [topic, data] of this.sendQ.splice(0, 30)) this.room.emit(topic, data).catch(() => { }); this.leaveRoom(this.room); }
       this.role = null; this.room = null; this.session = null; this.hostPeer = null;
+      clearTimeout(this.packTimer); this.packIn = null; this.packGot = false;
       for (const a of this.remote.values()) if (a.tag) a.tag.remove();
       this.remote.clear(); this.out.clear(); this.modKeys.clear(); this.reqQ.clear(); this.requested.clear(); this.pending.clear(); this.diffQ = []; this.sendQ = [];
       this.setLobby();
@@ -248,6 +253,32 @@
         if (!keys.length) break;
       }
       this.send('env', this.envData());
+      this.sendPack(m.peer);
+    }
+    // ---------------------------------------------------------------- the Studio-Paket (B1): the host's looks for the guests
+    // looks, variant slots and model looks (Item-Crafter overrides, newest first), capped at 512 KB, in parts of
+    // 3000 characters through the paced send queue
+    sendPack(to) {
+      const L = VR.Looks; if (this.role !== 'host' || !this.room || !L) return;
+      if (!to && !this.remote.size) return;
+      const own = (VR.CUSTOM && VR.CUSTOM.models) || {}, models = {};
+      for (const n of Object.keys(own).sort((a, b) => ((own[b] && own[b].t) || 0) - ((own[a] && own[a].t) || 0))) models[n] = own[n];
+      const parts = L.packParts(L.packMake(L.current(), models), 3000), id = Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+      parts.forEach((b64, i) => this.send('pack', Object.assign(to ? { to } : {}, { id, part: i, of: parts.length, b64 })));
+    }
+    onPack(m) {
+      const d = m.data || {}, L = VR.Looks;
+      if (this.role !== 'client' || m.peer !== this.hostPeer || !L || (d.to && d.to !== this.myPeer())) return;
+      const of = d.of | 0, part = d.part | 0;
+      if (typeof d.id !== 'string' || of < 1 || of > 400 || part < 0 || part >= of || typeof d.b64 !== 'string') return;
+      if (!this.packIn || this.packIn.id !== d.id) this.packIn = { id: d.id, of, parts: new Array(of), got: 0 };
+      const P = this.packIn; if (P.parts[part] === undefined) { P.parts[part] = d.b64; P.got++; }
+      if (P.got < P.of) return;
+      this.packIn = null;
+      const pack = L.packJoin(P.parts);
+      if (!pack) { this.g.ui.chatLine(T('g.mp.lost', { code: 'pack' }), '#ffb86a'); return; }
+      this.packGot = true; clearTimeout(this.packTimer);
+      if (VR.LiveLoop) VR.LiveLoop.guestPack(this.g, pack);
     }
     // lk: the host's block look rides along, so a switch reaches the guests within a few seconds (older guests ignore it)
     // wx: the weather the host forced with /wetter ('' = the world's schedule, which every guest works out itself)
@@ -327,7 +358,7 @@
     async join(host) {
       const g = this.g;
       if (!this.ready || this.role) return false;
-      g.ui.loading('Joining ' + host.name + '…', 0.05);
+      g.ui.loading(T('g.mp.join', { name: host.name }), 0.05);
       const room = this.sessionRoom();
       if (!room) { g.ui.show('title'); g.ui.titleNote && g.ui.titleNote('Could not reach ' + host.name); return false; }
       this.role = 'joining'; this.room = room; this.session = host.session; this.hostPeer = host.peer;
@@ -346,6 +377,9 @@
       this.role = 'client';
       this.hostName = cleanName(d.host) || 'Host';
       this.g.startGuestWorld(d, this);
+      // the host's looks (the Studio-Paket) follow the welcome; without them in 15 s the guest plays with its own
+      this.packGot = false; clearTimeout(this.packTimer);
+      this.packTimer = setTimeout(() => { if (this.role === 'client' && !this.packGot && this.g.ui) this.g.ui.chatLine(VR.I18N ? VR.I18N.tx('live.mp.noPack', null, 'Looks des Hosts nicht geladen — du siehst deine eigenen.', "The host's looks did not load — you see your own.") : "The host's looks did not load.", '#ffb86a'); }, 15000);
     }
     onMods(m) {
       const d = m.data || {};
@@ -394,7 +428,7 @@
         if (pend) {
           this.pending.delete(c.key);
           const x0 = c.cx * 16, z0 = c.cz * 16, w = this.g.world;
-          for (const [i, s] of pend) w.setBlock(x0 + (i & 15), i >> 8, z0 + ((i >> 4) & 15), s, 0);
+          for (const [i, s] of pend) w.setBlock(x0 + (i & 15), i >> 8, z0 + ((i >> 4) & 15), s, VR.SB_EDIT | VR.SB_GUEST);   // (a friend's building, recorded for 📽)
         }
       }
     }
@@ -459,7 +493,7 @@
         const u8 = VR.Net.unb64(part[2]), a = new Int32Array(u8.buffer, 0, u8.length >> 2);
         const k = VR.ckey(cx, cz), col = w.col(cx, cz);
         if (col) {
-          for (let i = 0; i + 1 < a.length; i += 2) { const idx = a[i], s = a[i + 1]; if (s < nStates) w.setBlock(cx * 16 + (idx & 15), idx >> 8, cz * 16 + ((idx >> 4) & 15), s, 0); }
+          for (let i = 0; i + 1 < a.length; i += 2) { const idx = a[i], s = a[i + 1]; if (s < nStates) w.setBlock(cx * 16 + (idx & 15), idx >> 8, cz * 16 + ((idx >> 4) & 15), s, VR.SB_EDIT | VR.SB_GUEST); }
         } else {
           let pm = this.pending.get(k); if (!pm) { pm = new Map(); this.pending.set(k, pm); }
           let o = this.out.get(k); if (!o) { o = new Map(); this.out.set(k, o); }

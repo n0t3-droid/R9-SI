@@ -158,7 +158,7 @@ await section('4 · 📥 Übernehmen in the game\'s Studio', async () => {
     return out;
   }, fs.readFileSync(file, 'utf8'));
   console.log('  drop', JSON.stringify(d));
-  check(d.sum && /2 Favoriten · 1 Möbel · 1 Bauteil/.test(d.sum), 'dropping the file shows what is in it: ' + (d.sum || '').replace(/\s+/g, ' ').slice(0, 120));
+  check(d.sum && /2 Favoriten · 1 Möbelstück · 1 Bauteil/.test(d.sum), 'dropping the file shows what is in it: ' + (d.sum || '').replace(/\s+/g, ' ').slice(0, 120));
   check(d.closed && d.favs === 0, 'Abbrechen: nothing changes');
   // 🕘 Weitermachen → 📥 Übernehmen → pick the file → ✓ Übernehmen
   await gev(() => VR.Projects.show(true));
@@ -177,7 +177,7 @@ await section('4 · 📥 Übernehmen in the game\'s Studio', async () => {
     return out;
   }, SOFA);
   console.log('  import', JSON.stringify(r));
-  check(/2 Favoriten · 1 Möbel · 1 Bauteil/.test(r.sum), '📥 Übernehmen in 🕘 shows the same summary');
+  check(/2 Favoriten · 1 Möbelstück · 1 Bauteil/.test(r.sum), '📥 Übernehmen in 🕘 shows the same summary');
   check(r.favs.join() === 'vx_led_cove,blueprint_2' && r.model && r.applied && r.lib.join() === 'Säule', '✓ Übernehmen: the favourites, the sofa design and the Bauteil are here now');
   check(/Übernommen/.test(r.msg), 'and it says so: ' + r.msg.slice(0, 160));
 });

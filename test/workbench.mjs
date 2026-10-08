@@ -31,9 +31,9 @@ const studio = await ctx.newPage(); watch(studio, 'studio');
 await studio.goto(URL0 + '/studio.html');
 const sev = (fn, a) => studio.evaluate(fn, a);
 for (let i = 0; i < 240; i++) { await studio.waitForTimeout(500); if (await sev(() => !document.getElementById('studio').classList.contains('boot') && window.__studio && window.__studio.HOUSE.size >= 1)) break; }
-await sev(() => window.__studioCore.setMode('world'));
+await sev(() => { if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); window.__studioCore.setMode('world'); });   // (W1: the Werkbank is a Profi tab — Einfach's Welt is the Karte)
 for (let i = 0; i < 40; i++) { await studio.waitForTimeout(300); if (await sev(() => !!VR.StudioWorld.worlds)) break; }
-await sev((id) => { const WM = VR.StudioWorld; WM.open(WM.worlds.find(w => w.id === id)); }, W.id);
+await sev((id) => { const WM = VR.StudioWorld; WM.tab = 'bench'; WM.open(WM.worlds.find(w => w.id === id)); }, W.id);
 for (let i = 0; i < 400; i++) { await studio.waitForTimeout(500); if (await sev(() => VR.StudioWorld.world && !VR.StudioWorld.loading && VR.StudioWorld.cols.size && VR.StudioWorld.wb.region === VR.StudioWorld.region)) break; }
 const ui = await sev(() => ({ tab: VR.StudioWorld.tab, chip: [...document.querySelectorAll('#chips button.on')].map(b => b.textContent).join('|'), tools: document.querySelectorAll('#benchTools button').length, bar: document.querySelectorAll('#benchBar .slot').length, tiles: document.querySelectorAll('#list .tile').length }));
 console.log('  ui', JSON.stringify(ui));
@@ -105,7 +105,7 @@ console.log('  game', JSON.stringify(gm));
 check(gm.pend === 0 && gm.fill === 'vollton_coral' && gm.top === 'vollton_mint' && gm.paste === 'vollton_coral' && gm.hole === 'air', 'the open game built every change');
 // ---- the Studio reads the world again: the changes are there
 await gev(async () => { await VR.game.world.saveAll(); });
-await sev(() => { const WM = VR.StudioWorld; WM.open(WM.world); });
+await sev(() => { const WM = VR.StudioWorld; WM.tab = 'bench'; WM.open(WM.world); });
 for (let i = 0; i < 400; i++) { await studio.waitForTimeout(500); if (await sev(() => VR.StudioWorld.world && !VR.StudioWorld.loading && VR.StudioWorld.cols.size && VR.StudioWorld.wb.region === VR.StudioWorld.region)) break; }
 const again = await sev((P) => { const WM = VR.StudioWorld, nm = (s) => s ? VR.R.types[VR.R.T.type[s]].name : 'air'; return { fill: nm(WM.getBlock(P[0] + 5, P[1], P[2] + 5)), paste: nm(WM.getBlock(P[0] + 18, P[1] + 1, P[2] + 6)), pendingN: WM.wb.pendingN, tab: WM.tab }; }, P);
 console.log('  reload', JSON.stringify(again));

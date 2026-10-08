@@ -92,7 +92,7 @@
     const it = I[id];
     if (it) return it;
     const t = R.byName[id];
-    if (t) return t.itemDef || (t.itemDef = { id, name: t.display, stack: t.o.stack || 64, block: t, cat: t.cat });
+    if (t) return t.itemDef || (t.itemDef = { id, get name() { return t.o && t.o.vxModel && VR.dispName ? VR.dispName(t.display) : t.display; }, stack: t.o.stack || 64, block: t, cat: t.cat });
     return null;
   };
   VR.itemName = (id) => { const d = VR.itemDef(id); return d ? d.name : id; };

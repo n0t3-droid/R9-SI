@@ -30,6 +30,18 @@
   // a list of lines (villager talk, loading tips): the table holds an array — the English list when the chosen
   // language has none, an empty list when nobody has it
   I.list = function (key) { const d = I.dict[I.lang], v = d && d[key]; if (Array.isArray(v)) return v; const e = I.dict.en && I.dict.en[key]; return Array.isArray(e) ? e : []; };
+  // a German word of the game's own data (a forge name, a Modern category): the German word is the source, its table
+  // entry is the g.fgw.* key whose German text it is. The word in the language of the moment; a word without an entry
+  // stays as it is. The index is made once, when the German table is there.
+  let wordIdx = null;
+  I.word = function (de) {
+    if (typeof de !== 'string' || !de || I.lang === 'de') return de;
+    if (!wordIdx) {
+      const d = I.dict.de || {}; if (!Object.keys(d).length) return de;
+      wordIdx = {}; for (const k of Object.keys(d)) if (k.indexOf('g.fgw.') === 0 && typeof d[k] === 'string') wordIdx[d[k]] = k;
+    }
+    return Object.prototype.hasOwnProperty.call(wordIdx, de) ? I.t(wordIdx[de]) : de;
+  };
   // the languages with a table (the game: de and en); the others are "soon"
   I.ready = (code) => !!(I.dict[code] && Object.keys(I.dict[code]).length);
   // static texts in a page: data-t (text), data-th (HTML), data-tt (title) are filled from the tables — again on

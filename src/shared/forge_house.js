@@ -11,6 +11,7 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  const tx = (...a) => VR.Forge.tx(...a);
   const Forge = VR.Forge; if (!Forge || !Forge.kit) return;
   const DIR = Forge.DIR;
   const STYLES = {
@@ -34,7 +35,7 @@
     ],
     styles: Object.keys(STYLES).map(id => ({ id, name: STYLES[id].name })),
     lot: (P) => lotOf(P.params),
-    describe: (P) => [P.params.f + (P.params.f === 1 ? ' Etage' : ' Etagen'), P.params.w + ' × ' + P.params.d, P.params.r ? 'Pultdach' : 'Flachdach', P.params.g === 2 ? 'Panoramaglas' : P.params.g ? 'Glasfront' : 'Fenster'].concat(['Terrasse'], P.params.c ? ['Carport'] : [], P.params.b && P.params.f > 1 ? ['Balkon'] : [], P.params.p ? ['Pool'] : []),
+    describe: (P) => [P.params.f === 1 ? tx('g.fg.floor1', { n: P.params.f }, '{n} Etage', '{n} floor') : tx('g.fg.floors', { n: P.params.f }, '{n} Etagen', '{n} floors'), P.params.w + ' × ' + P.params.d, P.params.r ? tx('g.fg.mono', null, 'Pultdach', 'mono-pitch roof') : tx('g.fg.flat', null, 'Flachdach', 'flat roof'), P.params.g === 2 ? tx('g.fg.panorama', null, 'Panoramaglas', 'panorama glass') : P.params.g ? tx('g.fg.glassFront', null, 'Glasfront', 'glass front') : tx('g.fg.windows', null, 'Fenster', 'windows')].concat([tx('g.fg.terrace', null, 'Terrasse', 'terrace')], P.params.c ? [tx('g.fg.carport', null, 'Carport', 'carport')] : [], P.params.b && P.params.f > 1 ? [tx('g.fg.balcony', null, 'Balkon', 'balcony')] : [], P.params.p ? [tx('g.fg.pool', null, 'Pool', 'pool')] : []),
   };
   def.params.push({ k: 'p', label: 'Pool', min: 0, max: 1, def: 0 });
   const SIDE = 2, FRONT = 3;

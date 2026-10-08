@@ -18,23 +18,32 @@
   const cc = new Map();
   LOD.setAvg = (a) => { AVG = a; cc.clear(); };
   const hexc = (h) => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
+  // a block with its own colour (B1 „🎨 Aussehen", T.rc): that colour; the cache follows the looks (VR.Looks.ver)
+  let ccVer = 0;
+  const looksSync = () => { const v = VR.Looks ? VR.Looks.ver | 0 : 0; if (v !== ccVer) { cc.clear(); ccVer = v; } };
+  const rcCol = (s) => { const rc = R.T.rc ? R.T.rc[s] : 0; if (!rc || !VR.Looks) return null; const v = VR.Looks.from565(rc); return [(v >> 16) & 255, (v >> 8) & 255, v & 255]; };
   // average colour of a block face (sRGB 0..255) from the texture atlas, with a fallback
   function bcol(name, face, fb) {
+    looksSync();
     const k = name + ':' + face;
     let c = cc.get(k); if (c) return c;
     c = hexc(fb);
-    const t = R.byName[name];
-    if (AVG && t) {
+    const t = R.byName[name], own = t ? rcCol(t.defaultState) : null;
+    if (own) c = own;
+    else if (AVG && t) {
       const layer = R.T.tex[t.defaultState * 6 + face] & 0xfff;
       if (AVG[layer * 4 + 3] > 0.05) c = [AVG[layer * 4] * 255, AVG[layer * 4 + 1] * 255, AVG[layer * 4 + 2] * 255];
     }
     cc.set(k, c); return c;
   }
   function scol(state, fb) {
+    looksSync();
     const k = 's' + state;
     let c = cc.get(k); if (c) return c;
     c = hexc(fb);
-    if (AVG && state) { const layer = R.T.tex[state * 6 + 2] & 0xfff; if (AVG[layer * 4 + 3] > 0.05) c = [AVG[layer * 4] * 255, AVG[layer * 4 + 1] * 255, AVG[layer * 4 + 2] * 255]; }
+    const own = state ? rcCol(state) : null;
+    if (own) c = own;
+    else if (AVG && state) { const layer = R.T.tex[state * 6 + 2] & 0xfff; if (AVG[layer * 4 + 3] > 0.05) c = [AVG[layer * 4] * 255, AVG[layer * 4 + 1] * 255, AVG[layer * 4 + 2] * 255]; }
     cc.set(k, c); return c;
   }
   const tint = (c, h, k) => [c[0] * ((h >> 16) & 255) / 255 * (k || 1), c[1] * ((h >> 8) & 255) / 255 * (k || 1), c[2] * (h & 255) / 255 * (k || 1)];

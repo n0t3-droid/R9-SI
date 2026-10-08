@@ -14,6 +14,7 @@
 // ============================================================================
 (function (VR) {
   'use strict';
+  const tx = (...a) => VR.Forge.tx(...a);
   const Forge = VR.Forge; if (!Forge || !Forge.kit) return;
   const DIR = Forge.DIR;
   const STYLES = {
@@ -36,8 +37,8 @@
     ],
     styles: Object.keys(STYLES).map(id => ({ id, name: STYLES[id].name })),
     lot: (P) => [P.params.w, P.params.d],
-    title: (P) => (P.params.u ? 'Wohnturm' : 'Hochhaus'),
-    describe: (P) => [P.params.f + ' Stockwerke', P.params.w + ' × ' + P.params.d, P.params.u ? 'Wohnungen' : 'Büros', ['Flachdach', 'Dachgarten', 'Helipad', 'Spitze'][P.params.c]],
+    title: (P) => (P.params.u ? tx('g.fg.residential', null, 'Wohnturm', 'Residential tower') : tx('g.fg.skyscraper', null, 'Hochhaus', 'Skyscraper')),
+    describe: (P) => [tx('g.fg.storeys', { n: P.params.f }, '{n} Stockwerke', '{n} storeys'), P.params.w + ' × ' + P.params.d, P.params.u ? tx('g.fg.flats', null, 'Wohnungen', 'flats') : tx('g.fg.offices', null, 'Büros', 'offices'), [tx('g.fg.flat', null, 'Flachdach', 'flat roof'), tx('g.fg.roofGarden', null, 'Dachgarten', 'roof garden'), tx('g.fg.helipad', null, 'Helipad', 'helipad'), tx('g.fg.spire', null, 'Spitze', 'spire')][P.params.c]],
   };
 
   function build(P, env) {

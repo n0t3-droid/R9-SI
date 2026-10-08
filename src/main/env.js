@@ -89,19 +89,9 @@
       // celestial bodies ride the same sky rotation
       // the planets never set (TRAILER.md §2.1): the ringed giant circles at ~33° elevation, the blue
       // planet higher up on the other side; both drift slowly around the sky with the day
-      const pa = th * 0.5 + 0.55;
-      E.planetDir = norm([Math.cos(pa) * 0.84, 0.55, Math.sin(pa) * 0.84]);
-      {
-        // keep the rings seen at a slant (never face-on): ring normal ~70° away from the line of sight, tilted diagonally
-        const P = E.planetDir, upd = P[1];
-        let Y = norm([-P[0] * upd, 1 - P[1] * upd, -P[2] * upd]);
-        const X = norm([Y[1] * P[2] - Y[2] * P[1], Y[2] * P[0] - Y[0] * P[2], Y[0] * P[1] - Y[1] * P[0]]);
-        const c = Math.cos(0.45), sn = Math.sin(0.45);
-        const Np = [Y[0] * c + X[0] * sn, Y[1] * c + X[1] * sn, Y[2] * c + X[2] * sn];
-        E.ringNormal = norm([Np[0] * 0.94 - P[0] * 0.34, Np[1] * 0.94 - P[1] * 0.34, Np[2] * 0.94 - P[2] * 0.34]);
-      }
-      const pb = th * 0.5 + 0.55 + 2.4;
-      E.planet2Dir = norm([Math.cos(pb) * 0.62, 0.78, Math.sin(pb) * 0.62]);
+      // the bodies (skybodies.js): the giant with its ring, the blue planet and the moons, with their angular radii
+      const SB = VR.SkyBodies.at(th);
+      E.planetDir = SB.giant; E.ringNormal = SB.ring; E.planet2Dir = SB.blue; E.bodies = SB;
       // dimension overrides
       const rd = (o.renderDist || 8) * 16;
       let fogStart = rd * 0.62, fogEnd = rd * 1.0, dens = 0.0002 + rain * 0.0035;

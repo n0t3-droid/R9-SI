@@ -39,6 +39,7 @@
   const FV = () => VR.Favs;
   // ★ favourites that can be placed here (the same list as in Teile, the Werkbank, the World and the game)
   const favItems = () => { if (!itemsByCat) buildItems(); return FV() ? FV().list().filter(id => itemSet.has(id)) : []; };
+  CR.resetItems = () => { itemsByCat = null; itemSet = null; };   // a variant came or went (B1, lookpanel.js)
   function buildItems() {
     itemsByCat = { all: [] };
     for (const t of R.types) {
@@ -268,8 +269,8 @@
   }
   function originLabel(o) {
     const H = (i) => { const h = C.HOUSES.find(x => x.i === i); return h ? h.name : ''; };
-    const nm = o.mode === 'arch' ? (Number.isFinite(o.index) ? H(o.index) : '') : (o.mode === 'furn' || o.mode === 'facade') ? (o.name && VM.MODELS[o.name] ? VM.MODELS[o.name].display : '')
-      : o.mode === 'parts' ? (o.scene === 'model' && o.name ? (VM.MODELS[o.name] || {}).display || '' : o.scene === 'house' ? H(o.index) : o.id ? nameOf(o.id) : '') : o.mode === 'world' ? o.world || '' : '';
+    const nm = o.mode === 'arch' ? (Number.isFinite(o.index) ? H(o.index) : '') : (o.mode === 'furn' || o.mode === 'facade') ? (o.name && VM.MODELS[o.name] ? VR.dispName(VM.MODELS[o.name].display) : '')
+      : o.mode === 'parts' ? (o.scene === 'model' && o.name ? VR.dispName((VM.MODELS[o.name] || {}).display || '') : o.scene === 'house' ? H(o.index) : o.id ? nameOf(o.id) : '') : o.mode === 'world' ? o.world || '' : '';
     return '← ' + L('mode.' + o.mode, MODE_NAME[o.mode]) + (nm ? ' · ' + nm : '');
   }
   // ✕ and "← <Herkunft>": back there, with the same selection
@@ -1303,7 +1304,7 @@
     }
     if (CR.kind === 'item' && CR.item) {
       const it = CR.item;
-      $('#hudName').textContent = 'Crafter · ' + it.display;
+      $('#hudName').textContent = 'Crafter · ' + VR.dispName(it.display);
       $('#hudMeta').innerHTML = `<b>${it.W}×${it.H}×${it.D}</b> Blöcke · 1/${it.res} · <b>${fmt(it.changed || 0)}</b> Voxel geändert${it.dirty ? ` · <span class="warn">${SA ? L('cr.itemDraftSA', 'Entwurf gesichert, noch nicht gespeichert') : L('cr.itemDraft', 'Entwurf gesichert, noch nicht im Spiel')}</span>` : it.savedAt ? ` · <span class="good">${SA ? L('cr.savedSA', 'gespeichert') : L('cr.saved', 'im Spiel')}</span>` : ''} · Werkzeug <b>${TOOLS.find(t => t[0] === it.tool)[1]}</b>`;
       return true;
     }
@@ -1405,7 +1406,7 @@
     }
     for (const n of ms) {
       const m = VM.MODELS[n], d = document.createElement('div'); d.className = 'design';
-      d.innerHTML = `<span class="ic">${IC('cube', 18)}</span><span class="n">${m ? m.display : n}<small>${when(st.models[n].t)}${wip('m:' + n)}</small></span>`;
+      d.innerHTML = `<span class="ic">${IC('cube', 18)}</span><span class="n">${m ? VR.dispName(m.display) : n}<small>${when(st.models[n].t)}${wip('m:' + n)}</small></span>`;
       d.appendChild(btn(IC('arrow', 16), 'mini', () => openItem(n), L('cr.open', 'öffnen')));
       d.appendChild(delButton(btn, () => { const s2 = store(); delete s2.models[n]; if (!saveStore(s2)) { tip(L('cr.saveFail', 'Speichern fehlgeschlagen — der Browser-Speicher ist voll'), false); return; } CU.applyModel(n, null); C.THUMB.delete(n); if (CR.item && CR.item.name === n) openItem(n); tip((m ? m.display : n) + ' → ' + L('cr.original', 'Original'), true); C.parts(); }, L('cr.remove', 'Design entfernen (Original zurück)')));
       el.appendChild(d);
@@ -1557,7 +1558,7 @@
   }
   function itemPanel(el, H, btn, row) {
     const it = CR.item;
-    H('Crafter · Item', esc(it.display));
+    H('Crafter · Item', esc(VR.dispName(it.display)));
     row(saveButton(!it.dirty && it.savedAt, it.dirty, updateItem, L('cr.saveItemT', 'Das Item sieht überall im Spiel so aus — auch wo es schon steht')));
     const kv = document.createElement('div'); kv.className = 'kv';
     kv.innerHTML = `<span>Modell</span><b>${esc(it.name)}</b><span>Größe</span><b>${it.W} × ${it.H} × ${it.D} Blöcke · ${it.res}³ Voxel je Block</b><span>Geändert</span><b>${fmt(it.changed || 0)} Voxel</b><span>${SA ? L('cr.kvSavedSA', 'Gespeichert') : L('cr.kvSaved', 'Im Spiel')}</span><b>${it.savedAt ? L('cr.ownDesign', 'eigenes Design') : 'Original'}${it.dirty ? ' · ✎ ' + L('cr.draftAuto', 'Entwurf (automatisch gesichert)') : ''}</b>`;
