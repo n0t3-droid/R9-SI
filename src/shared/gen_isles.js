@@ -200,6 +200,18 @@
         put(x, y + h, z, K.CRY(c, true)); put(x + 1, y + h - 3, z, K.CRY(c, false)); put(x - 1, y, z, K.CRY(c, false));
       }
     }
+    // ---- hanging crystals: the undersides drip crystal stalactites (the trailer's violet and cyan spikes below the isles)
+    for (const I of L) {
+      const nH = Math.round(I.r * 0.35);
+      for (let k = 0; k < nH; k++) {
+        const a = rng.next() * Math.PI * 2, d = rng.next() * I.r * 0.75;
+        const x = Math.round(I.x + Math.cos(a) * d), z = Math.round(I.z + Math.sin(a) * d);
+        const sh = shape(x, z); if (!sh || sh.isle !== I) continue;
+        if (I.hoodoo && Math.abs(x - I.x) < 9 && Math.abs(z - I.z) < 9) continue;
+        const c = CRYS[rng.int(CRYS.length)], len = 4 + rng.int(6), yb = sh.bottom - 1;
+        for (let t = 0; t < len; t++) { put(x, yb - t, z, K.CRYB(c)); if (t < len * 0.5) put(x + 1, yb - t, z, K.CRYB(c)); }
+      }
+    }
     g._islesOps = chunks;
     return chunks;
   };
