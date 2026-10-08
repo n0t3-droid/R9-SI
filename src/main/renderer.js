@@ -586,7 +586,9 @@
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.expFB[dst]); gl.viewport(0, 0, 1, 1);
       this.tex(0, this.sceneCol, p.u.u_scene); this.tex(1, this.expTex[this.expCur], p.u.u_prev);
       gl.uniform1f(p.u.u_dt, Math.min(0.25, E.dt || 0.016));
-      gl.uniform3f(p.u.u_expParams, 0.8, 1.35, 0.3);
+      const EX = VR.Atmos.EXPOSURE;
+      gl.uniform3f(p.u.u_expParams, EX.lo, EX.hi, EX.power);   // ±0.5 stops around 1, partial adaptation (atmos.js)
+      if (p.u.u_expKey) gl.uniform1f(p.u.u_expKey, EX.key);
       this.fs(p);
       this.expCur = dst;
     }
