@@ -203,7 +203,7 @@
       this.qA = new Int32Array(1 << 16); this.qB = new Int32Array(1 << 16);
       this.changed = new Set();
       this.fancyLeaves = true; this.smooth = true;
-      this.smoothProps = false;   // t-smooth: the palms as smooth props (game.js sets it from the setting)
+      this.smoothProps = 0;   // t-smooth: the prop groups drawn smooth (1 palms, 2 furniture; game.js propMask)
       this.meshBudget = 6;
       this.lastCol = null;
       this.shDirty = new Set(); this.shGone = new Set(); // columns whose shadow heights must reach the GPU
@@ -656,7 +656,7 @@
           }
         }
       }
-      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: !!this.smoothProps, vxLod: true };
+      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true };
     }
     markDirty(x, y, z) {
       const sy = y >> 4;

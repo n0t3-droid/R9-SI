@@ -843,6 +843,168 @@ void main() {
   o_col = vec4(1.0);
 }`;
 
+  // ------------------------------------------------------------ smooth furniture (t-smooth, props.js): instanced pieces
+  // Vertex: pos, normal, uv (the furniture atlas), colour, material, tint slot, ambient occlusion. Instance: the centre
+  // (camera-relative) and the turn · the first colour (linear) and the second (an sRGB number) · sky and block light.
+  S.FURN_VS = `
+layout(location=0) in vec3 a_pos;
+layout(location=1) in vec3 a_nrm;
+layout(location=2) in vec2 a_uv;
+layout(location=3) in vec3 a_col;
+layout(location=4) in float a_mat;
+layout(location=5) in float a_tint;
+layout(location=6) in float a_ao;
+layout(location=7) in vec4 a_inst0;
+layout(location=8) in vec4 a_inst1;
+layout(location=9) in vec4 a_inst2;
+uniform mat4 u_viewProj;
+#ifdef SHADOWS
+uniform mat4 u_shadowMat;
+out vec4 v_shadow;
+#endif
+out vec2 v_uv;
+out vec3 v_col;
+out vec3 v_n;
+out vec3 v_rel;
+out vec3 v_lp;
+flat out float v_mat;
+out float v_ao;
+out float v_sky;
+out vec3 v_block;
+void main() {
+  float c = cos(a_inst0.w), s = sin(a_inst0.w);
+  vec3 q = vec3(c * a_pos.x - s * a_pos.z, a_pos.y, s * a_pos.x + c * a_pos.z);
+  vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
+  vec3 rel = q + a_inst0.xyz;
+  vec3 col = a_col;
+  if (a_tint > 0.5 && a_tint < 1.5) col *= a_inst1.rgb;
+  else if (a_tint > 1.5) { float t = a_inst1.w; vec3 b = vec3(floor(t / 65536.0), mod(floor(t / 256.0), 256.0), mod(t, 256.0)) / 255.0; col *= pow(b, vec3(2.2)); }
+  v_uv = a_uv; v_col = col; v_n = nq; v_rel = rel; v_lp = a_pos; v_mat = a_mat; v_ao = a_ao; v_sky = a_inst2.x; v_block = a_inst2.yzw;
+#ifdef SHADOWS
+  v_shadow = u_shadowMat * vec4(rel + nq * 0.03, 1.0);
+#endif
+  gl_Position = u_viewProj * vec4(rel, 1.0);
+}`;
+  // the materials (props.js PR.MAT): 0 fabric, 1 wood, 2 metal, 3 glass, 4 light, 5 matte, 6 gloss, 7 leaf, 8 marble,
+  // 9 leather, 10 a lamp shade (lit from inside), 11 the contact shadow. The terrain's light (the sky as a hemisphere, the
+  // sun through the shadow map outdoors, the block light of the lamps from above), F2's response (metal mirrors its
+  // surroundings tinted by its colour, smooth surfaces take a fresnel rim, fabric is matte with a soft sheen at grazing
+  // angles), the surface detail of wood grain, weave and marble veins faded with distance, the same fog.
+  S.FURN_FS = `
+uniform sampler2D u_tex;
+uniform ivec3 u_camInt;      // (declared for the common block's heightmap shadow; the pieces do not march it)
+uniform float u_emissiveBoost;
+#ifdef SHADOWS
+uniform highp sampler2DShadow u_shadowMap;
+uniform float u_shadowTexel;
+in vec4 v_shadow;
+#endif
+${'__COMMON__'}
+in vec2 v_uv;
+in vec3 v_col;
+in vec3 v_n;
+in vec3 v_rel;
+in vec3 v_lp;
+flat in float v_mat;
+in float v_ao;
+in float v_sky;
+in vec3 v_block;
+layout(location=0) out vec4 o_col;
+#ifdef SHADOWS
+float furnSun() {
+  vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
+  if (sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0) return 1.0;
+  float t = u_shadowTexel, b = 0.0006;
+  float s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - b));
+  return s * 0.25;
+}
+#endif
+vec3 furnEnv(vec3 R) { return mix(u_skyHorizon * 0.5, mix(u_skyHorizon, u_skyZenith, smoothstep(0.0, 0.8, R.y)), smoothstep(-0.05, 0.6, R.y)); }
+void main() {
+  int m = int(v_mat + 0.5);
+  float dist = length(v_rel);
+  if (m == 11) {
+    // the contact shadow: a soft patch under the piece, fading at its edges and with distance
+    vec2 q = abs(v_uv - 0.5) * 2.0;
+    float e = length(max(q - 0.5, 0.0)) / 0.5;
+    o_col = vec4(0.0, 0.0, 0.0, (1.0 - smoothstep(0.0, 1.0, e)) * 0.42 * (1.0 - smoothstep(16.0, 26.0, dist)));
+    return;
+  }
+  vec4 t = texture(u_tex, v_uv);
+  if (m == 7 && t.a < 0.5) discard;
+  vec3 alb = v_col * t.rgb;
+  if (m == 4) {
+    // the lights: a bulb, the inside of a shade, a screen
+    o_col = vec4(applyFog(alb * (1.7 + u_emissiveBoost), v_rel, dist), 1.0);
+    return;
+  }
+  vec3 N = normalize(v_n);
+  if (!gl_FrontFacing) N = -N;
+  vec3 V = normalize(-v_rel);
+  float fade = 1.0 - smoothstep(6.0, 14.0, dist);
+  vec3 lp = v_lp * 16.0;
+  float rough = 0.8, metal = 0.0, sheen = 0.0;
+  if (m == 0) { rough = 0.96; sheen = 0.5; alb *= 1.0 + fade * 0.07 * (vnoise(lp.xy * 1.9 + lp.zz * 1.3) - 0.5); }
+  else if (m == 1) { rough = 0.42; float g = vnoise(vec2(lp.x * 0.11 + lp.z * 0.03, (lp.y + lp.z) * 2.6)) * 0.7 + vnoise(vec2(lp.x * 0.5, (lp.y - lp.z) * 7.0)) * 0.3; alb *= 1.0 + fade * 0.22 * (g - 0.5); }
+  else if (m == 2) { rough = 0.3; metal = 1.0; }
+  else if (m == 3) { rough = 0.05; }
+  else if (m == 5) { rough = 0.82; }
+  else if (m == 6) { rough = 0.16; }
+  else if (m == 7) { rough = 0.62; sheen = 0.2; }
+  else if (m == 8) { rough = 0.2; float vn = vnoise(lp.xz * 0.32 + vec2(lp.y * 0.21)); alb *= 1.0 - fade * 0.12 * (smoothstep(0.46, 0.5, vn) - smoothstep(0.5, 0.54, vn)); }
+  else if (m == 9) { rough = 0.48; }
+  else if (m == 10) { rough = 0.95; sheen = 0.3; }
+  float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
+  vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
+  float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
+  vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
+  vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
+  float wrap = (m == 0 || m == 7 || m == 10) ? 0.3 : 0.0;
+  float ndl = clamp((dot(N, L) + wrap) / (1.0 + wrap), 0.0, 1.0);
+  float outdoors = smoothstep(0.55, 0.95, v_sky);
+#ifdef SHADOWS
+  float sh = outdoors > 0.0 && ndl > 0.0 ? furnSun() : 1.0;
+#else
+  float sh = 1.0;
+#endif
+  float up = 0.5 + 0.5 * N.y;
+  vec3 amb = u_ambSky * skyL * mix(0.45, 1.0, up);
+  vec3 blk = blockL * mix(0.5, 1.0, up);
+  vec3 col = alb * ((amb + lc * ndl * sh * outdoors) * v_ao + blk * v_ao + vec3(0.012, 0.012, 0.016)) * (1.0 - metal * 0.85);
+#ifndef LITE
+  // highlights: the sun's (outdoors) and the room light's (from above, in the lamps' colour)
+  float shin = mix(180.0, 10.0, rough), ks = (1.0 - rough) * 1.4;
+  vec3 spc = mix(vec3(1.0), alb, metal);
+  vec3 Hs = normalize(L + V);
+  col += lc * pow(max(dot(N, Hs), 0.0), shin) * ks * sh * outdoors * spc;
+  vec3 Hb = normalize(normalize(vec3(0.3, 1.0, 0.2)) + V);
+  col += blockL * pow(max(dot(N, Hb), 0.0), shin) * ks * 0.8 * spc * v_ao;
+#endif
+  // reflections: outdoors the sky, indoors the room's light
+  vec3 env = mix(blockL * 0.7 + u_ambSky * skyL * 0.5 + vec3(0.02), furnEnv(reflect(-V, N)) * (0.3 + 0.7 * v_sky), outdoors);
+  float nv = max(dot(N, V), 0.0), fres = 0.04 + 0.96 * pow(1.0 - nv, 5.0);
+  if (metal > 0.5) col += alb * env * (1.0 - rough * 0.6) * 1.1 * v_ao;
+  else col += env * fres * (1.0 - rough) * 0.6 * v_ao;
+  col += alb * sheen * pow(1.0 - nv, 3.0) * (amb + blk + lc * sh * outdoors * 0.3) * 0.6;
+  if (m == 10) col += alb * vec3(1.0, 0.86, 0.62) * (0.55 + 0.25 * u_emissiveBoost);   // a shade glows through
+  float alpha = 1.0;
+  if (m == 3) { alpha = clamp(0.16 + 0.7 * fres, 0.0, 0.9); col = col * 0.5 + env * fres; }
+  o_col = vec4(applyFog(col, v_rel, dist), alpha);
+}`;
+  // the shadow pass: the same vertices, the leaves cut out
+  S.FURN_SHADOW_FS = `
+uniform sampler2D u_tex;
+in vec2 v_uv;
+flat in float v_mat;
+layout(location=0) out vec4 o_col;
+void main() {
+  if (int(v_mat + 0.5) == 7 && texture(u_tex, v_uv).a < 0.5) discard;
+  o_col = vec4(1.0);
+}`;
+
   // ------------------------------------------------------------ translucent (water / glass / ice)
   S.TRANS_FS = `
 uniform sampler2DArray u_albedo;
