@@ -218,15 +218,17 @@ console.log('8 · the cost per chunk (far land, seed 1):');
 {
   const chunks = []; for (let cz = 62; cz < 70; cz++) for (let cx = 62; cx < 70; cx++) chunks.push([cx, cz]);
   // one generator per run, the order alternated (the first run pays for the JIT and the code's warm-up)
+  // CPU time of this process: the cost of the code, not of the other work on the box
+  const cpuMs = (c0) => { const d = process.cpuUsage(c0); return (d.user + d.system) / 1000; };
   const run = (vgen) => {
     const g = V.makeGen('overworld', 1, { vgen });
-    let t = Date.now(); for (const [cx, cz] of chunks) g.generate(cx, cz); const cold = (Date.now() - t) / chunks.length;
-    t = Date.now(); for (const [cx, cz] of chunks) g.generate(cx, cz); const warm = (Date.now() - t) / chunks.length;
+    let c = process.cpuUsage(); for (const [cx, cz] of chunks) g.generate(cx, cz); const cold = cpuMs(c) / chunks.length;
+    c = process.cpuUsage(); for (const [cx, cz] of chunks) g.generate(cx, cz); const warm = cpuMs(c) / chunks.length;
     return { cold, warm };
   };
   const a5 = run(5), a6 = run(6), b6 = run(6), b5 = run(5);
   const c5 = { cold: Math.min(a5.cold, b5.cold), warm: Math.min(a5.warm, b5.warm) }, c6 = { cold: Math.min(a6.cold, b6.cold), warm: Math.min(a6.warm, b6.warm) };
-  console.log(`  vgen 5: cold ${c5.cold.toFixed(1)} ms, warm ${c5.warm.toFixed(1)} ms · vgen 6: cold ${c6.cold.toFixed(1)} ms, warm ${c6.warm.toFixed(1)} ms per chunk`);
+  console.log(`  vgen 5: cold ${c5.cold.toFixed(1)} ms, warm ${c5.warm.toFixed(1)} ms · vgen 6: cold ${c6.cold.toFixed(1)} ms, warm ${c6.warm.toFixed(1)} ms per chunk (CPU time)`);
   check(c6.cold <= c5.cold * 1.5 + 2, `cold chunks cost at most 1.5× the vgen 5 chunks (${(c6.cold / c5.cold).toFixed(2)}×)`);
   check(c6.warm <= c5.warm * 1.3 + 1, `warm chunks cost at most 1.3× (${(c6.warm / c5.warm).toFixed(2)}×)`);
 }
