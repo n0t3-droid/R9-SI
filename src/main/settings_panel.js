@@ -39,10 +39,10 @@
     if (item.t === 'slider') {
       const d = el('div', 'setrow'); d.dataset.key = item.key;
       d.innerHTML = `<div class="sethead"><label>${label}</label><span class="val">${esc(fmt(item, S[item.key]))}</span>${badge(item)}</div>`;
-      const inp = el('input'); inp.type = 'range'; inp.min = item.min; inp.max = item.max; inp.step = item.step; inp.value = S[item.key];
+      const inp = el('input'); inp.type = 'range'; inp.min = item.min; inp.max = VR.Settings.maxOf ? VR.Settings.maxOf(item, S) : item.max; inp.step = item.step; inp.value = S[item.key];
       inp.setAttribute('aria-label', T(item.lab));
       const val = d.querySelector('.val');
-      inp.oninput = () => { S[item.key] = VR.Settings.snap(item, inp.value); inp.value = S[item.key]; val.textContent = fmt(item, S[item.key]); after(item.key); };
+      inp.oninput = () => { S[item.key] = VR.Settings.snapFor ? VR.Settings.snapFor(item, inp.value, S) : VR.Settings.snap(item, inp.value); inp.value = S[item.key]; val.textContent = fmt(item, S[item.key]); after(item.key); };
       inp.onchange = () => game.saveSettings();
       d.appendChild(inp); d.insertAdjacentHTML('beforeend', tipOf(item));
       return d;

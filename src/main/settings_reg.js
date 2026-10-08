@@ -33,7 +33,7 @@
     // ---- Bild · Automatik and the quality preset
     // ---- Bild · Licht & Schatten
     { key: 'preset', g: 'img', sec: 'auto', t: 'preset', lab: 'g.set.preset', tip: 'g.set.preset.tip', def: 'balanced' },
-    { key: 'renderDist', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.renderDist', tip: 'g.set.renderDist.tip', cost: 'high', def: 10, min: 3, max: 24, step: 1, fmt: 'chunks' },
+    { key: 'renderDist', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.renderDist', tip: 'g.set.renderDist.tip', cost: 'high', def: 10, min: 3, max: 24, maxKey: 'rdMax', step: 1, fmt: 'chunks' },   // (F-Far: the top follows the preset's rdMax — 32 on Ultra)
     { key: 'horizon', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.horizon', tip: 'g.set.horizon.tip', cost: 'high', def: 4, min: 0, max: 4, step: 1, vals: 'g.set.horizonV' },
     { key: 'shadows', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.shadows', tip: 'g.set.shadows.tip', cost: 'mid', def: 1, min: 0, max: 3, step: 1, vals: 'g.set.shadowsV' },
     { key: 'matTier', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.matTier', tip: 'g.set.matTier.tip', cost: 'mid', def: 2, min: 0, max: 3, step: 1, vals: 'g.set.matTierV' },   // F2 materials
@@ -105,4 +105,8 @@
     return +(Math.min(hi, lo + k * st)).toFixed(6);
   };
   S.costOf = (item) => (item && COST[item.cost]) || null;
+  // the top of a slider for these settings: a slider with maxKey takes it from the settings (F-Far: the render distance
+  // reaches 32 on Ultra), never below its own max
+  S.maxOf = (item, settings) => (item && item.maxKey && settings && settings[item.maxKey] > item.max ? settings[item.maxKey] : item.max);
+  S.snapFor = function (item, v, settings) { const hi = S.maxOf(item, settings); return hi === item.max ? S.snap(item, v) : S.snap(Object.assign({}, item, { max: hi }), v); };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
