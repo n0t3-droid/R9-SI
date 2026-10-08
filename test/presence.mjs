@@ -30,7 +30,7 @@ await ev(`VR.game.createWorld({name:'Presence',mode:'creative',difficulty:'peace
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; g.env.setTime(6000); g.player.mob = null; });
 
-// ---- scene 1: a sunbeam room (9 × 9, four high, a 3 × 3 hole in the roof on the sun's side)
+// ---- scene 1: a sunbeam room (9 × 9, four high, a 3 × 3 hole in the roof at the far side; the low sun's beam falls toward the camera)
 await ev(() => {
   const g = VR.game, w = g.world, R = VR.R, p = g.player;
   const ox = Math.floor(p.pos[0]) + 14, oz = Math.floor(p.pos[2]) - 6, y0 = w.topAt(ox + 4, oz + 4);
@@ -38,11 +38,11 @@ await ev(() => {
   for (let x = 0; x <= 8; x++) for (let z = 0; z <= 8; z++) {
     w.setBlock(ox + x, y0 + 1, oz + z, S, 4);
     if (x === 0 || x === 8 || z === 0 || z === 8) for (let y = 2; y <= 5; y++) w.setBlock(ox + x, y0 + y, oz + z, S, 4);
-    const hole = x >= 3 && x <= 5 && z >= 5 && z <= 7;
+    const hole = x >= 3 && x <= 5 && z >= 1 && z <= 3;
     w.setBlock(ox + x, y0 + 6, oz + z, hole ? A : S, 4);
   }
   for (let x = 1; x <= 7; x++) for (let z = 1; z <= 7; z++) for (let y = 2; y <= 5; y++) w.setBlock(ox + x, y0 + y, oz + z, A, 4);
-  p.flying = true; p.noclip = true; p.teleport(ox + 4.5, y0 + 2, oz + 1.5); p.yaw = Math.PI; p.pitch = 0.05; p.fovKick = 0;
+  p.flying = true; p.noclip = true; p.teleport(ox + 4.5, y0 + 2, oz + 6.5); p.yaw = 0; p.pitch = 0.05; p.fovKick = 0;
   window.__room = { ox, y0, oz };
 });
 await settle(40);
@@ -179,7 +179,7 @@ for (const preset of ['potato', 'high']) {
 }
 await ev(() => { VR.game.airLife.setOn(true, 0); VR.game.settings.airLife = true; });
 // Very Low: fireflies and snow only, and the noon meadow holds no birds, butterflies or pollen
-await ev(() => { const g = VR.game; g.applyPreset('potato'); g.applySettings('*'); const m = window.__meadow; g.player.teleport(m.cx, m.top + 1, m.cz + 6); g.env.setTime(6000); });
+await ev(() => { const g = VR.game; g.applyPreset('potato'); g.applySettings('*'); const m = window.__meadow; g.player.teleport(m.cx, m.top + 1, m.cz + 6); g.env.setTime(6000); for (const k of Object.keys(g.airLife.drawn)) g.airLife.drawn[k] = 0; });
 await step(240);
 const potatoNoon = await ev(() => { const a = VR.game.airLife; return { tier: a.tier, drawn: { ...a.drawn } }; });
 check(potatoNoon.tier === 0 && potatoNoon.drawn.bird === 0 && potatoNoon.drawn.butterfly === 0 && potatoNoon.drawn.pollen === 0 && potatoNoon.drawn.mote === 0, 'Very Low at noon: no birds, butterflies, pollen or motes (' + JSON.stringify(potatoNoon.drawn) + ')');
