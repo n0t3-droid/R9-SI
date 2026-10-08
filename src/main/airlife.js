@@ -79,7 +79,8 @@
       this.acc = { mote: 0, pollen: 0, leaf: 0, snow: 0 };
       this.ff = []; this.bf = []; this.flocks = []; this.flowers = []; this.flowerT = 0; this.birdT = 25;
       this.drawn = { mote: 0, pollen: 0, firefly: 0, leaf: 0, snow: 0, butterfly: 0, bird: 0 };   // particles made per kind (the test reads them)
-      this.ms = 0;            // the CPU time of an update (a moving average, ms): the cost the test reads
+      this.ms = 0;            // the CPU time of an update (a moving average, ms)
+      this.msSum = 0; this.msN = 0;   // the same time summed over a window (the test takes the mean of its window)
     }
     setOn(on, tier) {
       this.on = on !== false;
@@ -229,7 +230,7 @@
         }
       }
       const ms = performance.now() - t0;
-      this.ms = this.ms * 0.9 + ms * 0.1;
+      this.ms = this.ms * 0.9 + ms * 0.1; this.msSum += ms; this.msN++;
     }
   }
   VR.AirLife = Object.assign(AirLife, { KINDS, CAPS, tierOf, budgetFor });
