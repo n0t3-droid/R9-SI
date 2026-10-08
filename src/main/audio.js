@@ -11,6 +11,13 @@
   const HEAR = 48;                // a positional voice beyond this many blocks is silent (no nodes)
   const ROOM_SEND = 0.55, CAVE_SEND = 0.8;
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+  // the noise hits of the construction site (baustelle.js: hammer, clang, thud, clatter, the start): band, Q, length, level
+  // and body of planks, stone and metal (noiseHit)
+  const PROFILE = {
+    stone: { f: 1400, q: 1.2, d: 0.09, g: 0.5, thump: 110 },
+    planks: { f: 700, q: 2.5, d: 0.08, g: 0.6, thump: 200, knock: 1 },
+    metal: { f: 2400, q: 8, d: 0.25, g: 0.35, clang: 1 },
+  };
 
   // the room's impulse, synthesized: a noise tail that darkens as it decays, with a few early reflections. The room is
   // 1.3 s; a cave is 2.6 s and darker. Made once; seeded, so every start sounds the same.
@@ -100,6 +107,20 @@
       g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.035); g.gain.setValueAtTime(gain * 0.85, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
       o.connect(flt); o2.connect(g2); g2.connect(flt); flt.connect(g); g.connect(this.sfx); g.connect(this.rev);
       o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    }
+    // a short burst of filtered noise on the sfx bus, with the body a profile asks for (thump, knock, clang): the ship's
+    // switches and buttons (p = {f, q, g, knock?}) and the construction site's planks, stone and metal (PROFILE)
+    noiseHit(p, gain, dur, pitchMul) {
+      const c = this.ctx; if (!c || !p) return;
+      const t = c.currentTime, pm = pitchMul || 1;
+      const src = c.createBufferSource(); src.buffer = this.noise; src.playbackRate.value = 0.8 + Math.random() * 0.4;
+      const f = c.createBiquadFilter(); f.type = p.hp ? 'highpass' : 'bandpass'; f.frequency.value = p.f * pm * (0.85 + Math.random() * 0.3); f.Q.value = p.q;
+      const g = c.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain * p.g, t + 0.004); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+      src.connect(f); f.connect(g); g.connect(this.sfx);
+      src.start(t, Math.random() * 1.5, dur + 0.05); src.stop(t + dur + 0.06);
+      if (p.thump) this.tone(p.thump * pm, gain * 0.5, dur * 0.8, 'sine');
+      if (p.knock) this.tone(p.f * 0.35, gain * 0.35, 0.06, 'triangle');
+      if (p.clang) for (const k of [1, 2.76, 5.4]) this.tone(p.f * 0.4 * k, gain * 0.12, p.d * 1.5, 'sine', true);
     }
 
     // ---------------- the listener: where the ear is, which way it faces, and the place's flags (per frame, numbers only)
