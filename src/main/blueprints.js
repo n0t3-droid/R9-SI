@@ -147,20 +147,25 @@
       if (!at) return;
       if (!p.creative) { this.hint(T('g.bp.mode'), 2600); return; }
       if (!at.ok) { this.hint(at.why, 2200); return; }
-      const t0 = performance.now(), n = this.buildAt(at);
+      const P = this.plan(), name = P.CATALOGUE[i].name;
+      const t0 = performance.now(), n = this.buildAt(at, name + (at.bp.custom ? ' ★' : ''));
       if (!n) { this.hint(T('g.bp.standing'), 1600); return; }
       g.audio.place(R.byName.stone.defaultState);
       g.particles && g.particles.spark && g.particles.spark(at.ox + 0.5, at.F + 1, at.oz + 0.5, [0.5, 0.9, 1], 30, 4);
-      const P = this.plan(), name = P.CATALOGUE[i].name;
-      this.hint(T('g.bp.built', { name: name + (at.bp.custom ? ' ★' : ''), n: n.toLocaleString() }), 3200);
+      // (a construction site says so itself; at once: how many blocks)
+      if (!this.siteStarted) this.hint(T('g.bp.built', { name: name + (at.bp.custom ? ' ★' : ''), n: n.toLocaleString() }), 3200);
       g.codex && g.codex.event && g.codex.event('blueprint');
       this.lastMs = performance.now() - t0;
     }
     // level the ground under a lot and lay the house down (at: a placement from locate() or a Studio plan);
     // returns how many blocks changed (all of it one undo step)
-    buildAt(at) {
+    buildAt(at, name) {
+      this.siteStarted = null;
+      if (this.slices && this.finishSites) this.finishSites('next');   // (a site still building is finished first: this one reads the ground it leaves)
       const { list, undo } = this.planAt(at);
       if (!list.length) return 0;
+      // 🏗 Baustelle (baustelle.js): built in front of the player — or at once, as below
+      if (name !== undefined && this.siteFor && this.siteFor({ kind: 'blueprint', name, list, undo, F: at.F })) return list.length;
       this.gad.applyEdit(list, undo, EK('PLAN'));
       return list.length;
     }
@@ -345,6 +350,7 @@
       return null;
     }
     tickPlans(dt) {
+      if (this.siteTick) this.siteTick(dt);   // 🏗 the construction sites' show (baustelle.js)
       if (this.slices) { this.tickSlices(dt); return; }
       this.planT = (this.planT || 0) - dt; if (this.planT > 0) return;
       this.planT = 0.5;
@@ -383,6 +389,8 @@
       let { list, undo } = direct ? this.opsAt(bp, r, pl.ox, pl.oz, pl.F, wo) : this.planAt({ bp, r, ox: pl.ox, oz: pl.oz, F: pl.F, x0, z0, x1, z1, rect, ok: true, world: wo });
       if (wo) ({ list, undo } = wo.merge(list, undo));
       const name = this.planName(pl, bp);
+      // 🏗 Baustelle (baustelle.js): built in front of the player — or Sofort, as below, and the session hears of it
+      if (list.length && this.siteFor && this.siteFor({ kind: 'plan', pl, name, list, undo, F: pl.F })) return 'built';
       // a big one goes in slices, bottom up, a few thousand cells per tick — the frame stays smooth, Z takes it all back
       // (the cells and their undo sorted together: a build stopped half way is put back exactly)
       if (list.length > SLICE_MAX) {
@@ -469,6 +477,7 @@
     // the slices of a big piece: one chunk per tick, the undo of all of them as one step at the end
     tickSlices(dt) {
       const S = this.slices, g = this.g, w = g.world;
+      if (VR.Baustelle && S instanceof VR.Baustelle.Site) { S.write(dt); return; }   // (a Baustelle or Sofort job of baustelle.js)
       if (S.w !== w) { this.slices = null; return; }     // another world now: that one rebuilds the plan when it is back
       if (!w || g.state !== 'play') return;
       S.t -= dt; if (S.t > 0) return;
@@ -502,6 +511,7 @@
     tickEdits(dt) {
       this.editT = (this.editT || 0) - dt; if (this.editT > 0) return;
       this.editT = 0.25;
+      if (this.editsSite && this.editsSite()) return;   // 🏗 the Werkbank's changes as a construction site (baustelle.js)
       const E = VR.Edits, id = this.editWorld(), g = this.g, w = g.world;
       if (!E || !id || !w || g.state !== 'play') return;
       const ids = E.list(id); if (!ids.length) return;
@@ -524,7 +534,8 @@
       // built where you stand? you step out to the nearest free spot instead of being stuck in it
       if (g.player && g.player.unstick) g.player.unstick();
       // into the save right away (the Studio reads the world from it)
-      clearTimeout(this.editSave); this.editSave = setTimeout(() => { if (g.world === w && w.saveAll) w.saveAll(); }, 800);
+      // (while a construction site builds the save waits — it would finish the site at once)
+      clearTimeout(this.editSave); const save = () => { if (this.siteBusy && this.siteBusy()) { this.editSave = setTimeout(save, 1000); return; } if (g.world === w && w.saveAll) w.saveAll(); }; this.editSave = setTimeout(save, 800);
       if (n && g.ui && g.ui.toast) g.ui.toast('R9 Studio', VR.I18N ? VR.I18N.tx('g.studio.edits', { n: n.toLocaleString() }, '{n} Blöcke aus der Werkbank', '{n} blocks from the Werkbank') : n + ' blocks from the Werkbank');
     }
 
@@ -555,6 +566,8 @@
       const T = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : en);
       const text = a.join(' ').trim();
       if (!Fg) { say('No Forge in this build.', '#ff8a8a'); return true; }
+      // „/bau fertig": the construction site that is building now is done at once (⏩)
+      if (/^(fertig|sofort|skip|done|finish|⏩)$/i.test(text) && this.siteSkip) { if (!this.siteSkip()) say(T('g.bau.none', null, 'Gerade wird nichts gebaut.', 'Nothing is being built right now.')); return true; }
       if (!this.plans) this.loadPlans();
       if (!text) { say(T('g.forge.help', null, '🏭 /bau <Wunsch> — „/bau Hochhaus 30 Stockwerke Glas“, „/bau Hängebrücke 60 lang“, „/bau Burg mit Bergfried“ · danach „/bau höher“, „/bau mehr Glas“, „/bau aus Stein“', '🏭 /bau <wish> — “/bau skyscraper 30 floors glass”, “/bau suspension bridge 60 long”, “/bau castle with keep” · then “/bau taller”, “/bau more glass”, “/bau stone”')); return true; }
       // ✨ a wonder of the world (wonders.js): once found in this world, /bau <its name> builds it — before that, a kind word
@@ -570,9 +583,14 @@
         if (again.dna === dna) { say(T('g.forge.same', null, 'Das ändert nichts — sag „höher“, „breiter“, „mehr Glas“, „aus Stein“ … oder etwas Neues: „/bau Brücke 40 lang“.', 'That changes nothing — say “taller”, “wider”, “more glass”, “stone” … or something new: “/bau bridge 40 long”.')); return true; }
         // the last one goes (one Z, while nothing changed since), the changed one takes its place
         const u = this.gad.wand.undo;
-        if (again.status === 'built' && !(this.lastForge.undo && u[u.length - 1] === this.lastForge.undo)) { say(T('g.forge.moved', null, 'Seit der letzten Forge hat sich etwas geändert — sag ein neues Ganzes: „/bau Hochhaus …“', 'Something changed since the last Forge build — say a whole new wish: “/bau skyscraper …”'), '#ff8a8a'); return true; }
-        if (this.slices && this.slices.pl.id === again.id) { say(T('g.forge.busy', null, 'Noch im Bau — gleich.', 'Still building — a moment.')); return true; }
-        if (again.status === 'built') this.gad.undo();
+        let stopped = false;
+        if (this.slices && this.slices.pl && this.slices.pl.id === again.id) {
+          // still building: its step is the newest (the site's undo is there from the first cell on) — Z stops it
+          if (!this.slices.undo || u[u.length - 1] !== this.slices.undo || !this.slices.undo.onUndo) { say(T('g.forge.busy', null, 'Noch im Bau — gleich.', 'Still building — a moment.')); return true; }
+          this.gad.undo(); stopped = true;
+        }
+        if (!stopped && again.status === 'built' && !(this.lastForge.undo && u[u.length - 1] === this.lastForge.undo)) { say(T('g.forge.moved', null, 'Seit der letzten Forge hat sich etwas geändert — sag ein neues Ganzes: „/bau Hochhaus …“', 'Something changed since the last Forge build — say a whole new wish: “/bau skyscraper …”'), '#ff8a8a'); return true; }
+        if (!stopped && again.status === 'built') this.gad.undo();
         // the same front centre (a wider one grows to both sides, a longer bridge further out)
         const r = again.r & 3, a0 = ROT[r](Fg.meta(again.dna).lot[0] >> 1, 0), a1 = ROT[r](Fg.meta(dna).lot[0] >> 1, 0);
         pl = Object.assign({}, again, { id: 'f' + Date.now().toString(36), dna, ox: again.ox + a0[0] - a1[0], oz: again.oz + a0[1] - a1[1], status: 'pending', t: Date.now() });

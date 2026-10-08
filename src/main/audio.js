@@ -92,6 +92,15 @@
       this.rev = c.createConvolver(); this.rev.buffer = buf;
       this.room.connect(this.rev); this.musRev.connect(this.rev); this.rev.connect(this.revGain);
     }
+    brass(f, t, dur, gain) {
+      const c = this.ctx; if (!c) return;
+      const o = c.createOscillator(), o2 = c.createOscillator(), flt = c.createBiquadFilter(), g = c.createGain(), g2 = c.createGain();
+      o.type = 'sawtooth'; o2.type = 'square'; o.frequency.value = f; o2.frequency.value = f * 1.004; g2.gain.value = 0.3;
+      flt.type = 'lowpass'; flt.Q.value = 1.1; flt.frequency.setValueAtTime(f * 1.4, t); flt.frequency.linearRampToValueAtTime(f * 5, t + 0.06); flt.frequency.exponentialRampToValueAtTime(f * 2.2, t + dur);
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(gain, t + 0.035); g.gain.setValueAtTime(gain * 0.85, t + dur * 0.7); g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+      o.connect(flt); o2.connect(g2); g2.connect(flt); flt.connect(g); g.connect(this.sfx); g.connect(this.rev);
+      o.start(t); o2.start(t); o.stop(t + dur + 0.05); o2.stop(t + dur + 0.05);
+    }
 
     // ---------------- the listener: where the ear is, which way it faces, and the place's flags (per frame, numbers only)
     listen(eye, yaw, w, underwater) {
@@ -274,6 +283,23 @@
         case 'wonder': [523, 659, 784, 988, 1175, 1319, 1568].forEach((f, i) => { this.tone(f, 0.07, 2.4, 'sine', true, t + i * 0.32); this.tone(f * 2.01, 0.02, 1.6, 'sine', true, t + i * 0.32 + 0.01); }); break;
         // ✨ a wonder found: a bright little fanfare (a rising triad, then the chord held)
         case 'fanfare': [[523, 0], [659, 0.12], [784, 0.24], [1047, 0.42]].forEach(([f, d]) => { this.tone(f, 0.16, d < 0.4 ? 0.3 : 1.6, 'triangle', true, t + d); this.tone(f * 0.5, 0.06, d < 0.4 ? 0.3 : 1.6, 'sawtooth', false, t + d); }); [1047, 1319, 1568].forEach((f) => this.tone(f, 0.08, 1.8, 'sine', true, t + 0.42)); break;
+        // 🏗 the construction site (baustelle.js): opts.vol is how near it is (0 … 1)
+        case 'bau_start': { const v = (opts && opts.vol) || 1; [784, 1047].forEach((f, i) => this.tone(f, 0.13 * v, 0.55, 'triangle', true, t + i * 0.16)); this.noiseHit(PROFILE.metal, 0.3 * v, 0.2, 0.9); break; }
+        case 'hammer': { const v = (opts && opts.vol) || 1; this.noiseHit(PROFILE.planks, 0.55 * v, 0.07, 1.05 + Math.random() * 0.35); this.tone(290 + Math.random() * 170, 0.09 * v, 0.06, 'triangle'); break; }
+        case 'clang': { const v = (opts && opts.vol) || 1; this.noiseHit(PROFILE.metal, 0.42 * v, 0.22, 0.7 + Math.random() * 0.2); break; }
+        case 'thud': { const v = (opts && opts.vol) || 1; this.noiseHit(PROFILE.stone, 0.4 * v, 0.12, 0.6 + Math.random() * 0.2); break; }
+        case 'clatter': { const v = (opts && opts.vol) || 1; for (let i = 0; i < 6; i++) this.noiseHit(PROFILE.metal, 0.26 * v, 0.14, 0.8 + Math.random() * 0.5); [0.09, 0.2, 0.33, 0.45].forEach((d) => this.tone(600 + Math.random() * 900, 0.05 * v, 0.12, 'triangle', false, t + d)); break; }
+        case 'twinkle': { const v = (opts && opts.vol) || 1; [1319, 1568, 2093, 2637].forEach((f, i) => this.tone(f, 0.07 * v, 0.6, 'sine', true, t + i * 0.07)); break; }
+        case 'bau_fanfare': {   // 🏗 the Richtfest (the ✨ wonders' 'fanfare' is the short bright one)
+          const v = (opts && opts.vol) || 1;
+          for (const [f, d, l] of [[392, 0, 0.13], [523, 0.13, 0.13], [659, 0.26, 0.13], [784, 0.4, 0.95]]) this.brass(f, t + d, l, 0.11 * v);
+          for (const f of [523, 659, 1047]) this.brass(f, t + 0.4, 1.15, 0.055 * v);
+          const src = c.createBufferSource(); src.buffer = this.noise; const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5200;
+          const g = c.createGain(); g.gain.setValueAtTime(0.0001, t + 0.4); g.gain.linearRampToValueAtTime(0.2 * v, t + 0.42); g.gain.exponentialRampToValueAtTime(0.001, t + 1.9);
+          src.connect(hp); hp.connect(g); g.connect(this.sfx); g.connect(this.rev); src.start(t + 0.4, Math.random(), 1.6);
+          const o = this.tone(110, 0.4 * v, 0.5, 'sine', false, t + 0.4); if (o) o.frequency.exponentialRampToValueAtTime(55, t + 0.85);
+          break;
+        }
       }
     }
     // continuous loops: name → {gain, filter}; level 0..1
@@ -286,12 +312,12 @@
         const src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
         const f = c.createBiquadFilter();
         const g = c.createGain(); g.gain.value = 0;
-        const cfg = { rain: ['highpass', 1200, 0.2], wind: ['bandpass', 400, 0.8], jet: ['bandpass', 900, 1.2], engine: ['lowpass', 300, 4], flyby: ['lowpass', 420, 2.5], water: ['bandpass', 600, 0.6], fire: ['bandpass', 1500, 0.5], cave: ['lowpass', 180, 1], hum: ['bandpass', 180, 2.5] }[name] || ['lowpass', 500, 1];
+        const cfg = { rain: ['highpass', 1200, 0.2], wind: ['bandpass', 400, 0.8], jet: ['bandpass', 900, 1.2], engine: ['lowpass', 300, 4], flyby: ['lowpass', 420, 2.5], water: ['bandpass', 600, 0.6], fire: ['bandpass', 1500, 0.5], cave: ['lowpass', 180, 1], hum: ['bandpass', 180, 2.5], crane: ['bandpass', 380, 2.4] }[name] || ['lowpass', 500, 1];
         f.type = cfg[0]; f.frequency.value = cfg[1]; f.Q.value = cfg[2];
-        src.connect(f); f.connect(g); g.connect(name === 'jet' || name === 'engine' || name === 'flyby' ? this.sfx : this.amb);
+        src.connect(f); f.connect(g); g.connect(name === 'jet' || name === 'engine' || name === 'flyby' || name === 'crane' ? this.sfx : this.amb);
         src.start();
         let osc = null;
-        if (name === 'engine' || name === 'jet' || name === 'flyby' || name === 'hum') { osc = c.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 55; const og = c.createGain(); og.gain.value = 0.25; osc.connect(og); og.connect(f); osc.start(); }
+        if (name === 'engine' || name === 'jet' || name === 'flyby' || name === 'hum' || name === 'crane') { osc = c.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = 55; const og = c.createGain(); og.gain.value = 0.25; osc.connect(og); og.connect(f); osc.start(); }
         L = this.loops[name] = { src, f, g, osc, base: cfg[1] };
       }
       L.g.gain.setTargetAtTime(level, c.currentTime, 0.25);

@@ -79,6 +79,7 @@
     { key: 'kids', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.kids', tip: 'g.set.kids.tip', def: false },
     { key: 'showCoords', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.showCoords', tip: 'g.set.showCoords.tip', def: false },
     { key: 'minimap', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.minimap', tip: 'g.set.minimap.tip', def: true },
+    { key: 'bau', g: 'play', sec: 'play', t: 'choice', lab: 'g.bau.setting', tip: 'g.bau.settingTip', def: 'site', opts: [['site', 'g.bau.site', 'g.bau.siteTip'], ['instant', 'g.bau.instant', 'g.bau.instantTip']] },   // 🏗 Baustelle (baustelle.js); Very Low's preset says instant
     { key: 'wonderCompass', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.wonderCompass', tip: 'g.set.wonderCompass.tip', def: true },   // ✨ the Wunderkompass (wonders_game.js)
     { key: 'toasts', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.toasts', tip: 'g.set.toasts.tip', def: true },
     { key: 'mpHost', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.mpHost', tip: 'g.set.mpHost.tip', def: true },

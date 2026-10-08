@@ -8,11 +8,11 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0 },
-    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1 },
-    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1 },
-    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2 },
-    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2 },
+    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant' },
+    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site' },
+    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site' },
+    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
+    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
@@ -40,6 +40,8 @@
       try { s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); } catch (e) { s = {}; }
       // the registry's defaults (F5 · Steuerung & Einstellungen) fill the keys the older table does not have
       const out = Object.assign({}, VR.Settings ? VR.Settings.defaults() : {}, DEFAULTS, s);
+      // 🏗 Bauen (Sofort / Baustelle): settings saved before it follow their preset (Very Low builds at once)
+      if (s.bau === undefined && s.preset) out.bau = (PRESETS[s.preset] || PRESETS.balanced).bau;
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -49,7 +51,11 @@
       return out;
     }
     saveSettings() { try { localStorage.setItem('r9si.settings', JSON.stringify(this.settings)); } catch (e) { /* ignore */ } }
-    applyPreset(p) { this.settings.preset = p; Object.assign(this.settings, PRESETS[p]); this.applySettings('*'); this.saveSettings(); }
+    applyPreset(p) {
+      const keep = this.settings.bauSet ? this.settings.bau : null;   // (a „Bauen" chosen in the settings stays)
+      this.settings.preset = p; Object.assign(this.settings, PRESETS[p]); if (keep) this.settings.bau = keep;
+      this.applySettings('*'); this.saveSettings();
+    }
       // F7 · water: bubbles from the mouth while diving, mist at the foot of the falls near the player (the falling
     // columns are looked up every 2 s), a splash when the eye crosses the surface (its ripple comes from crossT)
     waterFx(dt, p, eye, underwater, inLava, E) {
@@ -89,8 +95,9 @@
       return VR.WaterWave.sample(p.pos[0], p.pos[2], E.time, E.windDir[0], E.windDir[1], VR.WaterWave.ampK(4, E.wind)).h * 0.7;
     }
 
-  applySettings(key) {
+    applySettings(key) {
       const S = this.settings, r = this.renderer;
+      if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier'].includes(key)) S.preset = 'custom';
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
@@ -330,6 +337,7 @@
       if (this.traffic) this.traffic.t = 2.5;
     }
     teardownWorld() {
+      if (VR.Baustelle && VR.Baustelle.reset) VR.Baustelle.reset(this.gadgets && this.gadgets.blue);   // (a construction site's bar and meshes go with the world)
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
       this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false;
@@ -1030,7 +1038,7 @@
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
-        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
+        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
         drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
       });
@@ -1047,7 +1055,8 @@
       if (S.showFps) this.ui.fps(T('g.hud.fps', { n: Math.round(this.fps || 0) }));
       if (this.codex && this.codex.update) this.codex.update(dt);
       if (this.map) this.map.update(dt);
-      if (performance.now() > this.autosaveAt) { this.autosaveAt = performance.now() + 60000; this.saveMeta(); this.world.saveAll(); }
+      // (the autosave waits while a construction site builds — a save would finish it at once; ≤ 20 s)
+      if (performance.now() > this.autosaveAt && !(gad && gad.blue && gad.blue.siteBusy && gad.blue.siteBusy())) { this.autosaveAt = performance.now() + 60000; this.saveMeta(); this.world.saveAll(); }
     }
     debugText(cam, E) {
       const p = this.player, w = this.world, r = this.renderer;
