@@ -178,7 +178,11 @@ check(shots.filter(s => !/not built/.test(s)).length === 10, 'all eight wonders 
 const sp = await ctx.newPage(); sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 600)));
 await sp.goto(URL0 + '/studio.html', { timeout: 120000 });
 for (let i = 0; i < 240; i++) { await sp.waitForTimeout(500); if (await sp.evaluate(() => !document.getElementById('studio').classList.contains('boot') && !!(window.__studio && window.__studio.HOUSE.size >= 1))) break; }
-await sp.evaluate(() => { const b = document.querySelector('nav.modes button[data-mode="forge"]'); if (b) b.click(); });   // (a DOM click: the header's button is not always the pointer's target in a small window)
+// the mode bar with 🏭 Forge is the Profi screen (Einfach hides it, r9si.ui): the player switches to Profi, then clicks the button
+await sp.waitForSelector('#proSwitch button[data-pro="1"]', { timeout: 20000 });
+await sp.click('#proSwitch button[data-pro="1"]');
+await sp.waitForFunction(() => document.getElementById('studio').classList.contains('pro'), null, { timeout: 15000 });
+await sp.click('nav.modes button[data-mode="forge"]', { timeout: 20000 });
 await sp.waitForFunction(() => !!(window.__st && window.__st.mode === 'forge'), null, { timeout: 20000 }).catch(() => { /* reported below */ });
 await sp.waitForTimeout(1200);
 const chips = await sp.evaluate(() => [...document.querySelectorAll('#chips button[data-ftype^="wonder:"]')].map(b => b.textContent.trim()));
