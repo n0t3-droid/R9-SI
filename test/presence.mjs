@@ -174,7 +174,8 @@ for (const preset of ['potato', 'high']) {
     (rows[air ? 'on' : 'off'] = rows[air ? 'on' : 'off'] || []).push(r);
   }
   const avg = (a, k) => a.reduce((s, r) => s + r[k], 0) / a.length;
-  costs[preset] = { tier, off: { ms: avg(rows.off, 'ms'), draws: rows.off[0].draws, tris: rows.off[0].tris }, on: { ms: avg(rows.on, 'ms'), draws: rows.on[0].draws, tris: rows.on[0].tris, air: avg(rows.on, 'air') } };
+  const med = (a, k) => { const v = a.map(r => r[k]).sort((x, y) => x - y); const m = v.length >> 1; return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2; };   // the median of the rounds: one slow round does not decide
+  costs[preset] = { tier, off: { ms: med(rows.off, 'ms'), mean: avg(rows.off, 'ms'), draws: rows.off[0].draws, tris: rows.off[0].tris }, on: { ms: med(rows.on, 'ms'), mean: avg(rows.on, 'ms'), draws: rows.on[0].draws, tris: rows.on[0].tris, air: avg(rows.on, 'air') } };
   console.log('cost', preset, JSON.stringify(costs[preset]));
 }
 await ev(() => { VR.game.airLife.setOn(true, 0); VR.game.settings.airLife = true; });

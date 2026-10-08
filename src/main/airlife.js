@@ -96,6 +96,10 @@
       this.time += dt;
       const P = o.particles, w = o.w, E = o.E || {}, eye = o.eye, cap = CAPS[this.tier];
       if (o.underwater || P.n > 3400) { this.ff.length = 0; this.bf.length = 0; this.flocks.length = 0; return; }
+      // a lower tier sheds the agents above its caps at once (they would otherwise live out their time at the old count)
+      if (this.bf.length > cap.butterfly) this.bf.length = cap.butterfly;
+      if (this.ff.length > cap.firefly) this.ff.length = cap.firefly;
+      if (this.birds() > cap.bird) this.flocks.length = 0;
       const ex = Math.floor(eye[0]), ez = Math.floor(eye[2]);
       const outdoor = eye[1] > w.topAt(ex, ez) + 1.0;          // the sky is above the eye (not under a roof)
       const sd = E.sunDir || [0, 1, 0];
