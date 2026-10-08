@@ -15,7 +15,7 @@
   const R = VR.R, L = VR.Looks;
   if (!L) return;
   const tx = (k, v, de, en) => (VR.I18N && VR.I18N.tx ? VR.I18N.tx(k, v, de, en) : String(de).replace(/\{(\w+)\}/g, (m, x) => (v && v[x] !== undefined ? v[x] : m)));
-  const LL = VR.LiveLoop = { scan: null, lastTarget: null, lum: null, lumAlb: null, lumDone: null, bh: false, stats: { applies: 0, marked: 0, scanMs: 0 } };
+  const LL = VR.LiveLoop = { scan: null, lastTarget: null, lum: null, lumAlb: null, lumDone: null, bh: false, stats: { applies: 0, marked: 0, scanMs: 0, frameMax: 0 } };
 
   // ---------------------------------------------------------------- the looks in, everywhere
   // → the number of block types whose look changed
@@ -48,7 +48,12 @@
   // every frame: the scan goes on (≤ 8 columns or 3 ms); the crosshair's block is remembered for the pause menu
   LL.tick = function (g) {
     const p = g.player;
-    if (p && g.ui && !g.ui.blocking && g.state === 'play') LL.lastTarget = p.target ? { x: p.target.x, y: p.target.y, z: p.target.z, state: p.target.state } : null;
+    if (p && g.ui && !g.ui.blocking && g.state === 'play') {
+      // (one record, refilled each frame: no allocation per frame)
+      const tg = p.target;
+      if (!tg) LL.lastTarget = null;
+      else { const lt = LL.lastTarget || (LL.lastTarget = { x: 0, y: 0, z: 0, state: 0 }); lt.x = tg.x; lt.y = tg.y; lt.z = tg.z; lt.state = tg.state; }
+    }
     if (!LL.bh && VR.Bauhand) LL.hookBauhand(g);
     const S = LL.scan; if (!S || !g.world) return;
     const w = g.world, t0 = performance.now();
@@ -68,7 +73,7 @@
         mark(c.cx - 1, sy, c.cz); mark(c.cx + 1, sy, c.cz); mark(c.cx, sy, c.cz - 1); mark(c.cx, sy, c.cz + 1);
       }
     }
-    S.n += n; LL.stats.scanMs += performance.now() - t0;
+    const dt = performance.now() - t0; S.n += n; LL.stats.scanMs += dt; if (dt > LL.stats.frameMax) LL.stats.frameMax = dt;
     if (S.i >= S.cols.length) { if (S.marked) for (const s of S.marked) s.markLook = 0; LL.scan = null; LL.stats.lastScanMs = performance.now() - S.t0; }
   };
   // the average luminance of the layers recoloured blocks draw with (renderer.setAvgLum): only those, only when needed
@@ -132,12 +137,12 @@
     b.title = tx('live.pause.lookTip', null, 'Farbe und Material im R9 Studio — für alle deine Welten', 'Colour and material in the R9 Studio — for all your worlds');
   };
   LL.fromPause = function (g) { return LL.editTarget(LL.lastTarget, g); };
-  // the Bauhand (W2) owns the B key; its target card gets „🎨 Aussehen ändern" from here (spec §5: „🎨 Aussehen von
+  // the Bauhand (W2) owns the B key; its target card gets „✏️ Aussehen ändern" from here (spec §5: „🎨 Aussehen von
   // ‹Block›" — the card shows the name; its own ✏️ Bearbeiten opens the Crafter). Hooked at boot, or when it appears.
   LL.hookBauhand = function (g) {
     const B = VR.Bauhand; if (LL.bh || !B || typeof B.addAction !== 'function') return false;
     try {
-      B.addAction({ id: 'look', order: 15, icon: '🎨', label: () => tx('live.bh.look', null, 'Aussehen ändern', 'Change look'),
+      B.addAction({ id: 'look', order: 15, icon: '✏️', label: () => tx('live.bh.look', null, 'Aussehen ändern', 'Change look'),
         when: (t) => LL.canEdit(t, g),
         run: (t) => { if (typeof B.close === 'function') B.close(); LL.editTarget(t, g); } });
       LL.bh = true;

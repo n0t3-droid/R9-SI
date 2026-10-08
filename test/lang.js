@@ -166,5 +166,5 @@ check(!old.length, 'no old word (Nach Hause, Spawnpunkt, Zen-Baumeister, Weiterm
 check(de['g.pause.resume'] === de['start.play'] && de['g.pause.bauen'] === de['start.bauen'] && de['g.pause.meins'] === de['start.meins'] && en['g.pause.resume'] === en['start.play'] && en['g.pause.meins'] === en['start.meins'], 'the pause menu and the start screen use the same words (▶ Weiterspielen, 🏗 Bauen, 🎒 Meins)');
 check(de['ding.edit'] === '✏️ Bearbeiten' && de['ding.set'] === '📍 Setzen' && de['ding.share'] === '📦 Teilen' && de['ding.fav'] === 'Favorit' && de['g.pause.spawn'] === '📍 Mein Platz ist hier' && de['g.pause.home'] === '🏠 Zu meinem Platz', 'the card actions and „mein Platz" read as in the spec');
 
-console.log(fails ? 'FAIL ' + fails : 'OK');
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
