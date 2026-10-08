@@ -33,6 +33,7 @@
       // actions and keys that do not come from the keyboard: the gamepad and the touch layer name an action id
       this.padDown = new Set(); this.padPressed = new Set();   // the gamepad's held and pressed actions (by action id)
       this.tDown = new Set(); this.tPressed = new Set();       // the touch layer's (by action id)
+      this.tRelease = new Set();                                // touch buttons let go this frame: they stay down until endFrame, so a tap between two frames still counts
       this.vPhys = new Set();                                 // physical names pressed by the pad (Start = Escape)
       this.touchMove = { fwd: 0, str: 0 };                     // the touch stick, set by touch.js
       this.padMove = { fwd: 0, str: 0 };
@@ -187,6 +188,7 @@
       this.padMove = { fwd: clamp(pf + tm.fwd, -1, 1), str: clamp(ps + tm.str, -1, 1) };
     }
     endFrame() {
+      if (this.tRelease.size) { for (const id of this.tRelease) this.tDown.delete(id); this.tRelease.clear(); }
       this.pressed.clear(); this.released.clear(); this.doubleTap.clear();
       this.padPressed.clear(); this.tPressed.clear(); this.vPhys.clear();
       this.mouse.dx = 0; this.mouse.dy = 0; this.mouse.wheel = 0;

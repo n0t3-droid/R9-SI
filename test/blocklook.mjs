@@ -110,7 +110,7 @@ for (const lk of LOOKS) {
   check(sv.used && sv.now === (lk === 'classic' ? 'dirt_path' : 'grass_block_cut'), `${lk}: the shovel on grass makes ${sv.now}`);
 }
 // back with the settings button (Esc → Settings → Graphics → Blöcke: Klassisch)
-const back = await ev(() => { const g = VR.game, u = g.ui; u.showSettings('img'); const b = document.querySelector('#setbody [data-set="look:classic"]'); if (b) b.click(); const on = document.querySelector('#setbody [data-set^="look:"].on'); return { look: VR.LOOK.mode, setting: g.settings.look, on: on && on.dataset.look }; });
+const back = await ev(() => { const g = VR.game, u = g.ui; u.showSettings('img'); const b = document.querySelector('#setbody [data-set="look:classic"]'); if (b) b.click(); const on = document.querySelector('#setbody [data-set^="look:"].on'); return { look: VR.LOOK.mode, setting: g.settings.look, on: on && on.dataset.set.split(':')[1] }; });   // (F5 panel: the choice buttons carry data-set="look:<value>", the chosen one is .on)
 for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim)) break; await step(2); await wait(100); }
 const back2 = await ev(() => ({ rim: VR.game.texRim, icons: VR.game.icons.cache.size >= 0 }));
 check(back.look === 'classic' && back.setting === 'classic' && back.on === 'classic' && back2.rim === true, 'the settings button switches back to Klassisch (textures with the rim again): ' + JSON.stringify([back, back2]));

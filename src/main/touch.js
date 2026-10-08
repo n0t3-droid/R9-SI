@@ -83,7 +83,7 @@
     const release = (ev) => {
       ev.preventDefault();
       const i = input(); e.classList.remove('on'); if (!i) return;
-      if (id === 'jump' || id === 'sprint') i.tDown.delete(id === 'jump' ? 'jump' : 'sprint');
+      if (id === 'jump' || id === 'sprint') { const a = id === 'jump' ? 'jump' : 'sprint'; if (i.tRelease) i.tRelease.add(a); else i.tDown.delete(a); }   // (let go at the frame's end: a tap still counts)
       if (id === 'place') { i.mouse.down[2] = false; i.mouse.releasedBtn[2] = true; }
       if (id === 'break') { i.mouse.down[0] = false; i.mouse.releasedBtn[0] = true; }
     };

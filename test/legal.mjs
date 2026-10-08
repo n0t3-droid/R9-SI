@@ -16,7 +16,7 @@ await ctx.addInitScript(() => {
   const rec = window.__mp = { used: [], pres: [], emits: [], realNameAt: 0, noticeAt: 0 };
   const mine = {};
   const me = () => ({ peer: 'p_me', by: 'u_me', isMe: true, sameTab: true, kind: 'viewer', guest: false, presence: Object.freeze(Object.assign({}, mine)), updatedAt: Date.now() });
-  const friend = { peer: 'p_fr', by: 'u_fr', isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: { v: 1, n: 'Buddy', host: { s: 'w-buddy', w: 'Buddys Welt', m: 'creative', t: Date.now() } }, updatedAt: Date.now() };
+  const friend = { peer: 'p_fr', by: 'u_fr', isMe: false, sameTab: false, kind: 'viewer', guest: false, presence: { v: 2, n: 'Buddy', host: { s: 'w-buddy', w: 'Buddys Welt', m: 'creative', t: Date.now() } }, updatedAt: Date.now() };
   const fns = [];
   const peers = () => [me(), friend];
   const lobby = {
@@ -58,7 +58,7 @@ const cardText = () => ev(() => { const c = document.getElementById('r9mpcard');
 const clearMp = () => ev(() => { localStorage.removeItem('r9si.mpNotice'); localStorage.removeItem('r9si.mp'); const s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); delete s.playerName; localStorage.setItem('r9si.settings', JSON.stringify(s)); });
 
 console.log('1 · a fresh browser: „Explorer“ until the answer; the notice card');
-await page.goto(GAME);
+await page.goto(GAME, { timeout: 180000 });
 let t = await toTitle();
 await ev(() => { const g = VR.game; g.settings.renderDist = 3; g.settings.dynRes = false; g.settings.horizon = 0; g.applySettings('*'); g.saveSettings(); });
 await clearMp(); await page.reload(); t = await toTitle();
@@ -179,6 +179,7 @@ check(await ev(() => !document.querySelector('#r9legal.on') && VR.game.ui.screen
 
 console.log('5 · Join before the answer: the friend’s hello carries „Explorer“');
 await clearMp(); await page.reload(); t = await toTitle();
+for (let i = 0; i < 40 && !(await ev(() => VR.game.mp && VR.game.mp.hostList().length >= 1)); i++) await wait(250);   // (the lobby's peers arrive a moment after the title)
 r = await ev(() => ({ hosts: VR.game.mp.hostList().length, join: !!document.querySelector('#mphosts .mphost button'), card: !!document.getElementById('r9mpcard') }));
 check(r.hosts === 1 && r.join && r.card, 'a friend’s world is listed with Join, the card is up');
 await ev(() => document.querySelector('#mphosts .mphost button')?.click());
@@ -191,7 +192,7 @@ console.log('6 · the R9 Studio');
 const sp = await ctx.newPage();
 sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 1200)));
 sp.on('console', m => { if (m.type() === 'error' && !/favicon|404|ERR_FILE_NOT_FOUND/.test(m.text())) logs.push('[studio console] ' + m.text().slice(0, 400)); });
-await sp.goto(STUDIO);
+await sp.goto(STUDIO, { timeout: 180000 });   // (the Studio page is 5 MB and boots its worker: slow on a loaded machine)
 for (let i = 0; i < 60; i++) { await wait(500); if (await sp.evaluate(() => !!document.querySelector('#studio > header [data-legal]') && !!window.VR && !!VR.StudioBridge).catch(() => false)) break; }
 r = await sp.evaluate(() => { const b = document.querySelector('#studio > header [data-legal]'); return { btn: !!b, text: b ? b.textContent : '', visible: !!(b && b.offsetParent !== null) }; });
 check(r.btn && r.visible && /📜/.test(r.text), 'the Studio\'s header has 📜 (' + r.text + ')');

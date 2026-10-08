@@ -249,11 +249,12 @@ await section('7 · the small ones: 🗑 asks twice, ↻ on screen, ✋ Benutzen
     CR.vApply([[i0 % it.VW, Math.floor(i0 / (it.VW * it.VD)), Math.floor(i0 / it.VW) % it.VD, VR.VM.M.matte(0x20d020) >>> 0]]);
     document.querySelector('#partsBody [data-act="save"]').click(); await sleep(300);
     out.saved = !!(CR.store().models || {})[sofa];
-    const del = () => [...document.querySelectorAll('#partsBody .design')].find(d => d.textContent.includes(VR.VM.MODELS[sofa].display.split(' ·')[0])) ;
+    const del = () => [...document.querySelectorAll('#partsBody .design')].find(d => d.textContent.includes((VR.dispName ? VR.dispName(VR.VM.MODELS[sofa].display) : VR.VM.MODELS[sofa].display).split(' ·')[0]));   // (the card shows the player's language: VR.dispName since i18n2)
     const d1 = del(), tb = d1 && d1.querySelector('[data-act="del"]');
-    if (tb) tb.click(); await sleep(100);
+    if (tb) { tb.dataset.probe = '1'; tb.click(); } await sleep(100);
     out.after1 = !!(CR.store().models || {})[sofa];
     const d2 = del(), tb2 = d2 && d2.querySelector('[data-act="del"]');
+    out.del = { d1: !!d1, tb: !!tb, armed: !!(tb && tb.classList.contains('arm')), same: !!(tb2 && tb2.dataset.probe === '1'), tb2: !!tb2, designs: document.querySelectorAll('#partsBody .design').length };   // (which button the second click hits: the armed one, or a fresh one after a re-render)
     if (tb2) tb2.click(); await sleep(200);
     out.after2 = !!(CR.store().models || {})[sofa];
     // ↻ on the house Crafter's bar turns the next piece (R without a keyboard)
