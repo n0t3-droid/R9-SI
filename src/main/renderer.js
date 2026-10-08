@@ -161,6 +161,14 @@
       P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod');
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
+    // F-Far: the far programs, made when ring 1 first needs them (Very Low … Balanced never compile them): 'form' = ring 1,
+    // 'lodFar' = the horizon tiles cut by ring 1 too. A failed compile answers null (the caller draws nothing then).
+    farProgram(name) {
+      const P = this.P, k = 'far_' + name;
+      if (P[k] !== undefined) return P[k];
+      try { P[k] = GL.program(S.LOD_VS, S.LOD_FS, name, [name === 'form' ? 'FORM' : 'FAR1']); } catch (e) { console.error(e); P[k] = null; }
+      return P[k];
+    }
 
     // ------------------------------------------------ heightmap shadows (see hShadow in the shaders)
     ensureHmap() {

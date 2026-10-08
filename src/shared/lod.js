@@ -250,9 +250,17 @@
     else if (/^vx_crystal_(violet|azure|rose)/.test(nm) && VX) r = { c: hexcA(VX.faceColor(s)), k: 4 };
     else if (/^vx_/.test(nm) && VX) r = { c: hexcA(VX.faceColor(s)), k: 0 };
     else if (t.o.solid !== false || (R.T.flags[s] & VR.F.LEAVES)) r = { c: scol(s, 0x8a6a40), k: (R.T.emit && R.T.emit[s]) ? 4 : 0 };
+    // a texture the mesher colours by the biome or a fixed tint (grass tops, leaves): that colour here, the plains' or
+    // the forest's for the biome ones (r.tint says which: a caller may prefer the land's own colour then)
+    const tc = R.T.tint ? R.T.tint[s] : 0;
+    if (r && tc) {
+      const h = tc >= 8 ? R.tintColors[tc - 8] : (STATE_TINT[tc] || 0x7fbf55);
+      r = { c: tint(r.c, typeof h === 'number' ? h : 0x7fbf55, 1.0), k: r.k, tint: tc };
+    }
     SLK.set(s, r);
     return r;
   };
+  const STATE_TINT = [0, 0x7fbf55, 0x5fa83a, 0x3f76e4, 0x80a755, 0x619961, 0xb38a55, 0x6fae3a];   // (grass, foliage, water as the plains; birch, spruce, dry as the mesher's fixed ones)
   LOD.util = { bcol, scol, tint, mixc, hh, leafCol, TREES, TRUNKS };
   // the site cells a tile's villages are looked up in (villagesNear's cells; the worker computes the cold ones first)
   LOD.tileCells = function (g, job) {
