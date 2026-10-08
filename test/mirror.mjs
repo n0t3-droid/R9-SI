@@ -3,7 +3,7 @@
 // four of each with mirrored facings and hinges, both door halves; the hand breaks one stair → its copies go too; the
 // pause menu's 🪞 button switches to 8-fach; the axis is drawn (the renderer's draw count, and the line's pixels on the
 // ground with and without it); ⇧M → aus → one stair stays one. Then a symmetric little house: a quarter placed by the
-// hand's code path in 4-fach (/spiegel 4 puts the mirror on the spot looked at), a ring of lanterns in 8-fach —
+// hand's code path in 4-fach (⇧M three times from aus puts the mirror on the spot looked at), a ring of lanterns in 8-fach —
 // test/shots/mirror_1.png (the front, the axis glowing), mirror_2.png (from above: the axis lines, the four corners),
 // mirror_3.png (the back: the door and windows the mirror made, the 8-fach ring). No page errors.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -119,10 +119,13 @@ check((await ev(() => __t.pixel([0, 0, 0]).drawn)) === 0, 'and no axis drawn');
 
 console.log('7 · a symmetric little house: a quarter by hand in 4-fach, a lantern ring in 8-fach');
 await ev(({ X, Y, Z }) => __t.clear(X - 12, Y, Z - 12, X + 12, Y + 8, Z + 12), base);
-// /spiegel 4: the mirror on the block looked at (the command re-centres)
-await ev(({ X, Y, Z }) => { __t.stand(X + 0.5, Y + 1, Z + 7.5); __t.look([X + 0.5, Y, Z + 0.5]); __t.frame(); VR.game.chat('/spiegel 4'); __t.frame(); }, base);
+// from aus, ⇧M three times (X, Z, 4-fach): the first press puts the centre on the block looked at (/spiegel is a Profi
+// command; Einfach has the chip and ⇧M)
+await ev(({ X, Y, Z }) => { __t.stand(X + 0.5, Y + 1, Z + 7.5); __t.look([X + 0.5, Y, Z + 0.5]); __t.frame(); }, base);
+await shift(3);
 st = await ev(() => { const m = VR.game.mirror; return { mode: m.mode, c2x: m.c2x, c2z: m.c2z }; });
-check(st.mode === 'xz' && st.c2x === 2 * X + 1 && st.c2z === 2 * Z + 1, '/spiegel 4: 4-fach through the block looked at (' + JSON.stringify(st) + ')');
+const chipNow = await ev(() => __t.chip());
+check(st.mode === 'xz' && st.c2x === 2 * X + 1 && st.c2z === 2 * Z + 1 && chipNow.text === '🪞 4-fach', '⇧M ×3 from aus: 4-fach through the block looked at (' + JSON.stringify(st) + ', chip „' + chipNow.text + '")');
 const built = await ev(({ X, Y, Z }) => {
   const g = VR.game, p = g.player, w = g.world, R = VR.R;
   p.noclip = true; p.flying = true; p.pos = [X + 0.5, Y + 14, Z + 14.5];
