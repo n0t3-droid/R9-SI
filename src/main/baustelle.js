@@ -453,6 +453,13 @@
       M.box(1.88, 1.05, -0.07, 2.0, 1.17, 0.07, 0xFFB020, { e: true });
       return M.pack();
     },
+    // a ladder segment (two blocks): two rails and five rungs in the plane of its wall (x across, z out from the wall)
+    ladder() {
+      const M = new MeshBuf();
+      for (const x of [-0.27, 0.27]) M.box(x - 0.035, 0, -0.035, x + 0.035, 2, 0.035, C.steel);
+      for (let i = 0; i < 5; i++) { const y = 0.25 + i * 0.4; M.box(-0.27, y - 0.03, -0.03, 0.27, y + 0.03, 0.03, C.steelD); }
+      return M.pack();
+    },
     trolley() { const M = new MeshBuf(); M.box(-0.55, -0.35, -0.6, 0.55, 0, 0.6, C.grey); M.box(-0.2, -0.5, -0.3, 0.2, -0.35, 0.3, C.black); return M.pack(); },
     cable() { const M = new MeshBuf(); for (const z of [-0.22, 0.22]) M.box(-0.035, -1, z - 0.035, 0.035, 0, z + 0.035, C.cable, { skip: 12 }); return M.pack(); },
     hook() {
@@ -516,7 +523,7 @@
     if (BS.gpuFor === gl && BS.gpuSet) return BS.gpuSet;
     const up = (m) => { const o = VR.VoxGPU.upload(gl, m); o.data = null; return o; };
     const G = {};
-    for (const k of ['bay', 'brace', 'screen', 'deck', 'mast', 'fence', 'trolley', 'cable', 'hook', 'pallet', 'cubes', 'blink', 'tree', 'office']) G[k] = up(BS.MOD[k]());
+    for (const k of ['bay', 'brace', 'screen', 'deck', 'mast', 'fence', 'trolley', 'cable', 'hook', 'pallet', 'cubes', 'blink', 'tree', 'office', 'ladder']) G[k] = up(BS.MOD[k]());
     G.corner = up(BS.MOD.corner(false)); G.deckCorner = up(BS.MOD.corner(true));
     BS.gpuFor = gl; BS.gpuSet = G;
     return G;
@@ -555,21 +562,23 @@
       this.ox = sb[0]; this.oz = sb[2]; this.oy = o.H ? o.yMin : sb[1];
       this.H = o.H; this.top = o.H ? o.yMax + 1 : sb[4] + 1;
       this.cx = (sb[0] + sb[3] + 1) / 2; this.cz = (sb[2] + sb[5] + 1) / 2; this.sw = sb[3] + 1 - sb[0]; this.sd = sb[5] + 1 - sb[2];
-      this.deck = 0; this.deckV = 0;                     // the deck's height over the origin (its planks)
+      this.deck = 0; this.riseV = 0;                     // the deck's height over the origin (its planks), its speed (blocks/s)
       this.band = this.H > 24 ? 6 : 1e9;                 // levels of scaffold under the deck
       this.light = new Float32Array(4); this.lightT = -1;
       this.mm = new Float32Array(16); this.tint = new Float32Array(3);
       this.pt = [0, 0, 0, 0];                            // a ring point (x, z, inward yaw, perimeter)
-      this.crew = []; this.crane = null; this.inst = null; this.gl = null;
+      this.crew = []; this.crane = null; this.inst = null; this.gl = null; this.ladder = null;
       this.hits = 0; this.knockT = -1; this.motor = 0;
       const S = g.settings || {};
       this.preset = S.preset || 'balanced';
       // the plan's volume as a blueprint ghost while it is built (gadgets.js outlines)
-      this.outline = { x: sb[0], y: sb[1], z: sb[2], boxes: [[0, 0, 0, sb[3] + 1 - sb[0], sb[4] + 1 - sb[1], sb[5] + 1 - sb[2]]], color: [0.35, 0.95, 1, 0.5] };
+      this.outline = { x: sb[0], y: sb[1], z: sb[2], boxes: [[0, 0, 0, sb[3] + 1 - sb[0], sb[4] + 1 - sb[1], sb[5] + 1 - sb[2]]], color: [0.45, 0.95, 1, 0.26] };
       // (the barrier, the office and the crane stand on the ground as the earthworks leave it: placed again then)
       this.grounded = !o.nEarth; this.office = null; this.tree = null;
       if (this.scaffold) {
         this.rings();
+        this.placeGate();
+        this.placeLadder();
         this.fence();
         if (VR.Folk && VR.FolkAnim) this.makeCrew();
         if (this.top - site.F > 12 && this.preset !== 'potato') this.makeCrane();
@@ -579,6 +588,7 @@
     // the earthworks are done: the barrier on the new ground, the office, the crane (it goes up only now)
     ground() {
       if (this.gl) this.dispose();
+      this.placeLadder();
       this.fence();
       this.placeOffice();
       if (this.crane && this.crane.rise <= 0) this.makeCrane();
@@ -670,18 +680,55 @@
       return out;
     }
     level() { return clamp(Math.floor(this.deck / 2), 0, this.K - 1); }
+    // the gate: where the crew comes in, toward the player (the barrier's gap is there)
+    placeGate() {
+      const g = this.site.g, p = g.player && g.player.pos, dx = p ? p[0] - this.cx : 1, dz = p ? p[2] - this.cz : 0, dl = Math.hypot(dx, dz) || 1;
+      const rad = Math.max(this.ring[1] - this.ring[0], this.ring[3] - this.ring[2]) * 0.6 + 7;
+      this.gate = [this.cx + dx / dl * rad, this.cz + dz / dl * rad];
+    }
+    // the ladder up the scaffold's outer side, on the side toward the gate: 1.6 blocks out from the scaffold's line (clear
+    // of the toe boards), its foot on the ground there, its segments (two blocks each) up to the top of the scaffold
+    placeLadder() {
+      const R = this.ring, X0 = R[0], X1 = R[1], Z0 = R[2], Z1 = R[3], cx = (X0 + X1) / 2, cz = (Z0 + Z1) / 2, LAD = 1.62;
+      const dx = this.gate[0] - this.ox - cx, dz = this.gate[1] - this.oz - cz;
+      const side = Math.abs(dx) * (Z1 - Z0) > Math.abs(dz) * (X1 - X0) ? (dx > 0 ? 1 : 3) : (dz > 0 ? 0 : 2);   // 0 +z, 1 +x, 2 −z, 3 −x
+      const lx = side === 1 ? X1 + LAD : side === 3 ? X0 - LAD : cx, lz = side === 0 ? Z1 + LAD : side === 2 ? Z0 - LAD : cz;
+      const foot = this.groundY(this.ox + lx, this.oz + lz) - this.oy, seg = new Float32Array(this.K * 4);
+      for (let s = 0; s < this.K; s++) { seg[s * 4] = lx; seg[s * 4 + 1] = foot + 2 * s; seg[s * 4 + 2] = lz; seg[s * 4 + 3] = side; }
+      this.ladder = { x: this.ox + lx, z: this.oz + lz, side, yaw: [0, PI / 2, PI, -PI / 2][side], foot };
+      this.inst.ladder = seg;
+    }
+    // the ground under a point of the yard (the level the earthworks left), else the site's own
+    groundY(x, z) { const w = this.site.g.world; if (w && w.topAt) { const gy = w.topAt(Math.floor(x), Math.floor(z)) + 1; if (gy > this.oy - 6 && gy < this.oy + 6) return gy; } return this.oy; }
+    // the ring's parameter (0…1, the walk's perimeter at level k) of the middle of a side: where the ladder meets the deck
+    sideS(k, side) {
+      const i = clamp(k, 0, this.K - 1) * 4, d = 0.72, a = this.ring[i + 1] - this.ring[i] + 2 * d, b = this.ring[i + 3] - this.ring[i + 2] + 2 * d, P = 2 * (a + b);
+      return (side === 0 ? a / 2 : side === 1 ? a + b / 2 : side === 2 ? a + b + a / 2 : 2 * a + b + b / 2) / P;
+    }
+    // walks round the ring at level k from the builder's place b.ps toward target, the short way (never over the building)
+    ringWalk(b, k, target, dt) {
+      const P = this.ringPoint(k, b.ps, this.pt)[3], dd = target - b.ps, ds = dd - Math.round(dd), step = 2.5 * dt / P;
+      b.ps += Math.abs(ds) <= step ? ds : Math.sign(ds) * step;
+      this.ringPoint(k, b.ps, this.pt);
+      return Math.abs(ds) <= step;
+    }
+    // the way off: straight out from the side the builder stands on, a few blocks (the building is never crossed)
+    awayFrom(p) {
+      const R = this.ring, cx = this.ox + (R[0] + R[1]) / 2, cz = this.oz + (R[2] + R[3]) / 2;
+      const ux = (p[0] - cx) / Math.max(1, R[1] - R[0]), uz = (p[2] - cz) / Math.max(1, R[3] - R[2]);
+      let nx = 0, nz = 0; if (Math.abs(ux) > Math.abs(uz)) nx = ux < 0 ? -1 : 1; else nz = uz < 0 ? -1 : 1;
+      const d = 7 + rnd() * 2, lat = (rnd() - 0.5) * 3;
+      return [p[0] + nx * d - nz * lat, p[2] + nz * d + nx * lat];
+    }
     // ---- the crew: the villagers' builders, walking in from the side the player looks from
     makeCrew() {
       const g = this.site.g, P = this.ringPoint(0, 0, this.pt)[3];
       const n = Math.max(1, Math.min(CREW[this.preset] || 3, Math.round(P / 14)));
-      const p = g.player && g.player.pos, dx = p ? p[0] - this.cx : 1, dz = p ? p[2] - this.cz : 0, dl = Math.hypot(dx, dz) || 1;
-      const rad = Math.max(this.ring[1] - this.ring[0], this.ring[3] - this.ring[2]) * 0.6 + 7;
-      this.gate = [this.cx + dx / dl * rad, this.cz + dz / dl * rad];
       for (let i = 0; i < n; i++) {
         const seed = (Math.floor(this.cx * 7919 + this.cz * 104729 + i * 31337) >>> 0) || 1;
         const look = VR.Folk.look(seed, 'builder', 'adult');
         this.crew.push({
-          look, seed, s: (i + 0.5) / n + (rnd() - 0.5) * 0.08, sT: 0, mode: 'walkin', delay: 0.25 + i * 0.55, timer: 0, work: false,
+          look, seed, s: this.sideS(0, this.ladder.side) + (i - (n - 1) / 2) * 0.09 + (rnd() - 0.5) * 0.02, sT: 0, mode: 'walkin', delay: 0.25 + i * 0.55, timer: 0, work: false,
           pos: [this.gate[0] + (rnd() - 0.5) * 2, this.oy, this.gate[1] + (rnd() - 0.5) * 2], yaw: 0, walk: rnd() * 6, walkAmt: 0, lx: 0, lz: 0,
           state: 'idle', poseOut: {}, hitPh: 0, opts: { flash: 0, scale: 1, shade: 0, noFog: false, hide: { lids: true, mouth: true } },
         });
@@ -749,16 +796,16 @@
           if (P) for (let i = 0; i < 14; i++) sparkle(P, this.tree.x, this.tree.y + rnd() * 2 * this.tree.s, this.tree.z);
         }
       }
-      for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } if (b.mode === 'walkin') { b.mode = 'leave'; continue; } b.mode = 'cheer'; b.timer = 1.6 + rnd() * 0.4; }
+      for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } if (b.mode === 'walkin') { if (!b.lad || b.lad === 1) b.mode = 'leave'; continue; } b.mode = 'cheer'; b.timer = 1.6 + rnd() * 0.4; }
       if (g.ui && g.ui.hint && !this.tiny && this.site.kind !== 'blueprint') g.ui.hint(T('g.bau.done', { name: this.site.name }, '✨ {name} steht!', '✨ {name} is done!'), 2600);
     }
-    onCancel() { this.cancelT = 0; this.tree = null; for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } b.mode = b.mode === 'walkin' ? 'leave' : 'ride'; b.timer = 0.8; } }
+    onCancel() { this.cancelT = 0; this.tree = null; for (const b of this.crew) { if (b.mode === 'gone') continue; if (b.delay > 0) { b.mode = 'gone'; continue; } if (b.mode === 'walkin') { if (!b.lad || b.lad === 1) b.mode = 'leave'; } else b.mode = 'ride'; b.timer = 0.8; } }
     // ---- every frame
     tick(dt) {
       const site = this.site; this.t += dt;
       if (site.phase === 'gone') return;
       if (!this.grounded && site.phase !== 'earth') { this.grounded = true; if (this.scaffold) this.ground(); }
-      const o = site.o;
+      const o = site.o, deck0 = this.deck;
       // the build front over the origin (layers), smooth; the deck a little under it (hands at the newest layer)
       let front = 0;
       if (site.phase === 'earth' || site.phase === 'build') {
@@ -772,23 +819,35 @@
         if (tt > wait) { const v = Math.max(7, this.H / 2.6); this.deck = Math.max(-0.11, this.deck - v * dt); }
         if (this.deck <= -0.1) {
           if (this.endT === undefined) { this.endT = tt; for (const b of this.crew) if (b.mode !== 'gone') b.mode = 'leave'; this.sound('clatter', this.cx, this.oy + 1, this.cz, 0.8); if (site.g.particles && this.scaffold) for (let i = 0; i < 10; i++) { const k = this.ringPoint(0, rnd(), this.pt); dust(site.g.particles, this.ox + k[0], this.oy + 0.4, this.oz + k[1], 1); } }
-          if (tt - this.endT > 3.5 || !this.crew.length) site.phase = 'gone';
+          if (tt - this.endT > 6.5 || !this.crew.length) site.phase = 'gone';
         }
         if (!this.scaffold && tt > 0.8) site.phase = 'gone';
       }
+      this.riseV = (this.deck - deck0) / Math.max(dt, 1e-3);
       if (this.crew.length) this.tickCrew(dt);
       if (this.crane) this.tickCrane(dt, front);
     }
     tickCrew(dt) {
-      const site = this.site, pt = this.pt, k = this.level(), y = this.oy + this.deck + 0.11, FA = VR.FolkAnim;
+      const site = this.site, pt = this.pt, k = this.level(), y = this.oy + this.deck + 0.11, FA = VR.FolkAnim, L = this.ladder;
       const building = site.phase === 'earth' || site.phase === 'build';
       for (const b of this.crew) {
         if (b.mode === 'gone') continue;
         if (b.delay > 0) { b.delay -= dt; continue; }
-        let tx = b.pos[0], tz = b.pos[2], ty = b.pos[1], speed = 2.3, state = 'idle';
+        let tx = b.pos[0], tz = b.pos[2], ty = b.pos[1], speed = 2.3, state = 'idle', climb = false;
         if (b.mode === 'walkin') {
-          this.ringPoint(k, b.s, pt); tx = this.ox + pt[0]; tz = this.oz + pt[1]; ty = y;
-          if (Math.hypot(tx - b.pos[0], tz - b.pos[2]) < 0.25) { b.mode = building ? 'deck' : 'cheer'; b.timer = 0.5; b.sT = b.s; }
+          // up the ladder: on the ground to its foot, up it at its own column (never over the lawn), then round the deck
+          if (!b.lad) b.lad = 1;
+          if (b.lad === 1) {
+            tx = L.x; tz = L.z; ty = this.groundY(tx, tz);
+            if (Math.hypot(tx - b.pos[0], tz - b.pos[2]) < 0.2) { b.lad = 2; b.faceYaw = L.yaw; }
+          } else if (b.lad === 2) {
+            // (the arrival is checked after the move below: the deck may rise every frame, the builder keeps pace)
+            tx = b.pos[0]; tz = b.pos[2]; ty = y; climb = true;
+          } else {
+            const arrived = this.ringWalk(b, k, b.s, dt);
+            tx = this.ox + pt[0]; tz = this.oz + pt[1]; ty = y;
+            if (arrived) { b.mode = building ? 'deck' : 'cheer'; b.timer = 0.5; b.sT = b.s; }
+          }
         } else if (b.mode === 'deck') {
           this.ringPoint(k, b.s, pt); const P = pt[3];
           if (!b.work) {
@@ -807,19 +866,36 @@
           if (b.mode === 'cheer') { state = 'cheer'; b.timer -= dt; if (b.timer <= 0) b.mode = 'ride'; b.faceYaw = pt[2] + PI; }
           else { b.faceYaw = pt[2]; }
         } else if (b.mode === 'leave') {
-          const gx = this.gate[0], gz = this.gate[1], ax = gx - this.cx, az = gz - this.cz, al = Math.hypot(ax, az) || 1;
-          if (!b.away) { b.away = [gx + ax / al * 9 + (rnd() - 0.5) * 6, gz + az / al * 9 + (rnd() - 0.5) * 6]; }
-          tx = b.away[0]; tz = b.away[1]; ty = this.oy;
-          const w = site.g.world; if (w && w.topAt) { const gy = w.topAt(Math.floor(b.pos[0]), Math.floor(b.pos[2])) + 1; if (gy > this.oy - 6 && gy < this.oy + 6) ty = gy; }
-          if (Math.hypot(tx - b.pos[0], tz - b.pos[2]) < 0.4) { b.mode = 'gone'; continue; }
+          // off the scaffold: down to the ladder's foot if they came up it, then straight out from the side they stand on
+          if (b.lv === undefined) b.lv = b.lad === 1 || b.lad === 2 ? 1 : 2;
+          if (b.lv === 1) {
+            tx = L.x; tz = L.z; ty = this.groundY(tx, tz);
+            if (Math.hypot(tx - b.pos[0], tz - b.pos[2]) < 0.2) b.lv = 2;
+          } else {
+            if (!b.away) b.away = this.awayFrom(b.pos);
+            tx = b.away[0]; tz = b.away[1]; ty = this.groundY(tx, tz);
+            if (Math.hypot(tx - b.pos[0], tz - b.pos[2]) < 0.4) { b.mode = 'gone'; continue; }
+          }
         }
-        // move (on the deck the walk sets the place; off it a straight walk), the walk cycle from the distance covered
+        // move: a climb rises at a hoist's pace at the ladder's column; on the deck the walk sets the place (no jump at
+        // a setback); off it a straight walk; the walk cycle from the distance covered
         const dx = tx - b.pos[0], dz = tz - b.pos[2], dist = Math.hypot(dx, dz);
         let moved = 0;
-        if (b.mode === 'deck' || b.mode === 'cheer' || b.mode === 'ride') { const k = Math.min(1, dt * 12); b.pos[0] += (tx - b.pos[0]) * k; b.pos[2] += (tz - b.pos[2]) * k; b.pos[1] = ty; moved = Math.hypot(b.pos[0] - b.lx, b.pos[2] - b.lz); }   // (where the deck steps in at a setback they walk over, no jump)
-        else if (dist > 0.01) { const st = Math.min(dist, speed * dt); b.pos[0] += dx / dist * st; b.pos[2] += dz / dist * st; moved = st; b.pos[1] += (ty - b.pos[1]) * Math.min(1, dt * 8); }
+        if (climb) {
+          const dy = ty - b.pos[1], v = Math.max(9, 1.5 * Math.abs(dy), 1.5 * Math.abs(this.riseV)), st = clamp(dy, -v * dt, v * dt);
+          b.pos[1] += st; moved = Math.abs(st);
+          // on the deck's level: the walk round the ring starts from the ladder's side
+          if (b.mode === 'walkin' && b.lad === 2 && Math.abs(ty - b.pos[1]) < 0.06) { b.lad = 3; b.ps = this.sideS(k, L.side); }
+        } else if (b.mode === 'deck' || b.mode === 'cheer' || b.mode === 'ride' || (b.mode === 'walkin' && b.lad === 3)) {
+          const k2 = Math.min(1, dt * 12); b.pos[0] += (tx - b.pos[0]) * k2; b.pos[2] += (tz - b.pos[2]) * k2; b.pos[1] = ty;
+          moved = Math.hypot(b.pos[0] - b.lx, b.pos[2] - b.lz);
+        } else if (dist > 0.01) {
+          const st = Math.min(dist, speed * dt); b.pos[0] += dx / dist * st; b.pos[2] += dz / dist * st; moved = st; b.pos[1] += (ty - b.pos[1]) * Math.min(1, dt * 8);
+        }
         const mv = moved / Math.max(dt, 1e-3);
-        if (moved > 0.002) { const yw = Math.atan2(-(b.pos[0] - b.lx), -(b.pos[2] - b.lz)); if (isFinite(yw) && moved > 0.01) b.yaw += wrapA(yw - b.yaw) * Math.min(1, dt * 10); }
+        // the body turns to where it walks (sideways), or to the wall it climbs and works at
+        const hx = b.pos[0] - b.lx, hz = b.pos[2] - b.lz, hm = Math.hypot(hx, hz);
+        if (hm > 0.01) { const yw = Math.atan2(-hx, -hz); if (isFinite(yw)) b.yaw += wrapA(yw - b.yaw) * Math.min(1, dt * 10); }
         else if (b.faceYaw !== undefined) b.yaw += wrapA(b.faceYaw - b.yaw) * Math.min(1, dt * 6);
         b.lx = b.pos[0]; b.lz = b.pos[2];
         b.walk += moved * 1.15; b.walkAmt += ((mv > 0.3 ? 1 : 0) - b.walkAmt) * Math.min(1, dt * 8);
@@ -959,9 +1035,9 @@
       if (this.gl === gl && this.vaos) return;
       this.gl = gl; const I = this.inst, V = this.vaos = {};
       const buf = (a) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, a.length ? a : new Float32Array(4), gl.STATIC_DRAW); return b; };
-      this.bufs = { bays: buf(I.bays), braces: buf(I.braces), corners: buf(I.corners), fence: buf(this.fenceInst || new Float32Array(0)) };
+      this.bufs = { bays: buf(I.bays), braces: buf(I.braces), corners: buf(I.corners), fence: buf(this.fenceInst || new Float32Array(0)), ladder: buf(I.ladder || new Float32Array(4)) };
       V.bay = instVAO(gl, G.bay, this.bufs.bays); V.screen = instVAO(gl, G.screen, this.bufs.bays); V.deck = instVAO(gl, G.deck, this.bufs.bays);
-      V.fence = instVAO(gl, G.fence, this.bufs.fence); V.brace = instVAO(gl, G.brace, this.bufs.braces); V.corner = instVAO(gl, G.corner, this.bufs.corners); V.deckCorner = instVAO(gl, G.deckCorner, this.bufs.corners);
+      V.fence = instVAO(gl, G.fence, this.bufs.fence); V.brace = instVAO(gl, G.brace, this.bufs.braces); V.corner = instVAO(gl, G.corner, this.bufs.corners); V.deckCorner = instVAO(gl, G.deckCorner, this.bufs.corners); V.ladder = instVAO(gl, G.ladder, this.bufs.ladder);
       if (this.crane) { this.bufs.mast = buf(this.crane.mast); V.mast = instVAO(gl, G.mast, this.bufs.mast); }
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
     }
@@ -984,6 +1060,7 @@
         drawInst(gl, V.corner, B.corners, G.corner, low * 4, top * 4);
         if (this.band < 1e9) drawInst(gl, V.screen, B.bays, G.screen, I.bayStart[Math.max(low, top - 3)], I.bayStart[top]);
       }
+      if (this.ladder && I.ladder) drawInst(gl, V.ladder, B.ladder, G.ladder, 0, clamp(Math.floor(Math.max(0, this.deck) / 2) + 2, 1, this.K));
       if (this.fenceInst && this.endT === undefined) drawInst(gl, V.fence, B.fence, G.fence, 0, this.fenceInst.length / 4);
       if (deckOn) {
         gl.uniformMatrix4fv(p.u.u_model, false, this.model(this.ox, this.oy + this.deck - kd * 2, this.oz, cam));
