@@ -5,7 +5,7 @@
 // „An meinem Platz" → a piece plan within 8 blocks of the spawn, built within 10 s of the world opening, g.landedBy 'new';
 // in the world: ✨ from the ring → Hochhaus in three clicks → in your hand → one more click builds it; in the R9 Studio:
 // the ✨ tile opens the same wizard, 🗺 puts the thing on the Karte. No page errors.
-// Screenshots: w2_wiz_was, w2_wiz_wie, w2_wiz_haus, w2_wiz_wohin, w2_wiz_spot, w2_wiz_tower, w2_wiz_studio, w2_wiz_karte.
+// Screenshots: w2_wiz_was, w2_wiz_wie, w2_wiz_haus, w2_wiz_wohin, w2_wiz_world (the ✨ over the world), w2_wiz_spot, w2_wiz_tower, w2_wiz_studio, w2_wiz_karte.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import { spawn } from 'child_process';
 const PORT = 8765 + Math.floor(Math.random() * 200);
@@ -27,7 +27,7 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const shot = (n) => page.screenshot({ path: `/home/claude/vr/test/shots/${n}.png`, timeout: 180000 }).catch(() => {});
 const ONLY = (process.env.ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
 const want = (n) => !ONLY.length || ONLY.includes(String(n));
-const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).slice(0, 400)); } };
+const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).split('\n').filter(l => l.trim()).slice(0, 12).join(' | ').slice(0, 1200)); } };
 const until = async (fn, a, maxS = 30) => { for (let i = 0; i < maxS * 4; i++) { const r = await safe(fn, a); if (r) return r; await wait(250); } return null; };
 const atTitle = async (maxS = 150) => !!(await until(() => !!(window.VR && VR.game && VR.game.state === 'title'), null, maxS));
 const inPlay = async (maxS = 180) => !!(await until(() => { const g = window.VR && VR.game; return !!(g && g.state === 'play' && g.player && !g.player.hold && !g.studioOpen); }, null, maxS));
@@ -62,7 +62,7 @@ await section(2, 'Was?: the ✨ tile opens the wizard — picture tiles, the wis
   console.log('  GenieLazy', JSON.stringify(lazy));
   check(!lazy.had && lazy.ok, 'the Genie is not there before the first ✨, then it is (' + lazy.ms + ' ms to compile)');
   await page.click('#title .tile[data-tile="erschaffen"]');
-  const w = await until(() => { const b = document.querySelector('#wizard.on'); if (!b) return null; const tiles = [...b.querySelectorAll('.wz-tile')]; return tiles.length ? { tiles: tiles.map(t => ({ id: t.dataset.tile, w: Math.round(t.getBoundingClientRect().width), h: Math.round(t.getBoundingClientRect().height), label: t.textContent.trim() })), steps: [...b.querySelectorAll('.wz-steps li')].map(l => l.textContent + (l.classList.contains('on') ? '*' : '')), wish: !!b.querySelector('.wz-wish input'), focus: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.tile : null } : null; }, null, 20);
+  const w = await until(() => { const b = document.querySelector('#wizard.on'); if (!b) return null; const tiles = [...b.querySelectorAll('.wz-tile')]; return tiles.length ? { tiles: tiles.map(t => ({ id: t.dataset.tile, w: t.offsetWidth, h: t.offsetHeight, label: t.textContent.trim() })), steps: [...b.querySelectorAll('.wz-steps li')].map(l => l.textContent + (l.classList.contains('on') ? '*' : '')), wish: !!b.querySelector('.wz-wish input'), focus: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.tile : null } : null; }, null, 20);
   console.log('  was', JSON.stringify(w && { n: w.tiles.length, steps: w.steps, focus: w.focus, first: w.tiles.slice(0, 3) }));
   check(!!w, 'the ✨ tile opens #wizard');
   check(w && w.tiles.length >= 10, '≥ 10 picture tiles (' + (w && w.tiles.length) + ')');
@@ -182,7 +182,30 @@ await section(8, 'in the world: ✨ from the ring, a Hochhaus in three clicks, o
   await page.keyboard.down('w'); await wait(600); await page.keyboard.up('w');
   const p1 = await ev(() => VR.game.player.pos.slice());
   check(Math.hypot(p1[0] - p0[0], p1[2] - p0[2]) < 0.2, 'W does not walk while the wizard is open');
-  await page.click('#wizard .wz-tile[data-tile="hochhaus"]');                       // click 1
+  // the tile pops in (0.28 s, staggered by its place); a player clicks it once it is there. Wait for opacity 1 (8 s at most), log how long
+  // that took and how many frames the page drew in a second meanwhile (a slow page stretches the pop-in), and keep a picture of the wizard over the world
+  const popT0 = Date.now();
+  const popped = await until(() => { const t = document.querySelector('#wizard .wz-tile[data-tile="hochhaus"]'); return t && getComputedStyle(t).opacity === '1' ? true : null; }, null, 8);
+  const fps = await ev(() => new Promise((res) => { let n = 0; const t0 = performance.now(); const f = () => { n++; if (performance.now() - t0 < 1000) requestAnimationFrame(f); else res(n); }; requestAnimationFrame(f); }));
+  console.log('  pop-in', JSON.stringify({ visible: !!popped, ms: Date.now() - popT0, framesPerSecond: fps }));
+  await shot('w2_wiz_world');
+  // (click 1 by mouse. In the world the mouse click was once taken by the step's body: log what is under the tile, then click it through the DOM
+  // so the rest of the flow still runs and the log says where the click went)
+  const geo = await ev(() => {
+    const t = document.querySelector('#wizard .wz-tile[data-tile="hochhaus"]'); if (!t) return { none: true };
+    const r = t.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2, cs = getComputedStyle(t);
+    const q = (e) => e.tagName.toLowerCase() + (e.id ? '#' + e.id : '') + (typeof e.className === 'string' && e.className ? '.' + e.className.trim().split(/\s+/).join('.') : '') + ' pe=' + getComputedStyle(e).pointerEvents;
+    const panel = document.querySelector('#wizard .wz-panel'), body = document.querySelector('#wizard .wz-body'), ui = document.getElementById('ui'), wz = document.getElementById('wizard');
+    const R = (e) => e ? [e.getBoundingClientRect().left, e.getBoundingClientRect().top, e.getBoundingClientRect().width, e.getBoundingClientRect().height].map(v => Math.round(v)) : null;
+    return { rect: R(t), at: [Math.round(cx), Math.round(cy)], vw: innerWidth, vh: innerHeight, hit: document.elementsFromPoint(cx, cy).slice(0, 5).map(q),
+      tile: { pe: cs.pointerEvents, vis: cs.visibility, op: cs.opacity, tf: cs.transform, an: cs.animationName }, panel: R(panel), panelScroll: panel ? panel.scrollTop : null, body: R(body),
+      wizPe: wz && getComputedStyle(wz).pointerEvents, uiPe: ui && getComputedStyle(ui).pointerEvents, ui: ui && ui.className, ring: (document.getElementById('bauhand') || {}).className,
+      lock: document.pointerLockElement ? document.pointerLockElement.tagName : 'free', captured: !!(VR.game && VR.game.input && VR.game.input.captured), zoom: getComputedStyle(document.documentElement).zoom, docScroll: document.scrollingElement.scrollTop };
+  });
+  console.log('  tile geometry', JSON.stringify(geo));
+  const direct = await page.click('#wizard .wz-tile[data-tile="hochhaus"]', { timeout: 8000 }).then(() => true, (e) => { console.log('  mouse click 1: ' + String(e.message).split('\n').filter(l => /intercept|resolved|not visible|outside/.test(l)).slice(0, 2).join(' | ').slice(0, 300)); return false; });
+  if (!direct) await ev(() => { const t = document.querySelector('#wizard .wz-tile[data-tile="hochhaus"]'); if (t) t.click(); });
+  check(direct, 'the Hochhaus tile takes a mouse click in the world' + (direct ? '' : ' (the DOM click went through)'));                       // click 1
   await allDrawn(6, 60);
   await page.click('#wizard .wz-var.on');                                           // click 2: the lit one again = Weiter
   check(!!(await until(() => VR.Wizard.state() && VR.Wizard.state().step === 3, null, 10)), 'a second click on the lit picture goes on');
