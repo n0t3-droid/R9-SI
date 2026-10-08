@@ -13,6 +13,37 @@
   const stCache = new Map();
   const st = (name, props) => { const key = props ? name + JSON.stringify(props) : name; let s = stCache.get(key); if (s !== undefined) return s; const t = R.byName[name]; s = t ? (props ? t.state(props) : t.defaultState) : 0; stCache.set(key, s); return s; };
   HILLS.box = { x0: -270, x1: 270, z0: -430, z1: -200 };
+  // ---- the terraces (vgen 6): the green slopes are cut into 2-block steps that follow the contours (the rice terraces
+  // of the trailer). A column's top is the natural surface rounded down to its step; the treads are grass, the risers
+  // are the cut faces. Older worlds (vgen < 6) keep the smooth hills, and their chunks do not change.
+  const TER = HILLS.TER = { base: 86, step: 2, min: 88 };
+  HILLS.inBox = (x, z) => x >= HILLS.box.x0 && x <= HILLS.box.x1 && z >= HILLS.box.z0 && z <= HILLS.box.z1;
+  HILLS.topY = function (g, x, z) {
+    const H = g.surfaceY(x, z);
+    if (!(g.vgen >= 6) || H < TER.min || !HILLS.inBox(x, z)) return H;
+    return TER.base + TER.step * Math.floor((H - TER.base) / TER.step);
+  };
+  // the cut: above each tread the column is cleared (the wild grass and whatever stood on the old slope); the tread is
+  // grass and the soil under it dirt
+  HILLS.cut = function (g, cx, cz, blocks) {
+    const x0 = cx * 16, z0 = cz * 16, B = HILLS.box;
+    if (x0 + 16 <= B.x0 || x0 > B.x1 || z0 + 16 <= B.z0 || z0 > B.z1) return;
+    const GR = st('grass_block'), DI = st('dirt');
+    for (let col = 0; col < 256; col++) {
+      const x = x0 + (col & 15), z = z0 + (col >> 4);
+      if (!HILLS.inBox(x, z) || g.surfaceY(x, z) < TER.min) continue;
+      const T = HILLS.topY(g, x, z);
+      for (let y = T + 1; y < 255; y++) blocks[(y << 8) | col] = 0;
+      blocks[(T << 8) | col] = GR;
+      for (let y = T - 1; y >= T - 2 && y > 0; y--) { const b = blocks[(y << 8) | col]; if (b && b !== DI && b !== GR) blocks[(y << 8) | col] = DI; }
+    }
+  };
+  // no wild trees on the terraced hills: a trunk would hang over the cut treads (the terraces carry their own palms and shrubs)
+  const prevTreeHills = OG.tree;
+  OG.tree = function (w, key, x, y, z, rng) {
+    if (this.vgen >= 6 && key === 'sky_meadow' && HILLS.inBox(x, z) && VR.Heart && VR.Heart.on(this)) return;
+    return prevTreeHills.call(this, w, key, x, y, z, rng);
+  };
 
   HILLS.build = function (g) {
     if (g._hillsOps) return g._hillsOps;
@@ -21,8 +52,8 @@
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
     const put = (x, y, z, s) => { bucket(x, z).o.push(x, y, z, s); };
-    const rng = new VR.RNG(g.seed ^ 0x9111);
-    const gy = (x, z) => g.surfaceY(x, z);
+    const rng = new VR.RNG(g.seed ^ 0x9111), B = HILLS.box;
+    const gy = (x, z) => HILLS.topY(g, x, z);   // the treads on the terraced hills (vgen 6); the natural surface otherwise
     const used = [];
     const freeSpot = (x, z, r) => !used.some(u => Math.hypot(u[0] - x, u[1] - z) < r + u[2]);
     const onHill = (x, z) => { const cl = g.climateAt(x, z); return cl.heart > 0.5 && gy(x, z) >= 86 && !(g.villageNear && g.villageNear(x, z, 4)); };
@@ -59,6 +90,36 @@
     }
     // ---- pod houses: a white mushroom cap (radius 3–4) with a ring of cyan windows on a slim stem, in loose
     // groups beside the paths
+    // ---- terrace villas (vgen 6): white stepped houses on the flat treads, a palm at each corner, shrubs on the fields
+    if (g.vgen >= 6 && VR.VillageGen && VR.VillageGen.techTower) {
+      const VG = VR.VillageGen, W = 9, D = 8;
+      let villas = 0;
+      for (let k = 0; k < 700 && villas < 6; k++) {
+        const ox = B.x0 + 14 + rng.int(B.x1 - B.x0 - 28), oz = B.z0 + 14 + rng.int(B.z1 - B.z0 - 28);
+        const T = gy(ox + 4, oz + 4);
+        if (T < 90 || !onHill(ox + 4, oz + 4) || !freeSpot(ox + 4, oz + 4, 14)) continue;
+        let flat = true;
+        for (let a = -2; a < W + 2 && flat; a++) for (let b = -2; b < D + 2; b++) if (gy(ox + a, oz + b) !== T) { flat = false; break; }
+        if (!flat) continue;
+        const L = VG.makeLot(put, ox, oz, 0);
+        const floors = rng.chance(0.5) ? 3 : 2;
+        VG.techTower(L, { w: W, d: D, floors, F: T + 1, style: 'tech', rng: new VR.RNG(M.hash2(ox, oz, g.seed + 4421) >>> 0), kind: 'home', beds: 2, ground: () => T, walls: 'vx_tech_white', window: 'vx_window_tech', roof: 'white', wood: 'birch', chimney: false, seed: (ox * 7 + oz) & 255 });
+        const pal = new VR.RNG(M.hash2(ox, oz, g.seed + 77) >>> 0);
+        VG.palmTall(put, ox - 2, T + 1, oz + 2, 9 + pal.int(3), 2);
+        VG.palmTall(put, ox + W + 1, T + 1, oz + D - 3, 10 + pal.int(3), 2);
+        used.push([ox + W / 2, oz + D / 2, 9]); villas++;
+      }
+    }
+    // shrubs on the flat treads: the green fields (vgen 6 only: the older hills keep their chunks)
+    if (g.vgen >= 6) {
+      let bushes = 0;
+      for (let k = 0; k < 1400 && bushes < 90; k++) {
+        const x = B.x0 + rng.int(B.x1 - B.x0), z = B.z0 + rng.int(B.z1 - B.z0);
+        const T = gy(x, z);
+        if (T < 90 || !onHill(x, z) || !freeSpot(x, z, 3) || gy(x + 1, z) !== T || gy(x - 1, z) !== T || gy(x, z + 1) !== T || gy(x, z - 1) !== T) continue;
+        put(x, T + 1, z, K.BUSH); used.push([x, z, 2.5]); bushes++;
+      }
+    }
     let pods = 0;
     for (let k = 0; k < 600 && pods < 30; k++) {
       const P = paths[rng.int(paths.length)], p = P[rng.int(P.length)];
@@ -122,6 +183,7 @@
   HEART.builders.push(function (g, cx, cz, out) {
     const x0 = cx * 16, z0 = cz * 16, B = HILLS.box;
     if (x0 + 16 <= B.x0 || x0 > B.x1 || z0 + 16 <= B.z0 || z0 > B.z1) return;
+    if (g.vgen >= 6) HILLS.cut(g, cx, cz, out.blocks);   // the terraces: cut the slope to its steps before anything stands on it
     const chunks = HILLS.build(g);
     const b = chunks.get(cx + ',' + cz);
     if (!b) return;
