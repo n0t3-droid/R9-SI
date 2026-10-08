@@ -17,7 +17,7 @@ bash test/regress.sh "" smoke.mjs               # named tests only
 
 ## Release regression set
 
-17 node tests and 31 browser tests (48 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
+18 node tests and 32 browser tests (50 in all), listed as "yes" below (the 📽 Zeitraffer tests joined the set with the feature; the others as before). The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
 
 Typical time of a full release run: about 127 min of browser tests (median of the recorded passing runs, plus the wait for the lock) and about 72 s of node tests.
 
@@ -55,7 +55,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | vx_cache.js | node | The mini-voxel painter's piece cache is bounded and keeps what is in use. | 5 † | – | yes |
 | vx_cells.js | node | The first packs' models are built from src/shared/voxcells.js and register as before. | 4 † | – | yes |
 | worker_jobs.js | node | Worker job handling in node with a fake self: a mesh job answers with the quads of meshSection. | 6 † | – | yes |
-| zeitraffer.js | node | 📽 Zeitraffer recorder (zeit_rec.js): packing round trip and sizes, check-points and seals, the ring buffer (2 M / 20 MB), the r9si-history record format, the world.js choke points (SB_EDIT, bulkSet kinds, undo), cost per change, scan/collect/timeline on a 2 M history, torn segments; the replay engine with a fake game (swap, the land as it was, play, seek, restore). | 3 † | – | new |
+| zeitraffer.js | node | 📽 Zeitraffer recorder (zeit_rec.js): packing round trip and sizes, check-points and seals, the ring buffer (2 M / 20 MB), the r9si-history record format, the world.js choke points (SB_EDIT, bulkSet kinds, undo), cost per change, scan/collect/timeline on a 2 M history, torn segments; the replay engine with a fake game (swap, the land as it was, play, seek, restore). | 3 † | – | yes |
 | blocklook.mjs | browser | v0.39 block look: the same scene in Klassisch and Nahtlos (hill, stucco house, glass, mini-voxel cottage), switched live. | 312 (175–448) | 2/2 | yes |
 | blueprint.mjs | browser | Blueprints: /haus puts a villa in hand; the ghost lot sits on a slope; the build levels the ground; undo restores the land. | – | – | no |
 | bridge.mjs | browser | v0.39 the standalone Studio (another origin, own storage) and the game: banner, Zum Spiel, Mitnehmen, Speichern. | 750 (290–1209) | 2/4 | yes |
@@ -96,7 +96,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | workbench.mjs | browser | v0.35 Welt to Werkbank: the game saves a world and the Studio opens it; fill, replace, copy, paste, carve, raise ground, undo and redo go to the game. | 112 (107–118) | 5/5 | yes |
 | world_mode.mjs | browser | Studio World mode end to end: the game saves a world with a player-built tower; the Studio opens the region. | 583 (543–654) | 6/6 | yes |
 | world_style.mjs | browser | v0.34 Welt to Stil: the Studio opens the region, lists what it is made of and applies rules (grass to moss, oak to spruce planks). | 254 (236–1265) | 6/6 | yes |
-| zeitraffer.mjs | browser | 📽 Zeitraffer end to end (German UI): hand, wand + /undo and /bau Haus are recorded in r9si-history; 📽 from the pause menu shows the place as it was, half built, finished; scrubber, ⏯; ⏺ gives a video/webm Blob and a .webm download; Esc restores everything; 📽 from 🎒 Meins. | – † | – | new |
+| zeitraffer.mjs | browser | 📽 Zeitraffer end to end (German UI): hand, wand + /undo and /bau Haus are recorded in r9si-history; 📽 from the pause menu shows the place as it was, half built, finished; scrubber, ⏯; ⏺ gives a video/webm Blob and a .webm download; Esc restores everything; 📽 from 🎒 Meins. | – † | – | yes |
 
 ## Debug, profiling and screenshot scripts
 
