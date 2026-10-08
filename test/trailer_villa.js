@@ -173,7 +173,8 @@ check(lines >= 16 && lineEdge > 0, 'a cyan light line along both of its edges: e
 
 // ---------------------------------------------------------------- 7 · the new pieces
 console.log('7 · the new pieces');
-const snap = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'id_snapshot.json'), 'utf8'));
+// (from the checkout's test folder: test/wt_run.sh runs a copy of this file from .tmp_tests)
+const snap = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'test', 'id_snapshot.json'), 'utf8'));
 const shippedEnd = Math.max(...snap.map(r => r[1] + r[2])), NEW = ['vx_nova_window', 'vx_nova_band', 'vm_nova_tread', 'vm_nova_pad'];
 check(NEW.every(n => R.byName[n] && R.byName[n].base >= shippedEnd), 'the new pieces come after every shipped state id (' + NEW.map(n => n + ' ' + (R.byName[n] ? R.byName[n].base : '?')).join(', ') + ')');
 for (const n of ['vm_nova_tread', 'vm_nova_pad']) { const m = VM.MODELS[n]; VM.materialize(m); const scan = VM.scanParts(m).map(p => p.px + ',' + p.py + ',' + p.pz).join(' '), decl = m.parts.map(p => p.px + ',' + p.py + ',' + p.pz).join(' '); check(scan === decl, n + ' builds to its declared cells (' + m.parts.length + ' parts)'); }
