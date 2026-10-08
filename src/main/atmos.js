@@ -27,7 +27,9 @@
   //   chP: the power of cos θ along which the chroma goes from the horizon's to the zenith's (small: blue down low)
   // (tuned on the six weather scenes against v0.41 and the trailer: a deeper zenith, the blue held up high, a warm
   // peach-pink band along the horizon — TRAILER.md §2.1 "horizon peach/pink → mid violet-blue → zenith deep blue")
-  const K = { scale: 0.05, horizonA: 0.9, broad: 1.3, band: 0.8, sharp: 0.45, horXY: [0.285, 0.28], chP: 0.7 };
+  //   sideC: the chroma's sun-side C for x and y by day (the sky within ~25° of the sun is whiter and warmer: forward
+  //   scattering on the haze; a low sun raises them to 0.55 and 0.35)
+  const K = { scale: 0.05, horizonA: 0.9, broad: 1.3, band: 0.8, sharp: 0.45, horXY: [0.285, 0.28], chP: 0.7, sideC: [0.25, 0.2] };
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -97,7 +99,7 @@
     const wz = 1 - smooth(0.02, 0.35, se), hw = clamp((T - 2) / 8, 0, 1) * 0.25;
     const zx = XY_ZEN[0] + (XY_TWI[0] - XY_ZEN[0]) * wz, zy = XY_ZEN[1] + (XY_TWI[1] - XY_ZEN[1]) * wz;
     const low = wz;
-    s.sx[0] = 0.10 + 0.45 * low; s.sx[1] = -1.0 - 2.0 * low; s.sy[0] = 0.10 + 0.25 * low; s.sy[1] = -1.2 - 2.0 * low;
+    s.sx[0] = K.sideC[0] + (0.55 - K.sideC[0]) * low; s.sx[1] = -2.5 - 0.5 * low; s.sy[0] = K.sideC[1] + (0.35 - K.sideC[1]) * low; s.sy[1] = -2.7 - 0.5 * low;
     s.T = T; s.sun[0] = sun[0]; s.sun[1] = sun[1]; s.sun[2] = sun[2]; s.th = th;
     s.Yz = zenithLum(T, th);
     s.xz = zx + (XY_WHITE[0] - zx) * hw; s.yz = zy + (XY_WHITE[1] - zy) * hw;

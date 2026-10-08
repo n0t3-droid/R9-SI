@@ -4,12 +4,13 @@
 // with its warm glow (ported from v0.41's shaders.js as the reference), F1's is VR.Atmos.air() — the Perez sky (or its
 // table), the sun-side glow and the weather, the same sum as the shaders' atmoAir().
 //  - rain and storm: the sky is v0.41's grey (luminance within 25 %), not a white or blue haze
-//  - the clear noon: every probed direction at least as saturated as v0.41's (−0.03), the luminance within 15 %;
+//  - the clear noon: every probed direction at least as colourful as v0.41's (perceptual chroma, within 5 %), the
+//    luminance within 15 %;
 //    the sun side keeps v0.41's warm glow (its red at least 90 % of v0.41's)
 //  - fog keeps the blue sky above it (the zenith within 15 % of v0.41's luminance)
 //  - dawn and dusk: the zenith is blue-violet (blue over red and green), as bright as v0.41's within 40 %
 //  - the haze the far land turns toward (applyFog's colour) is the sky's colour, never white: in the clear noon its
-//    saturation is at least 0.15 and it is no brighter than the sky at the horizon
+//    chroma is at least 0.06 (OKLab) and it is no brighter than the sky at the horizon
 //    bash test/wt_run.sh atmos_look.js
 require('./load_shared.js');
 require('../src/main/atmos.js');
@@ -43,7 +44,14 @@ function display(c, E, gpuExp) {
   const L = E.lift || [0, 0, 0];
   return c.map((v, i) => Math.pow(clamp(clamp(v, 0, 1) + L[i] * (1 - clamp(v, 0, 1)), 0, 1), 1 / 2.2));
 }
-const satOf = (p) => (Math.max(...p) - Math.min(...p)) / Math.max(1e-4, Math.max(...p));
+// perceptual chroma (OKLab C, Ottosson 2020) of a display colour 0..1: a violet-blue and a pure blue of the same
+// colourfulness score alike (the HSV ratio called a lavender paler than a cyan-blue of less chroma)
+const lin = (v) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4));
+const satOf = (p) => {
+  const r = lin(p[0]), g = lin(p[1]), b = lin(p[2]);
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), q = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return Math.hypot(1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * q, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * q);
+};
 const lumD = (p) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
 const rgb8 = (p) => p.map(v => Math.round(v * 255)).join(',');
 
@@ -115,7 +123,7 @@ for (const kind of ['regen', 'gewitter']) {
   }
   check(Math.abs(worst - 1) <= 0.25, `${kind}: the sky's luminance within 25 % of v0.41's at 5 directions (worst ×${worst.toFixed(2)}, ${at})`);
   const z = both(E, 90, 0);
-  check(satOf(z.now) <= satOf(z.old) + 0.08, `${kind}: the zenith is grey, not blue (saturation ${satOf(z.now).toFixed(2)} against v0.41's ${satOf(z.old).toFixed(2)})`);
+  check(satOf(z.now) <= satOf(z.old) + 0.02, `${kind}: the zenith is grey, not blue (chroma ${satOf(z.now).toFixed(3)} against v0.41's ${satOf(z.old).toFixed(3)})`);
 }
 
 console.log('the clear noon');
@@ -124,11 +132,11 @@ console.log('the clear noon');
   let worstS = 1, atS = '', worstL = 1, atL = '';
   for (const el of [90, 60, 35, 15, 5, 1]) for (const az of [180, 90, 0]) {
     if (el === 90 && az !== 0) continue;
-    const p = both(E, el, az), ds = satOf(p.now) - satOf(p.old), rl = lumD(p.now) / lumD(p.old);
-    if (ds < worstS) { worstS = ds; atS = `${el}° up, ${az}°: ${rgb8(p.now)} s ${satOf(p.now).toFixed(2)} against ${rgb8(p.old)} s ${satOf(p.old).toFixed(2)}`; }
+    const p = both(E, el, az), ds = satOf(p.now) / Math.max(1e-4, satOf(p.old)) - 1, rl = lumD(p.now) / lumD(p.old);
+    if (ds < worstS) { worstS = ds; atS = `${el}° up, ${az}°: ${rgb8(p.now)} C ${satOf(p.now).toFixed(3)} against ${rgb8(p.old)} C ${satOf(p.old).toFixed(3)}`; }
     if (Math.abs(rl - 1) > Math.abs(worstL - 1)) { worstL = rl; atL = `${el}° up, ${az}°: ${rgb8(p.now)} against ${rgb8(p.old)}`; }
   }
-  check(worstS >= -0.03, `every direction at least as saturated as v0.41's (worst ${worstS.toFixed(3)}: ${atS})`);
+  check(worstS >= -0.05, `every direction at least as colourful as v0.41's, within 5 % (perceptual chroma; worst ${(worstS * 100).toFixed(1)} %: ${atS})`);
   check(Math.abs(worstL - 1) <= 0.15, `the luminance within 15 % of v0.41's everywhere (worst ×${worstL.toFixed(2)}: ${atL})`);
   for (const el of [35, 15]) {
     const p = both(E, el, 0);
@@ -139,14 +147,14 @@ console.log('the clear noon');
   for (const az of [180, 90]) {
     const d = dirAt(E, 0.5, az);
     const hz = display(f1Haze(d, E, st), E, 1), sk = display(veil(f1Sky(d, E, st), d, E, 0.8), E, 1), old = display(haze041(d, E), E, 1);
-    check(satOf(hz) >= 0.15 && lumD(hz) <= lumD(sk) + 0.02, `the haze at ${az}° is the sky's colour, not white (${rgb8(hz)} s ${satOf(hz).toFixed(2)}; the sky ${rgb8(sk)}; v0.41's haze ${rgb8(old)})`);
+    check(satOf(hz) >= 0.06 && lumD(hz) <= lumD(sk) + 0.02, `the haze at ${az}° is the sky's colour, not white (${rgb8(hz)} C ${satOf(hz).toFixed(3)}; the sky ${rgb8(sk)}; v0.41's haze ${rgb8(old)} C ${satOf(old).toFixed(3)})`);
   }
 }
 
 console.log('fog keeps the blue sky above it');
 {
   const E = stateAt('nebel', 6000), p = both(E, 90, 0);
-  check(Math.abs(lumD(p.now) / lumD(p.old) - 1) <= 0.15 && satOf(p.now) >= satOf(p.old) - 0.05, `the zenith in fog (${rgb8(p.now)} against v0.41's ${rgb8(p.old)})`);
+  check(Math.abs(lumD(p.now) / lumD(p.old) - 1) <= 0.15 && satOf(p.now) >= 0.9 * satOf(p.old), `the zenith in fog (${rgb8(p.now)} against v0.41's ${rgb8(p.old)})`);
 }
 
 console.log('dawn and dusk: a blue-violet zenith');
