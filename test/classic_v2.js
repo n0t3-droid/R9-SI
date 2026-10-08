@@ -30,7 +30,7 @@ console.log('(a) Nahtlos textures unchanged');
 // ones, so the layer indices move); every v0.39 texture must still be there and unchanged.
 {
   const { tex } = buildAll('seamless');
-  const ref = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, 'tex_ref.json'), 'utf8'));
+  const ref = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'test', 'tex_ref.json'), 'utf8'));
   const idx = new Map(R.texNames.map((n, i) => [n, i]));
   const changed = [], missing = [];
   for (const name of Object.keys(ref)) {
