@@ -36,6 +36,7 @@
     { key: 'renderDist', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.renderDist', tip: 'g.set.renderDist.tip', cost: 'high', def: 10, min: 3, max: 24, step: 1, fmt: 'chunks' },
     { key: 'horizon', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.horizon', tip: 'g.set.horizon.tip', cost: 'high', def: 4, min: 0, max: 4, step: 1, vals: 'g.set.horizonV' },
     { key: 'shadows', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.shadows', tip: 'g.set.shadows.tip', cost: 'mid', def: 1, min: 0, max: 3, step: 1, vals: 'g.set.shadowsV' },
+    { key: 'matTier', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.matTier', tip: 'g.set.matTier.tip', cost: 'mid', def: 2, min: 0, max: 3, step: 1, vals: 'g.set.matTierV' },   // F2 materials
     { key: 'sunShadows', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.sunShadows', tip: 'g.set.sunShadows.tip', cost: 'low', def: true },
     { key: 'rays', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.rays', tip: 'g.set.rays.tip', cost: 'mid', def: false },
     { key: 'magic', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.magic', tip: 'g.set.magic.tip', cost: 'low', def: 0.8, min: 0, max: 1, step: 0.05, fmt: 'pct' },

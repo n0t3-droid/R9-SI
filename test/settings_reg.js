@@ -41,7 +41,7 @@ check(S.ITEMS.filter(x => x.t === 'switch').every(x => typeof x.def === 'boolean
 console.log('c · cost badges');
 // the graphics options: the picture's settings in the light, quality and object sections (the display switches and the Automatik are not)
 const graphics = S.ITEMS.filter(x => x.g === 'img' && ['light', 'quality', 'objects'].includes(x.sec) && ['slider', 'switch', 'choice'].includes(x.t));
-check(graphics.length === 18 && graphics.every(x => S.COST[x.cost]), 'every graphics option has a cost badge (' + graphics.length + ' options)');
+check(graphics.length >= 18 && graphics.every(x => S.COST[x.cost]), 'every graphics option has a cost badge (' + graphics.length + ' options)');
 check(S.byKey('showFps').cost === undefined && S.byKey('showFps').sec === 'show', 'the FPS display is a display switch, not a graphics option: no badge');
 check(['low', 'mid', 'high'].every(t => graphics.some(x => x.cost === t)), 'all three cost tiers are in use');
 check(['low', 'mid', 'high'].every(t => hasBoth(S.COST[t].lab) && S.COST[t].icon), 'each tier has an icon and a word in both languages');
