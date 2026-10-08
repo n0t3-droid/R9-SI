@@ -143,12 +143,13 @@ for (const st of NOVA.STAIRS) {
   if (ok) stairsOk++;
 }
 check(stairsOk === 2, 'two floating glass stairs in front of the glass wall, from the side walls up toward the middle: seven tread pieces each, one up and one along, nothing but their glass cheeks in the two cells over every tread, the first floor\'s floor at the top (' + stairsOk + ' of 2)');
-// the cheeks: the stringer pane and the handrail join from one piece to the next (the model's voxels on its two sides)
-{ const m = VM.MODELS.vm_nova_tread; VM.materialize(m); const Rs = m.res / 16; let joins = 0;
-  for (const x of [1, 31]) { const X = Math.floor(x * Rs); const top = (z) => { let y = -1; for (let yy = 0; yy < m.VH; yy++) if (m.get(X, yy, Math.min(m.VD - 1, Math.floor(z * Rs)))) y = yy; return y / Rs; };
-    // the top edge rises one block over the piece's depth: its height at the back is one block above its height at the front
-    if (Math.abs(top(15.9) - top(0) - 16) <= 1.5 && top(0) >= 23 && top(0) <= 27) joins++; }
-  check(joins === 2, 'the glass cheeks on both sides of the tread piece rise one block over its depth, a block over the nosing line (' + joins + ' of 2)'); }
+// the cheeks: the glass stringer on both sides of the piece climbs one block over its depth (in steps), from half a block
+// under the nosing line to a block over it, so the cheeks of the pieces join from one to the next
+{ const m = VM.MODELS.vm_nova_tread; VM.materialize(m); const Rs = m.res / 16, st = V.Nova.CHEEK.step; let joins = 0;
+  for (const x of [0.5, 31.5]) { const X = Math.floor(x * Rs); const top = (z) => { let y = -1; for (let yy = 0; yy < m.VH; yy++) if (m.get(X, yy, Math.floor(z * Rs))) y = yy; return (y + 1) / Rs; };
+    const bot = (z) => { for (let yy = 0; yy < m.VH; yy++) if (m.get(X, yy, Math.floor(z * Rs))) return yy / Rs; return -1; };
+    if (Math.abs(top(16 - st) - top(0) - (16 - st)) <= 1 && Math.abs(top(0) - 24) <= 1 && Math.abs(bot(0)) <= 1 && Math.abs(bot(16 - st) - (16 - st)) <= 1) joins++; }
+  check(joins === 2, 'the glass cheeks on both sides of the tread piece climb one block over its depth, from half a block under the nosing line to a block over it (' + joins + ' of 2)'); }
 let cove = 0; for (let v = 12; v <= 17; v++) for (let u = 8; u <= 16; u++) { const s = at(u, G.slab, v); if (nameOf(s) === 'vx_nova_band' && propOf(s, 'glow') === 1) cove++; }
 check(cove >= 20 && !at(12, G.slab, 15), 'the cove in the hall ceiling: a recess ringed by a cyan light line (' + cove + ' ring cells)');
 
