@@ -85,6 +85,7 @@
       E.blockTint = [1.0, 0.84, 0.64];
       E.emissiveBoost = 0.45 + night * 1.1;
       E.wind = W.wind;
+      E.windDir = W.windDir;      // the wind's heading (weather.js): the water's swell runs with it
       E.cloudCover = W.cloud;
       // celestial bodies ride the same sky rotation
       // the planets never set (TRAILER.md §2.1): the ringed giant circles at ~33° elevation, the blue
