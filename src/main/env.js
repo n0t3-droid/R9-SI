@@ -21,7 +21,7 @@
         sunDir: [0, 1, 0], moonDir: [0, -1, 0], sunColor: [1, 1, 1], moonColor: [0.2, 0.2, 0.3], ambSky: [0.5, 0.5, 0.6],
         zenith: [0.2, 0.4, 0.9], horizon: [0.6, 0.7, 1], sunset: [0, 0, 0], fogColor: [0.6, 0.7, 0.9], fog: [100, 160, 0, 0],
         rain: 0, snow: 0, wet: 0, time: 0, night: 0, dimId: 0, blockTint: [1, 0.86, 0.68], planetDir: [0, 1, 0], planet2Dir: [0, 1, 0], ringNormal: norm([0.25, 0.92, 0.3]),
-        wind: 1, emissiveBoost: 0.5, exposure: 1, grade: [1, 1, 1], saturation: 1.12, bloomThreshold: 1.0, bloomStrength: 0.07, cloudCover: 0.35,
+        wind: 1, windDir: [1, 0], gust: 0, emissiveBoost: 0.5, exposure: 1, grade: [1, 1, 1], saturation: 1.12, bloomThreshold: 1.0, bloomStrength: 0.07, cloudCover: 0.35,
       };
     }
     get timeOfDay() { return ((this.ticks % 24000) + 24000) % 24000; }
@@ -84,6 +84,9 @@
       E.blockTint = [1.0, 0.84, 0.64];
       E.emissiveBoost = 0.45 + night * 1.1;
       E.wind = W.wind;
+      // the wind's direction and its gusts (weather.js, F3 · Da-Sein): plants, leaves and the air life follow them
+      const wa = this.wx.windAng || 0;
+      E.windDir = [Math.cos(wa), Math.sin(wa)]; E.gust = this.wx.gust || 0;
       E.cloudCover = W.cloud;
       // celestial bodies ride the same sky rotation
       // the planets never set (TRAILER.md §2.1): the ringed giant circles at ~33° elevation, the blue

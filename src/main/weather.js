@@ -118,6 +118,22 @@
     return Math.min(1, f);
   }
   const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+  // the wind's direction in radians (F3 · Da-Sein): the seed picks the base, and over the world's day it turns slowly
+  // (under a tenth of a turn in an hour of game time) — the same wind for every visitor of the same world
+  function windAngle(seed, A) {
+    const s = seed == null ? 0 : seed;
+    const base = hash01(s, 0x3d, 0, 0) * Math.PI * 2;
+    return base + 0.5 * Math.sin(A / DAY * Math.PI * 2 + hash01(s, 0x3e, 0, 0) * Math.PI * 2) + 0.25 * Math.sin(A / (DAY * 0.31) * Math.PI * 2);
+  }
+  // gusts: every 10 s of the session's clock a seeded slot may hold one gust (60 % of them); it starts within the first
+  // 6 s of its slot, swells over 3 s (sin² envelope, 0 → 1 → 0) and is gone before the next slot begins
+  function gustAt(seed, clock) {
+    const s = seed == null ? 0 : seed, k = Math.floor(clock / 10);
+    if (!(clock >= 0) || hash01(s, k, 0x6a, 0) >= 0.6) return 0;
+    const d = clock - (k * 10 + hash01(s, k, 0x6b, 0) * 6);
+    return d > 0 && d < 3 ? Math.pow(Math.sin(Math.PI * d / 3), 2) : 0;
+  }
+  const windDirVec = (a) => [Math.cos(a), Math.sin(a)];
 
   class Weather {
     // o.onThunder(delay): called delay seconds after each bolt (the sound follows the light)
@@ -130,6 +146,7 @@
       this.inStorm = false; this.bolt = 0; this.strikes = 0; this.sinceStrike = 1e9; this.flash = 0; this.thunders = [];
       this.rng = makeRng(0);
       this.v = { rain: 0, snow: 0, fog: 0, cloud: VIS.klar.cloud, sun: 1, dark: 0, exp: 0, wind: 1 };
+      this.windAng = 0; this.gust = 0;   // the wind's direction (radians) and the gust now (0..1): plant sway (env.js)
     }
     // the world's seed (null: no world, e.g. the title screen): new seed, no forced state, no bolts pending
     setSeed(seed) {
@@ -167,6 +184,8 @@
       const T = { rain: V.rain, snow: V.snow, fog: kind === 'nebel' ? loc : V.fog, cloud: V.cloud, sun: V.sun, dark: V.dark, exp: V.exp, wind: V.wind };
       const a = 1 - Math.exp(-dt / TAU);
       for (const k in T) this.v[k] += (T[k] - this.v[k]) * a;
+      // the wind: its direction turns slowly over the world's day, and gusts come and go (F3 · Da-Sein)
+      this.windAng = windAngle(this.seed, A); this.gust = gustAt(this.seed, this.clock);
       // lightning: in a storm a bolt every 8–25 s; the thunder comes 0.5–4 s later
       this.sinceStrike += dt;
       if (kind === 'gewitter') {
@@ -192,6 +211,6 @@
     info() { return label(this.kind) + (this.forced ? ' (Befehl)' : ''); }
   }
 
-  VR.WX = { KINDS, VIS, WEIGHTS, FOG_DAY, DAY, climateOf, slotAt, slotLen, kindAt, fogDay, hash01, parse, label, flashAt };
+  VR.WX = { KINDS, VIS, WEIGHTS, FOG_DAY, DAY, climateOf, slotAt, slotLen, kindAt, fogDay, hash01, parse, label, flashAt, windAngle, gustAt, windDirVec };
   VR.Weather = Weather;
 })(VR);
