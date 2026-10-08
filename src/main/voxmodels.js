@@ -279,6 +279,84 @@
       gait: 'hover',
     };
   };
+  // 🐾 companions (wild and tamed): small, round and peaceful; every part pivots at its joint so the pose can
+  // wag the tail, twitch the ears, sit (hind legs folded) or curl up (legs tucked, head down) — see companions.js
+  // Glimmerfuchs: an orange fox, cream chest and cheeks, a glowing cyan tail tip
+  M.glimmer_fox = () => {
+    const fur = 0xe8782e, fur2 = 0xc2561e, cream = 0xfff0dc, leg = 0x9a5424, paw = 0x3a2418, nose = 0x1a1414, eye = 0x1a1212, tip = 0x7af0ff;
+    const tail = part(7, 7, 14, [3, 3, 0], (g) => {
+      g.ell(3, 3, 6, 2.6, 2.6, 5.4, (x, y, z) => (y <= 1 ? cream : fur), { shade: 0.06 });
+      for (let z = 9; z < 14; z++) for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) if (g.get(x, y, z)) g.set(x, y, z, tip, 1);
+    });
+    return {
+      h: 0.72, w: 0.3, parts: {
+        body: part(9, 7, 13, [4, 3, 6], (g) => { g.ell(4, 3, 6, 3.6, 3.0, 5.6, (x, y, z) => (y <= 1 && z >= 3 ? cream : fur), { shade: 0.08 }); }),
+        head: part(9, 8, 12, [4, 3, 7], (g) => {
+          g.ell(4, 3, 7, 3.4, 3.0, 3.2, (x, y, z) => (y <= 2 && z <= 6 ? cream : fur), { shade: 0.06 });
+          g.box(3, 2, 1, 5, 2, 4, cream); g.set(4, 3, 1, nose); g.set(2, 4, 4, eye); g.set(6, 4, 4, eye); g.set(2, 5, 4, 0xffffff); g.set(6, 5, 4, 0xffffff);
+          g.box(2, 6, 6, 2, 6, 7, fur2); g.box(6, 6, 6, 6, 6, 7, fur2);
+        }),
+        ear_l: part(3, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 2, 1, 1, fur); g.box(0, 2, 0, 2, 2, 1, fur2); g.box(1, 3, 0, 1, 3, 0, tip, { emis: 1 }); }),
+        ear_r: part(3, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 2, 1, 1, fur); g.box(0, 2, 0, 2, 2, 1, fur2); g.box(1, 3, 0, 1, 3, 0, tip, { emis: 1 }); }),
+        tail,
+        leg_fl: part(3, 5, 3, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_fr: part(3, 5, 3, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_bl: part(3, 5, 3, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_br: part(3, 5, 3, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+      },
+      layout: { body: [0, 6, 0], head: [0, 9, -6.5], ear_l: [-1.6, 11.6, -6], ear_r: [1.6, 11.6, -6], tail: [0, 6.5, 5.2], leg_fl: [-2, 5, -3], leg_fr: [2, 5, -3], leg_bl: [-2, 5, 3], leg_br: [2, 5, 3] },
+      gait: 'quad',
+    };
+  };
+  // Mooskätzchen: a moss-coated kitten with pointed ears, a yellow flower or two, a long striped tail
+  M.moss_cat = () => {
+    const moss = 0x6e9e4c, moss2 = 0x8fbf5e, moss3 = 0x4f7a34, cream = 0xf2ecd6, pink = 0xf0a0a8, eye = 0x9be85a, flower = 0xffe27a, inner = 0xf0b0c0, paw = 0x2f4a22;
+    const dot = (x, y, z) => ((x * 7 + y * 3 + z * 5) % 11 === 0 ? moss2 : (y === 5 && z % 3 === 0 ? flower : moss));
+    return {
+      h: 0.62, w: 0.26, parts: {
+        body: part(7, 6, 11, [3, 3, 5], (g) => { g.ell(3, 3, 5, 3.0, 2.6, 4.8, dot, { shade: 0.1 }); }),
+        head: part(8, 8, 8, [4, 4, 4], (g) => {
+          g.ell(4, 4, 4, 3.2, 3.0, 3.0, (x, y, z) => (z <= 2 && y <= 4 && x >= 2 && x <= 5 ? cream : moss), { shade: 0.08 });
+          g.set(2, 4, 1, eye); g.set(5, 4, 1, eye); g.set(4, 3, 1, pink); g.set(4, 2, 1, cream);
+        }),
+        ear_l: part(3, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 2, 0, 1, moss); g.box(0, 1, 0, 2, 1, 1, moss); g.box(1, 2, 0, 1, 2, 1, moss); g.set(1, 1, 0, inner); }),
+        ear_r: part(3, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 2, 0, 1, moss); g.box(0, 1, 0, 2, 1, 1, moss); g.box(1, 2, 0, 1, 2, 1, moss); g.set(1, 1, 0, inner); }),
+        tail: part(3, 4, 14, [1, 1, 0], (g) => { for (let z = 0; z < 12; z++) { const y = Math.min(2, Math.floor(z / 4)); g.box(0, y, z, 1, y + 1, z, z >= 10 ? cream : (z % 4 < 2 ? moss : moss3)); } }),
+        leg_fl: part(2, 4, 2, [1, 4, 1], (g) => { g.box(0, 0, 0, 1, 3, 1, moss3); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_fr: part(2, 4, 2, [1, 4, 1], (g) => { g.box(0, 0, 0, 1, 3, 1, moss3); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_bl: part(2, 4, 2, [1, 4, 1], (g) => { g.box(0, 0, 0, 1, 3, 1, moss3); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_br: part(2, 4, 2, [1, 4, 1], (g) => { g.box(0, 0, 0, 1, 3, 1, moss3); g.box(0, 0, 0, 1, 0, 1, paw); }),
+      },
+      layout: { body: [0, 6, 0], head: [0, 9.6, -5.2], ear_l: [-1.8, 12.4, -5.6], ear_r: [1.8, 12.4, -5.6], tail: [0, 6, 4.8], leg_fl: [-2, 4, -3], leg_fr: [2, 4, -3], leg_bl: [-2, 4, 3], leg_br: [2, 4, 3] },
+      gait: 'quad',
+    };
+  };
+  // Kristallwelpe: a fluffy white-blue puppy with tiny glowing crystal ears and crystal shards along its back
+  M.crystal_pup = () => {
+    const fur = 0xeaf6ff, fur2 = 0xc4e4f8, leg = 0xdff0ff, paw = 0x9ad8ff, cry = 0x7ae8ff, cry2 = 0x3ab8e8, eye = 0x3a6ad8, nose = 0x2a3a4a, cream = 0xffffff;
+    const body = part(8, 7, 11, [4, 3, 5], (g) => {
+      g.ell(4, 3, 5, 3.4, 3.0, 4.8, (x, y, z) => (y <= 1 ? fur2 : fur), { shade: 0.05 });
+      for (let z = 2; z <= 8; z += 3) if (g.get(4, 6, z)) g.set(4, 6, z, cry, 1);
+    });
+    return {
+      h: 0.7, w: 0.28, parts: {
+        body,
+        head: part(8, 8, 8, [4, 4, 4], (g) => {
+          g.ell(4, 4, 4, 3.3, 3.1, 3.0, (x, y, z) => (z <= 3 && y <= 3 && x >= 2 && x <= 5 ? cream : fur), { shade: 0.05 });
+          g.set(2, 5, 1, eye); g.set(5, 5, 1, eye); g.set(4, 3, 0, nose); g.set(4, 3, 1, nose);
+        }),
+        ear_l: part(2, 5, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 0, 1, cry2); g.box(0, 1, 0, 1, 2, 1, cry, { emis: 1 }); g.box(0, 3, 0, 0, 4, 0, 0xe8fbff, { emis: 1 }); }),
+        ear_r: part(2, 5, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 0, 1, cry2); g.box(0, 1, 0, 1, 2, 1, cry, { emis: 1 }); g.box(0, 3, 0, 0, 4, 0, 0xe8fbff, { emis: 1 }); }),
+        tail: part(2, 4, 2, [1, 0, 1], (g) => { g.box(0, 0, 0, 1, 2, 1, fur); g.box(0, 3, 0, 1, 3, 1, cry, { emis: 1 }); }),
+        leg_fl: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_fr: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_bl: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+        leg_br: part(2, 5, 2, [1, 5, 1], (g) => { g.box(0, 0, 0, 1, 4, 1, leg); g.box(0, 0, 0, 1, 0, 1, paw); }),
+      },
+      layout: { body: [0, 5.5, 0], head: [0, 10, -5], ear_l: [-2.2, 11.2, -4.6], ear_r: [2.2, 11.2, -4.6], tail: [0, 6.4, 5], leg_fl: [-2.4, 5, -3.4], leg_fr: [2.4, 5, -3.4], leg_bl: [-2.4, 5, 3.4], leg_br: [2.4, 5, 3.4] },
+      gait: 'quad',
+    };
+  };
   // Player / astronaut (third person & hand)
   M.player = () => {
     const suit = 0xe8ecf0, trim = 0xff6a1a, visor = 0x2a6ad0, glove = 0x3a3e46;
