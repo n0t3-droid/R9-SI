@@ -14,7 +14,7 @@ page.on('pageerror', e => errs.push('[pageerror] ' + (e.stack || e.message).slic
 page.on('console', m => { if (m.type() === 'error') errs.push('[console] ' + m.text().slice(0, 300)); });
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
-await page.goto('file:///home/claude/vr/dist/index.html');
+await page.goto(process.env.DIST_URL || 'file:///home/claude/vr/dist/index.html');
 for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 await ev((seed) => VR.game.createWorld({ name: 'HorizonCost', mode: 'creative', difficulty: 'peaceful', type: 'default', seed, cheats: true, kit: false }), SEED);
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
