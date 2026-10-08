@@ -19,23 +19,24 @@
   const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
-  // Perez coefficients A..E as linear functions of the turbidity T (Preetham et al. 1999, their Table 1)
-  // (C, the sun's aureole, is damped to 40 %: the published value makes the horizon glow white on the sun side;
-  // B, the horizon brightening, is lowered by HORIZON_DIM: the published fit puts the horizon at 1.19 × v0.41's
-  // luminance and its blue above 1, so the sky band clipped in blue; with it the 1° horizon is 10 % under v0.41's
-  // and the 30° luminance within 4 % of it)
-  const SUN_GLOW = 0.4, HORIZON_DIM = 0.14;
-  const LUM = (T) => [0.1787 * T - 1.4630, -0.3554 * T + 0.4275 - HORIZON_DIM, (-0.0227 * T + 5.3251) * SUN_GLOW, 0.1206 * T - 2.5771, -0.0670 * T + 0.3703];
+  // Perez coefficients A..E as linear functions of the turbidity T (Preetham et al. 1999, their Table 1).
+  // Three of them are ours: C, the sun's aureole, is damped to 15 % and falls off faster (AUREOLE_FALL): the published
+  // glow turned the sky on the sun's side white in blue (28 % of the clear noon sky clipped); B, the horizon
+  // brightening, is lowered by HORIZON_DIM (the published fit puts the horizon at 1.19 × v0.41's luminance with its
+  // blue above 1, so the band clipped in blue). With both, the zenith and the 1° horizon sit within 1 % of v0.41's.
+  const SUN_GLOW = 0.15, HORIZON_DIM = 0.14, AUREOLE_FALL = 0.8;
+  const LUM = (T) => [0.1787 * T - 1.4630, -0.3554 * T + 0.4275 - HORIZON_DIM, (-0.0227 * T + 5.3251) * SUN_GLOW, 0.1206 * T - 2.5771 - AUREOLE_FALL, -0.0670 * T + 0.3703];
   // Chromaticity (our own fit, same form): the published Preetham chroma whitens the horizon (x 0.32 there against 0.24
   // overhead at this turbidity), so the sky keeps its hue down to the horizon instead: the zenith is a deep blue, the
   // horizon a paler one (about the luminance ratio of v0.41's palette), the sun's warm side keeps the C and D terms.
-  // Turbidity whitens the zenith chroma toward the white point (zenithXY) and so the horizon with it.
-  const CHX = (T) => [-0.3116, -0.5, 0.10, -1.0, 0];
-  const CHY = (T) => [-0.3973, -0.5, 0.10, -1.2, 0];
+  // Turbidity whitens the zenith chroma toward the white point (zenithXY, by a quarter of the way at most, in a storm)
+  // and so the horizon with it: rain keeps its grey sky a little blue, as v0.41's does.
+  const CHX = (T) => [-0.42, -0.5, 0.10, -1.0, 0];
+  const CHY = (T) => [-0.5355, -0.5, 0.10, -1.2, 0];
   // the zenith's hue goes warm as the sun nears the horizon (the long path through the air, as Preetham's θs fit has it)
   const XY_ZEN = [0.215, 0.205], XY_WHITE = [0.3127, 0.3290], XY_WARM = [0.36, 0.35];
   const zenithXY = (T, se) => {
-    const h = clamp((T - 2) / 8, 0, 1) * 0.5, w = 1 - smooth(0.02, 0.35, se);
+    const h = clamp((T - 2) / 8, 0, 1) * 0.25, w = 1 - smooth(0.02, 0.35, se);
     const x = XY_ZEN[0] + (XY_WARM[0] - XY_ZEN[0]) * w, y = XY_ZEN[1] + (XY_WARM[1] - XY_ZEN[1]) * w;
     return [x + (XY_WHITE[0] - x) * h, y + (XY_WHITE[1] - y) * h];
   };
