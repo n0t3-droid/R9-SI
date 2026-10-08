@@ -64,7 +64,7 @@
       this.shadowMat = mat4.create(); this.shadowBase = mat4.create(); this.shadowCam = [0, 0, 0];
       this.frameNo = 0;
       this.stats = { draws: 0, tris: 0, sections: 0, shadowDraws: 0, ms: 0 };
-      this.q = { scale: 1, shadows: 2048, shadowDist: 64, bloom: true, rays: true, fxaa: true, clouds: 2, water: 2, bevel: 1, particles: 1, renderDist: 10, magic: 0.8 };
+      this.q = { scale: 1, shadows: 2048, shadowDist: 64, bloom: true, rays: true, fxaa: true, clouds: 2, water: 2, bevel: 1, particles: 1, renderDist: 10, magic: 0.8, matTier: 0 };
       this.visList = []; this.visDirty = true; this.visKey = '';
       this.firsts = new Int32Array(512); this.counts = new Int32Array(512); this.origins = new Float32Array(512 * 4);
       this.tmpM = mat4.create(); this.tmpM2 = mat4.create();
@@ -91,6 +91,11 @@
       this.setAniso(4);
       // noise
       this.texNoise = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: tex.noise, wrap: gl.REPEAT, filter: gl.LINEAR });
+      // F2: the material family of every texture layer (tex_mat.js), one byte per layer, one row: the detail layer and the
+      // material response read it (padded to 4 bytes: the upload's row alignment)
+      const famBytes = new Uint8Array((tex.layers + 3) & ~3);
+      if (VR.R && VR.R.texNames && VR.matFamilies && VR.R.texNames.length === tex.layers) famBytes.set(VR.matFamilies(VR.R.texNames));
+      this.texFam = GL.tex2D(tex.layers, 1, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: famBytes, wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
@@ -541,6 +546,9 @@
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
       if (u.u_rain) gl.uniform1f(u.u_rain, E.rain);
       if (u.u_wet) gl.uniform1f(u.u_wet, E.wet || 0);     // wet ground (weather.js via env): the terrain's top faces darken in the rain
+      // F2: the material detail tier (0 Very Low … 3 High) and the puddles (env.js: they fill in the rain and dry over minutes)
+      if (u.u_matTier) gl.uniform1f(u.u_matTier, this.q.matTier || 0);
+      if (u.u_puddle) gl.uniform1f(u.u_puddle, E.puddle || 0);
       if (u.u_time) gl.uniform1f(u.u_time, E.time);
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
@@ -554,6 +562,7 @@
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); if (p.u.u_albedo) gl.uniform1i(p.u.u_albedo, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texMaterial); if (p.u.u_material) gl.uniform1i(p.u.u_material, 1);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
+      gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {

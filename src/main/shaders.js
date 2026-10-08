@@ -410,6 +410,9 @@ void main() {
   S.TERRAIN_FS = `
 uniform float u_mipScale;
 uniform float u_wet;
+uniform float u_matTier;     // F2: the material detail tier (0 Very Low … 3 High)
+uniform float u_puddle;      // F2: the puddles' fill (env.js: they gather in the rain, dry over minutes)
+uniform sampler2D u_fam;     // F2: the material family of every layer, one row (0 none, 1 stone, 2 wood, 3 fabric, 4 metal, 5 plaster)
 uniform sampler2DArray u_albedo;
 uniform sampler2DArray u_material;
 uniform sampler2D u_noise;
@@ -442,6 +445,19 @@ layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 const vec3 TANG[6] = vec3[6](vec3(0,0,-1), vec3(0,0,1), vec3(1,0,0), vec3(1,0,0), vec3(1,0,0), vec3(-1,0,0));
 const vec3 BITN[6] = vec3[6](vec3(0,-1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1), vec3(0,-1,0), vec3(0,-1,0));
+// F2 · materials. The family's micro pattern at dp (the face's tangent coordinates in blocks × 4: four cells to a block):
+// x = the height (0…1), y = a pit (plaster). From the tileable noise texture, no new texture; fibres stretch along x.
+vec2 famPattern(vec2 dp, int fam) {
+  if (fam == 2) return vec2(texture(u_noise, vec2(dp.x * 0.03, dp.y * 0.5)).r, 0.0);
+  if (fam == 4) return vec2(texture(u_noise, vec2(dp.x * 0.02, dp.y * 0.6)).r, 0.0);
+  if (fam == 3) return vec2(0.5 + 0.5 * sin(dp.x * 12.566) * sin(dp.y * 12.566), 0.0);
+  if (fam == 5) return vec2(texture(u_noise, dp * 0.125).r, step(0.86, texture(u_noise, dp * 0.5).a));
+  return vec2(texture(u_noise, dp * 0.125).r * 0.65 + texture(u_noise, dp * 0.25 + vec2(0.37, 0.61)).g * 0.35, 0.0);
+}
+// F2 · the sky seen in a reflection: a cheap environment term from the horizon and zenith colours (F1's sky LUT replaces it)
+vec3 matEnv(vec3 R) {
+  return mix(u_skyHorizon * 0.5, mix(u_skyHorizon, u_skyZenith, smoothstep(0.0, 0.8, R.y)), smoothstep(-0.05, 0.6, R.y));
+}
 // sun visibility: the shadow map near the camera, heightmap rays beyond it (or everywhere on Low)
 float shadowAt(vec3 N, vec3 L) {
   float s = 1.0, cover = 0.0;
@@ -535,9 +551,41 @@ void main() {
 #ifdef MODEL
   N = u_normalMat * N;
 #endif
-#ifdef LITE
-  vec3 n = N;
-#else
+  // F2 · the material layer (tier ≥ 1): the family's micro detail (albedo, roughness, at tier 2 a bump) at four cells per
+  // block, faded out by 12 blocks from the eye and damped on the outermost texel line (the outline stays on top); the wet
+  // top faces (roughness drops, a thin sky layer) and the puddles in the hollows of a low-frequency field
+  int fam = 0;
+  float dAlb = 0.0, dRough = 0.0, wetK = 0.0, pud = 0.0;
+  vec3 bumpW = vec3(0.0);
+  if (u_matTier > 0.5) {
+    fam = int(texelFetch(u_fam, ivec2(int(layer), 0), 0).r * 255.0 + 0.5);
+    vec3 wpM = v_localPos + vec3(u_camInt);
+    float up = smoothstep(0.55, 0.92, N.y);
+    wetK = u_wet * up;
+    if (u_puddle > 0.001 && up > 0.001) {
+      float low = texture(u_noise, wpM.xz * 0.012).r * 0.65 + texture(u_noise, wpM.xz * 0.05).g * 0.35;
+      pud = u_puddle * up * (1.0 - smoothstep(0.42, 0.55, low));
+    }
+    float edgeD = min(min(fu.x, 1.0 - fu.x), min(fu.y, 1.0 - fu.y));
+    float fade = (1.0 - smoothstep(8.0, 12.0, length(v_rel))) * mix(0.1, 1.0, smoothstep(0.0, 0.045, edgeD));
+    if (fam > 0 && fade > 0.001) {
+      vec2 dp = (face <= 1u ? wpM.zy : (face <= 3u ? wpM.xz : wpM.xy)) * 4.0;
+      vec2 pat = famPattern(dp, fam);
+      float h = pat.x - 0.5;
+      if (fam == 1) { dAlb = h * 0.2; dRough = h * 0.12; }
+      else if (fam == 2) { dAlb = h * 0.26; dRough = h * 0.2; }
+      else if (fam == 3) { dAlb = h * 0.14; }
+      else if (fam == 4) { dAlb = h * 0.12; dRough = h * 0.14; }
+      else { dAlb = h * 0.12 - pat.y * 0.08; dRough = h * 0.08 + pat.y * 0.1; }
+      dAlb *= fade; dRough *= fade;
+      if (u_matTier > 1.5) {
+        float e = 0.25;
+        vec2 g = vec2(famPattern(dp + vec2(e, 0.0), fam).x - pat.x, famPattern(dp + vec2(0.0, e), fam).x - pat.x) / e;
+        g *= fade * 0.06;
+        bumpW = face <= 1u ? vec3(0.0, g.y, g.x) : (face <= 3u ? vec3(g.x, 0.0, g.y) : vec3(g.x, g.y, 0.0));
+      }
+    }
+  }
   vec2 nxy = mat.rg * 2.0 - 1.0;
   // Klassisch: the normal map turns with the tile, so a turned grass top is lit as its texels lie and every block's
   // edges catch the low sun alike (unturned, the edges of neighbouring blocks lit up at random and pairs of blocks
@@ -548,10 +596,15 @@ void main() {
 #ifdef MODEL
   T = u_normalMat * T; Bt = u_normalMat * Bt;
 #endif
+  // (F2: the baked normal map now models the light on every tier, Very Low included: one normalize, no extra fetch)
   vec3 n = normalize(N * sqrt(max(0.0, 1.0 - dot(nxy, nxy))) + T * nxy.x + Bt * nxy.y);
-#endif
+  if (u_matTier > 1.5) n = normalize(n - (bumpW - dot(bumpW, n) * n));
   if (noshade) n = vec3(0.0, 1.0, 0.0);
-  float rough = mat.b;
+  float rough = clamp(mat.b + dRough, 0.02, 1.0);
+  if (fam == 3) rough = 0.97;                             // fabric: matte, no highlight
+  rough = mix(rough, 0.25 * rough + 0.03, wetK * 0.85);   // wet: smoother
+  rough = mix(rough, 0.03, pud);                          // a puddle is a mirror
+  alb.rgb *= (1.0 + dAlb) * (1.0 - 0.4 * pud);
   float emis = mat.a;
   // lighting
   float sky = v_sky;
@@ -582,6 +635,15 @@ void main() {
     col += lc * sp * sh * outdoors * (1.0 + u_rain * 1.5);
   }
 #endif
+  if (u_matTier > 0.5) {
+    // F2 · the response: metal reflects the sky tinted by its colour, wet surfaces and puddles mirror it at grazing angles
+    // (outdoors only), varnished wood takes a soft sheen (tier 3)
+    vec3 envC = matEnv(reflect(-V, n));
+    float fresW = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
+    if (fam == 4) col = mix(col, alb.rgb * envC * (0.3 + 0.7 * v_sky) * 1.25, 0.8);
+    col = mix(col, envC, outdoors * clamp(wetK * (0.1 + 0.9 * fresW) + pud * (0.45 + 0.55 * fresW), 0.0, 0.9));
+    if (fam == 2 && u_matTier > 2.5 && ndl > 0.0) { vec3 Hs = normalize(L + V); col += lc * pow(max(dot(n, Hs), 0.0), 22.0) * 0.1 * sh * outdoors; }
+  }
   if (emis > 0.02 || emissiveFace) {
     float e = emissiveFace ? max(emis, 0.85) : emis;
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
@@ -659,6 +721,10 @@ float shadowAt(vec3 N, vec3 L) {
 #else
   return 1.0;
 #endif
+}
+// F2 · the sky seen in a reflection (the same cheap term as the terrain's matEnv)
+vec3 matEnv(vec3 R) {
+  return mix(u_skyHorizon * 0.5, mix(u_skyHorizon, u_skyZenith, smoothstep(0.0, 0.8, R.y)), smoothstep(-0.05, 0.6, R.y));
 }
 vec3 waveNormal(vec2 p) {
   float t = u_time;
@@ -790,6 +856,8 @@ void main() {
   col += lc * pow(max(dot(n, H), 0.0), 120.0) * 1.5 * smoothstep(0.55, 0.95, v_sky);
   float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
   col += skyColor(reflect(-V, n), false) * fres * 0.35 * skyL;
+  // F2: the rim: a glass edge seen at a grazing angle catches the sky (the fresnel's edge, cheap)
+  col += matEnv(reflect(-V, n)) * pow(1.0 - max(dot(n, V), 0.0), 3.0) * 0.3 * skyL;
   col = applyFog(col, v_rel, dist);
   o_col = vec4(col, clamp(alb.a + fres * 0.3, 0.0, 1.0));
 }`;
