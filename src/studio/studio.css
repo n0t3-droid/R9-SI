@@ -605,8 +605,8 @@ nav.modes button.hubm.on { color: var(--txt); background: #2a2110; box-shadow: 0
 #fullBar .freeList { display: flex; flex-direction: column; gap: 2px; font: 11.5px var(--mono); color: var(--txt); }
 #fullBar .keep { font-size: 11.5px; }
 #bridgeBar .x, #fullBar .x { border: 0; background: transparent; color: var(--mute); padding: 2px 6px; }
-.gameLink { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--mute); }
-.gameLink input { width: 300px; max-width: 46vw; padding: 3px 6px; font: 11px var(--mono); color: var(--acc); }
+.gameUrlBox { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--mute); }
+.gameUrlBox input { width: 300px; max-width: 46vw; padding: 3px 6px; font: 11px var(--mono); color: var(--acc); }
 /* ⚙ Profi: the developer tabs */
 #studio:not(.pro) .tab.pro { display: none; }
 .tabs .proT { margin-left: auto; align-self: center; padding: 3px 8px; font-size: 11px; color: var(--mute); background: transparent; border-color: transparent; }

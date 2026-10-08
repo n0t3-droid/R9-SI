@@ -140,9 +140,9 @@
     // (noopener hands nothing back — and a blocked one neither): the link, ready to copy
     const host = (anchor && anchor.closest && anchor.closest('#bridgeBar, .note, .crow, #tiles')) || $('#bridgeBar') || $('#partsBody');   // (W1: the ▶ tile asks too)
     if (!host) return;
-    let box = host.querySelector('.gameLink');
+    let box = host.querySelector('.gameUrlBox');
     if (!box) {
-      box = document.createElement('span'); box.className = 'gameLink';
+      box = document.createElement('span'); box.className = 'gameUrlBox';
       box.innerHTML = `<span>${esc(L('br.linkT', 'Kein neuer Tab? Link kopieren:'))}</span><input readonly value="${esc(GAME_URL)}"><button class="cbtn mini" data-act="copy" title="${esc(L('br.copy', 'Kopieren'))}">📋</button>`;
       host.appendChild(box);
       const inp = box.querySelector('input'); inp.onclick = () => inp.select();

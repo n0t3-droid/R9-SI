@@ -52,10 +52,10 @@ await section('1 · the standalone says it is not connected', async () => {
     const calls = []; const real = window.open; window.open = (...a) => { calls.push(a); return null; };
     const tile = document.querySelector('#tiles .tile[data-tile="play"]');
     tile.click(); await new Promise(r => setTimeout(r, 100));
-    const first = !document.querySelector('#tiles .gameLink');   // one click: the tab opens, no link box yet
+    const first = !document.querySelector('#tiles .gameUrlBox');   // one click: the tab opens, no link box yet
     tile.click(); await new Promise(r => setTimeout(r, 100));   // a second click soon after: it evidently did not open
     window.open = real;
-    const inp = document.querySelector('.gameLink input');
+    const inp = document.querySelector('.gameUrlBox input');
     return { calls, first, link: inp ? inp.value : null };
   });
   check(g.calls.length === 2 && g.calls[0][0] === GAME_URL && g.calls[0][1] === '_blank' && /noopener/.test(g.calls[0][2] || '') && g.first, '🎮 Zum Spiel opens the game in a new tab (noopener), no link box on the first click');
