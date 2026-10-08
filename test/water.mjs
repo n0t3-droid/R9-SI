@@ -6,6 +6,9 @@
 // PRESET=potato,high (default both) · SEED=777 · DIST=<dist/index.html> (default: this checkout) · BASE=<dist before F7>
 // NO_COST=1 (no frame cost) · COST_ONLY=1 (no shots)
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+// every line carries the time (a long run under load: where the minutes go)
+const _log = console.log.bind(console);
+console.log = (...a) => _log(new Date().toISOString().slice(11, 19), ...a);
 const TAG = process.env.TAG || 'water';
 const PRESETS = (process.env.PRESET || 'potato,high').split(',');
 const DIST = process.env.DIST || '/home/claude/vr/dist/index.html';
@@ -16,18 +19,22 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const report = {};
 
-// the frame cost, run inside the page: 20 warm-up frames, then n frames with the GPU drained after each one
-const measure = (n) => new Promise((res) => {
+// the frame cost, run inside the page: `warm` frames first, then n frames with the GPU drained after each one (a
+// failing frame rejects, so a broken build shows as an error rather than a silent wait; each frame is logged)
+const measure = (n, warm = 2) => new Promise((res, rej) => {
   const g = VR.game, gl = g.renderer.gl;
-  let k = -20, sum = 0, refl = 0, draws = 0, tris = 0;
+  let k = -warm, sum = 0, refl = 0, draws = 0, tris = 0;
   const frame = () => {
-    const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish();
-    const dt = performance.now() - t0;
-    if (k < 0) { k++; setTimeout(frame, 0); return; }
-    const st = g.renderer.stats || {};
-    sum += dt; refl += st.reflMs || 0; draws += st.draws || 0; tris += st.tris || 0;
-    if (++k < n) setTimeout(frame, 0);
-    else res({ ms: +(sum / n).toFixed(1), reflMs: +(refl / n).toFixed(2), draws: Math.round(draws / n), tris: Math.round(tris / n) });
+    try {
+      const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish();
+      const dt = performance.now() - t0;
+      console.log('[cost] frame ' + k + ' ' + dt.toFixed(0) + ' ms');
+      if (k < 0) { k++; setTimeout(frame, 0); return; }
+      const st = g.renderer.stats || {};
+      sum += dt; refl += st.reflMs || 0; draws += st.draws || 0; tris += st.tris || 0;
+      if (++k < n) setTimeout(frame, 0);
+      else res({ ms: +(sum / n).toFixed(1), reflMs: +(refl / n).toFixed(2), draws: Math.round(draws / n), tris: Math.round(tris / n), reflSecs: st.reflSecs || 0, reflDraws: st.reflDraws || 0 });
+    } catch (e) { rej(e); }
   };
   frame();
 });
@@ -54,7 +61,7 @@ const boot = async (url, preset) => {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await ctx.newPage();
   const logs = [];
-  page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|missing|shader/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
+  page.on('console', m => { const t = m.type(), s = m.text(); if (s.startsWith('[cost]')) console.log('  ' + s); if (t === 'error' || /error|fail|missing|shader/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
   page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
   await page.goto('file://' + url);
   const ev = (fn, arg) => page.evaluate(fn, arg);
@@ -120,9 +127,12 @@ for (const preset of PRESETS) {
   if (pose && !process.env.NO_COST) {
     await look(page, pose.camP, pose.yaw, pose.pitch);
     await ev(() => { window.__norender = false; VR.game.env.setTime(6000); });
-    const on = await page.evaluate(measure, 12);
-    await ev(() => { VR.game.renderer.noRefl = true; });
-    const off = await page.evaluate(measure, 12);
+    const on = await page.evaluate(measure, 4);
+    let off = null;
+    if (preset !== 'potato') {      // Very Low draws no planar reflection: its frame is the same with and without
+      await ev(() => { VR.game.renderer.noRefl = true; });
+      off = await page.evaluate(measure, 4);
+    }
     await ev(() => { VR.game.renderer.noRefl = false; window.__norender = true; });
     report[preset] = Object.assign(report[preset] || {}, { new: on, newNoRefl: off });
     console.log('cost new', preset, JSON.stringify({ on, off }));
@@ -159,7 +169,7 @@ for (const preset of PRESETS) {
     const B = await boot(BASE, preset);
     await look(B.page, pose.camP, pose.yaw, pose.pitch);
     await B.page.evaluate(() => { window.__norender = false; VR.game.env.setTime(6000); });
-    const base = await B.page.evaluate(measure, 12);
+    const base = await B.page.evaluate(measure, 4);
     console.log('cost base', preset, JSON.stringify(base));
     report[preset] = Object.assign(report[preset] || {}, { base });
     await B.ctx.close();
