@@ -148,5 +148,31 @@ const night = (home, pl) => ({ player: pl || [0, 0, 0], night: true, home: home 
   check(P.deserialize(five)[0].pos.length === 3 && P.deserialize(five)[0].idle === 0, 'a loaded companion starts idle with no path');
 }
 
+// ---------------------------------------------------------------- (i) the three rigs (src/main/voxmodels.js)
+//  every companion model has the parts the pose moves (body, head, four legs, tail, two ears), every part is
+//  meshable, every joint has a place, and the glowing parts glow (the fox's tail tip, the pup's crystal ears)
+{
+  require('../src/main/voxmodels.js');
+  const PARTS = ['body', 'head', 'leg_fl', 'leg_fr', 'leg_bl', 'leg_br', 'tail', 'ear_l', 'ear_r'];
+  const glowing = { glimmer_fox: 'tail', crystal_pup: 'ear_l' };
+  for (const k of KINDS) {
+    const def = VR.VOXMODELS[k] && VR.VOXMODELS[k]();
+    check(!!def && def.gait === 'quad', k + ': a quadruped rig');
+    if (!def) continue;
+    check(PARTS.every(n => def.parts[n] && def.layout[n]), k + ': every part and joint is there');
+    let quads = 0, glow = 0, sized = true;
+    for (const n of PARTS) {
+      const g = def.parts[n].grid;
+      const mesh = VR.meshVoxGrid(g);
+      quads += mesh.count;
+      if (!(g.sx > 0 && g.sy > 0 && g.sz > 0)) sized = false;
+      for (let i = 0; i < g.c.length; i++) if ((g.c[i] >>> 24) & 1) glow++;
+    }
+    check(sized && quads > 40, k + ': every part meshes (' + quads + ' faces)');
+    check(!glowing[k] || (glow > 0 && def.parts[glowing[k]].grid.c.some(v => (v >>> 24) & 1)), k + (glowing[k] ? ': its ' + glowing[k] + ' glows (' + glow + ' glowing voxels)' : ': a matt coat, no glow needed'));
+    check(def.h > 0.5 && def.h < 1 && def.w > 0.2 && def.w < 0.4, k + ': the body fits a small animal (h ' + def.h + ')');
+  }
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

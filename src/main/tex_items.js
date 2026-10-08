@@ -147,7 +147,7 @@
   for (const c of ['violet', 'azure', 'verdant', 'rose', 'amber']) MISC['crystal_shard_' + c] = () => shard({ violet: 0xb05aff, azure: 0x3ab8ff, verdant: 0x3aff7a, rose: 0xff5ab8, amber: 0xffb02a }[c], 0.6);
 
   // spawn eggs
-  const EGG_COL = { glimmer_deer: [0xd8c8a0, 0x5ad8ff], moss_boar: [0x5a7a2a, 0x3a2a1a], sky_ray: [0x3a6ad8, 0xf0f0ff], crystal_crab: [0xb05aff, 0x2a1a4a], ember_husk: [0x6a2a1a, 0xff8a2a], void_stalker: [0x1a1a2a, 0xb03aff], shard_wisp: [0xe0f8ff, 0x3af0c8], bloom_sheep: [0xf4f0f0, 0xff8ac8], hover_drone: [0xd8dce4, 0xff6a1a] };
+  const EGG_COL = { glimmer_deer: [0xd8c8a0, 0x5ad8ff], moss_boar: [0x5a7a2a, 0x3a2a1a], sky_ray: [0x3a6ad8, 0xf0f0ff], crystal_crab: [0xb05aff, 0x2a1a4a], ember_husk: [0x6a2a1a, 0xff8a2a], void_stalker: [0x1a1a2a, 0xb03aff], shard_wisp: [0xe0f8ff, 0x3af0c8], bloom_sheep: [0xf4f0f0, 0xff8ac8], hover_drone: [0xd8dce4, 0xff6a1a], glimmer_fox: [0xe8862a, 0x5affff], moss_cat: [0x6a8a3a, 0xf2e6c8], crystal_pup: [0xd8f2ff, 0x7ad8ff] };
   PRE.egg = (m) => { const [a, b] = EGG_COL[m] || [0xaaaaaa, 0x555555]; const img = sprite(); circ(img, 8, 9, 5.5, (x, y, d) => hh(x >> 1, y >> 1, m.length) < 0.3 ? K(b) : d < 0.5 && x < 8 ? lighten(a, 0.25) : K(a)); outline(img); return img; };
 
   // shared with other sprite recipe files (tex_groceries.js)
