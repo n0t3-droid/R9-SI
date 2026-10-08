@@ -210,6 +210,7 @@
           <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
           <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
           <button type="button" class="btn" data-act="zeitraffer" data-t="g.pause.zeit" data-tt="g.pause.zeitTip"></button>
+          <button type="button" class="btn" data-act="pfeifen" data-t="g.pet.pfeifen" data-tt="g.pet.pfeifenTip"></button>
           <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
         </div>
         <div class="pgrp pside">
@@ -268,6 +269,7 @@
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
       case 'zeitraffer': if (VR.Zeit) VR.Zeit.open(ui.screen === 'pause' ? 'pause' : null); return true;
+      case 'pfeifen': { const g = game(); ui.resume(); if (g && g.companions) g.companions.call(); else ui.hint(t('g.pet.none'), 4200); return true; }
       case 'legal': if (legalOK()) VR.Legal.open('impressum'); return true;
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;
@@ -427,7 +429,7 @@
   // the cheat-like chat commands are a Profi thing (Einfach: the chat stays, /give, /time, /tp … get the note). The
   // friendly ones work in Einfach too: the language, the way home, the block look, the weather and 🏭 /bau — they change
   // nothing a world's rules forbid (survival without cheats still refuses /bau and /wetter after this gate)
-  ST.einfachCmd = (text) => /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call)(\s|$)/i.test(text);
+  ST.einfachCmd = (text) => /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call|pfeifen)(\s|$)/i.test(text);
   if (VR.Game) {
     const origChat = VR.Game.prototype.chat;
     VR.Game.prototype.chat = function (text) {

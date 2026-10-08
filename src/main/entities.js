@@ -16,6 +16,10 @@
     void_stalker: { model: 'void_stalker', hp: 40, speed: 4.2, w: 0.3, h: 2.7, hostile: true, dmg: 6, drops: [['nether_star_shard', 0, 1], ['amethyst_shard', 1, 2]], xp: 10, teleports: true },
     raider_drone: { model: 'raider_drone', hp: 14, speed: 6, w: 0.45, h: 0.9, hostile: true, fly: 'hover', dmg: 3, ranged: true, drops: [['energy_cell', 0, 1], ['iron_ingot', 0, 1]], xp: 6 },
     hover_drone: { model: 'hover_drone', hp: 20, speed: 7, w: 0.3, h: 0.6, fly: 'hover', friendly: true, drops: [], xp: 0 },
+    // 🐾 companions (src/main/companions.js, rules in src/shared/pets.js): peaceful, never hurt by you, rare in the wild
+    glimmer_fox: { model: 'glimmer_fox', hp: 10, speed: 3.6, w: 0.3, h: 0.72, drops: [], xp: 0, companion: true, biomes: /meadow|plains|forest|birch|flower|sunflower|cherry|taiga|grove/ },
+    moss_cat: { model: 'moss_cat', hp: 10, speed: 3.0, w: 0.26, h: 0.62, drops: [], xp: 0, companion: true, biomes: /meadow|plains|forest|jungle|swamp|grove|taiga|flower|birch/ },
+    crystal_pup: { model: 'crystal_pup', hp: 10, speed: 3.8, w: 0.28, h: 0.7, drops: [], xp: 0, companion: true, biomes: /crystal|prism|beach|river|meadow|plains|shore/ },
   };
   VR.MOB_EGGS && VR.MOB_EGGS.forEach((m) => { if (!MOBS[m]) MOBS[m] = MOBS.glimmer_deer; });
 
@@ -58,8 +62,8 @@
       this.spawnT -= dt;
       if (this.spawnT > 0) return;
       this.spawnT = 1.2;
-      const counts = { passive: 0, hostile: 0, ambient: 0 };
-      for (const m of this.mobs) counts[m.def.hostile ? 'hostile' : m.def.ambient ? 'ambient' : 'passive']++;
+      const counts = { passive: 0, hostile: 0, ambient: 0, wild: 0 };
+      for (const m of this.mobs) { if (m.pet) continue; counts[m.def.hostile ? 'hostile' : m.def.ambient ? 'ambient' : m.def.companion ? 'wild' : 'passive']++; }
       const E = g.env.E, night = E.night > 0.5;
       const zen = p.mode === 'zen';
       for (let attempt = 0; attempt < 3; attempt++) {
@@ -89,8 +93,13 @@
           this.summon(kind, x + 0.5, top + 1, z + 0.5); counts.hostile++;
           continue;
         }
+        // 🐾 a wild companion is rare: meadows, a little more often near a village; never in zen (the zen check above)
+        if (counts.wild < 3 && !night && g.dim === 'overworld' && (ground === VR.GEN.S().grass || ground === VR.GEN.S().podzol)) {
+          const opts = Object.keys(MOBS).filter(k => MOBS[k].companion && MOBS[k].biomes.test(key));
+          if (opts.length && Math.random() < (this.nearVillage(x, z) ? 0.01 : 0.003)) { this.summon(opts[Math.floor(Math.random() * opts.length)], x + 0.5, top + 1, z + 0.5); counts.wild++; continue; }
+        }
         if (counts.passive < 14 && !night && (ground === VR.GEN.S().grass || ground === VR.GEN.S().sand || ground === VR.GEN.S().podzol)) {
-          const opts = Object.keys(MOBS).filter(k => !MOBS[k].hostile && !MOBS[k].ambient && MOBS[k].biomes && MOBS[k].biomes.test(key));
+          const opts = Object.keys(MOBS).filter(k => !MOBS[k].hostile && !MOBS[k].ambient && !MOBS[k].companion && MOBS[k].biomes && MOBS[k].biomes.test(key));
           if (!opts.length) continue;
           const kind = opts[Math.floor(Math.random() * opts.length)];
           const [g0, g1] = MOBS[kind].group || [1, 2];
@@ -100,6 +109,7 @@
         }
       }
     }
+    nearVillage(x, z) { const V = this.game.villages; if (!V || !V.sites) return false; for (const s of V.sites) if (Math.abs(s.x - x) < 80 && Math.abs(s.z - z) < 80) return true; return false; }
     // ---------------------------------------------------------------- items
     dropStack(stack, fromPlayer, at) {
       const p = this.game.player;
@@ -127,7 +137,7 @@
         m.age += dt;
         const dx = m.pos[0] - p.pos[0], dz = m.pos[2] - p.pos[2], d2 = dx * dx + dz * dz;
         if (m.dead) { m.deathT += dt; if (m.deathT > 0.8) { this.onMobDeath(m); this.mobs.splice(i, 1); } continue; }
-        if (d2 > 140 * 140 || (!w.isLoaded(Math.floor(m.pos[0]), Math.floor(m.pos[2])))) { this.mobs.splice(i, 1); continue; }
+        if (!m.pet && (d2 > 140 * 140 || (!w.isLoaded(Math.floor(m.pos[0]), Math.floor(m.pos[2]))))) { this.mobs.splice(i, 1); continue; }
         if (m.def.hostile && p.mode === 'zen') { this.mobs.splice(i, 1); continue; }
         m.hurt = Math.max(0, m.hurt - dt);
         this.ai(m, dt, d2);
@@ -204,6 +214,7 @@
       if (m.pos[1] < -20) m.dead = true;
     }
     ai(m, dt, d2) {
+      if (m.pet) { if (this.game.companions) this.game.companions.steer(m, dt, d2); return; }
       const g = this.game, p = g.player, def = m.def, A = m.ai, w = g.world;
       A.t -= dt; A.cool -= dt; A.flee -= dt;
       let tx = null, tz = null, speed = def.speed;
@@ -324,6 +335,12 @@
       if (!hit) return;
       const blockDist = p.target ? p.target.dist : 99;
       if (hit.dist > blockDist) return;
+      if (hit.ent.def && hit.ent.def.companion) {
+        const C = g.companions;
+        if (rclick && C) { C.onUse(hit.ent, p, input.keys.has('ShiftLeft') || input.keys.has('ShiftRight')); input.mouse.clicked[2] = false; input.mouse.releasedBtn[2] = false; p.placeCooldown = 0.3; }
+        else if (click && C) { C.pat(hit.ent); input.mouse.clicked[0] = false; input.mouse.releasedBtn[0] = false; p.breakCooldown = 0.35; p.handSwing = 1; }
+        return;
+      }
       if (rclick && hit.ent.onUse) { hit.ent.onUse(p); input.mouse.clicked[2] = false; input.mouse.releasedBtn[2] = false; p.placeCooldown = 0.3; return; }
       if (click && hit.ent.onHit) { hit.ent.onHit(p.pos); p.handSwing = 1; input.mouse.clicked[0] = false; input.mouse.releasedBtn[0] = false; p.breakCooldown = 0.35; return; }
       if (!click || !hit.ent.def) return;
@@ -338,7 +355,7 @@
       input.mouse.clicked[0] = false; input.mouse.releasedBtn[0] = false; p.breakCooldown = 0.35;
     }
     hurtMob(m, dmg, from) {
-      if (m.dead || m.hurt > 0.3) return;
+      if (m.dead || m.hurt > 0.3 || m.def.companion) return;
       m.hp -= dmg; m.hurt = 0.5;
       if (from) { const dx = m.pos[0] - from[0], dz = m.pos[2] - from[2], l = Math.hypot(dx, dz) || 1; m.vel[0] += dx / l * 7; m.vel[2] += dz / l * 7; if (!m.def.fly) m.vel[1] = 5.5; }
       if (!m.def.hostile) m.ai.flee = 5;
@@ -447,6 +464,7 @@
       }
     }
     pose(m, t) {
+      if (m.def && m.def.companion && VR.Companions) return VR.Companions.poseOf(m, t);
       const gait = m.def ? VR.getVoxModel(this.game.renderer.gl, m.def.model).def.gait : 'biped';
       const s = Math.sin(m.walk * 3) * 0.7 * (m.walkAmt || 0);
       const P = {};
