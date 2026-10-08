@@ -57,7 +57,7 @@
   }
   // a whole catalogue house as a favourite: blueprint_<i>
   const houseOf = (id) => { const m = /^blueprint_(\d+)$/.exec(id || ''); if (!m) return null; const h = C.HOUSES.find(x => x.i === +m[1]); return h || null; };
-  const disp = (id) => { const t = R.byName[id]; if (VM.MODELS[id]) return VM.MODELS[id].display; const h = houseOf(id); if (h) return h.name; if (t) return t.display || (t.o && t.o.display) || id; return VR.ITEMS && VR.ITEMS[id] ? VR.ITEMS[id].name || id : id; };
+  const disp = (id) => { const t = R.byName[id]; if (VM.MODELS[id]) return VR.dispName(VM.MODELS[id].display); const h = houseOf(id); if (h) return h.name; if (t) return t.display || (t.o && t.o.display) || id; return VR.ITEMS && VR.ITEMS[id] ? VR.ITEMS[id].name || id : id; };
   const kindLabel = (k) => { const e = KINDS.find(x => x[0] === k); return e ? (e[1] ? e[1] + ' ' : '') + L('cat.' + k, e[2]) : k; };
   CAT.kindsOf = (id) => { entries(); const e = BYID.get(id); return e ? e.kinds : []; };
 
