@@ -14,6 +14,8 @@
   'use strict';
   const mat4 = VR.mat4, TAU = Math.PI * 2;
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  // the player's language (lang_de.js / lang_en.js)
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const BW = 0.27, BH = 1.78, EYE = 1.6, STEP = 0.3, REACH = 2.2;
   // the cockpit door: 0.4 s to slide open, triggered 2.6 m away — it is fully open before a running walker (5.2 m/s)
   // reaches it, so nobody ever pushes against a half-open door
@@ -53,7 +55,7 @@
     toggleDoor(s, open) {
       const H = this.hatch(s), fl = s.flight;
       if (open === undefined) open = !H.doorOpen;
-      if (open && fl && s.state === 'flying' && fl.speed > 8) { if (this.g.ui) this.g.ui.hint('Door locked above 8 m/s', 1500); if (this.g.audio) this.g.audio.play('deny'); return false; }
+      if (open && fl && s.state === 'flying' && fl.speed > 8) { if (this.g.ui) this.g.ui.hint(T('g.cabin.locked', { v: 8 }), 1500); if (this.g.audio) this.g.audio.play('deny'); return false; }
       H.doorOpen = open; if (this.g.audio) this.g.audio.play('switch');
       return true;
     }
@@ -109,7 +111,7 @@
     standUp(s) {
       const fl = s.flight, C = Cabin.of(s); if (!fl || !C) return false;
       const steady = fl.state === 'landed' || fl.auto || (fl.speed < 2.5 && Math.abs(fl.throttle) < 0.03);
-      if (!steady) { if (this.g.ui) this.g.ui.hint('Hover first (X) or let the autopilot fly — then you can get up', 2200); if (this.g.audio) this.g.audio.play('deny'); return false; }
+      if (!steady) { if (this.g.ui) this.g.ui.hint(T('g.cabin.hoverFirst'), 2200); if (this.g.audio) this.g.audio.play('deny'); return false; }
       const ck = s.d.meta.cockpit, [sx, sz] = ck.seats[0], zMax = C.zb - 0.45;
       // the first free spot behind the seats (the seat backs lean aft; the door is shut) — in the middle, else behind a seat;
       // the walker's box must not start inside anything, or it could never move
@@ -127,7 +129,7 @@
       if (g.gadgets) g.gadgets.riding = { type: 'cabin', ship: s };
       p.flying = false; p.target = null; p.breaking = null; p.fallStart = null;
       g.camMode = 0;
-      if (g.ui && g.ui.hint) g.ui.hint('Aboard · WASD walk · aim + click: pilot seat, doors, ramp, holo map · V takes the pilot seat', 3500);
+      if (g.ui && g.ui.hint) g.ui.hint(T('g.cabin.aboard'), 3500);
       this.sync(0);
     }
     // back into the world where you stand
