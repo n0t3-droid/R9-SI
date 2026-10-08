@@ -229,6 +229,7 @@
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
       this.trails = VR.Trails ? new VR.Trails(this) : null;
+      this.vents = VR.Vents ? new VR.Vents(this) : null;
       this.director = VR.Director ? new VR.Director(this) : null;
       this.cockpit = VR.Cockpit ? new VR.Cockpit(this) : null;
       this.horizon = VR.Horizon ? new VR.Horizon(this) : null;
@@ -835,6 +836,7 @@
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       this.particles.update(dt, eye);
       if (this.trails) this.trails.update(dt);
+      if (this.vents) this.vents.update(dt, eye);
       // camera
       const S = this.settings;
       const bob = S.viewBob && !p.flying ? p.bobAmt : 0;
