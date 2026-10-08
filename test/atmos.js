@@ -133,10 +133,14 @@ console.log('exposure');
   const upStep = A.easeExposure(1, 2, 0.5, 0.8, 2.5) - 1, downStep = 1 - A.easeExposure(2, 1, 0.5, 0.8, 2.5);
   check(upStep > downStep, `the eyes adapt faster to the dark than to the bright (${upStep.toFixed(3)} up vs ${downStep.toFixed(3)} down in 0.5 s)`);
   // targets: a middle-grey scene is 1, a dark scene (cave) wants more light, a bright one less, the range holds
-  check(Math.abs(A.exposureTarget(Math.log(0.18), 0.18, 0.5, 2, 0.5) - 1) < 1e-9, 'a middle-grey scene wants exposure 1');
-  const cave = A.exposureTarget(Math.log(0.02), 0.18, 0.5, 2, 0.5), noon = A.exposureTarget(Math.log(0.6), 0.18, 0.5, 2, 0.5);
+  // the GPU's constants (EXPOSURE, the same numbers as shaders.js EXPOSE_FS and renderer.js): the key is the clear noon's
+  // log-average luminance, which wants exposure 1; the range is ±0.5 stops around 1
+  const E = A.EXPOSURE;
+  check(Math.abs(A.exposureTarget(Math.log(E.key)) - 1) < 1e-9, `the clear noon's key wants exposure 1 (key ${E.key})`);
+  const cave = A.exposureTarget(Math.log(0.02)), noon = A.exposureTarget(Math.log(0.6));
   check(cave > 1 && noon < 1, `a cave wants more light (${cave.toFixed(3)}), a bright noon less (${noon.toFixed(3)})`);
-  check(A.exposureTarget(Math.log(1e-9), 0.18, 0.5, 2, 0.5) === 2 && A.exposureTarget(Math.log(1e6), 0.18, 0.5, 2, 0.5) === 0.5, 'the target stays in its range at the extremes');
+  check(Math.abs(E.lo - Math.SQRT1_2) < 1e-12 && Math.abs(E.hi - Math.SQRT2) < 1e-12, 'the range is ±0.5 stops around 1');
+  check(A.exposureTarget(Math.log(1e-9)) === E.hi && A.exposureTarget(Math.log(1e6)) === E.lo, 'the target stays in its range at the extremes');
 }
 
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
