@@ -137,9 +137,9 @@ check(lag > 0.01 && lag <= 0.031 && caught < 0.002, 'turn inertia: a 1 rad turn 
 const tree = await ev(() => {
   const g = VR.game, w = g.world, R = VR.R, p = g.player, m = window.__meadow;
   const tx = m.cx - 4, tz = m.cz + 2, top = w.topAt(tx, tz);
-  for (let y = 1; y <= 5; y++) w.setBlock(tx, top + y, tz, R.byName.oak_log.defaultState, 4);
-  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let y = 4; y <= 7; y++) {
-    if (Math.abs(dx) === 2 && Math.abs(dz) === 2 && y === 7) continue;
+  for (let y = 1; y <= 6; y++) w.setBlock(tx, top + y, tz, R.byName.oak_log.defaultState, 4);
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) for (let y = 7; y <= 9; y++) {
+    if (Math.abs(dx) === 2 && Math.abs(dz) === 2 && y === 9) continue;
     if (!w.getBlock(tx + dx, top + y, tz + dz)) w.setBlock(tx + dx, top + y, tz + dz, R.byName.oak_leaves.defaultState, 4);
   }
   p.flying = true; p.noclip = true; p.teleport(tx + 4, top + 2, tz + 4); p.yaw = Math.PI * 0.75; p.pitch = 0.1; p.fovKick = 0;

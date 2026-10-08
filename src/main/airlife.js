@@ -106,12 +106,12 @@
       // ---- dust motes in the sunbeams indoors (stateful: they drift about 6 s)
       if (sunUp && !rain && cap.mote > 0 && !outdoor) {
         this.acc.mote = Math.min(3, this.acc.mote + cap.mote / 4 * dt);
-        for (let k = 0; k < 8 && this.acc.mote >= 1; k++) {
+        for (let k = 0; k < 24 && this.acc.mote >= 1; k++) {
           const p = sunPoint(w, eye[0], eye[1], eye[2], sd);
           if (!p) continue;
           this.acc.mote -= 1; this.drawn.mote++;
           spawn(p[0], p[1], p[2], (Math.random() - 0.5) * 0.08 + dir[0] * wind * 0.015, (Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.08 + dir[1] * wind * 0.015,
-            [1.0, 0.97, 0.86], 0.011 + Math.random() * 0.012, { life: 6 + Math.random() * 3, grav: 0, drag: 0.4, emis: 0.9, collide: false, fade: true });
+            [1.0, 0.97, 0.86], 0.014 + Math.random() * 0.012, { life: 6 + Math.random() * 3, grav: 0, drag: 0.4, emis: 1.0, collide: false, fade: true });
         }
       } else this.acc.mote = 0;
 
@@ -134,9 +134,12 @@
         for (let k = 0; k < 4 && this.acc.leaf >= 1; k++) {
           const x = eye[0] + (Math.random() * 2 - 1) * 11, z = eye[2] + (Math.random() * 2 - 1) * 11;
           const fx = Math.floor(x), fz = Math.floor(z), top = w.topAt(fx, fz);
-          if (!(R.T.flags[w.getBlock(fx, top, fz)] & F.LEAVES) || top < eye[1] + 2) continue;   // a canopy above
-          const y = eye[1] + 0.5 + Math.random() * (top - eye[1] - 1.5);
-          if (R.T.flags[w.getBlock(fx, Math.floor(y), fz)] & F.SOLID) continue;
+          if (!(R.T.flags[w.getBlock(fx, top, fz)] & F.LEAVES)) continue;                     // a canopy stands over the column
+          let under = top;                                                                    // its underside: the first air below the leaves
+          while (under > top - 9 && (R.T.flags[w.getBlock(fx, under - 1, fz)] & F.SOLID)) under--;
+          if (under < eye[1] + 1 || under > eye[1] + 9) continue;                             // the canopy is above the eye, not on it
+          const y = under - 0.2 - Math.random() * 1.4;                                        // a leaf lets go just under the canopy
+          if (R.T.flags[w.getBlock(fx, Math.floor(y), fz)] & F.SOLID) continue;               // and starts in air
           this.acc.leaf -= 1; this.drawn.leaf++;
           const pc = PALETTE_LEAF[(Math.random() * PALETTE_LEAF.length) | 0];
           spawn(x, y, z, dir[0] * wind * 1.4 + (Math.random() - 0.5), -0.3, dir[1] * wind * 1.4 + (Math.random() - 0.5), pc, 0.09 + Math.random() * 0.05,
@@ -169,7 +172,7 @@
         const s = this.time * 0.31 + f.ph;
         f.x += (Math.sin(s) * 0.35 + f.wx) * dt; f.z += (Math.cos(s * 1.1) * 0.35 + f.wz) * dt; f.y += Math.sin(this.time * 0.7 + f.ph) * 0.12 * dt;
         const b = Math.pow(Math.max(0, Math.sin(this.time * f.fr + f.ph)), 5);   // a glow that swells and dies away
-        if (b > 0.04) { this.drawn.firefly++; spawn(f.x, f.y, f.z, 0, 0, 0, [0.9 * b, 1.0 * b, 0.4 * b], 0.14 + 0.06 * b, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 1, collide: false, fade: false }); }
+        if (b > 0.04) { this.drawn.firefly++; spawn(f.x, f.y, f.z, 0, 0, 0, [0.9 * b, 1.0 * b, 0.4 * b], 0.10 + 0.05 * b, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 1, collide: false, fade: false }); }
       }
 
       // ---- butterflies over the flowers by day (agents: they wander around a flower)
