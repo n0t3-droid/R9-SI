@@ -352,6 +352,8 @@ await section(10, '← restores where you were: ✏️ from a card → the edito
   if (!WORLD) { await page.goto(URL0 + '/index.html', NAV); check(await atTitle(), 'the game'); await ensureWorld(); }
   await page.goto(URL0 + '/studio.html?r=' + Date.now() + '#world/' + encodeURIComponent(WORLD) + '/karte', NAV);   // (a fresh query: a hash-only change would not reload the Studio)
   check(await inStudio(WORLD), 'the Karte view');
+  // (the hub may have opened by itself and sit over the chips: close it, as §8 does)
+  await ev(() => { if (VR.Projects.isOpen()) VR.Projects.show(false); }); await wait(300);
   await page.$eval('#chips button[data-kcat="furn"]', (b) => b.click());   // (as above)
   // (the cards come in a moment: a slow frame rate draws them later than a fixed wait would)
   const id3 = await until(() => { const l = document.getElementById('list'); if (!l || l.querySelectorAll('.ding').length < 4) return null; l.scrollTop = 140; const c = l.querySelectorAll('.ding')[3]; return c && c.dataset.ding ? c.dataset.ding : null; }, null, 30);
