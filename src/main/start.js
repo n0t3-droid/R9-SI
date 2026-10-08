@@ -95,6 +95,7 @@
     $('#title [data-act="worlds"]').textContent = tx('start.worlds', null, 'Andere Welt', 'Another world');
     $('#title [data-act="newworld"]').textContent = tx('start.newWorld', null, '＋ Neue Welt', '＋ New world');
     $('#title [data-act="settings"]').textContent = tx('start.settings', null, '⚙ Einstellungen', '⚙ Settings');
+    { const kb = $('#title [data-act="kids"]'); if (kb) { kb.textContent = tx('g.set.kids', null, '🧸 Kindersicher', '🧸 Child-safe'); kb.title = tx('g.set.kids.tip', null, 'Zen ohne Gegner und mit automatischem Springen. Ein Tipp auf dem Startbildschirm reicht.', 'Zen without enemies and with auto-jump. One tap on the start screen is enough.'); } }
     const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.setAttribute('aria-label', aa.title); aa.setAttribute('aria-pressed', String(p.scale >= 1.3)); aa.classList.toggle('on', p.scale >= 1.3);
     // (VR.Legal's own words when it has them — the overlay and its buttons say the same)
     for (const b of document.querySelectorAll('#ui [data-act="legal"]')) { const LG = VR.Legal; b.hidden = !legalOK(); b.textContent = LG && typeof LG.label === 'function' ? LG.label() : tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); if (LG && typeof LG.tip === 'function') b.title = LG.tip(); }

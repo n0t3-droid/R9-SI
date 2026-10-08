@@ -78,7 +78,7 @@
 #touch .tb.on { background: rgba(58, 240, 255, 0.32); border-color: var(--accent); }
 #touch .tb-sprint { grid-column: 1 / span 2; min-height: 48px; flex-direction: row; gap: 8px; }
 /* the hotbar moves up above the buttons while the touch layer shows */
-#ui.touchon #hotbar { bottom: 186px; }
+#ui.touchon #hotbar { bottom: 240px; }   /* above the stick and the button cluster */
 @media (max-width: 700px) {
   #settings .panel { padding: 14px 16px; }
   .setrow .sethead label { font-size: 16px; }
