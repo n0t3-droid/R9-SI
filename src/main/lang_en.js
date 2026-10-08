@@ -878,6 +878,7 @@
     'g.tram.to': 'Sky tram to {name} · Shift to get off at a station',
     'g.tram.nextTown': 'the next town',
     'g.tram.moving': 'The tram is moving · Shift again to climb onto the roof',
+    'g.tram.wait': 'The tram is still moving · wait until it stops at the platform',
     'g.tram.hudStop': '<b>SKY TRAM</b> · at {name} · leaves in {s} s<br><small>Shift to get off · F5 view</small>',
     'g.tram.hudGo': '<b>SKY TRAM</b> → {name} · {s} s<br><small>Shift at a station to get off · F5 view</small>',
     'g.tram.next': 'next town',

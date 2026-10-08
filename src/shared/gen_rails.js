@@ -96,6 +96,8 @@
     if (pts.length < 30) return null;
     // no line through a third village
     for (let k = 0; k < pts.length; k += 16) { const v = VG.near(g, pts[k][0], pts[k][1], 6); if (v && v.id !== A.id && v.id !== B.id) return null; }
+    // (vgen 6) no line through the Heartland's citadel zone: its plinth and the viaducts leave there (gen_citadel.js)
+    if (g.vgen >= 6 && VR.Heart && VR.Heart.on(g)) { const C = VR.Heart.CITADEL; for (let k = 0; k < pts.length; k += 4) if (Math.hypot(pts[k][0] - C.x, pts[k][1] - C.z) < 52) return null; }
     // heights: clear the land (widest ground in a window), gentle grades (1 in 6), ramps to ground at both ends
     const n = pts.length, ground = pts.map(p => g.surfaceY(p[0], p[1]));
     const req = new Float64Array(n);
@@ -228,6 +230,9 @@
     for (let i = 0; i < n; i++) { P[i * 3] = Ln.pts[i][0]; P[i * 3 + 1] = Ln.Y[i]; P[i * 3 + 2] = Ln.pts[i][1]; }
     return { key: Ln.key, pts: P, tech: Ln.tech, names: Ln.names };
   };
+  // every other source of rail lines (the citadel viaducts, see gen_citadel.js) registers a provider: (g, x, z, r) → descriptions
+  // of the lines near (x, z) within r. The tram system learns all of them through this one call (the worker's 'railways').
+  RG.providers = [];
   RG.near = function (g, x, z, r) {
     const CELL = VG.cell(g);
     const out = [], seen = new Set(), R0 = Math.ceil(r / CELL) + 1, ci = Math.floor(x / CELL), cj = Math.floor(z / CELL);
@@ -237,6 +242,7 @@
       if (Math.hypot((lk.a.x + lk.b.x) / 2 - x, (lk.a.z + lk.b.z) / 2 - z) > r) continue;
       const Ln = RG.line(g, lk); if (Ln) out.push(RG.describe(Ln));
     }
+    for (const P of RG.providers) { const more = P(g, x, z, r); if (more) for (const d of more) out.push(d); }
     return out;
   };
 
