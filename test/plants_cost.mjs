@@ -72,7 +72,7 @@ for (const vgen of [6, 7]) {
     out[vgen][name] = m;
     console.log(`  vgen ${vgen} · ${name}: ${JSON.stringify(m)}`);
   }
-  const plants = await ev(() => { const R = VR.R, w = VR.game.world; let n = 0; const names = new Set(['vx_palm_crown', 'vx_palm_trunk']); for (const c of w.cols.values()) { if (!c.ready) continue; for (let i = 0; i < c.blocks.length; i++) { const t = R.types[R.T.type[c.blocks[i]]]; if (t && /^vx_(palm|tree_round|tuft|flower|blossom|rice)/.test(t.name)) n++; } } return n; });
+  const plants = await ev(() => { const R = VR.R, w = VR.game.world; let n = 0; for (const c of w.cols.values()) { if (!c.ready) continue; for (let i = 0; i < c.blocks.length; i++) { const t = R.types[R.T.type[c.blocks[i]]]; if (t && /^vm_(palm_crown|tree_round|tuft|flower|bush_blossom|crop)/.test(t.name)) n++; } } return n; });
   console.log(`  vgen ${vgen} · plant blocks in the loaded columns: ${plants}`);
   out[vgen].plants = plants;
   check(logs.length === 0, `vgen ${vgen}: no page or shader errors${logs.length ? ' — ' + logs.slice(0, 2).join(' | ') : ''}`);
