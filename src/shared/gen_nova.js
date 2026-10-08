@@ -375,7 +375,7 @@
         if (u < 1 || u >= W - 1 || v <= G.v1 + 2 || v >= D - 1 || isPath(u, v)) continue;
         const d = Math.hypot((u + 0.5 - cu) / ru, (v + 0.5 - cv) / rv); if (d >= 1) continue;
         const hh = Math.round(h * Math.sqrt(1 - d * d)); if (hh < 1) continue;
-        for (let y = 0; y < hh - 1; y++) put(u, y, v, 'dirt');
+        for (let y = 0; y < hh - 1; y++) put(u, y, v, 'moss_block');   // (green sides: no dirt cliff shows)
         put(u, hh - 1, v, 'grass_block'); top[u + ',' + v] = hh;
       }
       return (u, v) => top[u + ',' + v] | 0;

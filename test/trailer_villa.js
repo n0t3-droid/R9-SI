@@ -207,7 +207,9 @@ check(cF.cells >= 20 && cF.bad === 0 && cF.comps === 2, 'the front path\'s light
 check(cB.cells >= 20 && cB.bad === 0 && cB.comps <= 2, 'the back garden\'s path and terrace: the light lines unbroken too (' + cB.cells + ' line cells, ' + cB.comps + ' chains, ' + cB.bad + ' odd cells)');
 // the back garden (t1_29 / t1_30 through the glass: lawn, palms, round trees, green mounds, a curved path)
 const backRows = D - 1 - G.v1;
-let mound = 0, moundTop = 0; for (let v = G.v1 + 1; v < D; v++) for (let u = 0; u < W; u++) for (let y = 0; y <= 4; y++) if (nm(u, y, v) === 'grass_block') { mound++; moundTop = Math.max(moundTop, y + 1); }
+let mound = 0, moundTop = 0, cliff = 0; for (let v = G.v1 + 1; v < D; v++) for (let u = 0; u < W; u++) for (let y = 0; y <= 4; y++) { const n2 = nm(u, y, v); if (n2 === 'grass_block') { mound++; moundTop = Math.max(moundTop, y + 1); } if (n2 === 'dirt') cliff++; }
+// (green hills: a mound's body is moss under the grass, no dirt side shows — run 2 showed brown cliffs)
+check(cliff === 0, 'the mounds are green all over: no dirt in their sides (' + cliff + ')');
 let backPalms = 0; for (const [k, s] of A.rec) if (nameOf(s) === 'vm_palm_crown' && propOf(s, 'part') === 0) { const [x, y, z] = k.split(',').map(Number); if (z + 3 > G.v1 + 1 && nameOf(A.rec.get((x + 3) + ',' + (y - 1) + ',' + (z + 3))) === 'vx_palm_trunk') backPalms++; }
 const backPath = (() => { const door = [NOVA.ENTRY, G.v1 + 1]; const sn = new Set([door.join()]), st = [door]; let far = 0; while (st.length) { const [u, v] = st.pop(); far = Math.max(far, v - G.v1); for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = u + du, b = v + dv, k = a + ',' + b; if (b > G.v1 && b < D && a >= 0 && a < W && !sn.has(k) && pathAt(a, b)) { sn.add(k); st.push([a, b]); } } } return far; })();
 check(backRows >= 10 && mound >= 30 && moundTop >= 2 && backPalms >= 3 && backPath >= 6, 'the back garden: ' + backRows + ' rows behind the glass wall, green mounds (' + mound + ' cells, ' + moundTop + ' high), ' + backPalms + ' palms, the path from the garden door ' + backPath + ' rows back');
@@ -232,7 +234,12 @@ check(NEW.every(n => R.byName[n] && R.byName[n].base >= shippedEnd), 'the new pi
     }
   }
   // (the mullion: two voxels wide over the sheet's height but the frame rows at its top and bottom: 2 × 30)
-  check(gt && gt.base >= shippedEnd && inner === 0 && frame > 0 && glassN > 1000 && post === 60,'the glass sheet joins in both looks: a 3 × 2 sheet is clear glass (' + glassN + ' cells) in one slim frame (' + frame + ') with a slim mullion in its post cell (' + post + '), ' + inner + ' misplaced'); }
+  check(gt && gt.base >= shippedEnd && inner === 0 && frame > 0 && glassN > 1000 && post === 60,'the glass sheet joins in both looks: a 3 × 2 sheet is clear glass (' + glassN + ' cells) in one slim frame (' + frame + ') with a slim mullion in its post cell (' + post + '), ' + inner + ' misplaced');
+  // run 2: glass voxels hazed the garden behind the sheet (each VX glass face adds its lit colour at a quarter alpha, a
+  // pane has two faces) — the sheet's glass is perfectly clear: it paints no glass voxel, only its frame and mullion
+  let glassVox = 0, solidVox = 0;
+  if (gt) { const G16 = VX.gridFor(16); for (const m of [0, 15, 31]) { VX._.PAINT_FN.novaglass(gt.o.vx, { facing: 0, x: m, nc: [0, 0, 0, 0, 0, 0], px: 0, py: 0, pz: 0, h: 0 }); for (const v of G16) { if (v & VX.GLASS) glassVox++; else if (v & VX.PRESENT) solidVox++; } } }
+  check(gt && glassVox === 0 && solidVox > 0, 'the sheet is clear: no glass voxel to haze the view (' + glassVox + '), only its frame and mullion (' + solidVox + ' voxels over three contexts)'); }
 for (const n of ['vm_nova_tread', 'vm_nova_pad']) { const m = VM.MODELS[n]; VM.materialize(m); const scan = VM.scanParts(m).map(p => p.px + ',' + p.py + ',' + p.pz).join(' '), decl = m.parts.map(p => p.px + ',' + p.py + ',' + p.pz).join(' '); check(scan === decl, n + ' builds to its declared cells (' + m.parts.length + ' parts)'); }
 // every state of the new pieces paints and meshes (a one-block section around it) under 1000 quads
 let maxQ = 0, worst = '', meshed = 0;

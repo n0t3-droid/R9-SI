@@ -117,9 +117,12 @@
   // ---------------------------------------------------------------- the clear glass sheet (kind 'novaglass', 16³)
   // t1_29 · t1_30 · t3_10: floor-to-ceiling glass, one clear sheet with slim mullions — in BOTH looks (panorama glass and
   // the tech glass wall frame every block in Klassisch, by the look's rule). Any rectangle of these blocks in one wall
-  // plane is one sheet of clear glass (two voxels thick, in the middle of the block) in ONE slim white frame where the
-  // sheet ends (floor, ceiling, a wall, a door); the state post = 1 stands a slim mullion in the middle of its cell, and
-  // the sheet runs on through it. Context: bit 0 the sheet continues along +u, 1 along −u, 2 up, 3 down, 4 the post.
+  // plane is one sheet of glass in ONE slim white frame where the sheet ends (floor, ceiling, a wall, a door); the state
+  // post = 1 stands a slim mullion in the middle of its cell, and the sheet runs on through it. The glass itself is
+  // perfectly clear: no glass voxel is painted (run 2 of the browser test: every VX glass face adds its lit colour at a
+  // quarter alpha, two faces a pane, and the garden behind read as fog — the trailer's glass is all but invisible); the
+  // block still stops the player (its box) and lets the light through. Context: bit 0 the sheet continues along +u,
+  // 1 along −u, 2 up, 3 down, 4 the post.
   let sheetType = null;
   const sameSheet = (ns, c) => {
     if (!ns) return false;
@@ -132,8 +135,8 @@
     const t = VR.R.types[VR.R.T.type[s]], alongX = (c.facing & 1) === 0;
     return (sameSheet(nbS[alongX ? 0 : 4], c) ? 1 : 0) | (sameSheet(nbS[alongX ? 1 : 5], c) ? 2 : 0) | (sameSheet(nbS[2], c) ? 4 : 0) | (sameSheet(nbS[3], c) ? 8 : 0) | (t && t.has('post') && t.get(s, 'post') ? 16 : 0);
   };
-  N.SHEET = { frame: 1, post: [7, 8], col: 0xCFF6FA, frameCol: 0xF0F2F5 };
-  // what a cell of the 16 × 16 face shows: the frame where the sheet ends, the mullion of a post cell, else glass
+  N.SHEET = { frame: 1, post: [7, 8], frameCol: 0xF0F2F5 };
+  // what a cell of the 16 × 16 face shows: the frame where the sheet ends, the mullion of a post cell, else (clear) glass
   N.glassCell = function (u, v, m) {
     const R_ = m & 1, L_ = (m >> 1) & 1, U_ = (m >> 2) & 1, D_ = (m >> 3) & 1, S = N.SHEET;
     const e = Math.min(L_ ? 99 : u, R_ ? 99 : 15 - u, D_ ? 99 : v, U_ ? 99 : 15 - v);
@@ -142,14 +145,13 @@
     return { kind: 'glass' };
   };
   PAINT_FN.novaglass = function (s, c) {
-    const G = VX.gridFor(16), I16 = VX.I16, S = N.SHEET, GLASS = VX.GLASS;
+    const G = VX.gridFor(16), I16 = VX.I16, S = N.SHEET;
     G.fill(0);
     const alongX = (c.facing & 1) === 0, m = c.x | 0;
     const put = (u, v, dp, col, fl) => { G[alongX ? I16(u, v, dp) : I16(dp, v, u)] = pack(col, fl); };
     for (let v = 0; v < 16; v++) for (let u = 0; u < 16; u++) {
       const w = N.glassCell(u, v, m);
-      if (w.kind === 'glass') { put(u, v, 7, S.col, GLASS); put(u, v, 8, S.col, GLASS); }
-      else for (let dp = 6; dp <= 9; dp++) put(u, v, dp, S.frameCol, GLOSS);
+      if (w.kind !== 'glass') for (let dp = 6; dp <= 9; dp++) put(u, v, dp, S.frameCol, GLOSS);
     }
   };
   VX.KIND.novaglass = { cls: VX.CLS.WIN };
