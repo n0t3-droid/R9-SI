@@ -122,7 +122,7 @@ const settle = async (maxS) => {
   }
   return +((Date.now() - t0) / 1000).toFixed(1);
 };
-const shot = async (path) => { await ev(() => { const g = VR.game; g.last = performance.now() - 100; g.loop(performance.now()); }); await wait(120); await page.screenshot({ path, timeout: 180000 }); };
+const shot = async (path) => { await ev(() => { const g = VR.game; g.last = performance.now() - 100; g.loop(performance.now()); }); await wait(120); await page.screenshot({ path, timeout: 900000 }); };   // a frame behind a long GPU queue can take minutes here
 const SHOTS = '/home/claude/vr/test/shots';
 
 for (const preset of PRESETS) {
