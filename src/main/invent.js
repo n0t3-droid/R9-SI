@@ -290,7 +290,7 @@
   let rv = null;
   function paintReveal(d) {
     const tx = Inv.text(d.k), L = showLayer('reveal');
-    const line = d.pill === 'inv' ? T('erf.toInv') : d.pill === 'full' ? T('erf.invFull') : d.pill === 'codex' ? T('erf.codexNote') : '';
+    const line = d.pill === 'inv' ? T('erf.toInv') : d.pill === 'full' ? T('erf.invFull') : d.pill === 'codex' ? T(d.isNew ? 'erf.codexNote' : 'erf.codexAgain') : '';
     L.innerHTML = '<div class="erf-rv" role="dialog" aria-modal="true" aria-labelledby="erf-rvn" tabindex="-1"><div class="erf-conf" aria-hidden="true"></div><div class="erf-rays" aria-hidden="true"></div>' +
       '<div class="erf-from" aria-hidden="true"></div><div class="erf-big"></div>' +
       '<div class="erf-badge">' + esc(T(d.isNew ? 'erf.new' : 'erf.again')) + '</div>' +

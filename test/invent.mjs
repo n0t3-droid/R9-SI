@@ -61,6 +61,11 @@ const rv = () => ev(() => {
   return { name: q('.erf-rn'), line: q('.erf-rl'), badge: q('.erf-badge'), pill: pill ? pill.textContent.trim() : null, pillKind: pill ? pill.className.replace('erf-pill', '').trim() : null,
     craftCells: L.querySelectorAll('.erf-craft .erf-cgrid .erf-cc:not(.empty)').length, craftNote: q('.erf-craft .erf-note'), confetti: L.querySelectorAll('.erf-cf').length, bigPx: px(L.querySelector('.erf-big canvas')), from: L.querySelectorAll('.erf-from .erf-pic').length };
 });
+// the reveal's own animations (the burst, the pop, the wobble) end before a picture is taken: a frame can take seconds under load
+const settle = () => ev(() => Promise.race([
+  Promise.all(document.getAnimations().filter((a) => /^erf(Burst|Pop|Wobble)$/.test(a.animationName)).map((a) => a.finished.catch(() => {}))),
+  new Promise((res) => setTimeout(res, 5000)),
+]));
 const closeReveal = async () => { await wait(650); await page.click('#erf-layer .erf-go'); return layerGone(); };
 const trayKeys = () => ev(() => [...document.querySelectorAll('#erf-tray .erf-card')].map(c => c.dataset.k));
 const countText = () => ev(() => document.getElementById('erf-count').textContent.trim());
@@ -154,6 +159,7 @@ await section(2, 'a Creative world: 💡 in the pause menu; the invention goes i
   check(r.pill === '💡 Neu im Inventar' && r.pillKind === 'inv', 'Creative: „💡 Neu im Inventar"');
   check((await invCount('furnace')) >= 1, 'the furnace is in the inventory (' + ((await hotbarHas('furnace')) ? 'on the hotbar' : 'in the main inventory: the creative kit filled the hotbar') + ')');
   check(had ? r.confetti === 0 : r.confetti > 10, (had ? 'a known one gets no confetti' : 'a little confetti') + ' (' + r.confetti + ' pieces)');
+  await settle(); await wait(250);
   await shot('invent_1');
   check(await closeReveal(), 'Weiter');
   check((await trayKeys()).includes('ofen'), 'the Ofen is among the cards');
@@ -329,6 +335,7 @@ await section(5, '📖 the book and ⌫ forget (with a question)', async () => {
   check(bk.tiles === total && bk.locked === total - n, 'the book has a tile for every invention; the ones not found are silhouettes (' + bk.tiles + ' tiles, ' + bk.locked + ' hidden)');
   check(bk.sum === `${n} von ${total} gefunden` && bk.lockedNames.join() === '???' && bk.names.length === n, 'found ones show their name, the others ??? (' + bk.sum + ')');
   check(bk.heads.length === 8 && bk.under, 'eight groups; the workbench below is inert while the book is open');
+  await wait(1200);   // the silhouettes are painted a few per frame
   await shot('invent_book');
   const first = await ev(() => document.querySelector('#erf-layer .erf-tile:not(.locked)').dataset.k);
   await page.click(`#erf-layer .erf-tile[data-k="${first}"]`); await wait(300);
@@ -396,6 +403,7 @@ await section(7, 'a Survival world: no free item, the recipe in pictures, the co
   check(r.name === 'Ofen' && r.pillKind === 'codex' && /Codex/.test(r.pill || ''), 'Survival: the pill says the Codex remembers it — no „Neu im Inventar"');
   check((await invCount('furnace')) === f0 && f0 === 0, 'no free furnace in the inventory');
   check(r.craftCells === 8 && /stellst du es her/.test(r.craftNote || ''), 'the crafting recipe is shown in pictures: 8 stones round the middle (' + r.craftCells + ' cells)');
+  await settle(); await wait(250);
   await shot('invent_survival');
   await closeReveal();
   await page.keyboard.press('Escape'); await wait(300);
@@ -440,10 +448,11 @@ await section(8, 'a phone-sized screen, 44 px targets', async () => {
   // a full round on the phone: two taps → reveal fits the screen
   await tap('holz'); await tap('stein');
   check(await revealUp(), 'two taps make an invention on the phone too');
-  await wait(450);
-  const rl = await ev(() => { const b = document.querySelector('#erf-layer .erf-rv').getBoundingClientRect(), g = document.querySelector('#erf-layer .erf-go').getBoundingClientRect(); return { rvH: Math.round(b.height), goB: Math.round(g.bottom), goH: Math.round(g.height), vh: innerHeight, goW: Math.round(g.width) }; });
+  await settle(); await wait(250);
+  const rl = await ev(() => { const b = document.querySelector('#erf-layer .erf-rv').getBoundingClientRect(), g = document.querySelector('#erf-layer .erf-go').getBoundingClientRect(), big = document.querySelector('#erf-layer .erf-big'), bb = big ? big.getBoundingClientRect() : null; return { rvH: Math.round(b.height), goB: Math.round(g.bottom), goH: Math.round(g.height), vh: innerHeight, goW: Math.round(g.width), bigH: bb ? Math.round(bb.height) : -1, bigOp: big ? getComputedStyle(big).opacity : null }; });
   console.log('  reveal (phone)', JSON.stringify(rl));
   check(rl.goB <= rl.vh && rl.goH >= 44, '„Weiter" is on the screen and big enough');
+  check(rl.bigH > 60 && rl.bigOp === '1', 'the big picture is shown on the phone (' + rl.bigH + ' px, opacity ' + rl.bigOp + ')');
   await shot('invent_3_reveal');
   await closeReveal();
   await page.keyboard.press('Escape'); await wait(300);
