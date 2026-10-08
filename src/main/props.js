@@ -1,17 +1,19 @@
 // ============================================================================
-// Smooth props (t-smooth, TRAILER.md §3.2 and the palms of trailer frames t3_05–t3_08): procedural triangle meshes for
-// the blocks whose type carries a `prop` (the mesher hands over one anchor per prop instance, mesher.js). Everything is
-// built in JS once per model, from a few numbers — no asset, no texture file.
-//   palm      the palm: a tapering 8-sided trunk that bends with its seed (the lean), a crown of 13 green fronds (bent
-//             strips of 6 segments that rise a little and droop under their weight), two dead fronds hanging under it,
-//             three coconuts and the crownshaft bulb. A frond mask per instance picks 9–13 green fronds (and 0–2 dead).
+// Smooth props (t-smooth, TRAILER.md §3.2 and the palms of trailer frames t3_05–t3_08; the owner's „die Items sollen
+// schon echte Möbel sein"): procedural triangle meshes for the blocks the mesher hands over as anchors (mesher.js: the
+// palm blocks with a `prop`, the furniture blocks of VR.PROP_FURN). Everything is built in JS once per model, from a few
+// numbers — no asset, no texture file.
+//   palm      a 10-sided trunk that curves with its seed (the lean) and shows bark rings, a crown of 13 frond slots on the
+//             golden angle in tiers (V-folded, wide, sagging toward the tip), two dead fronds, two spear leaves, the
+//             crownshaft and three coconuts. A frond mask per instance picks 9–13 green fronds (and 1–2 dead).
 //   palm far  a cross of two cutout quads with the palm's silhouette (the same fronds, painted flat), for the distance.
-//   furniture the furniture pack's pieces as smooth meshes (sofas, armchairs, dining sets, beds, lamps, kitchens, the
-//             bookcase, planters, the TV lowboard and the wall TV, coffee tables, nightstands): see the furniture section.
-// Models are described by their vertex layout (14 floats: pos, normal, uv, colour, bend, sway, frond) and the instance
-// layout (12 floats: [x y z yaw] [scale lean phase mask] [sky r g b]); renderer.js owns the GL side (drawProps).
-// A prop kind is a number the mesher writes (VR.PROP_KIND in mesher.js) and a model here: a new prop (topiary, hedge,
-// furniture) is one model function and one line in KINDS.
+//   furniture the furniture pack's pieces and the villages' own (sofas, armchairs, dining sets, beds, lamps, kitchens,
+//             the bookcase, planters, the TV lowboard and the wall TV, coffee tables, nightstands, the cosy beds, tables,
+//             chairs and modular sofas): a model builder and the models in the furniture section below.
+// Vertex layout (14 floats): palm — pos, normal, uv, colour, bend, sway, frond slot; furniture — pos, normal, uv,
+// colour, material, tint slot, ambient occlusion. Instance (12 floats): palm — [x y z yaw] [scale lean phase mask]
+// [sky r g b]; furniture — [x y z yaw] [first colour rgb, second colour as an sRGB number] [sky r g b].
+// renderer.js owns the GL side (drawProps). A new prop is one model here and one entry in the mesher's lists.
 // ============================================================================
 (function (VR) {
   'use strict';
