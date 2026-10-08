@@ -34,7 +34,7 @@
       this.game = game;
       this.pos = [0.5, 100, 0.5]; this.vel = [0, 0, 0];
       this.yaw = 0; this.pitch = 0; this.roll = 0;
-      this.onGround = false; this.flying = false; this.sprinting = false; this.sneaking = false;
+      this.onGround = false; this.flying = false; this.sprinting = false; this.sneaking = false; this.sprintLatch = false;
       this.inWater = false; this.inLava = false; this.headInWater = false; this.onLadder = false;
       this.mode = 'creative';
       this.health = 20; this.food = 20; this.sat = 5; this.exhaust = 0; this.air = 300; this.xp = 0; this.level = 0;
@@ -57,6 +57,15 @@
     lookDir() { const cp = Math.cos(this.pitch); return [-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp]; }
     setMode(m) { this.mode = m; if (m === 'survival') this.flying = false; this.game.ui && this.game.ui.updateHUD(true); }
     // (a destination with a number gone bad — "/tp a b c", a corrupt save — is refused: the player stays where they are)
+    // auto-jump (F5 · Steuerung): the setting, on in Einfach by default, always on in the child-safe Zen mode (Kindersicher)
+    autoJumpOn() { const S = this.game.settings || {}; if (S.kids) return true; if (S.autoJump === 'on') return true; if (S.autoJump === 'off') return false; return !(VR.UIPrefs && VR.UIPrefs.get().pro); }
+    // a one-block step in front of the body (solid at foot height, air above it): auto-jump takes it, a wall does not
+    stepAhead(get, wx, wz) {
+      const T = R.T.flags, p = this.pos, l = Math.hypot(wx, wz) || 1;
+      const fx = Math.floor(p[0] + wx / l * 0.7), fz = Math.floor(p[2] + wz / l * 0.7);
+      const b0 = get(fx, Math.floor(p[1] + 0.5), fz), b1 = get(fx, Math.floor(p[1] + 1.5), fz), b2 = get(fx, Math.floor(p[1] + 2.5), fz);
+      return !!(T[b0] & F.SOLID) && !(T[b1] & F.SOLID) && !(T[b2] & F.SOLID);
+    }
     teleport(x, y, z) { if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return false; this.pos = [x, y, z]; this.vel = [0, 0, 0]; this.fallStart = null; return true; }
     // the player is somewhere real: every number of the position, velocity and view finite. A NaN anywhere (a bad
     // command, a bug in a vehicle or a cutscene) would otherwise spread into every frame — the world vanishes, nothing
@@ -180,8 +189,13 @@
       const k = (c) => !typing && input.down(c);
       let fw = (k('KeyW') ? 1 : 0) - (k('KeyS') ? 1 : 0);
       let st = (k('KeyD') ? 1 : 0) - (k('KeyA') ? 1 : 0);
+      // the gamepad's left stick is analog and adds to the keys, never beyond full speed (F5)
+      if (!typing && input.padMove) { fw = Math.max(-1, Math.min(1, fw + input.padMove.fwd)); st = Math.max(-1, Math.min(1, st + input.padMove.str)); }   // the pad and the touch stick (input.beginFrame)
       const jump = k('Space'), sneak = k('ShiftLeft') || k('ShiftRight');
-      if ((input.dbl('KeyW') || k('ControlLeft')) && fw > 0 && !sneak && (this.food > 6 || this.creative)) this.sprinting = true;
+      // sprint: held (Ctrl or 2× W), or with the setting 'toggle' one press on and one press off (F5 · Sprinten)
+      const sprintToggle = !!this.game.settings && this.game.settings.sprintMode === 'toggle';
+      if (sprintToggle) { if (!typing && input.hit('ControlLeft')) this.sprintLatch = !this.sprintLatch; if (!typing && input.dbl('KeyW') && fw > 0) this.sprintLatch = !this.sprintLatch; if (fw <= 0 || sneak) this.sprintLatch = false; }
+      if ((sprintToggle ? this.sprintLatch : (input.dbl('KeyW') || k('ControlLeft'))) && fw > 0 && !sneak && (this.food > 6 || this.creative)) this.sprinting = true;
       if (fw <= 0 || sneak || (this.hitWall && !this.flying)) this.sprinting = false;
       if (this.creative && !typing && input.dbl('Space')) { this.flying = !this.flying; this.vel[1] = 0; if (this.flying && VR.Hints) VR.Hints.done('fly'); }   // (the fly hint leaves with the flight, not on the next 250 ms tick)
       if (this.flying && this.onGround && !jump && this.vel[1] < 0 && !this.noclip) this.flying = false;
@@ -219,7 +233,9 @@
         v[1] -= 30 * dt;
         if (v[1] < -78) v[1] = -78;
         this.jumpCooldown -= dt;
-        if (jump && this.onGround && this.jumpCooldown <= 0) {
+        // auto-jump: walking into a one-block step lifts you over it (F5), a wall never does
+        const autoStep = !jump && this.onGround && this.hitWall && !this.sneaking && !this.flying && (fw !== 0 || st !== 0) && this.autoJumpOn() && this.stepAhead(get, wx, wz);
+        if ((jump || autoStep) && this.onGround && this.jumpCooldown <= 0) {
           v[1] = 9.1; this.jumpCooldown = 0.25; this.onGround = false;
           if (this.sprinting) { v[0] += wx * 1.6; v[2] += wz * 1.6; }
           this.exhaust += this.sprinting ? 0.2 : 0.05;
@@ -267,6 +283,8 @@
       // ---------- fall damage ----------
       if (!this.onGround && !this.flying && !this.inWater && !this.onLadder) { if (this.fallStart === null || this.pos[1] > this.fallStart) this.fallStart = this.pos[1]; }
       else {
+        // the controller buzzes after a real fall (a jump lands at its own height and stays quiet) — F5 · Vibration
+        if (this.fallStart !== null && this.game.settings && this.game.settings.vibrate !== false && VR.Pad && this.fallStart - this.pos[1] > 1.8) VR.Pad.vibrate(VR.Pad.rumbleFor(this.fallStart - this.pos[1]));
         if (this.fallStart !== null && !this.creative) {
           const d = this.fallStart - this.pos[1];
           const below = get(Math.floor(this.pos[0]), Math.floor(this.pos[1] - 0.05), Math.floor(this.pos[2]));

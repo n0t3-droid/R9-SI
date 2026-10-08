@@ -45,11 +45,11 @@ check(/Kreativ/.test(zen || ''), 'the creative tools panel is German: ' + zen);
 await ev(() => { VR.game.ui.prevScreen = 'pause'; VR.game.ui.showSettings(); }); await step(2);
 check(await text('#settings h2') === 'Einstellungen', 'the settings title is Einstellungen');
 const tabs = await texts('#settabs button');
-check(tabs.join('|') === 'Grafik|Steuerung|Ton|Spiel|🌐 Sprache', 'the settings tabs are German: ' + tabs.join(' · '));
+check(tabs.join('|') === '🖼 Bild|🔊 Klang|🎮 Spiel', 'the settings groups are German: ' + tabs.join(' · '));
 const labels = await texts('#setbody label');
 check(labels.some(l => l.startsWith('Sichtweite')) && labels.some(l => l.startsWith('Qualitätsstufe')), 'graphics labels are German (Sichtweite, Qualitätsstufe)');
 check(labels.some(l => l === 'Blöcke') && (await texts('#setbody .seg button')).includes('Klassisch'), 'the block look reads Blöcke: Klassisch');
-await ev(() => { VR.game.ui.settingsTab = 'game'; VR.game.ui.showSettings(); }); await step(1);
+await ev(() => { VR.game.ui.settingsTab = 'play'; VR.game.ui.showSettings(); }); await step(1);
 const gameLabels = await texts('#setbody label');
 check(gameLabels.some(l => l.startsWith('Dein Name')) && gameLabels.some(l => /Koordinaten anzeigen/.test(l)), 'game tab labels are German');
 await ev(() => { VR.game.ui.show(null); VR.game.ui.openInventory(); }); await step(2);
@@ -59,7 +59,7 @@ check((await texts('#invpanel .subtitle')).includes('Schnellleiste'), 'the hotba
 await ev(() => VR.game.ui.closeInventory()); await step(2);
 
 // ---- the 🌐 tab switches live to English, /lang switches back
-await ev(() => { VR.game.ui.pause(); VR.game.ui.prevScreen = 'pause'; VR.game.ui.settingsTab = 'lang'; VR.game.ui.showSettings(); }); await step(1);
+await ev(() => { VR.game.ui.pause(); VR.game.ui.prevScreen = 'pause'; VR.game.ui.settingsTab = 'play'; VR.game.ui.showSettings(); }); await step(1);
 const langBtns = await texts('#langseg button');
 check(langBtns.join('|') === 'Deutsch|English', 'the language tab offers Deutsch and English');
 check((await texts('#setbody .langsoon button')).length === 0, 'Einfach: only the languages that are there (no „bald" list)');
@@ -70,7 +70,7 @@ await page.click('#langseg button[data-lang="en"]'); await step(2);
 const after = await ev(() => ({ lang: VR.I18N.lang, stored: localStorage.getItem('r9si.lang'), html: document.documentElement.lang, title: document.querySelector('#settings h2').textContent, tabs: [...document.querySelectorAll('#settabs button')].map(b => b.textContent), pause: document.querySelector('#pause h2').textContent, resume: document.querySelector('#pause [data-act="resume"]').textContent, soon: [...document.querySelectorAll('#setbody .langsoon button')].map(b => b.textContent) }));
 console.log('after click', JSON.stringify(after));
 check(after.lang === 'en' && after.stored === 'en' && after.html === 'en', 'English is chosen, stored and on <html>');
-check(after.title === 'Settings' && after.tabs[0] === 'Graphics' && after.tabs[4] === '🌐 Language', 'the settings re-render in English without a reload');
+check(after.title === 'Settings' && after.tabs[0] === '🖼 Picture' && after.tabs[2] === '🎮 Game', 'the settings re-render in English without a reload');
 check(after.pause === 'Paused' && after.resume === '▶ Play on', 'the pause screen (static texts) re-reads the tables: ' + after.pause + ' · ' + after.resume);
 check(after.soon.every(t => / · soon$/.test(t)), 'the soon-entries read "soon"');
 await ev(() => { VR.UIPrefs.set({ pro: false }); VR.game.ui.show(null); }); await step(1);
