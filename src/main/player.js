@@ -43,6 +43,8 @@
       this.target = null;
       this.breaking = null; this.breakCooldown = 0; this.placeCooldown = 0;
       this.bob = 0; this.bobAmt = 0; this.fovKick = 0; this.eye = EYE; this.stepDist = 0;
+      // F3 · Da-Sein (presence.js): the landing dip, the view nudge and hand push of a placed or broken block, the drawn yaw
+      this.dipAmp = 0; this.dipT = 1e9; this.nudgeAmp = 0; this.nudgeT = 1e9; this.pushAmp = 0; this.pushT = 1e9; this.viewYaw = NaN;
       this.jumpCooldown = 0;
       this.spawn = [0.5, 100, 0.5];
       this.handSwing = 0;
@@ -267,6 +269,8 @@
       // ---------- fall damage ----------
       if (!this.onGround && !this.flying && !this.inWater && !this.onLadder) { if (this.fallStart === null || this.pos[1] > this.fallStart) this.fallStart = this.pos[1]; }
       else {
+        // a landing after a fall dips the eye (presence.js: from 0.6 blocks on, up to 0.14)
+        if (this.fallStart !== null) { const amp = VR.Presence.landingDip(this.fallStart - this.pos[1]); if (amp > 0) { this.dipAmp = amp; this.dipT = 0; } }
         if (this.fallStart !== null && !this.creative) {
           const d = this.fallStart - this.pos[1];
           const below = get(Math.floor(this.pos[0]), Math.floor(this.pos[1] - 0.05), Math.floor(this.pos[2]));
@@ -283,8 +287,9 @@
       if (this.onGround && hs > 0.1 && !this.flying) { this.bob += hs * dt * 1.55; this.bobAmt = Math.min(1, this.bobAmt + dt * 4); this.stepDist += hs * dt; }
       else this.bobAmt = Math.max(0, this.bobAmt - dt * 4);
       if (this.stepDist > 2.2) { this.stepDist = 0; g.audio && g.audio.step(this.blockBelow()); }
-      const kick = (this.sprinting ? 0.1 : 0) + (this.flying && this.sprinting ? 0.08 : 0);
-      this.fovKick += (kick - this.fovKick) * Math.min(1, dt * 6);
+      // the sprint kick: +8 degrees, eased in 150 ms (presence.js fovDeg); the dip, nudge and push run on their own clocks
+      this.fovKick = VR.Presence.easeKick(this.fovKick || 0, this.sprinting ? 1 : 0, dt);
+      this.dipT += dt; this.nudgeT += dt; this.pushT += dt;
       if (this.stepSmooth) { this.stepSmooth *= Math.exp(-dt * 14); if (Math.abs(this.stepSmooth) < 0.01) this.stepSmooth = 0; }
       // ---------- survival ----------
       this.survival(dt);
@@ -474,7 +479,7 @@
       world.setBlock(x, y, z, fluidIn, 4);
       if (VR.CUT_OF && (VR.CUT_OF[t.name] || VR.SMOOTH_OF[t.name] || (R.T.flags[s] & F.SMOOTH)) && g.sim && g.sim.cutAround) g.sim.cutAround(x, y, z);
       g.audio && g.audio.dig(s, true);
-      g.particles && g.particles.breakBlock(x, y, z, s);
+      g.particles && g.particles.breakBlock(x, y, z, s); this.kickView(0.006, 0.5);   // a broken block: a smaller flick, half the push
       g.onBlockBroken && g.onBlockBroken(x, y, z, s, this);
       if (survival) {
         const hdef = this.inv.held ? VR.itemDef(this.inv.held.id) : null;
@@ -551,9 +556,11 @@
       this.afterPlace(type, list[0].x, list[0].y, list[0].z, list[0].state);
       return true;
     }
+    // the feel of a block set or taken (F3 · Da-Sein): a tiny flick of the view (amp, radians) and the hand's push (push 0..1)
+    kickView(amp, push) { this.nudgeAmp = amp; this.nudgeT = 0; this.pushAmp = push; this.pushT = 0; }
     afterPlace(type, x, y, z, s) {
       const g = this.game;
-      g.audio && g.audio.place(s);
+      g.audio && g.audio.place(s); this.kickView(0.012, 1);   // a placed block: the view flicks and the hand pushes forward (presence.js)
       if (!this.creative) this.inv.consumeHeld(1);
       g.onBlockPlaced && g.onBlockPlaced(x, y, z, s, this);
     }
