@@ -570,9 +570,9 @@
           if (sk.bot[c] < bBot) bBot = sk.bot[c];
           wins += sk.win[c]; tot += sk.tot[c];
         }
-        if (gbest >= 0) {   // the paving at ground level colours the land under it
+        if (gbest >= 0) {   // the paving at ground level colours the land under it (grass keeps the biome's own green)
           const L = LOD.stateLook(sk.gS[gbest]);
-          if (L) for (let q = 0; q < 4; q++) { const k = (j + NB4[q][1] + 1) * W + i + NB4[q][0] + 1; if (!f.wet[k]) { f.col[k * 3] = L.c[0]; f.col[k * 3 + 1] = L.c[1]; f.col[k * 3 + 2] = L.c[2]; f.cliff[k * 3] = L.c[0]; f.cliff[k * 3 + 1] = L.c[1]; f.cliff[k * 3 + 2] = L.c[2]; } }
+          if (L && !L.tint) for (let q = 0; q < 4; q++) { const k = (j + NB4[q][1] + 1) * W + i + NB4[q][0] + 1; if (!f.wet[k]) { f.col[k * 3] = L.c[0]; f.col[k * 3 + 1] = L.c[1]; f.col[k * 3 + 2] = L.c[2]; f.cliff[k * 3] = L.c[0]; f.cliff[k * 3 + 1] = L.c[1]; f.cliff[k * 3 + 2] = L.c[2]; } }
         }
         if (best < 0) continue;
         const ci = j * n + i, gy = sk.ground[best] + 1;

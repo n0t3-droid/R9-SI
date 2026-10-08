@@ -1228,6 +1228,10 @@ void main() {
 }`;
   S.LOD_FS = `
 uniform sampler2D u_mask;
+#if defined(FAR1) || defined(FORM)
+uniform sampler2D u_mask1;    // F-Far: the forms' fades per column (ring 1), the same 136 x 136 columns as u_mask
+uniform float u_g1;           // FAR1: 1 = the horizon tiles step aside for ring 1 too (0 in the water's mirror: no ring 1 there)
+#endif
 uniform sampler2D u_noise;
 uniform vec3 u_camFrac;
 uniform ivec3 u_camInt;
@@ -1256,6 +1260,26 @@ vec3 waveN(vec2 p) {
 void main() {
   // real chunks are drawn here: the far terrain steps aside
   vec2 cl = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz & 15);
+#if defined(FAR1) || defined(FORM)
+  // F-Far · three rings: per column R = the chunk's fade (ring 0), G = the form's (ring 1). Ring 1 draws where
+  // min(bilinear R, nearest R) <= t < G, ring 2 where t >= max(cover R, cover G) (t = the 4x4 dither threshold): every t
+  // is drawn by one ring at least, a settled column by exactly one (VR.Far.draws, test/far_rings.js)
+  int mn = textureSize(u_mask, 0).x, mh = mn / 2;
+  ivec2 ch = ivec2(floor(cl / 16.0)) + mh;
+  float nR = 0.0, bR = 0.0, nG = 0.0, bG = 0.0;
+  if (ch.x >= 0 && ch.y >= 0 && ch.x < mn && ch.y < mn) {
+    vec2 muv = (cl / 16.0 + float(mh)) / float(mn);
+    nR = texelFetch(u_mask, ch, 0).r; bR = textureLod(u_mask, muv, 0.0).r;
+    nG = texelFetch(u_mask1, ch, 0).r; bG = textureLod(u_mask1, muv, 0.0).r;
+  }
+  float th = bayer4(gl_FragCoord.xy), cR = min(bR, nR);
+#ifdef FORM
+  if (th < cR || th >= nG) discard;
+#else
+  if (th < max(cR, min(bG, nG) * u_g1)) discard;
+  if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#endif
+#else
   ivec2 ch = ivec2(floor(cl / 16.0)) + 32;
   // the mask carries each chunk column's fade (0..1, 300 ms in): the tile is cut where the chunk keeps the pixel, and the
   // soft edge (bilinear) makes the cut fade over a chunk; min() with the nearest fade keeps the cut under the chunk's own
@@ -1265,8 +1289,15 @@ void main() {
   if (cover > 0.0 && bayer4(gl_FragCoord.xy) < cover) discard;
   // never right in front of the eyes: coarse cells only stand in at a distance
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#endif
   vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
+#ifdef FORM
+  // ring 1's height field (face 6) takes its normal from the geometry: a slope toward the sun is lit, one away shaded
+  vec3 N = v_face == 6u ? normalize(cross(dFdx(v_rel), dFdy(v_rel))) : NORMALS[min(v_face, 5u)];
+  if (v_face == 6u && N.y < 0.0) N = -N;
+#else
   vec3 N = NORMALS[v_face];
+#endif
   float dist = length(v_rel);
   vec3 V = -v_rel / max(dist, 1e-3);
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
@@ -1310,7 +1341,11 @@ void main() {
       // brightness of the near blocks (whose mips keep their mean too)
       alb *= 0.92 + hash13(bp) * 0.16;
       vec3 fr = wp3 - bp;
+#ifdef FORM
+      vec2 g = v_face <= 1u ? fr.zy : (v_face <= 3u || v_face == 6u) ? fr.xz : fr.xy;
+#else
       vec2 g = v_face <= 1u ? fr.zy : v_face <= 3u ? fr.xz : fr.xy;
+#endif
       vec2 e = min(g, 1.0 - g);
       float px = max(length(fwidth(wp3)), 1e-3);
       float k = u_gridK * (1.0 - smoothstep(0.12, 0.3, px));
@@ -1323,6 +1358,9 @@ void main() {
       alb *= 0.93 + hash13(bp) * 0.14;
     }
     float faceShade = v_face == 2u ? 1.0 : v_face == 3u ? 0.55 : (v_face <= 1u ? 0.78 : 0.88);
+#ifdef FORM
+    if (v_face == 6u) faceShade = mix(0.8, 1.0, clamp(N.y, 0.0, 1.0));
+#endif
     float ndl = max(dot(N, L), 0.0);
     vec3 amb = u_ambSky * mix(0.62, 1.0, faceShade);
     col = alb * (amb + lc * ndl * 0.92) * (0.3 + 0.7 * v_shade) + alb * 0.012;
