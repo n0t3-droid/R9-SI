@@ -188,7 +188,6 @@
       // their 300 ms fade-in are listed in `fading`, and the streaming rung is set by the governor (game.js)
       this.uploadQ = new VR.Stream.UploadScheduler({ msPerByte: 2e-6 });
       this.fading = new Set(); this.streamRung = 0; this.viewDir = null;
-      this.colEpoch = 0;   // counts the unloads: the far mask (horizon.js) is rebuilt right after one, never a stale cut
       this.listeners = [];
       this.frame = 0;
       this.stats = { gen: 0, mesh: 0, genMs: 0, meshMs: 0 };
@@ -415,7 +414,7 @@
       // a saved column comes back from the save when the player returns (it was regenerated before: edits vanished)
       if (c.modified && this.store) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
       for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s);
-      this.cols.delete(c.key); this.fading.delete(c); this.colEpoch++;
+      this.cols.delete(c.key); this.fading.delete(c);
       this.lastCol = null;
       this.shDirty.delete(c.key); this.shGone.add(c.key);
       for (const l of this.listeners) if (l.onColumnUnloaded) l.onColumnUnloaded(c);
@@ -499,6 +498,9 @@
       const room = nw * 10 - (this.meshInflight || 0);      // ~two frames of mesh work per worker in flight, never more
       let budget = Math.min(room, 8 + nw * 8);
       if (this.meshBudget <= 3) budget = Math.min(budget, this.meshBudget * 2);   // smart quality asked for less main-thread work
+      // F8: a job starts on the main thread (its padded block copy), so the starts share the frame's streaming budget too:
+      // four jobs per millisecond of the upload budget (6 on Very Low), fewer as the governor drops the streaming rung
+      budget = Math.min(budget, Math.max(2, Math.round(this.uploadBudget() * 4)));
       if (budget <= 0) return;                               // the workers are full: not even a look around (most frames while the world streams in)
       const rd = this.renderDist, r2 = (rd + 0.5) * (rd + 0.5);
       if (lcx === undefined) { lcx = pcx; lcz = pcz; }
@@ -562,6 +564,7 @@
       s.dirty = false;
       // empty section with empty neighbors above/below → no geometry
       if (s.count === 0) {
+        s.uTok = (s.uTok || 0) + 1;   // a queued upload of an older mesh must not bring it back
         if (s.hasMesh) this.renderer.freeSection(s);
         s.vis = 0x7fff; s.meshVer = s.ver; s.meshed = true; s.vxDropped = false;
         this.checkShown(c, performance.now());
@@ -587,11 +590,12 @@
         s.fails = 0;
         this.stats.mesh++; this.stats.meshMs += m.ms || 0;
         s.vis = m.vis;
+        const tok = s.uTok = (s.uTok || 0) + 1;   // only the newest queued mesh of a section is uploaded
         // the upload waits in the streaming queue (drainUploads spends the frame's budget on it, in view order): meshing
         // itself never blocks, and FIFO order holds for one section, so an older mesh never lands after a newer one
         const bl = (a) => (a ? (a.byteLength !== undefined ? a.byteLength : a.length * 4) : 0);
         this.uploadQ.push({ key: c.key, col: c, x: c.cx * 16 + 8, z: c.cz * 16 + 8, bytes: bl(m.opaque) + bl(m.cutout) + bl(m.trans) + bl(m.vx) + bl(m.vxFar), run: () => {
-          if (this.dead || this.cols.get(c.key) !== c) return;
+          if (this.dead || this.cols.get(c.key) !== c || s.uTok !== tok) return;
           this.renderer.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar);
           if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
           s.meshVer = ver; s.meshed = true;
