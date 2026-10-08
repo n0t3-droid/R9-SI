@@ -96,6 +96,7 @@
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
       this.buildPrograms();
       this.buildStatic();
+      this.initPuffs();
       // origins UBO
       if (this.multi) {
         this.ubo = gl.createBuffer();
@@ -125,8 +126,9 @@
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
-      P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky');
+      P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky', this.q.lite ? ['LITE'] : []);   // LITE: two-octave nebula, no dust (Very Low)
       P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud');
+      P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff');   // t-clouds: cumulus, fog banks, anchors (balanced and above)
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
       P.down = GL.program(S.FS_VS, S.DOWN_FS, 'down');
       P.up = GL.program(S.FS_VS, S.UP_FS, 'up');
@@ -545,6 +547,14 @@
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
+      // the sky bodies (skybodies.js): directions and angular radii of the giant, the blue planet and the four moons
+      const B = E.bodies;
+      if (B) {
+        const v4 = (n, a) => { if (u[n]) gl.uniform4f(u[n], a[0], a[1], a[2], a[3]); };
+        v4('u_giant', [B.giant[0], B.giant[1], B.giant[2], B.radius.giant]);
+        v4('u_blue', [B.blue[0], B.blue[1], B.blue[2], B.radius.blue]);
+        for (let mi = 0; mi < 4; mi++) v4('u_moon' + mi, B.moons[mi]);
+      }
       // the block look (Klassisch v2): natural blocks shaded per block, normal maps turned with the tile, still water
       // and the far terrain per block
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
@@ -729,6 +739,8 @@
     }
     drawClouds(E) {
       if (!this.q.clouds || E.dimId !== 0 && E.dimId !== 3) return;
+      // balanced and above (t-clouds): the cumulus as sprites, the fog banks under the Sky Isles and the citadel's anchors
+      if (this.q.clouds >= 2 && E.dimId === 0) { this.drawPuffs(E); return; }
       const gl = this.gl, cam = this.cam;
       const { cell, wind } = this.updateClouds(E, cam);
       if (!this.cloudCount) return;
@@ -750,6 +762,64 @@
       gl.depthFunc(gl.LEQUAL);
       gl.depthMask(true);
       gl.disable(gl.BLEND);
+    }
+
+    // ------------------------------------------------ puffs (t-clouds, balanced and above): sprites, see clouds.js
+    initPuffs() {
+      const gl = this.gl;
+      this.puffCorner = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.puffCorner);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
+      // 0: the fog banks and anchors (world space), 1: the cumulus (cloud space, drawn at − wind)
+      this.puffVAO = [0, 1].map(() => {
+        const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.puffCorner); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+        const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+        gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1);
+        gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1);
+        gl.bindVertexArray(null);
+        return { vao, buf, n: 0 };
+      });
+      this.puffKey = ''; this.puffCount = 0;
+    }
+    updatePuffs(E, cam) {
+      const cov = Math.round(E.cloudCover * 20) / 20, wind = E.time * 0.9, cell = VR.Clouds.CELL;
+      const ocx = Math.floor((cam.x + wind) / cell), ocz = Math.floor(cam.z / cell);
+      const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + Math.floor(cam.x / 96) + ',' + Math.floor(cam.z / 96);
+      if (key === this.puffKey) return;
+      this.puffKey = key;
+      const f = VR.Clouds.field(cam, wind, { cover: cov }), gl = this.gl;
+      const lists = [VR.Clouds.pack(f.fog), VR.Clouds.pack(f.cumulus)];
+      for (let i = 0; i < 2; i++) {
+        const v = this.puffVAO[i];
+        gl.bindBuffer(gl.ARRAY_BUFFER, v.buf); gl.bufferData(gl.ARRAY_BUFFER, lists[i], gl.DYNAMIC_DRAW);
+        v.n = lists[i].length / VR.Clouds.SPRITE_FLOATS;
+      }
+    }
+    drawPuffs(E) {
+      const gl = this.gl, cam = this.cam;
+      if (!this.cloudAtlas) this.cloudAtlas = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: VR.Clouds.atlas(), filter: gl.LINEAR });
+      this.updatePuffs(E, cam);
+      const p = this.P.puff, u = p.u;
+      gl.useProgram(p.p); this.common(p, E);
+      gl.uniformMatrix4fv(u.u_viewProj, false, this.viewProj);
+      // the billboard axes of the game's camera (player.lookDir: yaw 0 looks along −z)
+      const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+      const right = [cy, 0, -sy], up = [sy * sp, cp, cy * sp];
+      gl.uniform3f(u.u_camRight, right[0], right[1], right[2]); gl.uniform3f(u.u_camUp, up[0], up[1], up[2]);
+      const L = E.sunDir, lx = L[0] * right[0] + L[2] * right[2], ly = L[0] * up[0] + L[1] * up[1] + L[2] * up[2];
+      const ll = Math.hypot(lx, ly) || 1, sk = Math.min(1, Math.max(0, (L[1] + 0.12) / 0.24));
+      gl.uniform2f(u.u_sunScreen, lx / ll, ly / ll); gl.uniform1f(u.u_sunK, sk * sk * (3 - 2 * sk));
+      gl.uniform1f(u.u_cloudR, 600);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
+      this.tex(0, this.cloudAtlas, u.u_cloudTex);
+      const fog = this.puffVAO[0], cu = this.puffVAO[1];
+      gl.uniform1f(u.u_fogK, 1); gl.uniform3f(u.u_origin, -cam.x, -cam.y, -cam.z);
+      if (fog.n) { gl.bindVertexArray(fog.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, fog.n); }
+      gl.uniform1f(u.u_fogK, 0); gl.uniform3f(u.u_origin, -E.time * 0.9 - cam.x, -cam.y, -cam.z);
+      if (cu.n) { gl.bindVertexArray(cu.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, cu.n); }
+      this.puffCount = fog.n + cu.n;
+      gl.bindVertexArray(null); gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE); gl.depthFunc(gl.LEQUAL);
     }
 
     // ------------------------------------------------ ships (block grids with a model matrix)
@@ -833,6 +903,7 @@
       {
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
+        if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);   // t-clouds: cirrus from balanced up
         this.fs(p);
       }
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);

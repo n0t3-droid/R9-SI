@@ -26,6 +26,13 @@ uniform vec3 u_planetDir;
 uniform vec3 u_planet2Dir;
 uniform vec3 u_ringNormal;
 uniform float u_skyMagic;    // how strongly the cosmic sky shows by day
+uniform vec4 u_giant;        // gas giant: direction (xyz), angular radius (w) — skybodies.js
+uniform vec4 u_blue;         // blue-green planet: direction, radius
+uniform vec4 u_moon0;        // four grey moons: direction, radius
+uniform vec4 u_moon1;
+uniform vec4 u_moon2;
+uniform vec4 u_moon3;
+uniform float u_cirrus;      // high cirrus streaks: 1 on balanced and above, 0 on Very Low (the sky pass only)
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -49,6 +56,7 @@ float vnoise3(vec3 p){ vec3 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   float b = mix(mix(hash13(i+vec3(0,0,1)), hash13(i+vec3(1,0,1)), f.x), mix(hash13(i+vec3(0,1,1)), hash13(i+vec3(1,1,1)), f.x), f.y);
   return mix(a, b, f.z); }
 float fbm3(vec3 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += vnoise3(p) * a; p = p * 2.03 + 17.1; a *= 0.5; } return v / 0.9375; }
+float fbm3L(vec3 p){ return vnoise3(p) * 0.6667 + vnoise3(p * 2.03 + 17.1) * 0.3333; }   // two octaves, the same scale as fbm3 (Very Low)
 
 // ---- cosmic sky: nebula band, ringed gas giant, second planet, meteors ----
 vec3 nebula(vec3 dir) {
@@ -56,13 +64,23 @@ vec3 nebula(vec3 dir) {
   float b = dot(dir, G);
   float band = exp(-b * b * 7.0);
   vec3 p = dir * 2.6;
+#ifdef LITE
+  float n1 = fbm3L(p + vec3(0.0, u_time * 0.0015, 0.0));
+  float n2 = fbm3L(p * 2.1 + 11.0);
+  float dust = 0.0;
+#else
   float n1 = fbm3(p + vec3(0.0, u_time * 0.0015, 0.0));
   float n2 = fbm3(p * 2.1 + 11.0);
   float dust = smoothstep(0.42, 0.78, fbm3(p * 3.7 - 3.0));
+#endif
   vec3 col = mix(vec3(0.22, 0.06, 0.46), vec3(0.10, 0.36, 1.0), smoothstep(0.3, 0.7, n1));
   col = mix(col, vec3(1.0, 0.30, 0.68), smoothstep(0.48, 0.78, n2) * 0.9);
   // cyan gas lobes and bright pink cores, as in the trailer
+#ifdef LITE
+  float n3 = n1 * 0.6 + n2 * 0.4;
+#else
   float n3 = fbm3(p * 1.6 - 5.0);
+#endif
   col = mix(col, vec3(0.15, 0.95, 1.0), smoothstep(0.6, 0.85, n3) * 0.55);
   col += vec3(1.0, 0.55, 0.85) * smoothstep(0.72, 0.9, n2 * 0.6 + n1 * 0.5) * 0.9;
   vec3 coreDir = normalize(vec3(0.62, 0.42, -0.66));
@@ -212,21 +230,21 @@ vec3 skyColor(vec3 dir, bool withSun) {
       // the blue deepens to violet where the nebula shows, so its colours read by day as in the trailer
       col = mix(col, col * vec3(0.6, 0.48, 0.9) + vec3(0.02, 0.0, 0.05), cosmic * (1.0 - u_night) * 0.7);
       col += nebula(dir) * cosmic * 0.9;
-      vec4 gg = gasGiant(dir, u_planetDir, 0.14, u_sunDir);
+      vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
       col = mix(col, gg.rgb * (0.35 + 0.65 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.6, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)
-      vec4 rp = rockyPlanet(dir, u_planet2Dir, 0.085, u_sunDir);
+      vec4 rp = rockyPlanet(dir, u_planet2Dir, u_blue.w, u_sunDir);
       col += rp.rgb * (1.0 - rp.a) * planetsK * 0.6;
       col = mix(col, rp.rgb * (0.45 + 0.55 * u_night) + col * 0.2, rp.a * mix(0.6, 1.0, u_night) * clear);
-      // the giant's moons ride along with it; a fourth drifts near the blue planet
-      vec3 PD = u_planetDir;
-      vec3 PX = normalize(cross(abs(PD.y) < 0.95 ? vec3(0, 1, 0) : vec3(1, 0, 0), PD)), PY = cross(PD, PX);
-      for (int mi = 0; mi < 4; mi++) {
-        float fm = float(mi);
-        vec3 MC = mi < 3 ? normalize(PD + PX * (0.34 + fm * 0.13) * (mi == 1 ? -1.0 : 1.0) + PY * (0.16 - fm * 0.14)) : normalize(u_planet2Dir + vec3(0.26, -0.12, 0.1));
-        vec4 mn = moonlet(dir, MC, 0.02 + fm * 0.006, u_sunDir, fm * 7.3);
-        col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
-      }
+      // the giant's moons ride along with it; a fourth drifts near the blue planet (skybodies.js: places and radii)
+      vec4 mn = moonlet(dir, u_moon0.xyz, u_moon0.w, u_sunDir, 0.0);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
+      mn = moonlet(dir, u_moon1.xyz, u_moon1.w, u_sunDir, 7.3);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
+      mn = moonlet(dir, u_moon2.xyz, u_moon2.w, u_sunDir, 14.6);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
+      mn = moonlet(dir, u_moon3.xyz, u_moon3.w, u_sunDir, 21.9);
+      col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
     }
     float sd = dot(dir, u_sunDir);
     col += u_sunColor * 16.0 * smoothstep(0.99945, 0.99972, sd) * clear;
@@ -242,6 +260,15 @@ vec3 skyColor(vec3 dir, bool withSun) {
       col += vec3(0.85, 0.9, 1.0) * 3.2 * crater * mix(0.06, 1.0, lit) * clear * smoothstep(1.0, 0.95, length(mp));
     }
     col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night;
+    // high cirrus (t-clouds): thin streaks across the day sky, lit like the day; u_cirrus is 0 on Very Low
+    if (u_cirrus > 0.0 && dir.y > 0.12) {
+      vec2 q = dir.xz / (dir.y + 0.1);
+      float a = vnoise(vec2(q.x * 0.55 + q.y * 0.3, q.y * 4.2 + 3.0) + vec2(u_time * 0.0025, 0.0));
+      float b = vnoise(vec2(q.x * 0.4 - 7.0, q.y * 9.0 - 1.0));
+      float st = smoothstep(0.56, 0.86, a * 0.66 + b * 0.5) * smoothstep(0.12, 0.34, dir.y) * (1.0 - smoothstep(0.62, 0.92, dir.y));
+      vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
+      col = mix(col, cir, st * u_cirrus * 0.42 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
+    }
     // stars
     float starK = max(u_night, cosmic * 0.45);
     if (starK > 0.02 && dir.y > -0.1) {
@@ -909,6 +936,57 @@ void main() {
   float fade = 1.0 - smoothstep(u_cloudR * 0.55, u_cloudR * 0.97, length(v_rel.xz));
   col = mix(col, skyColor(V, false), clamp(dist / (u_cloudR * 1.7), 0.0, 1.0) * 0.55);
   o = vec4(col, u_cloudAlpha * fade);
+}`;
+
+  // ------------------------------------------------------------ puffs (t-clouds): cumulus, fog banks, anchors as billboards
+  // a sprite is a camera-facing quad with the cloud texture (clouds.js atlas): R = density, G/B = the outward normal, so the
+  // sunward rim is lit and the base stays darker. Drawn far to near, depth tested but not written.
+  S.PUFF_VS = `
+layout(location=0) in vec2 a_corner;   // -1..1: the quad
+layout(location=1) in vec4 a_c;        // centre x, y, z (relative to the origin uniform), radius
+layout(location=2) in vec4 a_p;        // alpha, squash (vertical), atlas variant, -
+uniform mat4 u_viewProj;
+uniform vec3 u_origin;                 // −camera (and −wind for the drifting cumulus)
+uniform vec3 u_camRight;
+uniform vec3 u_camUp;
+out vec2 v_uv;
+out float v_alpha;
+out float v_var;
+out float v_dist;
+void main() {
+  vec3 rel = u_origin + a_c.xyz;
+  vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
+  v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x; v_var = a_p.z; v_dist = length(rel.xz);
+  gl_Position = u_viewProj * vec4(p, 1.0);
+}`;
+  S.PUFF_FS = `
+${'__COMMON__'}
+uniform sampler2D u_cloudTex;
+uniform vec2 u_sunScreen;   // the sun's direction in the camera's plane (unit length; 0 at night)
+uniform float u_sunK;       // 0..1 while the sun is up
+uniform float u_fogK;       // 1 for the fog banks (greyer, hazier), 0 for the cumulus
+uniform float u_cloudR;     // the window's radius: the sprites fade out toward it
+in vec2 v_uv;
+in float v_alpha;
+in float v_var;
+in float v_dist;
+out vec4 o;
+void main() {
+  vec2 at = vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5 + v_uv * 0.5;
+  vec4 t = texture(u_cloudTex, at);
+  float d = t.r;
+  if (d < 0.02) discard;
+  vec2 n = t.gb * 2.0 - 1.0;
+  float lit = clamp(0.5 + 0.6 * dot(n, u_sunScreen) * u_sunK, 0.0, 1.0) * mix(0.72, 1.0, v_uv.y);
+  vec3 ambC = u_ambSky * 1.15 + u_moonColor * 0.5 * (1.0 - u_sunK);
+  vec3 litC = ambC + u_sunColor * 0.3 * u_sunK;
+  vec3 shadeC = u_ambSky * 0.8 + vec3(0.02, 0.03, 0.05);
+  vec3 col = mix(shadeC, litC, lit) + u_sunset * 0.22 * (1.0 - lit);
+  col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))), u_rain * 0.6);
+  col = mix(col, u_skyHorizon * 1.1 + ambC * 0.5, u_fogK * 0.45);
+  float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
+  col = mix(col, u_skyHorizon, smoothstep(260.0, 600.0, v_dist) * 0.5);
+  o = vec4(col, d * v_alpha * fade);
 }`;
 
   // ------------------------------------------------------------ far-terrain horizon (LOD tiles)
