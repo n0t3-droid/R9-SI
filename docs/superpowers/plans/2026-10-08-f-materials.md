@@ -4,8 +4,8 @@ Spec: docs/superpowers/specs/2026-10-08-realism-wave-design.md, section F2. Bran
 
 ## What
 
-1. **Normal relief for every opaque cube** (forge, tex_build.js + new tex_mat.js). Baseline (measured with
-   test/… scratch script, interior 24×24 texels, rms of the normal xy): 599 cube layers; 78 have no relief at all
+1. **Normal relief for every opaque cube** (forge, tex_build.js + new tex_mat.js). Baseline (measured with a
+   scratch script outside the repo, scratchpad/f2/interior.js: interior texels 4…27, rms of the normal xy): 599 cube layers; 78 have no relief at all
    (< 0.02: copper, glazed terracotta, crate sides, neon, mire light, Vollton, quartz pillar …), 48 are < 0.05,
    56 are < 0.1. Recipes that already carry relief (bricks' mortar, plank seams, tile grout, leaf clumps, log rings)
    keep it. Layers below the threshold get a family relief (stone grain, wood fibres, fabric weave, brushed metal,
@@ -13,8 +13,7 @@ Spec: docs/superpowers/specs/2026-10-08-realism-wave-design.md, section F2. Bran
    Klassisch outline stays exactly as it is.
 2. **Material families** (new tex_mat.js, shared by the worker and the main thread): VR.matFamily(name) → 0 none,
    1 stone, 2 wood, 3 fabric, 4 metal, 5 plaster. Main thread: one R8 row (1 × layers) uploaded as u_fam.
-3. **Detail layer** (TERRAIN_FS, tier ≥ 1): micro detail per family at 4 cells per block (coarse) and 16 per block
-   (fine), read from the existing 256² tileable noise (u_noise, no new texture); faded out between 8 and 12 blocks
+3. **Detail layer** (TERRAIN_FS, tier ≥ 1): micro detail per family at 4 cells per block (the 16-per-block fine octave is not in this build), read from the existing 256² tileable noise (u_noise, no new texture); faded out between 8 and 12 blocks
    from the eye; damped to 10 % on the outermost texel line so the outline stays on top. Tier 2 adds the gradient
    normal (two more fetches); tier 3 adds the fine octave and the varnished-wood sheen.
 4. **Wet look** (tier ≥ 1, only with the wetGround setting, as before): top faces lose roughness in the rain and take
@@ -59,4 +58,27 @@ Spec: docs/superpowers/specs/2026-10-08-realism-wave-design.md, section F2. Bran
 
 ## Measured
 
-(filled in during the work: forge ms before/after; Very Low and High render costs before/after; screenshots)
+Forge (node, test/tex_materials.js, one process, 1832 layers, on the shared 2-CPU machine): 3716 ms with the relief,
+of which the relief calls are 117 ms; 3420 ms without. The rest of the difference is the re-encoding of the relieved
+layers. The scratch baseline (scratchpad/f2/base.js, not in the repo) gave 2905 ms on average and 2220 ms in one later
+run: the spread here is 30–50 %, so the forge is reported as "the relief is about 3 % of it", not as a ratio.
+
+Render (test/materials.mjs, MEASURE, SwiftShader, 1280×720, the gallery's near view, median of 12 frames after 3
+warm-ups, gl.finish plus a one-texel readPixels). Deviation from the spec: the measured scene is the flat-world
+gallery (seed 31), not the Heartland plaza (that needs the 'default' world type and the origin from gen_heart.js).
+The first run gave 0.3–0.6 ms frames, too fast for a full frame, so the timing was redone with the readPixels sync.
+- after (69cfebf): Very Low tier 0 dry 1611.6 ms, tier 1 forced 1611.2 ms · High tier 0 forced 3344.6 ms, tier 3
+  3420.8 ms (+2.3 %) · rain: Very Low 1531.7 ms, High tier 3 3493.6 ms. Draws 2 and 1156 tris in every case.
+- before (the build of 205d00c, DIST=scratchpad/f2/base/dist, TAG=materials_base): pending.
+
+Shots (test/shots/materials_<preset>_<dry|rain>_<near|far>.png; potato = Very Low, high = High):
+- High dry near: the two-high wall reads as stone (chunky speckle), oak planks (seams, grain), red wool (matte, no
+  highlight), iron block (steel-blue, sky reflection), stucco (cream), glass (frame lines), the stone patch in front.
+- Very Low dry near: the same blocks with less surface detail; the iron block is cream (no metal response at tier 0).
+- High rain far: puddles in the hollows of the grass and of the patch, about a sixth of a flat ground: grey reflective
+  patches. They read as wet, not as glossy water (no sun glint, no ripples, no dark rim).
+- Very Low rain: no puddles (the Very Low preset has wetGround off), the overcast sky only.
+- materials.mjs checks, final run: puddles fill (0.94 after 90 s of rain), dry to 0.36 after 4 min; no page errors
+  and no shader messages.
+- Tests on 69cfebf: materials.mjs ALL OK (exit 0); node set REGRESS_ONLY=node 19 tests, 0 failed.
+- Pending in the browser queue at the time of writing: classic_v2.mjs, smoke.mjs, texcache.mjs.
