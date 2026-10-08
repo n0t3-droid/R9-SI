@@ -137,5 +137,20 @@ const want = [...pick].sort((a, b) => (vol(b) - vol(a)) || (a < b ? -1 : a > b ?
   check(got.join() === 'vm_b_one,vm_c_three' && w.failed && w.done() && env.pending() === 0, 'a failing build is skipped, the rest is built once each in the order given: ' + got.join(' · '));
 }
 
+// 9 · a picture drawn in slices (the pump's ready, Icons.stepIcon): a frame ends when more() says its budget is spent, and an
+// item is painted only once ready says it is complete, in the frame that completes it
+{
+  const e = frameEnv(), painted = [], need = { a: 1, b: 3 }, left = {};
+  const ready = (id, more) => {   // like stepIcon: at least one step per call, more steps while more() says so
+    if (left[id] === undefined) left[id] = need[id];
+    do { e.t += 2; left[id]--; if (left[id] <= 0) return true; } while (more());
+    return false;
+  };
+  const pump = new VR.IconPump({ budget: 6, now: e.now, raf: e.raf, ready, paint: (cv, id) => { painted.push(id + '@' + e.t); e.t += 1; } });
+  pump.add(canvas(), 'a'); pump.add(canvas(), 'b');
+  for (let k = 0; k < 10 && pump.pending; k++) e.runFrame();
+  check(painted.join() === 'a@2,b@9' && pump.pending === 0 && e.rafCalls === 2, 'a sliced picture waits for its frames and is painted when complete: ' + painted.join(' · ') + ' in ' + e.rafCalls + ' frames');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

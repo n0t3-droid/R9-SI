@@ -736,7 +736,7 @@
     // palette icons paint in small batches, about 6 ms per frame (VR.IconPump): a tab of hundreds of models (each builds its
     // voxels on first use) never stalls a frame on a small PC; slots that left the page are skipped
     iconPump() {
-      return this._palPump || (this._palPump = new VR.IconPump({ paint: (cv, id) => this.game.icons.paint(cv, id) }));
+      return this._palPump || (this._palPump = new VR.IconPump({ paint: (cv, id) => this.game.icons.paint(cv, id), ready: (id, more) => this.game.icons.stepIcon(id, more) }));
     }
     // ★ marks on the palette slots
     markFavs(pal) {
