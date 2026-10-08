@@ -59,7 +59,7 @@ for (let i = 0; i < 12; i++) {
 }
 await ev((w) => { const g = VR.game, x = w.x + 7, y = w.gy + 1, z = w.z + 5; g.player.breakBlock(x, y, z, g.world.getBlock(x, y, z), false); }, W);
 // ---- the wand: a glass box, then /undo
-await ev((w) => { const g = VR.game, G = g.gadgets; G.wand.a = [w.x - 12, w.gy + 1, w.z + 4]; G.wand.b = [w.x - 8, w.gy + 4, w.z + 8]; g.chat('/fill glass'); });
+await ev((w) => { const g = VR.game, G = g.gadgets; G.wand.a = [w.x - 12, w.gy + 1, w.z + 4]; G.wand.b = [w.x - 8, w.gy + 4, w.z + 8]; g.chat('/fill glass'); }, W);
 await wait(80);
 await ev(() => VR.game.chat('/undo'));
 // ---- the Forge: a house where the player looks
@@ -137,23 +137,31 @@ await step(30, 33);
 const P1 = await ev(() => ({ cur: VR.Zeit.S.cursor, playing: VR.Zeit.S.playing, speed: VR.Zeit.S.speed, btn: document.querySelector('#zr .zr-play').textContent }));
 check(P1.speed === 100 && P1.cur > c0 && (P1.playing || P1.cur === R0.n), '⏯ plays (×100): change ' + c0 + ' → ' + P1.cur + ', button ' + P1.btn);
 // the replay frame's main-thread time (the picture off: what the replay itself costs)
-const fr = await ev(() => { const g = VR.game, Z = VR.Zeit; Z.seek(0); Z.S.playing = true; Z.S.speed = 300; window.__norender = true; const ts = []; for (let i = 0; i < 60; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); ts.push(performance.now() - t0); } ts.sort((a, b) => a - b); return { med: ts[30], p90: ts[54], cur: Z.S.cursor }; });
-console.log('replay frame (no picture): median ' + fr.med.toFixed(2) + ' ms, p90 ' + fr.p90.toFixed(2) + ' ms');
-check(fr.med < 16, 'a replay frame costs ' + fr.med.toFixed(2) + ' ms on the main thread without the picture (median, ×300)');
+// (60 frames at ×10 from the land as it was: the whole build is placed within the first ~22 of them; the timer's
+// resolution is 0.1 ms, so the average over the frames is the number)
+const fr = await ev(() => { const g = VR.game, Z = VR.Zeit; Z.seek(0); Z.S.playing = true; Z.S.speed = 10; window.__norender = true; const N = 60, a = performance.now(); for (let i = 0; i < N; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); } return { avg: (performance.now() - a) / N, cur: Z.S.cursor, n: Z.S.C.n }; });
+console.log('replay frame (no picture): ' + fr.avg.toFixed(3) + ' ms on average over 60 frames at ×10 (change ' + fr.cur + ' of ' + fr.n + ')');
+check(fr.avg < 16, 'a replay frame costs ' + fr.avg.toFixed(2) + ' ms on the main thread without the picture (average of 60 frames, ×10)');
 
 // ---- ⏺ Video
 const canRec = await ev(() => VR.Zeit.canRecord());
 console.log('MediaRecorder here: ' + canRec);
 if (canRec) {
-  await ev(() => { VR.Zeit.cfg.titleS = 1; VR.Zeit.cfg.endS = 1; VR.Zeit.cfg.maxBodyS = 3; });
+  await ev(() => { VR.Zeit.cfg.titleS = 2.5; VR.Zeit.cfg.endS = 2; VR.Zeit.cfg.maxBodyS = 3; });
   await page.click('#zr [data-zr="rec"]');
-  let shotRec = false, done = false;
+  let shotRec = false, done = false, capT = false, capE = false;
+  // the recording canvas itself (what the video holds): the title card and the end card, as pictures
+  const card = async (name) => { const u = await ev(() => (VR.Zeit.S && VR.Zeit.S.rec ? VR.Zeit.S.rec.cv.toDataURL('image/png') : null)); if (!u) return false; fs.writeFileSync(`${SHOTS}/${name}.png`, Buffer.from(u.split(',')[1], 'base64')); console.log('  shot ' + name + '.png'); return true; };
   for (let i = 0; i < 400 && !done; i++) {
     await step(1, 40, true);
     await wait(40);
     if (!shotRec && i >= 3) { shotRec = true; await page.screenshot({ path: `${SHOTS}/zeitraffer_4_rec.png`, timeout: 180000 }); console.log('  shot zeitraffer_4_rec.png'); }
+    const ph = await ev(() => { const r = VR.Zeit.S && VR.Zeit.S.rec; return r ? { p: r.phase, t: r.t, e: r.tEnd } : null; });
+    if (ph && !capT && ph.p === 'title' && ph.t > 1.2) capT = await card('zeitraffer_4b_card_title');
+    if (ph && !capE && ph.p === 'end' && ph.t - ph.e > 0.9) capE = await card('zeitraffer_4c_card_end');
     done = await ev(() => !!VR.Zeit.lastVideo);
   }
+  check(capT && capE, 'the video\'s title card and end card are drawn (picture of each in test/shots)');
   for (let i = 0; i < 40 && !done; i++) { await wait(250); done = await ev(() => !!VR.Zeit.lastVideo); }
   const V = await ev(() => { const b = VR.Zeit.lastVideo, I = VR.Zeit.lastVideoInfo || {}; return b ? { type: b.type, size: b.size, w: I.w, h: I.h, mime: I.mime, s: I.s, mode: VR.Zeit.ui.mode } : null; });
   console.log('video', JSON.stringify(V));
