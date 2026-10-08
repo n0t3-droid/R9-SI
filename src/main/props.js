@@ -25,7 +25,7 @@
   PR.BIT_FIXED = 15;        // mask bit: the trunk and the crownshaft (always drawn)
   PR.BIT_COCO = 16;         // mask bit: the coconuts
   // the palm's colours (sRGB), linearised by lin() like the terrain's tints
-  const PAL = { bark: 0x7A5A3A, shaft: 0x5E8A4A, nut: 0x5E4026, leafA: 0x2F8A34, leafB: 0x5FC24E, tip: 0xB8D85A, dead: 0x9A7440 };
+  const PAL = { bark: 0x8C7256, shaft: 0x6A8E4A, nut: 0x5E4026, leafA: 0x2F8A34, leafB: 0x62C24C, tip: 0xC2DC5A, dead: 0x9A7440, spear: 0x9CCB5A };
   const lin = (c, k) => [Math.pow(((c >> 16) & 255) / 255, 2.2) * k, Math.pow(((c >> 8) & 255) / 255, 2.2) * k, Math.pow((c & 255) / 255, 2.2) * k];
   const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const norm3 = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
@@ -40,17 +40,19 @@
   };
 
   // ---------------------------------------------------------------- the frond curves (the mesh and the silhouette use them)
-  // the azimuth and the length of a frond slot: green fronds spread evenly with a little jitter, the dead ones hang at random
+  // the axis of a frond slot: the green fronds fan out round the crown (the golden angle) in tiers — the young ones leave
+  // it steeply (el up to 0.95 rad), the old ones nearly level and longer — and droop under their weight; the dead ones hang
   PR.frondAxis = function (k) {
-    if (k < PR.DEAD_FIRST) return { az: ((k + 0.3 * (hash(k, 0, 0, 101) - 0.5)) / PR.FROND_N) * TAU, len: 4.9 + 0.7 * hash(k, 0, 0, 102), dead: false };
-    return { az: hash(k, 0, 0, 103) * TAU, len: 2.6, dead: true };
+    if (k < PR.DEAD_FIRST) { const tier = (k * 0.6180339887) % 1; return { az: k * 2.39996 + 0.35 * (hash(k, 0, 0, 101) - 0.5), el: 0.95 * (1 - tier), len: 4.6 + 1.4 * tier + 0.4 * hash(k, 0, 0, 102), dead: false }; }
+    return { az: hash(k, 0, 0, 103) * TAU, el: -1.2, len: 2.6, dead: true };
   };
-  // a point on frond slot k at t (0 = the crown's centre, 1 = the tip): out rises a little, then the tip droops under its weight
+  // a point on frond slot k at t (0 = the crown's centre, 1 = the tip): it leaves the crown at its elevation and sags
+  // toward the tip (a parabola: the lower the frond, the more it hangs)
   PR.frondPoint = function (k, t, out) {
     const a = PR.frondAxis(k), o = out || [0, 0, 0];
     if (!a.dead) {
-      const r = 0.2 + a.len * t;
-      o[0] = r * Math.cos(a.az); o[1] = 0.35 + 1.2 * t - 4.35 * t * t; o[2] = r * Math.sin(a.az);
+      const g = 2.5 + 1.3 * (1 - a.el / 0.95), r = 0.25 + a.len * Math.cos(a.el) * t;
+      o[0] = r * Math.cos(a.az); o[1] = 0.3 + a.len * Math.sin(a.el) * t - g * t * t; o[2] = r * Math.sin(a.az);
     } else {
       const r = 0.25 + 0.35 * a.len * t;
       o[0] = r * Math.cos(a.az); o[1] = 0.1 - 1.9 * t * t; o[2] = r * Math.sin(a.az);
@@ -73,7 +75,7 @@
         const th = Math.PI * i / LAT, row = [];
         for (let j = 0; j < LON; j++) {
           const ph = TAU * j / LON, nx = Math.sin(th) * Math.cos(ph), ny = Math.cos(th), nz = Math.sin(th) * Math.sin(ph);
-          row.push(vert([cx + rx * nx, cy + ry * ny, cz + rz * nz], [nx, ny, nz], [0.75, 0.5], col, 0, sway, frond));
+          row.push(vert([cx + rx * nx, cy + ry * ny, cz + rz * nz], [nx, ny, nz], [2.75, 0.5], col, 0, sway, frond));
         }
         rows.push(row);
       }
@@ -96,41 +98,60 @@
   let PALM = null;
   PR.palm = function () {
     if (PALM) return PALM;
-    const B = Builder(), D = PR.TRUNK_D, SIDES = 8, RINGS = 10;
-    // the trunk: eleven rings down to −D, tapering (0.24 at the crown, 0.48 at −D), bark rings banded every two blocks
+    const B = Builder(), D = PR.TRUNK_D, SIDES = 10, RINGS = 14;
+    // the trunk: rings down to −D, slim at the crown (0.27) and wider below, a slight collar under the crown; it curves with
+    // the instance's lean (the bend reaches its full lean nine blocks under the crown); uv.x 2.25 marks a solid part (no
+    // atlas lookup: the trunk, the bulb and the nuts are u >= 2) and uv.y counts the bark rings (2.5 a block, the shader
+    // bands them)
     const trunk = [];
     for (let j = 0; j <= RINGS; j++) {
-      const s = D * j / RINGS, bend = (s / D) * (s / D), r = 0.3 + 0.012 * s, ring = [];
-      for (let k = 0; k < SIDES; k++) {
+      const s = D * Math.pow(j / RINGS, 1.6), bend = Math.pow(Math.min(1, s / 9), 1.6), r = 0.27 + 0.013 * s + (s < 0.7 ? 0.05 * (1 - s / 0.7) : 0), ring = [];
+      for (let k = 0; k <= SIDES; k++) {
         const f = (k / SIDES) * TAU, c = Math.cos(f), sn = Math.sin(f);
-        const sh = (j & 1 ? 0.88 : 1) * (k & 1 ? 0.94 : 1);
-        ring.push(B.vert([r * c, -s, r * sn], [c, 0, sn], [0.75, 0.5], lin(PAL.bark, sh), bend, 0.12 * (1 - bend), PR.BIT_FIXED));
+        ring.push(B.vert([r * c, -s, r * sn], [c, 0, sn], [2.25, s * 2.5], lin(PAL.bark, 0.92 + 0.12 * hash(k, j, 0, 5)), bend, 0.12 * (1 - bend), PR.BIT_FIXED));
       }
       trunk.push(ring);
     }
     for (let j = 0; j < RINGS; j++) for (let k = 0; k < SIDES; k++) {
-      const a = trunk[j][k], b = trunk[j][(k + 1) % SIDES], c = trunk[j + 1][(k + 1) % SIDES], d = trunk[j + 1][k];
+      const a = trunk[j][k], b = trunk[j][k + 1], c = trunk[j + 1][k + 1], d = trunk[j + 1][k];
       B.idx.push(a, d, c, a, c, b);
     }
     // the crownshaft: a green bulb on the trunk top, the crown's floor
-    B.sphere(0, 0.12, 0, 0.36, 0.42, 0.36, lin(PAL.shaft, 1), 0.12, PR.BIT_FIXED, 4, 6);
-    // the fronds: six segments each, a V-fold (the sides rise a little above the midrib), the width tapering to the tip
-    for (let k = 0; k < PR.FROND_N + 2; k++) {
-      const a = PR.frondAxis(k), dead = a.dead, ring = [], P = [0, 0, 0];
-      for (let i = 0; i <= 6; i++) {
-        const t = i / 6, p = PR.frondPoint(k, t, P), sx = -Math.sin(a.az), sz = Math.cos(a.az);
-        const W = (dead ? 0.3 : 0.8) * Math.pow(1 - t, 0.5) * Math.min(1, t * 5), up = 0.12 * W;
-        const col = dead ? lin(PAL.dead, 0.85 + 0.2 * hash(k, i, 0, 7))
-          : lerp3(lin(PAL.leafA, 1), lin(PAL.leafB, 1), hash(k, 0, 0, 8)).map((c, q) => c * (1 - 0.3 * t) + lin(PAL.tip, 1)[q] * 0.3 * t);
-        const sway = dead ? 0.25 * t : 0.35 + 0.65 * t;
-        const l = B.vert([p[0] + sx * W, p[1] + up, p[2] + sz * W], norm3([sx * 0.3, 0.94, sz * 0.3]), [0, t], col, 0, sway, k);
-        const r = B.vert([p[0] - sx * W, p[1] + up, p[2] - sz * W], norm3([-sx * 0.3, 0.94, -sz * 0.3]), [0.5, t], col, 0, sway, k);
-        ring.push([l, r]);
+    B.sphere(0, 0.16, 0, 0.42, 0.55, 0.42, lin(PAL.shaft, 1), 0.12, PR.BIT_FIXED, 5, 8);
+    // a frond: eight segments along its curve, three vertices across (a V-fold: the leaflets rise from the midrib), wide
+    // in the middle and narrow at the stalk and the tip; the atlas's frond (u 0…0.5) cuts the leaflets out
+    const P = [0, 0, 0], Q = [0, 0, 0], ROWS = 8;
+    const frond = (k, pt, axisAz, Wmax, fold, colOf, swayOf, slot) => {
+      const sx = -Math.sin(axisAz), sz = Math.cos(axisAz), rows = [];
+      for (let i = 0; i <= ROWS; i++) {
+        const t = i / ROWS, p = pt(Math.min(t, 0.98), P).slice(), q = pt(Math.min(1, t + 0.02), Q), tg = norm3([q[0] - p[0], q[1] - p[1], q[2] - p[2]]);
+        if (t > 0.98) pt(1, p);
+        // the frond's up: perpendicular to its tangent and its side
+        const side = [sx, 0, sz], u = norm3([side[1] * tg[2] - side[2] * tg[1], side[2] * tg[0] - side[0] * tg[2], side[0] * tg[1] - side[1] * tg[0]]);
+        const W = Wmax * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.04)), 0.6) * (1 - 0.3 * t), lift = fold * W;
+        const col = colOf(t), sw = swayOf(t);
+        const nl = norm3([u[0] - sx * fold, u[1], u[2] - sz * fold]), nr = norm3([u[0] + sx * fold, u[1], u[2] + sz * fold]);
+        const l = B.vert([p[0] + sx * W + u[0] * lift, p[1] + u[1] * lift, p[2] + sz * W + u[2] * lift], nl, [0, t], col, 0, sw, slot);
+        const m = B.vert([p[0], p[1], p[2]], u, [0.25, t], col.map(c => c * 1.08), 0, sw, slot);
+        const r = B.vert([p[0] - sx * W + u[0] * lift, p[1] + u[1] * lift, p[2] - sz * W + u[2] * lift], nr, [0.5, t], col, 0, sw, slot);
+        rows.push([l, m, r]);
       }
-      for (let i = 0; i < 6; i++) { const a0 = ring[i][0], b0 = ring[i][1], c0 = ring[i + 1][1], d0 = ring[i + 1][0]; B.idx.push(a0, b0, c0, a0, c0, d0); }
+      for (let i = 0; i < ROWS; i++) { const [a0, b0, c0] = rows[i], [a1, b1, c1] = rows[i + 1]; B.idx.push(a0, b0, b1, a0, b1, a1, b0, c0, c1, b0, c1, b1); }
+    };
+    for (let k = 0; k < PR.FROND_N + 2; k++) {
+      const a = PR.frondAxis(k), dead = a.dead, h = hash(k, 0, 0, 8);
+      const leaf = lerp3(lin(PAL.leafA, 1), lin(PAL.leafB, 1), h), tip = lin(PAL.tip, 1);
+      frond(k, (t, o) => PR.frondPoint(k, t, o), a.az, dead ? 0.34 : 1.05, dead ? 0.15 : 0.42,
+        (t) => dead ? lin(PAL.dead, 0.82 + 0.22 * hash(k, Math.round(t * 8), 0, 7)) : leaf.map((c, q) => c * (1 - 0.32 * t) + tip[q] * 0.32 * t),
+        (t) => dead ? 0.25 * t : 0.35 + 0.65 * t, k);
+    }
+    // two spear leaves: the young fronds still folded, standing up out of the crown's middle (always on)
+    for (const [az, el] of [[0.6, 1.35], [3.4, 1.22]]) {
+      frond(99, (t, o) => { const r = 0.08 + 2.3 * Math.cos(el) * t; o[0] = r * Math.cos(az); o[1] = 0.35 + 2.3 * Math.sin(el) * t - 0.25 * t * t; o[2] = r * Math.sin(az); return o; }, az, 0.16, 0.9,
+        () => lin(PAL.spear, 1), (t) => 0.2 + 0.4 * t, PR.BIT_FIXED);
     }
     // three coconuts under the crown (always on with the crown: mask bit 16)
-    for (const [x, y, z] of [[0.22, -0.3, 0.12], [-0.18, -0.34, -0.1], [0.04, -0.4, -0.24]]) B.sphere(x, y, z, 0.2, 0.2, 0.2, lin(PAL.nut, 1), 0.8, PR.BIT_COCO, 4, 6);
+    for (const [x, y, z] of [[0.24, -0.32, 0.12], [-0.2, -0.36, -0.1], [0.04, -0.42, -0.26]]) B.sphere(x, y, z, 0.2, 0.22, 0.2, lin(PAL.nut, 1), 0.8, PR.BIT_COCO, 4, 6);
     PALM = finish(B);
     return PALM;
   };
@@ -165,13 +186,14 @@
       if (x >= W / 2) { d[o] = d[o + 1] = d[o + 2] = d[o + 3] = 255; continue; }
       const v = (y + 0.5) / H, u = (x + 0.5) / (W / 2), e = Math.abs(u - 0.5) * 2;
       let on = false, shade = 1;
-      if (e < 0.05) on = true;
+      if (e < 0.045) { on = true; shade = 1.0; }
       else {
-        const halfW = 0.95 * Math.pow(1 - v, 0.35), s = (v * 30 + e * 2.4) % 1;
-        on = e < halfW && s < 0.42 + 0.15 * (1 - e) && hash(x, y, 0, 41) > 0.04;
-        shade = 0.72 + 0.28 * (1 - s);
+        // the leaflets: slanting to the tip, broad (about two thirds leaf, a third gap), their ends ragged at the edge
+        const s = (v * 24 + e * 2.0) % 1, rag = 0.9 + 0.1 * Math.sin((v * 24 + e * 2.0) * 9.0 + x);
+        on = e < 0.98 * rag && s < 0.6 + 0.2 * (1 - e) && hash(x, y, 0, 41) > 0.03;
+        shade = 0.7 + 0.3 * (1 - s) - 0.12 * e;
       }
-      const c = on ? Math.round(255 * shade) : 0;
+      const c = on ? Math.round(255 * Math.min(1, shade)) : 0;
       d[o] = d[o + 1] = d[o + 2] = c; d[o + 3] = on ? 255 : 0;
     }
     return { w: W, h: H, data: d };
@@ -196,7 +218,7 @@
     const P = [0, 0, 0];
     for (let k = 0; k < PR.FROND_N + 2; k++) {
       const dead = k >= PR.DEAD_FIRST, col = dead ? PAL.dead : (k & 1 ? PAL.leafB : PAL.leafA);
-      for (let i = 0; i <= 30; i++) { const t = i / 30; PR.frondPoint(k, t, P); disc(P[0], P[1], dead ? 0.3 : 0.42 * (1 - 0.5 * t), rgbOf(col), 0.1, 61 + k); }
+      for (let i = 0; i <= 30; i++) { const t = i / 30; PR.frondPoint(k, t, P); disc(P[0], P[1], dead ? 0.3 : 0.62 * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.04)), 0.6) * (1 - 0.3 * t) + 0.08, rgbOf(col), 0.12, 61 + k); }
     }
     disc(0, 0.3, 0.9, rgbOf(PAL.leafA), 0, 81);
     for (const [x, y] of [[0.22, -0.3], [-0.18, -0.34], [0.04, -0.4]]) disc(x, y, 0.22, rgbOf(PAL.nut), 0, 91);
