@@ -31,6 +31,17 @@ console.log('grade');
   check(night.lift.every(v => v >= 0) && dawn.lift.every(v => v >= 0), 'the lift never darkens (every component ≥ 0)');
 }
 
+console.log('moon');
+{
+  // a new world's first night shows a full moon; the phases cycle over eight days (new moon four days later)
+  const night = (d) => { env.day = d; return Object.assign({}, at(17000)); };
+  const n0 = night(0), n4 = night(4), n2 = night(2);
+  check(n0.moonIllum > 0.99 && n0.moonPh < -0.99, `the first night: full moon (light ${n0.moonIllum.toFixed(2)}, terminator ${n0.moonPh.toFixed(2)})`);
+  check(n4.moonIllum < 0.01, `four nights later: new moon (light ${n4.moonIllum.toFixed(2)})`);
+  check(Math.abs(n2.moonIllum - 0.5) < 0.01, `in between: half (light ${n2.moonIllum.toFixed(2)})`);
+  env.day = 0;
+}
+
 console.log('exposure');
 {
   const EX = VR.Atmos.EXPOSURE, A = VR.Atmos;

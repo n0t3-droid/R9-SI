@@ -133,13 +133,13 @@
       E.saturation = 1.17 - rain * 0.2;
       // F1 · Licht & Luft: the sky's turbidity (fog whitens the horizon a little: the mist lies low, the sky above stays
       // blue; the rain's sky keeps the clear sky's gradient, greyed — dark above, lighter at the horizon), the weather on the sky (atmos.js skyWeather: rain greys it, overcast and storms dim it — v0.41's
-      // palette factors), the biome's tint on the sky, the moon's phase (eight days a cycle: new = dark, full = bright),
+      // palette factors), the biome's tint on the sky, the moon's phase (eight days a cycle, full on the first night),
       // the cloud shadows on the ground, and the grade's lift (warm at the horizon line, blue at night)
       E.skyT = 2.3 + 0.5 * (W.fog || 0);
       E.skyWx = VR.Atmos ? VR.Atmos.skyWeather(rain, W.dark || 0) : [0, 1];
       E.skyOvercast = Math.min(1, rain + (W.dark || 0));
       { const m = (bsky[0] + bsky[1] + bsky[2]) / 3 || 1; E.skyTint = bsky.map((v) => 1 + (v / m - 1) * 0.25); }
-      const ph = (((this.day % 8) + 8) % 8) / 8;
+      const ph = ((((this.day + 4) % 8) + 8) % 8) / 8;   // a new world's first night has a full moon
       E.moonPh = Math.cos(2 * Math.PI * ph);
       E.moonIllum = (1 - Math.cos(2 * Math.PI * ph)) * 0.5;
       E.moonColor = E.moonColor.map((v) => v * (0.25 + 0.75 * E.moonIllum));
