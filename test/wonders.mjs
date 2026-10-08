@@ -43,6 +43,7 @@ console.log('sites', JSON.stringify(info && { n: info.n, spawn: info.spawn && in
 const first = info && info.first;
 check(!!first && Math.hypot(first.x - info.spawn[0], first.z - info.spawn[2]) >= 250 && Math.hypot(first.x - info.spawn[0], first.z - info.spawn[2]) <= 450, 'the first wonder of the world: a ' + (first && first.type) + ' ' + (first ? Math.round(Math.hypot(first.x - info.spawn[0], first.z - info.spawn[2])) : '?') + ' blocks from the spawn');
 if (!first) await finish();
+await step(10);
 const comp0 = await ev(() => { const el = document.getElementById('wcompass'); return el ? { shown: el.style.display !== 'none', text: el.textContent } : null; });
 check(comp0 && comp0.shown && /^✨ [\d.]+ m [↑↗→↘↓↙←↖]$/.test(comp0.text), 'the Wunderkompass at the top points to it: ' + JSON.stringify(comp0));
 // ---- go there: 46 blocks short of it on the way from the spawn, hovering, looking at it
@@ -133,7 +134,8 @@ for (let k = 0; k < TYPES8.length; k++) {
     await ev(([x, z, y]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x + 0.5, y + 70, z + 0.5); p.pitch = -1.2; }, [gx, gz, base.y]);
     await settle(40);
     spot = await land(gx, gz, lot[0] + 6, lot[1] + 6);
-    if (spot.wet <= 0.06 && spot.relief <= 14) break;
+    spot.site = await ev(([x, z]) => Math.round(Math.min(1e4, ...VR.game.wonders.sites.map(q => Math.hypot(q.x - x, q.z - z)))), [gx, gz]);
+    if (spot.wet <= 0.06 && spot.relief <= 14 && spot.site >= 110) break;
     console.log('  (' + type + ': the spot at ' + gx + ' ' + gz + ' is ' + JSON.stringify(spot) + ' — further along)');
     along += 70;
   }
