@@ -63,6 +63,9 @@
       c.addEventListener('wheel', (e) => { if (this.captured) { this.mouse.wheel += Math.sign(e.deltaY); e.preventDefault(); } }, { passive: false });
       document.addEventListener('pointerlockchange', () => {
         this.locked = document.pointerLockElement === this.canvas;
+        // a lock that arrives after the game stopped wanting the mouse (a request made just before the wizard or a screen
+        // opened: the ring's ✨ closes the hand first) is given back at once, or the pointer is locked under the open dialog
+        if (this.locked && !this.captured) { this.locked = false; document.exitPointerLock(); return; }
         if (this.locked) { this.dragLook = false; this.lockFails = 0; this.lockFailed = false; }
         if (this.onLockChange) this.onLockChange(this.locked);
       });

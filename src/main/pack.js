@@ -29,6 +29,7 @@
   // ---------------------------------------------------------------- what may come in
   // a favourite: a block of this game (furniture included), an item, or a whole catalogue house (blueprint_<i>)
   P.idOK = (id) => {
+    if (typeof id === 'string' && /^f:[a-z]+:[a-z0-9,]{0,100}#[0-9a-f]{1,8}$/i.test(id)) return true;   // a Forge thing by its DNA (W2)
     if (typeof id !== 'string' || !id || id.length > 80 || !/^[a-z0-9_:.-]+$/i.test(id) || id === 'air') return false;
     if (VR.R && VR.R.byName[id]) return true;
     if (VR.ITEMS && VR.ITEMS[id]) return true;
