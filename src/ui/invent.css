@@ -81,7 +81,7 @@
 #invent .erf-chip { flex: 0 0 auto; min-width: 44px; justify-content: center; min-height: 44px; padding: 0 13px; border-radius: 22px; border: 1px solid var(--st-line); background: var(--st-bg); color: var(--st-ink); font-weight: 600; font-size: calc(var(--st-fs) * 0.9); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 #invent .erf-chip i { font-style: normal; }
 #invent .erf-chip.on { border-color: var(--erf-a); background: rgba(255, 201, 77, 0.17); }
-@media (max-width: 520px) { #invent .erf-chip:not(.on) span { display: none; } #invent .erf-chip { padding: 0 12px; } }
+@media (max-width: 520px) { #invent .erf-chip:not(.on) span { display: none; } #invent .erf-chip { padding: 0 12px; } #invent .erf-chips { -webkit-mask-image: linear-gradient(90deg, #000 84%, transparent); mask-image: linear-gradient(90deg, #000 84%, transparent); } }
 #invent .erf-tray { flex: 1; min-height: 110px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 10px; align-content: start; padding: 6px 4px 14px; overscroll-behavior: contain; }
 @media (max-width: 520px) { #invent .erf-tray { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; } }
 #invent .erf-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 6px; min-height: 108px; border-radius: 18px; border: 2px solid var(--erf-edge); background: var(--erf-card); color: var(--st-ink); cursor: pointer; touch-action: pan-y; -webkit-touch-callout: none; transition: transform 0.12s, border-color 0.15s, box-shadow 0.15s, opacity 0.15s; }
@@ -132,8 +132,8 @@
 #invent .erf-cn2 { position: absolute; right: 1px; bottom: 0; font-style: normal; font-weight: 800; font-size: 13px; line-height: 1; color: #fff; text-shadow: 0 1px 2px #000; }
 #invent .erf-carrow, #invent .erf-cplus { font-size: 22px; color: var(--erf-a); }
 
-/* a phone or a short window: the invention, its line and „Weiter“ fit without scrolling (360 × 640 checked) */
-@media (max-width: 520px), (max-height: 700px) {
+/* a phone or a short window: the invention, its line and „Weiter“ fit without scrolling (360 × 640 and 1280 × 720 checked) */
+@media (max-width: 520px), (max-height: 760px) {
   #invent .erf-rv { gap: 7px; }
   #invent .erf-big { width: clamp(118px, 30vmin, 170px); }
   #invent .erf-rn { font-size: calc(var(--st-fs) * 1.7); }
