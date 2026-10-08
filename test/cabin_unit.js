@@ -102,6 +102,9 @@ const up = mgr.cabin.standUp(s); run(0.1);
 check(up && W() && !mgr.pilot && fl.state === 'flying', 'stood up while it hovers: walking in the cockpit');
 const wy0 = g.player.pos[1], ly0 = W().p[1]; fl.holdAlt += 6; run(3);
 check(Math.abs(W().p[1] - ly0) < 0.05 && g.player.pos[1] - wy0 > 4, 'the hovering ship carries you (local Δy ' + (W().p[1] - ly0).toFixed(2) + ', world Δy ' + (g.player.pos[1] - wy0).toFixed(1) + ')');
+// the gamepad's walk stick (input.padMove, F5's pad.js: analog, not the W key) walks the deck as W does
+const pz0 = W().p[2]; W().yaw = Math.PI; input.padMove = { fwd: 1, str: 0 }; run(0.8); input.padMove = { fwd: 0, str: 0 }; run(0.2);
+check(W() && W().p[2] - pz0 > 0.8, 'the gamepad\'s walk stick walks the deck (z ' + pz0.toFixed(2) + ' → ' + (W() && W().p[2].toFixed(2)) + ')');
 input.pressed.add('KeyV'); run(0.1);
 check(mgr.pilot === s, 'and V sits you back down');
 input.pressed.add('KeyV'); run(8);
