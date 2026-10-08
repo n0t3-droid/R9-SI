@@ -283,7 +283,9 @@ vec3 skyColor(vec3 dir, bool withSun) {
       col = mix(col, col * vec3(0.6, 0.48, 0.9) + vec3(0.02, 0.0, 0.05), cosmic * (1.0 - u_night) * 0.7);
       col += nebula(dir) * cosmic * mix(1.3, 0.9, u_night);   // by day the veil reads as the trailer's magenta and cyan
       vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
-      col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
+      // the planet keeps 5 % of the sky behind it by day (v0.41: 15 %): the sky's blue made the ringed giant's disc as
+      // blue as its ring, so the body stood out less than in v0.41
+      col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.05 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)
       vec4 rp = rockyPlanet(dir, u_planet2Dir, u_blue.w, u_sunDir);
       col += rp.rgb * (1.0 - rp.a) * planetsK * 0.6;
@@ -405,6 +407,9 @@ vec3 applyFog(vec3 col, vec3 rel, float dist) {
   // aerial perspective (F1): the air keeps less of the far things' red and blue differently (blue scatters out first),
   // and adds the sky seen along the view — distant land turns toward the sky's colour instead of a flat grey
   vec3 sky = atmoAir(vec3(dir.x, max(dir.y, 0.0), dir.z));
+  // the haze keeps 60 % of the sky's chroma at the sky's own luminance: the full blue made the far grass grey-blue
+  // (saturation −17 % against v0.41 in the clear noon), while the luminance and the density stay as they are
+  sky = mix(vec3(dot(sky, vec3(0.2126, 0.7152, 0.0722))), sky, 0.6);
   vec3 tr = pow(vec3(1.0 - f), vec3(0.9, 1.0, 1.22));
   return col * tr + sky * (1.0 - tr);
 }
@@ -1480,13 +1485,15 @@ void main() {
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
   o = vec4(c, 1.0);
 }`;
-  // the adaptive exposure (F1): a log average of the scene's luminance from 16 samples, the target of the middle grey
-  // (key 0.3, partial: power 0.3, within 0.8…1.35), eased — up at a rate of 0.8 s, down in 2.5 s
+  // the adaptive exposure (F1): a log average of the scene's luminance from 16 samples, the target (key 0.44, the clear
+  // noon's log average, partial: power 0.3) kept within ±0.5 stops of 1 (0.707…1.414), so a bright day is never
+  // bleached and a dark cave gets a little light; eased slowly — up in 2 s, down in 3 s (the eyes take their time)
   S.EXPOSE_FS = `
 uniform sampler2D u_scene;
 uniform sampler2D u_prev;
 uniform float u_dt;
 uniform vec3 u_expParams;   // lo, hi, power
+uniform float u_expKey;     // the log-average luminance that wants exposure 1 (atmos.js EXPOSURE.key)
 in vec2 v_uv;
 out vec4 o;
 void main() {
@@ -1495,9 +1502,9 @@ void main() {
     vec3 c = texture(u_scene, (vec2(float(i), float(j)) + 0.5) / 4.0).rgb;
     s += log(dot(c, vec3(0.2126, 0.7152, 0.0722)) + 0.02);
   }
-  float target = clamp(pow(0.3 / exp(s / 16.0), u_expParams.z), u_expParams.x, u_expParams.y);
+  float target = clamp(pow(u_expKey / exp(s / 16.0), u_expParams.z), u_expParams.x, u_expParams.y);
   float prev = texture(u_prev, vec2(0.5)).r;
-  float tau = target > prev ? 0.8 : 2.5;
+  float tau = target > prev ? 2.0 : 3.0;
   float cur = prev + (target - prev) * (1.0 - exp(-u_dt / tau));
   o = vec4(cur, cur, cur, 1.0);
 }`;
