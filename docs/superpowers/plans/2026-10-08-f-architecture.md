@@ -79,10 +79,14 @@ Measured on the 2-CPU machine while other agents' browser tests ran (load 7–12
   and roads at vgen 6 as at vgen 5.
 - **Beds:** village homes without a bed: vgen 5 0 of 323; vgen 6 67 of 323 before the bed fix, 0 of 323 after it.
   Homes without a table: 47 → 0; without seats: 47 → 7.
-- **Render cost (browser, `test/cost_before_after.mjs`: the villa's front, a modern street and a village home inside, 960×540,
-  `renderer.stats` after one real frame, the preset's own settings with the smart-quality ladder off):** measured in the
-  browser run that is queued at the time of writing (the numbers go in when it is in). An earlier partly loaded run
-  (55 draws on Very Low, 134 on High) is not used: its views were not settled. The frame ms are noisy on this machine and
-  are not compared.
-- **Before and after (pre-F6 build 205d00c against this build, the same three views, `test/cost_before_after.mjs`):**
-  see the probe output below (filled in when the run is in).
+- **Geometry cost, before and after (node, the mesher's vertex units for sections y 48–111 of every chunk of the same modern
+  town and of the same village; before = pre-F6 build 205d00c at vgen 5, after = this build at vgen 6; default mesh flags):**
+  town 17,602,032 → 17,672,532 (+0.4%), sections with geometry 823 → 823; village 6,005,976 → 6,061,616 (+0.9%), sections
+  with geometry 240 → 240. Most of the change is the mini-voxel stream (furniture and street models); the village's opaque
+  stream is unchanged (330,288). So Very Low gets slightly more triangles in these places (under 1%); the draw-call count
+  of the views is unchanged.
+- **Render cost in the browser (`test/cost_before_after.mjs`, Very Low and High, before and after): not measured.** Its
+  views (the modern town's villa front and street, a village home inside) did not finish loading within the 5 minutes
+  per view that the test allows on this loaded machine (renderDist 4); the counts read from those unsettled views are
+  discarded. The item shadows and lamp halos on High are therefore not measured. Checked in the browser: on Very Low the
+  item shadows and lamp halos are off (`test/architecture.mjs`).
