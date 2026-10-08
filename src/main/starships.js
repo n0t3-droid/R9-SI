@@ -13,6 +13,7 @@
   'use strict';
   const mat4 = VR.mat4, M = VR.M, PH = VR.PHYS, R = VR.R, F = VR.F;
   const TAU = Math.PI * 2, QT = Math.PI / 2;
+  const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const IDENT = mat4.create();
   const wrapA = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
   let NEXT = 1;
@@ -174,7 +175,7 @@
         s.pos[1] = y !== null ? y : Math.floor(p.pos[1]);
         g.audio.play('warp');
         g.particles.explosion(x + 0.5, s.pos[1] + m.height * 0.5, z + 0.5, 0.8);
-        g.ui.chatLine(`${m.name} (${m.label}) has landed. Right-click it to board.`, '#9affd8');
+        g.ui.chatLine(T('g.ship.parked', { name: m.name, label: m.label }), '#9affd8');
       });
       return d;
     }
@@ -247,7 +248,7 @@
       if (!s.flight) s.flight = new VR.Flight(g, this.body(s));
       s.flight.enter(resume && flying);
       g.audio.play('door');
-      g.ui.hint(`${s.d.meta.name} · W/S throttle · A/D turn · Space/Shift climb · mouse looks (hold right button to steer) · B boost · C view · G autopilot · V land`, 5000);
+      g.ui.hint(T('g.ship.hint', { name: s.d.meta.name }), 5000);
       g.codex && g.codex.event && g.codex.event('ship');
       this.refreshNear(true);
     }

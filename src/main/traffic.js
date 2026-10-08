@@ -38,16 +38,19 @@
       const a = rng.range(0, TAU), pass = rng.range(big ? 60 : 30, big ? 140 : 110) * (rng.chance(0.5) ? 1 : -1), D = rng.range(150, 230);
       const fx = Math.cos(a), fz = Math.sin(a), rx = -fz, rz = fx;
       const alt = M.clamp(fp[1] + rng.range(big ? 55 : 25, big ? 110 : 75), 96, big ? 236 : 226);
-      const A = [fp[0] - fx * D + rx * pass, alt + rng.range(-8, 8), fp[2] - fz * D + rz * pass];
-      const B = [fp[0] + fx * D + rx * pass * 0.4, alt + rng.range(-12, 12), fp[2] + fz * D + rz * pass * 0.4];
-      const C = [(A[0] + B[0]) / 2 + rx * rng.range(-60, 60), (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * rng.range(-60, 60)];
+      let A = [fp[0] - fx * D + rx * pass, alt + rng.range(-8, 8), fp[2] - fz * D + rz * pass];
+      let B = [fp[0] + fx * D + rx * pass * 0.4, alt + rng.range(-12, 12), fp[2] + fz * D + rz * pass * 0.4];
+      let C = [(A[0] + B[0]) / 2 + rx * rng.range(-60, 60), (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * rng.range(-60, 60)];
+      // a docking flight comes in over the plaza from the south and sets down on the apron in front of the portal
+      const dock = opts.dock ? this.dockPoint() : null;
+      if (dock) { A = [dock[0] + rng.range(-40, 40), 120, dock[2] + 190]; C = [dock[0] + rng.range(-10, 10), 104, dock[2] + 70]; B = [dock[0], dock[1] + m.height * 0.5 + 2.5, dock[2]]; }
       const len = Math.hypot(B[0] - A[0], B[2] - A[2]) * 1.1;
-      const squad = !opts.defender && !opts.circle && (arch === 'interceptor' || arch === 'racer' || arch === 'gunship') && rng.chance(0.5);
-      const n = opts.defender ? 1 : squad ? rng.irange(3, 5) : arch === 'interceptor' || arch === 'racer' ? (rng.chance(0.55) ? rng.irange(2, 3) : 1) : arch === 'gunship' && rng.chance(0.3) ? 2 : 1;
+      const squad = !opts.defender && !opts.circle && (arch === 'interceptor' || arch === 'racer' || arch === 'gunship' || arch === 'shuttle' || arch === 'dropship') && rng.chance(0.5);
+      const n = opts.defender ? 1 : squad ? rng.irange(2, 4) : arch === 'interceptor' || arch === 'racer' ? (rng.chance(0.55) ? rng.irange(2, 3) : 1) : arch === 'gunship' && rng.chance(0.3) ? 2 : 1;
       for (let k = 0; k < n; k++) {
         // a V formation: wingmen fall back and out, staggered in height
         const off = k === 0 ? [0, 0, 0] : [(k % 2 ? -1 : 1) * (m.width + (squad ? 6 : 3)) * Math.ceil(k / 2), (squad ? -1.5 : 0) * Math.ceil(k / 2) + rng.range(-1, 1), (m.length + (squad ? 7 : 4)) * Math.ceil(k / 2)];
-        this.ships.push({ d, A, B, C, off, t: -k * 0.02, dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0 });
+        this.ships.push({ d, A, B, C, off, t: -k * 0.02, dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), dock: dock ? { phase: 'in', parkT: 0, parkDur: rng.range(9, 15) } : null, defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0 });
       }
     }
     spawnDefenders() {
@@ -61,7 +64,12 @@
       if (!fp || (g.state === 'play' && g.dim !== 'overworld')) return;
       this.t -= dt;
       const maxShips = g.settings.preset === 'potato' ? 2 : g.settings.preset === 'low' ? 4 : 9;
-      if (this.t <= 0) { this.t = 11 + Math.random() * 22; if (this.ships.length < maxShips) this.spawnFlight(); }
+      if (this.t <= 0) {
+        this.t = 11 + Math.random() * 22;
+        const dp = this.dockPoint();
+        if (this.ships.length < maxShips && dp && !this.ships.some(s => s.dock) && Math.hypot(dp[0] - fp[0], dp[2] - fp[2]) < 900 && Math.random() < 0.2) this.spawnFlight({ arch: Math.random() < 0.6 ? 'shuttle' : 'dropship', dock: true });
+        else if (this.ships.length < maxShips) this.spawnFlight();
+      }
       if (g.state === 'play' && g.raidActive && !this.ships.some(s => s.defender) && !this.defended) { this.defended = true; this.spawnDefenders(); }
       if (!g.raidActive) this.defended = false;
       let near = 1e9;
@@ -72,13 +80,59 @@
         if (s.dead) { this.ships.splice(i, 1); continue; }
         const d = Math.hypot(s.pos[0] - fp[0], s.pos[1] - fp[1], s.pos[2] - fp[2]);
         near = Math.min(near, d);
+        // the speed each craft really makes (its plume is hot and short when it idles at the apron)
+        if (s.lastPos) { const v = Math.hypot(s.pos[0] - s.lastPos[0], s.pos[1] - s.lastPos[1], s.pos[2] - s.lastPos[2]) / Math.max(dt, 1e-3); s.spd = s.spd === undefined ? v : s.spd + (v - s.spd) * Math.min(1, dt * 3); }
+        s.lastPos = s.pos.slice();
         this.exhaust(s, d);
         if (s.defender) this.dogfight(s, dt);
       }
       g.audio.loop('flyby', near < 90 ? (1 - near / 90) * 0.45 : 0, near < 90 ? 0.6 + (1 - near / 90) * 0.6 : 0.5);
     }
+    // the Gate Temple's apron: where a docking craft sets down (the runway's deck in front of the portal)
+    dockPoint() { const H = VR.Heart; return H ? [H.TEMPLE.x, H.PLAT + 1, H.TEMPLE.front + 10] : null; }
+    // docking: the craft comes in over the plaza, settles on the apron with its wingmen beside it, idles there for
+    // 9–15 s, then lifts off and leaves the way it came (the same curves in reverse)
+    flyDock(s, dt) {
+      const D = s.dock;
+      if (D.phase === 'park') { D.parkT += dt; if (D.parkT >= D.parkDur) this.dockLeave(s); }
+      if (D.phase !== 'park') {
+        s.t += dt / s.dur;
+        if (s.t < 0) return;   // a wingman waits for its turn
+        if (s.t >= 1) {
+          if (D.phase === 'out') { s.dead = true; this.flash(s, false); return; }
+          s.t = 1; D.phase = 'park'; D.parkT = 0;
+          if (!s.arrived) { s.arrived = true; this.dockDust(s); }
+        }
+      }
+      const t = Math.min(1, s.t), P = this.bez(s, t);
+      if (D.phase !== 'park') {
+        const P2 = this.bez(s, Math.min(1, t + 0.01)), yaw = Math.atan2(-(P2[0] - P[0]), -(P2[2] - P[2]));
+        if (s.prevYaw !== null) { let dy = yaw - s.prevYaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU; s.roll += (M.clamp(dy / Math.max(dt, 1e-3) * 2.5, -0.6, 0.6) - s.roll) * Math.min(1, dt * 2); }
+        s.prevYaw = yaw; s.heading = yaw;
+      } else s.roll += (0 - s.roll) * Math.min(1, dt * 2);
+      const c = Math.cos(s.heading), sn = Math.sin(s.heading);
+      const bob = D.phase === 'park' ? 0.1 * Math.sin(s.age * 1.3) : Math.sin(s.age * 0.7) * 0.6;
+      s.pos = [P[0] + s.off[0] * c + s.off[2] * sn, P[1] + s.off[1] + bob, P[2] - s.off[0] * sn + s.off[2] * c];
+    }
+    dockLeave(s) {
+      const D = s.dock, dp = this.dockPoint();
+      D.phase = 'out';
+      s.A = s.B.slice(); s.C = [dp[0] + (s.B[0] - dp[0]) * 0.3, 104, dp[2] + 80]; s.B = [dp[0], 120, dp[2] + 220];
+      s.t = 0; s.dur = Math.max(1, Math.hypot(s.B[0] - s.A[0], s.B[2] - s.A[2]) * 1.1 / Math.max(20, s.speed)); s.prevYaw = null;
+      this.dockDust(s);
+    }
+    // the engines blow the dust off the apron as a craft settles or lifts off (nothing when nobody is near)
+    dockDust(s) {
+      const g = this.g, P = g.particles, dp = this.dockPoint(), fp = this.focus();
+      if (!P || !dp || !fp || Math.hypot(dp[0] - fp[0], dp[2] - fp[2]) > 320) return;
+      for (let k = 0; k < 22; k++) {
+        const a = Math.random() * TAU, r = 3 + Math.random() * 7, x = s.pos[0] + Math.cos(a) * r, z = s.pos[2] + Math.sin(a) * r;
+        P.spawn(x, dp[1] + 0.2, z, Math.cos(a) * 6, 0.6 + Math.random() * 1.2, Math.sin(a) * 6, { life: 0.8 + Math.random() * 0.6, size: 0.3 + Math.random() * 0.3, grav: -0.2, col: [0.72, 0.68, 0.6], drag: 1.5, grow: 1.2, collide: false });
+      }
+    }
     bez(s, t) { const u = 1 - t, A = s.A, B = s.B, C = s.C; return [u * u * A[0] + 2 * u * t * C[0] + t * t * B[0], u * u * A[1] + 2 * u * t * C[1] + t * t * B[1], u * u * A[2] + 2 * u * t * C[2] + t * t * B[2]]; }
     flyPath(s, dt) {
+      if (s.dock) return this.flyDock(s, dt);
       s.t += dt / s.dur;
       if (s.t < 0) return;
       if (s.t >= 1 && !s.warpOut) { s.warpOut = true; s.wt = 0; this.flash(s, false); }
@@ -129,11 +183,12 @@
       const g = this.g, m = s.d.meta;
       if (dist > 260 || s.t < 0 || !m) return;
       const c = Math.cos(s.heading), sn = Math.sin(s.heading), f = [-sn, -c];
-      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], 40, { thrust: 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : [0.6, 0.5, 1], minor: ei > 1, smokeLife: s.big ? 4.5 : 7, smokeK: 1.15 }); } }
+      const sp = s.spd !== undefined ? s.spd : 40, hov = sp < 6;
+      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], sp, { thrust: hov ? 0.45 : 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : hov ? [1, 0.6, 0.28] : [0.52, 0.92, 1], minor: ei > 1, smokeLife: s.big ? 4.5 : 7, smokeK: 1.15 }); } }
       for (const e of m.exhaust) {
         if (Math.random() > 0.55) continue;
         const x = s.pos[0] + e[0] * c + e[2] * sn, z = s.pos[2] - e[0] * sn + e[2] * c;
-        g.particles.spawn(x, s.pos[1] + e[1], z, -f[0] * 12, 0, -f[1] * 12, { life: 0.25 + Math.random() * 0.2, size: e[3] * (s.big ? 1.2 : 0.8), grav: 0, col: [1, 0.6, 0.3], emis: 1, drag: 3, grow: 0.8, collide: false });
+        g.particles.spawn(x, s.pos[1] + e[1], z, -f[0] * 12, 0, -f[1] * 12, { life: 0.25 + Math.random() * 0.2, size: e[3] * (s.big ? 1.2 : 0.8), grav: 0, col: hov ? [1, 0.6, 0.28] : [0.5, 0.85, 1], emis: 1, drag: 3, grow: 0.8, collide: false });
       }
     }
     draw(r, E, layer) {

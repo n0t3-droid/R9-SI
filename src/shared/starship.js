@@ -528,7 +528,7 @@
       opts = opts || {};
       const rng = new VR.RNG(((seed >>> 0) ^ 0x2545f491) >>> 0);
       arch = arch && ARCH[arch] ? arch : this.pickArch(rng, opts.allow);
-      const palOpts = arch === 'shuttle' ? [PAL[0], PAL[7], PAL[2]] : arch === 'freighter' ? [PAL[5], PAL[0], PAL[3], PAL[2]] : PAL;
+      const palOpts = arch === 'shuttle' ? [PAL[0], PAL[0], PAL[7]] : arch === 'freighter' ? [PAL[5], PAL[0], PAL[3], PAL[2]] : PAL;
       const pal = opts.palette ? (PAL.find(p => p.key === opts.palette) || PAL[0]) : rng.pick(palOpts);
       const S = { hull: rgb(pal.hull), hull2: rgb(pal.hull2), trim: rgb(pal.trim), acc: rgb(pal.acc), acc2: rgb(pal.acc2), glow: rgb(pal.glow), glass: rgb(pal.glass), eng: rgb(pal.eng), core: rgb(pal.core), meta: { exhaust: [], guns: [], eye: null, seat: null } };
       const R = ARCH[arch].res;
