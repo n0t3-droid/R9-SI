@@ -76,7 +76,7 @@ if (A) {
 // hc: the middle of the house's street front (lot ox + house u0 + w/2, oz + house v0); eye → target
 const DUSK = +(process.env.TOD || 13300);
 const CAMS = {
-  front: { t: DUSK, fov: 45, eye: [8, 2.4, -24], at: [-2, 7, 6] },
+  front: { t: DUSK, fov: 42, eye: [12, 3.5, -34], at: [-1, 8.5, 6] },
   corner: { t: DUSK, fov: 50, eye: [-1.0, 1.8, -7.5], at: [-7.5, 4.0, -0.5] },
   garden: { t: DUSK, fov: 50, eye: [-8, 4.2, -16], at: [0, 3.5, 0] },
   stair: { t: 6000, fov: 70, eye: [0, 3.0, 5.2], at: [0, 3.4, 14] },
@@ -84,9 +84,9 @@ const CAMS = {
   foyer: { t: 6000, fov: 66, eye: [0.5, 2.4, 2.4], at: [0, 2.6, 14] },
 };
 const EXTRA = {
-  back: { t: 6500, fov: 60, eye: [0, 3.0, 28], at: [0, 5, 12] },
+  back: { t: 6500, fov: 60, eye: [-5, 4.0, 29], at: [0, 4, 12] },
   aerial: { t: DUSK, fov: 50, eye: [26, 28, -24], at: [0, 6, 9] },
-  front_day: { t: 9000, fov: 45, eye: [8, 2.4, -24], at: [-2, 7, 6] },
+  front_day: { t: 9000, fov: 42, eye: [12, 3.5, -34], at: [-1, 8.5, 6] },
   garden_noon: { t: 7000, fov: 50, eye: [-8, 4.2, -16], at: [0, 3.5, 0] },
   roof: { t: DUSK, fov: 55, eye: [0, 20, -12], at: [0, 13, 10] },
 };
@@ -97,9 +97,12 @@ const aim = async (H, cam) => {
   await settle(40); await step(6);
 };
 let pics = 0, want = 0;
+// BEFORE_SHOTS=front,corner …: only these "before" pictures (the old house does not change between runs; the cost
+// measurement below still uses it)
+const BEFORE = process.env.BEFORE_SHOTS ? new Set(process.env.BEFORE_SHOTS.split(',')) : null;
 for (const [name, cam] of Object.entries(CAMS)) {
   if (A) { want++; await aim(A, cam); if (await shot(`${TAG}_${name}`)) pics++; }
-  if (Bf) { want++; await aim(Bf, cam); if (await shot(`${TAG}_${name}_before`)) pics++; }
+  if (Bf && (!BEFORE || BEFORE.has(name))) { want++; await aim(Bf, cam); if (await shot(`${TAG}_${name}_before`)) pics++; }
 }
 for (const [name, cam] of Object.entries(EXTRA)) if (A) { want++; await aim(A, cam); if (await shot(`${TAG}_${name}`)) pics++; }
 check(pics === want && want >= 10, `every picture is written (${pics} of ${want})`);
