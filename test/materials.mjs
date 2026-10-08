@@ -65,14 +65,15 @@ await run('high', 'dry');
 // the rain: the weather forced to rain; the puddles fill in ~30 s, so the simulated time runs first (no drawing)
 await ev(() => VR.game.env.wx.force('regen'));
 await step(900, 100);
-const pud = await ev(() => ({ puddle: VR.game.env.puddle, rain: VR.game.env.rain, wet: VR.game.env.E.wet, puddleE: VR.game.env.E.puddle }));
+// (the baseline build has no puddle state: NaN there, so the checks fail and the costs still run)
+const pud = await ev(() => ({ puddle: VR.game.env.puddle ?? NaN, rain: VR.game.env.rain, wet: VR.game.env.E.wet, puddleE: VR.game.env.E.puddle ?? NaN }));
 check(pud.rain > 0.5 && pud.puddle > 0.5, `puddles fill in the rain (puddle ${pud.puddle.toFixed(2)}, rain ${pud.rain.toFixed(2)})`);
 await run('potato', 'rain');
 await run('high', 'rain');
 // the drying: the rain stops; after four minutes the puddles are at about 1/e of their fill (4-minute time constant)
 await ev(() => VR.game.env.wx.force('klar'));
 await step(60 * 4 * 10, 100);
-const dry = await ev(() => ({ puddle: VR.game.env.puddle, rain: VR.game.env.rain }));
+const dry = await ev(() => ({ puddle: VR.game.env.puddle ?? NaN, rain: VR.game.env.rain }));
 check(dry.puddle > 0.2 && dry.puddle < 0.5, `puddles dry over minutes (after 4 min: ${dry.puddle.toFixed(2)}, the fill was ${pud.puddle.toFixed(2)})`);
 
 // the costs: the same near view at each tier (matTier forced), median frame wall time in ms
