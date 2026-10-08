@@ -28,10 +28,10 @@ const run = async (URL, TAG) => {
   await ev(`VR.game.createWorld({name:'Trailer',mode:'creative',difficulty:'normal',type:'default',seed:'424242',cheats:true,kit:true})`);
   for (let i = 0; i < 60; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   await frames(30);
-  // ---- shot D (the frame t3_03): the camera on the plaza at eye level, about 24 m in front of the apron, the portal
-  // behind. A shuttle comes in over the plaza and parks on the apron, turned to face the camera (after; before: a craft
-  // flies by). The apron is dockPoint(): x 0, deck 81, z 30; the temple's front is at z 20.
-  await ev(() => { const g = VR.game, p = g.player; p.teleport(0, 84, 54); p.flying = true; p.yaw = 0; p.pitch = -0.02; g.env.setTime(12600); });
+  // ---- shot D (the frame t3_03): the camera on the plaza at the craft's height, about 14 m in front of the apron, the
+  // portal behind. A shuttle comes in over the plaza and parks on the apron, turned to face the camera (after; before: a
+  // craft flies by). The apron is dockPoint(): x 0, deck 81, z 30; the temple's front is at z 20.
+  await ev(() => { const g = VR.game, p = g.player; p.teleport(0, 85.4, 44); p.flying = true; p.yaw = 0; p.pitch = 0.03; g.env.setTime(12600); });
   await frames(40);
   const spawned = await ev(() => { const g = VR.game; g.traffic.spawnFlight({ arch: 'shuttle', dock: true }); return true; });
   check(spawned, TAG + ': a shuttle is launched toward the Gate Temple');
@@ -42,12 +42,15 @@ const run = async (URL, TAG) => {
   await frames(TAG === 'after' ? 150 : 30);   // the craft turns on the apron (about 3 s) before the picture
   const parked = await ev(() => VR.game.traffic.ships.filter(s => s.dock && s.dock.phase === 'park').map(s => ({ y: +s.pos[1].toFixed(2), z: +s.pos[2].toFixed(1), off180: +Math.abs(Math.atan2(Math.sin(s.heading - Math.PI), Math.cos(s.heading - Math.PI))).toFixed(3) })));
   check(TAG !== 'after' || parked.length > 0, TAG + ': the shuttle parks on the apron, facing the plaza (' + JSON.stringify(parked) + ')');
+  await wait(3000);   // the chunk meshes around the apron come back from the workers between the frames
+  await frames(2);
   await shot('plaza');
   // ---- formation (the frame t1_01): loose formations of 2 to 4 over the canyon. The camera hangs off the right side of a
   // lead shuttle, a little behind and above, so its engine trails run back across the frame as in the trailer.
-  await ev(() => { const g = VR.game, p = g.player; p.teleport(-160, 128, 240); p.yaw = 0.6; p.pitch = -0.12; });
+  // the formation is launched from the plaza (where the chunks are loaded, so the worker's designs come back in time);
+  // the camera goes to the canyon's side of a lead shuttle only once the formation is flying
   for (let k = 0; k < 3; k++) await ev(() => { VR.game.traffic.spawnFlight({ arch: 'shuttle' }); return 1; });
-  for (let i = 0; i < 300; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length >= 2)) break; }
+  for (let i = 0; i < 750; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length >= 2)) break; }
   for (let i = 0; i < 10; i++) { await frames(20); await wait(30); }
   const fl = await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length);
   check(fl >= 2, TAG + ': several shuttles fly over the Heartland (' + fl + ')');
@@ -63,6 +66,8 @@ const run = async (URL, TAG) => {
     return { n: S.length, t: +s.t.toFixed(2), dist: +Math.hypot(d[0], d[1], d[2]).toFixed(1) };
   });
   check(aim !== null, TAG + ': a lead shuttle is framed from its side (' + JSON.stringify(aim) + ')');
+  await wait(3000);
+  await frames(2);
   await shot('formation');
   // ---- cost on Very Low: the frame's JS time with the flight effects on (potato), averaged over 30 drawn frames
   await ev(() => VR.game.applyPreset('potato'));
