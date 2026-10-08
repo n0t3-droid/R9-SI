@@ -1111,6 +1111,7 @@
     'g.tram.hudGo': '<b>SKY TRAM</b> → {name} · {s} s<br><small>Shift at a station to get off · F5 view</small>',
     'g.tram.next': 'next town',
     // ---- blueprints (villas in hand)
+    'g.bp.nova.sub': 'The villa from the trailer · terraces · glass stairs · light pad',
     'g.bp.failed': 'Blueprint failed: {why}',
     'g.bp.oneFacade': 'Your own design has one facade — change it in R9 Studio',
     'g.bp.mode': 'Blueprints build in Creative or Zen Builder',

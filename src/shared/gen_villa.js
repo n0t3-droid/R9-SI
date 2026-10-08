@@ -106,6 +106,16 @@
         },
       });
     }
+    // a catalogue house with its own builder (Villa Nova, gen_nova.js) builds its lot itself; a ★ design of it goes on top
+    if (cat.build) {
+      const info = yield* cat.build(L, lot, o);
+      if (info && custom) {
+        if (tpl) VR.Custom.applyTemplate(custom, L0, lot.F, info, cap); else VR.Custom.applyHouse(custom, L, lot.F, info);
+        if (custom.top) info.roofTop = Math.max(info.roofTop, lot.F + custom.top + 1);
+        info.custom = true;
+      }
+      return info;
+    }
     const rng = o.rng, F = lot.F, P = L.P;
     const skin = SKINS[o.skin] || SKINS[cat.skins[rng.int(cat.skins.length)]];
     const H = PLAN.scalePlan(cat.make({ rng, beds: o.beds, w: lot.w, d: lot.d, staffel: (skin.id === 'bauhaus' || skin.id === 'blacklabel' || skin.staffel) && rng.chance(0.5), cantilever: !!skin.cantilever }), PLAN.SCALE);

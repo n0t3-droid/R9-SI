@@ -16,6 +16,8 @@
   const PHRASE = {
     'Palm Crown': 'Palmenkrone', 'Round Tree Small': 'Rundbaum klein', 'Round Tree Large': 'Rundbaum groß', 'Grass Tuft': 'Grasbüschel',
     'Flower Cluster': 'Blumenbüschel', 'Blossom Bush': 'Blütenbusch', 'Rice Row Crop': 'Reisreihen-Feld',
+    'Glass Stair Tread': 'Glas-Treppenstufe', 'Light Pad': 'Lichtsockel', 'Nova Window': 'Nova-Fenster', 'Orange Frame': 'oranger Rahmen',
+    'Nova Slab Edge': 'Nova-Deckenkante', 'Light Line': 'Lichtlinie',
     'Three-seater': 'Dreisitzer', 'Chaise': 'Chaiselongue', 'Armchair': 'Sessel', 'Coffee Table': 'Couchtisch',
     'Side Table': 'Beistelltisch', 'Dining Table': 'Esstisch', 'Dining Chair': 'Esszimmerstuhl', 'Bar Stool': 'Barhocker',
     'Desk': 'Schreibtisch', 'Office Chair': 'Bürostuhl', 'TV Lowboard': 'TV-Lowboard', 'Wall TV 65"': 'Wand-TV 65"',
