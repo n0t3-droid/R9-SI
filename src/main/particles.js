@@ -78,6 +78,24 @@
     }
     splash(x, y, z, col) { for (let k = 0; k < 24; k++) { const a = Math.random() * 6.28, s = 1 + Math.random() * 3; this.spawn(x, y, z, Math.cos(a) * s, 3 + Math.random() * 4, Math.sin(a) * s, { life: 0.6 + Math.random() * 0.4, size: 0.05 + Math.random() * 0.05, grav: 18, col: col || [0.7, 0.85, 1] }); } }
     glow(x, y, z, col, life, size, vy) { return this.spawn(x, y, z, (Math.random() - 0.5) * 0.3, vy === undefined ? 0.3 : vy, (Math.random() - 0.5) * 0.3, { life: life || 2, size: size || 0.06, grav: 0, col, emis: 1, drag: 0.2, collide: false }); }
+    // F6 · lamp glow: after dark, the emissive blocks (lamps, lanterns, windows) near the eye get a soft warm halo.
+    // The lamps are found by a scan of a 29 × 11 × 29 box every two seconds (their emission is in R.T.emit).
+    lampGlows(dt, eye, night) {
+      const w = this.game.world, T = VR.R.T;
+      if (!w || !(night > 0.35)) return;
+      this.lampT = (this.lampT || 0) - dt;
+      if (this.lampT <= 0 || !this.lamps) {
+        this.lampT = 2;
+        const L = [], ex = Math.floor(eye[0]), ey = Math.floor(eye[1]), ez = Math.floor(eye[2]);
+        for (let y = ey - 6; y <= ey + 4 && L.length < 48; y++) for (let z = ez - 14; z <= ez + 14 && L.length < 48; z++) for (let x = ex - 14; x <= ex + 14 && L.length < 48; x++) {
+          const s = w.getBlock(x, y, z);
+          if (s && T.emit[s]) L.push(x + 0.5, y + 0.5, z + 0.5);
+        }
+        this.lamps = L;
+      }
+      const L = this.lamps;
+      for (let i = 0; i < L.length; i += 3) if (Math.random() < dt * 1.5) this.glow(L[i], L[i + 1], L[i + 2], [1, 0.74, 0.42], 1.1, 0.42, 0.04);
+    }
     update(dt, camPos) {
       const w = this.game.world;
       let i = 0;

@@ -621,6 +621,14 @@
         mat4.translate(M, M, dx, dy + 0.18 + Math.sin(it.age * 2.5) * 0.06, dz);
         mat4.rotY(M, M, it.spin);
         const sc = mesh.block ? 0.28 : 0.42;
+        // F6: a flat dark silhouette on the ground under the item (quality dropShadow: off on Very Low)
+        if (r.q && r.q.dropShadow && dx * dx + dz * dz < 28 * 28) {
+          const gy = this.game.world.topAt(Math.floor(it.pos[0]), Math.floor(it.pos[2])) + 1 - cam.y + 0.025;
+          const S = this.tmpShadow || (this.tmpShadow = mat4.create());
+          S.set(mat4.create());
+          mat4.translate(S, S, dx, gy, dz); mat4.rotY(S, S, it.spin); mat4.scale(S, S, sc * 0.95, 0.02, sc * 0.95);
+          this.drawMesh(r, p, mesh, S, { sky: 0, bl: [0, 0, 0] });
+        }
         mat4.scale(M, M, sc, sc, sc);
         this.drawMesh(r, p, mesh, M, this.lightAt(it.pos[0], it.pos[1] + 0.3, it.pos[2]));
         if (it.stack.n > 1) { const M2 = mat4.create(); M2.set(M); mat4.translate(M2, M2, 0.18, 0.12, 0.18); this.drawMesh(r, p, mesh, M2, this.lightAt(it.pos[0], it.pos[1] + 0.3, it.pos[2])); }

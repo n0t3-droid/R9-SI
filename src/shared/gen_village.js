@@ -270,7 +270,10 @@
     const used = new Set();
     const take = (u, v) => { const k = u + ',' + v; if (used.has(k)) return false; used.add(k); return true; };
     take(du, 1); // keep the entrance free
-    if (kind === 'home' || kind === 'farmhouse' || kind === 'clinic') {
+    if (o.detail && kind === 'home' && VR.Detail) {
+      // vgen 6: the placement grammar furnishes every storey room by room (gen_detail.js); the lamp and planters outside too
+      VR.Detail.homeInterior(L, info, { w, d, floors, F, du, S, rng, seed: o.seed, alongU, top });
+    } else if (kind === 'home' || kind === 'farmhouse' || kind === 'clinic') {
       // beds along the back wall on the top storey (head against the wall)
       const by = floors > 1 ? F + 5 : Y;
       const nb = Math.min(o.beds || 2, w - 2);
@@ -560,6 +563,12 @@
     const ops = tupleList(4), fills = tupleList(5);
     const put = (x, y, z, s) => { ops.push(x, y, z, s); };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) fills.push(x, z, y0, y1, s); };
+    // F6: towns made from vgen 6 on carry the detail layer (gen_detail.js); older towns are planned exactly as before
+    const detOn = !!(VR.Detail && VR.Detail.on(g));
+    const detP = (x, y, z, nm, pr) => put(x, y, z, typeof nm === 'number' ? nm : st(nm, pr));
+    // the street decor draws from its own rng and runs after every lot is placed (it only takes cells nothing else
+    // took), so a town keeps its roads and houses exactly as at vgen 5 and only gains the street pieces
+    const detRng = new VR.RNG((site.seed ^ 0x2545f491) >>> 0), decorJobs = [];
     const AIR = 0;
     if (HOME) { const B = VR.TempleGen.box; for (let x = B.x0 - 2; x <= B.x1 + 2; x++) for (let z = B.z0 - 2; z <= B.z1 + 2; z++) { const o = oi(x, z); if (o >= 0) occ[o] = 7; } }
     const plan = { rad: RAD, id: site.id, name: site.name, style: site.style, x: cx, z: cz, y: site.y, seed: site.seed, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: null, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null };
@@ -691,7 +700,7 @@
           // street trees on the sidewalk line, alternating sides
           const side = (k / 10 | 0) % 2 ? -1 : 1;
           const tx = Math.round(px + nx * 3 * side), tz = Math.round(pz + nz * 3 * side), o2 = oi(tx, tz);
-          if (o2 >= 0 && occ[o2] === 0) { occ[o2] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st('grass_block')); fill(tx, tz, ty + 1, ty + 8, AIR); const f = ['apple', 'cherry', 'plum', 'orange'][(tx + tz) & 3]; put(tx, ty + 1, tz, st('vx_fruit_trunk')); put(tx, ty + 2, tz, st('vx_fruit_trunk')); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(tx + a, ty + 3, tz + b, st('vx_fruit_crown_' + f)); if (Math.abs(a) + Math.abs(b) <= 1) put(tx + a, ty + 4, tz + b, st('vx_fruit_crown_' + f)); } }
+          if (o2 >= 0 && occ[o2] === 0) { occ[o2] = 6; const gy = ground(tx, tz), ty = Math.max(gy, ry); fill(tx, tz, gy + 1, ty, st('dirt')); put(tx, ty, tz, st(detOn && S.modern ? 'dirt' : 'grass_block')); if (detOn && S.modern) decorJobs.push(() => VR.Detail.treeGrate({ P: detP, occ, oi, ground, plan }, tx, ty, tz, st, fill)); fill(tx, tz, ty + 1, ty + 8, AIR); const f = ['apple', 'cherry', 'plum', 'orange'][(tx + tz) & 3]; put(tx, ty + 1, tz, st('vx_fruit_trunk')); put(tx, ty + 2, tz, st('vx_fruit_trunk')); for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(tx + a, ty + 3, tz + b, st('vx_fruit_crown_' + f)); if (Math.abs(a) + Math.abs(b) <= 1) put(tx + a, ty + 4, tz + b, st('vx_fruit_crown_' + f)); } }
         }
         if (S.pathLine) {
           if (S.tech) {
@@ -720,6 +729,7 @@
           if (o >= 0 && occ[o] === 0) { occ[o] = 6; const gy = ground(lx, lz); const ly = Math.max(gy, ry); fill(lx, lz, gy + 1, ly, st('dirt')); put(lx, ly + 1, lz, st(S.lamp, { head: 0 })); put(lx, ly + 2, lz, st(S.lamp, { head: 1 })); fill(lx, lz, ly + 3, ly + 5, AIR); plan.lamps.push([lx, ly + 2, lz]); }
         }
       }
+      if (detOn && S.modern) decorJobs.push(() => VR.Detail.roadDecor({ P: detP, occ, oi, ground, st, fill, AIR, rng: detRng, plan }, pts, sm, S));
       roads.push(road);
       plan.roads.push(road.pts.filter((_, k) => k % 3 === 0));
     }
@@ -1215,7 +1225,7 @@
       const tower = !!(S.tech && VG.techTower && kind === 'home' && lot.w >= 7 && lot.d >= 7);
       const floors = tower ? Math.min(4, 2 + (lot.w >= 9 && lot.d >= 9 ? lrng.int(2) : 0) + (lrng.chance(0.35) ? 1 : 0)) : kind === 'hall' ? 2 : (kind === 'home' && lot.w >= 6 && lrng.chance(0.4)) ? 2 : (S.tall && lot.w >= 5 && lrng.chance(0.65)) ? 2 : 1;
       const beds = kind === 'home' ? 2 + lrng.int(Math.max(1, Math.min(4, lot.w - 3))) : kind === 'clinic' ? 2 : 0;
-      const bopt = { w: lot.w, d: lot.d, floors, F: lot.F, style: site.style, rng: lrng, kind, beds, ground: lg, walls: kind === 'smithy' ? (S.tech ? 'vx_tech_gray' : S.base === 'vx_sandstone' ? 'vx_sandstone' : 'vx_stonebrick') : walls, window: win, roof, wood: S.wood, chimney: !S.noChimney && kind !== 'library' && kind !== 'clinic' && kind !== 'barn', seed: homeSeed & 255, pitched: kind === 'barn' };
+      const bopt = { detail: detOn, w: lot.w, d: lot.d, floors, F: lot.F, style: site.style, rng: lrng, kind, beds, ground: lg, walls: kind === 'smithy' ? (S.tech ? 'vx_tech_gray' : S.base === 'vx_sandstone' ? 'vx_sandstone' : 'vx_stonebrick') : walls, window: win, roof, wood: S.wood, chimney: !S.noChimney && kind !== 'library' && kind !== 'clinic' && kind !== 'barn', seed: homeSeed & 255, pitched: kind === 'barn' };
       if (lot.kind === 'lot') {
         // reserved plot: foundation + fence posts + material crates; the real house is built by villagers later
         const rec = [];
@@ -1269,6 +1279,8 @@
         }
       }
     }
+    // the street decor of a modern town, last: the free cells left after every lot and road
+    for (const job of decorJobs) job();
     // ---- bucket ops per chunk
     const chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
