@@ -272,7 +272,7 @@
     take(du, 1); // keep the entrance free
     if (o.detail && kind === 'home' && VR.Detail) {
       // vgen 6: the placement grammar furnishes every storey room by room (gen_detail.js); the lamp and planters outside too
-      VR.Detail.homeInterior(L, info, { w, d, floors, F, du, S, rng, seed: o.seed });
+      VR.Detail.homeInterior(L, info, { w, d, floors, F, du, S, rng, seed: o.seed, alongU, top });
     } else if (kind === 'home' || kind === 'farmhouse' || kind === 'clinic') {
       // beds along the back wall on the top storey (head against the wall)
       const by = floors > 1 ? F + 5 : Y;

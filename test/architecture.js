@@ -167,9 +167,9 @@ function planHash(p) { let h = 2166136261 >>> 0; for (const k of [...p.chunks.ke
   const sites = []; const g = new VR.OverworldGen(SEED >>> 0, { vgen: 5 });
   for (let i = -5; i <= 5 && sites.length < 4; i++) for (let j = -5; j <= 5 && sites.length < 4; j++) { const s = VG.site(g, i, j); if (s) sites.push([i, j, s]); }
   for (const vgen of [5, 6]) {
-    let tot = 0, mx = 0;
-    for (const [, , s] of sites) { const g2 = new VR.OverworldGen(SEED >>> 0, { vgen }); const t0 = performance.now(); VG.plan(g2, s); const dt = performance.now() - t0; tot += dt; mx = Math.max(mx, dt); }
-    console.log(`     plan time vgen ${vgen}: ${sites.length} villages ${tot.toFixed(0)} ms in all, the slowest ${mx.toFixed(0)} ms (whole plan, one call)`);
+    let tot = 0, mx = 0, ops = 0;
+    for (const [, , s] of sites) { const g2 = new VR.OverworldGen(SEED >>> 0, { vgen }); const t0 = performance.now(); const p = VG.plan(g2, s); const dt = performance.now() - t0; tot += dt; mx = Math.max(mx, dt); for (const [, b] of p.chunks) for (let i = 0; i < b.o.length; i += 4) if (b.o[i + 3]) ops++; }
+    console.log(`     plan vgen ${vgen}: ${sites.length} villages, ${tot.toFixed(0)} ms in all (the slowest ${mx.toFixed(0)} ms, one call), ${ops} block ops that place a block (the cost on the renderer's side)`);
   }
 }
 
