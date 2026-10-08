@@ -315,7 +315,7 @@
   PLAN.shared = shared;
   if (VG.modern && VG.modern.DIMS) VG.modern.DIMS.home = PLAN.DIMS.slice();   // the town planner draws home lots from the catalogue
 
-  // ================================================================ VILLA NOVA (25 × 25): the house of the trailer
+  // ================================================================ VILLA NOVA (25 × 31): the house of the trailer
   // (docs/trailer/frames t1_26 · t3_05 · t2_23, the white hall of t1_29 · t3_10): three stepped storeys of grey stone with
   // cantilevered slabs, box bays with turquoise windows in thick orange frames, balustrade terraces, a roof garden, the
   // white hall with the floating glass stairs and the light pad; built block by block by gen_nova.js (PLAN.buildNova).
@@ -323,7 +323,7 @@
   // a lot of exactly its size; the city (gen_city / t-city) places it with { index: PLAN.TRAILER } (see PLAN.buildNova).
   // the geometry (lot-local u across the street front, v into the lot; y relative to the floor F)
   const NOVA = PLAN.NOVA = {
-    LOT: [25, 25],
+    LOT: [25, 31],                                                     // the street on the v = 0 side; ten rows of garden behind the house
     G: { u0: 2, v0: 6, u1: 22, v1: 20, y: 0, clear: 5, slab: 6 },    // ground floor: floor block y 0, rooms 1..5, slab zone 6..7
     U: { u0: 4, v0: 9, u1: 20, v1: 20, y: 7, clear: 4, slab: 12 },   // first floor: floor y 7 (the slab's top row), rooms 8..11
     T: { u0: 7, v0: 13, u1: 17, v1: 20, y: 13, clear: 4, slab: 18 },  // top floor: floor y 13, rooms 14..17, roof 18..19

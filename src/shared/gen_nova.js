@@ -2,7 +2,7 @@
 // Villa Nova — THE house of the trailer (docs/trailer/frames t1_26 · t3_05 ·
 // t2_23 · t1_24 outside, t1_29 · t1_30 · t3_10 · t2_28 inside), the catalogue
 // family 'trailer' (gen_plan.js, skin 'nova'). Built block by block, at real
-// scale, on a 25 × 25 lot (u across the street front, v into the lot):
+// scale, on a 25 × 31 lot (u across the street front, v into the lot; the street on the v = 0 side):
 //  · three stepped storeys of grey stone: a ground floor 21 × 15 with a two-block
 //    slab that cantilevers two blocks over the front, a first floor set back three
 //    blocks at the front and two at the sides (the ground floor's roof is a
@@ -284,22 +284,49 @@
     yield;
 
     // ---- the garden
-    const lawnFree = new Set(); const mark = (u, v) => lawnFree.add(u + ',' + v);
-    // the paved apron in front of the entrance and the curved path from the street (u 6, v 0) to it, three wide, the cyan
-    // line on both edges: the cells within 1.5 of the centre line are path, the path cells beside lawn are the line
-    const pathCells = new Set();
-    const bez = (t) => { const a = [5.5, -1], b = [5.5, 4.5], c = [EU, 2.5]; const s = 1 - t; return [s * s * a[0] + 2 * s * t * b[0] + t * t * c[0], s * s * a[1] + 2 * s * t * b[1] + t * t * c[1]]; };
-    for (let t = 0; t <= 1.0001; t += 0.01) { const [cu, cv] = bez(t); for (let v = Math.floor(cv - 2); v <= Math.ceil(cv + 2); v++) for (let u = Math.floor(cu - 2); u <= Math.ceil(cu + 2); u++) if (v >= 0 && Math.hypot(u + 0.5 - cu, v + 0.5 - cv) <= 1.55) pathCells.add(u + ',' + v); }
-    for (let v = G.v0 - 3; v <= G.v0 - 1; v++) for (let u = EU - 3; u <= EU + 3; u++) pathCells.add(u + ',' + v);
-    const isPath = (u, v) => pathCells.has(u + ',' + v);
-    // a path cell is on the edge when one of its four neighbours is lawn (not path, not the house, not the street)
-    const lawnAt = (u, v) => v >= 0 && !isPath(u, v) && !(v >= G.v0 && u >= G.u0 && u <= G.u1);
-    for (const k of pathCells) {
-      const [u, v] = k.split(',').map(Number); if (u < 0 || u >= W || v < 0 || v >= D) continue;
-      const edge = lawnAt(u + 1, v) || lawnAt(u - 1, v) || lawnAt(u, v + 1) || (v > 0 && lawnAt(u, v - 1));
-      put(u, yard, v, edge ? M.line : M.path); mark(u, v);
-    }
-    // hedges: along the street (with the path's gap) and along both sides
+    // the house's footprint at the ground (the walls, the box bays standing out of them): no lawn there
+    const houseAt = (u, v) => (u >= G.u0 && u <= G.u1 && v >= G.v0 && v <= G.v1) || (v === G.v0 - 1 && ((u >= 3 && u <= 7) || (u >= 17 && u <= 21) || Math.abs(u - EU) <= 2)) || ((u === G.u0 - 1 || u === G.u1 + 1) && v >= 12 && v <= 16);
+    const paved = new Set(); const isPath = (u, v) => paved.has(u + ',' + v);
+    const lawnAt = (u, v) => u >= 0 && u < W && v >= 0 && v < D && !isPath(u, v) && !houseAt(u, v);
+    // a band of paving along a quadratic curve (a → b → c), the cells within r of the centre line
+    const band = (a, b, c, r) => {
+      for (let t = 0; t <= 1.0001; t += 0.01) {
+        const q = 1 - t, cu = q * q * a[0] + 2 * q * t * b[0] + t * t * c[0], cv = q * q * a[1] + 2 * q * t * b[1] + t * t * c[1];
+        for (let v = Math.floor(cv - r - 1); v <= Math.ceil(cv + r + 1); v++) for (let u = Math.floor(cu - r - 1); u <= Math.ceil(cu + r + 1); u++) if (v >= 0 && v < D && u >= 0 && u < W && Math.hypot(u + 0.5 - cu, v + 0.5 - cv) <= r) paved.add(u + ',' + v);
+      }
+    };
+    const disc = (cu, cv, r) => { for (let v = Math.floor(cv - r); v <= Math.ceil(cv + r); v++) for (let u = Math.floor(cu - r); u <= Math.ceil(cu + r); u++) if (Math.hypot(u + 0.5 - cu, v + 0.5 - cv) <= r) paved.add(u + ',' + v); };
+    // the light lines: a paved cell that touches the lawn across a side is a line cell; where two line cells meet only at
+    // a corner, the paved cell in that corner joins them (the line piece joins across sides only — run 1 showed dashes and
+    // dots), so every edge is one unbroken chain of straights and quarter arcs
+    const lines = () => {
+      const line = new Set(), key = (u, v) => u + ',' + v;
+      for (const k of paved) { const [u, v] = k.split(',').map(Number); if (lawnAt(u + 1, v) || lawnAt(u - 1, v) || lawnAt(u, v + 1) || lawnAt(u, v - 1)) line.add(k); }
+      for (let pass = 0; pass < 3; pass++) {
+        let added = 0;
+        for (const k of [...line]) {
+          const [u, v] = k.split(',').map(Number);
+          for (const [du, dv] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+            if (!line.has(key(u + du, v + dv)) || line.has(key(u + du, v)) || line.has(key(u, v + dv))) continue;
+            const c = isPath(u + du, v) ? key(u + du, v) : isPath(u, v + dv) ? key(u, v + dv) : null;
+            if (c) { line.add(c); added++; }
+          }
+        }
+        if (!added) break;
+      }
+      return line;
+    };
+    // the front: the curved path from the street (u 5–8) to the paved apron in front of the entrance, four wide
+    band([6.5, -1], [6.5, 4], [EU + 0.5, 3], 2.05);
+    for (let v = G.v0 - 3; v <= G.v0 - 1; v++) for (let u = EU - 3; u <= EU + 3; u++) if (!houseAt(u, v)) paved.add(u + ',' + v);
+    // the back (t1_29 through the glass): a paved terrace two rows deep along the glass wall, the path from the garden
+    // door straight back to a round patio with a palm in the middle
+    for (let v = G.v1 + 1; v <= G.v1 + 2; v++) for (let u = G.u0; u <= G.u1; u++) paved.add(u + ',' + v);
+    const PAT = [EU + 0.5, G.v1 + 7.5];
+    band([EU + 0.5, G.v1 + 2], [EU + 0.5, G.v1 + 4], PAT, 1.55); disc(PAT[0], PAT[1], 2.3);
+    const lineSet = lines();
+    for (const k of paved) { const [u, v] = k.split(',').map(Number); put(u, yard, v, lineSet.has(k) ? M.line : M.path); }
+    // hedges: along the street (with the path's gap), along both sides and the back
     for (let u = 0; u < W; u++) if (!isPath(u, 0)) put(u, 0, 0, M.hedge);
     for (let v = 1; v < D; v++) { put(0, 0, v, M.hedge); put(W - 1, 0, v, M.hedge); }
     for (let u = 1; u < W - 1; u++) put(u, 0, D - 1, M.hedge);
@@ -314,14 +341,30 @@
     }
     // planters flanking the door
     for (const u of [EU - 3, EU + 3]) put(u, 0, G.v0 - 2, 'vx_tech_planter');
-    // palms: the shared crown on a ringed trunk (VR.Plants.palm) — two at the front corners, two in the back garden
-    const palm = (u, v, h) => { for (let k = 0; k < h; k++) put(u, k, v, 'vx_palm_trunk'); model(u - 3, h, v - 3, 'vm_palm_crown', 0); };
-    // (the back palms stand at the hedge: their crowns clear the first floor's back wall and overhang the lot's back edge)
-    palm(3, 2, 10); palm(21, 2, 9); palm(5, D - 1, 10); palm(19, D - 1, 11);
-    // the back garden: a paved strip with loungers in front of the glass wall, lawn, round bushes
-    for (let u = G.u0; u <= G.u1; u++) put(u, yard, G.v1 + 1, M.path);
-    for (const u of [8, 10]) model(u, 0, G.v1 + 2, 'vm_lounger', 2);
-    for (const u of [14, 16]) model(u, 0, G.v1 + 2, 'vm_bush_blossom', 0);
+    // palms: the shared crown on a ringed trunk (VR.Plants.palm), the trunk from the ground at y0
+    const palm = (u, v, h, y0) => { y0 = y0 | 0; for (let k = 0; k < h; k++) put(u, y0 + k, v, 'vx_palm_trunk'); model(u - 3, y0 + h, v - 3, 'vm_palm_crown', 0); };
+    palm(3, 2, 10); palm(21, 2, 9);
+    // the back garden: two green mounds left and right (the hills behind the glass in t1_29), a palm on each, the palm in
+    // the patio in a planter, round trees and blossom bushes, loungers on the lawn
+    const mound = (cu, cv, ru, rv, h) => {
+      const top = {};
+      for (let v = Math.floor(cv - rv); v <= Math.ceil(cv + rv); v++) for (let u = Math.floor(cu - ru); u <= Math.ceil(cu + ru); u++) {
+        if (u < 1 || u >= W - 1 || v <= G.v1 + 2 || v >= D - 1 || isPath(u, v)) continue;
+        const d = Math.hypot((u + 0.5 - cu) / ru, (v + 0.5 - cv) / rv); if (d >= 1) continue;
+        const hh = Math.round(h * Math.sqrt(1 - d * d)); if (hh < 1) continue;
+        for (let y = 0; y < hh - 1; y++) put(u, y, v, 'dirt');
+        put(u, hh - 1, v, 'grass_block'); top[u + ',' + v] = hh;
+      }
+      return (u, v) => top[u + ',' + v] | 0;
+    };
+    const mL = mound(4.2, G.v1 + 6.5, 4.8, 4.0, 4.6), mR = mound(20.8, G.v1 + 6.5, 4.8, 4.0, 4.6);
+    palm(4, G.v1 + 6, 10, mL(4, G.v1 + 6)); palm(20, G.v1 + 7, 11, mR(20, G.v1 + 7));
+    for (const u of [9, 15]) model(u, 0, G.v1 + 6, 'vm_tree_round_s', 0);
+    const qu = Math.floor(PAT[0]), qv = Math.floor(PAT[1]);
+    put(qu, 0, qv, 'vx_tech_planter'); palm(qu, qv, 10, 1);
+    for (const [u, v] of [[7, G.v1 + 4], [17, G.v1 + 4]]) model(u, 0, v, 'vm_bush_blossom', 0);
+    for (const [u, v] of [[9, G.v1 + 9], [15, G.v1 + 9], [10, G.v1 + 4], [14, G.v1 + 4]]) model(u, 0, v, 'vm_flower_cluster', 0);
+    for (const u of [9, 15]) model(u, 0, G.v1 + 3, 'vm_lounger', 0);
     yield;
 
     // ---- the plan record (house-local rooms for the villa tests and the Studio's room list)

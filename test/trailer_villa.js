@@ -1,5 +1,5 @@
 // Villa Nova (gen_nova.js, voxnova.js, the catalogue entry in gen_plan.js) — the trailer's house as blocks:
-//   1. the catalogue: Villa Nova is appended (index 11, lot 25 × 25), the town lots (PLAN.DIMS) and PLAN.pick are as before
+//   1. the catalogue: Villa Nova is appended (index 11, lot 25 × 31), the town lots (PLAN.DIMS) and PLAN.pick are as before
 //   2. the build: every block name exists, the same plan twice gives the same blocks, the info record (door, beds, seats)
 //   3. the masses: three storeys, each set back from the one below at the front and the sides; three slab zones, each
 //      two blocks thick and cantilevering past the walls below; a light line (vx_nova_band, cyan + orange underglow) on
@@ -23,9 +23,9 @@ const propOf = (s, k) => { const t = s && R.types[R.T.type[s]]; return t && t.ha
 console.log('1 · the catalogue');
 const BASE_DIMS = [[37, 33], [34, 31], [31, 30], [35, 34], [37, 35], [32, 28], [35, 30], [47, 40], [29, 28], [24, 28], [19, 25]];
 const T = PLAN.TRAILER, cat = PLAN.CATALOGUE[T];
-check(T === 11 && cat && cat.name === 'Villa Nova' && cat.special && cat.lot.join() === '25,25', 'Villa Nova is the catalogue\'s 12th house (index ' + T + ', lot ' + (cat && cat.lot.join(' × ')) + ')');
+check(T === 11 && cat && cat.name === 'Villa Nova' && cat.special && cat.lot.join() === '25,31', 'Villa Nova is the catalogue\'s 12th house (index ' + T + ', lot ' + (cat && cat.lot.join(' × ')) + ': the street on the v = 0 side, ten rows of garden behind the house)');
 check(JSON.stringify(PLAN.DIMS) === JSON.stringify(BASE_DIMS) && JSON.stringify(VG.modern.DIMS.home) === JSON.stringify(BASE_DIMS), 'the town lots are the eleven of before (the towns draw the same houses)');
-check(BASE_DIMS.every(([w, d]) => !PLAN.pick(w, d).special) && !PLAN.pick(60, 60).special && PLAN.pick(25, 25) === cat, 'PLAN.pick never hands it to a town lot, only to a lot of exactly 25 × 25');
+check(BASE_DIMS.every(([w, d]) => !PLAN.pick(w, d).special) && !PLAN.pick(60, 60).special && PLAN.pick(25, 31) === cat, 'PLAN.pick never hands it to a town lot, only to a lot of exactly 25 × 31');
 check(PLAN.templates.trailer === cat.make && cat.make({}).family === 'trailer' && PLAN.SKINS.nova && V.ITEMS['blueprint_' + T], 'the family id trailer, the skin nova and the blueprint item blueprint_' + T);
 
 // ---------------------------------------------------------------- the build into a cell map (the worker's way: last write wins)
@@ -171,9 +171,35 @@ const pathAt = (u, v) => /^vx_floor_plaza(_line)?$/.test(nm(u, -1, v));
 const seen = new Set(), stack = []; for (let u = 0; u < W; u++) if (pathAt(u, 0)) { stack.push([u, 0]); seen.add(u + ',0'); }
 while (stack.length) { const [u, v] = stack.pop(); for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = u + du, b = v + dv, k = a + ',' + b; if (a >= 0 && a < W && b >= 0 && b < D && !seen.has(k) && pathAt(a, b) && b < G.v0) { seen.add(k); stack.push([a, b]); } } }
 const door = info.door, reach = seen.has(door[0] + ',' + (door[2] - 1));
-let lines = 0, lineEdge = 0; for (const k of seen) { const [u, v] = k.split(',').map(Number); const isLine = nm(u, -1, v) === 'vx_floor_plaza_line'; if (isLine) lines++; const lawnNb = [[1, 0], [-1, 0], [0, 1]].some(([du, dv]) => nm(u + du, -1, v + dv) === 'grass_block'); if (lawnNb) { lineEdge++; if (!isLine) lineEdge -= 1000; } }
+// (lawn: grass at the yard level with nothing built on it — the box bays stand on grass too)
+const lawnCell = (u, v) => nm(u, -1, v) === 'grass_block' && !WALLS.has(nm(u, 0, v));
+let lines = 0, lineEdge = 0; for (const k of seen) { const [u, v] = k.split(',').map(Number); const isLine = nm(u, -1, v) === 'vx_floor_plaza_line'; if (isLine) lines++; const lawnNb = [[1, 0], [-1, 0], [0, 1]].some(([du, dv]) => lawnCell(u + du, v + dv)); if (lawnNb) { lineEdge++; if (!isLine) lineEdge -= 1000; } }
 check(reach && seen.size >= 30, 'the curved path runs from the street to the step in front of the door (' + seen.size + ' paved cells)');
 check(lines >= 16 && lineEdge > 0, 'a cyan light line along both of its edges: every paved cell beside the lawn is a line block (' + lines + ' line cells)');
+// the lines are unbroken (run 1: dashes and dots — line cells that met only at a corner): the line piece joins its
+// neighbours across sides only, so every line cell has one or two line neighbours across a side, every paved cell that
+// touches the lawn across a side or a corner joins a chain, and each path has its two chains (front and back garden)
+const lineAt = (u, v) => nm(u, -1, v) === 'vx_floor_plaza_line';
+const chainCheck = (v0, v1) => {
+  let cells = 0, bad = 0, comps = 0; const seen2 = new Set();
+  for (let v = v0; v <= v1; v++) for (let u = 0; u < W; u++) {
+    if (!lineAt(u, v)) continue; cells++;
+    const n = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([du, dv]) => lineAt(u + du, v + dv) && v + dv >= v0 && v + dv <= v1).length;
+    if (n < 1 || n > 2) bad++;
+    const k = u + ',' + v; if (seen2.has(k)) continue; comps++; const st = [[u, v]]; seen2.add(k);
+    while (st.length) { const [a, b] = st.pop(); for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const k2 = (a + du) + ',' + (b + dv); if (b + dv >= v0 && b + dv <= v1 && lineAt(a + du, b + dv) && !seen2.has(k2)) { seen2.add(k2); st.push([a + du, b + dv]); } } }
+  }
+  return { cells, bad, comps };
+};
+const cF = chainCheck(0, G.v0 - 1), cB = chainCheck(G.v1 + 1, D - 1);
+check(cF.cells >= 20 && cF.bad === 0 && cF.comps === 2, 'the front path\'s light lines are two unbroken chains (' + cF.cells + ' line cells, ' + cF.comps + ' chains, ' + cF.bad + ' cells with no or three line neighbours)');
+check(cB.cells >= 20 && cB.bad === 0 && cB.comps <= 2, 'the back garden\'s path and terrace: the light lines unbroken too (' + cB.cells + ' line cells, ' + cB.comps + ' chains, ' + cB.bad + ' odd cells)');
+// the back garden (t1_29 / t1_30 through the glass: lawn, palms, round trees, green mounds, a curved path)
+const backRows = D - 1 - G.v1;
+let mound = 0, moundTop = 0; for (let v = G.v1 + 1; v < D; v++) for (let u = 0; u < W; u++) for (let y = 0; y <= 4; y++) if (nm(u, y, v) === 'grass_block') { mound++; moundTop = Math.max(moundTop, y + 1); }
+let backPalms = 0; for (const [k, s] of A.rec) if (nameOf(s) === 'vm_palm_crown' && propOf(s, 'part') === 0) { const [x, y, z] = k.split(',').map(Number); if (z + 3 > G.v1 + 1 && nameOf(A.rec.get((x + 3) + ',' + (y - 1) + ',' + (z + 3))) === 'vx_palm_trunk') backPalms++; }
+const backPath = (() => { const door = [NOVA.ENTRY, G.v1 + 1]; const sn = new Set([door.join()]), st = [door]; let far = 0; while (st.length) { const [u, v] = st.pop(); far = Math.max(far, v - G.v1); for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = u + du, b = v + dv, k = a + ',' + b; if (b > G.v1 && b < D && a >= 0 && a < W && !sn.has(k) && pathAt(a, b)) { sn.add(k); st.push([a, b]); } } } return far; })();
+check(backRows >= 10 && mound >= 30 && moundTop >= 2 && backPalms >= 3 && backPath >= 6, 'the back garden: ' + backRows + ' rows behind the glass wall, green mounds (' + mound + ' cells, ' + moundTop + ' high), ' + backPalms + ' palms, the path from the garden door ' + backPath + ' rows back');
 
 // ---------------------------------------------------------------- 7 · the new pieces
 console.log('7 · the new pieces');
