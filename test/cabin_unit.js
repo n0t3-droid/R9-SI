@@ -13,6 +13,10 @@ require(__dirname + '/../src/main/flight.js');
 require(__dirname + '/../src/main/cockpit.js');
 require(__dirname + '/../src/main/starships.js');
 require(__dirname + '/../src/main/cabin.js');
+// the language tables (German first): the walker's messages are table texts
+if (!window.addEventListener) window.addEventListener = () => { }; if (!document.documentElement) document.documentElement = {};
+require(__dirname + '/../src/main/i18n.js'); require(__dirname + '/../src/main/lang_en.js'); require(__dirname + '/../src/main/lang_de.js');
+VR.I18N.lang = 'de';
 const R = VR.R;
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
@@ -98,7 +102,12 @@ const fl = s.flight;
 fl.setPower(true); fl.startEngines(); run(3.5);
 input.keys.add('Space'); run(2); input.keys.delete('Space'); input.pressed.add('KeyX'); run(2);
 check(fl.state === 'flying' && fl.alt > 8 && fl.speed < 1, 'took off and hovers (' + fl.alt.toFixed(1) + ' m, ' + fl.speed.toFixed(2) + ' m/s)');
+// getting up at speed is refused, with the table's words; no message of the walker is written into cabin.js itself
+const th0 = fl.throttle; fl.throttle = 0.5; const refused = mgr.cabin.standUp(s); fl.throttle = th0;
+check(!refused && hints[hints.length - 1] === VR.I18N.t('g.cabin.hoverFirst') && VR.I18N.dict.de['g.cabin.hoverFirst'] !== undefined && VR.I18N.dict.en['g.cabin.hoverFirst'] !== undefined, 'getting up at speed is refused in German (' + hints[hints.length - 1] + ')');
+check(!/\.hint\(\s*['"`]/.test(require('fs').readFileSync(__dirname + '/../src/main/cabin.js', 'utf8')), 'cabin.js shows no text of its own: every hint is a table key');
 const up = mgr.cabin.standUp(s); run(0.1);
+check(hints.includes(VR.I18N.t('g.cabin.aboard')) && VR.I18N.dict.de['g.cabin.aboard'] !== undefined, 'aboard: the walking hint from the table (' + VR.I18N.t('g.cabin.aboard') + ')');
 check(up && W() && !mgr.pilot && fl.state === 'flying', 'stood up while it hovers: walking in the cockpit');
 const wy0 = g.player.pos[1], ly0 = W().p[1]; fl.holdAlt += 6; run(3);
 check(Math.abs(W().p[1] - ly0) < 0.05 && g.player.pos[1] - wy0 > 4, 'the hovering ship carries you (local Δy ' + (W().p[1] - ly0).toFixed(2) + ', world Δy ' + (g.player.pos[1] - wy0).toFixed(1) + ')');
