@@ -19,7 +19,7 @@
   class Horizon {
     constructor(g) {
       this.g = g; this.tiles = new Map(); this.radius = 0; this.inflight = 0; this.frame = 0;
-      this.mask = new Uint8Array(64 * 64); this.maskTex = null; this.maskKey = ''; this.maskT = 0;
+      this.mask = new Uint8Array(64 * 64); this.maskTex = null;
       this.drawList = []; this.sentAvg = false; this.worldKey = ''; this.split = 1.35; this.level = 0;
       this.stats = { tiles: 0, drawn: 0, tris: 0, mb: 0, done: 0, want: 0 }; this.bytes = 0;
     }
@@ -36,7 +36,8 @@
       const g = this.g, w = g.world, r = g.renderer;
       this.drawList.length = 0;
       if (!this.enabled() || !r) return;
-      if (!this.maskTex) { const gl = r.gl; this.maskTex = VR.GL.tex2D(64, 64, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.mask, filter: gl.NEAREST }); }
+      // the mask is filtered linearly: the cut between far tiles and chunks is a soft band over a chunk (F8), not a step
+      if (!this.maskTex) { const gl = r.gl; this.maskTex = VR.GL.tex2D(64, 64, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.mask, filter: gl.LINEAR }); }
       if (!this.sentAvg && g.tex && g.tex.avgColor) { g.pool.broadcast({ type: 'lodinit', avg: g.tex.avgColor }); this.sentAvg = true; }
       const wk = w.seed + ':' + (w.genOpts && w.genOpts.worldType || '') + ':' + (w.genOpts && w.genOpts.vgen || 1);
       if (wk !== this.worldKey) { this.reset(); this.worldKey = wk; }
@@ -131,19 +132,22 @@
         t.state = 1;
       }, d / S - L * 0.6);
     }
-    // chunks that are really drawn → LOD fragments there are discarded
+    // chunk sections that are really drawn → the far tiles are cut there. Each texel holds its chunk column's fade
+    // (0..255; 255 = whole, 0 = not drawn): the cut follows the same dither thresholds as the chunk's fade-in (shaders.js
+    // LOD_FS). The texel is set only for a column with a drawable section in the renderer's visible list — the list the
+    // frame draws (collectVisible is cached by the camera's section, so this call costs the render nothing). A column that
+    // is shown but whose sections the renderer culls (no line of sight) keeps its far tile, so no hole can open.
+    // Rebuilt every frame: the list changes with the camera's section and with every upload.
     updateMask(cam) {
-      const w = this.g.world, gl = this.g.renderer.gl;
+      const w = this.g.world, r = this.g.renderer, gl = r.gl;
       const ccx = Math.floor(cam.x) >> 4, ccz = Math.floor(cam.z) >> 4;
-      const key = ccx + ',' + ccz;
-      if (key === this.maskKey && (this.maskT = this.maskT + 1) % 6 !== 0) return;
-      this.maskKey = key;
       const m = this.mask; m.fill(0);
-      for (const c of w.cols.values()) {
-        const dx = c.cx - ccx, dz = c.cz - ccz;
-        if (dx < -32 || dz < -32 || dx > 31 || dz > 31 || !c.ready) continue;
-        let ok = true; for (let s = 0; s < c.sec.length; s++) if (!c.sec[s].meshed) { ok = false; break; }
-        if (ok) m[(dz + 32) * 64 + dx + 32] = 255;
+      const list = w ? r.collectVisible(w, cam) : [];
+      for (const s of list) {
+        if (!s.hasMesh || !(s.fade > 0)) continue;
+        const dx = (s.ox >> 4) - ccx, dz = (s.oz >> 4) - ccz;
+        if (dx < -32 || dz < -32 || dx > 31 || dz > 31) continue;
+        m[(dz + 32) * 64 + dx + 32] = Math.round(255 * s.fade);
       }
       gl.bindTexture(gl.TEXTURE_2D, this.maskTex);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.UNSIGNED_BYTE, m);
@@ -160,10 +164,14 @@
       // coarse cells stay out of the player's immediate surroundings — unless nothing real is there yet (a long jump,
       // a flight outrunning the loader): then the horizon fills the view right down to the ground
       const w = this.g.world, rd = (w && w.renderDist) || 8;
-      const cc = w && w.col(Math.floor(cam.x) >> 4, Math.floor(cam.z) >> 4);
-      let under = !!cc;
-      if (cc) for (let s = 0; s < cc.sec.length && under; s++) if (!cc.sec[s].meshed) under = false;
-      gl.uniform1f(p.u.u_lodNear, under ? Math.max(24, Math.min(80, rd * 8)) : 4);
+      const near = Math.max(24, Math.min(80, rd * 8)), R = Math.ceil(near / 16);
+      // (F8) inside `near` blocks of the eye the far tiles give way to the chunks, so every column there must be drawn whole:
+      // the mask says 255 only for a column whose sections are in the frame's list and fully faded in (a column still
+      // waiting for its upload, dissolving in, or culled would leave a hole around the eye)
+      const ccx = Math.floor(cam.x) >> 4, ccz = Math.floor(cam.z) >> 4;
+      let under = !!w;
+      for (let dz = -R; dz <= R && under; dz++) for (let dx = -R; dx <= R && under; dx++) if (this.mask[(dz + 32) * 64 + dx + 32] !== 255) under = false;
+      gl.uniform1f(p.u.u_lodNear, under ? near : 4);
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.maskTex); gl.uniform1i(p.u.u_mask, 0);
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, r.texNoise); gl.uniform1i(p.u.u_noise, 1);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE);
