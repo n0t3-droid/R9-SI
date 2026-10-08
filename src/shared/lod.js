@@ -232,6 +232,28 @@
     return res;
   }
   LOD.villageMesh = villageMesh;
+  // (F-Far) the helpers ring 1 shares with the horizon tiles: colours from the atlas, the tree table, the hash
+  const TRUNKS = { birch: ['birch_log', 0xd8d2c0], spruce: ['spruce_log', 0x3d2c1a], jungle: ['jungle_log', 0x584419], acacia: ['acacia_log', 0x676158], dark_oak: ['dark_oak_log', 0x3c2e1a], cherry: ['cherry_log', 0x4a2b2e], pale_oak: ['pale_oak_log', 0x8a8580], mangrove: ['mangrove_log', 0x5a3a2a], poplar: ['oak_log', 0x6b5033], oak: ['oak_log', 0x6b5033] };
+  // the look of a block state seen from afar: { c: [r, g, b], k: kind } (k 0 solid, 4 glowing, 7 window), or null for
+  // what does not show at a distance (furniture, plants, torches, rails); cached per state (follows the looks' version)
+  const SLK = new Map(); let slkVer = -1;
+  LOD.stateLook = function (s) {
+    if (!s) return null;
+    const v = (VR.Looks ? VR.Looks.ver | 0 : 0) * 1 + (AVG ? 1e6 : 0);
+    if (v !== slkVer) { SLK.clear(); slkVer = v; }
+    let r = SLK.get(s); if (r !== undefined) return r;
+    const t = R.types[R.T.type[s]], nm = t ? t.name : '', VX = VR.VX;
+    r = null;
+    if (!t || FURN.test(nm) || /^vx_lamppost/.test(nm)) r = null;
+    else if (/^vx_window_glow/.test(nm)) r = { c: hexcA(0x7ADFFF), k: 4 };
+    else if (/^vx_window|glass|viewport/.test(nm)) r = { c: WIN_C, k: 7 };
+    else if (/^vx_crystal_(violet|azure|rose)/.test(nm) && VX) r = { c: hexcA(VX.faceColor(s)), k: 4 };
+    else if (/^vx_/.test(nm) && VX) r = { c: hexcA(VX.faceColor(s)), k: 0 };
+    else if (t.o.solid !== false || (R.T.flags[s] & VR.F.LEAVES)) r = { c: scol(s, 0x8a6a40), k: (R.T.emit && R.T.emit[s]) ? 4 : 0 };
+    SLK.set(s, r);
+    return r;
+  };
+  LOD.util = { bcol, scol, tint, mixc, hh, leafCol, TREES, TRUNKS };
   // the site cells a tile's villages are looked up in (villagesNear's cells; the worker computes the cold ones first)
   LOD.tileCells = function (g, job) {
     const VG = VR.VillageGen; if (!VG || g.singleBiome >= 0 || job.level > 1) return [];
