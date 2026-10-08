@@ -72,6 +72,8 @@
     { key: 'invertY', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.invertY', tip: 'g.set.invertY.tip', def: false },
     { key: 'viewBob', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.viewBob', tip: 'g.set.viewBob.tip', def: true },
     { key: 'turnInertia', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.turnInertia', tip: 'g.set.turnInertia.tip', def: false },
+    { key: 'mouseSteer', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.mouseSteer', tip: 'g.set.mouseSteer.tip', def: false },   // 🚀 ships (flight.js): off = the mouse looks, the right button steers
+    { key: 'camShake', g: 'play', sec: 'steer', t: 'switch', lab: 'g.set.camShake', tip: 'g.set.camShake.tip', def: true },          // 🚀 the ship's camera shake (flight.js)
     { key: 'sprintMode', g: 'play', sec: 'steer', t: 'choice', lab: 'g.set.sprintMode', tip: 'g.set.sprintMode.tip', def: 'hold', opts: [['hold', 'g.set.sprintMode.hold', 'g.set.sprintMode.hold.tip'], ['toggle', 'g.set.sprintMode.toggle', 'g.set.sprintMode.toggle.tip']] },
     { key: 'autoJump', g: 'play', sec: 'steer', t: 'choice', lab: 'g.set.autoJump', tip: 'g.set.autoJump.tip', def: 'auto', opts: [['auto', 'g.set.autoJump.auto', 'g.set.autoJump.auto.tip'], ['on', 'g.set.autoJump.on', 'g.set.autoJump.on.tip'], ['off', 'g.set.autoJump.off', 'g.set.autoJump.off.tip']] },
     { key: 'touch', g: 'play', sec: 'steer', t: 'choice', lab: 'g.set.touch', tip: 'g.set.touch.tip', def: 'auto', opts: [['auto', 'g.set.touch.auto', 'g.set.touch.auto.tip'], ['on', 'g.set.touch.on', 'g.set.touch.on.tip'], ['off', 'g.set.touch.off', 'g.set.touch.off.tip']] },
