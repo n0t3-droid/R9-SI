@@ -889,6 +889,9 @@
     'start.firstT': 'Macht deine erste Welt und bringt dich hinein',
     'start.worlds': 'Andere Welt',
     'start.newWorld': '＋ Neue Welt',
+    'start.trailer': '🎬 Trailer',
+    'start.trailerT': 'Der Trailer von R9-SI: eine Fahrt durch die Welt, mit Schiffen und Helden — Esc beendet ihn',
+    'start.trailerWorld': '🎬 Trailer',
     'start.settings': '⚙ Einstellungen',
     'start.scaleT': 'Große Schrift',
     'start.legal': '📜 Impressum & Datenschutz',
@@ -1010,6 +1013,8 @@
     // ---- 📽 Zeitraffer (zeitraffer.js)
     'g.pause.zeit': '📽 Zeitraffer',
     'g.pause.zeitTip': 'Sieh zu, wie deine Welt entstand — Block für Block',
+    'g.pause.trailer': '🎬 Trailer',
+    'g.pause.trailerTip': 'Der Trailer läuft in dieser Welt — Esc beendet ihn',
     'meins.zeit': '📽 Zeitraffer',
     'g.zr.title': '📽 Zeitraffer',
     'g.zr.loading': 'Der Zeitraffer wird vorbereitet …',
