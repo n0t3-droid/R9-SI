@@ -285,32 +285,41 @@
       an.onfinish = () => { if (p.parentNode) p.remove(); };
     }
   }
+  // the reveal's words and pictures: d = { k, id, a, b, isNew, reward, pill: 'inv' | 'full' | 'codex' | null }. Written
+  // again (in the new language) when the language changes while it is open; nothing is granted or counted twice.
+  let rv = null;
+  function paintReveal(d) {
+    const tx = Inv.text(d.k), L = showLayer('reveal');
+    const line = d.pill === 'inv' ? T('erf.toInv') : d.pill === 'full' ? T('erf.invFull') : d.pill === 'codex' ? T('erf.codexNote') : '';
+    L.innerHTML = '<div class="erf-rv" role="dialog" aria-modal="true" aria-labelledby="erf-rvn" tabindex="-1"><div class="erf-conf" aria-hidden="true"></div><div class="erf-rays" aria-hidden="true"></div>' +
+      '<div class="erf-from" aria-hidden="true"></div><div class="erf-big"></div>' +
+      '<div class="erf-badge">' + esc(T(d.isNew ? 'erf.new' : 'erf.again')) + '</div>' +
+      '<h3 class="erf-rn" id="erf-rvn">' + esc(tx.name) + '</h3><p class="erf-rl">' + esc(tx.line) + '</p>' +
+      (line ? '<div class="erf-pill ' + d.pill + '">' + esc(line) + '</div>' : '') +
+      '<button type="button" class="erf-btn primary erf-go" data-erf="close">' + esc(T('erf.cont')) + '</button></div>';
+    const from0 = $('.erf-from', L);
+    from0.appendChild(pic(Inv.idOf(d.a), 'erf-pic')); from0.appendChild(el('b', '', '+')); from0.appendChild(pic(Inv.idOf(d.b), 'erf-pic'));
+    const big = $('.erf-big', L), cv = doc.createElement('canvas'); cv.width = 64; cv.height = 64; cv.setAttribute('aria-hidden', 'true'); big.appendChild(cv);
+    if (!paintNow(cv, d.id)) paintLater(cv, d.id);
+    if (d.reward === 'codex') $('.erf-rv', L).insertBefore(recipeEl(d.id), $('.erf-go', L));
+    return L;
+  }
   function reveal(r, a, b) {
     const g = game(), ctx = Inv.ctxOf(g), reward = Inv.reward(ctx), k = r.k, id = r.id, tx = Inv.text(k);
-    let pill = null;
+    let pill = null;   // the line under the words: what the child got (in the inventory, too full, or in the codex)
     if (reward === 'inventory') {
       const res = Inv.grant(g, k);
-      if (res.ok && res.added > 0) { pill = ['inv', T('erf.toInv')]; toasts.push([T('erf.toInv'), tx.name, id]); try { if (ui.updateHUD) ui.updateHUD(true); } catch (e) { /* the hotbar catches up */ } }
-      else if (res.ok) pill = ['inv', T('erf.toInv')];
-      else if (res.reason === 'full') pill = ['full', T('erf.invFull')];
+      if (res.ok && res.added > 0) { pill = 'inv'; toasts.push([T('erf.toInv'), tx.name, id]); try { if (ui.updateHUD) ui.updateHUD(true); } catch (e) { /* the hotbar catches up */ } }
+      else if (res.ok) pill = 'inv';
+      else if (res.reason === 'full') pill = 'full';
     } else if (reward === 'codex') {
-      pill = ['codex', T('erf.codexNote')];
+      pill = 'codex';
       if (r.isNew) toasts.push([T('g.codex.toastInvention'), tx.name, id]);
     }
     if (r.isNew) fresh.add(k);
     detailKey = k; revealAt = performance.now();
-    const L = showLayer('reveal');
-    L.innerHTML = '<div class="erf-rv" role="dialog" aria-modal="true" aria-labelledby="erf-rvn" tabindex="-1"><div class="erf-conf" aria-hidden="true"></div><div class="erf-rays" aria-hidden="true"></div>' +
-      '<div class="erf-from" aria-hidden="true"></div><div class="erf-big"></div>' +
-      '<div class="erf-badge">' + esc(T(r.isNew ? 'erf.new' : 'erf.again')) + '</div>' +
-      '<h3 class="erf-rn" id="erf-rvn">' + esc(tx.name) + '</h3><p class="erf-rl">' + esc(tx.line) + '</p>' +
-      (pill ? '<div class="erf-pill ' + pill[0] + '">' + esc(pill[1]) + '</div>' : '') +
-      '<button type="button" class="erf-btn primary erf-go" data-erf="close">' + esc(T('erf.cont')) + '</button></div>';
-    const from0 = $('.erf-from', L);
-    from0.appendChild(pic(Inv.idOf(a), 'erf-pic')); from0.appendChild(el('b', '', '+')); from0.appendChild(pic(Inv.idOf(b), 'erf-pic'));
-    const big = $('.erf-big', L), cv = doc.createElement('canvas'); cv.width = 64; cv.height = 64; cv.setAttribute('aria-hidden', 'true'); big.appendChild(cv);
-    if (!paintNow(cv, id)) paintLater(cv, id);
-    if (reward === 'codex') $('.erf-rv', L).insertBefore(recipeEl(id), $('.erf-go', L));
+    rv = { k, id, a, b, isNew: !!r.isNew, reward, pill };
+    const L = paintReveal(rv);
     renderCount(); renderTray();
     if (r.isNew) { sfx('new', k); confetti($('.erf-conf', L)); } else sfx('again');
     focusIn('.erf-go');
@@ -318,7 +327,7 @@
   function closeReveal() {
     if (layer !== 'reveal' || performance.now() - revealAt < 450) return;
     hideLayer();
-    const k = detailKey; slots = [null, null]; tipPair = null; busy = false;
+    const k = detailKey; slots = [null, null]; tipPair = null; busy = false; rv = null;
     const tray = $('#erf-tray', root); if (tray) tray.scrollTop = 0;
     renderChips(); renderTray(); afterSlots(); renderCount();
     if (Inv.count() >= Inv.TOTAL) setMsg('done', T('erf.allDone')); else defaultMsg();
@@ -576,7 +585,14 @@
     // Esc: one step back (capture: the game's own Esc must not open the pause menu on top)
     window.addEventListener('keydown', (e) => { if (e.key !== 'Escape' || !isOpen()) return; e.preventDefault(); e.stopImmediatePropagation(); E.back(); }, true);
     // the language switches live; another tab found something
-    if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { if (isOpen()) { if (VR.I18N.retext) VR.I18N.retext(root); renderAll(); if (layer === 'book') renderBook(); } });
+    if (VR.I18N && VR.I18N.on) VR.I18N.on(() => {
+      if (!isOpen()) return;
+      if (VR.I18N.retext) VR.I18N.retext(root);
+      renderAll();
+      if (layer === 'book') renderBook();
+      else if (layer === 'detail' && detailKey) openDetail(detailKey);
+      else if (layer === 'reveal' && rv) { paintReveal(rv); focusIn('.erf-go'); }
+    });
     Inv.on((e) => { if ((e.type === 'sync' || e.type === 'reset') && isOpen() && !layer) { slots = [null, null]; busy = false; renderAll(); } });
   }
 
