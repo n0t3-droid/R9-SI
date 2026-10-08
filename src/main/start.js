@@ -137,8 +137,9 @@
     panel.innerHTML = `<h2>🌍 ${esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))}</h2><div class="worldlist" id="worldlist"></div><div class="row gap wrow"><button class="btn primary" data-act="newworld">${esc(tx('start.newWorld', null, '＋ Neue Welt', '＋ New world'))}</button><button class="btn" data-act="back">${esc(tx('start.back', null, '← Zurück', '← Back'))}</button></div>`;
     panel.onclick = (e) => { const arm = $('#worlds .wcard button.arm'); if (arm && !arm.contains(e.target)) { arm.classList.remove('arm'); arm.textContent = tx('start.del', null, '🗑 Löschen', '🗑 Delete'); } };
   }
-  // one world, one card: ▶ · 🏗 · ✎ · 🗑 (the worlds screen and 🎒 Meins); seed and time are a Profi detail
-  function worldCard(w) {
+  // one world, one card: ▶ · 🏗 · ✎ · 🗑 (the worlds screen and 🎒 Meins; 🎒 Meins adds 📽 Zeitraffer); seed and time
+  // are a Profi detail
+  function worldCard(w, zeit) {
     const c = el('div', 'wcard'); c.dataset.id = w.id;
     c.innerHTML = `<div class="wtxt"><div class="wn"></div><div class="wm"></div></div><div class="wacts"></div>`;
     $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
@@ -146,6 +147,7 @@
     $('.wm', c).innerHTML = esc(modeName(w.mode)) + (when ? ' · ' + esc(when) : '') + `<span class="pro"> · Seed ${w.seed >>> 0}</span>`;
     const acts = $('.wacts', c);
     const BTN = [['play', tx('start.w.play', null, '▶ Spielen', '▶ Play'), 'primary'], ['bauen', tx('start.w.bauen', null, '🏗 Bauen', '🏗 Build'), ''], ['rename', tx('start.w.rename', null, '✎ Name', '✎ Rename'), ''], ['del', tx('start.del', null, '🗑 Löschen', '🗑 Delete'), 'danger']];
+    if (zeit) BTN.splice(2, 0, ['zeit', tx('meins.zeit', null, '📽 Zeitraffer', '📽 Time-lapse'), '']);
     for (const [k, label, cls] of BTN) { const b = el('button', 'btn small ' + cls); b.type = 'button'; b.dataset.act = 'w:' + k; b.dataset.w = k; b.dataset.id = w.id; b.textContent = label; if (k === 'rename' || k === 'del') b.setAttribute('aria-label', label + ' · ' + (w.name || '')); acts.appendChild(b); }
     return c;
   }
@@ -161,6 +163,7 @@
     const g = game(), id = b.dataset.id, w = (ST.worldsCache || []).find(x => x.id === id); if (!w) return;
     if (k === 'play') { g.loadWorld(w); return; }
     if (k === 'bauen') { try { location.href = 'studio.html' + (location.search || '') + '#world/' + encodeURIComponent(id) + '/karte'; } catch (e) { /* */ } return; }
+    if (k === 'zeit') { if (VR.Zeit) VR.Zeit.openWorld(w); return; }   // 📽: in this world now, or it opens and plays
     if (k === 'rename') {
       const card = b.closest('.wcard'), nm = $('.wn', card); if (!nm || $('input', nm)) return;
       const inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 40; inp.value = w.name || ''; nm.textContent = ''; nm.appendChild(inp); inp.focus(); inp.select();
@@ -190,6 +193,7 @@
           <button type="button" class="btn primary" data-act="resume" data-t="g.pause.resume"></button>
           <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
           <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
+          <button type="button" class="btn" data-act="zeitraffer" data-t="g.pause.zeit" data-tt="g.pause.zeitTip"></button>
           <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
         </div>
         <div class="pgrp pside">
@@ -246,6 +250,7 @@
       case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
+      case 'zeitraffer': if (VR.Zeit) VR.Zeit.open(ui.screen === 'pause' ? 'pause' : null); return true;
       case 'legal': if (legalOK()) VR.Legal.open('impressum'); return true;
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;
@@ -274,7 +279,7 @@
     Dg.fillNow(body, 24);   // (the first screen of cards has its pictures at once; the rest as they scroll in)
     if (ws.length) {
       body.appendChild(el('div', 'grp', '🌍 ' + esc(tx('start.worldsTitle', null, 'Welten', 'Worlds'))));
-      for (const w of ws) { const c = worldCard(w); c.style.gridColumn = '1 / -1'; body.appendChild(c); }
+      for (const w of ws) { const c = worldCard(w, true); c.style.gridColumn = '1 / -1'; body.appendChild(c); }
     }
   };
   // the cards' actions on this page: 👁 and ✏️ open the R9 Studio on the thing, 📍 puts it in your hand (in play now,

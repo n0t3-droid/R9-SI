@@ -1041,7 +1041,7 @@
           let x = t.x, y = t.y, z = t.z;
           if (!(R.T.flags[t.state] & F.REPLACE)) { x += VR.DX[t.face]; y += VR.DY[t.face]; z += VR.DZ[t.face]; }
           const fl = R.byName[def.fluid]; if (!fl) return false;
-          w.setBlock(x, y, z, fl.defaultState, 4);
+          w.setBlock(x, y, z, fl.defaultState, 4 | VR.SB_EDIT);
           this.audio.play('splash');
           if (!p.creative) { stack.id = 'bucket'; p.inv.changed = true; }
           return true;
@@ -1066,15 +1066,15 @@
     }
     breakMulti(x, y, z, s) {
       const w = this.world, t = R.types[R.T.type[s]];
-      if (t.o.kind === 'door' || t.o.tall) { const oy = t.get(s, 'half') ? -1 : 1; if (R.T.type[w.getBlock(x, y + oy, z)] === t.id) w.setBlock(x, y + oy, z, 0, 4); }
+      if (t.o.kind === 'door' || t.o.tall) { const oy = t.get(s, 'half') ? -1 : 1; if (R.T.type[w.getBlock(x, y + oy, z)] === t.id) w.setBlock(x, y + oy, z, 0, 4 | VR.SB_EDIT); }
       if ((t.o.kind === 'model' || t.o.vxModel) && VR.VM && VR.VM.MODELS[t.name]) {
         // a VX16 model: find its anchor from the broken part's offset, then clear every part
         const f = t.get(s, 'facing'), pi = t.get(s, 'part'), m = VR.VM.MODELS[t.name], fp = VR.VM.footprint(m, f);
         const me = fp.find(o => o[3] === pi) || [0, 0, 0, 0];
         const ax = x - me[0], ay = y - me[1], az = z - me[2];
-        for (const [dx, dy, dz] of fp) { const bx = ax + dx, by = ay + dy, bz = az + dz; if (bx === x && by === y && bz === z) continue; if (R.T.type[w.getBlock(bx, by, bz)] === t.id) w.setBlock(bx, by, bz, 0, 4); }
+        for (const [dx, dy, dz] of fp) { const bx = ax + dx, by = ay + dy, bz = az + dz; if (bx === x && by === y && bz === z) continue; if (R.T.type[w.getBlock(bx, by, bz)] === t.id) w.setBlock(bx, by, bz, 0, 4 | VR.SB_EDIT); }
       }
-      if (t.o.kind === 'bed') { const f = t.get(s, 'facing'), head = t.get(s, 'part'); const d = head ? -1 : 1; const ox = x + VR.HF_DX[f] * d, oz = z + VR.HF_DZ[f] * d; if (R.T.type[w.getBlock(ox, y, oz)] === t.id) w.setBlock(ox, y, oz, 0, 4); }
+      if (t.o.kind === 'bed') { const f = t.get(s, 'facing'), head = t.get(s, 'part'); const d = head ? -1 : 1; const ox = x + VR.HF_DX[f] * d, oz = z + VR.HF_DZ[f] * d; if (R.T.type[w.getBlock(ox, y, oz)] === t.id) w.setBlock(ox, y, oz, 0, 4 | VR.SB_EDIT); }
     }
 
     // ---------------------------------------------------------------- chat & commands

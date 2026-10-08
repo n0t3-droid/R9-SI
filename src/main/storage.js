@@ -57,6 +57,7 @@
     }
     async deleteWorld(id) {
       this.mem.worlds.delete(id);
+      if (VR.ZeitRec) VR.ZeitRec.forget(id);   // its 📽 history (a database of its own) goes with it
       for (const k of [...this.mem.chunks.keys()]) if (k.startsWith(id + ':')) this.mem.chunks.delete(k);
       if (!this.ok) return;
       try {
@@ -75,6 +76,7 @@
       return set;
     }
     saveColumn(dim, col) {
+      if (col.zr) return Promise.resolve();   // a 📽 replay copy is never saved (the original stays aside meanwhile)
       // sv: the version of the world's style the generated part of this column was made with (v0.34)
       const rec = { b: rleEncode(col.blocks), h: (col.blocks.length >> 8), be: col.blockEntities && col.blockEntities.size ? [...col.blockEntities.entries()] : null, sv: col.sv || 0 };
       col.modified = false;
