@@ -417,6 +417,8 @@
     slots = [null, null]; cat = 'all'; busy = false; layer = null; tipPair = null; fresh = new Set(); toasts = [];
     hideLayer();
     ui.show('invent');
+    // the pointer is free here: a lock that the last close asked for must not hold it (the cards need the mouse)
+    try { document.exitPointerLock(); } catch (e) { /* no lock here */ }
     byKey = (VR.Start && VR.Start.kbd) || where === 'key';
     if (VR.I18N && VR.I18N.retext) VR.I18N.retext(root);   // (the words may have changed while it was closed)
     renderAll(); defaultMsg();
@@ -457,14 +459,12 @@
     root.appendChild(ghost); drag.src.classList.add('lift'); moveGhost(x, y);
   }
   function moveGhost(x, y) {
-    if (!ghost) return;
+    if (!ghost || !drag) return;
     ghost.style.transform = 'translate(' + (x - 40) + 'px,' + (y - 52) + 'px) rotate(-6deg) scale(1.08)';
-    if (drag && !drag.raf) drag.raf = requestAnimationFrame(() => {
-      if (!drag) return; drag.raf = 0;
-      const t = doc.elementFromPoint(x, y), tgt = t && t.closest ? (t.closest('.erf-slot') || t.closest('.erf-card')) : null;
-      if (dropT && dropT !== tgt) dropT.classList.remove('drop');
-      dropT = tgt && !(tgt.classList.contains('erf-card') && tgt.dataset.k === drag.k) ? tgt : null; if (dropT) dropT.classList.add('drop');
-    });
+    // the target under the pointer, at once (pointer events already come one per frame; the ghost ignores hits)
+    const t = doc.elementFromPoint(x, y), tgt = t && t.closest ? (t.closest('.erf-slot') || t.closest('.erf-card')) : null;
+    if (dropT && dropT !== tgt) dropT.classList.remove('drop');
+    dropT = tgt && !(tgt.classList.contains('erf-card') && tgt.dataset.k === drag.k) ? tgt : null; if (dropT) dropT.classList.add('drop');
   }
   function endGhost() {
     if (ghost) { ghost.remove(); ghost = null; }
@@ -473,6 +473,7 @@
   }
   function cancelDrag() { if (!drag) return; clearTimeout(drag.hold); if (drag.raf) cancelAnimationFrame(drag.raf); const on = drag.on; drag = null; endGhost(); if (on) setTimeout(() => { swallow = 0; }, 60); }
   function onDown(e) {
+    if (drag && !drag.on) { clearTimeout(drag.hold); drag = null; }   // a press whose end never came: forget it, the new press counts
     if (busy || layer || (e.button !== undefined && e.button > 0) || drag) return;
     const c = e.target.closest ? e.target.closest('.erf-card') : null; if (!c || !c.dataset.k) return;
     drag = { k: c.dataset.k, id: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, touch: e.pointerType === 'touch' || e.pointerType === 'pen', src: c, hold: 0, raf: 0 };
@@ -561,6 +562,8 @@
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', () => cancelDrag());
+    // a lock that arrives after the workshop opened (the close before asked for it) is given back at once
+    document.addEventListener('pointerlockchange', () => { if (isOpen() && document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) { /* */ } } });
     // key I: the workshop, in the game (never while typing, with a menu up, in photo mode, dead, or with the Studio over it)
     window.addEventListener('keydown', (e) => {
       if (e.code !== 'KeyI' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
@@ -601,6 +604,7 @@
         if (body && !body.querySelector('.erf-mcard') && (ST.meinsChip || 'all') === 'all') {
           const b = el('button', 'erf-mcard'); b.type = 'button'; b.dataset.act = 'invent';
           b.innerHTML = '<span class="erf-mpic" aria-hidden="true"><i>🔥</i><b>+</b><i>🪨</i><b>=</b><i>💡</i></span><span class="erf-mlbl">' + esc(T('erf.meins')) + '</span><span class="erf-msub">' + esc(T('erf.meinsSub')) + '</span>';
+          body.querySelectorAll(':scope > .note').forEach((n) => n.remove());   // („Noch nichts hier“ is not true with a card in it)
           body.insertBefore(b, body.firstChild);
         }
       } catch (e) { console.warn('invent: meins card', e); }

@@ -400,7 +400,7 @@
     'erf.toInv': '💡 Neu im Inventar',
     'erf.invFull': 'Dein Inventar ist voll. Mach Platz und hol es dir im Buch.',
     'erf.take': '🎒 Ins Inventar',
-    'erf.codexNote': 'Der Codex merkt sich diese Erfindung.',
+    'erf.codexNote': 'Steht jetzt im Codex!',
     'erf.recipe': 'So stellst du es her:',
     'erf.onlyInvent': 'Das gibt es nur durch Erfinden!',
     'erf.all': 'Alle',

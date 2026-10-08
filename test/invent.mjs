@@ -29,7 +29,7 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const shot = (n) => page.screenshot({ path: `/home/claude/vr/test/shots/${n}.png`, timeout: 180000 }).catch(() => {});
 const ONLY = (process.env.ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
 const want = (n) => !ONLY.length || ONLY.includes(String(n));
-const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).slice(0, 400)); } };
+const section = async (n, name, fn) => { if (!want(n)) return; console.log(n + ' · ' + name); try { await fn(); } catch (e) { fails++; console.log('  ✗ ' + name + ' broke: ' + String(e && e.message || e).slice(0, 400)); await safe(() => { if (VR.Invent && VR.Invent.isOpen()) VR.Invent.close(); }); await wait(200); } };   // (a broken section leaves the workshop shut: the next one starts clean)
 const done = async () => { console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 14)) console.log(l); check(!logs.some(l => /pageerror/.test(l)), 'no page errors'); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); await browser.close(); srv.kill(); process.exit(fails ? 1 : 0); };
 
 // ---- helpers: the game
@@ -95,8 +95,8 @@ await section(1, 'the start screen: 🎒 Meins has the 💡 card; six start card
   check(s.on && s.title === '💡 Erfinden', 'the screen is German: „💡 Erfinden"');
   check(s.cards.join() === 'holz:Holz,stein:Stein,feuer:Feuer,wasser:Wasser,erde:Erde,luft:Luft', 'six start cards: Holz · Stein · Feuer · Wasser · Erde · Luft');
   check(/^0 \/ \d{3} erfunden$/.test(s.count), 'the count starts at „0 / 167 erfunden" (' + s.count + ')');
-  check(s.hint === 'feuer,stein' && /Feuer und Stein/.test(s.msg), 'the first time, Feuer and Stein are lit and the help says so');
-  check(s.slots === 2 && s.tools.includes('💡 Tipp') && s.tools.includes('📖 Buch') && s.chips[0] === '✨ Alle', 'two slots, 💡 Tipp, 📖 Buch, ⌫, and the category chips');
+  check(s.hint.split(',').sort().join() === 'feuer,stein' && /Feuer und Stein/.test(s.msg), 'the first time, Feuer and Stein are lit and the help says so');
+  check(s.slots === 2 && s.tools.includes('💡 Tipp') && s.tools.includes('📖 Buch') && s.chips[0].replace(/\s+/g, '') === '✨Alle', 'two slots, 💡 Tipp, 📖 Buch, ⌫, and the category chips');
   // the six pictures are drawn, a few per frame
   check(await waitFor(() => { const px = (cv) => { const d = cv.getContext('2d').getImageData(0, 0, 64, 64).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 20) n++; return n; }; const cs = [...document.querySelectorAll('#erf-tray .erf-card canvas')]; return cs.length === 6 && cs.every(c => px(c) > 300); }, null, 8000), 'all six start cards show a picture (not an empty square)');
   const looks = await ev(() => { const px = (cv) => { const d = cv.getContext('2d').getImageData(0, 0, 64, 64).data; let h = 0; for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] * 3 + d[i + 1] * 5 + d[i + 2] * 7 + d[i + 3]) | 0; return h; }; return new Set([...document.querySelectorAll('#erf-tray .erf-card canvas')].map(px)).size; });
@@ -152,8 +152,8 @@ await section(2, 'a Creative world: 💡 in the pause menu; the invention goes i
   console.log('  reveal', JSON.stringify(r));
   check(r.name === 'Ofen' && r.badge === (had ? 'Das kennst du schon.' : '✨ Neu erfunden!'), 'the Ofen (' + r.badge + ')');
   check(r.pill === '💡 Neu im Inventar' && r.pillKind === 'inv', 'Creative: „💡 Neu im Inventar"');
-  check((await invCount('furnace')) >= 1 && await hotbarHas('furnace'), 'the furnace is in the inventory, on the hotbar');
-  check(r.confetti > 10, 'a little confetti (' + r.confetti + ' pieces)');
+  check((await invCount('furnace')) >= 1, 'the furnace is in the inventory (' + ((await hotbarHas('furnace')) ? 'on the hotbar' : 'in the main inventory: the creative kit filled the hotbar') + ')');
+  check(had ? r.confetti === 0 : r.confetti > 10, (had ? 'a known one gets no confetti' : 'a little confetti') + ' (' + r.confetti + ' pieces)');
   await shot('invent_1');
   check(await closeReveal(), 'Weiter');
   check((await trayKeys()).includes('ofen'), 'the Ofen is among the cards');
@@ -181,6 +181,7 @@ await section(2, 'a Creative world: 💡 in the pause menu; the invention goes i
   const ok2 = !!tip0 && st.slots[0] === tip0.a && st.slots[1] === tip0.b && st.tip && st.tip.join() === [tip0.a, tip0.b].join();
   check(ok2 && tm.kind === 'tip', '💡 Tipp puts a working pair into the slots (' + (st.slots || []).join(' + ') + ' → ' + (tip0 && tip0.k) + ')');
   check(await ev(() => !!document.querySelector('#invent .erf-eq.glow:not([disabled])')), 'the = button glows and is ready');
+  await wait(300);   // (the = button eases from grey to amber in 0.2 s)
   await shot('invent_2');
   await page.click('#invent .erf-eq');
   check(await revealUp(), '= makes it');
@@ -273,10 +274,14 @@ await section(4, 'drag one card onto another with the mouse; onto a slot', async
   await page.keyboard.press('i'); await waitFor(() => VR.Invent.isOpen(), null, 3000);
   const a = await center('#invent .erf-card[data-k="holz"]'), b = await center('#invent .erf-card[data-k="wasser"]');
   const want0 = await ev(() => { const I = VR.Inventions, k = I.find('holz', 'wasser'); return { k, name: I.text(k).name }; });
+  console.log('  after I', JSON.stringify(await ev(() => ({ open: VR.Invent.isOpen(), pl: !!document.pointerLockElement, screen: VR.game.ui.screen, typing: VR.game.ui.typing, ae: document.activeElement ? document.activeElement.tagName + '.' + String(document.activeElement.className).slice(0, 30) : null }))));
+  await ev(() => { window.__pd = []; const rec = (t) => (e) => { if (window.__pd.length < 14) window.__pd.push(t + ':' + (e.target.tagName || '?') + '.' + String(e.target.className || '').slice(0, 24)); }; window.addEventListener('pointerdown', rec('down'), true); window.addEventListener('pointerup', rec('up'), true); });
+  console.log('  under the holz card', JSON.stringify(await ev((p) => { const e = document.elementFromPoint(p.x, p.y); return e ? e.tagName + '.' + String(e.className).slice(0, 30) : null; }, a)));
   await page.mouse.move(a.x, a.y); await page.mouse.down();
   await page.mouse.move(a.x + 14, a.y + 6, { steps: 3 });
   await page.mouse.move(b.x, b.y, { steps: 10 });
   await wait(120);
+  console.log('  pointer events', JSON.stringify(await ev(() => window.__pd || [])));
   const dr = await ev(() => ({ ghost: !!document.querySelector('#invent .erf-ghost'), drop: !!document.querySelector('#invent .erf-card.drop[data-k="wasser"]'), lift: !!document.querySelector('#invent .erf-card.lift[data-k="holz"]') }));
   console.log('  while dragging', JSON.stringify(dr));
   check(dr.ghost && dr.drop && dr.lift, 'while dragging: the card hangs on the pointer and the other one lights up');
@@ -309,9 +314,11 @@ await section(5, '📖 the book and ⌫ forget (with a question)', async () => {
   if (!(await enterWorld('creative'))) return;
   await ev(() => { const u = VR.game.ui; if (u.screen) u.resume(); }); await wait(150);
   await page.keyboard.press('i'); await waitFor(() => VR.Invent.isOpen(), null, 3000);
+  console.log('  section 5 start', JSON.stringify(await ev(() => ({ open: VR.Invent.isOpen(), screen: VR.game.ui.screen, pl: !!document.pointerLockElement }))));
   // make sure there is something to remember
   if ((await ev(() => VR.Inventions.count())) < 3) { for (let i = 0; i < 3; i++) { const t = await ev(() => VR.Inventions.tip()); if (!t) break; await makeBy(t.a, t.b); await closeReveal(); } }
   const n = await ev(() => VR.Inventions.count()), total = await ev(() => VR.Inventions.TOTAL);
+  console.log('  before the book', JSON.stringify(await ev(() => ({ open: VR.Invent.isOpen(), screen: VR.game.ui.screen, st: VR.Invent.state() }))));
   await page.click('[data-erf="book"]'); await wait(500);
   const bk = await ev(() => {
     const tiles = [...document.querySelectorAll('#erf-layer .erf-tile')];
