@@ -713,25 +713,35 @@ void main() {
   float skyL = v_sky * v_sky;
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
   if (kind == 3u) {
-    // ---------------- portal veil (Animierte Anzeigen): an energy field whose two swirl layers drift in world space,
-    // so neighbouring veil blocks join; still when the animation is off. The texture gives a soft alpha and the swirl
-    // lifts it, so the palm city shows through the opening.
+    // ---------------- portal veil (t3_04): a hot orange-white rim on the frame, blue-white energy crackling a few
+    // blocks in from it, and a clear middle that shows what lies beyond (the hall, the palm city). The mesher hands each
+    // corner its distance to the veil's rim in v_uv.x (mesher.js emitVeilQuad); the swirl and the filaments drift in
+    // world space, so neighbouring veil blocks join. Animierte Anzeigen off (Very Low): no noise, one texture read
     vec3 wp = v_localPos + vec3(u_camInt);
     vec2 pp = face <= 1u ? wp.zy : (face <= 3u ? wp.xz : wp.xy);
-    // still with the animation off (Very Low): a flat swirl, so no noise is spent on the veil there
-    float swirl = 0.4;
+    float rd = v_uv.x;
+    float swirl, fil = 0.0, wob = 0.0;
     if (u_animOn > 0.5) {
-      float s1 = vnoise(pp * 1.6 + vec2(u_time * 0.9, -u_time * 0.6));
-      float s2 = vnoise(pp * 4.2 - vec2(u_time * 1.7, u_time * 1.1));
-      swirl = smoothstep(0.32, 0.92, s1 * 0.6 + s2 * 0.5);
+      float s1 = vnoise(pp * 0.8 + vec2(u_time * 0.35, -u_time * 0.27));
+      float s2 = vnoise(pp * 2.1 - vec2(u_time * 0.8, u_time * 0.55));
+      swirl = s1 * 0.6 + s2 * 0.4;
+      wob = (s1 - 0.5) * 1.6;
+      // lightning: the thin iso-lines of a warped, fast noise (two layers, so the strands cross and flicker)
+      float w = vnoise(pp * 0.7 + vec2(u_time * 0.6, u_time * 0.4)) * 2.0;
+      float n1 = vnoise(pp * 1.5 + vec2(w, -u_time * 1.3)), n2 = vnoise(pp * 2.6 + vec2(u_time * 1.7, w));
+      fil = (1.0 - smoothstep(0.0, 0.05, abs(n1 - 0.5))) + (1.0 - smoothstep(0.0, 0.035, abs(n2 - 0.5))) * 0.6;
+    } else {
+      swirl = clamp((texture(u_albedo, vec3(fract(pp * 0.25), layer)).a - 0.3) / 0.3, 0.0, 1.0);
     }
-    vec4 va = textureGrad(u_albedo, vec3(fu, layer), dFdx(fu), dFdy(fu));
-    // a deeper blue and dimmer than before: the veil is see-through, not a lit panel (the swirl lifts it a little)
-    vec3 veilCol = mix(vec3(0.05, 0.34, 0.92), vec3(0.6, 0.88, 1.0), swirl * swirl);
-    vec3 vcol = veilCol * (0.6 + 0.45 * swirl) * (0.85 + 0.3 * va.r);
-    float dv = length(v_rel);
-    vcol = applyFog(vcol, v_rel, dv);
-    o_col = vec4(vcol, clamp(va.a * (0.45 + 0.75 * swirl), 0.0, 1.0));
+    float rim = 1.0 - smoothstep(0.0, 0.9, rd);
+    float band = 1.0 - smoothstep(0.4, 3.0 + wob, rd);
+    float e = clamp(band * (0.2 + 0.8 * swirl) * 0.8 + fil * band, 0.0, 1.0);
+    vec3 hot = mix(vec3(1.0, 0.62, 0.28), vec3(1.0, 0.92, 0.8), 1.0 - smoothstep(0.0, 0.35, rd)) * 3.2;
+    vec3 vcol = mix(vec3(0.12, 0.38, 1.0) * 0.9, vec3(0.5, 0.82, 1.0) * 2.4, e);
+    vcol = mix(vcol, hot, rim);
+    float va = clamp(0.05 + 0.08 * swirl + e * 0.75 + rim * 0.92, 0.0, 0.97);
+    vcol = applyFog(vcol, v_rel, dist);
+    o_col = vec4(vcol, va);
     return;
   }
   if (kind == 1u || kind == 6u) {
