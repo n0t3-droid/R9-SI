@@ -145,4 +145,10 @@
   // the palm's footprint in blocks, for a lot's yard test: the crown's 7×7 (the trunk is one block)
   P.palmFoot = (x, z) => [x - 3, z - 3, x + 3, z + 3];
   P.on = (g) => !!(g && g.vgen >= 7);
+  // the state sets the crown pass reads, each a Uint8Array by state (1 = in the set), read from the registry once it is
+  // complete and kept while the registry stays the same: the leaves a crown may replace (an older palm's crown and fronds,
+  // a fruit tree's crown, a bush or a fern) and the soil a trunk may stand on (the ground the fills raise)
+  const stateSet = (re) => { let a = null, n = -1; return () => { const R = VR.R; if (!a || n !== R.stateCount) { a = new Uint8Array(R.stateCount + 1); n = R.stateCount; for (const t of R.types) if (re.test(t.name)) a.fill(1, t.base, t.base + t.nstates); } return a; }; };
+  P.leafStates = stateSet(/^(vx_palm_crown|vx_palm_frond|vx_fruit_crown_|vx_bush|vx_fern)/);
+  P.soilStates = stateSet(/^(dirt|grass_block|coarse_dirt|podzol|mycelium|rooted_dirt|sand|snow_block|stone|gravel|clay|mud)$/);
 })(VR);
