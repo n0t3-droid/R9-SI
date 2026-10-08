@@ -473,6 +473,8 @@
       if (!this.studioOpen) return;
       const fr = document.getElementById('studioFrame');
       if (fr) { fr.classList.remove('on'); setTimeout(() => { if (!this.studioOpen && fr) fr.src = 'about:blank'; }, 60); }
+      // the keys belong to the game again: the Studio's frame kept the focus, so B, Esc and the hotbar did nothing until a click
+      if (fr && document.activeElement === fr) { try { fr.blur(); window.focus(); } catch (e) { /* no focus here */ } }
       this.studioOpen = false;
       this.last = performance.now();
       // what the Studio did, in the world now (a look missed by the storage event too)
@@ -941,7 +943,10 @@
       if (this.prewarm) this.prewarm.stop();
       this.prewarm = VR.VM.prewarm({ notBefore: performance.now() + 10000 });
       this.prewarm.start();
-      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden && this.prewarm) this.prewarm.start(); }); }
+      // (iconperf) the Modern Living pictures are made the same way (VR.iconWarm): the tab then opens without a build
+      if (this.iconWarm) this.iconWarm.stop();
+      if (VR.iconWarm && this.icons) this.iconWarm = VR.iconWarm(this.icons, this.creativeItems('vmodern'), { notBefore: performance.now() + 10000 });
+      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (this.prewarm) this.prewarm.start(); if (this.iconWarm) this.iconWarm.start(); } }); }
     }
     playFrame(dt) {
       const g = this, p = this.player, w = this.world, input = this.input;

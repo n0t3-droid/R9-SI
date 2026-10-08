@@ -140,6 +140,7 @@ has a per-frame budget and the quality governor never lowers your view distance;
 giant with its slanted ring, moons, the nebula veil, puffy cumulus around the citadel's spires and fog banks under the
 sky isles — is in. **Deutsch überall**: every text of the game and the Studio in German and English, German furniture
 names, `/wetter`. Worldgen is twice as fast (the realm's climate per field, cave fields per layer, cached tables).
+The ✨ Modern Living tab opens without a hitch: voxel pictures are drawn in 6 ms slices and warmed in idle time.
 
 ### 🚪 Doors that open, 🏭 R9 Forge, 🌦 weather, one front door for all ages (v0.40)
 **Doors, switches and beds just work.** A quick click opens a door (wooden, iron with power, modern hinged, the

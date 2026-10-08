@@ -158,11 +158,12 @@ await section('4 · 📥 Übernehmen in the game\'s Studio', async () => {
     return out;
   }, fs.readFileSync(file, 'utf8'));
   console.log('  drop', JSON.stringify(d));
-  check(d.sum && /2 Favoriten · 1 Möbel · 1 Bauteil/.test(d.sum), 'dropping the file shows what is in it: ' + (d.sum || '').replace(/\s+/g, ' ').slice(0, 120));
+  check(d.sum && /2 Favoriten · 1 Möbelstück · 1 Bauteil/.test(d.sum), 'dropping the file shows what is in it: ' + (d.sum || '').replace(/\s+/g, ' ').slice(0, 120));
   check(d.closed && d.favs === 0, 'Abbrechen: nothing changes');
   // 🕘 Weitermachen → 📥 Übernehmen → pick the file → ✓ Übernehmen
   await gev(() => VR.Projects.show(true));
   await gs.waitForTimeout(300);
+  console.log('  hub', JSON.stringify(await gev(() => { const h = document.getElementById('hub'), b = document.querySelector('#hub [data-pack="in"]'); return { hub: !!h, cls: h && h.className, btn: !!b, shown: !!(b && b.getClientRects().length), bridge: !!(VR.StudioBridge && VR.StudioBridge.pickFile), input: !!document.getElementById('packFile'), open: VR.Projects.isOpen && VR.Projects.isOpen() }; })));
   const [fc] = await Promise.all([gs.waitForEvent('filechooser', { timeout: 15000 }), gev(() => document.querySelector('#hub [data-pack="in"]').click())]);
   await fc.setFiles(file);
   for (let i = 0; i < 30 && !(await gev(() => !!document.querySelector('#packDlg.on'))); i++) await gs.waitForTimeout(100);
@@ -177,7 +178,7 @@ await section('4 · 📥 Übernehmen in the game\'s Studio', async () => {
     return out;
   }, SOFA);
   console.log('  import', JSON.stringify(r));
-  check(/2 Favoriten · 1 Möbel · 1 Bauteil/.test(r.sum), '📥 Übernehmen in 🕘 shows the same summary');
+  check(/2 Favoriten · 1 Möbelstück · 1 Bauteil/.test(r.sum), '📥 Übernehmen in 🕘 shows the same summary');
   check(r.favs.join() === 'vx_led_cove,blueprint_2' && r.model && r.applied && r.lib.join() === 'Säule', '✓ Übernehmen: the favourites, the sofa design and the Bauteil are here now');
   check(/Übernommen/.test(r.msg), 'and it says so: ' + r.msg.slice(0, 160));
 });

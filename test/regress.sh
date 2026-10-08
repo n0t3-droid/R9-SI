@@ -50,7 +50,7 @@ run_test() { # <name> <timeout seconds>; returns 0 only for exit code 0 and ALL 
 
 total=0; fails=0
 for t in "${NODES[@]}"; do total=$((total + 1)); run_test "$t" 600 || fails=$((fails + 1)); done
-for t in "${BROWSERS[@]}"; do total=$((total + 1)); run_test "$t" 1800 || fails=$((fails + 1)); done
+for t in "${BROWSERS[@]}"; do total=$((total + 1)); run_test "$t" "${R9_BROWSER_TO:-1800}" || fails=$((fails + 1)); done   # (R9_BROWSER_TO: a longer limit for the long ones, e.g. horizon.mjs on this machine)
 echo "$total tests, $fails failed; results in $RESULTS"
 if [ "$fails" = 0 ]; then echo "ALL OK"; exit 0; fi
 echo "FAILED $fails"
