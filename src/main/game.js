@@ -8,11 +8,11 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false },
-    low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true },
-    balanced: { renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true },
-    high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true },
-    ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true },
+    potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false, water: 0 },
+    low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true, water: 1 },
+    balanced: { renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true, water: 1 },
+    high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true, water: 2 },
+    ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true, water: 2 },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
@@ -46,7 +46,46 @@
     }
     saveSettings() { try { localStorage.setItem('r9si.settings', JSON.stringify(this.settings)); } catch (e) { /* ignore */ } }
     applyPreset(p) { this.settings.preset = p; Object.assign(this.settings, PRESETS[p]); this.applySettings('*'); this.saveSettings(); }
-    applySettings(key) {
+      // F7 · water: bubbles from the mouth while diving, mist at the foot of the falls near the player (the falling
+    // columns are looked up every 2 s), a splash when the eye crosses the surface (its ripple comes from crossT)
+    waterFx(dt, p, eye, underwater, inLava, E) {
+      const R = VR.R, F = VR.F, w = this.world;
+      if (!this.particles || !w) return;
+      if (underwater && !inLava && Math.random() < dt * 3.5) {
+        const r = () => Math.random() - 0.5;
+        this.particles.spawn(eye[0] + r() * 0.3, eye[1] - 0.3, eye[2] + r() * 0.3, r() * 0.2, 0.7 + Math.random() * 0.5, r() * 0.2, { life: 1.8, size: 0.05 + Math.random() * 0.04, grav: -1.1, drag: 0.4, col: [0.86, 0.95, 1], emis: 0.6, collide: false });
+      }
+      this.waterScan = (this.waterScan || 0) - dt;
+      if (this.waterScan <= 0) {
+        this.waterScan = 2;
+        const falls = [], px = Math.floor(p.pos[0]), pz = Math.floor(p.pos[2]);
+        for (let dz = -24; dz <= 24; dz += 2) for (let dx = -24; dx <= 24; dx += 2) {
+          const x = px + dx, z = pz + dz;
+          if (!w.isLoaded(x, z)) continue;
+          const y = w.topAt(x, z), s = w.getBlock(x, y, z);
+          if (!s || !(R.T.flags[s] & F.WATER) || R.types[R.T.type[s]].get(s, 'level') < 8) continue;   // falling water only
+          const b = w.getBlock(x, y - 1, z);
+          if (!(R.T.flags[b] & (F.OPAQUE | F.WATER))) falls.push([x + 0.5, y - 1, z + 0.5]);
+        }
+        this.waterFalls = falls;
+      }
+      const falls = this.waterFalls || [];
+      for (const f of falls) {
+        if (Math.random() > dt * 5 / Math.max(1, falls.length)) continue;
+        const r = () => Math.random() - 0.5;
+        this.particles.spawn(f[0] + r() * 1.2, f[1] + 0.2, f[2] + r() * 1.2, r() * 0.8, 0.4 + Math.random() * 0.6, r() * 0.8, { life: 2.4, size: 0.6 + Math.random() * 0.4, grav: -0.25, drag: 1.4, col: [0.93, 0.96, 1], emis: 0.12, collide: false });
+      }
+    }
+    // F7: a swimmer's eye rides the swell (the surface's own waves, water_wave.js); nothing when the feet are dry
+    swimBob(p, underwater, E) {
+      const R = VR.R, F = VR.F, w = this.world;
+      if (underwater || !w || !E.windDir) return 0;
+      const feet = w.getBlock(Math.floor(p.pos[0]), Math.floor(p.pos[1] + 0.2), Math.floor(p.pos[2]));
+      if (!(R.T.flags[feet] & F.WATER)) return 0;
+      return VR.WaterWave.sample(p.pos[0], p.pos[2], E.time, E.windDir[0], E.windDir[1], VR.WaterWave.ampK(4, E.wind)).h * 0.7;
+    }
+
+  applySettings(key) {
       const S = this.settings, r = this.renderer;
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround'].includes(key)) S.preset = 'custom';
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
@@ -55,7 +94,7 @@
       if (S.tsr === undefined) S.tsr = true;
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
-      if (r) r.setQuality({ scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite });
+      if (r) r.setQuality({ scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite, water: S.water === undefined ? 1 : S.water });
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
@@ -825,18 +864,25 @@
       const eye = p.eyePos();
       const headState = w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2]));
       const underwater = !!(R.T.flags[headState] & F.WATER) || p.aetherAt(headState);
+      // F7: crossing the surface sends a splash and a short ripple across the picture (the composite pass)
+      if (!!underwater !== !!this.wasUnder && this.particles) this.particles.splash(eye[0], eye[1], eye[2], [0.72, 0.86, 1]);
+      if (!!underwater !== !!this.wasUnder) this.crossT = 0.9;
+      this.wasUnder = !!underwater;
+      this.crossT = Math.max(0, (this.crossT || 0) - dt);
       let waterColor = null;
       if (underwater) { const c = w.col(Math.floor(eye[0]) >> 4, Math.floor(eye[2]) >> 4); if (c) { const v = c.water[((Math.floor(eye[2]) & 15) << 4) | (Math.floor(eye[0]) & 15)]; waterColor = [((v >> 11) & 31) / 31 * 0.5, ((v >> 5) & 63) / 63 * 0.6, (v & 31) / 31 * 0.7]; } }
       const inLava = !!(R.T.flags[headState] & F.LAVA);
       const E = this.envFor(eye, dt, { underwater: underwater || inLava, waterColor: inLava ? [0.9, 0.3, 0.05] : waterColor, freezeTime: this.zenFreezeTime && p.mode !== 'survival', freezeWeather: this.zenFreezeWeather && p.mode !== 'survival' });
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       this.particles.update(dt, eye);
+      this.waterFx(dt, p, eye, underwater, inLava, E);
       if (this.trails) this.trails.update(dt);
       // camera
       const S = this.settings;
       const bob = S.viewBob && !p.flying ? p.bobAmt : 0;
       const bx = Math.sin(p.bob * 2) * 0.035 * bob, by = Math.abs(Math.cos(p.bob * 2)) * 0.05 * bob;
-      let cam = { x: eye[0] + Math.cos(p.yaw) * bx, y: eye[1] + by + (p.stepSmooth || 0), z: eye[2] - Math.sin(p.yaw) * bx, yaw: p.yaw, pitch: p.pitch, roll: bob * Math.sin(p.bob * 2) * 0.004, fov: (S.fov * (1 + p.fovKick)) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
+      const swim = this.swimBob(p, underwater, E);
+      let cam = { x: eye[0] + Math.cos(p.yaw) * bx, y: eye[1] + by + (p.stepSmooth || 0) + swim, z: eye[2] - Math.sin(p.yaw) * bx, yaw: p.yaw, pitch: p.pitch, roll: bob * Math.sin(p.bob * 2) * 0.004, fov: (S.fov * (1 + p.fovKick)) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
       if (this.vehicleCam) { const vc = this.vehicleCam(cam); if (vc) cam = vc; }
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {
@@ -875,7 +921,7 @@
       this.smartQuality(dt, S, w);
       if (this.horizon) this.horizon.update(cam);
       this.renderer.render({
-        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, particles: this.particles, outline, crack, precip,
+        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, outline, crack, precip,
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
