@@ -22,10 +22,10 @@
       this.hz = hz; this.g = hz.g;
       this.set = new F.RingSet();
       this.r1 = 0; this.gen = 1; this.inflight = 0; this.reqIdx = 0; this.scanSeen = -1;
-      this.live = []; this.fading = [];
+      this.live = []; this.fading = []; this.failed = [];
       this.maskG = new Uint8Array(MASK_N * MASK_N); this.maskDirty = true; this.mcx = NaN; this.mcz = NaN;
       this.stats = { tiles: 0, ready: 0, cols: 0, bytes: 0, drawn: 0, tris: 0, inflight: 0, requested: 0, empty: 0, uploads: 0 };
-      this.t0 = -1; this.firstAt = -1; this.allAt = -1;
+      this.t0 = -1; this.firstAt = -1; this.firstUpAt = -1; this.allAt = -1;
     }
     static get MASK_N() { return MASK_N; }
     // the preset's ring-1 radius in chunks (0 = off)
@@ -42,15 +42,16 @@
       t.gpu = null;
       let i = this.live.indexOf(t); if (i >= 0) { this.live[i] = this.live[this.live.length - 1]; this.live.pop(); }
       i = this.fading.indexOf(t); if (i >= 0) { this.fading[i] = this.fading[this.fading.length - 1]; this.fading.pop(); }
+      if (t.state === 2) { i = this.failed.indexOf(t); if (i >= 0) this.failed.splice(i, 1); }
       this.set.free(t);
       this.maskDirty = true;
     }
     reset() {
       for (let i = this.live.length - 1; i >= 0; i--) this.free(this.live[i]);
-      this.live.length = 0; this.fading.length = 0;
+      this.live.length = 0; this.fading.length = 0; this.failed.length = 0;
       this.set.clear(); this.gen++; this.inflight = 0; this.reqIdx = 0;
       this.maskG.fill(0); this.maskDirty = true;
-      this.t0 = this.r1 > 0 ? performance.now() : -1; this.firstAt = -1; this.allAt = -1;
+      this.t0 = this.r1 > 0 ? performance.now() : -1; this.firstAt = -1; this.firstUpAt = -1; this.allAt = -1;
     }
     // ---------------------------------------------------------------- per frame
     update(cam) {
@@ -64,6 +65,7 @@
         this.reqIdx = 0;
       }
       if (ccx !== this.mcx || ccz !== this.mcz) { this.mcx = ccx; this.mcz = ccz; this.maskDirty = true; }
+      if (this.failed.length && performance.now() - this.failed[0].failedAt > 10000) { const t = this.failed.shift(); this.set.free(t); this.set.ccx = NaN; }
       this.ask();
       this.stepFades(performance.now());
       if (this.maskDirty) this.writeMask();
@@ -94,9 +96,9 @@
         if (this.gen !== gen) return;
         this.inflight = Math.max(0, this.inflight - 1);
         if (set.tiles.get(t.key) !== t) return;
-        if (m.type !== 'form') {   // cancelled or failed: forgotten (a failed one is asked again at the next rescan)
-          if (t.state === 0) set.free(t); else t.redo = 0;
-          set.ccx = NaN;   // rescan next frame
+        if (m.type === 'cancelled') { if (t.state === 0) set.free(t); else t.redo = 0; set.ccx = NaN; return; }   // (asked again if still wanted)
+        if (m.type !== 'form') {   // failed (a worker that threw or died): the tile rests 10 s before it is asked for again
+          if (t.state === 0) { t.state = 2; t.failedAt = performance.now(); this.failed.push(t); } else t.redo = 0;
           return;
         }
         if (m.empty) { set.ready(t, 0); t.empty = true; this.stats.empty++; return; }
@@ -124,6 +126,7 @@
       else this.live.push(t);
       this.set.ready(t, bytes);
       this.stats.uploads++;
+      if (this.firstUpAt < 0) this.firstUpAt = performance.now();
       if (t.shownAt < 0) { t.shownAt = performance.now(); t.fade = 0; this.fading.push(t); }
       this.maskDirty = true;
     }
@@ -195,7 +198,8 @@
       for (const t of this.set.tiles.values()) if (t.state === 1) { ready++; cols += 16; }
       return { radius: this.r1, on: this.on(), tiles: this.set.tiles.size, ready, cols, bytes: this.set.bytes, drawn: this.stats.drawn, tris: this.stats.tris, inflight: this.inflight,
         want: Math.max(0, this.set.requestOrder().length - this.reqIdx), requested: this.stats.requested, uploads: this.stats.uploads,
-        firstFrameMs: this.firstAt >= 0 && this.t0 >= 0 ? this.firstAt - this.t0 : -1, allMs: this.allAt >= 0 && this.t0 >= 0 ? this.allAt - this.t0 : -1 };
+        firstFrameMs: this.firstAt >= 0 && this.t0 >= 0 ? this.firstAt - this.t0 : -1, firstUploadMs: this.firstUpAt >= 0 && this.t0 >= 0 ? this.firstUpAt - this.t0 : -1,
+        allMs: this.allAt >= 0 && this.t0 >= 0 ? this.allAt - this.t0 : -1 };
     }
     destroy() { this.reset(); }
   }
