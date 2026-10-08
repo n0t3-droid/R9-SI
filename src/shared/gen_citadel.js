@@ -235,6 +235,23 @@
     }
   }
 
+  // ---------------------------------------------------------------- the Heartland's lava streams
+  // three lava streams run down the citadel mountain's flanks from the plinth rim (TRAILER §3.7: "three lava streams at its
+  // foot"): a meandering channel of lava on the surface, two blocks wide, with basalt rims; where a stream leaves the
+  // plinth a vent smokes (vents.js)
+  const STREAM_ANG = [1.2, 2.6, 4.2];
+  function streamAt(s, x, z) {
+    const dx = x - s.x, dz = z - s.z, r = Math.hypot(dx, dz);
+    if (r < s.R + 2 || r > s.R + 84) return null;
+    const th = Math.atan2(dz, dx);
+    for (let k = 0; k < 3; k++) {
+      const a = STREAM_ANG[k] + 0.12 * Math.sin(r * 0.09 + 2.1 * k);
+      const d = Math.abs(Math.atan2(Math.sin(th - a), Math.cos(th - a))) * r;   // blocks from the channel's centreline
+      if (d < 2.2) return { k, r, d, lava: d < 1.2 };
+    }
+    return null;
+  }
+
   // ---------------------------------------------------------------- per chunk
   CIT.apply = function (g, cx, cz, out) {
     const x0 = cx * 16, z0 = cz * 16;
@@ -246,6 +263,15 @@
       const nearSite = s.x + s.R + 44 > x0 && s.x - s.R - 44 < x0 + 16 && s.z + s.R + 44 > z0 && s.z - s.R - 44 < z0 + 16;
       if (nearSite) {
         terrace(g, w, s, P, x0, z0);
+        if (s.home) {
+          for (let x = x0; x < x0 + 16; x++) for (let z = z0; z < z0 + 16; z++) {
+            const hit = streamAt(s, x, z); if (!hit) continue;
+            const gy = g.surfaceY(x, z); if (gy <= SEA + 2) continue;   // the streams stop where the canyon floor begins
+            w.set(x, gy, z, hit.lava ? st('lava') : st('basalt'));
+            if (hit.lava) w.set(x, gy - 1, z, st('basalt'));
+            if (hit.lava && hit.d < 0.6 && hit.r >= s.R + 3 && hit.r < s.R + 5) { if (!out.spawns) out.spawns = []; out.spawns.push(['vent', x, gy + 1, z]); }
+          }
+        }
         for (const T of s.towers) {
           const reach = T.r + 3 + (T.kind === 'watch' ? 8 : 0);
           if (T.x + reach < x0 || T.x - reach > x0 + 16 || T.z + reach < z0 || T.z - reach > z0 + 16) continue;
