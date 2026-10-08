@@ -15,12 +15,13 @@
       this.day = 0;
       this.anim = 0;              // seconds for shader animation
       this.rain = 0; this.snow = 0; this.thunder = 0;
+      this.puddle = 0;            // F2: the puddles' fill, 0..1 — they gather in the rain and dry over minutes
       this.wx = new VR.Weather();     // weather.js: the sky's state from the world's schedule, its eased visuals and the bolts
       this.exposure = 1; this.eyeLight = 1;
       this.E = {
         sunDir: [0, 1, 0], moonDir: [0, -1, 0], sunColor: [1, 1, 1], moonColor: [0.2, 0.2, 0.3], ambSky: [0.5, 0.5, 0.6],
         zenith: [0.2, 0.4, 0.9], horizon: [0.6, 0.7, 1], sunset: [0, 0, 0], fogColor: [0.6, 0.7, 0.9], fog: [100, 160, 0, 0],
-        rain: 0, snow: 0, wet: 0, time: 0, night: 0, dimId: 0, blockTint: [1, 0.86, 0.68], planetDir: [0, 1, 0], planet2Dir: [0, 1, 0], ringNormal: norm([0.25, 0.92, 0.3]),
+        rain: 0, snow: 0, wet: 0, puddle: 0, time: 0, night: 0, dimId: 0, blockTint: [1, 0.86, 0.68], planetDir: [0, 1, 0], planet2Dir: [0, 1, 0], ringNormal: norm([0.25, 0.92, 0.3]),
         wind: 1, emissiveBoost: 0.5, exposure: 1, grade: [1, 1, 1], saturation: 1.12, bloomThreshold: 1.0, bloomStrength: 0.07, cloudCover: 0.35,
       };
     }
@@ -131,6 +132,10 @@
       E.rain = rain; E.snow = this.snow;
       // wet ground: the ground darkens a little while it rains (the terrain shader's u_wet; off on Very Low)
       E.wet = o.wetOn ? rain : 0;
+      // puddles (F2): they fill within ~30 s of rain and dry with a 4-minute time constant after it stops
+      const pt = rain > 0.02 ? rain : 0;
+      this.puddle += (pt - this.puddle) * (1 - Math.exp(-dt / (pt > this.puddle ? 30 : 240)));
+      E.puddle = o.wetOn ? this.puddle : 0;
       // lightning: the bolt lights the sky (weather.js decides when; the thunder follows by sound)
       const fl = this.wx.flash;
       if (fl > 0.001) { E.ambSky = E.ambSky.map(v => v + fl * 1.8); E.zenith = E.zenith.map(v => v + fl * 0.6); }
