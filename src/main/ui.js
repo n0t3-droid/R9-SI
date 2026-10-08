@@ -552,7 +552,7 @@
             const wrap = el('div', 'row gap'); wrap.style.flexWrap = 'wrap';
             items.forEach((it, i) => {
               const b = el('button', 'swatch' + ((H[key] | 0) === i ? ' on' : ''), paint ? '' : esc(it));
-              if (paint) b.style.background = paint(it); b.title = typeof it === 'object' && it.name ? it.name : String(it);
+              if (paint) b.style.background = paint(it); b.title = typeof it === 'object' && it.name ? (it.tx && VR.I18N ? VR.I18N.tx(it.tx[0], null, it.tx[1], it.tx[2]) : it.name) : String(it);
               b.onclick = () => { H[key] = i; this.game.saveSettings(); if (this.game.mp) this.game.mp.publish(true); this.showSettings(); };
               wrap.appendChild(b);
             });
