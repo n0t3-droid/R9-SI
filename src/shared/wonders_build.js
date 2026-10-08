@@ -596,6 +596,8 @@
     H.disc(cx, cz, 2.6, f + 1, 'marble_white'); H.disc(cx, cz, 2.6, f, 'marble_white');
     K.set(cx, fl, cz, 'chiseled_quartz_block'); K.set(cx, fl + 1, cz, 'tide_lantern');
     for (const [a, b] of [[-2, 0], [2, 0], [0, 2]]) K.set(cx + a, fl, cz + b, 'spirit_lantern');
+    // lamps along the platform's edge for the night, a post every so often, none in the gate's way
+    for (let k = 0; k < 10; k++) { const a = (k / 10 + 0.05) * Math.PI * 2, da = Math.abs(Math.atan2(Math.sin(a + Math.PI / 2), Math.cos(a + Math.PI / 2))); if (da < 0.55) continue; H.post(cx + Math.round(Math.cos(a) * (SR + 1)), f + 1, cz + Math.round(Math.sin(a) * (SR + 1))); }
     // the crescent moon at the back, standing in the water: light panels with a bright rim
     const mz = cz + PR - 3, my = fl + 10, mr = 7;
     for (let y = my - mr; y <= my + mr; y++) for (let x = cx - mr; x <= cx + mr; x++) { const d1 = Math.hypot(x - cx, y - my), d2 = Math.hypot(x - cx - 3.2, y - my - 1.6); if (d1 <= mr + 0.3 && d2 > mr - 0.4) K.set(x, y, mz, d1 > mr - 0.9 || d2 < mr + 0.6 ? 'tide_lantern' : 'light_panel'); }
