@@ -194,7 +194,13 @@
         const d = Math.hypot(p.pos[0] - vil.plan.x, p.pos[2] - vil.plan.z);
         if (!vil.active && d < 110 && w.isLoaded(vil.plan.x, vil.plan.z)) this.activate(vil, tod);
         else if (vil.active && d > 190) this.deactivate(vil);
-        if (vil.active) this.updateVillage(vil, dt, tod, d);
+        if (vil.active) {
+          // who sits and who plays right now: the benches' and the games' budgets read these counts
+          let ns = 0, np = 0;
+          for (const o of vil.agents) { if (o.pose === 'sit') ns++; if (o.act && o.act.type === 'play') np++; }
+          vil.nSeated = ns; vil.nPlay = np;
+          this.updateVillage(vil, dt, tod, d);
+        }
       }
       // agents: every frame up close, every 2nd / 4th frame further away (with the time they skipped), and
       // half as often again while the main thread is the bottleneck — the far crowd keeps living, cheaper
@@ -245,7 +251,8 @@
       const night = tod >= 13000 && tod < 23300;
       if (night && person.bed) return this.bedPos(person.bed);
       const pz = vil.plan.plaza;
-      if (!night && (H(person.seed, 4, 4) & 1)) { const a = (H(person.seed, 5, 5) % 628) / 100, r = 1.5 + (H(person.seed, 6, 6) % 3); return [pz.x + 0.5 + Math.cos(a) * r, pz.y, pz.z + 0.5 + Math.sin(a) * r]; }
+      // (one person in eight starts the day on the plaza's ring; the others at their own door: no crowd at the plaza)
+      if (!night && VR.Crowd.plazaPerson(person.seed)) { const a = (H(person.seed, 5, 5) % 628) / 100, r = 1.5 + (H(person.seed, 6, 6) % 3); return [pz.x + 0.5 + Math.cos(a) * r, pz.y, pz.z + 0.5 + Math.sin(a) * r]; }
       const o = home && (home.outside || home.door);
       return o ? [o[0] + 0.5, o[1], o[2] + 0.5] : [pz.x + 0.5, pz.y, pz.z + 0.5];
     }
@@ -484,10 +491,17 @@
       if (tod >= 13000 && tod < 23300) return role === 'ranger' && (a.p.idx === 0 || a.p.fam % 2 === 0) ? 'patrol' : 'sleep';
       if (tod >= 23300 || tod < 900) return 'breakfast';
       if (tod >= 5600 && tod < 6900) return (a.p.seed & 1) ? (cafe && !a.kid && ((a.p.seed >> 4) & 1) ? 'cafe' : 'plaza') : 'lunch';
-      if (tod >= 10600 && tod < 12300) return a.kid ? 'play' : ((a.p.seed >> 1) & 1) ? (park && (a.elder || ((a.p.seed >> 5) & 1)) ? 'park' : 'plaza') : 'stroll';
+      // dusk (the street's budget, src/shared/folkcrowd.js): each person walks home at its own time, so the streets empty
+      // gradually; the adults who are out roam the village roads, a few sit at the plaza's benches, the children run
+      if (tod >= 10600 && tod < 12300) {
+        if (tod >= VR.Crowd.homeAt(a.p.seed)) return 'home';
+        if (a.kid) return this.kidGames(a, vil);
+        if ((a.p.seed >> 1) & 1) { if (park && (a.elder || ((a.p.seed >> 5) & 1))) return 'park'; if (VR.Crowd.plazaPerson(a.p.seed)) return 'plaza'; }
+        return 'stroll';
+      }
       if (tod >= 12300) return 'home';
       // school hours: every kid sits in class while the teacher teaches (the small ones go a little later)
-      if (a.kid) { if (school && tod >= 1200 + (a.p.years < 7 ? 600 : 0) && tod < 5600) return 'school'; return (a.p.seed >> 2) & 1 && tod > 3000 && !school ? 'learn' : 'play'; }
+      if (a.kid) { if (school && tod >= 1200 + (a.p.years < 7 ? 600 : 0) && tod < 5600) return 'school'; return (a.p.seed >> 2) & 1 && tod > 3000 && !school ? 'learn' : this.kidGames(a, vil); }
       if (a.elder) return (a.p.seed >> 3) & 1 ? 'garden' : park && tod > 2500 ? 'park' : 'stroll';
       return 'work';
     }
@@ -636,16 +650,17 @@
             const seats = plaza.seats || [];
             if (!act.spot) {
               const k = H2(3) % (seats.length + 6);
-              if (k < seats.length) act.spot = seats[k].slice(); else { const an = (H2(4) % 628) / 100, r = 1.8 + (H2(5) % 30) / 10; act.spot = [Math.floor(plaza.x + Math.cos(an) * r), plaza.y, Math.floor(plaza.z + Math.sin(an) * r)]; }
+              // (at most a few sit on the benches at a time: the street's budget; the others stand around the ring)
+              if (k < seats.length && (vil.nSeated || 0) < VR.Crowd.STREET.seats) act.spot = seats[k].slice(); else { const an = (H2(4) % 628) / 100, r = 1.8 + (H2(5) % 30) / 10; act.spot = [Math.floor(plaza.x + Math.cos(an) * r), plaza.y, Math.floor(plaza.z + Math.sin(an) * r)]; }
             }
             if (a.pose === 'sit') { if (act.t > 40) { a.pose = 'stand'; act.spot = null; act.t = 0; } return; }
             if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.1)) {
               if (act.spot.length > 3) this.sit(a, act.spot); else { a.lookAt = [plaza.x + 0.5, plaza.y, plaza.z + 0.5]; if (act.t > 25) { act.spot = null; act.t = 0; } }
             }
           } else {
-            // stroll along a village lane
-            if (!act.spot) { const roads = P.roads; const rd = roads[H2(6) % Math.max(1, roads.length)] || []; const pt = rd[H2(7) % Math.max(1, rd.length)] || [plaza.x, plaza.y, plaza.z]; act.spot = pt.slice(); }
-            if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.6)) { a.lookAt = null; if (act.t > 12) { act.spot = null; act.t = 0; } }
+            // a purposeful walk along the village roads (the light-line paths): a far point, a short pause there, the next
+            if (!act.spot) this.pickRoute(a, act, H2);
+            if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.6)) { a.lookAt = null; act.rest = (act.rest || 0) + dt; if (act.rest > 2 + (H2(9) % 20) / 10) { act.spot = null; act.rest = 0; } }
           }
           return;
         }
@@ -747,6 +762,39 @@
           return;
         }
       }
+    }
+    // a route for a stroller: a point of a village road (the light-line paths) at least 12 blocks away (the first of six
+    // tries that is that far); the children roam running, an adult now and then walks with a neighbour (a pair)
+    pickRoute(a, act, H2) {
+      const P = a.vil.plan, roads = P.roads || [];
+      let pt = null;
+      for (let k = 0; k < 6 && roads.length; k++) {
+        const rd = roads[H2(6 + 3 * k) % roads.length] || [];
+        const c = rd.length ? rd[H2(7 + 3 * k) % rd.length] : null;
+        if (!c) continue;
+        pt = c;
+        if (Math.hypot(c[0] - a.pos[0], c[2] - a.pos[2]) > 12) break;
+      }
+      if (!pt) pt = [P.plaza.x, P.plaza.y, P.plaza.z];
+      act.spot = pt.slice(); act.pal = false;
+      if (a.kid) act.run = true;
+      else if (Math.random() < VR.Crowd.STREET.pairShare) this.pairWith(a, act);
+    }
+    // a neighbouring stroller (an adult within 12 blocks that is not paired yet) walks to the same point: a pair
+    pairWith(a, act) {
+      let best = null, bd = 144;
+      for (const o of a.vil.agents) {
+        if (o === a || o.kid || !o.act || o.act.type !== 'stroll' || o.act.pal) continue;
+        const d = (o.pos[0] - a.pos[0]) ** 2 + (o.pos[2] - a.pos[2]) ** 2;
+        if (d < bd) { bd = d; best = o; }
+      }
+      if (!best) return;
+      act.pal = true; best.act.pal = true; best.act.spot = act.spot.slice(); best.act.rest = 0;
+    }
+    // the children's games: at most VR.Crowd.STREET.kids play at a time (a child who plays keeps on playing)
+    kidGames(a, vil) {
+      if (a.act && a.act.type === 'play') return 'play';
+      return (vil.nPlay || 0) < VR.Crowd.STREET.kids ? 'play' : 'stroll';
     }
     sit(a, seat) {
       a.pose = 'sit'; a.path = null; a.vel = [0, 0, 0];
@@ -1253,12 +1301,25 @@
       if (!ent) return;
       const p = ent.beginVox(r, E);
       const t = g.time;
+      // the street's budget (src/shared/folkcrowd.js): the people in view are at most streetCap of the preset; the
+      // nearest ones are drawn, the others wait out of sight (they keep walking, so nobody pops in on the spot)
+      const C = VR.Crowd, FD = g.folkDist || g.folkBase || 100, cap = C.streetCap(g.settings && g.settings.preset);
+      const near = this._near || (this._near = new Float64Array(16));
+      let nn = 0;
       for (const a of this.agents) {
         const dx = a.pos[0] - cam.x, dy = a.pos[1] - cam.y, dz = a.pos[2] - cam.z;
         const d2 = dx * dx + dz * dz;
-        const FD = g.folkDist || g.folkBase || 100;
+        a.vis = false;
         if (d2 > FD * FD) continue;
         if (!VR.mat4.boxInFrustum(r.planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
+        a.vis = true; a.d2v = d2;
+        if (!(a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type]))) nn = C.keepNearest(near, nn, cap, d2);
+      }
+      const thr = nn >= cap ? near[cap - 1] : Infinity;
+      for (const a of this.agents) {
+        if (!a.vis) continue;
+        const d2 = a.d2v, dy = a.pos[1] - cam.y;
+        if (d2 > thr && !(a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type]))) continue;
         const far = d2 > (FD < 100 ? 16 : 24) * (FD < 100 ? 16 : 24);
         // the model is looked up once per agent and LOD (the key is built from the look only once)
         const mk = far ? 1 : 0;
