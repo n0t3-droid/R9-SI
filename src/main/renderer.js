@@ -582,15 +582,16 @@
       const A = VR.Atmos, gl = this.gl, sun = E.sunDir;
       const T = E.skyT === undefined ? 2.5 : E.skyT, tint = E.skyTint || [1, 1, 1], oc = E.skyOvercast || 0;
       const o = this.atmoOpt || (this.atmoOpt = {});
-      o.T = T; o.tint = tint; o.overcast = oc;
+      o.T = T; o.tint = tint; o.overcast = oc; o.pal = A.K.palette > 0 ? E.skyPal : null;
       const st = this.atmoS = A.prepare(sun, o, this.atmoS);
       this.atmoP = A.glParams(st, this.atmoP);
       if (!this.q.atmoLUT || !this.atmoTex) return;
       const k = this.atmoKey;
-      if (k && 1 - (k[0] * sun[0] + k[1] * sun[1] + k[2] * sun[2]) < 3.8e-5 && Math.abs(k[3] - T) < 0.02 && Math.abs(k[4] - tint[0]) + Math.abs(k[5] - tint[1]) + Math.abs(k[6] - tint[2]) < 0.002 && Math.abs(k[7] - oc) < 0.02) return;
+      const pal = o.pal ? o.pal[0][2] + o.pal[1][0] : 0;   // (a palette sky: its colours move with the time of day and the biome)
+      if (k && 1 - (k[0] * sun[0] + k[1] * sun[1] + k[2] * sun[2]) < 3.8e-5 && Math.abs(k[3] - T) < 0.02 && Math.abs(k[4] - tint[0]) + Math.abs(k[5] - tint[1]) + Math.abs(k[6] - tint[2]) < 0.002 && Math.abs(k[7] - oc) < 0.02 && Math.abs(k[8] - pal) < 0.004) return;
       gl.activeTexture(gl.TEXTURE0 + ATMO_UNIT); gl.bindTexture(gl.TEXTURE_2D, this.atmoTex);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, A.LUT_W, A.LUT_H, gl.RGBA, gl.FLOAT, A.buildLUT(st, this.atmoBuf || (this.atmoBuf = new Float32Array(A.LUT_W * A.LUT_H * 4))));
-      this.atmoKey = [sun[0], sun[1], sun[2], T, tint[0], tint[1], tint[2], oc];
+      this.atmoKey = [sun[0], sun[1], sun[2], T, tint[0], tint[1], tint[2], oc, pal];
     }
     // the exposure (F1): this frame's log-average luminance of the scene, eased toward the middle grey (EXPOSE_FS, 1×1)
     updateExposure(E) {
