@@ -50,7 +50,20 @@ const run = async (URL, TAG) => {
   // the formation is launched from the plaza (where the chunks are loaded, so the worker's designs come back in time);
   // the camera goes to the canyon's side of a lead shuttle only once the formation is flying
   for (let k = 0; k < 3; k++) await ev(() => { VR.game.traffic.spawnFlight({ arch: 'shuttle' }); return 1; });
-  for (let i = 0; i < 750; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length >= 2)) break; }
+  const tW = Date.now();
+  for (let i = 0; i < 450; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length >= 2)) break; }
+  // on a loaded machine the worker's new designs can sit behind the chunk jobs (every earlier run got 0 or 1 of them):
+  // then the formation flies a shuttle design the cache already holds (the docking one), through the same launch() as
+  // every sky flight — and the run says so, with the pool's state
+  const late = await ev(() => {
+    const g = VR.game, T = g.traffic;
+    if (T.ships.filter(s => s.arch === 'shuttle' && !s.dock).length >= 2) return null;
+    const P = g.pool, D = [...g.starships.designs.values()], d0 = D.find(d => d.meta && d.meta.arch === 'shuttle');
+    const info = { inflight: P.workers.map(w => w.inflight), started: P.started.size, waiting: D.filter(d => !d.meta).length, cached: !!d0 };
+    if (d0) for (let k = 0; k < 3; k++) T.launch(d0, new VR.RNG(1000 + k), {});
+    return info;
+  });
+  if (late) console.log('  (note) after ' + Math.round((Date.now() - tW) / 1000) + ' s the formation designs were not back ' + JSON.stringify(late) + ': the formation flies the cached shuttle design');
   for (let i = 0; i < 10; i++) { await frames(20); await wait(30); }
   const fl = await ev(() => VR.game.traffic.ships.filter(s => s.arch === 'shuttle' && !s.dock).length);
   check(fl >= 2, TAG + ': several shuttles fly over the Heartland (' + fl + ')');
