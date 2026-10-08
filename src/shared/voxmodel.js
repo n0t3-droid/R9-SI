@@ -137,9 +137,21 @@
       const S = this.S; poly = poly.map(p => [p[0] * S, p[1] * S]); c0 = Math.round(c0 * S); c1 = Math.round(c1 * S);
       let minA = 1e9, maxA = -1e9, minB = 1e9, maxB = -1e9;
       for (const [a, b] of poly) { minA = Math.min(minA, a); maxA = Math.max(maxA, a); minB = Math.min(minB, b); maxB = Math.max(maxB, b); }
-      const inside = (a, b) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [ai, bi] = poly[i], [aj, bj] = poly[j]; if ((bi > b) !== (bj > b) && a < (aj - ai) * (b - bi) / (bj - bi) + ai) c = !c; } return c; };
-      for (let t = Math.max(0, c0); t < c1; t++) for (let b = Math.floor(minB); b < Math.ceil(maxB); b++) for (let a = Math.floor(minA); a < Math.ceil(maxA); a++) {
-        if (!inside(a + 0.5, b + 0.5)) continue;
+      // (iconperf) the cross-section does not depend on the layer: its cells are tested once, and every layer copies them.
+      // The hammock's cloth (168 edges, six layers) made 2 million edge tests per build before; the cells are the same
+      const a0 = Math.floor(minA), b0 = Math.floor(minB), nA = Math.max(0, Math.ceil(maxA) - a0), nB = Math.max(0, Math.ceil(maxB) - b0);
+      const cell = new Uint8Array(nA * nB), E = poly.length, pa = new Float64Array(E), pb = new Float64Array(E);
+      for (let e = 0; e < E; e++) { pa[e] = poly[e][0]; pb[e] = poly[e][1]; }
+      // the same even-odd test as inside() (same operations, same order), on flat arrays: the mask is 220k edge tests
+      for (let j = 0; j < nB; j++) for (let i = 0; i < nA; i++) {
+        const a = a0 + i + 0.5, b = b0 + j + 0.5;
+        let c = false;
+        for (let e = 0, f = E - 1; e < E; f = e++) { const bi = pb[e], bj = pb[f]; if ((bi > b) !== (bj > b) && a < (pa[f] - pa[e]) * (b - bi) / (bj - bi) + pa[e]) c = !c; }
+        if (c) cell[j * nA + i] = 1;
+      }
+      for (let t = Math.max(0, c0); t < c1; t++) for (let j = 0; j < nB; j++) for (let i = 0; i < nA; i++) {
+        if (!cell[j * nA + i]) continue;
+        const a = a0 + i, b = b0 + j;
         if (axis === 'z') this.set(a, b, t, m); else if (axis === 'x') this.set(t, b, a, m); else this.set(a, t, b, m);
       }
       return this;
@@ -434,24 +446,42 @@
     for (let d = 0; d < 6; d++) { const j = t[i * 6 + d]; if (j >= 0) VM.fillNeighbour(model, model.parts[j], f, d); }
   };
   // icon: the whole model downsampled into the 8³ icon grid
+  // (iconperf) the cells are summed in one pass over the model's occupied voxels: each voxel falls into exactly one cell
+  // of the grid (whole k-sized cells, the same offsets as the sampling of the span box, which it replaces: that visited
+  // every empty position too, up to 16 M lookups for a large model, 26 ms per icon). A grid that is not whole keeps the
+  // sampling loop. The icon is the same cell for cell (test/icon_same.js).
   VM.icon = function (sp) {
     const m = sp.model, out = new Uint32Array(512), R = m.res;
     const span = Math.max(m.W, m.H, m.D) * R, k = span / 8;
     const ox = (span - m.W * R) / 2, oz = (span - m.D * R) / 2;
-    const acc = [];
-    for (let y = 0; y < 8; y++) for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) {
-      let r = 0, g = 0, b = 0, n = 0, fl = 0;
-      for (let dy = 0; dy < k; dy++) for (let dz = 0; dz < k; dz++) for (let dx = 0; dx < k; dx++) {
-        const vx = Math.floor(x * k + dx - ox), vy = Math.floor(y * k + dy), vz = Math.floor(z * k + dz - oz);
-        const v = m.get(vx, vy, vz);
-        if (!v) continue;
-        r += (v >> 16) & 255; g += (v >> 8) & 255; b += v & 255; n++; fl |= v & (EMIS | GLASS | GLOSS);
+    const sr = new Float64Array(512), sg = new Float64Array(512), sb = new Float64Array(512), cn = new Uint32Array(512), cf = new Int32Array(512);
+    if (Number.isInteger(k) && Number.isInteger(ox) && Number.isInteger(oz)) {
+      const vol = m.vol, P = m.pal, VW = m.VW, VH = m.VH, VD = m.VD;   // (reading the volume builds a lazy model, once)
+      for (let vy = 0; vy < VH; vy++) {
+        const cy = Math.floor(vy / k);
+        for (let vz = 0; vz < VD; vz++) {
+          const row = (vy * VD + vz) * VW, cz = Math.floor((vz + oz) / k);
+          for (let vx = 0; vx < VW; vx++) {
+            const id = vol[row + vx];
+            if (!id) continue;
+            const v = P[id], c = (cy * 8 + cz) * 8 + Math.floor((vx + ox) / k);
+            sr[c] += (v >> 16) & 255; sg[c] += (v >> 8) & 255; sb[c] += v & 255; cn[c]++; cf[c] |= v & (EMIS | GLASS | GLOSS);
+          }
+        }
       }
-      if (n) acc.push([(y * 8 + z) * 8 + x, r, g, b, n, fl]);
+    } else {
+      for (let y = 0; y < 8; y++) for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) {
+        const c = (y * 8 + z) * 8 + x;
+        for (let dy = 0; dy < k; dy++) for (let dz = 0; dz < k; dz++) for (let dx = 0; dx < k; dx++) {
+          const v = m.get(Math.floor(x * k + dx - ox), Math.floor(y * k + dy), Math.floor(z * k + dz - oz));
+          if (!v) continue;
+          sr[c] += (v >> 16) & 255; sg[c] += (v >> 8) & 255; sb[c] += v & 255; cn[c]++; cf[c] |= v & (EMIS | GLASS | GLOSS);
+        }
+      }
     }
     // a cell shows when it is 18 % full; a slim thing (a floor lamp's pole, a wire) that leaves almost nothing at that
     // gets a thinner threshold, so its icon is never empty
-    const fill = (th) => { let c = 0; for (const [i, r, g, b, n, fl] of acc) if (n >= Math.max(1, (k * k * k) * th)) { out[i] = pack((Math.round(r / n) << 16) | (Math.round(g / n) << 8) | Math.round(b / n), fl); c++; } return c; };
+    const fill = (th) => { let c = 0; for (let i = 0; i < 512; i++) { const n = cn[i]; if (n && n >= Math.max(1, (k * k * k) * th)) { out[i] = pack((Math.round(sr[i] / n) << 16) | (Math.round(sg[i] / n) << 8) | Math.round(sb[i] / n), cf[i]); c++; } } return c; };
     if (fill(0.18) < 4) { out.fill(0); if (fill(0.03) < 4) { out.fill(0); fill(0); } }
     return out;
   };
