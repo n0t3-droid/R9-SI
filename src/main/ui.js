@@ -725,25 +725,19 @@
         // ☆ in the corner (on hover): a favourite, the same as in the R9 Studio
         if (VR.Favs) { const fb = el('span', 'favS'); fb.onmousedown = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleFav(id); }; s.appendChild(fb); }
         frag.appendChild(s);
-        // paint lazily, a few per frame (pumpIcons)
-        (this._iconQ || (this._iconQ = [])).push([s.firstChild, id]);
+        // paint lazily, a few per frame (the palette's icon pump, VR.IconPump in icons.js)
+        this.iconPump().add(s.firstChild, id);
       }
       pal.appendChild(frag);
-      this.pumpIcons();
       this.markFavs(pal);
       if (this.creativeTab === 'fav' && !items.length) { const n = el('div', 'note', T('g.inv.noFavs')); n.style.gridColumn = '1 / -1'; n.style.padding = '10px 4px'; pal.appendChild(n); }
       pal.onmousedown = (e) => { if (e.target === pal && this.cursor) { this.cursor = null; this.updateCursor(); } };
     }
-    // palette icons paint in small batches, about 6 ms per frame: a tab of hundreds of models (each builds its voxels
-    // on first use) never stalls a frame on a small PC; slots that left the screen are skipped
-    pumpIcons() {
-      if (this._iconPump) return;
-      const step = () => {
-        const q = this._iconQ || [], t0 = performance.now();
-        while (q.length && performance.now() - t0 < 6) { const [cv, id] = q.shift(); if (cv.isConnected) this.game.icons.paint(cv, id); }
-        this._iconPump = q.length ? requestAnimationFrame(step) : 0;
-      };
-      this._iconPump = requestAnimationFrame(step);
+    // palette icons paint in small batches, about 6 ms per frame (VR.IconPump): a tab of hundreds of models (each builds its
+    // voxels on first use) never stalls a frame on a small PC; a model still to be built gets a frame of its own; slots that
+    // left the page are skipped
+    iconPump() {
+      return this._palPump || (this._palPump = new VR.IconPump({ paint: (cv, id) => this.game.icons.paint(cv, id), cold: (id) => this.game.icons.cold(id) }));
     }
     // ★ marks on the palette slots
     markFavs(pal) {

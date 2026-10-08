@@ -123,6 +123,8 @@
       const vol = (bb[3] - bb[0]) * (bb[4] - bb[1]) * (bb[5] - bb[2]);
       return vol < 0.2;
     }
+    // true while painting this id would first build a lazy model (no picture cached yet): VR.IconPump gives it a frame of its own
+    cold(id) { if (this.cache.has(id)) return false; const m = VR.VM && VR.VM.MODELS[id]; return !!(m && m.lazy && !m.compiled); }
     // draw into target canvas element
     paint(el, id, size) {
       const c = this.get(id);
@@ -171,5 +173,54 @@
       if (!solid(x + 1, y, z)) quad([P(1, 0, 0), P(1, 1, 0), P(1, 1, 1), P(1, 0, 1)], col(s, 0, 0.84));
       if (!solid(x, y, z - 1)) quad([P(0, 0, 0), P(1, 0, 0), P(1, 1, 0), P(0, 1, 0)], col(s, 5, 0.68));
     }
+  };
+})(VR);
+
+// The palette's icon pump (ui.js, the creative tab) and the idle warm of the Modern Living pictures (game.startPrewarm).
+// (iconperf) a palette of hundreds of icons paints a few per frame: a frame paints until `budget` ms are used (the check
+// comes before each paint, so the last one may run over), and a model that still has to be built (Icons.cold) gets a frame
+// of its own: its build is that frame's cost and no other paint shares it. A canvas that has left the page is dropped
+// without a paint. The paint, the clock and the frames are injectable (test/icon_pump.js).
+(function (VR) {
+  'use strict';
+  class IconPump {
+    constructor(o) {
+      o = o || {};
+      this.paint = o.paint; this.cold = o.cold || (() => false);
+      this.budget = o.budget === undefined ? 6 : o.budget;
+      this.now = o.now || (() => performance.now());
+      this.raf = o.raf || ((cb) => requestAnimationFrame(cb));
+      this.connected = o.connected || ((cv) => cv.isConnected !== false);
+      this.q = []; this.handle = 0;
+    }
+    get pending() { return this.q.length; }
+    add(cv, id) { this.q.push([cv, id]); this.start(); }
+    start() { if (!this.handle) this.handle = this.raf(() => this.step()); }
+    step() {
+      this.handle = 0;
+      const q = this.q, t0 = this.now();
+      let n = 0;
+      while (q.length) {
+        const [cv, id] = q[0];
+        if (!this.connected(cv)) { q.shift(); continue; }
+        const cold = this.cold(id);
+        if (n && (cold || this.now() - t0 >= this.budget)) break;
+        q.shift(); this.paint(cv, id); n++;
+        if (cold) break;
+      }
+      if (q.length) this.start();
+    }
+  }
+  VR.IconPump = IconPump;
+
+  // the idle warm (game.startPrewarm, 10 s into play): the pictures of the given items, one per idle slice, largest model
+  // first, with VM.prewarm's rules (a slice needs more than 8 ms left, nothing before notBefore, stopped while the page is
+  // hidden). A picture is cached once it is made, so the tab opens without a build.
+  VR.iconWarm = function (icons, ids, o) {
+    const VM = VR.VM;
+    const items = ids.map(id => { const m = VM && VM.MODELS[id]; return { name: id, lazy: true, compiled: false, VW: m ? m.VW : 1, VH: m ? m.VH : 1, VD: m ? m.VD : 1 }; });
+    const pw = VM.prewarm(Object.assign({}, o || {}, { models: items, build: (w) => { icons.get(w.name); w.compiled = true; } }));
+    pw.start();
+    return pw;
   };
 })(VR);
