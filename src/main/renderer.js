@@ -160,8 +160,7 @@
       P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain');
       P.decal = GL.program(S.DECAL_VS, S.DECAL_FS, 'decal');
       P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod');
-      P.prop = GL.program(S.PROP_VS, S.PROP_FS, 'prop', [...sh]);            // smooth props (t-smooth): the palms
-      P.propShadow = GL.program(S.PROP_VS, S.PROP_SHADOW_FS, 'propShadow', []);
+      // (the smooth props' programs are compiled on their first use, propProgram: Very Low never compiles them)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
 
@@ -750,7 +749,7 @@
         const inst = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, inst);
         for (let k = 0; k < 3; k++) { gl.enableVertexAttribArray(7 + k); gl.vertexAttribPointer(7 + k, 4, gl.FLOAT, false, IST, k * 16); gl.vertexAttribDivisor(7 + k, 1); }
         gl.bindVertexArray(null);
-        const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.activeTexture(gl.TEXTURE8); const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, img.w, img.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, img.data);
         gl.generateMipmap(gl.TEXTURE_2D);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
@@ -761,6 +760,13 @@
       this.propM = { palm: model(pal, PR.atlas()), cross: model(cro, PR.silhouette()) };
       this.propA = new Float32Array(PR.INST * 256); this.propB = new Float32Array(PR.INST * 256);
       return this.propM;
+    }
+    // the prop programs, compiled on first use with the terrain's shadow defines (buildPrograms drops them with P)
+    propProgram(shadow) {
+      const P = this.P, S = VR.SHADERS;
+      if (shadow) return P.propShadow || (P.propShadow = GL.program(S.PROP_VS, S.PROP_SHADOW_FS, 'propShadow', []));
+      if (!P.prop) { const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); P.prop = GL.program(S.PROP_VS, S.PROP_FS, 'prop', sh); }
+      return P.prop;
     }
     // the anchors in reach, camera-relative: list A (full palms, nearer than D1) and list B (crosses, nearer than D2)
     propGather(cam, lvl, D1, D2) {
@@ -800,7 +806,7 @@
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
       this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, 2 * D1);
-      const p = shadow ? this.P.propShadow : this.P.prop, u = p.u;
+      const p = this.propProgram(shadow), u = p.u;
       gl.useProgram(p.p);
       this.common(p, E);
       gl.uniformMatrix4fv(u.u_viewProj, false, shadow ? this.shadowMat : this.viewProj);

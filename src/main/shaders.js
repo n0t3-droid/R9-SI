@@ -784,6 +784,7 @@ void main() {
 }`;
   S.PROP_FS = `
 uniform sampler2D u_tex;
+uniform ivec3 u_camInt;      // (declared for the common block's heightmap shadow; the props do not march it)
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
