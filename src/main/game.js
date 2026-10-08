@@ -881,7 +881,10 @@
       if (this.prewarm) this.prewarm.stop();
       this.prewarm = VR.VM.prewarm({ notBefore: performance.now() + 10000 });
       this.prewarm.start();
-      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden && this.prewarm) this.prewarm.start(); }); }
+      // (iconperf) the Modern Living pictures are made the same way (VR.iconWarm): the tab then opens without a build
+      if (this.iconWarm) this.iconWarm.stop();
+      if (VR.iconWarm && this.icons) this.iconWarm = VR.iconWarm(this.icons, this.creativeItems('vmodern'), { notBefore: performance.now() + 10000 });
+      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (this.prewarm) this.prewarm.start(); if (this.iconWarm) this.iconWarm.start(); } }); }
     }
     playFrame(dt) {
       const g = this, p = this.player, w = this.world, input = this.input;
