@@ -274,7 +274,7 @@
       if (this.mineT.p >= 1) {
         const s = hit.state, t = R.types[R.T.type[s]];
         if (t.o.kind === 'door' || (t.o.tall && t.has('half')) || t.o.kind === 'bed' || t.o.vxModel) g.breakMulti && g.breakMulti(hit.x, hit.y, hit.z, s);
-        w.setBlock(hit.x, hit.y, hit.z, (R.T.flags[s] & F.WATERLOG) ? R.byName.water.defaultState : 0, 4);
+        w.setBlock(hit.x, hit.y, hit.z, (R.T.flags[s] & F.WATERLOG) ? R.byName.water.defaultState : 0, 4 | VR.SB_EDIT);
         g.audio.dig(s, true); g.particles.breakBlock(hit.x, hit.y, hit.z, s);
         if (!p.creative) g.dropsFor && g.dropsFor(hit.x, hit.y, hit.z, s, { tool: t.o.tool, tier: 4, speed: 12 });
         this.mineT = null; p.breaking = null;
@@ -339,16 +339,17 @@
       g.ui.hint(T('g.wand.placed', { what: T(mode === 'clear' ? 'g.wand.cleared' : 'g.wand.set'), n: list.length.toLocaleString() }), 2200);
       g.codex && g.codex.event && g.codex.event('wand');
     }
-    applyEdit(list, undo) {
+    // kind (VR.EDIT): what made the change, for 📽 (the wand and the other tools when not said)
+    applyEdit(list, undo, kind) {
       const g = this.g;
-      g.world.bulkSet(list, false);
+      g.world.bulkSet(list, false, kind || VR.EDIT.TOOL);
       if (undo) { this.wand.undo.push(undo); let total = 0; for (let i = this.wand.undo.length - 1; i >= 0; i--) { total += this.wand.undo[i].length; if (total > 1500000 || this.wand.undo.length - i > 8) { this.wand.undo.splice(0, i + 1); break; } } }
       for (const [x, y, z, s] of list) this.noteBlock(x, y, z, s);
     }
     undo() {
       const u = this.wand.undo.pop();
       if (!u) { this.g.ui.hint(T('g.wand.noUndo'), 1500); return; }
-      this.g.world.bulkSet(u, false);
+      this.g.world.bulkSet(u, false, VR.EDIT.UNDO);
       for (const [x, y, z, s] of u) this.noteBlock(x, y, z, s);
       this.g.ui.hint(T('g.wand.undid', { n: u.length.toLocaleString() }), 1800);
     }

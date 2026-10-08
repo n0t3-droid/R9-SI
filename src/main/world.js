@@ -7,6 +7,11 @@
   const R = VR.R, F = VR.F;
   const ckey = VR.ckey = (cx, cz) => (cx + 32768) * 65536 + (cz + 32768);
   const PAD = 2, PS = 16 + PAD * 2, PSS = PS * PS;   // the mesher's padded section (mesher.js MESH_PAD)
+  // 📽 Zeitraffer: every building change passes one of two doors here — setBlock with SB_EDIT (the player's hand;
+  // SB_GUEST: a friend's edit at the host) and bulkSet with a kind (tools, blueprints and plans, the Werkbank, undo).
+  // Both hand (x, y, z, old, new) of each real change to world.zr (zeit_rec.js), which only the player's own worlds have.
+  VR.SB_EDIT = 8; VR.SB_GUEST = 16;
+  VR.EDIT = { HAND: 1, TOOL: 2, PLAN: 3, BENCH: 4, UNDO: 5, GUEST: 6 };
 
   // ----------------------------------------------------------------- worker pool
   // Two lanes share the workers: lane 0 is the terrain around the player (generate, light, mesh), lane 1 the far
@@ -404,7 +409,8 @@
     }
     unloadColumn(c) {
       // a saved column comes back from the save when the player returns (it was regenerated before: edits vanished)
-      if (c.modified && this.store) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
+      // (a 📽 replay copy — c.zr — is never saved)
+      if (c.modified && this.store && !c.zr) { this.store.saveColumn(this.dim, c); this.savedKeys.add(c.key); }
       for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s);
       this.cols.delete(c.key);
       this.lastCol = null;
@@ -438,7 +444,7 @@
         void i;
       });
     }
-    saveAll() { if (!this.store) return Promise.resolve(); const ps = []; for (const c of this.cols.values()) if (c.modified) { ps.push(this.store.saveColumn(this.dim, c)); this.savedKeys.add(c.key); } return Promise.all(ps); }
+    saveAll() { if (!this.store) return Promise.resolve(); const ps = []; for (const c of this.cols.values()) if (c.modified && !c.zr) { ps.push(this.store.saveColumn(this.dim, c)); this.savedKeys.add(c.key); } return Promise.all(ps); }
     destroy() { this.dead = true; for (const c of this.cols.values()) for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s); this.cols.clear(); }
 
     // ---------- meshing ----------
@@ -597,7 +603,8 @@
     }
 
     // ---------- block set ----------
-    // flags: 1 = no light update, 2 = no neighbor notify, 4 = urgent remesh
+    // flags: 1 = no light update, 2 = no neighbor notify, 4 = urgent remesh, 8 = a building change (VR.SB_EDIT:
+    // recorded for 📽), 16 = by a friend (VR.SB_GUEST)
     setBlock(x, y, z, state, flags) {
       if (y < 0 || y >= VR.MAXY) return false;
       const c = this.col(x >> 4, z >> 4);
@@ -608,6 +615,7 @@
       if (old === state) return false;
       c.blocks[i] = state;
       c.modified = true;
+      if ((flags & 8) && this.zr) this.zr.one(x, y, z, old, state, this.dim, (flags & 16) ? 6 : 1);
       const s = c.sec[y >> 4];
       if (!old && state) s.count++; else if (old && !state) s.count--;
       // heightmap
@@ -623,10 +631,12 @@
       if (!(flags & 2)) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       return true;
     }
-    // bulk edit without per-block light updates; columns are relit in workers afterwards
-    bulkSet(list, notify) {
+    // bulk edit without per-block light updates; columns are relit in workers afterwards. kind (VR.EDIT): a building
+    // change, recorded as one batch for 📽
+    bulkSet(list, notify, kind) {
       const touched = new Map();
-      const T = R.T;
+      const T = R.T, Z = kind ? this.zr : null;
+      let zb = false;
       for (const [x, y, z, state] of list) {
         if (y < 0 || y >= VR.MAXY) continue;
         const c = this.col(x >> 4, z >> 4); if (!c) continue;
@@ -634,6 +644,7 @@
         const i = (y << 8) | ((z & 15) << 4) | (x & 15);
         const old = c.blocks[i]; if (old === state) continue;
         c.blocks[i] = state; c.modified = true;
+        if (Z) { if (!zb) { Z.begin(kind, this.dim); zb = true; } Z.add(x, y, z, old, state); }
         const s = c.sec[y >> 4];
         if (!old && state) s.count++; else if (old && !state) s.count--;
         const col = i & 255;
@@ -644,6 +655,7 @@
         touched.set(c.key, c);
         if (notify) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       }
+      if (zb) Z.end();
       this.relightColumns([...touched.values()]);
       return touched.size;
     }
