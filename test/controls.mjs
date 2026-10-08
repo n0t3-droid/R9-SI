@@ -1,7 +1,8 @@
 // F5 · Steuerung & Einstellungen (browser, de-DE): (a) the key screen rebinds forward from W to I — I walks the
 // player, W no longer does, and the binding is saved; (b) a simulated gamepad (navigator.getGamepads) walks the player
 // with the left stick; (c) every graphics option of the Bild group shows its cost badge, and a change shows the live
-// preview; (d) the Automatik run measures for 3 s and records a decision that is a step of the ladder; (e) on a phone
+// preview; (d) the Automatik run measures for 3 s and records its decision (a step of the ladder, or 'none' when the
+// software renderer draws no frame in under a second); (e) on a phone
 // (390 × 844, touch) the touch layer shows its stick and five buttons, the page does not scroll sideways, the stick
 // walks and the ⤒ button jumps. Screenshots go to test/shots/ (Bild, Tasten, Automatik, Telefon). No page errors.
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -29,6 +30,7 @@ async function playWorld(page, name, seed) {
 }
 const pos = (page) => ev(page, () => ({ x: VR.game.player.pos[0], z: VR.game.player.pos[2], y: VR.game.player.pos[1] }));
 const dist = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
+async function walkUntil(page, ms, cond) { const t0 = Date.now(); while (Date.now() - t0 < ms) { await wait(page, 250); if (await cond()) return true; } return false; }
 
 // ---------------------------------------------------------------- (a)–(d) on a desktop window
 {
@@ -38,6 +40,9 @@ const dist = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
   check(!!kidsText && /Kindersicher/.test(kidsText), 'the start screen has the 🧸 Kindersicher button (' + kidsText + ')');
   await playWorld(page, 'Steuerung', '777');
   check(await ev(page, () => VR.game.state) === 'play', 'a creative world is playing');
+  // a light scene (Very Low at half the resolution): the software renderer here draws a frame in about two seconds at full size
+  await ev(page, () => { VR.game.applyPreset('potato'); VR.game.settings.scale = 0.5; VR.game.applySettings('scale'); });
+  await wait(page, 1500);
 
   // ---- (c) the Bild group: a cost badge on every graphics option, the preview after a change
   await ev(page, () => VR.game.ui.pause());
@@ -49,13 +54,19 @@ const dist = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
   const missing = await ev(page, () => VR.Settings.ITEMS.filter(x => x.g === 'img' && x.cost).map(x => x.key).filter(k => !document.querySelector('.setrow[data-key="' + k + '"] .cost')));
   const badges = await ev(page, () => document.querySelectorAll('#setbody .cost').length);
   check(missing.length === 0 && badges >= 18, 'every graphics option has its cost badge (' + badges + ' badges' + (missing.length ? ', missing ' + missing.join(',') : '') + ')');
-  const tips = await ev(page, () => [...document.querySelectorAll('#setbody .setip')].filter(e => e.textContent.trim().length > 10).length);
-  check(tips >= 25, 'every row has its one-line tip (' + tips + ')');
+  const rows = await ev(page, () => document.querySelectorAll('#setbody .setrow').length);
+  const tips = await ev(page, () => [...document.querySelectorAll('#setbody .setrow .setip')].filter(e => e.textContent.trim().length > 10).length);
+  check(rows >= 21 && tips === rows, 'every row has its one-line tip (' + tips + ' of ' + rows + ')');
   await ev(page, () => { document.querySelector('#settings .panel').scrollTop = 0; });
-  await page.click('#setbody .seg button[data-set="shadows:2"]');
-  await wait(page, 1600);
-  const pvOn = await ev(page, () => { const c = document.querySelector('canvas.pv'); if (!c) return -1; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i] + d[i + 1] + d[i + 2]; return s; });
-  check(pvOn > 0, 'a graphics change draws the live preview (sum ' + pvOn + ')');
+  // the shadow slider moves (a range input: the way a finger or a mouse changes it), then the preview is drawn two frames later
+  await ev(page, () => { const r = document.querySelector('.setrow[data-key="shadows"] input[type=range]'); r.value = 2; r.dispatchEvent(new Event('input')); });
+  let pvOn = -1;
+  for (let i = 0; i < 40; i++) {
+    await wait(page, 250);
+    pvOn = await ev(page, () => { const c = document.querySelector('canvas.pv'); if (!c) return -1; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let s = 0; for (let k = 0; k < d.length; k += 4) s += d[k] + d[k + 1] + d[k + 2]; return s; });
+    if (pvOn > 0) break;
+  }
+  check(pvOn > 0 && (await ev(page, () => VR.game.settings.shadows)) === 2, 'a graphics change draws the live preview (sum ' + pvOn + ')');
   await page.screenshot({ path: SHOTS + 'controls_bild.png' });
 
   // ---- (d) the Automatik run: 3 s of frames, then a step of the ladder is set
@@ -66,8 +77,18 @@ const dist = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
   const during = await ev(page, () => { const b = document.getElementById('benchbox'); return b ? b.textContent : ''; });
   check(/Misst gerade/.test(during), 'the Automatik box says it is measuring: ' + during.slice(0, 80));
   for (let i = 0; i < 30; i++) { await wait(page, 200); if (await ev(page, () => !VR.game.bench)) break; }
+  // the thumbnail is drawn two frames after the group is redrawn (a software renderer needs seconds per frame): wait for its picture
+  for (let i = 0; i < 40; i++) {
+    await wait(page, 250);
+    const drawn = await ev(page, () => { const c = document.querySelector('canvas.pv'); if (!c) return 0; const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let t = 0; for (let k = 0; k < d.length; k += 16) t += d[k] + d[k + 1] + d[k + 2]; return t; });
+    if (drawn > 0) break;
+  }
   const res = await ev(page, () => ({ r: VR.game.benchResult, p: VR.game.settings.preset, v: VR.game.settings.renderDist, ladder: VR.Bench.LADDER.some(x => x.p === VR.game.settings.preset && x.v === VR.game.settings.renderDist), box: (document.getElementById('benchbox') || {}).textContent || '' }));
-  check(!!res.r && !!res.r.preset && res.ladder, 'Automatik picks a preset and a view distance from the ladder (' + res.p + ', ' + res.v + ', ' + (res.r ? res.r.action + ', ' + Math.round(res.r.measured || 0) + ' fps' : 'no result') + ')');
+  // a software renderer that needs more than a second per frame gives no usable frame time: the honest result is 'none' and
+  // the settings stay as they were (the decision table itself is covered by test/bench_table.js)
+  const measured = !!res.r && (res.r.n || 0) >= 1;
+  const desc = res.r ? res.r.action + ', ' + (res.r.n || 0) + ' frames, ' + Math.round(res.r.measured || 0) + ' fps' : 'no result';
+  check(!!res.r && (measured ? res.ladder && res.r.action !== 'none' : res.r.action === 'none'), 'Automatik decides from its frames: a step of the ladder, or none when it measured none (' + res.p + ', ' + res.v + ', ' + desc + ')');
   check(res.box.length > 10 && !/Misst gerade/.test(res.box), 'the Automatik box shows the result');
   await page.screenshot({ path: SHOTS + 'controls_automatik.png' });
 
@@ -96,22 +117,23 @@ const dist = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
   await ev(page, () => VR.game.ui.resume());
   await wait(page, 800);
 
-  // walk with I, then with W: only I moves the player
+  // walk with I, then with W: only I moves the player (the walks wait for the frames they need)
   const p0 = await pos(page);
   await page.keyboard.down('KeyI');
-  await wait(page, 1600);
+  const wentI = await walkUntil(page, 25000, async () => dist(p0, await pos(page)) > 0.3);
   await page.keyboard.up('KeyI');
-  await wait(page, 400);
   const p1 = await pos(page);
   const dI = dist(p0, p1);
-  check(dI > 0.3, 'holding I walks the player (' + dI.toFixed(2) + ' blocks)');
+  check(wentI && dI > 0.3, 'holding I walks the player (' + dI.toFixed(2) + ' blocks)');
+  await wait(page, 300);
+  const p1b = await pos(page), f0 = await ev(page, () => VR.game.frame);
   await page.keyboard.down('KeyW');
-  await wait(page, 1600);
+  await walkUntil(page, 30000, async () => (await ev(page, () => VR.game.frame)) - f0 >= 3);
+  const framesW = (await ev(page, () => VR.game.frame)) - f0;
   await page.keyboard.up('KeyW');
-  await wait(page, 400);
   const p2 = await pos(page);
-  const dW = dist(p1, p2);
-  check(dW < dI * 0.5 && dW < 0.6, 'holding W no longer walks the player (' + dW.toFixed(2) + ' blocks)');
+  const dW = dist(p1b, p2);
+  check(framesW >= 3 && dW < 0.3, 'holding W does not walk the player any more (' + dW.toFixed(2) + ' blocks in ' + framesW + ' frames)');
 
   // ---- (b) a gamepad: the left stick up walks the player forward
   await ev(page, () => {
@@ -120,12 +142,12 @@ const dist = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
     navigator.getGamepads = () => [window.__pad];
   });
   const g0 = await pos(page);
-  await wait(page, 1600);
+  const wentG = await walkUntil(page, 25000, async () => dist(g0, await pos(page)) > 0.3);
   const g1 = await pos(page);
   const dG = dist(g0, g1);
-  check(dG > 0.3, 'the left stick walks the player with a gamepad (' + dG.toFixed(2) + ' blocks)');
-  const padInfo = await ev(page, () => VR.game.input.pad && VR.game.input.pad.connected);
-  check(padInfo === true, 'the pad is read every frame');
+  check(wentG && dG > 0.3, 'the left stick walks the player with a gamepad (' + dG.toFixed(2) + ' blocks)');
+  const padInfo = await ev(page, () => !!(VR.game.input.pad && VR.game.input.pad.connected));
+  check(padInfo, 'the pad is read every frame');
   await ev(page, () => { window.__pad.axes = [0, 0, 0, 0]; navigator.getGamepads = () => []; });
   await wait(page, 300);
   await ctx.close();
@@ -161,16 +183,18 @@ const dist = (a, b) => Math.hypot(b.x - a.x, b.z - a.z);
   await ev(page, () => { const s = document.getElementById('tStick'); s.dispatchEvent(new PointerEvent('pointerup', { pointerId: 9, clientX: 0, clientY: 0, bubbles: true })); });
   await wait(page, 120);
   check(await ev(page, () => VR.game.input.touchMove.fwd) === 0, 'letting go of the stick stops it');
-  // the ⤒ button jumps (a real tap, through the touch screen)
-  const y0 = (await pos(page)).y;
+  // the ⤒ button jumps (a real tap, through the touch screen): from the ground, and the player does not start to fly
+  await walkUntil(page, 15000, () => ev(page, () => VR.game.player.onGround && !VR.game.player.flying));   // first on the ground (a new world may still be settling)
+  const s0 = await ev(page, () => ({ y: VR.game.player.pos[1], fly: !!VR.game.player.flying }));
   const jb = await ev(page, () => { const r = document.querySelector('#touch .tb-jump').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-  let top = y0;
-  for (let i = 0; i < 6; i++) {
-    if (i === 0) await page.touchscreen.tap(jb.x, jb.y);
-    await wait(page, 60);
-    top = Math.max(top, (await pos(page)).y);
+  let top = s0.y, flew = s0.fly;
+  await page.touchscreen.tap(jb.x, jb.y);
+  for (let i = 0; i < 40 && top - s0.y <= 0.2; i++) {
+    await wait(page, 100);
+    const s = await ev(page, () => ({ y: VR.game.player.pos[1], fly: !!VR.game.player.flying }));
+    top = Math.max(top, s.y); flew = flew || s.fly;
   }
-  check(top - y0 > 0.2, 'the ⤒ button makes the player jump (' + (top - y0).toFixed(2) + ' blocks)');
+  check(top - s0.y > 0.2 && !flew, 'the ⤒ button makes the player jump, and does not fly (' + (top - s0.y).toFixed(2) + ' blocks, flying ' + flew + ')');
   await wait(page, 600);
   await page.screenshot({ path: SHOTS + 'controls_telefon.png' });
   await ctx.close();
