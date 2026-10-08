@@ -14,6 +14,8 @@
   const R = VR.R, F = VR.F;
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
+  // the edit kinds (📽 Zeitraffer, world.js) — a node test may load this file without world.js
+  const EK = (k) => (VR.EDIT ? VR.EDIT[k] : undefined);
   const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];   // = the lot builder's
   const FRONT = [[0, -1], [1, 0], [0, 1], [-1, 0]];                                            // street side of a lot turned r
   const REACH = 120, MARGIN = 3, DEPTH = 48, CLEAR = 80;
@@ -159,7 +161,7 @@
     buildAt(at) {
       const { list, undo } = this.planAt(at);
       if (!list.length) return 0;
-      this.gad.applyEdit(list, undo, VR.EDIT.PLAN);
+      this.gad.applyEdit(list, undo, EK('PLAN'));
       return list.length;
     }
     // the highest ground block of a column between two heights (−1 below yLo when there is none)
@@ -389,7 +391,7 @@
         this.slices = { pl, name, list, undo, at: 0, t: 0, w }; pl.status = 'building';
         return 'sliced';
       }
-      if (list.length) this.gad.applyEdit(list, undo, VR.EDIT.PLAN);
+      if (list.length) this.gad.applyEdit(list, undo, EK('PLAN'));
       this.planDone(pl, name, list.length, list.length ? undo : null);
       return 'built';
     }
@@ -472,7 +474,7 @@
       S.t -= dt; if (S.t > 0) return;
       S.t = SLICE_T;
       const end = Math.min(S.list.length, S.at + SLICE_STEP), chunk = S.list.slice(S.at, end);
-      if (chunk.length) { w.bulkSet(chunk, false, VR.EDIT.PLAN); for (const [x, y, z, s] of chunk) this.gad.noteBlock(x, y, z, s); }
+      if (chunk.length) { w.bulkSet(chunk, false, EK('PLAN')); for (const [x, y, z, s] of chunk) this.gad.noteBlock(x, y, z, s); }
       S.at = end;
       if (S.at < S.list.length) return;
       this.slices = null;
@@ -513,7 +515,7 @@
         if (!ready) continue;
         const list = [], undo = [];
         for (const [x, y, z, s] of E.unpack(b)) { const old = w.getBlock(x, y, z); if (old === s) continue; list.push([x, y, z, s]); undo.push([x, y, z, old]); }
-        if (list.length) this.gad.applyEdit(list, undo, VR.EDIT.BENCH);
+        if (list.length) this.gad.applyEdit(list, undo, EK('BENCH'));
         E.markDone(id, bid);
         n += list.length; nb++;
         if (n > 60000) break;    // a big one per quarter second keeps the frame smooth
