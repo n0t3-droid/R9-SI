@@ -58,7 +58,7 @@ const cardText = () => ev(() => { const c = document.getElementById('r9mpcard');
 const clearMp = () => ev(() => { localStorage.removeItem('r9si.mpNotice'); localStorage.removeItem('r9si.mp'); const s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); delete s.playerName; localStorage.setItem('r9si.settings', JSON.stringify(s)); });
 
 console.log('1 · a fresh browser: „Explorer“ until the answer; the notice card');
-await page.goto(GAME);
+await page.goto(GAME, { timeout: 180000 });
 let t = await toTitle();
 await ev(() => { const g = VR.game; g.settings.renderDist = 3; g.settings.dynRes = false; g.settings.horizon = 0; g.applySettings('*'); g.saveSettings(); });
 await clearMp(); await page.reload(); t = await toTitle();
@@ -192,7 +192,7 @@ console.log('6 · the R9 Studio');
 const sp = await ctx.newPage();
 sp.on('pageerror', e => logs.push('[studio pageerror] ' + (e.stack || e.message).slice(0, 1200)));
 sp.on('console', m => { if (m.type() === 'error' && !/favicon|404|ERR_FILE_NOT_FOUND/.test(m.text())) logs.push('[studio console] ' + m.text().slice(0, 400)); });
-await sp.goto(STUDIO);
+await sp.goto(STUDIO, { timeout: 180000 });   // (the Studio page is 5 MB and boots its worker: slow on a loaded machine)
 for (let i = 0; i < 60; i++) { await wait(500); if (await sp.evaluate(() => !!document.querySelector('#studio > header [data-legal]') && !!window.VR && !!VR.StudioBridge).catch(() => false)) break; }
 r = await sp.evaluate(() => { const b = document.querySelector('#studio > header [data-legal]'); return { btn: !!b, text: b ? b.textContent : '', visible: !!(b && b.offsetParent !== null) }; });
 check(r.btn && r.visible && /📜/.test(r.text), 'the Studio\'s header has 📜 (' + r.text + ')');
