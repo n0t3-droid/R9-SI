@@ -35,6 +35,15 @@ uniform vec4 u_moon1;
 uniform vec4 u_moon2;
 uniform vec4 u_moon3;
 uniform float u_cirrus;      // high cirrus streaks: 1 on balanced and above, 0 on Very Low (the sky pass only)
+// the daylight sky (F1 · atmos.js): the Perez luminance and the xy fits (their five coefficients each), the scale and
+// normalisers kY, kx, ky with dayK, the twilight and night weights, the biome tint; the moon's phase and light
+uniform float u_skyPer[15];
+uniform vec4 u_skyK;
+uniform vec2 u_skyK2;
+uniform vec3 u_skyTint;
+uniform sampler2D u_atmoLUT;  // Very Low: the same radiance baked into a 64×32 table (ATMO_LUT)
+uniform float u_moonPh;       // the terminator: cos(2π·phase), 1 at new moon, −1 at full
+uniform float u_moonIllum;    // how much moonlight the phase gives (0..1)
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -202,6 +211,53 @@ vec3 meteors(vec3 dir) {
   return acc;
 }
 
+float pzY(float ct, float g, float cg) { return (1.0 + u_skyPer[0] * exp(u_skyPer[1] / ct)) * (1.0 + u_skyPer[2] * exp(u_skyPer[3] * g) + u_skyPer[4] * cg * cg); }
+float pzX(float ct, float g, float cg) { return (1.0 + u_skyPer[5] * exp(u_skyPer[6] / ct)) * (1.0 + u_skyPer[7] * exp(u_skyPer[8] * g) + u_skyPer[9] * cg * cg); }
+float pzC(float ct, float g, float cg) { return (1.0 + u_skyPer[10] * exp(u_skyPer[11] / ct)) * (1.0 + u_skyPer[12] * exp(u_skyPer[13] * g) + u_skyPer[14] * cg * cg); }
+// the sky's radiance from the view's zenith cosine ct and the cosine cg of the angle to the sun: the Perez daylight with
+// the xy fit (kY·F_Y, kx·F_x, ky·F_y → XYZ → linear sRGB), the twilight colour order (orange low on the sun side, rose
+// and magenta above, violet higher), the dark blue night base. The same sum as src/main/atmos.js radiance().
+vec3 atmoFormula(float ct, float cg) {
+  float c = max(ct, 0.01);
+  float g = acos(clamp(cg, -1.0, 1.0));
+  vec3 col = vec3(0.0);
+  if (u_skyK.w > 0.0) {
+    float Y = u_skyK.x * pzY(c, g, cg);
+    float x = u_skyK.y * pzX(c, g, cg);
+    float y = max(0.01, u_skyK.z * pzC(c, g, cg));
+    float X = x / y * Y, Z = (1.0 - x - y) / y * Y;
+    col = vec3(3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z) * u_skyK.w * u_skyTint;
+  }
+  if (u_skyK2.x > 0.0) {
+    float h = max(ct, 0.0), band = exp(-h / 0.11), upper = exp(-h / 0.32);
+    float side = smoothstep(-0.2, 0.95, cg);
+    vec3 low = mix(vec3(0.80, 0.30, 0.52), vec3(1.00, 0.42, 0.14), side);
+    vec3 high = mix(vec3(0.30, 0.22, 0.52), vec3(0.62, 0.30, 0.50), side);
+    col += (low * band + high * upper * 0.55) * (0.9 * u_skyK2.x);
+  }
+  if (u_skyK2.y > 0.0) col += mix(vec3(0.030, 0.040, 0.085), vec3(0.010, 0.016, 0.042), sqrt(max(ct, 0.0))) * u_skyK2.y;
+  return max(col, vec3(0.0));
+}
+// Very Low: the table (atmos.js buildLUT, u = sqrt(γ/π), v = 1 − sqrt(1 − 2θ/π)) — one linear fetch instead of the exps
+vec3 atmoLut(float ct, float cg) {
+  float u = sqrt(acos(clamp(cg, -1.0, 1.0)) / 3.14159265);
+  float v = 1.0 - sqrt(max(0.0, 1.0 - 2.0 * acos(clamp(ct, 0.0, 1.0)) / 3.14159265));
+  return texture(u_atmoLUT, vec2(u, v)).rgb;
+}
+vec3 atmoRad(float ct, float cg) {
+#ifdef ATMO_LUT
+  return atmoLut(ct, cg);
+#else
+  return atmoFormula(ct, cg);
+#endif
+}
+// the air toward a direction: the radiance with the rain's grey, and the ground's dimmer below the horizon
+vec3 atmoAir(vec3 dir) {
+  vec3 col = atmoRad(max(dir.y, -1.0), dot(dir, u_sunDir));
+  if (u_rain > 0.0) col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), u_rain * 0.45);
+  if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
+  return col;
+}
 vec3 skyColor(vec3 dir, bool withSun) {
   if (u_dim == 1) return u_fogColor;
   if (u_dim == 2) {
@@ -209,17 +265,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
     c += nebula(dir) * 0.8;
     return c;
   }
-  float h = max(dir.y, 0.0);
-  // Rayleigh-style gradient: the blue deepens quickly above a thin, luminous haze band
-  vec3 col = mix(u_skyHorizon, u_skyZenith, pow(h, 0.42));
-  float dayK = 1.0 - u_night;
-  col = mix(col, u_skyHorizon * vec3(1.16, 1.1, 1.02) + vec3(0.035, 0.04, 0.03) * dayK, pow(1.0 - h, 16.0) * 0.6 * dayK);
-  col += vec3(0.0, 0.012, 0.03) * pow(max(1.0 - abs(dir.y - 0.35), 0.0), 6.0) * dayK;   // (max: pow of a negative base is NaN below the horizon)
-  float toSun = max(dot(dir, u_sunDir), 0.0);
-  float horizonBand = pow(1.0 - h, 5.0);
-  col += u_sunset * (pow(toSun, 7.0) * 1.3 + horizonBand * 0.45) * (0.3 + 0.7 * toSun);
-  col += u_sunColor * pow(toSun, 60.0) * 0.45 * (1.0 - u_rain);
-  if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
+  vec3 col = atmoAir(dir);
   if (withSun) {
     float clear = 1.0 - u_rain;
     // cosmic layer: the nebula owns the night; by day only a faint veil stays in the blue,
@@ -252,17 +298,23 @@ vec3 skyColor(vec3 dir, bool withSun) {
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
     }
     float sd = dot(dir, u_sunDir);
-    col += u_sunColor * 16.0 * smoothstep(0.99945, 0.99972, sd) * clear;
-    col += u_sunColor * pow(max(sd, 0.0), 900.0) * 3.0 * clear;
+    float kk = (1.0 - sd) / (1.0 - 0.99996);
+    if (kk < 1.0) {
+      float mu = sqrt(max(0.0, 1.0 - kk));
+      col += u_sunColor * 42.0 * (1.0 - 0.6 * (1.0 - mu)) * smoothstep(1.0, 0.9, kk) * clear;
+    }
+    col += u_sunColor * (0.35 * pow(max(sd, 0.0), 1500.0) + 0.05 * pow(max(sd, 0.0), 90.0)) * clear;
     float md = dot(dir, u_moonDir);
     if (md > 0.9992) {
       vec3 up = abs(u_moonDir.y) < 0.99 ? vec3(0,1,0) : vec3(1,0,0);
       vec3 mx = normalize(cross(up, u_moonDir)), my = cross(u_moonDir, mx);
-      vec2 mp = vec2(dot(dir, mx), dot(dir, my)) / 0.04;
-      float phase = fract(u_time / 1200.0 / 8.0);
-      float lit = smoothstep(-0.1, 0.1, mp.x * cos(phase * 6.2831) + 0.35 * sin(phase * 6.2831));
-      float crater = 0.78 + 0.22 * vnoise(mp * 4.0 + 10.0);
-      col += vec3(0.85, 0.9, 1.0) * 3.2 * crater * mix(0.06, 1.0, lit) * clear * smoothstep(1.0, 0.95, length(mp));
+      vec2 mp = vec2(dot(dir, mx), dot(dir, my)) / 0.035;
+      float r2 = dot(mp, mp);
+      if (r2 < 1.0) {
+        float lit = smoothstep(-0.03, 0.03, mp.x - u_moonPh * sqrt(max(0.0, 1.0 - r2)));
+        float crater = 0.78 + 0.22 * vnoise(mp * 4.0 + 10.0);
+        col += vec3(0.85, 0.9, 1.0) * 3.2 * crater * mix(0.05, 1.0, lit) * (0.2 + 0.8 * u_moonIllum) * clear * smoothstep(1.0, 0.95, sqrt(r2));
+      }
     }
     col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night;
     // high cirrus (t-clouds): thin streaks across the day sky, lit like the day; u_cirrus is 0 on Very Low
@@ -343,12 +395,17 @@ vec3 hazeColor(vec3 dir) {
 }
 vec3 applyFog(vec3 col, vec3 rel, float dist) {
   vec3 dir = rel / max(dist, 0.001);
-  vec3 fc = u_dim == 1 || u_dim == 2 ? u_fogColor : mix(hazeColor(dir), u_fogColor, 0.35);
   float hd = max(length(rel.xz), abs(rel.y) * 0.35);
   float f = smoothstep(u_fog.x, u_fog.y, hd);
   f = max(f, (1.0 - exp(-dist * u_fog.z)) * 0.85);
-  if (u_fog.w > 0.5) { f = 1.0 - exp(-dist * 0.07); fc = u_fogColor; }
-  return mix(col, fc, clamp(f, 0.0, 1.0));
+  if (u_fog.w > 0.5) { f = 1.0 - exp(-dist * 0.07); return mix(col, u_fogColor, clamp(f, 0.0, 1.0)); }
+  f = clamp(f, 0.0, 1.0);
+  if (u_dim == 1 || u_dim == 2) return mix(col, u_fogColor, f);
+  // aerial perspective (F1): the air keeps less of the far things' red and blue differently (blue scatters out first),
+  // and adds the sky seen along the view — distant land turns toward the sky's colour instead of a flat grey
+  vec3 sky = atmoAir(vec3(dir.x, max(dir.y, 0.0), dir.z));
+  vec3 tr = pow(vec3(1.0 - f), vec3(0.9, 1.0, 1.22));
+  return col * tr + sky * (1.0 - tr);
 }
 `;
 
@@ -460,6 +517,7 @@ uniform float u_wet;
 uniform float u_matTier;     // F2: the material detail tier (0 Very Low … 3 High)
 uniform float u_puddle;      // F2: the puddles' fill (env.js: they gather in the rain, dry over minutes)
 uniform sampler2D u_fam;     // F2: the material family of every layer, one row (0 none, 1 stone, 2 wood, 3 fabric, 4 metal, 5 plaster)
+uniform float u_cloudSh;      // cloud shadows on the ground (0 off; cloud cover on tier 1 and up)
 uniform sampler2DArray u_albedo;
 uniform sampler2DArray u_material;
 uniform sampler2D u_noise;
@@ -509,19 +567,31 @@ vec2 famPattern(vec2 dp, int fam) {
 vec3 matEnv(vec3 R) {
   return mix(u_skyHorizon * 0.5, mix(u_skyHorizon, u_skyZenith, smoothstep(0.0, 0.8, R.y)), smoothstep(-0.05, 0.6, R.y));
 }
-// sun visibility: the shadow map near the camera, heightmap rays beyond it (or everywhere on Low)
+// sun visibility: the shadow map near the camera, heightmap rays beyond it (or everywhere on Low). Tiers: SHQ1 one hard
+// tap, SHQ2 a 3×3 PCF (balanced), SHQ3 a rotated 16-tap disc (high, ultra): the disc turns the banding into fine grain
+const vec2 PD16[16] = vec2[16](vec2(0.1768,0.0000), vec2(-0.2258,0.2068), vec2(0.0346,-0.3938), vec2(0.2846,0.3712), vec2(-0.5222,-0.0924), vec2(0.4947,-0.3147), vec2(-0.1655,0.6155), vec2(-0.3156,-0.6076), vec2(0.6846,0.2500), vec2(-0.7123,0.2940), vec2(0.3434,-0.7337), vec2(0.2537,0.8089), vec2(-0.7647,-0.4432), vec2(0.8971,-0.1972), vec2(-0.5475,0.7788), vec2(-0.1265,-0.9761));
 float shadowAt(vec3 N, vec3 L) {
   float s = 1.0, cover = 0.0;
 #ifdef SHADOWS
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
   if (!(sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0)) {
     float t = u_shadowTexel;
-    float bias = 0.0006;
-    s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - bias));
-    s *= 0.25;
+    float ndl = clamp(dot(N, L), 0.0, 1.0);
+    // slope-scaled bias: a face turned from the sun needs more room against its own shadow (no acne, no peter-panning)
+    float bias = 0.0005 + 0.0016 * sqrt(1.0 - ndl * ndl) / max(ndl, 0.3);
+#ifdef SHQ3
+    float a = hash12(gl_FragCoord.xy) * 6.2831853;
+    mat2 R = mat2(cos(a), sin(a), -sin(a), cos(a));
+    s = 0.0;
+    for (int i = 0; i < 16; i++) s += texture(u_shadowMap, vec3(sc.xy + (R * PD16[i]) * t * 1.5, sc.z - bias));
+    s *= 0.0625;
+#elif defined(SHQ2)
+    s = 0.0;
+    for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) s += texture(u_shadowMap, vec3(sc.xy + vec2(float(i), float(j)) * t, sc.z - bias));
+    s *= 0.1111111;
+#else
+    s = texture(u_shadowMap, vec3(sc.xy, sc.z - bias));
+#endif
     vec2 edge = smoothstep(vec2(0.0), vec2(0.08), sc.xy) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - sc.xy);
     cover = edge.x * edge.y;
   }
@@ -532,6 +602,13 @@ float shadowAt(vec3 N, vec3 L) {
   s = mix(1.0, s, cover);
 #endif
   return s;
+}
+// cloud shadows on the ground (tier 1 and up): the cloud field drifts with the wind, a 2D noise lookup
+float cloudShade(vec2 wxz) {
+  vec2 q = (wxz + vec2(u_time * 0.9, u_time * 0.2)) / 210.0;
+  float n = texture(u_noise, q).r * 0.65 + texture(u_noise, q * 2.7 + 0.37).g * 0.35;
+  float thr = 0.62 - 0.22 * u_cloudSh;
+  return smoothstep(thr - 0.06, thr + 0.06, n) * u_cloudSh;
 }
 void main() {
 #ifdef MODEL
@@ -669,7 +746,8 @@ void main() {
   float skyL = sky * sky * (3.0 - 2.0 * sky);
   vec3 bl = v_block;
   vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
-  float ao = 1.0 - v_ao * 0.2;
+  // vertex AO, stronger than before: a corner with two occluders reads as a room corner, an edge with one as a seam
+  float ao = v_ao < 0.5 ? 1.0 : v_ao < 1.5 ? 0.72 : v_ao < 2.5 ? 0.48 : 0.32;
   float faceShade = face == 2u ? 1.0 : face == 3u ? 0.55 : (face <= 1u ? 0.78 : 0.88);
   if (noshade) faceShade = 0.92;
   vec3 V = normalize(-v_rel);
@@ -679,6 +757,7 @@ void main() {
   float ndl = noshade ? 0.65 : max(dot(n, L), 0.0);
   float outdoors = smoothstep(0.55, 0.95, sky);
   float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
+  if (u_cloudSh > 0.0 && sh > 0.0) sh *= 1.0 - 0.55 * cloudShade(v_localPos.xz + vec2(u_camInt.xz));
   vec3 direct = lc * ndl * sh * outdoors;
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
@@ -1075,6 +1154,9 @@ void main() {
 out vec2 v_uv;
 void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); v_uv = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
 
+  S.SKY_VS = `
+out vec2 v_uv;
+void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); v_uv = p; gl_Position = vec4(p * 2.0 - 1.0, 1.0, 1.0); }`;
   S.SKY_FS = `
 uniform mat4 u_invViewProj;
 uniform float u_skyProbe;    // test hook (test/horizon.mjs): 1 paints the sky magenta, so a hole below the horizon shows
@@ -1493,6 +1575,8 @@ uniform float u_shafts;     // F7: underwater light shafts (tier 2), 0 above the
 uniform float u_crossing;   // F7: the surface passing the eye (1 at the moment, fading): a ripple across the picture
 uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed in the world
 uniform vec3 u_shaftCol;
+uniform sampler2D u_expTex; // the adapted exposure (1×1, EXPOSE_FS), eased from the scene's brightness
+uniform vec3 u_lift;        // the time-of-day grade's lift (warm at dusk and dawn, blue at night)
 in vec2 v_uv;
 out vec4 o;
 // HDR → 0..1 for the sharpening weights (keeps bright lights from ringing)
@@ -1538,6 +1622,7 @@ void main() {
     c += u_shaftCol * pow(s1 * s2, 3.0) * smoothstep(-0.2, 0.5, rd.y) * u_shafts * 0.25;
   }
   c *= u_exposure;
+  c *= u_exposure * texture(u_expTex, vec2(0.5)).r;
   c = tonemap(c * u_grade);
   float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
   c = mix(vec3(l), c, u_saturation);
@@ -1545,10 +1630,32 @@ void main() {
   c *= 1.0 - dot(vc, vc) * u_vignette;
   if (u_damage > 0.0) c = mix(c, vec3(0.7, 0.05, 0.05), u_damage * (0.3 + 0.7 * smoothstep(0.2, 0.75, length(vc))) * 0.55);
   if (u_portal > 0.0) c = mix(c, vec3(0.9, 0.45, 0.15), u_portal * 0.35);
+  c = clamp(c + u_lift * (1.0 - c), 0.0, 1.0);
   c = pow(c, vec3(1.0 / 2.2));
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
   o = vec4(c, 1.0);
+}`;
+  // the adaptive exposure (F1): a log average of the scene's luminance from 16 samples, the target of the middle grey
+  // (key 0.3, partial: power 0.3, within 0.8…1.35), eased — up at a rate of 0.8 s, down in 2.5 s
+  S.EXPOSE_FS = `
+uniform sampler2D u_scene;
+uniform sampler2D u_prev;
+uniform float u_dt;
+uniform vec3 u_expParams;   // lo, hi, power
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  float s = 0.0;
+  for (int j = 0; j < 4; j++) for (int i = 0; i < 4; i++) {
+    vec3 c = texture(u_scene, (vec2(float(i), float(j)) + 0.5) / 4.0).rgb;
+    s += log(dot(c, vec3(0.2126, 0.7152, 0.0722)) + 0.02);
+  }
+  float target = clamp(pow(0.3 / exp(s / 16.0), u_expParams.z), u_expParams.x, u_expParams.y);
+  float prev = texture(u_prev, vec2(0.5)).r;
+  float tau = target > prev ? 0.8 : 2.5;
+  float cur = prev + (target - prev) * (1.0 - exp(-u_dt / tau));
+  o = vec4(cur, cur, cur, 1.0);
 }`;
   // R9 Super Resolution: temporal upscaling. The scene is rendered at a lower resolution with a
   // different sub-pixel offset every frame; this pass reprojects last frame's full-resolution result
