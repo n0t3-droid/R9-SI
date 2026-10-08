@@ -81,4 +81,10 @@ Shots (test/shots/materials_<preset>_<dry|rain>_<near|far>.png; potato = Very Lo
 - materials.mjs checks, final run: puddles fill (0.94 after 90 s of rain), dry to 0.36 after 4 min; no page errors
   and no shader messages.
 - Tests on 69cfebf: materials.mjs ALL OK (exit 0); node set REGRESS_ONLY=node 19 tests, 0 failed.
-- Pending in the browser queue at the time of writing: classic_v2.mjs, smoke.mjs, texcache.mjs.
+- classic_v2.mjs on 69cfebf: ALL OK. The Klassisch block grid is found on the flat grass (hill: 3 of 4 rows; grass
+  scene: 3 of 4 rows, 9–13 blocks away); no grid in the Nahtlos shots; 0 page errors and no shader messages.
+- smoke.mjs on 69cfebf: ALL OK, no page errors.
+- texcache.mjs on 69cfebf: ALL OK. The second start takes the textures from the cache (texMs 110 against 3299 ms
+  forged), the first world frame comes at 33.3 s against 38.0 s, the look switch forges Nahtlos once, and with
+  IndexedDB refused the textures are forged again with the same bytes.
+- before (materials_base): pending in the browser queue at the time of writing.
