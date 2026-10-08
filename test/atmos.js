@@ -76,6 +76,25 @@ console.log('sky model');
   check(bad === 0, `radiance finite and non-negative over 32 times × 24 directions (${bad} bad)`);
 }
 
+console.log('the palette hook (K.palette: a grade that sets its sky in env.js keeps its colours)');
+{
+  const xyY = (c) => { const X = 0.4124 * c[0] + 0.3576 * c[1] + 0.1805 * c[2], Y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], Z = 0.0193 * c[0] + 0.1192 * c[1] + 0.9505 * c[2]; return [X / (X + Y + Z), Y / (X + Y + Z), Y]; };
+  // a deep violet palette (the kind of sky the trailer grade of v0.42 sets in env.js)
+  const pal = [[0.105, 0.085, 0.33], [0.42, 0.33, 0.64]];
+  const sun = sunAt(6000), up = [0, 1, 0], low = dirAt(1, 160)(sun);
+  const own = A.radiance(A.prepare(sun, { T: 2.3 }), 1, dot(up, sun));
+  A.K.palette = 0;
+  const off = A.radiance(A.prepare(sun, { T: 2.3, pal }), 1, dot(up, sun));
+  check(off.every((v, i) => Math.abs(v - own[i]) < 1e-12), 'palette 0: the sky ignores the palette');
+  A.K.palette = 1;
+  const st = A.prepare(sun, { T: 2.3, pal });
+  const z = xyY(A.radiance(st, 1, dot(up, sun))), h = xyY(A.radiance(st, low[1], dot(low, sun)));
+  const pz = xyY(pal[0]), ph = xyY(pal[1]);
+  check(Math.abs(z[0] - pz[0]) < 0.004 && Math.abs(z[1] - pz[1]) < 0.004 && Math.abs(z[2] / pz[2] - 1) < 0.03, `palette 1: the zenith takes the palette's colour (xy ${z[0].toFixed(3)}, ${z[1].toFixed(3)} Y ${z[2].toFixed(3)} against ${pz[0].toFixed(3)}, ${pz[1].toFixed(3)} Y ${pz[2].toFixed(3)})`);
+  check(Math.abs(h[0] - ph[0]) < 0.02 && Math.abs(h[1] - ph[1]) < 0.02 && Math.abs((h[2] / z[2]) / (ph[2] / pz[2]) - 1) < 0.2, `palette 1: the horizon away from the sun takes its hue and its brightness ratio (xy ${h[0].toFixed(3)}, ${h[1].toFixed(3)} ×${(h[2] / z[2]).toFixed(2)} against ${ph[0].toFixed(3)}, ${ph[1].toFixed(3)} ×${(ph[2] / pz[2]).toFixed(2)})`);
+  A.K.palette = 0;
+}
+
 console.log('lookup table');
 {
   let maxErr = 0, worst = null, n = 0;

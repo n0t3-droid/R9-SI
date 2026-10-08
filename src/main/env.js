@@ -138,6 +138,9 @@
       E.skyT = 2.3 + 0.5 * (W.fog || 0);
       E.skyWx = VR.Atmos ? VR.Atmos.skyWeather(rain, W.dark || 0) : [0, 1];
       E.skyOvercast = Math.min(1, rain + (W.dark || 0));
+      // the palette's day sky (before the night, the rain and the overcast; with the golden hour): VR.Atmos.K.palette
+      // blends the analytic sky toward it (0 on this branch; a grade that sets its look in the palette sets 1)
+      E.skyPal = [mix3(dayZen, [0.13, 0.08, 0.38], horizonness * 0.55), mix3(dayHor, [0.98, 0.52, 0.36], horizonness * 0.55)];
       { const m = (bsky[0] + bsky[1] + bsky[2]) / 3 || 1; E.skyTint = bsky.map((v) => 1 + (v / m - 1) * 0.25); }
       const ph = ((((this.day + 4) % 8) + 8) % 8) / 8;   // a new world's first night has a full moon
       E.moonPh = Math.cos(2 * Math.PI * ph);

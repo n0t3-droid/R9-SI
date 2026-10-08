@@ -29,7 +29,16 @@
   // peach-pink band along the horizon — TRAILER.md §2.1 "horizon peach/pink → mid violet-blue → zenith deep blue")
   //   sideC: the chroma's sun-side C for x and y by day (the sky within ~25° of the sun is whiter and warmer: forward
   //   scattering on the haze; a low sun raises them to 0.55 and 0.35)
-  const K = { scale: 0.05, horizonA: 0.9, broad: 1.3, band: 0.8, sharp: 0.45, horXY: [0.285, 0.28], chP: 0.7, sideC: [0.25, 0.2] };
+  //   palette (0..1): how far the sky follows env.js's day palette (E.skyPal: the zenith's and the horizon's colour)
+  //   instead of these numbers — its chroma at both ends, its zenith luminance and its horizon-to-zenith ratio, on
+  //   the Perez shape, with the glow and the weather on top. 0 here; a grade that sets its look in the palette (the
+  //   trailer grade of v0.42, env.js VR.Grade) sets 1 and keeps its colours
+  const K = { scale: 0.05, horizonA: 0.9, broad: 1.3, band: 0.8, sharp: 0.45, horXY: [0.285, 0.28], chP: 0.7, sideC: [0.25, 0.2], palette: 0 };
+  const xyY = (c) => {
+    const X = 0.4124 * c[0] + 0.3576 * c[1] + 0.1805 * c[2], Y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], Z = 0.0193 * c[0] + 0.1192 * c[1] + 0.9505 * c[2];
+    const S = X + Y + Z || 1;
+    return [X / S, Y / S, Y];
+  };
   const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
   const smooth = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
@@ -94,6 +103,14 @@
     const cY = s.cY;
     cY[0] = (0.1787 * T - 1.4630) * K.horizonA; cY[1] = -0.3554 * T + 0.4275 - HORIZON_DIM; cY[2] = (-0.0227 * T + 5.3251) * SUN_GLOW * oc;
     cY[3] = 0.1206 * T - 2.5771 - AUREOLE_FALL; cY[4] = (-0.0670 * T + 0.3703) * oc;
+    // the palette (K.palette > 0, opt.pal = [zenith rgb, horizon rgb]): its horizon-to-zenith luminance ratio R sets
+    // the brightening A from 1 / (1 + A e^B) = R, its ends set the chroma and the zenith luminance (below)
+    const pk = opt.pal ? clamp(K.palette, 0, 1) : 0;
+    const pz = pk > 0 ? xyY(opt.pal[0]) : null, ph = pk > 0 ? xyY(opt.pal[1]) : null;
+    if (pk > 0) {
+      const R = clamp(ph[2] / Math.max(pz[2], 1e-4), 1.05, 8);
+      cY[0] += (clamp((1 / R - 1) / Math.exp(cY[1]), -4, -0.05) - cY[0]) * pk;
+    }
     const cs = Math.cos(th);
     // the zenith's chromaticity (deep blue by day, violet-blue while the sun is low) and the horizon's, whitened by T
     const wz = 1 - smooth(0.02, 0.35, se), hw = clamp((T - 2) / 8, 0, 1) * 0.25;
@@ -114,6 +131,10 @@
     s.tint = opt.tint || ONE3;
     s.chP = K.chP;
     s.scale = opt.scale === undefined ? K.scale : opt.scale;
+    if (pk > 0) {
+      s.xz += (pz[0] - s.xz) * pk; s.yz += (pz[1] - s.yz) * pk; s.xh += (ph[0] - s.xh) * pk; s.yh += (ph[1] - s.yh) * pk;
+      s.scale += (pz[2] / Math.max(s.Yz, 1e-3) - s.scale) * pk;
+    }
     return s;
   }
 
