@@ -5,10 +5,37 @@
   'use strict';
   const R = VR.R, SH = VR.SHAPE, F = VR.F;
   const TINTS = { 1: 0x7fbf55, 2: 0x5fa83a, 3: 0x3f76e4, 4: 0x80a755, 5: 0x619961, 6: 0xb38a55, 7: 0x7fbf2f };
+  // A voxel block's icon (Voxel Architecture blocks, the Modern Living pack): the visible faces of the 8³ grid in painter's
+  // order, one voxel per step. The generator yields after every voxel, so the palette's pump can stop between two voxels and
+  // go on in the next frame (Icons.stepIcon). Run to the end it makes the same canvas calls, in the same order, as the
+  // one-go drawing it replaced (test/icon_draw_same.js).
+  function* voxelIconSteps(ctx, s) {
+    const G = VR.VX.iconGrid(s);
+    if (!G) return;
+    const P = VR.VX.PRESENT, E = VR.VX.EMIS, GL = VR.VX.GLASS;
+    const at = (x, y, z) => (x < 0 || y < 0 || z < 0 || x > 7 || y > 7 || z > 7) ? 0 : G[(y * 8 + z) * 8 + x];
+    const open = (v) => !(v & P) || (v & GL);
+    const S = (X, Y, Z) => [32 + 28 * (X - Z) / 8, 3 + 14 * (X + Z) / 8 + 29 * (1 - Y / 8)];
+    const order = [];
+    for (let y = 0; y < 8; y++) for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) if (at(x, y, z) & P) order.push([x + y + z, x, y, z]);
+    order.sort((a, b) => a[0] - b[0]);
+    const poly = (pts, col) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.fill(); ctx.stroke(); };
+    const rgb = (v, k) => { const e = (v & E) ? 1.25 : 1; return `rgb(${Math.min(255, ((v >> 16) & 255) * k * e) | 0},${Math.min(255, ((v >> 8) & 255) * k * e) | 0},${Math.min(255, (v & 255) * k * e) | 0})`; };
+    for (const [, x, y, z] of order) {
+      const v = at(x, y, z);
+      const glass = (v & GL) !== 0;
+      const col = (k) => glass ? `rgba(190,230,255,${0.35 + k * 0.2})` : rgb(v, k);
+      if (open(at(x, y + 1, z)) || (glass && !(at(x, y + 1, z) & GL))) poly([S(x, y + 1, z), S(x + 1, y + 1, z), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(1));
+      if (open(at(x, y, z + 1)) || (glass && !(at(x, y, z + 1) & GL))) poly([S(x, y, z + 1), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(0.8));
+      if (open(at(x + 1, y, z)) || (glass && !(at(x + 1, y, z) & GL))) poly([S(x + 1, y, z), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x + 1, y + 1, z)], col(0.64));
+      yield;
+    }
+  }
+  VR.voxelIconSteps = voxelIconSteps;
   class Icons {
     constructor(tex) {
       this.alb = tex.albedo[0]; this.N = tex.size;
-      this.cache = new Map(); this.faceCache = new Map();
+      this.cache = new Map(); this.faceCache = new Map(); this.jobs = new Map();
     }
     tintOf(state) {
       const code = R.T.tint[state];
@@ -17,8 +44,10 @@
       if (h === undefined) return null;
       return [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
     }
-    face(layer, tint, shade, opaqueMask) {
-      const key = layer + ':' + (tint ? tint.join(',') : '') + ':' + shade + ':' + (opaqueMask ? 1 : 0);
+    // rc (B1 „🎨 Aussehen"): a recoloured block's colour (0xRRGGBB) — the texture's detail in that colour, as the shaders
+    // draw it: linear luminance against the layer's average, times the colour
+    face(layer, tint, shade, opaqueMask, rc) {
+      const key = layer + ':' + (tint ? tint.join(',') : '') + ':' + shade + ':' + (opaqueMask ? 1 : 0) + (rc ? ':' + rc : '');
       let c = this.faceCache.get(key);
       if (c) return c;
       const N = this.N;
@@ -26,9 +55,18 @@
       const ctx = c.getContext('2d');
       const img = ctx.createImageData(N, N);
       const src = this.alb, off = layer * N * N * 4;
+      let look = null;
+      if (rc && VR.Looks) {
+        const lin = (v) => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+        const avg = VR.Looks.lumFill(new Float32Array(4096), src, N, (VR.textureMasks ? VR.textureMasks().cut : null), [layer])[layer] || 0.5;
+        look = { k: 1 / Math.max(avg, 0.004), r: lin((rc >> 16) & 255), g: lin((rc >> 8) & 255), b: lin(rc & 255), lin, enc: (x) => Math.round(255 * (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.pow(Math.min(1, x), 1 / 2.4) - 0.055)) };
+      }
       for (let i = 0; i < N * N; i++) {
         let r = src[off + i * 4], g = src[off + i * 4 + 1], b = src[off + i * 4 + 2], a = src[off + i * 4 + 3];
-        if (tint) {
+        if (look) {
+          const l = (0.2126 * look.lin(r) + 0.7152 * look.lin(g) + 0.0722 * look.lin(b)) * look.k;
+          r = look.enc(look.r * l); g = look.enc(look.g * l); b = look.enc(look.b * l);
+        } else if (tint) {
           const k = opaqueMask ? a / 255 : 1;
           r *= 1 + (tint[0] - 1) * k; g *= 1 + (tint[1] - 1) * k; b *= 1 + (tint[2] - 1) * k;
         }
@@ -39,21 +77,39 @@
       this.faceCache.set(key, c);
       return c;
     }
-    // returns a 64x64 canvas
+    // returns a 64x64 canvas (a voxel icon that stepIcon is still drawing is finished here)
     get(id) {
-      let c = this.cache.get(id);
-      if (c) return c;
-      c = document.createElement('canvas'); c.width = 64; c.height = 64;
-      const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
-      const t = R.byName[id];
-      if (t && !VR.ITEMS[id]) this.drawBlock(ctx, t);
-      else {
-        const d = VR.ITEMS[id];
-        if (d) ctx.drawImage(this.face(d.tex, null, 1, false), 4, 4, 56, 56);
+      this.stepIcon(id, () => true);
+      return this.cache.get(id);
+    }
+    // draws the icon of an item while more() says so; at least one step per call, so every call makes progress. True once
+    // the icon is complete and cached. A voxel block is drawn one voxel per step (iconperf: the palette pump slices it across
+    // frames), everything else in one go. A failing draw is not cached, and its error goes to the caller, as before.
+    stepIcon(id, more) {
+      if (this.cache.has(id)) return true;
+      let job = this.jobs.get(id);
+      if (!job) {
+        const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        const t = R.byName[id];
+        if (t && !VR.ITEMS[id] && VR.VX && R.T.shape[t.defaultState] === SH.VOXEL) {
+          job = { c, steps: voxelIconSteps(ctx, t.defaultState) };
+          this.jobs.set(id, job);
+        } else {
+          if (t && !VR.ITEMS[id]) this.drawBlock(ctx, t);
+          else {
+            const d = VR.ITEMS[id];
+            if (d) ctx.drawImage(this.face(d.tex, null, 1, false), 4, 4, 56, 56);
+          }
+          this.cache.set(id, c);
+          return true;
+        }
       }
-      this.cache.set(id, c);
-      return c;
+      try {
+        do { if (job.steps.next().done) { this.jobs.delete(id); this.cache.set(id, job.c); return true; } } while (more());
+      } catch (e) { this.jobs.delete(id); throw e; }
+      return false;
     }
     drawBlock(ctx, t) {
       const s = t.defaultState, T = R.T;
@@ -61,6 +117,7 @@
       const tint = this.tintOf(s);
       const opaque = layer === 0;
       const tex = (f) => T.tex[s * 6 + f] & 0xfff;
+      const rc = T.rc && T.rc[s] && VR.Looks ? VR.Looks.from565(T.rc[s]) : 0;
       if (shape === SH.VOXEL && VR.VX) { this.drawVoxels(ctx, s); return; }
       const flat = shape === SH.CROSS || shape === SH.TALLCROSS || shape === SH.CROP || shape === SH.WIRE || shape === SH.DRIP || shape === SH.FLUID || shape === SH.PANE ||
         (shape === SH.MODEL && this.thin(s)) || t.o.kind === 'torch' || t.o.kind === 'door' || t.o.kind === 'ladder' || t.o.kind === 'rail';
@@ -68,14 +125,14 @@
         let L = tex(4);
         if (t.o.itemTex !== undefined) L = t.o.itemTex;
         if (t.o.kind === 'door') L = R.texIndex[(R.texNames[L] || '').replace('door_bottom', 'door_top')] || L;
-        ctx.drawImage(this.face(L, tint, 1, false), 4, 4, 56, 56);
+        ctx.drawImage(this.face(L, tint, 1, false, rc), 4, 4, 56, 56);
         return;
       }
       let h = 1;
       if (shape === SH.MODEL) { const bb = VR.PHYS.selection(s)[0]; if (bb) h = Math.max(0.2, Math.min(1, bb[4] - bb[1])); }
       if (t.o.kind === 'slab') h = 0.5;
       if (T.height[s] && T.height[s] < 16 && shape !== SH.CUBE) h = Math.max(0.2, T.height[s] / 16);
-      const top = this.face(tex(2), tint, 1.0, opaque), left = this.face(tex(4), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.8, opaque), right = this.face(tex(0), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.62, opaque);
+      const top = this.face(tex(2), tint, 1.0, opaque, rc), left = this.face(tex(4), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.8, opaque, rc), right = this.face(tex(0), (shape === SH.CUBE && t.o.soil) ? null : tint, 0.62, opaque, rc);
       // soil blocks (grass): tint only the overlay parts (mask handled by alpha)
       const N = this.N;
       const dy = (1 - h) * 29;
@@ -95,28 +152,8 @@
         void l2; void r2;
       }
     }
-    // mini-voxel sculpture icon (Voxel Architecture blocks)
-    drawVoxels(ctx, s) {
-      const G = VR.VX.iconGrid(s);
-      if (!G) return;
-      const P = VR.VX.PRESENT, E = VR.VX.EMIS, GL = VR.VX.GLASS;
-      const at = (x, y, z) => (x < 0 || y < 0 || z < 0 || x > 7 || y > 7 || z > 7) ? 0 : G[(y * 8 + z) * 8 + x];
-      const open = (v) => !(v & P) || (v & GL);
-      const S = (X, Y, Z) => [32 + 28 * (X - Z) / 8, 3 + 14 * (X + Z) / 8 + 29 * (1 - Y / 8)];
-      const order = [];
-      for (let y = 0; y < 8; y++) for (let z = 0; z < 8; z++) for (let x = 0; x < 8; x++) if (at(x, y, z) & P) order.push([x + y + z, x, y, z]);
-      order.sort((a, b) => a[0] - b[0]);
-      const poly = (pts, col) => { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]); ctx.closePath(); ctx.fillStyle = col; ctx.strokeStyle = col; ctx.lineWidth = 0.6; ctx.fill(); ctx.stroke(); };
-      const rgb = (v, k) => { const e = (v & E) ? 1.25 : 1; return `rgb(${Math.min(255, ((v >> 16) & 255) * k * e) | 0},${Math.min(255, ((v >> 8) & 255) * k * e) | 0},${Math.min(255, (v & 255) * k * e) | 0})`; };
-      for (const [, x, y, z] of order) {
-        const v = at(x, y, z);
-        const glass = (v & GL) !== 0;
-        const col = (k) => glass ? `rgba(190,230,255,${0.35 + k * 0.2})` : rgb(v, k);
-        if (open(at(x, y + 1, z)) || (glass && !(at(x, y + 1, z) & GL))) poly([S(x, y + 1, z), S(x + 1, y + 1, z), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(1));
-        if (open(at(x, y, z + 1)) || (glass && !(at(x, y, z + 1) & GL))) poly([S(x, y, z + 1), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x, y + 1, z + 1)], col(0.8));
-        if (open(at(x + 1, y, z)) || (glass && !(at(x + 1, y, z) & GL))) poly([S(x + 1, y, z), S(x + 1, y, z + 1), S(x + 1, y + 1, z + 1), S(x + 1, y + 1, z)], col(0.64));
-      }
-    }
+    // mini-voxel sculpture icon (Voxel Architecture blocks), drawn in one go
+    drawVoxels(ctx, s) { const it = voxelIconSteps(ctx, s); while (!it.next().done); }
     thin(s) {
       const bb = VR.PHYS.selection(s)[0];
       if (!bb) return true;
@@ -171,5 +208,68 @@
       if (!solid(x + 1, y, z)) quad([P(1, 0, 0), P(1, 1, 0), P(1, 1, 1), P(1, 0, 1)], col(s, 0, 0.84));
       if (!solid(x, y, z - 1)) quad([P(0, 0, 0), P(1, 0, 0), P(1, 1, 0), P(0, 1, 0)], col(s, 5, 0.68));
     }
+  };
+})(VR);
+
+// The palette's icon pump (ui.js, the creative tab) and the idle warm of the Modern Living pictures (game.startPrewarm).
+// (iconperf) a palette of hundreds of icons paints a few per frame: a frame paints until `budget` ms are used. A voxel
+// picture is drawn in slices (ready = Icons.stepIcon: one voxel per step) and painted once it is complete, so the work in
+// a frame is the budget plus one step. The one step that cannot be cut is a model's build (a few ms typically, up to ~30 ms
+// in node for the heaviest pack model); it is counted like any other. (Giving every cold model a frame of its own made a
+// cold tab of 236 models take 236+ frames.) A canvas that has left the page is dropped without a paint. The paint, the
+// clock, the frames and the ready step are injectable (test/icon_pump.js).
+(function (VR) {
+  'use strict';
+  class IconPump {
+    constructor(o) {
+      o = o || {};
+      this.paint = o.paint;
+      this.budget = o.budget === undefined ? 6 : o.budget;
+      this.now = o.now || (() => performance.now());
+      this.raf = o.raf || ((cb) => requestAnimationFrame(cb));
+      this.connected = o.connected || ((cv) => cv.isConnected !== false);
+      // ready(id, more) draws the item's picture while more() says the frame has time, true once it is complete (the
+      // icons' stepIcon); by default every item is ready at once
+      this.ready = o.ready || (() => true);
+      this.q = []; this.handle = 0;
+    }
+    get pending() { return this.q.length; }
+    add(cv, id) { this.q.push([cv, id]); this.start(); }
+    start() { if (!this.handle) this.handle = this.raf(() => this.step()); }
+    step() {
+      this.handle = 0;
+      const q = this.q, t0 = this.now();
+      let n = 0;
+      while (q.length) {
+        const [cv, id] = q[0];
+        if (!this.connected(cv)) { q.shift(); continue; }
+        if (n && this.now() - t0 >= this.budget) break;
+        // a voxel picture is drawn in slices while this frame has time; an unfinished one waits for the next frame
+        if (!this.ready(id, () => this.now() - t0 < this.budget)) break;
+        q.shift(); this.paint(cv, id); n++;
+      }
+      if (q.length) this.start();
+    }
+  }
+  VR.IconPump = IconPump;
+
+  // the idle warm (game.startPrewarm, 10 s into play): the pictures of the given items, one per idle slice, largest model
+  // first, with VM.prewarm's rules (a slice needs more than 8 ms left, nothing before notBefore, stopped while the page is
+  // hidden). A picture is cached once it is made, so the tab opens without a build.
+  VR.iconWarm = function (icons, ids, o) {
+    const VM = VR.VM;
+    const items = ids.map(id => { const m = VM && VM.MODELS[id]; return { name: id, lazy: true, compiled: false, VW: m ? m.VW : 1, VH: m ? m.VH : 1, VD: m ? m.VD : 1 }; });
+    // a picture is drawn in the idle slices that have time for it (stepIcon); it is counted once it is complete
+    const pw = VM.prewarm(Object.assign({}, o || {}, { models: items, build: (w, more) => { const done = icons.stepIcon(w.name, more); if (done) w.compiled = true; return done; } }));
+    pw.start();
+    return pw;
+  };
+
+  // the same warm for any list of ids (the Studio's ✨ Modern thumbnails, studio/catalog.js): build(id) once per id, one per
+  // idle slice, in the order given (VM.prewarm sorts by size, so each id gets a size that keeps that order). Not started:
+  // the caller starts it, and starts it again when the page shows.
+  VR.warmQueue = function (ids, build, o) {
+    const items = ids.map((id, i) => ({ name: id, lazy: true, compiled: false, VW: ids.length - i, VH: 1, VD: 1 }));
+    return VR.VM.prewarm(Object.assign({}, o || {}, { models: items, build: (w) => { build(w.name); w.compiled = true; } }));
   };
 })(VR);

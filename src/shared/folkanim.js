@@ -40,17 +40,21 @@
     }
     return out;
   };
-  // the parametric walk / run cycle: ph = walking phase, amt = 0..1 blend from standing, run = faster gait
-  FA.walk = function (ph, amt, run, out) {
+  // the parametric walk / run cycle: ph = walking phase, amt = 0..1 blend from standing, run = faster gait,
+  // k = the stride's strength (1 = the villagers' gait; the heroes stride out with k ≈ 1.2). Allocation-free: the
+  // joint arrays of `out` are reused from call to call, and the same phase always gives the same numbers.
+  const setJ = (out, j, rx, rz, ty, ry) => { const o = out[j] || (out[j] = Z6()); o[0] = rx; o[1] = ry || 0; o[2] = rz || 0; o[3] = 0; o[4] = ty || 0; o[5] = 0; };
+  // the shin folds while the leg swings through
+  const kneeAt = (ph, sg, amt, run) => -Math.max(0, -Math.sin(ph * sg + 0.6)) * (run ? 1.4 : 0.9) * amt;
+  FA.walk = function (ph, amt, run, out, k) {
     out = out || {};
-    const s = Math.sin(ph) * (run ? 0.95 : 0.68) * amt, c = Math.cos(ph);
-    const knee = (sg) => -Math.max(0, -Math.sin(ph * sg + 0.6)) * (run ? 1.4 : 0.9) * amt;   // the shin folds while the leg swings through
-    const bob = Math.abs(c) * amt * (run ? 1.8 : 0.9);
-    const set = (j, rx, ry, rz, ty) => { const o = out[j] || (out[j] = Z6()); o[0] = rx; o[1] = ry || 0; o[2] = rz || 0; o[3] = 0; o[4] = ty || 0; o[5] = 0; };
-    set('leg_l', s); set('shin_l', knee(1)); set('leg_r', -s); set('shin_r', knee(-1));
-    set('arm_l', -s * 0.9 + (run ? 0.35 : 0) * amt, 0, -0.07, bob); set('arm_r', s * 0.9 + (run ? 0.35 : 0) * amt, 0, 0.07, bob);
-    set('fore_l', (run ? 1.1 : 0.3) * amt, 0, 0, 0); set('fore_r', (run ? 1.1 : 0.3) * amt, 0, 0, 0);
-    set('body', run ? 0.18 * amt : 0, 0, 0, bob); set('head', run ? -0.1 * amt : 0, 0, 0, bob);
+    const kk = k === undefined ? 1 : k;
+    const s = Math.sin(ph) * (run ? 0.95 : 0.68) * amt * kk, c = Math.cos(ph);
+    const bob = Math.abs(c) * amt * (run ? 1.8 : 0.9) * kk;
+    setJ(out, 'leg_l', s, 0, 0); setJ(out, 'shin_l', kneeAt(ph, 1, amt, run), 0, 0); setJ(out, 'leg_r', -s, 0, 0); setJ(out, 'shin_r', kneeAt(ph, -1, amt, run), 0, 0);
+    setJ(out, 'arm_l', -s * 0.9 + (run ? 0.35 : 0) * amt, -0.07, bob); setJ(out, 'arm_r', s * 0.9 + (run ? 0.35 : 0) * amt, 0.07, bob);
+    setJ(out, 'fore_l', (run ? 1.1 : 0.3) * amt, 0, 0); setJ(out, 'fore_r', (run ? 1.1 : 0.3) * amt, 0, 0);
+    setJ(out, 'body', run ? 0.18 * amt : 0, 0, bob); setJ(out, 'head', run ? -0.1 * amt : 0, 0, bob);
     return out;
   };
   FA.lerp = function (a, b, k, out) {
@@ -85,6 +89,17 @@
     head: [[0, 0, 0, 0], [0.8, 0.05, 0.06, 0], [1.6, -0.03, -0.04, 0], [2.4, 0.04, 0.05, 0], [3.2, 0, 0, 0]], body: [[0, 0, 0, 0], [1.6, 0.03, 0.08, 0.02], [3.2, 0, 0, 0]],
   } });
   def('wave', { len: 1.2, loop: true, tracks: { arm_r: [[0, 2.7, 0, 0.3]], fore_r: [[0, 0.35, 0, -0.45], [0.3, 0.35, 0, 0.45], [0.6, 0.35, 0, -0.45], [0.9, 0.35, 0, 0.45], [1.2, 0.35, 0, -0.45]], head: [[0, 0.06, 0, 0]], arm_l: [[0, 0.05, 0, -0.1]], fore_l: [[0, 0.2, 0, 0]] } });
+  // the trailer heroes hold their blaster ready at the hip (right arm forward and down, the elbow a little bent); they
+  // breathe, glance left and right now and then, and the free left hand hangs loose
+  def('hold', { len: 4, loop: true, tracks: {
+    body: [[0, 0, 0, 0, 0, 0, 0], [2, 0.015, 0, 0.02, 0, 0.22, 0], [4, 0, 0, 0, 0, 0, 0]],
+    head: [[0, 0, 0, 0], [1.2, 0.02, 0.12, 0], [2.6, -0.02, -0.14, 0], [4, 0, 0, 0]],
+    arm_r: [[0, 0.95, 0, 0.1], [2, 1.0, 0, 0.1], [4, 0.95, 0, 0.1]],
+    fore_r: [[0, 0.35, 0, 0], [2, 0.4, 0, 0], [4, 0.35, 0, 0]],
+    arm_l: [[0, 0.06, 0, -0.1], [2, 0.1, 0, -0.1], [4, 0.06, 0, -0.1]], fore_l: [[0, 0.2, 0, 0]],
+  } });
+  // the left hand waves while the right keeps the blaster
+  def('wave_l', { len: 1.2, loop: true, tracks: { arm_l: [[0, 2.7, 0, -0.3]], fore_l: [[0, 0.35, 0, 0.45], [0.3, 0.35, 0, -0.45], [0.6, 0.35, 0, 0.45], [0.9, 0.35, 0, -0.45], [1.2, 0.35, 0, 0.45]], head: [[0, 0.06, 0, 0]], arm_r: [[0, 0.95, 0, 0.1]], fore_r: [[0, 0.35, 0, 0]] } });
   def('cheer', { len: 0.7, loop: true, tracks: { arm_l: [[0, 2.5, 0, -0.35], [0.35, 2.15, 0, -0.5], [0.7, 2.5, 0, -0.35]], arm_r: [[0, 2.15, 0, 0.5], [0.35, 2.5, 0, 0.35], [0.7, 2.15, 0, 0.5]], fore_l: [[0, 0.35, 0, 0]], fore_r: [[0, 0.35, 0, 0]], head: [[0, 0.15, 0, 0]] } });
   def('stretch', { len: 2.4, loop: false, tracks: { arm_l: [[0, 0, 0, -0.08], [0.9, 2.9, 0, -0.25], [1.6, 2.9, 0, -0.25], [2.4, 0, 0, -0.08]], arm_r: [[0, 0, 0, 0.08], [0.9, 2.9, 0, 0.25], [1.6, 2.9, 0, 0.25], [2.4, 0, 0, 0.08]], fore_l: [[0, 0.2, 0, 0], [0.9, 0.05, 0, 0], [2.4, 0.2, 0, 0]], fore_r: [[0, 0.2, 0, 0], [0.9, 0.05, 0, 0], [2.4, 0.2, 0, 0]], body: [[0, 0, 0, 0], [1.2, -0.12, 0, 0], [2.4, 0, 0, 0]], head: [[0, 0, 0, 0], [1.2, 0.25, 0, 0], [2.4, 0, 0, 0]] } });
   def('dance', { len: 2, loop: true, tracks: {
@@ -108,7 +123,8 @@
     return st;
   };
   // the full body pose for an agent: state clip (crossfaded) under the walk cycle (by walkAmt)
-  FA.pose = function (a, state, dt, walkPhase, walkAmt, run, out) {
+  // k: the stride's strength of the walk (see FA.walk); the villagers pass nothing and walk as before
+  FA.pose = function (a, state, dt, walkPhase, walkAmt, run, out, k) {
     const st = FA.play(a, state);
     st.t += dt; if (st.fade < 1) { st.fade = Math.min(1, st.fade + dt / st.fadeLen); st.prevT += dt; }
     const cur = clips[st.cur] || clips.idle;
@@ -116,7 +132,7 @@
     let body = tmpA;
     if (st.fade < 1 && st.prev && clips[st.prev]) { FA.sample(clips[st.prev], st.prevT, tmpB); body = FA.lerp(tmpB, tmpA, ease(st.fade), tmpB); }
     out = out || {};
-    if (walkAmt > 0.01 && !cur.still) { FA.walk(walkPhase, 1, run, tmpW); FA.lerp(body, tmpW, Math.min(1, walkAmt), out); }
+    if (walkAmt > 0.01 && !cur.still) { FA.walk(walkPhase, 1, run, tmpW, k); FA.lerp(body, tmpW, Math.min(1, walkAmt), out); }
     else for (const j of JOINTS) { const o = out[j] || (out[j] = Z6()), b = body[j] || Z6(); for (let i = 0; i < 6; i++) o[i] = b[i]; }
     return out;
   };

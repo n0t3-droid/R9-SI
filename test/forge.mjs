@@ -16,7 +16,7 @@ await new Promise(r => srv.listen(0, '127.0.0.1', r));
 const URL0 = `http://127.0.0.1:${srv.address().port}`;
 console.log('serving', DIST, 'at', URL0);
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const ctx = await browser.newContext({ viewport: { width: 1360, height: 820 } });
+const ctx = await browser.newContext({ viewport: { width: 1360, height: 820 }, locale: 'de-DE' });   // (the German names: „Hochhaus“)
 const logs = [], fails = [];
 const check = (ok, msg) => { if (!ok) fails.push(msg); console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 const watch = (pg, tag) => { pg.on('pageerror', e => logs.push(`[${tag} pageerror] ` + (e.stack || e.message).slice(0, 900))); pg.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) logs.push(`[${tag}] ` + m.text().slice(0, 300)); }); };
@@ -45,9 +45,12 @@ console.log('studio', JSON.stringify(await sev(() => ({ boot: document.getElemen
 const hasNav = await sev(() => !!document.querySelector('nav.modes button[data-mode="forge"]'));
 check(hasNav, 'the header has a 🏭 Forge button (Profi)');
 if (!hasNav) await finish();
-// Einfach (the default): the mode bar waits behind Profi — ✨ Erschaffen offers 🏭 Forge
+// Einfach (the default): the mode bar waits behind Profi — ✨ Erschaffen offers 🏭 Forge (W2: the ✨ wizard opens first
+// and has the 🏭 way too; without it the Erschaffen dialog's 🏭 button)
 check(await sev(() => !(VR.UIPrefs && VR.UIPrefs.get().pro)), 'the Studio starts in Einfach');
 await studio.click('#tiles .tile[data-tile="erschaffen"]'); await studio.waitForTimeout(800);
+const viaWizard = await sev(() => !!(VR.Wizard && VR.Wizard.isOpen && VR.Wizard.isOpen()));
+if (viaWizard) { await sev(() => VR.Wizard.close && VR.Wizard.close()); await studio.waitForTimeout(200); await sev(() => { const IM = VR.StudioWorld && VR.StudioWorld.imagine; if (IM && IM.open) IM.open(null, 'house'); }); await studio.waitForTimeout(600); }
 check(!!(await studio.$('#imagine.on [data-forge]')), '✨ Erschaffen offers 🏭 Forge');
 await studio.click('#imagine.on [data-forge]'); await studio.waitForTimeout(600);
 check(await sev(() => !document.querySelector('#imagine.on')), 'the Erschaffen dialog closes on 🏭');

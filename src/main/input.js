@@ -1,8 +1,14 @@
 // ============================================================================
-// Input: keyboard, mouse (pointer lock with drag-to-look fallback), wheel, touch, gamepad
+// Input: keyboard (through the player's key bindings, binds.js), mouse (pointer
+// lock with drag-to-look fallback, raw movement, optional smoothing), wheel,
+// touch (one finger look; the on-screen layer in touch.js), gamepad (pad.js).
+// The game asks for its default key names (input.down('KeyW')); a name owned by a
+// rebound action is translated to the keys the player chose (codesFor).
 // ============================================================================
 (function (VR) {
   'use strict';
+  const LOOK_PAD = 1400;   // the right stick at full push turns the view by this many "mouse pixels" a second
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   class Input {
     constructor(canvas) {
       this.canvas = canvas;
@@ -15,13 +21,25 @@
       this.captured = false;         // game wants mouse input
       this.sensitivity = 0.0024;
       this.invertY = false;
+      this.raw = true;               // raw mouse movement (no OS acceleration) when the browser allows it
+      this.smooth = false;           // mouse smoothing (F5, off by default)
+      this.smX = 0; this.smY = 0;
       this.lastTap = {};
       this.doubleTap = new Set();
       this.enabled = true;
       this.lockFailed = false;       // permanent: pointer lock not available at all
       this.lockFails = 0;            // consecutive failed attempts (a click retries)
       this.dragStart = null;
-      this.padKeys = new Set(); this.padBtn = [false, false, false]; this.padT = 0; this.padActive = false;
+      // actions and keys that do not come from the keyboard: the gamepad and the touch layer name an action id
+      this.padDown = new Set(); this.padPressed = new Set();   // the gamepad's held and pressed actions (by action id)
+      this.tDown = new Set(); this.tPressed = new Set();       // the touch layer's (by action id)
+      this.tRelease = new Set();                                // touch buttons let go this frame: they stay down until endFrame, so a tap between two frames still counts
+      this.vPhys = new Set();                                 // physical names pressed by the pad (Start = Escape)
+      this.touchMove = { fwd: 0, str: 0 };                     // the touch stick, set by touch.js
+      this.padMove = { fwd: 0, str: 0 };
+      this.padPrev = null; this.pad = null; this.padHeld = [false, false, false];
+      this.menuOpen = false;         // set by the game: menus take the pad as focus moves, not as game keys
+      this.capture = null;           // the next key goes to this callback (the key-binding screen)
       this.bind();
     }
     bind() {
@@ -31,6 +49,7 @@
         const tgt = e.target;
         if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA')) return;
         const k = e.code;
+        if (this.capture) { const cb = this.capture; this.capture = null; e.preventDefault(); cb(k); return; }
         if (!this.keys.has(k)) {
           this.pressed.add(k);
           const now = performance.now();
@@ -41,7 +60,7 @@
         if (this.captured && (k === 'Space' || k.startsWith('Arrow') || k === 'Tab' || k === 'F3' || k === 'F1' || k === 'F2' || k === 'F5' || k === 'Slash' || (e.ctrlKey && (k === 'KeyW' || k === 'KeyS' || k === 'KeyD')))) e.preventDefault();
       });
       window.addEventListener('keyup', (e) => { this.keys.delete(e.code); this.released.add(e.code); });
-      window.addEventListener('blur', () => { this.keys.clear(); this.mouse.down = [false, false, false]; });
+      window.addEventListener('blur', () => { this.keys.clear(); this.mouse.down = [false, false, false]; this.padDown.clear(); this.tDown.clear(); this.padHeld = [false, false, false]; });
       c.addEventListener('contextmenu', (e) => e.preventDefault());
       c.addEventListener('mousedown', (e) => {
         if (!this.enabled) return;
@@ -64,6 +83,9 @@
       c.addEventListener('wheel', (e) => { if (this.captured) { this.mouse.wheel += Math.sign(e.deltaY); e.preventDefault(); } }, { passive: false });
       document.addEventListener('pointerlockchange', () => {
         this.locked = document.pointerLockElement === this.canvas;
+        // a lock that arrives after the game stopped wanting the mouse (a request made just before the wizard or a screen
+        // opened: the ring's ✨ closes the hand first) is given back at once, or the pointer is locked under the open dialog
+        if (this.locked && !this.captured) { this.locked = false; document.exitPointerLock(); return; }
         if (this.locked) { this.dragLook = false; this.lockFails = 0; this.lockFailed = false; }
         if (this.onLockChange) this.onLockChange(this.locked);
       });
@@ -74,14 +96,36 @@
       c.addEventListener('touchmove', (e) => { if (!touch) return; for (const t of e.changedTouches) if (t.identifier === touch.id) { const dx = t.clientX - touch.x, dy = t.clientY - touch.y; this.mouse.dx += dx * 1.5; this.mouse.dy += dy * 1.5; touch.moved += Math.abs(dx) + Math.abs(dy); touch.x = t.clientX; touch.y = t.clientY; } e.preventDefault(); }, { passive: false });
       c.addEventListener('touchend', (e) => { if (touch && touch.moved < 10) { this.mouse.clicked[performance.now() - touch.t > 350 ? 0 : 2] = true; } touch = null; });
     }
+    // ---- the names the game asks for, through the player's bindings (VR.Binds.current)
+    // a name owned by an action is answered by that action's keys, and by the pad or the touch layer naming the action;
+    // any other name (Escape, Enter, F12 …) is the physical key itself, as before (and the pad's Start is Escape)
+    anyOf(name, set, a1, a2, pset) {
+      const B = VR.Binds, b = B && B.current;
+      const codes = b ? b.codesFor(name) : null;
+      if (codes === null) return set.has(name) || (!!pset && pset.has(name));
+      for (const c of codes) if (set.has(c)) return true;
+      const id = B.byName(name);
+      if (id && ((a1 && a1.has(id)) || (a2 && a2.has(id)))) return true;
+      return !!pset && pset.has(name);
+    }
+    down(k) { return this.anyOf(k, this.keys, this.padDown, this.tDown, this.vPhys); }
+    hit(k) { return this.anyOf(k, this.pressed, this.padPressed, this.tPressed, this.vPhys); }
+    dbl(k) { return this.anyOf(k, this.doubleTap, null, null, null); }
+    // the next key pressed goes to cb (the key-binding screen); cb gets e.code, Escape cancels there
+    captureNext(cb) { this.capture = cb; }
+    cancelCapture() { this.capture = null; }
+    // ---- pointer lock: raw movement first, the plain request when the platform refuses raw
     requestLock() {
       if (this.locked || this.lockFailed) return;
       if (!this.canvas.requestPointerLock) { this.lockFailed = true; this.dragLook = true; return; }
       const stamp = this.lockReq = (this.lockReq || 0) + 1;
+      const plain = () => { try { const q = this.canvas.requestPointerLock(); if (q && q.catch) q.catch(() => { if (stamp === this.lockReq) this.failLock(); }); } catch (e) { this.failLock(); } };
       try {
-        const p = this.canvas.requestPointerLock();
-        if (p && p.catch) p.catch(() => { if (stamp === this.lockReq) this.failLock(); });
-      } catch (e) { this.failLock(); }
+        const p = this.raw ? this.canvas.requestPointerLock({ unadjustedMovement: true }) : this.canvas.requestPointerLock();
+        if (p && p.catch) p.catch((err) => { if (stamp !== this.lockReq) return; if (this.raw && err && err.name === 'NotSupportedError') { this.raw = false; plain(); } else this.failLock(); });
+      } catch (e) {
+        if (this.raw) { this.raw = false; plain(); } else this.failLock();
+      }
       setTimeout(() => { if (stamp === this.lockReq && !this.locked && this.captured) this.failLock(true); }, 700);
     }
     // a refused lock (no user gesture yet, browser cooldown, iframe policy…) only switches to drag-to-look
@@ -93,9 +137,6 @@
       if (this.onLockChange) this.onLockChange(false, true);
     }
     releaseLock() { if (document.pointerLockElement) document.exitPointerLock(); }
-    down(k) { return this.keys.has(k); }
-    hit(k) { return this.pressed.has(k); }
-    dbl(k) { return this.doubleTap.has(k); }
     // a click counts as action; in drag-look mode only if the mouse barely moved
     clickAction(b) {
       if (!this.mouse.releasedBtn[b] && !this.mouse.clicked[b]) return false;
@@ -106,55 +147,52 @@
       if (this.dragLook) return this.mouse.down[b] && this.dragStart && this.dragStart.moved < 6 && performance.now() - (this.dragStartT || 0) > 0;
       return this.mouse.down[b];
     }
+    // ---- once per frame, before the game reads the input: smoothing, the gamepad, the stick look, the touch stick
+    beginFrame(dt) {
+      const k = clamp(dt || 0.016, 0, 0.1);
+      // mouse smoothing (F5, off by default): an exponential glide on the look delta; the total turn is kept
+      if (this.smooth) {
+        const a = 1 - Math.exp(-k * 26);
+        this.smX += (this.mouse.dx - this.smX) * a; this.smY += (this.mouse.dy - this.smY) * a;
+        this.mouse.dx = this.smX; this.mouse.dy = this.smY;
+      } else { this.smX = this.mouse.dx; this.smY = this.mouse.dy; }
+      let pad = null, list = null;
+      if (VR.Pad && typeof navigator !== 'undefined' && navigator.getGamepads) {
+        try { list = navigator.getGamepads(); } catch (e) { list = null; }
+        pad = this.pad = VR.Pad.poll(list, this.padPrev);
+        this.padPrev = pad;
+      }
+      const menu = this.menuOpen;
+      // Start pauses (Escape) in or out of a menu; B goes back in a menu (also Escape)
+      if (pad && pad.connected) {
+        for (const p of pad.physPressed) this.vPhys.add(p);
+        if (menu && pad.menu.indexOf('back') >= 0) this.vPhys.add('Escape');
+      }
+      const live = !!pad && pad.connected && !menu;     // the pad drives the game only when no menu is open
+      this.padDown = live ? new Set(pad.down) : new Set();
+      if (live) for (const a of pad.pressed) this.padPressed.add(a);
+      for (let b = 0; b < 3; b++) {
+        const on = live && !!pad.mouseDown[b];
+        if (on && !this.padHeld[b]) { this.mouse.down[b] = true; this.mouse.clicked[b] = true; }
+        if (!on && this.padHeld[b]) { this.mouse.down[b] = false; this.mouse.releasedBtn[b] = true; }
+        this.padHeld[b] = on;
+      }
+      if (live) {
+        this.mouse.wheel += pad.wheel;
+        if (pad.dpad.indexOf('left') >= 0) this.mouse.wheel -= 1;
+        if (pad.dpad.indexOf('right') >= 0) this.mouse.wheel += 1;
+        this.mouse.dx += pad.look[0] * LOOK_PAD * k; this.mouse.dy += pad.look[1] * LOOK_PAD * k;
+      }
+      const tm = menu ? { fwd: 0, str: 0 } : (this.touchMove || { fwd: 0, str: 0 });
+      const pf = live ? -pad.move[1] : 0, ps = live ? pad.move[0] : 0;
+      this.padMove = { fwd: clamp(pf + tm.fwd, -1, 1), str: clamp(ps + tm.str, -1, 1) };
+    }
     endFrame() {
+      if (this.tRelease.size) { for (const id of this.tRelease) this.tDown.delete(id); this.tRelease.clear(); }
       this.pressed.clear(); this.released.clear(); this.doubleTap.clear();
+      this.padPressed.clear(); this.tPressed.clear(); this.vPhys.clear();
       this.mouse.dx = 0; this.mouse.dy = 0; this.mouse.wheel = 0;
       this.mouse.clicked = [false, false, false]; this.mouse.releasedBtn = [false, false, false];
-      // the gamepad's state for the next frame
-      try { this.pollPad(); } catch (e) { this.pollPad = () => { }; }
-    }
-    // ---- gamepad (standard mapping): sticks and buttons become the keys and mouse moves the game reads anyway.
-    // On foot: left stick walks (WASD), right stick looks, A jump, B sneak, RT break / use, LT place, X inventory (E),
-    // Y camera (F5), LB drop (Q), d-pad left/right the hotbar (wheel), Start pauses.
-    // In a ship: left stick turns (A/D) and climbs (Space/Shift), RT/LT push the throttle (W/S), the right stick looks
-    // around the cockpit (click it to re-centre), A boost (B), B hover (X), X gear (F), Y view (C), LB look back (Q),
-    // RB the left mouse button (the control you aim at, or the guns), d-pad: up autopilot (G), down land / get out (V),
-    // left lights (L), right ramp (R).
-    pollPad() {
-      const list = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : null;
-      let gp = null; if (list) for (const p of list) if (p && p.connected && p.buttons && p.buttons.length >= 16) { gp = p; break; }
-      const now = performance.now(), dt = Math.min(0.1, Math.max(0, (now - (this.padT || now)) / 1000)); this.padT = now;
-      const want = new Set(), btn = [false, false, false];
-      if (gp && this.captured && this.enabled) {
-        const B = (i) => !!(gp.buttons[i] && (gp.buttons[i].pressed || gp.buttons[i].value > 0.4)), ax = (i) => { const v = gp.axes[i] || 0; return Math.abs(v) < 0.18 ? 0 : v; };
-        const ship = !!(VR.game && VR.game.flight), lx = ax(0), ly = ax(1), rx = ax(2), ry = ax(3);
-        if (lx || ly || rx || ry || gp.buttons.some(b => b && b.pressed)) this.padActive = true;
-        if (ship) {
-          if (lx < -0.45) want.add('KeyA'); if (lx > 0.45) want.add('KeyD');
-          if (ly < -0.45) want.add('Space'); if (ly > 0.45) want.add('ShiftLeft');
-          if (B(7)) want.add('KeyW'); if (B(6)) want.add('KeyS');
-          if (B(0)) want.add('KeyB'); if (B(1)) want.add('KeyX'); if (B(2)) want.add('KeyF'); if (B(3)) want.add('KeyC'); if (B(4)) want.add('KeyQ');
-          if (B(12)) want.add('KeyG'); if (B(13)) want.add('KeyV'); if (B(14)) want.add('KeyL'); if (B(15)) want.add('KeyR');
-          if (B(5)) btn[0] = true; if (B(11)) btn[1] = true;
-        } else {
-          if (lx < -0.45) want.add('KeyA'); if (lx > 0.45) want.add('KeyD'); if (ly < -0.45) want.add('KeyW'); if (ly > 0.45) want.add('KeyS');
-          if (B(0)) want.add('Space'); if (B(1)) want.add('ShiftLeft'); if (B(2)) want.add('KeyE'); if (B(3)) want.add('F5'); if (B(4)) want.add('KeyQ'); if (B(10)) want.add('ControlLeft');
-          if (B(7) || B(5)) btn[0] = true; if (B(6)) btn[2] = true;
-          if (B(14) && !this.padKeys.has('PadL')) this.mouse.wheel -= 1; if (B(15) && !this.padKeys.has('PadR')) this.mouse.wheel += 1;
-          if (B(14)) want.add('PadL'); if (B(15)) want.add('PadR');
-        }
-        if (B(9)) want.add('Escape');
-        // the right stick looks (a curve for fine aim), like a mouse moving
-        const k = 950 * dt;
-        this.mouse.dx += Math.sign(rx) * Math.pow(Math.abs(rx), 1.7) * k; this.mouse.dy += Math.sign(ry) * Math.pow(Math.abs(ry), 1.7) * k;
-      }
-      for (const c of want) if (!this.padKeys.has(c)) { this.padKeys.add(c); if (!c.startsWith('Pad')) { this.keys.add(c); this.pressed.add(c); } }
-      for (const c of [...this.padKeys]) if (!want.has(c)) { this.padKeys.delete(c); if (!c.startsWith('Pad')) { this.keys.delete(c); this.released.add(c); } }
-      for (let b = 0; b < 3; b++) {
-        if (btn[b] && !this.padBtn[b]) { this.mouse.down[b] = true; this.mouse.clicked[b] = true; }
-        else if (!btn[b] && this.padBtn[b]) { this.mouse.down[b] = false; this.mouse.releasedBtn[b] = true; }
-        this.padBtn[b] = btn[b];
-      }
     }
   }
   VR.Input = Input;

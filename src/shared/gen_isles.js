@@ -33,6 +33,7 @@
     ];
     // bridges between neighbours (island indices)
     ISLES.LINKS = [[0, 1], [0, 3], [0, 4], [0, 6], [1, 2], [3, 4], [6, 5], [2, 3]];
+    ISLES.LOOP = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 4]];   // the rail loop C → N → NE → E → S → C rides a stone viaduct
     g._isles = L;
     return L;
   };
@@ -51,15 +52,31 @@
       WALL: st('temple_stone'), SMOOTH: st('temple_stone_smooth'), BAND: st('temple_stone_band'), SLIT: st('temple_slit'), BAR: st('temple_light_bar'), FRAME: st('vx_portal_frame', { facing: 0 }), BEACON: st('beacon_red'),
       OCHRE: st('ochre_rock'), UMBER: st('umber_rock'), TERRA: st('orange_terracotta'), TERRAB: st('brown_terracotta'), GRASS: st('grass_block'), DIRT: st('dirt'),
       CRY: (c, big) => st(c + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 }), CRYB: (c) => st(c + '_crystal_block'), FERN: st('vx_fern_lush'), BUSH: st('vx_bush'),
+      VSTONE: st('spire_stone'), VRAIL: st('vx_tech_railing'), VLINE: st('vx_floor_plaza_line'),
     };
   }
   ISLES.build = function (g) {
     if (g._islesOps) return g._islesOps;
     const K = mats(), L = ISLES.list(g);
-    const chunks = new Map();
+    const chunks = new Map(), tracks = [];
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
     const put = (x, y, z, s) => { bucket(x, z).o.push(x, y, z, s); };
+    // (vgen ≥ 6) a bridge's track: a rail on the deck's centre, one block up (on the island's top where the island carries
+    // the bridge); its shapes ramp like the village lines'; the points become the bridge's tram line (ISLES.trackLines)
+    const bridgeTrack = (A, B, ia, ib, tr, dx, dz) => {
+      const alongX = Math.abs(dx) >= Math.abs(dz), dir = alongX ? Math.sign(dx) : Math.sign(dz), pts = [];
+      for (let i = 0; i < tr.length; i++) {
+        const [x, y, z] = tr[i], prev = tr[Math.max(0, i - 1)][1], next = tr[Math.min(tr.length - 1, i + 1)][1];
+        let shp = alongX ? 1 : 0;
+        if (next > y) shp = alongX ? (dir > 0 ? 2 : 3) : (dir > 0 ? 5 : 4);
+        else if (prev > y) shp = alongX ? (dir > 0 ? 3 : 2) : (dir > 0 ? 4 : 5);
+        put(x, y + 1, z, st('rail', { shape: shp }));
+        const last = pts[pts.length - 1];
+        if (last && last[0] === x && last[1] === z) last[2] = y + 1; else pts.push([x, z, y + 1]);
+      }
+      tracks.push({ key: 'isle-' + ia + '-' + ib, names: ['Isle ' + A.name, 'Isle ' + B.name], pts });
+    };
     const shape = (x, z) => { let best = null; for (const I of L) { const sh = g.islandShape(I, x, z); if (sh && (!best || sh.top > best.top)) best = sh; } return best; };
     const rng = new VR.RNG(g.seed ^ 0x151e);
     const placed = new Map();
@@ -102,6 +119,30 @@
       for (let r = I.r * 0.5; r < I.r * 1.4; r += 1) { const px = Math.round(I.x + Math.cos(a) * r), pz = Math.round(I.z + Math.sin(a) * r); const sh = shape(px, pz); if (sh && sh.isle === I) best = [px, pz, sh.top]; else if (best) break; }
       return best;
     };
+    // the rail loop (TRAILER §3.6: "one stone-arch viaduct carrying the Isles rail loop"): a 5-wide stone deck with rails
+    // and a cyan line, piers 3 wide every 10 blocks, a round arch of stone in every span; where the land carries the deck
+    // the viaduct is not built
+    const VIA_H = 6;
+    const viaduct = (pa, pb, len, dx, dz, nx, nz) => {
+      for (let t = 0; t <= len; t++) {
+        const x = pa[0] + dx * t, z = pa[1] + dz * t, y = Math.round(pa[2] + (pb[2] - pa[2]) * t / len);
+        const rise = Math.round(VIA_H * (1 - Math.sin(Math.PI * (t % 10) / 10)));   // the arch's rise under the deck
+        const landAt = (px, pz) => { const sh = shape(px, pz); return !!sh && sh.top >= y - 1; };
+        for (let v = -2; v <= 2; v++) {
+          const px = Math.round(x + nx * v), pz = Math.round(z + nz * v);
+          if (t > 2 && t < len - 2 && landAt(px, pz)) continue;
+          put(px, y, pz, K.VSTONE);
+          if (Math.abs(v) === 2) put(px, y + 1, pz, K.VRAIL); else if (v === 0) put(px, y + 1, pz, K.VLINE);
+          put(px, y - 1 - rise, pz, K.VSTONE); put(px, y - 2 - rise, pz, K.VSTONE);   // the arch ring
+        }
+        if (t % 10 === 0) for (let v = -1; v <= 1; v++) {   // a pier: from the deck down into the void
+          const px = Math.round(x + nx * v), pz = Math.round(z + nz * v);
+          if (landAt(px, pz)) continue;
+          for (let yy = y - 1; yy >= y - 12; yy--) put(px, yy, pz, K.VSTONE);
+        }
+        if (t % 20 === 10) { const px = Math.round(x + nx * 2), pz = Math.round(z + nz * 2); put(px, y + 1, pz, K.LAMP0); put(px, y + 2, pz, K.LAMP1); }
+      }
+    };
     for (const [ia, ib] of ISLES.LINKS) {
       const A = L[ia], B = L[ib];
       const pa = rimPoint(A, B), pb = rimPoint(B, A);
@@ -110,19 +151,27 @@
       const nearest = (I, p) => I.ring.reduce((best, q) => (Math.hypot(q[0] - p[0], q[1] - p[1]) < Math.hypot(best[0] - p[0], best[1] - p[1]) ? q : best), I.ring[0]);
       road([nearest(A, pa), [pa[0], pa[1]]], false); road([nearest(B, pb), [pb[0], pb[1]]], false);
       const len = Math.max(1, Math.round(Math.hypot(pb[0] - pa[0], pb[1] - pa[1])));
-      const dx = (pb[0] - pa[0]) / len, dz = (pb[1] - pa[1]) / len, nx = -dz, nz = dx;
+      const dx = (pb[0] - pa[0]) / len, dz = (pb[1] - pa[1]) / len, nx = -dz, nz = dx, tr = [];
+      // the rail loop's links ride t-world's stone-arch viaduct (the deck at the same height); the tram track (t-infra) still runs on it
+      const loop = ISLES.LOOP.some(([p, q]) => (p === ia && q === ib) || (p === ib && q === ia));
+      if (loop) viaduct(pa, pb, len, dx, dz, nx, nz);
       for (let t = 0; t <= len; t++) {
         const x = pa[0] + dx * t, z = pa[1] + dz * t, y = Math.round(pa[2] + (pb[2] - pa[2]) * t / len);
-        for (let v = -2; v <= 2; v++) {
-          const px = Math.round(x + nx * v), pz = Math.round(z + nz * v);
-          const sh = shape(px, pz);
-          if (sh && sh.top >= y - 1 && t > 2 && t < len - 2) continue;   // the island itself carries the road here
-          if (Math.abs(v) === 2) { put(px, y + 1, pz, K.FENCE); put(px, y, pz, K.PLANK); }
-          else { put(px, y, pz, K.PLANK); fill(px, pz, y + 1, y + 4, 0); }
-          if (t % 6 === 0 && Math.abs(v) === 1) for (let k = 1; k <= 12; k++) put(px, y - k, pz, K.LOG); // trestle posts into the void
+        if (!loop) {
+          for (let v = -2; v <= 2; v++) {
+            const px = Math.round(x + nx * v), pz = Math.round(z + nz * v);
+            const sh = shape(px, pz);
+            if (sh && sh.top >= y - 1 && t > 2 && t < len - 2) continue;   // the island itself carries the road here
+            if (Math.abs(v) === 2) { put(px, y + 1, pz, K.FENCE); put(px, y, pz, K.PLANK); }
+            else { put(px, y, pz, K.PLANK); fill(px, pz, y + 1, y + 4, 0); }
+            if (t % 6 === 0 && Math.abs(v) === 1) for (let k = 1; k <= 12; k++) put(px, y - k, pz, K.LOG); // trestle posts into the void
+          }
+          if (t % 12 === 6) { const px = Math.round(x + nx * 2), pz = Math.round(z + nz * 2); put(px, y + 1, pz, K.LAMP0); put(px, y + 2, pz, K.LAMP1); }
         }
-        if (t % 12 === 6) { const px = Math.round(x + nx * 2), pz = Math.round(z + nz * 2); put(px, y + 1, pz, K.LAMP0); put(px, y + 2, pz, K.LAMP1); }
+        const cx = Math.round(x), cz = Math.round(z), sh = shape(cx, cz);
+        tr.push([cx, sh && sh.top >= y - 1 && t > 2 && t < len - 2 ? Math.max(y, sh.top) : y, cz]);
       }
+      if (g.vgen >= 6) bridgeTrack(A, B, ia, ib, tr, dx, dz);
     }
     // ---- the Isle Temple on the centre island: three stepped tiers of slate stone, an octagon door, a beacon
     {
@@ -188,7 +237,11 @@
         const sh = shape(x, z); if (!sh || sh.isle !== I || !free(x, z)) continue;
         if (I.temple && Math.abs(x - I.x) < 12 && Math.abs(z - I.z - 2) < 12) continue;
         if (I.hoodoo && Math.abs(x - I.x) < 9 && Math.abs(z - I.z) < 9) continue;
-        if (rng.chance(0.7)) GEN.TREES.roundTree(w, x, sh.top + 1, z, rng); else put(x, sh.top + 1, z, rng.chance(0.5) ? K.BUSH : K.FERN);
+        if (VR.Plants && VR.Plants.on(g)) {   // vgen 7: the trailer's round trees (voxel crowns, dense leaf balls), tufts and flower clusters
+          const r = rng.next();
+          if (r < 0.45) { const big = rng.chance(0.4), o = big ? 2 : 1; for (const [px, py, pz, st] of VR.Plants.parts(big ? 'vm_tree_round_l' : 'vm_tree_round_s', x - o, sh.top + 1, z - o, 0)) put(px, py, pz, st); }
+          else put(x, sh.top + 1, z, VR.R.S(r < 0.75 ? 'vm_tuft_grass' : 'vm_flower_cluster', { part: 'p000', facing: 0 }));
+        } else if (rng.chance(0.7)) GEN.TREES.roundTree(w, x, sh.top + 1, z, rng); else put(x, sh.top + 1, z, rng.chance(0.5) ? K.BUSH : K.FERN);
       }
       const nC = 1 + rng.int(3);
       for (let k = 0; k < nC; k++) {
@@ -200,9 +253,38 @@
         put(x, y + h, z, K.CRY(c, true)); put(x + 1, y + h - 3, z, K.CRY(c, false)); put(x - 1, y, z, K.CRY(c, false));
       }
     }
-    g._islesOps = chunks;
+    // ---- hanging crystals: the undersides drip crystal stalactites (the trailer's violet and cyan spikes below the isles)
+    for (const I of L) {
+      const nH = Math.round(I.r * 0.35);
+      for (let k = 0; k < nH; k++) {
+        const a = rng.next() * Math.PI * 2, d = rng.next() * I.r * 0.75;
+        const x = Math.round(I.x + Math.cos(a) * d), z = Math.round(I.z + Math.sin(a) * d);
+        const sh = shape(x, z); if (!sh || sh.isle !== I) continue;
+        if (I.hoodoo && Math.abs(x - I.x) < 9 && Math.abs(z - I.z) < 9) continue;
+        const c = CRYS[rng.int(CRYS.length)], len = 4 + rng.int(6), yb = sh.bottom - 1;
+        for (let t = 0; t < len; t++) { put(x, yb - t, z, K.CRYB(c)); if (t < len * 0.5) put(x + 1, yb - t, z, K.CRYB(c)); }
+      }
+    }
+    g._islesOps = chunks; g._isleTracks = tracks;
     return chunks;
   };
+
+  // (vgen ≥ 6) every bridge between two isles is a tram line, from rim to rim (its track is laid by ISLES.build)
+  ISLES.trackLines = function (g, x, z, r) {
+    if (!(g.vgen >= 6) || !HEART.on(g) || Math.abs(x - C.x) > 240 + r || Math.abs(z - C.z) > 240 + r) return null;
+    ISLES.build(g);
+    const out = [];
+    for (const t of g._isleTracks || []) {
+      let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+      for (const q of t.pts) { x0 = Math.min(x0, q[0]); x1 = Math.max(x1, q[0]); z0 = Math.min(z0, q[1]); z1 = Math.max(z1, q[1]); }
+      if (Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1)) > r) continue;
+      const P = new Int32Array(t.pts.length * 3);
+      t.pts.forEach((q, i) => { P[i * 3] = q[0]; P[i * 3 + 1] = q[2]; P[i * 3 + 2] = q[1]; });
+      out.push({ key: t.key, pts: P, tech: true, names: t.names });
+    }
+    return out;
+  };
+  if (VR.RailGen && VR.RailGen.providers) VR.RailGen.providers.push(ISLES.trackLines);
 
   HEART.builders.push(function (g, cx, cz, out) {
     const x0 = cx * 16, z0 = cz * 16;

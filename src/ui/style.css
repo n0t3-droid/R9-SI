@@ -95,6 +95,14 @@ html.einfach #mirrorchip { font-size: 15px; padding: 7px 13px; bottom: 52px; }  
 #compass { position: absolute; right: 12px; top: 198px; width: 180px; text-align: center; font-family: var(--display); font-size: 11px; color: var(--muted); display: none; }
 #vehiclehud { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); display: none; font-family: var(--display); font-size: 13px; letter-spacing: 1px; color: var(--accent); text-align: center; text-shadow: 0 0 8px rgba(58,240,255,.6), 0 1px 2px #000; white-space: nowrap; }
 #vehiclehud small { display: block; margin-top: 4px; font-family: var(--font); font-size: 13px; letter-spacing: .3px; color: #cfe6ff; text-shadow: 0 1px 2px #000; }
+/* 🏗 the construction site's bar (baustelle.js): top centre, over the pause screen too (⏩ can be clicked there) */
+#bauhud { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 30; display: none; pointer-events: none; min-width: 270px; max-width: 72vw; background: rgba(6, 9, 20, 0.66); border: 1px solid var(--line2); border-radius: 12px; padding: 7px 10px 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, .35); }
+#bauhud .bh-row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+#bauhud .bh-t { font-family: var(--display); font-size: 13px; letter-spacing: .5px; color: #ffe2a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+#bauhud .bh-skip { pointer-events: auto; cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: #1d1d1f; background: linear-gradient(#ffd75a, #f0a830); border: 0; border-radius: 8px; padding: 4px 11px; white-space: nowrap; }
+#bauhud .bh-skip:hover { filter: brightness(1.08); }
+#bauhud .bh-bar { margin-top: 6px; height: 6px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+#bauhud .bh-bar i { display: block; height: 100%; width: 0; background: repeating-linear-gradient(135deg, #f2b90f 0 7px, #26282c 7px 14px); transition: width .15s linear; }
 #shot { position: absolute; right: 16px; bottom: 16px; z-index: 40; display: none; background: var(--panel2); border: 1px solid var(--line2); border-radius: 12px; padding: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.55); cursor: pointer; animation: toastIn .3s ease-out; }
 #shot img { display: block; width: min(320px, 60vw); border-radius: 8px; user-select: auto; -webkit-user-select: auto; }
 #shot .note { font-size: 12px; margin-top: 6px; text-align: center; }
@@ -150,6 +158,7 @@ html.einfach #mirrorchip { font-size: 15px; padding: 7px 13px; bottom: 52px; }  
 .tktrade { display: flex; align-items: center; gap: 6px; }
 .tktrade canvas { width: 24px; height: 24px; image-rendering: pixelated; }
 
+#petchip { position: absolute; left: 12px; bottom: 44px; max-width: 46vw; font: 600 13px var(--font); color: #ffe6f4; background: rgba(40, 10, 34, .62); border: 1px solid rgba(255, 150, 210, .45); border-radius: 8px; padding: 4px 10px; text-shadow: 0 1px 2px #000; pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #lockhint { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); padding: 8px 16px; border-radius: 12px; background: rgba(8, 12, 28, 0.72); color: #e8f0ff; font: 600 15px var(--font); letter-spacing: 0.3px; pointer-events: none; display: none; box-shadow: 0 0 0 1px rgba(58, 240, 255, 0.35); z-index: 6; }
 /* piloting in first person: the instrument panel and HUD take over */
 #hud #hotbar, #hud #stats, #hud #xpbar, #hud #xplvl, #hud #crosshair, #hud #itemname, #hud #air { transition: opacity .35s; }
@@ -246,3 +255,8 @@ html.einfach #mirrorchip { font-size: 15px; padding: 7px 13px; bottom: 52px; }  
 #zr .zr-keys { position: absolute; left: 50%; bottom: 1.5vh; transform: translateX(-50%); font-size: 12px; color: rgba(255, 255, 255, .55); letter-spacing: .06em; white-space: nowrap; }
 #zr.m-video .zr-keys, #zr.m-loading .zr-keys, #zr.m-empty .zr-keys, #zr.m-far .zr-keys { display: none; }
 @media (max-width: 640px) { #zr .zr-keys { display: none; } #zr .zr-count { min-width: 0; } #zr .zr-head { flex-wrap: wrap; gap: 6px 10px; } }
+/* ✨ Wunder der Welt (wonders_game.js): the discovery banner in the middle of the screen, the Wunderkompass at the top */
+#wbanner { position: absolute; left: 50%; top: 33%; transform: translate(-50%, -50%) scale(.9); z-index: 40; pointer-events: none; opacity: 0; text-align: center; white-space: nowrap; font-family: var(--display); font-weight: 900; font-size: clamp(24px, 4.2vw, 52px); letter-spacing: 1px; color: #fff4d2; text-shadow: 0 0 22px rgba(255, 200, 110, .95), 0 0 6px rgba(255, 236, 180, .9), 0 4px 0 rgba(20, 12, 40, .55); padding: 14px 34px; border-radius: 22px; background: radial-gradient(ellipse at center, rgba(40, 24, 70, .55), rgba(10, 8, 24, 0) 72%); transition: opacity .45s ease-out, transform .7s cubic-bezier(.2, 1.4, .4, 1); }
+#wbanner.on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+#wbanner.off { opacity: 0; transform: translate(-50%, -50%) scale(1.04); transition: opacity .7s ease-in, transform .7s ease-in; }
+#wcompass { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); display: none; padding: 4px 13px; border-radius: 14px; background: rgba(8, 12, 28, .5); border: 1px solid rgba(255, 220, 150, .35); color: #ffe7a6; font-family: var(--font); font-weight: 700; font-size: 15px; letter-spacing: .3px; text-shadow: 0 1px 3px #000; white-space: nowrap; }

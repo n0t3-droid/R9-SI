@@ -79,7 +79,7 @@
   item('scanner', { cat: 'tech', stack: 1, use: 'scan', name: 'Geo Scanner' });
 
   // spawn eggs for creative
-  VR.MOB_EGGS = ['glimmer_deer', 'moss_boar', 'sky_ray', 'crystal_crab', 'ember_husk', 'void_stalker', 'shard_wisp', 'bloom_sheep', 'hover_drone'];
+  VR.MOB_EGGS = ['glimmer_deer', 'moss_boar', 'sky_ray', 'crystal_crab', 'ember_husk', 'void_stalker', 'shard_wisp', 'bloom_sheep', 'hover_drone', 'glimmer_fox', 'moss_cat', 'crystal_pup'];
   for (const m of VR.MOB_EGGS) item('egg_' + m, { cat: 'spawn', stack: 64, use: 'spawn', mob: m, texKey: 'egg:' + m, name: title(m) + ' Egg' });
 
   // extra texture layers used by the renderer

@@ -14,6 +14,8 @@
   'use strict';
   // whole segments (case-sensitive, as the data writes them)
   const PHRASE = {
+    'Palm Crown': 'Palmenkrone', 'Round Tree Small': 'Rundbaum klein', 'Round Tree Large': 'Rundbaum groß', 'Grass Tuft': 'Grasbüschel',
+    'Flower Cluster': 'Blumenbüschel', 'Blossom Bush': 'Blütenbusch', 'Rice Row Crop': 'Reisreihen-Feld',
     'Three-seater': 'Dreisitzer', 'Chaise': 'Chaiselongue', 'Armchair': 'Sessel', 'Coffee Table': 'Couchtisch',
     'Side Table': 'Beistelltisch', 'Dining Table': 'Esstisch', 'Dining Chair': 'Esszimmerstuhl', 'Bar Stool': 'Barhocker',
     'Desk': 'Schreibtisch', 'Office Chair': 'Bürostuhl', 'TV Lowboard': 'TV-Lowboard', 'Wall TV 65"': 'Wand-TV 65"',
@@ -80,6 +82,8 @@
   };
   // one word or a part of a segment (lower case; "&", numbers and the names in KEEP stay as they are)
   const WORD = {
+    'Palm': 'Palm', 'Crown': 'Krone', 'Round': 'Rund', 'Tree': 'Baum', 'Small': 'klein', 'Large': 'groß', 'Grass': 'Gras', 'Tuft': 'Büschel',
+    'Flower': 'Blumen', 'Cluster': 'Büschel', 'Blossom': 'Blüten', 'Bush': 'Busch', 'Rice': 'Reis', 'Row': 'Reihe', 'Crop': 'Feld',
     // colours and materials
     'black': 'schwarz', 'white': 'weiß', 'grey': 'grau', 'charcoal': 'anthrazit', 'anthracite': 'anthrazit', 'cream': 'creme',
     'taupe': 'taupe', 'sage': 'salbei', 'navy': 'marineblau', 'mustard': 'senf', 'rose': 'rosé', 'olive': 'oliv',

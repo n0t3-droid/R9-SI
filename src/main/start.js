@@ -52,6 +52,11 @@
     const tiles = el('div', 'tiles');
     for (const k of TILES) { const b = el('button', 'tile ' + k); b.type = 'button'; b.dataset.act = 'tile'; b.dataset.tile = k; b.innerHTML = `<span class="pic" aria-hidden="true">${SVG[k]}</span><span class="lbl"></span><span class="sub2"></span>`; tiles.appendChild(b); }
     box.appendChild(tiles);
+    // 🧸 Kindersicher (F5): one tap into a peaceful Zen world, the child-safe settings on
+    const kids = el('button', 'btn kids'); kids.type = 'button'; kids.dataset.act = 'kids';
+    kids.textContent = tx('g.set.kids', null, '🧸 Kindersicher', '🧸 Child-safe');
+    kids.title = tx('g.set.kids.tip', null, 'Zen ohne Gegner und mit automatischem Springen. Ein Tipp auf dem Startbildschirm reicht.', 'Zen without enemies and with auto-jump. One tap on the start screen is enough.');
+    box.appendChild(kids);
     const sub = el('div', 'sub'); const w = el('button', 'lnk'); w.type = 'button'; w.dataset.act = 'worlds'; const n = el('button', 'lnk'); n.type = 'button'; n.dataset.act = 'newworld'; sub.appendChild(w); sub.appendChild(el('span', 'dot', '·')).setAttribute('aria-hidden', 'true'); sub.appendChild(n); box.appendChild(sub);
     const foot = el('div', 'below');
     foot.appendChild(el('div', 'studionote', '')).id = 'studionote';
@@ -90,6 +95,7 @@
     $('#title [data-act="worlds"]').textContent = tx('start.worlds', null, 'Andere Welt', 'Another world');
     $('#title [data-act="newworld"]').textContent = tx('start.newWorld', null, '＋ Neue Welt', '＋ New world');
     $('#title [data-act="settings"]').textContent = tx('start.settings', null, '⚙ Einstellungen', '⚙ Settings');
+    { const kb = $('#title [data-act="kids"]'); if (kb) { kb.textContent = tx('g.set.kids', null, '🧸 Kindersicher', '🧸 Child-safe'); kb.title = tx('g.set.kids.tip', null, 'Zen ohne Gegner und mit automatischem Springen. Ein Tipp auf dem Startbildschirm reicht.', 'Zen without enemies and with auto-jump. One tap on the start screen is enough.'); } }
     const aa = $('#title [data-act="scale"]'); aa.title = tx('start.scaleT', null, 'Große Schrift', 'Large text'); aa.setAttribute('aria-label', aa.title); aa.setAttribute('aria-pressed', String(p.scale >= 1.3)); aa.classList.toggle('on', p.scale >= 1.3);
     // (VR.Legal's own words when it has them — the overlay and its buttons say the same)
     for (const b of document.querySelectorAll('#ui [data-act="legal"]')) { const LG = VR.Legal; b.hidden = !legalOK(); b.textContent = LG && typeof LG.label === 'function' ? LG.label() : tx('start.legal', null, '📜 Impressum & Datenschutz', '📜 Legal notice & privacy'); if (LG && typeof LG.tip === 'function') b.title = LG.tip(); }
@@ -122,6 +128,16 @@
     const ws = await ST.listWorlds(), base = tx('start.myWorld', null, 'Meine Welt', 'My World');
     const n = ws.filter(w => String(w.name || '').startsWith(base)).length;
     g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
+    return true;
+  };
+  // 🧸 Kindersicher: a peaceful Zen world (no hostile creatures) — the last one of that kind, or a new "Kinderwelt"
+  ST.kids = async function () {
+    const g = game(); if (!g || g.state !== 'title') return false;
+    g.settings.kids = true; g.saveSettings();
+    const ws = await ST.listWorlds();
+    const zen = ws.find(w => w && w.mode === 'zen' && w.difficulty === 'peaceful');
+    if (zen) { g.loadWorld(zen); return true; }
+    g.createWorld({ name: tx('start.kidsWorld', null, 'Kinderwelt', 'Kids world'), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
     return true;
   };
   ST.bauen = async function () {
@@ -194,6 +210,7 @@
           <button type="button" class="btn" data-act="bauenlive" data-t="g.pause.bauen" data-tt="g.pause.bauenTip"></button>
           <button type="button" class="btn" data-act="meins" data-t="g.pause.meins"></button>
           <button type="button" class="btn" data-act="zeitraffer" data-t="g.pause.zeit" data-tt="g.pause.zeitTip"></button>
+          <button type="button" class="btn" data-act="pfeifen" data-t="g.pet.pfeifen" data-tt="g.pet.pfeifenTip"></button>
           <div class="row gap"><button type="button" class="btn" data-act="gohome" style="flex:1" data-t="g.pause.home"></button><button type="button" class="btn" data-act="sethome" style="flex:1" data-t="g.pause.spawn" data-tt="g.pause.spawnTip"></button></div>
         </div>
         <div class="pgrp pside">
@@ -247,10 +264,12 @@
     switch (a) {
       case 'tile': { const k = b && b.dataset.tile; if (k === 'play') ST.play(); else if (k === 'bauen') ST.bauen(); else if (k === 'erschaffen') ST.erschaffen(); else if (k === 'meins') ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true; }
       case 'worlds': ST.worlds(ui); return true;
+      case 'kids': ST.kids(); return true;
       case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
       case 'zeitraffer': if (VR.Zeit) VR.Zeit.open(ui.screen === 'pause' ? 'pause' : null); return true;
+      case 'pfeifen': { const g = game(); ui.resume(); if (g && g.companions) g.companions.call(); else ui.hint(t('g.pet.none'), 4200); return true; }
       case 'legal': if (legalOK()) VR.Legal.open('impressum'); return true;
       case 'meinsback': ui.show(ST.meinsFrom === 'pause' && game() && game().state === 'play' ? 'pause' : 'title'); return true;
       case 'pro': if (VR.UIPrefs) VR.UIPrefs.set({ pro: b.dataset.pro === '1' }); return true;
@@ -292,11 +311,13 @@
       __game: true,
       view: (id) => studio('#ding/' + id),
       edit: (id) => studio('#ding/' + id + '/edit'),
-      canSet: (id) => /^[bmh]:/.test(id),
+      canSet: (id) => /^[bmhfp]:/.test(id) || (/^[kg]:/.test(id) && !!(VR.Bauhand && VR.Bauhand.pieceOf && VR.Bauhand.pieceOf(id))),   // (W2: everything but a place goes into the 🖐 Bauhand; a project as its Bauteil)
       canEdit: (id) => !/^p:/.test(id) || prefs().pro,
       set: (id) => {
         const g = game(), d = Dg.parse(id); if (!g || !d) return false;
         const item = d.kind === 'h' ? 'blueprint_' + d.key : d.key;
+        // (W2) a thing (not a block) goes into the 🖐 Bauhand: the ghost, a click places it
+        if (g.state === 'play' && g.player && ST.handAllowed(g.meta) && d.kind !== 'b' && VR.Bauhand) { g.ui.resume(); return VR.Bauhand.hold(id, { from: 'card' }); }
         if (g.state === 'play' && g.player && ST.handAllowed(g.meta) && VR.itemDef(item)) {
           const inv = g.player.inv; inv.slots[inv.sel] = { id: item, n: VR.maxStack(item) }; inv.changed = true; g.ui.updateHUD(true);
           g.ui.resume(); g.ui.hint(tx('hand.toast', { n: VR.itemName(item) }, '{n} — Rechtsklick setzt es', '{n} — right click places it'), 2600);
@@ -351,11 +372,17 @@
   // a Ding set from the start screen (📍 Setzen on a card) is in your hand when the world opens — your own world,
   // Creative or Zen (never a free item in Survival); r9si.hand is read once
   ST.handAllowed = (meta) => !!(meta && !meta.guest && (meta.mode === 'creative' || meta.mode === 'zen'));
+  // (B1: ✋ In die Hand from the Studio over the game puts it into the selected slot right away — liveloop.js)
+  ST.handIn = (g) => handIn(g);
   function handIn(g) {
     let h = null; try { h = JSON.parse(localStorage.getItem('r9si.hand') || 'null'); } catch (e) { h = null; }
     if (!h) return;
     try { localStorage.removeItem('r9si.hand'); } catch (e) { /* */ }
     const d = VR.Ding && VR.Ding.parse(h.ding); if (!d || !ST.handAllowed(g.meta) || (h.world && h.world !== g.meta.id)) return;
+    // (W2) ✨ „An meinem Platz" from the start screen with no world yet: it is planned now, in front of the spawn point
+    if (h.spot && VR.Wizard && VR.Wizard.spotHere) { VR.Wizard.spotHere(h.ding, h.name); return; }
+    // a thing (not a block) is in the 🖐 Bauhand: its ghost, one click places it
+    if (d.kind !== 'b' && VR.Bauhand && VR.Bauhand.hold(h.ding, { name: h.name, from: h.from || 'card' })) return;
     const id = d.kind === 'h' ? 'blueprint_' + d.key : d.kind === 'b' || d.kind === 'm' ? d.key : null;
     if (!id || !VR.itemDef(id) || !g.player) return;
     const inv = g.player.inv; inv.slots[inv.sel] = { id, n: VR.maxStack(id) }; inv.changed = true;
@@ -402,7 +429,7 @@
   // the cheat-like chat commands are a Profi thing (Einfach: the chat stays, /give, /time, /tp … get the note). The
   // friendly ones work in Einfach too: the language, the way home, the block look, the weather and 🏭 /bau — they change
   // nothing a world's rules forbid (survival without cheats still refuses /bau and /wetter after this gate)
-  ST.einfachCmd = (text) => /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call)(\s|$)/i.test(text);
+  ST.einfachCmd = (text) => /^\/(lang|sprache|home|spawn|sethome|look|wetter|weather|bau|forge|players|list|tphost|call|pfeifen)(\s|$)/i.test(text);
   if (VR.Game) {
     const origChat = VR.Game.prototype.chat;
     VR.Game.prototype.chat = function (text) {

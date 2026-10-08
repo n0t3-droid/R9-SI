@@ -68,6 +68,7 @@ const check = (ok, what) => { console.log((ok ? 'OK   ' : 'FAIL ') + what); if (
   check(types[0] === 'init' && nw0.sent[0].seed === 99 && types.indexOf('custom') > 0 && custom.custom.models.x === 1, 'the replacement is told the world first: init with the seed, then the latest designs (' + types.join(', ') + ')');
   check(types.includes('style') && types.includes('look') && types.includes('lodinit') && nw0.sent.find(m => m.type === 'look').mode === 'classic', 'and the style, the look and the horizon colours');
   check(nw0.inflight === 0 && nw1.inflight === 0 && pool.busy === 0, 'nothing counts as in flight on the new workers');
+  check(pool.stuckMs > stale && pool.stuckMs <= 300000, 'the patience doubles after a replacement, up to five minutes (' + pool.stuckMs + ' ms)');
   // the new worker is used for new work
   pool.submit({ type: 'mesh', key: 5 }, null, () => {});
   pool.pump();
@@ -82,7 +83,7 @@ const check = (ok, what) => { console.log((ok ? 'OK   ' : 'FAIL ') + what); if (
   // a direct job (the textures at boot) on a worker that dies is answered too — the boot never waits forever
   let texAnswer = null;
   pool.direct(0, { type: 'textures', bevel: 1 }, null, (m) => { texAnswer = m; });
-  for (const st of pool.started.values()) st.t0 = performance.now() - stale - 1;
+  for (const st of pool.started.values()) st.t0 = performance.now() - pool.stuckMs - 1;   // (the patience doubled after the first replacement)
   pool.pump();
   check(texAnswer && texAnswer.type === 'error' && pool.workers[0].alive && pool.workers[0] !== nw0, 'a direct job on a worker that died hears {type: error}; the worker is replaced');
 }

@@ -15,7 +15,7 @@
     ['raid', 'turret'], ['kill', 'iron_sword'], ['deep', 'deepstone'], ['sky', 'white_wool'], ['night', 'lantern'], ['sleep', 'red_bed'], ['village', 'vx_lamppost'],
     ['villager', 'vx_bed_red'], ['quest', 'emerald'], ['home', 'vx_bed_blue'], ['festival', 'lantern'], ['autopilot', 'shuttle_beacon'],
   ];
-  const CATS = { milestones: 'g.codex.cat.milestones', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift' };
+  const CATS = { milestones: 'g.codex.cat.milestones', wonders: 'g.codex.cat.wonders', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift', inventions: 'g.codex.cat.inventions' };
   const INV_TRIGGERS = { oak_log: 'log', birch_log: 'log', spruce_log: 'log', jungle_log: 'log', acacia_log: 'log', dark_oak_log: 'log', cherry_log: 'log', mangrove_log: 'log', cobblestone: 'stone', iron_ingot: 'iron', diamond: 'diamond', crystal_shard_violet: 'crystal', crystal_shard_azure: 'crystal', crystal_shard_verdant: 'crystal', crystal_shard_rose: 'crystal', crystal_shard_amber: 'crystal', aether_bucket: 'aether', star_core: 'star_core', laser_blaster: 'blaster', crafting_table: 'table', torch: 'torch', furnace: 'furnace' };
 
   class Codex {
@@ -25,21 +25,28 @@
       this.found = Object.assign({}, this.meta.codex || {});
       this.entries = [];
       this.byId = new Map();
-      // an entry: {id, catKey, icon, text()} — text() gives {name, desc, hint} in the language of the moment
-      const add = (id, catKey, icon, text) => { const e = { id, catKey, icon, text }; this.entries.push(e); this.byId.set(id, e); };
+      // an entry: {id, catKey, icon, text()} — text() gives {name, desc, hint} in the language of the moment; live() (the
+      // 💡 inventions) says whether it is found: they belong to the profile, not to the world, so they are not saved here
+      const add = (id, catKey, icon, text, live) => { const e = { id, catKey, icon, text, live }; this.entries.push(e); this.byId.set(id, e); };
       for (const [id, ic] of MILESTONES) add('m:' + id, 'milestones', ic, () => { const L = TL('g.codex.m.' + id); return { name: L[0] || id, desc: L[1] || '', hint: L[2] || '' }; });
+      // ✨ the wonders of the world (wonders.js): found by standing at a wonder's glowing heart
+      if (VR.Wonders) for (const t of VR.Wonders.TYPES) add('w:' + t.id, 'wonders', null, () => { const L = TL('g.codex.w.' + t.id); return { name: L[0] || t.de, desc: L[1] || '', hint: L[2] || '' }; });
       for (const k in VR.MOBS || {}) { if (VR.MOBS[k] === VR.MOBS.glimmer_deer && k !== 'glimmer_deer') continue; add('c:' + k, 'creatures', 'egg_' + k, () => { const name = T('g.mob.' + k, null, title(k)); return { name, desc: T('g.codex.metCreature', { name }), hint: T('g.codex.creatureHint') }; }); }
       for (const b of VR.BIOMES) {
         const catKey = b.realm ? 'realm' : b.cave ? 'caves' : b.forge ? 'forge' : b.hollow ? 'hollow' : b.drift ? 'drift' : 'overworld';
         add('b:' + b.key, catKey, null, () => { const name = T('g.biome.' + b.key, null, b.name); return { name, desc: T('g.codex.foundBiome', { name }), hint: T(catKey === 'caves' ? 'g.codex.biomeHintCave' : 'g.codex.biomeHint') }; });
       }
+      // 💡 Erfindungen (src/main/inventions.js): one entry per invention, found when the profile has made it
+      const IV = VR.Inventions;
+      if (IV) for (const c of IV.LIST) add('i:' + c.k, 'inventions', c.id, () => { const x = IV.text(c.k); return { name: x.name, desc: x.line, hint: T('g.codex.inventHint') }; }, () => IV.has(c.k));
       this.t = 0; this.nightStart = null;
       this.seen = new Set();
     }
-    unlock(id) {
+    unlock(id, quiet) {
       if (this.found[id]) return false;
       const e = this.byId.get(id); if (!e) return false;
       this.found[id] = Date.now();
+      if (quiet) return true;
       const g = this.g;
       if (g.settings.toasts !== false && g.ui) g.ui.toast(T(e.catKey === 'milestones' ? 'g.codex.toastMilestone' : 'g.codex.toastFound'), e.text().name, e.icon && VR.itemDef(e.icon) ? e.icon : null);
       else if (g.audio) g.audio.play('achievement');
@@ -79,8 +86,8 @@
     }
     // the entries with their texts in the language of the moment: {id, cat, name, desc, hint, icon, found}
     list() {
-      const order = ['milestones', 'creatures', 'realm', 'overworld', 'caves', 'forge', 'hollow', 'drift'];
-      return this.entries.map(e => Object.assign({ id: e.id, catKey: e.catKey, cat: T(CATS[e.catKey]), icon: e.icon, found: !!this.found[e.id] }, e.text())).sort((a, b) => order.indexOf(a.catKey) - order.indexOf(b.catKey));
+      const order = ['milestones', 'wonders', 'creatures', 'realm', 'overworld', 'caves', 'forge', 'hollow', 'drift', 'inventions'];
+      return this.entries.map(e => Object.assign({ id: e.id, catKey: e.catKey, cat: T(CATS[e.catKey]), icon: e.icon, found: e.live ? !!e.live() : !!this.found[e.id] }, e.text())).sort((a, b) => order.indexOf(a.catKey) - order.indexOf(b.catKey));
     }
     toJSON() { return this.found; }
   }

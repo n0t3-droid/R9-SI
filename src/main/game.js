@@ -8,17 +8,20 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false },
-    low: { renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true },
-    balanced: { renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true },
-    high: { renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true },
-    ultra: { renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true },
+    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant' },
+    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site' },
+    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site' },
+    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
+    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
   // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
   // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 72, sens: 1, invertY: false, viewBob: true, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 75, sens: 1, invertY: false, viewBob: true, airLife: true, turnInertia: false, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
+  const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
+  const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -35,7 +38,10 @@
     loadSettings() {
       let s = {};
       try { s = JSON.parse(localStorage.getItem('r9si.settings') || '{}'); } catch (e) { s = {}; }
-      const out = Object.assign({}, DEFAULTS, s);
+      // the registry's defaults (F5 · Steuerung & Einstellungen) fill the keys the older table does not have
+      const out = Object.assign({}, VR.Settings ? VR.Settings.defaults() : {}, DEFAULTS, s);
+      // 🏗 Bauen (Sofort / Baustelle): settings saved before it follow their preset (Very Low builds at once)
+      if (s.bau === undefined && s.preset) out.bau = (PRESETS[s.preset] || PRESETS.balanced).bau;
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -45,27 +51,75 @@
       return out;
     }
     saveSettings() { try { localStorage.setItem('r9si.settings', JSON.stringify(this.settings)); } catch (e) { /* ignore */ } }
-    applyPreset(p) { this.settings.preset = p; Object.assign(this.settings, PRESETS[p]); this.applySettings('*'); this.saveSettings(); }
+    applyPreset(p) {
+      const keep = this.settings.bauSet ? this.settings.bau : null;   // (a „Bauen" chosen in the settings stays)
+      this.settings.preset = p; Object.assign(this.settings, PRESETS[p]); if (keep) this.settings.bau = keep;
+      this.applySettings('*'); this.saveSettings();
+    }
+      // F7 · water: bubbles from the mouth while diving, mist at the foot of the falls near the player (the falling
+    // columns are looked up every 2 s), a splash when the eye crosses the surface (its ripple comes from crossT)
+    waterFx(dt, p, eye, underwater, inLava, E) {
+      const R = VR.R, F = VR.F, w = this.world;
+      if (!this.particles || !w) return;
+      if (underwater && !inLava && Math.random() < dt * 3.5) {
+        const r = () => Math.random() - 0.5;
+        this.particles.spawn(eye[0] + r() * 0.3, eye[1] - 0.3, eye[2] + r() * 0.3, r() * 0.2, 0.7 + Math.random() * 0.5, r() * 0.2, { life: 1.8, size: 0.05 + Math.random() * 0.04, grav: -1.1, drag: 0.4, col: [0.86, 0.95, 1], emis: 0.6, collide: false });
+      }
+      this.waterScan = (this.waterScan || 0) - dt;
+      if (this.waterScan <= 0) {
+        this.waterScan = 2;
+        const falls = [], px = Math.floor(p.pos[0]), pz = Math.floor(p.pos[2]);
+        for (let dz = -24; dz <= 24; dz += 2) for (let dx = -24; dx <= 24; dx += 2) {
+          const x = px + dx, z = pz + dz;
+          if (!w.isLoaded(x, z)) continue;
+          const y = w.topAt(x, z), s = w.getBlock(x, y, z);
+          if (!s || !(R.T.flags[s] & F.WATER) || R.types[R.T.type[s]].get(s, 'level') < 8) continue;   // falling water only
+          const b = w.getBlock(x, y - 1, z);
+          if (!(R.T.flags[b] & (F.OPAQUE | F.WATER))) falls.push([x + 0.5, y - 1, z + 0.5]);
+        }
+        this.waterFalls = falls;
+      }
+      const falls = this.waterFalls || [];
+      for (const f of falls) {
+        if (Math.random() > dt * 5 / Math.max(1, falls.length)) continue;
+        const r = () => Math.random() - 0.5;
+        this.particles.spawn(f[0] + r() * 1.2, f[1] + 0.2, f[2] + r() * 1.2, r() * 0.8, 0.4 + Math.random() * 0.6, r() * 0.8, { life: 2.4, size: 0.6 + Math.random() * 0.4, grav: -0.25, drag: 1.4, col: [0.93, 0.96, 1], emis: 0.12, collide: false });
+      }
+    }
+    // F7: a swimmer's eye rides the swell (the surface's own waves, water_wave.js); nothing when the feet are dry
+    swimBob(p, underwater, E) {
+      const R = VR.R, F = VR.F, w = this.world;
+      if (underwater || !w || !E.windDir) return 0;
+      const feet = w.getBlock(Math.floor(p.pos[0]), Math.floor(p.pos[1] + 0.2), Math.floor(p.pos[2]));
+      if (!(R.T.flags[feet] & F.WATER)) return 0;
+      return VR.WaterWave.sample(p.pos[0], p.pos[2], E.time, E.windDir[0], E.windDir[1], VR.WaterWave.ampK(4, E.wind)).h * 0.7;
+    }
+
     applySettings(key) {
       const S = this.settings, r = this.renderer;
-      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround'].includes(key)) S.preset = 'custom';
+      if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
+      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier'].includes(key)) S.preset = 'custom';
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
       if (S.tsr === undefined) S.tsr = true;
+      // F6: the item shadows and the lamp halos (Very Low: none, so it is never slower than before)
+      if (S.dropShadow === undefined) S.dropShadow = PRESETS[S.preset] ? PRESETS[S.preset].dropShadow : 1;
+      if (S.lampGlow === undefined) S.lampGlow = PRESETS[S.preset] ? PRESETS[S.preset].lampGlow : 1;
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
-      if (r) r.setQuality({ scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite });
+      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water });
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
       if (this.world) { this.world.renderDist = Math.max(5, S.renderDist - (this.aq && this.aq.over && this.aq.over.rd || 0)); if (key === 'fancyLeaves' || key === '*') { this.world.fancyLeaves = S.fancyLeaves; this.remeshAll(); } }
-      if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; }
+      if (this.input) { this.input.sensitivity = 0.0024 * S.sens; this.input.invertY = S.invertY; this.input.raw = S.rawInput !== false; this.input.smooth = !!S.mouseSmooth; }
       if (this.audio) this.audio.setVolumes({ master: S.volMaster, sfx: S.volSfx, music: S.volMusic, ambient: S.volAmbient });
       // atmosphere switches: Wetter (the sky's weather, its sound and bolts) and Natur-Klänge (birds, crickets, water, wind)
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
       if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
+      if (this.airLife) this.airLife.setOn(S.airLife !== false, VR.AirLife.tierOf(S));
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
       if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
       this.applyLook();
@@ -97,6 +151,7 @@
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
+        if (VR.LiveLoop) VR.LiveLoop.updateLum(this);   // the recolour table follows the textures of the look
         this.texFromCache = fromCache; this.texMs = Math.round(performance.now() - t0);
         if (VR.LOOK.rim !== rim) { this.reloadTextures(); return; }   // switched again while these were built: once more
         if (this.icons) { this.icons.alb = tex.albedo[0]; this.icons.cache.clear(); this.icons.faceCache.clear(); }
@@ -156,6 +211,7 @@
       if (this.pool) this.pool.broadcast({ type: 'custom', custom: VR.CUSTOM });
       if (after !== before) { if (this.icons) this.icons.cache.clear(); this.remeshAll(); }
       if (this.gadgets && this.gadgets.blue) this.gadgets.blue.reset();
+      if (this.mp && this.mp.isHost && this.mp.sendPack) this.mp.sendPack(null);   // friends see the new model looks too (B1)
       const n = VR.Custom.count();
       if (this.ui && this.ui.toast && this.state === 'play') this.ui.toast('R9 Studio', T('g.studio.designs', { h: n.houses, m: n.models }));
       if (this.ui && this.ui.studioNote) this.ui.studioNote();
@@ -184,6 +240,7 @@
       this.env.wx.onThunder = (d) => { if (this.ambience) this.ambience.thunder(d); };
       this.store = new VR.Store();
       this.ui = new VR.UI(this);
+      if (VR.Touch) VR.Touch.mount(this);   // the touch layer (F5): shown only on a touch screen, in a game with no menu
       this.mp = VR.MP ? new VR.MP(this) : null;
       if (this.mp) this.mp.init();
       this.ui.loading(T('g.load.textures'), 0.05);
@@ -199,6 +256,8 @@
         if (e.key && VR.Edits && this.meta && !this.meta.guest && e.key === VR.Edits.listKey(this.meta.id) && this.gadgets && this.gadgets.blue) this.gadgets.blue.editT = 0;
         // the Studio changed this world's style (another tab of the same page)
         if (e.key && VR.WorldStyle && this.meta && !this.meta.guest && e.key === VR.WorldStyle.key(this.meta.id)) this.applyStyle();
+        // B1 „🎨 Aussehen": a block's look or a variant changed in the Studio (also the one over the game) — live, no reload
+        if (VR.LiveLoop) VR.LiveLoop.onStorage(this, e);
       });
       const n = VR.poolSize(navigator.hardwareConcurrency || 4, this.settings.preset);
       const src = document.getElementById('worker-src').textContent;
@@ -208,6 +267,8 @@
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: {}, custom: VR.CUSTOM });
       // the block look before the first texture and the first mesh
       if (VR.setLook) { VR.setLook(this.lookMode()); this.lookSent = VR.LOOK.mode; this.pool.broadcast({ type: 'look', mode: VR.LOOK.mode }); }
+      // the looks and variants of this browser (B1, looks.js): here and in every worker before the first mesh
+      if (VR.LiveLoop) VR.LiveLoop.boot(this);
       // the block textures: the last start with this build and look kept them (tex_cache.js; a read slower than 500 ms is
       // a miss), else they are forged in a worker and kept for the next start. A worker that fails (out of memory on a very
       // small machine) is tried once more on another, then the game says so instead of waiting forever behind the loading screen
@@ -226,9 +287,12 @@
       this.tex = tex; this.texRim = rim0;
       tex.noise = tex.noise;
       this.renderer.init(tex);
+      if (VR.LiveLoop) VR.LiveLoop.updateLum(this);
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
+      this.airLife = new VR.AirLife(this);   // the living air (F3 · Da-Sein): caps per tier, see airlife.js
       this.trails = VR.Trails ? new VR.Trails(this) : null;
+      this.vents = VR.Vents ? new VR.Vents(this) : null;
       this.director = VR.Director ? new VR.Director(this) : null;
       this.cockpit = VR.Cockpit ? new VR.Cockpit(this) : null;
       this.horizon = VR.Horizon ? new VR.Horizon(this) : null;
@@ -276,12 +340,15 @@
       if (this.traffic) this.traffic.t = 2.5;
     }
     teardownWorld() {
+      if (VR.Baustelle && VR.Baustelle.reset) VR.Baustelle.reset(this.gadgets && this.gadgets.blue);   // (a construction site's bar and meshes go with the world)
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
       this.entities = null; this.player = null; this.sim = null; this.gadgets = null; this.vehicleCam = null; this.raidActive = false; this.flight = null; this.flightWind = 0;
+      if (this.wonders) { this.wonders.destroy(); this.wonders = null; }
+      if (this.companions) { this.companions.destroy(); this.companions = null; }
       if (this.traffic) { this.traffic.destroy(); this.traffic = null; }
       if (this.starships) { this.starships.destroy(); this.starships = null; }
-      if (this.villages) { this.villages.destroy(); this.villages = null; }
+      if (this.villages) { this.villages.destroy(); this.villages = null; } if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(null);
       if (this.trams) { this.trams.destroy(); this.trams = null; }
       if (this.horizon) this.horizon.reset();
       if (this.furnaces) this.furnaces.clear();
@@ -292,7 +359,7 @@
     async createWorld(o) {
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
-      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: 5 }; // vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells
+      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 6 }; // vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants; o.vgen picks it until the potato cost is measured) · 6: the citadel viaducts carry a track and trams (t-infra)
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
     }
@@ -307,6 +374,8 @@
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
       this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style });
+      // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
+      if (VR.LiveLoop) VR.LiveLoop.openWorld(this, meta);
       const dim = meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld');
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
@@ -330,16 +399,19 @@
       this.landOnEntry(entry, !meta.player);
       this.sim = VR.Sim ? new VR.Sim(this) : null;
       this.entities = VR.Entities ? new VR.Entities(this) : null;
+      this.companions = VR.Companions && this.entities ? new VR.Companions(this, meta) : null;   // 🐾 yours, from the saved world
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
       this.mirror = VR.MirrorBuild ? new VR.MirrorBuild(this) : null;   // 🪞 Spiegel-Bauen (off in every new session)
+      if (this.wonders) this.wonders.destroy();
+      this.wonders = VR.WondersGame ? new VR.WondersGame(this, meta) : null;   // ✨ wonders_game.js
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
       this.starships = VR.Starships ? new VR.Starships(this) : null;
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
-      this.villages = VR.Villages ? new VR.Villages(this, meta) : null;
+      this.villages = VR.Villages ? new VR.Villages(this, meta) : null; if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(this);
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
       this.world.listeners.push(this);
@@ -404,9 +476,12 @@
       if (!this.studioOpen) return;
       const fr = document.getElementById('studioFrame');
       if (fr) { fr.classList.remove('on'); setTimeout(() => { if (!this.studioOpen && fr) fr.src = 'about:blank'; }, 60); }
+      // the keys belong to the game again: the Studio's frame kept the focus, so B, Esc and the hotbar did nothing until a click
+      if (fr && document.activeElement === fr) { try { fr.blur(); window.focus(); } catch (e) { /* no focus here */ } }
       this.studioOpen = false;
       this.last = performance.now();
-      // what the Studio did, in the world now
+      // what the Studio did, in the world now (a look missed by the storage event too)
+      if (VR.LiveLoop) VR.LiveLoop.apply(this);
       const b = this.gadgets && this.gadgets.blue;
       if (b) { b.loadPlans(); for (let i = 0; i < 10; i++) { b.editT = 0; b.tickEdits(0); } b.planT = 0; }
       this.applyStyle(true);
@@ -518,16 +593,19 @@
       this.giveKit(meta);
       this.sim = VR.Sim ? new VR.Sim(this) : null;
       this.entities = VR.Entities ? new VR.Entities(this) : null;
+      this.companions = VR.Companions && this.entities ? new VR.Companions(this, null) : null;   // a guest: the host's world keeps the host's companions
       this.codex = VR.Codex ? new VR.Codex(this, meta) : { onCraft() {}, list() { return []; }, update() {} };
       if (VR.installCraftingHooks) VR.installCraftingHooks(this);
       this.gadgets = VR.Gadgets ? new VR.Gadgets(this) : null;
       this.mirror = VR.MirrorBuild ? new VR.MirrorBuild(this) : null;   // 🪞 Spiegel-Bauen (off in every new session)
+      if (this.wonders) this.wonders.destroy();
+      this.wonders = VR.WondersGame ? new VR.WondersGame(this, meta) : null;   // ✨ wonders_game.js
       this.map = VR.MapView ? (this.map || new VR.MapView(this)) : null;
       if (this.traffic) this.traffic.destroy();
       if (this.starships) this.starships.destroy();
       this.starships = VR.Starships ? new VR.Starships(this) : null;
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
-      this.villages = VR.Villages ? new VR.Villages(this, meta) : null;
+      this.villages = VR.Villages ? new VR.Villages(this, meta) : null; if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(this);
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
       this.world.listeners.push(this);
@@ -538,6 +616,7 @@
     leaveGuestWorld(msg) {
       if (this.mp) this.mp.clearSession();
       this.hostLook = null; this.applyLook();   // back to my own block look
+      if (VR.LiveLoop) VR.LiveLoop.endSession(this);   // and my own looks and variants (B1)
       try { if (this.starships) this.starships.shutdown(); if (this.gadgets) this.gadgets.shutdown(); } catch (e) { console.warn(e); }
       this.input.releaseLock();
       this.startTitle();
@@ -563,9 +642,12 @@
       m.player = this.player.toJSON(); m.time = this.env.ticks; m.day = this.env.day; m.lastPlayed = Date.now(); m.dim = this.dim;
       m.zenFreezeTime = this.zenFreezeTime; m.zenFreezeWeather = this.zenFreezeWeather;
       if (this.codex && this.codex.toJSON) m.codex = this.codex.toJSON();
+      if (VR.LiveLoop) VR.LiveLoop.metaVars(this, m);   // the variants its saved columns contain (B1)
       if (this.gadgets) this.gadgets.beforeSave(m);
       if (this.starships) this.starships.beforeSave(m);
+      if (this.companions) this.companions.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
+      if (this.wonders) this.wonders.beforeSave(m);
       return this.store.saveWorld(m);
     }
     async quitToTitle() {
@@ -598,14 +680,78 @@
       this.fpsAcc = (this.fpsAcc || 0) + dt; this.fpsN = (this.fpsN || 0) + 1;
       if (this.fpsAcc > 0.5) { this.fps = this.fpsN / this.fpsAcc; this.fpsAcc = 0; this.fpsN = 0; }
       try {
+        // F5 · Steuerung: menus and the chat take the pad as focus, not as game keys; the pad and the touch layer are
+        // read once per frame, then the menu focus and the touch buttons follow
+        this.input.menuOpen = this.state !== 'play' || !!(this.ui && (this.ui.screen || this.ui.typing || this.ui.blocking)) || !!this.studioOpen;
+        this.input.beginFrame(dt);
+        if (VR.PadNav) VR.PadNav.frame(this);
+        if (VR.Touch) VR.Touch.frame(this);
         if (this.cockpit && this.state !== 'play') this.cockpit.updateHud(0, true);
         if (this.state === 'title') this.titleFrame(dt);
         else if (this.state === 'loading') this.loadingFrame(dt);
         else if (this.state === 'play') { if (!this.studioOpen) this.playFrame(dt); }
         if (this.mp) this.mp.update(dt);
+        if (this.bench) this.benchTick();
+        this.capturePreview();   // the settings' live preview: the frame just drawn, if one was asked for
       } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine(T('g.chat.error', { msg: e.message }), '#ff8a8a'); } }
       this.input.endFrame();
       this.jsMs += (performance.now() - tj0 - this.jsMs) * 0.08;
+    }
+    // ---------------------------------------------------------------- F5 · Steuerung & Einstellungen
+    // the settings' preview thumbnail: the frame two frames after a graphics change (the new setting has taken effect)
+    requestPreview() { this.previewAt = this.frame + 2; }
+    capturePreview() {
+      if (!this.previewAt || this.frame < this.previewAt) return;
+      this.previewAt = 0;
+      const c = this.ui && this.ui.previewCtx;
+      if (!c || !this.canvas || !this.canvas.width) return;
+      try { c.drawImage(this.canvas, 0, 0, c.canvas.width, c.canvas.height); } catch (e) { /* no picture this frame */ }
+    }
+    // ⚡ Automatik: 3 s of frame times on the scene the player stands in (the first half second is warm-up), then the
+    // table in bench.js picks the preset and the view distance for 60 fps (30 on a weak machine)
+    benchStart() {
+      if (this.bench) return false;
+      this.bench = { t: 0, last: 0, dts: [], was: { preset: this.settings.preset, renderDist: this.settings.renderDist } };
+      if (this.ui && this.ui.benchBegin) this.ui.benchBegin();
+      return true;
+    }
+    // wall-clock time between two frames (the loop's dt is clamped for the physics; a slow machine must still finish in 3 s)
+    benchTick() {
+      const b = this.bench; if (!b) return;
+      const now = performance.now();
+      if (b.last) { const d = now - b.last; b.t += d; if (b.t > 500 && d > 0) b.dts.push(d); }
+      b.last = now;
+      if (b.t >= 3000) this.benchFinish();
+    }
+    benchFinish() {
+      const b = this.bench; if (!b || !VR.Bench) return null;
+      this.bench = null;
+      const S = this.settings, sum = VR.Bench.summarize(b.dts);
+      const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist), target: 60 });
+      if (d.action !== 'none') {
+        Object.assign(S, PRESETS[d.preset]); S.preset = d.preset; S.renderDist = d.renderDist;
+        this.applySettings('*'); this.saveSettings();
+      }
+      this.benchResult = Object.assign({}, d, { n: sum.n, median: sum.median, p90: sum.p90, measured: sum.fps, before: b.was, when: Date.now() });
+      if (this.ui && this.ui.benchDone) this.ui.benchDone(this.benchResult);
+      return this.benchResult;
+    }
+    // the quality governor made visible: the ⚙ line lists the steps it has taken (GPU ladder, then CPU ladder)
+    aqWhat() {
+      const aq = this.aq; if (!aq) return '';
+      const out = [];
+      for (let i = 0; i < Math.min(AQ_G.length, aq.g | 0); i++) out.push(T(AQ_G[i]));
+      for (let i = 0; i < Math.min(AQ_C.length, aq.c | 0); i++) out.push(T(AQ_C[i]));
+      return out.join(' · ');
+    }
+    aqChanged() {
+      if (typeof document === 'undefined') return;
+      const aq = this.aq, on = !!(aq && aq.stack && aq.stack.length) && this.state === 'play';
+      let h = document.getElementById('aqhint');
+      if (!h) { h = document.createElement('div'); h.id = 'aqhint'; h.setAttribute('role', 'status'); h.hidden = true; (document.getElementById('ui') || document.body).appendChild(h); }
+      h.hidden = !on;
+      if (on) { h.textContent = T('g.aq.hint'); h.title = T('g.aq.tip', { what: this.aqWhat() }); }
+      if (this.ui && this.ui.screen === 'settings' && VR.SettingsPanel) VR.SettingsPanel.aqLine(this.ui);
     }
     // ---------------------------------------------------------------- R9 Smart Quality
     // The old "dynamic resolution" blurred the picture whenever the frame rate dropped — and near villages
@@ -619,6 +765,7 @@
     // Every step is probed: if it does not buy frame rate it is undone and the other ladder is tried.
     // Everything is undone again when the frame rate has been fine for a while. The user's settings never change.
     smartQuality(dt, S, w) {
+      if (this.bench) return;   // the Automatik run measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
       const aq = this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null });
       if (!S.dynRes || !this.fps) {
@@ -685,19 +832,17 @@
         (o) => { o.clouds = Math.min(S.clouds, 1); o.vxLod = Math.max(16, Math.round((S.vxLod || 48) * 0.4)); },
         (o) => { o.scale = Math.max(floor, S.scale - 0.1); o.sharpen = Math.max(S.sharpen ? 0.35 : 0, 0.45); },
         (o) => { o.scale = Math.max(floor - 0.08, S.scale - 0.2); o.sharpen = 0.55; },
-        (o) => { o.hz = 1; },
-        (o) => { o.rd = 1; },
-        (o) => { o.rd = 2; },
       ];
       return list;
     }
     aqCpuRungs(S) {
       return [
+        // F8: the streaming rate goes first (uploads per frame), the view distance never (no rd / hz rungs)
+        (o) => { o.stream = 1; },
+        (o) => { o.stream = 2; },
         (o) => { o.sim = 1; },
         (o) => { o.folkDist = 56; },
         (o) => { o.mesh = 3; o.folkDist = 44; },
-        (o) => { o.rd = 1; },
-        (o) => { o.rd = 2; },
       ];
     }
     aqPush(aq, kind, S, w) { if (kind === 'g') aq.g++; else aq.c++; aq.stack.push(kind); this.aqApply(aq, S, w); if (VR.AQ_TRACE) console.log('aq push', kind, aq.stack.join(''), 'fps', (aq.fpsWin || this.fps || 0).toFixed(0), 't', this.time.toFixed(1)); }
@@ -716,6 +861,7 @@
       const rd = Math.max(5, rdBase - (o.rd || 0));
       if (w && w.renderDist !== rd) w.renderDist = rd;
       if (w) w.meshBudget = o.mesh || 6;
+      if (w) w.streamRung = o.stream || 0;   // F8: the upload rate (world.uploadBudget)
       this.folkDist = Math.min(this.folkBase || 100, o.folkDist || 100);
       this.simSlow = !!o.sim || !!this.slowBase;
       const hz = this.horizon;
@@ -724,6 +870,7 @@
         else if (aq.hzBase >= 0) { hz.setLevel(aq.hzBase); aq.hzBase = -1; }
       }
       aq.over = o;
+      this.aqChanged();
     }
     farFor(w, extra) { const hf = this.horizon ? this.horizon.farPlane() : 0; return Math.max(w.renderDist * 16 + (extra || 200), hf); }
     envFor(pos, dt, extra) {
@@ -799,11 +946,15 @@
       if (this.prewarm) this.prewarm.stop();
       this.prewarm = VR.VM.prewarm({ notBefore: performance.now() + 10000 });
       this.prewarm.start();
-      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden && this.prewarm) this.prewarm.start(); }); }
+      // (iconperf) the Modern Living pictures are made the same way (VR.iconWarm): the tab then opens without a build
+      if (this.iconWarm) this.iconWarm.stop();
+      if (VR.iconWarm && this.icons) this.iconWarm = VR.iconWarm(this.icons, this.creativeItems('vmodern'), { notBefore: performance.now() + 10000 });
+      if (!this.prewarmVisible) { this.prewarmVisible = true; document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (this.prewarm) this.prewarm.start(); if (this.iconWarm) this.iconWarm.start(); } }); }
     }
     playFrame(dt) {
       const g = this, p = this.player, w = this.world, input = this.input;
       this.time += dt;
+      if (VR.LiveLoop) VR.LiveLoop.tick(this);   // a look changed: the sections that show it are meshed again, a few a frame
       this.handleKeys();
       const gad = this.gadgets, driving = gad && gad.controlling;
       if (this.entities && !this.ui.blocking && !driving) this.entities.playerAttack();
@@ -815,8 +966,10 @@
         else { if (gad) gad.preUpdate(dt, input, p); p.update(dt, input); }
       }
       if (this.sim) this.sim.update(dt, !!(this.mp && this.mp.isClient));   // a guest: only the sliding doors (the host runs the world)
+      if (this.companions) this.companions.update(dt);
       if (this.entities) this.entities.update(dt);
       if (this.villages) this.villages.update(dt);
+      if (VR.Crowd && VR.Crowd.update) VR.Crowd.update(dt);   // the heroes and the crowd's budget (src/shared/folkcrowd.js)
       if (gad) gad.tick(dt);
       if (this.mirror) this.mirror.update(dt);
       if (this.starships) this.starships.update(dt);
@@ -824,22 +977,37 @@
       if (this.director) this.director.update(dt);
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
+      w.viewDir = [-Math.sin(p.yaw), -Math.cos(p.yaw)];   // the way the player looks (flat): uploads ahead come first
       w.update(p.pos[0], p.pos[1], p.pos[2], performance.now());
       const eye = p.eyePos();
       const headState = w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2]));
       const underwater = !!(R.T.flags[headState] & F.WATER) || p.aetherAt(headState);
+      // F7: crossing the surface sends a splash and a short ripple across the picture (the composite pass)
+      if (!!underwater !== !!this.wasUnder && this.particles) this.particles.splash(eye[0], eye[1], eye[2], [0.72, 0.86, 1]);
+      if (!!underwater !== !!this.wasUnder) this.crossT = 0.9;
+      this.wasUnder = !!underwater;
+      this.crossT = Math.max(0, (this.crossT || 0) - dt);
       let waterColor = null;
       if (underwater) { const c = w.col(Math.floor(eye[0]) >> 4, Math.floor(eye[2]) >> 4); if (c) { const v = c.water[((Math.floor(eye[2]) & 15) << 4) | (Math.floor(eye[0]) & 15)]; waterColor = [((v >> 11) & 31) / 31 * 0.5, ((v >> 5) & 63) / 63 * 0.6, (v & 31) / 31 * 0.7]; } }
       const inLava = !!(R.T.flags[headState] & F.LAVA);
       const E = this.envFor(eye, dt, { underwater: underwater || inLava, waterColor: inLava ? [0.9, 0.3, 0.05] : waterColor, freezeTime: this.zenFreezeTime && p.mode !== 'survival', freezeWeather: this.zenFreezeWeather && p.mode !== 'survival' });
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
+      if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
+      if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
       this.particles.update(dt, eye);
+      if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
+      this.waterFx(dt, p, eye, underwater, inLava, E);
       if (this.trails) this.trails.update(dt);
+      if (this.vents) this.vents.update(dt, eye);
       // camera
-      const S = this.settings;
+      // (F3 · Da-Sein, presence.js: the head bob, the landing dip, the optional turn inertia, the view nudge of a block set
+      // or taken, the sprint FOV — every curve is bounded and eased; the raycast and the crosshair keep the true look)
+      const S = this.settings, PR = VR.Presence;
       const bob = S.viewBob && !p.flying ? p.bobAmt : 0;
-      const bx = Math.sin(p.bob * 2) * 0.035 * bob, by = Math.abs(Math.cos(p.bob * 2)) * 0.05 * bob;
-      let cam = { x: eye[0] + Math.cos(p.yaw) * bx, y: eye[1] + by + (p.stepSmooth || 0), z: eye[2] - Math.sin(p.yaw) * bx, yaw: p.yaw, pitch: p.pitch, roll: bob * Math.sin(p.bob * 2) * 0.004, fov: (S.fov * (1 + p.fovKick)) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
+      const swim = this.swimBob(p, underwater, E);
+      const bb = PR.bobAt(p.bob * 2, bob), dip = PR.dipAt(p.dipT, p.dipAmp);
+      p.viewYaw = PR.turnFollow(p.viewYaw, p.yaw, dt, !!S.turnInertia);
+      let cam = { x: eye[0] + Math.cos(p.viewYaw) * bb.x, y: eye[1] + bb.y - dip + (p.stepSmooth || 0) + swim, z: eye[2] - Math.sin(p.viewYaw) * bb.x, yaw: p.viewYaw, pitch: p.pitch + PR.nudgeAt(p.nudgeT, p.nudgeAmp), roll: PR.rollAt(p.bob * 2, bob), fov: PR.fovDeg(S.fov, p.fovKick) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
       if (this.vehicleCam) { const vc = this.vehicleCam(cam); if (vc) cam = vc; }
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {
@@ -878,12 +1046,12 @@
       this.smartQuality(dt, S, w);
       if (this.horizon) this.horizon.update(cam);
       this.renderer.render({
-        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, particles: this.particles, outline, crack, precip,
+        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, outline, crack, precip,
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
-        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
+        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
         drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
       });
@@ -891,15 +1059,17 @@
       // audio
       // ambience (ambience.js): the wind, the rain and thunder, the birds, crickets and water of this place
       if (this.ambience) this.ambience.update(dt, { w, eye, E, biome: VR.BIOMES[w.biomeAt(Math.floor(eye[0]), Math.floor(eye[2]))], speed: (p.flying ? Math.hypot(p.vel[0], p.vel[2]) : 0) + (this.flightWind || 0) * 40, underwater: underwater || inLava });
+      this.audio.listen(eye, p.yaw, w, underwater || inLava);   // the ear: where it is and which way it faces (F4 · Klang)
       const skyAtEye = (w.getLight(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2])) >>> 12);
-      this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true });
+      this.audio.updateMusic(dt, { night: E.night, cave: skyAtEye < 4 && eye[1] < 60, danger: this.raidActive, space: this.dim === 'drift' || cam.y > 180, festival: !!(this.villages && this.villages.festivalNear && this.villages.festivalNear()), enabled: true, day: this.env.day, mobs: this.entities ? this.entities.mobs : null, agents: this.villages ? this.villages.agents : null });
       // HUD
       this.ui.updateHUD();
       if (this.debugOn) this.ui.debug(this.debugText(cam, E));
       if (S.showFps) this.ui.fps(T('g.hud.fps', { n: Math.round(this.fps || 0) }));
       if (this.codex && this.codex.update) this.codex.update(dt);
       if (this.map) this.map.update(dt);
-      if (performance.now() > this.autosaveAt) { this.autosaveAt = performance.now() + 60000; this.saveMeta(); this.world.saveAll(); }
+      // (the autosave waits while a construction site builds — a save would finish it at once; ≤ 20 s)
+      if (performance.now() > this.autosaveAt && !(gad && gad.blue && gad.blue.siteBusy && gad.blue.siteBusy())) { this.autosaveAt = performance.now() + 60000; this.saveMeta(); this.world.saveAll(); }
     }
     debugText(cam, E) {
       const p = this.player, w = this.world, r = this.renderer;
@@ -1120,6 +1290,7 @@
         if (c0 === 'lang' || c0 === 'sprache') { this.langCommand(a0[0]); return; }
         if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0(T('g.cmd.spawn')); return; }
         if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0(T('g.cmd.helpHome')); return; }
+        if (c0 === 'pfeifen') { if (this.companions) this.companions.call(); else say0(T('g.pet.none')); return; }
         if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0(T('g.cmd.sethome')); return; }
         if (c0 === 'spiegel' || c0 === 'mirror') { if (this.mirror) this.mirror.command(a0); return; }   // 🪞 x|z|4|8|aus (Überleben: a kind hint)
         if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? T('g.cmd.players', { list: L.map(q => q.name + (q.host ? ' ' + T('g.mp.hostTag') : '') + ' ' + Math.round(q.dist) + 'm').join(', ') }) : T('g.cmd.onlyYou')); return; }

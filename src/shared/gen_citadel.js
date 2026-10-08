@@ -16,6 +16,20 @@
   if (!OG || !GEN) return;
   const st = (n, p) => { const t = R.byName[n]; return t ? (p ? t.state(p) : t.defaultState) : 0; };
   const CIT = VR.CitadelGen = {};
+  // the viaducts carry a track from this world generator version on (new worlds; older worlds keep their chunks)
+  const VIA_VGEN = 6;
+  const deckAt = (V, u) => Math.round(V.y0 - u * 10 / V.len) - 1;   // the deck's block y at u (it eases down 10 over the length)
+  // the track's rail block at u: flat, or ramped where the deck steps down (the shapes the village lines use: 1 flat along x,
+  // 0 flat along z; 2/3 ramp along x, 4/5 along z, pointing up toward the higher neighbour)
+  function railShape(V, u) {
+    const cosA = Math.cos(V.a), sinA = Math.sin(V.a), alongX = Math.abs(cosA) >= Math.abs(sinA);
+    const dir = alongX ? Math.sign(cosA) : Math.sign(sinA), y = deckAt(V, u);
+    if (deckAt(V, Math.min(V.len, u + 1)) > y) return alongX ? (dir > 0 ? 2 : 3) : (dir > 0 ? 5 : 4);
+    if (deckAt(V, Math.max(0, u - 1)) > y) return alongX ? (dir > 0 ? 3 : 2) : (dir > 0 ? 4 : 5);
+    return alongX ? 1 : 0;
+  }
+  const TRK = {};
+  const trackBlock = (shape) => TRK[shape] !== undefined ? TRK[shape] : (TRK[shape] = st('rail', { shape }));
   const CELL = CIT.CELL = 640;
 
   // ---------------------------------------------------------------- cluster layout
@@ -211,12 +225,12 @@
   // stone-arch viaduct: a 5-wide deck on 3×3 piers every 10 blocks with round arches between, glass railings,
   // an amber lamp on every pier; the deck eases down from the plinth over its length
   function viaduct(g, w, V, P, x0, z0) {
-    const cosA = Math.cos(V.a), sinA = Math.sin(V.a), nx = -sinA, nz = cosA;
+    const cosA = Math.cos(V.a), sinA = Math.sin(V.a), nx = -sinA, nz = cosA, tracked = g.vgen >= VIA_VGEN;
     // does this chunk touch the viaduct's corridor at all?
     const cx = x0 + 8, cz = z0 + 8, rx = cx - V.x0, rz = cz - V.z0, along = rx * cosA + rz * sinA, side = Math.abs(rx * nx + rz * nz);
     if (along < -14 || along > V.len + 14 || side > 18) return;
     for (let u = 0; u <= V.len; u++) {
-      const deckY = Math.round(V.y0 - u * 10 / V.len) - 1;
+      const deckY = deckAt(V, u);
       const bx = V.x0 + cosA * u, bz = V.z0 + sinA * u;
       const pier = u % 10 === 0, span = u % 10, arch = Math.round(5 - Math.sqrt(Math.max(0, 25 - (span - 5) * (span - 5)))); // spandrel depth
       for (let v = -2; v <= 2; v++) {
@@ -231,8 +245,49 @@
         if (pier && Math.abs(v) <= 1) { for (let y = gy + 1; y < deckY; y++) w.set(px, y, pz, (y === deckY - 1 && Math.abs(v) === 1) ? P.amber : ((y - gy) % 6 === 0 ? P.body[1] : P.body[0])); }
         else if (Math.abs(v) <= 1) { for (let y = deckY - 1; y >= deckY - arch && y > gy; y--) w.set(px, y, pz, P.body[0]); }
       }
+      // the track the trams run on: the deck's centre, one block up — also where the terrace carries the line (no deck there)
+      if (tracked) { const px = Math.round(bx), pz = Math.round(bz); if (w.ok(px, deckY + 1, pz) && g.surfaceY(px, pz) <= deckY + 1) w.set(px, deckY + 1, pz, trackBlock(railShape(V, u))); }
       if (pier) for (const v of [-2, 2]) { const px = Math.round(bx + nx * v), pz = Math.round(bz + nz * v); if (w.ok(px, deckY, pz)) { const gy = g.surfaceY(px, pz); if (gy < deckY - 1) for (let y = Math.max(gy + 1, deckY - 6); y < deckY; y++) w.set(px, y, pz, y === deckY - 1 ? P.amber : P.body[0]); } }
     }
+  }
+
+  // the viaducts as tram lines (the rail network's providers, gen_rails.js): the track's centre from the plinth rim to the far
+  // end, one line per viaduct; the two ends are the stations (a tram waits there). Only worlds with the track (vgen ≥ 6).
+  CIT.viaductLine = function (V, k) {
+    const cosA = Math.cos(V.a), sinA = Math.sin(V.a), P = new Int32Array((V.len + 1) * 3);
+    let m = 0, lx = NaN, lz = NaN;
+    for (let u = 0; u <= V.len; u++) {
+      const px = Math.round(V.x0 + cosA * u), pz = Math.round(V.z0 + sinA * u), py = deckAt(V, u) + 1;
+      if (px === lx && pz === lz) { P[(m - 1) * 3 + 1] = py; continue; }   // a step: the later deck's track is the one left standing
+      P[m * 3] = px; P[m * 3 + 1] = py; P[m * 3 + 2] = pz; m++; lx = px; lz = pz;
+    }
+    return { key: 'heart-viaduct-' + k, pts: P.slice(0, m * 3), tech: true, names: k === 0 ? ['Spire Citadel', 'Gate Plaza'] : ['Spire Citadel', 'Canyon Rim'] };
+  };
+  CIT.trackLines = function (g, x, z, r) {
+    if (!VR.Heart || !VR.Heart.on(g) || !(g.vgen >= VIA_VGEN)) return null;
+    const Vs = g._citViaducts || (g._citViaducts = CIT.heartSite(g, VR.Heart.CITADEL).viaducts), out = [];
+    Vs.forEach((V, k) => {
+      const mx = V.x0 + Math.cos(V.a) * V.len / 2, mz = V.z0 + Math.sin(V.a) * V.len / 2;
+      if (Math.hypot(mx - x, mz - z) <= r + V.len / 2) out.push(CIT.viaductLine(V, k));
+    });
+    return out;
+  };
+  if (VR.RailGen && VR.RailGen.providers) VR.RailGen.providers.push(CIT.trackLines);
+  // ---------------------------------------------------------------- the Heartland's lava streams
+  // three lava streams run down the citadel mountain's flanks from the plinth rim (TRAILER §3.7: "three lava streams at its
+  // foot"): a meandering channel of lava on the surface, two blocks wide, with basalt rims; where a stream leaves the
+  // plinth a vent smokes (vents.js)
+  const STREAM_ANG = [1.2, 2.6, 4.2];
+  function streamAt(s, x, z) {
+    const dx = x - s.x, dz = z - s.z, r = Math.hypot(dx, dz);
+    if (r < s.R + 2 || r > s.R + 84) return null;
+    const th = Math.atan2(dz, dx);
+    for (let k = 0; k < 3; k++) {
+      const a = STREAM_ANG[k] + 0.12 * Math.sin(r * 0.09 + 2.1 * k);
+      const d = Math.abs(Math.atan2(Math.sin(th - a), Math.cos(th - a))) * r;   // blocks from the channel's centreline
+      if (d < 2.2) return { k, r, d, lava: d < 1.2 };
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------- per chunk
@@ -246,21 +301,34 @@
       const nearSite = s.x + s.R + 44 > x0 && s.x - s.R - 44 < x0 + 16 && s.z + s.R + 44 > z0 && s.z - s.R - 44 < z0 + 16;
       if (nearSite) {
         terrace(g, w, s, P, x0, z0);
+        if (s.home) {
+          for (let x = x0; x < x0 + 16; x++) for (let z = z0; z < z0 + 16; z++) {
+            const hit = streamAt(s, x, z); if (!hit) continue;
+            const gy = g.surfaceY(x, z); if (gy <= SEA + 2) continue;   // the streams stop where the canyon floor begins
+            w.set(x, gy, z, hit.lava ? st('lava') : st('basalt'));
+            if (hit.lava) w.set(x, gy - 1, z, st('basalt'));
+            if (hit.lava && hit.d < 0.6 && hit.r >= s.R + 3 && hit.r < s.R + 5) { if (!out.spawns) out.spawns = []; out.spawns.push(['vent', x, gy + 1, z]); }
+          }
+        }
         for (const T of s.towers) {
           const reach = T.r + 3 + (T.kind === 'watch' ? 8 : 0);
           if (T.x + reach < x0 || T.x - reach > x0 + 16 || T.z + reach < z0 || T.z - reach > z0 + 16) continue;
           if (T.kind === 'watch') watchTower(w, T, s.y + 1, P, g); else spire(w, T, s.y + 1, P, g);
+          // the red tip beacon of every spire and watch tower: vents.js makes it blink (the spawn sits on the beacon cell)
+          if (T.kind !== 'pin' && T.x >= x0 && T.x < x0 + 16 && T.z >= z0 && T.z < z0 + 16) { if (!out.spawns) out.spawns = []; out.spawns.push(['beacon', T.x, s.y + 1 + T.h + (T.kind === 'watch' ? 15 : 1), T.z]); }
         }
         // crystal groves on the slopes around the terrace
         const crng = new VR.RNG(s.seed ^ 0x51);
         for (let k = 0; k < 16; k++) {
           const a = crng.next() * Math.PI * 2, d = s.R + 4 + crng.next() * 26;
           const px = Math.round(s.x + Math.cos(a) * d), pz = Math.round(s.z + Math.sin(a) * d);
-          const big = crng.chance(0.35), cc = ['violet', 'azure', 'verdant', 'rose', 'amber'][(s.cry + k) % 5];
+          // the Heartland citadel's foot carries three giant crystals (TRAILER §3.7: azure 25 tall, violet 16, verdant 12)
+          const giant = s.home && k < 3 ? [25, 16, 12][k] : 0;
+          const big = giant > 0 || crng.chance(0.35), cc = giant ? ['azure', 'violet', 'verdant'][k] : ['violet', 'azure', 'verdant', 'rose', 'amber'][(s.cry + k) % 5];
           if (px < x0 - 3 || px > x0 + 19 || pz < z0 - 3 || pz > z0 + 19) continue;
           const gy = g.surfaceY(px, pz);
           if (gy <= SEA + 2) continue;
-          const hh = big ? 7 + crng.int(8) : 3 + crng.int(4), blk = st(cc + '_crystal_block'), cl = st(cc + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 });
+          const hh = giant || (big ? 7 + crng.int(8) : 3 + crng.int(4)), blk = st(cc + '_crystal_block'), cl = st(cc + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 });
           for (let t = 0; t < hh; t++) { w.set(px, gy + 1 + t, pz, blk); if (big && t < hh - 3) { w.set(px + 1, gy + 1 + t, pz, blk); w.set(px, gy + 1 + t, pz + 1, blk); if (t < hh - 6) w.set(px + 1, gy + 1 + t, pz + 1, blk); } }
           w.set(px, gy + 1 + hh, pz, cl);
         }
