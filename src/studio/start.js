@@ -68,8 +68,8 @@
   SS.go = function (what) {
     const P = PJ(), W = WM();
     const ready = (fn) => (P && P.whenReady ? P.whenReady(fn) : fn());
-    if (what === 'meins') { if (P && P.show) P.show(true); return; }
-    if (what === 'erschaffen') { if (P && P.isOpen && P.isOpen()) P.show(false); ready(() => { const IM = W && W.imagine; if (IM && IM.open) IM.open(null, IM.aiOK ? 'genie' : 'house'); }); return; }
+    if (what === 'meins') { if (P && P.show) P.show(true); light(); return; }   // the tile lights at once (the 400 ms tick is the fallback)
+    if (what === 'erschaffen') { if (P && P.isOpen && P.isOpen()) P.show(false); ready(() => { const IM = W && W.imagine; if (IM && IM.open) IM.open(null, IM.aiOK ? 'genie' : 'house'); light(); }); return; }
     if (what === 'bauen') {
       if (P && P.isOpen && P.isOpen()) P.show(false);
       ready(async () => {
