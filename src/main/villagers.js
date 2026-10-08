@@ -324,7 +324,8 @@
   };
   let roadSet = null;
   V.isRoad = (s) => {
-    if (!roadSet) { roadSet = new Uint8Array(R.T.type.length); for (const n of ['dirt_path', 'coarse_dirt', 'vx_floor_stone', 'stone_bricks', 'polished_andesite', 'cobblestone', 'mossy_cobblestone', 'smooth_sandstone', 'cut_sandstone', 'vx_floor_marble', 'vx_floor_checker', 'vx_floor_tile', 'packed_ice', 'landing_pad', 'vx_floor_plaza', 'vx_floor_plaza_line']   // (the tech city's light-line paths)) { const t = R.byName[n]; if (t) for (let s2 = t.base; s2 < t.base + t.nstates; s2++) roadSet[s2] = 1; } }
+    // the roads the villagers walk: the paths and floors, and the tech city's light-line paths (vx_floor_plaza*)
+    if (!roadSet) { roadSet = new Uint8Array(R.T.type.length); for (const n of ['dirt_path', 'coarse_dirt', 'vx_floor_stone', 'stone_bricks', 'polished_andesite', 'cobblestone', 'mossy_cobblestone', 'smooth_sandstone', 'cut_sandstone', 'vx_floor_marble', 'vx_floor_checker', 'vx_floor_tile', 'packed_ice', 'landing_pad', 'vx_floor_plaza', 'vx_floor_plaza_line']) { const t = R.byName[n]; if (t) for (let s2 = t.base; s2 < t.base + t.nstates; s2++) roadSet[s2] = 1; } }
     return roadSet[s] === 1;
   };
   V.passable = (s) => { caches(); return passC[s]; };
