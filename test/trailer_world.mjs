@@ -17,8 +17,10 @@ page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slic
 await page.goto(process.env.DIST ? 'file://' + process.env.DIST : 'file:///home/claude/vr/dist/index.html');
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
+// a preset with the test's render distance and horizon (the same for every preset, so the costs compare presets)
+const setPreset = (p) => ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 12; g.settings.horizon = 2; g.applySettings('*'); }, p);
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 12; g.settings.horizon = 2; g.applySettings('*'); }, process.env.PRESET || 'high');
+await setPreset(process.env.PRESET || 'high');
 await ev(`VR.game.createWorld({name:'Trailer World',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
 for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => {
@@ -53,15 +55,23 @@ const measure = () => ev(() => {
   window.__norender = true; ts.sort((a, b) => a - b);
   return { median: +ts[ts.length >> 1].toFixed(1), mean: +(ts.reduce((a, b) => a + b, 0) / ts.length).toFixed(1) };
 });
-// photograph the paused director's current frame: the world around the camera settles first, time stands still
-let cost = null;
-const capture = async (name) => {
-  await freeze();
+// the world settles: chunks, meshes and the scripted designs are in place when the loop stops
+const settle = async () => {
   for (let i = 0; i < 120; i++) {
     await step(10, 50); await wait(50);
     const s = await ev(() => ({ busy: VR.game.pool.busy, pend: VR.game.world.pending.size, wait: VR.game.director.shipWait || 0 }));
     if (s.busy === 0 && s.pend === 0 && s.wait <= 0 && i > 3) break;
   }
+};
+// photograph the paused director's current frame: the world around the camera settles first, time stands still
+// the frame cost at the last picture, for each preset of COSTPRESETS (default high,potato: the Very Low preset on the same
+// camera, the world settled for it)
+const COSTPRESETS = (process.env.COSTPRESETS || 'high,potato').split(',');
+let curPreset = process.env.PRESET || 'high';
+const costs = {};
+const capture = async (name) => {
+  await freeze();
+  await settle();
   // each scripted ship sits where the director's clock puts it: t = (shot time - its delay) / its duration; the one traffic
   // update that places them is the real one (the frozen update is bypassed for this call only)
   await ev(() => {
@@ -78,7 +88,10 @@ const capture = async (name) => {
     mine: (D.myShips || []).map(s => ({ t: +s.t.toFixed(2), gpu: !!(s.d && s.d.gpu), pos: s.pos.map(v => Math.round(v)) })) }; });
   console.log('  air', name, JSON.stringify(air));
   await shot(name);
-  if (name === COSTAT) cost = await measure();
+  if (name === COSTAT) for (const p of COSTPRESETS) {
+    if (p !== curPreset) { await setPreset(p); curPreset = p; await settle(); }
+    costs[p] = await measure();
+  }
   await thaw();
 };
 console.log('director', await ev(() => VR.game.director.play('trailer')));
@@ -95,6 +108,6 @@ for (let i = 0; i < 1500; i++) {
   if (!done.has(name + '1') && st.t >= 1.2) { done.add(name + '1'); console.log('  ', JSON.stringify(st)); await capture(`trailer_${name}_1_${TAG}`); }
   else if (!done.has(name + '2') && st.t >= st.dur - 0.6) { done.add(name + '2'); console.log('  ', JSON.stringify(st)); await capture(`trailer_${name}_2_${TAG}`); }
 }
-console.log('COST', TAG, process.env.PRESET || 'high', cost ? JSON.stringify(cost) + ' at ' + COSTAT : 'not measured (no last picture)');
+for (const p of COSTPRESETS) console.log('COST', TAG, p, costs[p] ? JSON.stringify(costs[p]) + ' at ' + COSTAT : 'not measured (no last picture)');
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 16)) console.log(l);
 await browser.close();
