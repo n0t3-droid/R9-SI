@@ -989,6 +989,7 @@
       list.length = 0;
       for (const sec of vis) {
         if (sec.oy - cam.y + 16 <= d) continue;
+        if (sec.oy - cam.y > 40) continue;     // the high sky (clouds): their mirror images read as stray cubes on the water
         const dx = sec.ox + 8 - cam.x, dz = sec.oz + 8 - cam.z;
         if (dx * dx + dz * dz > reach2) continue;
         list.push(sec);
@@ -1009,6 +1010,7 @@
       gl.frontFace(gl.CW);                                        // the mirror turns every triangle inside out
       const savedVP = this.viewProj, savedPlanes = this.planes;
       this.viewProj = this.viewProjR; this.planes = this.planesR;
+      const dr0 = this.stats.draws;
       for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
         gl.useProgram(p.p);
         this.common(p, E);
@@ -1026,6 +1028,7 @@
         this.drawSections(list, layer, p, camPos, this.planesR, false);
         gl.enable(gl.CULL_FACE);
       }
+      this.stats.reflSecs = list.length; this.stats.reflDraws = this.stats.draws - dr0;     // (test/water.mjs reports them)
       if (this.q.water >= 2 && F.horizon) F.horizon.draw(this, E);
       this.viewProj = savedVP; this.planes = savedPlanes;
       gl.frontFace(gl.CCW);

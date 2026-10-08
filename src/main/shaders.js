@@ -759,11 +759,14 @@ void main() {
     float brightK = smoothstep(0.4, 0.7, pN * 0.72 + bandN * 0.28);
     float depthK = clamp(thick / 14.0, 0.0, 1.0);
     vec3 navy = vec3(0.010, 0.040, 0.140), ocean = vec3(0.060, 0.300, 0.660), sea = vec3(0.030, 0.200, 0.190);
-    vec3 body = mix(ocean, navy, clamp(0.42 + depthK * 0.4 - brightK * 0.62, 0.0, 1.0));
+    // (softer patches than before: the blotches read as clouds on the water, the sky reflection should carry the look)
+    vec3 body = mix(ocean, navy, clamp(0.42 + depthK * 0.4 - brightK * 0.4, 0.0, 1.0));
     body = mix(body, sea, 0.12 + bandN * 0.08);
     float ripple = clamp(0.5 + dot(n.xz, normalize(L.xz + vec2(1e-4))) * 2.6, 0.0, 1.0);
     body *= 0.84 + ripple * 0.32;
     body = mix(body, wcol * vec3(0.55, 0.75, 0.9), 0.16);
+    // a falling sheet is aerated: lighter, with bands of brighter water running down it
+    if (kind == 6u) body = mix(body, vec3(0.34, 0.6, 0.95) * (0.82 + 0.36 * sin(wp.y * 7.0 + sin(wp.x * 3.0 + wp.z * 2.0) * 1.7 - u_time * 3.0)), 0.5);
     // Klassisch: a faint seam where two blocks of the surface meet, in the water's own colour (the reflection stays
     // whole), fading out where a block is only a few pixels wide
     float seamK = 0.0, pxW = max(fwidth(wp.x), fwidth(wp.z));
@@ -801,14 +804,17 @@ void main() {
     float nh = max(dot(n, H), 0.0);
     float a = 0.02 + 0.09 * clamp(length(n.xz) * 2.0, 0.0, 1.0), a2 = a * a;
     float dd = nh * nh * (a2 - 1.0) + 1.0;
-    float sp = (a2 / (3.14159 * dd * dd)) * (0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0)) * 1.6 + pow(nh, 60.0) * 0.4;
+    float sp = (a2 / (3.14159 * dd * dd)) * (0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0)) * 0.035 + pow(nh, 60.0) * 0.12;
     col += lc * sp * (sp > 0.004 ? shadowAt(NORMALS[face], L) : 1.0) * smoothstep(0.6, 1.0, v_sky) * (1.0 - u_rain);
     // shore foam
-    float foam = (1.0 - smoothstep(0.0, 0.45, thick)) * (0.6 + 0.4 * sin(wp.x * 3.0 + wp.z * 2.0 + u_time * 2.0));
-    col = mix(col, vec3(0.9) * (u_ambSky * skyL + blockL + lc * 0.3), clamp(foam, 0.0, 1.0) * 0.45 * float(face == 2u));
+    // (a broken, drifting line from the noise where the water is a few tenths of a block deep, not a regular stripe)
+    // (thin: a step between two water levels also measures as shallow, so the foam must stay a whisper there)
+    float foamN = texture(u_noise, wp.xz / 5.0 + vec2(u_time * 0.02, -u_time * 0.015)).r;
+    float foam = (1.0 - smoothstep(0.0, 0.2, thick)) * smoothstep(0.45, 0.7, foamN);
+    col = mix(col, vec3(0.9) * (u_ambSky * skyL + blockL + lc * 0.3), clamp(foam, 0.0, 1.0) * 0.28 * float(face == 2u));
     col = applyFog(col, v_rel, dist);
     // the depth-fade edge: where the water is a few centimetres deep it lets the shore through, so no edge cuts
-    o_col = vec4(col, face == 2u ? mix(0.55, 1.0, smoothstep(0.03, 0.7, thick)) : 1.0);
+    o_col = vec4(col, face == 2u ? mix(0.55, 1.0, smoothstep(0.03, 0.7, thick)) : (kind == 6u ? 0.8 : 1.0));
     return;
   }
   if (kind == 7u) {
