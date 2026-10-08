@@ -33,20 +33,20 @@
     return model.partSway;
   };
 
-  // ---------------------------------------------------------------- the palm crown: 5×2×5 blocks, ten drooping fronds
+  // ---------------------------------------------------------------- the palm crown: 7×2×7 blocks, ten drooping fronds
   // The trunk (vx_palm_trunk, ringed) stands below; the crown's floor is the trunk's top. Fronds leave the crown's
   // centre at a shallow angle, run out 4.5 blocks and droop to the crown's lower edge; each has two rows of leaflets
   // hanging off it; three coconuts hang under the crown; the crownshaft is a green bulb on the trunk.
   def('vm_palm_crown', 'Palm Crown', {
-    res: 8, size: [5, 2, 5], sway: 3, swayFrom: 0, sound: 'grass', hard: 0.3,
+    res: 8, size: [7, 2, 7], sway: 3, swayFrom: 0, sound: 'grass', hard: 0.3,
     build(b, M) {
-      const cx = 40, cy = 22, cz = 40;
+      const cx = 56, cy = 22, cz = 56;
       b.ellipsoid(cx, 6, cz, 4.5, 4.2, 4.5, M.plant(PLANT.crownShaft));
       for (let k = 0; k < 10; k++) {
         const a = (k / 10) * Math.PI * 2 + (k & 1) * 0.16, dx = Math.cos(a), dz = Math.sin(a);
         let px = cx + dx * 6, py = cy + 4, pz = cz + dz * 6;
         for (let s = 1; s <= 9; s++) {
-          const u = s / 9, r = 6 + 62 * u;
+          const u = s / 9, r = 6 + 44 * u;
           const nx = cx + dx * r, ny = 26 - 8 * u - 15 * u * u, nz = cz + dz * r;
           const thick = 2.6 - 1.5 * u;
           b.rod(px, py, pz, nx, ny, nz, thick, M.plant((s & 1) ? PLANT.leaf1 : PLANT.leaf2));
@@ -60,7 +60,7 @@
           px = nx; py = ny; pz = nz;
         }
       }
-      for (const [x, y, z] of [[36, 19, 38], [44, 18, 42], [40, 16, 46]]) b.sphere(x, y, z, 3.4, M.matte(PLANT.nut));
+      for (const [x, y, z] of [[52, 19, 54], [60, 18, 58], [56, 16, 62]]) b.sphere(x, y, z, 3.4, M.matte(PLANT.nut));
     },
   });
 
@@ -136,13 +136,13 @@
     for (const p of m.parts) out.push([x0 + p.px, y0 + p.py, z0 + p.pz, VR.R.S(name, { part: 'p' + p.px + p.py + p.pz, facing: facing | 0 })]);
     return out;
   };
-  // a palm: the ringed trunk of `h` blocks at (x, y, z) and the shared crown on its top (the crown spans 5×5 blocks)
+  // a palm: the ringed trunk of `h` blocks at (x, y, z) and the shared crown on its top (the crown spans 7×7 blocks)
   P.palm = function (put, x, y, z, h) {
     const R = VR.R;
     for (let k = 0; k < h; k++) put(x, y + k, z, R.S('vx_palm_trunk'));
-    for (const [px, py, pz, s] of P.parts('vm_palm_crown', x - 2, y + h, z - 2, 0)) put(px, py, pz, s);
+    for (const [px, py, pz, s] of P.parts('vm_palm_crown', x - 3, y + h, z - 3, 0)) put(px, py, pz, s);
   };
-  // the palm's footprint in blocks, for a lot's yard test: the crown's 5×5 (the trunk is one block)
-  P.palmFoot = (x, z) => [x - 2, z - 2, x + 2, z + 2];
+  // the palm's footprint in blocks, for a lot's yard test: the crown's 7×7 (the trunk is one block)
+  P.palmFoot = (x, z) => [x - 3, z - 3, x + 3, z + 3];
   P.on = (g) => !!(g && g.vgen >= 7);
 })(VR);
