@@ -64,10 +64,46 @@ Source: docs/superpowers/specs/2026-10-08-realism-wave-design.md §F5 and the W3
 
 ## Measured
 
-(filled in during the work — see the final report)
+Method. `test/controls_cost.mjs` measures the untouched build (a copy of the base, no F5 code) and this build back to
+back in one run, in headless Chromium with SwiftShader (software GL) on the 2-CPU machine that the other agents' browser
+tests share: the spawn of the default world, seed 1, noon, dynamic quality off, 1280×720. Very Low is the potato preset,
+High the high preset. `test/controls_frame.js` (node) times the new CPU paths on their own.
+
+| per frame | Very Low, before | Very Low, after | High, before | High, after |
+|---|---|---|---|---|
+| draw calls | 32 | 26 | 38 | 30 |
+| triangles | 227 220 | 234 072 | 466 330 | 390 356 |
+| sections drawn | 22 | 13 | 22 | 13 |
+| jsMs (main thread, smoothed) | 33.8 | 21.1 | 30.5 | 33.1 |
+
+Not a like-for-like comparison: the two scenes drew different numbers of sections, because the chunks around the spawn
+had not finished meshing alike on the shared machine. The untouched build alone drew 21 and 22 sections in two runs
+(466 000 to 492 000 triangles for High). So the table does not show F5's cost; it shows that this run could not hold the
+scene still. The draw calls and triangles of the two builds are equal only when the sections are equal, and this run did
+not reach that state. F5 adds no draw call and no render pass by design (the controls are DOM and JavaScript).
+
+- Frame interval: 4.0 s (before) and 2.0 s (after, Very Low) per frame at 1280×720 under SwiftShader. Not a performance
+  figure: a software renderer, shared with other tests.
+- Live preview: one `drawImage` of the 1280×720 game canvas into the 240×135 thumbnail took 2 892 ms before and 1 286 ms
+  after. The call waits for the software frame to finish, so this is the renderer's time, not the copy's. It runs once,
+  two frames after a graphics change; with the settings closed the per-frame cost is one comparison.
+- Automatik decision (`VR.Bench.decide`): 0.0019 ms per call (1 000 calls in the browser).
+- Controls layer per frame on the CPU (node, `test/controls_frame.js`): `beginFrame` + `endFrame` with a connected
+  gamepad 4.0 µs; with three keys held 5.6 µs; the pad poll alone 2.2 µs; one binding lookup (`down(name)`) 0.30 µs.
 
 ## Known gaps (to be reported honestly)
 
 - Mouse buttons (break / place) stay on the mouse; key binding of break and place is a stretch goal.
-- Gamepad buttons are the standard mapping, not rebindable (the keyboard screen is).
+- Gamepad buttons are the standard mapping, not rebindable (the keyboard screen is). Vibration needs a real pad; the
+  simulated pad in the test has none.
 - The preview thumbnail is a capture of the live frame, not a separate render at another setting.
+- Automatik on SwiftShader: no frame comes in under a second, so the 3 s run records 'none' and the settings stay (see
+  test/shots/controls_automatik.png, where the thumbnail is still black: most likely the test's ten-second wait ended
+  before two software frames had passed; not verified). The decision table itself is covered by test/bench_table.js.
+- Cost comparison: a clean before/after with equal scenes needs a quiet machine (or a settle loop that waits for the
+  section count); the numbers above are not that.
+- Phone: the tutorial card ("ziehen = umschauen") sits over the ⤒ and Sprint buttons (test/shots/controls_telefon.png).
+  Not fixed in this round.
+- Touch and gamepad are verified in emulation (Playwright touch, a simulated pad), not on hardware.
+- The jump check reads a rise of 5.00 blocks after one tap, while the jump impulse (9.1 blocks/s at gravity 30) gives
+  about 1.4 blocks. Not analysed: the check passes on any rise above 0.2 blocks without flight.
