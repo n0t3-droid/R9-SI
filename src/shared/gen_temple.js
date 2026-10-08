@@ -38,7 +38,7 @@
   function mats() {
     return {
       WALL: st('temple_stone'), SMOOTH: st('temple_stone_smooth'), BAND: st('temple_stone_band'), PIL: st('temple_pilaster', { axis: 0 }),
-      BAR: st('temple_light_bar'), SLIT: st('temple_slit'), WIN: st('amber_window'), VEIL: st('portal_veil'), BEACON: st('beacon_red'),
+      BAR: st('temple_light_bar'), SLIT: st('temple_slit'), WIN: st('amber_window'), VEIL: st('portal_veil'), BEACON: st('beacon_red'), NEONA: st('neon_amber'),
       FRAME: st('vx_portal_frame', { facing: 0 }), CYAN: st('neon_cyan'), PANEL: st('tech_panel'), PANELA: st('tech_panel_amber'), ANT: st('antenna'),
       DARK: st('vx_tech_dark_strip'), HEX: st('vx_tech_hex'), GRAY: st('vx_tech_gray'), HEXF: st('vx_floor_hex'), PAD: st('vx_floor_pad'), LINE: st('vx_floor_plaza_line'), PLAZA: st('vx_floor_plaza'),
       DECK: st('vx_floor_deck'), FLAG: st('flagstone') || st('vx_floor_stone'), GRASS: st('grass_block'), DIRT: st('dirt'), STAIR: st('temple_stone_stairs', { facing: 0, half: 0 }),
@@ -313,7 +313,9 @@
       if (gy < Y) fill(x, z, gy + 1, Y - 1, K.SMOOTH);
       let s = K.FLAG;
       if (ax <= 4) s = K.DECK; else if (ax === 5) s = K.LINE;
-      if (v6 && ax === 0 && z % 8 === 4) s = K.BAR;                      // the landing strip's lights (vgen 6)
+      // the landing strip's lights (vgen 6): amber neon bars across the centre line every 8 blocks, flush with the deck,
+      // so they glow from above (the light bar's top is plain stone)
+      if (v6 && x >= -1 && x <= 1 && z % 8 === 4) s = K.NEONA;
       if (ax >= 18 && ax <= 21 && z >= 40 && z <= 132 && (z % 24) >= 2 && (z % 24) <= 20) s = K.GRASS;   // lawn strips
       put(x, Y, z, s);
       fill(x, z, Y + 1, Math.max(Y + 8, gy + 3), AIR);
