@@ -17,7 +17,7 @@ bash test/regress.sh "" smoke.mjs               # named tests only
 
 ## Release regression set
 
-17 node tests and 31 browser tests (48 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
+18 node tests and 32 browser tests (50 in all), listed as "yes" below. The browser tests are the union of the two full runs in the scratchpad (`run_reg5.txt` and `run_v039.txt`); the node tests are the ones that passed in the final node run today (`f_*.log`) and in `run_reg5.txt`, plus `modern_pack.js` and `tex_check.js`, which were fixed today and pass. `frame_cost.js` is not in the set: its checks compare frame times against budgets, so they depend on the load of the machine.
 
 Typical time of a full release run: about 127 min of browser tests (median of the recorded passing runs, plus the wait for the lock) and about 72 s of node tests.
 
@@ -40,6 +40,8 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | model_smoke.js | node | Every VM model compiles, paints and meshes; boxes exist; reports the mesh cost per state. | 80 † | – | no |
 | modern_pack.js | node | Modern Living pack: ids append-only after the older states, every item registered after Vollton, set counts and palette. | 10 † | – | yes |
 | pack.js | node | r9-paket (VR.Pack): favourites, designs and Werkbank parts travel as one file. | 1 † | – | no |
+| pets.mjs | browser | 🐾 Begleiter in the browser (German, creative flat world): a wild Glimmerfuchs is patted, not hurt, and runs off; a second one is tamed with glow berries and named Pfotenfritz; a 40-block walk with it following; sit; save and reload; 🐾 Pfeifen and /pfeifen; the three species pictures in test/shots. | 100 † | – | yes |
+| pets_logic.js | node | 🐾 Begleiter rules: three species and their treats, names, taming, follow / sit / sleep / teleport decisions, the save format, the models and rigs (65 checks). | 2 † | – | yes |
 | phys_guard.js | node | Physics and the player survive bad numbers; move, gather and raycast keep their results. | 3 † | – | yes |
 | pool_recover.js | node | The worker pool survives a worker that dies or throws; its in-flight jobs get an answer. | 1 † | – | yes |
 | ridge_seam.js | node | Seam check at the test hill's ridge end for every section alignment: the top must meet the flat ground. | 3 † | – | no |
