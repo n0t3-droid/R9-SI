@@ -253,6 +253,69 @@
     return vs.filter(st => st.x >= x0 && st.x < x0 + T && st.z >= z0 && st.z < z0 + T && !VQ.has(st.id) && !VG.planReady(g, st, true));
   };
 
+  // ---------------------------------------------------------------- the surface look of a cell
+  // The colours of the far land, from the texture atlas' averages (the same for every tile of a frame; F-Far's ring 1
+  // shares them, so the two far rings and the near blocks agree).
+  LOD.palette = function () {
+    return {
+      stone: bcol('stone', 2, 0x7d7d7d), dirt: bcol('dirt', 2, 0x8a5f3c), sand: bcol('sand', 2, 0xdbcf9f), gravel: bcol('gravel', 2, 0x837d7a),
+      snow: bcol('snow_block', 2, 0xf4f8fb), redsand: bcol('red_sand', 2, 0xbe6621), sandstone: bcol('sandstone', 0, 0xd8c890),
+      clay: bcol('clay', 2, 0xa0a6b3), ice: bcol('packed_ice', 2, 0x8db4e8), mud: bcol('mud', 2, 0x3c3837), myc: bcol('mycelium', 2, 0x6f6265),
+      podzol: bcol('podzol', 2, 0x5b3d1e), coarse: bcol('coarse_dirt', 2, 0x77553b), calcite: bcol('calcite', 2, 0xdfe0dc), powder: bcol('powder_snow', 2, 0xf6fafc),
+      grassTop: bcol('grass_block', 2, 0x9a9a9a), ochre: bcol('ochre_rock', 2, 0xb8743a), umber: bcol('umber_rock', 2, 0x6a4430), duskrock: bcol('duskrock', 2, 0x3a3450),
+      terr: bcol('orange_terracotta', 2, 0xa0531e),
+    };
+  };
+  // The surface of one cell (terrain top y at (X, Z), its climate cl and biome B with key, the steepest neighbour step per
+  // block `slope`, the cell size `step`): o.t, o.s, o.cliff = top, side and cliff colours; o.kd = kind (0 land, 1 water,
+  // 2 lava, 3 aether, 6 snow / ice); o.h = the top face's height; o.ax = aux (water depth and tint); o.water, o.cold.
+  // Everything LOD.build decides for a cell before its trees — ring 1 (far.js) calls it for its own cells.
+  LOD.look = function (g, P, B, key, cl, X, Z, y, slope, step, o) {
+    const SEA = VR.C.SEA;
+    const { stone, dirt, sand, gravel, snow, redsand, sandstone, clay, ice, mud, myc, podzol, coarse, calcite, powder, grassTop, ochre, umber, duskrock, terr } = P;
+    const pn = g.patchN ? g.patchN.n2(X, Z) : 0;
+    const cold = (B.temp - Math.max(0, y - 90) * 0.0025) < 0.15;
+    let t = mixc(tint(grassTop, B.grass, 1.0), dirt, 0), s = mixc(dirt, t, 0.18), cliff = stone;
+    let kd = 0, h = y + 1, ax = 0;
+    const water = y < SEA;
+    const ember = cl.ember > 0.45 || key === 'ember_canyons';
+    if (water) {
+      const deep = SEA - y > 6;
+      t = deep ? (B.warm ? sand : gravel) : (pn > 0.25 ? clay : sand);
+      s = t; cliff = deep ? gravel : sandstone;
+      if (ember) { if (y < 59) { kd = 2; h = 60; t = [255, 120, 30]; } else { t = redsand; } }
+      else if ((cl.prism > 0.35 || cl.ember > 0.35) && cl.river > 0.25) { kd = 3; h = SEA + 1; t = [70, 200, 255]; }
+      else if (cold || B.frozen) { kd = 6; h = SEA + 1; t = ice; ax = 0; }
+      else { kd = 1; h = SEA + 0.9; ax = Math.min(62, (SEA - y + 1) & ~1) | ((B.warm ? 1 : key.indexOf('swamp') >= 0 ? 3 : (key.indexOf('cold') >= 0 || key.indexOf('frozen') >= 0) ? 2 : 0) << 6); }
+    } else if (key === 'desert' || key === 'beach' || key === 'snowy_beach') { t = sand; s = sand; cliff = sandstone; }
+    else if (key === 'stony_shore') { t = pn > 0 ? stone : gravel; s = t; }
+    else if (key.indexOf('badlands') >= 0) {
+      const band = g.bands ? scol(g.bands[M.clamp(y + Math.round((g.stripN ? g.stripN.n3(X * 0.01, 0, Z * 0.01) : 0) * 7), 0, 255)], 0xa0531e) : terr;
+      t = y < 80 ? redsand : band; s = terr; cliff = band;
+      if (key === 'wooded_badlands' && y > 94) t = mixc(tint(grassTop, B.grass), coarse, 0.4);
+    }
+    else if (key === 'mushroom_fields') t = myc;
+    else if (key === 'mangrove_swamp') { t = mud; s = mud; }
+    else if (key === 'ice_spikes') { t = snow; s = snow; }
+    else if (key === 'jagged_peaks' || key === 'frozen_peaks') { t = slope > 0.9 ? stone : (key === 'frozen_peaks' && pn > 0.2 ? ice : snow); s = stone; }
+    else if (key === 'snowy_slopes' || key === 'grove') { t = slope > 0.9 ? stone : (pn > 0.3 ? powder : snow); if (key === 'grove' && pn < -0.2) t = tint(grassTop, B.grass); s = stone; }
+    else if (key === 'stony_peaks') { t = (g.stripN && g.stripN.n3(X * 0.02, y * 0.2, Z * 0.02) > 0.2) ? calcite : stone; s = t; }
+    else if (key === 'windswept_hills' || key === 'windswept_forest') { if (pn > 0.15) { t = stone; s = stone; } }
+    else if (key === 'windswept_gravelly_hills') { if (pn > 0.1) { t = gravel; s = gravel; } else if (pn < -0.3) { t = stone; s = stone; } }
+    else if (key === 'windswept_savanna') { if (pn > 0.2) { t = stone; s = stone; } else if (pn < -0.2) t = coarse; }
+    else if (key === 'old_growth_pine_taiga' || key === 'old_growth_spruce_taiga') t = pn > 0.25 ? coarse : pn > -0.1 ? podzol : t;
+    else if (key === 'dappled_forest') { if (pn > 0.15) t = coarse; }
+    else if (ember) { const bandc = ((y + Math.round(hh(X >> 5, Z >> 5, 7) * 4)) % 5) < 2 ? umber : ochre; const capGreen = cl.hz1 > 0.4 && key === 'sky_meadow'; t = (y > 70 && cl.canyon < 0.25) ? (capGreen ? tint(grassTop, B.grass) : redsand) : bandc; s = bandc; cliff = bandc;
+      if (y > 66 && cl.canyon < 0.3 && g.nCrack && step <= 8) { const cr = g.nCrack.n2(X, Z), cr2 = g.nCrack2.n2(X, Z), wdt = 0.028 + cl.ember * 0.02 + step * 0.004; if (Math.abs(cr) < wdt || Math.abs(cr2) < wdt * 0.6) { kd = 2; t = [255, 120, 30]; } } }
+    else if (key === 'prism_fields' || key === 'crystal_highlands') { cliff = duskrock; s = mixc(duskrock, t, 0.3); }
+    if (!water && t === t && slope > 1.25 && y > 95 && kd === 0 && key.indexOf('badlands') < 0 && !ember) { t = stone; s = stone; }
+    const duskPeak = (cl.hz3 || 0) > 0.45;   // the Mountain Station's peaks are dark dusk-rock, never snow
+    if (duskPeak) { t = duskrock; s = duskrock; cliff = duskrock; }
+    if (!water && cold && kd === 0 && key !== 'stony_shore' && !duskPeak) { t = snow; s = mixc(s, snow, 0.5); kd = 6; }
+    o.t = t; o.s = s; o.cliff = cliff; o.kd = kd; o.h = h; o.ax = ax; o.water = water; o.cold = cold;
+    return o;
+  };
+
   // ---------------------------------------------------------------- one tile
   LOD.build = function (g, job) {
     if (!g.computeClimate || !g.n3) return null;
@@ -277,12 +340,8 @@
     const top = new Float32Array(N * N), kind = new Uint8Array(N * N), aux = new Uint8Array(N * N);
     const trees = [];
     const cTop = new Array(N * N), cSide = new Array(N * N), cCliff = new Array(N * N);
-    const stone = bcol('stone', 2, 0x7d7d7d), dirt = bcol('dirt', 2, 0x8a5f3c), sand = bcol('sand', 2, 0xdbcf9f), gravel = bcol('gravel', 2, 0x837d7a);
-    const snow = bcol('snow_block', 2, 0xf4f8fb), redsand = bcol('red_sand', 2, 0xbe6621), sandstone = bcol('sandstone', 0, 0xd8c890);
-    const clay = bcol('clay', 2, 0xa0a6b3), ice = bcol('packed_ice', 2, 0x8db4e8), mud = bcol('mud', 2, 0x3c3837), myc = bcol('mycelium', 2, 0x6f6265);
-    const podzol = bcol('podzol', 2, 0x5b3d1e), coarse = bcol('coarse_dirt', 2, 0x77553b), calcite = bcol('calcite', 2, 0xdfe0dc), powder = bcol('powder_snow', 2, 0xf6fafc);
-    const grassTop = bcol('grass_block', 2, 0x9a9a9a), ochre = bcol('ochre_rock', 2, 0xb8743a), umber = bcol('umber_rock', 2, 0x6a4430), duskrock = bcol('duskrock', 2, 0x3a3450);
-    const terr = bcol('orange_terracotta', 2, 0xa0531e);
+    const P = LOD.palette(), lk = {};
+    const { stone, dirt, snow, redsand, grassTop, ochre, duskrock } = P;   // (the islands below use them)
     for (let j = -1; j <= n; j++) for (let i = -1; i <= n; i++) {
       const k = idx(i, j), y = Hs[k], cl = CL[k], B = BIOMES[BIO[k]], key = B.key;
       const X = x0 + i * step + (step >> 1), Z = z0 + j * step + (step >> 1);
@@ -290,45 +349,9 @@
       if (i > -1) slope = Math.max(slope, Math.abs(y - Hs[k - 1])); if (i < n) slope = Math.max(slope, Math.abs(y - Hs[k + 1]));
       if (j > -1) slope = Math.max(slope, Math.abs(y - Hs[k - N])); if (j < n) slope = Math.max(slope, Math.abs(y - Hs[k + N]));
       slope /= step;
-      const pn = g.patchN ? g.patchN.n2(X, Z) : 0;
-      const cold = (B.temp - Math.max(0, y - 90) * 0.0025) < 0.15;
-      let t = mixc(tint(grassTop, B.grass, 1.0), dirt, 0), s = mixc(dirt, t, 0.18), cliff = stone;
-      let kd = 0, h = y + 1, ax = 0;
-      const water = y < SEA;
-      const ember = cl.ember > 0.45 || key === 'ember_canyons';
-      if (water) {
-        const deep = SEA - y > 6;
-        t = deep ? (B.warm ? sand : gravel) : (pn > 0.25 ? clay : sand);
-        s = t; cliff = deep ? gravel : sandstone;
-        if (ember) { if (y < 59) { kd = 2; h = 60; t = [255, 120, 30]; } else { t = redsand; } }
-        else if ((cl.prism > 0.35 || cl.ember > 0.35) && cl.river > 0.25) { kd = 3; h = SEA + 1; t = [70, 200, 255]; }
-        else if (cold || B.frozen) { kd = 6; h = SEA + 1; t = ice; ax = 0; }
-        else { kd = 1; h = SEA + 0.9; ax = Math.min(62, (SEA - y + 1) & ~1) | ((B.warm ? 1 : key.indexOf('swamp') >= 0 ? 3 : (key.indexOf('cold') >= 0 || key.indexOf('frozen') >= 0) ? 2 : 0) << 6); }
-      } else if (key === 'desert' || key === 'beach' || key === 'snowy_beach') { t = sand; s = sand; cliff = sandstone; }
-      else if (key === 'stony_shore') { t = pn > 0 ? stone : gravel; s = t; }
-      else if (key.indexOf('badlands') >= 0) {
-        const band = g.bands ? scol(g.bands[M.clamp(y + Math.round((g.stripN ? g.stripN.n3(X * 0.01, 0, Z * 0.01) : 0) * 7), 0, 255)], 0xa0531e) : terr;
-        t = y < 80 ? redsand : band; s = terr; cliff = band;
-        if (key === 'wooded_badlands' && y > 94) t = mixc(tint(grassTop, B.grass), coarse, 0.4);
-      }
-      else if (key === 'mushroom_fields') t = myc;
-      else if (key === 'mangrove_swamp') { t = mud; s = mud; }
-      else if (key === 'ice_spikes') { t = snow; s = snow; }
-      else if (key === 'jagged_peaks' || key === 'frozen_peaks') { t = slope > 0.9 ? stone : (key === 'frozen_peaks' && pn > 0.2 ? ice : snow); s = stone; }
-      else if (key === 'snowy_slopes' || key === 'grove') { t = slope > 0.9 ? stone : (pn > 0.3 ? powder : snow); if (key === 'grove' && pn < -0.2) t = tint(grassTop, B.grass); s = stone; }
-      else if (key === 'stony_peaks') { t = (g.stripN && g.stripN.n3(X * 0.02, y * 0.2, Z * 0.02) > 0.2) ? calcite : stone; s = t; }
-      else if (key === 'windswept_hills' || key === 'windswept_forest') { if (pn > 0.15) { t = stone; s = stone; } }
-      else if (key === 'windswept_gravelly_hills') { if (pn > 0.1) { t = gravel; s = gravel; } else if (pn < -0.3) { t = stone; s = stone; } }
-      else if (key === 'windswept_savanna') { if (pn > 0.2) { t = stone; s = stone; } else if (pn < -0.2) t = coarse; }
-      else if (key === 'old_growth_pine_taiga' || key === 'old_growth_spruce_taiga') t = pn > 0.25 ? coarse : pn > -0.1 ? podzol : t;
-      else if (key === 'dappled_forest') { if (pn > 0.15) t = coarse; }
-      else if (ember) { const bandc = ((y + Math.round(hh(X >> 5, Z >> 5, 7) * 4)) % 5) < 2 ? umber : ochre; const capGreen = cl.hz1 > 0.4 && key === 'sky_meadow'; t = (y > 70 && cl.canyon < 0.25) ? (capGreen ? tint(grassTop, B.grass) : redsand) : bandc; s = bandc; cliff = bandc;
-        if (y > 66 && cl.canyon < 0.3 && g.nCrack && step <= 8) { const cr = g.nCrack.n2(X, Z), cr2 = g.nCrack2.n2(X, Z), wdt = 0.028 + cl.ember * 0.02 + step * 0.004; if (Math.abs(cr) < wdt || Math.abs(cr2) < wdt * 0.6) { kd = 2; t = [255, 120, 30]; } } }
-      else if (key === 'prism_fields' || key === 'crystal_highlands') { cliff = duskrock; s = mixc(duskrock, t, 0.3); }
-      if (!water && t === t && slope > 1.25 && y > 95 && kd === 0 && key.indexOf('badlands') < 0 && !ember) { t = stone; s = stone; }
-      const duskPeak = (cl.hz3 || 0) > 0.45;   // the Mountain Station's peaks are dark dusk-rock, never snow
-      if (duskPeak) { t = duskrock; s = duskrock; cliff = duskrock; }
-      if (!water && cold && kd === 0 && key !== 'stony_shore' && !duskPeak) { t = snow; s = mixc(s, snow, 0.5); kd = 6; }
+      LOD.look(g, P, B, key, cl, X, Z, y, slope, step, lk);
+      let t = lk.t, s = lk.s, kd = lk.kd, h = lk.h;
+      const ax = lk.ax, cliff = lk.cliff, water = lk.water, cold = lk.cold;
       // trees: near levels get little voxel trees (trunk + canopy), far levels blend canopy colour & height into the cell
       const tr = TREES[key];
       if (!water && tr && kd !== 6 || (!water && tr && (key === 'snowy_taiga' || key === 'grove'))) {
