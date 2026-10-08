@@ -417,7 +417,7 @@
         this.setBlock(x, y, z, t.with(s, 'open', 1));
         if (t.o.kind === 'door') { const h = t.get(s, 'half'); const oy = h ? y - 1 : y + 1; const s2 = w.getBlock(x, oy, z); if (R.T.type[s2] === t.id) this.setBlock(x, oy, z, t.with(s2, 'open', 1)); }
         const d = Math.hypot(this.g.player.pos[0] - x, this.g.player.pos[2] - z);
-        if (d < 18 && this.g.audio) this.g.audio.play('door');
+        if (d < 18 && this.g.audio) this.g.audio.play('door', { at: [x + 0.5, y + 0.5, z + 0.5] });
       }
       this.doors.set(key, { x, y, z, t: 2.2 });
     }
@@ -832,7 +832,7 @@
           const target = vil.homes[act.deliver - 1];
           const o = target && target.outside;
           if (!o) { act.deliver = 0; return; }
-          if (this.goTo(a, o[0], o[1], o[2], 1.6)) { const fam = vil.fams.find(f => f.home === act.deliver - 1); if (this.near(a, 24)) a.say(T('g.folk.bread', { s: fam ? fam.surname : T('g.vil.neighbours') }), 3.5); vil.st.stats.bread++; act.deliver = 0; if (this.near(a, 14) && g.audio) g.audio.play('door'); }
+          if (this.goTo(a, o[0], o[1], o[2], 1.6)) { const fam = vil.fams.find(f => f.home === act.deliver - 1); if (this.near(a, 24)) a.say(T('g.folk.bread', { s: fam ? fam.surname : T('g.vil.neighbours') }), 3.5); vil.st.stats.bread++; act.deliver = 0; if (this.near(a, 14) && g.audio) g.audio.play('door', { at: a.pos }); }
           return;
         }
         if (spot && this.goTo(a, spot[0], spot[1], spot[2], 1.5)) {
@@ -1005,7 +1005,7 @@
       if (from) { const dx = a.pos[0] - from[0], dz = a.pos[2] - from[2], l = Math.hypot(dx, dz) || 1; a.vel[0] += dx / l * 5; a.vel[2] += dz / l * 5; a.vel[1] = 4.5; }
       if (a.pose === 'sleep' || a.pose === 'sit') this.wake(a);
       a.say(Folk.say('hurt', H(a.p.seed, this.time | 0, 13)), 3);
-      g.audio.play('hurt');
+      g.audio.play('hurt', { at: a.pos });
       a.vil.st.rep = Math.max(-20, (a.vil.st.rep || 0) - 2);
       const fam = a.vil.agents.find(o => o !== a && o.p.fam === a.p.fam && !o.kid && Math.hypot(o.pos[0] - a.pos[0], o.pos[2] - a.pos[2]) < 16);
       if (fam) setTimeout(() => fam.say(T('g.folk.leaveAlone', { n: a.p.name }), 3), 900);

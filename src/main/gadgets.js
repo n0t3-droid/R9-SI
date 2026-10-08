@@ -872,7 +872,7 @@
         if (list) { at = [base[0] + dx, base[1] + dy, base[2] + dz]; break outer; }
       }
       if (!list) {
-        if (!force) { g.ui.hint(T('g.ship.noRoom'), 2600); g.audio.play('zap'); return false; }
+        if (!force) { g.ui.hint(T('g.ship.noRoom'), 2600); g.audio.play('bonk'); return false; }
         at = base; list = place(base[0], base[1], base[2], false);
       }
       const touched = new Set();
