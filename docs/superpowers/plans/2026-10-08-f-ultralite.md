@@ -85,6 +85,7 @@ Count first: draw calls by kind at the villa and the Nova Haven plaza (terrain m
 horizon, ring 1, entities). If the furniture's per-model draws are a real share: one multi-draw-instanced call for all
 near furniture models (instance data from a float texture indexed by gl_DrawID + gl_InstanceID), the same for the far
 boxes and the glass. The VX detail meshes are unchanged.
+→ Counted, then not built as a switch: see "As built" (the far furniture went into the Fern-Cache instead).
 
 ### 3 · Spiegelung leicht (`reflLite`)
 The water mirror at ¼ × ¼ of the frame instead of ½ × ½, sharpened by a depth-aware 4-tap upsample in the water shader
@@ -92,7 +93,7 @@ The water mirror at ¼ × ¼ of the frame instead of ½ × ½, sharpened by a de
 covers beyond); the props at their far forms only; no folk (as today). Measured: reflMs at a lake, before/after.
 
 ### 6 · The preset „Ultra · Leicht" (`ultraLite`)
-Ultra's look values + farCache, shadowTakt, streamTakt, reflLite, furnBatch on. The governor on Ultra and Ultra-Lite
+Ultra's look values + farCache, shadowTakt, streamTakt, reflLite on (as built: four switches, no furnBatch). The governor on Ultra and Ultra-Lite
 takes cheap rungs first — far-cache refresh (500 → 1000 ms), shadow cadence (rings × 2), mirror ¼, folk 72 — before
 rays, VX detail, shadow size, clouds and only then resolution; the view distance never. The ladders only list rungs that
 change something with the current settings (a no-op rung would fail its probe and block the ladder for 30 s).
@@ -131,7 +132,10 @@ WIP split (done: 6ef16a5, 18e2918) → plan → baseline probe → 2 → 5 → 1
 
 Done: 5476fd8 Schatten-Takt · 43d309d Weltgenerierung im Takt · f52be05 Fern-Cache · 1d1ec48 Spiegelung leicht ·
 88ea20e the preset, rungs, Automatik, settings · d3b303a the measuring browser test. Step 4 (furniture batching): see
-the decision below.
+the decision below. Then: 8907fe1 the seam light spread over frames · bb4a177 the cache a strip a frame · 7073b7e the far
+furniture in the cache (step 4) · c7d4561 the mesh-job starts within the budget · babd8f9 the cache on the screen's pixel
+grid · test: a7fc714 / ad3fcf8 / b90c781 / 00dd6d6 / ad1c85c / d745f95 (the walks' parts, the settle, still pictures,
+the lake, one path for both walks).
 
 ## As built (where it differs from the design above)
 
@@ -160,6 +164,23 @@ the decision below.
   with the shadow lookup moved to the cache's eye; the live pass draws only the pieces within it (liveProps). The palms
   stay live (they sway). Node: ultralite_far.js d/e (within 64 blocks live, beyond it cached, none twice, none lost).
 - The light mirror reaches 96 blocks with the props' far forms; a governor rung draws it every other frame.
+- Fern-Cache on the screen's pixel grid (babd8f9, after run 2): the cache was ceil(w × overscan) wide, so its texels sat
+  between the screen's pixels and the composite resampled the whole far world (run 2's village: every far edge a little
+  soft, 8.9 % of the pixels off). `VR.UL.Far.grid` makes it the screen's grid with whole pixels round it (1280 × 720 →
+  1772 × 1066, at least the overscan) and widens the projection by exactly those pixels: an eye where the cache was drawn
+  reads every pixel's own texel at its centre (ultralite_far.js: worst 4·10⁻⁵ texels). Moved or turned within the cache's
+  limits, the composite still reprojects (bilinear) until the next cache — at most 1.5 m, 4° or 500 ms.
+- The furniture batching (step 4) — why no switch: the furniture already is one instanced draw per model and distance
+  band. The draws were counted (run 1, Ultra's main pass): props 7 at the hall, 10 at the plaza, 84 at the village (49 in
+  run 2), against 17 · 46 · 160 terrain multi-draws, 331 far draws (horizon + ring 1) and ~300 for the folk and the things.
+  One multi-draw-instanced call for all models needs the instance data in a texture indexed by gl_DrawID (FURN_VS rewritten
+  — t-smooth's code, a merge risk), and on the owner's ANGLE / D3D11 `WEBGL_multi_draw` is emulated by a loop of the
+  same draws in the GPU process: the iGPU would do the same work. What was worth doing is done in the far cache: every
+  piece beyond the cache's near radius (64 blocks at render distance 8, 128 at 16) is drawn into the cache a strip at a
+  time and not again until the next cache; the live pass draws only the pieces within (run 2's village, 8 blocks above
+  the roofs: the props pass 96 → 66 ms, 49 → 47 draws — most of a village's furniture is within the 64 blocks).
+- The walks (test, after run 2): both presets walk the same 200 m north through Nova Haven, each in a world made fresh
+  (runs 1–2 sent Ultra · Leicht through the city and Ultra into the canyon).
 
 ## What the baseline showed (v0.43 dist, Ultra, render distance 8, SwiftShader)
 
@@ -210,9 +231,33 @@ starts up to 27 ms), Ultra · Leicht 1 (76 ms; drainUploads ≤ 12 ms, mesh star
 mesh-start cap. 60 m with the day running (420 frames, only the shadow work drawn): **Ultra 1 090 ms a frame, 85 full
 maps; Ultra · Leicht 554 ms, 17 maps** (one full, sixteen sun steps over 6 frames each).
 
-### Run 2 (the final code)
+### Run 2 (the code of c7d4561: strips, step 4, the mesh-start cap; before the far cache's grid and the still pictures)
 
-(filled in from .tmp_tests/ultralite_run2.json)
+.tmp_tests/ultralite_run2.json / .log; pictures test/shots/ultralite_{hall,plaza,village}_{ultra,ultraLite}_run2.png.
+
+| scene | Ultra | Ultra · Leicht steady | a new cache's frames (5) | draws | triangles | full shadow map | pictures |
+|---|---|---|---|---|---|---|---|
+| hall | 11 093 | **6 066 (−45 %)** | 9 703 · 8 669 · 9 112 · 8 888 · 9 196 | 357 → 13 | 1 178k → 228k | 4 176 → 3 525 | mean 7/255, 8.2 % off: a ship lands in the second picture |
+| plaza | 11 645 | **7 197 (−38 %)** | 5 742 · 7 714 · 6 970 · 7 476 · 7 054 | 387 → 32 | 1 983k → 648k | 5 362 → 4 024 | mean 1.0/255, 1.6 % — the same |
+| village | 20 051 | **9 171 (−54 %)** | 15 623 · 12 233 · 14 521 · 16 557 · 10 904 | 543 → 82 | 2 778k → 977k | 16 549 → 24 278 | mean 5.2/255, 8.9 %: chimney smoke, a contrail — and every far edge a little soft |
+
+- Every frame of Ultra · Leicht — the frames that draw a new cache too — costs less than Ultra's: the strips spread the
+  far world (a refresh frame 49–87 % of Ultra's frame), the steady ones draw only the near world live (terrain
+  sub-draws 169 → 56, 332 → 74, 587 → 188; the horizon's and ring 1's 330 draws in the cache).
+- The pictures: the hall and the village differed by what moves (the test now leaves out ships, folk, trails and
+  particles in both) and, at the village, by the far cache's resampling (fixed: the cache on the screen's grid, babd8f9).
+  Looked at: test/shots/ultralite_village_{ultra,ultraLite}_run2.png — the same village, lake, island and sky; the
+  difference map shows the contrail, the smoke puffs and a fine line along every far edge.
+- The full shadow map is one sample each (± 30 % between runs on this machine: run 1 village 21 321 → 19 478, run 2
+  16 549 → 24 278); the takt draws a full map only when the eye jumped (> 64 blocks) or a fresh map starts.
+- Walks (the presets on opposite paths — see run 3 for the same path): 200 m streaming, 1 397 frames: Ultra 1 frame
+  over 40 ms (42 ms), Ultra · Leicht 2 (63 ms: the villages' update 50 ms; 99 ms: a stalled frame — one column's
+  integration 34 ms where the median is 0.3, the seam light 25 ms and the horizon 37 ms in the same frame). A column's
+  arrival in the worker message handler between two frames: Ultra up to 21 ms (253 columns, 255 ms in all), Ultra ·
+  Leicht ≤ 2 ms (the 90 columns wait and are integrated in the frames). 30 m back with the day running (211 frames,
+  only the shadow work drawn): Ultra 32 full maps, 765 ms a frame (the longest 9.6 s: a whole map in one frame);
+  Ultra · Leicht 9 maps (one full, eight sun steps over 6 frames each), 681 ms a frame — but through the city's casters
+  against the canyon's few.
 
 ## Known gaps
 
