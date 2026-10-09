@@ -601,6 +601,149 @@
     });
   }
 
+  // ============================================================================ rocks and relief
+  // Boulders over the land (more on the ridge and in the woods, a few in the meadow): rounded lumps of stone, andesite
+  // and mossy cobble with moss on top; tors on the ridge (two or three lumps stacked); the lookout tower on the
+  // ridge's crest (a stone tower with a spiral stair round a newel, a railed platform with lanterns on top); a small
+  // shrine at the west crossroads (a pedestal with a lantern under a slate roof on four pillars, flowers, a bench);
+  // fairy rings of mushrooms in the woods and the meadows. No crystal anywhere (vgen ≥ 9: GEN.noCry).
+  const BC = 18;
+  function dressRocks(g, P, cx, cz, out) {
+    const x0 = cx * 16, z0 = cz * 16, w = new GEN.ColumnWriter(cx, cz, out.blocks), BIm = VR.BIOME.sky_meadow;
+    const ST = { stone: st('stone'), and: st('andesite'), mc: st('mossy_cobblestone'), cob: st('cobblestone'), tuff: st('tuff'), moss: st('moss_carpet'), mossB: st('moss_block') };
+    for (let gz = Math.floor((z0 - 6) / BC); gz <= Math.floor((z0 + 21) / BC); gz++) for (let gx = Math.floor((x0 - 6) / BC); gx <= Math.floor((x0 + 21) / BC); gx++) {
+      const hx = M.hash2(gx, gz, g.seed ^ 0xb01d) >>> 0, x = gx * BC + 2 + (hx % (BC - 4)), z = gz * BC + 2 + ((hx >>> 9) % (BC - 4));
+      if (x < x0 - 6 || x > x0 + 21 || z < z0 - 6 || z > z0 + 21) continue;
+      const lift = (x < -500 && x > -730 && z > -160 && z < 250) ? LAND.ridgeLift(g, x, z) : 0, q = LAND.woodAt(g, x, z);
+      const p = lift > 6 ? 0.75 : q.d > 0.4 ? 0.24 : 0.1;
+      if (((hx >>> 20) & 1023) / 1024 >= p) continue;
+      if (LAND.zoneAt(g, x, z) || (LAND.keepAt(P, x, z) & (1 | 2 | 4 | 8 | 16)) || LAND.keepAt(P, x + 2, z) & 1 || LAND.keepAt(P, x - 2, z) & 1 || LAND.keepAt(P, x, z + 2) & 1 || LAND.keepAt(P, x, z - 2) & 1) continue;
+      const y = g.surfaceY(x, z); if (y <= SEA + 1 || g.biomeFor(g.climateAt(x, z), y) !== BIm) continue;
+      const rng = new VR.RNG((hx ^ 0x68e31da4) >>> 0), tor = lift > 10 && rng.chance(0.45), n = tor ? 2 + rng.int(2) : 1;
+      let by = y, bx = x, bz = z;
+      for (let k = 0; k < n; k++) {
+        const rx = (tor ? 2 : 1) + rng.int(2) - (k ? 1 : 0), ry = 1 + rng.int(2), rz = (tor ? 2 : 1) + rng.int(2) - (k ? 1 : 0);
+        for (let dy = -ry; dy <= ry; dy++) for (let dx = -rx; dx <= rx; dx++) for (let dz = -rz; dz <= rz; dz++) {
+          const dd = (dx * dx) / (rx * rx + 0.3) + (dy * dy) / (ry * ry + 0.3) + (dz * dz) / (rz * rz + 0.3);
+          if (dd > 1 + (rng.next() - 0.5) * 0.5) continue;
+          const yy = by + dy + (k ? 0 : 1), r2 = rng.next();
+          w.place(bx + dx, yy, bz + dz, lift > 6 ? (r2 < 0.45 ? ST.stone : r2 < 0.75 ? ST.and : r2 < 0.9 ? ST.tuff : ST.mc) : (r2 < 0.4 ? ST.mc : r2 < 0.7 ? ST.stone : r2 < 0.88 ? ST.and : ST.cob), 2);
+        }
+        // moss on its top
+        for (let dx = -rx; dx <= rx; dx++) for (let dz = -rz; dz <= rz; dz++) { if (rng.next() > 0.55) continue; let yy = by + ry + 2; while (yy > by - 2 && w.get(bx + dx, yy, bz + dz) === 0) yy--; const b = w.get(bx + dx, yy, bz + dz); if (b === ST.stone || b === ST.mc || b === ST.and || b === ST.cob) w.place(bx + dx, yy + 1, bz + dz, ST.moss); }
+        by += ry + 1; bx += rng.int(3) - 1; bz += rng.int(3) - 1;
+      }
+    }
+    // fairy rings: one candidate per 64 blocks, in a wood or a meadow, a circle of mushrooms
+    const blocks = out.blocks, BR = st('brown_mushroom'), RD = st('red_mushroom'), GR = st('grass_block'), PZ = st('podzol');
+    for (let gz = Math.floor((z0 - 5) / 64); gz <= Math.floor((z0 + 20) / 64); gz++) for (let gx = Math.floor((x0 - 5) / 64); gx <= Math.floor((x0 + 20) / 64); gx++) {
+      const hx = M.hash2(gx, gz, g.seed ^ 0xfa1e) >>> 0;
+      if ((hx & 1023) / 1024 > 0.3) continue;
+      const rcx = gx * 64 + 8 + (hx >>> 10) % 48, rcz = gz * 64 + 8 + (hx >>> 17) % 48, rr = 3 + ((hx >>> 26) & 1) * 0.8;
+      if (rcx + 5 < x0 || rcx - 5 > x0 + 15 || rcz + 5 < z0 || rcz - 5 > z0 + 15) continue;
+      if (LAND.zoneAt(g, rcx, rcz) || LAND.keepAt(P, rcx, rcz)) continue;
+      for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) {
+        const x = rcx + dx, z = rcz + dz, lx = x - x0, lz = z - z0; if (lx < 0 || lz < 0 || lx > 15 || lz > 15) continue;
+        const d = Math.hypot(dx, dz); if (d < rr - 0.5 || d > rr + 0.5) continue;
+        if (LAND.keepAt(P, x, z)) continue;
+        const col = (lz << 4) | lx, y = topOf(blocks, col, 160), t = blocks[(y << 8) | col];
+        if ((t !== GR && t !== PZ) || y <= SEA) continue;
+        const ai = ((y + 1) << 8) | col; if (blocks[ai] && !(R.T.flags[blocks[ai]] & F.REPLACE)) continue;
+        blocks[ai] = h01(x, z, 7) < 0.7 ? BR : RD;
+      }
+    }
+  }
+  LAND.DRESS.push(dressRocks);
+  // the fairy rings' centres (for the tests and the map): the same draws as dressRocks
+  LAND.rings = function (g, P, x0, z0, x1, z1) {
+    const out = [];
+    for (let gz = Math.floor(z0 / 64); gz <= Math.floor(z1 / 64); gz++) for (let gx = Math.floor(x0 / 64); gx <= Math.floor(x1 / 64); gx++) {
+      const hx = M.hash2(gx, gz, g.seed ^ 0xfa1e) >>> 0;
+      if ((hx & 1023) / 1024 > 0.3) continue;
+      const rcx = gx * 64 + 8 + (hx >>> 10) % 48, rcz = gz * 64 + 8 + (hx >>> 17) % 48;
+      if (!LAND.zoneAt(g, rcx, rcz) && !LAND.keepAt(P, rcx, rcz)) out.push([rcx, rcz, 3 + ((hx >>> 26) & 1) * 0.8]);
+    }
+    return out;
+  };
+  // ---- the lookout tower on the ridge's crest
+  LAND.PIECES.push(Object.assign(function lookout(g, P, K) {
+    const site = P.sites.find(s => s.kind === 'lookout'); if (!site) return;
+    const gy = groundOf(g, P), put = K.put;
+    // the tower beside the way's end: the highest free ground within 10 blocks
+    let bx = site.x, bz = site.z, bh = -1;
+    for (let dz = -10; dz <= 10; dz += 2) for (let dx = -10; dx <= 10; dx += 2) {
+      const x = site.x + dx, z = site.z + dz; if (Math.hypot(dx, dz) < 5) continue;
+      let free = true; for (let a = -3; a <= 3 && free; a++) for (let b = -3; b <= 3; b++) if (P.cells.has(ck(x + a, z + b))) { free = false; break; }
+      if (!free) continue;
+      const h = gy(x, z) + h01(x, z, 9) * 0.5; if (h > bh) { bh = h; bx = x; bz = z; }
+    }
+    const F = gy(bx, bz) + 1, H = 15, SB = st('stone_bricks'), MB = st('mossy_stone_bricks'), CB = st('cracked_stone_bricks');
+    const face = FACE4(site.x - bx, site.z - bz), dv = [[0, -1], [1, 0], [0, 1], [-1, 0]][face];
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+      const x = bx + dx, z = bz + dz, y0 = gy(x, z), edge = Math.abs(dx) === 2 || Math.abs(dz) === 2;
+      for (let y = Math.min(y0, F - 1) - 1; y < F; y++) put(x, y, z, SB);
+      put(x, F, z, SB);
+      for (let y = F + 1; y <= F + H; y++) put(x, y, z, edge ? (h01(x * 3 + y, z, 11) < 0.18 ? MB : h01(x, z * 5 + y, 12) < 0.08 ? CB : SB) : 0);
+    }
+    // the door, arrow-slit windows, the spiral stair round the newel (one step a block, all the way up)
+    put(bx + dv[0] * 2, F + 1, bz + dv[1] * 2, 0); put(bx + dv[0] * 2, F + 2, bz + dv[1] * 2, 0);
+    for (let y = F + 4; y < F + H; y += 4) for (const [ax, az] of [[2, 0], [-2, 0], [0, 2], [0, -2]]) if (!(ax === dv[0] * 2 && az === dv[1] * 2) || y > F + 4) put(bx + ax, y, bz + az, 0);
+    for (let y = F + 1; y <= F + H; y++) put(bx, y, bz, SB);
+    const RING = [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]];
+    const k = Math.max(0, RING.findIndex(([a, b]) => a === dv[0] && b === dv[1]));
+    for (let i = 0; i < H; i++) {
+      const [a, b] = RING[(k + i) % 8], [na, nb] = RING[(k + i + 1) % 8];
+      put(bx + a, F + 1 + i, bz + b, st('stone_brick_stairs', { facing: FACE4(na - a, nb - b), half: 0 }));
+    }
+    // the platform: wider than the tower, a railing round it, lanterns on its corners; a hole over the stair's last steps
+    const Y = F + H + 1;
+    for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+      const x = bx + dx, z = bz + dz, rim = Math.abs(dx) === 3 || Math.abs(dz) === 3;
+      put(x, Y, z, st('spruce_planks'));
+      if (rim) put(x, Y + 1, z, (Math.abs(dx) === 3 && Math.abs(dz) === 3) ? st('stone_brick_wall') : st('spruce_fence'));
+      else put(x, Y + 1, z, 0);
+      if (rim && Math.abs(dx) === 3 && Math.abs(dz) === 3) put(x, Y + 2, z, st('lantern', { hanging: 0 }));
+    }
+    for (let i = H - 3; i < H; i++) { const [a, b] = RING[(k + i) % 8]; put(bx + a, Y, bz + b, 0); }
+    put(bx, Y, bz, SB); put(bx, Y + 1, bz, st('stone_brick_wall')); put(bx, Y + 2, bz, st('lantern', { hanging: 0 }));
+    markDisc(P, bx, bz, 6, LAND.KEEP.PIECE);
+    LAND.addSpawn(P, ['lookout', bx, Y + 1, bz], bx, bz);
+    P.pieces.push({ kind: 'lookout', x: bx, z: bz, y: F, top: Y, h: H });
+  }, { order: 2.5 }));
+  // ---- the shrine at the west crossroads
+  LAND.PIECES.push(Object.assign(function shrine(g, P, K) {
+    const site = P.sites.find(s => s.id === 'cross_w'); if (!site) return;
+    const gy = groundOf(g, P), put = K.put;
+    // beside the junction: the first free spot round it, 5 × 5, facing the junction
+    let spot = null;
+    for (let r = 5; r <= 12 && !spot; r++) for (let a = 0; a < 6.283 && !spot; a += 0.3) {
+      const x = Math.round(site.x + Math.cos(a) * r), z = Math.round(site.z + Math.sin(a) * r);
+      let ok = true; for (let dz = -3; dz <= 3 && ok; dz++) for (let dx = -3; dx <= 3; dx++) if (P.cells.has(ck(x + dx, z + dz)) || (LAND.keepAt(P, x + dx, z + dz) & 2)) { ok = false; break; }
+      if (ok && Math.abs(gy(x + 2, z) - gy(x - 2, z)) <= 1 && Math.abs(gy(x, z + 2) - gy(x, z - 2)) <= 1) spot = [x, z];
+    }
+    if (!spot) return;
+    const [x, z] = spot, F = gy(x, z) + 1, face = FACE4(site.x - x, site.z - z);
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+      const qx = x + dx, qz = z + dz, y0 = gy(qx, qz), d = Math.max(Math.abs(dx), Math.abs(dz));
+      for (let y = Math.min(y0, F - 1); y < F; y++) put(qx, y, qz, st('stone_bricks'));
+      put(qx, F, qz, d === 2 ? st('mossy_stone_bricks') : st('polished_andesite'));
+      for (let y = F + 1; y <= F + 5; y++) put(qx, y, qz, 0);
+      if (d === 2 && h01(qx, qz, 13) < 0.5) put(qx, F + 1, qz, st(h01(qx, qz, 14) < 0.5 ? 'poppy' : 'oxeye_daisy'));
+    }
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { put(x + a, F + 1, z + b, st('stone_brick_wall')); put(x + a, F + 2, z + b, st('stone_brick_wall')); put(x + a, F + 3, z + b, st('stone_brick_wall')); }
+    put(x, F + 1, z, st('chiseled_stone_bricks')); put(x, F + 2, z, st('lantern', { hanging: 0 }));
+    const al = (face & 1) ? 0 : 1;   // the ridge across the face
+    for (let a = -2; a <= 2; a++) for (let b = -1; b <= 1; b++) {
+      const [qx, qz] = al ? [x + a, z + b] : [x + b, z + a];
+      put(qx, F + 4 + (b === 0 ? 1 : 0), qz, b === 0 ? st('vx_ridge_slate', { facing: al ? 1 : 0 }) : st('vx_roof_slate', { facing: al ? (b < 0 ? 0 : 2) : (b < 0 ? 3 : 1) }));
+    }
+    const dv = [[0, -1], [1, 0], [0, 1], [-1, 0]][face];
+    const bxx = x + dv[0] * 4 + dv[1] * 2, bzz = z + dv[1] * 4 - dv[0] * 2;
+    if (!P.cells.has(ck(bxx, bzz))) put(bxx, gy(bxx, bzz) + 1, bzz, st('vx_bench', { facing: (face + 2) & 3 }));
+    markDisc(P, x, z, 4, LAND.KEEP.PIECE);
+    P.pieces.push({ kind: 'shrine', x, z, y: F, lamp: [x, F + 2, z] });
+  }, { order: 2.6 }));
+
   // ---------------------------------------------------------------- per chunk: the plan's pieces stamped
   // The land's own blocks go over natural ground only: what another module built stays as it is.
   let NAT = null;
