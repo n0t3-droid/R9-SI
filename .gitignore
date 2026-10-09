@@ -1,6 +1,4 @@
-dist/*
-!dist/index.html
-!dist/studio.html
+dist/
 test/shots/
 test/ships/
 .tmp_tests/
