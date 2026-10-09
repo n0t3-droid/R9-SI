@@ -1395,10 +1395,12 @@
         else if (a.pose === 'sitground') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? -0.05 - (G.hip - 4) * G.bpu : -(a.kid ? 0.26 : 0.6)), a.pos[2]]; }
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
+        // (t-folk: the person's soft shadow on the ground — deeper in the open sun, faint in the terrain's shade and at night)
+        if (smooth && !sleeping && d2 < FG.SH_D * FG.SH_D) FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
         if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);
       }
-      if (smooth) FG.flush(r, E, cam);
+      if (smooth) { FG.drawShadows(r, E); FG.flush(r, E, cam); }
       if (this.drawBoats) this.drawBoats(r, E, cam);
     }
     // the body pose: FolkAnim clips (crossfaded) under the parametric walk cycle, then the head look-at, blinking and

@@ -74,7 +74,7 @@
     const r = g && g.renderer, gl = r && r.gl;
     if (!gl) { rec.state = 0; return; }
     FG.upload(gl, rec, m);
-    FG.stats.got++; FG.stats.workerMs += m.ms || 0; FG.stats.hits += m.hits | 0; FG.stats.miss += m.miss | 0;
+    FG.stats.got++; FG.stats.workerMs += m.ms || 0; FG.stats.hits += m.hits | 0; FG.stats.miss += m.miss | 0; FG.stats.lru = Math.max(FG.stats.lru || 0, m.cacheBytes || 0);
   };
   FG.upload = function (gl, rec, m) {
     FG.free(gl, rec);
@@ -173,6 +173,80 @@
     gl.bindVertexArray(null);
     evict(gl, now);
     return FG.stats.drawn;
+  };
+
+  // ---------------------------------------------------------------- the people's shadows on the ground
+  // A soft dark ellipse under each person drawn (smooth or voxel) within SH_D blocks, stretched away from the sun the lower
+  // it stands, multiplied over the ground: one instanced draw for all of them, with Echte Menschen (the shadow map is
+  // kept for many frames — moving people in it would leave their shadows behind — and the people take the CPU's terrain
+  // shade for their own light, as before). k: the shadow's depth (weaker in the shade of the terrain, at night).
+  FG.SH_D = 32;
+  const SH_VS = `
+layout(location=0) in vec2 a_corner;
+layout(location=1) in vec4 a_inst;
+layout(location=2) in float a_k;
+uniform mat4 u_viewProj;
+uniform vec3 u_light;
+uniform float u_kMul;
+out vec2 v_q;
+out float v_a;
+void main() {
+  vec2 s = -normalize(u_light.xz + vec2(1e-4, 0.0));
+  float len = clamp(0.5 / max(0.12, u_light.y), 1.0, 2.6);
+  vec2 t = vec2(-s.y, s.x);
+  vec2 c = a_inst.xz + s * a_inst.w * (len - 1.0) * 0.85;
+  vec2 p = c + s * a_corner.y * a_inst.w * len + t * a_corner.x * a_inst.w;
+  v_q = a_corner;
+  v_a = a_k * u_kMul * (1.0 - smoothstep(22.0, 32.0, length(vec3(p.x, a_inst.y, p.y))));
+  gl_Position = u_viewProj * vec4(p.x, a_inst.y + 0.03, p.y, 1.0);
+}`;
+  const SH_FS = `
+in vec2 v_q;
+in float v_a;
+out vec4 o;
+void main() { float r = dot(v_q, v_q); if (r > 1.0) discard; float a = 1.0 - r; o = vec4(0.0, 0.0, 0.0, a * a * v_a); }`;
+  const SH = { n: 0, data: new Float32Array(5 * 64), vao: null, vbo: null, ibuf: null, cap: 0, prog: undefined };
+  FG.shadow = function (pos, cam, r, k) {
+    const d = SH.data, n = SH.n;
+    if ((n + 1) * 5 > d.length) { const b = new Float32Array(d.length * 2); b.set(d); SH.data = b; }
+    const o = n * 5, D = SH.data;
+    D[o] = pos[0] - cam.x; D[o + 1] = pos[1] - cam.y; D[o + 2] = pos[2] - cam.z; D[o + 3] = r; D[o + 4] = k;
+    SH.n = n + 1;
+  };
+  FG.drawShadows = function (r, E) {
+    const n = SH.n; SH.n = 0;
+    if (!n) return 0;
+    const gl = r.gl;
+    if (SH.prog === undefined) { try { SH.prog = VR.GL.program(SH_VS, SH_FS, 'folkShadow'); } catch (e) { console.error(e); SH.prog = null; } }
+    const p = SH.prog; if (!p) return 0;
+    if (!SH.vao) {
+      SH.vao = gl.createVertexArray(); gl.bindVertexArray(SH.vao);
+      SH.vbo = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, SH.vbo); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 8, 0);
+      SH.ibuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, SH.ibuf);
+      gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 20, 0); gl.vertexAttribDivisor(1, 1);
+      gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 1, gl.FLOAT, false, 20, 16); gl.vertexAttribDivisor(2, 1);
+      gl.bindVertexArray(null);
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, SH.ibuf);
+    if (SH.cap < SH.data.length) { gl.bufferData(gl.ARRAY_BUFFER, SH.data.byteLength, gl.DYNAMIC_DRAW); SH.cap = SH.data.length; }
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, SH.data, 0, n * 5);
+    gl.useProgram(p.p);
+    gl.uniformMatrix4fv(p.u.u_viewProj, false, r.viewProj);
+    const sun = E.sunDir[1] > 0.02, L = sun ? E.sunDir : E.moonDir;
+    gl.uniform3f(p.u.u_light, L[0], Math.max(0.05, L[1]), L[2]);
+    // (by day the sun's; at dusk it fades; by night a faint one under the moon)
+    gl.uniform1f(p.u.u_kMul, sun ? 0.45 + 0.55 * Math.min(1, (E.sunDir[1] - 0.02) / 0.2) : 0.4);
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -2);
+    gl.bindVertexArray(SH.vao);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
+    gl.bindVertexArray(null);
+    gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE);
+    if (r.stats) r.stats.draws++;
+    FG.stats.shadows = n;
+    return n;
   };
 
   // ---------------------------------------------------------------- the setting (⚙ Bild · Dinge & Effekte)
