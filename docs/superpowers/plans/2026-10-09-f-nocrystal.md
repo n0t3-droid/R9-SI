@@ -139,7 +139,11 @@ rehearsed the merges.
   failed it once in a rehearsed merge); `villages` asks t-town's aired-out layout once VG.townFountain exists.
 - REGRESS_ONLY=node, before the speed-up: 103 tests, 102 ALL OK, far_forms.js FAILED 1 on timing (the Sky Isles' form
   22 ms = 19.3 % of its chunks' generation; a vgen-6 world, which this branch leaves alone) — on its own: ALL OK
-  (6.9 ms, 3.5 %). After the speed-up: (running at the commit; the result follows in the next commit)
+  (6.9 ms, 3.5 %). After the speed-up (14:43–15:24): 103 tests, 102 ALL OK, modern_pack.js FAILED 1 on timing
+  (registering the pack 52.1 ms, its cap 50 ms; it passed in both runs before) — under the machine's load then (load
+  average 9.5 on 2 CPUs) the base commit 441658d misses it too, back to back with this branch: 87.5 / 69.6 ms there,
+  68.9 / 248.8 ms here. nocrystal.js, gen_same, mesh_same, light_same, lod_same, id_snapshot, lang, far_forms,
+  trailer_city, trailer_world_gen, heart_gen: ALL OK.
 - smoke.mjs: ALL OK (a new survival world, now vgen 9: spawn in the Gate Temple, inventory, palette, night mobs).
 
 ### Speed (the world must not hang while it generates)
