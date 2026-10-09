@@ -10,6 +10,10 @@
 //   P5  the hall from outside: its long wall, a gate and the tall windows
 //   P6  a house close-up: arched windows, the awning over the storefront, the sign, flower boxes
 //   P0  the hall from above its entrance end (the layout)
+//   P7  (round 2) a shop house's façade from the street's edge: the storefront, the awnings, the word sign, the order of
+//       pilasters, the arched windows, the cornices, the gable
+//   P8  (round 2) the grand staircase from its foot: the flights and landings, the parapets, the newels, the gallery
+//   P1_gold  P1 at 16:00 (the golden hour: the low sun through the glass)
 // The cameras are in the hall's own frame (u across, v along the nave from the plaza at the site's centre; the apse at
 // +v): the frame of the site is r = (site.seed >>> 3) & 3, the same in both builds, so a before and an after picture show
 // the same place. 14:00 is time 8000, dusk 13000; seed 53, the meadow site of cell (-2, -1), the High preset, no HUD.
@@ -21,14 +25,16 @@
 // cameras (glass in the vault over the street, the fountain at the plaza, lamps along the street), the plaza is bright
 // (sky light through the glass), and the villagers in view at P1 stay within the town's budget.
 // usage: BEFORE_DIST=file:///…/index.html TAG=after bash test/wt_run.sh trailer_town.mjs 3600
-//   ONLY=P1,P2 (shot names) · NO_AFTER=1 (only the BEFORE_DIST page) · N=8 frames per cost round · SEED=53 · CELL=-2,-1
+//   ONLY=P1,P2 (shot names) · ONLY_BEFORE=P1,P7 (the BEFORE_DIST page's shots only) · NO_AFTER=1 (only the BEFORE_DIST
+//   page) · N=8 frames per cost round · SEED=53 · CELL=-2,-1
 // regress: skip  (a showcase with two world loads; the gate is test/hallcity.js)
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
 const TAG = process.env.TAG || 'after', N = +(process.env.N || 8), SEED = process.env.SEED || '53';
 const CELL = (process.env.CELL || '-2,-1').split(',').map(Number);
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
-const DAY = 8000, DUSK = 13000;
+const ONLY_BEFORE = process.env.ONLY_BEFORE ? process.env.ONLY_BEFORE.split(',') : null;
+const DAY = 8000, DUSK = 13000, GOLD = 10000;
 const RUNS = [];
 if (process.env.BEFORE_DIST) RUNS.push(['before', process.env.BEFORE_DIST]);
 if (!process.env.NO_AFTER) RUNS.push([TAG, process.env.DIST || 'file:///home/claude/vr/dist/index.html']);
@@ -43,6 +49,9 @@ const SHOTS = [
   ['P0', 0.5, -150.5, { up: 60 }, [0, 0, 10], 66, DAY],    // the layout from above the entrance end
   ['P1_dusk', 0.5, -24.5, 1.62, [0.5, 40, 8], 66, DUSK],
   ['P2_dusk', -1.5, 36.5, 1.62, [0, -80, 9], 60, DUSK],
+  ['P7', -2.5, -31.5, 1.62, [6, -31.5, 7.5], 74, DAY],     // (round 2) a shop house's façade from the street's edge
+  ['P8', 0.5, 30.5, 1.62, [0, 52, 7], 70, DAY],            // (round 2) the grand staircase from its foot
+  ['P1_gold', 0.5, -24.5, 1.62, [0.5, 40, 8], 66, GOLD],   // (round 2) P1 at 16:00
 ];
 const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
@@ -144,8 +153,9 @@ async function runPage(tag, dist) {
   const aim = (c, feet) => { const dx = c.tx - c.x, dz = c.tz - c.z, dy = c.ty - (feet + c.eye); return [Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz))]; };
   // (a first visit to the first camera without a picture: the world, the far ring and the horizon settle there once)
   { const c = await camOf(SHOTS[0]); const f0 = await place(c.x, c.z, c.feet, 0, 0, c.fov, c.tod); const [yaw, pitch] = aim(c, f0); await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]); await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; }); await wait(1500); await settle(40); }
+  const only = tag === 'before' && ONLY_BEFORE ? ONLY_BEFORE : ONLY;
   for (const s of SHOTS) {
-    if (ONLY && !ONLY.some(o => s[0] === o || s[0].startsWith(o + '_'))) continue;
+    if (only && !only.some(o => s[0] === o || s[0].startsWith(o + '_'))) continue;
     want++;
     const c = await camOf(s);
     const feet0 = await place(c.x, c.z, c.feet, 0, 0, c.fov, c.tod);
@@ -176,6 +186,25 @@ async function runPage(tag, dist) {
     console.log(tag, 'probe', JSON.stringify(probe));
     check(probe.glass >= 8 && probe.fountain >= 1 && probe.lamps >= 4, `${tag}: the hall stands at the cameras (vault glass over the street at ${probe.glass} of 13 cells, fountain cells ${probe.fountain}, lamp cells along the street ${probe.lamps})`);
     check(probe.sky >= 12, `${tag}: the plaza is bright (sky light ${probe.sky} of 15 at eye height)`);
+    // round 2 (a build with the word signs): the ornament stands in the world the game loaded — word signs and arched
+    // windows along the street, stalls in the aisles, the staircase's landings — and the signs speak the page's language
+    const orn = await ev(([cx, cz, r, F]) => {
+      if (!VR.Town || !VR.Town.WORDS) return null;
+      const w = VR.game.world, R = VR.R, nm = (s) => s ? R.types[R.T.type[s]].name : 'air';
+      const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
+      const at = (u, y, v) => { const q = ROT[r](u, v); return nm(w.getBlock(cx + q[0], y, cz + q[1])); };
+      let words = 0, arches = 0, stalls = 0, landing = 0;
+      for (let v = -66; v <= 37; v++) for (const u of [-6, -5, 5, 6]) for (let y = F + 1; y <= F + 15; y++) { const n = at(u, y, v); if (/^vm_town_word_/.test(n)) words++; if (n === 'vm_town_arch3') arches++; }
+      for (let v = -77; v <= 51; v++) for (const u of [-31, 31]) if (/^vm_town_stall_/.test(at(u, F + 1, v))) stalls++;
+      for (const v of [40, 41, 44, 45, 48, 49]) if (/smooth_quartz|travertine/.test(at(0, F + [2, 2, 4, 4, 6, 6][[40, 41, 44, 45, 48, 49].indexOf(v)], v))) landing++;
+      const T = VR.Town, lang = VR.I18N && VR.I18N.lang, sample = T.word('baker');
+      return { words, arches, stalls, landing, lang, sample };
+    }, [cx, cz, r, F]);
+    if (orn) {
+      console.log(tag, 'ornament', JSON.stringify(orn));
+      check(orn.words >= 40 && orn.arches >= 100 && orn.stalls >= 60 && orn.landing === 6, `${tag}: round 2 stands in the loaded world (word sign cells ${orn.words}, arched window cells ${orn.arches}, stall cells ${orn.stalls}, the stair's landings ${orn.landing} of 6)`);
+      check(!orn.lang || orn.sample === (orn.lang === 'de' ? 'Bäckerei' : 'Bakery'), `${tag}: the signs speak the page's language (${orn.lang}: ${orn.sample})`);
+    }
     if (folk[tag] && site.folkCap) check(folk[tag].onStreet <= folk[tag].cap && folk[tag].agents <= site.folkCap.max, `${tag}: the town's people fit its budget (${folk[tag].agents} ≤ ${site.folkCap.max}) and at most the street's cap of them are drawn on the street at P1 (${folk[tag].onStreet} on the street + ${folk[tag].drawn - folk[tag].onStreet} indoors drawn of ${folk[tag].inView} in view, cap ${folk[tag].cap})`);
     if (folkDusk[tag] && site.folkCap) check(folkDusk[tag].onStreet <= folkDusk[tag].cap, `${tag}: at dusk too at most the street's cap are drawn on the street at P1 (${folkDusk[tag].onStreet} on the street + ${folkDusk[tag].drawn - folkDusk[tag].onStreet} indoors of ${folkDusk[tag].inView} in view)`);
   }
@@ -203,7 +232,7 @@ async function runPage(tag, dist) {
     const ms = rounds.map(q => q.ms).sort((a, b) => a - b), mid = rounds.find(q => q.ms === ms[1]) || rounds[1];
     return { msMedian: ms[1], ms, draws: mid.draws, tris: mid.tris, parts: { sim: mid.sim, folk: mid.folk, world: mid.world, other: mid.other }, people: mid.people };
   };
-  if (!ONLY || ONLY.includes('P1')) {
+  if (!only || only.includes('P1')) {
     try {
       await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
       const c = await camOf(SHOTS[0]);
