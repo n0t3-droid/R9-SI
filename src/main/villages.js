@@ -36,16 +36,24 @@
     for (const li of st.built || []) if (P.lots[li]) homes.push(Object.assign({}, P.lots[li], { newHome: true }));
     // houses the player built (a roof, a door and a bed near the village): a family moved in
     for (const ch of st.custom || []) homes.push(Object.assign({}, ch, { newHome: true, custom: true }));
-    homes.forEach((home, hi) => {
+    const kindsOf = homes.map((home, hi) => {
       const fs = H(P.seed, hi, 101);
       const nb = Math.max(1, home.beds.length);
-      const fam = { id: hi, surname: surFor(fs), home: hi, members: [], newHome: !!home.newHome };
       const kinds = [];
       if (nb === 1) kinds.push('adult');
       else if (nb === 2 && fs % 5 === 0) kinds.push('elder', 'elder');
       else { kinds.push('adult', 'adult'); for (let k = 2; k < nb; k++) kinds.push(k === nb - 1 && nb >= 4 && fs % 3 === 0 ? 'elder' : 'child'); }
       if (home.newHome) { kinds.length = 0; kinds.push('adult', 'adult'); }
       if (home.custom) { kinds.length = 0; kinds.push('adult'); if (nb >= 2) kinds.push('adult'); for (let k = 2; k < Math.min(nb, 5); k++) kinds.push('child'); }
+      return kinds;
+    });
+    // a town that carries its villager budget (vgen 9: plan.folkCap — one villager per 9 blocks of walkable street and
+    // plaza plus 2 per home): the biggest families shrink, the youngest first, until the town's people fit it
+    Folk.fitBudget(kindsOf, P.folkCap && P.folkCap.max);
+    homes.forEach((home, hi) => {
+      const fs = H(P.seed, hi, 101);
+      const fam = { id: hi, surname: surFor(fs), home: hi, members: [], newHome: !!home.newHome };
+      const kinds = kindsOf[hi];
       let parentLook = null;
       kinds.forEach((age, k) => {
         const seed = H(fs, k, 7);
@@ -81,7 +89,7 @@
     let si = 0;
     for (const a of adults) if (!a.role) { a.role = spare[(si + (H(a.seed, 3, 3) & 1)) % spare.length]; si++; }
     void hasPlots;
-    for (const f of fams) for (const m of f.members) m.look = Folk.look(m.seed, m.role, m.age === 'adult' ? 'adult' : m.age, m.parentLook);
+    for (const f of fams) for (const m of f.members) m.look = Folk.look(m.seed, m.role, m.age === 'adult' ? 'adult' : m.age, m.parentLook, P.style);
     // workplace lookup per role
     vil.workOf = {};
     for (const w of P.work) { const r = WORK_ROLE[w.kind]; if (r) (vil.workOf[r] || (vil.workOf[r] = [])).push(w); if (w.kind === 'market') (vil.workOf.clerk || (vil.workOf.clerk = [])).push(w); }
@@ -210,7 +218,10 @@
       for (let i = 0; i < this.agents.length; i++) {
         const a = this.agents[i];
         const dx = a.pos[0] - px, dz = a.pos[2] - pz, d2 = dx * dx + dz * dz;
-        const every = Math.min(8, (a.pose === 'sleep' ? 6 : d2 < 24 * 24 ? 1 : d2 < 56 * 56 ? 2 : d2 < 100 * 100 ? 3 : 6) * slow);
+        let every = Math.min(8, (a.pose === 'sleep' ? 6 : d2 < 24 * 24 ? 1 : d2 < 56 * 56 ? 2 : d2 < 100 * 100 ? 3 : 6) * slow);
+        // a person nobody sees (not drawn last frame: out of view, beyond the folk distance or past the street's cap) and
+        // not right beside the player lives at the far rate: its time accumulates, its walk goes on in longer steps
+        if (a.drawn === false && d2 > 16 * 16 && every < 4 * slow) every = Math.min(8, 4 * slow);
         a.dtAcc = (a.dtAcc || 0) + dt;
         if (every > 1 && ((fr + i) % every) !== 0) continue;
         if (budget <= 0 && d2 > 24 * 24 && a.dtAcc < 0.5) continue;
@@ -228,7 +239,7 @@
       const g = this.g;
       vil.active = true;
       vil.agents = [];
-      if (!vil.visited) { vil.visited = true; if (g.ui && g.settings.toasts !== false) g.ui.toast(T('g.vil.welcome', { v: vil.name }), T('g.vil.welcomeSub', { n: vil.people.length, f: vil.fams.length }), null); if (g.codex && g.codex.event) g.codex.event('village'); }
+      if (!vil.visited) { vil.visited = true; if (g.ui && g.settings.toasts !== false) g.ui.toast(T('g.vil.welcome', { v: vil.name }), T(vil.plan.style === 'hall' ? 'g.vil.hallSub' : 'g.vil.welcomeSub', { n: vil.people.length, f: vil.fams.length }), null); if (g.codex && g.codex.event) g.codex.event('village'); }
       this.catchUp(vil);
       for (const person of vil.people) {
         const pos = this.spawnPos(vil, person, tod);
@@ -525,8 +536,19 @@
       const gx = Math.floor(x), gy = Math.floor(y), gz = Math.floor(z);
       const dx = a.pos[0] - (gx + 0.5), dz = a.pos[2] - (gz + 0.5);
       const nr = near || 0.6;
-      if (dx * dx + dz * dz < nr * nr && Math.abs(a.pos[1] - gy) < 1.6) { a.path = null; return true; }
-      if (!a.goal || a.goal[0] !== gx || a.goal[1] !== gy || a.goal[2] !== gz) { a.goal = [gx, gy, gz]; a.path = null; a.fails = 0; }
+      if (dx * dx + dz * dz < nr * nr && Math.abs(a.pos[1] - gy) < 1.6) { a.path = null; a.offT = 0; return true; }
+      if (!a.goal || a.goal[0] !== gx || a.goal[1] !== gy || a.goal[2] !== gz) { a.goal = [gx, gy, gz]; a.path = null; a.fails = 0; a.offT = 0; }
+      // a walk nobody sees (t-town: a hall city's 149 people searched three times the paths of a village's 38): a person
+      // not drawn (pick) and away from the player, whose goal no one sees either, searches no path — it arrives when the
+      // walk would be done (the straight distance at its pace, a third more for the bends) and stands at the goal, unseen.
+      // Drawn on the way (the player turned), it searches its path from where it stands, as before.
+      if (!a.path && a.drawn === false && this.unseenWalk(a, gx, gy, gz)) {
+        if (!a.offT) a.offT = this.time + Math.hypot(dx, dz) / Math.max(0.5, a.speed || 1) * 1.35 + 0.5;
+        if (this.time < a.offT) return false;
+        a.offT = 0; a.pos = [gx + 0.5, gy, gz + 0.5]; a.vel = [0, 0, 0]; a.fails = 0;
+        return true;
+      }
+      a.offT = 0;
       if (!a.path) {
         a.pathWait -= 1;
         if (a.pathWait > 0 || this.pathBudget <= 0) return false;
@@ -543,6 +565,14 @@
         }
       }
       return false;
+    }
+    // may a person walk unseen to (gx, gy, gz)? It and its goal away from the player, and the goal out of the last frame's
+    // view or beyond the folk distance (so nobody sees it appear there)
+    unseenWalk(a, gx, gy, gz) {
+      const p = this.g.player.pos, c = this._pickCam, R = 24 * 24;
+      if ((a.pos[0] - p[0]) ** 2 + (a.pos[2] - p[2]) ** 2 < R || (gx + 0.5 - p[0]) ** 2 + (gz + 0.5 - p[2]) ** 2 < R || !c) return false;
+      const dx = gx + 0.5 - c.x, dy = gy - c.y, dz = gz + 0.5 - c.z;
+      return dx * dx + dz * dz > c.FD * c.FD || !VR.mat4.boxInFrustum(this._pickPlanes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2);
     }
     teleportTo(a, x, y, z) {
       // unseen shortcut so nobody stays stuck forever
@@ -591,6 +621,13 @@
       } else { a.vel[0] *= Math.exp(-dt * 10); a.vel[2] *= Math.exp(-dt * 10); }
       // face whatever we are looking at when standing
       if (tx === null && a.lookAt) { const dx = a.lookAt[0] - a.pos[0], dz = a.lookAt[2] - a.pos[2]; const ty2 = Math.atan2(-dx, -dz); let dy = ty2 - a.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; a.yaw += dy * Math.min(1, dt * 5); }
+      // standing still on solid ground with nowhere to go: nothing moves this step, so no collision query — a town's most
+      // common case (t-town: the hall city's 149 people); a person whose ground went away falls as before
+      if (tx === null && a.onGround && a.vel[1] <= 0 && a.vel[0] * a.vel[0] + a.vel[2] * a.vel[2] < 1e-4 && (R.T.flags[get(Math.floor(a.pos[0]), Math.floor(a.pos[1] - 0.05), Math.floor(a.pos[2]))] & F.SOLID)) {
+        a.vel[0] = 0; a.vel[1] = 0; a.vel[2] = 0;
+        a.walkAmt += (0 - a.walkAmt) * Math.min(1, dt * 6);
+        return;
+      }
       const inFluid = R.T.flags[get(Math.floor(a.pos[0]), Math.floor(a.pos[1] + 0.3), Math.floor(a.pos[2]))] & F.FLUID;
       if (inFluid) { a.vel[1] = Math.min(a.vel[1] + 22 * dt, 2.6); } else a.vel[1] -= 28 * dt;
       let my = a.vel[1] * dt, follow = null;
@@ -1036,8 +1073,10 @@
     // -------------------------------------------------- player interaction
     ray(o, d, maxD) {
       let best = null, bt = maxD;
+      const b = this._rayBox || (this._rayBox = [0, 0, 0, 0, 0, 0]), M2 = (maxD + 2) * (maxD + 2);
       for (const a of this.agents) {
-        const b = [-a.w - 0.08, 0, -a.w - 0.08, a.w + 0.08, a.h + 0.1, a.w + 0.08];
+        if ((a.pos[0] - o[0]) ** 2 + (a.pos[2] - o[2]) ** 2 > M2) continue;   // (out of the ray's reach: no box test, no box made)
+        b[0] = -a.w - 0.08; b[1] = 0; b[2] = -a.w - 0.08; b[3] = a.w + 0.08; b[4] = a.h + 0.1; b[5] = a.w + 0.08;
         const r = PH.rayBox(o[0], o[1], o[2], d[0], d[1], d[2], b, a.pos[0], a.pos[1], a.pos[2]);
         if (r && r[0] < bt) { bt = r[0]; best = a; }
       }
@@ -1228,7 +1267,7 @@
       }
       p.inv.consumeHeld(1);
       const def = VR.itemDef(h.id);
-      const loved = (a.p.likes === 'bread' && /bread|cake|cookie|pie/.test(h.id)) || (a.p.likes === 'flowers' && /poppy|dandelion|tulip|orchid|allium|bluet|daisy|rose|lily|flower/.test(h.id)) || (a.p.likes === 'crystals' && /crystal|shard|amethyst/.test(h.id)) || (a.p.likes === 'books' && /book|paper/.test(h.id)) || (a.p.likes === 'stars' && /star|glow/.test(h.id));
+      const loved = (a.p.likes === 'bread' && /bread|cake|cookie|pie/.test(h.id)) || (a.p.likes === 'flowers' && /poppy|dandelion|tulip|orchid|allium|bluet|daisy|rose|lily|flower/.test(h.id)) || (a.p.likes === 'crystals' && /crystal|shard|amethyst|lantern|glow_berr/.test(h.id)) || (a.p.likes === 'books' && /book|paper/.test(h.id)) || (a.p.likes === 'stars' && /star|glow/.test(h.id));
       const food = def && def.food;
       st.rep = (st.rep || 0) + (loved ? 3 : food ? 2 : 1);
       this.talkText(loved ? T('g.gift.love', { item: name, likes: T('g.likes.' + a.p.likes, null, a.p.likes) }) : Folk.say('thanks', H(a.p.seed, this.time | 0, 41)));
@@ -1295,31 +1334,39 @@
     }
 
     // -------------------------------------------------- rendering
+    // who is drawn this frame — the street's budget (src/shared/folkcrowd.js): of the people within the folk distance and
+    // in view, the nearest streetCap of those on the street (on the way in counts), and whoever has arrived indoors; the
+    // others wait out of sight (they keep walking, so nobody pops in on the spot). Marks a.vis, a.street, a.d2v and
+    // a.drawn: update() and separate() simulate a person nobody sees at the far rate (t-town: a hall city's 149 people)
+    pick(planes, cam, cap, FD) {
+      const C = VR.Crowd, near = this._near || (this._near = new Float64Array(16));
+      const pc = this._pickCam || (this._pickCam = { x: 0, y: 0, z: 0, FD: 0 });
+      pc.x = cam.x; pc.y = cam.y; pc.z = cam.z; pc.FD = FD; this._pickPlanes = planes;
+      let nn = 0;
+      for (const a of this.agents) {
+        const dx = a.pos[0] - cam.x, dy = a.pos[1] - cam.y, dz = a.pos[2] - cam.z;
+        const d2 = dx * dx + dz * dz;
+        a.vis = false; a.drawn = false;
+        if (d2 > FD * FD) continue;
+        if (!VR.mat4.boxInFrustum(planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
+        a.vis = true; a.d2v = d2;
+        a.street = C.onStreet(a);
+        if (a.street) nn = C.keepNearest(near, nn, cap, d2);
+      }
+      const thr = nn >= cap ? near[cap - 1] : Infinity;
+      for (const a of this.agents) if (a.vis) a.drawn = !(a.street && a.d2v > thr);
+    }
     draw(r, E, cam) {
       if (!this.agents.length) return;
       const g = this.g, gl = r.gl, ent = g.entities;
       if (!ent) return;
       const p = ent.beginVox(r, E);
       const t = g.time;
-      // the street's budget (src/shared/folkcrowd.js): the people in view are at most streetCap of the preset; the
-      // nearest ones are drawn, the others wait out of sight (they keep walking, so nobody pops in on the spot)
       const C = VR.Crowd, FD = g.folkDist || g.folkBase || 100, cap = C.streetCap(g.settings && g.settings.preset);
-      const near = this._near || (this._near = new Float64Array(16));
-      let nn = 0;
+      this.pick(r.planes, cam, cap, FD);
       for (const a of this.agents) {
-        const dx = a.pos[0] - cam.x, dy = a.pos[1] - cam.y, dz = a.pos[2] - cam.z;
-        const d2 = dx * dx + dz * dz;
-        a.vis = false;
-        if (d2 > FD * FD) continue;
-        if (!VR.mat4.boxInFrustum(r.planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
-        a.vis = true; a.d2v = d2;
-        if (!(a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type]))) nn = C.keepNearest(near, nn, cap, d2);
-      }
-      const thr = nn >= cap ? near[cap - 1] : Infinity;
-      for (const a of this.agents) {
-        if (!a.vis) continue;
+        if (!a.drawn) continue;
         const d2 = a.d2v, dy = a.pos[1] - cam.y;
-        if (d2 > thr && !(a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type]))) continue;
         const far = d2 > (FD < 100 ? 16 : 24) * (FD < 100 ? 16 : 24);
         // the model is looked up once per agent and LOD (the key is built from the look only once)
         const mk = far ? 1 : 0;
@@ -1387,7 +1434,7 @@
       const pl = g.player.pos;
       for (const a of this.agents) {
         const d2 = (a.pos[0] - pl[0]) ** 2 + (a.pos[2] - pl[2]) ** 2;
-        if (d2 > 26 * 26) continue;
+        if (d2 > 26 * 26 || a.drawn === false) continue;   // (no bubble floats where the street's budget drew nobody)
         const looked = this.lookTarget === a;
         if (!a.bubble && !(looked && d2 < 12 * 12)) continue;
         // greet the player the first time they come close
@@ -1431,4 +1478,5 @@
     list() { return this.sites; }
   }
   VR.Villages = Villages;
+  Villages.makeRoster = makeRoster;   // (the families and jobs of a village record: test/town_folk.js)
 })(VR);

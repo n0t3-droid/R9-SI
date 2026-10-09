@@ -407,21 +407,31 @@
     const list = this.agents, n = list.length; if (n < 2 && !this.g.player) return;
     const w = this.g.world, get = (x, y, z) => w.getBlock(x, y, z), nb = w.nbFn();
     const pl = this.g.player;
-    // a 2-block grid: only neighbours in the same or adjacent cells can touch (no more n² over the whole city)
-    const grid = this._sepGrid || (this._sepGrid = new Map());
-    grid.clear();
-    const gk = (x, z) => ((x >> 1) + 32768) * 65536 + ((z >> 1) + 32768);
-    for (let j = 0; j < n; j++) { const b = list[j]; const k = gk(Math.floor(b.pos[0]), Math.floor(b.pos[2])); let cell = grid.get(k); if (!cell) { cell = []; grid.set(k, cell); } cell.push(b); }
-    const cand = [];
     const ppx = pl ? pl.pos[0] : 0, ppz = pl ? pl.pos[2] : 0;
+    // a 2-block grid: only neighbours in the same or adjacent cells can touch (no more n² over the whole city). Its cells
+    // are kept between frames and stamped with the frame (no arrays made per frame: a hall city has 149 people)
+    const grid = this._sepGrid || (this._sepGrid = new Map()), fr = (this._sepFr = (this._sepFr || 0) + 1);
+    if (grid.size > 8192) grid.clear();
+    const gk = (x, z) => ((x >> 1) + 32768) * 65536 + ((z >> 1) + 32768);
+    for (let j = 0; j < n; j++) {
+      const b = list[j];
+      if (pl && (b.pos[0] - ppx) ** 2 + (b.pos[2] - ppz) ** 2 > 50 * 50) continue;
+      const k = gk(Math.floor(b.pos[0]), Math.floor(b.pos[2]));
+      let cell = grid.get(k); if (!cell) { cell = []; cell.f = 0; grid.set(k, cell); }
+      if (cell.f !== fr) { cell.length = 0; cell.f = fr; }
+      cell.push(b);
+    }
+    const cand = this._sepCand || (this._sepCand = []);
     for (let i = 0; i < n; i++) {
       const a = list[i];
       if (a.inBoat || a.pose === 'sleep' || a.pose === 'sit') continue;
-      if (pl && (a.pos[0] - ppx) ** 2 + (a.pos[2] - ppz) ** 2 > 48 * 48) continue; // crowding far out of sight costs nothing
+      const dp2 = pl ? (a.pos[0] - ppx) ** 2 + (a.pos[2] - ppz) ** 2 : 0;
+      if (dp2 > 48 * 48) continue; // crowding far out of sight costs nothing
+      if (a.drawn === false && dp2 > 16 * 16) continue; // nor does it where nobody is drawn (villages.js pick: out of view, past the street's cap)
       let px = 0, pz = 0;
       cand.length = 0;
       const ax = Math.floor(a.pos[0]) >> 1, az = Math.floor(a.pos[2]) >> 1;
-      for (let gx = ax - 1; gx <= ax + 1; gx++) for (let gz = az - 1; gz <= az + 1; gz++) { const cell = grid.get((gx + 32768) * 65536 + (gz + 32768)); if (cell) for (const b of cell) if (b !== a) cand.push(b); }
+      for (let gx = ax - 1; gx <= ax + 1; gx++) for (let gz = az - 1; gz <= az + 1; gz++) { const cell = grid.get((gx + 32768) * 65536 + (gz + 32768)); if (cell && cell.f === fr) for (let q = 0; q < cell.length; q++) { const b = cell[q]; if (b !== a) cand.push(b); } }
       for (let j = 0; j < cand.length; j++) {
         const b = cand[j];
         const dx = a.pos[0] - b.pos[0], dz = a.pos[2] - b.pos[2];
@@ -443,5 +453,39 @@
         VR.PHYS.move(get, a.pos, a.w, a.h, px * mx, 0, pz * mx, 0.6, nb, true); VR.PHYS.snapSmooth(get, a.pos);
       }
     }
+  };
+
+  // ---------------------------------------------------------------- the Weißstadt's afternoon (the hall city, style 'hall')
+  // The town's grown-ups without a counter to keep (the trades keep their shops) spend part of the afternoon out: one in
+  // three sits at the café's tables round the plaza ('terrace': the café of the hall city is outdoors, so its guests count
+  // toward the street's budget of src/shared/folkcrowd.js, unlike an indoor café's), one in two goes shopping along the
+  // street (a stroll, bag or basket in hand: villagers.js V.WEISS); at lunch the café's guests sit on the terrace too.
+  const SHOPKEEPERS = { baker: 1, scholar: 1, cashier: 1, clerk: 1, barista: 1, mayor: 1, healer: 1, ranger: 1, teacher: 1 };
+  P.TOWN_AFTERNOON = [6900, 10600];
+  P.townPlan = function (a, tod, want) {
+    if (!a.vil || !a.vil.plan || a.vil.plan.style !== 'hall') return want;
+    if (want === 'cafe') return 'terrace';
+    if (a.kid || want !== 'work' || SHOPKEEPERS[a.role] || tod < P.TOWN_AFTERNOON[0] || tod >= P.TOWN_AFTERNOON[1]) return want;
+    const k = Folk.hash(a.p.seed, 23, 7) % 6;
+    return k < 2 ? 'terrace' : k < 5 ? 'stroll' : want;
+  };
+  const prevSchedule = P.schedule;
+  P.schedule = function (a, tod) { return this.townPlan(a, tod, prevSchedule.call(this, a, tod)); };
+  // the terrace: a seat at one of the café's tables (the plaza's chairs), sitting a while, a word now and then
+  const prevRunAct = P.runAct;
+  P.runAct = function (a, dt, tod) {
+    const act = a.act;
+    if (!act || act.type !== 'terrace') return prevRunAct.call(this, a, dt, tod);
+    act.t += dt;
+    const vil = a.vil, cafe = (vil.workOf.barista || [])[0], seats = cafe && cafe.seats || [];
+    if (!seats.length) { act.type = 'plaza'; return; }
+    if (!act.spot) {
+      // a free chair: the person's own pick first, the next ones round the tables when it is taken
+      const k0 = Folk.hash(a.p.seed, 41, (this.time / 60) | 0) % seats.length;
+      for (let i = 0; i < seats.length && !act.spot; i++) { const s = seats[(k0 + i) % seats.length]; if (!vil.agents.some(o => o !== a && o.act && o.act.spot && o.act.spot[0] === s[0] && o.act.spot[2] === s[2])) act.spot = s.slice(); }
+      if (!act.spot) { act.type = 'plaza'; return; }
+    }
+    if (a.pose === 'sit') { if (Math.random() < dt * 0.04 && this.near(a, 12)) a.say(Folk.say('cafe', Folk.hash(a.p.seed, 18, (this.time / 7) | 0), { v: vil.name }), 3); if (act.t > 90) act.done = true; return; }
+    if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 0.8)) this.sit(a, act.spot);
   };
 })(VR);

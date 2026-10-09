@@ -58,7 +58,8 @@
     const rnd = (k) => H3(sd & 0xffff, k, sd >>> 16, 4242);
     const skin = L.skin, hc = L.hair, shoes = L.shoes;
     let shirt = L.shirt, pants = L.pants;
-    const acc = kid ? null : role.acc;
+    // (the Weißstadt's robes and coats replace a trade's work clothes, but aprons, sashes, the healer's cross and armour stay over them)
+    const acc = kid ? null : L.garb ? (/^(apron|apron2|sash|cross|armor)$/.test(role.acc || '') ? role.acc : null) : role.acc;
     if (acc === 'overalls') pants = 0x3A5A9A;
     // proportions (model units = 1/32 block)
     // the trailer heroes are chunkier: shorter legs, broader shoulders, the same torso (two blocks tall in all)
@@ -245,7 +246,7 @@
     mouth.set(0, my + 1, -7, 0xF4F4F0);
 
     // ============================== body
-    const body = mk(-12, 12, -17, bodyH + 3, -8, 7);
+    const body = mk(-12, 12, L.garb === 'robe' && !kid ? -22 : -17, bodyH + 3, -8, 7);   // (a Weißstadt robe reaches lower: its grid does)
     const shF = fab(shirt, 0.07, 11);
     body.rbox(-bw, 0, bz0, bw, top, bz1, shF, { top: true });
     for (let y = 0; y <= 1; y++) for (let z = bz0; z <= bz1; z++) for (let x = -bw; x <= bw; x++) body.paint(x, y, z, fab(pants, 0.05, 12)(x, y, z));
@@ -372,6 +373,15 @@
       }
     }
     if (L.dress) skirt(kid ? -6 : -10, 0.12, fab(L.dressCol || shirt, 0.06, 20));
+    // the Weißstadt's robes and coats (villagers.js V.WEISS): a robe to the ankles or a coat to the knees in the town's
+    // palette, a gold hem, a gold line down the robe's front, gold buttons and a lighter collar on a coat (the cuffs below)
+    if (L.garb && !kid) {
+      const gc = fab(shirt, 0.05, 41), trim = L.trim || 0xD8B048, long = L.garb === 'robe';
+      const y0 = long ? -(legH - 3) : -Math.round(legH * 0.55);
+      skirt(y0, long ? 0.06 : 0.04, (x, y, z) => (y === y0 ? trim : gc(x, y, z)));
+      if (long) { for (let y = y0; y <= top - 1; y++) front(0, y, trim); for (let x = -bw; x <= bw; x++) body.paint(x, 2, bz0, trim); }
+      else { for (let y = y0; y <= top - 1; y++) front(0, y, mul(shirt, 0.84)); for (const y of [3, 6, 9, 12]) front(1, y, trim); for (let x = -3; x <= 3; x++) body.set(x, top, bz0 - 1, mul(shirt, 1.16)); }
+    }
 
     // ============================== arms (pivot at the shoulder)
     const sleeveLen = armLen - handH;
@@ -391,7 +401,7 @@
         for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, -Math.round(sleeveLen * 0.55), z, P2);
       }
       if (acc === 'flight') for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, -5, z, 0xFF7A1A);
-      if (acc === 'cross' || acc === 'robe') for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, sleeveBottom, z, acc === 'robe' ? 0xE0C060 : 0xE8E8E4);
+      if (acc === 'cross' || acc === 'robe' || L.garb) for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, sleeveBottom, z, L.garb ? (L.trim || 0xD8B048) : acc === 'robe' ? 0xE0C060 : 0xE8E8E4);
       // cuff
       if (!rolled && !shortSl) for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, sleeveBottom, z, mul(shirt, 0.85));
       if (rolled) for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) a.paint(x, sleeveBottom, z, mul(shirt, 1.12));
@@ -420,6 +430,19 @@
         }
         else if (tool === 'book') { a.box(-3, fy - 3, -6, 2, fy + 3, -4, (x, y, z) => z === -6 || x === -3 ? 0x3F63A8 : 0xF0EAD8); a.set(-3, fy, -7, 0xE0C060); }
         else if (tool === 'bread') { a.box(-3, fy - 6, -4, 3, fy - 2, 3, (x, y, z) => (x + y + z) & 1 ? 0xA07040 : 0x8A5A30); a.ell(-1, fy - 1, -1, 2, 1.2, 1.5, 0xD89A50); a.ell(1.5, fy - 1, 1, 1.5, 1, 1.5, 0xE8B060); }
+        // the Weißstadt's shopping: a paper bag on two cord handles, or a wicker basket with bread and apples, hanging from the fist
+        else if (tool === 'bag') {
+          const bc = (x, y, z) => mul(0xC89A60, 0.93 + H3(x, y, z, 26) * 0.1);
+          a.box(-4, fy - 14, -3, 4, fy - 4, 2, bc);
+          for (let x = -4; x <= 4; x++) for (let z = -3; z <= 2; z++) a.paint(x, fy - 6, z, 0xD8B048);
+          for (const x of [-2, 2]) { a.set(x, fy - 3, -1, 0x5A3F2A); a.set(x, fy - 2, -1, 0x5A3F2A); } a.set(-1, fy - 1, -1, 0x5A3F2A); a.set(0, fy - 1, -1, 0x5A3F2A); a.set(1, fy - 1, -1, 0x5A3F2A);
+        }
+        else if (tool === 'basket') {
+          const wk = (x, y, z) => mul(0xB08850, ((x + y + z) & 1) ? 0.92 : 1.04);
+          for (let y = fy - 11; y <= fy - 5; y++) for (let z = -4; z <= 3; z++) for (let x = -4; x <= 4; x++) if (y === fy - 11 || Math.abs(x) === 4 || z === -4 || z === 3) a.set(x, y, z, wk(x, y, z));
+          for (let x = -4; x <= 4; x++) { const h = Math.round(4 - (x * x) / 4); a.set(x, fy - 5 + h, -1, 0x8A6A40); }
+          a.ell(-1.5, fy - 5, -1, 2.2, 1.2, 1.4, 0xD89A50); a.ell(2, fy - 5.5, 1, 1.3, 1.3, 1.3, 0xD8402E); a.ell(0.5, fy - 5.5, 1.5, 1.2, 1.2, 1.2, 0x6AB04A);
+        }
         else if (tool === 'can') { a.box(-2, fy - 7, -3, 2, fy - 2, 2, (x, y, z) => mul(0x5A9AC0, 0.92 + H3(x, y, z, 25) * 0.1)); for (let k = 0; k < 5; k++) a.set(0, fy - 5 + k, -4 - k, 0x5A9AC0); a.box(-1, fy - 1, -1, 1, fy, 1, 0x3A6A8A); }
       }
       if (!right && elder && role.tool === 'cane') { for (let y = -armLen - 22; y <= fy + 1; y++) a.set(0, y, -3, mul(0x8A5A3A, 0.9 + ((y & 1) ? 0.08 : 0))); a.set(0, fy + 2, -4, 0x8A5A3A); a.set(0, fy + 2, -5, 0x8A5A3A); a.set(0, fy + 1, -5, 0x8A5A3A); }

@@ -5,7 +5,8 @@
 // a white cap with a red beacon; five secondary spires and buttress pinnacles
 // clustered around it; a watchtower with a saucer observation ring and a
 // spike; a ribbed plinth terrace with a landing pad; crystal groves at the
-// foot. The Heartland places one on its mountain south-west of the temple;
+// foot (new worlds, vgen ≥ 9: rock pinnacles and boulders of the mountain's stone instead — VR.GEN.noCry). The
+// Heartland places one on its mountain south-west of the temple;
 // elsewhere one citadel per ~640-block cell sits on the highest mountain.
 // The far horizon (lod.js) draws the same spires from kilometres away.
 // ============================================================================
@@ -329,6 +330,7 @@
           const gy = g.surfaceY(px, pz);
           if (gy <= SEA + 2) continue;
           const hh = giant || (big ? 7 + crng.int(8) : 3 + crng.int(4)), blk = st(cc + '_crystal_block'), cl = st(cc + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 });
+          if (GEN.noCry(g)) { groveRock(w, px, gy, pz, hh, giant, big, s.seed + k); continue; }   // vgen 9: rock (the same draws)
           for (let t = 0; t < hh; t++) { w.set(px, gy + 1 + t, pz, blk); if (big && t < hh - 3) { w.set(px + 1, gy + 1 + t, pz, blk); w.set(px, gy + 1 + t, pz + 1, blk); if (t < hh - 6) w.set(px + 1, gy + 1 + t, pz + 1, blk); } }
           w.set(px, gy + 1 + hh, pz, cl);
         }
@@ -337,6 +339,21 @@
       for (const V of (s.viaducts || [])) viaduct(g, w, V, P, x0, z0);
     }
   };
+  // vgen 9 (GEN.noCry): rock where a crystal of the groves would stand — the giants and the big ones pinnacles of the
+  // mountain's stone (stone with andesite and mossy cobble courses, a tuff foot, a mossy top), the small ones boulders
+  // (the rock never cuts into the citadel: a cell holding anything but the mountain's own ground or a plant is kept)
+  let RK = null;
+  function groveRock(w, x, gy, z, hh, giant, big, seed) {
+    if (!RK) {
+      RK = { stone: st('stone'), andesite: st('andesite'), tuff: st('tuff'), mossy: st('mossy_cobblestone'), moss: st('moss_block'), ground: new Uint8Array(R.stateCount + 1) };
+      for (const t of R.types) if (/^(stone|dirt|grass_block|coarse_dirt|podzol|rooted_dirt|andesite|diorite|granite|tuff|gravel|sand|red_sand|snow|snow_block|powder_snow|calcite|deepstone|cobblestone|mossy_cobblestone|moss_block|moss_carpet|packed_ice|ice|clay|mud)$/.test(t.name) || (R.T.flags[t.defaultState] & (VR.F.PLANT | VR.F.REPLACE | VR.F.LEAVES))) RK.ground.fill(1, t.base, t.base + t.nstates);
+    }
+    const S = RK, keep = (s) => !S.ground[s];
+    const mat = (px, py, pz) => { const k = M.hash2(px * 3 + py, pz, seed) & 7; return py <= gy + 1 ? S.tuff : k < 2 ? S.andesite : k === 2 ? S.mossy : S.stone; };
+    if (giant) GEN.pinnacle(w, x, gy + 1, z, { h: hh, r: hh >= 20 ? 2.4 : 1.8, mat, top: S.moss, seed, keep });
+    else if (big) GEN.pinnacle(w, x, gy + 1, z, { h: hh, r: 1.3, mat, top: S.moss, seed, keep });
+    else GEN.pinnacle(w, x, gy + 1, z, { h: 2, r: 1.1, mat, top: S.moss, root: 1, seed, keep });
+  }
   const prevGen = OG.generate;
   OG.generate = function (cx, cz) {
     const out = prevGen.call(this, cx, cz);
