@@ -10,8 +10,10 @@
 //  - MEASURE: the fixed scene (default world, seed 1, the Heartland plaza at the spawn, 12:00 = ticks 6000, frozen
 //    time and weather, 1280×720) on Very Low (potato) and High in one world: the frame time (FRAMES frames, then a 1×1
 //    read of the canvas, which waits for the GPU: SwiftShader's work counts; relative costs only), the per-pass
-//    submission time (renderer.prof), draws, tris, sections, full-screen passes. BOTH=1 measures the v0.41 copy
-//    (REFDIST) first, in the same session: the before/after cost table.
+//    submission time (renderer.prof), draws, tris, sections, full-screen passes. BOTH=1 opens the v0.41 copy
+//    (REFDIST) beside it, the same world in a second page, and measures the two in turns (ROUNDS rounds, default 3:
+//    v0.41, this build, v0.41, …) so a load change on the shared machine falls on both alike: the median per build
+//    and the median of the per-round ratios (the before/after cost table); Very Low must not be slower.
 //  - SHOTS: outdoors above the plaza at 06:00, 12:00, 18:30, 23:00; inside a lit stone room (two torches, a glowing
 //    block, a window) at 18:30 and 23:00; Very Low and High → test/shots/light_<tag>_<preset>_<clock>.png. LOOK at them.
 //  - RD (default 6) caps the render distance of both presets (High's 14 chunks take too long on the shared machine);
@@ -36,10 +38,14 @@ const SHOTS = '/home/claude/vr/test/shots';
 const CLOCKS = [['0600', 0], ['1200', 6000], ['1830', 12500], ['2300', 17000]];
 const INSIDE = [['1830', 12500], ['2300', 17000]];
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
-const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
 const logs = [];
-page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error') logs.push(`[${t}] ${s.slice(0, 400)}`); });
-page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 800)));
+const newPage = async () => {
+  const pg = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  pg.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error') logs.push(`[${t}] ${s.slice(0, 400)}`); });
+  pg.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 800)));
+  return pg;
+};
+let page = await newPage();   // the helpers below act on this page (MEASURE switches it between the builds)
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 let fails = 0;
@@ -59,8 +65,8 @@ const drive = (n, render) => ev(([m, r]) => {
 const settle = async (max = 120) => {
   for (let i = 0; i < max; i++) {
     await drive(10, false);
-    const s = await ev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty }; });
-    if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && i > 3) break;
+    const s = await ev(() => { const g = VR.game, h = g.horizon; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty, far: h ? (h.inflight || 0) + ((h.stats && h.stats.want) || 0) : 0 }; });
+    if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.far === 0 && i > 3) break;
     await wait(60);
   }
 };
@@ -149,11 +155,15 @@ const lookAt = async (dist, tag) => {
     return y0;
   });
   console.log('look: open sky at y ' + up);
+  // the land in view fully built before any number is read (both builds alike: a loaded machine streams slower, and
+  // a half-built view — the far tiles standing in for the sections — reads as another picture)
   for (let k = 0; k < 600; k += 60) await drive(60, false);
+  await settle(240);
   const out = { tag, scenes: {} };
   for (const kind of LOOK_SCENES) {
     await ev((w) => VR.game.chat('/wetter ' + w), LOOK_WORD[kind]);
     for (let k = 0; k < 720; k += 60) await drive(60, false);
+    await settle(60);
     const st = await ev(() => { const W = VR.game.env.wx; return { kind: W.kind, rain: +VR.game.env.rain.toFixed(3), snow: +VR.game.env.snow.toFixed(3), fog: +W.v.fog.toFixed(3), tod: VR.game.env.timeOfDay }; });
     const m = await ev(LOOK_PROBE, { body: false });
     out.scenes[kind] = { ...st, ...m };
@@ -284,29 +294,56 @@ try {
   }
   if (MODE === 'measure' || MODE === 'shots' || MODE === 'all') {
     const BUILDS = process.env.BOTH ? [[REFDIST, 'v041'], [DIST, TAG]] : [[DIST, TAG]];
+    const ROUNDS = +(process.env.ROUNDS || (process.env.BOTH ? 3 : 1));
+    await page.close();
+    // one page per build, the same world in each (the page's own frame loop stops at the first settle: drive())
+    const worlds = [];
     for (const [bdist, btag] of BUILDS) {
+      page = await newPage();
       await toTitle(bdist);
-      const results = {};
       await ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.renderDist = rd; g.settings.dynRes = false; g.applySettings('*'); }, [PRESETS[0], RD]);
       await ev(`VR.game.createWorld({name:'Light',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
       for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
       await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.env.rainTarget = 0; g.hideHud = true; const hd = document.getElementById('hud'); if (hd) hd.style.display = 'none'; });
       const spot = { ground: await ev(() => { const pl = VR.game.player; pl.flying = true; pl.pitch = -0.08; pl.yaw = 0.6; return [Math.floor(pl.pos[0]), Math.floor(pl.pos[1]), Math.floor(pl.pos[2])]; }) };
       await ev(() => { VR.game.env.setTime(6000); });
-      for (const preset of PRESETS) {
+      await settle();
+      worlds.push({ page, btag, spot, results: {}, runs: {} });
+    }
+    const med = (a) => { const b = a.slice().sort((x, y) => x - y); return b.length % 2 ? b[(b.length - 1) / 2] : (b[b.length / 2 - 1] + b[b.length / 2]) / 2; };
+    for (const preset of PRESETS) {
+      for (const w of worlds) {
+        page = w.page;
         await ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.renderDist = rd; g.settings.dynRes = false; g.applySettings('*'); }, [preset, RD]);
-        await ev((p) => { const pl = VR.game.player; pl.flying = true; pl.teleport(p[0] + 0.5, p[1] + 0.02, p[2] + 0.5); pl.pitch = -0.08; pl.yaw = 0.6; }, spot.ground);
+        await ev((p) => { const pl = VR.game.player; pl.flying = true; pl.teleport(p[0] + 0.5, p[1] + 0.02, p[2] + 0.5); pl.pitch = -0.08; pl.yaw = 0.6; }, w.spot.ground);
         await settle();
-        if (MODE !== 'shots') results[preset] = await measure(btag, preset);
-        if (MODE !== 'measure') {
-          if (!spot.room) { spot.room = await buildRoom(spot.ground); await settle(40); }
-          await shots(btag, preset, spot);
-        }
       }
       if (MODE !== 'shots') {
-        fs.mkdirSync(TMP, { recursive: true });
-        fs.writeFileSync(`${TMP}light_measure_${btag}.json`, JSON.stringify(results, null, 1));
+        // the builds in turns, round after round
+        for (let r = 0; r < ROUNDS; r++) for (const w of worlds) { page = w.page; (w.runs[preset] = w.runs[preset] || []).push(await measure(w.btag, preset)); }
+        for (const w of worlds) {
+          const walls = w.runs[preset].map((x) => x.wallMs), m = med(walls);
+          const pick = w.runs[preset].slice().sort((x, y) => Math.abs(x.wallMs - m) - Math.abs(y.wallMs - m))[0];
+          w.results[preset] = Object.assign({}, pick, { wallMs: +m.toFixed(2), rounds: walls });
+          console.log(`[${w.btag} ${preset}] median ${m.toFixed(2)} ms/frame over ${walls.length} rounds (${walls.join(', ')})`);
+        }
+        if (worlds.length === 2) {
+          const a = worlds[0].runs[preset].map((x) => x.wallMs), b = worlds[1].runs[preset].map((x) => x.wallMs);
+          const ratios = b.map((v, i) => v / a[i]), rm = med(ratios);
+          worlds[1].results[preset].vsV041 = { ratioMedian: +rm.toFixed(3), ratios: ratios.map((v) => +v.toFixed(3)) };
+          console.log(`[${preset}] ${TAG} against v0.41: ×${rm.toFixed(3)} (median of the per-round ratios ${ratios.map((v) => v.toFixed(3)).join(', ')})`);
+          if (preset === 'potato') check(rm <= 1.0, `Very Low: ${TAG} no slower than v0.41 (×${rm.toFixed(3)}, the median per-round frame time ratio)`);
+        }
       }
+      if (MODE !== 'measure') for (const w of worlds) {
+        page = w.page;
+        if (!w.spot.room) { w.spot.room = await buildRoom(w.spot.ground); await settle(40); }
+        await shots(w.btag, preset, w.spot);
+      }
+    }
+    if (MODE !== 'shots') {
+      fs.mkdirSync(TMP, { recursive: true });
+      for (const w of worlds) fs.writeFileSync(`${TMP}light_measure_${w.btag}.json`, JSON.stringify(w.results, null, 1));
     }
   }
   check(errorsNow().length === 0, `no page or WebGL errors (${errorsNow().length})`);
