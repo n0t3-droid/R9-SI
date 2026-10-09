@@ -147,10 +147,34 @@
   // every second terrace where the hill is gentle enough (its lot cut level into the slope), and three stairways climb
   // from the city's hill foot over every riser, paved across the treads with light lines on both sides. The cut leaves
   // every cell the city laid out as it is (plan.nova.owns). The edges of the region blend into the natural hills.
-  const T8 = HILLS.T8 = { x0: -170, x1: 170, z0: -285, z1: -150, base: 82, blend: 18, stairsX: [-64, 0, 64] };
+  const T8 = HILLS.T8 = { x0: -170, x1: 170, z0: -285, z1: -150, base: 82, blend: 18 };
   T8.levels = (() => { const L = [T8.base]; while (L[L.length - 1] < 140) L.push(L[L.length - 1] + ((L.length & 1) ? 4 : 5)); return L; })();
   HILLS.inT8 = (x, z) => x >= T8.x0 && x <= T8.x1 && z >= T8.z0 && z <= T8.z1;
   const ss = M.smoothstep;
+  // the round hills (t3_07 · t3_08 · t3_09): at vgen 8 the Heartland's own terrain (HEART.design, so the generator, the
+  // far forms and the horizon all see them) carries domes on a jittered grid of the face — a cosine bell each, 16–23
+  // blocks over the land, the highest one counting where two meet — faded in from the city's edge and at the face's
+  // sides; the terrace cut then runs round each hill in rings (run 1: one long slope cut into straight steps read as a
+  // stepped wall behind the city)
+  HILLS.domesT8 = function (g) {
+    if (g._t8domes) return g._t8domes;
+    const rng = new VR.RNG((g.seed ^ 0x2d0e5) >>> 0), D = [];
+    for (let zc = T8.z1 - 40; zc >= T8.z0 + 20; zc -= 52) for (let xc = T8.x0 + 30; xc <= T8.x1 - 30; xc += 62) D.push({ x: xc + (rng.next() - 0.5) * 26, z: zc + (rng.next() - 0.5) * 18, r: 30 + rng.int(12), h: 16 + rng.int(8) });
+    return (g._t8domes = D);
+  };
+  HILLS.liftT8 = function (g, x, z) {
+    if (x < T8.x0 || x > T8.x1 || z < T8.z0 || z > T8.z1) return 0;
+    const fade = ss(-T8.z1, -T8.z1 + 22, -z) * ss(T8.x0, T8.x0 + T8.blend, x) * (1 - ss(T8.x1 - T8.blend, T8.x1, x)) * ss(T8.z0, T8.z0 + T8.blend, z);
+    if (fade <= 0) return 0;
+    let b = 0;
+    for (const d of HILLS.domesT8(g)) { const q = Math.hypot(x - d.x, z - d.z) / d.r; if (q < 1) { const v = d.h * 0.5 * (1 + Math.cos(Math.PI * q)); if (v > b) b = v; } }
+    return b * fade;
+  };
+  if (HEART.design && !HEART._t8lift) {
+    const prevDesign = HEART.design;
+    HEART.design = function (g, X, Z) { const D = prevDesign(g, X, Z); if (D && g.vgen >= 8) { const b = HILLS.liftT8(g, X, Z); if (b) D.H += b; } return D; };
+    HEART._t8lift = true;
+  }
   // the terraced surface of a column: {h natural top, y terraced top, k level index (−1: not a terrace), w mask}
   const cityOwns = (g) => {
     if (g._t8owns !== undefined) return g._t8owns;
@@ -214,30 +238,34 @@
         taken.push([x0, z0, x1, z1]); n++; xc += 40;
       }
     }
-    // ---- the stairways: three wide flights from the hill foot over every riser, paved across the treads
+    // ---- the stairways: up the south face of every round hill (toward the city), wide flights over every riser to its
+    //      top (to the villa there), paved across the treads
     const ST_UP = st('vollton_light_grey_stairs', { facing: 0, half: 0 }), ST_BODY = st('vollton_light_grey'), PAVE = st('vx_floor_plaza'), LINE = st('vx_floor_plaza_line');
     const inLot = (x, z) => taken.some(t => x >= t[0] - 1 && x <= t[2] + 1 && z >= t[1] - 1 && z <= t[3] + 1);
-    for (const sx of T8.stairsX) {
-      const flights = [];
-      let z = T8.z1;
-      while (z > T8.z0 + 2) {
+    const lines = HILLS.domesT8(g).map(d => ({ x: Math.round(d.x), z0: Math.min(T8.z1 - 1, Math.round(d.z + d.r + 6)), z1: Math.round(d.z) }));
+    const onStair = (x, z) => lines.some(l => Math.abs(l.x - x) <= 3 && z <= l.z0 + 1 && z >= l.z1 - 1);
+    for (const SL of lines) {
+      const sx = SL.x, flights = [];
+      for (let z = SL.z0; z > SL.z1; z--) {
         const a = C(sx, z), b = C(sx, z - 1);
         if (b.y - a.y >= 3 && a.k >= -1) flights.push([z, a.y, b.y]);
-        z--;
       }
-      // a flight stands on the lower tread in front of its riser: step i at height low + i, one cell further north each
+      // a flight stands on the lower tread in front of its riser (step i at height low + i, one cell further north each),
+      // or, where that tread is too narrow (the round hills' upper rings), it is cut into the upper tread behind the riser
       let prevTop = null;
+      const flat = (zA, zB, lvl) => { for (let zz = zA; zz >= zB; zz--) for (let dx = -1; dx <= 1; dx++) { const c = C(sx + dx, zz); if (Math.abs(c.y - lvl) > 1 || inLot(sx + dx, zz)) return false; } return true; };
       for (const [ze, low, high] of flights) {
         const d = high - low;
-        let room = true; for (let i = 0; i < d; i++) for (let dx = -1; dx <= 1; dx++) { const c = C(sx + dx, ze + i); if (Math.abs(c.y - low) > 1 || inLot(sx + dx, ze + i)) room = false; }
-        if (!room) { prevTop = null; continue; }
+        const at = flat(ze + d - 1, ze, low) ? (i) => ze + d - i : flat(ze - 1, ze - d, high) ? (i) => ze - i : null;
+        if (!at) { prevTop = null; continue; }
         for (let i = 1; i <= d; i++) {
-          const zz = ze + d - i;
+          const zz = at(i);
           for (let dx = -1; dx <= 1; dx++) { for (let y = low + 1; y < low + i; y++) put(sx + dx, y, zz, ST_BODY); put(sx + dx, low + i, zz, ST_UP); for (let y = low + i + 1; y <= high + 3; y++) put(sx + dx, y, zz, 0); }
         }
         // the paving across the tread below, from the last flight's top to the foot of this one
-        if (prevTop !== null) for (let zz = prevTop; zz >= ze + d; zz--) { for (let dx = -2; dx <= 2; dx++) { if (inLot(sx + dx, zz)) continue; const c = C(sx + dx, zz); if (Math.abs(c.y - low) > 0) continue; put(sx + dx, low, zz, Math.abs(dx) === 2 ? LINE : PAVE); } }
-        prevTop = ze - 1;
+        const foot = at(1);
+        if (prevTop !== null) for (let zz = prevTop; zz > foot; zz--) { for (let dx = -2; dx <= 2; dx++) { if (inLot(sx + dx, zz)) continue; const c = C(sx + dx, zz); if (Math.abs(c.y - low) > 0) continue; put(sx + dx, low, zz, Math.abs(dx) === 2 ? LINE : PAVE); } }
+        prevTop = at(d) - 1;
         T.stairs.push({ x: sx, z: ze, low, high });
       }
     }
@@ -247,7 +275,7 @@
       const VM = VR.VM;
       for (let z = T8.z0 + 8; z <= T8.z1 - 4; z += 3) for (let x = T8.x0 + 8; x <= T8.x1 - 8; x += 3) {
         const hv = (M.hash2(x, z, g.seed + 4401) >>> 0) % 1000; if (hv >= 22) continue;
-        const c = C(x, z); if (c.k < 1 || inLot(x, z) || T8.stairsX.some(s => Math.abs(s - x) <= 3)) continue;
+        const c = C(x, z); if (c.k < 1 || inLot(x, z) || onStair(x, z)) continue;
         let flat = true; for (let dx = -2; dx <= 2 && flat; dx++) for (let dz = -2; dz <= 2; dz++) { const n = C(x + dx, z + dz); if (n.y !== c.y || HILLS.edgeT8(g, x + dx, z + dz)) { flat = false; break; } }
         if (!flat) continue;
         VM.put((xx, yy, zz, n, pr) => put(xx, yy, zz, st(n, pr)), x, c.y + 1, z, TREE, 0);
@@ -256,7 +284,7 @@
     // ---- samples for test/trailer_city.js: tread and edge cells spread over the face, as many of each
     const tread = [], edge = [];
     for (let z = T8.z1 - 4; z >= T8.z0 + 20; z -= 1) for (let x = T8.x0 + 24 + ((z * 3) & 7); x <= T8.x1 - 24; x += 9) {
-      const c = C(x, z); if (c.k < 0 || inLot(x, z) || T8.stairsX.some(s => Math.abs(s - x) <= 3)) continue;
+      const c = C(x, z); if (c.k < 0 || inLot(x, z) || onStair(x, z)) continue;
       (HILLS.edgeT8(g, x, z) ? edge : tread).push([x, z, c.k, HILLS.edgeT8(g, x, z) ? 1 : 0]);
     }
     for (let i = 0; i < 150; i++) { if (edge[Math.floor(i * edge.length / 150)]) T.samples.push(edge[Math.floor(i * edge.length / 150)]); if (tread[Math.floor(i * tread.length / 150)]) T.samples.push(tread[Math.floor(i * tread.length / 150)]); }
@@ -269,7 +297,9 @@
     if (v.ops) return v.ops;
     const VG = VR.VillageGen, PLAN = VG.plan2, chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { o: [] }; chunks.set(k, b); } return b; };
-    const L = VG.makeLot((x, y, z, s) => bucket(x, z).o.push(x, y, z, s), v.ox, v.oz, v.r);
+    // (on a round hill the lot stands out over the slope: its fill shows moss from the side, like the risers, not dirt)
+    const DIRT = st('dirt'), MOSS = st('moss_block');
+    const L = VG.makeLot((x, y, z, s) => bucket(x, z).o.push(x, y, z, s === DIRT ? MOSS : s), v.ox, v.oz, v.r);
     const ground = (u, w) => { const q = VG.rot(v.r, u, w); return HILLS.cellT8(g, v.ox + q[0], v.oz + q[1]).y; };
     PLAN.build(L, { w: PLAN.NOVA.LOT[0], d: PLAN.NOVA.LOT[1], F: v.L + 1, r: v.r, ox: v.ox, oz: v.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: v.comp, novaMirror: v.mirror, rng: new VR.RNG((g.seed ^ (v.ox * 73 + v.oz * 977)) >>> 0), ground, beds: 3, noCustom: v.comp !== 'classic' });
     v.ops = chunks; v.built = true;
