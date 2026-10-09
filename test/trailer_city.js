@@ -207,6 +207,12 @@ if (city) {
   const cnt = {}; for (const s of cityAt.values()) { const n = nameOf(s); cnt[n] = (cnt[n] || 0) + 1; }
   const parts0 = (n) => { let c = 0; for (const s of cityAt.values()) if (nameOf(s) === n && propOf(s, 'part') === 0) c++; return c; };
   check((cnt.grass_block || 0) > 4000 && (cnt.vx_hedge || 0) > 200 && (cnt.vx_bush_light || 0) + parts0('vm_bush_blossom') > 30 && parts0('vm_flower_cluster') > 150, `lawns ${cnt.grass_block | 0}, hedges ${cnt.vx_hedge | 0}, topiary balls ${(cnt.vx_bush_light | 0) + parts0('vm_bush_blossom')}, flower clusters ${parts0('vm_flower_cluster')}`);
+  // the planted verges of t1_24 · t2_23: ferns along the kerbs, fan palms (a crown on a trunk of two or three) between
+  // the tall palms, each with its trunk and the crown's anchor (the cell the smooth palm stands on); small round trees
+  const ANCHOR = R.S('vm_palm_crown', { part: 'p303', facing: 0 }), anchorOf = (x, y, z) => cityAt.get(x + ',' + y + ',' + z) === ANCHOR;
+  let fans = 0, fansOk = 0; for (const rd of roads) for (const [x, z, , y, h] of (rd.fans || [])) { fans++; let ok = h >= 2 && h <= 3 && anchorOf(x, y + h, z); for (let k = 0; k < h; k++) if (cnm(x, y + k, z) !== 'vx_palm_trunk') ok = false; if (ok) fansOk++; }
+  let anchors = 0; for (const rd of roads) for (const side of ['L', 'R']) for (const run of ((rd.palms && rd.palms[side]) || [])) for (const p of run) if (anchorOf(p[0], p[3] + p[4], p[1])) anchors++;
+  check((cnt.vx_fern_lush || 0) > 100 && fans >= 20 && fansOk === fans && anchors === palmsRoad && (city.trees || []).length >= 10, `planted verges: ${cnt.vx_fern_lush | 0} ferns, ${fansOk} of ${fans} fan palms whole, ${anchors} of ${palmsRoad} tall crowns anchored, ${(city.trees || []).length} small round trees`);
   // the homes: a door and a bed each; the plan the same twice
   const homesOk = plan8.homes.filter(h => h.door && h.beds && h.beds.length && /door/.test(cnm(h.door[0], h.door[1], h.door[2]))).length;
   check(plan8.homes.length === lots.length && homesOk === plan8.homes.length, `every villa is a home with its door and a bed (${homesOk} of ${plan8.homes.length})`);
