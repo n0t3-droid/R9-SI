@@ -572,8 +572,9 @@
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
       // t-sky: the sky's middle stop, the stops' heights and the space by day (env.js VR.Sky)
       v3('u_skyMid', E.skyMid || E.horizon);
-      if (u.u_skyStops) { const s = E.skyStops || [0.25, 0.1, 1.0, 0.45]; gl.uniform4f(u.u_skyStops, s[0], s[1], s[2], s[3] === undefined ? 0.45 : s[3]); }
-      if (u.u_skySpace) { const s = E.skySpace || [0.2, 0.9, 0.5, 1.3]; gl.uniform4f(u.u_skySpace, s[0], s[1], s[2], s[3]); }
+      // (the shader takes the reciprocals of the widths: a multiply per pixel instead of a division)
+      if (u.u_skyStops) { const s = E.skyStops || [0.25, 0.1, 1.0, 0.45]; gl.uniform4f(u.u_skyStops, 1 / Math.max(1e-3, s[0]), s[1], 1 / Math.max(1e-3, s[2] - s[1]), s[3] === undefined ? 0.45 : s[3]); }
+      if (u.u_skySpace) { const s = E.skySpace || [0.2, 0.9, 0.5, 1.3]; gl.uniform4f(u.u_skySpace, s[0], 1 / Math.max(1e-3, s[1] - s[0]), s[2], s[3]); }
       v3('u_fogColor', E.fogColor); v3('u_blockLightTint', E.blockTint); v3('u_planetDir', E.planetDir); v3('u_planet2Dir', E.planet2Dir); v3('u_ringNormal', E.ringNormal);
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
       // the grade's knobs (env.js VR.Grade): the cosmic veil, the sun's disc in HDR, the Klassisch block edges
