@@ -218,7 +218,10 @@
       for (let i = 0; i < this.agents.length; i++) {
         const a = this.agents[i];
         const dx = a.pos[0] - px, dz = a.pos[2] - pz, d2 = dx * dx + dz * dz;
-        const every = Math.min(8, (a.pose === 'sleep' ? 6 : d2 < 24 * 24 ? 1 : d2 < 56 * 56 ? 2 : d2 < 100 * 100 ? 3 : 6) * slow);
+        let every = Math.min(8, (a.pose === 'sleep' ? 6 : d2 < 24 * 24 ? 1 : d2 < 56 * 56 ? 2 : d2 < 100 * 100 ? 3 : 6) * slow);
+        // a person nobody sees (not drawn last frame: out of view, beyond the folk distance or past the street's cap) and
+        // not right beside the player lives at the far rate: its time accumulates, its walk goes on in longer steps
+        if (a.drawn === false && d2 > 16 * 16 && every < 4 * slow) every = Math.min(8, 4 * slow);
         a.dtAcc = (a.dtAcc || 0) + dt;
         if (every > 1 && ((fr + i) % every) !== 0) continue;
         if (budget <= 0 && d2 > 24 * 24 && a.dtAcc < 0.5) continue;
@@ -533,8 +536,19 @@
       const gx = Math.floor(x), gy = Math.floor(y), gz = Math.floor(z);
       const dx = a.pos[0] - (gx + 0.5), dz = a.pos[2] - (gz + 0.5);
       const nr = near || 0.6;
-      if (dx * dx + dz * dz < nr * nr && Math.abs(a.pos[1] - gy) < 1.6) { a.path = null; return true; }
-      if (!a.goal || a.goal[0] !== gx || a.goal[1] !== gy || a.goal[2] !== gz) { a.goal = [gx, gy, gz]; a.path = null; a.fails = 0; }
+      if (dx * dx + dz * dz < nr * nr && Math.abs(a.pos[1] - gy) < 1.6) { a.path = null; a.offT = 0; return true; }
+      if (!a.goal || a.goal[0] !== gx || a.goal[1] !== gy || a.goal[2] !== gz) { a.goal = [gx, gy, gz]; a.path = null; a.fails = 0; a.offT = 0; }
+      // a walk nobody sees (t-town: a hall city's 149 people searched three times the paths of a village's 38): a person
+      // not drawn (pick) and away from the player, whose goal no one sees either, searches no path — it arrives when the
+      // walk would be done (the straight distance at its pace, a third more for the bends) and stands at the goal, unseen.
+      // Drawn on the way (the player turned), it searches its path from where it stands, as before.
+      if (!a.path && a.drawn === false && this.unseenWalk(a, gx, gy, gz)) {
+        if (!a.offT) a.offT = this.time + Math.hypot(dx, dz) / Math.max(0.5, a.speed || 1) * 1.35 + 0.5;
+        if (this.time < a.offT) return false;
+        a.offT = 0; a.pos = [gx + 0.5, gy, gz + 0.5]; a.vel = [0, 0, 0]; a.fails = 0;
+        return true;
+      }
+      a.offT = 0;
       if (!a.path) {
         a.pathWait -= 1;
         if (a.pathWait > 0 || this.pathBudget <= 0) return false;
@@ -551,6 +565,14 @@
         }
       }
       return false;
+    }
+    // may a person walk unseen to (gx, gy, gz)? It and its goal away from the player, and the goal out of the last frame's
+    // view or beyond the folk distance (so nobody sees it appear there)
+    unseenWalk(a, gx, gy, gz) {
+      const p = this.g.player.pos, c = this._pickCam, R = 24 * 24;
+      if ((a.pos[0] - p[0]) ** 2 + (a.pos[2] - p[2]) ** 2 < R || (gx + 0.5 - p[0]) ** 2 + (gz + 0.5 - p[2]) ** 2 < R || !c) return false;
+      const dx = gx + 0.5 - c.x, dy = gy - c.y, dz = gz + 0.5 - c.z;
+      return dx * dx + dz * dz > c.FD * c.FD || !VR.mat4.boxInFrustum(this._pickPlanes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2);
     }
     teleportTo(a, x, y, z) {
       // unseen shortcut so nobody stays stuck forever
@@ -1303,32 +1325,39 @@
     }
 
     // -------------------------------------------------- rendering
+    // who is drawn this frame — the street's budget (src/shared/folkcrowd.js): of the people within the folk distance and
+    // in view, the nearest streetCap of those on the street (on the way in counts), and whoever has arrived indoors; the
+    // others wait out of sight (they keep walking, so nobody pops in on the spot). Marks a.vis, a.street, a.d2v and
+    // a.drawn: update() and separate() simulate a person nobody sees at the far rate (t-town: a hall city's 149 people)
+    pick(planes, cam, cap, FD) {
+      const C = VR.Crowd, near = this._near || (this._near = new Float64Array(16));
+      const pc = this._pickCam || (this._pickCam = { x: 0, y: 0, z: 0, FD: 0 });
+      pc.x = cam.x; pc.y = cam.y; pc.z = cam.z; pc.FD = FD; this._pickPlanes = planes;
+      let nn = 0;
+      for (const a of this.agents) {
+        const dx = a.pos[0] - cam.x, dy = a.pos[1] - cam.y, dz = a.pos[2] - cam.z;
+        const d2 = dx * dx + dz * dz;
+        a.vis = false; a.drawn = false;
+        if (d2 > FD * FD) continue;
+        if (!VR.mat4.boxInFrustum(planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
+        a.vis = true; a.d2v = d2;
+        a.street = C.onStreet(a);
+        if (a.street) nn = C.keepNearest(near, nn, cap, d2);
+      }
+      const thr = nn >= cap ? near[cap - 1] : Infinity;
+      for (const a of this.agents) if (a.vis) a.drawn = !(a.street && a.d2v > thr);
+    }
     draw(r, E, cam) {
       if (!this.agents.length) return;
       const g = this.g, gl = r.gl, ent = g.entities;
       if (!ent) return;
       const p = ent.beginVox(r, E);
       const t = g.time;
-      // the street's budget (src/shared/folkcrowd.js): the people in view are at most streetCap of the preset; the
-      // nearest ones are drawn, the others wait out of sight (they keep walking, so nobody pops in on the spot)
       const C = VR.Crowd, FD = g.folkDist || g.folkBase || 100, cap = C.streetCap(g.settings && g.settings.preset);
-      const near = this._near || (this._near = new Float64Array(16));
-      let nn = 0;
+      this.pick(r.planes, cam, cap, FD);
       for (const a of this.agents) {
-        const dx = a.pos[0] - cam.x, dy = a.pos[1] - cam.y, dz = a.pos[2] - cam.z;
-        const d2 = dx * dx + dz * dz;
-        a.vis = false;
-        if (d2 > FD * FD) continue;
-        if (!VR.mat4.boxInFrustum(r.planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
-        a.vis = true; a.d2v = d2;
-        a.street = C.onStreet(a);   // (on the way in counts: src/shared/folkcrowd.js)
-        if (a.street) nn = C.keepNearest(near, nn, cap, d2);
-      }
-      const thr = nn >= cap ? near[cap - 1] : Infinity;
-      for (const a of this.agents) {
-        if (!a.vis) continue;
+        if (!a.drawn) continue;
         const d2 = a.d2v, dy = a.pos[1] - cam.y;
-        if (d2 > thr && a.street) continue;
         const far = d2 > (FD < 100 ? 16 : 24) * (FD < 100 ? 16 : 24);
         // the model is looked up once per agent and LOD (the key is built from the look only once)
         const mk = far ? 1 : 0;
@@ -1396,7 +1425,7 @@
       const pl = g.player.pos;
       for (const a of this.agents) {
         const d2 = (a.pos[0] - pl[0]) ** 2 + (a.pos[2] - pl[2]) ** 2;
-        if (d2 > 26 * 26) continue;
+        if (d2 > 26 * 26 || a.drawn === false) continue;   // (no bubble floats where the street's budget drew nobody)
         const looked = this.lookTarget === a;
         if (!a.bubble && !(looked && d2 < 12 * 12)) continue;
         // greet the player the first time they come close

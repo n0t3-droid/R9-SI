@@ -407,21 +407,31 @@
     const list = this.agents, n = list.length; if (n < 2 && !this.g.player) return;
     const w = this.g.world, get = (x, y, z) => w.getBlock(x, y, z), nb = w.nbFn();
     const pl = this.g.player;
-    // a 2-block grid: only neighbours in the same or adjacent cells can touch (no more n² over the whole city)
-    const grid = this._sepGrid || (this._sepGrid = new Map());
-    grid.clear();
-    const gk = (x, z) => ((x >> 1) + 32768) * 65536 + ((z >> 1) + 32768);
-    for (let j = 0; j < n; j++) { const b = list[j]; const k = gk(Math.floor(b.pos[0]), Math.floor(b.pos[2])); let cell = grid.get(k); if (!cell) { cell = []; grid.set(k, cell); } cell.push(b); }
-    const cand = [];
     const ppx = pl ? pl.pos[0] : 0, ppz = pl ? pl.pos[2] : 0;
+    // a 2-block grid: only neighbours in the same or adjacent cells can touch (no more n² over the whole city). Its cells
+    // are kept between frames and stamped with the frame (no arrays made per frame: a hall city has 149 people)
+    const grid = this._sepGrid || (this._sepGrid = new Map()), fr = (this._sepFr = (this._sepFr || 0) + 1);
+    if (grid.size > 8192) grid.clear();
+    const gk = (x, z) => ((x >> 1) + 32768) * 65536 + ((z >> 1) + 32768);
+    for (let j = 0; j < n; j++) {
+      const b = list[j];
+      if (pl && (b.pos[0] - ppx) ** 2 + (b.pos[2] - ppz) ** 2 > 50 * 50) continue;
+      const k = gk(Math.floor(b.pos[0]), Math.floor(b.pos[2]));
+      let cell = grid.get(k); if (!cell) { cell = []; cell.f = 0; grid.set(k, cell); }
+      if (cell.f !== fr) { cell.length = 0; cell.f = fr; }
+      cell.push(b);
+    }
+    const cand = this._sepCand || (this._sepCand = []);
     for (let i = 0; i < n; i++) {
       const a = list[i];
       if (a.inBoat || a.pose === 'sleep' || a.pose === 'sit') continue;
-      if (pl && (a.pos[0] - ppx) ** 2 + (a.pos[2] - ppz) ** 2 > 48 * 48) continue; // crowding far out of sight costs nothing
+      const dp2 = pl ? (a.pos[0] - ppx) ** 2 + (a.pos[2] - ppz) ** 2 : 0;
+      if (dp2 > 48 * 48) continue; // crowding far out of sight costs nothing
+      if (a.drawn === false && dp2 > 16 * 16) continue; // nor does it where nobody is drawn (villages.js pick: out of view, past the street's cap)
       let px = 0, pz = 0;
       cand.length = 0;
       const ax = Math.floor(a.pos[0]) >> 1, az = Math.floor(a.pos[2]) >> 1;
-      for (let gx = ax - 1; gx <= ax + 1; gx++) for (let gz = az - 1; gz <= az + 1; gz++) { const cell = grid.get((gx + 32768) * 65536 + (gz + 32768)); if (cell) for (const b of cell) if (b !== a) cand.push(b); }
+      for (let gx = ax - 1; gx <= ax + 1; gx++) for (let gz = az - 1; gz <= az + 1; gz++) { const cell = grid.get((gx + 32768) * 65536 + (gz + 32768)); if (cell && cell.f === fr) for (let q = 0; q < cell.length; q++) { const b = cell[q]; if (b !== a) cand.push(b); } }
       for (let j = 0; j < cand.length; j++) {
         const b = cand[j];
         const dx = a.pos[0] - b.pos[0], dz = a.pos[2] - b.pos[2];
