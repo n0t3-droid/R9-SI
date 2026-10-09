@@ -5,10 +5,10 @@ procedural and our own: the terrain, the cities, the textures, the sky, the wate
 
 ## Play
 
-**Download → double-click → play.** [`dist/index.html`](dist/index.html) is the whole game in one file (the Studio is
-[`dist/studio.html`](dist/studio.html)). On GitHub open the file and press *Download raw file*, or take the repository
-as a ZIP (*Code → Download ZIP*) and open `dist/index.html`. Chrome, Edge or Firefox; worlds are saved in your browser.
-Build it yourself with `node build.js` (plain JavaScript, nothing to install).
+**Download → double-click → play.** [`play/R9-SI.html`](play/R9-SI.html) is the whole game in one file; the editor is
+[`play/R9-SI-Studio.html`](play/R9-SI-Studio.html). On GitHub open the file and press *Download raw file*, or take the
+repository as a ZIP (*Code → Download ZIP*) and open `play/R9-SI.html`. Chrome, Edge or Firefox; worlds are saved in
+your browser. Build it yourself with `node build.js` → `dist/` (plain JavaScript, nothing to install).
 
 An independent, non-commercial work: not affiliated with, endorsed or approved by any other game company
 (NOT AN OFFICIAL MINECRAFT PRODUCT — Minecraft is a trademark of Mojang). Impressum, privacy and credits: 📜 in the game.
