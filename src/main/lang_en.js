@@ -375,7 +375,7 @@
     'g.set.sec.steer': 'Controls',
     'g.set.sec.play': 'Playing',
     'g.set.preset.tip': 'One step sets everything at once: Very low for old laptops, Ultra for strong graphics cards.',
-    'g.set.renderDist.tip': 'How far you see with full detail, in chunks of 16 blocks. Distance costs the most.',
+    'g.set.renderDist.tip': 'How far you see everything in detail (ring 0, in chunks of 16 blocks). On High and Ultra, ring 1 shows the shapes beyond out to about 1 km – hills, towns, towers – and ring 2 the horizon. Distance costs the most.',
     'g.set.horizon.tip': 'The land beyond, as coarse terrain out to 5 km.',
     'g.set.shadows.tip': 'Shadows of sun and blocks; higher steps are sharper and softer.',
     'g.set.sunShadows.tip': 'Soft sun shadows across the whole terrain.',
