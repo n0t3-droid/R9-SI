@@ -4,11 +4,12 @@
 // front — the entrance — at v = 0; grid row 0 + dy = the ground row, F − 1).
 // Every one has a clear way in from the front edge and a glowing heart at its
 // centre (meta.heart, y relative to the floor F) — standing within four
-// blocks of it is the discovery. Light for the night (lanterns, crystals,
-// glowing stone), colour (Vollton, stained glass, gold, crystal), and only
-// existing blocks. Empty space above the levelled rows is left to the world
-// (keep), so a wonder's ops stay small; whatever a person walks through above
-// those rows is carved air.
+// blocks of it is the discovery. Light for the night (lanterns, light rods,
+// glowing stone), colour (Vollton, stained glass, gold, lilacite), and only
+// existing blocks — no crystals (f-nocrystal, the owner's wish: all worlds).
+// Empty space above the levelled rows is left to the world (keep), so a
+// wonder's ops stay small; whatever a person walks through above those rows is
+// carved air.
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -24,7 +25,7 @@
       carve(x0, y0, z0, x1, y1, z1) { K.box(x0, y0, z0, x1, y1, z1, 0); },
       // a two-high lamppost (post + lamp head)
       post(x, y, z, name) { K.set(x, y, z, name || 'vx_lamppost', { head: 0 }); K.set(x, y + 1, z, name || 'vx_lamppost', { head: 1 }); },
-      // a tapering crystal spire: discs shrinking from r0 to a point over h rows, leaning a little, a cluster on its tip
+      // a tapering spire: discs shrinking from r0 to a point over h rows, leaning a little, a tip block on its point
       spire(x, z, y0, h, r0, mat, tip, lean, band) {
         let top = y0;
         for (let t = 0; t < h; t++) {
@@ -34,23 +35,6 @@
           if (t === h - 1 && tip) K.set(x + ox, top + 1, z + oz, tip, { facing: 4, size: 1 });
         }
         return top;
-      },
-      // a crystal: a prism of radius r for most of its height, then a point; tilted (lean = offset at the top)
-      crystal(x, z, y0, h, r, mat, tip, lean) {
-        let ox = 0, oz = 0;
-        for (let t = 0; t < h; t++) {
-          const fr = t / h, rr = fr < 0.7 ? r : r * Math.max(0.12, 1 - (fr - 0.7) / 0.3);
-          ox = Math.round((lean ? lean[0] : 0) * fr); oz = Math.round((lean ? lean[1] : 0) * fr);
-          H.disc(x + ox, z + oz, rr, y0 + t, mat);
-        }
-        if (tip) K.set(x + ox, y0 + h, z + oz, tip, { facing: 4, size: 1 });
-        return y0 + h;
-      },
-      // a cluster: a tall crystal and two or three smaller ones leaning out from it
-      cluster(x, z, y0, h, r, mat, tip, rng, out) {
-        H.crystal(x, z, y0, h, r, mat, tip, [out[0] * 2, out[1] * 2]);
-        const n = 2 + rng.int(2);
-        for (let k = 0; k < n; k++) { const a = Math.atan2(out[1], out[0]) + (k - (n - 1) / 2) * 1.1 + (rng.next() - 0.5) * 0.4, d = r + 1.2; H.crystal(x + Math.round(Math.cos(a) * d), z + Math.round(Math.sin(a) * d), y0, Math.round(h * (0.35 + rng.next() * 0.25)), Math.max(1, r * 0.55), mat, tip, [Math.round(Math.cos(a) * h * 0.18), Math.round(Math.sin(a) * h * 0.18)]); }
       },
       // the cells of a discrete circle of radius r, 4-connected, in order around it (a path a person can walk)
       circle(cx, cz, r) {
@@ -73,16 +57,17 @@
   const faceOf = (dx, dz) => (dz < 0 ? 0 : dx > 0 ? 1 : dz > 0 ? 2 : 3);
   const meta = (K, o) => Object.assign({ doors: [[o.door, 0, 0]], floors: [K.dy + 1], anchor: [o.door, 0] }, o.m);
 
-  // ---------------------------------------------------------------- 💎 Kristallkathedrale
-  // a glass nave on quartz piers, a pointed glass vault, a rose window over the portal, an apse; violet, azure and rose
-  // crystal spires all around (the tallest behind the apse), a crystal garden; inside, the heart: a light on a geode
+  // ---------------------------------------------------------------- ⛪ Lichtkathedrale (type id kristall: DNA, gifts)
+  // a glass nave on quartz piers, a pointed glass vault with light rods on its ribs, a rose window round a sunstone over
+  // the portal, an apse; Gothic stone spires all around — twin towers over the portal, pinnacles at the corners and along
+  // the walls, the great steeple behind the apse — a flower garden; inside, the heart: a beacon on a lilacite floor
   W.GENS.kristall = function (P, env, rng) {
     const LW = 45, LD = 58, dy = -1, K = Forge.kit(LW, 96, LD, dy), H = helpers(K), cx = 22;
     const g0 = 0, f = 1;                                                  // ground row, feet row
     const n0 = 15, n1 = 29, v0 = 10, v1 = 46;                             // the nave (u, v)
-    // the grounds: lawn, a white forecourt with an amethyst inlay, a ring path, crystal gardens
+    // the grounds: lawn, a white forecourt with a lilacite inlay, a ring path, flower gardens
     K.box(0, g0, 0, LW - 1, g0, LD - 1, 'grass_block');
-    K.box(cx - 3, g0, 0, cx + 3, g0, v0, 'smooth_quartz'); for (let v = 0; v < v0; v += 2) K.set(cx, g0, v, 'amethyst_block');
+    K.box(cx - 3, g0, 0, cx + 3, g0, v0, 'smooth_quartz'); for (let v = 0; v < v0; v += 2) K.set(cx, g0, v, 'lilacite_block');
     for (let v = 6; v <= 54; v++) for (let u = 9; u <= 35; u++) { const edge = u <= 10 || u >= 34 || v <= 7 || v >= 53; if (edge) K.set(u, g0, v, 'quartz_bricks'); }
     const glass = ['purple_stained_glass', 'magenta_stained_glass', 'light_blue_stained_glass', 'blue_stained_glass'];
     // ---- the nave: piers every four, a quartz plinth, coloured glass between (blue at the foot to magenta at the head)
@@ -97,7 +82,7 @@
       K.set(u, eave, v, pier ? 'chiseled_quartz_block' : 'quartz_bricks');
       if (pier) { K.set(u + (u === n0 ? -1 : 1), f, v, 'quartz_bricks'); K.set(u + (u === n0 ? -1 : 1), f + 1, v, 'quartz_stairs', { facing: u === n0 ? 1 : 3, half: 0 }); }   // buttress feet
     }
-    // ---- the vault: a pointed roof of coloured glass between quartz ribs, a crystal ridge
+    // ---- the vault: a pointed roof of coloured glass between quartz ribs, a light rod on every rib's ridge
     const half = (n1 - n0) / 2, roofY = (d) => eave + Math.floor((half + 0.5 - d) * 1.35);
     for (let v = v0; v <= v1; v++) {
       const rib = (v - v0) % 4 === 0;
@@ -107,19 +92,19 @@
         if (d < half && !rib) K.set(u, y - 1 < eave ? eave : y, v, K.get(u, y, v));
         for (let yy = f; yy < y; yy++) if (u > n0 && u < n1) K.air(u, yy, v);
       }
-      if (rib) { K.set(cx, roofY(0) + 1, v, 'violet_crystal_cluster', { facing: 4, size: 1 }); }
+      if (rib) { K.set(cx, roofY(0) + 1, v, 'light_rod', { facing: 4 }); }
     }
-    // the floor: white quartz, an amethyst aisle, purple carpet
+    // the floor: white quartz, a lilacite aisle, purple carpet
     K.box(n0 + 1, g0, v0, n1 - 1, g0, v1, 'smooth_quartz');
-    for (let v = v0; v <= v1; v++) { K.set(cx - 2, g0, v, 'amethyst_block'); K.set(cx + 2, g0, v, 'amethyst_block'); }
+    for (let v = v0; v <= v1; v++) { K.set(cx - 2, g0, v, 'lilacite_block'); K.set(cx + 2, g0, v, 'lilacite_block'); }
     // ---- the front: a gable wall, the pointed portal, a rose window of coloured glass
     for (let u = n0; u <= n1; u++) { const top = roofY(Math.abs(u - cx)) + 2; for (let y = f; y <= top; y++) K.set(u, y, v0, 'quartz_bricks'); K.set(u, top, v0, 'chiseled_quartz_block'); }
-    K.set(cx, roofY(0) + 3, v0, 'violet_crystal_block'); K.set(cx, roofY(0) + 4, v0, 'violet_crystal_cluster', { facing: 4, size: 1 });
-    for (let y = f; y <= f + 8; y++) { const w = y <= f + 4 ? 2 : y <= f + 6 ? 1 : 0; for (let u = cx - w - 1; u <= cx + w + 1; u++) K.set(u, y, v0, 'amethyst_block'); if (y <= f + 7) for (let u = cx - w; u <= cx + w; u++) K.air(u, y, v0); }
-    for (const du of [-4, 4]) { for (let y = f; y <= f + 6; y++) K.set(cx + du, y, v0 - 1, 'quartz_pillar', { axis: 0 }); K.set(cx + du, f + 7, v0 - 1, 'vx_lantern_crystal'); }
+    K.set(cx, roofY(0) + 3, v0, 'gold_block'); K.set(cx, roofY(0) + 4, v0, 'light_rod', { facing: 4 });
+    for (let y = f; y <= f + 8; y++) { const w = y <= f + 4 ? 2 : y <= f + 6 ? 1 : 0; for (let u = cx - w - 1; u <= cx + w + 1; u++) K.set(u, y, v0, 'lilacite_block'); if (y <= f + 7) for (let u = cx - w; u <= cx + w; u++) K.air(u, y, v0); }
+    for (const du of [-4, 4]) { for (let y = f; y <= f + 6; y++) K.set(cx + du, y, v0 - 1, 'quartz_pillar', { axis: 0 }); K.set(cx + du, f + 7, v0 - 1, 'vx_lantern'); }
     const rr = 5, ry = f + 14;
     for (let y = ry - rr; y <= ry + rr; y++) for (let u = cx - rr; u <= cx + rr; u++) { const d = Math.hypot(u - cx, y - ry); if (d > rr + 0.4) continue; K.set(u, y, v0, d > rr - 0.6 ? 'chiseled_quartz_block' : d < 1.2 ? 'light_blue_stained_glass' : ['magenta_stained_glass', 'purple_stained_glass', 'blue_stained_glass'][Math.min(2, Math.floor(d - 1.2))]); }
-    K.set(cx, ry, v0, 'vx_crystal_violet');
+    K.set(cx, ry, v0, 'sunstone');
     // ---- the apse: a half ring of glass bays behind the nave, a glass half-dome
     const ar = 7;
     for (let v = v1; v <= v1 + ar + 1; v++) for (let u = cx - ar - 1; u <= cx + ar + 1; u++) {
@@ -129,26 +114,27 @@
       else { K.set(u, g0, v, 'smooth_quartz'); for (let y = f; y < eave; y++) K.air(u, y, v); }
     }
     for (let y = eave; y <= eave + ar; y++) { const r = Math.sqrt(Math.max(0, ar * ar - (y - eave) * (y - eave))); for (let v = v1 + 1; v <= v1 + ar; v++) for (let u = cx - ar; u <= cx + ar; u++) { const d = Math.hypot(u - cx, v - v1); if (d <= r + 0.5 && d > r - 0.7) K.set(u, y, v, (u + y) % 3 ? 'magenta_stained_glass' : 'purple_stained_glass'); } }
-    // ---- the spires: two over the portal, two at the back corners, the great one behind the apse, small ones along the walls
-    // (clusters: a tall prism with a point, two or three smaller ones leaning out of its foot)
-    H.cluster(n0 - 5, v0 - 1, f, 44 + rng.int(6), 2.6, 'violet_crystal_block', 'violet_crystal_cluster', rng, [-1, -1]);
-    H.cluster(n1 + 5, v0 - 1, f, 44 + rng.int(6), 2.6, 'violet_crystal_block', 'violet_crystal_cluster', rng, [1, -1]);
-    H.cluster(n0 - 4, v1 + 2, f, 32 + rng.int(6), 2.2, 'rose_crystal_block', 'rose_crystal_cluster', rng, [-1, 1]);
-    H.cluster(n1 + 4, v1 + 2, f, 32 + rng.int(6), 2.2, 'rose_crystal_block', 'rose_crystal_cluster', rng, [1, 1]);
-    H.crystal(cx, v1 + ar + 3, f, 80 + rng.int(6), 3.6, 'azure_crystal_block', 'azure_crystal_cluster', [0, 2]);
-    for (const [du, dv, h] of [[-4, 1, 46], [4, 1, 50], [0, 4, 38]]) H.crystal(cx + du, v1 + ar + 3 + dv, f, h + rng.int(6), 2, du ? 'violet_crystal_block' : 'rose_crystal_block', du ? 'violet_crystal_cluster' : 'rose_crystal_cluster', [du * 2, 3]);
-    for (let v = v0 + 4; v < v1; v += 8) for (const u of [n0 - 4, n1 + 4]) H.crystal(u, v + (u < cx ? 0 : 4), f, 12 + rng.int(10), 1.3, rng.pick(['violet_crystal_block', 'azure_crystal_block', 'rose_crystal_block']), 'violet_crystal_cluster', [u < cx ? -3 : 3, 0]);
-    // the crystal garden: clusters in the lawn, lamps along the ring path
-    for (let k = 0; k < 70; k++) { const u = rng.int(LW), v = rng.int(LD); if (K.get(u, g0, v) === Forge.st('grass_block') && K.get(u, f, v) === 0xFFFF) K.set(u, f, v, rng.pick(['violet_crystal_cluster', 'azure_crystal_cluster', 'rose_crystal_cluster']), { facing: 4, size: rng.int(2) }); }
-    for (const [u, v] of [[9, 6], [35, 6], [9, 30], [35, 30], [9, 54], [35, 54], [cx - 4, 2], [cx + 4, 2]]) H.post(u, f, v, 'vx_lamppost_crystal');
-    // ---- inside: crystal lanterns on quartz posts along the aisle, the heart at the crossing under a hanging light
-    for (let v = v0 + 3; v < v1 - 1; v += 4) for (const u of [cx - 4, cx + 4]) { K.set(u, f, v, 'quartz_pillar', { axis: 0 }); K.set(u, f + 1, v, 'vx_lantern_crystal'); }
+    // ---- the spires: twin towers over the portal, pinnacles at the back corners, the great steeple behind the apse with
+    // three smaller ones round it, buttress pinnacles along the walls — white quartz, chiseled bands every seven rows,
+    // a light rod on every tip (H.spire: discs shrinking to a point)
+    const SP = 'quartz_bricks', BAND = 'chiseled_quartz_block', TIP = 'light_rod';
+    for (const [u, sg] of [[n0 - 5, -1], [n1 + 5, 1]]) { H.disc(u, v0 - 1, 3.4, f, BAND); H.spire(u, v0 - 1, f + 1, 44 + rng.int(6), 2.6, SP, TIP, [0, 0], BAND); H.disc(u, v0 - 1, 2.9, f + 14, 'gold_block'); void sg; }
+    for (const u of [n0 - 4, n1 + 4]) H.spire(u, v1 + 2, f, 32 + rng.int(6), 2.2, SP, TIP, [0, 0], BAND);
+    H.disc(cx, v1 + ar + 3, 4.4, f, BAND); H.spire(cx, v1 + ar + 3, f + 1, 80 + rng.int(6), 3.6, SP, TIP, [0, 0], BAND); H.disc(cx, v1 + ar + 3, 3.5, f + 24, 'gold_block');
+    for (const [du, dv, h] of [[-4, 1, 46], [4, 1, 50], [0, 4, 38]]) H.spire(cx + du, v1 + ar + 3 + dv, f, h + rng.int(6), 2, SP, TIP, [0, 0], BAND);
+    for (let v = v0 + 4; v < v1; v += 8) for (const u of [n0 - 4, n1 + 4]) H.spire(u, v + (u < cx ? 0 : 4), f, 12 + rng.int(10), 1.3, SP, TIP, [0, 0], BAND);
+    // the flower garden: violet, blue and white flowers in the lawn, lamps along the ring path
+    const FLOWERS = ['allium', 'azure_bluet', 'lily_of_the_valley', 'cornflower', 'oxeye_daisy', 'pink_tulip'];
+    for (let k = 0; k < 70; k++) { const u = rng.int(LW), v = rng.int(LD); if (K.get(u, g0, v) === Forge.st('grass_block') && K.get(u, f, v) === 0xFFFF) K.set(u, f, v, rng.pick(FLOWERS)); }
+    for (const [u, v] of [[9, 6], [35, 6], [9, 30], [35, 30], [9, 54], [35, 54], [cx - 4, 2], [cx + 4, 2]]) H.post(u, f, v, 'vx_lamppost');
+    // ---- inside: lanterns on quartz posts along the aisle, the heart at the crossing under a hanging light
+    for (let v = v0 + 3; v < v1 - 1; v += 4) for (const u of [cx - 4, cx + 4]) { K.set(u, f, v, 'quartz_pillar', { axis: 0 }); K.set(u, f + 1, v, 'vx_lantern'); }
     const hv = 33, hy = f + 1;
-    H.disc(cx, hv, 2.4, g0, 'amethyst_block'); K.set(cx, g0, hv, 'chiseled_quartz_block');
+    H.disc(cx, hv, 2.4, g0, 'lilacite_block'); K.set(cx, g0, hv, 'chiseled_quartz_block');
     K.set(cx, f, hv, 'chiseled_quartz_block'); K.set(cx, hy, hv, 'beacon');
-    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.set(cx + a, f, hv + b, 'violet_crystal_cluster', { facing: 4, size: 1 });
-    for (let y = hy + 4; y < roofY(0); y++) K.set(cx, y, hv, 'iron_chain', { axis: 0 }); K.set(cx, hy + 3, hv, 'vx_lantern_crystal');
-    return Object.assign(K.grid, { meta: meta(K, { door: cx, m: { name: 'Kristallkathedrale', heart: [cx, hy + dy, hv], top: K.sy - 1 + dy } }) });
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.set(cx + a, f, hv + b, 'vx_lantern');
+    for (let y = hy + 4; y < roofY(0); y++) K.set(cx, y, hv, 'iron_chain', { axis: 0 }); K.set(cx, hy + 3, hv, 'vx_lantern');
+    return Object.assign(K.grid, { meta: meta(K, { door: cx, m: { name: 'Lichtkathedrale', heart: [cx, hy + dy, hv], top: K.sy - 1 + dy } }) });
   };
 
   // ---------------------------------------------------------------- 🌈 Regenbogenbrücke
@@ -195,11 +181,11 @@
       }
       if (y > g0) for (const u of [4, 12]) { K.set(u, y + 1, v, v % 6 === 0 ? 'quartz_pillar' : 'glass_rail'); if (v % 6 === 0) K.set(u, y + 2, v, 'vx_lantern'); for (let yy = Math.max(g0 + 1, top[v] + 1); yy <= y; yy++) K.set(u, yy, v, 'quartz_bricks'); }
     }
-    // the heart: at the top of the rainbow, between two crystal lanterns
+    // the heart: at the top of the rainbow, between two lanterns
     const hv = Math.round(vc), hy = wk[hv] + 1;
-    K.set(cu, hy, hv, 'beacon'); K.set(cu - 2, hy, hv, 'vx_lantern_crystal'); K.set(cu + 2, hy, hv, 'vx_lantern_crystal');
+    K.set(cu, hy, hv, 'beacon'); K.set(cu - 2, hy, hv, 'vx_lantern'); K.set(cu + 2, hy, hv, 'vx_lantern');
     // lamps at both ends, flowers
-    for (const v of [1, LD - 2]) { H.post(2, f, v, 'vx_lamppost_crystal'); H.post(LW - 3, f, v, 'vx_lamppost_crystal'); }
+    for (const v of [1, LD - 2]) { H.post(2, f, v, 'vx_lamppost'); H.post(LW - 3, f, v, 'vx_lamppost'); }
     for (let k = 0; k < 24; k++) { const u = rng.chance(0.5) ? rng.int(3) : LW - 1 - rng.int(3), v = rng.int(LD); if (K.get(u, g0, v) === Forge.st('grass_block')) K.set(u, f, v, rng.pick(['vx_flowerbed_roses', 'vx_flowerbed_tulips', 'pink_petals', 'vx_bush']), { count: 3 }); }
     let topRow = 0; for (let y = 0; y < K.sy; y++) for (let i = 0; i < LW * LD; i++) if (K.grid.blocks[y * LW * LD + i] !== 0xFFFF && K.grid.blocks[y * LW * LD + i] !== 0) topRow = y;
     return Object.assign(K.grid, { meta: meta(K, { door: cu, m: { name: 'Regenbogenbrücke', heart: [cu, hy + dy, hv], top: topRow + dy } }) });
@@ -403,7 +389,7 @@
     K.air(cx, gy + 1, cz - 4); K.air(cx, gy + 2, cz - 4); K.air(cx + 4, gy + 1, cz); K.air(cx + 4, gy + 2, cz);
     for (let y = gy + 1; y <= gy + 4; y++) H.disc(cx, cz, TR - 1.6, y, 0);
     K.set(cx, gy, cz, 'gold_block'); K.set(cx, gy + 1, cz, 'beacon'); K.set(cx, gy + 2, cz, 'light_panel'); K.set(cx, gy + 3, cz, 'beacon');
-    for (const [a, b] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) K.set(cx + a, gy + 2, cz + b, 'vx_lantern_crystal');
+    for (const [a, b] of [[-1, 0], [1, 0], [0, 1], [0, -1]]) K.set(cx + a, gy + 2, cz + b, 'vx_lantern');
     for (let k = 0; k < 4; k++) H.disc(cx, cz, TR - 0.5 - k * 1.3, gy + 6 + k, 'vollton_signal_red');
     K.set(cx, gy + 10, cz, 'gold_block'); K.set(cx, gy + 11, cz, 'light_rod', { facing: 4 });
     // the clouds: soft white puffs round the upper tower
@@ -452,29 +438,29 @@
     // the garden: clear the 3 × 3 cells, a lawn with flower beds, paths, the fountain, lamps
     for (let z = 25; z <= 35; z++) for (let x = 25; x <= 35; x++) { K.set(x, g0, z, 'grass_block'); for (let y = f; y <= f + 3; y++) K.air(x, y, z); }
     for (let z = 25; z <= 35; z++) for (let x = 25; x <= 35; x++) { const d = Math.hypot(x - mid, z - mid); if (d >= 4.5 && d <= 5.6 || Math.abs(x - mid) <= 1 || Math.abs(z - mid) <= 1) K.set(x, g0, z, 'smooth_quartz'); }
-    for (const [x, z] of [[26, 26], [34, 26], [26, 34], [34, 34]]) { K.set(x, f, z, rng.pick(['vx_flowerbed_roses', 'vx_flowerbed_tulips', 'vx_flowerbed'])); H.post(x + (x < mid ? -1 : 1), f, z + (z < mid ? -1 : 1), 'vx_lamppost_crystal'); }
+    for (const [x, z] of [[26, 26], [34, 26], [26, 34], [34, 34]]) { K.set(x, f, z, rng.pick(['vx_flowerbed_roses', 'vx_flowerbed_tulips', 'vx_flowerbed'])); H.post(x + (x < mid ? -1 : 1), f, z + (z < mid ? -1 : 1), 'vx_lamppost'); }
     for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, x = mid + Math.round(Math.cos(a) * 3.8), z = mid + Math.round(Math.sin(a) * 3.8); if (Math.abs(x - mid) > 1 && Math.abs(z - mid) > 1) K.set(x, f, z, 'pink_petals', { count: 3 }); }
     // the fountain: a quartz basin (radius 3), water, a pedestal with the heart; jets of light in the water
     H.ring(mid, mid, 3, f, 'smooth_quartz_slab', { type: 0 }); H.disc(mid, mid, 2.2, g0, 'tide_lantern'); H.disc(mid, mid, 2.2, f, 'water');
     K.set(mid, f, mid, 'chiseled_quartz_block'); K.set(mid, f + 1, mid, 'tide_lantern');
     for (const [a, b] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) K.set(mid + a, g0, mid + b, 'sunstone');
-    // lamps at some of the maze's corners (on the hedge tops), a crystal light at every dead end
+    // lamps at some of the maze's corners (on the hedge tops), a lantern at every dead end
     for (let j = 0; j < C; j++) for (let i = 0; i < C; i++) {
       if (plaza(i, j)) continue;
       const x0 = 1 + i * S, z0 = 1 + j * S, ways = [0, 1, 2, 3].filter(d => open[(j * C + i) * 4 + d]).length;
-      if (ways === 1) K.set(x0 + 1, f, z0 + 1, 'vx_lantern_crystal');
+      if (ways === 1) K.set(x0 + 1, f, z0 + 1, 'vx_lantern');
       if ((i + j * 3) % 5 === 0) K.set(x0 + 3, f + 3, z0 + 3, 'vx_garden_lamp');
     }
-    // more light for the night: a crystal lamp on the north-west corner of every third or fourth cell (the corner is
+    // more light for the night: a lantern on the north-west corner of every third or fourth cell (the corner is
     // beside the way, never on its middle — the paths stay open)
-    for (let j = 0; j < C; j++) for (let i = 0; i < C; i++) if (!plaza(i, j) && (i * 2 + j * 3) % 4 === 0) K.set(1 + i * S, f, 1 + j * S, 'vx_lantern_crystal');
-    // the rotunda over the fountain: eight white columns, a ring, a dome of gold and glass, a crystal light on top —
+    for (let j = 0; j < C; j++) for (let i = 0; i < C; i++) if (!plaza(i, j) && (i * 2 + j * 3) % 4 === 0) K.set(1 + i * S, f, 1 + j * S, 'vx_lantern');
+    // the rotunda over the fountain: eight white columns, a ring, a dome of gold and glass, a lantern on top —
     // seen from outside the maze, where its heart is
     const RR = 5;
     for (let k = 0; k < 8; k++) { const a = k / 8 * Math.PI * 2 + Math.PI / 8, x = mid + Math.round(Math.cos(a) * RR), z = mid + Math.round(Math.sin(a) * RR); K.set(x, g0, z, 'smooth_quartz'); for (let y = f; y <= f + 6; y++) K.set(x, y, z, 'quartz_pillar', { axis: 0 }); }
     H.ring(mid, mid, RR, f + 7, 'chiseled_quartz_block'); H.ring(mid, mid, RR + 0.6, f + 7, 'chiseled_quartz_block');
     for (let y = f + 8; y <= f + 12; y++) { const r = RR * Math.sqrt(Math.max(0, 1 - Math.pow((y - f - 7) / 5.5, 2))); H.ring(mid, mid, r, y, (y & 1) ? 'gold_block' : 'yellow_stained_glass'); }
-    K.set(mid, f + 13, mid, 'gold_block'); K.set(mid, f + 14, mid, 'vx_lantern_crystal');
+    K.set(mid, f + 13, mid, 'gold_block'); K.set(mid, f + 14, mid, 'vx_lantern');
     for (let y = f + 4; y <= f + 6; y++) K.set(mid, y + 5, mid, 'iron_chain', { axis: 0 }); K.set(mid, f + 8, mid, 'lantern', { hanging: 1 });
     // the lookouts: an open pavilion over each front corner — posts, a deck over the hedges, a stair up its side,
     // a railing, a little roof and a lantern
@@ -544,7 +530,7 @@
     }
     for (let u = cx - 1; u <= cx + 1; u++) for (let y = f; y <= f + 3; y++) K.air(u, y, cz - ch);
     K.set(cx, f, cz, 'gold_block'); K.set(cx, f + 1, cz, 'sunstone');
-    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.set(cx + a, f, cz + b, 'amber_crystal_cluster', { facing: 4, size: 1 });
+    for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) K.set(cx + a, f, cz + b, 'vx_lantern');
     for (const [a, b] of [[-ch + 1, -ch + 1], [ch - 1, -ch + 1], [-ch + 1, ch - 1], [ch - 1, ch - 1]]) K.set(cx + a, f, cz + b, 'vx_lantern');
     // the plaza: palms and braziers
     for (const [x, z] of [[4, 4], [LW - 5, 4], [4, LD - 5], [LW - 5, LD - 5]]) { if (VR.VillageGen && VR.VillageGen.palm) VR.VillageGen.palm((xx, yy, zz, s) => K.set(xx, yy - 64, zz, s), x, f + 64, z, 7); }
@@ -603,7 +589,7 @@
     for (let y = my - mr; y <= my + mr; y++) for (let x = cx - mr; x <= cx + mr; x++) { const d1 = Math.hypot(x - cx, y - my), d2 = Math.hypot(x - cx - 3.2, y - my - 1.6); if (d1 <= mr + 0.3 && d2 > mr - 0.4) K.set(x, y, mz, d1 > mr - 0.9 || d2 < mr + 0.6 ? 'tide_lantern' : 'light_panel'); }
     for (let y = fl; y < my - mr + 2; y++) K.set(cx - 3, y, mz, 'quartz_pillar', { axis: 0 });
     // lamps outside, pale flowers
-    for (const [x, z] of [[cx - 4, 2], [cx + 4, 2], [2, cz], [LW - 3, cz], [cx - 14, 8], [cx + 14, 8]]) H.post(x, f, z, 'vx_lamppost_crystal');
+    for (const [x, z] of [[cx - 4, 2], [cx + 4, 2], [2, cz], [LW - 3, cz], [cx - 14, 8], [cx + 14, 8]]) H.post(x, f, z, 'vx_lamppost');
     for (let k = 0; k < 40; k++) { const x = rng.int(LW), z = rng.int(LD); if (K.get(x, g0, z) === Forge.st('grass_block') && K.get(x, f, z) === 0xFFFF) K.set(x, f, z, rng.pick(['lily_of_the_valley', 'allium', 'azure_bluet', 'vx_bush', 'oxeye_daisy'])); }
     return Object.assign(K.grid, { meta: meta(K, { door: cx, m: { name: 'Mondtempel', heart: [cx, fl + 1 + dy, cz], top: fl + 17 + dy } }) });
   };
