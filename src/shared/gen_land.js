@@ -744,6 +744,57 @@
     P.pieces.push({ kind: 'shrine', x, z, y: F, lamp: [x, F + 2, z] });
   }, { order: 2.6 }));
 
+  // ============================================================================ animals at their places
+  // The generator lists the animals' anchors as 'fauna' spawns of their chunks: [ 'fauna', kind, x, y, z, n, …extra ]
+  // — the herds in the pastures (extra: the pasture's box), ducks on the ponds (extra: the pond's radius), fish at the
+  // pier and in the falls' pool, deer at the woods' edges (one candidate per 48 blocks where a wood meets the open).
+  // The game (entities.js) keeps a group at each anchor within reach while its hour allows: LAND.faunaPlan, a pure
+  // function of the anchor's kind, the time of day (ticks, 0 sunrise … 6000 noon … 12000 sunset … 18000 midnight)
+  // and the preset.
+  const FCELL = 48;
+  // a cell's deer anchor: the first of six hashed points that lies at a wood's edge on dry open land, or null
+  LAND.deerAt = function (g, P, gx, gz) {
+    const hx = M.hash2(gx, gz, g.seed ^ 0xdee5) >>> 0;
+    for (let t = 0; t < 6; t++) {
+      const hh = M.hash2(hx, t, 0x5eed) >>> 0, x = gx * FCELL + 4 + (hh % (FCELL - 8)), z = gz * FCELL + 4 + ((hh >>> 11) % (FCELL - 8));
+      const q = LAND.woodAt(g, x, z); if (q.d < 0.08 || q.d > 0.5) continue;
+      if (LAND.zoneAt(g, x, z) || LAND.keepAt(P, x, z)) continue;
+      const y = g.surfaceY(x, z); if (y <= SEA + 1) continue;
+      return [x, y + 1, z, 2 + (hx >>> 28) % 3];
+    }
+    return null;
+  };
+  function dressFauna(g, P, cx, cz, out) {
+    const x0 = cx * 16, z0 = cz * 16;
+    for (let gz = Math.floor((z0 - 40) / FCELL); gz <= Math.floor((z0 + 55) / FCELL); gz++) for (let gx = Math.floor((x0 - 40) / FCELL); gx <= Math.floor((x0 + 55) / FCELL); gx++) {
+      const a = LAND.deerAt(g, P, gx, gz);
+      if (!a || a[0] < x0 || a[0] > x0 + 15 || a[2] < z0 || a[2] > z0 + 15) continue;
+      if (!out.spawns) out.spawns = [];
+      out.spawns.push(['fauna', 'deer', a[0], a[1], a[2], a[3], 10]);
+    }
+  }
+  LAND.DRESS.push(dressFauna);
+  LAND.PIECES.push(Object.assign(function poolFish(g, P) {
+    const Fa = LAND.falls(g), Rv = LAND.river(g), p = Rv.pts[Math.min(Rv.pts.length - 1, 4)];
+    LAND.addSpawn(P, ['fauna', 'fish', Math.round(p[0]), SEA, Math.round(p[1]), 2, 4], Math.round(p[0]), Math.round(p[1]));
+    void Fa;
+  }, { order: 7 }));
+  // what an anchor wants now: {mob, n} (mob null: none at this hour), fish: {jumps}
+  const TOD = (t) => ((t % 24000) + 24000) % 24000;
+  LAND.FAUNA = { deer: 'glimmer_deer', sheep: 'bloom_sheep', duck: 'pond_duck', fish: null };
+  LAND.faunaPlan = function (kind, ticks, preset, n) {
+    const t = TOD(ticks), low = preset === 'potato', mid = preset === 'low';
+    const dawn = t >= 22300 || t < 1700, dusk = t >= 10600 && t < 13400, day = t >= 500 && t < 11800, night = t >= 13400 && t < 22300;
+    const cap = (k) => Math.max(0, Math.min(n | 0, low ? Math.min(k, 2) : mid ? Math.min(k, 3) : k));
+    switch (kind) {
+      case 'deer': return { mob: dawn || dusk ? LAND.FAUNA.deer : null, n: dawn || dusk ? cap(4) : 0 };
+      case 'sheep': return { mob: LAND.FAUNA.sheep, n: cap(night ? 4 : 6), rest: night };
+      case 'duck': return { mob: day && !low ? LAND.FAUNA.duck : null, n: day && !low ? cap(4) : 0 };
+      case 'fish': return { mob: null, n: 0, jumps: (day || dusk) && !low ? (mid ? 1 : 2) : 0 };
+    }
+    return { mob: null, n: 0 };
+  };
+
   // ---------------------------------------------------------------- per chunk: the plan's pieces stamped
   // The land's own blocks go over natural ground only: what another module built stays as it is.
   let NAT = null;

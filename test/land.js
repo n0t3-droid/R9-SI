@@ -334,6 +334,71 @@ if (want(5)) {
   console.log(`  (${secs()})`);
 }
 
+// ---------------------------------------------------------------- 6 · animals at their places
+if (want(6)) {
+  console.log('6 · animals: deer at the woods\' edges at dawn and dusk, herds in the pastures, ducks on the ponds, fish at the pier');
+  const FP = LAND.faunaPlan;
+  // the pure choice: kind × hour × preset
+  const at = (k, t, pr, n) => FP(k, t, pr || 'high', n || 4);
+  check(at('deer', 600).mob === 'glimmer_deer' && at('deer', 12000).mob === 'glimmer_deer' && !at('deer', 6000).mob && !at('deer', 18000).mob && at('deer', 600).n >= 2,
+    `deer come at dawn and dusk only (dawn ${at('deer', 600).n}, noon ${at('deer', 6000).n}, dusk ${at('deer', 12000).n}, midnight ${at('deer', 18000).n})`);
+  check(at('sheep', 6000, 'high', 6).mob === 'bloom_sheep' && at('sheep', 6000, 'high', 6).n === 6 && at('sheep', 18000, 'high', 6).rest === true && at('sheep', 6000, 'potato', 6).n <= 2,
+    `the herd keeps to its pasture by day (6), rests at night, Very Low keeps two (${at('sheep', 6000, 'potato', 6).n})`);
+  check(at('duck', 6000).mob === 'pond_duck' && !at('duck', 18000).mob && !at('duck', 6000, 'potato').mob, 'ducks swim by day, not at night and not on Very Low');
+  check(at('fish', 6000).jumps > 0 && at('fish', 6000, 'potato').jumps === 0 && at('fish', 18000).jumps === 0, 'fish jump by day (a particle), not at night and not on Very Low');
+  // the deer's anchors stand at the woods' edges: every 48-block cell of the middle of the land asked, a dozen of the
+  // anchors found in their chunks' spawns
+  let deer = [], cells = 0;
+  for (let gz = -12; gz <= 12; gz++) for (let gx = -12; gx <= 12; gx++) { cells++; const a = LAND.deerAt(g, P, gx, gz); if (a) deer.push(a); }
+  let edgeOk = 0, inChunk = 0;
+  for (const a of deer) { const q = LAND.woodAt(g, a[0], a[2]).d; if (q >= 0.08 && q <= 0.5 && a[1] > SEA + 2) edgeOk++; }
+  for (const a of deer.slice(0, 12)) if ((chunk(a[0] >> 4, a[2] >> 4).spawns || []).some(s0 => s0[0] === 'fauna' && s0[1] === 'deer' && s0[2] === a[0] && s0[4] === a[2])) inChunk++;
+  check(deer.length >= 60 && edgeOk === deer.length && inChunk === Math.min(12, deer.length), `deer anchors at the woods' edges (${deer.length} in ${cells} cells of 48 blocks, ${edgeOk} between the open and the wood, ${inChunk} of 12 in their chunks' spawns)`);
+  deer = deer.map(a => ['fauna', 'deer', a[0], a[1], a[2], a[3], 10]);
+  // the game's side (landlife.js) on a stub world: the anchors of the generated chunks, the groups it keeps
+  require('../src/main/landlife.js');
+  const LLc = V.LandLife;
+  const mkGame = (pos, t, preset) => ({ player: { pos }, env: { timeOfDay: t, E: { night: t > 13000 && t < 23000 ? 1 : 0 } }, settings: { preset }, particles: { n: 0, spawn() { this.n++; }, glow() { this.n++; } },
+    world: { isLoaded: () => true, topAt: (x, z) => { for (let y = 160; y > 2; y--) { const b = blockAt(x, y, z); if (b && !((R.T.flags[b] & V.F.PLANT) && !(R.T.flags[b] & V.F.SOLID)) && !(R.T.flags[b] & V.F.LEAVES)) return y; } return 0; }, getBlock: (x, y, z) => blockAt(x, y, z) } });
+  const mkEnts = () => ({ mobs: [], summon(kind, x, y, z) { const m = { kind, pos: [x, y, z], dead: false }; this.mobs.push(m); return m; } });
+  const pasture = P.pieces.find(p => p.kind === 'pasture'), pond = P.pieces.find(p => p.kind === 'pond'), pier = P.pieces.find(p => p.kind === 'pier');
+  const sp = (x, z) => chunk(x >> 4, z >> 4).spawns || [];
+  // the herd at noon, the player 30 blocks off
+  {
+    const game = mkGame([pasture.x + 30, 90, pasture.z], 6000, 'high'), E = mkEnts(), L = new LLc(game, E);
+    L.absorb(sp(pasture.x, pasture.z)); L.herds('high');
+    const box = pasture.rect, inBox = E.mobs.filter(m => m.pos[0] >= box[0] && m.pos[0] <= box[2] + 1 && m.pos[2] >= box[1] && m.pos[2] <= box[3] + 1);
+    check(E.mobs.length >= 4 && E.mobs.every(m => m.kind === 'bloom_sheep') && inBox.length === E.mobs.length, `a herd appears in its pasture (${E.mobs.length} sheep, ${inBox.length} inside its fence)`);
+    const game2 = mkGame([pasture.x + 30, 90, pasture.z], 6000, 'potato'), E2 = mkEnts(), L2 = new LLc(game2, E2); L2.absorb(sp(pasture.x, pasture.z)); L2.herds('potato');
+    check(E2.mobs.length <= 2 && E2.mobs.length >= 1, `Very Low keeps a smaller herd (${E2.mobs.length})`);
+  }
+  // ducks on the pond at its water, by day
+  {
+    const game = mkGame([pond.x + 25, 90, pond.z], 6000, 'high'), E = mkEnts(), L = new LLc(game, E);
+    L.absorb(sp(pond.x, pond.z)); L.herds('high');
+    const onWater = E.mobs.filter(m => m.kind === 'pond_duck' && Math.abs(m.pos[1] - (pond.y + 1 - 0.12)) < 0.01 && Math.hypot(m.pos[0] - pond.x - 0.5, m.pos[2] - pond.z - 0.5) <= pond.r);
+    check(E.mobs.length >= 2 && onWater.length === E.mobs.length, `ducks swim on the pond (${onWater.length} of ${E.mobs.length} on its water inside its shore)`);
+  }
+  // deer at dawn, gone at noon when the player is away
+  {
+    const d0 = deer[0], game = mkGame([d0[2] + 30, 90, d0[4]], 600, 'high'), E = mkEnts(), L = new LLc(game, E);
+    L.absorb(sp(d0[2], d0[4])); L.herds('high');
+    const n0 = E.mobs.filter(m => m.kind === 'glimmer_deer').length;
+    for (const m of E.mobs) m.anchor = 'deer:' + d0[2] + ',' + d0[4];
+    game.env.timeOfDay = 6000; L.herds('high');
+    check(n0 >= 2 && E.mobs.filter(m => m.kind === 'glimmer_deer').length === 0, `deer appear at the wood's edge at dawn (${n0}) and are gone by noon`);
+  }
+  // fish at the pier: jumps by day on High, none on Very Low
+  {
+    const game = mkGame([pier.x + 12, 70, pier.z], 6000, 'high'), E = mkEnts(), L = new LLc(game, E);
+    L.absorb(sp(pier.x, pier.z));
+    for (let i = 0; i < 300; i++) L.effects(0.05, 'high');
+    const game2 = mkGame([pier.x + 12, 70, pier.z], 6000, 'potato'), L2 = new LLc(game2, mkEnts()); L2.absorb(sp(pier.x, pier.z)); for (let i = 0; i < 300; i++) L2.update(0.05);
+    check(game.particles.n > 0 && game2.particles.n === 0, `fish leap at the pier (${game.particles.n} particles in 15 s on High, ${game2.particles.n} on Very Low)`);
+  }
+  console.log(`  (${secs()})`);
+}
+
 console.log(`(${secs()})`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

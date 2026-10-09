@@ -21,6 +21,8 @@
     glimmer_fox: { model: 'glimmer_fox', hp: 10, speed: 3.6, w: 0.3, h: 0.72, drops: [], xp: 0, companion: true, biomes: /meadow|plains|forest|birch|flower|sunflower|cherry|taiga|grove/ },
     moss_cat: { model: 'moss_cat', hp: 10, speed: 3.0, w: 0.26, h: 0.62, drops: [], xp: 0, companion: true, biomes: /meadow|plains|forest|jungle|swamp|grove|taiga|flower|birch/ },
     crystal_pup: { model: 'crystal_pup', hp: 10, speed: 3.8, w: 0.28, h: 0.7, drops: [], xp: 0, companion: true, biomes: /crystal|prism|beach|river|meadow|plains|shore/ },
+    // (t-land) a duck on a pond of the land between: it swims round its pond (landlife.js keeps it there), never spawned at random
+    pond_duck: { model: 'pond_duck', hp: 4, speed: 1, w: 0.25, h: 0.45, fly: 'swim', drops: [], xp: 0 },
   };
   VR.MOB_EGGS && VR.MOB_EGGS.forEach((m) => { if (!MOBS[m]) MOBS[m] = MOBS.glimmer_deer; });
 
@@ -44,6 +46,7 @@
       this.game = game;
       this.mobs = []; this.items = []; this.falling = []; this.bolts = []; this.vehicles = [];
       this.spawnT = 2; this.mm = mat4.create(); this.tmp = mat4.create(); this.tmp2 = mat4.create();
+      this.land = VR.LandLife ? new VR.LandLife(game, this) : null;   // (t-land) the herds, deer, ducks and fish at the land's places
       this.meshCache = new Map();
       game.dropStack = (stack, fromPlayer, at) => this.dropStack(stack, fromPlayer, at);
       game.entityBlocks = (x, y, z) => this.blocksPlacement(x, y, z);
@@ -132,6 +135,7 @@
       const g = this.game, w = g.world, p = g.player;
       const get = (x, y, z) => w.getBlock(x, y, z), nb = w.nbFn();
       this.trySpawn(dt);
+      if (this.land) this.land.update(dt);
       // mobs
       for (let i = this.mobs.length - 1; i >= 0; i--) {
         const m = this.mobs[i];
@@ -229,6 +233,17 @@
         m.walk += dt * 1.5; m.walkAmt = 1;
         return;
       }
+      if (def.fly === 'swim') {
+        // (t-land) round its pond on the water: a slow circle about the pond's middle, the head bobbing
+        const H = m.home || { x: m.pos[0] - 0.5, z: m.pos[2] - 0.5, r: 3 };
+        if (!m.swim) m.swim = { a: Math.random() * 6.283, r: Math.max(0.8, (H.r || 3) - 1.6) * (0.35 + Math.random() * 0.6), w: (Math.random() < 0.5 ? -1 : 1) * (0.12 + Math.random() * 0.18) };
+        m.swim.a += m.swim.w * dt;
+        const tx2 = H.x + 0.5 + Math.cos(m.swim.a) * m.swim.r, tz2 = H.z + 0.5 + Math.sin(m.swim.a) * m.swim.r;
+        m.vel[0] = (tx2 - m.pos[0]) * 0.9; m.vel[2] = (tz2 - m.pos[2]) * 0.9; m.vel[1] = ((m.waterY !== undefined ? m.waterY : m.pos[1]) - m.pos[1]) * 2;
+        if (Math.hypot(m.vel[0], m.vel[2]) > 0.05) m.yaw = Math.atan2(-m.vel[0], -m.vel[2]);
+        m.walk += dt * 0.5; m.walkAmt = 0.15;
+        return;
+      }
       if (def.fly === 'float') {
         m.vel[0] = Math.sin(m.age * 0.3 + m.id) * 0.8; m.vel[2] = Math.cos(m.age * 0.27 + m.id * 2) * 0.8;
         const top = w.topAt(Math.floor(m.pos[0]), Math.floor(m.pos[2]));
@@ -267,6 +282,8 @@
           A.t = 2 + Math.random() * 5;
           A.target = Math.random() < 0.6 ? [m.pos[0] + (Math.random() - 0.5) * 16, m.pos[2] + (Math.random() - 0.5) * 16] : null;
         }
+        if (A.target && m.home && VR.LandLife) VR.LandLife.clampHome(m.home, A.target);   // (t-land) a herd keeps to its pasture, deer to their wood's edge
+        if (A.target && m.rest) A.target = null;                                            // (the herd rests at night)
         if (A.target) { tx = A.target[0]; tz = A.target[1]; speed *= 0.55; }
       }
       if (tx !== null) {
@@ -728,7 +745,7 @@
     }
     onColumnLoaded(c) {
       // generator-requested spawns (parked hoverbikes) are handled by Gadgets (with de-duplication)
-      void c;
+      if (this.land && c && c.spawns) this.land.absorb(c.spawns);   // (t-land) the land's anchors
     }
   }
   VR.Entities = Entities;

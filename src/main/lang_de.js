@@ -642,7 +642,7 @@
     'g.set.wonderCompass.tip': 'Eine kleine Zeile oben: Richtung und Entfernung zum nächsten unentdeckten Wunder.',
     // Wesen und Biome (Namen im Codex)
     'g.mob.glimmer_deer': 'Glimmerhirsch', 'g.mob.moss_boar': 'Mooskeiler', 'g.mob.sky_ray': 'Himmelsrochen', 'g.mob.crystal_crab': 'Kristallkrabbe', 'g.mob.ember_husk': 'Glutschale',
-    'g.mob.void_stalker': 'Leerenschleicher', 'g.mob.shard_wisp': 'Scherbenirrlicht', 'g.mob.bloom_sheep': 'Blütenschaf', 'g.mob.hover_drone': 'Schwebedrohne',
+    'g.mob.void_stalker': 'Leerenschleicher', 'g.mob.shard_wisp': 'Scherbenirrlicht', 'g.mob.pond_duck': 'Teichente', 'g.mob.bloom_sheep': 'Blütenschaf', 'g.mob.hover_drone': 'Schwebedrohne',
     'g.biome.ocean': 'Ozean', 'g.biome.deep_ocean': 'Tiefer Ozean', 'g.biome.warm_ocean': 'Warmer Ozean', 'g.biome.lukewarm_ocean': 'Lauwarmer Ozean', 'g.biome.deep_lukewarm_ocean': 'Tiefer lauwarmer Ozean',
     'g.biome.cold_ocean': 'Kalter Ozean', 'g.biome.deep_cold_ocean': 'Tiefer kalter Ozean', 'g.biome.frozen_ocean': 'Eisozean', 'g.biome.deep_frozen_ocean': 'Tiefer Eisozean', 'g.biome.mushroom_fields': 'Pilzfelder',
     'g.biome.jagged_peaks': 'Zerklüftete Gipfel', 'g.biome.frozen_peaks': 'Eisgipfel', 'g.biome.stony_peaks': 'Steingipfel', 'g.biome.meadow': 'Wiese', 'g.biome.cherry_grove': 'Kirschhain', 'g.biome.grove': 'Hain',

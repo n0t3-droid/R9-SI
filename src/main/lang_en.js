@@ -642,7 +642,7 @@
     'g.set.wonderCompass.tip': 'A small line at the top: direction and distance to the nearest undiscovered wonder.',
     // creatures and biomes (names in the codex)
     'g.mob.glimmer_deer': 'Glimmer Deer', 'g.mob.moss_boar': 'Moss Boar', 'g.mob.sky_ray': 'Sky Ray', 'g.mob.crystal_crab': 'Crystal Crab', 'g.mob.ember_husk': 'Ember Husk',
-    'g.mob.void_stalker': 'Void Stalker', 'g.mob.shard_wisp': 'Shard Wisp', 'g.mob.bloom_sheep': 'Bloom Sheep', 'g.mob.hover_drone': 'Hover Drone',
+    'g.mob.void_stalker': 'Void Stalker', 'g.mob.shard_wisp': 'Shard Wisp', 'g.mob.pond_duck': 'Pond Duck', 'g.mob.bloom_sheep': 'Bloom Sheep', 'g.mob.hover_drone': 'Hover Drone',
     'g.biome.ocean': 'Ocean', 'g.biome.deep_ocean': 'Deep Ocean', 'g.biome.warm_ocean': 'Warm Ocean', 'g.biome.lukewarm_ocean': 'Lukewarm Ocean', 'g.biome.deep_lukewarm_ocean': 'Deep Lukewarm Ocean',
     'g.biome.cold_ocean': 'Cold Ocean', 'g.biome.deep_cold_ocean': 'Deep Cold Ocean', 'g.biome.frozen_ocean': 'Frozen Ocean', 'g.biome.deep_frozen_ocean': 'Deep Frozen Ocean', 'g.biome.mushroom_fields': 'Mushroom Fields',
     'g.biome.jagged_peaks': 'Jagged Peaks', 'g.biome.frozen_peaks': 'Frozen Peaks', 'g.biome.stony_peaks': 'Stony Peaks', 'g.biome.meadow': 'Meadow', 'g.biome.cherry_grove': 'Cherry Grove', 'g.biome.grove': 'Grove',
