@@ -59,13 +59,14 @@
       if (!this.on() || !w) { if (this.set.tiles.size) this.reset(); return; }
       if (this.t0 < 0) this.t0 = performance.now();
       const ccx = Math.floor(cam.x) >> 4, ccz = Math.floor(cam.z) >> 4;
+      // a failed form rests 10 s, then the scan below finds it missing and asks for it again
+      if (this.failed.length && performance.now() - this.failed[0].failedAt > 10000) { const t = this.failed.shift(); this.set.free(t); this.set.ccx = NaN; }
       if (this.set.update(ccx, ccz, w.renderDist, this.r1)) {
         const fl = this.set.freeList();
         for (let i = fl.length - 1; i >= 0; i--) this.free(fl[i]);
         this.reqIdx = 0;
       }
       if (ccx !== this.mcx || ccz !== this.mcz) { this.mcx = ccx; this.mcz = ccz; this.maskDirty = true; }
-      if (this.failed.length && performance.now() - this.failed[0].failedAt > 10000) { const t = this.failed.shift(); this.set.free(t); this.set.ccx = NaN; }
       this.ask();
       this.stepFades(performance.now());
       if (this.maskDirty) this.writeMask();
@@ -106,13 +107,24 @@
         // keeps an item whose column it cannot find — world.js drainUploads compares cols.get(key) with col, both empty)
         const w = g.world, bytes = m.verts.byteLength + m.idx.byteLength;
         const run = () => { if (this.gen === gen && set.tiles.get(t.key) === t) this.upload(t, m, bytes); };
-        if (w && w.uploadQ) w.uploadQ.push({ key: null, col: undefined, x: t.tx * 64 + 32, z: t.tz * 64 + 32, bytes, run });
+        if (w && w.uploadQ) { t.queued = true; w.uploadQ.push({ key: null, col: undefined, x: t.tx * 64 + 32, z: t.tz * 64 + 32, bytes, run }); }
         else run();
       }, -1.4 + 1.6 * dmin / Math.max(1, this.r1));   // (far lane: after the coarsest horizon tiles, before the finer ones far out)
+    }
+    // a new world object took the old upload queue with it (horizon.js): the forms that waited in it are asked for again
+    // (a tile whose new cell size waited keeps its old mesh and is asked again by the next scan)
+    dropQueued() {
+      for (const t of this.set.tiles.values()) {
+        if (!t.queued) continue;
+        t.queued = false;
+        if (t.state === 0) this.free(t); else t.redo = 0;
+      }
+      this.set.ccx = NaN;
     }
     upload(t, m, bytes) {
       const r = this.g.renderer, gl = r.gl;
       const old = t.gpu;
+      t.queued = false;
       const vao = gl.createVertexArray(), vbo = gl.createBuffer(), ibo = gl.createBuffer();
       gl.bindVertexArray(vao);
       gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(m.verts), gl.STATIC_DRAW);
