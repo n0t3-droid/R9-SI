@@ -209,7 +209,8 @@
       E.vivid = 0.6;
       E.bloomThreshold = GRADE.bloomThr; E.bloomStrength = GRADE.bloomStr + night * 0.04;
       E.contrast = GRADE.contrast; E.vignette = GRADE.vignette; E.nebula = GRADE.nebula; E.sunDisc = GRADE.sunDisc;
-      E.rays = GRADE.rays; E.gridK = GRADE.gridK;
+      // t-sky: the god rays at 40 % by day (a high sun's rays streak the clean day sky the trailer shows), full round dusk
+      E.rays = GRADE.rays * (SKY.on ? 1 - 0.6 * wDay : 1); E.gridK = GRADE.gridK;
       return E;
     }
     lightning() { this.wx.strike(); }

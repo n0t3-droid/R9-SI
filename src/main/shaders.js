@@ -280,7 +280,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
       vec2 q = dir.xz / (dir.y + 0.1);
       float a = vnoise(vec2(q.x * 0.55 + q.y * 0.3, q.y * 4.2 + 3.0) + vec2(u_time * 0.0025, 0.0));
       float b = vnoise(vec2(q.x * 0.4 - 7.0, q.y * 9.0 - 1.0));
-      float st = smoothstep(0.6, 0.92, a * 0.66 + b * 0.5) * smoothstep(0.12, 0.34, dir.y) * (1.0 - smoothstep(0.62, 0.92, dir.y));
+      float st = smoothstep(0.6, 0.92, a * 0.66 + b * 0.5) * smoothstep(0.12, 0.34, dir.y) * (1.0 - smoothstep(0.4, 0.62, dir.y));   // t-sky: low in the blue, not across the space
       vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
       col = mix(col, cir, st * u_cirrus * 0.12 * (1.0 - u_rain) * (1.0 - u_night * 0.8) * (1.0 - cosmic * 0.8));   // t-sky: no white streaks over the space
     }
@@ -299,7 +299,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
         float tw = 0.55 + 0.45 * sin(u_time * 3.0 + s * 100.0);
         vec3 sc = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.85, 0.7), hash13(g + 3.0));
         float br = smoothstep(0.9955, 1.0, s);
-        col += sc * starK * clear * tw * (3.0 + br * 14.0) * exp(-d * d * 28.0);
+        col += sc * starK * clear * tw * (3.0 + br * 14.0) * exp(-d * d * mix(9.0, 28.0, u_night));   // t-sky: by day a little larger, so they read through the daylight
       }
       col += meteors(dir) * u_night * clear;
       if (u_dim == 3) {
