@@ -503,8 +503,8 @@
         if (isKerb && o === 8) put(x, y + 1, z, K.KERB);
       }
     }
-    // fan palms between the tall ones (t1_24 · t2_23 · t2_25: low palms in the planted verges), a crown on a trunk of two
-    // or three blocks halfway between two palms of a run — in every second gap (a crown is the verge's dearest piece on
+    // fan palms between the tall ones (t1_24 · t2_23 · t2_25: low palms in raised beds in the planted verges), a crown on a
+    // trunk of two or three blocks halfway between two palms of a run — in every second gap (a crown is the verge's dearest piece on
     // Very Low) — where the verge is free and no lamp stands within three blocks (by a hash of the cell: the tall palms'
     // seeded sequence stays as it was)
     const hsh = (x, z, s) => (Math.imul(x * 73856093 ^ z * 19349663, 0x9E3779B1) ^ s) >>> 0;
@@ -517,8 +517,11 @@
         let ok = free(x, z) && !nearLamp(x, z) && !nearTip(x, z);
         for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) { const o = oc(x + dx, z + dz); if (o === 5 || o === 6 || o === 2) { ok = false; break; } }
         if (!ok) continue;
-        setO(x, z, 6);
-        rd.fans.push([x, z, k, run[i][3], 2 + (hsh(x, z, site.seed) & 1)]);
+        // (t1_24: the fan palm stands in a raised bed — dark soil in a light grey kerb one block high, on the lawn round it)
+        const yb = run[i][3];
+        setO(x, z, 6); put(x, yb, z, K.SOIL);
+        for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if ((dx || dz) && oc(x + dx, z + dz) === 0) { setO(x + dx, z + dz, 6); put(x + dx, yb, z + dz, K.BEDKERB); }
+        rd.fans.push([x, z, k, yb + 1, 2 + (hsh(x, z, site.seed) & 1)]);
       }
     }
     // the island's beds: a light grey kerb one block high round dark soil with ferns and flowers; the round clipped tree in
