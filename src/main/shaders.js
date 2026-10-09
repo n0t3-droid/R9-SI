@@ -190,8 +190,8 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
     vec3 col = alb * (diff * shade * 1.3 + 0.12) * (0.6 + 0.4 * sqrt(zz)) + vec3(0.4, 0.6, 1.0) * rim * 0.45 * diff;   // 0.12: the night side keeps a trace of its bands
     float edge = smoothstep(1.0, 0.96, sqrt(r2));
     res = vec4(col, edge);
-  } else {
-    // the soft limb: a thin lilac glow round the lit side
+  } else if (r2 < 1.44) {
+    // the soft limb: a thin lilac glow round the lit side (within 1.2 radii: the rest of the giant's cone skips it)
     float r = sqrt(r2);
     vec2 lq = vec2(dot(Lb, X), dot(Lb, Y));
     float side = smoothstep(-0.3, 0.6, dot(q / r, lq));
@@ -224,6 +224,7 @@ vec4 rockyPlanet(vec3 dir, vec3 C, float R, vec3 L) {
   vec3 X = normalize(cross(up, C)), Y = cross(C, X);
   vec2 q = vec2(dot(dir, X), dot(dir, Y)) / R;
   float r2 = dot(q, q);
+  if (r2 >= 1.69) return vec4(0.0);   // (t-sky2: past 1.3 radii the glow is nil: the rest of the cone skips it)
   vec3 Lb = bodyLight(C, L);
   // t-sky2: the atmosphere's glow brighter on the lit side (the soft limb)
   if (r2 >= 1.0) { float r = sqrt(r2); float side = 0.35 + 0.65 * smoothstep(-0.3, 0.6, dot(q / r, vec2(dot(Lb, X), dot(Lb, Y)))); float glow = exp(-(r - 1.0) * 14.0) * 0.25 * side; return vec4(vec3(0.4, 0.7, 1.0) * glow, 0.0); }
