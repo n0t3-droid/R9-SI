@@ -17,7 +17,7 @@
 //  2. Very Low and High with no streaming (the settled spawn, model off): frame ms before and after (must be equal)
 //   nohup bash test/wt_run.sh stream_hitches.mjs 9000 > .tmp_tests/stream_hitches.log 2>&1 &
 //   BEFORE_URL / AFTER_URL (default: .tmp_tests/before_dist/index.html — build v042's dist there first — and dist/index.html)
-//   MS_PER_MB · FLIGHT_FRAMES (240) · DT (0.25 s) · SPEED (15 blocks/s) · PRESETS (low,balanced) · SKIP_COST=1 · SKIP_FLIGHT=1
+//   MS_PER_MB · FLIGHT_FRAMES (100) · DT (0.6 s) · SPEED (15 blocks/s) · PRESETS (low,balanced) · SKIP_COST=1 · SKIP_FLIGHT=1
 // regress: skip  (a before/after benchmark of an hour that needs the build before in .tmp_tests/before_dist)
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/claude/.npm-global/lib/node_modules/sharp/lib/index.js';
@@ -27,7 +27,7 @@ const BEFORE_URL = process.env.BEFORE_URL || 'file://' + ROOT + '/.tmp_tests/bef
 const AFTER_URL = process.env.AFTER_URL || 'file://' + ROOT + '/dist/index.html';
 const MS_PER_MB = +(process.env.MS_PER_MB || 15);
 const OWNER_MS = { low: 50, balanced: 70 };
-const FLIGHT_FRAMES = +(process.env.FLIGHT_FRAMES || 240), DT = +(process.env.DT || 0.25), SPEED = +(process.env.SPEED || 15);
+const FLIGHT_FRAMES = +(process.env.FLIGHT_FRAMES || 100), DT = +(process.env.DT || 0.6), SPEED = +(process.env.SPEED || 15);   // (100 frames of 0.6 s: 60 s of flight; a software frame takes seconds)
 const PRESETS = (process.env.PRESETS || 'low,balanced').split(',');
 const SHOTS = ROOT + '/test/shots', OUT = ROOT + '/.tmp_tests';
 const MB = 1048576;
@@ -92,7 +92,7 @@ async function open(build, preset) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, window.__px);
       const t2 = performance.now();
       const q = w.uploadQ;
-      return { ms: t2 - t0, js: t1 - t0, sync: t2 - t1, sub: sim.sub, data: sim.data, tex: sim.tex, copyMs: sim.waitMs - w0, ran: (w.stats.uploaded || 0) - up0, queue: q ? q.size : 0,
+      return { ms: t2 - t0, js: t1 - t0, sync: t2 - t1, sub: sim.sub, data: sim.data, tex: sim.tex, copyMs: sim.waitMs - w0, ran: (w.stats.uploaded || 0) - up0, queue: q ? q.size : 0, upMs: w.stats.uploadMs || 0,
         kb: rs.uploadKB, budgetKB: rs.upBudgetKB, mbs: rs.upMBs, hitches: rs.hitches, scale: q && q.scale, mpb: q && q.msPerByte };
     };
     // streaming without drawing (between two drawn frames the world goes on: a frame costs seconds here)
@@ -164,6 +164,7 @@ if (!process.env.SKIP_FLIGHT) for (let pi = 0; pi < PRESETS.length; pi++) {
       rec.push(await P.ev((dt) => window.__frame(dt), DT));
     }
     const end = path[path.length - 1];
+    const colsFlight = (await P.ev(() => window.__cols())).length;   // (how far the world kept up: the columns shown when the flight ends)
     const fin = await P.ev(() => { const rs = VR.game.renderer.stats, q = VR.game.world.uploadQ; return { hitchMeter: rs.hitches, mpb: q && q.msPerByte, line: VR.game.upLine ? VR.game.upLine(VR.game.renderer) : null }; });
     // the end: the model off again, settle (streaming ticks), then the picture from the last spot
     await setModel(P, false, 0); await recal();
@@ -180,6 +181,7 @@ if (!process.env.SKIP_FLIGHT) for (let pi = 0; pi < PRESETS.length; pi++) {
       upMedianKB: +(median(up) / 1024).toFixed(0), upP95KB: +(pct(up, 0.95) / 1024).toFixed(0), upMaxKB: +(Math.max(...up) / 1024).toFixed(0), upTotalMB: +(up.reduce((a, b) => a + b, 0) / MB).toFixed(1),
       copyMedianMs: +median(copy).toFixed(0), copyMaxMs: +Math.max(...copy).toFixed(0), ownerCopyMaxMs: +(Math.max(...copy) / k).toFixed(1), ownerCopyP95Ms: +(pct(copy, 0.95) / k).toFixed(1),
       jsMedianMs: +median(rec.map(r => r.js)).toFixed(0), jsMaxMs: +Math.max(...rec.map(r => r.js)).toFixed(0),
+      upMsMedian: +median(rec.map(r => r.upMs)).toFixed(2), upMsP95: +pct(rec.map(r => r.upMs), 0.95).toFixed(2), upMsMax: +Math.max(...rec.map(r => r.upMs)).toFixed(2), colsFlight,
       queueMax: Math.max(...rec.map(r => r.queue)), cols: cols.length, cal, fin, modelRate: rate };
     console.log('FLIGHT ' + JSON.stringify(out));
     const worst = rec.map((r, i) => ({ i, ...r })).sort((a, b) => b.ms - a.ms).slice(0, 4).map(r => ({ i: r.i, ms: +r.ms.toFixed(0), js: +r.js.toFixed(0), copy: +r.copyMs.toFixed(0), subKB: +(r.sub / 1024).toFixed(0), dataKB: +(r.data / 1024).toFixed(0), texKB: +(r.tex / 1024).toFixed(0), q: r.queue }));
@@ -218,7 +220,7 @@ if (!process.env.SKIP_COST) {
   for (const build of BUILDS) {
     const P = await open(build, 'high');
     await settle(P, 600);
-    cost['high_' + build.label] = +median(await frameMs(P, 12)).toFixed(1);
+    cost['high_' + build.label] = +median(await frameMs(P, 8)).toFixed(1);
     await P.page.screenshot({ path: `${SHOTS}/stream_cost_high_${build.label}.png`, timeout: 900000 });
     await P.ctx.close();
   }
