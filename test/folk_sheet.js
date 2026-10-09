@@ -135,7 +135,8 @@ for (const smooth of [false, true]) {
 {
   const cv = new Canvas(1280, 720, BG);
   cv.cam([-3.2, 1.3, -3.6], [0, 0.9, 0], 50);
-  people.slice(0, 8).forEach((p, i) => { const ph = i * 0.7; const P = FA.walk(ph, 1, false, {}); drawPerson(cv, p.def, partMeshes(p.def, true), (i - 3.5) * 0.7, 0, Math.PI / 2, P, p.kid ? 0.82 : 1, { lids: true, mouth: true }); });
+  // (the people's own gait, folkanim.js FA.walkPerson: each at another moment of its cycle)
+  people.slice(0, 8).forEach((p, i) => { const G = Folk.gaitFor(p.L); G.ph = i * 0.7; G.S = FA.stepLen(G, p.kid ? 2.9 : 2.2, false); const P = FA.walkPerson(G, 1, {}); drawPerson(cv, p.def, partMeshes(p.def, true), (i - 3.5) * 0.7, 0, Math.PI / 2, P, p.kid ? 0.82 : 1, { lids: true, mouth: true }); });
   fs.writeFileSync(path.join(OUT, 'folk_sheet_walk.png'), cv.png());
   check(cv.drawn > 30000, `the walk drawn (${cv.drawn} pixels)`);
 }

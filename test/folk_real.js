@@ -152,5 +152,121 @@ function closed(mesh) {
   }
 }
 
+// ---------------------------------------------------------------- §4 movement
+// the gait (folkanim.js FA.walkPerson) walked on the rig: a planted foot does not slide (its sole's speed over the ground
+// in the middle of its stance), the arms swing against the legs, the pelvis shifts over the stance foot and turns while
+// the shoulders turn against it, a robe's legs stay inside its hem; standing, the weight moves from leg to leg and the
+// chest breathes; the head turns at most 40° toward what the person looks at (the shoulders the rest); seated, the
+// thighs rest on the seat and the feet on the floor
+console.log('§4 movement');
+require('../src/main/villages.js');
+const FA = V.FolkAnim;
+// a foot's sole in the world (model units, the base at the walker's place): the shin's frame point (0, sole, 0)
+function soleAt(def, base, pose, side) {
+  const mats = FS.rigMats(def, base, pose, {}), M = mats['shin_' + side], g = def.parts['shin_' + side].grid;
+  let row = 0; while (row < g.sy) { let any = false; for (let z = 0; z < g.sz && !any; z++) for (let x = 0; x < g.sx; x++) if (g.c[g.i(x, row, z)]) { any = true; break; } if (any) break; row++; }
+  const y = row - g.oy;   // (the bottom of the shin's lowest row of voxels: the sole)
+  return [M[4] * y + M[12], M[5] * y + M[13], M[6] * y + M[14]];
+}
+function walkRun(L, v, run, secs) {
+  const def = Folk.buildHiRes(L), G = Folk.gaitFor(L), u = def.unit / G.scale;   // model units a block, as drawn
+  const dt = 1 / 240, out = {};
+  let x = 0, worst = 0, maxSwing = 0, maxFoot = 0, sxCorr = 0, yawCorr = 0;
+  const arms = [], legs = [];
+  let prev = null;
+  for (let i = 0; i < secs / dt; i++) {
+    FA.stride(G, v, dt, run); x += v * dt;
+    FA.walkPerson(G, 1, out);
+    const base = m4.create(); m4.translate(base, base, 0, 0, -x * u);   // (walking toward −z: the models face −z)
+    const sl = soleAt(def, base, out, 'l'), sr = soleAt(def, base, out, 'r');
+    const TAU = Math.PI * 2, uL = ((G.ph % TAU) + TAU) % TAU / TAU, beta = run ? 0.38 : 0.6;
+    if (prev && i * dt > 0.5) {
+      // in the middle 80 % of the left foot's stance: its sole's speed over the ground (blocks a second)
+      if (uL > beta * 0.1 && uL < beta * 0.9) { const vz = Math.hypot(sl[0] - prev[0], sl[2] - prev[2]) / u / dt; worst = Math.max(worst, vz / v); }
+      maxSwing = Math.max(maxSwing, Math.abs(out.leg_l[0]), Math.abs(out.leg_r[0]));
+      maxFoot = Math.max(maxFoot, Math.abs(sl[2] + x * u));
+      arms.push(out.arm_l[0]); legs.push(out.leg_l[0]);
+      sxCorr += out.hips[3] * (uL < beta ? -1 : 1);
+      yawCorr += out.hips[1] * out.body[1];
+    }
+    prev = sl; void sr;
+  }
+  // the correlation of the left arm's swing with the left thigh's (about their means)
+  const mean = (A) => A.reduce((p, q) => p + q, 0) / A.length, ma = mean(arms), ml = mean(legs);
+  let sab = 0, saa = 0, sbb = 0; for (let i = 0; i < arms.length; i++) { const da = arms[i] - ma, dl = legs[i] - ml; sab += da * dl; saa += da * da; sbb += dl * dl; }
+  return { worst, maxSwing, maxFoot, arm: sab / Math.sqrt(saa * sbb || 1), sx: sxCorr, yaw: yawCorr, G, S: G.S };
+}
+{
+  const cases = [
+    ['trousers, 2.2 blocks/s', Folk.look(11, 'crafter', 'adult'), 2.2, false],
+    ['an elder, 1.5 blocks/s', Folk.look(111, 'elder', 'elder'), 1.5, false],
+    ['a robe, 2.2 blocks/s', Folk.look(4, 'crafter', 'adult', null, 'hall'), 2.2, false],
+    ['a child running, 2.9 blocks/s', Folk.look(77, 'child', 'child'), 2.9 * 1.0, true],
+  ];
+  for (const [name, L0, v, run] of cases) {
+    const L = name.startsWith('a robe') ? (() => { for (let s = 1; s < 400; s++) { const q = Folk.look(s, 'crafter', 'adult', null, 'hall'); if (q.garb === 'robe') return q; } return L0; })() : L0;
+    const r = walkRun(L, v, run, 3);
+    console.log(`    ${name}: step ${r.S.toFixed(2)} blocks, the stance foot's speed ≤ ${(r.worst * 100).toFixed(1)} % of the walk's, thigh swing ≤ ${r.maxSwing.toFixed(2)} rad (the clothes allow ${r.G.maxSwing}), arm·leg ${r.arm.toFixed(2)}`);
+    check(r.worst < 0.08, `${name}: a planted foot does not slide (${(r.worst * 100).toFixed(1)} % of the walking speed)`);
+    check(r.arm < -0.5, `${name}: the arm swings against the leg on its side (correlation ${r.arm.toFixed(2)})`);
+    check(r.sx > 0 && r.yaw < 0, `${name}: the pelvis shifts over the stance foot and the shoulders turn against it`);
+    if (L.garb === 'robe') {
+      // the legs inside the robe: at 24 moments of a cycle, the thigh and shin voxels above the hem against the robe's
+      // own outline at their height (its front and back, its sides) — a leg voxel outside it pokes through the cloth
+      const def = Folk.buildHiRes(L), G = Folk.gaitFor(L), out = {};
+      let worstOut = 0, legs = 0;
+      for (let k = 0; k < 24; k++) {
+        G.ph = k / 24 * Math.PI * 2; G.S = FA.stepLen(G, v, false); FA.walkPerson(G, 1, out);
+        const A = assemble(def, out), rows = new Map();
+        let hem = Infinity; for (const q of A.hips.vox) hem = Math.min(hem, q.y);
+        for (const q of A.hips.vox) { const y = Math.round(q.y), r = rows.get(y) || { z0: Infinity, z1: -Infinity, x0: Infinity, x1: -Infinity }; r.z0 = Math.min(r.z0, q.z); r.z1 = Math.max(r.z1, q.z); r.x0 = Math.min(r.x0, q.x); r.x1 = Math.max(r.x1, q.x); rows.set(y, r); }
+        let outN = 0, n = 0;
+        for (const part of ['leg_l', 'leg_r', 'shin_l', 'shin_r']) for (const q of A[part].vox) {
+          if (q.y < hem + 2) continue;   // (the feet below the hem show, as they should)
+          const r = rows.get(Math.round(q.y)); n++;
+          if (!r || q.z < r.z0 - 0.6 || q.z > r.z1 + 0.6 || q.x < r.x0 - 0.6 || q.x > r.x1 + 0.6) outN++;
+        }
+        worstOut = Math.max(worstOut, outN / Math.max(1, n)); legs = n;
+      }
+      check(worstOut < 0.02, `a robe's legs stay inside it: at worst ${(worstOut * 100).toFixed(1)} % of the leg voxels above the hem outside its outline (of ${legs})`);
+    }
+  }
+}
+{
+  // standing: FA.pose with the gait — the weight from leg to leg, the free knee bent, the chest breathing
+  const L = Folk.look(11, 'crafter', 'adult'), G = Folk.gaitFor(L), a = { seedW: 3 };
+  let tx0 = Infinity, tx1 = -Infinity, knee = 0, by0 = Infinity, by1 = -Infinity;
+  for (let i = 0; i < 20 * 30; i++) { const P = FA.pose(a, 'idle', 1 / 30, 0, 0, false, a.poseOut || (a.poseOut = {}), undefined, G); tx0 = Math.min(tx0, P.hips[3]); tx1 = Math.max(tx1, P.hips[3]); knee = Math.min(knee, P.shin_l[0], P.shin_r[0]); by0 = Math.min(by0, P.body[4]); by1 = Math.max(by1, P.body[4]); }
+  check(tx1 - tx0 > 0.8 && knee < -0.08, `standing, the weight moves from leg to leg (the pelvis slides ${(tx1 - tx0).toFixed(2)} units, the free knee bends ${(-knee).toFixed(2)} rad)`);
+  check(by1 - by0 > 0.2, `standing, the chest breathes (rises ${(by1 - by0).toFixed(2)} units)`);
+}
+{
+  // the head: a person looking at something 90° to its right turns the head 40° at most, the shoulders the rest
+  const mgr = Object.create(V.Villages.prototype);
+  mgr.g = { player: { pos: [1000, 0, 1000] } };
+  const L = Folk.look(11, 'crafter', 'adult');
+  const a = { pos: [0, 70, 0], vel: [0, 0, 0], yaw: 0, walk: 0, walkAmt: 0, pose: 'stand', p: { look: L, seed: 5 }, headYaw: 0, headPitch: 0, lookAt: [-5, 71.5, 0], kid: false };
+  let P; for (let i = 0; i < 60; i++) P = mgr.pose(a, i / 30);
+  // (40° of looking, the idle's own small glance on top)
+  check(Math.abs(P.head[1]) <= 0.7 + 0.1 && Math.abs(P.body[1]) > 0.3, `the head turns ${(Math.abs(P.head[1]) * 180 / Math.PI).toFixed(0)}° toward the target 90° aside (40° of looking and the idle's glance), the shoulders ${(Math.abs(P.body[1]) * 180 / Math.PI).toFixed(0)}°`);
+}
+{
+  // seated: the sit clip on the rig, placed as villages.js draws it (the seat half a block up from the seat block's floor)
+  for (const [L, who] of [[Folk.look(11, 'crafter', 'adult'), 'an adult'], [Folk.look(77, 'child', 'child'), 'a child']]) {
+    const def = Folk.buildHiRes(L), G = Folk.gaitFor(L), P = FA.sample(FA.clips.sit, 0, {});
+    const dy = 0.05 + 0.45 - (G.hip - 4) * G.bpu;   // villages.js: the agent stands 0.05 over the floor, the draw adds this
+    const base = m4.create(); m4.translate(base, base, 0, dy * def.unit / G.scale, 0);
+    const A = assemble(def, P);
+    let under = Infinity, sole = Infinity;
+    for (const k of ['leg_l', 'leg_r']) { const mats = FS.rigMats(def, base, P, {}), M = mats[k], g = def.parts[k].grid; for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) { if (!g.c[g.i(x, y, z)]) continue; const px = x - g.ox + 0.5, py = y - g.oy, pz = z - g.oz + 0.5; under = Math.min(under, M[1] * px + M[5] * py + M[9] * pz + M[13]); } }
+    for (const k of ['shin_l', 'shin_r']) { const s = soleAt(def, base, P, k.slice(-1)); sole = Math.min(sole, s[1]); }
+    const ub = under * G.bpu, sb = sole * G.bpu;   // blocks above the floor
+    void A;
+    console.log(`    ${who} seated: the thighs' underside ${ub.toFixed(2)} blocks over the floor (the seat 0.5), the soles ${sb.toFixed(2)}`);
+    check(Math.abs(ub - 0.5) < 0.07, `${who} seated: the thighs rest on the seat (${ub.toFixed(2)} blocks, the seat at 0.50)`);
+    if (who === 'an adult') check(sb > -0.03 && sb < 0.14, `an adult seated: the feet on the floor (${sb.toFixed(2)} blocks)`);
+  }
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

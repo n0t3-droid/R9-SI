@@ -573,6 +573,12 @@
   };
 
   const STRIDE = { robe: 0.28, coat: 0.32, frock: 0.34, whitecoat: 0.32, dress: 0.36, tunic: 0.45, suit: 0.5 };
+  // a person's legs for the gait (folkanim.js FA.gait): the hip joint's height, the thigh and the shin (model units), the
+  // draw scale, the widest swing the clothes allow — without building the model (the villagers' pose needs it each frame)
+  V.gaitFor = function (L) {
+    const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult;
+    return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[V.familyOf(L)] || 0.6, kid });
+  };
   function buildPerson(L) {
     const kid = L.age === 'child', elder = L.age === 'elder';
     const role = V.ROLES[L.role] || V.ROLES.farmer;

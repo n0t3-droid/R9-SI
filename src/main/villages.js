@@ -1388,8 +1388,10 @@
         const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: a.kid ? 0.82 : 1, shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn } };
         let pos = a.pos;
         if (sleeping) { opts.pitch = Math.PI / 2; pos = [a.pos[0] - VR.HF_DX[a.p.bed ? a.p.bed[3] : 0] * 0.85, a.pos[1] + 0.12, a.pos[2] - VR.HF_DZ[a.p.bed ? a.p.bed[3] : 0] * 0.85]; }
-        else if (a.pose === 'sit') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.2 : 0.3), a.pos[2]];
-        else if (a.pose === 'sitground') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.26 : 0.6), a.pos[2]];
+        // (t-folk: the seat from the rig — the thighs' underside, some four units under the hip joint as they lie, on the
+        // seat's top half a block up; on the ground the same underside on the ground)
+        else if (a.pose === 'sit') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? 0.45 - (G.hip - 4) * G.bpu : -(a.kid ? 0.2 : 0.3)), a.pos[2]]; }
+        else if (a.pose === 'sitground') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? -0.05 - (G.hip - 4) * G.bpu : -(a.kid ? 0.26 : 0.6)), a.pos[2]]; }
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
         if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
@@ -1411,7 +1413,11 @@
       if (a.stretchT > 0) { a.stretchT -= dt; state = 'stretch'; }
       if (a.waveT > 0) { a.waveT -= dt; state = 'wave'; }                                                               // wave when the player comes close
       if (a.dance) state = 'dance';
-      const P = FA.pose(a, state, dt, ph, wa, run, a.poseOut || (a.poseOut = {}));
+      // t-folk: a person walks on its own legs (folkanim.js FA.walkPerson: the phase by the distance walked, the step by the
+      // pace and the clothes) and shifts its weight standing; the gait is the look's, kept on the agent
+      const G = a.gait !== undefined ? a.gait : (a.gait = Folk.gaitFor && a.p.look && a.p.look.role !== 'hero' ? Folk.gaitFor(a.p.look) : null);
+      if (G) FA.stride(G, Math.hypot(a.vel[0], a.vel[2]), dt, run);
+      const P = FA.pose(a, state, dt, ph, wa, run, a.poseOut || (a.poseOut = {}), undefined, G);
       // head: look at the target (or the player close by), otherwise glance around now and then
       let hy = 0, hp = 0;
       const pl = this.g.player.pos;
@@ -1429,7 +1435,9 @@
       }
       const k = Math.min(1, dt * 7);
       a.headYaw += (hy - a.headYaw) * k; a.headPitch += (hp - a.headPitch) * k;
-      P.head[0] += a.headPitch + (a.bubble ? Math.sin(t * 7) * 0.04 : 0); P.head[1] += a.headYaw;
+      // (t-folk: the head turns up to 40° toward what the person looks at, the shoulders take the rest — up to 23°)
+      const hyH = G ? Math.max(-0.7, Math.min(0.7, a.headYaw)) : a.headYaw, hyB = G ? Math.max(-0.4, Math.min(0.4, a.headYaw - hyH)) : 0;
+      P.head[0] += a.headPitch + (a.bubble ? Math.sin(t * 7) * 0.04 : 0); P.head[1] += hyH; if (hyB) P.body[1] += hyB;
       // blinking and a talking mouth (the lids and mouth parts hang on the head: no pose of their own)
       a.blinkT = (a.blinkT === undefined ? Math.random() * 4 : a.blinkT) - dt;
       if (a.blinkT < 0) { a.blinkOn = true; if (a.blinkT < -0.14) { a.blinkOn = false; a.blinkT = 2.2 + Math.random() * 4; } }
