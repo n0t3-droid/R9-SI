@@ -17,7 +17,19 @@ const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(5); } };
 const settle = async (max = 400) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game; return { busy: g.pool.busy, pend: g.world.pending.size, lod: g.horizon ? g.horizon.inflight : 0, want: g.world.lastWant || 0 }; }); if (s.busy === 0 && s.pend === 0 && s.lod === 0 && !s.want && i > 3) break; await wait(100); } };
-const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: `/home/claude/vr/test/shots/trailer_${name}_${TAG}.png`, timeout: 180000 }); console.log('shot', name); };
+// a picture; on the shared machine a screenshot can stall (run 3's verylow_hall timed out after 180 s): one more try,
+// then the run goes on without it (the verdict still prints)
+const shot = async (name) => {
+  for (let k = 0; k < 2; k++) {
+    try {
+      await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; });
+      await page.screenshot({ path: `/home/claude/vr/test/shots/trailer_${name}_${TAG}.png`, timeout: 180000 });
+      console.log('shot', name); return true;
+    } catch (e) { console.log('shot', name, 'failed (' + (k ? 'gave up' : 'trying again') + '):', String(e.message || e).split('\n')[0]); }
+  }
+  missed.push(name); return false;
+};
+const missed = [];
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 await ev(`window.__hz=${process.env.HZ === undefined ? 2 : +process.env.HZ}`);
 const PRESET = process.env.PRESET || 'high';
@@ -41,7 +53,7 @@ const SHOT = {
   // D (t3_04 colours): through the gate's veil down the hall, the shuttle on the pad beyond it
   veil: { from: [0.5, 83.6, 34], to: [0, 88, -80], fly: { phase: 'pad', at: 0.5 }, pt: 8 },
   // E (t1_19, new): from the pad end past the heroes at the consoles to the mouth, the shuttle hovering in it
-  mouth: { from: [0.5, 83.7, -3.5], to: [0.5, 86.5, 20], fly: { phase: 'in', at: 0.22 }, pt: 8 },
+  mouth: { from: [0.5, 82.2, -8], to: [0.5, 85.5, 20], fly: { phase: 'in', at: 0.22 }, pt: 8 },
   // E: the hall from the front end down the axis, the shuttle settling onto the pad
   hall: { from: [0.5, 83.2, 16], to: [0, 86, -36], fly: { phase: 'settle', at: 0.4 }, pt: 8 },
   // E (t1_16 / t1_17): the pad from the front end, the heroes at the sides, the shuttle lifting and turning
@@ -107,7 +119,7 @@ for (const name of shots) {
 }
 // VERYLOW=1: the cost of the same hall view on the High preset and on Very Low (render on, 6 frames each; the
 // Very Low preset has Animierte Anzeigen off), then Very Low with the animation forced on
-if (process.env.VERYLOW) {
+if (process.env.VERYLOW) try {
   // five blocks of six frames (each after three warm-up frames); the minimum is the cost, since the machine is shared
   const timeFrames = async (label) => {
     const runs = [];
@@ -128,7 +140,7 @@ if (process.env.VERYLOW) {
   await ev((t) => VR.game.env.setTime(t), +(process.env.TOD || 3200)); await look(hallView.from, hallView.to, null);
   await timeFrames('Very Low (' + TAG + ', animation forced on)');
   await shot('verylow_hall_anim');
-}
+} catch (e) { console.log('VERYLOW pass broke off:', String(e.message || e).split('\n')[0]); missed.push('verylow'); }
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 // the verdict (only when the shots were taken, so a picture-only run prints no verdict): no page errors, the two heroes
 // stand in the hall, the shuttle on the pad is built and uploaded
@@ -142,6 +154,7 @@ if (diags.hall && diags.pad) {
   ok(fl && fl.active && fl.built && fl.variant === 'hall' && fl.draws > 0 && diags.pad.ships.every(s => s.hidden), `the shuttle flies and is drawn; the parked one is out meanwhile (${JSON.stringify(fl)})`);
   // the crew walks out to the corridor's city end (hall.js)
   if (diags.exit) ok(diags.exit.crewAt.every(c => c[1] < -42 && c[3] === 1), `the heroes walk out through the corridor (${JSON.stringify(diags.exit.crewAt)})`);
+  ok(!missed.length, `every picture was taken (${missed.length ? 'missing: ' + missed.join(' ') : shots.length + ' shots' + (process.env.VERYLOW ? ' and the Very Low pass' : '')})`);
   console.log(bad ? `FAILED ${bad}` : 'ALL OK');
   process.exitCode = bad ? 1 : 0;
 }

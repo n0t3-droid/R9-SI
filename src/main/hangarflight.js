@@ -215,7 +215,9 @@
       if (!m || !pl) return;
       const near = Math.hypot(this.inst.pos[0] - pl.pos[0], this.inst.pos[2] - pl.pos[2]);
       if (near > 260) return;
-      if (g.trails) for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(this.tid + ei, this.toWorld([e[0], e[1], e[2] + 0.3]), s.speed, { thrust: s.thrust, size: e[3] * HF.SCALE * 1.25, col: s.phase === 'air' ? [0.45, 0.75, 1] : [1, 0.68, 0.32], minor: ei > 1, smokeLife: 4, minSmoke: 14 }); }
+      // in the air the engines burn long and blue-white (t1_10, t3_03); hovering, a short orange glow
+      const air = s.phase === 'air' || s.phase === 'out';
+      if (g.trails) for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(this.tid + ei, this.toWorld([e[0], e[1], e[2] + 0.3]), s.speed, { thrust: air ? 1 : s.thrust, size: e[3] * HF.SCALE * (air ? 2.2 : 1.25), col: air ? [0.45, 0.75, 1] : [1, 0.68, 0.32], minor: ei > 1, smokeLife: 4, minSmoke: 14 }); }
       if (!g.particles || near > 120) return;
       const low = s.pos[1] - DECK, P = g.particles;
       // lift jets: two hot cones under the hull while it hovers, settles and lifts
@@ -224,11 +226,13 @@
         P.spawn(w[0] + (Math.random() - 0.5) * 0.4, w[1], w[2] + (Math.random() - 0.5) * 0.4, (Math.random() - 0.5) * 0.6, -6 - Math.random() * 4, (Math.random() - 0.5) * 0.6, { life: 0.18 + Math.random() * 0.12, size: 0.35 + Math.random() * 0.25, grav: 0, col: [1, 0.72, 0.36], emis: 1, drag: 2, grow: 1.2, collide: false });
       }
       // dust (or the hangar's haze) blown off the deck under it — outdoors warm grey, in the hall a cool haze
-      if (low < 7 && Math.abs(s.pos[0] - AX) < 14 && Math.random() < 0.6) {
-        const inHall = s.pos[2] < MOUTH, col = inHall ? [0.58, 0.66, 0.76] : [0.66, 0.6, 0.52], n = s.phase === 'pad' ? 1 : 3;
+      // (in the hall a thin haze, so the pad's rings still show through it)
+      const inHall = s.pos[2] < MOUTH;
+      if (low < 7 && Math.abs(s.pos[0] - AX) < 14 && Math.random() < (inHall ? 0.4 : 0.6)) {
+        const col = inHall ? [0.58, 0.66, 0.76] : [0.66, 0.6, 0.52], n = s.phase === 'pad' ? 1 : inHall ? 2 : 3;
         for (let k = 0; k < n; k++) {
           const a = Math.random() * TAU, r = 2 + Math.random() * 3, sp = 2.5 + (7 - low) * 0.6;
-          P.spawn(s.pos[0] + Math.cos(a) * r, DECK + 0.15, s.pos[2] + Math.sin(a) * r, Math.cos(a) * sp, 0.15 + Math.random() * 0.35, Math.sin(a) * sp, { life: 0.9 + Math.random() * 0.7, size: 0.3 + Math.random() * 0.3, grav: -0.1, col, emis: 0, drag: 1.4, grow: 1.6, collide: false });
+          P.spawn(s.pos[0] + Math.cos(a) * r, DECK + 0.15, s.pos[2] + Math.sin(a) * r, Math.cos(a) * sp, 0.15 + Math.random() * 0.35, Math.sin(a) * sp, { life: (inHall ? 0.6 : 0.9) + Math.random() * 0.6, size: (inHall ? 0.22 : 0.3) + Math.random() * (inHall ? 0.2 : 0.3), grav: -0.1, col, emis: 0, drag: 1.4, grow: inHall ? 1.0 : 1.6, collide: false });
         }
       }
     }
