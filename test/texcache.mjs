@@ -78,7 +78,7 @@ const w1 = await firstWorldFrame(page);
 console.log('start 1 ' + JSON.stringify({ fromCache: s1.fromCache, texMs: s1.texMs, storeMs: s1.storeAt, titleMs: s1.title, worldMs: w1, loadMs: s1.load }));
 check(s1.fromCache === false && s1.layers > 0, 'start 1 forges the block textures (nothing cached yet)');
 const keys1 = await cacheKeys(page);
-check(Array.isArray(keys1) && keys1.includes('rim-1'), 'the forged textures are stored in IndexedDB: ' + JSON.stringify(keys1));
+check(Array.isArray(keys1) && keys1.includes('seam-1'), 'the forged textures (Nahtlos) are stored in IndexedDB: ' + JSON.stringify(keys1));
 await ctx.close();
 
 // ---- start 2: a new launch on the same profile: the textures come from the cache
@@ -94,19 +94,19 @@ check(d2 === d1, 'the cached textures are the same bytes as the forged ones');
 check(s2.texMs < s1.texMs, 'the texture step is faster from the cache (' + s2.texMs + ' ms against ' + s1.texMs + ' ms)');
 check(w2 < w1, 'the first frame of the world comes sooner (' + w2 + ' ms against ' + w1 + ' ms)');
 
-// ---- the look switch: each look is forged once, then read from the cache
-await page.evaluate(() => VR.game.lookCommand('seamless'));
-await until(page, () => VR.game.texRim === false, 'the Nahtlos textures');
-const sS = await texState(page), dS = await digest(page);
+// ---- the look switch: each look is forged once, then read from the cache (the start is Nahtlos since v0.43)
 await page.evaluate(() => VR.game.lookCommand('classic'));
 await until(page, () => VR.game.texRim === true, 'the Klassisch textures');
 const sC = await texState(page), dC = await digest(page);
 await page.evaluate(() => VR.game.lookCommand('seamless'));
-await until(page, () => VR.game.texRim === false, 'the Nahtlos textures again');
-const sS2 = await texState(page), dS2 = await digest(page);
-console.log('looks ' + JSON.stringify({ seamless: [sS.fromCache, sS.texMs], classic: [sC.fromCache, sC.texMs], seamlessAgain: [sS2.fromCache, sS2.texMs] }));
-check(sS.fromCache === false && sC.fromCache === true && sS2.fromCache === true, 'the look switch forges Nahtlos once; Klassisch and Nahtlos again come from the cache');
-check(dS !== d1 && dC === d1 && dS2 === dS, 'each look shows its own textures, the same bytes every time');
+await until(page, () => VR.game.texRim === false, 'the Nahtlos textures');
+const sS = await texState(page), dS = await digest(page);
+await page.evaluate(() => VR.game.lookCommand('classic'));
+await until(page, () => VR.game.texRim === true, 'the Klassisch textures again');
+const sC2 = await texState(page), dC2 = await digest(page);
+console.log('looks ' + JSON.stringify({ classic: [sC.fromCache, sC.texMs], seamless: [sS.fromCache, sS.texMs], classicAgain: [sC2.fromCache, sC2.texMs] }));
+check(sC.fromCache === false && sS.fromCache === true && sC2.fromCache === true, 'the look switch forges Klassisch once; Nahtlos and Klassisch again come from the cache');
+check(dC !== d1 && dS === d1 && dC2 === dC, 'each look shows its own textures, the same bytes every time');
 const keys2 = await cacheKeys(page);
 check(Array.isArray(keys2) && keys2.includes('rim-1') && keys2.includes('seam-1'), 'both looks are kept: ' + JSON.stringify(keys2));
 await page.close();
