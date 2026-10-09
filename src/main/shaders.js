@@ -1080,6 +1080,9 @@ uniform float u_underwater;
 uniform float u_blockVar;     // Klassisch: still water reads per block (chunky ripples, a faint seam), glass texels crisp
 uniform sampler2D u_reflTex;  // F7: the planar reflection of the water (renderer.js), valid when u_reflOn > 0.5
 uniform float u_reflOn;
+uniform highp sampler2D u_reflDepth;  // F9 · Spiegelung leicht: the mirror's depth and size (texels) for its edge-aware upsample
+uniform vec2 u_reflSize;
+uniform float u_reflUp;               // 1: the mirror is a quarter size and read edge-aware (0: one bilinear tap as before)
 uniform float u_waterTier;    // 0 Very Low (sky-LUT reflection only, no caustics), 1 and 2: caustics on the floor
 uniform vec2 u_windDir;       // the wind's heading (weather.js), the swell runs with it
 uniform float u_stormK;       // the storm factor of the waves (water_wave.js)
@@ -1111,6 +1114,20 @@ flat in float v_fade;
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 float linDepth(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
+// F9 · the quarter-size mirror read edge-aware: of its four texels round the point, the ones on the nearest surface keep
+// their bilinear weight and the ones behind it (more than 8 % deeper) drop out, so a roof's edge against the sky stays a
+// line instead of a smear; one bilinear tap when u_reflUp is 0
+vec3 reflSample(vec2 uv) {
+  if (u_reflUp < 0.5) return texture(u_reflTex, uv).rgb;
+  vec2 t = uv * u_reflSize - 0.5, f = fract(t), b = (floor(t) + 0.5) / u_reflSize, e = 1.0 / u_reflSize;
+  vec2 o1 = b + vec2(e.x, 0.0), o2 = b + vec2(0.0, e.y), o3 = b + e;
+  vec4 d = vec4(linDepth(texture(u_reflDepth, b).r), linDepth(texture(u_reflDepth, o1).r), linDepth(texture(u_reflDepth, o2).r), linDepth(texture(u_reflDepth, o3).r));
+  float dn = min(min(d.x, d.y), min(d.z, d.w));
+  vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
+  w *= step(d, vec4(dn * 1.08 + 0.05)) + 1e-4;
+  vec3 c = texture(u_reflTex, b).rgb * w.x + texture(u_reflTex, o1).rgb * w.y + texture(u_reflTex, o2).rgb * w.z + texture(u_reflTex, o3).rgb * w.w;
+  return c / (w.x + w.y + w.z + w.w);
+}
 float shadowAt(vec3 N, vec3 L) {
 #ifdef SHADOWS
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
@@ -1288,7 +1305,7 @@ void main() {
     refl = mix(refl, refl * vec3(0.62, 0.84, 1.0) + body * 0.25, 0.4);
     if (u_reflOn > 0.5) {
       // the planar reflection (renderer.js): the mirrored near world and sky, shifted by the slope of the surface
-      vec3 pr = texture(u_reflTex, clamp(suv + n.xz * vec2(0.22, 0.4), 0.001, 0.999)).rgb;
+      vec3 pr = reflSample(clamp(suv + n.xz * vec2(0.22, 0.4), 0.001, 0.999));
       refl = pr * vec3(0.86, 0.94, 1.0) + body * 0.1;
     }
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
