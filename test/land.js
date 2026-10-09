@@ -399,6 +399,25 @@ if (want(6)) {
   console.log(`  (${secs()})`);
 }
 
+// ---------------------------------------------------------------- 7 · the woods from afar
+if (want(7)) {
+  console.log('7 · the horizon shows the woods as canopies; its cost at the hills view');
+  // a horizon tile over the north-western woods: canopy cells (leaves, kind 5) in the land's tile, none in vgen 9's
+  const g9 = V.makeGen('overworld', SEED, { vgen: 9 });
+  const leafCells = (gg, L, tx, tz) => { const t = V.LOD.build(gg, { level: L, tx, tz }); if (!t || t.empty) return 0; const u8 = new Uint8Array(t.verts); let n = 0; for (let i = 6; i < u8.length; i += 12) if ((u8[i] >> 3) === 5) n++; return n; };
+  // the tile whose middle lies deepest in a wood (searched over the north-west)
+  let best = null;
+  for (let tz = -6; tz <= -2; tz++) for (let tx = -5; tx <= -2; tx++) { const T = 32 * 8, x = tx * T + T / 2, z = tz * T + T / 2; if (x * x + z * z > 640 * 640) continue; const d = LAND.woodAt(g, x, z).d; if (!best || d > best.d) best = { tx, tz, d }; }
+  const n10 = leafCells(g, 1, best.tx, best.tz), n9 = leafCells(g9, 1, best.tx, best.tz);
+  check(n10 > 50 && n9 === 0, `a horizon tile over the woods (level 1, ${best.tx}, ${best.tz}) draws them as canopies (${n10} leaf vertices; vgen 9: ${n9})`);
+  // the cost: the horizon's triangles round the hills view (Very Low's horizon: its finest tiles from 64 blocks out)
+  const cam = [0, -292];
+  const tris = (gg) => { let t3 = 0; for (const [L, r0, r1] of [[0, 64, 320], [1, 320, 640], [2, 640, 1280]]) { const T = 32 * (4 << L); for (let tz = Math.floor((cam[1] - r1) / T); tz <= Math.floor((cam[1] + r1) / T); tz++) for (let tx = Math.floor((cam[0] - r1) / T); tx <= Math.floor((cam[0] + r1) / T); tx++) { const d = Math.hypot(tx * T + T / 2 - cam[0], tz * T + T / 2 - cam[1]); if (d < r0 || d > r1) continue; const t = V.LOD.build(gg, { level: L, tx, tz }); if (t && !t.empty) t3 += t.count / 3; } } return t3; };
+  const a = tris(g9), b = tris(g);
+  check(b <= a * 1.08, `the horizon round the hills view: ${Math.round(b)} triangles against vgen 9's ${Math.round(a)} (×${(b / a).toFixed(3)}, at most ×1.08)`);
+  console.log(`  (${secs()})`);
+}
+
 console.log(`(${secs()})`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

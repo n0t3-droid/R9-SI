@@ -795,6 +795,22 @@
     return { mob: null, n: 0 };
   };
 
+  // ============================================================================ the woods from afar
+  // The horizon (lod.js) and the far ring (far.js) ask here for the sky meadow's cells (their biome table has no trees
+  // for it): a cell of the land's woods answers [cover, kind, height] — the woods stand as canopies on the far land —
+  // every other cell, and every older world, null (test/land_v9_same.js hashes their tiles with and without this file).
+  const LODK = ['oak', 'birch', 'dark_oak', 'spruce', 'cherry'], LODH = [8, 9, 8, 11, 7], LT = [0, 'oak', 8, 4, 0];
+  LAND.LOD_NEAR = 1;   // the canopy is in the cell on every tile (no little voxel trees: Very Low's horizon at the hills view +6 % triangles, not +23 %)
+  LAND.lodTree = function (g, X, Z, key) {
+    if (key !== 'sky_meadow' || !LAND.on(g)) return null;
+    if (LAND.zoneAt(g, X, Z)) return null;
+    const q = LAND.woodAt(g, X, Z);
+    if (q.d < 0.3) return null;
+    if (LAND.LOD_OFF) return null;
+    LT[0] = 0.62 * q.d; LT[1] = LODK[q.kind]; LT[2] = LODH[q.kind]; LT[3] = LAND.LOD_NEAR; LT[4] = LAND.LOD_FLAT ? 1 : 0;
+    return LT;
+  };
+
   // ---------------------------------------------------------------- per chunk: the plan's pieces stamped
   // The land's own blocks go over natural ground only: what another module built stays as it is.
   let NAT = null;

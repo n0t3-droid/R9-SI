@@ -660,7 +660,7 @@
     for (let v = 0; v < 16; v++) for (let u = 0; u < 16; u++) {
       const X = x0 + u * 4 + 2, Z = z0 + v * 4 + 2;
       const vi = Math.round((u * 4 + 2) / cell), vj = Math.round((v * 4 + 2) / cell), k = (vj + 1) * W + vi + 1;
-      const B = BIOMES[bio[k]], key = B.key, tr = U.TREES[key];
+      const B = BIOMES[bio[k]], key = B.key, tr = U.TREES[key] || (U.landTree ? U.landTree(g, X, Z, key) : null);
       if (!tr || f.wet[k] || !(U.hh(X, Z, 91) < tr[0])) continue;
       if (f.kd[k] === 6 && key !== 'snowy_taiga' && key !== 'grove') continue;
       const ci = Math.min(n - 1, ((v * 4 + 2) / cell) | 0) * n + Math.min(n - 1, ((u * 4 + 2) / cell) | 0);
