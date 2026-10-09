@@ -171,7 +171,7 @@
         c.y = Math.round(h - w * (h - T8.levels[k])); c.w = w; c.k = w >= 0.999 ? k : -1;
       }
     }
-    if (cache.size > 400000) cache.clear();
+    if (cache.size > 120000) cache.clear();   // (the face is 341 × 136 cells; a world far away does not keep it)
     cache.set(key, c);
     return c;
   };
