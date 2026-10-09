@@ -95,6 +95,7 @@
       }
     }
     PROPT = { kind, anchor, stem, facing, group, join, stack };
+    if (VR.SmoothVox && VR.SmoothVox.tables) VR.SmoothVox.tables(PROPT, PROP_GROUP);   // t-form: every other model piece gets an auto kind (smoothvox.js), drawn smooth once its mesh is ready
   }
 
   class Buf {

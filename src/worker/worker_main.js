@@ -167,12 +167,18 @@
           [m.blocks.buffer, light.buffer]);
       } else if (m.type === 'mesh') {
         const t0 = performance.now();
+        const svWant = VR.SmoothVox ? VR.SmoothVox.prep(m) : null;   // t-form: the ready bits of the smooth models, the ones this section wants
         const r = VR.meshSection(m);
         const o = toTris(r.opaque), c = toTris(r.cutout), t = toTris(r.trans);
         const vx = r.vx ? toTris(r.vx) : null, vxFar = r.vxFar ? toTris(r.vxFar) : null;
         const tr = [o.buffer, c.buffer, t.buffer]; if (vx) tr.push(vx.buffer); if (vxFar) tr.push(vxFar.buffer);
         const pr = r.props || null; if (pr) tr.push(pr.buffer);   // smooth props: six ints an instance (mesher.js)
-        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, ms: performance.now() - t0 }, tr);
+        post({ type: 'mesh', id: m.id, key: m.key, sy: m.sy, ver: m.ver, opaque: o, cutout: c, trans: t, vx, vxFar, props: pr, vis: r.vis, svWant, ms: performance.now() - t0 }, tr);
+      } else if (m.type === 'smoothvox') {
+        // t-form: a model's surface-nets meshes (smoothvox.js): the game's furniture layout or the Studio's
+        const r = VR.SmoothVox.job(m), tr = r.transfer; delete r.transfer;
+        r.type = r.error ? 'error' : 'smoothvox'; r.id = m.id; if (r.error) r.msg = r.error;
+        post(r, tr);
       } else if (m.type === 'lightonly') {
         const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
         const light = VR.computeColumnLight(m.blocks, sky);

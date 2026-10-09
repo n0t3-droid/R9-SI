@@ -748,7 +748,7 @@
     propSet(sec, props) {
       const PR = VR.Props, n = props ? props.length / 6 : 0;
       if (!n || !PR) { sec.propN = 0; sec.propData = null; sec.propKind = null; sec.propSlot = null; this.propSecs.delete(sec); return; }
-      const data = new Float64Array(n * PR.INST), kind = new Uint8Array(n), slot = new Int16Array(n);
+      const data = new Float64Array(n * PR.INST), kind = new Int32Array(n), slot = new Int16Array(n);   // (t-form: the surface-nets models' kinds start at 4096)
       for (let i = 0; i < n; i++) {
         const o = i * 6;
         kind[i] = props[o + 3];
