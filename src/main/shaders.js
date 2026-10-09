@@ -183,21 +183,28 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
     // t-sky2: a soft terminator (wrapped), the ring's shadow on the body (the ray to the light crosses the ring plane
     // inside the ring), the limb darkened
     float diff = smoothstep(-0.25, 0.55, dot(N, Lb));
+#ifdef LITE
+    float shade = 1.0;   // (Very Low: no ring shadow)
+#else
     // (the shadow's light a little flatter to the ring plane than the sun's, so the band falls on the body in most views)
     vec3 Ls = normalize(Lb - RN * (dot(Lb, RN) * 0.6));
     float ld = dot(Ls, RN), sr = abs(ld) > 0.01 ? -dot(N, RN) / ld : -1.0;
     float shade = sr > 0.0 && sr < 6.0 ? 1.0 - 0.75 * ringDens(length(N + Ls * sr)) : 1.0;
+#endif
     float rim = pow(1.0 - zz, 3.0);
     vec3 col = alb * (diff * shade * 1.3 + 0.12) * (0.6 + 0.4 * sqrt(zz)) + vec3(0.4, 0.6, 1.0) * rim * 0.45 * diff;   // 0.12: the night side keeps a trace of its bands
     float edge = smoothstep(1.0, 0.96, sqrt(r2));
     res = vec4(col, edge);
-  } else if (r2 < 1.44) {
-    // the soft limb: a thin lilac glow round the lit side (within 1.2 radii: the rest of the giant's cone skips it)
+  }
+#ifndef LITE
+  else if (r2 < 1.44) {
+    // the soft limb: a thin lilac glow round the lit side (within 1.2 radii; not on Very Low)
     float r = sqrt(r2);
     vec2 lq = vec2(dot(Lb, X), dot(Lb, Y));
     float side = smoothstep(-0.3, 0.6, dot(q / r, lq));
     res = vec4(vec3(0.6, 0.45, 0.85) * exp(-(r - 1.0) * 26.0) * 0.35 * side, 0.0);
   }
+#endif
   // rings
   if (abs(den) > 0.02) {
     float t = -(q.x * dot(X, RN) + q.y * dot(Y, RN)) / den;
@@ -227,7 +234,11 @@ vec4 rockyPlanet(vec3 dir, vec3 C, float R, vec3 L) {
   if (r2 >= 1.69) return vec4(0.0);   // (t-sky2: past 1.3 radii the glow is nil: the rest of the cone skips it)
   vec3 Lb = bodyLight(C, L);
   // t-sky2: the atmosphere's glow brighter on the lit side (the soft limb)
+#ifdef LITE
+  if (r2 >= 1.0) { float glow = exp(-(sqrt(r2) - 1.0) * 14.0) * 0.25; return vec4(vec3(0.4, 0.7, 1.0) * glow, 0.0); }
+#else
   if (r2 >= 1.0) { float r = sqrt(r2); float side = 0.35 + 0.65 * smoothstep(-0.3, 0.6, dot(q / r, vec2(dot(Lb, X), dot(Lb, Y)))); float glow = exp(-(r - 1.0) * 14.0) * 0.25 * side; return vec4(vec3(0.4, 0.7, 1.0) * glow, 0.0); }
+#endif
   float zz = sqrt(1.0 - r2);
   vec3 N = normalize(X * q.x + Y * q.y - C * zz);
   float n = fbm3(N * 4.0 + 7.0);
