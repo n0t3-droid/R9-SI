@@ -159,7 +159,7 @@
   HILLS.domesT8 = function (g) {
     if (g._t8domes) return g._t8domes;
     const rng = new VR.RNG((g.seed ^ 0x2d0e5) >>> 0), D = [];
-    for (let zc = T8.z1 - 40; zc >= T8.z0 + 20; zc -= 52) for (let xc = T8.x0 + 30; xc <= T8.x1 - 30; xc += 62) D.push({ x: xc + (rng.next() - 0.5) * 26, z: zc + (rng.next() - 0.5) * 18, r: 30 + rng.int(12), h: 16 + rng.int(8) });
+    for (let zc = T8.z1 - 40; zc >= T8.z0 + 20; zc -= 52) for (let xc = T8.x0 + 30; xc <= T8.x1 - 30; xc += 62) D.push({ x: xc + (rng.next() - 0.5) * 26, z: zc + (rng.next() - 0.5) * 18, r: 25 + rng.int(8), h: 16 + rng.int(8) });
     return (g._t8domes = D);
   };
   HILLS.liftT8 = function (g, x, z) {

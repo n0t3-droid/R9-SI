@@ -287,6 +287,21 @@ if (T8) {
   const lvSet = new Set(vl.map(v => v.level));
   check(vl.length >= 3 && [...lvSet].every(l => l % 2 === 0), `Villa Nova variants on every second terrace (${vl.length} villas on levels ${[...lvSet].sort((a, b) => a - b).join(', ')})`);
   check((T8.stairs || []).length >= levels.length - 1, `a stair from each terrace to the next (${(T8.stairs || []).length} flights for ${levels.length} levels)`);
+  // the round hills (t3_07 · t3_08 · t3_09; run 1: one long slope cut into straight steps read as a stepped wall): every
+  // dome of the face is a hill as the city sees it — its top terrace two levels or more above its foot to the east, the
+  // south-east, the south, the south-west and the west (the near row leans on the rising land behind it) — and a stairway
+  // climbs its south face
+  {
+    const D = HILLS.domesT8 ? HILLS.domesT8(g8) : [], C = (x, z) => HILLS.cellT8(g8, x, z);
+    let hills = 0, withStair = 0; const flat = [];
+    for (const d of D) {
+      const top = C(Math.round(d.x), Math.round(d.z)).k; let ok = top >= 2;
+      for (const a of [0, 1, 2, 3, 4]) { const x = Math.round(d.x + Math.cos(a * Math.PI / 4) * d.r * 1.05), z = Math.round(d.z + Math.sin(a * Math.PI / 4) * d.r * 1.05); if (Math.max(0, C(x, z).k) > top - 2) ok = false; }
+      if (ok) hills++; else flat.push(Math.round(d.x) + ',' + Math.round(d.z));
+      if ((T8.stairs || []).some(st => st.x === Math.round(d.x))) withStair++;
+    }
+    check(D.length >= 6 && hills >= D.length - 1 && withStair >= D.length - 2, `round hills: ${hills} of ${D.length} domes stand two levels or more over their foot all round${flat.length ? ' (not: ' + flat.join(' ') + ')' : ''}, ${withStair} with a stairway up the south face`);
+  }
 }
 
 // ---------------------------------------------------------------- 5 · Very Low cost at F1
