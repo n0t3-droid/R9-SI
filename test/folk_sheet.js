@@ -6,6 +6,8 @@
 //   test/shots/folk_sheet_vox.png, folk_sheet_smooth.png — the lineup at eye height from 4 blocks
 //   test/shots/folk_sheet_portrait.png — four heads at 1 block, voxels left, smooth right
 //   test/shots/folk_sheet_walk.png — the lineup walking (the gait of folkanim.js)
+//   test/shots/folk_sheet_faces.png — six faces at two blocks, smooth
+//   test/shots/folk_sheet_hall.png — the hall city's garbs (robe, coat, tunic, gown, cape), the front five and the back five
 // Each picture is checked to hold the people (pixels drawn); ALL OK when every one does.
 // regress: skip (a tool for the eyes)
 //   bash test/wt_run.sh folk_sheet.js 600
@@ -139,6 +141,26 @@ for (const smooth of [false, true]) {
   people.slice(0, 8).forEach((p, i) => { const G = Folk.gaitFor(p.L); G.ph = i * 0.7; G.S = FA.stepLen(G, p.kid ? 2.9 : 2.2, false); const P = FA.walkPerson(G, 1, {}); drawPerson(cv, p.def, partMeshes(p.def, true), (i - 3.5) * 0.7, 0, Math.PI / 2, P, p.kid ? 0.82 : 1, { lids: true, mouth: true }); });
   fs.writeFileSync(path.join(OUT, 'folk_sheet_walk.png'), cv.png());
   check(cv.drawn > 30000, `the walk drawn (${cv.drawn} pixels)`);
+}
+{
+  // the hall city's townsfolk (villagers.js V.WEISS): a robe, a coat, a tunic, a gown and a cape twice each, smooth
+  const want = ['robe', 'coat', 'tunic', 'gown', 'cape', 'robe', 'coat', 'tunic', 'gown', 'cape'], hall = [];
+  for (const g of want) for (let s2 = 1 + hall.length * 97; s2 < 5000; s2++) { const L = Folk.look(s2, s2 & 1 ? 'crafter' : 'gardener', 'adult', null, 'hall'); if (L.garb === g) { hall.push({ L, def: Folk.buildHiRes(L), kid: false }); break; } }
+  const cv = new Canvas(1280, 720, BG);
+  cv.cam([0, 1.45, -5.2], [0, 1.0, 0], 50);
+  hall.forEach((p, i) => drawPerson(cv, p.def, partMeshes(p.def, true), (i - (hall.length - 1) / 2) * 0.62, (i & 1) * 0.35, 0.25 * ((i % 3) - 1) + (i >= 5 ? Math.PI : 0), idle, 1, { lids: true, mouth: true }));
+  fs.writeFileSync(path.join(OUT, 'folk_sheet_hall.png'), cv.png());
+  check(cv.drawn > 50000, `the hall city's garbs drawn smooth, front and back (${cv.drawn} pixels)`);
+}
+{
+  // faces at two blocks (the game's close portrait): six people, smooth, front-lit — the beard, the glasses, a child
+  const six = [Folk.look(4, 'crafter', 'adult', null, 'hall'), Folk.look(31, 'scholar', 'adult'), Folk.look(9, 'gardener', 'adult', null, 'hall'), Folk.look(1212, 'child', 'child'), Folk.look(808, 'elder', 'elder'), Folk.look(15, 'baker', 'adult')];
+  for (let s2 = 1; s2 < 999; s2++) { const L = Folk.look(s2, 'crafter', 'adult'); if (L.beard) { six[0] = L; break; } }
+  const cv = new Canvas(1280, 720, BG);
+  cv.cam([0, 1.5, -2.0], [0, 1.45, 0], 36);
+  six.forEach((L, i) => { const def = Folk.buildHiRes(L); drawPerson(cv, def, partMeshes(def, true), (i - 2.5) * 0.36, 0, 0, idle, L.age === 'child' ? 0.82 : 1, { lids: true, mouth: true }); });
+  fs.writeFileSync(path.join(OUT, 'folk_sheet_faces.png'), cv.png());
+  check(cv.drawn > 50000, `six faces at two blocks, smooth (${cv.drawn} pixels)`);
 }
 console.log(`    ${tParts} parts, ${meshCache.size} meshes built (${hits} shared), smooth meshing ${tMs.toFixed(0)} ms`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

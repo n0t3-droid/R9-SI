@@ -8,6 +8,7 @@
 const V = require('./load_shared.js');
 require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js');
 require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
+require('../src/main/villages.js'); require('../src/main/folklife.js');
 const Folk = V.Folk, FS = V.FolkSmooth, m4 = V.mat4;
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
@@ -152,6 +153,47 @@ function closed(mesh) {
   }
 }
 
+// ---------------------------------------------------------------- §3 clothes and hair
+// the towns' people as villages.js makes them (makeRoster: the families, the trades, the looks, then Folk.unlike): at
+// least six outfit families in a village and in the hall city, no two neighbours (a home's members and the next home's,
+// three either way in the roster) dressed alike; the clothes and the hair have volume (a collar standing out of the
+// chest, cuffs out of the sleeve, a hem with folds, the hair a shell over the skull)
+console.log('§3 clothes and hair');
+{
+  const VG = V.VillageGen, Vs = V.Villages;
+  const towns = [];
+  for (const [vgen, cell] of [[9, [-2, -1]], [8, [-2, -1]], [8, [3, 2]], [8, [0, 3]]]) {
+    const og = new V.OverworldGen(53, { worldType: 'default', vgen }), s = VG.site(og, cell[0], cell[1]);
+    if (!s) continue;
+    const vil = { plan: VG.summary(VG.plan(og, s)), st: {} }; Vs.makeRoster(vil);
+    towns.push([vgen === 9 ? 'the hall city' : `the village at ${cell}`, vil]);
+  }
+  for (const [name, vil] of towns) {
+    const fams = new Map(); for (const p of vil.people) { const f = Folk.familyOf(p.look); fams.set(f, (fams.get(f) || 0) + 1); }
+    let clash = 0, pairs = 0;
+    for (let i = 0; i < vil.people.length; i++) for (let j = Math.max(0, i - 3); j < i; j++) { pairs++; if (Folk.outfitKey(vil.people[i].look) === Folk.outfitKey(vil.people[j].look)) clash++; }
+    console.log(`    ${name}: ${vil.people.length} people, ${fams.size} outfit families — ${[...fams].map(([k, n]) => k + ' ' + n).join(', ')}`);
+    if (vil.people.length >= 20) check(fams.size >= 6, `${name}: ${fams.size} outfit families (≥ 6)`);
+    check(clash === 0, `${name}: no two neighbours dressed alike (${clash} of ${pairs} pairs)`);
+  }
+  // the volume: a coat's collar stands a voxel out of the chest, the cuff a voxel out of the sleeve, a robe's hem has folds
+  // (voxels a step further out every other fourteenth of its round), the hair is a shell a voxel over the skull
+  const coatL = (() => { for (let s = 1; s < 400; s++) { const q = Folk.look(s, 'crafter', 'adult', null, 'hall'); if (q.garb === 'coat') return q; } })();
+  const robeL = (() => { for (let s = 1; s < 400; s++) { const q = Folk.look(s, 'crafter', 'adult', null, 'hall'); if (q.garb === 'robe') return q; } })();
+  const d1 = Folk.buildHiRes(coatL), d2 = Folk.buildHiRes(robeL);
+  const at = (g, x, y, z) => { const X = x + g.ox, Y = y + g.oy, Z = z + g.oz; return g.in(X, Y, Z) ? g.c[g.i(X, Y, Z)] : 0; };
+  const bg = d1.parts.body.grid, top = 18;
+  const plain = Folk.buildHiRes(Folk.look(7, 'office', 'adult')).parts.body.grid;   // (a jacket's V, no lapels a voxel out)
+  check(!!at(bg, 2, top - 1, -3) && !!at(bg, -2, top - 1, -3) && !at(plain, 2, top - 1, -3), "a coat's lapels stand a voxel out of its chest (a shirt has none)");
+  const fg = d1.parts.fore_l.grid; let cuff = 0; for (let y = -10; y <= 0; y++) if (at(fg, 2, y, 0) || at(fg, -2, y, 0)) cuff++;
+  check(cuff >= 1, `the cuffs stand out of the sleeve (${cuff} rows)`);
+  const hg = d2.parts.hips.grid; let lo = Infinity; for (let y = -40; y < 0; y++) for (let x = -12; x <= 12; x++) for (let z = -12; z <= 12; z++) if (at(hg, x, y, z)) lo = Math.min(lo, y);
+  let ring = 0, fold = 0; for (let x = -12; x <= 12; x++) for (let z = -12; z <= 12; z++) { if (!at(hg, x, lo, z)) continue; ring++; const r = Math.hypot(x, z + 0.5); if (r > 8.4) fold++; }
+  check(fold >= 4, `a robe's hem has folds (${fold} of its ${ring} hem voxels a step further out)`);
+  const head = d1.parts.head.grid; let shell = 0; for (let x = -2; x <= 2; x++) for (let z = -2; z <= 1; z++) if ((at(head, x, 7, z) >>> 26 & 7) === Folk.TAG.hair) shell++;
+  check(shell >= 12, `the hair is a shell over the skull (${shell} hair voxels a row over the crown)`);
+}
+
 // ---------------------------------------------------------------- §4 movement
 // the gait (folkanim.js FA.walkPerson) walked on the rig: a planted foot does not slide (its sole's speed over the ground
 // in the middle of its stance), the arms swing against the legs, the pelvis shifts over the stance foot and turns while
@@ -159,7 +201,6 @@ function closed(mesh) {
 // chest breathes; the head turns at most 40° toward what the person looks at (the shoulders the rest); seated, the
 // thighs rest on the seat and the feet on the floor
 console.log('§4 movement');
-require('../src/main/villages.js');
 const FA = V.FolkAnim;
 // a foot's sole in the world (model units, the base at the walker's place): the shin's frame point (0, sole, 0)
 function soleAt(def, base, pose, side) {

@@ -551,12 +551,13 @@
     child: { xl: -3, xr: 2, top: 7, z0: -3, z1: 2, eyes: [-2, 1], rows: [[-2, 1, -3, 0], [-3, 2, -3, 1], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2], [-3, 2, -3, 2]] },
   };
   // the outfit families (step 3): every villager wears one; the trades and the Weißstadt's robes and coats choose it
-  V.FAMILIES = ['shirt', 'overalls', 'apron', 'smith', 'tunic', 'vest', 'coat', 'frock', 'robe', 'whitecoat', 'suit', 'armor', 'jumpsuit', 'shawl', 'dress', 'tee'];
+  V.FAMILIES = ['shirt', 'overalls', 'apron', 'smith', 'tunic', 'vest', 'coat', 'frock', 'robe', 'whitecoat', 'suit', 'armor', 'jumpsuit', 'shawl', 'dress', 'tee', 'gown', 'cape'];
   V.familyOf = function (L) {
     const kid = L.age === 'child', role = V.ROLES[L.role] || V.ROLES.farmer, acc = role.acc || '';
     if (kid) return L.dress ? 'dress' : 'tee';
     if (L.garb === 'robe') return 'robe';
     if (L.garb === 'coat') return 'coat';
+    if (L.garb === 'tunic' || L.garb === 'gown' || L.garb === 'cape') return L.garb;   // (t-folk: the Weißstadt's other garbs)
     switch (acc) {
       case 'overalls': return 'overalls';
       case 'apron': case 'apron2': return 'apron';
@@ -572,7 +573,7 @@
     return L.dress ? 'dress' : 'shirt';
   };
 
-  const STRIDE = { robe: 0.28, coat: 0.32, frock: 0.34, whitecoat: 0.32, dress: 0.36, tunic: 0.45, suit: 0.5 };
+  const STRIDE = { robe: 0.28, coat: 0.32, frock: 0.34, whitecoat: 0.32, dress: 0.36, tunic: 0.45, suit: 0.5, gown: 0.28, cape: 0.45 };
   // a person's legs for the gait (folkanim.js FA.gait): the hip joint's height, the thigh and the shin (model units), the
   // draw scale, the widest swing the clothes allow — without building the model (the villagers' pose needs it each frame)
   V.gaitFor = function (L) {
@@ -611,10 +612,13 @@
     const F = (x, y, c, t) => head.set(x, y, A.z0, c, 0, t || TG.skin);
     const eyeY = 3, my = 1;
     // eyes (an iris dark enough to read on every skin), brows a voxel above
-    const iris = mix(L.eye, 0x0A0806, 0.45), brow = elder ? mix(hc, 0xE0E0E0, 0.25) : mul(hc, 0.72);
+    const iris = mix(L.eye, 0x0A0806, 0.5);
     // (the eye sits a voxel deep under the brow — an eye socket: the brow, the cheek and the nose round it cast the
-    // shadow a real eye sits in; the smooth surface makes it a soft hollow)
-    for (const ex of A.eyes) { head.del(ex, eyeY, A.z0); head.set(ex, eyeY, A.z0 + 1, iris, 0, TG.eye); F(ex, eyeY + 1, brow, TG.hair); }
+    // shadow a real eye sits in; the smooth surface makes it a soft hollow). The brow is the hair's colour laid over the
+    // skin — a clear line under dark hair, a faint one under fair hair: a solid hair voxel there read as a second, bigger
+    // eye on the smooth face
+    const brow = mix(skin, elder ? mix(hc, 0xE0E0E0, 0.3) : mul(hc, 0.7), elder ? 0.32 : 0.45);
+    for (const ex of A.eyes) { head.del(ex, eyeY, A.z0); head.set(ex, eyeY, A.z0 + 1, iris, 0, TG.eye); F(ex, eyeY + 1, brow, TG.skin); }
     // the nose stands out a voxel (the child's is small: a shade only), the lips, the chin
     if (!kid) { head.set(0, 2, A.z0 - 1, mul(skin, 1.02), 0, TG.skin); F(0, my, mix(skin, LIP, 0.85)); F(-1, my, mix(skin, LIP, 0.4)); F(1, my, mix(skin, LIP, 0.4)); }
     else { F(-1, 2, mul(skin, 0.98)); F(0, 2, mul(skin, 0.98)); F(-1, my, mix(skin, LIP, 0.6)); F(0, my, mix(skin, LIP, 0.6)); }
@@ -681,19 +685,27 @@
     }
     // beard and moustache
     if (L.beard && !kid) {
-      for (let x = -1; x <= 1; x++) F(x, 0, hcF(x, 0, -3), TG.hair);
-      for (const sx of [A.xl, A.xr]) for (let y = 0; y <= 2; y++) for (let z = A.z0 + 1; z <= 0; z++) if (head.has(sx, y, z)) head.set(sx, y, z, hcF, 0, TG.hair);
-      head.set(0, -1, A.z0 + 1, hcF, 0, TG.hair); head.set(0, 0, A.z0 - 1, hcF, 0, TG.hair);
-      F(-1, my + 1, mul(hc, 0.9), TG.hair); F(1, my + 1, mul(hc, 0.9), TG.hair);
-      F(0, my, mix(skin, LIP, 0.85));
+      // a trimmed full beard: the chin and the jaw (the face's two lowest rows, front and sides) in the hair's colour, a
+      // voxel of it before the chin, the sideburns up the cheeks' sides, the moustache as the mouth row's corners; the
+      // lips stay (the old beard's moustache sat beside the nose and its sides covered the cheeks: black blotches)
+      const bd = (x, y, z) => mix(hcF(x, y, z), skin, 0.1);
+      for (let y = 0; y <= 1; y++) for (let z = A.z0; z <= A.z0 + 2; z++) for (let x = A.xl; x <= A.xr; x++) {
+        if (!head.has(x, y, z)) continue;
+        const front = z === A.z0, side = x === A.xl || x === A.xr;
+        if (y === my && front && Math.abs(x) <= 1) continue;   // (the mouth row's middle: the lips and the moustache below)
+        if (front || side) head.set(x, y, z, bd, 0, TG.hair);
+      }
+      for (const sx of [A.xl, A.xr]) for (let z = A.z0 + 1; z <= A.z0 + 2; z++) if (head.has(sx, 2, z)) head.set(sx, 2, z, bd, 0, TG.hair);
+      head.set(0, 0, A.z0 - 1, bd, 0, TG.hair);
+      F(-1, my, mix(hc, LIP, 0.2), TG.hair); F(1, my, mix(hc, LIP, 0.2), TG.hair);
     }
     // glasses (scholars, teachers, some elders): rims round the eyes, the bridge, the arms over the ears
     if (role.glasses || (elder && rnd(3) < 0.45)) {
-      // (thin frames at 3 cm a voxel: the top of each frame over the eye, the outer rims beside it, the arms back over the
-      // ears — painted on the face, nothing stands out but the arms)
-      const fr = elder ? 0xB09A64 : 0x8C8C96;
-      for (const ex of A.eyes) F(ex, eyeY + 1, fr, TG.metal);
-      for (const sx of [A.xl - 1, A.xr + 1]) for (let z = A.z0 + 1; z <= 0; z++) if (!head.has(sx, eyeY + 1, z)) head.set(sx, eyeY + 1, z, fr, 0, TG.metal);
+      // (thin dark frames at 3 cm a voxel: the bridge over the nose between the eyes, the outer rims on the face's edge
+      // beside them, the arms back over the ears; the brows stay — a light frame over the brows read as goggles)
+      const fr = elder ? 0x5A4A30 : 0x2A2A32, rim = mix(skin, fr, 0.55);   // (the rims on the face half the frame's tone: a dark band read as sunglasses)
+      F(0, eyeY, rim, TG.metal); F(A.xl, eyeY, rim, TG.metal); F(A.xr, eyeY, rim, TG.metal);
+      for (const sx of [A.xl - 1, A.xr + 1]) for (let z = A.z0 + 1; z <= 0; z++) if (!head.has(sx, eyeY, z)) head.set(sx, eyeY, z, fr, 0, TG.metal);
     }
     // ---- hats (at the head's scale; H1 is the first row over the hair)
     const hat = kid ? L.kidHat : (elder ? (L.elderHat || role.hat) : role.hat);
@@ -831,8 +843,9 @@
         break;
       }
       case 'tunic': case 'vest': {
-        // a tunic to mid-thigh, belted (the crafter, the factory worker); the builder's high-visibility vest over a shirt
-        if (fam === 'tunic') skirt(beltY - 1, kid ? -5 : -9, kid ? 4.5 : 6.2, kid ? 3.6 : 4.8, (x, y, z) => shF(x, y, z));
+        // a tunic to mid-thigh, belted (the crafter, the factory worker; the Weißstadt's with a gold hem); the builder's
+        // high-visibility vest over a shirt
+        if (fam === 'tunic') skirt(beltY - 1, kid ? -5 : -9, kid ? 4.5 : 6.2, kid ? 3.6 : 4.8, (x, y, z) => shF(x, y, z), L.garb ? trim : undefined);
         for (let z = rowOf(beltY)[1] - 1; z <= rowOf(beltY)[2] + 1; z++) for (let x = -hw - 1; x <= hw + 1; x++) { const ex = Math.abs(x) === hw + 1, ez = z === rowOf(beltY)[1] - 1 || z === rowOf(beltY)[2] + 1; if (ex && ez) continue; if (ex || ez) hips.set(x, beltY, z, 0x5A3A22, 0, TG.leather); }
         hips.set(0, beltY, rowOf(beltY)[1] - 2, 0xC8A050, 0, TG.metal);
         if (fam === 'vest') {
@@ -867,6 +880,41 @@
         for (let y = beltY + 1; y <= top - 1; y++) front(0, y, gold);
         for (let z = rowOf(beltY)[1] - 1; z <= rowOf(beltY)[2] + 1; z++) for (let x = -hw - 1; x <= hw + 1; x++) { const ex = Math.abs(x) === hw + 1, ez = z === rowOf(beltY)[1] - 1 || z === rowOf(beltY)[2] + 1; if (ex && ez) continue; if (ex || ez) hips.set(x, beltY, z, mul(gold, 0.9), 0, TG.cloth); }
         collar(mul(shirt, 1.12));
+        break;
+      }
+      case 'gown': {
+        // (the Weißstadt) a gown to the ankle: the bodice, a gold sash at the waist with its ends down the front, the skirt
+        // in an A-line with a gold hem and its folds, a round neckline
+        const gF = cloth(shirt, 43);
+        skirt(beltY - 1, -(legLen - 3), 7.6, 7.4, (x, y, z) => (x === 0 && z <= rowOf(0)[1] - 1 && y > beltY - 6) ? mul(trim, 0.92) : gF(x, y, z), trim);
+        for (let z = rowOf(beltY)[1] - 1; z <= rowOf(beltY)[2] + 1; z++) for (let x = -hw - 1; x <= hw + 1; x++) { const ex = Math.abs(x) === hw + 1, ez = z === rowOf(beltY)[1] - 1 || z === rowOf(beltY)[2] + 1; if (ex && ez) continue; if (ex || ez) hips.set(x, beltY, z, trim, 0, TG.cloth); }
+        for (let y = beltY + 1; y <= beltY + 2; y++) for (let x = -hw; x <= hw; x++) body.paint(x, y, rowOf(y)[1], mul(trim, 0.94));
+        for (let y = beltY + 3; y <= top - 4; y += 2) front(0, y, mul(shirt, 0.86));
+        collar(mul(shirt, 1.08));
+        break;
+      }
+      case 'cape': {
+        // (the Weißstadt) a belted tunic under a shoulder cape: the cape over the shoulders and down the back to the waist
+        // (open at the sides, where the arms swing), its hood down on the upper back, a gold clasp at the throat
+        const cc = L.cape || mul(shirt, 0.7), cpF = cloth(cc, 44);
+        skirt(beltY - 1, -9, 6.2, 4.8, (x, y, z) => shF(x, y, z), trim);
+        for (let z = rowOf(beltY)[1] - 1; z <= rowOf(beltY)[2] + 1; z++) for (let x = -hw - 1; x <= hw + 1; x++) { const ex = Math.abs(x) === hw + 1, ez = z === rowOf(beltY)[1] - 1 || z === rowOf(beltY)[2] + 1; if (ex && ez) continue; if (ex || ez) hips.set(x, beltY, z, 0x5A3A22, 0, TG.leather); }
+        hips.set(0, beltY, rowOf(beltY)[1] - 2, trim, 0, TG.metal);
+        for (let y = beltY + 4; y <= top; y++) {
+          const r = rowOf(y); if (!r) continue;
+          const sh = y >= top - 2;   // (the shoulders: the cape across them, front to back)
+          for (let z = sh ? r[1] : 0; z <= r[2] + 1; z++) for (let x = -r[0] - 1; x <= r[0] + 1; x++) {
+            const out = z === r[2] + 1 || Math.abs(x) === r[0] + 1 || (y === top && Math.abs(x) >= 2);
+            if (!out) continue;
+            if (Math.abs(x) === r[0] + 1 && z === r[2] + 1) continue;
+            if (!sh && Math.abs(x) === r[0] + 1 && z < r[2] - 1) continue;   // (the sides below the shoulders stay open)
+            body.set(x, y, z, y === beltY + 4 && z === r[2] + 1 ? mul(cc, 0.86) : cpF(x, y, z), 0, TG.cloth);
+          }
+        }
+        // the hood, down: a roll across the upper back under the collar
+        for (let y = top - 3; y <= top; y++) for (let x = -2; x <= 2; x++) body.set(x, y, rowOf(y)[2] + 2, mul(cc, y === top ? 0.92 : 0.98), 0, TG.cloth);
+        front(0, top, trim, TG.metal, true);
+        collar(mul(shirt, 1.1));
         break;
       }
       case 'suit': {
@@ -926,7 +974,7 @@
     if (over === 'apron' || over === 'apron2') { const ac = over === 'apron' ? 0xFFFFFF : 0x7AB05A; for (let y = -10; y <= beltY; y++) for (let x = -3; x <= 3; x++) hips.set(x, y, rowOf(0)[1] - 2, y === -10 ? mul(ac, 0.9) : ac, 0, TG.cloth); }
 
     // ============================== arms (the pivot at the shoulder; left and right are one grid)
-    const longCoat = fam === 'coat' || fam === 'frock' || fam === 'robe' || fam === 'whitecoat';
+    const longCoat = fam === 'coat' || fam === 'frock' || fam === 'robe' || fam === 'whitecoat' || fam === 'gown' || fam === 'cape';
     const sleeveC = fam === 'whitecoat' ? 0xF4F4F0 : fam === 'dress' ? (L.dressCol || shirt) : shirt;
     const slF = cloth(sleeveC, 21);
     const rolled = !kid && (L.role === 'smith' || L.role === 'builder' || L.role === 'farmer') && !longCoat;

@@ -96,6 +96,7 @@
     vil.fams = fams;
     vil.people = [];
     for (const f of fams) for (const m of f.members) vil.people.push(m);
+    if (Folk.unlike) Folk.unlike(vil.people, 3);   // t-folk: no two neighbours dressed alike (villagers.js)
     vil.homes = homes;
   }
 
