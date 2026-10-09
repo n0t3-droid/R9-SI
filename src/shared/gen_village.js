@@ -96,6 +96,15 @@
       wood: 'jungle', fence: 'vx_fence_wood', lamp: 'vx_lamppost', path: 'dirt_path', plaza: ['vx_floor_stone', 'mossy_cobblestone'], chimney: 'vx_chimney_stone', beam: 'vx_beam_oak', crops: true, flowers: true,
     },
   };
+  // new worlds (vgen ≥ 9, VR.GEN.noCry) build the prism villages without crystals: lavender plaster, white hull and white
+  // timber for the crystal walls, street lamps, lanterns indoors, the aether pool with a stone fountain centre on the
+  // plaza and a flowerbed in every lot where the crystal lamp stood (the site keeps its style key 'prism': its boats,
+  // its tech chance, its layout)
+  STYLES.prism9 = Object.assign({}, STYLES.prism, {
+    walls: ['vx_plaster_lavender', 'vx_hull_white', 'vx_timber_white', 'vx_plaster_lavender'], lamp: 'vx_lamppost',
+    crystals: false, aetherFountain: true, lotFlowers: ['vx_flowerbed', 'vx_flowerbed_roses', 'vx_flowerbed_tulips'],
+  });
+  VG.styleOf = (g, key) => (key === 'prism' && VR.GEN.noCry(g)) ? STYLES.prism9 : (STYLES[key] || STYLES.meadow);
   VG.styleFor = function (key, cl) {
     if (/prism|crystal/.test(key)) return 'prism';
     if (/snowy|ice|frozen|grove|jagged|slopes/.test(key)) return 'snowy';
@@ -551,7 +560,7 @@
   };
   const planSteps = function* (g, site) {
     const rng = new VR.RNG(site.seed);
-    const S = STYLES[site.style] || STYLES.meadow;
+    const S = VG.styleOf(g, site.style);
     const RAD = VG.siteRad(g, site), V2 = g.vgen >= 2;
     const HOME = !!(site.home && VR.Heart && VR.Heart.on(g) && VR.Heart.templeBase); // the Heartland's home city around the Gate Temple
     if (HOME && g.vgen >= 8 && VG.novaHaven) return yield* VG.novaHaven(g, site);   // vgen 8: the trailer's Nova Haven (gen_city.js)
@@ -610,6 +619,13 @@
     } else if (S.crystals) {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (dx || dz) put(cx + dx, py + 1, cz + dz, wellMat); }
       put(cx, py + 1, cz, st('aether')); put(cx, py + 2, cz, st('vx_crystal_violet'));
+      for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(cx + dx, py + 1, cz + dz, st('vx_planter'));
+    } else if (S.aetherFountain) {
+      // vgen 9: a stone fountain centre in a glowing aether pool sunk into the plaza, a low stone curb round it with the
+      // four planters in the curb
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) put(cx + dx, py, cz + dz, (dx || dz) ? st('aether') : wellMat);
+      put(cx, py + 1, cz, st('vx_fountain'));
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if ((Math.abs(dx) === 2 || Math.abs(dz) === 2) && dx && dz) put(cx + dx, py + 1, cz + dz, st('stone_brick_slab', { type: 0 }));
       for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(cx + dx, py + 1, cz + dz, st('vx_planter'));
     } else {
       put(cx, py + 1, cz, st('vx_well'));
@@ -1230,6 +1246,7 @@
         if (VR.Plants && VR.Plants.on(g) && (M.hash2(lot.ox, lot.oz, site.seed + 727) >>> 0) % 2 === 0) L.P(1, lot.F + 1, 1, 'vm_bush_blossom', { part: 'p000', facing: 0 });
         L.P(0, lot.F + 1, 0, S.lamp, { head: 0 }); L.P(0, lot.F + 2, 0, S.lamp, { head: 1 });
         if (S.crystals) L.P(mid, lot.F + 1, lot.d - 1, 'vx_crystal_' + lrng.pick(['violet', 'azure', 'rose']));
+        else if (S.lotFlowers) L.P(mid, lot.F + 1, lot.d - 1, S.lotFlowers[['violet', 'azure', 'rose'].indexOf(lrng.pick(['violet', 'azure', 'rose']))]);   // (vgen 9: a flowerbed, the same draw)
         plan.work.push({ kind: 'garden', spot: (() => { const q = ROT[lot.r](mid, (lot.d >> 1) - 1); return [lot.ox + q[0], lot.F + 1, lot.oz + q[1]]; })() });
         continue;
       }
@@ -1251,7 +1268,7 @@
       const tower = !!(S.tech && VG.techTower && kind === 'home' && lot.w >= 7 && lot.d >= 7);
       const floors = tower ? Math.min(4, 2 + (lot.w >= 9 && lot.d >= 9 ? lrng.int(2) : 0) + (lrng.chance(0.35) ? 1 : 0)) : kind === 'hall' ? 2 : (kind === 'home' && lot.w >= 6 && lrng.chance(0.4)) ? 2 : (S.tall && lot.w >= 5 && lrng.chance(0.65)) ? 2 : 1;
       const beds = kind === 'home' ? 2 + lrng.int(Math.max(1, Math.min(4, lot.w - 3))) : kind === 'clinic' ? 2 : 0;
-      const bopt = { detail: detOn, w: lot.w, d: lot.d, floors, F: lot.F, style: site.style, rng: lrng, kind, beds, ground: lg, walls: kind === 'smithy' ? (S.tech ? 'vx_tech_gray' : S.base === 'vx_sandstone' ? 'vx_sandstone' : 'vx_stonebrick') : walls, window: win, roof, wood: S.wood, chimney: !S.noChimney && kind !== 'library' && kind !== 'clinic' && kind !== 'barn', seed: homeSeed & 255, pitched: kind === 'barn' };
+      const bopt = { detail: detOn, w: lot.w, d: lot.d, floors, F: lot.F, style: S === STYLES.prism9 ? 'prism9' : site.style, rng: lrng, kind, beds, ground: lg, walls: kind === 'smithy' ? (S.tech ? 'vx_tech_gray' : S.base === 'vx_sandstone' ? 'vx_sandstone' : 'vx_stonebrick') : walls, window: win, roof, wood: S.wood, chimney: !S.noChimney && kind !== 'library' && kind !== 'clinic' && kind !== 'barn', seed: homeSeed & 255, pitched: kind === 'barn' };
       if (lot.kind === 'lot') {
         // reserved plot: foundation + fence posts + material crates; the real house is built by villagers later
         const rec = [];
