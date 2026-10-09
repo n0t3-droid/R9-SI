@@ -26,6 +26,7 @@
   // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
   const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
   const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];
+  const AQ_MEM = 'r9si.aqmem';   // F9: the smart-quality steps that held, per GPU and preset (aqRemember), this browser only
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -323,6 +324,7 @@
         this.settings.autoPreset = false; this.saveSettings();
       }
       this.applySettings('*');
+      this.aqRestoreStart();   // F9: this GPU's remembered smart-quality steps (aqRestoreSteps, at the first frame of play)
       document.getElementById('gpuinfo').textContent = (VR.GL.rendererName || 'WebGL2') + (this.renderer.multi ? ' · multi-draw' : '');
       window.addEventListener('resize', () => this.renderer.resize(false));
       this.last = performance.now();
@@ -791,13 +793,15 @@
     smartQuality(dt, S, w) {
       if (this.bench) return;   // the Automatik run measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
-      const aq = this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null });
+      const aq = this.aqState();
       if (!S.dynRes || !this.fps) {
         if (aq.stack.length) this.aqReset(aq, S, w);
         this.cpuBound = (this.jsMs > Math.max(9, dt * 1000 * 0.72) && dt > 1 / 55) || !!this.slowBase;
         this.folkDist = this.folkBase || 100;
         return;
       }
+      // F9: the steps this GPU held last time (aqRestoreStart) go on again once the world runs
+      if (aq.pending && this.world) { const s = aq.pending; aq.pending = ''; this.aqRestoreSteps(aq, S, this.world, s); }
       const target = 55, budget = 1000 / target;
       const gpuMs = r.gpuMs, jsMs = this.jsMs;
       // who is the bottleneck? measured when the browser exposes GPU timing, estimated otherwise
@@ -841,6 +845,10 @@
           this.aqPop(aq, S, w); aq.good = 0; aq.hold = 3; aq.upT = now;
         }
       } else if (!fine) aq.good = 0;
+      // F9: ten seconds of fine frames at this depth are remembered for this GPU (a struggling frame restarts the count)
+      if (struggling) aq.steady = 0; else if (fine) aq.steady += dt;
+      aq.memT -= dt;
+      if (aq.steady >= 10 && aq.memT <= 0) { aq.memT = 2; this.aqRemember(aq, S); }
       // fell back within 8 s of a step up: wait longer next time (up to a minute)
       if (aq.upT && struggling && now - aq.upT < 8) { aq.backoff = Math.min(60, aq.backoff * 2); aq.upT = 0; }
       else if (aq.upT && now - aq.upT > 20) { aq.backoff = Math.max(6, aq.backoff * 0.7); aq.upT = 0; }
@@ -872,6 +880,52 @@
     aqPush(aq, kind, S, w) { if (kind === 'g') aq.g++; else aq.c++; aq.stack.push(kind); this.aqApply(aq, S, w); if (VR.AQ_TRACE) console.log('aq push', kind, aq.stack.join(''), 'fps', (aq.fpsWin || this.fps || 0).toFixed(0), 't', this.time.toFixed(1)); }
     aqPop(aq, S, w) { const k = aq.stack.pop(); if (!k) return; if (k === 'g') aq.g--; else aq.c--; this.aqApply(aq, S, w); if (VR.AQ_TRACE) console.log('aq pop', k, aq.stack.join(''), 'fps', (aq.fpsWin || this.fps || 0).toFixed(0), 't', this.time.toFixed(1)); }
     aqReset(aq, S, w) { aq.g = 0; aq.c = 0; aq.stack.length = 0; aq.probe = null; this.aqApply(aq, S, w); }
+    // the governor's state, made on first use
+    aqState() {
+      return this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null, steady: 0, memT: 0, memS: null, memK: '', pending: '' });
+    }
+    // F9 · Gedächtnis pro Grafikkarte: the steps that held for ten seconds are remembered per GPU and preset, in this
+    // browser only (localStorage 'r9si.aqmem', at most 24 entries). The next start takes them at once, so the first
+    // minute does not stutter while the governor climbs down to what this machine can hold. An empty entry is removed.
+    aqMemKey(name, preset) { return String(name || 'gpu').slice(0, 96) + '|' + (preset || 'custom'); }
+    aqMemRead(key) {
+      try { const m = JSON.parse(localStorage.getItem(AQ_MEM) || '{}') || {}; const e = m[key]; return e && typeof e.s === 'string' ? e.s.replace(/[^gc]/g, '').slice(0, 24) : ''; }
+      catch (err) { return ''; }
+    }
+    aqMemWrite(key, s) {
+      try {
+        let m = {};
+        try { m = JSON.parse(localStorage.getItem(AQ_MEM) || '{}'); } catch (err) { m = {}; }   // a damaged store is replaced
+        if (!m || typeof m !== 'object' || Array.isArray(m)) m = {};
+        if (s) m[key] = { s: String(s).slice(0, 24), t: Date.now() }; else delete m[key];
+        const ks = Object.keys(m), age = (k) => (m[k] && m[k].t) || 0;
+        if (ks.length > 24) { ks.sort((a, b) => age(a) - age(b)); for (const k of ks.slice(0, ks.length - 24)) delete m[k]; }
+        localStorage.setItem(AQ_MEM, JSON.stringify(m));
+      } catch (err) { /* the memory is optional: a full or blocked store changes nothing */ }
+    }
+    // at the start: this GPU's remembered steps wait for the first frame of play (smartQuality → aqRestoreSteps)
+    aqRestoreStart() {
+      const S = this.settings, aq = this.aqState();
+      if (!S.dynRes) return;
+      aq.memK = this.aqMemKey(VR.GL && VR.GL.rendererName, S.preset);
+      aq.memS = this.aqMemRead(aq.memK);
+      aq.pending = aq.memS;
+    }
+    aqRemember(aq, S) {
+      const s = aq.stack.join(''), key = this.aqMemKey(VR.GL && VR.GL.rendererName, S.preset);
+      if (s === aq.memS && key === aq.memK) return;
+      aq.memS = s; aq.memK = key;
+      this.aqMemWrite(key, s);
+    }
+    // the remembered steps go on again without a probe; the governor waits before it takes any of them back
+    aqRestoreSteps(aq, S, w, s) {
+      const gN = this.aqGpuRungs(S).length, cN = this.aqCpuRungs(S).length;
+      for (const k of String(s || '')) {
+        if (k === 'g' && aq.g < gN) this.aqPush(aq, 'g', S, w);
+        else if (k === 'c' && aq.c < cN) this.aqPush(aq, 'c', S, w);
+      }
+      aq.backoff = Math.max(aq.backoff, 30); aq.hold = Math.max(aq.hold, 3); aq.good = 0; aq.upT = 0;
+    }
     aqApply(aq, S, w) {
       const o = {}, gL = this.aqGpuRungs(S), cL = this.aqCpuRungs(S);
       for (let i = 0; i < aq.g; i++) gL[i](o);
