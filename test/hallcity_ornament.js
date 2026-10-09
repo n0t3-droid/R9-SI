@@ -219,8 +219,9 @@ for (const [label, H] of HALLS) {
       check(between >= bt.length - 2, `a tall window between every pair of buttresses (${between} of ${bt.length - 1}, the gate's bay aside)`);
       let tracery = 0; for (let k = -7; k <= 4; k++) { if (k === 0) continue; const v = 10 * k; if (atN(s * 47, F + 10, v - 2) !== 'air' && !/glass/.test(atN(s * 47, F + 10, v - 2)) && /glass/.test(atN(s * 47, F + 8, v - 2))) tracery++; }
       check(tracery >= 10, `tracery: a stone cross in the long wall's windows (${tracery})`);
-      let corn = 0, cn = 0; for (let v = Hh.V0; v <= Hh.V1; v++) { cn++; if (/quartz_stairs/.test(atN(s * 49, F + 23, v))) corn++; }
-      check(corn >= 0.8 * cn, `a cornice band under the glass roof along the long wall (${corn} of ${cn})`);
+      // (round 2c: the buttress piers rise through the cornice line, which wraps round them one block further out)
+      let corn = 0, cn = 0; for (let v = Hh.V0; v <= Hh.V1; v++) { cn++; if (/quartz_stairs/.test(atN(s * 49, F + 23, v)) || /quartz_stairs/.test(atN(s * 50, F + 23, v))) corn++; }
+      check(corn >= 0.8 * cn, `a cornice band under the glass roof along the long wall, wrapping round the buttress piers (${corn} of ${cn})`);
     }
     const V0 = Hh.V0;
     let open = 0; for (let u = -3; u <= 3; u++) for (let y = F + 1; y <= F + 5; y++) for (let v = V0; v <= V0 + 2; v++) if (atN(u, y, v) === 'air') open++;
@@ -430,6 +431,30 @@ for (const [label, H] of HALLS) {
     }
     check(ln > 0 && shops === ln, `goods before every workshop's arch, its doorway free (${shops} of ${ln})`);
     check(lamps === ln, `lanterns on the loggias' columns at eye height (${lamps} of ${ln} units)`);
+  }
+  // ---------------------------------------------------------------- 12. round 2c: the exterior's flying buttresses (P5)
+  console.log(`12. round 2c — flying buttresses over the aisle roofs (${label})`);
+  {
+    // from every outer buttress (the pier lines v = 10k + 5) a stone half-arch leaps over the aisle's roof to the
+    // clerestory: solid stone above the roof's surface in most columns between the clerestory and the outer wall, its top
+    // falling from the clerestory to the wall, and nothing of it over the roof's glass (the sky light keeps its columns)
+    let fly = 0, n = 0, overGlass = 0;
+    for (let k = -8; k <= 4; k++) {
+      const vp = 10 * k + 5; if (vp < Hh.V0 + 2 || vp > Hh.V1) continue;
+      for (const s of [-1, 1]) {
+        n++; const tops = [];
+        for (let a = 30; a <= 47; a++) {
+          const roof = F + VG.HALL.hA(a); let top = -1;
+          for (let y = F + 36; y > roof + 1; y--) { const nmv = atN(s * a, y, vp); if (solid(nmv) && !/glass|lantern|balustrade/.test(nmv)) { top = y; break; } }
+          tops.push(top);
+          for (let y = roof + 2; y <= F + 36; y++) if (solid(atN(s * a, y, vp)) && /glass/.test(atN(s * a, roof, vp))) overGlass++;
+        }
+        const have = tops.filter(t => t > 0).length, falls = tops[1] > 0 && tops[tops.length - 3] > 0 && tops[1] > tops[tops.length - 3];
+        if (have >= 15 && falls) fly++;
+      }
+    }
+    check(n > 0 && fly === n, `a flying buttress from every outer buttress over the aisle roof to the clerestory, falling toward the wall (${fly} of ${n})`);
+    check(overGlass === 0, `the flyers stand over the roof's stone ribs, never over its glass (${overGlass} cells)`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();

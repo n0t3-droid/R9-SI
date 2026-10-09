@@ -472,7 +472,21 @@
     for (let v = H.V0; v <= H.VE; v++) for (const s of [-1, 1]) P(s * H.HW, F + H.WALLTOP + 1, v, 'vx_balustrade');
     for (let k = -8; k <= 4; k++) {
       const vp = 10 * k + 5; if (vp < H.V0 + 2 || vp > H.V1) continue;
-      for (const s of [-1, 1]) { for (let y = F + 22; y <= F + 24; y++) P(s * (H.HW + 1), y, vp, 'quartz_pillar', { axis: 0 }); P(s * (H.HW + 1), F + 25, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 26, vp, BAND); }
+      // (round 2c: the buttress pier rises over the wall's balustrade to a gold cap at 27, its pinnacle above it to 34 —
+      // the row of pinnacles that crowns the long wall seen from the land)
+      for (const s of [-1, 1]) {
+        for (let dv = -1; dv <= 1; dv++) { for (let y = F + 21; y <= F + 26; y++) P(s * (H.HW + 1), y, vp + dv, STONE); P(s * (H.HW + 1), F + 27, vp + dv, BAND); P(s * (H.HW + 2), F + H.WALLTOP, vp + dv, 'smooth_quartz_stairs', { facing: s > 0 ? 3 : 1, half: 1 }); }   // (the wall's cornice wraps round the pier)
+        for (let y = F + 28; y <= F + 31; y++) P(s * (H.HW + 1), y, vp, 'quartz_pillar', { axis: 0 });
+        P(s * (H.HW + 1), F + 32, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 33, vp, BAND); P(s * (H.HW + 1), F + 34, vp, 'quartz_pillar', { axis: 0 });
+      }
+      // (round 2c) a flying buttress from it: a stone half-arch leaping over the aisle's roof from the clerestory to the
+      // buttress pier — its top falling from under the clerestory's cornice (30) to the pier's cap (27), its underside an
+      // arch (three blocks thick at both ends, one at the crown), a gold course where it meets the clerestory. On the
+      // pier line it stands over the aisle vault's stone rib: no glass panel loses its sky light.
+      for (const s of [-1, 1]) for (let a = H.A0; a <= H.HW; a++) {
+        const top = 30 - Math.floor((a - H.A0) * 3 / 18), th = 1 + Math.round(2 * ((a - 39) / 9) ** 2), roof = a < H.W0 ? hA(a) : H.WALLTOP;
+        for (let y = Math.max(roof + 2, top - th); y <= top; y++) P(s * a, F + y, vp, a === H.A0 && y === top ? BAND : SMOOTH);
+      }
     }
     // lantern turrets on the ridge every 24 blocks (round 2b: five wide, were three): a glazed lantern on four white
     // posts over a white base, a cornice, a stepped glass cap, a gold-banded dome and a finial; the base's middle and the
