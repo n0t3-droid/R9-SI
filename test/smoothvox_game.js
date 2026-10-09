@@ -1,6 +1,7 @@
 // Glatt-Modelle in the game (t-form): the path from a placed model piece to its surface-nets mesh in the furniture pass.
-//   1. the eligible pieces: every VM model without a hand-built mesh, no joiners, no plants pack; a switch has a second
-//      entry for its dark look; the list is the registry's (the same in every thread)
+//   1. the eligible pieces: every VM model without a hand-built mesh, no joiners, no plants pack, not the pieces that
+//      look better as voxels (SV.KEEP); a switch has a second entry for its dark look; the list is the registry's (the
+//      same in every thread)
 //   2. a section with a sideboard, a lit and a switched-off lamp and a hand-built sofa, „Glatte Möbel" on, nothing ready:
 //      the mesher draws the pieces' voxels (the output is exactly the one without smoothvox.js), the sofa is an anchor,
 //      the section wants the sideboard and both lamp looks
@@ -28,6 +29,10 @@ check(A.n > 250, `${names.size} models (${A.n} entries with the switched-off loo
 check([...names].every(n => !furn.has(n)), 'no piece with a hand-built mesh is in the list (hand-built meshes win)');
 check(![...names].some(n => /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|tuft_grass)/.test(n)), 'no joiner (windows, gutters, downpipes, the garage door, the Nova tread) and no plants-pack piece');
 check(['vm_sideboard', 'vm_piano', 'vm_fridge', 'vm_curtain', 'vm_nova_pad', 'vm_living_sofa3_sage'].every(n => names.has(n)), 'the sideboard, the piano, the fridge, the curtain, the Nova pad, the Modern Living sofa are in it');
+// the pieces that look better as voxels keep them (SV.KEEP: pictures, lettering, weaves, small lights and things, the
+// res-32 kitchen fronts and lockers whose seams a 16-a-block surface closes; the VX wall shelf's small things)
+const kept = ['vm_art_abstract', 'vm_deco_canvas_large', 'vm_shop_neon_open', 'vm_shop_menuboard_chalk', 'vm_living_rug_stripe', 'vm_shop_shelf_grocery', 'vm_kitchen_sage_drawers', 'vm_kitchen_navy_wall', 'vm_office_lockers_sage', 'vm_smart_speaker_sand', 'vx_wall_shelf'];
+check(kept.every(n => !names.has(n)) && kept.filter(n => n.startsWith('vm_')).every(n => SV.KEEP.test(n)), 'the pictures, the neon letters, the rugs, the shelves of small things, the kitchen fronts, the lockers, the smart speakers keep their voxels');
 const lampName = A.list.find(e => e.off).name;
 check(SV.indexOf(lampName, true) === SV.indexOf(lampName, false) + 1, `a switch has two entries, lit and dark (${lampName})`);
 check(SV.AUTO0 === PR.AUTO0 && SV.AUTO0 > 255, 'the auto kinds start at ' + SV.AUTO0 + ' in both files');
