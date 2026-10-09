@@ -55,6 +55,7 @@
     { key: 'fancyLeaves', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.fancyLeaves', tip: 'g.set.fancyLeaves.tip', cost: 'mid', def: true },
     { key: 'wetGround', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.wetGround', tip: 'g.set.wetGround.tip', cost: 'low', def: true },
     { key: 'airLife', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.airLife', tip: 'g.set.airLife.tip', cost: 'low', def: true },
+    { key: 'anim', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.anim', tip: 'g.set.anim.tip', cost: 'low', def: true },
     { key: 'showFps', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.showFps', tip: 'g.set.showFps.tip', def: false },
     { key: 'bench', g: 'img', sec: 'auto', t: 'action', lab: 'g.set.bench', tip: 'g.set.bench.tip', act: 'bench' },
     // ---- Klang

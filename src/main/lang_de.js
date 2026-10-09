@@ -233,6 +233,7 @@
     'g.set.rays': 'Sonnenstrahlen',
     'g.set.fxaa': 'Kantenglättung (FXAA — nur ohne Super Resolution)',
     'g.set.fancyLeaves': 'Schöne Blätter',
+    'g.set.anim': 'Animierte Anzeigen (Bildschirme, Portal, Lichter)',
     'g.set.dynRes': 'Schlaue Qualität (hält das Bild scharf: bei wenig FPS zuerst weniger Schatten, Strahlen und Details — nie unscharf)',
     'g.set.lite': 'Einfache Materialien (flache Flächen ohne Relief & Glanz — am schnellsten)',
     'g.set.showFps': 'FPS anzeigen',
@@ -431,6 +432,7 @@
     'g.set.mouseSteer.tip': 'Das Schiff fliegt, wohin du schaust. Aus: Die Maus schaut sich nur um, mit gedrückter rechter Taste lenkst du.',
     'g.set.camShake.tip': 'Tempo, Boost und Stöße rütteln die Kamera ein wenig.',
     'g.set.airLife.tip': 'Staub im Sonnenstrahl, Pollen, Glühwürmchen, fallende Blätter, Schnee und Vögel — je nach Stufe weniger; auf Sehr niedrig nur Glühwürmchen und Schnee.',
+    'g.set.anim.tip': 'Radar-Bildschirme, das Portal-Energiefeld, blinkende Konsolen und pulsierende Lichtleisten bewegen sich. Auf Sehr niedrig aus.',
     'g.set.sprintMode': 'Sprinten',
     'g.set.sprintMode.tip': 'Halten: nur solange die Taste gedrückt ist. Umschalten: einmal an, wieder aus.',
     'g.set.sprintMode.hold': 'Halten',
@@ -1157,6 +1159,7 @@
     'g.tram.hudGo': '<b>SCHWEBEBAHN</b> → {name} · {s} s<br><small>Shift an einer Station steigt aus · F5 Ansicht</small>',
     'g.tram.next': 'nächste Stadt',
     // ---- Baupläne (Villen in der Hand)
+    'g.bp.nova.sub': 'Die Villa aus dem Trailer · Terrassen · Glastreppen · Lichtsockel',
     'g.bp.failed': 'Bauplan fehlgeschlagen: {why}',
     'g.bp.oneFacade': 'Dein eigenes Design hat eine Fassade — ändere sie im R9 Studio',
     'g.bp.mode': 'Baupläne bauen nur im Kreativ- oder Zen-Modus',

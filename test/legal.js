@@ -142,14 +142,14 @@ for (const f of files) fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) 
 check(files.length > 100 && !hits.length, 'none of the audit\'s company / product names in src/ (' + files.length + ' files) or the README' + (hits.length ? ': ' + hits.slice(0, 8).join(' · ') : ''));
 require(path.join(ROOT, 'test/load_shared.js'));
 const PLAN = VR.VillageGen && VR.VillageGen.plan2;
-const want = ['Villa R9 180', 'Villa R9 160', 'Villa R9 140', 'Villa Belfronte', 'Beau Lac', 'Torre Ocra', 'Bungalow R9', 'Palais Étoile', 'Villa R9 130', 'Villa R9 130 Carport', 'Villa R9 Compact'];
+const want = ['Villa R9 180', 'Villa R9 160', 'Villa R9 140', 'Villa Belfronte', 'Beau Lac', 'Torre Ocra', 'Bungalow R9', 'Palais Étoile', 'Villa R9 130', 'Villa R9 130 Carport', 'Villa R9 Compact', 'Villa Nova'];   // (t-villa: Villa Nova appended, the indices before it stay)
 check(PLAN && JSON.stringify(PLAN.CATALOGUE.map(c => c.name)) === JSON.stringify(want), 'the catalogue, index by index: ' + (PLAN ? PLAN.CATALOGUE.map(c => c.name).join(' · ') : '?'));
 check(PLAN && ['stadtvilla', 'belportale', 'sanssoucis', 'toscana', 'bungalow', 'palais'].every(k => typeof PLAN.templates[k] === 'function') && ['signus', 'blacklabel', 'toscana', 'lake', 'classic'].every(k => PLAN.SKINS[k] && PLAN.SKINS[k].id === k), 'the family ids and skin ids are the same (saved designs keep working)');
 check(PLAN && [3, 4, 5, 7].every(i => PLAN.CATALOGUE[i].make({ rng: new VR.RNG(1), beds: 3 }).family === ['belportale', 'sanssoucis', 'toscana', 'palais'][[3, 4, 5, 7].indexOf(i)]), 'each renamed house still builds its own family');
 const bp = (i) => (VR.ITEMS && VR.ITEMS['blueprint_' + i] ? VR.ITEMS['blueprint_' + i].name : '?');
 check(bp(3) === 'Blueprint · Villa Belfronte' && bp(7) === 'Blueprint · Palais Étoile', 'the blueprint items (favourites keep blueprint_<i>): ' + bp(3) + ', ' + bp(7));
 const studioHouses = [...read('src/studio/studio.js').matchAll(/\{ i: (\d+), name: '([^']+)'/g)].map(m => [+m[1], m[2]]);
-check(studioHouses.length === 11 && studioHouses.every(([i, n]) => want[i] === n), 'the Studio\'s house list has the same names at the same indices');
+check(studioHouses.length === want.length && studioHouses.every(([i, n]) => want[i] === n), 'the Studio\'s house list has the same names at the same indices');
 check(/signus: 'Weiß · Anthrazit'/.test(read('src/studio/studio.js')) && /blacklabel: 'Schwarzkubus'/.test(read('src/studio/studio.js')), 'the skins shown in the Studio: „Weiß · Anthrazit“, „Schwarzkubus“');
 
 console.log('10 · the independence disclaimer, the reworded lines, the milestone titles');

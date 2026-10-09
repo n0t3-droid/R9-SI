@@ -60,7 +60,8 @@
       const P = this.plan(), cat = P && P.CATALOGUE[i]; if (!cat) return [];
       if (VR.Custom && VR.Custom.houseFor(i)) return [{ custom: true }];
       const skins = cat.skins.filter((s, k, a) => a.indexOf(s) === k), out = [];
-      for (const mirror of [false, true]) for (const skin of skins) out.push({ skin, mirror });
+      // (a special house — Villa Nova — is built as drawn: no mirrored twin that would look the same)
+      for (const mirror of cat.special ? [false] : [false, true]) for (const skin of skins) out.push({ skin, mirror });
       return out;
     }
     key(i) {

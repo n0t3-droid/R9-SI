@@ -324,6 +324,8 @@
       this.shadowFB = GL.fbo([], this.shadowTex);
       if (!this.shadowFB) { this.shadowSize = 0; this.q.shadows = 0; }
     }
+    // the texture-array layer of a named texture (-1 when it is not loaded): the shader picks layers by number
+    texLayer(name) { const R = VR.R, i = R && R.texIndex ? R.texIndex[name] : undefined; return i === undefined ? -1 : i; }
     setQuality(q) {
       this.qBase = Object.assign(this.qBase || {}, q);
       this.applyQ(true);
@@ -568,6 +570,10 @@
       if (u.u_matTier) gl.uniform1f(u.u_matTier, this.q.matTier || 0);
       if (u.u_puddle) gl.uniform1f(u.u_puddle, E.puddle || 0);
       if (u.u_time) gl.uniform1f(u.u_time, E.time);
+      // Animierte Anzeigen (settings.anim, off on Very Low): the holo displays, the portal veil and the hall's light pulses
+      if (u.u_animOn) gl.uniform1f(u.u_animOn, this.q.anim === false ? 0 : 1);
+      if (u.u_pulseA) gl.uniform1f(u.u_pulseA, this.texLayer('vx_tech_hex'));
+      if (u.u_pulseB) gl.uniform1f(u.u_pulseB, this.texLayer('vx_tech_dark_strip'));
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
