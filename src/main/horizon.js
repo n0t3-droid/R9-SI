@@ -47,6 +47,9 @@
       if (!this.sentAvg && g.tex && g.tex.avgColor) { g.pool.broadcast({ type: 'lodinit', avg: g.tex.avgColor }); this.sentAvg = true; }
       const wk = w.seed + ':' + (w.genOpts && w.genOpts.worldType || '') + ':' + (w.genOpts && w.genOpts.vgen || 1);
       if (wk !== this.worldKey) { this.reset(); this.worldKey = wk; }
+      // (F-Far) another world object (a dimension and back) took the old upload queue with it: the tiles and forms that
+      // waited in it are asked for again
+      if (w !== this.qWorld) { if (this.qWorld) this.dropQueued(); this.qWorld = w; }
       this.frame++;
       // F-Far: ring 1 first (it frees and asks for its forms), then the masks: with ring 1 on, the far mask covers 136 x 136
       // columns and carries ring 1's fades (updateMaskFar); without it, the 64 x 64 mask as before
@@ -134,6 +137,11 @@
         if (this.farOn() && w && w.uploadQ && !t.queued) { t.queued = true; w.uploadQ.push({ key: null, col: undefined, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: m.verts.byteLength + m.idx.byteLength, run: () => { if (this.tiles.get(key) === t && !t.vao) this.put(t, m, S); } }); return; }
         this.put(t, m, S);
       }, d / S - L * 0.6);
+    }
+    // (F-Far) the tiles whose mesh waited in a world's upload queue that is gone: asked for again; ring 1 likewise
+    dropQueued() {
+      for (const [k, t] of this.tiles) if (t.queued && !t.vao) this.tiles.delete(k);
+      if (this.far) this.far.dropQueued();
     }
     // a tile's mesh onto the GPU (at once, or from the upload queue while ring 1 is on)
     put(t, m, S) {
