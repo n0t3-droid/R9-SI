@@ -233,6 +233,19 @@ if (HF && HF.sched) {
   const g1 = mkGame('high', [40, 81, 40]); g1.settings.padLife = false; const A1 = new PL.Actor(g1);
   for (let i = 0; i < 200; i++) { A1.update(0.05); A1.draw(rr, {}, 'opaque', rr.cam); A1.draw(rr, {}, 'trans', rr.cam); }
   check(calls.design === 0 && calls.drawOne === 0 && calls.trail === 0, 'padLife off: no design is built, nothing is drawn or spent');
+  // an outpost: a world ship parked on its pad gets a ground crew at its places and the drone; flown away, visitors come
+  for (const k in calls) calls[k] = 0;
+  const go = mkGame('balanced', [210, 70, 205]);
+  const wd = go.starships.design(99, 'dropship', null);
+  const ship = { key: '200,64,200', d: wd, pos: [200.5, 64, 200.5], yaw: 0.5, state: 'parked' };
+  go.starships.ships.push(ship);
+  const AO = new PL.Actor(go); let oc = 0, od = 0, ok2 = true, vis = 0;
+  try {
+    for (let i = 0; i < 400; i++) { AO.update(0.05); oc = Math.max(oc, AO.stats().crew); od = Math.max(od, AO.stats().drones); if (i % 10 === 0) { AO.draw(rr, {}, 'opaque', rr.cam); AO.draw(rr, {}, 'trans', rr.cam); } }
+    go.starships.ships.length = 0;   // the player flies it away: visitors use the pad
+    for (let i = 0; i < 4000; i++) { AO.update(0.05); vis = Math.max(vis, AO.stats().parked); }
+  } catch (e) { ok2 = false; console.log(e.stack); }
+  check(ok2 && oc >= 2 && od >= 1 && vis >= 1, `an outpost: the parked ship's ground crew stands at its places (${oc}) with the drone (${od}); with the ship gone, a visitor parks (${vis})`);
   // the hall's two craft in a game: they fly, one parks, its ground crew walks and is drawn
   for (const k in calls) calls[k] = 0;
   const gh = mkGame('balanced', [0.5, 81, 6]);

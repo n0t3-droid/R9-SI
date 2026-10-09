@@ -354,8 +354,9 @@
       if (!PL || !LK || !m || s.phase !== 'pad' || this.tier < 1 || dist > 80) return;
       if (!C.G || C.Gd !== C.d) {
         C.G = PL.geom(m, HF.SCALE, C.d.occ); C.Gd = C.d;
-        // the technicians come from the console rows' end (world [−7.5, z +4]): parked, the craft faces −z (yaw 0)
-        const svc = [-8 - AX, (this.spot === APRONZ ? APRONZ + 14 : 6) - this.spot];
+        // the technicians come in from the back door (the corridor; at the apron: out of the portal): parked, the craft
+        // faces −z (yaw 0), so they come from ahead of its nose and walk round its side
+        const svc = [0, (this.spot === APRONZ ? MOUTH + 2 : -36) - this.spot];
         C.plans = [0, 1].map(k => PL.crewPlan(HF.SEEDS[C.c] + k, s.n, C.G, svc));
       }
       const plan = C.plans[s.n & 1];

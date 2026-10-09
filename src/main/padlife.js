@@ -204,7 +204,7 @@
       const foot = [0, Math.max(0, R0.hinge[1] + R0.len * Math.cos(a)), R0.hinge[2] + R0.len * Math.sin(a)];
       head = [inside, top, foot, [0, 0, Math.max(foot[2], z1) + 1.0]];
     } else head = [[service[0], 0, service[1]]];
-    const behind = head[head.length - 1], zb = Math.max(behind[2], z1 + 1.4);
+    const behind = head[head.length - 1], front = behind[2] < z1 - 0.5, zb = front ? z1 + 1.4 : Math.max(behind[2], z1 + 1.4);
     // the engineer: behind an outer engine (the middle one is over the ramp)
     const outer = G.engines.filter(e => Math.abs(e[0]) > 0.8), engs = outer.length ? outer : G.engines;
     const eng = engs.length ? engs[Math.floor(h(seed, m, 25) * engs.length)] : [side * hw * 0.5, 1, z1, 0.5];
@@ -222,8 +222,10 @@
     const plans = [];
     for (let i = 0; i < N; i++) {
       const st = stations[ramp ? i : i === 0 ? 1 : 2], pts = head.map(q => q.slice());
-      if (st === stations[1]) pts.push([st[0], 0, zb], st);
-      else { pts.push([side * off, 0, zb]); pts.push([side * off, 0, st[2]]); if (Math.abs(st[0] - side * off) > 0.05) pts.push(st); }
+      // (from behind the craft straight to its place; from a service point ahead of it, first out to the side, then along)
+      if (front) pts.push([side * off, 0, behind[2]]);
+      if (st === stations[1]) { if (front) pts.push([side * off, 0, zb]); pts.push([st[0], 0, zb], st); }
+      else { if (!front) pts.push([side * off, 0, zb]); pts.push([side * off, 0, st[2]]); if (Math.abs(st[0] - side * off) > 0.05) pts.push(st); }
       plans.push({ i, path: LK.path(pts), st, look: st === stations[1] ? [eng[0], 0, eng[2]] : st === stations[2] ? [gear[0], 0, gear[1]] : [0, 0, (z0 + z1) * 0.5], role: st === stations[1] ? 'engineer' : st === stations[2] ? 'gear' : 'captain' });
     }
     return { N, side, plans, ramp, stations };
@@ -410,20 +412,23 @@
     groundCrew(pad, dt, dPad) {
       const s = pad.ship, st = this.st;
       if (this.tier < 1 || dPad > 90 || !s.d.meta) { pad.ground = null; return; }
-      const S = 150, cyc = Math.floor(this.clock / (S + 30)), u = this.clock - cyc * (S + 30);
+      const S = 150, cyc = 0;
       let G = pad.ground;
       if (!G || G.cyc !== cyc) {
         const geo = PL.geom(s.d.meta, 1, s.d.occ);
         geo.ramp = null;   // (the ship's own ramp stays as the player left it: a ground crew comes from behind it)
         G = pad.ground = { cyc, G: geo, plan: PL.crewPlan(pad.seed, cyc, geo, [3, geo.bounds[5] + 8]), folk: [], crew: [], drone: { pos: [0, 0, 0], yaw: 0 } };
       }
-      const crew = PL.crew(pad.seed, cyc, u, S, G.G, G.plan, G.crew);
+      // (they stay at their places round the ship — no walk out of nowhere: the clock runs inside the window where every
+      // member stands at its last place)
+      if (G.win === undefined) { const CT = PL.crewTimes(G.plan, S); let lo = 0, hi = S; for (const W of CT.T) { if (W.skip) continue; lo = Math.max(lo, W.moveEnd); hi = Math.min(hi, W.b); } G.win = hi - lo > 10 ? [lo, hi - lo] : [lo, 0]; }
+      const crew = PL.crew(pad.seed, cyc, G.win[1] ? G.win[0] + (this.clock % G.win[1]) : G.win[0], S, G.G, G.plan, G.crew);
       for (let i = 0; i < crew.length; i++) {
         const o = crew[i], f = G.folk[i] || (G.folk[i] = { look: LK.folk((pad.seed ^ cyc * 31) + i * 7919, 'operator', 'adult'), pos: [0, 0, 0], yaw: 0, seed: i });
         f.on = o.on; if (!f.on) continue;
         PL.toWorld(s.pos, s.yaw, o.pos, f.pos); f.yaw = o.yaw + s.yaw; f.state = o.state; f.walk = o.walk; f.walkAmt = o.walkAmt; f.talking = o.talking; st.crew++;
       }
-      const D = PL.drone(pad.seed, cyc, u, S, G.G, G.drone);
+      const D = PL.drone(pad.seed, cyc, 20 + (this.clock % 100), S, G.G, G.drone);   // (the drone circles on and on)
       G.droneOn = D.on; if (D.on) { G.dronePos = PL.toWorld(s.pos, s.yaw, D.pos, G.dronePos); G.droneYaw = D.yaw + s.yaw; st.drones++; }
       void dt;
     }
