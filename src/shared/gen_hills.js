@@ -195,7 +195,7 @@
     const LW = PLAN ? PLAN.NOVA.LOT[0] : 25, LD = PLAN ? PLAN.NOVA.LOT[1] : 31;
     const taken = [];
     const free = (x0, z0, x1, z1) => !taken.some(t => x0 <= t[2] + 8 && x1 >= t[0] - 8 && z0 <= t[3] + 8 && z1 >= t[1] - 8);
-    const rng = new VR.RNG((g.seed ^ 0x7e88a5) >>> 0), comps = ['long', 'bungalow', 'classic', 'tower', 'corner'];
+    const rng = new VR.RNG((g.seed ^ 0x7e88a5) >>> 0), comps = ['long', 'bungalow', 'classic', 'tower', 'corner'], c0 = rng.int(comps.length);
     if (PLAN) for (const k of [2, 4, 6, 8]) {
       const L = T8.levels[k]; let n = 0;
       for (let xc = T8.x0 + 30; xc <= T8.x1 - 30 && n < 3; xc += 4) {
@@ -209,7 +209,7 @@
         let ok = true, cut = 0;
         for (let z = z0; z <= z1 && ok; z++) for (let x = x0; x <= x1; x++) { const c = C(x, z); if (c.k < 0 && c.y >= T8.base) { ok = false; break; } if (c.y > L + 13 || c.y < L - 5) { ok = false; break; } cut += Math.max(0, c.y - L); }
         if (!ok) continue;
-        const comp = comps[(rng.int(comps.length) + T.villas.length) % comps.length];
+        const comp = comps[(c0 + T.villas.length) % comps.length];   // (the family in turn: five villas, five compositions)
         T.villas.push({ level: k, L, ox, oz, r: 2, comp, mirror: rng.chance(0.5), cut, built: false });
         taken.push([x0, z0, x1, z1]); n++; xc += 40;
       }
