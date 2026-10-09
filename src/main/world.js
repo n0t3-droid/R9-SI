@@ -196,7 +196,10 @@
       // F8 · Sichtweite: finished meshes wait in a queue and go up a few milliseconds a frame (uploadBudget), columns in
       // their 300 ms fade-in are listed in `fading`, and the streaming rung is set by the governor (game.js)
       this.uploadQ = new VR.Stream.UploadScheduler({ msPerByte: 2e-6 });
-      this.fading = new Set(); this.streamRung = 0; this.viewDir = null;
+      // F10: what an upload costs on this machine — measured once as the world starts (1 MB, gl.finish before and after;
+      // renderer.calibrateUploads), then followed through the frames' fences (renderer.upGauge)
+      if (this.renderer && this.renderer.calibrateUploads) { const cal = this.renderer.calibrateUploads(); if (cal) this.uploadQ.calibrate(cal.ms, cal.bytes); }
+      this.fading = new Set(); this.streamRung = 0; this.viewDir = null; this.viewCos = 0.6;   // (viewCos: the cosine of the horizontal half field of view, game.js)
       this.listeners = [];
       this.frame = 0;
       this.stats = { gen: 0, mesh: 0, genMs: 0, meshMs: 0 };
@@ -292,8 +295,12 @@
     // discounted for columns ahead. Requests that drift out of range are cancelled before a worker touches them.
     update(px, py, pz, now) {
       this.frame++;
+      // F10: the interval since the last update is the frame the last uploads shared: the scheduler's frame factor, its
+      // adaptive scale and the hitch meter learn from it
+      if (this.lastUpd !== undefined && now > this.lastUpd) this.uploadQ.frame(now - this.lastUpd, now);
+      this.lastUpd = now;
       this.stepFades(now);
-      this.drainUploads(px, pz);
+      this.drainUploads(px, pz, now);
       const pcx = Math.floor(px) >> 4, pcz = Math.floor(pz) >> 4;
       this.center = [pcx, pcz];
       const rd = this.renderDist, loadR = rd + 1;
@@ -466,7 +473,7 @@
       for (const l of this.listeners) if (l.onBeforeSave) l.onBeforeSave(this);
       const ps = []; for (const c of this.cols.values()) if (c.modified && !c.zr) { ps.push(this.store.saveColumn(this.dim, c)); this.savedKeys.add(c.key); } return Promise.all(ps);
     }
-    destroy() { this.dead = true; for (const c of this.cols.values()) for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s); this.cols.clear(); }
+    destroy() { this.dead = true; this.uploadQ.clear(); for (const c of this.cols.values()) for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s); this.cols.clear(); }   // (F10: what waited in parts gives its ranges back)
 
     // ---------- streaming: the fade-in and the upload budget (F8 · Sichtweite) ----------
     // A column is shown once every one of its sections is meshed (or known empty). From then on it fades in over 300 ms:
@@ -494,17 +501,21 @@
       const base = (this.renderer && this.renderer.q && this.renderer.q.upload) || 2.5;
       return base * VR.Stream.streamScale(this.streamRung);
     }
-    // uploads go up in view-priority order (the nearest and the ones ahead first) within the budget; the rest waits. A
-    // column unloaded while its upload waited drops out of the queue.
-    drainUploads(px, pz) {
-      const q = this.uploadQ;
-      if (!q.size) return;
-      q.prune(it => !this.dead && this.cols.get(it.key) === it.col);
-      for (const it of q.items) { it.dx = it.x - px; it.dz = it.z - pz; }
-      const vd = this.viewDir || [0, 0];
-      const r = q.drain(this.uploadBudget(), () => performance.now(), vd[0], vd[1]);
+    // uploads go up in view order (F10: the columns in the view first, nearest first, behind last) within the frame's
+    // bytes; the rest waits. An item whose column was unloaded (or whose section has a newer mesh) drops out of the queue
+    // and gives its staged ranges back. The numbers land in renderer.stats for the ⚙ line (F3) and the tests.
+    drainUploads(px, pz, now) {
+      const q = this.uploadQ, a = q.items;
+      for (let i = 0; i < a.length; i++) { const it = a[i]; it.dx = it.x - px; it.dz = it.z - pz; }
+      const vd = this.viewDir;
+      const r = q.drain(this.uploadBudget(), this._clk || (this._clk = () => performance.now()), vd ? vd[0] : 0, vd ? vd[1] : 0, this.viewCos);
       this.stats.uploadMs = r.spentMs; this.stats.uploadQueue = r.left;
       this.stats.uploaded = (this.stats.uploaded || 0) + r.ran;
+      const rs = this.renderer && this.renderer.stats;
+      if (rs) {
+        rs.uploadMs = r.spentMs; rs.uploadKB = r.bytes / 1024; rs.upBudgetKB = r.budgetBytes / 1024; rs.upQueue = r.left;
+        rs.upMBs = q.mbps(); rs.upScale = q.scale; rs.hitches = q.hitches(now !== undefined ? now : performance.now());
+      }
     }
 
     // ---------- meshing ----------
@@ -578,7 +589,7 @@
       const dx = c.cx * 16 + 8 - pos[0], dy = sy * 16 + 8 - pos[1], dz = c.cz * 16 + 8 - pos[2];
       return dx * dx + dy * dy * 0.5 + dz * dz < keep * keep;
     }
-    meshSection(c, sy, urgent, prio, pos) {
+    meshSection(c, sy, urgent, prio, pos, hand) {
       const s = c.sec[sy];
       s.dirty = false;
       // empty section with empty neighbors above/below → no geometry
@@ -610,19 +621,32 @@
         this.stats.mesh++; this.stats.meshMs += m.ms || 0;
         s.vis = m.vis;
         const tok = s.uTok = (s.uTok || 0) + 1;   // only the newest queued mesh of a section is uploaded
-        // the upload waits in the streaming queue (drainUploads spends the frame's budget on it, in view order): meshing
-        // itself never blocks, and FIFO order holds for one section, so an older mesh never lands after a newer one
-        const bl = (a) => (a ? (a.byteLength !== undefined ? a.byteLength : a.length * 4) : 0);
-        this.uploadQ.push({ key: c.key, col: c, x: c.cx * 16 + 8, z: c.cz * 16 + 8, bytes: bl(m.opaque) + bl(m.cutout) + bl(m.trans) + bl(m.vx) + bl(m.vxFar), run: () => {
-          if (this.dead || this.cols.get(c.key) !== c || s.uTok !== tok) return;
-          this.renderer.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar, m.props);
+        // the upload waits in the streaming queue (drainUploads spends the frame's bytes on it, in view order): meshing
+        // itself never blocks; a newer mesh of the section makes this one stale (alive), so an older mesh never lands
+        // after a newer one
+        const R = this.renderer, alive = () => !this.dead && this.cols.get(c.key) === c && s.uTok === tok;
+        const done = () => {
           if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
           s.meshVer = ver; s.meshed = true;
           s.fade = c.shownAt >= 0 ? c.fade : 0;
           if (s.ver !== ver) s.dirty = true;
           this.checkShown(c, performance.now());
           this.visDirty = true;
-        } });
+        };
+        const it = { key: c.key, col: c, x: c.cx * 16 + 8, z: c.cz * 16 + 8, urgent: !!hand, alive };   // (hand: the player's own edit goes first and whole)
+        if (R.newStage) {
+          // F10: in packets that may straddle frames; the section draws its old mesh until the last byte is up
+          const st = R.newStage(m.opaque, m.cutout, m.trans, m.vx, m.vxFar, m.props);
+          it.bytes = st.bytes;
+          it.step = (max) => R.stagePart(st, max);
+          it.commit = () => { R.commitStage(st, s, c, sy); done(); };
+          it.abort = () => R.dropStage(st);
+        } else {
+          const bl = (a) => (a ? (a.byteLength !== undefined ? a.byteLength : a.length * 4) : 0);
+          it.bytes = bl(m.opaque) + bl(m.cutout) + bl(m.trans) + bl(m.vx) + bl(m.vxFar);
+          it.run = () => { if (!alive()) return; R.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar, m.props); done(); };
+        }
+        this.uploadQ.push(it);
       }, urgent ? -1e9 : (prio || 0));
     }
     // the padded section for the mesher: 20³ blocks and light (16 + 2 of the neighbours on every side), 20² tints.
@@ -701,7 +725,7 @@
       if (!(flags & 1)) this.updateLight(x, y, z, old, state);
       this.markDirtyAround(x, y, z);
       this.flushChanged();
-      if (flags & 4) this.urgentRemesh(x, y, z);
+      if (flags & 4) this.urgentRemesh(x, y, z, (flags & 8) !== 0);   // (8 = SB_EDIT: the player's own edit — its upload goes whole, F10)
       if (!(flags & 2)) for (const l of this.listeners) if (l.onBlockChanged) l.onBlockChanged(x, y, z, old, state);
       return true;
     }
@@ -780,7 +804,7 @@
       }
       this.pool.queueDirty = true;
     }
-    urgentRemesh(x, y, z) {
+    urgentRemesh(x, y, z, hand) {
       // remesh the edited section (and touched neighbors) immediately, bypassing the queue
       const cx = x >> 4, cz = z >> 4, sy = y >> 4;
       const touch = [[cx, sy, cz]];
@@ -795,7 +819,7 @@
         if (!ok) continue;
         const s = c.sec[b];
         if (s.pending) { s.dirty = true; continue; }
-        this.meshSection(c, b, true);
+        this.meshSection(c, b, true, undefined, undefined, hand);
       }
     }
 
