@@ -362,7 +362,19 @@ console.log('8 · a fall off a floating island pours off the rim and dissolves i
   check(nv === 0 && vl.spawned.length === 0, `Very Low: none (${nv})`);
   check(far.near(ms[0]).length === 0, `nothing beyond the reach (${far.near(ms[0]).length} from 900 blocks)`);
   const p0 = hi.near(ms[0])[0];
-  check(p0 && p0.o.collide === false && p0.o.grow > 0 && p0.o.size >= 1 && !p0.o.emis && p0.o.col[2] >= 0.9, `a puff is soft white spray that grows as it thins (${p0 ? JSON.stringify({ size: +p0.o.size.toFixed(2), grow: p0.o.grow, col: p0.o.col, life: +p0.o.life.toFixed(1) }) : '-'})`);
+  // (run c2's pictures — water_1, water_r1, far_3: the first puffs, opaque white discs of 1 … 2 blocks, hung under the
+  //  isles as white balls on strings; a puff is a thin veil now, wide and see-through, the many of a foot one haze)
+  check(p0 && p0.o.collide === false && p0.o.grow > 0 && p0.o.size >= 2 && p0.o.alpha > 0 && p0.o.alpha <= 0.3 && !p0.o.emis && p0.o.col[2] >= 0.9, `a puff is a thin white veil that grows as it thins (${p0 ? JSON.stringify({ size: +p0.o.size.toFixed(2), grow: p0.o.grow, alpha: p0.o.alpha, col: p0.o.col, life: +p0.o.life.toFixed(1) }) : '-'})`);
+  // particles.js draws a particle's own opacity: the instance alpha of a veil is its alpha (× the fade), of a spark 1
+  {
+    require('../src/main/particles.js');
+    const P = new VR.Particles({ world: null, skyBright: 1 });
+    P.spawn(0, 0, 0, 0, 0, 0, { life: 4, size: 2, alpha: 0.25, collide: false, grav: 0 });
+    P.spawn(0, 0, 0, 0, 0, 0, { life: 4, size: 0.1, collide: false, grav: 0 });
+    P.update(0.016, [0, 0, 0]);
+    const a0 = P.data[13], a1 = P.data[14 + 13];
+    check(Math.abs(a0 - 0.25) < 0.01 && Math.abs(a1 - 1) < 0.01, `particles.js: a veil of alpha 0.25 is drawn at ${a0.toFixed(2)}, a spark at ${a1.toFixed(2)}`);
+  }
   hi.Vn.reset();
   check(hi.Vn.mists.size === 0, `a new world brings its own falls (reset clears the mists)`);
 }

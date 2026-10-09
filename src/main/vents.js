@@ -47,17 +47,19 @@
             { life: 1.2 + Math.random() * 0.8, size: 0.07, grav: -0.1, drag: 0.3, col: [1, 0.62, 0.22], emis: 1, collide: false });
         }
       }
-      // the falls' feet: the curtain breaks up into spray — a soft white puff round the ragged end every quarter second
-      // (Low: every 0.9 s), sinking slowly and spreading as it thins; a lava fall's foot smokes and throws a few sparks
+      // the falls' feet: the curtain breaks up into spray — a thin white veil round the ragged end every quarter second
+      // (Low: every 0.9 s), wide and see-through, sinking slowly and spreading as it thins, the many of one foot a haze
+      // (run c2's first puffs, opaque discs of one or two blocks, hung under the isles as white balls on strings); a lava
+      // fall's foot smokes and throws a few sparks
       this.macc += dt;
       if (this.macc >= (low ? 0.9 : 0.25) && this.mists.size) {
         this.macc = 0;
         for (const [x, y, z, lava] of this.mists.values()) {
           const dx = x - eye[0], dz = z - eye[2];
           if (dx * dx + dz * dz > REACH_MIST * REACH_MIST) continue;
-          P.spawn(x + (Math.random() - 0.5) * 2.4, y - 2 + Math.random() * 5, z + (Math.random() - 0.5) * 2.4,
-            (Math.random() - 0.5) * 0.9, -0.7 - Math.random() * 0.6, (Math.random() - 0.5) * 0.9,
-            { life: 4 + Math.random() * 2, size: 1.1 + Math.random() * 0.7, grav: -0.08, drag: 0.5, col: lava ? SMOKE : SPRAY, grow: 1.1, collide: false, emis: 0 });
+          P.spawn(x + (Math.random() - 0.5) * 5, y - 3 + Math.random() * 6, z + (Math.random() - 0.5) * 5,
+            (Math.random() - 0.5) * 0.9, -0.5 - Math.random() * 0.5, (Math.random() - 0.5) * 0.9,
+            { life: 5 + Math.random() * 2, size: 2.2 + Math.random() * 1.2, grav: -0.05, drag: 0.6, col: lava ? SMOKE : SPRAY, alpha: lava ? 0.3 : 0.22, grow: 1.3, collide: false, emis: 0 });
           if (lava && !low && Math.random() < 0.6) P.spawn(x + (Math.random() - 0.5) * 1.5, y + Math.random() * 3, z + (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.2, -1 - Math.random(), (Math.random() - 0.5) * 1.2,
             { life: 1 + Math.random() * 0.8, size: 0.08, grav: 2, drag: 0.4, col: EMBER, emis: 1, collide: false });
         }

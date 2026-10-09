@@ -14,6 +14,7 @@
       this.size = new Float32Array(CAP); this.grav = new Float32Array(CAP); this.drag = new Float32Array(CAP);
       this.layer = new Float32Array(CAP); this.uv = new Float32Array(CAP * 4); this.col = new Float32Array(CAP * 3);
       this.emis = new Float32Array(CAP); this.fade = new Uint8Array(CAP); this.collide = new Uint8Array(CAP); this.grow = new Float32Array(CAP);
+      this.alpha = new Float32Array(CAP);   // a particle's own opacity (o.alpha, default 1): the falls' mist is a thin veil (vents.js)
       this.data = new Float32Array(CAP * 14);
       this.count = 0;
       this.budget = 1;
@@ -30,6 +31,7 @@
       const uv = o.uv || [0, 0, 1, 1]; this.uv.set(uv, i * 4);
       const c = o.col || [1, 1, 1]; this.col[i * 3] = c[0]; this.col[i * 3 + 1] = c[1]; this.col[i * 3 + 2] = c[2];
       this.emis[i] = o.emis || 0; this.fade[i] = o.fade === false ? 0 : 1; this.collide[i] = o.collide === false ? 0 : 1; this.grow[i] = o.grow || 0;
+      this.alpha[i] = o.alpha === undefined ? 1 : o.alpha;
       return i;
     }
     tintFor(state, layer) {
@@ -146,7 +148,7 @@
         D[o] = x - camPos[0]; D[o + 1] = y - camPos[1]; D[o + 2] = z - camPos[2]; D[o + 3] = this.size[k];
         D[o + 4] = this.uv[k * 4]; D[o + 5] = this.uv[k * 4 + 1]; D[o + 6] = this.uv[k * 4 + 2]; D[o + 7] = this.uv[k * 4 + 3];
         D[o + 8] = this.col[vi] * lm; D[o + 9] = this.col[vi + 1] * lm; D[o + 10] = this.col[vi + 2] * lm; D[o + 11] = this.layer[k];
-        D[o + 12] = this.emis[k]; D[o + 13] = this.fade[k] ? Math.min(1, t * 2) : (t < 0.15 ? t / 0.15 : 1);
+        D[o + 12] = this.emis[k]; D[o + 13] = (this.fade[k] ? Math.min(1, t * 2) : (t < 0.15 ? t / 0.15 : 1)) * this.alpha[k];
         o += 14;
       }
       this.count = this.n;
@@ -156,7 +158,7 @@
       if (i === j) return;
       const cp3 = (a) => { a[i * 3] = a[j * 3]; a[i * 3 + 1] = a[j * 3 + 1]; a[i * 3 + 2] = a[j * 3 + 2]; };
       cp3(this.p); cp3(this.v); cp3(this.col);
-      for (const a of [this.life, this.max, this.size, this.grav, this.drag, this.layer, this.emis, this.fade, this.collide, this.grow]) a[i] = a[j];
+      for (const a of [this.life, this.max, this.size, this.grav, this.drag, this.layer, this.emis, this.fade, this.collide, this.grow, this.alpha]) a[i] = a[j];
       for (let k = 0; k < 4; k++) this.uv[i * 4 + k] = this.uv[j * 4 + k];
     }
   }
