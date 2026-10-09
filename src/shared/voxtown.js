@@ -280,9 +280,10 @@
         b.box(2.4, 3.4, 12.2, 61.6, 12.6, 12.5, edge);                                  // a dark inner field
         for (const x of [4, 60]) b.sphere(x, 8, 11.9, 0.9, gold);                       // studs at the ends
         for (const x of [8, 56]) b.box(x - 0.5, 14, 14, x + 0.5, 15.5, 16, ir);         // the brackets
-        // the word, centred, its letters one voxel proud (rows 5 … 9, an umlaut's dots at 11)
+        // the word, centred, its letters one voxel proud (rows 5 … 9, an umlaut's dots at 11); seen from the front (−z)
+        // +x runs to the viewer's left, so the word is laid out mirrored
         const L = T.layout(T.word(k)), x0 = Math.round(32 - L.w / 2);
-        for (const [x, y] of L.px) b.box(x0 + x, 5 + y, 11, x0 + x + 1, 6 + y, 12, goldL);
+        for (const [x, y] of L.px) { const xm = x0 + (L.w - 1 - x); b.box(xm, 5 + y, 11, xm + 1, 6 + y, 12, goldL); }
       },
     });
   }

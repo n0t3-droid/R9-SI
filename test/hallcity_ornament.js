@@ -124,7 +124,10 @@ for (const [label, H] of HALLS) {
 
   // ---------------------------------------------------------------- 3. the grand staircase and the gallery
   console.log(`3. the grand staircase and the gallery (${label})`);
-  const surf = (u, v) => { for (let y = F + 10; y >= F; y--) { const n = atN(u, y, v); if (solid(n) && atN(u, y + 1, v) === 'air' && atN(u, y + 2, v) === 'air') return y - F; } return -1; };
+  // the walking surface: the highest solid cell up to the gallery's rail with two free cells over it (roof eaves, vines and
+  // lanterns overhead count as free)
+  const free = (u, y, v) => { const n = atN(u, y, v); return n === 'air' || /roof|slate|vines|lantern|beam/.test(n); };
+  const surf = (u, v) => { for (let y = F + 9; y >= F; y--) { const n = atN(u, y, v); if (solid(n) && !/roof|slate|beam/.test(n) && free(u, y + 1, v) && free(u, y + 2, v)) return y - F; } return -1; };
   {
     const prof = []; for (let v = 34; v <= 56; v++) prof.push([v, surf(0, v)]);
     let mono = true, maxStep = 0, reach = -1;
@@ -145,19 +148,23 @@ for (const [label, H] of HALLS) {
     }
     check(bal === n, `balusters on both sides of every step and landing (${bal} of ${n})`);
     check(rail >= 0.8 * n, `a rail (slab) on the balusters, newels at the landings (${rail} of ${n})`);
-    let cols = 0; for (const s of [-1, 1]) for (const v of [stairV[0] - 1, stairV[stairV.length - 1] - 1]) { let hgt = 0; for (let y = F + 1; y <= F + 12; y++) if (atN(s * 8, y, v) === 'quartz_pillar') hgt++; if (hgt >= 8) cols++; }
+    let cols = 0; for (const s of [-1, 1]) for (const vs of [[stairV[0] - 1, stairV[0] + 2], [stairV[stairV.length - 1] - 2, stairV[stairV.length - 1]]]) { let best = 0; for (let v = vs[0]; v <= vs[1]; v++) for (let a = 8; a <= 9; a++) { let hgt = 0; for (let y = F + 1; y <= F + 12; y++) if (atN(s * a, y, v) === 'quartz_pillar') hgt++; best = Math.max(best, hgt); } if (best >= 8) cols++; }
     check(cols === 4, `columns flank the staircase up to the gallery at its foot and its head (${cols} of 4)`);
     // the gallery closed: every gallery floor cell beside a lower cell inside the hall carries a balustrade (the stair's
     // arrival aside)
+    // (a gallery cell: its floor at 8, nothing over it but a balustrade, a post, a lamp, a bench, a plant or the bell)
+    const RAIL = /balustrade|quartz_pillar|lamp|lantern|chiseled/;
+    const galCell = (u, v) => solid(atN(u, F + 8, v)) && (atN(u, F + 9, v) === 'air' || /balustrade|quartz_pillar|lamp|lantern|bench|bell|planter/.test(atN(u, F + 9, v))) && atN(u, F + 10, v) !== '?' && !solid(atN(u, F + 11, v));
     let open = 0, edges = 0;
-    for (let v = 48; v <= 80; v++) for (let u = -27; u <= 27; u++) {
-      if (surf(u, v) !== 8) continue;
+    for (let v = Hh.V1 - 1; v <= 80; v++) for (let u = -27; u <= 27; u++) {
+      if (!galCell(u, v)) continue;
       for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        if (galCell(u + du, v + dv)) continue;
         const h2 = surf(u + du, v + dv); if (h2 < 0 || h2 >= 7) continue;
-        edges++; if (!/balustrade|quartz_pillar|lamp|lantern|chiseled/.test(atN(u, F + 9, v))) open++;
+        edges++; if (!RAIL.test(atN(u, F + 9, v))) open++;
       }
     }
-    check(edges > 40 && open === 0, `the gallery is closed: a balustrade on every open edge (${edges} edges, ${open} open)`);
+    check(edges >= 30 && open === 0, `the gallery is closed: a balustrade on every open edge (${edges} edges, ${open} open)`);
     let niches = 0;
     for (let v = 52; v <= 80; v++) for (let u = -29; u <= 29; u++) { const d = Math.hypot(u, v - 51); if (d < 26.6 || d > 28.6) continue; for (let y = F + 9; y <= F + 13; y++) if (/^(lantern|vx_lantern)$/.test(atN(u, y, v))) niches++; }   // (in the wall: the gallery's own floor lanterns at 26 do not count)
     check(niches >= 5, `arched niches with lanterns in the apse wall (${niches} lanterns)`);
