@@ -8,7 +8,7 @@
 // the world spawn. The spawn's own cell always has one, 250–450 blocks out,
 // its entrance turned toward the spawn: a new player finds it on day one.
 // What stands there: one of eight wonders, by the biome where one fits
-// (crystal fields → the cathedral, forests → the giant tree, coasts → the
+// (the violet prism lands → the cathedral, forests → the giant tree, coasts → the
 // lighthouse …). Sites are read in the worker (they need the terrain); the
 // game builds a wonder when you come near (src/main/wonders_game.js) — the
 // chunk generator never does, so old worlds keep their terrain exactly.
@@ -22,7 +22,8 @@
   const W = VR.Wonders = { CELL: 640, CHANCE: 0.6, GENS: {} };
   // the eight: German first (the names the owner gave them), English our own; prefer = the biomes where one fits
   W.TYPES = [
-    { id: 'kristall', icon: '💎', de: 'Kristallkathedrale', en: 'Cathedral of Crystals', prefer: /prism|crystal|cherry|amethyst/, lot: [45, 58] },
+    // (the cathedral is of glass and white stone, no crystal — f-nocrystal; its id stays 'kristall': DNA, gifts, saves)
+    { id: 'kristall', icon: '⛪', de: 'Lichtkathedrale', en: 'Cathedral of Light', prefer: /prism|crystal|cherry|amethyst/, lot: [45, 58] },
     { id: 'regenbogen', icon: '🌈', de: 'Regenbogenbrücke', en: 'Rainbow Arch', prefer: /river|flower|sunflower|meadow|lush/, coast: true, lot: [17, 62] },
     { id: 'sternwarte', icon: '🔭', de: 'Sternwarte', en: 'Star Observatory', prefer: /windswept|hills|plateau|slopes|grove|meadow/, lot: [41, 45] },
     { id: 'riesenbaum', icon: '🌳', de: 'Riesenbaum', en: 'Giant Tree', prefer: /forest|jungle|taiga|dappled|pale_garden/, lot: [57, 57] },
@@ -40,7 +41,7 @@
   W.byName = function (text) {
     const f = fold(text); if (f.length < 4) return null;
     for (const t of W.TYPES) { if (f === t.id) return t.id; for (const nm of [t.de, t.en]) { const k = fold(nm); if (f === k || f.includes(k)) return t.id; } }
-    const WORDS = { kristall: ['kathedrale', 'cathedral', 'kristallkirche'], regenbogen: ['regenbogen', 'rainbow'], sternwarte: ['observatorium', 'observatory', 'teleskop', 'telescope'], riesenbaum: ['baumriese', 'giantree', 'riesenbaume'], wolkenturm: ['wolkenturm', 'cloudtower', 'cloudlighthouse'], labyrinth: ['labyrinth', 'irrgarten', 'maze'], pyramide: ['pyramide', 'pyramid'], mondtempel: ['mondtempel', 'moontemple', 'moonlight'] };
+    const WORDS = { kristall: ['kathedrale', 'cathedral', 'kristallkirche', 'lichtkirche'], regenbogen: ['regenbogen', 'rainbow'], sternwarte: ['observatorium', 'observatory', 'teleskop', 'telescope'], riesenbaum: ['baumriese', 'giantree', 'riesenbaume'], wolkenturm: ['wolkenturm', 'cloudtower', 'cloudlighthouse'], labyrinth: ['labyrinth', 'irrgarten', 'maze'], pyramide: ['pyramide', 'pyramid'], mondtempel: ['mondtempel', 'moontemple', 'moonlight'] };
     for (const id in WORDS) for (const w of WORDS[id]) if (f.includes(w)) return id;
     return null;
   };
