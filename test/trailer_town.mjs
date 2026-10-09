@@ -157,11 +157,13 @@ async function runPage(tag, dist) {
       const ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
       const at = (u, v) => { const q = ROT[r](u, v); return [cx + q[0], cz + q[1]]; };
       let glass = 0, fountain = 0, lamps = 0;
-      for (let v = -30; v <= -18; v++) { const [x, z] = at(0, v); for (let y = F + 20; y <= F + 44; y++) if (/glass/.test(nm(w.getBlock(x, y, z)))) { glass++; break; } }
+      for (let v = -30; v <= -18; v++) { const [x, z] = at(1, v); for (let y = F + 20; y <= F + 44; y++) if (/glass/.test(nm(w.getBlock(x, y, z)))) { glass++; break; } }
       for (let du = -2; du <= 2; du++) for (let dv = -2; dv <= 2; dv++) { const [x, z] = at(du, dv); for (let y = F + 1; y <= F + 6; y++) if (/fountain/.test(nm(w.getBlock(x, y, z)))) fountain++; }
       for (let v = -60; v <= -14; v++) for (const u of [-4, -3, 3, 4]) { const [x, z] = at(u, v); for (let y = F + 1; y <= F + 3; y++) if (/lamp/.test(nm(w.getBlock(x, y, z)))) lamps++; }
-      const [px, pz] = at(0, -6), sky = w.getLight(px, F + 2, pz) >>> 12;
-      return { glass, fountain, lamps, sky };
+      // the sky light at eye height over the street and the plaza (the best of five cells, and the column's story if it is low)
+      const cells = [[0, -24], [0, -8], [6, -6], [-6, 6], [2, -40]].map(([u, v]) => { const [x, z] = at(u, v), c = w.col(x >> 4, z >> 4); return { u, v, sky: w.getLight(x, F + 2, z) >>> 12, ready: !!c, top: (() => { for (let y = F + 44; y > F; y--) { const b = w.getBlock(x, y, z); if (b) return (y - F) + ':' + nm(b) + ':' + (w.getLight(x, y - 1, z) >>> 12); } return 'none'; })() }; });
+      const sky = Math.max(...cells.map(c => c.sky));
+      return { glass, fountain, lamps, sky, cells };
     }, [cx, cz, r, F]);
     console.log(tag, 'probe', JSON.stringify(probe));
     check(probe.glass >= 8 && probe.fountain >= 1 && probe.lamps >= 4, `${tag}: the hall stands at the cameras (vault glass over the street at ${probe.glass} of 13 cells, fountain cells ${probe.fountain}, lamp cells along the street ${probe.lamps})`);
