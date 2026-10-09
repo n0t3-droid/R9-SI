@@ -283,10 +283,13 @@
   // ---- a hover-cart glides along the street across your view, crates of produce under its awning, a cyan glow beneath
   ACT.cart = {
     start(D, ev) {
-      const d0 = 11 + 5 * rnd(ev, 1); let run = null;
+      // across the view (a street seen from its side), else along it (a street you look down: it comes toward you and
+      // passes beside you)
+      const d0 = 11 + 5 * rnd(ev, 1); let run = null, along = false;
       for (const d of [d0, d0 + 4, d0 - 3, d0 + 8]) if ((run = D.runAcross(d, 18))) break;
+      if (!run) for (const off of [2.6, -2.6, 4, -4]) if ((run = D.runAlong(off, 18))) { along = true; break; }
       if (!run) return false;
-      ev.run = rnd(ev, 2) < 0.5 ? run : run.slice().reverse(); ev.L = 0; ev.sp = 3.2;
+      ev.run = along ? run.slice().reverse() : rnd(ev, 2) < 0.5 ? run : run.slice().reverse(); ev.L = 0; ev.sp = 3.2;
       const P = []; for (const p of ev.run) P.push([p[0], p[1] + 0.45, p[2]]); ev.path = LK.path(P);
       ev.pos = [0, 0, 0, 0]; ev.dur = ev.path.L / ev.sp + 0.5; ev.y = null;
     },
@@ -542,6 +545,17 @@
       const side = (sg) => { const out = []; let y = y0; for (let k = 1; k <= 26; k++) { const x = cx + sx * k * sg, z = cz + sz * k * sg, gy = this.ground(x, z, y); if (gy === null || Math.abs(gy - y) > 1.01 || this.solid(this.get(x, gy + 1, z)) || this.solid(this.get(x + sz, gy, z - sx)) && this.solid(this.get(x - sz, gy, z + sx))) break; y = gy; out.push([x, gy, z]); } return out; };
       const a = side(-1).reverse(), b = side(1), run = a.concat([[cx, y0, cz]], b);
       return run.length >= min ? run : null;
+    }
+    // a walkable run along the view, off to one side by off metres, from 3 to 40 m ahead (≥ min metres): its points, or null
+    runAlong(off, min) {
+      const f = this.fwd, eye = this.eye, sx = -f[1], sz = f[0], out = [];
+      let y = this.ground(eye[0] + sx * off + f[0] * 3, eye[2] + sz * off + f[1] * 3, eye[1] - 1.6); if (y === null) return null;
+      for (let k = 3; k <= 40; k++) {
+        const x = eye[0] + sx * off + f[0] * k, z = eye[2] + sz * off + f[1] * k, gy = this.ground(x, z, y);
+        if (gy === null || Math.abs(gy - y) > 1.01 || this.solid(this.get(x, gy + 1, z)) || this.solid(this.get(x + sx * 0.8, gy, z + sz * 0.8)) || this.solid(this.get(x - sx * 0.8, gy, z - sz * 0.8))) break;
+        y = gy; out.push([x, gy, z]);
+      }
+      return out.length >= min ? out : null;
     }
     // a wall top in front (1–3 blocks over the ground on your side) the cat can sit and walk on: {path, away}
     wallTop(ev) {
