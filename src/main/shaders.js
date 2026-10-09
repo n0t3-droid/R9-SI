@@ -316,14 +316,17 @@ vec3 skyColor(vec3 dir, bool withSun) {
       col += vec3(0.85, 0.9, 1.0) * 3.2 * crater * mix(0.06, 1.0, lit) * clear * smoothstep(1.0, 0.95, length(mp));
     }
     col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night;
-    // high cirrus (t-clouds): thin streaks across the day sky, lit like the day; u_cirrus is 0 on Very Low
-    if (u_cirrus > 0.0 && dir.y > 0.12) {
+    // high cirrus (t-clouds): u_cirrus is 0 on Very Low. t-sky2: a few thin high wisps (the trailer's) instead of the wide
+    // pale streaks — a noise drawn out 14:1 along the wind, cut thin, in a few patches (a slow mask: about a fifth of the
+    // sky), at up to half alpha, so the nebula and the stars show through them
+    if (u_cirrus > 0.0 && dir.y > 0.1) {
       vec2 q = dir.xz / (dir.y + 0.1);
-      float a = vnoise(vec2(q.x * 0.55 + q.y * 0.3, q.y * 4.2 + 3.0) + vec2(u_time * 0.0025, 0.0));
-      float b = vnoise(vec2(q.x * 0.4 - 7.0, q.y * 9.0 - 1.0));
-      float st = smoothstep(0.6, 0.92, a * 0.66 + b * 0.5) * smoothstep(0.12, 0.34, dir.y) * (1.0 - smoothstep(0.4, 0.62, dir.y));   // t-sky: low in the blue, not across the space
+      float a = vnoise(vec2(q.x * 0.35 + q.y * 0.2, q.y * 5.0 + 3.0) + vec2(u_time * 0.0025, 0.0));
+      float b = vnoise(vec2(q.x * 0.6 - 7.0, q.y * 13.0 - 1.0));
+      float st = smoothstep(0.74, 0.9, a * 0.7 + b * 0.38) * smoothstep(0.55, 0.72, vnoise(q * 0.22 + 17.0));
+      st *= smoothstep(0.1, 0.24, dir.y) * (1.0 - smoothstep(0.55, 0.8, dir.y));
       vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
-      col = mix(col, cir, st * u_cirrus * 0.12 * (1.0 - u_rain) * (1.0 - u_night * 0.8) * (1.0 - cosmic * 0.8));   // t-sky: no white streaks over the space
+      col = mix(col, cir, st * u_cirrus * 0.5 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
     }
     // stars: the bright ones (240 cells a radian) and, t-sky2, a field of small faint ones (400 a radian: the trailer's
     // dense stars); by day they belong to the space above the blue band (cosmic) and are a little larger, so they read
@@ -344,7 +347,8 @@ vec3 skyColor(vec3 dir, bool withSun) {
         float br = smoothstep(0.9955, 1.0, s);
         col += sc * starK * clear * tw * (3.0 + br * 14.0) * exp(-d * d * mix(9.0, 28.0, u_night));   // t-sky: by day a little larger, so they read through the daylight
       }
-      vec3 sp2 = sd3 * 400.0;
+#ifndef LITE
+      vec3 sp2 = sd3 * 400.0;   // (not on Very Low: its sky pass stays as cheap as before)
       vec3 g2 = floor(sp2);
       float s2 = hash13(g2 + 41.0);
       if (s2 > 0.993) {
@@ -352,6 +356,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
         float d2 = length(sp2 - c2);
         col += mix(vec3(0.8, 0.88, 1.0), vec3(1.0, 0.9, 0.8), fract(s2 * 337.0)) * starK * clear * (0.9 + 2.6 * smoothstep(0.993, 1.0, s2)) * exp(-d2 * d2 * mix(5.0, 14.0, u_night));
       }
+#endif
       if (u_night > 0.5) col += meteors(dir) * u_night * clear;   // t-sky: the meteors' loop only once the night is deep (by day and at dusk it drew nothing or a faint trace)
       if (u_dim == 3) {
         float a = vnoise(vec2(dir.x * 3.0 + u_time * 0.02, dir.z * 1.5)) * smoothstep(0.1, 0.5, dir.y) * smoothstep(0.95, 0.4, dir.y);
@@ -1564,6 +1569,7 @@ uniform mat4 u_viewProj;
 uniform vec3 u_origin;                 // −camera (and −wind for the drifting cumulus)
 uniform vec3 u_camRight;
 uniform vec3 u_camUp;
+uniform vec4 u_cloudHigh;              // t-sky2: x from, y 1/(to − from) (the centre's elevation sine), z how far a high puff fades (clouds.js HIGH)
 out vec2 v_uv;
 out float v_alpha;
 out float v_var;
@@ -1572,7 +1578,8 @@ out float v_near;
 void main() {
   vec3 rel = u_origin + a_c.xyz;
   vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
-  v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x; v_var = a_p.z; v_dist = length(rel.xz);
+  float hi = clamp((rel.y / max(length(rel), 1.0) - u_cloudHigh.x) * u_cloudHigh.y, 0.0, 1.0);
+  v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x * (1.0 - u_cloudHigh.z * hi * hi * (3.0 - 2.0 * hi)); v_var = a_p.z; v_dist = length(rel.xz);
   // a sprite the camera is inside (the citadel's anchors) or almost touches fades out: no white wall in front of the lens
   v_near = smoothstep(2.0, 24.0, length(rel) - a_c.w);
   gl_Position = u_viewProj * vec4(p, 1.0);

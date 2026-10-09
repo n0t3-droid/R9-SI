@@ -1095,7 +1095,7 @@
         this.cloudKey = key;
         const inst = [];
         const nz = VR.cloudNoise || (VR.cloudNoise = new VR.Simplex(9173));
-        const thr = 0.72 - cov * 0.36;
+        const thr = VR.Clouds ? VR.Clouds.boxThr(cov) : 0.72 - cov * 0.36;   // t-sky2: clear weather sparser (clouds.js)
         // cumulus: every run of cloud cells is a flat base slab; where the cloud noise peaks, narrower and
         // taller boxes stack on top of it (instance w = yOffset·8 + thickness, in cells of 4 blocks)
         const push = (x0, z, len, yo, th) => inst.push(x0, z, len, yo * 8 + Math.min(7.9, th));
@@ -1212,7 +1212,11 @@
       // the fade radius: the fog banks are fixed in the world (they reach 300 blocks from the islands), the cumulus fades at
       // the edge of its window (clouds.js RANGE cells), so no cloud pops in or out at the window's edge
       gl.uniform1f(u.u_fogK, 1); gl.uniform1f(u.u_cloudR, 640); gl.uniform3f(u.u_origin, -cam.x, -cam.y, -cam.z);
+      const HI = VR.Clouds.HIGH;
+      if (u.u_cloudHigh) gl.uniform4f(u.u_cloudHigh, HI.from, 1 / (HI.to - HI.from), 0, 0);
       if (fog.n) { gl.bindVertexArray(fog.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, fog.n); }
+      // t-sky2: by day in clear weather the high cumulus thin out (clouds.js HIGH): the ones seen sit low and far
+      if (u.u_cloudHigh) gl.uniform4f(u.u_cloudHigh, HI.from, 1 / (HI.to - HI.from), HI.k * VR.Clouds.clearDay(E.cloudCover, E.skyDay ? E.skyDay[2] : 0), 0);
       gl.uniform1f(u.u_fogK, 0); gl.uniform1f(u.u_cloudR, VR.Clouds.RANGE * VR.Clouds.CELL * 1.04);
       gl.uniform3f(u.u_origin, -E.time * 0.9 - cam.x, -cam.y, -cam.z);
       if (cu.n) { gl.bindVertexArray(cu.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, cu.n); }

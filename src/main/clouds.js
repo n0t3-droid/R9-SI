@@ -1,7 +1,7 @@
 // ============================================================================
 // Clouds (t-clouds · TRAILER.md §2.1): the trailer's cumulus, the fog banks under the Sky Isles and the cloud anchors
 // round the Spire Citadel, as sprites the renderer draws (renderer.js drawPuffs, shaders PUFF_VS / PUFF_FS).
-//   cumulus  a cell of CELL blocks holds a cloud when the cover says so (about one cell in five in clear weather):
+//   cumulus  a cell of CELL blocks holds a cloud when the cover says so (t-sky2: about one cell in 14 in clear weather):
 //            2–4 billboards, a big one and its lobes, the sunlit tops and the flat base; they drift with the wind at
 //            y 206–214, so the lowest part of a cloud stays above y 190. Cloud space: the wind moves the drawing,
 //            not the cells, so a cloud keeps its place in the sky while it drifts.
@@ -34,19 +34,33 @@
     const a = hash(i, j, s), b = hash(i + 1, j, s), c = hash(i, j + 1, s), d = hash(i + 1, j + 1, s);
     return (a + (b - a) * u) * (1 - v) + (c + (d - c) * u) * v;
   }
-  // the cover: a cell is on when its score clears 1 − 1.8·cover (the score is clustered: a slow noise and a random part)
+  // the cover: a cell is on when its score clears 1 − 1.8·cover (the score is clustered: a slow noise and a random part).
+  // t-sky2: clear weather is sparser — the trailer's day has a few small cumulus low and far, the big puffy ring covered
+  // the nebula: + 0.135 at the clear end (cover 0.2: one cell in about 14 instead of one in four), nothing from cover 0.6 on
+  const clearK = (cover) => 1 - smooth(0.2, 0.6, cover);
   function cellOn(gx, gz, cover) {
     const score = 0.55 * vnoise(gx * 0.23, gz * 0.23, 11) + 0.45 * hash(gx, gz, 7);
-    return score > 1 - cover * 1.8;
+    return score > 1 - cover * 1.8 + 0.135 * clearK(cover);
   }
+  // t-sky2: the box clouds of Low and Very Low (renderer.js updateClouds) as sparse: their noise threshold (0.72 − 0.36·cover
+  // before; cover 0.2 now about 7 % of the sky instead of 17 %)
+  function boxThr(cover) { return 0.72 - cover * 0.36 + 0.067 * clearK(cover); }
+  // t-sky2: the clear-day factor (1 by day in clear weather, 0 under overcast and at night; wDay: the day palette's weight,
+  // env.js E.skyDay[2]) and the puffs' thinning by height: by day in clear weather a puff high in the view (its centre's
+  // elevation sine over HIGH.from … HIGH.to) fades to 1 − HIGH.k of its alpha, so the cumulus seen sit low and far and the
+  // nebula overhead stays clear (renderer.js passes HIGH and the factor to PUFF_VS as u_cloudHigh)
+  const HIGH = { from: 0.42, to: 0.72, k: 0.85 };
+  function clearDay(cover, wDay) { return (wDay || 0) * (1 - smooth(0.25, 0.55, cover)); }
+  function highFade(sinElev, cd) { return 1 - cd * HIGH.k * smooth(HIGH.from, HIGH.to, sinElev); }
   // the sprites of one cumulus cell, in cloud space (the big one first, then 1–3 lobes); every centre sits at y ≥ 206 and
   // no sprite reaches below y 190 (its flat base is 0.45 of its radius under the centre, radius ≤ 36)
-  function cumulusCell(gx, gz) {
+  // t-sky2: cover (default 1) — clear weather's clouds are smaller (0.62 of their size at cover 0.2, full from cover 0.6)
+  function cumulusCell(gx, gz, cover) {
     const out = [];
     const cx = (gx + 0.5) * CELL + (hash(gx, gz, 21) - 0.5) * CELL * 0.4;
     const cz = (gz + 0.5) * CELL + (hash(gx, gz, 22) - 0.5) * CELL * 0.4;
     const n = 2 + Math.floor(hash(gx, gz, 24) * 3);
-    const R0 = 22 + hash(gx, gz, 23) * 14;
+    const R0 = (22 + hash(gx, gz, 23) * 14) * (1 - 0.38 * clearK(cover === undefined ? 1 : cover));
     const y0 = 209 + hash(gx, gz, 25) * 3;
     for (let k = 0; k < n; k++) {
       const a = hash(gx, gz, 30 + k) * Math.PI * 2;
@@ -93,7 +107,7 @@
     for (let gz = ocz - RANGE; gz <= ocz + RANGE; gz++) for (let gx = ocx - RANGE; gx <= ocx + RANGE; gx++) {
       if ((gx - ocx) * (gx - ocx) + (gz - ocz) * (gz - ocz) > RANGE * RANGE) continue;
       if (!cellOn(gx, gz, cover)) continue;
-      for (const s of cumulusCell(gx, gz)) cu.push(s);
+      for (const s of cumulusCell(gx, gz, cover)) cu.push(s);
     }
     // the nearest MAX_CUMULUS, then far to near (the blend needs the far ones first)
     const dist = (s) => (s[0] - cx) * (s[0] - cx) + (s[2] - cz) * (s[2] - cz);
@@ -148,5 +162,5 @@
     return out;
   }
 
-  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, hash, vnoise, cellOn, cumulusCell, fogBanks, anchors, field, pack, density, atlas };
+  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, HIGH, hash, vnoise, cellOn, boxThr, clearDay, highFade, cumulusCell, fogBanks, anchors, field, pack, density, atlas };
 })(VR);

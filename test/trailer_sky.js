@@ -3,6 +3,8 @@
 //  - the cumulus field is deterministic and its cover is what the sky asks for (about 0.2 in clear weather; none at 0;
 //    most cells at the overcast end); every cumulus sprite stays above y 190 at its base (no clouds below 190 except the
 //    fog band); the sprites are the same on every call
+//  - t-sky2: in clear weather one cumulus cell in twelve at most, the clouds smaller, the high ones thin by day; the box
+//    clouds (Low, Very Low) as sparse
 //  - the fog banks lie under the Sky Isles (y 104–114, within 300 blocks of their centre); the citadel has its cloud
 //    anchors round the spires at y 207–212 (the spire tip is at 252)
 //  - the sprite atlas: full density at the centre, empty corners, the lobes' normals point out of the cloud
@@ -33,7 +35,10 @@ check(fo.cumulus.length <= C.MAX_CUMULUS, 'overcast keeps the sprite count withi
 let on = 0, all = 0;
 for (let gz = -40; gz < 40; gz++) for (let gx = -40; gx < 40; gx++) { all++; if (C.cellOn(gx, gz, 0.2)) on++; }
 const share = on / all;
-check(share > 0.12 && share < 0.3, `cover 0.2 gives ${(share * 100).toFixed(1)} % of the cells a cloud (12–30 %)`);
+// t-sky2: in clear weather one cell in twelve at most (the trailer's day: a few small cumulus low and far; the big puffy
+// ring covered the nebula), still a few; the overcast end as before
+check(share > 1 / 30 && share <= 1 / 12, `cover 0.2 gives ${(share * 100).toFixed(1)} % of the cells a cloud (t-sky2: 3.3–8.3 %, one in twelve at most)`);
+{ let k = 0, n = 0; for (let gz = -40; gz < 40; gz++) for (let gx = -40; gx < 40; gx++) { n++; if (C.cellOn(gx, gz, 0.85)) k++; } check(k / n >= 0.6, `overcast (0.85) still fills ${(k / n * 100).toFixed(0)} % of the cells (≥ 60 %)`); }
 let monotone = true, prev = -1;
 for (const c of [0, 0.2, 0.4, 0.6, 0.8, 1]) { let k = 0; for (let gz = -20; gz < 20; gz++) for (let gx = -20; gx < 20; gx++) if (C.cellOn(gx, gz, c)) k++; if (k < prev) monotone = false; prev = k; }
 check(monotone, 'the share of cloud cells grows with the cover');
@@ -45,6 +50,31 @@ check(minBase >= 190, `the lowest cumulus base is at y ${minBase.toFixed(1)} (�
 for (let gz = -30; gz < 30; gz++) for (let gx = -30; gx < 30; gx++) {
   if (!C.cellOn(gx, gz, 0.6)) continue;
   for (const s of C.cumulusCell(gx, gz)) if (s[1] - 0.5 * s[3] < 190) { check(false, 'a cumulus base below 190 at cell ' + gx + ',' + gz); gz = 99; gx = 99; }
+}
+// t-sky2: smaller in clear weather — the same cells' sprites at cover 0.2 at most 0.7 of their size under overcast
+{
+  let rc = 0, ro = 0, n = 0;
+  for (let gz = -30; gz < 30; gz++) for (let gx = -30; gx < 30; gx++) {
+    if (!C.cellOn(gx, gz, 0.2)) continue;
+    const a = C.cumulusCell(gx, gz, 0.2), b = C.cumulusCell(gx, gz, 0.85);
+    rc += a[0][3]; ro += b[0][3]; n++;
+  }
+  check(n > 0 && rc / ro <= 0.7, `clear-weather cumulus are smaller: ${(rc / n).toFixed(1)} vs ${(ro / n).toFixed(1)} blocks under overcast (≤ 0.7)`);
+}
+// t-sky2: by day in clear weather the high puffs thin out (the shader: VR.Clouds.HIGH, mirrored here), so the visible cumulus
+// sit low and far and the nebula overhead stays clear; low ones and overcast skies keep their clouds
+{
+  const sinD = (d) => Math.sin(d * Math.PI / 180);
+  check(C.clearDay(0.2, 1) === 1 && C.clearDay(0.85, 1) === 0 && C.clearDay(0.2, 0) === 0, 'the clear-day factor: 1 by day in clear weather, 0 under overcast and at night');
+  check(C.highFade(sinD(15), 1) === 1 && C.highFade(sinD(60), 1) <= 0.2 && C.highFade(sinD(60), 0) === 1, `high puffs thin by day in clear weather (15°: ${C.highFade(sinD(15), 1).toFixed(2)}, 60°: ${C.highFade(sinD(60), 1).toFixed(2)}; overcast 60°: ${C.highFade(sinD(60), 0)})`);
+}
+// t-sky2: the box clouds (Low and Very Low, renderer.js updateClouds) as sparse: their noise above VR.Clouds.boxThr(cover)
+{
+  require('../src/shared/core.js'); require('../src/shared/noise.js');
+  const nz = new VR.Simplex(9173);
+  const frac = (cov) => { let k = 0, n = 0; const thr = C.boxThr(cov); for (let gz = -150; gz < 150; gz += 2) for (let gx = -150; gx < 150; gx += 2) { n++; const v = (nz.n2(gx * 0.085, gz * 0.085) * 0.65 + nz.n2(gx * 0.27 + 50, gz * 0.27) * 0.35) * 0.5 + 0.5; if (v > thr) k++; } return k / n; };
+  const fc = frac(0.2), fo = frac(0.85);
+  check(fc > 0.01 && fc <= 1 / 12 && fo >= 0.5, `the box clouds cover ${(fc * 100).toFixed(1)} % in clear weather (≤ 8.3 %), ${(fo * 100).toFixed(0)} % under overcast (≥ 50 %)`);
 }
 // the wind moves the drawing, not the cells: in cloud space a cloud is the same sprite whatever the wind is
 {
