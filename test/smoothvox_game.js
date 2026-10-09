@@ -19,6 +19,9 @@
 //   8. the renderer's lists (renderer.js propGather): a piece with a fine surface nearer than F0 (a quarter of vxLod) in
 //      the fine list, then near, then far; its shadow and the hand-built pieces never fine; Niedrig (vxLod 28): none
 //   9. a better preset (vxLod 28 → 44): every piece asked again with its fine surface, the sections with pieces meshed again
+//  10. a hand-built piece shaped anew in the Studio (VR.CUSTOM.models): its design wins — no hand-built anchor, its voxels
+//      until its surface-nets mesh (made from the design) is there, then that; the design taken back: hand-built again;
+//      a designed picture (SV.KEEP) shows its voxels
 //   bash test/wt_run.sh smoothvox_game.js 300
 require('./load_shared.js');
 require('../src/shared/smoothvox.js');
@@ -31,10 +34,12 @@ let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  �
 // ---------------------------------------------------------------- 1. the list
 console.log('1. the eligible pieces');
 const A = SV.autoTables();
-const names = new Set(A.list.map(e => e.name));
+const names = new Set(A.list.filter(e => !e.hand).map(e => e.name));
 const furn = new Set(VR.PROP_FURN);
 check(A.n > 200, `${names.size} models (${A.n} entries with the switched-off looks) get a smooth mesh`);
 check([...names].every(n => !furn.has(n)), 'no piece with a hand-built mesh is in the list (hand-built meshes win)');
+const hand = A.list.filter(e => e.hand), firstHand = A.list.findIndex(e => e.hand);
+check(hand.length > 100 && hand.every(e => furn.has(e.name)) && A.list.slice(firstHand).every(e => e.hand), `the hand-built pieces have dormant entries after all the others (${hand.length}, from ${firstHand}: on only while the player's design of one is in — section 10)`);
 check(![...names].some(n => /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|tuft_grass)/.test(n)), 'no joiner (windows, gutters, downpipes, the garage door, the Nova tread) and no plants-pack piece');
 check(['vm_living_sofa3_sage', 'vm_kitchen_espresso_steel', 'vm_deco_vases_trio', 'vm_light_floor_globe_brass', 'vm_sleep_wardrobe_fluted', 'vx_planter', 'vx_well'].every(n => names.has(n)), 'the Modern Living sofa, the espresso machine, the vases, the floor lamp, the wardrobe, the planter, the well are in it');
 const round2 = ['vm_sideboard', 'vm_piano', 'vm_fridge', 'vm_curtain', 'vm_nova_pad', 'vx_urn_white', 'vx_fountain'];
@@ -263,6 +268,46 @@ SV.want([iEsp], world9, col9, 2);
 check(asked9.length === 1 && asked9[0].msg.fine === true, 'and the espresso machine is asked again, with its fine surface');
 { const r = SV.job(structuredClone(asked9[0].msg)); delete r.transfer; r.type = 'smoothvox'; asked9[0].cb(structuredClone(r)); }
 check(PR.FURN[PR.AUTO[SV.AUTO0 + iEsp].model].fine && /:f$/.test(PR.AUTO[SV.AUTO0 + iEsp].model), 'registered with it under a new key (' + PR.AUTO[SV.AUTO0 + iEsp].model + ')');
+
+// ---------------------------------------------------------------- 10. a hand-built piece shaped anew
+console.log('10. a hand-built piece shaped anew in the Studio');
+{
+  const C = VR.Custom, HN = 'vm_sofa_cream', m = VM.MODELS[HN], iHand = SV.indexOf(HN, false), handKind = PR.FURN0 + VR.PROP_FURN.indexOf(HN);
+  check(iHand >= 0 && A.list[iHand].hand && !A.list[iHand].keep, `the hand-built sofa has a dormant entry (${iHand}, after the ${A.list.findIndex(e => e.hand)} others)`);
+  // the design: the sofa without its back cushions' top (every voxel above 2/3 of its height gone)
+  const idx = Uint16Array.from(m.vol), cut = Math.floor(m.VH * 0.62); let gone = 0;
+  for (let y = cut; y < m.VH; y++) for (let k = 0; k < m.VW * m.VD; k++) { const i = (y * m.VD) * m.VW + k; if (idx[i]) { idx[i] = 0; gone++; } }
+  const orig = { vol: m.vol, pal: m.pal };
+  const v0 = SV.verOf(HN);
+  C.apply({ houses: {}, models: { [HN]: { t: 'model', W: m.W, H: m.H, D: m.D, res: m.res, rle: C.b64(new Uint8Array(C.rle(idx).buffer)), pal: Array.from(m.pal) } } });
+  check(SV.designed(HN) && SV.verOf(HN) === v0 + 1, `the design is in (${gone} voxels taken off the top), the sofa's next mesh is version ${SV.verOf(HN)}`);
+  const jd = section(); SV.tagJob(jd); const jdc = structuredClone(jd), wd = SV.prep(jdc), rd = VR.meshSection(jdc), kd = kindsIn(rd.props);
+  check(!kd.some(a => a.kind === handKind) && wd && wd.includes(iHand), `no hand-built anchor any more (the old shape), the section wants the design's mesh (${JSON.stringify(wd)})`);
+  const asked10 = [], world10 = Object.assign({}, world, { pool: { submit: (msg, tr, cb, prio) => asked10.push({ msg, cb, prio }) } });
+  SV.want(wd, world10, col, 4);
+  const aH = asked10.find(a => a.msg.name === HN);
+  check(aH && aH.msg.ver === v0 + 1, 'asked for as version ' + (aH ? aH.msg.ver : '?'));
+  for (const a of asked10) { const r = SV.job(structuredClone(a.msg)); delete r.transfer; r.type = 'smoothvox'; a.cb(structuredClone(r)); }
+  const top = (mm) => { let t = -1e9; for (let i = 0; i < mm.nv; i++) t = Math.max(t, mm.verts[i * 14 + 1]); return t; };
+  const mesh = PR.furnModel(PR.AUTO[SV.AUTO0 + iHand].model).near, full = SV.forModel(VM.MODELS[HN]).near;
+  const jr = section(); SV.tagJob(jr); const jrc = structuredClone(jr); SV.prep(jrc); const rr = VR.meshSection(jrc), kr = kindsIn(rr.props);
+  check(kr.some(a => a.kind === SV.AUTO0 + iHand) && !kr.some(a => a.kind === handKind), 'meshed again: the designed sofa is a surface-nets anchor');
+  check(top(mesh) <= cut / m.res + 0.05, `its mesh is the design's: its top at ${top(mesh).toFixed(2)} blocks (the design ends at ${(cut / m.res).toFixed(2)})`);
+  // the design taken back
+  C.apply({ houses: {}, models: {} });
+  check(!SV.designed(HN) && m.vol === orig.vol, 'the design taken back: the original model again');
+  const jb2 = section(); SV.tagJob(jb2); const jb2c = structuredClone(jb2), wb2 = SV.prep(jb2c), rb2 = VR.meshSection(jb2c), kb2 = kindsIn(rb2.props);
+  check(kb2.some(a => a.kind === handKind) && !kb2.some(a => a.kind === SV.AUTO0 + iHand) && !(wb2 || []).includes(iHand), 'hand-built again: its anchor back, nothing wanted for it');
+  // a designed picture (SV.KEEP): its voxels
+  const AN = 'vm_art_abstract', am = VM.MODELS[AN], iArt = SV.indexOf(AN, false), artKind = PR.FURN0 + VR.PROP_FURN.indexOf(AN);
+  const ja = section(); { const S = (n, pr) => R.byName[n].state(pr); VM.put((xx, yy, zz, nm, pr) => { ja.blocks[at(xx, yy, zz)] = S(nm, pr); }, 12, 2, 12, AN, 0); }
+  const art0 = (() => { const j = structuredClone(ja); SV.tagJob(j); SV.prep(j); return VR.meshSection(j); })();
+  const ida = Uint16Array.from(am.vol); for (let i = 0; i < ida.length; i++) if (ida[i] && (i & 7) === 0) ida[i] = 1;
+  C.apply({ houses: {}, models: { [AN]: { t: 'model', W: am.W, H: am.H, D: am.D, res: am.res, rle: C.b64(new Uint8Array(C.rle(ida).buffer)), pal: Array.from(am.pal) } } });
+  const art1 = (() => { const j = structuredClone(ja); SV.tagJob(j); const w = SV.prep(j); const r = VR.meshSection(j); r.want = w; return r; })();
+  check(iArt >= 0 && A.list[iArt].keep && kindsIn(art0.props).some(a => a.kind === artKind) && !kindsIn(art1.props).some(a => a.kind === artKind || a.kind === SV.AUTO0 + iArt) && art1.vx.length > art0.vx.length && !(art1.want || []).includes(iArt), `a designed picture shows its voxels (the design as it is): no anchor, ${art1.vx.length / 8} detail vertices, nothing wanted`);
+  C.apply({ houses: {}, models: {} });
+}
 
 console.log(`    the three worker jobs took ${jobMs} ms`);
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
