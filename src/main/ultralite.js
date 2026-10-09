@@ -121,4 +121,63 @@
   };
   // a generation's place in the queue (world.update's own order: the distance, discounted for columns ahead)
   ST.genPrio = function (ex, ez, ux, uz, ahead) { const along = ahead ? Math.max(0, ex * ux + ez * uz) : 0; return ex * ex + ez * ez - along * along * 0.5; };
+
+  // ---------------------------------------------------------------- Fern-Cache (renderer.js farFrame, q.farCache)
+  // The sky, the sections beyond half the render distance, ring 1 and the horizon tiles are drawn into a cache (colour and
+  // depth, a little wider than the screen) and composited every frame — reprojected with the cached depth, so turning is
+  // exact and a short walk is followed — while the near world is drawn live over it. A new cache is begun when the eye
+  // moved 1.5 m or turned 6° from the cached one, after 500 ms, or when the day moved on two game minutes; it is drawn
+  // over SLICES frames into a second buffer (opaque drawing with a depth test does not depend on the order), then the two
+  // swap — no frame pays for the whole far world. Faster than FAST m/s (a flight) the cache is not used.
+  const FC = UL.Far = {};
+  FC.MOVE = 1.5;                         // m
+  FC.TURN = 6 * Math.PI / 180;           // rad
+  FC.AGE = 500;                          // ms
+  FC.SUN = 2 * 2 * Math.PI / 1440;       // rad: the sun's way in two game minutes (0.5°; the Zeitraffer goes faster)
+  FC.SLICES = 4;                         // frames a new cache takes
+  FC.FAST = 10;                          // m/s: faster, everything is drawn live
+  FC.MARGIN = FC.TURN + 1.5 * Math.PI / 180;   // the cache's overscan beyond each edge of the screen
+  FC.TOO_OLD_MOVE = 6; FC.TOO_OLD_TURN = FC.MARGIN;   // a cache further off than this is not shown (the frame draws live)
+  // why a cache (c: its eye x y z, forward fx fy fz, fov, aspect, time t ms, sun direction, size w h) is stale for this
+  // camera, or '' when it is still good
+  // (slow: the governor's cheap rung — 2 doubles the step, the age and the sun's way; the turn stays, the overscan is for it)
+  FC.stale = function (c, cam, now, sun, w, h, slow) {
+    const k = slow > 1 ? slow : 1;
+    if (!c || !c.ok) return 'none';
+    if (c.w !== w || c.h !== h || Math.abs(c.fov - cam.fov) > 1e-6 || Math.abs(c.aspect - cam.aspect) > 1e-6) return 'size';
+    if (Math.hypot(cam.x - c.x, cam.y - c.y, cam.z - c.z) > FC.MOVE * k) return 'move';
+    if (FC.turn(c, cam) > FC.TURN) return 'turn';
+    if (now - c.t > FC.AGE * k) return 'age';
+    if (sun && c.sun && Math.acos(Math.max(-1, Math.min(1, sun[0] * c.sun[0] + sun[1] * c.sun[1] + sun[2] * c.sun[2]))) > FC.SUN * k) return 'tod';
+    return '';
+  };
+  FC.turn = function (c, cam) { const d = c.fx * cam.fx + c.fy * cam.fy + c.fz * cam.fz; return Math.acos(Math.max(-1, Math.min(1, d))); };
+  // can the cache be shown at all: not too far off (else the frame draws everything live)
+  FC.showable = function (c, cam) { return !!(c && c.ok) && Math.hypot(cam.x - c.x, cam.y - c.y, cam.z - c.z) <= FC.TOO_OLD_MOVE && FC.turn(c, cam) <= FC.TOO_OLD_TURN; };
+  // the near radius in blocks (sections nearer than this to the cache's eye are drawn live)
+  FC.near = (rd) => Math.max(48, rd * 8);
+  // the cache's projection: every direction within MARGIN of the screen's view lies in it (the screen's corners and edge
+  // middles turned by MARGIN every way, the widest kept), with the same pixels per unit of view as the screen
+  // → { sx, sy } (its size: w × sx, h × sy), fov (vertical, rad), aspect
+  FC.overscan = function (fov, aspect) {
+    const tv = Math.tan(fov / 2), th = tv * aspect, c = Math.cos(FC.MARGIN), s = Math.sin(FC.MARGIN), cap = Math.tan(89 * Math.PI / 180);
+    let mx = th, my = tv;
+    const edge = []; for (let i = 0; i <= 8; i++) { edge.push([1, i / 8]); edge.push([i / 8, 1]); }   // (the screen's edges, by symmetry one quarter)
+    for (const [px, py] of edge) {
+      const l = Math.hypot(px * th, py * tv, 1), d = [px * th / l, py * tv / l, -1 / l];
+      // two directions across d, then MARGIN round it in 24 steps
+      const e1 = Math.abs(d[1]) < 0.9 ? [d[2], 0, -d[0]] : [0, -d[2], d[1]], l1 = Math.hypot(e1[0], e1[1], e1[2]);
+      e1[0] /= l1; e1[1] /= l1; e1[2] /= l1;
+      const e2 = [d[1] * e1[2] - d[2] * e1[1], d[2] * e1[0] - d[0] * e1[2], d[0] * e1[1] - d[1] * e1[0]];
+      for (let k = 0; k < 24; k++) {
+        const a = k / 24 * 2 * Math.PI, ca = Math.cos(a), sa = Math.sin(a);
+        const q = [d[0] * c + (e1[0] * ca + e2[0] * sa) * s, d[1] * c + (e1[1] * ca + e2[1] * sa) * s, d[2] * c + (e1[2] * ca + e2[2] * sa) * s];
+        if (q[2] > -1e-3) { mx = my = cap; continue; }
+        mx = Math.max(mx, Math.min(cap, Math.abs(q[0] / q[2]))); my = Math.max(my, Math.min(cap, Math.abs(q[1] / q[2])));
+      }
+    }
+    mx = Math.min(cap, mx * 1.004); my = Math.min(cap, my * 1.004);   // (a hair more: the edges between the samples)
+    return { sx: mx / th, sy: my / tv, fov: 2 * Math.atan(my), aspect: mx / my };
+  };
+  FC.slice = (n, K, k) => [Math.floor(k * n / K), Math.floor((k + 1) * n / K)];
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -983,6 +983,147 @@
     // the shaders' wrap offset (0 without the takt)
     shadowOffUni(u) { if (u.u_shadowOff) { const o = this.shadowOff; this.gl.uniform2f(u.u_shadowOff, o ? o[0] : 0, o ? o[1] : 0); } }
 
+    // ------------------------------------------------ F9 · Fern-Cache (q.farCache; the rules: ultralite.js UL.Far)
+    // render() asks here before the sky. null: the frame is drawn as before (the cache is off, not ready, too far off,
+    // or the eye moves faster than a run). Else the cached sky and far world (the sections beyond half the render
+    // distance, ring 1, the horizon tiles) have been composited into the scene — colour and depth, reprojected — and the
+    // answer lists the near sections render() draws live over them. A new cache is drawn into the second buffer a slice a
+    // frame (UL.Far.SLICES) while this one is shown, then the two swap: no frame pays for the whole far world.
+    farFrame(F, E, world, vis, camPos) {
+      const FC = VR.UL.Far, cam = F.cam, now = performance.now();
+      const st = this.fc || (this.fc = { front: this.fcLayer(), back: null, spare: this.fcLayer(), near: [], part: [], speed: 0, last: null, eye: [0, 0, 0] });
+      // the eye's speed (smoothed): a flight draws everything live (every frame would begin a new cache)
+      if (st.last) { const dt = (now - st.last[3]) / 1000; if (dt > 0) { const v = Math.hypot(cam.x - st.last[0], cam.y - st.last[1], cam.z - st.last[2]) / dt; st.speed += (Math.min(500, v) - st.speed) * Math.min(1, dt * 4); } }
+      st.last = [cam.x, cam.y, cam.z, now];
+      if (st.speed > FC.FAST) { st.front.ok = false; this.fcCancel(st); this.stats.farCache = 'fast'; return null; }
+      const fw = this.camFwd, info = st.info || (st.info = {});
+      info.x = cam.x; info.y = cam.y; info.z = cam.z; info.fx = fw[0]; info.fy = fw[1]; info.fz = fw[2]; info.fov = cam.fov; info.aspect = this.W / this.H;
+      const why = FC.stale(st.front, info, now, E.sunDir, this.w, this.h, this.q.farSlow);
+      if (why && !st.back) this.fcBegin(st, F, E, world, vis, info, now);
+      if (st.back) this.fcSlice(st, F, E);
+      // nothing to show yet (the first frame) or the shown cache too far off: the new one is finished now
+      if (!FC.showable(st.front, info) && st.back) { while (st.back) this.fcSlice(st, F, E); }
+      if (!FC.showable(st.front, info)) { this.stats.farCache = 'live'; return null; }
+      this.fcComposite(st, F);
+      this.stats.farCache = why || 'cached';
+      // the near sections: within the near radius of the shown cache's eye (the cache holds the rest)
+      const f = st.front, R2 = f.R * f.R, near = st.near; near.length = 0;
+      for (let i = 0; i < vis.length; i++) { const s = vis[i], dx = s.ox + 8 - f.x, dz = s.oz + 8 - f.z; if (dx * dx + dz * dz <= R2) near.push(s); }
+      this.stats.farNear = near.length;
+      return st;
+    }
+    fcLayer() { return { ok: false, fb: null, col: null, depth: null, tw: 0, th: 0, x: 0, y: 0, z: 0, fx: 0, fy: 0, fz: -1, fov: 0, aspect: 0, w: 0, h: 0, t: 0, sun: [0, 1, 0], R: 0, k: 0, list: [], proj: mat4.create(), vp: mat4.create(), inv: mat4.create(), planes: new Float32Array(24), scale: [1, 1], camInt: [0, 0, 0], camFrac: [0, 0, 0], cam: null }; }
+    fcCancel(st) { if (st.back) { st.spare = st.back; st.back = null; } }
+    // the buffers of a layer at the size of its view (made or resized when needed)
+    fcEnsure(L, tw, th) {
+      const gl = this.gl;
+      if (L.fb && L.tw === tw && L.th === th && L.hdr === this.hdr) return true;
+      if (L.fb) { gl.deleteFramebuffer(L.fb); gl.deleteTexture(L.col); gl.deleteTexture(L.depth); L.fb = null; }
+      const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+      L.col = GL.tex2D(tw, th, cfmt, gl.RGBA, ctype, { filter: gl.LINEAR });
+      L.depth = GL.tex2D(tw, th, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
+      L.fb = GL.fbo([L.col], L.depth);
+      L.tw = tw; L.th = th; L.hdr = this.hdr;
+      return !!L.fb;
+    }
+    fcDrop() {
+      const gl = this.gl, st = this.fc; if (!st) return;
+      for (const L of [st.front, st.back, st.spare]) if (L && L.fb) { gl.deleteFramebuffer(L.fb); gl.deleteTexture(L.col); gl.deleteTexture(L.depth); L.fb = null; }
+      this.fc = null;
+    }
+    // a new cache: this frame's eye and look, a wider projection (no sub-pixel jitter), the far sections of this moment
+    fcBegin(st, F, E, world, vis, info, now) {
+      const FC = VR.UL.Far, b = st.spare, os = FC.overscan(info.fov, info.aspect);
+      const tw = Math.max(16, Math.ceil(this.w * os.sx)), th = Math.max(16, Math.ceil(this.h * os.sy));
+      if (!b || !this.fcEnsure(b, tw, th)) return;
+      st.back = b; st.spare = null;
+      b.x = info.x; b.y = info.y; b.z = info.z; b.fx = info.fx; b.fy = info.fy; b.fz = info.fz; b.fov = info.fov; b.aspect = info.aspect;
+      b.w = this.w; b.h = this.h; b.t = now; b.sun[0] = E.sunDir[0]; b.sun[1] = E.sunDir[1]; b.sun[2] = E.sunDir[2];
+      b.scale[0] = os.sx; b.scale[1] = os.sy; b.R = FC.near(world.renderDist);
+      mat4.perspective(b.proj, os.fov, os.aspect, 0.06, F.cam.far || 1200);
+      mat4.mul(b.vp, b.proj, this.view); mat4.invert(b.inv, b.vp); mat4.frustum(b.planes, b.vp);
+      b.camInt[0] = this.camInt[0]; b.camInt[1] = this.camInt[1]; b.camInt[2] = this.camInt[2];
+      b.camFrac[0] = this.camFrac[0]; b.camFrac[1] = this.camFrac[1]; b.camFrac[2] = this.camFrac[2];
+      b.cam = Object.assign({}, F.cam);
+      // (only those in the cache's view: the slices share out what is really drawn)
+      const R2 = b.R * b.R; b.list.length = 0;
+      for (let i = 0; i < vis.length; i++) {
+        const s = vis[i], dx = s.ox + 8 - b.x, dz = s.oz + 8 - b.z;
+        if (dx * dx + dz * dz <= R2) continue;
+        const ox = s.ox - b.x, oy = s.oy - b.y, oz = s.oz - b.z;
+        if (mat4.boxInFrustum(b.planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) b.list.push(s);
+      }
+      b.k = 0; b.ok = false;
+      this.stats.farBegun = (this.stats.farBegun || 0) + 1;
+    }
+    // one slice of the cache being drawn: slice 0 clears it and draws the sky, the middle ones a share of the far
+    // sections, the last one ring 1 and the horizon tiles; then the two caches swap
+    fcSlice(st, F, E) {
+      const FC = VR.UL.Far, gl = this.gl, b = st.back, K = FC.SLICES;
+      const sv = [this.viewProj, this.invViewProj, this.planes, this.camFrac, this.camInt, this.cam];
+      this.viewProj = b.vp; this.invViewProj = b.inv; this.planes = b.planes; this.camFrac = b.camFrac; this.camInt = b.camInt; this.cam = b.cam;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, b.fb); gl.viewport(0, 0, b.tw, b.th);
+      if (b.k === 0) {
+        gl.depthMask(true); gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+        const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
+        if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);
+        gl.uniformMatrix4fv(p.u.u_invViewProj, false, b.inv);
+        if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);
+        this.fs(p);
+      }
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      if (b.k < K - 1) {
+        const [s, e] = FC.slice(b.list.length, K - 1, b.k), part = st.part; part.length = 0;
+        for (let i = s; i < e; i++) part.push(b.list[i]);
+        this.fcTerrain(part, E, [b.x, b.y, b.z]);
+      } else if (F.horizon) F.horizon.draw(this, E);
+      this.viewProj = sv[0]; this.invViewProj = sv[1]; this.planes = sv[2]; this.camFrac = sv[3]; this.camInt = sv[4]; this.cam = sv[5];
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, this.w, this.h);
+      if (++b.k < K) return;
+      b.ok = true; st.spare = st.front; st.front = b; st.back = null;
+      this.stats.farBuilt = (this.stats.farBuilt || 0) + 1;
+    }
+    // the far sections of a slice, as render() draws its terrain (opaque, cut-out, the VX boxes), from the cache's eye
+    fcTerrain(list, E, camPos) {
+      const gl = this.gl;
+      for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
+        gl.useProgram(p.p);
+        this.common(p, E);
+        this.bindTerrainTextures(p);
+        gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
+        gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
+        gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
+        if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
+        if (p.u.u_emissiveBoost) gl.uniform1f(p.u.u_emissiveBoost, E.emissiveBoost);
+        if (p.u.u_normalStrength) gl.uniform1f(p.u.u_normalStrength, this.q.normals === 0 ? 0 : 1);
+        if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, 1);
+        if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
+        if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
+        if (layer === 1) gl.disable(gl.CULL_FACE);
+        this.drawSections(list, layer, p, camPos, this.planes, false);
+        if (layer === 0) { const sp = this.splitVx(list, camPos); this.drawSections(sp.near, 3, p, camPos, this.planes, false); this.drawSections(sp.far, 4, p, camPos, this.planes, false); }
+        gl.enable(gl.CULL_FACE);
+      }
+    }
+    // the shown cache into the scene: colour and depth for every pixel (the sky where it has none)
+    fcComposite(st, F) {
+      const gl = this.gl, f = st.front, S = VR.SHADERS;
+      const p = this.P.farComp || (this.P.farComp = GL.program(S.FS_VS, S.FAR_COMP_FS, 'farComp'));
+      gl.useProgram(p.p);
+      gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.ALWAYS); gl.depthMask(true);
+      this.tex(0, f.col, p.u.u_fcCol); this.tex(1, f.depth, p.u.u_fcDepth);
+      gl.uniformMatrix4fv(p.u.u_invVP, false, this.invViewProj);
+      gl.uniformMatrix4fv(p.u.u_curVP, false, this.viewProj);
+      gl.uniformMatrix4fv(p.u.u_fcVP, false, f.vp);
+      gl.uniformMatrix4fv(p.u.u_fcInvVP, false, f.inv);
+      gl.uniform3f(p.u.u_delta, F.cam.x - f.x, F.cam.y - f.y, F.cam.z - f.z);
+      gl.uniform2f(p.u.u_scale, f.scale[0], f.scale[1]);
+      this.fs(p);
+      gl.depthFunc(gl.LEQUAL);
+    }
+
     // ------------------------------------------------ smooth props (t-smooth, props.js): one instanced draw per model
     // A section keeps its prop anchors (propSet): per anchor 12 doubles — the origin in world blocks, then the variation
     // and the light. Each frame the origins are written camera-relative into two lists: the full palms within vxLod and
@@ -1389,9 +1530,13 @@
       gl.depthMask(true);
       gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      // F9 · Fern-Cache: the sky and the far world composited from the cache (null: drawn as before)
+      const fc = world && this.q.farCache && VR.UL ? this.farFrame(F, E, world, vis, camPos) : null;
+      if (!this.q.farCache && this.fc) this.fcDrop();
+      const near = fc ? fc.near : vis;
       // sky
       gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
-      {
+      if (!fc) {
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
         if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
@@ -1417,11 +1562,11 @@
           if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
           this.shadowOffUni(p.u);
           if (layer === 1) gl.disable(gl.CULL_FACE);
-          this.drawSections(vis, layer, p, camPos, this.planes, false);
+          this.drawSections(near, layer, p, camPos, this.planes, false);
           if (layer === 0) {
             // mini-voxel pieces: full detail up close, averaged boxes beyond the VX detail distance
             this.vxResidency(vis, camPos);
-            const sp = this.splitVx(vis, camPos);
+            const sp = this.splitVx(near, camPos);
             this.drawSections(sp.near, 3, p, camPos, this.planes, false);
             this.drawSections(sp.far, 4, p, camPos, this.planes, false);
           }
@@ -1430,8 +1575,8 @@
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
       if (world && (this.q.smoothProps || this.q.smoothFurn)) this.drawProps(E, camPos, false);
-      // far-terrain horizon (cut away where real chunks are drawn)
-      if (F.horizon) F.horizon.draw(this, E);
+      // far-terrain horizon (cut away where real chunks are drawn; with the Fern-Cache it is in the cache)
+      if (F.horizon && !fc) F.horizon.draw(this, E);
       // voxel models & meshes
       if (F.drawOpaque) F.drawOpaque(this, E);
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
