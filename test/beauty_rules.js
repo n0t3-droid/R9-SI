@@ -91,5 +91,51 @@ console.log('2 · every street of Nova Haven ends at a street, the plaza or a tu
   check(Math.abs(P9.homes.length - P8.homes.length) <= 2 && P9.homes.length >= 9, `vgen 9 keeps the villas (${P9.homes.length}, vgen 8 ${P8.homes.length})`);
 }
 
+// ---------------------------------------------------------------- 3 · no blank wall on any side of a villa
+console.log('3 · every side of every storey of a Villa Nova keeps a window within four blocks (vgen 9)');
+{
+  const PLAN = VG.plan2, FAM = PLAN.NOVA_FAMILY;
+  const fnv = (h, a) => { for (let i = 0; i < a.length; i++) { h ^= a[i] & 0xffff; h = Math.imul(h, 16777619) >>> 0; h ^= (a[i] >>> 16) & 0xffff; h = Math.imul(h, 16777619) >>> 0; } return h; };
+  const build = (comp, mirror, vgen) => {
+    const rec = new Map(), ops = [];
+    const L = VG.makeLot((x, y, z, s) => { rec.set(x + ',' + y + ',' + z, s); ops.push(x, y, z, s); }, 0, 0, 0);
+    PLAN.build(L, { w: 25, d: 31, F: 64, r: 0, ox: 0, oz: 0, kind: 'home' }, Object.assign({ index: PLAN.TRAILER, comp, novaMirror: mirror, rng: new V.RNG(7), ground: () => 63, beds: 3, noCustom: true }, vgen ? { vgen } : {}));
+    return { at: (u, y, v) => nameOf(rec.get(u + ',' + y + ',' + v) || 0), hash: fnv(2166136261 >>> 0, ops).toString(16) };
+  };
+  // the longest run of plain wall at the window rows along a side of a storey (a cell is open when glass, a window or a
+  // door stands in the wall plane or a bay stands out in front of it within two blocks)
+  const blankRuns = (B, C, mirror) => {
+    const W = 25, out = [];
+    for (const [key, R0] of [['G', C.G], ['U', C.U], ['T', C.T]]) {
+      if (!R0) continue;
+      const rows = key === 'G' ? [2, 3, 4] : [R0.y + 2, R0.y + 3];
+      const mu = (u) => mirror ? W - 1 - u : u;
+      const sides = [['front', (a) => [a, R0.v0], [0, -1], R0.u0, R0.u1], ['back', (a) => [a, R0.v1], [0, 1], R0.u0, R0.u1], ['left', (a) => [R0.u0, a], [-1, 0], R0.v0, R0.v1], ['right', (a) => [R0.u1, a], [1, 0], R0.v0, R0.v1]];
+      for (const [sn, cell, [du, dv], a0, a1] of sides) {
+        let run = 0, best = 0;
+        for (let a = a0; a <= a1; a++) {
+          const [u, v] = cell(a);
+          let open = false, wall = false;
+          for (const y of rows) for (let k = 0; k <= 2; k++) { const n = B.at(mu(u + du * k), 64 + y, v + dv * k); if (/window|glass|door|panorama|sheet/.test(n)) open = true; if (k === 0 && /stone_grey|mid_grey/.test(n)) wall = true; if (k > 0 && /^vollton_light_grey$/.test(n)) open = true; }
+          if (wall && !open) { run++; best = Math.max(best, run); } else run = 0;
+        }
+        out.push([key + '.' + sn, best]);
+      }
+    }
+    return out;
+  };
+  const REF8 = { classic: '4a95064f', classicm: '94841337', long: '8768c452', longm: 'd2d63592', tower: '5ae4695a', towerm: '2297866c', corner: 'f717b036', cornerm: '4b5a6dd4', bungalow: '260f93b', bungalowm: '97630041' };
+  let same8 = 0, n8 = 0;
+  for (const comp of Object.keys(FAM)) for (const mirror of [false, true]) {
+    const tag = comp + (mirror ? 'm' : '');
+    const B8 = build(comp, mirror, 0), B9 = build(comp, mirror, 9);
+    n8++; if (B8.hash === REF8[tag]) same8++; else console.log(`     ${tag} at vgen 8: ${B8.hash} (expected ${REF8[tag]})`);
+    const r8 = blankRuns(B8, FAM[comp], mirror), r9 = blankRuns(B9, FAM[comp], mirror);
+    const worst8 = r8.reduce((a, b) => b[1] > a[1] ? b : a), worst9 = r9.reduce((a, b) => b[1] > a[1] ? b : a);
+    check(worst9[1] <= 4, `${tag}: the longest blank wall at vgen 9 is ${worst9[1]} (${worst9[0]}; vgen 8: ${worst8[1]} at ${worst8[0]})`);
+  }
+  check(same8 === n8, `the family as vgen 8 builds it is byte for byte as before (${same8} of ${n8})`);
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

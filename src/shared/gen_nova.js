@@ -613,7 +613,9 @@
 
     // ---- the facades: the operations a composition calls (s: 0 front −v, 1 +u, 2 back +v, 3 −u; fixed: the wall plane)
     const FACE = [0, 1, 2, 3];
-    const win = (s, a0, a1, y0, y1, fixed) => { for (let a = a0; a <= a1; a++) for (let y = y0; y <= y1; y++) put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.win, { facing: FACE[s] }); };
+    // (the openings of every side, for vgen 9's blank-wall pass below: "side|along|row" of a window, a door or a bay)
+    const opened = new Set(), mark = (s, a, y) => opened.add(s + '|' + a + '|' + y);
+    const win = (s, a0, a1, y0, y1, fixed) => { for (let a = a0; a <= a1; a++) for (let y = y0; y <= y1; y++) { put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.win, { facing: FACE[s] }); mark(s, a, y); } };
     const lintel = (s, a0, a1, y, fixed) => { for (let a = a0; a <= a1; a++) put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.fascia, { glow: 2 }); };
     // the cells behind a window open into the room (the ground floor's white lining too)
     const openBehind = (s, a0, a1, y0, y1, fixed, deep) => { const inw = s === 0 ? 1 : s === 2 ? -1 : s === 1 ? -1 : 1; for (let a = a0; a <= a1; a++) for (let y = y0; y <= y1; y++) for (let k = 1; k <= deep; k++) put((s & 1) ? fixed + inw * k : a, y, (s & 1) ? a : fixed + inw * k, null); };
@@ -624,7 +626,7 @@
       for (let k = 1; k <= dep; k++) for (let a = a0; a <= a1; a++) {
         const oo = outK(k), u = (s & 1) ? oo : a, v = (s & 1) ? a : oo;
         if (R.isG && !o2.hang) { put(u, 0, v, M.plinth); foot.add(u + ',' + v); }
-        for (let y = y0; y <= y1; y++) put(u, y, v, M.bay);
+        for (let y = y0; y <= y1; y++) { put(u, y, v, M.bay); mark(s, a, y); }
         if (o2.hang) put(u, y0, v, M.fascia, { glow: 2 });
         else if (k === dep) { const fu = (s & 1) ? fr : a, fv = (s & 1) ? a : fr; put(fu, y0, fv, M.base, { facing: (s + 2) & 3 }); }
       }
@@ -641,7 +643,7 @@
         info.bays.push({ side: s, a0: w0, a1: w1, out, y0: wy0, y1: wy1 });
       }
     };
-    const door = (s, u, y, v, hinge) => { put(u, y, v, M.door, { facing: s, half: 0, hinge: hinge | 0, open: 0 }); put(u, y + 1, v, M.door, { facing: s, half: 1, hinge: hinge | 0, open: 0 }); };
+    const door = (s, u, y, v, hinge) => { put(u, y, v, M.door, { facing: s, half: 0, hinge: hinge | 0, open: 0 }); put(u, y + 1, v, M.door, { facing: s, half: 1, hinge: hinge | 0, open: 0 }); mark(s, (s & 1) ? v : u, y); mark(s, (s & 1) ? v : u, y + 1); };
     const F_ = {
       bay, win, lintel, door,
       // a window band in the wall plane with its lintel; upper storeys' walls are one thick, the ground floor's two
@@ -673,9 +675,33 @@
 
     // ---- the glass wall to the back garden (the hall): one clear sheet floor to ceiling with a slim mullion every five
     //      blocks, the garden door in the middle
-    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) put(u, y, G.v1, M.sheet, { facing: 0, post: (u - 2) % 5 === 0 ? 1 : 0 });
+    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) { put(u, y, G.v1, M.sheet, { facing: 0, post: (u - 2) % 5 === 0 ? 1 : 0 }); mark(2, u, y); }
     for (let y = 1; y <= G.clear; y++) { put(G.u0 + 1, y, G.v1, M.wall); put(G.u1 - 1, y, G.v1, M.wall); }
     door(2, EU, 1, G.v1, 1);
+    // ---- vgen 9 (t-beauty): no blank wall. Along every side of every storey, a run of plain wall longer than four
+    //      blocks at the window rows gets a window band of two or three in its middle with its lintel, again until none
+    //      is left (vgen 8: the corner villa showed its neighbour a nine-block grey first floor and a top box blank at the
+    //      back and one side, the bungalow's pavilion a blank side, the long villa's first floor and the tower house's
+    //      ground floor runs of five); the family as vgen 8 built it keeps every wall
+    if (o && o.vgen >= 9) {
+      for (const [R, rs, isG] of [[G, GR, true], [U, UR, false], [T, TR, false]]) {
+        if (!R) continue;
+        const rows = isG ? [2, 3, 4] : [R.y + 2, R.y + 3];
+        for (const s of FACE) {
+          const fixed = s === 0 ? R.v0 : s === 2 ? R.v1 : s === 1 ? R.u1 : R.u0, lo = (s & 1) ? R.v0 : R.u0, hi = (s & 1) ? R.v1 : R.u1;
+          // (a run counts the corner blocks too — a side six blocks long with no window reads blank — but a window never
+          //  takes a corner)
+          const blank = (a) => { const u = (s & 1) ? fixed : a, v = (s & 1) ? a : fixed; if (a < lo || a > hi || !ringOf(rs, u, v)) return false; for (const y of rows) if (opened.has(s + '|' + a + '|' + y)) return false; return true; };
+          for (let guard = 0; guard < 4; guard++) {
+            let best = null;
+            for (let a = lo, run = 0; a <= hi; a++) { if (blank(a)) { run++; if (run > 4 && (!best || run > best[1])) best = [a - run + 1, run]; } else run = 0; }
+            if (!best) break;
+            const w = best[1] >= 7 ? 3 : 2, a0 = Math.max(lo + 1, Math.min(hi - w, best[0] + ((best[1] - w) >> 1)));
+            F_.band(s, a0, a0 + w - 1, rows[0], rows[rows.length - 1], fixed, !isG);
+          }
+        }
+      }
+    }
     yield;
 
     // ---- the hall: the cove over the pad, spots, the partition, the pad with its ring of light, benches, plants

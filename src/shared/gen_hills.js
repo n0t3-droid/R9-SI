@@ -301,7 +301,7 @@
     const DIRT = st('dirt'), MOSS = st('moss_block');
     const L = VG.makeLot((x, y, z, s) => bucket(x, z).o.push(x, y, z, s === DIRT ? MOSS : s), v.ox, v.oz, v.r);
     const ground = (u, w) => { const q = VG.rot(v.r, u, w); return HILLS.cellT8(g, v.ox + q[0], v.oz + q[1]).y; };
-    PLAN.build(L, { w: PLAN.NOVA.LOT[0], d: PLAN.NOVA.LOT[1], F: v.L + 1, r: v.r, ox: v.ox, oz: v.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: v.comp, novaMirror: v.mirror, rng: new VR.RNG((g.seed ^ (v.ox * 73 + v.oz * 977)) >>> 0), ground, beds: 3, noCustom: v.comp !== 'classic' });
+    PLAN.build(L, { w: PLAN.NOVA.LOT[0], d: PLAN.NOVA.LOT[1], F: v.L + 1, r: v.r, ox: v.ox, oz: v.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: v.comp, novaMirror: v.mirror, rng: new VR.RNG((g.seed ^ (v.ox * 73 + v.oz * 977)) >>> 0), ground, beds: 3, noCustom: v.comp !== 'classic', vgen: g.vgen });
     v.ops = chunks; v.built = true;
     return chunks;
   };

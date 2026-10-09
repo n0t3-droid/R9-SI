@@ -698,7 +698,7 @@
       const L = VG.makeLot(lput, lot.ox, lot.oz, lot.r);
       const lg = (u, v) => { const qq = VG.rot(lot.r, u, v); return ground(lot.ox + qq[0], lot.oz + qq[1]); };
       homeSeed = (homeSeed * 1103515245 + 12345) >>> 0;
-      const info = yield* PLAN.buildSteps(L, { w: LW, d: LD, F, r: lot.r, ox: lot.ox, oz: lot.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: lot.comp, novaMirror: !!lot.mirror, rng: new VR.RNG(homeSeed), ground: lg, beds: 3, noCustom: lot.comp !== 'classic', pathU: lot.pathU });
+      const info = yield* PLAN.buildSteps(L, { w: LW, d: LD, F, r: lot.r, ox: lot.ox, oz: lot.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: lot.comp, novaMirror: !!lot.mirror, rng: new VR.RNG(homeSeed), ground: lg, beds: 3, noCustom: lot.comp !== 'classic', pathU: lot.pathU, vgen: g.vgen });
       for (const c of clears.values()) fill(c[2], c[3], c[0], c[1], AIR);
       if (!info) continue;
       const sm = recordInfo(lot, info, F);
