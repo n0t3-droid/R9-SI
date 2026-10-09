@@ -3,7 +3,11 @@
 //   1. no random ruin in the Heartland's designed land: the obsidian ruined gates (and the other random surface
 //      structures) stay out of the Heartland's designed radius (HEART.R0) — a vgen-8 world keeps them where they were
 //   2. every street of Nova Haven ends at a street, the plaza or a turning circle: a round paved bulb with the cyan line
-//      round its rim, the light grey kerb round that, and a planted island in the middle (a raised bed with a palm)
+//      round its rim, the light grey kerb round that, and a planted island in the middle (a raised bed, a round tree);
+//      every road's kerbs stay one light line each
+//   3. every side of every storey of a Villa Nova keeps a window within four blocks (the vgen-8 family unchanged)
+//   4. nothing a generator places stands on air (the Pod Hills' lamps and bushes, a sulfur spring's crust)
+//   5. Very Low: the chunk triangles at the audit's two Very Low scenes within 1 % of vgen 8 (SKIP_COST=1 skips it)
 //   bash test/wt_run.sh beauty_rules.js 600
 const V = require('./load_shared.js');
 const R = V.R, F = V.F, VG = V.VillageGen, HEART = V.Heart;
@@ -183,6 +187,45 @@ console.log('4 · nothing a generator places stands on air (vgen 9)');
   check(hills9.props === 0, `the Pod Hills: no lamp or bush on air at vgen 9 (${hills9.props}${hills9.props ? ' ' + JSON.stringify(hills9.at) : ''}; vgen 8: ${hills8.props} ${JSON.stringify(hills8.at)})`);
   const plaza8 = scan(W8, 80, 20, 128, 64), plaza9 = scan(W9, 80, 20, 128, 64);
   check(plaza8.sul > 0 && plaza9.sul === 0 && plaza9.props === 0, `beside the plaza: no sulfur crust floating at vgen 9 (${plaza9.sul}; vgen 8: ${plaza8.sul}), no prop on air (${plaza9.props})`);
+}
+
+// ---------------------------------------------------------------- 5 · Very Low
+// the mesher's triangles per chunk column within Very Low's render distance (4 chunks) of the audit's two Very Low
+// scenes (test/beauty_audit.mjs COST=1: the crescent's west end — its turning circle — and the lawn between the villa
+// rows), the faces Very Low draws (terrain, cutout, water, the mini-voxel far boxes beyond its 12-block detail
+// distance, the near pieces within): vgen 9 at most 1 % over vgen 8 — equal (the method of test/trailer_city.js 5)
+if (!process.env.SKIP_COST) {
+  console.log('5 · Very Low: the chunk triangles at the cost scenes');
+  V.setLook('seamless');
+  const PAD = V.MESH_PAD, PS = V.MESH_PS, PSS = PS * PS, RD = 4, VXLOD = 12;
+  const windowTris = (W, at, eyeY) => {
+    const want = [], c0x = Math.floor(at[0] / 16), c0z = Math.floor(at[1] / 16);
+    for (let dz = -RD; dz <= RD; dz++) for (let dx = -RD; dx <= RD; dx++) if (dx * dx + dz * dz <= RD * RD) want.push([c0x + dx, c0z + dz]);
+    const lit = new Map(), col = (cx, cz) => { const k = cx + ',' + cz; let c = lit.get(k); if (!c) { c = W.chunk(cx, cz); if (!c.light) c.light = V.computeColumnLight(c.blocks, true); lit.set(k, c); } return c; };
+    let tris = 0;
+    for (const [CX, CZ] of want) for (let sy = 0; sy < 16; sy++) {
+      const blocks = new Uint16Array(PSS * PS), light = new Uint16Array(PSS * PS), gr = new Uint16Array(PSS), fo = new Uint16Array(PSS), wa = new Uint16Array(PSS);
+      let any = false;
+      for (let y = -PAD; y < 16 + PAD; y++) for (let z = -PAD; z < 16 + PAD; z++) for (let x = -PAD; x < 16 + PAD; x++) {
+        const wy = sy * 16 + y, c = col(CX + Math.floor(x / 16), CZ + Math.floor(z / 16));
+        const lx = ((x % 16) + 16) % 16, lz = ((z % 16) + 16) % 16, pi = (y + PAD) * PSS + (z + PAD) * PS + (x + PAD);
+        if (y === 0) { const ti = (z + PAD) * PS + x + PAD; gr[ti] = c.tints.grass[lz * 16 + lx]; fo[ti] = c.tints.foliage[lz * 16 + lx]; wa[ti] = c.tints.water[lz * 16 + lx]; }
+        if (wy < 0 || wy > 255) { light[pi] = wy > 255 ? 0xf000 : 0; continue; }
+        const i = (wy << 8) | (lz << 4) | lx; blocks[pi] = c.blocks[i]; light[pi] = c.light[i];
+        if (blocks[pi] && x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < 16) any = true;
+      }
+      if (!any) continue;
+      const r = V.meshSection({ blocks, light, grass: gr, foliage: fo, water: wa, sy, ox: CX * 16, oz: CZ * 16, smooth: true, fancyLeaves: false, vxLod: true });
+      const near = Math.hypot(CX * 16 + 8 - at[0], CZ * 16 + 8 - at[1], sy * 16 + 8 - eyeY) < VXLOD + 14;
+      const q = (a) => a ? a.length / 8 / 4 * 2 : 0;
+      tris += q(r.opaque) + q(r.cutout) + q(r.trans) + (near ? q(r.vx) : q(r.vxFar));
+    }
+    return tris / want.length;
+  };
+  for (const [scene, at] of [['crescent_end', [-100.5, -91.5]], ['between_rows', [20.5, -116.5]]]) {
+    const t0 = performance.now(), a = windowTris(W8, at, 82), b = windowTris(W9, at, 82);
+    check(b <= a * 1.01, `${scene}: vgen 9 ${b.toFixed(0)} triangles a column, vgen 8 ${a.toFixed(0)} (${(b / a * 100 - 100).toFixed(1)} %, ${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+  }
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

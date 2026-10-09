@@ -163,7 +163,7 @@
     // vgen 9 (t-beauty): every street ends somewhere — an end that meets no other street and not the plaza swells into
     // a turning circle of radius r round a point `push` blocks past the road's last one (pulled back so the circle stays
     // inside the city's disc): the paving lit round its rim like every kerb, a raised bed of radius `bed` in the middle
-    // with a tall palm, a lamp on each side, palms on its far verge
+    // with a round clipped tree (the island's tip bed's), a lamp on each side
     TURN: { r: 7, bed: 2.5, push: 2 },
   };
   const PATH_STARTS = new Map();   // composition (+ m for the mirror) → where its garden path meets the street row
@@ -523,19 +523,13 @@
         }
       }
     }
-    // the turning circles (vgen 9): a lamp in the kerb on either side, square to the road's way; a palm on the verge of
-    // the far side, 50° off the road's axis on either hand
-    const turnPalms = [];
+    // the turning circles (vgen 9): a lamp in the kerb on either side, square to the road's way
     for (const t of turns) {
       for (const sg of [1, -1]) {
         const ax = t.x - t.uz * sg * (t.r + 1), az = t.z + t.ux * sg * (t.r + 1);
         let best = null, bd = 3;
         for (const key of kerbSet) { const [x, z] = key.split(',').map(Number), d = Math.hypot(x + 0.5 - ax, z + 0.5 - az); if (d < bd && oc(x, z) === 8) { bd = d; best = [x, z]; } }
         if (best) { const [x, z] = best; setO(x, z, 6); kerbSet.delete(x + ',' + z); put(x, t.y + 1, z, K.LAMP0); put(x, t.y + 2, z, K.LAMP1); fill(x, z, t.y + 3, t.y + 6, AIR); plan.lamps.push([x, t.y + 2, z]); }
-        const ang = Math.atan2(t.uz, t.ux) + sg * 0.9, px = Math.floor(t.x + Math.cos(ang) * (t.r + 2.5)), pz = Math.floor(t.z + Math.sin(ang) * (t.r + 2.5));
-        let ok = free(px, pz) && Math.hypot(px - cx, pz - cz) < RAD - 4;
-        for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) { const o = oc(px + dx, pz + dz); if (o === 5 || o === 6 || o === 2 || o === 3) { ok = false; break; } }
-        if (ok) { setO(px, pz, 6); turnPalms.push([px, pz, -1, t.y + 1, 10 + rng.int(4)]); }
       }
     }
     yield;
@@ -603,7 +597,7 @@
         else if (bd.kind === 'fan') isleFans.push([cx, cz, -1, y, 2]);
       }
       if (nova.island) nova.island.beds = beds.map(b => ({ kind: b.kind, x: b.cx, z: b.cz, rx: b.rx, rz: b.rz, n: b.cells.length, tree: b.tree || null }));
-      // the turning circles' beds (vgen 9): the same raised bed round a tall palm, ferns and flower clusters
+      // the turning circles' beds (vgen 9): the same raised bed round a round clipped tree, ferns and flower clusters
       for (const t of turns) {
         const cells = bedCells.filter(c => c[2] === t), inB = new Set(cells.map(c => c[0] + ',' + c[1])), mx = Math.floor(t.x), mz = Math.floor(t.z);
         for (const [x, z] of cells) {
@@ -612,14 +606,14 @@
           if (edge || (x === mx && z === mz)) continue;
           put(x, t.y + 2, z, hsh(x, z, site.seed + 91) % 10 < 6 ? FERN0 : FCL0);
         }
-        if (inB.has(mx + ',' + mz)) isleFans.push([mx, mz, -1, t.y + 2, 9 + (hsh(mx, mz, site.seed) % 3)]);
+        // (the round clipped tree of the island's tip bed: a palm's crown here cost Very Low 2 % more triangles at the circle)
+        if (inB.has(mx + ',' + mz) && VR.Plants && VR.R.byName.vm_tree_round_s) { for (const [px, py, pz, s] of VR.Plants.parts('vm_tree_round_s', mx - 1, t.y + 2, mz - 1, 0)) put(px, py, pz, s); t.tree = [mx, t.y + 2, mz]; }
       }
-      if (turns.length) nova.turns = turns.map(t => ({ road: t.road, end: t.end, x: t.x, z: t.z, r: t.r, bed: t.bed, y: t.y }));
+      if (turns.length) nova.turns = turns.map(t => ({ road: t.road, end: t.end, x: t.x, z: t.z, r: t.r, bed: t.bed, y: t.y, tree: t.tree || null }));
     }
     // the palms in the verges (the shared crown on a ringed trunk); then every trunk and every crown's anchor once more,
     // so a neighbour's fronds never cut a trunk or take the cell the smooth palm stands on
     const allPalms = isleFans.slice();
-    for (const p of turnPalms) allPalms.push(p);
     for (const rd of roads) { for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const p of run) allPalms.push(p); for (const p of rd.fans) allPalms.push(p); }
     if (VR.Plants && VR.Plants.palm) {
       for (const [x, z, , y, h] of allPalms) VR.Plants.palm(put, x, y, z, h);
