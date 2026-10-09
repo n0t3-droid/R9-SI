@@ -16,7 +16,7 @@
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const TL = (k) => (VR.I18N && VR.I18N.list ? VR.I18N.list(k) : []);
   const lang = () => (VR.I18N && VR.I18N.lang === 'en' ? 'en' : 'de');
-  const PRESET = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultra: 'g.set.pUltra' };
+  const PRESET = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultra: 'g.set.pUltra', ultraLite: 'g.set.pUltraLite' };
 
   function fmt(item, v) {
     if (item.vals) { const names = TL(item.vals); return names[Math.round(v) - item.min] || String(v); }
@@ -71,9 +71,9 @@
       const d = el('div', 'setrow'); d.dataset.key = 'preset';
       d.innerHTML = `<div class="sethead"><label>${esc(T(item.lab))}</label></div>`;
       const seg = el('div', 'seg');
-      for (const p of ['potato', 'low', 'balanced', 'high', 'ultra']) {
+      for (const p of ['potato', 'low', 'balanced', 'high', 'ultra', 'ultraLite']) {
         const b = el('button', S.preset === p ? 'on' : '', esc(T(PRESET[p])));
-        b.dataset.preset = p; b.title = p === 'potato' ? T('g.set.pVeryLowTip') : '';
+        b.dataset.preset = p; b.title = p === 'potato' ? T('g.set.pVeryLowTip') : p === 'ultraLite' ? T('g.set.pUltraLiteTip') : '';
         b.onclick = () => { game.applyPreset(p); ctx.rerender(); };
         seg.appendChild(b);
       }

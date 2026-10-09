@@ -20,6 +20,16 @@
     { p: 'balanced', v: 12 }, { p: 'high', v: 14 }, { p: 'high', v: 16 }, { p: 'ultra', v: 16 },
   ];
   const TOP = LADDER.length - 1;
+  // F9 · an integrated GPU (a Ryzen's Radeon Graphics or Vega, Intel's UHD / Iris / HD, Apple M, phones' Adreno and Mali):
+  // its ladder ends on Ultra · Leicht instead of Ultra, and the run starts there (game.js benchStart). A dedicated card
+  // (GeForce, Radeon RX — the RX Vega too —, Radeon Pro, Intel Arc) keeps the ladder above.
+  const LADDER_I = LADDER.slice(0, TOP).concat([{ p: 'ultraLite', v: 16 }]);
+  function integrated(name) {
+    const n = String(name || '');
+    if (!n || /\bRX\b|Radeon Pro|GeForce|NVIDIA|Quadro|\bArc\b/i.test(n)) return false;
+    return /Radeon(\(TM\))? Graphics|Vega|Iris|UHD|Intel|Adreno|Mali|Apple M/i.test(n);
+  }
+  const ladder = (igpu) => (igpu ? LADDER_I : LADDER);
   const clampStep = (s) => (Number.isFinite(s) ? Math.min(TOP, Math.max(0, Math.round(s))) : 4);
   const sane = (x) => Number.isFinite(x) && x > 0 && x <= 1000;   // a frame of 0 or below is a glitch, a stall over 1 s is a tab switch
   function median(xs) {
@@ -36,8 +46,8 @@
     return { n: a.length, median: med, p90, fps: 1000 / med };
   }
   // the step whose preset and view distance match the settings; a custom setup goes to the nearest view distance
-  function stepOf(preset, renderDist) {
-    const exact = LADDER.findIndex((x, i) => x.p === preset && x.v === renderDist);
+  function stepOf(preset, renderDist, igpu) {
+    const L = ladder(igpu), exact = L.findIndex((x, i) => x.p === preset && x.v === renderDist);
     if (exact >= 0) return exact;
     if (!Number.isFinite(renderDist)) return 4;
     let best = 4, bd = Infinity;
@@ -55,9 +65,12 @@
   function decide(o) {
     const ms = o && o.ms, s0 = clampStep(o && o.step);
     let target = o && o.target === 30 ? 30 : 60;
-    const out = (st, action, weak) => ({ step: st, preset: LADDER[st].p, renderDist: LADDER[st].v, fps: target, weak, action: st === s0 && action !== 'none' ? 'hold' : action, from: s0 });
+    const L = ladder(o && o.igpu);
+    const out = (st, action, weak) => ({ step: st, preset: L[st].p, renderDist: L[st].v, fps: target, weak, action: st === s0 && action !== 'none' ? 'hold' : action, from: s0 });
     if (!sane(ms)) return out(s0, 'none', false);
     let [st, action] = stepTable(ms, s0, target);
+    // (F9: on an integrated GPU Ultra · Leicht holds from 50 fps — its governor's cheap rungs carry the rest)
+    if (o.igpu && s0 === TOP && target === 60 && ms * target / 1000 <= 1.2) { st = TOP; action = 'hold'; }
     st = clampStep(st);
     let weak = false;
     if (target === 60 && st === 0 && ms > 1000 / 60) {
@@ -68,5 +81,5 @@
     }
     return out(st, action, weak);
   }
-  VR.Bench = { LADDER, median, summarize, stepOf, decide, clampStep };
+  VR.Bench = { LADDER, median, summarize, stepOf, decide, clampStep, integrated, ladder };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
