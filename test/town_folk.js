@@ -115,5 +115,31 @@ console.log('5. the afternoon');
   P.runAct.call(mgr, a, 0.1, 8000);
   check(!!sat && cafe.seats.some(s => s[0] === sat[0] && s[2] === sat[2]), 'a guest sits down on one of the café chairs');
 }
+console.log('6. the evening: the people on their way in count toward the street\'s cap');
+{
+  // run 3's dusk picture: at 13000 every villager's act turns 'sleep' (an indoor act, so free of the cap) while they still
+  // walk the street to their beds — 93 of the 149 were drawn in view (the cap 16, the Very Low preset's 8). Only who has
+  // arrived indoors is free of the cap; who is on the way is on the street.
+  const C = V.Crowd;
+  check(typeof C.onStreet === 'function', 'Crowd.onStreet says who the street\'s cap applies to');
+  if (typeof C.onStreet === 'function') {
+    const walking = { act: { type: 'sleep' }, pose: 'stand', path: [[0, 0, 0], [1, 0, 0]], walkAmt: 1 };
+    const homeWalk = { act: { type: 'home' }, pose: 'stand', path: [[0, 0, 0], [1, 0, 0]], walkAmt: 0.8 };
+    const arrived = { act: { type: 'home' }, pose: 'stand', path: null, walkAmt: 0 };
+    const asleep = { act: { type: 'sleep' }, pose: 'sleep', path: null, walkAmt: 0 };
+    const cafeSit = { act: { type: 'cafe' }, pose: 'sit', path: null, walkAmt: 0 };
+    const stroll = { act: { type: 'stroll' }, pose: 'stand', path: null, walkAmt: 0 };
+    const terrace = { act: { type: 'terrace' }, pose: 'sit', path: null, walkAmt: 0 };
+    check(C.onStreet(walking) && C.onStreet(homeWalk), 'a person walking home or to bed is on the street (capped)');
+    check(!C.onStreet(arrived) && !C.onStreet(asleep) && !C.onStreet(cafeSit), 'a person at home, asleep or sitting in an indoor café is indoors (drawn, free of the cap)');
+    check(C.onStreet(stroll) && C.onStreet(terrace), 'a stroller and a guest on the terrace are on the street');
+    // the evening of the hall city: 149 people, every one with the act 'sleep' at 13000, 120 still on their way: the
+    // street's cap keeps the nearest 16 (8 on Very Low) of the walkers, plus the 29 who are in
+    let walkers = 0, inside = 0;
+    for (let i = 0; i < 149; i++) { const a = i < 120 ? walking : asleep; if (C.onStreet(a)) walkers++; else inside++; }
+    const drawnHigh = Math.min(walkers, C.streetCap('high')) + inside, drawnLow = Math.min(walkers, C.streetCap('potato')) + inside;
+    check(drawnHigh === 45 && drawnLow === 37, `at dusk ${drawnHigh} of 149 are drawn on High, ${drawnLow} on Very Low (all 149 before)`);
+  }
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
