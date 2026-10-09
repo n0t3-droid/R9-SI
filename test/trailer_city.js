@@ -10,7 +10,7 @@
 //      accent at every path mouth, four or more compositions and both mirrors on the lots, palms along the roads every
 //      6–9 blocks, lamps with cyan heads, lawns, hedges, topiary and flower beds between the lots, a bed and a door in
 //      every home, the same plan twice
-//   4. the terraces (gen_hills.js, vgen 8): risers 4–5 blocks high, grass on the treads, a light line along every
+//   4. the terraces (gen_hills.js, vgen 8): risers 4–5 blocks high, green treads in rows, a light line along every
 //      terrace edge, a Villa Nova variant on every second terrace, a stair from each terrace to the next
 //   5. Very Low: the city's chunk triangles per column at F1 (the faces the Very Low preset draws: terrain, cutout,
 //      water, the mini-voxel far boxes and the near pieces within 12 blocks) within 10 % of the v042 town there
@@ -234,14 +234,15 @@ if (T8) {
   const got = new Map();
   const blockAt = (x, y, z) => { const ck = (x >> 4) + ',' + (z >> 4); let c = got.get(ck); if (!c) { c = g8.generate(x >> 4, z >> 4); got.set(ck, c); } return c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; };
   const topAt = (x, z) => { for (let y = 160; y > 60; y--) { const s = blockAt(x, y, z); if (s && (R.T.flags[s] & V.F.OPAQUE)) return y; } return -1; };
-  let treads = 0, grass = 0, edges = 0, lit = 0;
+  let treads = 0, grass = 0, rows = 0, edges = 0, lit = 0;
   for (const e of (T8.samples || []).slice(0, 240)) {
     const [x, z, lvl, isEdge] = e; const y = topAt(x, z); if (y < 0) continue;
     if (isEdge) { edges++; if (/plaza_line/.test(nameOf(blockAt(x, y, z)))) lit++; }
-    else { treads++; if (/grass_block|vm_crop_rows/.test(nameOf(blockAt(x, y, z))) || nameOf(blockAt(x, y + 1, z)) === 'vm_crop_rows') grass++; }
+    else { treads++; const n = nameOf(blockAt(x, y, z)); if (/grass_block|moss_block|vm_crop_rows/.test(n) || nameOf(blockAt(x, y + 1, z)) === 'vm_crop_rows') grass++; if (n === 'moss_block') rows++; }
     void lvl;
   }
-  check(treads >= 40 && grass >= treads * 0.85, `grass on the treads (${grass} of ${treads} sampled tread cells)`);
+  // (the treads in rows along the hill's contours, t3_09: grass and a darker moss row by turns)
+  check(treads >= 40 && grass >= treads * 0.85 && rows >= treads * 0.2 && rows <= treads * 0.8, `green treads in rows along the contours (${grass} of ${treads} sampled tread cells green, ${rows} of them the darker row)`);
   check(edges >= 40 && lit === edges, `a light line along every terrace edge (${lit} of ${edges} sampled edge cells)`);
   const vl = T8.villas || [];
   const lvSet = new Set(vl.map(v => v.level));

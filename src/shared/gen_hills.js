@@ -287,7 +287,9 @@
       const x = x0 + lx, z = z0 + lz, c = HILLS.cellT8(g, x, z);
       if (c.y === c.h && c.k < 0) continue;
       for (let y = c.y + 1; y <= Math.min(254, c.h + 14); y++) { const i = (y << 8) | (lz << 4) | lx; const b = blocks[i]; if (b && !(RT.flags[b] & FL.FLUID)) blocks[i] = 0; }
-      blocks[(c.y << 8) | (lz << 4) | lx] = HILLS.edgeT8(g, x, z) ? K.LINE : K.GRASS;
+      // (the tread in rows along the hill's own contours, t3_09: where the natural ground stood an odd number of blocks
+      //  above the tread, moss — a darker green, the same one full block)
+      blocks[(c.y << 8) | (lz << 4) | lx] = HILLS.edgeT8(g, x, z) ? K.LINE : (c.k >= 0 && ((c.h - c.y) & 1)) ? K.MOSS : K.GRASS;
       for (let y = Math.max(1, c.y - 14); y < c.y; y++) { const i = (y << 8) | (lz << 4) | lx; if (blocks[i] && (RT.flags[blocks[i]] & FL.OPAQUE)) blocks[i] = K.MOSS; }
     }
     // the stairways and trees, then the villas over this chunk
