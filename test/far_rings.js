@@ -126,5 +126,32 @@ console.log('f · budget arithmetic');
   const n = F.bandTiles(14, 64), per = 40 * 1024;
   check(n * per < F.capBytes(4) / 2, 'arithmetic: the whole band at 40 KB a tile fits in half the cap', n + ' tiles × 40 KB = ' + (n * per / MB).toFixed(1) + ' MB');
 }
+console.log('g · a form wholly under ring 0 is not drawn (no draw call, no pixel thrown away)');
+{
+  if (!F.underRing0) { check(false, 'VR.Far.underRing0 missing'); } else {
+    const N = 136, H = 68, m = new Uint8Array(N * N);
+    // the chunks are drawn out to 14.5 columns around the camera's (column 3, −2): the mask holds 255 there
+    const ccx = 3, ccz = -2;
+    for (let dz = -H; dz < H; dz++) for (let dx = -H; dx < H; dx++) if (Math.hypot(dx, dz) <= 14.5) m[(dz + H) * N + dx + H] = 255;
+    let bad = 0, hidden = 0, n = 0;
+    for (let tz = -6; tz <= 5; tz++) for (let tx = -6; tx <= 6; tx++) {
+      const hid = F.underRing0(m, N, tx, tz, ccx, ccz);
+      // the truth: the tile's 16 columns and the ring of columns around them (the soft edge reads its neighbours) are drawn
+      // by the chunks, so every threshold of every pixel is ring 0's (VR.Far.draws: ring 1 needs t ≥ min(bilinear, nearest))
+      let all = true;
+      for (let z = tz * 4 - 1; z <= tz * 4 + 4; z++) for (let x = tx * 4 - 1; x <= tx * 4 + 4; x++) if (Math.hypot(x - ccx, z - ccz) > 14.5) all = false;
+      n++; if (hid) hidden++; if (hid !== all) bad++;
+    }
+    check(bad === 0 && hidden > 0 && hidden < n, 'skipped exactly when its columns and their neighbours are all the chunks\'', hidden + ' of ' + n + ' tiles skipped');
+    // one column of a hidden tile still fading in (or one neighbour): the tile is drawn
+    let tx = 0, tz = 0; for (let a = -3; a <= 3; a++) if (F.underRing0(m, N, a, -1, ccx, ccz)) { tx = a; tz = -1; break; }
+    const k = (tz * 4 + 2 - ccz + H) * N + tx * 4 + 1 - ccx + H, keep = m[k];
+    check(F.underRing0(m, N, tx, tz, ccx, ccz), 'a tile in the middle of ring 0 is hidden', tx + ', ' + tz);
+    m[k] = 128;
+    check(!F.underRing0(m, N, tx, tz, ccx, ccz), 'one of its columns fading in: drawn');
+    m[k] = keep;
+    check(!F.underRing0(m, N, 40, 0, ccx, ccz), 'a tile outside the mask: drawn');
+  }
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

@@ -166,10 +166,13 @@
       gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, r.texNoise); gl.uniform1i(p.u.u_noise, 1);
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, mask1); gl.uniform1i(p.u.u_mask1, 2);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE);
+      // (a form wholly under ring 0 — kept for the moment its chunks leave — would only be thrown away pixel by pixel)
+      const mF = this.hz.maskF, ccx = this.mcx, ccz = this.mcz;
       let n = 0, tris = 0;
       for (let i = 0; i < list.length; i++) {
         const t = list[i], m = t.gpu;
         if (!m || !(t.fade > 0)) continue;
+        if (mF && F.underRing0(mF, MASK_N, t.tx, t.tz, ccx, ccz)) continue;
         const ox = t.tx * 64 - cam.x, oz = t.tz * 64 - cam.z;
         if (!mat4.boxInFrustum(r.planes, ox + m.bx0, m.minY - cam.y, oz + m.bz0, ox + m.bx1, m.maxY - cam.y, oz + m.bz1)) continue;
         gl.uniform3f(p.u.u_tileOrigin, ox, -cam.y, oz);
