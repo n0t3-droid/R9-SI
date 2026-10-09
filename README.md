@@ -103,6 +103,56 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🌴 Realism meets voxel — the trailer's world, up close and far away (v0.42)
+**🔭 The far world is real.** On High and Ultra a third ring of real terrain forms stands between the chunks and the
+5 km horizon, out to about 1 km: the Gate Temple's spires and gold windows, Nova Haven's roads and houses, the
+canyon's mesas with lit and shaded walls, the Mountain Station's tower on its peak — where the horizon used to show
+terraces. The render-distance slider goes to 32 chunks on Ultra. Very Low is untouched.
+
+**🌴 Palms that are palms, furniture that is furniture.** The trailer's plants are in every new world (vgen 7): palm
+crowns, round trees, tufts, flowers, blossom bushes, rice crops. From Low upward the palms are drawn as smooth meshes —
+slender ringed trunks, tiered crowns of broad feathery fronds that move in the wind, coconuts, a few dead fronds —
+and 171 pieces of furniture become smooth: sofas and armchairs with cushions and seams, tables and chairs, beds, floor
+and table lamps that glow, chandeliers, rugs with borders, kitchen blocks, bookshelves, bar stools, planters.
+*🌿 Glatte Pflanzen* and *🛋 Glatte Möbel* in the settings; Very Low keeps the voxel pieces exactly as before.
+
+**🏠 Villa Nova.** The trailer's house as a catalogue villa the towns place and the Bauhand offers: stepped white
+masses, turquoise glass bands in orange frames, cyan light lines along every slab edge, box bays with big windows, a
+roof garden with the round tree, the floating glass stair, the pad with its ring, cove light, a glass wall to the back
+garden, curved light-line paths with palms and topiary.
+
+**🛕 Gate Temple & Hangar Hall.** The portal is a translucent energy field with a hot rim — the palm city shows
+through it. A shuttle flies its loop down the runway, through the hangar mouth, lands on the pad with plumes, lift
+jets and dust and takes off again; two heroes with blasters stand at the consoles and walk out to the corridor's end;
+radar holo screens sweep, wall strips pulse, console lights blink; amber bars light the runway; the hex corridor is
+seven high with a veil at its city end. *Animierte Anzeigen* in the settings (off on Very Low).
+
+**🚀 Shuttles.** One flight model for every ship (the mouse is your head), a furnished, walkable cabin with the
+cockpit's bulkhead, docking traffic that parks on the apron and turns to face the plaza, the wingmen closing up beside
+their leader, a gamepad that flies the ship.
+
+**🌊 Water, 🌬 air, ✋ presence.** Gerstner waves with foam and falling sheets, planar reflections by tier, the swell
+running with the wind; dust motes in walled-in sunbeams, pollen, fireflies with a long glow, falling leaves, snow,
+birds — capped per tier, Very Low keeps fireflies and snow; FOV 75 with a sprint kick, head bob, hand sway, a landing
+dip, a nudge when a block is set or taken, optional turn inertia; the terrain sways with the real wind and its gusts.
+
+**Also in this release.** 🎨 the trailer's grade (saturation and contrast up, haze down, the violet-blue sky veil);
+the Heartland's set pieces (Ember Canyon vents, gems and the aether river; Spire Citadel crystals, lava streams,
+steam and beacons; Sky Isles hanging crystals and the stone-arch viaduct); the heroes up close (blasters at the
+chest, cap helmets, glowing chest plates) and the dusk walk home; 🐾 Begleiter — Glimmerfuchs, Mooskätzchen,
+Kristallwelpe — tamed, following, whistled for, saved with the world; 💡 Erfinderwerkstatt — 167 recipes from six
+starters, a card screen with confetti, the book, rewards (key I); 🏗 Baustelle — planned buildings rise in front of
+you with scaffold, builders, a crane, dust, a fanfare and a Richtfest tree (*Sofort* on Very Low); ✨ Wunder der Welt
+— eight wonders rising near the player, discovery, codex and Wunderkompass; F2 material relief (normal maps per
+material family, a detail layer up close, wet look with puddles); F6 furnished village homes with gutters, downpipes,
+lamps and planters by the door, street decor in modern towns; the citadel viaducts carry a track and trams.
+
+Known gaps, honestly: the far ring does not show what a player builds beyond the chunks and has no sun shadows of its
+own; curtains, fridges, art and wardrobes are still voxel; a rug shows a hole where a piece stands on it; the flying
+shuttle is drawn smaller than its parked twin so it fits the portal; the hall's two big radar screens per wall are
+many small ones. The Very Low cost of the plants (vgen 7) is measured on the release machine during the day; if a
+new world costs more than 6 % per frame on Very Low, the next build thins the crowns there.
+
 ### 🖐 Bauhand, ✨ Assistent, 📽 Zeitraffer, 🪞 Spiegel, 🎨 Aussehen, 🔊 Klang (v0.41)
 **🖐 Bauhand (B).** A ring of what you hold and what you point at: pick a house, a piece, a vehicle or furniture, a cyan
 ghost snaps to the ground and shows its footprint, a click places it as a plan the game builds — Z takes it back.
