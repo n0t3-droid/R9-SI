@@ -476,8 +476,12 @@
       // the row of pinnacles that crowns the long wall seen from the land)
       for (const s of [-1, 1]) {
         for (let dv = -1; dv <= 1; dv++) { for (let y = F + 21; y <= F + 26; y++) P(s * (H.HW + 1), y, vp + dv, STONE); P(s * (H.HW + 1), F + 27, vp + dv, BAND); P(s * (H.HW + 2), F + H.WALLTOP, vp + dv, 'smooth_quartz_stairs', { facing: s > 0 ? 3 : 1, half: 1 }); }   // (the wall's cornice wraps round the pier)
+        // (the pinnacle tapers: sloped shoulders on the cap, a shaft, a capital, a gold course and a lantern as its finial —
+        // a row of lights along the roofline at dusk)
+        P(s * (H.HW + 1), F + 28, vp - 1, 'smooth_quartz_stairs', { facing: 2, half: 0 }); P(s * (H.HW + 1), F + 28, vp + 1, 'smooth_quartz_stairs', { facing: 0, half: 0 });
         for (let y = F + 28; y <= F + 31; y++) P(s * (H.HW + 1), y, vp, 'quartz_pillar', { axis: 0 });
-        P(s * (H.HW + 1), F + 32, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 33, vp, BAND); P(s * (H.HW + 1), F + 34, vp, 'quartz_pillar', { axis: 0 });
+        P(s * (H.HW + 1), F + 32, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 33, vp, BAND); P(s * (H.HW + 1), F + 34, vp, 'lantern', { hanging: 0 });
+        { const [x, z] = W2(s * (H.HW + 1), vp); plan.lamps.push([x, F + 34, z]); }
       }
       // (round 2c) a flying buttress from it: a stone half-arch leaping over the aisle's roof from the clerestory to the
       // buttress pier — its top falling from under the clerestory's cornice (30) to the pier's cap (27), its underside an
