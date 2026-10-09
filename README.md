@@ -103,6 +103,37 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🏛 Weißstadt, the trailer's sky, no crystals, 📊 Stufentest (v0.44)
+**🏛 The Weißstadt hall city (vgen 9).** The villages of every climate get the airing the owner's references ask for —
+streets five wide, a plaza with a fountain, lots 1.6 × — and the Weißstadt stands INSIDE a vast white vaulted hall:
+a glass vault in a dark frame grid over a shop street with storefront windows, signs, striped awnings, street lamps,
+flower boxes, vines and café chairs, a market side aisle with stalls, barrels and crates, the apse with its staircase
+and gallery. 149 people live there under a budget rule (one per nine blocks of walkable street plus two per home), the
+street's cap counts the people on their way in, and the people nobody sees cost less (no path search for an unseen
+walk, a standing person needs no collision query). The hall's long wall, gate and tall windows show from outside.
+
+**🌌 The trailer's sky.** Measured from the frames: three colour stops — white-cyan at the horizon, blue, a navy space
+with stars and the nebula at the zenith by day; lavender to violet to navy at dusk; the far fog matches the horizon
+(targets in docs/trailer/sky_ref.json, the game within ΔE 7–11 per band). One world-time wind for the water and the
+plants, without a jump at midnight.
+
+**✨ No crystals.** New worlds (vgen 9) have no crystal anywhere, big or small: rock needles, lilac and allium, blossom
+trees and tuff where the prism spires stood; basalt meteorites in the craters; hoodoos in the canyon; stone pinnacles
+and boulders at the citadel; round trees, glow-berry vines and roots on the sky isles; dripstone pockets, snow and white
+calcite in the caves and the Drift; lavender-and-white villages with street lamps, a fountain and flowerbeds. The far
+ring and the horizon tiles follow. Old worlds keep what they have.
+
+**📊 Stufentest and the GPU-Profil.** Bild · Automatik has a second button: the Stufentest measures every quality step
+in turn on the scene you stand in (3 s each, the governor off) and says which step runs ruckelfrei (the slow frames
+still make 50 fps) and which is still spielbar (30 fps median); your settings come back untouched and the table stays
+under the Automatik. With F3 open the overlay's second line shows where the graphics card spends the frame — shadow,
+sky, opaque, cutout, props, far, models, mirror, water, tsr, post — and the worst frame per pass of the last 60: the
+instrument for a weak PC. Measured costs: a vgen-9 village column renders near 55 % of a vgen-8 one, the far boxes 52 %
+(the blocks' streams alone 193 %: walls and the coffered vault — the VX detail halves); vgen 9 generates at least as
+fast as vgen 8 (55–56 ms vs 57–67 ms for a 3 × 3-chunk highlands patch). Known gaps: on Very Low the hall's far end
+shows sky beyond the 4-chunk view; the Weißstadt's splendour (arches, columns, balustrades, the grand staircase, the
+full market) and realistic people are the next rounds.
+
 ### 🏙 Nova Haven, Nahtlos by default, every piece of furniture smooth (v0.43)
 **🏙 Nova Haven.** The trailer's palm city stands in every new world (vgen 8): Villa Nova as a family of five
 compositions (classic, long, tower, corner, bungalow — each mirrored) along a curved avenue that forks round a planted
