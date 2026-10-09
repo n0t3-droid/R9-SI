@@ -1105,6 +1105,7 @@
       const t = p.target, ts = t ? R.types[R.T.type[t.state]] : null;
       const aq = this.aq || {};
       return `R9-SI  ${Math.round(this.fps || 0)} fps  scale ${Math.round(r.q.scale * 100)}%  js ${(this.jsMs || 0).toFixed(1)} ms${r.gpuMs !== undefined ? '  gpu ' + r.gpuMs.toFixed(1) + ' ms' : ''}  smart ${aq.stack ? 'G' + aq.g + ' C' + aq.c + (aq.gpuBound ? ' gpu-bound' : aq.cpuBound ? ' cpu-bound' : '') : 'off'}\n` +
+        (r.prof && r.prof.line() ? r.prof.line() + (r.prof.peaks() ? '  ·  max ' + r.prof.peaks() : '') + '\n' : '') +
         `XYZ ${p.pos[0].toFixed(2)} / ${p.pos[1].toFixed(2)} / ${p.pos[2].toFixed(2)}\nChunk ${x >> 4} ${z >> 4}  Facing ${['N', 'E', 'S', 'W'][VR.Place.playerFacing(p.yaw)]}\n` +
         `Biome ${b ? b.name : '?'}  Light sky ${l >>> 12} rgb ${(l >> 8) & 15},${(l >> 4) & 15},${l & 15}\n` +
         `Time ${Math.floor(this.env.timeOfDay)} day ${this.env.day}  rain ${E.rain.toFixed(2)}  snow ${E.snow.toFixed(2)}  wind ${E.wind.toFixed(1)}\n` +
@@ -1139,7 +1140,7 @@
       if (i.hit('Slash')) { ui.openChat('/'); return; }
       if (i.hit('F1')) { this.hideHud = !this.hideHud; document.getElementById('hud').style.visibility = this.hideHud ? 'hidden' : 'visible'; }
       if (i.hit('F2')) this.screenshot();
-      if (i.hit('F3')) { this.debugOn = !this.debugOn; if (!this.debugOn) ui.debug(null); }
+      if (i.hit('F3')) { this.debugOn = !this.debugOn; this.renderer.profDetail = this.debugOn; if (!this.debugOn) ui.debug(null); }
       // piloting a ship: F5 / C cycle the ship's own views and Q looks back (flight.js) — nothing gets dropped
       const piloting = !!this.flight;
       if (i.hit('F5') && !piloting) this.camMode = (this.camMode + 1) % 3;
