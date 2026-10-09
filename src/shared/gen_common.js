@@ -66,16 +66,25 @@
   //        top: the top row's state (moss, grass) or 0, root (default 2), seed,
   //        keep(state) → true leaves a cell holding that block as it is (a building beside the rock) }
   // rock replaces what is there (w.set; a writer with ok() — a chunk's ColumnWriter — is asked first, so the material is
-  // only worked out for the cells of its own chunk); returns the y of the top row
+  // only worked out for the cells of its own chunk); returns the y of the top row.
+  // A chunk's ColumnWriter (x0, z0) is visited over its own 16 × 16 columns only: the realm features run for a chunk and
+  // its eight neighbours through the chunk's writer, so most passes over a rock miss it — they now cost nothing (the
+  // same cells are written: the ones beyond the chunk were refused by ok() anyway; no draw, only hashes of the cell)
   GEN.pinnacle = function (w, x, y, z, o) {
     const H = VR.M.hash2, ok = w.ok ? (px, py, pz) => w.ok(px, py, pz) : null;
     const h = Math.max(2, o.h | 0), r0 = Math.max(0.6, o.r), root = o.root === undefined ? 2 : o.root, seed = o.seed | 0;
     const lx = o.lean ? o.lean[0] : 0, lz = o.lean ? o.lean[1] : 0;
+    const clip = !!ok && typeof w.x0 === 'number' && typeof w.z0 === 'number';
+    const X0 = clip ? w.x0 : -1e9, X1 = clip ? w.x0 + 15 : 1e9, Z0 = clip ? w.z0 : -1e9, Z1 = clip ? w.z0 + 15 : 1e9;
+    // (the whole rock beside the chunk: its widest row is r0 + 0.3, ri one more, the lean at most |lean| out)
+    const reach = r0 + 3;
+    if (clip && (x + Math.max(0, lx) + reach < X0 || x + Math.min(0, lx) - reach > X1 || z + Math.max(0, lz) + reach < Z0 || z + Math.min(0, lz) - reach > Z1)) return y + h - 1;
     for (let t = -root; t < h; t++) {
       const f = Math.max(0, t) / h;
       const r = r0 * (1 - 0.45 * Math.pow(f, 1.2)) + ((H(t, seed, 0x51) & 3) === 0 ? 0.3 : 0);
       const cx = x + lx * f * f, cz = z + lz * f * f, rx = Math.round(cx), rz = Math.round(cz), ri = Math.ceil(r + 0.5);
-      for (let dx = -ri; dx <= ri; dx++) for (let dz = -ri; dz <= ri; dz++) {
+      const dx0 = Math.max(-ri, X0 - rx), dx1 = Math.min(ri, X1 - rx), dz0 = Math.max(-ri, Z0 - rz), dz1 = Math.min(ri, Z1 - rz);
+      for (let dx = dx0; dx <= dx1; dx++) for (let dz = dz0; dz <= dz1; dz++) {
         const px = rx + dx, pz = rz + dz, ex = px - cx, ez = pz - cz;
         if (ok && !ok(px, y + t, pz)) continue;
         const rr = r + ((H(px * 7 + t, pz * 13 - t, seed) & 255) / 255 - 0.5) * 0.5;
