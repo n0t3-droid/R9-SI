@@ -6,7 +6,7 @@
 //   2. a two-material piece (a fabric top on a wood leg) keeps its crease: the vertices on the seam are split per
 //      material and their normals differ; the same piece in one material has no crease
 //   3. a 32-res chair (the catalogue's black dining chair) stays inside its block footprint in the game's layout
-//   4. all 380 catalogue models through the mesher (the game's policy, a worker-like loop): a sane mesh each; the pieces
+//   4. all catalogue models (380 and the Weißstadt's 13) through the mesher (the game's policy, a worker-like loop): a sane mesh each; the pieces
 //      the game meshes (SV.autoTables) at most 25 ms each (the CPU time; the others — the 7-block garage door, the
 //      tree crowns — are reported)
 //   5. the game's layout: centred on the footprint like the hand-built pieces, Uint16 indices, opaque first, glass after,
@@ -131,7 +131,7 @@ for (const n of names) {
 }
 console.log(`    CPU time, all 380: mean ${(tsum / names.length).toFixed(1)} ms, max ${tmax.toFixed(1)} ms (${maxName}), the most vertices ${vmax}`);
 console.log(`    the ${gn} models the game meshes: mean ${(gsum / gn).toFixed(1)} ms, max ${gmax.toFixed(1)} ms (${gName}); ${(tris / cells).toFixed(0)} triangles a block cell near`);
-check(names.length === 380, `the catalogue has 380 models (${names.length})`);
+check(names.length >= 380, `the catalogue has its models (${names.length}: 380 and the Weißstadt's)`);
 check(!bad.length, 'every model gets a sane mesh' + (bad.length ? ': ' + bad.slice(0, 8).join(', ') : ''));
 check(gn > 150 && gmax <= 25, `at most 25 ms a model the game meshes (max ${gmax.toFixed(1)} ms, ${gName}; ${gn} models since round II's hand-built pieces)`);
 

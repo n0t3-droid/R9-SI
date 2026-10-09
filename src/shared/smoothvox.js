@@ -594,12 +594,14 @@
   // The list follows the registry, so every thread makes the same one: an entry's index means the same piece in the
   // workers and on the main thread; its prop kind is AUTO0 + the index (the mesher's anchors, props.js PR.AUTO).
   const AUTO0 = SV.AUTO0 = 4096;
-  SV.SKIP = /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|bush_blossom|flower_cluster|tuft_grass|crop_rows)/;
+  // (the Weißstadt's window cells, gen_hallcity.js, are wall: a wall of them must stay one wall)
+  SV.SKIP = /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|bush_blossom|flower_cluster|tuft_grass|crop_rows|town_window_)/;
   // the pieces that keep their voxels because they look better so (every catalogue piece was drawn both ways side by
   // side, the plan's section 5): a picture, lettering, a weave, many small lights or things — their detail is finer than
   // a smooth surface at 16 cells a block holds, and a picture's faces are flat anyway — and the res-32 fronts whose
   // one-voxel seams the 16-a-block surface closes (the kitchen fronts, the lockers)
-  SV.KEEP = /^vm_(art_|deco_canvas_|office_pinboard|shop_menuboard|house_sign|shop_neon_|deco_neon_|office_whiteboard|living_rug_|office_panel_felt|shop_shelf_grocery|kitchen_shelf|wall_shelf|deco_candles_tray|laundry_basket|deco_macrame_wall|towel_rail|kitchen_(sage|navy|greige)_|office_lockers|mobility_parcellocker|smart_(speaker|display|panel|thermostat|router|mesh|doorbell|heatpump|battery|inverter))/;
+  // (and the Weißstadt's shop signs — their pictograms — and market stalls — their crates of produce and jars)
+  SV.KEEP = /^vm_(art_|deco_canvas_|office_pinboard|shop_menuboard|house_sign|shop_neon_|deco_neon_|office_whiteboard|living_rug_|office_panel_felt|shop_shelf_grocery|kitchen_shelf|wall_shelf|deco_candles_tray|laundry_basket|deco_macrame_wall|towel_rail|kitchen_(sage|navy|greige)_|office_lockers|mobility_parcellocker|smart_(speaker|display|panel|thermostat|router|mesh|doorbell|heatpump|battery|inverter)|town_sign_|town_stall_)/;
   SV.enabled = true;                    // (the tests hold it back to take the „before" picture)
   let AT = null;
   SV.autoTables = function () {
