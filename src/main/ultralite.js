@@ -1,0 +1,94 @@
+// ============================================================================
+// F9 · Ultra für schwache PCs („Ultra · Leicht"): the pure rules the renderer, the world and the game share — no GL, no
+// DOM, node-tested (test/ultralite_*.js). Plan: docs/superpowers/plans/2026-10-08-f-ultralite.md
+//   UL.Shadow   Schatten-Takt: the shadow map kept up to date in tiles (toroidal addressing, cadence by ring, the sun
+//               step built over a few frames in a second buffer)
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const UL = VR.UL = VR.UL || {};
+
+  // ---------------------------------------------------------------- Schatten-Takt
+  // The map is the same as without the takt (the same size, reach R, texel lattice and filtering). Only its addressing
+  // and its updates differ:
+  //  · texel = light-space position mod 2R (the shaders add u_shadowOff = frac((Wc − R) / 2R) to their window coordinate
+  //    and sample with REPEAT): the window [Wc − R, Wc + R] moves by whole tiles and only the tiles entering it are drawn
+  //  · depth is measured from a fixed light-space origin P0 (a full redraw re-bases it, when the eye is REBASE blocks away)
+  //  · a changed section marks the tiles under its light-space box; dirty tiles are redrawn by ring: the 3 × 3 around the
+  //    eye the same frame, ring 1 every 2nd frame, ring 2 every 4th (slow × 2 when the governor asks)
+  //  · a sun step (the renderer's 0.0044 rad quantum, ≈ 0.25°) builds the next map in a second buffer, a slice of the
+  //    casters a frame (depth is order-independent), then the buffers swap
+  const SH = UL.Shadow = {};
+  SH.N = 16;          // tiles a side (12 blocks on shadows 3)
+  SH.HYST = 0.75;     // the window moves when the eye is this many tiles off its centre
+  SH.REBASE = 64;     // blocks from the depth origin (horizontal + ½ vertical) before a full redraw
+  SH.SLICES = 6;      // a sun step is drawn over this many frames
+  SH.Q = 0.0044;      // the sun's angle step (radians), as renderShadows
+  SH.DEPTH = 260;     // the depth range ± around the origin, as renderShadows
+  SH.MAX_TILES = 40;  // dirty tiles redrawn in one frame at most (the rest wait, nearest first)
+  SH.tile = (R, N) => 2 * R / (N || SH.N);
+  // the window centre on one axis (a multiple of the tile T): kept while the eye stays within HYST tiles of it
+  SH.center = function (prev, l, T) {
+    if (prev !== null && prev !== undefined && Math.abs(l - prev) <= SH.HYST * T) return prev;
+    return Math.round(l / T) * T;
+  };
+  SH.offset = function (wc, R) { const v = (wc - R) / (2 * R); return v - Math.floor(v); };
+  SH.slot = (i, N) => (((i % N) + N) % N);
+  // the window's tile range around a centre wc (absolute tile indices, inclusive)
+  SH.windowTiles = function (wc, T, N) { const k = Math.round(wc / T), n = N || SH.N; return [k - n / 2, k + n / 2 - 1]; };
+  SH.ring = function (ti, tj, ci, cj) { const d = Math.max(Math.abs(ti - ci), Math.abs(tj - cj)); return d <= 1 ? 0 : d <= 3 ? 1 : 2; };
+  SH.due = function (ring, frame, slow) { const k = slow > 1 ? slow : 1; return ring === 0 ? true : ring === 1 ? frame % (2 * k) === 0 : frame % (4 * k) === 0; };
+  // the tiles that enter the window when its centre tile moves kOld → kNew on one axis: [first, last], null or 'all'
+  SH.entering = function (kOld, kNew, N) {
+    const n = N || SH.N, d = kNew - kOld;
+    if (!d) return null;
+    if (Math.abs(d) >= n) return 'all';
+    return d > 0 ? [kOld + n / 2, kNew + n / 2 - 1] : [kNew - n / 2, kOld - n / 2 - 1];
+  };
+  // a tile range split where the texels wrap (each run is contiguous in the texture)
+  SH.runs = function (i0, i1, N) {
+    const n = N || SH.N, out = [];
+    let a = i0;
+    while (a <= i1) { const b = Math.min(i1, (Math.floor(a / n) + 1) * n - 1); out.push([a, b]); a = b + 1; }
+    return out;
+  };
+  // the light's view (rotation only), as renderShadows builds it
+  SH.lightView = function (out, L) {
+    const up = Math.abs(L[1]) > 0.99;
+    return VR.mat4.lookAt(out, 0, 0, 0, -L[0], -L[1], -L[2], up ? 1 : 0, up ? 0 : 1, 0);
+  };
+  SH.toLight = (lv, X) => [lv[0] * X[0] + lv[4] * X[1] + lv[8] * X[2], lv[1] * X[0] + lv[5] * X[1] + lv[9] * X[2], lv[2] * X[0] + lv[6] * X[1] + lv[10] * X[2]];
+  SH.apply = function (m, v) {
+    const x = m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12], y = m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13];
+    const z = m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14], w = m[3] * v[0] + m[7] * v[1] + m[11] * v[2] + m[15];
+    return [x / w, y / w, z / w];
+  };
+  // ortho(x0, x1, y0, y1, ±depth) × translate(lv · d − (wx, wy, 0)) × lv: camera-relative positions → clip
+  function compose(out, lv, d, wx, wy, x0, x1, y0, y1, depth) {
+    const M4 = VR.mat4, t = M4.create(), o = M4.create(), m = M4.create();
+    const l = SH.toLight(lv, d);
+    t[12] = l[0] - wx; t[13] = l[1] - wy; t[14] = l[2];
+    M4.ortho(o, x0, x1, y0, y1, -depth, depth);
+    M4.mul(m, t, lv);
+    return M4.mul(out, o, m);
+  }
+  // the lookup: d = eye − P0, wcRel = window centre − P0 in light space; the window maps to clip [−1, 1]
+  SH.lookupMatrix = (out, lv, d, wcRel, R, depth) => compose(out, lv, d, wcRel[0], wcRel[1], -R, R, -R, R, depth || SH.DEPTH);
+  // drawing a light-space rectangle [x0, x1] × [y0, y1] (relative to P0) into its viewport
+  SH.tileMatrix = (out, lv, d, x0, x1, y0, y1, depth) => compose(out, lv, d, 0, 0, x0, x1, y0, y1, depth || SH.DEPTH);
+  // a world box's light-space extent [x0, x1, y0, y1] (centre ± |lv| · half size)
+  SH.lightBox = function (lv, x0, y0, z0, x1, y1, z1, out) {
+    const cx = (x0 + x1) * 0.5, cy = (y0 + y1) * 0.5, cz = (z0 + z1) * 0.5, hx = (x1 - x0) * 0.5, hy = (y1 - y0) * 0.5, hz = (z1 - z0) * 0.5;
+    const lx = lv[0] * cx + lv[4] * cy + lv[8] * cz, ly = lv[1] * cx + lv[5] * cy + lv[9] * cz;
+    const ex = Math.abs(lv[0]) * hx + Math.abs(lv[4]) * hy + Math.abs(lv[8]) * hz, ey = Math.abs(lv[1]) * hx + Math.abs(lv[5]) * hy + Math.abs(lv[9]) * hz;
+    out[0] = lx - ex; out[1] = lx + ex; out[2] = ly - ey; out[3] = ly + ey;
+    return out;
+  };
+  SH.tilesOf = function (lb, T, out) { out[0] = Math.floor(lb[0] / T); out[1] = Math.floor(lb[1] / T); out[2] = Math.floor(lb[2] / T); out[3] = Math.floor(lb[3] / T); return out; };
+  // the stepped sun (renderShadows' quantization): its key and its direction
+  SH.sunKey = function (L) {
+    const q = SH.Q, qe = Math.round(Math.asin(Math.max(-1, Math.min(1, L[1]))) / q) * q, qz = Math.round(Math.atan2(L[2], L[0]) / q) * q;
+    return { key: (qe * 1000 + qz).toFixed(4), L: [Math.cos(qz) * Math.cos(qe), Math.sin(qe), Math.sin(qz) * Math.cos(qe)] };
+  };
+  SH.slice = (n, K, k) => [Math.floor(k * n / K), Math.floor((k + 1) * n / K)];
+})(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
