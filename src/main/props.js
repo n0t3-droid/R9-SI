@@ -1131,4 +1131,13 @@
     if (kind >= PR.FURN0) { const key = PR.furnKey(kind, 0); return key ? PR.furnModel(key) : null; }
     return null;
   };
+
+  // ---------------------------------------------------------------- t-form: the surface-nets models (smoothvox.js)
+  // Every model piece without a hand-built mesh above gets one from smoothvox.js (made in a worker when its first piece
+  // comes into a mesh): a kind from AUTO0 names it, registerAuto puts its definition and its finished meshes into the
+  // tables above, furnDef finds it. Hand-built meshes win (their blocks never get an auto kind); nothing above changes.
+  PR.AUTO0 = 4096; PR.AUTO = {};
+  PR.registerAuto = function (kind, key, size, cell, mesh) { const k = 'auto:' + key; PR.AUTO[kind] = { model: k, cell: cell || null }; FM[k] = { size: size.slice(), build: null, auto: true }; FCACHE[k] = { near: mesh.near, far: mesh.far || null, key: k, size: size.slice() }; return k; };
+  const furnDefHand = PR.furnDef;
+  PR.furnDef = function (kind) { return kind >= PR.AUTO0 ? PR.AUTO[kind] || null : furnDefHand(kind); };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

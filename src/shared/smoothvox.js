@@ -425,4 +425,178 @@
     while (this.map.size > 1 && (this.map.size > this.max || this.bytes > this.maxBytes)) { const k0 = this.map.keys().next().value; this.bytes -= this.map.get(k0).b; this.map.delete(k0); }
   };
   SV.LRU.prototype.clear = function () { this.map.clear(); this.bytes = 0; };
+
+  // ================================================================ the game: which pieces, when ready, the lazy meshes
+  // The pieces that get a surface-nets mesh: every VM model (vxModel) without a hand-built smooth mesh (not in
+  // VR.PROP_FURN — hand-built meshes win), that is no prop of its own (the palms), does not join its neighbours into one
+  // form (the windows, gutters, downpipes, the garage door, the Nova tread) and is not one of the plants pack's crowns,
+  // bushes, tufts and crops (the terrain's own plants). A switch (o.toggle) has a second entry: its switched-off look.
+  // The list follows the registry, so every thread makes the same one: an entry's index means the same piece in the
+  // workers and on the main thread; its prop kind is AUTO0 + the index (the mesher's anchors, props.js PR.AUTO).
+  const AUTO0 = SV.AUTO0 = 4096;
+  SV.SKIP = /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|bush_blossom|flower_cluster|tuft_grass|crop_rows)/;
+  SV.enabled = true;                    // (the tests hold it back to take the „before" picture)
+  let AT = null;
+  SV.autoTables = function () {
+    if (AT) return AT;
+    const R = VR.R, VM = VR.VM; if (!R || !R.types || !VM) return null;
+    const furn = new Set(VR.PROP_FURN || []), n = R.stateCount + 1;
+    const list = [], idx = new Int32Array(n).fill(-1), anchor = new Uint8Array(n), facing = new Uint8Array(n), states = [];
+    for (const t of R.types) {
+      const o = t.o || {}, m = VM.MODELS[t.name];
+      if (!m || !o.vxModel || furn.has(t.name) || o.prop || o.propStem || SV.SKIP.test(t.name)) continue;
+      const i0 = list.length, tog = !!o.toggle && t.has('lit');
+      list.push({ name: t.name, off: false });
+      if (tog) list.push({ name: t.name, off: true });
+      for (let st = t.base; st < t.base + t.nstates && st < n; st++) {
+        idx[st] = tog && !t.get(st, 'lit') ? i0 + 1 : i0;
+        anchor[st] = !t.has('part') || t.get(st, 'part') === 0 ? 1 : 0;
+        facing[st] = t.has('facing') ? t.get(st, 'facing') & 3 : 0;
+        states.push(st);
+      }
+    }
+    AT = { list, idx, anchor, facing, states: Int32Array.from(states), n: list.length };
+    return AT;
+  };
+  SV.indexOf = (name, off) => { const A = SV.autoTables(); if (!A) return -1; for (let i = 0; i < A.n; i++) if (A.list[i].name === name && A.list[i].off === !!off) return i; return -1; };
+  // the ready bits (one per entry): the main thread sets them as the meshes arrive; every mesh job carries them
+  SV.ready = { ver: 0, bits: null };
+  const isReady = SV.isReady = (bits, i) => !!bits && ((bits[i >> 3] >> (i & 7)) & 1) === 1;
+
+  // ---------------------------------------------------------------- the worker: the mesher's tables, the job's bits, the wants
+  // mesher.js propTables() hands its tables over once (one additive line): every state of an eligible piece that is no
+  // prop already gets its auto kind (an Int32 copy of the kind table), its anchor (part 0) and its facing; its group stays
+  // 0 — the mesher draws its voxels — until its mesh is ready, then it is furniture (the furniture pass draws it)
+  let PT = null, GFURN = 2, applied = -1;
+  SV.tables = function (T, GROUP) {
+    if (!SV.enabled) return;
+    const A = SV.autoTables(); if (!A) return;
+    GFURN = (GROUP && GROUP.furniture) || 2;
+    const kind = new Int32Array(T.kind.length); kind.set(T.kind);
+    const mine = [];
+    for (let k = 0; k < A.states.length; k++) {
+      const st = A.states[k]; if (st >= kind.length || T.kind[st] || T.group[st]) continue;
+      kind[st] = AUTO0 + A.idx[st]; T.anchor[st] = A.anchor[st]; T.facing[st] = A.facing[st]; mine.push(st);
+    }
+    T.kind = kind; T.autoStates = Int32Array.from(mine);
+    PT = T; applyReady();
+  };
+  function applyReady() {
+    if (!PT || !PT.autoStates || !AT) return;
+    const bits = SV.ready.bits, G = PT.group, S = PT.autoStates;
+    for (let k = 0; k < S.length; k++) { const st = S[k]; G[st] = isReady(bits, AT.idx[st]) ? GFURN : 0; }
+    applied = SV.ready.ver;
+  }
+  // worker_main.js 'mesh', before the mesher: the job's ready bits, then the pieces in the section's own 16³ that are not
+  // ready yet (the main thread asks for their meshes) — only for a job that draws the furniture smooth (never Very Low)
+  // and has its detail (a far section waits until the player comes close)
+  SV.prep = function (job) {
+    if (!SV.enabled || !((job.smoothProps | 0) & 2)) return null;
+    const A = SV.autoTables(); if (!A) return null;
+    const r = job.svReady;
+    if (r && r.bits && r.ver !== SV.ready.ver) SV.ready = { ver: r.ver, bits: r.bits };
+    if (PT && applied !== SV.ready.ver) applyReady();
+    if (job.vxDetail === false || !job.blocks) return null;
+    const B = job.blocks, PS = VR.MESH_PS || 20, PAD = VR.MESH_PAD || 2, PSS = PS * PS, bits = SV.ready.bits, I = A.idx;
+    let want = null;
+    for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) {
+      const row = (y + PAD) * PSS + (z + PAD) * PS + PAD;
+      for (let x = 0; x < 16; x++) {
+        const st = B[row + x]; if (!st) continue;
+        const i = I[st]; if (i < 0 || isReady(bits, i)) continue;
+        if (!want) want = [i]; else if (want.indexOf(i) < 0) want.push(i);
+      }
+    }
+    return want;
+  };
+  // the 'smoothvox' job: one model's meshes — the game's layout (near, far, size, the anchor's cell) or the Studio's
+  // (m.layout 'studio'); a model by name (its design version in m.ver), or a raw volume (m.vol + m.pal, the Crafter's
+  // edit). Kept in the thread's LRU; what goes back is a copy (its buffers are transferred)
+  SV.cache = null;
+  const bytesOf = (r) => { let b = 0; for (const k of ['near', 'far']) if (r[k]) b += r[k].verts.byteLength + r[k].idx.byteLength; if (r.verts) b += r.verts.byteLength + r.glass.byteLength; return b; };
+  const copyPart = (p, tr) => { if (!p) return null; const q = Object.assign({}, p, { verts: p.verts.slice(), idx: p.idx.slice() }); tr.push(q.verts.buffer, q.idx.buffer); return q; };
+  SV.studioMesh = function (src, opts) {
+    const res = src.res || 16, g = SV.mesh(src, Object.assign({ step: res >= 32 ? 1 : 1, aoScale: res / 16 }, opts || {}));
+    return SV.toStudio(g, 1 / res, [0, 0, 0]);
+  };
+  SV.job = function (m) {
+    const t0 = now(), VM = VR.VM, tr = [];
+    const cache = SV.cache || (SV.cache = new SV.LRU());
+    let r = null, key = null;
+    if (m.name) {
+      const model = VM && VM.MODELS[m.name];
+      if (!model) return { error: 'unknown model ' + m.name, transfer: tr };
+      key = m.name + (m.off ? ':off' : '') + '#' + (m.ver | 0) + (m.layout === 'studio' ? ':studio' : '');
+      r = cache.get(key);
+      if (!r) { r = m.layout === 'studio' ? SV.studioMesh(model, { off: !!m.off }) : SV.forModel(model, { off: !!m.off }); cache.set(key, r, bytesOf(r)); }
+    } else if (m.vol && m.pal) {
+      const src = { vol: m.vol, pal: m.pal, VW: m.VW, VH: m.VH, VD: m.VD, res: m.res || 16 };
+      r = m.layout === 'furn' ? SV.forModel(Object.assign({ W: m.W, H: m.H, D: m.D, parts: null }, src)) : SV.studioMesh(src);
+    } else return { error: 'nothing to mesh', transfer: tr };
+    const out = { ver: m.ver | 0, name: m.name || null, ms: now() - t0, transfer: tr };
+    if (r.near) { out.near = copyPart(r.near, tr); out.far = copyPart(r.far, tr); out.size = r.size; out.cell = r.cell; out.step = r.step; }
+    else { out.verts = r.verts.slice(); out.glass = r.glass.slice(); out.tri = r.tri; out.quads = r.quads; tr.push(out.verts.buffer, out.glass.buffer); }
+    return out;
+  };
+
+  // ---------------------------------------------------------------- the main thread: ask, register, mesh again
+  // world.js tags every mesh job with the ready bits (tagJob) and hands a mesh answer's wants here (want): an entry not
+  // asked for yet is asked from the worker pool ('smoothvox'); its mesh is registered in props.js (PR.registerAuto), its
+  // bit set, and the sections that wanted it are made dirty — they come back with the smooth anchor. A design changed in
+  // the Studio (custom.js refreshModel) takes the model's meshes back: a new version is asked for.
+  const MAIN = SV.main = { asked: new Set(), waiting: new Map(), ver: {}, world: null, stats: { asked: 0, got: 0, ms: 0, bytes: 0, redo: 0 } };
+  SV.verOf = (name) => MAIN.ver[name] | 0;
+  const bitsFor = (n) => new Uint8Array((n + 7) >> 3);
+  SV.tagJob = function (job) {
+    if (!SV.enabled || !((job.smoothProps | 0) & 2)) return;
+    const A = SV.autoTables(); if (!A) return;
+    if (!SV.ready.bits) { SV.ready.bits = bitsFor(A.n); SV.ready.ver = 1; }
+    job.svReady = SV.ready;   // (cloned when the pool posts the job: the bits of that moment)
+  };
+  SV.want = function (list, world, c, sy) {
+    if (!list || !list.length || !SV.enabled || !world) return;
+    const A = SV.autoTables(); if (!A) return;
+    if (MAIN.world !== world) {   // another world: what was asked for and never came is asked again
+      MAIN.world = world; MAIN.waiting.clear();
+      for (const i of [...MAIN.asked]) if (!isReady(SV.ready.bits, i)) MAIN.asked.delete(i);
+    }
+    let redo = false;
+    for (const i of list) {
+      if (i < 0 || i >= A.n) continue;
+      if (isReady(SV.ready.bits, i)) { redo = true; continue; }   // the job left before the mesh came: mesh the section again
+      let w = MAIN.waiting.get(i); if (!w) MAIN.waiting.set(i, w = new Map());
+      w.set(c.key + ':' + sy, [c, sy]);
+      if (!MAIN.asked.has(i)) { MAIN.asked.add(i); SV.ask(i, world); }
+    }
+    if (redo) { const sc = c.sec && c.sec[sy]; if (sc && (sc.svRedo = (sc.svRedo | 0) + 1) <= 3) { sc.dirty = true; sc.ver++; MAIN.stats.redo++; } }
+  };
+  SV.ask = function (i, world) {
+    const e = AT.list[i];
+    MAIN.stats.asked++;
+    world.pool.submit({ type: 'smoothvox', name: e.name, off: e.off, ver: SV.verOf(e.name) }, null, (m) => SV.got(i, m, world), 1);
+  };
+  SV.got = function (i, m, world) {
+    const e = AT && AT.list[i], PR = VR.Props;
+    if (!e || !m || m.type !== 'smoothvox' || !m.near || m.ver !== SV.verOf(e.name) || !PR || !PR.registerAuto) { MAIN.asked.delete(i); return; }   // failed, cancelled or out of date: asked again with the next want
+    PR.registerAuto(AUTO0 + i, e.name + (e.off ? ':off' : '') + '#' + m.ver, m.size, m.cell, { near: m.near, far: m.far });
+    if (!SV.ready.bits) SV.ready.bits = bitsFor(AT.n);
+    SV.ready.bits[i >> 3] |= 1 << (i & 7); SV.ready.ver++;
+    MAIN.stats.got++; MAIN.stats.ms += m.ms || 0; MAIN.stats.bytes += bytesOf(m);
+    const w = MAIN.waiting.get(i); MAIN.waiting.delete(i);
+    if (w) for (const [c, sy] of w.values()) { if (world.dead || world.cols.get(c.key) !== c) continue; const sc = c.sec[sy]; if (sc) { sc.dirty = true; sc.ver++; } }
+  };
+  // a model's design changed (custom.js): its entries are not ready any more and its next mesh is a new version
+  SV.invalidate = function (name) {
+    if (SV.cache) for (const k of [...SV.cache.map.keys()]) if (k.startsWith(name + '#') || k.startsWith(name + ':off#')) { SV.cache.bytes -= SV.cache.map.get(k).b; SV.cache.map.delete(k); }
+    if (!AT) return;
+    MAIN.ver[name] = (MAIN.ver[name] | 0) + 1;
+    let any = false;
+    for (let i = 0; i < AT.n; i++) if (AT.list[i].name === name) { MAIN.asked.delete(i); if (SV.ready.bits && isReady(SV.ready.bits, i)) { SV.ready.bits[i >> 3] &= ~(1 << (i & 7)); any = true; } }
+    if (any) { SV.ready.ver++; const g = typeof window !== 'undefined' && VR.game; if (g && g.renderer) g.renderer.furnByKind = null; }   // (the renderer's slot of the old version is looked up again)
+  };
+  if (VR.Custom && VR.Custom.refreshModel && !VR.Custom.refreshModel.sv) {
+    const rf = VR.Custom.refreshModel;
+    VR.Custom.refreshModel = function (m) { const r = rf.apply(this, arguments); try { if (m && m.name) SV.invalidate(m.name); } catch (e) { /* never in the way of a design */ } return r; };
+    VR.Custom.refreshModel.sv = true;
+  }
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

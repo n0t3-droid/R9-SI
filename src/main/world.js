@@ -592,6 +592,7 @@
       const detail = urgent || this.wantDetail(c, sy, pos || (this.lastPos ? this.lastPos : null));
       const job = this.buildJob(c, sy);
       job.vxDetail = detail;
+      if (VR.SmoothVox) VR.SmoothVox.tagJob(job);   // t-form: the smooth models that are ready (smoothvox.js)
       s.pending = true;
       const ver = s.ver;
       job.cancel = () => { if (this.dead || this.cols.get(c.key) !== c) { s.pending = false; return true; } return false; };
@@ -607,6 +608,7 @@
         }
         if (this.cols.get(c.key) !== c || this.dead) return;
         s.fails = 0;
+        if (m.svWant && VR.SmoothVox) VR.SmoothVox.want(m.svWant, this, c, sy);   // t-form: ask for the smooth models this section holds
         this.stats.mesh++; this.stats.meshMs += m.ms || 0;
         s.vis = m.vis;
         const tok = s.uTok = (s.uTok || 0) + 1;   // only the newest queued mesh of a section is uploaded
