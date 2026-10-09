@@ -378,6 +378,13 @@
           const fluid = I.lava ? S.lava : cl.ember > 0.45 ? S.lava : cl.prism > 0.35 ? S.aether : S.water;
           const typ = R.types[R.T.type[fluid]];
           const out1 = [Math.round(Math.cos(a)), Math.round(Math.sin(a))];
+          // vgen 9: the fall's lead cell — the first of its 2 × 2 cells off the island (the cells over the rim column keep
+          // the pool's lip; the curtain proper is the cells outside) — lists the mist spawn of the whole fall
+          let lead = -1;
+          if (g.vgen >= 9) for (let k = 0; k < 4 && lead < 0; k++) {
+            const J = g.islandAt(fx + out1[0] + (k & 1) - (out1[0] > 0 ? 1 : 0), fz + out1[1] + (k >> 1) - (out1[1] > 0 ? 1 : 0));
+            if (!(J && J.isle === I)) lead = k;
+          }
           for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
             // spring pool on the rim, falling curtain just outside it
             const sx = fx + ox - (out1[0] > 0 ? 1 : 0), sz = fz + oz - (out1[1] > 0 ? 1 : 0);
@@ -400,14 +407,15 @@
             if (qx < 0 || qx >= 16 || qz < 0 || qz >= 16) continue;
             const col = (qz << 4) | qx;
             // vgen 9 (t-beauty): the fall pours off the rim and dissolves into mist (the trailer's t1_07 · t1_09; TRAILER.md
-            // §3.6) — its curtain ends 18 … 29 below the rim, each cell up to six further (a ragged end), and the chunk
-            // lists a mist spawn at its foot (vents.js puffs the spray there); vgen 8's ran 90 … 100 blocks to the
-            // ground as straight blue poles (beauty_audit run 2: water_1, water_r1, far_3). A short drop still lands.
+            // §3.6) — its curtain ends 18 … 29 below the rim, each cell 0, 2, 4 or 6 further (its own step: a ragged
+            // end), and the chunk of the lead cell lists a mist spawn at its foot (vents.js puffs the spray there); vgen
+            // 8's ran 90 … 100 blocks to the ground as straight blue poles (beauty_audit run 2: water_1, water_r1,
+            // far_3). A short drop still lands.
             let yEnd = 2, foot = 0;
             if (g.vgen >= 9) {
-              const fs = ((I.seed | 0) * 31 + f * 17) >>> 0, base = 18 + fs % 12, cell = (Math.imul(fs + 1, 2654435761) ^ Math.imul(ox * 2 + oz + 1, 40503)) >>> 0;
+              const fs = ((I.seed | 0) * 31 + f * 17) >>> 0, base = 18 + fs % 12;
               foot = ft.top - base;
-              yEnd = Math.max(2, foot - (cell >>> 7) % 7);
+              yEnd = Math.max(2, foot - ((ox + oz * 2 + (fs >>> 4)) & 3) * 2);
             }
             let y = ft.top;
             for (; y > yEnd; y--) {
@@ -416,10 +424,11 @@
               if (b && (R.T.flags[b] & F.FLUID) && y < ft.bottom) break;
               blocks[i] = typ.state({ level: 8 });
             }
-            // (one spawn a fall, by its first cell, when it ended in the air: the mist round its foot)
-            if (g.vgen >= 9 && ox === 0 && oz === 0 && y === yEnd && !blocks[(yEnd << 8) | col]) {
+            // (one spawn a fall, by its lead cell, when its curtain ended in the air: the mist round the foot, at the
+            //  middle of the 2 × 2 cells)
+            if (g.vgen >= 9 && ox + oz * 2 === lead && y === yEnd && !blocks[(yEnd << 8) | col]) {
               if (!out.spawns) out.spawns = [];
-              out.spawns.push(['mist', cx2 + 1, foot - 3, cz2 + 1, fluid === S.lava ? 1 : 0]);
+              out.spawns.push(['mist', fx + out1[0] - (out1[0] > 0 ? 1 : 0) + 1, foot - 3, fz + out1[1] - (out1[1] > 0 ? 1 : 0) + 1, fluid === S.lava ? 1 : 0]);
             }
           }
         }

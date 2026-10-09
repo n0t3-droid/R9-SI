@@ -333,10 +333,38 @@ console.log('8 · a fall off a floating island pours off the rim and dissolves i
   const dissolve = A9.falls.filter(f => f.cols.every(c => c.air));
   check(l9.length > 0 && l9[l9.length - 1] <= 36 && l9[0] >= 18, `vgen 9: every curtain ends 18 … 36 below its rim (${l9[0]} … ${l9[l9.length - 1]})`);
   check(dissolve.length === A9.falls.length, `vgen 9: every fall over the low land ends in the air, not on it (${dissolve.length} of ${A9.falls.length})`);
-  const ragged = dissolve.filter(f => new Set(f.cols.map(c => c.foot)).size >= 2);
-  check(ragged.length === dissolve.length, `vgen 9: each fall's cells end at their own heights, a ragged end (${ragged.length} of ${dissolve.length})`);
+  // (a curtain of one cell — where only one of the 2 × 2 cells lies off the rim — has one end)
+  const wide = dissolve.filter(f => f.cols.length >= 2), ragged = wide.filter(f => new Set(f.cols.map(c => c.foot)).size === f.cols.length);
+  check(ragged.length === wide.length && wide.length >= dissolve.length / 2, `vgen 9: each fall's cells end at their own heights, a ragged end (${ragged.length} of the ${wide.length} curtains of two or three cells; ${dissolve.length - wide.length} of one)`);
   const misted = dissolve.filter(f => A9.mists.some(m => f.cols.some(c => Math.abs(m[1] - c.x - 0.5) <= 2 && Math.abs(m[3] - c.z - 0.5) <= 2 && m[2] <= c.foot + 8 && m[2] >= c.foot - 8)));
   check(misted.length === dissolve.length && A9.mists.length === dissolve.length && A8.mists.length === 0, `vgen 9: a mist spawn at the foot of each (${misted.length} of ${dissolve.length}; ${A9.mists.length} spawns, vgen 8 ${A8.mists.length})`);
+
+  // 9 · the spray (vents.js): the mist spawns of the loaded chunks puff soft white spray round each fall's foot — High a
+  // puff every quarter second a fall, Low one every 0.9 s, Very Low none; nothing beyond the reach; a lava fall smokes
+  console.log('9 · the falls\' mist: vents.js puffs spray at each foot (High, Low fewer, Very Low none)');
+  require('../src/main/vents.js');
+  const runMist = (preset, eye, secs, mists) => {
+    const spawned = [];
+    const game = { settings: { preset }, particles: { spawn(x, y, z, vx, vy, vz, o) { spawned.push({ x, y, z, o }); return 1; }, glow() { return 1; } } };
+    const Vn = new VR.Vents(game);
+    Vn.absorb(mists);
+    for (let t = 0; t < secs; t += 1 / 30) Vn.update(1 / 30, eye);
+    const near = (m) => spawned.filter(s => Math.abs(s.x - m[1]) < 4 && Math.abs(s.z - m[3]) < 4 && s.y > m[2] - 8 && s.y < m[2] + 8);
+    return { Vn, spawned, near };
+  };
+  const ms = A9.mists.slice(0, 3), eye = [ms[0][1] + 40, ms[0][2] + 10, ms[0][3] + 30];
+  const hi = runMist('high', eye, 4, ms), lo = runMist('low', eye, 4, ms), vl = runMist('potato', eye, 4, ms);
+  const far = runMist('high', [ms[0][1] + 900, ms[0][2], ms[0][3]], 4, ms.slice(0, 1));
+  const nh = hi.near(ms[0]).length, nl = lo.near(ms[0]).length, nv = vl.near(ms[0]).length;
+  check(hi.Vn.mists && hi.Vn.mists.size === ms.length && hi.Vn.list.size === 0, `the mist spawns are kept apart from the vents (${hi.Vn.mists ? hi.Vn.mists.size : 0} mists, ${hi.Vn.list.size} vents)`);
+  check(nh >= 12 && nh <= 24, `High: ${nh} puffs at a fall's foot in 4 s`);
+  check(nl >= 3 && nl <= nh / 2, `Low: fewer (${nl})`);
+  check(nv === 0 && vl.spawned.length === 0, `Very Low: none (${nv})`);
+  check(far.near(ms[0]).length === 0, `nothing beyond the reach (${far.near(ms[0]).length} from 900 blocks)`);
+  const p0 = hi.near(ms[0])[0];
+  check(p0 && p0.o.collide === false && p0.o.grow > 0 && p0.o.size >= 1 && !p0.o.emis && p0.o.col[2] >= 0.9, `a puff is soft white spray that grows as it thins (${p0 ? JSON.stringify({ size: +p0.o.size.toFixed(2), grow: p0.o.grow, col: p0.o.col, life: +p0.o.life.toFixed(1) }) : '-'})`);
+  hi.Vn.reset();
+  check(hi.Vn.mists.size === 0, `a new world brings its own falls (reset clears the mists)`);
 }
 
 // ---------------------------------------------------------------- 5 · Very Low
