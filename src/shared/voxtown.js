@@ -171,6 +171,122 @@
     },
   });
 
+  // ---------------------------------------------------------------- round 2 (t-town2): the arched window of the references
+  // vm_town_arch3 — three wide, three high, one deep (a wall cell): a round-headed opening in white stone with a lighter
+  // archivolt ring and a keystone, a wood-brown frame with a mullion, a transom and two glazing bars in the head, warm
+  // glass deep in the reveal, a stone sill. The block colour is the town window's (its texture exists).
+  // (registered after the gold band — a second late call below — so every piece of round 1 keeps its id)
+  const NAMES2 = T.NAMES2 = [];
+  const def2 = (name, display, o) => { VM.define(name, display, Object.assign({ res: 16, sound: 'stone', hard: 1, cat: 'arch', cats: ['arch'] }, o, { late: true, lazy: true })); NAMES2.push(name); return name; };
+  T.ARCH = { x0: 9, x1: 39, y0: 5, spring: 29, r: 15, z0: 6 };
+  def2('vm_town_arch3', 'Arched Window · Wood · Three Wide', {
+    size: [3, 3, 1], col: 0xF2EEE6, sound: 'glass', hard: 1,
+    build(b, M) {
+      const A = T.ARCH, cx = 24, stone = M.stone(COL.stone), ring = M.stone(COL.stoneL), key = M.stone(COL.stoneD), sill = M.stone(COL.stoneD);
+      const wood = M.wood(COL.woodD), woodL = M.wood(COL.wood), glass = M.glass(COL.warm);
+      b.box(0, 0, 0, 48, 48, 16, stone);
+      // the archivolt: a lighter ring round the head, proud of the wall by one voxel inside the cell (the wall face recessed)
+      b.cut(0, 0, 0, 48, 48, 1);
+      b.cyl('z', cx, A.spring, A.r + 3, 0, 1, ring); b.cut(0, 0, 0, 48, A.spring, 1);
+      b.box(cx - 3, A.spring + A.r - 1, 0, cx + 3, 48, 1, key); b.box(cx - 2.5, A.spring + A.r - 1, 0.3, cx + 2.5, 47.5, 0.6, key);   // the keystone
+      // the opening and its reveal (a rectangle under the springing, the half circle over it)
+      b.cut(A.x0, A.y0, 0, A.x1, A.spring, 16); b.cyl('z', cx, A.spring, A.r, 0, 16, 0);
+      // the frame in the reveal: jambs, the head's rim, a mullion, a transom, the head's two bars
+      const zf0 = A.z0, zf1 = A.z0 + 3;
+      b.box(A.x0, A.y0, zf0, A.x0 + 1.5, A.spring, zf1, wood); b.box(A.x1 - 1.5, A.y0, zf0, A.x1, A.spring, zf1, wood);
+      b.tube('z', cx, A.spring, A.r, 1.5, zf0, zf1, wood);
+      b.box(A.x0, A.y0, zf0, A.x1, A.y0 + 1.5, zf1, wood);
+      b.box(cx - 0.75, A.y0, zf0, cx + 0.75, A.spring + A.r, zf1, woodL);
+      b.box(A.x0, A.spring - 1, zf0, A.x1, A.spring + 0.5, zf1, wood);
+      b.box(A.x0, 17, zf0 + 0.5, A.x1, 18, zf1 - 0.5, woodL);
+      for (const s of [-1, 1]) b.rod(cx, A.spring, zf0 + 1.5, cx + s * A.r * 0.72, A.spring + A.r * 0.69, zf0 + 1.5, 0.45, woodL);
+      // the warm glass, the sill (a ledge on the outer face under the opening)
+      b.box(A.x0 + 1.5, A.y0 + 1.5, zf0 + 1.2, A.x1 - 1.5, A.spring - 1, zf0 + 1.8, glass); b.cyl('z', cx, A.spring, A.r - 1.5, zf0 + 1.2, zf0 + 1.8, glass);
+      b.box(A.x0 - 2, A.y0 - 2.5, 0, A.x1 + 2, A.y0, 6, sill); b.box(A.x0 - 1, A.y0 - 3.5, 0, A.x1 + 1, A.y0 - 2.5, 3, sill);
+    },
+  });
+
+  // ---------------------------------------------------------------- round 2: the shop signs with words
+  // vm_town_word_<key> — a dark green board four blocks wide in a gold frame with the shop's word in raised gold letters
+  // of our own 3 × 5 pixel font (umlauts and é too). The word is the language's (src/main/lang_de.js / lang_en.js,
+  // town.sign.<key>): the main thread reads it through VR.I18N; a worker gets the table with the world's init message
+  // (T.setWords) — without one it follows the browser's language. The block is the same in every language (a saved
+  // world and a multiplayer guest keep their blocks); only its look follows the table.
+  const WORD_DEF = T.WORD_DEF = {
+    baker: ['Bäckerei', 'Bakery'], sweets: ['Konditorei', 'Sweets'], tea: ['Teestube', 'Tea Room'], cheese: ['Käse', 'Cheese'],
+    flowers: ['Blumen', 'Flowers'], tailor: ['Schneider', 'Tailor'], pharmacy: ['Apotheke', 'Pharmacy'], lanterns: ['Laternen', 'Lanterns'],
+    books: ['Buchladen', 'Books'], workshop: ['Werkstatt', 'Workshop'], maps: ['Karten', 'Maps'], cafe: ['Café', 'Café'],
+  };
+  T.WORDS = Object.keys(WORD_DEF);
+  // the font: rows top to bottom; a glyph of 7 rows carries its umlaut or accent over the line
+  const FONT = T.FONT = {
+    A: ['.X.', 'X.X', 'XXX', 'X.X', 'X.X'], B: ['XX.', 'X.X', 'XX.', 'X.X', 'XX.'], C: ['.XX', 'X..', 'X..', 'X..', '.XX'], D: ['XX.', 'X.X', 'X.X', 'X.X', 'XX.'],
+    E: ['XXX', 'X..', 'XX.', 'X..', 'XXX'], F: ['XXX', 'X..', 'XX.', 'X..', 'X..'], G: ['.XX', 'X..', 'X.X', 'X.X', '.XX'], H: ['X.X', 'X.X', 'XXX', 'X.X', 'X.X'],
+    I: ['XXX', '.X.', '.X.', '.X.', 'XXX'], J: ['..X', '..X', '..X', 'X.X', '.X.'], K: ['X.X', 'X.X', 'XX.', 'X.X', 'X.X'], L: ['X..', 'X..', 'X..', 'X..', 'XXX'],
+    M: ['X...X', 'XX.XX', 'X.X.X', 'X...X', 'X...X'], N: ['X..X', 'XX.X', 'X.XX', 'X..X', 'X..X'], O: ['.X.', 'X.X', 'X.X', 'X.X', '.X.'], P: ['XX.', 'X.X', 'XX.', 'X..', 'X..'],
+    Q: ['.X.', 'X.X', 'X.X', 'XX.', '.XX'], R: ['XX.', 'X.X', 'XX.', 'X.X', 'X.X'], S: ['.XX', 'X..', '.X.', '..X', 'XX.'], T: ['XXX', '.X.', '.X.', '.X.', '.X.'],
+    U: ['X.X', 'X.X', 'X.X', 'X.X', 'XXX'], V: ['X.X', 'X.X', 'X.X', 'X.X', '.X.'], W: ['X...X', 'X...X', 'X.X.X', 'XX.XX', 'X...X'], X: ['X.X', 'X.X', '.X.', 'X.X', 'X.X'],
+    Y: ['X.X', 'X.X', '.X.', '.X.', '.X.'], Z: ['XXX', '..X', '.X.', 'X..', 'XXX'],
+    'Ä': ['X.X', '...', '.X.', 'X.X', 'XXX', 'X.X', 'X.X'], 'Ö': ['X.X', '...', '.X.', 'X.X', 'X.X', 'X.X', '.X.'], 'Ü': ['X.X', '...', 'X.X', 'X.X', 'X.X', 'X.X', 'XXX'],
+    'É': ['..X', '...', 'XXX', 'X..', 'XX.', 'X..', 'XXX'], '&': ['.X.', 'X.X', '.X.', 'X.X', '.XX'], '-': ['...', '...', 'XXX', '...', '...'], '.': ['.', '.', '.', '.', 'X'], "'": ['X', 'X', '.', '.', '.'],
+  };
+  // the word of a key in this thread's language: the table a worker was given, else VR.I18N (main thread), else the
+  // browser's language
+  T._words = null;
+  T.word = function (k) {
+    if (T._words && typeof T._words[k] === 'string') return T._words[k];
+    const d = WORD_DEF[k]; if (!d) return String(k);
+    const I = VR.I18N;
+    if (I && I.tx && I.dict && (I.dict.de || I.dict.en)) return I.tx('town.sign.' + k, null, d[0], d[1]);
+    const nav = (typeof navigator !== 'undefined' && navigator && navigator.language) ? String(navigator.language).slice(0, 2).toLowerCase() : 'en';
+    return nav === 'de' ? d[0] : d[1];
+  };
+  // the main thread's table (sent to the workers with the world's init)
+  T.table = function () { const o = {}; for (const k of T.WORDS) o[k] = T.word(k); return o; };
+  // a new table: the word signs built before are built again from it (their pieces and boxes forgotten)
+  T.setWords = function (tab) {
+    const next = tab && typeof tab === 'object' ? Object.assign({}, tab) : null;
+    if (JSON.stringify(T._words) === JSON.stringify(next)) return false;
+    T._words = next;
+    for (const k of T.WORDS) {
+      const name = 'vm_town_word_' + k, m = VM.MODELS[name];
+      if (!m || !m.compiled || !m.src) continue;
+      const fresh = VM.lazyModel(name, m.src); VM.MODELS[name] = fresh;
+      const t = VR.R && VR.R.byName && VR.R.byName[name];
+      if (t && t.o && t.o.vx) { t.o.vx.model = fresh; if (VX.refreshStates) VX.refreshStates(t.base, t.nstates); }
+    }
+    return true;
+  };
+  // the word laid out in the font: [x, y] pixels (y up from the baseline), its width
+  T.layout = function (word) {
+    const px = []; let x = 0;
+    for (const ch of String(word).toUpperCase()) {
+      if (ch === ' ') { x += 2; continue; }
+      const g = FONT[ch]; if (!g) { x += 2; continue; }
+      const h = g.length;
+      for (let r = 0; r < h; r++) for (let c = 0; c < g[r].length; c++) if (g[r][c] === 'X') px.push([x + c, h - 1 - r]);
+      x += g[0].length + 1;
+    }
+    return { px, w: Math.max(0, x - 1) };
+  };
+  for (const k of T.WORDS) {
+    def2('vm_town_word_' + k, 'Shop Sign · ' + WORD_DEF[k][1], {
+      size: [4, 1, 1], col: 0x2E5843, sound: 'wood', hard: 0.6,
+      build(b, M) {
+        const board = M.gloss(COL.green), edge = M.gloss(COL.greenD), gold = M.metal(COL.gold), goldL = M.metal(COL.goldL), ir = M.metal(COL.iron);
+        b.box(1, 2, 12.5, 63, 14, 15, board);                                          // the board
+        b.box(1, 2, 12, 63, 2.8, 15, gold); b.box(1, 13.2, 12, 63, 14, 15, gold);      // the gold frame
+        b.box(1, 2, 12, 1.8, 14, 15, gold); b.box(62.2, 2, 12, 63, 14, 15, gold);
+        b.box(2.4, 3.4, 12.2, 61.6, 12.6, 12.5, edge);                                  // a dark inner field
+        for (const x of [4, 60]) b.sphere(x, 8, 11.9, 0.9, gold);                       // studs at the ends
+        for (const x of [8, 56]) b.box(x - 0.5, 14, 14, x + 0.5, 15.5, 16, ir);         // the brackets
+        // the word, centred, its letters one voxel proud (rows 5 … 9, an umlaut's dots at 11)
+        const L = T.layout(T.word(k)), x0 = Math.round(32 - L.w / 2);
+        for (const [x, y] of L.px) b.box(x0 + x, 5 + y, 11, x0 + x + 1, 6 + y, 12, goldL);
+      },
+    });
+  }
+
   // ---------------------------------------------------------------- the gold band (VX 16³, a full block)
   T.bandCol = { stone: COL.stone, joint: COL.stoneD, gold: COL.gold, goldL: COL.goldL };
   VX._.PAINT_FN.townband = function (s, c) {
@@ -193,4 +309,6 @@
     // (the colour is vx_town's stone, f2eee6: its texture name exists already)
     K.add('vx_town_band', 'Gold Band · White Stone', { kind: 'townband', res: 16, col: 0xF2EEE6 }, { filter: 15, opaque: true, sound: 'stone', hard: 2, group: G_.ARCH || G_.BUILD, cat: 'arch' });
   });
+  // round 2 (t-town2): the arched window and the word signs, after the gold band
+  VR.BL.late.push(() => { if (VM._K) VM.registerLate(NAMES2); });
 })(VR);

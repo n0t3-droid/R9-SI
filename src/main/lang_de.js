@@ -1925,5 +1925,18 @@
     'g.bau.cancel': 'Baustelle abgebrochen — alles zurück',
     'g.bau.none': 'Gerade wird nichts gebaut.',
     'g.bau.bench': 'Werkbank',
+    // the Weißstadt's shop signs (src/shared/voxtown.js: the word on the board, in our own pixel font)
+    'town.sign.baker': 'Bäckerei',
+    'town.sign.sweets': 'Konditorei',
+    'town.sign.tea': 'Teestube',
+    'town.sign.cheese': 'Käse',
+    'town.sign.flowers': 'Blumen',
+    'town.sign.tailor': 'Schneider',
+    'town.sign.pharmacy': 'Apotheke',
+    'town.sign.lanterns': 'Laternen',
+    'town.sign.books': 'Buchladen',
+    'town.sign.workshop': 'Werkstatt',
+    'town.sign.maps': 'Karten',
+    'town.sign.cafe': 'Café',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -1925,5 +1925,18 @@
     'g.bau.cancel': 'Construction stopped — all taken back',
     'g.bau.none': 'Nothing is being built right now.',
     'g.bau.bench': 'Workbench',
+    // the Weißstadt's shop signs (src/shared/voxtown.js: the word on the board, in our own pixel font)
+    'town.sign.baker': 'Bakery',
+    'town.sign.sweets': 'Sweets',
+    'town.sign.tea': 'Tea Room',
+    'town.sign.cheese': 'Cheese',
+    'town.sign.flowers': 'Flowers',
+    'town.sign.tailor': 'Tailor',
+    'town.sign.pharmacy': 'Pharmacy',
+    'town.sign.lanterns': 'Lanterns',
+    'town.sign.books': 'Books',
+    'town.sign.workshop': 'Workshop',
+    'town.sign.maps': 'Maps',
+    'town.sign.cafe': 'Café',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
