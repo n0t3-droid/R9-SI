@@ -37,15 +37,22 @@ const SHOW = [['vm_bookshelf', 0, 0, 0, 2], ['vm_bookshelf', 1, 0, 0, 2], ['vm_k
   // the villages' pieces to the right: a row of three white sofas (they join: arms at the ends), a table with two chairs,
   // a blue bed (its head east of its foot)
   ['vx_sofa_white', 20, 0, 1, 2], ['vx_sofa_white', 21, 0, 1, 2], ['vx_sofa_white', 22, 0, 1, 2], ['vx_table', 24, 0, 2, 0], ['vx_chair', 24, 0, 1, 2], ['vx_chair', 25, 0, 2, 3],
-  ['vx_bed_blue', 26, 0, 4, 1, 0], ['vx_bed_blue', 27, 0, 4, 1, 1]];
+  ['vx_bed_blue', 26, 0, 4, 1, 0], ['vx_bed_blue', 27, 0, 4, 1, 1],
+  // run 3: the villas' smaller pieces beside them — a console against the wall, a side table with its table lamp at the
+  // sofa row's end, a rug in front of the sofas (six blocks: one rug), a bar cart, two bar stools, a chandelier over the
+  // table (a beam above it)
+  ['vm_console', 19, 0, 0, 2], ['vm_side_table', 19, 0, 1, 0], ['vm_table_lamp', 19, 1, 1, 0],
+  ['vx_rug_sand', 20, 0, 2], ['vx_rug_sand', 21, 0, 2], ['vx_rug_sand', 22, 0, 2], ['vx_rug_sand', 20, 0, 3], ['vx_rug_sand', 21, 0, 3], ['vx_rug_sand', 22, 0, 3],
+  ['vm_bar_cart', 23, 0, 0, 2], ['vm_stool', 28, 0, 1, 3], ['vm_stool', 28, 0, 2, 3], ['vm_chandelier', 24, 3, 2, 0]];
 const INSIDE = [
   // the villa's open-plan room at eye height (feet on the floor): the living group in front, the dining tables and the kitchen behind
   ['living', [-220.5, 87, -106.5], { yaw: 0.7854, pitch: -0.1 }, DAY],
   ['dining', [-235.5, 87, -109.5], { yaw: 5.1051, pitch: -0.08 }, DAY],
-  // the showroom: all ten kinds from eight blocks, then the living group up close at dusk (the lamps glow)
+  // the showroom: all ten kinds from eight blocks, then the living group up close at dusk (the lamps glow), then the
+  // villages' pieces with the villas' smaller ones (console, side table and lamp, rug, bar cart, stools, chandelier)
   ['show', [SX + 9, SY, SZ + 11.5], [SX + 9, SY + 1, SZ + 2.5], DAY],
   ['showclose', [SX + 7, SY + 0.2, SZ + 8.6], [SX + 7, SY + 0.5, SZ + 4.5], 13200],
-  ['village', [SX + 23.5, SY, SZ + 9.5], [SX + 23.5, SY + 0.5, SZ + 2], DAY],
+  ['village', [SX + 23.5, SY, SZ + 8], [SX + 23.5, SY + 0.5, SZ + 1.5], DAY],
 ];
 const ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'];
 let fails = 0;
@@ -165,10 +172,11 @@ async function buildSite(P) {
     for (let x = SX - 2; x <= SX + 29; x++) for (let z = SZ - 1; z <= SZ + 8; z++) w.setBlock(x, SY - 1, z, S('marble_white'), 0);
     for (let x = SX - 2; x <= SX + 29; x++) for (let y = SY; y <= SY + 3; y++) w.setBlock(x, y, SZ - 1, S('stucco_white'), 0);
     for (let x = SX + 10; x <= SX + 14; x++) w.setBlock(x, SY + 4, SZ + 4, S('white_concrete'), 0);
+    for (let x = SX + 23; x <= SX + 25; x++) w.setBlock(x, SY + 4, SZ + 2, S('white_concrete'), 0);
     let placed = 0;
     for (const [name, x, dy, z, f, part] of show) {
       if (VM.MODELS[name]) VM.put((xx, yy, zz, nm, pr) => w.setBlock(xx, yy, zz, S(nm, pr), 0), SX + x, SY + dy, SZ + z, name, f);
-      else if (R.byName[name]) w.setBlock(SX + x, SY + dy, SZ + z, S(name, R.byName[name].has('part') ? { facing: f, part: part | 0 } : { facing: f }), 0);
+      else if (R.byName[name]) { const t = R.byName[name]; w.setBlock(SX + x, SY + dy, SZ + z, S(name, !t.has('facing') ? null : t.has('part') ? { facing: f, part: part | 0 } : { facing: f }), 0); }
       else continue;
       placed++;
     }
@@ -228,23 +236,31 @@ try {
   }
   await P.ctx.close();
 
-  // 4. the potato preset (Very Low: no prop pass) on the build before the pass and on this one, at the town places
+  // 4. the potato preset (Very Low: no prop pass) on the build before the pass and on this one, at the town places. Both
+  // builds stand side by side in two pages and their frames alternate (old, new, new, old …): the machine is shared with
+  // other browser tests, and run 2 measured the builds minutes apart (0.70× to 1.12× for the same scene). The paired
+  // ratio (each new frame over the old frame next to it, the median of the pairs) is the comparison.
   if (OLD_DIST) {
+    const Q = {}, NP = 8;
     for (const [tag, dist] of [['old', OLD_DIST], ['new', DIST]]) {
-      const Q = await open(dist, tag);
-      await Q.ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.minimap = false; g.applySettings('*'); });
-      await world(Q, 'Props potato ' + tag, VGEN);
-      await freeze(Q, DUSK);
-      res.potato[tag] = await costs(Q, 'potato ' + tag, TOWN);
-      await Q.ctx.close();
+      Q[tag] = await open(dist, tag);
+      await Q[tag].ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.minimap = false; g.applySettings('*'); });
+      await world(Q[tag], 'Props potato ' + tag, VGEN);
+      await freeze(Q[tag], DUSK);
     }
-    // the best frame of each build is compared (the machine is shared with another browser test: its slowest frames
-    // are the other test's), the means are printed beside it; the draws and triangles must be the same
+    const one = `(${measure.toString()})(1, 0)`;
     for (const sp of TOWN) {
-      const o = res.potato.old[sp[0]], nw = res.potato.new[sp[0]], r = nw.min / o.min;
-      check(r <= 1.06, `potato ${sp[0]}: best frame ${nw.min} ms new vs ${o.min} ms old (${r.toFixed(2)}×; means ${nw.ms} vs ${o.ms}) — at most 1.06×`);
-      console.log(`    potato ${sp[0]}: draws ${nw.draws} / ${o.draws}, triangles ${nw.tris} / ${o.tris} (new / old: the same scene when equal)`);
+      for (const tag of ['old', 'new']) { await place(Q[tag], sp); await step(Q[tag], 4); await Q[tag].page.evaluate(`(${measure.toString()})(2, 1)`); }
+      const t = { old: [], new: [] }, last = {};
+      for (let k = 0; k < NP; k++) for (const tag of (k & 1 ? ['new', 'old'] : ['old', 'new'])) { const r = await Q[tag].page.evaluate(one); t[tag].push(r.ms); last[tag] = r; }
+      const med = (a) => { const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; };
+      const pairs = t.new.map((v, i) => v / t.old[i]), r = med(pairs);
+      res.potato[sp[0]] = { old: { med: med(t.old), min: Math.min(...t.old), draws: last.old.draws, tris: last.old.tris }, new: { med: med(t.new), min: Math.min(...t.new), draws: last.new.draws, tris: last.new.tris }, pair: +r.toFixed(3) };
+      console.log(`  potato ${sp[0]}: old ${t.old.map(Math.round).join(' ')} · new ${t.new.map(Math.round).join(' ')} ms`);
+      check(r <= 1.06, `potato ${sp[0]}: the paired frames, new over old, median ${r.toFixed(3)}× (medians ${med(t.new).toFixed(0)} vs ${med(t.old).toFixed(0)} ms, best ${Math.min(...t.new).toFixed(0)} vs ${Math.min(...t.old).toFixed(0)}) — at most 1.06×`);
+      console.log(`    potato ${sp[0]}: draws ${last.new.draws} / ${last.old.draws}, triangles ${last.new.tris} / ${last.old.tris} (new / old: the same scene when equal)`);
     }
+    for (const tag of ['old', 'new']) await Q[tag].ctx.close();
   }
   // 5. the logs: no page error, no shader error
   console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
