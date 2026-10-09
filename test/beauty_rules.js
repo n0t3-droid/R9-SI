@@ -137,5 +137,35 @@ console.log('3 · every side of every storey of a Villa Nova keeps a window with
   check(same8 === n8, `the family as vgen 8 builds it is byte for byte as before (${same8} of ${n8})`);
 }
 
+// ---------------------------------------------------------------- 4 · nothing hovers
+console.log('4 · nothing a generator places stands on air (vgen 9)');
+{
+  // a prop (a plant, a bush, a lamp, a planter) whose cell below is air or water — the palm crowns' frond tips and the
+  // floating glass treads hang by design; over the Pod Hills (the ribbon paths' lamps, the pods' bushes) and round the
+  // plaza (vgen 8: a sulfur spring's crust beside it)
+  const isProp = (n) => /^vx_(bush|lamppost|tech_planter|fern|hedge)|^vm_(tree|bush|flower|tuft|plant)|^(short_grass|poppy|dandelion|allium|cornflower)$/.test(n);
+  const scan = (W, x0, z0, x1, z1) => {
+    let props = 0, sul = 0; const at = [];
+    for (let cz = z0 >> 4; cz <= (z1 - 1) >> 4; cz++) for (let cx = x0 >> 4; cx <= (x1 - 1) >> 4; cx++) {
+      const c = W.chunk(cx, cz);
+      for (let y = 64; y < 200; y++) for (let col = 0; col < 256; col++) {
+        const b = c.blocks[(y << 8) | col]; if (!b) continue;
+        const n = nameOf(b);
+        if (n === 'sulfur' && y > 66) { const below = c.blocks[((y - 1) << 8) | col]; if (!below) sul++; }
+        if (!isProp(n)) continue;
+        const t = R.types[R.T.type[b]]; if (t.has && t.has('part') && t.get(b, 'part')[2] !== '0') continue;
+        const below = c.blocks[((y - 1) << 8) | col];
+        if (below && !(R.T.flags[below] & F.FLUID)) continue;
+        props++; if (at.length < 4) at.push([cx * 16 + (col & 15), y, cz * 16 + (col >> 4), n]);
+      }
+    }
+    return { props, sul, at };
+  };
+  const hills8 = scan(W8, -150, -430, 150, -290), hills9 = scan(W9, -150, -430, 150, -290);
+  check(hills9.props === 0, `the Pod Hills: no lamp or bush on air at vgen 9 (${hills9.props}${hills9.props ? ' ' + JSON.stringify(hills9.at) : ''}; vgen 8: ${hills8.props} ${JSON.stringify(hills8.at)})`);
+  const plaza8 = scan(W8, 80, 20, 128, 64), plaza9 = scan(W9, 80, 20, 128, 64);
+  check(plaza8.sul > 0 && plaza9.sul === 0 && plaza9.props === 0, `beside the plaza: no sulfur crust floating at vgen 9 (${plaza9.sul}; vgen 8: ${plaza8.sul}), no prop on air (${plaza9.props})`);
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

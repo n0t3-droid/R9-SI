@@ -52,7 +52,15 @@
           fill(qx, qz, y + 1, Math.max(y + 4, g0 + 3), 0);
           used.push([qx, qz, 1.2]);
         }
-        if (i % 16 === 8) { const lx = Math.round(px + nx * 2.2), lz = Math.round(pz + nz * 2.2); if (onHill(lx, lz)) { const ly = Math.max(gy(lx, lz), y); put(lx, ly + 1, lz, K.LAMP0); put(lx, ly + 2, lz, K.LAMP1); } }
+        if (i % 16 === 8) {
+          const lx = Math.round(px + nx * 2.2), lz = Math.round(pz + nz * 2.2);
+          if (onHill(lx, lz)) {
+            const g1 = gy(lx, lz), ly = Math.max(g1, y);
+            // (vgen 9, t-beauty: a lamp beside a path raised over the slope stands on the path's bank, not on air)
+            if (g.vgen >= 9 && g1 < y) { fill(lx, lz, g1 + 1, y - 1, K.DIRT); put(lx, y, lz, K.GRASS); }
+            put(lx, ly + 1, lz, K.LAMP0); put(lx, ly + 2, lz, K.LAMP1);
+          }
+        }
         last = [px, pz];
       }
       void last;
@@ -84,7 +92,7 @@
         }
         fill(x + dx, z + dz, top + 1, Math.max(top + 4, g0 + 3), 0);
       }
-      if (rng.chance(0.6)) put(x + rad, y + 1, z + rad, K.BUSH);
+      if (rng.chance(0.6)) put(x + rad, (g.vgen >= 9 ? gy(x + rad, z + rad) : y) + 1, z + rad, K.BUSH);   // (vgen 9: on its own ground, not at the stem's height over a slope)
       used.push([x, z, rad + 1]); pods++;
     }
     // ---- tube houses: white half-cylinders (5 wide, 8–14 long) lying along x or z, a glowing doorway at one end
