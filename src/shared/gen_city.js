@@ -137,16 +137,25 @@
     PLAZA: { x: 0.5, z: -49.5, r: 10.5 },                                  // the arrival plaza at the corridor's city end (z ≤ −50)
     // the roads' centre lines (control points of Catmull-Rom curves), in the order their lots are laid out: the crescent
     // (an arc of radius 211 whose apex touches the plaza: the road that sweeps across the view from the corridor), Palm
-    // Row (the same arc 90 blocks north: the villas of both stand back to back), the avenue (a gentle S from the plaza
-    // across both to the hills)
+    // Row (the same arc 90 blocks north: the villas of both stand back to back), the avenue from the plaza across the
+    // crescent between the frames' villas, where it forks (t3_05 · t2_23: the Y with a cyan line sweeping into each
+    // branch) into two branches that curve round the planted island (NH.ISLAND) to Palm Row, and the hill road from
+    // Palm Row to the terraces' foot
     ROADS: [
       { name: 'crescent', arc: { x: 0.5, z: -64, R: 211, x0: -112, x1: 113 } },
       { name: 'palmrow', arc: { x: 0.5, z: -154, R: 211, x0: -84, x1: 85 } },
-      { name: 'avenue', ctrl: [[0.5, -59], [3.5, -80], [-2, -102], [3.5, -124], [-1, -146], [2, -163]] },
+      { name: 'avenue', ctrl: [[0.5, -59], [3, -80], [0.5, -101]] },
+      { name: 'west', ctrl: [[0.5, -101], [-3, -111], [-14, -123], [-21, -135], [-19, -147], [-12, -158]] },
+      { name: 'east', ctrl: [[0.5, -101], [4, -111], [15, -123], [22, -135], [20, -147], [13, -158]] },
+      { name: 'hillroad', ctrl: [[0.5, -152], [1.5, -158], [2, -166]] },
     ],
     // which sides of a road take lots (1: the left of its way, −1: the right): the crescent's north side and its far ends'
-    // south side, Palm Row's south side (and its north side where the land is level), the avenue's both sides
-    SIDES: { crescent: [-1, 1], palmrow: [1, -1], avenue: [1, -1] },
+    // south side, Palm Row's south side (and its north side where the land is level), the avenue's both sides; the
+    // branches and the hill road none (the island between the branches is a park, NH.ISLAND)
+    SIDES: { crescent: [-1, 1], palmrow: [1, -1], avenue: [1, -1], west: [], east: [], hillroad: [] },
+    // the planted island between the branches (t3_05 · t2_23 · t1_24): lawn, a raised bed in a light grey kerb at its
+    // tip with dark soil, ferns, flowers and a round clipped tree; raised beds with fan palms along its axis
+    ISLAND: { branches: ['west', 'east'], tipBed: { rx: 3.5, rz: 5.5, back: 8 }, fanBeds: 2 },
     HW: 3.5, Y: 80,                                                         // the roads' half width; the city's level (the corridor floor)
     // the frames' houses at the corridor's end (the lot nearest each point): t1_22's long villa with the big tree, t2_23's
     // corner villa, t1_24's tower house, t2_25's glass-fronted bungalow
@@ -169,7 +178,9 @@
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
     const hc = new Map();
     const ground = (x, z) => { const k = x * 65536 + z; let h = hc.get(k); if (h === undefined) { h = g.surfaceY(x, z); hc.set(k, h); } return h; };
-    const K = { PAVE: st('vx_floor_plaza'), LINE: st('vx_floor_plaza_line'), AMBER: st('vx_floor_plaza_line_amber'), KERB: st('vollton_mid_grey_slab', { type: 'bottom' }), GRASS: st('grass_block'), DIRT: st('dirt'),
+    // (the kerb light grey, the frames' #D2D9E1 — run 1: the mid grey read as a dark navy wall along every road at dusk)
+    const K = { PAVE: st('vx_floor_plaza'), LINE: st('vx_floor_plaza_line'), AMBER: st('vx_floor_plaza_line_amber'), KERB: st('vollton_light_grey_slab', { type: 'bottom' }), GRASS: st('grass_block'), DIRT: st('dirt'),
+      BEDKERB: st('vollton_light_grey'), SOIL: st('podzol'),
       LAMP0: st('vx_lamppost_tech', { head: 0 }), LAMP1: st('vx_lamppost_tech', { head: 1 }), HEDGE: st('vx_hedge'), BALL: st('vx_bush_light'), PLANTER: st('vx_tech_planter'), HOLO: st('vx_holo_table'), BENCH: (f) => st('vx_bench', { facing: f }), BELL: st('bell', { facing: 0 }) };
     const plan = { rad: RAD, id: site.id, name: site.name, style: site.style, x: cx, z: cz, y: Y0 + 1, seed: site.seed, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: null, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null };
     const nova = plan.nova = { roads: [], lots: [], plaza: null };
@@ -242,6 +253,21 @@
       plazaCells.push([x, z]); setO(x, z, 2);
     }
     const yAt = (x, z) => { const c = cellRoad.get(x + ',' + z); return c ? c[3] : Y0; };
+    // the island: the lawn between the two branches, from the fork to Palm Row — kept from the lots while they are laid
+    // out (9), planted with the verges afterwards (plan.nova.island for the test and the cameras)
+    const ISL = NH.ISLAND, isle = [];
+    {
+      const bw = roads.find(r => r.name === ISL.branches[0]), be = roads.find(r => r.name === ISL.branches[1]);
+      if (bw && be) {
+        const xOf = (rd) => { const m = new Map(); for (const p of rd.pts) { const z = Math.floor(p[1]); if (!m.has(z)) m.set(z, p[0]); } return m; };
+        const XW = xOf(bw), XE = xOf(be), PR = (NH.ROADS.find(q => q.name === 'palmrow') || {}).arc;
+        const south = (x, z) => !PR || z > PR.z - PR.R + Math.sqrt(Math.max(0, PR.R * PR.R - (x - PR.x) * (x - PR.x)));   // (south of Palm Row)
+        for (const [z, xw] of XW) {
+          const xe = XE.get(z); if (xe === undefined) continue;
+          for (let x = Math.floor(xw); x <= Math.ceil(xe); x++) if (oc(x, z) === 0 && south(x, z)) { isle.push([x, z]); setO(x, z, 9); }
+        }
+      }
+    }
     yield;
 
     // ---------------------------------------------------------------- the lots: Villa Nova lots along every road
@@ -296,6 +322,7 @@
       }
       yield;
     }
+    for (const [x, z] of isle) if (oc(x, z) === 9) setO(x, z, 0);   // (the island is lawn again: the verges plant it)
     // the compositions: the frames' houses at their spots (the long villa, the corner villa, the tower house …), the
     // others from the family by the seed, never the same composition twice in a row along a road, half of them mirrored
     const FAMILY = ['classic', 'long', 'tower', 'corner', 'bungalow'];
@@ -382,8 +409,43 @@
     for (const rd of roads) for (const sd of ['L', 'R']) rd.kerb[sd].sort((a, b) => a[2] - b[2]);
     yield;
 
+    // ---------------------------------------------------------------- the island's raised beds (kept before the palms)
+    // the tip bed on the island's axis a few blocks behind its tip (the round clipped tree of t3_05, seen from the fork),
+    // and small beds with a fan palm further along (t1_24 · t2_23); the cells are reserved now (6), the blocks laid with
+    // the verges
+    const beds = [];
+    if (isle.length) {
+      let tip = isle[0]; for (const c of isle) if (c[1] > tip[1]) tip = c;
+      const rowX = (z) => { let a = 1e9, b = -1e9; for (const c of isle) if (c[1] === z && oc(c[0], z) === 0) { a = Math.min(a, c[0]); b = Math.max(b, c[0]); } return a <= b ? (a + b + 1) / 2 : null; };
+      // (a bed keeps one lawn cell from the kerb: where the island narrows, the ellipse is cut back; its middle 3 × 3 whole)
+      const reserve = (cx, cz, rx, rz, kind) => {
+        const cells = []; let all = 0;
+        const okAt = (x, z) => { if (oc(x, z) !== 0) return false; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { const o = oc(x + a, z + b); if (o === 8 || o === 1 || o === 6) return false; } return true; };
+        for (let z = Math.floor(cz - rz); z <= Math.ceil(cz + rz); z++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+          const dx = (x + 0.5 - cx) / rx, dz = (z + 0.5 - cz) / rz; if (dx * dx + dz * dz > 1) continue;
+          all++; if (okAt(x, z)) cells.push([x, z]);
+        }
+        const mx = Math.floor(cx), mz = Math.floor(cz);
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) if (!okAt(mx + a, mz + b)) return null;
+        if (cells.length < all * 0.6) return null;
+        for (const [x, z] of cells) setO(x, z, 6);
+        const bd = { kind, cx, cz, rx, rz, cells }; beds.push(bd); return bd;
+      };
+      const TB = ISL.tipBed, tz = tip[1] - TB.back, tx = rowX(tz);
+      if (tx !== null) reserve(Math.floor(tx) + 0.5, tz + 0.5, TB.rx, TB.rz, 'tip');
+      // the fan beds: along the axis, every 10 blocks behind the tip bed, a little to one side and the other by turns
+      for (let i = 0, z = Math.floor(tz - TB.rz - 7); i < ISL.fanBeds && z > tip[1] - 60; z -= 3) {
+        const x = rowX(z); if (x === null) continue;
+        if (reserve(Math.floor(x + (i & 1 ? 5 : -5)) + 0.5, z + 0.5, 2.5, 2.5, 'fan')) { i++; z -= 7; }
+      }
+      nova.island = { cells: isle.length, tip: tip.slice(), beds: [] };
+    }
+    yield;
+
     // ---------------------------------------------------------------- palms and lamps along the roads
     const free = (x, z) => oc(x, z) === 0;
+    // (the island's tip stays open: from the fork the eye meets the bed with the round tree, not a trunk — t3_05)
+    const nearTip = (x, z) => !!nova.island && Math.hypot(x - nova.island.tip[0], z - nova.island.tip[1]) < 7;
     const palmAt = new Set();
     for (const rd of roads) {
       rd.palms = { L: [], R: [] };
@@ -395,10 +457,10 @@
           for (let k = kNext; k <= Math.min(P.length - 1, kNext + 3) && !done; k++) {
             const [px, pz, a] = P[k], nx = -Math.sin(a) * sign, nz = Math.cos(a) * sign;
             const x = Math.floor(px + nx * (HW + 2.5)), z = Math.floor(pz + nz * (HW + 2.5));
-            let ok = free(x, z);
+            let ok = free(x, z) && !nearTip(x, z);
             for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) { const o = oc(x + dx, z + dz); if (o === 5 || o === 6 || o === 2) { ok = false; break; } }
             if (!ok) continue;
-            const y = yAt(Math.floor(px), Math.floor(pz)), h = 8 + rng.int(5);
+            const y = yAt(Math.floor(px), Math.floor(pz)), h = 10 + rng.int(5);   // (10–14: the frames' palms stand over the villas' first floor)
             setO(x, z, 6); palmAt.add(x + ',' + z);
             run.push([x, z, k, y + 1, h]);
             kNext = k + 6 + rng.int(4); done = true;
@@ -452,16 +514,37 @@
       for (const [sd, sign] of [['L', 1], ['R', -1]]) for (const run of rd.palms[sd]) for (let i = 1 + (sign > 0 ? 0 : 1); i < run.length; i += 2) {
         const k = Math.round((run[i - 1][2] + run[i][2]) / 2), [px, pz, a] = rd.pts[k], nx = -Math.sin(a) * sign, nz = Math.cos(a) * sign;
         const x = Math.floor(px + nx * (HW + 2.5)), z = Math.floor(pz + nz * (HW + 2.5));
-        let ok = free(x, z) && !nearLamp(x, z);
+        let ok = free(x, z) && !nearLamp(x, z) && !nearTip(x, z);
         for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) { const o = oc(x + dx, z + dz); if (o === 5 || o === 6 || o === 2) { ok = false; break; } }
         if (!ok) continue;
         setO(x, z, 6);
         rd.fans.push([x, z, k, run[i][3], 2 + (hsh(x, z, site.seed) & 1)]);
       }
     }
+    // the island's beds: a light grey kerb one block high round dark soil with ferns and flowers; the round clipped tree in
+    // the tip bed, a fan palm (a crown on a trunk of two) in each fan bed
+    const isleFans = [];
+    {
+      const FERN0 = st('vx_fern_lush'), FCL0 = VR.R.byName.vm_flower_cluster ? st('vm_flower_cluster', { part: 'p000', facing: 0 }) : FERN0;
+      for (const bd of beds) {
+        const inB = new Set(bd.cells.map(c => c[0] + ',' + c[1])), cx = Math.floor(bd.cx), cz = Math.floor(bd.cz);
+        const treeAt = (x, z) => bd.kind === 'tip' && Math.abs(x - cx) <= 1 && Math.abs(z - cz) <= 1;
+        for (const [x, z] of bd.cells) {
+          const y = levelOf(x, z), edge = !inB.has((x + 1) + ',' + z) || !inB.has((x - 1) + ',' + z) || !inB.has(x + ',' + (z + 1)) || !inB.has(x + ',' + (z - 1));
+          put(x, y + 1, z, edge ? K.BEDKERB : K.SOIL);
+          if (edge || treeAt(x, z) || (bd.kind === 'fan' && x === cx && z === cz)) continue;
+          const h = hsh(x, z, site.seed + 77) % 10;
+          put(x, y + 2, z, h < 5 ? FERN0 : FCL0);
+        }
+        const y = levelOf(cx, cz) + 2;
+        if (bd.kind === 'tip' && VR.Plants && VR.R.byName.vm_tree_round_s) { for (const [px, py, pz, s] of VR.Plants.parts('vm_tree_round_s', cx - 1, y, cz - 1, 0)) put(px, py, pz, s); bd.tree = [cx, y, cz]; }
+        else if (bd.kind === 'fan') isleFans.push([cx, cz, -1, y, 2]);
+      }
+      if (nova.island) nova.island.beds = beds.map(b => ({ kind: b.kind, x: b.cx, z: b.cz, rx: b.rx, rz: b.rz, n: b.cells.length, tree: b.tree || null }));
+    }
     // the palms in the verges (the shared crown on a ringed trunk); then every trunk and every crown's anchor once more,
     // so a neighbour's fronds never cut a trunk or take the cell the smooth palm stands on
-    const allPalms = [];
+    const allPalms = isleFans.slice();
     for (const rd of roads) { for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const p of run) allPalms.push(p); for (const p of rd.fans) allPalms.push(p); }
     if (VR.Plants && VR.Plants.palm) {
       for (const [x, z, , y, h] of allPalms) VR.Plants.palm(put, x, y, z, h);
