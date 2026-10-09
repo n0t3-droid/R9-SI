@@ -399,11 +399,27 @@
             const qx = cx2 - x0, qz = cz2 - z0;
             if (qx < 0 || qx >= 16 || qz < 0 || qz >= 16) continue;
             const col = (qz << 4) | qx;
-            for (let y = ft.top; y > 2; y--) {
+            // vgen 9 (t-beauty): the fall pours off the rim and dissolves into mist (the trailer's t1_07 · t1_09; TRAILER.md
+            // §3.6) — its curtain ends 18 … 29 below the rim, each cell up to six further (a ragged end), and the chunk
+            // lists a mist spawn at its foot (vents.js puffs the spray there); vgen 8's ran 90 … 100 blocks to the
+            // ground as straight blue poles (beauty_audit run 2: water_1, water_r1, far_3). A short drop still lands.
+            let yEnd = 2, foot = 0;
+            if (g.vgen >= 9) {
+              const fs = ((I.seed | 0) * 31 + f * 17) >>> 0, base = 18 + fs % 12, cell = (Math.imul(fs + 1, 2654435761) ^ Math.imul(ox * 2 + oz + 1, 40503)) >>> 0;
+              foot = ft.top - base;
+              yEnd = Math.max(2, foot - (cell >>> 7) % 7);
+            }
+            let y = ft.top;
+            for (; y > yEnd; y--) {
               const i = (y << 8) | col, b = blocks[i];
               if (b && (R.T.flags[b] & F.SOLID)) break;
               if (b && (R.T.flags[b] & F.FLUID) && y < ft.bottom) break;
               blocks[i] = typ.state({ level: 8 });
+            }
+            // (one spawn a fall, by its first cell, when it ended in the air: the mist round its foot)
+            if (g.vgen >= 9 && ox === 0 && oz === 0 && y === yEnd && !blocks[(yEnd << 8) | col]) {
+              if (!out.spawns) out.spawns = [];
+              out.spawns.push(['mist', cx2 + 1, foot - 3, cz2 + 1, fluid === S.lava ? 1 : 0]);
             }
           }
         }

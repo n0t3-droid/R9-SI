@@ -11,6 +11,9 @@
 //   6. the Gate Plaza's trees are the city's round trees in raised beds; Villa Nova's garden mounds are smooth hills
 //   7. a floating island's sides: four of soil, six to ten bands of warm strata, grey rock, moss among the tuff at the
 //      tips (TRAILER.md §3.6) — and the far rings colour its sides warm, not grey stone; a vgen-8 world keeps its islands
+//   8. a fall off a floating island pours off the rim and dissolves into mist (t1_07 · t1_09): its 2 × 2 curtain ends
+//      18 … 35 below the rim, each cell at its own height (a ragged end), and the chunk lists a mist spawn at its foot —
+//      vgen 8's falls ran 90 … 100 blocks to the ground as straight blue poles (the audit's water_1, water_r1, far_3)
 //   bash test/wt_run.sh beauty_rules.js 600
 const V = require('./load_shared.js');
 const R = V.R, F = V.F, VG = V.VillageGen, HEART = V.Heart;
@@ -295,6 +298,45 @@ console.log('7 · a floating island\'s sides: soil, warm strata, grey rock, moss
   const LOD = V.LOD, P = LOD.palette(), plain = { ember: 0, prism: 0, t: 0.3 };
   const s8 = LOD.isleSide(W8.g, P, plain), s9 = LOD.isleSide(W9.g, P, plain), hex = (c) => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
   check(s8 === P.stone && s9[0] > s9[2] + 30 && s9[0] > s9[1] + 10, `the far rings: an island's sides ${hex(s9)} at vgen 9 (vgen 8 grey stone ${hex(s8)}); ember ${hex(LOD.isleSide(W9.g, P, { ember: 0.6, prism: 0 }))} and prism ${hex(LOD.isleSide(W9.g, P, { ember: 0, prism: 0.6 }))} as before`);
+}
+
+// ---------------------------------------------------------------- 8 · the falls dissolve into mist
+console.log('8 · a fall off a floating island pours off the rim and dissolves into mist (vgen 9)');
+{
+  // every column of the Sky Isles' region with a run of six or more falling fluid blocks: its top, its foot, what lies
+  // under the foot; the columns of one fall (its 2 × 2 curtain) grouped by their rim; the chunks' mist spawns
+  const scanFalls = (vgen) => {
+    const g = V.makeGen('overworld', SEED, { vgen }), cols = [], mists = [];
+    const C = HEART.ISLES;
+    for (let cz = (C.z - 130) >> 4; cz <= (C.z + 130) >> 4; cz++) for (let cx = (C.x - 150) >> 4; cx <= (C.x + 130) >> 4; cx++) {
+      const c = g.generate(cx, cz);
+      if (c.spawns) for (const s of c.spawns) if (s[0] === 'mist') mists.push(s);
+      for (let col = 0; col < 256; col++) {
+        let run = 0, top = -1;
+        for (let y = 250; y >= 1; y--) {
+          const b = c.blocks[(y << 8) | col];
+          if (b && (R.T.flags[b] & F.FLUID) && R.types[R.T.type[b]].get(b, 'level') >= 8) { if (!run) top = y; run++; continue; }
+          if (run >= 6) cols.push({ x: cx * 16 + (col & 15), z: cz * 16 + (col >> 4), top, foot: top - run + 1, len: run, air: !b });
+          run = 0;
+        }
+      }
+    }
+    const falls = [];
+    for (const c of cols) { let f = falls.find(q => q.top === c.top && q.cols.some(o => Math.abs(o.x - c.x) <= 1 && Math.abs(o.z - c.z) <= 1)); if (!f) falls.push(f = { top: c.top, cols: [] }); f.cols.push(c); }
+    return { cols, falls, mists };
+  };
+  const A8 = scanFalls(8), A9 = scanFalls(9);
+  const len = (A) => A.cols.map(c => c.len).sort((a, b) => a - b);
+  const l8 = len(A8), l9 = len(A9);
+  check(A8.falls.length >= 5 && A8.cols.every(c => !c.air) && l8[0] >= 60, `vgen 8 keeps its falls: ${A8.falls.length} falls, ${A8.cols.length} columns, every one down to the ground, ${l8[0]} … ${l8[l8.length - 1]} long`);
+  check(A9.falls.length === A8.falls.length && A9.cols.length === A8.cols.length, `vgen 9: the same falls off the same rims (${A9.falls.length} falls, ${A9.cols.length} columns; vgen 8 ${A8.falls.length}, ${A8.cols.length})`);
+  const dissolve = A9.falls.filter(f => f.cols.every(c => c.air));
+  check(l9.length > 0 && l9[l9.length - 1] <= 36 && l9[0] >= 18, `vgen 9: every curtain ends 18 … 36 below its rim (${l9[0]} … ${l9[l9.length - 1]})`);
+  check(dissolve.length === A9.falls.length, `vgen 9: every fall over the low land ends in the air, not on it (${dissolve.length} of ${A9.falls.length})`);
+  const ragged = dissolve.filter(f => new Set(f.cols.map(c => c.foot)).size >= 2);
+  check(ragged.length === dissolve.length, `vgen 9: each fall's cells end at their own heights, a ragged end (${ragged.length} of ${dissolve.length})`);
+  const misted = dissolve.filter(f => A9.mists.some(m => f.cols.some(c => Math.abs(m[1] - c.x - 0.5) <= 2 && Math.abs(m[3] - c.z - 0.5) <= 2 && m[2] <= c.foot + 8 && m[2] >= c.foot - 8)));
+  check(misted.length === dissolve.length && A9.mists.length === dissolve.length && A8.mists.length === 0, `vgen 9: a mist spawn at the foot of each (${misted.length} of ${dissolve.length}; ${A9.mists.length} spawns, vgen 8 ${A8.mists.length})`);
 }
 
 // ---------------------------------------------------------------- 5 · Very Low
