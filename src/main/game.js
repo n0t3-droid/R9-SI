@@ -1057,6 +1057,9 @@
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
       w.viewDir = [-Math.sin(p.yaw), -Math.cos(p.yaw)];   // the way the player looks (flat): uploads ahead come first
+      // F9 · Weltgenerierung im Takt (Ultra · Leicht or the switch): the world streams within the frame's headroom
+      w.streamTakt = !!this.settings.streamTakt && !!VR.UL;
+      if (w.streamTakt) w.streamMs = VR.UL.Stream.budget(this.renderer.gpuMs, this.jsMs);
       w.update(p.pos[0], p.pos[1], p.pos[2], performance.now());
       const eye = p.eyePos();
       const headState = w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2]));

@@ -50,23 +50,26 @@
     push(item) { this.items.push({ key: item.key, col: item.col, x: item.x, z: item.z, bytes: item.bytes || 0, dx: item.dx || 0, dz: item.dz || 0, run: item.run, age: 0 }); }
     // drops the queued items the predicate rejects (a column unloaded while its mesh waited)
     prune(keep) { this.items = this.items.filter(it => keep(it)); }
-    drain(budgetMs, clock, vx, vz) {
+    // (maxBytes, F9 · Weltgenerierung im Takt: a byte cap beside the ms budget; an item bigger than the cap runs alone
+    // once it has waited four frames, as one bigger than the ms budget does)
+    drain(budgetMs, clock, vx, vz, maxBytes) {
       const now = clock || (() => 0);
       const order = this.items.map((it) => ({ it, p: S.viewPrio(it.dx, it.dz, vx || 0, vz || 0) }));
       order.sort((a, b) => a.p - b.p);
       const keep = [];
-      let spent = 0, ran = 0, forced = 0, blocked = false;
+      let spent = 0, ran = 0, forced = 0, blocked = false, bytes = 0;
+      const capB = maxBytes > 0 ? maxBytes : Infinity;
       for (const { it } of order) {
         if (blocked) { it.age++; keep.push(it); continue; }
         const est = it.bytes * this.msPerByte;
-        if (spent + est > budgetMs + 1e-9) {
-          if (spent === 0 && est > budgetMs && it.age >= 4) forced++;
+        if (spent + est > budgetMs + 1e-9 || bytes + it.bytes > capB) {
+          if (spent === 0 && bytes === 0 && (est > budgetMs || it.bytes > capB) && it.age >= 4) forced++;
           else { blocked = true; it.age++; keep.push(it); continue; }
         }
         const t0 = now();
         it.run();
         const ms = Math.max(0, now() - t0);
-        spent += ms; ran++;
+        spent += ms; ran++; bytes += it.bytes;
         if (it.bytes > 0) {
           const per = ms / it.bytes;
           this.msPerByte = per > this.msPerByte ? per : this.msPerByte * 0.8 + per * 0.2;

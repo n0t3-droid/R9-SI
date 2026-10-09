@@ -91,4 +91,34 @@
     return { key: (qe * 1000 + qz).toFixed(4), L: [Math.cos(qz) * Math.cos(qe), Math.sin(qe), Math.sin(qz) * Math.cos(qe)] };
   };
   SH.slice = (n, K, k) => [Math.floor(k * n / K), Math.floor((k + 1) * n / K)];
+
+  // ---------------------------------------------------------------- Weltgenerierung im Takt (world.js streamTakt)
+  // The main thread's share of the streaming — a generated column's arrival (counts, heights, seam light), the uploads,
+  // the mesh-job starts — follows the frame's headroom instead of arriving whenever a worker answers. CPU and GPU work
+  // side by side: a frame takes max(gpu, js), so the main thread may use up to max(budget, gpu) − js without making the
+  // frame longer. (Subtracting the GPU's time as if the two ran one after the other would starve the streaming exactly on
+  // a GPU-bound machine — an integrated GPU — and the world would load slower: the "hang" the owner felt.)
+  const ST = UL.Stream = {};
+  ST.TARGET = 55;                  // the frame rate the governor aims at
+  ST.MIN = 0.75;                   // ms a frame at least (the world never stops streaming)
+  ST.MAX = 4;                      // ms a frame at most
+  ST.SHARE = 0.6;                  // the share of the headroom the streaming takes
+  ST.BYTES = 2 * 1024 * 1024;      // upload bytes a frame at most (beside F8's ms budget)
+  ST.budget = function (gpuMs, jsMs, target) {
+    const b = 1000 / (target || ST.TARGET);
+    const top = gpuMs > 0 ? Math.max(b, gpuMs) : b;
+    const head = top - (jsMs > 0 ? jsMs : 0);
+    return Math.max(ST.MIN, Math.min(ST.MAX, head * ST.SHARE));
+  };
+  ST.jobs = (ms) => Math.max(2, Math.round(ms * 4));   // mesh-job starts a frame (each copies a padded section)
+  // a queued generation the player has moved away from: beyond the load radius around the loading centre (dxL, dzL), or —
+  // while moving — behind the player (dxP, dzP) near the edge of the view; (ux, uz) the direction of travel
+  ST.away = function (dxL, dzL, dxP, dzP, rd, ux, uz, moving) {
+    if (dxL * dxL + dzL * dzL > (rd + 1.5) * (rd + 1.5)) return true;
+    if (!moving) return false;
+    const d = Math.hypot(dxP, dzP);
+    return d > rd - 1 && (dxP * ux + dzP * uz) < -0.25 * d;
+  };
+  // a generation's place in the queue (world.update's own order: the distance, discounted for columns ahead)
+  ST.genPrio = function (ex, ez, ux, uz, ahead) { const along = ahead ? Math.max(0, ex * ux + ez * uz) : 0; return ex * ex + ez * ez - along * along * 0.5; };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
