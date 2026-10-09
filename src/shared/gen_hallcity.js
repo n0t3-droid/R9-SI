@@ -38,7 +38,7 @@
     PR: 12, PV: 13,                                             // the plaza's radius; its clearing |v| ≤ 13
     ARC: 18, CLR: 22, SPR: 31, TOP: 40, AIS: 22, AISTOP: 26, WALLTOP: 23,
     GAL: 8, STAIR0: 42, GAL0: 50,                               // the gallery's height, the stair's first step (v), the gallery's front edge (v)
-    GLASS: 26, AGL0: 32, AGL1: 41,                              // the vault's glass panels |u| ≤ 26, to the springing (the half dome's d ≤ 26), the aisle vaults' 32–41
+    GLASS: 26, AGL0: 32, AGL1: 45,                              // the vault's glass panels |u| ≤ 26, to the springing (the half dome's d ≤ 26), the aisle vaults' 32–45 (to the wall)
     LOT: { w: 12, d: 18, house: 12 },                           // a shop house's lot: 12 along the street, 18 deep (front 2, house 12, yard 4)
     RAD: 112, VGEN: 9,
   };
@@ -283,7 +283,7 @@
       const a = Math.abs(u);
       if (v <= H.V1) {
         if (a <= H.GLASS) return !ribV(v) && a % 6 !== 3;
-        if (a >= H.AGL0 && a <= H.AGL1) return !ribV(v) && a !== 35 && v <= H.V1 - 1 && v >= H.V0 + 3;
+        if (a >= H.AGL0 && a <= H.AGL1) return !ribV(v) && a !== 35 && a !== 41 && v <= H.V1 - 1 && v >= H.V0 + 3;   // (ribs at 35 and 41; to the wall: the strip over the loggias was black where a chunk border cut it off)
         return false;
       }
       const d = dApse(u, v), k = Math.round(Math.atan2(v - H.V1, u) / (Math.PI / 10));
