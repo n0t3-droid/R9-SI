@@ -930,6 +930,7 @@ void main() {
 uniform sampler2D u_tex;
 uniform ivec3 u_camInt;      // (declared for the common block's heightmap shadow; the pieces do not march it)
 uniform float u_emissiveBoost;
+uniform float u_blockVar;    // the Klassisch look (VR.LOOK.vary, t-smooth2): the pieces answer like the blocks — the surface detail on the blocks' 16-texel grid, a duller sheen; their shape never changes
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
@@ -982,6 +983,8 @@ void main() {
   vec3 V = normalize(-v_rel);
   float fade = 1.0 - smoothstep(6.0, 14.0, dist);
   vec3 lp = v_lp * 16.0;
+  bool klassisch = u_blockVar > 0.5;
+  if (klassisch) lp = floor(lp) + 0.5;           // Klassisch: grain, weave and veins in block texels
   float rough = 0.8, metal = 0.0, sheen = 0.0;
   if (m == 0) { rough = 0.96; sheen = 0.5; alb *= 1.0 + fade * 0.07 * (vnoise(lp.xy * 1.9 + lp.zz * 1.3) - 0.5); }
   else if (m == 1) { rough = 0.42; float g = vnoise(vec2(lp.x * 0.11 + lp.z * 0.03, (lp.y + lp.z) * 2.6)) * 0.7 + vnoise(vec2(lp.x * 0.5, (lp.y - lp.z) * 7.0)) * 0.3; alb *= 1.0 + fade * 0.22 * (g - 0.5); }
@@ -993,6 +996,8 @@ void main() {
   else if (m == 8) { rough = 0.2; float vn = vnoise(lp.xz * 0.32 + vec2(lp.y * 0.21)); alb *= 1.0 - fade * 0.12 * (smoothstep(0.46, 0.5, vn) - smoothstep(0.5, 0.54, vn)); }
   else if (m == 9) { rough = 0.48; }
   else if (m == 10) { rough = 0.95; sheen = 0.3; }
+  else if (m == 12) { rough = 0.03; metal = 1.0; }
+  if (klassisch && m != 12) { rough = max(rough, 0.34); sheen *= 0.6; }   // Klassisch: the blocks' matter, less gloss
   float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
@@ -1007,6 +1012,18 @@ void main() {
   float sh = 1.0;
 #endif
   float up = 0.5 + 0.5 * N.y;
+  if (m == 12) {
+    // a mirror (t-smooth2, MAT.mirror): the room seen in it — indoors a bright ceiling, the walls in the room's light, a
+    // darker floor and a soft line where the far wall meets it; outdoors the sky — with the sun's glint
+    vec3 Rm = reflect(-V, N);
+    vec3 roomL = blockL * 0.9 + u_ambSky * skyL * 0.75 + vec3(0.04);
+    vec3 room = roomL * (Rm.y > 0.0 ? mix(0.95, 1.3, smoothstep(0.05, 0.8, Rm.y)) : mix(0.8, 0.5, smoothstep(0.0, 0.6, -Rm.y)));
+    room *= 1.0 - 0.25 * (1.0 - smoothstep(0.0, 0.06, abs(Rm.y + 0.02)));
+    vec3 envM = mix(room, furnEnv(Rm) * (0.35 + 0.65 * v_sky), outdoors);
+    vec3 cm = alb * envM * 1.1 * v_ao + lc * pow(max(dot(N, normalize(L + V)), 0.0), 400.0) * sh * outdoors;
+    o_col = vec4(applyFog(cm, v_rel, dist), 1.0);
+    return;
+  }
   vec3 amb = u_ambSky * skyL * mix(0.45, 1.0, up);
   vec3 blk = blockL * mix(0.5, 1.0, up);
   vec3 col = alb * ((amb + lc * ndl * sh * outdoors) * v_ao + blk * v_ao + vec3(0.012, 0.012, 0.016)) * (1.0 - metal * 0.85);
