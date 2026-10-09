@@ -150,7 +150,7 @@
     HW: 3.5, Y: 80,                                                         // the roads' half width; the city's level (the corridor floor)
     // the frames' houses at the corridor's end (the lot nearest each point): t1_22's long villa with the big tree, t2_23's
     // corner villa, t1_24's tower house, t2_25's glass-fronted bungalow
-    PICK: [['long', false, [17, -87]], ['corner', false, [-16, -87]], ['tower', false, [-44, -90]], ['bungalow', true, [45, -90]]],
+    PICK: [['long', false, [-17, -87]], ['corner', false, [20, -87]], ['tower', false, [-45, -88]], ['bungalow', true, [47, -88]]],
   };
   const PATH_STARTS = new Map();   // composition (+ m for the mirror) → where its garden path meets the street row
   VG.novaHaven = function* (g, site) {
@@ -207,6 +207,8 @@
     // an arc bowing south (toward +z) with its apex at (x, z): the circle's centre lies R north of the apex
     const arc = (A) => { const dense = [], f0 = Math.asin((A.x0 - A.x) / A.R), f1 = Math.asin((A.x1 - A.x) / A.R); for (let k = 0; k <= 400; k++) { const f = f0 + (f1 - f0) * k / 400; dense.push([A.x + A.R * Math.sin(f), A.z - A.R + A.R * Math.cos(f)]); } return resample(dense, false); };
     const roads = NH.ROADS.map(R0 => ({ name: R0.name, pts: R0.arc ? arc(R0.arc) : catmull(R0.ctrl) }));
+    const R0of = (rd) => NH.ROADS.find(q => q.name === rd.name);
+    for (const rd of roads) { const A = R0of(rd).arc; if (A) { let best = 0; rd.pts.forEach((p, k) => { if (Math.abs(p[0] - A.x) < Math.abs(rd.pts[best][0] - A.x)) best = k; }); rd.apex = best; } }
     void ellipse;
     // the road surface: the city's level, rising with the ground toward the hills (smoothed, one block in four at most)
     for (const rd of roads) {
@@ -269,8 +271,11 @@
     for (let ri = 0; ri < roads.length; ri++) {
       const rd = roads[ri], P = rd.pts;
       for (const side of (NH.SIDES[rd.name] || [1, -1])) {
-        let k = 6;
-        while (k < P.length - 6) {
+        // (an arc is walked from its apex out to both ends, so the first lots on either side hug the avenue)
+        const ks = [];
+        if (R0of(rd).arc) { const mid = rd.apex; for (let k = mid; k < P.length - 6; k += 3) ks.push(k); for (let k = mid - 3; k >= 6; k -= 3) ks.push(k); }
+        else for (let k = 6; k < P.length - 6; k += 3) ks.push(k);
+        for (const k of ks) {
           const [px, pz, a] = P[k], nx = -Math.sin(a) * side, nz = Math.cos(a) * side;
           // the axis nearest the outward normal (and the other one where the road runs diagonally); the lot's front
           // centre moves out along it, and slides along the road, until the lot fits — the nearest fit wins
@@ -284,7 +289,6 @@
             if (fits(ox, oz, r)) placed = { r, ox, oz, road: ri, k, side };
           }
           if (placed) { claim(placed); lots.push(placed); }
-          k += 3;
         }
       }
       yield;
@@ -449,22 +453,24 @@
     yield;
 
     // ---------------------------------------------------------------- the plaza: paving, its cyan ring, the holo table
-    const PCX = 0, PCZ = -54;
+    // (the corridor's axis stays clear — the view from the corridor runs up the avenue between the villas; the holo
+    //  table with its ring and benches stands on the east side, two palms in planters on the west)
+    const PCX = -1, PCZ = -55, HX = 6, HZ = -54;
     for (const [x, z] of plazaCells) {
-      const key = x + ',' + z, d = Math.hypot(x + 0.5 - (PCX + 0.5), z + 0.5 - (PCZ + 0.5));
-      const ring = Math.abs(d - 3.6) < 0.62;
+      const key = x + ',' + z, d = Math.hypot(x - HX, z - HZ);
+      const ring = Math.abs(d - 2.6) < 0.55;
       const gy = ground(x, z);
       if (gy < Y0) fill(x, z, gy + 1, Y0 - 1, K.DIRT);
       fill(x, z, Y0 + 1, Math.max(Y0 + 8, gy + 2), AIR);
       put(x, Y0, z, lineSet.has(key) || ring ? K.LINE : K.PAVE);
     }
-    put(PCX, Y0 + 1, PCZ, K.HOLO);
+    put(HX, Y0 + 1, HZ, K.HOLO);
     const seats = [];
-    for (const [dx, dz, f] of [[-2, 0, 1], [2, 0, 3], [0, -2, 2]]) { put(PCX + dx, Y0 + 1, PCZ + dz, K.BENCH(f)); seats.push([PCX + dx, Y0 + 1, PCZ + dz, f]); }
-    for (const [dx, dz] of [[-7, -1], [7, -1]]) { put(PCX + dx, Y0 + 1, PCZ + dz, K.PLANTER); if (VR.Plants) VR.Plants.palm(put, PCX + dx, Y0 + 2, PCZ + dz, 9); }
-    for (const [dx, dz] of [[-9, 2], [9, 2]]) { put(PCX + dx, Y0 + 1, PCZ + dz, K.LAMP0); put(PCX + dx, Y0 + 2, PCZ + dz, K.LAMP1); plan.lamps.push([PCX + dx, Y0 + 2, PCZ + dz]); }
-    put(PCX - 5, Y0 + 1, PCZ + 3, K.BELL); plan.bell = [PCX - 5, Y0 + 1, PCZ + 3];
-    plan.plaza = { x: PCX, y: Y0 + 1, z: PCZ, r: 6, seats, stalls: [] };
+    for (const [dx, dz, f] of [[-2, 0, 1], [2, 0, 3], [0, -2, 2]]) { put(HX + dx, Y0 + 1, HZ + dz, K.BENCH(f)); seats.push([HX + dx, Y0 + 1, HZ + dz, f]); }
+    for (const [x, z] of [[-7, -51], [-5, -57]]) { put(x, Y0 + 1, z, K.PLANTER); if (VR.Plants) VR.Plants.palm(put, x, Y0 + 2, z, 9); }
+    for (const [x, z] of [[-9, -51], [9, -51]]) { put(x, Y0 + 1, z, K.LAMP0); put(x, Y0 + 2, z, K.LAMP1); plan.lamps.push([x, Y0 + 2, z]); }
+    put(-3, Y0 + 1, -51, K.BELL); plan.bell = [-3, Y0 + 1, -51];
+    plan.plaza = { x: PCX, y: Y0 + 1, z: PCZ, r: 4, seats, stalls: [] };
     nova.plaza = { x: PZ.x, z: PZ.z, r: PZ.r, y: Y0 };
     yield;
 

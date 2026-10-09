@@ -24,14 +24,14 @@ if (process.env.BEFORE_DIST) RUNS.push(['before', process.env.BEFORE_DIST]);
 if (!process.env.NO_AFTER) RUNS.push([TAG, process.env.DIST || 'file:///home/claude/vr/dist/index.html']);
 // [name, x, z, eye above the ground (or {y: feet}), yaw, pitch, fov, time of day]
 const SHOTS = [
-  ['F1', -5.5, -147.5, 1.62, 0.32, -0.03, 55, DUSK],
-  ['F2', 1.5, -51.5, 2.4, 0.45, -0.06, 50, DUSK],
-  ['F3', 6.5, -53.5, 1.8, 0.95, -0.04, 50, DUSK],
-  ['F4', 0.5, -44.5, { y: 81 }, 0, -0.03, 55, DUSK],
-  ['F5', 11.5, -226.5, 1.62, 0.05, 0.05, 55, DUSK],
-  ['F6', 70.5, -235.5, 40, 0.75, -0.32, 60, DUSK],
-  ['F0', 0.5, -60.5, { y: 150 }, 0, -0.62, 70, DUSK],
-  ['F1_noon', -5.5, -147.5, 1.62, 0.32, -0.03, 55, NOON],
+  ['F1', 1.5, -112.5, 1.62, 0.08, 0.0, 55, DUSK],          // the avenue between the villas, the fork with Palm Row, the terraces behind
+  ['F2', 1.5, -51.5, 2.4, 0.6, -0.06, 50, DUSK],            // from the corridor's end: the crescent sweeping across, the tower house and the long villa
+  ['F3', 2.5, -58.5, 1.8, -0.9, -0.03, 50, DUSK],           // the corner villa east of the avenue, the crescent curving away right
+  ['F4', 0.5, -44.5, { y: 81 }, 0.08, -0.03, 55, DUSK],     // from inside the corridor: up the avenue between the villas
+  ['F5', 1.5, -138.5, 1.62, 0.05, 0.07, 55, DUSK],          // the terraces from the street (Palm Row's villas both sides)
+  ['F6', 60.5, -200.5, 35, 0.6, -0.35, 60, DUSK],           // the terraces from above: contour lines, stairways, villas
+  ['F0', 0.5, -60.5, { y: 150 }, 0, -0.62, 70, DUSK],       // the layout from above the plaza
+  ['F1_noon', 1.5, -112.5, 1.62, 0.08, 0.0, 55, NOON],
 ];
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 let fails = 0;
@@ -90,7 +90,7 @@ async function runPage(tag, dist) {
     const probe = await ev(() => {
       const w = VR.game.world, R = VR.R, nm = (s) => s ? R.types[R.T.type[s]].name : 'air';
       const count = (x0, z0, r, y0, y1, re) => { let n = 0; for (let x = x0 - r; x <= x0 + r; x++) for (let z = z0 - r; z <= z0 + r; z++) for (let y = y0; y <= y1; y++) if (re.test(nm(w.getBlock(x, y, z)))) n++; return n; };
-      return { lineF1: count(-6, -148, 12, 76, 88, /^vx_floor_plaza_line$/), amber: count(0, -70, 30, 76, 88, /^vx_floor_plaza_line_amber$/), window: count(0, -80, 40, 80, 104, /^vx_nova_window$/) };
+      return { lineF1: count(1, -112, 12, 76, 88, /^vx_floor_plaza_line$/), amber: count(0, -75, 30, 76, 88, /^vx_floor_plaza_line_amber$/), window: count(0, -85, 40, 80, 104, /^vx_nova_window$/) };
     });
     console.log(tag, 'probe', JSON.stringify(probe));
     check(probe.lineF1 >= 10 && probe.amber >= 1 && probe.window >= 20, `${tag}: the city stands at the cameras (light-line cells by the F1 road ${probe.lineF1}, amber accents near the plaza ${probe.amber}, nova window cells ${probe.window})`);

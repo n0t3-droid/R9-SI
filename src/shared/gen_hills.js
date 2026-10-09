@@ -204,9 +204,10 @@
         if (zf === null) continue;
         const ox = xc + 12, oz = zf - 1, x0 = ox - LW + 1, x1 = ox, z0 = oz - LD + 1, z1 = oz;
         if (!free(x0, z0, x1, z1)) continue;
-        // gentle enough: the cut into the slope is at most 9 blocks, the fill under the front at most 5
+        // gentle enough: the cut into the slope behind the house at most 13 blocks (the moss under every tread runs 14
+        // deep, so the cut face is green), the fill under the front at most 5
         let ok = true, cut = 0;
-        for (let z = z0; z <= z1 && ok; z++) for (let x = x0; x <= x1; x++) { const c = C(x, z); if (c.k < 0 && c.y >= T8.base) { ok = false; break; } if (c.y > L + 9 || c.y < L - 5) { ok = false; break; } cut += Math.max(0, c.y - L); }
+        for (let z = z0; z <= z1 && ok; z++) for (let x = x0; x <= x1; x++) { const c = C(x, z); if (c.k < 0 && c.y >= T8.base) { ok = false; break; } if (c.y > L + 13 || c.y < L - 5) { ok = false; break; } cut += Math.max(0, c.y - L); }
         if (!ok) continue;
         const comp = comps[(rng.int(comps.length) + T.villas.length) % comps.length];
         T.villas.push({ level: k, L, ox, oz, r: 2, comp, mirror: rng.chance(0.5), cut, built: false });
@@ -287,7 +288,7 @@
       if (c.y === c.h && c.k < 0) continue;
       for (let y = c.y + 1; y <= Math.min(254, c.h + 14); y++) { const i = (y << 8) | (lz << 4) | lx; const b = blocks[i]; if (b && !(RT.flags[b] & FL.FLUID)) blocks[i] = 0; }
       blocks[(c.y << 8) | (lz << 4) | lx] = HILLS.edgeT8(g, x, z) ? K.LINE : K.GRASS;
-      for (let y = Math.max(1, c.y - 8); y < c.y; y++) { const i = (y << 8) | (lz << 4) | lx; if (blocks[i] && (RT.flags[blocks[i]] & FL.OPAQUE)) blocks[i] = K.MOSS; }
+      for (let y = Math.max(1, c.y - 14); y < c.y; y++) { const i = (y << 8) | (lz << 4) | lx; if (blocks[i] && (RT.flags[blocks[i]] & FL.OPAQUE)) blocks[i] = K.MOSS; }
     }
     // the stairways and trees, then the villas over this chunk
     const key = cx + ',' + cz, b = T.ops.get(key);

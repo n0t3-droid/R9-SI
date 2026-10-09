@@ -248,7 +248,7 @@ if (!process.env.SKIP_COST) {
   console.log('5 · the Very Low cost at F1');
   V.setLook('seamless');
   const PAD = V.MESH_PAD, PS = V.MESH_PS, PSS = PS * PS;
-  const F1 = [-5.5, -147.5], RD = 4, VXLOD = 12;
+  const F1 = [1.5, -112.5], RD = 4, VXLOD = 12;   // test/trailer_city.mjs's F1
   const windowTris = (vgen) => {
     const g = V.makeGen('overworld', 4242, { vgen });
     const cols = new Map(), c0x = Math.floor(F1[0] / 16), c0z = Math.floor(F1[1] / 16);
