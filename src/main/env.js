@@ -44,7 +44,7 @@
     dusk: { hor: [0.3564, 0.3154, 0.5082], mid: [0.1777, 0.1647, 0.3202], zen: [0.0058, 0.0251, 0.1247], stops: [0.407, 0.499, 0.658, 0.45] },
     night: { hor: [0.03, 0.045, 0.1], mid: [0.014, 0.022, 0.055], zen: [0.006, 0.01, 0.03], stops: [0.3, 0.1, 0.9, 0.45] },
     space: [0.18, 0.42, 1.0],
-    nebDay: 0.9,          // the nebula's brightness by day (at night 0.9; t-look pushed it to 1.3 on its lilac sky)
+    nebDay: 0.8,          // the nebula's brightness by day (at night 0.9; t-look pushed it to 1.3 on its lilac sky)
     spaceDusk: [0.2, 0.7, 0.9, 0.55],
     fog: 0.3,
     haze: [0.99, 7.96],
