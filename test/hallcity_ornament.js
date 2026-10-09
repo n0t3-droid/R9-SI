@@ -323,6 +323,16 @@ for (const [label, H] of HALLS) {
     let big = 0; const tv = [];
     for (let v = Hh.V0; v <= Hh.V1; v++) { let posts = 0; for (const [du, dv] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) if (/pillar/.test(atN(du, F + 42, v + dv))) posts++; if (posts === 4) { let top = 0; for (let y = F + 41; y <= F + 56; y++) if (solid(atN(0, y, v))) top = y - F; if (top >= 50) { big++; tv.push(v); } } }
     check(big >= 4, `lantern turrets five wide on the ridge, a dome and a finial to 50 over the floor (${big}: at v ${tv.join(' ')})`);
+    // the entrance gable crowned: a cornice following the end wall's top one block proud, a finial with a lantern at the
+    // apex, pinnacles on the nave's shoulders and at the outer corners
+    {
+      const V0 = Hh.V0; let cn = 0, ok = 0;
+      for (let u = -47; u <= 47; u++) { let top = -1; for (let y = F + 45; y >= F + 15; y--) if (solid(atN(u, y, V0)) && !/lantern|pillar|chiseled|band/.test(atN(u, y, V0))) { top = y; break; } if (top < 0) continue; cn++; if (/stairs/.test(atN(u, top, V0 - 1))) ok++; }
+      let fin = 0; for (let y = F + 41; y <= F + 50; y++) if (solid(atN(0, y, V0))) fin = y - F;
+      const pin = (u, y0) => { let t = 0; for (let y = y0; y <= y0 + 8; y++) if (solid(atN(u, y, V0))) t = y - y0; return t; };
+      const pins = [-27, 27].filter(u => pin(u, F + 32) >= 3).length + [-48, 48].filter(u => pin(u, F + 24) >= 3).length;
+      check(cn > 60 && ok >= 0.8 * cn && fin >= 44 && pins === 4, `the entrance gable crowned: a cornice along its top (${ok} of ${cn}), a finial to ${fin}, pinnacles on its shoulders and corners (${pins} of 4)`);
+    }
     let cup = 0; for (let u = -4; u <= 4; u++) for (let v = -4; v <= 4; v++) for (let y = F + 41; y <= F + 50; y++) if (glassy(atN(u, y, v))) cup++;
     check(cup >= 60, `a glazed cupola over the crossing (${cup} glass cells)`);
   }

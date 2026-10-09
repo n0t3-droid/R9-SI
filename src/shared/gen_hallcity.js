@@ -439,6 +439,20 @@
         else if (d <= 2.6) P(uc + t, F + y, outer, BAND);
       }
     }
+    // (round 2b) the entrance gable crowned: a cornice of upside-down stairs following the end wall's top one block
+    // proud, a gold course under it over the nave, pinnacles on the nave's shoulders and at the outer corners (a plinth, a
+    // shaft, a gold cap, a lantern), a finial with a lantern at the apex
+    for (let u = -H.HW + 1; u <= H.HW - 1; u++) {
+      const top = roofH(u, H.V0); if (top < 0) continue;
+      P(u, F + top, H.V0 - 1, 'smooth_quartz_stairs', { facing: 2, half: 1 });
+      if (Math.abs(u) <= 26 && Math.abs(u) > 13) P(u, F + top - 1, H.V0 - 1, BAND);
+    }
+    for (const [uc, y0] of [[-27, H.SPR], [27, H.SPR], [-H.HW, H.WALLTOP], [H.HW, H.WALLTOP]]) {
+      P(uc, F + y0 + 1, H.V0, CHIS); P(uc, F + y0 + 2, H.V0, 'quartz_pillar', { axis: 0 }); P(uc, F + y0 + 3, H.V0, 'quartz_pillar', { axis: 0 }); P(uc, F + y0 + 4, H.V0, BAND); P(uc, F + y0 + 5, H.V0, 'lantern', { hanging: 0 });
+      const [x, z] = W2(uc, H.V0); plan.lamps.push([x, F + y0 + 5, z]);
+    }
+    P(0, F + H.TOP + 1, H.V0, CHIS); P(0, F + H.TOP + 2, H.V0, BAND); P(0, F + H.TOP + 3, H.V0, 'quartz_pillar', { axis: 0 }); P(0, F + H.TOP + 4, H.V0, 'quartz_pillar', { axis: 0 }); P(0, F + H.TOP + 5, H.V0, 'lantern', { hanging: 0 });
+    { const [x, z] = W2(0, H.V0); plan.lamps.push([x, F + H.TOP + 5, z]); }
     // the cornice band outside: upside-down stairs along the long walls under the aisle roof's glass and along the
     // clerestory under the vault's; a plinth course of slabs at the walls' foot
     for (let v = H.V0; v <= H.VE; v++) for (const s of [-1, 1]) {
