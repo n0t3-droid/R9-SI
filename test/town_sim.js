@@ -30,7 +30,7 @@ function worldOf(vgen) {
   return (worlds[vgen] = { site, plan, sum, col });
 }
 const random0 = Math.random;
-function run(vgen, preset, pickOn, seed) {
+function run(vgen, preset, pickOn, seed, duskAt) {
   const { site, plan, sum, col } = worldOf(vgen);
   let rs = seed; Math.random = () => { rs = (Math.imul(rs, 1664525) + 1013904223) >>> 0; return rs / 4294967296; };
   const r = plan.hall ? plan.hall.r : (site.seed >>> 3) & 3;
@@ -62,6 +62,7 @@ function run(vgen, preset, pickOn, seed) {
   try {
     for (let f = 0; f < FRAMES; f++) {
       if (f === WARM) counting = true;
+      if (duskAt !== undefined && f === duskAt) g.env.timeOfDay = 13000;
       const c0 = process.cpuUsage();
       mgr.update(1 / 30);
       const c = process.cpuUsage(c0);
@@ -69,10 +70,14 @@ function run(vgen, preset, pickOn, seed) {
       if (counting) ms.push((c.user + c.system) / 1000);
     }
   } finally { V.Folk.findPath = FP; Math.random = random0; }
-  let sit = 0, at = 0;
-  for (const a of mgr.agents) { if (a.pose === 'sit') sit++; if (a.goal && Math.hypot(a.pos[0] - a.goal[0] - 0.5, a.pos[2] - a.goal[2] - 0.5) < 2.5) at++; }
+  let sit = 0, at = 0, vis = 0, drawn = 0, street = 0, oldRule = 0, oldOut = 0;
+  for (const a of mgr.agents) {
+    if (a.pose === 'sit') sit++; if (a.goal && Math.hypot(a.pos[0] - a.goal[0] - 0.5, a.pos[2] - a.goal[2] - 0.5) < 2.5) at++;
+    if (!a.vis) continue; vis++; if (a.drawn) { drawn++; if (a.street) street++; }
+    if (a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type])) oldRule++; else oldOut++;   // (the rule before: every indoor act free of the cap)
+  }
   const n = FRAMES - WARM, sorted = ms.slice().sort((a, b) => a - b);
-  return { agents: mgr.agents.length, upd: updates / n, paths: paths / n, mean: ms.reduce((a, b) => a + b, 0) / n, median: sorted[n >> 1], sit, at };
+  return { agents: mgr.agents.length, upd: updates / n, paths: paths / n, mean: ms.reduce((a, b) => a + b, 0) / n, median: sorted[n >> 1], sit, at, vis, drawn, street, drawnOld: Math.min(oldOut, cap) + oldRule, cap };
 }
 const fmt = (o) => `${o.agents} people: ${o.upd.toFixed(1)} updates and ${o.paths.toFixed(2)} path searches a frame, ${o.mean.toFixed(2)} ms a frame (median ${o.median.toFixed(2)}), ${o.sit} sitting, ${o.at} at their goal`;
 
@@ -90,5 +95,11 @@ const vilOld = best(8, false), hallNow = best(9, true);
 console.log('    v042 village: ' + fmt(vilOld));
 console.log('    hall city:    ' + fmt(hallNow));
 check(hallNow.mean <= vilOld.mean * 1.1, `the hall city's people cost Very Low no more than the village's did: ${hallNow.mean.toFixed(2)} ms a frame (the village ${vilOld.mean.toFixed(2)} ms; the best of three runs each)`);
+console.log('4. dusk on High: 14:00, then 13000 (every act turns \'sleep\'), 300 frames later the people drawn at P1');
+{
+  const d = run(9, 'high', true, 21, FRAMES - 300);
+  console.log(`    ${d.vis} in view, ${d.drawn} drawn (${d.street} of them on the street, cap ${d.cap}; the rest asleep, seated or at their goal) · the rule before would have drawn ${d.drawnOld}`);
+  check(d.street <= d.cap && d.drawn <= d.cap + (d.drawn - d.street) && d.drawn < d.drawnOld, `at dusk the street's cap holds: ${d.drawn} drawn, ${d.street} on the street (the rule before: ${d.drawnOld})`);
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
