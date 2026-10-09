@@ -36,16 +36,24 @@
     for (const li of st.built || []) if (P.lots[li]) homes.push(Object.assign({}, P.lots[li], { newHome: true }));
     // houses the player built (a roof, a door and a bed near the village): a family moved in
     for (const ch of st.custom || []) homes.push(Object.assign({}, ch, { newHome: true, custom: true }));
-    homes.forEach((home, hi) => {
+    const kindsOf = homes.map((home, hi) => {
       const fs = H(P.seed, hi, 101);
       const nb = Math.max(1, home.beds.length);
-      const fam = { id: hi, surname: surFor(fs), home: hi, members: [], newHome: !!home.newHome };
       const kinds = [];
       if (nb === 1) kinds.push('adult');
       else if (nb === 2 && fs % 5 === 0) kinds.push('elder', 'elder');
       else { kinds.push('adult', 'adult'); for (let k = 2; k < nb; k++) kinds.push(k === nb - 1 && nb >= 4 && fs % 3 === 0 ? 'elder' : 'child'); }
       if (home.newHome) { kinds.length = 0; kinds.push('adult', 'adult'); }
       if (home.custom) { kinds.length = 0; kinds.push('adult'); if (nb >= 2) kinds.push('adult'); for (let k = 2; k < Math.min(nb, 5); k++) kinds.push('child'); }
+      return kinds;
+    });
+    // a town that carries its villager budget (vgen 9: plan.folkCap — one villager per 9 blocks of walkable street and
+    // plaza plus 2 per home): the biggest families shrink, the youngest first, until the town's people fit it
+    Folk.fitBudget(kindsOf, P.folkCap && P.folkCap.max);
+    homes.forEach((home, hi) => {
+      const fs = H(P.seed, hi, 101);
+      const fam = { id: hi, surname: surFor(fs), home: hi, members: [], newHome: !!home.newHome };
+      const kinds = kindsOf[hi];
       let parentLook = null;
       kinds.forEach((age, k) => {
         const seed = H(fs, k, 7);
@@ -81,7 +89,7 @@
     let si = 0;
     for (const a of adults) if (!a.role) { a.role = spare[(si + (H(a.seed, 3, 3) & 1)) % spare.length]; si++; }
     void hasPlots;
-    for (const f of fams) for (const m of f.members) m.look = Folk.look(m.seed, m.role, m.age === 'adult' ? 'adult' : m.age, m.parentLook);
+    for (const f of fams) for (const m of f.members) m.look = Folk.look(m.seed, m.role, m.age === 'adult' ? 'adult' : m.age, m.parentLook, P.style);
     // workplace lookup per role
     vil.workOf = {};
     for (const w of P.work) { const r = WORK_ROLE[w.kind]; if (r) (vil.workOf[r] || (vil.workOf[r] = [])).push(w); if (w.kind === 'market') (vil.workOf.clerk || (vil.workOf.clerk = [])).push(w); }
@@ -228,7 +236,7 @@
       const g = this.g;
       vil.active = true;
       vil.agents = [];
-      if (!vil.visited) { vil.visited = true; if (g.ui && g.settings.toasts !== false) g.ui.toast(T('g.vil.welcome', { v: vil.name }), T('g.vil.welcomeSub', { n: vil.people.length, f: vil.fams.length }), null); if (g.codex && g.codex.event) g.codex.event('village'); }
+      if (!vil.visited) { vil.visited = true; if (g.ui && g.settings.toasts !== false) g.ui.toast(T('g.vil.welcome', { v: vil.name }), T(vil.plan.style === 'hall' ? 'g.vil.hallSub' : 'g.vil.welcomeSub', { n: vil.people.length, f: vil.fams.length }), null); if (g.codex && g.codex.event) g.codex.event('village'); }
       this.catchUp(vil);
       for (const person of vil.people) {
         const pos = this.spawnPos(vil, person, tod);
@@ -1431,4 +1439,5 @@
     list() { return this.sites; }
   }
   VR.Villages = Villages;
+  Villages.makeRoster = makeRoster;   // (the families and jobs of a village record: test/town_folk.js)
 })(VR);

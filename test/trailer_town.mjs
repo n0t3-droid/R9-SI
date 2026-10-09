@@ -79,20 +79,18 @@ async function runPage(tag, dist) {
     }
     return n;
   });
-  // the villagers in the picture: within 64 blocks and inside the camera's view (the vertical fov and the page's aspect)
+  // the villagers in the picture (after a drawn frame): in the view (the renderer's frustum, within the folk distance),
+  // and the ones drawn — the street's budget draws the nearest outdoor ones up to the preset's cap (src/shared/folkcrowd.js)
   const inView = () => ev(() => {
-    const g = VR.game, V = g.villages, p = g.player; if (!V || !V.agents) return { agents: 0, inView: 0, near: 0 };
-    const fov = (g.settings.fov || 70) * Math.PI / 180, asp = innerWidth / innerHeight, hx = Math.atan(Math.tan(fov / 2) * asp);
-    const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
-    let n = 0, near = 0;
+    const g = VR.game, V = g.villages, p = g.player; if (!V || !V.agents) return { agents: 0, inView: 0, drawn: 0 };
+    const C = VR.Crowd, cap = C.streetCap(g.settings && g.settings.preset);
+    let vis = 0, out = 0, ind = 0, near = 0;
     for (const a of V.agents) {
-      const dx = a.pos[0] - p.pos[0], dz = a.pos[2] - p.pos[2], d = Math.hypot(dx, dz);
-      if (d > 64 || d < 0.5) continue;
-      if (d < 24) near++;
-      const ang = Math.acos(Math.max(-1, Math.min(1, (dx * fx + dz * fz) / d)));
-      if (ang <= hx) n++;
+      if (!a.vis) continue; vis++;
+      if (Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) < 24) near++;
+      if (a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type])) ind++; else out++;
     }
-    return { agents: V.agents.length, inView: n, near };
+    return { agents: V.agents.length, inView: vis, drawn: Math.min(out, cap) + ind, cap, near };
   });
   const shot = async (name, frames = 4) => { const vx = await warmVx(); await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames); for (let t = 1; ; t++) { try { await page.screenshot({ path: shotPath(name), timeout: 180000 }); break; } catch (e) { console.log(`  screenshot ${name} try ${t} failed: ${String(e.message).split('\n')[0]}`); if (t >= 2) break; await wait(3000); } } const ok = fs.existsSync(shotPath(name)); console.log('shot', name, tag, ok ? '' : '(missing)', 'vx warm rounds', vx); return ok; };
   // the top of the solid ground under (x, z) from y0 down: the highest opaque block that is not leaves
@@ -147,8 +145,8 @@ async function runPage(tag, dist) {
     await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]);
     await step(4);
     console.log(`  ${c.name}: feet ${feet0} at (${c.x}, ${c.z}) yaw ${yaw.toFixed(2)} pitch ${pitch.toFixed(2)} fov ${c.fov} tod ${c.tod}`);
-    if (c.name === 'P1' || c.name === 'P1_dusk') { const f = await inView(); console.log(`  villagers at ${c.name}: ${JSON.stringify(f)}`); if (c.name === 'P1') folk[tag] = f; }
     if (await shot(c.name)) pics++;
+    if (c.name === 'P1' || c.name === 'P1_dusk') { const f = await inView(); console.log(`  villagers at ${c.name}: ${JSON.stringify(f)}`); if (c.name === 'P1') folk[tag] = f; }
   }
   check(pics === want && want > 0, `${tag}: every picture is written (${pics} of ${want})`);
   // the hall at the cameras (a vgen-9 build): glass in the vault over P1, the fountain at the plaza, lamps along the street,
@@ -168,7 +166,7 @@ async function runPage(tag, dist) {
     console.log(tag, 'probe', JSON.stringify(probe));
     check(probe.glass >= 8 && probe.fountain >= 1 && probe.lamps >= 4, `${tag}: the hall stands at the cameras (vault glass over the street at ${probe.glass} of 13 cells, fountain cells ${probe.fountain}, lamp cells along the street ${probe.lamps})`);
     check(probe.sky >= 12, `${tag}: the plaza is bright (sky light ${probe.sky} of 15 at eye height)`);
-    if (folk[tag] && site.folkCap) check(folk[tag].inView <= site.folkCap.view, `${tag}: the villagers in view at P1 stay within the town's budget (${folk[tag].inView} ≤ ${site.folkCap.view})`);
+    if (folk[tag] && site.folkCap) check(folk[tag].drawn <= folk[tag].cap + 4 && folk[tag].agents <= site.folkCap.max, `${tag}: the town's people fit its budget (${folk[tag].agents} ≤ ${site.folkCap.max}) and at most the street's cap of them are drawn at P1 (${folk[tag].drawn} of ${folk[tag].inView} in view, cap ${folk[tag].cap})`);
   }
   // the Very Low (potato) preset at P1: its picture and its frame cost
   if (!ONLY || ONLY.includes('P1')) {
