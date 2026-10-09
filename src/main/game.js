@@ -162,10 +162,18 @@
       const upload = (tex, fromCache) => {
         const r = this.renderer, gl = r && r.gl;
         if (req !== this.texReq || tex.type !== 'textures' || !gl || !r.texAlbedo || tex.layers !== r.layers) return;
+        // F10: ~20 MB in one frame was a hitch on a GPU that shares the system memory: the set goes through the world's
+        // upload queue into new arrays, swapped in when complete (renderer.queueTextures); without a world, at once as before
+        const Q = this.world && this.world.uploadQ;
+        if (r.queueTextures && Q && Q.drain) { r.queueTextures(tex, Q, () => applied(tex, fromCache)); return; }
         for (const [t, lv] of [[r.texAlbedo, tex.albedo], [r.texMaterial, tex.material]]) {
           gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
+        applied(tex, fromCache);
+      };
+      // the textures are on the GPU: the icons, the recolour table and the bookkeeping follow
+      const applied = (tex, fromCache) => {
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
         if (VR.LiveLoop) VR.LiveLoop.updateLum(this);   // the recolour table follows the textures of the look
         this.texFromCache = fromCache; this.texMs = Math.round(performance.now() - t0);
@@ -1012,7 +1020,8 @@
       if (this.director) this.director.update(dt);
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
-      w.viewDir = [-Math.sin(p.yaw), -Math.cos(p.yaw)];   // the way the player looks (flat): uploads ahead come first
+      const vd = w.viewDir || (w.viewDir = [0, 0]); vd[0] = -Math.sin(p.yaw); vd[1] = -Math.cos(p.yaw);   // the way the player looks (flat): uploads in the view first (F10: no new array a frame)
+      { const r0 = this.renderer, asp = r0 && r0.H ? r0.W / r0.H : 16 / 9; w.viewCos = Math.cos(Math.atan(Math.tan((this.settings.fov || 75) * Math.PI / 360) * asp)); }   // (F10: the horizontal half field of view)
       w.update(p.pos[0], p.pos[1], p.pos[2], performance.now());
       const eye = p.eyePos();
       const headState = w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2]));
@@ -1121,7 +1130,15 @@
         `Weather ${this.env.wx.info()}  fog ${this.env.wx.v.fog.toFixed(2)}  bolts ${this.env.wx.strikes}  slot ends in ${Math.max(0, Math.round((this.env.wx.slotEnd - this.env.wx.ticks) / 1200))} min` + (this.ambience ? `\nAmbience ${this.ambience.info()}` : '') + '\n' +
         `Sections ${r.stats.sections} draws ${r.stats.draws} tris ${(r.stats.tris / 1000).toFixed(0)}k  GPU ${r.gpuMemoryMB().toFixed(0)} MB\n` +
         `Columns ${w.cols.size} pending ${w.pending.size} jobs ${this.pool.busy}` + (this.horizon && this.horizon.enabled() ? `  Horizon ${this.horizon.stats.tiles} tiles ${this.horizon.stats.drawn} drawn ${(this.horizon.stats.tris / 1000).toFixed(0)}k tris ${this.horizon.stats.mb.toFixed(0)} MB` : '') + '\n' +
+        this.upLine(r) + '\n' +
         (ts ? `Target ${ts.name} ${JSON.stringify(ts.decode(t.state))}` : '');
+    }
+    // F10 · the streaming's line on the ⚙ screen (F3): what went up this frame against the frame's budget, the cost the
+    // machine was measured at, what waits, and the hitches (frames over twice the usual one) of the last 10 s
+    upLine(r) {
+      const s = r.stats, v = { ms: (s.uploadMs || 0).toFixed(1), kb: Math.round(s.uploadKB || 0), budget: Math.round(s.upBudgetKB || 0), mbs: Math.round(s.upMBs || 0), q: s.upQueue || 0, h: s.hitches || 0 };
+      return VR.I18N ? VR.I18N.tx('g.f3.stream', v, 'Hochladen {ms} ms · {kb}/{budget} KB · {mbs} MB/s · wartet {q} · Ruckler {h} (10 s)', 'Upload {ms} ms · {kb}/{budget} KB · {mbs} MB/s · waiting {q} · hitches {h} (10 s)')
+        : `Upload ${v.ms} ms · ${v.kb}/${v.budget} KB · ${v.mbs} MB/s · waiting ${v.q} · hitches ${v.h} (10 s)`;
     }
     handleKeys() {
       const i = this.input, ui = this.ui;

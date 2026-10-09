@@ -122,6 +122,7 @@
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.FLOAT, table);
     }
     setAniso(level) {
+      this.anisoLevel = level;   // (F10: a texture set swapped in later gets the same)
       const gl = this.gl, ext = GL.ext.aniso;
       if (!ext) return;
       const mx = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
@@ -399,6 +400,159 @@
       this.visDirty = true;
       this.nearShadow(sec);
     }
+    // ---- F10 · a section's mesh in packets (world.js queues it; the upload scheduler spends the frame's bytes on it).
+    // newStage keeps the mesh's layers; stagePart writes up to maxBytes of them in layer order (opaque, cutout, trans,
+    // vxFar — whole vertices; a layer takes its arena range on its first packet, a big layer is split across frames);
+    // commitStage swaps the staged ranges in once every byte is up — until then the section draws its old mesh (or
+    // nothing), never half of a new one; dropStage gives the ranges back (a newer mesh, an unloaded column).
+    // The mini-voxel detail (vx) stays in RAM as before (vxResidency) and the prop anchors come with the commit.
+    newStage(opaque, cutout, trans, vx, vxFar, props) {
+      const d = [opaque || null, cutout || null, trans || null, null, vxFar || null];
+      let bytes = 0;
+      for (let l = 0; l < 5; l++) if (d[l]) bytes += (d[l].length >> 3) * VSTRIDE;
+      return { d, vx: vx || null, props: props || null, m: [null, null, null, null, null], l: 0, o: 0, bytes };
+    }
+    stagePart(st, maxBytes) {
+      const gl = this.gl;
+      let done = 0;
+      while (st.l < 5) {
+        const l = st.l, d = st.d[l], n = d ? d.length >> 3 : 0;
+        if (st.o >= n) { st.l++; st.o = 0; continue; }
+        const k = Math.min(n - st.o, Math.floor((maxBytes - done) / VSTRIDE));
+        if (k <= 0) break;
+        if (!st.m[l]) st.m[l] = this.allocMesh(n);
+        const m = st.m[l];
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
+        gl.bufferSubData(gl.ARRAY_BUFFER, (m.off + st.o) * VSTRIDE, d, st.o * 8, k * 8);
+        st.o += k; done += k * VSTRIDE;
+      }
+      return done;
+    }
+    commitStage(st, sec, col, sy) {
+      this.propSet(sec, st.props);
+      if (sec.mesh.length < 5) sec.mesh.push(null, null);
+      for (let l = 0; l < 5; l++) {
+        const o = sec.mesh[l];
+        if (o) o.arena.release(o.off, o.cap);
+        sec.mesh[l] = st.m[l]; st.m[l] = null;
+      }
+      const vn = st.vx ? st.vx.length >> 3 : 0;
+      sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
+      sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
+      sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
+      this.visDirty = true;
+      this.nearShadow(sec);
+    }
+    dropStage(st) {
+      for (let l = 0; l < 5; l++) { const m = st.m[l]; if (m) { m.arena.release(m.off, m.cap); st.m[l] = null; } }
+      st.l = 5;
+    }
+    // ---- F10 · what an upload costs on this machine. Once as a world starts: a 1 MB buffer, gl.finish(), then the upload
+    // and gl.finish() again (twice; the faster counts) — finish waits for the GPU process and the GPU, so the copy into a
+    // GPU that shares the system memory is in the number (the JS call alone returns after a memcpy).
+    calibrateUploads() {
+      const gl = this.gl;
+      if (!gl || !gl.finish || !gl.bufferSubData) return null;
+      const N = 1 << 20, data = new Uint8Array(N);
+      for (let i = 0; i < N; i += 64) data[i] = i >> 6;   // (not all zeros: no shortcut for a cleared buffer)
+      const b = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, N, gl.DYNAMIC_DRAW);
+      gl.finish();
+      let best = Infinity;
+      for (let r = 0; r < 2; r++) { const t0 = performance.now(); gl.bufferSubData(gl.ARRAY_BUFFER, 0, data); gl.finish(); best = Math.min(best, performance.now() - t0); }
+      gl.deleteBuffer(b);
+      this.upCal = { ms: Math.max(0.05, best), bytes: N };
+      return this.upCal;
+    }
+    // ---- F10 · the GPU side of the uploads, seen through fences: at the end of a frame that uploaded (and of every 4th
+    // frame within 120 frames of the last upload: the base line) a fence; polled at the next frames with
+    // clientWaitSync(sync, 0, 0) — timeout 0, never blocking; at most four pending. The lag from the fence to its seen
+    // signal and the frame's bytes go to the scheduler's fit (stream.js gpuSample). A settled world sets none.
+    upGauge(Q, now) {
+      const gl = this.gl;
+      if (!Q || !gl || !gl.fenceSync || !gl.clientWaitSync) return;
+      const R = this.upRing || (this.upRing = { s: [null, null, null, null], t: new Float64Array(4), b: new Float64Array(4), h: 0, n: 0, quiet: 1e9, k: 0 });
+      while (R.n) {
+        const i = R.h, st = gl.clientWaitSync(R.s[i], 0, 0);
+        if (st === gl.TIMEOUT_EXPIRED) break;
+        if (st !== gl.WAIT_FAILED) Q.gpuSample(R.b[i], now - R.t[i]);
+        gl.deleteSync(R.s[i]); R.s[i] = null; R.h = (i + 1) & 3; R.n--;
+      }
+      const L = Q.last, bytes = L && !L.gauged ? L.bytes : 0;   // (this frame's drain, counted once)
+      if (L) L.gauged = true;
+      R.quiet = bytes > 0 ? 0 : R.quiet + 1;
+      if (R.n >= 4 || (bytes <= 0 && (R.quiet > 120 || (++R.k & 3)))) return;
+      const i = (R.h + R.n) & 3;
+      R.s[i] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); R.t[i] = now; R.b[i] = bytes; R.n++;
+    }
+    // ---- F10 · the block look's textures (game.js reloadTextures: Klassisch ↔ Nahtlos, ~20 MB) through the upload queue:
+    // new arrays are filled a slice of layers at a time (each mip level of each array) within the frame's bytes, ahead of
+    // the sections, and swapped in once complete — the old look draws until then, no block half in one look and half in
+    // the other. A newer set aborts this one (its arrays deleted); dropped for any other reason (its world went away) it
+    // is finished at once, so the look is never lost.
+    queueTextures(tex, Q, done) {
+      const gl = this.gl, R = this, tok = this.texTok = (this.texTok || 0) + 1, L = tex.layers, N = tex.size, lvls = [tex.albedo, tex.material];
+      let made = null, a = 0, lv = 0, z = 0, bytes = 0;
+      for (let l = 0; l < tex.levels; l++) bytes += 2 * (N >> l) * (N >> l) * 4 * L;
+      const step = (max) => {
+        if (!made) made = [R.texArray(tex, true), R.texArray(tex, false)];
+        let wrote = 0;
+        while (a < 2) {
+          const n = N >> lv, per = n * n * 4;
+          let k = Math.min(L - z, Math.floor((max - wrote) / per));
+          if (k <= 0) { if (wrote || max < per * 0.25) break; k = 1; }   // (one layer at least: never stuck behind a small budget)
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, made[a]);
+          gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, lv, 0, 0, z, n, n, k, gl.RGBA, gl.UNSIGNED_BYTE, lvls[a][lv], z * per);
+          z += k; wrote += k * per;
+          if (z >= L) { z = 0; lv++; if (lv >= tex.levels) { lv = 0; a++; } }
+        }
+        return wrote;
+      };
+      const commit = () => {
+        const old = [R.texAlbedo, R.texMaterial];
+        R.texAlbedo = made[0]; R.texMaterial = made[1]; made = null;
+        gl.deleteTexture(old[0]); gl.deleteTexture(old[1]);
+        if (VR.GL.ext && VR.GL.ext.aniso) R.setAniso(R.anisoLevel || 4);
+        if (done) done();
+      };
+      Q.push({ prio: -1, x: 0, z: 0, bytes, alive: () => R.texTok === tok, step, commit,
+        abort: () => {
+          if (R.texTok === tok) { while (a < 2) step(Infinity); commit(); return; }   // (not replaced: finished at once)
+          if (made) { gl.deleteTexture(made[0]); gl.deleteTexture(made[1]); made = null; }
+        } });
+    }
+    // an empty texture array for a texture set, with the block textures' sampling (as init's)
+    texArray(tex, srgb) {
+      const gl = this.gl, t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, tex.levels, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, tex.size, tex.size, tex.layers);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      return t;
+    }
+    // ---- F10 · a section's mini-voxel detail through the upload queue (vxResidency asks once per section): packets
+    // within the frame's bytes, in place once complete; dropped data (the player went away, a new mesh) aborts it
+    queueVx(s, Q) {
+      const d = s.vxData, n = d.length >> 3, R = this;
+      const it = { x: s.ox + 8, z: s.oz + 8, bytes: n * VSTRIDE, m: null, o: 0,
+        alive: () => s.vxData === d && !s.mesh[3],
+        step: (max) => {
+          const k = Math.min(n - it.o, Math.floor(max / VSTRIDE));
+          if (k <= 0) return 0;
+          if (!it.m) it.m = R.allocMesh(n);
+          const gl = R.gl;
+          gl.bindBuffer(gl.ARRAY_BUFFER, it.m.arena.buf);
+          gl.bufferSubData(gl.ARRAY_BUFFER, (it.m.off + it.o) * VSTRIDE, d, it.o * 8, k * 8);
+          it.o += k;
+          return k * VSTRIDE;
+        },
+        commit: () => { s.vxQ = null; s.mesh[3] = it.m; it.m = null; R.nearShadow(s); },
+        abort: () => { if (s.vxQ === it) s.vxQ = null; if (it.m) { it.m.arena.release(it.m.off, it.m.cap); it.m = null; } } };
+      s.vxQ = it;
+      Q.push(it);
+    }
     // a changed section inside the cached shadow map's area: redraw the map next frame
     nearShadow(sec) {
       const c = this.shadowCam; if (!c || this.shadowDirty) return;
@@ -427,7 +581,8 @@
         if (s.mesh[3]) { if (d2 > down2) { s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap); s.mesh[3] = null; } continue; }
         if (d2 > keep2) { s.vxData = null; s.vxDropped = true; continue; }
         if (d2 < up2) {
-          if (uploads < 4) { this.uploadVx(s); uploads++; }
+          if (this.upQ) { if (!s.vxQ) this.queueVx(s, this.upQ); }   // (F10: the world's upload queue — one budget for everything)
+          else if (uploads < 4) { this.uploadVx(s); uploads++; }
           else if (d2 < bestD) { best = s; bestD = d2; }
         }
       }
@@ -1121,6 +1276,7 @@
       this.frameNo++;
       this.gpuTimerBegin();
       this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
+      this.upQ = world && world.uploadQ && world.uploadQ.drain ? world.uploadQ : null;   // (F10: the one upload queue — vxResidency, upGauge)
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
@@ -1246,6 +1402,7 @@
       this.gpuPass('post');
       this.post(F, E);
       this.gpuTimerEnd();
+      if (this.upQ) this.upGauge(this.upQ, performance.now());   // (F10: a fence after the frame that uploaded)
       this.stats.ms = performance.now() - t0;
     }
 

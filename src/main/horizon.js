@@ -132,27 +132,71 @@
         if (m.type === 'cancelled') { this.tiles.delete(key); return; }
         if (m.type !== 'lod') { t.state = 2; t.failedAt = this.frame; return; }
         if (m.empty) { t.state = 1; t.empty = true; return; }
-        // (F-Far) with ring 1 on, the tile goes up within the frame's upload budget (the world's queue), like every ring
+        // (F-Far, F10) the tile goes up within the frame's upload bytes — the world's queue, its far lane, in the order it was
+        // asked for — on every preset (before F10 only with ring 1 on: Very Low to Balanced uploaded a flight's burst of
+        // tiles in one frame). A tile nobody wants any more (the camera moved on, evicted) is dropped before it costs a
+        // byte, and forgotten, so it is asked for again when it is wanted again.
         const w = g.world;
-        if (this.farOn() && w && w.uploadQ && !t.queued) { t.queued = true; w.uploadQ.push({ key: null, col: undefined, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: m.verts.byteLength + m.idx.byteLength, run: () => { if (this.tiles.get(key) === t && !t.vao) this.put(t, m, S); } }); return; }
+        if (w && w.uploadQ && !t.queued) {
+          t.queued = true;
+          // (in parts: a coarse tile bigger than a frame's bytes straddles frames; drawn only once complete)
+          const P = Horizon.parted(g.renderer.gl, m), mine = () => this.tiles.get(key) === t && !t.vao;
+          w.uploadQ.push({ key: null, col: undefined, lane: 1, prio: d / S - L * 0.6, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: P.bytes,
+            alive: () => mine() && this.frame - t.used <= 120,
+            abort: () => { P.abort(); if (mine()) this.tiles.delete(key); },
+            step: P.step,
+            commit: () => { if (mine()) this.put(t, m, S, P.take()); else P.abort(); },
+            run: () => { if (mine()) this.put(t, m, S); } });
+          return;
+        }
         this.put(t, m, S);
       }, d / S - L * 0.6);
+    }
+    // F10 · a tile's (or a form's) mesh in packets for the upload queue: the buffers take their full size on the first
+    // packet, then the vertices (whole 12-byte vertices) and the indices are written a slice at a time; take() hands the
+    // filled buffers to put / upload, which set up the vertex array then — nothing is drawn before; abort() deletes them
+    static parted(gl, m) {
+      const verts = new Uint8Array(m.verts), idx = m.idx, vb = verts.byteLength, ib = idx.byteLength, isz = idx.BYTES_PER_ELEMENT || 2;
+      let made = null, vo = 0, io = 0;
+      return {
+        bytes: vb + ib,
+        step(max) {
+          if (!made) {
+            made = { vbo: gl.createBuffer(), ibo: gl.createBuffer() };
+            gl.bindVertexArray(null);   // (the element binding belongs to the bound vertex array: none of the scene's)
+            gl.bindBuffer(gl.ARRAY_BUFFER, made.vbo); gl.bufferData(gl.ARRAY_BUFFER, vb, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, made.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ib, gl.STATIC_DRAW);
+          }
+          let wrote = 0;
+          if (vo < vb) {
+            const k = Math.min(vb - vo, Math.floor(max / 12) * 12);
+            if (k > 0) { gl.bindBuffer(gl.ARRAY_BUFFER, made.vbo); gl.bufferSubData(gl.ARRAY_BUFFER, vo, verts, vo, k); vo += k; wrote += k; }
+          }
+          if (vo >= vb && io < ib) {
+            const k = Math.min(ib - io, Math.floor((max - wrote) / isz) * isz);
+            if (k > 0) { gl.bindVertexArray(null); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, made.ibo); gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, io, idx, io / isz, k / isz); io += k; wrote += k; }
+          }
+          return wrote;
+        },
+        take() { const b = made; made = null; return b; },
+        abort() { if (made) { gl.deleteBuffer(made.vbo); gl.deleteBuffer(made.ibo); made = null; } },
+      };
     }
     // (F-Far) the tiles whose mesh waited in a world's upload queue that is gone: asked for again; ring 1 likewise
     dropQueued() {
       for (const [k, t] of this.tiles) if (t.queued && !t.vao) this.tiles.delete(k);
       if (this.far) this.far.dropQueued();
     }
-    // a tile's mesh onto the GPU (at once, or from the upload queue while ring 1 is on)
-    put(t, m, S) {
+    // a tile's mesh onto the GPU (at once, or from the upload queue: F10 hands the buffers it filled in parts, `made`)
+    put(t, m, S, made) {
       const g = this.g, gl = g.renderer.gl;
-      t.vao = gl.createVertexArray(); t.vbo = gl.createBuffer(); t.ibo = gl.createBuffer();
+      t.vao = gl.createVertexArray(); t.vbo = made ? made.vbo : gl.createBuffer(); t.ibo = made ? made.ibo : gl.createBuffer();
       gl.bindVertexArray(t.vao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, t.vbo); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(m.verts), gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, t.vbo); if (!made) gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(m.verts), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.SHORT, false, 12, 0);
       gl.enableVertexAttribArray(1); gl.vertexAttribIPointer(1, 2, gl.UNSIGNED_BYTE, 12, 6);
       gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.UNSIGNED_BYTE, true, 12, 8);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.ibo); if (!made) gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       gl.bindVertexArray(null);
       t.count = m.count; t.type = m.big ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT; t.minY = m.minY; t.maxY = m.maxY;
       t.bx0 = m.bx0 !== undefined ? m.bx0 : 0; t.bz0 = m.bz0 !== undefined ? m.bz0 : 0; t.bx1 = m.bx1 !== undefined ? m.bx1 : S; t.bz1 = m.bz1 !== undefined ? m.bz1 : S;
