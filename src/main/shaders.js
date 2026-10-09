@@ -37,7 +37,7 @@ uniform vec2 u_skyK2;
 uniform vec3 u_skyTint;
 uniform vec2 u_skyWx;         // atmos.js skyWeather: how much the rain greys the sky, how much the overcast dims it
 uniform vec3 u_skyGlow;       // atmos.js K: the glow's wide lobe, its horizon band, its tight lobe
-uniform sampler2D u_atmoLUT;  // Very Low: the same radiance baked into a 64×32 table (ATMO_LUT)
+uniform sampler2D u_atmoLUT;  // the same radiance baked into a 64×32 table (ATMO_LUT: the haze on every tier, the sky pass on Very Low)
 uniform float u_moonPh;       // the terminator: cos(2π·phase), 1 at new moon, −1 at full
 uniform float u_moonIllum;    // how much moonlight the phase gives (0..1)
 uniform vec4 u_giant;        // gas giant: direction (xyz), angular radius (w) — skybodies.js
@@ -600,10 +600,15 @@ float shadowAt(vec3 N, vec3 L) {
     float bias = 0.0005 + 0.0016 * sqrt(1.0 - ndl * ndl) / max(ndl, 0.3);
 #ifdef SHQ3
     float a = hash12(gl_FragCoord.xy) * 6.2831853;
-    mat2 R = mat2(cos(a), sin(a), -sin(a), cos(a));
+    mat2 R = mat2(cos(a), sin(a), -sin(a), cos(a)) * (t * 1.5);
+    // the disc's four outermost taps first: where they agree (well inside the light or the shadow — most of the
+    // picture) their mean is the answer; only the penumbra pays for all sixteen
     s = 0.0;
-    for (int i = 0; i < 16; i++) s += texture(u_shadowMap, vec3(sc.xy + (R * PD16[i]) * t * 1.5, sc.z - bias));
-    s *= 0.0625;
+    for (int i = 12; i < 16; i++) s += texture(u_shadowMap, vec3(sc.xy + R * PD16[i], sc.z - bias));
+    if (s > 0.001 && s < 3.999) {
+      for (int i = 0; i < 12; i++) s += texture(u_shadowMap, vec3(sc.xy + R * PD16[i], sc.z - bias));
+      s *= 0.0625;
+    } else s *= 0.25;
 #elif defined(SHQ2)
     s = 0.0;
     for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) s += texture(u_shadowMap, vec3(sc.xy + vec2(float(i), float(j)) * t, sc.z - bias));
