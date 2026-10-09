@@ -399,7 +399,7 @@
       this.keepInventory = meta.keep;
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
-      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style });
+      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null });   // (townWords: the shop signs' words in the player's language, voxtown.js)
       // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
       if (VR.LiveLoop) VR.LiveLoop.openWorld(this, meta);
       const dim = meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld');
@@ -605,7 +605,7 @@
       // the host's world style, as multiplayer allows it (buildings, furniture, trees — the land stays shared)
       this.guestStyle = wel.style && typeof wel.style === 'object' ? wel.style : null;
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
-      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style });
+      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null });   // (townWords: the shop signs' words in the player's language, voxtown.js)
       const dim = meta.type === 'flat' ? 'flat' : 'overworld';
       this.dim = dim;
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: null, savedKeys: new Set(), renderDist: this.settings.renderDist });

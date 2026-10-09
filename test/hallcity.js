@@ -99,26 +99,28 @@ const solid = (n) => n !== 'air' && n !== '?';
   for (let k = -7; k <= 4; k++) for (const s of [-1, 1]) for (let y = F + 25; y <= F + 29; y++) { n++; if (/glass/.test(atN(s * 28, y, 10 * k))) g++; }
   check(g === n, `the clerestory's windows are glass (${g} of ${n} cells in 24 windows)`);
   let n2 = 0, g2 = 0;
-  for (let k = -7; k <= 4; k++) { if (k === 0) continue; for (const s of [-1, 1]) for (let y = F + 6; y <= F + 15; y++) for (const t of [-2, -1, 1, 2]) { n2++; if (/glass/.test(atN(s * 47, y, 10 * k + t))) g2++; } }
-  check(g2 === n2, `the long walls' windows are glass (${g2} of ${n2} cells in 22 windows)`);
+  for (let k = -7; k <= 4; k++) { if (k === 0) continue; for (const s of [-1, 1]) for (let y = F + 6; y <= F + 15; y++) for (const t of [-2, -1, 1, 2]) { if (y === F + 10) continue; n2++; if (/glass/.test(atN(s * 47, y, 10 * k + t))) g2++; } }
+  check(g2 === n2, `the long walls' windows are glass, the tracery's transom aside (${g2} of ${n2} cells in 22 windows)`);
   let n3 = 0, g3 = 0;
-  for (const u of [-11, -6, -1, 1, 6, 11]) for (let y = F + 7; y <= F + 34; y++) { const b = atN(u, y, -79); if (b === '?' ) continue; n3++; if (/glass/.test(b) || (u % 4 !== 0 && y !== F + 14 && y !== F + 22 && b === 'smooth_quartz')) g3++; }
+  for (const u of [-11, -6, -1, 1, 6, 11]) for (let y = F + 7; y <= F + 34; y++) { const b = atN(u, y, -79); if (b === '?' ) continue; if (Math.abs(u) <= 5 && y <= F + 12) continue; n3++; if (/glass/.test(b) || (u % 4 !== 0 && y !== F + 14 && y !== F + 22 && b === 'smooth_quartz')) g3++; }   // (round 2: the portal under it)
   check(n3 > 100 && g3 >= n3 * 0.85, `the entrance end's giant window is glass (${g3} of ${n3} cells)`);
   // the gates: open from the floor to 10 in both long walls
   let open = 0;
   for (const s of [-1, 1]) for (let t = -3; t <= 3; t++) for (let y = F + 1; y <= F + 9; y++) for (let a = 46; a <= 48; a++) if (atN(s * a, y, t) === 'air') open++;
   check(open === 2 * 7 * 9 * 3, `two gates seven wide in the long walls (${open} of ${2 * 7 * 9 * 3} cells open)`);
 }
-// the grand staircase climbs to the gallery; balustrades on its stringers and along the gallery's front
+// the grand staircase climbs to the gallery (round 2: four flights of two steps from v 38 with landings at 2, 4 and 6, the
+// last step cut into the gallery's front); balustrades on its parapets and along the gallery's front
 {
+  const prof = [1, 2, 2, 2, 3, 4, 4, 4, 5, 6, 6, 6, 7];
   let ok = 0;
-  for (let k = 0; k < 7; k++) { const s = atN(0, F + 1 + k, 42 + k); if (s === 'quartz_stairs' && atN(0, F + 2 + k, 42 + k) === 'air' && atN(0, F + 4 + k, 42 + k) === 'air') ok++; }
-  const landing = solid(atN(0, F + 8, 49)) && atN(0, F + 9, 49) === 'air';
-  let gal = 0; for (let v = 50; v <= 70; v++) if (solid(atN(0, F + 8, v)) && atN(0, F + 9, v) !== '?' ) gal++;
-  check(ok === 7 && landing && gal === 21, `the grand staircase climbs eight steps to the gallery (${ok} of 7 steps with headroom, landing ${landing}, gallery floor ${gal} of 21)`);
-  let bal = 0; for (let k = 0; k < 8; k++) for (const s of [-1, 1]) if (atN(s * 6, F + 2 + k, 42 + k) === 'vx_balustrade') bal++;
+  for (let k = 0; k < prof.length; k++) { const v = 38 + k, h = prof[k], step = h > (k ? prof[k - 1] : 0); const b = atN(0, F + h, v); if ((step ? b === 'quartz_stairs' : /smooth_quartz|travertine/.test(b)) && atN(0, F + h + 1, v) === 'air' && atN(0, F + h + 3, v) === 'air') ok++; }
+  const landing = solid(atN(0, F + 8, 51)) && atN(0, F + 9, 51) === 'air';
+  let gal = 0; for (let v = 51; v <= 70; v++) if (solid(atN(0, F + 8, v)) && atN(0, F + 9, v) !== '?') gal++;
+  check(ok === prof.length && landing && gal === 20, `the grand staircase climbs to the gallery (${ok} of ${prof.length} steps and landings with headroom, the arrival ${landing}, gallery floor ${gal} of 20)`);
+  let bal = 0; for (let k = 0; k < prof.length; k++) for (const s of [-1, 1]) if (/vx_balustrade|quartz_pillar/.test(atN(s * 7, F + prof[k] + 1, 38 + k))) bal++;
   let front = 0; for (let u = -26; u <= 26; u++) if (atN(u, F + 9, 50) === 'vx_balustrade') front++;
-  check(bal === 16 && front >= 36, `balustrades climb the stringers (${bal} of 16) and run along the gallery's front (${front})`);
+  check(bal === 2 * prof.length && front >= 30, `balustrades climb the parapets (${bal} of ${2 * prof.length}) and run along the gallery's front (${front})`);
 }
 // the sky over the hall: no floating island over it, and the light under the whole roof (the light engine's sky light
 // falls straight down a column, light_local.js: run 3's apse and the vault over the plaza were black under seed 53's
@@ -198,7 +200,7 @@ console.log('4. the town');
   for (const s of [-1, 1]) for (let v = -78; v <= 48; v++) { const b = at(s * 4, F + 1, v); if (b > 0 && nm(b) === 'vm_town_lamp') lamps[s].push(v); }
   let gaps = [], bad = 0;
   for (const s of [-1, 1]) { const L = lamps[s]; for (let i = 1; i < L.length; i++) { const gp = L[i] - L[i - 1]; if (L[i - 1] < -13 && L[i] > 13) continue; gaps.push(gp); if (gp < 7 || gp > 9) bad++; } }
-  check(gaps.length >= 20 && bad === 0, `street lamps every 7–9 blocks (${gaps.length} gaps: ${[...new Set(gaps)].join(', ')})`);
+  check(gaps.length >= 18 && bad === 0, `street lamps every 7–9 blocks to the stair's foot (${gaps.length} gaps: ${[...new Set(gaps)].join(', ')})`);
 }
 // the lots and the houses against the v042 village of the same site (seed 53's meadow village at vgen 8)
 const old = VG.plan(g8, s8);

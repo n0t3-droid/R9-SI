@@ -20,6 +20,8 @@
     'Arched Window': 'Bogenfenster', 'Stained Glass': 'Buntglas', 'Town Lamp': 'Stadtlaterne', 'Striped Awning': 'Streifenmarkise',
     'Shop Sign': 'Ladenschild', 'Market Stall': 'Marktstand', 'Town Fountain': 'Stadtbrunnen', 'Gold Band': 'Goldband', 'White Stone': 'weißer Stein',
     'Blue': 'Blau', 'Gold': 'Gold', 'Rose': 'Rosé', 'Amber': 'Bernstein', 'Teal': 'Petrol', 'Bread': 'Brot', 'Cup': 'Tasse', 'Book': 'Buch', 'Flower': 'Blume',
+    'Tall': 'hoch', 'Three Wide': 'drei breit', 'Bakery': 'Bäckerei', 'Sweets': 'Konditorei', 'Tea Room': 'Teestube', 'Cheese': 'Käse', 'Flowers': 'Blumen', 'Tailor': 'Schneider',
+    'Pharmacy': 'Apotheke', 'Lanterns': 'Laternen', 'Books': 'Buchladen', 'Workshop': 'Werkstatt', 'Maps': 'Karten', 'Café': 'Café',
     'Nova Slab Edge': 'Nova-Deckenkante', 'Light Line': 'Lichtlinie', 'Nova Glass Sheet': 'Nova-Glasscheibe',
     'Three-seater': 'Dreisitzer', 'Chaise': 'Chaiselongue', 'Armchair': 'Sessel', 'Coffee Table': 'Couchtisch',
     'Side Table': 'Beistelltisch', 'Dining Table': 'Esstisch', 'Dining Chair': 'Esszimmerstuhl', 'Bar Stool': 'Barhocker',

@@ -122,6 +122,7 @@
       if (m.type === 'init') {
         seed = m.seed >>> 0; opts = m.opts || {}; epoch++;
         if (m.custom !== undefined && VR.Custom) VR.Custom.apply(m.custom);   // the player's Studio designs
+        if (m.townWords && VR.Town && VR.Town.setWords) VR.Town.setWords(m.townWords);   // the shop signs' words in the player's language (voxtown.js)
         setStyle(m.style);
         for (const k in gens) delete gens[k];
         post({ type: 'ready' });
