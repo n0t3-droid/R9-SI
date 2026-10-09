@@ -15,6 +15,11 @@
 //      lantern turrets on the ridge
 //   6. the light: a lantern at every stall and four round the fountain; warm block light at the stalls (the light engine)
 //   7. no crystal anywhere
+//   8. round 2b (the views' focal pieces): the great window over the stair, lamps on newel pedestals at its foot, round-arched
+//      doorways and a cornice in the gallery's front; the loggias' workshops lit and under awnings, lanterns hanging low on
+//      chains from the tie beams, tall stalls with a lantern in the canopy; outside every tall window framed (jambs, an
+//      arched hood, a keystone, a sill), a portal with a gabled pediment at the side gates, turrets five wide, a cupola
+//   9. round 2b: warm lantern light at the stair's foot, its landings, the gallery's doors and in the workshops
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -236,6 +241,93 @@ for (const [label, H] of HALLS) {
     let warm = 0; const seen = [];
     for (const st of stalls) { const L = lightAt(st.s * 32, F + 2, st.v0 + 1), r = (L >> 8) & 15, b = L & 15; seen.push(r + '/' + ((L >> 4) & 15) + '/' + b); if (r >= 9 && r >= b + 4) warm++; }
     check(stalls.length && warm === stalls.length, `warm block light in front of the stalls (${warm} of ${stalls.length}: ${seen.join(' ')})`);
+  }
+  // ---------------------------------------------------------------- 8. round 2b: the views' focal pieces
+  console.log(`8. round 2b — the stair's frame, the market's light, the exterior's order (${label})`);
+  {
+    const glassy = (n) => /glass/.test(n), stoneN = (n) => /quartz|travertine|band|smooth|chiseled/.test(n);
+    // P4 / P8: the great window over the staircase — the apse wall straight down the nave (u −5 … 5, d 27 … 29 from the
+    // apse's centre) glazed nine wide from the gallery's head height up to a round head, its head stained, stone tracery
+    let gl = 0, stained = 0, trac = 0;
+    for (let u = -5; u <= 5; u++) for (let v = Hh.V1 + 25; v <= Hh.V1 + 30; v++) { const d = Math.hypot(u, v - Hh.V1); if (d < 26.5 || d >= 30) continue; for (let y = F + 10; y <= F + 31; y++) { const n = atN(u, y, v); if (glassy(n)) { gl++; if (/stained/.test(n)) stained++; } else if (y < F + 26 && Math.abs(u) <= 3 && stoneN(n) && Math.abs(d - 28) < 0.75 && glassy(atN(u, y + 1, v))) trac++; } }
+    check(gl >= 120 && stained >= 20 && trac >= 4, `the great window over the stair: nine wide, a round head (${gl} glass cells, ${stained} stained, ${trac} tracery cells)`);
+    // lamps on newel pedestals at the stair's foot, both sides (an emitting block over a pedestal beside the first step)
+    let feet = 0;
+    for (const s of [-1, 1]) { let lit = false; for (let a = 6; a <= 9; a++) for (let v = 36; v <= 39; v++) for (let y = F + 3; y <= F + 8; y++) { const x = at(s * a, y, v); if (x > 0 && R.T.emit[x]) lit = true; } if (lit && stoneN(atN(s * 7, F + 1, 38)) && stoneN(atN(s * 7, F + 2, 38))) feet++; }
+    check(feet === 2, `lamps on newel pedestals at the stair's foot (${feet} of 2)`);
+    // the gallery's front: round-arched doorways four high (a door, a hanging lantern, a keystone) between the pilasters,
+    // and a cornice under the gallery's balustrade
+    let doors = 0, dn = 0;
+    for (const s of [-1, 1]) for (const a of [11, 17, 23]) {
+      dn++; const uc = s * a, V = Hh.V1 - 1;   // (the gallery's front face: v 50)
+      let open = 0; for (let t = -1; t <= 1; t++) for (let y = F + 1; y <= F + 3; y++) if (!solid(atN(uc + t, y, V)) || /lantern/.test(atN(uc + t, y, V))) open++;
+      const head = (!solid(atN(uc, F + 4, V)) || /lantern/.test(atN(uc, F + 4, V))) && /stairs/.test(atN(uc - 1, F + 4, V)) && /stairs/.test(atN(uc + 1, F + 4, V));
+      const door = /door/.test(atN(uc, F + 1, V + 1)), lamp = /lantern/.test(atN(uc, F + 4, V)) || /lantern/.test(atN(uc, F + 3, V)), key = /chiseled|band/.test(atN(uc, F + 5, V - 1));
+      if (open === 9 && head && door && lamp && key) doors++;
+    }
+    check(doors === dn, `round-arched doorways four high in the gallery's front, each with a door, a lantern and a keystone (${doors} of ${dn})`);
+    let cor = 0, cn = 0;
+    for (let a = 8; a <= 26; a++) for (const s of [-1, 1]) { if (a === 14 || a === 20) continue; cn++; const n = atN(s * a, F + 8, Hh.V1 - 2), p = props(at(s * a, F + 8, Hh.V1 - 2)); if (/stairs/.test(n) && (p.half === 1 || p.half === 'top')) cor++; }
+    check(cor >= 0.8 * cn, `a cornice along the gallery's front under its balustrade (${cor} of ${cn})`);
+    // P3: the loggias' workshops lit from inside and an awning over each; lanterns hanging low on chains from the tie beams
+    let litW = 0, awnW = 0, ln = 0;
+    for (const l of Hh.loggias.filter(l => l.frame)) {
+      ln++; const [rr, ox, oz] = l.frame, S = (u, y, v) => { const q = ROT[rr](u, v); return H.stAt(ox + q[0], y, oz + q[1]); };
+      let lit = false; for (let u = 1; u <= 8; u++) for (let v = 1; v <= 5; v++) for (let y = F + 1; y <= F + 4; y++) { const x = S(u, y, v); if (x > 0 && R.T.emit[x]) lit = true; }
+      if (lit) litW++;
+      let aw = 0; for (let u = 3; u <= 6; u++) if (/^vm_town_awning_/.test(nm(S(u, F + 4, -1)))) aw++;
+      if (aw >= 3) awnW++;
+    }
+    check(ln > 0 && litW === ln, `every loggia's workshop lit from inside (${litW} of ${ln})`);
+    check(awnW === ln, `a striped awning over every workshop's arch (${awnW} of ${ln})`);
+    let low = 0, chains = 0, lines = 0;
+    for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
+      lines++; let ok = 0;
+      for (const a of [34, 41]) { let y = -1; for (let yy = F + 6; yy <= F + 13; yy++) if (/lantern/.test(atN(s * a, yy, v))) y = yy; if (y < 0) continue; let c = 0; for (let yy = y + 1; yy <= F + 19; yy++) if (/chain/.test(atN(s * a, yy, v))) c++; if (c >= F + 19 - y - 1) { ok++; chains += c; } }
+      if (ok === 2) low++;
+    }
+    check(low === lines, `two lanterns hang low on chains from every tie beam (${low} of ${lines} beams, ${chains} chain links)`);
+    // the tall stalls: a pitched striped canopy over the head (the stall reaches a fourth block) with a lantern in it
+    const stl = Hh.stalls || []; let tall = 0;
+    for (const st of stl) { let c = 0; for (let v = st.v0; v <= st.v0 + 2; v++) for (const a of [30, 31]) if (/^vm_town_stall_/.test(atN(st.s * a, F + 4, v))) c++; let L = 0; for (let v = st.v0; v <= st.v0 + 2; v++) for (const a of [30, 31]) for (let y = F + 1; y <= F + 4; y++) { const x = at(st.s * a, y, v); if (x > 0 && R.T.emit[x] && /^vm_town_stall_/.test(nm(x))) L++; } if (c >= 6 && L >= 1) tall++; }
+    check(stl.length && tall === stl.length, `tall stalls: a canopy over the head and a lantern hanging in it (${tall} of ${stl.length})`);
+    // P5: the long walls' windows framed outside — jambs, an arched hood with a keystone, a sill
+    for (const s of [-1, 1]) {
+      let framed = 0, wn = 0;
+      for (let k = -7; k <= 4; k++) {
+        if (k === 0) continue; wn++; const vc = 10 * k;
+        let ring = 0; for (let t = -4; t <= 4; t++) for (let y = F + 14; y <= F + 21; y++) if (stoneN(atN(s * 49, y, vc + t)) && !/pillar/.test(atN(s * 49, y, vc + t))) ring++;
+        const jambs = [-3, 3].every(t => { let n = 0; for (let y = F + 5; y <= F + 13; y++) if (/pillar/.test(atN(s * 49, y, vc + t))) n++; return n >= 7; });
+        const key = /chiseled|band/.test(atN(s * 49, F + 20, vc)) || /chiseled|band/.test(atN(s * 49, F + 19, vc));
+        const sill = /slab|stairs/.test(atN(s * 49, F + 4, vc));
+        if (ring >= 7 && jambs && key && sill) framed++;
+      }
+      check(framed === wn, `wall ${s > 0 ? '+' : '−'}: every tall window framed outside — jambs, an arched hood with a keystone, a sill (${framed} of ${wn})`);
+      // the side gate's portal: columns two blocks proud on both sides, a gabled pediment over the arch, lanterns
+      let colN = 0; for (const t of [-5, 5]) { let n = 0; for (let y = F + 1; y <= F + 12; y++) if (/pillar|chiseled|smooth/.test(atN(s * 50, y, t))) n++; if (n >= 10) colN++; }
+      let ped = 0; for (let t = -6; t <= 6; t++) for (let y = F + 13; y <= F + 20; y++) if (solid(atN(s * 50, y, t))) ped++;
+      const apex = solid(atN(s * 50, F + 18, 0)) && !solid(atN(s * 50, F + 18, 5));
+      let lamps = 0; for (const t of [-5, 5]) for (let y = F + 1; y <= F + 16; y++) for (const a of [50, 51]) { const x = at(s * a, y, t); if (x > 0 && R.T.emit[x]) lamps++; }
+      check(colN === 2 && ped >= 25 && apex && lamps >= 2, `wall ${s > 0 ? '+' : '−'}: a portal at the side gate — columns two proud (${colN} of 2), a gabled pediment (${ped} cells, apex ${apex}), lanterns (${lamps})`);
+    }
+    // the ridge: lantern turrets five wide with a dome and a finial, and a glazed cupola over the crossing
+    let big = 0; const tv = [];
+    for (let v = Hh.V0; v <= Hh.V1; v++) { let posts = 0; for (const [du, dv] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) if (/pillar/.test(atN(du, F + 42, v + dv))) posts++; if (posts === 4) { let top = 0; for (let y = F + 41; y <= F + 56; y++) if (solid(atN(0, y, v))) top = y - F; if (top >= 50) { big++; tv.push(v); } } }
+    check(big >= 4, `lantern turrets five wide on the ridge, a dome and a finial to 50 over the floor (${big}: at v ${tv.join(' ')})`);
+    let cup = 0; for (let u = -4; u <= 4; u++) for (let v = -4; v <= 4; v++) for (let y = F + 41; y <= F + 50; y++) if (glassy(atN(u, y, v))) cup++;
+    check(cup >= 60, `a glazed cupola over the crossing (${cup} glass cells)`);
+  }
+  // ---------------------------------------------------------------- 9. round 2b: warm light where the views look
+  {
+    const g = H.g, cache = new Map();
+    const lightAt = (u, y, v) => { const [x, z] = H.W2(u, v), k = (x >> 4) + ',' + (z >> 4); let c = cache.get(k); if (!c) { const ch = g.generate(x >> 4, z >> 4); c = V.computeColumnLight(ch.blocks, true); cache.set(k, c); } return c[(y << 8) | ((z & 15) << 4) | (x & 15)]; };
+    const warm = (L) => ((L >> 8) & 15) >= 9 && ((L >> 8) & 15) >= (L & 15) + 3;
+    const fmt = (L) => ((L >> 8) & 15) + '/' + ((L >> 4) & 15) + '/' + (L & 15);
+    const spots = [['the stair\'s foot', 5, F + 2, 37], ['the stair\'s foot', -5, F + 2, 37], ['a landing', 5, F + 5, 45], ['the gallery\'s front', 11, F + 2, 48]];
+    const lg = Hh.loggias.filter(l => l.frame).slice(0, 4);
+    for (const l of lg) { const [rr, ox, oz] = l.frame, q = ROT[rr](4, 2), w = [ox + q[0], oz + q[1]]; const uv = (() => { for (let u = -48; u <= 48; u++) for (let v = -84; v <= 84; v++) { const [x, z] = H.W2(u, v); if (x === w[0] && z === w[1]) return [u, v]; } return null; })(); if (uv) spots.push(['a workshop', uv[0], F + 2, uv[1]]); }
+    const seen = spots.map(([n, u, y, v]) => { const L = lightAt(u, y, v); return [n, warm(L), fmt(L)]; });
+    check(seen.every(s => s[1]), `warm lantern light at the stair's foot, its landings, the gallery's doors and in the workshops (${seen.map(s => s[0] + ' ' + s[2]).join(', ')})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();
