@@ -234,9 +234,18 @@ section('villages', () => {
     const by = (cells) => { const o = {}; for (const c of cells) { const k = nameOf(c[3]).replace(/\[.*/, ''); o[k] = (o[k] || 0) + 1; } return o; };
     check(a.length > 0, `prism village ${s8.id} (seed ${seed}) at vgen 8 keeps its crystal walls, lamps and fountain: ${JSON.stringify(by(a))}`);
     check(b.length === 0, `the same village at vgen 9 has none: ${JSON.stringify(by(b))}`);
-    check(p9.homes.length === p8.homes.length && p9.lots.length === p8.lots.length && p9.roads.length === p8.roads.length, `it keeps its layout (${p9.homes.length} homes, ${p9.lots.length} lots, ${p9.roads.length} roads)`);
-    const lamps8 = opCells(p8.chunks, (s) => /^vx_lamppost_crystal$/.test(nameOf(s))).length, lamps9 = opCells(p9.chunks, (s) => /^vx_lamppost$/.test(nameOf(s))).length - opCells(p8.chunks, (s) => /^vx_lamppost$/.test(nameOf(s))).length;
-    check(lamps8 > 0 && lamps9 === lamps8, `its crystal street lamps are street lamps (${lamps9} lamp blocks for ${lamps8})`);
+    // (t-town's vgen 9 airs the other climates' villages out as well — wider streets, bigger lots, its town fountain:
+    // once both are merged, VG.townFountain is there and a prism village keeps no vgen-8 layout; then it is asked for
+    // homes, roads and plain street lamps instead of the same counts)
+    const aired = typeof VG.townFountain === 'function';
+    const lamps8 = opCells(p8.chunks, (s) => /^vx_lamppost_crystal$/.test(nameOf(s))).length, plain9 = opCells(p9.chunks, (s) => /^vx_lamppost$/.test(nameOf(s))).length, lamps9 = plain9 - opCells(p8.chunks, (s) => /^vx_lamppost$/.test(nameOf(s))).length;
+    if (!aired) {
+      check(p9.homes.length === p8.homes.length && p9.lots.length === p8.lots.length && p9.roads.length === p8.roads.length, `it keeps its layout (${p9.homes.length} homes, ${p9.lots.length} lots, ${p9.roads.length} roads)`);
+      check(lamps8 > 0 && lamps9 === lamps8, `its crystal street lamps are street lamps (${lamps9} lamp blocks for ${lamps8})`);
+    } else {
+      check(p9.homes.length > 0 && p9.roads.length > 0, `it is the aired-out village of vgen 9 (t-town): ${p9.homes.length} homes, ${p9.roads.length} roads (vgen 8: ${p8.homes.length}, ${p8.roads.length})`);
+      check(lamps8 > 0 && plain9 > 0, `its streets are lit by plain street lamps (${plain9} lamp blocks; vgen 8: ${lamps8} crystal lamp blocks)`);
+    }
   }
   check(seen > 0, 'a prism village was found for at least one seed');
 });
@@ -284,14 +293,16 @@ section('texts', () => {
 section('cost', () => {
   const seed = SEEDS[0], at = findBiome(gen(seed, 8), ['crystal_highlands']) || findBiome(gen(seed, 8), ['prism_fields']);
   if (!at) { check(false, 'no prism land for the cost test'); return; }
-  const run = (vgen) => { const g = gen(seed, vgen); let emit = 0, solid = 0; const ms = cpu(() => { for (let cz = (at[1] >> 4) - 1; cz <= (at[1] >> 4) + 1; cz++) for (let cx = (at[0] >> 4) - 1; cx <= (at[0] >> 4) + 1; cx++) { const c = g.generate(cx, cz); for (let i = 0; i < c.blocks.length; i++) { const s = c.blocks[i]; if (s) { solid++; if (T.emit && T.emit[s] > 0) emit++; } } } }); return { ms, emit, solid }; };
+  // (each run's generator is warmed by a chunk a kilometre away first: its noises, caches and code are made there, the
+  // same at both vgens — the cold start alone spread the runs by 50 % and failed the check now and then)
+  const run = (vgen) => { const g = gen(seed, vgen); g.generate((at[0] >> 4) + 64, at[1] >> 4); let emit = 0, solid = 0; const ms = cpu(() => { for (let cz = (at[1] >> 4) - 1; cz <= (at[1] >> 4) + 1; cz++) for (let cx = (at[0] >> 4) - 1; cx <= (at[0] >> 4) + 1; cx++) { const c = g.generate(cx, cz); for (let i = 0; i < c.blocks.length; i++) { const s = c.blocks[i]; if (s) { solid++; if (T.emit && T.emit[s] > 0) emit++; } } } }); return { ms, emit, solid }; };
   // (a busy machine spreads single runs over a factor of five: the least of six interleaved runs is the work itself)
   const r8 = [], r9 = [];
   for (let k = 0; k < 6; k++) { if (k & 1) { r9.push(run(9)); r8.push(run(8)); } else { r8.push(run(8)); r9.push(run(9)); } }
   const least = (a) => Math.min(...a.map(r => r.ms));
   const m8 = least(r8), m9 = least(r9);
   console.log(`    ${at[2]} 3×3 chunks: vgen 8 ${m8.toFixed(0)} ms CPU, ${r8[0].solid} blocks, ${r8[0].emit} glowing · vgen 9 ${m9.toFixed(0)} ms, ${r9[0].solid} blocks, ${r9[0].emit} glowing (runs: ${r8.map(r => r.ms.toFixed(0)).join(' ')} · ${r9.map(r => r.ms.toFixed(0)).join(' ')})`);
-  check(m9 <= m8 * 1.15 + 15, `the prism patch generates no slower at vgen 9 (${m9.toFixed(0)} ms vs ${m8.toFixed(0)} ms CPU, the least of six runs)`);
+  check(m9 <= m8 * 1.15 + 15, `the prism patch generates no slower at vgen 9 (${m9.toFixed(0)} ms vs ${m8.toFixed(0)} ms CPU, the least of six runs, warm generators)`);
   check(r9[0].emit < r8[0].emit, `fewer glowing blocks to light at vgen 9 (${r9[0].emit} < ${r8[0].emit})`);
   // what the renderer draws (Very Low's look: classic, no smooth plants, no voxel detail): the vertices of the patch's
   // sections — rock pinnacles of plain cubes for crystal blocks and cutout clusters
