@@ -1,16 +1,18 @@
 // Palm City Nova Haven (TRAILER.md shot F; plan docs/superpowers/plans/2026-10-08-t-city2.md): the game's picture of
 // every city frame at the same world cameras, one page per build — BEFORE_DIST (an earlier build, e.g. a copy of the
 // v042 dist) as test/shots/trailer_city_<shot>_before.png, then this checkout's dist as …_<TAG>.png (TAG default after):
-//   F1  t3_05  the avenue at eye height (dusk) · F1_noon the same at noon · F1_potato the Very Low picture
-//   F2  t1_24  the tower house from the corridor's end      F3  t2_23  the corner villa from the plaza
-//   F4  t1_22  the long villa with the big tree, from inside the corridor
-//   F5  t3_07  the terraces from the street                 F6  t3_09  the terraces from above
+//   F1  t3_05  the fork at eye height (dusk) · F1_noon the same at noon · F1_late at the blue hour · F1_potato Very Low
+//   F2  t1_24  the long villa and the tower house from the corridor's end   F3  t2_23  the corner villa (F3_late too)
+//   F4  t1_22  from inside the corridor: up the avenue between the villas
+//   F5  t3_07  the terraced round hills from the street     F6  t3_09  the terraced round hills from above
 //   F0  the city from above the plaza (the layout)
-// Dusk is 13000 (19:00 on the cockpit clock), the ringed giant pinned in the north sky (env.planetsOverride, as the
-// director's trailer shots do), seed 4242, the High preset, no HUD. Then the Very Low (potato) cost at F1: ms per
-// frame, draws and triangles over N frames (swiftshader: compare the two builds of one run, not absolute numbers).
+// Dusk is 13000 (19:00 on the cockpit clock), the blue hour 13700, the ringed giant pinned in the north sky
+// (env.planetsOverride, as the director's trailer shots do), seed 4242, the High preset, no HUD. Before each picture the
+// detailed pieces within the detail distance are uploaded (the settling steps draw nothing) and the villagers right at
+// the camera are left out. Then the Very Low (potato) cost at F1: ms per frame, draws and triangles over N frames
+// (swiftshader: compare the two builds of one run, not absolute numbers).
 // Checks: every picture written, no page error, and on a vgen-8 build the city's pieces at the cameras (a light line by
-// the F1 road, an amber accent and a nova window near the plaza).
+// the F1 road, an amber accent and a nova window near the plaza, the island's tip bed).
 // usage: BEFORE_DIST=file:///…/index.html TAG=after bash test/wt_run.sh trailer_city.mjs 3600
 //   ONLY=F1,F2 (shot names) · NO_AFTER=1 (only the BEFORE_DIST page) · N=8 frames per cost round · SEED=4242
 // regress: skip  (a showcase with two world loads; the gate is test/trailer_city.js)
@@ -18,20 +20,22 @@ import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/i
 import fs from 'fs';
 const TAG = process.env.TAG || 'after', N = +(process.env.N || 8), SEED = process.env.SEED || '4242';
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
-const DUSK = +(process.env.TOD || 13000), NOON = 6000;
+const DUSK = +(process.env.TOD || 13000), NOON = 6000, LATE = 13700;
 const RUNS = [];
 if (process.env.BEFORE_DIST) RUNS.push(['before', process.env.BEFORE_DIST]);
 if (!process.env.NO_AFTER) RUNS.push([TAG, process.env.DIST || 'file:///home/claude/vr/dist/index.html']);
 // [name, x, z, eye above the ground (or {y: feet}), yaw, pitch, fov, time of day]
 const SHOTS = [
-  ['F1', 1.5, -112.5, 1.62, 0.08, 0.0, 55, DUSK],          // the avenue between the villas, the fork with Palm Row, the terraces behind
-  ['F2', 1.5, -51.5, 2.4, 0.6, -0.06, 50, DUSK],            // from the corridor's end: the crescent sweeping across, the tower house and the long villa
-  ['F3', 2.5, -58.5, 1.8, -0.9, -0.03, 50, DUSK],           // the corner villa east of the avenue, the crescent curving away right
-  ['F4', 0.5, -44.5, { y: 81 }, 0.08, -0.03, 55, DUSK],     // from inside the corridor: up the avenue between the villas
-  ['F5', 1.5, -138.5, 1.62, 0.05, 0.07, 55, DUSK],          // the terraces from the street (Palm Row's villas both sides)
-  ['F6', 60.5, -200.5, 35, 0.6, -0.35, 60, DUSK],           // the terraces from above: contour lines, stairways, villas
+  ['F1', 3.5, -96.5, 1.62, 0.3, 0.03, 60, DUSK],           // t3_05: the fork — the avenue parting round the island (the raised bed, the round tree), the villas, the round hills behind
+  ['F2', 1.5, -51.5, 2.4, 0.6, -0.06, 50, DUSK],            // t1_24: from the corridor's end — the crescent sweeping across, the long villa and the tower house
+  ['F3', 2.5, -58.5, 1.8, -0.9, -0.03, 50, DUSK],           // t2_23: the corner villa east of the avenue, the crescent curving away right
+  ['F4', 0.5, -44.5, { y: 81 }, 0.08, -0.03, 55, DUSK],     // t1_22: from inside the corridor — up the avenue between the villas
+  ['F5', -19.5, -122.5, 1.62, -0.05, 0.08, 55, DUSK],       // t3_07: the west branch curving right in front, the terraced round hills behind
+  ['F6', 60.5, -160.5, { y: 122 }, 0.45, -0.3, 60, DUSK],   // t3_09: the terraced round hills from above — rings, stairways, villas
   ['F0', 0.5, -60.5, { y: 150 }, 0, -0.62, 70, DUSK],       // the layout from above the plaza
-  ['F1_noon', 1.5, -112.5, 1.62, 0.08, 0.0, 55, NOON],
+  ['F1_noon', 3.5, -96.5, 1.62, 0.3, 0.03, 60, NOON],
+  ['F1_late', 3.5, -96.5, 1.62, 0.3, 0.03, 60, LATE],       // the blue hour (20:15): the frames' starry sky over a lit street
+  ['F3_late', 2.5, -58.5, 1.8, -0.9, -0.03, 50, LATE],
 ];
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 let fails = 0;
@@ -55,7 +59,24 @@ async function runPage(tag, dist) {
   const step = async (n, dtms = 16) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
   const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && i > 2) break; await wait(60); } };
   const shotPath = (name) => `/home/claude/vr/test/shots/trailer_city_${name}_${tag}.png`;
-  const shot = async (name, frames = 4) => { await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames); await page.screenshot({ path: shotPath(name), timeout: 180000 }); const ok = fs.existsSync(shotPath(name)); console.log('shot', name, tag, ok ? '' : '(missing)'); return ok; };
+  // the detailed pieces (VX: the palms' crowns, the furniture, the facades' pieces) are uploaded a few sections per drawn
+  // frame (renderer.vxResidency); the settling steps draw nothing, so before a picture every section within the detail
+  // distance gets its pieces now — run 1's first pictures showed the averaged boxes instead of the crowns
+  const warmVx = () => ev(() => {
+    const g = VR.game, r = g.renderer, p = g.player; if (!r.vxResidency || !g.world) return -1;
+    const cam = [p.pos[0], p.pos[1] + (p.eye || 1.62), p.pos[2]], list = [];
+    for (const c of g.world.cols.values()) for (const s of c.sec) if (s && s.hasMesh) list.push(s);
+    const D = (r.q && r.q.vxLod) || 48, up2 = D * D; let n = 0;
+    for (; n < 600; n++) {
+      let wait = 0; for (const s of list) { if (!s.vxData || s.mesh[3]) continue; const dx = s.ox + 8 - cam[0], dy = s.oy + 8 - cam[1], dz = s.oz + 8 - cam[2]; if (dx * dx + dy * dy * 0.5 + dz * dz < up2) wait++; }
+      if (!wait) break;
+      r.vxResidency(list, cam);
+    }
+    return n;
+  });
+  // (the villagers within 12 blocks of the camera are left out of the picture: at dusk they gather on the plaza round the
+  //  player and wave into the lens — run 1's F2 and F4)
+  const shot = async (name, frames = 4) => { const vx = await warmVx(); await ev((frames) => { window.__norender = false; const g = VR.game, V = g.villages, p = g.player; const keep = V && V.agents ? V.agents : null; if (keep) V.agents = keep.filter(a => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) > 12); for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); if (keep) V.agents = keep; window.__norender = true; }, frames); await page.screenshot({ path: shotPath(name), timeout: 180000 }); const ok = fs.existsSync(shotPath(name)); console.log('shot', name, tag, ok ? '' : '(missing)', 'vx warm rounds', vx); return ok; };
   // the top of the ground under (x, z): the highest opaque block below y 140 that is not leaves
   const groundY = (x, z) => ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = 140; y > 40; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return 80; }, [x, z]);
   const place = async (x, z, eye, yaw, pitch, fov, tod) => {
@@ -90,10 +111,10 @@ async function runPage(tag, dist) {
     const probe = await ev(() => {
       const w = VR.game.world, R = VR.R, nm = (s) => s ? R.types[R.T.type[s]].name : 'air';
       const count = (x0, z0, r, y0, y1, re) => { let n = 0; for (let x = x0 - r; x <= x0 + r; x++) for (let z = z0 - r; z <= z0 + r; z++) for (let y = y0; y <= y1; y++) if (re.test(nm(w.getBlock(x, y, z)))) n++; return n; };
-      return { lineF1: count(1, -112, 12, 76, 88, /^vx_floor_plaza_line$/), amber: count(0, -75, 30, 76, 88, /^vx_floor_plaza_line_amber$/), window: count(0, -85, 40, 80, 104, /^vx_nova_window$/) };
+      return { lineF1: count(3, -100, 12, 76, 88, /^vx_floor_plaza_line$/), amber: count(0, -75, 30, 76, 88, /^vx_floor_plaza_line_amber$/), window: count(0, -85, 40, 80, 104, /^vx_nova_window$/), bed: count(0, -122, 6, 80, 84, /^podzol$/) };
     });
     console.log(tag, 'probe', JSON.stringify(probe));
-    check(probe.lineF1 >= 10 && probe.amber >= 1 && probe.window >= 20, `${tag}: the city stands at the cameras (light-line cells by the F1 road ${probe.lineF1}, amber accents near the plaza ${probe.amber}, nova window cells ${probe.window})`);
+    check(probe.lineF1 >= 10 && probe.amber >= 1 && probe.window >= 20 && probe.bed >= 10, `${tag}: the city stands at the cameras (light-line cells by the F1 road ${probe.lineF1}, amber accents near the plaza ${probe.amber}, nova window cells ${probe.window}, the island's tip bed ${probe.bed})`);
   }
   // the Very Low (potato) preset at F1: its picture and its frame cost
   if (!ONLY || ONLY.includes('F1')) {
