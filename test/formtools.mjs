@@ -65,8 +65,9 @@ try {
   await ev(() => { const it = VR.Crafter.item, l = []; for (let i = 0; i < it.V.length; i++) if (it.V[i]) { const x = i % it.VW, z = Math.floor(i / it.VW) % it.VD, y = Math.floor(i / (it.VW * it.VD)); l.push([x, y, z, 0]); } VR.Crafter.vApply(l); it.color = '#e8e2d4'; it.mat = 'gloss'; window.__studioCore.list(); });
   check(await count() === 0, 'emptied (one undo step)');
   await page.click('#list button[data-ft="lathe"]'); await wait(300);
-  const panel = await ev(() => document.getElementById('list').innerText);
+  const panel = await ev(() => document.getElementById('list').textContent);   // (innerText: the group headers are upper case)
   check(['Formen', 'Drehkörper', 'Extrusion', 'Abrunden', 'Kugel', 'Zylinder', 'Kegel', 'Anwenden'].every(w => panel.includes(w)), 'the panel names the tools in German');
+  check(await ev(() => { const b = document.querySelector('#list .ftbox'), l = document.getElementById('list'); return !!b && b.getBoundingClientRect().width > l.clientWidth * 0.8; }), 'the tool\'s settings use the panel\'s whole width');
   // drag the belly point out by two voxels in the profile panel
   const cv = await page.$('#list canvas[data-ft="profile"]'); await cv.scrollIntoViewIfNeeded(); await wait(200);
   const bb = await cv.boundingBox();
