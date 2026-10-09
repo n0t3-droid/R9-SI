@@ -56,13 +56,14 @@
     });
     return img;
   };
+  // the veil: one soft, seamless sheet of colour and alpha. No ring per block here: a radial term drew a grid of circles
+  // over the veil. The shader adds the swirl, the see-through and the blue; the texture only varies a little.
   REC.portal_veil = () => {
     const img = new TX.Img();
     img.forEach((x, y, i) => {
-      const d = Math.hypot(x - 15.5, y - 15.5) / 16;
-      const ring = 0.5 + 0.5 * Math.sin(d * 22 + TX.fbm(x, y, 6, 2, 4105) * 6);
-      const col = TX.mix(C(0xfff0b0), C(0xff8a1a), Math.min(1, d * 1.1 + ring * 0.25));
-      img.set(x, y, col, 0.62 + ring * 0.25); img.em[i] = 1; img.ro[i] = 0.1;
+      const n = TX.fbm(x, y, 6, 2, 4105);
+      const col = TX.mix(C(0x9fe6ff), C(0x2f8cff), Math.min(1, Math.max(0, (n - 0.3) * 1.8)));
+      img.set(x, y, col, 0.3 + 0.3 * n); img.em[i] = 1; img.ro[i] = 0.1;
     });
     return img;
   };

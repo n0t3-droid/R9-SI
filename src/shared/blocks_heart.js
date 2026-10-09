@@ -22,7 +22,7 @@
   def('temple_light_bar', Object.assign({ display: 'Orange Light Bar', tex: { top: T('temple_stone_smooth'), bottom: T('temple_stone_smooth'), side: T('temple_light_bar') }, light: [11, 5, 1], flags: F.EMISSIVE }, stone, { hard: 1 }));
   def('temple_slit', Object.assign({ display: 'Cyan Light Slit', tex: { top: T('temple_stone_smooth'), bottom: T('temple_stone_smooth'), side: T('temple_slit') }, light: [3, 9, 11], flags: F.EMISSIVE }, stone, { hard: 1 }));
   def('amber_window', Object.assign({ display: 'Amber Window', tex: T('amber_window'), light: [12, 8, 2], flags: F.EMISSIVE }, stone, { hard: 1, sound: 'glass' }));
-  def('portal_veil', Object.assign({ display: 'Portal Veil', tex: T('portal_veil'), layer: 'trans', opaque: false, filter: 0, light: [13, 10, 3], flags: F.SELFCULL | F.EMISSIVE, solid: false }, stone, { hard: 50, blast: 500 }));
+  def('portal_veil', Object.assign({ display: 'Portal Veil', tex: T('portal_veil', { veil: true }), layer: 'trans', opaque: false, filter: 0, light: [13, 10, 3], flags: F.SELFCULL | F.EMISSIVE, solid: false }, stone, { hard: 50, blast: 500 }));
   def('beacon_red', Object.assign({ display: 'Red Beacon Light', tex: T('beacon_red'), light: [15, 3, 3], flags: F.EMISSIVE }, stone, { hard: 1, sound: 'glass' }));
   // ---- Spire Citadel ----
   def('spire_stone', Object.assign({ display: 'Spire Stone', tex: T('spire_stone') }, stone));

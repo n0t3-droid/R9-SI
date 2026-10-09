@@ -54,10 +54,12 @@
   // Panorama glass (the only glass whose frames join, v0.31): per block type its frame family (0 = none) — the frame
   // variants sit in 16 texture layers from o.ctm. Every other glass keeps its own frame per block (v0.33.2: the
   // joined-up window glass, plain / stained glass and panes of v0.33 are single blocks again). Built on first use.
-  let CTMK = null, CTML = null;
+  let CTMK = null, CTML = null, VEILT = null;
   function ctmTables() {
-    const n = R.types.length; CTMK = new Int32Array(n); CTML = new Uint8Array(n);
+    const n = R.types.length; CTMK = new Int32Array(n); CTML = new Uint8Array(n); VEILT = new Uint8Array(n);
     for (const t of R.types) if (t.o.ctm) { CTMK[t.id] = 0x10000 | t.o.ctm; CTML[t.id] = 1; }
+    // the portal veil (a texture with meta.veil): drawn by the translucent shader's veil branch (KIND.PORTAL, emitVeilQuad)
+    for (const t of R.types) { const m = R.texMeta[R.T.tex[t.defaultState * 6] & 0xfff]; if (m && m.veil) VEILT[t.id] = 1; }
   }
   // a look or a variant changed the tables (looks.js): the parts built from them are made again
   VR.meshCacheClear = function () { partCache.clear(); CTMK = null; CTML = null; };
@@ -69,6 +71,7 @@
   const BUF_POOL = [];
   function takeBuf(i, cap) { let b = BUF_POOL[i]; if (!b) b = BUF_POOL[i] = new Buf(cap); b.n = 0; return b; }
   const FLOOD_SEEN = new Uint8Array(4096), FLOOD_STACK = new Int32Array(4096);
+  const VEIL_CELL = new Int32Array(3);   // emitVeilQuad's scratch cell
   function stairsModels(t, state) {
     let e = partCache.get('s' + t.id + ':' + state);
     if (e) return e;
@@ -165,6 +168,31 @@
       for (let kk = 0; kk < 4; kk++) {
         const k = (kk + start) & 3;
         buf.v(FP[k * 3], FP[k * 3 + 1], FP[k * 3 + 2], w3, k >= 2 ? uw : 0, (k === 1 || k === 2) ? vh : 0, w5base | ((aos ? aos[k] : 0) << 3), lights ? lights[k] : 0, tint);
+      }
+    }
+    // the portal veil (KIND.PORTAL): each corner's u carries its distance to the veil's rim in 1/16 blocks — the nearest
+    // cell in the face's plane that is not the veil (the frame, the floor, open air), within 8 blocks and the padded
+    // section (a cell beyond it counts as veil, so a gate cut by a chunk edge keeps the rim of its other half). The
+    // translucent shader lays the hot rim, the energy band and the clear middle on that distance (shaders.js TRANS_FS)
+    function emitVeilQuad(buf, d, x, y, z, w3, w5, lights, tint, vt) {
+      facePosInto(d, x, y, z, x + 1, y + 1, z + 1);
+      const ax = DAXIS[d], a1 = ax === 0 ? 1 : 0, a2 = ax === 2 ? 1 : 2;
+      const cell = VEIL_CELL; cell[0] = x; cell[1] = y; cell[2] = z;
+      const p0 = cell[a1], q0 = cell[a2], lo = -PAD, hi = 15 + PAD;
+      let m0 = 8, m1 = 8, m2 = 8, m3 = 8;
+      for (let i = Math.max(lo, p0 - 8); i <= Math.min(hi, p0 + 8); i++) for (let j = Math.max(lo, q0 - 8); j <= Math.min(hi, q0 + 8); j++) {
+        cell[a1] = i; cell[a2] = j;
+        if (TTYPE[B[P(cell[0], cell[1], cell[2])]] === vt) continue;
+        for (let k = 0; k < 4; k++) {
+          const cp = FP[k * 3 + a1], cq = FP[k * 3 + a2];
+          const dx = Math.max(i - cp, 0, cp - i - 1), dy = Math.max(j - cq, 0, cq - j - 1), dd = Math.sqrt(dx * dx + dy * dy);
+          if (k === 0) { if (dd < m0) m0 = dd; } else if (k === 1) { if (dd < m1) m1 = dd; } else if (k === 2) { if (dd < m2) m2 = dd; } else if (dd < m3) m3 = dd;
+        }
+      }
+      buf.ensure(4);
+      for (let k = 0; k < 4; k++) {
+        const dist = k === 0 ? m0 : k === 1 ? m1 : k === 2 ? m2 : m3;
+        buf.v(FP[k * 3], FP[k * 3 + 1], FP[k * 3 + 2], w3, Math.min(255, Math.round(dist * 16)), (k === 1 || k === 2) ? 16 : 0, w5, lights ? lights[k] : 0, tint);
       }
     }
     // ---- R9 Smooth Ground: the natural surface as a height field (see physics.js P.smoothCorners) ----
@@ -317,6 +345,7 @@
         const same = (nb) => nb === b || TTYPE[nb] === TTYPE[b] || (fam !== 0 && (CTMK[TTYPE[nb]] | 0) === fam && TSH[nb] === SH.CUBE);
         // which edges of face d join the same glass (bit 0 top, 1 right, 2 bottom, 3 left)
         const joinMask = (d) => { const E = CTM_NB[d]; let m = 0; for (let k = 0; k < 4; k++) if (same(B[bi + DOFF[E[k]]])) m |= 1 << k; return m; };
+        const veil = VEILT[TTYPE[b]] === 1;
         // (v0.33.2: no more "pane in the middle of the wall" for glass set in a wall — a neighbour that changed made the
         // pane jump to the block's surface, and it looked like glass popping up next to a block you broke. Glass is
         // drawn as the block it is, flush like every other block.)
@@ -339,6 +368,7 @@
           // panorama glass: the frame variant from the same glass around this face (top, right, bottom, left);
           // Klassisch: variant 0, the full frame on every block
           if (cmode === 1) { texv = ctm + (ctmJoin ? joinMask(d) : 0); w5 |= 1 << 14; }
+          if (veil) { emitVeilQuad(bufs[layer], d, x, y, z, texW3(texv, fl, d, b), w5 | (KIND.PORTAL << 8), cornerLight, tint, TTYPE[b]); continue; }
           emitCubeQuad(bufs[layer], d, x, y, z, x + 1, y + 1, z + 1, 1, 1, texW3(texv, fl, d, b), w5, cornerLight, cornerAO, tint);
         }
         continue;
@@ -402,6 +432,7 @@
         const texv = f.tex;
         const meta = R.texMeta[texv & 0xfff];
         if (meta && meta.anim) kind = KIND.ANIM;
+        if (meta && meta.veil) kind = KIND.PORTAL;   // the portal veil: its own swirl in the translucent shader (shaders.js TRANS_FS)
         let w5base = (f.dir & 7) | (kind << 8) | ((fflags & FF.EMIT) || (fl & F.EMISSIVE) ? 1 << 12 : 0) | (!f.shade ? 1 << 11 : 0);
         if ((fflags & FF.WAVELEAF) || (fl & F.WAVELEAF)) w5base |= 1 << 7;
         // a recoloured block: every plain face in its colour (water, lava, portal and star faces keep theirs)

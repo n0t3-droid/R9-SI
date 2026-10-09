@@ -316,7 +316,7 @@
       let ships = this.game.starships ? this.game.starships.ships : [];
       if (this.game.trams && this.game.trams.cars.length) ships = ships.concat(this.game.trams.cars);
       for (const v of this.vehicles.length ? (ships.length ? this.vehicles.concat(ships) : this.vehicles) : ships) {
-        if (!v.hitbox || v.state === 'flying') continue;
+        if (!v.hitbox || v.state === 'flying' || v.hidden) continue;
         const b = v.hitbox();
         const r = PH.rayBox(o[0], o[1], o[2], d[0], d[1], d[2], b, 0, 0, 0);
         if (r && r[0] < bt) { bt = r[0]; best = v; }
