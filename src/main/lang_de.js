@@ -403,6 +403,8 @@
     'g.set.smoothPlantsV': ['Aus', 'Einfach', 'Voll'],
     'g.set.smoothFurn': 'Echte Möbel',
     'g.set.smoothFurn.tip': 'Sofas, Betten, Lampen, Küchen und Pflanzen als runde, weiche Möbel aus Stoff, Holz, Metall und Glas statt Würfelmöbel; Lampenschirme leuchten. Aus = Blockbild.',
+    'g.set.smoothFolk': 'Echte Menschen',
+    'g.set.smoothFolk.tip': 'Die Dorfbewohner in der Nähe (bis 24 Blöcke) mit runden, weichen Formen statt Würfelstufen: Gesichter, Kleidung und Haare glatt, eine Zeichnung pro Person. Weiter weg und aus = die Voxel-Figuren mit denselben Proportionen.',
     // ---- t-form: ✦ Formen im Crafter des R9 Studio (formtools.js) — dieselben Texte stehen am Aufruf
     'ft.apply': 'Anwenden',
     'ft.bevel': 'Abrunden',
