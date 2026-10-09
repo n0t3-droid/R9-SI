@@ -7,8 +7,9 @@
 //      search when its goal is out of sight (villages.js goTo / unseenWalk); the personal-space pass skips it (folklife.js)
 //   2. so the hall city with its 149 people does at most 60 % of the agent updates and path searches it did before
 //      (deterministic: Math.random seeded), and its people still do what they do (the terrace guests sit, people arrive)
-//   3. its simulation per frame (CPU, the best of two runs) costs at most what the v042 village's 38 cost with the code
-//      before (the village without the pick: a.drawn unknown, every rule as it was)
+//   3. its simulation per frame (CPU, the best of three runs) costs at most what the v042 village's 38 cost without the
+//      pick (a.drawn unknown: no far rate, no unseen walk; a standing person's skipped collision query and the look ray's
+//      reach apply to both, so the comparison is on the safe side)
 // usage: bash test/wt_run.sh town_sim.js 600
 const V = require('./load_shared.js');
 require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
@@ -83,11 +84,11 @@ check(hallNew.upd <= hallOld.upd * 0.6, `the people nobody sees live at the far 
 check(hallNew.paths <= hallOld.paths * 0.6, `a walk nobody sees searches no path: ${hallNew.paths.toFixed(2)} path searches a frame (${hallOld.paths.toFixed(2)} before)`);
 check(hallNew.sit >= hallOld.sit * 0.8 && hallNew.at >= hallOld.at * 0.75, `the people still do what they do (${hallNew.sit} sitting and ${hallNew.at} at their goals; ${hallOld.sit} and ${hallOld.at} before)`);
 
-console.log('3. the cost against the v042 village (vgen 8, its 38 people, the code before)');
-const best = (vgen, pickOn) => { const a = run(vgen, 'potato', pickOn, 11), b = run(vgen, 'potato', pickOn, 12); return a.mean <= b.mean ? a : b; };
+console.log('3. the cost against the v042 village (vgen 8, its 38 people without the pick: no far rate, no unseen walk)');
+const best = (vgen, pickOn) => [11, 12, 13].map(sd => run(vgen, 'potato', pickOn, sd)).reduce((a, b) => (a.mean <= b.mean ? a : b));
 const vilOld = best(8, false), hallNow = best(9, true);
 console.log('    v042 village: ' + fmt(vilOld));
 console.log('    hall city:    ' + fmt(hallNow));
-check(hallNow.mean <= vilOld.mean * 1.1, `the hall city's people cost Very Low no more than the village's did: ${hallNow.mean.toFixed(2)} ms a frame (the village ${vilOld.mean.toFixed(2)} ms; the best of two runs each)`);
+check(hallNow.mean <= vilOld.mean * 1.1, `the hall city's people cost Very Low no more than the village's did: ${hallNow.mean.toFixed(2)} ms a frame (the village ${vilOld.mean.toFixed(2)} ms; the best of three runs each)`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
