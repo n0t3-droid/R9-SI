@@ -124,6 +124,7 @@
     const put = (x, y, z, s) => { bucket(x, z).o.push(x, y, z, s); };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
     const W2 = (u, v) => { const q = ROT[r](u, v); return [cx + q[0], cz + q[1]]; };
+    const toHall = (x, z) => ROT[(4 - r) & 3](x - cx, z - cz);           // (world → hall-local u, v: W2's inverse)
     const L = VG.makeLot(put, cx, cz, r), P = L.P;                       // hall-local puts (facing and axis turn with the frame)
     const FL = (u, v, y0, y1, s) => { const q = ROT[r](u, v); fill(cx + q[0], cz + q[1], y0, y1, s); };
     const hc = new Map();
@@ -899,6 +900,17 @@
       // the order of the arcade front (round 2): a column at each end of the unit, from the plinth to the crowning cornice,
       // carrying the galleries between them; the cornice of upside-down stairs under the parapet's balustrade
       for (const u of [0, w - 1]) { Q(u, F + 1, -1, 'smooth_quartz'); for (let y = F + 2; y <= F + 14; y++) Q(u, y, -1, 'quartz_pillar', { axis: 0 }); Q(u, F + 15, -1, 'chiseled_quartz_block'); }
+      // (round 2c) a lantern on each column at eye height (warm light down the loggia side of the walk), and the workshop's
+      // goods out on the walk's edge beside its arch — the doorway's way out (u 4) stays free. (A hash picks the goods: the
+      // unit's own random draws stay as they were, so its homes and beds do not change.)
+      for (const u of [0, w - 1]) { putModel(Q, 'vm_wall_lantern', 0, u, F + 4, -2); const q = ROT[rr](u, -2); plan.lamps.push([ox + q[0], F + 4, oz + q[1]]); }
+      {
+        const hk = M.hash2(ox, oz, 4242) >>> 0;
+        for (const [u, name] of [[2, ['vx_veg_crate', 'vx_shop_flower_stand', 'vx_veg_crate'][hk % 3]], [7, ['vx_shop_produce', 'vx_veg_crate', 'vx_shop_flower_stand'][(hk >>> 4) % 3]]]) {
+          Q(u, F + 1, -1, name, { facing: 0 });
+          const q = ROT[rr](u, -1), h = toHall(ox + q[0], oz + q[1]); setC(h[0], h[1], C.STALL);
+        }
+      }
       for (let u = 1; u < w - 1; u++) Q(u, F + 15, -1, 'smooth_quartz_stairs', { facing: 2, half: 1 });
       lg.frame = [rr, ox, oz];
       const box = (() => { const a = (() => { const q = ROT[rr](-1, -1); return [ox + q[0], oz + q[1]]; })(), b = (() => { const q = ROT[rr](w, d); return [ox + q[0], oz + q[1]]; })(); return [Math.min(a[0], b[0]), F, Math.min(a[1], b[1]), Math.max(a[0], b[0]), F + 17, Math.max(a[1], b[1])]; })();
@@ -975,6 +987,11 @@
         const [lx, lz] = W2(s * H.STALL1, v0 + 1); plan.lamps.push([lx, F + 3, lz]);
         const [x, z] = W2(s * (H.STALL1 + 1), v0 + 1); stalls.push([x, F + 1, z, L.facing(fa)]);
         hallStalls.push({ s, v0 });
+        // (round 2c) the goods spill out on the walk's edge beside the keeper's place (the references' crates and stands
+        // piled before the stalls): a crate of produce at one end, a flower stand, a produce stand or another crate at the
+        // other; the keeper's place in the middle stays free, the walk keeps five blocks
+        const other = ['vx_shop_flower_stand', 'vx_shop_produce', 'vx_veg_crate'][hallStalls.length % 3];
+        for (const [dv, name] of [[0, 'vx_veg_crate'], [2, other]]) { P(s * (H.STALL1 + 1), F + 1, v0 + dv, name, { facing: fa }); setC(s * (H.STALL1 + 1), v0 + dv, C.STALL); }
         const item = (dv, fn) => { const v = v0 + dv; if (v <= H.V1 && !inCross(v)) fn(v); };
         item(3, (v) => { P(s * H.A0, F + 1, v, 'vx_barrel'); P(s * H.STALL1, F + 1, v, 'vx_barrel'); if (n & 1) P(s * H.A0, F + 2, v, 'vx_crate'); });
         item(6, (v) => { putModel(P, 'vm_planter', 0, s * H.A0, F + 1, v); P(s * H.STALL1, F + 1, v, 'vx_bench', { facing: fa }); });

@@ -401,6 +401,36 @@ for (const [label, H] of HALLS) {
     const carried = [...rays.values()].filter(n => n >= 10).length;
     check(carried >= 8, `wooden ribs under the half dome's rays (${carried} rays carried by 10 or more beams: ${[...rays.entries()].sort((a, b) => a[0] - b[0]).map(([k, n]) => k * 18 + '° ' + n).join(', ') || 'none'})`);
   }
+  // ---------------------------------------------------------------- 11. round 2c: the market's goods and light (P3)
+  console.log(`11. round 2c — the market aisle's goods, its lanterns at eye height (${label})`);
+  {
+    const GOODS = /vx_veg_crate|vx_shop_produce|vx_shop_flower_stand|vx_crate|vx_barrel|vx_shop_bakery_case/;
+    const stl = Hh.stalls || [];
+    let piled = 0, kept = 0;
+    for (const st of stl) {
+      // the goods spill out on the walk's edge beside the keeper's place (a 32, the stall's middle v stays free)
+      const g2 = [st.v0, st.v0 + 2].filter(v => GOODS.test(atN(st.s * 32, F + 1, v))).length;
+      if (g2 === 2) piled++;
+      if (atN(st.s * 32, F + 1, st.v0 + 1) === 'air' && atN(st.s * 32, F + 2, st.v0 + 1) === 'air') kept++;
+    }
+    check(stl.length && piled === stl.length, `goods piled out in front of every stall — crates of produce, flower stands (${piled} of ${stl.length})`);
+    check(kept === stl.length, `the keeper's place in front of each counter stays free (${kept} of ${stl.length})`);
+    // the walk stays a walk: no stretch of the market walk narrower than five free blocks
+    let narrow = 0;
+    for (const s of [-1, 1]) for (let v = Hh.V0 + 3; v <= Hh.V1; v++) { let free = 0; for (let a = 32; a <= 38; a++) if (atN(s * a, F + 1, v) === 'air' && atN(s * a, F + 2, v) === 'air') free++; if (free < 5) narrow++; }
+    check(narrow === 0, `the market walk stays five blocks free all along (${narrow} narrow cells)`);
+    // the loggias' workshops spill out too: goods on the walk's edge beside the arch (the door's way out stays free)
+    let shops = 0, ln = 0, lamps = 0;
+    for (const l of Hh.loggias.filter(l => l.frame)) {
+      ln++; const [rr, ox, oz] = l.frame, S = (u, y, v) => { const q = ROT[rr](u, v); return H.stAt(ox + q[0], y, oz + q[1]); };
+      if ([2, 7].every(u => GOODS.test(nm(S(u, F + 1, -1)))) && nm(S(4, F + 1, -1)) === 'air' && nm(S(4, F + 1, -2)) === 'air') shops++;
+      // a lantern on each of the unit's two columns at eye height (warm light along the loggia side of the walk)
+      let L = 0; for (const u of [0, 9]) for (let y = F + 2; y <= F + 5; y++) for (const v of [-1, -2]) { const x = S(u, y, v); if (x > 0 && R.T.emit[x]) L++; }
+      if (L >= 2) lamps++;
+    }
+    check(ln > 0 && shops === ln, `goods before every workshop's arch, its doorway free (${shops} of ${ln})`);
+    check(lamps === ln, `lanterns on the loggias' columns at eye height (${lamps} of ${ln} units)`);
+  }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();
   for (const b of plan.chunks.values()) { for (let i = 3; i < b.o.length; i += 4) { const n = nm(b.o[i]); if (/crystal|prism|aether/.test(n)) bad.add(n); } for (let i = 4; i < b.f.length; i += 5) { const n = nm(b.f[i]); if (/crystal|prism|aether/.test(n)) bad.add(n); } }
