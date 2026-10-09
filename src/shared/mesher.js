@@ -39,6 +39,64 @@
   const hex565 = (h) => VR.rgb565((h >> 16) & 255, (h >> 8) & 255, h & 255);
   const AETHER_TINT = VR.rgb565(90, 240, 255);
 
+  // ---- smooth props (job.smoothProps; src/main/props.js draws them). The blocks whose type has `prop` get no voxel
+  // geometry when the job asks for smooth props, and each prop instance is one anchor of six ints: world x, y, z, kind,
+  // facing, light. Type options (read from the registry once per size): `prop` names the prop a block belongs to,
+  // `propAnchor` ('all', or a part name) marks the block that anchors it (the palm crown's bottom centre part), and
+  // `propStem` names the prop a trunk top draws alone when no prop of its kind stands above it (player-built trunks).
+  // The kinds are numbers: a new prop kind is one entry here and one model in props.js.
+  const PROP_KIND = VR.PROP_KIND = { palm: 1, palm_trunk: 2 };
+  // smooth furniture: the furniture pack's pieces (voxfurn.js) that a smooth model of props.js draws — the ten kinds the
+  // villas show most (sofas and their chaise, armchairs, dining tables and chairs, beds, the tripod and the arc lamp,
+  // the pendant, the kitchen units and the island, the bookcase, the planters, the TV lowboard and the wall TV) and the
+  // coffee tables and nightstands beside them. A type's kind is PROP_FURN0 + its index in this list (the list lives
+  // only in a running game: nothing of it is saved); its anchor is the model's part 0 (the cell VM.put places first),
+  // its facing the model's turn. No block definition changes.
+  const FCOL = ['charcoal', 'cream', 'taupe', 'sage', 'navy'], KCOL = ['white', 'black', 'oak'], KUNIT = ['cabinet', 'sink', 'hob', 'oven', 'tall', 'upper'];
+  const PROP_FURN0 = VR.PROP_FURN0 = 16;
+  const PROP_FURN = VR.PROP_FURN = [].concat(
+    FCOL.map(c => 'vm_sofa_' + c), FCOL.map(c => 'vm_chaise_' + c), FCOL.map(c => 'vm_armchair_' + c),
+    ['vm_dining_table_oak', 'vm_dining_table', 'vm_dining_chair_oak', 'vm_dining_chair'],
+    ['grey', 'navy', 'sage', 'white', 'rose'].map(c => 'vm_bed_' + c),
+    ['vm_floor_lamp', 'vm_arc_lamp', 'vm_pendant'],
+    [].concat(...KCOL.map(c => KUNIT.map(u => 'vm_kitchen_' + c + '_' + u))), ['vm_island'],
+    ['vm_bookshelf', 'vm_planter', 'vm_monstera', 'vm_olive', 'vm_lowboard', 'vm_tv', 'vm_coffee_table_glass', 'vm_coffee_table', 'vm_nightstand'],
+    // the villages' and the towns' own pieces (voxarch.js, voxtech.js, voxhome.js): the beds (foot and head), the table,
+    // the chair, the modular sofas (a row joins: a sofa's arms stand only at the row's ends)
+    ['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'white', 'teal'].map(c => 'vx_bed_' + c), ['vx_table', 'vx_chair'],
+    ['white', 'charcoal', 'cream', 'taupe', 'blue', 'orange'].map(c => 'vx_sofa_' + c),
+    // the villas' smaller pieces (the chandelier, the table lamp and its side table, the console, the bar cart, the bar
+    // stool) and the rugs (voxarch.js: a rug block joins its neighbours into one rug)
+    ['vm_chandelier', 'vm_table_lamp', 'vm_side_table', 'vm_console', 'vm_bar_cart', 'vm_stool'], ['red', 'blue', 'green', 'sand'].map(c => 'vx_rug_' + c));
+  // the sofas that join their neighbours in a row (voxtech.js ctxHook.sofa: the same kind and family): the group number;
+  // groups from 16 join on all four sides along the world's axes (the rugs: any rug joins any rug, as voxarch.js does)
+  const PROP_JOIN = { vx_sofa_white: 1, vx_sofa_charcoal: 1, vx_sofa_cream: 1, vx_sofa_taupe: 1, vx_sofa_blue: 2, vx_sofa_orange: 3, vx_rug_red: 16, vx_rug_blue: 16, vx_rug_green: 16, vx_rug_sand: 16 };
+  const LXP = [0, 4, 1, 5], LXM = [1, 5, 0, 4];   // the neighbour (DOFF index) on a piece's local +x and −x for its facing
+  // the pieces that stand on one another (gen_villa_rooms.js puts the table lamp in the cell over its side table): 1 looks
+  // for a 2 over it, 2 for a 1 under it (bit 2 of the anchor's facing: the lamp stands on the table's top, the table's
+  // vase makes room)
+  const PROP_STACK = { vm_side_table: 1, vm_table_lamp: 2 };
+  // the prop groups (job.smoothProps is a mask of them; true is the plants alone): 1 the plants (palms), 2 the furniture
+  const PROP_GROUP = VR.PROP_GROUP = { plants: 1, furniture: 2 };
+  let PROPT = null;
+  function propTables() {
+    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n), group = new Uint8Array(n), join = new Uint8Array(n), stack = new Uint8Array(n);
+    const furn = new Map(PROP_FURN.map((nm, i) => [nm, i]));
+    for (const t of R.types) {
+      const o = t.o || {}, fi = furn.get(t.name);
+      if (!o.prop && !o.propStem && fi === undefined) continue;
+      for (let s = t.base; s < t.base + t.nstates; s++) {
+        facing[s] = t.has('facing') ? t.get(s, 'facing') & 3 : 0;
+        if (fi !== undefined) { kind[s] = PROP_FURN0 + fi; group[s] = PROP_GROUP.furniture; anchor[s] = !t.has('part') || t.get(s, 'part') === 0 ? 1 : 0; join[s] = PROP_JOIN[t.name] || 0; stack[s] = PROP_STACK[t.name] || 0; continue; }
+        kind[s] = PROP_KIND[o.prop] || 0;
+        stem[s] = PROP_KIND[o.propStem] || 0;
+        group[s] = PROP_GROUP.plants;
+        anchor[s] = (o.propAnchor === 'all' || (o.propAnchor && t.has('part') && t.getV(s, 'part') === o.propAnchor)) ? 1 : 0;
+      }
+    }
+    PROPT = { kind, anchor, stem, facing, group, join, stack };
+  }
+
   class Buf {
     constructor(n) { this.a = new Uint16Array(n * 8); this.n = 0; }
     ensure(k) { if ((this.n + k) * 8 > this.a.length) { const b = new Uint16Array(Math.max(this.a.length * 2, (this.n + k) * 8 + 4096)); b.set(this.a); this.a = b; } }
@@ -107,6 +165,11 @@
     // material never read as one surface (Klassisch v2)
     const LK = VR.LOOK, ctmJoin = !LK || LK.ctm, macroOn = !LK || LK.macro, varyOn = !!(LK && LK.vary && !macroOn);
     const NAT = R.natural;
+    // smooth props: the prop blocks of the groups job.smoothProps asks for give no voxel geometry; their anchors are
+    // collected in propOut (job.smoothProps only: a mask of PROP_GROUP, true = the plants)
+    const propMask = job.smoothProps === true ? PROP_GROUP.plants : (job.smoothProps | 0), propOn = propMask !== 0;
+    if (propOn && (!PROPT || PROPT.kind.length !== R.stateCount + 1)) propTables();
+    const propOut = propOn ? [] : null;
     const bufs = [takeBuf(0, 4096), takeBuf(1, 1024), takeBuf(2, 1024)];
     // world sections keep their mini-voxel pieces apart from the plain terrain: a detailed buffer drawn up close
     // and a far buffer of averaged boxes (ships and previews merge everything into the opaque stream as before)
@@ -336,6 +399,22 @@
       if (!b) continue;
       const shape = TSH[b], fl = TF[b], layer = TL[b];
       if (shape === SH.NONE) continue;
+      if (propOn && (PROPT.group[b] & propMask)) {
+        // a prop block: its geometry is the smooth prop's. The anchor goes to the list: the block that anchors the prop
+        // (its bottom face is the trunk's top), or the air above a trunk top that no prop of its kind covers
+        if (PROPT.anchor[b]) {
+          // a sofa in a row: bit 2 a neighbour of its group on its local +x, bit 3 on its local −x (its arms go there); a
+          // rug: bits 2–5 a rug on +x, −x, +z, −z; a table lamp on its side table, the table under it: bit 2
+          let f = PROPT.facing[b];
+          const jg = PROPT.join[b], sk = PROPT.stack[b];
+          if (jg >= 16) f |= (PROPT.join[B[bi + DOFF[0]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[1]]] === jg ? 8 : 0) | (PROPT.join[B[bi + DOFF[4]]] === jg ? 16 : 0) | (PROPT.join[B[bi + DOFF[5]]] === jg ? 32 : 0);
+          else if (jg) f |= (PROPT.join[B[bi + DOFF[LXP[f]]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[LXM[f]]]] === jg ? 8 : 0);
+          if (sk && PROPT.stack[B[bi + DOFF[sk === 1 ? 2 : 3]]] === 3 - sk) f |= 4;
+          propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[b], f, L[bi]);
+        }
+        else if (PROPT.stem[b] && PROPT.kind[B[bi + DOFF[2]]] !== PROPT.kind[b]) propOut.push(job.ox + x, sy * 16 + y + 1, job.oz + z, PROPT.stem[b], 0, L[bi + DOFF[2]]);
+        continue;
+      }
       if (shape === SH.CUBE) {
         if (layer === 0 && (fl & F.OPAQUE)) continue; // done by greedy
         // non-opaque cube (glass, leaves, ice, slime, lava-like)
@@ -720,6 +799,7 @@
 
     const res = { opaque: bufs[0].out(), cutout: bufs[1].out(), trans: bufs[2].out(), vis: visMask };
     if (vxSplit) { res.vx = bufs[3].out(); res.vxFar = bufs[4].out(); }
+    if (propOut) res.props = Int32Array.from(propOut);   // six ints per prop instance (see propTables)
     return res;
   };
   // pair index for faces a<b (6 faces → 15 pairs)

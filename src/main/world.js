@@ -204,6 +204,7 @@
       this.qA = new Int32Array(1 << 16); this.qB = new Int32Array(1 << 16);
       this.changed = new Set();
       this.fancyLeaves = true; this.smooth = true;
+      this.smoothProps = 0;   // t-smooth: the prop groups drawn smooth (1 palms, 2 furniture; game.js propMask)
       this.meshBudget = 6;
       this.lastCol = null;
       this.shDirty = new Set(); this.shGone = new Set(); // columns whose shadow heights must reach the GPU
@@ -614,7 +615,7 @@
         const bl = (a) => (a ? (a.byteLength !== undefined ? a.byteLength : a.length * 4) : 0);
         this.uploadQ.push({ key: c.key, col: c, x: c.cx * 16 + 8, z: c.cz * 16 + 8, bytes: bl(m.opaque) + bl(m.cutout) + bl(m.trans) + bl(m.vx) + bl(m.vxFar), run: () => {
           if (this.dead || this.cols.get(c.key) !== c || s.uTok !== tok) return;
-          this.renderer.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar);
+          this.renderer.uploadSection(s, c, sy, m.opaque, m.cutout, m.trans, m.vx, m.vxFar, m.props);
           if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
           s.meshVer = ver; s.meshed = true;
           s.fade = c.shownAt >= 0 ? c.fade : 0;
@@ -657,7 +658,7 @@
           }
         }
       }
-      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, vxLod: true };
+      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true };
     }
     markDirty(x, y, z) {
       const sy = y >> 4;

@@ -545,11 +545,11 @@
     WIN_('vx_window_tech_dark', 'Dark-Frame City Window', { frame: T.grayDD, glassCol: 0x8AE8FF, glow: 0x5AD8FF, sill: T.gray, frameFlags: GLOSS }, { light: [2, 7, 10] });
     A('vx_lamppost_tech', 'Tech Street Lamp', { kind: 'lamppost', col: 0xE0E6EE, post: 0xE0E6EE, glow: T.cyan }, { props: [['head', 2]], defaultIndex: 1, light: (p) => p.head ? [6, 13, 15] : null, filter: 0, sound: 'metal' });
     // nature & domes
-    A('vx_palm_trunk', 'Palm Trunk', { kind: 'palmtrunk', col: PALM.bark }, { filter: 0, sound: 'wood', hard: 1 });
+    A('vx_palm_trunk', 'Palm Trunk', { kind: 'palmtrunk', col: PALM.bark }, { filter: 0, sound: 'wood', hard: 1, prop: 'palm', propStem: 'palm_trunk' });
     A('vx_royal_trunk', 'Royal Palm Trunk', { kind: 'palmtrunk', col: 0x9A9A92, royal: true }, { filter: 0, sound: 'wood', hard: 1 });
     A('vx_palm_shaft', 'Palm Crownshaft', { kind: 'palmtrunk', col: 0x5E8A4A, shaft: true }, { filter: 0, sound: 'wood', hard: 1 });
-    A('vx_palm_crown', 'Palm Crown', { kind: 'palmcrown', col: PALM.l2 }, { filter: 0, sound: 'grass', hard: 0.3 });
-    A('vx_palm_frond', 'Palm Frond', { kind: 'palmfrond', col: PALM.l2 }, { props: [FACING4], kind: 'wallmount', filter: 0, solid: false, sound: 'grass', hard: 0.2 });
+    A('vx_palm_crown', 'Palm Crown', { kind: 'palmcrown', col: PALM.l2 }, { filter: 0, sound: 'grass', hard: 0.3, prop: 'palm', propAnchor: 'all' });
+    A('vx_palm_frond', 'Palm Frond', { kind: 'palmfrond', col: PALM.l2 }, { props: [FACING4], kind: 'wallmount', filter: 0, solid: false, sound: 'grass', hard: 0.2, prop: 'palm' });
     A('vx_fern', 'Tropical Fern', { kind: 'fern', col: 0x3E9A3A }, { filter: 0, solid: false, sound: 'grass', hard: 0.1 });
     A('vx_fern_lush', 'Lush Fern', { kind: 'fern', family: 'lush', col: 0x5AB84A }, { filter: 0, solid: false, sound: 'grass', hard: 0.1 });
     A('vx_dome_white', 'White Dome', { kind: 'dome', col: 0xF2F4F8, windows: T.cyan, band: 0xC8D0DA }, { filter: 0, light: [1, 5, 7], sound: 'metal', hard: 2 });

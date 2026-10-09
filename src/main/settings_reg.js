@@ -53,6 +53,8 @@
     { key: 'clouds', g: 'img', sec: 'objects', t: 'slider', lab: 'g.set.clouds', tip: 'g.set.clouds.tip', cost: 'low', def: 2, min: 0, max: 2, step: 1, vals: 'g.set.cloudsV' },
     { key: 'bloom', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.bloom', tip: 'g.set.bloom.tip', cost: 'mid', def: true },
     { key: 'fancyLeaves', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.fancyLeaves', tip: 'g.set.fancyLeaves.tip', cost: 'mid', def: true },
+    { key: 'smoothPlants', g: 'img', sec: 'objects', t: 'slider', lab: 'g.set.smoothPlants', tip: 'g.set.smoothPlants.tip', cost: 'mid', def: 2, min: 0, max: 2, step: 1, vals: 'g.set.smoothPlantsV' },   // t-smooth: palms as smooth props (props.js)
+    { key: 'smoothFurn', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.smoothFurn', tip: 'g.set.smoothFurn.tip', cost: 'mid', def: true },   // t-smooth: the furniture as smooth props (props.js)
     { key: 'wetGround', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.wetGround', tip: 'g.set.wetGround.tip', cost: 'low', def: true },
     { key: 'airLife', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.airLife', tip: 'g.set.airLife.tip', cost: 'low', def: true },
     { key: 'anim', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.anim', tip: 'g.set.anim.tip', cost: 'low', def: true },
