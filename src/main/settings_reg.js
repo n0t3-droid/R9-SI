@@ -48,7 +48,7 @@
     { key: 'dynRes', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.dynRes', tip: 'g.set.dynRes.tip', cost: 'low', def: true },
     { key: 'lite', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.lite', tip: 'g.set.lite.tip', cost: 'low', def: false },
     // ---- Bild · Dinge & Effekte
-    { key: 'look', g: 'img', sec: 'objects', t: 'choice', lab: 'g.set.look', tip: 'g.set.look.tip', cost: 'low', def: 'classic', opts: [['classic', 'g.set.look.classic', 'g.set.look.classic.tip'], ['seamless', 'g.set.look.seamless', 'g.set.look.seamless.tip']] },
+    { key: 'look', g: 'img', sec: 'objects', t: 'choice', lab: 'g.set.look', tip: 'g.set.look.tip', cost: 'low', def: 'seamless', opts: [['classic', 'g.set.look.classic', 'g.set.look.classic.tip'], ['seamless', 'g.set.look.seamless', 'g.set.look.seamless.tip']] },
     { key: 'particles', g: 'img', sec: 'objects', t: 'slider', lab: 'g.set.particles', tip: 'g.set.particles.tip', cost: 'low', def: 2, min: 0, max: 2, step: 1, vals: 'g.set.particlesV' },
     { key: 'clouds', g: 'img', sec: 'objects', t: 'slider', lab: 'g.set.clouds', tip: 'g.set.clouds.tip', cost: 'low', def: 2, min: 0, max: 2, step: 1, vals: 'g.set.cloudsV' },
     { key: 'bloom', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.bloom', tip: 'g.set.bloom.tip', cost: 'mid', def: true },
