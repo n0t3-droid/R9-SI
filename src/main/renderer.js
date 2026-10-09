@@ -1665,7 +1665,7 @@
     // the reflection target: a quarter of the frame on tier 1, half on tier 2 (made when first needed, kept until the
     // size or the colour format changes)
     ensureReflection() {
-      const gl = this.gl, k = this.q.water >= 2 ? 0.5 : 0.25;
+      const gl = this.gl, k = this.q.water >= 2 && !this.q.reflLite ? 0.5 : 0.25;   // (F9 · Spiegelung leicht: a quarter, read edge-aware)
       const rw = Math.max(16, Math.floor(this.w * k)), rh = Math.max(9, Math.floor(this.h * k));
       if (this.reflFB && rw === this.reflW && rh === this.reflH && this.reflHdr === this.hdr) return true;
       if (this.reflFB) gl.deleteFramebuffer(this.reflFB);
@@ -1696,7 +1696,7 @@
       M4.frustum(this.planesR, this.viewProjR);
       M4.invert(this.invViewProjR, this.viewProjR);
       // the sections that can show in the mirror: their top is above the water and they are within reach
-      const reach = this.q.water >= 2 ? 160 : 96, reach2 = reach * reach, list = this.reflList || (this.reflList = []);
+      const reach = this.q.water >= 2 && !this.q.reflLite ? 160 : 96, reach2 = reach * reach, list = this.reflList || (this.reflList = []);   // (F9: the far ones are the horizon's)
       list.length = 0;
       for (const sec of vis) {
         if (sec.oy - cam.y + 16 <= d) continue;
@@ -1746,7 +1746,7 @@
       this.stats.reflProps = 0;
       if (!this.noReflProps && (this.q.smoothProps || this.q.smoothFurn)) {
         const nA = this.propNA, nB = this.propNB, nF = this.propNF, dp = this.stats.draws;
-        this.drawProps(E, camPos, false, this.q.water >= 2 ? 2 : 1);
+        this.drawProps(E, camPos, false, this.q.water >= 2 && !this.q.reflLite ? 2 : 1);   // (F9 · Spiegelung leicht: their far forms)
         this.stats.reflProps = this.stats.draws - dp; this.propNA = nA; this.propNB = nB; this.propNF = nF;
       }
       this.stats.reflSecs = list.length; this.stats.reflDraws = this.stats.draws - dr0;     // (test/water.mjs reports them)
@@ -1766,6 +1766,13 @@
       if (u.u_waterTier) gl.uniform1f(u.u_waterTier, this.q.water | 0);
       if (u.u_reflOn) gl.uniform1f(u.u_reflOn, this.reflOn ? 1 : 0);
       if (u.u_reflTex) this.tex(8, this.reflOn && this.reflCol ? this.reflCol : this.texNoise, u.u_reflTex);
+      // F9 · Spiegelung leicht: the mirror's depth for the edge-aware read (unit 9)
+      if (u.u_reflUp) {
+        const up = this.q.reflLite && this.reflOn && this.reflDepth ? 1 : 0;
+        gl.uniform1f(u.u_reflUp, up);
+        if (u.u_reflDepth) this.tex(9, up ? this.reflDepth : this.texNoise, u.u_reflDepth);
+        if (u.u_reflSize) gl.uniform2f(u.u_reflSize, this.reflW || 1, this.reflH || 1);
+      }
     }
 
     drawPrecip(F, E) {
