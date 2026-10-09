@@ -77,7 +77,27 @@ async function runPage(tag, dist) {
   const wait = (ms) => page.waitForTimeout(ms);
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 16) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
-  const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && i > 2) break; await wait(60); } };
+  // the world settles before a picture: every column within the view distance shown, nothing queued, meshing or uploading.
+  // On a crowded machine (other agents' browsers: load 15 on 2 CPUs) the workers are slow — after `max` rounds the
+  // wait goes on while work is still pending and progressing, up to SETTLE_S seconds (default 300); a stall of 40 s
+  // ends it. Every picture's log line says how it settled (a picture taken unsettled shows missing chunks).
+  let lastSettle = null;
+  const SETTLE_MS = +(process.env.SETTLE_S || 300) * 1000;
+  const settle = async (max = 60) => {
+    const t0 = Date.now(); let s = null, i = 0, done = false, sig = '', sigT = Date.now();
+    for (; ; i++) {
+      await step(10);
+      s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown }; });
+      done = s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0;
+      if (done && i > 2) break;
+      const left = s.pend + s.dirty + s.up + s.unshown + s.busy, k = [s.pend, s.dirty, s.up, s.unshown].join(',');
+      if (k !== sig) { sig = k; sigT = Date.now(); }
+      if (i >= max && (!left || Date.now() - t0 > SETTLE_MS || Date.now() - sigT > 40000)) break;
+      await wait(60);
+    }
+    lastSettle = { ok: done, rounds: i, s: Math.round((Date.now() - t0) / 1000), state: s };
+    return lastSettle;
+  };
   const shotPath = (name) => `/home/dev/vr/test/shots/trailer_town_${name}_${tag}.png`;
   // the detailed pieces within the detail distance are uploaded before a picture (the settling steps draw nothing)
   const warmVx = () => ev(() => {
@@ -109,7 +129,7 @@ async function runPage(tag, dist) {
     // (a build with villages.js pick() marks who it drew; an older one drew the nearest cap outdoors plus everyone indoors)
     return { agents: V.agents.length, inView: vis, drawn: own ? drawn : Math.min(out, cap) + ind, onStreet: own ? street : Math.min(out, cap), cap, near, acts };
   });
-  const shot = async (name, frames = 4) => { const vx = await warmVx(); await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames); for (let t = 1; ; t++) { try { await page.screenshot({ path: shotPath(name), timeout: 180000 }); break; } catch (e) { console.log(`  screenshot ${name} try ${t} failed: ${String(e.message).split('\n')[0]}`); if (t >= 2) break; await wait(3000); } } const ok = fs.existsSync(shotPath(name)); console.log('shot', name, tag, ok ? '' : '(missing)', 'vx warm rounds', vx); return ok; };
+  const shot = async (name, frames = 4) => { const vx = await warmVx(); await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames); for (let t = 1; ; t++) { try { await page.screenshot({ path: shotPath(name), timeout: 180000 }); break; } catch (e) { console.log(`  screenshot ${name} try ${t} failed: ${String(e.message).split('\n')[0]}`); if (t >= 2) break; await wait(3000); } } const ok = fs.existsSync(shotPath(name)); console.log('shot', name, tag, ok ? '' : '(missing)', 'vx warm rounds', vx, lastSettle ? (lastSettle.ok ? `settled in ${lastSettle.s} s` : `UNSETTLED after ${lastSettle.s} s ${JSON.stringify(lastSettle.state)}`) : ''); return ok; };
   // the top of the solid ground under (x, z) from y0 down: the highest opaque block that is not leaves
   const groundY = (x, z, y0) => ev(([x, z, y0]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = y0; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return 70; }, [x, z, y0]);
   const place = async (x, z, feet, yaw, pitch, fov, tod) => {
