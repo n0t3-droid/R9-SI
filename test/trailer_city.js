@@ -56,7 +56,9 @@ console.log('1 · old worlds keep their city');
   }
   check(same === 4, `the classic Villa Nova builds as before (its palm crowns centred) in all four rotations (${same} of 4)`);
   const src = fs.readFileSync(__dirname + '/../src/main/game.js', 'utf8');
-  check(/vgen: o\.vgen \? \+o\.vgen : 8\b/.test(src), 'new worlds are made with vgen 8 (game.js createWorld)');
+  // (vgen 9 — f-nocrystal's and t-town's — keeps Nova Haven: new worlds get vgen 8 or a later generator)
+  const dv = +((/vgen: o\.vgen \? \+o\.vgen : (\d+)\b/.exec(src) || [])[1] || 0);
+  check(dv >= 8, `new worlds are made with vgen 8 or newer (game.js createWorld: ${dv})`);
 }
 
 // ---------------------------------------------------------------- 2 · the family
