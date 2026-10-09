@@ -14,11 +14,13 @@
 //            dist> TAG=before: the before numbers)
 // usage: bash test/wt_run.sh ultralite.mjs 3600   ·   MODE=potato DIST=file:///…/index.html TAG=before …
 //   SCENES=hall,plaza,village (default; `lake` adds the water mirror's scene: a lake 210 m east of the hall, the camera on
-//   its east shore looking west over the water to the hills) · WALK=0 skips the walks · N=3 timed frames · RD=8 the render distance of every preset
-//   (one worker on this 2-CPU machine: Ultra's 16 chunks would take many minutes a scene; the far ring stays 64)
+//   its east shore looking west over the water to the hills) · WALK=0 skips the walks · N=3 timed frames · RD=8 caps every
+//   preset's render distance (one worker on this 2-CPU machine: Ultra's 16 chunks would take many minutes a scene; the far
+//   ring stays 64; Very Low keeps its own 4)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import fs from 'fs';
+import { execSync } from 'child_process';
 const TAG = process.env.TAG || 'after', N = +(process.env.N || 3), MODE = process.env.MODE || 'full';
 const DIST = process.env.DIST || 'file:///home/dev/vr/dist/index.html';
 const SCENES = (process.env.SCENES || 'hall,plaza,village').split(',');
@@ -36,6 +38,17 @@ await page.goto(DIST);
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const r1 = (x) => Math.round(x * 10) / 10;
+// the CPU time (ms) this test's browser has used: utime + stime of every process below this node process (the browser,
+// its GPU process — SwiftShader draws there — and the renderer). On this shared 2-CPU machine the other agents' load
+// stretches a frame's wall time (a run at load 6 against one at load 11 differed by 70 % with the same draws); the CPU
+// time a frame costs is what it takes from a weak PC, and it hardly moves with the load
+const cpuNow = () => {
+  const kids = new Map();
+  for (const l of execSync('ps -e -o pid=,ppid=').toString().trim().split('\n')) { const [p, pp] = l.trim().split(/\s+/).map(Number); if (!kids.has(pp)) kids.set(pp, []); kids.get(pp).push(p); }
+  let t = 0; const st = [process.pid];
+  while (st.length) { for (const c of kids.get(st.pop()) || []) { st.push(c); try { const s = fs.readFileSync(`/proc/${c}/stat`, 'utf8'), f = s.slice(s.lastIndexOf(')') + 2).split(' '); t += +f[11] + +f[12]; } catch (e) { } } }
+  return t * 10;   // (clock ticks of 10 ms)
+};
 // the render stub: __norender draws nothing (setupCamera only); __shadowOnly also runs the frame's shadow work (the visible
 // list, the VX detail uploads and the shadow update, as render() does them), timed with the sync
 const stub = () => ev(() => {
@@ -128,14 +141,17 @@ const freshWorld = async (name) => {
   await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.env.setTime(6000); });
   return ev(() => VR.game.state);
 };
-const setPreset = (p) => ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; g.applySettings('*'); }, [p, RD]);
+// (RD caps every preset's render distance: Ultra's 16 and High's 14 → 8, Very Low keeps its own 4)
+const setPreset = (p) => ev(([p, rd]) => { const g = VR.game, own = (VR.Game.PRESETS[p] || {}).renderDist || rd; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = Math.min(rd, own); g.applySettings('*'); return g.settings.renderDist; }, [p, RD]);
 // frames drawn and timed (each synced); the clouds' clock pinned so two presets' pictures show the same sky
 const frames = (n) => ev((n) => { const g = VR.game, r = g.renderer, out = []; window.__norender = false; for (let i = 0; i < n; i++) { g.env.anim = 500; window.__sync(); const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); out.push({ ms: performance.now() - t0, draws: r.stats.draws, tris: r.stats.tris, fc: r.stats.farCache || '', tiles: r.stats.shadowTiles || 0 }); } window.__norender = true; return out; }, n);
 const measure = async (lite) => {
   await warmVx();
   if (lite) await ev(() => { VR.UL.Far.AGE = 1e9; });   // (the steady frames: no "age" refresh at 2–3 s a frame)
   await frames(lite ? 6 : 2);   // (Ultra · Leicht: the first builds its cache)
+  const c0 = cpuNow();
   const fs3 = await frames(N);
+  const cpuMs = (cpuNow() - c0) / N;
   const passes = await ev(() => { const g = VR.game, r = g.renderer, P = window.__pass; P.ms = {}; P.calls = {}; P.sub = {}; P.on = true; window.__norender = false; g.env.anim = 500; window.__sync(); const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); const ms = performance.now() - t0; P.on = false; window.__norender = true; const st = r.stats || {}; return { ms, pass: P.ms, calls: P.calls, sub: P.sub, mirror: { on: !!r.reflOn, size: r.reflOn ? r.reflW + '×' + r.reflH : '', secs: r.reflOn ? st.reflSecs | 0 : 0, draws: r.reflOn ? st.reflDraws | 0 : 0 } }; });
   let refresh = null;
   if (lite) {   // a new far cache: one slice a frame
@@ -148,7 +164,7 @@ const measure = async (lite) => {
   if (lite) await ev(() => { VR.UL.Far.AGE = 500; });
   const ms = fs3.map(f => f.ms).sort((a, b) => a - b);
   const pass = {}; let sum = 0; for (const k in passes.pass) { pass[k] = r1(passes.pass[k]); sum += passes.pass[k]; } pass.rest = r1(passes.ms - sum);
-  return { frameMs: r1(ms[ms.length >> 1]), frames: ms.map(r1), fc: fs3[fs3.length - 1].fc, draws: fs3[fs3.length - 1].draws, tris: Math.round(fs3[fs3.length - 1].tris / 1000) + 'k', passMs: r1(passes.ms), pass, calls: passes.calls, sub: passes.sub, mirror: passes.mirror, fullShadowMs: full === null ? null : r1(full), refresh };
+  return { frameMs: r1(ms[ms.length >> 1]), cpuMs: r1(cpuMs), frames: ms.map(r1), fc: fs3[fs3.length - 1].fc, draws: fs3[fs3.length - 1].draws, tris: Math.round(fs3[fs3.length - 1].tris / 1000) + 'k', passMs: r1(passes.ms), pass, calls: passes.calls, sub: passes.sub, mirror: passes.mirror, fullShadowMs: full === null ? null : r1(full), refresh };
 };
 const shotPath = (name) => `/home/dev/vr/test/shots/ultralite_${name}_${TAG}.png`;
 const shot = async (name) => {
@@ -236,13 +252,13 @@ for (const sc of SCENES) {
   const PAIR = MODE === 'full';
   for (const p of presets) {
     if (!have.includes(p)) { console.log(`  ${TAG}: no preset ${p} in this build`); continue; }
-    await setPreset(p);
+    const rdUsed = await setPreset(p);
     const first = p === presets[0] || !PAIR;
     const feet = await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
     if (PAIR && first) { const held = await holdFar(true); await settle(400); console.log(`  ${sc}: settled ${place.ok}, the far ring's ${held} queued jobs held for the pair`); }
     const m = await measure(p === 'ultraLite');
-    res.scenes[sc][p] = m;
-    console.log(`  ${sc} ${p} (feet ${typeof feet === 'number' ? feet.toFixed(1) : feet}): ${JSON.stringify(m)}`);
+    m.rd = rdUsed; res.scenes[sc][p] = m;
+    console.log(`  ${sc} ${p} (feet ${typeof feet === 'number' ? feet.toFixed(1) : feet}, render distance ${rdUsed}): ${JSON.stringify(m)}`);
     check(await shot(`${sc}_${p}`), `${TAG} ${p} ${sc}: the picture is written`);
   }
   if (MODE === 'full' && res.scenes[sc].ultra && res.scenes[sc].ultraLite) {
