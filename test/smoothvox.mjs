@@ -206,10 +206,11 @@ try {
   });
   await settle(P, 200); await place(P, DESIGN, 120); await step(P, 6);
   res.designed.after = await shot(P, 'smoothvox_designed_after');
-  const dk = (st, auto) => Object.keys(st.keys).filter(k => /vm_armchair_cream/.test(k) && (k.indexOf('auto:') === 0) === auto).reduce((a, k) => a + st.keys[k], 0);
-  console.log(`    the armchair: hand-built ${dk(res.designed.before, false)} → ${dk(res.designed.after, false)}, from its design ${dk(res.designed.before, true)} → ${dk(res.designed.after, true)}`);
-  // (every armchair of the kind in the frame: the showroom's and the villa's further off)
-  check(dk(res.designed.before, false) >= 1 && dk(res.designed.after, false) === 0 && dk(res.designed.after, true) === dk(res.designed.before, false), `the designed armchair: its design drawn from surface nets (${dk(res.designed.after, true)}), the old hand-built shape gone (${dk(res.designed.after, false)})`);
+  // (the hand-built armchairs share one slot of all their colours — props.js furnKey: 'armchair'; the design's has its own)
+  const handKey = await P.ev(() => VR.Props.furnKey(VR.Props.FURN0 + VR.PROP_FURN.indexOf('vm_armchair_cream'), 0));
+  const hk = (st) => st.keys[handKey] | 0, ak = (st) => Object.keys(st.keys).filter(k => k.indexOf('auto:vm_armchair_cream') === 0).reduce((a, k) => a + st.keys[k], 0);
+  console.log(`    the armchairs (slot '${handKey}'): hand-built ${hk(res.designed.before)} → ${hk(res.designed.after)}, from the cream one's design ${ak(res.designed.before)} → ${ak(res.designed.after)}`);
+  check(hk(res.designed.before) >= 1 && ak(res.designed.before) === 0 && ak(res.designed.after) >= 1 && hk(res.designed.before) - hk(res.designed.after) === ak(res.designed.after), `the designed armchair: its design drawn from surface nets (${ak(res.designed.after)}), the old hand-built shape gone (the hand-built armchairs ${hk(res.designed.before)} → ${hk(res.designed.after)})`);
   await P.ev(() => VR.game.reloadCustom({ v: 1, houses: {}, models: {} })); await settle(P, 200);
   await place(P, PLACES[0]); await step(P, 4); res.cost.after = await P.page.evaluate(measure, N); console.log('  cost after · dining ' + JSON.stringify(res.cost.after));
   res.stats = await P.ev(() => { const M = VR.SmoothVox.main; return Object.assign({ ready: M.asked.size, cacheMain: Object.keys(VR.Props.AUTO).length }, M.stats); });
