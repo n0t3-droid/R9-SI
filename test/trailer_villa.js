@@ -173,7 +173,10 @@ let lawn = 0, hedge = 0; for (let v = 0; v < D; v++) for (let u = 0; u < W; u++)
 const parts0 = (name) => { let n = 0; for (const s of A.rec.values()) if (nameOf(s) === name && propOf(s, 'part') === 0) n++; return n; };
 check(lawn >= 120 && hedge >= 50, 'lawn (' + lawn + ' cells) and hedges (' + hedge + ' cells)');
 check(parts0('vm_bush_blossom') >= 2 && parts0('vm_tree_round_s') >= 1, 'round bushes (' + parts0('vm_bush_blossom') + ') and round trees (' + parts0('vm_tree_round_s') + ')');
-let palms = 0; for (const [k, s] of A.rec) if (nameOf(s) === 'vm_palm_crown' && propOf(s, 'part') === 0) { const [x, y, z] = k.split(',').map(Number); if (nameOf(A.rec.get((x + 3) + ',' + (y - 1) + ',' + (z + 3))) === 'vx_palm_trunk') palms++; }
+// the trunk stands under the crown's middle (since t-city2 the crown is laid by its corner, centred on the trunk): part 0
+// lies (−min dx, −min dz) from the crown's grid corner, the middle 3 on from that corner
+const PFP = VM.footprint(VM.MODELS.vm_palm_crown, 0), PDX = 3 + Math.min(...PFP.map(c => c[0])), PDZ = 3 + Math.min(...PFP.map(c => c[2]));
+let palms = 0; for (const [k, s] of A.rec) if (nameOf(s) === 'vm_palm_crown' && propOf(s, 'part') === 0) { const [x, y, z] = k.split(',').map(Number); if (nameOf(A.rec.get((x + PDX) + ',' + (y - 1) + ',' + (z + PDZ))) === 'vx_palm_trunk') palms++; }
 check(palms >= 4, 'palms: the shared crown (vm_palm_crown) on a ringed trunk (' + palms + ')');
 let planters = 0; for (const s of A.rec.values()) if (nameOf(s) === 'vx_tech_planter') planters++;
 check(planters >= 6, 'planters (' + planters + ')');
@@ -211,7 +214,7 @@ let mound = 0, moundTop = 0, cliff = 0; for (let v = G.v1 + 1; v < D; v++) for (
 // (green hills: a mound's body is moss, grass only on tops whose sides are all covered — run 2 showed brown cliffs, run 3
 // the dirt sides of the grass on the steps' edges)
 check(cliff === 0, 'the mounds are green all over: no dirt and no grass block\'s dirt side in their faces (' + cliff + ')');
-let backPalms = 0; for (const [k, s] of A.rec) if (nameOf(s) === 'vm_palm_crown' && propOf(s, 'part') === 0) { const [x, y, z] = k.split(',').map(Number); if (z + 3 > G.v1 + 1 && nameOf(A.rec.get((x + 3) + ',' + (y - 1) + ',' + (z + 3))) === 'vx_palm_trunk') backPalms++; }
+let backPalms = 0; for (const [k, s] of A.rec) if (nameOf(s) === 'vm_palm_crown' && propOf(s, 'part') === 0) { const [x, y, z] = k.split(',').map(Number); if (z + PDZ > G.v1 + 1 && nameOf(A.rec.get((x + PDX) + ',' + (y - 1) + ',' + (z + PDZ))) === 'vx_palm_trunk') backPalms++; }
 const backPath = (() => { const door = [NOVA.ENTRY, G.v1 + 1]; const sn = new Set([door.join()]), st = [door]; let far = 0; while (st.length) { const [u, v] = st.pop(); far = Math.max(far, v - G.v1); for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = u + du, b = v + dv, k = a + ',' + b; if (b > G.v1 && b < D && a >= 0 && a < W && !sn.has(k) && pathAt(a, b)) { sn.add(k); st.push([a, b]); } } } return far; })();
 check(backRows >= 10 && mound >= 30 && moundTop >= 2 && backPalms >= 3 && backPath >= 6, 'the back garden: ' + backRows + ' rows behind the glass wall, green mounds (' + mound + ' cells, ' + moundTop + ' high), ' + backPalms + ' palms, the path from the garden door ' + backPath + ' rows back');
 
