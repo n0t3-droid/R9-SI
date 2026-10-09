@@ -110,7 +110,8 @@
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
-      // F1: the sky table (Very Low; rebuilt by updateAtmo) and the exposure (1×1, ping-pong; float targets when the device has them)
+      // F1: the sky table (the haze on every tier, the sky pass on Very Low; rebuilt by updateAtmo) and the exposure (1×1,
+      // ping-pong; float targets when the device has them)
       this.atmoTex = GL.tex2D(64, 32, gl.RGBA16F, gl.RGBA, gl.FLOAT, { data: new Float32Array(64 * 32 * 4), filter: gl.LINEAR, wrap: gl.CLAMP_TO_EDGE });
       this.atmoKey = null;
       this.expTex = [0, 1].map(() => GL.tex2D(1, 1, gl.RGBA16F, gl.RGBA, gl.FLOAT, { data: new Float32Array([1, 1, 1, 1]), filter: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE }));
