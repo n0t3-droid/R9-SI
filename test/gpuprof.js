@@ -80,6 +80,17 @@ console.log('c · results: read back, smoothed, summed');
   check(prof.peaks().startsWith('opaque 16.0'), 'peaks() lists the worst first', prof.peaks());
 }
 
+console.log('c2 · a switch restarts the total with the passes');
+{
+  const gl = fakeGL(); const prof = new GP(gl);
+  frame(prof, gl, PASSES, [5], false); frame(prof, gl, PASSES, [5], false); frame(prof, gl, PASSES, [5], false);   // off: one query a frame
+  check(Math.abs(prof.total - 5) < 1e-9, 'off: 5 ms frames', prof.total);
+  frame(prof, gl, PASSES, [4, 4, 4, 4, 4], true);   // detail on: the total forgets the old level
+  frame(prof, gl, PASSES, [4, 4, 4, 4, 4], true);
+  const sum = Object.values(prof.times).reduce((a, b) => a + b, 0);
+  check(prof.total !== undefined && Math.abs(prof.total - 20) < 1e-9 && Math.abs(sum - prof.total) < 1e-9, 'on: the total equals the sum of the passes from the first detail frame (20 ms)', prof.total + ' vs ' + sum);
+}
+
 console.log('d · never stall');
 {
   const gl = fakeGL({ lag: 100 }); const prof = new GP(gl);   // results never arrive within the test

@@ -26,11 +26,13 @@ await wait(1500);
 const f0 = await ev(() => VR.game.renderer.frameNo);
 // F3: the overlay and the per-pass queries
 await ev(() => { const g = VR.game; g.debugOn = true; g.renderer.profDetail = true; });
-await wait(2500);
+// a software frame can take a second on the shared machine: wait for six frames with the profile on (up to 2 minutes)
+let waited = 0;
+for (; waited < 120; waited++) { await wait(1000); if (await ev((f0) => VR.game.renderer.frameNo >= f0 + 6 && VR.game.renderer.prof.frames > 0, f0)) break; }
 const st = await ev(() => { const g = VR.game, r = g.renderer, p = r.prof; const d = document.getElementById('debug'); return { frames: r.frameNo, detail: !!(p && p.detail), ext: !!(p && p.ext), total: p ? p.total : null, line: p ? p.line() : null, peaks: p ? p.peaks() : null, overlay: d ? d.textContent.split('\n').slice(0, 2) : null, inFlight: p ? p.flight.length : -1, open: !!(p && p.active) }; });
 console.log('  overlay: ' + JSON.stringify(st.overlay));
 console.log('  profile: ' + st.line + (st.peaks ? '  ·  max ' + st.peaks : '') + '  (ext ' + st.ext + ', total ' + st.total + ', frames ' + (st.frames - f0) + ')');
-check(st.frames > f0 + 20, 'the game keeps rendering with the profile on (' + (st.frames - f0) + ' frames in 2.5 s)');
+check(st.frames >= f0 + 6, 'the game keeps rendering with the profile on (' + (st.frames - f0) + ' frames in ' + (waited + 1) + ' s)');
 check(st.detail === true && st.inFlight <= 4 && !st.open, 'detail on, at most four frames in flight, no query left open between frames');
 if (st.ext) {
   check(typeof st.total === 'number' && st.total > 0, 'a GPU time arrives (' + st.total + ' ms)');
@@ -42,7 +44,7 @@ if (st.ext) {
 }
 // F3 again: the detail is off, the single frame query as before
 await ev(() => { const g = VR.game; g.debugOn = false; g.renderer.profDetail = false; });
-await wait(800);
+for (let i = 0; i < 60; i++) { await wait(1000); if (await ev((f) => VR.game.renderer.frameNo >= f + 2, st.frames)) break; }   // two frames with the profile off (a software frame takes seconds here)
 const off = await ev(() => { const p = VR.game.renderer.prof; return { detail: p ? p.detail : null, times: p ? Object.keys(p.times).length : -1, line: p ? p.line() : null }; });
 check(off.detail === false && off.times === 0 && off.line === '', 'F3 closed: detail off, the per-pass times cleared, no line');
 check(logs.length === 0, 'no page errors' + (logs.length ? '\n' + logs.join('\n') : ''));

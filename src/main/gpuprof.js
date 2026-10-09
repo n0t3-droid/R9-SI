@@ -36,7 +36,7 @@
       if (!this.ext) return;
       this.collect();
       detail = !!detail;
-      if (detail !== this.detail) { this.times = {}; this.peak = {}; this.peakN = 0; }
+      if (detail !== this.detail) { this.times = {}; this.peak = {}; this.peakN = 0; this.total = undefined; }   // the total restarts with the passes, so the line adds up from the first frame
       this.detail = detail;
       this.cur = null;
       if (this.flight.length >= IN_FLIGHT) return;   // never stall on results
