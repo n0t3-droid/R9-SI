@@ -293,6 +293,31 @@ section('cost', () => {
   console.log(`    ${at[2]} 3×3 chunks: vgen 8 ${m8.toFixed(0)} ms CPU, ${r8[0].solid} blocks, ${r8[0].emit} glowing · vgen 9 ${m9.toFixed(0)} ms, ${r9[0].solid} blocks, ${r9[0].emit} glowing (runs: ${r8.map(r => r.ms.toFixed(0)).join(' ')} · ${r9.map(r => r.ms.toFixed(0)).join(' ')})`);
   check(m9 <= m8 * 1.15 + 15, `the prism patch generates no slower at vgen 9 (${m9.toFixed(0)} ms vs ${m8.toFixed(0)} ms CPU, the least of six runs)`);
   check(r9[0].emit < r8[0].emit, `fewer glowing blocks to light at vgen 9 (${r9[0].emit} < ${r8[0].emit})`);
+  // what the renderer draws (Very Low's look: classic, no smooth plants, no voxel detail): the vertices of the patch's
+  // sections — rock pinnacles of plain cubes for crystal blocks and cutout clusters
+  const PAD = V.MESH_PAD || 1, PS = V.MESH_PS || 18, PSS = PS * PS;
+  const verts = (vgen) => {
+    const g = gen(seed, vgen), cache = new Map(), col = (cx, cz) => { const k = cx + ',' + cz; let c = cache.get(k); if (!c) { c = g.generate(cx, cz); c.light = V.computeColumnLight(c.blocks, true); cache.set(k, c); } return c; };
+    let n = 0;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const CX = (at[0] >> 4) + dx, CZ = (at[1] >> 4) + dz;
+      for (let sy = 0; sy < 16; sy++) {
+        const blocks = new Uint16Array(PSS * PS), light = new Uint16Array(PSS * PS), gr = new Uint16Array(PSS), fo = new Uint16Array(PSS), wa = new Uint16Array(PSS);
+        for (let y = -PAD; y < 16 + PAD; y++) for (let z = -PAD; z < 16 + PAD; z++) for (let x = -PAD; x < 16 + PAD; x++) {
+          const wy = sy * 16 + y, c = col(CX + Math.floor(x / 16), CZ + Math.floor(z / 16)), lx = ((x % 16) + 16) % 16, lz = ((z % 16) + 16) % 16, pi = (y + PAD) * PSS + (z + PAD) * PS + (x + PAD);
+          if (y === 0) { const q = (z + PAD) * PS + x + PAD; gr[q] = c.tints.grass[lz * 16 + lx]; fo[q] = c.tints.foliage[lz * 16 + lx]; wa[q] = c.tints.water[lz * 16 + lx]; }
+          if (wy < 0 || wy > 255) { light[pi] = wy > 255 ? 0xf000 : 0; continue; }
+          const i = (wy << 8) | (lz << 4) | lx; blocks[pi] = c.blocks[i]; light[pi] = c.light[i];
+        }
+        const r = V.meshSection({ blocks, light, grass: gr, foliage: fo, water: wa, sy, ox: CX * 16, oz: CZ * 16, smooth: false, fancyLeaves: false, vxLod: false });
+        for (const k of ['opaque', 'cutout', 'trans', 'vx']) if (r[k]) n += r[k].length / 8;
+      }
+    }
+    return n;
+  };
+  V.setLook('classic');
+  const v8 = verts(8), v9 = verts(9);
+  check(v9 <= v8, `Very Low draws less there at vgen 9: ${v9} vertices for ${v8} at vgen 8 (${(v9 / v8).toFixed(2)}×, the classic look)`);
 });
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
