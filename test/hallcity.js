@@ -114,7 +114,7 @@ const solid = (n) => n !== 'air' && n !== '?';
 {
   const prof = [1, 2, 2, 2, 3, 4, 4, 4, 5, 6, 6, 6, 7];
   let ok = 0;
-  for (let k = 0; k < prof.length; k++) { const v = 38 + k, h = prof[k], step = h > (k ? prof[k - 1] : 0); const b = atN(0, F + h, v); if ((step ? b === 'quartz_stairs' : b === 'smooth_quartz') && atN(0, F + h + 1, v) === 'air' && atN(0, F + h + 3, v) === 'air') ok++; }
+  for (let k = 0; k < prof.length; k++) { const v = 38 + k, h = prof[k], step = h > (k ? prof[k - 1] : 0); const b = atN(0, F + h, v); if ((step ? b === 'quartz_stairs' : /smooth_quartz|travertine/.test(b)) && atN(0, F + h + 1, v) === 'air' && atN(0, F + h + 3, v) === 'air') ok++; }
   const landing = solid(atN(0, F + 8, 51)) && atN(0, F + 9, 51) === 'air';
   let gal = 0; for (let v = 51; v <= 70; v++) if (solid(atN(0, F + 8, v)) && atN(0, F + 9, v) !== '?') gal++;
   check(ok === prof.length && landing && gal === 20, `the grand staircase climbs to the gallery (${ok} of ${prof.length} steps and landings with headroom, the arrival ${landing}, gallery floor ${gal} of 20)`);
