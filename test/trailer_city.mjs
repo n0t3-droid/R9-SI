@@ -57,7 +57,7 @@ async function runPage(tag, dist) {
   const wait = (ms) => page.waitForTimeout(ms);
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 16) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
-  const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game; let dirty = 0; for (const c of g.world.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: g.world.pending.size, dirty }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && i > 2) break; await wait(60); } };
+  const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0 }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && i > 2) break; await wait(60); } };
   const shotPath = (name) => `/home/claude/vr/test/shots/trailer_city_${name}_${tag}.png`;
   // the detailed pieces (VX: the palms' crowns, the furniture, the facades' pieces) are uploaded a few sections per drawn
   // frame (renderer.vxResidency); the settling steps draw nothing, so before a picture every section within the detail
@@ -77,6 +77,8 @@ async function runPage(tag, dist) {
   // (the villagers within 12 blocks of the camera are left out of the picture: at dusk they gather on the plaza round the
   //  player and wave into the lens — run 1's F2 and F4)
   const shot = async (name, frames = 4) => { const vx = await warmVx(); await ev((frames) => { window.__norender = false; const g = VR.game, V = g.villages, p = g.player; const keep = V && V.agents ? V.agents : null; if (keep) V.agents = keep.filter(a => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) > 12); for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); if (keep) V.agents = keep; window.__norender = true; }, frames); await page.screenshot({ path: shotPath(name), timeout: 180000 }); const ok = fs.existsSync(shotPath(name)); console.log('shot', name, tag, ok ? '' : '(missing)', 'vx warm rounds', vx); return ok; };
+  // (settled: no job, no column waiting, no section to mesh, no upload waiting in the streaming queue and no column still
+  //  fading in — run 2's first pictures caught the columns mid-fade with ring 1's forms still standing in for them)
   // the top of the ground under (x, z): the highest opaque block below y 140 that is not leaves
   const groundY = (x, z) => ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = 140; y > 40; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return 80; }, [x, z]);
   const place = async (x, z, eye, yaw, pitch, fov, tod) => {
