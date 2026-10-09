@@ -442,6 +442,45 @@ require('../src/main/horizon.js'); require('../src/main/farring.js');
   check(R.live.length === fjobs.length, 'and go up', R.live.length + ' forms');
 }
 
+console.log('4c · the block look\'s textures through the same queue');
+{
+  let texId = 0; const calls = [];
+  const gl = Object.assign({}, GLX, { TEXTURE_2D_ARRAY: 0x8c1a, RGBA8: 0x8058, SRGB8_ALPHA8: 0x8c43, RGBA: 0x1908, NEAREST_MIPMAP_LINEAR: 0x2702, NEAREST: 0x2600, REPEAT: 0x2901, TEXTURE_MIN_FILTER: 0x2801, TEXTURE_MAG_FILTER: 0x2800, TEXTURE_WRAP_S: 0x2802, TEXTURE_WRAP_T: 0x2803,
+    createTexture: () => ({ tex: ++texId }), deleteTexture: (t) => calls.push('del ' + t.tex), bindTexture() {}, texParameteri() {}, texParameterf() {},
+    texStorage3D: (t, levels, fmt, w, h, d) => calls.push('storage ' + levels + ' ' + w + ' ' + d),
+    texSubImage3D: (t, lv, x, y, z, w, h, d, f, ty, data, off) => { frameBytes += w * h * d * 4; if (off !== z * w * h * 4 || data.length < off + w * h * d * 4) calls.push('BAD ' + lv + ' ' + z); } });
+  const r = mkRenderer(); r.gl = gl; r.texAlbedo = { tex: 'oldA' }; r.texMaterial = { tex: 'oldM' }; r.layers = 100;
+  const sch = new S.UploadScheduler({ msPerByte: 1e-6 });
+  const levels = (n) => { const out = []; for (let l = 0; l < 6; l++) out.push(new Uint8Array(((32 >> l) ** 2) * 4 * n)); return out; };
+  const tex = { type: 'textures', size: 32, levels: 6, layers: 100, albedo: levels(100), material: levels(100) };
+  check(typeof r.queueTextures === 'function', 'renderer.queueTextures exists');
+  let done = 0;
+  r.queueTextures(tex, sch, () => done++);
+  sch.push(parted(30000, { dx: 5, dz: 5 }));   // a section waiting nearby: the textures come first
+  let worst = 0, f = 0, oldUntil = 0;
+  while (sch.size && f < 40) { frameBytes = 0; sch.drain(0.1); worst = Math.max(worst, frameBytes); f++; if (r.texAlbedo.tex === 'oldA') oldUntil = f; }
+  const total = 2 * 100 * 4 * (1024 + 256 + 64 + 16 + 4 + 1);
+  check(worst <= 100000 && done === 1 && f >= 10, 'a look\'s textures (' + (total / 1024).toFixed(0) + ' KB) go up within the frame\'s 100 KB', f + ' frames, worst ' + worst + ' bytes');
+  check(oldUntil >= f - 1 && r.texAlbedo.tex !== 'oldA' && r.texMaterial.tex !== 'oldM' && calls.includes('del oldA') && calls.includes('del oldM'), 'the old look draws until the new arrays are complete, then they are swapped in and the old ones deleted');
+  check(!calls.some(c => c.startsWith('BAD')) && calls.filter(c => c.startsWith('storage 6 32 100')).length === 2, 'every slice lands at its layers (srcOffset), full mip chains in new arrays', calls.filter(c => c.startsWith('BAD')).slice(0, 3).join(' '));
+  // a newer set aborts the one in progress (its new arrays deleted); the newer one goes in
+  const r2 = mkRenderer(); r2.gl = gl; r2.texAlbedo = { tex: 'A0' }; r2.texMaterial = { tex: 'M0' }; r2.layers = 100;
+  const s2 = new S.UploadScheduler({ msPerByte: 1e-6 });
+  let d1 = 0, d2 = 0;
+  r2.queueTextures(tex, s2, () => d1++); s2.drain(0.1);
+  const id1 = texId;
+  r2.queueTextures(tex, s2, () => d2++);
+  let k = 0; while (s2.size && k < 40) { s2.drain(0.1); k++; }
+  check(d1 === 0 && d2 === 1 && calls.includes('del ' + id1) && calls.includes('del ' + (id1 - 1)) && r2.texAlbedo.tex > id1, 'a newer set aborts the one in progress: its arrays deleted, the newer one swapped in');
+  // the world goes away (clear) before the set is complete: it is applied at once, so the look is never lost
+  const r3 = mkRenderer(); r3.gl = gl; r3.texAlbedo = { tex: 'A3' }; r3.texMaterial = { tex: 'M3' }; r3.layers = 100;
+  const s3 = new S.UploadScheduler({ msPerByte: 1e-6 });
+  let d3 = 0;
+  r3.queueTextures(tex, s3, () => d3++); s3.drain(0.1);
+  s3.clear();
+  check(d3 === 1 && r3.texAlbedo.tex !== 'A3', 'a set dropped with its world is finished at once (the new look is never lost)');
+}
+
 console.log('5 · cost: the drain against v042\'s');
 // v042's scheduler, verbatim (src/shared/stream.js at a00fd82): the reference for the cost
 class OldScheduler {
@@ -476,7 +515,8 @@ class OldScheduler {
 (async () => {
   const { PerformanceObserver } = require('perf_hooks');
   let gcs = 0;
-  const obs = new PerformanceObserver((list) => { gcs += list.getEntries().length; });
+  // (minor collections only — scavenges are what allocation causes; V8's memory reducer may run a major one any time)
+  const obs = new PerformanceObserver((list) => { for (const e of list.getEntries()) if ((e.detail ? e.detail.kind : e.kind) === 1) gcs++; });
   obs.observe({ entryTypes: ['gc'] });
   const tick = () => new Promise((res) => setImmediate(res));
   const cpuMs = (f, n) => { let best = 1e9; for (let r = 0; r < 5; r++) { const c0 = process.cpuUsage(); for (let i = 0; i < n; i++) f(i); const c1 = process.cpuUsage(c0); best = Math.min(best, (c1.user + c1.system) / 1000 / n); } return best; };
@@ -508,7 +548,7 @@ class OldScheduler {
   await tick(); await tick();
   const gOld = gcs;
   obs.disconnect();
-  check(gNew === 0 && gOld > 0, 'no allocation per frame: 20 000 waiting frames without a garbage collection (v042: ' + gOld + ')', gNew + ' collections');
+  check(gNew === 0 && gOld > 0, 'no allocation per frame: 20 000 waiting frames without a scavenge (v042: ' + gOld + ')', gNew + ' scavenges');
   console.log(fails ? 'FAILED ' + fails : 'ALL OK');
   process.exit(fails ? 1 : 0);
 })();

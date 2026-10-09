@@ -62,7 +62,8 @@
   //                   priority (the horizon's: coarse and near first). While both lanes wait the far lane gets FAR_SHARE
   //                   of the bytes; each lane takes what the other leaves. The queue sorts in place (insertion sort: the
   //                   last frame's order is nearly right), so a turn of the camera re-sorts at once.
-  //   items           { bytes, x, z (or dx, dz, set by the caller each frame), lane (0 near, 1 far), prio (far lane),
+  //   items           { bytes, x, z (or dx, dz, set by the caller each frame), lane (0 near, 1 far), prio (far lane; a near item
+  //                     with its own: before every column),
   //                     urgent, alive() (false: dropped, abort() called), and either run() (atomic: all at once — the
   //                     first one that does not fit stops its lane, nothing overtakes it; one bigger than the whole
   //                     budget goes alone after waiting four frames, reported as forced) or step(maxBytes) → bytes
@@ -203,6 +204,7 @@
         else {
           const dx = r.dx, dz = r.dz, d = Math.sqrt(dx * dx + dz * dz);
           if (r.lane === 1) p = r.prio === r.prio ? r.prio : d / 1024;
+          else if (r.prio === r.prio) p = r.prio;   // (a near item with its own priority: the look's textures, -1, ahead of every column)
           else if (d < S.NEAR_BLOCKS || !view) p = d;
           else {   // = viewTier, inlined (the distance once): in the view, beside, behind
             const c = (dx * ux + dz * uz) / d, m = 12 / d;

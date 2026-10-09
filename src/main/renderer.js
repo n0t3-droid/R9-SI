@@ -122,6 +122,7 @@
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.FLOAT, table);
     }
     setAniso(level) {
+      this.anisoLevel = level;   // (F10: a texture set swapped in later gets the same)
       const gl = this.gl, ext = GL.ext.aniso;
       if (!ext) return;
       const mx = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
@@ -499,6 +500,53 @@
       if (R.n >= 4 || (bytes <= 0 && (R.quiet > 120 || (++R.k & 3)))) return;
       const i = (R.h + R.n) & 3;
       R.s[i] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); R.t[i] = now; R.b[i] = bytes; R.n++;
+    }
+    // ---- F10 · the block look's textures (game.js reloadTextures: Klassisch ↔ Nahtlos, ~20 MB) through the upload queue:
+    // new arrays are filled a slice of layers at a time (each mip level of each array) within the frame's bytes, ahead of
+    // the sections, and swapped in once complete — the old look draws until then, no block half in one look and half in
+    // the other. A newer set aborts this one (its arrays deleted); dropped for any other reason (its world went away) it
+    // is finished at once, so the look is never lost.
+    queueTextures(tex, Q, done) {
+      const gl = this.gl, R = this, tok = this.texTok = (this.texTok || 0) + 1, L = tex.layers, N = tex.size, lvls = [tex.albedo, tex.material];
+      let made = null, a = 0, lv = 0, z = 0, bytes = 0;
+      for (let l = 0; l < tex.levels; l++) bytes += 2 * (N >> l) * (N >> l) * 4 * L;
+      const step = (max) => {
+        if (!made) made = [R.texArray(tex, true), R.texArray(tex, false)];
+        let wrote = 0;
+        while (a < 2) {
+          const n = N >> lv, per = n * n * 4;
+          let k = Math.min(L - z, Math.floor((max - wrote) / per));
+          if (k <= 0) { if (wrote || max < per * 0.25) break; k = 1; }   // (one layer at least: never stuck behind a small budget)
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, made[a]);
+          gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, lv, 0, 0, z, n, n, k, gl.RGBA, gl.UNSIGNED_BYTE, lvls[a][lv], z * per);
+          z += k; wrote += k * per;
+          if (z >= L) { z = 0; lv++; if (lv >= tex.levels) { lv = 0; a++; } }
+        }
+        return wrote;
+      };
+      const commit = () => {
+        const old = [R.texAlbedo, R.texMaterial];
+        R.texAlbedo = made[0]; R.texMaterial = made[1]; made = null;
+        gl.deleteTexture(old[0]); gl.deleteTexture(old[1]);
+        if (VR.GL.ext && VR.GL.ext.aniso) R.setAniso(R.anisoLevel || 4);
+        if (done) done();
+      };
+      Q.push({ prio: -1, x: 0, z: 0, bytes, alive: () => R.texTok === tok, step, commit,
+        abort: () => {
+          if (R.texTok === tok) { while (a < 2) step(Infinity); commit(); return; }   // (not replaced: finished at once)
+          if (made) { gl.deleteTexture(made[0]); gl.deleteTexture(made[1]); made = null; }
+        } });
+    }
+    // an empty texture array for a texture set, with the block textures' sampling (as init's)
+    texArray(tex, srgb) {
+      const gl = this.gl, t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, tex.levels, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, tex.size, tex.size, tex.layers);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      return t;
     }
     // ---- F10 · a section's mini-voxel detail through the upload queue (vxResidency asks once per section): packets
     // within the frame's bytes, in place once complete; dropped data (the player went away, a new mesh) aborts it

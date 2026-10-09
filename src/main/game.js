@@ -162,10 +162,18 @@
       const upload = (tex, fromCache) => {
         const r = this.renderer, gl = r && r.gl;
         if (req !== this.texReq || tex.type !== 'textures' || !gl || !r.texAlbedo || tex.layers !== r.layers) return;
+        // F10: ~20 MB in one frame was a hitch on a GPU that shares the system memory: the set goes through the world's
+        // upload queue into new arrays, swapped in when complete (renderer.queueTextures); without a world, at once as before
+        const Q = this.world && this.world.uploadQ;
+        if (r.queueTextures && Q && Q.drain) { r.queueTextures(tex, Q, () => applied(tex, fromCache)); return; }
         for (const [t, lv] of [[r.texAlbedo, tex.albedo], [r.texMaterial, tex.material]]) {
           gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
+        applied(tex, fromCache);
+      };
+      // the textures are on the GPU: the icons, the recolour table and the bookkeeping follow
+      const applied = (tex, fromCache) => {
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
         if (VR.LiveLoop) VR.LiveLoop.updateLum(this);   // the recolour table follows the textures of the look
         this.texFromCache = fromCache; this.texMs = Math.round(performance.now() - t0);
