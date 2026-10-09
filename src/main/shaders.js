@@ -19,6 +19,7 @@ uniform vec3 u_skyHorizon;
 uniform vec3 u_skyMid;       // t-sky: the sky's middle stop (env.js VR.Sky): the blue between the horizon's white-cyan and space
 uniform vec4 u_skyStops;     // t-sky: x 1/h1 (the horizon gives way to the middle by dir.y h1); y h2a, z 1/(h2b - h2a) (the middle to the zenith from h2a to h2b); w the sun's halo — reciprocals from renderer.js, no division per pixel
 uniform vec4 u_skySpace;     // t-sky: space (stars, nebula) shows through the day sky from dir.y x (none) over 1/y (all), z of it at the top; w: the nebula's brightness by day
+uniform vec4 u_skyDay;       // t-sky2 (env.js VR.Sky): x, y the white-cyan haze band over the horizon — its strength and tightness (the band is (1 − y·dir.y)^16); z the day palette's weight (1 by day, 0 at dusk and night: the space by day and the nebula's day look follow it)
 // t-sky: smoothstep from an edge and the reciprocal of the width (the renderer passes 1 / width: a multiply, not a division)
 float sstepR(float e0, float rw, float x) { float t = clamp((x - e0) * rw, 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 uniform vec3 u_sunset;
@@ -75,40 +76,70 @@ float fbm3(vec3 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { v += v
 float fbm3L(vec3 p){ return vnoise3(p) * 0.6667 + vnoise3(p * 2.03 + 17.1) * 0.3333; }   // two octaves, the same scale as fbm3 (Very Low)
 
 // ---- cosmic sky: nebula band, ringed gas giant, second planet, meteors ----
-vec3 nebula(vec3 dir) {
+// t-sky2 · the nebula's structure (our own noise and numbers). The gas: the value-noise fbm, in the band a little drawn out
+// along it, off the band swirled by two low fields (the clouds flow instead of lying on a grid). The dust: soft dark
+// clouds as before, and where the gas is dense a ridged term (1 − |2n − 1|) whose crests are thin dark lanes and whose
+// shoulders are lit edges (in a domain drawn out across the band, so the lanes run along it). The hue field adds an
+// orange-gold zone and a cyan zone to the old violet-blue, pink and cyan. dayK (the day palette's weight, u_skyDay.z):
+// by day the veil's clouds cover every view's top off the band, the band breaks into clouds with dark sky between, the
+// lanes and rims are full and the colours a little softer (the frames' day nebula: C* up to ~42); at dusk and at night
+// (dayK 0) t-sky's band and thin wisps, the lanes and rims faint. Noise calls: High 13 (was 16: the dust's four octaves
+// became two, n3 the low hue field); Very Low (LITE) 3 (was 4: two octaves of gas, one of colour, the hue zones from them; no
+// dust as before, no lanes, no swirl).
+vec3 nebula(vec3 dir, float dayK) {
   vec3 G = normalize(vec3(0.32, 0.62, -0.72));
   float b = dot(dir, G);
   float band = exp(-b * b * 7.0);
   vec3 p = dir * 2.6;
 #ifdef LITE
-  float n1 = fbm3L(p + vec3(0.0, u_time * 0.0015, 0.0));
-  float n2 = fbm3L(p * 2.1 + 11.0);
-  float dust = 0.0;
+  // Very Low: no swirl, the hue zones from the gas itself (three noise calls, one fewer than before)
+  vec3 q = p + G * (b * 0.9);
+  float n1 = fbm3L(q + vec3(0.0, u_time * 0.0015, 0.0));
+  float n2 = vnoise3(q * 2.1 + 11.0);
+  float hz = n1 * 0.7 + n2 * 0.3;
 #else
-  float n1 = fbm3(p + vec3(0.0, u_time * 0.0015, 0.0));
-  float n2 = fbm3(p * 2.1 + 11.0);
-  float dust = smoothstep(0.42, 0.78, fbm3(p * 3.7 - 3.0));
+  float hz = vnoise3(p * 0.55 + 31.0);
+  float wz = fbm3L(p * 0.9 + 7.0);
+  // the gas's domain: in the band as before (a little drawn out along it); off the band swirled by two low fields, so the
+  // veil's clouds flow instead of lying on a grid
+  vec3 q = p + (vec3(0.9, -0.5, 0.7) * (hz - 0.5) * 1.2 + vec3(-0.6, 0.3, 0.9) * (wz - 0.5) * 1.6) * (1.0 - band) + G * (b * 0.9);
+  float n1 = fbm3(q + vec3(0.0, u_time * 0.0015, 0.0));
+  float n2 = fbm3(q * 2.1 + 11.0);
+  float nd = fbm3L(q * 1.85 - 1.5 + G * (b * 4.8));   // the dust's domain: drawn out across the band, so its lanes run along it
+#endif
+  // the dust: soft dark clouds (as before), and where the gas is dense thin dark lanes — the ridged term's crests — with
+  // lit edges beside them
+#ifdef LITE
+  float soft = 0.0, lane = 0.0, rim = 0.0;   // (Very Low: no dust, as before; one octave's crests would be drawn curves)
+#else
+  float soft = smoothstep(0.42, 0.78, nd);
+  float ridge = 1.0 - abs(2.0 * nd - 1.0);
+  float dense = smoothstep(0.5, 0.7, n1);
+  float lane = smoothstep(0.92, 0.99, ridge) * dense;
+  float rim = smoothstep(0.74, 0.92, ridge) * (1.0 - smoothstep(0.92, 0.99, ridge)) * dense;
 #endif
   vec3 col = mix(vec3(0.22, 0.06, 0.46), vec3(0.10, 0.36, 1.0), smoothstep(0.3, 0.7, n1));
   col = mix(col, vec3(1.0, 0.30, 0.68), smoothstep(0.48, 0.78, n2) * 0.9);
-  // cyan gas lobes and bright pink cores, as in the trailer
-#ifdef LITE
-  float n3 = n1 * 0.6 + n2 * 0.4;
-#else
-  float n3 = fbm3(p * 1.6 - 5.0);
-#endif
-  col = mix(col, vec3(0.15, 0.95, 1.0), smoothstep(0.6, 0.85, n3) * 0.55);
-  col += vec3(1.0, 0.55, 0.85) * smoothstep(0.72, 0.9, n2 * 0.6 + n1 * 0.5) * 0.9;
+  col = mix(col, vec3(1.0, 0.62, 0.3), smoothstep(0.23, 0.15, hz) * (0.35 + 0.4 * dayK));
+  col = mix(col, vec3(0.15, 0.95, 1.0), smoothstep(0.62, 0.8, hz) * 0.55);
+  // bright pink cores, as in the trailer (by day softer: the frames' day nebula is moderately saturated, C* up to ~42)
+  col += vec3(1.0, 0.55, 0.85) * smoothstep(0.72, 0.9, n2 * 0.6 + n1 * 0.5) * (0.9 - 0.4 * dayK);
+  col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))), 0.22 * dayK);
   vec3 coreDir = normalize(vec3(0.62, 0.42, -0.66));
   float cd = max(0.0, dot(dir, coreDir));
-  float core = pow(cd, 60.0) * 2.2 + pow(cd, 12.0) * 0.5;
+  float core = (pow(cd, 60.0) * 2.2 + pow(cd, 12.0) * 0.5) * (1.0 - 0.4 * dayK);   // (by day a smaller glare: the planets stay clear)
   col += vec3(1.0, 0.78, 0.6) * core;
-  float dens = band * (0.35 + 1.35 * n1 * n1) * (1.0 - dust * 0.7) + core * 0.6;
-#ifndef LITE
-  // t-sky: wisps of the veil off the band, high in the sky (the trailer has nebula over every view's top, not one band);
-  // not on Very Low
-  dens += smoothstep(0.55, 0.85, n2) * smoothstep(0.15, 0.7, dir.y) * (1.0 - band) * 0.3;
+  // off the band: at night t-sky's thin wisps; by day (dayK) the veil's clouds over every view's top, sharp-edged so the
+  // dark sky shows between them; by day the band too breaks into clouds (the frames' tops: vivid clouds, dark gaps)
+#ifdef LITE
+  float wisp = 0.0;
+#else
+  float wisp = smoothstep(0.55, 0.85, n2) * smoothstep(0.15, 0.7, dir.y) * 0.3;
 #endif
+  float cloud = smoothstep(0.5, 0.66, n1 * 0.8 + n2 * 0.3) * (0.4 + n1) * smoothstep(0.1, 0.5, dir.y) * 0.8;
+  float clump = mix(1.0, smoothstep(0.44, 0.66, n1 * 0.8 + n2 * 0.3), dayK * 0.9);
+  float dusty = (1.0 - 0.65 * soft) * (1.0 - (0.2 + 0.4 * dayK) * lane) * (1.0 + (0.3 + 0.5 * dayK) * rim);   // (the lanes and rims faint at night: the night keeps its soft look)
+  float dens = band * (0.35 + 1.35 * n1 * n1) * clump * dusty + (1.0 - band) * mix(wisp, cloud * dusty, dayK) + core * 0.6;
   // sparkling star clusters inside the band
   vec3 g = floor(dir * 520.0);
   float s = hash13(g);
@@ -222,7 +253,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
   if (u_dim == 1) return u_fogColor;
   if (u_dim == 2) {
     vec3 c = vec3(0.012, 0.006, 0.03);
-    c += nebula(dir) * 0.8;
+    c += nebula(dir, 0.0) * 0.8;
     return c;
   }
   float h = max(dir.y, 0.0);
@@ -232,7 +263,9 @@ vec3 skyColor(vec3 dir, bool withSun) {
   col = mix(col, u_skyZenith, sstepR(u_skyStops.y, u_skyStops.z, h));
   float dayK = 1.0 - u_night;
   float qh = 1.0 - h, qh2 = qh * qh, qh4 = qh2 * qh2, qh8 = qh4 * qh4;   // (1 - h)^n as squarings: the bands without a pow
-  col = mix(col, u_skyHorizon * vec3(1.16, 1.1, 1.02) + vec3(0.035, 0.04, 0.03) * dayK, qh8 * qh8 * 0.6 * dayK);
+  // the haze band over the horizon (t-sky2: its strength and tightness from VR.Sky.haze, fitted to the frames' haze)
+  float zh = 1.0 - min(1.0, h * u_skyDay.y), zh2 = zh * zh, zh4 = zh2 * zh2, zh8 = zh4 * zh4;
+  col = mix(col, u_skyHorizon * vec3(1.16, 1.1, 1.02) + vec3(0.035, 0.04, 0.03) * dayK, zh8 * zh8 * u_skyDay.x * dayK);
   float toSun = max(dot(dir, u_sunDir), 0.0);
   float horizonBand = qh4 * qh;
   col += u_sunset * (pow(toSun, 7.0) * 1.3 + horizonBand * 0.45) * (0.3 + 0.7 * toSun);
@@ -240,16 +273,19 @@ vec3 skyColor(vec3 dir, bool withSun) {
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   if (withSun) {
     float clear = 1.0 - u_rain;
-    // cosmic layer: the nebula owns the night; by day only a faint veil stays in the blue,
-    // while the ringed giant and its moon keep hanging in the daylight sky
-    float magicDay = u_skyMagic * (1.0 - u_night);
+    // cosmic layer: the nebula owns the night; by day it shows above the blue band, and the ringed giant and its moons
+    // keep hanging in the daylight sky. t-sky2: the 'Kosmischer Himmel am Tag' setting at its default (0.8) shows space
+    // fully by day (the trailer's day: deep navy space with dense stars and the nebula over the top of every view)
+    float magicDay = min(1.0, u_skyMagic * (1.0 + 0.25 * u_skyDay.z)) * (1.0 - u_night);
     float horizonFade = smoothstep(-0.12, 0.08, dir.y);
-    // t-sky: space shows through the day sky by height — none over the clean, bright horizon, most at the navy zenith
-    // (u_skySpace) — and all of it at night; the stars and the nebula follow it
+    // t-sky: space shows through the day sky by height — none over the clean, bright horizon, all of it above the blue
+    // band (u_skySpace: t-sky2 from dir.y 0.18 to 0.42) — and all of it at night; the stars and the nebula follow it
     float cosmic = clamp(u_night + magicDay * sstepR(u_skySpace.x, u_skySpace.y, dir.y) * u_skySpace.z, 0.0, 1.0) * clear * horizonFade;
-    float planetsK = clamp(u_night + magicDay * 0.7, 0.0, 1.0) * clear * horizonFade;
+    float planetsK = clamp(u_night + magicDay * 0.85, 0.0, 1.0) * clear * horizonFade;
     if (planetsK > 0.01) {
-      col += nebula(dir) * cosmic * mix(u_skySpace.w, 0.9, u_night) * u_nebula;   // u_nebula: the grade's knob (t-look); by day u_skySpace.w (t-sky: on the navy top the veil needs no extra push)
+      // the nebula: by day its veil covers the top (1), at night the band carries it (0.3); its brightness by day
+      // u_skySpace.w (t-sky2: fitted to the frames' chroma), at night 0.9; u_nebula: the grade's knob (t-look)
+      col += nebula(dir, u_skyDay.z) * cosmic * mix(u_skySpace.w, 0.9, u_night) * u_nebula;
       vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
       col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)
@@ -289,8 +325,10 @@ vec3 skyColor(vec3 dir, bool withSun) {
       vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
       col = mix(col, cir, st * u_cirrus * 0.12 * (1.0 - u_rain) * (1.0 - u_night * 0.8) * (1.0 - cosmic * 0.8));   // t-sky: no white streaks over the space
     }
-    // stars
-    float starK = max(u_night, cosmic * 0.8);   // t-sky: the stars show through the navy top by day
+    // stars: the bright ones (240 cells a radian) and, t-sky2, a field of small faint ones (400 a radian: the trailer's
+    // dense stars); by day they belong to the space above the blue band (cosmic) and are a little larger, so they read
+    // through the daylight
+    float starK = max(u_night, cosmic);
     if (starK > 0.02 && dir.y > -0.1) {
       vec3 sd3 = dir;
       float ang = u_time * 0.0003;
@@ -305,6 +343,14 @@ vec3 skyColor(vec3 dir, bool withSun) {
         vec3 sc = mix(vec3(0.75, 0.85, 1.0), vec3(1.0, 0.85, 0.7), hash13(g + 3.0));
         float br = smoothstep(0.9955, 1.0, s);
         col += sc * starK * clear * tw * (3.0 + br * 14.0) * exp(-d * d * mix(9.0, 28.0, u_night));   // t-sky: by day a little larger, so they read through the daylight
+      }
+      vec3 sp2 = sd3 * 400.0;
+      vec3 g2 = floor(sp2);
+      float s2 = hash13(g2 + 41.0);
+      if (s2 > 0.993) {
+        vec3 c2 = g2 + 0.5 + (vec3(hash13(g2 + 5.3), hash13(g2 + 6.1), hash13(g2 + 7.7)) - 0.5) * 0.5;
+        float d2 = length(sp2 - c2);
+        col += mix(vec3(0.8, 0.88, 1.0), vec3(1.0, 0.9, 0.8), fract(s2 * 337.0)) * starK * clear * (0.9 + 2.6 * smoothstep(0.993, 1.0, s2)) * exp(-d2 * d2 * mix(5.0, 14.0, u_night));
       }
       if (u_night > 0.5) col += meteors(dir) * u_night * clear;   // t-sky: the meteors' loop only once the night is deep (by day and at dusk it drew nothing or a faint trace)
       if (u_dim == 3) {
