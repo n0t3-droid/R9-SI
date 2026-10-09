@@ -585,7 +585,9 @@
         }
       }
     }
-    // ---- giant crystal spires (exact, from the realm feature generator) on nearer tiles
+    // ---- giant crystal spires (exact, from the realm feature generator) on nearer tiles; a world without crystals
+    // (vgen ≥ 9, VR.GEN.noCry) has rock pinnacles of duskrock there instead: drawn in their stone's colour, not glowing
+    const noCry = !!(VR.GEN && VR.GEN.noCry && VR.GEN.noCry(g));
     if (L <= 2 && VR.RealmFeatures && g.climateAt) {
       let any = false;
       for (let k = 0; k < N * N && !any; k++) { const key = BIOMES[BIO[k]].key; if (key === 'prism_fields' || key === 'crystal_highlands') any = true; }
@@ -593,7 +595,7 @@
         const cols = new Map();
         const rec = {
           ok: () => true, get: () => 0,
-          set(x, y, z, s) { if (!s) return; const t = R.types[R.T.type[s]]; if (!t || t.name.indexOf('crystal_block') < 0) return; const ck = (x >> 1) * 65536 + (z >> 1); let c = cols.get(ck); if (!c) { c = { x: x >> 1, z: z >> 1, y0: y, y1: y, s }; cols.set(ck, c); } else { if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y; } },
+          set(x, y, z, s) { if (!s) return; const t = R.types[R.T.type[s]]; if (!t || (t.name.indexOf('crystal_block') < 0 && !(noCry && (t.name === 'duskrock' || t.name === 'dusk_aether')))) return; const ck = (x >> 1) * 65536 + (z >> 1); let c = cols.get(ck); if (!c) { c = { x: x >> 1, z: z >> 1, y0: y, y1: y, s }; cols.set(ck, c); } else { if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y; } },
           place(x, y, z, s) { this.set(x, y, z, s); return true; },
         };
         const cx0 = Math.floor(x0 / 16), cz0 = Math.floor(z0 / 16), cn = (n * S) >> 4;
@@ -603,16 +605,18 @@
           if (key !== 'prism_fields' && key !== 'crystal_highlands') continue;
           try { VR.RealmFeatures(g, rec, cx, cz, [], true); } catch (e) { /* keep going */ }
         }
+        const kd = noCry ? 0 : 4;
         for (const c of cols.values()) {
+          if (noCry && c.y1 - c.y0 < 3) continue;   // (the rocks round a pinnacle's foot are too small for the horizon)
           const col = scol(c.s, 0x9a6aff);
           const x = c.x * 2 - x0, z = c.z * 2 - z0;
           if (x < -2 || z < -2 || x > n * S + 2 || z > n * S + 2) continue;
           const y0 = c.y0, y1 = c.y1 + 1;
-          quad([x, y1, z], [x, y1, z + 2], [x + 2, y1, z + 2], [x + 2, y1, z], 2, 4, 0, col, 255);
-          quad([x + 2, y1, z + 2], [x + 2, y0, z + 2], [x + 2, y0, z], [x + 2, y1, z], 0, 4, 0, col, 210);
-          quad([x, y1, z], [x, y0, z], [x, y0, z + 2], [x, y1, z + 2], 1, 4, 0, col, 210);
-          quad([x, y1, z + 2], [x, y0, z + 2], [x + 2, y0, z + 2], [x + 2, y1, z + 2], 4, 4, 0, col, 230);
-          quad([x + 2, y1, z], [x + 2, y0, z], [x, y0, z], [x, y1, z], 5, 4, 0, col, 230);
+          quad([x, y1, z], [x, y1, z + 2], [x + 2, y1, z + 2], [x + 2, y1, z], 2, kd, 0, col, 255);
+          quad([x + 2, y1, z + 2], [x + 2, y0, z + 2], [x + 2, y0, z], [x + 2, y1, z], 0, kd, 0, col, 210);
+          quad([x, y1, z], [x, y0, z], [x, y0, z + 2], [x, y1, z + 2], 1, kd, 0, col, 210);
+          quad([x, y1, z + 2], [x, y0, z + 2], [x + 2, y0, z + 2], [x + 2, y1, z + 2], 4, kd, 0, col, 230);
+          quad([x + 2, y1, z], [x + 2, y0, z], [x, y0, z], [x, y1, z], 5, kd, 0, col, 230);
         }
       }
     }

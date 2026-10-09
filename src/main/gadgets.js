@@ -1151,8 +1151,10 @@
       const bedrock = R.byName.bedrock && R.byName.bedrock.defaultState;
       const cry = VR.CRYSTALS ? VR.CRYSTALS[Math.floor(Math.random() * VR.CRYSTALS.length)][0] : 'violet';
       const S = (n, pr) => R.byName[n] ? (pr ? R.S(n, pr) : R.byName[n].defaultState) : 0;
-      const magma = S('magma_block'), obs = S('obsidian'), ember = S('emberrock') || S('netherrack'), cblock = S(cry + '_crystal_block');
-      const cluster = R.byName[cry + '_crystal_cluster'] ? R.S(cry + '_crystal_cluster', { facing: 4, size: 1 }) : 0;
+      // a vgen-9 world has no crystals (f-nocrystal): basalt in the rim, a magma core under smooth basalt, no clusters
+      const noCry = !!(g.meta && (g.meta.vgen | 0) >= 9);
+      const magma = S('magma_block'), obs = S('obsidian'), ember = S('emberrock') || S('netherrack'), cblock = noCry ? S('basalt', { axis: 0 }) : S(cry + '_crystal_block');
+      const cluster = noCry ? 0 : R.byName[cry + '_crystal_cluster'] ? R.S(cry + '_crystal_cluster', { facing: 4, size: 1 }) : 0;
       for (let dy = -R0; dy <= R0; dy++) for (let dz = -R0; dz <= R0; dz++) for (let dx = -R0; dx <= R0; dx++) {
         const x = cx + dx, y = cy + dy, z = cz + dz;
         if (y < 1 || y >= VR.MAXY) continue;
@@ -1167,8 +1169,9 @@
       }
       // the meteorite core
       const floorY = cy - Math.floor(r / 1.25);
-      list.push([cx, floorY, cz, cblock || obs]); list.push([cx, floorY + 1, cz, cluster]);
-      for (let k = 0; k < 5; k++) { const a = Math.random() * TAU, rr = 1 + Math.random() * (r - 1.5); const x = cx + Math.round(Math.cos(a) * rr), z = cz + Math.round(Math.sin(a) * rr); let y = floorY + 2; while (y > floorY - 3 && !(w.getBlock(x, y - 1, z) && (BT.flags[w.getBlock(x, y - 1, z)] & F.SOLID))) y--; list.push([x, y, z, cluster]); }
+      if (noCry) { list.push([cx, floorY, cz, magma || obs]); list.push([cx, floorY + 1, cz, S('smooth_basalt') || obs]); }
+      else { list.push([cx, floorY, cz, cblock || obs]); list.push([cx, floorY + 1, cz, cluster]); }
+      if (!noCry) for (let k = 0; k < 5; k++) { const a = Math.random() * TAU, rr = 1 + Math.random() * (r - 1.5); const x = cx + Math.round(Math.cos(a) * rr), z = cz + Math.round(Math.sin(a) * rr); let y = floorY + 2; while (y > floorY - 3 && !(w.getBlock(x, y - 1, z) && (BT.flags[w.getBlock(x, y - 1, z)] & F.SOLID))) y--; list.push([x, y, z, cluster]); }
       const last = new Map(); for (const e of list) if (w.col(e[0] >> 4, e[2] >> 4)) last.set(K3(e[0], e[1], e[2]), e);
       w.bulkSet([...last.values()], false);
       if (g.entities) g.entities.dropStack({ id: 'star_core', n: 1 }, false, [cx + 0.5, floorY + 2.5, cz + 0.5]);
