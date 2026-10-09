@@ -50,7 +50,7 @@ const SHOW = [
   ['vx_rug_blue', 20, 0, 5], ['vx_rug_blue', 21, 0, 5], ['vx_rug_blue', 22, 0, 5], ['vx_rug_blue', 20, 0, 6], ['vx_rug_blue', 22, 0, 6], ['vx_rug_blue', 20, 0, 7], ['vx_rug_blue', 21, 0, 7],
   ['vx_rug_blue', 20, 0, 8], ['vx_rug_blue', 21, 0, 8], ['vx_rug_blue', 22, 0, 8], ['vm_armchair_sage', 21, 0, 6, 1], ['vx_coffee_table_marble', 22, 0, 7, 0],
   ['vx_coffee_table', 26, 0, 3, 0], ['vx_dining_table', 28, 0, 4, 1], ['vx_dining_table', 28, 0, 5, 1], ['vx_dining_table', 28, 0, 6, 1], ['vx_dining_chair', 27, 0, 4, 1], ['vx_dining_chair', 27, 0, 6, 1],
-  ['vx_dining_chair_teal', 29, 0, 5, 3], ['vx_dining_table_white', 31, 0, 4, 0], ['vx_bench', 31, 0, 6, 0], ['vx_urn_white', 33, 0, 3],
+  ['vx_dining_chair_teal', 29, 0, 5, 3], ['vx_dining_table_white', 31, 0, 4, 0], ['vx_bench', 31, 0, 6, 0], ['vx_urn_white', 33, 0, 3], ['vx_locker', 34, 0, 0, 2],
   // bay 3 · bedroom (x 36–52): wardrobes, curtains beside two windows, a mirror, a dresser with a round mirror, a bench,
   // lights under a beam (chandelier, lanterns, pendants)
   ['vm_wardrobe', 36, 0, 0, 2], ['vm_wardrobe_walnut', 38, 0, 0, 2], ['vx_wardrobe', 40, 0, 0, 2, 0], ['vx_wardrobe', 40, 1, 0, 2, 1], ['vx_wardrobe_walnut', 41, 0, 0, 2, 0], ['vx_wardrobe_walnut', 41, 1, 0, 2, 1],
@@ -65,7 +65,8 @@ const VILLAGE = [['vx_bed_blue', 58, 0, 1, 0, 0], ['vx_bed_blue', 58, 0, 0, 0, 1
   ['vx_curtain', 60, 0, 0, 2, 0], ['vx_curtain', 60, 1, 0, 2, 1], ['vx_curtain', 63, 0, 0, 2, 0], ['vx_curtain', 63, 1, 0, 2, 1],
   ['vx_wardrobe', 63, 0, 3, 3, 0], ['vx_wardrobe', 63, 1, 3, 3, 1], ['vx_wardrobe', 63, 0, 4, 3, 0], ['vx_wardrobe', 63, 1, 4, 3, 1],
   ['vx_rug_red', 57, 0, 3], ['vx_rug_red', 58, 0, 3], ['vx_rug_red', 59, 0, 3], ['vx_rug_red', 57, 0, 4], ['vx_rug_red', 59, 0, 4], ['vx_rug_red', 57, 0, 5], ['vx_rug_red', 58, 0, 5], ['vx_rug_red', 59, 0, 5],
-  ['vx_table', 58, 0, 4], ['vx_lantern', 59, 3, 3], ['vx_art_warm', 56, 1, 3, 1], ['vx_bookshelf', 61, 0, 6, 0], ['vx_potplant', 56, 0, 6]];
+  ['vx_table', 58, 0, 4], ['vx_lantern', 59, 3, 3], ['vx_art_warm', 56, 1, 3, 1], ['vx_bookshelf', 61, 0, 6, 0], ['vx_potplant', 56, 0, 6],
+  ['vx_stove', 56, 0, 1, 1], ['vx_counter', 56, 0, 2, 1], ['vx_shelf', 62, 0, 0, 2]];      // the village kitchen corner: stove, counter, the shelf nook under the window
 const VWIN = [61, 62];
 
 // ---------------------------------------------------------------- the cameras: eye → target (or {yaw, pitch} from the feet, run 1 of round I), time

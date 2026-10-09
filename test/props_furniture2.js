@@ -167,6 +167,11 @@ const FURN = (VR.PROP_GROUP || {}).furniture || 2;
   check(some('glamp', p => p.m === MAT.light && p.y > 9 && p.y < 13) && some('glamp', p => p.m === MAT.metal && p.y < 1), 'the garden light: a glowing drum on a black post and foot');
   check(some('varclamp', p => p.m === MAT.light && p.x < 8.5 && p.z < 8.5) && some('varclamp', p => p.m === MAT.gloss && p.y < 1.4 && p.x > 8), 'the arc lamp: the foot in the back corner, the glowing shade over the front corner');
   check(['vx_fountain', 'vx_garden_lamp', 'vx_arc_lamp'].every(n => VR.PROP_FURN.includes(n) && PR.FDEF[n]), 'the fountain, the garden light and the arc lamp are listed and defined');
+  // the village houses' kitchen (gen_village.js: a stove and a counter in every house, a shelf nook) and the tech houses' lockers
+  check(some('vstove', p => p.m === MAT.light && p.nz < -0.9 && p.y > 4 && p.y < 9.5) && some('vstove', p => p.m === MAT.metal && p.y > 15.5), 'the village stove: the fire glows behind its door, the flue collar on top');
+  check(some('vkcounter', p => p.m === MAT.marble && p.y > 13.4) && count('vkcounter', p => p.m === MAT.wood && p.t === 1 && p.nz < -0.9) > 20, 'the village counter: wooden doors (its colour), a stone top');
+  check(count('locker', p => p.m === MAT.matte && p.nz < -0.9) >= 32 && some('locker', p => p.m === MAT.light), 'the locker: louvred doors, a status light');
+  check(['vx_stove', 'vx_counter', 'vx_shelf', 'vx_locker'].every(n => VR.PROP_FURN.includes(n) && PR.FDEF[n]) && PR.FDEF.vx_shelf.model === 'vbooks:w', 'the stove, the counter, the shelf nook (the bookcase in oak) and the locker are listed and defined');
 }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
