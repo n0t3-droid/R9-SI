@@ -79,6 +79,7 @@ const CAMS = [
   ['hall', { eye: [-240.5, 88.62, -170.6], at: [-240.5, 90, -158] }],            // the mansion's grand hall: reception desk, fountain, urns, sconces, gold art, chandeliers
   ['mdining', { eye: [-247.5, 88.62, -167.5], at: [-253.5, 88, -160] }],          // the mansion's dining wing: the long table, chairs, chandeliers, tall plants, the kitchen run
   ['nova', { eye: [-287, 88.4, -166.6], at: [-287.5, 88.6, -155] }],              // Villa Nova's hall from the foyer (t3_10): the glass wall, the pad, plants
+  ['nova2', { eye: [-287.5, 89.5, -164.2], at: [-287.5, 87.3, -158.6] }],         // the light pad close, from above (t1_30): the white rim, the blue top, the ring emblem
   ['show1', { eye: [SX + 8.5, Y0 + 2.2, SZ + 9.5], at: [SX + 8.5, Y0 + 1, SZ + 0.5] }],   // bay 1
   ['show2', { eye: [SX + 26.5, Y0 + 2.4, SZ + 11], at: [SX + 26.5, Y0 + 0.8, SZ + 2] }],  // bay 2
   ['show3', { eye: [SX + 44.5, Y0 + 2.2, SZ + 9.5], at: [SX + 44.5, Y0 + 1.6, SZ + 0.5] }],// bay 3
@@ -290,6 +291,9 @@ try {
       await freeze(Q[tag], DAY);
       await aim(Q[tag], { feet: [-240, 100, -115], yaw: 0, pitch: 0 }, DAY, 160);
       const b = await buildSites(Q[tag], true);
+      // the sky traffic off in both pages: its ships and their trails come and go (run 2: two trail draws in one page
+      // and not in the other made the "same scene" check fail at every place)
+      await Q[tag].ev(() => { const g = VR.game; if (g.traffic) { g.traffic.destroy(); g.traffic = null; } });
       console.log(`  potato ${tag}: villa ${b.villa} blocks`);
       await settle(Q[tag], 160);
     }

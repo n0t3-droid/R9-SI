@@ -89,11 +89,13 @@
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   PR.paint = function (name, u, v) {   // u, v in 0…1 (v down): the colour of a painting at a point (also the test's probe)
     if (PALS[name]) {
+      // the voxel motif's own field and bands, painted as a hard-edged print: flat colour fields with crisp curved
+      // borders, a fine dark line where two fields meet, the canvas weave (run 2's soft brush strokes read as blotches)
       const p = PALS[name].map(rgb), x = u * 6 + 1, y = (1 - v) * 6 + 1, sd = name === 'warm' ? 1 : name === 'cool' ? 2 : 3;
-      const f = (Math.sin(x * 0.9 + sd * 1.7) + Math.cos(y * 1.1 + sd * 2)) * 0.5 + 0.12 * Math.sin(u * 37 + v * 11 + sd) * Math.sin(v * 23);
+      const f = (Math.sin(x * 0.9 + sd * 1.7) + Math.cos(y * 1.1 + sd * 2)) * 0.5;
       const band = f > 0.5 ? 1 : f > 0 ? 2 : f > -0.5 ? 0 : 3, edge = Math.min(Math.abs(f - 0.5), Math.abs(f), Math.abs(f + 0.5));
-      const next = f > 0.5 ? 2 : f > 0 ? (f > 0.25 ? 1 : 0) : f > -0.5 ? (f > -0.25 ? 2 : 3) : 0;
-      return mix3(p[band], p[next], 0.5 * (1 - Math.min(1, edge / 0.06)) * 0.6).map((q) => q * (0.93 + 0.07 * hash(Math.floor(u * 64), Math.floor(v * 64), 0, sd)));
+      const c = edge < 0.035 && band !== 3 ? mix3(p[band], p[3], 0.6) : p[band];
+      return c.map((q) => q * (0.95 + 0.05 * ((Math.floor(u * 64) + Math.floor(v * 64)) & 1)));
     }
     if (name === 'abstract') {
       let c = rgb(0xE8E2D4);
@@ -971,15 +973,15 @@
   // on a cyan light line, its top recessed and glowing blue, darker at the rim, the cyan ring emblem in it
   MD('novapad', [3, 1, 3], (F) => {
     F.m(MAT.light, 0x3AF0FF).rbox(2.5, 0, 2.5, 45.5, 1.5, 45.5, 4.5, { seg: 3, skip: B_BOT });
-    F.m(MAT.gloss, 0xF2F4F8).rbox(1, 1.5, 1, 47, 11, 5, 3.6, { seg: 3, skip: 0 }).rbox(1, 1.5, 43, 47, 11, 47, 3.6, { seg: 3 }).rbox(1, 1.5, 5, 5, 11, 43, 1.6, { seg: 2 }).rbox(43, 1.5, 5, 47, 11, 43, 1.6, { seg: 2 });
-    F.m(MAT.gloss, 0xE8ECF2).box(5, 1.5, 5, 43, 8.4, 43);
-    F.m(MAT.light, 0x163E96).box(5, 8.4, 5, 43, 8.6, 43);
-    F.m(MAT.light, 0x2A6AD8).lathe(24, 24, [[8.62, 16.5], [8.66, 15.5], [8.7, 0.01]], { seg: 40 });
+    F.m(MAT.matte, 0xF6F7FA).rbox(1, 1.5, 1, 47, 11, 5, 3.6, { seg: 3, skip: 0 }).rbox(1, 1.5, 43, 47, 11, 47, 3.6, { seg: 3 }).rbox(1, 1.5, 5, 5, 11, 43, 1.6, { seg: 2 }).rbox(43, 1.5, 5, 47, 11, 43, 1.6, { seg: 2 });
+    F.m(MAT.matte, 0xE8ECF2).box(5, 1.5, 5, 43, 8.4, 43);
+    F.m(MAT.light, 0x0E2C78).box(5, 8.4, 5, 43, 8.6, 43);
+    F.m(MAT.light, 0x1A50B8).lathe(24, 24, [[8.62, 16.5], [8.66, 15.5], [8.7, 0.01]], { seg: 40 });
     F.m(MAT.light, 0x3AF0FF);
     for (const [r, w] of [[12.3, 0.7], [8.0, 0.55]]) F.tube(loop(24, 24, r, 9.0, 48), w, w, { seg: 6, caps: 0 });
     F.cyl(24, 24, 8.6, 9.4, 2.4, 2.4, { seg: 18, caps: 2 });
     for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; F.rod(24 + Math.cos(a) * 3.4, 9.0, 24 + Math.sin(a) * 3.4, 24 + Math.cos(a) * 7.2, 9.0, 24 + Math.sin(a) * 7.2, 0.4, { seg: 5 }); }
-    F.m(MAT.gloss, 0xF2F4F8); F.far(1, 0, 1, 47, 11, 47);
+    F.m(MAT.matte, 0xF6F7FA); F.far(1, 0, 1, 47, 11, 47);
     F.shadow(0, 0, 48, 48);
   });
   // the fountain's centre (the mansion's hall, the plazas, the park): a round stone basin with a rolled rim and water in
