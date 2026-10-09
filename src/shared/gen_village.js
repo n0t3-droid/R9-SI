@@ -469,6 +469,9 @@
         if (home) style = 'tech'; // the home city (new worlds start in its Starbase)
         site = { id: i + '_' + j, i, j, x, z, y: Math.round(sum / n), style, biome: bk.key, seed: rng.int(1 << 30), name: null };
         if (style === 'modern') site.rad = g.vgen >= 5 ? 230 : 120;   // rich towns spread wide: villa lots 30+ deep, two ring roads, farms outside
+        // vgen 9: a meadow or cherry village becomes the Weißstadt, the hall city (gen_hallcity.js), where its hall fits the land
+        if (!home && (style === 'meadow' || style === 'cherry') && VG.hallOn && VG.hallOn(g) && VG.hallFits(g, x, z, site.seed)) { site.style = 'hall'; site.from = style; site.rad = VG.HALL.RAD; }
+        else if (!home && g.vgen >= 9 && style !== 'modern' && style !== 'tech') site.rad = 100;   // vgen 9: the other villages are aired out (wider streets, bigger lots)
         site.name = VG.name(site.seed);
         if (home) g._homeFound = true;
       }
@@ -560,10 +563,14 @@
   };
   const planSteps = function* (g, site) {
     const rng = new VR.RNG(site.seed);
+    // vgen 9: the villages of the other climates get the Weißstadt's airing (gen_hallcity.js: streets 5 wide, a plaza of
+    // radius 9–10 with a fountain, lots 1.6 ×, a larger radius) and the prism villages lose their crystals (no crystals anywhere)
+    const AIRY = g.vgen >= 9 && !site.home && !/^(modern|tech|hall)$/.test(site.style);
     const S = VG.styleOf(g, site.style);
     const RAD = VG.siteRad(g, site), V2 = g.vgen >= 2;
     const HOME = !!(site.home && VR.Heart && VR.Heart.on(g) && VR.Heart.templeBase); // the Heartland's home city around the Gate Temple
     if (HOME && g.vgen >= 8 && VG.novaHaven) return yield* VG.novaHaven(g, site);   // vgen 8: the trailer's Nova Haven (gen_city.js)
+    if (site.style === 'hall' && VG.hallCity) return yield* VG.hallCity(g, site);   // vgen 9: the Weißstadt hall city (gen_hallcity.js)
     const cx = site.x, cz = site.z;
     const SZ = RAD * 2 + 1, occ = new Uint8Array(SZ * SZ); // 0 free 1 road 2 plaza 3 lot 4 margin 5 path
     const oi = (x, z) => { const lx = x - cx + RAD, lz = z - cz + RAD; return (lx < 0 || lz < 0 || lx >= SZ || lz >= SZ) ? -1 : lz * SZ + lx; };
@@ -585,7 +592,7 @@
     if (HOME) { const B = VR.TempleGen.box; for (let x = B.x0 - 2; x <= B.x1 + 2; x++) for (let z = B.z0 - 2; z <= B.z1 + 2; z++) { const o = oi(x, z); if (o >= 0) occ[o] = 7; } }
     const plan = { rad: RAD, id: site.id, name: site.name, style: site.style, x: cx, z: cz, y: site.y, seed: site.seed, homes: [], work: [], farms: [], lots: [], lamps: [], chimneys: [], plaza: null, roads: [], bell: null, pad: null, shops: [], pastures: [], orchards: [], windmills: [], base: null };
     // ---- plaza
-    const PR = V2 ? 6 + rng.int(2) : 4 + rng.int(2);
+    const PR = (V2 ? 6 + rng.int(2) : 4 + rng.int(2)) + (AIRY ? 3 : 0);
     let py = 0, pn = 0;
     for (let dz = -PR; dz <= PR; dz++) for (let dx = -PR; dx <= PR; dx++) { py += ground(cx + dx, cz + dz); pn++; }
     py = Math.round(py / pn);
@@ -616,6 +623,8 @@
       const pc = VR.Plants && VR.Plants.on(g) ? 4 : 3;   // vgen 7: the 7-block crowns stand 4 out, so their footprints do not meet
       for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) { const dx = sx * pc, dz = sz * pc; if (VR.Plants && VR.Plants.on(g)) { const ph = 7 + ((dx + dz + site.seed) & 1); put(cx + dx, py + 1, cz + dz, st('vx_tech_planter')); VR.Plants.palm(put, cx + dx, py + 2, cz + dz, ph); palms.push(['plaza', -1, cx + dx, cz + dz, ph]); } else { const ph = 4 + ((dx + dz + site.seed) & 1); VG.palm(put, cx + dx, py + 1, cz + dz, ph); palms.push(['plaza', -1, cx + dx, cz + dz, ph]); } }
       for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) put(cx + dx, py + 1, cz + dz, st('vx_tech_planter'));
+    } else if (AIRY && VG.townFountain) {
+      VG.townFountain(put, cx, py, cz, S); rng.pick(S.roofs);   // (the well's roof draw is kept: the rest of the plan draws as before)
     } else if (S.crystals) {
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { if (dx || dz) put(cx + dx, py + 1, cz + dz, wellMat); }
       put(cx, py + 1, cz, st('aether')); put(cx, py + 2, cz, st('vx_crystal_violet'));
@@ -681,13 +690,13 @@
     const pathS = st(S.path), pathAlt = S.pathAlt ? st(S.pathAlt) : st(site.style === 'desert' ? 'sandstone' : 'coarse_dirt');
     const roads = [];
     const lineCells = new Set();
-    const ringR = V2 ? (S.modern ? (RAD >= 200 ? [72 + rng.int(3), 158 + rng.int(3)] : [40 + rng.int(3), 82 + rng.int(3)]) : [31 + rng.int(8)]) : [];
+    const ringR = V2 ? (S.modern ? (RAD >= 200 ? [72 + rng.int(3), 158 + rng.int(3)] : [40 + rng.int(3), 82 + rng.int(3)]) : [Math.round((31 + rng.int(8)) * (AIRY ? 1.35 : 1))]) : [];
     const zebra = new Map();   // "x,z" → axis: zebra crossings at the plaza exits and where the ring roads cross the radials
     const zebraAt = (px, pz, nx, nz, pa) => { const ax = Math.abs(Math.cos(pa)) >= Math.abs(Math.sin(pa)) ? 1 : 0; for (let wv = -1; wv <= 1; wv++) zebra.set(Math.round(px + nx * wv) + ',' + Math.round(pz + nz * wv), ax); };
     for (let r = 0; r < nR; r++) {
       yield;
       let ang = a0 + r * Math.PI * 2 / nR + (HOME && r === 0 ? 0 : (rng.next() - 0.5) * 0.5);
-      const L = HOME ? (r === 0 ? 140 : 70 + rng.int(24)) : S.modern ? RAD - 6 : V2 ? 54 + rng.int(20) : 30 + rng.int(20);
+      const L = HOME ? (r === 0 ? 140 : 70 + rng.int(24)) : S.modern ? RAD - 6 : V2 ? Math.round((54 + rng.int(20)) * (AIRY ? 1.3 : 1)) : 30 + rng.int(20);
       const pts = [];
       let x = cx + Math.cos(ang) * (PR + 1), z = cz + Math.sin(ang) * (PR + 1);
       const curve = HOME && r === 0 ? 0 : (rng.next() - 0.5) * (HOME ? 0.05 : 0.03);
@@ -710,7 +719,7 @@
         const [px, pz, pa] = pts[k];
         const ry = sm[k];
         const nx = -Math.sin(pa), nz = Math.cos(pa);
-        const RW = S.sidewalk ? 2 : 1;
+        const RW = S.sidewalk || AIRY ? 2 : 1;
         for (let wv = -RW; wv <= RW; wv++) {
           const qx = Math.round(px + nx * wv), qz = Math.round(pz + nz * wv);
           const o = oi(qx, qz);
@@ -746,7 +755,7 @@
         if (S.modern) { const dist = Math.hypot(px - cx, pz - cz); if (k === 4 || ringR.some(Rr => Math.abs(Math.round(dist) - Rr) === 4)) zebraAt(px, pz, nx, nz, pa); }
         if (k % 9 === 5) {
           const side = (k / 9 | 0) % 2 ? 1 : -1;
-          const lx = Math.round(px + nx * 2 * side), lz = Math.round(pz + nz * 2 * side);
+          const lx = Math.round(px + nx * (AIRY ? 3 : 2) * side), lz = Math.round(pz + nz * (AIRY ? 3 : 2) * side);
           const o = oi(lx, lz);
           if (o >= 0 && occ[o] === 0) { occ[o] = 6; const gy = ground(lx, lz); const ly = Math.max(gy, ry); fill(lx, lz, gy + 1, ly, st('dirt')); put(lx, ly + 1, lz, st(S.lamp, { head: 0 })); put(lx, ly + 2, lz, st(S.lamp, { head: 1 })); fill(lx, lz, ly + 3, ly + 5, AIR); plan.lamps.push([lx, ly + 2, lz]); }
         }
@@ -780,7 +789,7 @@
         const road = { pts: [], ang: pts[0][2], ring: true };
         for (let k = 0; k < pts.length; k++) {
           const [px, pz, pa] = pts[k], ry = sm[k], nx = -Math.sin(pa), nz = Math.cos(pa);
-          const RW = S.sidewalk ? 2 : 1;
+          const RW = S.sidewalk || AIRY ? 2 : 1;
           for (let wv = -RW; wv <= RW; wv++) {
             const qx = Math.round(px + nx * wv), qz = Math.round(pz + nz * wv), o = oi(qx, qz);
             if (o < 0 || occ[o] === 2 || occ[o] === 1 || occ[o] === 7) continue;
@@ -807,7 +816,7 @@
             }
           }
           if (k % 11 === 6) {
-            const side = (k / 11 | 0) % 2 ? 1 : -1, lx = Math.round(px + nx * 2 * side), lz = Math.round(pz + nz * 2 * side), o = oi(lx, lz);
+            const side = (k / 11 | 0) % 2 ? 1 : -1, lx = Math.round(px + nx * (AIRY ? 3 : 2) * side), lz = Math.round(pz + nz * (AIRY ? 3 : 2) * side), o = oi(lx, lz);
             if (o >= 0 && occ[o] === 0) { occ[o] = 6; const gy = ground(lx, lz), ly = Math.max(gy, ry); fill(lx, lz, gy + 1, ly, st('dirt')); put(lx, ly + 1, lz, st(S.lamp, { head: 0 })); put(lx, ly + 2, lz, st(S.lamp, { head: 1 })); fill(lx, lz, ly + 3, ly + 5, AIR); plan.lamps.push([lx, ly + 2, lz]); }
           }
         }
@@ -830,7 +839,7 @@
     const lotsWanted = [];
     const MODERN = !!(S.modern && VG.modern);
     const civic = MODERN ? VG.modern.CIVIC.filter(k => k !== 'hall') : KINDS_CIVIC.filter(() => true);
-    const MU = V2 ? 2 : 1, MV = V2 ? 3 : 2; // yard margins at the sides & back / in front
+    const MU = AIRY ? 4 : V2 ? 2 : 1, MV = AIRY ? 5 : V2 ? 3 : 2; // yard margins at the sides & back / in front (vgen 9: lots 1.6 ×)
     const tryLot = (kind, w, d, road, k, side) => {
       const p = road.pts[k]; if (!p) return null;
       const ang = Math.atan2(road.pts[Math.min(road.pts.length - 1, k + 1)][2] - road.pts[Math.max(0, k - 1)][2], road.pts[Math.min(road.pts.length - 1, k + 1)][0] - road.pts[Math.max(0, k - 1)][0]);
@@ -840,7 +849,7 @@
       let r;
       if (Math.abs(fx) > Math.abs(fz)) r = fx > 0 ? 1 : 3; else r = fz > 0 ? 2 : 0;
       // lot front-centre sits 3 blocks from the road centre
-      const gap = 3 + (V2 ? 1 : 0) + (kind === 'farm' ? 1 : 0) + (Math.abs(Math.abs(nx) - Math.abs(nz)) < 0.5 ? 1 : 0) + (S.sidewalk ? 2 : 0) + (S.modern && kind === 'hall' ? 2 : 0);
+      const gap = 3 + (V2 ? 1 : 0) + (AIRY ? 1 : 0) + (kind === 'farm' ? 1 : 0) + (Math.abs(Math.abs(nx) - Math.abs(nz)) < 0.5 ? 1 : 0) + (S.sidewalk ? 2 : 0) + (S.modern && kind === 'hall' ? 2 : 0);
       const fcx = Math.round(p[0] + nx * gap), fcz = Math.round(p[2] + nz * gap);
       // origin (u=0,v=0) from front centre: front centre = origin + rot(w>>1, 0)
       const du = w >> 1;
@@ -1382,6 +1391,8 @@
     for (const blk of fills.blocks) for (let i = 0; i < blk.length; i += 5) { if (++nF % 4000 === 0) yield; bucket(blk[i], blk[i + 1]).f.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3], blk[i + 4]); }
     for (const blk of ops.blocks) for (let i = 0; i < blk.length; i += 4) { if (++nO % 5000 === 0) yield; bucket(blk[i], blk[i + 2]).o.push(blk[i], blk[i + 1], blk[i + 2], blk[i + 3]); }
     plan.palms = palms; plan.crownDrops = drops;
+    // vgen 9: the village's villager budget (one per 9 blocks of walkable street and plaza plus 2 per home), its street width and lot margins
+    if (AIRY) { const walk = roadCells.length + (2 * PR + 1) ** 2; plan.folkCap = { walk, homes: plan.homes.length, perWalk: 9, perHome: 2, max: Math.floor(walk / 9) + 2 * plan.homes.length }; plan.roadW = 5; plan.lotMargins = [MU, MV]; }
     plan.chunks = chunks;
     plan.center = [cx, py + 1, cz];
     return plan;
@@ -1478,7 +1489,7 @@
 
   // JSON-friendly plan summary for the game thread
   VG.summary = function (plan) {
-    return { rad: plan.rad, id: plan.id, name: plan.name, style: plan.style, x: plan.x, y: plan.center[1], z: plan.z, seed: plan.seed, plaza: plan.plaza, homes: plan.homes, work: plan.work, farms: plan.farms, lots: plan.lots, lamps: plan.lamps, chimneys: plan.chimneys, roads: plan.roads, bell: plan.bell, pad: plan.pad, shops: plan.shops, pastures: plan.pastures, orchards: plan.orchards, windmills: plan.windmills, base: plan.base };
+    return { rad: plan.rad, id: plan.id, name: plan.name, style: plan.style, x: plan.x, y: plan.center[1], z: plan.z, seed: plan.seed, plaza: plan.plaza, homes: plan.homes, work: plan.work, farms: plan.farms, lots: plan.lots, lamps: plan.lamps, chimneys: plan.chimneys, roads: plan.roads, bell: plan.bell, pad: plan.pad, shops: plan.shops, pastures: plan.pastures, orchards: plan.orchards, windmills: plan.windmills, base: plan.base, folkCap: plan.folkCap || null };
   };
 
   // ---------------------------------------------------------------- hooks into the overworld generator
