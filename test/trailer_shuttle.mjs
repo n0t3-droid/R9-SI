@@ -21,29 +21,53 @@ const run = async (URL, TAG) => {
   // the game loop is stepped by hand (headless animation frames are lazy): each call advances the simulation 33 ms
   // (the warm-up frames are simulated without drawing: only the shots and the cost frames are drawn)
   const frames = (n) => ev((n) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; let t = window.__t || performance.now(); for (let i = 0; i < n; i++) { t += 33; g.last = t - 33; g.loop(t); } window.__t = t; return n; }, n);
-  // the picture as the frames show it: the HUD is hidden (F1), and the hand and the block outline with it
-  const shot = async (name) => { await ev(() => { window.__norender = false; const g = VR.game; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.visibility = 'hidden'; window.__t = (window.__t || performance.now()) + 33; g.last = window.__t - 33; g.loop(window.__t); g.renderer.gl.finish(); window.__norender = true; }); await page.screenshot({ path: `/home/claude/vr/test/shots/trailer_${TAG}_${name}.png` }); await ev(() => { VR.game.hideHud = false; const h = document.getElementById('hud'); if (h) h.style.visibility = 'visible'; }); };
+  // the picture as the frames show it: the HUD and the hints are hidden (F1), and the hand and the block outline with them.
+  // F8 uploads finished meshes a few ms a frame and fades a column in over 300 ms once all its sections are meshed: the
+  // queue is emptied first (without advancing the game) and the fade-in gets its real time before the drawn frame
+  const HIDE = ['hud', 'hints'];
+  const shot = async (name) => {
+    await ev(() => { const g = VR.game, w = g.world, p = g.player; for (let i = 0; i < 400 && w.uploadQ && w.uploadQ.size; i++) w.drainUploads(p.pos[0], p.pos[2]); return 1; });
+    await wait(400);
+    await ev((H) => { window.__norender = false; const g = VR.game; g.hideHud = true; for (const id of H) { const h = document.getElementById(id); if (h) h.style.visibility = 'hidden'; } window.__t = (window.__t || performance.now()) + 33; g.last = window.__t - 33; g.loop(window.__t); g.renderer.gl.finish(); window.__norender = true; }, HIDE);
+    await page.screenshot({ path: `/home/claude/vr/test/shots/trailer_${TAG}_${name}.png` });
+    await ev((H) => { VR.game.hideHud = false; for (const id of H) { const h = document.getElementById(id); if (h) h.style.visibility = 'visible'; } }, HIDE);
+  };
+  // F8: a column is drawn only once all its sections are meshed (world.checkShown). Single frames (the workers mesh
+  // between them) until the columns within r chunks of the camera are shown and faded in, or maxMs of real time
+  const settle = async (r, maxMs) => {
+    const t0 = Date.now(); let left = -1;
+    while (Date.now() - t0 < maxMs) {
+      left = await ev((r) => { const g = VR.game, w = g.world, p = g.player, cx = Math.floor(p.pos[0]) >> 4, cz = Math.floor(p.pos[2]) >> 4; let n = 0; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) { const c = w.cols.get(VR.ckey(cx + dx, cz + dz)); if (!c || !c.ready || !(c.shownAt >= 0) || c.fade < 1) n++; } return n; }, r);
+      if (!left) break;
+      await frames(1); await wait(150);
+    }
+    return { left, s: Math.round((Date.now() - t0) / 1000) };
+  };
   await wait(6000);
   await ev(() => { const g = VR.game; g.settings.renderDist = 6; g.settings.dynRes = false; g.settings.minimap = false; g.applySettings('renderDist'); });
   await ev(`VR.game.createWorld({name:'Trailer',mode:'creative',difficulty:'normal',type:'default',seed:'424242',cheats:true,kit:true})`);
   for (let i = 0; i < 60; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
+  // every g.loop() call asks for one more animation frame, so each hand-stepped frame would start one more real loop and
+  // the game raced ahead during every wait (the formation flew past and was gone in each earlier run): from here on only
+  // the hand steps the game, as in cabin.mjs
+  await ev(() => { window.requestAnimationFrame = () => 0; return 1; });
   await frames(30);
   // ---- shot D (the frame t3_03): the camera on the plaza at the craft's height, about 14 m in front of the apron, the
   // portal behind. A shuttle comes in over the plaza and parks on the apron, turned to face the camera (after; before: a
   // craft flies by). The apron is dockPoint(): x 0, deck 81, z 30; the temple's front is at z 20.
   await ev(() => { const g = VR.game, p = g.player; p.teleport(0, 85.4, 44); p.flying = true; p.yaw = 0; p.pitch = 0.03; g.env.setTime(12600); });
   await frames(40);
+  const sp = await settle(3, 120000);
+  console.log('  (plaza: columns within 3 chunks not yet shown: ' + sp.left + ' after ' + sp.s + ' s)');
   const spawned = await ev(() => { const g = VR.game; g.traffic.spawnFlight({ arch: 'shuttle', dock: true }); return true; });
   check(spawned, TAG + ': a shuttle is launched toward the Gate Temple');
   // the design comes back from a worker (behind the chunk jobs on a loaded machine): the page must run between the frames
-  for (let i = 0; i < 300; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.length > 0)) break; }
+  for (let i = 0; i < 300; i++) { await wait(200); if (await ev(() => VR.game.traffic.ships.some(s => s.dock))) break; }
   await frames(60);
   for (let i = 0; i < (TAG === 'after' ? 40 : 1); i++) { await frames(20); await wait(40); if (await ev(() => VR.game.traffic.ships.some(s => s.dock && s.dock.phase === 'park'))) break; }
   await frames(TAG === 'after' ? 150 : 30);   // the craft turns on the apron (about 3 s) before the picture
   const parked = await ev(() => VR.game.traffic.ships.filter(s => s.dock && s.dock.phase === 'park').map(s => ({ y: +s.pos[1].toFixed(2), z: +s.pos[2].toFixed(1), off180: +Math.abs(Math.atan2(Math.sin(s.heading - Math.PI), Math.cos(s.heading - Math.PI))).toFixed(3) })));
   check(TAG !== 'after' || parked.length > 0, TAG + ': the shuttle parks on the apron, facing the plaza (' + JSON.stringify(parked) + ')');
-  await wait(3000);   // the chunk meshes around the apron come back from the workers between the frames
-  await frames(2);
   await shot('plaza');
   // ---- formation (the frame t1_01): loose formations of 2 to 4 over the canyon. The camera hangs off the right side of a
   // lead shuttle, a little behind and above, so its engine trails run back across the frame as in the trailer.
@@ -79,8 +103,7 @@ const run = async (URL, TAG) => {
     return { n: S.length, t: +s.t.toFixed(2), dist: +Math.hypot(d[0], d[1], d[2]).toFixed(1) };
   });
   check(aim !== null, TAG + ': a lead shuttle is framed from its side (' + JSON.stringify(aim) + ')');
-  await wait(3000);
-  await frames(2);
+  await frames(1);
   await shot('formation');
   // ---- cost on Very Low: the frame's JS time with the flight effects on (potato), averaged over 30 drawn frames
   await ev(() => VR.game.applyPreset('potato'));
