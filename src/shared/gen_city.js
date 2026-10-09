@@ -512,6 +512,8 @@
     plan.base = b; plan.pad = null;
     plan.work.push({ kind: 'base', door: b.back.slice(), outside: [b.back[0], b.back[1], b.back[2] - 2], inside: b.inside.slice(), beds: [], seats: [], work: b.work.map(w => w.slice()), chimney: null, table: null, lights: [], box: b.box.slice(), base: b });
     nova.roads = roads.map(rd => ({ name: rd.name, pts: rd.pts.map(p => [p[0], p[1]]), kerb: rd.kerb, palms: rd.palms }));
+    // the city's cells, for the terraces behind it (gen_hills.js leaves every cell the city laid out as it is)
+    nova.owns = (x, z) => { const o = oi(x, z); return o >= 0 && occ[o] !== 0; };
     plan.roads = roads.map(rd => rd.pts.filter((_, k) => k % 3 === 0).map((p, k) => [Math.floor(p[0]), rd.ys[k * 3] + 1, Math.floor(p[1])]));
     plan.palms = []; for (const rd of roads) for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const p of run) plan.palms.push(['street', rd.name, p[0], p[1], p[4]]);
     plan.crownDrops = [];
