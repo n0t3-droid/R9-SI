@@ -71,7 +71,9 @@ console.log('pack', pack.length, 'items · load', loadMs, 'ms');
   check(!compiled.length, 'nothing in the pack is compiled after load' + (compiled.length ? ' — compiled: ' + compiled.slice(0, 5).map(t => t.name).join(', ') : ''));
   const st = VM.stats || {};
   console.log('    registration', (st.lateMs || 0).toFixed(1), 'ms for', st.lateN, 'models =', ((st.lateMs || 0) / Math.max(1, st.lateN)).toFixed(3), 'ms/model');
-  check(st.lateN === pack.length && st.lateMs < 50, 'registering the pack takes < 50 ms (' + (st.lateMs || 0).toFixed(1) + ' ms)');
+  // (since v0.42 other late models register with the pack — the trailer plants, Villa Nova's pieces — so the pack's share of the time is judged)
+  const packMs = (st.lateMs || 0) / Math.max(1, st.lateN) * pack.length;
+  check(st.lateN >= pack.length && packMs < 50, 'registering the pack takes < 50 ms (' + packMs.toFixed(1) + ' ms of ' + (st.lateMs || 0).toFixed(1) + ' for ' + st.lateN + ' late models)');
 }
 
 // 5 · lint while building: a primitive that draws nothing (a quarter-unit face rounds away on the grid) or reaches past
