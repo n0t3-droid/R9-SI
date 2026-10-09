@@ -125,13 +125,18 @@ console.log('6. the evening: the people on their way in count toward the street\
   if (typeof C.onStreet === 'function') {
     const walking = { act: { type: 'sleep' }, pose: 'stand', path: [[0, 0, 0], [1, 0, 0]], walkAmt: 1 };
     const homeWalk = { act: { type: 'home' }, pose: 'stand', path: [[0, 0, 0], [1, 0, 0]], walkAmt: 0.8 };
-    const arrived = { act: { type: 'home' }, pose: 'stand', path: null, walkAmt: 0 };
+    const arrived = { act: { type: 'home' }, pose: 'stand', path: null, walkAmt: 0, pos: [10.5, 70, 4.5], goal: [11, 70, 4] };
+    // (run 4's dusk: 56 of the 149 stood on the street with the act 'sleep', no path yet — waiting for a path search —
+    //  and were drawn as if indoors: arrived means at the goal, not standing still)
+    const waiting = { act: { type: 'sleep' }, pose: 'stand', path: null, walkAmt: 0, pos: [0.5, 70, 0.5], goal: [30, 70, 2] };
+    const noGoal = { act: { type: 'home' }, pose: 'stand', path: null, walkAmt: 0, pos: [0.5, 70, 0.5], goal: null };
     const asleep = { act: { type: 'sleep' }, pose: 'sleep', path: null, walkAmt: 0 };
     const cafeSit = { act: { type: 'cafe' }, pose: 'sit', path: null, walkAmt: 0 };
     const stroll = { act: { type: 'stroll' }, pose: 'stand', path: null, walkAmt: 0 };
     const terrace = { act: { type: 'terrace' }, pose: 'sit', path: null, walkAmt: 0 };
     check(C.onStreet(walking) && C.onStreet(homeWalk), 'a person walking home or to bed is on the street (capped)');
     check(!C.onStreet(arrived) && !C.onStreet(asleep) && !C.onStreet(cafeSit), 'a person at home, asleep or sitting in an indoor café is indoors (drawn, free of the cap)');
+    check(C.onStreet(waiting) && C.onStreet(noGoal), 'a person standing on the street on the way in (waiting for its path, or no goal yet) is on the street');
     check(C.onStreet(stroll) && C.onStreet(terrace), 'a stroller and a guest on the terrace are on the street');
     // the evening of the hall city: 149 people, every one with the act 'sleep' at 13000, 120 still on their way: the
     // street's cap keeps the nearest 16 (8 on Very Low) of the walkers, plus the 29 who are in
