@@ -357,7 +357,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
       float a = vnoise(vec2(q.x * 0.35 + q.y * 0.2, q.y * 5.0 + 3.0) + vec2(u_time * 0.0025, 0.0));
       float b = vnoise(vec2(q.x * 0.6 - 7.0, q.y * 13.0 - 1.0));
       float st = smoothstep(0.74, 0.9, a * 0.7 + b * 0.38) * smoothstep(0.55, 0.72, vnoise(q * 0.22 + 17.0));
-      st *= smoothstep(0.1, 0.24, dir.y) * (1.0 - smoothstep(0.55, 0.8, dir.y));
+      st *= smoothstep(0.14, 0.28, dir.y) * (1.0 - smoothstep(0.55, 0.8, dir.y));   // (none right over the horizon: the haze band stays clean)
       vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
       col = mix(col, cir, st * u_cirrus * 0.5 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
     }

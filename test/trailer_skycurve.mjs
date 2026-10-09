@@ -19,6 +19,9 @@
 // sky pass (the sky drawn alone, 7 rounds of 24 passes at the potato size): with DIST_BEFORE the same in the baseline build,
 // in turns with the order alternating, and not slower than it (the median of the rounds' ratios within 5 %: the shared
 // machine moves a single round by 10–40 %).
+// t-sky2: also by day the top band's stars (≥ 60 % of the frames', local maxima) and the top three bands' chroma (mean and
+// variance ≥ 70 % of the frames'), the stars, chroma and haze in the results, and ONE sheet test/shots/sky2_sheet.png
+// (the game beside the trailer's frame, six pairs).
 // Also the Very Low pictures of the city at noon and the canyon at dusk, and the Very Low frame time of the canyon.
 // TAG (default after) names the pictures; DIST (default the dist/ of this checkout) is the build under test;
 // DIST_BEFORE (optional) the baseline build for the sky-pass comparison.
@@ -26,7 +29,8 @@
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'node:fs';
 import SR from '/home/dev/vr/test/sky_ref.js';
-const { load, curveOf, spaceOf, bandRows, compare, NB, REF } = SR;
+const { load, curveOf, spaceOf, bandRows, compare, NB, REF, starsOf, chromaOf, hazeOf } = SR;
+import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 
 const TAG = process.env.TAG || 'after';
 const DIST = process.env.DIST || '/home/dev/vr/dist/index.html';
@@ -128,8 +132,12 @@ async function measure(name, geo, kind) {
   const curve = curveOf(img, Hl, inMask);
   const space = spaceOf(img, 0, bandRows(Hl, NB - 2)[1], inMask);
   const hband = spaceOf(img, bandRows(Hl, 0)[0], Hl, inMask);
+  // t-sky2: the stars of the top three bands (local maxima), the chroma of the top three bands, the haze over the horizon
+  const stars = [NB - 3, NB - 2, NB - 1].map(k => { const [a, b] = bandRows(Hl, k); return starsOf(img, a, b, inMask); });
+  const chroma = chromaOf(img, 0, bandRows(Hl, NB - 3)[1], inMask);
+  const haze = hazeOf(img, Hl, inMask);
   let skyN = 0; for (let i = 0; i < W * H; i++) skyN += mask[i];
-  return { H: Hl, y0, sky: +(skyN / (W * H)).toFixed(3), curve, space, hband, sunInView: geo.sun[1] > 0 && sunMin < 2 * Math.PI / 180 };
+  return { H: Hl, y0, sky: +(skyN / (W * H)).toFixed(3), curve, space, hband, stars, chroma, haze: { L0: haze.L0, width: haze.width }, sunInView: geo.sun[1] > 0 && sunMin < 2 * Math.PI / 180 };
 }
 const geoOf = () => ev(() => { const g = VR.game, R = g.renderer, E = g.env.E, B = E.bodies; return { inv: Array.from(R.invVPNJ || R.invViewProj), sun: E.sunDir, giant: E.planetDir, blue: E.planet2Dir, rg: B ? B.radius.giant : 0.122, rb: B ? B.radius.blue : 0.085, moons: B ? B.moons : [], night: E.night }; });
 const fmtCurve = (c) => c.map(b => (b.lab ? `${b.rgb.map(v => Math.round(v)).join(',')}` : '—')).join(' | ');
@@ -153,6 +161,7 @@ const shootAt = async (P, T, preset) => {
   const r = { name, place: P.name, time: T[0], kind: T[2], preset, ...m, dE: dEs, geo };
   results.push(r);
   console.log(`shot ${name}  H ${m.H} (geometric ${m.y0})  sky ${m.sky}${m.sunInView ? '  the sun in view' : ''}  space ${JSON.stringify(m.space)}  horizon stars ${m.hband.stars}`);
+  console.log(`   stars (bands 5 6 7) ${m.stars.map(v => (v === null ? '—' : v)).join(' ')}  chroma ${m.chroma ? m.chroma.mean + ' var ' + m.chroma.var : '—'}  haze L0 ${m.haze.L0} width ${m.haze.width}`);
   console.log('   curve  ' + fmtCurve(m.curve));
   console.log('   L*     ' + m.curve.map(b => (b.lab ? b.L.toFixed(0) : '—')).join(' '));
   if (dEs) console.log('   ΔE(' + T[2] + ') ' + dEs.map(v => (v === null ? '—' : v.toFixed(1))).join(' '));
@@ -244,13 +253,43 @@ for (const r of hi.filter(r => r.kind === 'day')) {
   const b0 = r.curve[0];
   check(b0.lab && b0.L >= dayT.bands[0].L - 10 && (r.hband.stars || 0) < 1, `${r.place} ${r.time}: the horizon band bright and clean (L* ${b0.L} vs the frames' ${dayT.bands[0].L}, stars ${r.hband.stars})`);
 }
+// t-sky2: the space by day as the frames' — the top band's stars at least 60 % of the frames' (local maxima, test/sky_ref.js
+// starsOf), the top three bands' chroma at least 70 % of theirs (its mean and its variance: the nebula's coloured clouds)
+for (const r of hi.filter(r => r.kind === 'day')) {
+  const st = r.stars[2], ch = r.chroma, TS = dayT.stars[2], TC = dayT.chroma;
+  check(st !== null && st >= 0.6 * TS, `${r.place} ${r.time}: the top band's stars ${st} per 1000 sky pixels (≥ 60 % of the frames' ${TS})`);
+  check(!!ch && ch.mean >= 0.7 * TC.mean && ch.var >= 0.7 * TC.var, `${r.place} ${r.time}: the nebula's chroma ${ch ? ch.mean : '—'} (variance ${ch ? ch.var : '—'}) ≥ 70 % of the frames' ${TC.mean} (${TC.var})`);
+}
 // night: dark, with stars; the nebula at full strength may lift the top to the trailer's dusk top (L* 30)
 for (const r of hi.filter(r => r.time === 'night')) {
   const top = r.curve[NB - 1], low = r.curve[0];
   check(top.lab && low.lab && top.L < 35 && low.L < 50 && r.space.stars > 0.5, `${r.place} night: a dark sky (top L* ${top.L}, horizon L* ${low.L}) with stars (${r.space.stars})`);
 }
 if (before) check(skyRatio <= 1.05, `Very Low: the sky pass is not slower than the baseline's (the rounds' median ratio ${skyRatio.toFixed(3)}; ${skyAfter.toFixed(2)} ms vs ${skyBefore.toFixed(2)} ms a pass at ${skyA[0].w}x${skyA[0].h})`);
-fs.writeFileSync('/home/dev/vr/.tmp_tests/skycurve_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, place: r.place, time: r.time, kind: r.kind, preset: r.preset, H: r.H, sky: r.sky, space: r.space, hband: r.hband, dE: r.dE, curve: r.curve.map(b => ({ n: b.n, rgb: b.rgb, L: b.L, C: b.C, h: b.h })), geo: r.geo })), frameMs, sky: { after: skyAfter, before: skyBefore, ratio: skyRatio, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) } }, null, 1));
+fs.writeFileSync('/home/dev/vr/.tmp_tests/skycurve_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, place: r.place, time: r.time, kind: r.kind, preset: r.preset, H: r.H, sky: r.sky, space: r.space, hband: r.hband, stars: r.stars, chroma: r.chroma, haze: r.haze, dE: r.dE, curve: r.curve.map(b => ({ n: b.n, rgb: b.rgb, L: b.L, C: b.C, h: b.h })), geo: r.geo })), frameMs, sky: { after: skyAfter, before: skyBefore, ratio: skyRatio, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) } }, null, 1));
+// t-sky2: ONE sheet, the game beside the trailer's frame (as test/shots/sky_check_v044.jpg): test/shots/sky2_sheet.png
+{
+  const PAIRS = [['city', 'noon', 't3_05', 'Stadt, Mittag', 'city, noon'], ['city', 't15', 't3_06', 'Stadt, 15 Uhr', 'city, 15:00'], ['canyon', 'noon', 't1_05', 'Canyon, Mittag', 'canyon, noon'],
+    ['isles', 'noon', 't1_24', 'Inseln, Mittag', 'isles, noon'], ['canyon', 'dusk', 't1_01', 'Canyon, Dämmerung', 'canyon, dusk'], ['canyon', 'night', 't3_01', 'Canyon, Nacht', 'canyon, night']];
+  const CW = 640, CH = 360, LH = 22, parts = [];
+  const label = (txt) => Buffer.from(`<svg width="${CW}" height="${LH}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#111"/><text x="6" y="16" font-family="sans-serif" font-size="14" fill="#eee">${txt}</text></svg>`);
+  let row = 0;
+  for (const [pl, tm, fr, de, en] of PAIRS) {
+    const g = `test/shots/trailer_skycurve_${pl}_${tm}_${TAG}.png`;
+    if (!fs.existsSync('/home/dev/vr/' + g)) continue;
+    const y = row * (CH + LH);
+    parts.push({ input: label(`Spiel · ${de} (${TAG}) — game, ${en}`), left: 0, top: y });
+    parts.push({ input: label(`Trailer ${fr}`), left: CW, top: y });
+    parts.push({ input: await sharp('/home/dev/vr/' + g).resize(CW, CH, { fit: 'fill' }).png().toBuffer(), left: 0, top: y + LH });
+    parts.push({ input: await sharp('/home/dev/vr/docs/trailer/frames/' + fr + '.jpg').resize(CW, CH, { fit: 'fill' }).png().toBuffer(), left: CW, top: y + LH });
+    row++;
+  }
+  if (row) {
+    await sharp({ create: { width: CW * 2, height: row * (CH + LH), channels: 3, background: '#000' } }).composite(parts).png().toFile('/home/dev/vr/test/shots/sky2_sheet.png');
+    console.log('sheet test/shots/sky2_sheet.png (' + row + ' pairs)');
+  }
+  check(row >= 5 && fs.existsSync('/home/dev/vr/test/shots/sky2_sheet.png'), `the sheet test/shots/sky2_sheet.png: ${row} game / trailer pairs`);
+}
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 await browser.close();
 console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
