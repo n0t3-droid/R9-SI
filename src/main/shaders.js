@@ -157,14 +157,14 @@ float ringDens(float rr) {
 }
 vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
   float cz = dot(dir, C);
-  if (cz < 0.5) return vec4(0.0);
+  if (1.0 - cz > R * R * 3.6) return vec4(0.0);   // (t-sky2: past ~2.7 radii nothing of it — its ring ends at 2.45 — so the rest of the sky skips it; was a 60° cone)
   vec3 up = abs(C.y) < 0.95 ? vec3(0, 1, 0) : vec3(1, 0, 0);
   vec3 X = normalize(cross(up, C)), Y = cross(C, X);
   vec2 q = vec2(dot(dir, X), dot(dir, Y)) / R;
   float r2 = dot(q, q);
   vec3 RN = u_ringNormal;
   float den = dot(C, RN);
-  vec3 Lb = bodyLight(C, L);
+  vec3 Lb = bodyLight(C, L);   // (only the ~2.7 radii round the giant get here)
   vec4 res = vec4(0.0);
   // planet body
   float ts = 1e9;
@@ -219,7 +219,7 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
 }
 vec4 rockyPlanet(vec3 dir, vec3 C, float R, vec3 L) {
   float cz = dot(dir, C);
-  if (cz < 0.5) return vec4(0.0);
+  if (1.0 - cz > R * R * 0.9) return vec4(0.0);   // (t-sky2: past ~1.34 radii nothing of it; was a 60° cone)
   vec3 up = abs(C.y) < 0.95 ? vec3(0, 1, 0) : vec3(1, 0, 0);
   vec3 X = normalize(cross(up, C)), Y = cross(C, X);
   vec2 q = vec2(dot(dir, X), dot(dir, Y)) / R;
@@ -240,7 +240,7 @@ vec4 rockyPlanet(vec3 dir, vec3 C, float R, vec3 L) {
 // small grey cratered moons (lit by the sun, faint earthshine on the dark side)
 vec4 moonlet(vec3 dir, vec3 C, float R, vec3 L, float seed) {
   float cz = dot(dir, C);
-  if (cz < 0.9) return vec4(0.0);
+  if (1.0 - cz > R * R * 0.6) return vec4(0.0);   // (t-sky2: past ~1.1 radii nothing of it; was a 25° cone)
   vec3 up = abs(C.y) < 0.95 ? vec3(0, 1, 0) : vec3(1, 0, 0);
   vec3 X = normalize(cross(up, C)), Y = cross(C, X);
   vec2 q = vec2(dot(dir, X), dot(dir, Y)) / R;
