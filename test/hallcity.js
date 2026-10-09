@@ -80,15 +80,18 @@ const solid = (n) => n !== 'air' && n !== '?';
   for (let v = -70; v <= 36; v++) { if (Math.abs(v) <= 5) continue; for (let y = F + 1; y <= F + 22; y++) { street++; if (atN(0, y, v) !== 'air') sbad++; } }
   check(sbad === 0, `the street's axis is open from the floor to the vault, the fountain's basin aside (${street} cells, ${sbad} blocked)`);
 }
-// the vault's crown: a glass band over the street (the ribs every ten blocks are stone)
+// the vault: a coffered one — frosted glass panels between white stone ribs (every 6 across, every 5 along); from below a
+// luminous white ceiling (run 2: a clear glass band read as open sky, the hall looked outdoors)
 {
-  let n = 0, glass = 0, ribs = 0;
-  for (let u = -9; u <= 9; u++) for (let v = -76; v <= 50; v++) {
+  let n = 0, glass = 0, clear = 0, far = 0;
+  for (let u = -22; u <= 22; u++) for (let v = -76; v <= 50; v++) {
     const y = F + VG.HALL.hN(Math.abs(u)), b = atN(u, y, v); n++;
-    if (/glass/.test(b)) glass++; else if ((((v - 5) % 10) + 10) % 10 === 0) ribs++;
+    if (/glass/.test(b)) { glass++; if (b === 'glass') clear++; }
+    else { let near = false; for (let du = -2; du <= 2 && !near; du++) for (let dv = -2; dv <= 2; dv++) if (/glass/.test(atN(u + du, F + VG.HALL.hN(Math.abs(u + du)), v + dv))) { near = true; break; } if (!near) far++; }
   }
-  check(glass + ribs === n && glass >= n * 0.85, `the vault's crown is a glass band over the street (${glass} glass, ${ribs} rib cells of ${n})`);
-  check(atN(0, F + 40, -24) === 'glass' && atN(0, F + 41, -24) !== 'glass', 'the crown of the vault is at 40 over the floor (34–40 high)');
+  check(glass >= n * 0.6 && clear === 0, `the vault is frosted glass panels between ribs (${glass} of ${n} cells, ${clear} clear)`);
+  check(far === 0, `every rib lies within two cells of a panel (${far} farther)`);
+  check(atN(0, F + 40, -24) === 'frosted_glass' && atN(0, F + 41, -24) === 'air', 'the crown of the vault is at 40 over the floor (34–40 high)');
 }
 // windows: the clerestory over every opening of the arcade, the long walls' bays, the entrance end's giant window
 {
@@ -168,7 +171,7 @@ console.log('5. the light');
 {
   // the chunk under the street at (0, −24) and the plaza's edge, generated and lit as the worker does
   const lightAt = (u, y, v) => { const [x, z] = W2(u, v); const c = g9.generate(x >> 4, z >> 4); const L = V.computeColumnLight(c.blocks, true); return L[(y << 8) | ((z & 15) << 4) | (x & 15)] >>> 12; };
-  const a = lightAt(0, F + 2, -24), b = lightAt(2, F + 2, -40), c = lightAt(8, F + 2, -1);
+  const a = lightAt(0, F + 2, -24), b = lightAt(2, F + 2, -42), c = lightAt(8, F + 2, -1);
   check(a === 15 && b === 15, `full sky light on the street through the vault's glass (${a}, ${b} of 15)`);
   check(c >= 12, `bright on the plaza by the café tables (${c} of 15; the light engine's own column)`);
 }
@@ -208,6 +211,43 @@ console.log('7. the plan in the worker');
   check(bad.size === 0, `no crystal anywhere in the town (${[...bad].join(' ') || 'none'})`);
   const sum = VG.summary(plan);
   check(sum.folkCap && sum.folkCap.max === plan.folkCap.max && sum.style === 'hall', 'the game gets the budget with the plan');
+}
+// ---------------------------------------------------------------- 8. the villages of the other climates at vgen 9: the same airing
+console.log('8. the other climates\' villages (vgen 9): wider streets, a plaza with a fountain, lots 1.6 ×, no crystals');
+{
+  const pairs = [];
+  // (seed 1's prism villages at (−2, 0) and (2, 1)'s savanna, seed 5's desert at (−2, 0), then seeds 53, 11 and 31's own)
+  for (const [seed, cells] of [[1, [[-2, 0], [2, 1]]], [5, [[-2, 0]]], [53, null], [11, null], [31, null]]) {
+    const ga = new V.OverworldGen(seed, { worldType: 'default', vgen: 9 }), gb = new V.OverworldGen(seed, { worldType: 'default', vgen: 8 });
+    for (let i = -2; i <= 2 && pairs.length < 9; i++) for (let j = -2; j <= 2 && pairs.length < 9; j++) {
+      if (cells && !cells.some(c => c[0] === i && c[1] === j)) continue;
+      const a = VG.site(ga, i, j), b = VG.site(gb, i, j);
+      if (!a || !b || a.home || /modern|hall|tech/.test(a.style) || a.style !== b.style) continue;
+      pairs.push({ seed, a, b, pa: VG.plan(ga, a), pb: VG.plan(gb, b) });
+    }
+  }
+  const styles = [...new Set(pairs.map(p => p.a.style))];
+  console.log(`    ${pairs.length} villages (${styles.join(', ')})`);
+  check(pairs.length >= 5, `village sites of other climates to compare (${pairs.length})`);
+  let wide = 0, fountains = 0, crystals = 0, caps = 0; const ra = [], rb = [];
+  for (const { pa, pb } of pairs) {
+    if (pa.roadW >= 5 && pa.roadW <= 7) wide++;
+    let f = false; for (const b of pa.chunks.values()) for (let i = 3; i < b.o.length; i += 4) { const n = nm(b.o[i]); if (n === 'vm_town_fountain') f = true; if (/crystal|aether/.test(n)) crystals++; }
+    if (f && pa.plaza.r >= 9) fountains++;
+    if (pa.folkCap && pa.homes.reduce((x, h) => x + Math.max(1, h.beds.length), 0) <= pa.folkCap.max) caps++;
+    const [mu, mv] = pa.lotMargins || [2, 3];
+    for (const h of pa.homes) ra.push((h.w + 2 * mu) * (h.d + mu + mv)); for (const h of pb.homes) rb.push((h.w + 4) * (h.d + 5));
+  }
+  check(wide === pairs.length, `their streets are 5–7 wide (${wide} of ${pairs.length})`);
+  check(fountains === pairs.length, `each has a plaza of radius 9 or more with a fountain (${fountains} of ${pairs.length})`);
+  check(crystals === 0, `no crystal in them (${crystals})`);
+  check(caps === pairs.length, `each carries its villager budget and fits it (${caps} of ${pairs.length})`);
+  const rl = mean(ra) / mean(rb);
+  check(rl >= 1.6, `their lots are ${rl.toFixed(2)} × the vgen-8 villages' (mean ${mean(ra).toFixed(0)} vs ${mean(rb).toFixed(0)} m²)`);
+  // (their footprint: a larger radius, so the airing does not shrink the village to a hamlet)
+  const homesA = mean(pairs.map(p => p.pa.homes.length)), homesB = mean(pairs.map(p => p.pb.homes.length));
+  console.log(`    homes per village: ${homesA.toFixed(1)} (vgen 9) vs ${homesB.toFixed(1)} (vgen 8); radius ${pairs[0].a.rad} vs ${VG.rad(new V.OverworldGen(53, { worldType: 'default', vgen: 8 }))}`);
+  check(homesA >= homesB * 0.6, 'the aired villages keep most of their homes (a larger radius)');
 }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

@@ -38,7 +38,7 @@
     PR: 12, PV: 13,                                             // the plaza's radius; its clearing |v| ≤ 13
     ARC: 18, CLR: 22, SPR: 31, TOP: 40, AIS: 22, AISTOP: 26, WALLTOP: 23,
     GAL: 8, STAIR0: 42, GAL0: 50,                               // the gallery's height, the stair's first step (v), the gallery's front edge (v)
-    GLASS: 9, AGL0: 33, AGL1: 38,                               // the vault's glass band |u| ≤ 9, the aisle vault's 33–38
+    GLASS: 22, AGL0: 32, AGL1: 41,                              // the vault's glass panels |u| ≤ 22 (the half dome's d ≤ 22), the aisle vaults' 32–41
     LOT: { w: 12, d: 18, house: 12 },                           // a shop house's lot: 12 along the street, 18 deep (front 2, house 12, yard 4)
     RAD: 112, VGEN: 9,
   };
@@ -62,6 +62,21 @@
   const WALKABLE = VG.HALL_WALKABLE = new Set([C.STREET, C.PLAZA, C.LANE, C.FRONT, C.WALK, C.GALLERY, C.FORE, C.CROSS, C.STAIR]);
   // the style record other code reads (a hall city's own rules live here; lots the builders grow on: none)
   if (VG.STYLES && !VG.STYLES.hall) VG.STYLES.hall = Object.assign({}, VG.STYLES.meadow, { walls: ['travertine', 'quartz_bricks'], roofs: ['slate'], floor: 'spruce_planks', base: 'smooth_quartz', windows: ['vm_town_window_blue'], wood: 'spruce', fence: 'vx_balustrade', lamp: 'vm_town_lamp', path: 'paver_grey', plaza: ['marble_white', 'travertine'], chimney: 'vx_chimney_stone', beam: 'vx_beam_dark', crops: false, flowers: true, hall: true, noChimney: true });
+
+  // the prism villages of vgen 9 without crystals (the owner: no crystals anywhere): white hull and lavender plaster,
+  // plain lamps and lanterns, no crystal fountain or crystal garden lamps
+  if (VG.STYLES && VG.STYLES.prism && !VG.STYLES.prism_clear) VG.STYLES.prism_clear = Object.assign({}, VG.STYLES.prism, { walls: ['vx_hull_white', 'vx_plaster_lavender', 'vx_hull_white', 'vx_plaster_white'], lamp: 'vx_lamppost', crystals: false });
+  // the aired-out villages' fountain (vgen 9, gen_village.js): a round basin with a stone rim and the town fountain's three tiers
+  VG.townFountain = function (put, cx, py, cz, S) {
+    const st = VG.st, rim = st(S && S.base === 'vx_sandstone' ? 'smooth_sandstone' : 'polished_andesite');
+    for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) {
+      const d = Math.hypot(dx, dz); if (d > 4.6) continue;
+      if (d > 3.6) { put(cx + dx, py + 1, cz + dz, rim); continue; }
+      put(cx + dx, py + 1, cz + dz, st('water'));
+    }
+    const VM = VR.VM, m = VM && VM.MODELS.vm_town_fountain;
+    if (m) for (const [dx, dy, dz, i] of VM.footprint(m, 0)) put(cx - 1 + dx, py + 1 + dy, cz - 1 + dz, st('vm_town_fountain', { facing: 0, part: i }));
+  };
 
   VG.hallCity = function* (g, site) {
     const st = VG.st, AIR = 0, VM = VR.VM;
@@ -202,7 +217,7 @@
 
     // ================================================================ the walls, the piers, the arcade and the clerestory
     const STONE = st('quartz_bricks'), SMOOTH = st('smooth_quartz'), BAND = st(VR.R.byName.vx_town_band ? 'vx_town_band' : 'chiseled_quartz_block'), CHIS = st('chiseled_quartz_block');
-    const GLASS = st('glass');
+    const GLASS = st('glass'), FROST = st('frosted_glass');
     for (let v = H.V0; v <= 80; v++) {
       if ((v & 7) === 0) yield;
       for (let u = -H.HW; u <= H.HW; u++) {
@@ -232,10 +247,20 @@
     }
     yield;
     // ---- the roof: one closed shell over the whole hall (each cell from its lowest neighbour's height up to its own)
+    // (run 2: a clear glass band read as open sky — the hall looked outdoors, the owner's very complaint. The vault is a
+    //  coffered one now: frosted white glass panels between white stone ribs every 6 across and every 5 along, over the
+    //  whole nave up to its springing, the half dome likewise in rings and rays, the aisle vaults' middles: from below a
+    //  luminous white ceiling, and every rib lies within two cells of a panel, so the vault's underside is lit too)
+    const ribV = (v) => ((v % 5) + 5) % 5 === 0;
     const inGlass = (u, v) => {
-      const a = Math.abs(u), rib = (((v - 5) % 10) + 10) % 10 === 0;
-      if (v <= H.V1) { if (a <= H.GLASS) return !rib; if (a >= H.AGL0 && a <= H.AGL1) return !rib && v <= H.V1 - 1 && v >= H.V0 + 3; return false; }
-      return dApse(u, v) <= H.GLASS && (((Math.round(Math.atan2(v - H.V1, u) / (Math.PI / 8))) & 1) === 0 || dApse(u, v) < 3);
+      const a = Math.abs(u);
+      if (v <= H.V1) {
+        if (a <= H.GLASS) return !ribV(v) && a % 6 !== 3;
+        if (a >= H.AGL0 && a <= H.AGL1) return !ribV(v) && a !== 35 && v <= H.V1 - 1 && v >= H.V0 + 3;
+        return false;
+      }
+      const d = dApse(u, v), k = Math.round(Math.atan2(v - H.V1, u) / (Math.PI / 10));
+      return d <= H.GLASS && d >= 2 && Math.abs(Math.atan2(v - H.V1, u) - k * Math.PI / 10) * d > 0.7 && Math.abs(d - 12) > 0.7;
     };
     for (let v = H.V0; v <= 80; v++) {
       if ((v & 7) === 0) yield;
@@ -246,7 +271,7 @@
         for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nr = region(u + du, v + dv); const nh = nr ? roofH(u + du, v + dv) : 0; lo = Math.min(lo, nh + 1); }
         lo = Math.max(lo, reg === 'wall' || (Math.abs(u) >= H.P0 && Math.abs(u) <= H.P1 && v <= H.V1) ? h : 1);
         const [x, z] = W2(u, v), gls = reg === 'in' && inGlass(u, v);
-        for (let y = lo; y <= h; y++) put(x, F + y, z, gls && y === h ? GLASS : SMOOTH);
+        for (let y = lo; y <= h; y++) put(x, F + y, z, gls ? FROST : SMOOTH);   // (a panel's whole column is glass: no stone under it stops the light)
         // the transverse ribs under the nave vault (every pier line), gold banded
         if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) put(x, F + lo - 1, z, BAND);
         // the ring of the half dome at a third of its radius
@@ -293,6 +318,24 @@
     for (const s of [-1, 1]) for (let t = -3; t <= 3; t++) {
       const soffit = 8 + Math.floor(Math.sqrt(Math.max(0, 12.25 - t * t)) + 0.5);
       for (let a = H.W0; a <= H.HW; a++) { for (let y = 1; y < soffit; y++) P(s * a, F + y, t, AIR); P(s * a, F + soffit, t, BAND); P(s * a, F, t, MAT.fore); setC(s * a, t, C.CROSS); }
+    }
+    // outside (run 2: a long plain white box): buttresses three wide at every pier line of the long walls and beside the
+    // entrance end's window, stepped back at two heights, a gold band at their caps; over each gate a portal of two
+    // pilasters and a stepped pediment with a gold course
+    for (let k = -8; k <= 4; k++) {
+      const vp = 10 * k + 5; if (vp < H.V0 + 2 || vp > H.V1) continue;
+      for (const s of [-1, 1]) for (let dv = -1; dv <= 1; dv++) {
+        const [x, z] = W2(s * (H.HW + 1), vp + dv), [x2, z2] = W2(s * (H.HW + 2), vp + dv);
+        fill(x, z, F, F + 20, STONE); put(x, F + 21, z, BAND); fill(x2, z2, F, F + 10, STONE); put(x2, F + 11, z2, BAND);
+      }
+    }
+    for (const uc of [-27, -15, 15, 27]) for (let du = -1; du <= 1; du++) {
+      const [x, z] = W2(uc + du, H.V0 - 1), [x2, z2] = W2(uc + du, H.V0 - 2);
+      fill(x, z, F, F + (Math.abs(uc) === 15 ? 30 : 20), STONE); put(x, F + (Math.abs(uc) === 15 ? 31 : 21), z, BAND); fill(x2, z2, F, F + 10, STONE); put(x2, F + 11, z2, BAND);
+    }
+    for (const s of [-1, 1]) {
+      for (let y = F + 13; y <= F + 17; y++) { const half = 6 - (y - F - 13) - (y - F - 13 >> 1); for (let t = -half; t <= half; t++) P(s * (H.HW + 1), y, t, y === F + 13 ? BAND : STONE); }
+      for (let t = -5; t <= 5; t++) P(s * (H.HW + 1), F + 12, t, BAND);
     }
     yield;
     // the entrance end: a giant arched window over the nave (mullions every 4, transoms, a stained head of rays and a ring)
@@ -360,6 +403,8 @@
     const galSeats = [];
     for (const uc of [-18, -12, 12, 18]) { P(uc, F + H.GAL + 1, H.GAL0 + 3, 'vx_bench', { facing: 0 }); const [x, z] = W2(uc, H.GAL0 + 3); galSeats.push([x, F + H.GAL + 1, z, L.facing(0)]); }
     for (const [uc, vc] of [[-22, 56], [22, 56], [-12, 68], [12, 68], [0, 74]]) if (region(uc, vc) === 'in') putModel(P, 'vm_planter', 0, uc, F + H.GAL + 1, vc);
+    // lanterns round the apse on the gallery's floor by its wall: the gallery is lit at dusk
+    for (let k = 0; k <= 6; k++) { const th = k * Math.PI / 6, uu = Math.round(Math.cos(th) * (H.AR - 1)), vv = Math.round(H.V1 + Math.sin(th) * (H.AR - 1)); if (region(uu, vv) === 'in') { P(uu, F + H.GAL + 1, vv, 'lantern', { hanging: 0 }); const [x, z] = W2(uu, vv); plan.lamps.push([x, F + H.GAL + 1, z]); } }
     P(0, F + H.GAL + 1, 64, 'bell', { facing: 0 });
     { const [x, z] = W2(0, 64); plan.bell = [x, F + H.GAL + 1, z]; }
     // the council (the town's hall, the mayor's place) on the gallery
@@ -408,6 +453,7 @@
       putModel(Q, 'vm_town_awning_' + awning, 0, 4, F + 4, -2); putModel(Q, 'vm_town_awning_' + awning, 0, w - 5, F + 4, -2);
       putModel(Q, 'vm_town_sign_' + SIGN[kind], 0, (w >> 1) - 1, F + 5, -1);
       putModel(Q, 'vm_wall_lantern', 0, 1, F + 3, -1);
+      putModel(Q, 'vm_planter', 0, 1, F + 1, -1);   // (a potted plant under the lantern, beside the door)
       // ---- the upper storeys' windows, flower boxes, a balcony with a balustrade and vines on three-storey houses
       const winU = [2, 4, 7, 9];
       for (let k = 1; k < floors; k++) {
@@ -513,6 +559,8 @@
         Q(u, F + 15, v, edge ? 'vx_town_band' : 'smooth_quartz');
         if (edge) Q(u, F + 16, v, 'vx_balustrade');
       }
+      // potted plants and a barrel by the front (on the walk's edge), now and then
+      if (lrng.chance(0.7)) putModel(Q, 'vm_planter', 0, 1, F + 1, -1); if (lrng.chance(0.5)) Q(w - 2, F + 1, -1, lrng.chance(0.5) ? 'vx_barrel' : 'vx_crate');
       // the ground floor: an arched workshop opening to the walk, crates and a counter inside
       for (let u = 3; u <= 6; u++) for (let y = F + 1; y <= F + 3; y++) Q(u, y, 0, null);
       Q(4, F + 4, 0, 'vx_town_band'); Q(5, F + 4, 0, 'vx_town_band');
@@ -552,11 +600,22 @@
     putModel(P, 'vm_town_fountain', 0, -1, F + 1, -1);
     plan.plaza = { x: cx, y: F + 1, z: cz, r: H.PR, seats: [], stalls: [] };
     // benches round the basin (facing it), lamps on the diagonals, planters between
-    for (const [du, dv, f] of [[0, -7, 2], [0, 7, 0], [-7, 0, 1], [7, 0, 3]]) { if (Math.abs(du) === 0 && Math.abs(dv) === 7) continue; P(du, F + 1, dv, 'vx_bench', { facing: f }); const [x, z] = W2(du, dv); plan.plaza.seats.push([x, F + 1, z, L.facing(f)]); }
+    // (the benches stand off the street's and the cross street's axes, facing the fountain)
+    for (const [du, dv, f] of [[-3, -7, 2], [3, -7, 2], [-3, 7, 0], [3, 7, 0]]) { P(du, F + 1, dv, 'vx_bench', { facing: f }); const [x, z] = W2(du, dv); plan.plaza.seats.push([x, F + 1, z, L.facing(f)]); }
     for (const [du, dv] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) { putModel(P, 'vm_town_lamp', 0, du, F + 1, dv); const [x, z] = W2(du, dv); plan.lamps.push([x, F + 4, z]); }
     for (const [du, dv] of [[-6, -3], [6, -3], [-6, 3], [6, 3]]) putModel(P, 'vm_planter', 0, du, F + 1, dv);
     // the café's tables: a ring on the plaza's diagonals and terraces in front of the corner houses
     const cafeSeats = [];
+    // the café's terrace on the street in front of its house (the street's edge; five blocks stay free to walk)
+    for (const h of houses) {
+      if (!h.lot || h.lot.kind !== 'cafe') continue;
+      for (const vt of [h.vlo + 3, h.vlo + 8]) {
+        const ut = h.side * 3;
+        if (getC(ut, vt) !== C.STREET) continue;
+        putModel(P, 'vm_shop_table_marble', 0, ut, F + 1, vt);
+        for (const [dv, f] of [[-1, 2], [1, 0]]) { putModel(P, 'vm_shop_chair_bentwood', f, ut, F + 1, vt + dv); const [x, z] = W2(ut, vt + dv); cafeSeats.push([x, F + 1, z, L.facing(f)]); }
+      }
+    }
     const table = (du, dv, chairs) => {
       if (getC(du, dv) !== C.PLAZA) return;
       putModel(P, 'vm_shop_table_marble', 0, du, F + 1, dv);
@@ -612,7 +671,7 @@
         fill(x, z, y + 1, Math.max(y + 4, gy + 2), AIR);
         put(x, y, z, Math.abs(dv) === 3 ? SMOOTH : (M.hash2(x, z, 934) & 7) === 0 ? MAT.street2 : MAT.lane);
       }
-      for (const dv of [-4, 4]) { putModel(P, 'vm_town_lamp', 0, s * (t0 + 1), F + 1, dv); const [x, z] = W2(s * (t0 + 1), dv); plan.lamps.push([x, F + 4, z]); }
+      for (const dv of [-4, 4]) { putModel(P, 'vm_town_lamp', 0, s * (t0 + 4), F + 1, dv); const [x, z] = W2(s * (t0 + 4), dv); plan.lamps.push([x, F + 4, z]); }
     }
     yield;
 
