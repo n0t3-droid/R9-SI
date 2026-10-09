@@ -1149,6 +1149,7 @@
       const it = CR.item, hv = CR.hover;
       if (hv) { const r = it.res, s = it.brush, x = hv.x - (s >> 1), y = hv.y - (s >> 1), z = hv.z - (s >> 1); box12([0, 0, 0, s / r, s / r, s / r], x / r, y / r, z / r, 0.002, [1, 1, 1], segs); }
       if (it.mirror) { const mx = it.W / 2; segs.push(mx, 0, 0, mx, it.H, 0, 0.36, 1, 0.8, mx, it.H, 0, mx, it.H, it.D, 0.36, 1, 0.8, mx, it.H, it.D, mx, 0, it.D, 0.36, 1, 0.8, mx, 0, it.D, mx, 0, 0, 0.36, 1, 0.8); }
+      if (VR.FormTools && VR.FormTools.overlay) VR.FormTools.overlay(segs);   // t-form: the bevel's selection
       C.drawLines(segs, vp, eye, true);
     }
   };
@@ -1515,6 +1516,7 @@
     it.dirty = true; countItem(); remeshItem(false); draftSoon(); C.hud(); C.parts();
   }
   function voxelClick(hv, button) {
+    if (VR.FormTools && VR.FormTools.click && VR.FormTools.click(hv, button)) return;   // t-form: ✦ Formen (a selection corner, a sphere, cylinder or cone)
     const it = CR.item;
     let tool = it.tool;
     if (button === 2) tool = 'add'; else if (button === 1) tool = 'pick';
@@ -1555,6 +1557,7 @@
     }
     el.appendChild(sws);
     const p = document.createElement('div'); p.className = 'note dim'; p.innerHTML = '<b>Umfärben</b> färbt alle Voxel genau dieser Farbe auf einmal — ideal, um den Stoff, das Holz oder das Metall eines Möbels zu tauschen.'; el.appendChild(p);
+    if (VR.FormTools && VR.FormTools.panel) VR.FormTools.panel(el);   // t-form: ✦ Formen (formtools.js)
   }
   function itemPanel(el, H, btn, row) {
     const it = CR.item;
