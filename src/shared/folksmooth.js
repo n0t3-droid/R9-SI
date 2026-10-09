@@ -93,6 +93,62 @@
   };
   const Z3 = [0, 0, 0]; FS.stamp = 1;
 
+  // ---------------------------------------------------------------- a part's grid cut to what it holds
+  // (the rig's grids are generous — a robe's hips 33 × 37 × 27 for some 2 000 voxels): the box round its voxels, the
+  // origin moved with it, so the key and the mesh do not depend on how big the part was laid out. null when empty
+  FS.crop = function (g) {
+    const SX = g.sx, SY = g.sy, SZ = g.sz, C = g.c;
+    let x0 = SX, y0 = SY, z0 = SZ, x1 = -1, y1 = -1, z1 = -1;
+    for (let y = 0; y < SY; y++) for (let z = 0; z < SZ; z++) {
+      const row = (y * SZ + z) * SX;
+      for (let x = 0; x < SX; x++) if (C[row + x]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    }
+    if (x1 < 0) return null;
+    const sx = x1 - x0 + 1, sy = y1 - y0 + 1, sz = z1 - z0 + 1, c = new Uint32Array(sx * sy * sz);
+    for (let y = 0; y < sy; y++) for (let z = 0; z < sz; z++) { const s = ((y + y0) * SZ + z + z0) * SX + x0; c.set(C.subarray(s, s + sx), (y * sz + z) * sx); }
+    return { sx, sy, sz, ox: g.ox - x0, oy: g.oy - y0, oz: g.oz - z0, c };
+  };
+
+  // ---------------------------------------------------------------- a person: every part's mesh in one buffer
+  // The game draws a villager with ONE draw: its parts' meshes one after the other in one vertex buffer, each vertex
+  // carrying its part's index (the bone, in the vertex's pad byte 15 — the voxel models' layout has it free), the shader
+  // (shaders.js VOX_VS, BONES) takes the part's matrix from an array the rig fills (folkgpu.js). m.parts: [{ key, bone,
+  // and the cropped grid (sx … c) the first time a key appears in the job }] (the left and the right arm are one grid: one
+  // mesh, merged twice with their two bones). Each part's mesh is kept in the thread's LRU (≤ 24 MB) by its key — the
+  // villagers share sleeves, trousers and shoes. → { data, idx (Uint16, Uint32 past 65 535 vertices), nv, nt, hits,
+  // miss, ms, cacheBytes, transfer }
+  FS.person = function (m) {
+    const SV = VR.SmoothVox, t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const cache = FS.cache || (FS.cache = SV && SV.LRU ? new SV.LRU(1024, 24 << 20) : null);
+    const got = new Map(), list = [];
+    let nv = 0, ni = 0, hits = 0, miss = 0, ms = 0;
+    for (const p of m.parts || []) {
+      let r = got.get(p.key);
+      if (r === undefined) {
+        r = cache ? cache.get(p.key) : undefined;
+        if (r !== undefined) hits++;
+        else if (p.c) { r = FS.mesh(p, m.opts); if (cache) cache.set(p.key, r, (r ? r.data.byteLength + r.idx.byteLength : 0) + 64); miss++; if (r) ms += r.ms; }
+        else return { error: 'part ' + p.key + ' not sent', transfer: [] };
+        got.set(p.key, r);
+      }
+      if (!r) continue;
+      list.push(r, p.bone | 0); nv += r.nv; ni += r.idx.length;
+    }
+    if (!nv) return { error: 'empty person', transfer: [] };
+    const data = new Uint8Array(nv * 20), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    let vo = 0, io = 0;
+    for (let k = 0; k < list.length; k += 2) {
+      const r = list[k], bone = list[k + 1], n = r.nv, I = r.idx;
+      data.set(r.data, vo * 20);
+      for (let i = 0; i < n; i++) data[(vo + i) * 20 + 15] = bone;
+      for (let i = 0; i < I.length; i++) idx[io + i] = I[i] + vo;
+      vo += n; io += I.length;
+    }
+    FS.stats.hits += hits; FS.stats.miss += miss; FS.stats.ms += ms;
+    const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    return { data, idx, nv, nt: ni / 3, hits, miss, ms, total: t1 - t0, cacheBytes: cache ? cache.bytes : 0, transfer: [data.buffer, idx.buffer] };
+  };
+
   // ---------------------------------------------------------------- the worker's job: several parts, one LRU
   // m.parts: [{ key, sx, sy, sz, ox, oy, oz, c }] → { parts: [{ key, data, idx, nv, nt, ms, hit }], hits, miss, ms, transfer }
   FS.cache = null; FS.stats = { hits: 0, miss: 0, ms: 0 };

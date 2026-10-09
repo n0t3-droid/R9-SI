@@ -179,6 +179,11 @@
         const r = VR.SmoothVox.job(m), tr = r.transfer; delete r.transfer;
         r.type = r.error ? 'error' : 'smoothvox'; r.id = m.id; if (r.error) r.msg = r.error;
         post(r, tr);
+      } else if (m.type === 'folkmesh') {
+        // t-folk: a villager's smooth body (folksmooth.js FS.person): its parts' surface-nets meshes in one buffer
+        const r = VR.FolkSmooth ? VR.FolkSmooth.person(m) : { error: 'no FolkSmooth', transfer: [] }, tr = r.transfer; delete r.transfer;
+        r.type = r.error ? 'error' : 'folkmesh'; r.id = m.id; if (r.error) r.msg = r.error;
+        post(r, tr);
       } else if (m.type === 'lightonly') {
         const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
         const light = VR.computeColumnLight(m.blocks, sky);

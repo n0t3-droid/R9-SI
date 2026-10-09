@@ -1363,15 +1363,23 @@
       const p = ent.beginVox(r, E);
       const t = g.time;
       const C = VR.Crowd, FD = g.folkDist || g.folkBase || 100, cap = C.streetCap(g.settings && g.settings.preset);
+      // t-folk: Echte Menschen (folkgpu.js) — within FG.NEAR blocks the smooth body, once the worker has made it; until
+      // then (and beyond) the voxel self: with the switch on the half-resolution one, so the full voxel model is never
+      // built only to be shown for a moment. A mesh is asked for from FG.ASK blocks, also for the people behind the eye
+      const FG = VR.FolkGPU, smooth = !!(FG && FG.on(g)), N2 = smooth ? FG.NEAR * FG.NEAR : 0;
+      if (smooth && (g.frame & 15) === 0) for (const a of this.agents) { const rec = a.fg || (a.fg = FG.recFor(a.p.look)); if (rec.state === 0) FG.want(g, rec, (a.pos[0] - cam.x) ** 2 + (a.pos[2] - cam.z) ** 2); }
       this.pick(r.planes, cam, cap, FD);
       for (const a of this.agents) {
         if (!a.drawn) continue;
         const d2 = a.d2v, dy = a.pos[1] - cam.y;
         const far = d2 > (FD < 100 ? 16 : 24) * (FD < 100 ? 16 : 24);
+        let rec = null;
+        if (smooth) { rec = a.fg || (a.fg = FG.recFor(a.p.look)); if (rec.state === 0) FG.want(g, rec, d2); }
+        const sm = smooth && d2 < N2 && rec.state === 2;
         // the model is looked up once per agent and LOD (the key is built from the look only once)
-        const mk = far ? 1 : 0;
-        const model = a.mdl && a.mdl[mk] ? a.mdl[mk] : ((a.mdl = a.mdl || [null, null])[mk] = Folk.model(gl, a.p.look, far));
-        if (!model) continue;
+        const mk = far || (smooth && !sm && rec.state !== 3) ? 1 : 0;
+        const model = sm ? null : a.mdl && a.mdl[mk] ? a.mdl[mk] : ((a.mdl = a.mdl || [null, null])[mk] = Folk.model(gl, a.p.look, mk === 1));
+        if (!model && !sm) continue;
         const light = ent.lightAt(a.pos[0], a.pos[1] + 1.2, a.pos[2]);
         // the budget (src/shared/folkcrowd.js): a villager far from the eye is posed every 2nd, 4th or 8th frame; between two its last pose holds
         const pose = (!VR.Crowd || VR.Crowd.due(a, d2) || !a.poseOut) ? this.pose(a, t) : a.poseOut;
@@ -1384,8 +1392,10 @@
         else if (a.pose === 'sitground') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.26 : 0.6), a.pos[2]];
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
+        if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);
       }
+      if (smooth) FG.flush(r, E, cam);
       if (this.drawBoats) this.drawBoats(r, E, cam);
     }
     // the body pose: FolkAnim clips (crossfaded) under the parametric walk cycle, then the head look-at, blinking and

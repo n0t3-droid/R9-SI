@@ -16,6 +16,9 @@
     high: { far: 64, rdMax: 24, upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
     ultra: { far: 64, rdMax: 32, upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
   };
+  // t-folk: Echte Menschen (folkgpu.js) — the villagers smooth within 24 blocks from Balanced up; Very Low and Low keep the
+  // voxel people (with the same real proportions)
+  PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1;
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)
@@ -49,6 +52,8 @@
       // as High (renderDist 14) and is not the lite look of a weak PC
       if (s.far === undefined && s.preset) out.far = PRESETS[s.preset] ? PRESETS[s.preset].far : ((s.renderDist || 0) >= 14 && !s.lite ? 64 : 0);
       if (s.rdMax === undefined && s.preset) out.rdMax = PRESETS[s.preset] ? PRESETS[s.preset].rdMax : 24;
+      // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
+      if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';

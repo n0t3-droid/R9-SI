@@ -1758,11 +1758,21 @@ layout(location=2) in vec4 a_color;
 layout(location=3) in vec4 a_inst;
 #endif
 uniform mat4 u_viewProj;
+#ifdef BONES
+// t-folk (folkgpu.js): a villager's smooth body in one draw — each vertex names its part (the pad byte after the normal),
+// the rig's matrices come as an array
+layout(location=3) in float a_bone;
+uniform mat4 u_bones[16];
+#else
 uniform mat4 u_model;
+#endif
 out vec3 v_n;
 out vec4 v_color;
 out vec3 v_rel;
 void main() {
+#ifdef BONES
+  mat4 u_model = u_bones[int(a_bone + 0.5)];
+#endif
   vec3 p = a_pos, nn = a_normal;
 #ifdef INST
   float sx = floor(a_inst.w / 4.0 + 0.001) / 256.0;
