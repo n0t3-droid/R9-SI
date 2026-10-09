@@ -137,6 +137,59 @@ check(asked.length === 1 && asked[0].msg.name === 'vm_sideboard' && asked[0].msg
 asked[0].cb(Object.assign({ type: 'smoothvox', ver: v0 }, (() => { const r = SV.job({ name: 'vm_sideboard', ver: v0 }); delete r.transfer; return r; })()));
 check(!SV.isReady(SV.ready.bits, iSide), 'an answer for the old design is not taken');
 
+// ---------------------------------------------------------------- 7. the VX pieces (the mansion's urns, fountain, sconces)
+console.log('7. the standalone VX pieces');
+const VX = VR.VX, CL = VX.CLS, PF = VX._.PAINT_FN, T = R.T;
+const vxNames = [...new Set(A.list.filter(e => e.vx).map(e => e.name))];
+check(vxNames.length >= 40 && ['vx_urn_white', 'vx_fountain', 'vx_chandelier', 'vx_sconce', 'vx_tech_desk'].every(n => vxNames.includes(n)), `${vxNames.length} VX pieces, the mansion hall's urns, fountain, chandeliers, sconces and desks among them`);
+// every one paints the same whatever stands round it (only its look h, for the kinds of four looks), and facing f is
+// facing 0 turned f quarters (the furniture pass turns the mesh by the anchor's facing)
+const ctx = (st, o) => { const t = R.types[T.type[st]]; return Object.assign({ nc: [CL.AIR, CL.AIR, CL.AIR, CL.SOLID, CL.AIR, CL.AIR], ns: [0, 0, 0, 0, 0, 0], ext: 0b110011, px: 0, py: 0, pz: 0, h: 0, x: 0, facing: t.has('facing') ? t.get(st, 'facing') : 0, facing2: 0, shape: 0, part: 0, axis: 0, head: 0, icon: 0, eave: 0, sideA: 0, sideB: 0, ridgeTop: 0, borderSpec: null, lit: 1 }, o || {}); };
+const paint = (st, c) => { const sp = VX.spec(st); for (let d = 0; d < 6; d++) VX.NB[d] = null; const G = VX.gridFor(sp.res >= 16 ? sp.res : 8); PF[sp.kind](sp, c); return G.slice(); };
+const eq = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const VARS = [{ nc: [CL.SOLID, CL.SOLID, CL.SOLID, CL.SOLID, CL.SOLID, CL.SOLID] }, { nc: [CL.AIR, CL.AIR, CL.SOLID, CL.SOLID, CL.AIR, CL.AIR] }, { nc: [CL.WALL, CL.WALL, CL.AIR, CL.SOLID, CL.WALL, CL.WALL] }, { ext: 0 }, { px: 1 }, { py: 1 }, { pz: 1 }, { x: 5 }];
+const depend = [], badTurn = [];
+for (const n of vxNames) {
+  const t = R.byName[n], nv = A.list.find(e => e.name === n).nvar;
+  for (let st = t.base; st < t.base + t.nstates; st++) {
+    const g0 = paint(st, ctx(st));
+    if (VARS.some(v => !eq(g0, paint(st, ctx(st, v))))) { depend.push(n); break; }
+    if (nv === 1 && [1, 2, 3].some(h => !eq(g0, paint(st, ctx(st, { h }))))) { depend.push(n + ' (h)'); break; }
+  }
+  if (t.has('facing')) {
+    const N = VX.spec(t.defaultState).res >= 16 ? VX.spec(t.defaultState).res : 8, I3 = (x, y, z) => (y * N + z) * N + x, s0 = t.state({ facing: 0 }), g0 = paint(s0, ctx(s0));
+    for (let f = 1; f < 4; f++) { const sf = t.state({ facing: f }), g = paint(sf, ctx(sf)); let ok = true; for (let y = 0; y < N && ok; y++) for (let z = 0; z < N && ok; z++) for (let x = 0; x < N; x++) { let nx = x, nz = z; for (let r = 0; r < f; r++) { const tt = nx; nx = N - 1 - nz; nz = tt; } if (g0[I3(x, y, z)] !== g[I3(nx, y, nz)]) { ok = false; break; } } if (!ok) { badTurn.push(n + ' f' + f); break; } }
+  }
+}
+check(!depend.length, 'every VX piece paints the same whatever stands round it' + (depend.length ? ': ' + depend.join(', ') : ''));
+check(!badTurn.length, 'facing f is facing 0 turned f quarters' + (badTurn.length ? ': ' + badTurn.join(', ') : ''));
+// a hall: two urns, the fountain, a sconce on the wall (facing 1)
+function hall() {
+  const j = section(); const S = (n, pr) => R.byName[n].state(pr);
+  for (let z = -PAD; z < 16 + PAD; z++) for (let x = -PAD; x < 16 + PAD; x++) for (let y = 1; y < 16 + PAD; y++) j.blocks[at(x, y, z)] = 0;
+  j.blocks[at(4, 1, 4)] = S('vx_urn_white'); j.blocks[at(11, 1, 9)] = S('vx_urn_white'); j.blocks[at(8, 1, 8)] = S('vx_fountain'); j.blocks[at(2, 3, 6)] = S('vx_sconce', { facing: 1 });
+  return j;
+}
+const h0 = hall(); SV.tagJob(h0); const hw = SV.prep(structuredClone(h0));
+const iUrn = SV.indexOf('vx_urn_white', false), iFou = A.list.findIndex(e => e.name === 'vx_fountain'), iSco = A.list.findIndex(e => e.name === 'vx_sconce');
+check(hw && hw.includes(iUrn) && hw.includes(iFou) && hw.includes(iSco), `the hall wants the urn, the fountain and the sconce (${JSON.stringify(hw)})`);
+asked.length = 0; SV.want(hw, world, col, 4);
+check(asked.length === 4 + 1 + 1 && asked.filter(a => a.msg.name === 'vx_urn_white').map(a => a.msg.h).sort().join() === '0,1,2,3', `the urn's four looks are asked (${asked.map(a => a.msg.name + (a.msg.h >= 0 ? ':' + a.msg.h : '')).join(', ')})`);
+for (let k = 0; k < asked.length; k++) {
+  const a = asked[k], r = SV.job(structuredClone(a.msg)); delete r.transfer; r.type = 'smoothvox';
+  a.cb(structuredClone(r));
+}
+check([0, 1, 2, 3].every(h => SV.isReady(SV.ready.bits, iUrn + h)) && SV.isReady(SV.ready.bits, iFou) && SV.isReady(SV.ready.bits, iSco), 'every look is ready');
+const h1 = hall(); SV.tagJob(h1); const j1h = structuredClone(h1); SV.prep(j1h); const rh = VR.meshSection(j1h);
+const props = SV.variants(rh.props), ka = kindsIn(props);
+const urns = ka.filter(a => a.kind >= SV.AUTO0 + iUrn && a.kind < SV.AUTO0 + iUrn + 4);
+check(urns.length === 2 && urns.every(a => a.kind === SV.AUTO0 + iUrn + (VX.hash(a.x, a.y, a.z, 77) & 3)), `each urn gets the look of its place (${urns.map(a => 'h' + (a.kind - SV.AUTO0 - iUrn)).join(', ')})`);
+const sco = ka.find(a => a.kind === SV.AUTO0 + iSco);
+check(ka.some(a => a.kind === SV.AUTO0 + iFou) && sco && (sco.f & 3) === 1, 'the fountain is an anchor, the sconce turned with its facing (' + (sco ? sco.f : '?') + ')');
+check(rh.vx.length === 0 && rh.vxFar.length === 0, 'and none of them is drawn as voxels any more');
+const urnM = PR.furnModel(PR.furnKey(urns[0].kind, 0)).near;
+check(urnM.nv > 50 && urnM.verts.every(Number.isFinite), `an urn's smooth mesh: ${urnM.nv} vertices, ${urnM.nt} triangles`);
+
 console.log(`    the three worker jobs took ${jobMs} ms`);
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);
