@@ -27,6 +27,10 @@
 // with a lantern on a bracket, barrels, a bench and a plant, oak ribs and tie beams under the aisle vaults, wooden arches
 // under the nave's ribs. Outside: a portal in the entrance end, tracery, cornice bands, a plinth, pinnacles, a parapet,
 // oculi and lantern turrets on the ridge.
+// Round 2c: the apse a crown of five tall windows over the gallery and wooden ribs under the half dome's rays; goods
+// piled before the market's stalls and the workshops, lanterns on the loggia columns; outside, the buttress piers rise
+// over the wall to tapering pinnacles with lantern finials, and flying buttresses leap from them over the aisle roofs to
+// the clerestory (on the pier lines, over the aisle vault's stone ribs: no glass loses its sky light).
 // The plan is built like Nova Haven's (gen_city.js): a generator that yields between its steps (VG.planAdvance runs it
 // in slices in the worker, the plan cached per site), ops bucketed per chunk, the usual plan record for the game
 // (homes with beds, workplaces, the plaza and its seats, lamps, strolling routes) plus the hall's frame (plan.hall) and
