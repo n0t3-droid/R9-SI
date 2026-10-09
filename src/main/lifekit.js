@@ -123,7 +123,7 @@
       const basket = part(6, 4, 6, [3, 0, 3], (gr) => { gr.box(0, 0, 0, 5, 3, 5, (x, y, z) => ((x + y + z) & 1 ? 0x9A6A3A : 0x7A4E28)); gr.box(1, 3, 1, 4, 3, 4, 0x4A3220); });
       const ropes = part(14, 8, 14, [7, 0, 7], (gr) => { for (let y = 0; y < 8; y++) { const k = Math.round(2 + y * 0.6); for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) gr.set(7 + sx * Math.min(6, k), y, 7 + sz * Math.min(6, k), 0x3A2A1E); } });
       const flame = part(3, 4, 3, [1, 0, 1], (gr) => { gr.box(0, 0, 0, 2, 1, 2, 0xFF8A1A, { emis: 1 }); gr.set(1, 2, 1, 0xFFD24A, 1); gr.set(1, 3, 1, 0xFFF2A0, 1); });
-      return { unit: 3, radius: 7, parts: { basket, ropes, flame, envelope: env }, layout: { basket: [0, 0, 0], ropes: [0, 4, 0], flame: [0, 5, 0], envelope: [0, 11, 0] } };
+      return { unit: 3, radius: 9, parts: { basket, ropes, flame, envelope: env }, layout: { basket: [0, 0, 0], ropes: [0, 4, 0], flame: [0, 5, 0], envelope: [0, 11, 0] } };
     };
     // the hover-cart (1 voxel = 1/8 m): a white bed 3 m long on a glowing cyan skirt, crates of produce, an orange canopy
     M.life_cart = () => ({
