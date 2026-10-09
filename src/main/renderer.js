@@ -771,7 +771,7 @@
       const key = PR.furnKey(kind, facing | 0), md = key && PR.FURN[key];
       if (!md) return (byKind[ck] = -1);
       let i = S.findIndex(sl => sl.key === key);
-      if (i < 0) { i = S.length; S.push({ key, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null }); this.furnWarm(key); }
+      if (i < 0) { i = S.length; S.push({ key, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null, fine: !!md.fine, fl: null, nfi: 0, gFine: null }); this.furnWarm(key); }   // (t-form: fine — a surface-nets model's 32-a-block surface, drawn close by)
       return (byKind[ck] = i);
     }
     // a new model is built in an idle tick, one a tick, when its first piece arrives with a section (a cold build takes
@@ -835,14 +835,17 @@
     propDefines() { return (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); }
     // the anchors in reach, camera-relative: list A (full palms, nearer than D1), list B (crosses, nearer than D2), and
     // the furniture by model (near F1, far F2, in the frustum)
-    propGather(cam, lvl, D1, D2, furn, planes, refl) {
+    propGather(cam, lvl, D1, D2, furn, planes, refl, shadow) {
       const PR = VR.Props, K = PR.INST, FURN0 = PR.FURN0, r1 = D1 * D1, r2m = D2 * D2;
       // refl (t-smooth2): 1 the mirror on tier 1 — the furniture's far forms only; 2 the mirror on tier 2 — the models
       // within 16 blocks, the far forms to 64 (the mirror is half the frame and rippled: run 2 measured +64 draws and
       // +126 k triangles at the pool with the main pass's radii)
       const lod = this.q.vxLod || 48, F1 = Math.max(14, Math.min(28, lod * 0.6)) * (refl === 2 ? 0.6 : 1), F2 = refl === 2 ? 64 : Math.max(48, 2 * lod), f1 = refl === 1 ? 0 : F1 * F1, f2 = F2 * F2;
+      // t-form: a surface-nets model's fine surface (32 a block) nearer than F0 (a quarter of vxLod, 8…18 blocks) in the
+      // main pass; its shadow and its mirror image take the 16-a-block one. Niedrig (vxLod < SmoothVox.FINE_LOD): none
+      const SVx = VR.SmoothVox, F0 = !refl && !shadow && lod >= ((SVx && SVx.FINE_LOD) || 44) ? Math.max(8, Math.min(18, lod * 0.25)) : 0, f0 = F0 * F0;
       const slots = this.furnSlots || [];
-      for (let s = 0; s < slots.length; s++) { slots[s].nn = 0; slots[s].nf = 0; }
+      for (let s = 0; s < slots.length; s++) { slots[s].nn = 0; slots[s].nf = 0; slots[s].nfi = 0; }
       let A = this.propA, B = this.propB, nA = 0, nB = 0, nF = 0;
       for (const sec of this.propSecs) {
         const d = sec.propData, kind = sec.propKind, n = sec.propN, ms = sec.propSlot;
@@ -854,7 +857,8 @@
             const R = sl.rad;
             if (planes && !mat4.boxInFrustum(planes, dx - R, dy - 0.2, dz - R, dx + R, dy + sl.h, dz + R)) continue;
             let L, at;
-            if (r2 < f1) { if ((sl.nn + 1) * K > sl.near.length) { const N = new Float32Array(sl.near.length * 2); N.set(sl.near); sl.near = N; } L = sl.near; at = sl.nn++ * K; }
+            if (sl.fine && r2 < f0) { if (!sl.fl || (sl.nfi + 1) * K > sl.fl.length) { const N = new Float32Array(sl.fl ? sl.fl.length * 2 : K * 16); if (sl.fl) N.set(sl.fl); sl.fl = N; } L = sl.fl; at = sl.nfi++ * K; }
+            else if (r2 < f1) { if ((sl.nn + 1) * K > sl.near.length) { const N = new Float32Array(sl.near.length * 2); N.set(sl.near); sl.near = N; } L = sl.near; at = sl.nn++ * K; }
             else { if ((sl.nf + 1) * K > sl.far.length) { const N = new Float32Array(sl.far.length * 2); N.set(sl.far); sl.far = N; } L = sl.far; at = sl.nf++ * K; }
             for (let k = 3; k < K; k++) L[at + k] = d[o + k];
             L[at] = dx; L[at + 1] = dy; L[at + 2] = dz;
@@ -910,7 +914,7 @@
       if ((!lvl0 && !furn) || !this.propSecs || !this.propSecs.size) return;
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
-      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0);
+      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0, !!shadow);
       const cullWas = gl.isEnabled(gl.CULL_FACE);
       // the palms: two-sided fronds
       if (this.propNA || this.propNB) {
@@ -928,10 +932,12 @@
         for (const sl of slots) {
           if (sl.nn) { if (!sl.gNear) { const m = PR.furnModel(sl.key); sl.gNear = this.propVao(m.near); } this.propFlush(sl.gNear, sl.nn, sl.near, u, ps.furnTex, 0, sl.gNear.nOpaque); }
           if (sl.nf) { if (!sl.gFar) { const m = PR.furnModel(sl.key); sl.gFar = m.far ? this.propVao(m.far) : { n: 0 }; } if (sl.gFar.n) this.propFlush(sl.gFar, sl.nf, sl.far, u, ps.furnTex, 0, sl.gFar.nOpaque); }
+          if (sl.nfi) { if (!sl.gFine) { const m = PR.furnModel(sl.key); sl.gFine = m.fine ? this.propVao(m.fine) : { n: 0 }; } if (sl.gFine.n) this.propFlush(sl.gFine, sl.nfi, sl.fl, u, ps.furnTex, 0, sl.gFine.nOpaque); }   // t-form
         }
         if (!shadow && !refl) {
           gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
           for (const sl of slots) if (sl.nn && sl.gNear && sl.gNear.n > sl.gNear.nOpaque) this.propFlush(sl.gNear, sl.nn, null, u, ps.furnTex, sl.gNear.nOpaque, sl.gNear.n - sl.gNear.nOpaque);
+          for (const sl of slots) if (sl.nfi && sl.gFine && sl.gFine.n > sl.gFine.nOpaque) this.propFlush(sl.gFine, sl.nfi, null, u, ps.furnTex, sl.gFine.nOpaque, sl.gFine.n - sl.gFine.nOpaque);   // t-form
           gl.depthMask(true); gl.disable(gl.BLEND);
         }
       }

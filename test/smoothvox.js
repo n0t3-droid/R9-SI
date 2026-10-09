@@ -17,6 +17,9 @@
 //   8. flat patches thinned (SV.flatten): a box keeps its surface — closed, the same area, the same bounds, the same
 //      colours — with fewer triangles; a curved piece keeps every vertex
 //   9. a res-8 piece is split to 16 a block (SV.upFor): inside its block, a one-voxel leaf a small rounded cube
+//  10. the fine surface (32 a block) of a res-32 piece: a one-voxel gap between two boxes stays a groove (16 a block
+//      closes it), a painted stripe keeps its colour; every catalogue piece the game meshes gets one within 65 535
+//      vertices; the meshing with it a mean of at most 20 ms a model (the biggest 150); what it costs in triangles
 //   bash test/wt_run.sh smoothvox.js 300
 require('./load_shared.js');
 require('../src/shared/smoothvox.js');
@@ -130,7 +133,7 @@ console.log(`    CPU time, all 380: mean ${(tsum / names.length).toFixed(1)} ms,
 console.log(`    the ${gn} models the game meshes: mean ${(gsum / gn).toFixed(1)} ms, max ${gmax.toFixed(1)} ms (${gName}); ${(tris / cells).toFixed(0)} triangles a block cell near`);
 check(names.length === 380, `the catalogue has 380 models (${names.length})`);
 check(!bad.length, 'every model gets a sane mesh' + (bad.length ? ': ' + bad.slice(0, 8).join(', ') : ''));
-check(gn > 200 && gmax <= 25, `at most 25 ms a model the game meshes (max ${gmax.toFixed(1)} ms, ${gName})`);
+check(gn > 150 && gmax <= 25, `at most 25 ms a model the game meshes (max ${gmax.toFixed(1)} ms, ${gName}; ${gn} models since round II's hand-built pieces)`);
 
 // ---------------------------------------------------------------- 5. the game's layout
 console.log('5. the game layout');
@@ -210,6 +213,34 @@ for (let i = 0; i < g8.nv; i++) { const x = g8.pos[i * 3], y = g8.pos[i * 3 + 1]
 check(g8.up === 2 && inB, `split ×${g8.up}: every vertex inside the 8³ block`);
 check(leafV >= 8 && leafTop > 3.6, `the one-voxel leaf is a small rounded cube (${leafV} vertices, up to ${leafTop.toFixed(2)} of its top at 4)`);
 check(g8.idx.length > g81.idx.length, `more triangles than at 8 a block (${g8.idx.length / 3} > ${g81.idx.length / 3}) — the price of the even rounding`);
+
+// ---------------------------------------------------------------- 10. the fine surface
+console.log('10. the fine surface (32 a block)');
+// two boxes with a one-voxel gap (x 7.5…8 of the model language's 16 a block = the voxel column 15 at res 32), a dark
+// stripe painted across the right one (one voxel high)
+const gapM = model('t_gap', [1, 1, 1], 32, (b) => { b.box(1, 0, 4, 7.5, 8, 12, M.wood(0xB08A5A)); b.box(8, 0, 4, 15, 8, 12, M.wood(0xB08A5A)); b.recolor(8, 4, 4, 15, 4.5, 12, M.wood(0x3A2A1A)); });
+// (the gap's two walls, deep inside: vertices at x 15…16 looking along ±x, away from the front and the back)
+const inGap = (g) => { let n = 0; for (let i = 0; i < g.nv; i++) { const x = g.pos[i * 3], y = g.pos[i * 3 + 1], z = g.pos[i * 3 + 2]; if (x > 14.5 && x < 16.5 && y > 2 && y < 14 && z > 11 && z < 21 && Math.abs(g.nrm[i * 3]) > 0.9) n++; } return n; };
+const gc = SV.mesh(gapM, { step: 2 }), gfi = SV.mesh(gapM, { step: SV.stepFor(32, true) });
+check(SV.stepFor(32, true) === 1 && SV.stepFor(32) === 2 && SV.stepFor(16, true) === 1, 'the fine surface takes a res-32 piece at 32 a block (16 a block without it; res 16 as it is)');
+check(inGap(gc) === 0 && inGap(gfi) > 8, `the gap: closed at 16 a block (${inGap(gc)} vertices in it), a groove at 32 (${inGap(gfi)})`);
+const dark = (g) => { let n = 0; for (let i = 0; i < g.nv; i++) if (g.rgb[i * 3] < 90 && g.nrm[i * 3 + 2] < -0.9) n++; return n; };
+check(dark(gfi) >= 8, `the painted stripe keeps its colour on the front (${dark(gfi)} dark vertices at 32 a block, ${dark(gc)} at 16)`);
+const rec = SV.forModel(gapM, { fine: true }), rec16 = SV.forModel(VM.MODELS.vm_plant_fig_concrete || VM.MODELS[names.find(n => VM.MODELS[n].res === 16)], { fine: true });
+check(rec.fine && rec.fine.nt > rec.near.nt && rec.fine.idx instanceof Uint16Array && rec.fine.nOpaque <= rec.fine.idx.length, `a res-32 record carries it in the game's layout (${rec.fine.nt} triangles, ${rec.near.nt} at 16 a block)`);
+check(rec16 && rec16.fine === null, 'a res-16 piece has none (its near mesh is its own resolution)');
+check(!SV.forModel(gapM).fine, 'without fine: none (Niedrig\'s PCs never mesh it)');
+let fineN = 0, fineNull = [], fineTri = 0, nearTri = 0, fineMax = 0, fineMaxN = '', fineSum = 0;
+for (const n of [...inGame]) {
+  const m = VM.MODELS[n]; if (m.res < 32) continue;
+  let t0 = cpu(), r = SV.forModel(m, { fine: true }), t = cpu() - t0;
+  if (t > 40) { t0 = cpu(); r = SV.forModel(m, { fine: true }); t = Math.min(t, cpu() - t0); }
+  fineN++; fineSum += t; if (t > fineMax) { fineMax = t; fineMaxN = n; }
+  if (!r.fine) fineNull.push(n); else { fineTri += r.fine.nt; nearTri += r.near.nt; }
+}
+console.log(`    ${fineN} res-32 pieces: fine ${fineTri} triangles, near ${nearTri} (${(fineTri / nearTri).toFixed(2)} ×); with it a mean ${(fineSum / fineN).toFixed(1)} ms, max ${fineMax.toFixed(1)} ms (${fineMaxN})`);
+check(fineN > 100 && !fineNull.length, `every res-32 piece the game meshes has its fine surface within 65 535 vertices (${fineN - fineNull.length} of ${fineN}${fineNull.length ? ': not ' + fineNull.slice(0, 5).join(', ') : ''})`);
+check(fineSum / fineN <= 20 && fineMax <= 150, `near, far and fine: a mean ${(fineSum / fineN).toFixed(1)} ms (at most 20), the biggest at most 150 ms (${fineMax.toFixed(1)} ms, ${fineMaxN}) — once a session, in a worker, behind the terrain`);
 
 console.log(fails ? `FAILED ${fails}` : 'ALL OK');
 process.exit(fails ? 1 : 0);

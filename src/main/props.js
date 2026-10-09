@@ -1140,7 +1140,8 @@
   // comes into a mesh): a kind from AUTO0 names it, registerAuto puts its definition and its finished meshes into the
   // tables above, furnDef finds it. Hand-built meshes win (their blocks never get an auto kind); nothing above changes.
   PR.AUTO0 = 4096; PR.AUTO = {};
-  PR.registerAuto = function (kind, key, size, cell, mesh) { const k = 'auto:' + key; PR.AUTO[kind] = { model: k, cell: cell || null }; FM[k] = { size: size.slice(), build: null, auto: true }; FCACHE[k] = { near: mesh.near, far: mesh.far || null, key: k, size: size.slice() }; return k; };
+  // (mesh.fine: the 32-a-block surface of a res-32 piece, drawn close by — renderer.js propGather's fine list)
+  PR.registerAuto = function (kind, key, size, cell, mesh) { const k = 'auto:' + key; PR.AUTO[kind] = { model: k, cell: cell || null }; FM[k] = { size: size.slice(), build: null, auto: true, fine: !!mesh.fine }; FCACHE[k] = { near: mesh.near, far: mesh.far || null, fine: mesh.fine || null, key: k, size: size.slice() }; return k; };
   const furnDefHand = PR.furnDef;
   PR.furnDef = function (kind) { return kind >= PR.AUTO0 ? PR.AUTO[kind] || null : furnDefHand(kind); };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
