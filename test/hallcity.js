@@ -120,6 +120,33 @@ const solid = (n) => n !== 'air' && n !== '?';
   let front = 0; for (let u = -26; u <= 26; u++) if (atN(u, F + 9, 50) === 'vx_balustrade') front++;
   check(bal === 16 && front >= 36, `balustrades climb the stringers (${bal} of 16) and run along the gallery's front (${front})`);
 }
+// the sky over the hall: no floating island over it, and the light under the whole roof (the light engine's sky light
+// falls straight down a column, light_local.js: run 3's apse and the vault over the plaza were black under seed 53's
+// islands, whose bottoms hung 2 blocks over the roof)
+{
+  let isl = 0, n = 0;
+  for (let u = -52; u <= 52; u += 4) for (let v = -84; v <= 84; v += 4) { const [x, z] = W2(u, v); n++; if (g9.islandAt(x, z)) isl++; }
+  check(isl === 0, `no floating island over the hall (${isl} of ${n} columns of its footprint under one)`);
+  const g8b = new V.OverworldGen(SEED, { worldType: 'default', vgen: 8 });
+  let isl8 = 0; for (let u = -52; u <= 52; u += 4) for (let v = -84; v <= 84; v += 4) { const [x, z] = W2(u, v); if (g8b.islandAt(x, z)) isl8++; }
+  check(isl8 > 0, `the islands of the same place stay in an older world (${isl8} columns under one at vgen 8)`);
+  // the light under the roof in the chunks of the apse and the plaza's vault (generated and lit as the worker does): the
+  // air under the vault and over the gallery is lit through the glass, no black corner
+  const lit = new Map();
+  const colL = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let c = lit.get(k); if (!c) { const ch = g9.generate(x >> 4, z >> 4); c = { b: ch.blocks, L: V.computeColumnLight(ch.blocks, true) }; lit.set(k, c); } return c; };
+  const idx = (x, y, z) => (y << 8) | ((z & 15) << 4) | (x & 15);
+  let cells = 0, dark = 0, low = 1e9, gal = 0, galDark = 0;
+  for (let u = -26; u <= 26; u += 2) for (let v = -6; v <= 78; v += 2) {
+    const [x, z] = W2(u, v), c = colL(x, z);
+    let y = F + 44; while (y > F && !c.b[idx(x, y, z)]) y--;          // the roof's top
+    while (y > F && c.b[idx(x, y, z)]) y--;                            // down through the roof to the air under it
+    if (y <= F + 12) continue;
+    cells++; const s = c.L[idx(x, y, z)] >>> 12; low = Math.min(low, s); if (s < 6) dark++;
+    if (v >= 52 && v <= 74 && Math.hypot(u, v - 51) < 25) { const s2 = c.L[idx(x, F + 10, z)] >>> 12; gal++; if (s2 < 10) galDark++; }
+  }
+  check(cells > 500 && dark === 0, `the vault over the plaza and the apse is lit from below (${cells} cells, ${dark} under sky light 6, the lowest ${low})`);
+  check(gal > 80 && galDark === 0, `the apse's gallery is bright (${gal} cells at eye height, ${galDark} under sky light 10)`);
+}
 console.log('4. the town');
 // the street: 7 wide between paved fronts, the house fronts beyond
 {
