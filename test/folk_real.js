@@ -9,7 +9,7 @@ const V = require('./load_shared.js');
 require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js');
 require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
 require('../src/main/villages.js'); require('../src/main/folklife.js');
-const Folk = V.Folk, FS = V.FolkSmooth, m4 = V.mat4;
+const Folk = V.Folk, FS = V.FolkSmooth, m4 = V.mat4, FA_ = V.FolkAnim;
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const f2 = (x) => (Math.round(x * 100) / 100).toFixed(2);
@@ -138,6 +138,19 @@ function closed(mesh) {
   const Q = FS.personFromLook(L);
   check(!Q.error && Q.nv === P.nv && Q.nt === P.nt && Q.rig && Q.rig.order.length === def.order.length && JSON.stringify(Q.rig.layout) === JSON.stringify(def.layout), `a person from its look alone: ${Q.nv} vertices, the rig's joints back (built in ${(Q.buildMs || 0).toFixed(1)} ms)`);
   check(FS.personFromLook(Folk.heroLook({ suit: 0 })).error === 'not a person', 'the trailer heroes keep their own build (no smooth mesh)');
+  // the smooth person is posed exactly as the voxel one: FolkSmooth.rigMats (folkgpu.js's bones) against the matrices
+  // entities.js drawModel hands the GL for every part, with a walking pose, a turn, a pitch and a child's scale
+  require('../src/main/entities.js');
+  const ent = Object.create(V.Entities.prototype); ent.mm = new Float32Array(16); ent.tmp = new Float32Array(16);
+  const got = [], glMock = { uniform1f() {}, uniform3f() {}, uniformMatrix4fv(loc, tr, m) { got.push(Float32Array.from(m)); }, bindVertexArray() {}, drawArrays() {} };
+  const model = { def, parts: {} }; for (const n of def.order) model.parts[n] = { vao: n, count: 3 };
+  const Gw = Folk.gaitFor(L); FA_.stride(Gw, 2.2, 0.31, false); const pose = FA_.walkPerson(Gw, 1, {}); pose.head = [0.1, 0.4, 0.05, 0, 0, 0];
+  const cam = { x: 3, y: 60, z: -2 }, pos = [10.5, 64, 7.25], yaw = 0.8, opts = { shade: 0, scale: 0.82, pitch: 0.2 };
+  ent.drawModel({ gl: glMock }, { u: {} }, model, pos, cam, yaw, pose, { sky: 1, bl: [0, 0, 0] }, opts);
+  const base = m4.create(); m4.translate(base, base, pos[0] - cam.x, pos[1] - cam.y, pos[2] - cam.z); m4.rotY(base, base, yaw); m4.rotX(base, base, opts.pitch); const sc = opts.scale / def.unit; m4.scale(base, base, sc, sc, sc);
+  const mine = FS.rigMats(def, base, pose, {});
+  let worstM = 0; def.order.forEach((n, i) => { for (let k = 0; k < 16; k++) worstM = Math.max(worstM, Math.abs(mine[n][k] - got[i][k])); });
+  check(got.length === def.order.length && worstM < 1e-5, `the smooth person's bones are the voxel person's part matrices (${got.length} parts, worst difference ${worstM.toExponential(1)})`);
 }
 {
   // 40 villagers of a village (the trades, the children, the elders as villages.js deals them) and 40 of the hall city:
