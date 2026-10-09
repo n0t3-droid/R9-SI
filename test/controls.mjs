@@ -1,4 +1,4 @@
-// F5 · Steuerung & Einstellungen (browser, de-DE): (a) the key screen rebinds forward from W to I — I walks the
+// F5 · Steuerung & Einstellungen (browser, de-DE): (a) the key screen rebinds forward from W to K (a free key; I is the workshop's since v0.42) — K walks the
 // player, W no longer does, and the binding is saved; (b) a simulated gamepad (navigator.getGamepads) walks the player
 // with the left stick; (c) every graphics option of the Bild group shows its cost badge, and a change shows the live
 // preview; (d) the Automatik run measures for 3 s and records its decision (a step of the ladder, or 'none' when the
@@ -103,28 +103,28 @@ async function walkUntil(page, ms, cond) { const t0 = Date.now(); while (Date.no
   check(fwdBefore[0] === 'KeyW', 'forward starts on W (' + fwdBefore.join(',') + ')');
   await page.click('.keyrow[data-action="fwd"] .key[data-slot="0"]');
   await wait(page, 150);
-  await page.keyboard.press('KeyI');
+  await page.keyboard.press('KeyK');
   await wait(page, 400);
   const fwdAfter = await ev(page, () => VR.Binds.current.slots('fwd'));
-  check(fwdAfter[0] === 'KeyI', 'forward is now I (' + fwdAfter.join(',') + ')');
+  check(fwdAfter[0] === 'KeyK', 'forward is now K (' + fwdAfter.join(',') + ')');
   const msg = await ev(page, () => { const m = document.querySelector('.keymsg'); return m ? m.textContent : ''; });
   check(/ist jetzt/.test(msg) && /Vorwärts/.test(msg), 'the key screen confirms it in German: ' + msg.trim());
   const saved = await ev(page, () => { try { return localStorage.getItem('r9si.controls') || ''; } catch (e) { return ''; } });
-  check(saved.indexOf('KeyI') >= 0, 'the binding is saved (r9si.controls)');
+  check(saved.indexOf('KeyK') >= 0, 'the binding is saved (r9si.controls)');
   await page.screenshot({ path: SHOTS + 'controls_tasten.png' });
   await page.click('.keytop .btn');
   await wait(page, 300);
   await ev(page, () => VR.game.ui.resume());
   await wait(page, 800);
 
-  // walk with I, then with W: only I moves the player (the walks wait for the frames they need)
+  // walk with K, then with W: only K moves the player (the walks wait for the frames they need)
   const p0 = await pos(page);
-  await page.keyboard.down('KeyI');
+  await page.keyboard.down('KeyK');
   const wentI = await walkUntil(page, 25000, async () => dist(p0, await pos(page)) > 0.3);
-  await page.keyboard.up('KeyI');
+  await page.keyboard.up('KeyK');
   const p1 = await pos(page);
   const dI = dist(p0, p1);
-  check(wentI && dI > 0.3, 'holding I walks the player (' + dI.toFixed(2) + ' blocks)');
+  check(wentI && dI > 0.3, 'holding K walks the player (' + dI.toFixed(2) + ' blocks)');
   await wait(page, 300);
   const p1b = await pos(page), f0 = await ev(page, () => VR.game.frame);
   await page.keyboard.down('KeyW');
