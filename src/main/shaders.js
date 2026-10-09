@@ -2079,6 +2079,41 @@ in vec2 v_uv;
 out vec4 o;
 void main() { o = texture(u_src, v_uv); }`;
 
+  // F9 · Fern-Cache (renderer.js farFrame): the cached sky and far world, reprojected into this frame. The cache was drawn
+  // from an eye a little off this one (≤ 1.5 m, ≤ 6°) with a wider view; a pixel finds its cached texel by the rotation,
+  // then a few fixed-point steps with the cached depth follow the parallax of the move. It writes the colour and the depth
+  // this frame's camera sees there; the near world is drawn live over it with the depth test.
+  S.FAR_COMP_FS = `
+uniform sampler2D u_fcCol;
+uniform highp sampler2D u_fcDepth;
+uniform mat4 u_invVP;       // this frame (camera-relative)
+uniform mat4 u_curVP;
+uniform mat4 u_fcVP;        // the cache (relative to its own eye)
+uniform mat4 u_fcInvVP;
+uniform vec3 u_delta;       // this eye − the cache's eye
+uniform vec2 u_scale;       // the cache's view over the screen's (its overscan)
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec4 pf = u_invVP * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
+  vec3 farP = pf.xyz / pf.w;                         // this pixel's ray at the far plane (now-relative)
+  vec4 c0 = u_fcVP * vec4(farP + u_delta, 1.0);      // seen from the cache's eye
+  vec2 uv = c0.xy / c0.w * 0.5 + 0.5;
+  for (int i = 0; i < 3; i++) {
+    float d = texture(u_fcDepth, uv).r;
+    if (d >= 1.0) break;                              // the sky: its direction is all that counts
+    vec4 xc = u_fcInvVP * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+    vec4 cn = u_curVP * vec4(xc.xyz / xc.w - u_delta, 1.0);
+    uv += (v_uv - (cn.xy / cn.w * 0.5 + 0.5)) / u_scale;   // a step toward this pixel, in the cache's wider texels
+  }
+  float d = texture(u_fcDepth, uv).r;
+  o = texture(u_fcCol, uv);
+  if (d >= 1.0) { gl_FragDepth = 1.0; return; }
+  vec4 xc = u_fcInvVP * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  vec4 cn = u_curVP * vec4(xc.xyz / xc.w - u_delta, 1.0);
+  gl_FragDepth = clamp(cn.z / cn.w * 0.5 + 0.5, 0.0, 1.0);
+}`;
+
   // ------------------------------------------------------------ simple lit mesh (entities, items, hand, falling blocks)
   S.MESH_VS = `
 layout(location=0) in vec3 a_pos;
