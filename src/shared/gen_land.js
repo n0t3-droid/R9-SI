@@ -1102,11 +1102,14 @@
           const x = Math.round(px + nx * side * 3.2), z = Math.round(pz + nz * side * 3.2);
           if (!P.cells.has(ck(x, z)) && !LAND.zoneAt(g, x, z) && !(LAND.keepAt(P, x, z) & (2 | 4 | 16))) { const y = gy(x, z); if (y > SEA + 1 && Math.abs(y - L.y[i]) <= 2) P.furn.push({ kind: 'hedge', x, z, y, h: h01(x, z, 31) < 0.3 ? 2 : 1 }); }
         }
-        if (nearFarm && i % 7 === 0 && Math.sin(i / 37 + li) > -0.2) for (const sd of [1, -1]) {
+        // the avenue: a farm's own lane in, its last 56 blocks lined with poplars on both sides, one every 8
+        const fEnd = P.sites[L.b].kind === 'farm' ? P.sites[L.b] : P.sites[L.a].kind === 'farm' ? P.sites[L.a] : null;
+        if (fEnd && i % 8 === 4 && (fEnd.x - px) ** 2 + (fEnd.z - pz) ** 2 < 56 * 56 && (fEnd.x - px) ** 2 + (fEnd.z - pz) ** 2 > 12 * 12) for (const sd of [1, -1]) {
           const x = Math.round(px + nx * sd * 4), z = Math.round(pz + nz * sd * 4);
           if (P.cells.has(ck(x, z)) || LAND.zoneAt(g, x, z) || LAND.keepAt(P, x, z) & 6) continue;
+          if (P.trees.some(t => Math.abs(t.x - x) < 5 && Math.abs(t.z - z) < 5)) continue;
           const y = gy(x, z); if (y <= SEA + 2 || Math.abs(y - L.y[i]) > 2) continue;
-          P.trees.push({ x, z, y: y + 1, kind: 'poplar', color: (li + (i / 7 | 0)) % 3 });
+          P.trees.push({ x, z, y: y + 1, kind: 'poplar', color: (fEnd.x + fEnd.z) & 1 ? 0 : 1 });
         }
       }
     });
