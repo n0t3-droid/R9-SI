@@ -38,6 +38,9 @@ uniform vec4 u_moon1;
 uniform vec4 u_moon2;
 uniform vec4 u_moon3;
 uniform float u_cirrus;      // high cirrus streaks: 1 on balanced and above, 0 on Very Low (the sky pass only)
+uniform float u_animOn;      // Animierte Anzeigen (settings.anim): 1 animates the holo displays, the portal veil and the hall's light pulses
+uniform float u_pulseA;      // texture layers of the Hangar Hall's pulsing wall strips (-1 when not loaded)
+uniform float u_pulseB;
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -719,6 +722,29 @@ void main() {
     float sweep = smoothstep(0.88, 1.0, fract(hp.y * 0.35 - u_time * 0.4));
     float flick = 0.93 + 0.07 * sin(u_time * 31.0 + hash13(floor(hp * 4.0)) * 40.0);
     col *= scan * flick + sweep * 0.9;
+    if (u_animOn > 0.5) {
+      // Animierte Anzeigen: a radar per 3 × 3 m panel (a sweep that turns, range rings, a crosshair, blips) and
+      // scrolling readout bars on the rest of the screen, all in the panel's own plane so it reads as one display
+      vec2 pl = face <= 1u ? hp.zy : (face <= 3u ? hp.xz : hp.xy);
+      vec2 cc = (floor(pl / 3.0) + 0.5) * 3.0, d = pl - cc;
+      float rr = length(d), ang = atan(d.y, d.x);
+      float hc = hash12(floor(pl / 3.0));
+      float da = mod(ang - (u_time * (0.5 + hc) + hc * 6.28) + 3.14159, 6.28318) - 3.14159;
+      float inR = step(rr, 1.25);
+      float wedge = clamp(1.0 - abs(da) / 0.8, 0.0, 1.0) * inR;
+      float rings = ((1.0 - smoothstep(0.0, 0.05, abs(rr - 0.45))) + (1.0 - smoothstep(0.0, 0.05, abs(rr - 0.9)))) * inR;
+      float cross = ((1.0 - smoothstep(0.0, 0.03, abs(d.x))) + (1.0 - smoothstep(0.0, 0.03, abs(d.y)))) * inR * 0.5;
+      float blip = step(0.97, hash12(floor(pl * 3.0) + floor(u_time * 1.5))) * step(rr, 1.1);
+      float rowF = pl.y * 6.0, row = floor(rowF);
+      float bar = step(0.55, hash12(vec2(row, floor(pl.x * 3.0 + u_time * 2.0 * (0.6 + fract(row * 0.37)))))) * step(0.3, fract(rowF)) * (1.0 - step(0.75, fract(rowF)));
+      vec3 ink = vec3(0.35, 0.95, 1.0);
+      col = col * 0.42 + ink * (wedge * 0.85 + rings * 0.55 + cross + blip * 1.4) + ink * bar * (1.0 - inR) * 0.75;
+    }
+  }
+  if (u_animOn > 0.5 && u_pulseA > -0.5 && (abs(layer - u_pulseA) < 0.5 || abs(layer - u_pulseB) < 0.5)) {
+    // the Hangar Hall's wall strips: a light that runs along the wall (the same phase wherever the walls meet)
+    vec3 pp = v_localPos + vec3(u_camInt);
+    col *= 0.8 + 0.2 * (0.5 + 0.5 * sin(u_time * 2.2 - pp.z * 0.8 - pp.x * 0.4));
   }
   if (kind == 3u) { // portal swirl
     vec2 p = vec2(v_localPos.x + v_localPos.z, v_localPos.y);
@@ -859,6 +885,39 @@ void main() {
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
   float skyL = v_sky * v_sky;
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
+  if (kind == 3u) {
+    // ---------------- portal veil (t3_04): a hot orange-white rim on the frame, blue-white energy crackling a few
+    // blocks in from it, and a clear middle that shows what lies beyond (the hall, the palm city). The mesher hands each
+    // corner its distance to the veil's rim in v_uv.x (mesher.js emitVeilQuad); the swirl and the filaments drift in
+    // world space, so neighbouring veil blocks join. Animierte Anzeigen off (Very Low): no noise, one texture read
+    vec3 wp = v_localPos + vec3(u_camInt);
+    vec2 pp = face <= 1u ? wp.zy : (face <= 3u ? wp.xz : wp.xy);
+    float rd = v_uv.x;
+    float swirl, fil = 0.0, wob = 0.0;
+    if (u_animOn > 0.5) {
+      float s1 = vnoise(pp * 0.8 + vec2(u_time * 0.35, -u_time * 0.27));
+      float s2 = vnoise(pp * 2.1 - vec2(u_time * 0.8, u_time * 0.55));
+      swirl = s1 * 0.6 + s2 * 0.4;
+      wob = (s1 - 0.5) * 1.6;
+      // lightning: the thin iso-lines of a warped, fast noise (two layers, so the strands cross and flicker)
+      float w = vnoise(pp * 0.7 + vec2(u_time * 0.6, u_time * 0.4)) * 2.0;
+      float n1 = vnoise(pp * 1.5 + vec2(w, -u_time * 1.3)), n2 = vnoise(pp * 2.6 + vec2(u_time * 1.7, w));
+      fil = (1.0 - smoothstep(0.0, 0.05, abs(n1 - 0.5))) + (1.0 - smoothstep(0.0, 0.035, abs(n2 - 0.5))) * 0.6;
+    } else {
+      swirl = clamp((texture(u_albedo, vec3(fract(pp * 0.25), layer)).a - 0.3) / 0.3, 0.0, 1.0);
+    }
+    // the energy hugs the rim (about 2 blocks, its edge wavering) so the middle stays clear, as in t3_04
+    float rim = 1.0 - smoothstep(0.0, 0.75, rd);
+    float band = 1.0 - smoothstep(0.3, 1.9 + wob * 0.6, rd);
+    float e = clamp(band * (0.2 + 0.8 * swirl) * 0.8 + fil * band, 0.0, 1.0);
+    vec3 hot = mix(vec3(1.0, 0.62, 0.28), vec3(1.0, 0.92, 0.8), 1.0 - smoothstep(0.0, 0.3, rd)) * 2.8;
+    vec3 vcol = mix(vec3(0.12, 0.38, 1.0) * 0.9, vec3(0.5, 0.82, 1.0) * 2.4, e);
+    vcol = mix(vcol, hot, rim);
+    float va = clamp(0.04 + 0.06 * swirl + e * 0.75 + rim * 0.92, 0.0, 0.97);
+    vcol = applyFog(vcol, v_rel, dist);
+    o_col = vec4(vcol, va);
+    return;
+  }
   if (kind == 1u || kind == 6u) {
     // ---------------- water ----------------
     // every water surface exists twice (one copy per side, for looking up from below); only the copy
