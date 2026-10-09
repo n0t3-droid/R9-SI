@@ -129,9 +129,38 @@ The owner's saving is estimated from the measured shares (stated as an estimate:
 
 WIP split (done: 6ef16a5, 18e2918) → plan → baseline probe → 2 → 5 → 1 → 4 → 3 → 6 → 7 full run. Commit after each.
 
+Done: 5476fd8 Schatten-Takt · 43d309d Weltgenerierung im Takt · f52be05 Fern-Cache · 1d1ec48 Spiegelung leicht ·
+88ea20e the preset, rungs, Automatik, settings · d3b303a the measuring browser test. Step 4 (furniture batching): see
+the decision below.
+
+## What the baseline showed (v0.43 dist, Ultra, render distance 8, SwiftShader)
+
+- Walking 60 m with the day running (420 frames, shadow work only): **188 full shadow-map redraws** — the cached
+  map was redrawn on 45 % of the frames (section and VX uploads near the eye, the sun's 0.25° steps, 17-block moves).
+- Walking 200 m (1 397 frames, nothing drawn): 5 frames over 40 ms, the longest 86 ms; the worker messages handled
+  between two frames took up to 61 ms — a column's arrival (counts, heights, seam light) in the message handler.
+- (The first baseline timed passes with gl.finish, which returns before the GPU process has drawn; the test now syncs
+  with a one-texel read, as test/materials.mjs and far.mjs do.)
+
+## Node-test results (stub GL where the renderer is involved)
+
+| switch | test | what it shows |
+|---|---|---|
+| Schatten-Takt | ultralite_shadow.js | the toroidal map is exact (a point drawn into its tile lands on the texel the lookup reads: worst error 0.0000 texels over 391 points; the same depth); a changed section near the eye redraws 230 of 1 115 section draws (21 %, scissored) instead of the whole map; walking 40 blocks costs 210 section draws in all (the old cache: a full map every 17 blocks and on every upload); a sun step is drawn over 6 frames (164 · 211 · 207 · 203 · 177 · 113 draws), then the maps swap; standing still draws nothing |
+| Weltgenerierung im Takt | ultralite_stream.js | six columns answered between two frames wait and go in one a frame (budget 1 ms), nearest first, never asked twice; a GPU-bound frame (gpu 22, js 5 ms) streams at the most (4 ms), a CPU-bound one (js ≥ 17.5 ms) at the least (0.75 ms); 10 uploads of 600 KB: 3 a frame (2 MB); queued generations behind a walking player near the edge are cancelled (cx −1 … −7), the queue re-ordered to where the player is (4 5 3 6 first); the seam light spread over frames (the seeds at the arrival, the light-increase walk a little a frame, its end independent of order): nine town columns identical cell for cell (589 824 cells), the median step 0.4–0.5 ms at a 0.3 ms budget; the columns round a spreading seam wait to be meshed, at most 8 frames; a block edit finishes the spreading first |
+| (measurement) | ultralite_arrival.js | 25 Nova Haven columns in a walk's order, each the least of 3 runs: the old arrival 0.3 ms median, the heaviest 1.7 ms, all 9 ms; in the takt 0.2 ms median, the heaviest 0.4 ms, all 6 ms, plus 2 ms of spreading in 24 steps; the light identical (1 638 400 cells). Single runs on this shared machine scatter to 13–159 ms (GC, scheduling, the first JIT run) — the takt's gain is that such work no longer lands in one frame |
+| Fern-Cache | ultralite_far.js | stale after 1.56 m (not 1.4), 6.5° (not 5.5°), 501 ms, the sun 0.6°; the cache 1.38 × 1.48 the screen (every screen edge turned 7.5° any way stays inside, worst ndc 0.999) at the screen's pixels per unit of view; the first frame builds it whole (429 far sections in view, the horizon once); standing 20 frames: 0 far draws; a 2 m step: 146 · 146 · 137 far draws then ring 1 and the tiles, one slice a frame; a 60 m/s run draws live |
+| Spiegelung leicht | ultralite_refl.js | the mirror 320 × 180 (Ultra 640 × 360) at 1280 × 720, 113 sections (Ultra 317) within 96 blocks, the props' far forms, read edge-aware; water 1 unchanged |
+| preset | ultralite_preset.js | Ultra · Leicht = Ultra's look + the four switches; the other presets off; the rungs (below); Automatik by GPU name |
+
+Governor ladders (aqGpuRungs), from ultralite_preset.js:
+- Ultra · Leicht: far cache ×2 patient → shadow tiles ½ as often → the mirror every other frame → folk to 72 blocks →
+  rays off → VX detail 0.6 → half shadow map → simple clouds → resolution −10 % → −20 %. The view distance never.
+- Ultra: shadow tiles/map ½ as often → the light mirror → folk to 72 → rays → … → resolution. High and below: unchanged.
+
 ## Results
 
-(filled in as measured)
+(browser measurements: filled in from test/ultralite.mjs)
 
 ## Known gaps
 
