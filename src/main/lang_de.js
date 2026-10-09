@@ -1185,6 +1185,7 @@
     // ---- Dörfer: Hinweise, neue Häuser
     'g.vil.welcome': 'Willkommen in {v}',
     'g.vil.welcomeSub': '{n} Bewohner · {f} Familien',
+    'g.vil.hallSub': 'Eine Hallenstadt · {n} Bewohner · {f} Familien',
     'g.vil.growing': '{v} wächst!',
     'g.vil.movedIn': 'Familie {fam} ist in ein nagelneues Haus gezogen.',
     'g.vil.newFam': 'Neu',

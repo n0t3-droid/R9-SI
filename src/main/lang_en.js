@@ -1185,6 +1185,7 @@
     // ---- villages: toasts, homes
     'g.vil.welcome': 'Welcome to {v}',
     'g.vil.welcomeSub': '{n} villagers · {f} families',
+    'g.vil.hallSub': 'A hall city · {n} villagers · {f} families',
     'g.vil.growing': '{v} is growing!',
     'g.vil.movedIn': 'The {fam} family moved into a brand-new home.',
     'g.vil.newFam': 'new',

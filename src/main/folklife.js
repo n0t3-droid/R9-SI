@@ -444,4 +444,38 @@
       }
     }
   };
+
+  // ---------------------------------------------------------------- the Weißstadt's afternoon (the hall city, style 'hall')
+  // The town's grown-ups without a counter to keep (the trades keep their shops) spend part of the afternoon out: one in
+  // three sits at the café's tables round the plaza ('terrace': the café of the hall city is outdoors, so its guests count
+  // toward the street's budget of src/shared/folkcrowd.js, unlike an indoor café's), one in two goes shopping along the
+  // street (a stroll, bag or basket in hand: villagers.js V.WEISS); at lunch the café's guests sit on the terrace too.
+  const SHOPKEEPERS = { baker: 1, scholar: 1, cashier: 1, clerk: 1, barista: 1, mayor: 1, healer: 1, ranger: 1, teacher: 1 };
+  P.TOWN_AFTERNOON = [6900, 10600];
+  P.townPlan = function (a, tod, want) {
+    if (!a.vil || !a.vil.plan || a.vil.plan.style !== 'hall') return want;
+    if (want === 'cafe') return 'terrace';
+    if (a.kid || want !== 'work' || SHOPKEEPERS[a.role] || tod < P.TOWN_AFTERNOON[0] || tod >= P.TOWN_AFTERNOON[1]) return want;
+    const k = Folk.hash(a.p.seed, 23, 7) % 6;
+    return k < 2 ? 'terrace' : k < 5 ? 'stroll' : want;
+  };
+  const prevSchedule = P.schedule;
+  P.schedule = function (a, tod) { return this.townPlan(a, tod, prevSchedule.call(this, a, tod)); };
+  // the terrace: a seat at one of the café's tables (the plaza's chairs), sitting a while, a word now and then
+  const prevRunAct = P.runAct;
+  P.runAct = function (a, dt, tod) {
+    const act = a.act;
+    if (!act || act.type !== 'terrace') return prevRunAct.call(this, a, dt, tod);
+    act.t += dt;
+    const vil = a.vil, cafe = (vil.workOf.barista || [])[0], seats = cafe && cafe.seats || [];
+    if (!seats.length) { act.type = 'plaza'; return; }
+    if (!act.spot) {
+      // a free chair: the person's own pick first, the next ones round the tables when it is taken
+      const k0 = Folk.hash(a.p.seed, 41, (this.time / 60) | 0) % seats.length;
+      for (let i = 0; i < seats.length && !act.spot; i++) { const s = seats[(k0 + i) % seats.length]; if (!vil.agents.some(o => o !== a && o.act && o.act.spot && o.act.spot[0] === s[0] && o.act.spot[2] === s[2])) act.spot = s.slice(); }
+      if (!act.spot) { act.type = 'plaza'; return; }
+    }
+    if (a.pose === 'sit') { if (Math.random() < dt * 0.04 && this.near(a, 12)) a.say(Folk.say('cafe', Folk.hash(a.p.seed, 18, (this.time / 7) | 0), { v: vil.name }), 3); if (act.t > 90) act.done = true; return; }
+    if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 0.8)) this.sit(a, act.spot);
+  };
 })(VR);

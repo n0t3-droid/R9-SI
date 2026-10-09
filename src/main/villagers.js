@@ -48,8 +48,47 @@
   V.TRAITS = ['cheerful', 'curious', 'shy', 'dreamy', 'jokester', 'wise', 'kind', 'energetic'];
   V.LIKES = ['stars', 'bread', 'starships', 'flowers', 'crystals', 'music', 'rain', 'books', 'gardening', 'stories'];
 
+  // ---------------------------------------------------------------- the villager budget of a town
+  // kindsOf: the members of every home ('adult', 'elder', 'child'); max: the town's budget (plan.folkCap.max, vgen 9). The
+  // biggest families shrink — a child first, else their last member — until the town's people fit; a family keeps one
+  // member at least. No budget (the towns of older worlds): the families stay as they are.
+  V.fitBudget = function (kindsOf, max) {
+    if (!(max > 0)) return kindsOf;
+    let total = 0;
+    for (const k of kindsOf) total += k.length;
+    while (total > max) {
+      let best = -1;
+      for (let i = 0; i < kindsOf.length; i++) if (kindsOf[i].length > 1 && (best < 0 || kindsOf[i].length > kindsOf[best].length)) best = i;
+      if (best < 0) break;
+      const K = kindsOf[best], ci = K.lastIndexOf('child');
+      K.splice(ci >= 0 ? ci : K.length - 1, 1);
+      total--;
+    }
+    return kindsOf;
+  };
+  // the Weißstadt's clothes (the hall city, style 'hall'; the owner's reference pictures' palette): robes and coats in
+  // white, cream, blue-grey and brown with gold trims for the grown-ups, a shopping bag or a basket in hand, the children
+  // in the same colours. Only the clothes change: the proportions stay folkmodel.js's own (never a figure-toy's).
+  const WEISS = V.WEISS = {
+    robe: [0xF4F0E6, 0xE8DCC0, 0xF2E8D2, 0x7C8CA0, 0x8E6A48], coat: [0xE8DCC0, 0x7C8CA0, 0x5A6A88, 0x7A5A3E, 0x8E6A48, 0xD8C49A, 0xF4F0E6],
+    pants: [0x4A3A2C, 0x3A3A40, 0x5A4A3A, 0x2E3440], kid: [0xF4F0E6, 0x7C8CA0, 0xE8DCC0, 0x8E6A48, 0x5A6A88, 0xD8C49A], trim: 0xD8B048,
+  };
+  const weiss = (L, r, R0, age) => {
+    if (age === 'child') { L.shirt = WEISS.kid[r(17) % WEISS.kid.length]; L.pants = WEISS.pants[r(18) % WEISS.pants.length]; return L; }
+    const k = r(17);
+    L.garb = (k % 5) < 2 || (age === 'elder' && (k & 1)) ? 'robe' : 'coat';
+    L.shirt = (L.garb === 'robe' ? WEISS.robe : WEISS.coat)[r(18) % (L.garb === 'robe' ? WEISS.robe.length : WEISS.coat.length)];
+    L.pants = WEISS.pants[r(19) % WEISS.pants.length];
+    L.trim = WEISS.trim; L.dress = false;
+    // in hand: a shopping bag or a basket (the trades keep their own tools: the baker's bread, the scholar's book)
+    const tl = R0.tool;
+    if (!tl || tl === 'hoe' || tl === 'can' || tl === 'hammer' || tl === 'cane') { const q = r(20) % 10; L.tool = age === 'elder' ? (q < 3 ? 'basket' : null) : q < 5 ? 'bag' : q < 8 ? 'basket' : null; }
+    return L;
+  };
+
   // ---------------------------------------------------------------- appearance
-  V.look = function (seed, role, age, parentLook) {
+  // style: the town's style (plan.style): 'hall' dresses the people of the Weißstadt
+  V.look = function (seed, role, age, parentLook, style) {
     const r = (k) => hash(seed, k, 911);
     const R0 = ROLES[role] || ROLES.farmer;
     const skin = parentLook && (r(1) & 3) ? parentLook.skin : SKIN[r(1) % SKIN.length];
@@ -57,7 +96,7 @@
     if (age === 'elder') hair = (r(2) & 1) ? 0xE8E8E8 : 0xB8B8B8;
     let hs = STYLES_H[r(3) % STYLES_H.length];
     if (age === 'elder' && (r(3) & 3) === 0) hs = 'bald';
-    return {
+    const L = {
       skin, hair, hs, age, role,
       shirt: R0.shirts[r(4) % R0.shirts.length],
       pants: PANTS[r(5) % PANTS.length],
@@ -73,9 +112,10 @@
       emblem: r(15) % 12,
       lashes: (r(16) & 1) === 1,
     };
+    return style === 'hall' && role !== 'hero' ? weiss(L, r, R0, age) : L;
   };
   // (the helmet and the white panels join the key only when a suit has them: the villagers' keys stay as they were)
-  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '');
+  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '') + (L.garb ? ':' + L.garb + ':' + (L.trim | 0) : '');
 
   // ---------------------------------------------------------------- heroes (players): armour suits from the trailer
   V.SKIN = SKIN; V.HAIR = HAIR; V.HAIR_STYLES = STYLES_H.slice(0, 9);
