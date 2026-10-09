@@ -384,18 +384,31 @@
     // the patio in a planter, round trees and blossom bushes, loungers on the lawn
     // (green all over: the body is moss, and grass only on a top whose four sides are covered — a grass block's side
     //  is dirt, and on the steps' edges it read as brown cliffs)
+    // vgen 9 (t-beauty): a smooth hill — the dome's steps at most one block between neighbours (the cells relaxed from
+    // the rim inward) and grass on every top, so the Nahtlos look draws one soft green slope; vgen 8's steps of two to
+    // four read from the garden as dark stepped boxes of moss
+    const soft = !!(o && o.vgen >= 9);
+    // (soft: the cells the garden's bushes, flowers and round trees take over afterwards stay out of the hill — a bush set
+    //  into a mound's flank left a step of two beside it)
+    const keepOut = new Set();
+    if (soft) { for (const [u, v] of [[7, G.v1 + 4], [17, G.v1 + 4], [9, G.v1 + 9], [15, G.v1 + 9], [10, G.v1 + 4], [14, G.v1 + 4]]) keepOut.add(u + ',' + v); for (const u of [9, 15]) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) keepOut.add((u + a) + ',' + (G.v1 + 6 + b)); }
     const mound = (cu, cv, ru, rv, h) => {
       const top = {}, at = (u, v) => top[u + ',' + v] | 0;
       for (let v = Math.floor(cv - rv); v <= Math.ceil(cv + rv); v++) for (let u = Math.floor(cu - ru); u <= Math.ceil(cu + ru); u++) {
-        if (u < 1 || u >= W - 1 || v <= G.v1 + 2 || v >= D - 1 || isPath(u, v)) continue;
+        if (u < 1 || u >= W - 1 || v <= G.v1 + 2 || v >= D - 1 || isPath(u, v) || keepOut.has(u + ',' + v)) continue;
         const d = Math.hypot((u + 0.5 - cu) / ru, (v + 0.5 - cv) / rv); if (d >= 1) continue;
         const hh = Math.round(h * Math.sqrt(1 - d * d)); if (hh >= 1) top[u + ',' + v] = hh;
+      }
+      if (soft) for (let pass = 0; pass < 8; pass++) {
+        let changed = false;
+        for (const k in top) { const [u, v] = k.split(',').map(Number); const lo = Math.min(at(u + 1, v), at(u - 1, v), at(u, v + 1), at(u, v - 1)); if (top[k] > lo + 1) { top[k] = lo + 1; changed = true; } }
+        if (!changed) break;
       }
       for (const k in top) {
         const [u, v] = k.split(',').map(Number), hh = top[k];
         for (let y = 0; y < hh - 1; y++) put(u, y, v, 'moss_block');
         const covered = at(u + 1, v) >= hh && at(u - 1, v) >= hh && at(u, v + 1) >= hh && at(u, v - 1) >= hh;
-        put(u, hh - 1, v, covered ? 'grass_block' : 'moss_block');
+        put(u, hh - 1, v, soft || covered ? 'grass_block' : 'moss_block');
       }
       return at;
     };

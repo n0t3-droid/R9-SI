@@ -189,6 +189,29 @@ console.log('4 · nothing a generator places stands on air (vgen 9)');
   check(plaza8.sul > 0 && plaza9.sul === 0 && plaza9.props === 0, `beside the plaza: no sulfur crust floating at vgen 9 (${plaza9.sul}; vgen 8: ${plaza8.sul}), no prop on air (${plaza9.props})`);
 }
 
+// ---------------------------------------------------------------- 6 · the plaza's trees, the villa's mounds
+console.log('6 · the Gate Plaza\'s trees are the city\'s round trees in raised beds; Villa Nova\'s garden mounds are smooth hills (vgen 9)');
+{
+  // the plaza's eight trees and the two terrace trees: vgen 8 leaf-block blobs, vgen 9 the city's round tree in a bed
+  const count = (W) => { let leaves = 0, round = 0, kerb = 0; for (let cz = 1; cz <= 8; cz++) for (let cx = -3; cx <= 2; cx++) { const c = W.chunk(cx, cz); for (let y = 80; y < 110; y++) for (let col = 0; col < 256; col++) { const n = nameOf(c.blocks[(y << 8) | col]); if (n === 'oak_leaves') leaves++; else if (n === 'vm_tree_round_l') round++; else if (n === 'vollton_light_grey' && y >= 81) kerb++; } } return { leaves, round, kerb }; };
+  const p8 = count(W8), p9 = count(W9);
+  check(p8.leaves > 100 && p9.leaves === 0 && p9.round >= 48 * 8 && p9.kerb >= 12 * 8, `the plaza: vgen 8 ${p8.leaves} leaf blocks; vgen 9 ${p9.leaves} leaf blocks, ${p9.round} round-tree pieces, ${p9.kerb} bed kerb blocks`);
+  // the classic's back garden: two mounds; every step between neighbouring mound columns at most one block (Nahtlos
+  // draws them as a smooth slope — vgen 8's steps of two read as dark stepped boxes), every top grass
+  const PLAN = VG.plan2, mounds = (vgen) => {
+    const rec = new Map();
+    const L = VG.makeLot((x, y, z, s) => rec.set(x + ',' + y + ',' + z, s), 0, 0, 0);
+    PLAN.build(L, { w: 25, d: 31, F: 64, r: 0, ox: 0, oz: 0, kind: 'home' }, Object.assign({ index: PLAN.TRAILER, rng: new V.RNG(7), ground: () => 63, beds: 3 }, vgen ? { vgen } : {}));
+    const top = new Map();
+    for (let v = 21; v < 31; v++) for (let u = 0; u < 25; u++) { let h = 0, t = ''; for (let y = 64; y < 72; y++) { const n = nameOf(rec.get(u + ',' + y + ',' + v) || 0); if (n === 'moss_block' || n === 'grass_block' || n === 'dirt') { h = y - 63; t = n; } } if (h) top.set(u + ',' + v, [h, t]); }
+    let worst = 0, notGrass = 0;
+    for (const [k, [h, t]] of top) { const [u, v] = k.split(',').map(Number); if (t !== 'grass_block') notGrass++; for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const o = top.get((u + du) + ',' + (v + dv)); worst = Math.max(worst, h - (o ? o[0] : 0)); } }
+    return { cells: top.size, worst, notGrass };
+  };
+  const m8 = mounds(0), m9 = mounds(9);
+  check(m9.cells >= 30 && m9.worst <= 1 && m9.notGrass === 0, `Villa Nova's garden mounds: ${m9.cells} columns, the steepest step ${m9.worst}, ${m9.notGrass} tops not grass (vgen 8: steps of ${m8.worst}, ${m8.notGrass} moss tops)`);
+}
+
 // ---------------------------------------------------------------- 5 · Very Low
 // the mesher's triangles per chunk column within Very Low's render distance (4 chunks) of the audit's two Very Low
 // scenes (test/beauty_audit.mjs COST=1: the crescent's west end — its turning circle — and the lawn between the villa
