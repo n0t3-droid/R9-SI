@@ -319,7 +319,8 @@
       }
     }
     // ---- sky islands (terrain) ----
-    const ISL = g._islStates || (g._islStates = { tuff: st('tuff') || S.stone, andesite: st('andesite') || S.stone, granite: st('granite') || S.stone });
+    const ISL = g._islStates || (g._islStates = { tuff: st('tuff') || S.stone, andesite: st('andesite') || S.stone, granite: st('granite') || S.stone,
+      moss: st('moss_block') || S.dirt, strata: [S.ochre, S.umber, S.terraOrange, S.ochre, S.terraBrown, S.umber, S.terraRed].map(s => s || S.dirt) });
     const isl = new Array(256);
     for (let col = 0; col < 256; col++) {
       const x = x0 + (col & 15), z = z0 + (col >> 4);
@@ -339,6 +340,12 @@
           const depth = I.top - y, band = (y + ((I.isle ? I.isle.seed : 0) & 7)) % 9;
           if (prism) s = Math.abs(v) < 0.05 ? S.aetherStone : S.duskrock;
           else if (ember) s = band < 3 ? S.ochre : S.umber;
+          else if (g.vgen >= 9 && !(I.isle && I.isle.designed) && depth > 4 && (depth <= 4 + 6 + ((I.isle ? I.isle.seed : 0) % 5) || y - I.bottom <= 2)) {
+            // vgen 9 (t-beauty): the trailer's islands (TRAILER.md §3.6, t1_07 · t1_09): under four of soil, six to ten
+            // bands of warm strata (ochre, umber, terracotta), and at the dangling tips moss among the dark tuff — seen
+            // from a ridge, vgen 8's islands hung as grey cones of stone over the horizon (beauty_audit run 2, far_2)
+            s = y - I.bottom <= 2 && depth > 10 ? (rng.chance(0.55) ? ISL.moss : ISL.tuff) : ISL.strata[(y + ((I.isle ? I.isle.seed : 0) & 7)) % ISL.strata.length];
+          }
           else if (depth <= 6) s = band < 2 ? S.coarse || S.dirt : S.dirt;
           else if (y - I.bottom <= 3) s = ISL.tuff;
           else s = Math.abs(v) < 0.05 ? ISL.andesite : band === 0 ? ISL.granite : band === 4 ? ISL.andesite : S.stone;

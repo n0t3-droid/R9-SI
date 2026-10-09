@@ -8,6 +8,9 @@
 //   3. every side of every storey of a Villa Nova keeps a window within four blocks (the vgen-8 family unchanged)
 //   4. nothing a generator places stands on air (the Pod Hills' lamps and bushes, a sulfur spring's crust)
 //   5. Very Low: the chunk triangles at the audit's two Very Low scenes within 1 % of vgen 8 (SKIP_COST=1 skips it)
+//   6. the Gate Plaza's trees are the city's round trees in raised beds; Villa Nova's garden mounds are smooth hills
+//   7. a floating island's sides: four of soil, six to ten bands of warm strata, grey rock, moss among the tuff at the
+//      tips (TRAILER.md §3.6) — and the far rings colour its sides warm, not grey stone; a vgen-8 world keeps its islands
 //   bash test/wt_run.sh beauty_rules.js 600
 const V = require('./load_shared.js');
 const R = V.R, F = V.F, VG = V.VillageGen, HEART = V.Heart;
@@ -210,6 +213,48 @@ console.log('6 · the Gate Plaza\'s trees are the city\'s round trees in raised 
   };
   const m8 = mounds(0), m9 = mounds(9);
   check(m9.cells >= 30 && m9.worst <= 1 && m9.notGrass === 0, `Villa Nova's garden mounds: ${m9.cells} columns, the steepest step ${m9.worst}, ${m9.notGrass} tops not grass (vgen 8: steps of ${m8.worst}, ${m8.notGrass} moss tops)`);
+}
+
+// ---------------------------------------------------------------- 7 · the islands' layered sides
+console.log('7 · a floating island\'s sides: soil, warm strata, grey rock, moss at the tips (vgen 9)');
+{
+  const STRATA = new Set(['ochre_rock', 'umber_rock', 'orange_terracotta', 'brown_terracotta', 'red_terracotta']);
+  const TIP = new Set(['moss_block', 'tuff']);
+  // the first plain islands (not ember, not prism, no designed one) of a spread of island cells far beyond the Heartland
+  W9.g.islandAt(0, 0);
+  const isles = [];
+  for (let j = 14; j < 60 && isles.length < 4; j++) for (let i = 14; i < 60 && isles.length < 4; i++) {
+    const I = W9.g.islandCell(i, j); if (!I || I.r < 14) continue;
+    const cl = W9.g.climateAt(Math.round(I.x), Math.round(I.z)); if (cl.ember > 0.3 || cl.prism > 0.3) continue;
+    isles.push(I);
+  }
+  // their columns on a 3-block grid: what lies under the soil (depth 5 … 10) and at the dangling tips
+  const tally = (W) => {
+    const t = { cols: 0, band: 0, bandStrata: 0, tips: 0, tipMoss: 0, tipOk: 0, strataAnywhere: 0, tops: 0 };
+    for (const I of isles) for (let dz = -I.r; dz <= I.r; dz += 3) for (let dx = -I.r; dx <= I.r; dx += 3) {
+      const x = Math.round(I.x + dx), z = Math.round(I.z + dz), sh = W.g.islandAt(x, z);
+      if (!sh || !sh.isle || sh.isle.x !== I.x || sh.isle.z !== I.z || sh.top - sh.bottom < 14) continue;   // (each world its own island records)
+      const cl = W.g.climateAt(x, z); if (cl.ember > 0.45 || cl.prism > 0.45) continue;
+      t.cols++;
+      if (nameOf(W.at(x, sh.top, z)) === 'grass_block' || nameOf(W.at(x, sh.top, z)) === 'snow_block') t.tops++;
+      for (let y = sh.bottom; y < sh.top; y++) {
+        const n = nameOf(W.at(x, y, z)), depth = sh.top - y;
+        if (STRATA.has(n)) t.strataAnywhere++;
+        if (depth >= 5 && depth <= 10 && y - sh.bottom > 2) { t.band++; if (STRATA.has(n)) t.bandStrata++; }
+        if (y - sh.bottom <= 2 && depth > 10) { t.tips++; if (n === 'moss_block') t.tipMoss++; if (TIP.has(n)) t.tipOk++; }
+      }
+    }
+    return t;
+  };
+  const t8 = tally(W8), t9 = tally(W9);
+  check(isles.length === 4 && t9.cols >= 60, `four plain islands far out, ${t9.cols} of their columns (${isles.map(I => Math.round(I.x) + '/' + Math.round(I.z) + ' r' + Math.round(I.r)).join(', ')})`);
+  check(t9.band > 0 && t9.bandStrata >= t9.band * 0.97, `vgen 9: under the soil the warm strata — ${t9.bandStrata} of ${t9.band} blocks at depth 5 … 10 (vgen 8: ${t8.bandStrata})`);
+  check(t9.tips > 0 && t9.tipOk >= t9.tips * 0.85 && t9.tipMoss >= t9.tips * 0.3, `vgen 9: the tips moss among the tuff — ${t9.tipMoss} moss, ${t9.tipOk} moss or tuff of ${t9.tips} (the rest ore and crystal)`);
+  check(t8.strataAnywhere === 0 && t8.cols === t9.cols && t8.tops === t9.tops && t9.tops >= t9.cols * 0.95, `vgen 8 keeps its islands: no strata block in ${t8.cols} columns (${t8.strataAnywhere}), the same tops (vgen 8 ${t8.tops}, vgen 9 ${t9.tops} of ${t9.cols} grass or snow, the rest the falls' rim pools)`);
+  // the far rings (far.js ring 1, lod.js ring 2) draw an island's sides in one colour: vgen 9 warm, vgen 8 grey stone
+  const LOD = V.LOD, P = LOD.palette(), plain = { ember: 0, prism: 0, t: 0.3 };
+  const s8 = LOD.isleSide(W8.g, P, plain), s9 = LOD.isleSide(W9.g, P, plain), hex = (c) => '#' + c.map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+  check(s8 === P.stone && s9[0] > s9[2] + 30 && s9[0] > s9[1] + 10, `the far rings: an island's sides ${hex(s9)} at vgen 9 (vgen 8 grey stone ${hex(s8)}); ember ${hex(LOD.isleSide(W9.g, P, { ember: 0.6, prism: 0 }))} and prism ${hex(LOD.isleSide(W9.g, P, { ember: 0, prism: 0.6 }))} as before`);
 }
 
 // ---------------------------------------------------------------- 5 · Very Low
