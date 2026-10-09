@@ -985,24 +985,29 @@
 
     // ------------------------------------------------ F9 · Fern-Cache (q.farCache; the rules: ultralite.js UL.Far)
     // render() asks here before the sky. null: the frame is drawn as before (the cache is off, not ready, too far off,
-    // or the eye moves faster than a run). Else the cached sky and far world (the sections beyond half the render
-    // distance, ring 1, the horizon tiles) have been composited into the scene — colour and depth, reprojected — and the
-    // answer lists the near sections render() draws live over them. A new cache is drawn into the second buffer a slice a
-    // frame (UL.Far.SLICES) while this one is shown, then the two swap: no frame pays for the whole far world.
+    // or the eye moves faster than a run or turns faster than TURN_FAST). Else the cached sky and far world (the sections
+    // beyond half the render distance, ring 1, the horizon tiles) have been composited into the scene — colour and depth,
+    // reprojected — and the answer lists the near sections render() draws live over them. A new cache is drawn into the
+    // second buffer a vertical strip a frame (UL.Far.SLICES) while this one is shown (or, with none to show, while the
+    // frames draw live), then the two swap: no frame pays for the whole far world.
     farFrame(F, E, world, vis, camPos) {
-      const FC = VR.UL.Far, cam = F.cam, now = performance.now();
-      const st = this.fc || (this.fc = { front: this.fcLayer(), back: null, spare: this.fcLayer(), near: [], part: [], speed: 0, last: null, eye: [0, 0, 0] });
-      // the eye's speed (smoothed): a flight draws everything live (every frame would begin a new cache)
-      if (st.last) { const dt = (now - st.last[3]) / 1000; if (dt > 0) { const v = Math.hypot(cam.x - st.last[0], cam.y - st.last[1], cam.z - st.last[2]) / dt; st.speed += (Math.min(500, v) - st.speed) * Math.min(1, dt * 4); } }
-      st.last = [cam.x, cam.y, cam.z, now];
+      const FC = VR.UL.Far, cam = F.cam, now = performance.now(), fw = this.camFwd;
+      const st = this.fc || (this.fc = { front: this.fcLayer(), back: null, spare: this.fcLayer(), near: [], speed: 0, turn: 0, last: null });
+      // the eye's speed and turn rate (smoothed): a flight or a quick look round draws everything live (every frame would
+      // begin a new cache, and a cache would be off before it is done)
+      const L = st.last;
+      if (L) { const dt = (now - L[3]) / 1000; if (dt > 0) { const v = Math.hypot(cam.x - L[0], cam.y - L[1], cam.z - L[2]) / dt, om = Math.acos(Math.max(-1, Math.min(1, fw[0] * L[4] + fw[1] * L[5] + fw[2] * L[6]))) / dt; st.speed += (Math.min(500, v) - st.speed) * Math.min(1, dt * 4); st.turn += (Math.min(60, om) - st.turn) * Math.min(1, dt * 8); } }
+      const l = st.last || (st.last = new Float64Array(7)); l[0] = cam.x; l[1] = cam.y; l[2] = cam.z; l[3] = now; l[4] = fw[0]; l[5] = fw[1]; l[6] = fw[2];
       if (st.speed > FC.FAST) { st.front.ok = false; this.fcCancel(st); this.stats.farCache = 'fast'; return null; }
-      const fw = this.camFwd, info = st.info || (st.info = {});
+      if (st.turn > FC.TURN_FAST) { this.fcCancel(st); this.stats.farCache = 'turning'; return null; }
+      const info = st.info || (st.info = {});
       info.x = cam.x; info.y = cam.y; info.z = cam.z; info.fx = fw[0]; info.fy = fw[1]; info.fz = fw[2]; info.fov = cam.fov; info.aspect = this.W / this.H;
+      // a cache still being drawn for an eye already too far off is dropped (a jump, a turn)
+      if (st.back && !FC.within(st.back, info)) this.fcCancel(st);
       const why = FC.stale(st.front, info, now, E.sunDir, this.w, this.h, this.q.farSlow);
       if (why && !st.back) this.fcBegin(st, F, E, world, vis, info, now);
       if (st.back) this.fcSlice(st, F, E);
-      // nothing to show yet (the first frame) or the shown cache too far off: the new one is finished now
-      if (!FC.showable(st.front, info) && st.back) { while (st.back) this.fcSlice(st, F, E); }
+      // nothing to show (yet) or the shown cache too far off: this frame draws live (the new one goes on a strip a frame)
       if (!FC.showable(st.front, info)) { this.stats.farCache = 'live'; return null; }
       this.fcComposite(st, F);
       this.stats.farCache = why || 'cached';
@@ -1042,6 +1047,16 @@
       b.scale[0] = os.sx; b.scale[1] = os.sy; b.R = FC.near(world.renderDist);
       mat4.perspective(b.proj, os.fov, os.aspect, 0.06, F.cam.far || 1200);
       mat4.mul(b.vp, b.proj, this.view); mat4.invert(b.inv, b.vp); mat4.frustum(b.planes, b.vp);
+      // the strips' frustums (a strip's columns cropped to the whole clip range: what lies outside it is not drawn there)
+      const K = FC.SLICES, C = this.fcCrop || (this.fcCrop = mat4.create()), T = this.fcTmp || (this.fcTmp = mat4.create());
+      if (!b.strips) b.strips = [];
+      for (let k = 0; k < K; k++) {
+        const [x0, x1] = FC.strip(k, K, tw), n0 = 2 * x0 / tw - 1, n1 = 2 * x1 / tw - 1, sx = 2 / Math.max(1e-6, n1 - n0);
+        C.fill(0); C[0] = sx; C[5] = 1; C[10] = 1; C[15] = 1; C[12] = -(n0 + n1) / 2 * sx;
+        mat4.mul(T, C, b.vp);
+        if (!b.strips[k]) b.strips[k] = new Float32Array(24);
+        mat4.frustum(b.strips[k], T);
+      }
       b.camInt[0] = this.camInt[0]; b.camInt[1] = this.camInt[1]; b.camInt[2] = this.camInt[2];
       b.camFrac[0] = this.camFrac[0]; b.camFrac[1] = this.camFrac[1]; b.camFrac[2] = this.camFrac[2];
       b.cam = Object.assign({}, F.cam);
@@ -1056,28 +1071,28 @@
       b.k = 0; b.ok = false;
       this.stats.farBegun = (this.stats.farBegun || 0) + 1;
     }
-    // one slice of the cache being drawn: slice 0 clears it and draws the sky, the middle ones a share of the far
-    // sections, the last one ring 1 and the horizon tiles; then the two caches swap
+    // one strip of the cache being drawn (strip 0 first clears it all): within its columns the sky, the far sections
+    // (culled by the strip's frustum) and ring 1 with the horizon tiles (they cull by r.planes too); after the last one
+    // the two caches swap. Each frame pays about a SLICES-th of the far world, whatever lies where.
     fcSlice(st, F, E) {
-      const FC = VR.UL.Far, gl = this.gl, b = st.back, K = FC.SLICES;
+      const FC = VR.UL.Far, gl = this.gl, b = st.back, K = FC.SLICES, k = b.k;
       const sv = [this.viewProj, this.invViewProj, this.planes, this.camFrac, this.camInt, this.cam];
-      this.viewProj = b.vp; this.invViewProj = b.inv; this.planes = b.planes; this.camFrac = b.camFrac; this.camInt = b.camInt; this.cam = b.cam;
+      this.viewProj = b.vp; this.invViewProj = b.inv; this.planes = b.strips[k]; this.camFrac = b.camFrac; this.camInt = b.camInt; this.cam = b.cam;
       gl.bindFramebuffer(gl.FRAMEBUFFER, b.fb); gl.viewport(0, 0, b.tw, b.th);
-      if (b.k === 0) {
-        gl.depthMask(true); gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-        gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
-        const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
-        if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);
-        gl.uniformMatrix4fv(p.u.u_invViewProj, false, b.inv);
-        if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);
-        this.fs(p);
-      }
+      gl.disable(gl.SCISSOR_TEST);
+      if (k === 0) { gl.depthMask(true); gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); }
+      const [x0, x1] = FC.strip(k, K, b.tw);
+      gl.enable(gl.SCISSOR_TEST); gl.scissor(x0, 0, x1 - x0, b.th);
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+      const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
+      if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);
+      gl.uniformMatrix4fv(p.u.u_invViewProj, false, b.inv);
+      if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);
+      this.fs(p);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
-      if (b.k < K - 1) {
-        const [s, e] = FC.slice(b.list.length, K - 1, b.k), part = st.part; part.length = 0;
-        for (let i = s; i < e; i++) part.push(b.list[i]);
-        this.fcTerrain(part, E, [b.x, b.y, b.z]);
-      } else if (F.horizon) F.horizon.draw(this, E);
+      this.fcTerrain(b.list, E, [b.x, b.y, b.z]);
+      if (F.horizon) F.horizon.draw(this, E);
+      gl.disable(gl.SCISSOR_TEST);
       this.viewProj = sv[0]; this.invViewProj = sv[1]; this.planes = sv[2]; this.camFrac = sv[3]; this.camInt = sv[4]; this.cam = sv[5];
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, this.w, this.h);
       if (++b.k < K) return;

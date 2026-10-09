@@ -9,7 +9,8 @@
 //   walks    stream: 200 m from the hall (Ultra · Leicht south, Ultra north: fresh land for both), nothing drawn, every
 //            frame's main-thread time = the loop + the worker messages handled since the frame before (a frame over
 //            40 ms is a hitch); shadow: 60 m back with the day running, only the shadow work drawn
-//   Very Low: MODE=potato measures its frames at the three scenes (with DIST=<a v0.43 dist> TAG=before: the before numbers)
+//   Very Low and High: MODE=potato measures their frames at the three scenes (PRESETS=potato,high; with DIST=<a v0.43
+//            dist> TAG=before: the before numbers)
 // usage: bash test/wt_run.sh ultralite.mjs 3600   ·   MODE=potato DIST=file:///…/index.html TAG=before …
 //   SCENES=hall,plaza,village · WALK=0 skips the walks · N=3 timed frames · RD=8 the render distance of every preset
 //   (one worker on this 2-CPU machine: Ultra's 16 chunks would take many minutes a scene; the far ring stays 64)
@@ -89,7 +90,8 @@ const instrument = () => ev(() => {
   };
 });
 const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
-const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, arr: w.arrivals ? w.arrivals.length : 0 }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && s.arr === 0 && i > 2) return true; await wait(60); } return false; };
+let window_last = null;   // (the last state settle saw: what is still loading when it gives up)
+const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, arr: w.arrivals ? w.arrivals.length : 0 }; }); window_last = s; if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && s.arr === 0 && i > 2) return true; await wait(60); } return false; };
 const warmVx = () => ev(() => {
   const g = VR.game, r = g.renderer, p = g.player; if (!r.vxResidency || !g.world) return -1;
   const cam = [p.pos[0], p.pos[1] + (p.eye || 1.62), p.pos[2]], list = [];
@@ -99,15 +101,19 @@ const warmVx = () => ev(() => {
   return n;
 });
 const groundY = (x, z) => ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = 160; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return 80; }, [x, z]);
-const place = async (x, z, eye, yaw, pitch) => {
+const place = async (x, z, eye, yaw, pitch, max = 400) => {
   await ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 130, z); }, [x, z]);
-  const ok0 = await settle(400);
+  const ok0 = await settle(max);
   const feet = typeof eye === 'object' ? eye.y : (await groundY(x, z)) + 1 + (eye - 1.62);
   await ev(([x, y, z, yaw, pitch]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; p.vel = [0, 0, 0]; g.settings.fov = 75; g.env.setTime(6000); const e = g.entities; if (e && e.mobs) e.mobs.length = 0; }, [x, feet, z, yaw, pitch]);
   const ok1 = await settle(400); await step(6);
-  if (!ok0 || !ok1) console.log(`  (not settled: ${ok0} ${ok1})`);
+  if (!ok0 || !ok1) console.log(`  (not settled: ${ok0} ${ok1} — ${JSON.stringify(window_last)})`);
+  place.ok = ok0 && ok1;
   return feet;
 };
+// the far ring's queued jobs held (and given back): while a scene's two presets are measured nothing more arrives, so
+// both see the same world; the near world is settled first, the far ring as far as it got in the settle before
+const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (on) pool.__heldFar = (pool.__heldFar || []).concat(pool.queueFar.splice(0)); else if (pool.__heldFar) { for (const j of pool.__heldFar) pool.queueFar.push(j); pool.__heldFar = null; pool.queueDirty = true; if (pool.pump) pool.pump(); } return pool.queueFar.length + (pool.__heldFar ? pool.__heldFar.length : 0); }, on);
 const setPreset = (p) => ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = rd; g.applySettings('*'); }, [p, RD]);
 // frames drawn and timed (each synced); the clouds' clock pinned so two presets' pictures show the same sky
 const frames = (n) => ev((n) => { const g = VR.game, r = g.renderer, out = []; window.__norender = false; for (let i = 0; i < n; i++) { g.env.anim = 500; window.__sync(); const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); out.push({ ms: performance.now() - t0, draws: r.stats.draws, tris: r.stats.tris, fc: r.stats.farCache || '', tiles: r.stats.shadowTiles || 0 }); } window.__norender = true; return out; }, n);
@@ -200,14 +206,17 @@ const CAM = {
   village: vsite ? [vsite[0] + 22.5, vsite[1] + 22.5, 1.62, Math.atan2(22.5, 22.5), -0.06] : null,
 };
 const res = { scenes: {}, walks: {} };
-const presets = MODE === 'potato' ? ['potato'] : ['ultra', 'ultraLite'];
+const presets = MODE === 'potato' ? (process.env.PRESETS || 'potato,high').split(',') : ['ultra', 'ultraLite'];   // (MODE=potato: Very Low and High, before/after)
 for (const sc of SCENES) {
   const c = CAM[sc]; if (!c) { console.log(`  ${sc}: no camera (no village found)`); continue; }
   res.scenes[sc] = {};
+  const PAIR = MODE === 'full';
   for (const p of presets) {
     if (!have.includes(p)) { console.log(`  ${TAG}: no preset ${p} in this build`); continue; }
     await setPreset(p);
-    const feet = await place(c[0], c[1], c[2], c[3], c[4]);
+    const first = p === presets[0] || !PAIR;
+    const feet = await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
+    if (PAIR && first) { const held = await holdFar(true); await settle(400); console.log(`  ${sc}: settled ${place.ok}, the far ring's ${held} queued jobs held for the pair`); }
     const m = await measure(p === 'ultraLite');
     res.scenes[sc][p] = m;
     console.log(`  ${sc} ${p} (feet ${typeof feet === 'number' ? feet.toFixed(1) : feet}): ${JSON.stringify(m)}`);
@@ -222,6 +231,7 @@ for (const sc of SCENES) {
     check(l.frameMs < u.frameMs, `${sc}: a steady Ultra · Leicht frame costs less than Ultra's (${l.frameMs} < ${u.frameMs} ms)`);
     check(d.mean < 6 && d.big < 8, `${sc}: the two pictures look the same (mean difference ${d.mean}/255, ${d.big} % of the pixels off by more than 1/10)`);
   }
+  await holdFar(false);
 }
 if (WALK) {
   for (const [p, to] of [['ultraLite', [0.5, -209.5]], ['ultra', [0.5, 190.5]]]) {
