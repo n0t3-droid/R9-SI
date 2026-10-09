@@ -337,7 +337,7 @@ console.log('6 · the lamp halos after dark');
   try { require(__dirname + '/../src/main/particles.js'); P = V.Particles; } catch (e) { console.log('    ' + String(e && e.message || e).slice(0, 160)); }
   const HS = P && P.haloStates ? P.haloStates() : null;
   const S = (n, pr) => R.S(n, pr);
-  const area = [['vx_floor_plaza_line'], ['vx_floor_plaza_line_amber'], ['vx_nova_window', { facing: 0 }], ['vx_nova_band', { glow: 3 }], ['vx_nova_band', { glow: 1 }], ['vx_led_strip']];
+  const area = [['vx_floor_plaza_line'], ['vx_floor_plaza_line_amber'], ['vx_nova_window', { facing: 0 }], ['vx_nova_band', { glow: 3 }], ['vx_nova_band', { glow: 1 }], ['vx_led_strip'], ['vx_spot']];
   const point = [['lantern'], ['torch'], ['vx_lamppost_tech', { head: 1 }], ['vx_lantern'], ['vx_garden_lamp']];
   const badA = area.filter(([n, pr]) => !HS || HS[S(n, pr)]).map(a => a[0]), badP = point.filter(([n, pr]) => !HS || !HS[S(n, pr)] || !R.T.emit[S(n, pr)]).map(a => a[0]);
   check(!!HS && !badA.length && !badP.length, `halos for the point lights only (area lights with a halo: ${badA.join(', ') || 'none'}; point lights without: ${badP.join(', ') || 'none'})`);

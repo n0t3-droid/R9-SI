@@ -161,7 +161,8 @@
     }
   }
   // the area lights: no halo (the light lines, strips and bands, the hex floor lights, the lit railings, the Villa Nova
-  // pieces — window, slab edge, pad, treads — the temple's slits and light bars, the portal veil)
-  Particles.HALO_AREA = /plaza_line|_strip|led_|nova_|light_bar|neon_|hex_light|floor_hex|floor_pad|railing|cove|ledbar|portal_veil|temple_slit/;
+  // pieces — window, slab edge, pad, treads — the temple's slits and light bars, the portal veil) and the recessed ceiling
+  // spots (run 2: every villa's hall spots hung as big warm blobs in the air behind its glass)
+  Particles.HALO_AREA = /plaza_line|_strip|led_|nova_|light_bar|neon_|hex_light|floor_hex|floor_pad|railing|cove|ledbar|portal_veil|temple_slit|^vx_spot$/;
   VR.Particles = Particles;
 })(VR);
