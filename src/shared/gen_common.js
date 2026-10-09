@@ -54,6 +54,49 @@
   GEN.ColumnWriter = ColumnWriter;
 
   // ---------------------------------------------------------------------------
+  // F-NoCrystal: new worlds (vgen ≥ 9) generate no crystal of any kind, large or small (the owner's wish); every crystal
+  // source of the generators asks this one gate. A generator made with the option noCrystal (the title panorama: a
+  // vgen-5 world that is only looked at) asks it too. Older worlds keep their crystals (and their chunks) exactly.
+  GEN.NOCRY_VGEN = 9;
+  GEN.noCry = (g) => !!g && ((g.vgen | 0) >= GEN.NOCRY_VGEN || g.noCrystal === true);
+  // a natural rock pinnacle where a crystal spire stood: a round needle tapering gently to a blunt top, its outline
+  // wobbling a little and stepping out in a ledge now and then (a hash of the cell and o.seed: no draw from the caller's
+  // random stream), leaning a few blocks at most, sunk `root` rows into the ground.
+  //   o: { h, r (the foot's radius), lean: [dx, dz] of the top, mat(x, y, z, f) → state (f = 0 foot … 1 top),
+  //        top: the top row's state (moss, grass) or 0, root (default 2), seed,
+  //        keep(state) → true leaves a cell holding that block as it is (a building beside the rock) }
+  // rock replaces what is there (w.set; a writer with ok() — a chunk's ColumnWriter — is asked first, so the material is
+  // only worked out for the cells of its own chunk); returns the y of the top row.
+  // A chunk's ColumnWriter (x0, z0) is visited over its own 16 × 16 columns only: the realm features run for a chunk and
+  // its eight neighbours through the chunk's writer, so most passes over a rock miss it — they now cost nothing (the
+  // same cells are written: the ones beyond the chunk were refused by ok() anyway; no draw, only hashes of the cell)
+  GEN.pinnacle = function (w, x, y, z, o) {
+    const H = VR.M.hash2, ok = w.ok ? (px, py, pz) => w.ok(px, py, pz) : null;
+    const h = Math.max(2, o.h | 0), r0 = Math.max(0.6, o.r), root = o.root === undefined ? 2 : o.root, seed = o.seed | 0;
+    const lx = o.lean ? o.lean[0] : 0, lz = o.lean ? o.lean[1] : 0;
+    const clip = !!ok && typeof w.x0 === 'number' && typeof w.z0 === 'number';
+    const X0 = clip ? w.x0 : -1e9, X1 = clip ? w.x0 + 15 : 1e9, Z0 = clip ? w.z0 : -1e9, Z1 = clip ? w.z0 + 15 : 1e9;
+    // (the whole rock beside the chunk: its widest row is r0 + 0.3, ri one more, the lean at most |lean| out)
+    const reach = r0 + 3;
+    if (clip && (x + Math.max(0, lx) + reach < X0 || x + Math.min(0, lx) - reach > X1 || z + Math.max(0, lz) + reach < Z0 || z + Math.min(0, lz) - reach > Z1)) return y + h - 1;
+    for (let t = -root; t < h; t++) {
+      const f = Math.max(0, t) / h;
+      const r = r0 * (1 - 0.45 * Math.pow(f, 1.2)) + ((H(t, seed, 0x51) & 3) === 0 ? 0.3 : 0);
+      const cx = x + lx * f * f, cz = z + lz * f * f, rx = Math.round(cx), rz = Math.round(cz), ri = Math.ceil(r + 0.5);
+      const dx0 = Math.max(-ri, X0 - rx), dx1 = Math.min(ri, X1 - rx), dz0 = Math.max(-ri, Z0 - rz), dz1 = Math.min(ri, Z1 - rz);
+      for (let dx = dx0; dx <= dx1; dx++) for (let dz = dz0; dz <= dz1; dz++) {
+        const px = rx + dx, pz = rz + dz, ex = px - cx, ez = pz - cz;
+        if (ok && !ok(px, y + t, pz)) continue;
+        const rr = r + ((H(px * 7 + t, pz * 13 - t, seed) & 255) / 255 - 0.5) * 0.5;
+        if (ex * ex + ez * ez > rr * rr) continue;
+        if (o.keep) { const cur = w.get(px, y + t, pz); if (cur > 0 && o.keep(cur)) continue; }
+        w.set(px, y + t, pz, t === h - 1 && o.top ? o.top : o.mat(px, y + t, pz, f));
+      }
+    }
+    return y + h - 1;
+  };
+
+  // ---------------------------------------------------------------------------
   // Tree builders. w: writer, (x,y,z) = base (first log block), rng
   const st = (n, p) => R.S(n, p);
   const leafState = (name) => st(name, { persistent: 0, distance: 1 });
@@ -464,9 +507,12 @@
     w.set(x + 1, y + h - 4, z + 1, st('lantern', { hanging: 0 }));
     if (w.ok(x + 1, y, z - 1)) { w.set(x + 1, y, z - 1, st('chest', { facing: 2 })); if (chestList) chestList.push([x + 1, y, z - 1, 'tower']); }
   };
-  STRUCT.geode = function (w, x, y, z, rng) {
+  // noCry (a vgen-9 world): the same hollow with the same draws, a dripstone pocket instead of an amethyst geode — a
+  // dripstone lining in the calcite and basalt shells, stalagmites on its floor and stalactites from its ceiling where
+  // the buds and clusters grew (nothing on its walls)
+  STRUCT.geode = function (w, x, y, z, rng, noCry) {
     const r = 4 + rng.int(2);
-    const bas = GEN.S().smoothbasalt, cal = GEN.S().calcite, am = st('amethyst_block'), bud = st('budding_amethyst');
+    const bas = GEN.S().smoothbasalt, cal = GEN.S().calcite, am = noCry ? GEN.S().dripblock : st('amethyst_block'), bud = noCry ? am : st('budding_amethyst');
     for (let dx = -r - 2; dx <= r + 2; dx++) for (let dy = -r - 2; dy <= r + 2; dy++) for (let dz = -r - 2; dz <= r + 2; dz++) {
       const d = Math.sqrt(dx * dx + dy * dy * 1.2 + dz * dz) + (rng.next() - 0.5) * 0.6;
       const cur = w.get(x + dx, y + dy, z + dz); if (cur < 0 || cur === GEN.S().bedrock) continue;
@@ -476,7 +522,7 @@
       else if (d > r - 1) w.set(x + dx, y + dy, z + dz, rng.chance(0.1) ? bud : am);
       else w.set(x + dx, y + dy, z + dz, 0);
     }
-    // crystals on inner surface
+    // crystals on inner surface (noCry: dripstone on its floor and ceiling)
     for (let i = 0; i < 40; i++) {
       const a = rng.next() * Math.PI * 2, b = Math.acos(2 * rng.next() - 1);
       const px = Math.round(x + Math.cos(a) * Math.sin(b) * (r - 1.5)), py = Math.round(y + Math.cos(b) * (r - 1.5)), pz = Math.round(z + Math.sin(a) * Math.sin(b) * (r - 1.5));
@@ -484,7 +530,12 @@
       for (let f = 0; f < 6; f++) {
         const nx = px - VR.DX[f], ny = py - VR.DY[f], nz = pz - VR.DZ[f];
         const g = w.get(nx, ny, nz);
-        if (g === am || g === bud) { const fac = [1, 3, 4, 5, 2, 0][f]; w.set(px, py, pz, st(['small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'amethyst_cluster'][rng.int(4)], { facing: fac })); break; }
+        if (g === am || g === bud) {
+          const fac = [1, 3, 4, 5, 2, 0][f], k = rng.int(4);
+          if (!noCry) w.set(px, py, pz, st(['small_amethyst_bud', 'medium_amethyst_bud', 'large_amethyst_bud', 'amethyst_cluster'][k], { facing: fac }));
+          else if (fac === 4 || fac === 5) w.set(px, py, pz, st('pointed_dripstone', { dir: fac === 4 ? 0 : 1 }));
+          break;
+        }
       }
     }
   };
