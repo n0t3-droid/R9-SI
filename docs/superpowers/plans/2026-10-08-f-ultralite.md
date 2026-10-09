@@ -192,8 +192,38 @@ Governor ladders (aqGpuRungs), from ultralite_preset.js:
 
 ## Known gaps
 
-(filled in at the end)
+- Measured in SwiftShader only (the CPU draws): the shares are relative; the owner's saving is an estimate until the
+  in-game ⚡ Automatik (which now starts integrated GPUs on Ultra · Leicht) runs on his Vega.
+- The far cache freezes what it holds for up to 500 ms: animated far things (water ripples beyond the near radius are
+  still drawn live — the translucent pass is not cached — but far flags, lights and the far ring's fades step) and the
+  far furniture's glass (only the near forms have glass anyway). A disocclusion while walking (≤ 1.5 m) shows the
+  cache's colour for a few frames at depth edges.
+- The cache is drawn at the screen's pixel density with a 7.5° overscan: 2 × the screen's pixels. Turning faster than
+  90°/s or running faster than 10 m/s the frames are drawn live (Ultra's cost, no hitch).
+- (c) the two-rate shadow map and (d) rotated PCF taps: not done (see the decisions). Cascades: not done.
+- Step 4 is not a multi-draw (see "As built"); the near furniture still draws per model.
+- Ultra is measured at render distance 8 (one worker on this 2-CPU machine); at 16 the far cache holds more (its near
+  radius is 128 blocks).
+- The seam light's spreading and the arrivals share the streaming budget; a block edit finishes pending seams at once
+  (rare: only while columns stream in next to the edit).
 
 ## Merge notes
 
-(filled in at the end)
+New file `src/main/ultralite.js` (VR.UL: Shadow, Stream, Far — pure rules) and `build.js` MAIN gets `'ultralite'`
+before `'renderer'`. Everything else is additive or behind the four switches (off on every preset but Ultra · Leicht):
+- renderer.js: render() calls `shadowFrame()` (the old four lines moved into its no-takt branch verbatim), asks
+  `farFrame()` before the sky (`near` replaces `vis` for the opaque terrain only when the cache is shown; the horizon and
+  the sky are skipped then), `liveProps()` instead of the inline drawProps call; drawProps/propGather take an optional
+  `split`; nearShadow() marks tiles first in the takt; drawSections draws fade-0 sections when `shtAll`; the
+  `u_shadowOff` uniform at the five shadow-lookup sites; ensureReflection/reflectPass/waterUniforms read `q.reflLite`;
+  drawShip sets `u_reflDepth` to unit 9. New methods sht*, fc*, farFrame, liveProps.
+- shaders.js: `u_shadowOff` (+ `fract(sc.xy + u_shadowOff)`, 0 = the old lookup) in TERRAIN/PROP/FURN/TRANS FS;
+  TRANS_FS `reflSample()` (one plain tap when `u_reflUp` is 0); new `FAR_COMP_FS`.
+- game.js: `PRESETS.ultraLite` + the four switches set false on the other presets (after PRESETS); applySettings,
+  setQuality and aqApply copy the new q fields; playFrame sets `world.streamTakt/streamMs`; the governor's rungs are
+  labelled (aqWhat) with the cheap rungs first on Ultra/Ultra · Leicht; Automatik's igpu flag (bench.js ladder).
+- world.js: onColumn, update(), scheduleMeshes, drainUploads, updateLight each gain a takt branch; new integrate, reprio,
+  seam* methods. shared/stream.js: `drain()` takes an optional byte cap.
+- settings_reg.js (4 rows), settings_panel.js and ui.js (the preset's name), lang_de/en (keys g.set.pUltraLite*,
+  g.set.farCache/shadowTakt/streamTakt/reflLite(.tip), g.aq.ul.*).
+- Conflicts most likely with fronts that touch render()'s pass order, renderShadows, reflectPass or drawProps.
