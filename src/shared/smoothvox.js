@@ -446,8 +446,8 @@
       const o = t.o || {}, m = VM.MODELS[t.name];
       if (!m || !o.vxModel || furn.has(t.name) || o.prop || o.propStem || SV.SKIP.test(t.name)) continue;
       const i0 = list.length, tog = !!o.toggle && t.has('lit');
-      list.push({ name: t.name, off: false });
-      if (tog) list.push({ name: t.name, off: true });
+      list.push({ name: t.name, off: false, base: i0, nvar: 1 });
+      if (tog) list.push({ name: t.name, off: true, base: i0 + 1, nvar: 1 });
       for (let st = t.base; st < t.base + t.nstates && st < n; st++) {
         idx[st] = tog && !t.get(st, 'lit') ? i0 + 1 : i0;
         anchor[st] = !t.has('part') || t.get(st, 'part') === 0 ? 1 : 0;
@@ -455,10 +455,45 @@
         states.push(st);
       }
     }
+    // the VX pieces of the standalone kinds (SV.VX_KINDS — they paint the same whatever stands round them, test/
+    // smoothvox_game.js checks it; a kind of 4 looks different by its position's hash: four entries, one a look, and the
+    // worker gives each anchor its look, SV.variants): painted at facing 0, the anchor's facing turns them
+    const VX = VR.VX;
+    if (SV.VX_ON && VX && VX.spec && VX._) for (const t of R.types) {
+      if (VM.MODELS[t.name] || furn.has(t.name)) continue;
+      const o = t.o || {}, sp = VX.spec(t.defaultState), nv = sp && SV.VX_KINDS[sp.kind];
+      if (!nv || o.prop || o.propStem || t.nstates !== (t.has('facing') ? 4 : 1)) continue;
+      const i0 = list.length;
+      for (let h = 0; h < nv; h++) list.push({ name: t.name, vx: true, h: nv > 1 ? h : -1, base: i0, nvar: nv });
+      for (let st = t.base; st < t.base + t.nstates && st < n; st++) { idx[st] = i0; anchor[st] = 1; facing[st] = t.has('facing') ? t.get(st, 'facing') & 3 : 0; states.push(st); }
+    }
     AT = { list, idx, anchor, facing, states: Int32Array.from(states), n: list.length };
     return AT;
   };
-  SV.indexOf = (name, off) => { const A = SV.autoTables(); if (!A) return -1; for (let i = 0; i < A.n; i++) if (A.list[i].name === name && A.list[i].off === !!off) return i; return -1; };
+  // the standalone VX kinds and their number of looks (4: by the position's hash h)
+  SV.VX_ON = true;
+  SV.VX_KINDS = { arclamp: 1, barrel: 1, bbq: 1, bench: 1, bollard: 1, chandelier: 1, coatrack: 1, crate: 1, dchair: 1, dish: 1, floorlamp: 1, fountain: 1, gardenlamp: 1, holotable: 1, lounger: 1, mirror: 1, nightstand: 1, pendant: 1, piano: 1, plant2: 1, sconce: 1, sdesk: 1, sign: 1, spot: 1, stool: 1, stove: 1, toilet: 1, vanity: 1, washer: 1, well: 1, wshelf: 1,
+    birdbath: 4, coffee: 4, locker: 4, machine: 4, milkcan: 4, mpromo: 4, planter: 4, scarecrow: 4, tdesk: 4, urn: 4 };
+  // an entry is ready when all looks of its piece are
+  const allReady = (bits, i) => { const e = AT.list[i]; if (!e) return false; for (let j = e.base; j < e.base + e.nvar; j++) if (!isReady(bits, j)) return false; return true; };
+  // a VX piece's voxels: painted at facing 0, standing free on a floor, look h
+  SV.paintVX = function (name, h) {
+    const R = VR.R, VX = VR.VX, t = R.byName[name]; if (!t || !VX) return null;
+    const st = t.has('facing') ? t.state({ facing: 0 }) : t.defaultState, sp = VX.spec(st); if (!sp) return null;
+    const C = VX.CLS, N = sp.res >= 16 ? sp.res : 8, G = VX.gridFor(N), fn = VX._.PAINT_FN[sp.kind];
+    const c = { nc: [C.AIR, C.AIR, C.AIR, C.SOLID, C.AIR, C.AIR], ns: [0, 0, 0, 0, 0, 0], ext: 0b110011, px: 0, py: 0, pz: 0, h: h > 0 ? h : 0, x: 0, facing: 0, facing2: 0, shape: 0, part: 0, axis: 0, head: 0, icon: 0, eave: 0, sideA: 0, sideB: 0, ridgeTop: 0, borderSpec: null, lit: 1 };
+    for (let d = 0; d < 6; d++) VX.NB[d] = null;
+    if (fn) fn(sp, c); else G.fill(0);
+    return { V: G.slice(), VW: N, VH: N, VD: N, res: N, W: 1, H: 1, D: 1, parts: [{ px: 0, py: 0, pz: 0 }] };
+  };
+  // the worker's anchors: a piece of several looks gets its look's kind from its position (as voxarch.js buildCtx's h)
+  SV.variants = function (props) {
+    if (!AT || !props) return props;
+    const VX = VR.VX;
+    for (let o = 0; o < props.length; o += 6) { const k = props[o + 3] - AUTO0; if (k < 0) continue; const e = AT.list[k]; if (e && e.nvar > 1 && e.h === 0) props[o + 3] += VX.hash(props[o], props[o + 1], props[o + 2], 77) & 3; }
+    return props;
+  };
+  SV.indexOf = (name, off) => { const A = SV.autoTables(); if (!A) return -1; for (let i = 0; i < A.n; i++) if (A.list[i].name === name && !!A.list[i].off === !!off) return i; return -1; };
   // the ready bits (one per entry): the main thread sets them as the meshes arrive; every mesh job carries them
   SV.ready = { ver: 0, bits: null };
   const isReady = SV.isReady = (bits, i) => !!bits && ((bits[i >> 3] >> (i & 7)) & 1) === 1;
@@ -484,7 +519,7 @@
   function applyReady() {
     if (!PT || !PT.autoStates || !AT) return;
     const bits = SV.ready.bits, G = PT.group, S = PT.autoStates;
-    for (let k = 0; k < S.length; k++) { const st = S[k]; G[st] = isReady(bits, AT.idx[st]) ? GFURN : 0; }
+    for (let k = 0; k < S.length; k++) { const st = S[k]; G[st] = allReady(bits, AT.idx[st]) ? GFURN : 0; }
     applied = SV.ready.ver;
   }
   // worker_main.js 'mesh', before the mesher: the job's ready bits, then the pieces in the section's own 16³ that are not
@@ -503,7 +538,7 @@
       const row = (y + PAD) * PSS + (z + PAD) * PS + PAD;
       for (let x = 0; x < 16; x++) {
         const st = B[row + x]; if (!st) continue;
-        const i = I[st]; if (i < 0 || isReady(bits, i)) continue;
+        const i = I[st]; if (i < 0 || allReady(bits, i)) continue;
         if (!want) want = [i]; else if (want.indexOf(i) < 0) want.push(i);
       }
     }
@@ -526,7 +561,11 @@
     const t0 = now(), VM = VR.VM, tr = [];
     const cache = SV.cache || (SV.cache = new SV.LRU());
     let r = null, key = null;
-    if (m.name) {
+    if (m.vx && m.name) {
+      key = 'vx:' + m.name + '#' + (m.h | 0);
+      r = cache.get(key);
+      if (!r) { const src = SV.paintVX(m.name, m.h | 0); if (!src) return { error: 'unknown piece ' + m.name, transfer: tr }; r = m.layout === 'studio' ? SV.studioMesh(src) : SV.forModel(src); cache.set(key, r, bytesOf(r)); }
+    } else if (m.name) {
       const model = VM && VM.MODELS[m.name];
       if (!model) return { error: 'unknown model ' + m.name, transfer: tr };
       key = m.name + (m.off ? ':off' : '') + '#' + (m.ver | 0) + (m.layout === 'studio' ? ':studio' : '');
@@ -566,7 +605,7 @@
     let redo = false;
     for (const i of list) {
       if (i < 0 || i >= A.n) continue;
-      if (isReady(SV.ready.bits, i)) { redo = true; continue; }   // the job left before the mesh came: mesh the section again
+      if (allReady(SV.ready.bits, i)) { redo = true; continue; }   // the job left before the mesh came: mesh the section again
       let w = MAIN.waiting.get(i); if (!w) MAIN.waiting.set(i, w = new Map());
       w.set(c.key + ':' + sy, [c, sy]);
       if (!MAIN.asked.has(i)) { MAIN.asked.add(i); SV.ask(i, world); }
@@ -574,18 +613,22 @@
     if (redo) { const sc = c.sec && c.sec[sy]; if (sc && (sc.svRedo = (sc.svRedo | 0) + 1) <= 3) { sc.dirty = true; sc.ver++; MAIN.stats.redo++; } }
   };
   SV.ask = function (i, world) {
-    const e = AT.list[i];
-    MAIN.stats.asked++;
-    world.pool.submit({ type: 'smoothvox', name: e.name, off: e.off, ver: SV.verOf(e.name) }, null, (m) => SV.got(i, m, world), 1);
+    const e0 = AT.list[i];
+    for (let j = e0.base; j < e0.base + e0.nvar; j++) {
+      const e = AT.list[j]; if (isReady(SV.ready.bits, j)) continue;
+      MAIN.stats.asked++;
+      world.pool.submit(e.vx ? { type: 'smoothvox', name: e.name, vx: true, h: e.h, ver: SV.verOf(e.name) } : { type: 'smoothvox', name: e.name, off: e.off, ver: SV.verOf(e.name) }, null, (m) => SV.got(j, m, world), 1);
+    }
   };
   SV.got = function (i, m, world) {
     const e = AT && AT.list[i], PR = VR.Props;
     if (!e || !m || m.type !== 'smoothvox' || !m.near || m.ver !== SV.verOf(e.name) || !PR || !PR.registerAuto) { MAIN.asked.delete(i); return; }   // failed, cancelled or out of date: asked again with the next want
-    PR.registerAuto(AUTO0 + i, e.name + (e.off ? ':off' : '') + '#' + m.ver, m.size, m.cell, { near: m.near, far: m.far });
+    PR.registerAuto(AUTO0 + i, e.name + (e.off ? ':off' : e.vx && e.h > 0 ? ':h' + e.h : '') + '#' + m.ver, m.size, m.cell, { near: m.near, far: m.far });
     if (!SV.ready.bits) SV.ready.bits = bitsFor(AT.n);
     SV.ready.bits[i >> 3] |= 1 << (i & 7); SV.ready.ver++;
     MAIN.stats.got++; MAIN.stats.ms += m.ms || 0; MAIN.stats.bytes += bytesOf(m);
-    const w = MAIN.waiting.get(i); MAIN.waiting.delete(i);
+    const b = e.base; if (!allReady(SV.ready.bits, b)) return;   // (a piece of several looks waits for all of them)
+    const w = MAIN.waiting.get(b); MAIN.waiting.delete(b);
     if (w) for (const [c, sy] of w.values()) { if (world.dead || world.cols.get(c.key) !== c) continue; const sc = c.sec[sy]; if (sc) { sc.dirty = true; sc.ver++; } }
   };
   // a model's design changed (custom.js): its entries are not ready any more and its next mesh is a new version
@@ -594,7 +637,7 @@
     if (!AT) return;
     MAIN.ver[name] = (MAIN.ver[name] | 0) + 1;
     let any = false;
-    for (let i = 0; i < AT.n; i++) if (AT.list[i].name === name) { MAIN.asked.delete(i); if (SV.ready.bits && isReady(SV.ready.bits, i)) { SV.ready.bits[i >> 3] &= ~(1 << (i & 7)); any = true; } }
+    for (let i = 0; i < AT.n; i++) if (AT.list[i].name === name && !AT.list[i].vx) { MAIN.asked.delete(i); if (SV.ready.bits && isReady(SV.ready.bits, i)) { SV.ready.bits[i >> 3] &= ~(1 << (i & 7)); any = true; } }
     if (any) { SV.ready.ver++; const g = typeof window !== 'undefined' && VR.game; if (g && g.renderer) g.renderer.furnByKind = null; }   // (the renderer's slot of the old version is looked up again)
   };
   if (VR.Custom && VR.Custom.refreshModel && !VR.Custom.refreshModel.sv) {
