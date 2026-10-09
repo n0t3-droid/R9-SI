@@ -291,6 +291,7 @@
     'ctl.clear': 'Leeren',
     'ctl.rot': 'Drehen',
     'ctl.undo': 'Rückgängig',
+    'ctl.invent': 'Erfinderwerkstatt',
     'ctl.hud': 'Anzeige ein/aus',
     'ctl.shot': 'Bildschirmfoto',
     'ctl.debug': 'Debug-Info',

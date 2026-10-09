@@ -291,6 +291,7 @@
     'ctl.clear': 'Clear',
     'ctl.rot': 'Rotate',
     'ctl.undo': 'Undo',
+    'ctl.invent': 'Inventor workshop',
     'ctl.hud': 'HUD on/off',
     'ctl.shot': 'Screenshot',
     'ctl.debug': 'Debug info',
