@@ -64,7 +64,7 @@
           <button data-v="creative" class="on">Creative<small>Unlimited blocks, flight</small></button>
           <button data-v="zen">Zen Builder<small>Unbothered: no mobs, no damage</small></button></div></div>
         <div class="field"><label>Difficulty</label><div class="seg" id="cw_diff">
-          <button data-v="peaceful">Peaceful</button><button data-v="easy">Easy</button><button data-v="normal" class="on">Normal</button><button data-v="hard">Hard</button></div></div>
+          <button data-v="peaceful" class="on">Peaceful</button><button data-v="easy">Easy</button><button data-v="normal">Normal</button><button data-v="hard">Hard</button></div></div>
         <div class="field"><label>World type</label><div class="seg" id="cw_type">
           <button data-v="default" class="on">Realm</button><button data-v="large">Large Biomes</button><button data-v="amplified">Amplified</button><button data-v="flat">Flat</button></div></div>
         <div class="field"><label>Seed (optional)</label><input type="text" id="cw_seed" placeholder="Leave blank for random"></div>
