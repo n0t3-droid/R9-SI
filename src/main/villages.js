@@ -1228,7 +1228,7 @@
       }
       p.inv.consumeHeld(1);
       const def = VR.itemDef(h.id);
-      const loved = (a.p.likes === 'bread' && /bread|cake|cookie|pie/.test(h.id)) || (a.p.likes === 'flowers' && /poppy|dandelion|tulip|orchid|allium|bluet|daisy|rose|lily|flower/.test(h.id)) || (a.p.likes === 'crystals' && /crystal|shard|amethyst/.test(h.id)) || (a.p.likes === 'books' && /book|paper/.test(h.id)) || (a.p.likes === 'stars' && /star|glow/.test(h.id));
+      const loved = (a.p.likes === 'bread' && /bread|cake|cookie|pie/.test(h.id)) || (a.p.likes === 'flowers' && /poppy|dandelion|tulip|orchid|allium|bluet|daisy|rose|lily|flower/.test(h.id)) || (a.p.likes === 'crystals' && /crystal|shard|amethyst|lantern|glow_berr/.test(h.id)) || (a.p.likes === 'books' && /book|paper/.test(h.id)) || (a.p.likes === 'stars' && /star|glow/.test(h.id));
       const food = def && def.food;
       st.rep = (st.rep || 0) + (loved ? 3 : food ? 2 : 1);
       this.talkText(loved ? T('g.gift.love', { item: name, likes: T('g.likes.' + a.p.likes, null, a.p.likes) }) : Folk.say('thanks', H(a.p.seed, this.time | 0, 41)));

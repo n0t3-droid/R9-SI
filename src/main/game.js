@@ -339,8 +339,9 @@
     startTitle() {
       this.state = 'title';
       this.teardownWorld();
-      this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5 }, custom: VR.CUSTOM });
-      this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5 }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
+      // (the panorama is a vgen-5 world without crystals: GEN.noCry — no crystal on the start screen either)
+      this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5, noCrystal: true }, custom: VR.CUSTOM });
+      this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5, noCrystal: true }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
       this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
       this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
@@ -376,7 +377,7 @@
     async createWorld(o) {
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
-      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 8 }; // vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
+      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 9 }; // vgen 9: no crystals of any kind (f-nocrystal: GEN.noCry; t-town's villages too) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
     }
@@ -647,9 +648,10 @@
     giveKit(meta) {
       const inv = this.player.inv;
       if (meta.mode !== 'survival') {
-        const kit = ['grass_block', 'oak_planks', 'stone_bricks', 'glass', 'violet_crystal_block', 'hull_plating', 'neon_cyan', 'lantern', 'oak_log'];
+        const noCry = (meta.vgen | 0) >= 9;   // (a vgen-9 world has no crystals: none in the kit either)
+        const kit = ['grass_block', 'oak_planks', 'stone_bricks', 'glass', noCry ? 'neon_magenta' : 'violet_crystal_block', 'hull_plating', 'neon_cyan', 'lantern', 'oak_log'];
         kit.forEach((id, i) => { if (R.byName[id] || VR.ITEMS[id]) inv.slots[i] = { id, n: 64 }; });
-        const extra = ['builder_wand', 'laser_blaster', 'jetpack', 'hoverbike', 'shuttle_beacon', 'torch', 'azure_crystal_cluster', 'water_bucket', 'tech_panel', 'landing_pad', 'cherry_leaves', 'quartz_block'];
+        const extra = ['builder_wand', 'laser_blaster', 'jetpack', 'hoverbike', 'shuttle_beacon', 'torch', noCry ? 'vx_lamppost' : 'azure_crystal_cluster', 'water_bucket', 'tech_panel', 'landing_pad', 'cherry_leaves', 'quartz_block'];
         extra.forEach((id, i) => { if (R.byName[id] || VR.ITEMS[id]) inv.slots[9 + i] = { id, n: VR.maxStack(id) }; });
       } else if (meta.kit) {
         inv.add('wooden_pickaxe', 1); inv.add('wooden_axe', 1); inv.add('bread', 6); inv.add('torch', 12); inv.add('apple', 3);

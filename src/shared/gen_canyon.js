@@ -5,6 +5,8 @@
 // a tram shuttling on it; watchtowers (dark hull, cyan light strips, a deck
 // with a turret and a red beacon) on the mesa tops; turret nests; and a small
 // ruined village of dusk and ochre bricks with magenta windows.
+// New worlds (vgen ≥ 9, VR.GEN.noCry): hoodoos of the canyon's own strata stand where the giant crystal gems stood, and
+// the ruin village's well holds water (docs/superpowers/plans/2026-10-09-f-nocrystal.md).
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -115,11 +117,13 @@
       HULLG: st('hull_plating_gray'), PANEL: st('tech_panel'), PANELA: st('tech_panel_amber'), RAILING: st('vx_tech_railing'), VIEW: st('viewport'),
       DUSK: st('duskrock_bricks'), OCHRE: st('ochre_bricks'), MAG: st('neon_magenta'), CRYV: st('violet_crystal_cluster', { facing: 4, size: 1 }), CRYVB: st('violet_crystal_block'), COBBLE: st('mossy_cobblestone') || st('cobblestone'),
       CRYB: (c) => st(c + '_crystal_block'), CRY: (c, big) => st(c + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 }),
+      // (vgen 9) the hoodoos' cap rock and grass hat, the well's water, its posts and roof
+      CAP: st('umber_rock'), GRASS: st('grass_block'), DRYG: st('short_dry_grass') || st('dead_bush'), WATER: st('water'), OWALL: st('ochre_brick_wall') || st('ochre_bricks'), OSLAB: st('ochre_brick_slab', { type: 0 }) || st('ochre_bricks'),
     };
   }
   CAN.build = function (g) {
     if (g._canyonOps) return g._canyonOps;
-    const K = mats(), Ln = CAN.line(g);
+    const K = mats(), Ln = CAN.line(g), noCry = VR.GEN.noCry(g);
     const chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
@@ -197,7 +201,23 @@
       put(x + 3, h + 1, z + 3, K.LBEACON);
     });
     // ---- giant crystal clusters on the mesa tops (TRAILER.md §3.5: 8–22 tall, magenta, azure, verdant, rose): a column
-    // of crystal blocks (their light makes the ground round it glow), two shorter shards and a cluster on top
+    // of crystal blocks (their light makes the ground round it glow), two shorter shards and a cluster on top.
+    // vgen 9: hoodoos instead — a column of the canyon's banded strata as tall as the gem (GEN.pinnacle, its outline a
+    // hash of the place), a darker cap rock wider than the column under it with a grass hat like the mesas', and two
+    // shorter companions beside it
+    const bands = noCry ? VR.realmBands(g) : null;
+    const W = { set: (x, y, z, s) => put(x, y, z, s) };
+    const hoodoo = (x, z, h, H) => {
+      const stack = (x0, z0, hh, r, seed) => {
+        const top = VR.GEN.pinnacle(W, x0, h + 1, z0, { h: hh, r, mat: (px, py) => bands[Math.max(0, Math.min(255, py))], top: K.CAP, seed });
+        const cr = r + 0.8;
+        for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const d2 = dx * dx + dz * dz; if (d2 <= cr * cr) put(x0 + dx, top, z0 + dz, K.CAP); if (d2 <= (r + 0.2) * (r + 0.2)) { put(x0 + dx, top + 1, z0 + dz, K.GRASS); if (((x0 + dx) * 7 + (z0 + dz) * 3) % 5 === 0) put(x0 + dx, top + 2, z0 + dz, K.DRYG); } }
+      };
+      const seed = M.hash2(x, z, g.seed + 0x400d);
+      stack(x, z, H, 1.4, seed);
+      stack(x + 2 + (seed & 1), z + 1, Math.max(4, H - 6), 0.8, seed + 1);
+      stack(x - 1, z + 2 + ((seed >> 1) & 1), Math.max(3, H - 9), 0.7, seed + 2);
+    };
     {
       const crng = new VR.RNG(g.seed ^ 0xc41e), B = CAN.box, gems = [];
       const COL = ['violet', 'azure', 'verdant', 'rose'];
@@ -211,8 +231,11 @@
         let flat = true; for (const [dx, dz] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) if (Math.abs(g.surfaceY(x + dx, z + dz) - h) > 2) flat = false;
         if (!flat) continue;
         const c = COL[crng.int(COL.length)], H = 9 + crng.int(12);
-        for (const [dx, dz, hh] of [[0, 0, H], [1, 0, H - 4], [0, 1, H - 6]]) for (let t = 0; t < hh; t++) put(x + dx, h + 1 + t, z + dz, K.CRYB(c));
-        put(x, h + 1 + H, z, K.CRY(c, true)); put(x + 1, h + H - 3, z, K.CRY(c, false)); put(x, h + H - 5, z + 1, K.CRY(c, false));
+        if (noCry) hoodoo(x, z, h, H);   // vgen 9: a hoodoo of the canyon's strata (the same draws: the sites stay)
+        else {
+          for (const [dx, dz, hh] of [[0, 0, H], [1, 0, H - 4], [0, 1, H - 6]]) for (let t = 0; t < hh; t++) put(x + dx, h + 1 + t, z + dz, K.CRYB(c));
+          put(x, h + 1 + H, z, K.CRY(c, true)); put(x + 1, h + H - 3, z, K.CRY(c, false)); put(x, h + H - 5, z + 1, K.CRY(c, false));
+        }
         gems.push([x, z, h]);
       }
     }
@@ -238,8 +261,16 @@
         }
       }
       const wy = g.surfaceY(cx, cz);
-      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) put(cx + dx, wy + 1, cz + dz, (dx || dz) ? K.OCHRE : K.CRYVB);
-      put(cx, wy + 2, cz, K.CRYVB); put(cx, wy + 3, cz, K.CRYV);
+      if (noCry) {
+        // vgen 9: a water well — the ochre rim round water two deep, two posts and a broken slab roof
+        for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) put(cx + dx, wy + 1, cz + dz, (dx || dz) ? K.OCHRE : K.WATER);
+        put(cx, wy, cz, K.WATER);
+        for (const sx of [-1, 1]) { put(cx + sx, wy + 2, cz, K.OWALL); put(cx + sx, wy + 3, cz, K.OWALL); }
+        put(cx - 1, wy + 4, cz, K.OSLAB); put(cx, wy + 4, cz, K.OSLAB);
+      } else {
+        for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) put(cx + dx, wy + 1, cz + dz, (dx || dz) ? K.OCHRE : K.CRYVB);
+        put(cx, wy + 2, cz, K.CRYVB); put(cx, wy + 3, cz, K.CRYV);
+      }
     }
     g._canyonOps = chunks;
     return chunks;
