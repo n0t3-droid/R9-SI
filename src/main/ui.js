@@ -511,7 +511,7 @@
     }
     benchBegin() { this.benchMsg = { run: true, text: T('g.bench.run', { s: 3 }) }; if (this.screen === 'settings') this.showSettings(); }
     benchDone(r) {
-      const PN = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultra: 'g.set.pUltra' };
+      const PN = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultra: 'g.set.pUltra', ultraLite: 'g.set.pUltraLite' };
       let text;
       if (!r || r.action === 'none') text = T('g.bench.none');
       else {

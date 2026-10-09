@@ -1582,7 +1582,10 @@
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
       this.reflOn = false;
       this.stats.reflMs = 0;
-      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) { const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; }
+      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) {
+        if (this.q.reflEvery > 1 && this.reflKept && this.frameNo % this.q.reflEvery) this.reflOn = true;   // F9 (a governor rung on Ultra · Leicht): last frame's mirror again
+        else { const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; this.reflKept = this.reflOn; }
+      } else this.reflKept = false;
       // ---------------- copy scene for refraction
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);

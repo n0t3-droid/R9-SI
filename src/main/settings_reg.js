@@ -116,4 +116,6 @@
   // reaches 32 on Ultra), never below its own max
   S.maxOf = (item, settings) => (item && item.maxKey && settings && settings[item.maxKey] > item.max ? settings[item.maxKey] : item.max);
   S.snapFor = function (item, v, settings) { const hi = S.maxOf(item, settings); return hi === item.max ? S.snap(item, v) : S.snap(Object.assign({}, item, { max: hi }), v); };
+  // F9 · Ultra für schwache PCs: the four switches of „Ultra · Leicht" (each makes the frame cheaper; the picture stays)
+  for (const k of ['farCache', 'shadowTakt', 'streamTakt', 'reflLite']) S.add({ key: k, g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.' + k, tip: 'g.set.' + k + '.tip', cost: 'low', def: false });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -17,6 +17,12 @@
     high: { far: 64, rdMax: 24, upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
     ultra: { far: 64, rdMax: 32, upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
   };
+  // F9 · Ultra für schwache PCs: „Ultra · Leicht" — Ultra's picture with the four switches that spend the GPU where the eye
+  // looks and reuse what did not change (Fern-Cache, Schatten-Takt, Weltgenerierung im Takt, Spiegelung leicht). Every other
+  // preset has them off, so a preset change sets them all; ⚡ Automatik starts an integrated GPU on it (bench.js).
+  const F9_SW = ['farCache', 'shadowTakt', 'streamTakt', 'reflLite'];
+  for (const p in PRESETS) for (const k of F9_SW) PRESETS[p][k] = false;
+  PRESETS.ultraLite = Object.assign({}, PRESETS.ultra, { farCache: true, shadowTakt: true, streamTakt: true, reflLite: true });
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)
@@ -110,6 +116,7 @@
       const S = this.settings, r = this.renderer;
       if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
+      if (key !== '*' && F9_SW.includes(key)) S.preset = 'custom';   // (F9: a switch of Ultra · Leicht changed by hand)
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -738,6 +745,9 @@
     benchStart() {
       if (this.bench) return false;
       this.bench = { t: 0, last: 0, dts: [], was: { preset: this.settings.preset, renderDist: this.settings.renderDist } };
+      // F9: an integrated GPU (bench.js integrated: a Ryzen's Radeon Graphics, Intel, Apple M, phones) starts on Ultra · Leicht
+      // and measures there; a dedicated one measures what it has, as before
+      if (VR.Bench && VR.Bench.integrated && VR.Bench.integrated(VR.GL && VR.GL.rendererName)) { this.bench.igpu = true; if (this.settings.preset !== 'ultraLite') this.applyPreset('ultraLite'); }
       if (this.ui && this.ui.benchBegin) this.ui.benchBegin();
       return true;
     }
@@ -753,7 +763,7 @@
       const b = this.bench; if (!b || !VR.Bench) return null;
       this.bench = null;
       const S = this.settings, sum = VR.Bench.summarize(b.dts);
-      const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist), target: 60 });
+      const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist, b.igpu), target: 60, igpu: b.igpu });
       if (d.action !== 'none') {
         Object.assign(S, PRESETS[d.preset]); S.preset = d.preset; S.renderDist = d.renderDist;
         this.applySettings('*'); this.saveSettings();
@@ -766,7 +776,8 @@
     aqWhat() {
       const aq = this.aq; if (!aq) return '';
       const out = [];
-      for (let i = 0; i < Math.min(AQ_G.length, aq.g | 0); i++) out.push(T(AQ_G[i]));
+      const gL = this.settings ? this.aqGpuRungs(this.settings) : [];   // (F9: each rung carries its name; Ultra's ladder starts with its own)
+      for (let i = 0; i < Math.min(Math.max(AQ_G.length, gL.length), aq.g | 0); i++) out.push(T((gL[i] && gL[i].lab) || AQ_G[i]));
       for (let i = 0; i < Math.min(AQ_C.length, aq.c | 0); i++) out.push(T(AQ_C[i]));
       return out.join(' · ');
     }
@@ -865,6 +876,19 @@
         (o) => { o.scale = Math.max(floor, S.scale - 0.1); o.sharpen = Math.max(S.sharpen ? 0.35 : 0, 0.45); },
         (o) => { o.scale = Math.max(floor - 0.08, S.scale - 0.2); o.sharpen = 0.55; },
       ];
+      list.forEach((f, i) => { f.lab = AQ_G[i]; });
+      // F9 · Ultra and Ultra · Leicht: the cheap rungs first — the far cache twice as patient, the shadows' tiles half as
+      // often, the water's mirror lighter (Ultra: a quarter size; Ultra · Leicht: drawn every other frame), people drawn to
+      // 72 blocks — then rays, detail, the shadow map, clouds, and only then the resolution. Only rungs that change
+      // something with these settings (a rung that buys nothing fails its probe and blocks the ladder for 30 s).
+      if (S.preset === 'ultra' || S.preset === 'ultraLite') {
+        const lab = (f, n) => { f.lab = n; return f; }, cheap = [];
+        if (S.farCache) cheap.push(lab((o) => { o.farSlow = 2; }, 'g.aq.ul.far'));
+        if (R) cheap.push(lab((o) => { o.shadowEvery = 2; }, 'g.aq.ul.shadow'));
+        if ((S.water | 0) >= 2) cheap.push(lab(S.reflLite ? (o) => { o.reflEvery = 2; } : (o) => { o.reflLite = true; }, 'g.aq.ul.refl'));
+        if ((S.folk || 100) > 72) cheap.push(lab((o) => { o.folkDist = 72; }, 'g.aq.ul.folk'));
+        return cheap.concat(list.slice(1));   // (the old first rung, the shadow cadence, is among them)
+      }
       return list;
     }
     aqCpuRungs(S) {
@@ -933,6 +957,7 @@
       // renderer overrides
       const ro = {};
       for (const k of ['shadowEvery', 'rays', 'vxLod', 'shadows', 'shadowDist', 'clouds', 'scale', 'sharpen']) if (o[k] !== undefined) ro[k] = o[k];
+      for (const k of ['farSlow', 'reflLite', 'reflEvery']) if (o[k] !== undefined) ro[k] = o[k];   // (F9's cheap rungs)
       this.renderer.setOverride(Object.keys(ro).length ? ro : null);
       // world / sim overrides
       const rdBase = S.renderDist;

@@ -56,7 +56,7 @@ console.log('b · the governor on Ultra');
   sec(40, slow);
   const aq = g.aqState();
   check(depthMax >= 2 && aq.stack.length >= 2, 'a slow machine takes steps: the governor climbs the ladder', 'depth ' + depthMax + ', now ' + aq.stack.join(''));
-  check(sawRaysOff, 'the second step on Ultra is the sun rays off (the renderer got it)');
+  check(sawRaysOff, 'deeper on the ladder the sun rays go off (the renderer got it; F9: Ultra\'s cheap rungs come first)');
   check(aq.g <= 7 && aq.c <= 5, 'never more steps than the ladders have');
   check(rdMin === 16, 'the view distance is never lowered (16 chunks all the time)', 'lowest ' + rdMin);
   // (the frame-rate window is two seconds behind, so ten fine seconds count from about the fourth second of fine frames)
@@ -107,7 +107,7 @@ console.log('d · the start');
   g.fps = 30; g.renderer.gpuMs = 34; g.time = 5;
   g.smartQuality(1 / 30, g.settings, w);
   check(aq.stack.join('') === 'ggc' && aq.pending === '', 'the first frame of play takes them, the same steps', aq.stack.join(''));
-  check(over && over.rays === false && over.shadowEvery === 2, 'the renderer gets the steps at once (sun rays off, shadows every other frame)');
+  check(over && over.shadowEvery === 2 && over.reflLite === true, 'the renderer gets the steps at once (F9: Ultra\'s cheap rungs — shadows every other frame, the light mirror)');
   check(aq.backoff >= 30 && aq.hold > 0, 'the governor waits before it takes any of them back');
   const gOff = stand({ settings: Object.assign({}, ULTRA, { dynRes: false }) });
   gOff.aqRestoreStart();
