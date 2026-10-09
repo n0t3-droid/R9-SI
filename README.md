@@ -103,6 +103,28 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🏙 Nova Haven, Nahtlos by default, every piece of furniture smooth (v0.43)
+**🏙 Nova Haven.** The trailer's palm city stands in every new world (vgen 8): Villa Nova as a family of five
+compositions (classic, long, tower, corner, bungalow — each mirrored) along a curved avenue that forks round a planted
+island, unbroken cyan light lines along the kerbs and to every door, palms every few blocks with fan palms and round
+trees in raised beds, light-grey kerbs; behind the city the terraced round hills with light lines, villas on the
+terraces and stairways between them. The Gate Temple's hex corridor opens onto the avenue.
+
+**🧱 Nahtlos is the default look.** Smooth hills, joined glass, no block borders — the trailer's look — for every player
+who never chose a look; Klassisch stays one click away (Bild · Objekte, or `/look klassisch`). The Studio follows.
+
+**🛋 Echte Möbel II.** 110 more smooth pieces for 100 block types: curtains, fridges, dishwashers and range hoods, art
+and mirrors, desks and dressers, wardrobes, lanterns and chandeliers, corner sofas, the mansions' urns, gold-framed
+art, fountain and reception desks, the village stove, counter and shelf nook — in all fifteen test rooms no piece of
+furniture is voxel any more; rugs run on under the furniture; the water's reflection shows the props; Villa Nova's
+pad is a white plinth with the cyan ring. Very Low unchanged.
+
+**Fixes.** The new world's spawn stands on the Hangar Hall's deck in front of the pad (a spawn on the pad was pushed
+out of the parked shuttle's hull); the Erfinderwerkstatt's key I is a rebindable action, so a key given to another
+action never opens the workshop; the far ring asks the waiting tiles and forms again after a world object is replaced.
+Measured on the software renderer against v0.41: Very Low frames are not slower (the hall 1.5 s vs 2.4 s, the plaza
+1.4 s vs 2.3 s, the town with the plants 2.7 s vs 4.2 s); Balanced is equal at the plaza and +10 % in the town.
+
 ### 🌴 Realism meets voxel — the trailer's world, up close and far away (v0.42)
 **🔭 The far world is real.** On High and Ultra a third ring of real terrain forms stands between the chunks and the
 5 km horizon, out to about 1 km: the Gate Temple's spires and gold windows, Nova Haven's roads and houses, the
