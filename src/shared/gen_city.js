@@ -437,11 +437,37 @@
         if (isKerb && o === 8) put(x, y + 1, z, K.KERB);
       }
     }
-    // the palms in the verges (the shared crown on a ringed trunk)
-    for (const rd of roads) for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const [x, z, , y, h] of run) if (VR.Plants && VR.Plants.palm) VR.Plants.palm(put, x, y, z, h);
-    // the verges: flower clusters along the kerb, clipped balls and blossom bushes every few blocks, tufts in the lawn
+    // fan palms between the tall ones (t1_24 · t2_23 · t2_25: low palms in the planted verges), a crown on a trunk of two
+    // or three blocks halfway between two palms of a run — in every second gap (a crown is the verge's dearest piece on
+    // Very Low) — where the verge is free and no lamp stands within three blocks (by a hash of the cell: the tall palms'
+    // seeded sequence stays as it was)
     const hsh = (x, z, s) => (Math.imul(x * 73856093 ^ z * 19349663, 0x9E3779B1) ^ s) >>> 0;
+    const nearLamp = (x, z) => plan.lamps.some(l => Math.abs(l[0] - x) <= 3 && Math.abs(l[2] - z) <= 3);
+    for (const rd of roads) {
+      rd.fans = [];
+      for (const [sd, sign] of [['L', 1], ['R', -1]]) for (const run of rd.palms[sd]) for (let i = 1 + (sign > 0 ? 0 : 1); i < run.length; i += 2) {
+        const k = Math.round((run[i - 1][2] + run[i][2]) / 2), [px, pz, a] = rd.pts[k], nx = -Math.sin(a) * sign, nz = Math.cos(a) * sign;
+        const x = Math.floor(px + nx * (HW + 2.5)), z = Math.floor(pz + nz * (HW + 2.5));
+        let ok = free(x, z) && !nearLamp(x, z);
+        for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) { const o = oc(x + dx, z + dz); if (o === 5 || o === 6 || o === 2) { ok = false; break; } }
+        if (!ok) continue;
+        setO(x, z, 6);
+        rd.fans.push([x, z, k, run[i][3], 2 + (hsh(x, z, site.seed) & 1)]);
+      }
+    }
+    // the palms in the verges (the shared crown on a ringed trunk); then every trunk and every crown's anchor once more,
+    // so a neighbour's fronds never cut a trunk or take the cell the smooth palm stands on
+    const allPalms = [];
+    for (const rd of roads) { for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const p of run) allPalms.push(p); for (const p of rd.fans) allPalms.push(p); }
+    if (VR.Plants && VR.Plants.palm) {
+      for (const [x, z, , y, h] of allPalms) VR.Plants.palm(put, x, y, z, h);
+      const trunk = st('vx_palm_trunk'), anchor = st('vm_palm_crown', { part: 'p303', facing: 0 });
+      for (const [x, z, , y, h] of allPalms) { for (let k = 0; k < h; k++) put(x, y + k, z, trunk); put(x, y + h, z, anchor); }
+    }
+    // the verges: a planted strip along the kerb (ferns, flower clusters, clipped balls), blossom bushes and ferns behind
+    // it, tufts in the open lawn, now and then a small round tree on a wide lawn (t3_05)
     const fcl = VR.R.byName.vm_flower_cluster ? st('vm_flower_cluster', { part: 'p000', facing: 0 }) : 0, tuft = VR.R.byName.vm_tuft_grass ? st('vm_tuft_grass', { part: 'p000', facing: 0 }) : 0, blossom = VR.R.byName.vm_bush_blossom ? st('vm_bush_blossom', { part: 'p000', facing: 0 }) : 0;
+    const FERN = st('vx_fern_lush'), trees = [];
     for (let z = cz - RAD; z <= cz + RAD; z++) for (let x = cx - RAD; x <= cx + RAD; x++) {
       if (x === cx - RAD && ((z - cz) & 15) === 0) yield;
       if (oc(x, z) !== 0 || ground(x, z) >= Y0 + 2 || Math.hypot(x - cx, z - cz) > RAD - 3) continue;
@@ -450,10 +476,17 @@
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const o = oc(x + dx, z + dz); if (o === 8) byKerb = true; }
       for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) if (oc(x + dx, z + dz) === 8) near++;
       const h = hsh(x, z, site.seed) % 100;
-      if (byKerb) { if (h < 34 && fcl) put(x, y, z, fcl); else if (h < 40) put(x, y, z, K.BALL); }
-      else if (near && h < 7) put(x, y, z, h < 3 ? K.BALL : blossom || K.BALL);
-      else if (!near && h < 3 && tuft) put(x, y, z, tuft);
+      if (byKerb) { if (h < 24 && fcl) put(x, y, z, fcl); else if (h < 44) put(x, y, z, FERN); else if (h < 50) put(x, y, z, K.BALL); }
+      else if (near) { if (h < 4) put(x, y, z, K.BALL); else if (h < 9) put(x, y, z, blossom || K.BALL); else if (h < 17) put(x, y, z, FERN); }
+      else if (h < 3 && tuft) put(x, y, z, tuft);
+      else if (h === 99 && VR.Plants && VR.R.byName.vm_tree_round_s) {
+        // a small round tree: its 3×3 on open lawn, eight blocks from the next one
+        let ok = !trees.some(t => Math.abs(t[0] - x) < 8 && Math.abs(t[1] - z) < 8);
+        for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) if (oc(x + dx, z + dz) !== 0 || ground(x + dx, z + dz) !== ground(x, z)) { ok = false; break; }
+        if (ok) { trees.push([x, z]); for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) setO(x + dx, z + dz, 6); for (const [px, py, pz, s] of VR.Plants.parts('vm_tree_round_s', x - 1, y, z - 1, 0)) put(px, py, pz, s); }
+      }
     }
+    nova.trees = trees;
     yield;
 
     // ---------------------------------------------------------------- the plaza: paving, its cyan ring, the holo table
@@ -521,11 +554,11 @@
     const b = HEART.templeBase(g);
     plan.base = b; plan.pad = null;
     plan.work.push({ kind: 'base', door: b.back.slice(), outside: [b.back[0], b.back[1], b.back[2] - 2], inside: b.inside.slice(), beds: [], seats: [], work: b.work.map(w => w.slice()), chimney: null, table: null, lights: [], box: b.box.slice(), base: b });
-    nova.roads = roads.map(rd => ({ name: rd.name, pts: rd.pts.map(p => [p[0], p[1]]), kerb: rd.kerb, palms: rd.palms }));
+    nova.roads = roads.map(rd => ({ name: rd.name, pts: rd.pts.map(p => [p[0], p[1]]), kerb: rd.kerb, palms: rd.palms, fans: rd.fans }));
     // the city's cells, for the terraces behind it (gen_hills.js leaves every cell the city laid out as it is)
     nova.owns = (x, z) => { const o = oi(x, z); return o >= 0 && occ[o] !== 0; };
     plan.roads = roads.map(rd => rd.pts.filter((_, k) => k % 3 === 0).map((p, k) => [Math.floor(p[0]), rd.ys[k * 3] + 1, Math.floor(p[1])]));
-    plan.palms = []; for (const rd of roads) for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const p of run) plan.palms.push(['street', rd.name, p[0], p[1], p[4]]);
+    plan.palms = []; for (const rd of roads) { for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const p of run) plan.palms.push(['street', rd.name, p[0], p[1], p[4]]); for (const p of rd.fans) plan.palms.push(['fan', rd.name, p[0], p[1], p[4]]); }
     plan.crownDrops = [];
     plan.chunks = chunks;
     plan.center = [cx, Y0 + 1, cz];
