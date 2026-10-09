@@ -123,6 +123,7 @@ ${legal}
 <script>${guard(read('src/studio/genie_site.js'))}</script>
 <script>${guard(read('src/studio/imagine.js'))}</script>
 <script>${guard(read('src/studio/catalog.js'))}</script>
+<script>${guard(read('src/studio/formtools.js'))}</script>
 <script>${guard(read('src/studio/modern.js'))}</script>
 <script>${guard(read('src/studio/forge.js'))}</script>
 <script>${guard(read('src/studio/variants.js'))}</script>

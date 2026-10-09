@@ -778,6 +778,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
         c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n" title="${m.display}">${nm}</div><div class="s">${m.W}×${m.H}×${m.D} · ${m.parts.length} Teile · 1/${m.res}</div></div>`);
         c.onclick = () => selectModel(n);
         if (VR.StudioCatalog) c.appendChild(VR.StudioCatalog.favButton(n, () => { chips(); if (S.cat === 'fav') list(); }));
+        if (VR.FormTools) c.appendChild(VR.FormTools.glattButton(n, c));   // t-form: ✦ Glatt
         el.appendChild(c);
       }
     }

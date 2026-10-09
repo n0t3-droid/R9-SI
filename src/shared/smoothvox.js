@@ -516,7 +516,10 @@
   const bytesOf = (r) => { let b = 0; for (const k of ['near', 'far']) if (r[k]) b += r[k].verts.byteLength + r[k].idx.byteLength; if (r.verts) b += r.verts.byteLength + r.glass.byteLength; return b; };
   const copyPart = (p, tr) => { if (!p) return null; const q = Object.assign({}, p, { verts: p.verts.slice(), idx: p.idx.slice() }); tr.push(q.verts.buffer, q.idx.buffer); return q; };
   SV.studioMesh = function (src, opts) {
-    const res = src.res || 16, g = SV.mesh(src, Object.assign({ step: res >= 32 ? 1 : 1, aoScale: res / 16 }, opts || {}));
+    // (full resolution; a big model — more than ~400 k voxels, the 7-block garage door — at half: the Studio draws every
+    // triangle unindexed)
+    const res = src.res || 16, big = src.VW * src.VH * src.VD > 400000, step = big ? 2 : 1;
+    const g = SV.mesh(src, Object.assign({ step, aoScale: res / step / 16 }, opts || {}));
     return SV.toStudio(g, 1 / res, [0, 0, 0]);
   };
   SV.job = function (m) {
