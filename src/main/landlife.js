@@ -36,8 +36,9 @@
       const own = new Map();
       for (const m of E.mobs) if (m.anchor && !m.dead) { const a = own.get(m.anchor); if (a) a.push(m); else own.set(m.anchor, [m]); }
       for (const A of this.anchors.values()) {
-        if (A.kind === 'fish') continue;
+        if (A.kind === 'fish') { const fx = A.x - p.pos[0], fz = A.z - p.pos[2]; if (fx * fx + fz * fz > 420 * 420) this.anchors.delete(A.key); continue; }
         const dx = A.x + 0.5 - p.pos[0], dz = A.z + 0.5 - p.pos[2], d2 = dx * dx + dz * dz, mine = own.get(A.key) || [];
+        if (d2 > 420 * 420) { this.anchors.delete(A.key); continue; }   // (far behind: its column brings it again when it loads)
         if (d2 > REACH * REACH) continue;                     // (the entities' own despawn takes them beyond 140)
         const plan = VR.Land.faunaPlan(A.kind, ticks, preset, A.n);
         // out of their hour (or too many: the preset changed): they go while no one is looking closely
@@ -89,8 +90,9 @@
         P.spawn(x, y, z, Math.cos(h) * 1.4, 4.2, Math.sin(h) * 1.4, { life: 0.85, size: 0.13, grav: 10, col: [0.78, 0.84, 0.9], emis: 0, drag: 0, collide: false });
         for (let k = 0; k < (low ? 4 : 9); k++) { const b = Math.random() * 6.283, s = 0.8 + Math.random() * 1.2; P.spawn(x, y, z, Math.cos(b) * s, 1.6 + Math.random() * 1.6, Math.sin(b) * s, { life: 0.45 + Math.random() * 0.3, size: 0.05, grav: 14, col: [0.75, 0.88, 1], emis: 0, collide: false }); }
       }
-      for (const M of this.fx.values()) {
+      for (const [mk, M] of this.fx) {
         const dx = M.x - p.pos[0], dz = M.z - p.pos[2], d2 = dx * dx + dz * dz;
+        if (d2 > 900 * 900) { this.fx.delete(mk); continue; }
         if (M.kind === 'mist') {
           if (d2 > FX * FX) continue;
           M.acc += dt * (low ? 2.5 : 6) * M.k;
