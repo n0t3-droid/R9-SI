@@ -442,7 +442,7 @@
       if (Tr && q.thrust > 0.01) for (let ei = 0; ei < m.exhaust.length; ei++) {
         const e = m.exhaust[ei]; loc[0] = e[0]; loc[1] = e[1]; loc[2] = e[2] + 0.3; PL.toWorld(I.pos, I.yaw, loc, wpos);
         const cool = q.phase === 'parked' ? Math.min(1, q.thrust * 4) : 1;
-        Tr.engine(c.tid + ei, wpos.slice(), air ? Math.max(8, q.speed) : 0, { thrust: q.thrust, size: e[3] * (air ? 1.4 : 1), col: air ? [0.5, 0.85, 1] : [1, 0.42 + 0.26 * cool, 0.2 + 0.12 * cool], minor: ei > 1, smokeLife: 5 });
+        Tr.engine(c.tid + ei, wpos, air ? Math.max(8, q.speed) : 0, { thrust: q.thrust, size: e[3] * (air ? 1.4 : 1), col: air ? [0.5, 0.85, 1] : [1, 0.42 + 0.26 * cool, 0.2 + 0.12 * cool], minor: ei > 1, smokeLife: 5 });
       }
       if (!P) return;
       // the pad's dust as it settles and lifts
