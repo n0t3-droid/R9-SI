@@ -676,7 +676,12 @@
       if (key0.indexOf('frozen_ocean') >= 0 && rng.chance(0.3)) { const x = fx0 + 3 + rng.int(10), z = fz0 + 3 + rng.int(10); for (let i = 0; i < 1; i++) { const h = 5 + rng.int(12), r = 3 + rng.int(4); for (let dy = -6; dy < h; dy++) { const rr = Math.round(r * (1 - Math.max(0, dy) / h)); for (let dx = -rr; dx <= rr; dx++) for (let dz = -rr; dz <= rr; dz++) if (dx * dx + dz * dz <= rr * rr + rng.next()) w.set(x + dx, SEA + dy, z + dz, dy > h - 3 && rng.chance(0.5) ? S.snowblock : rng.chance(0.08) ? S.blueice : S.packed); } } }
       // structures (rare)
       const sr = rng.next();
+      // vgen 9 (t-beauty): no random ruin, well, camp or tower on the surface of the Heartland's designed land — 244 of
+      // its 5 664 chunks carried an obsidian ruined gate (beside the temple, at the crescent's end, on the plaza's rim),
+      // and where the city or the terraces levelled the ground over one, its obsidian was left hanging in the air
+      const designed = this.vgen >= 9 && VR.Heart && VR.Heart.noRandom && VR.Heart.noRandom(this, fx0 + 8, fz0 + 8);
       if (sr < 0.11) { const x = fx0 + 4 + rng.int(8), z = fz0 + 4 + rng.int(8), y = 12 + rng.int(40); if (y < this.surfaceY(x, z) - 10) SS.dungeon(w, x, y, z, rng, chests); }
+      else if (designed) { /* the designed land keeps its own pieces */ }
       else if (sr < 0.14 && key0 === 'desert') { const x = fx0 + 8, z = fz0 + 8; SS.well(w, x, this.surfaceY(x, z) + 1, z, rng); }
       else if (sr < 0.16 && h0 > SEA + 2 && key0 !== 'river') { const x = fx0 + 6, z = fz0 + 6; SS.ruinedGate(w, x, this.surfaceY(x, z) + 1, z, rng, chests); }
       else if (sr < 0.2 && key0 === 'dappled_forest') { const x = fx0 + 8, z = fz0 + 8; SS.camp(w, x, this.surfaceY(x, z) + 1, z, rng, chests); }

@@ -160,6 +160,11 @@
     // the frames' houses at the corridor's end (the lot nearest each point): t1_22's long villa with the big tree, t2_23's
     // corner villa, t1_24's tower house, t2_25's glass-fronted bungalow
     PICK: [['long', false, [-17, -87]], ['corner', false, [20, -87]], ['tower', false, [-45, -88]], ['bungalow', true, [47, -88]]],
+    // vgen 9 (t-beauty): every street ends somewhere — an end that meets no other street and not the plaza swells into
+    // a turning circle of radius r round a point `push` blocks past the road's last one (pulled back so the circle stays
+    // inside the city's disc): the paving lit round its rim like every kerb, a raised bed of radius `bed` in the middle
+    // with a tall palm, a lamp on each side, palms on its far verge
+    TURN: { r: 7, bed: 2.5, push: 2 },
   };
   const PATH_STARTS = new Map();   // composition (+ m for the mirror) → where its garden path meets the street row
   VG.novaHaven = function* (g, site) {
@@ -228,6 +233,32 @@
       for (let it = 0; it < 2; it++) for (let k = 1; k < sm.length; k++) if (sm[k] > sm[k - 1] + 1) sm[k] = sm[k - 1] + 1;
       rd.ys = sm;
     }
+    // vgen 9: the turning circles at the ends that meet nothing (NH.TURN): the crescent's and Palm Row's four ends cut
+    // off in the lawn (beauty_audit run 2), the hill road's in front of the terraces
+    const turns = [];
+    if (g.vgen >= 9) {
+      const TU = NH.TURN;
+      roads.forEach((rd, ri) => {
+        const P = rd.pts;
+        for (const which of ['start', 'end']) {
+          const k = which === 'start' ? 0 : P.length - 1, p = P[k];
+          const joins = roads.some(o => o !== rd && o.pts.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) <= HW + 1.5));
+          if (joins || Math.hypot(p[0] - NH.PLAZA.x, p[1] - NH.PLAZA.z) <= NH.PLAZA.r + 1.5) continue;
+          const q = P[which === 'start' ? Math.min(P.length - 1, 4) : Math.max(0, P.length - 5)], dl = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1;
+          const ux = (p[0] - q[0]) / dl, uz = (p[1] - q[1]) / dl;
+          let push = TU.push;
+          while (push > -TU.r + 1 && Math.hypot(p[0] + ux * push - cx, p[1] + uz * push - cz) + TU.r > RAD - 3.5) push -= 0.5;
+          const tx = p[0] + ux * push, tz = p[1] + uz * push;
+          // the circle lies level with the road where the road comes in, and the road's stretch inside it with it (the
+          // hill road climbs a block at its end: no step between the road and its circle)
+          let ke = k; const dk = which === 'start' ? 1 : -1;
+          while (ke + dk >= 0 && ke + dk < P.length && Math.hypot(P[ke][0] - tx, P[ke][1] - tz) <= TU.r + 0.5) ke += dk;
+          const ty = rd.ys[ke];
+          for (let q2 = Math.min(ke, k); q2 <= Math.max(ke, k); q2++) rd.ys[q2] = ty;
+          turns.push({ road: rd.name, ri, end: which, k, x: tx, z: tz, ux, uz, r: TU.r, bed: TU.bed, y: ty });
+        }
+      });
+    }
     // the raster: every cell within HW of a centre line is road; the cell remembers its road, side and place on it
     const cellRoad = new Map();   // "x,z" → [road index, w (signed offset), s (sample), y]
     roads.forEach((rd, ri) => {
@@ -245,7 +276,18 @@
         }
       }
     });
+    // (the turning circles: their cells are the road's at its end's height; the bed in the middle is no road)
+    const bedCells = [];
+    for (const t of turns) {
+      for (let z = Math.floor(t.z - t.r - 1); z <= Math.ceil(t.z + t.r + 1); z++) for (let x = Math.floor(t.x - t.r - 1); x <= Math.ceil(t.x + t.r + 1); x++) {
+        const d = Math.hypot(x + 0.5 - t.x, z + 0.5 - t.z), key = x + ',' + z;
+        if (d > t.r || oc(x, z) === 7) continue;
+        if (d <= t.bed) { cellRoad.delete(key); bedCells.push([x, z, t]); continue; }
+        if (!cellRoad.has(key)) cellRoad.set(key, [t.ri, 0, t.k, t.y]);
+      }
+    }
     for (const key of cellRoad.keys()) { const [x, z] = key.split(',').map(Number); setO(x, z, 1); }
+    for (const [x, z] of bedCells) setO(x, z, 6);
     // the plaza: a half disc at the corridor's end
     const PZ = NH.PLAZA, plazaCells = [];
     for (let z = -50; z >= Math.floor(PZ.z - PZ.r); z--) for (let x = Math.floor(PZ.x - PZ.r); x <= Math.ceil(PZ.x + PZ.r); x++) {
@@ -479,6 +521,21 @@
         }
       }
     }
+    // the turning circles (vgen 9): a lamp in the kerb on either side, square to the road's way; a palm on the verge of
+    // the far side, 50° off the road's axis on either hand
+    const turnPalms = [];
+    for (const t of turns) {
+      for (const sg of [1, -1]) {
+        const ax = t.x - t.uz * sg * (t.r + 1), az = t.z + t.ux * sg * (t.r + 1);
+        let best = null, bd = 3;
+        for (const key of kerbSet) { const [x, z] = key.split(',').map(Number), d = Math.hypot(x + 0.5 - ax, z + 0.5 - az); if (d < bd && oc(x, z) === 8) { bd = d; best = [x, z]; } }
+        if (best) { const [x, z] = best; setO(x, z, 6); kerbSet.delete(x + ',' + z); put(x, t.y + 1, z, K.LAMP0); put(x, t.y + 2, z, K.LAMP1); fill(x, z, t.y + 3, t.y + 6, AIR); plan.lamps.push([x, t.y + 2, z]); }
+        const ang = Math.atan2(t.uz, t.ux) + sg * 0.9, px = Math.floor(t.x + Math.cos(ang) * (t.r + 2.5)), pz = Math.floor(t.z + Math.sin(ang) * (t.r + 2.5));
+        let ok = free(px, pz) && Math.hypot(px - cx, pz - cz) < RAD - 4;
+        for (let dx = -1; dx <= 1 && ok; dx++) for (let dz = -1; dz <= 1; dz++) { const o = oc(px + dx, pz + dz); if (o === 5 || o === 6 || o === 2 || o === 3) { ok = false; break; } }
+        if (ok) { setO(px, pz, 6); turnPalms.push([px, pz, -1, t.y + 1, 10 + rng.int(4)]); }
+      }
+    }
     yield;
 
     // ---------------------------------------------------------------- the ground of the city and its paving
@@ -544,10 +601,23 @@
         else if (bd.kind === 'fan') isleFans.push([cx, cz, -1, y, 2]);
       }
       if (nova.island) nova.island.beds = beds.map(b => ({ kind: b.kind, x: b.cx, z: b.cz, rx: b.rx, rz: b.rz, n: b.cells.length, tree: b.tree || null }));
+      // the turning circles' beds (vgen 9): the same raised bed round a tall palm, ferns and flower clusters
+      for (const t of turns) {
+        const cells = bedCells.filter(c => c[2] === t), inB = new Set(cells.map(c => c[0] + ',' + c[1])), mx = Math.floor(t.x), mz = Math.floor(t.z);
+        for (const [x, z] of cells) {
+          const edge = !inB.has((x + 1) + ',' + z) || !inB.has((x - 1) + ',' + z) || !inB.has(x + ',' + (z + 1)) || !inB.has(x + ',' + (z - 1));
+          put(x, t.y + 1, z, edge ? K.BEDKERB : K.SOIL);
+          if (edge || (x === mx && z === mz)) continue;
+          put(x, t.y + 2, z, hsh(x, z, site.seed + 91) % 10 < 6 ? FERN0 : FCL0);
+        }
+        if (inB.has(mx + ',' + mz)) isleFans.push([mx, mz, -1, t.y + 2, 9 + (hsh(mx, mz, site.seed) % 3)]);
+      }
+      if (turns.length) nova.turns = turns.map(t => ({ road: t.road, end: t.end, x: t.x, z: t.z, r: t.r, bed: t.bed, y: t.y }));
     }
     // the palms in the verges (the shared crown on a ringed trunk); then every trunk and every crown's anchor once more,
     // so a neighbour's fronds never cut a trunk or take the cell the smooth palm stands on
     const allPalms = isleFans.slice();
+    for (const p of turnPalms) allPalms.push(p);
     for (const rd of roads) { for (const sd of ['L', 'R']) for (const run of rd.palms[sd]) for (const p of run) allPalms.push(p); for (const p of rd.fans) allPalms.push(p); }
     if (VR.Plants && VR.Plants.palm) {
       for (const [x, z, , y, h] of allPalms) VR.Plants.palm(put, x, y, z, h);
