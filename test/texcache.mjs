@@ -78,7 +78,7 @@ const w1 = await firstWorldFrame(page);
 console.log('start 1 ' + JSON.stringify({ fromCache: s1.fromCache, texMs: s1.texMs, storeMs: s1.storeAt, titleMs: s1.title, worldMs: w1, loadMs: s1.load }));
 check(s1.fromCache === false && s1.layers > 0, 'start 1 forges the block textures (nothing cached yet)');
 const keys1 = await cacheKeys(page);
-check(Array.isArray(keys1) && keys1.includes('rim-1'), 'the forged textures are stored in IndexedDB: ' + JSON.stringify(keys1));
+check(Array.isArray(keys1) && keys1.includes('seam-1'), 'the forged textures (Nahtlos) are stored in IndexedDB: ' + JSON.stringify(keys1));
 await ctx.close();
 
 // ---- start 2: a new launch on the same profile: the textures come from the cache
