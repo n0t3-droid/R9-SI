@@ -1,25 +1,28 @@
-// A living world without combat (docs/superpowers/plans/2026-10-09-t-life.md): the game's pictures of four scenes, one
+// A living world without combat (docs/superpowers/plans/2026-10-09-t-life.md): the game's pictures of six scenes, one
 // page per build — BEFORE_DIST (the build before t-life) as test/shots/life_<scene>_before.png, then this checkout's
 // dist as …_<TAG>.png (TAG default after):
-//   hangar      the owner's view of the Gate Temple (feet at −42, 89, 26, looking at the portal): a craft parked on the
-//               apron with its crew, the hangar's shuttle on its pad, a second one holding over the canyon
+//   hangar      the owner's view from the west terrace (feet −42, 89, 26) toward the portal and the plaza's east side: the
+//               Gate Temple's apron with a craft parked on it, the hall's craft (one on the pad, the other holding)
+//   apron       the apron close up: the parked craft with its crew out, the service drone
+//   hall        the Hangar Hall's pad: the parked craft with the hall's ground crew, the heroes at the consoles
 //   plaza_dusk  Nova Haven's arrival plaza at dusk (time 12600): the lantern lighter lights the lamps one by one
-//   street_noon the Weißstadt's street at noon (seed 53, cell −2,−1; time 6000): pigeons on the plaza, a hover-cart
+//   street_noon the Weißstadt's street at noon (seed 53, cell −2,−1; time 6000): pigeons on the paving, a hover-cart
 //   hills       the Pod Hills in the morning (time 4500): the hot-air balloon over the terraces
 // Per scene the actors in view are counted (sky craft, pad craft, hangar craft, crew, the director's acts, particles);
 // at the plaza the sky craft within 550 blocks are sampled once a second for 60 s of game time (the owner: "immer etwas
 // los"; after: never fewer than one). The Very Low cost (ms per frame, draws) is measured at the hangar view and at the
 // plaza, and the High cost at the hangar view (swiftshader: compare the two builds of one run, never absolute numbers).
-// Checks: every picture written, no page error; on the after build the apron has a craft parked with its crew out, the
-// lantern lighter has lit lamps, the pigeons and the cart are there, the balloon flies, and the plaza's sky is never
-// empty of craft.
+// Checks: every picture written, no page error; on the after build a craft is parked on the apron with its crew out, the
+// hall's pad has its craft and ground crew, the lantern lighter has lit lamps, the pigeons and the cart are there, the
+// balloon flies, and the plaza's sky is never empty of craft.
 // usage: BEFORE_DIST=file:///…/index.html TAG=after nohup bash test/wt_run.sh life.mjs 3600 > .tmp_tests/life.log 2>&1 &
-//   NO_AFTER=1 (only the BEFORE_DIST page) · ONLY=hangar,hills · N=8 frames per cost round · NOCOST=1 · SEED=53
+//   NO_AFTER=1 (only the BEFORE_DIST page) · ONLY=hangar,hills · ONLY_BEFORE=apron,hall (the before page's scenes) · N=8
+//   frames per cost round · NOCOST=1 · SEED=53
 // regress: skip  (a showcase with two world loads; the gates are test/life_sched.js, life_director.js, life_peace.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
 const TAG = process.env.TAG || 'after', N = +(process.env.N || 8), SEED = process.env.SEED || '53';
-const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, ONLY_BEFORE = process.env.ONLY_BEFORE ? process.env.ONLY_BEFORE.split(',') : null;
 const RUNS = [];
 if (process.env.BEFORE_DIST) RUNS.push(['before', process.env.BEFORE_DIST]);
 if (!process.env.NO_AFTER) RUNS.push([TAG, process.env.DIST || 'file:///home/dev/vr/dist/index.html']);
@@ -27,7 +30,9 @@ if (!process.env.NO_AFTER) RUNS.push([TAG, process.env.DIST || 'file:///home/dev
 const HALL = { cx: -944, cz: -296, F: 73 };
 // [name, feet [x, y, z] (y null: on the ground + up), look-at [x, y, z] (y null: the ground there + up), time, fov, force]
 const SCENES = [
-  { name: 'hangar', feet: [-42, 89, 26], at: [0.5, 87, 20], tod: 4000, fov: 74 },
+  { name: 'hangar', feet: [-42, 89, 26], at: [17.6, 85, 33.3], tod: 4000, fov: 74 },
+  { name: 'apron', feet: [26, 81, 44], at: [47, 84, 62], tod: 4000, fov: 70 },
+  { name: 'hall', feet: [0.5, 82.4, 9], at: [0.5, 83.2, -10], tod: 4000, fov: 74 },
   { name: 'plaza_dusk', feet: [-8, 82.5, -52], at: [6, 82.6, -80], tod: 12600, fov: 72, force: ['lanterns'] },
   { name: 'street_noon', feet: [HALL.cx - 24.5, HALL.F + 1, HALL.cz - 0.5], at: [HALL.cx + 40, HALL.F + 9, HALL.cz - 0.5], tod: 6000, fov: 66, force: ['pigeons', 'cart'] },
   { name: 'hills', feet: [30, null, -196], up: 14, at: [0, null, -330], atUp: 34, tod: 4500, fov: 70, force: ['balloon'] },
@@ -116,21 +121,22 @@ async function runPage(tag, dist) {
   let pics = 0, want = 0;
   for (const sc of SCENES) {
     if (ONLY && !ONLY.includes(sc.name)) continue;
+    if (tag === 'before' && ONLY_BEFORE && !ONLY_BEFORE.includes(sc.name)) continue;
     want++;
     const pl = await place(sc);
     console.log(`  ${sc.name}: feet ${pl.feet.map(v => +v.toFixed(1))} looking at ${pl.at.map(v => +v.toFixed(1))} tod ${sc.tod}`);
     // the after build: the scene's moment (the apron's visit with the crew out, the hangar's craft on the pad and the second
     // one holding; the director's acts of the scene started where the camera looks)
-    if (sc.name === 'hangar') await ev(() => { const g = VR.game; if (g.padLife && g.padLife.jump) g.padLife.jump('apron', 'crew'); if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) g.hall.flight.jumpPhase('pad'); });
+    if (sc.name === 'hangar' || sc.name === 'apron') await ev(() => { const g = VR.game; if (g.padLife && g.padLife.jump) g.padLife.jump('apron', 'crew'); if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) g.hall.flight.jumpPhase('pad', 0.2); });
+    if (sc.name === 'hall') await ev(() => { const g = VR.game; if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) { g.hall.flight.update(0.03); const L = g.hall.flight.plan && g.hall.flight.plan.legs.find(l => l.name === 'pad'); g.hall.flight.jumpPhase('pad', L ? Math.min(0.6, 21 / L.T) : 0.3); } if (g.hall && g.hall.jump) g.hall.jump(8); });
     if (sc.force) await ev(([kinds, at]) => { const g = VR.game; if (!g.lifeDirector || !g.lifeDirector.force) return; for (const k of kinds) g.lifeDirector.force(k, { look: at }); }, [sc.force, pl.at]);
     await step(sc.name === 'plaza_dusk' ? 260 : 90);   // the lighter has walked a few lamps, the cart rolls into view, the crew is out
     const c = await count(); counts[`${sc.name}/${tag}`] = c;
     console.log(`  ${sc.name} ${tag}: ${JSON.stringify(c)}`);
     if (await shot(sc.name)) pics++;
-    if (has.pad && sc.name === 'hangar') {
-      const p = c.pad || {};
-      check(p.parked >= 1 && p.crew >= 2, `${tag}: a craft stands on the apron with its crew out (parked ${p.parked}, crew ${p.crew}, drones ${p.drones})`);
-    }
+    if (has.pad && sc.name === 'hangar') { const p = c.pad || {}; check(p.parked >= 1 && c.hangarCraft >= 1, `${tag}: from the terrace a craft stands on the apron (parked ${p.parked}) and the hall's craft fly (${c.hangarCraft} in sight range)`); }
+    if (has.pad && sc.name === 'apron') { const p = c.pad || {}; check(p.parked >= 1 && p.crew >= 2 && p.drones >= 1, `${tag}: a craft stands on the apron with its crew out and its drone up (parked ${p.parked}, crew ${p.crew}, drones ${p.drones})`); }
+    if (has.hold && sc.name === 'hall') { const hf = await ev(() => { const f = VR.game.hall.flight; return { phases: f.crafts.map(C => C.phase), crew: f.crafts.reduce((a, C) => a + (C.crewOn ? C.folk.filter(x => x.on).length : 0), 0), drone: f.crafts.some(C => C.droneOn) }; }); console.log('  hall flight', JSON.stringify(hf)); check(hf.phases.includes('pad') && hf.crew >= 2, `${tag}: the hall's pad has its craft with the ground crew out (${JSON.stringify(hf)})`); }
     if (has.dir && sc.name === 'plaza_dusk') check(c.life && c.life.kinds && c.life.kinds.lanterns && c.life.lit >= 2, `${tag}: the lantern lighter has lit lamps one by one (${c.life && c.life.lit} lit of ${c.life && c.life.lamps})`);
     if (has.dir && sc.name === 'street_noon') check(c.life && c.life.kinds && c.life.kinds.pigeons && c.life.kinds.cart, `${tag}: pigeons and a cart in the street (${JSON.stringify(c.life && c.life.kinds)})`);
     if (has.dir && sc.name === 'hills') check(c.life && c.life.kinds && c.life.kinds.balloon, `${tag}: the balloon flies over the hills (${JSON.stringify(c.life && c.life.kinds)})`);

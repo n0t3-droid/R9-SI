@@ -55,12 +55,16 @@
       const sp = SPEED[arch] || [30, 40], speed = rng.range(sp[0], sp[1]);
       // (a horizon flight: from 640 blocks out to 640 blocks out on the other side, passing 80–250 blocks from the focus)
       const horizon = !opts.dock && !opts.circle && !opts.defender;
-      const a = rng.range(0, TAU), pass = (horizon ? rng.range(80, 250) : rng.range(big ? 60 : 30, big ? 140 : 110)) * (rng.chance(0.5) ? 1 : -1), D = horizon ? HZ : rng.range(150, 230);
+      // (an act of the Regisseur des Lebens, lifedirector.js — opts.over: {a: the heading, pass, alt, t0, contrail, convoy:
+      // the craft in line astern, tag}: a low pass over the player, or the sunrise convoy high up)
+      const ov = opts.over || null;
+      const a = ov && ov.a !== undefined ? ov.a : rng.range(0, TAU), pass = ov && ov.pass !== undefined ? ov.pass : (horizon ? rng.range(80, 250) : rng.range(big ? 60 : 30, big ? 140 : 110)) * (rng.chance(0.5) ? 1 : -1), D = horizon ? HZ : rng.range(150, 230);
       const fx = Math.cos(a), fz = Math.sin(a), rx = -fz, rz = fx;
-      const alt = M.clamp(fp[1] + rng.range(big ? 55 : 25, big ? 110 : 75), 96, big ? 236 : 226);
+      const alt = ov && ov.alt !== undefined ? fp[1] + ov.alt : M.clamp(fp[1] + rng.range(big ? 55 : 25, big ? 110 : 75), 96, big ? 236 : 226);
       let A = [fp[0] - fx * D + rx * pass, alt + rng.range(-8, 8), fp[2] - fz * D + rz * pass];
       let B = [fp[0] + fx * D + rx * pass * 0.4, alt + rng.range(-12, 12), fp[2] + fz * D + rz * pass * 0.4];
       let C = [(A[0] + B[0]) / 2 + rx * rng.range(-60, 60), (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * rng.range(-60, 60)];
+      if (ov) { A[1] = alt; B[1] = alt + 6; B[0] = fp[0] + fx * D + rx * pass; B[2] = fp[2] + fz * D + rz * pass; C = [(A[0] + B[0]) / 2, alt - 2 * (ov.dip || 0), (A[2] + B[2]) / 2]; }
       // a docking flight comes in over the plaza from the south and sets down on the apron in front of the portal
       const dock = opts.dock ? this.dockPoint() : null;
       if (dock) { A = [dock[0] + rng.range(-40, 40), 120, dock[2] + 190]; C = [dock[0] + rng.range(-10, 10), 104, dock[2] + 70]; B = [dock[0], dock[1] + m.height * 0.5 + 2.5, dock[2]]; }
@@ -68,10 +72,11 @@
       const squad = !opts.defender && !opts.circle && (arch === 'interceptor' || arch === 'racer' || arch === 'gunship' || arch === 'shuttle' || arch === 'dropship') && rng.chance(0.5);
       let n = opts.defender ? 1 : squad ? rng.irange(2, 4) : arch === 'interceptor' || arch === 'racer' ? (rng.chance(0.55) ? rng.irange(2, 3) : 1) : arch === 'gunship' && rng.chance(0.3) ? 2 : 1;
       if (this.g.settings && this.g.settings.preset === 'potato') n = 1;   // (Very Low flies single craft)
+      if (ov) n = ov.convoy || 1;
       for (let k = 0; k < n; k++) {
         // a V formation: wingmen fall back and out, staggered in height
-        const off = k === 0 ? [0, 0, 0] : [(k % 2 ? -1 : 1) * (m.width + (squad ? 6 : 3)) * Math.ceil(k / 2), (squad ? -1.5 : 0) * Math.ceil(k / 2) + rng.range(-1, 1), (m.length + (squad ? 7 : 4)) * Math.ceil(k / 2)];
-        this.ships.push({ d, A, B, C, off, t: -k * 0.02, dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), dock: dock ? { phase: 'in', parkT: 0, parkDur: rng.range(9, 15) } : null, defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0, horizon, wing: k > 0, alpha: horizon ? 0 : 1, arrived: horizon, wt: horizon ? 1 : undefined });
+        const off = k === 0 ? [0, 0, 0] : ov ? [0, -k * 1.5, k * (m.length + 26)] : [(k % 2 ? -1 : 1) * (m.width + (squad ? 6 : 3)) * Math.ceil(k / 2), (squad ? -1.5 : 0) * Math.ceil(k / 2) + rng.range(-1, 1), (m.length + (squad ? 7 : 4)) * Math.ceil(k / 2)];
+        this.ships.push({ tag: ov ? ov.tag : null, contrail: !!(ov && ov.contrail), d, A, B, C, off, t: (ov && ov.t0 ? ov.t0 : 0) - k * 0.02 * (ov ? 0 : 1), dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), dock: dock ? { phase: 'in', parkT: 0, parkDur: rng.range(9, 15) } : null, defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0, horizon, wing: k > 0, alpha: horizon ? 0 : 1, arrived: horizon, wt: horizon ? 1 : undefined });
       }
     }
     spawnDefenders() {
@@ -224,7 +229,7 @@
       if (dist > 260 || s.t < 0 || !m) return;
       const c = Math.cos(s.heading), sn = Math.sin(s.heading), f = [-sn, -c];
       const sp = s.spd !== undefined ? s.spd : 40, hov = sp < 6;
-      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], sp, { thrust: hov ? 0.45 : 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : hov ? [1, 0.6, 0.28] : [0.52, 0.92, 1], minor: ei > 1, smokeLife: s.big ? 4.5 : 7, smokeK: 1.15 }); } }
+      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], sp, { thrust: hov ? 0.45 : 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : hov ? [1, 0.6, 0.28] : [0.52, 0.92, 1], minor: ei > 1, smokeLife: s.contrail ? 14 : s.big ? 4.5 : 7, smokeK: s.contrail ? 1.6 : 1.15 }); } }
       for (const e of m.exhaust) {
         if (Math.random() > 0.55) continue;
         const x = s.pos[0] + e[0] * c + e[2] * sn, z = s.pos[2] - e[0] * sn + e[2] * c;
