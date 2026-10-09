@@ -256,7 +256,9 @@
         // fading at the horizon: see-through in the translucent pass (its own depth written)
         if (al < 0.99) { if (prog) { SS.end(r, layer); prog = null; } SS.drawAlpha(r, E, inst, cam, al, { sky: 1, bl: [0, 0, 0] }); continue; }
         if (!prog) prog = SS.begin(r, E, layer);
-        SS.drawOne(r, prog, inst, cam, layer, { sky: 1, bl: [0, 0, 0] }, stretch, false);
+        // (beyond 40 blocks the stand-in seats and the cabin inside the closed hull are not drawn: nobody sees them)
+        const far = dx * dx + dy * dy + dz * dz > 1600;
+        SS.drawOne(r, prog, inst, cam, layer, { sky: 1, bl: [0, 0, 0] }, stretch, false, layer === 'opaque' && far, far);
       }
       if (prog) SS.end(r, layer);
     }

@@ -422,7 +422,8 @@
           if (layer !== 'opaque' && !d.gpu.glass) continue;
           if (!prog) prog = SS.begin(r, E, layer);
           if (prog.u.u_clipNear) r.gl.uniform1f(prog.u.u_clipNear, 0);
-          SS.drawOne(r, prog, I, cam, layer, light, 1, false);
+          const far = C.dist > 40;   // (the stand-in seats and the cabin inside the closed hull: not beyond 40 blocks)
+          SS.drawOne(r, prog, I, cam, layer, light, 1, false, layer === 'opaque' && far, far);
           this.draws++;
         } else if (layer !== 'opaque' && SS.drawAlpha) {
           if (prog) { SS.end(r, layer); prog = null; }
