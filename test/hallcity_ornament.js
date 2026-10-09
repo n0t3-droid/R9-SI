@@ -431,6 +431,16 @@ for (const [label, H] of HALLS) {
     }
     check(ln > 0 && shops === ln, `goods before every workshop's arch, its doorway free (${shops} of ${ln})`);
     check(lamps === ln, `lanterns on the loggias' columns at eye height (${lamps} of ${ln} units)`);
+    // their light (the light engine on the generated chunk): warm on the walk's loggia side at eye height under them
+    const g = H.g, cache = new Map(), seen = [];
+    let warmL = 0, wn = 0;
+    for (const l of Hh.loggias.filter(l => l.frame).slice(0, 6)) {
+      const [rr, ox, oz] = l.frame, q = ROT[rr](0, -2), x = ox + q[0], z = oz + q[1], k = (x >> 4) + ',' + (z >> 4);
+      let c = cache.get(k); if (!c) { c = V.computeColumnLight(g.generate(x >> 4, z >> 4).blocks, true); cache.set(k, c); }
+      const L = c[((F + 2) << 8) | ((z & 15) << 4) | (x & 15)], r0 = (L >> 8) & 15, b0 = L & 15;
+      wn++; seen.push(r0 + '/' + ((L >> 4) & 15) + '/' + b0); if (r0 >= 9 && r0 >= b0 + 3) warmL++;
+    }
+    check(wn > 0 && warmL === wn, `warm lantern light on the walk under the loggia columns (${warmL} of ${wn}: ${seen.join(' ')})`);
   }
   // ---------------------------------------------------------------- 12. round 2c: the exterior's flying buttresses (P5)
   console.log(`12. round 2c — flying buttresses over the aisle roofs (${label})`);
