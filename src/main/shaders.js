@@ -243,11 +243,11 @@ vec3 atmoFormula(float ct, float cg) {
   if (u_skyK2.y > 0.0) col += mix(vec3(0.030, 0.040, 0.085), vec3(0.010, 0.016, 0.042), sqrt(max(ct, 0.0))) * u_skyK2.y;
   return max(col, vec3(0.0));
 }
-// Very Low: the table (atmos.js buildLUT, u = sqrt(γ/π), v = 1 − sqrt(1 − 2θ/π)) — one linear fetch instead of the exps
+// Very Low: the table (atmos.js buildLUT, u = sin(γ/2) = sqrt((1 − cos γ)/2), v = 1 − sqrt(1 − 2θ/π)) — one linear
+// fetch instead of the exps
 vec3 atmoLut(float ct, float cg) {
-  float u = sqrt(acos(clamp(cg, -1.0, 1.0)) / 3.14159265);
   float v = 1.0 - sqrt(max(0.0, 1.0 - 2.0 * acos(clamp(ct, 0.0, 1.0)) / 3.14159265));
-  return texture(u_atmoLUT, vec2(u, v)).rgb;
+  return texture(u_atmoLUT, vec2(sqrt(max(0.0, 0.5 - 0.5 * cg)), v)).rgb;
 }
 vec3 atmoRad(float ct, float cg) {
 #ifdef ATMO_LUT
@@ -258,9 +258,12 @@ vec3 atmoRad(float ct, float cg) {
 }
 // the warm light around the sun (forward scattering on the haze) and the warm band along the horizon, in the sun's
 // colour and the low sun's (sunset) colour: the eternal dusk's glow, v0.41's terms (atmos.js glow)
+// (integer powers as products: the same numbers, a few multiplies instead of three pows — cheap on a CPU renderer too)
 vec3 atmoGlow(float ct, float cg) {
-  float toSun = max(cg, 0.0), h = max(ct, 0.0);
-  return u_sunset * ((pow(toSun, 7.0) * u_skyGlow.x + pow(1.0 - h, 5.0) * u_skyGlow.y) * (0.3 + 0.7 * toSun)) + u_sunColor * (pow(toSun, 60.0) * u_skyGlow.z * (1.0 - u_rain));
+  float t = max(cg, 0.0), q = 1.0 - max(ct, 0.0);
+  float t2 = t * t, t4 = t2 * t2, t8 = t4 * t4, t16 = t8 * t8, q2 = q * q;
+  float t7 = t4 * t2 * t, t60 = t16 * t16 * t16 * t8 * t4, q5 = q2 * q2 * q;
+  return u_sunset * ((t7 * u_skyGlow.x + q5 * u_skyGlow.y) * (0.3 + 0.7 * t)) + u_sunColor * (t60 * u_skyGlow.z * (1.0 - u_rain));
 }
 // the air toward a direction (atmos.js air): the radiance (formula or table) with the glow (glowK: 1 for the sky, 0.45
 // for the haze over the land), then the weather — rain greys it (and keeps a lighter band at the horizon), overcast and
@@ -268,7 +271,8 @@ vec3 atmoGlow(float ct, float cg) {
 vec3 atmoAir(vec3 dir, float glowK) {
   float cg = dot(dir, u_sunDir);
   vec3 col = atmoRad(max(dir.y, -1.0), cg) + atmoGlow(dir.y, cg) * glowK;
-  col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), u_skyWx.x) * (u_skyWx.y * (1.0 + 0.45 * u_skyWx.x * pow(1.0 - clamp(dir.y, 0.0, 1.0), 16.0)));
+  float q = 1.0 - clamp(dir.y, 0.0, 1.0), q2 = q * q, q4 = q2 * q2, q8 = q4 * q4;
+  col = mix(col, vec3(dot(col, vec3(0.2126, 0.7152, 0.0722))), u_skyWx.x) * (u_skyWx.y * (1.0 + 0.45 * u_skyWx.x * q8 * q8));
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   return col;
 }
@@ -429,7 +433,13 @@ vec3 applyFog(vec3 col, vec3 rel, float dist) {
   float sl = dot(sky, vec3(0.2126, 0.7152, 0.0722)), fl = max(dot(u_fogColor, vec3(0.2126, 0.7152, 0.0722)), 1e-3);
   sky = mix(sky, u_fogColor * (sl / fl), 0.35);
   if (dir.y < 0.0) sky *= 1.0 - 0.4 * clamp(-dir.y * 2.0, 0.0, 1.0);
-  vec3 tr = pow(vec3(1.0 - f), vec3(0.9, 1.0, 1.22));
+#ifdef LITE
+  vec3 tr = vec3(1.0 - f);   // Very Low: one transmittance for all three channels
+#else
+  // (1 − f)^(0.9, 1, 1.22) from one log and two exps
+  float lt = log(max(1.0 - f, 1e-4));
+  vec3 tr = vec3(exp(lt * 0.9), 1.0 - f, exp(lt * 1.22));
+#endif
   return col * tr + sky * (1.0 - tr);
 }
 `;

@@ -11,8 +11,8 @@
 // test/atmos_look.js check it in node. Game HDR units: 1.0 ≈ a white surface in noon sun.
 // The sky depends only on two angles: the view's zenith angle θ (cos θ = dir.y) and the angle γ to the sun, so the
 // table is indexed by those two (the sun's azimuth does not matter). Table mapping (also in the shaders):
-//   u = sqrt(γ / π)            (fine near the sun)
-//   v = 1 − sqrt(1 − 2θ / π)   (fine near the horizon)
+//   u = sin(γ / 2) = sqrt((1 − cos γ) / 2)   (1.8° a texel by the sun; no acos: the shader samples it from cos γ)
+//   v = 1 − sqrt(1 − 2θ / π)                  (fine near the horizon)
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -223,17 +223,16 @@
 
   // the lookup-table coordinates of a direction (cT, cG), as in the shaders
   function lutUV(cT, cG) {
-    const g = Math.acos(clamp(cG, -1, 1)), t = Math.acos(clamp(cT, 0, 1));
-    return [Math.sqrt(g / PI), 1 - Math.sqrt(Math.max(0, 1 - 2 * t / PI))];
+    return [Math.sqrt(Math.max(0, 0.5 - 0.5 * clamp(cG, -1, 1))), 1 - Math.sqrt(Math.max(0, 1 - 2 * Math.acos(clamp(cT, 0, 1)) / PI))];
   }
   // the table: LUT_W × LUT_H RGBA floats, texel centres at (i + 0.5) / W, (j + 0.5) / H
   function buildLUT(s, out) {
     out = out || new Float32Array(LUT_W * LUT_H * 4);
     for (let j = 0; j < LUT_H; j++) {
-      const v = (j + 0.5) / LUT_H, th = (PI / 2) * (2 * v - v * v), cT = Math.cos(th);
+      const v = (j + 0.5) / LUT_H, cT = Math.cos((PI / 2) * (2 * v - v * v));
       for (let i = 0; i < LUT_W; i++) {
-        const u = (i + 0.5) / LUT_W, g = PI * u * u;
-        const c = radiance(s, cT, Math.cos(g));
+        const u = (i + 0.5) / LUT_W;
+        const c = radiance(s, cT, 1 - 2 * u * u);
         const k = (j * LUT_W + i) * 4;
         out[k] = c[0]; out[k + 1] = c[1]; out[k + 2] = c[2]; out[k + 3] = 1;
       }
