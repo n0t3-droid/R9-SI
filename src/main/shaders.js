@@ -307,8 +307,9 @@ vec3 skyColor(vec3 dir, bool withSun) {
   float horizonBand = qh4 * qh;
   float t7 = pow(toSun, 7.0);
   col += u_sunset * (t7 * 1.3 + horizonBand * 0.45) * (0.3 + 0.7 * toSun);
-  // t-sky2: by day a wide glow round the sun over the dark ground of space (the sky near the sun is bright, not navy)
-  col += u_sunColor * t7 * 0.06 * u_skyDay.z * (1.0 - u_rain);
+  // t-sky2: by day a glow round the sun over the dark ground of space (the sky near the sun is bright, not navy; within
+  // ~25°, so the space beyond stays dark)
+  col += u_sunColor * (t7 * t7) * 0.07 * u_skyDay.z * (1.0 - u_rain);
   col += u_sunColor * pow(toSun, 60.0) * u_skyStops.w * (1.0 - u_rain);   // the sun's halo (t-sky: u_skyStops.w, tighter by day)
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   if (withSun) {
@@ -321,6 +322,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
     // t-sky: space shows through the day sky by height — none over the clean, bright horizon, all of it above the blue
     // band (u_skySpace: t-sky2 from dir.y 0.18 to 0.42) — and all of it at night; the stars and the nebula follow it
     float cosmic = clamp(u_night + magicDay * sstepR(u_skySpace.x, u_skySpace.y, dir.y) * u_skySpace.z, 0.0, 1.0) * clear * horizonFade;
+    cosmic *= 1.0 - 0.6 * smoothstep(0.45, 0.92, toSun) * u_skyDay.z;   // t-sky2: by day space fades toward the sun (its light washes the sky within ~60° of it)
     float planetsK = clamp(u_night + magicDay * 0.85, 0.0, 1.0) * clear * horizonFade;
     if (planetsK > 0.01) {
       // the nebula: by day its veil covers the top (1), at night the band carries it (0.3); its brightness by day
@@ -361,9 +363,10 @@ vec3 skyColor(vec3 dir, bool withSun) {
       col += vec3(0.85, 0.9, 1.0) * 3.2 * crater * mix(0.06, 1.0, lit) * clear * smoothstep(1.0, 0.95, length(mp));
     }
     col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night;
-    // high cirrus (t-clouds): u_cirrus is 0 on Very Low. t-sky2: a few thin high wisps (the trailer's) instead of the wide
+    // high cirrus (t-clouds): u_cirrus is 0 on Very Low (t-sky2: and the code is not in its shader). t-sky2: a few thin high wisps (the trailer's) instead of the wide
     // pale streaks — a noise drawn out 14:1 along the wind, cut thin, in a few patches (a slow mask: about a fifth of the
     // sky), at up to half alpha, so the nebula and the stars show through them
+#ifndef LITE
     if (u_cirrus > 0.0 && dir.y > 0.1) {
       vec2 q = dir.xz / (dir.y + 0.1);
       float a = vnoise(vec2(q.x * 0.35 + q.y * 0.2, q.y * 5.0 + 3.0) + vec2(u_time * 0.0025, 0.0));
@@ -373,6 +376,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
       vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
       col = mix(col, cir, st * u_cirrus * 0.5 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
     }
+#endif
     // stars: the bright ones (240 cells a radian) and, t-sky2, a field of small faint ones (400 a radian: the trailer's
     // dense stars); by day they belong to the space above the blue band (cosmic) and are a little larger, so they read
     // through the daylight

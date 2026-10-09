@@ -16,7 +16,7 @@
 // the sun in the picture the upper half, bands 4–7),
 // the stars and the nebula visible in the top bands (local contrast and colour variation), the horizon band bright and
 // clean (no stars); at dusk every band within ΔE 12 of the dusk target; at night a dark sky with stars; the Very Low
-// sky pass (the sky drawn alone, 7 rounds of 24 passes at the potato size): with DIST_BEFORE the same in the baseline build,
+// sky pass (the sky drawn alone, 11 rounds of 24 passes at the potato size): with DIST_BEFORE the same in the baseline build,
 // in turns with the order alternating, and not slower than it (the median of the rounds' ratios within 5 %: the shared
 // machine moves a single round by 10–40 %).
 // t-sky2: also by day the top band's stars (≥ 60 % of the frames', local maxima) and the top three bands' chroma (mean and
@@ -215,10 +215,10 @@ if (DIST_BEFORE && fs.existsSync(DIST_BEFORE)) {
   for (let i = 0; i < 240; i++) { await before.waitForTimeout(500); if (await before.evaluate(() => typeof VR !== 'undefined' && VR.game && VR.game.state === 'title').catch(() => false)) break; }
   await before.evaluate(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
 }
-// 7 rounds, the two builds in turns and the order alternating (before first, then after first), so a change of the shared
+// 11 rounds (t-sky2: was 7 — the shared machine moved single rounds by up to 2× in run 1), the two builds in turns and the order alternating (before first, then after first), so a change of the shared
 // machine's load falls on both; the verdict is the median of the rounds' ratios (one load spike moves one round, not it)
 const skyA = [], skyB = [];
-for (let b = 0; b < 7; b++) {
+for (let b = 0; b < 11; b++) {
   if (before && b % 2 === 0) skyB.push(await before.evaluate(SKYBENCH, benchArgs));
   skyA.push(await ev(SKYBENCH, benchArgs));
   if (before && b % 2 === 1) skyB.push(await before.evaluate(SKYBENCH, benchArgs));

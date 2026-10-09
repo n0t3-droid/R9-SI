@@ -221,7 +221,7 @@
       E.bloomThreshold = GRADE.bloomThr; E.bloomStrength = GRADE.bloomStr + night * 0.04;
       E.contrast = GRADE.contrast; E.vignette = GRADE.vignette; E.nebula = GRADE.nebula; E.sunDisc = GRADE.sunDisc;
       // t-sky: the god rays at 40 % by day (a high sun's rays streak the clean day sky the trailer shows), full round dusk
-      E.rays = GRADE.rays * (SKY.on ? 1 - 0.6 * wDay : 1); E.gridK = GRADE.gridK;
+      E.rays = GRADE.rays * (SKY.on ? 1 - 0.75 * wDay : 1); E.gridK = GRADE.gridK;   // t-sky2: 25 % by day (the space round the sun stays dark; the frames' day has no rays)
       return E;
     }
     lightning() { this.wx.strike(); }
