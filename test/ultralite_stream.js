@@ -7,6 +7,7 @@
 //      nearest first, the request stays pending until then (never asked twice), one far away by now is dropped
 //  e · the queue follows the player: queued generations and meshes are re-ordered by the current distance
 //  f · off (every preset but Ultra · Leicht): the world streams exactly as before
+//  g · the seam light in the takt: the same light, spread over frames · h · the mesh-job starts stop at half the budget
 //   bash test/wt_run.sh ultralite_stream.js
 const V = require('./load_shared.js');
 global.window = undefined;
@@ -157,6 +158,23 @@ console.log('g · the seam light in the takt: the same light, spread over frames
   w3.frame = f0 + w3.SEAM_HOLD - 1; const heldLate = w3.seamHeld(k0);
   w3.frame = f0 + w3.SEAM_HOLD; const heldOver = w3.seamHeld(k0);
   check(heldNow && heldLate && !heldOver && w3.seamPending(), 'a column waits for a spreading seam at most SEAM_HOLD frames, even while the spreading goes on', `SEAM_HOLD ${w3.SEAM_HOLD}`);
+}
+
+console.log('h · the mesh-job starts stop at the frame\'s share of the budget');
+{
+  // a start copies the section's padded blocks on the main thread; on a crowded machine one can take a millisecond:
+  // in the takt the starts stop at half the frame's streaming budget (at least one), the rest start next frame
+  const starts = (takt) => {
+    const { w } = makeWorld(takt);
+    for (let cz = -3; cz <= 3; cz++) for (let cx = -3; cx <= 3; cx++) w.onColumn(genMsg(cx, cz));
+    while (w.seamPending()) w.seamStep(undefined);
+    if (takt) w.streamMs = 2;
+    let n = 0; w.meshSection = function (c, sy) { c.sec[sy].dirty = false; const t = performance.now(); while (performance.now() - t < 0.6); n++; };
+    w.scheduleMeshes(0, 4, 0, 0, 0, [8, 70, 8]);
+    return n;
+  };
+  const on = starts(true), off = starts(false);
+  check(on >= 1 && on <= 3 && off >= 8, 'starts of 0.6 ms each: in the takt (budget 2 ms) they stop after about 1 ms, without it the count rule alone', `${on} vs ${off}`);
 }
 
 console.log('f · off: as before');
