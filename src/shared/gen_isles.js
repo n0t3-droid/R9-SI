@@ -6,6 +6,8 @@
 // stone temple on the centre island and a hoodoo island with a cave arch.
 // The islands are generated through the realm island system (shape, soil,
 // falls); this module lists them and stamps the roads, bridges and buildings.
+// New worlds (vgen ≥ 9, VR.GEN.noCry): no crystals — big round trees with bushes at their foot where the crystals stood,
+// glow-berry vines and hanging roots under the islands where the crystal stalactites hung.
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -53,6 +55,7 @@
       OCHRE: st('ochre_rock'), UMBER: st('umber_rock'), TERRA: st('orange_terracotta'), TERRAB: st('brown_terracotta'), GRASS: st('grass_block'), DIRT: st('dirt'),
       CRY: (c, big) => st(c + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 }), CRYB: (c) => st(c + '_crystal_block'), FERN: st('vx_fern_lush'), BUSH: st('vx_bush'),
       VSTONE: st('spire_stone'), VRAIL: st('vx_tech_railing'), VLINE: st('vx_floor_plaza_line'),
+      ROOTS: st('hanging_roots'), VINE: (berries, tip) => st('glow_berry_vine', { berries: berries ? 1 : 0, tip: tip ? 1 : 0 }), TUFT: st('vm_tuft_grass', { part: 'p000', facing: 0 }) || st('vx_fern_lush'),
     };
   }
   ISLES.build = function (g) {
@@ -227,8 +230,27 @@
       }
     }
     // ---- trees, bushes, crystals (kept off the roads)
+    const noCry = VR.GEN.noCry(g);
     const free = (x, z) => !roadCells.has(x + ',' + z) && !roadCells.has((x + 1) + ',' + z) && !roadCells.has(x + ',' + (z + 1)) && !roadCells.has((x - 1) + ',' + z) && !roadCells.has(x + ',' + (z - 1));
     const CRYS = ['violet', 'azure', 'verdant', 'rose'];
+    // (vgen 9) a big round tree where a crystal would stand (vm_tree_round_l, its trunk on the spot) with bushes on the three
+    // cells beside it the crystal covered; not on the temple (its tiers stand there) and not in the hoodoo's rock; off
+    // the roads. A world without the trailer's plants (the title panorama) grows a round leaf tree instead
+    const trng = new VR.RNG(g.seed ^ 0x7ee5);
+    const inTemple = (I, x, z) => I.temple && Math.abs(x - I.x) <= 9 && Math.abs(z - I.z - 2) <= 9;
+    const inHoodoo = (I, x, z) => I.hoodoo && Math.hypot(x - I.x, z - I.z) + Math.sin((x - I.x) * 0.9) * 0.6 + Math.cos((z - I.z) * 1.1) * 0.6 <= 7.6;
+    const nearTemple = (I, x, z) => I.temple && Math.abs(x - I.x) < 12 && Math.abs(z - I.z - 2) < 12, nearHoodoo = (I, x, z) => I.hoodoo && Math.abs(x - I.x) < 9 && Math.abs(z - I.z) < 9;
+    const bigTree = (I, x, y, z, h) => {
+      if (inTemple(I, x, z) || inHoodoo(I, x, z)) return;                                   // (their stone stands there)
+      if (nearTemple(I, x, z) || nearHoodoo(I, x, z)) { put(x, y, z, K.BUSH); return; }    // (no crown against their walls)
+      if (VR.Plants) for (const [px, py, pz, s] of VR.Plants.parts(h >= 8 ? 'vm_tree_round_l' : 'vm_tree_round_s', x - (h >= 8 ? 2 : 1), y, z - (h >= 8 ? 2 : 1), 0)) put(px, py, pz, s);
+      else GEN.TREES.roundTree(w, x, y, z, trng);
+      for (const [dx, dz] of [[1, 0], [0, 1], [1, 1]]) {
+        const s2 = shape(x + dx, z + dz);
+        if (!s2 || s2.isle !== I || roadCells.has((x + dx) + ',' + (z + dz)) || inTemple(I, x + dx, z + dz) || inHoodoo(I, x + dx, z + dz)) continue;
+        put(x + dx, s2.top + 1, z + dz, ((x + dx + z + dz) & 1) ? K.BUSH : K.FERN);
+      }
+    };
     for (const I of L) {
       const nT = Math.round(I.r * 0.5);
       for (let k = 0; k < nT; k++) {
@@ -249,6 +271,7 @@
         const x = Math.round(I.x + Math.cos(a) * d), z = Math.round(I.z + Math.sin(a) * d);
         const sh = shape(x, z); if (!sh || sh.isle !== I || !free(x, z)) continue;
         const c = CRYS[rng.int(CRYS.length)], h = 5 + rng.int(9), y = sh.top + 1;
+        if (noCry) { bigTree(I, x, y, z, h); continue; }   // vgen 9: a big round tree (the same draws)
         for (let t = 0; t < h; t++) { put(x, y + t, z, K.CRYB(c)); if (t < h - 3) { put(x + 1, y + t, z, K.CRYB(c)); put(x, y + t, z + 1, K.CRYB(c)); } if (t < h - 6) put(x + 1, y + t, z + 1, K.CRYB(c)); }
         put(x, y + h, z, K.CRY(c, true)); put(x + 1, y + h - 3, z, K.CRY(c, false)); put(x - 1, y, z, K.CRY(c, false));
       }
@@ -262,6 +285,14 @@
         const sh = shape(x, z); if (!sh || sh.isle !== I) continue;
         if (I.hoodoo && Math.abs(x - I.x) < 9 && Math.abs(z - I.z) < 9) continue;
         const c = CRYS[rng.int(CRYS.length)], len = 4 + rng.int(6), yb = sh.bottom - 1;
+        if (noCry) {
+          // vgen 9: a glow-berry vine as long as the crystal was (every third leaf with berries: a warm light under the isle)
+          // and hanging roots beside it, each from its own column's underside
+          for (let t = 0; t < len; t++) put(x, yb - t, z, K.VINE((M.hash2(x, yb - t, z) % 3) === 0, t === len - 1));
+          const s1 = shape(x + 1, z);
+          if (s1 && s1.isle === I) for (let t = 0; t < len * 0.5; t++) put(x + 1, s1.bottom - 1 - t, z, K.ROOTS);
+          continue;
+        }
         for (let t = 0; t < len; t++) { put(x, yb - t, z, K.CRYB(c)); if (t < len * 0.5) put(x + 1, yb - t, z, K.CRYB(c)); }
       }
     }
