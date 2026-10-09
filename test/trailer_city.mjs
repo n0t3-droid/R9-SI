@@ -30,7 +30,7 @@ const SHOTS = [
   ['F2', 1.5, -51.5, 2.4, 0.6, -0.06, 50, DUSK],            // t1_24: from the corridor's end — the crescent sweeping across, the long villa and the tower house
   ['F3', 2.5, -58.5, 1.8, -0.9, -0.03, 50, DUSK],           // t2_23: the corner villa east of the avenue, the crescent curving away right
   ['F4', 0.5, -44.5, { y: 81 }, 0.08, -0.03, 55, DUSK],     // t1_22: from inside the corridor — up the avenue between the villas
-  ['F5', -19.5, -122.5, 1.62, -0.05, 0.08, 55, DUSK],       // t3_07: the west branch curving right in front, the terraced round hills behind
+  ['F5', -18.5, -128.5, 1.62, 0.0, 0.08, 55, DUSK],         // t3_07: on the west branch, curving right in front; the terraced round hills behind
   ['F6', 60.5, -160.5, { y: 122 }, 0.45, -0.3, 60, DUSK],   // t3_09: the terraced round hills from above — rings, stairways, villas
   ['F0', 0.5, -60.5, { y: 150 }, 0, -0.62, 70, DUSK],       // the layout from above the plaza
   ['F1_noon', 3.5, -96.5, 1.62, 0.3, 0.03, 60, NOON],
