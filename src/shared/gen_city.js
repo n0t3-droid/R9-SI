@@ -233,6 +233,11 @@
       for (let it = 0; it < 2; it++) for (let k = 1; k < sm.length; k++) if (sm[k] > sm[k - 1] + 1) sm[k] = sm[k - 1] + 1;
       rd.ys = sm;
     }
+    // vgen 9 (t-beauty): no street climbs above the hills' first tread — the terraces (gen_hills.js T8) cut the ground
+    // round Palm Row's ends down to their base level (82), so its last climb to 84 left the road's end and its turning
+    // circle on a bank two blocks over the lawn, a wall of dirt on every side (beauty_audit run 2: street_2; 83 + 65 such
+    // steps at the two ends): the roads stay at or under the base, two steps of one block from the city's 80
+    if (g.vgen >= 9 && VR.HillsGen && VR.HillsGen.T8) { const cap = VR.HillsGen.T8.base; for (const rd of roads) for (let k = 0; k < rd.ys.length; k++) if (rd.ys[k] > cap) rd.ys[k] = cap; }
     // vgen 9: the turning circles at the ends that meet nothing (NH.TURN): the crescent's and Palm Row's four ends cut
     // off in the lawn (beauty_audit run 2), the hill road's in front of the terraces
     const turns = [];
