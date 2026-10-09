@@ -107,7 +107,8 @@
         // keeps an item whose column it cannot find — world.js drainUploads compares cols.get(key) with col, both empty)
         const w = g.world, bytes = m.verts.byteLength + m.idx.byteLength;
         const run = () => { if (this.gen === gen && set.tiles.get(t.key) === t) this.upload(t, m, bytes); };
-        if (w && w.uploadQ) { t.queued = true; w.uploadQ.push({ key: null, col: undefined, x: t.tx * 64 + 32, z: t.tz * 64 + 32, bytes, run }); }
+        // (F10: the far lane, in the order the forms were asked for; one that left the ring while it waited costs nothing)
+        if (w && w.uploadQ) { t.queued = true; w.uploadQ.push({ key: null, col: undefined, lane: 1, prio: -1.4 + 1.6 * dmin / Math.max(1, this.r1), x: t.tx * 64 + 32, z: t.tz * 64 + 32, bytes, alive: () => this.gen === gen && set.tiles.get(t.key) === t, run }); }
         else run();
       }, -1.4 + 1.6 * dmin / Math.max(1, this.r1));   // (far lane: after the coarsest horizon tiles, before the finer ones far out)
     }
