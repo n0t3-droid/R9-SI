@@ -163,6 +163,7 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
   vec2 q = vec2(dot(dir, X), dot(dir, Y)) / R;
   float r2 = dot(q, q);
   vec3 RN = u_ringNormal;
+  float den = dot(C, RN);
   vec3 Lb = bodyLight(C, L);
   vec4 res = vec4(0.0);
   // planet body
@@ -198,7 +199,6 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
     res = vec4(vec3(0.6, 0.45, 0.85) * exp(-(r - 1.0) * 26.0) * 0.35 * side, 0.0);
   }
   // rings
-  float den = dot(C, RN);
   if (abs(den) > 0.02) {
     float t = -(q.x * dot(X, RN) + q.y * dot(Y, RN)) / den;
     vec3 P = X * q.x + Y * q.y + C * t;
@@ -368,8 +368,10 @@ vec3 skyColor(vec3 dir, bool withSun) {
     float starK = max(u_night, cosmic);
     if (starK > 0.02 && dir.y > -0.1) {
       vec3 sd3 = dir;
-      float ang = u_time * 0.0003;
+#ifndef LITE
+      float ang = u_time * 0.0003;   // (the stars turn slowly; on Very Low they stand, like the nebula: no sine per pixel)
       sd3.xz = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * sd3.xz;
+#endif
       vec3 sp = sd3 * 240.0;
       vec3 g = floor(sp);
       float s = hash13(g);
