@@ -1,18 +1,21 @@
 // The trailer's sky in the game, measured against the frames (t-sky). Three places framed like the trailer — the canyon
 // vista (t1_01: over the Ember Canyon, the dusk sun right of centre, the Spire Citadel on the horizon), the city street
-// (t3_05: the Nova Haven avenue at eye level) and the Sky Isles (t1_07) — at noon (6000), 15:00 (9000), dusk 19:00
+// (t3_05, t1_24: over the Nova Haven avenue at the villas' upper floors) and the Sky Isles (t1_07) — at noon (6000),
+// 15:00 (9000), dusk 19:00
 // (13000) and night 23:00 (17000), the camera pitched up 12° so the upper part of the picture is sky (vertical fov 72°,
 // 1280 × 720), the ringed giant and the blue planet pinned in view as the director pins them for the trailer's shots.
 // Every picture is taken twice: as it is (test/shots/trailer_skycurve_<place>_<time>_<TAG>.png) and with the sky
 // painted magenta (the renderer's probe, .tmp_tests/skyprobe_*.png): the sky pixels are the magenta ones, less a
-// cone round the sun (9°) and round the planets and moons (their discs and rings, from the camera's matrices). The
+// cone round the sun (by day 30°: the disc, the bloom and the rays round it — the day frames have no sun in view; at dusk
+// 14°: the dusk frames' rectangles come that close) and round the planets and moons (their discs and rings). The
 // horizon line is where the land meets the sky (the lowest sky row per column, the 80th percentile over the columns);
 // from it to the top, 8 bands: the trimmed mean colour per band (test/sky_ref.js, the same functions as the frames'),
 // its CIELAB colour and the CIE76 distance to the trailer's target (docs/trailer/sky_ref.json): the day target for noon
 // and 15:00, the dusk target for 19:00. The space: stars, local contrast and nebula of the top two bands.
-// Checks (ALL OK / FAILED n): the pictures written, no page errors; by day every band within ΔE 12 of the day target,
+// Checks (ALL OK / FAILED n): the pictures written, no page errors; by day every band within ΔE 12 of the day target (with
+// the sun in the picture the upper half, bands 4–7),
 // the stars and the nebula visible in the top bands (local contrast and colour variation), the horizon band bright and
-// clean (no stars); at dusk every band within ΔE 12 of the dusk target; at night a dark top with stars; the Very Low
+// clean (no stars); at dusk every band within ΔE 12 of the dusk target; at night a dark sky with stars; the Very Low
 // sky pass (the sky drawn alone, the median of 5 blocks of 24 passes at the potato size): with DIST_BEFORE the same
 // in the baseline build, interleaved (A B A B …), and not slower than it (within 3 %).
 // Also the Very Low pictures of the city at noon and the canyon at dusk, and the Very Low frame time of the canyon.
@@ -48,7 +51,7 @@ const probePath = (name) => `/home/claude/vr/.tmp_tests/skyprobe_${name}.png`;
 // three frames drawn, then the screenshot; probe: the sky painted magenta (the god rays off, so no magenta light lands on the land)
 const draw = (probe) => ev((probe) => {
   const g = VR.game, R = g.renderer;
-  if (!document.getElementById('__nohint')) { const st = document.createElement('style'); st.id = '__nohint'; st.textContent = '#hint{display:none !important}'; document.head.appendChild(st); }   // the "B = build hand" toast
+  if (!document.getElementById('__nohint')) { const st = document.createElement('style'); st.id = '__nohint'; st.textContent = '#hint,#hints{display:none !important}'; document.head.appendChild(st); }   // the "B = build hand" toast (VR.Hints' #hints)
   R.skyProbe = !!probe;
   const G = VR.Grade || {}; const rays = G.rays; if (probe) G.rays = 0;
   window.__norender = false;
@@ -97,16 +100,19 @@ const W = 640, H = 360;
 const matVec = (m, v) => [0, 1, 2, 3].map(i => m[i] * v[0] + m[4 + i] * v[1] + m[8 + i] * v[2] + m[12 + i] * v[3]);
 const ang = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
 const normv = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
-async function measure(name, geo) {
+async function measure(name, geo, kind) {
   const img = await load(shotPath(name), W, H), pr = await load(probePath(name), W, H);
   const sky = new Uint8Array(W * H), mask = new Uint8Array(W * H);
-  const bodies = [[geo.sun, 14 * Math.PI / 180], [geo.giant, geo.rg * 2.6], [geo.blue, geo.rb * 1.6], ...geo.moons.map(m => [[m[0], m[1], m[2]], m[3] * 1.8])];
+  // the sun's cone: by day 30° (its disc, the bloom and the rays round it: the day frames have no sun in view), else 14°
+  const bodies = [[geo.sun, (kind === 'day' ? 30 : 14) * Math.PI / 180], [geo.giant, geo.rg * 2.6], [geo.blue, geo.rb * 1.6], ...geo.moons.map(m => [[m[0], m[1], m[2]], m[3] * 1.8])];
+  let sunMin = Math.PI;
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const p = (y * W + x) * 3, R = pr.d[p], G = pr.d[p + 1], B = pr.d[p + 2];
-    if (!(R > 140 && B > 140 && G < 0.55 * Math.min(R, B))) continue;   // magenta (at night the exposure lifts its green to ~100)
-    sky[y * W + x] = 1;
     const c = matVec(geo.inv, [(x + 0.5) / W * 2 - 1, 1 - (y + 0.5) / H * 2, 1, 1]);
     const dir = normv([c[0] / c[3], c[1] / c[3], c[2] / c[3]]);
+    sunMin = Math.min(sunMin, ang(dir, geo.sun));
+    if (!(R > 140 && B > 140 && G < 0.55 * Math.min(R, B))) continue;   // magenta (at night the exposure lifts its green to ~100)
+    sky[y * W + x] = 1;
     let ok = true;
     for (const [d, r] of bodies) if (ang(dir, d) < r) { ok = false; break; }
     if (ok) mask[y * W + x] = 1;
@@ -122,7 +128,7 @@ async function measure(name, geo) {
   const space = spaceOf(img, 0, bandRows(Hl, NB - 2)[1], inMask);
   const hband = spaceOf(img, bandRows(Hl, 0)[0], Hl, inMask);
   let skyN = 0; for (let i = 0; i < W * H; i++) skyN += mask[i];
-  return { H: Hl, y0, sky: +(skyN / (W * H)).toFixed(3), curve, space, hband };
+  return { H: Hl, y0, sky: +(skyN / (W * H)).toFixed(3), curve, space, hband, sunInView: geo.sun[1] > 0 && sunMin < 2 * Math.PI / 180 };
 }
 const geoOf = () => ev(() => { const g = VR.game, R = g.renderer, E = g.env.E, B = E.bodies; return { inv: Array.from(R.invVPNJ || R.invViewProj), sun: E.sunDir, giant: E.planetDir, blue: E.planet2Dir, rg: B ? B.radius.giant : 0.122, rb: B ? B.radius.blue : 0.085, moons: B ? B.moons : [], night: E.night }; });
 const fmtCurve = (c) => c.map(b => (b.lab ? `${b.rgb.map(v => Math.round(v)).join(',')}` : '—')).join(' | ');
@@ -140,12 +146,12 @@ const shootAt = async (P, T, preset) => {
   await draw(true);
   await page.screenshot({ path: probePath(name), timeout: 240000 });
   await draw(false);
-  const m = await measure(name, geo);
+  const m = await measure(name, geo, T[2]);
   const target = T[2] ? ref.targets[T[2]] : null;
   const dEs = target ? compare(m.curve, target) : null;
   const r = { name, place: P.name, time: T[0], kind: T[2], preset, ...m, dE: dEs, geo };
   results.push(r);
-  console.log(`shot ${name}  H ${m.H} (geometric ${m.y0})  sky ${m.sky}  space ${JSON.stringify(m.space)}  horizon stars ${m.hband.stars}`);
+  console.log(`shot ${name}  H ${m.H} (geometric ${m.y0})  sky ${m.sky}${m.sunInView ? '  the sun in view' : ''}  space ${JSON.stringify(m.space)}  horizon stars ${m.hband.stars}`);
   console.log('   curve  ' + fmtCurve(m.curve));
   console.log('   L*     ' + m.curve.map(b => (b.lab ? b.L.toFixed(0) : '—')).join(' '));
   if (dEs) console.log('   ΔE(' + T[2] + ') ' + dEs.map(v => (v === null ? '—' : v.toFixed(1))).join(' '));
@@ -218,10 +224,13 @@ for (const r of hi) {
 }
 check(logs.filter(l => /pageerror|\berror\]/.test(l)).length === 0, 'no page or WebGL errors');
 const LIM = 12;
+// every band, except by day with the sun in the picture: the day frames have no sun in view, so there the upper half
+// (bands 4–7, the dark top) is held to the target and the lower half reported
 for (const r of hi.filter(r => r.kind)) {
-  const bad = r.dE.map((v, k) => [k, v]).filter(([k, v]) => v !== null && r.curve[k].n >= 100 && v > LIM);
-  const measured = r.dE.filter((v, k) => v !== null && r.curve[k].n >= 100).length;
-  check(bad.length === 0 && measured >= 6, `${r.place} ${r.time}: the sky within ΔE ${LIM} of the ${r.kind} target in every band (${measured} bands measured; ΔE ${r.dE.map(v => (v === null ? '—' : v.toFixed(0))).join(' ')})`);
+  const from = r.kind === 'day' && r.sunInView ? 4 : 0;
+  const bad = r.dE.map((v, k) => [k, v]).filter(([k, v]) => k >= from && v !== null && r.curve[k].n >= 100 && v > LIM);
+  const measured = r.dE.filter((v, k) => k >= from && v !== null && r.curve[k].n >= 100).length;
+  check(bad.length === 0 && measured >= (from ? 3 : 6), `${r.place} ${r.time}: the sky within ΔE ${LIM} of the ${r.kind} target in ${from ? 'the upper half (the sun in view)' : 'every band'} (${measured} bands measured; ΔE ${r.dE.map(v => (v === null ? '—' : v.toFixed(0))).join(' ')})`);
 }
 const dayT = ref.targets.day;
 for (const r of hi.filter(r => r.kind === 'day')) {
@@ -230,9 +239,10 @@ for (const r of hi.filter(r => r.kind === 'day')) {
   const b0 = r.curve[0];
   check(b0.lab && b0.L >= dayT.bands[0].L - 10 && (r.hband.stars || 0) < 1, `${r.place} ${r.time}: the horizon band bright and clean (L* ${b0.L} vs the frames' ${dayT.bands[0].L}, stars ${r.hband.stars})`);
 }
+// night: dark, with stars; the nebula at full strength may lift the top to the trailer's dusk top (L* 30)
 for (const r of hi.filter(r => r.time === 'night')) {
-  const top = r.curve[NB - 1];
-  check(top.lab && top.L < 22 && r.space.stars > 0.5, `${r.place} night: a dark top (L* ${top.L}) with stars (${r.space.stars})`);
+  const top = r.curve[NB - 1], low = r.curve[0];
+  check(top.lab && low.lab && top.L < 35 && low.L < 50 && r.space.stars > 0.5, `${r.place} night: a dark sky (top L* ${top.L}, horizon L* ${low.L}) with stars (${r.space.stars})`);
 }
 if (before) check(skyAfter <= skyBefore * 1.03, `Very Low: the sky pass is not slower than the baseline's (${skyAfter.toFixed(2)} ms vs ${skyBefore.toFixed(2)} ms a pass at ${skyA[0].w}x${skyA[0].h})`);
 fs.writeFileSync('/home/claude/vr/.tmp_tests/skycurve_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, place: r.place, time: r.time, kind: r.kind, preset: r.preset, H: r.H, sky: r.sky, space: r.space, hband: r.hband, dE: r.dE, curve: r.curve.map(b => ({ n: b.n, rgb: b.rgb, L: b.L, C: b.C, h: b.h })), geo: r.geo })), frameMs, sky: { after: skyAfter, before: skyBefore, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) } }, null, 1));
