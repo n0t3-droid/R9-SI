@@ -283,7 +283,9 @@
         const d = Math.hypot(x + 0.5 - t.x, z + 0.5 - t.z), key = x + ',' + z;
         if (d > t.r || oc(x, z) === 7) continue;
         if (d <= t.bed) { cellRoad.delete(key); bedCells.push([x, z, t]); continue; }
-        if (!cellRoad.has(key)) cellRoad.set(key, [t.ri, 0, t.k, t.y]);
+        // (every cell of the circle is the circle's, the road's own included: the road's kerbs end where it meets the
+        //  circle, whose rim carries the line on round — the ring round the bed is no kerb of the road)
+        cellRoad.set(key, [t.ri, 0, t.k, t.y]);
       }
     }
     for (const key of cellRoad.keys()) { const [x, z] = key.split(',').map(Number); setO(x, z, 1); }
