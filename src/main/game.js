@@ -8,11 +8,11 @@
   // the player's language (lang_de.js / lang_en.js)
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   const PRESETS = {
-    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant' },
-    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site' },
-    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site' },
-    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
-    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
+    potato: { upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false, anim: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant' },
+    low: { upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true, anim: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site' },
+    balanced: { upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site' },
+    high: { upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
+    ultra: { upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site' },
   };
   // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
   // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
@@ -98,7 +98,7 @@
     applySettings(key) {
       const S = this.settings, r = this.renderer;
       if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
-      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier'].includes(key)) S.preset = 'custom';
+      if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim'].includes(key)) S.preset = 'custom';
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -108,7 +108,7 @@
       if (S.lampGlow === undefined) S.lampGlow = PRESETS[S.preset] ? PRESETS[S.preset].lampGlow : 1;
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
-      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water });
+      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false });
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
       if (this.aq && this.aq.stack.length) this.aqApply(this.aq, S, this.world);   // re-lay the smart-quality overrides over the new settings
@@ -349,6 +349,7 @@
       if (this.traffic) { this.traffic.destroy(); this.traffic = null; }
       if (this.starships) { this.starships.destroy(); this.starships = null; }
       if (this.villages) { this.villages.destroy(); this.villages = null; } if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(null);
+      if (this.hall) { this.hall.destroy(); this.hall = null; }
       if (this.trams) { this.trams.destroy(); this.trams = null; }
       if (this.horizon) this.horizon.reset();
       if (this.furnaces) this.furnaces.clear();
@@ -359,7 +360,7 @@
     async createWorld(o) {
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
-      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 6 }; // vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants; o.vgen picks it until the potato cost is measured) · 6: the citadel viaducts carry a track and trams (t-infra)
+      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 6 }; // vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants; o.vgen picks it until the potato cost is measured) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
     }
@@ -412,10 +413,14 @@
       this.starships = VR.Starships ? new VR.Starships(this) : null;
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
       this.villages = VR.Villages ? new VR.Villages(this, meta) : null; if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(this);
+      this.hall = VR.Hall ? new VR.Hall(this) : null;   // the Hangar Hall's heroes and console lights (hall.js)
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
       this.world.listeners.push(this);
       if (this.mp) this.world.listeners.push(this.mp);
+      // the columns that loaded during the start (the await above, before the game listened) get their spawns now: the
+      // hangar shuttle and the Hangar Hall's crew of the start area are not lost
+      for (const c of this.world.cols.values()) this.onColumnLoaded(c);
       this.state = 'loading';
       this.loadStart = performance.now(); this.nearReadyAt = 0;
     }
@@ -606,6 +611,7 @@
       this.starships = VR.Starships ? new VR.Starships(this) : null;
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
       this.villages = VR.Villages ? new VR.Villages(this, meta) : null; if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(this);
+      this.hall = VR.Hall ? new VR.Hall(this) : null;   // the Hangar Hall's heroes and console lights (hall.js)
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
       this.world.listeners.push(this);
@@ -662,7 +668,8 @@
 
     // world listener hooks
     onBlockChanged(x, y, z, old, s) { if (this.sim && !(this.mp && this.mp.isClient)) this.sim.onBlockChanged(x, y, z, old, s); if (this.gadgets) this.gadgets.onBlockChanged(x, y, z, old, s); if (this.villages) this.villages.onBlockChanged(x, y, z, old, s); }
-    onColumnLoaded(c) { if (this.sim && this.sim.onColumnLoaded) this.sim.onColumnLoaded(c); if (this.entities && this.entities.onColumnLoaded) this.entities.onColumnLoaded(c); if (this.villages) this.villages.onColumnLoaded(c); if (this.starships) this.starships.onColumnLoaded(c); if (this.gadgets) this.gadgets.onColumnLoaded(c); }
+    // the hall reads its crew before gadgets clears the column's spawns (gadgets sets c.spawns = null)
+    onColumnLoaded(c) { if (this.sim && this.sim.onColumnLoaded) this.sim.onColumnLoaded(c); if (this.entities && this.entities.onColumnLoaded) this.entities.onColumnLoaded(c); if (this.villages) this.villages.onColumnLoaded(c); if (this.starships) this.starships.onColumnLoaded(c); if (this.hall) this.hall.onColumnLoaded(c); if (this.gadgets) this.gadgets.onColumnLoaded(c); }
 
     // ---------------------------------------------------------------- main loop
     loop(t) {
@@ -970,6 +977,7 @@
       if (this.entities) this.entities.update(dt);
       if (this.villages) this.villages.update(dt);
       if (VR.Crowd && VR.Crowd.update) VR.Crowd.update(dt);   // the heroes and the crowd's budget (src/shared/folkcrowd.js)
+      if (this.hall) this.hall.update(dt);
       if (gad) gad.tick(dt);
       if (this.mirror) this.mirror.update(dt);
       if (this.starships) this.starships.update(dt);
@@ -1051,8 +1059,8 @@
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
-        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
-        drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.trails) this.trails.draw(r, E2); },
+        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
+        drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.hall) this.hall.drawTrans(r, E2); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
       });
       if (this.cockpit) this.cockpit.updateHud(dt);

@@ -233,6 +233,7 @@
     'g.set.rays': 'God rays',
     'g.set.fxaa': 'Anti-aliasing (FXAA — only used when Super Resolution is off)',
     'g.set.fancyLeaves': 'Fancy leaves',
+    'g.set.anim': 'Animated displays (screens, portal, lights)',
     'g.set.dynRes': 'Smart quality (keeps the picture sharp: trims shadows, rays and detail radius first when FPS drop, never blurs)',
     'g.set.lite': 'Lite materials (flat surfaces without normal maps & glints — fastest shading)',
     'g.set.showFps': 'Show FPS',
@@ -431,6 +432,7 @@
     'g.set.mouseSteer.tip': 'The ship flies where you look. Off: the mouse only looks around; steer with the right button held down.',
     'g.set.camShake.tip': 'Speed, boost and bumps shake the camera a little.',
     'g.set.airLife.tip': 'Dust in sunbeams, pollen, fireflies, falling leaves, snow and birds — fewer on lower tiers; Very Low keeps only fireflies and snow.',
+    'g.set.anim.tip': 'Radar screens, the portal veil, blinking consoles and pulsing light strips move. Off on Very Low.',
     'g.set.sprintMode': 'Sprinting',
     'g.set.sprintMode.tip': 'Hold: only while the key is pressed. Toggle: on with one press, off with the next.',
     'g.set.sprintMode.hold': 'Hold',
@@ -1157,6 +1159,7 @@
     'g.tram.hudGo': '<b>SKY TRAM</b> → {name} · {s} s<br><small>Shift at a station to get off · F5 view</small>',
     'g.tram.next': 'next town',
     // ---- blueprints (villas in hand)
+    'g.bp.nova.sub': 'The villa from the trailer · terraces · glass stairs · light pad',
     'g.bp.failed': 'Blueprint failed: {why}',
     'g.bp.oneFacade': 'Your own design has one facade — change it in R9 Studio',
     'g.bp.mode': 'Blueprints build in Creative or Zen Builder',

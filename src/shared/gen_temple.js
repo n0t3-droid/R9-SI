@@ -23,6 +23,13 @@
   const BACK = [2, 3, 4, 4, 4, 4, 4, 3, 2];                // back door half-widths, rows 0..8
   const T = HEART.TEMPLE, Y = HEART.PLAT;                  // floor block level (stand on Y + 1)
   TEMPLE.Y = Y;
+  // the Hangar Hall's crew (TRAILER.md shot E): two heroes in blue and orange armour stand in front of the console rows,
+  // facing the pad, with their blasters up, mirror images about the hall's axis x 0.5 (clear of the stools at x ±6).
+  // [x, y, z, yaw, suit, hair, hairstyle, skin] (hall.js shows them and walks them out to the corridor's city end)
+  const yawTo = (x, z, tx, tz) => Math.atan2(-(tx - x), -(tz - z));
+  TEMPLE.crew = (Y) => [[-3.9, Y + 1, 0.5, yawTo(-3.9, 0.5, 0.5, -9.5), 0, 1, 0, 0], [4.9, Y + 1, 0.5, yawTo(4.9, 0.5, 0.5, -9.5), 6, 4, 2, 1]];
+  // the blinking lights on the console tops (x, y, z) — the console rows at x ±7, z −4 … +6 (hall.js blinks them)
+  TEMPLE.consoleLights = (Y) => { const out = []; for (const sx of [-1, 1]) for (let z = -4; z <= 6; z += 2) out.push([sx * 7 + 0.5, Y + 2.1, z + 0.5]); return out; };
   // footprint (with the plaza) in world coordinates — reserved from villages, trees and random features
   TEMPLE.box = { x0: -66, x1: 84, z0: -50, z1: 142 };
   TEMPLE.inside = (x, z) => x >= TEMPLE.box.x0 && x <= TEMPLE.box.x1 && z >= TEMPLE.box.z0 && z <= TEMPLE.box.z1;
@@ -31,7 +38,7 @@
   function mats() {
     return {
       WALL: st('temple_stone'), SMOOTH: st('temple_stone_smooth'), BAND: st('temple_stone_band'), PIL: st('temple_pilaster', { axis: 0 }),
-      BAR: st('temple_light_bar'), SLIT: st('temple_slit'), WIN: st('amber_window'), VEIL: st('portal_veil'), BEACON: st('beacon_red'),
+      BAR: st('temple_light_bar'), SLIT: st('temple_slit'), WIN: st('amber_window'), VEIL: st('portal_veil'), BEACON: st('beacon_red'), NEONA: st('neon_amber'),
       FRAME: st('vx_portal_frame', { facing: 0 }), CYAN: st('neon_cyan'), PANEL: st('tech_panel'), PANELA: st('tech_panel_amber'), ANT: st('antenna'),
       DARK: st('vx_tech_dark_strip'), HEX: st('vx_tech_hex'), GRAY: st('vx_tech_gray'), HEXF: st('vx_floor_hex'), PAD: st('vx_floor_pad'), LINE: st('vx_floor_plaza_line'), PLAZA: st('vx_floor_plaza'),
       DECK: st('vx_floor_deck'), FLAG: st('flagstone') || st('vx_floor_stone'), GRASS: st('grass_block'), DIRT: st('dirt'), STAIR: st('temple_stone_stairs', { facing: 0, half: 0 }),
@@ -201,6 +208,9 @@
   TEMPLE.buildSteps = function* (g) {
     if (g._temple) return g._temple;
     const K = mats(), mat = makeMat(K);
+    // vgen 6 (the trailer's Gate Temple: landing-strip lights, the 7-high hex corridor). Older worlds keep the temple they
+    // were made with (AGENTS.md: old worlds' generated chunks stay identical), so their terrain is the HEAD one.
+    const v6 = g.vgen >= 6;
     const chunks = new Map();
     const bucket = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let b = chunks.get(k); if (!b) { b = { f: [], o: [] }; chunks.set(k, b); } return b; };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
@@ -273,7 +283,26 @@
     for (let z = T.back + 4; z <= T.front - 4; z += 6) { if (Math.abs(z - HZ) > 7) { put(0, Y + 15, z, K.HEXL); put(-5, Y + 15, z, K.HEXL); put(5, Y + 15, z, K.HEXL); } }
     yield;
     // ---- outside: the path to the city from the back door
-    for (let z = T.back - 1; z >= T.back - 9; z--) for (let x = -3; x <= 3; x++) { const gy = ground(x, z); fill(x, z, gy + 1, Y - 1, K.DIRT); put(x, Y, z, Math.abs(x) === 3 ? K.LINE : K.PLAZA); fill(x, z, Y + 1, Y + 6, AIR); }
+    // a corridor 7 wide and 7 high from the back door to the city (TRAILER.md shot E, t1_21): hex panels down both sides,
+    // a row of cyan hex lights in the ceiling, the chamfered top corners in grey
+    for (let z = T.back - 1; z >= T.back - 9; z--) {
+      if (!v6) { for (let x = -3; x <= 3; x++) { const gy = ground(x, z); fill(x, z, gy + 1, Y - 1, K.DIRT); put(x, Y, z, Math.abs(x) === 3 ? K.LINE : K.PLAZA); fill(x, z, Y + 1, Y + 6, AIR); } continue; }
+      for (let x = -3; x <= 3; x++) { const gy = ground(x, z); fill(x, z, gy + 1, Y - 1, K.DIRT); put(x, Y, z, Math.abs(x) === 3 ? K.LINE : K.PLAZA); fill(x, z, Y + 1, Y + 7, AIR); }
+      for (const sx of [-1, 1]) {
+        const gy = ground(sx * 4, z); if (gy < Y) fill(sx * 4, z, gy + 1, Y - 1, K.SMOOTH);
+        for (let y = Y + 1; y <= Y + 6; y++) put(sx * 4, y, z, ((z + y) % 5 === 0) ? K.HEX : K.DARK);
+        put(sx * 4, Y + 7, z, K.GRAY); put(sx * 3, Y + 7, z, K.GRAY);
+      }
+      for (let x = -2; x <= 2; x++) put(x, Y + 8, z, K.GRAY);
+      put(0, Y + 8, z, z % 4 === 0 ? K.HEXLC : K.GRAY);
+      // the city end (t3_04, the portal as a window): a veil across the opening, cut to an octagon by light-bar corners,
+      // in a frame of orange light bars — from inside the corridor the palm city shows through its clear middle
+      if (z === T.back - 9) {
+        for (let y = Y + 1; y <= Y + 7; y++) for (let x = -3; x <= 3; x++) put(x, y, z, (Math.abs(x) === 3 && (y === Y + 1 || y === Y + 7)) ? K.BAR : K.VEIL);
+        for (const sx of [-1, 1]) for (let y = Y + 1; y <= Y + 7; y++) put(sx * 4, y, z, K.BAR);
+        for (let x = -2; x <= 2; x++) put(x, Y + 8, z, K.BAR);
+      }
+    }
     // ---- the plaza & runway
     for (let x = -60; x <= 60; x++) for (let z = 21; z <= 140; z++) {
       if (z === 21) yield;
@@ -284,6 +313,9 @@
       if (gy < Y) fill(x, z, gy + 1, Y - 1, K.SMOOTH);
       let s = K.FLAG;
       if (ax <= 4) s = K.DECK; else if (ax === 5) s = K.LINE;
+      // the landing strip's lights (vgen 6): amber neon bars across the centre line every 8 blocks, flush with the deck,
+      // so they glow from above (the light bar's top is plain stone)
+      if (v6 && x >= -1 && x <= 1 && z % 8 === 4) s = K.NEONA;
       if (ax >= 18 && ax <= 21 && z >= 40 && z <= 132 && (z % 24) >= 2 && (z % 24) <= 20) s = K.GRASS;   // lawn strips
       put(x, Y, z, s);
       fill(x, z, Y + 1, Math.max(Y + 8, gy + 3), AIR);
@@ -376,7 +408,14 @@
     // the ship on the pad announces itself from the pad's chunk
     if (tp.base.pad.x >= x0 && tp.base.pad.x < x0 + 16 && tp.base.pad.z >= z0 && tp.base.pad.z < z0 + 16) {
       if (!out.spawns) out.spawns = [];
-      out.spawns.push(['starship', tp.base.pad.seed, tp.base.pad.x, tp.base.pad.y, tp.base.pad.z, tp.base.pad.dir]);
+      const row = ['starship', tp.base.pad.seed, tp.base.pad.x, tp.base.pad.y, tp.base.pad.z, tp.base.pad.dir];
+      if (g.vgen >= 6) row.push('hangar');   // vgen 6: a parked shuttle that burns its thrusters (starships.js hangarFx)
+      out.spawns.push(row);
+    }
+    // the Hangar Hall's crew (vgen 6): spawned with the chunk they stand in
+    if (g.vgen >= 6) for (const c of TEMPLE.crew(HEART.PLAT)) if (c[0] >= x0 && c[0] < x0 + 16 && c[2] >= z0 && c[2] < z0 + 16) {
+      if (!out.spawns) out.spawns = [];
+      out.spawns.push(['hallcrew', c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]]);
     }
   });
   HEART.templeBase = (g) => TEMPLE.build(g).base;

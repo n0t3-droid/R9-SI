@@ -73,7 +73,7 @@ check(S.add({ key: 'fov', g: 'play', sec: 'play', t: 'switch', lab: 'g.set.kids'
 check(S.add(null) === false && S.add({ g: 'play' }) === false, 'add() refuses an entry without a key');
 S.ITEMS.splice(S.ITEMS.findIndex(x => x.key === 'testOnlyNew'), 1);
 const d = S.defaults();
-check(d.renderDist === 10 && d.fov === 75 && d.rawInput === true && d.mouseSmooth === false && d.sprintMode === 'hold', 'defaults(): the numbers of the registry (FOV 75 since F3, raw input on, smoothing off, hold to sprint)');
+check(d.renderDist === 10 && d.fov === 75 && d.rawInput === true && d.mouseSmooth === false && d.sprintMode === 'hold', 'defaults(): the numbers of the registry (raw input on, smoothing off, hold to sprint)');
 check(!('bench' in d) && !('keys' in d) && d.autoJump === 'auto', 'defaults(): actions have no default; auto-jump follows the mode');
 check(S.items('img', 'auto').map(x => x.key).join() === 'preset,bench', 'the Automatik section holds the preset and the Automatik button, in that order');
 

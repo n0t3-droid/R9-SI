@@ -28,6 +28,8 @@ console.log('(a) Nahtlos textures unchanged');
 // test/tex_ref.json: per texture name, FNV-1a over the layer in every albedo level, then every material level, of the
 // v0.39 Nahtlos build (written from v0.41 by the same code). New textures may come (they are laid out among the old
 // ones, so the layer indices move); every v0.39 texture must still be there and unchanged.
+// v0.42 (t-temple): portal_veil changed on purpose (tex_recipes4.js REC.portal_veil: one soft sheet with no ring per block;
+// the shader does the swirl) — its entry in tex_ref.json was re-recorded at the merge.
 {
   const { tex } = buildAll('seamless');
   const ref = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'test', 'tex_ref.json'), 'utf8'));
