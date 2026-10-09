@@ -68,7 +68,7 @@ section('gate', () => {
   check(GEN.noCry(V.makeGen('drift', 1, { vgen: 9 })) && !GEN.noCry(V.makeGen('drift', 1, { vgen: 8 })) && !GEN.noCry(V.makeGen('drift', 1, {})), 'the Drift follows the world\'s vgen (an old Drift keeps its Prism Reach)');
   check(GEN.noCry(gen(1, 5, { noCrystal: true })), 'the title panorama (vgen 5 with noCrystal) shows none');
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'game.js'), 'utf8');
-  check(/vgen: o\.vgen \? \+o\.vgen : 9\b/.test(src), 'a new world is made with vgen 9 (src/main/game.js createWorld)');
+  { const m = /vgen: o\.vgen \? \+o\.vgen : (\d+)\b/.exec(src); check(!!m && +m[1] >= 9, `a new world is made with vgen ≥ 9 (src/main/game.js createWorld: ${m ? m[1] : '?'}; t-land made it 10, the land between — still no crystal)`); }
   check(/opts: \{ vgen: 5, noCrystal: true \}/.test(src) && /genOpts: \{ vgen: 5, noCrystal: true \}/.test(src), 'the title panorama asks for no crystals (both the workers\' and the world\'s options)');
 });
 
