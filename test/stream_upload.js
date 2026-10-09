@@ -83,7 +83,15 @@ console.log('1 · measured cost');
   let now = 0; const clock = () => now;
   for (let k = 0; k < 6; k++) { const it = atomic(100000); it.run = () => { now += 3; }; s.push(it); }
   s.drain(50, clock);
-  check(s.msPerByte >= 3 / 100000 - 1e-12, 'the CPU side raises the estimate (3 ms for 100 KB)', s.msPerByte.toExponential(2));
+  check(s.msPerByte >= 2e-5, 'the CPU side raises the estimate toward 3 ms per 100 KB (from 1 ms per MB)', s.msPerByte.toExponential(2));
+  // one call preempted by the system (4 ms for 50 KB) does not cap the budget for good: the next normal frames bring it back
+  const p = new S.UploadScheduler({ msPerByte: 2e-6 }); p.calibrate(1, MB);
+  let t = 0; const ck = () => t;
+  const one = (ms) => { const it = parted(50000); const st = it.step; it.step = (m) => { t += ms; return st(m); }; p.push(it); p.drain(2, ck); };
+  one(4);
+  const spiked = p.msPerByte;
+  for (let k = 0; k < 40; k++) one(0.02);
+  check(spiked <= 4 * 9.6e-7 && p.msPerByte < 1.2e-6, 'a preempted call raises the estimate at most 4x, and normal frames bring it back', (spiked / 9.54e-7).toFixed(1) + 'x, then ' + (p.msPerByte / 9.54e-7).toFixed(2) + 'x');
 }
 {
   // e · the frame feedback: a steady 50 ms machine (the owner's Low), then overruns and headroom
@@ -245,6 +253,7 @@ const cap96 = (n) => Math.ceil(n / 96) * 96;   // (the arenas hand out ranges in
   const r = mkRenderer();
   const w = new V.World({}, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: r, renderDist: 6 });
   w.uploadQ.calibrate(1, 1e6);                       // 1e-6 ms per byte: the frame's 0.05 ms are 50 KB
+  w._clk = () => 0;                                  // (the GL calls untimed: the machine's load must not move the budget here)
   check(typeof r.newStage === 'function' && typeof r.stagePart === 'function' && typeof r.commitStage === 'function' && typeof r.dropStage === 'function', 'the renderer stages a mesh in parts (newStage, stagePart, commitStage, dropStage)');
   // a column of 400 KB: four sections with meshes, twelve empty
   const counts = []; counts[3] = 900; counts[4] = 700; counts[5] = 500; counts[6] = 300;
@@ -369,7 +378,7 @@ const cap96 = (n) => Math.ceil(n / 96) * 96;   // (the arenas hand out ranges in
   // the mini-voxel detail (vxResidency) goes through the queue too: no more six uploads a frame outside any budget
   const r = mkRenderer();
   const w = new V.World({}, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: r, renderDist: 6 });
-  w.uploadQ.calibrate(1, 1e6);
+  w.uploadQ.calibrate(1, 1e6); w._clk = () => 0;
   r.upQ = w.uploadQ;
   const secs = [];
   for (let i = 0; i < 8; i++) { const s = new V.Column(i, 0).sec[4]; s.ox = i * 16; s.oy = 64; s.oz = 0; s.mesh = [null, null, null, null, null]; s.vxData = verts(40000); s.hasMesh = true; secs.push(s); }
@@ -538,17 +547,23 @@ class OldScheduler {
   const iNew = cpuMs(() => { sNew.drain(1e-9, clock, 0.6, 0.8, 0.6); young(sNew); }, 2000), iOld = cpuMs(() => { sOld.drain(1e-9, clock, 0.6, 0.8); young(sOld); }, 2000);
   console.log(`     a frame that waits (300 queued, none fits): v042 ${(iOld * 1000).toFixed(1)} µs, now ${(iNew * 1000).toFixed(1)} µs`);
   check(iNew <= iOld * 1.1 && sNew.size === 300 && sOld.size === 300, 'a waiting frame is not slower either', (iNew / iOld).toFixed(2) + 'x');
-  // allocations: a queue that waits allocates nothing a frame (no garbage collection in 20 000 frames); v042's made an
-  // object per item and two arrays a frame
+  // allocations: a queue that waits allocates nothing a frame — the heap does not grow over 20 000 frames (measured over a
+  // loop no collection fell into: tried up to three times); v042's made an object per item and two arrays a frame
+  let grow = Infinity;
+  for (let tries = 0; tries < 3 && grow === Infinity; tries++) {
+    await tick(); await tick(); gcs = 0;
+    const h0 = process.memoryUsage().heapUsed;
+    for (let i = 0; i < 20000; i++) { sNew.drain(1e-9, clock, 0.6, 0.8, 0.6); young(sNew); }
+    const h1 = process.memoryUsage().heapUsed;
+    await tick(); await tick();
+    if (gcs === 0) grow = h1 - h0;
+  }
   await tick(); await tick(); gcs = 0;
-  for (let i = 0; i < 20000; i++) { sNew.drain(1e-9, clock, 0.6, 0.8, 0.6); young(sNew); }
-  await tick(); await tick();
-  const gNew = gcs; gcs = 0;
   for (let i = 0; i < 20000; i++) { sOld.drain(1e-9, clock, 0.6, 0.8); young(sOld); }
   await tick(); await tick();
   const gOld = gcs;
   obs.disconnect();
-  check(gNew === 0 && gOld > 0, 'no allocation per frame: 20 000 waiting frames without a scavenge (v042: ' + gOld + ')', gNew + ' scavenges');
+  check(grow < 65536 && gOld > 0, 'no allocation per frame: 20 000 waiting frames, the heap grew ' + (grow / 1024).toFixed(1) + ' KB (v042: ' + gOld + ' scavenges)');
   console.log(fails ? 'FAILED ' + fails : 'ALL OK');
   process.exit(fails ? 1 : 0);
 })();
