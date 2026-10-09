@@ -69,7 +69,7 @@
   // way. A home city's plan is built after the temple it stands on.
   // init and custom replace the generators: a job still waiting then is answered {type:'cancelled'} (its owner asks
   // again if it still wants it).
-  const PLAN_SLICE_MS = 20, PLAN_JOBS = { gen: 1, relight: 1, lod: 1, spawn: 1, villageplan: 1 };
+  const PLAN_SLICE_MS = 20, PLAN_JOBS = { gen: 1, relight: 1, lod: 1, spawn: 1, villageplan: 1, form: 1 };   // (form: F-Far's ring 1, far.js)
   let epoch = 0;
   const post = (msg, tr) => { if (VR.VillageGen && VR.VillageGen.probe && VR.VillageGen.probe.miss) return; self.postMessage(msg, tr); };
   // the needs of a job, in the order they are met: {temple: true}, or {site, lod} for a town's plan
@@ -84,6 +84,7 @@
     let cells = [];
     if (m.type === 'gen' || m.type === 'relight') for (const f of VG.cellNeeds) cells = cells.concat(f(g, m.cx, m.cz));
     else if (m.type === 'lod' && m.dim === 'overworld' && VR.LOD) cells = VR.LOD.tileCells(g, m);
+    else if (m.type === 'form' && m.dim === 'overworld' && VR.Far) cells = VR.Far.tileCells(g, m);
     const seenC = new Set();
     const addCell = (i, j) => { const k = (i + 4096) * 8192 + (j + 4096); if (seenC.has(k) || VG.siteKnown(g, i, j)) return; seenC.add(k); out.push({ cell: true, i, j }); };
     if (cells.some(([i, j]) => Math.abs(i) <= 1 && Math.abs(j) <= 1 && !VG.siteKnown(g, i, j))) addCell(0, 0);
@@ -206,6 +207,14 @@
         const r = VR.LOD && m.dim === 'overworld' ? VR.LOD.build(g, m) : null;
         if (!r || r.empty) { post({ type: 'lod', id: m.id, empty: true, ms: performance.now() - t0 + (m.planMs || 0) }); return; }
         post({ type: 'lod', id: m.id, verts: r.verts, idx: r.idx, count: r.count, minY: r.minY, maxY: r.maxY, big: r.big, bx0: r.bx0, bz0: r.bz0, bx1: r.bx1, bz1: r.bz1, ms: performance.now() - t0 + (m.planMs || 0) }, [r.verts, r.idx.buffer]);
+      } else if (m.type === 'form') {
+        // F-Far · ring 1: the coarse form of 4 x 4 chunk columns (far.js); a town plan or the temple it needs and has not
+        // got yet ends the run (VG.probe), and the job waits for their slices like a chunk does
+        const t0 = performance.now();
+        const g = getGen(m.dim);
+        const r = VR.Far && m.dim === 'overworld' ? VR.Far.form(g, m) : null;
+        if (!r || r.empty) { post({ type: 'form', id: m.id, empty: true, ms: performance.now() - t0 + (m.planMs || 0) }); return; }
+        post({ type: 'form', id: m.id, verts: r.verts, idx: r.idx, count: r.count, big: r.big, minY: r.minY, maxY: r.maxY, bx0: r.bx0, bz0: r.bz0, bx1: r.bx1, bz1: r.bz1, tris: r.tris, ms: performance.now() - t0 + (m.planMs || 0) }, [r.verts, r.idx.buffer]);
       } else if (m.type === 'look') {
         // the block look (Klassisch / Nahtlos): the next meshes follow it (the main thread re-meshes)
         if (VR.setLook) VR.setLook(m.mode);

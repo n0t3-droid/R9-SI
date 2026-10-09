@@ -29,9 +29,14 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 |---|---|---|---|---|---|
 | frame_cost.js | node | Main-thread budgets per frame: mesh scheduling, visibility walk, buildJob against the v0.39 loop (timing). | 6 † | – | no (timing) |
 | gen_same.js | node | Generated terrain is unchanged when the generator loops are tuned (hash of blocks, biomes and tints). | 7 † | – | yes |
+| far_forms.js | node | F-Far ring 1's mesher (VR.Far.form): a flat field, a mesa, deep water, a house lot, a floating deck, a tree; the canyon, Nova Haven, the citadel, the Sky Isles, a forest and the open sea of seed 1; determinism; cost and triangles against the tile's 16 chunks (≤ 1/10, ≤ 1/8); the ring's memory against the 5 km horizon's cap. | 60 † | – | yes |
+| far_presets.js | node | F-Far presets: ring 1 on High and Ultra only, the render distance's top 32 on Ultra; the governor never lowers a ring; settings saved before; the slider's top; the tip names the rings. | 2 † | – | yes |
+| far_rings.js | node | F-Far ring bookkeeping (VR.Far.RingSet): which ring a column is in, the band of ring-1 tiles, promotion, demotion and the outer edge with hysteresis, the far mask's rule (no pixel undrawn, a settled column drawn once), no rescan in a steady camera, the byte budget. | 1 † | – | yes |
+| far_worker.js | node | F-Far: the worker's form job with a fake self — the open sea answers, Nova Haven waits for its plan a slice at a time and then answers VR.Far.form's bytes, another dimension answers empty. | 4 † | – | yes |
 | genie_brain.js | node | The Genie without Claude: wishes become houses and things (geometry and words). | 4 (4–5) | 2/2 | yes |
 | genie_raster.js | node | Genie answer parser and the shape-to-block rasteriser (geometry only). | 1 (1–1) | 3/3 | yes |
 | heart_gen.js | node | Heartland generator smoke test: climate and biome at key points, temple, chunk timings; every chunk has blocks. | 3 † | – | no |
+| lod_same.js | node | The horizon tiles (LOD.build) are unchanged by F-Far's shared surface look (LOD.look): a hash of eight tiles of seed 1 on levels 0–3. | 2 † | – | yes |
 | housekit.js | node | The Haus-Baukasten: every roof, wall, window and extra builds; doors, stairs and furniture land where they belong. | 2 (2–2) | 3/3 | yes |
 | icon_perf.js | node | Modern Living icon work stays cheap, in CPU time (the wall clock fails under load): every pack model builds in under 60 ms on first use, the pack's icons take under 150 ms in all (best of three runs), the cloth extrude under 60 ms for ten builds. | 2 † | – | yes |
 | icon_pump.js | node | The palette's icon pump: 6 ms of paints per frame, a voxel picture drawn in slices and painted once complete, detached slots skipped; the idle warm starts after 10 s of play, one picture per slice, largest first. | 1 † | – | yes |
@@ -71,6 +76,7 @@ Typical (s): median of the recorded passing runs in the scratchpad `run_*.txt` f
 | crafter3.mjs | browser | v0.33 Crafter UI: icon tool strip, mouse legend, paint tool (one piece, a surface, a kind), hold-to-confirm, one undo. | 92 (89–103) | 3/3 | yes |
 | create_standalone.mjs | browser | v0.35 Erschaffen in the standalone Studio (its own artifact, no game worlds): the result is kept as a Bauteil or saved as a file. | 18 (15–27) | 4/4 | yes |
 | deadends.mjs | browser | v0.39 phase A: no dead ends (Keine Sackgassen) in the Studio; Bearbeiten everywhere; the Crafter return keeps the selection. | 450 (446–1712) | 3/4 | yes |
+| far.mjs | browser | F-Far · die echte Ferne: High on v042's build and this one from 120 blocks over the Heartland (far_high_before/after.png), ring-1 columns, time to the first ring-1 frame, video memory per ring, frame ms; Very Low side by side: no ring 1, frame ms within ±5 %. | – | – | yes |
 | favs.mjs | browser | v0.37 favourites shared by the Studio and the game (creative star tab, F over an item, the star on each slot). | 718 (284–787) | 3/10 | yes |
 | glass_conn.mjs | browser | Glass (v0.33.2): panes join each other and solid blocks; every glass keeps its frame; collision follows the shape. | 118 (118–118) | 1/1 | yes |
 | grocery_icons.mjs | browser | Every grocery icon renders on a sheet; every catalogue product resolves to an item. | – | – | no |
@@ -135,6 +141,7 @@ No summary line, no exit code, not run by `regress.sh`. They print numbers, writ
 | heroes.mjs | browser | hero looks in third person, each suit with and without a blaster |
 | homes.mjs | browser | builds a little house near a village; a family should move in |
 | horizon.mjs | browser | the far horizon settles; screenshots and its state |
+| far_dbg.mjs | browser | F-Far: ring 1 alone and with the horizon over the Heartland (pictures far_dbg_*.png) and the first form's colours |
 | islands.mjs | browser | sky islands near spawn, from the side and from above |
 | kit.mjs | browser | Voxel Tech kit showcase: a hangar, a control room, a tropical plaza (screenshots) |
 | load_shared.js | node | helper: loads the shared modules for the node tests (not a test) |
