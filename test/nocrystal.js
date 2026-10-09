@@ -289,6 +289,26 @@ section('texts', () => {
   check(!/kristall|crystal/i.test(W.type('kristall').de + W.type('kristall').en), 'the wonder\'s own names (wonders.js) match');
 });
 
+// ---------------------------------------------------------------- GEN.pinnacle through a chunk's writer
+// (the realm features run for a chunk and its eight neighbours, each through the chunk's ColumnWriter: a rock is visited
+// over the chunk's own columns only — the passes that miss it cost nothing — and writes there what it would anyway)
+section('pinnacle', () => {
+  const GEN = V.GEN, stone = R.S('stone'), moss = R.S('moss_block');
+  const o = (seed) => ({ h: 40, r: 3.2, lean: [3, -2], mat: () => stone, top: moss, seed });
+  const blocks = new Uint16Array(65536), cw = new GEN.ColumnWriter(0, 0, blocks);
+  let asked = 0, askedOut = 0; const okc = cw.ok.bind(cw); cw.ok = (x, y, z) => { asked++; if (x < 0 || x > 15 || z < 0 || z > 15) askedOut++; return okc(x, y, z); };
+  const topY = GEN.pinnacle(cw, 40, 70, 8, o(7));
+  check(asked === 0 && topY === 70 + 40 - 1, `a pinnacle two chunks away asks the chunk's writer about no cell (${asked}) and still tells its top (${topY})`);
+  asked = 0; askedOut = 0;
+  const all = new Map(), wAll = { set(x, y, z, s) { all.set(x + ',' + y + ',' + z, s); }, get: () => 0 };
+  GEN.pinnacle(cw, 15, 70, 8, o(9)); GEN.pinnacle(wAll, 15, 70, 8, o(9));
+  let same = 0, diff = 0, extra = 0, outside = 0;
+  for (const [k, s] of all) { const [x, y, z] = k.split(',').map(Number); if (x < 0 || x > 15 || z < 0 || z > 15) { outside++; continue; } if (blocks[(y << 8) | (z << 4) | x] === s) same++; else diff++; }
+  for (let i = 0; i < blocks.length; i++) if (blocks[i] && !all.has((i & 15) + ',' + (i >> 8) + ',' + ((i >> 4) & 15))) extra++;
+  check(same > 0 && outside > 0 && diff === 0 && extra === 0, `on the chunk's edge it writes there what a writer that sees everything gets (${same} cells, ${diff} different, ${extra} extra; ${outside} beyond the edge)`);
+  check(asked > 0 && askedOut === 0, `and asks about the chunk's own columns only (${asked} cells asked, ${askedOut} of them beyond the edge)`);
+});
+
 // ---------------------------------------------------------------- the cost: a prism patch at vgen 9 is not dearer than at 8
 section('cost', () => {
   const seed = SEEDS[0], at = findBiome(gen(seed, 8), ['crystal_highlands']) || findBiome(gen(seed, 8), ['prism_fields']);
