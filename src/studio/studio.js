@@ -582,7 +582,7 @@ jedes Möbel- und Fassadenmodell mit Stückzahl (anklicken öffnet es), jeder Bl
     W.onerror = (e) => { console.error('worker', e.message || e); sys('Worker-Fehler: ' + (e.message || ''), 'err'); };
     W.postMessage({ type: 'init', seed: 1, opts: {}, custom: VR.Custom ? (VR.Custom.load() || null) : null });
     // the block look from the game's settings (Klassisch / Nahtlos): here as in the game, before the first texture and mesh
-    let look = 'classic'; try { look = JSON.parse(localStorage.getItem('r9si.settings') || '{}').look === 'seamless' ? 'seamless' : 'classic'; } catch (e) { /* default */ }
+    let look = 'seamless'; try { look = JSON.parse(localStorage.getItem('r9si.settings') || '{}').look === 'classic' ? 'classic' : 'seamless'; } catch (e) { /* default */ }
     if (VR.setLook) VR.setLook(look);
     W.postMessage({ type: 'look', mode: look });
     // the looks and variant slots of this browser (B1): the worker meshes blocks and houses with them
