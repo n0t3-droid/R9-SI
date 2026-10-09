@@ -641,7 +641,7 @@
         const X = x0 + i * cell + (cell >> 1), Z = z0 + j * cell + (cell >> 1);
         const cl = g.climateAt(X, Z, clo), B = BIOMES[g.biomeFor(cl, 90)];
         const t0 = cl.ember > 0.45 ? P.redsand : cl.t < -0.35 ? P.snow : U.tint(P.grassTop, B.grass);
-        const sd = cl.ember > 0.45 ? P.ochre : cl.prism > 0.45 ? P.duskrock : P.stone;
+        const sd = LOD.isleSide(g, P, cl);   // (vgen 9: the warm strata, not grey stone — lod.js)
         F.setSlab(I, i, j, { ground: -100, bot: iBot[c], top: iTop[c] + 1, roof: t0, wall: U.mixc(sd, ISLE_SHADE, 0.2), kind: 0 });
       }
     }

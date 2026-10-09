@@ -52,7 +52,15 @@
           fill(qx, qz, y + 1, Math.max(y + 4, g0 + 3), 0);
           used.push([qx, qz, 1.2]);
         }
-        if (i % 16 === 8) { const lx = Math.round(px + nx * 2.2), lz = Math.round(pz + nz * 2.2); if (onHill(lx, lz)) { const ly = Math.max(gy(lx, lz), y); put(lx, ly + 1, lz, K.LAMP0); put(lx, ly + 2, lz, K.LAMP1); } }
+        if (i % 16 === 8) {
+          const lx = Math.round(px + nx * 2.2), lz = Math.round(pz + nz * 2.2);
+          if (onHill(lx, lz)) {
+            const g1 = gy(lx, lz), ly = Math.max(g1, y);
+            // (vgen 9, t-beauty: a lamp beside a path raised over the slope stands on the path's bank, not on air)
+            if (g.vgen >= 9 && g1 < y) { fill(lx, lz, g1 + 1, y - 1, K.DIRT); put(lx, y, lz, K.GRASS); }
+            put(lx, ly + 1, lz, K.LAMP0); put(lx, ly + 2, lz, K.LAMP1);
+          }
+        }
         last = [px, pz];
       }
       void last;
@@ -84,7 +92,7 @@
         }
         fill(x + dx, z + dz, top + 1, Math.max(top + 4, g0 + 3), 0);
       }
-      if (rng.chance(0.6)) put(x + rad, y + 1, z + rad, K.BUSH);
+      if (rng.chance(0.6)) put(x + rad, (g.vgen >= 9 ? gy(x + rad, z + rad) : y) + 1, z + rad, K.BUSH);   // (vgen 9: on its own ground, not at the stem's height over a slope)
       used.push([x, z, rad + 1]); pods++;
     }
     // ---- tube houses: white half-cylinders (5 wide, 8–14 long) lying along x or z, a glowing doorway at one end
@@ -199,6 +207,17 @@
     cache.set(key, c);
     return c;
   };
+  // (t-beauty) the tread a column would be cut to, as cellT8 cuts it but without asking the city which cells it owns and
+  // without the cache — for the city's own plan (gen_city.js: a turning circle stays off the treads), which cellT8's
+  // question would ask back
+  HILLS.treadT8 = function (g, x, z) {
+    const h = g.surfaceY(x, z);
+    if (!HILLS.inT8(x, z) || h < T8.base) return h;
+    const B = T8.blend, w = ss(T8.x0, T8.x0 + B, x) * (1 - ss(T8.x1 - B, T8.x1, x)) * ss(T8.z0, T8.z0 + B, z);
+    if (!(w > 0)) return h;
+    let k = 0; while (k + 1 < T8.levels.length && T8.levels[k + 1] <= h) k++;
+    return Math.round(h - w * (h - T8.levels[k]));
+  };
   // an edge: a terrace cell whose neighbour lies a riser lower (the line runs along the top of every riser)
   HILLS.edgeT8 = function (g, x, z) {
     const c = HILLS.cellT8(g, x, z); if (c.k < 0) return false;
@@ -301,7 +320,7 @@
     const DIRT = st('dirt'), MOSS = st('moss_block');
     const L = VG.makeLot((x, y, z, s) => bucket(x, z).o.push(x, y, z, s === DIRT ? MOSS : s), v.ox, v.oz, v.r);
     const ground = (u, w) => { const q = VG.rot(v.r, u, w); return HILLS.cellT8(g, v.ox + q[0], v.oz + q[1]).y; };
-    PLAN.build(L, { w: PLAN.NOVA.LOT[0], d: PLAN.NOVA.LOT[1], F: v.L + 1, r: v.r, ox: v.ox, oz: v.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: v.comp, novaMirror: v.mirror, rng: new VR.RNG((g.seed ^ (v.ox * 73 + v.oz * 977)) >>> 0), ground, beds: 3, noCustom: v.comp !== 'classic' });
+    PLAN.build(L, { w: PLAN.NOVA.LOT[0], d: PLAN.NOVA.LOT[1], F: v.L + 1, r: v.r, ox: v.ox, oz: v.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: v.comp, novaMirror: v.mirror, rng: new VR.RNG((g.seed ^ (v.ox * 73 + v.oz * 977)) >>> 0), ground, beds: 3, noCustom: v.comp !== 'classic', vgen: g.vgen });
     v.ops = chunks; v.built = true;
     return chunks;
   };
