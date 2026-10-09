@@ -131,5 +131,25 @@ const streamsOf = (r) => ['opaque', 'cutout', 'trans', 'vx', 'vxFar'].map(k => (
   check(streamsOf(r).every(x => x === 0), 'the village pieces give no voxel geometry with the furniture asked for');
 }
 
+// 7. the rugs join on all four sides (bits 2–5: a rug on +x, −x, +z, −z — any rug colour, as voxarch.js joins them),
+// and a table lamp on a side table knows its table (bit 2), the table its lamp
+{
+  const place = (put) => {
+    for (const [x, z] of [[3, 3], [4, 3], [5, 3], [3, 4], [5, 4]]) put(x, 1, z, R.S('vx_rug_sand'));   // a U of rugs (4, 4 is free)
+    put(4, 1, 5, R.S('vx_rug_green'));                                                                     // another colour joins too
+    put(9, 1, 9, R.S('vm_side_table', { facing: 0, part: 0 })); put(9, 2, 9, R.S('vm_table_lamp', { facing: 0, part: 0 }));
+    put(12, 1, 9, R.S('vm_side_table', { facing: 0, part: 0 })); put(12, 1, 11, R.S('vm_table_lamp', { facing: 0, part: 0 }));   // apart
+  };
+  const r = VR.meshSection(section(place, (VR.PROP_GROUP || {}).furniture || 2));
+  const L = r.props ? Array.from({ length: r.props.length / 6 }, (_, i) => Array.from(r.props.slice(i * 6, i * 6 + 6))) : [];
+  const f = (x, y, z) => (L.find(a => a[0] === x && a[1] === y && a[2] === z) || [])[4];
+  // (3,3): +x (4,3) and +z (3,4) → 4 | 16; (4,3): ±x and no +z (4,4 free) → 4 | 8; (5,4): −z (5,3) → 32; (4,5) green: no rug
+  // on its sides but −z is (4,4), free → 0
+  check(f(3, 1, 3) === (4 | 16) && f(4, 1, 3) === (4 | 8) && f(5, 1, 3) === (8 | 16) && f(3, 1, 4) === 32 && f(5, 1, 4) === 32 && f(4, 1, 5) === 0,
+    'a rug knows its rug neighbours on all four sides (' + [f(3, 1, 3), f(4, 1, 3), f(5, 1, 3), f(3, 1, 4), f(5, 1, 4), f(4, 1, 5)].join(',') + ')');
+  check(f(9, 1, 9) === 4 && f(9, 2, 9) === 4 && f(12, 1, 9) === 0 && f(12, 1, 11) === 0, 'a table lamp on its side table and the table under it are marked, apart they are not (' + [f(9, 1, 9), f(9, 2, 9), f(12, 1, 9), f(12, 1, 11)].join(',') + ')');
+  check(L.length === 10 && streamsOf(r).every(x => x === 0), 'one anchor per rug block, table and lamp (' + L.length + '), no voxel geometry');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

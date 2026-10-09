@@ -743,7 +743,7 @@
     // the slot of a furniture kind: its model, its reach (for the frustum), its two instance lists (near, far)
     furnSlotOf(kind, facing) {
       const PR = VR.Props, S = this.furnSlots || (this.furnSlots = []), byKind = this.furnByKind || (this.furnByKind = {});
-      const ck = kind * 4 + (((facing | 0) >> 2) & 3);   // (a joining sofa's row bits choose its variant)
+      const ck = kind * 16 + (((facing | 0) >> 2) & 15);   // (a joining sofa's row bits, a rug's sides choose its variant)
       if (byKind[ck] !== undefined) return byKind[ck];
       const key = PR.furnKey(kind, facing | 0), md = key && PR.FURN[key];
       if (!md) return (byKind[ck] = -1);

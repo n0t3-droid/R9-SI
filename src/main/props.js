@@ -670,14 +670,14 @@
     else if (unit === 'oven') {
       front(F, wood, 1.5, 3.6, false);
       F.m(MAT.gloss, 0x1C1E22).rbox(0.5, 3.6, 0.9, 15.5, 13, 2.1, 0.3);
-      F.m(MAT.light, 0x4A3018).box(1.6, 4.6, 0.8, 14.4, 10.4, 0.9);
+      F.m(MAT.light, 0x2A1A0E).box(2.4, 5.4, 0.8, 13.6, 9.6, 0.9);
       F.m(MAT.metal, COL.steel).rod(2, 11.8, 0.4, 14, 11.8, 0.4, 0.42, { seg: 6 }).box(2, 11.5, 0.5, 2.6, 12.1, 0.95).box(13.4, 11.5, 0.5, 14, 12.1, 0.95);
       for (const x of [4, 7, 10]) F.m(MAT.metal, COL.steel).cyl(x, 0.7, 12.0, 12.8, 0.5, 0.5, { seg: 8 });
       F.m(MAT.light, 0x3AC8FF).box(11.5, 12.15, 0.8, 14, 12.65, 0.9);
     } else if (tall) {
       front(F, wood, 1.5, 12.5, true);
       F.m(MAT.gloss, 0x1C1E22).rbox(0.5, 12.5, 0.9, 15.5, 22.5, 2.1, 0.3);
-      F.m(MAT.light, 0x4A3018).box(1.6, 13.5, 0.8, 14.4, 19.5, 0.9);
+      F.m(MAT.light, 0x2A1A0E).box(2.4, 14.3, 0.8, 13.6, 18.7, 0.9);
       F.m(MAT.metal, COL.steel).rod(2, 21.3, 0.4, 14, 21.3, 0.4, 0.42, { seg: 6 });
       F.m(MAT.light, 0x3AC8FF).box(11.5, 20.3, 0.8, 14, 20.8, 0.9);
       front(F, wood, 22.5, 32, false);
@@ -835,6 +835,132 @@
     F.shadow(0.5, 1.5, 15.5, 15.5);
   });
 
+  // the ring chandelier: a black canopy and stem, three brushed-brass rings at three heights with a warm light band
+  // under each, four spokes from the stem's foot to the outer ring, thin wires down to the lower rings
+  const loop = (x, z, r, y, n) => { const pts = []; for (let i = 0; i <= n; i++) { const a = i / n * TAU; pts.push([x + Math.cos(a) * r, y, z + Math.sin(a) * r]); } return pts; };
+  MD('chandelier', [1, 1, 1], (F) => {
+    F.m(MAT.metal, COL.black).cyl(8, 8, 15.2, 16, 1.8, 1.8, { seg: 14, caps: 1 }).rod(8, 7.7, 8, 8, 15.2, 8, 0.22, { seg: 6 });
+    F.m(MAT.metal, COL.black).sphere(8, 7.8, 8, 0.6, 0.5, 0.6, { seg: 4 });
+    for (const [r, y] of [[6.9, 4.7], [4.5, 7.4], [2.4, 1.9]]) {
+      F.m(MAT.metal, COL.brass).tube(loop(8, 8, r, y, r > 3 ? 26 : 16), 0.42, 0.42, { seg: 6, caps: 0 });
+      F.m(MAT.light, 0xFFE6B8).tube(loop(8, 8, r, y - 0.38, r > 3 ? 26 : 16), 0.3, 0.3, { seg: 5, caps: 0 });
+    }
+    F.m(MAT.metal, COL.black);
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4, c = Math.cos(a), sn = Math.sin(a); F.rod(8, 7.6, 8, 8 + c * 6.9, 5.1, 8 + sn * 6.9, 0.16, { seg: 5 }); F.rod(8 + c * 4.5, 7.4, 8 + sn * 4.5, 8 + c * 2.4, 2.3, 8 + sn * 2.4, 0.08, { seg: 4, caps: 0 }); }
+    F.m(MAT.light, 0xFFE6B8); F.far(1.1, 4.1, 1.1, 14.9, 5.1, 2.1); F.far(1.1, 4.1, 13.9, 14.9, 5.1, 14.9); F.far(1.1, 4.1, 2.1, 2.1, 5.1, 13.9); F.far(13.9, 4.1, 2.1, 14.9, 5.1, 13.9);
+    F.m(MAT.metal, COL.black); F.far(7.7, 5, 7.7, 8.3, 16, 8.3);
+  });
+  // the table lamp: a turned brass body, a linen drum that glows from inside, a brass rim, the bulb; on a side table
+  // (variant 1: the mesher saw the side table under it) it stands on the table's top, six units down in the cell below
+  for (let j = 0; j < 2; j++) MD('tablelamp:' + j, [1, 1, 1], (F) => {
+    const y = j ? -6 : 0;
+    F.m(MAT.metal, COL.brass).lathe(8, 8, [[y, 3.0], [y + 0.45, 3.05], [y + 0.85, 2.5], [y + 1.5, 1.25], [y + 3.1, 1.8], [y + 4.7, 1.55], [y + 6.3, 0.85], [y + 7.6, 0.42]], { seg: 18 });
+    F.cyl(8, 8, y + 7.5, y + 9.2, 0.32, 0.3, { seg: 6, caps: 0 });
+    glowShade(F, 8, 8, [[y + 7, 5.5], [y + 13.5, 4.7]], [[y + 7.1, 5.15], [y + 13.4, 4.4]], MAT.shade, 0xF2E0C0);
+    F.m(MAT.metal, COL.brass).lathe(8, 8, [[y + 6.8, 5.55], [y + 7.3, 5.58]], { seg: 22 }).lathe(8, 8, [[y + 13.3, 4.76], [y + 13.8, 4.8]], { seg: 22 });
+    F.m(MAT.light, 0xFFF2D0).sphere(8, y + 9.9, 8, 1.4, 1.6, 1.4, { seg: 6 });
+    F.m(MAT.metal, COL.brass); F.far(6, y, 6, 10, y + 7.5, 10); F.m(MAT.shade, 0xF2E0C0); F.far(2.6, y + 7, 2.6, 13.4, y + 13.5, 13.4);
+    if (!j) F.shadow(3.5, 3.5, 12.5, 12.5);
+  });
+  FM['tablelamp:1'].drop = 6 / 16;
+  // the side table: a round walnut top with a soft edge on a slim black stem and a domed foot; a teal vase with a sprig
+  // on it (variant 0) — under a table lamp (variant 1) the top is the lamp's
+  for (let j = 0; j < 2; j++) MD('sidetable:' + j, [1, 1, 1], (F) => {
+    F.m(MAT.metal, COL.black).lathe(8, 8, [[0, 4.6], [0.3, 4.65], [0.7, 4.1], [1.0, 1.4], [1.2, 0.7]], { seg: 20 });
+    F.cyl(8, 8, 1.0, 8.4, 0.62, 0.52, { seg: 10, caps: 0 }).lathe(8, 8, [[7.9, 0.55], [8.3, 4.6], [8.5, 4.9]], { seg: 16 });
+    F.m(MAT.wood, WOOD.walnut).lathe(8, 8, [[8.45, 0.01], [8.45, 5.7], [8.65, 6.0], [9.85, 6.0], [10.05, 5.7], [10.05, 0.01]], { seg: 24 });
+    if (!j) {
+      F.m(MAT.gloss, 0x2F7A6A).lathe(9.4, 9.2, [[10.05, 1.5], [10.6, 2.3], [12, 2.8], [13.6, 2.0], [14.8, 1.1], [15.4, 1.35]], { seg: 14, capBot: true });
+      F.m(MAT.leaf, COL.stem).rod(9.4, 15, 9.2, 8.4, 18.6, 9.8, 0.2, { seg: 4 }).rod(9.4, 15, 9.2, 10.6, 18, 8.6, 0.2, { seg: 4 });
+      F.m(MAT.leaf, COL.leafL).sphere(8.3, 18.9, 9.9, 1.3, 0.8, 1.0, { seg: 4, lump: 0.3, seed: 21 }); F.m(MAT.leaf, COL.leaf).sphere(10.7, 18.3, 8.5, 1.2, 0.8, 1.0, { seg: 4, lump: 0.3, seed: 22 });
+    }
+    F.m(MAT.wood, WOOD.walnut); F.far(2, 8.45, 2, 14, 10.05, 14); F.m(MAT.metal, COL.black); F.far(7.4, 0, 7.4, 8.6, 8.45, 8.6);
+    F.shadow(2.5, 2.5, 13.5, 13.5);
+  });
+  // the console table: a slim walnut top against the wall on a black steel frame (two legs of flat bar, a low
+  // stretcher), a cream vase with a sprig, a dark tray with a card, a framed photo leaning on the wall
+  MD('console', [2, 1, 1], (F) => {
+    F.m(MAT.wood, WOOD.walnut).rbox(0, 11, 9, 32, 12.5, 16, 0.45, { seg: 2 });
+    F.m(MAT.metal, COL.black);
+    for (const x of [1.6, 30.4]) { F.rbox(x - 0.5, 0, 9.8, x + 0.5, 11, 10.7, 0.15, { seg: 1 }).rbox(x - 0.5, 0, 14.3, x + 0.5, 11, 15.2, 0.15, { seg: 1 }).rbox(x - 0.5, 10.2, 10.7, x + 0.5, 11, 14.3, 0.15, { seg: 1 }).rbox(x - 0.5, 0, 10.7, x + 0.5, 0.7, 14.3, 0.15, { seg: 1 }); }
+    F.rbox(2.1, 1.6, 12.1, 29.9, 2.3, 12.9, 0.2, { seg: 1 });
+    F.m(MAT.gloss, 0xE8E2D4).lathe(8, 12.5, [[12.5, 1.7], [13.2, 2.6], [14.6, 2.9], [16.4, 1.7], [17.5, 1.25], [18.1, 1.6]], { seg: 14, capBot: true });
+    F.m(MAT.leaf, COL.stem).tube([[8, 17.6, 12.5], [8.5, 19.4, 12.3], [9.3, 20.8, 12]], 0.24, 0.16, { seg: 4, caps: 0 }).rod(8.4, 19.2, 12.4, 6.6, 20.6, 12.6, 0.16, { seg: 4, caps: 0 });
+    F.m(MAT.leaf, COL.leafL).sphere(9.4, 21.1, 12, 1.4, 0.9, 1.1, { seg: 4, lump: 0.3, seed: 31 }); F.m(MAT.leaf, COL.leaf).sphere(6.4, 20.9, 12.6, 1.2, 0.8, 1.0, { seg: 4, lump: 0.3, seed: 32 });
+    F.m(MAT.gloss, 0x2A2D33).rbox(19, 12.5, 11, 28, 13.1, 14, 0.4, { seg: 1 }); F.m(MAT.matte, COL.paper).box(20.2, 13.1, 11.6, 26.8, 13.3, 13.4);
+    F.turn([['x', 0.12]], [15, 12.5, 14.6]); F.m(MAT.gloss, 0x2A2D33).rbox(12.8, 12.5, 14.2, 17.2, 18.2, 14.8, 0.2, { seg: 1 }); F.m(MAT.matte, 0xD8C8A0).box(13.4, 13.1, 14.15, 16.6, 17.6, 14.2); F.turn(null);
+    F.m(MAT.wood, WOOD.walnut); F.far(0, 11, 9, 32, 12.5, 16); F.m(MAT.metal, COL.black); F.far(1.1, 0, 9.8, 2.1, 11, 15.2); F.far(29.9, 0, 9.8, 30.9, 11, 15.2);
+    F.shadow(-0.5, 8.5, 32.5, 16.5);
+  });
+  // the bar cart: four brass posts on black castors, two glass trays in brass rims, bottles and glasses on the top tray,
+  // an ice bucket and two bottles below
+  MD('barcart', [1, 1, 1], (F) => {
+    const P4 = [[2.5, 2.5], [13.5, 2.5], [2.5, 13.5], [13.5, 13.5]];
+    F.m(MAT.metal, COL.brass); for (const [x, z] of P4) F.cyl(x, z, 1.5, 14.6, 0.42, 0.42, { seg: 8 }).sphere(x, 14.7, z, 0.55, 0.55, 0.55, { seg: 4 });
+    F.m(MAT.gloss, 0x111214); for (const [x, z] of P4) F.sphere(x, 0.9, z, 0.9, 0.9, 0.9, { seg: 5 });
+    for (const y of [5, 13]) {
+      F.m(MAT.metal, COL.brass).rod(2.5, y + 0.9, 2.5, 13.5, y + 0.9, 2.5, 0.28, { seg: 6 }).rod(2.5, y + 0.9, 13.5, 13.5, y + 0.9, 13.5, 0.28, { seg: 6 }).rod(2.5, y + 0.9, 2.5, 2.5, y + 0.9, 13.5, 0.28, { seg: 6 }).rod(13.5, y + 0.9, 2.5, 13.5, y + 0.9, 13.5, 0.28, { seg: 6 });
+      F.rbox(2.6, y - 0.2, 2.6, 13.4, y, 13.4, 0.1, { seg: 1 });
+      F.m(MAT.glass, 0xDCEFF8).rbox(2.6, y, 2.6, 13.4, y + 0.35, 13.4, 0.15, { seg: 1 });
+    }
+    for (const [x, z, c, h] of [[5, 5.5, 0x6A3A1A, 7], [8, 5.5, 0x2A6A3A, 8], [11, 5.5, 0xC8A24A, 6.5], [4.6, 10.5, 0x2A2D33, 7.5]]) {
+      F.m(MAT.glass, c).lathe(x, z, [[13.35, 1.1], [13.35 + h * 0.6, 1.1], [13.35 + h * 0.72, 0.62], [13.35 + h, 0.45]], { seg: 10, capBot: true });
+      F.m(MAT.wood, 0x8A6A4A).cyl(x, z, 13.35 + h, 14.2 + h, 0.42, 0.4, { seg: 6 });
+    }
+    F.m(MAT.glass, 0xE8F4FA).lathe(8.5, 10.5, [[13.35, 1.1], [15.8, 1.0], [16.4, 1.25]], { seg: 10, capBot: true }).lathe(11.5, 10.5, [[13.35, 1.1], [15.8, 1.0], [16.4, 1.25]], { seg: 10, capBot: true });
+    F.m(MAT.metal, COL.steel).lathe(8.4, 8.4, [[5.35, 2.0], [8.6, 2.4], [8.8, 2.3]], { seg: 14, capBot: true });
+    F.m(MAT.glass, 0x2A4A2A).lathe(4.4, 4.4, [[5.35, 0.9], [9.4, 0.9], [10.2, 0.5], [11.2, 0.45]], { seg: 8, capBot: true }); F.m(MAT.glass, 0x8A2A2A).lathe(11.8, 11.2, [[5.35, 1.0], [9.2, 0.95], [10.1, 0.5], [10.9, 0.45]], { seg: 8, capBot: true });
+    F.m(MAT.metal, COL.brass); F.far(2, 0.5, 2, 3, 14.6, 3); F.far(13, 0.5, 13, 14, 14.6, 14); F.far(2, 4.8, 2, 14, 5.9, 14); F.far(2, 12.8, 2, 14, 13.9, 14);
+    F.shadow(1.5, 1.5, 14.5, 14.5);
+  });
+  // the bar stool: a black disc foot, a column with a footrest ring on three spokes, a round cognac leather seat with a
+  // soft dome and a piped edge on a black plate
+  MD('stool', [1, 1, 1], (F) => {
+    F.m(MAT.metal, COL.black).lathe(8, 8, [[0, 5.2], [0.35, 5.25], [0.75, 4.4], [1.15, 1.6], [1.35, 0.8]], { seg: 22 });
+    F.cyl(8, 8, 1.2, 11.8, 0.85, 0.72, { seg: 10, caps: 0 });
+    F.tube(loop(8, 8, 4.3, 5.3, 26), 0.32, 0.32, { seg: 6, caps: 0 });
+    for (let k = 0; k < 3; k++) { const a = k * TAU / 3 + 0.3; F.rod(8 + Math.cos(a) * 0.7, 5.3, 8 + Math.sin(a) * 0.7, 8 + Math.cos(a) * 4.1, 5.3, 8 + Math.sin(a) * 4.1, 0.22, { seg: 5, caps: 0 }); }
+    F.cyl(8, 8, 11.6, 12.1, 2.8, 3.4, { seg: 14, caps: 1 });
+    F.m(MAT.leather, 0x9A5A32).lathe(8, 8, [[12.05, 0.01], [12.05, 5.3], [12.35, 5.75], [13.3, 5.95], [14.4, 5.6], [15.05, 4.3], [15.3, 2.2], [15.35, 0.01]], { seg: 24 });
+    F.m(MAT.leather, 0x7A4424).lathe(8, 8, [[13.2, 5.97], [13.45, 5.97]], { seg: 24 });
+    F.m(MAT.metal, COL.black); F.far(7.2, 0, 7.2, 8.8, 12, 8.8); F.m(MAT.leather, 0x9A5A32); F.far(2.2, 12, 2.2, 13.8, 15.3, 13.8);
+    F.shadow(2.6, 2.6, 13.4, 13.4);
+  });
+  // the rug (one block of a rug: rugs side by side make one rug): a soft wool pile in the rug's colour (tint 1), a border
+  // band in its second colour (tint 2) and a cream line inside it — both only along the sides where the rug ends, which
+  // round off to the floor; a joined side runs flush into the neighbour (variant bits: 1 a rug on +x, 2 on −x, 4 on
+  // +z, 8 on −z; the mesher's world-axis join of the rugs)
+  for (let j = 0; j < 16; j++) MD('rug:' + j, [1, 1, 1], (F) => {
+    const T = 0.9, E = 0.55, BW = 2.2, LW = 0.7, open = [!(j & 2), !(j & 1), !(j & 8), !(j & 4)];   // −x, +x, −z, +z
+    // the breakpoints along one axis: [from, to, region] (2 border, 1 line, 0 field), the bevel's inset at an open end
+    const segs = (lo, hi) => {
+      const out = [], a = lo ? E : 0, b = hi ? 16 - E : 16;
+      if (lo) out.push([a, BW, 2], [BW, BW + LW, 1]);
+      out.push([lo ? BW + LW : 0, hi ? 16 - BW - LW : 16, 0]);
+      if (hi) out.push([16 - BW - LW, 16 - BW, 1], [16 - BW, b, 2]);
+      return out;
+    };
+    const XS = segs(open[0], open[1]), ZS = segs(open[2], open[3]);
+    const LINE = 0xEDE4CF;
+    for (const [x0, x1, rx] of XS) for (const [z0, z1, rz] of ZS) {
+      const r = Math.max(rx, rz), nx = Math.ceil((x1 - x0) / 4 - 1e-6), nz = Math.ceil((z1 - z0) / 4 - 1e-6);
+      if (r === 2) F.m(MAT.fabric, 0xFFFFFF, 2, 0.95); else if (r === 1) F.m(MAT.fabric, LINE, 0, 0.95); else F.m(MAT.fabric, 0xFFFFFF, 1, 0.95);
+      for (let a = 0; a < nx; a++) for (let b = 0; b < nz; b++) {   // a few quads a region (the light varies across it)
+        const u0 = x0 + (x1 - x0) * a / nx, u1 = x0 + (x1 - x0) * (a + 1) / nx, w0 = z0 + (z1 - z0) * b / nz, w1 = z0 + (z1 - z0) * (b + 1) / nz;
+        F.quad([u0, T, w1], [u1, T, w1], [u1, T, w0], [u0, T, w0]);
+      }
+    }
+    // the open sides: a bevel from the top's edge down to a low skirt at the cell's edge (mitred at the corners)
+    F.m(MAT.fabric, 0xD8D8D8, 2, 0.85);
+    const lo = (k) => open[k] ? E : 0, hiE = (k) => open[k] ? 16 - E : 16;
+    const S = T * 0.4;
+    if (open[0]) { F.quad([0, S, 0], [0, S, 16], [E, T, hiE(3)], [E, T, lo(2)]); F.quad([0, 0, 0], [0, 0, 16], [0, S, 16], [0, S, 0]); }
+    if (open[1]) { F.quad([16, S, 16], [16, S, 0], [16 - E, T, lo(2)], [16 - E, T, hiE(3)]); F.quad([16, 0, 16], [16, 0, 0], [16, S, 0], [16, S, 16]); }
+    if (open[2]) { F.quad([16, S, 0], [0, S, 0], [lo(0), T, E], [hiE(1), T, E]); F.quad([16, 0, 0], [0, 0, 0], [0, S, 0], [16, S, 0]); }
+    if (open[3]) { F.quad([0, S, 16], [16, S, 16], [hiE(1), T, 16 - E], [lo(0), T, 16 - E]); F.quad([0, 0, 16], [16, 0, 16], [16, S, 16], [0, S, 16]); }
+    F.m(MAT.fabric, 0xFFFFFF, 1, 0.95); F.far(0, 0.3, 0, 16, T, 16);
+  });
+
   // ---------------------------------------------------------------- the villages' pieces (voxarch / voxtech / voxhome)
   // the cosy bed (two cells: the head north of the foot when it faces north; the foot is its anchor): a wooden frame on
   // short legs, a headboard with a rail, a low footboard, the mattress, the blanket (the piece's colour) over the foot
@@ -911,7 +1037,13 @@
     vm_floor_lamp: { model: 'tripod' }, vm_arc_lamp: { model: 'arclamp' }, vm_pendant: { model: 'pendant' }, vm_island: { model: 'island' },
     vm_bookshelf: { model: 'bookshelf' }, vm_planter: { model: 'planter' }, vm_monstera: { model: 'monstera' }, vm_olive: { model: 'olive' },
     vm_lowboard: { model: 'lowboard' }, vm_tv: { model: 'tv' }, vm_coffee_table_glass: { model: 'ctable_glass' }, vm_coffee_table: { model: 'ctable_marble' }, vm_nightstand: { model: 'nightstand' },
+    // the villas' smaller pieces (run 3 of the pictures: the chandelier over the dining table, the table lamp on its side
+    // table, the console behind the sofa, the bar cart, the bar stools); the lamp and its table come in two variants
+    vm_chandelier: { model: 'chandelier' }, vm_table_lamp: { model: 'tablelamp', stack: true }, vm_side_table: { model: 'sidetable', stack: true },
+    vm_console: { model: 'console' }, vm_bar_cart: { model: 'barcart' }, vm_stool: { model: 'stool' },
   });
+  // the rugs (voxarch.js RUGC: the pile and the border), joined on all four sides (furnKey)
+  for (const [k, col, col2] of [['red', 0xB84A3A, 0x6A2A22], ['blue', 0x3F63A8, 0x22345A], ['green', 0x4E7F46, 0x2A4A26], ['sand', 0xD8B87A, 0x8A6A3A]]) FDEF['vx_rug_' + k] = { model: 'rug', a: col, b: col2, join4: true };
   for (const [c, hex, wood] of [['white', 0xF2F2EE, false], ['black', 0x25272B, false], ['oak', 0xC8A878, true]]) for (const u of ['cabinet', 'sink', 'hob', 'oven', 'tall', 'upper']) FDEF['vm_kitchen_' + c + '_' + u] = { model: 'kitchen:' + u + (wood ? ':w' : ''), a: hex };
   // the villages' pieces: the beds' blankets on an oak frame (the foot, part 0, is the anchor: the model's cell 0, 1), the
   // sofas' fabric and pillows (a sofa's variant comes with its row: furnKey)
@@ -932,8 +1064,13 @@
   // the furniture kind of a block name, and back (kind = VR.PROP_FURN0 + the name's index in VR.PROP_FURN, mesher.js)
   PR.FURN0 = VR.PROP_FURN0 || 16;
   PR.furnDef = function (kind) { const L = VR.PROP_FURN, nm = L && L[kind - PR.FURN0]; return nm ? FDEF[nm] || null : null; };
-  // the model of a piece: its definition's model, a joining sofa's with the row bits of its anchor (facing bits 2, 3)
-  PR.furnKey = function (kind, facing) { const d = PR.furnDef(kind); if (!d) return null; return d.join ? d.model + ':' + ((facing >> 2) & 3) : d.model; };
+  // the model of a piece: its definition's model; a joining sofa's with the row bits of its anchor (facing bits 2, 3), a
+  // rug's with its four sides (bits 2–5), a table lamp's or a side table's with the other one under / over it (bit 2)
+  PR.furnKey = function (kind, facing) {
+    const d = PR.furnDef(kind); if (!d) return null;
+    const j = facing >> 2;
+    return d.join ? d.model + ':' + (j & 3) : d.join4 ? d.model + ':' + (j & 15) : d.stack ? d.model + ':' + (j & 1) : d.model;
+  };
   // the centre of a piece on the floor (world) from its anchor (part 0) and facing, and its turn (yaw): the model's
   // q quarter turns are VM.footprint's (part 0 lands where rotOffset(0, 0) says in the turned box)
   PR.furnPlace = function (size, wx, wy, wz, facing, out, cell) {
