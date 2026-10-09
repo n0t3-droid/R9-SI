@@ -404,5 +404,43 @@ const cap96 = (n) => Math.ceil(n / 96) * 96;   // (the arenas hand out ranges in
   check(calls.length === 1 && calls[0] === 1 && c.shownAt >= 0, 'a renderer without staging: the section goes up whole (uploadSection), as before');
 }
 
+console.log('4b · horizon tiles and far forms in the same queue');
+require('../src/main/horizon.js'); require('../src/main/farring.js');
+{
+  // ring 1 off (Very Low, Low, Balanced): a tile's mesh no longer goes up the moment the worker answers
+  const sch = new S.UploadScheduler({ msPerByte: 1e-6 });
+  const hjobs = [];
+  const g = { world: { uploadQ: sch, renderDist: 6, dim: 'overworld' }, dim: 'overworld', renderer: { gl: GLX }, pool: { workers: [{}], submit(msg, tr, cb, prio) { hjobs.push({ msg, cb, prio }); }, broadcast() {} } };
+  const hz = new V.Horizon(g); hz.setLevel(3);
+  check(!hz.farOn(), 'ring 1 off');
+  const tiles = [];
+  for (let i = 0; i < 12; i++) { hz.request(1, i, 0, 300 + i * 50); tiles.push(hz.tiles.get(hz.key(1, i, 0))); }
+  frameBytes = 0;
+  for (const j of hjobs) j.cb({ type: 'lod', verts: new ArrayBuffer(36000), idx: new Uint16Array(6000), count: 6000, big: false, minY: 40, maxY: 90 });
+  check(frameBytes === 0 && tiles.every(t => t.state === 0 && !t.vao) && sch.size === 12 && sch.items.every(it => it.lane === 1 && typeof it.prio === 'number'), 'the twelve answers wait in the world\'s queue on the far lane, in the horizon\'s order', sch.size + ' items');
+  let worst = 0, f = 0;
+  while (sch.size && f < 20) { frameBytes = 0; sch.drain(0.1); worst = Math.max(worst, frameBytes); f++; }
+  check(worst <= 100000 && tiles.every(t => t.state === 1 && t.vao) && hz.bytes === 12 * 48000, 'they go up within the frame\'s bytes (a burst never stalls a frame)', f + ' frames, worst ' + worst + ' bytes');
+  // a tile the horizon let go of while it waited is dropped without an upload
+  hz.request(1, 40, 0, 900);
+  const t = hz.tiles.get(hz.key(1, 40, 0));
+  hjobs[hjobs.length - 1].cb({ type: 'lod', verts: new ArrayBuffer(36000), idx: new Uint16Array(6000), count: 6000, big: false, minY: 40, maxY: 90 });
+  hz.tiles.delete(hz.key(1, 40, 0));
+  frameBytes = 0; sch.drain(1);
+  check(frameBytes === 0 && !t.vao && sch.size === 0, 'a tile evicted while it waited costs nothing');
+}
+{
+  // ring 1 (High, Ultra): the forms in the same far lane, with their priority
+  const sch = new S.UploadScheduler({ msPerByte: 1e-6 });
+  const fjobs = [];
+  const g = { world: { uploadQ: sch, renderDist: 14 }, pool: { workers: [{}, {}], submit(msg, tr, cb, prio) { fjobs.push({ msg, cb, prio }); } }, renderer: { gl: GLX } };
+  const hz = { g, level: 4, bytes: 0, maskF: null, enabled: () => true };
+  const R = new V.FarRing(hz); R.setRadius(64); R.update({ x: 8.5, y: 100, z: 8.5 });
+  for (const j of fjobs) j.cb({ type: 'form', verts: new ArrayBuffer(48000), idx: new Uint16Array(6000), count: 6000, big: false, minY: 60, maxY: 80, bx0: 0, bz0: 0, bx1: 64, bz1: 64, tris: 2000 });
+  check(sch.size === fjobs.length && sch.items.every(it => it.lane === 1 && typeof it.prio === 'number' && it.alive && it.alive()), 'the forms wait on the far lane with their priority', sch.size + ' items');
+  let f = 0; while (sch.size && f < 20) { sch.drain(0.1); f++; }
+  check(R.live.length === fjobs.length, 'and go up', R.live.length + ' forms');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

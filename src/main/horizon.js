@@ -132,9 +132,19 @@
         if (m.type === 'cancelled') { this.tiles.delete(key); return; }
         if (m.type !== 'lod') { t.state = 2; t.failedAt = this.frame; return; }
         if (m.empty) { t.state = 1; t.empty = true; return; }
-        // (F-Far) with ring 1 on, the tile goes up within the frame's upload budget (the world's queue), like every ring
+        // (F-Far, F10) the tile goes up within the frame's upload bytes — the world's queue, its far lane, in the order it was
+        // asked for — on every preset (before F10 only with ring 1 on: Very Low to Balanced uploaded a flight's burst of
+        // tiles in one frame). A tile nobody wants any more (the camera moved on, evicted) is dropped before it costs a
+        // byte, and forgotten, so it is asked for again when it is wanted again.
         const w = g.world;
-        if (this.farOn() && w && w.uploadQ && !t.queued) { t.queued = true; w.uploadQ.push({ key: null, col: undefined, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: m.verts.byteLength + m.idx.byteLength, run: () => { if (this.tiles.get(key) === t && !t.vao) this.put(t, m, S); } }); return; }
+        if (w && w.uploadQ && !t.queued) {
+          t.queued = true;
+          w.uploadQ.push({ key: null, col: undefined, lane: 1, prio: d / S - L * 0.6, x: t.x0 + S / 2, z: t.z0 + S / 2, bytes: m.verts.byteLength + m.idx.byteLength,
+            alive: () => this.tiles.get(key) === t && !t.vao && this.frame - t.used <= 120,
+            abort: () => { if (this.tiles.get(key) === t && !t.vao) this.tiles.delete(key); },
+            run: () => { if (this.tiles.get(key) === t && !t.vao) this.put(t, m, S); } });
+          return;
+        }
         this.put(t, m, S);
       }, d / S - L * 0.6);
     }
