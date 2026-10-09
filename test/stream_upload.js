@@ -214,5 +214,125 @@ console.log('4 · one budget for everything');
   check(p.aborted && s.size === 0, 'clear() aborts what waits (a world torn down)');
 }
 
+console.log('2 · packets: a column through the World and the renderer\'s staging');
+global.window = undefined;
+require('../src/main/gl.js'); require('../src/main/shaders.js'); require('../src/main/renderer.js');
+global.Worker = class { constructor() { this.inflight = 0; } postMessage() {} terminate() {} };
+global.Blob = class {}; global.URL = { createObjectURL: () => 'blob:x' };
+require('../src/main/world.js');
+// a GL that records what goes up (bytes per frame) and hands out buffers
+let frameBytes = 0, bufId = 0;
+const GLX = { ARRAY_BUFFER: 0x8892, ELEMENT_ARRAY_BUFFER: 0x8893, DYNAMIC_DRAW: 0x88e8, STATIC_DRAW: 0x88e4, UNSIGNED_SHORT: 0x1403, SHORT: 0x1402, UNSIGNED_BYTE: 0x1401, UNSIGNED_INT: 0x1405,
+  createBuffer: () => ({ id: ++bufId }), deleteBuffer() {}, bindBuffer() {}, bufferData(t, d) { if (typeof d !== 'number') frameBytes += d.byteLength; },
+  bufferSubData(t, off, d, so, len) { frameBytes += (len !== undefined ? len : d.length - (so || 0)) * d.BYTES_PER_ELEMENT; },
+  createVertexArray: () => ({}), deleteVertexArray() {}, bindVertexArray() {}, enableVertexAttribArray() {}, vertexAttribPointer() {}, vertexAttribIPointer() {} };
+const mkRenderer = () => { const r = Object.create(V.Renderer.prototype); Object.assign(r, { gl: GLX, arenas: [], arenaSize: 1 << 16, propSecs: new Set(), q: { upload: 0.05, vxLod: 48, shadowDist: 64 }, visDirty: false, shadowCam: null, stats: {} }); return r; };
+const jobs = [];
+const pool = { workers: [{ inflight: 0 }], queue: [], queueFar: [], submit(msg, tr, cb, prio) { jobs.push({ msg, cb, prio }); }, pump() {}, broadcast() {}, queueDirty: false };
+const mkCol = (w, cx, cz, counts) => {
+  const c = new V.Column(cx, cz);
+  c.blocks = new Uint16Array(65536); c.light = new Uint16Array(65536); c.biome = new Uint8Array(256); c.caveBiome = new Int8Array(256);
+  c.grass = new Uint16Array(256); c.foliage = new Uint16Array(256); c.water = new Uint16Array(256);
+  for (let sy = 0; sy < 16; sy++) c.sec[sy].count = counts[sy] || 0;
+  c.ready = true; w.cols.set(c.key, c); return c;
+};
+const verts = (bytes) => new Uint16Array(Math.round(bytes / 16) * 8);
+const mesh = (o, cu, tr, vxFar) => ({ type: 'mesh', opaque: verts(o), cutout: verts(cu || 0), trans: verts(tr || 0), vx: null, vxFar: vxFar ? verts(vxFar) : null, props: null, vis: 0x7fff });
+const answer = (sy, m) => { const i = jobs.findIndex(j => j.msg.sy === sy && !j.done); const j = jobs[i]; j.done = true; j.cb(m); return j; };
+const used = (r) => r.arenas.reduce((a, ar) => a + ar.used, 0);
+const cap96 = (n) => Math.ceil(n / 96) * 96;   // (the arenas hand out ranges in steps of 96 vertices)
+{
+  const r = mkRenderer();
+  const w = new V.World({}, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: r, renderDist: 6 });
+  w.uploadQ.calibrate(1, 1e6);                       // 1e-6 ms per byte: the frame's 0.05 ms are 50 KB
+  check(typeof r.newStage === 'function' && typeof r.stagePart === 'function' && typeof r.commitStage === 'function' && typeof r.dropStage === 'function', 'the renderer stages a mesh in parts (newStage, stagePart, commitStage, dropStage)');
+  // a column of 400 KB: four sections with meshes, twelve empty
+  const counts = []; counts[3] = 900; counts[4] = 700; counts[5] = 500; counts[6] = 300;
+  const c = mkCol(w, 0, 0, counts);
+  for (let sy = 0; sy < 16; sy++) w.meshSection(c, sy, false, sy, [8, 64, 8]);
+  const sizes = { 3: [150000, 20000, 0], 4: [100000, 0, 30000], 5: [60000, 0, 0], 6: [40000, 0, 0] };
+  for (const sy of [3, 4, 5, 6]) answer(sy, mesh(...sizes[sy]));
+  const total = 400000;
+  check(w.uploadQ.size === 4 && c.shownAt < 0, 'four section meshes wait; the column is not shown', w.uploadQ.size + ' items');
+  let frames = 0, worst = 0, sum = 0, shownEarly = false, drawnEarly = false;
+  while (w.uploadQ.size && frames < 40) {
+    frameBytes = 0; w.drainUploads(8, 8); frames++;
+    worst = Math.max(worst, frameBytes); sum += frameBytes;
+    if (w.uploadQ.size && c.shownAt >= 0) shownEarly = true;
+    if (w.uploadQ.size) for (const sy of [3, 4, 5, 6]) if (c.sec[sy].mesh[0] && !c.sec[sy].meshed) drawnEarly = true;
+  }
+  check(worst <= 50000 && frames >= 8, 'every frame stays within its 50 KB (the 400 KB column takes ' + frames + ' frames)', 'worst ' + worst + ' bytes');
+  check(Math.abs(sum - total) <= 64, 'all of it went up, once', sum + ' bytes');
+  check(!shownEarly && !drawnEarly && c.shownAt >= 0, 'shown only when complete (no section drawn half-uploaded, the column\'s fade starts after the last)');
+  check([3, 4, 5, 6].every(sy => c.sec[sy].meshed && c.sec[sy].hasMesh && c.sec[sy].mesh[0]) && c.sec[4].mesh[2] && !c.sec[5].mesh[1], 'each section has its layers', '');
+  // a remeshed section keeps drawing its old mesh until the new one is in
+  const u0 = used(r), old0 = c.sec[3].mesh[0];
+  c.sec[3].ver++; w.meshSection(c, 3, false, 0, [8, 64, 8]);
+  answer(3, mesh(160000, 20000, 0));
+  frameBytes = 0; w.drainUploads(8, 8);
+  check(frameBytes > 0 && c.sec[3].mesh[0] === old0 && used(r) > u0, 'a remesh in progress: the old mesh still draws, the new one is staged beside it', frameBytes + ' bytes staged');
+  let k = 0; while (w.uploadQ.size && k < 40) { frameBytes = 0; w.drainUploads(8, 8); k++; }
+  check(c.sec[3].mesh[0] !== old0 && c.sec[3].mesh[0].count === 10000 && used(r) - u0 === cap96(10000) - cap96(9375), 'committed: the new mesh draws, the old range is given back', 'arena ' + (used(r) - u0) + ' vertices more');
+  // a newer mesh of the same section aborts the older one that is still going up
+  const u1 = used(r);
+  c.sec[4].ver++; w.meshSection(c, 4, false, 0, [8, 64, 8]);
+  answer(4, mesh(200000, 0, 0));
+  frameBytes = 0; w.drainUploads(8, 8);
+  const mid = used(r);
+  c.sec[4].ver++; w.meshSection(c, 4, false, 0, [8, 64, 8]);
+  answer(4, mesh(80000, 0, 0));
+  k = 0; while (w.uploadQ.size && k < 60) { frameBytes = 0; w.drainUploads(8, 8); k++; }
+  check(mid > u1 && c.sec[4].mesh[0].count === 5000 && used(r) === u1 - cap96(6250) - cap96(1875) + cap96(5000), 'a newer mesh aborts the older one in progress: its staging is given back, only the newest goes in', 'arena ' + used(r) + ' (was ' + u1 + ')');
+  // an unloaded column gives its staging back
+  const u2 = used(r);
+  const c2 = mkCol(w, 1, 0, { 2: 400, 3: 400 });
+  for (let sy = 0; sy < 16; sy++) w.meshSection(c2, sy, false, sy, [8, 64, 8]);
+  answer(2, mesh(120000)); answer(3, mesh(90000));
+  frameBytes = 0; w.drainUploads(8, 8);
+  const stagedC2 = used(r) - u2;
+  w.unloadColumn(c2);
+  frameBytes = 0; w.drainUploads(8, 8);
+  check(stagedC2 > 0 && used(r) === u2 && frameBytes === 0 && w.uploadQ.size === 0, 'an unloaded column: what it had staged goes back, nothing more is uploaded for it', stagedC2 + ' vertices staged, then ' + (used(r) - u2));
+  // the player's own edit goes up whole and first, even over the frame's bytes
+  const c3 = mkCol(w, 0, 1, { 7: 300 });
+  for (let sy = 0; sy < 16; sy++) w.meshSection(c3, sy, false, sy, [8, 64, 8]);
+  answer(7, mesh(45000));
+  c.sec[5].ver++; w.meshSection(c, 5, true, undefined, undefined, true);   // (hand: setBlock with 4 | SB_EDIT, below)
+  answer(5, mesh(90000, 0, 0));
+  frameBytes = 0; w.drainUploads(8, 8);
+  check(c.sec[5].mesh[0] && c.sec[5].mesh[0].count === 90000 / 16 && frameBytes >= 90000 && c3.shownAt < 0, 'the player\'s edit (90 KB) goes up whole in its frame, before the waiting column', frameBytes + ' bytes this frame');
+  k = 0; while (w.uploadQ.size && k < 20) { w.drainUploads(8, 8); k++; }
+  // the player's edit reaches the mesher as `hand` (setBlock flags 4 | SB_EDIT), the simulation's (4 alone) does not
+  {
+    const seen = [], ms0 = w.meshSection;
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (!w.col(10 + dx, 10 + dz)) mkCol(w, 10 + dx, 10 + dz, { 4: 10 });
+    w.meshSection = (cc, sy, urgent, prio, pos, hand) => seen.push(!!urgent + '/' + !!hand);
+    w.setBlock(168, 70, 168, V.R.byName.stone.defaultState, 4 | V.SB_EDIT);
+    w.setBlock(169, 70, 168, V.R.byName.stone.defaultState, 4);
+    w.meshSection = ms0;
+    check(seen[0] === 'true/true' && seen[seen.length - 1] === 'true/false', 'setBlock: the player\'s edit (4 | SB_EDIT) is meshed as a hand edit, the simulation\'s (4) as urgent only', seen.join(' '));
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) w.cols.delete(V.ckey(10 + dx, 10 + dz));
+  }
+  // the world torn down: what waits is aborted
+  const c4 = mkCol(w, -1, 0, { 4: 300 });
+  for (let sy = 0; sy < 16; sy++) w.meshSection(c4, sy, false, sy, [8, 64, 8]);
+  answer(4, mesh(100000));
+  frameBytes = 0; w.drainUploads(8, 8);
+  const u3 = used(r);
+  w.destroy();
+  check(w.uploadQ.size === 0 && used(r) < u3 && used(r) === 0, 'a world torn down: the queue is cleared and every range goes back', used(r) + ' vertices left');
+}
+{
+  // without the staging (a stub renderer, the tests' and the ships'): one item per section, run whole, as in v042
+  const calls = [];
+  const r = { q: { upload: 2.5, vxLod: 48 }, uploadSection: (s, c, sy, o) => calls.push(sy), freeSection() {} };
+  const w = new V.World({}, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: r, renderDist: 4 });
+  const c = mkCol(w, 5, 5, { 1: 100 });
+  for (let sy = 0; sy < 16; sy++) w.meshSection(c, sy, false, sy, [88, 30, 88]);
+  answer(1, mesh(5000));
+  w.drainUploads(88, 88);
+  check(calls.length === 1 && calls[0] === 1 && c.shownAt >= 0, 'a renderer without staging: the section goes up whole (uploadSection), as before');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

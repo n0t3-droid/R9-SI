@@ -415,6 +415,53 @@
       this.visDirty = true;
       this.nearShadow(sec);
     }
+    // ---- F10 · a section's mesh in packets (world.js queues it; the upload scheduler spends the frame's bytes on it).
+    // newStage keeps the mesh's layers; stagePart writes up to maxBytes of them in layer order (opaque, cutout, trans,
+    // vxFar — whole vertices; a layer takes its arena range on its first packet, a big layer is split across frames);
+    // commitStage swaps the staged ranges in once every byte is up — until then the section draws its old mesh (or
+    // nothing), never half of a new one; dropStage gives the ranges back (a newer mesh, an unloaded column).
+    // The mini-voxel detail (vx) stays in RAM as before (vxResidency) and the prop anchors come with the commit.
+    newStage(opaque, cutout, trans, vx, vxFar, props) {
+      const d = [opaque || null, cutout || null, trans || null, null, vxFar || null];
+      let bytes = 0;
+      for (let l = 0; l < 5; l++) if (d[l]) bytes += (d[l].length >> 3) * VSTRIDE;
+      return { d, vx: vx || null, props: props || null, m: [null, null, null, null, null], l: 0, o: 0, bytes };
+    }
+    stagePart(st, maxBytes) {
+      const gl = this.gl;
+      let done = 0;
+      while (st.l < 5) {
+        const l = st.l, d = st.d[l], n = d ? d.length >> 3 : 0;
+        if (st.o >= n) { st.l++; st.o = 0; continue; }
+        const k = Math.min(n - st.o, Math.floor((maxBytes - done) / VSTRIDE));
+        if (k <= 0) break;
+        if (!st.m[l]) st.m[l] = this.allocMesh(n);
+        const m = st.m[l];
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
+        gl.bufferSubData(gl.ARRAY_BUFFER, (m.off + st.o) * VSTRIDE, d, st.o * 8, k * 8);
+        st.o += k; done += k * VSTRIDE;
+      }
+      return done;
+    }
+    commitStage(st, sec, col, sy) {
+      this.propSet(sec, st.props);
+      if (sec.mesh.length < 5) sec.mesh.push(null, null);
+      for (let l = 0; l < 5; l++) {
+        const o = sec.mesh[l];
+        if (o) o.arena.release(o.off, o.cap);
+        sec.mesh[l] = st.m[l]; st.m[l] = null;
+      }
+      const vn = st.vx ? st.vx.length >> 3 : 0;
+      sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
+      sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
+      sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
+      this.visDirty = true;
+      this.nearShadow(sec);
+    }
+    dropStage(st) {
+      for (let l = 0; l < 5; l++) { const m = st.m[l]; if (m) { m.arena.release(m.off, m.cap); st.m[l] = null; } }
+      st.l = 5;
+    }
     // a changed section inside the cached shadow map's area: redraw the map next frame
     nearShadow(sec) {
       const c = this.shadowCam; if (!c || this.shadowDirty) return;
