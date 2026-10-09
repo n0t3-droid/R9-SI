@@ -384,7 +384,16 @@
             const lx = sx - x0, lz = sz - z0;
             if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) {
               const J = g.islandAt(sx, sz);
-              if (J && J.isle === I) { blocks[((J.top) << 8) | (lz << 4) | lx] = fluid; }
+              if (J && J.isle === I) {
+                const pi = ((J.top) << 8) | (lz << 4) | lx;
+                blocks[pi] = fluid;
+                // vgen 9 (t-beauty): the grass and flowers the top grew there go with the soil — vgen 8 left them
+                // standing on the pool's water (the audit's lake scan: nothing hovers)
+                if (g.vgen >= 9) {
+                  const PL = g._poolPlants || (g._poolPlants = new Set(['short_grass', 'tall_grass', 'fern', 'poppy', 'dandelion', 'cornflower', 'allium', 'azure_bluet'].map(n => R.byName[n] && R.byName[n].id).filter(v => v !== undefined)));
+                  for (let k = pi + 256; k < pi + 768 && k < blocks.length && blocks[k] && PL.has(R.T.type[blocks[k]]); k += 256) blocks[k] = 0;
+                }
+              }
             }
             const cx2 = fx + out1[0] + ox - (out1[0] > 0 ? 1 : 0), cz2 = fz + out1[1] + oz - (out1[1] > 0 ? 1 : 0);
             const qx = cx2 - x0, qz = cz2 - z0;
