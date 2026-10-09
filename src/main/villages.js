@@ -621,6 +621,13 @@
       } else { a.vel[0] *= Math.exp(-dt * 10); a.vel[2] *= Math.exp(-dt * 10); }
       // face whatever we are looking at when standing
       if (tx === null && a.lookAt) { const dx = a.lookAt[0] - a.pos[0], dz = a.lookAt[2] - a.pos[2]; const ty2 = Math.atan2(-dx, -dz); let dy = ty2 - a.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2; a.yaw += dy * Math.min(1, dt * 5); }
+      // standing still on solid ground with nowhere to go: nothing moves this step, so no collision query — a town's most
+      // common case (t-town: the hall city's 149 people); a person whose ground went away falls as before
+      if (tx === null && a.onGround && a.vel[1] <= 0 && a.vel[0] * a.vel[0] + a.vel[2] * a.vel[2] < 1e-4 && (R.T.flags[get(Math.floor(a.pos[0]), Math.floor(a.pos[1] - 0.05), Math.floor(a.pos[2]))] & F.SOLID)) {
+        a.vel[0] = 0; a.vel[1] = 0; a.vel[2] = 0;
+        a.walkAmt += (0 - a.walkAmt) * Math.min(1, dt * 6);
+        return;
+      }
       const inFluid = R.T.flags[get(Math.floor(a.pos[0]), Math.floor(a.pos[1] + 0.3), Math.floor(a.pos[2]))] & F.FLUID;
       if (inFluid) { a.vel[1] = Math.min(a.vel[1] + 22 * dt, 2.6); } else a.vel[1] -= 28 * dt;
       let my = a.vel[1] * dt, follow = null;
@@ -1066,8 +1073,10 @@
     // -------------------------------------------------- player interaction
     ray(o, d, maxD) {
       let best = null, bt = maxD;
+      const b = this._rayBox || (this._rayBox = [0, 0, 0, 0, 0, 0]), M2 = (maxD + 2) * (maxD + 2);
       for (const a of this.agents) {
-        const b = [-a.w - 0.08, 0, -a.w - 0.08, a.w + 0.08, a.h + 0.1, a.w + 0.08];
+        if ((a.pos[0] - o[0]) ** 2 + (a.pos[2] - o[2]) ** 2 > M2) continue;   // (out of the ray's reach: no box test, no box made)
+        b[0] = -a.w - 0.08; b[1] = 0; b[2] = -a.w - 0.08; b[3] = a.w + 0.08; b[4] = a.h + 0.1; b[5] = a.w + 0.08;
         const r = PH.rayBox(o[0], o[1], o[2], d[0], d[1], d[2], b, a.pos[0], a.pos[1], a.pos[2]);
         if (r && r[0] < bt) { bt = r[0]; best = a; }
       }
