@@ -42,10 +42,10 @@ const PLACES = [
   ['hall', [-240.5, 87, -170.6], [-240.5, 90, -158], DAY],                       // the mansion's grand hall (t-smooth2's camera)
   ['show', [SX + 14.5, Y0 + 1.5, SZ + 8.5], [SX + 14.5, Y0 + 0.6, SZ + 1], DUSK],   // the showroom at dusk: the island, the bed, the tub, the vanity, the media wall
   ['show2', [SX + 3.5, Y0 + 1.6, SZ + 8], [SX + 3.5, Y0 + 0.9, SZ + 1], DUSK],      // its left end: the sofa, the shell chair, the lamps, the fig
-  ['detail', [SX + 10.5, Y0 + 1.15, SZ + 5.4], [SX + 10.5, Y0 + 0.3, SZ + 3.5], DAY], // up close: the espresso machine, the vases, the mixer
+  ['detail', [SX + 10.5, Y0 + 0.25, SZ + 5.6], [SX + 10.5, Y0 + 0.35, SZ + 3.5], DAY], // up close (the eye 1.9 above the floor, 2 blocks off): the espresso machine, the vases, the mixer
   ['yard', [SX + 41.5, Y0 + 1.9, SZ + 9.5], [SX + 41.5, Y0 + 0.4, SZ + 2.5], DAY],    // the villages' pieces
 ];
-const DESIGN = ['designed', [SX + 21.5, Y0 + 1.35, SZ + 5.6], [SX + 21.5, Y0 + 0.4, SZ + 3.5], DAY];   // the hand-built armchair, then its design
+const DESIGN = ['designed', [SX + 21.5, Y0 + 0.35, SZ + 5.8], [SX + 21.5, Y0 + 0.4, SZ + 3.5], DAY];   // the hand-built armchair, then its design
 const ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'];
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  x ' + msg); } else console.log('  ok ' + msg); };
