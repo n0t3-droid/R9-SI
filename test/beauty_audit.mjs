@@ -18,8 +18,9 @@
 // COST=1: the Very Low (potato) cost at two scenes — ms per frame (the GPU drained), draws, triangles; the median of
 // the rounds — and with COST_DIST=file:///…/index.html the same for that build, the two pages measured in turns.
 // Checks: the world is vgen 8 with Nova Haven, every picture is written and not blank, no page error.
-// usage: TAG=before nohup bash test/wt_run.sh beauty_audit.mjs 3600 > .tmp_tests/beauty_audit.log 2>&1 &
-//   ONLY=hills,street_1 (sites or shot names) · SEED=4242 · NO_EXTRA=1 (each camera at its own time only)
+// usage: BEFORE_DIST=file:///…/index.html TAG=after nohup bash test/wt_run.sh beauty_audit.mjs 7200 > .tmp_tests/beauty_audit.log 2>&1 &
+//   BEFORE_DIST: a build before, shot first (…_before.png), then DIST (default this checkout's dist) as …_<TAG>.png
+//   ONLY=hills,street_1 (sites or shot names) · SEED=4242 · NO_EXTRA=1 (each camera at its own time only) · NO_AFTER=1
 // regress: skip  (a showcase: the pictures are the evidence; the gates are the node tests, test/beauty_rules.js)
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/claude/.npm-global/lib/node_modules/sharp/lib/index.js';
@@ -163,8 +164,6 @@ const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
-const record = { tag: TAG, seed: SEED, dist: DIST, shots: [], cost: null };
-const recPath = `/home/claude/vr/test/shots/beauty_${TAG}.json`;
 
 // ---------------------------------------------------------------- a page with a world
 async function openWorld(dist, preset) {
@@ -232,69 +231,85 @@ async function openWorld(dist, preset) {
 // a picture is not blank: the luminance spreads (a black or a one-colour frame fails)
 const notBlank = async (path) => { try { const { data, info } = await sharp(path).raw().toBuffer({ resolveWithObject: true }); let s = 0, s2 = 0, n = 0; for (let i = 0; i < data.length; i += info.channels * 7) { const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]; s += l; s2 += l * l; n++; } const m = s / n; return Math.sqrt(Math.max(0, s2 / n - m * m)) > 6; } catch (e) { return false; } };
 
-// ---------------------------------------------------------------- the audit
-const A = await openWorld(DIST, 'high');
-check(A.ok, `${TAG}: the world is loaded (${secs()})`);
-const meta = await A.ev(() => { const g = VR.game, w = g.world, gen = w && w.genOpts; const VG = VR.VillageGen; return { vgen: (g.meta && g.meta.vgen) || (gen && gen.vgen) || 0, preset: g.settings.preset, rd: w.renderDist, far: g.settings.far, look: VR.LOOK ? VR.LOOK.mode : '?', nh: !!(VG && VG.NOVA_HAVEN) }; });
-console.log(TAG, 'world', JSON.stringify(meta));
-check(meta.vgen >= 8 && meta.nh && meta.preset === 'high', `${TAG}: a vgen-8 world with Nova Haven on High (${JSON.stringify(meta)})`);
-await A.settle(80);
-// (a first visit to the first camera without a picture: the world, the far ring and the horizon settle there once —
-//  t-city2 found the first pictures after a world's load unusable)
-let pics = 0, wanted = 0, blank = [];
-const place = async (s) => {
-  await A.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [s.x !== undefined ? s.x : 0, s.z !== undefined ? s.z : 0]);
-  s.s1 = await A.settle(150, 8);
-  if (s.random) {
-    // the random cameras: a first guess of the area's middle to load it, then the camera placed on what is there
-    const P = await placeRandom(A.ev, s);
-    if (!P) return null;
-    await A.ev(([x, z]) => { const p = VR.game.player; p.teleport(x, 150, z); }, [P.x, P.z]);
-    await A.settle(120, 8);
-    s.x = +P.x.toFixed(2); s.z = +P.z.toFixed(2); s.feet = +P.y.toFixed(2); s.yaw = +P.yaw.toFixed(3); s.pitch = +P.pitch.toFixed(3); s.what = P.what;
-  } else {
-    const gy = await A.groundY(s.x, s.z);
-    s.ground = gy;
-    const eyeY = typeof s.eye === 'object' ? s.eye.y : gy + 1 + s.eye;
-    s.feet = +(eyeY - EYE).toFixed(2);
-    const dx = s.at[0] - s.x, dy = s.at[1] - eyeY, dz = s.at[2] - s.z;
-    s.yaw = +Math.atan2(-dx, -dz).toFixed(3); s.pitch = +Math.atan2(dy, Math.hypot(dx, dz)).toFixed(3);
-  }
-  await A.pose(s.x, s.feet, s.z, s.yaw, s.pitch, s.fov, s.tod);
-  const st = await A.settle(60, 30); await A.step(6);
-  return st;
-};
+// ---------------------------------------------------------------- the audit of one build
 // (the random cameras' first guesses: the middle of their site)
 const MID = { temple: [0, -10], street: [0, -100], backs: [0, -120], villa: [75, -107], hills: [0, -250], far: [0, -400], water: [235, 45] };
-for (const s of SHOTS) if (s.random) { s.x = MID[s.random][0]; s.z = MID[s.random][1]; }
-if (SHOTS.length) { await place(Object.assign({}, SHOTS[0], { rnd: SHOTS[0].rnd })); await A.ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 4; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; }); await A.settle(30); }
-console.log(`warm-up done (${secs()})`);
-for (const s of SHOTS) {
-  const t0 = Date.now();
-  const st = await place(s);
-  if (!st) { console.log(`  ${s.name}: no place found`); wanted++; continue; }
-  const times = [s.tod].concat(s.extra || []);
-  s.pics = [];
-  for (let k = 0; k < times.length; k++) {
-    const path = `/home/claude/vr/test/shots/beauty_${s.name}${k ? '_' + TODN[times[k]] : ''}_${TAG}.png`;
-    wanted++;
-    const vx = await A.picture(path, times[k]);
-    const ok = fs.existsSync(path);
-    if (ok) { pics++; if (!(await notBlank(path))) blank.push(path); }
-    s.pics.push({ path: path.replace(/^.*test\/shots\//, 'test/shots/'), tod: times[k], vx });
+async function audit(tag, dist, keepOpen) {
+  const record = { tag, seed: SEED, dist, shots: [], cost: null }, recPath = `/home/claude/vr/test/shots/beauty_${tag}.json`;
+  const A = await openWorld(dist, 'high');
+  check(A.ok, `${tag}: the world is loaded (${secs()})`);
+  const meta = await A.ev(() => { const g = VR.game, w = g.world, gen = w && w.genOpts; const VG = VR.VillageGen; return { vgen: (g.meta && g.meta.vgen) || (gen && gen.vgen) || 0, preset: g.settings.preset, rd: w.renderDist, far: g.settings.far, look: VR.LOOK ? VR.LOOK.mode : '?', nh: !!(VG && VG.NOVA_HAVEN) }; });
+  console.log(tag, 'world', JSON.stringify(meta));
+  check(meta.vgen >= 8 && meta.nh && meta.preset === 'high', `${tag}: a new default world (vgen ${meta.vgen}) with Nova Haven on High (${JSON.stringify(meta)})`);
+  await A.settle(80);
+  let pics = 0, wanted = 0;
+  const blank = [];
+  const place = async (s) => {
+    await A.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [s.x !== undefined ? s.x : 0, s.z !== undefined ? s.z : 0]);
+    s.s1 = await A.settle(150, 8);
+    if (s.random) {
+      // the random cameras: a first guess of the area's middle to load it, then the camera placed on what is there
+      const P = await placeRandom(A.ev, s);
+      if (!P) return null;
+      await A.ev(([x, z]) => { const p = VR.game.player; p.teleport(x, 150, z); }, [P.x, P.z]);
+      await A.settle(120, 8);
+      s.x = +P.x.toFixed(2); s.z = +P.z.toFixed(2); s.feet = +P.y.toFixed(2); s.yaw = +P.yaw.toFixed(3); s.pitch = +P.pitch.toFixed(3); s.what = P.what;
+    } else {
+      const gy = await A.groundY(s.x, s.z);
+      s.ground = gy;
+      const eyeY = typeof s.eye === 'object' ? s.eye.y : gy + 1 + s.eye;
+      s.feet = +(eyeY - EYE).toFixed(2);
+      const dx = s.at[0] - s.x, dy = s.at[1] - eyeY, dz = s.at[2] - s.z;
+      s.yaw = +Math.atan2(-dx, -dz).toFixed(3); s.pitch = +Math.atan2(dy, Math.hypot(dx, dz)).toFixed(3);
+    }
+    await A.pose(s.x, s.feet, s.z, s.yaw, s.pitch, s.fov, s.tod);
+    const st = await A.settle(60, 30); await A.step(6);
+    return st;
+  };
+  // every build starts its random cameras afresh (the same seeded draws, the same first guesses)
+  const shots = SHOTS.map(s0 => { const s = Object.assign({}, s0); if (s.random) { s.rnd = rngOf(s.name); s.x = MID[s.random][0]; s.z = MID[s.random][1]; } return s; });
+  // (a first visit to the first camera without a picture: the world, the far ring and the horizon settle there once —
+  //  t-city2 found the first pictures after a world's load unusable)
+  if (shots.length) { const s0 = Object.assign({}, shots[0]); if (s0.random) s0.rnd = rngOf(s0.name); await place(s0); await A.ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 4; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; }); await A.settle(30); }
+  console.log(`${tag}: warm-up done (${secs()})`);
+  for (const s of shots) {
+    const t0 = Date.now();
+    const st = await place(s);
+    if (!st) { console.log(`  ${s.name}: no place found`); wanted++; continue; }
+    const times = [s.tod].concat(s.extra || []);
+    s.pics = [];
+    for (let k = 0; k < times.length; k++) {
+      const path = `/home/claude/vr/test/shots/beauty_${s.name}${k ? '_' + TODN[times[k]] : ''}_${tag}.png`;
+      wanted++;
+      const vx = await A.picture(path, times[k]);
+      const ok = fs.existsSync(path);
+      if (ok) { pics++; if (!(await notBlank(path))) blank.push(path); }
+      s.pics.push({ path: path.replace(/^.*test\/shots\//, 'test/shots/'), tod: times[k], vx });
+    }
+    s.ms = Date.now() - t0;
+    console.log(`  ${s.name}${s.random ? ' (' + s.what + ')' : ''}: (${s.x}, ${s.feet}, ${s.z}) yaw ${s.yaw} pitch ${s.pitch} fov ${s.fov} · ${times.map(t => TODN[t]).join(', ')} · ${(s.ms / 1000).toFixed(0)} s · load ${s.s1 ? s.s1.i + 1 : '?'} rounds · settle ${JSON.stringify(st)} (${secs()})`);
+    record.shots.push({ name: s.name, site: s.random || s.name.split('_')[0], x: s.x, feet: s.feet, z: s.z, yaw: s.yaw, pitch: s.pitch, fov: s.fov, ground: s.ground, what: s.what, pics: s.pics, ms: s.ms });
+    try { fs.writeFileSync(recPath, JSON.stringify(record, null, 1)); } catch (e) { /* the record is a convenience */ }
   }
-  s.ms = Date.now() - t0;
-  console.log(`  ${s.name}${s.random ? ' (' + s.what + ')' : ''}: (${s.x}, ${s.feet}, ${s.z}) yaw ${s.yaw} pitch ${s.pitch} fov ${s.fov} · ${times.map(t => TODN[t]).join(', ')} · ${(s.ms / 1000).toFixed(0)} s · load ${s.s1 ? s.s1.i + 1 : '?'} rounds · settle ${JSON.stringify(st)} (${secs()})`);
-  record.shots.push({ name: s.name, site: s.random || s.name.split('_')[0], x: s.x, feet: s.feet, z: s.z, yaw: s.yaw, pitch: s.pitch, fov: s.fov, ground: s.ground, what: s.what, pics: s.pics, ms: s.ms });
-  try { fs.writeFileSync(recPath, JSON.stringify(record, null, 1)); } catch (e) { /* the record is a convenience */ }
+  check(pics === wanted && wanted > 0, `${tag}: every picture is written (${pics} of ${wanted})`);
+  check(blank.length === 0, `${tag}: no picture is blank (${blank.length}${blank.length ? ': ' + blank.join(', ') : ''})`);
+  A.record = record; A.recPath = recPath; A.tag = tag;
+  if (keepOpen) return A;
+  const errs = A.logs.filter(l => l.startsWith('[pageerror]'));
+  console.log(`--- ${tag} logs (${A.logs.length})`); for (const l of A.logs.slice(0, 12)) console.log(l);
+  check(errs.length === 0, `${tag}: no page error (${errs.length})`);
+  await A.ctx.close();
+  return null;
 }
-check(pics === wanted && wanted > 0, `${TAG}: every picture is written (${pics} of ${wanted})`);
-check(blank.length === 0, `${TAG}: no picture is blank (${blank.length}${blank.length ? ': ' + blank.join(', ') : ''})`);
+// BEFORE_DIST (optional): the build before, shot first as …_before.png; then this checkout's dist as …_<TAG>.png
+if (process.env.BEFORE_DIST) await audit('before', process.env.BEFORE_DIST, false);
+const A = process.env.NO_AFTER ? null : await audit(TAG, DIST, true);
+const record = A ? A.record : { cost: null }, recPath = A ? A.recPath : `/home/claude/vr/test/shots/beauty_${TAG}.json`;
 
 // ---------------------------------------------------------------- the Very Low cost (COST=1)
 // two scenes of the city at eye height (the crescent's west end, the lawn between the rows), the GPU drained after each
 // frame; with COST_DIST the build before is opened beside it and the two are measured in turns
-if (process.env.COST) {
+if (process.env.COST && A) {
   const SCENES = [['crescent_end', -100.5, -91.5, [-125, 82, -100]], ['between_rows', 20.5, -116.5, [20, 84, -95]]];
   const pages = [['this', A]];
   try {
@@ -325,10 +340,12 @@ if (process.env.COST) {
     for (const [lbl, P] of pages) if (lbl !== 'this') { const errs = P.logs.filter(l => l.startsWith('[pageerror]')); check(errs.length === 0, `${lbl}: no page error (${errs.length})`); await P.ctx.close(); }
   } catch (e) { check(false, `the Very Low cost is measured (${String(e.message || e).slice(0, 300)})`); }
 }
-const errs = A.logs.filter(l => l.startsWith('[pageerror]'));
-console.log(`--- ${TAG} logs (${A.logs.length})`); for (const l of A.logs.slice(0, 12)) console.log(l);
-check(errs.length === 0, `${TAG}: no page error (${errs.length})`);
-await A.ctx.close();
+if (A) {
+  const errs = A.logs.filter(l => l.startsWith('[pageerror]'));
+  console.log(`--- ${TAG} logs (${A.logs.length})`); for (const l of A.logs.slice(0, 12)) console.log(l);
+  check(errs.length === 0, `${TAG}: no page error (${errs.length})`);
+  await A.ctx.close();
+}
 await browser.close();
 console.log(`(${secs()})`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
