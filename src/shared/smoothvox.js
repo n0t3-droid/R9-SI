@@ -355,8 +355,12 @@
   // the resolution: 16 cells a block for every piece, so the edges round off alike — res 32 at step 2 (the dominant
   // voxel of each 2³, set when ≥ 2 of 8 are; its faces coloured by the voxels they show), res 16 as it is, res 8 split
   // in 2³ (a one-voxel leaf stays a small rounded cube instead of a spike); the far mesh at 4 a block (every voxel
-  // counts, so thin parts stay visible)
-  SV.stepFor = (res) => (res >= 32 ? 2 : 1);
+  // counts, so thin parts stay visible). The fine surface (fine: true) takes a res-32 piece at its own 32 cells a block:
+  // 16 a block closes its one-voxel seams (the gaps between cushions and doors), loses its painted lines (slats,
+  // terrazzo) and melts its small parts (an espresso machine's knobs, a vanity's bulbs, a vase's ribs) — every piece of
+  // the catalogue was drawn both ways (the plan's section 5). It costs some 3.3 × the triangles: the game draws it only
+  // close by (renderer.js, the furniture's fine list), the Studio's ✦ Glatt shows it
+  SV.stepFor = (res, fine) => (res >= 32 ? (fine ? 1 : 2) : 1);
   SV.upFor = (res) => (res < 16 ? Math.round(16 / res) : 1);
   SV.farStep = (res) => Math.max(1, Math.round(res / 4));
   // a model's (or a grid's) generic mesh at a step (opts.step; opts.up splits every voxel), in the model's voxel units;
@@ -527,8 +531,9 @@
     }
     return { verts: nvOut === nv + (shadow ? 4 : 0) ? verts : verts.slice(0, nvOut * S), idx, nv: nvOut, nt: idx.length / 3, nOpaque: nOp, min: [mnx, mny, mnz], max: [mxx, mxy, mxz] };
   }
-  // a model's game record: { near, far, size, cell, key } — the near mesh at the default step (coarser when it would
-  // need more than 65 535 vertices), the far mesh at 4 a block (opaque only), the anchor part's cell offset
+  // a model's game record: { near, far, fine, size, cell, key } — the near mesh at the default step (coarser when it
+  // would need more than 65 535 vertices), the far mesh at 4 a block (opaque only), the anchor part's cell offset; with
+  // opts.fine a res-32 piece also gets its fine surface at 32 a block (null when it would not fit 65 535 vertices)
   SV.forModel = function (m, opts) {
     opts = opts || {};
     const t0 = now(), res = m.res, p0 = m.parts && m.parts[0] ? m.parts[0] : { px: 0, py: 0, pz: 0 };
@@ -542,7 +547,12 @@
     const scale = 1 / res;
     const near = furnPart(g, m.W, m.D, p0.py, scale, true, true);
     const farM = far.nv ? furnPart(far, m.W, m.D, p0.py, scale, false, false) : null;
-    return { near, far: farM, size: [m.W, m.H, m.D], cell: [p0.px, p0.pz], step, ms: now() - t0, cells: g.cells };
+    let fine = null;
+    if (opts.fine && !opts.step && SV.stepFor(res, true) < step) {
+      const gf = SV.mesh(src, { step: SV.stepFor(res, true), up: 1, aoScale: res / SV.stepFor(res, true) / 16 }); gf.vol = null;
+      if (gf.nv + 4 <= 65535) fine = furnPart(gf, m.W, m.D, p0.py, scale, true, true);
+    }
+    return { near, far: farM, fine, size: [m.W, m.H, m.D], cell: [p0.px, p0.pz], step, ms: now() - t0, cells: g.cells };
   };
 
   // ---------------------------------------------------------------- the Studio's layout (studio.js meshModel, 15 floats)
@@ -705,45 +715,51 @@
   // (m.layout 'studio'); a model by name (its design version in m.ver), or a raw volume (m.vol + m.pal, the Crafter's
   // edit). Kept in the thread's LRU; what goes back is a copy (its buffers are transferred)
   SV.cache = null;
-  const bytesOf = (r) => { let b = 0; for (const k of ['near', 'far']) if (r[k]) b += r[k].verts.byteLength + r[k].idx.byteLength; if (r.verts) b += r.verts.byteLength + r.glass.byteLength; return b; };
+  const bytesOf = (r) => { let b = 0; for (const k of ['near', 'far', 'fine']) if (r[k]) b += r[k].verts.byteLength + r[k].idx.byteLength; if (r.verts) b += r.verts.byteLength + r.glass.byteLength; return b; };
   const copyPart = (p, tr) => { if (!p) return null; const q = Object.assign({}, p, { verts: p.verts.slice(), idx: p.idx.slice() }); tr.push(q.verts.buffer, q.idx.buffer); return q; };
   SV.studioMesh = function (src, opts) {
-    // (the game's resolution — what the card and the view show is what the game draws; a big model — more than ~400 k
-    // voxels, the 7-block garage door — at half that: the Studio draws every triangle unindexed)
-    const res = src.res || 16, big = src.VW * src.VH * src.VD > 400000, step = SV.stepFor(res) * (big ? 2 : 1), up = big ? 1 : SV.upFor(res);
+    // (the game's finest resolution — what the card and the view show is what the game draws up close; a big model —
+    // more than ~400 k voxels, the 7-block garage door — at half that: the Studio draws every triangle unindexed)
+    const res = src.res || 16, big = src.VW * src.VH * src.VD > 400000, step = big ? SV.stepFor(res) * 2 : SV.stepFor(res, true), up = big ? 1 : SV.upFor(res);
     const g = SV.mesh(src, Object.assign({ step, up, aoScale: res * up / step / 16 }, opts || {}));
     return SV.toStudio(g, 1 / res, [0, 0, 0]);
   };
   SV.job = function (m) {
-    const t0 = now(), VM = VR.VM, tr = [];
+    const t0 = now(), VM = VR.VM, tr = [], fine = !!m.fine;
     const cache = SV.cache || (SV.cache = new SV.LRU());
     let r = null, key = null;
     if (m.vx && m.name) {
-      key = 'vx:' + m.name + '#' + (m.h | 0);
+      key = 'vx:' + m.name + '#' + (m.h | 0) + (m.layout === 'studio' ? ':studio' : fine ? ':f' : '');
       r = cache.get(key);
-      if (!r) { const src = SV.paintVX(m.name, m.h | 0); if (!src) return { error: 'unknown piece ' + m.name, transfer: tr }; r = m.layout === 'studio' ? SV.studioMesh(src) : SV.forModel(src); cache.set(key, r, bytesOf(r)); }
+      if (!r) { const src = SV.paintVX(m.name, m.h | 0); if (!src) return { error: 'unknown piece ' + m.name, transfer: tr }; r = m.layout === 'studio' ? SV.studioMesh(src) : SV.forModel(src, { fine }); cache.set(key, r, bytesOf(r)); }
     } else if (m.name) {
       const model = VM && VM.MODELS[m.name];
       if (!model) return { error: 'unknown model ' + m.name, transfer: tr };
-      key = m.name + (m.off ? ':off' : '') + '#' + (m.ver | 0) + (m.layout === 'studio' ? ':studio' : '');
+      key = m.name + (m.off ? ':off' : '') + '#' + (m.ver | 0) + (m.layout === 'studio' ? ':studio' : fine ? ':f' : '');
       r = cache.get(key);
-      if (!r) { r = m.layout === 'studio' ? SV.studioMesh(model, { off: !!m.off }) : SV.forModel(model, { off: !!m.off }); cache.set(key, r, bytesOf(r)); }
+      if (!r) { r = m.layout === 'studio' ? SV.studioMesh(model, { off: !!m.off }) : SV.forModel(model, { off: !!m.off, fine }); cache.set(key, r, bytesOf(r)); }
     } else if (m.vol && m.pal) {
       const src = { vol: m.vol, pal: m.pal, VW: m.VW, VH: m.VH, VD: m.VD, res: m.res || 16 };
-      r = m.layout === 'furn' ? SV.forModel(Object.assign({ W: m.W, H: m.H, D: m.D, parts: null }, src)) : SV.studioMesh(src);
+      r = m.layout === 'furn' ? SV.forModel(Object.assign({ W: m.W, H: m.H, D: m.D, parts: null }, src), { fine }) : SV.studioMesh(src);
     } else return { error: 'nothing to mesh', transfer: tr };
     const out = { ver: m.ver | 0, name: m.name || null, ms: now() - t0, transfer: tr };
-    if (r.near) { out.near = copyPart(r.near, tr); out.far = copyPart(r.far, tr); out.size = r.size; out.cell = r.cell; out.step = r.step; }
+    if (r.near) { out.near = copyPart(r.near, tr); out.far = copyPart(r.far, tr); out.fine = copyPart(r.fine, tr); out.size = r.size; out.cell = r.cell; out.step = r.step; }
     else { out.verts = r.verts.slice(); out.glass = r.glass.slice(); out.tri = r.tri; out.quads = r.quads; tr.push(out.verts.buffer, out.glass.buffer); }
     return out;
   };
 
   // ---------------------------------------------------------------- the main thread: ask, register, mesh again
   // world.js tags every mesh job with the ready bits (tagJob) and hands a mesh answer's wants here (want): an entry not
-  // asked for yet is asked from the worker pool ('smoothvox'); its mesh is registered in props.js (PR.registerAuto), its
-  // bit set, and the sections that wanted it are made dirty — they come back with the smooth anchor. A design changed in
-  // the Studio (custom.js refreshModel) takes the model's meshes back: a new version is asked for.
-  const MAIN = SV.main = { asked: new Set(), waiting: new Map(), ver: {}, world: null, stats: { asked: 0, got: 0, ms: 0, bytes: 0, redo: 0 } };
+  // asked for yet is asked from the worker pool ('smoothvox') behind the terrain round the section that wants it (its
+  // priority is that section's distance plus SV.LATER: the ground under the player and the columns next to it are
+  // generated and meshed first, the furniture smooths after — never a stall of the world's loading); its mesh is
+  // registered in props.js (PR.registerAuto), its bit set, and a section that wanted it is made dirty once ALL of its
+  // pieces are there: one mesh job a section, not one a piece. It comes back with the smooth anchors. A design changed in
+  // the Studio (custom.js refreshModel) takes the model's meshes back: a new version is asked for. The fine surfaces (32
+  // a block, SV.stepFor) are asked for while the preset keeps a wide detail ring (vxLod ≥ SV.FINE_LOD: Ausgewogen and
+  // up — Niedrig's PCs mesh and keep only the 16-a-block ones); a quality switch to it asks again for every piece.
+  const MAIN = SV.main = { asked: new Set(), waiting: new Map(), secWait: new Map(), fails: {}, ver: {}, world: null, fine: false, stats: { asked: 0, got: 0, ms: 0, bytes: 0, redo: 0, remesh: 0, failed: 0 } };
+  SV.LATER = 8; SV.FINE_LOD = 44;
   SV.verOf = (name) => MAIN.ver[name] | 0;
   const bitsFor = (n) => new Uint8Array((n + 7) >> 3);
   const HELD = { ver: -1, bits: null };   // the pass held back (SV.enabled false): the workers hear „nothing is ready"
@@ -753,41 +769,72 @@
     if (!SV.ready.bits) { SV.ready.bits = bitsFor(A.n); SV.ready.ver = 1; }
     job.svReady = SV.enabled ? SV.ready : HELD;   // (cloned when the pool posts the job: the bits of that moment)
   };
+  // the fine surfaces: the renderer's detail ring (renderer.js reads the same vxLod for the fine list's reach)
+  SV.fineFor = (world) => { const q = world && world.renderer && world.renderer.q; return !!(q && (q.vxLod | 0) >= SV.FINE_LOD); };
+  // the job's place in the pool's queue: the wanting section's distance from the player (world.js scheduleMeshes' scale:
+  // columns², half the sections' height²), SV.LATER behind it
+  SV.prioFor = function (world, c, sy) {
+    const p = world.lastPos; if (!p) return SV.LATER;
+    const dx = c.cx - (Math.floor(p[0]) >> 4), dz = c.cz - (Math.floor(p[2]) >> 4), dy = sy - (Math.floor(p[1]) >> 4);
+    return dx * dx + dz * dz + dy * dy * 0.5 + SV.LATER;
+  };
+  // a section waits for its pieces: made dirty (meshed again) when the last of them arrives
+  const secDone = (sw) => { const c = sw.c, w = sw.world; MAIN.secWait.delete(sw.key); if (!sw.some || w.dead || w.cols.get(c.key) !== c) return; const sc = c.sec[sw.sy]; if (sc) { sc.dirty = true; sc.ver++; MAIN.stats.remesh++; } };
   SV.want = function (list, world, c, sy) {
     if (!list || !list.length || !SV.enabled || !world) return;
     const A = SV.autoTables(); if (!A) return;
     if (MAIN.world !== world) {   // another world: what was asked for and never came is asked again
-      MAIN.world = world; MAIN.waiting.clear();
+      MAIN.world = world; MAIN.waiting.clear(); MAIN.secWait.clear(); MAIN.fine = SV.fineFor(world);
       for (const i of [...MAIN.asked]) if (!isReady(SV.ready.bits, i)) MAIN.asked.delete(i);
+    } else if (!MAIN.fine && SV.fineFor(world)) {
+      // a better preset: every piece asked again with its fine surface, the sections with pieces meshed again
+      MAIN.fine = true; MAIN.asked.clear(); MAIN.waiting.clear(); MAIN.secWait.clear();
+      if (SV.ready.bits) { SV.ready.bits.fill(0); SV.ready.ver++; }
+      const R = world.renderer; if (R) { R.furnByKind = null; if (R.propSecs) for (const s of R.propSecs) { s.dirty = true; s.ver++; } }
+      return;
     }
-    let redo = false;
+    let redo = false, sw = null;
+    const key = c.key + ':' + sy, prio = SV.prioFor(world, c, sy);
     for (const i of list) {
       if (i < 0 || i >= A.n) continue;
       if (allReady(SV.ready.bits, i)) { redo = true; continue; }   // the job left before the mesh came: mesh the section again
-      let w = MAIN.waiting.get(i); if (!w) MAIN.waiting.set(i, w = new Map());
-      w.set(c.key + ':' + sy, [c, sy]);
-      if (!MAIN.asked.has(i)) { MAIN.asked.add(i); SV.ask(i, world); }
+      if ((MAIN.fails[i] | 0) >= 3) continue;                       // (a piece that failed three times keeps its voxels)
+      let w = MAIN.waiting.get(i); if (!w) MAIN.waiting.set(i, w = new Set());
+      w.add(key);
+      if (!sw) { sw = MAIN.secWait.get(key); if (!sw) MAIN.secWait.set(key, sw = { key, c, sy, world, need: new Set(), some: false }); }
+      sw.need.add(i);
+      if (!MAIN.asked.has(i)) { MAIN.asked.add(i); SV.ask(i, world, prio); }
     }
-    if (redo) { const sc = c.sec && c.sec[sy]; if (sc && (sc.svRedo = (sc.svRedo | 0) + 1) <= 3) { sc.dirty = true; sc.ver++; MAIN.stats.redo++; } }
+    if (redo && !sw) { const sc = c.sec && c.sec[sy]; if (sc && (sc.svRedo = (sc.svRedo | 0) + 1) <= 3) { sc.dirty = true; sc.ver++; MAIN.stats.redo++; } }
+    else if (redo && sw) sw.some = true;   // (meshed again with the rest of its pieces)
   };
-  SV.ask = function (i, world) {
-    const e0 = AT.list[i];
+  SV.ask = function (i, world, prio) {
+    const e0 = AT.list[i], fine = MAIN.fine;
     for (let j = e0.base; j < e0.base + e0.nvar; j++) {
       const e = AT.list[j]; if (isReady(SV.ready.bits, j)) continue;
       MAIN.stats.asked++;
-      world.pool.submit(e.vx ? { type: 'smoothvox', name: e.name, vx: true, h: e.h, ver: SV.verOf(e.name) } : { type: 'smoothvox', name: e.name, off: e.off, ver: SV.verOf(e.name) }, null, (m) => SV.got(j, m, world), 1);
+      world.pool.submit(e.vx ? { type: 'smoothvox', name: e.name, vx: true, h: e.h, ver: SV.verOf(e.name), fine } : { type: 'smoothvox', name: e.name, off: e.off, ver: SV.verOf(e.name), fine }, null, (m) => SV.got(j, m, world), prio === undefined ? SV.LATER : prio);
     }
   };
+  // a base entry is settled for the sections that wait for it: ready (all its looks), or given up
+  function settled(b, ok) {
+    const w = MAIN.waiting.get(b); MAIN.waiting.delete(b);
+    if (w) for (const key of w) { const sw = MAIN.secWait.get(key); if (!sw) continue; sw.need.delete(b); if (ok) sw.some = true; if (!sw.need.size) secDone(sw); }
+  }
   SV.got = function (i, m, world) {
     const e = AT && AT.list[i], PR = VR.Props;
-    if (!e || !m || m.type !== 'smoothvox' || !m.near || m.ver !== SV.verOf(e.name) || !PR || !PR.registerAuto) { MAIN.asked.delete(i); return; }   // failed, cancelled or out of date: asked again with the next want
-    PR.registerAuto(AUTO0 + i, e.name + (e.off ? ':off' : e.vx && e.h > 0 ? ':h' + e.h : '') + '#' + m.ver, m.size, m.cell, { near: m.near, far: m.far });
+    if (!e || !m || m.type !== 'smoothvox' || !m.near || m.ver !== SV.verOf(e.name) || !PR || !PR.registerAuto) {
+      // failed or out of date: asked again with the next want (three failures: the piece keeps its voxels)
+      if (e) { const b = e.base; MAIN.asked.delete(b); if (!m || m.type !== 'smoothvox') { MAIN.fails[b] = (MAIN.fails[b] | 0) + 1; MAIN.stats.failed++; } settled(b, false); }
+      return;
+    }
+    const fine = m.fine && MAIN.fine ? m.fine : null;
+    PR.registerAuto(AUTO0 + i, e.name + (e.off ? ':off' : e.vx && e.h > 0 ? ':h' + e.h : '') + '#' + m.ver + (fine ? ':f' : ''), m.size, m.cell, { near: m.near, far: m.far, fine });
     if (!SV.ready.bits) SV.ready.bits = bitsFor(AT.n);
     SV.ready.bits[i >> 3] |= 1 << (i & 7); SV.ready.ver++;
     MAIN.stats.got++; MAIN.stats.ms += m.ms || 0; MAIN.stats.bytes += bytesOf(m);
     const b = e.base; if (!allReady(SV.ready.bits, b)) return;   // (a piece of several looks waits for all of them)
-    const w = MAIN.waiting.get(b); MAIN.waiting.delete(b);
-    if (w) for (const [c, sy] of w.values()) { if (world.dead || world.cols.get(c.key) !== c) continue; const sc = c.sec[sy]; if (sc) { sc.dirty = true; sc.ver++; } }
+    settled(b, true);
   };
   // a model's design changed (custom.js): its entries are not ready any more and its next mesh is a new version
   SV.invalidate = function (name) {
