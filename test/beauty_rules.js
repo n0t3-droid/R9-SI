@@ -87,6 +87,24 @@ console.log('2 · every street of Nova Haven ends at a street, the plaza or a tu
     check(bed >= 9 && plant >= 1, `${t.road} ${t.end}: a planted island in the middle (${bed} bed cells, ${plant} with a plant)`);
   }
   check((P9.nova.turns || []).length >= 4, `vgen 9: the crescent's and Palm Row's ends are turning circles (${(P9.nova.turns || []).length})`);
+  // the kerbs stay one light line each (as test/trailer_city.js asks of vgen 8): from a road's kerb into its circle's rim
+  // and on — the ring round a circle's bed is no kerb of the road
+  {
+    const LINE = new Set();
+    for (const [k, b] of P9.chunks) for (let i = 0; i < b.o.length; i += 4) { const n = nameOf(b.o[i + 3]); if (n === 'vx_floor_plaza_line' || n === 'vx_floor_plaza_line_amber') LINE.add(b.o[i] + ',' + b.o[i + 2]); }
+    const comp = (start) => { const seen = new Set([start]), q = [start]; while (q.length) { const k = q.pop(); const [x, z] = k.split(',').map(Number); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = (x + dx) + ',' + (z + dz); if (LINE.has(n) && !seen.has(n)) { seen.add(n); q.push(n); } } } return seen; };
+    // (where a road borders the planted island its kerb is the island's own loop — the west branch's east side)
+    const wb = P9.nova.roads.find(r => r.name === 'west'), isle = wb && wb.kerb && wb.kerb.L.length ? comp(wb.kerb.L[wb.kerb.L.length >> 1][0] + ',' + wb.kerb.L[wb.kerb.L.length >> 1][1]) : new Set();
+    let sides = 0, whole = 0; const bad = [];
+    for (const rd of P9.nova.roads) for (const sd of ['L', 'R']) {
+      const cells = ((rd.kerb && rd.kerb[sd]) || []).filter(c => !isle.has(c[0] + ',' + c[1])); if (!cells.length) continue;
+      sides++;
+      const reach = comp(cells[0][0] + ',' + cells[0][1]);
+      const apart = cells.filter(c => !reach.has(c[0] + ',' + c[1])).length, miss = cells.filter(c => !LINE.has(c[0] + ',' + c[1])).length;
+      if (!apart && !miss) whole++; else bad.push(`${rd.name}.${sd}: ${miss} not lit, ${apart} apart`);
+    }
+    check(sides >= 6 && whole === sides, `vgen 9: every road's kerbs are one light line each, on round its circles (${whole} of ${sides}${bad.length ? ': ' + bad.join('; ') : ''})`);
+  }
   // the plan stays the plan: villas on the lots (as many as vgen 8 within two), every road lined with its kerb line
   check(Math.abs(P9.homes.length - P8.homes.length) <= 2 && P9.homes.length >= 9, `vgen 9 keeps the villas (${P9.homes.length}, vgen 8 ${P8.homes.length})`);
 }
