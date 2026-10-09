@@ -20,6 +20,8 @@
 //      chains from the tie beams, tall stalls with a lantern in the canopy; outside every tall window framed (jambs, an
 //      arched hood, a keystone, a sill), a portal with a gabled pediment at the side gates, turrets five wide, a cupola
 //   9. round 2b: warm lantern light at the stair's foot, its landings, the gallery's doors and in the workshops
+//  10. round 2c (the brief's open items, in its order): the bright end — the apse a crown of five tall windows over the
+//      gallery (P4 / P8)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -364,6 +366,30 @@ for (const [label, H] of HALLS) {
     for (const l of Hh.loggias.filter(l => l.frame).slice(0, 4)) { const [rr, ox, oz] = l.frame, q = ROT[rr](4, 2), w = [ox + q[0], oz + q[1]]; for (let u = -48; u <= 48; u++) for (let v = -84; v <= 84; v++) { const [x, z] = H.W2(u, v); if (x === w[0] && z === w[1]) spots.push(['a workshop', u, F + 2, v]); } }
     const seen = spots.map(([n, u, y, v]) => { const c = lightNear(u, y, v); return [n, warm(c), c.join('/')]; });
     check(seen.every(s => s[1]), `warm lantern light at the stair's foot, its landings, the gallery's doors and in the workshops (${seen.map(s => s[0] + ' ' + s[2]).join(', ')})`);
+  }
+  // ---------------------------------------------------------------- 10. round 2c: the bright end (P4 / P8)
+  console.log(`10. round 2c — the apse's crown of tall windows (${label})`);
+  {
+    // every one of the five window axes of the apse wall over the gallery (30°, 60°, 90°, 120°, 150° round the apse's
+    // centre) glazed at least seven wide from the gallery's head height to a round head: stone tracery, a stained head
+    const glassy = (n) => /glass/.test(n), stoneN = (n) => /quartz|travertine|band|smooth|chiseled/.test(n);
+    const rows = [];
+    for (let k = 1; k <= 5; k++) {
+      const th = k * Math.PI / 6;
+      let gl = 0, stained = 0, trac = 0;
+      const lights = new Set();   // (the window's width: the distinct offsets across its axis holding a tall column of glass)
+      for (let u = -31; u <= 31; u++) for (let v = Hh.V1; v <= Hh.V1 + 31; v++) {
+        const d = Math.hypot(u, v - Hh.V1); if (d < 26.5 || d >= 30.5) continue;
+        const ph = Math.atan2(v - Hh.V1, u), t = d * Math.sin(ph - th);
+        if (Math.cos(ph - th) <= 0 || Math.abs(t) > 4.5) continue;
+        let colGlass = 0;
+        for (let y = F + 10; y <= F + 31; y++) { const n = atN(u, y, v); if (glassy(n)) { gl++; colGlass++; if (/stained/.test(n)) stained++; } else if (stoneN(n) && y < F + 26 && glassy(atN(u, y + 1, v)) && glassy(atN(u, y - 1, v))) trac++; }
+        if (colGlass >= 12) lights.add(Math.round(t));
+      }
+      rows.push({ k, gl, stained, trac, cols: lights.size ? Math.max(...lights) - Math.min(...lights) + 1 : 0 });   // (the span: a mullion on the axis is part of the window)
+    }
+    const ok = rows.filter(r0 => r0.gl >= 100 && r0.stained >= 15 && r0.trac >= 4 && r0.cols >= 7).length;
+    check(ok === 5, `the apse a crown of five tall windows, each seven wide or more with tracery and a stained round head (${ok} of 5: ${rows.map(r0 => `${r0.k * 30}° ${r0.gl} glass / ${r0.stained} stained / ${r0.trac} tracery / ${r0.cols} wide`).join(' · ')})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();

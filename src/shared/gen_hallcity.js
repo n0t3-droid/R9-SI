@@ -525,17 +525,30 @@
         }
       }
     }
-    for (let k = 1; k <= 5; k++) {
-      if (k === 3) continue;   // (round 2b: the great window above)
-      const th = k * Math.PI / 6, du = Math.cos(th), dv = Math.sin(th);
-      for (let w = -15; w <= 15; w++) for (let rr = H.AR; rr < H.AW; rr++) {
-        const t = w / 10, uu = Math.round(du * rr - dv * t), vv = Math.round(H.V1 + dv * rr + du * t);
-        if (region(uu, vv) !== 'wall') continue;
-        const mid = Math.abs(dApse(uu, vv) - 28) < 0.75;
-        for (let y = 12; y <= 27; y++) {
-          if (y > 25 && Math.abs(t) > 1.4 - (y - 25) * 0.5) continue;
-          if (Math.abs(t) > 1.5) continue;
-          P(uu, F + y, vv, mid ? (y >= 22 ? (Math.abs(t) < 0.5 ? SG.rose : SG.blue) : GLASS) : AIR);
+    // (round 2c) the apse a crown of tall windows: the four lancets beside the great window (were three wide, 12 … 27)
+    // seven wide from the gallery's head height to a round head — a stone mullion and a transom, a light-blue band under
+    // the head, the head stained in rays round a gold eye inside a rose ring — so the whole end over the gallery is the
+    // bright glazed end of the references. Laid out cell by cell in the curved wall: a wall cell belongs to the window of
+    // axis θ when its offset t across the axis is within the half width; the wall's middle ring holds the glass, the
+    // inner and outer rings open (a deep reveal).
+    {
+      const HALF = 3.6, YC = 24, RAD = 3.6;
+      for (let v = H.V1 + 1; v <= H.V1 + H.AW; v++) for (let u = -H.AW; u <= H.AW; u++) {
+        if (region(u, v) !== 'wall') continue;
+        const d = dApse(u, v), ph = Math.atan2(v - H.V1, u), mid = Math.abs(d - 28) < 0.75;
+        for (const k of [1, 2, 4, 5]) {
+          const th = k * Math.PI / 6, t = d * Math.sin(ph - th);
+          if (Math.cos(ph - th) <= 0 || Math.abs(t) > HALF) continue;
+          for (let y = 10; y <= YC + RAD; y++) {
+            const hd = y >= YC ? Math.hypot(t, y - YC + 0.5) : 0;
+            if (y >= YC && hd > RAD) continue;
+            let b = AIR;
+            if (mid) {
+              if (y < YC) b = (Math.abs(t) < 0.55 || y === 17) ? SMOOTH : (y >= YC - 2 ? SG.lblue : GLASS);
+              else { const a = Math.atan2(y - YC + 0.5, t), kk = Math.floor(a / (Math.PI / 5)); b = hd < 1.2 ? SG.amber : hd > RAD - 1 ? SG.rose : (kk & 1) ? SG.blue : SG.gold; }
+            }
+            P(u, F + y, v, b);
+          }
         }
       }
     }
