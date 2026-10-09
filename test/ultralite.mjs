@@ -209,7 +209,7 @@ console.log('village sites', vil.length, 'the scene\'s:', JSON.stringify(vsite))
 const CAM = {
   hall: [0.5, -9.5, { y: 81 }, Math.PI, 0],
   plaza: [3.5, -96.5, 1.62, 0.3, 0.03],
-  village: vsite ? [vsite[0] + 22.5, vsite[1] + 22.5, 1.62, Math.atan2(22.5, 22.5), -0.06] : null,
+  village: vsite ? [vsite[0] + 34.5, vsite[1] + 34.5, 9.62, Math.atan2(34.5, 34.5), -0.16] : null,   // (8 blocks up, over the first roofs, toward the centre)
 };
 const res = { scenes: {}, walks: {} };
 const presets = MODE === 'potato' ? (process.env.PRESETS || 'potato,high').split(',') : ['ultra', 'ultraLite'];   // (MODE=potato: Very Low and High, before/after)
