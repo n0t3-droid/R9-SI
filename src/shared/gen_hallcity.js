@@ -328,19 +328,29 @@
       const d = Math.hypot(t, y - yc + 0.5);
       return d <= rad + 0.25 ? (y >= yc ? 's' : 'g') : null;
     };
-    // the outer long walls: a window in every bay (a mullion in the middle), the stained head over F + 12
+    // the outer long walls: a tall window in every bay (a mullion in the middle), the stained round head over F + 16
+    // (round 2b: two blocks taller, and framed outside — pilaster jambs, an arched hood of stone stepping round the head
+    // with a gold keystone, a sill)
     for (let k = -7; k <= 4; k++) {
       if (k === 0) continue;
       yield;
-      const vc = 10 * k, win = archWin(2, 5, 14, 2.6);
-      for (const s of [-1, 1]) for (let t = -2; t <= 2; t++) for (let y = 5; y <= 18; y++) {
-        const w = win(t, y); if (!w) continue;
-        for (let a = H.W0; a <= H.HW; a++) {
-          const mid = a === 47;
-          let b = AIR;
-          if (mid) b = w === 's' ? (t === 0 ? SG.gold : Math.abs(t) === 1 ? SG.blue : SG.lblue) : ((t === 0 && y < 12) || y === 10 ? CHIS : GLASS);   // (the tracery: a stone cross)
-          P(s * a, F + y, vc + t, b);
+      const vc = 10 * k, win = archWin(2, 5, 16, 2.6);
+      for (const s of [-1, 1]) {
+        for (let t = -2; t <= 2; t++) for (let y = 5; y <= 20; y++) {
+          const w = win(t, y); if (!w) continue;
+          for (let a = H.W0; a <= H.HW; a++) {
+            const mid = a === 47;
+            let b = AIR;
+            if (mid) b = w === 's' ? (t === 0 ? SG.gold : Math.abs(t) === 1 ? SG.blue : SG.lblue) : ((t === 0 && y < 16) || y === 10 ? CHIS : GLASS);   // (the tracery: a stone cross)
+            P(s * a, F + y, vc + t, b);
+          }
         }
+        const o = s * (H.HW + 1), fo = s > 0 ? 3 : 1;
+        for (const t of [-3, 3]) { for (let y = F + 5; y <= F + 15; y++) P(o, y, vc + t, 'quartz_pillar', { axis: 0 }); P(o, F + 16, vc + t, CHIS); P(o, F + 17, vc + t, SMOOTH); }
+        for (const t of [-2, 2]) P(o, F + 18, vc + t, 'smooth_quartz_stairs', { facing: fo, half: 1 });
+        for (const t of [-1, 1]) P(o, F + 19, vc + t, 'smooth_quartz_stairs', { facing: fo, half: 1 });
+        P(o, F + 19, vc, BAND); P(o, F + 20, vc, CHIS);
+        for (let t = -3; t <= 3; t++) P(o, F + 4, vc + t, 'smooth_quartz_slab', { type: 'top' });
       }
     }
     // the clerestory: a window over every opening of the arcade, the head stained
@@ -374,6 +384,19 @@
     for (const s of [-1, 1]) {
       for (let y = F + 13; y <= F + 17; y++) { const half = 6 - (y - F - 13) - (y - F - 13 >> 1); for (let t = -half; t <= half; t++) P(s * (H.HW + 1), y, t, y === F + 13 ? BAND : STONE); }
       for (let t = -5; t <= 5; t++) P(s * (H.HW + 1), F + 12, t, BAND);
+      // (round 2b) a portico two blocks proud before the gate: two columns on plinths with capitals, a gold entablature, a
+      // gabled pediment with a raking cornice and a finial, lanterns on the columns' outer faces
+      const o = s * (H.HW + 2);
+      for (const t of [-5, 5]) {
+        P(o, F + 1, t, SMOOTH); for (let y = F + 2; y <= F + 11; y++) P(o, y, t, 'quartz_pillar', { axis: 0 }); P(o, F + 12, t, CHIS);
+        putModel(P, 'vm_wall_lantern', s > 0 ? 1 : 3, s * (H.HW + 3), F + 7, t); const [x, z] = W2(s * (H.HW + 3), t); plan.lamps.push([x, F + 7, z]);
+      }
+      for (let t = -6; t <= 6; t++) P(o, F + 13, t, BAND);
+      for (let i = 0; i <= 6; i++) for (let t = -(6 - i); t <= 6 - i; t++) {
+        const edge = Math.abs(t) === 6 - i;
+        P(o, F + 14 + i, t, edge && i < 6 ? 'smooth_quartz_stairs' : (i === 6 ? CHIS : SMOOTH), edge && i < 6 ? { facing: t < 0 ? 2 : 0, half: 0 } : undefined);
+      }
+      P(o, F + 21, 0, BAND); P(o, F + 22, 0, 'quartz_pillar', { axis: 0 });
     }
     yield;
     // the entrance end: a giant arched window over the nave (mullions every 4, transoms, a stained head of rays and a ring)
@@ -430,16 +453,37 @@
       const vp = 10 * k + 5; if (vp < H.V0 + 2 || vp > H.V1) continue;
       for (const s of [-1, 1]) { for (let y = F + 22; y <= F + 24; y++) P(s * (H.HW + 1), y, vp, 'quartz_pillar', { axis: 0 }); P(s * (H.HW + 1), F + 25, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 26, vp, BAND); }
     }
-    // lantern turrets on the ridge every 24 blocks: a glazed lantern on four white posts, a stepped cap, a gold finial
+    // lantern turrets on the ridge every 24 blocks (round 2b: five wide, were three): a glazed lantern on four white
+    // posts over a white base, a cornice, a stepped glass cap, a gold-banded dome and a finial; the base's middle and the
+    // cap glass, so the sky light still falls through into the street
+    const T0 = F + H.TOP;
     for (const vt of [-60, -36, -12, 12, 36]) {
-      for (let du = -1; du <= 1; du++) for (let dv = -1; dv <= 1; dv++) {
-        const corner = du !== 0 && dv !== 0, centre = du === 0 && dv === 0, v = vt + dv;
-        P(du, F + H.TOP + 1, v, centre ? GLASS : SMOOTH);
-        for (let y = F + H.TOP + 2; y <= F + H.TOP + 4; y++) P(du, y, v, corner ? 'quartz_pillar' : centre ? (y === F + H.TOP + 2 ? 'lantern' : AIR) : 'white_stained_glass', corner ? { axis: 0 } : (centre && y === F + H.TOP + 2 ? { hanging: 0 } : undefined));
-        P(du, F + H.TOP + 5, v, centre ? SMOOTH : 'smooth_quartz_slab', centre ? undefined : { type: 'bottom' });
+      for (let du = -2; du <= 2; du++) for (let dv = -2; dv <= 2; dv++) {
+        const ad = Math.abs(du), av = Math.abs(dv), corner = ad === 2 && av === 2, ring = ad === 2 || av === 2, v = vt + dv;
+        P(du, T0 + 1, v, ring ? SMOOTH : GLASS);
+        for (let y = T0 + 2; y <= T0 + 5; y++) P(du, y, v, corner ? 'quartz_pillar' : ring ? 'white_stained_glass' : (du === 0 && dv === 0 && y === T0 + 2 ? 'lantern' : AIR), corner ? { axis: 0 } : (du === 0 && dv === 0 && y === T0 + 2 ? { hanging: 0 } : undefined));
+        P(du, T0 + 6, v, ring ? 'smooth_quartz_slab' : FROST, ring ? { type: 'bottom' } : undefined);
+        if (!ring) P(du, T0 + 7, v, ad + av === 0 ? CHIS : FROST);
       }
-      P(0, F + H.TOP + 6, vt, BAND); P(0, F + H.TOP + 7, vt, 'quartz_pillar', { axis: 0 });
-      const [x, z] = W2(0, vt); plan.lamps.push([x, F + H.TOP + 2, z]);
+      P(0, T0 + 8, vt, BAND); P(0, T0 + 9, vt, 'quartz_pillar', { axis: 0 }); P(0, T0 + 10, vt, 'quartz_pillar', { axis: 0 }); P(0, T0 + 11, vt, 'lantern', { hanging: 0 });
+      const [x, z] = W2(0, vt); plan.lamps.push([x, T0 + 2, z]);
+    }
+    // the cupola over the crossing (round 2b): an octagonal glazed drum nine across on the ridge over the plaza, white
+    // posts at its corners, a cornice, a dome of frosted glass in three courses, a gold eye, a lantern finial — the hall's
+    // crown from outside; glass all through, so the plaza keeps its sky light
+    {
+      const oct = (du, dv, rr) => Math.max(Math.abs(du), Math.abs(dv)) === rr && !(Math.abs(du) === rr && Math.abs(dv) === rr);
+      for (let du = -4; du <= 4; du++) for (let dv = -4; dv <= 4; dv++) {
+        if (!oct(du, dv, 4)) continue;
+        const post = (Math.abs(du) === 4 && Math.abs(dv) === 3) || (Math.abs(du) === 3 && Math.abs(dv) === 4);
+        for (let y = F + hN(Math.abs(du)) + 1; y <= T0; y++) P(du, y, dv, SMOOTH);   // (closing the gap over the vault's flanks)
+        P(du, T0 + 1, dv, SMOOTH);
+        for (let y = T0 + 2; y <= T0 + 6; y++) P(du, y, dv, post ? 'quartz_pillar' : GLASS, post ? { axis: 0 } : undefined);
+        P(du, T0 + 7, dv, post ? CHIS : 'smooth_quartz_slab', post ? undefined : { type: 'bottom' });
+      }
+      for (let k = 3; k >= 1; k--) for (let du = -k; du <= k; du++) for (let dv = -k; dv <= k; dv++) if (oct(du, dv, k) || (k === 1 && Math.max(Math.abs(du), Math.abs(dv)) === 1)) P(du, T0 + 11 - k, dv, FROST);
+      P(0, T0 + 10, 0, BAND); P(0, T0 + 11, 0, CHIS); P(0, T0 + 12, 0, 'lantern', { hanging: 0 }); P(0, T0 + 13, 0, 'quartz_pillar', { axis: 0 });
+      const [x, z] = W2(0, 0); plan.lamps.push([x, T0 + 12, z]);
     }
     // the aisles' end windows (both ends) and the apse's five lancets over the gallery
     for (const vv of [[H.V0, H.V0 + 1, H.V0 + 2], [H.V1 + 1, H.V1 + 2, H.VE]]) for (const s of [-1, 1]) {
@@ -447,7 +491,28 @@
       for (let t = -2; t <= 2; t++) for (let y = 6; y <= 18; y++) { const w = win(t, y); if (!w) continue; for (const v of vv) P(s * (36 + t), F + y, v, v === vv[1] ? (w === 's' ? SG.gold : GLASS) : AIR); }
     }
     yield;
+    // (round 2b) the great window over the staircase: the apse wall straight down the nave glazed nine wide from the
+    // gallery's head height to a round head — two stone mullions, a transom, a stained head of rays in a ring round a gold
+    // eye: the bright end of the hall the references look into (it takes the middle lancet's place)
+    {
+      const yc = 24, rad = 4.6;
+      for (let u = -4; u <= 4; u++) for (let v = H.V1 + 25; v <= H.V1 + 30; v++) {
+        const dd = Math.hypot(u, v - H.V1); if (region(u, v) !== 'wall') continue;
+        const mid = Math.abs(dd - 28) < 0.75;
+        for (let y = 10; y <= 29; y++) {
+          const hd = y >= yc ? Math.hypot(u, y - yc + 0.5) : 0;
+          if (y >= yc && hd > rad) continue;
+          let b = AIR;
+          if (mid) {
+            if (y < yc) b = (Math.abs(u) === 2 || y === 17) ? SMOOTH : (y >= yc - 2 ? SG.lblue : GLASS);
+            else { const a = Math.atan2(y - yc + 0.5, u), kk = Math.floor(a / (Math.PI / 6)); b = hd < 1.3 ? SG.amber : hd > rad - 1.1 ? SG.rose : (kk & 1) ? SG.blue : SG.gold; }
+          }
+          P(u, F + y, v, b);
+        }
+      }
+    }
     for (let k = 1; k <= 5; k++) {
+      if (k === 3) continue;   // (round 2b: the great window above)
       const th = k * Math.PI / 6, du = Math.cos(th), dv = Math.sin(th);
       for (let w = -15; w <= 15; w++) for (let rr = H.AR; rr < H.AW; rr++) {
         const t = w / 10, uu = Math.round(du * rr - dv * t), vv = Math.round(H.V1 + dv * rr + du * t);
@@ -498,16 +563,27 @@
       P(u, F + 1, v, SMOOTH); for (let y = F + 2; y <= F + 10; y++) P(u, y, v, 'quartz_pillar', { axis: 0 }); P(u, F + 11, v, 'chiseled_quartz_block'); P(u, F + 12, v, 'lantern', { hanging: 0 });
       const [x, z] = W2(u, v); plan.lamps.push([x, F + 12, z]);
     }
-    // the gallery's front: pilasters between arched niches (a door at the back, a lantern hanging in the arch, a keystone)
+    // (round 2b) newel pedestals at the stair's foot: a plinth, a shaft and a capital ending the parapets, a lantern on
+    // each — the warm light at the foot of the flight
+    for (const s of [-1, 1]) {
+      const u = s * (H.STW + 1), v = H.STAIR0;
+      P(u, F + 1, v, SMOOTH); P(u, F + 2, v, 'quartz_pillar', { axis: 0 }); P(u, F + 3, v, 'chiseled_quartz_block'); P(u, F + 4, v, 'lantern', { hanging: 0 });
+      const [x, z] = W2(u, v); plan.lamps.push([x, F + 4, z]);
+    }
+    // the gallery's front: pilasters between round-arched doorways four high (round 2b: were niches three high) — a wooden
+    // door in a wooden tympanum at the back, a lantern hanging in the arch, a keystone over it — and a cornice of
+    // upside-down stairs along the front under the gallery's balustrade
     for (const s of [-1, 1]) {
       for (const a of [14, 20]) { const u = s * a; for (let y = F + 1; y <= F + 7; y++) P(u, y, H.GAL0 - 1, 'quartz_pillar', { axis: 0 }); P(u, F + 8, H.GAL0 - 1, 'chiseled_quartz_block'); }
+      for (let a = 9; a <= 26; a++) if (a !== 14 && a !== 20 && region(s * a, H.GAL0 - 1) === 'in') P(s * a, F + H.GAL, H.GAL0 - 1, 'smooth_quartz_stairs', { facing: 2, half: 1 });
       for (const a of [11, 17, 23]) {
         const uc = s * a;
-        for (let t = -1; t <= 1; t++) for (let y = F + 1; y <= F + 3; y++) P(uc + t, y, H.GAL0, null);
-        P(uc - 1, F + 3, H.GAL0, 'smooth_quartz_stairs', { facing: 3, half: 1 }); P(uc + 1, F + 3, H.GAL0, 'smooth_quartz_stairs', { facing: 1, half: 1 });
-        P(uc, F + 4, H.GAL0 - 1, 'chiseled_quartz_block');
+        for (let t = -1; t <= 1; t++) for (let y = F + 1; y <= F + 4; y++) P(uc + t, y, H.GAL0, null);
+        P(uc - 1, F + 4, H.GAL0, 'smooth_quartz_stairs', { facing: 3, half: 1 }); P(uc + 1, F + 4, H.GAL0, 'smooth_quartz_stairs', { facing: 1, half: 1 });
+        P(uc, F + 5, H.GAL0 - 1, 'chiseled_quartz_block');
+        for (let t = -1; t <= 1; t++) for (let y = F + 1; y <= F + 4; y++) if (t !== 0 || y >= F + 3) P(uc + t, y, H.GAL0 + 1, 'spruce_planks');
         P(uc, F + 1, H.GAL0 + 1, 'spruce_door', { facing: 0, half: 0, hinge: 0, open: 0 }); P(uc, F + 2, H.GAL0 + 1, 'spruce_door', { facing: 0, half: 1, hinge: 0, open: 0 });
-        putModel(P, 'vm_wall_lantern', 0, uc, F + 3, H.GAL0);
+        P(uc, F + 4, H.GAL0, 'lantern', { hanging: 1 }); const [x, z] = W2(uc, H.GAL0); plan.lamps.push([x, F + 4, z]);
       }
     }
     // the gallery closed: a balustrade along every edge of its floor that drops to the hall (the stair's arrival open)
@@ -756,6 +832,11 @@
       Q(4, F + 4, 0, 'chiseled_quartz_block'); Q(5, F + 4, 0, 'chiseled_quartz_block');
       for (const u of [1, 2, 7, 8]) Q(u, F + 1, 0, 'smooth_quartz');
       Q(2, F + 1, 3, 'vx_crate'); Q(7, F + 1, 3, 'vx_barrel'); Q(3, F + 1, 4, 'vx_counter', { facing: 0 }); Q(6, F + 1, 4, 'vx_counter', { facing: 0 });
+      // (round 2b) the workshop lit from inside (a lantern hanging from the storey's floor: the arch glows warm instead of
+      // black) and a striped awning over the arch; goods stacked by the counters
+      Q(4, F + 4, 2, 'lantern', { hanging: 1 }); { const q = ROT[rr](4, 2); plan.lamps.push([ox + q[0], F + 4, oz + q[1]]); }
+      putModel(Q, 'vm_town_awning_' + (((k + s) & 1) ? 'teal' : 'amber'), 0, 3, F + 4, -2);
+      Q(2, F + 2, 3, 'vx_veg_crate'); Q(7, F + 1, 4, 'vx_shop_basket_stack');
       for (let y = F + 1; y <= F + 14; y++) Q(w - 2, y, d - 2, 'ladder', { facing: 0 });
       // the two storeys: arched windows on the front, a gallery with a balustrade over the walk, a door onto it
       const homes = [];
@@ -847,9 +928,10 @@
       for (let v0 = H.V0 + 3; v0 + 2 <= H.V1; v0 += 7) {
         if (inCross(v0) || inCross(v0 + 1) || inCross(v0 + 2) || v0 + 3 > H.V1) continue;
         const fa = s > 0 ? 1 : 3;
-        putModel(P, 'vm_town_stall_' + ((n++ & 1) ? 'teal' : 'amber'), fa, s > 0 ? H.A0 : -H.STALL1, F + 1, v0);
-        putModel(P, 'vm_wall_lantern', fa, s * (H.STALL1 + 1), F + 3, v0 + 1);
-        const [lx, lz] = W2(s * (H.STALL1 + 1), v0 + 1); plan.lamps.push([lx, F + 3, lz]);
+        // (round 2b: the tall stall — posts and braces carrying a pitched striped canopy over the head, a lantern hanging
+        // in it over the counter; the bracket lantern over the walk went into the stall)
+        putModel(P, 'vm_town_stall_tall_' + ((n++ & 1) ? 'teal' : 'amber'), fa, s > 0 ? H.A0 : -H.STALL1, F + 1, v0);
+        const [lx, lz] = W2(s * H.STALL1, v0 + 1); plan.lamps.push([lx, F + 3, lz]);
         const [x, z] = W2(s * (H.STALL1 + 1), v0 + 1); stalls.push([x, F + 1, z, L.facing(fa)]);
         hallStalls.push({ s, v0 });
         const item = (dv, fn) => { const v = v0 + dv; if (v <= H.V1 && !inCross(v)) fn(v); };
@@ -866,7 +948,10 @@
     for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
       for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, 'vx_beam_oak', { axis: 1 }); }
       for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, 'vx_beam_oak', { axis: 1 });
-      for (const a of [34, 41]) if (F + 20 < F + shellLo(s * a, v) - 1) { P(s * a, F + 19, v, 'lantern', { hanging: 1 }); const [x, z] = W2(s * a, v); plan.lamps.push([x, F + 19, z]); }   // (lanterns hanging from the tie beam)
+      // lanterns hanging from the tie beam: over the walk low on chains (round 2b: they hung at the beam, out of sight under
+      // the vault), over the loggias' roofs at the beam
+      for (const a of [33, 37]) if (F + 20 < F + shellLo(s * a, v) - 1) { for (let y = F + 11; y <= F + 19; y++) P(s * a, y, v, 'iron_chain', { axis: 0 }); P(s * a, F + 10, v, 'lantern', { hanging: 1 }); const [x, z] = W2(s * a, v); plan.lamps.push([x, F + 10, z]); }
+      if (F + 20 < F + shellLo(s * 41, v) - 1) { P(s * 41, F + 19, v, 'lantern', { hanging: 1 }); const [x, z] = W2(s * 41, v); plan.lamps.push([x, F + 19, z]); }
     }
     for (let k = -8; k <= 4; k++) {
       const vp = 10 * k + 5; if (vp < H.V0 + 3 || vp > H.V1 || inCross(vp)) continue;

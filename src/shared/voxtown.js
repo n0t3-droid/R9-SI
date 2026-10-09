@@ -288,6 +288,50 @@
     });
   }
 
+  // ---------------------------------------------------------------- round 2b (t-town2): the tall market stall
+  // vm_town_stall_tall_{amber,teal} — the references' market stall (3 along the aisle × 4 high × 2 deep, the counter at
+  // the front −z): a wooden counter with crates of produce and baskets, four posts with braces carrying a pitched striped
+  // canopy over the head (its ridge over the middle, a scalloped valance at the front), two back shelves with jars, and a
+  // lantern hanging from the front beam over the counter (it lights the walk: part 13, the middle front cell of the third
+  // block). Registered after round 2's pieces (a third late call below); its colours are the old stalls' (textures exist).
+  const NAMES3 = T.NAMES3 = [];
+  const def3 = (name, display, o) => { VM.define(name, display, Object.assign({ res: 16, sound: 'stone', hard: 1, cat: 'arch', cats: ['arch'] }, o, { late: true, lazy: true })); NAMES3.push(name); return name; };
+  T.STALL_LAMP_PART = 13;
+  for (const [key, c1, c2, bc] of [['amber', COL.cream, COL.amber, 0xB08A5A], ['teal', COL.white, COL.teal, 0x2F8C8A]]) {
+    def3('vm_town_stall_tall_' + key, 'Market Stall · Tall · ' + key[0].toUpperCase() + key.slice(1), {
+      size: [3, 4, 2], col: bc, sound: 'wood', hard: 1, light: (p) => (p.part === T.STALL_LAMP_PART ? [14, 11, 7] : null),
+      build(b, M) {
+        const wood = M.wood(COL.wood), woodL = M.wood(COL.woodL), woodD = M.wood(COL.woodD), A = M.fabric(c1), B = M.fabric(c2);
+        const ir = M.metal(COL.iron), glass = M.glass(COL.warm), flame = M.light(COL.flame);
+        const stripe = (x) => (Math.floor(x / 6) & 1) ? B : A;
+        b.box(1, 0, 1, 47, 13, 15, wood); b.box(0, 13, 0, 48, 15, 16, woodL);                         // the counter and its top
+        for (let x = 3; x < 46; x += 6) b.box(x, 1, 0.6, x + 1, 12, 1, woodD);                         // its planks
+        for (let k = 0; k < 4; k++) {                                                                   // crates of produce
+          const x0 = 3 + k * 11; b.box(x0, 15, 3, x0 + 9, 19, 13, woodD);
+          const c = M.matte(PRODUCE[(k * 2 + (key === 'teal' ? 1 : 0)) % PRODUCE.length]);
+          for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) b.sphere(x0 + 1.5 + i * 1.3, 19.4, 4.5 + j * 3, 1.3, c);
+        }
+        for (const x of [9, 31]) { b.cyl('y', x, 10, 3.2, 15, 19, woodL); b.cyl('y', x, 10, 2.6, 16, 19, 0); for (let i = 0; i < 4; i++) b.sphere(x - 1.5 + (i & 1) * 3, 18.6, 9 + (i >> 1) * 2, 1.3, M.matte(PRODUCE[(i + (key === 'teal' ? 3 : 0)) % PRODUCE.length])); }   // baskets
+        b.box(1, 0, 16, 47, 1, 30, woodD);                                                              // the boards behind
+        b.box(18, 1, 18, 30, 12, 26, wood);                                                             // a crate behind the counter
+        for (const y of [22, 36]) { b.box(1, y, 25, 47, y + 1.5, 30, woodL); for (let k = 0; k < 8; k++) b.cyl('y', 5 + k * 5.4, 28, 1.6, y + 1.5, y + 5, M.glass([0xE8B83A, 0xD8402E, 0x6AB04A][(k + (y >> 3)) % 3])); }   // two shelves with jars
+        for (const x of [1, 45]) { b.box(x, 0, 1, x + 2, 50, 3, woodD); b.box(x, 0, 27, x + 2, 56, 29, woodD); }   // the posts
+        b.box(0, 48, 0.5, 48, 51, 3.5, woodD); b.box(0, 54, 26.5, 48, 57, 29.5, woodD);                // the front and back beams
+        for (const x of [1, 45]) b.box(x, 50, 2, x + 2, 52, 28, woodD);                                // the side beams
+        for (const [x, s] of [[2, 1], [46, -1]]) { b.rod(x, 38, 2, x + s * 9, 48.5, 2, 0.8, wood); b.rod(x, 42, 28, x + s * 9, 54.5, 28, 0.8, wood); }   // braces
+        for (let z = 0; z < 32; z++) {                                                                  // the canopy: a pitched roof, its ridge over the middle
+          const y = z <= 15 ? Math.round(50 + 12 * z / 15) : Math.round(62 - 5 * (z - 15) / 16);
+          for (let x = 0; x < 48; x++) { b.set(x, y, z, stripe(x)); b.set(x, y + 1, z, stripe(x)); }
+        }
+        for (let x = 0; x < 48; x++) { const s = x % 8, depth = 2 + Math.round(2.5 * Math.sin(Math.PI * (s + 0.5) / 8)); for (let y = 50 - depth; y < 51; y++) for (let z = 0; z < 2; z++) b.set(x, y, z, stripe(x)); }   // the scalloped valance
+        b.box(23.5, 43, 5.5, 24.5, 48, 6.5, ir);                                                        // the lantern's chain
+        b.box(20.5, 33, 2.5, 27.5, 34, 9.5, ir); b.box(21, 34, 3, 27, 41, 9, glass);                   // its cage, warm glass
+        for (const [x, z] of [[20.5, 2.5], [26.5, 2.5], [20.5, 8.5], [26.5, 8.5]]) b.box(x, 34, z, x + 1, 41, z + 1, ir);
+        b.sphere(24, 37, 6, 1.6, flame); b.box(20.5, 41, 2.5, 27.5, 42, 9.5, ir); b.box(22.5, 42, 4.5, 25.5, 43, 7.5, ir);
+      },
+    });
+  }
+
   // ---------------------------------------------------------------- the gold band (VX 16³, a full block)
   T.bandCol = { stone: COL.stone, joint: COL.stoneD, gold: COL.gold, goldL: COL.goldL };
   VX._.PAINT_FN.townband = function (s, c) {
@@ -312,4 +356,6 @@
   });
   // round 2 (t-town2): the arched window and the word signs, after the gold band
   VR.BL.late.push(() => { if (VM._K) VM.registerLate(NAMES2); });
+  // round 2b (t-town2): the tall market stall, after round 2's pieces
+  VR.BL.late.push(() => { if (VM._K) VM.registerLate(NAMES3); });
 })(VR);

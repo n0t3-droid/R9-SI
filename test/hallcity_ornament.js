@@ -132,7 +132,9 @@ for (const [label, H] of HALLS) {
   // the walking surface: the highest solid cell up to the gallery's rail with two free cells over it (roof eaves, vines and
   // lanterns overhead count as free)
   const free = (u, y, v) => { const n = atN(u, y, v); return n === 'air' || /roof|slate|vines|lantern|beam/.test(n); };
-  const surf = (u, v) => { for (let y = F + 9; y >= F; y--) { const n = atN(u, y, v); if (solid(n) && !/roof|slate|beam/.test(n) && free(u, y + 1, v) && free(u, y + 2, v)) return y - F; } return -1; };
+  // (an upside-down stair is a moulding — the gallery's cornice, round 2b — not a floor to stand on)
+  const floorN = (u, y, v) => { const n = atN(u, y, v); if (!/stairs/.test(n)) return true; const p = props(at(u, y, v)); return !(p.half === 1 || p.half === 'top'); };
+  const surf = (u, v) => { for (let y = F + 9; y >= F; y--) { const n = atN(u, y, v); if (solid(n) && !/roof|slate|beam/.test(n) && floorN(u, y, v) && free(u, y + 1, v) && free(u, y + 2, v)) return y - F; } return -1; };
   {
     const prof = []; for (let v = 34; v <= 56; v++) prof.push([v, surf(0, v)]);
     let mono = true, maxStep = 0, reach = -1;
@@ -159,7 +161,7 @@ for (const [label, H] of HALLS) {
     // arrival aside)
     // (a gallery cell: its floor at 8, nothing over it but a balustrade, a post, a lamp, a bench, a plant or the bell)
     const RAIL = /balustrade|quartz_pillar|lamp|lantern|chiseled/;
-    const galCell = (u, v) => solid(atN(u, F + 8, v)) && (atN(u, F + 9, v) === 'air' || /balustrade|quartz_pillar|lamp|lantern|bench|bell|planter/.test(atN(u, F + 9, v))) && atN(u, F + 10, v) !== '?' && !solid(atN(u, F + 11, v));
+    const galCell = (u, v) => solid(atN(u, F + 8, v)) && floorN(u, F + 8, v) && (atN(u, F + 9, v) === 'air' || /balustrade|quartz_pillar|lamp|lantern|bench|bell|planter/.test(atN(u, F + 9, v))) && atN(u, F + 10, v) !== '?' && !solid(atN(u, F + 11, v));
     let open = 0, edges = 0;
     for (let v = Hh.V1 - 1; v <= 80; v++) for (let u = -27; u <= 27; u++) {
       if (!galCell(u, v)) continue;
@@ -283,7 +285,7 @@ for (const [label, H] of HALLS) {
     let low = 0, chains = 0, lines = 0;
     for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
       lines++; let ok = 0;
-      for (const a of [34, 41]) { let y = -1; for (let yy = F + 6; yy <= F + 13; yy++) if (/lantern/.test(atN(s * a, yy, v))) y = yy; if (y < 0) continue; let c = 0; for (let yy = y + 1; yy <= F + 19; yy++) if (/chain/.test(atN(s * a, yy, v))) c++; if (c >= F + 19 - y - 1) { ok++; chains += c; } }
+      for (const a of [33, 37]) { let y = -1; for (let yy = F + 6; yy <= F + 13; yy++) if (/lantern/.test(atN(s * a, yy, v))) y = yy; if (y < 0) continue; let c = 0; for (let yy = y + 1; yy <= F + 19; yy++) if (/chain/.test(atN(s * a, yy, v))) c++; if (c >= F + 19 - y - 1) { ok++; chains += c; } }
       if (ok === 2) low++;
     }
     check(low === lines, `two lanterns hang low on chains from every tie beam (${low} of ${lines} beams, ${chains} chain links)`);
@@ -318,15 +320,32 @@ for (const [label, H] of HALLS) {
     check(cup >= 60, `a glazed cupola over the crossing (${cup} glass cells)`);
   }
   // ---------------------------------------------------------------- 9. round 2b: warm light where the views look
+  // (the block light of the plan's own blocks in a box round each spot — the light engine's rule: RGB from every
+  // emitter, −1 a step and the cell's filter; the generated chunks light themselves column by column, so a lantern in the
+  // next chunk would be missed there)
   {
-    const g = H.g, cache = new Map();
-    const lightAt = (u, y, v) => { const [x, z] = H.W2(u, v), k = (x >> 4) + ',' + (z >> 4); let c = cache.get(k); if (!c) { const ch = g.generate(x >> 4, z >> 4); c = V.computeColumnLight(ch.blocks, true); cache.set(k, c); } return c[(y << 8) | ((z & 15) << 4) | (x & 15)]; };
-    const warm = (L) => ((L >> 8) & 15) >= 9 && ((L >> 8) & 15) >= (L & 15) + 3;
-    const fmt = (L) => ((L >> 8) & 15) + '/' + ((L >> 4) & 15) + '/' + (L & 15);
-    const spots = [['the stair\'s foot', 5, F + 2, 37], ['the stair\'s foot', -5, F + 2, 37], ['a landing', 5, F + 5, 45], ['the gallery\'s front', 11, F + 2, 48]];
-    const lg = Hh.loggias.filter(l => l.frame).slice(0, 4);
-    for (const l of lg) { const [rr, ox, oz] = l.frame, q = ROT[rr](4, 2), w = [ox + q[0], oz + q[1]]; const uv = (() => { for (let u = -48; u <= 48; u++) for (let v = -84; v <= 84; v++) { const [x, z] = H.W2(u, v); if (x === w[0] && z === w[1]) return [u, v]; } return null; })(); if (uv) spots.push(['a workshop', uv[0], F + 2, uv[1]]); }
-    const seen = spots.map(([n, u, y, v]) => { const L = lightAt(u, y, v); return [n, warm(L), fmt(L)]; });
+    const lightNear = (u0, y0, v0) => {
+      const RAD = 8, N = 2 * RAD + 1, idx = (a, b, c) => ((a * N) + b) * N + c, L = new Int16Array(N * N * N * 3), cell = new Int32Array(N * N * N), q = [];
+      for (let a = 0; a < N; a++) for (let b = 0; b < N; b++) for (let c = 0; c < N; c++) {
+        const s = at(u0 + a - RAD, y0 + b - RAD, v0 + c - RAD), i = idx(a, b, c); cell[i] = s;
+        const e = s > 0 ? R.T.emit[s] : 0; if (e) { L[i * 3] = (e >> 8) & 15; L[i * 3 + 1] = (e >> 4) & 15; L[i * 3 + 2] = e & 15; q.push(i); }
+      }
+      while (q.length) {
+        const i = q.shift(), a = Math.floor(i / (N * N)), b = Math.floor(i / N) % N, c = i % N;
+        for (const [da, db, dc] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+          const A = a + da, B = b + db, Cc = c + dc; if (A < 0 || B < 0 || Cc < 0 || A >= N || B >= N || Cc >= N) continue;
+          const j = idx(A, B, Cc), s = cell[j]; if (s < 0) continue;
+          const f = s > 0 ? R.T.filter[s] : 0; if (f >= 15) continue;
+          let up = false; for (let k = 0; k < 3; k++) { const nv = L[i * 3 + k] - 1 - f; if (nv > L[j * 3 + k]) { L[j * 3 + k] = nv; up = true; } }
+          if (up) q.push(j);
+        }
+      }
+      const i = idx(RAD, RAD, RAD); return [L[i * 3], L[i * 3 + 1], L[i * 3 + 2]];
+    };
+    const warm = (c) => c[0] >= 9 && c[0] >= c[2] + 3;
+    const spots = [['the stair\'s first step', 4, F + 2, 38], ['the stair\'s first step', -4, F + 2, 38], ['a landing', 5, F + 5, 45], ['the gallery\'s doors', 11, F + 2, 48]];
+    for (const l of Hh.loggias.filter(l => l.frame).slice(0, 4)) { const [rr, ox, oz] = l.frame, q = ROT[rr](4, 2), w = [ox + q[0], oz + q[1]]; for (let u = -48; u <= 48; u++) for (let v = -84; v <= 84; v++) { const [x, z] = H.W2(u, v); if (x === w[0] && z === w[1]) spots.push(['a workshop', u, F + 2, v]); } }
+    const seen = spots.map(([n, u, y, v]) => { const c = lightNear(u, y, v); return [n, warm(c), c.join('/')]; });
     check(seen.every(s => s[1]), `warm lantern light at the stair's foot, its landings, the gallery's doors and in the workshops (${seen.map(s => s[0] + ' ' + s[2]).join(', ')})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
