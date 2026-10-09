@@ -28,26 +28,27 @@ for (let i = 0; i < palm.nv; i++) {
   if (fr < PR.DEAD_FIRST) minY = Math.min(minY, y);
   if (fr === PR.BIT_FIXED && y > -0.5) trunkTop++;
 }
-check(maxR >= 4.7, 'the green fronds reach out (radius ' + maxR.toFixed(2) + ', want at least 4.7)');
+// (the crown spans about 0.7 of a palm's height, as the trailer's palms in t3_05: the longest fronds 4–5 blocks)
+check(maxR >= 4.2 && maxR <= 5.2, 'the green fronds reach out (radius ' + maxR.toFixed(2) + ', want 4.2–5.2)');
 check(minY <= -1.2, 'the fronds droop below the crown (lowest green tip y ' + minY.toFixed(2) + ', want at most −1.2)');
 check(trunkTop > 0, 'the trunk has its top ring at the crown');
 const frondIds = [...ids].sort((a, b) => a - b);
 check(frondIds.join(',') === Array.from({ length: 17 }, (_, i) => i).join(','), 'frond slots 0–14 (green, dead), 15 (trunk, bulb), 16 (coconuts) all present');
 // the fronds fan out round the crown in tiers and arch under their weight: every green frond's tip is lower than its
-// highest point; the low ones (leaving the crown under 0.4 rad) reach 4.5+ blocks out and hang their tips below the crown,
+// highest point; the low ones (leaving the crown under 0.4 rad) reach 3.8+ blocks out and hang their tips below the crown,
 // the high ones (over 0.6 rad) rise above it; the azimuths cover the whole circle (no gap wider than 70°)
 let arch = 0, low = 0, lowOk = 0, high = 0, highOk = 0; const azs = [];
 for (let k = 0; k < PR.FROND_N; k++) {
   const a = PR.frondAxis(k), tip = PR.frondPoint(k, 1); let top = -Infinity;
   for (let i = 0; i <= 20; i++) top = Math.max(top, PR.frondPoint(k, i / 20)[1]);
   if (tip[1] < top - 0.05) arch++;
-  if (a.el < 0.4) { low++; if (Math.hypot(tip[0], tip[2]) > 4.5 && tip[1] < -0.6) lowOk++; }
+  if (a.el < 0.4) { low++; if (Math.hypot(tip[0], tip[2]) > 3.8 && tip[1] < -0.6) lowOk++; }
   if (a.el > 0.6) { high++; if (tip[1] > 0.4) highOk++; }
   azs.push(((a.az % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI));
 }
 azs.sort((a, b) => a - b); let gap = 2 * Math.PI - azs[azs.length - 1] + azs[0]; for (let i = 1; i < azs.length; i++) gap = Math.max(gap, azs[i] - azs[i - 1]);
 check(arch === PR.FROND_N, 'every green frond arches under its weight (' + arch + ' of ' + PR.FROND_N + ')');
-check(low >= 3 && lowOk === low, 'the low fronds reach 4.5+ blocks out and hang below the crown (' + lowOk + ' of ' + low + ')');
+check(low >= 3 && lowOk === low, 'the low fronds reach 3.8+ blocks out and hang below the crown (' + lowOk + ' of ' + low + ')');
 check(high >= 3 && highOk === high, 'the young fronds rise above the crown (' + highOk + ' of ' + high + ')');
 check(gap < 70 * Math.PI / 180, 'the fronds fan out all round the crown (largest gap ' + (gap * 180 / Math.PI).toFixed(0) + '°)');
 let dead = 0;
