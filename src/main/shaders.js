@@ -733,13 +733,14 @@ void main() {
     } else {
       swirl = clamp((texture(u_albedo, vec3(fract(pp * 0.25), layer)).a - 0.3) / 0.3, 0.0, 1.0);
     }
-    float rim = 1.0 - smoothstep(0.0, 0.9, rd);
-    float band = 1.0 - smoothstep(0.4, 3.0 + wob, rd);
+    // the energy hugs the rim (about 2 blocks, its edge wavering) so the middle stays clear, as in t3_04
+    float rim = 1.0 - smoothstep(0.0, 0.75, rd);
+    float band = 1.0 - smoothstep(0.3, 1.9 + wob * 0.6, rd);
     float e = clamp(band * (0.2 + 0.8 * swirl) * 0.8 + fil * band, 0.0, 1.0);
-    vec3 hot = mix(vec3(1.0, 0.62, 0.28), vec3(1.0, 0.92, 0.8), 1.0 - smoothstep(0.0, 0.35, rd)) * 3.2;
+    vec3 hot = mix(vec3(1.0, 0.62, 0.28), vec3(1.0, 0.92, 0.8), 1.0 - smoothstep(0.0, 0.3, rd)) * 2.8;
     vec3 vcol = mix(vec3(0.12, 0.38, 1.0) * 0.9, vec3(0.5, 0.82, 1.0) * 2.4, e);
     vcol = mix(vcol, hot, rim);
-    float va = clamp(0.05 + 0.08 * swirl + e * 0.75 + rim * 0.92, 0.0, 0.97);
+    float va = clamp(0.04 + 0.06 * swirl + e * 0.75 + rim * 0.92, 0.0, 0.97);
     vcol = applyFog(vcol, v_rel, dist);
     o_col = vec4(vcol, va);
     return;
