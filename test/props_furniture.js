@@ -7,6 +7,7 @@
 //   bash test/wt_run.sh props_furniture.js
 require('./load_shared.js');
 require('../src/main/props.js');
+require('../src/main/props2.js');   // round II (t-smooth2): the models of the rest of the pieces
 const PR = VR.Props, VM = VR.VM, R = VR.R, S = PR.VSTRIDE, MAT = PR.MAT;
 let fails = 0; const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const PLANTS = { monstera: 0.66, olive: 0.62 };   // leaves may reach a little past the pot's cell
@@ -79,11 +80,12 @@ check(PR.furnModel('sofa') === PR.furnModel('sofa'), 'a model is built once and 
 const list = VR.PROP_FURN || [];
 check(list.length >= 50, 'the mesher lists the furniture blocks (' + list.length + ')');
 let sized = 0, missing = [];
-// (a VX32 piece's size is its model's; a village piece is one block, the bed two — its foot and its head)
+// (a VX32 piece's size is its model's; a village piece is one block, the bed two — its foot and its head — and the
+// other two-part pieces two high: the fridge, the wardrobe, the curtain)
 for (let i = 0; i < list.length; i++) {
   const name = list[i], d = PR.furnDef(PR.FURN0 + i), vm = VM.MODELS[name], t = R.byName[name], key = PR.furnKey(PR.FURN0 + i, 0);
   if (!d || !PR.FURN[key] || !t) { missing.push(name); continue; }
-  const want = vm ? [vm.W, vm.H, vm.D] : t.has('part') && t.o.kind === 'bed' ? [1, 1, 2] : [1, 1, 1], sz = PR.FURN[key].size;
+  const want = vm ? [vm.W, vm.H, vm.D] : t.has('part') ? (t.o.kind === 'bed' ? [1, 1, 2] : [1, 2, 1]) : [1, 1, 1], sz = PR.FURN[key].size;
   if (sz[0] === want[0] && sz[1] === want[1] && sz[2] === want[2]) sized++; else missing.push(name + ' size ' + sz + ' vs ' + want);
 }
 check(!missing.length && sized === list.length, `every furniture block has a model of its voxel piece's size (${sized} of ${list.length}${missing.length ? ': ' + missing.slice(0, 6).join(', ') : ''})`);
