@@ -13,7 +13,8 @@
 //   Very Low and High: MODE=potato measures their frames at the three scenes (PRESETS=potato,high; with DIST=<a v0.43
 //            dist> TAG=before: the before numbers)
 // usage: bash test/wt_run.sh ultralite.mjs 3600   ·   MODE=potato DIST=file:///…/index.html TAG=before …
-//   SCENES=hall,plaza,village · WALK=0 skips the walks · N=3 timed frames · RD=8 the render distance of every preset
+//   SCENES=hall,plaza,village (default; `lake` adds the water mirror's scene: a lake 210 m east of the hall, the camera on
+//   its east shore looking west over the water to the hills) · WALK=0 skips the walks · N=3 timed frames · RD=8 the render distance of every preset
 //   (one worker on this 2-CPU machine: Ultra's 16 chunks would take many minutes a scene; the far ring stays 64)
 import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/claude/.npm-global/lib/node_modules/sharp/lib/index.js';
@@ -125,7 +126,7 @@ const measure = async (lite) => {
   if (lite) await ev(() => { VR.UL.Far.AGE = 1e9; });   // (the steady frames: no "age" refresh at 2–3 s a frame)
   await frames(lite ? 6 : 2);   // (Ultra · Leicht: the first builds its cache)
   const fs3 = await frames(N);
-  const passes = await ev(() => { const g = VR.game, P = window.__pass; P.ms = {}; P.calls = {}; P.sub = {}; P.on = true; window.__norender = false; g.env.anim = 500; window.__sync(); const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); const ms = performance.now() - t0; P.on = false; window.__norender = true; return { ms, pass: P.ms, calls: P.calls, sub: P.sub }; });
+  const passes = await ev(() => { const g = VR.game, r = g.renderer, P = window.__pass; P.ms = {}; P.calls = {}; P.sub = {}; P.on = true; window.__norender = false; g.env.anim = 500; window.__sync(); const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); const ms = performance.now() - t0; P.on = false; window.__norender = true; const st = r.stats || {}; return { ms, pass: P.ms, calls: P.calls, sub: P.sub, mirror: { on: !!r.reflOn, size: r.reflOn ? r.reflW + '×' + r.reflH : '', secs: r.reflOn ? st.reflSecs | 0 : 0, draws: r.reflOn ? st.reflDraws | 0 : 0 } }; });
   let refresh = null;
   if (lite) {   // a new far cache: one slice a frame
     await ev(() => { const st = VR.game.renderer.fc; if (st && st.front) st.front.t = -1e9; VR.UL.Far.AGE = 500; });
@@ -137,7 +138,7 @@ const measure = async (lite) => {
   if (lite) await ev(() => { VR.UL.Far.AGE = 500; });
   const ms = fs3.map(f => f.ms).sort((a, b) => a - b);
   const pass = {}; let sum = 0; for (const k in passes.pass) { pass[k] = r1(passes.pass[k]); sum += passes.pass[k]; } pass.rest = r1(passes.ms - sum);
-  return { frameMs: r1(ms[ms.length >> 1]), frames: ms.map(r1), fc: fs3[fs3.length - 1].fc, draws: fs3[fs3.length - 1].draws, tris: Math.round(fs3[fs3.length - 1].tris / 1000) + 'k', passMs: r1(passes.ms), pass, calls: passes.calls, sub: passes.sub, fullShadowMs: full === null ? null : r1(full), refresh };
+  return { frameMs: r1(ms[ms.length >> 1]), frames: ms.map(r1), fc: fs3[fs3.length - 1].fc, draws: fs3[fs3.length - 1].draws, tris: Math.round(fs3[fs3.length - 1].tris / 1000) + 'k', passMs: r1(passes.ms), pass, calls: passes.calls, sub: passes.sub, mirror: passes.mirror, fullShadowMs: full === null ? null : r1(full), refresh };
 };
 const shotPath = (name) => `/home/claude/vr/test/shots/ultralite_${name}_${TAG}.png`;
 const shot = async (name) => {
@@ -213,6 +214,9 @@ const CAM = {
   hall: [0.5, -9.5, { y: 81 }, Math.PI, 0],
   plaza: [3.5, -96.5, 1.62, 0.3, 0.03],
   village: vsite ? [vsite[0] + 34.5, vsite[1] + 34.5, 9.62, Math.atan2(34.5, 34.5), -0.16] : null,   // (8 blocks up, over the first roofs, toward the centre)
+  // the mirror's scene: a lake 210 m east of the hall (found in the generator, seed 4242 vgen 8: water x 192–216, z 6–82,
+  // its surface at y 63, 4 deep), the eye on the grass of its east shore (feet 66) looking west over it to the hills
+  lake: [220.5, 30.5, { y: 66 }, Math.PI / 2, -0.1],
 };
 const res = { scenes: {}, walks: {} };
 const presets = MODE === 'potato' ? (process.env.PRESETS || 'potato,high').split(',') : ['ultra', 'ultraLite'];   // (MODE=potato: Very Low and High, before/after)
@@ -235,12 +239,18 @@ for (const sc of SCENES) {
     const d = await diff(`${sc}_ultra`, `${sc}_ultraLite`);
     res.scenes[sc].diff = d;
     const u = res.scenes[sc].ultra, l = res.scenes[sc].ultraLite;
-    console.log(`  ${sc}: Ultra ${u.frameMs} ms · Ultra · Leicht ${l.frameMs} ms (steady, cache ${l.fc}) · a new cache's frames ${JSON.stringify(l.refresh)} · full shadow map ${u.fullShadowMs} → ${l.fullShadowMs} ms · picture difference ${JSON.stringify(d)}`);
+    const mir = (m) => m.mirror && m.mirror.on ? `${m.pass.refl} ms (${m.mirror.size}, ${m.mirror.secs} sections, ${m.mirror.draws} draws)` : 'none';
+    console.log(`  ${sc}: Ultra ${u.frameMs} ms · Ultra · Leicht ${l.frameMs} ms (steady, cache ${l.fc}) · a new cache's frames ${JSON.stringify(l.refresh)} · full shadow map ${u.fullShadowMs} → ${l.fullShadowMs} ms · the mirror ${mir(u)} → ${mir(l)} · picture difference ${JSON.stringify(d)}`);
     check(l.fc === 'cached', `${sc}: Ultra · Leicht shows its far cache in the steady frames (${l.fc})`);
     check(l.frameMs < u.frameMs, `${sc}: a steady Ultra · Leicht frame costs less than Ultra's (${l.frameMs} < ${u.frameMs} ms)`);
     check(d.mean < 6 && d.big < 8, `${sc}: the two pictures look the same (mean difference ${d.mean}/255, ${d.big} % of the pixels off by more than 1/10)`);
+    if (sc === 'lake') {
+      check(u.mirror && u.mirror.on && l.mirror && l.mirror.on, `lake: both draw the water's mirror (${mir(u)} · ${mir(l)})`);
+      check(l.pass.refl < u.pass.refl, `lake: the light mirror costs less than Ultra's (${l.pass.refl} < ${u.pass.refl} ms)`);
+    }
   }
   await holdFar(false);
+  fs.writeFileSync(`/home/claude/vr/.tmp_tests/ultralite_${TAG}.json`, JSON.stringify(res, null, 1));   // (after every scene: a run cut short keeps what it measured)
 }
 if (WALK) {
   for (const [p, to] of [['ultraLite', [0.5, -209.5]], ['ultra', [0.5, 190.5]]]) {
