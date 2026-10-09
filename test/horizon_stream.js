@@ -141,7 +141,9 @@ function run(budget, items, opts) {
   let now = 0; const clock = () => now; const order = [];
   for (const it of items) sch.push({ key: it.key, bytes: it.bytes, dx: it.dx, dz: it.dz, run: () => { order.push(it.key); now += 0.4; } });
   sch.drain(10, clock, 0, 1);
-  check('priority: runs in view priority order (near-side, ahead, behind, far-ahead)', order.join(',') === 'near-side,ahead,behind,far-ahead', order.join(','));
+  // (F10: the columns in the view first, nearest first, then beside, behind last — v042 weighted the distance by the
+  // angle instead and sent the near column at the side first: near-side, ahead, behind, far-ahead)
+  check('priority: runs in view order (ahead, far-ahead in the view, then near-side beside, behind last)', order.join(',') === 'ahead,far-ahead,near-side,behind', order.join(','));
 }
 {
   // a big item that does not fit blocks the smaller ones behind it this frame (no overtaking), then runs next frame

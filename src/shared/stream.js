@@ -8,7 +8,8 @@
 //                              chunk's own fade, so every pixel is drawn by the chunk or by the tile (no holes)
 //   maskSample(tex, n, u, v)   the GPU's bilinear read of the n×n mask (texel centres at i + 0.5)
 //   viewPrio(dx, dz, vx, vz)   streaming priority: distance, ×1.0 straight ahead … ×2.2 straight behind
-//   UploadScheduler            queued uploads run under a per-frame budget, strictly in priority order
+//   viewTier(dx, dz, vx, vz, c) the upload order's tier (F10): 0 in the view or under the player, 1 beside, 2 behind
+//   UploadScheduler            queued uploads run under a per-frame byte budget from the measured cost per byte (F10)
 //   streamRung(ms, target, r)  the streaming rate steps 1 → ½ → ¼ under frame-time pressure (never the view distance)
 // ============================================================================
 (function (VR) {
@@ -39,42 +40,216 @@
     return d * (1.6 - 0.6 * c);
   };
 
-  // ---- upload scheduler. A frame has `budgetMs` for uploads. Items run in view priority order and only while the
-  // estimated cost still fits: the first item that does not fit stops the frame (nothing overtakes it). An item
-  // bigger than the whole budget runs alone once it has waited four frames, and the run is reported as forced.
-  // The estimate is ms per byte: it rises at once to a measured higher rate and falls slowly to a lower one.
+  // ---- upload scheduler (F8, measured and adaptive since F10 · streaming without hitches on a weak GPU).
+  // One queue for everything that goes to the GPU while the world streams: the section meshes and their mini-voxel
+  // detail (the near lane), the horizon tiles and the far forms (the far lane). A frame gets a budget in BYTES: the
+  // frame's milliseconds divided by the measured cost per byte of THIS machine.
+  //   cost per byte   msPerByte = the larger of the CPU-side estimate (the GL calls timed: rises at once to a solid
+  //                   higher measurement, falls slowly) and the GPU-side one: calibrate() at world start (1 MB with a
+  //                   gl.finish before and after, renderer.calibrateUploads), then gpuSample() — the GPU's lag of a
+  //                   frame (its fence, polled at the next frames) fitted as lag = a + b · bytes over the recent frames;
+  //                   the slope b eases the estimate (held within ½ … 8x of the calibration). An integrated GPU that
+  //                   shares the system memory copies the bytes after the JS call has returned: the CPU side alone
+  //                   would never see it.
+  //   the frame's ms  the caller's budget (the preset's ms × the governor's rung) × scale × frameK, minus the debt
+  //                   frameK = max(1, the median frame ÷ the 30 fps target): a machine whose usual frame is longer
+  //                   spends the same share of it (the preset's ms are for a 33 ms frame)
+  //                   scale (frame(), AIMD): a frame over max(target, 1.25 × median) with an upload in the last three
+  //                   frames halves it (never below SCALE_MIN), a frame under 85 % of that adds 0.05 (up to 1)
+  //                   debt: what a forced frame spent over its budget is paid back from the next frames
+  //   order           the player's edit first (whole, even over the budget), then an item in progress, then by lane:
+  //                   near by view (viewTier: in the view, beside, behind; nearest first within), far by its own
+  //                   priority (the horizon's: coarse and near first). While both lanes wait the far lane gets FAR_SHARE
+  //                   of the bytes; each lane takes what the other leaves. The queue sorts in place (insertion sort: the
+  //                   last frame's order is nearly right), so a turn of the camera re-sorts at once.
+  //   items           { bytes, x, z (or dx, dz, set by the caller each frame), lane (0 near, 1 far), prio (far lane),
+  //                     urgent, alive() (false: dropped, abort() called), and either run() (atomic: all at once — the
+  //                     first one that does not fit stops its lane, nothing overtakes it; one bigger than the whole
+  //                     budget goes alone after waiting four frames, reported as forced) or step(maxBytes) → bytes
+  //                     written, commit() when the last byte is up, abort() (parted: a big mesh straddles frames, its
+  //                     old version draws until the commit) }
+  //   hitches         frame() counts frames longer than 2 × the usual frame (the median of the last 64, at least
+  //                   2 × 16.7 ms); hitches(now) = how many in the last 10 s
+  // No allocation per frame: the items are kept and sorted in place, the result object and the scratch arrays reused.
+  S.TARGET_MS = 1000 / 30;   // the frame the presets' upload milliseconds are meant for
+  S.SCALE_MIN = 0.25;        // the adaptive scale never takes the budget below a quarter
+  S.FAR_SHARE = 0.3;         // the far lane's share of the bytes while both lanes wait
+  S.HITCH_MS = 10000;        // the hitch meter's window
+  S.NEAR_BLOCKS = 24;        // columns this close come first, whatever the view (the ground under the player)
+  const RING = 64;
+  // the view tier of a column at (dx, dz) blocks from the camera: 0 in the view (its centre within the horizontal half
+  // field of view widened by its own half width as seen from the camera) or within NEAR_BLOCKS, 1 beside, 2 behind.
+  // (vx, vz): the unit view direction (flat); cosHalf: the cosine of the horizontal half field of view
+  S.viewTier = function (dx, dz, vx, vz, cosHalf, sinHalf) {
+    const d = Math.sqrt(dx * dx + dz * dz);
+    if (d < S.NEAR_BLOCKS || !(vx || vz)) return 0;
+    const c = (dx * vx + dz * vz) / d;
+    const ch = cosHalf > 0 && cosHalf < 1 ? cosHalf : 0.6, sh = sinHalf !== undefined ? sinHalf : Math.sqrt(1 - ch * ch);
+    const m = 12 / d;                                    // a column's half width seen from the camera (radians, d ≥ 24)
+    if (c >= ch * (1 - m * m * 0.5) - sh * m) return 0;  // cos(half + m), to second order
+    return c >= 0 ? 1 : 2;
+  };
   class UploadScheduler {
-    constructor(opts) { this.items = []; this.msPerByte = (opts && opts.msPerByte) || 2e-6; this.last = null; }
+    constructor(opts) {
+      const o = opts || {};
+      this.items = [];
+      this.cpuEst = o.msPerByte || 2e-6;   // the JS side of an upload, ms per byte
+      this.gpuEst = 0;                     // the GPU side (calibration, then the fence fit); 0 = not known
+      this.cal = 0;                        // the calibration, ms per byte (0 = none)
+      this.msPerByte = this.cpuEst;        // the estimate in use
+      this.targetMs = o.targetMs || S.TARGET_MS;
+      this.scale = 1; this.frameK = 1; this.debtMs = 0; this.medianMs = 0;
+      this.fr = new Float32Array(RING); this.frS = new Float32Array(RING); this.frN = 0; this.frI = 0; this.frC = 0;
+      this.hit = new Float64Array(RING).fill(-Infinity); this.hitI = 0;
+      this.sinceUp = 1e9;                  // frames since the last one that uploaded
+      this.fit = { w: 0, x: 0, y: 0, xx: 0, xy: 0, n: 0 };   // the fence fit's weighted sums
+      this.last = { ran: 0, spentMs: 0, forced: 0, left: 0, bytes: 0, budgetBytes: 0 };
+      this._spent = 0; this._clock = null;
+    }
     get size() { return this.items.length; }
-    // an item: run() does the upload; bytes size its estimate; x, z (absolute blocks) or dx, dz (relative) place it
-    push(item) { this.items.push({ key: item.key, col: item.col, x: item.x, z: item.z, bytes: item.bytes || 0, dx: item.dx || 0, dz: item.dz || 0, run: item.run, age: 0 }); }
-    // drops the queued items the predicate rejects (a column unloaded while its mesh waited)
-    prune(keep) { this.items = this.items.filter(it => keep(it)); }
-    drain(budgetMs, clock, vx, vz) {
-      const now = clock || (() => 0);
-      const order = this.items.map((it) => ({ it, p: S.viewPrio(it.dx, it.dz, vx || 0, vz || 0) }));
-      order.sort((a, b) => a.p - b.p);
-      const keep = [];
-      let spent = 0, ran = 0, forced = 0, blocked = false;
-      for (const { it } of order) {
-        if (blocked) { it.age++; keep.push(it); continue; }
-        const est = it.bytes * this.msPerByte;
-        if (spent + est > budgetMs + 1e-9) {
-          if (spent === 0 && est > budgetMs && it.age >= 4) forced++;
-          else { blocked = true; it.age++; keep.push(it); continue; }
-        }
-        const t0 = now();
-        it.run();
-        const ms = Math.max(0, now() - t0);
-        spent += ms; ran++;
-        if (it.bytes > 0) {
-          const per = ms / it.bytes;
-          this.msPerByte = per > this.msPerByte ? per : this.msPerByte * 0.8 + per * 0.2;
+    push(item) { item.age = 0; item.done = false; item.left = item.bytes || 0; item.p = 0; this.items.push(item); }
+    // drops the queued items the predicate rejects (a column unloaded while its mesh waited); their staging is given back
+    prune(keep) {
+      const a = this.items; let n = 0;
+      for (let i = 0; i < a.length; i++) { const it = a[i]; if (keep(it)) a[n++] = it; else if (it.abort) it.abort(); }
+      a.length = n;
+    }
+    // everything waiting is dropped (a world torn down): staged ranges go back to the arenas
+    clear() { const a = this.items; for (let i = 0; i < a.length; i++) if (a[i].abort) a[i].abort(); a.length = 0; this.debtMs = 0; }
+    // ---- the cost per byte
+    _est() { this.msPerByte = this.gpuEst > this.cpuEst ? this.gpuEst : this.cpuEst; }
+    // a CPU-side timing (a run or a step): a solid slower one (≥ 0.5 ms) counts at once, the rest eases in; timings under
+    // the clock's resolution say nothing
+    _cpu(bytes, ms) {
+      if (!(bytes > 0) || !(ms >= 0) || (ms < 0.25 && bytes < 262144)) return;
+      const per = ms / bytes;
+      this.cpuEst = per > this.cpuEst && ms >= 0.5 ? per : this.cpuEst * 0.8 + per * 0.2;
+      this._est();
+    }
+    // one measurement with gl.finish before and after: the whole path of `bytes` (the JS call, the GPU process, the copy)
+    // took `ms` — it replaces the constant both estimates started from
+    calibrate(ms, bytes) {
+      if (!(bytes > 0) || !(ms > 0)) return;
+      this.cal = ms / bytes; this.gpuEst = this.cal; this.cpuEst = this.cal;
+      const f = this.fit; f.w = 0; f.x = 0; f.y = 0; f.xx = 0; f.xy = 0; f.n = 0;
+      this._est();
+    }
+    // a frame's fence was seen signalled `lagMs` after it was set; the frame had uploaded `bytes` (0: a base-line frame)
+    gpuSample(bytes, lagMs) {
+      if (!(lagMs >= 0) || !(bytes >= 0)) return;
+      const f = this.fit, L = 0.995;   // (a memory of ~200 frames: the cost of the upload path is a property of the machine)
+      f.w = f.w * L + 1; f.x = f.x * L + bytes; f.y = f.y * L + lagMs; f.xx = f.xx * L + bytes * bytes; f.xy = f.xy * L + bytes * lagMs; f.n++;
+      if (f.n < 12) return;
+      const mx = f.x / f.w, vx = f.xx / f.w - mx * mx, sd = 0.2 * Math.max(mx, 16384);
+      if (!(vx > sd * sd)) return;                 // the frames' volumes too alike: no slope to tell
+      let b = (f.xy / f.w - mx * (f.y / f.w)) / vx;
+      const ref = this.cal || this.cpuEst;
+      b = b < ref * 0.5 ? ref * 0.5 : b > ref * 8 ? ref * 8 : b;
+      this.gpuEst = this.gpuEst ? this.gpuEst + (b - this.gpuEst) * 0.02 : b;
+      this._est();
+    }
+    // ---- the frame's budget
+    budgetMs(base) { return base > 0 ? base * this.scale * this.frameK : 0; }
+    budgetBytes(base) { return this.budgetMs(base) / this.msPerByte; }
+    // once a frame: the interval since the last frame (the frame the uploads of the frames before shared)
+    frame(ms, now) {
+      if (!(ms > 0) || ms > 4000) return;   // (a tab that slept, a breakpoint: nothing to learn)
+      const recent = this.sinceUp <= 3;
+      this.sinceUp++;
+      this.fr[this.frI] = ms; this.frI = (this.frI + 1) % RING; if (this.frN < RING) this.frN++;
+      if (this.frN < RING || (++this.frC & 7) === 0) {
+        const n = this.frN, s = this.frS;
+        for (let i = 0; i < RING; i++) s[i] = i < n ? this.fr[i] : Infinity;
+        s.sort();
+        this.medianMs = s[n >> 1];
+      }
+      const med = this.medianMs, T = this.targetMs;
+      this.frameK = med > T ? med / T : 1;
+      if (this.frN < 8) return;
+      const ref = med * 1.25 > T ? med * 1.25 : T;
+      if (ms > ref) { if (recent) this.scale = Math.max(S.SCALE_MIN, this.scale * 0.5); }
+      else if (ms < ref * 0.85) this.scale = Math.min(1, this.scale + 0.05);
+      if (ms > 2 * (med > 1000 / 60 ? med : 1000 / 60)) { this.hit[this.hitI] = now; this.hitI = (this.hitI + 1) % RING; }
+    }
+    hitches(now) { let k = 0; for (let i = 0; i < RING; i++) if (now - this.hit[i] <= S.HITCH_MS) k++; return k; }
+    mbps() { return 1 / (this.msPerByte * 1000); }   // MB/s at the estimate (decimal: bytes per µs)
+    // ---- the frame's uploads: budgetMs is the caller's (preset × rung); clock times the GL calls (none: not measured);
+    // (vx, vz) the unit view direction, cosHalf the cosine of the horizontal half field of view
+    drain(budgetMs, clock, vx, vz, cosHalf) {
+      const a = this.items, L = this.last;
+      L.ran = 0; L.spentMs = 0; L.forced = 0; L.bytes = 0;
+      // the dead go first, without spending bytes: their staging is given back
+      let n = 0;
+      for (let i = 0; i < a.length; i++) { const it = a[i]; if (it.alive && !it.alive()) { if (it.abort) it.abort(); continue; } a[n++] = it; }
+      a.length = n;
+      const avail0 = this.budgetMs(budgetMs);
+      if (!n) { L.left = 0; L.budgetBytes = avail0 / this.msPerByte; if (this.debtMs > 0) this.debtMs = Math.max(0, this.debtMs - avail0); return L; }
+      // the order, in place
+      const ch = cosHalf > 0 && cosHalf < 1 ? cosHalf : 0.6, sh = Math.sqrt(1 - ch * ch), ux = vx || 0, uz = vz || 0;
+      let far = false;
+      for (let i = 0; i < n; i++) { const it = a[i]; it.p = this._prio(it, ux, uz, ch, sh); if (it.lane === 1) far = true; }
+      for (let i = 1; i < n; i++) { const it = a[i], p = it.p; let j = i - 1; while (j >= 0 && a[j].p > p) { a[j + 1] = a[j]; j--; } a[j + 1] = it; }
+      // the frame's milliseconds after the debt of a forced frame
+      let avail = avail0 - this.debtMs;
+      if (avail < 0) { this.debtMs = -avail; avail = 0; } else this.debtMs = 0;
+      this._clock = clock || null; this._spent = 0;
+      this._lane(0, far ? avail * (1 - S.FAR_SHARE) : avail);
+      this._lane(1, avail);
+      this._lane(0, avail);
+      // the done ones out, the rest a frame older
+      let m = 0;
+      for (let i = 0; i < n; i++) { const it = a[i]; if (it.done) continue; it.age++; a[m++] = it; }
+      a.length = m;
+      if (this._spent > avail) this.debtMs += this._spent - avail;
+      if (L.bytes > 0) this.sinceUp = 0;
+      L.left = m; L.budgetBytes = avail / this.msPerByte;
+      this._clock = null;
+      return L;
+    }
+    _prio(it, vx, vz, ch, sh) {
+      if (it.urgent) return -3e9;
+      if (it.step && it.left > 0 && it.left < it.bytes) return -2e9;   // in progress: finish what was started
+      const dx = it.dx || 0, dz = it.dz || 0;
+      if (it.lane === 1) return it.prio !== undefined ? it.prio : Math.sqrt(dx * dx + dz * dz) / 1024;
+      return S.viewTier(dx, dz, vx, vz, ch, sh) * 1e7 + Math.sqrt(dx * dx + dz * dz);
+    }
+    // one pass over a lane, in order, until its cap is spent (the cap is cumulative over the frame)
+    _lane(lane, cap) {
+      const a = this.items, L = this.last, clk = this._clock;
+      for (let i = 0; i < a.length; i++) {
+        const it = a[i];
+        if (it.done || (it.lane === 1 ? 1 : 0) !== lane) continue;
+        const urgent = !!it.urgent, rem = cap - this._spent;
+        if (it.step) {
+          if (it.left > 0) {
+            let max = Infinity;
+            if (!urgent) { if (rem <= 0) return; max = Math.floor(rem / this.msPerByte); if (max < 16) return; }
+            const t0 = clk ? clk() : 0;
+            const b = it.step(max) || 0;
+            const ms = clk ? Math.max(0, clk() - t0) : 0;
+            if (b > 0) { it.left -= b; L.bytes += b; L.ran++; this._account(b, ms); }
+            if (it.left > 0) { if (urgent && b > 0) { i--; continue; } return; }
+          }
+          it.commit(); it.done = true;
+        } else {
+          const bytes = it.bytes || 0, est = bytes * this.msPerByte;
+          if (!urgent && est > rem + 1e-9) {
+            if (this._spent === 0 && est > cap && it.age >= 4) L.forced++;
+            else return;   // the first that does not fit stops its lane: nothing overtakes it
+          }
+          const t0 = clk ? clk() : 0;
+          it.run();
+          const ms = clk ? Math.max(0, clk() - t0) : 0;
+          it.done = true; L.ran++; L.bytes += bytes;
+          this._account(bytes, ms);
         }
       }
-      this.items = keep;
-      this.last = { ran, spentMs: spent, forced, left: keep.length };
-      return this.last;
+    }
+    _account(bytes, ms) {
+      const est = bytes * this.msPerByte;
+      if (this._clock) this._cpu(bytes, ms);
+      this._spent += ms > est ? ms : est;
+      this.last.spentMs += ms;
     }
   }
   S.UploadScheduler = UploadScheduler;
