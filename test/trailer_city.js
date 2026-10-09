@@ -229,7 +229,7 @@ if (T8) {
   const blockAt = (x, y, z) => { const ck = (x >> 4) + ',' + (z >> 4); let c = got.get(ck); if (!c) { c = g8.generate(x >> 4, z >> 4); got.set(ck, c); } return c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; };
   const topAt = (x, z) => { for (let y = 160; y > 60; y--) { const s = blockAt(x, y, z); if (s && (R.T.flags[s] & V.F.OPAQUE)) return y; } return -1; };
   let treads = 0, grass = 0, edges = 0, lit = 0;
-  for (const e of (T8.samples || []).slice(0, 120)) {
+  for (const e of (T8.samples || []).slice(0, 240)) {
     const [x, z, lvl, isEdge] = e; const y = topAt(x, z); if (y < 0) continue;
     if (isEdge) { edges++; if (/plaza_line/.test(nameOf(blockAt(x, y, z)))) lit++; }
     else { treads++; if (/grass_block|vm_crop_rows/.test(nameOf(blockAt(x, y, z))) || nameOf(blockAt(x, y + 1, z)) === 'vm_crop_rows') grass++; }
