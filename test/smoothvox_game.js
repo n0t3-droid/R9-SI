@@ -40,7 +40,8 @@ check(A.n > 200, `${names.size} models (${A.n} entries with the switched-off loo
 check([...names].every(n => !furn.has(n)), 'no piece with a hand-built mesh is in the list (hand-built meshes win)');
 const hand = A.list.filter(e => e.hand), firstHand = A.list.findIndex(e => e.hand);
 check(hand.length > 100 && hand.every(e => furn.has(e.name)) && A.list.slice(firstHand).every(e => e.hand), `the hand-built pieces have dormant entries after all the others (${hand.length}, from ${firstHand}: on only while the player's design of one is in — section 10)`);
-check(![...names].some(n => /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|tuft_grass)/.test(n)), 'no joiner (windows, gutters, downpipes, the garage door, the Nova tread) and no plants-pack piece');
+check(![...names].some(n => /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|tuft_grass|town_window_)/.test(n)), 'no joiner (windows — the Weißstadt\'s window cells too —, gutters, downpipes, the garage door, the Nova tread) and no plants-pack piece');
+check(['vm_town_lamp', 'vm_town_fountain', 'vm_town_awning_amber'].every(n => names.has(n)) && !names.has('vm_town_sign_bread') && !names.has('vm_town_stall_teal'), 'the Weißstadt\'s lamp, fountain and awnings are smooth; its signs (pictograms) and stalls (produce, jars) keep their voxels');
 check(['vm_living_sofa3_sage', 'vm_kitchen_espresso_steel', 'vm_deco_vases_trio', 'vm_light_floor_globe_brass', 'vm_sleep_wardrobe_fluted', 'vx_planter', 'vx_well'].every(n => names.has(n)), 'the Modern Living sofa, the espresso machine, the vases, the floor lamp, the wardrobe, the planter, the well are in it');
 const round2 = ['vm_sideboard', 'vm_piano', 'vm_fridge', 'vm_curtain', 'vm_nova_pad', 'vx_urn_white', 'vx_fountain'];
 check(round2.every(n => furn.has(n) && !names.has(n)), 'round II\'s hand-built pieces are not (the sideboard, the piano, the fridge, the curtain, the Nova pad, the urns, the fountain)');
