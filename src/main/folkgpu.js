@@ -3,8 +3,9 @@
 // A villager's look goes to a worker, which builds its rig (folkmodel.js buildPerson: real proportions at 32 voxels a
 // block — the rig's files are in the worker's bundle), cuts every part's grid to what it holds, makes it a surface-nets
 // mesh (folksmooth.js, kept in its LRU by the grid's hash: the villagers share sleeves, trousers and shoes) and hands back
-// ONE buffer for the whole person, each vertex naming its part, with the rig's joints. The game draws it with one draw a person (shaders.js VOX_VS with BONES: the rig's matrices as an
-// array), the same light as the voxel people (the vox program's shading, the CPU's terrain shade, the block light).
+// ONE buffer for the whole person, each vertex naming its part, with the rig's joints. The game draws it with one draw a
+// person (shaders.js VOX_VS with BONES: the rig's matrices as an array), the same light as the voxel people (the vox
+// program's shading, the CPU's terrain shade, the block light).
 // Until its mesh is there a villager shows its voxel self; beyond NEAR blocks it is the half-resolution voxel LOD as
 // before. The switch: Echte Menschen (settings.smoothFolk; off on Very Low and Low — game.js PRESETS — where nothing
 // here runs and no program is compiled). The meshes live on the GPU while they are used: past MAX_BYTES the ones not
@@ -229,7 +230,7 @@ void main() { float r = dot(v_q, v_q); if (r > 1.0) discard; float a = 1.0 - r; 
     gl.bindVertexArray(SH.vao);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
     gl.bindVertexArray(null);
-    gl.disable(gl.POLYGON_OFFSET_FILL); gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE);
+    gl.disable(gl.POLYGON_OFFSET_FILL); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE);
     if (r.stats) r.stats.draws++;
     FG.stats.shadows = n;
     return n;

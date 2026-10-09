@@ -77,7 +77,7 @@
   // the walker's own (advanced by FA.stride each pose), the rest the rig's.
   FA.gait = function (o) {
     const unit = o.unit || 32, scale = o.scale || 1, thigh = o.thigh, shin = o.shin;
-    return { unit, scale, hip: o.hip || thigh + shin, thigh, shin, L: thigh + shin, maxSwing: o.stride || 0.6, kid: !!o.kid, bpu: scale / unit, ph: o.ph || 0, S: 0, run: false };
+    return { unit, scale, hip: o.hip || thigh + shin, thigh, shin, L: thigh + shin, maxSwing: o.stride || 0.6, kid: !!o.kid, bpu: scale / unit, ph: o.ph || 0, S: 0, run: false, stoop: o.stoop || 0 };
   };
   const BETA_W = 0.6, BETA_R = 0.38;
   // the step length (blocks) at speed v (blocks a second)
@@ -238,6 +238,8 @@
     out = out || {};
     if (walkAmt > 0.01 && !cur.still) { if (G) FA.walkPerson(G, 1, tmpW); else FA.walk(walkPhase, 1, run, tmpW, k); FA.lerp(body, tmpW, Math.min(1, walkAmt), out); }
     else for (const j of JOINTS) { const o = out[j] || (out[j] = Z6()), b = body[j] || Z6(); for (let i = 0; i < 6; i++) o[i] = b[i]; }
+    // (an elder's back bends a little forward, the head comes up to look ahead)
+    if (G && G.stoop && !cur.still) { out.body[0] += G.stoop; out.head[0] -= G.stoop * 0.7; }
     return out;
   };
   // the states in which a person standing shifts its weight

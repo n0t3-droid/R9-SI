@@ -285,6 +285,11 @@ function walkRun(L, v, run, secs) {
   for (let i = 0; i < 20 * 30; i++) { const P = FA.pose(a, 'idle', 1 / 30, 0, 0, false, a.poseOut || (a.poseOut = {}), undefined, G); tx0 = Math.min(tx0, P.hips[3]); tx1 = Math.max(tx1, P.hips[3]); knee = Math.min(knee, P.shin_l[0], P.shin_r[0]); by0 = Math.min(by0, P.body[4]); by1 = Math.max(by1, P.body[4]); }
   check(tx1 - tx0 > 0.8 && knee < -0.08, `standing, the weight moves from leg to leg (the pelvis slides ${(tx1 - tx0).toFixed(2)} units, the free knee bends ${(-knee).toFixed(2)} rad)`);
   check(by1 - by0 > 0.2, `standing, the chest breathes (rises ${(by1 - by0).toFixed(2)} units)`);
+  // an elder stoops a little, standing and walking; the head comes up to look ahead
+  const E = Folk.look(111, 'elder', 'elder'), GE = Folk.gaitFor(E), b = { seedW: 5 };
+  const Ps = FA.pose(b, 'idle', 1 / 30, 0, 0, false, {}, undefined, GE);
+  FA.stride(GE, 1.5, 0.2, false); const Pw = FA.pose(b, 'idle', 1 / 30, 0, 1, false, {}, undefined, GE);
+  check(Ps.body[0] > 0.08 && Pw.body[0] > 0.08 && Ps.head[0] < -0.05, `an elder stoops (the back ${Ps.body[0].toFixed(2)} rad standing, ${Pw.body[0].toFixed(2)} walking; the head up ${(-Ps.head[0]).toFixed(2)})`);
 }
 {
   // the head: a person looking at something 90° to its right turns the head 40° at most, the shoulders the rest

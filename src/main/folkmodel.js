@@ -578,7 +578,7 @@
   // draw scale, the widest swing the clothes allow — without building the model (the villagers' pose needs it each frame)
   V.gaitFor = function (L) {
     const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult;
-    return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[V.familyOf(L)] || 0.6, kid });
+    return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[V.familyOf(L)] || 0.6, kid, stoop: L.age === 'elder' ? 0.12 : 0 });
   };
   function buildPerson(L) {
     const kid = L.age === 'child', elder = L.age === 'elder';
