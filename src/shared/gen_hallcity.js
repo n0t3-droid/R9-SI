@@ -38,12 +38,39 @@
     PR: 12, PV: 13,                                             // the plaza's radius; its clearing |v| ≤ 13
     ARC: 18, CLR: 22, SPR: 31, TOP: 40, AIS: 22, AISTOP: 26, WALLTOP: 23,
     GAL: 8, STAIR0: 42, GAL0: 50,                               // the gallery's height, the stair's first step (v), the gallery's front edge (v)
-    GLASS: 22, AGL0: 32, AGL1: 41,                              // the vault's glass panels |u| ≤ 22 (the half dome's d ≤ 22), the aisle vaults' 32–41
+    GLASS: 26, AGL0: 32, AGL1: 41,                              // the vault's glass panels |u| ≤ 26, to the springing (the half dome's d ≤ 26), the aisle vaults' 32–41
     LOT: { w: 12, d: 18, house: 12 },                           // a shop house's lot: 12 along the street, 18 deep (front 2, house 12, yard 4)
     RAD: 112, VGEN: 9,
   };
   VG.hallOn = (g) => !!(g && g.vgen >= H.VGEN);
   VG.hallFrame = (site) => (site.seed >>> 3) & 3;
+  // the sky over a hall city stays clear: no floating island over it (vgen 9). The light engine's sky light falls straight
+  // down a column (light_local.js), so an island anywhere over the hall shut its light off below — run 3's apse and the
+  // vault over the plaza were black under seed 53's islands, whose bottoms hung 2 blocks over the roof (and one floated
+  // on the roof seen from outside). An island cell whose island could reach within the hall's radius of a hall city's
+  // centre holds no island; the site cells it asks are the ones a chunk job computes first (VG.cellNeeds: the 3 × 3
+  // around the chunk), and the answer is kept per island cell. The far views read the same cells (far.js, lod.js).
+  VG.hallSkyClear = function (g, I) {
+    const C = VG.cell(g), reach = H.RAD + I.r * 1.4 + 8;
+    for (let j = Math.floor((I.z - reach) / C); j <= Math.floor((I.z + reach) / C); j++) for (let i = Math.floor((I.x - reach) / C); i <= Math.floor((I.x + reach) / C); i++) {
+      const s = VG.site(g, i, j);
+      if (s && s.style === 'hall' && (s.x - I.x) * (s.x - I.x) + (s.z - I.z) * (s.z - I.z) < reach * reach) return true;
+    }
+    return false;
+  };
+  const OGp = VR.OverworldGen && VR.OverworldGen.prototype;
+  if (OGp && OGp.islandCell && !OGp.islandCell.hallSky) {
+    const prevCell = OGp.islandCell;
+    OGp.islandCell = function (i, j) {
+      const I = prevCell.call(this, i, j);
+      if (!I || !(this.vgen >= H.VGEN) || this.singleBiome >= 0) return I;
+      const memo = this._hallSky || (this._hallSky = new Map()), key = (i + 1048576) * 2097152 + (j + 1048576);
+      let clear = memo.get(key);
+      if (clear === undefined) { if (memo.size > 4000) memo.clear(); clear = VG.hallSkyClear(this, I); memo.set(key, clear); }
+      return clear ? null : I;
+    };
+    OGp.islandCell.hallSky = true;
+  }
   // the nave vault's height at a distance a from the axis (and the half dome's at a distance a from the apse's centre)
   const hN = (a) => Math.round(H.SPR + (H.TOP - H.SPR) * Math.sqrt(Math.max(0, 1 - a / H.AR)));
   // the aisle vault's height at |u| = a
