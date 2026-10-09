@@ -493,6 +493,7 @@
       const body = $('#setbody');
       body.innerHTML = '';
       if (this.settingsKeys) { if (VR.SettingsPanel) VR.SettingsPanel.keys(this, body); return; }
+      if (!this.benchMsg && this.settingsTab === 'img' && VR.Sweep) { const last = VR.Sweep.last(); if (last) this.benchMsg = { run: false, sweep: true, text: VR.Sweep.text(last) }; }   // the last Stufentest
       if (this.benchMsg && this.settingsTab === 'img') body.appendChild(this.benchBox());
       if (this.settingsTab === 'play') this.buildLangPanel(body);
       if (VR.SettingsPanel) VR.SettingsPanel.render(this, body, this.settingsTab);
@@ -502,12 +503,21 @@
     settingsAct(name) {
       if (name === 'keys') { this.settingsKeys = true; this.showSettings(); }
       else if (name === 'bench') { if (!this.game.bench) this.game.benchStart(); }
+      else if (name === 'sweep') { if (this.game.sweepStart && !this.game.sweepStart()) this.hint && this.hint(T('g.sweep.none'), 2400); }
     }
     benchBox() {
       const m = this.benchMsg || {}, box = el('div', 'benchbox' + (m.run ? ' run' : ''));
       box.id = 'benchbox'; box.setAttribute('role', 'status');
-      box.innerHTML = `<b>⚡ ${esc(T('g.bench.title'))}</b> <span class="bt">${esc(m.text || '')}</span>`;
+      box.innerHTML = m.sweep ? `<b>📊 ${esc(T('g.sweep.title'))}</b> <span class="bt">${esc(m.text || '')}</span>` : `<b>⚡ ${esc(T('g.bench.title'))}</b> <span class="bt">${esc(m.text || '')}</span>`;
       return box;
+    }
+    // 📊 Stufentest: the progress and the table go through the same box; the last table is shown when the settings open
+    sweepStep(p, i, n) { this.benchMsg = { run: true, sweep: true, text: T('g.sweep.run', { p: VR.Sweep.name(p), i, n }) }; if (this.screen === 'settings') this.showSettings(); }
+    sweepDone(r) {
+      const text = VR.Sweep.text(r);
+      this.benchMsg = { run: false, sweep: true, text };
+      if (this.screen === 'settings') this.showSettings();
+      else if (this.game.state === 'play' && this.toast) this.toast('📊 ' + T('g.sweep.title'), text);
     }
     benchBegin() { this.benchMsg = { run: true, text: T('g.bench.run', { s: 3 }) }; if (this.screen === 'settings') this.showSettings(); }
     benchDone(r) {
