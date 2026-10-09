@@ -782,7 +782,7 @@
       }
       return line;
     };
-    const EV = info.entryV, PS = C.PS;
+    const EV = info.entryV, PS = o.pathU !== undefined ? o.pathU : C.PS;   // (the city asks the hero lot for a straight path on its axis)
     // the front: the path from the street (PS ± 2) to the apron in front of the door, four rows deep
     band([PS, -1], [PS, EV - 2], [EU + 0.5, EV - 3], 2.05);
     for (let v = EV - 3; v <= EV - 1; v++) for (let u = EU - 3; u <= EU + 3; u++) if (!houseAt(u, v)) paved.add(u + ',' + v);

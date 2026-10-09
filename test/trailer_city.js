@@ -183,8 +183,8 @@ if (city) {
   let doorOk = 0, doorBad = [];
   const kerbComp = new Set(); for (const rd of roads) for (const side of ['L', 'R']) for (const c of ((rd.kerb && rd.kerb[side]) || []).slice(0, 1)) for (const k of comp(c[0] + ',' + c[1])) kerbComp.add(k);
   for (const lot of lots) {
-    const ap = lot.apron || []; // the line cells of the lot's path at the door
-    if (ap.length && ap.every(c => LINE.has(c[0] + ',' + c[1])) && ap.some(c => kerbComp.has(c[0] + ',' + c[1]))) doorOk++; else doorBad.push(lot.comp + '@' + lot.ox + ',' + lot.oz);
+    const ap = lot.apron || []; // the line cells of the lot's path round the apron in front of its door
+    if (ap.length >= 2 && ap.every(c => LINE.has(c[0] + ',' + c[1])) && ap.some(c => kerbComp.has(c[0] + ',' + c[1]))) doorOk++; else doorBad.push(lot.comp + '@' + lot.ox + ',' + lot.oz + '(' + ap.length + ')');
   }
   check(lots.length >= 10 && doorOk === lots.length, `the light line runs unbroken from the road to every door (${doorOk} of ${lots.length} lots${doorBad.length ? '; not: ' + doorBad.slice(0, 5).join(' ') : ''})`);
   const amber = lots.filter(l => (l.mouth || []).some(c => cnm(c[0], LINE.get(c[0] + ',' + c[1]), c[1]) === 'vx_floor_plaza_line_amber')).length;
@@ -194,11 +194,12 @@ if (city) {
   // palms along the roads: per road side, consecutive palms 6–9 blocks apart along the road (a path mouth or a
   // junction may push one up to 3 blocks on)
   let gaps = 0, badGap = [];
-  for (const rd of roads) for (const side of ['L', 'R']) { const ps = ((rd.palms && rd.palms[side]) || []).map(p => p[2]).sort((a, b) => a - b); for (let i = 1; i < ps.length; i++) { gaps++; const d = ps[i] - ps[i - 1]; if (d < 5 || d > 12) badGap.push(`${rd.name}.${side} ${d}`); } }
+  // (a side's palms come in runs: a run ends where the side has no room for one — a junction, the plaza)
+  for (const rd of roads) for (const side of ['L', 'R']) for (const run of ((rd.palms && rd.palms[side]) || [])) { const ps = run.map(p => p[2]); for (let i = 1; i < ps.length; i++) { gaps++; const d = ps[i] - ps[i - 1]; if (d < 6 || d > 12) badGap.push(`${rd.name}.${side} ${d}`); } }
   const palmN = (plan8.palms || []).length;
   check(gaps >= 20 && badGap.length === 0, `palms along the roads every 6–9 blocks (${gaps} gaps${badGap.length ? '; off: ' + badGap.slice(0, 6).join(', ') : ''}), ${palmN} palms in the city`);
   // the trunks really stand: a palm trunk under every road palm's crown
-  let trunks = 0, palmsRoad = 0; for (const rd of roads) for (const side of ['L', 'R']) for (const p of ((rd.palms && rd.palms[side]) || [])) { palmsRoad++; if (cnm(p[0], p[3], p[1]) === 'vx_palm_trunk') trunks++; }
+  let trunks = 0, palmsRoad = 0; for (const rd of roads) for (const side of ['L', 'R']) for (const run of ((rd.palms && rd.palms[side]) || [])) for (const p of run) { palmsRoad++; if (cnm(p[0], p[3], p[1]) === 'vx_palm_trunk') trunks++; }
   check(palmsRoad > 0 && trunks === palmsRoad, `every road palm has its trunk (${trunks} of ${palmsRoad})`);
   const lampN = (plan8.lamps || []).filter(l => /lamppost_tech/.test(cnm(l[0], l[1], l[2]))).length;
   check(lampN >= total / 16, `tech lamps with cyan heads along the roads (${lampN} for ${total} blocks of road)`);

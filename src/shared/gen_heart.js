@@ -249,7 +249,7 @@
         const C = HEART.CITY;
         if (Math.floor(C.x / CELL) === i && Math.floor(C.z / CELL) === j) {
           const rng = new VR.RNG(M.hash2(7, 7, g.seed + 90210));
-          const site = { id: i + '_' + j, i, j, x: C.x, z: C.z, y: HEART.PLAT + 1, style: 'tech', biome: 'sky_meadow', seed: rng.int(1 << 30), name: null, home: true, rad: C.rad };
+          const site = { id: i + '_' + j, i, j, x: C.x, z: C.z, y: HEART.PLAT + 1, style: 'tech', biome: 'sky_meadow', seed: rng.int(1 << 30), name: null, home: true, rad: g.vgen >= 8 ? 130 : C.rad };   // vgen 8: Nova Haven's lots and crescents (gen_city.js) reach further out
           site.name = 'Nova Haven';
           g._homeFound = true;
           return site;
