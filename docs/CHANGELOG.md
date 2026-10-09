@@ -108,6 +108,34 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### ✦ Form trotz Voxel, a world without hitches, the Weißstadt's splendour, Friedlich (v0.45)
+**✦ Form trotz Voxel.** Any voxel volume becomes a smooth surface (naive surface nets, Laplacian passes clamped to
+±0.35 voxel, creases at material changes): 196 VM models and 19 VX pieces are drawn smooth; a fine 32-cells-a-block
+mesh within a quarter of the detail radius on Ausgewogen and up; a piece reshaped in the Studio shows its new design.
+The Studio's ✦ Formen tools — Drehkörper, Extrusion entlang Pfad, Abrunden, Kugel/Zylinder/Kegel — and ✦ Glatt on
+every card. Smooth-mesh jobs queue behind terrain.
+
+**🌊 A world without hitches.** Uploads to the GPU are paid in bytes from a measured price (a 1 MB calibration at world
+start, a ring of four fences, a weighted ms-per-byte fit); the budget shrinks after an overrun and grows with headroom;
+meshes go up in packets that may straddle frames while the old mesh keeps drawing; the queue is sorted by the view every
+frame; one budget for horizon tiles, far forms, VX detail and the look textures; a hitch meter in F3. In the model of
+the owner's machine (15 ms/MB): Balanced hitches 12 → 5, upload-caused 6 → 0.
+
+**🏛 The Weißstadt's splendour (round 2, in progress).** Relief façades — plinth, pilasters at the bay edges, cornices
+at every storey, the three-wide arched window with its archivolt —, the entrance gable crowned; the staircase, the
+market aisle and the exterior follow in v0.46.
+
+**🌿 Beauty fixes.** No random ruins in the designed land; a turning circle at every cul-de-sac on the level land in
+front of the terraces; no blank wall on a Villa Nova; the Gate Plaza's round trees in raised beds; a waterfall's spring
+pool takes the grass off its cell; a fall off a floating island breaks up into mist; no sulphur spring in the designed
+land. (The audit found two camera placements inside terrain — a test defect, fixed.)
+
+**☮ Friedlich by default.** A new world is peaceful unless the player picks otherwise: no raider drones, no fights.
+The living world — ships that stay on the pad with their crew, the Regisseur des Lebens, the lantern lighter at dusk —
+real people instead of block people (the rig measured 3.9 heads tall — the toy look — now corrected toward 7.5),
+the land between the landmarks (paths, forests, fields, a river) and the perfected day sky are the fronts of v0.46.
+Ultra · Leicht for weak PCs (the tiled shadow map, the far cache, streaming in step) lands with them.
+
 ### 🏛 Weißstadt, the trailer's sky, no crystals, 📊 Stufentest (v0.44)
 **🏛 The Weißstadt hall city (vgen 9).** The villages of every climate get the airing the owner's references ask for —
 streets five wide, a plaza with a fountain, lots 1.6 × — and the Weißstadt stands INSIDE a vast white vaulted hall:
