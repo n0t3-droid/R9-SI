@@ -309,6 +309,10 @@
       const ux = ahead ? (this.mvx / speed) : 0, uz = ahead ? (this.mvz / speed) : 0;
       const lcx = Math.round(pcx + ux * ahead), lcz = Math.round(pcz + uz * ahead);
       this.loadCenter = [lcx, lcz];
+      // F9 · Weltgenerierung im Takt: the columns that arrived are integrated within half the frame's streaming budget
+      // (at least one a frame); the queued jobs follow the player
+      if (this.arrivals && this.arrivals.length) this.integrate(pcx, pcz, lcx, lcz, this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : undefined);
+      if (this.streamTakt && VR.UL && this.frame % 15 === 0) this.reprio(pcx, Math.floor(py) >> 4, pcz, lcx, lcz, ux, uz, ahead);
       // request missing columns (nearest first, bounded) — the scan runs every other frame
       const want = [];
       if (this.frame & 1) for (let dz = -loadR; dz <= loadR; dz++) for (let dx = -loadR; dx <= loadR; dx++) {
@@ -354,6 +358,8 @@
       this.pending.set(k, true);
       const epoch = this.styleEpoch || 0;
       const onGen = (m) => {
+        // F9 · Weltgenerierung im Takt: the column waits for the frame (integrate); its request stays pending until then
+        if (m.type === 'gen' && this.streamTakt && !this.dead) { (this.arrivals || (this.arrivals = [])).push({ k, m, epoch }); return; }
         this.pending.delete(k);
         if (m.type === 'error') { (this.failed || (this.failed = new Map())).set(k, performance.now()); return; }   // asked again after a pause
         if (m.type !== 'gen') return;
@@ -363,7 +369,11 @@
         this.onColumn(m);
       };
       // a request the player has flown away from is dropped when its turn comes
-      const cancel = () => { if (this.dead) return true; const lc = this.loadCenter || this.center; if (!lc) return false; const dx = cx - lc[0], dz = cz - lc[1], r = this.renderDist + 3; return dx * dx + dz * dz > r * r; };
+      const cancel = () => {
+        if (this.dead) return true; const lc = this.loadCenter || this.center; if (!lc) return false;
+        if (this.streamTakt && VR.UL) { const pc = this.center || lc, sp = Math.hypot(this.mvx || 0, this.mvz || 0), mv = sp > 2; return VR.UL.Stream.away(cx - lc[0], cz - lc[1], cx - pc[0], cz - pc[1], this.renderDist, mv ? this.mvx / sp : 0, mv ? this.mvz / sp : 0, mv); }   // F9: left behind
+        const dx = cx - lc[0], dz = cz - lc[1], r = this.renderDist + 3; return dx * dx + dz * dz > r * r;
+      };
       if (this.savedKeys.has(k) && this.store) {
         this.store.loadColumn(this.dim, cx, cz).then((blocks) => {
           if (this.dead) return;
@@ -468,6 +478,42 @@
     }
     destroy() { this.dead = true; for (const c of this.cols.values()) for (const s of c.sec) if (s.hasMesh) this.renderer.freeSection(s); this.cols.clear(); }
 
+    // ---------- F9 · Weltgenerierung im Takt (streamTakt; the rules: ultralite.js UL.Stream) ----------
+    // the columns that arrived, nearest first, until the budget (ms) is spent — at least one a frame (none dropped counts);
+    // one the player has left beyond the unload radius is dropped (its request is done; the scan asks again if needed)
+    integrate(pcx, pcz, lcx, lcz, budgetMs) {
+      const A = this.arrivals; if (!A || !A.length) return 0;
+      const d2 = (a) => (a.m.cx - pcx) * (a.m.cx - pcx) + (a.m.cz - pcz) * (a.m.cz - pcz);
+      if (A.length > 1) A.sort((a, b) => d2(a) - d2(b));
+      const t0 = performance.now(), ur = this.renderDist + 3;
+      let n = 0;
+      while (A.length) {
+        if (n > 0 && budgetMs !== undefined && performance.now() - t0 >= budgetMs) break;
+        const a = A.shift();
+        this.pending.delete(a.k);
+        if (this.dead || a.epoch !== (this.styleEpoch || 0) || this.cols.has(a.k)) continue;
+        const ex = a.m.cx - lcx, ez = a.m.cz - lcz;
+        if (d2(a) > ur * ur && ex * ex + ez * ez > ur * ur) continue;
+        this.onColumn(a.m); n++;
+      }
+      this.stats.integrated = (this.stats.integrated || 0) + n; this.stats.arrivals = A.length;
+      return n;
+    }
+    // the queued generations and meshes get their places again from where the player is now
+    reprio(pcx, pcy, pcz, lcx, lcz, ux, uz, ahead) {
+      const q = this.pool && this.pool.queue; if (!q || !q.length) return;
+      const ST = VR.UL.Stream;
+      for (const j of q) {
+        const m = j.msg; if (!m) continue;
+        if ((m.type === 'gen' || m.type === 'relight') && m.cx !== undefined) j.prio = ST.genPrio(m.cx - pcx, m.cz - pcz, ux, uz, ahead);
+        else if (m.type === 'mesh' && m.ox !== undefined && j.prio > -1e8) {   // (an urgent mesh — a block the player set — stays first)
+          const cx = m.ox >> 4, cz = m.oz >> 4, dx = cx - pcx, dz = cz - pcz, ex = cx - lcx, ez = cz - lcz, dy = m.sy - pcy;
+          j.prio = Math.min(dx * dx + dz * dz, ex * ex + ez * ez) + dy * dy * 0.5;
+        }
+      }
+      this.pool.queueDirty = true;
+    }
+
     // ---------- streaming: the fade-in and the upload budget (F8 · Sichtweite) ----------
     // A column is shown once every one of its sections is meshed (or known empty). From then on it fades in over 300 ms:
     // the terrain shader dithers its sections in and the far tiles under it are cut by the same thresholds (horizon.js,
@@ -502,7 +548,8 @@
       q.prune(it => !this.dead && this.cols.get(it.key) === it.col);
       for (const it of q.items) { it.dx = it.x - px; it.dz = it.z - pz; }
       const vd = this.viewDir || [0, 0];
-      const r = q.drain(this.uploadBudget(), () => performance.now(), vd[0], vd[1]);
+      const tk = this.streamTakt && VR.UL && this.streamMs !== undefined;   // F9: within the frame's streaming budget, 2 MB at most
+      const r = q.drain(tk ? Math.min(this.uploadBudget(), this.streamMs) : this.uploadBudget(), () => performance.now(), vd[0], vd[1], tk ? VR.UL.Stream.BYTES : undefined);
       this.stats.uploadMs = r.spentMs; this.stats.uploadQueue = r.left;
       this.stats.uploaded = (this.stats.uploaded || 0) + r.ran;
     }
@@ -520,6 +567,7 @@
       // F8: a job starts on the main thread (its padded block copy), so the starts share the frame's streaming budget too:
       // four jobs per millisecond of the upload budget (6 on Very Low), fewer as the governor drops the streaming rung
       budget = Math.min(budget, Math.max(2, Math.round(this.uploadBudget() * 4)));
+      if (this.streamTakt && VR.UL && this.streamMs !== undefined) budget = Math.min(budget, VR.UL.Stream.jobs(this.streamMs));   // F9: the frame's headroom
       if (budget <= 0) return;                               // the workers are full: not even a look around (most frames while the world streams in)
       const rd = this.renderDist, r2 = (rd + 0.5) * (rd + 0.5);
       if (lcx === undefined) { lcx = pcx; lcz = pcz; }
