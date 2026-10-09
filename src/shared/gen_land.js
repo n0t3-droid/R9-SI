@@ -901,6 +901,216 @@
     P.furnBy = null;
   });
 
+  // ============================================================================ the farmsteads
+  // At every farm site (the way ends in its yard): a farmhouse and a barn facing the yard (the villages' own builders,
+  // VG.building), a well, two to four crop fields (VG.farm: a fence round each, a gate toward the yard, a water channel
+  // down the middle, a scarecrow in the first), a fenced pasture with a trough, hay and a lean-to (its herd an animal
+  // anchor), an orchard, at two farms a windmill (its sails round a hub: the pivot, a `windmill` spawn), at one a
+  // vineyard on a slope, at the others a field of sunflowers or lavender rows; earth lanes from the yard to the gates.
+  // Every piece stands on open land: no way, no other piece, ground within a few blocks of level.
+  const ROT4 = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
+  LAND.ROT4 = ROT4;
+  const lotRect = (ox, oz, r, w, d) => { const a = ROT4[r](0, 0), b = ROT4[r](w - 1, d - 1); return [ox + Math.min(a[0], b[0]), oz + Math.min(a[1], b[1]), ox + Math.max(a[0], b[0]), oz + Math.max(a[1], b[1])]; };
+  LAND.lotRect = lotRect;
+  // a free spot for a w × d lot within rMin…rMax of (sx, sz), its front facing (sx, sz): {ox, oz, r, rect, F, lo, hi}
+  function findLot(g, P, gy, rng, sx, sz, w, d, rMin, rMax, maxVar, taken, gap) {
+    for (let k = 0; k < 220; k++) {
+      const ang = rng.next() * Math.PI * 2, dist = rMin + rng.next() * (rMax - rMin), cx = sx + Math.cos(ang) * dist, cz = sz + Math.sin(ang) * dist;
+      const dx = sx - cx, dz = sz - cz, r = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 1 : 3) : (dz > 0 ? 2 : 0);
+      const c = ROT4[r]((w - 1) / 2, (d - 1) / 2), ox = Math.round(cx - c[0]), oz = Math.round(cz - c[1]);
+      const R0 = lotRect(ox, oz, r, w, d);
+      if (taken.some(t => R0[0] <= t[2] + gap && R0[2] >= t[0] - gap && R0[1] <= t[3] + gap && R0[3] >= t[1] - gap)) continue;
+      let ok = true, lo = 999, hi = -999, sum = 0, n = 0;
+      for (let z = R0[1] - 2; z <= R0[3] + 2 && ok; z += 2) for (let x = R0[0] - 2; x <= R0[2] + 2; x += 2) {
+        if (LAND.zoneAt(g, x, z) || (LAND.keepAt(P, x, z) & (1 | 2 | 4 | 16)) || nearViaduct(g, x, z)) { ok = false; break; }
+        const y = gy(x, z); if (y <= SEA + 2) { ok = false; break; }
+        if (x >= R0[0] && x <= R0[2] && z >= R0[1] && z <= R0[3]) { lo = Math.min(lo, y); hi = Math.max(hi, y); sum += y; n++; }
+      }
+      if (!ok || hi - lo > maxVar) continue;
+      for (let z = R0[1] - 1; z <= R0[3] + 1 && ok; z++) for (let x = R0[0] - 1; x <= R0[2] + 1; x++) if (P.cells.has(ck(x, z))) { ok = false; break; }
+      if (!ok) continue;
+      return { ox, oz, r, rect: R0, F: Math.round(sum / n), lo, hi };
+    }
+    return null;
+  }
+  LAND.findLot = findLot;
+  LAND.PIECES.unshift(function farms(g, P, K) {
+    const VG = VR.VillageGen; if (!VG || !VG.makeLot || !VG.building || !VG.farm) return;
+    const gy = groundOf(g, P), farmSites = P.sites.filter(s => s.kind === 'farm');
+    P.farms = [];
+    farmSites.forEach((site, fi) => {
+      const rng = new VR.RNG((M.hash2(site.x, site.z, g.seed ^ 0xfa53)) >>> 0);
+      const style = fi % 2 ? 'taiga' : 'meadow', S = VG.STYLES[style], taken = [], FM = { site, pieces: [], fields: [], gates: [] };
+      const put = K.put, LOT = (o) => VG.makeLot(put, o.ox, o.oz, o.r);
+      // the yard: gravel and coarse earth round the way's end, kept free
+      const yy = gy(site.x, site.z);
+      for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) { if (dx * dx + dz * dz > 27) continue; const x = site.x + dx, z = site.z + dz; if (P.cells.has(ck(x, z))) continue; const y = gy(x, z); if (Math.abs(y - yy) > 2) continue; put(x, y, z, h01(x, z, 41) < 0.55 ? st('coarse_dirt') : st('gravel')); }
+      taken.push([site.x - 6, site.z - 6, site.x + 6, site.z + 6]); markKeep(P, site.x - 6, site.z - 6, site.x + 6, site.z + 6, LAND.KEEP.PIECE);
+      const claim = (L, kind) => { taken.push(L.rect); markKeep(P, L.rect[0] - 3, L.rect[1] - 3, L.rect[2] + 3, L.rect[3] + 3, kind === 'field' ? LAND.KEEP.FIELD : LAND.KEEP.PIECE); };
+      const lane = (L, gu, gv) => {
+        // an earth lane from the gate (lot-local gu, gv − 1) back to the yard
+        const q = ROT4[L.r](gu, gv - 1), x0 = L.ox + q[0], z0 = L.oz + q[1], n = Math.round(Math.hypot(site.x - x0, site.z - z0));
+        for (let i = 0; i <= n; i++) { const x = Math.round(x0 + (site.x - x0) * i / n), z = Math.round(z0 + (site.z - z0) * i / n); if (Math.hypot(x - site.x, z - site.z) < 5) break; if (P.cells.has(ck(x, z)) || taken.some(t => x >= t[0] && x <= t[2] && z >= t[1] && z <= t[3] && t !== L.rect)) continue; put(x, gy(x, z), z, st('dirt_path')); P.keep[keepIdx(x, z)] |= LAND.KEEP.WAY; }
+      };
+      // ---- the farmhouse and the barn
+      const walls = S.walls[rng.int(S.walls.length)], roof = S.roofs[rng.int(S.roofs.length)], win = S.windows[rng.int(S.windows.length)];
+      const hw = 7 + rng.int(2) * 2, hd = 7 + rng.int(2);
+      const H = findLot(g, P, gy, rng, site.x, site.z, hw, hd, 9, 17, 3, taken, 3);
+      if (H) {
+        const L = LOT(H); claim(H, 'house');
+        const F = H.hi + 1;
+        VG.building(L, { w: hw, d: hd, floors: rng.chance(0.5) ? 2 : 1, F, style, rng, kind: 'farmhouse', beds: 2, walls, roof, window: win, wood: S.wood, chimney: true, seed: rng.int(1 << 20), ground: (u, v) => { const q = ROT4[H.r](u, v); return gy(H.ox + q[0], H.oz + q[1]); } });
+        { const q = ROT4[H.r]((hw >> 1) - 2, -2), lx = H.ox + q[0], lz = H.oz + q[1], ly = gy(lx, lz); put(lx, ly + 1, lz, st('oak_fence')); put(lx, ly + 2, lz, st('oak_fence')); put(lx, ly + 3, lz, st('lantern', { hanging: 0 })); }
+        FM.pieces.push({ kind: 'farmhouse', rect: H.rect, F }); P.pieces.push({ kind: 'farmhouse', x: Math.round((H.rect[0] + H.rect[2]) / 2), z: Math.round((H.rect[1] + H.rect[3]) / 2), y: F, farm: site.id, rect: H.rect });
+      }
+      const bw = 9 + rng.int(2) * 2, bd = 11 + rng.int(3);
+      const Bn = findLot(g, P, gy, rng, site.x, site.z, bw, bd, 12, 26, 3, taken, 4);
+      if (Bn) {
+        const L = LOT(Bn); claim(Bn, 'barn');
+        const F = Bn.hi + 1;
+        VG.building(L, { w: bw, d: bd, floors: 1, F, style, rng, kind: 'barn', walls: style === 'taiga' ? 'vx_siding_red' : (rng.chance(0.5) ? 'vx_siding_red' : 'vx_logwall'), roof: style === 'taiga' ? 'slate' : roof, window: 'vx_window_wood', wood: S.wood, seed: rng.int(1 << 20), ground: (u, v) => { const q = ROT4[Bn.r](u, v); return gy(Bn.ox + q[0], Bn.oz + q[1]); } });
+        for (const [u, v, h] of [[1, bd - 2, 3], [2, bd - 2, 2], [1, bd - 3, 2], [bw - 2, bd - 2, 2]]) for (let y = F + 1; y < F + 1 + h; y++) L.P(u, y, v, 'vx_hay');
+        L.P(bw - 2, F + 1, -1, 'vx_hay'); L.P(bw - 2, F + 2, -1, 'vx_hay'); L.P(1, F + 1, -1, 'vx_wheelbarrow', { facing: 0 });
+        FM.pieces.push({ kind: 'barn', rect: Bn.rect, F }); P.pieces.push({ kind: 'barn', x: Math.round((Bn.rect[0] + Bn.rect[2]) / 2), z: Math.round((Bn.rect[1] + Bn.rect[3]) / 2), y: F, farm: site.id, rect: Bn.rect });
+      }
+      // ---- the well in the yard's edge
+      { const a = rng.next() * 6.283, x = Math.round(site.x + Math.cos(a) * 4.5), z = Math.round(site.z + Math.sin(a) * 4.5); if (!P.cells.has(ck(x, z))) { put(x, gy(x, z) + 1, z, st('vx_well')); P.pieces.push({ kind: 'well', x, z, y: gy(x, z) + 1, farm: site.id }); } }
+      // ---- the windmill (farm_c and the third farm)
+      if (fi === 0 || fi === 2) {
+        const Wm = findLot(g, P, gy, rng, site.x, site.z, 5, 5, 16, 34, 2, taken, 4);
+        if (Wm) { claim(Wm, 'windmill'); windmill(g, P, K, Wm, gy, rng, site); }
+      }
+      // ---- the pasture
+      const pw = 13 + rng.int(4), pd = 15 + rng.int(5);
+      const Pa = findLot(g, P, gy, rng, site.x, site.z, pw, pd, 18, 46, 5, taken, 3);
+      if (Pa) { claim(Pa, 'pasture'); pasture(g, P, K, Pa, pw, pd, gy, rng, site); lane(Pa, pw >> 1, 0); }
+      // ---- the crop fields (two to four)
+      const nf = 2 + rng.int(3);
+      for (let k = 0; k < nf; k++) {
+        const fw = 11 + rng.int(3) * 2, fd = 13 + rng.int(5);
+        const Fl = findLot(g, P, gy, rng, site.x, site.z, fw, fd, 16, 60, 3, taken, 2);
+        if (!Fl) continue;
+        claim(Fl, 'field');
+        const L = LOT(Fl), F = Math.max(Fl.lo, Fl.F);
+        const info = VG.farm(L, { w: fw, d: fd, F, rng, style: 'meadow', ground: (u, v) => { const q = ROT4[Fl.r](u, v); return gy(Fl.ox + q[0], Fl.oz + q[1]); } });
+        L.P(fw >> 1, F + 1, 0, 'oak_fence_gate', { facing: 0, open: 0 });
+        // the field's ground under the fill: what VG.farm leaves above F + 3 on a high corner is cleared too
+        for (let u = 0; u < fw; u++) for (let v = 0; v < fd; v++) { const q = ROT4[Fl.r](u, v), x = Fl.ox + q[0], z = Fl.oz + q[1], y0 = gy(x, z); for (let y = F + 4; y <= y0 + 1; y++) put(x, y, z, 0); }
+        if (k === 0) L.P((fw >> 1) + 2, F + 1, fd >> 1, 'vx_scarecrow', { facing: 0 });
+        const fld = { kind: 'field', crop: info.crop, rect: Fl.rect, F, r: Fl.r, ox: Fl.ox, oz: Fl.oz, w: fw, d: fd, farm: site.id, scarecrow: k === 0 };
+        FM.fields.push(fld); P.pieces.push(Object.assign({ x: Math.round((Fl.rect[0] + Fl.rect[2]) / 2), z: Math.round((Fl.rect[1] + Fl.rect[3]) / 2), y: F }, fld));
+        lane(Fl, fw >> 1, 0);
+      }
+      // ---- the orchard
+      const ow = 13 + rng.int(2) * 4, od = 13 + rng.int(2) * 4;
+      const Or = findLot(g, P, gy, rng, site.x, site.z, ow, od, 18, 60, 6, taken, 2);
+      if (Or) { claim(Or, 'orchard'); orchard(g, P, K, Or, ow, od, gy, rng, site); }
+      // ---- a vineyard on a slope (one farm), else a flower field (sunflowers, lavender rows)
+      if (fi === 1) { const Vy = findLot(g, P, gy, rng, site.x, site.z, 13, 17, 20, 70, 9, taken, 2); if (Vy && Vy.hi - Vy.lo >= 2) { claim(Vy, 'vineyard'); vineyard(g, P, K, Vy, 13, 17, gy, site); } }
+      else { const Fw = findLot(g, P, gy, rng, site.x, site.z, 11, 15, 18, 60, 3, taken, 2); if (Fw) { claim(Fw, 'field'); flowerField(g, P, K, Fw, 11, 15, gy, fi % 3 === 0 ? 'sunflower' : 'allium', site); } }
+      P.farms.push(FM);
+    });
+  });
+  function pasture(g, P, K, Pa, w, d, gy, rng, site) {
+    const put = K.put, at = (u, v) => { const q = ROT4[Pa.r](u, v); return [Pa.ox + q[0], Pa.oz + q[1]]; }, FEN = st('oak_fence');
+    const gu = w >> 1, fG = (Pa.r) & 3;
+    for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) {
+      const [x, z] = at(u, v), y = gy(x, z), edge = u === 0 || v === 0 || u === w - 1 || v === d - 1;
+      for (let yy = y + 1; yy <= y + 3; yy++) put(x, yy, z, 0);
+      if (edge) put(x, y + 1, z, v === 0 && u === gu ? st('oak_fence_gate', { facing: fG, open: 0 }) : FEN);
+      else if (h01(x, z, 61) < 0.18) put(x, y + 1, z, st('short_grass'));
+    }
+    // trough, hay, a lean-to in the back corner
+    for (let u = 2; u <= 4; u++) { const [x, z] = at(u, d - 2); put(x, gy(x, z) + 1, z, st('vx_trough', { facing: fG })); }
+    { const [x, z] = at(w - 2, 1); put(x, gy(x, z) + 1, z, st('vx_hay')); const [x2, z2] = at(w - 3, 1); put(x2, gy(x2, z2) + 1, z2, st('vx_hay')); }
+    const su = w - 5, sv = d - 5, [bx, bz] = at(su + 1, sv + 1), by = gy(bx, bz);
+    for (const [a, b] of [[0, 0], [3, 0], [0, 3], [3, 3]]) { const [x, z] = at(su + a, sv + b); for (let y = gy(x, z) + 1; y <= by + 3; y++) put(x, y, z, st('vx_beam_oak', { axis: 0 })); }
+    const roofN = 'vx_roof_' + (rng.chance(0.5) ? 'red' : 'thatch');
+    for (let a = -1; a <= 4; a++) for (let b = 0; b <= 3; b++) { const [x, z] = at(su + a, sv + b); put(x, by + 4, z, st(roofN, { facing: (Pa.r + 2) & 3 })); }
+    const [cx, cz] = at(w >> 1, d >> 1);
+    LAND.addSpawn(P, ['fauna', 'sheep', cx, gy(cx, cz) + 1, cz, 4 + rng.int(3), Pa.rect[0] + 1, Pa.rect[1] + 1, Pa.rect[2] - 1, Pa.rect[3] - 1], cx, cz);
+    P.pieces.push({ kind: 'pasture', x: cx, z: cz, y: gy(cx, cz), farm: site.id, rect: Pa.rect });
+  }
+  function orchard(g, P, K, Or, w, d, gy, rng, site) {
+    const put = K.put, at = (u, v) => { const q = ROT4[Or.r](u, v); return [Or.ox + q[0], Or.oz + q[1]]; };
+    const fruit = ['apple', 'apple', 'plum', 'cherry', 'orange'][rng.int(5)], TR = st('vx_fruit_trunk'), CR = st('vx_fruit_crown_' + fruit);
+    let n = 0;
+    for (let u = 2; u <= w - 3; u += 4) for (let v = 2; v <= d - 3; v += 4) {
+      const [x, z] = at(u, v), y = gy(x, z);
+      put(x, y + 1, z, TR); put(x, y + 2, z, TR);
+      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) { put(x + a, y + 3, z + b, CR); if (a === 0 || b === 0) put(x + a, y + 4, z + b, CR); }
+      n++;
+    }
+    for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) { const [x, z] = at(u, v); if (h01(x, z, 63) < 0.12) put(x, gy(x, z) + 1, z, st(h01(x, z, 64) < 0.5 ? 'dandelion' : 'short_grass')); }
+    { const [x, z] = at(0, 0); put(x, gy(x, z) + 1, z, st('vx_veg_crate', { facing: 0 })); }
+    const [cx, cz] = at(w >> 1, d >> 1);
+    P.pieces.push({ kind: 'orchard', x: cx, z: cz, y: gy(cx, cz), fruit, trees: n, farm: site.id, rect: Or.rect });
+  }
+  function vineyard(g, P, K, Vy, w, d, gy, site) {
+    const put = K.put, at = (u, v) => { const q = ROT4[Vy.r](u, v); return [Vy.ox + q[0], Vy.oz + q[1]]; };
+    const POST = st('oak_fence'), VINE = st('azalea_leaves', { persistent: 1, distance: 1 }), GRAPE = st('sweet_berry_bush', { age: 3 });
+    let rows = 0;
+    for (let u = 1; u < w - 1; u += 3) {
+      for (let v = 1; v < d - 1; v++) {
+        const [x, z] = at(u, v), y = gy(x, z);
+        put(x, y, z, st('coarse_dirt'));
+        for (let yy = y + 1; yy <= y + 3; yy++) put(x, yy, z, 0);
+        if (v % 4 === 1) { put(x, y + 1, z, POST); put(x, y + 2, z, POST); put(x, y + 3, z, VINE); }
+        else { put(x, y + 1, z, h01(x, z, 65) < 0.3 ? GRAPE : VINE); put(x, y + 2, z, VINE); }
+      }
+      rows++;
+    }
+    const [cx, cz] = at(w >> 1, d >> 1);
+    P.pieces.push({ kind: 'vineyard', x: cx, z: cz, y: gy(cx, cz), rows, farm: site.id, rect: Vy.rect });
+  }
+  function flowerField(g, P, K, Fw, w, d, gy, kind, site) {
+    const put = K.put, at = (u, v) => { const q = ROT4[Fw.r](u, v); return [Fw.ox + q[0], Fw.oz + q[1]]; }, F = Math.max(Fw.lo, Fw.F);
+    for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) {
+      const [x, z] = at(u, v), y0 = gy(x, z);
+      for (let y = y0 + 1; y < F; y++) put(x, y, z, st('dirt'));
+      for (let y = F + 1; y <= Math.max(F + 3, y0 + 1); y++) put(x, y, z, 0);
+      const row = u % 2 === 0;
+      put(x, F, z, row ? st('grass_block') : st('coarse_dirt'));
+      if (row) { if (kind === 'sunflower') { put(x, F + 1, z, st('sunflower', { half: 0 })); put(x, F + 2, z, st('sunflower', { half: 1 })); } else put(x, F + 1, z, st('allium')); }
+    }
+    const [cx, cz] = at(w >> 1, d >> 1);
+    P.pieces.push({ kind: 'flowers', flower: kind, x: cx, z: cz, y: F, farm: site.id, rect: Fw.rect });
+  }
+  // the windmill: a white tower on a fieldstone base, a pointed roof, four sails round a hub on the face toward the
+  // yard; the hub is the pivot (a `windmill` spawn records it for a later turning)
+  function windmill(g, P, K, Wm, gy, rng, site) {
+    const put = K.put, at = (u, v) => { const q = ROT4[Wm.r](u, v); return [Wm.ox + q[0], Wm.oz + q[1]]; }, F = Wm.hi + 1, T = 10;
+    const roofC = ['red', 'slate', 'terracotta', 'teal'][rng.int(4)], fr = (f) => (f + Wm.r) & 3;
+    for (let u = 0; u < 5; u++) for (let v = 0; v < 5; v++) {
+      const [x, z] = at(u, v), y0 = gy(x, z), corner = (u === 0 || u === 4) && (v === 0 || v === 4), edge = u === 0 || v === 0 || u === 4 || v === 4;
+      for (let y = y0 + 1; y < F; y++) put(x, y, z, st('vx_fieldstone'));
+      put(x, F, z, st('vx_floor_oak'));
+      for (let y = F + 1; y <= F + T; y++) put(x, y, z, edge && !(corner && y > F + 2) ? (y <= F + 2 ? st('vx_fieldstone') : st('vx_plaster_white')) : 0);
+      if (corner) for (let y = F + 3; y <= F + T; y++) put(x, y, z, 0);
+    }
+    // the corners stepped in above the base: the round tower's octagon
+    for (const [u, v] of [[1, 0], [3, 0], [0, 1], [0, 3], [4, 1], [4, 3], [1, 4], [3, 4]]) { const [x, z] = at(u, v); for (let y = F + 3; y <= F + T; y++) put(x, y, z, st('vx_plaster_white')); }
+    const [dx, dz] = at(2, 0); put(dx, F + 1, dz, st('oak_door', { facing: fr(0), half: 0, hinge: 0, open: 0 })); put(dx, F + 2, dz, st('oak_door', { facing: fr(0), half: 1, hinge: 0, open: 0 }));
+    { const [x, z] = at(2, 0); put(x, F + 5, z, st('vx_window_round', { facing: fr(0) })); }
+    for (let u = 0; u < 5; u++) for (let v = 0; v < 5; v++) {
+      const ring = Math.max(Math.abs(u - 2), Math.abs(v - 2)), f = Math.abs(u - 2) >= Math.abs(v - 2) ? (u < 2 ? 3 : 1) : (v < 2 ? 0 : 2), [x, z] = at(u, v);
+      if (ring === 2) put(x, F + T + 1, z, st('vx_roof_' + roofC, { facing: fr(f) }));
+      else if (ring === 1) put(x, F + T + 2, z, st('vx_roof_' + roofC, { facing: fr(f) }));
+      else { put(x, F + T + 3, z, st('vx_ridge_' + roofC, { facing: fr(0) })); }
+    }
+    // the hub (pivot) one out from the front wall's middle, the sails in a cross round it
+    const hy = F + T - 2, [hx, hz] = at(2, -1);
+    put(hx, hy, hz, st('oak_log', { axis: (Wm.r & 1) ? 1 : 2 }));
+    const SAIL = st('vx_windmill_sail', { facing: fr(0) });
+    for (let k = 1; k <= 4; k++) {
+      const [lx, lz] = at(2 - k, -1), [rx, rz] = at(2 + k, -1);
+      put(lx, hy, lz, SAIL); put(rx, hy, rz, SAIL); put(hx, hy + k, hz, SAIL); if (hy - k > F + 1) put(hx, hy - k, hz, SAIL);
+    }
+    { const [x, z] = at(2, 2); put(x, F + 1, z, st('vx_hay')); put(x, F + 4, z, st('lantern', { hanging: 0 })); }
+    LAND.addSpawn(P, ['windmill', hx, hy, hz, fr(0)], hx, hz);
+    P.pieces.push({ kind: 'windmill', x: hx, z: hz, y: hy, hub: [hx, hy, hz], farm: site.id, rect: Wm.rect });
+  }
+
   LAND.DRESS = [];           // the per-chunk dressing (woods, meadows, banks — the later sections): fn(g, P, cx, cz, out)
   HEART.builders.push(function (g, cx, cz, out) {
     if (!LAND.on(g)) return;

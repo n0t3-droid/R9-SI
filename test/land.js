@@ -160,6 +160,56 @@ if (want(2)) {
   console.log(`  (${secs()})`);
 }
 
+// ---------------------------------------------------------------- 3 · farms
+if (want(3)) {
+  console.log('3 · farmsteads: fields, barn, windmill, well, pasture, orchard, vineyard');
+  const farms = P.sites.filter(s => s.kind === 'farm'), pc = (kind, f) => P.pieces.filter(p => p.kind === kind && (!f || p.farm === f.id));
+  for (const f of farms) {
+    const fields = pc('field', f).filter(p => p.crop), barn = pc('barn', f).length, house = pc('farmhouse', f).length;
+    check(barn === 1 && house === 1 && fields.length >= 2, `${f.id} (${f.x}, ${f.z}): a farmhouse (${house}), a barn (${barn}), ${fields.length} crop fields (${fields.map(p => p.crop).join(', ')}), ${pc('pasture', f).length} pasture, ${pc('orchard', f).length} orchard, ${pc('windmill', f).length} windmill, ${pc('vineyard', f).length} vineyard, ${pc('flowers', f).length} flower field, ${pc('well', f).length} well`);
+  }
+  const allFields = P.pieces.filter(p => p.kind === 'field' && p.crop);
+  check(farms.length >= 4 && allFields.length >= 8, `four farmsteads and their fields (${farms.length} farms, ${allFields.length} crop fields)`);
+  check(pc('windmill').length >= 2 && pc('pasture').length >= 3 && pc('orchard').length >= 3 && pc('vineyard').length >= 1 && pc('well').length >= 4, `windmills (${pc('windmill').length}), pastures (${pc('pasture').length}), orchards (${pc('orchard').length}), a vineyard (${pc('vineyard').length}), wells (${pc('well').length})`);
+  // in the chunks: the crops lie flat in their rows, a fence runs round every field (its gate allowed), a scarecrow
+  let flatBad = 0, cropN = 0, cropOk = 0, rimN = 0, rimOk = 0, scare = 0;
+  const ROT = LAND.ROT4;
+  for (const fl of allFields) {
+    const at = (u, v) => { const q = ROT[fl.r](u, v); return [fl.ox + q[0], fl.oz + q[1]]; };
+    const mid = fl.w >> 1;
+    let lastY = null;
+    for (let u = 1; u < fl.w - 1; u++) for (let v = 1; v < fl.d - 1; v++) {
+      if (u === mid) continue;
+      const [x, z] = at(u, v); cropN++;
+      const fb = nameOf(blockAt(x, fl.F, z)), cb = nameOf(blockAt(x, fl.F + 1, z));
+      if (fb === 'farmland' && /wheat|carrots|potatoes|beetroots|scarecrow/.test(cb)) cropOk++;
+      if (cb === 'vx_scarecrow') scare++;
+      const [x2, z2] = at(u, v + 1 < fl.d - 1 ? v + 1 : v); if (nameOf(blockAt(x2, fl.F, z2)) !== 'farmland' && nameOf(blockAt(x2, fl.F, z2)) !== 'water') flatBad++;
+    }
+    for (let u = 0; u < fl.w; u++) for (let v = 0; v < fl.d; v++) {
+      if (!(u === 0 || v === 0 || u === fl.w - 1 || v === fl.d - 1)) continue;
+      const [x, z] = at(u, v); rimN++;
+      if (/fence|gate|composter|vx_hay/.test(nameOf(blockAt(x, fl.F + 1, z)))) rimOk++;   // (the villages' farm puts a composter and a hay bale in its front row)
+    }
+  }
+  check(cropOk >= cropN * 0.95 && flatBad <= cropN * 0.02, `the crops stand in their rows on farmland, all at the field's one level (${cropOk} of ${cropN} crop cells; ${flatBad} off the level)`);
+  check(rimOk === rimN, `a fence runs round every field, a gate in it (${rimOk} of ${rimN} rim cells closed) (${secs()})`);
+  check(scare >= farms.length, `a scarecrow in a field of every farm (${scare})`);
+  // the windmills: the hub (the pivot) with the sails round it, its spawn
+  let wOk = 0;
+  for (const wm of pc('windmill')) {
+    const [hx, hy, hz] = wm.hub; let sails = 0;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) if (nameOf(blockAt(hx + dx, hy + dy, hz + dz)) === 'vx_windmill_sail') sails++;
+    const sp = (chunk(hx >> 4, hz >> 4).spawns || []).some(s => s[0] === 'windmill' && s[1] === hx && s[2] === hy && s[3] === hz);
+    if (/_log$/.test(nameOf(blockAt(hx, hy, hz))) && sails >= 14 && sp) wOk++;
+  }
+  check(wOk === pc('windmill').length && wOk >= 2, `every windmill turns its sails round a hub (the pivot, a 'windmill' spawn): ${wOk} of ${pc('windmill').length}`);
+  // the pastures' herds
+  let herds = 0; for (const p of pc('pasture')) if ((chunk(p.x >> 4, p.z >> 4).spawns || []).some(s => s[0] === 'fauna' && s[1] === 'sheep')) herds++;
+  check(herds === pc('pasture').length, `every pasture has its herd's anchor (${herds} of ${pc('pasture').length})`);
+  console.log(`  (${secs()})`);
+}
+
 console.log(`(${secs()})`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
