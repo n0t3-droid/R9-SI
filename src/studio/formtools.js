@@ -292,7 +292,7 @@
     const d = el('div', 'seg ftools');
     for (const [id, ic, k, de, en] of TOOLS) { const b = el('button', ST.tool === id ? 'on' : ''); b.dataset.ft = id; b.innerHTML = '<i>' + ic + '</i>'; b.appendChild(document.createTextNode(TX(k, null, de, en))); b.onclick = () => { ST.tool = ST.tool === id ? null : id; C.list(); }; d.appendChild(b); }
     root.appendChild(d);
-    const t = ST.tool; if (!t) { root.appendChild(el('div', 'note dim', TX('ft.note', null, 'Formen schreiben Voxel: Strg+Z nimmt sie zurück, das Design bleibt Voxel. ✦ Glatt zeigt die runde Oberfläche.', 'Shapes write voxels: Ctrl+Z takes them back, the design stays voxels. ✦ Smooth shows the round surface.'))); return; }
+    const t = ST.tool; if (!t) { root.appendChild(el('div', 'note dim ftnote', TX('ft.note', null, 'Formen schreiben Voxel: Strg+Z nimmt sie zurück, das Design bleibt Voxel. ✦ Glatt zeigt die runde Oberfläche.', 'Shapes write voxels: Ctrl+Z takes them back, the design stays voxels. ✦ Smooth shows the round surface.'))); return; }
     const box = el('div', 'ftbox'); root.appendChild(box);
     const applyB = () => { const b = el('button', 'pri ftapply', '✦ ' + TX('ft.apply', null, 'Anwenden', 'Apply')); b.dataset.act = 'ft-apply'; b.onclick = () => FT.applyTool(ST.tool); return b; };
     const i = it();
@@ -381,7 +381,7 @@
   }
   // the look of the new controls
   const css = document.createElement('style');
-  css.textContent = '.ftools button{min-width:0;padding:4px 6px}.ftools button i{margin-right:4px;font-style:normal}.ftbox{margin:4px 0 8px}.ftcv{display:block;width:100%;max-width:240px;border:1px solid var(--line);border-radius:6px;margin:4px 0;cursor:crosshair;touch-action:none}.ftrow{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:12px}.ftrow input{flex:1}.ftrow b{min-width:28px;text-align:right}.ftapply{margin-top:6px;width:100%}'
+  css.textContent = '#list .ftbox,#list .ftnote{grid-column:1/-1}.ftools button{min-width:0;padding:4px 6px}.ftools button i{margin-right:4px;font-style:normal}.ftbox{margin:4px 0 8px}.ftcv{display:block;width:100%;max-width:240px;border:1px solid var(--line);border-radius:6px;margin:4px 0;cursor:crosshair;touch-action:none}.ftrow{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:12px}.ftrow input{flex:1}.ftrow b{min-width:28px;text-align:right}.ftapply{margin-top:6px;width:100%}'
     + '.card .glattb{position:absolute;top:6px;left:6px;z-index:2;border:0;border-radius:6px;padding:1px 6px;background:rgba(10,14,20,.7);color:var(--mute);font-size:13px;cursor:pointer;opacity:.55;transition:opacity .15s}.card:hover .glattb,.card .glattb.on{opacity:1}.card .glattb.on{color:#38e6ff;background:rgba(56,230,255,.18)}@media (hover: none){.card .glattb{opacity:1}}.card.glatt .th{filter:saturate(1.05)}';
   document.head.appendChild(css);
   setTimeout(viewButton, 0);
