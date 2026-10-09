@@ -358,31 +358,15 @@
       this.resize(full || this.q.scale !== prevScale);
     }
     // GPU frame time (EXT_disjoint_timer_query_webgl2): tells the smart-quality controller whether the GPU or
-    // the main thread is the bottleneck; undefined when the browser does not expose it
+    // the main thread is the bottleneck; undefined when the browser does not expose it. With the F3 overlay open
+    // (profDetail) every pass gets its own query: GPU-Profil, gpuprof.js — the overlay shows the time per pass.
     gpuTimerBegin() {
-      const gl = this.gl, ext = this.gpuExt;
-      if (ext === undefined) { this.gpuExt = gl.getExtension('EXT_disjoint_timer_query_webgl2') || null; this.gpuQ = []; this.gpuFree = []; return this.gpuTimerBegin(); }
-      if (!ext || this.gpuActive) return;
-      // read back finished queries (oldest first)
-      while (this.gpuQ.length) {
-        const q = this.gpuQ[0];
-        const done = gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE);
-        if (!done) break;
-        this.gpuQ.shift();
-        const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
-        if (!disjoint) { const ns = gl.getQueryParameter(q, gl.QUERY_RESULT); const ms = ns / 1e6; if (ms > 0 && ms < 1000) this.gpuMs = this.gpuMs === undefined ? ms : this.gpuMs + (ms - this.gpuMs) * 0.1; }
-        this.gpuFree.push(q);
-      }
-      if (this.gpuQ.length >= 4) return;   // never stall on results
-      const q = this.gpuFree.pop() || gl.createQuery();
-      gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
-      this.gpuActive = q;
+      if (!this.prof) this.prof = new VR.GpuProf(this.gl);
+      this.prof.begin(!!this.profDetail);
+      if (this.prof.total !== undefined) this.gpuMs = this.prof.total;
     }
-    gpuTimerEnd() {
-      if (!this.gpuActive) return;
-      this.gl.endQuery(this.gpuExt.TIME_ELAPSED_EXT);
-      this.gpuQ.push(this.gpuActive); this.gpuActive = null;
-    }
+    gpuPass(name) { if (this.prof) this.prof.mark(name); }
+    gpuTimerEnd() { if (this.prof) this.prof.end(); }
 
     // ------------------------------------------------ section meshes
     allocMesh(n) {
@@ -1139,6 +1123,7 @@
       this.stats.sections = vis.length;
       if (world) this.updateHmap(world);
       // shadows
+      this.gpuPass('shadow');
       const shadowOn = world && (this.frameNo % (this.q.shadowEvery || 1) === 0 || !this.shadowValid) ? this.renderShadows(world, E) : this.shadowValid;
       this.shadowValid = shadowOn;
       // a shadow map kept from an earlier frame was made around the old camera position: shift its matrix
@@ -1151,6 +1136,7 @@
       gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       // sky
+      this.gpuPass('sky');
       gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
       {
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
@@ -1164,6 +1150,7 @@
       // terrain opaque + cutout
       if (world) {
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
+          this.gpuPass(layer === 0 ? 'opaque' : 'cutout');
           gl.useProgram(p.p);
           this.common(p, E);
           this.bindTerrainTextures(p);
@@ -1189,25 +1176,28 @@
         }
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
-      if (world && (this.q.smoothProps || this.q.smoothFurn)) this.drawProps(E, camPos, false);
+      if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.drawProps(E, camPos, false); }
       // far-terrain horizon (cut away where real chunks are drawn)
-      if (F.horizon) F.horizon.draw(this, E);
+      if (F.horizon) { this.gpuPass('far'); F.horizon.draw(this, E); }
       // voxel models & meshes
-      if (F.drawOpaque) F.drawOpaque(this, E);
+      if (F.drawOpaque) { this.gpuPass('models'); F.drawOpaque(this, E); }
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
       this.reflOn = false;
       this.stats.reflMs = 0;
-      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) { const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; }
+      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) { this.gpuPass('mirror'); const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; }
       // ---------------- copy scene for refraction
+      this.gpuPass('copy');
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
       gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
       gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
       // clouds (behind translucent terrain; depth tested)
+      this.gpuPass('clouds');
       this.drawClouds(E);
       // translucent terrain
       if (world) {
+        this.gpuPass('water');
         const p = this.P.trans;
         gl.useProgram(p.p);
         this.common(p, E);
@@ -1230,6 +1220,7 @@
         gl.disable(gl.BLEND);
         gl.enable(gl.CULL_FACE);
       }
+      this.gpuPass('rest');
       if (F.drawTranslucent) F.drawTranslucent(this, E);
       // precipitation
       if (F.precip && F.precip.amount > 0.01) this.drawPrecip(F, E);
@@ -1244,8 +1235,9 @@
       if (F.drawHand) { gl.clear(gl.DEPTH_BUFFER_BIT); F.drawHand(this, E); }
       // ---------------- R9 Super Resolution
       this.upTex = null;
-      if (this.jit) this.superRes(F);
+      if (this.jit) { this.gpuPass('tsr'); this.superRes(F); }
       // ---------------- post
+      this.gpuPass('post');
       this.post(F, E);
       this.gpuTimerEnd();
       this.stats.ms = performance.now() - t0;
