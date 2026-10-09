@@ -356,6 +356,11 @@
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
       if (this.traffic) this.traffic.t = 2.5;
     }
+    // t-life (padlife.js, lifedirector.js): the pads' visiting craft and the Regisseur des Lebens of this world
+    lifeStart() {
+      if (this.padLife) this.padLife.destroy(); this.padLife = VR.PadLife ? new VR.PadLife.Actor(this) : null;
+      if (this.lifeDirector) this.lifeDirector.destroy(); this.lifeDirector = VR.LifeDirector ? new VR.LifeDirector.Actor(this) : null;
+    }
     teardownWorld() {
       if (VR.Baustelle && VR.Baustelle.reset) VR.Baustelle.reset(this.gadgets && this.gadgets.blue);   // (a construction site's bar and meshes go with the world)
       if (this.world) { this.world.destroy(); this.world = null; }
@@ -368,6 +373,7 @@
       if (this.villages) { this.villages.destroy(); this.villages = null; } if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(null);
       if (this.hall) { this.hall.destroy(); this.hall = null; }
       if (this.trams) { this.trams.destroy(); this.trams = null; }
+      if (this.padLife) { this.padLife.destroy(); this.padLife = null; } if (this.lifeDirector) { this.lifeDirector.destroy(); this.lifeDirector = null; }   // (t-life: the pads' visitors, the Regisseur des Lebens)
       if (this.horizon) this.horizon.reset();
       if (this.furnaces) this.furnaces.clear();
       this.renderer && (this.renderer.visDirty = true);
@@ -433,6 +439,7 @@
       this.hall = VR.Hall ? new VR.Hall(this) : null;   // the Hangar Hall's heroes and console lights (hall.js)
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
+      this.lifeStart();   // (t-life: ships that stay on their pads, the Regisseur des Lebens)
       this.world.listeners.push(this);
       if (this.mp) this.world.listeners.push(this.mp);
       // the columns that loaded during the start (the await above, before the game listened) get their spawns now: the
@@ -631,6 +638,7 @@
       this.hall = VR.Hall ? new VR.Hall(this) : null;   // the Hangar Hall's heroes and console lights (hall.js)
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
+      this.lifeStart();   // (t-life: ships that stay on their pads, the Regisseur des Lebens)
       this.world.listeners.push(this);
       this.world.listeners.push(mp);
       this.state = 'loading';
@@ -1009,6 +1017,7 @@
       if (this.mirror) this.mirror.update(dt);
       if (this.starships) this.starships.update(dt);
       if (this.traffic) this.traffic.update(dt);
+      if (this.padLife) this.padLife.update(dt); if (this.lifeDirector) this.lifeDirector.update(dt);   // (t-life)
       if (this.director) this.director.update(dt);
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
@@ -1086,8 +1095,8 @@
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
-        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
-        drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.hall) this.hall.drawTrans(r, E2); if (this.trails) this.trails.draw(r, E2); },
+        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); if (this.padLife) this.padLife.draw(r, E2, 'opaque', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'opaque', cam); },
+        drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.padLife) this.padLife.draw(r, E2, 'trans', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'trans', cam); if (this.hall) this.hall.drawTrans(r, E2); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
       });
       if (this.cockpit) this.cockpit.updateHud(dt);

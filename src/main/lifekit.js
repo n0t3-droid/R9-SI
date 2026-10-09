@@ -19,6 +19,10 @@
   LK.wrap = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
   LK.smooth = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
   LK.yawOf = (dx, dz) => Math.atan2(-dx, -dz);   // the heading of a direction (the models face −z)
+  // the cost tier of a settings record (as the living air's, airlife.js): 0 Very Low · 1 Low · 2 Balanced · 3 High · 4 Ultra;
+  // a custom setup: its particle level (0 … 2)
+  const PRESET_TIER = { potato: 0, low: 1, balanced: 2, high: 3, ultra: 4 };
+  LK.tierOf = (S) => { if (!S) return 2; if (PRESET_TIER[S.preset] !== undefined) return PRESET_TIER[S.preset]; const p = Number.isFinite(S.particles) ? Math.round(S.particles) : 2; return Math.max(0, Math.min(2, p)); };
 
   // ---------------------------------------------------------------- a walkable polyline
   LK.path = function (pts) {
