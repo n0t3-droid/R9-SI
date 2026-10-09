@@ -900,7 +900,10 @@
         b.lx = b.pos[0]; b.lz = b.pos[2];
         b.walk += moved * 1.15; b.walkAmt += ((mv > 0.3 ? 1 : 0) - b.walkAmt) * Math.min(1, dt * 8);
         b.state = state;
-        if (FA) FA.pose(b, state, dt, b.walk * 3, b.walkAmt, false, b.poseOut);
+        // (t-folk: a builder walks on its own legs like any villager — folkanim.js FA.walkPerson, the look's gait)
+        const G = b.gait !== undefined ? b.gait : (b.gait = VR.Folk && VR.Folk.gaitFor && b.look ? VR.Folk.gaitFor(b.look) : null);
+        if (G && FA) FA.stride(G, mv, dt, false);
+        if (FA) FA.pose(b, state, dt, b.walk * 3, b.walkAmt, false, b.poseOut, undefined, G);
         // the hammer comes down (the 'work' clip: the arm is lowest at 0.33 of its 0.75 s): sparks and a knock
         if (state === 'work' && b.anim) {
           const ph = (b.anim.t % 0.75) / 0.75;
@@ -1116,12 +1119,19 @@
     one(gl, mesh, M) { gl.uniformMatrix4fv(this.dp.u.u_model, false, M); gl.bindVertexArray(mesh.vao); gl.drawArrays(gl.TRIANGLES, 0, mesh.count); }
     drawCrew(r, E, cam, ent) {
       const g = this.site.g, gl = r.gl, FD = g.folkDist || g.folkBase || 100;
-      let p = null;
+      // (t-folk: Echte Menschen — a builder near the eye is drawn smooth once its mesh is there, folkgpu.js)
+      const FG = VR.FolkGPU, smooth = !!(FG && FG.on(g));
+      let p = null, nSmooth = 0;
       for (const b of this.crew) {
         if (b.mode === 'gone' || b.delay > 0) continue;
         const dx = b.pos[0] - cam.x, dy = b.pos[1] - cam.y, dz = b.pos[2] - cam.z, d2 = dx * dx + dz * dz;
         if (d2 > FD * FD) continue;
         if (!VR.mat4.boxInFrustum(r.planes, dx - 1, dy - 0.5, dz - 1, dx + 1, dy + 2.2, dz + 1)) continue;
+        if (smooth && b.look && d2 < FG.NEAR * FG.NEAR) {
+          const rec = b.fg || (b.fg = FG.recFor(b.look));
+          if (rec.state === 0) FG.want(g, rec, d2);
+          if (rec.state === 2) { const L = this.light, lt = b.lt || (b.lt = { sky: 1, bl: [0, 0, 0] }); lt.sky = Math.max(0.45, L[0]); lt.bl[0] = L[1]; lt.bl[1] = L[2]; lt.bl[2] = L[3]; FG.queue(rec, b.pos, b.yaw, b.poseOut, lt, b.opts); nSmooth++; continue; }
+        }
         // (a builder's model is made the first time it is drawn: at most one new one a frame, no hitch on a small PC)
         const far = d2 > 24 * 24, mk = far ? 'lo' : 'hi';
         if (!b[mk]) { if (BS.madeThisFrame) continue; BS.madeThisFrame = true; b[mk] = true; }
@@ -1130,6 +1140,7 @@
         const L = this.light, lt = b.lt || (b.lt = { sky: 1, bl: [0, 0, 0] }); lt.sky = Math.max(0.45, L[0]); lt.bl[0] = L[1]; lt.bl[1] = L[2]; lt.bl[2] = L[3];
         ent.drawModel(r, p, model, b.pos, cam, b.yaw, b.poseOut, lt, b.opts);
       }
+      if (nSmooth) FG.flush(r, E, cam);
     }
     dispose() {
       const gl = this.gl; if (!gl) return;
