@@ -305,9 +305,13 @@
       for (const l of lots) { if (l.comp) continue; const c = centreOf(l), d = Math.hypot(c[0] - at[0], c[1] - at[1]); if (d < bd) { bd = d; best = l; } }
       if (best && bd < 30) { best.comp = comp; best.mirror = mirror; }
     }
-    let last = null;
+    // (the others are dealt from the family shuffled by the seed, the compositions not yet shown first: every
+    //  composition stands in the city)
+    const order = FAMILY.slice(); for (let i = order.length - 1; i > 0; i--) { const j = rng.int(i + 1); const t = order[i]; order[i] = order[j]; order[j] = t; }
+    const shown = new Set(lots.filter(l => l.comp).map(l => l.comp)), deck = order.filter(c => !shown.has(c)).concat(order.filter(c => shown.has(c)));
+    let last = null, di = 0;
     for (const l of lots) {
-      if (!l.comp) { let c = FAMILY[rng.int(FAMILY.length)]; if (c === last) c = FAMILY[(FAMILY.indexOf(c) + 1 + rng.int(FAMILY.length - 1)) % FAMILY.length]; l.comp = c; l.mirror = rng.chance(0.5); }
+      if (!l.comp) { let c = deck[di++ % deck.length]; if (c === last) c = deck[di++ % deck.length]; l.comp = c; l.mirror = rng.chance(0.5); }
       last = l.comp;
     }
     yield;

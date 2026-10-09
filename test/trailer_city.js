@@ -190,7 +190,8 @@ if (city) {
   const amber = lots.filter(l => (l.mouth || []).some(c => cnm(c[0], LINE.get(c[0] + ',' + c[1]), c[1]) === 'vx_floor_plaza_line_amber')).length;
   check(amber === lots.length, `an amber accent across every path mouth (${amber} of ${lots.length})`);
   const comps = new Set(lots.map(l => l.comp)), mir = new Set(lots.map(l => !!l.mirror));
-  check(comps.size >= 4 && mir.size === 2, `the lots vary: ${comps.size} compositions (${[...comps].join(', ')}), mirrored and not`);
+  const famN = Object.keys(PLAN.NOVA_FAMILY || {}).length;
+  check(comps.size >= 4 && comps.size === famN && mir.size === 2, `the lots vary: ${comps.size} compositions of ${famN} (${[...comps].join(', ')}), mirrored and not`);
   // palms along the roads: per road side, consecutive palms 6–9 blocks apart along the road (a path mouth or a
   // junction may push one up to 3 blocks on)
   let gaps = 0, badGap = [];
