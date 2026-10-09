@@ -121,7 +121,9 @@
     const q = Math.sqrt((u / L.rx) ** 2 + (v / L.rz) ** 2), th = Math.atan2(v, u), ph = (g.seed & 1023) / 163;
     return q * (1 + 0.09 * Math.sin(3 * th + ph) + 0.06 * Math.sin(5 * th + 2 * ph) + 0.17 * g.nLandW.n2(X * 1.3 + 900, Z * 1.3 - 900));
   };
-  LAND.lakeH = (q, Hl) => q < 0.95 ? 53 + 8 * ss(0.2, 0.95, q) : q < 1.04 ? lerp(61, SEA + 1.4, (q - 0.95) / 0.09) : lerp(SEA + 1.4, Hl, ss(1.04, 1.22, q));
+  // (the shore: the waterline at q ≈ 1, a flat sand beach to q 1.13, then the bank up to the land at q 1.32)
+  LAND.LAKE_OUT = 1.32;
+  LAND.lakeH = (q, Hl) => q < 0.95 ? 53 + 8 * ss(0.2, 0.95, q) : q < 1.03 ? lerp(61, SEA + 1.2, (q - 0.95) / 0.08) : q < 1.13 ? lerp(SEA + 1.2, SEA + 2.6, (q - 1.03) / 0.1) : lerp(SEA + 2.6, Hl, ss(1.13, LAND.LAKE_OUT, q));
 
   // ---------------------------------------------------------------- the rocky ridge in the west
   LAND.RIDGE = [[-655, -75], [-618, 40], [-582, 168]];
@@ -158,9 +160,9 @@
     const lift = LAND.ridgeLift(g, X, Z);
     if (lift > 0) { D.H += lift; D.A = lerp(D.A, 3.4, Math.min(1, lift / 20)); D.ridge = lift; }
     const q = LAND.lakeQ(g, X, Z);
-    if (q < 1.22) {
+    if (q < LAND.LAKE_OUT) {
       const Hl = LAND.lakeH(q, D.H);
-      if (Hl < D.H) { D.H = Hl; D.A = lerp(D.A, 0.8, 1 - ss(1.0, 1.22, q)); }
+      if (Hl < D.H) { D.H = Hl; D.A = lerp(D.A, 0.6, 1 - ss(1.05, LAND.LAKE_OUT, q)); }
       D.lake = q;
     }
     const rq = LAND.riverAt(g, X, Z, 72);
@@ -349,13 +351,15 @@
   LAND.falls = function (g) {
     if (g._landFalls) return g._landFalls;
     const Rv = LAND.river(g), [hx, hz] = Rv.head, [ux, uz] = Rv.dir0;
-    // the wall's top: walking back from the head, the first block whose ground stands 8 over the pool's water
-    let r = LAND.HEAD_R, top = 0;
-    for (; r < LAND.HEAD_R + 12; r++) { top = g.surfaceY(Math.round(hx - ux * r), Math.round(hz - uz * r)); if (top > SEA + 8) break; }
-    const ex = Math.round(hx - ux * (r - 1)), ez = Math.round(hz - uz * (r - 1));      // the first cell out over the pool
-    const sx = Math.round(hx - ux * (r + 3)), sz = Math.round(hz - uz * (r + 3));      // the spring
-    const sy = Math.min(g.surfaceY(sx, sz), top) - 1;                                    // its water's level
-    g._landFalls = { head: [Math.round(hx), Math.round(hz)], dir: [ux, uz], edge: [ex, ez], spring: [sx, sz], top: sy, rim: r };
+    // the wall behind the pool: walking back from the head, its top is where the ground stops climbing steeply
+    const gyr = (r) => g.surfaceY(Math.round(hx - ux * r), Math.round(hz - uz * r));
+    let plateau = 0; for (let q = LAND.HEAD_R + 8; q <= LAND.HEAD_R + 14; q++) plateau = Math.max(plateau, gyr(q));
+    let r = LAND.HEAD_R;
+    while (r < LAND.HEAD_R + 14 && gyr(r) < plateau - 3) r++;
+    const top = gyr(r) - 1;                                                              // the spring's water level
+    const ex = Math.round(hx - ux * r), ez = Math.round(hz - uz * r);                   // the lip
+    const sx = Math.round(hx - ux * (r + 4)), sz = Math.round(hz - uz * (r + 4));       // the spring
+    g._landFalls = { head: [Math.round(hx), Math.round(hz)], dir: [ux, uz], edge: [ex, ez], spring: [sx, sz], top: Math.min(top, g.surfaceY(sx, sz) - 1), rim: r };
     return g._landFalls;
   };
   // the sites of a world: the fixed ones, the farms a little moved by the seed, the beach and the falls found on the
@@ -365,8 +369,8 @@
     return LAND.SITES.map(([id, x, z, kind]) => {
       const j = kind === 'farm' ? 22 : 0;
       let sx = Math.round(x + (rng.next() - 0.5) * j), sz = Math.round(z + (rng.next() - 0.5) * j);
-      if (kind === 'beach') { const L = LAND.LAKE; [sx, sz] = LAND.shoreAt(g, Math.atan2(30 - L.z, 230 - L.x), 1.2); }
-      if (kind === 'shore') { const L = LAND.LAKE; [sx, sz] = LAND.shoreAt(g, Math.atan2(290 - L.z, 420 - L.x), 1.22); }
+      if (kind === 'beach') { const L = LAND.LAKE; [sx, sz] = LAND.shoreAt(g, Math.atan2(30 - L.z, 230 - L.x), 1.16); }
+      if (kind === 'shore') { const L = LAND.LAKE; [sx, sz] = LAND.shoreAt(g, Math.atan2(290 - L.z, 420 - L.x), 1.18); }
       if (kind === 'falls') { const [ux, uz] = Fa.dir; sx = Math.round(Fa.spring[0] - uz * 9 - ux * 2); sz = Math.round(Fa.spring[1] + ux * 9 - uz * 2); }
       return { id, x: sx, z: sz, kind };
     });
@@ -498,6 +502,7 @@
 
   // ---------------------------------------------------------------- the plan
   LAND.PIECES = [];          // the set pieces' makers (later sections): fn(g, P, K) → pushes into P.pieces, writes ops
+  LAND.DRESS = [];           // the per-chunk dressing (woods, meadows, banks — the later sections): fn(g, P, cx, cz, out)
   LAND.plan = function (g) {
     if (g._landPlan) return g._landPlan;
     noises(g);
@@ -553,7 +558,7 @@
     furnish(g, P);
     // ---- the set pieces (farms, water, rocks — the later sections)
     const K = opsOf(P);
-    for (const fn of LAND.PIECES) { try { fn(g, P, K); } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; if (!g._landErr) { g._landErr = 1; console.warn('land piece', e); } } }
+    for (const fn of LAND.PIECES.slice().sort((a, b) => (a.order || 9) - (b.order || 9))) { try { fn(g, P, K); } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; if (!g._landErr) { g._landErr = 1; console.warn('land piece', e); } } }
     P.ms = Date.now() - t0;
     g._landPlan = P;
     return P;
@@ -831,7 +836,7 @@
   // ---------------------------------------------------------------- clearings with a camp
   // In the deep woods, within reach of a way: a clearing (no tree within 8), a campfire with log seats, two tents (a
   // pitched roof of coloured canvas over a ridge), a lantern on a post, a barrel
-  LAND.PIECES.push(function camps(g, P, K) {
+  LAND.PIECES.push(Object.assign(function camps(g, P, K) {
     const gy = groundOf(g, P), rng = new VR.RNG((g.seed ^ 0xca39) >>> 0), got = [];
     const nearWay = (x, z, r0, r1) => { let best = 1e9; for (const c of P.cells.values()) { const d = (c.x - x) ** 2 + (c.z - z) ** 2; if (d < best) best = d; } best = Math.sqrt(best); return best >= r0 && best <= r1; };
     const cand = [];
@@ -869,9 +874,9 @@
       put(x - 3, gy(x - 3, z + 3) + 1, z + 3, st('barrel', { facing: 1, open: 0 }));
       P.pieces.push({ kind: 'camp', x, z, y });
     }
-  });
+  }, { order: 5 }));
   // hedgerows along the ways (one side, in stretches) and poplar rows on the lanes near the farms
-  LAND.PIECES.push(function hedges(g, P) {
+  LAND.PIECES.push(Object.assign(function hedges(g, P) {
     P.trees = P.trees || [];
     const gy = groundOf(g, P);
     const farms = P.sites.filter(s => s.kind === 'farm');
@@ -885,7 +890,7 @@
         const hedge = Math.sin(i / 23 + li * 1.7) > 0.35 && !nearFarm, side = Math.sin(i / 61 + li) > 0 ? 1 : -1;
         if (hedge) {
           const x = Math.round(px + nx * side * 3.2), z = Math.round(pz + nz * side * 3.2);
-          if (!P.cells.has(ck(x, z)) && !LAND.zoneAt(g, x, z) && !(LAND.keepAt(P, x, z) & 2)) { const y = gy(x, z); if (y > SEA + 1 && Math.abs(y - L.y[i]) <= 2) P.furn.push({ kind: 'hedge', x, z, y, h: h01(x, z, 31) < 0.3 ? 2 : 1 }); }
+          if (!P.cells.has(ck(x, z)) && !LAND.zoneAt(g, x, z) && !(LAND.keepAt(P, x, z) & (2 | 4 | 16))) { const y = gy(x, z); if (y > SEA + 1 && Math.abs(y - L.y[i]) <= 2) P.furn.push({ kind: 'hedge', x, z, y, h: h01(x, z, 31) < 0.3 ? 2 : 1 }); }
         }
         if (nearFarm && i % 7 === 0 && Math.sin(i / 37 + li) > -0.2) for (const sd of [1, -1]) {
           const x = Math.round(px + nx * sd * 4), z = Math.round(pz + nz * sd * 4);
@@ -899,7 +904,7 @@
     for (const t of P.trees) for (let dz = -4; dz <= 4; dz += 4) for (let dx = -4; dx <= 4; dx += 4) { const k = chunkKey(t.x + dx, t.z + dz); let a = by.get(k); if (!a) { a = []; by.set(k, a); } if (!a.includes(t)) a.push(t); }
     P.treesBy = by;
     P.furnBy = null;
-  });
+  }, { order: 6 }));
 
   // ============================================================================ the farmsteads
   // At every farm site (the way ends in its yard): a farmhouse and a barn facing the yard (the villages' own builders,
@@ -934,7 +939,7 @@
     return null;
   }
   LAND.findLot = findLot;
-  LAND.PIECES.unshift(function farms(g, P, K) {
+  LAND.PIECES.push(Object.assign(function farms(g, P, K) {
     const VG = VR.VillageGen; if (!VG || !VG.makeLot || !VG.building || !VG.farm) return;
     const gy = groundOf(g, P), farmSites = P.sites.filter(s => s.kind === 'farm');
     P.farms = [];
@@ -1010,7 +1015,7 @@
       else { const Fw = findLot(g, P, gy, rng, site.x, site.z, 11, 15, 18, 60, 3, taken, 2); if (Fw) { claim(Fw, 'field'); flowerField(g, P, K, Fw, 11, 15, gy, fi % 3 === 0 ? 'sunflower' : 'allium', site); } }
       P.farms.push(FM);
     });
-  });
+  }, { order: 1 }));
   function pasture(g, P, K, Pa, w, d, gy, rng, site) {
     const put = K.put, at = (u, v) => { const q = ROT4[Pa.r](u, v); return [Pa.ox + q[0], Pa.oz + q[1]]; }, FEN = st('oak_fence');
     const gu = w >> 1, fG = (Pa.r) & 3;
@@ -1111,7 +1116,263 @@
     P.pieces.push({ kind: 'windmill', x: hx, z: hz, y: hy, hub: [hx, hy, hz], farm: site.id, rect: Wm.rect });
   }
 
-  LAND.DRESS = [];           // the per-chunk dressing (woods, meadows, banks — the later sections): fn(g, P, cx, cz, out)
+  // ============================================================================ the water
+  // The lake's sand beach and the river's gravel bars, reed belts in stretches along both, the waterfall over the river's
+  // head (a spring on the cliff top, its outlet over the lip, the curtain down into the pool, a cave behind it, mist at
+  // its foot), a ford of stepping stones below it, lily ponds in the meadows and the woods (a closed bowl, lily pads,
+  // reeds, ducks), a lighthouse on the lake's south-west point, a fishing hut with a pier on its north-west beach, and
+  // mist where the Sky Isles' falls meet the lake.
+  let WS = null;
+  const wstates = () => WS || (WS = { WATER: st('water'), FALL: st('water', { level: 8 }), SAND: st('sand'), GRAVEL: st('gravel'), CLAY: st('clay'), COARSE: st('coarse_dirt'), GRASS: st('grass_block'), DIRT: st('dirt'),
+    CANE: st('sugar_cane'), LILY: st('lily_pad'), SEAG: st('seagrass'), MCOB: st('mossy_cobblestone'), MOSS: st('moss_block'), STONE: st('stone') });
+  // the banks: per column, near the river's water or on the lake's beach
+  function dressWater(g, P, cx, cz, out) {
+    const blocks = out.blocks, x0 = cx * 16, z0 = cz * 16, W = wstates(), T = R.T, Rv = LAND.river(g);
+    const Lk = LAND.LAKE, nearLake = Math.abs(x0 + 8 - Lk.x) < Lk.rx * 1.6 && Math.abs(z0 + 8 - Lk.z) < Lk.rx * 1.6;
+    const b = Rv.box, nearRiver = x0 + 16 > b[0] - 30 && x0 < b[2] + 30 && z0 + 16 > b[1] - 30 && z0 < b[3] + 30;
+    if (!nearLake && !nearRiver) return;
+    const isW = (col, y) => blocks[(y << 8) | col] === W.WATER;
+    for (let col = 0; col < 256; col++) {
+      const lx = col & 15, lz = col >> 4, x = x0 + lx, z = z0 + lz;
+      if (LAND.zoneAt(g, x, z) || (LAND.keepAt(P, x, z) & (1 | 2 | 16))) continue;
+      const y = topOf(blocks, col, 120); if (y < SEA - 1 || y > SEA + 4) continue;
+      const top = blocks[(y << 8) | col]; if (top !== W.GRASS && top !== W.SAND && top !== W.DIRT) continue;
+      // water next to this column (in the chunk), at the sea's level
+      let wet = false; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = lx + dx, nz = lz + dz; if (nx < 0 || nz < 0 || nx > 15 || nz > 15) continue; if (isW((nz << 4) | nx, SEA)) { wet = true; break; } }
+      const pn = g.nLandR.n2(x * 0.7, z * 0.7), h = h01(x, z, g.seed ^ 0xbea);
+      let kind = 0;   // 1 the beach, 2 a river bank
+      if (nearLake) { const q = LAND.lakeQ(g, x, z); if (q > 0.96 && q < 1.16) kind = q < 1.12 || h < (1.16 - q) * 25 ? 1 : 0; }
+      if (!kind && nearRiver) { const rq = LAND.riverAt(g, x, z, 14); if (rq && rq.d < Math.max(LAND.riverWb(rq.t), rq.s < 14 ? LAND.HEAD_R : 0) + 5.5) kind = 2; }
+      if (!kind) continue;
+      const ai = ((y + 1) << 8) | col;
+      if (kind === 1) {
+        for (let k = 0; k < 3; k++) { const i = ((y - k) << 8) | col; if (blocks[i] === W.GRASS || blocks[i] === W.DIRT) blocks[i] = W.SAND; }
+        if (blocks[ai] && (T.flags[blocks[ai]] & F.PLANT)) blocks[ai] = 0;
+        if (wet && pn > 0.3 && h < 0.55) { const n = 1 + ((h * 7) | 0) % 3; for (let k = 1; k <= n; k++) if (!blocks[((y + k) << 8) | col]) blocks[((y + k) << 8) | col] = W.CANE; }
+      } else {
+        const s = pn > 0.25 ? W.GRAVEL : pn > -0.1 ? (h < 0.5 ? W.SAND : W.GRAVEL) : pn > -0.3 ? W.COARSE : 0;
+        if (s) { blocks[(y << 8) | col] = s; if (blocks[((y - 1) << 8) | col] === W.DIRT || blocks[((y - 1) << 8) | col] === W.GRASS) blocks[((y - 1) << 8) | col] = s === W.COARSE ? W.DIRT : s; if (blocks[ai] && (T.flags[blocks[ai]] & F.PLANT)) blocks[ai] = 0; }
+        if (wet && pn < 0.15 && g.nLandD.n2(x * 1.3, z * 1.3) > -0.05) { const n = 1 + ((h * 11) | 0) % 3; for (let k = 1; k <= n; k++) if (!blocks[((y + k) << 8) | col]) blocks[((y + k) << 8) | col] = W.CANE; }
+      }
+    }
+    // the shallows: seagrass on the lake's sand shelf
+    if (nearLake) for (let col = 0; col < 256; col++) {
+      const x = x0 + (col & 15), z = z0 + (col >> 4);
+      if (!isW(col, SEA)) continue;
+      let y = SEA; while (y > 40 && isW(col, y)) y--;
+      if (SEA - y < 2 || SEA - y > 5 || !blocks[(y << 8) | col]) continue;
+      if (h01(x, z, g.seed ^ 0x5ea) < 0.16 && g.nLandD.n2(x, z) > 0) blocks[((y + 1) << 8) | col] = W.SEAG;
+    }
+  }
+  LAND.DRESS.push(dressWater);
+
+  // ---- the waterfall over the river's head, its cave, the ford below it
+  LAND.PIECES.push(Object.assign(function falls(g, P, K) {
+    const W = wstates(), gy = groundOf(g, P), Fa = LAND.falls(g), put = K.put;
+    const [ux, uz] = Fa.dir, px = -uz, pz = ux, top = Fa.top;
+    if (top < SEA + 10) return;
+    const at = (k, o) => [Math.round(Fa.spring[0] + ux * k + px * o), Math.round(Fa.spring[1] + uz * k + pz * o)];
+    // the spring: a little round pool behind the lip
+    for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+      const d = Math.hypot(dx, dz); if (d > 2.6) continue;
+      const x = Fa.spring[0] + dx, z = Fa.spring[1] + dz, y0 = gy(x, z);
+      put(x, top - 2, z, W.MCOB); put(x, top - 1, z, W.WATER); put(x, top, z, W.WATER);
+      for (let y = top + 1; y <= Math.max(y0, top) + 2; y++) put(x, y, z, 0);
+    }
+    // the outlet to the lip, then the water down the wall: three wide, over every step of the wall from the lip to the
+    // pool (a cascade hugging the rock), and a last free curtain over the pool in front of the cave's mouth
+    let k = 1; const curtain = [];
+    for (; k < 18; k++) {
+      const [cx0, cz0] = at(k, 0), g0 = gy(cx0, cz0);
+      if (g0 < top - 2) break;
+      for (let o = -1; o <= 1; o++) { const [x, z] = at(k, o); put(x, top - 1, z, W.MCOB); put(x, top, z, W.WATER); for (let y = top + 1; y <= gy(x, z) + 2; y++) put(x, y, z, 0); }
+    }
+    const [hx0, hz0] = Fa.head, rLip = Math.round(Math.hypot(at(k, 0)[0] - hx0, at(k, 0)[1] - hz0));
+    const wall = (r, o) => [Math.round(hx0 - ux * r + px * o), Math.round(hz0 - uz * r + pz * o)];
+    for (let o = -1; o <= 1; o++) {
+      let from = top;
+      for (let r = rLip; r >= LAND.HEAD_R - 1; r--) {
+        const [x, z] = wall(r, o), g0 = r >= LAND.HEAD_R ? gy(x, z) : SEA;
+        const lo = Math.max(g0 + 1, SEA + 1);
+        for (let y = from; y >= lo; y--) put(x, y, z, W.FALL);
+        if (o === 0 || curtain.length < 2) curtain.push([x, z]);
+        else curtain.push([x, z]);
+        from = Math.max(lo, g0);
+        if (r === LAND.HEAD_R - 1) break;
+      }
+    }
+    // the cave behind the curtain: into the wall at the pool's level, three wide, four high, eight deep
+    const [hx, hz] = Fa.head, back = (r, o) => [Math.round(hx - ux * r + px * o), Math.round(hz - uz * r + pz * o)];
+    let cave = 0;
+    for (let r = LAND.HEAD_R; r <= LAND.HEAD_R + 8; r++) for (let o = -1; o <= 1; o++) {
+      const [x, z] = back(r, o), g0 = gy(x, z); if (g0 < SEA + 6) continue;
+      put(x, SEA, z, r > LAND.HEAD_R + 6 ? W.MOSS : W.MCOB);
+      for (let y = SEA + 1; y <= SEA + 4; y++) put(x, y, z, 0);
+      if (o === 0 && r === LAND.HEAD_R + 7) put(x, SEA + 1, z, st('lantern', { hanging: 0 }));
+      else if (h01(x, z, 81) < 0.25) put(x, SEA + 1, z, st(h01(x, z, 82) < 0.5 ? 'brown_mushroom' : 'red_mushroom'));
+      put(x, SEA + 5, z, h01(x, z, 83) < 0.3 ? W.MOSS : W.STONE);
+      cave++;
+    }
+    const [mx, mz] = curtain.length ? curtain[(curtain.length / 2) | 0] : Fa.edge;
+    LAND.addSpawn(P, ['mist', mx, SEA + 1, mz, 3], mx, mz);
+    markDisc(P, Fa.spring[0], Fa.spring[1], 5, LAND.KEEP.PIECE);
+    P.pieces.push({ kind: 'waterfall', x: mx, z: mz, y: SEA + 1, top, spring: Fa.spring.slice(), curtain, cave });
+    // the ford: stepping stones over the river a little below the pool
+    const Rv = LAND.river(g), i = Math.min(Rv.pts.length - 2, 46), p0 = Rv.pts[i], p1 = Rv.pts[i + 1], tx = p1[0] - p0[0], tz = p1[1] - p0[1], tl = Math.hypot(tx, tz) || 1;
+    const wb = LAND.riverWb(i / Rv.len) + 2.5, stones = [];
+    for (let o = -wb; o <= wb; o += 1) {
+      const x = Math.round(p0[0] - tz / tl * o), z = Math.round(p0[1] + tx / tl * o);
+      if (gy(x, z) >= SEA) continue;
+      if ((Math.round(o) & 1) === 0) { put(x, SEA, z, W.MCOB); for (let y = gy(x, z) + 1; y < SEA; y++) put(x, y, z, W.STONE); stones.push([x, z]); }
+    }
+    P.pieces.push({ kind: 'ford', x: Math.round(p0[0]), z: Math.round(p0[1]), y: SEA, stones });
+  }, { order: 2 }));
+  // ---- lily ponds: closed bowls in the meadows and the woods, near a way
+  LAND.PIECES.push(Object.assign(function ponds(g, P, K) {
+    const W = wstates(), gy = groundOf(g, P), put = K.put, got = [];
+    const cand = [];
+    for (let z = -620; z <= 620; z += 44) for (let x = -620; x <= 620; x += 44) {
+      const px = x + Math.round((h01(x, z, g.seed ^ 91) - 0.5) * 30), pz = z + Math.round((h01(z, x, g.seed ^ 92) - 0.5) * 30);
+      if (px * px + pz * pz > 610 * 610 || LAND.zoneAt(g, px, pz) || LAND.keepAt(P, px, pz)) continue;
+      cand.push([px, pz, h01(px, pz, g.seed ^ 93)]);
+    }
+    cand.sort((a, b) => a[2] - b[2]);
+    for (const [x, z] of cand) {
+      if (got.length >= 7) break;
+      if (got.some(c => Math.hypot(c[0] - x, c[1] - z) < 160)) continue;
+      let dw = 1e9; for (const c of P.cells.values()) { const d = (c.x - x) ** 2 + (c.z - z) ** 2; if (d < dw) dw = d; }
+      dw = Math.sqrt(dw); if (dw < 14 || dw > 70) continue;
+      const R0 = 4.5 + h01(x, z, 94) * 3, ph = h01(x, z, 95) * 6.283, rad = (a) => R0 * (1 + 0.22 * Math.sin(3 * a + ph) + 0.12 * Math.sin(5 * a + 2 * ph));
+      // the level: one under the lowest ground of the ring round the bowl
+      let L = 999, hi = -999, ok = true;
+      for (let a = 0; a < 6.283; a += 0.2) { const r = rad(a) + 1.6, qx = Math.round(x + Math.cos(a) * r), qz = Math.round(z + Math.sin(a) * r); if (LAND.zoneAt(g, qx, qz) || (LAND.keepAt(P, qx, qz) & 3)) { ok = false; break; } const y = gy(qx, qz); L = Math.min(L, y - 1); hi = Math.max(hi, y); }
+      if (!ok || L <= SEA + 2 || hi - L > 6) continue;
+      got.push([x, z]);
+      const reach = Math.ceil(R0 * 1.4 + 3); let water = 0, lilies = 0, reeds = 0;
+      for (let dz = -reach; dz <= reach; dz++) for (let dx = -reach; dx <= reach; dx++) {
+        const qx = x + dx, qz = z + dz, d = Math.hypot(dx, dz), a = Math.atan2(dz, dx), r = rad(a), y0 = gy(qx, qz);
+        if (d < r) {
+          const depth = 1 + Math.round(2.4 * (1 - d / r)), bot = L - depth;
+          put(qx, bot, qz, h01(qx, qz, 96) < 0.4 ? W.CLAY : W.DIRT);
+          for (let y = bot + 1; y <= L; y++) put(qx, y, qz, W.WATER);
+          for (let y = L + 1; y <= y0 + 2; y++) put(qx, y, qz, 0);
+          water++;
+          if (d < r - 0.8 && h01(qx, qz, 97) < 0.2) { put(qx, L + 1, qz, W.LILY); lilies++; }
+        } else if (d < r + 2.5) {
+          // the bowl's rim: never lower than one over the water (a closed bowl), reeds and orchids on it
+          if (y0 < L + 1) { for (let y = y0 + 1; y < L + 1; y++) put(qx, y, qz, W.DIRT); put(qx, L + 1, qz, W.GRASS); }
+          const ry = Math.max(y0, L + 1);
+          if (d < r + 1.2 && h01(qx, qz, 98) < 0.4) { const n = 1 + ((h01(qx, qz, 99) * 3) | 0); for (let k = 1; k <= n; k++) put(qx, ry + k, qz, W.CANE); reeds++; }
+          else if (h01(qx, qz, 100) < 0.15) put(qx, ry + 1, qz, st(h01(qx, qz, 101) < 0.5 ? 'blue_orchid' : 'azure_bluet'));
+        }
+      }
+      markDisc(P, x, z, Math.ceil(R0 * 1.3) + 3, LAND.KEEP.POND);
+      LAND.addSpawn(P, ['fauna', 'duck', x, L + 1, z, 2 + (h01(x, z, 102) * 3 | 0), Math.round(R0)], x, z);
+      P.pieces.push({ kind: 'pond', x, z, y: L, r: R0, water, lilies, reeds });
+    }
+  }, { order: 3 }));
+  // ---- the lighthouse on the lake's south-west point, the fishing hut and its pier on the north-west beach
+  LAND.PIECES.push(Object.assign(function lakeside(g, P, K) {
+    const W = wstates(), gy = groundOf(g, P), put = K.put, Lk = LAND.LAKE;
+    // the lighthouse: the driest point of the shore between south and west that has water within four blocks
+    let best = null;
+    for (let a = 1.75; a <= 2.6; a += 0.05) {
+      const [sx, sz] = LAND.shoreAt(g, a, 1.07), y = gy(sx, sz);
+      if (y < SEA + 1 || LAND.zoneAt(g, sx, sz) || (LAND.keepAt(P, sx, sz) & 3)) continue;
+      let wet = 0; for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) if (gy(sx + dx, sz + dz) < SEA) wet++;
+      const score = wet + h01(sx, sz, 103);
+      if (wet >= 6 && (!best || score > best.score)) best = { x: sx, z: sz, y, score };
+    }
+    if (best) {
+      const { x, z } = best, F = best.y + 1, H = 20;
+      const towards = Math.atan2(Lk.z - z, Lk.x - x), door = FACE4(-Math.cos(towards), -Math.sin(towards));
+      for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+        const d = Math.hypot(dx, dz), qx = x + dx, qz = z + dz, y0 = gy(qx, qz);
+        if (d <= 3.5) { for (let y = Math.min(y0, SEA - 1); y < F; y++) put(qx, y, qz, st('stone_bricks')); put(qx, F, qz, st('stone_bricks')); }
+        if (d <= 3.0) for (let y = F + 1; y <= F + H; y++) {
+          const shell = d > 2.0;
+          if (!shell) { put(qx, y, qz, 0); continue; }
+          const band = ((y - F - 1) >> 2) & 1;
+          put(qx, y, qz, y <= F + 2 ? st('stone_bricks') : band ? st('red_concrete') : st('white_concrete'));
+        }
+      }
+      // door, windows, a ladder up the inside
+      const dv = [[0, -1], [1, 0], [0, 1], [-1, 0]][door], [ddx, ddz] = [dv[0] * 3, dv[1] * 3];
+      put(x + ddx, F + 1, z + ddz, st('oak_door', { facing: door, half: 0, hinge: 0, open: 0 })); put(x + ddx, F + 2, z + ddz, st('oak_door', { facing: door, half: 1, hinge: 0, open: 0 }));
+      for (let y = F + 6; y < F + H; y += 5) { put(x - dv[0] * 3, y, z - dv[1] * 3, st('glass_pane')); put(x + dv[1] * 3, y + 2, z - dv[0] * 3, st('glass_pane')); }
+      const lad = (door + 2) & 3, lv = [[0, -1], [1, 0], [0, 1], [-1, 0]][lad];
+      for (let y = F + 1; y <= F + H; y++) put(x + lv[0], y, z + lv[1], st('ladder', { facing: door }));
+      // the gallery: a slab ring with a railing, the lantern room (glass round a cluster of lamps), the cap
+      const G = F + H + 1;
+      for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+        const d = Math.hypot(dx, dz), qx = x + dx, qz = z + dz;
+        if (d <= 3.9) put(qx, G, qz, st('stone_brick_slab', { type: 0 }) || st('stone_bricks'));
+        if (d > 3.0 && d <= 3.9) put(qx, G + 1, qz, st('oak_fence'));
+        if (d <= 1.6) { put(qx, G + 1, qz, d < 0.5 ? st('tide_lantern') : st('glass')); put(qx, G + 2, qz, d < 0.5 ? st('tide_lantern') : st('glass')); put(qx, G + 3, qz, st('red_concrete')); }
+        if (d <= 0.5) put(qx, G + 4, qz, st('red_concrete'));
+      }
+      put(x + lv[0], G, z + lv[1], 0);
+      LAND.addSpawn(P, ['lighthouse', x, G + 2, z], x, z);
+      markDisc(P, x, z, 7, LAND.KEEP.PIECE);
+      P.pieces.push({ kind: 'lighthouse', x, z, y: F, top: G + 4, lamp: [x, G + 1, z] });
+    }
+    // the fishing hut: on the beach by the 'beach' site, the pier from the waterline out into the lake
+    const site = P.sites.find(s => s.kind === 'beach');
+    if (site) {
+      const a = Math.atan2(site.z - Lk.z, site.x - Lk.x), ux = -Math.cos(a), uz = -Math.sin(a), px = -uz, pz = ux;   // u: toward the lake
+      const [wx, wz] = LAND.shoreAt(g, a, 1.0);
+      const hx = Math.round(site.x + px * 9), hz = Math.round(site.z + pz * 9);
+      // the hut: 5 × 4, spruce, a thatch roof, its door to the lake
+      const hy = Math.max(gy(hx, hz), SEA + 2) + 1, face = FACE4(ux, uz);
+      const HR = [[-2, 2], [-2, 1]];
+      for (let a2 = -2; a2 <= 2; a2++) for (let b2 = -2; b2 <= 1; b2++) {
+        const x = Math.round(hx + px * a2 + ux * b2), z = Math.round(hz + pz * a2 + uz * b2), y0 = gy(x, z), edge = Math.abs(a2) === 2 || b2 === -2 || b2 === 1, corner = Math.abs(a2) === 2 && (b2 === -2 || b2 === 1);
+        for (let y = Math.min(y0, hy - 1); y < hy; y++) put(x, y, z, st('spruce_log', { axis: 0 }));
+        put(x, hy, z, st('spruce_planks'));
+        for (let y = hy + 1; y <= hy + 3; y++) put(x, y, z, edge ? (corner ? st('spruce_log', { axis: 0 }) : st('spruce_planks')) : 0);
+        put(x, hy + 4, z, st('vx_roof_thatch', { facing: b2 <= -1 ? (face + 2) & 3 : face }));
+        if (b2 === -1 || b2 === 0) put(x, hy + 5, z, st('vx_ridge_thatch', { facing: (face + 1) & 3 }));
+      }
+      void HR;
+      const dx0 = Math.round(hx + ux * 1), dz0 = Math.round(hz + uz * 1);
+      put(dx0, hy + 1, dz0, st('spruce_door', { facing: face, half: 0, hinge: 0, open: 0 })); put(dx0, hy + 2, dz0, st('spruce_door', { facing: face, half: 1, hinge: 0, open: 0 }));
+      { const x = Math.round(hx + px * 2 + ux * 0), z = Math.round(hz + pz * 2 + uz * 0); put(x, hy + 2, z, st('glass_pane')); }
+      { const x = Math.round(hx - px * 1), z = Math.round(hz - pz * 1); put(x, hy + 1, z, st('barrel', { facing: 1, open: 0 })); put(Math.round(hx + px), hy + 1, Math.round(hz + pz), st('lantern', { hanging: 0 })); }
+      // the pier: three wide, from two blocks behind the waterline to twelve out, on spruce posts, a lantern at its end
+      const len = 14, Y = SEA + 1;
+      let endX = wx, endZ = wz;
+      for (let i = -2; i <= len; i++) for (let o = -1; o <= 1; o++) {
+        const x = Math.round(wx + ux * i + px * o), z = Math.round(wz + uz * i + pz * o), y0 = gy(x, z);
+        put(x, Y, z, st('spruce_planks'));
+        for (let y = Y + 1; y <= Y + 3; y++) put(x, y, z, 0);
+        if ((i % 4 === 0 || i === len) && o !== 0) for (let y = Math.min(y0 + 1, Y - 1); y < Y; y++) put(x, y, z, st('spruce_log', { axis: 0 }));
+        if (o !== 0 && i > 0 && i % 2 === 0) put(x, Y + 1, z, st('spruce_fence'));
+        if (i === len && o === 0) { endX = x; endZ = z; }
+      }
+      { const x = Math.round(wx + ux * len + px), z = Math.round(wz + uz * len + pz); put(x, Y + 1, z, st('spruce_fence')); put(x, Y + 2, z, st('lantern', { hanging: 0 })); }
+      { const x = Math.round(wx + ux * (len - 2) - px), z = Math.round(wz + uz * (len - 2) - pz); put(x, Y + 1, z, st('barrel', { facing: 1, open: 0 })); }
+      LAND.addSpawn(P, ['fauna', 'fish', endX, SEA, endZ, 3, 6], endX, endZ);
+      markDisc(P, hx, hz, 5, LAND.KEEP.PIECE);
+      for (let i = -3; i <= len; i += 2) { const x = Math.round(wx + ux * i), z = Math.round(wz + uz * i); markDisc(P, x, z, 3, LAND.KEEP.PIECE); }
+      P.pieces.push({ kind: 'hut', x: hx, z: hz, y: hy }, { kind: 'pier', x: endX, z: endZ, y: Y, from: [wx, wz], dir: [ux, uz], len });
+    }
+    // the Sky Isles' falls: mist where they meet the lake (the fall's columns as gen_realm lays them)
+    const ISL = VR.IslesGen;
+    if (ISL && ISL.list && g.islandAt) for (const I of ISL.list(g)) {
+      if (!I.falls || I.lava) continue;
+      for (let f = 0; f < I.falls; f++) {
+        const a = ((I.seed * 0.618 + f * 0.37) % 1) * Math.PI * 2;
+        let fx = 0, fz = 0, ft = null;
+        for (let r = 0; r < I.r * 1.4; r += 1) { const qx = Math.round(I.x + Math.cos(a) * r), qz = Math.round(I.z + Math.sin(a) * r), J = g.islandAt(qx, qz); if (J && J.isle === I) { fx = qx; fz = qz; ft = J; } else if (ft) break; }
+        if (!ft) continue;
+        const o1 = [Math.round(Math.cos(a)), Math.round(Math.sin(a))], x = fx + o1[0] - (o1[0] > 0 ? 1 : 0) + 1, z = fz + o1[1] - (o1[1] > 0 ? 1 : 0) + 1;
+        const y = gy(x, z); if (y >= SEA) continue;
+        LAND.addSpawn(P, ['mist', x, SEA + 1, z, 2], x, z);
+        P.pieces.push({ kind: 'islefall', x, z, y: SEA + 1 });
+      }
+    }
+  }, { order: 4 }));
+
   HEART.builders.push(function (g, cx, cz, out) {
     if (!LAND.on(g)) return;
     const x0 = cx * 16, z0 = cz * 16;

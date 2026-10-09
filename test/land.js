@@ -210,6 +210,88 @@ if (want(3)) {
   console.log(`  (${secs()})`);
 }
 
+// ---------------------------------------------------------------- 4 · water
+if (want(4)) {
+  console.log('4 · water: the river, its banks, the waterfall, ponds, the lighthouse, the pier, the beaches');
+  const Rv = LAND.river(g), W = R.byName.water.id;
+  const isWater = (b) => b && R.T.type[b] === W;
+  const topAt = (x, z, y0) => { for (let y = y0 || 140; y > 2; y--) { const b = blockAt(x, y, z); if (b && !((R.T.flags[b] & V.F.PLANT) && !(R.T.flags[b] & V.F.SOLID))) return y; } return 0; };
+  // the river: water on its line all the way, the bed never rising downstream, sand and gravel on its banks
+  let wet = 0, n = 0, rises = 0, prevBed = 99, banks = 0, bankN = 0, ex = '';
+  const built = (x, z) => { for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const c = P.cells.get(ck(x + dx, z + dz)); if (c && c.deck) return true; } const f = P.pieces.find(p => p.kind === 'ford'); return !!f && f.stones.some(([sx, sz]) => Math.abs(sx - x) <= 2 && Math.abs(sz - z) <= 2); };
+  for (let i = 10; i < Rv.pts.length - 6; i += 9) {
+    const [px, pz] = Rv.pts[i], x = Math.round(px), z = Math.round(pz);
+    if (built(x, z)) continue;   // (a bridge's piers and the ford's stones stand in it)
+    n++;
+    if (isWater(blockAt(x, SEA, z))) wet++; else if (!ex) ex = `(${x}, ${z}) ${nameOf(blockAt(x, SEA, z))}`;
+    let bed = SEA; while (bed > 40 && (isWater(blockAt(x, bed, z)) || !(R.T.flags[blockAt(x, bed, z)] & V.F.SOLID))) bed--;   // (seagrass grows in the water)
+    if (bed > prevBed + 1) rises++;
+    prevBed = Math.min(prevBed, bed);
+    // the banks: the first dry column on each side
+    const a = Rv.pts[Math.max(0, i - 2)], b = Rv.pts[Math.min(Rv.pts.length - 1, i + 2)], tx = b[0] - a[0], tz = b[1] - a[1], tl = Math.hypot(tx, tz) || 1;
+    for (const sd of [1, -1]) for (let o = 1; o <= 14; o++) {
+      const qx = Math.round(px - tz / tl * o * sd), qz = Math.round(pz + tx / tl * o * sd), y = topAt(qx, qz, 100), t = blockAt(qx, y, qz);
+      if (isWater(t)) continue;
+      if (y <= SEA + 3) { bankN++; if (/sand|gravel|coarse_dirt|clay/.test(nameOf(t))) banks++; }
+      break;
+    }
+  }
+  check(wet >= n * 0.97, `the river runs unbroken from the pool under the falls to the lake (water on ${wet} of ${n} points of its line${ex ? '; dry at ' + ex : ''})`);
+  check(rises === 0 && LAND.riverBed(0) > LAND.riverBed(1), `its bed never rises downstream (${rises} rises; designed ${LAND.riverBed(0).toFixed(1)} → ${LAND.riverBed(1).toFixed(1)})`);
+  check(bankN > 20 && banks >= bankN * 0.6, `its banks are gravel and sand bars (${banks} of ${bankN} bank columns)`);
+  // the waterfall over the head: the curtain, the spring, the cave, the mist
+  const wf = P.pieces.find(p => p.kind === 'waterfall');
+  if (wf) {
+    let fall = 0; for (const [x, z] of wf.curtain) for (let y = SEA + 1; y <= wf.top; y++) { const b = blockAt(x, y, z); if (isWater(b)) fall++; }
+    const spring = isWater(blockAt(wf.spring[0], wf.top, wf.spring[1]));
+    const mist = (chunk(wf.x >> 4, wf.z >> 4).spawns || []).some(s => s[0] === 'mist');
+    check(fall >= 3 * (wf.top - SEA - 4) && spring && mist && wf.cave >= 15, `a waterfall drops ${wf.top - SEA} blocks from a spring into the river's pool (${fall} cells of falling water, the spring ${spring ? 'full' : 'dry'}, mist ${mist ? 'at its foot' : 'missing'}, a cave of ${wf.cave} cells behind it)`);
+  } else check(false, 'the waterfall over the river head is planned');
+  const ford = P.pieces.find(p => p.kind === 'ford');
+  check(!!ford && ford.stones.length >= 2 && ford.stones.every(([x, z]) => nameOf(blockAt(x, SEA, z)) === 'mossy_cobblestone'), `a ford of stepping stones below the falls (${ford ? ford.stones.length : 0} stones)`);
+  // the ponds: closed bowls (no water cell beside air), lily pads, reeds, ducks
+  const ponds = P.pieces.filter(p => p.kind === 'pond');
+  let leaks = 0, lil = 0, reeds = 0, ducks = 0, full = 0;
+  for (const pd of ponds) {
+    if (isWater(blockAt(pd.x, pd.y, pd.z))) full++;
+    for (let dz = -12; dz <= 12; dz++) for (let dx = -12; dx <= 12; dx++) {
+      const x = pd.x + dx, z = pd.z + dz;
+      if (!isWater(blockAt(x, pd.y, z))) continue;
+      for (const [ax, az] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!blockAt(x + ax, pd.y, z + az)) leaks++;
+      if (nameOf(blockAt(x, pd.y + 1, z)) === 'lily_pad') lil++;
+    }
+    for (let dz = -14; dz <= 14; dz++) for (let dx = -14; dx <= 14; dx++) for (let y = pd.y + 1; y <= pd.y + 4; y++) if (nameOf(blockAt(pd.x + dx, y, pd.z + dz)) === 'sugar_cane') { reeds++; break; }
+    if ((chunk(pd.x >> 4, pd.z >> 4).spawns || []).some(s => s[0] === 'fauna' && s[1] === 'duck')) ducks++;
+  }
+  check(ponds.length >= 5 && full === ponds.length && leaks === 0, `${ponds.length} lily ponds, each a closed bowl (${full} full, ${leaks} cells where the water meets open air)`);
+  check(lil >= ponds.length * 2 && reeds >= ponds.length * 3 && ducks === ponds.length, `the ponds carry lily pads (${lil}), reeds round them (${reeds}) and ducks (${ducks} anchors)`);
+  // the lighthouse on the shore, its lamp
+  const lh = P.pieces.find(p => p.kind === 'lighthouse');
+  if (lh) {
+    let water4 = 0; for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) if (isWater(blockAt(lh.x + dx, SEA, lh.z + dz))) water4++;
+    const foot = nameOf(blockAt(lh.x, lh.y, lh.z)), lamp = nameOf(blockAt(lh.lamp[0], lh.lamp[1], lh.lamp[2]));
+    check(water4 > 0 && foot === 'stone_bricks' && lh.y > SEA && lh.top - lh.y >= 20 && lamp === 'tide_lantern', `a lighthouse on the lake's shore at (${lh.x}, ${lh.z}): water within four blocks (${water4} cells), its foot dry at ${lh.y}, ${lh.top - lh.y} high, its lamp lit (${lamp})`);
+  } else check(false, 'the lighthouse is planned');
+  // the fishing hut and its pier: the pier's end over water, the fish there
+  const pier = P.pieces.find(p => p.kind === 'pier'), hut = P.pieces.find(p => p.kind === 'hut');
+  if (pier && hut) {
+    const endW = isWater(blockAt(pier.x, SEA, pier.z)) || isWater(blockAt(pier.x, SEA - 1, pier.z));
+    const plank = nameOf(blockAt(pier.x, pier.y, pier.z)) === 'spruce_planks', fish = (chunk(pier.x >> 4, pier.z >> 4).spawns || []).some(s => s[0] === 'fauna' && s[1] === 'fish');
+    check(endW && plank && fish, `a fishing hut at (${hut.x}, ${hut.z}) and its pier out over the water (its end ${endW ? 'over water' : 'on land'}, planks ${plank}, fish ${fish})`);
+  } else check(false, 'the fishing hut and its pier are planned');
+  // the beaches: the lake's shore sand
+  let sand = 0, sn = 0;
+  for (let a = 0; a < 6.28; a += 0.21) {
+    const [x, z] = LAND.shoreAt(g, a, 1.06); if (LAND.zoneAt(g, x, z) || LAND.keepAt(P, x, z)) continue;
+    const y = topAt(x, z, 100); if (y > SEA + 4 || y < SEA - 1) continue; sn++;
+    if (/sand/.test(nameOf(blockAt(x, y, z)))) sand++;
+  }
+  check(sn >= 10 && sand >= sn * 0.8, `the lake has its beaches (sand at ${sand} of ${sn} shore points)`);
+  const mists = P.pieces.filter(p => p.kind === 'islefall').length;
+  check(mists >= 3, `mist where the Sky Isles' falls meet the lake (${mists} falls)`);
+  console.log(`  (${secs()})`);
+}
+
 console.log(`(${secs()})`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
