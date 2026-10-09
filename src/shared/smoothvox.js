@@ -632,9 +632,29 @@
       for (let h = 0; h < nv; h++) list.push({ name: t.name, vx: true, h: nv > 1 ? h : -1, base: i0, nvar: nv });
       for (let st = t.base; st < t.base + t.nstates && st < n; st++) { idx[st] = i0; anchor[st] = 1; facing[st] = t.has('facing') ? t.get(st, 'facing') & 3 : 0; states.push(st); }
     }
-    AT = { list, idx, anchor, facing, states: Int32Array.from(states), n: list.length };
+    // the hand-built pieces shaped anew: a VM model with a hand-built mesh whose design the player changed in the Studio
+    // (VR.CUSTOM.models — the Crafter's ✦ Formen, a repaint): the hand-built mesh shows the old shape, so the design wins —
+    // its surface nets (its voxels for the pieces in SV.KEEP). Dormant entries after all the others (the list is the same
+    // in every thread whatever is designed); one is on while its model has a design (SV.designed)
+    const hstates = [];
+    for (const t of R.types) {
+      const o = t.o || {}, m = VM.MODELS[t.name];
+      if (!m || !o.vxModel || !furn.has(t.name) || o.prop || o.propStem || SV.SKIP.test(t.name)) continue;
+      const i0 = list.length, tog = !!o.toggle && t.has('lit'), keep = SV.KEEP.test(t.name);
+      list.push({ name: t.name, off: false, base: i0, nvar: 1, hand: true, keep });
+      if (tog) list.push({ name: t.name, off: true, base: i0 + 1, nvar: 1, hand: true, keep });
+      for (let st = t.base; st < t.base + t.nstates && st < n; st++) {
+        idx[st] = tog && !t.get(st, 'lit') ? i0 + 1 : i0;
+        anchor[st] = !t.has('part') || t.get(st, 'part') === 0 ? 1 : 0;
+        facing[st] = t.has('facing') ? t.get(st, 'facing') & 3 : 0;
+        hstates.push(st);
+      }
+    }
+    AT = { list, idx, anchor, facing, states: Int32Array.from(states), hstates: Int32Array.from(hstates), n: list.length };
     return AT;
   };
+  // a model the player designed (VR.CUSTOM.models: the Studio's ✦ Formen, a repaint, „Ins Spiel")
+  SV.designed = (name) => { const C = VR.CUSTOM; return !!(C && C.models && C.models[name]); };
   // the standalone VX kinds and their number of looks (4: by the position's hash h)
   SV.VX_ON = true;
   // (not the wall shelf's small things, wshelf, nor the sign's lettering; the res-8 pieces are split to 16 a block, SV.upFor)
@@ -668,25 +688,39 @@
   // mesher.js propTables() hands its tables over once (one additive line): every state of an eligible piece that is no
   // prop already gets its auto kind (an Int32 copy of the kind table), its anchor (part 0) and its facing; its group stays
   // 0 — the mesher draws its voxels — until its mesh is ready, then it is furniture (the furniture pass draws it)
-  let PT = null, GFURN = 2, applied = -1;
+  let PT = null, GFURN = 2, applied = -1, appliedCustom = null, ON = null;
   SV.tables = function (T, GROUP) {
     if (!SV.enabled) return;
     const A = SV.autoTables(); if (!A) return;
     GFURN = (GROUP && GROUP.furniture) || 2;
     const kind = new Int32Array(T.kind.length); kind.set(T.kind);
-    const mine = [];
+    const mine = [], hand = [];
     for (let k = 0; k < A.states.length; k++) {
       const st = A.states[k]; if (st >= kind.length || T.kind[st] || T.group[st]) continue;
       kind[st] = AUTO0 + A.idx[st]; T.anchor[st] = A.anchor[st]; T.facing[st] = A.facing[st]; mine.push(st);
     }
+    // (a hand-built piece keeps its kind and group until its model is designed: the originals kept to go back to)
+    for (let k = 0; k < A.hstates.length; k++) { const st = A.hstates[k]; if (st < kind.length && T.kind[st]) hand.push(st); }
     T.kind = kind; T.autoStates = Int32Array.from(mine);
+    T.handStates = Int32Array.from(hand); T.handKind = Int32Array.from(hand, st => kind[st]); T.handGroup = Uint8Array.from(hand, st => T.group[st]);
     PT = T; applyReady();
   };
-  function applyReady(held) {   // (held: the pass held back — every piece its voxels)
+  // the groups by the ready bits; the hand-built pieces by their designs: a designed one is an auto piece (its voxels
+  // until its mesh is ready; for SV.KEEP's pieces always its voxels), the others their hand-built selves
+  function applyReady(held) {   // (held: the pass held back — every piece its voxels, the hand-built ones hand-built)
     if (!PT || !PT.autoStates || !AT) return;
-    const bits = held ? null : SV.ready.bits, G = PT.group, S = PT.autoStates;
+    const bits = held ? null : SV.ready.bits, G = PT.group, K = PT.kind, S = PT.autoStates;
+    if (!ON || ON.length !== AT.n) { ON = new Uint8Array(AT.n); for (let i = 0; i < AT.n; i++) ON[i] = AT.list[i].hand ? 0 : 1; }
+    for (let i = 0; i < AT.n; i++) { const e = AT.list[i]; if (e.hand) ON[i] = !held && !e.keep && SV.designed(e.name) ? 1 : 0; }
     for (let k = 0; k < S.length; k++) { const st = S[k]; G[st] = allReady(bits, AT.idx[st]) ? GFURN : 0; }
-    applied = held ? -1 : SV.ready.ver;
+    const H = PT.handStates;
+    if (H) for (let k = 0; k < H.length; k++) {
+      const st = H[k], i = AT.idx[st], e = AT.list[i];
+      if (ON[i]) { K[st] = AUTO0 + i; G[st] = allReady(bits, i) ? GFURN : 0; }
+      else if (!held && e.keep && SV.designed(e.name)) { K[st] = 0; G[st] = 0; }   // (its voxels: the design as it is)
+      else { K[st] = PT.handKind[k]; G[st] = PT.handGroup[k]; }
+    }
+    applied = held ? -1 : SV.ready.ver; appliedCustom = held ? null : VR.CUSTOM;
   }
   // worker_main.js 'mesh', before the mesher: the job's ready bits, then the pieces in the section's own 16³ that are not
   // ready yet (the main thread asks for their meshes) — only for a job that draws the furniture smooth (never Very Low)
@@ -697,15 +731,16 @@
     const r = job.svReady;
     if (r && r.ver < 0) { if (PT && applied !== -1) applyReady(true); return null; }   // (held back: the voxels, no wants)
     if (r && r.bits && r.ver !== SV.ready.ver) SV.ready = { ver: r.ver, bits: r.bits };
-    if (PT && applied !== SV.ready.ver) applyReady();
+    if (PT && (applied !== SV.ready.ver || appliedCustom !== VR.CUSTOM)) applyReady();   // (new bits, or new designs: worker_main.js 'custom')
     if (job.vxDetail === false || !job.blocks) return null;
     const B = job.blocks, PS = VR.MESH_PS || 20, PAD = VR.MESH_PAD || 2, PSS = PS * PS, bits = SV.ready.bits, I = A.idx;
+    if (!ON) { ON = new Uint8Array(A.n); for (let i = 0; i < A.n; i++) ON[i] = A.list[i].hand ? (!A.list[i].keep && SV.designed(A.list[i].name) ? 1 : 0) : 1; }
     let want = null;
     for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) {
       const row = (y + PAD) * PSS + (z + PAD) * PS + PAD;
       for (let x = 0; x < 16; x++) {
         const st = B[row + x]; if (!st) continue;
-        const i = I[st]; if (i < 0 || allReady(bits, i)) continue;
+        const i = I[st]; if (i < 0 || !ON[i] || allReady(bits, i)) continue;
         if (!want) want = [i]; else if (want.indexOf(i) < 0) want.push(i);
       }
     }
