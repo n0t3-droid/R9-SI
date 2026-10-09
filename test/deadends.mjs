@@ -114,7 +114,7 @@ await section('3 · Architektur: ☆ and ✏️ on every house card, a ★ Favor
     return out;
   });
   console.log('  arch', JSON.stringify(r));
-  check(r.n === 11 && r.favb && r.editb, 'all 11 house cards have ☆ and ✏️');
+  check(r.n >= 11 && r.favb && r.editb, 'all ' + r.n + ' house cards have ☆ and ✏️ (11 houses + Villa Nova since v0.42)');
   check(r.favs.join() === 'blueprint_3', '☆ on Villa Belfronte makes blueprint_3 a favourite (the game\'s ★ tab knows that id)');
   check(/Favoriten/.test(r.chip || '') && r.shown.join() === '3', 'the ★ Favoriten chip in Architektur shows it (' + r.shown.join() + ')');
   check(r.craft.mode === 'craft' && r.craft.kind === 'house' && r.craft.idx === 3, '✏️ on the card opens that house in the Crafter');
