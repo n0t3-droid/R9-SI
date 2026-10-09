@@ -128,7 +128,50 @@ console.log('d · the renderer with a stub GL');
   check(live >= 10, 'a run of 60 m/s draws live (no cache)', live + ' of 20 frames live');
   let back = 0; for (let i = 0; i < 30; i++) if (frame(16.7).fc) back++;
   check(back > 0 && frame().fc, 'standing again, the cache comes back', back + ' of 30 frames');
+  // (step 4) a strip draws the furniture beyond the near radius into the cache, with the shadow lookup moved to the
+  // cache's eye (the cache is drawn from there; the frame's shadow matrix is for this frame's eye)
+  const seen = { props: [], shadow: [] };
+  const sm0 = M4.create(); for (let i = 0; i < 16; i++) sm0[i] = i + 1; r.shadowMat = sm0;
+  r.q.smoothFurn = 1;
+  const keepT = r.fcTerrain, keepP = r.drawProps;
+  r.fcTerrain = function () { seen.shadow.push(Array.from(this.shadowMat)); };
+  r.drawProps = function (E2, camPos, shadow, refl, split) { seen.props.push({ camPos: camPos.slice(), shadow, split: split && Object.assign({}, split) }); };
+  r.fc.front.t = -1e9; cam.x += 0.5;   // (an old cache: a new one is begun from here)
+  frame(16.7);
+  const b = r.fc.back || r.fc.front, pr = seen.props[0];
+  cam.x += 0.7; cam.z -= 0.4; frame(16.7);   // (the next strip is drawn from the eye the cache began at, the frame's eye moved on)
+  check(pr && pr.split && pr.split.far === true && Math.abs(pr.split.R2 - b.R * b.R) < 1e-6 && pr.split.x === b.x && pr.camPos[0] === b.x && !pr.shadow, 'a strip draws the furniture beyond the cache\'s near radius (from the cache\'s eye)', JSON.stringify(pr && pr.split));
+  const T = M4.create(); T[12] = b.x - cam.x; T[13] = b.y - cam.y; T[14] = b.z - cam.z;
+  const want = M4.mul(M4.create(), sm0, T), got = seen.shadow[1] || [];
+  check(got.length === 16 && got.every((v, i) => Math.abs(v - want[i]) < 1e-4) && r.shadowMat === sm0, 'its shadow lookup is moved to the cache\'s eye (and the frame\'s matrix is back after the strip)');
+  r.fcTerrain = keepT; r.drawProps = keepP;
+  // the live pass: with the cache shown, only the furniture within its near radius
+  const lp = []; r.drawProps = function (E2, camPos, shadow, refl, split) { lp.push(split && Object.assign({}, split)); };
+  r.liveProps(E, [cam.x, cam.y, cam.z], { front: r.fc.front }); r.liveProps(E, [cam.x, cam.y, cam.z], null);
+  check(lp.length === 2 && lp[0] && lp[0].far === false && lp[0].x === r.fc.front.x && Math.abs(lp[0].R2 - r.fc.front.R * r.fc.front.R) < 1e-6 && lp[1] === null, 'the live pass draws the furniture within the shown cache\'s near radius; without a cache all of it', JSON.stringify(lp));
+  r.drawProps = keepP;
   performance.now = realNow;
+}
+
+console.log('e · the furniture split between the cache and the live pass (renderer.propGather)');
+{
+  // pieces of one model at 10 … 250 blocks east of the cache's eye (vxLod 96: the smooth form within 28 blocks, the far
+  // boxes to 192); a palm at 20 blocks
+  const keep = V.Props; V.Props = { INST: 12, FURN0: 16 };
+  const r = Object.create(V.Renderer.prototype);
+  r.q = { vxLod: 96 };
+  r.furnSlots = [{ rad: 0.8, h: 1.5, near: new Float32Array(12 * 16), far: new Float32Array(12 * 16), nn: 0, nf: 0 }];
+  r.propA = new Float32Array(12 * 16); r.propB = new Float32Array(12 * 16);
+  const dists = [10, 30, 50, 70, 100, 150, 250], n = dists.length + 1, data = new Float64Array(n * 12), kind = new Uint8Array(n), slot = new Int16Array(n);
+  dists.forEach((d, i) => { data[i * 12] = d; data[i * 12 + 1] = 80; data[i * 12 + 2] = 0; kind[i] = 20; slot[i] = 0; });
+  data[(n - 1) * 12] = 20; data[(n - 1) * 12 + 1] = 80; kind[n - 1] = 1; slot[n - 1] = -1;
+  r.propSecs = new Set([{ propData: data, propKind: kind, propN: n, propSlot: slot }]);
+  const run = (split, lvl) => { r.propGather([0, 80, 0], lvl || 0, lvl ? 96 : 0, lvl ? 192 : 0, 1, null, 0, split); const sl = r.furnSlots[0]; return [sl.nn, sl.nf, r.propNA + r.propNB]; };
+  const all = run(null), live = run({ x: 0, y: 80, z: 0, R2: 64 * 64, far: false }), cached = run({ x: 0, y: 80, z: 0, R2: 64 * 64, far: true });
+  check(all.join() === '1,5,0' && live.join() === '1,2,0' && cached.join() === '0,3,0', 'within 64 blocks live (the near form and two far boxes), beyond it in the cache (three far boxes), none twice, none lost', `all ${all} · live ${live} · cache ${cached}`);
+  const palms = run({ x: 0, y: 80, z: 0, R2: 64 * 64, far: false }, 2);
+  check(palms[2] === 1, 'the palms stay live (they sway in the wind)', palms.join());
+  V.Props = keep;
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
