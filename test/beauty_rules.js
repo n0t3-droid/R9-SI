@@ -190,6 +190,9 @@ console.log('4 · nothing a generator places stands on air (vgen 9)');
   check(hills9.props === 0, `the Pod Hills: no lamp or bush on air at vgen 9 (${hills9.props}${hills9.props ? ' ' + JSON.stringify(hills9.at) : ''}; vgen 8: ${hills8.props} ${JSON.stringify(hills8.at)})`);
   const plaza8 = scan(W8, 80, 20, 128, 64), plaza9 = scan(W9, 80, 20, 128, 64);
   check(plaza8.sul > 0 && plaza9.sul === 0 && plaza9.props === 0, `beside the plaza: no sulfur crust floating at vgen 9 (${plaza9.sul}; vgen 8: ${plaza8.sul}), no prop on air (${plaza9.props})`);
+  // the lake's east shore (the audit's water_2: vgen 8's sulfur springs there hung yellow cubes over the meadow)
+  const lake8 = scan(W8, 128, -16, 272, 112), lake9 = scan(W9, 128, -16, 272, 112);
+  check(lake8.sul > 0 && lake9.sul === 0 && lake9.props === 0, `the lake's east shore: no sulfur crust floating at vgen 9 (${lake9.sul}; vgen 8: ${lake8.sul}), no prop on air (${lake9.props}${lake9.props ? ' ' + JSON.stringify(lake9.at) : ''})`);
 }
 
 // ---------------------------------------------------------------- 6 · the plaza's trees, the villa's mounds
