@@ -81,7 +81,8 @@
       'vx_dining_table', 'vx_dining_table_white', 'vx_dining_chair', 'vx_dining_chair_teal', 'vx_tv_wall', 'vx_stool', 'vx_stool_orange', 'vx_urn', 'vx_urn_white', 'vx_tech_planter', 'vx_potplant'],
     ['vm_sideboard', 'vm_dresser', 'vm_bench', 'vm_dining_bench', 'vm_wall_shelf', 'vm_kitchen_shelf', 'vm_office_chair', 'vm_vanity', 'vm_toilet', 'vm_bathtub', 'vm_shower', 'vm_bed_single', 'vm_bunk_bed',
       'vm_fireplace', 'vm_piano', 'vm_lounger', 'vm_coat_rack', 'vm_laundry_basket', 'vm_towel_rail', 'vm_toy_box', 'vm_washer', 'vm_sculpture', 'vm_plant_palm_concrete', 'vm_plant_palm_terracotta',
-      'vm_garden_chair', 'vm_garden_table', 'vm_outdoor_sofa', 'vm_fire_pit', 'vm_parasol']);
+      'vm_garden_chair', 'vm_garden_table', 'vm_outdoor_sofa', 'vm_fire_pit', 'vm_parasol'], ['vm_nova_pad'],
+    ['vx_fountain', 'vx_garden_lamp', 'vx_arc_lamp']);
   // the sofas that join their neighbours in a row (voxtech.js ctxHook.sofa: the same kind and family): the group number;
   // groups from 16 join on all four sides along the world's axes (the rugs: any rug joins any rug, as voxarch.js does).
   // Round II: a corner sofa joins the rows of its colours (an L: the rows lose their arm where the corner stands), the

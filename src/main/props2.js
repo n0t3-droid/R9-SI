@@ -63,6 +63,21 @@
     }
   };
 
+  // a leaf blade (a palm's leaflet, a tropical plant's leaf): a tapered strip from its base along dir, bending down by
+  // droop toward the tip, both faces drawn in the current material (no cutout: a solid green)
+  const blade = (F, base, dir, side, len, wid, droop, k0, k1) => {
+    const up = norm3(cross(side, dir)), rows = 4, A = F.count();
+    for (let i = 0; i <= rows; i++) {
+      const t = i / rows, dd = droop * t * t, w = wid * (t < 0.35 ? 0.55 + 1.3 * t : 1.04 - 0.98 * (t - 0.35) / 0.65) * 0.5, c = [base[0] + dir[0] * len * t - up[0] * dd, base[1] + dir[1] * len * t - up[1] * dd, base[2] + dir[2] * len * t - up[2] * dd];
+      const k = (k0 === undefined ? 0.85 : k0) + ((k1 === undefined ? 1.1 : k1) - (k0 === undefined ? 0.85 : k0)) * t;
+      F.emit(c[0] - side[0] * w, c[1] - side[1] * w, c[2] - side[2] * w, up[0], up[1], up[2], k); F.emit(c[0] + side[0] * w, c[1] + side[1] * w, c[2] + side[2] * w, up[0], up[1], up[2], k);
+    }
+    for (let i = 0; i < rows; i++) { const a = A + i * 2; F.tri(a, a + 1, a + 3); F.tri(a, a + 3, a + 2); }
+    const B = F.count();
+    for (let i = 0; i <= rows * 2 + 1; i++) { const p = F.pos(A + i); F.emit(p[0], p[1], p[2], -up[0], -up[1], -up[2], 0.8); }
+    for (let i = 0; i < rows; i++) { const a = B + i * 2; F.tri(a, a + 3, a + 1); F.tri(a, a + 2, a + 3); }
+  };
+
   // ---------------------------------------------------------------- the paintings (the furniture atlas, props.js)
   // five canvases in the atlas's free corners (the white quarter keeps its corner round UV0): the three abstracts of the
   // villages' art blocks in their palettes (the voxel motif, painted finer: soft colour fields and brush strokes), the
@@ -387,9 +402,10 @@
   });
   // the wall sconce (black): a slim backplate with a box that throws its light up and down the wall
   MD('sconce', [1, 1, 1], (F) => {
-    F.m(MAT.metal, COL.black).rbox(6.2, 3.6, 15.2, 9.8, 12.4, 16, 0.3, { seg: 1 }).rbox(5.6, 4.6, 12.0, 10.4, 11.4, 15.2, 0.6, { seg: 2 });
-    F.m(MAT.light, COL.warm).rbox(6.2, 11.4, 12.6, 9.8, 11.7, 14.6, 0.1, { seg: 1 }).rbox(6.2, 4.3, 12.6, 9.8, 4.6, 14.6, 0.1, { seg: 1 });
-    F.m(MAT.metal, COL.black); F.far(5.6, 3.6, 12, 10.4, 12.4, 16);
+    F.m(MAT.metal, COL.black).rbox(6.6, 4.0, 15.3, 9.4, 12.0, 16, 0.4, { seg: 2 }).rod(8, 8, 15.3, 8, 8, 13.4, 0.45, { seg: 6 });
+    F.m(MAT.metal, COL.black).cyl(8, 12.6, 4.8, 11.2, 2.0, 2.0, { seg: 18, caps: 0 });
+    F.m(MAT.light, COL.warm).cyl(8, 12.6, 11.0, 11.2, 1.8, 1.8, { seg: 18, caps: 2 }).cyl(8, 12.6, 4.8, 5.0, 1.8, 1.8, { seg: 18, caps: 1 });
+    F.m(MAT.metal, COL.black); F.far(6, 4.0, 10.6, 10, 12, 16);
   });
   // the villages' floor lamp: an iron foot, a brass stem, a fabric drum (the piece's colour) glowing from inside
   MD('vfloorlamp', [1, 1, 1], (F) => {
@@ -503,7 +519,7 @@
   // the coffee tables of the modern towns: two black slab legs under a glass top in a thin frame, or under a marble slab
   for (const k of ['glass', 'marble']) MD('vcoffee:' + k, [1, 1, 1], (F) => {
     F.m(MAT.metal, P.black).rbox(2, 0, 2.4, 3.8, 6.2, 13.6, 0.3, { seg: 1 }).rbox(12.2, 0, 2.4, 14, 6.2, 13.6, 0.3, { seg: 1 });
-    if (k === 'glass') { F.m(MAT.metal, P.black); frameBars(F, 0.2, 0.2, 15.8, 15.8, 0.6, 6.2, 7.2, 0.15); F.turn([['x', Math.PI / 2]], [8, 6.7, 8]); F.turn(null); F.m(MAT.metal, P.black).rbox(0.2, 6.2, 0.2, 0.8, 7.2, 15.8, 0.15, { seg: 1 }).rbox(15.2, 6.2, 0.2, 15.8, 7.2, 15.8, 0.15, { seg: 1 }).rbox(0.8, 6.2, 0.2, 15.2, 7.2, 0.8, 0.15, { seg: 1 }).rbox(0.8, 6.2, 15.2, 15.2, 7.2, 15.8, 0.15, { seg: 1 }); F.m(MAT.glass, 0xC8E0EE).box(0.8, 6.6, 0.8, 15.2, 7.0, 15.2); }
+    if (k === 'glass') { F.m(MAT.metal, P.black).rbox(0.2, 6.2, 0.2, 0.8, 7.2, 15.8, 0.15, { seg: 1 }).rbox(15.2, 6.2, 0.2, 15.8, 7.2, 15.8, 0.15, { seg: 1 }).rbox(0.8, 6.2, 0.2, 15.2, 7.2, 0.8, 0.15, { seg: 1 }).rbox(0.8, 6.2, 15.2, 15.2, 7.2, 15.8, 0.15, { seg: 1 }); F.m(MAT.glass, 0xC8E0EE).box(0.8, 6.6, 0.8, 15.2, 7.0, 15.2); }
     else F.m(MAT.marble, P.marble).rbox(0.2, 6.2, 0.2, 15.8, 7.8, 15.8, 0.7, { seg: 2 });
     const y = k === 'glass' ? 7.0 : 7.8;
     F.m(MAT.metal, P.brass).lathe(7, 8, [[y, 1.2], [y + 0.8, 2.6], [y + 1.4, 2.8], [y + 1.4, 2.5], [y + 0.9, 2.2], [y + 0.9, 0.01]], { seg: 14, capBot: true });
@@ -595,10 +611,11 @@
     F.m(MAT.gloss, 0xF0F2F6).rbox(0.2, 0.6, 0.2, 15.8, 6, 15.8, 0.6, { seg: 2, skip: B_BOT });
     F.m(MAT.light, 0x3AF0FF).box(0.6, 0, 0.6, 15.4, 0.6, 15.4, B_BOT);
     F.m(MAT.matte, COL.soil).box(1.2, 6, 1.2, 14.8, 6.1, 14.8);
-    F.m(MAT.leaf, 0x2E8A3A).sphere(8, 8.6, 8, 4.2, 3.0, 4.2, { seg: 9, lump: 0.2, seed: 23 });
+    F.m(MAT.leaf, 0x2E8A3A).sphere(8, 8.2, 8, 3.2, 2.2, 3.2, { seg: 8, lump: 0.2, seed: 23 });
     for (let k = 0; k < 7; k++) {
-      const a = k * TAU / 7 + 0.3, ca = Math.cos(a), sa = Math.sin(a), el = 0.78 - 0.08 * (k % 3);
-      F.m(MAT.leaf, [0x2E8A3A, 0x4EB84A, 0x7AD85A][k % 3]).leaf([8 + ca * 1.0, 7.2, 8 + sa * 1.0], norm3([ca * Math.cos(el), Math.sin(el), sa * Math.cos(el)]), norm3([-sa, 0, ca]), 6.2, 3.6, 2.2, PR.ATL.monstera);
+      const a = k * TAU / 7 + 0.3, ca = Math.cos(a), sa = Math.sin(a), el = 0.82 - 0.12 * (k % 3), r = 0.8 + (k % 2) * 0.6;
+      F.m(MAT.leaf, COL.stem).tube([[8 + ca * 0.3, 6.2, 8 + sa * 0.3], [8 + ca * r, 7.6 + (k % 3) * 0.8, 8 + sa * r]], 0.25, 0.2, { seg: 4, caps: 0 });
+      F.m(MAT.leaf, [0x2E8A3A, 0x4EB84A, 0x3E9A40][k % 3]).leaf([8 + ca * r, 7.6 + (k % 3) * 0.8, 8 + sa * r], norm3([ca * Math.cos(el), Math.sin(el), sa * Math.cos(el)]), norm3([-sa, 0, ca]), 6.2, 5.2, 1.5, PR.ATL.monstera);
     }
     F.m(MAT.gloss, 0xF0F2F6); F.far(0.2, 0, 0.2, 15.8, 6, 15.8); F.m(MAT.leaf, 0x2E8A3A); F.far(2.5, 6, 2.5, 13.5, 11.2, 13.5);
   });
@@ -888,15 +905,15 @@
     F.m(MAT.matte, 0xFFFFFF, 1).lathe(8, 8, [[0, 4.2], [0.5, 4.6], [7.2, 5.2], [7.8, 5.0], [7.8, 4.6], [7.4, 4.5]], { seg: 18, capBot: true });
     F.m(MAT.matte, COL.soil).lathe(8, 8, [[7.2, 4.55], [7.2, 0.01]], { seg: 18 });
     for (let k = 0; k < 7; k++) {
-      const a = k * TAU / 7 + 0.2, ca = Math.cos(a), sa = Math.sin(a), lift = 3 + (k % 3) * 2.5, pts = [];
-      for (let s = 0; s <= 7; s++) pts.push([8 + ca * s * 0.95, 7.2 + lift * Math.min(1, s / 2) + s * 3.2 - s * s * 0.36, 8 + sa * s * 0.95]);
-      F.m(MAT.leaf, COL.stem).tube(pts, 0.32, 0.12, { seg: 4, caps: 0 });
-      for (let s = 2; s < 7; s++) for (const sg of [-1, 1]) {
-        const p = pts[s], q = pts[s + 1], d = norm3(sub(q, p)), side = norm3([-sa * sg, 0, ca * sg]), dir = norm3([side[0] * 0.8 + d[0] * 0.5, -0.35 + d[1] * 0.3, side[2] * 0.8 + d[2] * 0.5]);
-        F.m(MAT.leaf, (s + k) & 1 ? 0x4E9A48 : 0x3E8A40).leaf(p, dir, norm3(cross(dir, [0, 1, 0])), 3.0 - (s - 2) * 0.25, 0.9, 0.5, PR.ATL.olive);
+      const a = k * TAU / 7 + 0.2, ca = Math.cos(a), sa = Math.sin(a), lift = 2.6 + (k % 3) * 2.2, pts = [];
+      for (let s = 0; s <= 8; s++) pts.push([8 + ca * s * 0.82, 7.2 + lift * Math.min(1, s / 2) + s * 2.7 - s * s * 0.27, 8 + sa * s * 0.82]);
+      F.m(MAT.leaf, COL.stem).tube(pts, 0.3, 0.1, { seg: 4, caps: 0 });
+      for (let s = 2; s < 8; s++) for (const sg of [-1, 1]) {
+        const p = pts[s], q = pts[s + 1], d = norm3(sub(q, p)), side = norm3([-sa * sg, 0, ca * sg]), dir = norm3([side[0] * 0.75 + d[0] * 0.6, -0.3 + d[1] * 0.35, side[2] * 0.75 + d[2] * 0.6]);
+        F.m(MAT.leaf, (s + k) & 1 ? 0x4E9A48 : 0x3E8A40); blade(F, p, dir, norm3(cross([0, 1, 0], dir)), 3.6 - (s - 2) * 0.32, 1.0, 0.7);
       }
     }
-    F.m(MAT.matte, 0xFFFFFF, 1); F.far(2.8, 0, 2.8, 13.2, 7.8, 13.2); F.m(MAT.leaf, 0x3E8A40); F.far(1.5, 10, 1.5, 14.5, 22, 14.5);
+    F.m(MAT.matte, 0xFFFFFF, 1); F.far(2.8, 0, 2.8, 13.2, 7.8, 13.2); F.m(MAT.leaf, 0x3E8A40); F.far(2, 9, 2, 14, 20.5, 14);
     F.shadow(2.5, 2.5, 13.5, 13.5);
   });
   // the garden chair: a black metal frame, teak slats in the seat and the back, a cream cushion
@@ -950,6 +967,58 @@
     F.shadow(35, 35, 47, 47);
   });
 
+  // Villa Nova's light pad (shot G: t1_29, t1_30 — the pool-like pad in the white hall): a white plinth with round corners
+  // on a cyan light line, its top recessed and glowing blue, darker at the rim, the cyan ring emblem in it
+  MD('novapad', [3, 1, 3], (F) => {
+    F.m(MAT.light, 0x3AF0FF).rbox(2.5, 0, 2.5, 45.5, 1.5, 45.5, 4.5, { seg: 3, skip: B_BOT });
+    F.m(MAT.gloss, 0xF2F4F8).rbox(1, 1.5, 1, 47, 11, 5, 3.6, { seg: 3, skip: 0 }).rbox(1, 1.5, 43, 47, 11, 47, 3.6, { seg: 3 }).rbox(1, 1.5, 5, 5, 11, 43, 1.6, { seg: 2 }).rbox(43, 1.5, 5, 47, 11, 43, 1.6, { seg: 2 });
+    F.m(MAT.gloss, 0xE8ECF2).box(5, 1.5, 5, 43, 8.4, 43);
+    F.m(MAT.light, 0x163E96).box(5, 8.4, 5, 43, 8.6, 43);
+    F.m(MAT.light, 0x2A6AD8).lathe(24, 24, [[8.62, 16.5], [8.66, 15.5], [8.7, 0.01]], { seg: 40 });
+    F.m(MAT.light, 0x3AF0FF);
+    for (const [r, w] of [[12.3, 0.7], [8.0, 0.55]]) F.tube(loop(24, 24, r, 9.0, 48), w, w, { seg: 6, caps: 0 });
+    F.cyl(24, 24, 8.6, 9.4, 2.4, 2.4, { seg: 18, caps: 2 });
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4; F.rod(24 + Math.cos(a) * 3.4, 9.0, 24 + Math.sin(a) * 3.4, 24 + Math.cos(a) * 7.2, 9.0, 24 + Math.sin(a) * 7.2, 0.4, { seg: 5 }); }
+    F.m(MAT.gloss, 0xF2F4F8); F.far(1, 0, 1, 47, 11, 47);
+    F.shadow(0, 0, 48, 48);
+  });
+  // the fountain's centre (the mansion's hall, the plazas, the park): a round stone basin with a rolled rim and water in
+  // it, a turned column, an upper bowl brimming over in thin glassy streams, the jet on top
+  MD('fountain', [1, 1, 1], (F) => {
+    const ST = 0xCBC6BA;
+    F.m(MAT.marble, ST).lathe(8, 8, [[0, 7.3], [0.5, 7.75], [2.9, 7.85], [3.5, 7.6], [3.6, 6.9], [3.3, 6.6], [1.4, 6.45]], { seg: 28, capBot: true });
+    F.m(MAT.glass, P.water).lathe(8, 8, [[2.9, 6.55], [2.9, 0.01]], { seg: 28 });
+    F.m(MAT.marble, ST).lathe(8, 8, [[2.8, 1.9], [3.6, 1.5], [7.4, 1.1], [8.6, 1.5], [9.2, 2.6], [10.2, 4.4], [10.9, 5.1], [11.3, 5.0], [11.1, 4.6]], { seg: 22 });
+    F.m(MAT.glass, P.water).lathe(8, 8, [[10.95, 4.7], [10.95, 0.01]], { seg: 22 });
+    F.m(MAT.glass, 0xBFEFFF);
+    for (let k = 0; k < 10; k++) { const a = k * TAU / 10 + 0.16, c = Math.cos(a), s = Math.sin(a), pts = []; for (let t = 0; t <= 5; t++) { const u = t / 5, r = 5.25 + 0.95 * Math.sqrt(u); pts.push([8 + c * r, 11.1 - 8.2 * u * u, 8 + s * r]); } F.tube(pts, 0.24, 0.3, { seg: 4, caps: 0 }); }
+    F.m(MAT.marble, ST).cyl(8, 8, 10.9, 12.0, 0.75, 0.55, { seg: 10 });
+    F.m(MAT.glass, 0xDDF6FF).lathe(8, 8, [[12.0, 0.5], [13.4, 0.42], [14.3, 0.2], [14.5, 0.01]], { seg: 10, capBot: true });
+    F.m(MAT.marble, ST); F.far(0.3, 0, 0.3, 15.7, 3.6, 15.7); F.far(6.6, 3.6, 6.6, 9.4, 9.2, 9.4); F.far(2.9, 9.2, 2.9, 13.1, 11.3, 13.1);
+    F.shadow(-0.5, -0.5, 16.5, 16.5);
+  });
+  // the garden path light (the villas' pool edge, the towers' roofs): a black post on a round foot, an opal drum glowing
+  // warm, a black cap
+  MD('glamp', [1, 1, 1], (F) => {
+    F.m(MAT.metal, P.black).cyl(8, 8, 0, 0.6, 2.8, 2.6, { seg: 14, caps: 2 }).cyl(8, 8, 0.6, 9.3, 1.3, 1.3, { seg: 10, caps: 0 });
+    F.cyl(8, 8, 9.2, 9.7, 3.1, 3.1, { seg: 16, caps: 3 });
+    F.m(MAT.light, 0xFFE2A8).cyl(8, 8, 9.7, 12.2, 2.85, 2.85, { seg: 16, caps: 0 });
+    F.m(MAT.metal, P.black).lathe(8, 8, [[12.2, 3.5], [12.7, 3.7], [13.3, 3.3], [13.8, 0.01]], { seg: 16, capBot: true });
+    F.far(6.7, 0, 6.7, 9.3, 9.7, 9.3); F.m(MAT.light, 0xFFE2A8); F.far(4.6, 9.7, 4.6, 11.4, 12.2, 11.4); F.m(MAT.metal, P.black); F.far(4.4, 12.2, 4.4, 11.6, 13.8, 11.6);
+    F.shadow(4.5, 4.5, 11.5, 11.5);
+  });
+  // the villages' arc lamp in one block: a black dome foot in the back corner, the stem rising and arching over to the
+  // front corner, a black dome shade glowing underneath
+  MD('varclamp', [1, 1, 1], (F) => {
+    F.m(MAT.gloss, P.black).lathe(11, 11, [[0, 3.0], [0.5, 3.0], [1.0, 2.3], [1.3, 0.01]], { seg: 16 });
+    const pts = []; for (let t = 0; t <= 12; t++) { const a = t / 12 * Math.PI / 2; pts.push([11 - 6.6 * (1 - Math.cos(a)), 1.2 + 12.2 * Math.sin(a), 11 - 6.6 * (1 - Math.cos(a))]); }
+    F.m(MAT.metal, P.black).tube(pts, 0.42, 0.36, { seg: 6, caps: 0 }).rod(4.4, 13.4, 4.4, 4.4, 12.4, 4.4, 0.3, { seg: 5 });
+    glowShade(F, 4.4, 4.4, [[8.6, 3.7], [9.6, 3.6], [11.2, 2.9], [12.2, 1.7], [12.7, 0.01]], [[8.7, 3.4], [9.6, 3.3], [11.0, 2.6], [11.9, 1.4], [12.3, 0.01]], MAT.gloss, P.black);
+    F.m(MAT.light, 0xFFF2D0).sphere(4.4, 9.5, 4.4, 1.1, 1.2, 1.1, { seg: 6 });
+    F.m(MAT.gloss, P.black); F.far(8, 0, 8, 14, 1.3, 14); F.far(10.4, 1.3, 10.4, 11.6, 7.5, 11.6); F.far(5, 7.5, 5, 11, 13.4, 11); F.far(0.7, 8.6, 0.7, 8.1, 12.7, 8.1);
+    F.shadow(7.5, 7.5, 14.5, 14.5);
+  });
+
   // ---------------------------------------------------------------- the pieces: block type → model and its two colours
   // (vary: the model's variant from the anchor's bits — a row's neighbours, a lantern's hanging; kind = PROP_FURN0 + the
   // name's index in the mesher's list)
@@ -980,6 +1049,7 @@
     vm_towel_rail: { model: 'towelrail' }, vm_toy_box: { model: 'toybox' }, vm_washer: { model: 'washer' }, vm_sculpture: { model: 'sculpture' },
     vm_plant_palm_concrete: { model: 'palmpot', a: 0xB4B0A6 }, vm_plant_palm_terracotta: { model: 'palmpot', a: 0xB0633C },
     vm_garden_chair: { model: 'gchair' }, vm_garden_table: { model: 'gtable' }, vm_outdoor_sofa: { model: 'osofa' }, vm_fire_pit: { model: 'firepit' }, vm_parasol: { model: 'parasol' },
+    vm_nova_pad: { model: 'novapad' }, vx_fountain: { model: 'fountain' }, vx_garden_lamp: { model: 'glamp' }, vx_arc_lamp: { model: 'varclamp' },
   });
   for (const [k, col, pil] of [['charcoal', 0x3A3D44, 0xE8D8B8], ['cream', 0xEDE6D6, 0x3A3D44], ['taupe', 0xA89482, 0xF2F2EE], ['white', 0xECEEF2, 0xFF8A2A]]) FDEF['vx_sofa_corner_' + k] = { model: 'vcorner', a: col, b: pil, vary: one };
   // a piece with a vary rule takes its variant from the anchor's bits (facing >> 2); the others as props.js says
