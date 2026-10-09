@@ -133,6 +133,27 @@ Done: 5476fd8 Schatten-Takt · 43d309d Weltgenerierung im Takt · f52be05 Fern-C
 88ea20e the preset, rungs, Automatik, settings · d3b303a the measuring browser test. Step 4 (furniture batching): see
 the decision below.
 
+## As built (where it differs from the design above)
+
+- Shadow tiles: 16 × 16 tiles of 12 blocks (finer than 8 × 8 × 24: a section's footprint redraws less); window
+  hysteresis 0.75 tile; depth origin re-based after 64 blocks; a sun step is built over **6** frames (not 4); the
+  casters' light-space boxes are cached per section; the VX/props flips (near ↔ far forms at 28 blocks) mark their tiles.
+- Stream budget: `VR.UL.Stream.budget(gpu, js) = clamp((max(1000/55, gpu) − js) × 0.6, 0.75, 4)` ms — the CPU and the
+  GPU work in parallel, so the main thread's headroom is the longer of the two minus the loop's own time (the
+  design's `budget − gpu − js` would give a GPU-bound frame no streaming at all — the very frames that have CPU to
+  spare). Half of it integrates arrivals, half spreads seam light; mesh-job starts 4 per ms of it.
+- Seam light: deferred (the design only queued the arrivals; the seam light's walk was the heavy tail).
+- Far cache: drawn a vertical strip a frame (4 strips: in each the sky, the far sections culled by the strip's frustum,
+  ring 1 and the horizon tiles — run 1 drew the sky with the first third of the sections and the horizon alone in the
+  last slice: those two frames cost as much as Ultra's whole frame, 10.3 and 10.1 s against 11.4 s at the plaza, the
+  middle ones 4.7 and 5.0 s); the near radius max(48, rd × 8) blocks; the cache is overscanned by the view's cone
+  widened 7.5° (not per axis), drawn at the screen's pixel density; stale after 1.5 m / **4°** (3.5° of the overscan
+  left while the next is drawn) / 500 ms / the sun 0.5° (≈ 2 game minutes) / a resize. Nothing to show (the first
+  frames, a jump) → the frames draw live while the cache is drawn (never the whole cache in one frame); running faster
+  than 10 m/s or turning faster than 90°/s → live, and no cache is drawn that would be off before it is done.
+- Furniture batching (step 4) is not built — see Results.
+- The light mirror reaches 96 blocks with the props' far forms; a governor rung draws it every other frame.
+
 ## What the baseline showed (v0.43 dist, Ultra, render distance 8, SwiftShader)
 
 - Walking 60 m with the day running (420 frames, shadow work only): **188 full shadow-map redraws** — the cached

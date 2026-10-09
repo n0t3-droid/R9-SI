@@ -126,17 +126,20 @@
   // The sky, the sections beyond half the render distance, ring 1 and the horizon tiles are drawn into a cache (colour and
   // depth, a little wider than the screen) and composited every frame — reprojected with the cached depth, so turning is
   // exact and a short walk is followed — while the near world is drawn live over it. A new cache is begun when the eye
-  // moved 1.5 m or turned 6° from the cached one, after 500 ms, or when the day moved on two game minutes; it is drawn
-  // over SLICES frames into a second buffer (opaque drawing with a depth test does not depend on the order), then the two
-  // swap — no frame pays for the whole far world. Faster than FAST m/s (a flight) the cache is not used.
+  // moved 1.5 m or turned 4° from the cached one, after 500 ms, or when the day moved on two game minutes; it is drawn
+  // into a second buffer a vertical strip a frame (SLICES strips: the sky, the far sections and the horizon in each), then
+  // the two swap — no frame pays for the whole far world. A cache is shown while the eye is within 6 m and 7.5° (its
+  // overscan) of it; else the frame draws live. Faster than FAST m/s (a flight) or turning faster than TURN_FAST the
+  // frames draw live and no cache is drawn (it would be off before it is done).
   const FC = UL.Far = {};
   FC.MOVE = 1.5;                         // m
-  FC.TURN = 6 * Math.PI / 180;           // rad
+  FC.TURN = 4 * Math.PI / 180;           // rad (3.5° of the overscan left while the next one is drawn)
   FC.AGE = 500;                          // ms
   FC.SUN = 2 * 2 * Math.PI / 1440;       // rad: the sun's way in two game minutes (0.5°; the Zeitraffer goes faster)
-  FC.SLICES = 4;                         // frames a new cache takes
+  FC.SLICES = 4;                         // frames a new cache takes (a vertical strip of it a frame)
   FC.FAST = 10;                          // m/s: faster, everything is drawn live
-  FC.MARGIN = FC.TURN + 1.5 * Math.PI / 180;   // the cache's overscan beyond each edge of the screen
+  FC.TURN_FAST = 90 * Math.PI / 180;     // rad/s: turning faster, everything is drawn live
+  FC.MARGIN = 7.5 * Math.PI / 180;       // the cache's overscan beyond each edge of the screen
   FC.TOO_OLD_MOVE = 6; FC.TOO_OLD_TURN = FC.MARGIN;   // a cache further off than this is not shown (the frame draws live)
   // why a cache (c: its eye x y z, forward fx fy fz, fov, aspect, time t ms, sun direction, size w h) is stale for this
   // camera, or '' when it is still good
@@ -153,7 +156,8 @@
   };
   FC.turn = function (c, cam) { const d = c.fx * cam.fx + c.fy * cam.fy + c.fz * cam.fz; return Math.acos(Math.max(-1, Math.min(1, d))); };
   // can the cache be shown at all: not too far off (else the frame draws everything live)
-  FC.showable = function (c, cam) { return !!(c && c.ok) && Math.hypot(cam.x - c.x, cam.y - c.y, cam.z - c.z) <= FC.TOO_OLD_MOVE && FC.turn(c, cam) <= FC.TOO_OLD_TURN; };
+  FC.within = function (c, cam) { return !!c && Math.hypot(cam.x - c.x, cam.y - c.y, cam.z - c.z) <= FC.TOO_OLD_MOVE && FC.turn(c, cam) <= FC.TOO_OLD_TURN; };
+  FC.showable = function (c, cam) { return !!(c && c.ok) && FC.within(c, cam); };
   // the near radius in blocks (sections nearer than this to the cache's eye are drawn live)
   FC.near = (rd) => Math.max(48, rd * 8);
   // the cache's projection: every direction within MARGIN of the screen's view lies in it (the screen's corners and edge
@@ -179,5 +183,6 @@
     mx = Math.min(cap, mx * 1.004); my = Math.min(cap, my * 1.004);   // (a hair more: the edges between the samples)
     return { sx: mx / th, sy: my / tv, fov: 2 * Math.atan(my), aspect: mx / my };
   };
-  FC.slice = (n, K, k) => [Math.floor(k * n / K), Math.floor((k + 1) * n / K)];
+  // strip k of K of a cache w pixels wide: its pixel columns [x0, x1)
+  FC.strip = (k, K, w) => [Math.floor(k * w / K), Math.floor((k + 1) * w / K)];
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
