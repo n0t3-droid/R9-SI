@@ -314,6 +314,12 @@
         if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) { put(x, F + lo - 1, z, BAND); P(u, F + lo - 2, v, 'vx_beam_oak', { axis: 1 }); }   // (round 2: a wood-brown arch under the gold rib, the reference's wooden arches)
         // the ring of the half dome at a third of its radius
         if (reg === 'in' && v > H.V1 && Math.abs(dApse(u, v) - 18) < 0.6) put(x, F + lo - 1, z, BAND);
+        // (round 2c) wooden ribs under the half dome's stone rays, following its curve (the references' wood-brown beams
+        // in the vault, like the nave's arches under its gold ribs); under stone, so no sky light is lost
+        else if (reg === 'in' && v > H.V1 && !gls) {
+          const dd = dApse(u, v), ang = Math.atan2(v - H.V1, u), k = Math.round(ang / (Math.PI / 10));
+          if (dd >= 3 && dd <= H.GLASS && Math.abs(ang - k * Math.PI / 10) * dd <= 0.7) P(u, F + lo - 1, v, 'vx_beam_oak', { axis: Math.abs(Math.cos(k * Math.PI / 10)) >= Math.abs(Math.sin(k * Math.PI / 10)) ? 1 : 2 });
+        }
       }
     }
     yield;

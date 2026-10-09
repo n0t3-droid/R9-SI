@@ -390,6 +390,16 @@ for (const [label, H] of HALLS) {
     }
     const ok = rows.filter(r0 => r0.gl >= 100 && r0.stained >= 15 && r0.trac >= 4 && r0.cols >= 7).length;
     check(ok === 5, `the apse a crown of five tall windows, each seven wide or more with tracery and a stained round head (${ok} of 5: ${rows.map(r0 => `${r0.k * 30}° ${r0.gl} glass / ${r0.stained} stained / ${r0.trac} tracery / ${r0.cols} wide`).join(' · ')})`);
+    // the half dome's rays carried by wooden ribs (the references' wood-brown beams in the vault, like the nave's arches):
+    // oak under the stone rays, following the dome's curve from its springing toward the crown
+    const rays = new Map();
+    for (let u = -26; u <= 26; u++) for (let v = Hh.V1 + 1; v <= Hh.V1 + 26; v++) {
+      const d = Math.hypot(u, v - Hh.V1); if (d > 26 || d < 3) continue;
+      const k = Math.round(Math.atan2(v - Hh.V1, u) / (Math.PI / 10));
+      for (let y = F + 26; y <= F + 40; y++) if (/beam_oak/.test(atN(u, y, v))) { rays.set(k, (rays.get(k) || 0) + 1); break; }
+    }
+    const carried = [...rays.values()].filter(n => n >= 10).length;
+    check(carried >= 8, `wooden ribs under the half dome's rays (${carried} rays carried by 10 or more beams: ${[...rays.entries()].sort((a, b) => a[0] - b[0]).map(([k, n]) => k * 18 + '° ' + n).join(', ') || 'none'})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();
