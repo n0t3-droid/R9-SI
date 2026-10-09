@@ -717,6 +717,7 @@
         else if (this.state === 'play') { if (!this.studioOpen) this.playFrame(dt); }
         if (this.mp) this.mp.update(dt);
         if (this.bench) this.benchTick();
+        if (this.sweep) this.sweep.tick();   // 📊 Stufentest
         this.capturePreview();   // the settings' live preview: the frame just drawn, if one was asked for
       } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine(T('g.chat.error', { msg: e.message }), '#ff8a8a'); } }
       this.input.endFrame();
@@ -761,6 +762,14 @@
       if (this.ui && this.ui.benchDone) this.ui.benchDone(this.benchResult);
       return this.benchResult;
     }
+    // 📊 Stufentest (sweep.js): every step measured in turn; false when one runs, the Automatik runs, or no world is up
+    sweepStart() {
+      if (this.sweep || this.bench || !VR.Sweep) return false;
+      const sw = new VR.Sweep(this);
+      if (!sw.start()) return false;
+      this.sweep = sw;
+      return true;
+    }
     // the quality governor made visible: the ⚙ line lists the steps it has taken (GPU ladder, then CPU ladder)
     aqWhat() {
       const aq = this.aq; if (!aq) return '';
@@ -790,7 +799,7 @@
     // Every step is probed: if it does not buy frame rate it is undone and the other ladder is tried.
     // Everything is undone again when the frame rate has been fine for a while. The user's settings never change.
     smartQuality(dt, S, w) {
-      if (this.bench) return;   // the Automatik run measures the scene as it is: the governor waits
+      if (this.bench || this.sweep) return;   // the Automatik run (or the Stufentest) measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
       const aq = this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null });
       if (!S.dynRes || !this.fps) {

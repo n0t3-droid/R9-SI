@@ -60,6 +60,7 @@
     { key: 'anim', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.anim', tip: 'g.set.anim.tip', cost: 'low', def: true },
     { key: 'showFps', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.showFps', tip: 'g.set.showFps.tip', def: false },
     { key: 'bench', g: 'img', sec: 'auto', t: 'action', lab: 'g.set.bench', tip: 'g.set.bench.tip', act: 'bench' },
+    { key: 'sweep', g: 'img', sec: 'auto', t: 'action', lab: 'g.set.sweep', tip: 'g.set.sweep.tip', act: 'sweep' },   // 📊 Stufentest (sweep.js): every step measured in turn
     // ---- Klang
     { key: 'volMaster', g: 'snd', sec: 'vol', t: 'slider', lab: 'g.set.volMaster', tip: 'g.set.volMaster.tip', def: 0.8, min: 0, max: 1, step: 0.05, fmt: 'pct' },
     { key: 'volSfx', g: 'snd', sec: 'vol', t: 'slider', lab: 'g.set.volSfx', tip: 'g.set.volSfx.tip', def: 0.9, min: 0, max: 1, step: 0.05, fmt: 'pct' },

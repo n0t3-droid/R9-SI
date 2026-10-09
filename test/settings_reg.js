@@ -75,7 +75,7 @@ S.ITEMS.splice(S.ITEMS.findIndex(x => x.key === 'testOnlyNew'), 1);
 const d = S.defaults();
 check(d.renderDist === 10 && d.fov === 75 && d.rawInput === true && d.mouseSmooth === false && d.sprintMode === 'hold', 'defaults(): the numbers of the registry (raw input on, smoothing off, hold to sprint)');
 check(!('bench' in d) && !('keys' in d) && d.autoJump === 'auto', 'defaults(): actions have no default; auto-jump follows the mode');
-check(S.items('img', 'auto').map(x => x.key).join() === 'preset,bench', 'the Automatik section holds the preset and the Automatik button, in that order');
+check(S.items('img', 'auto').map(x => x.key).join() === 'preset,bench,sweep', 'the Automatik section holds the preset, the Automatik button and the Stufentest, in that order');
 
 console.log('g · the ship (flight.js)');
 const ms = S.byKey('mouseSteer'), cs = S.byKey('camShake');
