@@ -21,7 +21,9 @@
       this.time = 0;
     }
     focus() { const g = this.g; if (g.state === 'play' && g.player) return g.player.pos; if (g.titleCam) return [g.titleCam.x, g.titleCam.y - 30, g.titleCam.z]; return null; }
-    pickType(rng) { let tot = 0; for (const t of TYPES) tot += t[1]; let r = rng.next() * tot; for (const t of TYPES) { r -= t[1]; if (r <= 0) return t[0]; } return 'interceptor'; }
+    // (a peaceful world flies no gunship: t-life, peace.js)
+    pickType(rng) { const peace = this.peace(), list = peace ? TYPES.filter(t => t[0] !== 'gunship') : TYPES; let tot = 0; for (const t of list) tot += t[1]; let r = rng.next() * tot; for (const t of list) { r -= t[1]; if (r <= 0) return t[0]; } return 'interceptor'; }
+    peace() { const g = this.g; return VR.Peace ? VR.Peace.on(g) : g.difficulty === 'peaceful'; }
     spawnFlight(opts) {
       opts = opts || {};
       const g = this.g, SS = g.starships;
@@ -54,7 +56,7 @@
       }
     }
     spawnDefenders() {
-      const g = this.g, p = g.player; if (!p) return;
+      const g = this.g, p = g.player; if (!p || this.peace()) return;   // (no fight in a peaceful world)
       for (let k = 0; k < 2; k++) this.spawnFlight({ arch: 'interceptor', defender: true, circle: { r: 34 + k * 6, h: p.pos[1] + 16 + k * 4, w: (k ? -1 : 1) * 0.55, a0: k * Math.PI }, life: 150 });
       g.ui.chatLine(T('g.chat.defence'), '#9affd8');
     }
@@ -70,7 +72,7 @@
         if (this.ships.length < maxShips && dp && !this.ships.some(s => s.dock) && Math.hypot(dp[0] - fp[0], dp[2] - fp[2]) < 900 && Math.random() < 0.2) this.spawnFlight({ arch: Math.random() < 0.6 ? 'shuttle' : 'dropship', dock: true });
         else if (this.ships.length < maxShips) this.spawnFlight();
       }
-      if (g.state === 'play' && g.raidActive && !this.ships.some(s => s.defender) && !this.defended) { this.defended = true; this.spawnDefenders(); }
+      if (g.state === 'play' && g.raidActive && !this.peace() && !this.ships.some(s => s.defender) && !this.defended) { this.defended = true; this.spawnDefenders(); }
       if (!g.raidActive) this.defended = false;
       let near = 1e9;
       for (let i = this.ships.length - 1; i >= 0; i--) {
@@ -173,7 +175,7 @@
     }
     dogfight(s, dt) {
       const g = this.g, ents = g.entities;
-      if (!ents || s.warpOut) return;
+      if (!ents || s.warpOut || this.peace()) return;
       s.fire -= dt; if (s.fire > 0) return;
       let best = null, bd = 60 * 60;
       for (const m of ents.mobs) { if (m.dead || !m.def.hostile) continue; const d2 = (m.pos[0] - s.pos[0]) ** 2 + (m.pos[1] - s.pos[1]) ** 2 + (m.pos[2] - s.pos[2]) ** 2; if (d2 < bd) { bd = d2; best = m; } }
