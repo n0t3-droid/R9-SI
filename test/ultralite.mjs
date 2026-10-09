@@ -157,22 +157,28 @@ const walk = (from, to, opts) => ev(([from, to, o]) => new Promise((ok) => {
   const g = VR.game, p = g.player, w = g.world, R = VR.R, F = VR.F, pool = g.pool;
   if (!pool.__onMsg) { pool.__onMsg = pool.onMsg; pool.onMsg = function (wk, m) { const t0 = performance.now(); try { return this.__onMsg(wk, m); } finally { const dt = performance.now() - t0; window.__msgMs += dt; const k = (m && m.type) || '?', b = window.__msgBy[k] || (window.__msgBy[k] = [0, 0, 0]); b[0]++; b[1] += dt; b[2] = Math.max(b[2], dt); } }; }
   window.__msgMs = 0; window.__msgBy = {};
-  if (!w.__wrapped) { w.__wrapped = true; for (const n of ['onColumn', 'integrate', 'drainUploads', 'scheduleMeshes']) { const f = w[n]; if (!f) continue; w[n] = function (...a) { const t0 = performance.now(); try { return f.apply(this, a); } finally { const dt = performance.now() - t0, b = window.__msgBy['w.' + n] || (window.__msgBy['w.' + n] = [0, 0, 0]); b[0]++; b[1] += dt; b[2] = Math.max(b[2], dt); } }; } }
+  const wrap = (o, n, key) => { const f = o && o[n]; if (typeof f !== 'function' || f.__w) return; const w2 = function (...a) { const t0 = performance.now(); try { return f.apply(this, a); } finally { const dt = performance.now() - t0, b = window.__msgBy[key] || (window.__msgBy[key] = [0, 0, 0]); b[0]++; b[1] += dt; b[2] = Math.max(b[2], dt); window.__part[key] = (window.__part[key] || 0) + dt; } }; w2.__w = 1; o[n] = w2; };
+  window.__part = {};
+  if (!w.__wrapped) { w.__wrapped = true; for (const n of ['update', 'onColumn', 'integrate', 'drainUploads', 'scheduleMeshes', 'seamStep', 'reprio']) wrap(w, n, 'w.' + n); }
+  // (every subsystem's update: a long frame names its parts)
+  for (const k of Object.keys(g)) { const o = g[k]; if (o && o !== w && o !== g.renderer && typeof o === 'object' && typeof o.update === 'function') wrap(o, 'update', 'g.' + k); }
   const gy = (x, z, y0) => { for (let y = Math.min(250, Math.floor(y0) + 12); y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y + 1; } return y0; };
   const len = Math.hypot(to[0] - from[0], to[1] - from[1]), n = Math.ceil(len / 4.3 * 30);
   window.__norender = true; window.__shadowOnly = !!o.shadow; window.__shMs = 0; window.__shN = 0; window.__shMax = 0;
   g.zenFreezeTime = !o.time;
   const r = g.renderer, red0 = r.stats.shadowRenders || 0, cols0 = w.cols.size;
-  const out = { frames: 0, long: 0, max: 0, sum: 0, msgMax: 0, list: [] };
+  const out = { frames: 0, long: 0, max: 0, sum: 0, msgMax: 0, list: [], longs: [] };
   let i = 0, y = p.pos[1];
   const f = () => {
     const msg = window.__msgMs; window.__msgMs = 0;
     const k = i / n, x = from[0] + (to[0] - from[0]) * k, z = from[1] + (to[1] - from[1]) * k;
     y = gy(x, z, y);
     p.flying = true; p.noclip = true; p.teleport(x, y, z); p.yaw = Math.atan2(-(to[0] - from[0]), -(to[1] - from[1])); p.pitch = -0.05;
+    window.__part = {};
     const t0 = performance.now(); g.last = t0 - 33.3; g.loop(t0); const loopMs = performance.now() - t0;
     const fm = loopMs + msg;
-    out.frames++; out.sum += fm; out.max = Math.max(out.max, fm); out.msgMax = Math.max(out.msgMax, msg); if (fm > 40) out.long++; out.list.push(Math.round(fm));
+    out.frames++; out.sum += fm; out.max = Math.max(out.max, fm); out.msgMax = Math.max(out.msgMax, msg); out.list.push(Math.round(fm));
+    if (fm > 40) { out.long++; const P = Object.entries(window.__part).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k, v]) => k + ' ' + Math.round(v)); if (out.longs.length < 8) out.longs.push(`${Math.round(fm)} ms (frame ${out.frames}, messages ${Math.round(msg)}): ${P.join(', ')}`); }
     if (++i <= n) setTimeout(f, 0);
     else {
       window.__shadowOnly = false; g.zenFreezeTime = true;
