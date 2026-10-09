@@ -52,17 +52,17 @@ console.log('B joined', JSON.stringify(joined));
 check(joined.state === 'play' && joined.guest, 'the guest joins the host world');
 await both(12);
 const lk1 = await ev(B, () => ({ look: VR.LOOK.mode, own: VR.game.settings.look, host: VR.game.hostLook }));
-check(lk1.look === 'classic', 'the guest sees the host\'s block look: ' + JSON.stringify(lk1));
-// the host switches to Nahtlos: the guest follows within a few seconds (the look rides along with the env sync)
-await ev(A, () => VR.game.chat('/look seamless'));
+check(lk1.look === 'seamless', 'the guest sees the host\'s block look (Nahtlos, the default since v0.43): ' + JSON.stringify(lk1));
+// the host switches to Klassisch: the guest follows within a few seconds (the look rides along with the env sync)
+await ev(A, () => VR.game.chat('/look classic'));
 await both(14);
 const lk2 = await ev(B, () => ({ look: VR.LOOK.mode, host: VR.game.hostLook, smooth: !!(VR.R.T.flags[VR.R.byName.grass_block.defaultState] & VR.F.SMOOTH) }));
-check(lk2.look === 'seamless' && lk2.smooth, 'the host\'s switch reaches the guest: ' + JSON.stringify(lk2));
-await ev(A, () => VR.game.chat('/look classic'));
+check(lk2.look === 'classic' && !lk2.smooth, 'the host\'s switch reaches the guest: ' + JSON.stringify(lk2));
+await ev(A, () => VR.game.chat('/look seamless'));
 await both(14);
 const lk3 = await ev(B, () => VR.LOOK.mode);
 console.log('guest look back with the host', lk3);
-check(lk3 === 'classic', 'the guest is back on the host\'s classic look');
+check(lk3 === 'seamless', 'the guest is back on the host\'s Nahtlos look');
 // the pre-join gold pillar reached the guest?
 const diff = await ev(B, (e) => { const w = VR.game.world; return [0, 1, 2, 3].map(k => w.getBlock(e[0], e[1] + k, e[2]) === e[3]); }, edit0);
 console.log('diff applied', JSON.stringify(diff));

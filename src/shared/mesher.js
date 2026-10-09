@@ -67,15 +67,37 @@
     ['white', 'charcoal', 'cream', 'taupe', 'blue', 'orange'].map(c => 'vx_sofa_' + c),
     // the villas' smaller pieces (the chandelier, the table lamp and its side table, the console, the bar cart, the bar
     // stool) and the rugs (voxarch.js: a rug block joins its neighbours into one rug)
-    ['vm_chandelier', 'vm_table_lamp', 'vm_side_table', 'vm_console', 'vm_bar_cart', 'vm_stool'], ['red', 'blue', 'green', 'sand'].map(c => 'vx_rug_' + c));
+    ['vm_chandelier', 'vm_table_lamp', 'vm_side_table', 'vm_console', 'vm_bar_cart', 'vm_stool'], ['red', 'blue', 'green', 'sand'].map(c => 'vx_rug_' + c),
+    // round II (t-smooth2, props2.js; appended — the kinds above keep their numbers): curtains, fridges, the dishwasher,
+    // range hoods, art, mirrors, desks, wardrobes, the villages' lights, the corner sofas, the mansions' pieces
+    // (gen_modern.js), the villas' remaining pieces and the garden's
+    ['vm_curtain', 'vx_curtain', 'vx_curtain_grey', 'vm_fridge', 'vx_fridge', 'vm_kitchen_fridge_french', 'vm_dishwasher', 'vm_range_hood', 'vm_kitchen_hood_island',
+      'vx_art_warm', 'vx_art_cool', 'vx_art_gold', 'vm_art_abstract', 'vm_art_landscape', 'vm_art_photo', 'vm_mirror', 'vm_mirror_round', 'vx_mirror',
+      'vm_desk', 'vx_tech_desk', 'vx_school_desk', 'vm_wardrobe', 'vm_wardrobe_walnut', 'vx_wardrobe', 'vx_wardrobe_walnut',
+      'vx_chandelier', 'vx_lantern', 'vx_lantern_crystal', 'vx_pendant', 'vx_pendant_brass', 'vx_sconce', 'vx_floorlamp'],
+    ['charcoal', 'cream', 'taupe', 'white'].map(c => 'vx_sofa_corner_' + c),
+    ['vx_nightstand', 'vx_bookshelf', 'vx_bookshelf_walnut', 'vx_tall_plant', 'vx_tall_plant_black', 'vx_vanity', 'vx_upper_cabinet', 'vx_toilet',
+      'vx_kitchen_island', 'vx_kitchen_island_dark', 'vx_kitchen_sink', 'vx_kitchen_hob', 'vx_coffee_table', 'vx_coffee_table_marble', 'vx_bathtub', 'vx_bench',
+      'vx_dining_table', 'vx_dining_table_white', 'vx_dining_chair', 'vx_dining_chair_teal', 'vx_tv_wall', 'vx_stool', 'vx_stool_orange', 'vx_urn', 'vx_urn_white', 'vx_tech_planter', 'vx_potplant'],
+    ['vm_sideboard', 'vm_dresser', 'vm_bench', 'vm_dining_bench', 'vm_wall_shelf', 'vm_kitchen_shelf', 'vm_office_chair', 'vm_vanity', 'vm_toilet', 'vm_bathtub', 'vm_shower', 'vm_bed_single', 'vm_bunk_bed',
+      'vm_fireplace', 'vm_piano', 'vm_lounger', 'vm_coat_rack', 'vm_laundry_basket', 'vm_towel_rail', 'vm_toy_box', 'vm_washer', 'vm_sculpture', 'vm_plant_palm_concrete', 'vm_plant_palm_terracotta',
+      'vm_garden_chair', 'vm_garden_table', 'vm_outdoor_sofa', 'vm_fire_pit', 'vm_parasol'], ['vm_nova_pad'],
+    ['vx_fountain', 'vx_garden_lamp', 'vx_arc_lamp'],
+    // the village houses' kitchens and nooks (voxarch.js), the tech houses' lockers (voxtech.js)
+    ['vx_stove', 'vx_counter', 'vx_shelf', 'vx_locker']);
   // the sofas that join their neighbours in a row (voxtech.js ctxHook.sofa: the same kind and family): the group number;
-  // groups from 16 join on all four sides along the world's axes (the rugs: any rug joins any rug, as voxarch.js does)
-  const PROP_JOIN = { vx_sofa_white: 1, vx_sofa_charcoal: 1, vx_sofa_cream: 1, vx_sofa_taupe: 1, vx_sofa_blue: 2, vx_sofa_orange: 3, vx_rug_red: 16, vx_rug_blue: 16, vx_rug_green: 16, vx_rug_sand: 16 };
+  // groups from 16 join on all four sides along the world's axes (the rugs: any rug joins any rug, as voxarch.js does).
+  // Round II: a corner sofa joins the rows of its colours (an L: the rows lose their arm where the corner stands), the
+  // counters of a modern kitchen join each other (one worktop), the long dining tables (legs only at the ends), the wall
+  // cabinets, the tubs and the TV walls their own kind (voxhome.js rowJoin)
+  const PROP_JOIN = { vx_sofa_white: 1, vx_sofa_charcoal: 1, vx_sofa_cream: 1, vx_sofa_taupe: 1, vx_sofa_blue: 2, vx_sofa_orange: 3, vx_rug_red: 16, vx_rug_blue: 16, vx_rug_green: 16, vx_rug_sand: 16,
+    vx_sofa_corner_white: 1, vx_sofa_corner_charcoal: 1, vx_sofa_corner_cream: 1, vx_sofa_corner_taupe: 1, vx_kitchen_island: 4, vx_kitchen_island_dark: 4, vx_kitchen_sink: 4, vx_kitchen_hob: 4,
+    vx_dining_table: 5, vx_dining_table_white: 6, vx_upper_cabinet: 7, vx_bathtub: 8, vx_tv_wall: 9 };
   const LXP = [0, 4, 1, 5], LXM = [1, 5, 0, 4];   // the neighbour (DOFF index) on a piece's local +x and −x for its facing
   // the pieces that stand on one another (gen_villa_rooms.js puts the table lamp in the cell over its side table): 1 looks
   // for a 2 over it, 2 for a 1 under it (bit 2 of the anchor's facing: the lamp stands on the table's top, the table's
-  // vase makes room)
-  const PROP_STACK = { vm_side_table: 1, vm_table_lamp: 2 };
+  // vase makes room); 4 hangs when something is above it (the villages' lanterns: bit 2, the chain to the ceiling)
+  const PROP_STACK = { vm_side_table: 1, vm_table_lamp: 2, vx_lantern: 4, vx_lantern_crystal: 4 };
   // the prop groups (job.smoothProps is a mask of them; true is the plants alone): 1 the plants (palms), 2 the furniture
   const PROP_GROUP = VR.PROP_GROUP = { plants: 1, furniture: 2 };
   let PROPT = null;
@@ -171,6 +193,25 @@
     const propMask = job.smoothProps === true ? PROP_GROUP.plants : (job.smoothProps | 0), propOn = propMask !== 0;
     if (propOn && (!PROPT || PROPT.kind.length !== R.stateCount + 1)) propTables();
     const propOut = propOn ? [] : null;
+    // the rug under the furniture (t-smooth2): a piece of furniture standing on a rug's floor with rug (or another such
+    // piece) on both sides of it along x or along z — looking past the pieces next to it — has the rug drawn under it, and
+    // the rugs round it join it: no bordered hole where the generator gave the rug's cells to the furniture. Only when the
+    // job asks for the furniture (Very Low meshes the voxel rugs as before)
+    const RUGG = 16, furnOn = propOn && (propMask & PROP_GROUP.furniture) !== 0;
+    const inPad = (x, z) => x >= -PAD && x < 16 + PAD && z >= -PAD && z < 16 + PAD;
+    const isRug = (i) => PROPT.join[B[i]] === RUGG;
+    const isPiece = (i) => (PROPT.group[B[i]] & PROP_GROUP.furniture) !== 0 && PROPT.join[B[i]] !== RUGG;
+    // rug on both sides along an axis (0: x, 1: z), past up to two pieces each way (the first pass)
+    const rugBoth = (x, y, z, ax) => { for (let sg = -1; sg <= 1; sg += 2) { let hit = false; for (let k = 1; k <= 3; k++) { const xx = ax ? x : x + k * sg, zz = ax ? z + k * sg : z; if (!inPad(xx, zz)) break; const i = P(xx, y, zz); if (isRug(i)) { hit = true; break; } if (!isPiece(i)) break; } if (!hit) return false; } return true; };
+    const under1 = (x, y, z) => inPad(x, z) && isPiece(P(x, y, z)) && (rugBoth(x, y, z, 0) || rugBoth(x, y, z, 1));
+    const rugOr1 = (x, y, z) => inPad(x, z) && (isRug(P(x, y, z)) || under1(x, y, z));
+    // the second pass: a piece between rug or first-pass pieces on both sides along an axis (a reading corner's middle)
+    const underRug = (x, y, z) => inPad(x, z) && isPiece(P(x, y, z)) && (under1(x, y, z) || (rugOr1(x + 1, y, z) && rugOr1(x - 1, y, z)) || (rugOr1(x, y, z + 1) && rugOr1(x, y, z - 1)));
+    const rugOrUnder = (x, y, z) => inPad(x, z) && (isRug(P(x, y, z)) || underRug(x, y, z));
+    // a rug's four sides (bits 2–5: +x, −x, +z, −z), the pieces it runs under counted as rug
+    const rugSides = (x, y, z) => (rugOrUnder(x + 1, y, z) ? 4 : 0) | (rugOrUnder(x - 1, y, z) ? 8 : 0) | (rugOrUnder(x, y, z + 1) ? 16 : 0) | (rugOrUnder(x, y, z - 1) ? 32 : 0);
+    // the rug a piece stands on: the first rug beside it, or past the pieces beside it
+    const rugNear = (x, y, z) => { for (let d = 0; d < 4; d++) { const dx = d === 0 ? 1 : d === 1 ? -1 : 0, dz = d === 2 ? 1 : d === 3 ? -1 : 0; for (let k = 1; k <= 3; k++) { const xx = x + dx * k, zz = z + dz * k; if (!inPad(xx, zz)) break; const i = P(xx, y, zz); if (isRug(i)) return B[i]; if (!isPiece(i)) break; } } return 0; };
     const bufs = [takeBuf(0, 4096), takeBuf(1, 1024), takeBuf(2, 1024)];
     // world sections keep their mini-voxel pieces apart from the plain terrain: a detailed buffer drawn up close
     // and a far buffer of averaged boxes (ships and previews merge everything into the opaque stream as before)
@@ -408,12 +449,16 @@
           // rug: bits 2–5 a rug on +x, −x, +z, −z; a table lamp on its side table, the table under it: bit 2
           let f = PROPT.facing[b];
           const jg = PROPT.join[b], sk = PROPT.stack[b];
-          if (jg >= 16) f |= (PROPT.join[B[bi + DOFF[0]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[1]]] === jg ? 8 : 0) | (PROPT.join[B[bi + DOFF[4]]] === jg ? 16 : 0) | (PROPT.join[B[bi + DOFF[5]]] === jg ? 32 : 0);
+          if (jg === RUGG) f |= rugSides(x, y, z);
+          else if (jg >= 16) f |= (PROPT.join[B[bi + DOFF[0]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[1]]] === jg ? 8 : 0) | (PROPT.join[B[bi + DOFF[4]]] === jg ? 16 : 0) | (PROPT.join[B[bi + DOFF[5]]] === jg ? 32 : 0);
           else if (jg) f |= (PROPT.join[B[bi + DOFF[LXP[f]]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[LXM[f]]]] === jg ? 8 : 0);
-          if (sk && PROPT.stack[B[bi + DOFF[sk === 1 ? 2 : 3]]] === 3 - sk) f |= 4;
+          if (sk === 4) { const up = B[bi + DOFF[2]]; if (up && !(TF[up] & F.FLUID)) f |= 4; }
+          else if (sk && PROPT.stack[B[bi + DOFF[sk === 1 ? 2 : 3]]] === 3 - sk) f |= 4;
           propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[b], f, L[bi]);
         }
         else if (PROPT.stem[b] && PROPT.kind[B[bi + DOFF[2]]] !== PROPT.kind[b]) propOut.push(job.ox + x, sy * 16 + y + 1, job.oz + z, PROPT.stem[b], 0, L[bi + DOFF[2]]);
+        // the rug runs on under a piece standing on it (any cell of the piece at the rug's level)
+        if (furnOn && PROPT.join[b] !== RUGG && (PROPT.group[b] & PROP_GROUP.furniture) && underRug(x, y, z)) { const rs = rugNear(x, y, z); if (rs) propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[rs], rugSides(x, y, z), L[bi]); }
         continue;
       }
       if (shape === SH.CUBE) {

@@ -1023,6 +1023,9 @@
     F.shadow(L ? 0 : -1, 0.6, R ? 16 : 17, 17);
   });
 
+  // the builder's helpers for the second set of models (props2.js, t-smooth2: curtains, fridges, wardrobes, art, mirrors …)
+  PR.H = { lin, shd, norm3, cross, sub, hash, MD, WOOD, COL, B_BOT, UV0, steelLeg, pillow, seatCush, backCush, glowShade, setting, loop, front, counter, carcass };
+
   // ---------------------------------------------------------------- the pieces: block type → model and its two colours
   // (the voxel pieces' palette: the fabric, the pillows of a sofa; the duvet and the frame of a bed; a kitchen's front)
   const FAB = { charcoal: 0x3A3D44, cream: 0xECE6D8, taupe: 0xA89482, sage: 0x8FA38E, navy: 0x2F3F60 };

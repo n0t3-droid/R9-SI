@@ -22,7 +22,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 const boot = await ev(() => ({ setting: VR.game.settings.look, look: VR.LOOK && VR.LOOK.mode, rim: VR.game.texRim }));
-check(boot.setting === 'classic' && boot.look === 'classic' && boot.rim === true, 'a new player starts in Klassisch (setting, registry and textures): ' + JSON.stringify(boot));
+check(boot.setting === 'seamless' && boot.look === 'seamless' && boot.rim === false, 'a new player starts in Nahtlos (setting, registry and textures; the default since v0.43): ' + JSON.stringify(boot));
 // Settings → Graphics: the "Blöcke" control, in German and in English (English players never see German)
 const ctl = await ev(() => {
   const u = VR.game.ui, I = VR.I18N, was = I ? I.lang : localStorage.getItem('r9si.lang'), out = {};
@@ -30,7 +30,7 @@ const ctl = await ev(() => {
   for (const lang of ['de', 'en']) { set(lang); u.showSettings('img'); const bs = [...document.querySelectorAll('#setbody [data-set^="look:"]')]; out[lang] = { lab: bs.length ? bs[0].closest('.setrow').querySelector('label').textContent : '', r: bs.map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join() }; }
   set(was); u.show('title'); return out;
 });
-check(ctl.de.lab === 'Blöcke' && ctl.de.r === 'Klassisch*,Nahtlos' && ctl.en.lab === 'Blocks' && ctl.en.r === 'Classic*,Seamless', 'Settings → Graphics shows "Blöcke: Klassisch / Nahtlos" (English: "Blocks: Classic / Seamless") with Klassisch on: ' + JSON.stringify(ctl));
+check(ctl.de.lab === 'Blöcke' && ctl.de.r === 'Klassisch,Nahtlos*' && ctl.en.lab === 'Blocks' && ctl.en.r === 'Classic,Seamless*', 'Settings → Graphics shows "Blöcke: Klassisch / Nahtlos" (English: "Blocks: Classic / Seamless") with Nahtlos on: ' + JSON.stringify(ctl));
 const LOOKS = (process.env.LOOKS || 'classic,seamless').split(',');
 await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 6; g.settings.look = lk; g.applySettings('*'); }, [process.env.PRESET || 'high', LOOKS[0]]);
 await ev(`VR.game.createWorld({name:'Blocks',mode:'creative',difficulty:'peaceful',type:'flat',seed:'31',cheats:true,kit:true})`);

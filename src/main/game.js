@@ -16,11 +16,12 @@
     high: { far: 64, rdMax: 24, upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
     ultra: { far: 64, rdMax: 32, upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
   };
-  // look: the block look (v0.39) — 'classic' (Klassisch, every block on its own like the original game; the default,
-  // also for players whose saved settings predate it) or 'seamless' (Nahtlos: smooth hills, joined glass)
+  // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
+  // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
+  // block on its own like the original game)
   // atmosphere (A1): wx = Wetter (normal · calm = Ruhig, clear and cloudy only · off), natSound = Natur-Klänge
   // (synth · off), wetGround = the ground darkens in the rain (off on Very Low)
-  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 75, sens: 1, invertY: false, viewBob: true, airLife: true, turnInertia: false, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'classic', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
+  const DEFAULTS = Object.assign({ preset: 'balanced', fov: 75, sens: 1, invertY: false, viewBob: true, airLife: true, turnInertia: false, mouseSteer: false, camShake: true, volMaster: 0.8, volSfx: 0.9, volMusic: 0.45, volAmbient: 0.6, showFps: false, showCoords: false, minimap: true, toasts: true, look: 'seamless', wx: 'normal', natSound: 'synth', wetGround: true }, PRESETS.balanced);
   // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
   const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
   const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];

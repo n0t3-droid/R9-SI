@@ -570,6 +570,11 @@
       const v3 = (n, a) => { if (u[n]) gl.uniform3f(u[n], a[0], a[1], a[2]); };
       v3('u_sunDir', E.sunDir); v3('u_moonDir', E.moonDir); v3('u_sunColor', E.sunColor); v3('u_moonColor', E.moonColor);
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
+      // t-sky: the sky's middle stop, the stops' heights and the space by day (env.js VR.Sky)
+      v3('u_skyMid', E.skyMid || E.horizon);
+      // (the shader takes the reciprocals of the widths: a multiply per pixel instead of a division)
+      if (u.u_skyStops) { const s = E.skyStops || [0.25, 0.1, 1.0, 0.45]; gl.uniform4f(u.u_skyStops, 1 / Math.max(1e-3, s[0]), s[1], 1 / Math.max(1e-3, s[2] - s[1]), s[3] === undefined ? 0.45 : s[3]); }
+      if (u.u_skySpace) { const s = E.skySpace || [0.2, 0.9, 0.5, 1.3]; gl.uniform4f(u.u_skySpace, s[0], 1 / Math.max(1e-3, s[1] - s[0]), s[2], s[3]); }
       v3('u_fogColor', E.fogColor); v3('u_blockLightTint', E.blockTint); v3('u_planetDir', E.planetDir); v3('u_planet2Dir', E.planet2Dir); v3('u_ringNormal', E.ringNormal);
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
       // the grade's knobs (env.js VR.Grade): the cosmic veil, the sun's disc in HDR, the Klassisch block edges
@@ -830,9 +835,12 @@
     propDefines() { return (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); }
     // the anchors in reach, camera-relative: list A (full palms, nearer than D1), list B (crosses, nearer than D2), and
     // the furniture by model (near F1, far F2, in the frustum)
-    propGather(cam, lvl, D1, D2, furn, planes) {
+    propGather(cam, lvl, D1, D2, furn, planes, refl) {
       const PR = VR.Props, K = PR.INST, FURN0 = PR.FURN0, r1 = D1 * D1, r2m = D2 * D2;
-      const lod = this.q.vxLod || 48, F1 = Math.max(14, Math.min(28, lod * 0.6)), F2 = Math.max(48, 2 * lod), f1 = F1 * F1, f2 = F2 * F2;
+      // refl (t-smooth2): 1 the mirror on tier 1 — the furniture's far forms only; 2 the mirror on tier 2 — the models
+      // within 16 blocks, the far forms to 64 (the mirror is half the frame and rippled: run 2 measured +64 draws and
+      // +126 k triangles at the pool with the main pass's radii)
+      const lod = this.q.vxLod || 48, F1 = Math.max(14, Math.min(28, lod * 0.6)) * (refl === 2 ? 0.6 : 1), F2 = refl === 2 ? 64 : Math.max(48, 2 * lod), f1 = refl === 1 ? 0 : F1 * F1, f2 = F2 * F2;
       const slots = this.furnSlots || [];
       for (let s = 0; s < slots.length; s++) { slots[s].nn = 0; slots[s].nf = 0; }
       let A = this.propA, B = this.propB, nA = 0, nB = 0, nF = 0;
@@ -895,12 +903,14 @@
       }
       return u;
     }
-    drawProps(E, camPos, shadow) {
-      const lvl = this.q.smoothProps | 0, furn = this.q.smoothFurn | 0;
-      if ((!lvl && !furn) || !this.propSecs || !this.propSecs.size) return;
+    // refl (t-smooth2): the water's mirrored pass (reflectPass) — 2 the props as in the main pass, 1 their far forms only
+    // (the crosses and the boxes: the quarter-size reflection of the lower water tier); no glass, no contact shadows there
+    drawProps(E, camPos, shadow, refl) {
+      const lvl0 = this.q.smoothProps | 0, furn = this.q.smoothFurn | 0, lvl = refl === 1 ? Math.min(1, lvl0) : lvl0;
+      if ((!lvl0 && !furn) || !this.propSecs || !this.propSecs.size) return;
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
-      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes);
+      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0);
       const cullWas = gl.isEnabled(gl.CULL_FACE);
       // the palms: two-sided fronds
       if (this.propNA || this.propNB) {
@@ -919,7 +929,7 @@
           if (sl.nn) { if (!sl.gNear) { const m = PR.furnModel(sl.key); sl.gNear = this.propVao(m.near); } this.propFlush(sl.gNear, sl.nn, sl.near, u, ps.furnTex, 0, sl.gNear.nOpaque); }
           if (sl.nf) { if (!sl.gFar) { const m = PR.furnModel(sl.key); sl.gFar = m.far ? this.propVao(m.far) : { n: 0 }; } if (sl.gFar.n) this.propFlush(sl.gFar, sl.nf, sl.far, u, ps.furnTex, 0, sl.gFar.nOpaque); }
         }
-        if (!shadow) {
+        if (!shadow && !refl) {
           gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
           for (const sl of slots) if (sl.nn && sl.gNear && sl.gNear.n > sl.gNear.nOpaque) this.propFlush(sl.gNear, sl.nn, null, u, ps.furnTex, sl.gNear.nOpaque, sl.gNear.n - sl.gNear.nOpaque);
           gl.depthMask(true); gl.disable(gl.BLEND);
@@ -1342,6 +1352,15 @@
         if (layer === 1) gl.disable(gl.CULL_FACE);
         this.drawSections(list, layer, p, camPos, this.planesR, false);
         gl.enable(gl.CULL_FACE);
+      }
+      // the props in the mirror (t-smooth2): the palms and the furniture by the water, so a palm on the shore and the loungers
+      // at a pool are mirrored as their voxel forms were. Tier 2 (High, Ultra) draws them as in the main pass, tier 1 their
+      // far forms; renderer.noReflProps switches them off (the cost test). The main pass's counts are kept for the stats.
+      this.stats.reflProps = 0;
+      if (!this.noReflProps && (this.q.smoothProps || this.q.smoothFurn)) {
+        const nA = this.propNA, nB = this.propNB, nF = this.propNF, dp = this.stats.draws;
+        this.drawProps(E, camPos, false, this.q.water >= 2 ? 2 : 1);
+        this.stats.reflProps = this.stats.draws - dp; this.propNA = nA; this.propNB = nB; this.propNF = nF;
       }
       this.stats.reflSecs = list.length; this.stats.reflDraws = this.stats.draws - dr0;     // (test/water.mjs reports them)
       if (this.q.water >= 2 && F.horizon) F.horizon.draw(this, E);
