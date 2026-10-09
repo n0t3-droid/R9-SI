@@ -9,6 +9,11 @@
 // The targets: per band the median over the day frames (the city by day, the citadel) and over the dusk frames (the
 // canyon with the sun on the horizon) of the frames' trimmed means; the isles' frames are a third kind (golden: the sun
 // low at the right, the land in full sun) and the cross-fade t1_26 has no horizon (recorded, in no target).
+// t-sky2 adds per frame (and the medians per kind; the old keys kept): the stars of each of the top three bands (local
+// maxima of the luma, STAR_T above the ring two pixels round them, per 1000 sky pixels: the trailer's dense small stars),
+// the nebula's chroma (the mean CIELAB C* of the 5 × 5-blurred top three bands and its variance: a plain navy has a
+// chroma but no spread, the nebula's coloured clouds and dark lanes spread it) and the haze over the horizon (the sky's
+// L* profile in 20 slices from H up: the lowest slice's L* and the height where it falls under HAZE_L).
 // Writes docs/trailer/sky_ref.json with --write; the test (no arguments) measures again and checks the reference
 // against the measurement and the targets against the trailer's look: by day bright white-cyan at the horizon, light
 // then medium blue, deep navy space at the top with stars and nebula; at dusk a warm horizon under a dark top.
@@ -19,6 +24,9 @@ const sharp = require('/home/claude/.npm-global/lib/node_modules/sharp');
 const FRAMES_DIR = path.join(__dirname, '..', 'docs', 'trailer', 'frames');
 const REF = path.join(__dirname, '..', 'docs', 'trailer', 'sky_ref.json');
 const NB = 8;
+// t-sky2: a star is a local maximum of the luma at least STAR_T above the mean of the ring two pixels round it; the haze
+// ends where the sky's luminance profile falls under L* HAZE_L (between the frames' white-cyan, 72–84, and their blue)
+const STAR_T = 14, HAZE_L = 60, NSLICE = 20;
 
 // the frames: kind, horizon row H, and the clear-sky rectangles [x0, y0, x1, y1) in frame pixels (640 × 348 / 360)
 const FRAMES = {
@@ -126,6 +134,85 @@ function spaceOf(img, y0, y1, inMask) {
   return { n, stars: +(stars / n * 1000).toFixed(2), contrast: +Math.sqrt(hp2 / n).toFixed(2), nebula: +(neb / cols.length).toFixed(2) };
 }
 
+// t-sky2 · the stars in rows [y0, y1): local maxima of the luma (the highest in their 3 × 3, ties to the first) at least
+// STAR_T above the mean of the ring two pixels round them (16 pixels: a star's own blur does not lift its surround, a
+// smooth gradient of the nebula does not count), per 1000 sky pixels whose 5 × 5 neighbourhood is sky. null under 200
+// such pixels (a band too small to count stars in)
+function starsOf(img, y0, y1, inMask) {
+  const W = img.w, at = (x, y) => { const p = (y * W + x) * 3; return luma(img.d[p], img.d[p + 1], img.d[p + 2]); };
+  let n = 0, stars = 0;
+  for (let y = Math.max(2, y0); y < Math.min(img.h - 2, y1); y++) for (let x = 2; x < W - 2; x++) {
+    if (!inMask(x, y)) continue;
+    let ok = true, ring = 0;
+    for (let dy = -2; dy <= 2 && ok; dy++) for (let dx = -2; dx <= 2; dx++) {
+      if (!inMask(x + dx, y + dy)) { ok = false; break; }
+      if (dx === -2 || dx === 2 || dy === -2 || dy === 2) ring += at(x + dx, y + dy);
+    }
+    if (!ok) continue;
+    n++;
+    const l = at(x, y);
+    if (l - ring / 16 < STAR_T) continue;
+    let max = true;
+    for (let dy = -1; dy <= 1 && max; dy++) for (let dx = -1; dx <= 1; dx++) {
+      if (!dx && !dy) continue;
+      const q = at(x + dx, y + dy);
+      if (q > l || (q === l && (dy < 0 || (dy === 0 && dx < 0)))) { max = false; break; }
+    }
+    if (max) stars++;
+  }
+  return n < 200 ? null : +(stars / n * 1000).toFixed(2);
+}
+// t-sky2 · the nebula's colour in rows [y0, y1): the CIELAB chroma C* of the 5 × 5-blurred sky (the stars blurred away),
+// its mean and its variance over the sky pixels whose 5 × 5 neighbourhood is sky — a plain navy has a chroma but hardly
+// a variance; the nebula's pink, violet, cyan and orange clouds and its dark lanes spread it
+function chromaOf(img, y0, y1, inMask) {
+  const W = img.w, C = [];
+  for (let y = Math.max(2, y0); y < Math.min(img.h - 2, y1); y++) for (let x = 2; x < W - 2; x++) {
+    if (!inMask(x, y)) continue;
+    let ok = true; const c = [0, 0, 0];
+    for (let dy = -2; dy <= 2 && ok; dy++) for (let dx = -2; dx <= 2; dx++) {
+      if (!inMask(x + dx, y + dy)) { ok = false; break; }
+      const p = ((y + dy) * W + x + dx) * 3; c[0] += img.d[p]; c[1] += img.d[p + 1]; c[2] += img.d[p + 2];
+    }
+    if (!ok) continue;
+    const L = lab([c[0] / 25, c[1] / 25, c[2] / 25]);
+    C.push(Math.hypot(L[1], L[2]));
+  }
+  if (C.length < 200) return null;
+  const mean = C.reduce((a, v) => a + v, 0) / C.length;
+  const vr = C.reduce((a, v) => a + (v - mean) * (v - mean), 0) / C.length;
+  return { n: C.length, mean: +mean.toFixed(2), var: +vr.toFixed(2) };
+}
+// t-sky2 · the haze over the horizon: the sky's luminance profile from the horizon line H up in NSLICE slices (each the
+// median L* of its sky pixels; null under 20), the L* of the lowest slice (L0, null when the lowest tenth has no sky) and
+// the height, as a share of H, where the profile first falls under HAZE_L (between two slices: linear), null when the
+// profile starts under it or never reaches it
+function hazeOf(img, H, inMask) {
+  const prof = [];
+  for (let s = 0; s < NSLICE; s++) {
+    const ya = Math.round(H * (1 - (s + 1) / NSLICE)), yb = Math.round(H * (1 - s / NSLICE)), ls = [];
+    for (let y = Math.max(0, ya); y < Math.min(img.h, yb); y++) for (let x = 0; x < img.w; x++) {
+      if (!inMask(x, y)) continue;
+      const p = (y * img.w + x) * 3; ls.push(lab([img.d[p], img.d[p + 1], img.d[p + 2]])[0]);
+    }
+    if (ls.length < 20) { prof.push(null); continue; }
+    ls.sort((a, b) => a - b);
+    prof.push(+ls[ls.length >> 1].toFixed(1));
+  }
+  const first = prof.findIndex(v => v !== null);
+  const L0 = first >= 0 && first < NSLICE / 10 ? prof[first] : null;
+  let width = null;
+  if (L0 !== null && L0 >= HAZE_L) {
+    let prev = first;
+    for (let s = first + 1; s < NSLICE; s++) {
+      if (prof[s] === null) continue;
+      if (prof[s] < HAZE_L) { const a = prof[prev], b = prof[s], t = (a - HAZE_L) / (a - b); width = +(((prev + 0.5) + t * (s - prev)) / NSLICE).toFixed(3); break; }
+      prev = s;
+    }
+  }
+  return { L0, width, profile: prof };
+}
+
 // ------------------------------------------------------------ the frames and the targets
 async function measureFrames() {
   const out = {};
@@ -135,6 +222,10 @@ async function measureFrames() {
     const bands = curveOf(img, F.H, mask);
     // the space: the top two bands (rows 0 … 2H/8)
     out[name] = { kind: F.kind, H: F.H, w: img.w, h: img.h, rects: F.rects, what: F.what, bands, space: spaceOf(img, 0, bandRows(F.H, NB - 2)[1], mask) };
+    // t-sky2: the stars per band (bands 5, 6, 7), the chroma of the top three bands, the haze
+    out[name].stars = [NB - 3, NB - 2, NB - 1].map(k => { const [a, b] = bandRows(F.H, k); return starsOf(img, a, b, mask); });
+    out[name].chroma = chromaOf(img, 0, bandRows(F.H, NB - 3)[1], mask);
+    out[name].haze = hazeOf(img, F.H, mask);
   }
   return out;
 }
@@ -154,7 +245,14 @@ function targetOf(frames, kind) {
   }
   const sp = names.map(n => frames[n].space).filter(s => s.n);
   const space = sp.length ? { stars: +median(sp.map(s => s.stars)).toFixed(2), contrast: +median(sp.map(s => s.contrast)).toFixed(2), nebula: +median(sp.map(s => s.nebula)).toFixed(2) } : null;
-  return { frames: names, bands, space };
+  // t-sky2: the medians over the kind's frames of the stars per band, the chroma's mean and variance, the haze
+  const med2 = (v) => { const w = v.filter(x => x !== null && x !== undefined); return w.length ? +median(w).toFixed(2) : null; };
+  const stars = [0, 1, 2].map(i => med2(names.map(n => frames[n].stars ? frames[n].stars[i] : null)));
+  const ch = names.map(n => frames[n].chroma).filter(c => c);
+  const chroma = ch.length ? { mean: med2(ch.map(c => c.mean)), var: med2(ch.map(c => c.var)) } : null;
+  const hz = names.map(n => frames[n].haze).filter(h => h);
+  const haze = { L0: med2(hz.map(h => h.L0)), width: med2(hz.map(h => h.width)) };
+  return { frames: names, bands, space, stars, chroma, haze };
 }
 async function reference() {
   const frames = await measureFrames();
@@ -179,7 +277,7 @@ async function overlay(dir) {
   }
 }
 
-module.exports = { NB, FRAMES, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, measureFrames, targetOf, reference, compare, REF };
+module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, measureFrames, targetOf, reference, compare, REF };
 
 if (require.main === module) {
   (async () => {
@@ -190,10 +288,12 @@ if (require.main === module) {
     for (const [n, f] of Object.entries(ref.frames)) {
       console.log(`${n} ${f.kind.padEnd(6)} H ${f.H}  stars ${f.space.stars} contrast ${f.space.contrast} nebula ${f.space.nebula}`);
       console.log('   ' + f.bands.map((b, k) => k + ':' + (b.rgb ? b.rgb.map(v => Math.round(v)).join(',') + '(' + b.n + ')' : '—')).join('  '));
+      console.log(`   stars (bands 5 6 7) ${f.stars.map(v => (v === null ? '—' : v)).join(' ')}  chroma ${f.chroma ? f.chroma.mean + ' var ' + f.chroma.var : '—'}  haze L0 ${f.haze.L0} width ${f.haze.width}  profile ${f.haze.profile.map(v => (v === null ? '—' : Math.round(v))).join(' ')}`);
     }
     for (const kind of ['day', 'dusk', 'golden']) {
       const t = ref.targets[kind];
       console.log(`\ntarget ${kind} (${t.frames.join(' ')}) space ${JSON.stringify(t.space)}`);
+      console.log(`  stars (bands 5 6 7) ${t.stars.join(' ')}  chroma ${JSON.stringify(t.chroma)}  haze ${JSON.stringify(t.haze)}`);
       for (const b of t.bands) console.log(`  band ${b.k}  ${fmtB(b)}  frames ${b.frames || 0}  spread ΔE ${b.spread}`);
     }
     if (args[0] === '--write') { fs.writeFileSync(REF, JSON.stringify(ref, null, 1) + '\n'); console.log('\nwrote ' + REF); }
@@ -222,6 +322,18 @@ if (require.main === module) {
     check(K[NB - 1].L < 35 && K[NB - 1].L < K[0].L - 30, `dusk: the top band is dark (L* ${K[NB - 1].L}, the horizon ${K[0].L})`);
     // the space shows: stars and nebula in the top bands of the day and dusk frames
     check(ref.targets.day.space.contrast > 3 && ref.targets.dusk.space.contrast > 3, `the space shows at the top (local contrast day ${ref.targets.day.space.contrast}, dusk ${ref.targets.dusk.space.contrast})`);
+    // t-sky2: the stars (local maxima per band in the top three bands), the nebula's chroma and the horizon's haze, stored
+    // with the old keys kept
+    const TD = ref.targets.day;
+    check(!!stored && !!stored.targets.day.bands && !!stored.targets.day.space && Object.values(stored.frames).every(f => f.bands && f.space), 'the stored reference keeps its keys (bands, space per frame and target)');
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    check(!!stored && !!stored.targets.day.stars && !!stored.targets.day.chroma && !!stored.targets.day.haze && ['day', 'dusk', 'golden'].every(k => same(stored.targets[k].stars, ref.targets[k].stars) && same(stored.targets[k].chroma, ref.targets[k].chroma) && same(stored.targets[k].haze, ref.targets[k].haze)) &&
+      Object.keys(ref.frames).every(n => stored.frames[n] && same(stored.frames[n].stars, ref.frames[n].stars) && same(stored.frames[n].chroma, ref.frames[n].chroma) && same(stored.frames[n].haze, ref.frames[n].haze)),
+      'the stored stars, chroma and haze (per frame and target) are this measurement');
+    const dayN = TD.frames.filter(n => ref.frames[n].stars && ref.frames[n].stars.every(v => v !== null)).length;
+    check(dayN >= 5 && TD.stars && TD.stars.length === 3 && TD.stars.every(v => v > 1.5), `day: stars in each of the top three bands, ${dayN} frames (per 1000 sky pixels, bands 5 6 7: ${TD.stars && TD.stars.join(' ')})`);
+    check(TD.chroma && TD.chroma.mean > 18 && TD.chroma.var > 9, `day: the space is coloured and varied (mean chroma C* ${TD.chroma && TD.chroma.mean}, its variance ${TD.chroma && TD.chroma.var})`);
+    check(TD.haze && TD.haze.L0 > 74 && TD.haze.width > 0.1 && TD.haze.width < 0.35, `day: a bright haze over the horizon (L* ${TD.haze && TD.haze.L0} at the bottom, under L* ${HAZE_L} from ${TD.haze && TD.haze.width} of the sky's height)`);
     console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
     process.exit(fails ? 1 : 0);
   })().catch(e => { console.error(e); console.log('FAILED 1'); process.exit(1); });
