@@ -1007,6 +1007,44 @@
     F.far(6.7, 0, 6.7, 9.3, 9.7, 9.3); F.m(MAT.light, 0xFFE2A8); F.far(4.6, 9.7, 4.6, 11.4, 12.2, 11.4); F.m(MAT.metal, P.black); F.far(4.4, 12.2, 4.4, 11.6, 13.8, 11.6);
     F.shadow(4.5, 4.5, 11.5, 11.5);
   });
+  // the village kitchen's cast-iron stove: a rounded iron body on four feet, the fire door's glass glowing, the ash
+  // drawer, a top plate with two hot plates, the flue collar at the back
+  MD('vstove', [1, 1, 1], (F) => {
+    const IRON = 0x45484F;
+    F.m(MAT.metal, 0x2A2C30); for (const [x, z] of [[2.4, 2.6], [13.6, 2.6], [2.4, 13.6], [13.6, 13.6]]) F.cyl(x, z, 0, 1.7, 0.85, 0.7, { seg: 8, caps: 2 });
+    F.m(MAT.matte, IRON).rbox(0.6, 1.6, 0.8, 15.4, 12.6, 15.4, 1.0, { seg: 2 });
+    F.m(MAT.metal, 0x2E3036).rbox(0.2, 12.6, 0.4, 15.8, 13.8, 15.8, 0.5, { seg: 1 });
+    F.m(MAT.metal, 0x1E2024).cyl(5.2, 9.6, 13.8, 14.2, 2.6, 2.6, { seg: 16, caps: 2 }).cyl(11.2, 6.4, 13.8, 14.2, 2.2, 2.2, { seg: 16, caps: 2 });
+    F.m(MAT.metal, 0x2A2C30).rbox(3.4, 3.2, 0.3, 12.6, 10.6, 1.0, 0.45, { seg: 1 }).rbox(4.0, 1.9, 0.4, 12.0, 2.9, 1.0, 0.25, { seg: 1 });
+    F.m(MAT.light, 0xFF8A3A).box(4.6, 4.4, 0.18, 11.4, 9.2, 0.32);
+    F.m(MAT.metal, 0x1E2024).box(6.8, 4.4, 0.1, 7.2, 9.2, 0.2).box(8.8, 4.4, 0.1, 9.2, 9.2, 0.2).rod(13.3, 5.2, 0.6, 13.3, 8.6, 0.6, 0.35, { seg: 6 });
+    F.m(MAT.metal, 0x2E3036).cyl(4, 12, 13.8, 16, 1.7, 1.6, { seg: 12, caps: 0 }).cyl(4, 12, 13.8, 14.4, 2.2, 2.2, { seg: 12, caps: 2 });
+    F.m(MAT.matte, IRON); F.far(0.6, 0, 0.8, 15.4, 13.8, 15.4);
+    F.shadow(-0.5, -0.5, 16.5, 16.5);
+  });
+  // the village kitchen's counter: a wooden cabinet (tint 1) on a dark kick, two doors with knobs under a drawer, a pale
+  // stone top, a cutting board on it
+  MD('vkcounter', [1, 1, 1], (F) => {
+    F.m(MAT.matte, 0x4A3A2A).box(0.8, 0, 2.2, 15.2, 1.2, 15.6, B_BOT);
+    F.m(MAT.wood, 0xFFFFFF, 1).rbox(0, 1.2, 1.2, 16, 12.2, 16, 0.3, { seg: 1 });
+    F.m(MAT.wood, 0xF2F2F2, 1).rbox(0.4, 9.2, 0.6, 15.6, 11.8, 1.3, 0.3, { seam: 0.9 }).rbox(0.4, 1.6, 0.6, 7.85, 8.9, 1.3, 0.3, { seam: 0.9 }).rbox(8.15, 1.6, 0.6, 15.6, 8.9, 1.3, 0.3, { seam: 0.9 });
+    F.m(MAT.metal, 0x3A3026); for (const [x, y] of [[6.6, 7.4], [9.4, 7.4], [8, 10.5]]) F.sphere(x, y, 0.35, 0.45, 0.45, 0.4, { seg: 5 });
+    F.m(MAT.marble, 0xD8D2C4).rbox(-0.2, 12.2, 0, 16.2, 13.6, 16, 0.35, { seg: 1 });
+    F.m(MAT.wood, 0xC8A070).rbox(2.4, 13.6, 4.2, 8.6, 14.1, 8.8, 0.3, { seg: 1 });
+    F.m(MAT.wood, 0xFFFFFF, 1); F.far(0, 0, 0.6, 16, 13.6, 16);
+    F.shadow(-0.5, -0.5, 16.5, 16.5);
+  });
+  // the tech houses' suit locker: a steel cabinet, two doors (tint 1) with louvres at the top and bar handles, the dark
+  // seam between them, a green status light
+  MD('locker', [1, 1, 1], (F) => {
+    F.m(MAT.metal, 0x8E98A2).rbox(0, 0, 4, 16, 16, 16, 0.5, { seg: 1 });
+    F.m(MAT.metal, 0xFFFFFF, 1).rbox(0.5, 0.5, 3.4, 7.8, 15.5, 4.4, 0.3, { seam: 0.9 }).rbox(8.2, 0.5, 3.4, 15.5, 15.5, 4.4, 0.3, { seam: 0.9 });
+    F.m(MAT.matte, 0x3A3F46); for (const x0 of [1.6, 9.3]) for (let k = 0; k < 4; k++) F.box(x0, 10.6 + k * 1.05, 3.2, x0 + 5.1, 11.05 + k * 1.05, 3.45);
+    F.m(MAT.metal, 0x2A2D33).rod(6.6, 5.6, 3.1, 6.6, 8.4, 3.1, 0.3, { seg: 6 }).rod(9.4, 5.6, 3.1, 9.4, 8.4, 3.1, 0.3, { seg: 6 });
+    F.m(MAT.light, 0x3AE07A).box(1.8, 1.8, 3.2, 2.8, 2.6, 3.4);
+    F.m(MAT.metal, 0x8E98A2); F.far(0, 0, 3.4, 16, 16, 16);
+    F.shadow(-0.5, 3, 16.5, 16.5);
+  });
   // the villages' arc lamp in one block: a black dome foot in the back corner, the stem rising and arching over to the
   // front corner, a black dome shade glowing underneath
   MD('varclamp', [1, 1, 1], (F) => {
@@ -1050,6 +1088,7 @@
     vm_plant_palm_concrete: { model: 'palmpot', a: 0xB4B0A6 }, vm_plant_palm_terracotta: { model: 'palmpot', a: 0xB0633C },
     vm_garden_chair: { model: 'gchair' }, vm_garden_table: { model: 'gtable' }, vm_outdoor_sofa: { model: 'osofa' }, vm_fire_pit: { model: 'firepit' }, vm_parasol: { model: 'parasol' },
     vm_nova_pad: { model: 'novapad' }, vx_fountain: { model: 'fountain' }, vx_garden_lamp: { model: 'glamp' }, vx_arc_lamp: { model: 'varclamp' },
+    vx_stove: { model: 'vstove' }, vx_counter: { model: 'vkcounter', a: 0xB08A5A }, vx_shelf: { model: 'vbooks:w', a: 0x8A5E32 }, vx_locker: { model: 'locker', a: 0xB4BEC8 },
   });
   for (const [k, col, pil] of [['charcoal', 0x3A3D44, 0xE8D8B8], ['cream', 0xEDE6D6, 0x3A3D44], ['taupe', 0xA89482, 0xF2F2EE], ['white', 0xECEEF2, 0xFF8A2A]]) FDEF['vx_sofa_corner_' + k] = { model: 'vcorner', a: col, b: pil, vary: one };
   // a piece with a vary rule takes its variant from the anchor's bits (facing >> 2); the others as props.js says
