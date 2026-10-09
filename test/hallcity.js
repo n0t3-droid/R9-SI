@@ -146,6 +146,26 @@ const solid = (n) => n !== 'air' && n !== '?';
   }
   check(cells > 500 && dark === 0, `the vault over the plaza and the apse is lit from below (${cells} cells, ${dark} under sky light 6, the lowest ${low})`);
   check(gal > 80 && galDark === 0, `the apse's gallery is bright (${gal} cells at eye height, ${galDark} under sky light 10)`);
+  // the whole roof — nave, apse and both aisles — of this hall and of seed 2026's (another frame, other chunk borders: the
+  // light spreads only inside its own chunk, so a strip under the aisle vault's outer edge was black there)
+  const underRoof = (g, Hp) => {
+    const cache = new Map(), RT = (u, v) => { const q = ROT[Hp.r](u, v); return [Hp.cx + q[0], Hp.cz + q[1]]; };
+    const col = (x, z) => { const k = (x >> 4) + ',' + (z >> 4); let c = cache.get(k); if (!c) { const ch = g.generate(x >> 4, z >> 4); c = { b: ch.blocks, L: V.computeColumnLight(ch.blocks, true) }; cache.set(k, c); } return c; };
+    let n = 0, bad = 0;
+    for (let u = -46; u <= 46; u += 2) for (let v = -76; v <= 78; v += 2) {
+      const [x, z] = RT(u, v), c = col(x, z);
+      let y = Hp.F + 44; while (y > Hp.F && !c.b[idx(x, y, z)]) y--;
+      if (y <= Hp.F + 10) continue;
+      while (y > Hp.F && c.b[idx(x, y, z)]) y--;
+      if (y <= Hp.F + 12) continue;
+      n++; const L = c.L[idx(x, y, z)]; if ((L >>> 12) < 6 && (L & 0xfff) === 0) bad++;
+    }
+    return [n, bad];
+  };
+  const [n53, bad53] = underRoof(g9, Hh);
+  const g26 = new V.OverworldGen(2026, { worldType: 'default', vgen: 9 }), s26 = VG.site(g26, -3, 1), p26 = s26 && s26.style === 'hall' ? VG.plan(g26, s26) : null;
+  const [n26, bad26] = p26 ? underRoof(g26, p26.hall) : [0, 1];
+  check(n53 > 2500 && bad53 <= n53 / 1000 && n26 > 2500 && bad26 <= n26 / 1000, `the whole roof of the hall is lit from below, the aisles' too: no dark strip, at most a stray cell in a thousand (seed 53: ${bad53} of ${n53} cells under sky light 6; seed 2026's hall: ${bad26} of ${n26}, 129 before the aisle's panels reached the wall)`);
 }
 console.log('4. the town');
 // the street: 7 wide between paved fronts, the house fronts beyond
