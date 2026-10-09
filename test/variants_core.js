@@ -15,9 +15,11 @@ const fs = require('fs');
 const slots = R.types.filter(t => /^var_\d+$/.test(t.name));
 check(slots.length === 256, '256 slot types (' + slots.length + ')');
 check(slots.every((t, k) => t.name === 'var_' + k && t.nstates === 64), 'var_0 … var_255, 64 states each');
-const last = R.types.slice(-256);
-check(last.every((t, k) => t === slots[k]), 'the slots are the last 256 block types (appended after everything, the modern pack too)');
-check(slots.every((t, k) => k === 0 || t.base === slots[k - 1].base + 64) && slots[255].base + 64 === R.stateCount, 'their states are one block at the end: ' + slots[0].base + ' … ' + (R.stateCount - 1));
+// (v0.40 shipped the slots as the last 256 types; since then blocks come after them — the slots keep their v0.40 ids,
+// which test/id_snapshot.js pins, and stay one consecutive run of types and states, which looks.js relies on)
+const i0 = R.types.indexOf(slots[0]);
+check(i0 >= 0 && slots.every((t, k) => R.types[i0 + k] === t), 'the slots are 256 consecutive block types (from type ' + i0 + ')');
+check(slots.every((t, k) => k === 0 || t.base === slots[k - 1].base + 64), 'their states are one consecutive block: ' + slots[0].base + ' … ' + (slots[255].base + 63));
 check(R.stateCount < 65535, 'state count ' + R.stateCount + ' < 65,535 (saved columns are Uint16)');
 const grey = R.texIndex['concrete:light_gray'];
 check(slots.every(t => T.shape[t.base] === SH.CUBE && (T.tex[t.base * 6 + 2] & 0xfff) === grey && t.cat === null && t.o.noItem), 'an empty slot is the grey cube „Fehlende Variante" (an existing texture: no new GPU layer), not an item');
