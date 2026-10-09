@@ -314,6 +314,7 @@
     'touch.break': 'Break',
     'touch.inv': 'Inventory',
     'touch.sprint': 'Sprint',
+    'g.f3.stream': 'Upload {ms} ms · {kb}/{budget} KB · {mbs} MB/s · waiting {q} · hitches {h} (10 s)',   // (F10 · the streaming line on the ⚙ screen, F3)
     'g.aq.hint': '⚙ adjusting',
     'g.aq.tip': 'Graphics are being lowered automatically to keep it smooth: {what}. They come back by themselves when it runs well again.',
     'g.aq.g1': 'shadows every other frame',

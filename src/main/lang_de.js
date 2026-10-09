@@ -314,6 +314,7 @@
     'touch.break': 'Abbauen',
     'touch.inv': 'Inventar',
     'touch.sprint': 'Sprint',
+    'g.f3.stream': 'Hochladen {ms} ms · {kb}/{budget} KB · {mbs} MB/s · wartet {q} · Ruckler {h} (10 s)',   // (F10 · die Streaming-Zeile auf dem ⚙-Bildschirm, F3)
     'g.aq.hint': '⚙ passt an',
     'g.aq.tip': 'Die Grafik wird gerade automatisch gesenkt, damit es flüssig läuft: {what}. Sie kommt von selbst zurück, wenn es wieder gut läuft.',
     'g.aq.g1': 'Schatten jedes zweite Bild',

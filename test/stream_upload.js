@@ -163,7 +163,7 @@ console.log('3 · priority by view');
   const big = parted(30000, { dx: 0, dz: 300 }), mine = atomic(500, { dx: 0, dz: -200, urgent: true });
   big.step0 = big.step; big.step = (m) => { seen.push('big'); return big.step0(m); }; mine.run = () => seen.push('edit');
   s2.push(big); s2.drain(0.01, null, 0, 1, ch);                 // big starts (10 000 bytes)
-  s2.push(atomic(100, { dx: 0, dz: 30 })); s2.items[s2.items.length - 1].run = () => seen.push('near');
+  const nearIt = atomic(100, { dx: 0, dz: 30 }); nearIt.run = () => seen.push('near'); s2.push(nearIt);
   s2.push(mine);
   s2.drain(0.01, null, 0, 1, ch);
   check(seen.join(',') === 'big,edit,big', 'the player\'s edit first, then the upload in progress continues before a new near column', seen.join(','));
@@ -209,7 +209,7 @@ console.log('4 · one budget for everything');
   s.push(dead); s.push(live);
   const r = s.drain(1);
   check(dead.aborted && uploaded([dead]) === 0 && live.committed && r.bytes === 50000, 'a stale item is aborted (its staging released) and costs nothing');
-  s.push(parted(10000)); const p = s.items[0];
+  const p = parted(10000); s.push(p);
   s.clear();
   check(p.aborted && s.size === 0, 'clear() aborts what waits (a world torn down)');
 }
@@ -417,7 +417,7 @@ require('../src/main/horizon.js'); require('../src/main/farring.js');
   for (let i = 0; i < 12; i++) { hz.request(1, i, 0, 300 + i * 50); tiles.push(hz.tiles.get(hz.key(1, i, 0))); }
   frameBytes = 0;
   for (const j of hjobs) j.cb({ type: 'lod', verts: new ArrayBuffer(36000), idx: new Uint16Array(6000), count: 6000, big: false, minY: 40, maxY: 90 });
-  check(frameBytes === 0 && tiles.every(t => t.state === 0 && !t.vao) && sch.size === 12 && sch.items.every(it => it.lane === 1 && typeof it.prio === 'number'), 'the twelve answers wait in the world\'s queue on the far lane, in the horizon\'s order', sch.size + ' items');
+  check(frameBytes === 0 && tiles.every(t => t.state === 0 && !t.vao) && sch.size === 12 && sch.items.every(r => r.lane === 1 && Number.isFinite(r.prio)), 'the twelve answers wait in the world\'s queue on the far lane, in the horizon\'s order', sch.size + ' items');
   let worst = 0, f = 0;
   while (sch.size && f < 20) { frameBytes = 0; sch.drain(0.1); worst = Math.max(worst, frameBytes); f++; }
   check(worst <= 100000 && tiles.every(t => t.state === 1 && t.vao) && hz.bytes === 12 * 48000, 'they go up within the frame\'s bytes (a burst never stalls a frame)', f + ' frames, worst ' + worst + ' bytes');
@@ -437,10 +437,78 @@ require('../src/main/horizon.js'); require('../src/main/farring.js');
   const hz = { g, level: 4, bytes: 0, maskF: null, enabled: () => true };
   const R = new V.FarRing(hz); R.setRadius(64); R.update({ x: 8.5, y: 100, z: 8.5 });
   for (const j of fjobs) j.cb({ type: 'form', verts: new ArrayBuffer(48000), idx: new Uint16Array(6000), count: 6000, big: false, minY: 60, maxY: 80, bx0: 0, bz0: 0, bx1: 64, bz1: 64, tris: 2000 });
-  check(sch.size === fjobs.length && sch.items.every(it => it.lane === 1 && typeof it.prio === 'number' && it.alive && it.alive()), 'the forms wait on the far lane with their priority', sch.size + ' items');
+  check(sch.size === fjobs.length && sch.items.every(r => r.lane === 1 && Number.isFinite(r.prio) && r.it.alive && r.it.alive()), 'the forms wait on the far lane with their priority', sch.size + ' items');
   let f = 0; while (sch.size && f < 20) { sch.drain(0.1); f++; }
   check(R.live.length === fjobs.length, 'and go up', R.live.length + ' forms');
 }
 
-console.log(fails ? 'FAILED ' + fails : 'ALL OK');
-process.exit(fails ? 1 : 0);
+console.log('5 · cost: the drain against v042\'s');
+// v042's scheduler, verbatim (src/shared/stream.js at a00fd82): the reference for the cost
+class OldScheduler {
+  constructor(opts) { this.items = []; this.msPerByte = (opts && opts.msPerByte) || 2e-6; this.last = null; }
+  get size() { return this.items.length; }
+  push(item) { this.items.push({ key: item.key, col: item.col, x: item.x, z: item.z, bytes: item.bytes || 0, dx: item.dx || 0, dz: item.dz || 0, run: item.run, age: 0 }); }
+  prune(keep) { this.items = this.items.filter(it => keep(it)); }
+  drain(budgetMs, clock, vx, vz) {
+    const now = clock || (() => 0);
+    const order = this.items.map((it) => ({ it, p: S.viewPrio(it.dx, it.dz, vx || 0, vz || 0) }));
+    order.sort((a, b) => a.p - b.p);
+    const keep = [];
+    let spent = 0, ran = 0, forced = 0, blocked = false;
+    for (const { it } of order) {
+      if (blocked) { it.age++; keep.push(it); continue; }
+      const est = it.bytes * this.msPerByte;
+      if (spent + est > budgetMs + 1e-9) {
+        if (spent === 0 && est > budgetMs && it.age >= 4) forced++;
+        else { blocked = true; it.age++; keep.push(it); continue; }
+      }
+      const t0 = now();
+      it.run();
+      const ms = Math.max(0, now() - t0);
+      spent += ms; ran++;
+      if (it.bytes > 0) { const per = ms / it.bytes; this.msPerByte = per > this.msPerByte ? per : this.msPerByte * 0.8 + per * 0.2; }
+    }
+    this.items = keep;
+    this.last = { ran, spentMs: spent, forced, left: keep.length };
+    return this.last;
+  }
+}
+(async () => {
+  const { PerformanceObserver } = require('perf_hooks');
+  let gcs = 0;
+  const obs = new PerformanceObserver((list) => { gcs += list.getEntries().length; });
+  obs.observe({ entryTypes: ['gc'] });
+  const tick = () => new Promise((res) => setImmediate(res));
+  const cpuMs = (f, n) => { let best = 1e9; for (let r = 0; r < 5; r++) { const c0 = process.cpuUsage(); for (let i = 0; i < n; i++) f(i); const c1 = process.cpuUsage(c0); best = Math.min(best, (c1.user + c1.system) / 1000 / n); } return best; };
+  // a world streaming in: 300 sections waiting around the camera, about a dozen fit a frame and as many new ones arrive.
+  // Both schedulers get the same clock: every run takes its bytes × 1e-6 ms (so v042's learning keeps its estimate)
+  let fake = 0; const clock = () => fake;
+  const item = (k) => { const b = 30000 + (k % 13) * 4000; return { x: ((k * 37) % 400) - 200, z: ((k * 91) % 400) - 200, dx: ((k * 37) % 400) - 200, dz: ((k * 91) % 400) - 200, bytes: b, run() { fake += b * 1e-6; } }; };
+  const fill = (sch) => { for (let i = 0; i < 300; i++) sch.push(item(i)); };
+  let kNew = 1000, kOld = 1000;
+  const streamNew = (sch) => { const before = sch.size; sch.drain(0.5, clock, 0.6, 0.8, 0.6); for (let i = sch.size; i < before; i++) sch.push(item(kNew++)); };
+  const streamOld = (sch) => { const before = sch.size; sch.drain(0.5, clock, 0.6, 0.8); for (let i = sch.size; i < before; i++) sch.push(item(kOld++)); };
+  const sNew = new S.UploadScheduler({ msPerByte: 1e-6 }), sOld = new OldScheduler({ msPerByte: 1e-6 });
+  fill(sNew); fill(sOld);
+  const tNew = cpuMs(() => streamNew(sNew), 400), tOld = cpuMs(() => streamOld(sOld), 400);
+  console.log(`     a streaming frame (300 waiting, ~12 up): v042 ${(tOld * 1000).toFixed(1)} µs, now ${(tNew * 1000).toFixed(1)} µs (queue ${sOld.size} / ${sNew.size})`);
+  check(tNew <= tOld * 1.1 && sOld.size === 300 && sNew.size === 300, 'the drain is not slower than v042\'s while the world streams in (Very Low: never slower)', (tNew / tOld).toFixed(2) + 'x');
+  // a frame where nothing fits (the budget spent): the queue is only looked at (ages kept under the forced rule)
+  const young = (sch) => { const a = sch.items; for (let i = 0; i < a.length; i++) a[i].age = 0; };
+  const iNew = cpuMs(() => { sNew.drain(1e-9, clock, 0.6, 0.8, 0.6); young(sNew); }, 2000), iOld = cpuMs(() => { sOld.drain(1e-9, clock, 0.6, 0.8); young(sOld); }, 2000);
+  console.log(`     a frame that waits (300 queued, none fits): v042 ${(iOld * 1000).toFixed(1)} µs, now ${(iNew * 1000).toFixed(1)} µs`);
+  check(iNew <= iOld * 1.1 && sNew.size === 300 && sOld.size === 300, 'a waiting frame is not slower either', (iNew / iOld).toFixed(2) + 'x');
+  // allocations: a queue that waits allocates nothing a frame (no garbage collection in 20 000 frames); v042's made an
+  // object per item and two arrays a frame
+  await tick(); await tick(); gcs = 0;
+  for (let i = 0; i < 20000; i++) { sNew.drain(1e-9, clock, 0.6, 0.8, 0.6); young(sNew); }
+  await tick(); await tick();
+  const gNew = gcs; gcs = 0;
+  for (let i = 0; i < 20000; i++) { sOld.drain(1e-9, clock, 0.6, 0.8); young(sOld); }
+  await tick(); await tick();
+  const gOld = gcs;
+  obs.disconnect();
+  check(gNew === 0 && gOld > 0, 'no allocation per frame: 20 000 waiting frames without a garbage collection (v042: ' + gOld + ')', gNew + ' collections');
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+  process.exit(fails ? 1 : 0);
+})();

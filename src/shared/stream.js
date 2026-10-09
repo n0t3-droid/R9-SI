@@ -98,24 +98,32 @@
       this.cal = 0;                        // the calibration, ms per byte (0 = none)
       this.msPerByte = this.cpuEst;        // the estimate in use
       this.targetMs = o.targetMs || S.TARGET_MS;
-      this.scale = 1; this.frameK = 1; this.debtMs = 0; this.medianMs = 0;
+      this.scale = 1; this.frameK = 1; this.debtMs = 0.5; this.medianMs = 0.5; this.debtMs = 0; this.medianMs = 0;   // (doubles from the start, see last)
       this.fr = new Float32Array(RING); this.frS = new Float32Array(RING); this.frN = 0; this.frI = 0; this.frC = 0;
       this.hit = new Float64Array(RING).fill(-Infinity); this.hitI = 0;
       this.sinceUp = 1e9;                  // frames since the last one that uploaded
       this.fit = { w: 0, x: 0, y: 0, xx: 0, xy: 0, n: 0 };   // the fence fit's weighted sums
-      this.last = { ran: 0, spentMs: 0, forced: 0, left: 0, bytes: 0, budgetBytes: 0, gauged: true };
-      this._spent = 0; this._clock = null;
+      // (the number fields start as doubles, so V8 keeps their values in place: no boxed number per frame)
+      this.last = { ran: 0, spentMs: 0.5, forced: 0, left: 0, bytes: 0, budgetBytes: 0.5, gauged: true };
+      this.last.spentMs = 0; this.last.budgetBytes = 0;
+      this._spent = 0.5; this._cap = 0.5; this._clock = null;
     }
     get size() { return this.items.length; }
-    push(item) { item.age = 0; item.done = false; item.left = item.bytes || 0; item.p = 0; this.items.push(item); }
-    // drops the queued items the predicate rejects (a column unloaded while its mesh waited); their staging is given back
+    // the queue keeps a record of one shape per item (made once, here): its hot loops stay monomorphic whatever mix of
+    // sections, mini-voxel detail, tiles and forms waits; the item's own functions are called on the item (it)
+    push(item) {
+      const prio = item.prio;
+      this.items.push({ it: item, x: item.x || 0, z: item.z || 0, dx: item.dx || 0, dz: item.dz || 0, bytes: item.bytes || 0, left: item.bytes || 0,
+        lane: item.lane === 1 ? 1 : 0, prio: typeof prio === 'number' ? prio : NaN, urgent: !!item.urgent, parted: typeof item.step === 'function', age: 0, p: 0.5, done: false });
+    }
+    // drops the queued items the predicate rejects (it gets the item); their staging is given back
     prune(keep) {
       const a = this.items; let n = 0;
-      for (let i = 0; i < a.length; i++) { const it = a[i]; if (keep(it)) a[n++] = it; else if (it.abort) it.abort(); }
+      for (let i = 0; i < a.length; i++) { const r = a[i]; if (keep(r.it)) a[n++] = r; else if (r.it.abort) r.it.abort(); }
       a.length = n;
     }
     // everything waiting is dropped (a world torn down): staged ranges go back to the arenas
-    clear() { const a = this.items; for (let i = 0; i < a.length; i++) if (a[i].abort) a[i].abort(); a.length = 0; this.debtMs = 0; }
+    clear() { const a = this.items; for (let i = 0; i < a.length; i++) if (a[i].it.abort) a[i].it.abort(); a.length = 0; this.debtMs = 0; }
     // ---- the cost per byte
     _est() { this.msPerByte = this.gpuEst > this.cpuEst ? this.gpuEst : this.cpuEst; }
     // a CPU-side timing (a run or a step): a solid slower one (≥ 0.5 ms) counts at once, the rest eases in; timings under
@@ -180,25 +188,40 @@
       L.ran = 0; L.spentMs = 0; L.forced = 0; L.bytes = 0; L.gauged = false;   // (gauged: renderer.upGauge has read this frame's bytes)
       // the dead go first, without spending bytes: their staging is given back
       let n = 0;
-      for (let i = 0; i < a.length; i++) { const it = a[i]; if (it.alive && !it.alive()) { if (it.abort) it.abort(); continue; } a[n++] = it; }
+      for (let i = 0; i < a.length; i++) { const r = a[i], it = r.it; if (it.alive && !it.alive()) { if (it.abort) it.abort(); continue; } a[n++] = r; }
       a.length = n;
-      const avail0 = this.budgetMs(budgetMs);
+      const avail0 = budgetMs > 0 ? budgetMs * this.scale * this.frameK : 0;   // (= budgetMs(), inlined: no boxed return)
       if (!n) { L.left = 0; L.budgetBytes = avail0 / this.msPerByte; if (this.debtMs > 0) this.debtMs = Math.max(0, this.debtMs - avail0); return L; }
-      // the order, in place
-      const ch = cosHalf > 0 && cosHalf < 1 ? cosHalf : 0.6, sh = Math.sqrt(1 - ch * ch), ux = vx || 0, uz = vz || 0;
+      // the order, in place (insertion sort: the last frame's order is nearly right)
+      const ch = cosHalf > 0 && cosHalf < 1 ? cosHalf : 0.6, sh = Math.sqrt(1 - ch * ch), ux = vx || 0, uz = vz || 0, view = ux !== 0 || uz !== 0;
       let far = false;
-      for (let i = 0; i < n; i++) { const it = a[i]; it.p = this._prio(it, ux, uz, ch, sh); if (it.lane === 1) far = true; }
-      for (let i = 1; i < n; i++) { const it = a[i], p = it.p; let j = i - 1; while (j >= 0 && a[j].p > p) { a[j + 1] = a[j]; j--; } a[j + 1] = it; }
+      for (let i = 0; i < n; i++) {
+        const r = a[i];
+        let p;
+        if (r.urgent) p = -3e9;
+        else if (r.parted && r.left > 0 && r.left < r.bytes) p = -2e9;   // in progress: finish what was started
+        else {
+          const dx = r.dx, dz = r.dz, d = Math.sqrt(dx * dx + dz * dz);
+          if (r.lane === 1) p = r.prio === r.prio ? r.prio : d / 1024;
+          else if (d < S.NEAR_BLOCKS || !view) p = d;
+          else {   // = viewTier, inlined (the distance once): in the view, beside, behind
+            const c = (dx * ux + dz * uz) / d, m = 12 / d;
+            p = c >= ch * (1 - m * m * 0.5) - sh * m ? d : (c >= 0 ? 1e7 : 2e7) + d;
+          }
+        }
+        r.p = p;
+        if (r.lane === 1) far = true;
+      }
+      for (let i = 1; i < n; i++) { const r = a[i], p = r.p; let j = i - 1; while (j >= 0 && a[j].p > p) { a[j + 1] = a[j]; j--; } a[j + 1] = r; }
       // the frame's milliseconds after the debt of a forced frame
       let avail = avail0 - this.debtMs;
       if (avail < 0) { this.debtMs = -avail; avail = 0; } else this.debtMs = 0;
       this._clock = clock || null; this._spent = 0;
-      this._lane(0, far ? avail * (1 - S.FAR_SHARE) : avail);
-      this._lane(1, avail);
-      this._lane(0, avail);
+      if (far) { this._cap = avail * (1 - S.FAR_SHARE); this._lane(0); this._cap = avail; this._lane(1); this._lane(0); }
+      else { this._cap = avail; this._lane(0); }
       // the done ones out, the rest a frame older
       let m = 0;
-      for (let i = 0; i < n; i++) { const it = a[i]; if (it.done) continue; it.age++; a[m++] = it; }
+      for (let i = 0; i < n; i++) { const r = a[i]; if (r.done) continue; r.age++; a[m++] = r; }
       a.length = m;
       if (this._spent > avail) this.debtMs += this._spent - avail;
       if (L.bytes > 0) this.sinceUp = 0;
@@ -206,41 +229,34 @@
       this._clock = null;
       return L;
     }
-    _prio(it, vx, vz, ch, sh) {
-      if (it.urgent) return -3e9;
-      if (it.step && it.left > 0 && it.left < it.bytes) return -2e9;   // in progress: finish what was started
-      const dx = it.dx || 0, dz = it.dz || 0;
-      if (it.lane === 1) return it.prio !== undefined ? it.prio : Math.sqrt(dx * dx + dz * dz) / 1024;
-      return S.viewTier(dx, dz, vx, vz, ch, sh) * 1e7 + Math.sqrt(dx * dx + dz * dz);
-    }
-    // one pass over a lane, in order, until its cap is spent (the cap is cumulative over the frame)
-    _lane(lane, cap) {
-      const a = this.items, L = this.last, clk = this._clock;
+    // one pass over a lane, in order, until its cap (this._cap, cumulative over the frame) is spent
+    _lane(lane) {
+      const a = this.items, L = this.last, clk = this._clock, cap = this._cap;
       for (let i = 0; i < a.length; i++) {
-        const it = a[i];
-        if (it.done || (it.lane === 1 ? 1 : 0) !== lane) continue;
-        const urgent = !!it.urgent, rem = cap - this._spent;
-        if (it.step) {
-          if (it.left > 0) {
+        const r = a[i];
+        if (r.done || r.lane !== lane) continue;
+        const it = r.it, urgent = r.urgent, rem = cap - this._spent;
+        if (r.parted) {
+          if (r.left > 0) {
             let max = Infinity;
             if (!urgent) { if (rem <= 0) return; max = Math.floor(rem / this.msPerByte); if (max < 16) return; }
             const t0 = clk ? clk() : 0;
             const b = it.step(max) || 0;
             const ms = clk ? Math.max(0, clk() - t0) : 0;
-            if (b > 0) { it.left -= b; L.bytes += b; L.ran++; this._account(b, ms); }
-            if (it.left > 0) { if (urgent && b > 0) { i--; continue; } return; }
+            if (b > 0) { r.left -= b; L.bytes += b; L.ran++; this._account(b, ms); }
+            if (r.left > 0) { if (urgent && b > 0) { i--; continue; } return; }
           }
-          it.commit(); it.done = true;
+          it.commit(); r.done = true;
         } else {
-          const bytes = it.bytes || 0, est = bytes * this.msPerByte;
+          const bytes = r.bytes, est = bytes * this.msPerByte;
           if (!urgent && est > rem + 1e-9) {
-            if (this._spent === 0 && est > cap && it.age >= 4) L.forced++;
+            if (this._spent === 0 && est > cap && r.age >= 4) L.forced++;
             else return;   // the first that does not fit stops its lane: nothing overtakes it
           }
           const t0 = clk ? clk() : 0;
           it.run();
           const ms = clk ? Math.max(0, clk() - t0) : 0;
-          it.done = true; L.ran++; L.bytes += bytes;
+          r.done = true; L.ran++; L.bytes += bytes;
           this._account(bytes, ms);
         }
       }
