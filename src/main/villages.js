@@ -1321,13 +1321,14 @@
         if (d2 > FD * FD) continue;
         if (!VR.mat4.boxInFrustum(r.planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
         a.vis = true; a.d2v = d2;
-        if (!(a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type]))) nn = C.keepNearest(near, nn, cap, d2);
+        a.street = C.onStreet(a);   // (on the way in counts: src/shared/folkcrowd.js)
+        if (a.street) nn = C.keepNearest(near, nn, cap, d2);
       }
       const thr = nn >= cap ? near[cap - 1] : Infinity;
       for (const a of this.agents) {
         if (!a.vis) continue;
         const d2 = a.d2v, dy = a.pos[1] - cam.y;
-        if (d2 > thr && !(a.pose === 'sleep' || (a.act && C.INDOOR[a.act.type]))) continue;
+        if (d2 > thr && a.street) continue;
         const far = d2 > (FD < 100 ? 16 : 24) * (FD < 100 ? 16 : 24);
         // the model is looked up once per agent and LOD (the key is built from the look only once)
         const mk = far ? 1 : 0;

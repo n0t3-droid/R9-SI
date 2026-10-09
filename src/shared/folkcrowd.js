@@ -51,6 +51,14 @@
   C.homeAt = function (seed) { const d = C.STREET.dusk; return d[0] + C.unit(seed, 77) * (d[1] - d[0]); };
   // the activities that happen indoors: their people are drawn (the walls hide them) but do not count toward the cap
   C.INDOOR = { home: 1, sleep: 1, breakfast: 1, lunch: 1, school: 1, learn: 1, office: 1, cafe: 1 };
+  // who the street's cap applies to: everyone out of doors, and whoever is still on the way to an indoor activity (a person
+  // walking home or to bed walks the street — at 13000 a whole town's people turn 'sleep' at once: t-town's dusk picture
+  // drew 93 of 149); free of it is only who has arrived (asleep, or standing or sitting at the indoor activity)
+  C.onStreet = function (a) {
+    if (a.pose === 'sleep') return false;
+    if (!(a.act && C.INDOOR[a.act.type])) return true;
+    return !!a.path || a.walkAmt > 0.3;
+  };
   // one person in plazaShare goes to the plaza's benches and its ring (decided once per person)
   C.plazaPerson = function (seed) { return C.unit(seed, 31) * C.STREET.plazaShare < 1; };
   // keeps the cap smallest squared distances of the people in view, in order, in buf (no allocation); n = how many
