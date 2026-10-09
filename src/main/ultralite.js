@@ -183,6 +183,15 @@
     mx = Math.min(cap, mx * 1.004); my = Math.min(cap, my * 1.004);   // (a hair more: the edges between the samples)
     return { sx: mx / th, sy: my / tv, fov: 2 * Math.atan(my), aspect: mx / my };
   };
+  // the cache's size and view for a screen of w × h pixels whose projection has this fov and aspect: the screen's pixel
+  // grid extended by whole pixels on every side (mx, my), at least the overscan — so an eye where the cache was drawn reads
+  // every screen pixel's own texel at its centre (the composite copies the far world as it was drawn, not resampled)
+  FC.grid = function (fov, aspect, w, h) {
+    const os = FC.overscan(fov, aspect);
+    const mx = Math.ceil(w * (os.sx - 1) / 2), my = Math.ceil(h * (os.sy - 1) / 2);
+    const tw = w + 2 * mx, th = h + 2 * my, sx = tw / w, sy = th / h;
+    return { tw, th, mx, my, sx, sy, fov: 2 * Math.atan(Math.tan(fov / 2) * sy), aspect: aspect * sx / sy };
+  };
   // strip k of K of a cache w pixels wide: its pixel columns [x0, x1)
   FC.strip = (k, K, w) => [Math.floor(k * w / K), Math.floor((k + 1) * w / K)];
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

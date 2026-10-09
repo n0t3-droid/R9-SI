@@ -1038,8 +1038,8 @@
     }
     // a new cache: this frame's eye and look, a wider projection (no sub-pixel jitter), the far sections of this moment
     fcBegin(st, F, E, world, vis, info, now) {
-      const FC = VR.UL.Far, b = st.spare, os = FC.overscan(info.fov, info.aspect);
-      const tw = Math.max(16, Math.ceil(this.w * os.sx)), th = Math.max(16, Math.ceil(this.h * os.sy));
+      const FC = VR.UL.Far, b = st.spare, os = FC.grid(info.fov, info.aspect, this.w, this.h);   // (the screen's pixel grid, whole pixels round it)
+      const tw = os.tw, th = os.th;
       if (!b || !this.fcEnsure(b, tw, th)) return;
       st.back = b; st.spare = null;
       b.x = info.x; b.y = info.y; b.z = info.z; b.fx = info.fx; b.fy = info.fy; b.fz = info.fz; b.fov = info.fov; b.aspect = info.aspect;

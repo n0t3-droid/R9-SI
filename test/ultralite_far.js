@@ -73,6 +73,23 @@ console.log('c · the overscan');
   check(worst <= 1, 'every edge of the screen turned by the margin any way stays inside', 'worst ndc ' + worst.toFixed(3));
   const w = 1280, tw = w * os.sx, density = (W, t) => (W / 2) / t;
   check(Math.abs(density(tw, Math.tan(os.fov / 2) * os.aspect) - density(w, Math.tan(fov / 2) * aspect)) < 1e-6, 'its pixels per unit of view are the screen\'s (the far world as sharp as before)');
+  // the cache's pixel grid is the screen's extended by whole pixels (FC.grid): with the eye where the cache was drawn, every
+  // screen pixel reads its own cache texel at the texel's centre — the far world copied as it was drawn, not resampled
+  // (run 2's village: the cache's ceil-rounded size put the screen's pixels between texels, every far edge a little soft)
+  let worstT = 0, covers = true, sizes = [];
+  for (const [w, h, A, f] of [[1280, 720, 1280 / 720, 75], [1920, 1080, 1920 / 1080, 75], [1151, 648, 1280 / 720, 75], [853, 480, 853 / 480, 90], [640, 360, 16 / 9, 60]]) {
+    const g = FC.grid && FC.grid(f * deg, A, w, h);
+    if (!g) { covers = false; break; }
+    const o2 = FC.overscan(f * deg, A);
+    if (!(g.sx >= o2.sx && g.sy >= o2.sy && g.tw === w + 2 * g.mx && g.th === h + 2 * g.my && Number.isInteger(g.mx) && Number.isInteger(g.my))) covers = false;
+    const P = M4.perspective(M4.create(), f * deg, A, 0.06, 1000), Pi = M4.invert(M4.create(), P), C = M4.perspective(M4.create(), g.fov, g.aspect, 0.06, 1000);
+    for (const [i, j] of [[0, 0], [w - 1, h - 1], [w >> 1, h >> 1], [17, h - 5], [w - 33, 101]]) {
+      const d = ap(Pi, [2 * (i + 0.5) / w - 1, 2 * (j + 0.5) / h - 1, 0.5, 1]), c = ap(C, [d[0], d[1], d[2], 1]);
+      worstT = Math.max(worstT, Math.abs((c[0] + 1) / 2 * g.tw - (i + 0.5 + g.mx)), Math.abs((c[1] + 1) / 2 * g.th - (j + 0.5 + g.my)));
+    }
+    sizes.push(`${w}×${h} → ${g.tw}×${g.th}`);
+  }
+  check(covers && worstT < 1e-3, 'the cache is the screen\'s pixel grid with whole pixels round it (at least the overscan): an unmoved eye reads every pixel\'s own texel at its centre', `worst ${worstT.toExponential(1)} texels · ${sizes.join(' · ')}`);
   let even = true;
   for (const W of [Math.ceil(1280 * os.sx), 7, 1000]) { const K = FC.SLICES, seen = new Uint8Array(W); for (let k = 0; k < K; k++) { const [x0, x1] = FC.strip(k, K, W); if (Math.abs((x1 - x0) - W / K) > 1) even = false; for (let i = x0; i < x1; i++) seen[i]++; } if (seen.some(v => v !== 1)) even = false; }
   check(even, `the ${FC.SLICES} strips cover the cache's width once each, evenly`);
@@ -110,6 +127,8 @@ console.log('d · the renderer with a stub GL');
   check(most <= 0.6 * inView && first.every(f => f.scissor >= 1) && hz === K, `a strip a frame: no frame draws more than 60 % of them (the most ${most}), each scissored, the horizon once in each`, first.map(f => f.far).join(' ') + ' · horizon ' + hz);
   const f1 = first[K - 1];
   check(f1.fc.near.length === vis.length - nFar && f1.fc.near.every(s => s.mesh[0].count === 96), 'the near list: the sections within the radius only', f1.fc.near.length);
+  const g0 = FC.grid ? FC.grid(cam.fov, r.W / r.H, r.w, r.h) : null, fr = r.fc.front, Cg = g0 && M4.perspective(M4.create(), g0.fov, g0.aspect, 0.06, cam.far);
+  check(g0 && fr.tw === g0.tw && fr.th === g0.th && fr.scale[0] === g0.sx && fr.scale[1] === g0.sy && Cg.every((v, i) => Math.abs(v - fr.proj[i]) < 1e-9), 'the renderer draws the cache on that grid (its size, its projection, the composite\'s scale)', g0 && `${fr.tw}×${fr.th}`);
   let far = 0, hz0 = hz; for (let i = 0; i < 20; i++) { cam.yaw += 0.001; far += frame().far; }
   check(far === 0 && hz === hz0 && r.stats.farBuilt === 1, 'standing (and looking a little round) for 20 frames: nothing far is drawn again', far);
   cam.x += 2;
