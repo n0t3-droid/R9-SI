@@ -160,7 +160,7 @@
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
       P.sky = GL.program(S.SKY_VS, S.SKY_FS, 'sky', atmo.concat(this.q.lite ? ['LITE'] : []));   // LITE: two-octave nebula, no dust (Very Low)
       P.expose = GL.program(S.FS_VS, S.EXPOSE_FS, 'expose');
-      P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud');
+      P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud', atmo);   // (atmo: every program that draws the sky or the haze takes the table on Very Low)
       P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff');   // t-clouds: cumulus, fog banks, anchors (balanced and above)
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
       P.down = GL.program(S.FS_VS, S.DOWN_FS, 'down');
@@ -170,13 +170,13 @@
       P.fxaa = GL.program(S.FS_VS, S.FXAA_FS, 'fxaa');
       P.tsr = GL.program(S.FS_VS, S.TSR_FS, 'tsr');
       P.copy = GL.program(S.FS_VS, S.COPY_FS, 'copy');
-      P.mesh = GL.program(S.MESH_VS, S.MESH_FS, 'mesh');
-      P.vox = GL.program(S.VOX_VS, S.VOX_FS, 'vox');
-      P.part = GL.program(S.PART_VS, S.PART_FS, 'part');
+      P.mesh = GL.program(S.MESH_VS, S.MESH_FS, 'mesh', atmo);
+      P.vox = GL.program(S.VOX_VS, S.VOX_FS, 'vox', atmo);
+      P.part = GL.program(S.PART_VS, S.PART_FS, 'part', atmo);
       P.line = GL.program(S.LINE_VS, S.LINE_FS, 'line');
       P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain');
       P.decal = GL.program(S.DECAL_VS, S.DECAL_FS, 'decal');
-      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod');
+      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod', atmo);   // the far tiles: the haze from the table on Very Low (the formula cost 10 exps a pixel there)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
 
