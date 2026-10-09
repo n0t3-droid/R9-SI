@@ -306,12 +306,52 @@
   PLAN.pick = function (w, d, rng) {
     const exact = PLAN.CATALOGUE.filter(c => c.lot[0] === w && c.lot[1] === d);
     if (exact.length) return exact[0];
-    // otherwise the biggest catalogue entry that fits the lot
-    const fits = PLAN.CATALOGUE.filter(c => c.lot[0] <= w && c.lot[1] <= d).sort((p, q) => q.lot[0] * q.lot[1] - p.lot[0] * p.lot[1]);
+    // otherwise the biggest catalogue entry that fits the lot (a special house — Villa Nova — only on its own lot size)
+    const fits = PLAN.CATALOGUE.filter(c => !c.special && c.lot[0] <= w && c.lot[1] <= d).sort((p, q) => q.lot[0] * q.lot[1] - p.lot[0] * p.lot[1]);
     return fits[0] || null;
   };
   PLAN.dims = function (rng) { return PLAN.DIMS[rng.int(PLAN.DIMS.length)].slice(); };
   PLAN.templates = { stadtvilla: tStadtvilla, belportale: tPortico, sanssoucis: tLake, toscana: tTower, bungalow: tBungalow, palais: tPalais };   // (the keys are the saved family ids)
   PLAN.shared = shared;
   if (VG.modern && VG.modern.DIMS) VG.modern.DIMS.home = PLAN.DIMS.slice();   // the town planner draws home lots from the catalogue
+
+  // ================================================================ VILLA NOVA (25 × 31): the house of the trailer
+  // (docs/trailer/frames t1_26 · t3_05 · t2_23, the white hall of t1_29 · t3_10): three stepped storeys of grey stone with
+  // cantilevered slabs, box bays with turquoise windows in thick orange frames, balustrade terraces, a roof garden, the
+  // white hall with the floating glass stairs and the light pad; built block by block by gen_nova.js (PLAN.buildNova).
+  // Appended after the town lots are counted: PLAN.DIMS (the towns' draw) stays as it was, PLAN.pick gives it only to
+  // a lot of exactly its size; the city (gen_city / t-city) places it with { index: PLAN.TRAILER } (see PLAN.buildNova).
+  // the geometry (lot-local u across the street front, v into the lot; y relative to the floor F)
+  const NOVA = PLAN.NOVA = {
+    LOT: [25, 31],                                                     // the street on the v = 0 side; ten rows of garden behind the house
+    G: { u0: 2, v0: 6, u1: 22, v1: 20, y: 0, clear: 5, slab: 6 },    // ground floor: floor block y 0, rooms 1..5, slab zone 6..7
+    U: { u0: 4, v0: 9, u1: 20, v1: 20, y: 7, clear: 4, slab: 12 },   // first floor: floor y 7 (the slab's top row), rooms 8..11
+    T: { u0: 5, v0: 13, u1: 13, v1: 20, y: 13, clear: 4, slab: 18 },  // top floor, a box at the left: floor y 13, rooms 14..17, roof 18..19
+    OVER: { G: [2, 1, 1], U: [1, 1, 1], T: [1, 1, 1] },               // each slab's overhang past the walls below: [front, sides, back]
+    // the floating stairs from the hall: two blocks deep in front of the glass wall (v 18–19), from the side walls up
+    // toward the middle — the foot at u, one block along du per block up (the V of the trailer's hall, t1_29 / t1_30)
+    STAIRS: [{ u: 4, du: 1 }, { u: 20, du: -1 }], STAIR_V: 18,
+    STAIR2: { u: 11, v: 12 },                                          // the stair from the first floor to the top floor (inside the top box)
+    PAD: [11, 14], ENTRY: 12, PARTITION: 10,
+  };
+  // the plan: one open storey per level (the foyer and the hall below, the gallery, the studio), house-local frame
+  function tTrailerVilla(o) {
+    const { G, U, T } = NOVA, R_ = (type, u0, v0, u1, v1, extra) => R(type, u0 - G.u0, v0 - G.v0, u1 - G.u0, v1 - G.v0, extra);
+    const H = { family: 'trailer', w: G.u1 - G.u0 + 1, d: G.v1 - G.v0 + 1, storeys: 3, sh: 6, floors: [], stairs: null, entry: { u: NOVA.ENTRY - G.u0, n: 1 }, features: {}, special: true };
+    // (the ground floor's walls are two thick: the white lining of the hall stands inside the grey stone)
+    H.floors.push({ y: 0, rect: [0, 0, H.w - 1, H.d - 1], rooms: [R_('foyer', G.u0 + 2, G.v0 + 2, G.u1 - 2, NOVA.PARTITION - 1, { id: 'foyer' }), R_('open', G.u0 + 2, NOVA.PARTITION + 1, G.u1 - 2, G.v1 - 1, { id: 'open', to: 'foyer' })] });
+    H.floors.push({ y: U.y, rect: [U.u0 - G.u0, U.v0 - G.v0, U.u1 - G.u0, U.v1 - G.v0], rooms: [R_('gallery', U.u0 + 1, U.v0 + 1, U.u1 - 1, U.v1 - 1, { id: 'gallery' })] });
+    H.floors.push({ y: T.y, rect: [T.u0 - G.u0, T.v0 - G.v0, T.u1 - G.u0, T.v1 - G.v0], rooms: [R_('studio', T.u0 + 1, T.v0 + 1, T.u1 - 1, T.v1 - 1, { id: 'studio' })] });
+    void o;
+    return H;
+  }
+  // the skin: grey stone, a white fascia with a cyan line, nova windows (voxnova.js), white balusters, a white hall
+  SKINS.nova = { id: 'nova', wall: 'vollton_stone_grey', bay: 'vollton_light_grey', plinth: 'vollton_mid_grey', fascia: 'vx_nova_band', ceiling: 'vollton_white',
+    floor: 'vollton_white_gloss', inner: 'vollton_white', terrace: 'vx_floor_plaza', rail: 'vx_balustrade', win: 'vx_nova_window', glass: 'panorama_white', mullion: 'vx_beam_white',
+    base: 'vx_led_strip', door: 'door_glass_white', path: 'vx_floor_plaza', line: 'vx_floor_plaza_line', hedge: 'vx_hedge', partition: 'vx_nova_glass', sheet: 'vx_nova_glass',
+    spot: 'vx_spot', glassRail: 'vx_tech_railing', band: 'vx_nova_band', trim: 'vx_nova_band', roof: 'flat', hip: 'slate', column: 'vx_beam_white', canopy: 'vx_nova_band', floorL: 'vollton_white_gloss', floorH: 'vollton_white_gloss' };
+  PLAN.CATALOGUE.push({ lot: NOVA.LOT.slice(), make: tTrailerVilla, build: (L, lot, o) => PLAN.buildNova(L, lot, o), garage: false, garden: 0, front: 0, skins: ['nova'], special: true, family: 'trailer', name: 'Villa Nova', icon: 'villa' });
+  PLAN.TRAILER = PLAN.CATALOGUE.length - 1;
+  PLAN.templates.trailer = tTrailerVilla;
+  if (VR.defItem) VR.defItem('blueprint_' + PLAN.TRAILER, { name: 'Blueprint · Villa Nova', cat: 'blueprints', stack: 1, use: 'blueprint', house: PLAN.TRAILER, texKey: 'blueprint:villa' });
 })(VR);
