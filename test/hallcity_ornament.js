@@ -21,7 +21,10 @@
 //      arched hood, a keystone, a sill), a portal with a gabled pediment at the side gates, turrets five wide, a cupola
 //   9. round 2b: warm lantern light at the stair's foot, its landings, the gallery's doors and in the workshops
 //  10. round 2c (the brief's open items, in its order): the bright end — the apse a crown of five tall windows over the
-//      gallery (P4 / P8)
+//      gallery, wooden ribs under the half dome's rays (P4 / P8)
+//  11. round 2c: the market's goods piled before every stall (the keeper's place free, the walk five blocks), the
+//      workshops' goods beside their arches, lanterns on the loggia columns lighting the walk warm (P3)
+//  12. round 2c: flying buttresses from every outer buttress over the aisle roof to the clerestory, never over glass (P5)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
