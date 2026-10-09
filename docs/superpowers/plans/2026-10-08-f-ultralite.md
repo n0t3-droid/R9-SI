@@ -188,7 +188,31 @@ Governor ladders (aqGpuRungs), from ultralite_preset.js:
 
 ## Results
 
-(browser measurements: filled in from test/ultralite.mjs)
+SwiftShader (the CPU draws), 1280 × 720, render distance 8, seed 4242, noon; every frame synced by a one-texel read.
+At each spot Ultra first, then Ultra · Leicht (steady frames: the cache's age rule lifted; refresh: a new cache's
+frames). Milliseconds are CPU-rendered: only the ratios mean something.
+
+### Run 1 (before the strips, step 4 and the mesh-start cap; its settle gave up while the world was still loading)
+
+| scene | Ultra | Ultra · Leicht steady | a new cache's frames | full shadow map | pictures |
+|---|---|---|---|---|---|
+| hall | 11 944 | 6 219 | 12 449 · 6 492 · 6 419 · 9 476 | 2 842 → 2 769 | not comparable: Ultra's frame came while the hall was still loading (the far forms over it) |
+| plaza | 11 367 | **4 969 (−56 %)** | 10 260 · 4 664 · 4 995 · 10 128 | 3 437 → 4 188 | mean 0.9/255, 1.5 % of the pixels |
+| village | 24 896 | **12 817 (−49 %)** | 19 858 · 18 576 · 15 033 · 23 544 | 21 321 → 19 478 | mean 0.3/255, 0.5 % |
+
+Plaza by pass, Ultra → Ultra · Leicht (ms): terrain 5 421 → 5 779 (sub-draws 332 → 74: only the near sections),
+horizon and ring 1 2 930 → 0 (cached), sky and the rest 2 083 → 60, the composite 0 → 436, props 617 → 483,
+post 534 → 557. Draw calls: terrain 50 → 20, horizon 329 → 0. The slice with the sky and the one with the horizon
+cost as much as Ultra's frame → the strips (each refresh frame a quarter of everything).
+
+Walks: 200 m streaming (1 397 frames, nothing drawn): Ultra 6 frames over 40 ms (the longest 92 ms; a frame's mesh
+starts up to 27 ms), Ultra · Leicht 1 (76 ms; drainUploads ≤ 12 ms, mesh starts ≤ 13 ms, integrate ≤ 6 ms) → the
+mesh-start cap. 60 m with the day running (420 frames, only the shadow work drawn): **Ultra 1 090 ms a frame, 85 full
+maps; Ultra · Leicht 554 ms, 17 maps** (one full, sixteen sun steps over 6 frames each).
+
+### Run 2 (the final code)
+
+(filled in from .tmp_tests/ultralite_run2.json)
 
 ## Known gaps
 
