@@ -168,16 +168,53 @@ if (city) {
   const LINE = new Map(); // "x,z" → y
   for (const [k, s] of cityAt) { const n = nameOf(s); if (n === 'vx_floor_plaza_line' || n === 'vx_floor_plaza_line_amber') { const [x, y, z] = k.split(',').map(Number); LINE.set(x + ',' + z, y); } }
   const comp = (start) => { const seen = new Set([start]), q = [start]; while (q.length) { const k = q.pop(); const [x, z] = k.split(',').map(Number); for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = (x + dx) + ',' + (z + dz); if (LINE.has(n) && !seen.has(n)) { seen.add(n); q.push(n); } } } return seen; };
-  // both kerbs of every road: the kerb cells the planner records lie on one connected line each
+  // both kerbs of every road: the kerb cells the planner records lie on one connected line each — or, where a road
+  // borders the planted island (Palm Row between the branches, the branches' inner sides), on the island's own line,
+  // which runs round it unbroken (a closed loop: every cell with two neighbours on it)
+  const byName = (n) => roads.find(r => r.name === n);
+  const isleSide = byName('west') && byName('west').kerb && byName('west').kerb.L.length ? byName('west').kerb.L : null;   // (the west branch's east side, w > 0)
+  const isleLoop = isleSide ? comp(isleSide[Math.floor(isleSide.length / 2)][0] + ',' + isleSide[Math.floor(isleSide.length / 2)][1]) : new Set();
+  let open = 0; for (const k of isleLoop) { const [x, z] = k.split(',').map(Number); let n = 0; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (isleLoop.has((x + dx) + ',' + (z + dz))) n++; if (n < 2) open++; }
   let kerbs = 0, kerbOk = 0, kerbBad = [];
   for (const rd of roads) for (const side of ['L', 'R']) {
     const cells = (rd.kerb && rd.kerb[side]) || []; if (!cells.length) continue; kerbs++;
     const miss = cells.filter(c => !LINE.has(c[0] + ',' + c[1])).length;
-    const reach = comp(cells[0][0] + ',' + cells[0][1]);
-    const apart = cells.filter(c => !reach.has(c[0] + ',' + c[1])).length;
+    const first = cells.find(c => !isleLoop.has(c[0] + ',' + c[1])) || cells[0];
+    const reach = comp(first[0] + ',' + first[1]);
+    const apart = cells.filter(c => !reach.has(c[0] + ',' + c[1]) && !isleLoop.has(c[0] + ',' + c[1])).length;
     if (!miss && !apart) kerbOk++; else kerbBad.push(`${rd.name}.${side}: ${miss} not lit, ${apart} apart`);
   }
-  check(kerbs >= 4 && kerbOk === kerbs, `both kerbs of every road are one continuous light line (${kerbOk} of ${kerbs}${kerbBad.length ? ': ' + kerbBad.slice(0, 4).join('; ') : ''})`);
+  check(kerbs >= 4 && kerbOk === kerbs && open === 0, `both kerbs of every road are one continuous light line (${kerbOk} of ${kerbs}${kerbBad.length ? ': ' + kerbBad.slice(0, 4).join('; ') : ''}); the island's line a closed loop of ${isleLoop.size} cells (${open} open ends)`);
+  // the fork (t3_05 · t2_23): the avenue ends where two branches leave it and curve apart round the island to Palm Row —
+  // each turns by 40° or more, at their widest more than 30 blocks apart (centre to centre)
+  {
+    const W = byName('west'), E = byName('east'), A = byName('avenue');
+    let ok = !!(W && E && A), widest = 0, turnW = 0, turnE = 0;
+    if (ok) {
+      const end = A.pts[A.pts.length - 1], d0 = (rd) => Math.hypot(rd.pts[0][0] - end[0], rd.pts[0][1] - end[1]);
+      const head = (p, i) => Math.atan2(p[i + 1][1] - p[i][1], p[i + 1][0] - p[i][0]);
+      const turn = (rd) => { let lo = 1e9, hi = -1e9, h0 = head(rd.pts, 0); for (let i = 0; i + 1 < rd.pts.length; i++) { let h = head(rd.pts, i); while (h - h0 > Math.PI) h -= 2 * Math.PI; while (h - h0 < -Math.PI) h += 2 * Math.PI; lo = Math.min(lo, h); hi = Math.max(hi, h); } return (hi - lo) * 180 / Math.PI; };
+      turnW = turn(W); turnE = turn(E);
+      for (const p of W.pts) { let best = 1e9; for (const q of E.pts) if (Math.abs(q[1] - p[1]) < 0.6) best = Math.min(best, Math.abs(q[0] - p[0])); if (best < 1e9) widest = Math.max(widest, best); }
+      ok = d0(W) < 2 && d0(E) < 2 && turnW >= 40 && turnE >= 40 && widest > 30;
+    }
+    check(ok, `the avenue forks round the island: two branches from its end, turning ${turnW.toFixed(0)}° and ${turnE.toFixed(0)}°, ${widest.toFixed(0)} blocks apart at their widest`);
+  }
+  // the island planted (t3_05 · t1_24 · t2_23): lawn; a raised bed at its tip — a light grey kerb one block high round
+  // dark soil with ferns and flowers, the round clipped tree in it; beds with a fan palm further along
+  {
+    const I = city.island || null, beds = (I && I.beds) || [];
+    const tipBed = beds.find(b => b.kind === 'tip'), fanBeds = beds.filter(b => b.kind === 'fan');
+    const tr = tipBed && tipBed.tree, treeOk = !!tr && [...cityAt].some(([k, s]) => { if (nameOf(s) !== 'vm_tree_round_s' || propOf(s, 'part') !== 0) return false; const [x, y, z] = k.split(',').map(Number); return Math.abs(x - tr[0]) <= 1 && Math.abs(z - tr[2]) <= 1 && y >= tr[1] - 1 && y <= tr[1] + 1; });
+    let kerbB = 0, soil = 0; if (tipBed) for (let z = Math.floor(tipBed.z - tipBed.rz) - 1; z <= Math.ceil(tipBed.z + tipBed.rz) + 1; z++) for (let x = Math.floor(tipBed.x - tipBed.rx) - 1; x <= Math.ceil(tipBed.x + tipBed.rx) + 1; x++) for (let y = 79; y <= 83; y++) { const n = cnm(x, y, z); if (n === 'vollton_light_grey') kerbB++; else if (n === 'podzol') soil++; }
+    const fanOk = fanBeds.filter(b => { const x = Math.floor(b.x), z = Math.floor(b.z); let t = 0; for (let y = 80; y <= 86; y++) if (cnm(x, y, z) === 'vx_palm_trunk') t++; return t >= 2; }).length;
+    check(!!I && I.cells >= 300 && !!tipBed && treeOk && kerbB >= 12 && soil >= 12 && fanBeds.length >= 2 && fanOk === fanBeds.length, `the island planted: ${I ? I.cells : 0} cells, the tip bed (${kerbB} kerb blocks round ${soil} of soil, the round tree ${treeOk ? 'in it' : 'missing'}), ${fanOk} of ${fanBeds.length} fan beds with their palm`);
+  }
+  // the kerbs light grey (the frames' #D2D9E1; run 1: the mid grey read as a dark wall along every road at dusk)
+  {
+    let light = 0, other = 0; for (const s of cityAt.values()) { const n = nameOf(s); if (n === 'vollton_light_grey_slab') light++; else if (n === 'vollton_mid_grey_slab') other++; }
+    check(light > 500 && other === 0, `the kerbs are light grey (${light} light grey kerb slabs, ${other} mid grey)`);
+  }
   // from the road to every door: the kerb's line component reaches the line cells beside the door's apron
   const lots = city.lots || [];
   let doorOk = 0, doorBad = [];
@@ -256,7 +293,7 @@ if (!process.env.SKIP_COST) {
   console.log('5 · the Very Low cost at F1');
   V.setLook('seamless');
   const PAD = V.MESH_PAD, PS = V.MESH_PS, PSS = PS * PS;
-  const F1 = [1.5, -112.5], RD = 4, VXLOD = 12;   // test/trailer_city.mjs's F1
+  const F1 = [3.5, -96.5], RD = 4, VXLOD = 12;   // test/trailer_city.mjs's F1 (the fork, t3_05)
   const windowTris = (vgen) => {
     const g = V.makeGen('overworld', 4242, { vgen });
     const cols = new Map(), c0x = Math.floor(F1[0] / 16), c0z = Math.floor(F1[1] / 16);
