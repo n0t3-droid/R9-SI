@@ -462,6 +462,65 @@
       for (let l = 0; l < 5; l++) { const m = st.m[l]; if (m) { m.arena.release(m.off, m.cap); st.m[l] = null; } }
       st.l = 5;
     }
+    // ---- F10 · what an upload costs on this machine. Once as a world starts: a 1 MB buffer, gl.finish(), then the upload
+    // and gl.finish() again (twice; the faster counts) — finish waits for the GPU process and the GPU, so the copy into a
+    // GPU that shares the system memory is in the number (the JS call alone returns after a memcpy).
+    calibrateUploads() {
+      const gl = this.gl;
+      if (!gl || !gl.finish || !gl.bufferSubData) return null;
+      const N = 1 << 20, data = new Uint8Array(N);
+      for (let i = 0; i < N; i += 64) data[i] = i >> 6;   // (not all zeros: no shortcut for a cleared buffer)
+      const b = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, N, gl.DYNAMIC_DRAW);
+      gl.finish();
+      let best = Infinity;
+      for (let r = 0; r < 2; r++) { const t0 = performance.now(); gl.bufferSubData(gl.ARRAY_BUFFER, 0, data); gl.finish(); best = Math.min(best, performance.now() - t0); }
+      gl.deleteBuffer(b);
+      this.upCal = { ms: Math.max(0.05, best), bytes: N };
+      return this.upCal;
+    }
+    // ---- F10 · the GPU side of the uploads, seen through fences: at the end of a frame that uploaded (and of every 4th
+    // frame within 120 frames of the last upload: the base line) a fence; polled at the next frames with
+    // clientWaitSync(sync, 0, 0) — timeout 0, never blocking; at most four pending. The lag from the fence to its seen
+    // signal and the frame's bytes go to the scheduler's fit (stream.js gpuSample). A settled world sets none.
+    upGauge(Q, now) {
+      const gl = this.gl;
+      if (!Q || !gl || !gl.fenceSync || !gl.clientWaitSync) return;
+      const R = this.upRing || (this.upRing = { s: [null, null, null, null], t: new Float64Array(4), b: new Float64Array(4), h: 0, n: 0, quiet: 1e9, k: 0 });
+      while (R.n) {
+        const i = R.h, st = gl.clientWaitSync(R.s[i], 0, 0);
+        if (st === gl.TIMEOUT_EXPIRED) break;
+        if (st !== gl.WAIT_FAILED) Q.gpuSample(R.b[i], now - R.t[i]);
+        gl.deleteSync(R.s[i]); R.s[i] = null; R.h = (i + 1) & 3; R.n--;
+      }
+      const L = Q.last, bytes = L && !L.gauged ? L.bytes : 0;   // (this frame's drain, counted once)
+      if (L) L.gauged = true;
+      R.quiet = bytes > 0 ? 0 : R.quiet + 1;
+      if (R.n >= 4 || (bytes <= 0 && (R.quiet > 120 || (++R.k & 3)))) return;
+      const i = (R.h + R.n) & 3;
+      R.s[i] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); R.t[i] = now; R.b[i] = bytes; R.n++;
+    }
+    // ---- F10 · a section's mini-voxel detail through the upload queue (vxResidency asks once per section): packets
+    // within the frame's bytes, in place once complete; dropped data (the player went away, a new mesh) aborts it
+    queueVx(s, Q) {
+      const d = s.vxData, n = d.length >> 3, R = this;
+      const it = { x: s.ox + 8, z: s.oz + 8, bytes: n * VSTRIDE, m: null, o: 0,
+        alive: () => s.vxData === d && !s.mesh[3],
+        step: (max) => {
+          const k = Math.min(n - it.o, Math.floor(max / VSTRIDE));
+          if (k <= 0) return 0;
+          if (!it.m) it.m = R.allocMesh(n);
+          const gl = R.gl;
+          gl.bindBuffer(gl.ARRAY_BUFFER, it.m.arena.buf);
+          gl.bufferSubData(gl.ARRAY_BUFFER, (it.m.off + it.o) * VSTRIDE, d, it.o * 8, k * 8);
+          it.o += k;
+          return k * VSTRIDE;
+        },
+        commit: () => { s.vxQ = null; s.mesh[3] = it.m; it.m = null; R.nearShadow(s); },
+        abort: () => { if (s.vxQ === it) s.vxQ = null; if (it.m) { it.m.arena.release(it.m.off, it.m.cap); it.m = null; } } };
+      s.vxQ = it;
+      Q.push(it);
+    }
     // a changed section inside the cached shadow map's area: redraw the map next frame
     nearShadow(sec) {
       const c = this.shadowCam; if (!c || this.shadowDirty) return;
@@ -490,7 +549,8 @@
         if (s.mesh[3]) { if (d2 > down2) { s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap); s.mesh[3] = null; } continue; }
         if (d2 > keep2) { s.vxData = null; s.vxDropped = true; continue; }
         if (d2 < up2) {
-          if (uploads < 4) { this.uploadVx(s); uploads++; }
+          if (this.upQ) { if (!s.vxQ) this.queueVx(s, this.upQ); }   // (F10: the world's upload queue — one budget for everything)
+          else if (uploads < 4) { this.uploadVx(s); uploads++; }
           else if (d2 < bestD) { best = s; bestD = d2; }
         }
       }
@@ -1178,6 +1238,7 @@
       this.frameNo++;
       this.gpuTimerBegin();
       this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
+      this.upQ = world && world.uploadQ && world.uploadQ.drain ? world.uploadQ : null;   // (F10: the one upload queue — vxResidency, upGauge)
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
@@ -1295,6 +1356,7 @@
       // ---------------- post
       this.post(F, E);
       this.gpuTimerEnd();
+      if (this.upQ) this.upGauge(this.upQ, performance.now());   // (F10: a fence after the frame that uploaded)
       this.stats.ms = performance.now() - t0;
     }
 
