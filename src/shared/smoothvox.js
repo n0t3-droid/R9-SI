@@ -56,6 +56,7 @@
     const NX = Math.ceil(VW / s), NY = Math.ceil(VH / s), NZ = Math.ceil(VD / s), V = new Uint32Array(NX * NY * NZ);
     if (s === 1) { if (vol) { for (let i = 0; i < V.length; i++) { const k = vol[i]; if (k) V[i] = pal[k]; } } else V.set(RV.subarray(0, V.length)); return { NX, NY, NZ, V, step: 1 }; }
     const T = thr || 1, S3 = s * s * s, vals = new Uint32Array(S3), cnt = new Int32Array(S3);
+    const fine = { vol, pal, RV, VW, VH, VD };   // (the faces take their colours from it: SV.nets)
     // (step 2 from a palette volume with even sides: the eight indices are read straight; an empty or uniform 2³ — most
     // of them — is decided without counting)
     if (s === 2 && vol && !(VW & 1) && !(VH & 1) && !(VD & 1)) {
@@ -80,7 +81,7 @@
           if (best >= 0) V[o] = vals[best];
         }
       }
-      return { NX, NY, NZ, V, step: s };
+      return { NX, NY, NZ, V, step: s, fine };
     }
     for (let cy = 0; cy < NY; cy++) {
       const y0 = cy * s, y1 = Math.min(VH, y0 + s);
@@ -108,7 +109,16 @@
         }
       }
     }
-    return { NX, NY, NZ, V, step: s };
+    return { NX, NY, NZ, V, step: s, fine };
+  };
+  // a finer volume: every cell split in f³ (a res-8 piece meshed at 16 a block)
+  SV.upsample = function (vol, f) {
+    const NX = vol.NX * f, NY = vol.NY * f, NZ = vol.NZ * f, V = new Uint32Array(NX * NY * NZ), S = vol.V;
+    for (let y = 0; y < NY; y++) for (let z = 0; z < NZ; z++) {
+      const srow = (((y / f) | 0) * vol.NZ + ((z / f) | 0)) * vol.NX, row = (y * NZ + z) * NX;
+      for (let x = 0; x < NX; x++) V[row + x] = S[srow + ((x / f) | 0)];
+    }
+    return { NX, NY, NZ, V, step: vol.step / f };
   };
   // a coarser volume from a finer one (the far mesh from the near one: a factor f more per cell, every voxel counts)
   SV.coarser = (vol, f) => { const r = SV.volume({ V: vol.V, VW: vol.NX, VH: vol.NY, VD: vol.NZ }, f, 1); r.step = vol.step * f; return r; };
@@ -152,6 +162,29 @@
       lastV = v; lastR = r;
       return r;
     };
+    // a cell of a coarser volume (step > 1) shows on each face the voxels of its fine grid that look that way: the most
+    // frequent value of its outermost layer of the same matter (a painted front, a fabric cover over a frame, a thin
+    // screen keep their colour where the cell's dominant voxel is the one behind them)
+    const FG = vol.fine && vol.step > 1 ? vol.fine : null, FS = vol.step | 0;
+    const fv = new Uint32Array(64), fc = new Int32Array(64);
+    const fineAt = !FG ? null : FG.vol ? (i) => { const k = FG.vol[i]; return k ? FG.pal[k] : 0; } : (i) => FG.RV[i];
+    const faceVal = (vIdx, ax, sp) => {
+      const cx = vIdx % NX, t = (vIdx / NX) | 0, cz = t % NZ, cy = (t / NZ) | 0, want = V[vIdx] & GLASS;
+      const x0 = cx * FS, y0 = cy * FS, z0 = cz * FS;
+      for (let layer = 0; layer < FS; layer++) {
+        const off = sp ? FS - 1 - layer : layer;   // (sp: the face looks toward +axis)
+        let nd = 0;
+        for (let i = 0; i < FS; i++) for (let j = 0; j < FS; j++) {
+          const fx = ax === 0 ? x0 + off : x0 + i, fy = ax === 1 ? y0 + off : ax === 0 ? y0 + i : y0 + j, fz = ax === 2 ? z0 + off : z0 + j;
+          if (fx >= FG.VW || fy >= FG.VH || fz >= FG.VD) continue;
+          const v = fineAt((fy * FG.VD + fz) * FG.VW + fx); if (!v || (v & GLASS) !== want) continue;
+          let k = 0; while (k < nd && fv[k] !== v) k++;
+          if (k === nd) { if (nd < 64) { fv[nd] = v; fc[nd++] = 1; } } else fc[k]++;
+        }
+        if (nd) { let best = 0; for (let k = 1; k < nd; k++) if (fc[k] > fc[best]) best = k; return fv[best]; }
+      }
+      return V[vIdx];
+    };
     // a pass over one kind of matter: which = 1 (opaque) or 2 (glass); the cells and quads of that surface
     const S = new Uint8Array(occ.length);
     const pass = (which) => {
@@ -174,9 +207,9 @@
       }
       // the quads: every voxel edge whose ends differ — this matter against empty space (and opaque matter against glass:
       // what stands behind glass keeps its surface) — between the four cells round it, wound so it looks out of the matter
-      const emit = (sp, vIdx, c0, c1, c2, c3) => {
+      const emit = (sp, vIdx, c0, c1, c2, c3, ax) => {
         if (c0 < 0 || c1 < 0 || c2 < 0 || c3 < 0) return;
-        const v = V[vIdx];
+        const v = FG ? faceVal(vIdx, ax, sp) : V[vIdx];
         quads.need(6);
         const Q = quads.a, n = quads.n;
         if (sp) { Q[n] = c0; Q[n + 1] = c1; Q[n + 2] = c2; Q[n + 3] = c3; } else { Q[n] = c0; Q[n + 1] = c3; Q[n + 2] = c2; Q[n + 3] = c1; }
@@ -190,7 +223,7 @@
           const p = row + x, sp = S[p], sq = S[p + 1];
           if (sp === sq) continue;
           if (glassPass && occ[sp ? p + 1 : p] !== 0) continue;
-          emit(sp, vrow + x + (sp ? 0 : 1), cellV[a + x], cellV[b + x], cellV[b + DX + x], cellV[a + DX + x]);
+          emit(sp, vrow + x + (sp ? 0 : 1), cellV[a + x], cellV[b + x], cellV[b + DX + x], cellV[a + DX + x], 0);
         }
       }
       // y edges: q = p + PXZ; the cells (x−1…x, y, z−1…z)
@@ -200,7 +233,7 @@
           const p = row + x, sp = S[p], sq = S[p + PXZ];
           if (sp === sq) continue;
           if (glassPass && occ[sp ? p + PXZ : p] !== 0) continue;
-          emit(sp, vrow + x + (sp ? 0 : NX * NZ), cellV[r0 + x - 1], cellV[r1 + x - 1], cellV[r1 + x], cellV[r0 + x]);
+          emit(sp, vrow + x + (sp ? 0 : NX * NZ), cellV[r0 + x - 1], cellV[r1 + x - 1], cellV[r1 + x], cellV[r0 + x], 1);
         }
       }
       // z edges: q = p + PX; the cells (x−1…x, y−1…y, z)
@@ -210,7 +243,7 @@
           const p = row + x, sp = S[p], sq = S[p + PX];
           if (sp === sq) continue;
           if (glassPass && occ[sp ? p + PX : p] !== 0) continue;
-          emit(sp, vrow + x + (sp ? 0 : NX), cellV[a + x - 1], cellV[a + x], cellV[b + x], cellV[b + x - 1]);
+          emit(sp, vrow + x + (sp ? 0 : NX), cellV[a + x - 1], cellV[a + x], cellV[b + x], cellV[b + x - 1], 2);
         }
       }
     };
@@ -319,21 +352,137 @@
     return { nv: nOut, pos, nrm, rgb, mat, val, ao, idx, nOpaque, cells: nCell, quads: nQ, regions: regVal.length, ms: now() - t0, NX, NY, NZ };
   };
 
-  // the default resolution: res-32 models at 16 cells a block (the dominant voxel of each 2³, set when ≥ 2 of 8 are);
-  // res 8 and 16 at their own; the far mesh at 4 a block (every voxel counts, so thin parts stay visible)
+  // the resolution: 16 cells a block for every piece, so the edges round off alike — res 32 at step 2 (the dominant
+  // voxel of each 2³, set when ≥ 2 of 8 are; its faces coloured by the voxels they show), res 16 as it is, res 8 split
+  // in 2³ (a one-voxel leaf stays a small rounded cube instead of a spike); the far mesh at 4 a block (every voxel
+  // counts, so thin parts stay visible)
   SV.stepFor = (res) => (res >= 32 ? 2 : 1);
+  SV.upFor = (res) => (res < 16 ? Math.round(16 / res) : 1);
   SV.farStep = (res) => Math.max(1, Math.round(res / 4));
-  // a model's (or a grid's) generic mesh at a step (opts.step), in the model's voxel units (×step: the volume's cells)
+  // a model's (or a grid's) generic mesh at a step (opts.step; opts.up splits every voxel), in the model's voxel units;
+  // the flat patches thinned (SV.flatten; opts.flat false keeps every vertex)
   SV.mesh = function (src, opts) {
     opts = opts || {};
-    const res = src.res || 16, step = opts.step || SV.stepFor(res);
-    const vol = opts.vol || SV.volume(src, step, opts.thr || (step > 1 ? 2 : 1));
-    const g = SV.nets(vol, opts);
+    const res = src.res || 16, step = opts.step || SV.stepFor(res), up = opts.up !== undefined ? opts.up : opts.step ? 1 : SV.upFor(res);
+    let vol = opts.vol || SV.volume(src, step, opts.thr || (step > 1 ? 2 : 1));
+    if (up > 1 && !opts.vol) vol = SV.upsample(vol, up);
+    let g = SV.nets(vol, opts);
+    if (opts.flat !== false) g = SV.flatten(g);
     g.vol = vol;
-    // positions in model voxels (the volume's cells × step)
-    if (step !== 1) for (let i = 0; i < g.pos.length; i++) g.pos[i] *= step;
-    g.step = step; g.res = res;
+    // positions in model voxels (the volume's cells × step ÷ up)
+    const k = step / (up > 1 && !opts.vol ? up : 1);
+    if (k !== 1) for (let i = 0; i < g.pos.length; i++) g.pos[i] *= k;
+    g.step = step; g.up = up; g.res = res;
     return g;
+  };
+
+  // ---------------------------------------------------------------- flat patches: fewer triangles, the same picture
+  // A vertex inside a flat patch — its triangles in one plane, every edge round it with a triangle on both sides (no
+  // crease, no border), its neighbours with the plane's normal, its colour and its occlusion — is folded into one of
+  // them (a half-edge collapse) when no triangle turns over or leaves the plane and the two share only the two vertices
+  // of their common triangles (the link condition). Everything the shader interpolates stays what it was there, so the
+  // picture does not change: the flat middle of a cupboard door goes from hundreds of triangles to a few, the rounded
+  // edges, the creases, the occlusion and the colour changes keep every vertex.
+  SV.flatten = function (g, o) {
+    o = o || {};
+    const nv = g.nv, nt0 = g.idx.length / 3;
+    if (nt0 < 16) return g;
+    const COS = o.cos || 0.9999, P = g.pos, N = g.nrm, C = g.rgb, AO = g.ao;
+    const T = Int32Array.from(g.idx), FN = new Float64Array(nt0 * 3);
+    const setN = (t) => {
+      const a = T[t * 3] * 3, b = T[t * 3 + 1] * 3, c = T[t * 3 + 2] * 3;
+      const ux = P[b] - P[a], uy = P[b + 1] - P[a + 1], uz = P[b + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx; const l = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (l > 0) { nx /= l; ny /= l; nz /= l; }
+      FN[t * 3] = nx; FN[t * 3 + 1] = ny; FN[t * 3 + 2] = nz;
+    };
+    for (let t = 0; t < nt0; t++) setN(t);
+    // vertex → triangles (compressed rows)
+    const s0 = new Int32Array(nv + 1);
+    for (let i = 0; i < T.length; i++) s0[T[i] + 1]++;
+    for (let v = 0; v < nv; v++) s0[v + 1] += s0[v];
+    const vt = new Int32Array(T.length), fill = s0.slice(0, nv);
+    for (let t = 0; t < nt0; t++) for (let e = 0; e < 3; e++) vt[fill[T[t * 3 + e]]++] = t;
+    const same = (u, w) => Math.abs(AO[u] - AO[w]) <= 0.021 && Math.abs(C[u * 3] - C[w * 3]) <= 3 && Math.abs(C[u * 3 + 1] - C[w * 3 + 1]) <= 3 && Math.abs(C[u * 3 + 2] - C[w * 3 + 2]) <= 3;
+    const cnt = new Int32Array(nv), seen = [];
+    // a vertex inside a flat patch (as above), from the mesh as it came: the only ones that can go
+    const flatAt = (u, L, k) => {
+      const t0 = L[0], nx = FN[t0 * 3], ny = FN[t0 * 3 + 1], nz = FN[t0 * 3 + 2];
+      if (N[u * 3] * nx + N[u * 3 + 1] * ny + N[u * 3 + 2] * nz < COS) return false;
+      for (let i = 1; i < k; i++) { const t = L[i]; if (FN[t * 3] * nx + FN[t * 3 + 1] * ny + FN[t * 3 + 2] * nz < COS) return false; }
+      seen.length = 0; let ok = true;
+      for (let i = 0; i < k; i++) { const t = L[i]; for (let e = 0; e < 3; e++) { const w = T[t * 3 + e]; if (w === u) continue; if (!cnt[w]) seen.push(w); cnt[w]++; } }
+      for (const w of seen) { if (ok && (cnt[w] !== 2 || N[w * 3] * nx + N[w * 3 + 1] * ny + N[w * 3 + 2] * nz < COS || !same(u, w))) ok = false; }
+      for (const w of seen) cnt[w] = 0;
+      return ok;
+    };
+    const cand = [];
+    { const L = []; for (let u = 0; u < nv; u++) { const k = s0[u + 1] - s0[u]; if (k < 3) continue; L.length = 0; for (let i = s0[u]; i < s0[u + 1]; i++) L.push(vt[i]); if (flatAt(u, L, k)) cand.push(u); } }
+    if (!cand.length) return g;
+    // the collapses, on lists made when a vertex is first touched
+    const live = new Uint8Array(nt0).fill(1), gone = new Uint8Array(nv), VT = new Map();
+    const tris = (v) => { let L = VT.get(v); if (!L) { L = []; for (let i = s0[v]; i < s0[v + 1]; i++) L.push(vt[i]); VT.set(v, L); } let k = 0; for (let i = 0; i < L.length; i++) if (live[L[i]]) L[k++] = L[i]; L.length = k; return L; };
+    const mark = new Int32Array(nv); let stamp = 0, removed = 0;
+    for (let pass = 0; pass < 6; pass++) {
+      let did = 0;
+      for (const u of cand) {
+        if (gone[u]) continue;
+        const L = tris(u), k = L.length;
+        if (k < 3 || !flatAt(u, L, k)) continue;
+        const t0 = L[0], nx = FN[t0 * 3], ny = FN[t0 * 3 + 1], nz = FN[t0 * 3 + 2];
+        // the ring of u (each neighbour twice, checked above)
+        stamp++; const ring = [];
+        for (let i = 0; i < k; i++) { const t = L[i]; for (let e = 0; e < 3; e++) { const w = T[t * 3 + e]; if (w !== u && mark[w] !== stamp) { mark[w] = stamp; ring.push(w); } } }
+        const ringStamp = stamp;
+        for (const w of ring) {
+          // the link condition
+          stamp++; let common = 0;
+          for (const t of tris(w)) for (let e = 0; e < 3; e++) { const x = T[t * 3 + e]; if (x === w || x === u || mark[x] === stamp) continue; if (mark[x] === ringStamp) common++; mark[x] = stamp; }
+          // (the marks of u's ring were overwritten where they were met: mark them again for the next w)
+          for (const x of ring) mark[x] = ringStamp;
+          if (common !== 2) continue;
+          // the triangles that stay (u → w): still in the plane, the same way round, not degenerate
+          let good = true;
+          for (let i = 0; i < k && good; i++) {
+            const t = L[i], a = T[t * 3], b = T[t * 3 + 1], c = T[t * 3 + 2];
+            if (a === w || b === w || c === w) continue;
+            const A = (a === u ? w : a) * 3, B = (b === u ? w : b) * 3, Cc = (c === u ? w : c) * 3;
+            const ux = P[B] - P[A], uy = P[B + 1] - P[A + 1], uz = P[B + 2] - P[A + 2], vx = P[Cc] - P[A], vy = P[Cc + 1] - P[A + 1], vz = P[Cc + 2] - P[A + 2];
+            const mx = uy * vz - uz * vy, my = uz * vx - ux * vz, mz = ux * vy - uy * vx, l = Math.sqrt(mx * mx + my * my + mz * mz);
+            if (l < 1e-5 || (mx * nx + my * ny + mz * nz) / l < COS) good = false;
+          }
+          if (!good) continue;
+          const LW = tris(w);
+          for (let i = 0; i < k; i++) {
+            const t = L[i];
+            if (T[t * 3] === w || T[t * 3 + 1] === w || T[t * 3 + 2] === w) { live[t] = 0; continue; }
+            for (let e = 0; e < 3; e++) if (T[t * 3 + e] === u) T[t * 3 + e] = w;
+            setN(t); LW.push(t);
+          }
+          gone[u] = 1; L.length = 0; did++;
+          break;
+        }
+      }
+      removed += did;
+      if (!did) break;
+    }
+    if (!removed) return g;
+    // the live triangles in their order (the opaque ones first), the vertices still used
+    const map = new Int32Array(nv).fill(-1), idx = new Uint32Array(nt0 * 3);
+    let n2 = 0, ni = 0, nOp = -1;
+    for (let t = 0; t < nt0; t++) {
+      if (t * 3 === g.nOpaque) nOp = ni;
+      if (!live[t]) continue;
+      for (let e = 0; e < 3; e++) { const v = T[t * 3 + e]; if (map[v] < 0) map[v] = n2++; idx[ni++] = map[v]; }
+    }
+    if (nOp < 0) nOp = ni;
+    const pos = new Float32Array(n2 * 3), nrm = new Float32Array(n2 * 3), rgb = new Uint8Array(n2 * 3), mat = new Uint8Array(n2), val = new Uint32Array(n2), ao = new Float32Array(n2);
+    for (let v = 0; v < nv; v++) {
+      const m = map[v]; if (m < 0) continue;
+      for (let c = 0; c < 3; c++) { pos[m * 3 + c] = P[v * 3 + c]; nrm[m * 3 + c] = N[v * 3 + c]; rgb[m * 3 + c] = C[v * 3 + c]; }
+      mat[m] = g.mat[v]; val[m] = g.val[v]; ao[m] = AO[v];
+    }
+    return Object.assign({}, g, { nv: n2, pos, nrm, rgb, mat, val, ao, idx: idx.slice(0, ni), nOpaque: nOp, flat: { removed, tri0: nt0 } });
   };
   // a palette with the lamps switched off (voxmodel.js lightsOff: the glowing voxels go to their frosted, unlit glass)
   SV.offPal = function (pal) {
@@ -384,10 +533,11 @@
     opts = opts || {};
     const t0 = now(), res = m.res, p0 = m.parts && m.parts[0] ? m.parts[0] : { px: 0, py: 0, pz: 0 };
     const src = opts.off ? { vol: m.vol, pal: SV.offPal(m.pal), VW: m.VW, VH: m.VH, VD: m.VD, res } : m;
-    let step = opts.step || SV.stepFor(res), g = null;
-    for (;;) { g = SV.mesh(src, { step, aoScale: res / step / 16 }); if (g.nv + 4 <= 65535 || step >= res) break; step *= 2; }
-    const fs = Math.max(step, SV.farStep(res)), fv = fs > step ? SV.coarser(g.vol, Math.round(fs / step)) : g.vol;
-    const far = SV.mesh(src, { step: fs, vol: fv, passes: 1, glass: false, ao: false });
+    let step = opts.step || SV.stepFor(res), up = opts.step ? 1 : SV.upFor(res), g = null;
+    for (;;) { g = SV.mesh(src, { step, up, aoScale: res * up / step / 16 }); if (g.nv + 4 <= 65535 || step >= res) break; if (up > 1) up = 1; else step *= 2; }
+    // the far mesh at 4 a block: from the near volume made coarser (a split piece: from its own voxels)
+    const fs = Math.max(step, SV.farStep(res)), fv = up > 1 ? null : fs > step ? SV.coarser(g.vol, Math.round(fs / step)) : g.vol;
+    const far = SV.mesh(src, { step: fs, up: 1, vol: fv || undefined, passes: 1, glass: false, ao: false });
     g.vol = null;
     const scale = 1 / res;
     const near = furnPart(g, m.W, m.D, p0.py, scale, true, true);
@@ -435,6 +585,11 @@
   // workers and on the main thread; its prop kind is AUTO0 + the index (the mesher's anchors, props.js PR.AUTO).
   const AUTO0 = SV.AUTO0 = 4096;
   SV.SKIP = /^vm_(win_|gutter|downpipe|garage_door|nova_tread|palm_crown|tree_round|bush_blossom|flower_cluster|tuft_grass|crop_rows)/;
+  // the pieces that keep their voxels because they look better so (every catalogue piece was drawn both ways side by
+  // side, the plan's section 5): a picture, lettering, a weave, many small lights or things — their detail is finer than
+  // a smooth surface at 16 cells a block holds, and a picture's faces are flat anyway — and the res-32 fronts whose
+  // one-voxel seams the 16-a-block surface closes (the kitchen fronts, the lockers)
+  SV.KEEP = /^vm_(art_|deco_canvas_|office_pinboard|shop_menuboard|house_sign|shop_neon_|deco_neon_|office_whiteboard|living_rug_|office_panel_felt|shop_shelf_grocery|kitchen_shelf|wall_shelf|deco_candles_tray|laundry_basket|deco_macrame_wall|towel_rail|kitchen_(sage|navy|greige)_|office_lockers|mobility_parcellocker|smart_(speaker|display|panel|thermostat|router|mesh|doorbell|heatpump|battery|inverter))/;
   SV.enabled = true;                    // (the tests hold it back to take the „before" picture)
   let AT = null;
   SV.autoTables = function () {
@@ -444,7 +599,7 @@
     const list = [], idx = new Int32Array(n).fill(-1), anchor = new Uint8Array(n), facing = new Uint8Array(n), states = [];
     for (const t of R.types) {
       const o = t.o || {}, m = VM.MODELS[t.name];
-      if (!m || !o.vxModel || furn.has(t.name) || o.prop || o.propStem || SV.SKIP.test(t.name)) continue;
+      if (!m || !o.vxModel || furn.has(t.name) || o.prop || o.propStem || SV.SKIP.test(t.name) || SV.KEEP.test(t.name)) continue;
       const i0 = list.length, tog = !!o.toggle && t.has('lit');
       list.push({ name: t.name, off: false, base: i0, nvar: 1 });
       if (tog) list.push({ name: t.name, off: true, base: i0 + 1, nvar: 1 });
@@ -472,7 +627,8 @@
   };
   // the standalone VX kinds and their number of looks (4: by the position's hash h)
   SV.VX_ON = true;
-  SV.VX_KINDS = { arclamp: 1, barrel: 1, bbq: 1, bench: 1, bollard: 1, chandelier: 1, coatrack: 1, crate: 1, dchair: 1, dish: 1, floorlamp: 1, fountain: 1, gardenlamp: 1, holotable: 1, lounger: 1, mirror: 1, nightstand: 1, pendant: 1, piano: 1, plant2: 1, sconce: 1, sdesk: 1, sign: 1, spot: 1, stool: 1, stove: 1, toilet: 1, vanity: 1, washer: 1, well: 1, wshelf: 1,
+  // (not the wall shelf's small things, wshelf, nor the sign's lettering; the res-8 pieces are split to 16 a block, SV.upFor)
+  SV.VX_KINDS = { arclamp: 1, barrel: 1, bbq: 1, bench: 1, bollard: 1, chandelier: 1, coatrack: 1, crate: 1, dchair: 1, dish: 1, floorlamp: 1, fountain: 1, gardenlamp: 1, holotable: 1, lounger: 1, mirror: 1, nightstand: 1, pendant: 1, piano: 1, plant2: 1, sconce: 1, sdesk: 1, spot: 1, stool: 1, stove: 1, toilet: 1, vanity: 1, washer: 1, well: 1,
     birdbath: 4, coffee: 4, locker: 4, machine: 4, milkcan: 4, mpromo: 4, planter: 4, scarecrow: 4, tdesk: 4, urn: 4 };
   // an entry is ready when all looks of its piece are
   const allReady = (bits, i) => { const e = AT.list[i]; if (!e) return false; for (let j = e.base; j < e.base + e.nvar; j++) if (!isReady(bits, j)) return false; return true; };
@@ -552,10 +708,10 @@
   const bytesOf = (r) => { let b = 0; for (const k of ['near', 'far']) if (r[k]) b += r[k].verts.byteLength + r[k].idx.byteLength; if (r.verts) b += r.verts.byteLength + r.glass.byteLength; return b; };
   const copyPart = (p, tr) => { if (!p) return null; const q = Object.assign({}, p, { verts: p.verts.slice(), idx: p.idx.slice() }); tr.push(q.verts.buffer, q.idx.buffer); return q; };
   SV.studioMesh = function (src, opts) {
-    // (full resolution; a big model — more than ~400 k voxels, the 7-block garage door — at half: the Studio draws every
-    // triangle unindexed)
-    const res = src.res || 16, big = src.VW * src.VH * src.VD > 400000, step = big ? 2 : 1;
-    const g = SV.mesh(src, Object.assign({ step, aoScale: res / step / 16 }, opts || {}));
+    // (the game's resolution — what the card and the view show is what the game draws; a big model — more than ~400 k
+    // voxels, the 7-block garage door — at half that: the Studio draws every triangle unindexed)
+    const res = src.res || 16, big = src.VW * src.VH * src.VD > 400000, step = SV.stepFor(res) * (big ? 2 : 1), up = big ? 1 : SV.upFor(res);
+    const g = SV.mesh(src, Object.assign({ step, up, aoScale: res * up / step / 16 }, opts || {}));
     return SV.toStudio(g, 1 / res, [0, 0, 0]);
   };
   SV.job = function (m) {
