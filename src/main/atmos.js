@@ -28,12 +28,15 @@
   // (tuned on the six weather scenes against v0.41 and the trailer: a deeper zenith, the blue held up high, a warm
   // peach-pink band along the horizon — TRAILER.md §2.1 "horizon peach/pink → mid violet-blue → zenith deep blue")
   //   sideC: the chroma's sun-side C for x and y by day (the sky within ~25° of the sun is whiter and warmer: forward
-  //   scattering on the haze; a low sun raises them to 0.55 and 0.35)
+  //   scattering on the haze; a low sun raises them to 0.55 and 0.35). Small by day, y above x: v0.41's warm glow
+  //   (glow()) is added on top, and a pinker, brighter sky under it clipped in red over ~5° around the sun
+  //   (test/light.mjs: 3.7 % of the clear sky against v0.41's 0.02 %)
+  //   aureole: the Perez C term's share (the published circumsolar brightening, damped to 5 %: the glow is glow())
   //   palette (0..1): how far the sky follows env.js's day palette (E.skyPal: the zenith's and the horizon's colour)
   //   instead of these numbers — its chroma at both ends, its zenith luminance and its horizon-to-zenith ratio, on
   //   the Perez shape, with the glow and the weather on top. 0 here; a grade that sets its look in the palette (the
   //   trailer grade of v0.42, env.js VR.Grade) sets 1 and keeps its colours
-  const K = { scale: 0.05, horizonA: 0.9, broad: 1.3, band: 0.8, sharp: 0.45, horXY: [0.285, 0.28], chP: 0.7, sideC: [0.25, 0.2], palette: 0 };
+  const K = { scale: 0.05, horizonA: 0.9, broad: 1.3, band: 0.8, sharp: 0.45, horXY: [0.285, 0.28], chP: 0.7, sideC: [0.1, 0.15], aureole: 0.05, palette: 0 };
   const xyY = (c) => {
     const X = 0.4124 * c[0] + 0.3576 * c[1] + 0.1805 * c[2], Y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], Z = 0.0193 * c[0] + 0.1192 * c[1] + 0.9505 * c[2];
     const S = X + Y + Z || 1;
@@ -44,11 +47,11 @@
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 
   // Perez coefficients A..E as linear functions of the turbidity T (Preetham et al. 1999, their Table 1).
-  // Three of them are ours: C, the sun's aureole, is damped to 15 % and falls off faster (AUREOLE_FALL): the published
+  // Three of them are ours: C, the sun's aureole, is damped to 5 % (K.aureole) and falls off faster (AUREOLE_FALL): the published
   // glow turned the sky on the sun's side white in blue (28 % of the clear noon sky clipped) — the warm glow around the
   // sun is glow() instead; B, the horizon brightening, is lowered by HORIZON_DIM (the published fit puts the horizon
   // at 1.19 × v0.41's luminance with its blue above 1, so the band clipped in blue).
-  const SUN_GLOW = 0.15, HORIZON_DIM = 0.14, AUREOLE_FALL = 0.8;
+  const HORIZON_DIM = 0.14, AUREOLE_FALL = 0.8;
   // Chromaticity (our own fit): the published Preetham chroma whitens the sky from ~30° down (x 0.32 at the horizon
   // against 0.24 overhead), so the picture went pale. Here the chroma runs from the zenith's deep blue to the horizon's
   // pale lavender along (cos θ)^K.chP — the blue holds high, then pales toward the horizon (the gradient of v0.41's
@@ -99,7 +102,7 @@
     const th = Math.min(Math.acos(se), PI / 2 - 0.01);
     const oc = 1 - 0.85 * clamp(opt.overcast || 0, 0, 1);
     const cY = s.cY;
-    cY[0] = (0.1787 * T - 1.4630) * K.horizonA; cY[1] = -0.3554 * T + 0.4275 - HORIZON_DIM; cY[2] = (-0.0227 * T + 5.3251) * SUN_GLOW * oc;
+    cY[0] = (0.1787 * T - 1.4630) * K.horizonA; cY[1] = -0.3554 * T + 0.4275 - HORIZON_DIM; cY[2] = (-0.0227 * T + 5.3251) * K.aureole * oc;
     cY[3] = 0.1206 * T - 2.5771 - AUREOLE_FALL; cY[4] = (-0.0670 * T + 0.3703) * oc;
     // the palette (K.palette > 0, opt.pal = [zenith rgb, horizon rgb]): its horizon-to-zenith luminance ratio R sets
     // the brightening A from 1 / (1 + A e^B) = R, its ends set the chroma and the zenith luminance (below)
