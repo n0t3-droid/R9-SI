@@ -367,6 +367,62 @@ console.log('8 · a fall off a floating island pours off the rim and dissolves i
   check(hi.Vn.mists.size === 0, `a new world brings its own falls (reset clears the mists)`);
 }
 
+// ---------------------------------------------------------------- 10 · a fall that is touched spills, it does not flood
+// The audit's run c2 (far_3): a minute near a floating island's falls and the island hung in a cone of water 60 blocks
+// deep. The game's block simulation (sim.js) left the generated falls alone until a block beside one changed — a grass
+// block creeping onto the dirt beside a rim pool — and then every block of the falling curtain, with falling water under
+// it, spread sideways at once, every new block falling and spreading again: 450 000 water blocks round one island in
+// 4 000 ticks (node, vgen 8 and 9 alike). Falling water over falling water of its kind feeds the fall below and does not
+// spread sideways (water landing on a lake still spreads on it): the touched fall spills a few streams off its pool's
+// rim, as water does, and that is all. (Random ticks are left out here: the change beside the pool is made by hand.)
+console.log('10 · a fall that is touched spills a little, it does not flood (sim.js)');
+{
+  require('../src/main/sim.js');
+  const floodTest = (vgen, ticks) => {
+    const g = V.makeGen('overworld', SEED, { vgen }), cols = new Map();
+    const col = (cx, cz) => { const k = cx + ',' + cz; let c = cols.get(k); if (!c) { const ch = g.generate(cx, cz); c = { cx, cz, blocks: ch.blocks, sec: [] }; for (let sy = 0; sy < 16; sy++) c.sec.push({ count: 1 }); cols.set(k, c); } return c; };
+    let sim = null;
+    const world = {
+      col, getLight: () => 0xf000,
+      getBlock: (x, y, z) => (y < 0 || y > 255) ? 0 : col(x >> 4, z >> 4).blocks[(y << 8) | ((z & 15) << 4) | (x & 15)],
+      setBlock(x, y, z, s, flags) { const c = col(x >> 4, z >> 4), i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i]; if (old === s) return; c.blocks[i] = s; if (!(flags & 2)) sim.onBlockChanged(x, y, z, old, s); },
+    };
+    const game = { world, player: { pos: [-470.5, 128, 420.5], mode: 'creative' }, skyBright: 1, particles: { breakBlock() {}, smoke() {} }, audio: { play() {} }, dim: 'overworld', entities: null, dropsFor() {}, dropStack() {} };
+    sim = new VR.Sim(game);
+    sim.randomTicks = () => {};
+    // the island of the audit's far_3 (centre -553/458, r 15, three falls): its first fall's rim pool, the grass beside it
+    const I = g.islandAt(-553, 458).isle, a = ((I.seed * 0.618) % 1) * Math.PI * 2;
+    let fx = 0, fz = 0, ft = null;
+    for (let r = 0; r < I.r * 1.4; r++) { const px = Math.round(I.x + Math.cos(a) * r), pz = Math.round(I.z + Math.sin(a) * r), J = g.islandAt(px, pz); if (J && J.isle === I) { fx = px; fz = pz; ft = J; } else if (ft) break; }
+    const box = (f) => { let n = 0; for (let z = Math.floor(I.z) - 45; z <= Math.floor(I.z) + 45; z++) for (let x = Math.floor(I.x) - 45; x <= Math.floor(I.x) + 45; x++) for (let y = 60; y < 200; y++) { const b = world.getBlock(x, y, z); if (b && f(b)) n++; } return n; };
+    const fluid = (b) => R.T.flags[b] & F.FLUID;
+    const f0 = box(fluid);
+    // the trigger: grass creeps onto the dirt under the rim pool (water above is no cover), as a random tick does
+    const under = world.getBlock(fx, ft.top - 1, fz);
+    world.setBlock(fx, ft.top - 1, fz, under === R.byName.grass_block.defaultState ? R.byName.dirt.defaultState : R.byName.grass_block.defaultState, 1);
+    for (let t = 0; t < ticks; t++) sim.step(false);
+    return { f0, f1: box(fluid), pool: [fx, ft.top, fz] };
+  };
+  const T9 = floodTest(9, 600), T8 = floodTest(8, 600);
+  check(T9.f1 - T9.f0 <= 1500, `vgen 9: a touched fall spills ${T9.f1 - T9.f0} fluid blocks round its island in 30 s (${T9.f0} → ${T9.f1}; the pool at ${T9.pool})`);
+  check(T8.f1 - T8.f0 <= 1500, `vgen 8: the same in an old world (${T8.f0} → ${T8.f1})`);
+  // water still flows as water: a source on a ledge runs to its edge, pours over it as one stream, spreads where it
+  // lands (a stone ledge at y 70 for x < 0, the ground at y 60)
+  {
+    const B = new Map(), key = (x, y, z) => x + ',' + y + ',' + z, STONE = R.byName.stone.defaultState, WATER = R.byName.water.defaultState;
+    const getBlock = (x, y, z) => { const v = B.get(key(x, y, z)); if (v !== undefined) return v; return y <= 60 || (x < 0 && y <= 70) ? STONE : 0; };
+    let sim = null;
+    const world = { getBlock, getLight: () => 0xf000, col: () => null, setBlock(x, y, z, s, flags) { const old = getBlock(x, y, z); if (old === s) return; B.set(key(x, y, z), s); if (!(flags & 2)) sim.onBlockChanged(x, y, z, old, s); } };
+    sim = new VR.Sim({ world, player: { pos: [0, 80, 0], mode: 'creative' }, skyBright: 1, particles: { breakBlock() {}, smoke() {} }, audio: { play() {} }, dim: 'overworld', entities: null, dropsFor() {}, dropStack() {} });
+    sim.randomTicks = () => {};
+    world.setBlock(-3, 71, 0, WATER, 1);
+    for (let t = 0; t < 900; t++) sim.step(false);
+    let ledge = 0, air = 0, ground = 0, stream = 0;
+    for (const [k, v] of B) { if (!v || !(R.T.flags[v] & F.FLUID)) continue; const [x, y] = k.split(',').map(Number); if (y === 71 && x < 0) ledge++; else if (y === 61) ground++; else if (y > 61 && y < 71 && x >= 0) { if (x === 0) stream++; else air++; } }
+    check(ledge >= 3 && stream >= 9 && ground >= 20 && air === 0, `a source on a ledge: ${ledge} on the ledge, a stream of ${stream} down its edge, ${ground} spread where it lands, ${air} in the air beside the stream`);
+  }
+}
+
 // ---------------------------------------------------------------- 5 · Very Low
 // the mesher's triangles per chunk column within Very Low's render distance (4 chunks) of the audit's two Very Low
 // scenes (test/beauty_audit.mjs COST=1: the crescent's west end — its turning circle — and the lawn between the villa
