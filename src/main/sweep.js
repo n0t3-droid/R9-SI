@@ -18,18 +18,19 @@
   const SMOOTH_FPS = 50, PLAYABLE_FPS = 30;
   const NAMES = { potato: 'g.set.pVeryLow', low: 'g.set.pLow', balanced: 'g.set.pBalanced', high: 'g.set.pHigh', ultraLite: 'g.set.pUltraLite', ultra: 'g.set.pUltra' };
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
-  const sane = (x) => Number.isFinite(x) && x > 0 && x <= 1000;
+  const sane = (x) => Number.isFinite(x) && x > 0 && x <= 5000;   // a frame of 0 is a glitch; a stall over 5 s a tab switch (a software renderer's 2 s frame still counts)
   class Sweep {
     constructor(game) { this.game = game; this.results = []; this.phase = 'idle'; this.plan = []; this.at = -1; this.was = null; this.t = 0; this.last = 0; this.dts = []; }
     // the steps in order, those the build has
     static plan(presets) { return ORDER.filter((p) => presets && presets[p]); }
     // the verdict from a table of { preset, fps (median), p90fps }
     static pick(results) {
-      const out = { smooth: null, playable: null };
+      const out = { smooth: null, playable: null, smoothOk: false, playableOk: false };
       if (!results || !results.length) return out;
       const rank = (p) => ORDER.indexOf(p);
       const sorted = results.slice().sort((a, b) => rank(a.preset) - rank(b.preset));
-      for (const r of sorted) { if (r.p90fps >= SMOOTH_FPS) out.smooth = r.preset; if (r.fps >= PLAYABLE_FPS) out.playable = r.preset; }
+      for (const r of sorted) { if (r.p90fps >= SMOOTH_FPS) { out.smooth = r.preset; out.smoothOk = true; } if (r.fps >= PLAYABLE_FPS) { out.playable = r.preset; out.playableOk = true; } }
+      // no step reaches the mark: the lowest step is named, and the text says that it falls short
       if (!out.smooth) out.smooth = sorted[0].preset;
       if (!out.playable) out.playable = sorted[0].preset;
       return out;
@@ -43,7 +44,9 @@
     static text(r) {
       if (!r || !r.results || !r.results.length) return T('g.sweep.none', null, 'Nichts gemessen.');
       const steps = r.results.map((x) => Sweep.name(x.preset) + ' ' + Math.round(x.fps) + ' fps').join(' · ');
-      return steps + ' — ' + T('g.sweep.verdict', { s: Sweep.name(r.smooth), p: Sweep.name(r.playable) }, 'Ruckelfrei: {s}. Spielbar: {p}.');
+      const sm = r.smoothOk === false ? T('g.sweep.noSmooth', { s: Sweep.name(r.smooth) }, 'Ruckelfrei: keine Stufe ganz ({s} kommt am nächsten).') : T('g.sweep.smooth', { s: Sweep.name(r.smooth) }, 'Ruckelfrei: {s}.');
+      const pl = r.playableOk === false ? T('g.sweep.noPlayable', { p: Sweep.name(r.playable) }, 'Spielbar: keine Stufe ganz ({p} kommt am nächsten).') : T('g.sweep.playable', { p: Sweep.name(r.playable) }, 'Spielbar: {p}.');
+      return steps + ' — ' + sm + ' ' + pl;
     }
     start() {
       const g = this.game;
@@ -92,7 +95,7 @@
       Object.assign(g.settings, this.was);
       g.applySettings('*'); g.saveSettings();
       const v = Sweep.pick(this.results);
-      const rec = { when: Date.now(), gpu: (VR.GL && VR.GL.rendererName) || '', results: this.results, smooth: v.smooth, playable: v.playable };
+      const rec = { when: Date.now(), gpu: (VR.GL && VR.GL.rendererName) || '', results: this.results, smooth: v.smooth, playable: v.playable, smoothOk: v.smoothOk, playableOk: v.playableOk };
       try { localStorage.setItem(KEY, JSON.stringify(rec)); } catch (e) { /* the record is optional */ }
       this.result = rec;
       if (g.sweep === this) g.sweep = null;
