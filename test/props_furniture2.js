@@ -159,5 +159,14 @@ const FURN = (VR.PROP_GROUP || {}).furniture || 2;
   const rp = rd.slice(rd.indexOf('reflectPass(F, E, world, vis, camPos) {'), rd.indexOf('waterUniforms(p, E) {'));
   check(/drawProps\(/.test(rp) && /noReflProps/.test(rp), 'the water\'s planar reflection draws the props (with a switch: renderer.noReflProps)');
 }
+// 15. the last pieces of the test's rooms: the mansion hall's fountain holds water in its basin and its bowl, the garden
+// light (the villa's pool edge) and the villages' arc lamp glow; all three are in the mesher's list
+{
+  const V = verts('fountain'), water = V.filter(p => p.m === MAT.glass && p.ny > 0.9);
+  check(water.some(p => p.y > 2 && p.y < 3.6) && water.some(p => p.y > 10 && p.y < 11.5) && V.some(p => p.m === MAT.marble && p.y > 3.4 && Math.hypot(p.x - 8, p.z - 8) > 7.4), `the fountain: water in the basin and in the upper bowl, a stone rim round it (${water.length} water vertices)`);
+  check(some('glamp', p => p.m === MAT.light && p.y > 9 && p.y < 13) && some('glamp', p => p.m === MAT.metal && p.y < 1), 'the garden light: a glowing drum on a black post and foot');
+  check(some('varclamp', p => p.m === MAT.light && p.x < 8.5 && p.z < 8.5) && some('varclamp', p => p.m === MAT.gloss && p.y < 1.4 && p.x > 8), 'the arc lamp: the foot in the back corner, the glowing shade over the front corner');
+  check(['vx_fountain', 'vx_garden_lamp', 'vx_arc_lamp'].every(n => VR.PROP_FURN.includes(n) && PR.FDEF[n]), 'the fountain, the garden light and the arc lamp are listed and defined');
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

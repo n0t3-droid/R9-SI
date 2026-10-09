@@ -71,7 +71,7 @@ const VWIN = [61, 62];
 // ---------------------------------------------------------------- the cameras: eye → target (or {yaw, pitch} from the feet, run 1 of round I), time
 const CAMS = [
   ['living', { feet: [-220.5, 87, -106.5], yaw: 0.7854, pitch: -0.1 }],          // round I's living camera: the reading corner, the sofa group, the TV wall, the curtain, the kitchen far left
-  ['living2', { eye: [-221.5, 88.62, -116.5], at: [-229, 87.6, -110] }],          // from the TV wall: the sofa, chaise, coffee table on its rug, armchairs, the dining zone
+  ['living2', { eye: [-224.5, 89.85, -117.55], at: [-225.5, 87.2, -110.5] }],     // over the TV, looking down: the coffee table on its rug, armchairs, sofa, chaise, the dining zone (run 1 stood beside the floor lamp)
   ['dining', { feet: [-235.5, 87, -109.5], yaw: 5.1051, pitch: -0.08 }],         // round I's dining camera: the oak table under the chandelier, art, bar cart
   ['kitchen', { eye: [-238.5, 88.62, -112.5], at: [-240.5, 88.2, -106] }],        // the black kitchen: sink, dishwasher, hob under the range hood, the fridge, the island
   ['bedroom', { eye: [-224.5, 93.62, -114.5], at: [-222.5, 92.9, -106] }],        // the master bedroom: wardrobes, the curtain by the glass, dresser and round mirror, armchair
@@ -82,7 +82,7 @@ const CAMS = [
   ['show2', { eye: [SX + 26.5, Y0 + 2.4, SZ + 11], at: [SX + 26.5, Y0 + 0.8, SZ + 2] }],  // bay 2
   ['show3', { eye: [SX + 44.5, Y0 + 2.2, SZ + 9.5], at: [SX + 44.5, Y0 + 1.6, SZ + 0.5] }],// bay 3
   ['vroom', { eye: [SX + 62.4, Y0 + 1.7, SZ + 6.4], at: [SX + 58.5, Y0 + 0.8, SZ + 0.5] }],// the village bedroom
-  ['pool', { eye: [-239.6, 86.75, -98.5], at: [-226, 87.2, -98.5] }],             // along the villa's pool, low over the water: the house, the lounger, the planter, a palm in the reflection
+  ['pool', { eye: [-236.6, 87.3, -97.6], at: [-226.5, 86.9, -101] }],            // over the pool's west end, low: the water, the path lights, the palm and its reflection (run 1's camera stood behind the lounger, its ray met the deck before the water: no reflection)
   ['lake', { eye: [-284.5, 86.9, -100.2], at: [-284.5, 89.5, -116] }],            // the pond: palms, loungers and a sofa on its banks, mirrored
 ];
 const ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'];
