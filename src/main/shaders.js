@@ -475,6 +475,7 @@ uniform sampler2D u_noise;
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt: the toroidal map's offset (0 = the plain map as before)
 in vec4 v_shadow;
 #endif
 uniform ivec3 u_camInt;
@@ -526,10 +527,11 @@ float shadowAt(vec3 N, vec3 L) {
   if (!(sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0)) {
     float t = u_shadowTexel;
     float bias = 0.0006;
-    s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - bias));
+    vec2 su = fract(sc.xy + u_shadowOff);   // (F9: the toroidal map; sc.xy itself when the offset is 0)
+    s = texture(u_shadowMap, vec3(su + vec2(-0.6, -0.6) * t, sc.z - bias));
+    s += texture(u_shadowMap, vec3(su + vec2(0.6, -0.6) * t, sc.z - bias));
+    s += texture(u_shadowMap, vec3(su + vec2(-0.6, 0.6) * t, sc.z - bias));
+    s += texture(u_shadowMap, vec3(su + vec2(0.6, 0.6) * t, sc.z - bias));
     s *= 0.25;
     vec2 edge = smoothstep(vec2(0.0), vec2(0.08), sc.xy) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - sc.xy);
     cover = edge.x * edge.y;
@@ -820,6 +822,7 @@ uniform ivec3 u_camInt;      // (declared for the common block's heightmap shado
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt (0: the plain map)
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
@@ -836,10 +839,11 @@ float propSun() {
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
   if (sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0) return 1.0;
   float t = u_shadowTexel, b = 0.0006;
-  float s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - b));
+  vec2 su = fract(sc.xy + u_shadowOff);   // (F9: the toroidal map)
+  float s = texture(u_shadowMap, vec3(su + vec2(-0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(-0.6, 0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, 0.6) * t, sc.z - b));
   return s * 0.25;
 }
 #endif
@@ -934,6 +938,7 @@ uniform float u_blockVar;    // the Klassisch look (VR.LOOK.vary, t-smooth2): th
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt (0: the plain map)
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
@@ -952,10 +957,11 @@ float furnSun() {
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
   if (sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0) return 1.0;
   float t = u_shadowTexel, b = 0.0006;
-  float s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - b));
+  vec2 su = fract(sc.xy + u_shadowOff);   // (F9: the toroidal map)
+  float s = texture(u_shadowMap, vec3(su + vec2(-0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(-0.6, 0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, 0.6) * t, sc.z - b));
   return s * 0.25;
 }
 #endif
@@ -1085,6 +1091,7 @@ uniform float u_clipNear;
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt (0: the plain map)
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
@@ -1107,7 +1114,7 @@ float linDepth(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_
 float shadowAt(vec3 N, vec3 L) {
 #ifdef SHADOWS
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
-  if (!(sc.x <= 0.0 || sc.x >= 1.0 || sc.y <= 0.0 || sc.y >= 1.0 || sc.z >= 1.0)) return texture(u_shadowMap, vec3(sc.xy, sc.z - 0.0008));
+  if (!(sc.x <= 0.0 || sc.x >= 1.0 || sc.y <= 0.0 || sc.y >= 1.0 || sc.z >= 1.0)) return texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - 0.0008));
 #endif
 #ifdef HSHADOW
   return hShadow(v_localPos, N, L);

@@ -417,6 +417,7 @@
     }
     // a changed section inside the cached shadow map's area: redraw the map next frame
     nearShadow(sec) {
+      if (this.sht) { this.shtMark(sec); return; }   // F9 · Schatten-Takt: only the tiles under it
       const c = this.shadowCam; if (!c || this.shadowDirty) return;
       const R = (this.q.shadowDist || 64) + 24;
       if (Math.abs(sec.ox + 8 - c[0]) < R && Math.abs(sec.oz + 8 - c[2]) < R) this.shadowDirty = true;
@@ -654,7 +655,7 @@
         // a chunk section in its fade-in (s.fade, 0..1) is dithered in by the terrain shader; one not shown yet (0) is
         // skipped: it is invisible and casts no shadow. Sections without a fade (ships, props) are whole.
         const fade = s.fade === undefined ? 1 : s.fade;
-        if (fade <= 0) continue;
+        if (fade <= 0 && !this.shtAll) continue;
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
@@ -736,6 +737,251 @@
       this.stats.shadowDraws = this.stats.draws - draws0;
       return true;
     }
+
+    // ------------------------------------------------ F9 · Schatten-Takt (q.shadowTakt; the rules: ultralite.js UL.Shadow)
+    // The frame's shadow map. Without the takt: the cached whole map as before (renderShadows; redrawn when the sun steps,
+    // the eye moved 0.18 R or a section near changed). With it the same map (size, reach, texels, filtering) is kept up to
+    // date in tiles: toroidal addressing (the window moves by tiles, only entering tiles are drawn), a changed section
+    // redraws the tiles under it (ring 0 the same frame, ring 1 every 2nd, ring 2 every 4th), a sun step is built in a
+    // second map over UL.Shadow.SLICES frames while the first is read, then the two swap.
+    shadowFrame(world, E, cam) {
+      if (!this.q.shadowTakt || !this.q.shadows || !this.shadowFB || !world || !VR.UL) {
+        if (this.sht) this.shtDrop();
+        const shadowOn = world && (this.frameNo % (this.q.shadowEvery || 1) === 0 || !this.shadowValid) ? this.renderShadows(world, E) : this.shadowValid;
+        this.shadowValid = shadowOn;
+        // a shadow map kept from an earlier frame was made around the old camera position: shift its matrix
+        // by the camera movement so shadows stay glued to the world instead of flickering every other frame
+        if (shadowOn) { const c0 = this.shadowCam, t = mat4.create(); t[12] = cam.x - c0[0]; t[13] = cam.y - c0[1]; t[14] = cam.z - c0[2]; mat4.mul(this.shadowMat, this.shadowBase, t); }
+        return shadowOn;
+      }
+      return this.shtFrame(world, E, cam);
+    }
+    shtFrame(world, E, cam) {
+      const SH = VR.UL.Shadow, sunUp = E.sunDir[1] > 0.02, L0 = sunUp ? E.sunDir : E.moonDir;
+      let st = this.sht;
+      if (L0[1] < 0.06) { if (st) st.front.ok = false; this.shadowValid = false; return false; }   // (the next light starts a fresh map)
+      const sk = SH.sunKey(L0), key = sk.key + (sunUp ? 's' : 'm');
+      if (!st || st.size !== this.shadowSize || st.R !== this.q.shadowDist || st.tex !== this.shadowTex) st = this.shtInit(this.shadowSize, this.q.shadowDist);
+      const f = st.front;
+      st.listAt = -1; st.drawn = 0;
+      const drift = f.ok ? Math.hypot(cam.x - f.P0[0], cam.z - f.P0[2]) + Math.abs(cam.y - f.P0[1]) * 0.5 : 1e9;
+      this.shtBegin();
+      if (!f.ok || drift > SH.REBASE) { if (st.back) this.shtCancelBack(st); this.shtFull(st, f, key, sk.L, world, E, cam); }
+      else {
+        if (f.key !== key && !st.back) this.shtBeginBack(st, key, sk.L, world, cam);
+        if (st.back) this.shtBackSlice(st, world, E, cam);
+        this.shtMove(st, world, E, cam);
+        if (this.frameNo % 4 === 0) this.shtFlips(st, world, cam);
+        this.shtDirty(st, world, E, cam);
+      }
+      this.shtEnd();
+      this.shtLookup(st, cam);
+      this.stats.shadowTiles = st.drawn;
+      this.shadowValid = true;
+      return true;
+    }
+    shtInit(size, R) {
+      const SH = VR.UL.Shadow, N = SH.N;
+      const layer = () => ({ ok: false, key: '', ser: 0, lv: new Float32Array(16), P0: [0, 0, 0], lP0: [0, 0, 0], wc: [0, 0], k: 0, casters: null, changed: null });
+      if (this.shadowFB2 && this.shadowTex2Size !== size) this.shtFreeBack();
+      this.shtWrap(this.shadowTex, true);
+      if (!this.shadowOff) this.shadowOff = [0, 0];
+      return (this.sht = { size, R, T: SH.tile(R), N, ts: size / N, front: layer(), back: null, spare: layer(), dirty: new Uint8Array(N * N), ser: 0, tex: this.shadowTex, list: [], part: [], listAt: -1, drawn: 0, tr: [0, 0, 0, 0], d: [0, 0, 0], due: [] });
+    }
+    shtWrap(tex, on) { const gl = this.gl; if (!tex) return; const m = on ? gl.REPEAT : gl.CLAMP_TO_EDGE; gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, m); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, m); }
+    shtFreeBack() { const gl = this.gl; if (this.shadowFB2) gl.deleteFramebuffer(this.shadowFB2); if (this.shadowTex2) gl.deleteTexture(this.shadowTex2); this.shadowFB2 = null; this.shadowTex2 = null; this.shadowTex2Size = 0; }
+    ensureShadowBack() {
+      const gl = this.gl, size = this.shadowSize;
+      if (this.shadowFB2 && this.shadowTex2Size === size) return true;
+      this.shtFreeBack();
+      this.shadowTex2 = GL.tex2D(size, size, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.LINEAR, compare: true, wrap: gl.REPEAT });
+      this.shadowFB2 = GL.fbo([], this.shadowTex2);
+      this.shadowTex2Size = size;
+      return !!this.shadowFB2;
+    }
+    // the takt off (or the map gone): the plain map again, the second one freed
+    shtDrop() {
+      this.shtFreeBack();
+      this.shtWrap(this.shadowTex, false);
+      this.sht = null;
+      if (this.shadowOff) { this.shadowOff[0] = 0; this.shadowOff[1] = 0; }
+      this.shadowValid = false;
+    }
+    shtBegin() { const gl = this.gl; gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.CULL_FACE); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.6, 3.0); }
+    shtEnd() { const gl = this.gl; gl.disable(gl.SCISSOR_TEST); gl.disable(gl.POLYGON_OFFSET_FILL); }
+    // the casters as renderShadows gathers them (every section with a mesh within reach of the eye), once a frame
+    shtList(world, cam) {
+      const st = this.sht;
+      if (st.listAt === this.frameNo) return st.list;
+      const list = st.list; list.length = 0;
+      const rs = Math.ceil(this.q.shadowDist / 16) + 1, pcx = Math.floor(cam.x) >> 4, pcz = Math.floor(cam.z) >> 4;
+      for (let dz = -rs; dz <= rs; dz++) for (let dx = -rs; dx <= rs; dx++) {
+        const c = world.col(pcx + dx, pcz + dz); if (!c) continue;
+        for (let s = 0; s < c.sec.length; s++) { const sec = c.sec[s]; if (sec.hasMesh && (sec.mesh[0] || sec.mesh[1] || sec.mesh[3] || sec.mesh[4])) list.push(sec); }
+      }
+      st.listAt = this.frameNo;
+      return list;
+    }
+    // one rectangle of tiles [ax..bx] × [ay..by] (absolute indices, not across the texels' wrap) of a map: its matrix,
+    // viewport and scissor; cleared when asked; then the casters (culled by its frustum) and, when asked, the props
+    shtRect(st, layer, casters, cam, E, ax, bx, ay, by, clear, props) {
+      const gl = this.gl, SH = VR.UL.Shadow, T = st.T, ts = st.ts, N = st.N, d = st.d;
+      d[0] = cam.x - layer.P0[0]; d[1] = cam.y - layer.P0[1]; d[2] = cam.z - layer.P0[2];
+      SH.tileMatrix(this.shadowMat, layer.lv, d, ax * T - layer.lP0[0], (bx + 1) * T - layer.lP0[0], ay * T - layer.lP0[1], (by + 1) * T - layer.lP0[1]);
+      mat4.frustum(this.shadowPlanes, this.shadowMat);
+      const sx = SH.slot(ax, N) * ts, sy = SH.slot(ay, N) * ts, sw = (bx - ax + 1) * ts, sh = (by - ay + 1) * ts;
+      gl.viewport(sx, sy, sw, sh); gl.enable(gl.SCISSOR_TEST); gl.scissor(sx, sy, sw, sh);
+      if (clear) gl.clear(gl.DEPTH_BUFFER_BIT);
+      const camPos = this.shtCam || (this.shtCam = [0, 0, 0]); camPos[0] = cam.x; camPos[1] = cam.y; camPos[2] = cam.z;
+      this.shtAll = true;   // (casters are drawn whatever their fade: a column fading in casts its shadow at once)
+      const vxSplit = this.splitVx(casters, camPos, 28);
+      for (const [p, l] of [[this.P.shadow, 0], [this.P.shadowCut, 1]]) {
+        gl.useProgram(p.p);
+        gl.uniformMatrix4fv(p.u.u_viewProj, false, this.shadowMat);
+        if (l === 1) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); gl.uniform1i(p.u.u_albedo, 0); }
+        this.drawSections(casters, l, p, camPos, this.shadowPlanes, false);
+        if (l === 0) { this.drawSections(vxSplit.near, 3, p, camPos, this.shadowPlanes, false); this.drawSections(vxSplit.far, 4, p, camPos, this.shadowPlanes, false); }
+      }
+      this.shtAll = false;
+      if (props && (this.q.smoothProps || this.q.smoothFurn)) this.drawProps(E, camPos, true);
+      st.drawn += (bx - ax + 1) * (by - ay + 1);
+    }
+    // a block of tiles of the front map, split where the texels wrap; their dirty marks go
+    shtRange(st, world, E, cam, i0, i1, j0, j1) {
+      const SH = VR.UL.Shadow, gl = this.gl, N = st.N, casters = this.shtList(world, cam);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFB);
+      for (const [ax, bx] of SH.runs(i0, i1, N)) for (const [ay, by] of SH.runs(j0, j1, N)) {
+        this.shtRect(st, st.front, casters, cam, E, ax, bx, ay, by, true, true);
+        for (let j = ay; j <= by; j++) for (let i = ax; i <= bx; i++) st.dirty[SH.slot(j, N) * N + SH.slot(i, N)] = 0;
+      }
+    }
+    // the whole front map, new: the stepped light, the depth origin at the eye, the window around it
+    shtFull(st, f, key, L, world, E, cam) {
+      const SH = VR.UL.Shadow;
+      f.key = key; f.ser = ++st.ser; SH.lightView(f.lv, L);
+      f.P0 = [cam.x, cam.y, cam.z]; f.lP0 = SH.toLight(f.lv, f.P0);
+      f.wc = [SH.center(null, f.lP0[0], st.T), SH.center(null, f.lP0[1], st.T)];
+      f.ok = true; st.dirty.fill(0);
+      const wx = SH.windowTiles(f.wc[0], st.T, st.N), wy = SH.windowTiles(f.wc[1], st.T, st.N);
+      this.shtRange(st, world, E, cam, wx[0], wx[1], wy[0], wy[1]);
+      this.stats.shadowRenders = (this.stats.shadowRenders || 0) + 1;
+    }
+    // a sun step: the next map is begun in the second buffer (cleared; the casters of this moment, a slice a frame)
+    shtBeginBack(st, key, L, world, cam) {
+      const SH = VR.UL.Shadow, gl = this.gl;
+      if (!this.ensureShadowBack()) return;
+      const b = st.back = st.spare; st.spare = null;
+      b.key = key; b.ser = ++st.ser; SH.lightView(b.lv, L);
+      b.P0 = [cam.x, cam.y, cam.z]; b.lP0 = SH.toLight(b.lv, b.P0);
+      b.wc = [SH.center(null, b.lP0[0], st.T), SH.center(null, b.lP0[1], st.T)];
+      b.k = 0; b.casters = this.shtList(world, cam).slice(); b.changed = new Set(); b.ok = false;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFB2); gl.disable(gl.SCISSOR_TEST); gl.viewport(0, 0, st.size, st.size); gl.clear(gl.DEPTH_BUFFER_BIT);
+    }
+    shtCancelBack(st) { const b = st.back; if (!b) return; b.casters = null; b.changed = null; st.spare = b; st.back = null; }
+    shtBackSlice(st, world, E, cam) {
+      const SH = VR.UL.Shadow, gl = this.gl, b = st.back, N = st.N, part = st.part;
+      const [s, e] = SH.slice(b.casters.length, SH.SLICES, b.k);
+      part.length = 0; for (let i = s; i < e; i++) part.push(b.casters[i]);
+      const last = b.k === SH.SLICES - 1;
+      const wx = SH.windowTiles(b.wc[0], st.T, N), wy = SH.windowTiles(b.wc[1], st.T, N);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFB2);
+      for (const [ax, bx] of SH.runs(wx[0], wx[1], N)) for (const [ay, by] of SH.runs(wy[0], wy[1], N)) this.shtRect(st, b, part, cam, E, ax, bx, ay, by, false, last);
+      st.drawn = Math.round(st.drawn / SH.SLICES);   // (a slice of the whole map counts as its share of the tiles)
+      if (++b.k < SH.SLICES) return;
+      // done: the two maps swap; what changed meanwhile is marked on the new one
+      const f = st.front;
+      st.front = b; st.back = null; st.spare = f; f.ok = false; f.casters = null; f.changed = null;
+      let t = this.shadowTex; this.shadowTex = this.shadowTex2; this.shadowTex2 = t;
+      t = this.shadowFB; this.shadowFB = this.shadowFB2; this.shadowFB2 = t;
+      st.tex = this.shadowTex; b.ok = true; st.dirty.fill(0);
+      const ch = b.changed; b.changed = null; b.casters = null;
+      for (const sec of ch) this.shtMark(sec);
+      this.stats.shadowRenders = (this.stats.shadowRenders || 0) + 1;
+    }
+    // the window follows the eye by whole tiles: only the strips that enter are drawn
+    shtMove(st, world, E, cam) {
+      const SH = VR.UL.Shadow, f = st.front, T = st.T, N = st.N;
+      const l = SH.toLight(f.lv, [cam.x, cam.y, cam.z]);
+      const nx = SH.center(f.wc[0], l[0], T), ny = SH.center(f.wc[1], l[1], T);
+      if (nx === f.wc[0] && ny === f.wc[1]) return;
+      const ex = SH.entering(Math.round(f.wc[0] / T), Math.round(nx / T), N), ey = SH.entering(Math.round(f.wc[1] / T), Math.round(ny / T), N);
+      f.wc[0] = nx; f.wc[1] = ny;
+      const wx = SH.windowTiles(nx, T, N), wy = SH.windowTiles(ny, T, N);
+      if (ex === 'all' || ey === 'all') { this.shtRange(st, world, E, cam, wx[0], wx[1], wy[0], wy[1]); return; }
+      if (ex) this.shtRange(st, world, E, cam, ex[0], ex[1], wy[0], wy[1]);
+      if (ey) this.shtRange(st, world, E, cam, wx[0], wx[1], ey[0], ey[1]);
+    }
+    // a section's light-space box under the front map's light (cached until the light steps)
+    shtLB(st, sec) {
+      if (sec.shSer !== st.front.ser) {
+        const e = 0.05;   // (a hair wider: the GPU's float placement never leaves the marked tiles)
+        sec.shLB = VR.UL.Shadow.lightBox(st.front.lv, sec.ox - e, sec.oy - e, sec.oz - e, sec.ox + 16 + e, sec.oy + 16 + e, sec.oz + 16 + e, sec.shLB || [0, 0, 0, 0]);
+        sec.shSer = st.front.ser;
+      }
+      return sec.shLB;
+    }
+    // a changed section: the tiles under it are redrawn (and it is drawn again on the map being built)
+    shtMark(sec) {
+      const st = this.sht, SH = VR.UL.Shadow, f = st.front;
+      if (st.back && st.back.changed) st.back.changed.add(sec);
+      if (!f.ok || sec.ox === undefined) return;
+      const tr = SH.tilesOf(this.shtLB(st, sec), st.T, st.tr);
+      const wx = SH.windowTiles(f.wc[0], st.T, st.N), wy = SH.windowTiles(f.wc[1], st.T, st.N);
+      const i0 = Math.max(tr[0], wx[0]), i1 = Math.min(tr[1], wx[1]), j0 = Math.max(tr[2], wy[0]), j1 = Math.min(tr[3], wy[1]);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) st.dirty[SH.slot(j, st.N) * st.N + SH.slot(i, st.N)] = 1;
+    }
+    // the detail meshes (VX) and the furniture near the eye cast their full shapes, farther their boxes: a section that
+    // crossed that line (28 blocks) since it was drawn is drawn again
+    shtFlips(st, world, cam) {
+      const list = this.shtList(world, cam), D2 = 28 * 28;
+      for (let i = 0; i < list.length; i++) {
+        const s = list[i];
+        if (!s.mesh[3] && !s.mesh[4] && !s.propN) continue;
+        const dx = s.ox + 8 - cam.x, dy = s.oy + 8 - cam.y, dz = s.oz + 8 - cam.z, near = dx * dx + dy * dy * 0.5 + dz * dz < D2;
+        if (s.shNear === undefined) { s.shNear = near; continue; }
+        if (s.shNear !== near) { s.shNear = near; this.shtMark(s); }
+      }
+    }
+    // the dirty tiles that are due this frame (ring 0 every frame, ring 1 every 2nd, ring 2 every 4th; slower when the
+    // governor asks), nearest rings first, at most MAX_TILES; a row's neighbours merge into one rectangle, rows with the
+    // same span merge too
+    shtDirty(st, world, E, cam) {
+      const SH = VR.UL.Shadow, f = st.front, N = st.N, T = st.T, dirty = st.dirty;
+      let any = false; for (let i = 0; i < dirty.length; i++) if (dirty[i]) { any = true; break; }
+      if (!any) return;
+      const wx = SH.windowTiles(f.wc[0], T, N), wy = SH.windowTiles(f.wc[1], T, N);
+      const l = SH.toLight(f.lv, [cam.x, cam.y, cam.z]), ci = Math.floor(l[0] / T), cj = Math.floor(l[1] / T);
+      const slow = this.q.shadowEvery || 1, due = st.due; due.length = 0;
+      for (let ring = 0; ring <= 2 && due.length < SH.MAX_TILES; ring++) {
+        if (!SH.due(ring, this.frameNo, slow)) continue;
+        for (let tj = wy[0]; tj <= wy[1]; tj++) for (let ti = wx[0]; ti <= wx[1]; ti++) {
+          if (!dirty[SH.slot(tj, N) * N + SH.slot(ti, N)] || SH.ring(ti, tj, ci, cj) !== ring) continue;
+          if (due.length >= SH.MAX_TILES) break;
+          due.push(ti, tj);
+        }
+      }
+      if (!due.length) return;
+      // rows: runs of consecutive tiles within one texel period
+      const rows = [];
+      for (let k = 0; k < due.length; k += 2) rows.push([due[k + 1], due[k], due[k]]);
+      rows.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const spans = [];
+      for (const r of rows) { const s = spans[spans.length - 1]; if (s && s[0] === r[0] && s[2] + 1 === r[1] && Math.floor(r[1] / N) === Math.floor(s[1] / N)) s[2] = r[1]; else spans.push([r[0], r[1], r[1]]); }
+      // rectangles: the same span in the next row (within one period) joins
+      spans.sort((a, b) => a[1] - b[1] || a[2] - b[2] || a[0] - b[0]);
+      const rects = [];
+      for (const s of spans) { const q = rects[rects.length - 1]; if (q && q[0] === s[1] && q[1] === s[2] && q[3] + 1 === s[0] && Math.floor(s[0] / N) === Math.floor(q[2] / N)) q[3] = s[0]; else rects.push([s[1], s[2], s[0], s[0]]); }
+      for (const q of rects) this.shtRange(st, world, E, cam, q[0], q[1], q[2], q[3]);
+    }
+    // the lookup for this frame: the camera-relative matrix and the wrap offset of the front map
+    shtLookup(st, cam) {
+      const SH = VR.UL.Shadow, f = st.front, d = st.d;
+      d[0] = cam.x - f.P0[0]; d[1] = cam.y - f.P0[1]; d[2] = cam.z - f.P0[2];
+      SH.lookupMatrix(this.shadowMat, f.lv, d, [f.wc[0] - f.lP0[0], f.wc[1] - f.lP0[1]], st.R);
+      this.shadowOff[0] = SH.offset(f.wc[0], st.R); this.shadowOff[1] = SH.offset(f.wc[1], st.R);
+    }
+    // the shaders' wrap offset (0 without the takt)
+    shadowOffUni(u) { if (u.u_shadowOff) { const o = this.shadowOff; this.gl.uniform2f(u.u_shadowOff, o ? o[0] : 0, o ? o[1] : 0); } }
 
     // ------------------------------------------------ smooth props (t-smooth, props.js): one instanced draw per model
     // A section keeps its prop anchors (propSet): per anchor 12 doubles — the origin in world blocks, then the variation
@@ -894,6 +1140,7 @@
       if (!shadow) {
         if (u.u_shadowMat) gl.uniformMatrix4fv(u.u_shadowMat, false, this.shadowMat);
         if (u.u_shadowTexel) gl.uniform1f(u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(u);
         if (u.u_shadowMap && this.shadowTex) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.u_shadowMap, 3); }
       }
       return u;
@@ -1101,6 +1348,7 @@
         if (p.u.u_clipNear) gl.uniform1f(p.u.u_clipNear, ship.clipNear || 0);
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
         gl.disable(gl.CULL_FACE);
         for (const s of ship.gpu) {
           const m = s.mesh[layer]; if (!m) continue;
@@ -1133,12 +1381,8 @@
       const vis = world ? this.collectVisible(world, F.cam) : [];
       this.stats.sections = vis.length;
       if (world) this.updateHmap(world);
-      // shadows
-      const shadowOn = world && (this.frameNo % (this.q.shadowEvery || 1) === 0 || !this.shadowValid) ? this.renderShadows(world, E) : this.shadowValid;
-      this.shadowValid = shadowOn;
-      // a shadow map kept from an earlier frame was made around the old camera position: shift its matrix
-      // by the camera movement so shadows stay glued to the world instead of flickering every other frame
-      if (shadowOn) { const c0 = this.shadowCam, t = mat4.create(); t[12] = F.cam.x - c0[0]; t[13] = F.cam.y - c0[1]; t[14] = F.cam.z - c0[2]; mat4.mul(this.shadowMat, this.shadowBase, t); }
+      // shadows (the cached map as before, or F9's Schatten-Takt: shadowFrame)
+      this.shadowFrame(world, E, F.cam);
       // ---------------- scene
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
       gl.viewport(0, 0, this.w, this.h);
@@ -1171,6 +1415,7 @@
           if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, this.jit && !this.q.lite ? Math.sqrt(Math.max(0.35, this.w / this.W)) : 1);   // lite: natural mips (cheaper texture reads on weak GPUs)
           if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
           if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+          this.shadowOffUni(p.u);
           if (layer === 1) gl.disable(gl.CULL_FACE);
           this.drawSections(vis, layer, p, camPos, this.planes, false);
           if (layer === 0) {
@@ -1219,6 +1464,7 @@
         if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, F.underwater ? 1 : 0);
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.disable(gl.CULL_FACE);
         this.drawSections(vis, 2, p, camPos, this.planes, true);
@@ -1344,6 +1590,7 @@
         if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, 1);
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
         if (layer === 1) gl.disable(gl.CULL_FACE);
         this.drawSections(list, layer, p, camPos, this.planesR, false);
         gl.enable(gl.CULL_FACE);
