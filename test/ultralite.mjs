@@ -5,7 +5,8 @@
 //   per scene and preset: the frame (synced by a one-texel read), the passes (each timed alone), draw calls by pass,
 //            triangles, a full shadow-map redraw; Ultra · Leicht also the frames that build a new far cache (a slice each)
 //            and its steady frames (the cache's age rule lifted: at 2–3 s a frame here every frame would be "old")
-//   pictures test/shots/ultralite_<scene>_<preset>_<TAG>.png of the same view (the clouds' clock pinned); their difference
+//   pictures test/shots/ultralite_<scene>_<preset>_<TAG>.png of the same view (the clouds' clock pinned; what moves — ships,
+//            folk, particles — left out of both); their difference
 //   walks    stream: 200 m from the hall (Ultra · Leicht south, Ultra north: fresh land for both), nothing drawn, every
 //            frame's main-thread time = the loop + the worker messages handled since the frame before (a frame over
 //            40 ms is a hitch); shadow: 30 m back with the day running, only the shadow work drawn
@@ -80,6 +81,8 @@ const instrument = () => ev(() => {
   if (md) for (const fn of ['multiDrawArraysWEBGL', 'multiDrawElementsWEBGL', 'multiDrawArraysInstancedWEBGL', 'multiDrawElementsInstancedWEBGL']) { if (!md[fn]) continue; const f = md[fn].bind(md); md[fn] = (...a) => { count(a[a.length - 1]); return f(...a); }; }
   const R0 = r.render;
   r.render = function (F) {
+    // (the pictures: what moves — ships, folk, animals, particles — is left out of both, so only the presets differ)
+    if (window.__still && F) { F.drawOpaque = null; F.drawTranslucent = null; F.particles = null; }
     if (P.on && F) {
       for (const [k, key] of [['drawOpaque', 'things'], ['drawTranslucent', 'thingsT']]) {
         const f = F[k]; if (!f) continue;
@@ -139,7 +142,7 @@ const measure = async (lite) => {
 const shotPath = (name) => `/home/claude/vr/test/shots/ultralite_${name}_${TAG}.png`;
 const shot = async (name) => {
   await warmVx();
-  await ev(() => { window.__norender = false; const g = VR.game, V = g.villages, p = g.player; const keep = V && V.agents ? V.agents : null; if (keep) V.agents = keep.filter(a => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) > 12); for (let i = 0; i < 4; i++) { g.env.anim = 500; g.last = performance.now() - 33; g.loop(performance.now()); } window.__sync(); if (keep) V.agents = keep; window.__norender = true; });
+  await ev(() => { window.__norender = false; window.__still = true; const g = VR.game; for (let i = 0; i < 4; i++) { g.env.anim = 500; g.last = performance.now() - 33; g.loop(performance.now()); } window.__sync(); window.__still = false; window.__norender = true; });
   await page.screenshot({ path: shotPath(name), timeout: 180000 });
   return fs.existsSync(shotPath(name));
 };
