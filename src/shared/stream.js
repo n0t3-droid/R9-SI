@@ -127,12 +127,15 @@
     clear() { const a = this.items; for (let i = 0; i < a.length; i++) if (a[i].it.abort) a[i].it.abort(); a.length = 0; this.debtMs = 0; }
     // ---- the cost per byte
     _est() { this.msPerByte = this.gpuEst > this.cpuEst ? this.gpuEst : this.cpuEst; }
-    // a CPU-side timing (a run or a step): a solid slower one (≥ 0.5 ms) counts at once, the rest eases in; timings under
-    // the clock's resolution say nothing
+    // a CPU-side timing (a run or a step) of 4 KB or more: a slower one raises the estimate by 30 % of the way, but by at
+    // most 4x a sample (a call the system preempted is not the machine's rate), a faster one lowers it by 20 % — so a
+    // spike is undone by the next ordinary frames instead of capping the budget for good (a timing under the clock's
+    // resolution reads 0: fast)
     _cpu(bytes, ms) {
-      if (!(bytes > 0) || !(ms >= 0) || (ms < 0.25 && bytes < 262144)) return;
-      const per = ms / bytes;
-      this.cpuEst = per > this.cpuEst && ms >= 0.5 ? per : this.cpuEst * 0.8 + per * 0.2;
+      if (!(bytes > 0) || !(ms >= 0) || (bytes < 4096 && ms < 0.1)) return;   // (small and under the clock's resolution: nothing to say)
+      const per = ms / bytes, e = this.cpuEst;
+      this.cpuEst = per > e ? e + ((per < e * 4 ? per : e * 4) - e) * 0.3 : e * 0.8 + per * 0.2;
+      if (this.cpuEst < 1e-8) this.cpuEst = 1e-8;   // (100 GB/s: never a zero cost, never an endless budget)
       this._est();
     }
     // one measurement with gl.finish before and after: the whole path of `bytes` (the JS call, the GPU process, the copy)
