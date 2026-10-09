@@ -313,6 +313,7 @@
       // (at least one a frame); the queued jobs follow the player
       if (this.arrivals && this.arrivals.length) this.integrate(pcx, pcz, lcx, lcz, this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : undefined);
       if (this.streamTakt && VR.UL && this.frame % 15 === 0) this.reprio(pcx, Math.floor(py) >> 4, pcz, lcx, lcz, ux, uz, ahead);
+      if (this.seamPending()) this.seamStep(this.streamTakt && this.streamMs !== undefined ? this.streamMs * 0.5 : undefined);
       // request missing columns (nearest first, bounded) — the scan runs every other frame
       const want = [];
       if (this.frame & 1) for (let dz = -loadR; dz <= loadR; dz++) for (let dx = -loadR; dx <= loadR; dx++) {
@@ -419,9 +420,9 @@
       this.lastCol = null;
       if (m.be) for (const [k2, v] of m.be) c.blockEntities.set(k2, v);
       if (m.chests && m.chests.length) for (const ch of m.chests) c.blockEntities.set(((ch[1] << 8) | ((ch[2] & 15) << 4) | (ch[0] & 15)), { type: 'chest', loot: ch[3] || 'dungeon', items: null });
-      // seam light with ready neighbors
-      this.seamLight(c);
-      this.flushChanged();
+      // seam light with ready neighbors (F9 · in the takt: the seeds now, the spreading a little a frame — seamStep)
+      if (this.streamTakt) this.seamQueue(c);
+      else { this.seamLight(c); this.flushChanged(); }
       for (const s of c.sec) { s.dirty = true; s.ver++; }
       // neighbor border sections need remesh
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
@@ -499,6 +500,84 @@
       this.stats.integrated = (this.stats.integrated || 0) + n; this.stats.arrivals = A.length;
       return n;
     }
+    // F9 · the seam light in the takt. A column's arrival only seeds its seams (the same comparisons as seamLight, the cells
+    // that change pushed on a queue of their own); the spreading — a light-increase walk, whose end is the same whatever
+    // its order — runs a little each frame (seamStep, within the budget, checked every 256 cells). The columns round a
+    // spreading seam wait to be meshed (seamHold), so no section is meshed twice; when the queue is empty the touched
+    // sections are marked and the hold is lifted. A block edit finishes the spreading first (updateLight).
+    seamPending() { return (this.sqT || 0) > (this.sqH || 0); }
+    seamQueue(c) {
+      let q = this.sq || (this.sq = new Int32Array(1 << 15)), qt = this.sqT || 0;
+      if (!this.sqT) this.sqH = 0;
+      const push = (x, y, z) => { if (qt + 3 >= q.length) { q = this.sq = this._grow(q); } q[qt++] = x; q[qt++] = y; q[qt++] = z; };
+      const T = R.T, filter = T.filter;
+      const x0 = c.cx * 16, z0 = c.cz * 16;
+      const dirs = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+      for (let d = 0; d < 4; d++) {
+        const n = this.col(c.cx + dirs[d][0], c.cz + dirs[d][1]);
+        if (!n) continue;
+        for (let k = 0; k < 16; k++) {
+          let ax, az, bx, bz;
+          if (d === 0) { ax = x0 + k; az = z0; bx = ax; bz = z0 - 1; }
+          else if (d === 1) { ax = x0 + 15; az = z0 + k; bx = x0 + 16; bz = az; }
+          else if (d === 2) { ax = x0 + k; az = z0 + 15; bx = ax; bz = z0 + 16; }
+          else { ax = x0; az = z0 + k; bx = x0 - 1; bz = az; }
+          const ai0 = ((az & 15) << 4) | (ax & 15), bi0 = ((bz & 15) << 4) | (bx & 15);
+          const yTop = Math.min(c.H, n.H);
+          for (let y = 0; y < yTop; y++) {
+            const ai = (y << 8) | ai0, bi = (y << 8) | bi0;
+            const la = c.light[ai], lb = n.light[bi];
+            if (la === lb) continue;
+            if (this._spread(la, n, bi, filter[n.blocks[bi]], false)) { push(bx, y, bz); this._touch(n, bx, y, bz); }
+            if (this._spread(n.light[bi], c, ai, filter[c.blocks[ai]], false)) push(ax, y, az);
+          }
+        }
+      }
+      this.sqT = qt;
+      // the columns round it wait for the spreading (nothing touched is meshed twice) — from their first hold at most
+      // SEAM_HOLD frames: in a burst the queue may not empty for a while, then they are meshed anyway (seamHeld)
+      const hold = this.seamHold || (this.seamHold = new Map());
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const k = ckey(c.cx + dx, c.cz + dz); if (!hold.has(k)) hold.set(k, this.frame); }
+      if (!this.seamPending()) this.seamDone();
+    }
+    get SEAM_HOLD() { return 8; }
+    seamHeld(key) { const h = this.seamHold; if (!h || !h.size) return false; const f = h.get(key); return f !== undefined && this.frame - f < this.SEAM_HOLD; }
+    // the spreading, until the budget (ms) is spent (undefined: to the end); the same walk as _propagate
+    seamStep(budgetMs) {
+      let q = this.sq, qh = this.sqH || 0, qt = this.sqT || 0;
+      if (!q || qh >= qt) return 0;
+      const T = R.T, filter = T.filter, t0 = performance.now();
+      const DX = [1, -1, 0, 0, 0, 0], DY = [0, 0, 1, -1, 0, 0], DZ = [0, 0, 0, 0, 1, -1];
+      let n = 0;
+      while (qh < qt) {
+        if ((++n & 255) === 0 && budgetMs !== undefined && performance.now() - t0 >= budgetMs) break;
+        const x = q[qh], y = q[qh + 1], z = q[qh + 2]; qh += 3;
+        const c = this.col(x >> 4, z >> 4); if (!c) continue;
+        const l = y >= c.H ? 0xf000 : c.light[(y << 8) | ((z & 15) << 4) | (x & 15)];
+        if (l === 0) continue;
+        for (let d = 0; d < 6; d++) {
+          const nx = x + DX[d], ny = y + DY[d], nz = z + DZ[d];
+          if (ny < 0 || ny >= VR.MAXY) continue;
+          const nb = this.col(nx >> 4, nz >> 4); if (!nb) continue;
+          if (ny >= nb.H) {
+            if (!(l & 0x0fff) || (((l >> 8) & 15) <= 1 && ((l >> 4) & 15) <= 1 && (l & 15) <= 1)) continue;
+            if (!this.growColumn(nb, ny)) continue;
+          }
+          const ni = (ny << 8) | ((nz & 15) << 4) | (nx & 15);
+          if (this._spread(l, nb, ni, filter[nb.blocks[ni]], d === 3)) {
+            this._touch(nb, nx, ny, nz);
+            if (qt + 3 >= q.length) { q = this.sq = this._grow(q); }
+            q[qt++] = nx; q[qt++] = ny; q[qt++] = nz;
+          }
+        }
+        if (qh > 1 << 20 && qh > qt / 2) { q.copyWithin(0, qh, qt); qt -= qh; qh = 0; }
+      }
+      this.sqH = qh; this.sqT = qt;
+      if (qh >= qt) this.seamDone();
+      return n;
+    }
+    seamDone() { this.sqH = 0; this.sqT = 0; this.flushChanged(); if (this.seamHold) this.seamHold.clear(); }
+
     // the queued generations and meshes get their places again from where the player is now
     reprio(pcx, pcy, pcz, lcx, lcz, ux, uz, ahead) {
       const q = this.pool && this.pool.queue; if (!q || !q.length) return;
@@ -577,10 +656,12 @@
       const best = this._best || (this._best = []);
       best.length = 0;
       let worst = Infinity;
+      const hold = this.seamHold && this.seamHold.size;   // (F9: round a spreading seam the columns wait a few frames)
       for (const c of this.cols.values()) {
         const dx = c.cx - pcx, dz = c.cz - pcz, ex = c.cx - lcx, ez = c.cz - lcz;
         const d2 = Math.min(dx * dx + dz * dz, ex * ex + ez * ez);
         if (d2 > r2) continue;
+        if (hold && this.seamHeld(c.key)) continue;
         if (best.length === budget && d2 >= worst) continue;   // nothing in this column can beat the list
         let anyDirty = false;
         for (let sy = 0; sy < c.sec.length; sy++) { const s = c.sec[sy]; if (s.dirty && !s.pending) { anyDirty = true; break; } }
@@ -940,6 +1021,7 @@
     }
     // Light update after block change at (x,y,z)
     updateLight(x, y, z, oldS, newS) {
+      if (this.seamPending()) this.seamStep(undefined);   // (F9: seams still spreading are finished first: the edit works on settled light)
       const T = R.T, filter = T.filter, emit = T.emit;
       const c = this.col(x >> 4, z >> 4); if (!c) return;
       const i = (y << 8) | ((z & 15) << 4) | (x & 15);

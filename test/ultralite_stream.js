@@ -118,6 +118,47 @@ console.log('e · the queue follows the player');
   check(cancelled.includes(-7) && cancelled.includes(-4) && !cancelled.some(cx => cx >= 2), 'the ones left behind near the edge answer "cancel" when their turn comes, none ahead', cancelled.join(' '));
 }
 
+console.log('g · the seam light in the takt: the same light, spread over frames');
+{
+  // nine real town columns (Nova Haven, seed 4242): integrated once as before (the seam light at once) and once in the
+  // takt (the seeds at the arrival, the spreading a little a frame), the same order; the light must be identical
+  const gen = V.makeGen('overworld', 4242, { vgen: 8 });
+  const cols = [];
+  for (let cz = -7; cz <= -5; cz++) for (let cx = -1; cx <= 1; cx++) { const c = gen.generate(cx, cz); cols.push({ cx, cz, c, light: V.computeColumnLight(c.blocks, true) }); }
+  const msgOf = (o) => ({ type: 'gen', cx: o.cx, cz: o.cz, blocks: o.c.blocks.slice(), light: o.light.slice(), biome: o.c.biome, caveBiome: o.c.caveBiome, grass: o.c.tints.grass, foliage: o.c.tints.foliage, water: o.c.tints.water });
+  const order = cols.slice().sort((a, b) => Math.hypot(a.cx, a.cz + 6) - Math.hypot(b.cx, b.cz + 6));
+  const { w: w0 } = makeWorld(false), { w: w1 } = makeWorld(true);
+  for (const o of order) w0.onColumn(msgOf(o));
+  let frames = 0, maxStep = 0, held = 0; const steps = [];
+  for (const o of order) {
+    w1.onColumn(msgOf(o));
+    // a frame or two between arrivals, each spreading for at most 0.3 ms
+    for (let k = 0; k < 2; k++) { const t = process.hrtime.bigint(); w1.seamStep(0.3); const ms = Number(process.hrtime.bigint() - t) / 1e6; steps.push(ms); maxStep = Math.max(maxStep, ms); frames++; if (w1.seamHold && w1.seamHold.size) held++; }
+  }
+  let rest = 0; while (w1.seamPending() && rest < 10000) { w1.seamStep(0.3); rest++; }
+  let diff = 0, cells = 0;
+  for (const o of order) { const a = w0.cols.get(V.ckey(o.cx, o.cz)).light, b = w1.cols.get(V.ckey(o.cx, o.cz)).light; for (let i = 0; i < a.length; i++) { cells++; if (a[i] !== b[i]) diff++; } }
+  check(diff === 0, 'the light of nine town columns is identical cell for cell (seams spread over frames vs at once)', `${cells} cells, ${diff} differ; ${frames + rest} frames of spreading`);
+  check(held > 0 && !w1.seamPending() && (!w1.seamHold || !w1.seamHold.size), 'while a seam spreads, the columns round it wait to be meshed; when it is done they may');
+  steps.sort((a, b) => a - b);
+  check(steps[steps.length >> 1] < 1.5, 'a frame\'s share of the spreading stays small (the median step; this shared machine adds GC and scheduling pauses)', `median ${steps[steps.length >> 1].toFixed(2)} ms, at most ${maxStep.toFixed(2)} ms (budget 0.3 ms, checked every 256 cells)`);
+  // a player's block edit first finishes any seam still spreading (the edit's light update then works on settled light)
+  const { w: w2 } = makeWorld(true);
+  for (const o of order) w2.onColumn(msgOf(o));
+  const pend = w2.seamPending();
+  w2.setBlock(8, 120, -88, V.R.byName.stone.defaultState);
+  check(pend && !w2.seamPending(), 'a block set while seams are spreading finishes them first');
+  // the wait is bounded: in a burst of arrivals the queue may not empty for a while — a column waits at most
+  // SEAM_HOLD frames from its first hold, then it is meshed anyway (a later light change remeshes it, as a neighbour does)
+  const { w: w3 } = makeWorld(true);
+  for (const o of order) w3.onColumn(msgOf(o));
+  const k0 = V.ckey(order[0].cx, order[0].cz), f0 = w3.frame;
+  const heldNow = w3.seamPending() && w3.seamHeld(k0);
+  w3.frame = f0 + w3.SEAM_HOLD - 1; const heldLate = w3.seamHeld(k0);
+  w3.frame = f0 + w3.SEAM_HOLD; const heldOver = w3.seamHeld(k0);
+  check(heldNow && heldLate && !heldOver && w3.seamPending(), 'a column waits for a spreading seam at most SEAM_HOLD frames, even while the spreading goes on', `SEAM_HOLD ${w3.SEAM_HOLD}`);
+}
+
 console.log('f · off: as before');
 {
   const { w, pool } = makeWorld(false);
