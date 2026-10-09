@@ -114,6 +114,30 @@ console.log('2 · every street of Nova Haven ends at a street, the plaza or a tu
   }
   // the plan stays the plan: villas on the lots (as many as vgen 8 within two), every road lined with its kerb line
   check(Math.abs(P9.homes.length - P8.homes.length) <= 2 && P9.homes.length >= 9, `vgen 9 keeps the villas (${P9.homes.length}, vgen 8 ${P8.homes.length})`);
+  // no street climbs onto a bank: the terraces (gen_hills.js T8) cut the lawn round Palm Row's ends down to their base
+  // (82), so vgen 8's last climb to 84 left the road's end on a bank two blocks over the lawn (the audit's street_2: a
+  // wall of dirt and kerb) — a bank step is a paving or kerb cell beside a lawn cell two or more blocks lower
+  {
+    const ROADTOP = /^(vx_floor_plaza|vx_floor_plaza_line|vx_floor_plaza_line_amber|vollton_light_grey)$/, LAWN = /^(grass_block|moss_block|dirt|podzol)$/;
+    const topOf = (W, x, z) => { for (let y = 96; y > 70; y--) { const n = nameOf(W.at(x, y, z)); if (ROADTOP.test(n) || LAWN.test(n)) return [y, n]; } return [70, 'none']; };
+    const banks = (W, P) => {
+      const rd = P.nova.roads.find(r => r.name === 'palmrow'), out = [], tread = V.HillsGen.T8.levels[1];
+      for (const p of [rd.pts[0], rd.pts[rd.pts.length - 1]]) {
+        let n = 0; const memo = new Map(), tp = (x, z) => { const k = x + ',' + z; let v = memo.get(k); if (!v) memo.set(k, v = topOf(W, x, z)); return v; };
+        for (let z = Math.floor(p[1]) - 14; z <= Math.floor(p[1]) + 14; z++) for (let x = Math.floor(p[0]) - 14; x <= Math.floor(p[0]) + 14; x++) {
+          // (the paving and the kerbs under the terraces' first tread — their lit edges up there are the risers', by design)
+          const [a, an] = tp(x, z); if (!ROADTOP.test(an) || a >= tread) continue;
+          for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const [b, bn] = tp(x + dx, z + dz); if (LAWN.test(bn) && a - b >= 2) n++; }
+        }
+        out.push(n);
+      }
+      return out;
+    };
+    const b8 = banks(W8, P8), b9 = banks(W9, P9);
+    let top9 = 0; for (const rd of P9.nova.roads) for (let k = 0; k < rd.pts.length; k += 2) { const [y, n] = topOf(W9, Math.floor(rd.pts[k][0]), Math.floor(rd.pts[k][1])); if (ROADTOP.test(n)) top9 = Math.max(top9, y); }
+    check(b8[0] + b8[1] >= 10 && b9[0] + b9[1] === 0, `vgen 9: Palm Row's ends lie level with the lawn — ${b9[0]} + ${b9[1]} bank steps at its two ends (vgen 8: ${b8[0]} + ${b8[1]})`);
+    check(top9 <= V.HillsGen.T8.base, `vgen 9: no street climbs above the terraces' base (${top9}, the base ${V.HillsGen.T8.base})`);
+  }
 }
 
 // ---------------------------------------------------------------- 3 · no blank wall on any side of a villa
