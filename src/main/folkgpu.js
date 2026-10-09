@@ -1,9 +1,9 @@
 // ============================================================================
 // FolkGPU (t-folk, the owner: „natürlich keine Lego-Villagers, wir wollen schon Realismus") — the villagers drawn smooth.
-// A villager's rig (folkmodel.js buildPerson: real proportions at 32 voxels a block) goes to a worker as its parts' grids,
-// cut to what they hold; the worker makes every part a surface-nets mesh (folksmooth.js, kept in its LRU by the grid's
-// hash: the villagers share sleeves, trousers and shoes) and hands back ONE buffer for the whole person, each vertex
-// naming its part. The game draws it with one draw a person (shaders.js VOX_VS with BONES: the rig's matrices as an
+// A villager's look goes to a worker, which builds its rig (folkmodel.js buildPerson: real proportions at 32 voxels a
+// block — the rig's files are in the worker's bundle), cuts every part's grid to what it holds, makes it a surface-nets
+// mesh (folksmooth.js, kept in its LRU by the grid's hash: the villagers share sleeves, trousers and shoes) and hands back
+// ONE buffer for the whole person, each vertex naming its part, with the rig's joints. The game draws it with one draw a person (shaders.js VOX_VS with BONES: the rig's matrices as an
 // array), the same light as the voxel people (the vox program's shading, the CPU's terrain shade, the block light).
 // Until its mesh is there a villager shows its voxel self; beyond NEAR blocks it is the half-resolution voxel LOD as
 // before. The switch: Echte Menschen (settings.smoothFolk; off on Very Low and Low — game.js PRESETS — where nothing
@@ -17,8 +17,8 @@
   const FG = VR.FolkGPU = {
     NEAR: 24,            // smooth within this many blocks (the voxel LOD beyond, as villages.js draws it)
     ASK: 30,             // a mesh is asked for from this distance (ready before the person reaches NEAR)
-    PER_FRAME: 2,        // new requests a frame (each builds the rig's grids on the main thread: ~1–3 ms)
-    INFLIGHT: 6,         // requests in the worker queue at most
+    PER_FRAME: 4,        // new requests a frame (a request is a look posted: the worker builds and meshes)
+    INFLIGHT: 8,         // requests in the worker queue at most
     MAX_BYTES: 32 << 20, // the GPU meshes kept (a person ~ 0.1–0.2 MB)
     KEEP_MS: 4000,       // a mesh drawn within this time is never evicted
     recs: new Map(), bytes: 0, inflight: 0, asked: 0, frame: -1,
@@ -44,36 +44,22 @@
     if (!rec || rec.state !== 0 || rec.fails >= 3) return false;
     if (FG.frame !== g.frame) { FG.frame = g.frame; FG.asked = 0; }
     if (FG.asked >= FG.PER_FRAME || FG.inflight >= FG.INFLIGHT || d2 > FG.ASK * FG.ASK) return false;
+    if (rec.look && rec.look.role === 'hero') { rec.state = 3; rec.fails = 3; return false; }   // (the trailer heroes keep their own build)
     FG.asked++;
-    const t0 = performance.now(), FS = VR.FolkSmooth;
-    let def;
-    try { def = VR.Folk.buildHiRes(rec.look); } catch (e) { rec.fails = 3; rec.state = 3; return false; }
-    if (!def || !def.person) { rec.state = 3; rec.fails = 3; return false; }   // (the trailer heroes keep their own build)
-    const parts = [], tr = [], seen = new Map();
-    def.order.forEach((name, bone) => {
-      const pr = def.parts[name]; if (!pr) return;
-      const g0 = pr.grid || pr;
-      let key = seen.get(g0);
-      if (key === undefined) {
-        const c = FS.crop(g0);
-        if (!c) { seen.set(g0, null); return; }
-        key = FS.keyOf(c); seen.set(g0, key);
-        parts.push({ key, bone, sx: c.sx, sy: c.sy, sz: c.sz, ox: c.ox, oy: c.oy, oz: c.oz, c: c.c }); tr.push(c.c.buffer);
-      } else if (key !== null) parts.push({ key, bone });
-    });
-    // (what the draw needs of the rig; the grids are dropped)
-    rec.def = { unit: def.unit, layout: def.layout, rig: def.rig, order: def.order, kid: def.kid, h: def.h };
-    rec.state = 1; FG.inflight++; FG.stats.asked++; FG.stats.buildMs += performance.now() - t0;
-    const prio = 8 + d2 / 256;
-    g.world.pool.submit({ type: 'folkmesh', parts }, tr, (m) => FG.got(g, rec, m), prio);
+    // the worker builds the rig from the look, cuts and meshes its parts (folksmooth.js FS.personFromLook): the main
+    // thread only posts the look (building the grids here cost some 6 ms a person, cutting and hashing them as much)
+    rec.state = 1; FG.inflight++; FG.stats.asked++;
+    g.world.pool.submit({ type: 'folkmesh', look: rec.look }, null, (m) => FG.got(g, rec, m), 8 + d2 / 256);
     return true;
   };
   FG.got = function (g, rec, m) {
     FG.inflight = Math.max(0, FG.inflight - 1);
-    if (!m || m.type !== 'folkmesh' || !m.data || !m.idx) { rec.fails++; rec.state = rec.fails >= 3 ? 3 : 0; FG.stats.failed++; return; }
+    if (!m || m.type !== 'folkmesh' || !m.data || !m.idx || !m.rig) { rec.fails++; rec.state = rec.fails >= 3 ? 3 : 0; FG.stats.failed++; return; }
     const r = g && g.renderer, gl = r && r.gl;
     if (!gl) { rec.state = 0; return; }
+    rec.def = m.rig;   // (what the draw needs of the rig: its units, layout, joints and order)
     FG.upload(gl, rec, m);
+    FG.stats.buildMs += m.buildMs || 0;
     FG.stats.got++; FG.stats.workerMs += m.ms || 0; FG.stats.hits += m.hits | 0; FG.stats.miss += m.miss | 0; FG.stats.lru = Math.max(FG.stats.lru || 0, m.cacheBytes || 0);
   };
   FG.upload = function (gl, rec, m) {

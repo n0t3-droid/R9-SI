@@ -149,6 +149,31 @@
     return { data, idx, nv, nt: ni / 3, hits, miss, ms, total: t1 - t0, cacheBytes: cache ? cache.bytes : 0, transfer: [data.buffer, idx.buffer] };
   };
 
+  // ---------------------------------------------------------------- a person from its look, all in the worker
+  // The rig's grids are built where they are meshed (the worker has folkmodel.js: build.js) — building them on the main
+  // thread cost some 6 ms a person and cutting and hashing them as much again. → FS.person's answer and the rig's draw
+  // record { unit, layout, rig, order, kid, h } (rig), or { error }
+  FS.personFromLook = function (look, opts) {
+    const Folk = VR.Folk; if (!Folk || !Folk.buildHiRes) return { error: 'no folk rig', transfer: [] };
+    const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    let def; try { def = Folk.buildHiRes(look); } catch (e) { return { error: 'rig: ' + (e && e.message), transfer: [] }; }
+    if (!def || !def.person) return { error: 'not a person', transfer: [] };
+    const parts = [], seen = new Map();
+    def.order.forEach((name, bone) => {
+      const pr = def.parts[name]; if (!pr) return;
+      const g0 = pr.grid || pr;
+      let key = seen.get(g0);
+      if (key === undefined) { const c = FS.crop(g0); if (!c) { seen.set(g0, null); return; } key = FS.keyOf(c); seen.set(g0, key); parts.push(Object.assign({ key, bone }, c)); }
+      else if (key !== null) parts.push({ key, bone });
+    });
+    const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    const r = FS.person({ parts, opts });
+    if (r.error) return r;
+    r.rig = { unit: def.unit, layout: def.layout, rig: def.rig, order: def.order, kid: def.kid, h: def.h };
+    r.buildMs = t1 - t0;
+    return r;
+  };
+
   // ---------------------------------------------------------------- the worker's job: several parts, one LRU
   // m.parts: [{ key, sx, sy, sz, ox, oy, oz, c }] → { parts: [{ key, data, idx, nv, nt, ms, hit }], hits, miss, ms, transfer }
   FS.cache = null; FS.stats = { hits: 0, miss: 0, ms: 0 };

@@ -133,6 +133,11 @@ function closed(mesh) {
   for (const i of P.idx) if (i >= P.nv) inRange = false;
   check(!P.error && bonesOk && inRange && used.size >= def.order.length - 2, `a person in one buffer: ${P.nv} vertices, ${P.nt} triangles, ${used.size} parts named (of ${def.order.length}), indices in range, ${P.ms.toFixed(0)} ms meshing`);
   check(used.has(def.order.indexOf('arm_l')) && used.has(def.order.indexOf('arm_r')), 'the left and the right arm: one mesh, two parts');
+  // the worker's way (folksmooth.js FS.personFromLook): the look in, the rig built, cut, meshed and merged there, the
+  // rig's joints back for the draw — the same buffer as the parts sent from outside
+  const Q = FS.personFromLook(L);
+  check(!Q.error && Q.nv === P.nv && Q.nt === P.nt && Q.rig && Q.rig.order.length === def.order.length && JSON.stringify(Q.rig.layout) === JSON.stringify(def.layout), `a person from its look alone: ${Q.nv} vertices, the rig's joints back (built in ${(Q.buildMs || 0).toFixed(1)} ms)`);
+  check(FS.personFromLook(Folk.heroLook({ suit: 0 })).error === 'not a person', 'the trailer heroes keep their own build (no smooth mesh)');
 }
 {
   // 40 villagers of a village (the trades, the children, the elders as villages.js deals them) and 40 of the hall city:

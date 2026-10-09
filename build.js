@@ -27,7 +27,10 @@ const UI_SHARED = ['uiprefs', 'hints', 'ding', 'tiles', 'isopic', 'wizkinds', 'w
 const exists = (p) => fs.existsSync(path.join(ROOT, p));
 const js = (dir, list) => list.filter(f => exists(`src/${dir}/${f}.js`)).map(f => `/* ${dir}/${f}.js */\n` + read(`src/${dir}/${f}.js`)).join('\n');
 const shared = js('shared', SHARED);
-const workerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js');
+// (t-folk: the villagers' rig — voxmodels' grid, the looks, folkmodel.js — in the worker too: it builds and meshes the
+// smooth people, folksmooth.js FS.personFromLook)
+const WORKER_MAIN = ['voxmodels', 'villagers', 'folkmodel'];
+const workerSrc = shared + '\n' + js('main', TEX) + '\n' + js('main', WORKER_MAIN) + '\n' + read('src/worker/worker_main.js');
 // the texture cache's key (tex_cache.js): a hash of the worker's bundle (the shared code the block registry and the
 // recipes come from, the recipes, the forge) and of the cache itself. Any change there forges the textures again, once;
 // a change on the main thread alone (the UI, the game's own logic) keeps the cached textures.
