@@ -516,11 +516,11 @@
     T.kind = kind; T.autoStates = Int32Array.from(mine);
     PT = T; applyReady();
   };
-  function applyReady() {
+  function applyReady(held) {   // (held: the pass held back — every piece its voxels)
     if (!PT || !PT.autoStates || !AT) return;
-    const bits = SV.ready.bits, G = PT.group, S = PT.autoStates;
+    const bits = held ? null : SV.ready.bits, G = PT.group, S = PT.autoStates;
     for (let k = 0; k < S.length; k++) { const st = S[k]; G[st] = allReady(bits, AT.idx[st]) ? GFURN : 0; }
-    applied = SV.ready.ver;
+    applied = held ? -1 : SV.ready.ver;
   }
   // worker_main.js 'mesh', before the mesher: the job's ready bits, then the pieces in the section's own 16³ that are not
   // ready yet (the main thread asks for their meshes) — only for a job that draws the furniture smooth (never Very Low)
@@ -529,6 +529,7 @@
     if (!SV.enabled || !((job.smoothProps | 0) & 2)) return null;
     const A = SV.autoTables(); if (!A) return null;
     const r = job.svReady;
+    if (r && r.ver < 0) { if (PT && applied !== -1) applyReady(true); return null; }   // (held back: the voxels, no wants)
     if (r && r.bits && r.ver !== SV.ready.ver) SV.ready = { ver: r.ver, bits: r.bits };
     if (PT && applied !== SV.ready.ver) applyReady();
     if (job.vxDetail === false || !job.blocks) return null;
@@ -589,11 +590,12 @@
   const MAIN = SV.main = { asked: new Set(), waiting: new Map(), ver: {}, world: null, stats: { asked: 0, got: 0, ms: 0, bytes: 0, redo: 0 } };
   SV.verOf = (name) => MAIN.ver[name] | 0;
   const bitsFor = (n) => new Uint8Array((n + 7) >> 3);
+  const HELD = { ver: -1, bits: null };   // the pass held back (SV.enabled false): the workers hear „nothing is ready"
   SV.tagJob = function (job) {
-    if (!SV.enabled || !((job.smoothProps | 0) & 2)) return;
+    if (!((job.smoothProps | 0) & 2)) return;
     const A = SV.autoTables(); if (!A) return;
     if (!SV.ready.bits) { SV.ready.bits = bitsFor(A.n); SV.ready.ver = 1; }
-    job.svReady = SV.ready;   // (cloned when the pool posts the job: the bits of that moment)
+    job.svReady = SV.enabled ? SV.ready : HELD;   // (cloned when the pool posts the job: the bits of that moment)
   };
   SV.want = function (list, world, c, sy) {
     if (!list || !list.length || !SV.enabled || !world) return;

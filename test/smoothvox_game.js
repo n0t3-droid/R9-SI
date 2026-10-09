@@ -46,9 +46,11 @@ function section() {
   return { blocks, light, grass: new Uint16Array(PSS), foliage: new Uint16Array(PSS), water: new Uint16Array(PSS), sy: 4, ox: 32, oz: 48, smooth: true, fancyLeaves: true, vxLod: true, vxDetail: true, smoothProps: 2 };
 }
 const hashOf = (r) => { const h = crypto.createHash('sha1'); for (const k of ['opaque', 'cutout', 'trans', 'vx', 'vxFar', 'props']) { const a = r[k]; h.update(k + (a ? a.length : -1)); if (a) h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); } return h.digest('hex').slice(0, 16); };
-// the same section meshed in a node without smoothvox.js (the reference: the mesher as it was)
+// the same section meshed in a node without smoothvox.js (the reference: the mesher as it was) — the loader this test
+// loaded (test/wt_run.sh runs a copy of the test from .tmp_tests, so not __dirname's)
+const LOADER = Object.keys(require.cache).find(k => /[\\/]load_shared\.js$/.test(k)) || require('path').join(__dirname, 'load_shared.js');
 function reference(smoothProps) {
-  const src = `require(${JSON.stringify(__dirname + '/load_shared.js')}); const S = VR.MESH_PS || 20, PSS = S * S, P = VR.MESH_PAD || 2;` +
+  const src = `require(${JSON.stringify(LOADER)}); const S = VR.MESH_PS || 20, PSS = S * S, P = VR.MESH_PAD || 2;` +
     `const job = JSON.parse(process.argv[1]); for (const k of ['blocks', 'light']) job[k] = Uint16Array.from(job[k]); for (const k of ['grass', 'foliage', 'water']) job[k] = new Uint16Array(PSS);` +
     `const r = VR.meshSection(job); const h = require('crypto').createHash('sha1'); for (const k of ['opaque', 'cutout', 'trans', 'vx', 'vxFar', 'props']) { const a = r[k]; h.update(k + (a ? a.length : -1)); if (a) h.update(Buffer.from(a.buffer, a.byteOffset, a.byteLength)); } console.log(h.digest('hex').slice(0, 16));`;
   const j = section(); j.smoothProps = smoothProps;
@@ -115,6 +117,14 @@ if (side) {
 }
 // the lamp's two looks: the dark one has no glowing vertex
 if (lit && dark) { const glow = (k) => { const m = PR.furnModel(PR.furnKey(k, 0)).near; let n = 0; for (let i = 0; i < m.nv; i++) if (m.verts[i * 14 + 11] === SV.MAT.light) n++; return n; }; check(glow(lit.kind) > 0 && glow(dark.kind) === 0, `the lit lamp glows (${glow(lit.kind)} vertices), the dark one does not (${glow(dark.kind)})`); }
+
+// the pass held back (SV.enabled false: test/smoothvox.mjs' „before" pictures): the job says „nothing is ready" — the
+// pieces that were smooth are voxels again, nothing is wanted; with the pass back they are smooth again
+SV.enabled = false; const jh = section(); SV.tagJob(jh); SV.enabled = true;   // (the main thread holds it back; the worker's own flag stays on)
+const jhc = structuredClone(jh), wh = SV.prep(jhc), rh0 = VR.meshSection(jhc);
+check(jh.svReady && jh.svReady.ver < 0 && wh === null && !kindsIn(rh0.props).some(a => a.kind >= SV.AUTO0) && rh0.vx.length === r0.vx.length, `held back: no smooth anchor, no want, the voxels as before the meshes came (${rh0.vx.length / 8} vertices)`);
+const jb = section(); SV.tagJob(jb); const jbc = structuredClone(jb); SV.prep(jbc); const rb = VR.meshSection(jbc);
+check(kindsIn(rb.props).filter(a => a.kind >= SV.AUTO0).length === 3 && rb.vx.length === r1.vx.length, 'the pass back: the three pieces smooth again');
 
 // ---------------------------------------------------------------- 5. Very Low
 console.log('5. Very Low (no smooth furniture)');
