@@ -331,7 +331,8 @@
       }
     }
     // ---- sky islands (terrain) ----
-    const ISL = g._islStates || (g._islStates = { tuff: st('tuff') || S.stone, andesite: st('andesite') || S.stone, granite: st('granite') || S.stone });
+    const ISL = g._islStates || (g._islStates = { tuff: st('tuff') || S.stone, andesite: st('andesite') || S.stone, granite: st('granite') || S.stone,
+      moss: st('moss_block') || S.dirt, strata: [S.ochre, S.umber, S.terraOrange, S.ochre, S.terraBrown, S.umber, S.terraRed].map(s => s || S.dirt) });
     const isl = new Array(256);
     for (let col = 0; col < 256; col++) {
       const x = x0 + (col & 15), z = z0 + (col >> 4);
@@ -351,6 +352,12 @@
           const depth = I.top - y, band = (y + ((I.isle ? I.isle.seed : 0) & 7)) % 9;
           if (prism) s = Math.abs(v) < 0.05 ? S.aetherStone : S.duskrock;
           else if (ember) s = band < 3 ? S.ochre : S.umber;
+          else if (g.vgen >= 9 && !(I.isle && I.isle.designed) && depth > 4 && (depth <= 4 + 6 + ((I.isle ? I.isle.seed : 0) % 5) || y - I.bottom <= 2)) {
+            // vgen 9 (t-beauty): the trailer's islands (TRAILER.md §3.6, t1_07 · t1_09): under four of soil, six to ten
+            // bands of warm strata (ochre, umber, terracotta), and at the dangling tips moss among the dark tuff — seen
+            // from a ridge, vgen 8's islands hung as grey cones of stone over the horizon (beauty_audit run 2, far_2)
+            s = y - I.bottom <= 2 && depth > 10 ? (rng.chance(0.55) ? ISL.moss : ISL.tuff) : ISL.strata[(y + ((I.isle ? I.isle.seed : 0) & 7)) % ISL.strata.length];
+          }
           else if (depth <= 6) s = band < 2 ? S.coarse || S.dirt : S.dirt;
           else if (y - I.bottom <= 3) s = ISL.tuff;
           else s = Math.abs(v) < 0.05 ? ISL.andesite : band === 0 ? ISL.granite : band === 4 ? ISL.andesite : S.stone;
@@ -383,23 +390,57 @@
           const fluid = I.lava ? S.lava : cl.ember > 0.45 ? S.lava : cl.prism > 0.35 ? S.aether : S.water;
           const typ = R.types[R.T.type[fluid]];
           const out1 = [Math.round(Math.cos(a)), Math.round(Math.sin(a))];
+          // vgen 9: the fall's lead cell — the first of its 2 × 2 cells off the island (the cells over the rim column keep
+          // the pool's lip; the curtain proper is the cells outside) — lists the mist spawn of the whole fall
+          let lead = -1;
+          if (g.vgen >= 9) for (let k = 0; k < 4 && lead < 0; k++) {
+            const J = g.islandAt(fx + out1[0] + (k & 1) - (out1[0] > 0 ? 1 : 0), fz + out1[1] + (k >> 1) - (out1[1] > 0 ? 1 : 0));
+            if (!(J && J.isle === I)) lead = k;
+          }
           for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
             // spring pool on the rim, falling curtain just outside it
             const sx = fx + ox - (out1[0] > 0 ? 1 : 0), sz = fz + oz - (out1[1] > 0 ? 1 : 0);
             const lx = sx - x0, lz = sz - z0;
             if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) {
               const J = g.islandAt(sx, sz);
-              if (J && J.isle === I) { blocks[((J.top) << 8) | (lz << 4) | lx] = fluid; }
+              if (J && J.isle === I) {
+                const pi = ((J.top) << 8) | (lz << 4) | lx;
+                blocks[pi] = fluid;
+                // vgen 9 (t-beauty): the grass and flowers the top grew there go with the soil — vgen 8 left them
+                // standing on the pool's water (the audit's lake scan: nothing hovers)
+                if (g.vgen >= 9) {
+                  const PL = g._poolPlants || (g._poolPlants = new Set(['short_grass', 'tall_grass', 'fern', 'poppy', 'dandelion', 'cornflower', 'allium', 'azure_bluet'].map(n => R.byName[n] && R.byName[n].id).filter(v => v !== undefined)));
+                  for (let k = pi + 256; k < pi + 768 && k < blocks.length && blocks[k] && PL.has(R.T.type[blocks[k]]); k += 256) blocks[k] = 0;
+                }
+              }
             }
             const cx2 = fx + out1[0] + ox - (out1[0] > 0 ? 1 : 0), cz2 = fz + out1[1] + oz - (out1[1] > 0 ? 1 : 0);
             const qx = cx2 - x0, qz = cz2 - z0;
             if (qx < 0 || qx >= 16 || qz < 0 || qz >= 16) continue;
             const col = (qz << 4) | qx;
-            for (let y = ft.top; y > 2; y--) {
+            // vgen 9 (t-beauty): the fall pours off the rim and dissolves into mist (the trailer's t1_07 · t1_09; TRAILER.md
+            // §3.6) — its curtain ends 18 … 29 below the rim, each cell 0, 2, 4 or 6 further (its own step: a ragged
+            // end), and the chunk of the lead cell lists a mist spawn at its foot (vents.js puffs the spray there); vgen
+            // 8's ran 90 … 100 blocks to the ground as straight blue poles (beauty_audit run 2: water_1, water_r1,
+            // far_3). A short drop still lands.
+            let yEnd = 2, foot = 0;
+            if (g.vgen >= 9) {
+              const fs = ((I.seed | 0) * 31 + f * 17) >>> 0, base = 18 + fs % 12;
+              foot = ft.top - base;
+              yEnd = Math.max(2, foot - ((ox + oz * 2 + (fs >>> 4)) & 3) * 2);
+            }
+            let y = ft.top;
+            for (; y > yEnd; y--) {
               const i = (y << 8) | col, b = blocks[i];
               if (b && (R.T.flags[b] & F.SOLID)) break;
               if (b && (R.T.flags[b] & F.FLUID) && y < ft.bottom) break;
               blocks[i] = typ.state({ level: 8 });
+            }
+            // (one spawn a fall, by its lead cell, when its curtain ended in the air: the mist round the foot, at the
+            //  middle of the 2 × 2 cells)
+            if (g.vgen >= 9 && ox + oz * 2 === lead && y === yEnd && !blocks[(yEnd << 8) | col]) {
+              if (!out.spawns) out.spawns = [];
+              out.spawns.push(['mist', fx + out1[0] - (out1[0] > 0 ? 1 : 0) + 1, foot - 3, fz + out1[1] - (out1[1] > 0 ? 1 : 0) + 1, fluid === S.lava ? 1 : 0]);
             }
           }
         }

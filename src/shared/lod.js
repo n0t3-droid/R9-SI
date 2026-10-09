@@ -262,6 +262,14 @@
   };
   const STATE_TINT = [0, 0x7fbf55, 0x5fa83a, 0x3f76e4, 0x80a755, 0x619961, 0xb38a55, 0x6fae3a];   // (grass, foliage, water as the plains; birch, spruce, dry as the mesher's fixed ones)
   LOD.util = { bcol, scol, tint, mixc, hh, leafCol, TREES, TRUNKS };
+  // the side colour of a floating island seen from afar (ring 1's forms, ring 2's tiles): ember and prism rock as they
+  // are; vgen 9 (t-beauty) the warm strata of its upper sides over a little of the rock below (gen_realm.js lays ochre,
+  // umber and terracotta under the soil and moss at the tips), vgen 8 grey stone
+  LOD.isleSide = function (g, P, cl) {
+    if (cl.ember > 0.45) return P.ochre;
+    if (cl.prism > 0.45) return P.duskrock;
+    return g && g.vgen >= 9 ? mixc(mixc(P.ochre, P.umber, 0.45), P.stone, 0.25) : P.stone;
+  };
   // the site cells a tile's villages are looked up in (villagesNear's cells; the worker computes the cold ones first)
   LOD.tileCells = function (g, job) {
     const VG = VR.VillageGen; if (!VG || g.singleBiome >= 0 || job.level > 1) return [];
@@ -567,7 +575,7 @@
         const I0 = isl[idx(i, j)]; if (!I0) continue;
         const k = idx(i, j), B = BIOMES[BIO[k]], cl = CL[k];
         const t0 = cl.ember > 0.45 ? redsand : cl.t < -0.35 ? snow : tint(grassTop, B.grass);
-        const side = cl.ember > 0.45 ? ochre : cl.prism > 0.45 ? duskrock : stone;
+        const side = LOD.isleSide(g, P, cl);
         const x = i * S, z = j * S, yt = I0.top + 1, yb = I0.bottom;
         quad([x, yt, z], [x, yt, z + S], [x + S, yt, z + S], [x + S, yt, z], 2, 0, 0, t0, 255);
         quad([x, yb, z], [x + S, yb, z], [x + S, yb, z + S], [x, yb, z + S], 3, 0, 0, mixc(side, [20, 20, 30], 0.35), 150);
