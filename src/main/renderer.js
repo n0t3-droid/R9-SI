@@ -830,9 +830,12 @@
     propDefines() { return (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); }
     // the anchors in reach, camera-relative: list A (full palms, nearer than D1), list B (crosses, nearer than D2), and
     // the furniture by model (near F1, far F2, in the frustum)
-    propGather(cam, lvl, D1, D2, furn, planes, farOnly) {
+    propGather(cam, lvl, D1, D2, furn, planes, refl) {
       const PR = VR.Props, K = PR.INST, FURN0 = PR.FURN0, r1 = D1 * D1, r2m = D2 * D2;
-      const lod = this.q.vxLod || 48, F1 = Math.max(14, Math.min(28, lod * 0.6)), F2 = Math.max(48, 2 * lod), f1 = farOnly ? 0 : F1 * F1, f2 = F2 * F2;
+      // refl (t-smooth2): 1 the mirror on tier 1 — the furniture's far forms only; 2 the mirror on tier 2 — the models
+      // within 16 blocks, the far forms to 64 (the mirror is half the frame and rippled: run 2 measured +64 draws and
+      // +126 k triangles at the pool with the main pass's radii)
+      const lod = this.q.vxLod || 48, F1 = Math.max(14, Math.min(28, lod * 0.6)) * (refl === 2 ? 0.6 : 1), F2 = refl === 2 ? 64 : Math.max(48, 2 * lod), f1 = refl === 1 ? 0 : F1 * F1, f2 = F2 * F2;
       const slots = this.furnSlots || [];
       for (let s = 0; s < slots.length; s++) { slots[s].nn = 0; slots[s].nf = 0; }
       let A = this.propA, B = this.propB, nA = 0, nB = 0, nF = 0;
@@ -902,7 +905,7 @@
       if ((!lvl0 && !furn) || !this.propSecs || !this.propSecs.size) return;
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
-      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl === 1);
+      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0);
       const cullWas = gl.isEnabled(gl.CULL_FACE);
       // the palms: two-sided fronds
       if (this.propNA || this.propNB) {
