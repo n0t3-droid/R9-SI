@@ -159,7 +159,7 @@ for (const [label, H] of HALLS) {
     }
     check(edges > 40 && open === 0, `the gallery is closed: a balustrade on every open edge (${edges} edges, ${open} open)`);
     let niches = 0;
-    for (let v = 52; v <= 80; v++) for (let u = -29; u <= 29; u++) { const d = Math.hypot(u, v - 51); if (d < 26.6 || d > 28.6) continue;   // (in the wall: the gallery's own floor lanterns at 26 do not count) for (let y = F + 9; y <= F + 13; y++) if (/^(lantern|vx_lantern)$/.test(atN(u, y, v))) niches++; }
+    for (let v = 52; v <= 80; v++) for (let u = -29; u <= 29; u++) { const d = Math.hypot(u, v - 51); if (d < 26.6 || d > 28.6) continue; for (let y = F + 9; y <= F + 13; y++) if (/^(lantern|vx_lantern)$/.test(atN(u, y, v))) niches++; }   // (in the wall: the gallery's own floor lanterns at 26 do not count)
     check(niches >= 5, `arched niches with lanterns in the apse wall (${niches} lanterns)`);
   }
 
