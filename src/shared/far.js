@@ -16,6 +16,9 @@
   F.NEAR = 32;              // tiles within this many chunks get 2-block cells, beyond 4-block cells
   F.IN = 2; F.IN_KEEP = 4;  // a tile is wanted from rd − 2 (its chunks may leave ring 0 any moment), kept to rd − 4
   F.OUT_KEEP = 2;           // … and kept to r1 + 2.5 (hysteresis at the outer edge)
+  F.SINK = 1;               // ring 1's land lies a block under the block tops: where ring 0 ends, the chunks' last top edge
+                            // is never lower than the form behind it (the chunks step, the form is straight between its
+                            // samples), so no gap under the edge shows the sky
   const MB = 1048576;
   const CAP = [0, 56, 84, 128, 192];   // the horizon's byte cap per level (horizon.js): ring 1 and ring 2 share it
   F.capBytes = (level) => (CAP[Math.max(0, Math.min(4, level | 0))] || 0) * MB;
@@ -59,6 +62,15 @@
   F.draws = function (t, nR, bR, nG, bG) {
     const cR = Math.min(bR, nR), cG = Math.min(bG, nG);
     return { r0: t < nR, r1: t >= cR && t < nG, r2: t >= Math.max(cR, cG) };
+  };
+  // a form wholly under ring 0: its 16 columns and the ring of columns around them (the bilinear read reaches one column
+  // over) hold 255 in the chunks' mask (m: N x N columns around the camera's column ccx, ccz). Then min(bR, nR) = 1 > t for
+  // every threshold of every pixel: all of it is the chunks', and the tile needs no draw call (farring.js draw)
+  F.underRing0 = function (m, N, tx, tz, ccx, ccz) {
+    const T = F.TILE, H = N >> 1, x0 = tx * T - 1 - ccx + H, z0 = tz * T - 1 - ccz + H;
+    if (x0 < 0 || z0 < 0 || x0 + T + 2 > N || z0 + T + 2 > N) return false;
+    for (let z = z0; z < z0 + T + 2; z++) { const o = z * N; for (let x = x0; x < x0 + T + 2; x++) if (m[o + x] !== 255) return false; }
+    return true;
   };
 
   // ---- the ring-1 tiles around the camera. update() rescans the band only when the camera's column, rd or r1 change
@@ -206,11 +218,11 @@
   F.Builder = Builder;
 
   // ---- the height field: (n + 3)² vertices (one ring beyond the tile for slopes and shading), index (i + 1, j + 1)
-  // h: the top face's height · col / cliff: the surface and the rock colour · kd: kind · wet: a water (lava, aether, ice)
-  // surface over the vertex (wh, wkd, wax, wcol) or none
+  // h: the top face's height · col / side / cliff: the surface, the wall's top (the skirts) and the rock colour · kd: kind ·
+  // wet: a water (lava, aether, ice) surface over the vertex (wh, wkd, wax, wcol) or none
   F.newField = function (n, cell) {
     const W = n + 3, N = W * W;
-    return { n, cell, W, h: new Float32Array(N), col: new Uint8Array(N * 3), cliff: new Uint8Array(N * 3), kd: new Uint8Array(N), wet: new Uint8Array(N), wh: new Float32Array(N), wkd: new Uint8Array(N), wax: new Uint8Array(N), wcol: new Uint8Array(N * 3) };
+    return { n, cell, W, h: new Float32Array(N), col: new Uint8Array(N * 3), side: new Uint8Array(N * 3), cliff: new Uint8Array(N * 3), kd: new Uint8Array(N), wet: new Uint8Array(N), wh: new Float32Array(N), wkd: new Uint8Array(N), wax: new Uint8Array(N), wcol: new Uint8Array(N * 3) };
   };
   F.fieldFrom = function (n, cell, fn) {
     const f = F.newField(n, cell), W = f.W;
@@ -219,6 +231,7 @@
       f.h[k] = v.h; f.kd[k] = v.kd || 0;
       f.col[k * 3] = v.c[0]; f.col[k * 3 + 1] = v.c[1]; f.col[k * 3 + 2] = v.c[2];
       const cl = v.cliff || v.c; f.cliff[k * 3] = cl[0]; f.cliff[k * 3 + 1] = cl[1]; f.cliff[k * 3 + 2] = cl[2];
+      const sd = v.side || cl; f.side[k * 3] = sd[0]; f.side[k * 3 + 1] = sd[1]; f.side[k * 3 + 2] = sd[2];
       if (v.wet) { f.wet[k] = 1; f.wh[k] = v.wet.h; f.wkd[k] = v.wet.kd; f.wax[k] = v.wet.ax || 0; f.wcol[k * 3] = v.wet.c[0]; f.wcol[k * 3 + 1] = v.wet.c[1]; f.wcol[k * 3 + 2] = v.wet.c[2]; }
     }
     return f;
@@ -308,14 +321,15 @@
       B.quad(x, h, z, x, h, z + d * cell, x + w * cell, h, z + d * cell, x + w * cell, h, z, 2, f.wkd[k], wax[ci], rgbOf(f.wcol, k), 255);
     }
     // skirts: outward walls along the four borders, 0.05 inside the tile (the far mask reads them as this tile's columns);
-    // runs of equal height merge, segments under water are left out
+    // runs of equal height merge, segments under water are left out. They wear the side colour (as the top of a horizon
+    // tile's wall): what shows of one is a sliver at its top
     B.part = 'skirt';
-    const T = n * cell, eps = 0.05, DROP = 12;
+    const T = n * cell, eps = 0.05, DROP = 12, side = f.side;
     // side: 0 west (−x, face 1), 1 east (+x, face 0), 2 north (−z, face 5), 3 south (+z, face 4)
     const kAt = (sd, t) => (sd === 0 ? (t + 1) * W + 1 : sd === 1 ? (t + 1) * W + n + 1 : sd === 2 ? W + t + 1 : (n + 1) * W + t + 1);
     const flush = (sd, a, b) => {
       if (a < 0 || b <= a) return;
-      const ka = kAt(sd, a), kb = kAt(sd, b), ya = H[ka], yb = H[kb], bot = Math.min(ya, yb) - DROP, c = rgbOf(cliff, ka);
+      const ka = kAt(sd, a), kb = kAt(sd, b), ya = H[ka], yb = H[kb], bot = Math.min(ya, yb) - DROP, c = rgbOf(side, ka);
       if (sd === 0) B.quad(eps, ya, a * cell, eps, bot, a * cell, eps, bot, b * cell, eps, yb, b * cell, 1, 0, 0, c, 200);
       else if (sd === 1) B.quad(T - eps, yb, b * cell, T - eps, bot, b * cell, T - eps, bot, a * cell, T - eps, ya, a * cell, 0, 0, 0, c, 200);
       else if (sd === 2) B.quad(b * cell, yb, eps, b * cell, bot, eps, a * cell, bot, eps, a * cell, ya, eps, 5, 0, 0, c, 200);
@@ -527,27 +541,52 @@
     // then the look of the tile's own vertices (the horizon tiles' colour code, LOD.look)
     const f = F.newField(n, cell), W = f.W, H = f.h;
     for (let j = -1; j <= n + 1; j++) { const Z = z0 + j * cell, o = (j + 1) * W + 1; for (let i = -1; i <= n + 1; i++) H[o + i] = g.surfaceY(x0 + i * cell, Z) + 1; }
-    const bio = new Uint8Array(W * W), cold = new Uint8Array(W * W);
+    const bio = new Uint8Array(W * W), cold = new Uint8Array(W * W), ex = new Uint8Array(W * W);
     const clo = g.climateAt(x0, z0);   // one climate object, written over for every vertex (climateAt(x, z, out))
-    for (let j = 0; j <= n; j++) for (let i = 0; i <= n; i++) {
+    const lookAt = (i, j) => {
       const X = x0 + i * cell, Z = z0 + j * cell, k = (j + 1) * W + i + 1, y = H[k] - 1;
       const e = H[k + 1] - H[k], w = H[k - 1] - H[k], s2 = H[k + W] - H[k], nn = H[k - W] - H[k];
       const slope = Math.max(e < 0 ? -e : e, w < 0 ? -w : w, s2 < 0 ? -s2 : s2, nn < 0 ? -nn : nn) / cell;
       const cl = g.climateAt(X, Z, clo), bi = g.biomeFor(cl, y), B = BIOMES[bi];
       LOD.look(g, P, B, B.key, cl, X, Z, y, slope, cell, lk);
       bio[k] = bi; cold[k] = lk.cold ? 1 : 0;
-      const t = lk.t, c = lk.cliff, k3 = k * 3;
+      // (the canyon's and the badlands' colours change with every height: their bands want every vertex's own look)
+      ex[k] = cl.ember > 0.45 || B.key === 'ember_canyons' || B.key.indexOf('badlands') >= 0 ? 1 : 0;
+      const t = lk.t, c = lk.cliff, sd = lk.s, k3 = k * 3;
       f.col[k3] = t[0]; f.col[k3 + 1] = t[1]; f.col[k3 + 2] = t[2];
+      f.side[k3] = sd[0]; f.side[k3 + 1] = sd[1]; f.side[k3 + 2] = sd[2];
       f.cliff[k3] = c[0]; f.cliff[k3 + 1] = c[1]; f.cliff[k3 + 2] = c[2];
       if (lk.water) { f.wet[k] = 1; f.wh[k] = lk.h; f.wkd[k] = lk.kd; f.wax[k] = lk.ax; f.wcol[k3] = t[0]; f.wcol[k3 + 1] = t[1]; f.wcol[k3 + 2] = t[2]; f.kd[k] = 0; }
       else f.kd[k] = lk.kd === 6 || lk.kd === 2 ? lk.kd : 0;
+    };
+    // on 2-block cells the looks are read every 4 blocks (the vertices on the world's 4-block lattice, the same in every
+    // tile), and a vertex between takes the mean colour of the lattice vertices around it — unless the water, the kind
+    // (snow, lava), the biome or a banded biome changes there or it lies at or under the sea's level: then its own look
+    // (job.exact: every vertex its own look — the node test's reference)
+    const st = cell === 2 && !job.exact ? 2 : 1;
+    for (let j = 0; j <= n; j += st) for (let i = 0; i <= n; i += st) lookAt(i, j);
+    if (st === 2) for (let j = 0; j <= n; j++) for (let i = (j & 1) ? 0 : 1; i <= n; i += (j & 1) ? 1 : 2) {
+      const k = (j + 1) * W + i + 1, i0 = i & ~1, i1 = (i & 1) ? i + 1 : i, j0 = j & ~1, j1 = (j & 1) ? j + 1 : j;
+      const a = (j0 + 1) * W + i0 + 1, b = (j0 + 1) * W + i1 + 1, c = (j1 + 1) * W + i0 + 1, d = (j1 + 1) * W + i1 + 1;
+      if (H[k] - 1 <= SEA || f.wet[a] | f.wet[b] | f.wet[c] | f.wet[d] | ex[a] | ex[b] | ex[c] | ex[d] ||
+          f.kd[a] !== f.kd[b] || f.kd[a] !== f.kd[c] || f.kd[a] !== f.kd[d] || bio[a] !== bio[b] || bio[a] !== bio[c] || bio[a] !== bio[d]) { lookAt(i, j); continue; }
+      const k3 = k * 3, a3 = a * 3, b3 = b * 3, c3 = c * 3, d3 = d * 3;
+      for (let q = 0; q < 3; q++) {
+        f.col[k3 + q] = (f.col[a3 + q] + f.col[b3 + q] + f.col[c3 + q] + f.col[d3 + q] + 2) >> 2;
+        f.side[k3 + q] = (f.side[a3 + q] + f.side[b3 + q] + f.side[c3 + q] + f.side[d3 + q] + 2) >> 2;
+        f.cliff[k3 + q] = (f.cliff[a3 + q] + f.cliff[b3 + q] + f.cliff[c3 + q] + f.cliff[d3 + q] + 2) >> 2;
+      }
+      f.kd[k] = f.kd[a]; bio[k] = bio[a]; cold[k] = cold[a] | cold[b] | cold[c] | cold[d];
     }
     // the ring beyond: the border's skirts and water read only its heights; it keeps the next vertex' colours
     for (let j = -1; j <= n + 1; j++) for (let i = -1; i <= n + 1; i++) {
       if (i >= 0 && i <= n && j >= 0 && j <= n) continue;
       const k = (j + 1) * W + i + 1, kk = (Math.max(0, Math.min(n, j)) + 1) * W + Math.max(0, Math.min(n, i)) + 1;
-      for (let c = 0; c < 3; c++) { f.col[k * 3 + c] = f.col[kk * 3 + c]; f.cliff[k * 3 + c] = f.cliff[kk * 3 + c]; }
+      for (let c = 0; c < 3; c++) { f.col[k * 3 + c] = f.col[kk * 3 + c]; f.side[k * 3 + c] = f.side[kk * 3 + c]; f.cliff[k * 3 + c] = f.cliff[kk * 3 + c]; }
     }
+    // the land a block under the block tops (F.SINK; the looks above read the real surface): the edge of ring 0 is never
+    // lower than the form behind it. The water's planes keep their own height
+    for (let k = 0; k < H.length; k++) H[k] -= F.SINK;
     lap('land');
     // 2. structures: their skylines over the tile's cells (the towns, the Heartland's set pieces); a skyline is looked up
     // before its plan is touched (the plan may be gone from the worker's caches by now: only a missing skyline needs it)
