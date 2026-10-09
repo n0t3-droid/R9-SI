@@ -613,7 +613,7 @@
     PATH: st('dirt_path'), COARSE: st('coarse_dirt'), GRAVEL: st('gravel'), DIRT: st('dirt'), GRASS: st('grass_block'), FLAG: st('flagstone'), PLAZA: st('vx_floor_plaza') || st('flagstone'),
     PLANK: st('spruce_planks'), PFENCE: st('spruce_fence'), PLOG: st('spruce_log', { axis: 0 }), BRICK: st('stone_bricks'), MBRICK: st('mossy_stone_bricks'), BWALL: st('stone_brick_wall'), STONE: st('stone'),
     FENCE: st('oak_fence'), LANTERN: st('lantern', { hanging: 0 }), MILE: st('chiseled_stone_bricks'), MOSSC: st('moss_carpet'), WATER: st('water'),
-    BENCH: [0, 1, 2, 3].map(f => st('vx_bench', { facing: f })),
+    BENCH: [0, 1, 2, 3].map(f => st('vx_bench', { facing: f })), HEDGE: st('oak_leaves', { persistent: 1, distance: 1 }),
   });
   LAND.mats = mats;
   // the top of a column (the highest block that is not air, a plant or leaves), from y0 down
@@ -686,6 +686,7 @@
       if (f.kind === 'lamp') { put(y + 1, K.FENCE); put(y + 2, K.FENCE); put(y + 3, K.LANTERN); }
       else if (f.kind === 'bench') put(y + 1, K.BENCH[f.face]);
       else if (f.kind === 'stone') { put(y + 1, K.MILE); if (h01(f.x, f.z, 9) < 0.5) put(y + 2, K.MOSSC); }
+      else if (f.kind === 'hedge') { put(y + 1, K.HEDGE); if (f.h > 1) put(y + 2, K.HEDGE); }
     }
   }
   function stampOps(P, cx, cz, blocks) {
@@ -693,6 +694,213 @@
     const x0 = cx * 16, z0 = cz * 16;
     for (let i = 0; i < b.length; i += 4) { const lx = b[i] - x0, lz = b[i + 2] - z0; blocks[(b[i + 1] << 8) | (lz << 4) | lx] = b[i + 3]; }
   }
+  // ============================================================================ the woods and the meadows
+  // One wood field over the land (two noises: the woods' blobs and their ragged edges), biased by region — deep woods
+  // in the north-west and on the ridge, open parkland round the temple, fields kept open round the farms — and a kind
+  // from a slower noise: mixed broadleaf, birch, dark, conifers (the ridge, the north-west), cherry groves in patches.
+  // Groves stand in the open where the edge noise peaks. Everything here is a function of the world position alone:
+  // a tree that reaches over a chunk border is the same tree on both sides.
+  const WQ = { d: 0, kind: 0 };
+  LAND.WOOD = { T: 0.04, KINDS: ['mixed', 'birch', 'dark', 'conifer', 'cherry'] };
+  const siteList = (g) => g._landSites || (g._landSites = LAND.sites(g));
+  LAND.woodAt = function (g, x, z) {
+    noises(g);
+    let n = g.nLand.n2(x, z) + 0.32 * g.nLand2.n2(x, z);
+    const d0 = Math.sqrt(x * x + z * z);
+    n -= 0.42 * (1 - ss(200, 320, d0));                                   // the plateau round the temple: parkland
+    n += 0.2 * ss(-250, -420, z) * ss(-180, -360, x);                     // the north-west: deep woods
+    n += 0.12 * ss(-100, -260, z) * ss(330, 440, x);                      // the slopes east of the river's head
+    let conifer = false;
+    if (x < -500 && x > -730 && z > -160 && z < 250) { const lift = LAND.ridgeLift(g, x, z); if (lift > 4) { n += 0.18 * Math.min(1, lift / 14); conifer = lift > 9; } }
+    if (x < -300 && z < -330) conifer = conifer || g.nLandK.n2(x + 999, z) > -0.1;
+    for (const s of siteList(g)) {
+      if (s.kind !== 'farm' && s.kind !== 'lookout' && s.kind !== 'beach' && s.kind !== 'shore') continue;
+      const dd = (s.x - x) * (s.x - x) + (s.z - z) * (s.z - z), r = s.kind === 'farm' ? 120 : 40;
+      if (dd < r * r) n -= (s.kind === 'farm' ? 0.75 : 0.5) * (1 - ss(r * 0.55, r, Math.sqrt(dd)));
+    }
+    WQ.d = ss(LAND.WOOD.T, LAND.WOOD.T + 0.16, n);
+    if (WQ.d < 0.05) { const gv = g.nLand2.n2(x * 1.7 + 311, z * 1.7 - 177); if (gv > 0.46) WQ.d = Math.max(WQ.d, 0.8 * ss(0.46, 0.6, gv)); }
+    const k = g.nLandK.n2(x, z);
+    WQ.kind = conifer ? 3 : k < -0.28 ? 1 : k > 0.27 ? 2 : 0;
+    if (WQ.kind === 0) { const ci = Math.floor(x / 96), cj = Math.floor(z / 96), hc = h01(ci, cj, g.seed ^ 0xc4e7); if (hc < 0.2) { const px = ci * 96 + 20 + hc * 280 % 56, pz = cj * 96 + 20 + (hc * 977) % 56; if ((x - px) * (x - px) + (z - pz) * (z - pz) < 26 * 26) WQ.kind = 4; } }
+    return WQ;
+  };
+  // may a tree stand here: open land, not on or next to a way, a piece, a field, a clearing, a pond; dry ground
+  const KW = 1 | 2 | 4 | 8 | 16;
+  const treeOk = (g, P, x, z) => !LAND.zoneAt(g, x, z) && !(LAND.keepAt(P, x, z) & KW) && !LAND.keepAt(P, x + 1, z) && !LAND.keepAt(P, x - 1, z) && !LAND.keepAt(P, x, z + 1) && !LAND.keepAt(P, x, z - 1) && !nearViaduct(g, x, z);
+  LAND.treeOk = treeOk;
+  function plantTree(w, kind, x, y, z, rng, big) {
+    const T = GEN.TREES, r = rng.next();
+    switch (kind) {
+      case 1: return r < 0.18 ? T.oak(w, x, y, z, rng) : T.birch(w, x, y, z, rng, { tall: rng.chance(0.35) });
+      case 2: return r < 0.55 ? T.darkOak(w, x, y, z, rng) : r < 0.85 ? T.oak(w, x, y, z, rng, { h: 5 }) : T.fancyOak(w, x, y, z, rng);
+      case 3: return r < 0.12 ? T.birch(w, x, y, z, rng) : T.spruce(w, x, y, z, rng, { pine: r > 0.72 });
+      case 4: return r < 0.8 ? T.cherry(w, x, y, z, rng) : T.roundTree(w, x, y, z, rng, { leaf: 'flowering_azalea_leaves' });
+      default: return big || r < 0.22 ? T.fancyOak(w, x, y, z, rng) : r < 0.62 ? T.oak(w, x, y, z, rng, { h: 5 }) : r < 0.84 ? T.birch(w, x, y, z, rng) : T.roundTree(w, x, y, z, rng);
+    }
+  }
+  LAND.plantTree = plantTree;
+  const SP = 5, SOLO = 22;
+  function dressTrees(g, P, cx, cz, out) {
+    const x0 = cx * 16, z0 = cz * 16, w = new GEN.ColumnWriter(cx, cz, out.blocks), BIm = VR.BIOME.sky_meadow;
+    const meadowAt = (x, z, y) => g.biomeFor(g.climateAt(x, z), y - 1) === BIm;
+    // the woods: a jittered grid, one candidate a cell, kept by the wood's density there
+    for (let gz = Math.floor((z0 - 7) / SP); gz <= Math.floor((z0 + 22) / SP); gz++) for (let gx = Math.floor((x0 - 7) / SP); gx <= Math.floor((x0 + 22) / SP); gx++) {
+      const hx = M.hash2(gx, gz, g.seed ^ 0x7ee51) >>> 0, x = gx * SP + (hx % SP), z = gz * SP + ((hx >>> 8) % SP);
+      if (x < x0 - 7 || x > x0 + 22 || z < z0 - 7 || z > z0 + 22) continue;
+      const q = LAND.woodAt(g, x, z);
+      if (((hx >>> 16) & 1023) / 1024 >= q.d * 0.85) continue;
+      if (!treeOk(g, P, x, z)) continue;
+      const y = g.surfaceY(x, z) + 1;
+      if (y <= SEA + 2 || !meadowAt(x, z, y)) continue;
+      plantTree(w, q.kind, x, y, z, new VR.RNG((hx ^ 0x5bd1e995) >>> 0));
+    }
+    // the parkland: a big tree alone in the meadow now and then (one candidate per 22 blocks)
+    for (let gz = Math.floor((z0 - 8) / SOLO); gz <= Math.floor((z0 + 23) / SOLO); gz++) for (let gx = Math.floor((x0 - 8) / SOLO); gx <= Math.floor((x0 + 23) / SOLO); gx++) {
+      const hx = M.hash2(gx, gz, g.seed ^ 0x501a) >>> 0;
+      if ((hx & 1023) / 1024 > 0.42) continue;
+      const x = gx * SOLO + 3 + ((hx >>> 10) % (SOLO - 6)), z = gz * SOLO + 3 + ((hx >>> 18) % (SOLO - 6));
+      if (x < x0 - 8 || x > x0 + 23 || z < z0 - 8 || z > z0 + 23) continue;
+      if (LAND.woodAt(g, x, z).d > 0.05 || !treeOk(g, P, x, z)) continue;
+      if (LAND.keepAt(P, x + 2, z) || LAND.keepAt(P, x - 2, z) || LAND.keepAt(P, x, z + 2) || LAND.keepAt(P, x, z - 2)) continue;
+      const y = g.surfaceY(x, z) + 1;
+      if (y <= SEA + 2 || !meadowAt(x, z, y)) continue;
+      const rng = new VR.RNG((hx ^ 0x2545f491) >>> 0), r = rng.next();
+      if (r < 0.5) GEN.TREES.fancyOak(w, x, y, z, rng); else if (r < 0.8) GEN.TREES.roundTree(w, x, y, z, rng, { r: 3.2, h: 4 }); else GEN.TREES.oak(w, x, y, z, rng, { h: 6 });
+    }
+    // the plan's own trees (the poplar rows along the farm lanes, the orchards' neighbours)
+    if (P.treesBy) { const list = P.treesBy.get(cx * 4096 + cz); if (list) for (const t of list) { const rng = new VR.RNG(M.hash2(t.x, t.z, g.seed ^ 0x9091) >>> 0); if (t.kind === 'poplar') GEN.TREES.poplar(w, t.x, t.y, t.z, rng, { color: t.color }); else plantTree(w, t.kind, t.x, t.y, t.z, rng, true); } }
+  }
+  // the ground: the woods' floor (ferns, litter, moss, mushrooms, podzol and coarse earth under the dark woods and the
+  // conifers), the woods' edges (tall grass, bushes), the meadow (grass, tall grass in patches, flower drifts: one kind
+  // of flower dominating each drift)
+  let PL = null;
+  const plants = () => PL || (PL = {
+    GRASS: st('grass_block'), PODZOL: st('podzol'), COARSE: st('coarse_dirt'), MOSS: st('moss_block'), SG: st('short_grass'), TG0: st('tall_grass', { half: 0 }), TG1: st('tall_grass', { half: 1 }),
+    FERN: st('fern'), LF0: st('large_fern', { half: 0 }), LF1: st('large_fern', { half: 1 }), BUSH: st('bush'), MOSSC: st('moss_carpet'), BROWN: st('brown_mushroom'), RED: st('red_mushroom'),
+    BERRY: st('sweet_berry_bush', { age: 3 }), LOTV: st('lily_of_the_valley'), PETALS: [0, 1, 2, 3].map(c => st('pink_petals', { count: c, facing: c })), LITTER: [0, 1, 2, 3].map(c => st('leaf_litter', { count: c, facing: (c * 3) & 3 })),
+    WILD: [0, 1, 2, 3].map(c => st('wildflowers', { count: c, facing: (c * 5) & 3 })), FIREFLY: st('firefly_bush'),
+    DRIFT: ['poppy', 'oxeye_daisy', 'cornflower', 'dandelion', 'azure_bluet', 'allium', 'red_tulip', 'wildflowers', 'white_tulip', 'lily_of_the_valley', 'orange_tulip', 'pink_tulip'].map(n => n === 'wildflowers' ? -1 : st(n)),
+  });
+  LAND.plants = plants;
+  function dressGround(g, P, cx, cz, out) {
+    const blocks = out.blocks, x0 = cx * 16, z0 = cz * 16, S = plants(), BIm = VR.BIOME.sky_meadow, KG = 1 | 2 | 4 | 16;
+    for (let col = 0; col < 256; col++) {
+      if (out.biome && out.biome[col] !== BIm) continue;
+      const x = x0 + (col & 15), z = z0 + (col >> 4);
+      if (LAND.zoneAt(g, x, z) || (LAND.keepAt(P, x, z) & KG)) continue;
+      const y = topOf(blocks, col, 180);
+      if (y < SEA || blocks[(y << 8) | col] !== S.GRASS) continue;
+      const ai = ((y + 1) << 8) | col; if (blocks[ai]) continue;
+      const free2 = !blocks[ai + 256];
+      const q = LAND.woodAt(g, x, z), r = h01(x, z, g.seed ^ 0x6a11), r2 = h01(z, x, g.seed ^ 0x51f3), pn = g.nLandR.n2(x, z);
+      if (q.d > 0.38) {
+        // the woods' floor
+        if ((q.kind === 2 || q.kind === 3) && pn > 0.18) blocks[(y << 8) | col] = pn > 0.5 && q.kind === 2 ? S.MOSS : S.PODZOL;
+        else if (pn < -0.5) blocks[(y << 8) | col] = S.COARSE;
+        if (r < 0.1) blocks[ai] = S.FERN;
+        else if (r < 0.125 && free2) { blocks[ai] = S.LF0; blocks[ai + 256] = S.LF1; }
+        else if (r < 0.19 && q.kind !== 3) blocks[ai] = S.LITTER[(r2 * 4) | 0];
+        else if (r < 0.215) blocks[ai] = q.kind === 2 || q.kind === 3 ? S.MOSSC : S.BUSH;
+        else if (r < 0.222) blocks[ai] = r2 < 0.6 ? S.BROWN : S.RED;
+        else if (r < 0.228) blocks[ai] = q.kind === 3 ? S.BERRY : S.LOTV;
+        else if (r < 0.232) blocks[ai] = S.FIREFLY;
+        else if (r < 0.32) blocks[ai] = S.SG;
+        if (q.kind === 4 && r2 < 0.35 && !blocks[ai]) blocks[ai] = S.PETALS[(r * 4) | 0];
+      } else if (q.d > 0.06) {
+        // the woods' edges
+        if (r < 0.06 && free2) { blocks[ai] = S.TG0; blocks[ai + 256] = S.TG1; }
+        else if (r < 0.085) blocks[ai] = S.BUSH;
+        else if (r < 0.12) blocks[ai] = S.FERN;
+        else if (r < 0.145) blocks[ai] = S.DRIFT[(r2 * 6) | 0] || S.WILD[1];
+        else if (r < 0.4) blocks[ai] = S.SG;
+      } else {
+        // the meadow: grass, tall grass in patches, the flower drifts
+        const fd = g.nLandD.n2(x, z);
+        if (fd > 0.26 && r < 0.1 + 0.48 * ss(0.26, 0.52, fd)) {
+          const sp = Math.floor((g.nLandK.n2(x * 0.9 + 500, z * 0.9 - 500) * 0.5 + 0.5) * S.DRIFT.length * 1.6) % S.DRIFT.length;
+          const s = S.DRIFT[r2 < 0.78 ? sp : (sp + 1) % S.DRIFT.length];
+          blocks[ai] = s < 0 ? S.WILD[(r2 * 4) | 0] : s;
+        } else if (pn > 0.42 && r2 < 0.16 && free2) { blocks[ai] = S.TG0; blocks[ai + 256] = S.TG1; }
+        else if (r < (pn > 0.15 ? 0.3 : 0.16)) blocks[ai] = S.SG;
+      }
+    }
+  }
+  LAND.DRESS_WOODS = [dressTrees, dressGround];
+
+  // ---------------------------------------------------------------- clearings with a camp
+  // In the deep woods, within reach of a way: a clearing (no tree within 8), a campfire with log seats, two tents (a
+  // pitched roof of coloured canvas over a ridge), a lantern on a post, a barrel
+  LAND.PIECES.push(function camps(g, P, K) {
+    const gy = groundOf(g, P), rng = new VR.RNG((g.seed ^ 0xca39) >>> 0), got = [];
+    const nearWay = (x, z, r0, r1) => { let best = 1e9; for (const c of P.cells.values()) { const d = (c.x - x) ** 2 + (c.z - z) ** 2; if (d < best) best = d; } best = Math.sqrt(best); return best >= r0 && best <= r1; };
+    const cand = [];
+    for (let z = -640; z <= 640; z += 36) for (let x = -640; x <= 640; x += 36) {
+      const px = x + Math.round((h01(x, z, g.seed ^ 77) - 0.5) * 20), pz = z + Math.round((h01(z, x, g.seed ^ 78) - 0.5) * 20);
+      if (px * px + pz * pz > 620 * 620 || LAND.zoneAt(g, px, pz) || LAND.keepAt(P, px, pz)) continue;
+      const q = LAND.woodAt(g, px, pz); if (q.d < 0.7) continue;
+      cand.push([px, pz, h01(px, pz, g.seed ^ 79)]);
+    }
+    cand.sort((a, b) => a[2] - b[2]);
+    for (const [x, z] of cand) {
+      if (got.length >= 5) break;
+      if (got.some(c => Math.hypot(c[0] - x, c[1] - z) < 170)) continue;
+      const y0 = gy(x, z); let flat = y0 > SEA + 2;
+      for (let dz = -6; dz <= 6 && flat; dz += 2) for (let dx = -6; dx <= 6; dx += 2) if (Math.abs(gy(x + dx, z + dz) - y0) > 2) { flat = false; break; }
+      if (!flat || !nearWay(x, z, 14, 70)) continue;
+      got.push([x, z]);
+      markDisc(P, x, z, 9, LAND.KEEP.CLEAR); markDisc(P, x, z, 6, LAND.KEEP.PIECE);
+      const put = K.put, y = y0;
+      put(x, y + 1, z, st('campfire', { facing: 0, lit: 1 }));
+      for (const [dx, dz, ax] of [[2, 0, 2], [-2, 0, 2], [0, 2, 1]]) put(x + dx, gy(x + dx, z + dz) + 1, z + dz, st('stripped_spruce_log', { axis: ax }));
+      const cols = ['red', 'blue', 'teal', 'green', 'white'], c0 = rng.int(cols.length);
+      // the tents: 3 long (along x), a roof of two slopes meeting at a ridge over the middle row
+      [[-4, -4], [3, -4]].forEach(([ox, oz], ti) => {
+        const col = cols[(c0 + ti * 2) % cols.length], ty = gy(x + ox, z + oz);
+        for (let u = 0; u < 3; u++) {
+          put(x + ox + u, ty + 1, z + oz - 1, st('vx_roof_' + col, { facing: 0 }));
+          put(x + ox + u, ty + 1, z + oz + 1, st('vx_roof_' + col, { facing: 2 }));
+          put(x + ox + u, ty + 2, z + oz, st('vx_ridge_' + col, { facing: 1 }));
+          put(x + ox + u, ty + 1, z + oz, 0);
+        }
+      });
+      const lx = x + 3, lz = z + 3, ly = gy(lx, lz);
+      put(lx, ly + 1, lz, st('oak_fence')); put(lx, ly + 2, lz, st('lantern', { hanging: 0 }));
+      put(x - 3, gy(x - 3, z + 3) + 1, z + 3, st('barrel', { facing: 1, open: 0 }));
+      P.pieces.push({ kind: 'camp', x, z, y });
+    }
+  });
+  // hedgerows along the ways (one side, in stretches) and poplar rows on the lanes near the farms
+  LAND.PIECES.push(function hedges(g, P) {
+    P.trees = P.trees || [];
+    const gy = groundOf(g, P);
+    const farms = P.sites.filter(s => s.kind === 'farm');
+    P.lines.forEach((L, li) => {
+      const n = L.pts.length;
+      for (let i = 4; i < n - 4; i++) {
+        const [px, pz] = L.pts[i];
+        if (L.deck[i]) continue;
+        const a = L.pts[i - 2], b = L.pts[i + 2], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l, nz = dx / l;
+        const nearFarm = farms.some(f => (f.x - px) ** 2 + (f.z - pz) ** 2 < 90 * 90);
+        const hedge = Math.sin(i / 23 + li * 1.7) > 0.35 && !nearFarm, side = Math.sin(i / 61 + li) > 0 ? 1 : -1;
+        if (hedge) {
+          const x = Math.round(px + nx * side * 3.2), z = Math.round(pz + nz * side * 3.2);
+          if (!P.cells.has(ck(x, z)) && !LAND.zoneAt(g, x, z) && !(LAND.keepAt(P, x, z) & 2)) { const y = gy(x, z); if (y > SEA + 1 && Math.abs(y - L.y[i]) <= 2) P.furn.push({ kind: 'hedge', x, z, y, h: h01(x, z, 31) < 0.3 ? 2 : 1 }); }
+        }
+        if (nearFarm && i % 7 === 0 && Math.sin(i / 37 + li) > -0.2) for (const sd of [1, -1]) {
+          const x = Math.round(px + nx * sd * 4), z = Math.round(pz + nz * sd * 4);
+          if (P.cells.has(ck(x, z)) || LAND.zoneAt(g, x, z) || LAND.keepAt(P, x, z) & 6) continue;
+          const y = gy(x, z); if (y <= SEA + 2 || Math.abs(y - L.y[i]) > 2) continue;
+          P.trees.push({ x, z, y: y + 1, kind: 'poplar', color: (li + (i / 7 | 0)) % 3 });
+        }
+      }
+    });
+    const by = new Map();
+    for (const t of P.trees) for (let dz = -4; dz <= 4; dz += 4) for (let dx = -4; dx <= 4; dx += 4) { const k = chunkKey(t.x + dx, t.z + dz); let a = by.get(k); if (!a) { a = []; by.set(k, a); } if (!a.includes(t)) a.push(t); }
+    P.treesBy = by;
+    P.furnBy = null;
+  });
+
   LAND.DRESS = [];           // the per-chunk dressing (woods, meadows, banks — the later sections): fn(g, P, cx, cz, out)
   HEART.builders.push(function (g, cx, cz, out) {
     if (!LAND.on(g)) return;
@@ -702,6 +910,7 @@
     stampWays(g, P, cx, cz, blocks);
     stampOps(P, cx, cz, blocks);
     stampFurn(g, P, cx, cz, blocks);
+    for (const fn of LAND.DRESS_WOODS) fn(g, P, cx, cz, out);
     for (const fn of LAND.DRESS) fn(g, P, cx, cz, out);
     const sp = P.spawns.get(cx * 4096 + cz);
     if (sp) { if (!out.spawns) out.spawns = []; for (const s of sp) out.spawns.push(s.slice()); }
