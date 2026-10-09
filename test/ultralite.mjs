@@ -8,7 +8,7 @@
 //   pictures test/shots/ultralite_<scene>_<preset>_<TAG>.png of the same view (the clouds' clock pinned); their difference
 //   walks    stream: 200 m from the hall (Ultra · Leicht south, Ultra north: fresh land for both), nothing drawn, every
 //            frame's main-thread time = the loop + the worker messages handled since the frame before (a frame over
-//            40 ms is a hitch); shadow: 60 m back with the day running, only the shadow work drawn
+//            40 ms is a hitch); shadow: 30 m back with the day running, only the shadow work drawn
 //   Very Low and High: MODE=potato measures their frames at the three scenes (PRESETS=potato,high; with DIST=<a v0.43
 //            dist> TAG=before: the before numbers)
 // usage: bash test/wt_run.sh ultralite.mjs 3600   ·   MODE=potato DIST=file:///…/index.html TAG=before …
@@ -247,7 +247,7 @@ if (WALK) {
     console.log(`  walk-stream ${p}: ${JSON.stringify(s)}`);
     res.walks[p] = { stream: s };
     await settle(200);
-    const back = [to[0], to[1] + (to[1] < 0 ? 60 : -60)];
+    const back = [to[0], to[1] + (to[1] < 0 ? 30 : -30)];   // (30 m: Ultra's full redraws take seconds each in SwiftShader)
     const h = await walk(to, back, { shadow: true, time: true });
     console.log(`  walk-shadow ${p}: ${JSON.stringify(h)}`);
     res.walks[p].shadow = h;
