@@ -8,8 +8,10 @@
 //             crownshaft and three coconuts. A frond mask per instance picks 9–13 green fronds (and 1–2 dead).
 //   palm far  a cross of two cutout quads with the palm's silhouette (the same fronds, painted flat), for the distance.
 //   furniture the furniture pack's pieces and the villages' own (sofas, armchairs, dining sets, beds, lamps, kitchens,
-//             the bookcase, planters, the TV lowboard and the wall TV, coffee tables, nightstands, the cosy beds, tables,
-//             chairs and modular sofas): a model builder and the models in the furniture section below.
+//             the bookcase, planters, the TV lowboard and the wall TV, coffee tables, nightstands, the chandelier, the
+//             table lamp on its side table, the console, the bar cart, bar stools, rugs, the cosy beds, tables, chairs
+//             and modular sofas): a model builder and the models in the furniture section below. A piece that changes
+//             with its neighbours (a sofa row, a rug's open sides, the lamp on its table) has one model per variant.
 // Vertex layout (14 floats): palm — pos, normal, uv, colour, bend, sway, frond slot; furniture — pos, normal, uv,
 // colour, material, tint slot, ambient occlusion. Instance (12 floats): palm — [x y z yaw] [scale lean phase mask]
 // [sky r g b]; furniture — [x y z yaw] [first colour rgb, second colour as an sRGB number] [sky r g b].
