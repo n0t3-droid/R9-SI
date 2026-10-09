@@ -49,9 +49,9 @@ const CAMS = [
   ['backs_5', [40.5, -111.5], EYE, [39, 85, -129], 70, MORNING, []],                   // a Palm Row villa's back from the crescent's gardens
   ['backs_3', [75.5, -136.5], EYE, [75, 88, -112], 70, GOLDEN, []],                    // the classic's back: the glass wall
   // (d) Villa Nova (the classic, lot 87/−92): from the garden and from the roof terrace
-  ['villa_1', [65.5, -121.5], EYE, [76, 87, -108], 75, GOLDEN, [NIGHT]],              // from the back garden's corner
-  ['villa_2', [69.5, -103.5], { y: 95.6 }, [0, 90, -10], 70, MORNING, [GOLDEN]],      // the roof terrace, over the city to the temple
-  ['villa_3', [70.5, -109.5], { y: 95.6 }, [40, 105, -230], 70, NOON, []],            // the roof terrace, to the terraced hills
+  ['villa_1', [56.5, -133.5], EYE, [76, 86, -110], 75, GOLDEN, [NIGHT]],              // from the back garden's corner, over its mounds (run 2 stood in front of one)
+  ['villa_2', [69.5, -103.5], EYE, [0, 90, -10], 70, MORNING, [GOLDEN]],              // the roof terrace (its lawn at 94), over the city to the temple
+  ['villa_3', [70.5, -109.5], EYE, [40, 105, -230], 70, NOON, []],                    // the roof terrace, to the terraced hills
   ['street_2', [40.5, -157.5], EYE, [84, 82.6, -171], 70, MORNING, []],               // Palm Row east to its end
   // (a) from the hills down at the city
   ['hills_1', [0.5, -292.5], { y: 136 }, [0, 84, -105], 60, GOLDEN, [NOON, NIGHT]],
@@ -60,7 +60,7 @@ const CAMS = [
   // (g) the far world from ridges
   ['far_4', [0.5, -330.5], { y: 160 }, [0, 80, 100], 60, NIGHT, [GOLDEN]],          // the whole Heartland at night
   ['far_2', [0.5, -425.5], { y: 128 }, [0, 100, -1200], 70, MORNING, []],             // from the Pod Hills' crest, north
-  ['far_1', [-372.5, -150.5], { y: 182 }, [-900, 120, -250], 70, GOLDEN, []],         // from the station's peak, west
+  ['far_1', [-410.5, -150.5], { y: 172 }, [-900, 120, -250], 70, GOLDEN, []],         // from the station mountain's west shoulder (run 2 stood in the station)
   ['far_3', [-470.5, 420.5], { y: 128 }, [-1000, 100, 900], 70, NOON, []],            // from the citadel's mountain, south-west
   // (f) the water line
   ['water_3', [6.5, 178.5], { y: 66 }, [0, 59, 230], 70, NIGHT, [GOLDEN]],            // the canyon's aether river
@@ -188,7 +188,7 @@ async function openWorld(dist, preset) {
     await boost(true);
     for (let i = 0; i < max; i++) {
       await step(20);
-      s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } const h = g.horizon, f = h && h.far, fr = f && f.report ? f.report() : null; return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, hz: h ? h.inflight : 0, far: fr ? fr.inflight + fr.want : 0 }; });
+      s = await ev(() => { const g = VR.game, w = g.world, p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0, dirtyAll = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; dirtyAll += n; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; } let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } const h = g.horizon, f = h && h.far, fr = f && f.report ? f.report() : null; return { busy: g.pool.busy, pend: w.pending.size, dirty, dirtyAll, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, hz: h ? h.inflight : 0, far: fr ? fr.inflight + fr.want : 0 }; });
       const near = s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0;
       s.i = i;
       if (near && i > 2 && ((s.hz === 0 && s.far === 0) || i >= farMax)) break;
@@ -263,7 +263,9 @@ async function audit(tag, dist, keepOpen) {
       s.yaw = +Math.atan2(-dx, -dz).toFixed(3); s.pitch = +Math.atan2(dy, Math.hypot(dx, dz)).toFixed(3);
     }
     await A.pose(s.x, s.feet, s.z, s.yaw, s.pitch, s.fov, s.tod);
-    const st = await A.settle(60, 30); await A.step(6);
+    // (the far cameras' columns load slowly — run 2 left 200 … 350 of them unshown after 60 rounds: up to 150 now, a
+    //  camera whose near world is all there stops as soon as it is)
+    const st = await A.settle(150, 30); await A.step(6);
     return st;
   };
   // every build starts its random cameras afresh (the same seeded draws, the same first guesses)
