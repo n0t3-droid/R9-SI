@@ -190,9 +190,9 @@ const lookAt = async (dist, tag) => {
 // ---- MEASURE and SHOTS: one world per build, the presets switched in it
 // the frame time: FRAMES frames, then a 1×1 read of the canvas — the read waits until the GPU (SwiftShader) has drawn
 // every frame (WebGL's finish() is a flush in Chromium: it does not wait), so the time is the real work, CPU and GPU
-const timed = (n) => ev((m) => {
+const timed = (n, render = true) => ev(([m, r]) => {
   const g = VR.game, R = g.renderer, gl = R.gl, px = new Uint8Array(4);
-  window.__norender = false;
+  window.__norender = !r;
   const sync = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
   sync();
   const t0 = performance.now();
@@ -200,13 +200,15 @@ const timed = (n) => ev((m) => {
   sync();
   window.__norender = true;
   return (performance.now() - t0) / m;
-}, n);
+}, [n, render]);
 const measure = async (btag, preset) => {
   await ev(() => { const g = VR.game; g.env.setTime(6000); });
   await drive(3, true);                      // warm-up: shaders compile, first chunks upload
   await timed(2);
   await ev(() => { const R = VR.game.renderer; R.prof = {}; });
   const wall = await timed(FRAMES);
+  // the same frames without the drawing (the game's update alone): the frame time less this is the drawing's cost
+  const upd = await timed(FRAMES, false);
   const r = await ev((n) => {
     const R = VR.game.renderer, P = R.prof || {}; const out = { passes: {}, fsPerFrame: (P.fs || 0) / n, W: R.w, H: R.h, shadowRes: R.shadowSize || 0 };
     for (const k of Object.keys(P)) if (k !== 'cur' && k !== 't' && k !== 'fs') out.passes[k] = +(P[k] / n).toFixed(3);
@@ -216,8 +218,8 @@ const measure = async (btag, preset) => {
     R.prof = null;
     return out;
   }, FRAMES);
-  r.wallMs = +wall.toFixed(2);
-  console.log(`[${btag} ${preset}] ${r.W}x${r.H} ${r.wallMs} ms/frame (CPU + GPU, synced by a canvas read), submission per pass ${r.total} ms, draws ${r.stats.draws}, tris ${r.stats.tris}, sections ${r.stats.sections}, full-screen passes ${r.fsPerFrame}`);
+  r.wallMs = +wall.toFixed(2); r.updMs = +upd.toFixed(2); r.drawMs = +(wall - upd).toFixed(2);
+  console.log(`[${btag} ${preset}] ${r.W}x${r.H} ${r.wallMs} ms/frame (CPU + GPU, synced by a canvas read; the update alone ${r.updMs} ms, the drawing ${r.drawMs} ms), submission per pass ${r.total} ms, draws ${r.stats.draws}, tris ${r.stats.tris}, sections ${r.stats.sections}, full-screen passes ${r.fsPerFrame}`);
   console.log('   ' + Object.entries(r.passes).map(([k, v]) => `${k} ${v}`).join(' · '));
   check(r.wallMs > 0 && Number.isFinite(r.wallMs), `${btag} ${preset}: the frames measured (${r.wallMs} ms per frame)`);
   return r;
@@ -322,16 +324,17 @@ try {
         // the builds in turns, round after round
         for (let r = 0; r < ROUNDS; r++) for (const w of worlds) { page = w.page; (w.runs[preset] = w.runs[preset] || []).push(await measure(w.btag, preset)); }
         for (const w of worlds) {
-          const walls = w.runs[preset].map((x) => x.wallMs), m = med(walls);
+          const walls = w.runs[preset].map((x) => x.wallMs), m = med(walls), draws = w.runs[preset].map((x) => x.drawMs), md = med(draws);
           const pick = w.runs[preset].slice().sort((x, y) => Math.abs(x.wallMs - m) - Math.abs(y.wallMs - m))[0];
-          w.results[preset] = Object.assign({}, pick, { wallMs: +m.toFixed(2), rounds: walls });
-          console.log(`[${w.btag} ${preset}] median ${m.toFixed(2)} ms/frame over ${walls.length} rounds (${walls.join(', ')})`);
+          w.results[preset] = Object.assign({}, pick, { wallMs: +m.toFixed(2), drawMs: +md.toFixed(2), rounds: walls, drawRounds: draws });
+          console.log(`[${w.btag} ${preset}] median ${m.toFixed(2)} ms/frame over ${walls.length} rounds (${walls.join(', ')}); the drawing alone ${md.toFixed(2)} ms (${draws.join(', ')})`);
         }
         if (worlds.length === 2) {
           const a = worlds[0].runs[preset].map((x) => x.wallMs), b = worlds[1].runs[preset].map((x) => x.wallMs);
           const ratios = b.map((v, i) => v / a[i]), rm = med(ratios);
-          worlds[1].results[preset].vsV041 = { ratioMedian: +rm.toFixed(3), ratios: ratios.map((v) => +v.toFixed(3)) };
-          console.log(`[${preset}] ${TAG} against v0.41: ×${rm.toFixed(3)} (median of the per-round ratios ${ratios.map((v) => v.toFixed(3)).join(', ')})`);
+          const ad = worlds[0].runs[preset].map((x) => x.drawMs), bd = worlds[1].runs[preset].map((x) => x.drawMs), dr = bd.map((v, i) => v / ad[i]), drm = med(dr);
+          worlds[1].results[preset].vsV041 = { ratioMedian: +rm.toFixed(3), ratios: ratios.map((v) => +v.toFixed(3)), drawRatioMedian: +drm.toFixed(3), drawRatios: dr.map((v) => +v.toFixed(3)) };
+          console.log(`[${preset}] ${TAG} against v0.41: ×${rm.toFixed(3)} (median of the per-round ratios ${ratios.map((v) => v.toFixed(3)).join(', ')}); the drawing alone ×${drm.toFixed(3)} (${dr.map((v) => v.toFixed(3)).join(', ')})`);
           if (preset === 'potato') check(rm <= 1.0, `Very Low: ${TAG} no slower than v0.41 (×${rm.toFixed(3)}, the median per-round frame time ratio)`);
         }
       }
