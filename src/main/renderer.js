@@ -144,8 +144,11 @@
     buildPrograms() {
       const md = this.multi ? ['MULTIDRAW'] : [];
       // F1: shadow tiers (SHQ2 = 3×3 PCF on balanced, SHQ3 = a rotated 16-tap disc on high and ultra, else one hard tap)
-      // and the sky table on Very Low (ATMO_LUT: the sky formula baked into a 64×32 texture)
-      const sq = this.q.shadowQ | 0, atmo = this.q.atmoLUT ? ['ATMO_LUT'] : [];
+      // and the sky table (ATMO_LUT: the sky formula baked into a 64×32 texture): the haze over the land, the clouds,
+      // models and particles read it on every tier (a texture read instead of ~10 exps a fogged pixel; the haze changes
+      // slowly, the table is within 2 % of the formula); the sky pass itself on Very Low only (skyLUT) — on the higher
+      // tiers its pixels keep the formula
+      const sq = this.q.shadowQ | 0, atmo = ['ATMO_LUT'], skyLUT = this.q.atmoLUT ? ['ATMO_LUT'] : [];
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(sq === 3 ? ['SHQ3'] : sq === 2 ? ['SHQ2'] : []).concat(atmo);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs)
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
@@ -158,9 +161,9 @@
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
-      P.sky = GL.program(S.SKY_VS, S.SKY_FS, 'sky', atmo.concat(this.q.lite ? ['LITE'] : []));   // LITE: two-octave nebula, no dust (Very Low)
+      P.sky = GL.program(S.SKY_VS, S.SKY_FS, 'sky', skyLUT.concat(this.q.lite ? ['LITE'] : []));   // LITE: two-octave nebula, no dust (Very Low)
       P.expose = GL.program(S.FS_VS, S.EXPOSE_FS, 'expose');
-      P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud', atmo);   // (atmo: every program that draws the sky or the haze takes the table on Very Low)
+      P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud', atmo);   // (atmo: every program that draws the haze takes the table)
       P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff');   // t-clouds: cumulus, fog banks, anchors (balanced and above)
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
       P.down = GL.program(S.FS_VS, S.DOWN_FS, 'down');
@@ -176,7 +179,7 @@
       P.line = GL.program(S.LINE_VS, S.LINE_FS, 'line');
       P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain');
       P.decal = GL.program(S.DECAL_VS, S.DECAL_FS, 'decal');
-      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod', atmo);   // the far tiles: the haze from the table on Very Low (the formula cost 10 exps a pixel there)
+      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod', atmo);   // the far tiles: the haze from the table (the formula cost 10 exps a pixel there)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
 
@@ -576,8 +579,9 @@
 
     // ------------------------------------------------ uniforms
     // ------------------------------------------------ sky and light (F1)
-    // the sky state of this frame (atmos.js): the packed Perez numbers for the analytic sky, and on Very Low the 64×32
-    // table, rebuilt when the sun has moved about half a degree, or the turbidity or the tint has changed
+    // the sky state of this frame (atmos.js): the packed Perez numbers for the analytic sky, and the 64×32 table (the
+    // haze on every tier, the sky pass on Very Low), rebuilt when the sun has moved about half a degree, or the
+    // turbidity, the overcast or the tint has changed
     updateAtmo(E) {
       const A = VR.Atmos, gl = this.gl, sun = E.sunDir;
       const T = E.skyT === undefined ? 2.5 : E.skyT, tint = E.skyTint || [1, 1, 1], oc = E.skyOvercast || 0;
@@ -585,7 +589,7 @@
       o.T = T; o.tint = tint; o.overcast = oc; o.pal = A.K.palette > 0 ? E.skyPal : null;
       const st = this.atmoS = A.prepare(sun, o, this.atmoS);
       this.atmoP = A.glParams(st, this.atmoP);
-      if (!this.q.atmoLUT || !this.atmoTex) return;
+      if (!this.atmoTex) return;
       const k = this.atmoKey;
       const pal = o.pal ? o.pal[0][2] + o.pal[1][0] : 0;   // (a palette sky: its colours move with the time of day and the biome)
       if (k && 1 - (k[0] * sun[0] + k[1] * sun[1] + k[2] * sun[2]) < 3.8e-5 && Math.abs(k[3] - T) < 0.02 && Math.abs(k[4] - tint[0]) + Math.abs(k[5] - tint[1]) + Math.abs(k[6] - tint[2]) < 0.002 && Math.abs(k[7] - oc) < 0.02 && Math.abs(k[8] - pal) < 0.004) return;
