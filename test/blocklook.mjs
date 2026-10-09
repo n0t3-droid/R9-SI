@@ -22,7 +22,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 const boot = await ev(() => ({ setting: VR.game.settings.look, look: VR.LOOK && VR.LOOK.mode, rim: VR.game.texRim }));
-check(boot.setting === 'classic' && boot.look === 'classic' && boot.rim === true, 'a new player starts in Klassisch (setting, registry and textures): ' + JSON.stringify(boot));
+check(boot.setting === 'seamless' && boot.look === 'seamless' && boot.rim === false, 'a new player starts in Nahtlos (setting, registry and textures; the default since v0.43): ' + JSON.stringify(boot));
 // Settings → Graphics: the "Blöcke" control, in German and in English (English players never see German)
 const ctl = await ev(() => {
   const u = VR.game.ui, I = VR.I18N, was = I ? I.lang : localStorage.getItem('r9si.lang'), out = {};
