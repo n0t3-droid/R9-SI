@@ -575,7 +575,11 @@
     document.addEventListener('pointerlockchange', () => { if (isOpen() && document.pointerLockElement) { try { document.exitPointerLock(); } catch (e) { /* */ } } });
     // key I: the workshop, in the game (never while typing, with a menu up, in photo mode, dead, or with the Studio over it)
     window.addEventListener('keydown', (e) => {
-      if (e.code !== 'KeyI' || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+      // the workshop's key through the player's bindings (binds.js 'invent', default I): a key rebound to another
+      // action — forward on I, say — never opens the workshop
+      const codes = VR.Binds && VR.Binds.current ? VR.Binds.current.codesFor('KeyI') : null;
+      if (!(codes ? codes.includes(e.code) : e.code === 'KeyI') || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+      if (codes && VR.Binds.current.owners && VR.Binds.current.owners(e.code, 'invent').length) return;   // the key is another action's too: that action wins
       const t = e.target; if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
       if (isOpen()) { if (!layer && !busy) { e.preventDefault(); E.close(); } return; }
       const g = game(); if (!g || g.state !== 'play' || !g.player || g.player.dead || !g.ui) return;
