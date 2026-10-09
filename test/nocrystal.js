@@ -113,10 +113,11 @@ for (const seed of SEEDS) section('heartland ' + seed, () => {
     check(list.length > 0 && k9 === 0, `the Spire Citadel's foot: ${list.reduce((a, l) => a + l[2], 0)} crystal blocks in ${list.length} chunks at vgen 8, ${k9} at vgen 9`);
     const giants = columns(cells).filter(c => c.y1 - c.y0 >= 10), s = stands(c9.get, giants, false);
     check(giants.length >= 3 && s.ok === s.n, `the citadel's giants: rock stands where ${s.n} giant crystals stood (${s.ok})` + (s.miss.length ? ' — empty at ' + s.miss.join(' · ') : ''));
-    // the citadel keeps its spires: the same tan stone, slits, trim and beacons
-    const same = (re) => { let a = 0, b = 0; for (const [cx, cz] of list) { const x8 = c8.col(cx, cz).blocks, x9 = c9.col(cx, cz).blocks; for (let i = 0; i < x8.length; i++) { if (re.test(nameOf(x8[i]))) a++; if (re.test(nameOf(x9[i]))) b++; } } return [a, b]; };
-    const [s8, s9] = same(/^spire_/);
-    check(s8 === s9, `the citadel keeps its spires (spire stone, trim, slits, caps: ${s9} blocks at vgen 9, ${s8} at vgen 8)`);
+    // the citadel keeps its spires: every block of its tan stone, slits, trim and caps at vgen 8 is there at vgen 9 (the
+    // rocks never cut into a tower; at vgen 8 a crystal could)
+    let s8 = 0, lost = 0; const where = [];
+    for (const [cx, cz] of list) { const x8 = c8.col(cx, cz).blocks, x9 = c9.col(cx, cz).blocks; for (let i = 0; i < x8.length; i++) if (/^spire_/.test(nameOf(x8[i]))) { s8++; if (x9[i] !== x8[i]) { lost++; if (where.length < 3) where.push((cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (cz * 16 + ((i >> 4) & 15)) + ' ' + nameOf(x9[i])); } } }
+    check(s8 > 0 && lost === 0, `the citadel keeps its spires (${s8} blocks of spire stone, trim, slits and caps; ${lost} changed at vgen 9)` + (where.length ? ': ' + where.join(' · ') : ''));
   }
 });
 
@@ -284,12 +285,13 @@ section('cost', () => {
   const seed = SEEDS[0], at = findBiome(gen(seed, 8), ['crystal_highlands']) || findBiome(gen(seed, 8), ['prism_fields']);
   if (!at) { check(false, 'no prism land for the cost test'); return; }
   const run = (vgen) => { const g = gen(seed, vgen); let emit = 0, solid = 0; const ms = cpu(() => { for (let cz = (at[1] >> 4) - 1; cz <= (at[1] >> 4) + 1; cz++) for (let cx = (at[0] >> 4) - 1; cx <= (at[0] >> 4) + 1; cx++) { const c = g.generate(cx, cz); for (let i = 0; i < c.blocks.length; i++) { const s = c.blocks[i]; if (s) { solid++; if (T.emit && T.emit[s] > 0) emit++; } } } }); return { ms, emit, solid }; };
+  // (a busy machine spreads single runs over a factor of five: the least of six interleaved runs is the work itself)
   const r8 = [], r9 = [];
-  for (let k = 0; k < 3; k++) { r8.push(run(8)); r9.push(run(9)); }
-  const med = (a) => a.map(r => r.ms).sort((x, y) => x - y)[1];
-  const m8 = med(r8), m9 = med(r9);
-  console.log(`    ${at[2]} 3×3 chunks: vgen 8 ${m8.toFixed(0)} ms CPU, ${r8[0].solid} blocks, ${r8[0].emit} glowing · vgen 9 ${m9.toFixed(0)} ms, ${r9[0].solid} blocks, ${r9[0].emit} glowing`);
-  check(m9 <= m8 * 1.15 + 15, `the prism patch generates no slower at vgen 9 (${m9.toFixed(0)} ms vs ${m8.toFixed(0)} ms CPU, median of 3)`);
+  for (let k = 0; k < 6; k++) { if (k & 1) { r9.push(run(9)); r8.push(run(8)); } else { r8.push(run(8)); r9.push(run(9)); } }
+  const least = (a) => Math.min(...a.map(r => r.ms));
+  const m8 = least(r8), m9 = least(r9);
+  console.log(`    ${at[2]} 3×3 chunks: vgen 8 ${m8.toFixed(0)} ms CPU, ${r8[0].solid} blocks, ${r8[0].emit} glowing · vgen 9 ${m9.toFixed(0)} ms, ${r9[0].solid} blocks, ${r9[0].emit} glowing (runs: ${r8.map(r => r.ms.toFixed(0)).join(' ')} · ${r9.map(r => r.ms.toFixed(0)).join(' ')})`);
+  check(m9 <= m8 * 1.15 + 15, `the prism patch generates no slower at vgen 9 (${m9.toFixed(0)} ms vs ${m8.toFixed(0)} ms CPU, the least of six runs)`);
   check(r9[0].emit < r8[0].emit, `fewer glowing blocks to light at vgen 9 (${r9[0].emit} < ${r8[0].emit})`);
 });
 

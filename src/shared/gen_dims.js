@@ -246,8 +246,10 @@
 
   // ================================ DRIFT ==================================
   class DriftGen {
-    constructor(seed) {
+    constructor(seed, opts) {
       this.seed = seed >>> 0;
+      this.vgen = (opts && opts.vgen) || 1;           // the world's generator version: vgen 9 has no crystals (GEN.noCry)
+      this.noCrystal = !!(opts && opts.noCrystal);
       const F = VR.Fractal, s = this.seed;
       this.mask = new F(s ^ 0x91, 3, 1 / 130, 0.5);
       this.top = new F(s ^ 0x92, 3, 1 / 60, 0.5);
@@ -270,6 +272,7 @@
       const blocks = new Uint16Array(65536), biome = new Uint8Array(256);
       const x0 = cx * 16, z0 = cz * 16;
       const rng = new VR.RNG(M.hash2(cx, cz, this.seed));
+      const noCry = GEN.noCry(this);
       for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
         const x = x0 + lx, z = z0 + lz, col = lz * 16 + lx;
         biome[col] = this.biomeAt(x, z);
@@ -279,7 +282,7 @@
         const prism = biome[col] === BI.prism_reach;
         for (let y = Math.max(1, bot); y <= top && y < 250; y++) {
           const d = top - y;
-          blocks[(y << 8) | col] = d === 0 ? (prism ? S.calcite : S.grass) : d < 3 ? (prism ? S.calcite : S.dirt) : (prism && rng.chance(0.05) ? st('amethyst_block') : S.stone);
+          blocks[(y << 8) | col] = d === 0 ? (prism ? S.calcite : S.grass) : d < 3 ? (prism ? S.calcite : S.dirt) : (prism && rng.chance(0.05) && !noCry ? st('amethyst_block') : S.stone);   // (vgen 9: stone, the same draws)
         }
         // ore sprinkle
         for (let y = Math.max(1, bot); y < top - 3; y++) if (rng.chance(0.004)) blocks[(y << 8) | col] = st(rng.pick(['coal_ore', 'iron_ore', 'copper_ore', 'lapis_ore', 'gold_ore', 'diamond_ore']));
@@ -310,11 +313,14 @@
       return { blocks, biome, caveBiome: new Int8Array(256).fill(-1), tints: emptyTints(BI.drift_isles), chests: [] };
     }
     crystal(w, x, y, z, rng) {
-      const kinds = ['amethyst_block', 'amethyst_block', 'calcite'];
+      // vgen 9 (GEN.noCry): the same draws, a white chalk pinnacle — calcite with a few stone courses, a calcite cap — and
+      // small calcite rocks round its foot where the ice crystals stood
+      const noCry = GEN.noCry(this);
+      const kinds = noCry ? ['calcite', 'calcite', 'stone'] : ['amethyst_block', 'amethyst_block', 'calcite'];
       const h = 3 + rng.int(7);
       for (let i = 0; i < h; i++) { const r = Math.max(0, Math.round((1 - i / h) * 1.5)); for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) w.place(x + dx, y + i, z + dz, st(kinds[rng.int(3)]), 2); }
-      w.place(x, y + h, z, st('amethyst_cluster', { facing: 4 }));
-      for (let n = 0; n < 4; n++) { const f = rng.int(4); w.place(x + VR.HF_DX[f] * 2, y, z + VR.HF_DZ[f] * 2, st('ice_crystal', { facing: 4, size: rng.int(3) })); }
+      w.place(x, y + h, z, noCry ? st('calcite') : st('amethyst_cluster', { facing: 4 }));
+      for (let n = 0; n < 4; n++) { const f = rng.int(4), sz = rng.int(3); w.place(x + VR.HF_DX[f] * 2, y, z + VR.HF_DZ[f] * 2, noCry ? st('calcite') : st('ice_crystal', { facing: 4, size: sz })); }
     }
     findSpawn() {
       for (let r = 0; r < 3000; r += 8) for (let a = 0; a < 16; a++) {
@@ -343,7 +349,7 @@
   VR.makeGen = function (dim, seed, opts) {
     if (dim === 'underforge') return new UnderforgeGen(seed);
     if (dim === 'hollow') return new HollowGen(seed);
-    if (dim === 'drift') return new DriftGen(seed);
+    if (dim === 'drift') return new DriftGen(seed, opts);
     if (opts && opts.worldType === 'flat') return new FlatGen();
     return new VR.OverworldGen(seed, opts);
   };
