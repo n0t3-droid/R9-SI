@@ -159,8 +159,8 @@
     return out;
   };
   // the craft around a pad at time t (at most three: the one leaving, the one on the pad, the one coming): poses
-  PL.active = function (pad, seed, t, cache, outs, o) {
-    const c = PL.visitAt(seed, t, cache, o), list = [];
+  PL.active = function (pad, seed, t, cache, outs, o, into) {
+    const c = PL.visitAt(seed, t, cache, o), list = into || []; list.length = 0;
     const Tm1 = c.T - PL.stay(seed, c.n - 1, o) - PL.GAP, Tp1 = c.T + PL.stay(seed, c.n, o) + PL.GAP;
     const ms = [[c.n - 1, Tm1], [c.n, c.T], [c.n + 1, Tp1]];
     for (let k = 0; k < 3; k++) { const q = PL.pose(pad, seed, ms[k][0], ms[k][1], t, outs ? outs[k] : null, o); if (q) list.push(q); }
@@ -357,7 +357,7 @@
         if (pad.kind === 'outpost' && pad.ship && this.occupied(pad)) { pad.live = null; this.groundCrew(pad, dt, d); continue; }
         pad.ground = null;
         pad.outs = pad.outs || [{}, {}, {}];
-        const list = PL.active(pad, pad.seed, this.clock, pad.cache || (pad.cache = { seed: pad.seed, n: 0, T: PL.t0(pad.seed) }), pad.outs);
+        const list = PL.active(pad, pad.seed, this.clock, pad.cache || (pad.cache = { seed: pad.seed, n: 0, T: PL.t0(pad.seed) }), pad.outs, null, pad.list || (pad.list = []));
         pad.live = list;
         for (const q of list) this.craft(pad, q, dt, d, night);
       }

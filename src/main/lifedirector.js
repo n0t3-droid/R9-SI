@@ -109,7 +109,9 @@
   // each: start(D, ev) → false when it finds no place to happen; update(D, ev, dt) → false when done; draw(D, ev, r, E,
   // cam, prog()) for its figures and models (the vox program, opaque); end(D, ev). ev: {kind, k, seed, age, dur, …}
   const ACT = LD.ACT = {};
-  const spawnP = (D, x, y, z, vx, vy, vz, col, size, o) => D.P.spawn(x, y, z, vx, vy, vz, Object.assign({ col, size, force: true, grav: 0, drag: 0, collide: false, fade: false, life: D.dtLife }, o));
+  // a particle that lives one frame (an agent drawn again every frame); one options record for all of them (no allocation)
+  const PO = { col: null, size: 0, force: true, grav: 0, drag: 0, collide: false, fade: false, life: 0, emis: 0 };
+  const spawnP = (D, x, y, z, vx, vy, vz, col, size, emis) => { PO.col = col; PO.size = size; PO.life = D.dtLife; PO.emis = emis || 0; return D.P.spawn(x, y, z, vx, vy, vz, PO); };
   const rnd = (ev, i) => h(ev.seed, i, 0x3b);
 
   // ---- birds across the sun: a flock of 9–15 crosses in front of the sun (or across the view when the sun is behind)
@@ -301,6 +303,7 @@
     draw(D, ev, r, E, cam, prog) { LK.drawModel(D.g, r, prog(), 'life_cart', [ev.pos[0], ev.y + Math.sin(D.time * 2.2) * 0.04, ev.pos[2]], ev.pos[3], cam, {}); },
   };
 
+  const METEOR = [1, 0.96, 0.86];
   // ---- a meteor at night (on Balanced and up a short shower): a bright head and a fading streak high over the land
   ACT.meteor = {
     start(D, ev) {
@@ -319,7 +322,7 @@
         const a = ev.age - m.t0; if (a < 0 || a > m.life) continue;
         m.p[0] += m.v[0] * dt; m.p[1] += m.v[1] * dt; m.p[2] += m.v[2] * dt;
         const k = Math.sin(Math.PI * a / m.life);
-        spawnP(D, m.p[0], m.p[1], m.p[2], 0, 0, 0, [1, 0.96, 0.86], 1.5 * k + 0.3, { emis: 1.6 });
+        spawnP(D, m.p[0], m.p[1], m.p[2], 0, 0, 0, METEOR, 1.5 * k + 0.3, 1.6);
         D.P.spawn(m.p[0], m.p[1], m.p[2], 0, 0, 0, { life: 0.5, size: 0.95 * k, grav: 0, col: [0.75, 0.82, 1], emis: 1.2, drag: 0, collide: false, force: true });
       }
     },

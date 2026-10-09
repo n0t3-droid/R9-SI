@@ -246,9 +246,9 @@
   };
   // both craft at clock t: [{c (0 the hangar's own, 1 the second), n (its visit), phase, pos, yaw, pitch, roll, gear,
   // thrust, speed, u (seconds on the pad), S (the stay)}, …]; cache: a visitAt cache; spot: the pad's z (or the apron's)
-  HF.sched = function (t, cache, outs, spot) {
+  HF.sched = function (t, cache, outs, spot, into) {
     const c = HF.visitAt(t, cache || { n: 0, T: HF.T0 }), n = c.n, T = c.T, S = HF.stay(n), L = T + S, z = spot === undefined ? PADZ : spot;
-    const res = [];
+    const res = into || []; res.length = 0;
     // the one whose visit it is: on the pad, or (lifted) on its way to visit n + 2
     const a = (outs && outs[n & 1]) || { pos: [0, 0, 0] };
     if (t < L) { a.pos[0] = AX; a.pos[1] = DECK; a.pos[2] = z; a.phase = 'pad'; a.yaw = 0; a.pitch = 0; a.roll = 0; a.gear = 1; a.speed = 0; a.u = t - T; a.S = S; a.thrust = a.u < 12 ? 0.25 * (1 - a.u / 12) : a.u > S - 3 ? 0.3 * (a.u - (S - 3)) / 3 : 0; }
@@ -329,7 +329,7 @@
       if ((this.variantT -= dt) <= 0) { this.variantT = 5; const was = this.variant; this.choose(); if (was !== this.variant) for (const C of this.crafts) this.flush(C); }
       this.fadeIn = Math.min(1, this.fadeIn + dt / 2);
       this.hideHome(this.variant === 'hall');
-      const outs = this.crafts.map(C => C.q), list = HF.sched(this.clock, this.cache, outs, this.spot), pl = g.player.pos;
+      const outs = this.outs || (this.outs = this.crafts.map(C => C.q)), list = HF.sched(this.clock, this.cache, outs, this.spot, this.list || (this.list = [])), pl = g.player.pos;
       for (const s of list) {
         const C = this.crafts[s.c];
         if (!C.d || !SS.designs.has(C.d.key)) { C.d = SS.design(HF.SEEDS[C.c], 'shuttle', HF.PALS[C.c]); C.inst.d = C.d; }
