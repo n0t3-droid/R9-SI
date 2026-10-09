@@ -248,9 +248,10 @@ if (city) {
   // the planted verges of t1_24 · t2_23: ferns along the kerbs, fan palms (a crown on a trunk of two or three) between
   // the tall palms, each with its trunk and the crown's anchor (the cell the smooth palm stands on); small round trees
   const ANCHOR = R.S('vm_palm_crown', { part: 'p303', facing: 0 }), anchorOf = (x, y, z) => cityAt.get(x + ',' + y + ',' + z) === ANCHOR;
-  let fans = 0, fansOk = 0; for (const rd of roads) for (const [x, z, , y, h] of (rd.fans || [])) { fans++; let ok = h >= 2 && h <= 3 && anchorOf(x, y + h, z); for (let k = 0; k < h; k++) if (cnm(x, y + k, z) !== 'vx_palm_trunk') ok = false; if (ok) fansOk++; }
+  // (each fan palm in its raised bed: dark soil under the trunk, the light grey kerb round it — t1_24)
+  let fans = 0, fansOk = 0, fanBeds = 0; for (const rd of roads) for (const [x, z, , y, h] of (rd.fans || [])) { fans++; let ok = h >= 2 && h <= 3 && anchorOf(x, y + h, z); for (let k = 0; k < h; k++) if (cnm(x, y + k, z) !== 'vx_palm_trunk') ok = false; if (ok) fansOk++; let ring = 0; for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if ((dx || dz) && cnm(x + dx, y - 1, z + dz) === 'vollton_light_grey') ring++; if (cnm(x, y - 1, z) === 'podzol' && ring >= 4) fanBeds++; }
   let anchors = 0; for (const rd of roads) for (const side of ['L', 'R']) for (const run of ((rd.palms && rd.palms[side]) || [])) for (const p of run) if (anchorOf(p[0], p[3] + p[4], p[1])) anchors++;
-  check((cnt.vx_fern_lush || 0) > 100 && fans >= 20 && fansOk === fans && anchors === palmsRoad && (city.trees || []).length >= 10, `planted verges: ${cnt.vx_fern_lush | 0} ferns, ${fansOk} of ${fans} fan palms whole, ${anchors} of ${palmsRoad} tall crowns anchored, ${(city.trees || []).length} small round trees`);
+  check((cnt.vx_fern_lush || 0) > 100 && fans >= 20 && fansOk === fans && fanBeds >= fans * 0.8 && anchors === palmsRoad && (city.trees || []).length >= 10, `planted verges: ${cnt.vx_fern_lush | 0} ferns, ${fansOk} of ${fans} fan palms whole, ${fanBeds} in a raised bed, ${anchors} of ${palmsRoad} tall crowns anchored, ${(city.trees || []).length} small round trees`);
   // the homes: a door and a bed each; the plan the same twice
   const homesOk = plan8.homes.filter(h => h.door && h.beds && h.beds.length && /door/.test(cnm(h.door[0], h.door[1], h.door[2]))).length;
   check(plan8.homes.length === lots.length && homesOk === plan8.homes.length, `every villa is a home with its door and a bed (${homesOk} of ${plan8.homes.length})`);
