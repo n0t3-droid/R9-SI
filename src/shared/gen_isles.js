@@ -55,7 +55,7 @@
       OCHRE: st('ochre_rock'), UMBER: st('umber_rock'), TERRA: st('orange_terracotta'), TERRAB: st('brown_terracotta'), GRASS: st('grass_block'), DIRT: st('dirt'),
       CRY: (c, big) => st(c + '_crystal_cluster', { facing: 4, size: big ? 1 : 0 }), CRYB: (c) => st(c + '_crystal_block'), FERN: st('vx_fern_lush'), BUSH: st('vx_bush'),
       VSTONE: st('spire_stone'), VRAIL: st('vx_tech_railing'), VLINE: st('vx_floor_plaza_line'),
-      ROOTS: st('hanging_roots'), VINE: (berries, tip) => st('glow_berry_vine', { berries: berries ? 1 : 0, tip: tip ? 1 : 0 }), TUFT: st('vm_tuft_grass', { part: 'p000', facing: 0 }) || st('vx_fern_lush'),
+      ROOTS: st('hanging_roots'), VINE: (berries, tip) => st('glow_berry_vine', { berries: berries ? 1 : 0, tip: tip ? 1 : 0 }),
     };
   }
   ISLES.build = function (g) {
