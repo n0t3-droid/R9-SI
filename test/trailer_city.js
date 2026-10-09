@@ -290,5 +290,22 @@ if (!process.env.SKIP_COST) {
   check(neu.per <= old.per * 1.10, `the city's chunk triangles per column at F1 within 10 % of the v042 town (${(neu.per / old.per * 100 - 100).toFixed(1)} %)`);
 }
 
+// ---------------------------------------------------------------- 6 · the lamp halos after dark
+// (run 1 at dusk: every cell of the kerb lines took one of the 48 warm halos — rows of blobs along every road; the
+//  frames' lines are clean cyan) — point lights only, a cool light in its own colour
+console.log('6 · the lamp halos after dark');
+{
+  let P = null;
+  try { require(__dirname + '/../src/main/particles.js'); P = V.Particles; } catch (e) { console.log('    ' + String(e && e.message || e).slice(0, 160)); }
+  const HS = P && P.haloStates ? P.haloStates() : null;
+  const S = (n, pr) => R.S(n, pr);
+  const area = [['vx_floor_plaza_line'], ['vx_floor_plaza_line_amber'], ['vx_nova_window', { facing: 0 }], ['vx_nova_band', { glow: 3 }], ['vx_nova_band', { glow: 1 }], ['vx_led_strip']];
+  const point = [['lantern'], ['torch'], ['vx_lamppost_tech', { head: 1 }], ['vx_lantern'], ['vx_garden_lamp']];
+  const badA = area.filter(([n, pr]) => !HS || HS[S(n, pr)]).map(a => a[0]), badP = point.filter(([n, pr]) => !HS || !HS[S(n, pr)] || !R.T.emit[S(n, pr)]).map(a => a[0]);
+  check(!!HS && !badA.length && !badP.length, `halos for the point lights only (area lights with a halo: ${badA.join(', ') || 'none'}; point lights without: ${badP.join(', ') || 'none'})`);
+  const cool = P && P.haloColor ? P.haloColor(S('vx_lamppost_tech', { head: 1 }), [0, 0, 0]) : [1, 1, 1], warm = P && P.haloColor ? P.haloColor(S('lantern'), [0, 0, 0]) : [0, 0, 0];
+  check(cool[2] > cool[0] + 0.3 && warm[0] === 1 && Math.abs(warm[1] - 0.74) < 1e-6 && Math.abs(warm[2] - 0.42) < 1e-6, `a cool light's halo is its own colour (the tech lamp ${cool.map(v => v.toFixed(2)).join('/')}), a warm one keeps v0.42's (${warm.map(v => v.toFixed(2)).join('/')})`);
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
