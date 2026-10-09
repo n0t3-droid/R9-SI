@@ -639,6 +639,8 @@
     // worker whenever it runs low, so a slow frame never starves them. Sections far from the player are meshed
     // without their mini-voxel detail (the averaged boxes draw there anyway) and get it when the player comes close.
     scheduleMeshes(pcx, pcy, pcz, lcx, lcz, pos) {
+      // (F9: in the takt the starts also stop at half the frame's streaming budget — a start copies blocks on the main thread)
+      const tk = !!(this.streamTakt && VR.UL && this.streamMs !== undefined), t0 = tk ? performance.now() : 0, cap = tk ? Math.max(0.25, this.streamMs * 0.5) : 0;
       const nw = this.pool.workers.length;
       const room = nw * 10 - (this.meshInflight || 0);      // ~two frames of mesh work per worker in flight, never more
       let budget = Math.min(room, 8 + nw * 8);
@@ -681,7 +683,7 @@
           if (best.length === budget) worst = best[budget - 1][0];
         }
       }
-      for (let i = 0; i < best.length; i++) { const b = best[i]; this.meshSection(b[1], b[2], false, b[0], pos); }   // same scale as the generation requests: nearest work first, whatever its kind
+      for (let i = 0; i < best.length; i++) { if (tk && i > 0 && performance.now() - t0 > cap) break; const b = best[i]; this.meshSection(b[1], b[2], false, b[0], pos); }   // same scale as the generation requests: nearest work first, whatever its kind
       best.length = 0;
     }
     // far-meshed sections inside the inner part of the keep ring are re-meshed with their detail
