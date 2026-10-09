@@ -64,29 +64,37 @@
     // the villages' and the towns' own pieces (voxarch.js, voxtech.js, voxhome.js): the beds (foot and head), the table,
     // the chair, the modular sofas (a row joins: a sofa's arms stand only at the row's ends)
     ['red', 'blue', 'green', 'yellow', 'purple', 'pink', 'white', 'teal'].map(c => 'vx_bed_' + c), ['vx_table', 'vx_chair'],
-    ['white', 'charcoal', 'cream', 'taupe', 'blue', 'orange'].map(c => 'vx_sofa_' + c));
-  // the sofas that join their neighbours in a row (voxtech.js ctxHook.sofa: the same kind and family): the group number
-  const PROP_JOIN = { vx_sofa_white: 1, vx_sofa_charcoal: 1, vx_sofa_cream: 1, vx_sofa_taupe: 1, vx_sofa_blue: 2, vx_sofa_orange: 3 };
+    ['white', 'charcoal', 'cream', 'taupe', 'blue', 'orange'].map(c => 'vx_sofa_' + c),
+    // the villas' smaller pieces (the chandelier, the table lamp and its side table, the console, the bar cart, the bar
+    // stool) and the rugs (voxarch.js: a rug block joins its neighbours into one rug)
+    ['vm_chandelier', 'vm_table_lamp', 'vm_side_table', 'vm_console', 'vm_bar_cart', 'vm_stool'], ['red', 'blue', 'green', 'sand'].map(c => 'vx_rug_' + c));
+  // the sofas that join their neighbours in a row (voxtech.js ctxHook.sofa: the same kind and family): the group number;
+  // groups from 16 join on all four sides along the world's axes (the rugs: any rug joins any rug, as voxarch.js does)
+  const PROP_JOIN = { vx_sofa_white: 1, vx_sofa_charcoal: 1, vx_sofa_cream: 1, vx_sofa_taupe: 1, vx_sofa_blue: 2, vx_sofa_orange: 3, vx_rug_red: 16, vx_rug_blue: 16, vx_rug_green: 16, vx_rug_sand: 16 };
   const LXP = [0, 4, 1, 5], LXM = [1, 5, 0, 4];   // the neighbour (DOFF index) on a piece's local +x and −x for its facing
+  // the pieces that stand on one another (gen_villa_rooms.js puts the table lamp in the cell over its side table): 1 looks
+  // for a 2 over it, 2 for a 1 under it (bit 2 of the anchor's facing: the lamp stands on the table's top, the table's
+  // vase makes room)
+  const PROP_STACK = { vm_side_table: 1, vm_table_lamp: 2 };
   // the prop groups (job.smoothProps is a mask of them; true is the plants alone): 1 the plants (palms), 2 the furniture
   const PROP_GROUP = VR.PROP_GROUP = { plants: 1, furniture: 2 };
   let PROPT = null;
   function propTables() {
-    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n), group = new Uint8Array(n), join = new Uint8Array(n);
+    const n = R.stateCount + 1, kind = new Uint8Array(n), anchor = new Uint8Array(n), stem = new Uint8Array(n), facing = new Uint8Array(n), group = new Uint8Array(n), join = new Uint8Array(n), stack = new Uint8Array(n);
     const furn = new Map(PROP_FURN.map((nm, i) => [nm, i]));
     for (const t of R.types) {
       const o = t.o || {}, fi = furn.get(t.name);
       if (!o.prop && !o.propStem && fi === undefined) continue;
       for (let s = t.base; s < t.base + t.nstates; s++) {
         facing[s] = t.has('facing') ? t.get(s, 'facing') & 3 : 0;
-        if (fi !== undefined) { kind[s] = PROP_FURN0 + fi; group[s] = PROP_GROUP.furniture; anchor[s] = !t.has('part') || t.get(s, 'part') === 0 ? 1 : 0; join[s] = PROP_JOIN[t.name] || 0; continue; }
+        if (fi !== undefined) { kind[s] = PROP_FURN0 + fi; group[s] = PROP_GROUP.furniture; anchor[s] = !t.has('part') || t.get(s, 'part') === 0 ? 1 : 0; join[s] = PROP_JOIN[t.name] || 0; stack[s] = PROP_STACK[t.name] || 0; continue; }
         kind[s] = PROP_KIND[o.prop] || 0;
         stem[s] = PROP_KIND[o.propStem] || 0;
         group[s] = PROP_GROUP.plants;
         anchor[s] = (o.propAnchor === 'all' || (o.propAnchor && t.has('part') && t.getV(s, 'part') === o.propAnchor)) ? 1 : 0;
       }
     }
-    PROPT = { kind, anchor, stem, facing, group, join };
+    PROPT = { kind, anchor, stem, facing, group, join, stack };
   }
 
   class Buf {
@@ -367,10 +375,13 @@
         // a prop block: its geometry is the smooth prop's. The anchor goes to the list: the block that anchors the prop
         // (its bottom face is the trunk's top), or the air above a trunk top that no prop of its kind covers
         if (PROPT.anchor[b]) {
-          // a sofa in a row: bit 2 a neighbour of its group on its local +x, bit 3 on its local −x (its arms go there)
+          // a sofa in a row: bit 2 a neighbour of its group on its local +x, bit 3 on its local −x (its arms go there); a
+          // rug: bits 2–5 a rug on +x, −x, +z, −z; a table lamp on its side table, the table under it: bit 2
           let f = PROPT.facing[b];
-          const jg = PROPT.join[b];
-          if (jg) f |= (PROPT.join[B[bi + DOFF[LXP[f]]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[LXM[f]]]] === jg ? 8 : 0);
+          const jg = PROPT.join[b], sk = PROPT.stack[b];
+          if (jg >= 16) f |= (PROPT.join[B[bi + DOFF[0]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[1]]] === jg ? 8 : 0) | (PROPT.join[B[bi + DOFF[4]]] === jg ? 16 : 0) | (PROPT.join[B[bi + DOFF[5]]] === jg ? 32 : 0);
+          else if (jg) f |= (PROPT.join[B[bi + DOFF[LXP[f]]]] === jg ? 4 : 0) | (PROPT.join[B[bi + DOFF[LXM[f]]]] === jg ? 8 : 0);
+          if (sk && PROPT.stack[B[bi + DOFF[sk === 1 ? 2 : 3]]] === 3 - sk) f |= 4;
           propOut.push(job.ox + x, sy * 16 + y, job.oz + z, PROPT.kind[b], f, L[bi]);
         }
         else if (PROPT.stem[b] && PROPT.kind[B[bi + DOFF[2]]] !== PROPT.kind[b]) propOut.push(job.ox + x, sy * 16 + y + 1, job.oz + z, PROPT.stem[b], 0, L[bi + DOFF[2]]);
