@@ -1076,8 +1076,12 @@
     // the two caches swap. Each frame pays about a SLICES-th of the far world, whatever lies where.
     fcSlice(st, F, E) {
       const FC = VR.UL.Far, gl = this.gl, b = st.back, K = FC.SLICES, k = b.k;
-      const sv = [this.viewProj, this.invViewProj, this.planes, this.camFrac, this.camInt, this.cam];
+      const sv = [this.viewProj, this.invViewProj, this.planes, this.camFrac, this.camInt, this.cam, this.shadowMat];
       this.viewProj = b.vp; this.invViewProj = b.inv; this.planes = b.strips[k]; this.camFrac = b.camFrac; this.camInt = b.camInt; this.cam = b.cam;
+      // the shadow lookup is for this frame's eye: moved to the cache's eye, where the strip is drawn from
+      const T = this.fcTmp2 || (this.fcTmp2 = mat4.create()), SM = this.fcShadowM || (this.fcShadowM = mat4.create());
+      T.fill(0); T[0] = 1; T[5] = 1; T[10] = 1; T[15] = 1; T[12] = b.x - F.cam.x; T[13] = b.y - F.cam.y; T[14] = b.z - F.cam.z;
+      this.shadowMat = mat4.mul(SM, sv[6], T);
       gl.bindFramebuffer(gl.FRAMEBUFFER, b.fb); gl.viewport(0, 0, b.tw, b.th);
       gl.disable(gl.SCISSOR_TEST);
       if (k === 0) { gl.depthMask(true); gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); }
@@ -1090,10 +1094,13 @@
       if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);
       this.fs(p);
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
-      this.fcTerrain(b.list, E, [b.x, b.y, b.z]);
+      const eye = [b.x, b.y, b.z];
+      this.fcTerrain(b.list, E, eye);
+      // (step 4) the furniture beyond the near radius: drawn here once, not every frame (liveProps draws the rest)
+      if (this.q.smoothFurn) { const sp = this.fcSplitFar || (this.fcSplitFar = { x: 0, y: 0, z: 0, R2: 0, far: true }); sp.x = b.x; sp.y = b.y; sp.z = b.z; sp.R2 = b.R * b.R; this.drawProps(E, eye, false, 0, sp); }
       if (F.horizon) F.horizon.draw(this, E);
       gl.disable(gl.SCISSOR_TEST);
-      this.viewProj = sv[0]; this.invViewProj = sv[1]; this.planes = sv[2]; this.camFrac = sv[3]; this.camInt = sv[4]; this.cam = sv[5];
+      this.viewProj = sv[0]; this.invViewProj = sv[1]; this.planes = sv[2]; this.camFrac = sv[3]; this.camInt = sv[4]; this.cam = sv[5]; this.shadowMat = sv[6];
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, this.w, this.h);
       if (++b.k < K) return;
       b.ok = true; st.spare = st.front; st.front = b; st.back = null;
@@ -1232,7 +1239,7 @@
     propDefines() { return (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); }
     // the anchors in reach, camera-relative: list A (full palms, nearer than D1), list B (crosses, nearer than D2), and
     // the furniture by model (near F1, far F2, in the frustum)
-    propGather(cam, lvl, D1, D2, furn, planes, refl) {
+    propGather(cam, lvl, D1, D2, furn, planes, refl, split) {
       const PR = VR.Props, K = PR.INST, FURN0 = PR.FURN0, r1 = D1 * D1, r2m = D2 * D2;
       // refl (t-smooth2): 1 the mirror on tier 1 — the furniture's far forms only; 2 the mirror on tier 2 — the models
       // within 16 blocks, the far forms to 64 (the mirror is half the frame and rippled: run 2 measured +64 draws and
@@ -1247,6 +1254,7 @@
           const o = i * K, dx = d[o] - cam[0], dy = d[o + 1] - cam[1], dz = d[o + 2] - cam[2], r2 = dx * dx + dy * dy + dz * dz;
           if (kind[i] >= FURN0) {
             if (!furn || r2 >= f2) continue;
+            if (split) { const ex = d[o] - split.x, ez = d[o + 2] - split.z, e2 = ex * ex + ez * ez; if (split.far ? e2 < split.R2 : e2 >= split.R2) continue; }
             const sl = slots[ms[i]]; if (!sl) continue;
             const R = sl.rad;
             if (planes && !mat4.boxInFrustum(planes, dx - R, dy - 0.2, dz - R, dx + R, dy + sl.h, dz + R)) continue;
@@ -1301,14 +1309,24 @@
       }
       return u;
     }
+    // F9 · (step 4) the props of the main pass: with the far cache shown, the furniture beyond its near radius is in the
+    // cache (fcSlice draws it there once) — only the pieces within it are drawn here every frame
+    liveProps(E, camPos, fc) {
+      if (!this.q.smoothProps && !this.q.smoothFurn) return;
+      let split = null;
+      if (fc && fc.front && this.q.smoothFurn) { const f = fc.front; split = this.fcSplitNear || (this.fcSplitNear = { x: 0, y: 0, z: 0, R2: 0, far: false }); split.x = f.x; split.y = f.y; split.z = f.z; split.R2 = f.R * f.R; }
+      this.drawProps(E, camPos, false, 0, split);
+    }
     // refl (t-smooth2): the water's mirrored pass (reflectPass) — 2 the props as in the main pass, 1 their far forms only
     // (the crosses and the boxes: the quarter-size reflection of the lower water tier); no glass, no contact shadows there
-    drawProps(E, camPos, shadow, refl) {
-      const lvl0 = this.q.smoothProps | 0, furn = this.q.smoothFurn | 0, lvl = refl === 1 ? Math.min(1, lvl0) : lvl0;
+    // split (F9): the furniture only on one side of a radius round a point ({x, z, R2, far}); far: the far cache's pass
+    // (furniture only, the palms stay live: they sway)
+    drawProps(E, camPos, shadow, refl, split) {
+      const lvl0 = this.q.smoothProps | 0, furn = this.q.smoothFurn | 0, lvl = split && split.far ? 0 : refl === 1 ? Math.min(1, lvl0) : lvl0;
       if ((!lvl0 && !furn) || !this.propSecs || !this.propSecs.size) return;
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
-      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0);
+      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0, split);
       const cullWas = gl.isEnabled(gl.CULL_FACE);
       // the palms: two-sided fronds
       if (this.propNA || this.propNB) {
@@ -1589,7 +1607,7 @@
         }
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
-      if (world && (this.q.smoothProps || this.q.smoothFurn)) this.drawProps(E, camPos, false);
+      if (world) this.liveProps(E, camPos, fc);
       // far-terrain horizon (cut away where real chunks are drawn; with the Fern-Cache it is in the cache)
       if (F.horizon && !fc) F.horizon.draw(this, E);
       // voxel models & meshes

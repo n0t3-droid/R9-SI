@@ -151,7 +151,14 @@ the decision below.
   left while the next is drawn) / 500 ms / the sun 0.5° (≈ 2 game minutes) / a resize. Nothing to show (the first
   frames, a jump) → the frames draw live while the cache is drawn (never the whole cache in one frame); running faster
   than 10 m/s or turning faster than 90°/s → live, and no cache is drawn that would be off before it is done.
-- Furniture batching (step 4) is not built — see Results.
+- Furniture (step 4): not a multi-draw — the far furniture goes into the far cache. The furniture is already one
+  instanced draw per model and distance band; run 1 counted the main pass's prop draws on Ultra: hall 7, plaza 10,
+  **village 84** (and again in the shadow map's redraws). One call for all models would need the instance data in a
+  texture indexed by gl_DrawID (FURN_VS rewritten, t-smooth's code) — and on the owner's ANGLE/D3D11 WEBGL_multi_draw
+  is a loop of the same draws in the GPU process: the iGPU would do the same work. With the far cache on, every piece
+  beyond the cache's near radius (64 blocks at render distance 8, 128 at 16) is drawn into the cache, a strip at a time,
+  with the shadow lookup moved to the cache's eye; the live pass draws only the pieces within it (liveProps). The palms
+  stay live (they sway). Node: ultralite_far.js d/e (within 64 blocks live, beyond it cached, none twice, none lost).
 - The light mirror reaches 96 blocks with the props' far forms; a governor rung draws it every other frame.
 
 ## What the baseline showed (v0.43 dist, Ultra, render distance 8, SwiftShader)
