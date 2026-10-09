@@ -356,7 +356,9 @@
     }
     const base = {
       inside: [0, Y + 1, -20], portal: [0, Y + 1, T.front], apron: [0, Y + 1, 30], yaw: Math.PI,
-      spawn: [0.5, Y + 1, HZ + 0.5, Math.PI],
+      // the spawn stands on the hall's deck in front of the pad, facing it (the parked hangar shuttle is solid and 23 m long:
+      // a spawn on the pad itself was pushed out of its hull the moment the ship was built)
+      spawn: [0.5, Y + 1, HZ + 14.5, Math.PI],
       pad: { x: 0, y: Y + 1, z: HZ, seed: (g.seed ^ 0x51ab) >>> 0, dir: 0 },
       box: [-10, Y + 1, T.back + 1, 10, Y + 15, T.front - 1],
       work: [['control', -6, Y + 1, 0], ['control', 6, Y + 1, 0], ['control', -6, Y + 1, 4], ['control', 6, Y + 1, 4]],
