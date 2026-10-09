@@ -301,7 +301,7 @@
         const [x, z] = W2(u, v), gls = reg === 'in' && inGlass(u, v);
         for (let y = lo; y <= h; y++) put(x, F + y, z, gls ? FROST : SMOOTH);   // (a panel's whole column is glass: no stone under it stops the light)
         // the transverse ribs under the nave vault (every pier line), gold banded
-        if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) put(x, F + lo - 1, z, BAND);
+        if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) { put(x, F + lo - 1, z, BAND); P(u, F + lo - 2, v, 'vx_beam_oak', { axis: 1 }); }   // (round 2: a wood-brown arch under the gold rib, the reference's wooden arches)
         // the ring of the half dome at a third of its radius
         if (reg === 'in' && v > H.V1 && Math.abs(dApse(u, v) - 18) < 0.6) put(x, F + lo - 1, z, BAND);
       }
@@ -413,6 +413,13 @@
       if (v >= H.V0 + 3 && v <= H.V1) P(s * H.A0, F + H.SPR, v, 'smooth_quartz_stairs', { facing: s > 0 ? 3 : 1, half: 1 });
       if (Math.abs(v) > 3) P(s * (H.HW + 1), F + 1, v, 'smooth_quartz_slab', { type: 'bottom' });
     }
+    // a balustrade along the long walls' top over the cornice, and a pinnacle on every buttress (white shaft, a capital, a
+    // gold cap)
+    for (let v = H.V0; v <= H.VE; v++) for (const s of [-1, 1]) P(s * H.HW, F + H.WALLTOP + 1, v, 'vx_balustrade');
+    for (let k = -8; k <= 4; k++) {
+      const vp = 10 * k + 5; if (vp < H.V0 + 2 || vp > H.V1) continue;
+      for (const s of [-1, 1]) { for (let y = F + 22; y <= F + 24; y++) P(s * (H.HW + 1), y, vp, 'quartz_pillar', { axis: 0 }); P(s * (H.HW + 1), F + 25, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 26, vp, BAND); }
+    }
     // lantern turrets on the ridge every 24 blocks: a glazed lantern on four white posts, a stepped cap, a gold finial
     for (const vt of [-60, -36, -12, 12, 36]) {
       for (let du = -1; du <= 1; du++) for (let dv = -1; dv <= 1; dv++) {
@@ -462,7 +469,7 @@
       const h = stairH(v), step = h > stairH(v - 1);
       for (let u = -H.STW; u <= H.STW; u++) {
         if (h > 1) FL(u, v, F + 1, F + h - 1, STONE);
-        P(u, F + h, v, step ? 'quartz_stairs' : 'smooth_quartz', step ? { facing: 2, half: 0 } : undefined);
+        P(u, F + h, v, step ? 'quartz_stairs' : (Math.abs(u) <= H.STW - 2 ? 'travertine' : 'smooth_quartz'), step ? { facing: 2, half: 0 } : undefined);   // (the landings: a warm field in a white border)
         for (let y = F + h + 1; y <= F + H.GAL + 3; y++) P(u, y, v, null);
         setC(u, v, C.STAIR);
       }
@@ -591,7 +598,7 @@
         for (const u of [5, 6]) { putModel(Q, 'vm_town_window_' + stain, 0, u, y0 + 1, 0); Q(u, y0 + 4, -1, 'smooth_quartz_slab', { type: 'top' }); }
         // back windows, and the side windows toward a lane or the plaza
         for (const u of [3, 8]) putModel(Q, 'vm_town_window_' + stain, 2, u, y0 + 1, d - 1);
-        if (plazaSide >= 0 || laneSide >= 0) { const su = plazaSide >= 0 ? plazaSide : laneSide; for (const v of [3, 8]) putModel(Q, 'vm_town_window_' + stain, su === 0 ? 3 : 1, su, y0 + 1, v); }
+        if (plazaSide < 0 && laneSide >= 0) { const su = laneSide; for (const v of [3, 8]) putModel(Q, 'vm_town_window_' + stain, su === 0 ? 3 : 1, su, y0 + 1, v); }
       }
       for (let k = 1; k <= floors; k++) for (let u = 0; u < w; u++) Q(u, F + 5 * k, -1, 'smooth_quartz_stairs', { facing: 2, half: 1 });
       // a balcony before the middle bay of a third storey: its floor the cornice and a slab row, a balustrade
@@ -605,17 +612,39 @@
         for (const u of [0, w - 1]) { const len = 3 + orng.int(3); for (let y = top - 1; y >= Math.max(F + 6, top - len); y--) Q(u, y, -2, 'vines', { faces: vm }); }
       }
       void vinesOld;
-      // ---- a corner house's storefront on the plaza side, with an awning
+      // ---- a corner house's side on the plaza: a second storefront under two awnings and the word sign, and the same order
+      // as the front — corner pilasters, pilasters between the upper bays, a cornice at every storey, arched windows
       if (plazaSide >= 0) {
-        const su = plazaSide, fac = su === 0 ? 3 : 1;
+        const su = plazaSide, fac = su === 0 ? 3 : 1, out = su === 0 ? -1 : w, inF = su === 0 ? 1 : 3;
         for (let v = 3; v <= 8; v++) { Q(su, F + 1, v, 'spruce_planks'); Q(su, F + 2, v, 'glass_pane'); Q(su, F + 3, v, 'glass_pane'); Q(su, F + 4, v, 'spruce_planks'); }
-        putModel(Q, 'vm_town_awning_' + awning, fac, su === 0 ? -2 : w, F + 4, 3); putModel(Q, 'vm_town_awning_' + awning, fac, su === 0 ? -2 : w, F + 4, 6);
+        putModel(Q, 'vm_town_awning_' + awning, fac, su === 0 ? -2 : w, F + 3, 2); putModel(Q, 'vm_town_awning_' + awning, fac, su === 0 ? -2 : w, F + 3, 6);
+        putModel(Q, 'vm_town_word_' + trade, fac, out, F + 4, 4);
+        for (const v of [0, d - 1]) { Q(out, F + 1, v, 'smooth_quartz'); for (let y = F + 2; y <= top - 1; y++) Q(out, y, v, 'quartz_pillar', { axis: 0 }); }
+        for (let k = 1; k < floors; k++) {
+          const y0 = F + 5 * k;
+          for (const v of [4, 7]) { for (let y = y0 + 1; y <= y0 + 3; y++) Q(out, y, v, 'quartz_pillar', { axis: 0 }); Q(out, y0 + 4, v, 'chiseled_quartz_block'); }
+          for (const v of [0, d - 1]) Q(out, y0 + 4, v, 'chiseled_quartz_block');
+          for (const v0 of [1, 8]) {
+            putModel(Q, 'vm_town_arch3', fac, su, y0 + 1, v0);
+            Q(out, y0 + 4, v0, 'smooth_quartz_stairs', { facing: 0, half: 1 }); Q(out, y0 + 4, v0 + 1, 'chiseled_quartz_block'); Q(out, y0 + 4, v0 + 2, 'smooth_quartz_stairs', { facing: 2, half: 1 });
+          }
+        }
+        for (let k = 1; k <= floors; k++) for (let v = 0; v < d; v++) Q(out, F + 5 * k, v, 'smooth_quartz_stairs', { facing: inF, half: 1 });
       }
       // ---- the back door to the yard, the yard's planter and a barrel
       Q(5, F + 1, d - 1, 'spruce_door', { facing: 0, half: 0, hinge: 0, open: 0 }); Q(5, F + 2, d - 1, 'spruce_door', { facing: 0, half: 1, hinge: 0, open: 0 });
       putModel(Q, 'vm_planter', 0, 1, F + 1, d + 2); Q(w - 2, F + 1, d + 3, 'vx_barrel'); if (lrng.chance(0.5)) Q(w - 3, F + 1, d + 3, 'vx_crate');
-      // ---- the gable roof: the ridge runs into the lot (the gable faces the street), slate over a timbered gable
-      {
+      // ---- the roof: on half of the three-storey houses a flat roof behind a balustraded parapet (posts with lanterns
+      // over the pilasters) — the street's skyline varies; the others the gable roof: the ridge runs into the lot (the gable
+      // faces the street), slate over a timbered gable
+      const parapet = floors === 3 && orng.chance(0.5);
+      if (parapet) {
+        for (let u = 1; u < w - 1; u++) for (let v = 1; v < d - 1; v++) if (!(u === w - 2 && v === d - 2)) Q(u, top, v, 'smooth_quartz');   // (a white roof deck)
+        for (let u = 0; u < w; u++) for (let v = 0; v < d; v++) if (u === 0 || u === w - 1 || v === d - 1) Q(u, top + 1, v, 'vx_balustrade');
+        for (let u = 0; u < w; u++) Q(u, top + 1, -1, PU.includes(u) ? 'chiseled_quartz_block' : 'vx_balustrade');
+        for (const u of PU) Q(u, top + 2, -1, 'lantern', { hanging: 0 });
+        hs0.roofTop = top + 2;
+      } else {
         const span = w, len = d, at = (a, b) => [b, a], half = Math.ceil((span + 2) / 2);
         let roofTop = top;
         for (let i = 0; i <= half; i++) {
@@ -820,8 +849,8 @@
       return Math.max(lo, 1);
     };
     for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
-      for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, 'vx_beam_dark', { axis: 1 }); }
-      for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, 'vx_beam_dark', { axis: 1 });
+      for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, 'vx_beam_oak', { axis: 1 }); }
+      for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, 'vx_beam_oak', { axis: 1 });
     }
     for (let k = -8; k <= 4; k++) {
       const vp = 10 * k + 5; if (vp < H.V0 + 3 || vp > H.V1 || inCross(vp)) continue;

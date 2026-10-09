@@ -196,7 +196,7 @@ async function runPage(tag, dist) {
       let words = 0, arches = 0, stalls = 0, landing = 0;
       for (let v = -66; v <= 37; v++) for (const u of [-6, -5, 5, 6]) for (let y = F + 1; y <= F + 15; y++) { const n = at(u, y, v); if (/^vm_town_word_/.test(n)) words++; if (n === 'vm_town_arch3') arches++; }
       for (let v = -77; v <= 51; v++) for (const u of [-31, 31]) if (/^vm_town_stall_/.test(at(u, F + 1, v))) stalls++;
-      for (const v of [40, 41, 44, 45, 48, 49]) if (at(0, F + [2, 2, 4, 4, 6, 6][[40, 41, 44, 45, 48, 49].indexOf(v)], v) === 'smooth_quartz') landing++;
+      for (const v of [40, 41, 44, 45, 48, 49]) if (/smooth_quartz|travertine/.test(at(0, F + [2, 2, 4, 4, 6, 6][[40, 41, 44, 45, 48, 49].indexOf(v)], v))) landing++;
       const T = VR.Town, lang = VR.I18N && VR.I18N.lang, sample = T.word('baker');
       return { words, arches, stalls, landing, lang, sample };
     }, [cx, cz, r, F]);
