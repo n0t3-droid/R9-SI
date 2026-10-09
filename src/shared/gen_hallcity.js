@@ -593,6 +593,14 @@
       for (const [du, dv] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const c2 = getC(u + du, v + dv), r2 = region(u + du, v + dv); if (r2 === 'in' && c2 !== C.GALLERY && c2 !== C.STAIR && c2 !== C.WALL) edge = true; }
       if (edge) P(u, F + H.GAL + 1, v, 'vx_balustrade');
     }
+    // (round 2b) posts with lanterns in the gallery's balustrade over the pilaster lines; vines falling from the gallery's
+    // cornice between the doorways; potted plants on the landings' outer corners
+    for (const s of [-1, 1]) {
+      for (const a of [14, 20, 26]) { P(s * a, F + H.GAL + 1, H.GAL0, CHIS); P(s * a, F + H.GAL + 2, H.GAL0, 'lantern', { hanging: 0 }); const [x, z] = W2(s * a, H.GAL0); plan.lamps.push([x, F + H.GAL + 2, z]); }
+      const vm = vineMask(r, 0, 1);
+      for (const [a, len] of [[9, 3], [13, 4], [19, 4], [25, 3]]) for (let y = F + H.GAL - 1; y >= F + H.GAL - len; y--) P(s * a, y, H.GAL0 - 1, 'vines', { faces: vm });
+      for (const v of [H.STAIR0 + 2, H.STAIR0 + 6, H.STAIR0 + 10]) putModel(P, 'vm_planter', 0, s * H.STW, F + stairH(v) + 1, v);
+    }
     // arched niches in the apse wall over the gallery, between the lancets, each with a lantern
     for (let k = 0; k < 6; k++) {
       const th = (k + 0.5) * Math.PI / 6, cs = Math.cos(th), sn = Math.sin(th);

@@ -148,7 +148,7 @@ for (const [label, H] of HALLS) {
     check(stairV.length >= 8 && wide === stairV.length, `eleven or more wide all the way up (${wide} of ${stairV.length} rows; ${(() => { let w = 0; for (let u = -10; u <= 10; u++) if (surf(u, stairV[2]) === surf(0, stairV[2])) w++; return w; })()} wide)`);
     let bal = 0, rail = 0, n = 0;
     for (const v of stairV) for (const s of [-1, 1]) {
-      n++; const h = surf(0, v); let edge = 0; for (let u = 6; u <= 9; u++) if (surf(s * u, v) !== h) { edge = u; break; }
+      n++; const h = surf(0, v); let edge = 0; for (let u = 6; u <= 9; u++) if (surf(s * u, v) !== h && !/planter|potplant/.test(atN(s * u, F + h + 1, v))) { edge = u; break; }   // (a potted plant on a landing is not its edge)
       const b = atN(s * edge, F + h + 1, v), c = atN(s * edge, F + h + 2, v);
       if (/balustrade|quartz_pillar/.test(b) || /balustrade|quartz_pillar/.test(atN(s * edge, F + h + 2, v)) && solid(b)) bal++;
       if (/slab|quartz_pillar|lantern|lamp|chiseled/.test(c)) rail++;
@@ -271,6 +271,13 @@ for (const [label, H] of HALLS) {
     let cor = 0, cn = 0;
     for (let a = 8; a <= 26; a++) for (const s of [-1, 1]) { if (a === 14 || a === 20) continue; cn++; const n = atN(s * a, F + 8, Hh.V1 - 2), p = props(at(s * a, F + 8, Hh.V1 - 2)); if (/stairs/.test(n) && (p.half === 1 || p.half === 'top')) cor++; }
     check(cor >= 0.8 * cn, `a cornice along the gallery's front under its balustrade (${cor} of ${cn})`);
+    // posts with lanterns in the gallery's balustrade over the pilasters; vines falling from the cornice; potted plants on
+    // the landings' outer corners
+    let posts = 0; for (const s of [-1, 1]) for (const a of [14, 20, 26]) if (/chiseled|pillar/.test(atN(s * a, F + 9, Hh.V1 - 1)) && /lantern/.test(atN(s * a, F + 10, Hh.V1 - 1))) posts++;
+    check(posts === 6, `posts with lanterns in the gallery's balustrade over the pilasters (${posts} of 6)`);
+    let vin = 0; for (let a = 8; a <= 26; a++) for (const s of [-1, 1]) for (let y = F + 4; y <= F + 7; y++) if (/vines/.test(atN(s * a, y, Hh.V1 - 2))) vin++;
+    let pots = 0; for (const v of [40, 44, 48]) for (const s of [-1, 1]) for (let y = F + 2; y <= F + 8; y++) if (/planter|potplant/.test(atN(s * 6, y, v))) pots++;
+    check(vin >= 12 && pots >= 6, `greenery on the way up: vines from the gallery's cornice (${vin} cells), plants on the landings (${pots})`);
     // P3: the loggias' workshops lit from inside and an awning over each; lanterns hanging low on chains from the tie beams
     let litW = 0, awnW = 0, ln = 0;
     for (const l of Hh.loggias.filter(l => l.frame)) {
