@@ -251,14 +251,15 @@
     // a lot fits when its cells and a one-block margin are lawn, and three rows in front of it hold no road (the verge)
     const why = NH.dbg ? (w) => { NH.dbg[w] = (NH.dbg[w] || 0) + 1; return false; } : () => false;
     const fits = (ox, oz, r) => {
+      // the cells first (cheap), the ground only for a lot whose cells are free
       for (let v = -3; v <= LD; v++) for (let u = -1; u <= LW; u++) {
         const q = VG.rot(r, u, v), x = ox + q[0], z = oz + q[1], o = oc(x, z);
-        if (Math.hypot(x - cx, z - cz) > RAD - 3) return why('radius');
         if (v < 0) { if (o === 1 || o === 2 || o === 3 || o === 7) return why('front' + o); continue; }
-        if (ground(x, z) > Y0 + 1) return why('steep');   // the city's lots stand on the level land; the hill is the terraces'
         if (o !== 0 && o !== 4) return why('cell' + o);
         if (u >= 0 && u < LW && o === 4) return why('margin');
       }
+      for (const [u, v] of [[-1, -3], [LW, -3], [-1, LD], [LW, LD]]) { const q = VG.rot(r, u, v); if (Math.hypot(ox + q[0] - cx, oz + q[1] - cz) > RAD - 3) return why('radius'); }
+      for (let v = 0; v < LD; v += 2) for (let u = 0; u < LW; u += 2) { const q = VG.rot(r, u, v); if (ground(ox + q[0], oz + q[1]) > Y0 + 1) return why('steep'); }   // the city's lots stand on the level land; the hill is the terraces'
       return true;
     };
     const claim = (lot) => {
@@ -275,7 +276,9 @@
         const ks = [];
         if (R0of(rd).arc) { const mid = rd.apex; for (let k = mid; k < P.length - 6; k += 3) ks.push(k); for (let k = mid - 3; k >= 6; k -= 3) ks.push(k); }
         else for (let k = 6; k < P.length - 6; k += 3) ks.push(k);
+        let nk = 0;
         for (const k of ks) {
+          if ((++nk & 1) === 0) yield;   // (two positions a slice: each tries up to 180 lots)
           const [px, pz, a] = P[k], nx = -Math.sin(a) * side, nz = Math.cos(a) * side;
           // the axis nearest the outward normal (and the other one where the road runs diagonally); the lot's front
           // centre moves out along it, and slides along the road, until the lot fits — the nearest fit wins
@@ -440,6 +443,7 @@
     const hsh = (x, z, s) => (Math.imul(x * 73856093 ^ z * 19349663, 0x9E3779B1) ^ s) >>> 0;
     const fcl = VR.R.byName.vm_flower_cluster ? st('vm_flower_cluster', { part: 'p000', facing: 0 }) : 0, tuft = VR.R.byName.vm_tuft_grass ? st('vm_tuft_grass', { part: 'p000', facing: 0 }) : 0, blossom = VR.R.byName.vm_bush_blossom ? st('vm_bush_blossom', { part: 'p000', facing: 0 }) : 0;
     for (let z = cz - RAD; z <= cz + RAD; z++) for (let x = cx - RAD; x <= cx + RAD; x++) {
+      if (x === cx - RAD && ((z - cz) & 15) === 0) yield;
       if (oc(x, z) !== 0 || ground(x, z) >= Y0 + 2 || Math.hypot(x - cx, z - cz) > RAD - 3) continue;
       const y = Math.max(Y0, ground(x, z)) + 1;
       let byKerb = false, near = 0;
@@ -493,8 +497,8 @@
       // blocks, a twentieth of the ops
       const written = new Set(), clears = new Map(), lineAt = new Map();
       const lput = (x, y, z, s) => {
-        const k = x + ',' + y + ',' + z;
-        if (!s && !written.has(k)) { const ck = x + ',' + z; let c = clears.get(ck); if (!c) clears.set(ck, c = [y, y]); else { c[0] = Math.min(c[0], y); c[1] = Math.max(c[1], y); } return; }
+        const ck = (x + 4096) * 8192 + (z + 4096), k = ck * 256 + y;   // (numbers, not strings: a lot writes 30 000 cells)
+        if (!s && !written.has(k)) { const c = clears.get(ck); if (!c) clears.set(ck, [y, y, x, z]); else { if (y < c[0]) c[0] = y; if (y > c[1]) c[1] = y; } return; }
         written.add(k); put(x, y, z, s);
         if (y === F - 1) lineAt.set(x + ',' + z, s === K.LINE);
       };
@@ -502,7 +506,7 @@
       const lg = (u, v) => { const qq = VG.rot(lot.r, u, v); return ground(lot.ox + qq[0], lot.oz + qq[1]); };
       homeSeed = (homeSeed * 1103515245 + 12345) >>> 0;
       const info = yield* PLAN.buildSteps(L, { w: LW, d: LD, F, r: lot.r, ox: lot.ox, oz: lot.oz, kind: 'home' }, { index: PLAN.TRAILER, comp: lot.comp, novaMirror: !!lot.mirror, rng: new VR.RNG(homeSeed), ground: lg, beds: 3, noCustom: lot.comp !== 'classic', pathU: lot.pathU });
-      for (const [ck, [y0, y1]] of clears) { const [x, z] = ck.split(',').map(Number); fill(x, z, y0, y1, AIR); }
+      for (const c of clears.values()) fill(c[2], c[3], c[0], c[1], AIR);
       if (!info) continue;
       const sm = recordInfo(lot, info, F);
       plan.homes.push(sm);
