@@ -39,6 +39,8 @@
   // hanging off it; three coconuts hang under the crown; the crownshaft is a green bulb on the trunk.
   def('vm_palm_crown', 'Palm Crown', {
     res: 8, size: [7, 2, 7], sway: 3, swayFrom: 0, sound: 'grass', hard: 0.3,
+    // smooth props (t-smooth): the crown's bottom centre part anchors the palm's smooth crown and trunk (mesher.js)
+    meta: { prop: 'palm', propAnchor: 'p303' },
     build(b, M) {
       const cx = 56, cy = 22, cz = 56;
       b.ellipsoid(cx, 6, cz, 4.5, 4.2, 4.5, M.plant(PLANT.crownShaft));

@@ -66,6 +66,7 @@
       this.stats = { draws: 0, tris: 0, sections: 0, shadowDraws: 0, ms: 0 };
       this.q = { scale: 1, shadows: 2048, shadowDist: 64, bloom: true, rays: true, fxaa: true, clouds: 2, water: 2, bevel: 1, particles: 1, renderDist: 10, magic: 0.8, matTier: 0 };
       this.visList = []; this.visDirty = true; this.visKey = '';
+      this.propSecs = new Set(); this.propM = undefined;   // t-smooth: the sections with prop anchors; the prop models (propInit)
       this.firsts = new Int32Array(512); this.counts = new Int32Array(512); this.origins = new Float32Array(512 * 4);
       this.tmpM = mat4.create(); this.tmpM2 = mat4.create();
     }
@@ -159,6 +160,7 @@
       P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain');
       P.decal = GL.program(S.DECAL_VS, S.DECAL_FS, 'decal');
       P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod');
+      // (the smooth props' programs are compiled on their first use, propProgram: Very Low never compiles them)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
     // F-Far: the far programs, made when ring 1 first needs them (Very Low … Balanced never compile them): 'form' = ring 1,
@@ -392,8 +394,9 @@
       const off = a.alloc(cap);
       return { arena: a, off, cap, count: n };
     }
-    uploadSection(sec, col, sy, opaque, cutout, trans, vx, vxFar) {
+    uploadSection(sec, col, sy, opaque, cutout, trans, vx, vxFar, props) {
       const gl = this.gl;
+      this.propSet(sec, props);
       const data = [opaque, cutout, trans, vx, vxFar];
       if (sec.mesh.length < 5) sec.mesh.push(null, null);
       for (let l = 0; l < 5; l++) {
@@ -422,6 +425,7 @@
       if (sec.hasMesh) this.nearShadow(sec);
       for (let l = 0; l < sec.mesh.length; l++) if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
       sec.vxData = null;
+      this.propSet(sec, null);
       sec.hasMesh = false; sec.meshed = false;
       this.visDirty = true;
     }
@@ -727,9 +731,201 @@
         this.drawSections(list, layer, p, camPos, this.shadowPlanes, false);
         if (layer === 0) { this.drawSections(vxSplit.near, 3, p, camPos, this.shadowPlanes, false); this.drawSections(vxSplit.far, 4, p, camPos, this.shadowPlanes, false); }
       }
+      if (this.q.smoothProps || this.q.smoothFurn) this.drawProps(E, camPos, true);   // the palms and the furniture cast their shadows too
       gl.disable(gl.POLYGON_OFFSET_FILL);
       this.stats.shadowDraws = this.stats.draws - draws0;
       return true;
+    }
+
+    // ------------------------------------------------ smooth props (t-smooth, props.js): one instanced draw per model
+    // A section keeps its prop anchors (propSet): per anchor 12 doubles — the origin in world blocks, then the variation
+    // and the light. Each frame the origins are written camera-relative into two lists: the full palms within vxLod and
+    // the far crosses out to twice that (a bare trunk has no cross; none beyond). Lists and buffers are reused; the
+    // shadow pass draws the same lists. Very Low (smoothProps 0) never gets here: the mesher leaves the voxel palms.
+    // The furniture (props.js, kinds >= FURN0) rides the same anchors: each piece goes to its model's slot — the smooth
+    // mesh nearer than F1 (0.6 × vxLod, 14…28 blocks), the far boxes out to F2 (2 × vxLod, at least 48) — culled by the
+    // frustum; one draw per model and distance (opaque, then the glass and the contact shadows blended).
+    propSet(sec, props) {
+      const PR = VR.Props, n = props ? props.length / 6 : 0;
+      if (!n || !PR) { sec.propN = 0; sec.propData = null; sec.propKind = null; sec.propSlot = null; this.propSecs.delete(sec); return; }
+      const data = new Float64Array(n * PR.INST), kind = new Uint8Array(n), slot = new Int16Array(n);
+      for (let i = 0; i < n; i++) {
+        const o = i * 6;
+        kind[i] = props[o + 3];
+        slot[i] = props[o + 3] >= PR.FURN0 ? this.furnSlotOf(props[o + 3], props[o + 4]) : -1;
+        PR.anchorData(props[o + 3], props[o], props[o + 1], props[o + 2], props[o + 5], data, i * PR.INST, props[o + 4]);
+      }
+      sec.propN = n; sec.propData = data; sec.propKind = kind; sec.propSlot = slot;
+      this.propSecs.add(sec);
+    }
+    // the slot of a furniture kind: its model, its reach (for the frustum), its two instance lists (near, far)
+    furnSlotOf(kind, facing) {
+      const PR = VR.Props, S = this.furnSlots || (this.furnSlots = []), byKind = this.furnByKind || (this.furnByKind = {});
+      const ck = kind * 16 + (((facing | 0) >> 2) & 15);   // (a joining sofa's row bits, a rug's sides choose its variant)
+      if (byKind[ck] !== undefined) return byKind[ck];
+      const key = PR.furnKey(kind, facing | 0), md = key && PR.FURN[key];
+      if (!md) return (byKind[ck] = -1);
+      let i = S.findIndex(sl => sl.key === key);
+      if (i < 0) { i = S.length; S.push({ key, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null }); this.furnWarm(key); }
+      return (byKind[ck] = i);
+    }
+    // a new model is built in an idle tick, one a tick, when its first piece arrives with a section (a cold build takes
+    // up to some 50 ms: in the draw it would stall the frame the house comes into view); the draw builds what is not
+    // ready yet itself
+    furnWarm(key) {
+      const Q = this.furnQ || (this.furnQ = []);
+      Q.push(key);
+      if (this.furnT) return;
+      const tick = () => { this.furnT = 0; const k = Q.shift(); if (k !== undefined && VR.Props) VR.Props.furnModel(k); if (Q.length) this.furnT = setTimeout(tick, 16); };
+      this.furnT = setTimeout(tick, 16);
+    }
+    // a mesh on the GPU: its vertices, indices and an instance buffer in one vertex array (the layout of props.js)
+    propVao(m) {
+      const gl = this.gl, PR = VR.Props, ST = PR.VSTRIDE * 4, IST = PR.INST * 4;
+      const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+      const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, m.verts, gl.STATIC_DRAW);
+      const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
+      [[0, 3], [3, 3], [6, 2], [8, 3], [11, 1], [12, 1], [13, 1]].forEach(([o, k], loc) => { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, k, gl.FLOAT, false, ST, o * 4); });
+      const inst = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, inst);
+      for (let k = 0; k < 3; k++) { gl.enableVertexAttribArray(7 + k); gl.vertexAttribPointer(7 + k, 4, gl.FLOAT, false, IST, k * 16); gl.vertexAttribDivisor(7 + k, 1); }
+      gl.bindVertexArray(null);
+      return { vao, inst, cap: 0, n: m.idx.length, nOpaque: m.nOpaque === undefined ? m.idx.length : m.nOpaque };
+    }
+    propTex(img) {
+      const gl = this.gl;
+      gl.activeTexture(gl.TEXTURE8); const tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, img.w, img.h, 0, gl.RGBA, gl.UNSIGNED_BYTE, img.data);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return tex;
+    }
+    propInit() {
+      if (this.propM !== undefined) return this.propM;
+      const gl = this.gl, PR = VR.Props;
+      if (!PR || !gl || !gl.createVertexArray) return (this.propM = null);
+      // the palms' meshes and textures come on the first palm, the furniture's on its first piece (propModels)
+      this.propM = { palm: null, cross: null, furnTex: null };
+      this.propA = new Float32Array(PR.INST * 256); this.propB = new Float32Array(PR.INST * 256);
+      return this.propM;
+    }
+    palmModels() {
+      const ps = this.propM, PR = VR.Props;
+      if (!ps.palm) { ps.palm = this.propVao(PR.palm()); ps.palm.tex = this.propTex(PR.atlas()); ps.cross = this.propVao(PR.cross()); ps.cross.tex = this.propTex(PR.silhouette()); }
+      return ps;
+    }
+    // the prop programs, compiled on first use with the terrain's shadow defines (buildPrograms drops them with P)
+    propProgram(shadow) {
+      const P = this.P, S = VR.SHADERS;
+      if (shadow) return P.propShadow || (P.propShadow = GL.program(S.PROP_VS, S.PROP_SHADOW_FS, 'propShadow', []));
+      if (!P.prop) P.prop = GL.program(S.PROP_VS, S.PROP_FS, 'prop', this.propDefines());
+      return P.prop;
+    }
+    furnProgram(shadow) {
+      const P = this.P, S = VR.SHADERS;
+      if (shadow) return P.furnShadow || (P.furnShadow = GL.program(S.FURN_VS, S.FURN_SHADOW_FS, 'furnShadow', []));
+      if (!P.furn) P.furn = GL.program(S.FURN_VS, S.FURN_FS, 'furn', this.propDefines());
+      return P.furn;
+    }
+    propDefines() { return (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); }
+    // the anchors in reach, camera-relative: list A (full palms, nearer than D1), list B (crosses, nearer than D2), and
+    // the furniture by model (near F1, far F2, in the frustum)
+    propGather(cam, lvl, D1, D2, furn, planes) {
+      const PR = VR.Props, K = PR.INST, FURN0 = PR.FURN0, r1 = D1 * D1, r2m = D2 * D2;
+      const lod = this.q.vxLod || 48, F1 = Math.max(14, Math.min(28, lod * 0.6)), F2 = Math.max(48, 2 * lod), f1 = F1 * F1, f2 = F2 * F2;
+      const slots = this.furnSlots || [];
+      for (let s = 0; s < slots.length; s++) { slots[s].nn = 0; slots[s].nf = 0; }
+      let A = this.propA, B = this.propB, nA = 0, nB = 0, nF = 0;
+      for (const sec of this.propSecs) {
+        const d = sec.propData, kind = sec.propKind, n = sec.propN, ms = sec.propSlot;
+        for (let i = 0; i < n; i++) {
+          const o = i * K, dx = d[o] - cam[0], dy = d[o + 1] - cam[1], dz = d[o + 2] - cam[2], r2 = dx * dx + dy * dy + dz * dz;
+          if (kind[i] >= FURN0) {
+            if (!furn || r2 >= f2) continue;
+            const sl = slots[ms[i]]; if (!sl) continue;
+            const R = sl.rad;
+            if (planes && !mat4.boxInFrustum(planes, dx - R, dy - 0.2, dz - R, dx + R, dy + sl.h, dz + R)) continue;
+            let L, at;
+            if (r2 < f1) { if ((sl.nn + 1) * K > sl.near.length) { const N = new Float32Array(sl.near.length * 2); N.set(sl.near); sl.near = N; } L = sl.near; at = sl.nn++ * K; }
+            else { if ((sl.nf + 1) * K > sl.far.length) { const N = new Float32Array(sl.far.length * 2); N.set(sl.far); sl.far = N; } L = sl.far; at = sl.nf++ * K; }
+            for (let k = 3; k < K; k++) L[at + k] = d[o + k];
+            L[at] = dx; L[at + 1] = dy; L[at + 2] = dz;
+            nF++;
+            continue;
+          }
+          if (r2 >= r2m) continue;
+          let L, at;
+          if (lvl >= 2 && r2 < r1) { if ((nA + 1) * K > A.length) { const N = new Float32Array(A.length * 2); N.set(A); A = this.propA = N; } L = A; at = nA++ * K; }
+          else if (kind[i] === 1) { if ((nB + 1) * K > B.length) { const N = new Float32Array(B.length * 2); N.set(B); B = this.propB = N; } L = B; at = nB++ * K; }
+          else continue;
+          for (let k = 3; k < K; k++) L[at + k] = d[o + k];
+          L[at] = dx; L[at + 1] = dy; L[at + 2] = dz;
+        }
+      }
+      this.propNA = nA; this.propNB = nB; this.propNF = nF;
+    }
+    // one model, one draw: its instance buffer takes the list; the index range [first, first + count) of the mesh
+    propFlush(m, n, arr, u, tex, first, count) {
+      if (!n) return;
+      const gl = this.gl, K = VR.Props.INST, c = count === undefined ? m.n : count;
+      if (!c) return;
+      gl.bindVertexArray(m.vao);
+      if (arr) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.inst);
+        if (n > m.cap) { m.cap = Math.max(16, Math.ceil(n * 1.5)); gl.bufferData(gl.ARRAY_BUFFER, m.cap * K * 4, gl.DYNAMIC_DRAW); }
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, arr, 0, n * K);
+      }
+      if (u.u_tex && tex) { gl.activeTexture(gl.TEXTURE8); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(u.u_tex, 8); }
+      gl.drawElementsInstanced(gl.TRIANGLES, c, gl.UNSIGNED_SHORT, (first | 0) * 2, n);
+      this.stats.draws++; this.stats.tris += (c / 3) * n;
+      gl.bindVertexArray(null);
+    }
+    propUniforms(p, E, shadow) {
+      const gl = this.gl, u = p.u;
+      gl.useProgram(p.p);
+      this.common(p, E);
+      gl.uniformMatrix4fv(u.u_viewProj, false, shadow ? this.shadowMat : this.viewProj);
+      if (u.u_wind) gl.uniform1f(u.u_wind, E.wind);
+      if (u.u_windDir) { const wd = E.windDir || [1, 0]; gl.uniform2f(u.u_windDir, wd[0], wd[1]); }
+      if (u.u_emissiveBoost) gl.uniform1f(u.u_emissiveBoost, E.emissiveBoost || 0);
+      if (!shadow) {
+        if (u.u_shadowMat) gl.uniformMatrix4fv(u.u_shadowMat, false, this.shadowMat);
+        if (u.u_shadowTexel) gl.uniform1f(u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        if (u.u_shadowMap && this.shadowTex) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.u_shadowMap, 3); }
+      }
+      return u;
+    }
+    drawProps(E, camPos, shadow) {
+      const lvl = this.q.smoothProps | 0, furn = this.q.smoothFurn | 0;
+      if ((!lvl && !furn) || !this.propSecs || !this.propSecs.size) return;
+      const ps = this.propInit(); if (!ps) return;
+      const gl = this.gl, D1 = this.q.vxLod || 48;
+      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes);
+      const cullWas = gl.isEnabled(gl.CULL_FACE);
+      // the palms: two-sided fronds
+      if (this.propNA || this.propNB) {
+        const pm = this.palmModels(), u = this.propUniforms(this.propProgram(shadow), E, shadow);
+        gl.disable(gl.CULL_FACE);
+        this.propFlush(pm.palm, this.propNA, this.propA, u, pm.palm.tex);
+        this.propFlush(pm.cross, this.propNB, this.propB, u, pm.cross.tex);
+      }
+      // the furniture: closed meshes (back faces culled; the leaves carry both faces), then the glass and the soft
+      // contact shadows blended over the scene (the main pass only)
+      if (this.propNF) {
+        const PR = VR.Props, slots = this.furnSlots, u = this.propUniforms(this.furnProgram(shadow), E, shadow);
+        if (!ps.furnTex) ps.furnTex = this.propTex(PR.furnAtlas());
+        gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+        for (const sl of slots) {
+          if (sl.nn) { if (!sl.gNear) { const m = PR.furnModel(sl.key); sl.gNear = this.propVao(m.near); } this.propFlush(sl.gNear, sl.nn, sl.near, u, ps.furnTex, 0, sl.gNear.nOpaque); }
+          if (sl.nf) { if (!sl.gFar) { const m = PR.furnModel(sl.key); sl.gFar = m.far ? this.propVao(m.far) : { n: 0 }; } if (sl.gFar.n) this.propFlush(sl.gFar, sl.nf, sl.far, u, ps.furnTex, 0, sl.gFar.nOpaque); }
+        }
+        if (!shadow) {
+          gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+          for (const sl of slots) if (sl.nn && sl.gNear && sl.gNear.n > sl.gNear.nOpaque) this.propFlush(sl.gNear, sl.nn, null, u, ps.furnTex, sl.gNear.nOpaque, sl.gNear.n - sl.gNear.nOpaque);
+          gl.depthMask(true); gl.disable(gl.BLEND);
+        }
+      }
+      if (cullWas) gl.enable(gl.CULL_FACE); else gl.disable(gl.CULL_FACE);
     }
 
     // ------------------------------------------------ clouds
@@ -982,6 +1178,8 @@
           gl.enable(gl.CULL_FACE);
         }
       }
+      // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
+      if (world && (this.q.smoothProps || this.q.smoothFurn)) this.drawProps(E, camPos, false);
       // far-terrain horizon (cut away where real chunks are drawn)
       if (F.horizon) F.horizon.draw(this, E);
       // voxel models & meshes
