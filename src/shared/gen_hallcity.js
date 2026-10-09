@@ -17,6 +17,16 @@
 //    stalls at the piers, barrels and crates; street lamps every eight blocks, lanterns on the piers and under the
 //    arches.
 // No crystals anywhere (the owner): lanterns, gold, glass and light instead.
+// Round 2, "the splendour" (docs/superpowers/plans/2026-10-08-t-town2.md; test/hallcity_ornament.js): every façade in
+// relief — a plinth, pilasters at the bay edges, a cornice of upside-down stairs at every storey, the three-wide arched
+// wood windows (vm_town_arch3) under stepped hoods with keystones, a balcony, flower boxes and vines; the ground floor a
+// wood storefront with sills, two awnings and the shop's word sign (vm_town_word_*: the trade's word in the player's
+// language); half of the three-storey houses a parapet instead of the gable; the corner houses' plaza sides alike. The
+// grand staircase in four flights with three landings, parapets with balusters, a rail and newels, columns at its foot
+// and head; the gallery closed, niches with lanterns in the apse wall. A market stall every 7 blocks along both aisles
+// with a lantern on a bracket, barrels, a bench and a plant, oak ribs and tie beams under the aisle vaults, wooden arches
+// under the nave's ribs. Outside: a portal in the entrance end, tracery, cornice bands, a plinth, pinnacles, a parapet,
+// oculi and lantern turrets on the ridge.
 // The plan is built like Nova Haven's (gen_city.js): a generator that yields between its steps (VG.planAdvance runs it
 // in slices in the worker, the plan cached per site), ops bucketed per chunk, the usual plan record for the game
 // (homes with beds, workplaces, the plaza and its seats, lamps, strolling routes) plus the hall's frame (plan.hall) and
