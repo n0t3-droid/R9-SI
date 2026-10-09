@@ -1,0 +1,142 @@
+# F9 · Ultra für schwache PCs — „Ultra · Leicht" (plan, 9 Oct 2026)
+
+Branch f-ultralite (on v041 + v0.43; the realism-wave spec has no F9 section: the coordinator's task is the section).
+Every edit to the files other fronts touch (renderer.js, shaders.js, game.js PRESETS, settings_reg.js, world.js) is
+additive and kept in its own methods or behind a switch that is off unless the new preset (or the player) turns it on.
+
+## The machine and the goal
+
+The owner's PC (measured by the coordinator in the built-in browser): AMD Radeon Graphics 0x1638 — an integrated Vega
+of a Ryzen APU (shared memory, no own VRAM), 16 threads, 32 GB, 1920 × 1080, D3D11 through ANGLE. At 1280 × 720 the
+governor dropped Balanced → Low and the game ran ~20 fps, GPU-bound: gpu 17–21 ms, js 5–6 ms. Ultra cannot be held.
+He wants Ultra „super problemlos": „ich will alles super realistisch aussehen haben aber irgendwie hängt das mit der
+Weltgenerierung usw. und die Schatten sind auch ziemlich belastbar — finde super intelligente Wege".
+
+Goal: Ultra's picture (shadows 3, rays, bloom, water 2, ring 1 to 64 chunks, vxLod 96, smoothPlants 2, folk 120) as a
+preset an integrated Vega holds at ≥ 50 fps at 1920 × 1080, by spending the GPU where the eye looks and reusing what did
+not change. Very Low never slower; the default presets' scheduling unchanged (test/frame_cost.js EXPECT '47f25156').
+
+## What the code does today (read before designing)
+
+- **Shadows** (renderer.renderShadows): one map (3072² on shadows 3, ±96 blocks), cached — but redrawn WHOLE when
+  (1) the sun's quantized angle steps (0.0044 rad ≈ 0.25°: the sun turns 0.3°/s, so every ~0.84 s), (2) the camera
+  moved > 0.18 R (17 blocks), (3) ANY section upload/free/VX upload within R + 24 blocks (`shadowDirty`) — while one
+  walks through a town the VX detail of the next houses streams in and the map is redrawn nearly every frame —
+  (4) the size changes. A redraw draws every caster section within ±(R/16 + 1) columns (and the props) into the whole
+  map. The PCF is already cheap: 4 hardware-filtered compare taps (2 × 2 each), not 16 separate taps.
+- **Streaming** (F8, world.js + stream.js): uploads go through an UploadScheduler with a per-frame ms budget
+  (q.upload: 1.5 … 3 ms) in view order; mesh-job starts share it (4 per ms); stale gen requests (beyond rd + 3 from the
+  load centre) are cancelled when their turn comes. NOT budgeted: a generated column's arrival (`onColumn`: section
+  counts, heights, sun-layer, seam light BFS, dirtying the neighbours) runs in the worker's message handler between two
+  frames — with 6 workers several land in one frame gap, and the loop's own `jsMs` never sees them.
+- **Governor** (game.js smartQuality): GPU ladder shadowEvery 2 → rays off → vxLod × 0.6 → half shadow map → simple
+  clouds → scale − 0.1 → scale − 0.2; CPU ladder stream rungs → sim → folk 56 → mesh 3. Since the WIP: Ultra runs it
+  (dynRes on) and the steps that held are remembered per GPU.
+- **Water mirror** (reflectPass): tier 2 at ½ × ½ of the frame, sections within 160 blocks, the props as in the main pass
+  (tier 2), the horizon; no folk. Sampled once, plainly bilinear, shifted by the waves.
+- **Props / furniture** (drawProps): already one instanced draw per model and distance band (near, far, glass), the
+  terrain's sections already multi-drawn per arena.
+
+## Design — five switches, one preset
+
+Each switch is a setting (Bild · Qualität, cost 🟢), off on every preset but the new one, and each has its own node test.
+
+### 2 · Schatten-Takt (`shadowTakt`) — the owner's main complaint
+The same map (3072², ±96 blocks, same texel lattice, same PCF) — only how it is kept up to date changes:
+- **Toroidal map, tiles.** The map is addressed with wrap-around (texel = light-space position mod 2R, REPEAT
+  sampling; one uniform offset in the shaders' lookup, 0 = today's addressing): when the camera walks, the window moves
+  by whole tiles (8 × 8 tiles of 24 blocks) and only the strip of tiles that enters is drawn (scissored) — no full
+  redraw every 17 blocks, no copy. Depth is measured from a fixed light-space origin (re-based, i.e. a full redraw,
+  only when the camera drifts > 64 blocks from it).
+- **Incremental by section.** A section upload/free marks only the tiles under its light-space footprint dirty
+  (instead of `shadowDirty` = all). Dirty tiles are redrawn with the casters that overlap them (scissor + clear + draw
+  culled by the tile's sub-frustum).
+- **Cadence by ring** (the task's cascades, mapped onto the tiles): dirty tiles in ring 0 (the 2 × 2 around the eye) are
+  redrawn the same frame, ring 1 every 2nd frame, ring 2 (the outer tiles) every 4th.
+- **Sun steps without a hitch.** When the quantized sun angle steps (> 0.25°), the new map is built in a second buffer
+  over K = 4 frames — a quarter of the casters each frame (depth is order-independent: no overlap cost) — while the old
+  one is sampled; then the two swap. A full redraw's work, spread over 4 frames, once per ~0.84 s.
+- Measured: shadow redraws per second and shadow ms per frame (min / mean / max) standing and walking at the hall, the
+  plaza and a village, Ultra vs Ultra-Lite.
+- (c) the two-rate map (far half at half resolution) and (d) 16 → 9 taps: see "decisions" below.
+
+### 5 · Weltgenerierung im Takt (`streamTakt`)
+- **Arrivals queued**: a generated column waits in a queue and is integrated (`onColumn`) in the frame, within the
+  frame's streaming budget — at least one per frame, so the world never stalls.
+- **Budget from headroom**: per frame the mesh-job starts and the column integrations get
+  `clamp((budget − gpuMs − jsMs) × k, min, max)` ms (budget = 1000/55 ms); a frame already over budget streams the
+  minimum, an idle one streams fast. Pure function `VR.UL.streamBudget`, node-tested.
+- **Bytes**: uploads also stop at 2 MB per frame (the F8 scheduler's ms budget stays; a byte cap is added beside it).
+- **Away from**: queued gen jobs whose column is now outside the load radius around the player AND behind the direction
+  of travel are cancelled at once (not only beyond rd + 3); the queue is re-prioritized by the current position every
+  half second, so what lies ahead goes first.
+- Measured: frames over 40 ms (main-thread loop + worker-message time) while walking 200 m, Ultra vs Ultra-Lite.
+
+### 1 · Fern-Cache (`farCache`)
+The sky, the sections beyond renderDist/2 chunks, ring 1 and the horizon tiles are drawn into a cached colour + depth
+target and re-composited (reprojected with the cached depth: exact for turning, a two-step fixed-point search for the
+small translations) while the camera stays within 1.5 m and 6° of the cache's camera, for at most 500 ms, and the time
+of day moved < 2 game minutes; the near world is drawn live over it with the depth test (the composite writes the
+reprojected depth). Pure staleness rule `VR.UL.farStale`, node-tested. Measured: GPU (SwiftShader) ms saved at the
+hall, plaza and village, cached frame vs refresh frame vs Ultra.
+
+### 4 · Möbel-Bündelung (`furnBatch`)
+Count first: draw calls by kind at the villa and the Nova Haven plaza (terrain multi-draws, props by model, folk,
+horizon, ring 1, entities). If the furniture's per-model draws are a real share: one multi-draw-instanced call for all
+near furniture models (instance data from a float texture indexed by gl_DrawID + gl_InstanceID), the same for the far
+boxes and the glass. The VX detail meshes are unchanged.
+
+### 3 · Spiegelung leicht (`reflLite`)
+The water mirror at ¼ × ¼ of the frame instead of ½ × ½, sharpened by a depth-aware 4-tap upsample in the water shader
+(the mirror's nearest surface wins at an edge, so silhouettes stay crisp); sections only within 96 blocks (the horizon
+covers beyond); the props at their far forms only; no folk (as today). Measured: reflMs at a lake, before/after.
+
+### 6 · The preset „Ultra · Leicht" (`ultraLite`)
+Ultra's look values + farCache, shadowTakt, streamTakt, reflLite, furnBatch on. The governor on Ultra and Ultra-Lite
+takes cheap rungs first — far-cache refresh (500 → 1000 ms), shadow cadence (rings × 2), mirror ¼, folk 72 — before
+rays, VX detail, shadow size, clouds and only then resolution; the view distance never. The ladders only list rungs that
+change something with the current settings (a no-op rung would fail its probe and block the ladder for 30 s).
+⚡ Automatik: on an integrated GPU (`VR.GL.rendererName` with Radeon Graphics, Vega, Iris, UHD, Intel, Adreno, Mali,
+Apple M) the top of the ladder is Ultra-Lite and the run starts there, then measures; a dedicated GPU keeps Ultra.
+Settings: the preset in the list with its tip; settings_reg rows for the switches (Bild · Qualität, cost low); all texts
+in lang_de.js / lang_en.js.
+
+### 7 · Tests
+Node: ultralite_shadow.js (tile/wrap math, ring cadence, footprint → tiles, sun-step key, rebuild progress),
+ultralite_far.js (staleness rules), ultralite_stream.js (budget rule, byte cap, cancel-away rule), ultralite_preset.js
+(preset values, rung order, Automatik choice by a stubbed renderer name, settings rows, texts), ultra_smart.js (kept
+green). Browser: test/ultralite.mjs — Ultra vs Ultra-Lite at the hall, the plaza and a village (gpu ms, draws, shadow ms,
+long frames while walking 200 m), the same view shot in both (test/shots/ultralite_*.png), Very Low before/after.
+
+## Measuring
+
+SwiftShader renders on the CPU: absolute times mean little, relative costs do. Passes are timed with
+`renderer.timePasses` (test only: gl.finish() at each pass boundary, ms per pass in `renderer.stats.passMs`); frames
+with gl.finish(). The same scenes, seed 4242 (vgen 8), noon, 1280 × 720: the hall (0.5, 81, −9.5), the Nova Haven fork
+(F1 of trailer_city), a village street. Very Low before (v0.43 dist built in the scratchpad) and after.
+The owner's saving is estimated from the measured shares (stated as an estimate: a real GPU weighs vertex work less).
+
+## Decisions taken up front
+
+- Cascades are not added: a second and third map would change the shadows' look and double the sampling. The tiled
+  map gives the same thing the cascades were asked for (near updated every frame, far less often) with the same picture.
+- (c) A two-rate map would need a second texture or an atlas and a second lookup per pixel; with the incremental map the
+  redraws are rare and local, so half-resolution far tiles would save little — not done (measured share in the results).
+- (d) The PCF is 4 hardware-bilinear taps already (16 texel compares in 4 fetches); "9 rotated taps" would be more
+  fetches, and per-pixel noise rotation flickers without TSR (Ultra renders at 100 %: no TSR). Not done.
+
+## Order and commits
+
+WIP split (done: 6ef16a5, 18e2918) → plan → baseline probe → 2 → 5 → 1 → 4 → 3 → 6 → 7 full run. Commit after each.
+
+## Results
+
+(filled in as measured)
+
+## Known gaps
+
+(filled in at the end)
+
+## Merge notes
+
+(filled in at the end)
