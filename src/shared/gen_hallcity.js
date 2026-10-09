@@ -608,7 +608,12 @@
       const flowery = (houses.indexOf(hs0) % 2 === 0) || kind === 'cafe';
       if (flowery) {
         const vm = vineMask(rr, 0, 1);
-        for (let k = 1; k < floors; k++) for (const u0 of [1, 8]) for (let u = u0; u <= u0 + 2; u++) Q(u, F + 5 * k + 1, -1, 'vx_windowbox', { facing: 0 });
+        for (let k = 1; k < floors; k++) for (const u0 of [1, 8]) {
+          for (let u = u0; u <= u0 + 2; u++) Q(u, F + 5 * k + 1, -1, 'vx_windowbox', { facing: 0 });
+          // a strand of vines spilling from the box's outer end over the cornice (above the awnings and the sign)
+          const uo = u0 === 1 ? 1 : 10;
+          for (let y = F + 5 * k + 1; y >= Math.max(F + 4, F + 5 * k - 2); y--) Q(uo, y, -2, 'vines', { faces: vm });
+        }
         for (const u of [0, w - 1]) { const len = 3 + orng.int(3); for (let y = top - 1; y >= Math.max(F + 6, top - len); y--) Q(u, y, -2, 'vines', { faces: vm }); }
       }
       void vinesOld;
@@ -838,7 +843,7 @@
         const [x, z] = W2(s * (H.STALL1 + 1), v0 + 1); stalls.push([x, F + 1, z, L.facing(fa)]);
         hallStalls.push({ s, v0 });
         const item = (dv, fn) => { const v = v0 + dv; if (v <= H.V1 && !inCross(v)) fn(v); };
-        item(3, (v) => { P(s * H.A0, F + 1, v, 'vx_barrel'); P(s * H.STALL1, F + 1, v, 'vx_barrel'); });
+        item(3, (v) => { P(s * H.A0, F + 1, v, 'vx_barrel'); P(s * H.STALL1, F + 1, v, 'vx_barrel'); if (n & 1) P(s * H.A0, F + 2, v, 'vx_crate'); });
         item(6, (v) => { putModel(P, 'vm_planter', 0, s * H.A0, F + 1, v); P(s * H.STALL1, F + 1, v, 'vx_bench', { facing: fa }); });
       }
     }
@@ -851,6 +856,7 @@
     for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
       for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, 'vx_beam_oak', { axis: 1 }); }
       for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, 'vx_beam_oak', { axis: 1 });
+      for (const a of [34, 41]) if (F + 20 < F + shellLo(s * a, v) - 1) { P(s * a, F + 19, v, 'lantern', { hanging: 1 }); const [x, z] = W2(s * a, v); plan.lamps.push([x, F + 19, z]); }   // (lanterns hanging from the tie beam)
     }
     for (let k = -8; k <= 4; k++) {
       const vp = 10 * k + 5; if (vp < H.V0 + 3 || vp > H.V1 || inCross(vp)) continue;
