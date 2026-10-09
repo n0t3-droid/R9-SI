@@ -16,8 +16,9 @@
 // the sun in the picture the upper half, bands 4–7),
 // the stars and the nebula visible in the top bands (local contrast and colour variation), the horizon band bright and
 // clean (no stars); at dusk every band within ΔE 12 of the dusk target; at night a dark sky with stars; the Very Low
-// sky pass (the sky drawn alone, the median of 5 blocks of 24 passes at the potato size): with DIST_BEFORE the same
-// in the baseline build, interleaved (A B A B …), and not slower than it (within 3 %).
+// sky pass (the sky drawn alone, 7 rounds of 24 passes at the potato size): with DIST_BEFORE the same in the baseline build,
+// in turns with the order alternating, and not slower than it (the median of the rounds' ratios within 5 %: the shared
+// machine moves a single round by 10–40 %).
 // Also the Very Low pictures of the city at noon and the canyon at dusk, and the Very Low frame time of the canyon.
 // TAG (default after) names the pictures; DIST (default the dist/ of this checkout) is the build under test;
 // DIST_BEFORE (optional) the baseline build for the sky-pass comparison.
@@ -205,14 +206,18 @@ if (DIST_BEFORE && fs.existsSync(DIST_BEFORE)) {
   for (let i = 0; i < 240; i++) { await before.waitForTimeout(500); if (await before.evaluate(() => typeof VR !== 'undefined' && VR.game && VR.game.state === 'title').catch(() => false)) break; }
   await before.evaluate(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
 }
+// 7 rounds, the two builds in turns and the order alternating (before first, then after first), so a change of the shared
+// machine's load falls on both; the verdict is the median of the rounds' ratios (one load spike moves one round, not it)
 const skyA = [], skyB = [];
-for (let b = 0; b < 5; b++) {
-  if (before) skyB.push(await before.evaluate(SKYBENCH, benchArgs));
+for (let b = 0; b < 7; b++) {
+  if (before && b % 2 === 0) skyB.push(await before.evaluate(SKYBENCH, benchArgs));
   skyA.push(await ev(SKYBENCH, benchArgs));
+  if (before && b % 2 === 1) skyB.push(await before.evaluate(SKYBENCH, benchArgs));
 }
-const med = (v) => { const s = v.map(x => x.ms).sort((a, b) => a - b); return s[s.length >> 1]; };
-const skyAfter = med(skyA), skyBefore = before ? med(skyB) : null;
-console.log('potato sky pass ' + JSON.stringify({ tag: TAG, size: skyA[0].w + 'x' + skyA[0].h, lite: skyA[0].lite, ms: skyA.map(s => +s.ms.toFixed(2)), median: +skyAfter.toFixed(2), before: before ? { ms: skyB.map(s => +s.ms.toFixed(2)), median: +skyBefore.toFixed(2) } : null }));
+const med = (v) => { const s = [...v].sort((a, b) => a - b); return s[s.length >> 1]; };
+const skyAfter = med(skyA.map(x => x.ms)), skyBefore = before ? med(skyB.map(x => x.ms)) : null;
+const skyRatio = before ? med(skyA.map((x, i) => x.ms / skyB[i].ms)) : null;
+console.log('potato sky pass ' + JSON.stringify({ tag: TAG, size: skyA[0].w + 'x' + skyA[0].h, lite: skyA[0].lite, ms: skyA.map(s => +s.ms.toFixed(2)), median: +skyAfter.toFixed(2), before: before ? { ms: skyB.map(s => +s.ms.toFixed(2)), median: +skyBefore.toFixed(2) } : null, ratio: skyRatio === null ? null : +skyRatio.toFixed(3) }));
 if (before) await before.close().catch(() => {});
 
 // ------------------------------------------------------------ the checks
@@ -244,8 +249,8 @@ for (const r of hi.filter(r => r.time === 'night')) {
   const top = r.curve[NB - 1], low = r.curve[0];
   check(top.lab && low.lab && top.L < 35 && low.L < 50 && r.space.stars > 0.5, `${r.place} night: a dark sky (top L* ${top.L}, horizon L* ${low.L}) with stars (${r.space.stars})`);
 }
-if (before) check(skyAfter <= skyBefore * 1.03, `Very Low: the sky pass is not slower than the baseline's (${skyAfter.toFixed(2)} ms vs ${skyBefore.toFixed(2)} ms a pass at ${skyA[0].w}x${skyA[0].h})`);
-fs.writeFileSync('/home/claude/vr/.tmp_tests/skycurve_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, place: r.place, time: r.time, kind: r.kind, preset: r.preset, H: r.H, sky: r.sky, space: r.space, hband: r.hband, dE: r.dE, curve: r.curve.map(b => ({ n: b.n, rgb: b.rgb, L: b.L, C: b.C, h: b.h })), geo: r.geo })), frameMs, sky: { after: skyAfter, before: skyBefore, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) } }, null, 1));
+if (before) check(skyRatio <= 1.05, `Very Low: the sky pass is not slower than the baseline's (the rounds' median ratio ${skyRatio.toFixed(3)}; ${skyAfter.toFixed(2)} ms vs ${skyBefore.toFixed(2)} ms a pass at ${skyA[0].w}x${skyA[0].h})`);
+fs.writeFileSync('/home/claude/vr/.tmp_tests/skycurve_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, place: r.place, time: r.time, kind: r.kind, preset: r.preset, H: r.H, sky: r.sky, space: r.space, hband: r.hband, dE: r.dE, curve: r.curve.map(b => ({ n: b.n, rgb: b.rgb, L: b.L, C: b.C, h: b.h })), geo: r.geo })), frameMs, sky: { after: skyAfter, before: skyBefore, ratio: skyRatio, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) } }, null, 1));
 console.log('--- logs (' + logs.length + ')'); for (const l of logs.slice(0, 12)) console.log(l);
 await browser.close();
 console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
