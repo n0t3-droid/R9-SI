@@ -460,6 +460,8 @@
         if (home) style = 'tech'; // the home city (new worlds start in its Starbase)
         site = { id: i + '_' + j, i, j, x, z, y: Math.round(sum / n), style, biome: bk.key, seed: rng.int(1 << 30), name: null };
         if (style === 'modern') site.rad = g.vgen >= 5 ? 230 : 120;   // rich towns spread wide: villa lots 30+ deep, two ring roads, farms outside
+        // vgen 9: a meadow or cherry village becomes the Weißstadt, the hall city (gen_hallcity.js), where its hall fits the land
+        if (!home && (style === 'meadow' || style === 'cherry') && VG.hallOn && VG.hallOn(g) && VG.hallFits(g, x, z, site.seed)) { site.style = 'hall'; site.from = style; site.rad = VG.HALL.RAD; }
         site.name = VG.name(site.seed);
         if (home) g._homeFound = true;
       }
@@ -555,6 +557,7 @@
     const RAD = VG.siteRad(g, site), V2 = g.vgen >= 2;
     const HOME = !!(site.home && VR.Heart && VR.Heart.on(g) && VR.Heart.templeBase); // the Heartland's home city around the Gate Temple
     if (HOME && g.vgen >= 8 && VG.novaHaven) return yield* VG.novaHaven(g, site);   // vgen 8: the trailer's Nova Haven (gen_city.js)
+    if (site.style === 'hall' && VG.hallCity) return yield* VG.hallCity(g, site);   // vgen 9: the Weißstadt hall city (gen_hallcity.js)
     const cx = site.x, cz = site.z;
     const SZ = RAD * 2 + 1, occ = new Uint8Array(SZ * SZ); // 0 free 1 road 2 plaza 3 lot 4 margin 5 path
     const oi = (x, z) => { const lx = x - cx + RAD, lz = z - cz + RAD; return (lx < 0 || lz < 0 || lx >= SZ || lz >= SZ) ? -1 : lz * SZ + lx; };
@@ -1461,7 +1464,7 @@
 
   // JSON-friendly plan summary for the game thread
   VG.summary = function (plan) {
-    return { rad: plan.rad, id: plan.id, name: plan.name, style: plan.style, x: plan.x, y: plan.center[1], z: plan.z, seed: plan.seed, plaza: plan.plaza, homes: plan.homes, work: plan.work, farms: plan.farms, lots: plan.lots, lamps: plan.lamps, chimneys: plan.chimneys, roads: plan.roads, bell: plan.bell, pad: plan.pad, shops: plan.shops, pastures: plan.pastures, orchards: plan.orchards, windmills: plan.windmills, base: plan.base };
+    return { rad: plan.rad, id: plan.id, name: plan.name, style: plan.style, x: plan.x, y: plan.center[1], z: plan.z, seed: plan.seed, plaza: plan.plaza, homes: plan.homes, work: plan.work, farms: plan.farms, lots: plan.lots, lamps: plan.lamps, chimneys: plan.chimneys, roads: plan.roads, bell: plan.bell, pad: plan.pad, shops: plan.shops, pastures: plan.pastures, orchards: plan.orchards, windmills: plan.windmills, base: plan.base, folkCap: plan.folkCap || null };
   };
 
   // ---------------------------------------------------------------- hooks into the overworld generator
