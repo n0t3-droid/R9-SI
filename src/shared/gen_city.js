@@ -253,6 +253,16 @@
           const ux = (p[0] - q[0]) / dl, uz = (p[1] - q[1]) / dl;
           let push = TU.push;
           while (push > -TU.r + 1 && Math.hypot(p[0] + ux * push - cx, p[1] + uz * push - cz) + TU.r > RAD - 3.5) push -= 0.5;
+          // (and back off the hill: the circle lies on the level land in front of the terraces, dug at most one riser
+          //  into their treads — at the end of the road the hill road's circle cut up to 11 into them, a wall of moss
+          //  round its north half; Palm Row's circles abut the first riser, as the treads' own risers do; beauty_rules 2)
+          const HG = VR.HillsGen, lv = rd.ys[k] + 4;
+          const dug = (ox, oz) => {
+            if (!HG || !HG.treadT8) return false;
+            for (let z = Math.floor(oz - TU.r); z <= Math.ceil(oz + TU.r); z++) for (let x = Math.floor(ox - TU.r); x <= Math.ceil(ox + TU.r); x++) if (Math.hypot(x + 0.5 - ox, z + 0.5 - oz) <= TU.r && HG.treadT8(g, x, z) > lv) return true;
+            return false;
+          };
+          while (push > -TU.r + 1 && dug(p[0] + ux * push, p[1] + uz * push)) push -= 0.5;
           const tx = p[0] + ux * push, tz = p[1] + uz * push;
           // the circle lies level with the road where the road comes in, and the road's stretch inside it with it (the
           // hill road climbs a block at its end: no step between the road and its circle)

@@ -134,9 +134,22 @@ console.log('2 · every street of Nova Haven ends at a street, the plaza or a tu
       return out;
     };
     const b8 = banks(W8, P8), b9 = banks(W9, P9);
-    let top9 = 0; for (const rd of P9.nova.roads) for (let k = 0; k < rd.pts.length; k += 2) { const [y, n] = topOf(W9, Math.floor(rd.pts[k][0]), Math.floor(rd.pts[k][1])); if (ROADTOP.test(n)) top9 = Math.max(top9, y); }
+    let top9 = 0; for (const rd of P9.nova.roads) for (let k = 0; k < rd.pts.length; k += 2) { const [px, pz] = rd.pts[k]; if ((P9.nova.turns || []).some(t => Math.hypot(px - t.x, pz - t.z) <= t.bed + 1.5)) continue; const [y, n] = topOf(W9, Math.floor(px), Math.floor(pz)); if (ROADTOP.test(n)) top9 = Math.max(top9, y); }   // (a circle's bed and its kerb ring are no street)
     check(b8[0] + b8[1] >= 10 && b9[0] + b9[1] === 0, `vgen 9: Palm Row's ends lie level with the lawn — ${b9[0]} + ${b9[1]} bank steps at its two ends (vgen 8: ${b8[0]} + ${b8[1]})`);
     check(top9 <= V.HillsGen.T8.base, `vgen 9: no street climbs above the terraces' base (${top9}, the base ${V.HillsGen.T8.base})`);
+    // a turning circle lies on the level land in front of the hill, dug at most one riser into it: under none of its
+    // cells did the ground (the vgen-8 world's, the terraces' treads) stand more than four over its paving — the hill
+    // road's circle at the foot of the terraces cut up to 11 into their treads, a wall of moss round its north half
+    // (Palm Row's circles abut the first riser, 4, as the treads' own risers do)
+    for (const t of (P9.nova.turns || [])) {
+      let n = 0, cut = 0, worst = 0;
+      for (let z = Math.floor(t.z - t.r); z <= Math.ceil(t.z + t.r); z++) for (let x = Math.floor(t.x - t.r); x <= Math.ceil(t.x + t.r); x++) {
+        if (Math.hypot(x + 0.5 - t.x, z + 0.5 - t.z) > t.r) continue;
+        const [y8, n8] = topOf(W8, x, z); if (n8 === 'none') continue;
+        n++; const h = y8 - t.y; worst = Math.max(worst, h); if (h > 4) cut++;
+      }
+      check(n > 100 && cut === 0, `${t.road} ${t.end}: the circle lies on the level land (${cut} of ${n} cells dug more than a riser, 4, into the ground; the deepest ${worst})`);
+    }
   }
 }
 

@@ -207,6 +207,17 @@
     cache.set(key, c);
     return c;
   };
+  // (t-beauty) the tread a column would be cut to, as cellT8 cuts it but without asking the city which cells it owns and
+  // without the cache — for the city's own plan (gen_city.js: a turning circle stays off the treads), which cellT8's
+  // question would ask back
+  HILLS.treadT8 = function (g, x, z) {
+    const h = g.surfaceY(x, z);
+    if (!HILLS.inT8(x, z) || h < T8.base) return h;
+    const B = T8.blend, w = ss(T8.x0, T8.x0 + B, x) * (1 - ss(T8.x1 - B, T8.x1, x)) * ss(T8.z0, T8.z0 + B, z);
+    if (!(w > 0)) return h;
+    let k = 0; while (k + 1 < T8.levels.length && T8.levels[k + 1] <= h) k++;
+    return Math.round(h - w * (h - T8.levels[k]));
+  };
   // an edge: a terrace cell whose neighbour lies a riser lower (the line runs along the top of every riser)
   HILLS.edgeT8 = function (g, x, z) {
     const c = HILLS.cellT8(g, x, z); if (c.k < 0) return false;
