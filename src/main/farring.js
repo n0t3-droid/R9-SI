@@ -107,8 +107,15 @@
         // keeps an item whose column it cannot find — world.js drainUploads compares cols.get(key) with col, both empty)
         const w = g.world, bytes = m.verts.byteLength + m.idx.byteLength;
         const run = () => { if (this.gen === gen && set.tiles.get(t.key) === t) this.upload(t, m, bytes); };
-        // (F10: the far lane, in the order the forms were asked for; one that left the ring while it waited costs nothing)
-        if (w && w.uploadQ) { t.queued = true; w.uploadQ.push({ key: null, col: undefined, lane: 1, prio: -1.4 + 1.6 * dmin / Math.max(1, this.r1), x: t.tx * 64 + 32, z: t.tz * 64 + 32, bytes, alive: () => this.gen === gen && set.tiles.get(t.key) === t, run }); }
+        // (F10: the far lane, in the order the forms were asked for, in parts — a big form straddles frames, drawn only once
+        // complete (horizon.js Horizon.parted); one that left the ring while it waited costs nothing)
+        if (w && w.uploadQ) {
+          t.queued = true;
+          const P = VR.Horizon && VR.Horizon.parted ? VR.Horizon.parted(g.renderer.gl, m) : null, mine = () => this.gen === gen && set.tiles.get(t.key) === t;
+          const it = { key: null, col: undefined, lane: 1, prio: -1.4 + 1.6 * dmin / Math.max(1, this.r1), x: t.tx * 64 + 32, z: t.tz * 64 + 32, bytes, alive: mine, run };
+          if (P) { it.step = P.step; it.abort = P.abort; it.commit = () => { if (mine()) this.upload(t, m, bytes, P.take()); else P.abort(); }; }
+          w.uploadQ.push(it);
+        }
         else run();
       }, -1.4 + 1.6 * dmin / Math.max(1, this.r1));   // (far lane: after the coarsest horizon tiles, before the finer ones far out)
     }
@@ -122,17 +129,17 @@
       }
       this.set.ccx = NaN;
     }
-    upload(t, m, bytes) {
+    upload(t, m, bytes, made) {   // (made: F10's buffers, already filled in parts)
       const r = this.g.renderer, gl = r.gl;
       const old = t.gpu;
       t.queued = false;
-      const vao = gl.createVertexArray(), vbo = gl.createBuffer(), ibo = gl.createBuffer();
+      const vao = gl.createVertexArray(), vbo = made ? made.vbo : gl.createBuffer(), ibo = made ? made.ibo : gl.createBuffer();
       gl.bindVertexArray(vao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, vbo); gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(m.verts), gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo); if (!made) gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array(m.verts), gl.STATIC_DRAW);
       gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.SHORT, false, 12, 0);
       gl.enableVertexAttribArray(1); gl.vertexAttribIPointer(1, 2, gl.UNSIGNED_BYTE, 12, 6);
       gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.UNSIGNED_BYTE, true, 12, 8);
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo); if (!made) gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.idx, gl.STATIC_DRAW);
       gl.bindVertexArray(null);
       t.gpu = { vao, vbo, ibo, count: m.count, type: m.big ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT, minY: m.minY, maxY: m.maxY, bx0: m.bx0, bz0: m.bz0, bx1: m.bx1, bz1: m.bz1, tris: m.tris || m.count / 3 };
       if (old) { gl.deleteVertexArray(old.vao); gl.deleteBuffer(old.vbo); gl.deleteBuffer(old.ibo); }

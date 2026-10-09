@@ -437,6 +437,14 @@ require('../src/main/horizon.js'); require('../src/main/farring.js');
   hz.tiles.delete(hz.key(1, 40, 0));
   frameBytes = 0; sch.drain(1);
   check(frameBytes === 0 && !t.vao && sch.size === 0, 'a tile evicted while it waited costs nothing');
+  // a coarse tile bigger than the frame's bytes (the flight test met one of 344 KB) goes up in parts over frames instead
+  // of being forced whole after four, and is drawn only once complete
+  hz.request(3, 5, 5, 2000);
+  const big = hz.tiles.get(hz.key(3, 5, 5));
+  hjobs[hjobs.length - 1].cb({ type: 'lod', verts: new ArrayBuffer(240000), idx: new Uint32Array(26000), count: 26000, big: true, minY: 40, maxY: 140 });
+  let fr = 0, forced = 0, early = false, worstB = 0;
+  while (sch.size && fr < 20) { frameBytes = 0; const r = sch.drain(0.1); forced += r.forced; worstB = Math.max(worstB, frameBytes); fr++; if (sch.size && (big.state === 1 || big.vao)) early = true; }
+  check(forced === 0 && worstB <= 100000 && fr >= 4 && !early && big.state === 1 && big.vao && hz.bytes === 12 * 48000 + 344000, 'a 344 KB tile straddles ' + fr + ' frames within the 100 KB (none forced), drawn only once complete', 'worst ' + worstB + ' bytes');
 }
 {
   // ring 1 (High, Ultra): the forms in the same far lane, with their priority
@@ -445,10 +453,10 @@ require('../src/main/horizon.js'); require('../src/main/farring.js');
   const g = { world: { uploadQ: sch, renderDist: 14 }, pool: { workers: [{}, {}], submit(msg, tr, cb, prio) { fjobs.push({ msg, cb, prio }); } }, renderer: { gl: GLX } };
   const hz = { g, level: 4, bytes: 0, maskF: null, enabled: () => true };
   const R = new V.FarRing(hz); R.setRadius(64); R.update({ x: 8.5, y: 100, z: 8.5 });
-  for (const j of fjobs) j.cb({ type: 'form', verts: new ArrayBuffer(48000), idx: new Uint16Array(6000), count: 6000, big: false, minY: 60, maxY: 80, bx0: 0, bz0: 0, bx1: 64, bz1: 64, tris: 2000 });
+  fjobs.forEach((j, i) => j.cb({ type: 'form', verts: new ArrayBuffer(i ? 48000 : 168000), idx: new Uint16Array(6000), count: 6000, big: false, minY: 60, maxY: 80, bx0: 0, bz0: 0, bx1: 64, bz1: 64, tris: 2000 }));   // (the first one 180 KB: more than a frame's bytes)
   check(sch.size === fjobs.length && sch.items.every(r => r.lane === 1 && Number.isFinite(r.prio) && r.it.alive && r.it.alive()), 'the forms wait on the far lane with their priority', sch.size + ' items');
-  let f = 0; while (sch.size && f < 20) { sch.drain(0.1); f++; }
-  check(R.live.length === fjobs.length, 'and go up', R.live.length + ' forms');
+  let f = 0, worstF = 0; while (sch.size && f < 20) { frameBytes = 0; sch.drain(0.1); worstF = Math.max(worstF, frameBytes); f++; }
+  check(R.live.length === fjobs.length && worstF <= 100000 && R.set.bytes === fjobs.length * 60000 + 120000, 'and go up within the frame\'s bytes (a 180 KB form in parts)', R.live.length + ' forms, worst ' + worstF + ' bytes');
 }
 
 console.log('4c · the block look\'s textures through the same queue');
