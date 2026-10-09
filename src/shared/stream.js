@@ -103,7 +103,7 @@
       this.hit = new Float64Array(RING).fill(-Infinity); this.hitI = 0;
       this.sinceUp = 1e9;                  // frames since the last one that uploaded
       this.fit = { w: 0, x: 0, y: 0, xx: 0, xy: 0, n: 0 };   // the fence fit's weighted sums
-      this.last = { ran: 0, spentMs: 0, forced: 0, left: 0, bytes: 0, budgetBytes: 0 };
+      this.last = { ran: 0, spentMs: 0, forced: 0, left: 0, bytes: 0, budgetBytes: 0, gauged: true };
       this._spent = 0; this._clock = null;
     }
     get size() { return this.items.length; }
@@ -177,7 +177,7 @@
     // (vx, vz) the unit view direction, cosHalf the cosine of the horizontal half field of view
     drain(budgetMs, clock, vx, vz, cosHalf) {
       const a = this.items, L = this.last;
-      L.ran = 0; L.spentMs = 0; L.forced = 0; L.bytes = 0;
+      L.ran = 0; L.spentMs = 0; L.forced = 0; L.bytes = 0; L.gauged = false;   // (gauged: renderer.upGauge has read this frame's bytes)
       // the dead go first, without spending bytes: their staging is given back
       let n = 0;
       for (let i = 0; i < a.length; i++) { const it = a[i]; if (it.alive && !it.alive()) { if (it.abort) it.abort(); continue; } a[n++] = it; }

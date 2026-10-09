@@ -323,6 +323,76 @@ const cap96 = (n) => Math.ceil(n / 96) * 96;   // (the arenas hand out ranges in
   check(w.uploadQ.size === 0 && used(r) < u3 && used(r) === 0, 'a world torn down: the queue is cleared and every range goes back', used(r) + ' vertices left');
 }
 {
+  // the calibration: a 1 MB buffer, gl.finish before and after the upload (twice, the faster counts) — at world start
+  const seq = [];
+  const gl = Object.assign({}, GLX, { finish: () => seq.push('finish'), bufferData: (t, d) => seq.push('data ' + (typeof d === 'number' ? d : d.byteLength)), bufferSubData: (t, o, d) => seq.push('sub ' + d.byteLength) });
+  const r = mkRenderer(); r.gl = gl;
+  const cal = r.calibrateUploads ? r.calibrateUploads() : null;
+  check(cal && cal.bytes === MB && cal.ms > 0 && seq.join(',') === 'data ' + MB + ',finish,sub ' + MB + ',finish,sub ' + MB + ',finish', 'calibrateUploads: 1 MB, finished before and after', seq.join(','));
+  const w = new V.World({}, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: r, renderDist: 6 });
+  check(w.uploadQ.cal > 0, 'a new world asks for it and the scheduler starts from it');
+  const r2 = mkRenderer();
+  check(r2.calibrateUploads() === null, 'no finish (a stub GL): no calibration, the constant stands');
+}
+{
+  // the fences: one at the end of a frame that uploaded, polled at the next frames with timeout 0, never more than four
+  const waits = []; let pending = [], behind = 2;   // (behind: the polls until a new fence signals)
+  const gl = Object.assign({}, GLX, { SYNC_GPU_COMMANDS_COMPLETE: 0x9117, TIMEOUT_EXPIRED: 0x911b, CONDITION_SATISFIED: 0x911c, ALREADY_SIGNALED: 0x911a, WAIT_FAILED: 0x911d,
+    fenceSync: () => { const f = { polls: 0, after: behind }; pending.push(f); return f; }, deleteSync: (f) => { f.deleted = true; },
+    clientWaitSync: (f, flags, timeout) => { waits.push(timeout); f.polls++; return f.polls >= f.after ? 0x911a : 0x911b; } });
+  const r = mkRenderer(); r.gl = gl;
+  const samples = [], Q = { last: { bytes: 0 }, gpuSample: (b, lag) => samples.push([b, lag]) };
+  check(typeof r.upGauge === 'function', 'renderer.upGauge exists');
+  let t = 0;
+  const frame = (bytes) => { Q.last.bytes = bytes; Q.last.gauged = false; t += 50; r.upGauge(Q, t); };
+  frame(100000);
+  check(pending.length === 1 && samples.length === 0, 'a frame that uploaded sets a fence');
+  frame(0); frame(0);
+  check(samples.length === 1 && samples[0][0] === 100000 && samples[0][1] === 100 && pending[0].deleted, 'seen signalled two frames later: its bytes and its lag go to the fit', JSON.stringify(samples[0]));
+  check(waits.every(x => x === 0), 'clientWaitSync with timeout 0 only (never blocking)', waits.join(','));
+  behind = 1e9;   // a GPU far behind
+  const n0 = pending.length;
+  for (let k = 0; k < 10; k++) frame(50000);
+  check(pending.filter(f => !f.deleted).length <= 4 && pending.length - n0 <= 4, 'never more than four fences pending', pending.filter(f => !f.deleted).length + ' pending');
+  behind = 2; for (const f of pending) f.after = 0;
+  frame(0);
+  // a settled world: no fence at all (Very Low pays nothing when nothing streams)
+  const p0 = pending.length;
+  for (let k = 0; k < 400; k++) frame(0);
+  const late = pending.length;
+  for (let k = 0; k < 200; k++) frame(0);
+  check(pending.length === late && late - p0 <= 40, 'a settled world sets no fence (only base-line ones within 120 frames of the last upload)', (late - p0) + ' base-line fences, then ' + (pending.length - late));
+  const r3 = mkRenderer();
+  check((() => { try { r3.upGauge(Q, 1); return true; } catch (e) { return false; } })(), 'no fences (a stub GL): nothing happens');
+}
+{
+  // the mini-voxel detail (vxResidency) goes through the queue too: no more six uploads a frame outside any budget
+  const r = mkRenderer();
+  const w = new V.World({}, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: r, renderDist: 6 });
+  w.uploadQ.calibrate(1, 1e6);
+  r.upQ = w.uploadQ;
+  const secs = [];
+  for (let i = 0; i < 8; i++) { const s = new V.Column(i, 0).sec[4]; s.ox = i * 16; s.oy = 64; s.oz = 0; s.mesh = [null, null, null, null, null]; s.vxData = verts(40000); s.hasMesh = true; secs.push(s); }
+  frameBytes = 0;
+  r.vxResidency(secs, [8, 70, 8]);
+  check(frameBytes === 0 && w.uploadQ.size > 0 && secs.every(s => !s.mesh[3]), 'within the detail distance the detail waits in the queue (nothing uploaded in the draw)', w.uploadQ.size + ' queued');
+  r.vxResidency(secs, [8, 70, 8]);
+  const q1 = w.uploadQ.size;
+  check(q1 === secs.filter(s => s.vxQ).length, 'asked once per section (not every frame again)', q1 + ' items');
+  let worst = 0, k = 0;
+  while (w.uploadQ.size && k < 30) { frameBytes = 0; w.drainUploads(8, 8); worst = Math.max(worst, frameBytes); r.vxResidency(secs, [8, 70, 8]); k++; }
+  const up = secs.filter(s => s.mesh[3]);
+  check(worst <= 50000 && up.length === q1 && up.every(s => s.mesh[3].count === 2500), 'within the frame\'s bytes, nearest first, each in place once complete', up.length + ' up, worst ' + worst + ' bytes');
+  // a section that loses its detail while waiting gives its staging back
+  const s = secs[secs.length - 1]; s.mesh[3] = null; s.vxData = verts(120000); s.vxQ = null;   // (more than a frame's bytes)
+  r.vxResidency([s], [s.ox + 8, 70, 8]);
+  frameBytes = 0; w.drainUploads(8, 8);
+  const u = used(r);
+  s.vxData = null;
+  w.drainUploads(8, 8);
+  check(used(r) < u && !s.vxQ && !s.mesh[3], 'its data dropped while it went up: the staged range is given back');
+}
+{
   // without the staging (a stub renderer, the tests' and the ships'): one item per section, run whole, as in v042
   const calls = [];
   const r = { q: { upload: 2.5, vxLod: 48 }, uploadSection: (s, c, sy, o) => calls.push(sy), freeSection() {} };
