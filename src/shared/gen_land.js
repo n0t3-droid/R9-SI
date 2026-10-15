@@ -495,12 +495,12 @@
   // 2-block cells over the Heartland: what the woods and the meadows leave alone (bits: 1 a way, 2 a piece, 4 a field,
   // 8 a clearing, 16 a pond's water)
   const KC = 2, KN = 760, K0 = -KC * KN / 2;
-  LAND.KEEP = { WAY: 1, PIECE: 2, FIELD: 4, CLEAR: 8, POND: 16 };
+  LAND.KEEP = { WAY: 1, PIECE: 2, FIELD: 4, CLEAR: 8, POND: 16, VIEW: 32 };   // (VIEW: t-vista's sight windows, vgen 11 — no tree there)
   const keepIdx = (x, z) => { const i = Math.floor((x - K0) / KC), j = Math.floor((z - K0) / KC); return i < 0 || j < 0 || i >= KN || j >= KN ? -1 : j * KN + i; };
   LAND.keepAt = (P, x, z) => { const k = keepIdx(x, z); return k < 0 ? 0 : P.keep[k]; };
   const markKeep = (P, x0, z0, x1, z1, bit) => { for (let z = Math.floor(z0); z <= z1; z += KC) for (let x = Math.floor(x0); x <= x1; x += KC) { const k = keepIdx(x, z); if (k >= 0) P.keep[k] |= bit; } const k = keepIdx(x1, z1); if (k >= 0) P.keep[k] |= bit; };
   const markDisc = (P, x, z, r, bit) => { for (let dz = -r; dz <= r; dz += KC) for (let dx = -r; dx <= r; dx += KC) if (dx * dx + dz * dz <= r * r) { const k = keepIdx(x + dx, z + dz); if (k >= 0) P.keep[k] |= bit; } };
-  LAND._markKeep = markKeep; LAND._markDisc = markDisc;
+  LAND._markKeep = markKeep; LAND._markDisc = markDisc; LAND._keepIdx = keepIdx;
 
   // ---------------------------------------------------------------- the ops of the pieces, per chunk
   // a piece writes through put(x, y, z, state) (0: air); the ops land in the chunk's bucket and are stamped in order
@@ -957,7 +957,7 @@
     return WQ;
   };
   // may a tree stand here: open land, not on or next to a way, a piece, a field, a clearing, a pond; dry ground
-  const KW = 1 | 2 | 4 | 8 | 16;
+  const KW = 1 | 2 | 4 | 8 | 16 | 32;   // (32: a sight window of t-vista — set in vgen 11 only)
   const treeOk = (g, P, x, z) => !LAND.zoneAt(g, x, z) && !(LAND.keepAt(P, x, z) & KW) && !LAND.keepAt(P, x + 1, z) && !LAND.keepAt(P, x - 1, z) && !LAND.keepAt(P, x, z + 1) && !LAND.keepAt(P, x, z - 1) && !nearViaduct(g, x, z);
   LAND.treeOk = treeOk;
   function plantTree(w, kind, x, y, z, rng, big) {
@@ -1122,7 +1122,7 @@
         const fEnd = P.sites[L.b].kind === 'farm' ? P.sites[L.b] : P.sites[L.a].kind === 'farm' ? P.sites[L.a] : null;
         if (fEnd && i % 8 === 4 && (fEnd.x - px) ** 2 + (fEnd.z - pz) ** 2 < 56 * 56 && (fEnd.x - px) ** 2 + (fEnd.z - pz) ** 2 > 12 * 12) for (const sd of [1, -1]) {
           const x = Math.round(px + nx * sd * 4), z = Math.round(pz + nz * sd * 4);
-          if (P.cells.has(ck(x, z)) || LAND.zoneAt(g, x, z) || LAND.keepAt(P, x, z) & 6) continue;
+          if (P.cells.has(ck(x, z)) || LAND.zoneAt(g, x, z) || LAND.keepAt(P, x, z) & (6 | 32)) continue;
           if (P.trees.some(t => Math.abs(t.x - x) < 5 && Math.abs(t.z - z) < 5)) continue;
           const y = gy(x, z); if (y <= SEA + 2 || Math.abs(y - L.y[i]) > 2) continue;
           P.trees.push({ x, z, y: y + 1, kind: 'poplar', color: (fEnd.x + fEnd.z) & 1 ? 0 : 1 });
@@ -1312,6 +1312,7 @@
   }
   // the windmill: a white tower on a fieldstone base, a pointed roof, a hub on the face toward the yard; the hub is the
   // pivot of the sails, which the game draws and turns (a `windmill` spawn records it; t-polish: no sail blocks)
+  LAND.windmill = (g, P, K, Wm, gy, rng, site) => windmill(g, P, K, Wm, gy, rng, site);   // (t-vista: the eye-catchers at the other farms)
   function windmill(g, P, K, Wm, gy, rng, site) {
     const put = K.put, at = (u, v) => { const q = ROT4[Wm.r](u, v); return [Wm.ox + q[0], Wm.oz + q[1]]; }, F = Wm.hi + 1, T = 10;
     const roofC = ['red', 'slate', 'terracotta', 'teal'][rng.int(4)], fr = (f) => (f + Wm.r) & 3;
@@ -1502,7 +1503,10 @@
     const W = wstates(), gy = groundOf(g, P), put = K.put, Lk = LAND.LAKE;
     // the lighthouse: the driest point of the shore between south and west that has water within four blocks
     let best = null;
-    for (let a = 1.75; a <= 2.6; a += 0.05) {
+    // (t-vista, vgen 11: LAND.lighthouseAt says where and how tall — the lake's far coast, 46 high; else the south-west
+    // point, 20 high as t-land built it)
+    const LHP = (LAND.lighthouseAt && LAND.lighthouseAt(g, P)) || null;
+    for (let a = LHP ? LHP.a0 : 1.75; a <= (LHP ? LHP.a1 : 2.6); a += 0.05) {
       const [sx, sz] = LAND.shoreAt(g, a, 1.07), y = gy(sx, sz);
       if (y < SEA + 1 || LAND.zoneAt(g, sx, sz) || (LAND.keepAt(P, sx, sz) & 3)) continue;
       let wet = 0; for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) if (gy(sx + dx, sz + dz) < SEA) wet++;
@@ -1510,7 +1514,7 @@
       if (wet >= 6 && (!best || score > best.score)) best = { x: sx, z: sz, y, score };
     }
     if (best) {
-      const { x, z } = best, F = best.y + 1, H = 20;
+      const { x, z } = best, F = best.y + 1, H = LHP ? LHP.H : 20;
       const towards = Math.atan2(Lk.z - z, Lk.x - x), door = FACE4(-Math.cos(towards), -Math.sin(towards));
       for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
         const d = Math.hypot(dx, dz), qx = x + dx, qz = z + dz, y0 = gy(qx, qz);
