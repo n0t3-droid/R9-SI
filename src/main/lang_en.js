@@ -318,7 +318,7 @@
     'g.set.pUltraLite': 'Ultra · Light',
     'g.set.pUltraLiteTip': "Ultra's picture for built-in graphics chips (laptops, a Ryzen with Radeon Graphics): the far land from a cache, shadows in tiles, the world loading in step, a lighter water mirror",
     'g.set.farCache': 'Far cache (the far land and the sky redrawn only when something changes)',
-    'g.set.farCache.tip': 'The sky and the far land come from a cache and turn with your view — redrawn only after 1.5 m, a 6° turn or half a second, spread over four frames.',
+    'g.set.farCache.tip': 'The sky and the far land come from a cache and turn with your view — redrawn only after 1.5 m, a 4° turn or half a second, spread over four frames.',
     'g.set.shadowTakt': 'Shadow takt (shadows redrawn only where something changes)',
     'g.set.shadowTakt.tip': 'The shadow map is kept up to date in tiles: near ones every frame, far ones less often; when the sun moves on, the new map is drawn over six frames. The same shadows, far less work.',
     'g.set.streamTakt': 'World in step (loading takes only what the frame leaves over)',

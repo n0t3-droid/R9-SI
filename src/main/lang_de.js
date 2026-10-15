@@ -318,7 +318,7 @@
     'g.set.pUltraLite': 'Ultra · Leicht',
     'g.set.pUltraLiteTip': 'Ultras Bild für eingebaute Grafikchips (Laptop, Ryzen mit eingebauter Radeon): fernes Land aus dem Zwischenspeicher, Schatten in Kacheln, die Welt lädt im Takt, ein leichterer Wasserspiegel',
     'g.set.farCache': 'Fern-Cache (fernes Land und Himmel nur neu, wenn sich etwas ändert)',
-    'g.set.farCache.tip': 'Himmel und fernes Land kommen aus einem Zwischenspeicher und wandern mit dem Blick mit — neu gezeichnet erst nach 1,5 m, 6° Drehung oder einer halben Sekunde, verteilt auf vier Bilder.',
+    'g.set.farCache.tip': 'Himmel und fernes Land kommen aus einem Zwischenspeicher und wandern mit dem Blick mit — neu gezeichnet erst nach 1,5 m, 4° Drehung oder einer halben Sekunde, verteilt auf vier Bilder.',
     'g.set.shadowTakt': 'Schatten-Takt (Schatten nur dort neu, wo sich etwas ändert)',
     'g.set.shadowTakt.tip': 'Die Schattenkarte bleibt in Kacheln aktuell: nah jedes Bild, weiter weg seltener; wandert die Sonne, entsteht die neue Karte über sechs Bilder. Dieselben Schatten, viel weniger Arbeit.',
     'g.set.streamTakt': 'Welt im Takt (das Laden nimmt sich nur, was das Bild übrig lässt)',
