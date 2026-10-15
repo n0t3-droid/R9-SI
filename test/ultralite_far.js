@@ -185,7 +185,8 @@ console.log('e · the furniture split between the cache and the live pass (rende
   dists.forEach((d, i) => { data[i * 12] = d; data[i * 12 + 1] = 80; data[i * 12 + 2] = 0; kind[i] = 20; slot[i] = 0; });
   data[(n - 1) * 12] = 20; data[(n - 1) * 12 + 1] = 80; kind[n - 1] = 1; slot[n - 1] = -1;
   r.propSecs = new Set([{ propData: data, propKind: kind, propN: n, propSlot: slot }]);
-  const run = (split, lvl) => { r.propGather([0, 80, 0], lvl || 0, lvl ? 96 : 0, lvl ? 192 : 0, 1, null, 0, split); const sl = r.furnSlots[0]; return [sl.nn, sl.nf, r.propNA + r.propNB]; };
+  // (propGather(cam, lvl, D1, D2, furn, planes, refl, shadow, split): t-form's shadow flag before the split since the merge of v042)
+  const run = (split, lvl) => { r.propGather([0, 80, 0], lvl || 0, lvl ? 96 : 0, lvl ? 192 : 0, 1, null, 0, false, split); const sl = r.furnSlots[0]; return [sl.nn, sl.nf, r.propNA + r.propNB]; };
   const all = run(null), live = run({ x: 0, y: 80, z: 0, R2: 64 * 64, far: false }), cached = run({ x: 0, y: 80, z: 0, R2: 64 * 64, far: true });
   check(all.join() === '1,5,0' && live.join() === '1,2,0' && cached.join() === '0,3,0', 'within 64 blocks live (the near form and two far boxes), beyond it in the cache (three far boxes), none twice, none lost', `all ${all} · live ${live} · cache ${cached}`);
   const palms = run({ x: 0, y: 80, z: 0, R2: 64 * 64, far: false }, 2);
