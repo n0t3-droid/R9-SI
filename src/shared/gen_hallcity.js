@@ -32,8 +32,11 @@
 // over the wall to tapering pinnacles with lantern finials, and flying buttresses leap from them over the aisle roofs to
 // the clerestory (on the pier lines, over the aisle vault's stone ribs: no glass loses its sky light).
 // Round 3 (continuation 3): the apse's order — engaged piers on the gallery between the tall windows, the wall's face white
-// smooth stone, a gold course at the springing; the arcade's piers clustered columns; the nave's wooden arches solid honey
-// oak stepping with the vault (the thin beams read as dashes), the half dome's rays clean white stone.
+// smooth stone, a gold course at the springing; the arcade's piers clustered columns; the nave's wooden arches and the
+// aisles' ribs and tie beams solid honey oak (the thin beams read as dashes), the half dome's rays clean white stone; every
+// window's stained head pale (white, light blue, gold); a second row of pinnacles on the clerestory over the flyers; a
+// flower box under every arched window; the street lamps on the street's edge, clear of the awnings (and in voxtown.js
+// the arched windows' panes lit warm).
 // The plan is built like Nova Haven's (gen_city.js): a generator that yields between its steps (VG.planAdvance runs it
 // in slices in the worker, the plan cached per site), ops bucketed per chunk, the usual plan record for the game
 // (homes with beds, workplaces, the plaza and its seats, lamps, strolling routes) plus the hall's frame (plan.hall) and
