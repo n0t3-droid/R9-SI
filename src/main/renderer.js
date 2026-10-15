@@ -129,6 +129,7 @@
       for (const t of [this.texAlbedo, this.texMaterial]) { gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texParameterf(gl.TEXTURE_2D_ARRAY, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mx, level)); }
     }
     buildPrograms() {
+      if (VR.Light2) { VR.Light2.use(this.q); this.l2Key = VR.Light2.key ? VR.Light2.key(this.q) : ''; if (VR.GL && !VR.GL.defineHook) VR.GL.defineHook = VR.Light2.hook; }   // (t-light2: its switches are defines, light2.js)
       const md = this.multi ? ['MULTIDRAW'] : [];
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs)
       const P = this.P = {};
@@ -434,6 +435,7 @@
       if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
+      if (VR.Light2 && VR.Light2.key && VR.Light2.key(this.q) !== this.l2Key) this.buildPrograms();   // (t-light2: the light's switches are program defines)
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
       this.resize(full || this.q.scale !== prevScale);
     }
@@ -827,6 +829,7 @@
       // the block look (Klassisch v2): natural blocks shaded per block, normal maps turned with the tile, still water
       // and the far terrain per block
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
+      if (this.l2Uniforms) this.l2Uniforms(p, E);   // (t-light2: the light's values, light2_gl.js)
     }
     bindTerrainTextures(p) {
       const gl = this.gl;
@@ -1875,6 +1878,7 @@
       this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
       this.stats.fsPasses = 0; if (this.stats.fsList) this.stats.fsList.length = 0;   // (F10 · Bandbreite: the full-screen passes, fsMark)
       this.upQ = world && world.uploadQ && world.uploadQ.drain ? world.uploadQ : null;   // (F10: the one upload queue — vxResidency, upGauge)
+      if (this.l2Frame) this.l2Frame(F, E);   // (t-light2: the light's values this frame, light2_gl.js)
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];

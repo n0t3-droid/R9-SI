@@ -35,6 +35,7 @@
   };
   GL.program = function (vsSrc, fsSrc, name, defines) {
     const gl = GL.gl;
+    if (GL.defineHook) defines = GL.defineHook(name, defines || []);   // (t-light2: the light's switches add their defines by program — light2.js L2.hook)
     const pre = '#version 300 es\n' + (defines || []).map(d => d.startsWith('#') ? d + '\n' : '#define ' + d + '\n').join('');
     const fix = (src) => {
       // move #extension lines right after #version

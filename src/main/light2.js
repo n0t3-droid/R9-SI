@@ -1,0 +1,520 @@
+// ============================================================================
+// t-light2 · WOW I · Das Licht (plan docs/superpowers/plans/2026-10-15-t-light2.md): the light of the picture.
+// Pure (no GL): the switches and their defaults per preset, the settings rows, the per-frame values the shaders read
+// (computed from env.js's E), the models the node test checks against the GLSL (the hemispheric ambient, the lamps'
+// pools, the height fog, the grade's curves, the SAO taps, the flare's ghosts, the blue noise), and the GLSL text itself:
+// the COMMON block's part (glslCommon, under #ifdefs: with every switch off the shaders compile from the same text as
+// before) and the light's own passes (contact shadows, their blur, the volumetric light). The GL side — targets, passes,
+// uniforms — is light2_gl.js (loaded after renderer.js); this file loads before shaders.js (build.js MAIN).
+//   l2Light  Licht-Modell: the sky from above and the ground's bounce from below, a soft wrap on leaves and skin, the
+//            lamps' light in pools, the moon a cool key light                                          (LIGHT2)
+//   l2Ssao   Kontaktschatten 0 · 1 · 2 · 3: half-res scalable ambient obscurance, 4 / 8 / 12 taps, into the ambient
+//            only (the next frame reads it at its reprojected place)                                   (L2AO)
+//   l2Vol    Lichtstrahlen im Raum: the sun's light in the air through the shadow map, quarter res    (L2VOL)
+//   l2Air    Luft & Dunst: height fog in the valleys and over water, the morning layer, aerial perspective  (AIR2)
+//   l2Grade  Farbstimmung: a grade by the hour (tone curve, split toning), a soft vignette, the sun's flare, the
+//            glow by the hour                                                                           (GRADE2)
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const L2 = VR.Light2 = VR.Light2 || {};
+  const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+  const sstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const mix = (a, b, t) => a + (b - a) * t;
+  const mix3 = (a, b, t) => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
+
+  // ---------------------------------------------------------------- the switches
+  L2.SW = ['l2Light', 'l2Ssao', 'l2Vol', 'l2Air', 'l2Grade'];
+  L2.MAX = { l2Ssao: 3 };
+  const OFF = { l2Light: false, l2Ssao: 0, l2Vol: false, l2Air: false, l2Grade: false };
+  const ON = { l2Light: true, l2Air: true, l2Grade: true };
+  // the tiers (the plan's table): Very Low none of them (its programs and passes as before); Low the cheap ones and the
+  // 4-tap contact shadows; Balanced 8 taps; High and Ultra 12 taps and the volumetric light (with the god rays' switch);
+  // Ultra · Leicht (the integrated GPUs' Ultra) 8 taps and the volumetric light
+  const TIERS = {
+    potato: OFF,
+    low: Object.assign({}, ON, { l2Ssao: 1, l2Vol: false }),
+    balanced: Object.assign({}, ON, { l2Ssao: 2, l2Vol: false }),
+    high: Object.assign({}, ON, { l2Ssao: 3, l2Vol: true }),
+    ultra: Object.assign({}, ON, { l2Ssao: 3, l2Vol: true }),
+    ultraLite: Object.assign({}, ON, { l2Ssao: 2, l2Vol: true }),
+  };
+  L2.defaults = (preset) => Object.assign({}, TIERS[preset] || TIERS.balanced);
+  L2.off = () => Object.assign({}, OFF);
+  // the settings rows (settings_reg.js adds them: Bild · Licht & Schatten), each with its cost
+  L2.ROWS = [
+    { key: 'l2Light', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.l2Light', tip: 'g.set.l2Light.tip', cost: 'low', def: true },
+    { key: 'l2Ssao', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.l2Ssao', tip: 'g.set.l2Ssao.tip', cost: 'mid', def: 2, min: 0, max: 3, step: 1, vals: 'g.set.l2SsaoV' },
+    { key: 'l2Vol', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.l2Vol', tip: 'g.set.l2Vol.tip', cost: 'mid', def: false },
+    { key: 'l2Air', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.l2Air', tip: 'g.set.l2Air.tip', cost: 'low', def: true },
+    { key: 'l2Grade', g: 'img', sec: 'light', t: 'switch', lab: 'g.set.l2Grade', tip: 'g.set.l2Grade.tip', cost: 'low', def: true },
+  ];
+  // the renderer's settings this frame (renderer.buildPrograms hands them over: L2.use)
+  L2.q = OFF;
+  L2.use = function (q) { L2.q = q || OFF; return L2.q; };
+  L2.on = (q) => { q = q || L2.q; return !!(q.l2Light || q.l2Ssao || q.l2Vol || q.l2Air || q.l2Grade); };
+
+  // ---------------------------------------------------------------- the defines, by program (gl.js asks: GL.defineHook)
+  // The terrain, the props and the furniture read the contact shadows (their vertex shaders write the reprojected place);
+  // every program that calls applyFog gets the air's fog (the same haze on the land, the water, the people and the far
+  // terrain); the composite gets the grade and the volumetric light's upsample.
+  const AO_PROGS = { terrain: 1, terrainCut: 1, terrainCutZ: 1, prop: 1, furn: 1 };
+  const LIGHT_PROGS = { terrain: 1, terrainCut: 1, terrainCutZ: 1, shipOpaque: 1, shipCutout: 1, prop: 1, furn: 1, vox: 1, voxInst: 1, mesh: 1, lod: 1, form: 1, lodFar: 1, folk: 1, folkSun: 1 };
+  const FOG_PROGS = Object.assign({ trans: 1, shipTrans: 1, part: 1 }, LIGHT_PROGS);
+  L2.definesFor = function (name, q) {
+    q = q || L2.q;
+    const out = [];
+    if (q.l2Light && LIGHT_PROGS[name]) out.push('LIGHT2');
+    if ((q.l2Ssao | 0) > 0 && AO_PROGS[name]) out.push('L2AO');
+    if (q.l2Air && FOG_PROGS[name]) out.push('AIR2');
+    if (name === 'composite') { if (q.l2Grade) out.push('GRADE2'); if (q.l2Vol) out.push('L2VOL'); }
+    return out;
+  };
+  // gl.js: every program passes through here — a renderer without the switches (or with them all off) gets its defines
+  // unchanged, so its shaders are the same text as before
+  L2.hook = function (name, defines) {
+    const extra = L2.definesFor(name);
+    if (!extra.length) return defines;
+    return (defines || []).concat(extra.filter(d => !(defines || []).includes(d)));
+  };
+  if (VR.GL) VR.GL.defineHook = L2.hook;
+
+  // ---------------------------------------------------------------- the hour's moods
+  // the weights of the four looks, from the sun's height (the sun climbs to ~24° at noon): the day above ~6°, the golden
+  // hour its low part (the sun under ~17°, down to the horizon), dusk from the sunset to ~−12°, night under ~−16°
+  L2.moods = function (sy) {
+    const wDay = sstep(-0.01, 0.1, sy), wNight = 1 - sstep(-0.28, -0.1, sy), wDusk = (1 - wDay) * (1 - wNight);
+    const g = 1 - sstep(0.1, 0.3, sy);
+    return { day: wDay * (1 - g), gold: wDay * g, dusk: wDusk, night: wNight };
+  };
+  // a value per mood (a number or a colour) blended by the hour's weights
+  const MOODS = ['day', 'gold', 'dusk', 'night'];
+  const byMood = (m, tab) => {
+    if (!Array.isArray(tab.day)) { let s = 0; for (const k of MOODS) s += tab[k] * m[k]; return s; }
+    const out = [0, 0, 0];
+    for (const k of MOODS) { const v = tab[k], w = m[k]; out[0] += v[0] * w; out[1] += v[1] * w; out[2] += v[2] * w; }
+    return out;
+  };
+  L2.byMood = byMood;
+
+  // ---------------------------------------------------------------- step 1 · the light model
+  // the shade's colour leans blue (the sky's light), the ground's bounce warm (the sunlit ground), per mood
+  const SKYTINT = { day: [0.94, 1.0, 1.1], gold: [0.88, 0.97, 1.2], dusk: [0.96, 0.93, 1.12], night: [0.84, 0.96, 1.25] };
+  const GROUND = { day: [1.06, 1.0, 0.72], gold: [1.18, 0.96, 0.66], dusk: [1.02, 0.86, 0.9], night: [0.86, 0.92, 1.08] };
+  const GROUNDK = { day: 0.6, gold: 0.56, dusk: 0.5, night: 0.42 };   // the bounce's luminance over the sky's
+  L2.K = { dir: 0.08, xFace: 0.94, wrapLeaf: 0.45, wrapSkin: 0.42, poolHot: 2.4, poolK: 0.25, poolTail: 0.25, poolHue: 1.25, moon: 1.7 };
+  // a colour with the luminance of another
+  const toLum = (c, L) => { const l = lum(c) || 1; return [c[0] * L / l, c[1] * L / l, c[2] * L / l]; };
+  // the hemisphere's two colours this frame: sky (from above) and ground (from below), from E.ambSky
+  L2.hemiColors = function (E) {
+    const m = L2.moods(E.sunDir[1]), a = E.ambSky, La = lum(a);
+    const st = byMood(m, SKYTINT), gt = byMood(m, GROUND), gk = byMood(m, GROUNDK);
+    const sky = toLum([a[0] * st[0], a[1] * st[1], a[2] * st[2]], La);
+    const ground = toLum([a[0] * gt[0], a[1] * gt[1], a[2] * gt[2]], La * gk);
+    return { sky, ground, moods: m };
+  };
+  // the hemispheric ambient for a normal (JS mirror of l2Hemi): the sky from above, the ground from below, linear in n.y
+  // (a Lambert surface under two half-spheres), a little brighter on the side of the sky toward the light
+  L2.hemi = function (n, sky, ground, az, dirK) {
+    const k = clamp(0.5 + 0.5 * n[1], 0, 1), side = 1 - Math.abs(n[1]);
+    const d = az ? (n[0] * az[0] + n[2] * az[1]) : 0;
+    const f = 1 + (dirK === undefined ? L2.K.dir : dirK) * d * side;
+    return [mix(ground[0], sky[0], k) * f, mix(ground[1], sky[1], k) * f, mix(ground[2], sky[2], k) * f];
+  };
+  // the lamps' light (JS mirror of l2Pool): the brightest channel's level m (0..1: 15 at the lamp, −1/15 a block) gives
+  // the distance d = 15 (1 − m); the light falls like a lamp's, 1 / (1 + d²·k), a hot spot at the lamp, the tail faded
+  // out before the flood fill's end; the hue is the channels over the brightest, a little more saturated
+  L2.pool = function (level, K) {
+    K = K || L2.K;
+    if (level <= 0) return 0;
+    const d = 15 * (1 - level);
+    return K.poolHot / (1 + d * d * K.poolK) * sstep(0, K.poolTail, level);
+  };
+  L2.poolOld = (level) => 1.35 * Math.pow(Math.max(0, level), 1.7);   // (the curve of before: shaders.js blockL)
+
+  // ---------------------------------------------------------------- step 4 · the air
+  // the height fog: density ρ(y) = ρ0 · exp(−k (y − base)); its optical depth along a ray from the eye (height ye) over
+  // the distance D rising by dy: ρ0 · exp(−k (ye − base)) · D · (1 − exp(−k dy)) / (k dy)
+  L2.fogOD = function (ye, dy, D, rho0, k, base) {
+    const y0 = Math.max(ye - base, -40);
+    const kd = k * dy;
+    const g = Math.abs(kd) > 1e-4 ? (1 - Math.exp(-kd)) / kd : 1 - kd * 0.5;
+    return rho0 * Math.exp(-k * y0) * D * g;
+  };
+  // the same by marching (the test's reference)
+  L2.fogODMarch = function (ye, dy, D, rho0, k, base, n) {
+    n = n || 2000; let s = 0;
+    for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, y = ye + dy * t; s += rho0 * Math.exp(-k * Math.max(y - base, -40)); }
+    return s * D / n;
+  };
+  // the air by the hour: the haze's density at the valley floor (per block), its scale height, its base, the aerial
+  // perspective's distance, the morning layer (thicker and lower round sunrise); the sea level is the Heartland's 62
+  const FOG = { day: [0.0016, 1 / 16, 62], gold: [0.0024, 1 / 14, 62], dusk: [0.003, 1 / 13, 60], night: [0.0022, 1 / 12, 60] };
+  L2.air = function (E, ticks) {
+    const m = L2.moods(E.sunDir[1]);
+    const f = byMood(m, FOG);
+    // the morning layer: round sunrise (the sun rising in the east, ticks 23000 … 2500) a dense low layer that burns off
+    const t = ((ticks % 24000) + 24000) % 24000, mt = t > 20000 ? t - 24000 : t;
+    const morning = sstep(-1800, -200, mt) * (1 - sstep(1200, 3000, mt));
+    const rho = f[0] * (1 + 2.2 * morning), k = f[1] * (1 + 0.8 * morning), base = f[2] - 1.5 * morning;
+    const rain = E.rain || 0;
+    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 900 * (1 - 0.4 * rain), apMax: 0.62, morning, moods: m };
+  };
+
+  // ---------------------------------------------------------------- step 5 · the grade
+  // a 3-point tone curve (JS mirror of l2Curve): the darks lifted to `toe`, the mid-point moved to `mid` (a gamma), an
+  // S of strength `s` round it, the lights pressed to `sh`; per channel, monotone, 0 → toe, 1 → sh
+  L2.curve = function (x, c) {
+    x = clamp(x, 0, 1);
+    const g = Math.log(c.mid) / Math.log(0.5);
+    let y = Math.pow(x, g);
+    y = mix(y, y * y * (3 - 2 * y), c.s);
+    return c.toe + (c.sh - c.toe) * y;
+  };
+  // the grade per mood: the curve (toe, mid, s, sh), the split toning (the darks' and the lights' leaning, in display
+  // space), the mid-tones' saturation, the vignette, the bloom's threshold and strength
+  const GRADE = {
+    day: { toe: 0.012, mid: 0.5, s: 0.32, sh: 0.985, dark: [-0.012, 0.004, 0.022], light: [0.018, 0.008, -0.016], sat: 1.06, vig: 0.22, bThr: 1.15, bStr: 0.10 },
+    gold: { toe: 0.016, mid: 0.48, s: 0.36, sh: 0.98, dark: [-0.02, 0.0, 0.04], light: [0.05, 0.016, -0.04], sat: 1.1, vig: 0.26, bThr: 1.0, bStr: 0.13 },
+    dusk: { toe: 0.024, mid: 0.46, s: 0.34, sh: 0.97, dark: [0.012, -0.012, 0.05], light: [0.04, 0.0, 0.02], sat: 1.08, vig: 0.3, bThr: 0.85, bStr: 0.16 },
+    night: { toe: 0.02, mid: 0.42, s: 0.38, sh: 0.97, dark: [-0.024, 0.018, 0.05], light: [0.05, 0.02, -0.02], sat: 1.04, vig: 0.34, bThr: 0.62, bStr: 0.22 },
+  };
+  L2.GRADE = GRADE;
+  L2.grade = function (E) {
+    const m = L2.moods(E.sunDir[1]), o = {};
+    for (const k of ['toe', 'mid', 's', 'sh', 'sat', 'vig', 'bThr', 'bStr']) o[k] = m.day * GRADE.day[k] + m.gold * GRADE.gold[k] + m.dusk * GRADE.dusk[k] + m.night * GRADE.night[k];
+    o.dark = byMood(m, { day: GRADE.day.dark, gold: GRADE.gold.dark, dusk: GRADE.dusk.dark, night: GRADE.night.dark });
+    o.light = byMood(m, { day: GRADE.day.light, gold: GRADE.gold.light, dusk: GRADE.dusk.light, night: GRADE.night.light });
+    o.moods = m;
+    return o;
+  };
+  // the split toning on a display colour (JS mirror of l2Split): the darks lean to `dark`, the lights to `light`,
+  // weighted by the luma's distance from the middle; the luma itself kept
+  L2.split = function (c, dark, light) {
+    const l = lum(c), wd = (1 - l) * (1 - l), wl = l * l;
+    const o = [c[0] + dark[0] * wd + light[0] * wl, c[1] + dark[1] * wd + light[1] * wl, c[2] + dark[2] * wd + light[2] * wl];
+    const dl = lum(o) - l;
+    return [clamp(o[0] - dl, 0, 1), clamp(o[1] - dl, 0, 1), clamp(o[2] - dl, 0, 1)];
+  };
+  // the sun's flare: ghosts along the axis from the sun through the screen's centre (uv 0..1), mirrored past it —
+  // [x, y, radius (screen heights), r, g, b]
+  const GHOSTS = [[0.55, 0.035, 1.0, 0.72, 0.42], [0.8, 0.02, 0.5, 0.9, 1.0], [1.25, 0.06, 0.62, 0.8, 1.0], [1.55, 0.028, 1.0, 0.6, 0.36], [1.9, 0.09, 0.42, 0.66, 1.0]];
+  L2.ghosts = function (sx, sy) {
+    return GHOSTS.map(([t, r, R, G, B]) => [sx + (0.5 - sx) * t, sy + (0.5 - sy) * t, r, R, G, B]);
+  };
+
+  // ---------------------------------------------------------------- step 2 · the contact shadows' taps
+  // scalable ambient obscurance (McGuire et al. 2012): tap i of n on a spiral of `turns` turns in the unit disc, rotated
+  // by phi — the radius grows with the index, so the taps cover the disc evenly in area
+  L2.saoTap = function (i, n, turns, phi) {
+    const a = (i + 0.5) / n, ang = a * turns * Math.PI * 2 + phi;
+    return [Math.cos(ang) * a, Math.sin(ang) * a];
+  };
+  L2.TAPS = [0, 4, 8, 12];
+  L2.TURNS = [0, 2, 5, 7];
+  // blue noise (void and cluster, Ulichney 1993): an N × N tiling threshold map whose values are spread with no low
+  // frequencies — the per-pixel rotation of the taps and the volumetric march's start. Made once (~10 ms for 64²)
+  L2.blueNoise = function (N, seed) {
+    N = N || 64; const n = N * N, R = 7, W = 2 * R + 1, sig = 1.9;
+    const lut = new Float32Array(W * W);
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) lut[(dy + R) * W + dx + R] = Math.exp(-(dx * dx + dy * dy) / (2 * sig * sig));
+    const E = new Float32Array(n), on = new Uint8Array(n), rank = new Int32Array(n);
+    const splat = (i, s) => { const x = i % N, y = (i / N) | 0; for (let dy = -R; dy <= R; dy++) { const yy = (y + dy + N) % N; for (let dx = -R; dx <= R; dx++) { const xx = (x + dx + N) % N; E[yy * N + xx] += s * lut[(dy + R) * W + dx + R]; } } };
+    let a = (seed || 7) >>> 0 || 1; const rnd = () => { a ^= a << 13; a >>>= 0; a ^= a >>> 17; a ^= a << 5; a >>>= 0; return a / 4294967296; };
+    const m0 = Math.max(1, Math.floor(n * 0.1));
+    for (let c = 0; c < m0;) { const i = Math.floor(rnd() * n); if (!on[i]) { on[i] = 1; splat(i, 1); c++; } }
+    const tight = () => { let b = -1, bv = -1e30; for (let i = 0; i < n; i++) if (on[i] && E[i] > bv) { bv = E[i]; b = i; } return b; };
+    const vacant = () => { let b = -1, bv = 1e30; for (let i = 0; i < n; i++) if (!on[i] && E[i] < bv) { bv = E[i]; b = i; } return b; };
+    for (let it = 0; it < n; it++) { const t = tight(); on[t] = 0; splat(t, -1); const v = vacant(); if (v === t) { on[t] = 1; splat(t, 1); break; } on[v] = 1; splat(v, 1); }
+    const on0 = on.slice(), E0 = E.slice();
+    for (let r = m0 - 1; r >= 0; r--) { const t = tight(); on[t] = 0; splat(t, -1); rank[t] = r; }
+    on.set(on0); E.set(E0);
+    for (let r = m0; r < n; r++) { const v = vacant(); on[v] = 1; splat(v, 1); rank[v] = r; }
+    const out = new Uint8Array(n); for (let i = 0; i < n; i++) out[i] = Math.min(255, Math.floor((rank[i] + 0.5) / n * 256));
+    return out;
+  };
+
+  // ---------------------------------------------------------------- the per-frame values (light2_gl.js uploads them)
+  // E: env.js's frame; q: the renderer's settings. Kept in one object (no allocation a frame after the first)
+  L2.frame = function (E, q, ticks, out) {
+    out = out || {};
+    const h = L2.hemiColors(E), K = L2.K;
+    out.sky = h.sky; out.ground = h.ground; out.moods = h.moods;
+    // the brighter side of the sky: toward the sun by day and at dusk, toward the moon at night
+    const L = E.sunDir[1] > -0.1 ? E.sunDir : E.moonDir, hl = Math.hypot(L[0], L[2]) || 1;
+    out.az = [L[0] / hl, L[2] / hl];
+    out.k = [K.dir, K.xFace, K.wrapLeaf, K.wrapSkin];
+    out.pool = [K.poolHot, K.poolK, K.poolTail, K.poolHue];
+    out.air = L2.air(E, ticks || 0);
+    out.grade = L2.grade(E);
+    return out;
+  };
+
+  // ---------------------------------------------------------------- GLSL: the COMMON block's part (shaders.js includes it
+  // right before applyFog; everything under its define, so a program without the switches compiles the same text)
+  L2.glslCommon = function () {
+    return `
+#ifdef LIGHT2
+// t-light2 · the light model (light2.js): the hemispheric ambient, the lamps' pools, the wrap
+uniform vec3 u_l2Sky;      // the sky's light from above: the colour of the shade
+uniform vec3 u_l2Ground;   // the ground's bounce from below
+uniform vec4 u_l2K;        // x the sky's lean toward the light's azimuth, y the x-faces' shade, z the leaves' wrap, w the skin's
+uniform vec2 u_l2Az;       // the light's azimuth (unit, x z)
+uniform vec4 u_l2Pool;     // the lamps: x the hot spot, y the falloff (1/blocks²), z the tail's fade (level), w the hue's power
+vec3 l2Hemi(vec3 n) {
+  vec3 c = mix(u_l2Ground, u_l2Sky, clamp(0.5 + 0.5 * n.y, 0.0, 1.0));
+  return c * (1.0 + u_l2K.x * dot(n.xz, u_l2Az) * (1.0 - abs(n.y)));
+}
+vec3 l2Pool(vec3 bl) {
+  float m = max(bl.r, max(bl.g, bl.b));
+  if (m <= 0.0) return vec3(0.0);
+  float d = 15.0 * (1.0 - m);
+  float f = u_l2Pool.x / (1.0 + d * d * u_l2Pool.y) * smoothstep(0.0, u_l2Pool.z, m);
+  return pow(bl / m, vec3(u_l2Pool.w)) * f * u_blockLightTint;
+}
+float l2Wrap(float nl, float w) { return clamp((nl + w) / (1.0 + w), 0.0, 1.0); }
+#endif
+#ifdef L2AO
+// t-light2 · the contact shadows (light2_gl.js l2Ssao): last frame's, read where this fragment was then; the texture keeps
+// the depth beside the occlusion, a fragment whose depth does not match (it was hidden then) takes none
+uniform sampler2D u_l2Ao;
+uniform vec4 u_l2AoK;      // x strength (0: not read — the mirror, the far cache), y the depth's tolerance (relative), z the block light's share
+in vec4 v_l2AoClip;
+float l2Ao() {
+  if (u_l2AoK.x <= 0.0 || v_l2AoClip.w <= 0.07) return 1.0;
+  vec2 uv = v_l2AoClip.xy / v_l2AoClip.w * 0.5 + 0.5;
+  if (uv.x <= 0.0 || uv.y <= 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return 1.0;
+  vec2 a = texture(u_l2Ao, uv).rg;
+  float e = abs(a.g - v_l2AoClip.w) / v_l2AoClip.w;
+  return mix(1.0, a.r, u_l2AoK.x * (1.0 - smoothstep(u_l2AoK.y, u_l2AoK.y * 2.5, e)));
+}
+#endif
+#ifdef AIR2
+// t-light2 · the air: the distance haze as before, an exponential height fog integrated along the ray (dense in the
+// valleys and over the water, a low morning layer), aerial perspective (the far land takes the horizon's colour, its
+// contrast fades), the sun's light in the haze toward it
+uniform vec4 u_l2Fog;      // x the density at the base (per block), y k (1 / scale height), z the base's height, w the eye's height
+uniform vec4 u_l2Fog2;     // x 1 / the aerial perspective's distance, y its most, z the sun's in-scatter, w the night's dimming
+uniform vec3 u_l2FogCol;   // the valley haze's colour
+vec3 l2Fog(vec3 col, vec3 rel, float dist) {
+  vec3 dir = rel / max(dist, 0.001);
+  if (u_fog.w > 0.5) return mix(col, u_fogColor, clamp(1.0 - exp(-dist * 0.07), 0.0, 1.0));
+  vec3 hz = hazeColor(dir);
+  vec3 fc = u_dim == 1 || u_dim == 2 ? u_fogColor : mix(hz, u_fogColor, 0.35);
+  float hd = max(length(rel.xz), abs(rel.y) * 0.35);
+  float f = smoothstep(u_fog.x, u_fog.y, hd);
+  f = max(f, (1.0 - exp(-dist * u_fog.z)) * 0.85);
+  if (u_dim != 0) return mix(col, fc, clamp(f, 0.0, 1.0));
+  // aerial perspective: toward the horizon's colour with the distance (the far hills a step paler and bluer per plane)
+  float ap = (1.0 - exp(-dist * u_l2Fog2.x)) * u_l2Fog2.y;
+  col = mix(col, hz, ap);
+  // the height fog along the ray
+  float k = u_l2Fog.y, dy = rel.y, kd = k * dy;
+  float g = abs(kd) > 1e-4 ? (1.0 - exp(-kd)) / kd : 1.0 - kd * 0.5;
+  float od = u_l2Fog.x * exp(-k * max(u_l2Fog.w - u_l2Fog.z, -40.0)) * dist * g;
+  float hf = 1.0 - exp(-od);
+  float toSun = max(dot(dir, u_sunDir), 0.0), t2 = toSun * toSun, t4 = t2 * t2;
+  vec3 mist = u_l2FogCol + u_sunColor * (t4 * t4 * u_l2Fog2.z);
+  col = mix(col, mist, clamp(hf, 0.0, 0.92));
+  return mix(col, fc, clamp(f, 0.0, 1.0));
+}
+#endif
+`;
+  };
+  // the vertex shaders' part (TERRAIN_VS, PROP_VS, FURN_VS): where this vertex was in the last frame's view (the contact
+  // shadows are read there)
+  L2.glslVS = function () {
+    return `
+#if defined(L2AO) && !defined(MODEL)
+uniform mat4 u_l2AoVP;     // the last frame's view-projection (as it was drawn, its jitter included)
+uniform vec3 u_l2AoDelta;  // the eye's move since: this eye − that eye
+out vec4 v_l2AoClip;
+#endif
+`;
+  };
+
+  // ---------------------------------------------------------------- GLSL: the light's own passes (light2_gl.js)
+  // the contact shadows at half resolution: the depth → the view position, the normal from the depth's neighbours (the
+  // smaller difference each way: no smear over an edge), n taps on a spiral in a disc of u_ao.x blocks, rotated by the
+  // blue noise; out: R the obscurance (1 = open), G the linear depth (for the reprojection's test)
+  L2.AO_FS = `
+uniform highp sampler2D u_depth;
+uniform sampler2D u_blue;
+uniform vec4 u_proj;       // 1/P00, 1/P11, P8, P9 (the projection as drawn, its jitter included)
+uniform vec2 u_nf;         // near, far
+uniform vec2 u_texel;      // the full-res texel
+uniform vec4 u_ao;         // x the radius (blocks), y the strength, z the bias (blocks), w the projected scale: P11 · (half the height in texels)
+uniform float u_phase;     // the noise's turn this frame (the TSR accumulates the turns)
+in vec2 v_uv;
+out vec4 o;
+float linZ(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nf.x * u_nf.y / (u_nf.y + u_nf.x - z * (u_nf.y - u_nf.x)); }
+vec3 viewAt(vec2 uv, float zl) { vec2 ndc = uv * 2.0 - 1.0; return vec3((ndc.x + u_proj.z) * zl * u_proj.x, (ndc.y + u_proj.w) * zl * u_proj.y, -zl); }
+vec3 posAt(vec2 uv) { return viewAt(uv, linZ(texture(u_depth, uv).r)); }
+void main() {
+  float d0 = texture(u_depth, v_uv).r;
+  if (d0 >= 0.999999) { o = vec4(1.0, 1e4, 0.0, 1.0); return; }
+  float z0 = linZ(d0);
+  vec3 P = viewAt(v_uv, z0);
+  vec3 pr = posAt(v_uv + vec2(u_texel.x, 0.0)), pl = posAt(v_uv - vec2(u_texel.x, 0.0));
+  vec3 pu = posAt(v_uv + vec2(0.0, u_texel.y)), pd = posAt(v_uv - vec2(0.0, u_texel.y));
+  vec3 dx = abs(pr.z - P.z) < abs(P.z - pl.z) ? pr - P : P - pl;
+  vec3 dy = abs(pu.z - P.z) < abs(P.z - pd.z) ? pu - P : P - pd;
+  vec3 N = normalize(cross(dx, dy));
+  if (N.z < 0.0) N = -N;
+  float rs = u_ao.x * u_ao.w / z0;                 // the disc's radius in texels (full res)
+  if (rs < 1.5) { o = vec4(1.0, z0, 0.0, 1.0); return; }
+  rs = min(rs, 160.0);
+  float phi = (texture(u_blue, gl_FragCoord.xy / 64.0).r + u_phase) * 6.2831853;
+  float R2 = u_ao.x * u_ao.x, sum = 0.0;
+  for (int i = 0; i < TAPS; i++) {
+    float a = (float(i) + 0.5) / float(TAPS), ang = a * TURNS * 6.2831853 + phi;
+    vec2 uv = v_uv + vec2(cos(ang), sin(ang)) * (a * rs) * u_texel;
+    vec3 Q = posAt(uv);
+    vec3 v = Q - P;
+    float vv = dot(v, v), vn = dot(v, N);
+    float fall = max(R2 - vv, 0.0) / R2;
+    sum += fall * fall * max(vn - u_ao.z, 0.0) / (vv + 0.01);
+  }
+  float ao = max(0.0, 1.0 - sum * u_ao.y * (2.0 / float(TAPS)));
+  o = vec4(ao, z0, 0.0, 1.0);
+}`;
+  // the bilateral blur, one direction a pass (u_dir): 7 taps, Gaussian, each weighed by how close its depth is
+  L2.BLUR_FS = `
+uniform sampler2D u_src;   // R the obscurance, G the depth
+uniform vec2 u_dir;        // one texel of the half-res target, along the pass
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec2 c = texture(u_src, v_uv).rg;
+  float s = c.r, w = 1.0;
+  for (int i = 1; i <= 3; i++) {
+    float g = exp(-float(i * i) / 8.0);
+    for (int k = -1; k <= 1; k += 2) {
+      vec2 t = texture(u_src, v_uv + u_dir * float(i * k)).rg;
+      float wt = g * max(0.0, 1.0 - abs(t.g - c.g) / (c.g * 0.04 + 0.05));
+      s += t.r * wt; w += wt;
+    }
+  }
+  o = vec4(s / w, c.g, 0.0, 1.0);
+}`;
+  // the volumetric light at quarter resolution: along the ray to the scene's depth (at most u_vol.y), u_vol.x steps
+  // started at a blue-noise offset, the light's visibility from the shadow map at each (the map is affine along the ray:
+  // its coordinates are interpolated), the density of the air at the step's height, a Henyey-Greenstein phase; out: the
+  // in-scattered light (rgb) and the linear depth (a) for the composite's depth-aware upsample
+  L2.VOL_FS = `
+uniform highp sampler2D u_depth;
+uniform highp sampler2DShadow u_shadowMap;
+uniform sampler2D u_blue;
+uniform mat4 u_invVP;      // NDC → camera-relative (this frame, as drawn)
+uniform mat4 u_shadowMat;  // camera-relative → the shadow map's clip space
+uniform vec2 u_shadowOff;  // F9 · Schatten-Takt's toroidal offset (0: the plain map)
+uniform vec2 u_nf;
+uniform vec4 u_vol;        // x the steps, y the march's reach (blocks), z the density at the eye, w the phase's g
+uniform vec4 u_volH;       // x the eye's height, y k (1 / the haze's scale height), z the haze's base, w the shadow map's bias
+uniform vec3 u_volCol;     // the light's colour × strength
+uniform vec3 u_volL;       // toward the light
+uniform float u_phase;
+in vec2 v_uv;
+out vec4 o;
+float linZ(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nf.x * u_nf.y / (u_nf.y + u_nf.x - z * (u_nf.y - u_nf.x)); }
+void main() {
+  float d = texture(u_depth, v_uv).r;
+  vec4 pf = u_invVP * vec4(v_uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  vec3 P = pf.xyz / pf.w;
+  float len = length(P);
+  vec3 dir = P / max(len, 1e-4);
+  float T = min(len, u_vol.y);
+  float n = u_vol.x, dt = T / n;
+  float j = fract(texture(u_blue, gl_FragCoord.xy / 64.0).r + u_phase);
+  vec3 s0 = (u_shadowMat * vec4(0.0, 0.0, 0.0, 1.0)).xyz, s1 = (u_shadowMat * vec4(dir * T, 1.0)).xyz;
+  float acc = 0.0;
+  for (int i = 0; i < 16; i++) {
+    if (float(i) >= n) break;
+    float t = (float(i) + j) * dt, f = t / max(T, 1e-4);
+    vec3 sc = mix(s0, s1, f) * 0.5 + 0.5;
+    float vis = 1.0;
+    if (sc.x > 0.0 && sc.y > 0.0 && sc.x < 1.0 && sc.y < 1.0 && sc.z < 1.0) vis = texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - u_volH.w));
+    float h = u_volH.x + dir.y * t;
+    acc += vis * exp(-u_volH.y * max(h - u_volH.z, -30.0)) * dt;
+  }
+  float c = dot(dir, u_volL), g = u_vol.w, g2 = g * g;
+  float ph = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5);
+  o = vec4(u_volCol * (acc * u_vol.z * ph), linZ(d));
+}`;
+  // the composite's part (COMPOSITE_FS includes it): the grade, the vignette, the flare, the volumetric light's upsample
+  L2.glslComposite = function () {
+    return `
+#ifdef GRADE2
+// t-light2 · the grade by the hour (light2.js L2.grade): a 3-point tone curve, split toning, the mid-tones' saturation,
+// a soft vignette (round on the screen, whatever its aspect), the sun's flare (ghosts along the axis through the centre)
+uniform vec4 u_l2Curve;    // x the toe, y the mid-point's gamma, z the S's strength, w the shoulder
+uniform vec3 u_l2Dark;     // the darks lean to (display space)
+uniform vec3 u_l2Light;    // the lights lean to
+uniform vec4 u_l2Vig;      // x the vignette's strength, y the aspect, z the mid-tones' saturation, w the flare's strength
+uniform vec4 u_l2Sun;      // xy the sun's place on the screen (uv), z its visibility (0 hidden … 1), w unused
+uniform vec4 u_l2Ghost[5]; // per ghost: xy its place, z its radius (screen heights), w unused
+uniform vec3 u_l2GhostC[5];
+vec3 l2Curve(vec3 x) {
+  x = clamp(x, 0.0, 1.0);
+  vec3 y = pow(x, vec3(u_l2Curve.y));
+  y = mix(y, y * y * (3.0 - 2.0 * y), u_l2Curve.z);
+  return u_l2Curve.x + (u_l2Curve.w - u_l2Curve.x) * y;
+}
+vec3 l2Grade(vec3 c, vec2 uv) {
+  c = l2Curve(c);
+  float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  float wd = (1.0 - l) * (1.0 - l), wl = l * l;
+  vec3 s = c + u_l2Dark * wd + u_l2Light * wl;
+  s -= dot(s, vec3(0.2126, 0.7152, 0.0722)) - l;
+  float mid = 1.0 - abs(2.0 * l - 1.0);
+  s = mix(vec3(l), s, 1.0 + (u_l2Vig.z - 1.0) * mid);
+  vec2 v = (uv - 0.5) * vec2(u_l2Vig.y, 1.0);
+  s *= 1.0 - u_l2Vig.x * smoothstep(0.25, 0.95, dot(v, v) * 2.2);
+  return clamp(s, 0.0, 1.0);
+}
+// the flare (added in HDR before the tone map, only with the sun in the frame and seen)
+vec3 l2Flare(vec2 uv) {
+  if (u_l2Sun.z <= 0.0) return vec3(0.0);
+  vec3 f = vec3(0.0);
+  for (int i = 0; i < 5; i++) {
+    vec2 d = (uv - u_l2Ghost[i].xy) * vec2(u_l2Vig.y, 1.0);
+    float r = length(d) / u_l2Ghost[i].z;
+    f += u_l2GhostC[i] * (1.0 - smoothstep(0.55, 1.0, r)) * (0.6 + 0.4 * smoothstep(0.3, 0.95, r));
+  }
+  return f * u_l2Sun.z * u_l2Vig.w;
+}
+#endif
+#ifdef L2VOL
+// t-light2 · the volumetric light, upsampled: the four quarter-res texels round the pixel, each weighed bilinearly and by
+// how close its depth is to the pixel's own
+uniform sampler2D u_l2Vol;          // rgb the in-scattered light, a the linear depth
+uniform highp sampler2D u_l2Depth;  // the full-res depth
+uniform vec2 u_l2VolSize;           // the quarter-res target's size (texels)
+uniform vec2 u_l2nf;
+vec3 l2VolAt(vec2 uv) {
+  float zd = texture(u_l2Depth, uv).r * 2.0 - 1.0;
+  float z = 2.0 * u_l2nf.x * u_l2nf.y / (u_l2nf.y + u_l2nf.x - zd * (u_l2nf.y - u_l2nf.x));
+  vec2 t = uv * u_l2VolSize - 0.5, f = fract(t), b = (floor(t) + 0.5) / u_l2VolSize, e = 1.0 / u_l2VolSize;
+  vec4 a = texture(u_l2Vol, b), bb = texture(u_l2Vol, b + vec2(e.x, 0.0)), c = texture(u_l2Vol, b + vec2(0.0, e.y)), d = texture(u_l2Vol, b + e);
+  vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
+  vec4 dz = abs(vec4(a.a, bb.a, c.a, d.a) - z) / (z * 0.06 + 0.3);
+  w *= 1.0 / (1.0 + dz * dz) + 1e-4;
+  return (a.rgb * w.x + bb.rgb * w.y + c.rgb * w.z + d.rgb * w.w) / (w.x + w.y + w.z + w.w);
+}
+#endif
+`;
+  };
+  // the light's programs and their define sets (the offline compile check and test/light2.js)
+  L2.passDefines = (taps) => ['TAPS ' + (taps | 0), 'TURNS ' + (L2.TURNS[L2.TAPS.indexOf(taps)] || 5) + '.0'];
+  L2.programs = function (S) {
+    return [
+      ['l2ao', S.FS_VS, L2.AO_FS, [L2.passDefines(4), L2.passDefines(8), L2.passDefines(12)]],
+      ['l2blur', S.FS_VS, L2.BLUR_FS, [[]]],
+      ['l2vol', S.FS_VS, L2.VOL_FS, [[]]],
+    ];
+  };
+  // the define sets of the terrain-like programs (the offline check compiles every one)
+  L2.defineSets = () => [[], ['LIGHT2'], ['LIGHT2', 'AIR2'], ['LIGHT2', 'L2AO', 'AIR2'], ['AIR2']];
+  L2.compositeSets = () => [[], ['GRADE2'], ['GRADE2', 'L2VOL'], ['L2VOL']];
+})(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
