@@ -27,6 +27,16 @@
 // with a lantern on a bracket, barrels, a bench and a plant, oak ribs and tie beams under the aisle vaults, wooden arches
 // under the nave's ribs. Outside: a portal in the entrance end, tracery, cornice bands, a plinth, pinnacles, a parapet,
 // oculi and lantern turrets on the ridge.
+// Round 2c: the apse a crown of five tall windows over the gallery and wooden ribs under the half dome's rays; goods
+// piled before the market's stalls and the workshops, lanterns on the loggia columns; outside, the buttress piers rise
+// over the wall to tapering pinnacles with lantern finials, and flying buttresses leap from them over the aisle roofs to
+// the clerestory (on the pier lines, over the aisle vault's stone ribs: no glass loses its sky light).
+// Round 3 (continuation 3): the apse's order — engaged piers on the gallery between the tall windows, the wall's face white
+// smooth stone, a gold course at the springing; the arcade's piers clustered columns; the nave's wooden arches and the
+// aisles' ribs and tie beams solid honey oak (the thin beams read as dashes), the half dome's rays clean white stone; every
+// window's stained head pale (white, light blue, gold); a second row of pinnacles on the clerestory over the flyers; a
+// flower box under every arched window; the street lamps on the street's edge, clear of the awnings (and in voxtown.js
+// the arched windows' panes lit warm).
 // The plan is built like Nova Haven's (gen_city.js): a generator that yields between its steps (VG.planAdvance runs it
 // in slices in the worker, the plan cached per site), ops bucketed per chunk, the usual plan record for the game
 // (homes with beds, workplaces, the plaza and its seats, lamps, strolling routes) plus the hall's frame (plan.hall) and
@@ -124,6 +134,7 @@
     const put = (x, y, z, s) => { bucket(x, z).o.push(x, y, z, s); };
     const fill = (x, z, y0, y1, s) => { if (y1 >= y0) bucket(x, z).f.push(x, z, y0, y1, s); };
     const W2 = (u, v) => { const q = ROT[r](u, v); return [cx + q[0], cz + q[1]]; };
+    const toHall = (x, z) => ROT[(4 - r) & 3](x - cx, z - cz);           // (world → hall-local u, v: W2's inverse)
     const L = VG.makeLot(put, cx, cz, r), P = L.P;                       // hall-local puts (facing and axis turn with the frame)
     const FL = (u, v, y0, y1, s) => { const q = ROT[r](u, v); fill(cx + q[0], cz + q[1], y0, y1, s); };
     const hc = new Map();
@@ -254,8 +265,8 @@
     yield;
 
     // ================================================================ the walls, the piers, the arcade and the clerestory
-    const STONE = st('quartz_bricks'), SMOOTH = st('smooth_quartz'), BAND = st(VR.R.byName.vx_town_band ? 'vx_town_band' : 'chiseled_quartz_block'), CHIS = st('chiseled_quartz_block');
-    const GLASS = st('glass'), FROST = st('frosted_glass');
+    const STONE = st('quartz_bricks'), SMOOTH = st('smooth_quartz'), BAND = st(VR.R.byName.vx_town_band ? 'vx_town_band' : 'chiseled_quartz_block'), CHIS = st('chiseled_quartz_block'), PILLAR = st('quartz_pillar', { axis: 0 });
+    const GLASS = st('glass'), FROST = st('frosted_glass'), OAKW = st('stripped_oak_wood');
     for (let v = H.V0; v <= 80; v++) {
       if ((v & 7) === 0) yield;
       for (let u = -H.HW; u <= H.HW; u++) {
@@ -263,7 +274,10 @@
         const a = Math.abs(u), [x, z] = W2(u, v);
         const top = F + roofH(u, v);
         if (reg === 'wall') {
-          fill(x, z, F, top, STONE);
+          // (round 3) the apse wall's face over the gallery smooth white stone (it was brick: from the stair the end of the
+          // hall read as a grey brick wall between its windows); its outer rings, seen from outside, stay brick
+          if (v > H.V1 && a < H.A0 && dApse(u, v) < 28) { fill(x, z, F, F + H.GAL, STONE); fill(x, z, F + H.GAL + 1, top, SMOOTH); }
+          else fill(x, z, F, top, STONE);
           // the outer walls' plinth course and cornice (the gold band outside)
           put(x, F + 1, z, SMOOTH);
           if (a >= H.W0 && v <= H.V1) put(x, F + H.WALLTOP, z, BAND);
@@ -272,7 +286,12 @@
         if (a >= H.P0 && a <= H.P1 && v <= H.V1) {
           // the clerestory over the arcade, the piers, the arches' spandrels
           fill(x, z, F + H.CLR, F + H.SPR, STONE);
-          if (isPierV(v) && Math.abs(v) > 3) { fill(x, z, F + 1, F + H.CLR - 1, STONE); put(x, F + 1, z, SMOOTH); put(x, F + H.ARC, z, BAND); }
+          if (isPierV(v) && Math.abs(v) > 3) {
+            fill(x, z, F + 1, F + H.CLR - 1, STONE); put(x, F + 1, z, SMOOTH); put(x, F + H.ARC, z, BAND);
+            // (round 3) a clustered column: every face of the pier pillar shafts from its plinth to a chiseled capital
+            // under the gold band (the references' white piers; they were brick)
+            if (a !== 28 || ((v % 10) + 10) % 10 !== 5) { for (let y = F + 2; y <= F + H.ARC - 2; y++) put(x, y, z, PILLAR); put(x, F + H.ARC - 1, z, CHIS); }
+          }
           else {
             // a round arch over the opening (radius 3.5 about the opening's middle, v ≡ 0 mod 10): the gold archivolt on its soffit
             const dd = Math.abs((((v + 5) % 10) + 10) % 10 - 5);
@@ -310,9 +329,12 @@
         lo = Math.max(lo, reg === 'wall' || (Math.abs(u) >= H.P0 && Math.abs(u) <= H.P1 && v <= H.V1) ? h : 1);
         const [x, z] = W2(u, v), gls = reg === 'in' && inGlass(u, v);
         for (let y = lo; y <= h; y++) put(x, F + y, z, gls ? FROST : SMOOTH);   // (a panel's whole column is glass: no stone under it stops the light)
-        // the transverse ribs under the nave vault (every pier line), gold banded
-        if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) { put(x, F + lo - 1, z, BAND); P(u, F + lo - 2, v, 'vx_beam_oak', { axis: 1 }); }   // (round 2: a wood-brown arch under the gold rib, the reference's wooden arches)
-        // the ring of the half dome at a third of its radius
+        // the transverse ribs under the nave vault (every pier line), gold banded, and under each a wooden arch (round 2: the
+        // reference's wooden arches; round 3: of solid honey oak, one course stepping with the vault — the thin beams of
+        // round 2, a step apart where the vault rose, read from below as a row of dashes, not as an arch)
+        if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) { put(x, F + lo - 1, z, BAND); put(x, F + lo - 2, z, OAKW); }
+        // the ring of the half dome at a third of its radius (round 3: its rays clean white stone ribs — round 2c's thin oak
+        // beams under them, scattered over the curve, read as noise over the stair's bright end)
         if (reg === 'in' && v > H.V1 && Math.abs(dApse(u, v) - 18) < 0.6) put(x, F + lo - 1, z, BAND);
       }
     }
@@ -341,7 +363,7 @@
           for (let a = H.W0; a <= H.HW; a++) {
             const mid = a === 47;
             let b = AIR;
-            if (mid) b = w === 's' ? (t === 0 ? SG.gold : Math.abs(t) === 1 ? SG.blue : SG.lblue) : ((t === 0 && y < 16) || y === 10 ? CHIS : GLASS);   // (the tracery: a stone cross)
+            if (mid) b = w === 's' ? (t === 0 ? SG.gold : Math.abs(t) === 1 ? SG.lblue : SG.white) : ((t === 0 && y < 16) || y === 10 ? CHIS : GLASS);   // (the tracery: a stone cross; round 3: the head pale — white, light blue, a gold middle)
             P(s * a, F + y, vc + t, b);
           }
         }
@@ -359,7 +381,7 @@
       const vc = 10 * k, win = archWin(2, 24, 28, 2.6);
       for (const s of [-1, 1]) for (let t = -2; t <= 2; t++) for (let y = 24; y <= 30; y++) {
         const w = win(t, y); if (!w) continue;
-        for (let a = H.P0; a <= H.P1; a++) P(s * a, F + y, vc + t, a === 28 ? (w === 's' ? (t === 0 ? SG.rose : SG.gold) : GLASS) : AIR);
+        for (let a = H.P0; a <= H.P1; a++) P(s * a, F + y, vc + t, a === 28 ? (w === 's' ? (t === 0 ? SG.gold : SG.white) : GLASS) : AIR);   // (round 3: a gold middle in a white head)
       }
     }
     // the gates in the long walls: an arched opening seven wide, the gold archivolt
@@ -406,9 +428,11 @@
       if (y > yc && d > 13.4) continue;
       const mull = (u % 4 === 0 && Math.abs(u) <= 12) || y === 14 || (y === 22 && Math.abs(u) <= 13);
       let b;
-      if (y > yc && Math.abs(d - 7) < 0.7) b = SG.magenta;
-      else if (y > yc && d < 2.2) b = SG.amber;
-      else if (y >= yc) { const k = Math.floor(Math.atan2(y - yc, u) / (Math.PI / 8)); b = (k & 1) ? SG.blue : SG.gold; }
+      // (round 3: the head pale like the references' windows — rays of white and light blue, a gold ring and a gold eye; it
+      // was magenta, amber, blue and gold)
+      if (y > yc && Math.abs(d - 7) < 0.7) b = SG.gold;
+      else if (y > yc && d < 2.2) b = SG.gold;
+      else if (y >= yc) { const k = Math.floor(Math.atan2(y - yc, u) / (Math.PI / 8)); b = (k & 1) ? SG.lblue : SG.white; }
       else b = mull ? SMOOTH : (y >= 18 && (Math.abs(u) === 13 || y === 21) ? SG.lblue : GLASS);
       if (mull && y < yc) b = SMOOTH;
       for (let vv = H.V0; vv <= H.V0 + 2; vv++) P(u, F + y, vv, vv === H.V0 + 1 ? b : AIR);
@@ -465,7 +489,35 @@
     for (let v = H.V0; v <= H.VE; v++) for (const s of [-1, 1]) P(s * H.HW, F + H.WALLTOP + 1, v, 'vx_balustrade');
     for (let k = -8; k <= 4; k++) {
       const vp = 10 * k + 5; if (vp < H.V0 + 2 || vp > H.V1) continue;
-      for (const s of [-1, 1]) { for (let y = F + 22; y <= F + 24; y++) P(s * (H.HW + 1), y, vp, 'quartz_pillar', { axis: 0 }); P(s * (H.HW + 1), F + 25, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 26, vp, BAND); }
+      // (round 2c: the buttress pier rises over the wall's balustrade to a gold cap at 27, its pinnacle above it to 34 —
+      // the row of pinnacles that crowns the long wall seen from the land)
+      for (const s of [-1, 1]) {
+        for (let dv = -1; dv <= 1; dv++) { for (let y = F + 21; y <= F + 26; y++) P(s * (H.HW + 1), y, vp + dv, STONE); P(s * (H.HW + 1), F + 27, vp + dv, BAND); P(s * (H.HW + 2), F + H.WALLTOP, vp + dv, 'smooth_quartz_stairs', { facing: s > 0 ? 3 : 1, half: 1 }); }   // (the wall's cornice wraps round the pier)
+        // (the pinnacle tapers: sloped shoulders on the cap, a shaft, a capital, a gold course and a lantern as its finial —
+        // a row of lights along the roofline at dusk)
+        P(s * (H.HW + 1), F + 28, vp - 1, 'smooth_quartz_stairs', { facing: 2, half: 0 }); P(s * (H.HW + 1), F + 28, vp + 1, 'smooth_quartz_stairs', { facing: 0, half: 0 });
+        for (let y = F + 28; y <= F + 31; y++) P(s * (H.HW + 1), y, vp, 'quartz_pillar', { axis: 0 });
+        P(s * (H.HW + 1), F + 32, vp, 'chiseled_quartz_block'); P(s * (H.HW + 1), F + 33, vp, BAND); P(s * (H.HW + 1), F + 34, vp, 'lantern', { hanging: 0 });
+        { const [x, z] = W2(s * (H.HW + 1), vp); plan.lamps.push([x, F + 34, z]); }
+      }
+      // (round 2c) a flying buttress from it: a stone half-arch leaping over the aisle's roof from the clerestory to the
+      // buttress pier — its top falling from under the clerestory's cornice (30) to the pier's cap (27), its underside an
+      // arch (three blocks thick at both ends, one at the crown), a gold course where it meets the clerestory. On the
+      // pier line it stands over the aisle vault's stone rib: no glass panel loses its sky light.
+      for (const s of [-1, 1]) for (let a = H.A0; a <= H.HW; a++) {
+        const top = 30 - Math.floor((a - H.A0) * 3 / 18), th = 1 + Math.round(2 * ((a - 39) / 9) ** 2), roof = a < H.W0 ? hA(a) : H.WALLTOP;
+        for (let y = Math.max(roof + 2, top - th); y <= top; y++) P(s * a, F + y, vp, a === H.A0 && y === top ? BAND : SMOOTH);
+      }
+      // (round 3) the second row of spires: where the flyer meets the clerestory a pinnacle stands on the clerestory's top
+      // (|u| 28) — sloped shoulders, a pillar shaft, a capital, a gold course and a lantern finial (two rows of lights along
+      // the roof at dusk); on the clerestory's stone, so no glass loses its light
+      for (const s of [-1, 1]) {
+        const u = s * 28, T = F + H.SPR;
+        P(u, T + 1, vp - 1, 'smooth_quartz_stairs', { facing: 2, half: 0 }); P(u, T + 1, vp + 1, 'smooth_quartz_stairs', { facing: 0, half: 0 });
+        for (let y = T + 1; y <= T + 4; y++) P(u, y, vp, 'quartz_pillar', { axis: 0 });
+        P(u, T + 5, vp, CHIS); P(u, T + 6, vp, BAND); P(u, T + 7, vp, 'lantern', { hanging: 0 });
+        const [x, z] = W2(u, vp); plan.lamps.push([x, T + 7, z]);
+      }
     }
     // lantern turrets on the ridge every 24 blocks (round 2b: five wide, were three): a glazed lantern on four white
     // posts over a white base, a cornice, a stepped glass cap, a gold-banded dome and a finial; the base's middle and the
@@ -519,23 +571,36 @@
           let b = AIR;
           if (mid) {
             if (y < yc) b = (Math.abs(u) === 2 || y === 17) ? SMOOTH : (y >= yc - 2 ? SG.lblue : GLASS);
-            else { const a = Math.atan2(y - yc + 0.5, u), kk = Math.floor(a / (Math.PI / 6)); b = hd < 1.3 ? SG.amber : hd > rad - 1.1 ? SG.rose : (kk & 1) ? SG.blue : SG.gold; }
+            else { const a = Math.atan2(y - yc + 0.5, u), kk = Math.floor(a / (Math.PI / 6)); b = hd < 1.3 ? SG.gold : hd > rad - 1.1 ? SG.gold : (kk & 1) ? SG.lblue : SG.white; }   // (round 3: pale rays in a gold ring round a gold eye)
           }
           P(u, F + y, v, b);
         }
       }
     }
-    for (let k = 1; k <= 5; k++) {
-      if (k === 3) continue;   // (round 2b: the great window above)
-      const th = k * Math.PI / 6, du = Math.cos(th), dv = Math.sin(th);
-      for (let w = -15; w <= 15; w++) for (let rr = H.AR; rr < H.AW; rr++) {
-        const t = w / 10, uu = Math.round(du * rr - dv * t), vv = Math.round(H.V1 + dv * rr + du * t);
-        if (region(uu, vv) !== 'wall') continue;
-        const mid = Math.abs(dApse(uu, vv) - 28) < 0.75;
-        for (let y = 12; y <= 27; y++) {
-          if (y > 25 && Math.abs(t) > 1.4 - (y - 25) * 0.5) continue;
-          if (Math.abs(t) > 1.5) continue;
-          P(uu, F + y, vv, mid ? (y >= 22 ? (Math.abs(t) < 0.5 ? SG.rose : SG.blue) : GLASS) : AIR);
+    // (round 2c) the apse a crown of tall windows: the four lancets beside the great window (were three wide, 12 … 27)
+    // seven wide from the gallery's head height to a round head — a stone mullion and a transom, a light-blue band under
+    // the head, the head stained in rays round a gold eye inside a rose ring — so the whole end over the gallery is the
+    // bright glazed end of the references. Laid out cell by cell in the curved wall: a wall cell belongs to the window of
+    // axis θ when its offset t across the axis is within the half width; the wall's middle ring holds the glass, the
+    // inner and outer rings open (a deep reveal).
+    {
+      const HALF = 3.6, YC = 24, RAD = 3.6;
+      for (let v = H.V1 + 1; v <= H.V1 + H.AW; v++) for (let u = -H.AW; u <= H.AW; u++) {
+        if (region(u, v) !== 'wall') continue;
+        const d = dApse(u, v), ph = Math.atan2(v - H.V1, u), mid = Math.abs(d - 28) < 0.75;
+        for (const k of [1, 2, 4, 5]) {
+          const th = k * Math.PI / 6, t = d * Math.sin(ph - th);
+          if (Math.cos(ph - th) <= 0 || Math.abs(t) > HALF) continue;
+          for (let y = 10; y <= YC + RAD; y++) {
+            const hd = y >= YC ? Math.hypot(t, y - YC + 0.5) : 0;
+            if (y >= YC && hd > RAD) continue;
+            let b = AIR;
+            if (mid) {
+              if (y < YC) b = (Math.abs(t) < 0.55 || y === 17) ? SMOOTH : (y >= YC - 2 ? SG.lblue : GLASS);
+              else { const a = Math.atan2(y - YC + 0.5, t), kk = Math.floor(a / (Math.PI / 5)); b = hd < 1.2 ? SG.gold : hd > RAD - 1 ? SG.gold : (kk & 1) ? SG.lblue : SG.white; }   // (round 3: pale, as the great window)
+            }
+            P(u, F + y, v, b);
+          }
         }
       }
     }
@@ -627,6 +692,32 @@
         if (t === 0) { P(uu, F + H.GAL + 1, vv, 'lantern', { hanging: 0 }); const [x, z] = W2(uu, vv); plan.lamps.push([x, F + H.GAL + 1, z]); }
       }
     }
+    // (round 3) the apse's order: an engaged pier on the gallery at every niche — between every two of the tall windows and
+    // beside the outer ones (the axes 15°, 45° … 165°) — five wide and one block proud of the wall's face: pillar shafts
+    // from the gallery floor to the springing, the niche cut through its foot (an arch: stair shoulders, a keystone, a
+    // gold course over it), a chiseled capital, and the gold course of the springing round the whole apse over it (the
+    // references' white piers between the tall windows; the dome's outer ring over the piers is stone, so no sky light is
+    // lost). The piers' cells leave the walkable floor.
+    for (let v = H.V1 + 1; v <= H.V1 + H.AR; v++) for (let u = -H.AR; u <= H.AR; u++) {
+      if (region(u, v) !== 'in') continue;
+      const d = dApse(u, v); if (d < 26) continue;
+      const ph = Math.atan2(v - H.V1, u), j = Math.round(ph / (Math.PI / 6) - 0.5), th = (j + 0.5) * Math.PI / 6;
+      if (j < 0 || j > 5) continue;
+      const t = d * Math.sin(ph - th); if (Math.abs(t) > 2.5) continue;
+      const mid = Math.abs(t) <= 1.5, key = Math.abs(t) < 0.5;
+      // (a shoulder faces along the wall away from the niche's middle: hall-local facing 0 −v · 1 +u · 2 +v · 3 −u)
+      const du = -Math.sin(th) * Math.sign(t), dv = Math.cos(th) * Math.sign(t), fs = Math.abs(du) >= Math.abs(dv) ? (du > 0 ? 1 : 3) : (dv > 0 ? 2 : 0);
+      for (let y = F + H.GAL + 1; y <= F + H.SPR - 2; y++) {
+        let b = 'quartz_pillar';
+        if (mid && y <= F + H.GAL + 3) b = null;                                          // the niche's opening (3 high)
+        else if (mid && y === F + H.GAL + 4) b = key ? null : 'smooth_quartz_stairs';     // its round head: shoulders
+        else if (mid && y === F + H.GAL + 5) b = key ? CHIS : BAND;                       // a keystone in a gold course
+        P(u, y, v, b, b === 'quartz_pillar' ? { axis: 0 } : b === 'smooth_quartz_stairs' ? { facing: fs, half: 1 } : undefined);
+      }
+      P(u, F + H.SPR - 1, v, CHIS); P(u, F + H.SPR, v, BAND);                             // the capital, the springing's course
+      setC(u, v, C.WALL);
+    }
+    for (let v = H.V1 + 1; v <= H.V1 + H.AW; v++) for (let u = -H.AW; u <= H.AW; u++) if (region(u, v) === 'wall' && Math.abs(u) < H.A0 && dApse(u, v) < 28) P(u, F + H.SPR, v, BAND);
     const galSeats = [];
     for (const uc of [-18, -12, 12, 18]) { P(uc, F + H.GAL + 1, H.GAL0 + 3, 'vx_bench', { facing: 0 }); const [x, z] = W2(uc, H.GAL0 + 3); galSeats.push([x, F + H.GAL + 1, z, L.facing(0)]); }
     for (const [uc, vc] of [[-22, 56], [22, 56], [-12, 68], [12, 68], [0, 74]]) if (region(uc, vc) === 'in') putModel(P, 'vm_planter', 0, uc, F + H.GAL + 1, vc);
@@ -714,6 +805,9 @@
       // flower boxes under the arched windows and vines down the corner pilasters on every other house (the café always)
       const vinesOld = floors === 2 ? lrng.chance(0.6) : false;   // (the old draw kept: the beds upstairs stay the same)
       const flowery = (houses.indexOf(hs0) % 2 === 0) || kind === 'cafe';
+      // (round 3) a flower box under every arched window of every house (innenstadt_full.jpg: nearly every window has one);
+      // the vines' curtains keep the every-other rhythm below (no draw is added: the parapets and beds stay as they were)
+      if (!flowery) for (let k = 1; k < floors; k++) for (const u0 of [1, 8]) for (let u = u0; u <= u0 + 2; u++) Q(u, F + 5 * k + 1, -1, 'vx_windowbox', { facing: 0 });
       if (flowery) {
         const vm = vineMask(rr, 0, 1);
         for (let k = 1; k < floors; k++) for (const u0 of [1, 8]) {
@@ -880,6 +974,17 @@
       // the order of the arcade front (round 2): a column at each end of the unit, from the plinth to the crowning cornice,
       // carrying the galleries between them; the cornice of upside-down stairs under the parapet's balustrade
       for (const u of [0, w - 1]) { Q(u, F + 1, -1, 'smooth_quartz'); for (let y = F + 2; y <= F + 14; y++) Q(u, y, -1, 'quartz_pillar', { axis: 0 }); Q(u, F + 15, -1, 'chiseled_quartz_block'); }
+      // (round 2c) a lantern on each column at eye height (warm light down the loggia side of the walk), and the workshop's
+      // goods out on the walk's edge beside its arch — the doorway's way out (u 4) stays free. (A hash picks the goods: the
+      // unit's own random draws stay as they were, so its homes and beds do not change.)
+      for (const u of [0, w - 1]) { putModel(Q, 'vm_wall_lantern', 0, u, F + 4, -2); const q = ROT[rr](u, -2); plan.lamps.push([ox + q[0], F + 4, oz + q[1]]); }
+      {
+        const hk = M.hash2(ox, oz, 4242) >>> 0;
+        for (const [u, name] of [[2, ['vx_veg_crate', 'vx_shop_flower_stand', 'vx_veg_crate'][hk % 3]], [7, ['vx_shop_produce', 'vx_veg_crate', 'vx_shop_flower_stand'][(hk >>> 4) % 3]]]) {
+          Q(u, F + 1, -1, name, { facing: 0 });
+          const q = ROT[rr](u, -1), h = toHall(ox + q[0], oz + q[1]); setC(h[0], h[1], C.STALL);
+        }
+      }
       for (let u = 1; u < w - 1; u++) Q(u, F + 15, -1, 'smooth_quartz_stairs', { facing: 2, half: 1 });
       lg.frame = [rr, ox, oz];
       const box = (() => { const a = (() => { const q = ROT[rr](-1, -1); return [ox + q[0], oz + q[1]]; })(), b = (() => { const q = ROT[rr](w, d); return [ox + q[0], oz + q[1]]; })(); return [Math.min(a[0], b[0]), F, Math.min(a[1], b[1]), Math.max(a[0], b[0]), F + 17, Math.max(a[1], b[1])]; })();
@@ -927,9 +1032,12 @@
     yield;
 
     // ================================================================ street lamps every eight blocks, lanterns on the piers and under the arches
-    for (let v = -72; v <= H.STAIR0 - 4; v += 8) {   // (to the stair's foot)
+    // (round 3: on the street's edge, |u| 3, at v ≡ 5 mod 8 — round 1's lamps stood in the fronts' outer row (|u| 4), the row
+    // the awnings lean out to, and on six of each side's twelve awnings a lamp post took an awning's cell; here they stand
+    // clear of every awning, lantern, vine and café table, and the street's sample rows stay free)
+    for (let v = -75; v <= H.STAIR0 - 4; v += 8) {   // (to the stair's foot)
       if (Math.abs(v) <= H.PV) continue;
-      for (const s of [-1, 1]) { putModel(P, 'vm_town_lamp', 0, s * 4, F + 1, v); const [x, z] = W2(s * 4, v); plan.lamps.push([x, F + 4, z]); }
+      for (const s of [-1, 1]) { putModel(P, 'vm_town_lamp', 0, s * 3, F + 1, v); const [x, z] = W2(s * 3, v); plan.lamps.push([x, F + 4, z]); }
     }
     for (let k = -8; k <= 4; k++) {
       const vp = 10 * k + 5; if (vp < H.V0 + 3 || vp > H.V1) continue;
@@ -956,6 +1064,11 @@
         const [lx, lz] = W2(s * H.STALL1, v0 + 1); plan.lamps.push([lx, F + 3, lz]);
         const [x, z] = W2(s * (H.STALL1 + 1), v0 + 1); stalls.push([x, F + 1, z, L.facing(fa)]);
         hallStalls.push({ s, v0 });
+        // (round 2c) the goods spill out on the walk's edge beside the keeper's place (the references' crates and stands
+        // piled before the stalls): a crate of produce at one end, a flower stand, a produce stand or another crate at the
+        // other; the keeper's place in the middle stays free, the walk keeps five blocks
+        const other = ['vx_shop_flower_stand', 'vx_shop_produce', 'vx_veg_crate'][hallStalls.length % 3];
+        for (const [dv, name] of [[0, 'vx_veg_crate'], [2, other]]) { P(s * (H.STALL1 + 1), F + 1, v0 + dv, name, { facing: fa }); setC(s * (H.STALL1 + 1), v0 + dv, C.STALL); }
         const item = (dv, fn) => { const v = v0 + dv; if (v <= H.V1 && !inCross(v)) fn(v); };
         item(3, (v) => { P(s * H.A0, F + 1, v, 'vx_barrel'); P(s * H.STALL1, F + 1, v, 'vx_barrel'); if (n & 1) P(s * H.A0, F + 2, v, 'vx_crate'); });
         item(6, (v) => { putModel(P, 'vm_planter', 0, s * H.A0, F + 1, v); P(s * H.STALL1, F + 1, v, 'vx_bench', { facing: fa }); });
@@ -968,8 +1081,10 @@
       return Math.max(lo, 1);
     };
     for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
-      for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, 'vx_beam_oak', { axis: 1 }); }
-      for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, 'vx_beam_oak', { axis: 1 });
+      // (round 3: solid honey oak like the nave's arches — the rib under the aisle vault and the tie beam; round 2's thin dark
+      // VX beams; also fewer triangles: full blocks merge, VX beams do not)
+      for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, OAKW); }
+      for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, OAKW);
       // lanterns hanging from the tie beam: over the walk low on chains (round 2b: they hung at the beam, out of sight under
       // the vault), over the loggias' roofs at the beam
       for (const a of [33, 37]) if (F + 20 < F + shellLo(s * a, v) - 1) { for (let y = F + 11; y <= F + 19; y++) P(s * a, y, v, 'iron_chain', { axis: 0 }); P(s * a, F + 10, v, 'lantern', { hanging: 1 }); const [x, z] = W2(s * a, v); plan.lamps.push([x, F + 10, z]); }
