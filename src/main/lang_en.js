@@ -420,7 +420,9 @@
     'g.set.smoothFurn': 'Real furniture',
     'g.set.smoothFurn.tip': 'Sofas, beds, lamps, kitchens and plants as round, soft furniture of fabric, wood, metal and glass instead of block furniture; lamp shades glow. Off = the block look.',
     'g.set.smoothFolk': 'Real people',
-    'g.set.smoothFolk.tip': 'The villagers nearby (up to 24 blocks) with round, soft shapes instead of voxel steps: faces, clothes and hair smooth, one draw per person. Further away and off = the voxel figures with the same proportions.',
+    'g.set.smoothFolk.tip': 'The villagers nearby (up to 24 blocks) with round, soft shapes instead of voxel steps: faces, clothes and hair smooth, all of them in one draw. Further away and off = the voxel figures with the same proportions.',
+    'g.set.folkShadow': 'People’s shadows',
+    'g.set.folkShadow.tip': 'The people nearby cast real shadows with their shape (drawn into the shadow map, like furniture and palms) and stand in the shadows of the houses themselves. Needs the shadows (Balanced and up); off = a soft blot under the feet.',
     // ---- t-form: ✦ Shapes in the R9 Studio's Crafter (formtools.js) — the same texts stand at the call
     'ft.apply': 'Apply',
     'ft.bevel': 'Round off',

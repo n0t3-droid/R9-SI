@@ -26,6 +26,8 @@
   // t-folk: Echte Menschen (folkgpu.js) — the villagers smooth within 24 blocks from Balanced up; Very Low and Low keep the
   // voxel people (with the same real proportions)
   PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1; PRESETS.ultraLite.smoothFolk = 1;
+  // t-folk2: the people in the shadow map (folkgpu.js castShadows) where there is one — Balanced and up
+  for (const p in PRESETS) PRESETS[p].folkShadow = PRESETS[p].shadows > 0 ? 1 : 0;
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)

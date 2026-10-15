@@ -545,8 +545,8 @@
   // upper arm's frame), the chin (the head's pivot), the legs' and arms' distance from the middle line, the torso's half
   // width; the head's pivot sits half a unit right on the child (its skull is 6 wide: centred on the body)
   const SKEL = V.SKEL = {
-    adult: { H: 58, hip: 29, knee: -14, sh: 46, elbow: -10, head: 50, legX: 2.5, armX: 6, hw: 4, hx: 0 },
-    child: { H: 45, hip: 20, knee: -10, sh: 32, elbow: -6, head: 36, legX: 1.5, armX: 5, hw: 3, hx: 0.5 },
+    adult: { H: 58, hip: 29, knee: -14, sh: 46, elbow: -10, head: 50, legX: 2.5, armX: 6, hw: 4, hx: 0, fore: 8, hand: 6 },
+    child: { H: 45, hip: 20, knee: -10, sh: 32, elbow: -6, head: 36, legX: 1.5, armX: 5, hw: 3, hx: 0.5, fore: 5, hand: 4 },
   };
   // the torso's rows (y relative to the hip joint): [half width, front z, back z]; the corners are cut (a rounder body)
   const TORSO = {
@@ -584,9 +584,18 @@
   const STRIDE = { robe: 0.28, coat: 0.32, frock: 0.34, whitecoat: 0.32, dress: 0.36, tunic: 0.45, suit: 0.5, gown: 0.28, cape: 0.45 };
   // a person's legs for the gait (folkanim.js FA.gait): the hip joint's height, the thigh and the shin (model units), the
   // draw scale, the widest swing the clothes allow — without building the model (the villagers' pose needs it each frame)
+  // (t-folk2: the arms' bones for the arm solve — the upper arm to the elbow, the forearm to the wrist, the shoulder joint
+  // over the hip joint —, the torso's and the legs' widths, what the hands hold — a bag, a basket or a can hangs from the
+  // right, a barista's tray lies on it, an elder's cane in the left —, the clothes for sitting: a robe or a gown drapes over
+  // the knees (2), a coat's or a dress's skirt lies on the thighs (1))
+  const SKIRT = { robe: 2, gown: 2, coat: 1, frock: 1, whitecoat: 1, cape: 1, tunic: 1, dress: 1 };
+  V.toolOf = function (L) { const role = V.ROLES[L.role] || V.ROLES.farmer; return L.age === 'child' ? null : L.tool !== undefined && L.tool !== null ? L.tool : L.role === 'hero' ? null : role.tool; };
   V.gaitFor = function (L) {
-    const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult;
-    return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[V.familyOf(L)] || 0.6, kid, stoop: L.age === 'elder' ? 0.12 : 0 });
+    const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult, fam = V.familyOf(L), role = V.ROLES[L.role] || V.ROLES.farmer;
+    const tool = V.toolOf(L), carry = tool === 'bag' || tool === 'basket' || tool === 'can' || tool === 'tray' ? tool : null;
+    return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[fam] || 0.6, kid, stoop: L.age === 'elder' ? 0.12 : 0,
+      arm: { L1: -S.elbow, L2: S.fore, x: S.armX, y: S.sh - S.hip }, hw: S.hw, legX: S.legX, wide: fam === 'robe' || fam === 'gown' ? 1 : 0,
+      carry, cane: !kid && L.age === 'elder' && role.tool === 'cane', item: tool, skirt: SKIRT[fam] || 0 });
   };
   // ============================== the fine face (t-folk, Echte Menschen: the smooth path only)
   // The surface nets give a vertex the mean colour of the voxel faces round it, so a one-voxel eye or lip at 32 a block
@@ -1150,9 +1159,9 @@
     }
     if (shortSl) for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) upper.paint(x, Math.round(elb * 0.45), z, mul(sleeveC, 0.88));
     if (fam === 'armor') for (let y = -3; y <= 1; y++) for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) { if (Math.abs(x) < 2 && Math.abs(z) < 2) continue; if (Math.abs(x) === 2 && Math.abs(z) === 2) continue; upper.set(x, y, z, mul(0x5E6E5E, 0.92 + H3(x, y, z, 21) * 0.12), 0, TG.metal); }
-    // the forearm and the hand: the sleeve to the wrist (rolled up for the trades that work with their hands), a cuff
-    // (a ring a voxel out, a bell sleeve on a robe), the hand hanging with its palm to the thigh, the thumb forward
-    const forearm = (right) => {
+    // the forearm: the sleeve to the wrist (rolled up for the trades that work with their hands), a cuff (a ring a voxel
+    // out, a bell sleeve on a robe); the hand and what it holds below it (t-folk2: parts of their own on the smooth path)
+    const forearm = (right, withHand) => {
       const P = mkT(-6, 6, -46, 2, -24, 8, TG.cloth);
       const sleeveEnd = shortSl ? 1 : rolled ? -2 : -foreLen;
       for (let y = 2; y >= -foreLen; y--) for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) {
@@ -1166,46 +1175,111 @@
         else for (const [x, z] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) P.set(x, cy, z, cuffC, 0, TG.cloth);
         for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) P.paint(x, cy, z, cuffC);
       }
-      // the hand (palm rows a plus, the fingers a slab, the thumb forward)
-      const h0 = -foreLen - 1;
-      // (a mitten: the palm a rounded 3 × 3, the fingers narrower toward the tips — nothing one voxel thin, which the
-      // smooth surface would fold into a sheet)
-      for (let k = 0; k < handLen; k++) {
-        const y = h0 - k, tip = k === handLen - 1;
-        for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) {
-          if (Math.abs(x) + Math.abs(z) === 2) continue;
-          if (tip && Math.abs(x) === 1) continue;
-          P.set(x, y, z, mul(skin, tip ? 0.95 : 1), 0, TG.skin);
-        }
+      // (the voxel people — Very Low, Low, the far LOD — keep hand and tool in the forearm: the same part count, the
+      // same draws; the hand at the wrist, the thing at the hand's grip, a tray turned to lie level on the forward forearm)
+      if (withHand) {
+        stamp(P, handGrid(!right), 0, -foreLen, 0);
+        const it = right ? itemR : itemL;
+        if (it) stamp(P, it, 0, -foreLen + GRIP[1], 0, it.tray ? 'tray' : null);
       }
-      P.set(0, h0 - 1, -2, mul(skin, 0.97), 0, TG.skin); P.set(0, h0 - 2, -2, mul(skin, 0.95), 0, TG.skin);
-      const fy = h0 - 2; // the fist's centre
-      if (right && !kid) {
-        const tool = L.tool !== undefined && L.tool !== null ? L.tool : role.tool;
-        const wood = (x, y, z) => mul(0x8A5A3A, 0.9 + H3(x, y, z, 22) * 0.12), metal = (x, y, z) => mul(0x9AA0A8, 0.9 + H3(x, y, z, 23) * 0.12);
-        if (tool === 'hammer') { for (let z = -8; z <= -2; z++) P.set(0, fy, z, wood, 0, TG.other); P.box(-1, fy - 2, -10, 1, fy + 2, -9, metal); }
-        else if (tool === 'hoe') { for (let y = fy - 12; y <= fy + 14; y++) P.set(0, y, -2, wood, 0, TG.other); for (let z = -6; z <= -2; z++) P.set(0, fy + 14, z, metal, 0, TG.metal); P.set(0, fy + 13, -6, metal, 0, TG.metal); }
-        else if (tool === 'rifle') { P.box(-1, fy - 1, -14, 1, fy + 1, -2, (x, y, z) => mul(0x3A3E46, 0.92 + H3(x, y, z, 24) * 0.1)); for (let z = -13; z <= -4; z++) P.set(0, fy + 2, z, 0x3AF0FF, 1, TG.metal); }
-        else if (tool === 'book') { P.box(-2, fy - 3, -5, 1, fy + 2, -3, (x, y, z) => z === -5 || x === -2 ? 0x3F63A8 : 0xF0EAD8); P.set(-2, fy, -6, 0xE0C060); }
-        else if (tool === 'bread') { P.box(-2, fy - 5, -3, 2, fy - 2, 2, (x, y, z) => (x + y + z) & 1 ? 0xA07040 : 0x8A5A30); P.ell(-0.5, fy - 1, -0.5, 1.6, 1, 1.4, 0xD89A50); P.ell(1.5, fy - 1, 1, 1.2, 0.9, 1.2, 0xE8B060); }
-        else if (tool === 'bag') {
-          const bc = (x, y, z) => mul(0xC89A60, 0.94 + H3(x, y, z, 26) * 0.08);
-          P.box(-3, fy - 12, -2, 3, fy - 4, 2, bc);
-          for (let x = -3; x <= 3; x++) for (let z = -2; z <= 2; z++) P.paint(x, fy - 5, z, 0xD8B048);
-          for (const z of [-1, 1]) { P.set(0, fy - 3, z, 0x5A3F2A); P.set(0, fy - 2, z, 0x5A3F2A); }
-        }
-        else if (tool === 'basket') {
-          const wk = (x, y, z) => mul(0xB08850, ((x + y + z) & 1) ? 0.93 : 1.04);
-          for (let y = fy - 9; y <= fy - 4; y++) for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) if (y === fy - 9 || Math.abs(x) === 3 || Math.abs(z) === 3) { if (Math.abs(x) === 3 && Math.abs(z) === 3) continue; P.set(x, y, z, wk(x, y, z), 0, TG.other); }
-          for (let z = -3; z <= 3; z++) { const h = Math.round(3 - (z * z) / 3); P.set(0, fy - 4 + h, z, 0x8A6A40, 0, TG.other); }
-          P.ell(-1, fy - 4, -0.5, 1.8, 1, 1.2, 0xD89A50); P.ell(1.5, fy - 4.5, 1, 1.1, 1.1, 1.1, 0xD8402E); P.ell(0.5, fy - 4.5, 1.5, 1, 1, 1, 0x6AB04A);
-        }
-        else if (tool === 'can') { P.box(-2, fy - 6, -2, 2, fy - 2, 2, (x, y, z) => mul(0x5A9AC0, 0.93 + H3(x, y, z, 25) * 0.08)); for (let k = 0; k < 4; k++) P.set(0, fy - 4 + k, -3 - k, 0x5A9AC0); }
-      }
-      if (!right && elder && role.tool === 'cane') { for (let y = fy - S.hip + 8; y <= fy + 1; y++) P.set(0, y, -2, mul(0x8A5A3A, 0.92 + ((y & 1) ? 0.06 : 0)), 0, TG.other); P.set(0, fy + 2, -3, 0x8A5A3A, 0, TG.other); P.set(0, fy + 2, -4, 0x8A5A3A, 0, TG.other); }
       return P;
     };
-    const foreL = forearm(false), foreR = forearm(true);
+    // ---- t-folk2: the hand (the owner: „Fäustlinge") at 32 a block, in its own frame: the wrist at the origin, the hand
+    // hanging along −y, the palm toward −x (the body's middle for a right hand; the left hand mirrors it), the thumb forward
+    // (−z). The palm 2 × 3 × 3 voxels (a row 0 inside the forearm's end closes the joint when the wrist bends), the four
+    // fingers one block 2 × 3 × 3 whose tip row is two wide (the little finger's side shorter), a notch between the fingers
+    // and the thumb on the palm's side, the thumb its own column at the palm's front edge; the palm's side a shade lighter
+    // (palms are paler than the back of the hand, a dark skin's most)
+    const nP = kid ? 2 : 3, nF = kid ? 2 : 3, palmC = mix(skin, 0xF4CCB8, 0.3);
+    const handGrid = (left) => {
+      const P = mkT(-3, 3, -9, 1, -4, 3, TG.skin), X = (x) => (left ? -1 - x : x);
+      for (let k = 0; k <= nP + nF; k++) {
+        const y = -k, tip = k === nP + nF, finger = k > nP;
+        for (let z = -1; z <= 1; z++) for (const x of [-1, 0]) {
+          if (tip && z === 1) continue;                                   // the little finger's side ends a row higher
+          if (k === nP + 1 && x === -1 && z === -1) continue;             // the notch between the fingers and the thumb
+          if (k === 0 && Math.abs(z) === 1 && x === -1) continue;         // the wrist row rounder
+          const c = x === -1 && k > 0 ? palmC : skin;
+          P.set(X(x), y, z, mul(c, (finger ? 0.97 : 1) * (tip ? 0.95 : 1)), 0, TG.skin);
+        }
+      }
+      // the thumb: from the palm's front edge on the palm's side, down beside the fingers' first row
+      for (let k = 2; k <= nP + 1; k++) P.set(X(-1), -k, -2, mul(skin, k === nP + 1 ? 0.94 : 0.98), 0, TG.skin);
+      P.set(X(0), -2, -2, mul(skin, 0.98), 0, TG.skin);
+      return P;
+    };
+    // the hand's grip (in the hand's frame: the fingers' middle row, half a voxel toward the palm) — where a held thing hangs
+    const GRIP = [-0.5, -(nP + 2), 0];
+    let caneLen = 24;
+    // ---- what the hands hold, each in its own frame with the grip at its origin (a bag, a basket, a can, a tray and a cane
+    // hang straight down from it — folkanim.js holdItems turns them back against the arm; tools sit in the fist)
+    const tool = right0 => (right0 && !kid ? (L.tool !== undefined && L.tool !== null ? L.tool : role.tool) : null);
+    const itemGrid = (t) => {
+      if (!t) return null;
+      const P = mkT(-12, 12, -34, 18, -16, 12, TG.other);
+      const wood = (x, y, z) => mul(0x8A5A3A, 0.9 + H3(x, y, z, 22) * 0.12), metal = (x, y, z) => mul(0x9AA0A8, 0.9 + H3(x, y, z, 23) * 0.12);
+      if (t === 'hammer') { for (let z = -8; z <= -2; z++) P.set(0, 0, z, wood, 0, TG.other); P.box(-1, -2, -10, 1, 2, -9, metal); }
+      else if (t === 'hoe') { for (let y = -12; y <= 14; y++) P.set(0, y, -2, wood, 0, TG.other); for (let z = -6; z <= -2; z++) P.set(0, 14, z, metal, 0, TG.metal); P.set(0, 13, -6, metal, 0, TG.metal); }
+      else if (t === 'rifle') { P.box(-1, -1, -14, 1, 1, -2, (x, y, z) => mul(0x3A3E46, 0.92 + H3(x, y, z, 24) * 0.1)); for (let z = -13; z <= -4; z++) P.set(0, 2, z, 0x3AF0FF, 1, TG.metal); }
+      else if (t === 'book') { P.box(-2, -3, -5, 1, 2, -3, (x, y, z) => z === -5 || x === -2 ? 0x3F63A8 : 0xF0EAD8); P.set(-2, 0, -6, 0xE0C060); }
+      else if (t === 'bread') { P.box(-2, -5, -3, 2, -2, 2, (x, y, z) => (x + y + z) & 1 ? 0xA07040 : 0x8A5A30); P.ell(-0.5, -1, -0.5, 1.6, 1, 1.4, 0xD89A50); P.ell(1.5, -1, 1, 1.2, 0.9, 1.2, 0xE8B060); }
+      else if (t === 'bag') {
+        // (two cord handles up into the fist, the paper bag below with its gold band)
+        const bc = (x, y, z) => mul(0xC89A60, 0.94 + H3(x, y, z, 26) * 0.08);
+        P.box(-3, -12, -2, 3, -4, 2, bc);
+        for (let x = -3; x <= 3; x++) for (let z = -2; z <= 2; z++) P.paint(x, -5, z, 0xD8B048);
+        for (const z of [-1, 1]) for (let y = -3; y <= -1; y++) P.set(0, y, z, 0x5A3F2A, 0, TG.leather);
+      }
+      else if (t === 'basket') {
+        const wk = (x, y, z) => mul(0xB08850, ((x + y + z) & 1) ? 0.93 : 1.04);
+        for (let y = -9; y <= -4; y++) for (let z = -3; z <= 3; z++) for (let x = -3; x <= 3; x++) if (y === -9 || Math.abs(x) === 3 || Math.abs(z) === 3) { if (Math.abs(x) === 3 && Math.abs(z) === 3) continue; P.set(x, y, z, wk(x, y, z), 0, TG.other); }
+        for (let z = -3; z <= 3; z++) { const h = Math.round(3 - (z * z) / 3); P.set(0, -4 + h, z, 0x8A6A40, 0, TG.other); }
+        P.ell(-1, -4, -0.5, 1.8, 1, 1.2, 0xD89A50); P.ell(1.5, -4.5, 1, 1.1, 1.1, 1.1, 0xD8402E); P.ell(0.5, -4.5, 1.5, 1, 1, 1, 0x6AB04A);
+      }
+      else if (t === 'can') { P.box(-2, -6, -2, 2, -2, 2, (x, y, z) => mul(0x5A9AC0, 0.93 + H3(x, y, z, 25) * 0.08)); for (let k = 0; k < 4; k++) P.set(0, -4 + k, -3 - k, 0x5A9AC0); for (let y = -1; y <= 0; y++) P.set(0, y, 0, 0x3A6A8A, 0, TG.metal); }
+      else if (t === 'tray') {
+        // (the barista's round tray lying on the open hand, a voxel over the palm, its middle over the palm's: a cup and a
+        // saucer on it)
+        const tr = (x, y, z) => mul(0x6A4A3A, 0.95 + H3(x, y, z, 27) * 0.06);
+        for (let z = -4; z <= 6; z++) for (let x = -5; x <= 5; x++) { const d = Math.hypot(x, z - 1); if (d > 5.4) continue; P.set(x, 2, z, d > 4.5 ? mul(0x6A4A3A, 0.8) : tr(x, 2, z), 0, TG.other); if (d > 4.6) P.set(x, 3, z, mul(0x6A4A3A, 0.85), 0, TG.other); }
+        P.ell(-1.5, 3.6, 2.5, 1.4, 0.5, 1.4, 0xF4F2EC, null, TG.other); P.box(-2, 4, 2, -1, 5, 3, 0xF4F2EC); P.set(0, 5, 2, 0xF4F2EC);
+        P.tray = true;
+      }
+      else if (t === 'cane') {
+        // (the crook over the fist, the stick straight down to the floor: as long as the grip stands over it at rest)
+        const len = Math.round(caneLen);
+        for (let y = -len; y <= 1; y++) P.set(0, y, 0, mul(0x8A5A3A, 0.92 + ((y & 1) ? 0.06 : 0)), 0, TG.other);
+        P.set(0, 2, 0, 0x8A5A3A, 0, TG.other); P.set(0, 2, -1, 0x8A5A3A, 0, TG.other); P.set(0, 1, -2, 0x8A5A3A, 0, TG.other);
+      }
+      else return null;
+      return P;
+    };
+    // (a part's voxels into another grid at an offset; 'tray': turned −90° about x — level on a forearm held forward)
+    function stamp(dst, src, ox, oy, oz, rot) {
+      const g = src.g;
+      for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) {
+        const v = g.c[g.i(x, y, z)]; if (!v) continue;
+        let px = x - g.ox, py = y - g.oy, pz = z - g.oz;
+        if (rot === 'tray') { const t = py; py = pz; pz = -t; }
+        const X = px + ox + dst.g.ox, Y = py + oy + dst.g.oy, Z = pz + oz + dst.g.oz;
+        if (dst.g.in(X, Y, Z)) dst.g.c[dst.g.i(X, Y, Z)] = v;
+      }
+    }
+    if (elder && role.tool === 'cane') {
+      // the cane's length: the grip's height over the floor in the standing rest of the cane's arm (folkanim.js restCane:
+      // the arm 0.16 forward and 0.1 out, the elbow 0.42; the elder's stoop on the body)
+      const FA = VR.FolkAnim, R = (q) => FA.rotYXZ(q[0], q[1], q[2], new Float64Array(9)), mv = (M, v) => [M[0] * v[0] + M[1] * v[1] + M[2] * v[2], M[3] * v[0] + M[4] * v[1] + M[5] * v[2], M[6] * v[0] + M[7] * v[1] + M[8] * v[2]];
+      const mm = (a, b) => { const o = new Float64Array(9); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) o[i * 3 + j] = a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j]; return o; };
+      if (FA && FA.rotYXZ) {
+        const Rb = R([-0.12, 0, 0]), Ra = mm(Rb, R([0.16, 0, -0.1])), Rf = mm(Ra, R([0.42, 0, 0]));
+        const sh = mv(Rb, [-S.armX, S.sh - S.hip, 0]), el = mv(Ra, [0, S.elbow, 0]), wr = mv(Rf, [0, -S.fore, 0]), gr = mv(Rf, [GRIP[0] + 0.5, GRIP[1] + 0.5, 0.5]);
+        caneLen = S.hip + sh[1] + el[1] + wr[1] + gr[1];
+      }
+    }
+    const tR = tool(true), itemR = itemGrid(tR === 'cane' ? null : tR), itemL = elder && role.tool === 'cane' ? itemGrid('cane') : null;
+    const fine0 = !!(opts && opts.fine);
+    const foreL = forearm(false, !fine0), foreR = forearm(true, !fine0);
+    const handL = fine0 ? handGrid(true) : null, handR = fine0 ? handGrid(false) : null;
 
     // ============================== legs (the pivot at the hip; left and right are one grid): the thigh to the knee,
     // the shin, the ankle and the shoe (the toe forward, the heel back, a darker sole)
@@ -1261,6 +1335,18 @@
       skel: S,
     };
     if (fine) def.fine = fine;
+    // (t-folk2: the smooth path's hands at the wrists and what they hold at the grips — their own bones: the wrist bends,
+    // a bag hangs straight down; the voxel people keep them in the forearm)
+    if (fine0) {
+      def.parts.hand_l = handL; def.parts.hand_r = handR;
+      def.rig.hand_l = ['fore_l', [0, -foreLen, 0]]; def.rig.hand_r = ['fore_r', [0, -foreLen, 0]];
+      const ord = def.order, at = ord.indexOf('fore_r') + 1;
+      const add = ['hand_l', 'hand_r'];
+      if (itemL) { def.parts.item_l = itemL; def.rig.item_l = ['hand_l', GRIP.slice()]; add.push('item_l'); }
+      if (itemR) { def.parts.item_r = itemR; def.rig.item_r = ['hand_r', GRIP.slice()]; add.push('item_r'); }
+      ord.splice(at, 0, ...add);
+    }
+    def.grip = GRIP.slice(); def.wrist = -foreLen;
     return def;
   }
 

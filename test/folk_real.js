@@ -138,7 +138,7 @@ function closed(mesh) {
   const Q = FS.personFromLook(L), dF = Folk.buildFine(L), partsF = [], seenF = new Map();
   dF.order.forEach((name, bone) => { const g = (dF.fine && dF.fine[name]) || dF.parts[name].grid; let k = seenF.get(g); if (k === undefined) { const cg = FS.crop(g); if (!cg) return; k = FS.keyOf(cg); seenF.set(g, k); partsF.push(Object.assign({ key: k, bone }, cg)); } else partsF.push({ key: k, bone }); });
   const PF = FS.person({ parts: partsF });
-  check(!Q.error && Q.nv === PF.nv && Q.nt === PF.nt && Q.rig && Q.rig.order.length === def.order.length && JSON.stringify(Q.rig.layout) === JSON.stringify(def.layout), `a person from its look alone: ${Q.nv} vertices, the rig's joints back (built in ${(Q.buildMs || 0).toFixed(1)} ms)`);
+  check(!Q.error && Q.nv === PF.nv && Q.nt === PF.nt && Q.rig && Q.rig.order.length === dF.order.length && JSON.stringify(Q.rig.layout) === JSON.stringify(dF.layout), `a person from its look alone: ${Q.nv} vertices, the rig's joints back (built in ${(Q.buildMs || 0).toFixed(1)} ms)`);
   check(FS.personFromLook(Folk.heroLook({ suit: 0 })).error === 'not a person', 'the trailer heroes keep their own build (no smooth mesh)');
   // the smooth person is posed exactly as the voxel one: FolkSmooth.rigMats (folkgpu.js's bones) against the matrices
   // entities.js drawModel hands the GL for every part, with a walking pose, a turn, a pitch and a child's scale
@@ -408,7 +408,8 @@ function walkRun(L, v, run, secs) {
   const E = Folk.look(111, 'elder', 'elder'), GE = Folk.gaitFor(E), b = { seedW: 5 };
   const Ps = FA.pose(b, 'idle', 1 / 30, 0, 0, false, {}, undefined, GE);
   FA.stride(GE, 1.5, 0.2, false); const Pw = FA.pose(b, 'idle', 1 / 30, 0, 1, false, {}, undefined, GE);
-  check(Ps.body[0] > 0.08 && Pw.body[0] > 0.08 && Ps.head[0] < -0.05, `an elder stoops (the back ${Ps.body[0].toFixed(2)} rad standing, ${Pw.body[0].toFixed(2)} walking; the head up ${(-Ps.head[0]).toFixed(2)})`);
+  // (t-folk2: the torso points up, so its −rx bends it forward — v0.46 had +rx and leaned the elders back)
+  check(Ps.body[0] < -0.08 && Pw.body[0] < -0.08 && Ps.head[0] > 0.05, `an elder stoops (the back ${(-Ps.body[0]).toFixed(2)} rad forward standing, ${(-Pw.body[0]).toFixed(2)} walking; the head up ${Ps.head[0].toFixed(2)})`);
 }
 {
   // the head: a person looking at something 90° to its right turns the head 40° at most, the shoulders the rest

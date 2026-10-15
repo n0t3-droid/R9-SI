@@ -22,6 +22,11 @@
   const WORK_ROLE = { bakery: 'baker', smithy: 'smith', library: 'scholar', clinic: 'healer', hall: 'mayor', workshop: 'builder', garden: 'gardener', base: 'operator', market: 'cashier', barn: 'farmer', school: 'teacher', factory: 'worker', office: 'office', cafe: 'barista' };
   // how many keepers a workplace employs
   const WORK_N = { factory: 4, office: 4, school: 2, market: 1 };
+  // t-folk2: the seats' and the tables' tops (blocks over the floor) as the furniture draws them — the café's bentwood
+  // chair (its seat at 7.75/16), the park bench, the wooden chair, the bar stool; the café's marble table (12/16, its top
+  // 5/16 round), the dining table, the high bar table — [top, radius]
+  const SEAT_H = { vm_shop_chair_bentwood: 0.484, vx_bench: 0.49, vx_chair: 0.5, vm_shop_barstool_velvet: 0.84 };
+  const TABLE_T = { vm_shop_table_marble: [0.75, 0.3125], vx_table: [0.875, 0.5], vm_shop_bartable_high: [1.125, 0.34] };
   const TICK = () => 0;
   void TICK;
 
@@ -839,6 +844,20 @@
       a.pos = [seat[0] + 0.5, seat[1] + 0.05, seat[2] + 0.5];
       const f = seat[3] || 0;
       a.yaw = [0, -Math.PI / 2, Math.PI, Math.PI / 2][f];
+      a.sitO = this.seatInfo(seat, a);
+    }
+    // t-folk2: what the sit pose is solved for (folkanim.js FA.sitPose): the seat's height (the furniture's own: a café
+    // chair, a bench, a stool — the blocks' collision boxes are their outlines, a chair's reaches its back) and a table
+    // straight ahead within two blocks (its top and its radius), the arm that rests on it (the person's own side)
+    seatInfo(seat, a) {
+      const w = this.g.world, T = R.T;
+      const nameAt = (x, y, z) => { const s = w.getBlock(x, y, z); const t = s ? R.types[T.type[s]] : null; return t ? t.name : ''; };
+      const n0 = nameAt(seat[0], seat[1], seat[2]);
+      const h = SEAT_H[n0] || (/sofa|couch/.test(n0) ? 0.5 : /stool/.test(n0) ? 0.75 : VR.FolkAnim.SEAT);
+      const dx = -Math.round(Math.sin(a.yaw)), dz = -Math.round(Math.cos(a.yaw));
+      let table = null;
+      for (let k = 1; k <= 2 && !table; k++) { const n = nameAt(seat[0] + dx * k, seat[1], seat[2] + dz * k); const t = TABLE_T[n] || (/table|desk/.test(n) && !/coffee|side|night/.test(n) ? [0.8, 0.45] : null); if (t) table = { d: k, h: t[0], r: t[1] }; }
+      return { seat: h, table, side: (a.p && a.p.seed & 1) ? 'r' : 'l' };
     }
     goHome(a) { const h = a.vil.homes[a.p.home]; if (h && h.inside) this.goTo(a, h.inside[0], h.inside[1], h.inside[2], 1.2); }
     near(a, d) { const p = this.g.player.pos; return (p[0] - a.pos[0]) ** 2 + (p[2] - a.pos[2]) ** 2 < d * d; }
@@ -1368,6 +1387,10 @@
       // then (and beyond) the voxel self: with the switch on the half-resolution one, so the full voxel model is never
       // built only to be shown for a moment. A mesh is asked for from FG.ASK blocks, also for the people behind the eye
       const FG = VR.FolkGPU, smooth = !!(FG && FG.on(g)), N2 = smooth ? FG.NEAR * FG.NEAR : 0;
+      // (t-folk2: the people's shadows — FG.shadowMode: 'map' the shadow map's (Balanced and up), 'ellipse' the soft blot
+      // stretched from the sun (Low), 'none' (Very Low))
+      const shMode = FG ? FG.shadowMode(g.settings, r.q) : 'none';
+      if (FG) FG.game = g;
       if (smooth && (g.frame & 15) === 0) for (const a of this.agents) { const rec = a.fg || (a.fg = FG.recFor(a.p.look)); if (rec.state === 0) FG.want(g, rec, (a.pos[0] - cam.x) ** 2 + (a.pos[2] - cam.z) ** 2); }
       this.pick(r.planes, cam, cap, FD);
       for (const a of this.agents) {
@@ -1383,24 +1406,36 @@
         if (!model && !sm) continue;
         const light = ent.lightAt(a.pos[0], a.pos[1] + 1.2, a.pos[2]);
         // the budget (src/shared/folkcrowd.js): a villager far from the eye is posed every 2nd, 4th or 8th frame; between two its last pose holds
+        if (a.gait) a.gait.hands = sm;   // (t-folk2: the smooth people's wrists bend — a hand on the hip; folkanim.js hipClock)
         const pose = (!VR.Crowd || VR.Crowd.due(a, d2) || !a.poseOut) ? this.pose(a, t) : a.poseOut;
         const sleeping = a.pose === 'sleep';
         if (a.shadeT === undefined || t - a.shadeT > 0.25) { a.shade = ent.sunShade(a.pos, 1.2); a.shadeT = t; }   // terrain-shadow ray only 4× a second per villager
-        const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: a.kid ? 0.82 : 1, shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn } };
+        const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: a.kid ? 0.82 : 1, shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn, item_r: a.pose === 'sit' || sleeping, item_l: a.pose === 'sit' || sleeping } };   // (t-folk2: a guest puts the bag down)
+        if (a.pose === 'sit' && VR.FolkAnim.sitHides && VR.FolkAnim.sitHides(a.gait)) for (const k of VR.FolkAnim.SIT_HIDE) opts.hide[k] = true;   // (a robe's lap hides the legs)
         let pos = a.pos;
         if (sleeping) { opts.pitch = Math.PI / 2; pos = [a.pos[0] - VR.HF_DX[a.p.bed ? a.p.bed[3] : 0] * 0.85, a.pos[1] + 0.12, a.pos[2] - VR.HF_DZ[a.p.bed ? a.p.bed[3] : 0] * 0.85]; }
         // (t-folk: the seat from the rig — the thighs' underside, some four units under the hip joint as they lie, on the
         // seat's top half a block up; on the ground the same underside on the ground)
-        else if (a.pose === 'sit') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? 0.45 - (G.hip - 4) * G.bpu : -(a.kid ? 0.2 : 0.3)), a.pos[2]]; }
+        // (t-folk2: the seat solved — folkanim.js FA.sitPose: the hip joint over the seat, the feet on the floor; at a table the
+        // guest sits forward on the chair)
+        else if (a.pose === 'sit') { const G = a.gait, sp = G && a.sitP && a.sitO ? a.sitP.info : null; pos = sp ? [a.pos[0] - Math.sin(a.yaw) * sp.fwd, a.pos[1] - 0.05 + sp.rootY, a.pos[2] - Math.cos(a.yaw) * sp.fwd] : [a.pos[0], a.pos[1] + (G ? 0.45 - (G.hip - 4) * G.bpu : -(a.kid ? 0.2 : 0.3)), a.pos[2]]; }
         else if (a.pose === 'sitground') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? -0.05 - (G.hip - 4) * G.bpu : -(a.kid ? 0.26 : 0.6)), a.pos[2]]; }
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
         // (t-folk: the person's soft shadow on the ground — deeper in the open sun, faint in the terrain's shade and at night)
-        if (smooth && !sleeping && d2 < FG.SH_D * FG.SH_D) FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
+        // (in the 'map' mode a round contact shadow under the soles stays — the ground's occlusion, not the sun's: the people
+        // stand on the floor indoors too, where the hall's roof keeps the sun off; the sun's shadow is the map's. Run 2's
+        // 0.21 blocks hid under the shoes and the hems: the figures stood on the hall's floor without a shadow — now the
+        // ellipse's own size, round, a little lighter)
+        if (shMode !== 'none' && !sleeping && d2 < FG.SH_D * FG.SH_D) {
+          if (shMode === 'ellipse') FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
+          else if (a.pose !== 'sit') FG.shadow(a.pos, cam, -(a.kid ? 0.24 : 0.31), 0.34 + 0.12 * light.sky);
+        }
         if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);
       }
-      if (smooth) { FG.drawShadows(r, E); FG.flush(r, E, cam); }
+      if (shMode !== 'none') FG.drawShadows(r, E);
+      if (smooth) FG.flush(r, E, cam);
       if (this.drawBoats) this.drawBoats(r, E, cam);
     }
     // the body pose: FolkAnim clips (crossfaded) under the parametric walk cycle, then the head look-at, blinking and
@@ -1445,6 +1480,7 @@
       a.blinkT = (a.blinkT === undefined ? Math.random() * 4 : a.blinkT) - dt;
       if (a.blinkT < 0) { a.blinkOn = true; if (a.blinkT < -0.14) { a.blinkOn = false; a.blinkT = 2.2 + Math.random() * 4; } }
       if (a.talkAnim > 0) { a.talkAnim -= dt; a.mouthOn = Math.sin(t * 21 + a.p.seed) > 0.1; } else a.mouthOn = false;
+      a.speaking = a.talkAnim > 0;   // (t-folk2: the speaker gestures, the listener's hands rest — folkanim.js FA.gesture)
       P.lids = null; P.mouth = null;
       return P;
     }

@@ -67,7 +67,9 @@
       const em = (m.val[i] & B.EMIS) !== 0;
       const key = em ? 1 : (ny >= 0 ? 0.91 + 0.09 * ny : 0.91 + 0.19 * ny) * (0.96 - 0.01 * Math.abs(nx)) * Math.max(0.55, m.ao[i]);
       u8[i * 20 + 16] = Math.min(255, Math.round(m.rgb[i * 3] * key)); u8[i * 20 + 17] = Math.min(255, Math.round(m.rgb[i * 3 + 1] * key)); u8[i * 20 + 18] = Math.min(255, Math.round(m.rgb[i * 3 + 2] * key));
-      u8[i * 20 + 19] = em ? 255 : 0;
+      // (t-folk2: the alpha byte 255 emissive, 128 the eye's material — tag 7, class 7: the people's shader lights an eye by
+      // the light's brightness, not its colour, so the whites stay white under warm light)
+      u8[i * 20 + 19] = em ? 255 : ((m.val[i] >>> 29) & 7) === 7 ? 128 : 0;
     }
     const idx = new Uint16Array(m.idx.length); idx.set(m.idx);
     const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
