@@ -802,6 +802,9 @@
       // flower boxes under the arched windows and vines down the corner pilasters on every other house (the café always)
       const vinesOld = floors === 2 ? lrng.chance(0.6) : false;   // (the old draw kept: the beds upstairs stay the same)
       const flowery = (houses.indexOf(hs0) % 2 === 0) || kind === 'cafe';
+      // (round 3) a flower box under every arched window of every house (innenstadt_full.jpg: nearly every window has one);
+      // the vines' curtains keep the every-other rhythm below (no draw is added: the parapets and beds stay as they were)
+      if (!flowery) for (let k = 1; k < floors; k++) for (const u0 of [1, 8]) for (let u = u0; u <= u0 + 2; u++) Q(u, F + 5 * k + 1, -1, 'vx_windowbox', { facing: 0 });
       if (flowery) {
         const vm = vineMask(rr, 0, 1);
         for (let k = 1; k < floors; k++) for (const u0 of [1, 8]) {

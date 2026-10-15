@@ -32,6 +32,7 @@
 //      now checks the half dome's rays clean) (P1 / P2 / P4)
 //  16. round 3: the hall's windows luminous — their stained heads white, light blue and gold, like the references' (P4 / P8 / P2)
 //  17. round 3: a second row of spires — a pinnacle with a lantern finial on the clerestory over every flyer's head (P5 / P0)
+//  18. round 3: a flower box under every arched window of the shop houses (P1 / P2 / P7)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -596,6 +597,18 @@ for (const [label, H] of HALLS) {
       }
     }
     check(n >= 20 && ok === n, `a pinnacle with a gold course and a lantern finial on the clerestory over every flyer (${ok} of ${n})`);
+  }
+  // ---------------------------------------------------------------- 18. round 3: flowers at every window (P1 / P2 / P7)
+  console.log(`18. round 3 — a flower box under every arched window of the shop houses (${label})`);
+  {
+    // innenstadt_full.jpg: nearly every upper window of the street's houses has its flower box (round 2 gave them to every
+    // other house; the vines' curtains keep that rhythm)
+    let wins = 0, boxed = 0;
+    for (const h of Hh.houses.filter(h => h.lot && h.frame)) for (let k = 1; k < h.lot.floors; k++) for (const u0 of [1, 8]) {
+      wins++; let n = 0; for (let u = u0; u <= u0 + 2; u++) if (lotN(h, u, F + 5 * k + 1, -1) === 'vx_windowbox') n++;
+      if (n === 3) boxed++;
+    }
+    check(wins >= 30 && boxed === wins, `a flower box under every arched window of the shop houses (${boxed} of ${wins})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();
