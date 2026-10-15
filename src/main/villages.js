@@ -1423,11 +1423,13 @@
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
         // (t-folk: the person's soft shadow on the ground — deeper in the open sun, faint in the terrain's shade and at night)
-        // (in the 'map' mode a small round contact shadow under the soles stays — the ground's occlusion, not the sun's: the
-        // people stand on the floor indoors too, where the hall's roof keeps the sun off; the sun's shadow is the map's)
+        // (in the 'map' mode a round contact shadow under the soles stays — the ground's occlusion, not the sun's: the people
+        // stand on the floor indoors too, where the hall's roof keeps the sun off; the sun's shadow is the map's. Run 2's
+        // 0.21 blocks hid under the shoes and the hems: the figures stood on the hall's floor without a shadow — now the
+        // ellipse's own size, round, a little lighter)
         if (shMode !== 'none' && !sleeping && d2 < FG.SH_D * FG.SH_D) {
           if (shMode === 'ellipse') FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
-          else if (a.pose !== 'sit') FG.shadow(a.pos, cam, -(a.kid ? 0.16 : 0.21), 0.3 + 0.1 * light.sky);
+          else if (a.pose !== 'sit') FG.shadow(a.pos, cam, -(a.kid ? 0.24 : 0.31), 0.34 + 0.12 * light.sky);
         }
         if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);

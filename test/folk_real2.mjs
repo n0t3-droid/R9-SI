@@ -219,29 +219,51 @@ async function runPage(tag, dist) {
     const s = await pic('street', 5);
     if (tag !== 'before' && info.mode === 'map') {
       check(s.read && s.cast >= 5, `${tag}: the street's people in the shadow map (${s.cast} drawn into it, ${s.castMs.toFixed(1)} ms; the frame reads the copy: ${s.read})`);
-      // the shadows themselves: the frame with the people in the map against the same frame without them (their pass
-      // switched off for one frame), and against itself drawn again (what moves between two frames: the noise) — the
-      // pixels the people's shadows darken, and a picture of the difference (folk_real2_street_shadow_<tag>.png: the
-      // darkening ×4, red)
-      const sd = await ev(() => {
-        const g = VR.game, gl = g.renderer.gl, FG = VR.FolkGPU, W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
-        window.__norender = false;
-        const grab = () => { g.last = performance.now() - 1; g.loop(performance.now()); const px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px); return px; };
-        grab(); const A = grab(); const c0 = FG.castShadows; FG.castShadows = function (r) { r.shadowRead = null; return false; };
-        let B; try { B = grab(); } finally { FG.castShadows = c0; }
-        grab(); const A2 = grab(); window.__norender = true;
-        const lum = (p, i) => p[i] * 0.2126 + p[i + 1] * 0.7152 + p[i + 2] * 0.0722;
-        let dark = 0, noise = 0, sum = 0; const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const cx = cv.getContext('2d'), im = cx.createImageData(W, H);
-        for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-          const i = ((H - 1 - y) * W + x) * 4, o = (y * W + x) * 4, dl = lum(B, i) - lum(A, i);
-          if (dl > 6) { dark++; sum += dl; } if (Math.abs(lum(A2, i) - lum(A, i)) > 6) noise++;
-          const v = Math.max(0, Math.min(255, dl * 4)); im.data[o] = 40 + v * 0.84; im.data[o + 1] = 40; im.data[o + 2] = 40; im.data[o + 3] = 255;
+      // the people in the copy where the ground looks for them: for each of the five, three points on the ground along its
+      // shadow (0.6, 1.2 and 2.4 blocks from its feet away from the sun — under its shins, its hips, its chest) and one
+      // 2 blocks to its side, each looked up in the people's copy of the map and in the map itself as the terrain looks it
+      // up (a 1×1 draw: the comparison at the ground's depth less the receivers' bias) — in the copy in shadow, in the map
+      // lit (run 3: the picture showed no shadow of theirs, and a one-frame picture difference drowned in the temporal
+      // upscaler's jitter)
+      const pr = await ev(() => {
+        const g = VR.game, r = g.renderer, gl = r.gl, FG = VR.FolkGPU, SM = FG.sm, E = g.env.E, V = g.villages;
+        window.__norender = false; for (let i = 0; i < 2; i++) { g.last = performance.now() - 16; g.loop(performance.now()); } gl.finish(); window.__norender = true;
+        const copy = r.shadowRead, map = r.shadowTex, M = r.shadowMat;
+        if (!copy || !map) return { err: `no copy (${!!copy}) or no map (${!!map})` };
+        let P; try { P = VR.GL.program('void main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); gl_PointSize = 1.0; }', 'uniform highp sampler2DShadow u_m;\nuniform vec3 u_q;\nout vec4 o;\nvoid main() { o = vec4(texture(u_m, u_q), 0.0, 0.0, 1.0); }', 'folkProbe'); } catch (e) { return { err: 'probe program: ' + String(e).slice(0, 300) }; }
+        const t = gl.createTexture(); gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, t); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+        const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+        gl.viewport(0, 0, 1, 1); gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); gl.disable(gl.SCISSOR_TEST); gl.colorMask(true, true, true, true);
+        gl.useProgram(P.p); gl.bindVertexArray(null);
+        const px = new Uint8Array(4);
+        const look = (tex, q) => { gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, tex); gl.uniform1i(P.u.u_m, 5); gl.uniform3f(P.u.u_q, q[0], q[1], q[2]); gl.drawArrays(gl.POINTS, 0, 1); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); return +(px[0] / 255).toFixed(2); };
+        // (the shadow matrix takes positions relative to the frame's eye: SM.cam, the eye of the frame the people were drawn in)
+        const cx = SM.cam[0], cy = SM.cam[1], cz = SM.cam[2];
+        const proj = (x, y, z) => { const X = x - cx, Y = y - cy, Z = z - cz, w = M[3] * X + M[7] * Y + M[11] * Z + M[15]; return [((M[0] * X + M[4] * Y + M[8] * Z + M[12]) / w) * 0.5 + 0.5, ((M[1] * X + M[5] * Y + M[9] * Z + M[13]) / w) * 0.5 + 0.5, ((M[2] * X + M[6] * Y + M[10] * Z + M[14]) / w) * 0.5 + 0.5 - 0.0006]; };
+        const L = E.sunDir, hl = Math.hypot(L[0], L[2]) || 1, sx = -L[0] / hl, sz = -L[2] / hl;
+        const out = [], side = [];
+        for (const a of V.agents) {
+          const row = [];
+          for (const d of [0.6, 1.2, 2.4]) { const q = proj(a.pos[0] + sx * d, a.pos[1] + 0.04, a.pos[2] + sz * d); row.push([look(copy, q), look(map, q)]); }
+          out.push(row);
+          const q = proj(a.pos[0] - sz * 2, a.pos[1] + 0.04, a.pos[2] + sx * 2); side.push([look(copy, q), look(map, q)]);
         }
-        cx.putImageData(im, 0, 0);
-        return { W, H, dark, noise, mean: dark ? +(sum / dark).toFixed(1) : 0, png: cv.toDataURL('image/png') };
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.deleteFramebuffer(fb); gl.deleteTexture(t);
+        return { sun: L.map(v => +v.toFixed(2)), n: SM.n, out, side };
       });
-      fs.writeFileSync(shotPath('street_shadow'), Buffer.from(sd.png.split(',')[1], 'base64'));
-      check(sd.dark > 400 && sd.dark > sd.noise * 3, `${tag}: the people's shadows on the street — ${sd.dark} pixels darker with them in the map (by ${sd.mean} on 255 on average) against ${sd.noise} that change between two frames alone (${sd.W}×${sd.H}; the picture folk_real2_street_shadow_${tag}.png)`);
+      if (pr.err) check(false, `${tag}: the probe of the people's copy of the map: ${pr.err}`);
+      else {
+        let lit = 0, hit = 0, sideOk = 0, sideLit = 0;
+        for (const row of pr.out) for (const [c, m] of row) if (m > 0.5) { lit++; if (c < 0.5) hit++; }
+        for (const [c, m] of pr.side) if (m > 0.5) { sideLit++; if (c > 0.5) sideOk++; }
+        console.log(`  the probe (the sun ${JSON.stringify(pr.sun)}, ${pr.n} people in the copy): along each one's shadow [copy, map] ${JSON.stringify(pr.out)}; beside them ${JSON.stringify(pr.side)}`);
+        check(lit >= 4 && hit >= Math.ceil(lit * 0.6) && sideOk === sideLit, `${tag}: the people's shadows in their copy of the map — ${hit} of the ${lit} ground points along their shadows that the map lights are in shadow in the copy; beside them ${sideOk} of ${sideLit} lit in both`);
+      }
+      // the picture without their shadows, for the eye (the pass switched off for 9 frames — the upscaler's history
+      // settled — then the people's shadows back for the next pictures): folk_real2_street_noshadow_<tag>.png
+      await ev(() => { const FG = VR.FolkGPU; FG._cast0 = FG.castShadows; FG.castShadows = function (r) { r.shadowRead = null; return false; }; });
+      try { await frames(9); await page.screenshot({ path: shotPath('street_noshadow'), timeout: 150000 }); } catch (e) { console.log('  the picture without their shadows failed: ' + String(e.message).split('\n')[0]); }
+      await ev(() => { const FG = VR.FolkGPU; if (FG._cast0) { FG.castShadows = FG._cast0; delete FG._cast0; } });
     }
     await unstage();
   } else check(false, `${tag}: the village of cell 0,1 for the street`); });
