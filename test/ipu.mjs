@@ -23,7 +23,7 @@ const TAG = process.env.TAG || 'after', N = +(process.env.N || 3), MODE = proces
 const DIST = process.env.DIST || 'file:///home/dev/vr/dist/index.html';
 const SW = ['hdrLite', 'postLite', 'zPre', 'texLite'];   // (dprLite changes the backing store: its own check below)
 const QUICK = MODE === 'quick';
-const SCENES = (process.env.SCENES || (QUICK ? 'plaza' : 'plaza,sun,hall,lake')).split(',');
+const SCENES = (process.env.SCENES || (QUICK ? 'plaza' : 'plaza,sun,forest,hall,lake')).split(',');
 const PRESETS = (process.env.PRESETS || (QUICK ? 'high' : 'high,ultraLite,potato')).split(',');
 const CONFIGS = (process.env.CONFIGS || (QUICK ? 'off,hdrLite,all' : ['off', ...SW, 'all'].join(','))).split(',');
 const RD = +(process.env.RD || 8), VGEN = +(process.env.VGEN || 8);
@@ -166,11 +166,11 @@ let forestBuilt = false;
 const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (on) pool.__heldFar = (pool.__heldFar || []).concat(pool.queueFar.splice(0)); else if (pool.__heldFar) { for (const j of pool.__heldFar) pool.queueFar.push(j); pool.__heldFar = null; pool.queueDirty = true; if (pool.pump) pool.pump(); } return pool.queueFar.length + (pool.__heldFar ? pool.__heldFar.length : 0); }, on);
 const setPreset = (p) => ev(([p, rd]) => { const g = VR.game, own = (VR.Game.PRESETS[p] || {}).renderDist || rd; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = Math.min(rd, own); g.applySettings('*'); return g.settings.renderDist; }, [p, RD]);
 // a configuration of the switches straight on the renderer (the settings rows are tested in node): all off, one, all
-// (postLite-<part>: postLite with one of its parts off — bloomUp, rays, copy — to tell what each part costs)
+// (postLite-<part>: postLite with one of its parts off — rays, copy — to tell what each part costs)
 const config = (c) => ev(([c, SW]) => {
   const r = VR.game.renderer, q = {}, [base, minus] = c.split('-');
   for (const k of SW) q[k] = base === 'all' || base === k;
-  q.plBloom = minus !== 'bloomUp'; q.plRays = minus !== 'rays'; q.plCopy = minus !== 'copy';
+  q.plRays = minus !== 'rays'; q.plCopy = minus !== 'copy';
   r.setQuality(q);
   return { fmt: r.stats.sceneFmt, q: SW.filter(k => r.q[k]).join(',') || 'off' };
 }, [c, SW]);
@@ -234,9 +234,47 @@ const CAM = {
   sun: [3.5, -96.5, 1.62, 2.74, 0.25],   // (the plaza looking up into the noon sun, 24° high in the south: the god rays on)
   forest: [224.5, 30.5, 1.62, -Math.PI / 2, -0.05],   // (east through the test's forest: forest())
 };
-const res = { info, scenes: {} };
+const res = { info, scenes: {}, ab: {} };
 const save = () => fs.writeFileSync(`/home/dev/vr/.tmp_tests/ipu_${TAG}.json`, JSON.stringify(res, null, 1));
-for (const sc of SCENES) {
+// MODE=ab: the CPU time of two configurations in turns — A B A B … (ROUNDS rounds of N frames each, every block after the
+// same K warm-up frames): on this shared machine the load drifts over minutes and a single pair of measurements can be
+// 10 % apart; in turns both see the same drift. AB="off:all,off:texLite" · the medians and their ratio
+const ROUNDS = +(process.env.ROUNDS || 4);
+const abRun = async (sc, p, A, B, K) => {
+  const out = { [A]: [], [B]: [] };
+  for (let r = 0; r < ROUNDS; r++) for (const cf of (r % 2 ? [B, A] : [A, B])) {
+    await config(cf); await warmVx(); await warmUp(K);
+    const c0 = cpuNow(); await timed(K, N); out[cf].push((cpuNow() - c0) / N);
+  }
+  await config('off');
+  const med = (a) => { const b = a.slice().sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+  const a = med(out[A]), b = med(out[B]);
+  return { A, B, a: r1(a), b: r1(b), ratio: Math.round(b / a * 1000) / 1000, runsA: out[A].map(r1), runsB: out[B].map(r1) };
+};
+if (MODE === 'ab') {
+  const pairs = (process.env.AB || 'off:all').split(',').map(x => x.split(':'));
+  for (const sc of SCENES) {
+    const c = CAM[sc]; if (!c) continue;
+    let first = true;
+    for (const p of PRESETS) {
+      if (!info.presets.includes(p)) continue;
+      await setPreset(p);
+      await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
+      if (sc === 'forest' && !forestBuilt) { const f = await forest(); forestBuilt = true; await settle(400); await step(6); console.log(`  forest: ${f.trees} trees, ${f.blocks} blocks set`); }
+      if (first) { await holdFar(true); await settle(300); first = false; }
+      const K = p === 'potato' ? 10 : p === 'ultraLite' ? 8 : 4;
+      for (const [A, B] of pairs) {
+        const m = await abRun(sc, p, A, B, K);
+        (res.ab[sc] || (res.ab[sc] = {}))[p + ' ' + A + ':' + B] = m;
+        console.log(`  ab ${sc} ${p} ${A} → ${B}: CPU ${m.a} → ${m.b} ms a frame (×${m.ratio}; ${A} ${m.runsA.join(' ')} · ${B} ${m.runsB.join(' ')})`);
+        if (p === 'potato' && A === 'off') check(m.ratio <= 1.03, `${sc} Very Low: ${B} costs no more than off (×${m.ratio}, the noise of this machine ±3 %)`);
+        save();
+      }
+    }
+    await holdFar(false);
+  }
+}
+for (const sc of MODE === 'ab' ? [] : SCENES) {
   const c = CAM[sc]; if (!c) continue;
   res.scenes[sc] = {};
   let first = true;
@@ -251,7 +289,7 @@ for (const sc of SCENES) {
     const R = res.scenes[sc][p] = {};
     // (each switch alone, and postLite without its bloom fold, at the plaza on High; the rays' part looking into the sun;
     // elsewhere off and all)
-    const cfs = process.env.CONFIGS || QUICK ? CONFIGS : sc === 'plaza' && p === 'high' ? ['off', 'hdrLite', 'postLite', 'postLite-bloomUp', 'zPre', 'texLite', 'all'] : sc === 'sun' ? ['off', 'postLite', 'postLite-rays', 'all'] : sc === 'forest' ? ['off', 'zPre', 'texLite', 'all'] : ['off', 'all'];
+    const cfs = process.env.CONFIGS || QUICK ? CONFIGS : p !== 'high' ? ['off', 'all'] : sc === 'plaza' ? ['off', 'hdrLite', 'postLite', 'zPre', 'texLite', 'all'] : sc === 'sun' ? ['off', 'postLite', 'postLite-rays', 'all'] : sc === 'forest' ? ['off', 'zPre', 'texLite', 'all'] : ['off', 'all'];
     for (const cf of cfs) {
       if (!info.ipu && cf !== 'off') continue;   // (an older build: the switches off only)
       const st = info.ipu ? await config(cf) : { fmt: '?', q: 'off' };
@@ -278,7 +316,7 @@ for (const sc of SCENES) {
   await holdFar(false);
 }
 // dprLite in the browser: a screen of 1000 × 563 CSS pixels at dpr 1 — the backing store follows it (off: the window's 1280)
-if (info.ipu && !QUICK) {
+if (info.ipu && !QUICK && MODE !== 'ab') {
   const d = await ev(() => {
     const r = VR.game.renderer, was = Object.getOwnPropertyDescriptor(window, 'screen');
     Object.defineProperty(window, 'screen', { value: { width: 1000, height: 563 }, configurable: true });
@@ -292,7 +330,7 @@ if (info.ipu && !QUICK) {
   check(d.off[0] === 1280 && d.on[0] <= 1000 && d.on[1] <= 563 && d.on[2] === d.on[0] && d.back[0] === 1280, `dprLite: the backing store never larger than the screen (a 1000 × 563 screen: ${d.off.slice(0, 2).join(' × ')} → ${d.on.slice(0, 2).join(' × ')}; off again: ${d.back.join(' × ')})`);
 }
 // the fallback forced: R11F_G11F_B10F refused → RGBA16F, the picture of the switches off
-if (info.ipu && !QUICK) {
+if (info.ipu && !QUICK && MODE !== 'ab') {
   const sc = SCENES[0], c = CAM[sc];
   await setPreset('high');
   await place(c[0], c[1], c[2], c[3], c[4], 400);
