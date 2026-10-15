@@ -135,8 +135,8 @@ console.log('c · postLite: the full-screen passes of a frame and their bytes');
   console.log('     Ultra, off: ' + u0.names.join(' · '));
   console.log('     Ultra, postLite: ' + u1.names.join(' · '));
   check(u0.names.join() === 'copyColour,copyDepth,bloomPre,down,down,down,down,up,up,up,up,rays,composite,fxaa' && u0.n === 14 && u0.draws === 12 && u0.blits.length === 2, 'off: one Ultra frame as before — 2 blits, bloom 1 + 4 + 4, rays, composite, FXAA', `${u0.n} passes`);
-  check(!u1.names.includes('fxaa') && u1.names.filter(x => x === 'up').length === 3 && u1.names.includes('raysMask') && u1.n === u0.n - 1, 'postLite: FXAA inside the composite, the last bloom upsample read there, the rays from a ¼-res mask (one pass more)', `${u0.n} → ${u1.n} passes`);
-  check(log.prog.some(t => /#define FXAA_IN/.test(t) && /#define BLOOM_UP/.test(t)), 'the composite compiled with FXAA_IN and BLOOM_UP');
+  check(u1.names.includes('fxaa') && u1.names.filter(x => x === 'up').length === 3 && u1.names.includes('raysMask') && u1.n === u0.n, 'postLite: the last bloom upsample read in the composite, the rays from a ¼-res mask (a pass more); FXAA stays a pass of its own (folded, its edges differed: plan)', `${u0.n} → ${u1.n} passes, ${u2.n} without water`);
+  check(log.prog.some(t => /#define BLOOM_UP/.test(t)) && !log.prog.some(t => /#define FXAA_IN/.test(t)), 'the composite compiled with BLOOM_UP');
   check(u2.blits.join() === 'DEPTH_BUFFER_BIT' && u2.names[0] === 'copyDepth', 'no water in view: no colour copy (the depth stays: the rays read it)', u2.blits.join());
   const ub = (b) => (b.all / 1048576).toFixed(1) + ' MB';
   check(u1.b.all < u0.b.all && u2.b.all < u1.b.all, 'the bytes the passes move: fewer', `1280 × 720 Ultra: ${ub(u0.b)} → ${ub(u1.b)} (water in view) → ${ub(u2.b)} (none); god-ray fetches ${u0.b.fetch} → ${u1.b.fetch}`);
@@ -151,6 +151,70 @@ console.log('c · postLite: the full-screen passes of a frame and their bytes');
   check(l2.b.all < l0.b.all, 'Low\'s bytes', `960 × 540 → 1280 × 720: ${ub(l0.b)} → ${ub(l1.b)} → ${ub(l2.b)} (with hdrLite)`);
   const big0 = frame(ULTRA, true, [1920, 1080]), big1 = frame(Object.assign({ postLite: true, hdrLite: true }, ULTRA), false, [1920, 1080]);
   console.log(`     1920 × 1080 Ultra: ${ub(big0.b)} → ${ub(big1.b)} without water (${(IPU.ms(big0.b.all - big1.b.all, 20)).toFixed(2)} ms at 20 GB/s)`);
+}
+
+console.log('e · zPre and texLite: their programs; off: the terrain programs as before');
+{
+  const progs = [], orig = V.GL.program;
+  V.GL.program = (vs, fs, name, defs) => { progs.push({ name, defs: (defs || []).slice() }); return orig(vs, fs, name, defs); };
+  const defsOf = (r, q) => { progs.length = 0; Object.assign(r.q, q); r.buildPrograms(); const o = {}; for (const p of progs) o[p.name] = p.defs.join(' '); return o; };
+  const r = make({ shadows: 2048, hshadow: true });
+  const off = defsOf(r, {});
+  check(off.terrain === 'SHADOWS HSHADOW FADE' && off.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE', 'off: the opaque and cut-out programs with the defines they had', `${off.terrain} · ${off.terrainCut}`);
+  const z = defsOf(r, { zPre: true });
+  check(z.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE ZINV' && z.terrain === off.terrain, 'zPre: the cut-out colour pass with invariant positions (ZINV), the opaque one unchanged', z.terrainCut);
+  progs.length = 0; const zp = r.zProgram();
+  check(progs.length === 1 && progs[0].defs.join(' ') === 'SHADOWS HSHADOW CUTOUT FADE ZINV ZPRE' && r.zProgram() === zp, 'its prepass program: the same defines and ZPRE, made once', progs.length ? progs[0].defs.join(' ') : 'none');
+  const fsSrc = require('fs').readFileSync(__dirname + '/../src/main/shaders.js', 'utf8');
+  check(/#ifdef ZPRE\n\s+o_col = vec4\(1\.0 \/ 255\.0[^\n]*return;/.test(fsSrc) && /#ifdef ZINV\ninvariant gl_Position;/.test(fsSrc), 'the shader: ZPRE returns right after the alpha test; ZINV declares gl_Position invariant');
+  const t = defsOf(r, { zPre: false, texLite: true });
+  check(t.terrain === 'SHADOWS HSHADOW FADE TEXLITE' && t.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE TEXLITE', 'texLite: TEXLITE in the opaque and cut-out programs', `${t.terrain} · ${t.terrainCut}`);
+  // the anisotropic filtering: 4 → 2 and back (setAniso through applyQ)
+  const anis = []; V.GL.ext.aniso = { MAX_TEXTURE_MAX_ANISOTROPY_EXT: 'MAXA', TEXTURE_MAX_ANISOTROPY_EXT: 'A' };
+  const r2 = make({}); r2.texAlbedo = {}; r2.texMaterial = {};
+  const tp = gl.texParameterf; gl.texParameterf = (a, b, v) => { if (b === 'A') anis.push(v); };
+  r2.qBase = {}; r2.setQuality({ texLite: true }); r2.setQuality({ texLite: false });
+  gl.texParameterf = tp; V.GL.ext.aniso = null;
+  check(anis.join() === '2,2,4,4', 'texLite: anisotropic filtering 4 → 2 (albedo and material), off: 4 again', anis.join());
+  // the layer table: emissive layers flagged, the mean roughness
+  const N = 2, L = 3, mat = new Uint8Array(N * N * 4 * L);
+  for (let i = 0; i < N * N; i++) { mat[(0 * N * N + i) * 4 + 2] = 100; mat[(1 * N * N + i) * 4 + 2] = 200; mat[(2 * N * N + i) * 4 + 2] = 50; }
+  mat[(1 * N * N + 2) * 4 + 3] = 180;   // layer 1: one glowing texel
+  const r3 = make({}); r3.texSrc = { layers: L, size: N, material: [mat] };
+  let data = null; const ti = gl.texImage2D; gl.texImage2D = (...a) => { if (a[2] === 'RG8') data = a[8]; return ti(...a); };
+  r3.layTex(); const again = r3.layTex();
+  gl.texImage2D = ti;
+  check(data && data[0] === 0 && data[1] === 100 && data[2] === 255 && data[3] === 200 && data[4] === 0 && data[5] === 50 && again === r3.texLay, 'the layer table: the glowing layer is always read, the others take their mean roughness; made once per material set', data ? Array.from(data.slice(0, 6)).join(',') : 'none');
+  V.GL.program = orig;
+}
+
+console.log('f · zPre: the order the opaque and cut-out sections are drawn in (collectVisible, unchanged)');
+{
+  // a world of meshed sections round the eye (as frame_cost.js): the walk's list must be front to back along every line of
+  // sight — of two sections in the same direction (within 8°) the nearer one comes first — so the nearer surface is in the
+  // depth buffer when the farther one is shaded; a full distance sort would only reorder sections that cannot hide each other
+  global.Worker = class { constructor() { this.inflight = 0; } postMessage() {} terminate() {} };
+  global.Blob = class {}; global.URL = { createObjectURL: () => 'blob:x' };
+  require('../src/main/world.js');
+  const RD = 8, pool = { workers: [{ inflight: 0 }], queue: [], queueFar: [], submitted: [], submit() {}, pump() {}, broadcast() {}, queueDirty: false };
+  const world = new V.World({}, { dim: 'overworld', seed: 1, genOpts: {}, pool, renderer: { freeSection() {}, uploadSection() {}, q: { vxLod: 48 } }, renderDist: RD });
+  for (let cz = -RD - 2; cz <= RD + 2; cz++) for (let cx = -RD - 2; cx <= RD + 2; cx++) {
+    const c = new V.Column(cx, cz);
+    for (let sy = 0; sy < 16; sy++) { const sc = c.sec[sy]; sc.count = sy < 6 ? 4096 : 0; sc.meshed = true; sc.hasMesh = sy < 6; sc.vis = 0x7fff; sc.ox = cx * 16; sc.oy = sy * 16; sc.oz = cz * 16; sc.mesh = [sy < 6 ? { count: 96 } : null, null, null, null, null]; }
+    c.ready = true; world.cols.set(c.key, c);
+  }
+  const r = Object.create(V.Renderer.prototype);
+  r.visList = []; r.visDirty = true; r.visKey = ''; r.frameNo = 1; r.q = { noCaveCull: false };
+  const cam = { x: 8.5, y: 70.5, z: 8.5 }, list = r.collectVisible(world, cam).slice();
+  const P = list.map(sc => { const x = sc.ox + 8 - cam.x, y = sc.oy + 8 - cam.y, z = sc.oz + 8 - cam.z, d = Math.hypot(x, y, z); return { d, x: x / d, y: y / d, z: z / d }; });
+  let pairs = 0, wrong = 0, worst = 0; const cos8 = Math.cos(8 * Math.PI / 180);
+  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+    const a = P[i], b = P[j];
+    if (a.x * b.x + a.y * b.y + a.z * b.z < cos8 || Math.abs(a.d - b.d) < 16) continue;
+    pairs++; if (b.d < a.d) { wrong++; worst = Math.max(worst, a.d - b.d); }
+  }
+  let inv = 0; for (let i = 1; i < P.length; i++) if (P[i].d < P[i - 1].d - 16) inv++;
+  check(list.length > 500 && wrong === 0, 'front to back along every line of sight: of two sections in one direction the nearer is drawn first', `${list.length} sections, ${pairs} pairs in line, ${wrong} out of order${wrong ? ' (worst ' + worst.toFixed(0) + ' blocks)' : ''}; across directions ${inv} steps back by more than a section (breadth-first by section steps)`);
 }
 
 console.log('d · dprLite: the backing store');

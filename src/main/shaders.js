@@ -544,6 +544,9 @@ out vec3 v_localPos;
 #ifdef FADE
 flat out float v_fade;
 #endif
+#ifdef ZINV
+invariant gl_Position;   // F10 · zPre: the cut-out layer's depth prepass and its colour pass place every fragment alike
+#endif
 void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
@@ -622,6 +625,9 @@ uniform float u_emissiveBoost;
 uniform float u_normalStrength;
 uniform float u_holoLayer;
 uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade, the normal map turns with the tile (Nahtlos: macro mottling)
+#ifdef TEXLITE
+uniform highp sampler2D u_lay;   // F10 · texLite: per texture layer r = it has emissive texels, g = its mean roughness (renderer layTable)
+#endif
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -712,6 +718,10 @@ void main() {
   if (kind == 5u) layer += mod(floor(u_time * 12.0 + cellF.x * 3.0 + cellF.z * 7.0), 8.0);
   // R9 Super Resolution renders below screen size: pick the texture detail of the full-size image
   float mipK = u_mipScale > 0.0 ? u_mipScale : 1.0;
+#ifdef TEXLITE
+  float dT = length(v_rel);
+  mipK *= 1.0 + 0.41421 * smoothstep(24.0, 40.0, dT);   // F10 · texLite: half a mip level coarser far away (eased in from 24 m)
+#endif
   vec2 dx = dFdx(uv) * mipK, dy = dFdy(uv) * mipK;
   if (rot == 1u || rot == 3u) { dx = dx.yx; dy = dy.yx; }
   // Klassisch: crisp texels up close, as in the original game — the sample snaps to its texel's centre and only the
@@ -724,8 +734,21 @@ void main() {
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
+#ifdef ZPRE
+  o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
 #endif
+#endif
+#ifdef TEXLITE
+  // F10 · texLite: beyond 32 m a layer without emissive texels is not read for its material — no normal map (its mips are
+  // nearly flat there), its mean roughness; a layer that glows is always read
+  vec4 mat;
+  int li = int(layer);
+  vec2 lay = dT > 32.0 && li < textureSize(u_lay, 0).x ? texelFetch(u_lay, ivec2(li, 0), 0).rg : vec2(1.0);
+  if (lay.r < 0.5) mat = vec4(0.5, 0.5, lay.g, 0.0);
+  else mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
+#else
   vec4 mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
+#endif
   vec3 tint = v_tint;
   // a recoloured block (B1): the texture's detail in its own colour, the whole face (the tint mask of a grass side too)
   if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, tint);
@@ -2142,32 +2165,6 @@ vec3 bloomAt(vec2 uv) {
   return texture(u_bloom, uv).rgb + c / 16.0;
 }
 #endif
-#ifdef FXAA_IN
-// F10 · postLite: FXAA inside the composite (no RGBA8 target, no second full-screen pass). The edge test takes the
-// tonemapped luma of the four diagonal scene texels and the centre (FXAA_FS's rule and thresholds); on an edge the scene's
-// HDR samples along it are blended, each weighted 1 / (1 + its luminance), so the blend follows the tonemapped picture the
-// FXAA pass saw — then bloom, rays and the grade are applied once, as to every other pixel
-float lumT(vec3 c) { return pow(acesL(max(dot(c * u_grade, vec3(0.299, 0.587, 0.114)) * u_exposure, 0.0)), 1.0 / 2.2); }
-float kw(vec3 c) { return 1.0 / (1.0 + max(dot(c, vec3(0.2126, 0.7152, 0.0722)) * u_exposure, 0.0)); }
-void fxaaIn(vec2 uv, vec2 t, inout vec3 c) {
-  vec3 nw = texture(u_scene, uv + vec2(-1.0, -1.0) * t).rgb, ne = texture(u_scene, uv + vec2(1.0, -1.0) * t).rgb;
-  vec3 sw = texture(u_scene, uv + vec2(-1.0, 1.0) * t).rgb, se = texture(u_scene, uv + vec2(1.0, 1.0) * t).rgb;
-  float lNW = lumT(nw), lNE = lumT(ne), lSW = lumT(sw), lSE = lumT(se), lM = lumT(texture(u_scene, uv).rgb);
-  float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE))), lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
-  if (lMax - lMin < max(0.05, lMax * 0.16)) return;
-  vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), ((lNW + lSW) - (lNE + lSE)));
-  float dirReduce = max((lNW + lNE + lSW + lSE) * 0.03125, 1.0 / 128.0);
-  float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
-  dir = clamp(dir * rcp, -8.0, 8.0) * t;
-  vec3 a1 = texture(u_scene, uv + dir * (1.0 / 3.0 - 0.5)).rgb, a2 = texture(u_scene, uv + dir * (2.0 / 3.0 - 0.5)).rgb;
-  vec3 b1 = texture(u_scene, uv + dir * -0.5).rgb, b2 = texture(u_scene, uv + dir * 0.5).rgb;
-  float w1 = kw(a1), w2 = kw(a2), w3 = kw(b1), w4 = kw(b2);
-  vec3 a = (a1 * w1 + a2 * w2) / (w1 + w2);
-  vec3 b = (a1 * w1 + a2 * w2 + b1 * w3 + b2 * w4) / (w1 + w2 + w3 + w4);
-  float lB = lumT(b);
-  c = (lB < lMin || lB > lMax) ? a : b;
-}
-#endif
 void main() {
   vec2 uv = v_uv;
   if (u_underwaterFx > 0.0) uv += vec2(sin(uv.y * 28.0 + u_time * 2.2), cos(uv.x * 22.0 + u_time * 1.7)) * 0.0022 * u_underwaterFx;
@@ -2184,9 +2181,6 @@ void main() {
     vec3 r = clamp((m + (a + b + d + e) * w) / (1.0 + 4.0 * w), 0.0, 0.996);
     c = r / (1.0 - r);
   } else c = texture(u_scene, uv).rgb;
-#ifdef FXAA_IN
-  fxaaIn(uv, u_sceneTexel, c);
-#endif
 #ifdef BLOOM_UP
   c += bloomAt(uv) * u_bloomStrength;
 #else

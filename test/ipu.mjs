@@ -23,7 +23,7 @@ const TAG = process.env.TAG || 'after', N = +(process.env.N || 3), MODE = proces
 const DIST = process.env.DIST || 'file:///home/dev/vr/dist/index.html';
 const SW = ['hdrLite', 'postLite', 'zPre', 'texLite'];   // (dprLite changes the backing store: its own check below)
 const QUICK = MODE === 'quick';
-const SCENES = (process.env.SCENES || (QUICK ? 'plaza' : 'hall,plaza,lake')).split(',');
+const SCENES = (process.env.SCENES || (QUICK ? 'plaza' : 'plaza,sun,hall,lake')).split(',');
 const PRESETS = (process.env.PRESETS || (QUICK ? 'high' : 'high,ultraLite,potato')).split(',');
 const CONFIGS = (process.env.CONFIGS || (QUICK ? 'off,hdrLite,all' : ['off', ...SW, 'all'].join(','))).split(',');
 const RD = +(process.env.RD || 8), VGEN = +(process.env.VGEN || 8);
@@ -143,26 +143,32 @@ const place = async (x, z, eye, yaw, pitch, max = 400) => {
 const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (on) pool.__heldFar = (pool.__heldFar || []).concat(pool.queueFar.splice(0)); else if (pool.__heldFar) { for (const j of pool.__heldFar) pool.queueFar.push(j); pool.__heldFar = null; pool.queueDirty = true; if (pool.pump) pool.pump(); } return pool.queueFar.length + (pool.__heldFar ? pool.__heldFar.length : 0); }, on);
 const setPreset = (p) => ev(([p, rd]) => { const g = VR.game, own = (VR.Game.PRESETS[p] || {}).renderDist || rd; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = Math.min(rd, own); g.applySettings('*'); return g.settings.renderDist; }, [p, RD]);
 // a configuration of the switches straight on the renderer (the settings rows are tested in node): all off, one, all
+// (postLite-<part>: postLite with one of its parts off — bloomUp, rays, copy — to tell what each part costs)
 const config = (c) => ev(([c, SW]) => {
-  const r = VR.game.renderer, q = {};
-  for (const k of SW) q[k] = c === 'all' || c === k;
+  const r = VR.game.renderer, q = {}, [base, minus] = c.split('-');
+  for (const k of SW) q[k] = base === 'all' || base === k;
+  q.plBloom = minus !== 'bloomUp'; q.plRays = minus !== 'rays'; q.plCopy = minus !== 'copy';
   r.setQuality(q);
   return { fmt: r.stats.sceneFmt, q: SW.filter(k => r.q[k]).join(',') || 'off' };
 }, [c, SW]);
 // K frames drawn from the same start: the frame counter (the TSR jitter), the history, the clocks — the same picture
 // whatever ran before; then N timed frames (each synced), one instrumented frame, and the picture read back
-const run = (K, n) => ev(([K, n]) => {
-  const g = VR.game, r = g.renderer, gl = r.gl, P = window.__pass, out = { ms: [], cpu: 0 };
-  window.__norender = false; window.__still = true;
-  const frame = () => { g.env.anim = 500; g.last = performance.now() - 33; g.loop(performance.now()); };
-  r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false;
-  for (let i = 0; i < K; i++) frame();
-  window.__sync();
-  for (let i = 0; i < n; i++) { r.frameNo = 1000 + K - 1; const t0 = performance.now(); frame(); window.__sync(); out.ms.push(performance.now() - t0); }
+// the frames of a measurement, each from the same start: the frame counter (the TSR jitter), the history, the clocks
+const FRAME = `const g = VR.game, r = g.renderer; window.__norender = false; window.__still = true; const frame = () => { g.env.anim = 500; g.last = performance.now() - 33; g.loop(performance.now()); };`;
+// 1 · K frames to build up the picture (TSR's eight jittered frames on Very Low, the far cache's strips on Ultra · Leicht)
+const warmUp = (K) => ev(new Function('K', FRAME + `r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false; for (let i = 0; i < K; i++) frame(); window.__sync(); window.__norender = true; window.__still = false;`), K);
+// 2 · n timed frames (each synced; the CPU time is taken around this call alone)
+const timed = (K, n) => ev(new Function('a', FRAME + `const out = []; for (let i = 0; i < a[1]; i++) { r.frameNo = 1000 + a[0] - 1; const t0 = performance.now(); frame(); window.__sync(); out.push(performance.now() - t0); } window.__norender = true; window.__still = false; return out;`), [K, n]);
+// 3 · one frame with every pass timed alone and the full-screen passes logged, one frame counting the cut-out layer's
+// fragments (renderer.zCount), then the picture: the same K frames again and the screen read back
+const detail = (K) => ev(new Function('K', FRAME + `
+  const gl = r.gl, P = window.__pass, out = {};
+  r.passLog = true;
   P.ms = {}; P.fs = 0; P.blit = 0; P.on = true; r.frameNo = 1000 + K - 1; window.__sync(); const t0 = performance.now(); frame(); window.__sync(); out.passMs = performance.now() - t0; P.on = false;
   out.pass = P.ms; out.fs = P.fs; out.blit = P.blit; out.draws = r.stats.draws; out.tris = r.stats.tris; out.fmt = r.stats.sceneFmt; out.fsPasses = r.stats.fsPasses; out.fsBytes = r.stats.fsBytes;
-  out.counts = r.stats.zCount || null;
-  // the picture: the same K frames again, then the screen read back
+  out.fsList = (r.stats.fsList || []).map(x => x.name).join(' ');
+  r.passLog = false;
+  r.zCount = true; r.frameNo = 1000 + K - 1; frame(); out.counts = r.stats.zCount || null; r.zCount = false;
   r.frameNo = 1000; r.tsrReset = true;
   for (let i = 0; i < K; i++) frame();
   const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
@@ -170,20 +176,21 @@ const run = (K, n) => ev(([K, n]) => {
   let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
   out.png = btoa(s); out.W = W; out.H = H;
   window.__norender = true; window.__still = false;
-  return out;
-}, [K, n]);
+  return out;`), K);
 const measure = async (name, K) => {
   await warmVx();
+  await warmUp(K);
   const c0 = cpuNow();
-  const m = await run(K, N);
-  const cpuAll = cpuNow() - c0;
+  const ms0 = await timed(K, N);
+  const cpuMs = (cpuNow() - c0) / N;
+  const m = await detail(K);
   const raw = Buffer.from(m.png, 'base64'); delete m.png;
   // (readPixels is bottom-up: flipped into a picture)
   await sharp(raw, { raw: { width: m.W, height: m.H, channels: 4 } }).flip().removeAlpha().png().toFile(shotPath(name));
-  const ms = m.ms.slice().sort((a, b) => a - b);
+  const ms = ms0.slice().sort((a, b) => a - b);
   const pass = {}; for (const k in m.pass) pass[k] = r1(m.pass[k]);
-  // (the CPU time covers all 2K + N + 1 frames; per frame it is the mean)
-  return { frameMs: r1(ms[ms.length >> 1]), cpuMs: r1(cpuAll / (2 * K + N + 1)), fs: m.fs, blit: m.blit, fsPasses: m.fsPasses, fsBytes: m.fsBytes, draws: m.draws, tris: Math.round(m.tris / 1000) + 'k', fmt: m.fmt, pass, passMs: r1(m.passMs), counts: m.counts };
+  const fb = m.fsBytes ? { n: m.fsBytes.n, MB: r1(m.fsBytes.all / 1048576), fetchK: Math.round(m.fsBytes.fetch / 1000) } : null;
+  return { frameMs: r1(ms[ms.length >> 1]), cpuMs: r1(cpuMs), fs: m.fs, blit: m.blit, fsPasses: m.fsPasses, fsBytes: fb, fsList: m.fsList, draws: m.draws, tris: Math.round(m.tris / 1000) + 'k', fmt: m.fmt, pass, passMs: r1(m.passMs), counts: m.counts };
 };
 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
@@ -201,6 +208,7 @@ const CAM = {
   hall: [0.5, -9.5, { y: 81 }, Math.PI, 0],
   plaza: [3.5, -96.5, 1.62, 0.3, 0.03],
   lake: [220.5, 30.5, { y: 66 }, Math.PI / 2, -0.1],
+  sun: [3.5, -96.5, 1.62, 2.74, 0.25],   // (the plaza looking up into the noon sun, 24° high in the south: the god rays on)
 };
 const res = { info, scenes: {} };
 const save = () => fs.writeFileSync(`/home/dev/vr/.tmp_tests/ipu_${TAG}.json`, JSON.stringify(res, null, 1));
@@ -210,12 +218,16 @@ for (const sc of SCENES) {
   let first = true;
   for (const p of PRESETS) {
     if (!info.presets.includes(p)) { console.log(`  no preset ${p} in this build`); continue; }
+    if (sc === 'sun' && p !== 'high' && !process.env.PRESETS) continue;   // (the rays' scene: High only)
     const rd = await setPreset(p);
     await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
     if (first) { const held = await holdFar(true); await settle(300); console.log(`  ${sc}: the far ring's ${held} queued jobs held`); first = false; }
     const K = p === 'potato' ? 10 : p === 'ultraLite' ? 8 : 4;   // (Very Low's TSR builds its picture over 8 jittered frames; the far cache takes 4 strips)
     const R = res.scenes[sc][p] = {};
-    for (const cf of CONFIGS) {
+    // (each switch alone, and postLite without its bloom fold, at the plaza on High; the rays' part looking into the sun;
+    // elsewhere off and all)
+    const cfs = process.env.CONFIGS || QUICK ? CONFIGS : sc === 'plaza' && p === 'high' ? ['off', 'hdrLite', 'postLite', 'postLite-bloomUp', 'zPre', 'texLite', 'all'] : sc === 'sun' ? ['off', 'postLite', 'postLite-rays', 'all'] : ['off', 'all'];
+    for (const cf of cfs) {
       if (!info.ipu && cf !== 'off') continue;   // (an older build: the switches off only)
       const st = info.ipu ? await config(cf) : { fmt: '?', q: 'off' };
       const m = await measure(`${sc}_${p}_${cf}`, K);
@@ -228,12 +240,31 @@ for (const sc of SCENES) {
       save();
     }
     if (info.ipu) await config('off');
+    if (R.off && R.off.counts && R.off.counts.one > 0) {
+      const c = R.off.counts;
+      console.log(`     the cut-out layer's fragments that run the full shader: one pass ${c.one} → after the prepass ${c.pre} (${Math.round(100 * (1 - c.pre / c.one))} % fewer; ${(c.one / c.px).toFixed(3)} → ${(c.pre / c.px).toFixed(3)} a pixel)`);
+      check(c.pre <= c.one, `${sc} ${p}: zPre — no more cut-out fragments reach the full shader (${c.one} → ${c.pre})`);
+    }
     if (R.all && R.off) {
       check(R.all.dE.mean < 1.0, `${sc} ${p}: the picture with every switch on is the same (ΔE mean ${R.all.dE.mean} < 1.0; ${R.all.dE.over} % of the pixels above 2.3, the worst ${R.all.dE.worst})`);
       if (p !== 'potato') check(R.all.cpuMs <= R.off.cpuMs * 1.02, `${sc} ${p}: every switch on costs no more (CPU ${R.off.cpuMs} → ${R.all.cpuMs} ms a frame)`);
     }
   }
   await holdFar(false);
+}
+// dprLite in the browser: a screen of 1000 × 563 CSS pixels at dpr 1 — the backing store follows it (off: the window's 1280)
+if (info.ipu && !QUICK) {
+  const d = await ev(() => {
+    const r = VR.game.renderer, was = Object.getOwnPropertyDescriptor(window, 'screen');
+    Object.defineProperty(window, 'screen', { value: { width: 1000, height: 563 }, configurable: true });
+    r.setQuality({ dprLite: false }); const off = [r.W, r.H, r.canvas.width];
+    r.setQuality({ dprLite: true }); const on = [r.W, r.H, r.canvas.width];
+    r.setQuality({ dprLite: false });
+    if (was) Object.defineProperty(window, 'screen', was); else delete window.screen;
+    return { off, on, back: [r.W, r.H] };
+  });
+  res.dpr = d;
+  check(d.off[0] === 1280 && d.on[0] <= 1000 && d.on[1] <= 563 && d.on[2] === d.on[0] && d.back[0] === 1280, `dprLite: the backing store never larger than the screen (a 1000 × 563 screen: ${d.off.slice(0, 2).join(' × ')} → ${d.on.slice(0, 2).join(' × ')}; off again: ${d.back.join(' × ')})`);
 }
 // the fallback forced: R11F_G11F_B10F refused → RGBA16F, the picture of the switches off
 if (info.ipu && !QUICK) {

@@ -89,6 +89,7 @@
       };
       this.texAlbedo = mk(tex.albedo, true);
       this.texMaterial = mk(tex.material);
+      this.texSrc = tex;   // (F10 · texLite: the layer table is made from its material)
       this.setAniso(4);
       // noise
       this.texNoise = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: tex.noise, wrap: gl.REPEAT, filter: gl.LINEAR });
@@ -116,6 +117,25 @@
       this.emptyVAO = gl.createVertexArray();
       this.resize(true);
     }
+    // F10 · texLite: a row with a texel per texture layer — r 255 when the layer has an emissive texel (its material is always
+    // read), g its mean roughness (what a far fragment takes without reading the material). Made from the material set in
+    // use (texSrc: the game's texture record, which a look switch refills) when it changed.
+    layTex() {
+      const src = this.texSrc, m = src && src.material && src.material[0];
+      if (this.texLay && this.texLayFor === m) return this.texLay;
+      const gl = this.gl, L = src ? src.layers : 1, N = src ? src.size : 1, W = Math.max(1, Math.min(L, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 2048));
+      const out = new Uint8Array((W * 2 + 3) & ~3);
+      for (let l = 0; l < W; l++) {
+        if (!m) { out[l * 2] = 255; continue; }
+        let em = 0, rs = 0; const o = l * N * N * 4;
+        for (let i = 0; i < N * N; i++) { const a = m[o + i * 4 + 3]; if (a > em) em = a; rs += m[o + i * 4 + 2]; }
+        out[l * 2] = em > 5 ? 255 : 0; out[l * 2 + 1] = Math.round(rs / (N * N));
+      }
+      if (this.texLay) gl.deleteTexture(this.texLay);
+      this.texLay = GL.tex2D(W, 1, gl.RG8, gl.RG, gl.UNSIGNED_BYTE, { data: out, filter: gl.NEAREST });
+      this.texLayFor = m;
+      return this.texLay;
+    }
     setAvgLum(table) {
       const gl = this.gl; if (!this.texAvgLum || !table) return;
       gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum);
@@ -134,8 +154,9 @@
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE']));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE']));
+      const tl = this.q.texLite ? ['TEXLITE'] : [];   // (F10 · texLite: the terrain's atlas read lighter far away)
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...tl]));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE', ...tl].concat(this.q.zPre ? ['ZINV'] : [])));   // (F10 · zPre: invariant positions)
       P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE']));
       P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL']);
       P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT']);
@@ -164,6 +185,65 @@
       // (the smooth props' programs are compiled on their first use, propProgram: Very Low never compiles them)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
+    // F10 · zPre: the cut-out layer's depth prepass program — the terrain shader cut after its alpha test (ZPRE), with the
+    // colour pass's defines (ZINV: both place their fragments alike); made on first use, dropped with P
+    zProgram() {
+      const P = this.P;
+      if (P.cutZ) return P.cutZ;
+      const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);
+      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE'].concat(this.q.texLite ? ['TEXLITE'] : []));
+      if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
+      return (P.cutZ = p);
+    }
+    // F10 · zPre: the cut-out layer's depth first (leaves, grass, flowers, fences: alpha-tested, so a GPU cannot reject their
+    // hidden fragments before it shades them) with the colour writes off; render() then draws the layer with depth writes off
+    // and LEQUAL — the full shader runs for the nearest texel only. count (a test): the colour on, adding 1/255 a fragment
+    zPrepass(list, E, camPos, count) {
+      const gl = this.gl, p = this.zProgram();
+      gl.useProgram(p.p);
+      this.common(p, E);
+      this.bindTerrainTextures(p);
+      gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
+      gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
+      gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
+      if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
+      if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, this.jit && !this.q.lite ? Math.sqrt(Math.max(0.35, this.w / this.W)) : 1);   // (as the colour pass: the same mip, the same alpha)
+      if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
+      gl.disable(gl.CULL_FACE);
+      if (count) { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); } else gl.colorMask(false, false, false, false);
+      const d0 = this.stats.draws;
+      this.drawSections(list, 1, p, camPos, this.planes, false);
+      if (count) gl.disable(gl.BLEND); else gl.colorMask(true, true, true, true);
+      gl.enable(gl.CULL_FACE);
+      this.stats.zpreDraws = this.stats.draws - d0;
+    }
+    // test hook (test/ipu.mjs, renderer.zCount): the cut-out layer's fragment work in this frame's view — how many of its
+    // fragments reach the full shader in one pass (each one that passes the depth test as the layer is drawn) and after the
+    // prepass (only those at the nearest depth), counted into a scratch target that starts from the opaque pass's depth
+    zCountPass(list, E, camPos) {
+      const gl = this.gl, w = this.w, h = this.h;
+      let z = this.zc;
+      if (!z || z.w !== w || z.h !== h) {
+        if (z) { gl.deleteFramebuffer(z.fb); gl.deleteTexture(z.col); gl.deleteTexture(z.depth); }
+        const col = GL.tex2D(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { filter: gl.NEAREST }), depth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
+        z = this.zc = { w, h, col, depth, fb: GL.fbo([col], depth), px: new Uint8Array(w * h * 4) };
+      }
+      const run = (pre) => {
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, z.fb);
+        gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, z.fb); gl.viewport(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.depthMask(true);
+        if (pre) { this.zPrepass(list, E, camPos); gl.depthMask(false); }
+        this.zPrepass(list, E, camPos, true);
+        gl.depthMask(true);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, z.px);
+        let n = 0; for (let i = 0; i < z.px.length; i += 4) n += z.px[i];
+        return n;
+      };
+      this.stats.zCount = { one: run(false), pre: run(true), px: w * h };
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, w, h);
+    }
     // F-Far: the far programs, made when ring 1 first needs them (Very Low … Balanced never compile them): 'form' = ring 1,
     // 'lodFar' = the horizon tiles cut by ring 1 too. A failed compile answers null (the caller draws nothing then).
     farProgram(name) {
@@ -370,8 +450,10 @@
     }
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
+      const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre, texLite: their own program defines)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.texLite !== prevT) this.buildPrograms();
+      if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
       this.resize(full || this.q.scale !== prevScale);
@@ -774,6 +856,7 @@
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
       if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
+      if (p.u.u_lay) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.layTex()); gl.uniform1i(p.u.u_lay, 10); }   // (F10 · texLite)
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {
@@ -1767,7 +1850,7 @@
     refrCopy(F, E, vis) {
       const gl = this.gl;
       let col = true, dep = true;
-      if (this.q.postLite) { col = this.waterInView(vis); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }
+      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy/plBloom/plRays false: one part off, for the measurement)
       this.copied = col;
       if (!col && !dep) return;
       const n = this.w * this.h, sb = this.sceneFmt().bytes;
@@ -1776,12 +1859,12 @@
       if (col) { this.fsMark('copyColour', this.w, this.h, n * sb, n * sb); gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST); }
       if (dep) { this.fsMark('copyDepth', this.w, this.h, n * 4, n * 4); gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST); }
     }
-    // the composite's program: the plain one, or with postLite FXAA inside it (FXAA_IN) and the bloom's last upsample read
-    // in it (BLOOM_UP) — compiled on first use
-    compProgram(fxaaIn, bloomUp) {
-      if (!fxaaIn && !bloomUp) return this.P.composite;
-      const k = 'comp' + (fxaaIn ? 'F' : '') + (bloomUp ? 'B' : ''), P = this.P;
-      return P[k] || (P[k] = GL.program(S.FS_VS, S.COMPOSITE_FS, k, [].concat(fxaaIn ? ['FXAA_IN'] : [], bloomUp ? ['BLOOM_UP'] : [])));
+    // the composite's program: the plain one, or with postLite the bloom's last upsample read in it (BLOOM_UP) — compiled on
+    // first use. (FXAA stays a pass of its own: folded into the composite it had to blend HDR samples, and the edges came out
+    // different — ΔE 1.6 at the plaza, plan; blending them as the FXAA pass does costs more texture reads than it saves.)
+    compProgram(bloomUp) {
+      if (!bloomUp) return this.P.composite;
+      return this.P.compB || (this.P.compB = GL.program(S.FS_VS, S.COMPOSITE_FS, 'compB', ['BLOOM_UP']));
     }
     // F10 · postLite: the god rays from a ¼-res sky mask (one pass reads the full-res depth and colour once), then the same
     // 28-step march over the mask
@@ -1859,6 +1942,8 @@
       if (world) {
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
           this.gpuPass(layer === 0 ? 'opaque' : 'cutout');
+          if (layer === 1 && this.zCount) this.zCountPass(near, E, camPos);   // (test hook: test/ipu.mjs)
+          if (layer === 1 && this.q.zPre) { this.gpuPass('zpre'); this.zPrepass(near, E, camPos); this.gpuPass('cutout'); }   // (F10 · zPre)
           gl.useProgram(p.p);
           this.common(p, E);
           this.bindTerrainTextures(p);
@@ -1873,7 +1958,10 @@
           if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
           this.shadowOffUni(p.u);
           if (layer === 1) gl.disable(gl.CULL_FACE);
+          const zp = layer === 1 && this.q.zPre;   // F10 · zPre: the layer's depth is there already — LEQUAL, no depth writes
+          if (zp) gl.depthMask(false);
           this.drawSections(near, layer, p, camPos, this.planes, false);
+          if (zp) gl.depthMask(true);
           if (layer === 0) {
             // mini-voxel pieces: full detail up close, averaged boxes beyond the VX detail distance
             this.vxResidency(vis, camPos);
@@ -2266,7 +2354,7 @@
         }
         p = this.P.up; gl.useProgram(p.p);
         gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-        for (let i = this.bloom.length - 1; i > (lite ? 1 : 0); i--) {   // (postLite: the last one is read in the composite, BLOOM_UP)
+        for (let i = this.bloom.length - 1; i > (lite && this.q.plBloom !== false ? 1 : 0); i--) {   // (postLite: the last one is read in the composite, BLOOM_UP)
           const src = this.bloom[i], dst = this.bloom[i - 1];
           gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb); gl.viewport(0, 0, dst.w, dst.h);
           this.tex(0, src.tex, p.u.u_src); gl.uniform2f(p.u.u_texel, 1 / src.w, 1 / src.h); gl.uniform1f(p.u.u_radius, 1.0);
@@ -2285,7 +2373,7 @@
         if (cw > 0) {
           const sx = (cx / cw) * 0.5 + 0.5, sy = (cy / cw) * 0.5 + 0.5;
           const fade = Math.max(0, 1 - Math.max(Math.abs(sx - 0.5), Math.abs(sy - 0.5)) * 1.6) * Math.min(1, L[1] * 4) * (1 - E.rain);
-          if (fade > 0.02 && lite) { raysOn = true; this.raysLite(sx, sy, fade * (E.sunDir[1] > 0 ? (E.rays !== undefined ? E.rays : 0.55) : 0.2)); }   // (F10 · postLite: from a ¼-res mask)
+          if (fade > 0.02 && lite && this.q.plRays !== false) { raysOn = true; this.raysLite(sx, sy, fade * (E.sunDir[1] > 0 ? (E.rays !== undefined ? E.rays : 0.55) : 0.2)); }   // (F10 · postLite: from a ¼-res mask)
           else if (fade > 0.02) {
             raysOn = true;
             const p = this.P.rays; gl.useProgram(p.p);
@@ -2298,11 +2386,10 @@
           }
         }
       }
-      // composite → ldr (or screen); F10 · postLite: FXAA inside it (FXAA_IN, straight to the screen) and the bloom's last
-      // upsample read in it (BLOOM_UP)
-      const fx = this.q.fxaa && !this.upTex, fin = lite && fx, bUp = lite && useBloom;
-      const p = lite ? this.compProgram(fin, bUp) : this.P.composite; gl.useProgram(p.p);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fx && !fin ? this.ldrFB : null);
+      // composite → ldr (or screen); F10 · postLite: the bloom's last upsample read in it (BLOOM_UP)
+      const fx = this.q.fxaa && !this.upTex, bUp = lite && useBloom && this.q.plBloom !== false;
+      const p = bUp ? this.compProgram(true) : this.P.composite; gl.useProgram(p.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fx ? this.ldrFB : null);
       gl.viewport(0, 0, this.W, this.H);
       this.tex(0, this.upTex || this.sceneCol, p.u.u_scene);
       this.tex(1, useBloom ? this.bloom[0].tex : this.sceneCol, p.u.u_bloom);
@@ -2335,7 +2422,7 @@
       { const b0 = this.bloom[0], b1 = this.bloom[1], nW = this.W * this.H;
         this.fsMark('composite', this.W, this.H, (this.upTex ? nW * 8 : this.w * this.h * sb) + (useBloom ? b0.w * b0.h * sb + (bUp ? b1.w * b1.h * sb : 0) : 0) + (raysOn ? this.raysW * this.raysH * sb : 0), nW * 4); }
       this.fs(p);
-      if (fx && !fin) {
+      if (fx) {
         const q = this.P.fxaa; gl.useProgram(q.p);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, this.W, this.H);
