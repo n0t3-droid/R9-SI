@@ -108,6 +108,47 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🌌 The sky, 🧑 real people, 🌿 the land between, 🚀 a living world, ⚡ Ultra · Leicht (v0.46)
+**🌌 The sky, perfected.** By day the upper half is space — dense stars and a structured nebula (pink, orange, violet
+streaks with dark lanes and lit edges) above a clean blue band and a bright white-cyan haze at the horizon; the sun a
+lilac-blue glow with a small core; the planets lit for the camera with a dark crescent, the giant's ring broad soft
+bands; fewer and thinner clouds, none over the top of the sky. Colour distance of the upper half to the trailer's frames
+8–19 → 3–8 (ΔE); the Very Low sky pass 0.935×.
+
+**🧑 Real people instead of block people.** The villagers' rig measured 3.9 heads tall — the toy look. Adults are 7.25
+heads now, children 5; every part goes through the surface-nets pass at 32 cells a block and the face at 64 — eye
+whites, irises, brows, nose, lips —, gowns, robes, coats, straw hats, hair in tufts, the elder's stoop, a standing
+weight shift. Smooth from Ausgewogen up (within 24 blocks); Very Low and Low keep voxel people with the same proportions
+— and draw forty of them with 222k triangles instead of 376k.
+
+**🌿 The land between (vgen 10).** Everything between the landmarks was empty green plain. Now paths with lanterns,
+benches, milestones and stone arches link all 22 sites; woods cover 29 % with undergrowth, orchards and hedgerows;
+four farms with twelve fields, barns, wells, windmills and pastures with herds; a meandering river with a 33-block
+waterfall and its cave, seven lily ponds, a lighthouse and a fishing pier; a lookout tower, a shrine, fairy rings; deer,
+herd and duck anchors. The horizon tiles draw the woods as canopies. Very Low at the hills 1.008× the triangles.
+
+**🚀 A living world without combat.** Ships land and stay: the apron's craft parks 60–180 s with ramp, crew and a
+service drone, the pad is occupied 90 % of the time and never empty for more than 10 s, no warp flash within 300
+blocks; two hangar shuttles take turns; a ship is in the sky 94–100 % of the time. The Regisseur des Lebens brings one
+of 17 acts every 20–40 s — birds across the sun, a tram, a flyover, pigeons bursting up, the lantern lighter at dusk,
+a balloon over the hills, a meteor at night … — chosen from (seed, slot, place, hour), the same for every player in a
+world. New worlds are Friedlich: no raiders, no bolts.
+
+**🏛 The Weißstadt's splendour.** Relief façades, three-wide arched windows lit warm from inside, a flower box under
+every shop window, signs in the player's language, the apse a white order with a gold band under the dome, white
+clustered arcade piers, honey-oak tie beams with lanterns on chains, pale window heads and a second row of lantern
+spires. The falls' mist is a plume, rim pools cannot spill, Palm Row climbs in half steps.
+
+**⚡ Ultra · Leicht for weak PCs.** Ultra's picture with four switches that spend the GPU where the eye looks: the
+shadow map kept in tiles (dirty tiles only, outer rings on a slower cadence, a sun step rebuilt over four frames —
+full redraws while walking 89 → 9, shadow work −60 %), world generation in step with the frame (a column's arrival
+0.93 → 0.06 ms, no streaming hitch on a 200 m walk), the far cache (steady frames −45…−62 %), the light mirror
+(−46 %); the plaza frame −52 %. The Automatik starts an integrated GPU on it. The pictures are the same (≤ 0.7/255).
+
+**Known gaps.** The nebula is softer than the trailer's finest filaments; the people's arms hang straight and the
+hands are mittens; the windmills' sails do not turn; the hall city costs Very Low 1.9 ms more at the plaza (the
+exterior ornament is drawn through the glass roof); the Ultra · Leicht numbers are from the software renderer.
+
 ### ✦ Form trotz Voxel, a world without hitches, the Weißstadt's splendour, Friedlich (v0.45)
 **✦ Form trotz Voxel.** Any voxel volume becomes a smooth surface (naive surface nets, Laplacian passes clamped to
 ±0.35 voxel, creases at material changes): 196 VM models and 19 VX pieces are drawn smooth; a fine 32-cells-a-block
