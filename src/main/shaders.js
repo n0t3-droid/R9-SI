@@ -2152,19 +2152,6 @@ vec3 tonemap(vec3 x) {
   if (m > 1.0) h = mix(h / m, vec3(1.0), clamp((m - 1.0) * 0.35, 0.0, 1.0)); // very bright: fade toward white gently
   return mix(f, clamp(h, 0.0, 1.0), u_vivid);
 }
-#ifdef BLOOM_UP
-// F10 · postLite: the bloom chain's last upsample read here — bloom[0] (the threshold) plus the tent of bloom[1] around the
-// pixel (UP_FS's nine taps), instead of a half-res pass that blends it into bloom[0] first
-uniform sampler2D u_bloom1;
-uniform vec2 u_bloom1Texel;
-vec3 bloomAt(vec2 uv) {
-  vec2 t = u_bloom1Texel;
-  vec3 c = texture(u_bloom1, uv + vec2(-t.x, 0)).rgb + texture(u_bloom1, uv + vec2(t.x, 0)).rgb + texture(u_bloom1, uv + vec2(0, -t.y)).rgb + texture(u_bloom1, uv + vec2(0, t.y)).rgb;
-  c = c * 2.0 + texture(u_bloom1, uv + vec2(-t.x, -t.y)).rgb + texture(u_bloom1, uv + vec2(t.x, -t.y)).rgb + texture(u_bloom1, uv + vec2(-t.x, t.y)).rgb + texture(u_bloom1, uv + vec2(t.x, t.y)).rgb;
-  c += texture(u_bloom1, uv).rgb * 4.0;
-  return texture(u_bloom, uv).rgb + c / 16.0;
-}
-#endif
 void main() {
   vec2 uv = v_uv;
   if (u_underwaterFx > 0.0) uv += vec2(sin(uv.y * 28.0 + u_time * 2.2), cos(uv.x * 22.0 + u_time * 1.7)) * 0.0022 * u_underwaterFx;
@@ -2181,11 +2168,7 @@ void main() {
     vec3 r = clamp((m + (a + b + d + e) * w) / (1.0 + 4.0 * w), 0.0, 0.996);
     c = r / (1.0 - r);
   } else c = texture(u_scene, uv).rgb;
-#ifdef BLOOM_UP
-  c += bloomAt(uv) * u_bloomStrength;
-#else
   c += texture(u_bloom, uv).rgb * u_bloomStrength;
-#endif
   if (u_useRays > 0.5) c += texture(u_rays, uv).rgb;
   if (u_shafts > 0.0) {
     // light shafts: columns of light from the surface, where the view ray points up toward it, drifting slowly

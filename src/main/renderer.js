@@ -1850,7 +1850,7 @@
     refrCopy(F, E, vis) {
       const gl = this.gl;
       let col = true, dep = true;
-      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy/plBloom/plRays false: one part off, for the measurement)
+      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy / plRays false: one part off, for the measurement)
       this.copied = col;
       if (!col && !dep) return;
       const n = this.w * this.h, sb = this.sceneFmt().bytes;
@@ -1858,13 +1858,6 @@
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
       if (col) { this.fsMark('copyColour', this.w, this.h, n * sb, n * sb); gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST); }
       if (dep) { this.fsMark('copyDepth', this.w, this.h, n * 4, n * 4); gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST); }
-    }
-    // the composite's program: the plain one, or with postLite the bloom's last upsample read in it (BLOOM_UP) — compiled on
-    // first use. (FXAA stays a pass of its own: folded into the composite it had to blend HDR samples, and the edges came out
-    // different — ΔE 1.6 at the plaza, plan; blending them as the FXAA pass does costs more texture reads than it saves.)
-    compProgram(bloomUp) {
-      if (!bloomUp) return this.P.composite;
-      return this.P.compB || (this.P.compB = GL.program(S.FS_VS, S.COMPOSITE_FS, 'compB', ['BLOOM_UP']));
     }
     // F10 · postLite: the god rays from a ¼-res sky mask (one pass reads the full-res depth and colour once), then the same
     // 28-step march over the mask
@@ -2333,7 +2326,7 @@
       const gl = this.gl;
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
       const useBloom = this.q.bloom && this.hdr;
-      const lite = !!this.q.postLite, sb = this.sceneFmt().bytes;   // F10 · postLite (fewer, lighter passes); the scene's bytes a pixel
+      const lite = !!this.q.postLite, sb = this.sceneFmt().bytes;   // F10 · postLite (the rays from a ¼-res mask); the scene's bytes a pixel
       // bloom
       if (useBloom) {
         let p = this.P.bloomPre; gl.useProgram(p.p);
@@ -2354,7 +2347,7 @@
         }
         p = this.P.up; gl.useProgram(p.p);
         gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
-        for (let i = this.bloom.length - 1; i > (lite && this.q.plBloom !== false ? 1 : 0); i--) {   // (postLite: the last one is read in the composite, BLOOM_UP)
+        for (let i = this.bloom.length - 1; i > 0; i--) {
           const src = this.bloom[i], dst = this.bloom[i - 1];
           gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb); gl.viewport(0, 0, dst.w, dst.h);
           this.tex(0, src.tex, p.u.u_src); gl.uniform2f(p.u.u_texel, 1 / src.w, 1 / src.h); gl.uniform1f(p.u.u_radius, 1.0);
@@ -2386,9 +2379,11 @@
           }
         }
       }
-      // composite → ldr (or screen); F10 · postLite: the bloom's last upsample read in it (BLOOM_UP)
-      const fx = this.q.fxaa && !this.upTex, bUp = lite && useBloom && this.q.plBloom !== false;
-      const p = bUp ? this.compProgram(true) : this.P.composite; gl.useProgram(p.p);
+      // composite → ldr (or screen). (F10 · postLite measured two folds and kept neither — FXAA folded in here blended HDR
+      // samples where the FXAA pass blends tonemapped ones: every edge differed, ΔE 1.6 at the plaza; the bloom's last
+      // upsample read here cost nine more texture reads a full-res pixel than the half-res pass it saved: plan, results)
+      const fx = this.q.fxaa && !this.upTex;
+      const p = this.P.composite; gl.useProgram(p.p);
       gl.bindFramebuffer(gl.FRAMEBUFFER, fx ? this.ldrFB : null);
       gl.viewport(0, 0, this.W, this.H);
       this.tex(0, this.upTex || this.sceneCol, p.u.u_scene);
@@ -2418,9 +2413,7 @@
       // sharpen more when the scene was rendered below screen resolution (less after super resolution)
       const up = Math.max(0, 1 - this.w / this.W) * (this.upTex ? 0.5 : 1);
       gl.uniform1f(p.u.u_sharpen, this.q.sharpen === 0 ? 0 : Math.min(1, (this.q.sharpen || 0.35) + up * 1.6));
-      if (bUp) { const b1 = this.bloom[1]; this.tex(3, b1.tex, p.u.u_bloom1); gl.uniform2f(p.u.u_bloom1Texel, 1 / b1.w, 1 / b1.h); }
-      { const b0 = this.bloom[0], b1 = this.bloom[1], nW = this.W * this.H;
-        this.fsMark('composite', this.W, this.H, (this.upTex ? nW * 8 : this.w * this.h * sb) + (useBloom ? b0.w * b0.h * sb + (bUp ? b1.w * b1.h * sb : 0) : 0) + (raysOn ? this.raysW * this.raysH * sb : 0), nW * 4); }
+      { const b0 = this.bloom[0], nW = this.W * this.H; this.fsMark('composite', this.W, this.H, (this.upTex ? nW * 8 : this.w * this.h * sb) + (useBloom ? b0.w * b0.h * sb : 0) + (raysOn ? this.raysW * this.raysH * sb : 0), nW * 4); }
       this.fs(p);
       if (fx) {
         const q = this.P.fxaa; gl.useProgram(q.p);

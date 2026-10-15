@@ -14,7 +14,7 @@
 //   pictures test/shots/ipu_<scene>_<preset>_<config>_<TAG>.png, the difference maps ipu_<…>_diff_<TAG>.png — LOOK at them
 // usage: bash test/wt_run.sh ipu.mjs 3000 · SCENES=hall,plaza,lake PRESETS=high,ultraLite,potato CONFIGS=off,hdrLite,…,all
 //   N=3 timed frames · DIST=file:///…/index.html (another build) TAG=before · MODE=quick (the plaza, High, off/hdrLite/all)
-//   BIG=1 the texLite pictures also at 1920 × 1080 (a second page)
+//   VIEW=1920x1080 the page at 1080p (texLite: the far mip bias and the skipped material read judged where it shows most)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import fs from 'fs';
@@ -76,7 +76,8 @@ const openPage = async (vw, vh) => {
   await page.goto(DIST);
   return { page, logs, ctx };
 };
-const { page, logs } = await openPage(1280, 720);
+const [VW, VH] = (process.env.VIEW || '1280x720').split('x').map(Number);   // (VIEW=1920x1080: texLite's pictures at 1080p)
+const { page, logs } = await openPage(VW, VH);
 const wait = (ms) => page.waitForTimeout(ms);
 const ev = (fn, arg) => page.evaluate(fn, arg);
 
@@ -140,6 +141,28 @@ const place = async (x, z, eye, yaw, pitch, max = 400) => {
   if (!ok0 || !ok1) console.log(`  (not settled: ${ok0} ${ok1} — ${JSON.stringify(lastSettle)})`);
   return feet;
 };
+// the forest (zPre's scene: the cut-out layer's leaves, grass and flowers fill the view): 63 oaks and birches on the grass
+// east of the lake, short grass and poppies between them — built once into the world (bulkSet), then meshed
+const forest = () => ev(() => {
+  const g = VR.game, w = g.world, R = VR.R, F = VR.F;
+  const st = (n) => { const t = R.byName[n]; return t ? t.defaultState : 0; };
+  const gy = (x, z) => { for (let y = 160; y > 30; y--) { const s = w.getBlock(x, y, z); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return -1; };
+  const list = [], put = (x, y, z, s) => list.push([x, y, z, s]);
+  const tree = (x, z, kind, h) => {
+    const y0 = gy(x, z); if (y0 < 0) return 0;
+    const log = st(kind + '_log'), leaves = st(kind + '_leaves');
+    for (let y = 1; y <= h; y++) put(x, y0 + y, z, log);
+    for (let dy = -2; dy <= 1; dy++) { const r = dy === 1 ? 1 : 2; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) { if (Math.abs(dx) === r && Math.abs(dz) === r && (dy !== -1 || (dx + dz) % 2)) continue; if (dx === 0 && dz === 0 && dy < 1) continue; put(x + dx, y0 + h + dy, z + dz, leaves); } }
+    return 1;
+  };
+  let n = 0;
+  for (let i = 0; i < 9; i++) for (let j = 0; j < 7; j++) n += tree(232 + i * 5 + (j % 2) * 2, 10 + j * 6 + (i % 3), (i + j) % 3 === 0 ? 'birch' : 'oak', 4 + ((i * 7 + j * 3) % 3));
+  const set = new Set(list.map(e => e[0] + ',' + e[1] + ',' + e[2]));
+  for (let x = 226; x < 280; x++) for (let z = 6; z < 54; z++) { if ((x * 7 + z * 13) % 3) continue; const y0 = gy(x, z); if (y0 < 0 || set.has(x + ',' + (y0 + 1) + ',' + z) || w.getBlock(x, y0 + 1, z)) continue; put(x, y0 + 1, z, (x + z) % 11 === 0 ? st('poppy') : st('short_grass')); }
+  w.bulkSet(list, false);
+  return { trees: n, blocks: list.length };
+});
+let forestBuilt = false;
 const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (on) pool.__heldFar = (pool.__heldFar || []).concat(pool.queueFar.splice(0)); else if (pool.__heldFar) { for (const j of pool.__heldFar) pool.queueFar.push(j); pool.__heldFar = null; pool.queueDirty = true; if (pool.pump) pool.pump(); } return pool.queueFar.length + (pool.__heldFar ? pool.__heldFar.length : 0); }, on);
 const setPreset = (p) => ev(([p, rd]) => { const g = VR.game, own = (VR.Game.PRESETS[p] || {}).renderDist || rd; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = Math.min(rd, own); g.applySettings('*'); return g.settings.renderDist; }, [p, RD]);
 // a configuration of the switches straight on the renderer (the settings rows are tested in node): all off, one, all
@@ -209,6 +232,7 @@ const CAM = {
   plaza: [3.5, -96.5, 1.62, 0.3, 0.03],
   lake: [220.5, 30.5, { y: 66 }, Math.PI / 2, -0.1],
   sun: [3.5, -96.5, 1.62, 2.74, 0.25],   // (the plaza looking up into the noon sun, 24° high in the south: the god rays on)
+  forest: [224.5, 30.5, 1.62, -Math.PI / 2, -0.05],   // (east through the test's forest: forest())
 };
 const res = { info, scenes: {} };
 const save = () => fs.writeFileSync(`/home/dev/vr/.tmp_tests/ipu_${TAG}.json`, JSON.stringify(res, null, 1));
@@ -221,12 +245,13 @@ for (const sc of SCENES) {
     if (sc === 'sun' && p !== 'high' && !process.env.PRESETS) continue;   // (the rays' scene: High only)
     const rd = await setPreset(p);
     await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
+    if (sc === 'forest' && !forestBuilt) { const f = await forest(); forestBuilt = true; await settle(400); await step(6); console.log(`  forest: ${f.trees} trees, ${f.blocks} blocks set`); }
     if (first) { const held = await holdFar(true); await settle(300); console.log(`  ${sc}: the far ring's ${held} queued jobs held`); first = false; }
     const K = p === 'potato' ? 10 : p === 'ultraLite' ? 8 : 4;   // (Very Low's TSR builds its picture over 8 jittered frames; the far cache takes 4 strips)
     const R = res.scenes[sc][p] = {};
     // (each switch alone, and postLite without its bloom fold, at the plaza on High; the rays' part looking into the sun;
     // elsewhere off and all)
-    const cfs = process.env.CONFIGS || QUICK ? CONFIGS : sc === 'plaza' && p === 'high' ? ['off', 'hdrLite', 'postLite', 'postLite-bloomUp', 'zPre', 'texLite', 'all'] : sc === 'sun' ? ['off', 'postLite', 'postLite-rays', 'all'] : ['off', 'all'];
+    const cfs = process.env.CONFIGS || QUICK ? CONFIGS : sc === 'plaza' && p === 'high' ? ['off', 'hdrLite', 'postLite', 'postLite-bloomUp', 'zPre', 'texLite', 'all'] : sc === 'sun' ? ['off', 'postLite', 'postLite-rays', 'all'] : sc === 'forest' ? ['off', 'zPre', 'texLite', 'all'] : ['off', 'all'];
     for (const cf of cfs) {
       if (!info.ipu && cf !== 'off') continue;   // (an older build: the switches off only)
       const st = info.ipu ? await config(cf) : { fmt: '?', q: 'off' };
