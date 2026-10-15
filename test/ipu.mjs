@@ -166,11 +166,13 @@ let forestBuilt = false;
 const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (on) pool.__heldFar = (pool.__heldFar || []).concat(pool.queueFar.splice(0)); else if (pool.__heldFar) { for (const j of pool.__heldFar) pool.queueFar.push(j); pool.__heldFar = null; pool.queueDirty = true; if (pool.pump) pool.pump(); } return pool.queueFar.length + (pool.__heldFar ? pool.__heldFar.length : 0); }, on);
 const setPreset = (p) => ev(([p, rd]) => { const g = VR.game, own = (VR.Game.PRESETS[p] || {}).renderDist || rd; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = Math.min(rd, own); g.applySettings('*'); return g.settings.renderDist; }, [p, RD]);
 // a configuration of the switches straight on the renderer (the settings rows are tested in node): all off, one, all
-// (postLite-<part>: postLite with one of its parts off — rays, copy — to tell what each part costs)
+// (postLite-<part> / texLite-bias: one part off — the rays' mask, the copy, the far mip bias — to tell what each part does)
+// all: what an integrated GPU gets on this preset (ipu.js defaults: zPre not on Very Low); all-<switch>: that one off
 const config = (c) => ev(([c, SW]) => {
   const r = VR.game.renderer, q = {}, [base, minus] = c.split('-');
-  for (const k of SW) q[k] = base === 'all' || base === k;
-  q.plRays = minus !== 'rays'; q.plCopy = minus !== 'copy';
+  const dflt = VR.IPU && VR.IPU.defaults ? VR.IPU.defaults(VR.game.settings.preset, 'AMD Radeon(TM) Graphics') : {};
+  for (const k of SW) q[k] = base === 'all' ? dflt[k] !== false && k !== minus : base === k;
+  q.plRays = minus !== 'rays'; q.plCopy = minus !== 'copy'; q.tlBias = minus !== 'bias';   // (texLite-bias: the anisotropy alone)
   r.setQuality(q);
   return { fmt: r.stats.sceneFmt, q: SW.filter(k => r.q[k]).join(',') || 'off' };
 }, [c, SW]);
@@ -262,7 +264,7 @@ if (MODE === 'ab') {
       await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
       if (sc === 'forest' && !forestBuilt) { const f = await forest(); forestBuilt = true; await settle(400); await step(6); console.log(`  forest: ${f.trees} trees, ${f.blocks} blocks set`); }
       if (first) { await holdFar(true); await settle(300); first = false; }
-      const K = p === 'potato' ? 10 : p === 'ultraLite' ? 8 : 4;
+      const K = p === 'potato' ? 9 : p === 'ultraLite' ? 6 : +(process.env.KH || 3);
       for (const [A, B] of pairs) {
         const m = await abRun(sc, p, A, B, K);
         (res.ab[sc] || (res.ab[sc] = {}))[p + ' ' + A + ':' + B] = m;
@@ -285,7 +287,7 @@ for (const sc of MODE === 'ab' ? [] : SCENES) {
     await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
     if (sc === 'forest' && !forestBuilt) { const f = await forest(); forestBuilt = true; await settle(400); await step(6); console.log(`  forest: ${f.trees} trees, ${f.blocks} blocks set`); }
     if (first) { const held = await holdFar(true); await settle(300); console.log(`  ${sc}: the far ring's ${held} queued jobs held`); first = false; }
-    const K = p === 'potato' ? 10 : p === 'ultraLite' ? 8 : 4;   // (Very Low's TSR builds its picture over 8 jittered frames; the far cache takes 4 strips)
+    const K = p === 'potato' ? 9 : p === 'ultraLite' ? 6 : +(process.env.KH || 3);   // (Very Low's TSR builds its picture over 8 jittered frames; the far cache takes 4 strips)
     const R = res.scenes[sc][p] = {};
     // (each switch alone, and postLite without its bloom fold, at the plaza on High; the rays' part looking into the sun;
     // elsewhere off and all)

@@ -52,7 +52,7 @@ console.log('b · an integrated GPU');
   g.settings.texLite = false;
   check(g.ipuDefaults(false) === false && g.settings.texLite === false, 'the next start: a switch turned off by hand stays off');
   g.applyPreset('potato');
-  check(g.settings.preset === 'potato' && all(g.settings, true), 'a preset change: on again — Very Low too (each switch only saves memory traffic)');
+  check(g.settings.preset === 'potato' && SW.every(k => g.settings[k] === (k !== 'zPre')), 'a preset change: on again — Very Low too, but for zPre (its prepass draws the cut-out layer twice)');
   g.applyPreset('high');
   check(all(g.settings, true), 'High: on');
   for (const [name, gpu] of [['a GeForce', RTX], ['SwiftShader', SWS]]) {

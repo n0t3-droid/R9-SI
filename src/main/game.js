@@ -88,7 +88,7 @@
       if (!IPU || !gpu || (!force && S.ipuGpu === gpu)) return false;
       S.ipuGpu = gpu;
       if (!IPU.integrated(gpu)) return false;
-      for (const k of IPU.SW) S[k] = true;
+      Object.assign(S, IPU.defaults(S.preset, gpu));
       return true;
     }
       // F7 · water: bubbles from the mouth while diving, mist at the foot of the falls near the player (the falling

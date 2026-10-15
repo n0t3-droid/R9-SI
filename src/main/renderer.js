@@ -134,7 +134,7 @@
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
-      const tl = this.q.texLite ? ['TEXLITE'] : [];   // (F10 · texLite: the terrain's atlas read lighter far away)
+      const tl = this.q.texLite && this.q.tlBias !== false ? ['TEXLITE'] : [];   // (F10 · texLite: the terrain's atlas read half a mip coarser far away; tlBias false: the anisotropy only, for the measurement)
       P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...tl]));
       P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE', ...tl].concat(this.q.zPre ? ['ZINV'] : [])));   // (F10 · zPre: invariant positions)
       P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE']));
@@ -171,7 +171,7 @@
       const P = this.P;
       if (P.cutZ) return P.cutZ;
       const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);
-      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE'].concat(this.q.texLite ? ['TEXLITE'] : []));
+      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE'].concat(this.q.texLite && this.q.tlBias !== false ? ['TEXLITE'] : []));
       if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
       return (P.cutZ = p);
     }
@@ -430,9 +430,9 @@
     }
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
-      const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre, texLite: their own program defines)
+      const prevZ = !!this.q.zPre, prevT = !!this.q.texLite, prevB = this.q.tlBias !== false;   // (F10 · zPre, texLite: their own program defines)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.texLite !== prevT) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.texLite !== prevT || (this.q.tlBias !== false) !== prevB) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();

@@ -17,10 +17,12 @@
   // phones' Adreno and Mali; a dedicated card — GeForce, Radeon RX / Pro, Arc — is not)
   IPU.integrated = (name) => !!(VR.Bench && VR.Bench.integrated && VR.Bench.integrated(name));
   // the switches' defaults: the preset Ultra · Leicht, or any preset on an integrated GPU (each switch makes the frame
-  // cheaper there and leaves the picture as it was)
+  // cheaper there and leaves the picture as it was) — but zPre not on Very Low: its prepass draws the cut-out layer twice,
+  // which pays only where that layer's shading is heavy (fancy leaves, the material tiers); SwiftShader cannot show its
+  // gain (plan), so Very Low — never slower — keeps one pass
   IPU.defaults = function (preset, gpu) {
     const on = preset === 'ultraLite' || IPU.integrated(gpu), o = {};
-    for (const k of IPU.SW) o[k] = on;
+    for (const k of IPU.SW) o[k] = on && !(k === 'zPre' && preset === 'potato');
     return o;
   };
 
