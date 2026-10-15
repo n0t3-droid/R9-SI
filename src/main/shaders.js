@@ -127,7 +127,8 @@ vec3 nebula(vec3 dir, float dayK) {
   col = mix(col, vec3(dot(col, vec3(0.3, 0.5, 0.2))), 0.22 * dayK);
   vec3 coreDir = normalize(vec3(0.62, 0.42, -0.66));
   float cd = max(0.0, dot(dir, coreDir));
-  float core = (pow(cd, 60.0) * 2.2 + pow(cd, 12.0) * 0.5) * (1.0 - 0.4 * dayK);   // (by day a smaller glare: the planets stay clear)
+  float c2 = cd * cd, c4 = c2 * c2, c8 = c4 * c4, c16 = c8 * c8;   // (cd^60 and cd^12 as products: no pow per pixel)
+  float core = (c16 * c16 * c16 * c8 * c4 * 2.2 + c8 * c4 * 0.5) * (1.0 - 0.4 * dayK);   // (by day a smaller glare: the planets stay clear)
   col += vec3(1.0, 0.78, 0.6) * core;
   // off the band: at night t-sky's thin wisps; by day (dayK) the veil's clouds over every view's top, sharp-edged so the
   // dark sky shows between them; by day the band too breaks into clouds (the frames' tops: vivid clouds, dark gaps)
@@ -313,12 +314,18 @@ vec3 skyColor(vec3 dir, bool withSun) {
   col = mix(col, u_skyHorizon * vec3(1.16, 1.1, 1.02) + vec3(0.035, 0.04, 0.03) * dayK, zh8 * zh8 * u_skyDay.x * dayK);
   float toSun = max(dot(dir, u_sunDir), 0.0);
   float horizonBand = qh4 * qh;
-  float t7 = pow(toSun, 7.0);
+  float ts2 = toSun * toSun, ts4 = ts2 * ts2, ts8 = ts4 * ts4, ts16 = ts8 * ts8;   // (the sun's powers as products: no pow per pixel)
+  float t7 = ts4 * ts2 * toSun;
   col += u_sunset * (t7 * 1.3 + horizonBand * 0.45) * (0.3 + 0.7 * toSun);
   // t-sky2: by day a glow round the sun over the dark ground of space (the sky near the sun is bright, not navy; within
   // ~25°, so the space beyond stays dark)
   col += u_sunColor * (t7 * t7) * 0.07 * u_skyDay.z * (1.0 - u_rain);
-  col += u_sunColor * pow(toSun, 60.0) * u_skyStops.w * (1.0 - u_rain);   // the sun's halo (t-sky: u_skyStops.w, tighter by day)
+  // t-sky2 · the day aureole: round the sun (within ~60°, under ~50° of elevation) the dark ground of space lifts to a
+  // light blue, so the space that fades toward the sun leaves a lilac-blue halo, not a muddy dark ring; the high sky
+  // above the sun stays the navy space (as the trailer's dusk keeps its top dark over the sun)
+  float aurK = smoothstep(0.5, 0.98, toSun) * (1.0 - smoothstep(0.52, 0.8, h));
+  col = max(col, u_skyMid * (2.0 * aurK * aurK * u_skyDay.z * (1.0 - u_rain)));
+  col += u_sunColor * (ts16 * ts16 * ts16 * ts8 * ts4) * u_skyStops.w * (1.0 - u_rain);   // the sun's halo, toSun^60 (t-sky: u_skyStops.w, tighter by day)
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   if (withSun) {
     float clear = 1.0 - u_rain;
@@ -352,13 +359,13 @@ vec3 skyColor(vec3 dir, bool withSun) {
       mn = moonlet(dir, u_moon3.xyz, u_moon3.w, u_sunDir, 21.9);
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
     }
-    // the sun (t-sky2: a soft glow, as the trailer's — a Gaussian core of about 1.3° where the hard disc was, in a warm
-    // halo of about 4°; only near the sun, the rest of the sky skips it)
+    // the sun (t-sky2: a soft glow, as the trailer's — a Gaussian core of about 1.1° where the hard disc was, in a warm
+    // halo of about 3.5° that is not clipped to a flat disc; only near the sun, the rest of the sky skips it)
     float sd = dot(dir, u_sunDir);
     if (sd > 0.985) {
       float e = 1.0 - sd, sl = dot(u_sunColor, vec3(0.3, 0.59, 0.11));
       vec3 sc = u_sunColor * (max(sl, 0.9) / max(sl, 1e-3));   // the disc stays bright down to the horizon (its light on the land dims, not the disc)
-      col += sc * (u_sunDisc * exp(-e * 4000.0) + vec3(2.6, 2.2, 1.7) * exp(-e * 420.0)) * clear;
+      col += sc * (u_sunDisc * exp(-e * 7000.0) + vec3(1.1, 0.85, 0.55) * exp(-e * 500.0)) * clear;
     }
     float md = dot(dir, u_moonDir);
     if (md > 0.9992) {
@@ -370,7 +377,10 @@ vec3 skyColor(vec3 dir, bool withSun) {
       float crater = 0.78 + 0.22 * vnoise(mp * 4.0 + 10.0);
       col += vec3(0.85, 0.9, 1.0) * 3.2 * crater * mix(0.06, 1.0, lit) * clear * smoothstep(1.0, 0.95, length(mp));
     }
-    col += vec3(0.6, 0.7, 1.0) * pow(max(md, 0.0), 400.0) * 0.4 * clear * u_night;
+    if (u_night > 0.0) {   // the moon's glow, md^400 as products (t-sky2: by day the whole sky skips it — it was multiplied by 0)
+      float m2 = max(md, 0.0); m2 *= m2; float m4 = m2 * m2, m8 = m4 * m4, m16 = m8 * m8, m32 = m16 * m16, m128 = m32 * m32; m128 *= m128;
+      col += vec3(0.6, 0.7, 1.0) * (m128 * m128 * m128 * m16) * 0.4 * clear * u_night;
+    }
     // high cirrus (t-clouds): u_cirrus is 0 on Very Low (t-sky2: and the code is not in its shader). t-sky2: a few thin high wisps (the trailer's) instead of the wide
     // pale streaks — a noise drawn out 14:1 along the wind, cut thin, in a few patches (a slow mask: about a fifth of the
     // sky), at up to half alpha, so the nebula and the stars show through them

@@ -16,6 +16,8 @@
 //    from the blue band (VR.Sky.space), E.skyDay (the haze band, the day weight) and the dusk's space as t-sky had it
 //  - the sun's warm glow is halved by day, the halo tighter by day than at dusk
 //  - rain greys and darkens all three stops; VR.Sky.on = 0 gives t-look's two colours back (the A/B switch)
+//  t-sky2 (continued): by day the aureole lifts the ground round the sun (no dark ring), the high sky over it stays navy,
+//    none at dusk; the god rays by day a tenth at most; the sky's per-pixel powers are products (no pow)
 // usage: node test/sky_stops.js
 globalThis.VR = globalThis.VR || {};
 require('./load_shared.js');
@@ -146,6 +148,31 @@ console.log('== the haze, the glow, the weather, the switch');
   // the switch: t-look's two colours (the day horizon lilac, the zenith violet) and its veil
   S.on = 0; const off = envAt(6000); S.on = 1;
   check(off.horizon[0] > off.horizon[1] && off.zenith[2] > off.zenith[1] * 2 && near(off.skyStops, [0.25, 0.1, 1.0, 0.45]), `VR.Sky.on = 0: t-look's lilac horizon (${off.horizon.map(v => v.toFixed(2)).join(',')}) and violet zenith through the same stops`);
+}
+// t-sky2 (continued): with the sun in the picture (15:00 over the canyon) the space faded toward the sun left a muddy dark
+// ring, and the god rays (every ray samples the sun's core) veiled the whole sky (the top bands L* +6). Now by day an
+// aureole lifts the ground round the sun to a light blue (skyColor: max(col, mid · 2 · aurK² · day · (1 − rain)), mirrored
+// here), the high sky over the sun stays the navy space, and the rays by day are a tenth at most
+console.log('== t-sky2: the day aureole round the sun, the god rays by day, the sky without pow per pixel');
+{
+  const fs = require('fs'), sh = fs.readFileSync(__dirname + '/../src/main/shaders.js', 'utf8');
+  const sc = sh.slice(sh.indexOf('vec3 skyColor('), sh.indexOf('#ifdef HSHADOW'));
+  check(/float aurK = smoothstep\(0\.5, 0\.98, toSun\) \* \(1\.0 - smoothstep\(0\.52, 0\.8, h\)\);/.test(sc) && /col = max\(col, u_skyMid \* \(2\.0 \* aurK \* aurK \* u_skyDay\.z \* \(1\.0 - u_rain\)\)\);/.test(sc), 'skyColor lifts the ground round the sun by day (the aureole, mirrored here)');
+  const aur = (E, c, toSun, h) => { const k = ss(0.5, 0.98, toSun) * (1 - ss(0.52, 0.8, h)), w = 2 * k * k * E.skyDay[2] * (1 - E.rain); return c.map((v, i) => Math.max(v, E.skyMid[i] * w)); };
+  const Lof = (E, c) => SR.lab(display(c, E))[0], rad = (d) => d * Math.PI / 180;
+  const h30 = Math.sin(rad(30)), g = grad(t15, h30), base = Lof(t15, g);
+  const near35 = Lof(t15, aur(t15, g, Math.cos(rad(35)), h30)), far75 = Lof(t15, aur(t15, g, Math.cos(rad(75)), h30));
+  check(near35 >= base + 10 && Math.abs(far75 - base) < 0.5, `by day at 30° of elevation the ground 35° from the sun is lifted (L* ${base.toFixed(0)} → ${near35.toFixed(0)}), 75° from it untouched (${far75.toFixed(0)})`);
+  let mono = true, prev = -1;
+  for (let a = 80; a >= 15; a -= 5) { const L = Lof(t15, aur(t15, g, Math.cos(rad(a)), h30)); if (L < prev - 0.01) mono = false; prev = L; }
+  check(mono, 'by day the ground brightens steadily toward the sun (no dark ring round it)');
+  const h60 = Math.sin(rad(60)), gt = grad(t15, h60);
+  check(Math.abs(Lof(t15, aur(t15, gt, Math.cos(rad(20)), h60)) - Lof(t15, gt)) < 0.5, 'the high sky over the sun (60° of elevation, 20° from it) stays the navy space');
+  const gd = grad(dusk, h30);
+  check(Math.abs(Lof(dusk, aur(dusk, gd, Math.cos(rad(25)), h30)) - Lof(dusk, gd)) < 0.01, 'at dusk no aureole (the dusk keeps its look)');
+  const G = VR.Grade;
+  check(noon.rays <= 0.1 * G.rays + 1e-9 && Math.abs(dusk.rays - G.rays) < 1e-9, `the god rays by day at ${(noon.rays / G.rays * 100).toFixed(0)} % of the grade's (≤ 10 %), full at dusk`);
+  check(!/pow\(toSun|pow\(cd|pow\(max\(md/.test(sh), 'the sun\'s, the nebula core\'s and the moon glow\'s powers are products (no pow per pixel of the sky)');
 }
 console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
 process.exit(fails ? 1 : 0);
