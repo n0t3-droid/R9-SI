@@ -331,7 +331,10 @@
     // (the hip joint a little more than the thigh's half thickness over the seat: the buttocks on it; a child does not
     // reach a café table from its chair — its hands stay in its lap)
     const seat = (o.seat || FA.SEAT) * U, lift = kid ? 1.6 : 3.2, hipH = seat + lift;
-    const table = !kid && o.table && o.table.h > (o.seat || FA.SEAT) + 0.12 ? o.table : null;
+    // (a table whose near edge is beyond a forearm's reach from the seat — two blocks off — is not leant on: the hands stay
+    // on the thighs rather than the arm stretching out to it)
+    const t0 = o.table, near = t0 ? (t0.d || 1) - (t0.r || 0.31) - 0.15 : 9;
+    const table = !kid && t0 && t0.h > (o.seat || FA.SEAT) + 0.12 && near <= 0.62 ? t0 : null;
     const fwd = table ? 0.15 : 0.12, lean = table ? (o.lean || 0.36) : 0.04;
     // the legs: the feet on the floor with the knees at some 95° when they reach, else the thighs level and the shins down
     let th, kb;
@@ -371,7 +374,7 @@
       FA.handAim(out, s, toBody(out, [-sx * 0.25, -0.12, -1], [0, 0, 0]), sx * 1.45, out);
     }
     const knee = Math.PI - kb;
-    return { rootY: (hipH - G.hip) * G.bpu, fwd, hipH, knee, th, reach };
+    return { rootY: (hipH - G.hip) * G.bpu, fwd, hipH, knee, th, reach, table: !!table };
   };
   // the weight of a person standing: every 8–12 s it moves from one leg to the other (the free knee bends a little, the
   // pelvis drops on the free side and slides over the standing foot, the chest leans back over it); w −1 … 1

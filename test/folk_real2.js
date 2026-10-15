@@ -424,6 +424,9 @@ console.log('§6 sitting');
       }
     }
   }
+  // a table two blocks off is not leant on (its edge beyond a forearm's reach): the hands stay on the thighs
+  { const G = Folk.gaitFor(crafter), far = FA.sitPose(G, { seat: 0.49, table: { d: 2, h: 0.75, r: 0.3125 }, side: 'r' }, {}), near = FA.sitPose(G, { seat: 0.49, table: { d: 1, h: 0.75, r: 0.3125 }, side: 'r' }, {});
+    check(near.table && !far.table && far.reach === 0, `a café table one block ahead is leant on, one two blocks ahead is not (${near.table}, ${far.table})`); }
   // a robe's skirt turns forward only half way: the level thighs and the knees would come out through its lap (run 2's café
   // guests in gowns showed them as a dark wedge under the belt) — seated, the robe hides the legs; a coat's tails lie on them
   const hides = [[robe, true], [coat, false], [crafter, false]].map(([L, want]) => [Folk.gaitFor(L), want]);
