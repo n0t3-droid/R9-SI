@@ -45,6 +45,7 @@
   const HAIR = [0x2A1A12, 0x4A2E1A, 0x7A4A24, 0xB07A3A, 0xE0C888, 0xA83A22, 0x303030, 0x6A4AC0, 0x2A7AB0, 0xD86AA0];
   const PANTS = [0x3A4A6A, 0x5A4A3A, 0x4A4A4A, 0x6A5A8A, 0x2A5A4A, 0x7A6A5A];
   const STYLES_H = ['short', 'long', 'bun', 'pony', 'curly', 'spiky', 'bob', 'braids', 'afro', 'short'];
+  V.DRESS = [0xE86A8A, 0x6AA0E8, 0xF0C050, 0x8ACB6A, 0xB48AE8, 0xF4F0E8];
   V.TRAITS = ['cheerful', 'curious', 'shy', 'dreamy', 'jokester', 'wise', 'kind', 'energetic'];
   V.LIKES = ['stars', 'bread', 'starships', 'flowers', 'crystals', 'music', 'rain', 'books', 'gardening', 'stories'];
 
@@ -69,15 +70,23 @@
   // the Weißstadt's clothes (the hall city, style 'hall'; the owner's reference pictures' palette): robes and coats in
   // white, cream, blue-grey and brown with gold trims for the grown-ups, a shopping bag or a basket in hand, the children
   // in the same colours. Only the clothes change: the proportions stay folkmodel.js's own (never a figure-toy's).
+  // (t-folk: more of the references' townsfolk — belted tunics over trousers, long gowns with a gold sash, a shoulder cape
+  // with its hood down over a tunic; the robes and coats stay the most)
   const WEISS = V.WEISS = {
     robe: [0xF4F0E6, 0xE8DCC0, 0xF2E8D2, 0x7C8CA0, 0x8E6A48], coat: [0xE8DCC0, 0x7C8CA0, 0x5A6A88, 0x7A5A3E, 0x8E6A48, 0xD8C49A, 0xF4F0E6],
+    tunic: [0x8E6A48, 0x7A5A3E, 0xE8DCC0, 0x5A6A88, 0x6E7A5A], gown: [0xF4F0E6, 0x7C8CA0, 0xD8C49A, 0xE8DCC0, 0x9A7A8A],
+    cape: [0x5A6A88, 0x7A5A3E, 0xE8DCC0, 0x3E4A5E, 0x8E6A48],
     pants: [0x4A3A2C, 0x3A3A40, 0x5A4A3A, 0x2E3440], kid: [0xF4F0E6, 0x7C8CA0, 0xE8DCC0, 0x8E6A48, 0x5A6A88, 0xD8C49A], trim: 0xD8B048,
   };
+  V.GARBS = ['robe', 'coat', 'tunic', 'gown', 'cape'];
   const weiss = (L, r, R0, age) => {
+    L.town = 'hall';
     if (age === 'child') { L.shirt = WEISS.kid[r(17) % WEISS.kid.length]; L.pants = WEISS.pants[r(18) % WEISS.pants.length]; return L; }
-    const k = r(17);
-    L.garb = (k % 5) < 2 || (age === 'elder' && (k & 1)) ? 'robe' : 'coat';
-    L.shirt = (L.garb === 'robe' ? WEISS.robe : WEISS.coat)[r(18) % (L.garb === 'robe' ? WEISS.robe.length : WEISS.coat.length)];
+    const k = r(17), q = k % 10;
+    L.garb = age === 'elder' ? ((k % 5) < 2 || (k & 1) ? 'robe' : q === 9 || q === 3 ? 'cape' : 'coat') : (q === 0 || q === 1 || q === 5) ? 'robe' : (q === 2 || q === 3 || q === 4) ? 'coat' : (q === 6 || q === 7) ? 'tunic' : q === 8 ? 'gown' : 'cape';
+    const pal = L.garb === 'cape' ? WEISS.tunic : WEISS[L.garb];
+    L.shirt = pal[r(18) % pal.length];
+    if (L.garb === 'cape') L.cape = WEISS.cape[r(22) % WEISS.cape.length];
     L.pants = WEISS.pants[r(19) % WEISS.pants.length];
     L.trim = WEISS.trim; L.dress = false;
     // in hand: a shopping bag or a basket (the trades keep their own tools: the baker's bread, the scholar's book)
@@ -94,6 +103,9 @@
     const skin = parentLook && (r(1) & 3) ? parentLook.skin : SKIN[r(1) % SKIN.length];
     let hair = parentLook && (r(2) & 1) ? parentLook.hair : HAIR[r(2) % (r(9) % 7 === 0 ? HAIR.length : 7)];
     if (age === 'elder') hair = (r(2) & 1) ? 0xE8E8E8 : 0xB8B8B8;
+    // (t-folk: hair as brown as the skin read as a bald head on the smooth people — such hair is taken darker; blond on a
+    // fair skin differs in its hue and stays)
+    else if (Math.hypot(((hair >> 16) & 255) - ((skin >> 16) & 255), ((hair >> 8) & 255) - ((skin >> 8) & 255), (hair & 255) - (skin & 255)) < 40) hair = (((((hair >> 16) & 255) * 0.42) | 0) << 16) | (((((hair >> 8) & 255) * 0.42) | 0) << 8) | (((hair & 255) * 0.42) | 0);
     let hs = STYLES_H[r(3) % STYLES_H.length];
     if (age === 'elder' && (r(3) & 3) === 0) hs = 'bald';
     const L = {
@@ -108,14 +120,46 @@
       kidHat: age === 'child' ? [null, null, 'beanie', 'kidcap', 'bow', null][r(11) % 6] : null,
       elderHat: age === 'elder' && (r(12) % 3) === 0 ? 'flat' : null,
       dress: age !== 'elder' && !R0.acc && (r(13) % 4) === 0,
-      dressCol: [0xE86A8A, 0x6AA0E8, 0xF0C050, 0x8ACB6A, 0xB48AE8, 0xF4F0E8][r(14) % 6],
+      dressCol: V.DRESS[r(14) % 6],
       emblem: r(15) % 12,
       lashes: (r(16) & 1) === 1,
     };
     return style === 'hall' && role !== 'hero' ? weiss(L, r, R0, age) : L;
   };
   // (the helmet and the white panels join the key only when a suit has them: the villagers' keys stay as they were)
-  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '') + (L.garb ? ':' + L.garb + ':' + (L.trim | 0) : '');
+  const lookKey = (L) => ['vil2', L.skin, L.hair, L.hs, L.age, L.role, L.shirt, L.pants, L.shoes, L.beard ? 1 : 0, L.freckles ? 1 : 0, L.eye, L.kidHat || '', L.elderHat || '', L.dress ? L.dressCol : 0, L.emblem | 0, L.lashes ? 1 : 0, L.suit2 | 0, L.tool || ''].join(':') + (L.helm ? ':helm' : '') + (L.suit3 ? ':w' + L.suit3 : '') + (L.garb ? ':' + L.garb + ':' + (L.trim | 0) : '') + (L.cape ? ':c' + L.cape : '');
+
+  // ---------------------------------------------------------------- t-folk: no two neighbours dressed alike
+  // the clothes of a look (the outfit family, the colours): two people with the same key wear the same clothes
+  V.outfitKey = (L) => [V.familyOf ? V.familyOf(L) : L.role, L.shirt, L.pants, L.dress ? L.dressCol : 0, L.garb || '', L.cape | 0].join(':');
+  // the next colour of the person's own palette (the trade's shirts, the Weißstadt garb's, the children's): n steps on; a
+  // trade with one colour (the baker's white, the healer's) changes its trousers instead
+  V.recolor = function (L, n) {
+    const R0 = ROLES[L.role] || ROLES.farmer;
+    if (L.dress && !L.garb) { const D = V.DRESS; L.dressCol = D[(D.indexOf(L.dressCol) + n + D.length) % D.length]; return L; }
+    const pal = L.garb ? (L.garb === 'cape' ? WEISS.tunic : WEISS[L.garb]) : L.town === 'hall' && L.age === 'child' ? WEISS.kid : R0.shirts;
+    if (L.garb === 'cape' && (n & 1)) { const C = WEISS.cape; L.cape = C[(C.indexOf(L.cape) + 1) % C.length]; return L; }
+    if (pal && pal.length > 1) { const i = pal.indexOf(L.shirt); L.shirt = pal[((i < 0 ? 0 : i) + n) % pal.length]; return L; }
+    const pp = L.town === 'hall' ? WEISS.pants : PANTS; const j = pp.indexOf(L.pants); L.pants = pp[((j < 0 ? 0 : j) + n) % pp.length];
+    return L;
+  };
+  // people in the roster's order (the members of a home, then the next home's): one dressed like one of the `near` before
+  // it is recoloured until it is not (deterministic: the same town dresses the same way every time)
+  V.unlike = function (people, near) {
+    near = near || 3;
+    let changed = 0;
+    for (let i = 1; i < people.length; i++) {
+      const L = people[i].look; if (!L) continue;
+      for (let n = 1; n <= 12; n++) {
+        const k = V.outfitKey(L);
+        let clash = false;
+        for (let j = Math.max(0, i - near); j < i; j++) { const o = people[j].look; if (o && V.outfitKey(o) === k) { clash = true; break; } }
+        if (!clash) break;
+        V.recolor(L, n); if (n === 1) changed++;
+      }
+    }
+    return changed;
+  };
 
   // ---------------------------------------------------------------- heroes (players): armour suits from the trailer
   V.SKIN = SKIN; V.HAIR = HAIR; V.HAIR_STYLES = STYLES_H.slice(0, 9);

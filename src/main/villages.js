@@ -96,6 +96,7 @@
     vil.fams = fams;
     vil.people = [];
     for (const f of fams) for (const m of f.members) vil.people.push(m);
+    if (Folk.unlike) Folk.unlike(vil.people, 3);   // t-folk: no two neighbours dressed alike (villagers.js)
     vil.homes = homes;
   }
 
@@ -1363,15 +1364,23 @@
       const p = ent.beginVox(r, E);
       const t = g.time;
       const C = VR.Crowd, FD = g.folkDist || g.folkBase || 100, cap = C.streetCap(g.settings && g.settings.preset);
+      // t-folk: Echte Menschen (folkgpu.js) — within FG.NEAR blocks the smooth body, once the worker has made it; until
+      // then (and beyond) the voxel self: with the switch on the half-resolution one, so the full voxel model is never
+      // built only to be shown for a moment. A mesh is asked for from FG.ASK blocks, also for the people behind the eye
+      const FG = VR.FolkGPU, smooth = !!(FG && FG.on(g)), N2 = smooth ? FG.NEAR * FG.NEAR : 0;
+      if (smooth && (g.frame & 15) === 0) for (const a of this.agents) { const rec = a.fg || (a.fg = FG.recFor(a.p.look)); if (rec.state === 0) FG.want(g, rec, (a.pos[0] - cam.x) ** 2 + (a.pos[2] - cam.z) ** 2); }
       this.pick(r.planes, cam, cap, FD);
       for (const a of this.agents) {
         if (!a.drawn) continue;
         const d2 = a.d2v, dy = a.pos[1] - cam.y;
         const far = d2 > (FD < 100 ? 16 : 24) * (FD < 100 ? 16 : 24);
+        let rec = null;
+        if (smooth) { rec = a.fg || (a.fg = FG.recFor(a.p.look)); if (rec.state === 0) FG.want(g, rec, d2); }
+        const sm = smooth && d2 < N2 && rec.state === 2;
         // the model is looked up once per agent and LOD (the key is built from the look only once)
-        const mk = far ? 1 : 0;
-        const model = a.mdl && a.mdl[mk] ? a.mdl[mk] : ((a.mdl = a.mdl || [null, null])[mk] = Folk.model(gl, a.p.look, far));
-        if (!model) continue;
+        const mk = far || (smooth && !sm && rec.state !== 3) ? 1 : 0;
+        const model = sm ? null : a.mdl && a.mdl[mk] ? a.mdl[mk] : ((a.mdl = a.mdl || [null, null])[mk] = Folk.model(gl, a.p.look, mk === 1));
+        if (!model && !sm) continue;
         const light = ent.lightAt(a.pos[0], a.pos[1] + 1.2, a.pos[2]);
         // the budget (src/shared/folkcrowd.js): a villager far from the eye is posed every 2nd, 4th or 8th frame; between two its last pose holds
         const pose = (!VR.Crowd || VR.Crowd.due(a, d2) || !a.poseOut) ? this.pose(a, t) : a.poseOut;
@@ -1380,12 +1389,18 @@
         const opts = { flash: a.hurt > 0.2 ? 1 : 0, scale: a.kid ? 0.82 : 1, shade: a.shade, hide: { lids: far || !(a.blinkOn || sleeping || a.eyesClosed), mouth: far || !a.mouthOn } };
         let pos = a.pos;
         if (sleeping) { opts.pitch = Math.PI / 2; pos = [a.pos[0] - VR.HF_DX[a.p.bed ? a.p.bed[3] : 0] * 0.85, a.pos[1] + 0.12, a.pos[2] - VR.HF_DZ[a.p.bed ? a.p.bed[3] : 0] * 0.85]; }
-        else if (a.pose === 'sit') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.2 : 0.3), a.pos[2]];
-        else if (a.pose === 'sitground') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.26 : 0.6), a.pos[2]];
+        // (t-folk: the seat from the rig — the thighs' underside, some four units under the hip joint as they lie, on the
+        // seat's top half a block up; on the ground the same underside on the ground)
+        else if (a.pose === 'sit') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? 0.45 - (G.hip - 4) * G.bpu : -(a.kid ? 0.2 : 0.3)), a.pos[2]]; }
+        else if (a.pose === 'sitground') { const G = a.gait; pos = [a.pos[0], a.pos[1] + (G ? -0.05 - (G.hip - 4) * G.bpu : -(a.kid ? 0.26 : 0.6)), a.pos[2]]; }
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
+        // (t-folk: the person's soft shadow on the ground — deeper in the open sun, faint in the terrain's shade and at night)
+        if (smooth && !sleeping && d2 < FG.SH_D * FG.SH_D) FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
+        if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);
       }
+      if (smooth) { FG.drawShadows(r, E); FG.flush(r, E, cam); }
       if (this.drawBoats) this.drawBoats(r, E, cam);
     }
     // the body pose: FolkAnim clips (crossfaded) under the parametric walk cycle, then the head look-at, blinking and
@@ -1401,7 +1416,11 @@
       if (a.stretchT > 0) { a.stretchT -= dt; state = 'stretch'; }
       if (a.waveT > 0) { a.waveT -= dt; state = 'wave'; }                                                               // wave when the player comes close
       if (a.dance) state = 'dance';
-      const P = FA.pose(a, state, dt, ph, wa, run, a.poseOut || (a.poseOut = {}));
+      // t-folk: a person walks on its own legs (folkanim.js FA.walkPerson: the phase by the distance walked, the step by the
+      // pace and the clothes) and shifts its weight standing; the gait is the look's, kept on the agent
+      const G = a.gait !== undefined ? a.gait : (a.gait = Folk.gaitFor && a.p.look && a.p.look.role !== 'hero' ? Folk.gaitFor(a.p.look) : null);
+      if (G) FA.stride(G, Math.hypot(a.vel[0], a.vel[2]), dt, run);
+      const P = FA.pose(a, state, dt, ph, wa, run, a.poseOut || (a.poseOut = {}), undefined, G);
       // head: look at the target (or the player close by), otherwise glance around now and then
       let hy = 0, hp = 0;
       const pl = this.g.player.pos;
@@ -1419,7 +1438,9 @@
       }
       const k = Math.min(1, dt * 7);
       a.headYaw += (hy - a.headYaw) * k; a.headPitch += (hp - a.headPitch) * k;
-      P.head[0] += a.headPitch + (a.bubble ? Math.sin(t * 7) * 0.04 : 0); P.head[1] += a.headYaw;
+      // (t-folk: the head turns up to 40° toward what the person looks at, the shoulders take the rest — up to 23°)
+      const hyH = G ? Math.max(-0.7, Math.min(0.7, a.headYaw)) : a.headYaw, hyB = G ? Math.max(-0.4, Math.min(0.4, a.headYaw - hyH)) : 0;
+      P.head[0] += a.headPitch + (a.bubble ? Math.sin(t * 7) * 0.04 : 0); P.head[1] += hyH; if (hyB) P.body[1] += hyB;
       // blinking and a talking mouth (the lids and mouth parts hang on the head: no pose of their own)
       a.blinkT = (a.blinkT === undefined ? Math.random() * 4 : a.blinkT) - dt;
       if (a.blinkT < 0) { a.blinkOn = true; if (a.blinkT < -0.14) { a.blinkOn = false; a.blinkT = 2.2 + Math.random() * 4; } }

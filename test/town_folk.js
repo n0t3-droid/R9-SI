@@ -44,13 +44,14 @@ Vs.makeRoster(vil9); Vs.makeRoster(vil8);
 }
 
 console.log('2. the clothes');
-const W = Folk.WEISS, PAL = new Set(W.robe.concat(W.coat));
+// (t-folk: the robes and the coats, and the references' other townsfolk — belted tunics, long gowns, shoulder capes)
+const W = Folk.WEISS, PAL = new Set(W.robe.concat(W.coat, W.tunic || [], W.gown || []));
 {
   const grown = vil9.people.filter(p => p.age !== 'child'), kids = vil9.people.filter(p => p.age === 'child');
   const garbed = grown.filter(p => p.look.garb && p.look.trim === W.trim);
   const inPal = garbed.filter(p => PAL.has(p.look.shirt));
-  const robes = garbed.filter(p => p.look.garb === 'robe').length, coats = garbed.filter(p => p.look.garb === 'coat').length;
-  check(garbed.length === grown.length && inPal.length === garbed.length, `every grown-up wears a robe or a coat in the palette with gold trims (${garbed.length} of ${grown.length}: ${robes} robes, ${coats} coats)`);
+  const n = (g) => garbed.filter(p => p.look.garb === g).length, robes = n('robe'), coats = n('coat');
+  check(garbed.length === grown.length && inPal.length === garbed.length && robes + coats >= garbed.length * 0.5, `every grown-up wears a Weißstadt garb in the palette with gold trims, most a robe or a coat (${garbed.length} of ${grown.length}: ${robes} robes, ${coats} coats, ${n('tunic')} tunics, ${n('gown')} gowns, ${n('cape')} capes)`);
   const carry = grown.filter(p => p.look.tool === 'bag' || p.look.tool === 'basket').length;
   check(carry >= grown.length * 0.3, `shopping bags and baskets in hand (${carry} of ${grown.length})`);
   check(kids.every(p => !p.look.garb && W.kid.includes(p.look.shirt)), `the children in the palette's colours (${kids.length})`);
@@ -78,9 +79,11 @@ console.log('4. the robe, the coat, the bag and the basket');
   const find = (pred) => { for (let s = 1; s < 4000; s++) { const L = Folk.look(s, 'crafter', 'adult', null, 'hall'); if (pred(L)) return L; } return null; };
   const robe = find(L => L.garb === 'robe'), coat = find(L => L.garb === 'coat'), bag = find(L => L.tool === 'bag'), basket = find(L => L.tool === 'basket');
   const lowest = (L, part, col) => { const m = Folk.buildHiRes(L), g = m.parts[part].grid; let lo = 1e9; for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) { const v = g.get(x, y, z); if (v && (col === undefined || (v & 0xffffff) === col)) lo = Math.min(lo, y - g.oy); } return lo; };
-  const robeLo = lowest(robe, 'body'), coatLo = lowest(coat, 'body'), plainLo = lowest(Folk.look(7, 'crafter', 'adult'), 'body');
+  // (t-folk: the clothes below the belt hang on the hips — their own part, pivoted at the hip joint like the body)
+  const cloth = (L, col) => { const m = Folk.buildHiRes(L); return m.parts.hips ? lowest(L, 'hips', col) : lowest(L, 'body', col); };
+  const robeLo = cloth(robe), coatLo = cloth(coat), plainLo = cloth(Folk.look(7, 'crafter', 'adult'));
   check(robeLo < coatLo && coatLo < plainLo, `the robe reaches lower than the coat, the coat lower than a shirt (lowest body voxel ${robeLo}, ${coatLo}, ${plainLo})`);
-  check(lowest(robe, 'body', W.trim) === robeLo, 'the robe has a gold hem');
+  check(cloth(robe, W.trim) === robeLo, 'the robe has a gold hem');
   const hand = (L) => lowest(L, 'fore_r'), handPlain = lowest(Folk.look(7, 'crafter', 'adult', null), 'fore_r');
   check(hand(bag) < handPlain - 6 && hand(basket) < handPlain - 4, `the bag and the basket hang below the right hand (${hand(bag)}, ${hand(basket)} vs the hand ${handPlain})`);
 }
