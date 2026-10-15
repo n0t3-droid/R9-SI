@@ -381,6 +381,8 @@
         pad.crafts.set(q.m, c);
         for (const k of [...pad.crafts.keys()]) if (k < q.m - 2 || k > q.m + 2) pad.crafts.delete(k);
       }
+      // (its design freed meanwhile — the eye away for over a minute, Starships.gc — the craft is built anew)
+      if (!SS.designs.has(c.d.key)) c.d = SS.design(PL.craftSeed(pad.seed, q.m), c.arch, PL.PALS[q.m % 3]);
       c.seen = this.clock; c.q = q;
       const d = c.d; d.last = performance.now();
       const I = c.inst; I.d = d;

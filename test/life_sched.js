@@ -228,6 +228,21 @@ if (HF && HF.sched) {
   const g0 = mkGame('potato', [40, 81, 40]), A0 = new PL.Actor(g0); let crew0 = 0;
   A0.jump('apron', 'crew'); for (let i = 0; i < 400; i++) { A0.update(0.05); crew0 = Math.max(crew0, A0.stats().crewOn); if (i % 10 === 0) { A0.draw(rr, {}, 'opaque', rr.cam); A0.draw(rr, {}, 'trans', rr.cam); } }
   check(calls.drawOne > 0 && crew0 === 0 && calls.model === 0 && calls.trail === 0 && calls.part === 0, `Very Low: the visiting craft only (drawn ${calls.drawOne}; crew ${crew0}, figures ${calls.model}, plumes ${calls.trail}, particles ${calls.part})`);
+  // away for over a minute (the eye beyond the pad's 620 blocks, or the switch off): the starships' gc frees the visitor's
+  // design (Starships.gc: unused for 60 s) — back again, the same visit's craft is built anew and drawn, not left invisible
+  {
+    for (const k in calls) calls[k] = 0;
+    const ge = mkGame('balanced', [40, 81, 40]), AE = new PL.Actor(ge);
+    AE.jump('apron', 'crew'); for (let i = 0; i < 20; i++) AE.update(0.05);
+    const pad = AE.pads.get('apron'), parked = pad && pad.live && pad.live.find(q => q.phase === 'parked'), c = parked && pad.crafts.get(parked.m);
+    const d0 = c && c.d, built0 = calls.design;
+    ge.player.pos = [47 + 900, 81, 62]; for (let i = 0; i < 20; i++) AE.update(0.05);
+    if (d0) { ge.starships.designs.delete(d0.key); d0.gpu = null; }   // (what Starships.gc does to a design unused for 60 s)
+    ge.player.pos = [40, 81, 40]; for (let i = 0; i < 20; i++) AE.update(0.05);
+    for (const k of ['drawOne']) calls[k] = 0; AE.draw(rr, {}, 'opaque', rr.cam);
+    const c1 = pad && pad.crafts.get(parked && parked.m);
+    check(!!c && calls.design > built0 && !!(c1 && c1.d && c1.d.gpu) && calls.drawOne > 0, `back after the design was freed, the parked craft is built anew and drawn (designs built ${calls.design - built0}, drawn ${calls.drawOne})`);
+  }
   // the switch off: nothing
   for (const k in calls) calls[k] = 0;
   const g1 = mkGame('high', [40, 81, 40]); g1.settings.padLife = false; const A1 = new PL.Actor(g1);

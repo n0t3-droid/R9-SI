@@ -210,6 +210,21 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
     for (let i = 0; i < 400 && L && L.lit < L.route.length; i++) A.update(0.05);
     check(before === 'balloon,lanterns' && fig0 && !A.events.some(e => e.kind === 'balloon') && L && !L.fig && L.lit === L.route.length, `Very Low chosen mid-act: the balloon ends, the lamplighter goes and the lamps light by themselves (${before} → ${A.events.map(e => e.kind).join()}, lit ${L && L.lit} of ${L && L.route.length})`);
   }
+  // the place or the hour changes between two slots (run 2 of test/life.mjs: "cat" at the plaza in the morning, then
+  // "cat" again at dusk — each slot's neighbours had been picked for its own context): never the same act twice in a row
+  {
+    const g = mk('high', [0, 81, 14], 0, 9000), A = new LD.Actor(g); A.auto = false; A.update(0.05);
+    const cA = Object.assign(A.context(), { hour: 'morning' }), cB = Object.assign(A.context(), { hour: 'dusk' });
+    let found = 0, twice = 0;
+    for (let k = 1; k < 4000 && found < 12; k++) {
+      if (!LD.pick(A.seed, k - 1, cA) || LD.pick(A.seed, k - 1, cA) !== LD.pick(A.seed, k, cB)) continue;
+      found++; A.history.length = 0;
+      A.ctx = cA; A.slot(k - 1); const a = A.st.pick;
+      A.ctx = cB; A.slot(k); if (A.st.pick && A.st.pick === a) twice++;
+      A.events.length = 0;
+    }
+    check(found > 0 && twice === 0, `the context changes between two slots: never the same act twice in a row (${twice} of ${found} such pairs)`);
+  }
   // the eye goes far away (a flight, a teleport): an act left 200 blocks behind ends (nothing is spent on it any more)
   {
     const g = mk('high', [0, 81, 14], 0, 12600), A = new LD.Actor(g); A.auto = false; A.update(0.05);

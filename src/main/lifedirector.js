@@ -686,7 +686,11 @@
     }
     slot(k) {
       const ctx = this.ctx; if (!ctx) return;
-      const kind = LD.pick(this.seed, k, ctx);
+      let kind = LD.pick(this.seed, k, ctx);
+      // (the place or the hour changed since the last slot — its neighbours were picked for another context: the slot
+      // after the same act stays quiet, so it never comes twice in a row)
+      const last = this.history.length ? this.history[this.history.length - 1] : null;
+      if (kind && last && last[0] === k - 1 && last[1] === kind) kind = null;
       this.st.pick = kind; this.st.slot = k;
       this.history.push([k, kind, ctx.place, ctx.hour]); if (this.history.length > 40) this.history.shift();
       if (!kind || this.events.some(e => e.kind === kind) || this.events.length >= (this.tier >= 2 ? 4 : 2)) return;
