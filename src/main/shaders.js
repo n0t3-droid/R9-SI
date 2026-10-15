@@ -161,8 +161,10 @@ vec3 nebula(vec3 dir, float dayK) {
 }
 // t-sky2 · the planets' light: from the sun's side, the part along the line of sight damped (× 0.3), so a planet seen
 // away from the sun is not a flat full disc but shows a lit side and a soft terminator, and one seen toward it is not a
-// black disc (the trailer's planets: lit from one side, the night side dark, t1_05)
-vec3 bodyLight(vec3 C, vec3 L) { return normalize(L - C * (dot(L, C) * 0.7)); }
+// black disc (the trailer's planets: lit from one side, the night side dark, t1_05). t-sky2, continued: the light leans
+// toward the viewer (− C · 0.25, and a sun behind the planet is turned round), so every view shows the trailer's lit
+// gibbous disc with a dark crescent on the side away from the sun — a planet near the sun was a black disc with a rim
+vec3 bodyLight(vec3 C, vec3 L) { float lc = dot(L, C); return normalize(L - C * (max(lc, 0.0) * 1.15 + min(lc, 0.0) * 0.7 + 0.25)); }
 // the ring's density at a radius (in planet radii), shared by the ring and its shadow on the body (t-sky2, continued: a
 // broad sheet of four or five soft bands, as the trailer's ring — the thin bright lines read as wire hoops)
 float ringDens(float rr) {
