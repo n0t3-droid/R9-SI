@@ -174,7 +174,7 @@ async function runPage(tag, dist) {
         if (has.pad && has.dir) {
           const ab = { off: [], on: [], dOff: [], dOn: [] };
           for (let r = 0; r < 4; r++) for (const mode of ['off', 'on']) {
-            await ev(([m, p]) => { const g = VR.game, s = g.settings; s.padLife = m === 'on'; s.lifeDir = m === 'on'; if (m === 'on' && g.padLife && g.padLife.jump && name === 'hangar') g.padLife.jump('apron', 'crew'); }, [mode, preset]);
+            await ev(([m, nm]) => { const g = VR.game, s = g.settings; s.padLife = m === 'on'; s.lifeDir = m === 'on'; if (m === 'on' && g.padLife && g.padLife.jump && nm === 'hangar') g.padLife.jump('apron', 'crew'); }, [mode, name]);
             await step(6);
             if (mode === 'on') await ev((p) => { const L = VR.game.lifeDirector; if (L && !L.events.length) L.force(p === 'potato' ? 'birds' : 'balloon'); }, preset);
             await step(4);
