@@ -26,18 +26,28 @@
   //         to h2b; halo: the sun's wide glow (tight by day: the trailer's day sky is clean round the sun)
   //   space [from, to, day]: space (stars, nebula) shows through the day sky from dir.y `from` (none) to `to` (all), with
   //         `day` of the night's strength at the top (× the 'Kosmischer Himmel am Tag' setting); at night all of it;
-  //         nebDay: the nebula's brightness by day
+  //         nebDay: the nebula's brightness by day. t-sky2 (the owner, v0.44: "der Himmel ist immer noch nicht
+  //         perfektioniert"): by day the space shows fully above the blue band (the trailer's upper half is deep navy space
+  //         with dense stars and a big nebula); the day stops refitted (scratchpad fit_day.js: the gradient through the
+  //         composite plus the real shader's nebula and stars, Mesa renders) so the band means stay at the frames' while the
+  //         ground between the nebula's clouds is the frames' dark navy; nebDay the strongest that keeps the top bands within
+  //         ΔE ~10 of the frames (its chroma then above theirs); spaceDusk: at dusk and at night t-sky's values (blended by the
+  //         day palette's weight), so the dusk and the night stay as they were
+  //   haze [strength, tightness]: t-sky2 · the white-cyan band right over the horizon by day (the frames: L* ~81 at the
+  //         bottom, test/sky_ref.js haze), (1 − tightness·dir.y)^16 mixed toward the horizon's white; dusk and night [0.6, 1]
   //   fog: the far haze by day — the horizon colour this far toward the middle, so the land's distance haze matches the
   //         sky at the horizon (at dusk and at night t-look's violet veil)
   //   on 0: t-look's two-colour palette through the same three stops (an A/B switch for the look tests)
   const SKY = VR.Sky = Object.assign({
     on: 1,
-    day: { hor: [0.3426, 0.5499, 0.6578], mid: [0.0135, 0.1129, 0.3273], zen: [0.03, 0.0305, 0.0933], stops: [0.416, 0.273, 0.648, 0.2] },
+    day: { hor: [0.3941, 0.6291, 0.7533], mid: [0.0247, 0.0885, 0.2516], zen: [0.0022, 0.0038, 0.0273], stops: [0.3905, 0.3468, 0.5968, 0.2] },
     dusk: { hor: [0.3564, 0.3154, 0.5082], mid: [0.1777, 0.1647, 0.3202], zen: [0.0058, 0.0251, 0.1247], stops: [0.407, 0.499, 0.658, 0.45] },
     night: { hor: [0.03, 0.045, 0.1], mid: [0.014, 0.022, 0.055], zen: [0.006, 0.01, 0.03], stops: [0.3, 0.1, 0.9, 0.45] },
-    space: [0.2, 0.7, 0.9],
-    nebDay: 0.55,          // the nebula's brightness by day (at night 0.9; t-look pushed it to 1.3 on its lilac sky)
+    space: [0.18, 0.42, 1.0],
+    nebDay: 0.8,          // the nebula's brightness by day (at night 0.9; t-look pushed it to 1.3 on its lilac sky)
+    spaceDusk: [0.2, 0.7, 0.9, 0.55],
     fog: 0.3,
+    haze: [0.99, 7.96],
   }, VR.Sky || {});
 
   class Env {
@@ -126,7 +136,8 @@
       // the state of the sky (weather.js): overcast and storms darken the sky, dim the sun, add cloud and wind
       zen = gray(zen, rain * 0.75); hor = gray(hor, rain * 0.7); mid = gray(mid, rain * 0.72);
       zen = zen.map(v => v * (1 - rain * 0.45) * (1 - W.dark * 0.5)); hor = hor.map(v => v * (1 - rain * 0.4) * (1 - W.dark * 0.4)); mid = mid.map(v => v * (1 - rain * 0.42) * (1 - W.dark * 0.45));
-      E.zenith = zen; E.horizon = hor; E.skyMid = mid; E.skyStops = stops; E.skySpace = [SKY.space[0], SKY.space[1], SKY.space[2], SKY.on ? SKY.nebDay : 1.3]; E.sunset = sunset.map(v => v * (1 - rain * 0.8));
+      E.zenith = zen; E.horizon = hor; E.skyMid = mid; E.skyStops = stops; E.skySpace = SKY.on ? [0, 1, 2, 3].map(i => { const d = SKY.spaceDusk[i], v = i < 3 ? SKY.space[i] : SKY.nebDay; return d + (v - d) * wDay; }) : [SKY.space[0], SKY.space[1], SKY.space[2], 1.3];
+      E.skyDay = SKY.on ? [0.6 + (SKY.haze[0] - 0.6) * wDay, 1 + (SKY.haze[1] - 1) * wDay, wDay, 0] : [0.6, 1, 0, 0]; E.sunset = sunset.map(v => v * (1 - rain * 0.8));
       const sunI = M.smoothstep(-0.05, 0.3, sy);
       const warm = (1 - M.smoothstep(0.05, 0.6, sy)) * GRADE.sunWarm;
       E.sunColor = mix3([2.9, 2.72, 2.4], [2.7, 1.3, 0.48], warm).map(v => v * sunI * (1 - rain * 0.7) * W.sun * GRADE.sunK);
@@ -210,7 +221,7 @@
       E.bloomThreshold = GRADE.bloomThr; E.bloomStrength = GRADE.bloomStr + night * 0.04;
       E.contrast = GRADE.contrast; E.vignette = GRADE.vignette; E.nebula = GRADE.nebula; E.sunDisc = GRADE.sunDisc;
       // t-sky: the god rays at 40 % by day (a high sun's rays streak the clean day sky the trailer shows), full round dusk
-      E.rays = GRADE.rays * (SKY.on ? 1 - 0.6 * wDay : 1); E.gridK = GRADE.gridK;
+      E.rays = GRADE.rays * (SKY.on ? 1 - 0.92 * wDay : 1); E.gridK = GRADE.gridK;   // t-sky2: 8 % by day (the frames' day has no rays; with the sun in view every ray sampled its core and veiled the whole sky, L* +6 at the top)
       return E;
     }
     lightning() { this.wx.strike(); }

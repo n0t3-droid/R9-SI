@@ -10,8 +10,14 @@
 //    the luminance falling from a bright horizon (L* > 65) to a dark navy top (L* < 32, blue over red and green)
 //  - at dusk the same against the dusk target; at night the zenith black-navy
 //  - the far haze by day is the horizon's colour (ΔE < 15 through the composite), at dusk t-look's violet veil
+//  t-sky2: by day the gradient is the ground under the space (the nebula and the stars lift its top half; the browser
+//    test measures the whole): the lower bands within ΔE 12 of the day target, the haze over the horizon as the frames'
+//    (its bottom's L* within 2, its width within the frames' range), the top a dark navy under the frames' mean, space
+//    from the blue band (VR.Sky.space), E.skyDay (the haze band, the day weight) and the dusk's space as t-sky had it
 //  - the sun's warm glow is halved by day, the halo tighter by day than at dusk
 //  - rain greys and darkens all three stops; VR.Sky.on = 0 gives t-look's two colours back (the A/B switch)
+//  t-sky2 (continued): by day the aureole lifts the ground round the sun (no dark ring), the high sky over it stays navy,
+//    none at dusk; the god rays by day a tenth at most; the sky's per-pixel powers are products (no pow)
 // usage: node test/sky_stops.js
 globalThis.VR = globalThis.VR || {};
 require('./load_shared.js');
@@ -40,9 +46,9 @@ function display(c, E) {
 function grad(E, dy) {
   const h = Math.max(dy, 0), s = E.skyStops, s1 = ss(0, s[0], h), s2 = ss(s[1], s[2], h);
   let c = [0, 1, 2].map(i => { const a = E.horizon[i] + (E.skyMid[i] - E.horizon[i]) * s1; return a + (E.zenith[i] - a) * s2; });
-  const q = 1 - h, q16 = Math.pow(q, 16), dayK = 1 - E.night;
+  const q = 1 - h, dayK = 1 - E.night, z = E.skyDay || [0.6, 1, 0, 0], zh16 = Math.pow(1 - Math.min(1, h * z[1]), 16);   // t-sky2: the haze band from E.skyDay
   const hb = [E.horizon[0] * 1.16 + 0.035 * dayK, E.horizon[1] * 1.1 + 0.04 * dayK, E.horizon[2] * 1.02 + 0.03 * dayK];
-  return c.map((v, i) => v + (hb[i] - v) * q16 * 0.6 * dayK + E.sunset[i] * Math.pow(q, 5) * 0.45 * 0.3);
+  return c.map((v, i) => v + (hb[i] - v) * zh16 * z[0] * dayK + E.sunset[i] * Math.pow(q, 5) * 0.45 * 0.3);
 }
 const envAt = (tod, o) => { const env = new VR.Env(); env.setTime(tod); env.wx.setSeed(7); env.wx.force((o && o.kind) || 'klar'); for (let i = 0; i < 80; i++) env.update(1, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 10, horizon: 4096, freezeTime: true, freezeWeather: true }); return env.E; };
 // the band heights of the measure: pitch 12°, vertical fov 72° at 360 rows, the horizon line 10 rows above the geometric
@@ -62,6 +68,22 @@ function curve(E) {
   return out;
 }
 const rgb = (c) => c.map(Math.round).join(',');
+// t-sky2: the haze — the L* profile in the measure's 20 slices from the horizon line up, its bottom and where it falls
+// under L* 60 (test/sky_ref.js hazeOf on the frames)
+function haze(E) {
+  const prof = [];
+  for (let s = 0; s < SR.NSLICE; s++) {
+    const ya = Math.round(Hl * (1 - (s + 1) / SR.NSLICE)), yb = Math.round(Hl * (1 - s / SR.NSLICE)); let acc = 0, n = 0;
+    for (let y = ya; y < yb; y++) for (let x = 0; x < 640; x += 64) {
+      const nx = ((x + 32) / 640 * 2 - 1) * t * asp, ny = (1 - (y + 0.5) / 360 * 2) * t;
+      acc += SR.lab(display(grad(E, (Math.sin(P) + Math.cos(P) * ny) / Math.hypot(1, nx, ny)), E))[0]; n++;
+    }
+    prof.push(acc / n);
+  }
+  let width = null;
+  for (let s = 1; s < prof.length; s++) if (prof[s] < SR.HAZE_L) { const a = prof[s - 1], b = prof[s]; width = (s - 0.5 + (a - SR.HAZE_L) / (a - b)) / SR.NSLICE; break; }
+  return { L0: prof[0], width, prof };
+}
 
 console.log('== the palette by the time of day');
 const S = VR.Sky;
@@ -74,19 +96,30 @@ check(near(dusk.horizon, S.dusk.hor, 0.01) && near(dusk.skyMid, S.dusk.mid, 0.01
 check(near(night.zenith, S.night.zen) && near(night.horizon, S.night.hor), '23:00 has the night palette');
 check(!near(t17.horizon, S.day.hor, 0.01) && !near(t17.horizon, S.dusk.hor, 0.01), '17:00 blends the day into the dusk');
 
-console.log('== by day, through the composite, against the trailer\'s day target');
+console.log('== by day, through the composite: the gradient under the space, against the trailer\'s day target');
+const TH = ref.targets.day.haze, HW = Object.values(ref.frames).filter(f => f.kind === 'day' && f.haze && f.haze.width !== null).map(f => f.haze.width);
 for (const [name, E] of [['noon', noon], ['15:00', t15]]) {
   const cv = curve(E), T = ref.targets.day.bands;
   const dE = cv.map((c, k) => SR.dE(SR.lab(c), T[k].lab));
   console.log(`   ${name}: ${cv.map(rgb).join(' | ')}`);
   console.log(`   ΔE ${dE.map(v => v.toFixed(1)).join(' ')}`);
-  check(dE.every(v => v <= 12), `${name}: every band within ΔE 12 of the day target (worst ${Math.max(...dE).toFixed(1)})`);
+  check(dE.slice(0, 4).every(v => v <= 12), `${name}: the lower bands (0–3, under the space) within ΔE 12 of the day target (worst ${Math.max(...dE.slice(0, 4)).toFixed(1)})`);
   const L = cv.map(c => SR.lab(c)[0]);
-  check(L[0] > 65 && L[7] < 32 && L.every((v, k) => k === 0 || v <= L[k - 1] + 1), `${name}: bright at the horizon (L* ${L[0].toFixed(0)}), falling band by band to a dark top (L* ${L[7].toFixed(0)})`);
-  const top = cv[7];
-  check(top[2] > top[0] + 25 && top[2] > top[1] + 20, `${name}: the top is navy (${rgb(top)})`);
+  check(L[0] > 65 && L.every((v, k) => k === 0 || v <= L[k - 1] + 1), `${name}: bright at the horizon (L* ${L[0].toFixed(0)}), falling band by band to the top (L* ${L[7].toFixed(0)})`);
+  const top = cv[7], tl = SR.lab(top);
+  check(tl[0] < T[7].L - 5 && top[2] > top[0] + 15 && top[2] > top[1] + 10, `${name}: the space's ground at the top is a dark navy under the frames' mean (${rgb(top)}, L* ${tl[0].toFixed(0)} vs ${T[7].L}: the nebula and the stars lift it)`);
   const hor = cv[0];
   check(hor[2] >= hor[1] && hor[1] > hor[0] + 20, `${name}: the horizon is white-cyan (${rgb(hor)})`);
+  const hz = haze(E);
+  console.log(`   haze profile ${hz.prof.map(v => v.toFixed(0)).join(' ')}`);
+  check(Math.abs(hz.L0 - TH.L0) <= 2 && hz.width !== null && hz.width >= Math.min(...HW) && hz.width <= Math.max(...HW), `${name}: the haze over the horizon as the frames' (L* ${hz.L0.toFixed(1)} at the bottom vs ${TH.L0}; under L* ${SR.HAZE_L} from ${hz.width && hz.width.toFixed(3)} of the sky's height, the frames ${Math.min(...HW).toFixed(3)}–${Math.max(...HW).toFixed(3)}, median ${TH.width})`);
+}
+{
+  const sp = noon.skySpace, sd = dusk.skySpace;
+  check(sp[0] >= 0.12 && sp[0] <= 0.25 && sp[1] >= 0.35 && sp[1] <= 0.5 && sp[2] === 1, `by day space shows from the blue band: none under dir.y ${sp[0]}, all above ${sp[1]} (all of it: ${sp[2]}); the nebula's day brightness ${sp[3]}`);
+  check(near(sd, [0.2, 0.7, 0.9, 0.55], 1e-6), `at dusk the space as t-sky had it (${sd.join(', ')}): the dusk and the night stay`);
+  const zd = noon.skyDay, zk = dusk.skyDay;
+  check(!!zd && !!zk && zd[2] === 1 && near(zd.slice(0, 2), S.haze) && zk[2] === 0 && near(zk.slice(0, 2), [0.6, 1]), `E.skyDay: by day the haze band ${zd ? zd.slice(0, 2).join(', ') : '—'} and the day weight 1; at dusk t-sky's band (0.6, 1) and 0`);
 }
 console.log('== at dusk and at night');
 {
@@ -115,6 +148,31 @@ console.log('== the haze, the glow, the weather, the switch');
   // the switch: t-look's two colours (the day horizon lilac, the zenith violet) and its veil
   S.on = 0; const off = envAt(6000); S.on = 1;
   check(off.horizon[0] > off.horizon[1] && off.zenith[2] > off.zenith[1] * 2 && near(off.skyStops, [0.25, 0.1, 1.0, 0.45]), `VR.Sky.on = 0: t-look's lilac horizon (${off.horizon.map(v => v.toFixed(2)).join(',')}) and violet zenith through the same stops`);
+}
+// t-sky2 (continued): with the sun in the picture (15:00 over the canyon) the space faded toward the sun left a muddy dark
+// ring, and the god rays (every ray samples the sun's core) veiled the whole sky (the top bands L* +6). Now by day an
+// aureole lifts the ground round the sun to a light blue (skyColor: max(col, mid · 2 · aurK² · day · (1 − rain)), mirrored
+// here), the high sky over the sun stays the navy space, and the rays by day are a tenth at most
+console.log('== t-sky2: the day aureole round the sun, the god rays by day, the sky without pow per pixel');
+{
+  const fs = require('fs'), sh = fs.readFileSync(__dirname + '/../src/main/shaders.js', 'utf8');
+  const sc = sh.slice(sh.indexOf('vec3 skyColor('), sh.indexOf('#ifdef HSHADOW'));
+  check(/float aurK = smoothstep\(0\.5, 0\.98, toSun\) \* \(1\.0 - smoothstep\(0\.52, 0\.8, h\)\);/.test(sc) && /col = max\(col, u_skyMid \* \(2\.0 \* aurK \* aurK \* u_skyDay\.z \* \(1\.0 - u_rain\)\)\);/.test(sc), 'skyColor lifts the ground round the sun by day (the aureole, mirrored here)');
+  const aur = (E, c, toSun, h) => { const k = ss(0.5, 0.98, toSun) * (1 - ss(0.52, 0.8, h)), w = 2 * k * k * E.skyDay[2] * (1 - E.rain); return c.map((v, i) => Math.max(v, E.skyMid[i] * w)); };
+  const Lof = (E, c) => SR.lab(display(c, E))[0], rad = (d) => d * Math.PI / 180;
+  const h30 = Math.sin(rad(30)), g = grad(t15, h30), base = Lof(t15, g);
+  const near35 = Lof(t15, aur(t15, g, Math.cos(rad(35)), h30)), far75 = Lof(t15, aur(t15, g, Math.cos(rad(75)), h30));
+  check(near35 >= base + 10 && Math.abs(far75 - base) < 0.5, `by day at 30° of elevation the ground 35° from the sun is lifted (L* ${base.toFixed(0)} → ${near35.toFixed(0)}), 75° from it untouched (${far75.toFixed(0)})`);
+  let mono = true, prev = -1;
+  for (let a = 80; a >= 15; a -= 5) { const L = Lof(t15, aur(t15, g, Math.cos(rad(a)), h30)); if (L < prev - 0.01) mono = false; prev = L; }
+  check(mono, 'by day the ground brightens steadily toward the sun (no dark ring round it)');
+  const h60 = Math.sin(rad(60)), gt = grad(t15, h60);
+  check(Math.abs(Lof(t15, aur(t15, gt, Math.cos(rad(20)), h60)) - Lof(t15, gt)) < 0.5, 'the high sky over the sun (60° of elevation, 20° from it) stays the navy space');
+  const gd = grad(dusk, h30);
+  check(Math.abs(Lof(dusk, aur(dusk, gd, Math.cos(rad(25)), h30)) - Lof(dusk, gd)) < 0.01, 'at dusk no aureole (the dusk keeps its look)');
+  const G = VR.Grade;
+  check(noon.rays <= 0.1 * G.rays + 1e-9 && Math.abs(dusk.rays - G.rays) < 1e-9, `the god rays by day at ${(noon.rays / G.rays * 100).toFixed(0)} % of the grade's (≤ 10 %), full at dusk`);
+  check(!/pow\(toSun|pow\(cd|pow\(max\(md/.test(sh), 'the sun\'s, the nebula core\'s and the moon glow\'s powers are products (no pow per pixel of the sky)');
 }
 console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
 process.exit(fails ? 1 : 0);
