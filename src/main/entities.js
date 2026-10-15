@@ -536,6 +536,7 @@
       }
       // vehicles
       if (g.gadgets && g.gadgets.drawVehicles) g.gadgets.drawVehicles(r, E, cam, p);
+      if (this.land && this.land.draw) this.land.draw(r, E, cam, p);   // (t-polish) the windmills' sails
       // items & falling blocks (textured meshes)
       this.drawItems(r, E, cam);
     }

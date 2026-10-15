@@ -96,6 +96,13 @@
   // the slots: t_k = 30 k + j, j ∈ [−5, 5] (pure)
   LD.slotTime = (seed, k) => 30 * k + (h(seed, k, 0x51) - 0.5) * 10;
   LD.slotAt = function (seed, t) { let k = Math.floor(t / 30) + 1; while (LD.slotTime(seed, k) > t) k--; return k; };
+  // t-polish · the cart is the streets' regular: by day in a town (a street, a plaza, a hall city) a hover-cart comes on
+  // its own clock besides the acts — cart m at c_m = 34 m + j(seed, m), j ∈ [−3, 3] s → 28–40 s apart, so within 40 s of
+  // arriving one comes (pure: every guest sees the same). It was one act in six of the slots: unseen for minutes.
+  LD.CART_PLACES = ['street', 'plaza', 'hall'];
+  LD.cartTime = (seed, m) => 34 * m + (h(seed, m, 0xca7) - 0.5) * 6;
+  LD.cartAt = function (seed, t) { let m = Math.floor(t / 34) + 1; while (LD.cartTime(seed, m) > t) m--; return m; };
+  LD.cartRegular = (ctx) => !!ctx && LD.CART_PLACES.includes(ctx.place) && LD.allowed('cart', ctx);
   // the act of slot k (null: quiet)
   LD.pick = function (seed, k, ctx) {
     const C = LD.candidates(ctx); if (!C.length) return null;
@@ -293,11 +300,15 @@
   // ---- a hover-cart glides along the street across your view, crates of produce under its awning, a cyan glow beneath
   ACT.cart = {
     start(D, ev) {
-      // across the view (a street seen from its side), else along it (a street you look down: it comes toward you and
-      // passes beside you)
+      // across the view (a street seen from its side) — t-polish: the run cut to the view and 3 m beyond its edges (an uncut
+      // run began 26 m to the side: t-life's picture shot it before it was in the frame), then to the stretch of it the eye
+      // sees, 12 m of it at least (t-polish's browser run 2: across a street looked down, the run went on through the open
+      // shop fronts and behind the palms — in the frame by its place, seen by nobody) — else along it (a street you look
+      // down: it comes toward you, passes beside you and goes on behind you), at ±2.6, at ±1.5 (inside the lamps of a
+      // narrow street), at ±4 m
       const d0 = 11 + 5 * rnd(ev, 1); let run = null, along = false;
-      for (const d of [d0, d0 + 4, d0 - 3, d0 + 8]) if ((run = D.runAcross(d, 18))) break;
-      if (!run) for (const off of [2.6, -2.6, 4, -4]) if ((run = D.runAlong(off, 18))) { along = true; break; }
+      for (const d of [d0, d0 + 4, d0 - 3, d0 + 8]) { const r = D.runAcross(d, 18); if (r && (run = D.seenPart(D.inView(r, d), 12))) break; }
+      if (!run) for (const off of [2.6, -2.6, 1.5, -1.5, 4, -4]) { const r = D.runAlong(off, 14); if (r && (run = D.seenPart(r, 12))) { along = true; break; } }
       if (!run) return false;
       ev.run = along ? run.slice().reverse() : rnd(ev, 2) < 0.5 ? run : run.slice().reverse(); ev.L = 0; ev.sp = 3.2;
       const P = []; for (const p of ev.run) P.push([p[0], p[1] + 0.45, p[2]]); ev.path = LK.path(P);
@@ -566,16 +577,54 @@
       const a = side(-1).reverse(), b = side(1), run = a.concat([[cx, y0, cz]], b);
       return run.length >= min ? run : null;
     }
-    // a walkable run along the view, off to one side by off metres, from 3 to 40 m ahead (≥ min metres): its points, or null
+    // the tangent of half the view's width (the settings' vertical fov, the canvas's aspect)
+    get tanH() { const g = this.g, fov = (g.settings && g.settings.fov) || 70, r = g.renderer, asp = r && r.W && r.H ? r.W / r.H : 16 / 9; return Math.tan(fov * Math.PI / 360) * asp; }
+    // a run across the view dist ahead cut to the view's width and 3 m beyond it (t-polish: an act along it is seen at once)
+    inView(run, dist) {
+      const f = this.fwd, eye = this.eye, sx = -f[1], sz = f[0], lim = dist * this.tanH + 3;
+      return run.filter(p => Math.abs((p[0] - eye[0]) * sx + (p[2] - eye[2]) * sz) <= lim);
+    }
+    // a walkable run along the view, off to one side by off metres, from 3 to 40 m ahead (≥ min metres), and on from there
+    // past the eye to 6 m behind it while it can (t-polish: so what comes along it goes on behind you, not out of sight 3 m
+    // in front of you): its points from behind to ahead, or null
     runAlong(off, min) {
-      const f = this.fwd, eye = this.eye, sx = -f[1], sz = f[0], out = [];
-      let y = this.ground(eye[0] + sx * off + f[0] * 3, eye[2] + sz * off + f[1] * 3, eye[1] - 1.6); if (y === null) return null;
-      for (let k = 3; k <= 40; k++) {
-        const x = eye[0] + sx * off + f[0] * k, z = eye[2] + sz * off + f[1] * k, gy = this.ground(x, z, y);
-        if (gy === null || Math.abs(gy - y) > 1.01 || this.solid(this.get(x, gy + 1, z)) || this.solid(this.get(x + sx * 0.8, gy, z + sz * 0.8)) || this.solid(this.get(x - sx * 0.8, gy, z - sz * 0.8))) break;
-        y = gy; out.push([x, gy, z]);
+      const f = this.fwd, eye = this.eye, sx = -f[1], sz = f[0];
+      const y3 = this.ground(eye[0] + sx * off + f[0] * 3, eye[2] + sz * off + f[1] * 3, eye[1] - 1.6); if (y3 === null) return null;
+      const walk = (k0, k1, dk) => {
+        const out = []; let y = y3;
+        for (let k = k0; dk > 0 ? k <= k1 : k >= k1; k += dk) {
+          const x = eye[0] + sx * off + f[0] * k, z = eye[2] + sz * off + f[1] * k, gy = this.ground(x, z, y);
+          if (gy === null || Math.abs(gy - y) > 1.01 || this.solid(this.get(x, gy + 1, z)) || this.solid(this.get(x + sx * 0.8, gy, z + sz * 0.8)) || this.solid(this.get(x - sx * 0.8, gy, z - sz * 0.8))) break;
+          y = gy; out.push([x, gy, z]);
+        }
+        return out;
+      };
+      const ahead = walk(3, 40, 1);
+      return ahead.length >= min ? walk(2, -6, -1).reverse().concat(ahead) : null;
+    }
+    // is a point seen from the eye: nothing solid on the line from the eye to dy over it (a wall, a trunk, a post, glass,
+    // leaves; t-polish: a cart's run "in the frame" ran behind the shop fronts and the palms)
+    seen(p, dy) {
+      const e = this.eye, T = VR.R.T, F = VR.F, M = F.SOLID | F.FULL | F.LEAVES;
+      const dx = p[0] - e[0], dyy = p[1] + (dy === undefined ? 1.2 : dy) - e[1], dz = p[2] - e[2], n = Math.ceil(Math.hypot(dx, dyy, dz) / 0.4);
+      for (let i = 1; i < n - 1; i++) { const t = i / n, b = this.get(e[0] + dx * t, e[1] + dyy * t, e[2] + dz * t); if (b && (T.flags[b] & M) && !(T.flags[b] & F.REPLACE)) return false; }
+      return true;
+    }
+    // the longest stretch of a run the eye sees (passing behind a post or a trunk: up to two points unseen in a row), with
+    // two points more at each end (out from behind what hid it, and behind it again): its points, or null when fewer than
+    // min of them are seen (a cart's upper half, 1.2 m over its ground)
+    seenPart(run, min) {
+      const v = run.map(p => this.seen(p, 1.2));
+      let best = null;
+      for (let i = 0; i < run.length; i++) {
+        if (!v[i]) continue;
+        let last = i, n = 0, gap = 0;
+        for (let j = i; j < run.length; j++) { if (v[j]) { last = j; n++; gap = 0; } else if (++gap > 2) break; }
+        if (!best || n > best.n) best = { a: i, b: last, n };
+        i = last;
       }
-      return out.length >= min ? out : null;
+      if (!best || best.n < min) return null;
+      return run.slice(Math.max(0, best.a - 2), Math.min(run.length, best.b + 3));
     }
     // a wall top in front (1–3 blocks over the ground on your side) the cat can sit and walk on: {path, away}
     wallTop(ev) {
@@ -671,6 +720,10 @@
       const k = LD.slotAt(this.seed, this.clock);
       if (this.lastK === null) this.lastK = k;            // (the first act comes with the next slot)
       else if (k > this.lastK) { this.lastK = k; if (this.auto !== false) this.slot(k); }   // (auto false: only forced acts — a test)
+      // t-polish: the streets' regular — by day in a town a cart on its own clock (28–40 s apart), one at a time
+      const ck = LD.cartAt(this.seed, this.clock);
+      if (this.lastCart === undefined) this.lastCart = ck;
+      else if (ck > this.lastCart) { this.lastCart = ck; if (this.auto !== false && LD.cartRegular(ctx) && !this.events.some(e => e.kind === 'cart')) this.start('cart', { k: 900000 + ck }); }
       const e0 = g.player.pos;
       for (let i = this.events.length - 1; i >= 0; i--) {
         const ev = this.events[i], A = ACT[ev.kind];
