@@ -49,7 +49,8 @@ async function runPage(tag, dist) {
   const wait = (ms) => page.waitForTimeout(ms);
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 16) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
-  const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && i > 2) break; await wait(60); } };
+  // (→ the last state seen and the rounds it took: a place not settled within `max` rounds is logged, not hidden)
+  const settle = async (max = 60) => { let s = null, i = 0; for (; i < max; i++) { await step(10); s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && i > 2) break; await wait(60); } return Object.assign({ rounds: i }, s); };
   const shotPath = (name) => `/home/dev/vr/test/shots/folk_real_${name}_${tag}.png`;
   const warmVx = () => ev(() => {
     const g = VR.game, r = g.renderer, p = g.player; if (!r.vxResidency || !g.world) return -1;
@@ -78,7 +79,8 @@ async function runPage(tag, dist) {
     await settle(40);
     if (typeof feet === 'function') feet = await feet();
     await ev(([x, y, z, yaw, pitch, fov]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; p.vel = [0, 0, 0]; g.settings.fov = fov; g.env.setTime(8000); const e = g.entities; if (e && e.mobs) e.mobs.length = 0; }, [x, feet, z, yaw, pitch, fov]);
-    await settle(50); await step(6);
+    const st = await settle(150); await step(6);
+    console.log(`  settled at (${x.toFixed(1)}, ${feet}, ${z.toFixed(1)}): ${JSON.stringify(st)}`);
     return feet;
   };
   // the staged people: a list of [look, x, z] (the look made in the page from [seed, role, age, style]) put on the ground,
@@ -160,6 +162,15 @@ async function runPage(tag, dist) {
   { const [yaw, pitch] = aim(px, pz, feet1, 1.62, tx, F + 1 + 8, tz); await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]); }
   await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; });
   await wait(1500); await settle(40); await step(30);
+  // (the town's people: the villages are polled every 6 s of game time — a teleport outruns that: poll now, step until the
+  // hall city is active and its people are out, then a second of their day)
+  for (let i = 0; i < 40; i++) {
+    const n = await ev(() => { const V = VR.game.villages; return V ? V.agents.length : -1; }).catch(() => -1);
+    if (n > 0) { console.log(`  P1: ${n} people out after ${i} rounds`); break; }
+    await ev(() => { const V = VR.game.villages; V.siteT = 0; V.siteAt = null; });
+    await step(20); await wait(250);
+  }
+  await step(60);
   let pics = 0, want = 0;
   await part('P1', async () => {
     const w1 = await warmFolk(3, 40);
