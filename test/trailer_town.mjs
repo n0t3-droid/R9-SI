@@ -20,8 +20,8 @@
 // The villagers in view at P1 are counted (the owner: the villages were crowded; with their acts, and who is drawn), and the
 // Very Low cost is measured at P1 (ms per frame, draws and triangles over N frames, broken down into the villagers'
 // simulation, their draw, the world's render and the rest) and at a control camera C0 outside the town looking away from
-// it (swiftshader: compare the two builds of one run, not absolute numbers) — on both pages right after the first visit
-// to P1, before the pictures (the same point of each page's history), five rounds after an idle spell.
+// it (swiftshader: compare the two builds of one run, not absolute numbers), five rounds after an idle spell; ONLY=P1
+// gives both pages the same history (MEASURE_EARLY=1: right after the first visit).
 // Checks: every picture written, no page error; on a vgen-9 build the site is a hall city, the hall stands at the
 // cameras (glass in the vault over the street, the fountain at the plaza, lamps along the street), the plaza is bright
 // (sky light through the glass), and the villagers in view at P1 stay within the town's budget.
@@ -178,10 +178,9 @@ async function runPage(tag, dist) {
   // the Very Low (potato) preset at P1: its picture and its frame cost, broken down (the villagers' simulation, their
   // draw, the world's render, the rest), and at a control camera C0 that sees the same land in both builds (outside the
   // town, looking away from it: what the preset costs where nothing of the town is in view)
-  // (continuation 3: the measure runs right after the first visit to P1, before the pictures, on both pages — so both
-  // builds are measured at the same point of the page's history: run 5 measured the before page after 3 pictures and
-  // the build's page after 12 (other cameras' columns loaded, unloaded, collected), and its two P1 numbers swung by ±2 ms
-  // from run 3's with the same geometry ±1 %; five rounds after an idle spell, the median and the minimum)
+  // (continuation 3: five rounds after an idle spell, the median and the minimum. For the same history on both pages run
+  // with ONLY=P1 (both pages take P1, P1_dusk and P1_gold, then measure); MEASURE_EARLY=1 measures right after the first
+  // visit instead — run 6 did, and the villagers' start made it noisier)
   const measure = async () => {
     const rounds = [];
     await step(120);
@@ -233,7 +232,10 @@ async function runPage(tag, dist) {
   // (a first visit to the first camera without a picture: the world, the far ring and the horizon settle there once)
   { const c = await camOf(SHOTS[0]); const f0 = await place(c.x, c.z, c.feet, 0, 0, c.fov, c.tod); const [yaw, pitch] = aim(c, f0); await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]); await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; }); await wait(1500); await settle(40); }
   const only = tag === 'before' && ONLY_BEFORE ? ONLY_BEFORE : ONLY;
-  if (!only || only.includes('P1')) await veryLow();
+  // (run 6 measured right after the first visit: the villagers' start — their spawn, their models — swung its rounds from
+  // 5 to 26 ms and once to 994; the measure runs after the pictures again, and ONLY=P1 gives both pages the same history)
+  const measureEarly = process.env.MEASURE_EARLY === '1';
+  if (measureEarly && (!only || only.includes('P1'))) await veryLow();
   for (const s of SHOTS) {
     if (only && !only.some(o => s[0] === o || s[0].startsWith(o + '_'))) continue;
     want++;
@@ -247,6 +249,7 @@ async function runPage(tag, dist) {
     if (c.name === 'P1' || c.name === 'P1_dusk') { const f = await inView(); console.log(`  villagers at ${c.name}: ${JSON.stringify(f)}`); if (c.name === 'P1') folk[tag] = f; else folkDusk[tag] = f; }
   }
   check(pics === want && want > 0, `${tag}: every picture is written (${pics} of ${want})`);
+  if (!measureEarly && (!only || only.includes('P1'))) await veryLow();
   // the hall at the cameras (a vgen-9 build): glass in the vault over P1, the fountain at the plaza, lamps along the street,
   // and the plaza bright with sky light through the glass
   if (site.hall) {
