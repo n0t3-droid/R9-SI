@@ -360,7 +360,7 @@
           for (let a = H.W0; a <= H.HW; a++) {
             const mid = a === 47;
             let b = AIR;
-            if (mid) b = w === 's' ? (t === 0 ? SG.gold : Math.abs(t) === 1 ? SG.blue : SG.lblue) : ((t === 0 && y < 16) || y === 10 ? CHIS : GLASS);   // (the tracery: a stone cross)
+            if (mid) b = w === 's' ? (t === 0 ? SG.gold : Math.abs(t) === 1 ? SG.lblue : SG.white) : ((t === 0 && y < 16) || y === 10 ? CHIS : GLASS);   // (the tracery: a stone cross; round 3: the head pale — white, light blue, a gold middle)
             P(s * a, F + y, vc + t, b);
           }
         }
@@ -378,7 +378,7 @@
       const vc = 10 * k, win = archWin(2, 24, 28, 2.6);
       for (const s of [-1, 1]) for (let t = -2; t <= 2; t++) for (let y = 24; y <= 30; y++) {
         const w = win(t, y); if (!w) continue;
-        for (let a = H.P0; a <= H.P1; a++) P(s * a, F + y, vc + t, a === 28 ? (w === 's' ? (t === 0 ? SG.rose : SG.gold) : GLASS) : AIR);
+        for (let a = H.P0; a <= H.P1; a++) P(s * a, F + y, vc + t, a === 28 ? (w === 's' ? (t === 0 ? SG.gold : SG.white) : GLASS) : AIR);   // (round 3: a gold middle in a white head)
       }
     }
     // the gates in the long walls: an arched opening seven wide, the gold archivolt
@@ -425,9 +425,11 @@
       if (y > yc && d > 13.4) continue;
       const mull = (u % 4 === 0 && Math.abs(u) <= 12) || y === 14 || (y === 22 && Math.abs(u) <= 13);
       let b;
-      if (y > yc && Math.abs(d - 7) < 0.7) b = SG.magenta;
-      else if (y > yc && d < 2.2) b = SG.amber;
-      else if (y >= yc) { const k = Math.floor(Math.atan2(y - yc, u) / (Math.PI / 8)); b = (k & 1) ? SG.blue : SG.gold; }
+      // (round 3: the head pale like the references' windows — rays of white and light blue, a gold ring and a gold eye; it
+      // was magenta, amber, blue and gold)
+      if (y > yc && Math.abs(d - 7) < 0.7) b = SG.gold;
+      else if (y > yc && d < 2.2) b = SG.gold;
+      else if (y >= yc) { const k = Math.floor(Math.atan2(y - yc, u) / (Math.PI / 8)); b = (k & 1) ? SG.lblue : SG.white; }
       else b = mull ? SMOOTH : (y >= 18 && (Math.abs(u) === 13 || y === 21) ? SG.lblue : GLASS);
       if (mull && y < yc) b = SMOOTH;
       for (let vv = H.V0; vv <= H.V0 + 2; vv++) P(u, F + y, vv, vv === H.V0 + 1 ? b : AIR);
@@ -556,7 +558,7 @@
           let b = AIR;
           if (mid) {
             if (y < yc) b = (Math.abs(u) === 2 || y === 17) ? SMOOTH : (y >= yc - 2 ? SG.lblue : GLASS);
-            else { const a = Math.atan2(y - yc + 0.5, u), kk = Math.floor(a / (Math.PI / 6)); b = hd < 1.3 ? SG.amber : hd > rad - 1.1 ? SG.rose : (kk & 1) ? SG.blue : SG.gold; }
+            else { const a = Math.atan2(y - yc + 0.5, u), kk = Math.floor(a / (Math.PI / 6)); b = hd < 1.3 ? SG.gold : hd > rad - 1.1 ? SG.gold : (kk & 1) ? SG.lblue : SG.white; }   // (round 3: pale rays in a gold ring round a gold eye)
           }
           P(u, F + y, v, b);
         }
@@ -582,7 +584,7 @@
             let b = AIR;
             if (mid) {
               if (y < YC) b = (Math.abs(t) < 0.55 || y === 17) ? SMOOTH : (y >= YC - 2 ? SG.lblue : GLASS);
-              else { const a = Math.atan2(y - YC + 0.5, t), kk = Math.floor(a / (Math.PI / 5)); b = hd < 1.2 ? SG.amber : hd > RAD - 1 ? SG.rose : (kk & 1) ? SG.blue : SG.gold; }
+              else { const a = Math.atan2(y - YC + 0.5, t), kk = Math.floor(a / (Math.PI / 5)); b = hd < 1.2 ? SG.gold : hd > RAD - 1 ? SG.gold : (kk & 1) ? SG.lblue : SG.white; }   // (round 3: pale, as the great window)
             }
             P(u, F + y, v, b);
           }

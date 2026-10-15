@@ -30,6 +30,7 @@
 //  14. round 3: the arcade's piers clustered columns — pillar shafts on every face, a capital under the gold band (P3)
 //  15. round 3: the nave's wooden arches solid honey oak, unbroken across the nave; no thin beams in the vaults (section 10
 //      now checks the half dome's rays clean) (P1 / P2 / P4)
+//  16. round 3: the hall's windows luminous — their stained heads white, light blue and gold, like the references' (P4 / P8 / P2)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -562,6 +563,20 @@ for (const [label, H] of HALLS) {
     check(n >= 10 && arches === n, `a solid wooden arch under every transverse rib, unbroken across the nave (${arches} of ${n}${seen.length ? ': ' + seen.join(', ') : ''})`);
     let thinN = 0; for (let v = Hh.V0 + 3; v <= Hh.V1; v++) for (let u = -26; u <= 26; u++) for (let y = F + 26; y <= F + 41; y++) if (/^vx_beam/.test(atN(u, y, v))) thinN++;
     check(thinN === 0, `no thin beams left under the nave vault (${thinN})`);
+  }
+  // ---------------------------------------------------------------- 16. round 3: the windows' heads pale (P4 / P8 / P2 / P5)
+  console.log(`16. round 3 — the hall's windows luminous and pale (${label})`);
+  {
+    // the references' windows are clear glass under pale heads — white, light blue, a little gold — never deep blue, magenta,
+    // rose or amber: every stained cell of the hall's own windows (walls, clerestory, ends, the apse) one of the pale three
+    const PALE = /^(white|light_blue|yellow)_stained_glass$/, cnt = {};
+    let pale = 0, deep = 0;
+    for (let v = Hh.V0 - 1; v <= Hh.V1 + 31; v++) for (let u = -49; u <= 49; u++) {
+      const inHall = v <= Hh.V1 + 3 ? (Math.abs(u) >= 27 || v <= Hh.V0 + 2) : Math.hypot(u, v - Hh.V1) >= 26.5;   // (the walls, not the town's houses)
+      if (!inHall) continue;
+      for (let y = F + 5; y <= F + 38; y++) { const n = atN(u, y, v); if (!/stained_glass/.test(n)) continue; if (PALE.test(n)) pale++; else { deep++; cnt[n] = (cnt[n] || 0) + 1; } }
+    }
+    check(pale > 300 && deep === 0, `the windows' heads pale — white, light blue and gold (${pale} pale cells, ${deep} deep: ${Object.entries(cnt).map(([k, n]) => k.replace('_stained_glass', '') + ' ' + n).join(', ') || 'none'})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();
