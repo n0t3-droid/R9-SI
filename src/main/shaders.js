@@ -92,8 +92,10 @@ vec3 nebula(vec3 dir, float dayK) {
   float band = exp(-b * b * 7.0);
   vec3 p = dir * 2.6;
 #ifdef LITE
-  // Very Low: no swirl, the hue zones from the gas itself (three noise calls, one fewer than before)
-  vec3 q = p + G * (b * 0.9);
+  // Very Low: no swirl, the hue zones from the gas itself (three noise calls, one fewer than before); the domain turned
+  // once (a fixed rotation, nine multiply-adds), so the value noise's lattice does not lie along the sky's axes — the
+  // clouds drift diagonally instead of standing as soft rectangles
+  vec3 q = mat3(0.8432, 0.4503, -0.2936, -0.2936, 0.8432, 0.4503, 0.4503, -0.2936, 0.8432) * (p + G * (b * 0.9));
   float n1 = fbm3L(q + vec3(0.0, u_time * 0.0015, 0.0));
   float n2 = vnoise3(q * 2.1 + 11.0);
   float hz = n1 * 0.7 + n2 * 0.3;
