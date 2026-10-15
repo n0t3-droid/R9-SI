@@ -181,9 +181,12 @@ const config = (c) => ev(([c, SW]) => {
 // K frames drawn from the same start: the frame counter (the TSR jitter), the history, the clocks — the same picture
 // whatever ran before; then N timed frames (each synced), one instrumented frame, and the picture read back
 // the frames of a measurement, each from the same start: the frame counter (the TSR jitter), the history, the clocks
-const FRAME = `const g = VR.game, r = g.renderer; window.__norender = false; window.__still = true; const frame = () => { g.env.anim = 500; g.last = performance.now() - 33; g.loop(performance.now()); };`;
+// (the eye's adaptation settled first — env.js moves the exposure 5 % a frame towards the light at the eye: in the hall, after
+// an outdoor scene, it was still on its way, and two configurations measured one after the other differed by it. One env
+// step of a second lands it; time and weather stay frozen)
+const FRAME = `const g = VR.game, r = g.renderer; window.__norender = false; window.__still = true; const frame = () => { g.env.anim = 500; g.last = performance.now() - 33; g.loop(performance.now()); }; const eyeSettle = () => { const p = g.player; if (g.envFor && p.eyePos) g.envFor(p.eyePos(), 1, { freezeTime: true, freezeWeather: true }); };`;
 // 1 · K frames to build up the picture (TSR's eight jittered frames on Very Low, the far cache's strips on Ultra · Leicht)
-const warmUp = (K) => ev(new Function('K', FRAME + `r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false; for (let i = 0; i < K; i++) frame(); window.__sync(); window.__norender = true; window.__still = false;`), K);
+const warmUp = (K) => ev(new Function('K', FRAME + `eyeSettle(); r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false; for (let i = 0; i < K; i++) frame(); window.__sync(); window.__norender = true; window.__still = false;`), K);
 // 2 · n timed frames (each synced; the CPU time is taken around this call alone)
 const timed = (K, n) => ev(new Function('a', FRAME + `const out = []; for (let i = 0; i < a[1]; i++) { r.frameNo = 1000 + a[0] - 1; const t0 = performance.now(); frame(); window.__sync(); out.push(performance.now() - t0); } window.__norender = true; window.__still = false; return out;`), [K, n]);
 // 3 · one frame with every pass timed alone and the full-screen passes logged, one frame counting the cut-out layer's
@@ -196,7 +199,7 @@ const detail = (K) => ev(new Function('K', FRAME + `
   out.fsList = (r.stats.fsList || []).map(x => x.name).join(' ');
   r.passLog = false;
   r.zCount = true; r.frameNo = 1000 + K - 1; frame(); out.counts = r.stats.zCount || null; r.zCount = false;
-  r.frameNo = 1000; r.tsrReset = true;
+  eyeSettle(); r.frameNo = 1000; r.tsrReset = true;
   for (let i = 0; i < K; i++) frame();
   const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
