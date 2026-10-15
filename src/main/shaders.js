@@ -613,6 +613,7 @@ uniform sampler2D u_noise;
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt: the toroidal map's offset (0 = the plain map as before)
 in vec4 v_shadow;
 #endif
 uniform ivec3 u_camInt;
@@ -665,10 +666,11 @@ float shadowAt(vec3 N, vec3 L) {
   if (!(sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0)) {
     float t = u_shadowTexel;
     float bias = 0.0006;
-    s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - bias));
-    s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - bias));
+    vec2 su = fract(sc.xy + u_shadowOff);   // (F9: the toroidal map; sc.xy itself when the offset is 0)
+    s = texture(u_shadowMap, vec3(su + vec2(-0.6, -0.6) * t, sc.z - bias));
+    s += texture(u_shadowMap, vec3(su + vec2(0.6, -0.6) * t, sc.z - bias));
+    s += texture(u_shadowMap, vec3(su + vec2(-0.6, 0.6) * t, sc.z - bias));
+    s += texture(u_shadowMap, vec3(su + vec2(0.6, 0.6) * t, sc.z - bias));
     s *= 0.25;
     vec2 edge = smoothstep(vec2(0.0), vec2(0.08), sc.xy) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - sc.xy);
     cover = edge.x * edge.y;
@@ -959,6 +961,7 @@ uniform ivec3 u_camInt;      // (declared for the common block's heightmap shado
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt (0: the plain map)
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
@@ -975,10 +978,11 @@ float propSun() {
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
   if (sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0) return 1.0;
   float t = u_shadowTexel, b = 0.0006;
-  float s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - b));
+  vec2 su = fract(sc.xy + u_shadowOff);   // (F9: the toroidal map)
+  float s = texture(u_shadowMap, vec3(su + vec2(-0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(-0.6, 0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, 0.6) * t, sc.z - b));
   return s * 0.25;
 }
 #endif
@@ -1073,6 +1077,7 @@ uniform float u_blockVar;    // the Klassisch look (VR.LOOK.vary, t-smooth2): th
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt (0: the plain map)
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
@@ -1091,10 +1096,11 @@ float furnSun() {
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
   if (sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0) return 1.0;
   float t = u_shadowTexel, b = 0.0006;
-  float s = texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, -0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(-0.6, 0.6) * t, sc.z - b));
-  s += texture(u_shadowMap, vec3(sc.xy + vec2(0.6, 0.6) * t, sc.z - b));
+  vec2 su = fract(sc.xy + u_shadowOff);   // (F9: the toroidal map)
+  float s = texture(u_shadowMap, vec3(su + vec2(-0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(-0.6, 0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, 0.6) * t, sc.z - b));
   return s * 0.25;
 }
 #endif
@@ -1213,6 +1219,9 @@ uniform float u_underwater;
 uniform float u_blockVar;     // Klassisch: still water reads per block (chunky ripples, a faint seam), glass texels crisp
 uniform sampler2D u_reflTex;  // F7: the planar reflection of the water (renderer.js), valid when u_reflOn > 0.5
 uniform float u_reflOn;
+uniform highp sampler2D u_reflDepth;  // F9 · Spiegelung leicht: the mirror's depth and size (texels) for its edge-aware upsample
+uniform vec2 u_reflSize;
+uniform float u_reflUp;               // 1: the mirror is a quarter size and read edge-aware (0: one bilinear tap as before)
 uniform float u_waterTier;    // 0 Very Low (sky-LUT reflection only, no caustics), 1 and 2: caustics on the floor
 uniform vec2 u_windDir;       // the wind's heading (weather.js), the swell runs with it
 uniform float u_stormK;       // the storm factor of the waves (water_wave.js)
@@ -1224,6 +1233,7 @@ uniform float u_clipNear;
 #ifdef SHADOWS
 uniform highp sampler2DShadow u_shadowMap;
 uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;    // F9 · Schatten-Takt (0: the plain map)
 in vec4 v_shadow;
 #endif
 ${'__COMMON__'}
@@ -1243,10 +1253,24 @@ flat in float v_fade;
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
 float linDepth(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
+// F9 · the quarter-size mirror read edge-aware: of its four texels round the point, the ones on the nearest surface keep
+// their bilinear weight and the ones behind it (more than 8 % deeper) drop out, so a roof's edge against the sky stays a
+// line instead of a smear; one bilinear tap when u_reflUp is 0
+vec3 reflSample(vec2 uv) {
+  if (u_reflUp < 0.5) return texture(u_reflTex, uv).rgb;
+  vec2 t = uv * u_reflSize - 0.5, f = fract(t), b = (floor(t) + 0.5) / u_reflSize, e = 1.0 / u_reflSize;
+  vec2 o1 = b + vec2(e.x, 0.0), o2 = b + vec2(0.0, e.y), o3 = b + e;
+  vec4 d = vec4(linDepth(texture(u_reflDepth, b).r), linDepth(texture(u_reflDepth, o1).r), linDepth(texture(u_reflDepth, o2).r), linDepth(texture(u_reflDepth, o3).r));
+  float dn = min(min(d.x, d.y), min(d.z, d.w));
+  vec4 w = vec4((1.0 - f.x) * (1.0 - f.y), f.x * (1.0 - f.y), (1.0 - f.x) * f.y, f.x * f.y);
+  w *= step(d, vec4(dn * 1.08 + 0.05)) + 1e-4;
+  vec3 c = texture(u_reflTex, b).rgb * w.x + texture(u_reflTex, o1).rgb * w.y + texture(u_reflTex, o2).rgb * w.z + texture(u_reflTex, o3).rgb * w.w;
+  return c / (w.x + w.y + w.z + w.w);
+}
 float shadowAt(vec3 N, vec3 L) {
 #ifdef SHADOWS
   vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
-  if (!(sc.x <= 0.0 || sc.x >= 1.0 || sc.y <= 0.0 || sc.y >= 1.0 || sc.z >= 1.0)) return texture(u_shadowMap, vec3(sc.xy, sc.z - 0.0008));
+  if (!(sc.x <= 0.0 || sc.x >= 1.0 || sc.y <= 0.0 || sc.y >= 1.0 || sc.z >= 1.0)) return texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - 0.0008));
 #endif
 #ifdef HSHADOW
   return hShadow(v_localPos, N, L);
@@ -1420,7 +1444,7 @@ void main() {
     refl = mix(refl, refl * vec3(0.62, 0.84, 1.0) + body * 0.25, 0.4);
     if (u_reflOn > 0.5) {
       // the planar reflection (renderer.js): the mirrored near world and sky, shifted by the slope of the surface
-      vec3 pr = texture(u_reflTex, clamp(suv + n.xz * vec2(0.22, 0.4), 0.001, 0.999)).rgb;
+      vec3 pr = reflSample(clamp(suv + n.xz * vec2(0.22, 0.4), 0.001, 0.999));
       refl = pr * vec3(0.86, 0.94, 1.0) + body * 0.1;
     }
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
@@ -2220,6 +2244,41 @@ uniform sampler2D u_src;
 in vec2 v_uv;
 out vec4 o;
 void main() { o = texture(u_src, v_uv); }`;
+
+  // F9 · Fern-Cache (renderer.js farFrame): the cached sky and far world, reprojected into this frame. The cache was drawn
+  // from an eye a little off this one (≤ 1.5 m, ≤ 6°) with a wider view; a pixel finds its cached texel by the rotation,
+  // then a few fixed-point steps with the cached depth follow the parallax of the move. It writes the colour and the depth
+  // this frame's camera sees there; the near world is drawn live over it with the depth test.
+  S.FAR_COMP_FS = `
+uniform sampler2D u_fcCol;
+uniform highp sampler2D u_fcDepth;
+uniform mat4 u_invVP;       // this frame (camera-relative)
+uniform mat4 u_curVP;
+uniform mat4 u_fcVP;        // the cache (relative to its own eye)
+uniform mat4 u_fcInvVP;
+uniform vec3 u_delta;       // this eye − the cache's eye
+uniform vec2 u_scale;       // the cache's view over the screen's (its overscan)
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec4 pf = u_invVP * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
+  vec3 farP = pf.xyz / pf.w;                         // this pixel's ray at the far plane (now-relative)
+  vec4 c0 = u_fcVP * vec4(farP + u_delta, 1.0);      // seen from the cache's eye
+  vec2 uv = c0.xy / c0.w * 0.5 + 0.5;
+  for (int i = 0; i < 3; i++) {
+    float d = texture(u_fcDepth, uv).r;
+    if (d >= 1.0) break;                              // the sky: its direction is all that counts
+    vec4 xc = u_fcInvVP * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+    vec4 cn = u_curVP * vec4(xc.xyz / xc.w - u_delta, 1.0);
+    uv += (v_uv - (cn.xy / cn.w * 0.5 + 0.5)) / u_scale;   // a step toward this pixel, in the cache's wider texels
+  }
+  float d = texture(u_fcDepth, uv).r;
+  o = texture(u_fcCol, uv);
+  if (d >= 1.0) { gl_FragDepth = 1.0; return; }
+  vec4 xc = u_fcInvVP * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  vec4 cn = u_curVP * vec4(xc.xyz / xc.w - u_delta, 1.0);
+  gl_FragDepth = clamp(cn.z / cn.w * 0.5 + 0.5, 0.0, 1.0);
+}`;
 
   // ------------------------------------------------------------ simple lit mesh (entities, items, hand, falling blocks)
   S.MESH_VS = `

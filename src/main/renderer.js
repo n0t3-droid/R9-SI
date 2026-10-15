@@ -555,6 +555,7 @@
     }
     // a changed section inside the cached shadow map's area: redraw the map next frame
     nearShadow(sec) {
+      if (this.sht) { this.shtMark(sec); return; }   // F9 · Schatten-Takt: only the tiles under it
       const c = this.shadowCam; if (!c || this.shadowDirty) return;
       const R = (this.q.shadowDist || 64) + 24;
       if (Math.abs(sec.ox + 8 - c[0]) < R && Math.abs(sec.oz + 8 - c[2]) < R) this.shadowDirty = true;
@@ -799,7 +800,7 @@
         // a chunk section in its fade-in (s.fade, 0..1) is dithered in by the terrain shader; one not shown yet (0) is
         // skipped: it is invisible and casts no shadow. Sections without a fade (ships, props) are whole.
         const fade = s.fade === undefined ? 1 : s.fade;
-        if (fade <= 0) continue;
+        if (fade <= 0 && !this.shtAll) continue;
         const ox = s.ox - originsFrom[0], oy = s.oy - originsFrom[1], oz = s.oz - originsFrom[2];
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
@@ -880,6 +881,414 @@
       gl.disable(gl.POLYGON_OFFSET_FILL);
       this.stats.shadowDraws = this.stats.draws - draws0;
       return true;
+    }
+
+    // ------------------------------------------------ F9 · Schatten-Takt (q.shadowTakt; the rules: ultralite.js UL.Shadow)
+    // The frame's shadow map. Without the takt: the cached whole map as before (renderShadows; redrawn when the sun steps,
+    // the eye moved 0.18 R or a section near changed). With it the same map (size, reach, texels, filtering) is kept up to
+    // date in tiles: toroidal addressing (the window moves by tiles, only entering tiles are drawn), a changed section
+    // redraws the tiles under it (ring 0 the same frame, ring 1 every 2nd, ring 2 every 4th), a sun step is built in a
+    // second map over UL.Shadow.SLICES frames while the first is read, then the two swap.
+    shadowFrame(world, E, cam) {
+      if (!this.q.shadowTakt || !this.q.shadows || !this.shadowFB || !world || !VR.UL) {
+        if (this.sht) this.shtDrop();
+        const shadowOn = world && (this.frameNo % (this.q.shadowEvery || 1) === 0 || !this.shadowValid) ? this.renderShadows(world, E) : this.shadowValid;
+        this.shadowValid = shadowOn;
+        // a shadow map kept from an earlier frame was made around the old camera position: shift its matrix
+        // by the camera movement so shadows stay glued to the world instead of flickering every other frame
+        if (shadowOn) { const c0 = this.shadowCam, t = mat4.create(); t[12] = cam.x - c0[0]; t[13] = cam.y - c0[1]; t[14] = cam.z - c0[2]; mat4.mul(this.shadowMat, this.shadowBase, t); }
+        return shadowOn;
+      }
+      return this.shtFrame(world, E, cam);
+    }
+    shtFrame(world, E, cam) {
+      const SH = VR.UL.Shadow, sunUp = E.sunDir[1] > 0.02, L0 = sunUp ? E.sunDir : E.moonDir;
+      let st = this.sht;
+      if (L0[1] < 0.06) { if (st) st.front.ok = false; this.shadowValid = false; return false; }   // (the next light starts a fresh map)
+      const sk = SH.sunKey(L0), key = sk.key + (sunUp ? 's' : 'm');
+      if (!st || st.size !== this.shadowSize || st.R !== this.q.shadowDist || st.tex !== this.shadowTex) st = this.shtInit(this.shadowSize, this.q.shadowDist);
+      const f = st.front;
+      st.listAt = -1; st.drawn = 0;
+      const drift = f.ok ? Math.hypot(cam.x - f.P0[0], cam.z - f.P0[2]) + Math.abs(cam.y - f.P0[1]) * 0.5 : 1e9;
+      this.shtBegin();
+      if (!f.ok || drift > SH.REBASE) { if (st.back) this.shtCancelBack(st); this.shtFull(st, f, key, sk.L, world, E, cam); }
+      else {
+        if (f.key !== key && !st.back) this.shtBeginBack(st, key, sk.L, world, cam);
+        if (st.back) this.shtBackSlice(st, world, E, cam);
+        this.shtMove(st, world, E, cam);
+        if (this.frameNo % 4 === 0) this.shtFlips(st, world, cam);
+        this.shtDirty(st, world, E, cam);
+      }
+      this.shtEnd();
+      this.shtLookup(st, cam);
+      this.stats.shadowTiles = st.drawn;
+      this.shadowValid = true;
+      return true;
+    }
+    shtInit(size, R) {
+      const SH = VR.UL.Shadow, N = SH.N;
+      const layer = () => ({ ok: false, key: '', ser: 0, lv: new Float32Array(16), P0: [0, 0, 0], lP0: [0, 0, 0], wc: [0, 0], k: 0, casters: null, changed: null });
+      if (this.shadowFB2 && this.shadowTex2Size !== size) this.shtFreeBack();
+      this.shtWrap(this.shadowTex, true);
+      if (!this.shadowOff) this.shadowOff = [0, 0];
+      return (this.sht = { size, R, T: SH.tile(R), N, ts: size / N, front: layer(), back: null, spare: layer(), dirty: new Uint8Array(N * N), ser: 0, tex: this.shadowTex, list: [], part: [], listAt: -1, drawn: 0, tr: [0, 0, 0, 0], d: [0, 0, 0], due: [] });
+    }
+    shtWrap(tex, on) { const gl = this.gl; if (!tex) return; const m = on ? gl.REPEAT : gl.CLAMP_TO_EDGE; gl.bindTexture(gl.TEXTURE_2D, tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, m); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, m); }
+    shtFreeBack() { const gl = this.gl; if (this.shadowFB2) gl.deleteFramebuffer(this.shadowFB2); if (this.shadowTex2) gl.deleteTexture(this.shadowTex2); this.shadowFB2 = null; this.shadowTex2 = null; this.shadowTex2Size = 0; }
+    ensureShadowBack() {
+      const gl = this.gl, size = this.shadowSize;
+      if (this.shadowFB2 && this.shadowTex2Size === size) return true;
+      this.shtFreeBack();
+      this.shadowTex2 = GL.tex2D(size, size, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.LINEAR, compare: true, wrap: gl.REPEAT });
+      this.shadowFB2 = GL.fbo([], this.shadowTex2);
+      this.shadowTex2Size = size;
+      return !!this.shadowFB2;
+    }
+    // the takt off (or the map gone): the plain map again, the second one freed
+    shtDrop() {
+      this.shtFreeBack();
+      this.shtWrap(this.shadowTex, false);
+      this.sht = null;
+      if (this.shadowOff) { this.shadowOff[0] = 0; this.shadowOff[1] = 0; }
+      this.shadowValid = false;
+    }
+    shtBegin() { const gl = this.gl; gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.CULL_FACE); gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.6, 3.0); }
+    shtEnd() { const gl = this.gl; gl.disable(gl.SCISSOR_TEST); gl.disable(gl.POLYGON_OFFSET_FILL); }
+    // the casters as renderShadows gathers them (every section with a mesh within reach of the eye), once a frame
+    shtList(world, cam) {
+      const st = this.sht;
+      if (st.listAt === this.frameNo) return st.list;
+      const list = st.list; list.length = 0;
+      const rs = Math.ceil(this.q.shadowDist / 16) + 1, pcx = Math.floor(cam.x) >> 4, pcz = Math.floor(cam.z) >> 4;
+      for (let dz = -rs; dz <= rs; dz++) for (let dx = -rs; dx <= rs; dx++) {
+        const c = world.col(pcx + dx, pcz + dz); if (!c) continue;
+        for (let s = 0; s < c.sec.length; s++) { const sec = c.sec[s]; if (sec.hasMesh && (sec.mesh[0] || sec.mesh[1] || sec.mesh[3] || sec.mesh[4])) list.push(sec); }
+      }
+      st.listAt = this.frameNo;
+      return list;
+    }
+    // one rectangle of tiles [ax..bx] × [ay..by] (absolute indices, not across the texels' wrap) of a map: its matrix,
+    // viewport and scissor; cleared when asked; then the casters (culled by its frustum) and, when asked, the props
+    shtRect(st, layer, casters, cam, E, ax, bx, ay, by, clear, props) {
+      const gl = this.gl, SH = VR.UL.Shadow, T = st.T, ts = st.ts, N = st.N, d = st.d;
+      d[0] = cam.x - layer.P0[0]; d[1] = cam.y - layer.P0[1]; d[2] = cam.z - layer.P0[2];
+      SH.tileMatrix(this.shadowMat, layer.lv, d, ax * T - layer.lP0[0], (bx + 1) * T - layer.lP0[0], ay * T - layer.lP0[1], (by + 1) * T - layer.lP0[1]);
+      mat4.frustum(this.shadowPlanes, this.shadowMat);
+      const sx = SH.slot(ax, N) * ts, sy = SH.slot(ay, N) * ts, sw = (bx - ax + 1) * ts, sh = (by - ay + 1) * ts;
+      gl.viewport(sx, sy, sw, sh); gl.enable(gl.SCISSOR_TEST); gl.scissor(sx, sy, sw, sh);
+      if (clear) gl.clear(gl.DEPTH_BUFFER_BIT);
+      const camPos = this.shtCam || (this.shtCam = [0, 0, 0]); camPos[0] = cam.x; camPos[1] = cam.y; camPos[2] = cam.z;
+      this.shtAll = true;   // (casters are drawn whatever their fade: a column fading in casts its shadow at once)
+      const vxSplit = this.splitVx(casters, camPos, 28);
+      for (const [p, l] of [[this.P.shadow, 0], [this.P.shadowCut, 1]]) {
+        gl.useProgram(p.p);
+        gl.uniformMatrix4fv(p.u.u_viewProj, false, this.shadowMat);
+        if (l === 1) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); gl.uniform1i(p.u.u_albedo, 0); }
+        this.drawSections(casters, l, p, camPos, this.shadowPlanes, false);
+        if (l === 0) { this.drawSections(vxSplit.near, 3, p, camPos, this.shadowPlanes, false); this.drawSections(vxSplit.far, 4, p, camPos, this.shadowPlanes, false); }
+      }
+      this.shtAll = false;
+      if (props && (this.q.smoothProps || this.q.smoothFurn)) this.drawProps(E, camPos, true);
+      st.drawn += (bx - ax + 1) * (by - ay + 1);
+    }
+    // a block of tiles of the front map, split where the texels wrap; their dirty marks go
+    shtRange(st, world, E, cam, i0, i1, j0, j1) {
+      const SH = VR.UL.Shadow, gl = this.gl, N = st.N, casters = this.shtList(world, cam);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFB);
+      for (const [ax, bx] of SH.runs(i0, i1, N)) for (const [ay, by] of SH.runs(j0, j1, N)) {
+        this.shtRect(st, st.front, casters, cam, E, ax, bx, ay, by, true, true);
+        for (let j = ay; j <= by; j++) for (let i = ax; i <= bx; i++) st.dirty[SH.slot(j, N) * N + SH.slot(i, N)] = 0;
+      }
+    }
+    // the whole front map, new: the stepped light, the depth origin at the eye, the window around it
+    shtFull(st, f, key, L, world, E, cam) {
+      const SH = VR.UL.Shadow;
+      f.key = key; f.ser = ++st.ser; SH.lightView(f.lv, L);
+      f.P0 = [cam.x, cam.y, cam.z]; f.lP0 = SH.toLight(f.lv, f.P0);
+      f.wc = [SH.center(null, f.lP0[0], st.T), SH.center(null, f.lP0[1], st.T)];
+      f.ok = true; st.dirty.fill(0);
+      const wx = SH.windowTiles(f.wc[0], st.T, st.N), wy = SH.windowTiles(f.wc[1], st.T, st.N);
+      this.shtRange(st, world, E, cam, wx[0], wx[1], wy[0], wy[1]);
+      this.stats.shadowRenders = (this.stats.shadowRenders || 0) + 1;
+    }
+    // a sun step: the next map is begun in the second buffer (cleared; the casters of this moment, a slice a frame)
+    shtBeginBack(st, key, L, world, cam) {
+      const SH = VR.UL.Shadow, gl = this.gl;
+      if (!this.ensureShadowBack()) return;
+      const b = st.back = st.spare; st.spare = null;
+      b.key = key; b.ser = ++st.ser; SH.lightView(b.lv, L);
+      b.P0 = [cam.x, cam.y, cam.z]; b.lP0 = SH.toLight(b.lv, b.P0);
+      b.wc = [SH.center(null, b.lP0[0], st.T), SH.center(null, b.lP0[1], st.T)];
+      b.k = 0; b.casters = this.shtList(world, cam).slice(); b.changed = new Set(); b.ok = false;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFB2); gl.disable(gl.SCISSOR_TEST); gl.viewport(0, 0, st.size, st.size); gl.clear(gl.DEPTH_BUFFER_BIT);
+    }
+    shtCancelBack(st) { const b = st.back; if (!b) return; b.casters = null; b.changed = null; st.spare = b; st.back = null; }
+    shtBackSlice(st, world, E, cam) {
+      const SH = VR.UL.Shadow, gl = this.gl, b = st.back, N = st.N, part = st.part;
+      const [s, e] = SH.slice(b.casters.length, SH.SLICES, b.k);
+      part.length = 0; for (let i = s; i < e; i++) part.push(b.casters[i]);
+      const last = b.k === SH.SLICES - 1;
+      const wx = SH.windowTiles(b.wc[0], st.T, N), wy = SH.windowTiles(b.wc[1], st.T, N);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFB2);
+      for (const [ax, bx] of SH.runs(wx[0], wx[1], N)) for (const [ay, by] of SH.runs(wy[0], wy[1], N)) this.shtRect(st, b, part, cam, E, ax, bx, ay, by, false, last);
+      st.drawn = Math.round(st.drawn / SH.SLICES);   // (a slice of the whole map counts as its share of the tiles)
+      if (++b.k < SH.SLICES) return;
+      // done: the two maps swap; what changed meanwhile is marked on the new one
+      const f = st.front;
+      st.front = b; st.back = null; st.spare = f; f.ok = false; f.casters = null; f.changed = null;
+      let t = this.shadowTex; this.shadowTex = this.shadowTex2; this.shadowTex2 = t;
+      t = this.shadowFB; this.shadowFB = this.shadowFB2; this.shadowFB2 = t;
+      st.tex = this.shadowTex; b.ok = true; st.dirty.fill(0);
+      const ch = b.changed; b.changed = null; b.casters = null;
+      for (const sec of ch) this.shtMark(sec);
+      this.stats.shadowRenders = (this.stats.shadowRenders || 0) + 1;
+    }
+    // the window follows the eye by whole tiles: only the strips that enter are drawn
+    shtMove(st, world, E, cam) {
+      const SH = VR.UL.Shadow, f = st.front, T = st.T, N = st.N;
+      const l = SH.toLight(f.lv, [cam.x, cam.y, cam.z]);
+      const nx = SH.center(f.wc[0], l[0], T), ny = SH.center(f.wc[1], l[1], T);
+      if (nx === f.wc[0] && ny === f.wc[1]) return;
+      const ex = SH.entering(Math.round(f.wc[0] / T), Math.round(nx / T), N), ey = SH.entering(Math.round(f.wc[1] / T), Math.round(ny / T), N);
+      f.wc[0] = nx; f.wc[1] = ny;
+      const wx = SH.windowTiles(nx, T, N), wy = SH.windowTiles(ny, T, N);
+      if (ex === 'all' || ey === 'all') { this.shtRange(st, world, E, cam, wx[0], wx[1], wy[0], wy[1]); return; }
+      if (ex) this.shtRange(st, world, E, cam, ex[0], ex[1], wy[0], wy[1]);
+      if (ey) this.shtRange(st, world, E, cam, wx[0], wx[1], ey[0], ey[1]);
+    }
+    // a section's light-space box under the front map's light (cached until the light steps)
+    shtLB(st, sec) {
+      if (sec.shSer !== st.front.ser) {
+        const e = 0.05;   // (a hair wider: the GPU's float placement never leaves the marked tiles)
+        sec.shLB = VR.UL.Shadow.lightBox(st.front.lv, sec.ox - e, sec.oy - e, sec.oz - e, sec.ox + 16 + e, sec.oy + 16 + e, sec.oz + 16 + e, sec.shLB || [0, 0, 0, 0]);
+        sec.shSer = st.front.ser;
+      }
+      return sec.shLB;
+    }
+    // a changed section: the tiles under it are redrawn (and it is drawn again on the map being built)
+    shtMark(sec) {
+      const st = this.sht, SH = VR.UL.Shadow, f = st.front;
+      if (st.back && st.back.changed) st.back.changed.add(sec);
+      if (!f.ok || sec.ox === undefined) return;
+      const tr = SH.tilesOf(this.shtLB(st, sec), st.T, st.tr);
+      const wx = SH.windowTiles(f.wc[0], st.T, st.N), wy = SH.windowTiles(f.wc[1], st.T, st.N);
+      const i0 = Math.max(tr[0], wx[0]), i1 = Math.min(tr[1], wx[1]), j0 = Math.max(tr[2], wy[0]), j1 = Math.min(tr[3], wy[1]);
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) st.dirty[SH.slot(j, st.N) * st.N + SH.slot(i, st.N)] = 1;
+    }
+    // the detail meshes (VX) and the furniture near the eye cast their full shapes, farther their boxes: a section that
+    // crossed that line (28 blocks) since it was drawn is drawn again
+    shtFlips(st, world, cam) {
+      const list = this.shtList(world, cam), D2 = 28 * 28;
+      for (let i = 0; i < list.length; i++) {
+        const s = list[i];
+        if (!s.mesh[3] && !s.mesh[4] && !s.propN) continue;
+        const dx = s.ox + 8 - cam.x, dy = s.oy + 8 - cam.y, dz = s.oz + 8 - cam.z, near = dx * dx + dy * dy * 0.5 + dz * dz < D2;
+        if (s.shNear === undefined) { s.shNear = near; continue; }
+        if (s.shNear !== near) { s.shNear = near; this.shtMark(s); }
+      }
+    }
+    // the dirty tiles that are due this frame (ring 0 every frame, ring 1 every 2nd, ring 2 every 4th; slower when the
+    // governor asks), nearest rings first, at most MAX_TILES; a row's neighbours merge into one rectangle, rows with the
+    // same span merge too
+    shtDirty(st, world, E, cam) {
+      const SH = VR.UL.Shadow, f = st.front, N = st.N, T = st.T, dirty = st.dirty;
+      let any = false; for (let i = 0; i < dirty.length; i++) if (dirty[i]) { any = true; break; }
+      if (!any) return;
+      const wx = SH.windowTiles(f.wc[0], T, N), wy = SH.windowTiles(f.wc[1], T, N);
+      const l = SH.toLight(f.lv, [cam.x, cam.y, cam.z]), ci = Math.floor(l[0] / T), cj = Math.floor(l[1] / T);
+      const slow = this.q.shadowEvery || 1, due = st.due; due.length = 0;
+      for (let ring = 0; ring <= 2 && due.length < SH.MAX_TILES; ring++) {
+        if (!SH.due(ring, this.frameNo, slow)) continue;
+        for (let tj = wy[0]; tj <= wy[1]; tj++) for (let ti = wx[0]; ti <= wx[1]; ti++) {
+          if (!dirty[SH.slot(tj, N) * N + SH.slot(ti, N)] || SH.ring(ti, tj, ci, cj) !== ring) continue;
+          if (due.length >= SH.MAX_TILES) break;
+          due.push(ti, tj);
+        }
+      }
+      if (!due.length) return;
+      // rows: runs of consecutive tiles within one texel period
+      const rows = [];
+      for (let k = 0; k < due.length; k += 2) rows.push([due[k + 1], due[k], due[k]]);
+      rows.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const spans = [];
+      for (const r of rows) { const s = spans[spans.length - 1]; if (s && s[0] === r[0] && s[2] + 1 === r[1] && Math.floor(r[1] / N) === Math.floor(s[1] / N)) s[2] = r[1]; else spans.push([r[0], r[1], r[1]]); }
+      // rectangles: the same span in the next row (within one period) joins
+      spans.sort((a, b) => a[1] - b[1] || a[2] - b[2] || a[0] - b[0]);
+      const rects = [];
+      for (const s of spans) { const q = rects[rects.length - 1]; if (q && q[0] === s[1] && q[1] === s[2] && q[3] + 1 === s[0] && Math.floor(s[0] / N) === Math.floor(q[2] / N)) q[3] = s[0]; else rects.push([s[1], s[2], s[0], s[0]]); }
+      for (const q of rects) this.shtRange(st, world, E, cam, q[0], q[1], q[2], q[3]);
+    }
+    // the lookup for this frame: the camera-relative matrix and the wrap offset of the front map
+    shtLookup(st, cam) {
+      const SH = VR.UL.Shadow, f = st.front, d = st.d;
+      d[0] = cam.x - f.P0[0]; d[1] = cam.y - f.P0[1]; d[2] = cam.z - f.P0[2];
+      SH.lookupMatrix(this.shadowMat, f.lv, d, [f.wc[0] - f.lP0[0], f.wc[1] - f.lP0[1]], st.R);
+      this.shadowOff[0] = SH.offset(f.wc[0], st.R); this.shadowOff[1] = SH.offset(f.wc[1], st.R);
+    }
+    // the shaders' wrap offset (0 without the takt)
+    shadowOffUni(u) { if (u.u_shadowOff) { const o = this.shadowOff; this.gl.uniform2f(u.u_shadowOff, o ? o[0] : 0, o ? o[1] : 0); } }
+
+    // ------------------------------------------------ F9 · Fern-Cache (q.farCache; the rules: ultralite.js UL.Far)
+    // render() asks here before the sky. null: the frame is drawn as before (the cache is off, not ready, too far off,
+    // or the eye moves faster than a run or turns faster than TURN_FAST). Else the cached sky and far world (the sections
+    // beyond half the render distance, ring 1, the horizon tiles) have been composited into the scene — colour and depth,
+    // reprojected — and the answer lists the near sections render() draws live over them. A new cache is drawn into the
+    // second buffer a vertical strip a frame (UL.Far.SLICES) while this one is shown (or, with none to show, while the
+    // frames draw live), then the two swap: no frame pays for the whole far world.
+    farFrame(F, E, world, vis, camPos) {
+      const FC = VR.UL.Far, cam = F.cam, now = performance.now(), fw = this.camFwd;
+      const st = this.fc || (this.fc = { front: this.fcLayer(), back: null, spare: this.fcLayer(), near: [], speed: 0, turn: 0, last: null });
+      // the eye's speed and turn rate (smoothed): a flight or a quick look round draws everything live (every frame would
+      // begin a new cache, and a cache would be off before it is done)
+      const L = st.last;
+      if (L) { const dt = (now - L[3]) / 1000; if (dt > 0) { const v = Math.hypot(cam.x - L[0], cam.y - L[1], cam.z - L[2]) / dt, om = Math.acos(Math.max(-1, Math.min(1, fw[0] * L[4] + fw[1] * L[5] + fw[2] * L[6]))) / dt; st.speed += (Math.min(500, v) - st.speed) * Math.min(1, dt * 4); st.turn += (Math.min(60, om) - st.turn) * Math.min(1, dt * 8); } }
+      const l = st.last || (st.last = new Float64Array(7)); l[0] = cam.x; l[1] = cam.y; l[2] = cam.z; l[3] = now; l[4] = fw[0]; l[5] = fw[1]; l[6] = fw[2];
+      if (st.speed > FC.FAST) { st.front.ok = false; this.fcCancel(st); this.stats.farCache = 'fast'; return null; }
+      if (st.turn > FC.TURN_FAST) { this.fcCancel(st); this.stats.farCache = 'turning'; return null; }
+      const info = st.info || (st.info = {});
+      info.x = cam.x; info.y = cam.y; info.z = cam.z; info.fx = fw[0]; info.fy = fw[1]; info.fz = fw[2]; info.fov = cam.fov; info.aspect = this.W / this.H;
+      // a cache still being drawn for an eye already too far off is dropped (a jump, a turn)
+      if (st.back && !FC.within(st.back, info)) this.fcCancel(st);
+      const why = FC.stale(st.front, info, now, E.sunDir, this.w, this.h, this.q.farSlow);
+      if (why && !st.back) this.fcBegin(st, F, E, world, vis, info, now);
+      if (st.back) this.fcSlice(st, F, E);
+      // nothing to show (yet) or the shown cache too far off: this frame draws live (the new one goes on a strip a frame)
+      if (!FC.showable(st.front, info)) { this.stats.farCache = 'live'; return null; }
+      this.fcComposite(st, F);
+      this.stats.farCache = why || 'cached';
+      // the near sections: within the near radius of the shown cache's eye (the cache holds the rest)
+      const f = st.front, R2 = f.R * f.R, near = st.near; near.length = 0;
+      for (let i = 0; i < vis.length; i++) { const s = vis[i], dx = s.ox + 8 - f.x, dz = s.oz + 8 - f.z; if (dx * dx + dz * dz <= R2) near.push(s); }
+      this.stats.farNear = near.length;
+      return st;
+    }
+    fcLayer() { return { ok: false, fb: null, col: null, depth: null, tw: 0, th: 0, x: 0, y: 0, z: 0, fx: 0, fy: 0, fz: -1, fov: 0, aspect: 0, w: 0, h: 0, t: 0, sun: [0, 1, 0], R: 0, k: 0, list: [], proj: mat4.create(), vp: mat4.create(), inv: mat4.create(), planes: new Float32Array(24), scale: [1, 1], camInt: [0, 0, 0], camFrac: [0, 0, 0], cam: null }; }
+    fcCancel(st) { if (st.back) { st.spare = st.back; st.back = null; } }
+    // the buffers of a layer at the size of its view (made or resized when needed)
+    fcEnsure(L, tw, th) {
+      const gl = this.gl;
+      if (L.fb && L.tw === tw && L.th === th && L.hdr === this.hdr) return true;
+      if (L.fb) { gl.deleteFramebuffer(L.fb); gl.deleteTexture(L.col); gl.deleteTexture(L.depth); L.fb = null; }
+      const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+      L.col = GL.tex2D(tw, th, cfmt, gl.RGBA, ctype, { filter: gl.LINEAR });
+      L.depth = GL.tex2D(tw, th, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
+      L.fb = GL.fbo([L.col], L.depth);
+      L.tw = tw; L.th = th; L.hdr = this.hdr;
+      return !!L.fb;
+    }
+    fcDrop() {
+      const gl = this.gl, st = this.fc; if (!st) return;
+      for (const L of [st.front, st.back, st.spare]) if (L && L.fb) { gl.deleteFramebuffer(L.fb); gl.deleteTexture(L.col); gl.deleteTexture(L.depth); L.fb = null; }
+      this.fc = null;
+    }
+    // a new cache: this frame's eye and look, a wider projection (no sub-pixel jitter), the far sections of this moment
+    fcBegin(st, F, E, world, vis, info, now) {
+      const FC = VR.UL.Far, b = st.spare, os = FC.grid(info.fov, info.aspect, this.w, this.h);   // (the screen's pixel grid, whole pixels round it)
+      const tw = os.tw, th = os.th;
+      if (!b || !this.fcEnsure(b, tw, th)) return;
+      st.back = b; st.spare = null;
+      b.x = info.x; b.y = info.y; b.z = info.z; b.fx = info.fx; b.fy = info.fy; b.fz = info.fz; b.fov = info.fov; b.aspect = info.aspect;
+      b.w = this.w; b.h = this.h; b.t = now; b.sun[0] = E.sunDir[0]; b.sun[1] = E.sunDir[1]; b.sun[2] = E.sunDir[2];
+      b.scale[0] = os.sx; b.scale[1] = os.sy; b.R = FC.near(world.renderDist);
+      mat4.perspective(b.proj, os.fov, os.aspect, 0.06, F.cam.far || 1200);
+      mat4.mul(b.vp, b.proj, this.view); mat4.invert(b.inv, b.vp); mat4.frustum(b.planes, b.vp);
+      // the strips' frustums (a strip's columns cropped to the whole clip range: what lies outside it is not drawn there)
+      const K = FC.SLICES, C = this.fcCrop || (this.fcCrop = mat4.create()), T = this.fcTmp || (this.fcTmp = mat4.create());
+      if (!b.strips) b.strips = [];
+      for (let k = 0; k < K; k++) {
+        const [x0, x1] = FC.strip(k, K, tw), n0 = 2 * x0 / tw - 1, n1 = 2 * x1 / tw - 1, sx = 2 / Math.max(1e-6, n1 - n0);
+        C.fill(0); C[0] = sx; C[5] = 1; C[10] = 1; C[15] = 1; C[12] = -(n0 + n1) / 2 * sx;
+        mat4.mul(T, C, b.vp);
+        if (!b.strips[k]) b.strips[k] = new Float32Array(24);
+        mat4.frustum(b.strips[k], T);
+      }
+      b.camInt[0] = this.camInt[0]; b.camInt[1] = this.camInt[1]; b.camInt[2] = this.camInt[2];
+      b.camFrac[0] = this.camFrac[0]; b.camFrac[1] = this.camFrac[1]; b.camFrac[2] = this.camFrac[2];
+      b.cam = Object.assign({}, F.cam);
+      // (only those in the cache's view: the slices share out what is really drawn)
+      const R2 = b.R * b.R; b.list.length = 0;
+      for (let i = 0; i < vis.length; i++) {
+        const s = vis[i], dx = s.ox + 8 - b.x, dz = s.oz + 8 - b.z;
+        if (dx * dx + dz * dz <= R2) continue;
+        const ox = s.ox - b.x, oy = s.oy - b.y, oz = s.oz - b.z;
+        if (mat4.boxInFrustum(b.planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) b.list.push(s);
+      }
+      b.k = 0; b.ok = false;
+      this.stats.farBegun = (this.stats.farBegun || 0) + 1;
+    }
+    // one strip of the cache being drawn (strip 0 first clears it all): within its columns the sky, the far sections
+    // (culled by the strip's frustum) and ring 1 with the horizon tiles (they cull by r.planes too); after the last one
+    // the two caches swap. Each frame pays about a SLICES-th of the far world, whatever lies where.
+    fcSlice(st, F, E) {
+      const FC = VR.UL.Far, gl = this.gl, b = st.back, K = FC.SLICES, k = b.k;
+      const sv = [this.viewProj, this.invViewProj, this.planes, this.camFrac, this.camInt, this.cam, this.shadowMat];
+      this.viewProj = b.vp; this.invViewProj = b.inv; this.planes = b.strips[k]; this.camFrac = b.camFrac; this.camInt = b.camInt; this.cam = b.cam;
+      // the shadow lookup is for this frame's eye: moved to the cache's eye, where the strip is drawn from
+      const T = this.fcTmp2 || (this.fcTmp2 = mat4.create()), SM = this.fcShadowM || (this.fcShadowM = mat4.create());
+      T.fill(0); T[0] = 1; T[5] = 1; T[10] = 1; T[15] = 1; T[12] = b.x - F.cam.x; T[13] = b.y - F.cam.y; T[14] = b.z - F.cam.z;
+      this.shadowMat = mat4.mul(SM, sv[6], T);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, b.fb); gl.viewport(0, 0, b.tw, b.th);
+      gl.disable(gl.SCISSOR_TEST);
+      if (k === 0) { gl.depthMask(true); gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); }
+      const [x0, x1] = FC.strip(k, K, b.tw);
+      gl.enable(gl.SCISSOR_TEST); gl.scissor(x0, 0, x1 - x0, b.th);
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+      const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
+      if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);
+      gl.uniformMatrix4fv(p.u.u_invViewProj, false, b.inv);
+      if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);
+      this.fs(p);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      const eye = [b.x, b.y, b.z];
+      this.fcTerrain(b.list, E, eye);
+      // (step 4) the furniture beyond the near radius: drawn here once, not every frame (liveProps draws the rest)
+      if (this.q.smoothFurn) { const sp = this.fcSplitFar || (this.fcSplitFar = { x: 0, y: 0, z: 0, R2: 0, far: true }); sp.x = b.x; sp.y = b.y; sp.z = b.z; sp.R2 = b.R * b.R; this.drawProps(E, eye, false, 0, sp); }
+      if (F.horizon) F.horizon.draw(this, E);
+      gl.disable(gl.SCISSOR_TEST);
+      this.viewProj = sv[0]; this.invViewProj = sv[1]; this.planes = sv[2]; this.camFrac = sv[3]; this.camInt = sv[4]; this.cam = sv[5]; this.shadowMat = sv[6];
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, this.w, this.h);
+      if (++b.k < K) return;
+      b.ok = true; st.spare = st.front; st.front = b; st.back = null;
+      this.stats.farBuilt = (this.stats.farBuilt || 0) + 1;
+    }
+    // the far sections of a slice, as render() draws its terrain (opaque, cut-out, the VX boxes), from the cache's eye
+    fcTerrain(list, E, camPos) {
+      const gl = this.gl;
+      for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
+        gl.useProgram(p.p);
+        this.common(p, E);
+        this.bindTerrainTextures(p);
+        gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
+        gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
+        gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
+        if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
+        if (p.u.u_emissiveBoost) gl.uniform1f(p.u.u_emissiveBoost, E.emissiveBoost);
+        if (p.u.u_normalStrength) gl.uniform1f(p.u.u_normalStrength, this.q.normals === 0 ? 0 : 1);
+        if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, 1);
+        if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
+        if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
+        if (layer === 1) gl.disable(gl.CULL_FACE);
+        this.drawSections(list, layer, p, camPos, this.planes, false);
+        if (layer === 0) { const sp = this.splitVx(list, camPos); this.drawSections(sp.near, 3, p, camPos, this.planes, false); this.drawSections(sp.far, 4, p, camPos, this.planes, false); }
+        gl.enable(gl.CULL_FACE);
+      }
+    }
+    // the shown cache into the scene: colour and depth for every pixel (the sky where it has none)
+    fcComposite(st, F) {
+      const gl = this.gl, f = st.front, S = VR.SHADERS;
+      const p = this.P.farComp || (this.P.farComp = GL.program(S.FS_VS, S.FAR_COMP_FS, 'farComp'));
+      gl.useProgram(p.p);
+      gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.ALWAYS); gl.depthMask(true);
+      this.tex(0, f.col, p.u.u_fcCol); this.tex(1, f.depth, p.u.u_fcDepth);
+      gl.uniformMatrix4fv(p.u.u_invVP, false, this.invViewProj);
+      gl.uniformMatrix4fv(p.u.u_curVP, false, this.viewProj);
+      gl.uniformMatrix4fv(p.u.u_fcVP, false, f.vp);
+      gl.uniformMatrix4fv(p.u.u_fcInvVP, false, f.inv);
+      gl.uniform3f(p.u.u_delta, F.cam.x - f.x, F.cam.y - f.y, F.cam.z - f.z);
+      gl.uniform2f(p.u.u_scale, f.scale[0], f.scale[1]);
+      this.fs(p);
+      gl.depthFunc(gl.LEQUAL);
     }
 
     // ------------------------------------------------ smooth props (t-smooth, props.js): one instanced draw per model
@@ -975,7 +1384,7 @@
     propDefines() { return (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); }
     // the anchors in reach, camera-relative: list A (full palms, nearer than D1), list B (crosses, nearer than D2), and
     // the furniture by model (near F1, far F2, in the frustum)
-    propGather(cam, lvl, D1, D2, furn, planes, refl, shadow) {
+    propGather(cam, lvl, D1, D2, furn, planes, refl, shadow, split) {
       const PR = VR.Props, K = PR.INST, FURN0 = PR.FURN0, r1 = D1 * D1, r2m = D2 * D2;
       // refl (t-smooth2): 1 the mirror on tier 1 — the furniture's far forms only; 2 the mirror on tier 2 — the models
       // within 16 blocks, the far forms to 64 (the mirror is half the frame and rippled: run 2 measured +64 draws and
@@ -993,6 +1402,7 @@
           const o = i * K, dx = d[o] - cam[0], dy = d[o + 1] - cam[1], dz = d[o + 2] - cam[2], r2 = dx * dx + dy * dy + dz * dz;
           if (kind[i] >= FURN0) {
             if (!furn || r2 >= f2) continue;
+            if (split) { const ex = d[o] - split.x, ez = d[o + 2] - split.z, e2 = ex * ex + ez * ez; if (split.far ? e2 < split.R2 : e2 >= split.R2) continue; }
             const sl = slots[ms[i]]; if (!sl) continue;
             const R = sl.rad;
             if (planes && !mat4.boxInFrustum(planes, dx - R, dy - 0.2, dz - R, dx + R, dy + sl.h, dz + R)) continue;
@@ -1043,18 +1453,29 @@
       if (!shadow) {
         if (u.u_shadowMat) gl.uniformMatrix4fv(u.u_shadowMat, false, this.shadowMat);
         if (u.u_shadowTexel) gl.uniform1f(u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(u);
         if (u.u_shadowMap && this.shadowTex) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.u_shadowMap, 3); }
       }
       return u;
     }
+    // F9 · (step 4) the props of the main pass: with the far cache shown, the furniture beyond its near radius is in the
+    // cache (fcSlice draws it there once) — only the pieces within it are drawn here every frame
+    liveProps(E, camPos, fc) {
+      if (!this.q.smoothProps && !this.q.smoothFurn) return;
+      let split = null;
+      if (fc && fc.front && this.q.smoothFurn) { const f = fc.front; split = this.fcSplitNear || (this.fcSplitNear = { x: 0, y: 0, z: 0, R2: 0, far: false }); split.x = f.x; split.y = f.y; split.z = f.z; split.R2 = f.R * f.R; }
+      this.drawProps(E, camPos, false, 0, split);
+    }
     // refl (t-smooth2): the water's mirrored pass (reflectPass) — 2 the props as in the main pass, 1 their far forms only
     // (the crosses and the boxes: the quarter-size reflection of the lower water tier); no glass, no contact shadows there
-    drawProps(E, camPos, shadow, refl) {
-      const lvl0 = this.q.smoothProps | 0, furn = this.q.smoothFurn | 0, lvl = refl === 1 ? Math.min(1, lvl0) : lvl0;
+    // split (F9): the furniture only on one side of a radius round a point ({x, z, R2, far}); far: the far cache's pass
+    // (furniture only, the palms stay live: they sway)
+    drawProps(E, camPos, shadow, refl, split) {
+      const lvl0 = this.q.smoothProps | 0, furn = this.q.smoothFurn | 0, lvl = split && split.far ? 0 : refl === 1 ? Math.min(1, lvl0) : lvl0;
       if ((!lvl0 && !furn) || !this.propSecs || !this.propSecs.size) return;
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
-      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0, !!shadow);
+      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0, !!shadow, split);
       const cullWas = gl.isEnabled(gl.CULL_FACE);
       // the palms: two-sided fronds
       if (this.propNA || this.propNB) {
@@ -1247,7 +1668,7 @@
         gl.useProgram(p.p);
         this.common(p, E);
         this.bindTerrainTextures(p);
-        if (layer === 2) { this.tex(4, this.copyCol, p.u.u_sceneColor); this.tex(5, this.copyDepth, p.u.u_sceneDepth); gl.uniform2f(p.u.u_screen, this.w, this.h); gl.uniform2f(p.u.u_nearFar, 0.06, cam.far || 1200); if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, 0); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
+        if (layer === 2) { this.tex(4, this.copyCol, p.u.u_sceneColor); this.tex(5, this.copyDepth, p.u.u_sceneDepth); if (p.u.u_reflDepth) gl.uniform1i(p.u.u_reflDepth, 9); gl.uniform2f(p.u.u_screen, this.w, this.h); gl.uniform2f(p.u.u_nearFar, 0.06, cam.far || 1200); if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, 0); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
         gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
         gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
         gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
@@ -1259,6 +1680,7 @@
         if (p.u.u_clipNear) gl.uniform1f(p.u.u_clipNear, ship.clipNear || 0);
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
         gl.disable(gl.CULL_FACE);
         for (const s of ship.gpu) {
           const m = s.mesh[layer]; if (!m) continue;
@@ -1292,23 +1714,24 @@
       const vis = world ? this.collectVisible(world, F.cam) : [];
       this.stats.sections = vis.length;
       if (world) this.updateHmap(world);
-      // shadows
+      // shadows (the cached map as before, or F9's Schatten-Takt: shadowFrame)
       this.gpuPass('shadow');
-      const shadowOn = world && (this.frameNo % (this.q.shadowEvery || 1) === 0 || !this.shadowValid) ? this.renderShadows(world, E) : this.shadowValid;
-      this.shadowValid = shadowOn;
-      // a shadow map kept from an earlier frame was made around the old camera position: shift its matrix
-      // by the camera movement so shadows stay glued to the world instead of flickering every other frame
-      if (shadowOn) { const c0 = this.shadowCam, t = mat4.create(); t[12] = F.cam.x - c0[0]; t[13] = F.cam.y - c0[1]; t[14] = F.cam.z - c0[2]; mat4.mul(this.shadowMat, this.shadowBase, t); }
+      this.shadowFrame(world, E, F.cam);
       // ---------------- scene
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
       gl.viewport(0, 0, this.w, this.h);
       gl.depthMask(true);
       gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      // F9 · Fern-Cache: the sky and the far world composited from the cache (null: drawn as before)
+      if (world && this.q.farCache && VR.UL) this.gpuPass('farcache');
+      const fc = world && this.q.farCache && VR.UL ? this.farFrame(F, E, world, vis, camPos) : null;
+      if (!this.q.farCache && this.fc) this.fcDrop();
+      const near = fc ? fc.near : vis;
       // sky
       this.gpuPass('sky');
       gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
-      {
+      if (!fc) {
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
         if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
@@ -1333,12 +1756,13 @@
           if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, this.jit && !this.q.lite ? Math.sqrt(Math.max(0.35, this.w / this.W)) : 1);   // lite: natural mips (cheaper texture reads on weak GPUs)
           if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
           if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+          this.shadowOffUni(p.u);
           if (layer === 1) gl.disable(gl.CULL_FACE);
-          this.drawSections(vis, layer, p, camPos, this.planes, false);
+          this.drawSections(near, layer, p, camPos, this.planes, false);
           if (layer === 0) {
             // mini-voxel pieces: full detail up close, averaged boxes beyond the VX detail distance
             this.vxResidency(vis, camPos);
-            const sp = this.splitVx(vis, camPos);
+            const sp = this.splitVx(near, camPos);
             this.drawSections(sp.near, 3, p, camPos, this.planes, false);
             this.drawSections(sp.far, 4, p, camPos, this.planes, false);
           }
@@ -1346,15 +1770,18 @@
         }
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
-      if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.drawProps(E, camPos, false); }
-      // far-terrain horizon (cut away where real chunks are drawn)
-      if (F.horizon) { this.gpuPass('far'); F.horizon.draw(this, E); }
+      if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.liveProps(E, camPos, fc); }
+      // far-terrain horizon (cut away where real chunks are drawn; with the Fern-Cache it is in the cache)
+      if (F.horizon && !fc) { this.gpuPass('far'); F.horizon.draw(this, E); }
       // voxel models & meshes
       if (F.drawOpaque) { this.gpuPass('models'); F.drawOpaque(this, E); }
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
       this.reflOn = false;
       this.stats.reflMs = 0;
-      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) { this.gpuPass('mirror'); const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; }
+      if (world && this.q.water > 0 && !F.underwater && !this.noRefl) {
+        if (this.q.reflEvery > 1 && this.reflKept && this.frameNo % this.q.reflEvery) this.reflOn = true;   // F9 (a governor rung on Ultra · Leicht): last frame's mirror again
+        else { this.gpuPass('mirror'); const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; this.reflKept = this.reflOn; }
+      } else this.reflKept = false;
       // ---------------- copy scene for refraction
       this.gpuPass('copy');
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
@@ -1384,6 +1811,7 @@
         if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, F.underwater ? 1 : 0);
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
         gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
         gl.disable(gl.CULL_FACE);
         this.drawSections(vis, 2, p, camPos, this.planes, true);
@@ -1442,7 +1870,7 @@
     // the reflection target: a quarter of the frame on tier 1, half on tier 2 (made when first needed, kept until the
     // size or the colour format changes)
     ensureReflection() {
-      const gl = this.gl, k = this.q.water >= 2 ? 0.5 : 0.25;
+      const gl = this.gl, k = this.q.water >= 2 && !this.q.reflLite ? 0.5 : 0.25;   // (F9 · Spiegelung leicht: a quarter, read edge-aware)
       const rw = Math.max(16, Math.floor(this.w * k)), rh = Math.max(9, Math.floor(this.h * k));
       if (this.reflFB && rw === this.reflW && rh === this.reflH && this.reflHdr === this.hdr) return true;
       if (this.reflFB) gl.deleteFramebuffer(this.reflFB);
@@ -1473,7 +1901,7 @@
       M4.frustum(this.planesR, this.viewProjR);
       M4.invert(this.invViewProjR, this.viewProjR);
       // the sections that can show in the mirror: their top is above the water and they are within reach
-      const reach = this.q.water >= 2 ? 160 : 96, reach2 = reach * reach, list = this.reflList || (this.reflList = []);
+      const reach = this.q.water >= 2 && !this.q.reflLite ? 160 : 96, reach2 = reach * reach, list = this.reflList || (this.reflList = []);   // (F9: the far ones are the horizon's)
       list.length = 0;
       for (const sec of vis) {
         if (sec.oy - cam.y + 16 <= d) continue;
@@ -1512,6 +1940,7 @@
         if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, 1);
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
+        this.shadowOffUni(p.u);
         if (layer === 1) gl.disable(gl.CULL_FACE);
         this.drawSections(list, layer, p, camPos, this.planesR, false);
         gl.enable(gl.CULL_FACE);
@@ -1522,7 +1951,7 @@
       this.stats.reflProps = 0;
       if (!this.noReflProps && (this.q.smoothProps || this.q.smoothFurn)) {
         const nA = this.propNA, nB = this.propNB, nF = this.propNF, dp = this.stats.draws;
-        this.drawProps(E, camPos, false, this.q.water >= 2 ? 2 : 1);
+        this.drawProps(E, camPos, false, this.q.water >= 2 && !this.q.reflLite ? 2 : 1);   // (F9 · Spiegelung leicht: their far forms)
         this.stats.reflProps = this.stats.draws - dp; this.propNA = nA; this.propNB = nB; this.propNF = nF;
       }
       this.stats.reflSecs = list.length; this.stats.reflDraws = this.stats.draws - dr0;     // (test/water.mjs reports them)
@@ -1542,6 +1971,13 @@
       if (u.u_waterTier) gl.uniform1f(u.u_waterTier, this.q.water | 0);
       if (u.u_reflOn) gl.uniform1f(u.u_reflOn, this.reflOn ? 1 : 0);
       if (u.u_reflTex) this.tex(8, this.reflOn && this.reflCol ? this.reflCol : this.texNoise, u.u_reflTex);
+      // F9 · Spiegelung leicht: the mirror's depth for the edge-aware read (unit 9)
+      if (u.u_reflUp) {
+        const up = this.q.reflLite && this.reflOn && this.reflDepth ? 1 : 0;
+        gl.uniform1f(u.u_reflUp, up);
+        if (u.u_reflDepth) this.tex(9, up ? this.reflDepth : this.texNoise, u.u_reflDepth);
+        if (u.u_reflSize) gl.uniform2f(u.u_reflSize, this.reflW || 1, this.reflH || 1);
+      }
     }
 
     drawPrecip(F, E) {

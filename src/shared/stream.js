@@ -107,7 +107,7 @@
       // (the number fields start as doubles, so V8 keeps their values in place: no boxed number per frame)
       this.last = { ran: 0, spentMs: 0.5, forced: 0, left: 0, bytes: 0, budgetBytes: 0.5, gauged: true };
       this.last.spentMs = 0; this.last.budgetBytes = 0;
-      this._spent = 0.5; this._cap = 0.5; this._clock = null;
+      this._spent = 0.5; this._cap = 0.5; this._capB = 0.5; this._clock = null;
     }
     get size() { return this.items.length; }
     // the queue keeps a record of one shape per item (made once, here): its hot loops stay monomorphic whatever mix of
@@ -186,8 +186,11 @@
     hitches(now) { let k = 0; for (let i = 0; i < RING; i++) if (now - this.hit[i] <= S.HITCH_MS) k++; return k; }
     mbps() { return 1 / (this.msPerByte * 1000); }   // MB/s at the estimate (decimal: bytes per µs)
     // ---- the frame's uploads: budgetMs is the caller's (preset × rung); clock times the GL calls (none: not measured);
-    // (vx, vz) the unit view direction, cosHalf the cosine of the horizontal half field of view
-    drain(budgetMs, clock, vx, vz, cosHalf) {
+    // (vx, vz) the unit view direction, cosHalf the cosine of the horizontal half field of view; maxBytes (F9 · Weltgenerierung
+    // im Takt, > 0): a byte cap beside the milliseconds — the frame never writes more, whatever the estimate; it is shared
+    // between the lanes as the milliseconds are (an atomic item bigger than the cap goes alone after four frames, as one
+    // bigger than the budget does; a parted one goes on in packets)
+    drain(budgetMs, clock, vx, vz, cosHalf, maxBytes) {
       const a = this.items, L = this.last;
       L.ran = 0; L.spentMs = 0; L.forced = 0; L.bytes = 0; L.gauged = false;   // (gauged: renderer.upGauge has read this frame's bytes)
       // the dead go first, without spending bytes: their staging is given back
@@ -222,15 +225,16 @@
       let avail = avail0 - this.debtMs;
       if (avail < 0) { this.debtMs = -avail; avail = 0; } else this.debtMs = 0;
       this._clock = clock || null; this._spent = 0;
-      if (far) { this._cap = avail * (1 - S.FAR_SHARE); this._lane(0); this._cap = avail; this._lane(1); this._lane(0); }
-      else { this._cap = avail; this._lane(0); }
+      const capB = maxBytes > 0 ? maxBytes : Infinity;   // (this._capB: the pass's cumulative byte limit, as this._cap for the ms)
+      if (far) { this._cap = avail * (1 - S.FAR_SHARE); this._capB = capB * (1 - S.FAR_SHARE); this._lane(0); this._cap = avail; this._capB = capB; this._lane(1); this._lane(0); }
+      else { this._cap = avail; this._capB = capB; this._lane(0); }
       // the done ones out, the rest a frame older
       let m = 0;
       for (let i = 0; i < n; i++) { const r = a[i]; if (r.done) continue; r.age++; a[m++] = r; }
       a.length = m;
       if (this._spent > avail) this.debtMs += this._spent - avail;
       if (L.bytes > 0) this.sinceUp = 0;
-      L.left = m; L.budgetBytes = avail / this.msPerByte;
+      L.left = m; L.budgetBytes = avail / this.msPerByte; if (L.budgetBytes > capB) L.budgetBytes = capB;
       this._clock = null;
       return L;
     }
@@ -244,7 +248,7 @@
         if (r.parted) {
           if (r.left > 0) {
             let max = Infinity;
-            if (!urgent) { if (rem <= 0) return; max = Math.floor(rem / this.msPerByte); if (max < 16) return; }
+            if (!urgent) { if (rem <= 0) return; max = Math.floor(rem / this.msPerByte); const remB = this._capB - L.bytes; if (max > remB) max = Math.floor(remB); if (max < 16) return; }
             const t0 = clk ? clk() : 0;
             const b = it.step(max) || 0;
             const ms = clk ? Math.max(0, clk() - t0) : 0;
@@ -254,8 +258,8 @@
           it.commit(); r.done = true;
         } else {
           const bytes = r.bytes, est = bytes * this.msPerByte;
-          if (!urgent && est > rem + 1e-9) {
-            if (this._spent === 0 && est > cap && r.age >= 4) L.forced++;
+          if (!urgent && (est > rem + 1e-9 || bytes > this._capB - L.bytes)) {
+            if (this._spent === 0 && (est > cap || bytes > this._capB) && r.age >= 4) L.forced++;
             else return;   // the first that does not fit stops its lane: nothing overtakes it
           }
           const t0 = clk ? clk() : 0;

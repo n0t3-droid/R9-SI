@@ -10,12 +10,19 @@
   const PRESETS = {
     // far: F-Far's ring 1 (the forms out to that many chunks, ~1 km on High and Ultra; 0 = none) · rdMax: the top of the
     // render-distance slider (32 on Ultra, 24 elsewhere as before)
+    // F9 · Ultra für schwache PCs: Ultra runs Smart Quality too (dynRes on): it steps down only when the frame rate asks, and never lowers a ring or the view distance
     potato: { far: 0, rdMax: 24, upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.8, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false, anim: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant', smoothPlants: 0, smoothFurn: 0 },
     low: { far: 0, rdMax: 24, upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true, anim: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site', smoothPlants: 1, smoothFurn: 1 },
     balanced: { far: 0, rdMax: 24, upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
     high: { far: 64, rdMax: 24, upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
-    ultra: { far: 64, rdMax: 32, upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: false, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
+    ultra: { far: 64, rdMax: 32, upload: 3, renderDist: 16, scale: 1, shadows: 3, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.9, horizon: 4, sunShadows: true, tsr: true, vxLod: 96, lite: false, folk: 120, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
   };
+  // F9 · Ultra für schwache PCs: „Ultra · Leicht" — Ultra's picture with the four switches that spend the GPU where the eye
+  // looks and reuse what did not change (Fern-Cache, Schatten-Takt, Weltgenerierung im Takt, Spiegelung leicht). Every other
+  // preset has them off, so a preset change sets them all; ⚡ Automatik starts an integrated GPU on it (bench.js).
+  const F9_SW = ['farCache', 'shadowTakt', 'streamTakt', 'reflLite'];
+  for (const p in PRESETS) for (const k of F9_SW) PRESETS[p][k] = false;
+  PRESETS.ultraLite = Object.assign({}, PRESETS.ultra, { farCache: true, shadowTakt: true, streamTakt: true, reflLite: true });
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)
@@ -25,6 +32,7 @@
   // the governor's rungs in the order they are taken, named for the ⚙ line (g = picture, c = main thread)
   const AQ_G = ['g.aq.g1', 'g.aq.g2', 'g.aq.g3', 'g.aq.g4', 'g.aq.g5', 'g.aq.g6', 'g.aq.g7', 'g.aq.g8', 'g.aq.g9', 'g.aq.g10'];
   const AQ_C = ['g.aq.c1', 'g.aq.c2', 'g.aq.c3', 'g.aq.c4', 'g.aq.c5'];
+  const AQ_MEM = 'r9si.aqmem';   // F9: the smart-quality steps that held, per GPU and preset (aqRemember), this browser only
   const SHADOW_RES = [0, 1024, 2048, 3072];
   const SHADOW_DIST = [0, 40, 64, 96];
 
@@ -108,6 +116,7 @@
       const S = this.settings, r = this.renderer;
       if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
+      if (key !== '*' && F9_SW.includes(key)) S.preset = 'custom';   // (F9: a switch of Ultra · Leicht changed by hand)
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -119,7 +128,7 @@
       if (S.smoothFurn === undefined) S.smoothFurn = PRESETS[S.preset] ? PRESETS[S.preset].smoothFurn : 1;   // t-smooth: Echte Möbel (0 the voxel pieces · 1 smooth)
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
-      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false });
+      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite });   // (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
       if (this.world) { const wp = this.propMask(); if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
@@ -330,6 +339,7 @@
         this.settings.autoPreset = false; this.saveSettings();
       }
       this.applySettings('*');
+      this.aqRestoreStart();   // F9: this GPU's remembered smart-quality steps (aqRestoreSteps, at the first frame of play)
       document.getElementById('gpuinfo').textContent = (VR.GL.rendererName || 'WebGL2') + (this.renderer.multi ? ' · multi-draw' : '');
       window.addEventListener('resize', () => this.renderer.resize(false));
       this.last = performance.now();
@@ -754,6 +764,9 @@
     benchStart() {
       if (this.bench) return false;
       this.bench = { t: 0, last: 0, dts: [], was: { preset: this.settings.preset, renderDist: this.settings.renderDist } };
+      // F9: an integrated GPU (bench.js integrated: a Ryzen's Radeon Graphics, Intel, Apple M, phones) starts on Ultra · Leicht
+      // and measures there; a dedicated one measures what it has, as before
+      if (VR.Bench && VR.Bench.integrated && VR.Bench.integrated(VR.GL && VR.GL.rendererName)) { this.bench.igpu = true; if (this.settings.preset !== 'ultraLite') this.applyPreset('ultraLite'); }
       if (this.ui && this.ui.benchBegin) this.ui.benchBegin();
       return true;
     }
@@ -769,7 +782,7 @@
       const b = this.bench; if (!b || !VR.Bench) return null;
       this.bench = null;
       const S = this.settings, sum = VR.Bench.summarize(b.dts);
-      const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist), target: 60 });
+      const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist, b.igpu), target: 60, igpu: b.igpu });
       if (d.action !== 'none') {
         Object.assign(S, PRESETS[d.preset]); S.preset = d.preset; S.renderDist = d.renderDist;
         this.applySettings('*'); this.saveSettings();
@@ -790,7 +803,8 @@
     aqWhat() {
       const aq = this.aq; if (!aq) return '';
       const out = [];
-      for (let i = 0; i < Math.min(AQ_G.length, aq.g | 0); i++) out.push(T(AQ_G[i]));
+      const gL = this.settings ? this.aqGpuRungs(this.settings) : [];   // (F9: each rung carries its name; Ultra's ladder starts with its own)
+      for (let i = 0; i < Math.min(Math.max(AQ_G.length, gL.length), aq.g | 0); i++) out.push(T((gL[i] && gL[i].lab) || AQ_G[i]));
       for (let i = 0; i < Math.min(AQ_C.length, aq.c | 0); i++) out.push(T(AQ_C[i]));
       return out.join(' · ');
     }
@@ -817,13 +831,15 @@
     smartQuality(dt, S, w) {
       if (this.bench || this.sweep) return;   // the Automatik run (or the Stufentest) measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
-      const aq = this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null });
+      const aq = this.aqState();
       if (!S.dynRes || !this.fps) {
         if (aq.stack.length) this.aqReset(aq, S, w);
         this.cpuBound = (this.jsMs > Math.max(9, dt * 1000 * 0.72) && dt > 1 / 55) || !!this.slowBase;
         this.folkDist = this.folkBase || 100;
         return;
       }
+      // F9: the steps this GPU held last time (aqRestoreStart) go on again once the world runs
+      if (aq.pending && this.world) { const s = aq.pending; aq.pending = ''; this.aqRestoreSteps(aq, S, this.world, s); }
       const target = 55, budget = 1000 / target;
       const gpuMs = r.gpuMs, jsMs = this.jsMs;
       // who is the bottleneck? measured when the browser exposes GPU timing, estimated otherwise
@@ -867,6 +883,10 @@
           this.aqPop(aq, S, w); aq.good = 0; aq.hold = 3; aq.upT = now;
         }
       } else if (!fine) aq.good = 0;
+      // F9: ten seconds of fine frames at this depth are remembered for this GPU (a struggling frame restarts the count)
+      if (struggling) aq.steady = 0; else if (fine) aq.steady += dt;
+      aq.memT -= dt;
+      if (aq.steady >= 10 && aq.memT <= 0) { aq.memT = 2; this.aqRemember(aq, S); }
       // fell back within 8 s of a step up: wait longer next time (up to a minute)
       if (aq.upT && struggling && now - aq.upT < 8) { aq.backoff = Math.min(60, aq.backoff * 2); aq.upT = 0; }
       else if (aq.upT && now - aq.upT > 20) { aq.backoff = Math.max(6, aq.backoff * 0.7); aq.upT = 0; }
@@ -883,6 +903,19 @@
         (o) => { o.scale = Math.max(floor, S.scale - 0.1); o.sharpen = Math.max(S.sharpen ? 0.35 : 0, 0.45); },
         (o) => { o.scale = Math.max(floor - 0.08, S.scale - 0.2); o.sharpen = 0.55; },
       ];
+      list.forEach((f, i) => { f.lab = AQ_G[i]; });
+      // F9 · Ultra and Ultra · Leicht: the cheap rungs first — the far cache twice as patient, the shadows' tiles half as
+      // often, the water's mirror lighter (Ultra: a quarter size; Ultra · Leicht: drawn every other frame), people drawn to
+      // 72 blocks — then rays, detail, the shadow map, clouds, and only then the resolution. Only rungs that change
+      // something with these settings (a rung that buys nothing fails its probe and blocks the ladder for 30 s).
+      if (S.preset === 'ultra' || S.preset === 'ultraLite') {
+        const lab = (f, n) => { f.lab = n; return f; }, cheap = [];
+        if (S.farCache) cheap.push(lab((o) => { o.farSlow = 2; }, 'g.aq.ul.far'));
+        if (R) cheap.push(lab((o) => { o.shadowEvery = 2; }, 'g.aq.ul.shadow'));
+        if ((S.water | 0) >= 2) cheap.push(lab(S.reflLite ? (o) => { o.reflEvery = 2; } : (o) => { o.reflLite = true; }, 'g.aq.ul.refl'));
+        if ((S.folk || 100) > 72) cheap.push(lab((o) => { o.folkDist = 72; }, 'g.aq.ul.folk'));
+        return cheap.concat(list.slice(1));   // (the old first rung, the shadow cadence, is among them)
+      }
       return list;
     }
     aqCpuRungs(S) {
@@ -898,6 +931,52 @@
     aqPush(aq, kind, S, w) { if (kind === 'g') aq.g++; else aq.c++; aq.stack.push(kind); this.aqApply(aq, S, w); if (VR.AQ_TRACE) console.log('aq push', kind, aq.stack.join(''), 'fps', (aq.fpsWin || this.fps || 0).toFixed(0), 't', this.time.toFixed(1)); }
     aqPop(aq, S, w) { const k = aq.stack.pop(); if (!k) return; if (k === 'g') aq.g--; else aq.c--; this.aqApply(aq, S, w); if (VR.AQ_TRACE) console.log('aq pop', k, aq.stack.join(''), 'fps', (aq.fpsWin || this.fps || 0).toFixed(0), 't', this.time.toFixed(1)); }
     aqReset(aq, S, w) { aq.g = 0; aq.c = 0; aq.stack.length = 0; aq.probe = null; this.aqApply(aq, S, w); }
+    // the governor's state, made on first use
+    aqState() {
+      return this.aq || (this.aq = { g: 0, c: 0, hold: 0, good: 0, stack: [], bad: {}, backoff: 6, hzBase: -1, winT: 0, winN: 0, probe: null, over: null, steady: 0, memT: 0, memS: null, memK: '', pending: '' });
+    }
+    // F9 · Gedächtnis pro Grafikkarte: the steps that held for ten seconds are remembered per GPU and preset, in this
+    // browser only (localStorage 'r9si.aqmem', at most 24 entries). The next start takes them at once, so the first
+    // minute does not stutter while the governor climbs down to what this machine can hold. An empty entry is removed.
+    aqMemKey(name, preset) { return String(name || 'gpu').slice(0, 96) + '|' + (preset || 'custom'); }
+    aqMemRead(key) {
+      try { const m = JSON.parse(localStorage.getItem(AQ_MEM) || '{}') || {}; const e = m[key]; return e && typeof e.s === 'string' ? e.s.replace(/[^gc]/g, '').slice(0, 24) : ''; }
+      catch (err) { return ''; }
+    }
+    aqMemWrite(key, s) {
+      try {
+        let m = {};
+        try { m = JSON.parse(localStorage.getItem(AQ_MEM) || '{}'); } catch (err) { m = {}; }   // a damaged store is replaced
+        if (!m || typeof m !== 'object' || Array.isArray(m)) m = {};
+        if (s) m[key] = { s: String(s).slice(0, 24), t: Date.now() }; else delete m[key];
+        const ks = Object.keys(m), age = (k) => (m[k] && m[k].t) || 0;
+        if (ks.length > 24) { ks.sort((a, b) => age(a) - age(b)); for (const k of ks.slice(0, ks.length - 24)) delete m[k]; }
+        localStorage.setItem(AQ_MEM, JSON.stringify(m));
+      } catch (err) { /* the memory is optional: a full or blocked store changes nothing */ }
+    }
+    // at the start: this GPU's remembered steps wait for the first frame of play (smartQuality → aqRestoreSteps)
+    aqRestoreStart() {
+      const S = this.settings, aq = this.aqState();
+      if (!S.dynRes) return;
+      aq.memK = this.aqMemKey(VR.GL && VR.GL.rendererName, S.preset);
+      aq.memS = this.aqMemRead(aq.memK);
+      aq.pending = aq.memS;
+    }
+    aqRemember(aq, S) {
+      const s = aq.stack.join(''), key = this.aqMemKey(VR.GL && VR.GL.rendererName, S.preset);
+      if (s === aq.memS && key === aq.memK) return;
+      aq.memS = s; aq.memK = key;
+      this.aqMemWrite(key, s);
+    }
+    // the remembered steps go on again without a probe; the governor waits before it takes any of them back
+    aqRestoreSteps(aq, S, w, s) {
+      const gN = this.aqGpuRungs(S).length, cN = this.aqCpuRungs(S).length;
+      for (const k of String(s || '')) {
+        if (k === 'g' && aq.g < gN) this.aqPush(aq, 'g', S, w);
+        else if (k === 'c' && aq.c < cN) this.aqPush(aq, 'c', S, w);
+      }
+      aq.backoff = Math.max(aq.backoff, 30); aq.hold = Math.max(aq.hold, 3); aq.good = 0; aq.upT = 0;
+    }
     aqApply(aq, S, w) {
       const o = {}, gL = this.aqGpuRungs(S), cL = this.aqCpuRungs(S);
       for (let i = 0; i < aq.g; i++) gL[i](o);
@@ -905,6 +984,7 @@
       // renderer overrides
       const ro = {};
       for (const k of ['shadowEvery', 'rays', 'vxLod', 'shadows', 'shadowDist', 'clouds', 'scale', 'sharpen']) if (o[k] !== undefined) ro[k] = o[k];
+      for (const k of ['farSlow', 'reflLite', 'reflEvery']) if (o[k] !== undefined) ro[k] = o[k];   // (F9's cheap rungs)
       this.renderer.setOverride(Object.keys(ro).length ? ro : null);
       // world / sim overrides
       const rdBase = S.renderDist;
@@ -1031,6 +1111,9 @@
       if (this.tickFurnaces) this.tickFurnaces(dt);
       const vd = w.viewDir || (w.viewDir = [0, 0]); vd[0] = -Math.sin(p.yaw); vd[1] = -Math.cos(p.yaw);   // the way the player looks (flat): uploads in the view first (F10: no new array a frame)
       { const r0 = this.renderer, asp = r0 && r0.H ? r0.W / r0.H : 16 / 9; w.viewCos = Math.cos(Math.atan(Math.tan((this.settings.fov || 75) * Math.PI / 360) * asp)); }   // (F10: the horizontal half field of view)
+      // F9 · Weltgenerierung im Takt (Ultra · Leicht or the switch): the world streams within the frame's headroom
+      w.streamTakt = !!this.settings.streamTakt && !!VR.UL;
+      if (w.streamTakt) w.streamMs = VR.UL.Stream.budget(this.renderer.gpuMs, this.jsMs);
       w.update(p.pos[0], p.pos[1], p.pos[2], performance.now());
       const eye = p.eyePos();
       const headState = w.getBlock(Math.floor(eye[0]), Math.floor(eye[1]), Math.floor(eye[2]));
