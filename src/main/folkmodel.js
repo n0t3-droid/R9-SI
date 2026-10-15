@@ -1132,9 +1132,10 @@
     const shortSl = (kid && !L.longSleeves) || (fam === 'dress' && rnd(6) < 0.5);
     const elb = S.elbow, foreLen = kid ? 5 : 8, handLen = kid ? 4 : 5;
     const cuffC = longCoat ? (L.garb ? trim : mul(sleeveC, 0.8)) : mul(sleeveC, 0.82);
-    // the upper arm: the shoulder's cap, the sleeve (short sleeves end above the elbow)
+    // the upper arm: the shoulder's cap, the sleeve (short sleeves end above the elbow); a row past the elbow and the
+    // forearm two rows up into it — each part's rounded end inside the other, so the smooth arm has no groove at the joint
     const upper = mkT(-4, 4, elb - 2, 3, -4, 4, TG.cloth);
-    for (let y = elb; y <= 1; y++) for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) {
+    for (let y = elb - 1; y <= 1; y++) for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) {
       if (y === 1 && (Math.abs(x) + Math.abs(z)) === 2) continue;   // the round of the shoulder
       const bare = shortSl && y < Math.round(elb * 0.45);
       upper.set(x, y, z, bare ? skinF(x, y, z) : slF(x, y, z), 0, bare ? TG.skin : TG.cloth);
@@ -1146,9 +1147,9 @@
     const forearm = (right) => {
       const P = mkT(-6, 6, -46, 2, -24, 8, TG.cloth);
       const sleeveEnd = shortSl ? 1 : rolled ? -2 : -foreLen;
-      for (let y = 0; y >= -foreLen; y--) for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) {
+      for (let y = 2; y >= -foreLen; y--) for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) {
         if (y <= -foreLen + 1 && Math.abs(x) + Math.abs(z) === 2 && y < sleeveEnd) continue;   // the wrist narrows
-        const sl = y >= sleeveEnd;
+        const sl = !shortSl && y >= sleeveEnd;
         P.set(x, y, z, sl ? slF(x, y - 40, z) : skinF(x, y, z), 0, sl ? TG.cloth : TG.skin);
       }
       if (!shortSl) {
@@ -1203,7 +1204,8 @@
     const kn = S.knee, ground = -S.hip - kn;   // the shin's frame: its row `ground` stands on the floor
     const thigh = mkT(-4, 4, kn - 2, 3, -4, 4, TG.cloth);
     const shortsTo = kid && !L.dress ? Math.round(kn * 0.55) : null;
-    for (let y = kn; y <= 1; y++) {
+    // (a row past the knee: the thigh's rounded end inside the shin's, no groove at the joint)
+    for (let y = kn - 1; y <= 1; y++) {
       const thick = kid ? 1 : (y > kn + 5 ? 2 : 1.5);
       for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) {
         const ax = Math.abs(x), az = Math.abs(z);
