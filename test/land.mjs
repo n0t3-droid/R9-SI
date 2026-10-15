@@ -63,9 +63,17 @@ const CAMS = [
   // the waterfall: from the river 26 blocks below its head, at the curtain's middle
   const Fa = L.falls(g);
   if (Fa) { const [hx, hz] = Fa.head, [ux, uz] = Fa.dir; CAMS.push(['falls', [hx + ux * 26 + 0.5, hz + uz * 26 + 0.5], { y: SEA + 8 }, [hx - ux * 6, (Fa.top + SEA) / 2, hz - uz * 6], 70, NOON]); }
+  // the woods from afar: high over Nova Haven's east end, over the land to the north-east woods 400–700 blocks off —
+  // beyond the chunks (High: 14), the far ring and the horizon draw them (lod.js, far.js: VR.Land.lodTree's canopies)
+  CAMS.push(['lod', [119.5, -96.5], { y: 205 }, [470, 92, -520], 60, MORNING]);
   console.log('cameras', JSON.stringify(CAMS.map(c => [c[0], c[1].map(v => +(+v).toFixed(1))])));
 }
+// (the land's own first: a run that stops early still has them)
+const OWN = ['walk', 'walk_2', 'river', 'farm', 'lookout', 'falls', 'lod'];
+CAMS.sort((a, b) => (OWN.includes(a[0]) ? OWN.indexOf(a[0]) : 99) - (OWN.includes(b[0]) ? OWN.indexOf(b[0]) : 99));
 const SHOTS = CAMS.filter(c => !ONLY || ONLY.includes(c[0])).map(c => ({ name: c[0], x: c[1][0], z: c[1][1], eye: c[2], at: c[3], fov: c[4], tod: c[5] }));
+// BEFORE_ONLY=lod,…: the build before shoots only these (the others' before pictures kept from an earlier run)
+const BONLY = process.env.BEFORE_ONLY ? process.env.BEFORE_ONLY.split(',') : null;
 
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 
@@ -153,6 +161,9 @@ const notBlank = async (path) => { try { const { data, info } = await sharp(path
 // ---------------------------------------------------------------- the pictures of one build
 async function shoot(tag, dist, keepOpen) {
   const record = { tag, seed: SEED, dist, shots: [] }, recPath = `/home/dev/vr/test/shots/land_${tag}.json`;
+  const LIST = tag === 'before' && BONLY ? SHOTS.filter(s => BONLY.includes(s.name)) : SHOTS;
+  // (BEFORE_ONLY: the earlier run's before record keeps its other shots)
+  if (tag === 'before' && BONLY) { try { const old = JSON.parse(fs.readFileSync(recPath, 'utf8')); record.shots = (old.shots || []).filter(q => !BONLY.includes(q.name)); } catch (e) { /* none yet */ } }
   const A = await openWorld(dist, 'high');
   check(A.ok, `${tag}: the world is loaded (${secs()})`);
   const meta = await A.ev(() => { const g = VR.game; return { vgen: (g.meta && g.meta.vgen) || 0, land: !!(VR.Land && VR.Land.on && g.world && VR.Land.on({ vgen: g.meta.vgen, singleBiome: -1, flat: false })), preset: g.settings.preset }; });
@@ -160,7 +171,7 @@ async function shoot(tag, dist, keepOpen) {
   if (tag !== 'before') check(meta.vgen >= 10 && meta.land, `${tag}: a new default world is vgen ${meta.vgen} with the land between`);
   await A.settle(80);
   let pics = 0, wanted = 0; const blank = [];
-  for (const s0 of SHOTS) {
+  for (const s0 of LIST) {
     const s = Object.assign({}, s0), t0 = Date.now();
     await A.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [s.x, s.z]);
     s.s1 = await A.settle(150, 8);
@@ -177,6 +188,7 @@ async function shoot(tag, dist, keepOpen) {
     try { await A.picture(path, s.tod); } catch (e) { console.log(`  !! ${s.name}: no picture (${String(e.message || e).split('\n')[0].slice(0, 160)})`); break; }
     if (fs.existsSync(path)) { pics++; if (!(await notBlank(path))) blank.push(path); }
     s.counts = await A.counts(s.x, s.z, 72);
+    s.counts.simQ = await A.ev(() => { const S = VR.game.sim; return S && S.sched ? S.sched.size : -1; });   // (the fluid sim's queue: a woken fall that grew showed here)
     s.ms = Date.now() - t0;
     console.log(`  ${s.name}: (${(+s.x).toFixed(1)}, ${s.feet}, ${(+s.z).toFixed(1)}) yaw ${s.yaw} pitch ${s.pitch} · ${JSON.stringify(s.counts)} · ${(s.ms / 1000).toFixed(0)} s · settle ${JSON.stringify(st)} (${secs()})`);
     record.shots.push({ name: s.name, x: s.x, z: s.z, feet: s.feet, yaw: s.yaw, pitch: s.pitch, tod: s.tod, counts: s.counts, ms: s.ms, path: path.replace(/^.*test\/shots\//, 'test/shots/') });
