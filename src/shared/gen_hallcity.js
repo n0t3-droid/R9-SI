@@ -1029,9 +1029,12 @@
     yield;
 
     // ================================================================ street lamps every eight blocks, lanterns on the piers and under the arches
-    for (let v = -72; v <= H.STAIR0 - 4; v += 8) {   // (to the stair's foot)
+    // (round 3: on the street's edge, |u| 3, at v ≡ 5 mod 8 — round 1's lamps stood in the fronts' outer row (|u| 4), the row
+    // the awnings lean out to, and on six of each side's twelve awnings a lamp post took an awning's cell; here they stand
+    // clear of every awning, lantern, vine and café table, and the street's sample rows stay free)
+    for (let v = -75; v <= H.STAIR0 - 4; v += 8) {   // (to the stair's foot)
       if (Math.abs(v) <= H.PV) continue;
-      for (const s of [-1, 1]) { putModel(P, 'vm_town_lamp', 0, s * 4, F + 1, v); const [x, z] = W2(s * 4, v); plan.lamps.push([x, F + 4, z]); }
+      for (const s of [-1, 1]) { putModel(P, 'vm_town_lamp', 0, s * 3, F + 1, v); const [x, z] = W2(s * 3, v); plan.lamps.push([x, F + 4, z]); }
     }
     for (let k = -8; k <= 4; k++) {
       const vp = 10 * k + 5; if (vp < H.V0 + 3 || vp > H.V1) continue;

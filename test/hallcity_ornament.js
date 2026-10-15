@@ -33,6 +33,7 @@
 //  16. round 3: the hall's windows luminous — their stained heads white, light blue and gold, like the references' (P4 / P8 / P2)
 //  17. round 3: a second row of spires — a pinnacle with a lantern finial on the clerestory over every flyer's head (P5 / P0)
 //  18. round 3: a flower box under every arched window of the shop houses (P1 / P2 / P7)
+//  19. round 3: the street lamps on the street's edge, clear of the awnings (every awning whole) (P1 / P2 / P7)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -609,6 +610,22 @@ for (const [label, H] of HALLS) {
       if (n === 3) boxed++;
     }
     check(wins >= 30 && boxed === wins, `a flower box under every arched window of the shop houses (${boxed} of ${wins})`);
+  }
+  // ---------------------------------------------------------------- 19. round 3: the street lamps clear of the awnings (P1 / P2 / P7)
+  console.log(`19. round 3 — the street lamps at the street's edge, every awning whole (${label})`);
+  {
+    // round 1's lamps stood every 8 blocks in the fronts' outer row (|u| 4) — the row the awnings lean out to (2 deep at
+    // F + 3): on six of each side's twelve awnings a lamp post took an awning's cell (a gap in the stripes, the post
+    // through it). The lamps stand on the street's edge (|u| 3), clear of every awning, lantern and vine.
+    let whole = 0, n = 0;
+    for (const h of Hh.houses.filter(h => h.lot && h.frame)) for (const u0 of [1, 8]) {
+      n++; let c = 0; for (let u = u0; u <= u0 + 2; u++) for (const v of [-2, -1]) if (/^vm_town_awning_/.test(lotN(h, u, F + 3, v))) c++;
+      if (c === 6) whole++;
+    }
+    check(n === 24 && whole === n, `every street awning whole, no lamp post through it (${whole} of ${n})`);
+    let lamps = 0, edge = 0;
+    for (let v = -78; v <= 48; v++) for (const u of [-4, -3, 3, 4]) if (atN(u, F + 1, v) === 'vm_town_lamp') { lamps++; if (Math.abs(u) === 3) edge++; }
+    check(lamps >= 20 && edge === lamps, `the street lamps stand on the street's edge (${edge} of ${lamps} at |u| 3)`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();

@@ -194,13 +194,17 @@ console.log('4. the town');
   const cafe = plan.work.find(w => w.kind === 'cafe');
   check(tables.length >= 10 && cafe && cafe.seats.length >= 20, `café tables round the plaza (${tables.length}) and the café's seats (${cafe ? cafe.seats.length : 0})`);
 }
-// street lamps every 7–9 blocks along both fronts (the plaza has its own)
+// street lamps every 7–9 blocks along both edges of the street (the plaza has its own; round 3 moved them from the fronts'
+// outer row, |u| 4, to the street's edge, |u| 3, clear of the awnings — test/hallcity_ornament.js 19)
 {
   const lamps = { '-1': [], '1': [] };
-  for (const s of [-1, 1]) for (let v = -78; v <= 48; v++) { const b = at(s * 4, F + 1, v); if (b > 0 && nm(b) === 'vm_town_lamp') lamps[s].push(v); }
+  for (const s of [-1, 1]) for (let v = -78; v <= 48; v++) { const b = at(s * 3, F + 1, v); if (b > 0 && nm(b) === 'vm_town_lamp') lamps[s].push(v); }
   let gaps = [], bad = 0;
   for (const s of [-1, 1]) { const L = lamps[s]; for (let i = 1; i < L.length; i++) { const gp = L[i] - L[i - 1]; if (L[i - 1] < -13 && L[i] > 13) continue; gaps.push(gp); if (gp < 7 || gp > 9) bad++; } }
-  check(gaps.length >= 18 && bad === 0, `street lamps every 7–9 blocks to the stair's foot (${gaps.length} gaps: ${[...new Set(gaps)].join(', ')})`);
+  // (the count of gaps follows the lamps' phase along the street: 18 at round 1's, 16 at round 3's; the rhythm and the reach
+  // to the stair's foot — its newel lamps at 38 — are the rule)
+  const reach = [-1, 1].every(s => lamps[s].length && lamps[s][lamps[s].length - 1] >= VG.HALL.STAIR0 - 9);
+  check(gaps.length >= 16 && bad === 0 && reach, `street lamps every 7–9 blocks to the stair's foot (${gaps.length} gaps: ${[...new Set(gaps)].join(', ')}; the last at ${lamps['1'].slice(-1)[0]}, the stair's foot at ${VG.HALL.STAIR0})`);
 }
 // the lots and the houses against the v042 village of the same site (seed 53's meadow village at vgen 8)
 const old = VG.plan(g8, s8);
