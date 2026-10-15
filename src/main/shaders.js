@@ -47,6 +47,22 @@ uniform float u_cirrus;      // high cirrus streaks: 1 on balanced and above, 0 
 uniform float u_animOn;      // Animierte Anzeigen (settings.anim): 1 animates the holo displays, the portal veil and the hall's light pulses
 uniform float u_pulseA;      // texture layers of the Hangar Hall's pulsing wall strips (-1 when not loaded)
 uniform float u_pulseB;
+#ifdef MOTION
+uniform vec2 u_cirrusDrift;  // t-motion: the cirrus' drift in its noise's space (renderer.js: the clouds' drift far up, a fifth of the cumulus' speed)
+#endif
+#ifdef CLOUDSH
+// t-motion · the cloud shadows (clouds.js shadowMask, renderer.js): the cumulus' footprints, 128² over 1024 blocks in cloud
+// space, 1 clear … 0 under a cloud's heart. u_cloudShadowM: xy the mask's origin in world blocks (the drift taken off), z 1 /
+// its size, w the strength (the sun up, the sky not overcast). cloudShadow(world position): the point's way to the sun
+// meets the cloud layer at y 210 — t-light2 multiplies it into its sun term
+uniform sampler2D u_cloudShadow;
+uniform vec4 u_cloudShadowM;
+float cloudShadow(vec3 wp) {
+  vec2 p = wp.xz + u_sunDir.xz * ((210.0 - wp.y) / max(u_sunDir.y, 0.12));
+  float m = texture(u_cloudShadow, (p - u_cloudShadowM.xy) * u_cloudShadowM.z).r;
+  return 1.0 - u_cloudShadowM.w * (1.0 - m);
+}
+#endif
 #ifdef WXDRAMA
 uniform vec4 u_storm;        // t-motion · Wetter-Drama: the storm's side (x, z: unit, where it comes from), its front 0..1, the rainbow 0..1
 uniform vec4 u_bolt;         // t-motion: the bolt's heading (x, z: unit), its shape seed, its flash 0..1
@@ -423,7 +439,11 @@ vec3 skyColor(vec3 dir, bool withSun) {
 #ifndef LITE
     if (u_cirrus > 0.0 && dir.y > 0.1) {
       vec2 q = dir.xz / (dir.y + 0.1);
+#ifdef MOTION
+      float a = vnoise(vec2(q.x * 0.35 + q.y * 0.2, q.y * 5.0 + 3.0) + u_cirrusDrift);   // (t-motion: the cirrus drift slowly with the wind, far above the cumulus)
+#else
       float a = vnoise(vec2(q.x * 0.35 + q.y * 0.2, q.y * 5.0 + 3.0) + vec2(u_time * 0.0025, 0.0));
+#endif
       float b = vnoise(vec2(q.x * 0.6 - 7.0, q.y * 13.0 - 1.0));
       float st = smoothstep(0.74, 0.9, a * 0.7 + b * 0.38) * smoothstep(0.55, 0.72, vnoise(q * 0.22 + 17.0));
       st *= smoothstep(0.14, 0.28, dir.y) * (1.0 - smoothstep(0.55, 0.8, dir.y));   // (none right over the horizon: the haze band stays clean)
@@ -943,6 +963,9 @@ void main() {
   float ndl = noshade ? 0.65 : max(dot(n, L), 0.0);
   float outdoors = smoothstep(0.55, 0.95, sky);
   float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
+#ifdef CLOUDSH
+  sh *= cloudShadow(v_localPos + vec3(u_camInt));   // t-motion: cloud shadow (t-light2 multiplies it into its sun term)
+#endif
   vec3 direct = lc * ndl * sh * outdoors;
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
