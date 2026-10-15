@@ -662,14 +662,15 @@
     const both = (X, Y, c, t, over) => { paint(X, Y, c, t, over); paint(mir(X), Y, c, t, over); };
     const Ye = 2 * C.eyeY + 1, eL = bL - 2;      // the eye row; the left iris's column (the eye: eL − 1 … eL + 1)
     const LASH = 0x2A1D1C, PINK = 0xFF7E86;
-    // the eyes: the white, the iris, the white, a voxel deep in a shallow socket (the lids close it); the iris dark enough
-    // to read on every skin, the outer white a shade greyer (the eye's round)
+    // the eyes: the white, the iris, the white, in the face's plane (sunk a voxel into a socket they went dark whenever
+    // the light came from behind: the socket's occlusion and its shadow — in the game the eyes read as slits); the iris dark
+    // enough to read on every skin, the outer white a shade greyer (the eye's round). The lids close them from before
     const iris = mix(C.eye, 0x0A0806, 0.35), white = 0xF2EEE6, whiteO = 0xDED8CE;
     const eyeAt = [];
     for (const X0 of [eL - 1, eL, eL + 1]) for (const X of [X0, mir(X0)]) {
       const Z = frontZ(X, Ye); if (Z === null || !skinAt(X, Ye, Z)) continue;
       const c = X0 === eL ? iris : X0 === eL - 1 ? whiteO : white;
-      F.c[idx(F, X, Ye, Z)] = 0; fset(F, X, Ye, Z + 1, c, TG.eye); eyeAt.push([X, Z]);
+      fset(F, X, Ye, Z, c, TG.eye); eyeAt.push([X, Z - 1]);
     }
     // the upper lid's line over the eye (darker with lashes, a flick at the outer corner), a shade under it
     // (the features that must stay crisp carry a tag of their own — the lid's line the eye's, the brows the hair's, the
