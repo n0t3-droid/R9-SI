@@ -183,6 +183,36 @@ function chromaOf(img, y0, y1, inMask) {
   const vr = C.reduce((a, v) => a + (v - mean) * (v - mean), 0) / C.length;
   return { n: C.length, mean: +mean.toFixed(2), var: +vr.toFixed(2) };
 }
+// t-polish · the nebula's fine structure in rows [y0, y1): the variance of the 3-px Laplacian of the luma —
+// l(x − 3, y) + l(x + 3, y) + l(x, y − 3) + l(x, y + 3) − 4 l(x, y) — over the sky pixels whose five taps are sky and clear
+// of the stars (starsOf's local maxima and the 5 × 5 round each: the stars are counted there, not here). The trailer's
+// filaments and knots (2–6 px wide at 640 px, t1_05) lift it; soft clouds, a smooth gradient and a plain navy hardly do.
+// null under 200 such pixels
+function hfOf(img, y0, y1, inMask) {
+  const W = img.w, Hh = img.h, L = new Float32Array(W * Hh), star = new Uint8Array(W * Hh);
+  for (let i = 0; i < W * Hh; i++) L[i] = luma(img.d[i * 3], img.d[i * 3 + 1], img.d[i * 3 + 2]);
+  const at = (x, y) => L[y * W + x];
+  // the stars of the rows round [y0, y1) (the taps reach 3 rows out): as starsOf finds them, marked with their 5 × 5
+  for (let y = Math.max(2, y0 - 5); y < Math.min(Hh - 2, y1 + 5); y++) for (let x = 2; x < W - 2; x++) {
+    let ring = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (dx === -2 || dx === 2 || dy === -2 || dy === 2) ring += at(x + dx, y + dy);
+    const l = at(x, y);
+    if (l - ring / 16 < STAR_T) continue;
+    let max = true;
+    for (let dy = -1; dy <= 1 && max; dy++) for (let dx = -1; dx <= 1; dx++) { if (!dx && !dy) continue; const q = at(x + dx, y + dy); if (q > l || (q === l && (dy < 0 || (dy === 0 && dx < 0)))) { max = false; break; } }
+    if (max) for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) star[(y + dy) * W + x + dx] = 1;
+  }
+  const S = 3, clear = (x, y) => inMask(x, y) && !star[y * W + x];
+  let n = 0, s1 = 0, s2 = 0;
+  for (let y = Math.max(S, y0); y < Math.min(Hh - S, y1); y++) for (let x = S; x < W - S; x++) {
+    if (!clear(x, y) || !clear(x - S, y) || !clear(x + S, y) || !clear(x, y - S) || !clear(x, y + S)) continue;
+    const lap = at(x - S, y) + at(x + S, y) + at(x, y - S) + at(x, y + S) - 4 * at(x, y);
+    n++; s1 += lap; s2 += lap * lap;
+  }
+  if (n < 200) return null;
+  const m = s1 / n;
+  return +(s2 / n - m * m).toFixed(1);
+}
 // t-sky2 · the haze over the horizon: the sky's luminance profile from the horizon line H up in NSLICE slices (each the
 // median L* of its sky pixels; null under 20), the L* of the lowest slice (L0, null when the lowest tenth has no sky) and
 // the height, as a share of H, where the profile first falls under HAZE_L (between two slices: linear), null when the
@@ -226,6 +256,8 @@ async function measureFrames() {
     out[name].stars = [NB - 3, NB - 2, NB - 1].map(k => { const [a, b] = bandRows(F.H, k); return starsOf(img, a, b, mask); });
     out[name].chroma = chromaOf(img, 0, bandRows(F.H, NB - 3)[1], mask);
     out[name].haze = hazeOf(img, F.H, mask);
+    // t-polish: the top band's fine structure (the nebula's filaments and knots)
+    { const [a, b] = bandRows(F.H, NB - 1); out[name].hf = hfOf(img, a, b, mask); }
   }
   return out;
 }
@@ -252,7 +284,9 @@ function targetOf(frames, kind) {
   const chroma = ch.length ? { mean: med2(ch.map(c => c.mean)), var: med2(ch.map(c => c.var)) } : null;
   const hz = names.map(n => frames[n].haze).filter(h => h);
   const haze = { L0: med2(hz.map(h => h.L0)), width: med2(hz.map(h => h.width)) };
-  return { frames: names, bands, space, stars, chroma, haze };
+  // t-polish: the median of the kind's frames' top-band fine structure
+  const hf = med2(names.map(n => (frames[n].hf === undefined ? null : frames[n].hf)));
+  return { frames: names, bands, space, stars, chroma, haze, hf };
 }
 async function reference() {
   const frames = await measureFrames();
@@ -277,7 +311,7 @@ async function overlay(dir) {
   }
 }
 
-module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, measureFrames, targetOf, reference, compare, REF };
+module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, hfOf, measureFrames, targetOf, reference, compare, REF };
 
 if (require.main === module) {
   (async () => {
@@ -288,12 +322,12 @@ if (require.main === module) {
     for (const [n, f] of Object.entries(ref.frames)) {
       console.log(`${n} ${f.kind.padEnd(6)} H ${f.H}  stars ${f.space.stars} contrast ${f.space.contrast} nebula ${f.space.nebula}`);
       console.log('   ' + f.bands.map((b, k) => k + ':' + (b.rgb ? b.rgb.map(v => Math.round(v)).join(',') + '(' + b.n + ')' : '—')).join('  '));
-      console.log(`   stars (bands 5 6 7) ${f.stars.map(v => (v === null ? '—' : v)).join(' ')}  chroma ${f.chroma ? f.chroma.mean + ' var ' + f.chroma.var : '—'}  haze L0 ${f.haze.L0} width ${f.haze.width}  profile ${f.haze.profile.map(v => (v === null ? '—' : Math.round(v))).join(' ')}`);
+      console.log(`   stars (bands 5 6 7) ${f.stars.map(v => (v === null ? '—' : v)).join(' ')}  chroma ${f.chroma ? f.chroma.mean + ' var ' + f.chroma.var : '—'}  haze L0 ${f.haze.L0} width ${f.haze.width}  profile ${f.haze.profile.map(v => (v === null ? '—' : Math.round(v))).join(' ')}  fine ${f.hf === null ? '—' : f.hf}`);
     }
     for (const kind of ['day', 'dusk', 'golden']) {
       const t = ref.targets[kind];
       console.log(`\ntarget ${kind} (${t.frames.join(' ')}) space ${JSON.stringify(t.space)}`);
-      console.log(`  stars (bands 5 6 7) ${t.stars.join(' ')}  chroma ${JSON.stringify(t.chroma)}  haze ${JSON.stringify(t.haze)}`);
+      console.log(`  stars (bands 5 6 7) ${t.stars.join(' ')}  chroma ${JSON.stringify(t.chroma)}  haze ${JSON.stringify(t.haze)}  fine (top band) ${t.hf}`);
       for (const b of t.bands) console.log(`  band ${b.k}  ${fmtB(b)}  frames ${b.frames || 0}  spread ΔE ${b.spread}`);
     }
     if (args[0] === '--write') { fs.writeFileSync(REF, JSON.stringify(ref, null, 1) + '\n'); console.log('\nwrote ' + REF); }
@@ -334,6 +368,12 @@ if (require.main === module) {
     check(dayN >= 5 && TD.stars && TD.stars.length === 3 && TD.stars.every(v => v > 1.5), `day: stars in each of the top three bands, ${dayN} frames (per 1000 sky pixels, bands 5 6 7: ${TD.stars && TD.stars.join(' ')})`);
     check(TD.chroma && TD.chroma.mean > 18 && TD.chroma.var > 9, `day: the space is coloured and varied (mean chroma C* ${TD.chroma && TD.chroma.mean}, its variance ${TD.chroma && TD.chroma.var})`);
     check(TD.haze && TD.haze.L0 > 74 && TD.haze.width > 0.1 && TD.haze.width < 0.35, `day: a bright haze over the horizon (L* ${TD.haze && TD.haze.L0} at the bottom, under L* ${HAZE_L} from ${TD.haze && TD.haze.width} of the sky's height)`);
+    // t-polish: the top band's fine structure (the variance of the 3-px Laplacian, the stars left out), stored per frame
+    // and as the targets; by day the frames have it (the nebula's filaments and knots over its clouds, t1_05, t3_05)
+    check(!!stored && ['day', 'dusk', 'golden'].every(k => stored.targets[k].hf === ref.targets[k].hf) && Object.keys(ref.frames).every(n => stored.frames[n] && stored.frames[n].hf === ref.frames[n].hf),
+      'the stored fine structure of the top band (per frame and target) is this measurement');
+    const hfN = TD.frames.filter(n => ref.frames[n].hf !== null).length;
+    check(hfN >= 5 && TD.hf > 100 && ref.frames.t1_05.hf > 50 && ref.frames.t3_05.hf > TD.hf, `day: the top band has fine structure, ${hfN} frames (the variance of the 3-px Laplacian: median ${TD.hf}; t1_05 ${ref.frames.t1_05.hf}, t3_05 ${ref.frames.t3_05.hf})`);
     console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
     process.exit(fails ? 1 : 0);
   })().catch(e => { console.error(e); console.log('FAILED 1'); process.exit(1); });

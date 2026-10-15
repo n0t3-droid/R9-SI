@@ -157,7 +157,25 @@ vec3 nebula(vec3 dir, float dayK) {
   vec3 g = floor(dir * 520.0);
   float s = hash13(g);
   dens += step(0.9975, s) * band * 3.0;
-  return col * dens;
+  vec3 res = col * dens;
+#ifndef LITE
+  // t-polish · the filaments (t1_05): fine bright threads and knots over the clouds — a ridged fbm of two octaves of the
+  // value noise in the gas's own domain drawn out along the band (squeezed across it ×10) and bent by the gas, so the
+  // threads follow the flow and curl with the clouds; thin crests (the ridge to the 6th), the second octave (a 2-D noise
+  // of the same domain, half the cost) breaking the first's threads and brightening where both crest (the knots); only
+  // where the gas is dense (the clouds carry them), the gas's own colour lifted. Strength u_skyDay.w (env.js VR.Sky.fil,
+  // at dusk and at night 0.3 of it); one 3-D and one 2-D noise call where the mask is on, none on Very Low (not in its
+  // shader). (A cell network — the ridges of isotropic noise — and straight parallel streaks were the two ways it went wrong)
+  float fm = smoothstep(0.1, 0.36, dens) * smoothstep(0.4, 0.62, n2) * u_skyDay.w;
+  if (fm > 0.0) {   // (the noise only where the gas can carry a thread)
+    vec3 qf = q * 4.0 + G * (b * 40.0) + vec3(n1 - 0.5, n2 - 0.5, hz - 0.5) * 3.6;
+    float r1 = 1.0 - abs(2.0 * vnoise3(qf) - 1.0), r2 = 1.0 - abs(2.0 * vnoise(vec2(dot(qf, vec3(0.8, 0.0, 0.6)), dot(qf, vec3(-0.36, 0.8, 0.48))) * 2.17 + 5.3) - 1.0);
+    r1 *= r1; r1 *= r1 * r1; r2 *= r2; r2 *= r2;
+    float fil = smoothstep(0.2, 0.8, r1 * (0.35 + 0.65 * r2) + r1 * r2 * 1.1) * fm;
+    res += (col * 1.4 + vec3(0.08)) * fil * (0.55 + 0.25 * dayK);
+  }
+#endif
+  return res;
 }
 // t-sky2 · the planets' light: from the sun's side, the part along the line of sight damped (× 0.3), so a planet seen
 // away from the sun is not a flat full disc but shows a lit side and a soft terminator, and one seen toward it is not a
@@ -350,7 +368,13 @@ vec3 skyColor(vec3 dir, bool withSun) {
     if (planetsK > 0.01) {
       // the nebula: by day its veil covers the top (1), at night the band carries it (0.3); its brightness by day
       // u_skySpace.w (t-sky2: fitted to the frames' chroma), at night 0.9; u_nebula: the grade's knob (t-look)
+      // (t-polish: on High and Balanced only where space shows — by day below the blue band cosmic is 0 and the nebula's
+      // thirteen noise calls were spent for nothing; Very Low's three cost less than the branch on SwiftShader)
+#ifdef LITE
       col += nebula(dir, u_skyDay.z) * cosmic * mix(u_skySpace.w, 0.9, u_night) * u_nebula;
+#else
+      if (cosmic > 0.0) col += nebula(dir, u_skyDay.z) * cosmic * mix(u_skySpace.w, 0.9, u_night) * u_nebula;
+#endif
       vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
       col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)

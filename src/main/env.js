@@ -48,6 +48,7 @@
     spaceDusk: [0.2, 0.7, 0.9, 0.55],
     fog: 0.3,
     haze: [0.99, 7.96],
+    fil: 1,               // t-polish · the nebula's filaments and knots (t1_05), their strength (u_skyDay.w); not in Very Low's shader
   }, VR.Sky || {});
 
   class Env {
@@ -137,7 +138,7 @@
       zen = gray(zen, rain * 0.75); hor = gray(hor, rain * 0.7); mid = gray(mid, rain * 0.72);
       zen = zen.map(v => v * (1 - rain * 0.45) * (1 - W.dark * 0.5)); hor = hor.map(v => v * (1 - rain * 0.4) * (1 - W.dark * 0.4)); mid = mid.map(v => v * (1 - rain * 0.42) * (1 - W.dark * 0.45));
       E.zenith = zen; E.horizon = hor; E.skyMid = mid; E.skyStops = stops; E.skySpace = SKY.on ? [0, 1, 2, 3].map(i => { const d = SKY.spaceDusk[i], v = i < 3 ? SKY.space[i] : SKY.nebDay; return d + (v - d) * wDay; }) : [SKY.space[0], SKY.space[1], SKY.space[2], 1.3];
-      E.skyDay = SKY.on ? [0.6 + (SKY.haze[0] - 0.6) * wDay, 1 + (SKY.haze[1] - 1) * wDay, wDay, 0] : [0.6, 1, 0, 0]; E.sunset = sunset.map(v => v * (1 - rain * 0.8));
+      E.skyDay = SKY.on ? [0.6 + (SKY.haze[0] - 0.6) * wDay, 1 + (SKY.haze[1] - 1) * wDay, wDay, SKY.fil * (0.3 + 0.7 * wDay)] : [0.6, 1, 0, 0]; E.sunset = sunset.map(v => v * (1 - rain * 0.8));
       const sunI = M.smoothstep(-0.05, 0.3, sy);
       const warm = (1 - M.smoothstep(0.05, 0.6, sy)) * GRADE.sunWarm;
       E.sunColor = mix3([2.9, 2.72, 2.4], [2.7, 1.3, 0.48], warm).map(v => v * sunI * (1 - rain * 0.7) * W.sun * GRADE.sunK);
