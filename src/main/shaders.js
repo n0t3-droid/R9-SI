@@ -710,6 +710,52 @@ float shadowAt(vec3 N, vec3 L) {
 #endif
   return s;
 }
+#ifdef PBR
+// t-material · PBR-lite (plan 2026-10-15-t-material.md, step 1). The material table (tex_pbr.js): per layer r metal, g a
+// clear coat (polish, lacquer, gloss tiles, painted hulls), b a scale on the painter's roughness (128 = ×1), a flags.
+uniform sampler2D u_pbr;
+float pow5(float x) { float x2 = x * x; return x2 * x2 * x; }
+// the sky seen in a reflection: the sky's gradient (matEnv) and the low sun's warm glow toward it; a rough surface sees it
+// blurred toward the mean of the sky
+vec3 pbrSky(vec3 R, float r) {
+  vec3 s = matEnv(R);
+  float ts = max(dot(R, u_sunDir), 0.0), t2 = ts * ts, t4 = t2 * t2, t8 = t4 * t4;
+  s += u_sunset * (t8 * 0.8) + u_sunColor * (t8 * t8 * t4 * 0.3 * (1.0 - r));
+  return mix(s, u_ambSky * 0.85 + u_skyHorizon * 0.15, r * r);
+}
+// the environment a surface reflects: the sky where the sky light reaches it, the block lights' colour where it does not
+// (a glossy hall floor shines in the colour of its lamps)
+vec3 pbrEnv(vec3 R, float r, float so, vec3 blockL) { return pbrSky(R, r) * so + blockL * (0.55 - 0.35 * so); }
+// GGX (Trowbridge-Reitz) with Schlick's Fresnel and a Kelemen visibility; the lobe capped (no fireflies under the jitter)
+vec3 pbrSun(vec3 n, vec3 V, vec3 L, float r, vec3 F0) {
+  vec3 H = normalize(L + V);
+  float nh = max(dot(n, H), 0.0), vh = max(dot(V, H), 0.0), a = r * r, a2 = a * a, d = nh * nh * (a2 - 1.0) + 1.0;
+  float D = min(a2 / (3.14159 * d * d), 48.0);
+  return D * (F0 + (1.0 - F0) * pow5(1.0 - vh)) * (0.25 / max(vh * vh, 0.06));
+}
+// the gloss of one fragment: col is its lit colour (diffuse, ambient, block light), lsun the sun's light reaching it
+// (shadow and the open sky applied), so the sky's specular occlusion. Matte things (rough, no coat, no metal) return col.
+vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 V, vec3 L, vec3 lsun, float ndl, float rough, float layer, float so, vec3 blockL, float wetK, float pud) {
+  vec4 pb = texelFetch(u_pbr, ivec2(int(layer), 0), 0);
+  float metal = pb.r, coat = max(pb.g, max(wetK * 0.75, pud));   // (the rain's film is a coat of water)
+  float r = clamp(rough * pb.b * 1.9922, 0.045, 1.0);
+  if (r > 0.8 && coat < 0.004 && metal < 0.004) return col;
+  float nv = clamp(dot(n, V), 1e-3, 1.0), fv = pow5(1.0 - nv);
+  vec3 R = reflect(-V, n);
+  vec3 F0 = mix(vec3(0.04), alb, metal);
+  vec3 Fr = (F0 + (max(vec3(1.0 - r), F0) - F0) * fv) * (1.0 - smoothstep(0.7, 0.92, r));   // Schlick with roughness
+  // the base: a metal keeps little of its diffuse; the reflection takes its share of the rest
+  vec3 c = col * (1.0 - 0.8 * metal) * (1.0 - Fr * (1.0 - metal)) + pbrEnv(R, r, so, blockL) * Fr;
+  if (ndl > 0.0 && r < 0.92) c += lsun * ndl * pbrSun(n, V, L, max(r, 0.08), F0);
+  // the clear coat: a second, sharp interface over it (the polish, the lacquer, the water of a puddle)
+  if (coat > 0.004) {
+    float rc = mix(0.08, 0.04, pud), Fc = (0.04 + 0.96 * fv) * coat;
+    c = c * (1.0 - Fc) + pbrEnv(R, rc, so, blockL) * Fc;
+    if (ndl > 0.0) c += lsun * ndl * pbrSun(n, V, L, rc, vec3(0.04)) * coat;
+  }
+  return c;
+}
+#endif
 void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
@@ -865,7 +911,10 @@ void main() {
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
   if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
   vec3 col = alb.rgb * lighting;
-#ifndef LITE
+#if defined(PBR)
+  // t-material: the gloss of the material (pbrShade above) in place of the one sun highlight
+  if (!noshade) col = pbrShade(col, alb.rgb, n, V, L, lc * (sh * outdoors), ndl, rough, layer, skyL * ao, blockL, wetK, pud);
+#elif !defined(LITE)
   // specular highlights (sun glints on smooth surfaces)
   if (rough < 0.75 && ndl > 0.0) {
     vec3 H = normalize(L + V);
@@ -873,6 +922,7 @@ void main() {
     col += lc * sp * sh * outdoors * (1.0 + u_rain * 1.5);
   }
 #endif
+#ifndef PBR
   if (u_matTier > 0.5) {
     // F2 · the response: metal reflects the sky tinted by its colour, wet surfaces and puddles mirror it at grazing angles
     // (outdoors only), varnished wood takes a soft sheen (tier 3)
@@ -882,6 +932,7 @@ void main() {
     col = mix(col, envC, outdoors * clamp(wetK * (0.1 + 0.9 * fresW) + pud * (0.6 + 0.4 * fresW), 0.0, 0.9));
     if (fam == 2 && u_matTier > 2.5 && ndl > 0.0) { vec3 Hs = normalize(L + V); col += lc * pow(max(dot(n, Hs), 0.0), 22.0) * 0.1 * sh * outdoors; }
   }
+#endif
   if (emis > 0.02 || emissiveFace) {
     float e = emissiveFace ? max(emis, 0.85) : emis;
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);

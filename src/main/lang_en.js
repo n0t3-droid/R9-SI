@@ -336,6 +336,10 @@
     'g.set.texLite.tip': 'Slanted faces are filtered 2× instead of 4× anisotropic — less texture work for weak graphics chips, but meadows and slopes in the distance look a little softer. No preset turns this on.',
     'g.set.dprLite': 'Resolution no higher than the screen',
     'g.set.dprLite.tip': 'The picture is never computed larger than the screen has pixels (Windows scaling 125 or 150 %); on Ultra · Leicht at most 1920 × 1080, the browser scales up the rest.',
+    // t-material · Glanz & Spiegelungen
+    'g.set.pbr': 'Gloss & reflections',
+    'g.set.pbr.tip': 'Polished stone, gloss tiles, lacquer and metal mirror the sky and the sun; on High glossy floors mirror the world too — prettier, costs a little.',
+    'g.set.pbrV': ['Off', 'Gloss', 'Gloss + mirror'],
     'g.aq.ul.far': 'far cache redrawn less often',
     'g.aq.ul.shadow': 'shadow tiles redrawn less often',
     'g.aq.ul.refl': 'lighter water mirror',

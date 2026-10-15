@@ -100,6 +100,10 @@
       const famBytes = new Uint8Array((tex.layers + 3) & ~3);
       if (VR.R && VR.R.texNames && VR.matFamilies && VR.R.texNames.length === tex.layers) famBytes.set(VR.matFamilies(VR.R.texNames));
       this.texFam = GL.tex2D(tex.layers, 1, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: famBytes, wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
+      // t-material: the PBR-lite material table (tex_pbr.js), four bytes a layer: metal, clear coat, roughness scale, flags
+      const pbrBytes = new Uint8Array(tex.layers * 4).fill(0); for (let l = 0; l < tex.layers; l++) pbrBytes[l * 4 + 2] = 128;
+      if (VR.R && VR.R.texNames && VR.PBR && VR.R.texNames.length === tex.layers) pbrBytes.set(VR.PBR.row(VR.R.texNames).subarray(0, tex.layers * 4));
+      this.texPbr = GL.tex2D(tex.layers, 1, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: pbrBytes, wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
@@ -134,12 +138,13 @@
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE']));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [])));   // (F10 · zPre: invariant positions)
-      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE']));
-      P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL']);
-      P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT']);
-      P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
+      const pb = VR.PBR ? VR.PBR.defines(this.q) : [];   // t-material: PBR (tier ≥ 1), SSR (tier 2); none on the lite look (Very Low)
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb]));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb)));   // (F10 · zPre: invariant positions)
+      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE', ...pb]));
+      P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
+      P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT', ...pb.filter(d => d !== 'SSR')]);
+      P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
       P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky', this.q.lite ? ['LITE'] : []);   // LITE: two-octave nebula, no dust (Very Low)
@@ -430,8 +435,9 @@
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
       const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre: its own program define; texLite: the sampler)
+      const prevPbr = this.q.pbr | 0;   // (t-material: the gloss tier is a program define)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || (this.q.pbr | 0) !== prevPbr) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
@@ -835,6 +841,7 @@
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
       if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
+      if (p.u.u_pbr && this.texPbr) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.texPbr); gl.uniform1i(p.u.u_pbr, 10); }   // (t-material: the material table)
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowRead || this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {

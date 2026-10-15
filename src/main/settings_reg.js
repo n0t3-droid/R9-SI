@@ -123,3 +123,9 @@
   // the picture stays) — on for Ultra · Leicht and on every preset of an integrated GPU (game.js ipuDefaults)
   for (const k of ['hdrLite', 'postLite', 'zPre', 'texLite', 'dprLite']) S.add({ key: k, g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.' + k, tip: 'g.set.' + k + '.tip', cost: 'low', def: false });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
+// t-material · Glanz & Spiegelungen (tex_pbr.js; plan 2026-10-15-t-material.md): 0 the old highlight · 1 the gloss of the
+// materials with the sky in it · 2 and the screen-space mirror (High and up); Very Low has none of it
+(function (VR) {
+  'use strict';
+  VR.Settings.add({ key: 'pbr', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.pbr', tip: 'g.set.pbr.tip', cost: 'mid', def: 1, min: 0, max: 2, step: 1, vals: 'g.set.pbrV' });
+})(typeof VR !== 'undefined' ? VR : self.VR);

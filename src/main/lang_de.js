@@ -336,6 +336,10 @@
     'g.set.texLite.tip': 'Schräge Flächen werden 2-fach statt 4-fach anisotrop gefiltert — weniger Texturarbeit für schwache Grafikchips, dafür wirken Wiesen und Hänge in der Ferne etwas weicher. Keine Voreinstellung schaltet das ein.',
     'g.set.dprLite': 'Auflösung höchstens wie der Bildschirm',
     'g.set.dprLite.tip': 'Das Bild wird nie größer gerechnet, als der Bildschirm Pixel hat (Windows-Skalierung 125 oder 150 %); bei Ultra · Leicht höchstens 1920 × 1080, den Rest vergrößert der Browser.',
+    // t-material · Glanz & Spiegelungen
+    'g.set.pbr': 'Glanz & Spiegelungen',
+    'g.set.pbr.tip': 'Polierter Stein, Glanzfliesen, Lack und Metall spiegeln Himmel und Sonne; auf Hoch spiegeln glänzende Böden auch die Welt — schöner, kostet etwas.',
+    'g.set.pbrV': ['Aus', 'Glanz', 'Glanz + Spiegel'],
     'g.aq.ul.far': 'Fern-Cache seltener neu',
     'g.aq.ul.shadow': 'Schatten-Kacheln seltener neu',
     'g.aq.ul.refl': 'Wasserspiegel leichter',

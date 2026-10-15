@@ -33,6 +33,11 @@
   PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1; PRESETS.ultraLite.smoothFolk = 1;
   // t-folk2: the people in the shadow map (folkgpu.js castShadows) where there is one — Balanced and up
   for (const p in PRESETS) PRESETS[p].folkShadow = PRESETS[p].shadows > 0 ? 1 : 0;
+  // t-material · Glanz & Spiegelungen (tex_pbr.js, shaders.js PBR): 0 the old highlight · 1 the gloss of the materials with
+  // the sky's reflection · 2 and the screen-space mirror (High and up); Very Low none (its lite programs never carry it)
+  const PBR_TIER = { potato: 0, low: 1, balanced: 1, high: 2, ultra: 2, ultraLite: 2 };
+  for (const p in PRESETS) PRESETS[p].pbr = PBR_TIER[p] | 0;
+  const MAT_SW = ['pbr'];
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)
@@ -69,6 +74,8 @@
       if (s.rdMax === undefined && s.preset) out.rdMax = PRESETS[s.preset] ? PRESETS[s.preset].rdMax : 24;
       // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
+      // t-material: settings saved before the gloss tiers follow their preset (a custom one: the gloss without the mirror, none when lite)
+      for (const k of MAT_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? 0 : 1);
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -141,6 +148,7 @@
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
       if (key !== '*' && F9_SW.includes(key)) S.preset = 'custom';   // (F9: a switch of Ultra · Leicht changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
+      if (key !== '*' && MAT_SW.includes(key)) S.preset = 'custom';   // (t-material: the gloss tier)
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -153,6 +161,7 @@
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
+      if (r) { const qb = r.qBase || (r.qBase = {}); qb.pbr = S.pbr === undefined ? (S.lite ? 0 : 1) : Math.max(0, Math.min(2, S.pbr | 0)); }   // t-material: the gloss tier (renderer: the PBR / SSR defines)
       if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite });   // (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
       if (this.world) { const wp = this.propMask(); if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
