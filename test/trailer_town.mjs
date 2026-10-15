@@ -87,7 +87,10 @@ async function runPage(tag, dist) {
     const t0 = Date.now(); let s = null, i = 0, done = false, sig = '', sigT = Date.now();
     for (; ; i++) {
       await step(10);
-      s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown }; });
+      // (continuation 3: the dirty sections are counted within the view distance only — run 5 waited out the full SETTLE_S
+      // on every picture for ~1150 dirty sections of columns beyond it that are never remeshed while the player stays put;
+      // they are reported as farDirty)
+      s = await ev(() => { const g = VR.game, w = g.world; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0, farDirty = 0; for (const c of w.cols.values()) { const dx = c.cx - pcx, dz = c.cz - pcz, near = dx * dx + dz * dz <= (rd + 1) * (rd + 1); for (const sc of c.sec) if (sc.dirty || sc.pending) { if (near) dirty++; else farDirty++; } } let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, farDirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown }; });
       done = s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0;
       if (done && i > 2) break;
       const left = s.pend + s.dirty + s.up + s.unshown + s.busy, k = [s.pend, s.dirty, s.up, s.unshown].join(',');
