@@ -461,6 +461,20 @@
       return p;
     }
     end(r, layer) { const gl = r.gl; if (layer !== 'opaque') { gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE); } }
+    // a ship drawn see-through (t-life: a craft fading in or out far away — the sky traffic at its horizon, a pad's
+    // visitor): its hull, gear and glass in the translucent pass at that alpha, its own depth written and its back faces
+    // culled, so its far side stays hidden
+    drawAlpha(r, E, s, cam, alpha, light) {
+      const gl = r.gl, d = s.d; if (!d || !d.gpu) return;
+      const p = this.begin(r, E, 'trans');
+      gl.depthMask(true); gl.enable(gl.CULL_FACE);
+      gl.uniform1f(p.u.u_alpha, Math.max(0, Math.min(1, alpha)));
+      if (p.u.u_clipNear) gl.uniform1f(p.u.u_clipNear, 0);
+      gl.uniformMatrix4fv(p.u.u_model, false, this.modelMat(s, cam, 1));
+      gl.uniform1f(p.u.u_sky, light.sky); gl.uniform3f(p.u.u_blockLight, light.bl[0], light.bl[1], light.bl[2]);
+      for (const mm of [d.gpu.hull, s.gear > 0.5 ? d.gpu.gear : null, d.gpu.glass]) { if (!mm) continue; gl.bindVertexArray(mm.vao); gl.drawArrays(gl.TRIANGLES, 0, mm.count); }
+      this.end(r, 'trans');
+    }
     lightAt(x, y, z) {
       const w = this.g.world; if (!w) return { sky: 1, bl: [0, 0, 0] };
       const l = w.getLight(Math.floor(x), Math.floor(y), Math.floor(z));

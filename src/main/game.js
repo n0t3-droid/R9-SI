@@ -11,7 +11,7 @@
     // far: F-Far's ring 1 (the forms out to that many chunks, ~1 km on High and Ultra; 0 = none) · rdMax: the top of the
     // render-distance slider (32 on Ultra, 24 elsewhere as before)
     // F9 · Ultra für schwache PCs: Ultra runs Smart Quality too (dynRes on): it steps down only when the frame rate asks, and never lowers a ring or the view distance
-    potato: { far: 0, rdMax: 24, upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.3, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false, anim: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant', smoothPlants: 0, smoothFurn: 0 },
+    potato: { far: 0, rdMax: 24, upload: 1.5, renderDist: 4, scale: 0.55, shadows: 0, clouds: 1, particles: 0, bloom: false, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.8, horizon: 2, sunShadows: false, tsr: true, vxLod: 12, lite: true, sharpen: true, folk: 32, slow: true, wetGround: false, anim: false , matTier: 0, dropShadow: 0, lampGlow: 0, water: 0, bau: 'instant', smoothPlants: 0, smoothFurn: 0 },
     low: { far: 0, rdMax: 24, upload: 2, renderDist: 6, scale: 0.75, shadows: 0, clouds: 1, particles: 1, bloom: true, rays: false, fxaa: false, fancyLeaves: false, dynRes: true, magic: 0.6, horizon: 4, sunShadows: true, tsr: true, vxLod: 28, lite: false, folk: 64, slow: false, wetGround: true, anim: true , matTier: 1, dropShadow: 1, lampGlow: 0, water: 1, bau: 'site', smoothPlants: 1, smoothFurn: 1 },
     balanced: { far: 0, rdMax: 24, upload: 2.5, renderDist: 10, scale: 0.9, shadows: 1, clouds: 2, particles: 2, bloom: true, rays: false, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.8, horizon: 4, sunShadows: true, tsr: true, vxLod: 44, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 2, dropShadow: 1, lampGlow: 1, water: 1, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
     high: { far: 64, rdMax: 24, upload: 3, renderDist: 14, scale: 1, shadows: 2, clouds: 2, particles: 2, bloom: true, rays: true, fxaa: true, fancyLeaves: true, dynRes: true, magic: 0.85, horizon: 4, sunShadows: true, tsr: true, vxLod: 64, lite: false, folk: 100, slow: false, wetGround: true, anim: true , matTier: 3, dropShadow: 1, lampGlow: 1, water: 2, bau: 'site', smoothPlants: 2, smoothFurn: 1 },
@@ -374,6 +374,11 @@
       this.traffic = VR.Traffic ? new VR.Traffic(this) : null;
       if (this.traffic) this.traffic.t = 2.5;
     }
+    // t-life (padlife.js, lifedirector.js): the pads' visiting craft and the Regisseur des Lebens of this world
+    lifeStart() {
+      if (this.padLife) this.padLife.destroy(); this.padLife = VR.PadLife ? new VR.PadLife.Actor(this) : null;
+      if (this.lifeDirector) this.lifeDirector.destroy(); this.lifeDirector = VR.LifeDirector ? new VR.LifeDirector.Actor(this) : null;
+    }
     teardownWorld() {
       if (VR.Baustelle && VR.Baustelle.reset) VR.Baustelle.reset(this.gadgets && this.gadgets.blue);   // (a construction site's bar and meshes go with the world)
       if (this.world) { this.world.destroy(); this.world = null; }
@@ -386,6 +391,7 @@
       if (this.villages) { this.villages.destroy(); this.villages = null; } if (VR.Crowd && VR.Crowd.attach) VR.Crowd.attach(null);
       if (this.hall) { this.hall.destroy(); this.hall = null; }
       if (this.trams) { this.trams.destroy(); this.trams = null; }
+      if (this.padLife) { this.padLife.destroy(); this.padLife = null; } if (this.lifeDirector) { this.lifeDirector.destroy(); this.lifeDirector = null; }   // (t-life: the pads' visitors, the Regisseur des Lebens)
       if (this.horizon) this.horizon.reset();
       if (this.furnaces) this.furnaces.clear();
       this.renderer && (this.renderer.visDirty = true);
@@ -451,6 +457,7 @@
       this.hall = VR.Hall ? new VR.Hall(this) : null;   // the Hangar Hall's heroes and console lights (hall.js)
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
+      this.lifeStart();   // (t-life: ships that stay on their pads, the Regisseur des Lebens)
       this.world.listeners.push(this);
       if (this.mp) this.world.listeners.push(this.mp);
       // the columns that loaded during the start (the await above, before the game listened) get their spawns now: the
@@ -649,6 +656,7 @@
       this.hall = VR.Hall ? new VR.Hall(this) : null;   // the Hangar Hall's heroes and console lights (hall.js)
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
+      this.lifeStart();   // (t-life: ships that stay on their pads, the Regisseur des Lebens)
       this.world.listeners.push(this);
       this.world.listeners.push(mp);
       this.state = 'loading';
@@ -1097,6 +1105,7 @@
       if (this.mirror) this.mirror.update(dt);
       if (this.starships) this.starships.update(dt);
       if (this.traffic) this.traffic.update(dt);
+      if (this.padLife) this.padLife.update(dt); if (this.lifeDirector) this.lifeDirector.update(dt);   // (t-life)
       if (this.director) this.director.update(dt);
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
@@ -1178,8 +1187,8 @@
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
-        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); },
-        drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.hall) this.hall.drawTrans(r, E2); if (this.trails) this.trails.draw(r, E2); },
+        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); if (this.padLife) this.padLife.draw(r, E2, 'opaque', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'opaque', cam); },
+        drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.padLife) this.padLife.draw(r, E2, 'trans', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'trans', cam); if (this.hall) this.hall.drawTrans(r, E2); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
       });
       if (this.cockpit) this.cockpit.updateHud(dt);

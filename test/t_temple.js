@@ -210,11 +210,16 @@ new Function('VR', fs.readFileSync(path.join(__dirname, '../src/main/hangarfligh
   };
   const runA = (o, secs) => { const m = mkGame(o), a = new HF.Actor(m.g); for (let t = 0; t < secs; t += 1 / 30) a.update(1 / 30); return Object.assign(m, { a }); };
   const r1 = runA({ anim: true }, 6);
-  check(r1.calls.design === 1 && r1.a.active && r1.a.variant === 'hall' && r1.home.hidden && r1.calls.trail > 0, `near the temple with the animation on: the shuttle flies (design built once, engines ${r1.calls.trail}, the parked one is out flying: hidden ${r1.home.hidden})`);
+  // (t-life: two craft share the pad — the hangar's own shuttle and a second one: two designs, each built once)
+  check(r1.calls.design === 2 && r1.a.active && r1.a.variant === 'hall' && r1.home.hidden && r1.calls.trail > 0, `near the temple with the animation on: the two shuttles fly (two designs, each built once: ${r1.calls.design}; engines ${r1.calls.trail}; the parked one is one of them: hidden ${r1.home.hidden})`);
   const r2 = runA({ anim: false }, 6);
   check(r2.calls.design === 0 && !r2.a.active && r2.calls.trail === 0 && r2.calls.part === 0 && !r2.home.hidden, 'Animierte Anzeigen off (Very Low): nothing is built, flown or spent; the parked shuttle stays on the pad');
-  const r3 = runA({ anim: true, player: [0.5, 81, -200] }, 6);
-  check(r3.calls.design === 0 && !r3.a.active && r3.calls.trail === 0, 'in the city, 220 blocks from the mouth: nothing runs (no cost)');
+  // (t-life: within 360 blocks of the mouth the two fly on, drawn fading with the distance, so nothing pops in or out; the
+  // plumes and the dust are made only within 260 blocks of a craft; past 380 blocks nothing runs)
+  const r3 = runA({ anim: true, player: [0.5, 81, -400] }, 6);
+  check(r3.calls.design === 0 && !r3.a.active && r3.calls.trail === 0, 'in the city, 420 blocks from the mouth: nothing runs (no cost)');
+  const r3b = runA({ anim: true, player: [0.5, 81, -320] }, 6);
+  check(r3b.a.active && r3b.a.crafts.every(C => C.dist > 260 || C.alpha >= 0) && r3b.calls.part === 0, `340 blocks from the mouth: the two fly on, faded with the distance (alpha ${r3b.a.crafts.map(C => C.alpha.toFixed(2)).join(', ')}), no dust is made`);
   const r4 = runA({ anim: true, temple: false }, 6);
   check(!r4.a.active && r4.calls.design === 0, 'no Gate Temple (another world type): no shuttle');
   const r5 = runA({ anim: true, other: true }, 6);
@@ -233,7 +238,7 @@ new Function('VR', fs.readFileSync(path.join(__dirname, '../src/main/hangarfligh
   const st0 = HF.at(a.plan, a.t);
   check(Math.abs(a.inst.yaw - st0.yaw) < 1e-9 && Math.abs(a.inst.pos[2] - st0.pos[2]) < 1e-9, `jump: the shuttle is put on its path at once (z ${a.inst.pos[2].toFixed(1)}, yaw ${a.inst.yaw.toFixed(2)})`);
   const before = m.calls.draw; a.draw(r, {}, 'opaque'); a.draw(r, {}, 'trans');
-  check(m.calls.draw - before === 2 && m.calls.trail > 0 && m.calls.part > 0, `the shuttle is drawn (hull and canopy) with its engines (${m.calls.trail}) and jets and dust (${m.calls.part})`);
+  check(m.calls.draw - before >= 2 && m.calls.trail > 0 && m.calls.part > 0, `the shuttles are drawn (hull and canopy: ${m.calls.draw - before} draws) with their engines (${m.calls.trail}) and jets and dust (${m.calls.part})`);
   // the hall: the crew walks (a stride pose) and is drawn where the walk puts it
   const drawn = [];
   VR.Folk.model = () => ({}); VR.Folk.heroPose = (o) => ({ head: [0, 0, 0, 0, 0, 0], body: [0, 0, 0, 0, 0, 0], walk: o.walk, walkAmt: o.walkAmt });

@@ -10,8 +10,17 @@ procedural and our own: the terrain, the cities, the textures, the sky, the wate
 repository as a ZIP (*Code → Download ZIP*) and open `play/R9-SI.html`. Chrome, Edge or Firefox; worlds are saved in
 your browser. Build it yourself with `node build.js` → `dist/` (plain JavaScript, nothing to install).
 
-An independent, non-commercial work: not affiliated with, endorsed or approved by any other game company
-(NOT AN OFFICIAL MINECRAFT PRODUCT — Minecraft is a trademark of Mojang). Impressum, privacy and credits: 📜 in the game.
+**An independent work.** R9-SI and R9 Studio are an independent, non-commercial hobby project — an original voxel game
+inspired by the block sandbox genre. They are not affiliated with, endorsed, sponsored or approved by any other game
+company. NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. Minecraft is a
+trademark of Mojang. Impressum, privacy policy and credits: 📜 in the pause menu, the settings and the Studio's header.
+
+**Files.** The Studio opens structures from WorldEdit / Amulet / Axiom (.schem), vanilla structure files (.nbt),
+Litematica (.litematic), MagicaVoxel (.vox) and R9 Bauteile (.json), and exports .schem, .vox and .json.
+NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT. WorldEdit, Amulet,
+Axiom, Litematica, MCEdit and MagicaVoxel are names or trademarks of their respective owners, named only to describe
+which files the Studio reads and writes. Share only what is yours — every export says so in one line.
+
 The long release notes live in [docs/CHANGELOG.md](docs/CHANGELOG.md); how to work on the code in [AGENTS.md](AGENTS.md).
 
 ## The mathematics and physics inside

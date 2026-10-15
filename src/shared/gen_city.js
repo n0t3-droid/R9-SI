@@ -292,7 +292,7 @@
       }
     });
     // (the turning circles: their cells are the road's at its end's height; the bed in the middle is no road)
-    const bedCells = [];
+    const bedCells = [], circleCells = new Set();
     for (const t of turns) {
       for (let z = Math.floor(t.z - t.r - 1); z <= Math.ceil(t.z + t.r + 1); z++) for (let x = Math.floor(t.x - t.r - 1); x <= Math.ceil(t.x + t.r + 1); x++) {
         const d = Math.hypot(x + 0.5 - t.x, z + 0.5 - t.z), key = x + ',' + z;
@@ -300,8 +300,18 @@
         if (d <= t.bed) { cellRoad.delete(key); bedCells.push([x, z, t]); continue; }
         // (every cell of the circle is the circle's, the road's own included: the road's kerbs end where it meets the
         //  circle, whose rim carries the line on round — the ring round the bed is no kerb of the road)
-        cellRoad.set(key, [t.ri, 0, t.k, t.y]);
+        cellRoad.set(key, [t.ri, 0, t.k, t.y]); circleCells.add(key);
       }
+    }
+    // vgen 10 (t-beauty): a street climbs in half steps — where its surface rises a block from one sample to the next,
+    // the road's cells of the two samples below the rise get a light grey slab (the kerb's own) on their paving; the
+    // light lines at its kerbs stay as they are (beauty_audit run c2's street_2: Palm Row's one-block rise at x ≈ 51 read
+    // as a low wall across the street eleven blocks ahead — four such, 80 → 81 → 82 at both its ends; beauty_rules 11)
+    const ramp = new Set();
+    if (g.vgen >= 10) for (const [key, c] of cellRoad) {
+      const ys = roads[c[0]].ys, s = c[2], y = c[3];
+      if (circleCells.has(key) || ys[s] !== y) continue;
+      for (const dir of [1, -1]) if (ys[s + dir] === y + 1 || (ys[s + dir] === y && ys[s + 2 * dir] === y + 1)) { ramp.add(key); break; }
     }
     for (const key of cellRoad.keys()) { const [x, z] = key.split(',').map(Number); setO(x, z, 1); }
     for (const [x, z] of bedCells) setO(x, z, 6);
@@ -565,7 +575,7 @@
         if (!isRoad && !isPath && !isKerb && o !== 6 && o !== 4 && gy >= Y0 + 2) continue;   // the hill: kept as it is
         if (gy < y) fill(x, z, gy + 1, y - 1, K.DIRT);
         fill(x, z, y + 1, Math.max(y + 6, gy + 2), AIR);
-        if (isRoad) { put(x, y, z, lineSet.has(key) ? K.LINE : K.PAVE); continue; }
+        if (isRoad) { put(x, y, z, lineSet.has(key) ? K.LINE : K.PAVE); if (ramp.has(key) && !lineSet.has(key)) put(x, y + 1, z, K.KERB); continue; }
         if (isPath) { const kd = pathCells.get(key); put(x, y, z, kd === 'line' ? K.LINE : kd === 'amber' ? K.AMBER : K.PAVE); continue; }
         put(x, y, z, K.GRASS);
         if (isKerb && o === 8) put(x, y + 1, z, K.KERB);
