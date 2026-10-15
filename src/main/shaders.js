@@ -136,8 +136,16 @@ vec3 nebula(vec3 dir, float dayK) {
 #else
   float wisp = smoothstep(0.55, 0.85, n2) * smoothstep(0.15, 0.7, dir.y) * 0.3;
 #endif
+#ifdef LITE
+  float cloud = smoothstep(0.4, 0.78, n1 * 0.8 + n2 * 0.3) * (0.4 + n1) * smoothstep(0.1, 0.5, dir.y) * 0.8;   // (two octaves: a softer edge, no round blobs)
+#else
   float cloud = smoothstep(0.5, 0.66, n1 * 0.8 + n2 * 0.3) * (0.4 + n1) * smoothstep(0.1, 0.5, dir.y) * 0.8;
+#endif
+#ifdef LITE
+  float clump = mix(1.0, smoothstep(0.36, 0.74, n1 * 0.8 + n2 * 0.3), dayK * 0.9);
+#else
   float clump = mix(1.0, smoothstep(0.44, 0.66, n1 * 0.8 + n2 * 0.3), dayK * 0.9);
+#endif
   float dusty = (1.0 - 0.65 * soft) * (1.0 - (0.2 + 0.4 * dayK) * lane) * (1.0 + (0.3 + 0.5 * dayK) * rim);   // (the lanes and rims faint at night: the night keeps its soft look)
   float dens = band * (0.35 + 1.35 * n1 * n1) * clump * dusty + (1.0 - band) * mix(wisp, cloud * dusty, dayK) + core * 0.6;
   // sparkling star clusters inside the band
