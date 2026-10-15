@@ -98,5 +98,23 @@
   // the MIDI note of a pentatonic degree d (may be negative or above five) over a plan's root
   function degreeMidi(plan, d) { const s = plan.scale, k = ((d % 5) + 5) % 5; return plan.root + s[k] + 12 * Math.floor(d / 5); }
 
-  VR.Klang = { FAMILIES, RECIPES, HIT, NAME_RULES, SOUND, familyOf, pitchFactor, timbre, stepGain, UI, DB18, SCALE, rng, seedOf, musicPlan, degreeMidi };
+  // the swell of a wow moment (t-vista, wowmoment.js): a rise of `bars` bars of `bar` seconds over a day's plan — the
+  // chord a pentatonic step higher each bar (from the colour of the day's first chord), the pad growing, a bell arpeggio
+  // climbing through each bar, and the arrival: the octave over the last chord held over the last beat. Pentatonic only
+  // (degreeMidi), so it sits on whatever the calm layer played; the bells kept in the fifth octave whatever the day's key.
+  // Returns the notes {midi, kind: 'pad' | 'bass' | 'bell', t (seconds from the start), dur, gain}
+  function swellPlan(plan, bars, bar) {
+    const B = Math.max(1, bars | 0 || 4), L = bar > 0 ? bar : 1, out = [];
+    const c0 = plan.prog[0] > 2 ? plan.prog[0] - 5 : plan.prog[0], up = plan.root > 62 ? 0 : 12;
+    for (let b = 0; b < B; b++) {
+      const ch = c0 + b, grow = b / Math.max(1, B - 1);
+      for (const d of [ch, ch + 2, ch + 4]) out.push({ midi: degreeMidi(plan, d) - 12, kind: 'pad', t: b * L, dur: L * 1.1, gain: 0.03 + 0.03 * grow });
+      out.push({ midi: degreeMidi(plan, ch) - 24, kind: 'bass', t: b * L, dur: L, gain: 0.05 + 0.03 * grow });
+      for (let i = 0; i < 4; i++) out.push({ midi: degreeMidi(plan, ch + i) + up, kind: 'bell', t: b * L + i * L / 4, dur: L * 0.9, gain: 0.025 + 0.025 * (b * 4 + i) / (B * 4) });
+    }
+    out.push({ midi: degreeMidi(plan, c0 + B - 1 + 5) + up, kind: 'bell', t: B * L - L / 4, dur: L * 2, gain: 0.06 });
+    return out;
+  }
+
+  VR.Klang = { FAMILIES, RECIPES, HIT, NAME_RULES, SOUND, familyOf, pitchFactor, timbre, stepGain, UI, DB18, SCALE, rng, seedOf, musicPlan, degreeMidi, swellPlan };
 })(VR);

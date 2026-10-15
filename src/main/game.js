@@ -418,6 +418,7 @@
       if (this.hall) { this.hall.destroy(); this.hall = null; }
       if (this.trams) { this.trams.destroy(); this.trams = null; }
       if (this.padLife) { this.padLife.destroy(); this.padLife = null; } if (this.lifeDirector) { this.lifeDirector.destroy(); this.lifeDirector = null; }   // (t-life: the pads' visitors, the Regisseur des Lebens)
+      if (this.wow) { this.wow.destroy(); this.wow = null; }   // (t-vista)
       if (this.horizon) this.horizon.reset();
       if (this.furnaces) this.furnaces.clear();
       this.renderer && (this.renderer.visDirty = true);
@@ -484,6 +485,7 @@
       if (this.trams) this.trams.destroy();
       this.trams = VR.Trams ? new VR.Trams(this) : null;
       this.lifeStart();   // (t-life: ships that stay on their pads, the Regisseur des Lebens)
+      this.wow = VR.WowMoment ? new VR.WowMoment.Actor(this) : null;   // (t-vista: the wow moments at the vista points, wowmoment.js)
       this.world.listeners.push(this);
       if (this.mp) this.world.listeners.push(this.mp);
       // the columns that loaded during the start (the await above, before the game listened) get their spawns now: the
@@ -739,7 +741,7 @@
     // world listener hooks
     onBlockChanged(x, y, z, old, s) { if (this.sim && !(this.mp && this.mp.isClient)) this.sim.onBlockChanged(x, y, z, old, s); if (this.gadgets) this.gadgets.onBlockChanged(x, y, z, old, s); if (this.villages) this.villages.onBlockChanged(x, y, z, old, s); }
     // the hall reads its crew before gadgets clears the column's spawns (gadgets sets c.spawns = null)
-    onColumnLoaded(c) { if (this.sim && this.sim.onColumnLoaded) this.sim.onColumnLoaded(c); if (this.entities && this.entities.onColumnLoaded) this.entities.onColumnLoaded(c); if (this.villages) this.villages.onColumnLoaded(c); if (this.starships) this.starships.onColumnLoaded(c); if (this.hall) this.hall.onColumnLoaded(c); if (this.gadgets) this.gadgets.onColumnLoaded(c); }
+    onColumnLoaded(c) { if (this.sim && this.sim.onColumnLoaded) this.sim.onColumnLoaded(c); if (this.entities && this.entities.onColumnLoaded) this.entities.onColumnLoaded(c); if (this.villages) this.villages.onColumnLoaded(c); if (this.starships) this.starships.onColumnLoaded(c); if (this.hall) this.hall.onColumnLoaded(c); if (this.wow && c.spawns) this.wow.absorb(c.spawns); if (this.gadgets) this.gadgets.onColumnLoaded(c); }
 
     // ---------------------------------------------------------------- main loop
     loop(t) {
@@ -1116,6 +1118,7 @@
       if (this.entities && !this.ui.blocking && !driving) this.entities.playerAttack();
       if (driving) gad.drive(dt, input, this.ui.blocking);
       else if (this.director && this.director.active) { /* the director moves the player */ }
+      else if (this.wow && this.wow.active) { /* a wow moment holds the view: the player stands (t-vista) */ }
       else if (!this.ui.blocking || this.ui.screen === null) {
         // ✨ arrived in front of something new: the flight starts a moment later (the Studio's blocks are built by then)
         if (this.revealPending && !p.hold && !this.studioOpen && !this.ui.screen && (this.revealWait = (this.revealWait || 0) + dt) > 0.4) { this.revealWait = 0; this.reveal(); }
@@ -1133,6 +1136,7 @@
       if (this.traffic) this.traffic.update(dt);
       if (this.padLife) this.padLife.update(dt); if (this.lifeDirector) this.lifeDirector.update(dt);   // (t-life)
       if (this.director) this.director.update(dt);
+      if (this.wow) this.wow.update(dt);   // (t-vista: four times a second a look at the vistas loaded)
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
       const vd = w.viewDir || (w.viewDir = [0, 0]); vd[0] = -Math.sin(p.yaw); vd[1] = -Math.cos(p.yaw);   // the way the player looks (flat): uploads in the view first (F10: no new array a frame)
@@ -1172,6 +1176,7 @@
       let cam = { x: eye[0] + Math.cos(p.viewYaw) * bb.x, y: eye[1] + bb.y - dip + (p.stepSmooth || 0) + swim, z: eye[2] - Math.sin(p.viewYaw) * bb.x, yaw: p.viewYaw, pitch: p.pitch + PR.nudgeAt(p.nudgeT, p.nudgeAmp), roll: PR.rollAt(p.bob * 2, bob), fov: PR.fovDeg(S.fov, p.fovKick) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
       if (this.vehicleCam) { const vc = this.vehicleCam(cam); if (vc) cam = vc; }
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
+      if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {
         const d = this.camMode === 1 ? 4 : -4, dir = p.lookDir();
         const ray = VR.PHYS.raycast((x, y, z) => w.getBlock(x, y, z), eye[0], eye[1], eye[2], -dir[0] * Math.sign(d), -dir[1] * Math.sign(d), -dir[2] * Math.sign(d), Math.abs(d));
@@ -1263,6 +1268,7 @@
       if (ui.typing) return;
       if (i.hit('Escape')) {
         if (this.director && this.director.active) { this.director.stop(); return; }
+        if (this.wow && this.wow.active) { this.wow.skip(); return; }   // (t-vista: Escape ends a wow moment, not the game)
         if (this.photo) { this.photoMode(false); return; }
         if (ui.screen === 'inventory') ui.closeInventory();
         else if (ui.screen === 'pause') ui.resume();
