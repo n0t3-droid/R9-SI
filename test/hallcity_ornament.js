@@ -27,6 +27,9 @@
 //  12. round 2c: flying buttresses from every outer buttress over the aisle roof to the clerestory, never over glass (P5)
 //  13. round 3 (continuation 3): the apse's order — engaged piers between its tall windows on the gallery, the wall's face
 //      white smooth stone instead of brick, a gold course at the springing; the piers off the walkable floor (P4 / P8)
+//  14. round 3: the arcade's piers clustered columns — pillar shafts on every face, a capital under the gold band (P3)
+//  15. round 3: the nave's wooden arches solid honey oak, unbroken across the nave; no thin beams in the vaults (section 10
+//      now checks the half dome's rays clean) (P1 / P2 / P4)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -396,16 +399,15 @@ for (const [label, H] of HALLS) {
     }
     const ok = rows.filter(r0 => r0.gl >= 100 && r0.stained >= 15 && r0.trac >= 4 && r0.cols >= 7).length;
     check(ok === 5, `the apse a crown of five tall windows, each seven wide or more with tracery and a stained round head (${ok} of 5: ${rows.map(r0 => `${r0.k * 30}° ${r0.gl} glass / ${r0.stained} stained / ${r0.trac} tracery / ${r0.cols} wide`).join(' · ')})`);
-    // the half dome's rays carried by wooden ribs (the references' wood-brown beams in the vault, like the nave's arches):
-    // oak under the stone rays, following the dome's curve from its springing toward the crown
-    const rays = new Map();
+    // (round 2c put thin oak beams under the half dome's rays; seen from the stair (continuation 3's node pictures) they lay
+    // scattered over the curve a step apart and read as noise over the bright end, so round 3 took them out: the rays are
+    // clean white stone ribs, the wood is in the nave's arches — section 15)
+    let thin = 0;
     for (let u = -26; u <= 26; u++) for (let v = Hh.V1 + 1; v <= Hh.V1 + 26; v++) {
-      const d = Math.hypot(u, v - Hh.V1); if (d > 26 || d < 3) continue;
-      const k = Math.round(Math.atan2(v - Hh.V1, u) / (Math.PI / 10));
-      for (let y = F + 26; y <= F + 40; y++) if (/beam_oak/.test(atN(u, y, v))) { rays.set(k, (rays.get(k) || 0) + 1); break; }
+      const d = Math.hypot(u, v - Hh.V1); if (d > 26) continue;
+      for (let y = F + 26; y <= F + 40; y++) if (/^vx_beam/.test(atN(u, y, v))) thin++;
     }
-    const carried = [...rays.values()].filter(n => n >= 10).length;
-    check(carried >= 8, `wooden ribs under the half dome's rays (${carried} rays carried by 10 or more beams: ${[...rays.entries()].sort((a, b) => a[0] - b[0]).map(([k, n]) => k * 18 + '° ' + n).join(', ') || 'none'})`);
+    check(thin === 0, `the half dome's rays are clean white stone ribs, no thin beams scattered under them (${thin})`);
   }
   // ---------------------------------------------------------------- 11. round 2c: the market's goods and light (P3)
   console.log(`11. round 2c — the market aisle's goods, its lanterns at eye height (${label})`);
@@ -539,6 +541,27 @@ for (const [label, H] of HALLS) {
       }
     }
     check(piers >= 20 && good === piers, `the arcade's piers are clustered columns — pillar shafts on every face, a capital under the gold band (${good} of ${piers}; ${pil} of ${faces} face cells)`);
+  }
+  // ---------------------------------------------------------------- 15. round 3: the nave's wooden arches (P1 / P2 / P4)
+  console.log(`15. round 3 — the nave's wooden arches, solid and unbroken (${label})`);
+  {
+    // under every transverse gold rib of the nave vault (the pier lines v ≡ 5 mod 10) an arch of solid honey oak one
+    // course thick, stepping with the vault: wood under the rib across the whole nave, and each step at most one block from
+    // the next, so from below it reads as one arch (round 2's thin beams, a step apart, read as dashes)
+    let arches = 0, n = 0; const seen = [];
+    for (let k = -8; k <= 4; k++) {
+      const vr = 10 * k + 5; if (vr < Hh.V0 + 3 || vr > Hh.V1) continue;
+      n++; let wood = 0, broken = 0, prev = null;
+      for (let u = -26; u <= 26; u++) {
+        let y0 = -1; for (let y = F + 41; y >= F + 26; y--) if (/^(stripped_oak_wood|oak_planks|stripped_oak_log)$/.test(atN(u, y, vr))) { y0 = y; break; }
+        if (y0 < 0) { prev = null; continue; }
+        wood++; if (prev !== null && Math.abs(y0 - prev) > 1) broken++; prev = y0;
+      }
+      if (wood >= 51 && broken === 0) arches++; else seen.push(`v ${vr}: ${wood} wood, ${broken} breaks`);
+    }
+    check(n >= 10 && arches === n, `a solid wooden arch under every transverse rib, unbroken across the nave (${arches} of ${n}${seen.length ? ': ' + seen.join(', ') : ''})`);
+    let thinN = 0; for (let v = Hh.V0 + 3; v <= Hh.V1; v++) for (let u = -26; u <= 26; u++) for (let y = F + 26; y <= F + 41; y++) if (/^vx_beam/.test(atN(u, y, v))) thinN++;
+    check(thinN === 0, `no thin beams left under the nave vault (${thinN})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();

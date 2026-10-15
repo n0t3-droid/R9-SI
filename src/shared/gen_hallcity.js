@@ -31,6 +31,9 @@
 // piled before the market's stalls and the workshops, lanterns on the loggia columns; outside, the buttress piers rise
 // over the wall to tapering pinnacles with lantern finials, and flying buttresses leap from them over the aisle roofs to
 // the clerestory (on the pier lines, over the aisle vault's stone ribs: no glass loses its sky light).
+// Round 3 (continuation 3): the apse's order — engaged piers on the gallery between the tall windows, the wall's face white
+// smooth stone, a gold course at the springing; the arcade's piers clustered columns; the nave's wooden arches solid honey
+// oak stepping with the vault (the thin beams read as dashes), the half dome's rays clean white stone.
 // The plan is built like Nova Haven's (gen_city.js): a generator that yields between its steps (VG.planAdvance runs it
 // in slices in the worker, the plan cached per site), ops bucketed per chunk, the usual plan record for the game
 // (homes with beds, workplaces, the plaza and its seats, lamps, strolling routes) plus the hall's frame (plan.hall) and
@@ -260,7 +263,7 @@
 
     // ================================================================ the walls, the piers, the arcade and the clerestory
     const STONE = st('quartz_bricks'), SMOOTH = st('smooth_quartz'), BAND = st(VR.R.byName.vx_town_band ? 'vx_town_band' : 'chiseled_quartz_block'), CHIS = st('chiseled_quartz_block'), PILLAR = st('quartz_pillar', { axis: 0 });
-    const GLASS = st('glass'), FROST = st('frosted_glass');
+    const GLASS = st('glass'), FROST = st('frosted_glass'), OAKW = st('stripped_oak_wood');
     for (let v = H.V0; v <= 80; v++) {
       if ((v & 7) === 0) yield;
       for (let u = -H.HW; u <= H.HW; u++) {
@@ -323,16 +326,13 @@
         lo = Math.max(lo, reg === 'wall' || (Math.abs(u) >= H.P0 && Math.abs(u) <= H.P1 && v <= H.V1) ? h : 1);
         const [x, z] = W2(u, v), gls = reg === 'in' && inGlass(u, v);
         for (let y = lo; y <= h; y++) put(x, F + y, z, gls ? FROST : SMOOTH);   // (a panel's whole column is glass: no stone under it stops the light)
-        // the transverse ribs under the nave vault (every pier line), gold banded
-        if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) { put(x, F + lo - 1, z, BAND); P(u, F + lo - 2, v, 'vx_beam_oak', { axis: 1 }); }   // (round 2: a wood-brown arch under the gold rib, the reference's wooden arches)
-        // the ring of the half dome at a third of its radius
+        // the transverse ribs under the nave vault (every pier line), gold banded, and under each a wooden arch (round 2: the
+        // reference's wooden arches; round 3: of solid honey oak, one course stepping with the vault — the thin beams of
+        // round 2, a step apart where the vault rose, read from below as a row of dashes, not as an arch)
+        if (reg === 'in' && v <= H.V1 && Math.abs(u) <= 26 && (((v - 5) % 10) + 10) % 10 === 0) { put(x, F + lo - 1, z, BAND); put(x, F + lo - 2, z, OAKW); }
+        // the ring of the half dome at a third of its radius (round 3: its rays clean white stone ribs — round 2c's thin oak
+        // beams under them, scattered over the curve, read as noise over the stair's bright end)
         if (reg === 'in' && v > H.V1 && Math.abs(dApse(u, v) - 18) < 0.6) put(x, F + lo - 1, z, BAND);
-        // (round 2c) wooden ribs under the half dome's stone rays, following its curve (the references' wood-brown beams
-        // in the vault, like the nave's arches under its gold ribs); under stone, so no sky light is lost
-        else if (reg === 'in' && v > H.V1 && !gls) {
-          const dd = dApse(u, v), ang = Math.atan2(v - H.V1, u), k = Math.round(ang / (Math.PI / 10));
-          if (dd >= 3 && dd <= H.GLASS && Math.abs(ang - k * Math.PI / 10) * dd <= 0.7) P(u, F + lo - 1, v, 'vx_beam_oak', { axis: Math.abs(Math.cos(k * Math.PI / 10)) >= Math.abs(Math.sin(k * Math.PI / 10)) ? 1 : 2 });
-        }
       }
     }
     yield;
