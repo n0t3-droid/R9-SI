@@ -1168,6 +1168,7 @@
       this.particles.update(dt, eye);
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
       this.waterFx(dt, p, eye, underwater, inLava, E);
+      if (VR.Wet && VR.Wet.drips) VR.Wet.drips(this, dt);   // t-material: drops from the eaves while the roofs are wet (wet.js)
       if (this.trails) this.trails.update(dt);
       if (this.vents) this.vents.update(dt, eye);
       // camera

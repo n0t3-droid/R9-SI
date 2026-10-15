@@ -715,6 +715,18 @@ float shadowAt(vec3 N, vec3 L) {
 // clear coat (polish, lacquer, gloss tiles, painted hulls), b a scale on the painter's roughness (128 = ×1), a flags.
 uniform sampler2D u_pbr;
 float pow5(float x) { float x2 = x * x; return x2 * x2 * x; }
+// rain rings on a puddle: the slope where drops land (one hashed spot per cell, each ring grows and fades; TRANS_FS's ringN)
+vec2 pudRing(vec2 p, float t) {
+  vec2 g = floor(p), acc = vec2(0.0);
+  for (int j = -1; j <= 0; j++) for (int i = -1; i <= 0; i++) {
+    vec2 cell = g + vec2(float(i), float(j));
+    float h1 = hash12(cell), h2 = hash12(cell + vec2(17.3, 5.1)), age = fract(t * 0.7 + h1 * 7.0), rad = age * 0.42;
+    vec2 dv = p - (cell + vec2(h1, h2));
+    float dd = length(dv), e = dd - rad;
+    acc += dv / max(dd, 1e-3) * (cos(e * 42.0) * exp(-e * e * 110.0) * (1.0 - age));
+  }
+  return acc * 0.3;
+}
 // the sky seen in a reflection: the sky's gradient (matEnv) and the low sun's warm glow toward it; a rough surface sees it
 // blurred toward the mean of the sky
 vec3 pbrSky(vec3 R, float r) {
@@ -870,6 +882,22 @@ void main() {
       }
     }
   }
+#ifdef PBR
+  // t-material · the wet world (wet.js: u_wet stays after the rain and dries over ten minutes, u_puddle the puddles' fill):
+  // only where the rain reaches (the open sky), the walls less and in streaks where the water runs down, the puddles in the
+  // hollows of a low-frequency field whose edge falls with the fill — they shrink from their rims as they dry
+  vec3 wq = v_localPos + vec3(u_camInt);
+  if (u_wet > 0.001 || u_puddle > 0.001) {
+    float open = smoothstep(0.86, 0.99, v_sky), upW = smoothstep(0.55, 0.92, N.y);
+    float streak = upW > 0.5 ? 1.0 : smoothstep(0.3, 0.72, texture(u_noise, vec2((wq.x + wq.z) * 0.37, wq.y * 0.05 - u_time * 0.002)).g);
+    wetK = u_wet * open * mix(0.55 * streak, 1.0, upW);
+    pud = 0.0;
+    if (u_puddle > 0.001 && upW > 0.5) {
+      float low = texture(u_noise, wq.xz * 0.012).r * 0.65 + texture(u_noise, wq.xz * 0.05).g * 0.35, edge = 0.31 + 0.13 * u_puddle;
+      pud = open * upW * (1.0 - smoothstep(edge - 0.035, edge, low)) * smoothstep(0.0, 0.12, u_puddle);
+    }
+  }
+#endif
   vec2 nxy = mat.rg * 2.0 - 1.0;
   // Klassisch: the normal map turns with the tile, so a turned grass top is lit as its texels lie and every block's
   // edges catch the low sun alike (unturned, the edges of neighbouring blocks lit up at random and pairs of blocks
@@ -884,6 +912,10 @@ void main() {
   vec3 n = normalize(N * sqrt(max(0.0, 1.0 - dot(nxy, nxy))) + T * nxy.x + Bt * nxy.y);
   if (u_matTier > 1.5) n = normalize(n - (bumpW - dot(bumpW, n) * n));
   if (noshade) n = vec3(0.0, 1.0, 0.0);
+#ifdef PBR
+  // (t-material) a puddle is flat water: the texture's relief drowns in it, the rain draws its rings on it
+  if (pud > 0.01) { n = normalize(mix(n, N, pud)); if (u_rain > 0.02) { vec2 rg = pudRing(wq.xz * 1.6, u_time) * (u_rain * pud); n = normalize(vec3(n.x + rg.x, n.y, n.z + rg.y)); } }
+#endif
   float rough = clamp(mat.b + dRough, 0.02, 1.0);
   if (fam == 3) rough = 0.97;                             // fabric: matte, no highlight
   rough = mix(rough, 0.25 * rough + 0.03, wetK * 0.85);   // wet: smoother
@@ -909,7 +941,12 @@ void main() {
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
+#ifdef PBR
+  // (t-material) wet things darken by how much water they soak: soil, sand, stone, wood a lot; polish, tiles, metal hardly
+  { float pr = clamp((mat.b - 0.45) / 0.45, 0.0, 1.0); alb.rgb *= 1.0 - wetK * 0.42 * pr * pr * (3.0 - 2.0 * pr) * (1.0 - texelFetch(u_pbr, ivec2(int(layer), 0), 0).g); }
+#else
   if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
+#endif
   vec3 col = alb.rgb * lighting;
 #if defined(PBR)
   // t-material: the gloss of the material (pbrShade above) in place of the one sun highlight

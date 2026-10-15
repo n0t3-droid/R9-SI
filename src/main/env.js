@@ -208,6 +208,8 @@
       const pt = rain > 0.02 ? rain : 0;
       this.puddle += (pt - this.puddle) * (1 - Math.exp(-dt / (pt > this.puddle ? 30 : 240)));
       E.puddle = o.wetOn ? this.puddle : 0;
+      // t-material (wet.js): the wet world — the ground stays wet after the rain and dries over ten minutes, the puddles too
+      if (VR.Wet) { const s = this.wetS || (this.wetS = VR.Wet.state()); VR.Wet.step(s, rain, dt); E.wet = o.wetOn ? s.wet : 0; E.puddle = o.wetOn ? s.pud : 0; }
       // lightning: the bolt lights the sky (weather.js decides when; the thunder follows by sound)
       const fl = this.wx.flash;
       if (fl > 0.001) { E.ambSky = E.ambSky.map(v => v + fl * 1.8); E.zenith = E.zenith.map(v => v + fl * 0.6); }
