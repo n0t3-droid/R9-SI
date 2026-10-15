@@ -20,7 +20,8 @@
 // The villagers in view at P1 are counted (the owner: the villages were crowded; with their acts, and who is drawn), and the
 // Very Low cost is measured at P1 (ms per frame, draws and triangles over N frames, broken down into the villagers'
 // simulation, their draw, the world's render and the rest) and at a control camera C0 outside the town looking away from
-// it (swiftshader: compare the two builds of one run, not absolute numbers).
+// it (swiftshader: compare the two builds of one run, not absolute numbers) — on both pages right after the first visit
+// to P1, before the pictures (the same point of each page's history), five rounds after an idle spell.
 // Checks: every picture written, no page error; on a vgen-9 build the site is a hall city, the hall stands at the
 // cameras (glass in the vault over the street, the fountain at the plaza, lamps along the street), the plaza is bright
 // (sky light through the glass), and the villagers in view at P1 stay within the town's budget.
@@ -174,9 +175,65 @@ async function runPage(tag, dist) {
     return { name, x, z, feet, tx, tz, ty, fov, tod, eye: inside ? eye : 1.62 };
   };
   const aim = (c, feet) => { const dx = c.tx - c.x, dz = c.tz - c.z, dy = c.ty - (feet + c.eye); return [Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz))]; };
+  // the Very Low (potato) preset at P1: its picture and its frame cost, broken down (the villagers' simulation, their
+  // draw, the world's render, the rest), and at a control camera C0 that sees the same land in both builds (outside the
+  // town, looking away from it: what the preset costs where nothing of the town is in view)
+  // (continuation 3: the measure runs right after the first visit to P1, before the pictures, on both pages — so both
+  // builds are measured at the same point of the page's history: run 5 measured the before page after 3 pictures and
+  // the build's page after 12 (other cameras' columns loaded, unloaded, collected), and its two P1 numbers swung by ±2 ms
+  // from run 3's with the same geometry ±1 %; five rounds after an idle spell, the median and the minimum)
+  const measure = async () => {
+    const rounds = [];
+    await step(120);
+    for (let k = 0; k < 5; k++) {
+      await ev(() => { window.__norender = false; });
+      rounds.push(await ev((n) => new Promise((ok, no) => {
+        const g = VR.game, gl = g.renderer.gl, V = g.villages, R = g.renderer;
+        // the frame's parts: the villagers' simulation (villages.update), their draw (villages.draw, inside the render)
+        // and the render as a whole (renderer.render); the rest of the loop is the other systems
+        const acc = { sim: 0, folk: 0, render: 0 }, wrap = (o, name, key) => { if (!o || !o[name] || o[name].__t) return; const f0 = o[name]; const w = function (...a) { const t = performance.now(); try { return f0.apply(this, a); } finally { acc[key] += performance.now() - t; } }; w.__t = f0; o[name] = w; };
+        const unwrap = (o, name) => { if (o && o[name] && o[name].__t) o[name] = o[name].__t; };
+        wrap(V, 'update', 'sim'); wrap(V, 'draw', 'folk'); wrap(R, 'render', 'render');
+        let k = -2, sum = 0, d = 0, t = 0;
+        const done = (r) => { unwrap(V, 'update'); unwrap(V, 'draw'); unwrap(R, 'render'); ok(r); };
+        const f = () => { try { if (k === 0) { acc.sim = acc.folk = acc.render = 0; } const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else done({ ms: +(sum / n).toFixed(1), draws: Math.round(d / n), tris: Math.round(t / n), sim: +(acc.sim / n).toFixed(2), folk: +(acc.folk / n).toFixed(2), world: +((acc.render - acc.folk) / n).toFixed(2), other: +((sum - acc.render - acc.sim) / n).toFixed(2), people: V ? V.agents.length : 0 }); } catch (e) { unwrap(V, 'update'); unwrap(V, 'draw'); unwrap(R, 'render'); no(String(e)); } };
+        f();
+      }), N));
+      await ev(() => { window.__norender = true; });
+    }
+    const ms = rounds.map(q => q.ms).sort((a, b) => a - b), mid = rounds.find(q => q.ms === ms[2]) || rounds[2];
+    return { msMedian: ms[2], msMin: ms[0], ms, draws: mid.draws, tris: mid.tris, parts: { sim: mid.sim, folk: mid.folk, world: mid.world, other: mid.other }, people: mid.people };
+  };
+  const veryLow = async () => {
+    try {
+      await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
+      const c = await camOf(SHOTS[0]);
+      const feet0 = await place(c.x, c.z, c.feet, 0, 0, c.fov, DAY);
+      const [yaw, pitch] = aim(c, feet0);
+      await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]);
+      await settle(80);
+      if (await shot('P1_potato', 16)) console.log('  P1_potato written');
+      const f = await inView(); console.log(`  villagers at P1_potato: ${JSON.stringify(f)}`);
+      costs[tag] = await measure();
+      console.log(`measure ${tag} potato at P1: ${JSON.stringify(costs[tag])}`);
+      // the control: 150 blocks across the nave's axis from the plaza, 6 over the land, looking further away
+      const c0 = await camOf(['C0', 150.5, -34.5, { up: 6 }, [400, -34.5, 0], 66, DAY]);
+      const f0 = await place(c0.x, c0.z, c0.feet, 0, 0, c0.fov, DAY);
+      const [y0, p0] = aim(Object.assign({}, c0, { ty: f0 + 1.62 }), f0);
+      await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [y0, p0]);
+      await settle(80);
+      if (await shot('C0_potato', 16)) console.log('  C0_potato written');
+      control[tag] = await measure();
+      console.log(`measure ${tag} potato at C0 (the control): ${JSON.stringify(control[tag])}`);
+    } catch (e) { console.log(`measure ${tag} failed: ${String(e.message || e).slice(0, 200)}`); }
+    // back to the High preset of the pictures, settled again at P1
+    await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.horizon = 1; g.applySettings('*'); });
+    const c = await camOf(SHOTS[0]); await place(c.x, c.z, c.feet, 0, 0, c.fov, DAY); await settle(40);
+  };
   // (a first visit to the first camera without a picture: the world, the far ring and the horizon settle there once)
   { const c = await camOf(SHOTS[0]); const f0 = await place(c.x, c.z, c.feet, 0, 0, c.fov, c.tod); const [yaw, pitch] = aim(c, f0); await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]); await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; }); await wait(1500); await settle(40); }
   const only = tag === 'before' && ONLY_BEFORE ? ONLY_BEFORE : ONLY;
+  if (!only || only.includes('P1')) await veryLow();
   for (const s of SHOTS) {
     if (only && !only.some(o => s[0] === o || s[0].startsWith(o + '_'))) continue;
     want++;
@@ -230,53 +287,6 @@ async function runPage(tag, dist) {
     }
     if (folk[tag] && site.folkCap) check(folk[tag].onStreet <= folk[tag].cap && folk[tag].agents <= site.folkCap.max, `${tag}: the town's people fit its budget (${folk[tag].agents} ≤ ${site.folkCap.max}) and at most the street's cap of them are drawn on the street at P1 (${folk[tag].onStreet} on the street + ${folk[tag].drawn - folk[tag].onStreet} indoors drawn of ${folk[tag].inView} in view, cap ${folk[tag].cap})`);
     if (folkDusk[tag] && site.folkCap) check(folkDusk[tag].onStreet <= folkDusk[tag].cap, `${tag}: at dusk too at most the street's cap are drawn on the street at P1 (${folkDusk[tag].onStreet} on the street + ${folkDusk[tag].drawn - folkDusk[tag].onStreet} indoors of ${folkDusk[tag].inView} in view)`);
-  }
-  // the Very Low (potato) preset at P1: its picture and its frame cost, broken down (the villagers' simulation, their
-  // draw, the world's render, the rest), and at a control camera C0 that sees the same land in both builds (outside the
-  // town, looking away from it: what the preset costs where nothing of the town is in view)
-  const measure = async () => {
-    const rounds = [];
-    for (let k = 0; k < 3; k++) {
-      await ev(() => { window.__norender = false; });
-      rounds.push(await ev((n) => new Promise((ok, no) => {
-        const g = VR.game, gl = g.renderer.gl, V = g.villages, R = g.renderer;
-        // the frame's parts: the villagers' simulation (villages.update), their draw (villages.draw, inside the render)
-        // and the render as a whole (renderer.render); the rest of the loop is the other systems
-        const acc = { sim: 0, folk: 0, render: 0 }, wrap = (o, name, key) => { if (!o || !o[name] || o[name].__t) return; const f0 = o[name]; const w = function (...a) { const t = performance.now(); try { return f0.apply(this, a); } finally { acc[key] += performance.now() - t; } }; w.__t = f0; o[name] = w; };
-        const unwrap = (o, name) => { if (o && o[name] && o[name].__t) o[name] = o[name].__t; };
-        wrap(V, 'update', 'sim'); wrap(V, 'draw', 'folk'); wrap(R, 'render', 'render');
-        let k = -2, sum = 0, d = 0, t = 0;
-        const done = (r) => { unwrap(V, 'update'); unwrap(V, 'draw'); unwrap(R, 'render'); ok(r); };
-        const f = () => { try { if (k === 0) { acc.sim = acc.folk = acc.render = 0; } const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else done({ ms: +(sum / n).toFixed(1), draws: Math.round(d / n), tris: Math.round(t / n), sim: +(acc.sim / n).toFixed(2), folk: +(acc.folk / n).toFixed(2), world: +((acc.render - acc.folk) / n).toFixed(2), other: +((sum - acc.render - acc.sim) / n).toFixed(2), people: V ? V.agents.length : 0 }); } catch (e) { unwrap(V, 'update'); unwrap(V, 'draw'); unwrap(R, 'render'); no(String(e)); } };
-        f();
-      }), N));
-      await ev(() => { window.__norender = true; });
-    }
-    const ms = rounds.map(q => q.ms).sort((a, b) => a - b), mid = rounds.find(q => q.ms === ms[1]) || rounds[1];
-    return { msMedian: ms[1], ms, draws: mid.draws, tris: mid.tris, parts: { sim: mid.sim, folk: mid.folk, world: mid.world, other: mid.other }, people: mid.people };
-  };
-  if (!only || only.includes('P1')) {
-    try {
-      await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
-      const c = await camOf(SHOTS[0]);
-      const feet0 = await place(c.x, c.z, c.feet, 0, 0, c.fov, DAY);
-      const [yaw, pitch] = aim(c, feet0);
-      await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]);
-      await settle(80);
-      if (await shot('P1_potato', 16)) console.log('  P1_potato written');
-      const f = await inView(); console.log(`  villagers at P1_potato: ${JSON.stringify(f)}`);
-      costs[tag] = await measure();
-      console.log(`measure ${tag} potato at P1: ${JSON.stringify(costs[tag])}`);
-      // the control: 150 blocks across the nave's axis from the plaza, 6 over the land, looking further away
-      const c0 = await camOf(['C0', 150.5, -34.5, { up: 6 }, [400, -34.5, 0], 66, DAY]);
-      const f0 = await place(c0.x, c0.z, c0.feet, 0, 0, c0.fov, DAY);
-      const [y0, p0] = aim(Object.assign({}, c0, { ty: f0 + 1.62 }), f0);
-      await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [y0, p0]);
-      await settle(80);
-      if (await shot('C0_potato', 16)) console.log('  C0_potato written');
-      control[tag] = await measure();
-      console.log(`measure ${tag} potato at C0 (the control): ${JSON.stringify(control[tag])}`);
-    } catch (e) { console.log(`measure ${tag} failed: ${String(e.message || e).slice(0, 200)}`); }
   }
   const errs = logs.filter(l => l.startsWith('[pageerror]'));
   console.log(`--- ${tag} logs (${logs.length})`); for (const l of logs.slice(0, 12)) console.log(l);
