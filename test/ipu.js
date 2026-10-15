@@ -36,6 +36,9 @@ const gl = new Proxy({}, { get(t, k) {
     if (k === 'blitFramebuffer') { log.blit.push(a[8]); return; }
     if (k === 'getUniformBlockIndex') return 0;
     if (k === 'getParameter') return 16;
+    if (k === 'shaderSource') { log.prog.push(a[1]); return; }
+    if (k === 'getShaderParameter') return true;
+    if (k === 'getProgramParameter') return a[1] === 'ACTIVE_UNIFORMS' ? 0 : true;
     return undefined;
   };
 } });
@@ -48,7 +51,7 @@ function make(q, size) {
   const r = Object.create(V.Renderer.prototype);
   const [cw, ch] = size || [1280, 720];
   Object.assign(r, { gl, canvas: { clientWidth: cw, clientHeight: ch, width: 0, height: 0 }, multi: false, hdr: !!(V.GL.ext.cbf || V.GL.ext.cbhf), stats: { draws: 0, tris: 0 }, frameNo: 0,
-    q: Object.assign({ scale: 1, shadows: 0, tsr: true, bloom: true, rays: true, fxaa: true, water: 2 }, q), P: {}, emptyVAO: {}, proj: M4.create(), view: M4.create(), viewProj: M4.create(), invViewProj: M4.create() });
+    q: Object.assign({ scale: 1, shadows: 0, tsr: true, bloom: true, rays: true, fxaa: true, water: 2 }, q), P: {}, emptyVAO: {}, proj: M4.create(), view: M4.create(), viewProj: M4.create(), invViewProj: M4.create(), planes: new Float32Array(24), tmpM: M4.create(), tmpM2: M4.create() });
   r.resize(true);
   return r;
 }
@@ -106,6 +109,48 @@ console.log('b · hdrLite: the probe and the fallback');
   const ldr = make({ hdrLite: true });
   check(fmtOf(ldr.sceneCol) === 'RGBA8' && ldr.hdr === false, 'no float colour at all: RGBA8 as before');
   setExt({});
+}
+
+console.log('c · postLite: the full-screen passes of a frame and their bytes');
+{
+  // a frame's post chain (the copy, TSR when it runs, bloom, rays, composite, FXAA) with the sun on the screen
+  const stubP = () => ({ p: {}, u: new Proxy({}, { get: () => undefined }) });
+  const E = { sunDir: [0, 0.5, -0.866], moonDir: [0, -1, 0], dimId: 0, rain: 0, rays: 0.55, exposure: 1, bloomStrength: 0.06, bloomThreshold: 1.1, vignette: 0.55, saturation: 1.12, contrast: 0, grade: [1, 1, 1], vivid: 0, time: 1 };
+  const frame = (q, water, size) => {
+    const r = make(q, size);
+    r.P = { bloomPre: stubP(), down: stubP(), up: stubP(), rays: stubP(), composite: stubP(), fxaa: stubP(), tsr: stubP() };
+    r.passLog = true; r.stats.fsList = []; r.stats.fsPasses = 0;
+    r.setupCamera({ x: 8, y: 70, z: 8, yaw: 0, pitch: Math.asin(0.5), fov: 75 * Math.PI / 180, far: 1200 });   // (looking into the sun)
+    const vis = [{ ox: 0, oy: 64, oz: -32, fade: 1, transW: water, mesh: [null, null, { count: 6 }, null, null] }];
+    const F = { cam: r.cam, underwater: false };
+    log.fs.length = 0; log.blit.length = 0;
+    r.refrCopy(F, E, vis);
+    if (r.jit) r.superRes(F);
+    r.post(F, E);
+    const names = r.stats.fsList.map(x => x.name);
+    return { r, names, n: r.stats.fsPasses, draws: log.fs.length, blits: log.blit.slice(), b: IPU.bytes(r.stats.fsList) };
+  };
+  const ULTRA = { scale: 1, bloom: true, rays: true, fxaa: true, tsr: true, sharpen: 0.35 };
+  const u0 = frame(ULTRA, true), u1 = frame(Object.assign({ postLite: true }, ULTRA), true), u2 = frame(Object.assign({ postLite: true }, ULTRA), false);
+  console.log('     Ultra, off: ' + u0.names.join(' · '));
+  console.log('     Ultra, postLite: ' + u1.names.join(' · '));
+  check(u0.names.join() === 'copyColour,copyDepth,bloomPre,down,down,down,down,up,up,up,up,rays,composite,fxaa' && u0.n === 14 && u0.draws === 12 && u0.blits.length === 2, 'off: one Ultra frame as before — 2 blits, bloom 1 + 4 + 4, rays, composite, FXAA', `${u0.n} passes`);
+  check(!u1.names.includes('fxaa') && u1.names.filter(x => x === 'up').length === 3 && u1.names.includes('raysMask') && u1.n === u0.n - 1, 'postLite: FXAA inside the composite, the last bloom upsample read there, the rays from a ¼-res mask (one pass more)', `${u0.n} → ${u1.n} passes`);
+  check(log.prog.some(t => /#define FXAA_IN/.test(t) && /#define BLOOM_UP/.test(t)), 'the composite compiled with FXAA_IN and BLOOM_UP');
+  check(u2.blits.join() === 'DEPTH_BUFFER_BIT' && u2.names[0] === 'copyDepth', 'no water in view: no colour copy (the depth stays: the rays read it)', u2.blits.join());
+  const ub = (b) => (b.all / 1048576).toFixed(1) + ' MB';
+  check(u1.b.all < u0.b.all && u2.b.all < u1.b.all, 'the bytes the passes move: fewer', `1280 × 720 Ultra: ${ub(u0.b)} → ${ub(u1.b)} (water in view) → ${ub(u2.b)} (none); god-ray fetches ${u0.b.fetch} → ${u1.b.fetch}`);
+  const h1 = frame(Object.assign({ postLite: true, hdrLite: true }, ULTRA), false);
+  check(h1.b.all < u2.b.all * 0.75, 'with hdrLite too (4 bytes a pixel)', `${ub(u2.b)} → ${ub(h1.b)}`);
+  // Low at 0.75 (the owner's measured setting): TSR, bloom, no rays, no FXAA
+  const LOW = { scale: 0.75, bloom: true, rays: false, fxaa: false, tsr: true, sharpen: 0.35 };
+  const l0 = frame(LOW, false), l1 = frame(Object.assign({ postLite: true }, LOW), false), l2 = frame(Object.assign({ postLite: true, hdrLite: true }, LOW), false);
+  console.log('     Low, off: ' + l0.names.join(' · '));
+  console.log('     Low, postLite + hdrLite: ' + l2.names.join(' · '));
+  check(l0.names.includes('tsr') && l0.blits.length === 2 && l1.blits.join() === 'DEPTH_BUFFER_BIT' && l1.names.filter(x => x === 'up').length === 3, 'Low (TSR): the depth copy stays for TSR, no colour copy without water, the last upsample folded', `${l0.n} → ${l1.n} passes`);
+  check(l2.b.all < l0.b.all, 'Low\'s bytes', `960 × 540 → 1280 × 720: ${ub(l0.b)} → ${ub(l1.b)} → ${ub(l2.b)} (with hdrLite)`);
+  const big0 = frame(ULTRA, true, [1920, 1080]), big1 = frame(Object.assign({ postLite: true, hdrLite: true }, ULTRA), false, [1920, 1080]);
+  console.log(`     1920 × 1080 Ultra: ${ub(big0.b)} → ${ub(big1.b)} without water (${(IPU.ms(big0.b.all - big1.b.all, 20)).toFixed(2)} ms at 20 GB/s)`);
 }
 
 console.log('d · dprLite: the backing store');

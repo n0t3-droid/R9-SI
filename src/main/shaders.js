@@ -2062,11 +2062,32 @@ void main() {
   for (int i = 0; i < 28; i++) {
     p += d;
     if (p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0) break;
+#ifdef MASK
+    acc += texture(u_color, p).rgb * w;   // (F10 · postLite: u_color is the ¼-res sky mask, RAYS_MASK_FS)
+#else
     float sky = step(0.99999, texture(u_depth, p).r);
     acc += texture(u_color, p).rgb * sky * w;
+#endif
     w *= 0.955;
   }
   o = vec4(acc / 28.0 * u_raysStrength, 1.0);
+}`;
+  // F10 · postLite: the god rays' source at ¼ × ¼ — per texel the sky's colour over its 4 × 4 full-res pixels (four bilinear
+  // colour taps, four depth taps; 0 where the depth is not the sky). RAYS_FS with MASK then marches over this small texture
+  // (it stays in the cache) instead of reading 28 colour and 28 depth texels of the full-res targets for every pixel.
+  S.RAYS_MASK_FS = `
+uniform sampler2D u_depth;
+uniform sampler2D u_color;
+uniform vec2 u_texel;       // the full-res texel
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec3 acc = vec3(0.0);
+  for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+    vec2 p = v_uv + (vec2(float(i), float(j)) * 2.0 - 1.0) * u_texel;
+    acc += texture(u_color, p).rgb * step(0.99999, texture(u_depth, p).r);
+  }
+  o = vec4(acc * 0.25, 1.0);
 }`;
   S.COMPOSITE_FS = `
 uniform sampler2D u_scene;
@@ -2108,6 +2129,45 @@ vec3 tonemap(vec3 x) {
   if (m > 1.0) h = mix(h / m, vec3(1.0), clamp((m - 1.0) * 0.35, 0.0, 1.0)); // very bright: fade toward white gently
   return mix(f, clamp(h, 0.0, 1.0), u_vivid);
 }
+#ifdef BLOOM_UP
+// F10 · postLite: the bloom chain's last upsample read here — bloom[0] (the threshold) plus the tent of bloom[1] around the
+// pixel (UP_FS's nine taps), instead of a half-res pass that blends it into bloom[0] first
+uniform sampler2D u_bloom1;
+uniform vec2 u_bloom1Texel;
+vec3 bloomAt(vec2 uv) {
+  vec2 t = u_bloom1Texel;
+  vec3 c = texture(u_bloom1, uv + vec2(-t.x, 0)).rgb + texture(u_bloom1, uv + vec2(t.x, 0)).rgb + texture(u_bloom1, uv + vec2(0, -t.y)).rgb + texture(u_bloom1, uv + vec2(0, t.y)).rgb;
+  c = c * 2.0 + texture(u_bloom1, uv + vec2(-t.x, -t.y)).rgb + texture(u_bloom1, uv + vec2(t.x, -t.y)).rgb + texture(u_bloom1, uv + vec2(-t.x, t.y)).rgb + texture(u_bloom1, uv + vec2(t.x, t.y)).rgb;
+  c += texture(u_bloom1, uv).rgb * 4.0;
+  return texture(u_bloom, uv).rgb + c / 16.0;
+}
+#endif
+#ifdef FXAA_IN
+// F10 · postLite: FXAA inside the composite (no RGBA8 target, no second full-screen pass). The edge test takes the
+// tonemapped luma of the four diagonal scene texels and the centre (FXAA_FS's rule and thresholds); on an edge the scene's
+// HDR samples along it are blended, each weighted 1 / (1 + its luminance), so the blend follows the tonemapped picture the
+// FXAA pass saw — then bloom, rays and the grade are applied once, as to every other pixel
+float lumT(vec3 c) { return pow(acesL(max(dot(c * u_grade, vec3(0.299, 0.587, 0.114)) * u_exposure, 0.0)), 1.0 / 2.2); }
+float kw(vec3 c) { return 1.0 / (1.0 + max(dot(c, vec3(0.2126, 0.7152, 0.0722)) * u_exposure, 0.0)); }
+void fxaaIn(vec2 uv, vec2 t, inout vec3 c) {
+  vec3 nw = texture(u_scene, uv + vec2(-1.0, -1.0) * t).rgb, ne = texture(u_scene, uv + vec2(1.0, -1.0) * t).rgb;
+  vec3 sw = texture(u_scene, uv + vec2(-1.0, 1.0) * t).rgb, se = texture(u_scene, uv + vec2(1.0, 1.0) * t).rgb;
+  float lNW = lumT(nw), lNE = lumT(ne), lSW = lumT(sw), lSE = lumT(se), lM = lumT(texture(u_scene, uv).rgb);
+  float lMin = min(lM, min(min(lNW, lNE), min(lSW, lSE))), lMax = max(lM, max(max(lNW, lNE), max(lSW, lSE)));
+  if (lMax - lMin < max(0.05, lMax * 0.16)) return;
+  vec2 dir = vec2(-((lNW + lNE) - (lSW + lSE)), ((lNW + lSW) - (lNE + lSE)));
+  float dirReduce = max((lNW + lNE + lSW + lSE) * 0.03125, 1.0 / 128.0);
+  float rcp = 1.0 / (min(abs(dir.x), abs(dir.y)) + dirReduce);
+  dir = clamp(dir * rcp, -8.0, 8.0) * t;
+  vec3 a1 = texture(u_scene, uv + dir * (1.0 / 3.0 - 0.5)).rgb, a2 = texture(u_scene, uv + dir * (2.0 / 3.0 - 0.5)).rgb;
+  vec3 b1 = texture(u_scene, uv + dir * -0.5).rgb, b2 = texture(u_scene, uv + dir * 0.5).rgb;
+  float w1 = kw(a1), w2 = kw(a2), w3 = kw(b1), w4 = kw(b2);
+  vec3 a = (a1 * w1 + a2 * w2) / (w1 + w2);
+  vec3 b = (a1 * w1 + a2 * w2 + b1 * w3 + b2 * w4) / (w1 + w2 + w3 + w4);
+  float lB = lumT(b);
+  c = (lB < lMin || lB > lMax) ? a : b;
+}
+#endif
 void main() {
   vec2 uv = v_uv;
   if (u_underwaterFx > 0.0) uv += vec2(sin(uv.y * 28.0 + u_time * 2.2), cos(uv.x * 22.0 + u_time * 1.7)) * 0.0022 * u_underwaterFx;
@@ -2124,7 +2184,14 @@ void main() {
     vec3 r = clamp((m + (a + b + d + e) * w) / (1.0 + 4.0 * w), 0.0, 0.996);
     c = r / (1.0 - r);
   } else c = texture(u_scene, uv).rgb;
+#ifdef FXAA_IN
+  fxaaIn(uv, u_sceneTexel, c);
+#endif
+#ifdef BLOOM_UP
+  c += bloomAt(uv) * u_bloomStrength;
+#else
   c += texture(u_bloom, uv).rgb * u_bloomStrength;
+#endif
   if (u_useRays > 0.5) c += texture(u_rays, uv).rgb;
   if (u_shafts > 0.0) {
     // light shafts: columns of light from the surface, where the view ray points up toward it, drifting slowly
