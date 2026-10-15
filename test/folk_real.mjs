@@ -114,8 +114,11 @@ async function runPage(tag, dist) {
     if (!V._own) { V._own = V.agents; V._upd = V.update; V._bub = V.updateBubbles; }
     // (down from a block over the eye's own floor: an awning or a balcony overhead is not the street)
     const ground = (x, z) => { for (let y = Math.floor(floorY) + 1; y > floorY - 6; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & Fl.SOLID)) return y + 1; } return floorY; };
-    const agents = list.map(([seed, role, age, style, x, z], i) => {
-      const look = F.look(seed, role, age, null, style), y = ground(x, z);
+    // (a spot on the eye's own floor or below it: a planter, a sill or a table under the spot moves the person beside it —
+    // run 3's crowd had one standing on a shop's sill, a block over the street)
+    const spot = (x, z) => { for (const [dx, dz] of [[0, 0], [0.8, 0], [-0.8, 0], [0, 0.8], [0, -0.8], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6]]) { if (ground(x + dx, z + dz) <= floorY) return [x + dx, z + dz]; } return [x, z]; };
+    const agents = list.map(([seed, role, age, style, x0, z0], i) => {
+      const [x, z] = spot(x0, z0), look = F.look(seed, role, age, null, style), y = ground(x, z);
       const yaw = Math.atan2(-(eye[0] - x), -(eye[2] - z));
       return { pos: [x, y, z], yaw, vel: [0, 0, 0], p: { look, seed, name: role, bed: null, home: 0 }, kid: age === 'child', elder: age === 'elder', walkAmt: 0, walk: 0, pose: 'stand', act: null, bubble: null, headYaw: 0, headPitch: 0, hurt: 0, talkAnim: 0, lookAt: [eye[0], eye[1], eye[2]], w: 0.3, h: 1.75, onGround: true, id: 'stage' + i, blinkT: 99 };
     });
