@@ -226,7 +226,7 @@ for (const [label, H] of HALLS) {
       check(barrels === mine.length, `a barrel pair beside each (${barrels} of ${mine.length})`);
       let bench = 0, plant = 0; for (let v = Hh.V0 + 3; v <= Hh.V1; v++) for (const a of [30, 31]) { const n = atN(s * a, F + 1, v); if (n === 'vx_bench') bench++; if (n === 'vm_planter') plant++; }
       check(bench >= mine.length - 2 && plant >= mine.length - 2, `benches and potted plants between the stalls (${bench} benches, ${plant} plants)`);
-      let ribs = 0, ribN = 0; for (let v = -72; v <= 48; v += 12) { ribN++; let w = 0; for (let a = 30; a <= 45; a++) { let any = false; for (let y = F + 16; y <= F + 26; y++) if (/beam/.test(atN(s * a, y, v))) any = true; if (any) w++; } if (w >= 13) ribs++; }
+      let ribs = 0, ribN = 0; for (let v = -72; v <= 48; v += 12) { ribN++; let w = 0; for (let a = 30; a <= 45; a++) { let any = false; for (let y = F + 16; y <= F + 26; y++) if (/beam|stripped_oak_wood/.test(atN(s * a, y, v))) any = true; if (any) w++; } if (w >= 13) ribs++; }   // (round 3: solid oak)
       check(ribs === ribN, `wooden ribs under the aisle vault every 12 blocks (${ribs} of ${ribN})`);
       // the arcades' side: a passage from the arcade into the aisle at least every 8 blocks
       let gap = 0, worst = 0; for (let v = Hh.V0 + 3; v <= Hh.V1; v++) { const free = [30, 31].every(a => atN(s * a, F + 1, v) === 'air' && atN(s * a, F + 2, v) === 'air'); if (free || Math.abs(v) <= 3) gap = 0; else { gap++; worst = Math.max(worst, gap); } }
@@ -580,6 +580,15 @@ for (const [label, H] of HALLS) {
     check(n >= 10 && arches === n, `a solid wooden arch under every transverse rib, unbroken across the nave (${arches} of ${n}${seen.length ? ': ' + seen.join(', ') : ''})`);
     let thinN = 0; for (let v = Hh.V0 + 3; v <= Hh.V1; v++) for (let u = -26; u <= 26; u++) for (let y = F + 26; y <= F + 41; y++) if (/^vx_beam/.test(atN(u, y, v))) thinN++;
     check(thinN === 0, `no thin beams left under the nave vault (${thinN})`);
+    // the aisles' timber the same honey oak, solid: the rib under each aisle vault every 12 blocks and the tie beam across
+    // the aisle at 20 over the floor, from the arcade to the loggias (round 2's thin dark VX beams)
+    let solid = 0, sn = 0, thinA = 0;
+    for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
+      sn++; let tie = 0; for (let a = 30; a <= 45; a++) if (atN(s * a, F + 20, v) === 'stripped_oak_wood') tie++;
+      if (tie >= 12) solid++;
+      for (let a = 30; a <= 46; a++) for (let y = F + 16; y <= F + 27; y++) if (/^vx_beam/.test(atN(s * a, y, v))) thinA++;
+    }
+    check(solid === sn && thinA === 0, `the aisles' tie beams solid honey oak across the aisle, no thin beams (${solid} of ${sn} beams; ${thinA} thin cells)`);
   }
   // ---------------------------------------------------------------- 16. round 3: the windows' heads pale (P4 / P8 / P2 / P5)
   console.log(`16. round 3 — the hall's windows luminous and pale (${label})`);

@@ -1078,8 +1078,10 @@
       return Math.max(lo, 1);
     };
     for (const s of [-1, 1]) for (let v = -72; v <= 48; v += 12) {
-      for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, 'vx_beam_oak', { axis: 1 }); }
-      for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, 'vx_beam_oak', { axis: 1 });
+      // (round 3: solid honey oak like the nave's arches — the rib under the aisle vault and the tie beam; round 2's thin dark
+      // VX beams; also fewer triangles: full blocks merge, VX beams do not)
+      for (let a = H.A0; a <= H.LG1; a++) { const lo = shellLo(s * a, v); P(s * a, F + lo - 1, v, OAKW); }
+      for (let a = H.A0; a <= H.LG1; a++) if (F + 20 < F + shellLo(s * a, v) - 1) P(s * a, F + 20, v, OAKW);
       // lanterns hanging from the tie beam: over the walk low on chains (round 2b: they hung at the beam, out of sight under
       // the vault), over the loggias' roofs at the beam
       for (const a of [33, 37]) if (F + 20 < F + shellLo(s * a, v) - 1) { for (let y = F + 11; y <= F + 19; y++) P(s * a, y, v, 'iron_chain', { axis: 0 }); P(s * a, F + 10, v, 'lantern', { hanging: 1 }); const [x, z] = W2(s * a, v); plan.lamps.push([x, F + 10, z]); }
