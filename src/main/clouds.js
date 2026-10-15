@@ -50,6 +50,10 @@
   // elevation sine over HIGH.from … HIGH.to) fades to 1 − HIGH.k of its alpha, so the cumulus seen sit low and far and the
   // nebula overhead stays clear (renderer.js passes HIGH and the factor to PUFF_VS as u_cloudHigh)
   const HIGH = { from: 0.42, to: 0.72, k: 0.85 };
+  // t-sky2 (continued): the box clouds of Low and Very Low (renderer.js drawClouds, CLOUD_VS) fade in a lower band and
+  // fully — from 20° of elevation, gone by 37° (the slabs are coarse; with the puffs' band those at 35°–45° stayed half
+  // there over the nebula): the cumulus of the low tiers sit low round the horizon, as the trailer's (t1_05)
+  const BOX_HIGH = { from: 0.34, to: 0.6 };
   function clearDay(cover, wDay) { return (wDay || 0) * (1 - smooth(0.25, 0.55, cover)); }
   function highFade(sinElev, cd) { return 1 - cd * HIGH.k * smooth(HIGH.from, HIGH.to, sinElev); }
   // the sprites of one cumulus cell, in cloud space (the big one first, then 1–3 lobes); every centre sits at y ≥ 206 and
@@ -162,5 +166,5 @@
     return out;
   }
 
-  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, HIGH, hash, vnoise, cellOn, boxThr, clearDay, highFade, cumulusCell, fogBanks, anchors, field, pack, density, atlas };
+  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, HIGH, BOX_HIGH, hash, vnoise, cellOn, boxThr, clearDay, highFade, cumulusCell, fogBanks, anchors, field, pack, density, atlas };
 })(VR);

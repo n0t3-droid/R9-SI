@@ -84,10 +84,13 @@ for (let gz = -30; gz < 30; gz++) for (let gx = -30; gx < 30; gx++) {
   const sh = fs.readFileSync(__dirname + '/../src/main/shaders.js', 'utf8'), rd = fs.readFileSync(__dirname + '/../src/main/renderer.js', 'utf8');
   const vs = sh.slice(sh.indexOf('S.CLOUD_VS'), sh.indexOf('S.CLOUD_FS')), cf = sh.slice(sh.indexOf('S.CLOUD_FS'), sh.indexOf('S.PUFF_VS'));
   check(/uniform vec4 u_cloudHigh/.test(vs) && /v_fade < 0\.01 \? vec4\(0\.0, 0\.0, 2\.0, 1\.0\)/.test(vs) && /u_cloudAlpha \* fade \* v_fade/.test(cf), 'CLOUD_VS fades a run by its elevation (u_cloudHigh) and drops one faded to nothing; CLOUD_FS takes the fade');
-  check(/u_cloudHigh, HI\.from, 1 \/ \(HI\.to - HI\.from\), VR\.Clouds\.clearDay\(E\.cloudCover/.test(rd.slice(rd.indexOf('drawClouds(E) {'), rd.indexOf('initPuffs() {'))), 'drawClouds passes the puffs\' band and the clear-day factor to the box clouds');
-  const fade = (dist, cd) => { const s = 150 / Math.hypot(dist, 150), hi = Math.min(1, Math.max(0, (s - C.HIGH.from) / (C.HIGH.to - C.HIGH.from))); return 1 - cd * hi * hi * (3 - 2 * hi); };
-  check(fade(0, 1) < 0.01 && fade(100, 1) < 0.01 && fade(500, 1) === 1 && fade(0, C.clearDay(0.85, 1)) === 1 && fade(0, C.clearDay(0.2, 0)) === 1,
-    `by day in clear weather a box cloud overhead is gone (${fade(0, 1).toFixed(2)}, 100 blocks out ${fade(100, 1).toFixed(2)}), one 500 out stays (${fade(500, 1)}); overcast and night keep theirs`);
+  // (run 2 of the browser test: with the puffs' band, 25°–46°, the slabs at 35°–45° were still half there — the box clouds
+  // get their own, lower band, VR.Clouds.BOX_HIGH: from 20°, gone by 37°; the trailer's cumulus sit under ~15°, t1_05)
+  check(/u_cloudHigh, BH\.from, 1 \/ \(BH\.to - BH\.from\), VR\.Clouds\.clearDay\(E\.cloudCover/.test(rd.slice(rd.indexOf('drawClouds(E) {'), rd.indexOf('initPuffs() {'))), 'drawClouds passes the box clouds\' band (VR.Clouds.BOX_HIGH) and the clear-day factor to the box clouds');
+  const BH = C.BOX_HIGH || C.HIGH, rad = (d) => d * Math.PI / 180;
+  const fade = (elev, cd) => { const s = Math.sin(rad(elev)), hi = Math.min(1, Math.max(0, (s - BH.from) / (BH.to - BH.from))); return 1 - cd * hi * hi * (3 - 2 * hi); };
+  check(!!C.BOX_HIGH && fade(90, 1) < 0.01 && fade(40, 1) < 0.01 && fade(30, 1) <= 0.5 && fade(15, 1) === 1 && fade(90, C.clearDay(0.85, 1)) === 1 && fade(90, C.clearDay(0.2, 0)) === 1,
+    `by day in clear weather a box cloud overhead or at 40° is gone (${fade(90, 1).toFixed(2)}, ${fade(40, 1).toFixed(2)}), at 30° at most half (${fade(30, 1).toFixed(2)}), at 15° kept (${fade(15, 1)}); overcast and night keep theirs`);
 }
 // the wind moves the drawing, not the cells: in cloud space a cloud is the same sprite whatever the wind is
 {
