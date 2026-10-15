@@ -505,6 +505,16 @@
         const top = 30 - Math.floor((a - H.A0) * 3 / 18), th = 1 + Math.round(2 * ((a - 39) / 9) ** 2), roof = a < H.W0 ? hA(a) : H.WALLTOP;
         for (let y = Math.max(roof + 2, top - th); y <= top; y++) P(s * a, F + y, vp, a === H.A0 && y === top ? BAND : SMOOTH);
       }
+      // (round 3) the second row of spires: where the flyer meets the clerestory a pinnacle stands on the clerestory's top
+      // (|u| 28) — sloped shoulders, a pillar shaft, a capital, a gold course and a lantern finial (two rows of lights along
+      // the roof at dusk); on the clerestory's stone, so no glass loses its light
+      for (const s of [-1, 1]) {
+        const u = s * 28, T = F + H.SPR;
+        P(u, T + 1, vp - 1, 'smooth_quartz_stairs', { facing: 2, half: 0 }); P(u, T + 1, vp + 1, 'smooth_quartz_stairs', { facing: 0, half: 0 });
+        for (let y = T + 1; y <= T + 4; y++) P(u, y, vp, 'quartz_pillar', { axis: 0 });
+        P(u, T + 5, vp, CHIS); P(u, T + 6, vp, BAND); P(u, T + 7, vp, 'lantern', { hanging: 0 });
+        const [x, z] = W2(u, vp); plan.lamps.push([x, T + 7, z]);
+      }
     }
     // lantern turrets on the ridge every 24 blocks (round 2b: five wide, were three): a glazed lantern on four white
     // posts over a white base, a cornice, a stepped glass cap, a gold-banded dome and a finial; the base's middle and the

@@ -31,6 +31,7 @@
 //  15. round 3: the nave's wooden arches solid honey oak, unbroken across the nave; no thin beams in the vaults (section 10
 //      now checks the half dome's rays clean) (P1 / P2 / P4)
 //  16. round 3: the hall's windows luminous — their stained heads white, light blue and gold, like the references' (P4 / P8 / P2)
+//  17. round 3: a second row of spires — a pinnacle with a lantern finial on the clerestory over every flyer's head (P5 / P0)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -577,6 +578,24 @@ for (const [label, H] of HALLS) {
       for (let y = F + 5; y <= F + 38; y++) { const n = atN(u, y, v); if (!/stained_glass/.test(n)) continue; if (PALE.test(n)) pale++; else { deep++; cnt[n] = (cnt[n] || 0) + 1; } }
     }
     check(pale > 300 && deep === 0, `the windows' heads pale — white, light blue and gold (${pale} pale cells, ${deep} deep: ${Object.entries(cnt).map(([k, n]) => k.replace('_stained_glass', '') + ' ' + n).join(', ') || 'none'})`);
+  }
+  // ---------------------------------------------------------------- 17. round 3: the clerestory's crown of pinnacles (P5 / P0)
+  console.log(`17. round 3 — pinnacles on the clerestory over the flyers' heads (${label})`);
+  {
+    // the second row of spires of a hall church seen from the land: where each flyer meets the clerestory (the pier lines
+    // v ≡ 5 mod 10, the clerestory's middle |u| 28) a pinnacle stands on its top — a shaft three or more high over the
+    // clerestory's top (31), a gold course and a lantern as its finial; on stone, so no glass loses its light
+    let ok = 0, n = 0;
+    for (let k = -8; k <= 4; k++) {
+      const vp = 10 * k + 5; if (vp < Hh.V0 + 2 || vp > Hh.V1) continue;
+      for (const s of [-1, 1]) {
+        n++; let shaft = 0, gold = false, lamp = false;
+        for (let y = F + 32; y <= F + 40; y++) { const nmv = atN(s * 28, y, vp); if (/quartz_pillar|chiseled/.test(nmv)) shaft++; if (/band/.test(nmv)) gold = true; if (/lantern/.test(nmv)) lamp = true; }
+        const onStone = /quartz|band|chiseled/.test(atN(s * 28, F + 31, vp));
+        if (shaft >= 3 && gold && lamp && onStone) ok++;
+      }
+    }
+    check(n >= 20 && ok === n, `a pinnacle with a gold course and a lantern finial on the clerestory over every flyer (${ok} of ${n})`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();
