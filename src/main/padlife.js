@@ -48,10 +48,14 @@
   };
   // the times of visit m whose touchdown is T: the approach (A0 … A1), the hold (… H1), the slide (… S1), the settle (… T),
   // the stay S (… L), the lift (… L1), the departure (… D1)
-  PL.times = function (seed, m, T, o) {
-    const Lp = T - PL.GAP, S = PL.stay(seed, m, o), L = T + S;
-    return { A0: Lp + PL.SLIDE0 - PL.HOLDT - PL.APP, A1: Lp + PL.SLIDE0 - PL.HOLDT, H1: Lp + PL.SLIDE0, S1: Lp + PL.SLIDE0 + PL.SLIDE, T, S, L, L1: L + PL.LIFT, D1: L + PL.LIFT + PL.DEP };
+  // (out: a record to fill — the pose asks every frame and keeps one)
+  PL.times = function (seed, m, T, o, out) {
+    const Lp = T - PL.GAP, S = PL.stay(seed, m, o), L = T + S, W = out || {};
+    W.A0 = Lp + PL.SLIDE0 - PL.HOLDT - PL.APP; W.A1 = Lp + PL.SLIDE0 - PL.HOLDT; W.H1 = Lp + PL.SLIDE0; W.S1 = Lp + PL.SLIDE0 + PL.SLIDE;
+    W.T = T; W.S = S; W.L = L; W.L1 = L + PL.LIFT; W.D1 = L + PL.LIFT + PL.DEP;
+    return W;
   };
+  const WT = {};
   // ---------------------------------------------------------------- the speed along a leg (pure)
   // braking in: a cruise, then a steady braking (BRAKE m/s²) to a stop at the end; L metres in T seconds → metres flown at t
   PL.brakeAt = function (L, T, a, t) {
@@ -108,7 +112,7 @@
   // gear's feet), yaw, pitch, roll, gear, thrust, speed, u (seconds since the touchdown), S, padFade (0 … 1: it fades in and
   // out at its horizon points)}
   PL.pose = function (pad, seed, m, T, t, out, o) {
-    const W = PL.times(seed, m, T, o);
+    const W = PL.times(seed, m, T, o, WT);
     if (t < W.A0 || t >= W.D1) return null;
     const G = PL.legs(pad, seed, m), Q = G.Q;
     out = out || {};
@@ -162,8 +166,8 @@
   PL.active = function (pad, seed, t, cache, outs, o, into) {
     const c = PL.visitAt(seed, t, cache, o), list = into || []; list.length = 0;
     const Tm1 = c.T - PL.stay(seed, c.n - 1, o) - PL.GAP, Tp1 = c.T + PL.stay(seed, c.n, o) + PL.GAP;
-    const ms = [[c.n - 1, Tm1], [c.n, c.T], [c.n + 1, Tp1]];
-    for (let k = 0; k < 3; k++) { const q = PL.pose(pad, seed, ms[k][0], ms[k][1], t, outs ? outs[k] : null, o); if (q) list.push(q); }
+    // (the one leaving, the one whose turn it is, the one coming)
+    for (let k = 0; k < 3; k++) { const q = PL.pose(pad, seed, c.n - 1 + k, k === 0 ? Tm1 : k === 1 ? c.T : Tp1, t, outs ? outs[k] : null, o); if (q) list.push(q); }
     return list;
   };
 
@@ -251,10 +255,13 @@
     return { T, st2 };
   };
   PL.crew = function (seed, m, u, S, G, plan, out) {
-    const C = PL.CREW, pl = plan || PL.crewPlan(seed, m, G), N = pl.N, CT = PL.crewTimes(pl, S), st2 = CT.st2;
+    const C = PL.CREW, pl = plan || PL.crewPlan(seed, m, G), N = pl.N;
+    // (the timetable of a stay is kept on its plan: the same every frame of the stay)
+    const CT = pl._ctS === S ? pl._ct : (pl._ctS = S, pl._ct = PL.crewTimes(pl, S)), st2 = CT.st2;
     out = out || [];
     out.length = N;
-    const cap = pl.plans.findIndex(p => p.role === 'captain'), gi = pl.plans.findIndex(p => p.role === 'gear');
+    if (pl._cap === undefined) { pl._cap = pl.plans.findIndex(p => p.role === 'captain'); pl._gi = pl.plans.findIndex(p => p.role === 'gear'); }
+    const cap = pl._cap, gi = pl._gi;
     for (let i = 0; i < N; i++) {
       const P = pl.plans[i], W = CT.T[i], o = out[i] || (out[i] = { i, pos: [0, 0, 0], yaw: 0 });
       const L = P.path.L, tmp = o.tmp || (o.tmp = [0, 0, 0, 0]);

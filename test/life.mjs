@@ -134,14 +134,16 @@ async function runPage(tag, dist) {
     console.log(`  ${sc.name}: feet ${pl.feet.map(v => +v.toFixed(1))} looking at ${pl.at.map(v => +v.toFixed(1))} tod ${sc.tod}`);
     // the after build: the scene's moment (the apron's visit with the crew out, the hangar's craft on the pad and the second
     // one holding; the director's acts of the scene started where the camera looks)
-    if (sc.name === 'hangar' || sc.name === 'apron') await ev(() => { const g = VR.game; if (g.padLife && g.padLife.jump) g.padLife.jump('apron', 'crew'); if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) g.hall.flight.jumpPhase('pad', 0.2); });
+    // (the owner's view: the hall's own craft runs out through the mouth over the runway — half its run, then 3 s: just past the
+    //  portal — while the second one hovers at its waiting point beside the runway, x −18, z 52)
+    if (sc.name === 'hangar' || sc.name === 'apron') await ev((nm) => { const g = VR.game; if (g.padLife && g.padLife.jump) g.padLife.jump('apron', 'crew'); if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) { if (nm === 'hangar') g.hall.flight.update(0.03); g.hall.flight.jumpPhase(nm === 'hangar' ? 'out' : 'pad', nm === 'hangar' ? 0.5 : 0.2); } }, sc.name);
     if (sc.name === 'hall') await ev(() => { const g = VR.game; if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) { g.hall.flight.update(0.03); const L = g.hall.flight.plan && g.hall.flight.plan.legs.find(l => l.name === 'pad'); g.hall.flight.jumpPhase('pad', L ? Math.min(0.6, 21 / L.T) : 0.3); } if (g.hall && g.hall.jump) g.hall.jump(8); });
     if (sc.force) await ev(([kinds, at]) => { const g = VR.game; if (!g.lifeDirector || !g.lifeDirector.force) return; for (const k of kinds) g.lifeDirector.force(k, { look: at }); }, [sc.force, pl.at]);
     await step(sc.name === 'plaza_dusk' ? 600 : 90);   // the lighter has walked a few lamps (20 s at 1.35 m/s), the cart rolls into view, the crew is out
     const c = await count(); counts[`${sc.name}/${tag}`] = c;
     console.log(`  ${sc.name} ${tag}: ${JSON.stringify(c)}`);
     if (await shot(sc.name)) pics++;
-    if (has.pad && sc.name === 'hangar') { const p = c.pad || {}; check(p.parked >= 1 && c.hangarCraft >= 1, `${tag}: from the terrace a craft stands on the apron (parked ${p.parked}) and the hall's craft fly (${c.hangarCraft} in sight range)`); }
+    if (has.pad && sc.name === 'hangar') { const p = c.pad || {}; const hf = await ev(() => VR.game.hall.flight.crafts.map(C => C.phase + ' ' + C.inst.pos.map(v => Math.round(v)).join(','))); check(p.parked >= 1 && c.hangarCraft >= 2, `${tag}: from the terrace a craft stands on the apron (parked ${p.parked}) and the hall's two fly (${c.hangarCraft} in sight range: ${hf.join(' · ')})`); }
     if (has.pad && sc.name === 'apron') { const p = c.pad || {}; check(p.parked >= 1 && p.crew >= 2 && p.drones >= 1, `${tag}: a craft stands on the apron with its crew out and its drone up (parked ${p.parked}, crew ${p.crew}, drones ${p.drones})`); }
     if (has.hold && sc.name === 'hall') { const hf = await ev(() => { const f = VR.game.hall.flight; return { phases: f.crafts.map(C => C.phase), crew: f.crafts.reduce((a, C) => a + (C.crewOn ? C.folk.filter(x => x.on).length : 0), 0), drone: f.crafts.some(C => C.droneOn) }; }); console.log('  hall flight', JSON.stringify(hf)); check(hf.phases.includes('pad') && hf.crew >= 2, `${tag}: the hall's pad has its craft with the ground crew out (${JSON.stringify(hf)})`); }
     if (has.dir && sc.name === 'plaza_dusk') check(c.life && c.life.kinds && c.life.kinds.lanterns && c.life.lit >= 2, `${tag}: the lantern lighter has lit lamps one by one (${c.life && c.life.lit} lit of ${c.life && c.life.lamps})`);
