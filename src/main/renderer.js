@@ -135,7 +135,7 @@
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
       P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE']));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE']));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [])));   // (F10 · zPre: invariant positions)
       P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE']));
       P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL']);
       P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT']);
@@ -164,6 +164,65 @@
       // (the smooth props' programs are compiled on their first use, propProgram: Very Low never compiles them)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
+    // F10 · zPre: the cut-out layer's depth prepass program — the terrain shader cut after its alpha test (ZPRE), with the
+    // colour pass's defines (ZINV: both place their fragments alike); made on first use, dropped with P
+    zProgram() {
+      const P = this.P;
+      if (P.cutZ) return P.cutZ;
+      const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);
+      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE']);
+      if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
+      return (P.cutZ = p);
+    }
+    // F10 · zPre: the cut-out layer's depth first (leaves, grass, flowers, fences: alpha-tested, so a GPU cannot reject their
+    // hidden fragments before it shades them) with the colour writes off; render() then draws the layer with depth writes off
+    // and LEQUAL — the full shader runs for the nearest texel only. count (a test): the colour on, adding 1/255 a fragment
+    zPrepass(list, E, camPos, count) {
+      const gl = this.gl, p = this.zProgram();
+      gl.useProgram(p.p);
+      this.common(p, E);
+      this.bindTerrainTextures(p);
+      gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
+      gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
+      gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
+      if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
+      if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, this.jit && !this.q.lite ? Math.sqrt(Math.max(0.35, this.w / this.W)) : 1);   // (as the colour pass: the same mip, the same alpha)
+      if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
+      gl.disable(gl.CULL_FACE);
+      if (count) { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); } else gl.colorMask(false, false, false, false);
+      const d0 = this.stats.draws;
+      this.drawSections(list, 1, p, camPos, this.planes, false);
+      if (count) gl.disable(gl.BLEND); else gl.colorMask(true, true, true, true);
+      gl.enable(gl.CULL_FACE);
+      this.stats.zpreDraws = this.stats.draws - d0;
+    }
+    // test hook (test/ipu.mjs, renderer.zCount): the cut-out layer's fragment work in this frame's view — how many of its
+    // fragments reach the full shader in one pass (each one that passes the depth test as the layer is drawn) and after the
+    // prepass (only those at the nearest depth), counted into a scratch target that starts from the opaque pass's depth
+    zCountPass(list, E, camPos) {
+      const gl = this.gl, w = this.w, h = this.h;
+      let z = this.zc;
+      if (!z || z.w !== w || z.h !== h) {
+        if (z) { gl.deleteFramebuffer(z.fb); gl.deleteTexture(z.col); gl.deleteTexture(z.depth); }
+        const col = GL.tex2D(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { filter: gl.NEAREST }), depth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
+        z = this.zc = { w, h, col, depth, fb: GL.fbo([col], depth), px: new Uint8Array(w * h * 4) };
+      }
+      const run = (pre) => {
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, z.fb);
+        gl.blitFramebuffer(0, 0, w, h, 0, 0, w, h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, z.fb); gl.viewport(0, 0, w, h);
+        gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.depthMask(true);
+        if (pre) { this.zPrepass(list, E, camPos); gl.depthMask(false); }
+        this.zPrepass(list, E, camPos, true);
+        gl.depthMask(true);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, z.px);
+        let n = 0; for (let i = 0; i < z.px.length; i += 4) n += z.px[i];
+        return n;
+      };
+      this.stats.zCount = { one: run(false), pre: run(true), px: w * h };
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, w, h);
+    }
     // F-Far: the far programs, made when ring 1 first needs them (Very Low … Balanced never compile them): 'form' = ring 1,
     // 'lodFar' = the horizon tiles cut by ring 1 too. A failed compile answers null (the caller draws nothing then).
     farProgram(name) {
@@ -282,7 +341,9 @@
     resize(force) {
       const gl = this.gl;
       const dpr = Math.min(window.devicePixelRatio || 1, this.q.maxDpr || 1.5);
-      const W = Math.max(2, Math.floor(this.canvas.clientWidth * dpr)), H = Math.max(2, Math.floor(this.canvas.clientHeight * dpr));
+      let W = Math.max(2, Math.floor(this.canvas.clientWidth * dpr)), H = Math.max(2, Math.floor(this.canvas.clientHeight * dpr));
+      // F10 · dprLite (ipu.js backing): never larger than the physical screen; on Ultra · Leicht at most 1920 × 1080 worth of pixels
+      if (this.q.dprLite && VR.IPU) { const sc = window.screen || {}, b = VR.IPU.backing(this.canvas.clientWidth, this.canvas.clientHeight, window.devicePixelRatio || 1, this.q.maxDpr || 1.5, sc.width, sc.height, true, !!this.q.dprCap, this._bk || (this._bk = {})); W = b.W; H = b.H; }
       const sc = this.q.scale;
       const w = Math.max(2, Math.floor(W * sc)), h = Math.max(2, Math.floor(H * sc));
       if (!force && W === this.W && H === this.H && w === this.w && h === this.h) return;
@@ -297,11 +358,15 @@
       if (outChanged) for (const k of ['histFB0', 'histTex0', 'histFB1', 'histTex1']) del(k);
       if (this.bloom) for (const b of this.bloom) { gl.deleteFramebuffer(b.fb); gl.deleteTexture(b.tex); }
       const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
-      this.sceneCol = GL.tex2D(w, h, cfmt, gl.RGBA, ctype, {});
+      // F10 · hdrLite: the scene colour, its copy, the bloom chain and the rays in R11F_G11F_B10F (ipu.js; the TSR history
+      // below keeps cfmt: it is fed back every frame)
+      this._sf = null; const sf = this.sceneFmt().gl;
+      this.sceneCol = GL.tex2D(w, h, sf[0], sf[1], sf[2], {});
       this.sceneDepth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       this.sceneFB = GL.fbo([this.sceneCol], this.sceneDepth);
+      if (!this.sceneFB && this._sf.name === 'R11F_G11F_B10F') { GL.r11 = false; return this.resize(true); }   // (F10: refused after all → RGBA16F)
       if (!this.sceneFB && this.hdr) { this.hdr = false; return this.resize(true); }
-      this.copyCol = GL.tex2D(w, h, cfmt, gl.RGBA, ctype, {});
+      this.copyCol = GL.tex2D(w, h, sf[0], sf[1], sf[2], {});
       this.copyDepth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       this.copyFB = GL.fbo([this.copyCol], this.copyDepth);
       this.ldrTex = GL.tex2D(W, H, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, {});
@@ -317,13 +382,25 @@
       this.bloom = [];
       let bw = Math.max(1, w >> 1), bh = Math.max(1, h >> 1);
       for (let i = 0; i < 5; i++) {
-        const t = GL.tex2D(bw, bh, cfmt, gl.RGBA, ctype, {});
+        const t = GL.tex2D(bw, bh, sf[0], sf[1], sf[2], {});
         this.bloom.push({ tex: t, fb: GL.fbo([t]), w: bw, h: bh });
         bw = Math.max(1, bw >> 1); bh = Math.max(1, bh >> 1);
       }
       const rw = Math.max(1, w >> 2), rh = Math.max(1, h >> 2);
-      this.raysTex = GL.tex2D(rw, rh, cfmt, gl.RGBA, ctype, {}); this.raysFB = GL.fbo([this.raysTex]); this.raysW = rw; this.raysH = rh;
+      this.raysTex = GL.tex2D(rw, rh, sf[0], sf[1], sf[2], {}); this.raysFB = GL.fbo([this.raysTex]); this.raysW = rw; this.raysH = rh;
       this.ensureShadowMap();
+    }
+    // F10 · hdrLite (ipu.js): the scene targets' format { name, bytes, gl: [internal, format, type] } — R11F_G11F_B10F with the
+    // switch where the probe passed, else RGBA16F / RGBA8 as before; made once per resize (the mirror and the far cache read it)
+    sceneFmt() {
+      if (this._sf) return this._sf;
+      const gl = this.gl, IPU = VR.IPU, lite = !!(this.q && this.q.hdrLite) && this.hdr;
+      const f = IPU ? IPU.colorFormat(this.hdr, lite, lite && IPU.probe(gl, GL.ext)) : { name: this.hdr ? 'RGBA16F' : 'RGBA8', bytes: this.hdr ? 8 : 4 };
+      f.gl = f.name === 'R11F_G11F_B10F' ? [gl.R11F_G11F_B10F, gl.RGB, gl.HALF_FLOAT] : this.hdr ? [gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT] : [gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE];
+      if (this.stats) this.stats.sceneFmt = f.name;
+      if (this.fc && this.sfLast && this.sfLast !== f.name) this.fcDrop();   // (the far cache is drawn again in the new format)
+      this.sfLast = f.name;
+      return (this._sf = f);
     }
     ensureShadowMap() {
       const gl = this.gl, size = this.q.shadows;
@@ -352,8 +429,10 @@
     }
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
+      const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre: its own program define; texLite: the sampler)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ) this.buildPrograms();
+      if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
       this.resize(full || this.q.scale !== prevScale);
@@ -396,6 +475,7 @@
         sec.mesh[l] = m;
       }
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
+      sec.transW = this.transWaterOf(trans);   // (F10 · postLite: water or aether among its translucent faces)
       sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
       this.visDirty = true;
       this.nearShadow(sec);
@@ -439,6 +519,7 @@
       const vn = st.vx ? st.vx.length >> 3 : 0;
       sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
+      sec.transW = this.transWaterOf(st.d[2]);   // (F10 · postLite: water or aether among its translucent faces)
       sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
       this.visDirty = true;
       this.nearShadow(sec);
@@ -563,7 +644,7 @@
     freeSection(sec) {
       if (sec.hasMesh) this.nearShadow(sec);
       for (let l = 0; l < sec.mesh.length; l++) if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
-      sec.vxData = null;
+      sec.vxData = null; sec.transW = false;
       this.propSet(sec, null);
       sec.hasMesh = false; sec.meshed = false;
       this.visDirty = true;
@@ -1166,11 +1247,11 @@
     fcCancel(st) { if (st.back) { st.spare = st.back; st.back = null; } }
     // the buffers of a layer at the size of its view (made or resized when needed)
     fcEnsure(L, tw, th) {
-      const gl = this.gl;
-      if (L.fb && L.tw === tw && L.th === th && L.hdr === this.hdr) return true;
+      const gl = this.gl, sf = this.sceneFmt();   // (F10 · hdrLite: the scene's format)
+      if (L.fb && L.tw === tw && L.th === th && L.hdr === this.hdr && L.fmt === sf.name) return true;
       if (L.fb) { gl.deleteFramebuffer(L.fb); gl.deleteTexture(L.col); gl.deleteTexture(L.depth); L.fb = null; }
-      const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
-      L.col = GL.tex2D(tw, th, cfmt, gl.RGBA, ctype, { filter: gl.LINEAR });
+      L.fmt = sf.name;
+      L.col = GL.tex2D(tw, th, sf.gl[0], sf.gl[1], sf.gl[2], { filter: gl.LINEAR });
       L.depth = GL.tex2D(tw, th, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       L.fb = GL.fbo([L.col], L.depth);
       L.tw = tw; L.th = th; L.hdr = this.hdr;
@@ -1287,6 +1368,7 @@
       gl.uniformMatrix4fv(p.u.u_fcInvVP, false, f.inv);
       gl.uniform3f(p.u.u_delta, F.cam.x - f.x, F.cam.y - f.y, F.cam.z - f.z);
       gl.uniform2f(p.u.u_scale, f.scale[0], f.scale[1]);
+      { const n = this.w * this.h, sb = this.sceneFmt().bytes; this.fsMark('farComp', this.w, this.h, n * (sb + 4) * 2, n * (sb + 4)); }   // (reads its colour and depth about twice: the reprojection's steps)
       this.fs(p);
       gl.depthFunc(gl.LEQUAL);
     }
@@ -1660,6 +1742,18 @@
       return out;
     }
     freeShip(list) { for (const o of list) this.freeSection(o); }
+    // F10 · postLite: a ship with water (rare) when this frame skipped the refraction copy — copied now, before its
+    // translucent faces (the copy then holds the terrain's water too; nothing else differs)
+    shipCopy(ship) {
+      let w = false; for (const s of ship.gpu) if (s.transW) { w = true; break; }
+      if (!w) return;
+      const gl = this.gl;
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
+      gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
+      gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
+      this.copied = true;
+    }
     drawShip(ship, E, layerSet) {
       const gl = this.gl, cam = this.cam;
       const model = ship.modelMat, nm = ship.normalMat;
@@ -1668,6 +1762,7 @@
         gl.useProgram(p.p);
         this.common(p, E);
         this.bindTerrainTextures(p);
+        if (layer === 2 && this.q.postLite && !this.copied) this.shipCopy(ship);   // (F10 · postLite: the frame skipped the copy)
         if (layer === 2) { this.tex(4, this.copyCol, p.u.u_sceneColor); this.tex(5, this.copyDepth, p.u.u_sceneDepth); if (p.u.u_reflDepth) gl.uniform1i(p.u.u_reflDepth, 9); gl.uniform2f(p.u.u_screen, this.w, this.h); gl.uniform2f(p.u.u_nearFar, 0.06, cam.far || 1200); if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, 0); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); }
         gl.uniformMatrix4fv(p.u.u_viewProj, false, this.viewProj);
         gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
@@ -1696,6 +1791,78 @@
 
     // ------------------------------------------------ fullscreen helpers
     fs(p) { const gl = this.gl; gl.bindVertexArray(this.emptyVAO); gl.drawArrays(gl.TRIANGLES, 0, 3); void p; }
+    // F10 · the frame's full-screen passes and blits (stats.fsPasses) and, with passLog on (the tests), each with its size and
+    // the bytes it reads and writes (stats.fsList; ipu.js bytes sums them) — no allocation unless passLog is on
+    fsMark(name, w, h, rd, wr, fetch) { const s = this.stats; s.fsPasses = (s.fsPasses || 0) + 1; if (this.passLog) (s.fsList || (s.fsList = [])).push({ name, w, h, rd, wr, fetch: fetch || 0 }); }
+    // F10 · postLite: does a translucent layer hold water or aether (the mesher's kinds 1, 6, 7 in w5 bits 8–10; w5 is the 6th
+    // ushort of a vertex) — they read the refraction copy, glass does not. Once per upload.
+    transWaterOf(d) {
+      if (!d) return false;
+      for (let i = 5; i < d.length; i += 8) { const k = (d[i] >> 8) & 7; if (k === 1 || k === 6 || k === 7) return true; }
+      return false;
+    }
+    // water or aether in this frame's view (a visible section with such a translucent layer inside the frustum)
+    waterInView(vis) {
+      const cam = this.cam, P = this.planes;
+      for (let i = 0; i < vis.length; i++) {
+        const s = vis[i];
+        if (!s.transW || !s.mesh[2] || (s.fade !== undefined && s.fade <= 0)) continue;
+        const ox = s.ox - cam.x, oy = s.oy - cam.y, oz = s.oz - cam.z;
+        if (mat4.boxInFrustum(P, ox, oy, oz, ox + 16, oy + 16, oz + 16)) return true;
+      }
+      return false;
+    }
+    // the god rays' strength this frame (0: none) — the same rule as post(): the sun (or the moon) on the screen
+    raysAt(F, E) {
+      if (!this.q.rays || E.dimId !== 0 || F.underwater) return 0;
+      const L = E.sunDir[1] > 0 ? E.sunDir : E.moonDir, m = this.viewProj;
+      const c0 = L[0] * 100, c1 = L[1] * 100, c2 = L[2] * 100;
+      const cx = m[0] * c0 + m[4] * c1 + m[8] * c2 + m[12], cy = m[1] * c0 + m[5] * c1 + m[9] * c2 + m[13], cw = m[3] * c0 + m[7] * c1 + m[11] * c2 + m[15];
+      if (cw <= 0) return 0;
+      const sx = (cx / cw) * 0.5 + 0.5, sy = (cy / cw) * 0.5 + 0.5;
+      return Math.max(0, 1 - Math.max(Math.abs(sx - 0.5), Math.abs(sy - 0.5)) * 1.6) * Math.min(1, L[1] * 4) * (1 - E.rain);
+    }
+    // ---- the refraction copy: the water and the aether read the scene's colour and depth under them; TSR and the god rays
+    // read the depth (the hand clears it before it is drawn). F10 · postLite: the colour only when water or aether is in
+    // view, the depth only when that, TSR or the rays need it (a ship's water copies on demand in drawShip)
+    refrCopy(F, E, vis) {
+      const gl = this.gl;
+      let col = true, dep = true;
+      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy / plRays false: one part off, for the measurement)
+      this.copied = col;
+      if (!col && !dep) return;
+      const n = this.w * this.h, sb = this.sceneFmt().bytes;
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
+      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
+      if (col) { this.fsMark('copyColour', this.w, this.h, n * sb, n * sb); gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST); }
+      if (dep) { this.fsMark('copyDepth', this.w, this.h, n * 4, n * 4); gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST); }
+    }
+    // F10 · postLite: the god rays from a ¼-res sky mask (one pass reads the full-res depth and colour once), then the same
+    // 28-step march over the mask
+    raysLite(sx, sy, strength) {
+      const gl = this.gl, P = this.P, sb = this.sceneFmt().bytes, rw = this.raysW, rh = this.raysH;
+      if (!this.raysMaskTex || this.raysMaskW !== rw || this.raysMaskH !== rh || this.raysMaskFmt !== this.sceneFmt().name) {
+        if (this.raysMaskFB) { gl.deleteFramebuffer(this.raysMaskFB); gl.deleteTexture(this.raysMaskTex); }
+        const sf = this.sceneFmt().gl;
+        this.raysMaskTex = GL.tex2D(rw, rh, sf[0], sf[1], sf[2], {}); this.raysMaskFB = GL.fbo([this.raysMaskTex]);
+        this.raysMaskW = rw; this.raysMaskH = rh; this.raysMaskFmt = this.sceneFmt().name;
+      }
+      const pm = P.raysMask || (P.raysMask = GL.program(S.FS_VS, S.RAYS_MASK_FS, 'raysMask'));
+      gl.useProgram(pm.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.raysMaskFB); gl.viewport(0, 0, rw, rh);
+      this.tex(0, this.copyDepth, pm.u.u_depth); this.tex(1, this.sceneCol, pm.u.u_color);
+      gl.uniform2f(pm.u.u_texel, 1 / this.w, 1 / this.h);
+      this.fsMark('raysMask', rw, rh, this.w * this.h * sb + this.w * this.h, rw * rh * sb, rw * rh * 8);
+      this.fs(pm);
+      const p = P.raysM || (P.raysM = GL.program(S.FS_VS, S.RAYS_FS, 'raysM', ['MASK']));
+      gl.useProgram(p.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.raysFB); gl.viewport(0, 0, rw, rh);
+      this.tex(1, this.raysMaskTex, p.u.u_color);
+      gl.uniform2f(p.u.u_sunScreen, sx, sy);
+      gl.uniform1f(p.u.u_raysStrength, strength);
+      this.fsMark('rays', rw, rh, rw * rh * sb, rw * rh * sb, rw * rh * 28);
+      this.fs(p);
+    }
     tex(unit, t, loc) { const gl = this.gl; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); if (loc) gl.uniform1i(loc, unit); }
 
     // ------------------------------------------------ main frame
@@ -1706,6 +1873,7 @@
       this.frameNo++;
       this.gpuTimerBegin();
       this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
+      this.stats.fsPasses = 0; if (this.stats.fsList) this.stats.fsList.length = 0;   // (F10 · Bandbreite: the full-screen passes, fsMark)
       this.upQ = world && world.uploadQ && world.uploadQ.drain ? world.uploadQ : null;   // (F10: the one upload queue — vxResidency, upGauge)
       this.resize(false);
       this.setupCamera(F.cam);
@@ -1738,6 +1906,7 @@
         if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
         if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);   // t-clouds: cirrus from balanced up
+        this.fsMark('sky', this.w, this.h, 0, this.w * this.h * this.sceneFmt().bytes);
         this.fs(p);
       }
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
@@ -1746,6 +1915,8 @@
       if (world) {
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
           this.gpuPass(layer === 0 ? 'opaque' : 'cutout');
+          if (layer === 1 && this.zCount) this.zCountPass(near, E, camPos);   // (test hook: test/ipu.mjs)
+          if (layer === 1 && this.q.zPre) { this.gpuPass('zpre'); this.zPrepass(near, E, camPos); this.gpuPass('cutout'); }   // (F10 · zPre)
           gl.useProgram(p.p);
           this.common(p, E);
           this.bindTerrainTextures(p);
@@ -1760,7 +1931,10 @@
           if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
           this.shadowOffUni(p.u);
           if (layer === 1) gl.disable(gl.CULL_FACE);
+          const zp = layer === 1 && this.q.zPre;   // F10 · zPre: the layer's depth is there already — LEQUAL, no depth writes
+          if (zp) gl.depthMask(false);
           this.drawSections(near, layer, p, camPos, this.planes, false);
+          if (zp) gl.depthMask(true);
           if (layer === 0) {
             // mini-voxel pieces: full detail up close, averaged boxes beyond the VX detail distance
             this.vxResidency(vis, camPos);
@@ -1784,12 +1958,9 @@
         if (this.q.reflEvery > 1 && this.reflKept && this.frameNo % this.q.reflEvery) this.reflOn = true;   // F9 (a governor rung on Ultra · Leicht): last frame's mirror again
         else { this.gpuPass('mirror'); const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; this.reflKept = this.reflOn; }
       } else this.reflKept = false;
-      // ---------------- copy scene for refraction
+      // ---------------- copy scene for refraction (F10 · postLite: only what this frame reads, refrCopy)
       this.gpuPass('copy');
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
-      gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
-      gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
-      gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+      this.refrCopy(F, E, vis);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
       // clouds (behind translucent terrain; depth tested)
       this.gpuPass('clouds');
@@ -1839,6 +2010,7 @@
       // ---------------- post
       this.gpuPass('post');
       this.post(F, E);
+      if (this.passLog && VR.IPU) this.stats.fsBytes = VR.IPU.bytes(this.stats.fsList);   // (F10: what the passes moved)
       this.gpuTimerEnd();
       if (this.upQ) this.upGauge(this.upQ, performance.now());   // (F10: a fence after the frame that uploaded)
       this.stats.ms = performance.now() - t0;
@@ -1874,13 +2046,13 @@
     ensureReflection() {
       const gl = this.gl, k = this.q.water >= 2 && !this.q.reflLite ? 0.5 : 0.25;   // (F9 · Spiegelung leicht: a quarter, read edge-aware)
       const rw = Math.max(16, Math.floor(this.w * k)), rh = Math.max(9, Math.floor(this.h * k));
-      if (this.reflFB && rw === this.reflW && rh === this.reflH && this.reflHdr === this.hdr) return true;
+      const sf = this.sceneFmt();   // (F10 · hdrLite: the scene's format)
+      if (this.reflFB && rw === this.reflW && rh === this.reflH && this.reflHdr === this.hdr && this.reflFmt === sf.name) return true;
       if (this.reflFB) gl.deleteFramebuffer(this.reflFB);
       if (this.reflCol) gl.deleteTexture(this.reflCol);
       if (this.reflDepth) gl.deleteTexture(this.reflDepth);
-      this.reflFB = null;
-      const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
-      this.reflCol = GL.tex2D(rw, rh, cfmt, gl.RGBA, ctype, { filter: gl.LINEAR });
+      this.reflFB = null; this.reflFmt = sf.name;
+      this.reflCol = GL.tex2D(rw, rh, sf.gl[0], sf.gl[1], sf.gl[2], { filter: gl.LINEAR });
       this.reflDepth = GL.tex2D(rw, rh, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       this.reflFB = GL.fbo([this.reflCol], this.reflDepth);
       this.reflW = rw; this.reflH = rh; this.reflHdr = this.hdr;
@@ -1921,6 +2093,7 @@
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProjR);
         if (p.u.u_skyOff) gl.uniform3f(p.u.u_skyOff, 0, 2 * d, 0);
+        this.fsMark('mirrorSky', this.reflW, this.reflH, 0, this.reflW * this.reflH * this.sceneFmt().bytes);
         this.fs(p);
         if (p.u.u_skyOff) gl.uniform3f(p.u.u_skyOff, 0, 0, 0);
       }
@@ -2121,6 +2294,7 @@
       // fast camera moves converge quicker (less smear), slow looks converge sharper
       const pv = this.prevView || [c.yaw, c.pitch]; const rot = Math.abs(c.yaw - pv[0]) + Math.abs(c.pitch - pv[1]); this.prevView = [c.yaw, c.pitch];
       gl.uniform1f(p.u.u_camSpeed, Math.min(1, Math.hypot(d[0], d[1], d[2]) * 1.5 + rot * 6));
+      { const n = this.w * this.h, nW = this.W * this.H, hb = this.hdr ? 8 : 4; this.fsMark('tsr', this.W, this.H, n * this.sceneFmt().bytes + n * 4 + nW * hb, nW * hb); }
       this.fs(p);
       this.histFlip = !this.histFlip;
       this.tsrReset = false;
@@ -2132,6 +2306,7 @@
       const gl = this.gl;
       gl.disable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
       const useBloom = this.q.bloom && this.hdr;
+      const lite = !!this.q.postLite, sb = this.sceneFmt().bytes;   // F10 · postLite (the rays from a ¼-res mask); the scene's bytes a pixel
       // bloom
       if (useBloom) {
         let p = this.P.bloomPre; gl.useProgram(p.p);
@@ -2140,12 +2315,14 @@
         this.tex(0, this.sceneCol, p.u.u_src);
         gl.uniform2f(p.u.u_texel, 1 / this.w, 1 / this.h);
         gl.uniform1f(p.u.u_threshold, E.bloomThreshold || 1.1);
+        this.fsMark('bloomPre', b0.w, b0.h, this.w * this.h * sb, b0.w * b0.h * sb);
         this.fs(p);
         p = this.P.down; gl.useProgram(p.p);
         for (let i = 1; i < this.bloom.length; i++) {
           const src = this.bloom[i - 1], dst = this.bloom[i];
           gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb); gl.viewport(0, 0, dst.w, dst.h);
           this.tex(0, src.tex, p.u.u_src); gl.uniform2f(p.u.u_texel, 1 / src.w, 1 / src.h);
+          this.fsMark('down', dst.w, dst.h, src.w * src.h * sb, dst.w * dst.h * sb);
           this.fs(p);
         }
         p = this.P.up; gl.useProgram(p.p);
@@ -2154,6 +2331,7 @@
           const src = this.bloom[i], dst = this.bloom[i - 1];
           gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb); gl.viewport(0, 0, dst.w, dst.h);
           this.tex(0, src.tex, p.u.u_src); gl.uniform2f(p.u.u_texel, 1 / src.w, 1 / src.h); gl.uniform1f(p.u.u_radius, 1.0);
+          this.fsMark('up', dst.w, dst.h, (src.w * src.h + dst.w * dst.h) * sb, dst.w * dst.h * sb);
           this.fs(p);
         }
         gl.disable(gl.BLEND);
@@ -2168,18 +2346,22 @@
         if (cw > 0) {
           const sx = (cx / cw) * 0.5 + 0.5, sy = (cy / cw) * 0.5 + 0.5;
           const fade = Math.max(0, 1 - Math.max(Math.abs(sx - 0.5), Math.abs(sy - 0.5)) * 1.6) * Math.min(1, L[1] * 4) * (1 - E.rain);
-          if (fade > 0.02) {
+          if (fade > 0.02 && lite && this.q.plRays !== false) { raysOn = true; this.raysLite(sx, sy, fade * (E.sunDir[1] > 0 ? (E.rays !== undefined ? E.rays : 0.55) : 0.2)); }   // (F10 · postLite: from a ¼-res mask)
+          else if (fade > 0.02) {
             raysOn = true;
             const p = this.P.rays; gl.useProgram(p.p);
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.raysFB); gl.viewport(0, 0, this.raysW, this.raysH);
             this.tex(0, this.copyDepth, p.u.u_depth); this.tex(1, this.sceneCol, p.u.u_color);
             gl.uniform2f(p.u.u_sunScreen, sx, sy);
             gl.uniform1f(p.u.u_raysStrength, fade * (E.sunDir[1] > 0 ? (E.rays !== undefined ? E.rays : 0.55) : 0.2));
+            this.fsMark('rays', this.raysW, this.raysH, this.w * this.h * (4 + sb), this.raysW * this.raysH * sb, this.raysW * this.raysH * 56);
             this.fs(p);
           }
         }
       }
-      // composite → ldr (or screen)
+      // composite → ldr (or screen). (F10 · postLite measured two folds and kept neither — FXAA folded in here blended HDR
+      // samples where the FXAA pass blends tonemapped ones: every edge differed, ΔE 1.6 at the plaza; the bloom's last
+      // upsample read here cost nine more texture reads a full-res pixel than the half-res pass it saved: plan, results)
       const fx = this.q.fxaa && !this.upTex;
       const p = this.P.composite; gl.useProgram(p.p);
       gl.bindFramebuffer(gl.FRAMEBUFFER, fx ? this.ldrFB : null);
@@ -2211,6 +2393,7 @@
       // sharpen more when the scene was rendered below screen resolution (less after super resolution)
       const up = Math.max(0, 1 - this.w / this.W) * (this.upTex ? 0.5 : 1);
       gl.uniform1f(p.u.u_sharpen, this.q.sharpen === 0 ? 0 : Math.min(1, (this.q.sharpen || 0.35) + up * 1.6));
+      { const b0 = this.bloom[0], nW = this.W * this.H; this.fsMark('composite', this.W, this.H, (this.upTex ? nW * 8 : this.w * this.h * sb) + (useBloom ? b0.w * b0.h * sb : 0) + (raysOn ? this.raysW * this.raysH * sb : 0), nW * 4); }
       this.fs(p);
       if (fx) {
         const q = this.P.fxaa; gl.useProgram(q.p);
@@ -2218,6 +2401,7 @@
         gl.viewport(0, 0, this.W, this.H);
         this.tex(0, this.ldrTex, q.u.u_src);
         gl.uniform2f(q.u.u_texel, 1 / this.W, 1 / this.H);
+        this.fsMark('fxaa', this.W, this.H, this.W * this.H * 4, this.W * this.H * 4);
         this.fs(q);
       }
     }

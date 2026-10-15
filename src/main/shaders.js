@@ -568,6 +568,9 @@ out vec3 v_localPos;
 #ifdef FADE
 flat out float v_fade;
 #endif
+#ifdef ZINV
+invariant gl_Position;   // F10 · zPre: the cut-out layer's depth prepass and its colour pass place every fragment alike
+#endif
 void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
@@ -748,6 +751,9 @@ void main() {
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
+#ifdef ZPRE
+  o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
+#endif
 #endif
   vec4 mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
   vec3 tint = v_tint;
@@ -2086,11 +2092,32 @@ void main() {
   for (int i = 0; i < 28; i++) {
     p += d;
     if (p.x < 0.0 || p.y < 0.0 || p.x > 1.0 || p.y > 1.0) break;
+#ifdef MASK
+    acc += texture(u_color, p).rgb * w;   // (F10 · postLite: u_color is the ¼-res sky mask, RAYS_MASK_FS)
+#else
     float sky = step(0.99999, texture(u_depth, p).r);
     acc += texture(u_color, p).rgb * sky * w;
+#endif
     w *= 0.955;
   }
   o = vec4(acc / 28.0 * u_raysStrength, 1.0);
+}`;
+  // F10 · postLite: the god rays' source at ¼ × ¼ — per texel the sky's colour over its 4 × 4 full-res pixels (four bilinear
+  // colour taps, four depth taps; 0 where the depth is not the sky). RAYS_FS with MASK then marches over this small texture
+  // (it stays in the cache) instead of reading 28 colour and 28 depth texels of the full-res targets for every pixel.
+  S.RAYS_MASK_FS = `
+uniform sampler2D u_depth;
+uniform sampler2D u_color;
+uniform vec2 u_texel;       // the full-res texel
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec3 acc = vec3(0.0);
+  for (int j = 0; j < 2; j++) for (int i = 0; i < 2; i++) {
+    vec2 p = v_uv + (vec2(float(i), float(j)) * 2.0 - 1.0) * u_texel;
+    acc += texture(u_color, p).rgb * step(0.99999, texture(u_depth, p).r);
+  }
+  o = vec4(acc * 0.25, 1.0);
 }`;
   S.COMPOSITE_FS = `
 uniform sampler2D u_scene;

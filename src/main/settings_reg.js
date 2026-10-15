@@ -119,4 +119,7 @@
   S.snapFor = function (item, v, settings) { const hi = S.maxOf(item, settings); return hi === item.max ? S.snap(item, v) : S.snap(Object.assign({}, item, { max: hi }), v); };
   // F9 · Ultra für schwache PCs: the four switches of „Ultra · Leicht" (each makes the frame cheaper; the picture stays)
   for (const k of ['farCache', 'shadowTakt', 'streamTakt', 'reflLite']) S.add({ key: k, g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.' + k, tip: 'g.set.' + k + '.tip', cost: 'low', def: false });
+  // F10 · Bandbreite (ipu.js): the five switches for graphics chips that share the system's memory (each saves memory traffic;
+  // the picture stays) — on for Ultra · Leicht and on every preset of an integrated GPU (game.js ipuDefaults)
+  for (const k of ['hdrLite', 'postLite', 'zPre', 'texLite', 'dprLite']) S.add({ key: k, g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.' + k, tip: 'g.set.' + k + '.tip', cost: 'low', def: false });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
