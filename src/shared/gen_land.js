@@ -1310,8 +1310,8 @@
     const [cx, cz] = at(w >> 1, d >> 1);
     P.pieces.push({ kind: 'flowers', flower: kind, x: cx, z: cz, y: F, farm: site.id, rect: Fw.rect });
   }
-  // the windmill: a white tower on a fieldstone base, a pointed roof, four sails round a hub on the face toward the
-  // yard; the hub is the pivot (a `windmill` spawn records it for a later turning)
+  // the windmill: a white tower on a fieldstone base, a pointed roof, a hub on the face toward the yard; the hub is the
+  // pivot of the sails, which the game draws and turns (a `windmill` spawn records it; t-polish: no sail blocks)
   function windmill(g, P, K, Wm, gy, rng, site) {
     const put = K.put, at = (u, v) => { const q = ROT4[Wm.r](u, v); return [Wm.ox + q[0], Wm.oz + q[1]]; }, F = Wm.hi + 1, T = 10;
     const roofC = ['red', 'slate', 'terracotta', 'teal'][rng.int(4)], fr = (f) => (f + Wm.r) & 3;
@@ -1332,14 +1332,11 @@
       else if (ring === 1) put(x, F + T + 2, z, st('vx_roof_' + roofC, { facing: fr(f) }));
       else { put(x, F + T + 3, z, st('vx_ridge_' + roofC, { facing: fr(0) })); }
     }
-    // the hub (pivot) one out from the front wall's middle, the sails in a cross round it
+    // the hub (pivot) one out from the front wall's middle, its axle along the facing. The sails are the game's (t-polish:
+    // landlife.js draws them as a model round the hub and turns them in the wind; the cross of sail blocks of t-land stood
+    // still) — the `windmill` spawn below records the hub and the facing for it
     const hy = F + T - 2, [hx, hz] = at(2, -1);
     put(hx, hy, hz, st('oak_log', { axis: (Wm.r & 1) ? 1 : 2 }));
-    const SAIL = st('vx_windmill_sail', { facing: fr(0) });
-    for (let k = 1; k <= 4; k++) {
-      const [lx, lz] = at(2 - k, -1), [rx, rz] = at(2 + k, -1);
-      put(lx, hy, lz, SAIL); put(rx, hy, rz, SAIL); put(hx, hy + k, hz, SAIL); if (hy - k > F + 1) put(hx, hy - k, hz, SAIL);
-    }
     { const [x, z] = at(2, 2); put(x, F + 1, z, st('vx_hay')); put(x, F + 4, z, st('lantern', { hanging: 0 })); }
     LAND.addSpawn(P, ['windmill', hx, hy, hz, fr(0)], hx, hz);
     P.pieces.push({ kind: 'windmill', x: hx, z: hz, y: hy, hub: [hx, hy, hz], farm: site.id, rect: Wm.rect });

@@ -210,15 +210,16 @@ if (want(3)) {
   check(cropOk >= cropN * 0.95 && flatBad <= cropN * 0.02, `the crops stand in their rows on farmland, all at the field's one level (${cropOk} of ${cropN} crop cells; ${flatBad} off the level)`);
   check(rimOk === rimN, `a fence runs round every field, a gate in it (${rimOk} of ${rimN} rim cells closed) (${secs()})`);
   check(scare >= farms.length, `a scarecrow in a field of every farm (${scare})`);
-  // the windmills: the hub (the pivot) with the sails round it, its spawn
+  // the windmills: the hub (the pivot) and its spawn; the sails are the game's (t-polish: landlife.js turns a model of
+  // them round the hub in the wind — no sail blocks; test/polish_mill.js)
   let wOk = 0;
   for (const wm of pc('windmill')) {
     const [hx, hy, hz] = wm.hub; let sails = 0;
     for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) for (let dz = -4; dz <= 4; dz++) if (nameOf(blockAt(hx + dx, hy + dy, hz + dz)) === 'vx_windmill_sail') sails++;
     const sp = (chunk(hx >> 4, hz >> 4).spawns || []).some(s => s[0] === 'windmill' && s[1] === hx && s[2] === hy && s[3] === hz);
-    if (/_log$/.test(nameOf(blockAt(hx, hy, hz))) && sails >= 14 && sp) wOk++;
+    if (/_log$/.test(nameOf(blockAt(hx, hy, hz))) && sails === 0 && sp) wOk++;
   }
-  check(wOk === pc('windmill').length && wOk >= 2, `every windmill turns its sails round a hub (the pivot, a 'windmill' spawn): ${wOk} of ${pc('windmill').length}`);
+  check(wOk === pc('windmill').length && wOk >= 2, `every windmill has its hub (the sails' pivot, a 'windmill' spawn; the sails the game's, no sail block): ${wOk} of ${pc('windmill').length}`);
   // the pastures' herds
   let herds = 0; for (const p of pc('pasture')) if ((chunk(p.x >> 4, p.z >> 4).spawns || []).some(s => s[0] === 'fauna' && s[1] === 'sheep')) herds++;
   check(herds === pc('pasture').length, `every pasture has its herd's anchor (${herds} of ${pc('pasture').length})`);
