@@ -189,6 +189,42 @@ for (const smooth of [false, true]) {
   fs.writeFileSync(path.join(OUT, 'folk_sheet_heads.png'), cv.png());
   check(cv.drawn > 50000, `every hat and hair style on the fine face (${heads.length} heads, ${cv.drawn} pixels)`);
 }
+{
+  // t-folk2: seated (folkanim.js FA.sitPose, as villages.js draws a guest: the root raised and moved forward on the seat) —
+  // a robe, a coat, trousers and a child on chairs (0.484, the bentwood chair's seat), the first three at a café table
+  // one block ahead (the marble table: its top 0.75, its radius 0.3125, the right forearm on it); seen from the front
+  // three-quarters (upper row) and from the side (lower row) — test/shots/folk_sheet_sit.png
+  const box = (x0, y0, z0, x1, y1, z1, c) => {
+    const P = [], N = [], C = [], I = [];
+    const quad = (a, b, cc, d, n) => { const k = P.length / 3; for (const v of [a, b, cc, d]) { P.push(...v); N.push(...n); C.push(...c); } I.push(k, k + 1, k + 2, k, k + 2, k + 3); };
+    quad([x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1]); quad([x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1]);
+    quad([x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0]); quad([x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0]);
+    quad([x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0]); quad([x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0]);
+    return { pos: new Float32Array(P), nrm: new Float32Array(N), rgb: new Float32Array(C), idx: new Uint32Array(I), n: P.length / 3 };
+  };
+  const wood = [0.45, 0.28, 0.18], marble = [0.92, 0.92, 0.9];
+  const guests = [[Folk.look(3301, 'crafter', 'adult', null, 'hall'), true], [Folk.look(3304, 'crafter', 'adult', null, 'hall'), true], [Folk.look(4242, 'farmer', 'adult', null, null), true], [Folk.look(77, 'child', 'child', null, null), false]];
+  const cv = new Canvas(1280, 720, BG);
+  cv.cam([0.6, 2.7, -5.2], [0.6, 0.45, 1.1], 44);
+  for (const [row, yaw0] of [[0, 0.5], [1, Math.PI / 2]]) guests.forEach(([L, atTable], i) => {
+    const G = Folk.gaitFor(L), def = Folk.buildFine(L), kid = L.age === 'child';
+    const o = { seat: 0.484, table: atTable ? { d: 1, h: 0.75, r: 0.3125 } : null, side: 'r' }, P = {}, sp = FA.sitPose(G, o, P);
+    // (the guest's pose seen at a quarter turn (upper) and from the side (lower): the chair at x, the table ahead of it)
+    const x = (i - 1.5) * 1.25 + 0.6, z = row ? 2.6 : -0.6, fx = -Math.sin(yaw0), fz = -Math.cos(yaw0);
+    const tr = (px, py, pz) => { const m = m4.create(); m4.translate(m, m, x + px, py, z + pz); return m; };
+    const turned = m4.create(); m4.translate(turned, turned, x, 0, z); m4.rotY(turned, turned, yaw0);
+    cv.mesh(box(-0.2, 0.44, -0.2, 0.2, 0.484, 0.2, wood), turned);
+    cv.mesh(box(-0.2, 0.484, 0.16, 0.2, 0.95, 0.2, wood), turned);   // (the chair's back, behind the guest)
+    if (atTable) { cv.mesh(box(-0.3, 0.71, -0.3, 0.3, 0.75, 0.3, marble), tr(fx, 0, fz)); cv.mesh(box(-0.04, 0, -0.04, 0.04, 0.71, 0.04, [0.1, 0.1, 0.1]), tr(fx, 0, fz)); }
+    const s = (kid ? 0.82 : 1);
+    const base = m4.create(); m4.translate(base, base, x + fx * sp.fwd, sp.rootY - 0.05, z + fz * sp.fwd); m4.rotY(base, base, yaw0); m4.scale(base, base, s / def.unit, s / def.unit, s / def.unit);
+    const mats = FS.rigMats(def, base, P, {}), meshes = partMeshes(def, true);
+    // (as villages.js draws a guest: the things held put down, a robe's thighs under its lap — FA.sitHides)
+    for (const name of def.order) { if (name === 'lids' || name === 'mouth' || name === 'item_r' || name === 'item_l') continue; if (FA.SIT_HIDE.includes(name) && FA.sitHides(G)) continue; const M = meshes[name]; if (M) cv.mesh(M, mats[name]); }
+  });
+  fs.writeFileSync(path.join(OUT, 'folk_sheet_sit.png'), cv.png());
+  check(cv.drawn > 30000, `seated at a café table and on a chair (${cv.drawn} pixels)`);
+}
 console.log(`    ${tParts} parts, ${meshCache.size} meshes built (${hits} shared), smooth meshing ${tMs.toFixed(0)} ms`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

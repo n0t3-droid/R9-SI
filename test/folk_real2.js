@@ -422,6 +422,10 @@ console.log('§6 sitting');
       }
     }
   }
+  // a robe's skirt turns forward only half way: the level thighs and the knees would come out through its lap (run 2's café
+  // guests in gowns showed them as a dark wedge under the belt) — seated, the robe hides the legs; a coat's tails lie on them
+  const hides = [[robe, true], [coat, false], [crafter, false]].map(([L, want]) => [Folk.gaitFor(L), want]);
+  check(hides.every(([G, want]) => FA.sitHides(G) === want), `seated, a robe hides the legs (${FA.SIT_HIDE.join(', ')}), a coat and trousers show them (${hides.map(([G]) => G.skirt + ':' + FA.sitHides(G)).join(', ')})`);
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

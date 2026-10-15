@@ -320,6 +320,11 @@
   // radius) } | null, side 'r' | 'l' (the arm on the table), lean } → { rootY (the model's origin over the floor, blocks),
   // fwd (blocks ahead of the seat's middle), hipH, knee (the knees' inner angle) }; the pose in out
   FA.SEAT = 0.49;
+  // the parts a seated person does not show: a robe's or a gown's skirt turns forward only half way (it drapes over the
+  // knees to the floor), so the thighs, level on the seat, and the knees would come out through its lap — the robe hides
+  // the legs (the draw leaves them out: villages.js)
+  FA.SIT_HIDE = ['leg_l', 'leg_r', 'shin_l', 'shin_r'];
+  FA.sitHides = (G) => !!(G && G.skirt === 2);
   FA.sitPose = function (G, o, out) {
     o = o || {};
     const U = 1 / G.bpu, kid = G.kid, Lt = G.thigh, Ls = G.shin;
