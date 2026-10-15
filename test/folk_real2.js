@@ -9,7 +9,7 @@
 const V = require('./load_shared.js');
 require('../src/shared/smoothvox.js'); require('../src/shared/folksmooth.js');
 require('../src/main/voxmodels.js'); require('../src/main/villagers.js'); require('../src/main/folkmodel.js');
-require('../src/main/villages.js'); require('../src/main/folklife.js');
+require('../src/main/villages.js'); require('../src/main/folklife.js'); require('../src/main/folkgpu.js');
 const Folk = V.Folk, FS = V.FolkSmooth, m4 = V.mat4, FA = V.FolkAnim;
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
@@ -230,6 +230,92 @@ console.log('§2 hands');
   for (const v of voxOf(def, M, 'item_l')) tip = Math.min(tip, v.p[1] - 0.5);
   for (const k of ['shin_l', 'shin_r']) for (const v of voxOf(def, M, k)) sole = Math.min(sole, v.p[1] - 0.5);
   check(G.cane && Number.isFinite(tip) && Math.abs(tip - sole) <= 1.2, `an elder's cane stands on the floor (its tip ${f2(tip - sole)} units from the soles' level)`);
+}
+
+// ---------------------------------------------------------------- §3 one draw for the crowd
+// folkgpu.js: every smooth person's mesh in ONE arena (one vertex buffer, one index buffer, first-fit ranges grown by
+// copy), the bones in a float texture (a row a person), the crowd drawn by one multiDrawElementsWEBGL — measured on a
+// recording fake GL: forty hall-city people in ≤ 12 draws (one with the extension, one a person without), every row the
+// rig's matrices (FolkSmooth.rigMats), the arena's data intact through its growth, freed ranges used again
+console.log('§3 one draw for the crowd');
+{
+  // the allocator alone
+  const R = new V.FolkGPU.Ranges(100);
+  const a1 = R.alloc(30), a2 = R.alloc(30), a3 = R.alloc(30);
+  R.release(a2, 30); const a4 = R.alloc(20);
+  R.release(a1, 30); R.release(a4, 20);
+  const merged = R.free.length === 2 && R.free[0][0] === 0 && R.free[0][1] === 60;
+  R.grow(200); const a5 = R.alloc(100);
+  check(a1 === 0 && a2 === 30 && a3 === 60 && a4 === 30 && merged && a5 === 90 && R.alloc(80) === -1, `the arena's ranges: first fit, a freed range used again, neighbours merged, the grown tail free (${JSON.stringify(R.free)})`);
+}
+{
+  // a recording fake GL
+  const bufs = [], calls = { drawElements: 0, multi: 0, multiN: 0, tex: null, grows: 0 }, K = {};
+  for (const [i, k] of ['ARRAY_BUFFER', 'ELEMENT_ARRAY_BUFFER', 'COPY_READ_BUFFER', 'COPY_WRITE_BUFFER', 'STATIC_DRAW', 'FLOAT', 'BYTE', 'UNSIGNED_BYTE', 'UNSIGNED_INT', 'UNSIGNED_SHORT', 'TRIANGLES', 'TEXTURE_2D', 'RGBA32F', 'RGBA', 'NEAREST', 'TEXTURE_MIN_FILTER', 'TEXTURE_MAG_FILTER', 'TEXTURE_WRAP_S', 'TEXTURE_WRAP_T', 'CLAMP_TO_EDGE', 'DEPTH_TEST', 'CULL_FACE'].entries()) K[k] = 100 + i;
+  K.TEXTURE0 = 1000;
+  const bound = {};
+  const gl = Object.assign({}, K, {
+    createBuffer() { const b = { id: bufs.length, data: new Uint8Array(0) }; bufs.push(b); return b; },
+    deleteBuffer() {}, createVertexArray() { return {}; }, deleteVertexArray() {}, bindVertexArray() {},
+    bindBuffer(t, b) { bound[t] = b; },
+    bufferData(t, size) { const b = bound[t]; b.data = new Uint8Array(typeof size === 'number' ? size : size.byteLength); },
+    bufferSubData(t, off, src) { const b = bound[t], u = new Uint8Array(src.buffer, src.byteOffset, src.byteLength); b.data.set(u, off); },
+    copyBufferSubData(r, w, ro, wo, n) { bound[w].data.set(bound[r].data.subarray(ro, ro + n), wo); calls.grows++; },
+    enableVertexAttribArray() {}, vertexAttribPointer() {}, createTexture() { return {}; }, deleteTexture() {}, bindTexture() {}, texImage2D() {}, texParameteri() {}, activeTexture() {},
+    texSubImage2D(t, l, x, y, w, h, f, ty, data) { calls.tex = { w, h, data: Float32Array.from(data.subarray(0, w * h * 4)) }; },
+    useProgram() {}, uniform1i() {}, uniform1f() {}, uniform3f() {}, uniformMatrix4fv() {}, enable() {}, disable() {},
+    drawElements() { calls.drawElements++; },
+  });
+  const ext = { multiDrawElementsWEBGL(mode, counts, co, type, offs, oo, n) { calls.multi++; calls.multiN = n; calls.counts = Array.from(counts.subarray(0, n)); calls.offs = Array.from(offs.subarray(0, n)); } };
+  V.GL = { ext: { multiDraw: ext }, program: () => ({ p: {}, u: new Proxy({}, { get: (t, k) => k }) }) };
+  V.SHADERS = V.SHADERS || { COMMON: '' }; if (!V.SHADERS.COMMON) V.SHADERS.COMMON = '';
+  const FG = V.FolkGPU, r = { gl, P: {}, common() {}, viewProj: new Float32Array(16), stats: { draws: 0, tris: 0 } }, g = { renderer: r };
+  const people = [];
+  FS.cache = null;
+  for (let i = 0; i < 40; i++) {
+    const age = i % 9 === 4 ? 'child' : i % 11 === 7 ? 'elder' : 'adult';
+    const L = Folk.look(7000 + i * 131, age === 'adult' ? ['crafter', 'farmer', 'gardener', 'baker', 'scholar'][i % 5] : age, age, null, 'hall');
+    const rec = FG.recFor(L), m = FS.personFromLook(L); m.type = 'folkmesh';
+    FG.inflight = 1; FG.got(g, rec, m);
+    people.push({ L, rec, m });
+  }
+  const ready = people.filter(q => q.rec.state === 2).length;
+  // the first person's mesh in the arena — still there after the arena grew for the other 39
+  const p0 = people[0], vb = FG.ar.vbo.data, ib = FG.ar.ibo.data;
+  let same = true; for (let k = 0; k < p0.m.data.length && same; k++) if (vb[p0.rec.vOff * 20 + k] !== p0.m.data[k]) same = false;
+  const ix = new Uint32Array(ib.buffer, ib.byteOffset + p0.rec.iOff * 4, p0.rec.count); let rebased = true; for (let k = 0; k < ix.length; k++) if (ix[k] !== p0.m.idx[k] + p0.rec.vOff) { rebased = false; break; }
+  check(ready === 40 && same && rebased && calls.grows >= 1, `forty people in the arena (${ready} ready; it grew ${calls.grows}× by copy and the first one's ${p0.m.nv} vertices are intact, its indices offset by its first vertex)`);
+  // the frame: forty queued, one flush
+  const cam = { x: 3, y: 60, z: -2 }, G = {}, poses = [];
+  people.forEach((q, i) => { const Gq = Folk.gaitFor(q.L), a = { seedW: i }, out = {}; let P; for (let k = 0; k < 3; k++) P = FA.pose(a, 'idle', 1 / 30, 0, 0, false, out, undefined, Gq); poses.push(P); FG.queue(q.rec, [10 + (i % 8) * 1.3, 64, 5 + ((i / 8) | 0) * 2], 0.3 * i, P, { sky: 1, bl: [0.2, 0.1, 0] }, { scale: q.L.age === 'child' ? 0.82 : 1, shade: 0, hide: { lids: true, mouth: true } }); });
+  void G;
+  const drawn = FG.flush(r, { sunDir: [0, 1, 0] }, cam);
+  check(drawn === 40 && calls.multi === 1 && calls.multiN === 40 && calls.drawElements === 0, `forty people in ${calls.multi + calls.drawElements} draw (one multi-draw over ${calls.multiN} ranges; v0.46: forty draws, the crowd test asks ≤ 12)`);
+  check(calls.offs.every((o, i) => o === people[i].rec.iOff * 4) && calls.counts.every((c, i) => c === people[i].rec.count), "every person's range drawn: its indices' offset and count");
+  // the rows: the rig's matrices of each person as entities.js drawModel builds them
+  let worst = 0;
+  people.forEach((q, i) => {
+    const base = m4.create(); m4.translate(base, base, 10 + (i % 8) * 1.3 - cam.x, 64 - cam.y, 5 + ((i / 8) | 0) * 2 - cam.z); m4.rotY(base, base, 0.3 * i);
+    const s = (q.L.age === 'child' ? 0.82 : 1) / 32; m4.scale(base, base, s, s, s);
+    const M = FS.rigMats(q.rec.def, base, poses[i], {}), D = calls.tex.data, row = i * V.FolkGPU.BW * 4;
+    q.rec.def.order.forEach((n, b) => { if (n === 'lids' || n === 'mouth') return; for (let k = 0; k < 16; k++) worst = Math.max(worst, Math.abs(D[row + b * 16 + k] - M[n][k])); });
+  });
+  check(calls.tex.w === V.FolkGPU.BW && calls.tex.h === 40 && worst < 1e-5, `the bones' texture: a row a person, the rig's matrices (worst difference ${worst.toExponential(1)})`);
+  // without the extension: one draw a person
+  V.GL.ext.multiDraw = null; r.P = {}; calls.drawElements = 0; calls.multi = 0;
+  people.forEach((q, i) => FG.queue(q.rec, [10, 64, 5], 0, poses[i], { sky: 1, bl: [0, 0, 0] }, {}));
+  FG.flush(r, { sunDir: [0, 1, 0] }, cam);
+  check(calls.drawElements === 40 && calls.multi === 0, `without WEBGL_multi_draw: one draw a person (${calls.drawElements})`);
+  // a freed person's ranges are taken again
+  const before = FG.ar.v.used; FG.free(gl, people[3].rec); const freed = before - FG.ar.v.used;
+  const r2 = FG.recFor(people[3].L); r2.state = 0; FG.inflight = 1; FG.got(g, r2, people[3].m);
+  check(freed === people[3].m.nv && r2.vOff === people[3].rec.vOff && r2.state === 2, `a freed person's ranges are used again (${freed} vertices)`);
+  // §5 the eyes: the eye's vertices flagged for the people's shader (the alpha byte 128), on the head only
+  const P0 = people[1].m, u8 = P0.data, hb = people[1].rec.def.order.indexOf('head');
+  let eyeV = 0, off = 0, headV = 0; for (let k = 0; k < P0.nv; k++) { const a = u8[k * 20 + 19], b = u8[k * 20 + 15]; if (b === hb) headV++; if (a === 128) { eyeV++; if (b !== hb) off++; } }
+  console.log('§5 the eyes');
+  check(eyeV >= 8 && off === 0 && eyeV < headV * 0.2, `the eyes' vertices marked for the eye's light (${eyeV} of the head's ${headV}, none elsewhere)`);
+  V.FolkGPU.clear(gl);
 }
 
 // ---------------------------------------------------------------- §6 sitting
