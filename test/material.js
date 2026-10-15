@@ -95,7 +95,10 @@ console.log('e · the shader text');
   check(/#ifdef PBR[\s\S]*uniform sampler2D u_pbr;/.test(fs), 'the terrain shader reads the table only with PBR (u_pbr)');
   check(/#if defined\(PBR\)[\s\S]*pbrShade\(/.test(fs) && /#elif !defined\(LITE\)/.test(fs), 'the gloss replaces the old highlight with PBR; without it the old highlight stays (not on LITE)');
   const fsPbr = fs.indexOf('vec3 pbrShade(');
-  check(fsPbr > 0 && fs.lastIndexOf('#ifdef PBR', fsPbr) > fs.lastIndexOf('#endif', fsPbr), 'pbrShade lives inside #ifdef PBR');
+  // the stack of the open #if… at a place in the text (nested blocks such as #ifdef SSR close before it)
+  const openAt = (src, pos) => { const st = []; for (const line of src.slice(0, pos).split('\n')) { const t = line.trim();
+    if (/^#if/.test(t)) st.push(t); else if (/^#endif/.test(t)) st.pop(); } return st; };
+  check(fsPbr > 0 && openAt(fs, fsPbr).includes('#ifdef PBR'), 'pbrShade lives inside #ifdef PBR', fsPbr > 0 ? openAt(fs, fsPbr).join(' · ') : 'none');
 }
 
 console.log('f · glass and the light lines');
@@ -118,6 +121,26 @@ console.log('f · glass and the light lines');
   T.emit[line.defaultState] = (0 << 8) | (3 << 4) | 4; const tOld = cpu(() => V.computeColumnLight(many, true), 20); T.emit[line.defaultState] = old;
   console.log(`     a column of paving with 64 line blocks: ${tNew.toFixed(2)} ms to light (the old emission ${tOld.toFixed(2)} ms)`);
   check(tNew < tOld * 1.6 + 0.3, 'the brighter lines cost the workers' + "'" + ' light flood little (a worst case: a line every fourth block)', `×${(tNew / tOld).toFixed(2)}`);
+}
+
+console.log('g · the screen-space mirror (tier 2)');
+{
+  const S = V.SHADERS, fs = S.TERRAIN_FS;
+  const i = fs.indexOf('layout(location=1) out vec4 o_ssr;'), j = fs.lastIndexOf('#ifdef SSR', i);
+  check(i > 0 && j > 0 && j > fs.lastIndexOf('#endif', i), 'the terrain writes the mirror\'s second target only with SSR (tier 2)');
+  check(/o_ssr = vec4\(octEnc\(n\)/.test(fs) && /g_ssrW = g_ssrW \* \(1.0 - Fc\) \+ Fc/.test(fs), 'the normal, the Fresnel weight (base and coat) and the roughness go into it');
+  check(typeof S.SSR_FS === 'string' && /for \(int i = 0; i < 14; i\+\+\)/.test(S.SSR_FS) && /for \(int k = 0; k < 3; k\+\+\)/.test(S.SSR_FS), 'the march: 14 growing steps, 3 halvings at a hit');
+  check(/smoothstep\(0.0, 0.07, e.x\)/.test(S.SSR_FS) && /dot\(R, V\)/.test(S.SSR_FS), 'it fades at the screen\'s edge and for rays back toward the eye');
+  check(typeof S.SSR_APPLY_FS === 'string' && /s.rgb \/ max\(s.a, 1e-3\)/.test(S.SSR_APPLY_FS), 'the apply mixes the half-size hit by the full-size weight');
+  // the octahedral normal's round trip (the shader's two functions, here in JS)
+  const enc = (n) => { const l = Math.abs(n[0]) + Math.abs(n[1]) + Math.abs(n[2]); let x = n[0] / l, y = n[1] / l, z = n[2] / l; if (y >= 0) return [x, z]; return [(1 - Math.abs(z)) * (x >= 0 ? 1 : -1), (1 - Math.abs(x)) * (z >= 0 ? 1 : -1)]; };
+  const dec = (e) => { let x = e[0], z = e[1], y = 1 - Math.abs(x) - Math.abs(z); if (y < 0) { const nx = (1 - Math.abs(z)) * (x >= 0 ? 1 : -1), nz = (1 - Math.abs(x)) * (z >= 0 ? 1 : -1); x = nx; z = nz; } const l = Math.hypot(x, y, z); return [x / l, y / l, z / l]; };
+  const q8 = (v) => Math.round((v * 0.5 + 0.5) * 255) / 255 * 2 - 1;
+  let worst = 0;
+  for (let k = 0; k < 2000; k++) { const a = Math.random() * 6.283, b = Math.acos(Math.random() * 2 - 1), n = [Math.sin(b) * Math.cos(a), Math.cos(b), Math.sin(b) * Math.sin(a)]; const e = enc(n).map(q8), m = dec(e); worst = Math.max(worst, Math.acos(Math.min(1, n[0] * m[0] + n[1] * m[1] + n[2] * m[2])) * 180 / Math.PI); }
+  check(worst < 1.5, 'the normal survives the 8-bit target within 1.5°', worst.toFixed(2) + '°');
+  const P = V.Game.PRESETS;
+  check(['high', 'ultra', 'ultraLite'].every(p => P[p].pbr === 2) && ['potato', 'low', 'balanced'].every(p => P[p].pbr < 2), 'it runs on High and Ultra (gloss tier 2); Balanced keeps the sky\'s reflection with its Fresnel');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

@@ -437,6 +437,7 @@
       const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre: its own program define; texLite: the sampler)
       const prevPbr = this.q.pbr | 0;   // (t-material: the gloss tier is a program define)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
+      this.q.ssr = (this.q.pbr | 0) >= 2 && !this.q.lite;   // (t-material: the screen-space mirror comes with gloss tier 2)
       if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || (this.q.pbr | 0) !== prevPbr) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
@@ -1889,6 +1890,61 @@
       this.fsMark('rays', rw, rh, rw * rh * sb, rw * rh * sb, rw * rh * 28);
       this.fs(p);
     }
+    // ---- t-material · the screen-space mirror (plan 2026-10-15-t-material.md, step 2; gloss tier 2 = High and up). The
+    // terrain draws into its own framebuffer — the scene's colour and depth and a second target (RGBA8: the normal, the
+    // mirror's weight and roughness), so no other pass ever writes that target; ssrPass then marches the reflected rays at
+    // half size and mixes the hits into the scene by the full-size weight. Off: nothing is made, nothing is drawn.
+    ssrFree() {
+      const gl = this.gl, S = this.ssr; if (!S) return;
+      for (const f of [S.mrtFB, S.fb, S.applyFB]) if (f) gl.deleteFramebuffer(f);
+      for (const t of [S.mat, S.tex]) if (t) gl.deleteTexture(t);
+      this.ssr = null;
+    }
+    ssrBegin() {
+      const gl = this.gl;
+      this.ssrOn = false;
+      if (!this.q.ssr || !this.sceneFB) { if (this.ssr) this.ssrFree(); return false; }
+      let S = this.ssr;
+      if (!S || S.col !== this.sceneCol || S.w !== this.w || S.h !== this.h || S.fmt !== this.sceneFmt().name) {
+        this.ssrFree();
+        const w = this.w, h = this.h, hw = Math.max(1, w >> 1), hh = Math.max(1, h >> 1), hdr = this.hdr;
+        const mat = GL.tex2D(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { filter: gl.NEAREST });
+        const tex = GL.tex2D(hw, hh, hdr ? gl.RGBA16F : gl.RGBA8, gl.RGBA, hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, { filter: gl.LINEAR });
+        S = this.ssr = { col: this.sceneCol, w, h, hw, hh, fmt: this.sceneFmt().name, mat, tex, mrtFB: GL.fbo([this.sceneCol, mat], this.sceneDepth), fb: GL.fbo([tex]), applyFB: GL.fbo([this.sceneCol]) };
+        if (!S.mrtFB || !S.fb || !S.applyFB) { this.ssrFree(); this.ssrBroken = true; return false; }
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.mrtFB);
+      gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]);
+      this.ssrOn = true;
+      return true;
+    }
+    ssrPass(F, E) {
+      const gl = this.gl, S = this.ssr, P = this.P, t0 = performance.now();
+      if (!S) return;
+      if (!P.ssr) { P.ssr = GL.program(VR.SHADERS.FS_VS, VR.SHADERS.SSR_FS, 'ssr'); P.ssrApply = GL.program(VR.SHADERS.FS_VS, VR.SHADERS.SSR_APPLY_FS, 'ssrApply'); }
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
+      // the march, half size
+      let p = P.ssr; gl.useProgram(p.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.fb); gl.viewport(0, 0, S.hw, S.hh);
+      this.tex(0, this.sceneDepth, p.u.u_depth); this.tex(1, S.mat, p.u.u_mat); this.tex(2, this.sceneCol, p.u.u_color);
+      gl.uniformMatrix4fv(p.u.u_vp, false, this.viewProj); gl.uniformMatrix4fv(p.u.u_invVP, false, this.invViewProj);
+      gl.uniform2f(p.u.u_nearFar, 0.06, (F.cam && F.cam.far) || 1200);
+      gl.uniform1f(p.u.u_frame, this.frameNo % 64);
+      const sb = this.sceneFmt().bytes, n = this.w * this.h, hn = S.hw * S.hh;
+      this.fsMark('ssr', S.hw, S.hh, hn * (4 + 4) + hn * 17 * 4 + hn * sb, hn * (this.hdr ? 8 : 4), hn * 18);
+      this.fs(p);
+      // the apply, full size over the scene's colour
+      p = P.ssrApply; gl.useProgram(p.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.applyFB); gl.viewport(0, 0, this.w, this.h);
+      this.tex(0, S.mat, p.u.u_mat); this.tex(1, S.tex, p.u.u_ssr);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      this.fsMark('ssrApply', this.w, this.h, n * 4 + hn * (this.hdr ? 8 : 4), n * sb);
+      this.fs(p);
+      gl.disable(gl.BLEND);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, this.w, this.h);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      this.stats.ssr = { ms: +(performance.now() - t0).toFixed(2), w: S.hw, h: S.hh };
+    }
     tex(unit, t, loc) { const gl = this.gl; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); if (loc) gl.uniform1i(loc, unit); }
 
     // ------------------------------------------------ main frame
@@ -1939,9 +1995,10 @@
       gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
       // terrain opaque + cutout
       if (world) {
+        const ssr = this.ssrBegin();   // t-material: on High the terrain writes the mirror's second target too (ssrPass)
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
           this.gpuPass(layer === 0 ? 'opaque' : 'cutout');
-          if (layer === 1 && this.zCount) this.zCountPass(near, E, camPos);   // (test hook: test/ipu.mjs)
+          if (layer === 1 && this.zCount) { this.zCountPass(near, E, camPos); if (ssr) gl.bindFramebuffer(gl.FRAMEBUFFER, this.ssr.mrtFB); }   // (test hook: test/ipu.mjs; t-material: back to the mirror's framebuffer)
           if (layer === 1 && this.q.zPre) { this.gpuPass('zpre'); this.zPrepass(near, E, camPos); this.gpuPass('cutout'); }   // (F10 · zPre)
           gl.useProgram(p.p);
           this.common(p, E);
@@ -1970,6 +2027,7 @@
           }
           gl.enable(gl.CULL_FACE);
         }
+        if (ssr) { this.gpuPass('ssr'); this.ssrPass(F, E); }   // (t-material: the screen-space mirror, right after the terrain)
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
       if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.liveProps(E, camPos, fc); }

@@ -714,6 +714,13 @@ float shadowAt(vec3 N, vec3 L) {
 // t-material · PBR-lite (plan 2026-10-15-t-material.md, step 1). The material table (tex_pbr.js): per layer r metal, g a
 // clear coat (polish, lacquer, gloss tiles, painted hulls), b a scale on the painter's roughness (128 = ×1), a flags.
 uniform sampler2D u_pbr;
+#ifdef SSR
+// t-material · the screen-space mirror (step 2, High): the terrain's second target — the shaded normal (octahedral, y up),
+// how much of the fragment is mirror (its Fresnel weight) and the mirror's roughness; renderer.js ssrPass reads it
+layout(location=1) out vec4 o_ssr;
+float g_ssrW = 0.0, g_ssrR = 1.0;
+vec2 octEnc(vec3 n) { n /= abs(n.x) + abs(n.y) + abs(n.z); return n.y >= 0.0 ? n.xz : (1.0 - abs(n.zx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); }
+#endif
 float pow5(float x) { float x2 = x * x; return x2 * x2 * x; }
 // rain rings on a puddle: the slope where drops land (one hashed spot per cell, each ring grows and fades; TRANS_FS's ringN)
 vec2 pudRing(vec2 p, float t) {
@@ -760,10 +767,16 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 V, vec3 L, vec3 lsun, float ndl, 
   vec3 c = col * (1.0 - 0.8 * metal) * (1.0 - Fr * (1.0 - metal)) + pbrEnv(R, r, so, blockL) * Fr;
   if (ndl > 0.0 && r < 0.92) c += lsun * ndl * pbrSun(n, V, L, max(r, 0.08), F0);
   // the clear coat: a second, sharp interface over it (the polish, the lacquer, the water of a puddle)
+#ifdef SSR
+  g_ssrW = dot(Fr, vec3(0.3, 0.59, 0.11)); g_ssrR = r;
+#endif
   if (coat > 0.004) {
     float rc = mix(0.08, 0.04, pud), Fc = (0.04 + 0.96 * fv) * coat;
     c = c * (1.0 - Fc) + pbrEnv(R, rc, so, blockL) * Fc;
     if (ndl > 0.0) c += lsun * ndl * pbrSun(n, V, L, rc, vec3(0.04)) * coat;
+#ifdef SSR
+    g_ssrW = g_ssrW * (1.0 - Fc) + Fc; g_ssrR = mix(r, rc, min(1.0, coat * 2.0));
+#endif
   }
   return c;
 }
@@ -1022,6 +1035,10 @@ void main() {
   float dist = length(v_rel);
   col = applyFog(col, v_rel, dist);
   o_col = vec4(col, 1.0);
+#ifdef SSR
+  // (no mirror on what glows or burns; it fades with the distance as the fog takes the floor)
+  o_ssr = vec4(octEnc(n) * 0.5 + 0.5, (emis > 0.02 || emissiveFace || kind == 2u || kind == 3u || kind == 4u) ? 0.0 : g_ssrW * (1.0 - smoothstep(48.0, 80.0, dist)), g_ssrR);
+#endif
 }`;
 
   // ------------------------------------------------------------ smooth props (t-smooth, props.js): instanced palms
@@ -2481,6 +2498,75 @@ uniform sampler2D u_src;
 in vec2 v_uv;
 out vec4 o;
 void main() { o = texture(u_src, v_uv); }`;
+
+  // ------------------------------------------------------------ t-material · the screen-space mirror (High and up)
+  // Half size: for a glossy pixel (the terrain's second target says how much of it is mirror) the reflected ray marches
+  // through the depth buffer in 14 growing steps (a jittered start, ~70 blocks at most), a hit is refined by three halvings
+  // and read from the scene's colour; the confidence fades at the screen's edge, for rough mirrors and for rays back toward
+  // the eye. Out: the hit premultiplied by its confidence (a miss: 0, the sky's reflection of the gloss pass stays).
+  S.SSR_FS = `
+uniform highp sampler2D u_depth;
+uniform sampler2D u_mat;
+uniform sampler2D u_color;
+uniform mat4 u_vp;
+uniform mat4 u_invVP;
+uniform vec2 u_nearFar;
+uniform float u_frame;
+in vec2 v_uv;
+out vec4 o;
+float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
+vec3 octDec(vec2 e) { vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y); if (n.y < 0.0) n.xz = (1.0 - abs(n.zx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return normalize(n); }
+float h12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+void main() {
+  o = vec4(0.0);
+  vec4 m = texture(u_mat, v_uv);
+  if (m.b < 0.01) return;
+  float d = texture(u_depth, v_uv).r;
+  if (d >= 0.99999) return;
+  vec4 wp = u_invVP * vec4(v_uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  vec3 P = wp.xyz / wp.w, N = octDec(m.rg * 2.0 - 1.0), V = normalize(-P);
+  float rough = m.a, jit = h12(gl_FragCoord.xy + u_frame * 7.31);
+  vec3 R = reflect(-V, N);
+  R = normalize(R + (vec3(h12(gl_FragCoord.xy * 1.7 + u_frame), h12(gl_FragCoord.yx * 2.3 - u_frame), jit) - 0.5) * rough * 0.35);
+  if (dot(R, N) < 0.02) return;
+  vec3 Q = P + N * 0.04;
+  float t = 0.18 * (0.6 + 0.8 * jit), st = t, prevT = 0.0;
+  vec2 huv = vec2(-1.0);
+  for (int i = 0; i < 14; i++) {
+    vec4 c = u_vp * vec4(Q + R * t, 1.0);
+    if (c.w < 0.07) break;
+    vec2 uv = c.xy / c.w * 0.5 + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+    float dz = c.w - lin(texture(u_depth, uv).r);
+    if (dz > 0.0) {
+      if (dz < 0.35 + t * 0.08) {
+        float a = prevT, b = t;
+        for (int k = 0; k < 3; k++) { float mt = (a + b) * 0.5; vec4 cm = u_vp * vec4(Q + R * mt, 1.0); if (cm.w - lin(texture(u_depth, cm.xy / cm.w * 0.5 + 0.5).r) > 0.0) b = mt; else a = mt; }
+        vec4 cb = u_vp * vec4(Q + R * b, 1.0); huv = cb.xy / cb.w * 0.5 + 0.5;
+      }
+      break;
+    }
+    prevT = t; st *= 1.42; t += st;
+  }
+  if (huv.x < 0.0) return;
+  vec2 e = min(huv, 1.0 - huv);
+  float conf = smoothstep(0.0, 0.07, e.x) * smoothstep(0.0, 0.07, e.y) * (1.0 - smoothstep(0.55, 0.9, rough)) * (1.0 - smoothstep(0.35, 0.8, dot(R, V)));
+  o = vec4(texture(u_color, huv).rgb * conf, conf);
+}`;
+  // the apply: full size, over the scene's colour (blended SRC_ALPHA, ONE_MINUS_SRC_ALPHA) — the hit replaces the share of
+  // the pixel that is mirror (the full-size weight keeps the glossy area's edges sharp; the half-size hit is premultiplied)
+  S.SSR_APPLY_FS = `
+uniform sampler2D u_mat;
+uniform sampler2D u_ssr;
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  float w = texture(u_mat, v_uv).b;
+  vec4 s = texture(u_ssr, v_uv);
+  float a = w * s.a;
+  if (a < 0.003) discard;
+  o = vec4(s.rgb / max(s.a, 1e-3), a);
+}`;
 
   // F9 · Fern-Cache (renderer.js farFrame): the cached sky and far world, reprojected into this frame. The cache was drawn
   // from an eye a little off this one (≤ 1.5 m, ≤ 6°) with a wider view; a pixel finds its cached texel by the rotation,
