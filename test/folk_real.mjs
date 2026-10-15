@@ -24,6 +24,7 @@
 // regress: skip  (a showcase with two world loads; the gate is test/folk_real.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
+import os from 'os';
 const TAG = process.env.TAG || 'after', N = +(process.env.N || 4), SEED = '53';
 const DAY = 8000, RD = 7;
 const RUNS = [];
@@ -265,8 +266,10 @@ async function runPage(tag, dist) {
     await frames(2);
     costs[tag] = {};
     const modes = info.smooth ? ['none', 'voxel', 'smooth'] : ['none', 'voxel'];
+    const load0 = os.loadavg()[0];
     costs[tag].balanced = await costRounds(modes);
-    console.log(`measure ${tag} balanced, the forty: ${JSON.stringify(costs[tag].balanced)}`);
+    costs[tag].load = [+load0.toFixed(1), +os.loadavg()[0].toFixed(1)];
+    console.log(`measure ${tag} balanced, the forty (the machine's load ${costs[tag].load.join(' → ')} on ${os.cpus().length} CPUs): ${JSON.stringify(costs[tag].balanced)}`);
     if (info.smooth) {
       const B = costs[tag].balanced;
       const fg = await ev(() => { const S = VR.FolkGPU.stats; return { asked: S.asked, got: S.got, failed: S.failed, people: S.people, bytes: S.bytes, mbGPU: +(S.bytes / 1048576).toFixed(2), lruMB: +((S.lru || 0) / 1048576).toFixed(2), buildMsPerPerson: +(S.buildMs / Math.max(1, S.got)).toFixed(2), workerMsPerPerson: +(S.workerMs / Math.max(1, S.got)).toFixed(2), partsFromLRU: S.hits, partsMade: S.miss, shadows: S.shadows || 0 }; });

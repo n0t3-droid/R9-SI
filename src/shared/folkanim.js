@@ -151,15 +151,16 @@
   };
   // the weight of a person standing: every 8–12 s it moves from one leg to the other (the free knee bends a little, the
   // pelvis drops on the free side and slides over the standing foot, the chest leans back over it); w −1 … 1
+  // (no closure a call: the villagers' pose runs every frame for everyone near the eye)
+  const addJ = (P, j, i, v) => { const o = P[j] || (P[j] = Z6()); o[i] += v; };
   FA.weightShift = function (P, t, seed, G, k) {
     const per = 8 + (seed % 5), w = Math.tanh(3 * Math.sin(t * Math.PI * 2 / per + (seed % 7))) * (k === undefined ? 1 : k);
-    const add = (j, i, v) => { const o = P[j] || (P[j] = Z6()); o[i] += v; };
-    add('hips', 3, 0.55 * w); add('hips', 2, 0.035 * w); add('body', 2, -0.025 * w); add('head', 2, -0.01 * w);
-    add('leg_l', 3, 0.55 * w); add('leg_r', 3, 0.55 * w);
+    addJ(P, 'hips', 3, 0.55 * w); addJ(P, 'hips', 2, 0.035 * w); addJ(P, 'body', 2, -0.025 * w); addJ(P, 'head', 2, -0.01 * w);
+    addJ(P, 'leg_l', 3, 0.55 * w); addJ(P, 'leg_r', 3, 0.55 * w);
     // (w > 0: the weight on the right leg — the left one free)
     const fl = Math.max(0, w), fr = Math.max(0, -w);
-    add('leg_l', 0, 0.06 * fl); add('shin_l', 0, -0.13 * fl);
-    add('leg_r', 0, 0.06 * fr); add('shin_r', 0, -0.13 * fr);
+    addJ(P, 'leg_l', 0, 0.06 * fl); addJ(P, 'shin_l', 0, -0.13 * fl);
+    addJ(P, 'leg_r', 0, 0.06 * fr); addJ(P, 'shin_r', 0, -0.13 * fr);
     return w;
   };
   function setJ6(out, j, rx, ry, rz, tx, ty, tz) { const o = out[j] || (out[j] = Z6()); o[0] = rx; o[1] = ry; o[2] = rz; o[3] = tx; o[4] = ty; o[5] = tz; }
