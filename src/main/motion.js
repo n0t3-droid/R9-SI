@@ -16,6 +16,10 @@
 //   sparkle  glints on water along the sun's glitter path (the points whose mirror ray meets the sun)
 //   leaf     leaves torn off and blown along when the wind is strong (the storm's front, weather.js)
 //   splash   raindrops bursting on the ground round the eye while it rains
+//   veil     light motes drifting out of the portal veils (the gate, the hangar's mouth, the station) onto the floor
+// The living landmarks (step 5) keep their numbers here too: the citadel beam's pulse and ring (vents.js), the
+// watchtower ring's running lights (vents.js), the veil's ripples and the holo screens' cycle (the shaders' MOTION
+// blocks), the trams' lights and sparks (trams.js).
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -49,17 +53,54 @@
     return { r: h1[0] * b1 + h2[0] * b2, g: h1[1] * b1 + h2[1] * b2, b: h1[2] * b1 + h2[2] * b2, b1, b2, inside: 1 - ssm(BOWG.inside[0], BOWG.inside[1], th), alex: ssm(BOWG.alex[0], BOWG.alex[1], th) * (1 - ssm(BOWG.alex[2], BOWG.alex[3], th)) };
   };
 
+  // ---- step 5 · the living landmarks (vents.js, trams.js and the shaders' MOTION blocks use these numbers; Low and up)
+  // the citadel's beam breathes on a 4 s cycle (pulse 0 … 1): its stream runs at 0.45 + 1.1·pulse of the old 46 sparks a
+  // second — the same number on average — brighter at the peak, and at each peak a ring of sparks shoots up the beam
+  const BEAM = M.BEAM = { period: 4, rate: [0.45, 1.1], bright: [0.75, 0.5], ring: 24, ringR: 1.8, ringV: 26, ringOut: 2.2, ringLife: 3.2 };
+  M.beamPulse = function (t) { const ph = ((t / BEAM.period) % 1 + 1) % 1; return 0.5 - 0.5 * Math.cos(ph * 2 * Math.PI); };
+  // the watchtower's saucer ring (gen_citadel.js watchTower: its widest rows an octagon of 10 — max(|dx|, |dz|,
+  // (|dx| + |dz|)·0.7071) ≤ 10, the outer faces at 10.5 —, 27 and 28 under the tip beacon's spawn): RING.n running lights
+  // RING.off outside its rim at the window row, a chase of RING.speed lights a second, each glowing on for RING.tail s
+  // (a fading tail of four)
+  const RING = M.RING = { n: 16, oct: 10.5, off: 0.5, dy: -27, speed: 6, tail: 0.7, size: 0.55, col: [0.5, 1.4, 1.6] };
+  M.ringHead = function (t, h) { return Math.floor(t * RING.speed + (h || 0) * RING.n) % RING.n; };
+  M.ringLight = function (k, bx, by, bz, out) {
+    const a = k / RING.n * 2 * Math.PI, c = Math.cos(a), s = Math.sin(a), o = out || [0, 0, 0];
+    const r = RING.oct / Math.max(Math.abs(c), Math.abs(s), (Math.abs(c) + Math.abs(s)) * 0.7071) + RING.off;   // (the octagon's rim at this angle)
+    o[0] = bx + 0.5 + c * r; o[1] = by + RING.dy + 0.5; o[2] = bz + 0.5 + s * r; return o;
+  };
+  // the portal veil (TRANS_FS, MOTION): rings run out from its middle to its rim — rd is a point's distance to the rim, so
+  // the crests of sin(rd·k + t·w) move outward at w/k blocks a second — bright where the veil is clear (rd past rd0 … rd1),
+  // and its energy breathes (b0 + b1·sin(t·bw))
+  const VEIL = M.VEIL = { k: 3.2, w: 2.2, lo: 0.55, rd0: 0.9, rd1: 2.4, amp: 0.3, b0: 0.9, b1: 0.1, bw: 1.7 };
+  M.veilRipple = function (rd, t) { return ssm(VEIL.lo, 1, Math.sin(rd * VEIL.k + t * VEIL.w)) * ssm(VEIL.rd0, VEIL.rd1, rd); };
+  // the holo screens (TERRAIN_FS, MOTION): every 9 s a 3 × 3 m panel switches between the radar, the map and the readouts;
+  // a scan line wipes down it in 0.6 s (above the line the new picture, below the old one); each panel keeps its phase (hc)
+  const HOLO = M.HOLO = { period: 9, phase: 2.7, wipe: 5.0, modes: 3 };
+  M.holoMode = function (t, hc, dy) {
+    const cyc = t / HOLO.period + hc * HOLO.phase, cf = (cyc - Math.floor(cyc)) * HOLO.period, wy = 1.5 - cf * HOLO.wipe;
+    return ((Math.floor(cyc) - (dy > wy ? 0 : 1)) % HOLO.modes + HOLO.modes) % HOLO.modes;
+  };
+  // the trams at dusk and night: the leading nose white, the trailing one red, the four window bays of each side lit; the
+  // pantograph sparks now and then while a tram runs (TRAM.spark a second per car). Car places (blocks): the noses 2.95 ahead
+  // of the car's centre, the bays along it (voxmodels.js tramCar: z 6–41 of 48 at 8 a block), 1.9 up, just outside the sides
+  const TRAM = M.TRAM = { nose: 2.95, lamp: 0.85, bays: [1.875, 0.75, -0.625, -1.75], side: 1.32, winY: 1.9, spark: 0.35, sparkV: 4 };
+  // which nose leads: car 0's nose points to the first station, car 1's to the second; v the line's heading (+1 to the
+  // second station, -1 back, 0 standing: both noses white)
+  M.tramLead = function (idx, v) { return v === 0 ? true : (v > 0) === (idx === 1); };
+
   // ---- the new air's caps per tier (live particles of each kind at most): 0 Very Low · 1 Low · 2 Balanced · 3 High · 4 Ultra
-  const KINDS = ['steam', 'tmote', 'sparkle', 'leaf', 'splash'];
+  const KINDS = ['steam', 'tmote', 'sparkle', 'leaf', 'splash', 'veil'];
   const CAPS = [
-    { steam: 8, tmote: 0, sparkle: 0, leaf: 0, splash: 0 },
-    { steam: 20, tmote: 24, sparkle: 16, leaf: 24, splash: 30 },
-    { steam: 40, tmote: 60, sparkle: 36, leaf: 48, splash: 70 },
-    { steam: 60, tmote: 90, sparkle: 56, leaf: 72, splash: 110 },
-    { steam: 80, tmote: 120, sparkle: 80, leaf: 96, splash: 150 },
+    { steam: 8, tmote: 0, sparkle: 0, leaf: 0, splash: 0, veil: 0 },
+    { steam: 20, tmote: 24, sparkle: 16, leaf: 24, splash: 30, veil: 16 },
+    { steam: 40, tmote: 60, sparkle: 36, leaf: 48, splash: 70, veil: 32 },
+    { steam: 60, tmote: 90, sparkle: 56, leaf: 72, splash: 110, veil: 48 },
+    { steam: 80, tmote: 120, sparkle: 80, leaf: 96, splash: 150, veil: 64 },
   ];
   // the life of each kind (s): the caps hold the spawn rate to cap / life a second
-  const LIFE = { steam: 2.6, tmote: 6, sparkle: 0.12, leaf: 6, splash: 0.35 };
+  const LIFE = { steam: 2.6, tmote: 6, sparkle: 0.12, leaf: 6, splash: 0.35, veil: 4 };
+  const VEIL_COOL = [0.65, 0.95, 1.3], VEIL_WARM = [1.3, 0.85, 0.45];   // the veil's motes: its blue-white energy, a few warm off the rim
   M.AIR_KINDS = KINDS; M.AIR_CAPS = CAPS; M.AIR_LIFE = LIFE;
   M.budgetFor = function (tier) { const t = Math.max(0, Math.min(CAPS.length - 1, tier | 0)); return { tier: t, cap: Object.assign({}, CAPS[t]), kinds: KINDS.filter(k => CAPS[t][k] > 0) }; };
 
@@ -73,9 +114,10 @@
   class MotionAir {
     constructor(game) {
       this.g = game; this.tier = 2; this.on = true; this.time = 0;
-      this.acc = { steam: 0, tmote: 0, sparkle: 0, leaf: 0, splash: 0 };
-      this.drawn = { steam: 0, tmote: 0, sparkle: 0, leaf: 0, splash: 0 };   // spawns per kind (the tests read them)
+      this.acc = { steam: 0, tmote: 0, sparkle: 0, leaf: 0, splash: 0, veil: 0 };
+      this.drawn = { steam: 0, tmote: 0, sparkle: 0, leaf: 0, splash: 0, veil: 0 };   // spawns per kind (the tests read them)
       this.tables = []; this.tableT = 0;
+      this.veils = []; this.veilT = 0;   // the portal veils' cells round the eye: x, y, z, nx, ny, nz (findVeils)
       this.ms = 0;
       this.o = { life: 1, size: 0.1, grav: 0, drag: 0.5, col: [1, 1, 1], emis: 0, collide: false, fade: true, alpha: 1, grow: 0, wind: 0, turb: 0, force: true };
     }
@@ -93,6 +135,20 @@
       }
       out.sort((a, b) => Math.hypot(a[0] - eye[0], a[2] - eye[2]) - Math.hypot(b[0] - eye[0], b[2] - eye[2]));
       this.tables = out.slice(0, 16);
+    }
+    // the portal veils round the eye (every 2.5 s: a 2-block grid over 37 × 17 × 37 blocks, 3249 reads; at most 48 cells),
+    // each with its plane's normal from its neighbours (a veil running along x faces ±z, along z ±x, a flat one up)
+    findVeils(w, eye) {
+      const R = VR.R, T = R && R.T, vt = R && R.byName && R.byName.portal_veil, V = this.veils;
+      V.length = 0;
+      if (!vt || !T || !T.type) return;
+      const id = vt.id, is = (x, y, z) => { const s = w.getBlock(x, y, z); return !!s && T.type[s] === id; };
+      const ex = Math.floor(eye[0]), ey = Math.floor(eye[1]), ez = Math.floor(eye[2]);
+      for (let y = ey - 8; y <= ey + 8 && V.length < 48 * 6; y += 2) for (let z = ez - 18; z <= ez + 18 && V.length < 48 * 6; z += 2) for (let x = ex - 18; x <= ex + 18 && V.length < 48 * 6; x += 2) {
+        if (!is(x, y, z)) continue;
+        const ax = is(x + 1, y, z) || is(x - 1, y, z), az = is(x, y, z + 1) || is(x, y, z - 1);
+        if (ax && az) V.push(x, y, z, 0, 1, 0); else if (az) V.push(x, y, z, 1, 0, 0); else V.push(x, y, z, 0, 0, 1);
+      }
     }
     spawn(P, x, y, z, vx, vy, vz) { return P.spawn(x, y, z, vx, vy, vz, this.o); }
     // one frame: o = {w, eye, E, underwater, particles}; storm (0..1): the front's wind (weather.js), for the leaves
@@ -177,6 +233,24 @@
           for (let q = 0; q < 2; q++) { const a = Math.random() * 6.283; this.spawn(P, x, top + 1.02, z, Math.cos(a) * 0.9, 1.2 + Math.random() * 0.9, Math.sin(a) * 0.9); }
         }
       } else this.acc.splash = 0;
+      // ---- light out of the portal veils: motes, blue-white and a few warm ones off the rim, drift out of the veil's
+      // plane on both sides and settle slowly onto the floor before it (the veil throws light; Low and up)
+      if (cap.veil > 0) {
+        if ((this.veilT -= dt) <= 0) { this.veilT = 2.5; this.findVeils(w, eye); }
+        const V = this.veils, nv = V.length / 6;
+        if (nv) {
+          this.acc.veil = Math.min(4, this.acc.veil + cap.veil / LIFE.veil * dt);
+          for (let k = 0; k < 4 && this.acc.veil >= 1; k++) {
+            this.acc.veil -= 1; this.drawn.veil++;
+            const i = ((Math.random() * nv) | 0) * 6, nx = V[i + 3], ny = V[i + 4], nz = V[i + 5], sd = ny || Math.random() < 0.5 ? 1 : -1;   // (a flat veil: up only)
+            const u = Math.random() - 0.5, v = Math.random() - 0.5, sp = 0.3 + Math.random() * 0.5, warm = Math.random() < 0.3;
+            // a point on the cell's face, just off the veil (the in-plane axes are the two the normal does not use)
+            const x = V[i] + 0.5 + (nx ? sd * 0.55 : u), y = V[i + 1] + 0.5 + (ny ? sd * 0.55 : v), z = V[i + 2] + 0.5 + (nz ? sd * 0.55 : (nx ? u : v));
+            O.life = LIFE.veil * (0.7 + Math.random() * 0.6); O.size = 0.035 + Math.random() * 0.03; O.grav = 0.03; O.drag = 0.35; O.col = warm ? VEIL_WARM : VEIL_COOL; O.emis = 1; O.fade = true; O.alpha = 1; O.grow = 0; O.wind = 0.05; O.turb = 0.25;
+            this.spawn(P, x, y, z, nx * sd * sp + (Math.random() - 0.5) * 0.1, ny * sd * sp - 0.08, nz * sd * sp + (Math.random() - 0.5) * 0.1);
+          }
+        } else this.acc.veil = 0;
+      }
       this.ms = this.ms * 0.9 + (performance.now() - t0) * 0.1;
     }
   }

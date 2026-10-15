@@ -17,6 +17,10 @@
     water: { spread: 2.6, rise: 4, side: 1.2, vy: [-5, -3], life: [5, 6.5], size: [1.5, 2.1], grav: 0.6, drag: 0.4, grow: 1.0, alpha: 0.11, turb: 1.4, wind: 0.12 },
     lava: { spread: 2.4, rise: 3, side: 1.0, vy: [1.4, 2.4], life: [5, 7], size: [1.0, 1.5], grav: -0.15, drag: 0.35, grow: 1.2, alpha: 0.08, turb: 0.9, wind: 0.2 },
   };
+  // t-motion: a water fall's stream on into the void (Wind in allem, Balanced and up): a puff 4–12 blocks under the foot,
+  // falling on at 5–8 blocks a second, bigger and thinner than the mist (the plume reaches some 40 blocks further down)
+  const STREAM = { below: [4, 12], vy: [-8, -5], life: [6, 8.5], size: [2.0, 3.0], grav: 0.4, drag: 0.25, grow: 1.4, alpha: 0.06, turb: 1.8, wind: 0.2 };
+  const REACH_RING = 520;   // (t-motion: the watchtowers' ring lights, seen from afar)
   class Vents {
     constructor(game) {
       this.g = game;
@@ -31,14 +35,14 @@
       for (const s of spawns) {
         if (!s) continue;
         if (s[0] === 'vent') this.list.set(s[1] + ',' + s[2] + ',' + s[3], [s[1], s[2], s[3]]);
-        else if (s[0] === 'beacon') this.beacons.set(s[1] + ',' + s[2] + ',' + s[3], [s[1], s[2], s[3]]);
+        else if (s[0] === 'beacon') this.beacons.set(s[1] + ',' + s[2] + ',' + s[3], [s[1], s[2], s[3], 0, -1, 0]);   // (t-motion: its kind — 0 not yet known, 1 a spire's, 2 a watchtower's —, the ring chase's last light, the next look)
         else if (s[0] === 'mist') this.mists.set(s[1] + ',' + s[2] + ',' + s[3], [s[1], s[2], s[3], s[4] | 0]);
       }
     }
     update(dt, eye) {
       const g = this.g, P = g.particles, preset = g.settings && g.settings.preset;
       if (!P || !eye || preset === 'potato') return;
-      const low = preset === 'low';
+      const low = preset === 'low', Mo = VR.Motion, mo = !!(g.settings && g.settings.motion && Mo && Mo.BEAM);   // (t-motion: the living landmarks, Low and up)
       this.acc += dt;
       if (this.acc >= (low ? 0.8 : 0.3) && this.list.size) {
         this.acc = 0;
@@ -72,6 +76,14 @@
           o.grav = M.grav; o.drag = M.drag; o.col = lava ? SMOKE : SPRAY; o.alpha = M.alpha; o.grow = M.grow; o.turb = M.turb || 0; o.wind = M.wind || 0;   // (t-motion: the plume billows and drifts)
           P.spawn(x + (r() - 0.5) * M.spread, y + r() * M.rise, z + (r() - 0.5) * M.spread, (r() - 0.5) * M.side, M.vy[0] + r() * (M.vy[1] - M.vy[0]), (r() - 0.5) * M.side, o);
           if (lava && !low && r() < 0.6) { e.life = 1 + r() * 0.8; P.spawn(x + (r() - 0.5) * 1.5, y + r() * 3, z + (r() - 0.5) * 1.5, (r() - 0.5) * 1.2, -1 - r(), (r() - 0.5) * 1.2, e); }
+          // t-motion: the fall streams on into the void — a long thin plume under the foot, falling, widening and fading
+          // (STREAM: one more puff a quarter second per water fall, Balanced and up)
+          if (mo && !lava && !low) {
+            const s = this._so || (this._so = { life: 1, size: 1, grav: STREAM.grav, drag: STREAM.drag, col: SPRAY, alpha: STREAM.alpha, grow: STREAM.grow, collide: false, emis: 0, turb: STREAM.turb, wind: STREAM.wind });
+            s.life = STREAM.life[0] + r() * (STREAM.life[1] - STREAM.life[0]); s.size = STREAM.size[0] + r() * (STREAM.size[1] - STREAM.size[0]);
+            P.spawn(x + (r() - 0.5) * M.spread * 1.4, y - STREAM.below[0] - r() * (STREAM.below[1] - STREAM.below[0]), z + (r() - 0.5) * M.spread * 1.4, (r() - 0.5) * M.side, STREAM.vy[0] + r() * (STREAM.vy[1] - STREAM.vy[0]), (r() - 0.5) * M.side, s);
+            this.streams = (this.streams | 0) + 1;
+          }
         }
       }
       // the red tip beacons blink: one flash every 1.6 s, a glow burst off each beacon cell within reach (TRAILER §3.7)
@@ -86,13 +98,15 @@
           if (!low) for (let k = 0; k < 3; k++) P.glow(x, y + 0.5, z, [1, 0.35, 0.3], 0.5, 0.2, 0.6 + Math.random());
         }
       } else if (!on) this.lit = false;
+      if (mo) this.ringLights(P, eye);
       // the citadel's blue sparkle beam: from the spire's mid-height up into the sky (the Heartland's fixed citadel)
       const C = HEART && HEART.CITADEL;
       if (C && !low) {
         const dx = C.x - eye[0], dz = C.z - eye[2];
         if (dx * dx + dz * dz < REACH_BEAM * REACH_BEAM) {
-          this.beam += dt * 46;
-          while (this.beam >= 1) {
+          if (mo) this.pulseBeam(dt, P, C);
+          else this.beam += dt * 46;
+          while (!mo && this.beam >= 1) {
             this.beam -= 1;
             const a = Math.random() * 6.283, r = Math.random() * 1.6, y = C.y + 40 + Math.random() * 110;
             P.spawn(C.x + Math.cos(a) * r, y, C.z + Math.sin(a) * r, (Math.random() - 0.5) * 0.6, 5 + Math.random() * 5, (Math.random() - 0.5) * 0.6,
@@ -101,7 +115,53 @@
         } else this.beam = 0;
       }
     }
+    // t-motion · the citadel's beam breathes (VR.Motion.BEAM): the stream runs at 0.45 … 1.55 of its old rate on a 4 s cycle
+    // (the same sparks a second on average), brighter at the peak, and at each peak a ring of sparks shoots up the beam,
+    // widening as it climbs
+    pulseBeam(dt, P, C) {
+      const Mo = VR.Motion, B = Mo.BEAM, pulse = Mo.beamPulse(this.t), k = B.bright[0] + B.bright[1] * pulse;
+      const o = this._bo || (this._bo = { life: 1, size: 0.2, grav: 0, drag: 0.05, col: [0, 0, 0], emis: 1, collide: false });
+      o.col[0] = 0.45 * k; o.col[1] = 0.86 * k; o.col[2] = 1.0 * k;
+      this.beam += dt * 46 * (B.rate[0] + B.rate[1] * pulse);
+      while (this.beam >= 1) {
+        this.beam -= 1; this.beamSparks = (this.beamSparks | 0) + 1;
+        const a = Math.random() * 6.283, r = Math.random() * 1.6, y = C.y + 40 + Math.random() * 110;
+        o.life = 2.2 + Math.random() * 1.2; o.size = 0.16 + Math.random() * 0.12;
+        P.spawn(C.x + Math.cos(a) * r, y, C.z + Math.sin(a) * r, (Math.random() - 0.5) * 0.6, 5 + Math.random() * 5, (Math.random() - 0.5) * 0.6, o);
+      }
+      const ph = ((this.t / B.period) % 1 + 1) % 1;
+      if (this.beamPh !== undefined && this.beamPh < 0.5 && ph >= 0.5) {
+        const ro = this._ro || (this._ro = { life: B.ringLife, size: 0.24, grav: 0, drag: 0.05, col: [0.7, 1.15, 1.5], emis: 1, collide: false, force: true });
+        for (let q = 0; q < B.ring; q++) { const a = q / B.ring * 2 * Math.PI, ca = Math.cos(a), sa = Math.sin(a); P.spawn(C.x + ca * B.ringR, C.y + 40, C.z + sa * B.ringR, ca * B.ringOut, B.ringV, sa * B.ringOut, ro); }
+        this.rings = (this.rings | 0) + 1;
+      }
+      this.beamPh = ph;
+    }
+    // t-motion · the watchtowers' saucer rings: a chase of running lights round the rim (VR.Motion.RING) within REACH_RING.
+    // A beacon is a watchtower's when the beacon block sits one above its spawn (gen_citadel.js: the spike's tip; a spire's
+    // spawn is the beacon cell itself) — looked up once its chunk is there
+    ringLights(P, eye) {
+      const Mo = VR.Motion, RG = Mo.RING, w = this.g.world, R = VR.R, bt = R && R.byName && R.byName.beacon_red;
+      if (!w || !bt) return;
+      const o = this._lo || (this._lo = { life: RG.tail, size: RG.size, grav: 0, drag: 0, col: RG.col, emis: 1, collide: false, force: true }), pt = this._lp || (this._lp = [0, 0, 0]);
+      for (const b of this.beacons.values()) {
+        const dx = b[0] - eye[0], dz = b[2] - eye[2];
+        if (dx * dx + dz * dz > REACH_RING * REACH_RING) continue;
+        if (b[3] === 0) {
+          if (this.t < b[5]) continue;
+          const at = (y) => { const s = w.getBlock(b[0], y, b[2]); return s ? (R.T.type[s] === bt.id ? 1 : 2) : 0; };
+          const here = at(b[1]), up = at(b[1] + 1);
+          if (here === 1) b[3] = 1; else if (here === 2 && up === 1) b[3] = 2; else { b[5] = this.t + 2; continue; }   // (not there yet: look again in 2 s)
+        }
+        if (b[3] !== 2) continue;
+        const h = Mo.ringHead(this.t, Mo.hash3(b[0], b[1], b[2]));
+        if (h === b[4]) continue;
+        b[4] = h; this.ringSpawns = (this.ringSpawns | 0) + 1;
+        Mo.ringLight(h, b[0], b[1], b[2], pt);
+        P.spawn(pt[0], pt[1], pt[2], 0, 0, 0, o);
+      }
+    }
   }
-  Vents.MIST = MIST;
+  Vents.MIST = MIST; Vents.STREAM = STREAM; Vents.REACH_RING = REACH_RING;
   VR.Vents = Vents;
 })(VR);

@@ -148,7 +148,12 @@
         if (L.distTo(p.pos[0], p.pos[2]) > 320 && !(ride && ride.line === L)) continue;
         const was = L.stop;
         L.place(this.clock);
-        for (const c of L.cars) this.cars.push(c);
+        for (const c of L.cars) {
+          this.cars.push(c);
+          // (t-motion: the car's velocity — its lights' glows ride along with it)
+          if (c.pp && dt > 0) { const k = 1 / dt; c.vel = c.vel || [0, 0, 0]; c.vel[0] = (c.pos[0] - c.pp[0]) * k; c.vel[1] = (c.pos[1] - c.pp[1]) * k; c.vel[2] = (c.pos[2] - c.pp[2]) * k; if (Math.hypot(c.vel[0], c.vel[2]) > 40) c.vel.fill(0); }
+          c.pp = c.pp || [0, 0, 0]; c.pp[0] = c.pos[0]; c.pp[1] = c.pos[1]; c.pp[2] = c.pos[2];
+        }
         if (ride && ride.line === L && L.stop && !was) {
           const name = L.names[L.stop - 1];
           g.ui.chatLine(T('g.tram.arriving', { name: name || T('g.tram.station') }), '#9affd8');
@@ -165,10 +170,14 @@
       for (const c of this.cars) { const d = Math.hypot(c.pos[0] - p.pos[0], c.pos[2] - p.pos[2]); if (d < near) near = d; }
       if (g.audio && g.audio.loop) g.audio.loop('hum', near < HUM_NEAR ? (1 - near / HUM_NEAR) * 0.09 : 0, 0.4);
       // the glints are a cost tier of their own: none on Very Low (the particles setting is 0 there)
-      if (night < 0.12 || !g.particles || !(g.settings && g.settings.particles > 0)) return;
+      if (!g.particles || !(g.settings && g.settings.particles > 0)) return;
+      const Mo = VR.Motion, mo = !!(g.settings.motion && Mo && Mo.TRAM);   // (t-motion: Wind in allem — the lights and the sparks)
+      if (mo) this.sparks(dt, p);
+      if (night < 0.12) return;
       this.glowT -= dt;
       if (this.glowT > 0) return;
       this.glowT = 0.05;
+      if (mo) { this.lights(p); return; }
       const col = [1, 0.93, 0.74];
       for (const c of this.cars) {
         const dx = c.pos[0] - p.pos[0], dz = c.pos[2] - p.pos[2];
@@ -179,6 +188,44 @@
           g.particles.glow(hx, y, hz, col, 0.12, 0.3, 0);
           g.particles.glow(hx + F[0] * 3.2, y, hz + F[1] * 3.2, col, 0.1, 0.2, 0);
         }
+      }
+    }
+    // t-motion · the trams at dusk and night (VR.Motion.TRAM): the leading nose's headlights white with their glint on the
+    // track ahead, the trailing nose's lamps red, the four window bays of each side lit (warm in the classic cars, cool in
+    // the tech ones); the glows move with the car (its velocity), every 20th of a second, for the cars within 140 blocks
+    lights(p) {
+      const P = this.g.particles, Mo = VR.Motion, TR = Mo.TRAM;
+      const o = this._lo || (this._lo = { life: 0.12, size: 0.3, grav: 0, drag: 0, col: null, emis: 1, collide: false, force: true, alpha: 1 });
+      const HEAD = [1, 0.93, 0.74], TAIL = [1, 0.12, 0.08], WARM = [1, 0.82, 0.55], COOL = [0.72, 0.94, 1.0];
+      for (const c of this.cars) {
+        const dx = c.pos[0] - p.pos[0], dz = c.pos[2] - p.pos[2];
+        if (dx * dx + dz * dz > GLINT_NEAR * GLINT_NEAR) continue;
+        const F = c.forward(), Rx = Math.cos(c.yaw), Rz = -Math.sin(c.yaw), v = c.vel || [0, 0, 0], y = c.pos[1] + 0.9;
+        const lead = Mo.tramLead(c.idx, c.line.v);
+        for (const side of [-TR.lamp, TR.lamp]) {
+          const hx = c.pos[0] + F[0] * TR.nose + Rx * side, hz = c.pos[2] + F[1] * TR.nose + Rz * side;
+          o.col = lead ? HEAD : TAIL; o.size = lead ? 0.3 : 0.24; o.life = 0.12; o.alpha = 1;
+          P.spawn(hx, y, hz, v[0], v[1], v[2], o);
+          if (lead) { o.size = 0.2; o.life = 0.1; P.spawn(hx + F[0] * 3.2, y, hz + F[1] * 3.2, v[0], v[1], v[2], o); }
+        }
+        o.col = c.line.tech ? COOL : WARM; o.size = 0.42; o.life = 0.12; o.alpha = 0.55;
+        for (const along of TR.bays) for (const side of [-TR.side, TR.side]) P.spawn(c.pos[0] + F[0] * along + Rx * side, c.pos[1] + TR.winY, c.pos[2] + F[1] * along + Rz * side, v[0], v[1], v[2], o);
+        this.lit = (this.lit | 0) + 1;
+      }
+    }
+    // t-motion · the pantograph sparks now and then while a tram runs (TRAM.spark a second per car, at speed): a burst of
+    // blue-white sparks off the roof unit and a flash, by day and by night
+    sparks(dt, p) {
+      const P = this.g.particles, TR = VR.Motion.TRAM;
+      const o = this._so || (this._so = { life: 0.4, size: 0.04, grav: 9, drag: 1.5, col: [0.8, 0.92, 1.2], emis: 1, collide: false, force: true });
+      for (const c of this.cars) {
+        const v = c.vel; if (!v || Math.hypot(v[0], v[2]) < TR.sparkV) continue;
+        const dx = c.pos[0] - p.pos[0], dz = c.pos[2] - p.pos[2];
+        if (dx * dx + dz * dz > GLINT_NEAR * GLINT_NEAR || Math.random() > TR.spark * dt) continue;
+        const x = c.pos[0], y = c.pos[1] + 3.15, z = c.pos[2];
+        for (let k = 0; k < 8; k++) { const a = Math.random() * 6.283; o.life = 0.25 + Math.random() * 0.3; P.spawn(x, y, z, v[0] * 0.6 + Math.cos(a) * 2.5, 1.5 + Math.random() * 2, v[2] * 0.6 + Math.sin(a) * 2.5, o); }
+        P.spawn(x, y + 0.1, z, v[0], 0, v[2], { life: 0.08, size: 0.6, grav: 0, drag: 0, col: [0.75, 0.9, 1.4], emis: 1, collide: false, force: true });
+        this.sparked = (this.sparked | 0) + 1;
       }
     }
     // ---------------------------------------------------------------- riding (through the gadgets' riding slot)

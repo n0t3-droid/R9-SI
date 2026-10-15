@@ -11,6 +11,9 @@ require('../src/main/particles.js');
 require('../src/main/airlife.js');
 require('../src/main/motion.js');
 const M = VR.Motion, A = VR.MotionAir;
+// a seeded Math.random: the small world has one sunbeam column under its canopy (1 in 324 of the motes' search square),
+// so an unseeded run could miss it in 10 s now and then
+{ let s = 0x9e3779b9; Math.random = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 
@@ -86,7 +89,7 @@ const steamPts = r0.parts.live;
 check(steamPts.length > 0 && steamPts.every(p => (Math.abs(p.x - 3.5) < 0.6 && Math.abs(p.z - 10.5) < 0.6) || (Math.abs(p.x - 3.5) < 0.6 && Math.abs(p.z - 14.5) < 0.6)), `the steam rises over the café tables the seats face (${steamPts.length} wisps, at x ${[...new Set(steamPts.map(p => Math.floor(p.x)))].join(',')})`);
 check(r0.a.drawn.steam <= Math.ceil(10 * M.budgetFor(0).cap.steam / M.AIR_LIFE.steam) + 4, `the steam keeps to its cap: ${r0.a.drawn.steam} wisps in 10 s (cap ${M.budgetFor(0).cap.steam} live, life ${M.AIR_LIFE.steam} s)`);
 // motes under the canopy: the sun straight up, the eye under the leaves near the gap
-const r2 = run(2, DAY, [4.5, 65.6, 3.5], 300);
+const r2 = run(2, DAY, [4.5, 65.6, 3.5], 900);
 const motes = r2.parts.live.filter(p => p.col[2] < 0.9 && p.col[0] > 0.99);
 check(r2.a.drawn.tmote > 0 && motes.every(p => Math.floor(p.x) === 4 && Math.floor(p.z) === 4), `motes glow only in the sunbeam through the canopy's gap (${r2.a.drawn.tmote} motes, columns ${[...new Set(motes.map(p => Math.floor(p.x) + ',' + Math.floor(p.z)))].join(' ')})`);
 // sparkle: a low sun over the water at x ≥ 20

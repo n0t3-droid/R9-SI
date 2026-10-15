@@ -1016,7 +1016,38 @@ void main() {
       float rowF = pl.y * 6.0, row = floor(rowF);
       float bar = step(0.55, hash12(vec2(row, floor(pl.x * 3.0 + u_time * 2.0 * (0.6 + fract(row * 0.37)))))) * step(0.3, fract(rowF)) * (1.0 - step(0.75, fract(rowF)));
       vec3 ink = vec3(0.35, 0.95, 1.0);
+#ifdef MOTION
+      // t-motion: every 9 s a panel switches between the radar, a map (a grid, contour lines, a marker pinging along its
+      // route) and the readouts (a trace and level bars); a bright scan line wipes down it in 0.6 s, the new picture
+      // above the line, the old one below (each panel on its own phase: motion.js HOLO, the same numbers)
+      float cyc = u_time / 9.0 + hc * 2.7, cf = fract(cyc) * 9.0, wy = 1.5 - cf * 5.0;
+      float mode = mod(floor(cyc) - (d.y > wy ? 0.0 : 1.0), 3.0);
+      float wipe = (1.0 - smoothstep(0.0, 0.07, abs(d.y - wy))) * step(cf, 0.62);
+      vec3 hol;
+      if (mode < 0.5) hol = ink * (wedge * 0.85 + rings * 0.55 + cross + blip * 1.4) + ink * bar * (1.0 - inR) * 0.75;
+      else if (mode < 1.5) {
+        vec2 gq = abs(fract(d * 2.0 + 0.5) - 0.5);
+        float grid = 1.0 - smoothstep(0.0, 0.035, min(gq.x, gq.y));
+        float hf = fract(vnoise(d * 1.1 + hc * 17.0) * 6.0);
+        float cont = 1.0 - smoothstep(0.0, 0.09, min(hf, 1.0 - hf));
+        vec2 mp = vec2(sin(u_time * 0.37 + hc * 6.0), sin(u_time * 0.23 + hc * 3.0)) * 1.05;
+        float md = length(d - mp), pr = fract(u_time * 0.8);
+        float mark = 1.0 - smoothstep(0.05, 0.12, md);
+        float ping = (1.0 - smoothstep(0.0, 0.035, abs(md - pr * 0.7))) * (1.0 - pr);
+        hol = ink * (grid * 0.3 + cont * 0.5 + mark * 1.6 + ping * 0.9);
+      } else {
+        float ty = 0.75 + 0.45 * sin(d.x * 3.1 + u_time * 2.3 + hc * 9.0) * (0.6 + 0.4 * sin(d.x * 7.3 - u_time * 1.1));
+        float trace = (1.0 - smoothstep(0.0, 0.05, abs(d.y - ty))) * step(0.0, d.y);
+        float bf = (d.x + 1.5) * 3.0, bi = floor(bf);
+        float lvl = 0.55 + 0.4 * sin(u_time * (1.0 + hash12(vec2(bi, 3.0)) * 2.0) + bi * 1.7 + hc * 5.0);
+        float bars = step(-1.35, d.y) * step(d.y, -1.35 + lvl * 1.15) * step(0.18, fract(bf)) * step(fract(bf), 0.82);
+        float axis = (1.0 - smoothstep(0.0, 0.03, abs(d.y))) * 0.4;
+        hol = ink * (trace * 1.3 + bars * 0.7 + axis);
+      }
+      col = col * 0.42 + hol + ink * wipe * 1.6;
+#else
       col = col * 0.42 + ink * (wedge * 0.85 + rings * 0.55 + cross + blip * 1.4) + ink * bar * (1.0 - inR) * 0.75;
+#endif
     }
   }
   if (u_animOn > 0.5 && u_pulseA > -0.5 && (abs(layer - u_pulseA) < 0.5 || abs(layer - u_pulseB) < 0.5)) {
@@ -1518,6 +1549,12 @@ void main() {
     float rim = 1.0 - smoothstep(0.0, 0.75, rd);
     float band = 1.0 - smoothstep(0.3, 1.9 + wob * 0.6, rd);
     float e = clamp(band * (0.2 + 0.8 * swirl) * 0.8 + fil * band, 0.0, 1.0);
+#ifdef MOTION
+    // t-motion: rings run out from the veil's middle to its rim (rd falls toward the rim, so the crests of
+    // sin(rd·3.2 + t·2.2) move outward at 0.7 blocks a second), bright where the veil is clear, and its energy breathes
+    // (motion.js VEIL, the same numbers)
+    if (u_animOn > 0.5) e = clamp((e + smoothstep(0.55, 1.0, sin(rd * 3.2 + u_time * 2.2)) * smoothstep(0.9, 2.4, rd) * 0.3) * (0.9 + 0.1 * sin(u_time * 1.7)), 0.0, 1.0);
+#endif
     vec3 hot = mix(vec3(1.0, 0.62, 0.28), vec3(1.0, 0.92, 0.8), 1.0 - smoothstep(0.0, 0.3, rd)) * 2.8;
     vec3 vcol = mix(vec3(0.12, 0.38, 1.0) * 0.9, vec3(0.5, 0.82, 1.0) * 2.4, e);
     vcol = mix(vcol, hot, rim);
