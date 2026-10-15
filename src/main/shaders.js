@@ -973,7 +973,10 @@ void main() {
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
 #ifdef PBR
   // (t-material) wet things darken by how much water they soak: soil, sand, stone, wood a lot; polish, tiles, metal hardly
-  { float pr = clamp((mat.b - 0.45) / 0.45, 0.0, 1.0); alb.rgb *= 1.0 - wetK * 0.42 * pr * pr * (3.0 - 2.0 * pr) * (1.0 - texelFetch(u_pbr, ivec2(int(layer), 0), 0).g); }
+  // (run 2: the plaza's tiles hardly changed in the rain — a film of water dims every surface a little, and a puddle's
+  // water over the ground a lot, so the mirror stands out on a darker ground)
+  { float pr = clamp((mat.b - 0.45) / 0.45, 0.0, 1.0); pr = pr * pr * (3.0 - 2.0 * pr) * (1.0 - texelFetch(u_pbr, ivec2(int(layer), 0), 0).g);
+    alb.rgb *= (1.0 - wetK * (0.42 * pr + 0.12 * (1.0 - pr))) * (1.0 - 0.34 * pud); }
 #else
   if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
 #endif
@@ -1635,7 +1638,13 @@ void main() {
       refl = pr * vec3(0.86, 0.94, 1.0) + body * 0.1;
     }
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
+#ifndef LITE
+    // (t-material, run 2: the clear water's bright floor took the mirror's contrast — the lake held the floating islands
+    // only faintly. Tier ≥ 1 lets the far water mirror fully, as real water does: clear at the feet, a mirror further out)
+    fres = u_waterTier > 0.5 ? min(fres, 0.82) : min(fres * 0.85, 0.66);
+#else
     fres = min(fres * 0.85, 0.66);
+#endif
     if (u_underwater > 0.5) { fres = face == 3u ? 0.0 : fres * 0.3; }
     vec3 col = mix(under * (1.0 - 0.22 * seamK), refl, clamp(fres, 0.0, 1.0));
     // sun sparkle: a GGX lobe whose width follows the slope (steep water glitters wider and dimmer), plus a sheen
@@ -1662,8 +1671,10 @@ void main() {
     if (u_waterTier > 0.5) {
       // t-material: foam on the banks (a noise mask by the depth under the surface) and on the crests of a rough water
       float fn2 = texture(u_noise, wp.xz / 1.7 - vec2(u_time * 0.05, u_time * 0.03)).g;
-      float fm = max(wfxShore(vdep, foamN * 0.65 + fn2 * 0.35), wfxCrest(whN, ak, fn2));
-      col = mix(col, vec3(0.92, 0.96, 1.0) * (u_ambSky * skyL + blockL + lc * 0.45 * v_sky + 0.02), clamp(fm, 0.0, 1.0) * 0.8 * float(face == 2u));
+      // (run 2: far off the bank's foam averaged into a milky band across the lake — it fades by 60 blocks, where its
+      // flecks are smaller than a pixel)
+      float fm = max(wfxShore(vdep, foamN * 0.65 + fn2 * 0.35), wfxCrest(whN, ak, fn2)) * (1.0 - smoothstep(22.0, 60.0, dist));
+      col = mix(col, vec3(0.92, 0.96, 1.0) * (u_ambSky * skyL + blockL + lc * 0.45 * v_sky + 0.02), clamp(fm, 0.0, 1.0) * 0.75 * float(face == 2u));
     } else {
 #endif
     float foam = (1.0 - smoothstep(0.0, 0.2, thick)) * smoothstep(0.45, 0.7, foamN);
@@ -2528,12 +2539,10 @@ uniform sampler2D u_color;
 uniform mat4 u_vp;
 uniform mat4 u_invVP;
 uniform vec2 u_nearFar;
-uniform float u_frame;
 in vec2 v_uv;
 out vec4 o;
 float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
 vec3 octDec(vec2 e) { vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y); if (n.y < 0.0) n.xz = (1.0 - abs(n.zx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return normalize(n); }
-float h12(vec2 p) { vec3 p3 = fract(vec3(p.xyx) * .1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
 void main() {
   o = vec4(0.0);
   vec4 m = texture(u_mat, v_uv);
@@ -2542,28 +2551,29 @@ void main() {
   if (d >= 0.99999) return;
   vec4 wp = u_invVP * vec4(v_uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
   vec3 P = wp.xyz / wp.w, N = octDec(m.rg * 2.0 - 1.0), V = normalize(-P);
-  float rough = m.a, jit = h12(gl_FragCoord.xy + u_frame * 7.31);
+  // (run 2: per-pixel jitter and a rough-scattered ray left a sparse spray of hits — single bright texels on the plaza and
+  // the hangar floor. Every ray is now the mirror ray, the same each frame; a crossing is refined first and only then
+  // judged: a surface the ray reaches is a hit, one it passes behind (a pole, a railing) a miss. The apply pass blurs by
+  // the roughness instead)
+  float rough = m.a;
   vec3 R = reflect(-V, N);
-  R = normalize(R + (vec3(h12(gl_FragCoord.xy * 1.7 + u_frame), h12(gl_FragCoord.yx * 2.3 - u_frame), jit) - 0.5) * rough * 0.35);
   if (dot(R, N) < 0.02) return;
   vec3 Q = P + N * 0.04;
-  float t = 0.18 * (0.6 + 0.8 * jit), st = t, prevT = 0.0;
+  float t = 0.12, st = 0.12, prevT = 0.0;
   vec2 huv = vec2(-1.0);
-  for (int i = 0; i < 14; i++) {
+  for (int i = 0; i < 16; i++) {
     vec4 c = u_vp * vec4(Q + R * t, 1.0);
     if (c.w < 0.07) break;
     vec2 uv = c.xy / c.w * 0.5 + 0.5;
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
-    float dz = c.w - lin(texture(u_depth, uv).r);
-    if (dz > 0.0) {
-      if (dz < 0.35 + t * 0.08) {
-        float a = prevT, b = t;
-        for (int k = 0; k < 3; k++) { float mt = (a + b) * 0.5; vec4 cm = u_vp * vec4(Q + R * mt, 1.0); if (cm.w - lin(texture(u_depth, cm.xy / cm.w * 0.5 + 0.5).r) > 0.0) b = mt; else a = mt; }
-        vec4 cb = u_vp * vec4(Q + R * b, 1.0); huv = cb.xy / cb.w * 0.5 + 0.5;
-      }
+    if (c.w - lin(texture(u_depth, uv).r) > 0.0) {
+      float a = prevT, b = t;
+      for (int k = 0; k < 5; k++) { float mt = (a + b) * 0.5; vec4 cm = u_vp * vec4(Q + R * mt, 1.0); if (cm.w - lin(texture(u_depth, cm.xy / cm.w * 0.5 + 0.5).r) > 0.0) b = mt; else a = mt; }
+      vec4 cb = u_vp * vec4(Q + R * b, 1.0); vec2 buv = cb.xy / cb.w * 0.5 + 0.5;
+      if (cb.w - lin(texture(u_depth, buv).r) < 0.1 + b * 0.025) huv = buv;
       break;
     }
-    prevT = t; st *= 1.42; t += st;
+    prevT = t; st *= 1.33; t += st;
   }
   if (huv.x < 0.0) return;
   vec2 e = min(huv, 1.0 - huv);
@@ -2578,9 +2588,15 @@ uniform sampler2D u_ssr;
 in vec2 v_uv;
 out vec4 o;
 void main() {
-  float w = texture(u_mat, v_uv).b;
-  vec4 s = texture(u_ssr, v_uv);
-  float a = w * s.a;
+  vec4 m = texture(u_mat, v_uv);
+  if (m.b < 0.003) discard;
+  // the hits, gathered over a footprint that grows with the roughness (a polished floor sharp, a honed one soft); a
+  // texel's hit counts by its own weight, so a lone hit spreads thin instead of standing out
+  vec2 px = 1.0 / vec2(textureSize(u_ssr, 0)), r = px * (0.6 + m.a * 5.0);
+  vec4 s = texture(u_ssr, v_uv) * 2.0 + texture(u_ssr, v_uv + vec2(r.x, r.y)) + texture(u_ssr, v_uv + vec2(-r.x, r.y))
+         + texture(u_ssr, v_uv + vec2(r.x, -r.y)) + texture(u_ssr, v_uv + vec2(-r.x, -r.y));
+  s /= 6.0;
+  float a = m.b * s.a;
   if (a < 0.003) discard;
   o = vec4(s.rgb / max(s.a, 1e-3), a);
 }`;

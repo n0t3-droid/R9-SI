@@ -209,7 +209,9 @@ async function shoot(tag, dist, only) {
     const yaw = Math.atan2(-dx, -dz), pitch = Math.atan2(dy, Math.hypot(dx, dz));
     await A.pose(fx, feet, fz, yaw, pitch, v.fov, v.times[0]);
     await A.weather(v.prep === 'rain' ? 'rain' : v.prep === 'after' ? 'after' : 'dry');
-    const st0 = await A.settle(150, 30); await A.step(6);
+    // (runs 1 and 2: the first views came out half loaded — 150 rounds with a thousand sections still dirty on this busy
+    //  machine; the loop stops as soon as the view is complete, so a longer budget costs only where it is needed)
+    const st0 = await A.settle(360, 40); await A.step(6);
     // the scene's moment: the hall's craft on its pad with the crew out; the apron's craft parked with its crew
     if (v.prep === 'hangar') await A.ev(() => { const g = VR.game; if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) { g.hall.flight.update(0.03); const L = g.hall.flight.plan && g.hall.flight.plan.legs.find(l => l.name === 'pad'); g.hall.flight.jumpPhase('pad', L ? Math.min(0.6, 21 / L.T) : 0.3); } if (g.hall && g.hall.jump) g.hall.jump(8); });
     if (v.prep === 'apron') await A.ev(() => { const g = VR.game; if (g.padLife && g.padLife.jump) g.padLife.jump('apron', 'crew'); });

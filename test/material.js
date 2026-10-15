@@ -129,7 +129,8 @@ console.log('g · the screen-space mirror (tier 2)');
   const i = fs.indexOf('layout(location=1) out vec4 o_ssr;'), j = fs.lastIndexOf('#ifdef SSR', i);
   check(i > 0 && j > 0 && j > fs.lastIndexOf('#endif', i), 'the terrain writes the mirror\'s second target only with SSR (tier 2)');
   check(/o_ssr = vec4\(octEnc\(n\)/.test(fs) && /g_ssrW = g_ssrW \* \(1.0 - Fc\) \+ Fc/.test(fs), 'the normal, the Fresnel weight (base and coat) and the roughness go into it');
-  check(typeof S.SSR_FS === 'string' && /for \(int i = 0; i < 14; i\+\+\)/.test(S.SSR_FS) && /for \(int k = 0; k < 3; k\+\+\)/.test(S.SSR_FS), 'the march: 14 growing steps, 3 halvings at a hit');
+  check(typeof S.SSR_FS === 'string' && /for \(int i = 0; i < 16; i\+\+\)/.test(S.SSR_FS) && /for \(int k = 0; k < 5; k\+\+\)/.test(S.SSR_FS) && !/u_frame|h12\(/.test(S.SSR_FS), 'the march: 16 growing steps, 5 halvings at a crossing before it is judged, the same ray every frame (no jitter: no spray of lone hits)');
+  check(/textureSize\(u_ssr, 0\)/.test(S.SSR_APPLY_FS) && /m\.a \* 5\.0/.test(S.SSR_APPLY_FS), 'the apply gathers the hits over a footprint that grows with the roughness');
   check(/smoothstep\(0.0, 0.07, e.x\)/.test(S.SSR_FS) && /dot\(R, V\)/.test(S.SSR_FS), 'it fades at the screen\'s edge and for rays back toward the eye');
   check(typeof S.SSR_APPLY_FS === 'string' && /s.rgb \/ max\(s.a, 1e-3\)/.test(S.SSR_APPLY_FS), 'the apply mixes the half-size hit by the full-size weight');
   // the octahedral normal's round trip (the shader's two functions, here in JS)

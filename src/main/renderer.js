@@ -1966,7 +1966,6 @@
       this.tex(0, this.sceneDepth, p.u.u_depth); this.tex(1, S.mat, p.u.u_mat); this.tex(2, this.sceneCol, p.u.u_color);
       gl.uniformMatrix4fv(p.u.u_vp, false, this.viewProj); gl.uniformMatrix4fv(p.u.u_invVP, false, this.invViewProj);
       gl.uniform2f(p.u.u_nearFar, 0.06, (F.cam && F.cam.far) || 1200);
-      gl.uniform1f(p.u.u_frame, this.frameNo % 64);
       const sb = this.sceneFmt().bytes, n = this.w * this.h, hn = S.hw * S.hh;
       this.fsMark('ssr', S.hw, S.hh, hn * (4 + 4) + hn * 17 * 4 + hn * sb, hn * (this.hdr ? 8 : 4), hn * 18);
       this.fs(p);
