@@ -825,7 +825,8 @@
         if (nb >= 1 && H3(x, y, z, 31) < 0.5) H(x, y, z);
       }
     } else if (hs === 'spiky') {
-      for (let k = 0; k < 6; k++) { const x = A.xl + Math.floor(H3(k, 1, 2, sd) * (A.xr - A.xl + 1)), z = A.z0 + 1 + Math.floor(H3(k, 3, 4, sd) * (A.z1 - A.z0)); H(x, A.top + 2, z); if (H3(k, 5, 6, sd) < 0.4) H(x, A.top + 3, z); }
+      // (ten tufts, a second voxel on one in five: six tall ones clustered into a pair of horns on the smooth head)
+      for (let k = 0; k < 10; k++) { const x = A.xl + Math.floor(H3(k, 1, 2, sd) * (A.xr - A.xl + 1)), z = A.z0 + 1 + Math.floor(H3(k, 3, 4, sd) * (A.z1 - A.z0)); H(x, A.top + 2, z); if (H3(k, 5, 6, sd) < 0.2) H(x, A.top + 3, z); }
     } else if (hs === 'braids') {
       for (const sx of [A.xl - 1, A.xr + 1]) {
         for (let y = (kid ? -3 : -5); y <= A.top - 2; y++) head.set(sx, y, A.z1, ((y & 3) < 2) ? hc : mul(hc, 0.78), 0, TG.hair);

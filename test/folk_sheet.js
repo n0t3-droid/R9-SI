@@ -166,6 +166,29 @@ for (const smooth of [false, true]) {
   fs.writeFileSync(path.join(OUT, 'folk_sheet_faces.png'), cv.png());
   check(cv.drawn > 50000, `six faces at two blocks, smooth (${cv.drawn} pixels)`);
 }
+{
+  // every hat and hair style on the fine face (folkmodel.js fineFace), two rows of heads at 1.1 blocks: the trades' hats
+  // (straw, chef, hard, top, visor, goggles, cap, sun), the children's (beanie, kid's cap, bow), an elder's flat cap, the
+  // hair styles bare — test/shots/folk_sheet_heads.png
+  const heads = [];
+  for (const role of ['farmer', 'baker', 'builder', 'mayor', 'ranger', 'pilot', 'healer', 'gardener', 'scholar']) heads.push(Object.assign(Folk.look(31 + heads.length * 7, role, 'adult'), { beard: false }));
+  for (const kh of ['beanie', 'kidcap', 'bow']) heads.push(Object.assign(Folk.look(5 + heads.length, 'child', 'child'), { kidHat: kh }));
+  heads.push(Object.assign(Folk.look(808, 'elder', 'elder'), { elderHat: 'flat', hs: 'short' }));
+  for (const hs of ['long', 'bob', 'bun', 'pony', 'curly', 'spiky', 'braids', 'afro', 'bald']) heads.push(Object.assign(Folk.look(61 + heads.length * 3, 'crafter', 'adult'), { hs, beard: hs === 'bald' }));
+  const cv = new Canvas(1280, 720, BG);
+  cv.cam([0, 1.3, -2.1], [0, 1.27, 0], 48);
+  const perRow = 11;
+  heads.forEach((L, i) => {
+    const row = (i / perRow) | 0, col = i % perRow, def = Folk.buildFine(L), kid = L.age === 'child';
+    // (each head's chin at 1.46 blocks, the second row 0.45 lower: two rows of busts)
+    const x = (col - (perRow - 1) / 2) * 0.3, hy = 1.5 - row * 0.45;
+    const base = m4.create(); m4.translate(base, base, x, hy - (kid ? 0.82 * 36 : 50) / 32, 0); m4.rotY(base, base, 0.25 * Math.sin(i)); const s = (kid ? 0.82 : 1) / def.unit; m4.scale(base, base, s, s, s);
+    const mats = FS.rigMats(def, base, idle, {}), meshes = partMeshes(def, true);
+    for (const name of ['head']) { const M = meshes[name]; if (M) cv.mesh(M, mats[name]); }
+  });
+  fs.writeFileSync(path.join(OUT, 'folk_sheet_heads.png'), cv.png());
+  check(cv.drawn > 50000, `every hat and hair style on the fine face (${heads.length} heads, ${cv.drawn} pixels)`);
+}
 console.log(`    ${tParts} parts, ${meshCache.size} meshes built (${hits} shared), smooth meshing ${tMs.toFixed(0)} ms`);
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
