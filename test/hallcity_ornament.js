@@ -34,6 +34,7 @@
 //  17. round 3: a second row of spires — a pinnacle with a lantern finial on the clerestory over every flyer's head (P5 / P0)
 //  18. round 3: a flower box under every arched window of the shop houses (P1 / P2 / P7)
 //  19. round 3: the street lamps on the street's edge, clear of the awnings (every awning whole) (P1 / P2 / P7)
+//  20. round 3 (in 1, the kit): the arched window's panes glow warm, lit from inside (P1 / P2 / P6 / P7)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -69,6 +70,19 @@ check(WORDS.length >= 10, `at least ten shop words (${WORDS.length})`);
   const gEn = gold('baker');
   check(gDe > 30 && gEn > 30 && gDe !== gEn, `a sign is drawn in the table's language (${de['town.sign.baker']}: ${gDe} gold voxels, ${en['town.sign.baker']}: ${gEn})`);
   T.setWords(null);
+  }
+  // (round 3, section 20) the arched window's panes glow warm — the references' upper windows are lit from inside, amber
+  // behind wood frames; round 2's cream glass read from the street as dark brown holes. The panes are emissive (a look,
+  // no light source: the light engine and the block are unchanged), warm, and fill the opening behind the frame.
+  {
+    const m = VM.MODELS.vm_town_arch3; VM.materialize(m);
+    let lit = 0, warm = 0, glassN = 0;
+    for (let i = 0; i < m.vol.length; i++) {
+      const p = m.pal[m.vol[i]]; if (!m.vol[i] || !(p & V.VX.PRESENT)) continue;
+      if (p & V.VX.GLASS) glassN++;
+      if (p & V.VX.EMIS) { lit++; const r = (p >> 16) & 255, b = p & 255; if (r >= b + 60) warm++; }
+    }
+    check(lit >= 400 && warm === lit && glassN === 0, `20. the arched window's panes glow warm, lit from inside (${lit} lit voxels, ${warm} warm, ${glassN} plain glass)`);
   }
 }
 

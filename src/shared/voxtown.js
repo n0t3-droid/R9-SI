@@ -29,7 +29,7 @@
   const COL = T.COL = {
     stone: 0xF2EEE6, stoneD: 0xE2DACB, stoneL: 0xFAF8F2, gold: 0xD8B048, goldL: 0xF0D27A, goldD: 0xB08A3A,
     iron: 0x22262C, ironL: 0x3A3F48, wood: 0x8A5E36, woodL: 0xB08A5A, woodD: 0x5A3F2A,
-    glass: 0xD6ECF4, warm: 0xFFE8C0, flame: 0xFFD27A, water: 0x8AD8FF, waterL: 0xC8F0FF,
+    glass: 0xD6ECF4, warm: 0xFFE8C0, flame: 0xFFD27A, water: 0x8AD8FF, waterL: 0xC8F0FF, lit: 0xC88E4E,
     green: 0x2E5843, greenD: 0x1F3E30, cream: 0xF2E8D2, amber: 0xC8744A, teal: 0x2F8C8A, white: 0xF4F2EC,
   };
   // the stained glass of the window heads: [ray A, ray B, the ring]
@@ -183,7 +183,9 @@
     size: [3, 3, 1], col: 0xF2EEE6, sound: 'glass', hard: 1,
     build(b, M) {
       const A = T.ARCH, cx = 24, stone = M.stone(COL.stone), ring = M.stone(COL.stoneL), key = M.stone(COL.stoneD), sill = M.stone(COL.stoneD);
-      const wood = M.wood(COL.woodD), woodL = M.wood(COL.wood), glass = M.glass(COL.warm);
+      // (round 3: the panes glow warm, lit from inside — the references' upper windows are amber behind their wood frames;
+      // the cream glass of round 2 read from the street as dark brown holes. A look only: no light source, same voxels)
+      const wood = M.wood(COL.woodD), woodL = M.wood(COL.wood), glass = M.light(COL.lit);
       b.box(0, 0, 0, 48, 48, 16, stone);
       // the archivolt: a lighter ring round the head, proud of the wall by one voxel inside the cell (the wall face recessed)
       b.cut(0, 0, 0, 48, 48, 1);
