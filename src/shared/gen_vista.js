@@ -320,11 +320,11 @@
     }
     // ---- 3. the vista points (VISTA.choose) and their spurs, frames and groves; 4. the sight windows
     VISTA.choose(g, P);
-    for (const V of P.vistas) VISTA.buildSpur(g, P, K, V);
+    for (const V of P.vistas) { VISTA.buildSpur(g, P, K, V); VISTA.dressFrame(g, P, V); }
     VISTA.openWindows(g, P);
     // ---- 5. where a way still looks into empty country for more than 60 blocks: an obelisk on the best rise ahead
     VISTA.fill(g, P, K);
-    for (const V of P.vistas) VISTA.dress(g, P, V);
+    for (const V of P.vistas) VISTA.dressGrove(g, P, V);
     P.vistaMs = Date.now() - t0;
   }, { order: 5.5 }));
 
@@ -468,7 +468,22 @@
     const at = (t, o) => [Math.round(sx + ux * t - uz * o - 0.5), Math.round(sz + uz * t + ux * o - 0.5)];
     { const [bx, bz] = at(L - 0.5, 0); put(bx, y + 1, bz, st('vx_bench', { facing: FACE4(ux, uz) })); }
     for (const o of [-3, 3]) { const [lx, lz] = at(L + 1.6, o); put(lx, y + 1, lz, POST); put(lx, y + 2, lz, LANT); }
-    for (const o of [-2, 2]) { const [lx, lz] = at(1.2, o); put(lx, y + 1, lz, POST); put(lx, y + 2, lz, POST); put(lx, y + 3, lz, LANT); }
+    // the gate into the spur: a pier either side, four high with a lantern on it (the picture's frame in the foreground)
+    const PIERB = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, CAP = white ? (st('chiseled_quartz_block') || BASE) : st('chiseled_stone_bricks');
+    for (const o of [-2, 2]) { const [lx, lz] = at(1.2, o); for (let yy = y + 1; yy <= y + 3; yy++) put(lx, yy, lz, PIERB); put(lx, y + 4, lz, CAP); put(lx, y + 5, lz, LANT); }
+    // the arch (V.frame 'arch': the landmark low enough to stand in its opening): two piers on the walls 2.5 out, a lintel
+    // with a keystone over the walk — the picture's frame in the foreground
+    if (V.frame === 'arch') {
+      const PIER = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, LIN = white ? (st('smooth_quartz') || BASE) : st('stone_bricks'), KEY = white ? (st('chiseled_quartz_block') || LIN) : st('chiseled_stone_bricks');
+      const done = new Set();
+      for (let o = -2; o <= 2; o += 0.5) {
+        const [ax, az] = at(2.5, o), k = ax * 65536 + az; if (done.has(k)) continue; done.add(k);
+        if (Math.abs(o) >= 2) { for (let yy = y + 1; yy <= y + 4; yy++) put(ax, yy, az, PIER); put(ax, y + 5, az, LIN); put(ax, y + 6, az, st('lantern', { hanging: 0 })); }
+        else put(ax, y + 5, az, Math.abs(o) < 0.5 ? KEY : LIN);
+      }
+      { const [kx, kz] = at(2.5, 0); put(kx, y + 6, kz, KEY); }
+      V.arch = true;
+    }
     // the spawn the game's wow moment reads: the trigger (the spur's start), the composition
     LAND.addSpawn(P, ['vista', V.id, V.x, y + 1, V.z, V.eye[0], V.eye[1], V.eye[2], V.yaw, V.pitch, V.fov, V.lm], V.x, V.z);
     P.pieces.push({ kind: 'vista', id: V.id, x: V.x, z: V.z, y, lm: V.lm });
@@ -568,35 +583,41 @@
       VISTA.openWindows(g, P, true);
     }
   };
-  // ---- a vista's frame and its middle ground: a tree pair at the spur's start (the picture's sides), an arch over the
-  // spur where the landmark is low enough to stand in its opening, a grove 60–200 blocks out beside the sight axis
-  VISTA.dress = function (g, P, V) {
-    const gy = groundOf(g, P), [ux, uz] = V.u, y = V.y;
+  // ---- a vista's frame and its middle ground: a tree pair at the spur's start (the picture's sides; planted before the
+  // windows, they are the frame the view is cut in), an arch over the spur where the landmark is low enough to stand in
+  // its opening (buildSpur), a grove 50–200 blocks out beside the sight axis (after the windows: none in a corridor)
+  const planTree = (g, P, x, z, kind, view) => {
+    x = Math.round(x); z = Math.round(z);
+    if (LAND.zoneAt(g, x, z) || P.cells.has(ck(x, z)) || (LAND.keepAt(P, x, z) & (1 | 2 | 4 | 16 | (view ? 32 : 0)))) return false;
+    const y0 = groundOf(g, P)(x, z); if (y0 <= SEA + 2) return false;
+    if (P.trees.some(t => Math.abs(t.x - x) < 4 && Math.abs(t.z - z) < 4)) return false;
+    P.trees.push({ x, z, y: y0 + 1, kind });
+    return true;
+  };
+  VISTA.dressFrame = function (g, P, V) {
+    const [ux, uz] = V.u;
     P.trees = P.trees || [];
-    const tree = (x, z, kind) => {
-      x = Math.round(x); z = Math.round(z);
-      if (LAND.zoneAt(g, x, z) || P.cells.has(ck(x, z)) || (LAND.keepAt(P, x, z) & (1 | 2 | 4 | 16 | 32))) return false;
-      const y0 = gy(x, z); if (y0 <= SEA + 2) return false;
-      if (P.trees.some(t => Math.abs(t.x - x) < 4 && Math.abs(t.z - z) < 4)) return false;
-      P.trees.push({ x, z, y: y0 + 1, kind });
-      return true;
-    };
-    const kindHere = (x, z) => { const q = LAND.woodAt(g, x, z); return q.kind === 3 ? 0 : q.kind; };
-    // the pair at the spur's start, a cherry's arching crown or a broad oak's either side, far enough out that the crowns
-    // close the picture's sides and leave the landmark free (from the eye ~50° off the axis, the crowns reaching in to ~25°)
+    // a cherry's arching crown or a broad oak's either side, far enough out that the crowns close the picture's sides and
+    // leave the landmark free (from the eye ~50° off the axis, the crowns reaching in to ~25°)
     V.framed = 0;
-    const fk = h01(V.x, V.z, 0x7a1) < 0.5 ? 4 : 0, fo = fk === 4 ? 11 : 9, ft = fk === 4 ? 5 : 4;
-    for (const o of [-fo, fo]) { const x = V.x + ux * ft - uz * o, z = V.z + uz * ft + ux * o; if (tree(x, z, fk)) V.framed++; }
-    // the grove: 7 trees round a point beside the axis, the side from the vista's hash
-    const sideA = (h01(V.z, V.x, 0x7a2) < 0.5 ? -1 : 1) * (22 + 6 * h01(V.x, V.z, 0x7a3)) * DEG, dist = 70 + 90 * h01(V.x, V.z, 0x7a4);
-    const ca = Math.cos(sideA), sa = Math.sin(sideA), gx = V.eye[0] + (ux * ca - uz * sa) * dist, gz = V.eye[2] + (uz * ca + ux * sa) * dist;
-    V.grove = 0;
-    if (LAND.woodAt(g, gx, gz).d < 0.3) for (let k = 0; k < 9; k++) {
-      const a = k * 2.4, rr = k === 0 ? 0 : 4 + 6 * h01(k, V.x, 0x7a5);
-      if (tree(gx + Math.cos(a) * rr, gz + Math.sin(a) * rr, kindHere(gx, gz))) V.grove++;
-    } else V.grove = -1;   // (the woods there are the middle ground already)
-    V.groveAt = [Math.round(gx), Math.round(gz)];
-    void y;
+    const fk = h01(V.x, V.z, 0x7a1) < 0.5 ? 4 : 0;
+    for (const sd of [-1, 1]) for (const [ft, fo] of (fk === 4 ? [[5, 11], [6, 12], [4, 10], [7, 12], [3, 10], [6, 10]] : [[4, 9], [5, 10], [3, 9], [6, 9], [5, 8], [7, 10]])) { const o = sd * fo; if (planTree(g, P, V.x + ux * ft - uz * o, V.z + uz * ft + ux * o, fk, false)) { V.framed++; break; } }
+  };
+  VISTA.dressGrove = function (g, P, V) {
+    const [ux, uz] = V.u, kindHere = (x, z) => { const q = LAND.woodAt(g, x, z); return q.kind === 3 ? 0 : q.kind; };
+    P.trees = P.trees || [];
+    V.grove = 0; V.groveAt = null;
+    const s0 = h01(V.z, V.x, 0x7a2) < 0.5 ? -1 : 1;
+    for (const sd of [s0, -s0]) for (const ang of [22, 28, 34, 18]) for (const dist of [90, 60, 130, 170]) {
+      if (V.groveAt) break;
+      const a = sd * ang * DEG, ca = Math.cos(a), sa = Math.sin(a), gx = V.eye[0] + (ux * ca - uz * sa) * dist, gz = V.eye[2] + (uz * ca + ux * sa) * dist;
+      const cx = Math.round(gx), cz = Math.round(gz);
+      if (LAND.zoneAt(g, cx, cz) || (LAND.keepAt(P, cx, cz) & (1 | 2 | 4 | 16 | 32)) || g.surfaceY(cx, cz) <= SEA + 2) continue;
+      if (LAND.woodAt(g, cx, cz).d >= 0.3) { V.grove = -1; V.groveAt = [cx, cz]; break; }   // (the woods there are the middle ground already)
+      let n = 0;
+      for (let k = 0; k < 9; k++) { const b = k * 2.4, rr = k === 0 ? 0 : 4 + 6 * h01(k, V.x, 0x7a5); if (planTree(g, P, gx + Math.cos(b) * rr, gz + Math.sin(b) * rr, kindHere(cx, cz), true)) n++; }
+      if (n >= 3) { V.grove = n; V.groveAt = [cx, cz]; }
+    }
   };
 
   // ---------------------------------------------------------------- the lighthouse on the far coast (t-land's hook)

@@ -12,7 +12,8 @@
 //      bands, the citadel's taller spires and side pinnacles, a fall off every isle into the void, the lighthouse ≥ 40
 //      high on the lake's far coast; the horizon tiles and the far ring's forms reach the landmarks' tops; Very Low's
 //      horizon in the hills view at most ×1.03 the triangles of vgen 10
-//   (the later sections — layers, the wow moments — come with their steps)
+//   5. layers: every vista has its foreground frame (a crown at the picture's side, or the arch over its spur), its middle
+//      distance (a grove beside the sight axis, the woods or the lake) and the landmark far, its top in the upper third
 //   bash test/wt_run.sh vista.js 900        (SEED=… another world; ONLY=1,2 some sections)
 const V = require('./load_shared.js');
 const R = V.R, LAND = V.Land, VI = V.Vista, SEA = V.C.SEA;
@@ -104,7 +105,7 @@ if (want(3)) {
     for (let dz = -12; dz <= 12; dz++) for (let dx = -12; dx <= 12; dx++) {
       const x = v.x + dx, z = v.z + dz; if (Math.hypot(dx, dz) > 12) continue;
       const a = nameOf(blockAt(x, v.y + 1, z)), b = nameOf(blockAt(x, v.y + 2, z)), c = nameOf(blockAt(x, v.y + 3, z)), f = nameOf(blockAt(x, v.y, z));
-      if (a === 'vx_bench') bench++; if (b === 'lantern' || c === 'lantern') lant++; if (/wall|balustrade/.test(a)) wall++; if (/flagstone|plaza/.test(f)) pave++;
+      if (a === 'vx_bench') bench++; if (b === 'lantern' || c === 'lantern' || nameOf(blockAt(x, v.y + 5, z)) === 'lantern') lant++; if (/wall|balustrade/.test(a)) wall++; if (/flagstone|plaza/.test(f)) pave++;
     }
     const sp = (chunk(v.x >> 4, v.z >> 4).spawns || []).some(s => s[0] === 'vista' && s[1] === v.id);
     if (bench >= 1 && lant >= 4 && wall >= 10 && pave >= 12 && sp) built++; else if (bad.length < 4) bad.push(`${v.id} bench ${bench} lanterns ${lant} walls ${wall} paving ${pave} spawn ${sp}`);
@@ -186,6 +187,42 @@ if (want(4)) {
   const view = tiles.filter(inLook), tris = (gg) => { let n = 0; for (const [Lv, tx, tz] of view) { const t = V.LOD.build(gg, { level: Lv, tx, tz }); if (t && !t.empty) n += t.count / 3; } return n; };
   const a10 = tris(g10), a11 = tris(g);
   check(a11 <= a10 * 1.03, `Very Low's horizon in the hills view: ${Math.round(a11)} triangles against vgen 10's ${Math.round(a10)} (×${(a11 / a10).toFixed(3)}, at most ×1.03; ${view.length} tiles)`);
+  console.log(`  (${secs()})`);
+}
+
+// ---------------------------------------------------------------- 5 · layers: near, middle, far
+if (want(5)) {
+  console.log('5 · layered depth: a frame in the foreground, a grove in the middle distance, the landmark far');
+  const vs = P.vistas, proj = (v, x, y, z) => {   // world → the vista camera's normalised device coordinates (x right, y up)
+    const dx = x - v.eye[0], dy = y - v.eye[1], dz = z - v.eye[2], sy = Math.sin(v.yaw), cy = Math.cos(v.yaw);
+    const fx = -sy, fz = -cy, rx = cy, rz = -sy;   // forward (yaw convention: look = (−sin, −cos)), right
+    let f = dx * fx + dz * fz, u = dy; const r = dx * rx + dz * rz, cp = Math.cos(v.pitch), sp = Math.sin(v.pitch), f2 = f * cp + u * sp, u2 = -f * sp + u * cp;
+    const t = Math.tan(v.fov * Math.PI / 360), asp = 16 / 9; return f2 <= 0 ? null : [r / (f2 * t * asp), u2 / (f2 * t), f2];
+  };
+  // the foreground: the tree pair's crowns at the picture's sides, or the arch round the landmark
+  let fg = 0; const fgBad = [];
+  for (const v of vs) {
+    const trees = (P.trees || []).filter(t => Math.hypot(t.x - v.x, t.z - v.z) < 16 && Math.hypot(t.x - v.x, t.z - v.z) > 6);
+    // (a crown's inner edge, 4 blocks from its trunk toward the sight axis, inside the picture's side)
+    const sides = trees.map(t => { const ax = v.eye[0] + v.u[0] * 8, az = v.eye[2] + v.u[1] * 8, dx = ax - t.x, dz = az - t.z, l = Math.hypot(dx, dz) || 1; return proj(v, t.x + 0.5 + dx / l * 4, t.y + 5, t.z + 0.5 + dz / l * 4); }).filter(Boolean).filter(q => Math.abs(q[0]) > 0.3 && Math.abs(q[0]) < 1.05);
+    // the gate's piers at the spur's start (four high, a lantern on each)
+    let piers = 0; for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) if (/chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 4, v.z + dz))) && nameOf(blockAt(v.x + dx, v.y + 5, v.z + dz)) === 'lantern') piers++;
+    let arch = false;
+    if (v.arch) { const piers = []; for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) { const n = nameOf(blockAt(v.x + dx, v.y + 3, v.z + dz)); if (/quartz_pillar|stone_bricks/.test(n) && /stone_bricks|quartz|chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 5, v.z + dz)))) piers.push([v.x + dx, v.z + dz]); } arch = piers.length >= 2; }
+    if (piers >= 2 && (sides.length >= 1 || arch)) fg++; else if (fgBad.length < 4) fgBad.push(`${v.id} (${piers} piers; ${trees.length} trees, ${sides.length} at the sides)`);
+  }
+  check(fg === vs.length, `every vista has its foreground frame: the gate's two piers at the spur's start and a crown at the picture's side or the arch over the spur (${fg} of ${vs.length}${fgBad.length ? '; ' + fgBad.join(', ') : ''}; arches: ${vs.filter(v => v.arch).length})`);
+  // the middle distance: the vista's grove inside the picture, beside the landmark (or the woods or the water there)
+  let mid = 0, inPic = 0;
+  for (const v of vs) {
+    if (v.grove > 0 && v.groveAt) { const q = proj(v, v.groveAt[0], g.surfaceY(v.groveAt[0], v.groveAt[1]) + 4, v.groveAt[1]); const lq = proj(v, v.aim[0], v.aim[1], v.aim[2]); if (q && Math.abs(q[0]) < 1 && q[2] > 40 && q[2] < 240 && lq && Math.abs(q[0] - lq[0]) > 0.15) inPic++; }
+    if (v.grove !== 0) mid++;
+    else { const [ex, , ez] = v.eye, [qx, , qz] = v.aim, d = Math.hypot(qx - ex, qz - ez); let water = 0, built = 0; for (let s2 = 60; s2 <= 220; s2 += 10) { const x = Math.round(ex + (qx - ex) * s2 / d), z = Math.round(ez + (qz - ez) * s2 / d); if (g.surfaceY(x, z) < SEA) water++; if (LAND.zoneAt(g, x, z)) built++; } if (water >= 3 || built >= 3) { mid++; v._mid = water >= 3 ? 'the lake' : 'the hills, the city or the canyon'; } }
+  }
+  check(mid === vs.length && inPic >= vs.filter(v => v.grove > 0).length * 0.8, `every vista has its middle distance — a grove beside the sight axis (${vs.filter(v => v.grove > 0).length}, ${inPic} of them inside the picture and clear of the landmark), the woods (${vs.filter(v => v.grove === -1).length}), the lake or a built site (${vs.filter(v => v._mid).map(v => v.id + ': ' + v._mid).join(', ')}) — ${mid} of ${vs.length}`);
+  // the far layer: the landmark inside the picture, its top in the upper third (§3), its box not cut by the frame's edge
+  let far = 0; for (const v of vs) { const q = proj(v, v.aim[0], v.aim[1], v.aim[2]); if (q && Math.abs(q[0]) < 0.8 && q[1] > 1 / 3 && q[1] < 1) far++; }
+  check(far === vs.length, `the landmark stands in every picture, its top in the upper third and away from the sides (${far} of ${vs.length})`);
   console.log(`  (${secs()})`);
 }
 
