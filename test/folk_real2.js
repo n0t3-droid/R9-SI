@@ -355,8 +355,8 @@ console.log('§4 shadows like props');
   // the renderer's lookup matrix: an orthographic box ±40 blocks across, ±260 deep, the light from up high
   const lv = m4.create(); m4.lookAt(lv, 0, 0, 0, -0.3, -0.9, -0.3, 0, 1, 0); const pr = m4.create(); m4.ortho(pr, -40, 40, -40, 40, -260, 260); r.shadowMat = m4.mul(m4.create(), pr, lv);
   const g = { renderer: r, settings: Object.assign({}, P.balanced) }; FG.game = g;
-  const cam = { x: 0, y: 70, z: 0 }, ppl = [];
-  for (let i = 0; i < 3; i++) { const L = Folk.look(9100 + i, 'crafter', 'adult', null, 'hall'), rec = FG.recFor(L), m = FS.personFromLook(L); m.type = 'folkmesh'; FG.inflight = 1; FG.got(g, rec, m); ppl.push(rec); }
+  const cam = { x: 0, y: 70, z: 0 }, ppl = [], meshes = [];
+  for (let i = 0; i < 3; i++) { const L = Folk.look(9100 + i, 'crafter', 'adult', null, 'hall'), rec = FG.recFor(L), m = FS.personFromLook(L); m.type = 'folkmesh'; FG.inflight = 1; FG.got(g, rec, m); ppl.push(rec); meshes.push(m); }
   const frame = (positions) => { r.frameNo++; ppl.forEach((rec, i) => FG.queue(rec, positions[i], 0, FA.sample(FA.clips.idle, 0, {}), { sky: 1, bl: [0, 0, 0] }, {})); FG.flush(r, { sunDir: [0.3, 0.9, 0.3], moonDir: [0, -1, 0] }, cam); };
   frame([[2, 70, -3], [3, 70, -4], [-1, 70, -5]]);
   r.frameNo++; calls.blits.length = 0; calls.multi = 0;
@@ -386,6 +386,52 @@ console.log('§4 shadows like props');
   // nobody drawn last frame (no villagers near): no pass, the frame reads the map itself
   r.frameNo += 2; const none = FG.castShadows(r, {}, cam);
   check(!none && r.shadowRead === null, 'no people drawn the frame before: no pass, the map itself is read');
+  // the shadow on the ground worked out on the CPU the way the pass writes it and the terrain reads it: a low sun (21°, as
+  // at 8000 ticks); every triangle of the three through the pass's own uniforms (the row's bone matrix, the shift, the
+  // write matrix, the depth bias — CAST_VS) into the copy's texels; the ground along each one's shadow looked up as the
+  // terrain does (shadowMat · (rel + n·0.04), the depth less 0.0006): at the hips' and the chest's shadow (2.4 and 3.2
+  // blocks from the feet) under a triangle nearer the light — in shadow; two blocks to the side, under none
+  {
+    const Ls = [-0.745, 0.356, 0.562], ll = Math.hypot(...Ls), L = Ls.map((v) => v / ll);
+    const lv2 = m4.create(); m4.lookAt(lv2, 0, 0, 0, -L[0], -L[1], -L[2], 0, 1, 0);
+    r.shadowMat = m4.mul(m4.create(), pr, lv2); r.shadowOff = [0, 0]; r.stats.shadowRenders++;
+    const pos3 = [[2, 70, -3], [3, 70, -4], [-1, 70, -5]];
+    frame(pos3); r.frameNo++; FG.castShadows(r, {}, cam);
+    const W = calls.uniforms.u_shadowW, shf = calls.uniforms.u_shift, zb2 = calls.uniforms.u_zBias, D = FG.bt.data, RW = FG.BW * 4, size = 1024;
+    const tris = [];
+    meshes.forEach((m, k) => {
+      const buf = m.data.buffer || m.data, off = m.data.byteOffset || 0, n = (m.data.byteLength) / 20;
+      const f32 = new Float32Array(buf, off, n * 5), u8 = new Uint8Array(buf, off, n * 20), P3 = new Float64Array(n * 3);
+      for (let v = 0; v < n; v++) {
+        const b = u8[v * 20 + 15], o = k * RW + b * 16, x = f32[v * 5], y = f32[v * 5 + 1], z = f32[v * 5 + 2];
+        const wx = D[o] * x + D[o + 4] * y + D[o + 8] * z + D[o + 12] + shf[0], wy = D[o + 1] * x + D[o + 5] * y + D[o + 9] * z + D[o + 13] + shf[1], wz = D[o + 2] * x + D[o + 6] * y + D[o + 10] * z + D[o + 14] + shf[2];
+        const cx = W[0] * wx + W[4] * wy + W[8] * wz + W[12], cy = W[1] * wx + W[5] * wy + W[9] * wz + W[13], cz = W[2] * wx + W[6] * wy + W[10] * wz + W[14], cw = W[3] * wx + W[7] * wy + W[11] * wz + W[15];
+        P3[v * 3] = (cx / cw * 0.5 + 0.5) * size; P3[v * 3 + 1] = (cy / cw * 0.5 + 0.5) * size; P3[v * 3 + 2] = (cz - zb2 * cw) / cw * 0.5 + 0.5;
+      }
+      for (let t = 0; t < m.idx.length; t += 3) tris.push([P3, m.idx[t] * 3, m.idx[t + 1] * 3, m.idx[t + 2] * 3]);
+    });
+    // the nearest caster depth over a texel position (Infinity: none covers it)
+    const casterAt = (u, v) => {
+      let best = Infinity;
+      for (const [P3, a, b, c] of tris) {
+        const x0 = P3[a], y0 = P3[a + 1], x1 = P3[b], y1 = P3[b + 1], x2 = P3[c], y2 = P3[c + 1];
+        if (u < Math.min(x0, x1, x2) || u > Math.max(x0, x1, x2) || v < Math.min(y0, y1, y2) || v > Math.max(y0, y1, y2)) continue;
+        const ar = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0); if (Math.abs(ar) < 1e-12) continue;
+        const w0 = ((x1 - u) * (y2 - v) - (x2 - u) * (y1 - v)) / ar, w1 = ((x2 - u) * (y0 - v) - (x0 - u) * (y2 - v)) / ar, w2 = 1 - w0 - w1;
+        if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+        best = Math.min(best, w0 * P3[a + 2] + w1 * P3[b + 2] + w2 * P3[c + 2]);
+      }
+      return best;
+    };
+    const M = r.shadowMat, look = (x, y, z) => { const X = x - cam.x, Y = y + 0.04 - cam.y, Z = z - cam.z, w = M[3] * X + M[7] * Y + M[11] * Z + M[15]; return [((M[0] * X + M[4] * Y + M[8] * Z + M[12]) / w * 0.5 + 0.5) * size, ((M[1] * X + M[5] * Y + M[9] * Z + M[13]) / w * 0.5 + 0.5) * size, (M[2] * X + M[6] * Y + M[10] * Z + M[14]) / w * 0.5 + 0.5 - 0.0006]; };
+    const hl = Math.hypot(L[0], L[2]), sx = -L[0] / hl, sz = -L[2] / hl;
+    let inShade = 0, along = 0, sideFree = 0; const notes = [];
+    for (const [px, py, pz] of pos3) {
+      for (const d of [2.4, 3.2]) { along++; const [u, v, ref] = look(px + sx * d, py, pz + sz * d), c = casterAt(u, v); if (c < ref) inShade++; else notes.push(`${d} blocks: caster ${c === Infinity ? 'none' : f2(c)} against ${f2(ref)}`); }
+      const [u, v, ref] = look(px - sz * 2, py, pz + sx * 2); if (!(casterAt(u, v) < ref)) sideFree++;
+    }
+    check(inShade === along && sideFree === pos3.length, `a low sun: the ground at the hips' and the chests' shadows under the people in the copy (${inShade} of ${along}), two blocks beside them free (${sideFree} of ${pos3.length})${notes.length ? ' — ' + notes.join('; ') : ''}`);
+  }
   // Low: the ellipse — no pass
   g.settings = Object.assign({}, P.low); r.q = { shadows: 0, dropShadow: true }; frame([[2, 70, -3], [3, 70, -4], [-1, 70, -5]]); r.frameNo++;
   check(!FG.castShadows(r, {}, cam) && r.shadowRead === null, 'on Low no pass: the ellipse');
