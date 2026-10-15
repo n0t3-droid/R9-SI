@@ -20,6 +20,8 @@ const RUNS = {
   run3b: ['ultralite.mjs', 5400, { SCENES: 'lake', TAG: 'run3b' }],
   // (after the merge of v042: the four switches still draw the same pictures cheaper — the plaza and the lake's mirror)
   merged: ['ultralite.mjs', 3600, { SCENES: 'plaza,lake', WALK: '0', TAG: 'merged' }],
+  // (the lake did not settle after the merge: the same two scenes on v042's own build, BASE=its index.html — Ultra only)
+  v042: ['ultralite.mjs', 3600, { SCENES: 'plaza,lake', WALK: '0', TAG: 'v042', DIST: process.env.BASE || '' }],
   smoke: ['smoke.mjs', 1800, {}],
   classic: ['classic_v2.mjs', 1800, {}],   // (the look's grid test: the shadow lookup's wrap offset sits in every preset's shaders)
 };
