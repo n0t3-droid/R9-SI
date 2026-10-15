@@ -103,6 +103,8 @@
     const skin = parentLook && (r(1) & 3) ? parentLook.skin : SKIN[r(1) % SKIN.length];
     let hair = parentLook && (r(2) & 1) ? parentLook.hair : HAIR[r(2) % (r(9) % 7 === 0 ? HAIR.length : 7)];
     if (age === 'elder') hair = (r(2) & 1) ? 0xE8E8E8 : 0xB8B8B8;
+    // (t-folk: hair as brown as the skin read as a bald head on the smooth people — such hair is taken darker)
+    else if (Math.hypot(((hair >> 16) & 255) - ((skin >> 16) & 255), ((hair >> 8) & 255) - ((skin >> 8) & 255), (hair & 255) - (skin & 255)) < 70) hair = (((((hair >> 16) & 255) * 0.42) | 0) << 16) | (((((hair >> 8) & 255) * 0.42) | 0) << 8) | (((hair & 255) * 0.42) | 0);
     let hs = STYLES_H[r(3) % STYLES_H.length];
     if (age === 'elder' && (r(3) & 3) === 0) hs = 'bald';
     const L = {

@@ -59,6 +59,7 @@
     const r = g && g.renderer, gl = r && r.gl;
     if (!gl) { rec.state = 0; return; }
     rec.def = m.rig;   // (what the draw needs of the rig: its units, layout, joints and order)
+    rec.ranges = m.ranges || null;   // (each part's indices: the split draw)
     FG.upload(gl, rec, m);
     FG.stats.buildMs += m.buildMs || 0;
     FG.stats.got++; FG.stats.workerMs += m.ms || 0; FG.stats.hits += m.hits | 0; FG.stats.miss += m.miss | 0; FG.stats.lru = Math.max(FG.stats.lru || 0, m.cacheBytes || 0);
@@ -112,13 +113,17 @@
     try { P.voxBone = VR.GL.program(VR.SHADERS.VOX_VS, VR.SHADERS.VOX_FS, 'voxBone', ['BONES']); } catch (e) { console.error(e); P.voxBone = null; }
     return P.voxBone;
   };
+  // split: a person drawn part by part (one drawElements a part over its range of the one buffer, the part's matrix as
+  // the vox program's model) — the way when the boned program is missing (it did not compile), and a switch to weigh the
+  // two (FG.SPLIT): no bone index in the vertex shader, a draw a part
+  FG.SPLIT = false;
   const IDENT = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
   const BONES = new Float32Array(16 * 16), base = new Float32Array(16), mats = {};
   FG.flush = function (r, E, cam) {
     const n = FG.n; FG.n = 0;
     FG.stats.drawn = 0; FG.stats.tris = 0;
     if (!n) return 0;
-    const gl = r.gl, p = FG.program(r);
+    const gl = r.gl, pb = FG.SPLIT ? null : FG.program(r), split = !pb, p = pb || r.P.vox;
     if (!p) { for (let i = 0; i < n; i++) FG.items[i].rec.state = 3; return 0; }
     const m4 = VR.mat4, FS = VR.FolkSmooth, now = performance.now();
     gl.useProgram(p.p); r.common(p, E);
@@ -143,6 +148,21 @@
       m4.scale(base, base, s, s, s);
       FS.rigMats(def, base, it.pose, mats);
       const order = def.order, hide = o.hide;
+      if (split) {
+        const R = rec.ranges; if (!R) continue;
+        gl.bindVertexArray(rec.vao);
+        const bpe = rec.type === gl.UNSIGNED_INT ? 4 : 2;
+        for (let q = 0; q < R.length; q += 3) {
+          const name = order[R[q]], M = mats[name];
+          if (!M || (hide && hide[name])) continue;
+          gl.uniformMatrix4fv(p.u.u_model, false, M);
+          gl.drawElements(gl.TRIANGLES, R[q + 2], rec.type, R[q + 1] * bpe);
+          if (r.stats) r.stats.draws++;
+        }
+        rec.used = now; FG.stats.drawn++; FG.stats.tris += rec.count / 3;
+        if (r.stats) r.stats.tris += rec.count / 3;
+        continue;
+      }
       for (let b = 0; b < order.length && b < 16; b++) {
         const M = mats[order[b]], off = b * 16;
         if (!M) continue;

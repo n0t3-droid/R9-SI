@@ -139,17 +139,21 @@
     }
     if (!nv) return { error: 'empty person', transfer: [] };
     const data = new Uint8Array(nv * 20), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+    // (ranges: each part's indices [bone, first, count] — a GPU that draws a person part by part, with the part's matrix
+    // as the model's, needs no bone index in its vertex shader: folkgpu.js FG.flush, split)
+    const ranges = [];
     let vo = 0, io = 0;
     for (let k = 0; k < list.length; k += 2) {
       const r = list[k], bone = list[k + 1], n = r.nv, I = r.idx;
       data.set(r.data, vo * 20);
       for (let i = 0; i < n; i++) data[(vo + i) * 20 + 15] = bone;
       for (let i = 0; i < I.length; i++) idx[io + i] = I[i] + vo;
+      ranges.push(bone, io, I.length);
       vo += n; io += I.length;
     }
     FS.stats.hits += hits; FS.stats.miss += miss; FS.stats.ms += ms;
     const t1 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    return { data, idx, nv, nt: ni / 3, hits, miss, ms, total: t1 - t0, cacheBytes: cache ? cache.bytes : 0, transfer: [data.buffer, idx.buffer] };
+    return { data, idx, nv, nt: ni / 3, ranges, hits, miss, ms, total: t1 - t0, cacheBytes: cache ? cache.bytes : 0, transfer: [data.buffer, idx.buffer] };
   };
 
   // ---------------------------------------------------------------- a person from its look, all in the worker
