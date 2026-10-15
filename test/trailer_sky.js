@@ -4,7 +4,7 @@
 //    most cells at the overcast end); every cumulus sprite stays above y 190 at its base (no clouds below 190 except the
 //    fog band); the sprites are the same on every call
 //  - t-sky2: in clear weather one cumulus cell in twelve at most, the clouds smaller, the high ones thin by day; the box
-//    clouds (Low, Very Low) as sparse
+//    clouds (Low, Very Low) as sparse, and by day their runs high in the view fade out fully (not drawn)
 //  - the fog banks lie under the Sky Isles (y 104–114, within 300 blocks of their centre); the citadel has its cloud
 //    anchors round the spires at y 207–212 (the spire tip is at 252)
 //  - the sprite atlas: full density at the centre, empty corners, the lobes' normals point out of the cloud
@@ -75,6 +75,19 @@ for (let gz = -30; gz < 30; gz++) for (let gx = -30; gx < 30; gx++) {
   const frac = (cov) => { let k = 0, n = 0; const thr = C.boxThr(cov); for (let gz = -150; gz < 150; gz += 2) for (let gx = -150; gx < 150; gx += 2) { n++; const v = (nz.n2(gx * 0.085, gz * 0.085) * 0.65 + nz.n2(gx * 0.27 + 50, gz * 0.27) * 0.35) * 0.5 + 0.5; if (v > thr) k++; } return k / n; };
   const fc = frac(0.2), fo = frac(0.85);
   check(fc > 0.01 && fc <= 1 / 12 && fo >= 0.5, `the box clouds cover ${(fc * 100).toFixed(1)} % in clear weather (≤ 8.3 %), ${(fo * 100).toFixed(0)} % under overcast (≥ 50 %)`);
+}
+// t-sky2 (continued): the box clouds of Low and Very Low fade high in the view by day in clear weather like the puffs — fully:
+// a run over the camera is not drawn at all (shaders.js CLOUD_VS collapses it), so the nebula overhead stays clear on the
+// low tiers too and they draw less. The sources, and the vertex shader's factor mirrored for a camera 150 blocks under the deck
+{
+  const fs = require('fs');
+  const sh = fs.readFileSync(__dirname + '/../src/main/shaders.js', 'utf8'), rd = fs.readFileSync(__dirname + '/../src/main/renderer.js', 'utf8');
+  const vs = sh.slice(sh.indexOf('S.CLOUD_VS'), sh.indexOf('S.CLOUD_FS')), cf = sh.slice(sh.indexOf('S.CLOUD_FS'), sh.indexOf('S.PUFF_VS'));
+  check(/uniform vec4 u_cloudHigh/.test(vs) && /v_fade < 0\.01 \? vec4\(0\.0, 0\.0, 2\.0, 1\.0\)/.test(vs) && /u_cloudAlpha \* fade \* v_fade/.test(cf), 'CLOUD_VS fades a run by its elevation (u_cloudHigh) and drops one faded to nothing; CLOUD_FS takes the fade');
+  check(/u_cloudHigh, HI\.from, 1 \/ \(HI\.to - HI\.from\), VR\.Clouds\.clearDay\(E\.cloudCover/.test(rd.slice(rd.indexOf('drawClouds(E) {'), rd.indexOf('initPuffs() {'))), 'drawClouds passes the puffs\' band and the clear-day factor to the box clouds');
+  const fade = (dist, cd) => { const s = 150 / Math.hypot(dist, 150), hi = Math.min(1, Math.max(0, (s - C.HIGH.from) / (C.HIGH.to - C.HIGH.from))); return 1 - cd * hi * hi * (3 - 2 * hi); };
+  check(fade(0, 1) < 0.01 && fade(100, 1) < 0.01 && fade(500, 1) === 1 && fade(0, C.clearDay(0.85, 1)) === 1 && fade(0, C.clearDay(0.2, 0)) === 1,
+    `by day in clear weather a box cloud overhead is gone (${fade(0, 1).toFixed(2)}, 100 blocks out ${fade(100, 1).toFixed(2)}), one 500 out stays (${fade(500, 1)}); overcast and night keep theirs`);
 }
 // the wind moves the drawing, not the cells: in cloud space a cloud is the same sprite whatever the wind is
 {

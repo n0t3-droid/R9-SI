@@ -1593,16 +1593,23 @@ layout(location=2) in vec4 a_inst;     // x,z cell, run length, thickness scale
 uniform mat4 u_viewProj;
 uniform vec3 u_cloudOrigin;             // relative to camera
 uniform vec3 u_cell;                    // cell size xyz
+uniform vec4 u_cloudHigh;               // t-sky2 (as the puffs', clouds.js HIGH): x from, y 1/(to − from) of a run's elevation sine, z how far a high run fades
 out vec3 v_rel;
 out vec3 v_n;
 out float v_h;
+out float v_fade;
 void main() {
   float yo = floor(a_inst.w / 8.0), th = a_inst.w - yo * 8.0;
   vec3 p = vec3(a_inst.x, yo, a_inst.y) * u_cell + a_corner * u_cell * vec3(a_inst.z, th, 1.0);
   vec3 rel = u_cloudOrigin + p;
   v_rel = rel; v_n = a_normal;
   v_h = a_corner.y;
-  gl_Position = u_viewProj * vec4(rel, 1.0);
+  // t-sky2: by day in clear weather the runs high in the view fade out (the trailer's sky overhead is the nebula, the
+  // cumulus sit low and far); a run faded to nothing is not drawn at all (its corners collapse outside the view)
+  vec3 c = u_cloudOrigin + vec3(a_inst.x + a_inst.z * 0.5, yo, a_inst.y + 0.5) * u_cell;
+  float hi = clamp((c.y / max(length(c), 1.0) - u_cloudHigh.x) * u_cloudHigh.y, 0.0, 1.0);
+  v_fade = 1.0 - u_cloudHigh.z * hi * hi * (3.0 - 2.0 * hi);
+  gl_Position = v_fade < 0.01 ? vec4(0.0, 0.0, 2.0, 1.0) : u_viewProj * vec4(rel, 1.0);
 }`;
   S.CLOUD_FS = `
 ${'__COMMON__'}
@@ -1611,6 +1618,7 @@ uniform float u_cloudR;
 in vec3 v_rel;
 in vec3 v_n;
 in float v_h;
+in float v_fade;
 out vec4 o;
 void main() {
   float sunUp = smoothstep(-0.15, 0.15, u_sunDir.y);
@@ -1626,7 +1634,7 @@ void main() {
   col += lc * pow(max(dot(V, L), 0.0), 8.0) * 0.35 * (1.0 - v_h * 0.5);
   float fade = 1.0 - smoothstep(u_cloudR * 0.55, u_cloudR * 0.97, length(v_rel.xz));
   col = mix(col, skyColor(V, false), clamp(dist / (u_cloudR * 1.7), 0.0, 1.0) * 0.55);
-  o = vec4(col, u_cloudAlpha * fade);
+  o = vec4(col, u_cloudAlpha * fade * v_fade);
 }`;
 
   // ------------------------------------------------------------ puffs (t-clouds): cumulus, fog banks, anchors as billboards

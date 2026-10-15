@@ -1150,6 +1150,9 @@
       gl.uniform3f(p.u.u_cell, cell, 4, cell);
       gl.uniform1f(p.u.u_cloudAlpha, 0.86);
       if (p.u.u_cloudR) gl.uniform1f(p.u.u_cloudR, this.cloudR || 500);
+      // t-sky2: by day in clear weather the box clouds high in the view fade out fully (the puffs' HIGH band, clouds.js): the
+      // nebula overhead stays clear on Low and Very Low too, and the runs faded to nothing are not drawn
+      if (p.u.u_cloudHigh && VR.Clouds) { const HI = VR.Clouds.HIGH; gl.uniform4f(p.u.u_cloudHigh, HI.from, 1 / (HI.to - HI.from), VR.Clouds.clearDay(E.cloudCover, E.skyDay ? E.skyDay[2] : 0), 0); }
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.enable(gl.CULL_FACE);
       gl.depthMask(true); gl.depthFunc(gl.LESS);
