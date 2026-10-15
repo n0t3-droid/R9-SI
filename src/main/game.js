@@ -25,6 +25,10 @@
   PRESETS.ultraLite = Object.assign({}, PRESETS.ultra, { farCache: true, shadowTakt: true, streamTakt: true, reflLite: true });
   // t-folk: Echte Menschen (folkgpu.js) — the villagers smooth within 24 blocks from Balanced up; Very Low and Low keep the
   // voxel people (with the same real proportions)
+  // F10 · Bandbreite (ipu.js): five switches for the GPUs that share the system's memory — off on every preset but Ultra ·
+  // Leicht; on an integrated GPU every preset turns them on (ipuDefaults: a preset change, and once at the first start there)
+  const F10_SW = ['hdrLite', 'postLite', 'zPre', 'texLite', 'dprLite'];
+  for (const p in PRESETS) for (const k of F10_SW) PRESETS[p][k] = p === 'ultraLite';
   PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1; PRESETS.ultraLite.smoothFolk = 1;
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
@@ -74,7 +78,18 @@
     applyPreset(p) {
       const keep = this.settings.bauSet ? this.settings.bau : null;   // (a „Bauen" chosen in the settings stays)
       this.settings.preset = p; Object.assign(this.settings, PRESETS[p]); if (keep) this.settings.bau = keep;
+      if (this.ipuDefaults) this.ipuDefaults(true);   // (F10: on an integrated GPU the five switches come on with any preset)
       this.applySettings('*'); this.saveSettings();
+    }
+    // F10 · Bandbreite: the switches' defaults on this GPU (ipu.js): an integrated one turns them on whatever the preset.
+    // force: a preset change; else once per GPU (the first start on it) — a switch changed by hand stays until the next preset
+    ipuDefaults(force) {
+      const S = this.settings, gpu = VR.GL && VR.GL.rendererName, IPU = VR.IPU;
+      if (!IPU || !gpu || (!force && S.ipuGpu === gpu)) return false;
+      S.ipuGpu = gpu;
+      if (!IPU.integrated(gpu)) return false;
+      for (const k of IPU.SW) S[k] = true;
+      return true;
     }
       // F7 · water: bubbles from the mouth while diving, mist at the foot of the falls near the player (the falling
     // columns are looked up every 2 s), a splash when the eye crosses the surface (its ripple comes from crossT)
@@ -122,6 +137,7 @@
       if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
       if (key !== '*' && F9_SW.includes(key)) S.preset = 'custom';   // (F9: a switch of Ultra · Leicht changed by hand)
+      if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -133,6 +149,7 @@
       if (S.smoothFurn === undefined) S.smoothFurn = PRESETS[S.preset] ? PRESETS[S.preset].smoothFurn : 1;   // t-smooth: Echte Möbel (0 the voxel pieces · 1 smooth)
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
+      if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
       if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite });   // (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
       if (this.world) { const wp = this.propMask(); if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
@@ -343,6 +360,7 @@
         if (want !== cur) { this.settings.preset = want; Object.assign(this.settings, PRESETS[want]); }
         this.settings.autoPreset = false; this.saveSettings();
       }
+      if (this.ipuDefaults && this.ipuDefaults(false)) this.saveSettings();   // (F10: the first start on an integrated GPU turns the five switches on)
       this.applySettings('*');
       this.aqRestoreStart();   // F9: this GPU's remembered smart-quality steps (aqRestoreSteps, at the first frame of play)
       document.getElementById('gpuinfo').textContent = (VR.GL.rendererName || 'WebGL2') + (this.renderer.multi ? ' · multi-draw' : '');
@@ -789,7 +807,7 @@
       const S = this.settings, sum = VR.Bench.summarize(b.dts);
       const d = VR.Bench.decide({ ms: sum.median, step: VR.Bench.stepOf(S.preset, S.renderDist, b.igpu), target: 60, igpu: b.igpu });
       if (d.action !== 'none') {
-        Object.assign(S, PRESETS[d.preset]); S.preset = d.preset; S.renderDist = d.renderDist;
+        Object.assign(S, PRESETS[d.preset]); S.preset = d.preset; S.renderDist = d.renderDist; if (this.ipuDefaults) this.ipuDefaults(true);   // (F10)
         this.applySettings('*'); this.saveSettings();
       }
       this.benchResult = Object.assign({}, d, { n: sum.n, median: sum.median, p90: sum.p90, measured: sum.fps, before: b.was, when: Date.now() });
