@@ -15,7 +15,7 @@
 //   pictures test/shots/ipu_<scene>_<preset>_<config>_<TAG>.png, the difference maps ipu_<…>_diff_<TAG>.png — LOOK at them
 // usage: bash test/wt_run.sh ipu.mjs 3000 · SCENES=hall,plaza,lake PRESETS=high,ultraLite,potato CONFIGS=off,hdrLite,…,all
 //   N=3 timed frames · DIST=file:///…/index.html (another build) TAG=before · MODE=quick (the plaza, High, off/hdrLite/all)
-//   VIEW=1920x1080 the page at 1080p (texLite: the far mip bias and the skipped material read judged where it shows most)
+//   VIEW=1920x1080 the page at 1080p (texLite's pictures judged at the owner's screen size)
 //   MODE=ab ROUNDS=4 AB=off:all (AB_<preset>=…, AB_<scene>_<preset>=… per preset or scene; '' skips it)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
@@ -327,7 +327,7 @@ for (const sc of MODE === 'ab' ? [] : SCENES) {
   }
   await holdFar(false);
 }
-// dprLite in the browser: a screen of 1000 × 563 CSS pixels at dpr 1 — the backing store follows it (off: the window's 1280)
+// dprLite in the browser: a screen of 1000 × 563 CSS pixels at dpr 1 — the backing store follows it (off: the window's width)
 if (info.ipu && !QUICK && MODE !== 'ab') {
   const d = await ev(() => {
     const r = VR.game.renderer, was = Object.getOwnPropertyDescriptor(window, 'screen');
@@ -339,7 +339,7 @@ if (info.ipu && !QUICK && MODE !== 'ab') {
     return { off, on, back: [r.W, r.H] };
   });
   res.dpr = d;
-  check(d.off[0] === 1280 && d.on[0] <= 1000 && d.on[1] <= 563 && d.on[2] === d.on[0] && d.back[0] === 1280, `dprLite: the backing store never larger than the screen (a 1000 × 563 screen: ${d.off.slice(0, 2).join(' × ')} → ${d.on.slice(0, 2).join(' × ')}; off again: ${d.back.join(' × ')})`);
+  check(d.off[0] === VW && d.on[0] <= 1000 && d.on[1] <= 563 && d.on[2] === d.on[0] && d.back[0] === VW, `dprLite: the backing store never larger than the screen (a 1000 × 563 screen: ${d.off.slice(0, 2).join(' × ')} → ${d.on.slice(0, 2).join(' × ')}; off again: ${d.back.join(' × ')})`);
 }
 // the fallback forced: R11F_G11F_B10F refused → RGBA16F, the picture of the switches off
 if (info.ipu && !QUICK && MODE !== 'ab') {
