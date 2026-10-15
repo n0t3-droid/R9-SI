@@ -97,6 +97,15 @@ async function runPage(tag, dist) {
     return agents.length;
   }, [list, eye]);
   const unstage = () => ev(() => { const V = VR.game.villages; if (!V._own) return; const own = V._own; delete V.agents; V.agents = own; V.update = V._upd; V.updateBubbles = V._bub; V._staged = null; V._own = null; });
+  // a section of the page on its own: a failure is counted and logged, the stage cleared and the High preset back, and the
+  // next section still runs (a browser run is scarce: one broken picture must not cost the others)
+  const part = async (name, fn) => {
+    try { await fn(); }
+    catch (e) {
+      fails++; console.log(`  ✗ ${tag}: ${name} failed: ${String(e && e.stack || e).slice(0, 900)}`);
+      try { await unstage(); await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.horizon = 1; g.applySettings('*'); if (VR.Crowd && VR.Crowd.STREET && VR.Crowd.STREET._cap) { VR.Crowd.STREET.capDefault = VR.Crowd.STREET._cap; VR.Crowd.STREET.cap = VR.Crowd.STREET._capP; } }); } catch (_) { /* the page is gone */ }
+    }
+  };
   const measure = async () => {
     const rounds = [];
     for (let k = 0; k < 3; k++) {
@@ -151,13 +160,15 @@ async function runPage(tag, dist) {
   { const [yaw, pitch] = aim(px, pz, feet1, 1.62, tx, F + 1 + 8, tz); await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]); }
   await ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 6; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; });
   await wait(1500); await settle(40); await step(30);
-  const w1 = await warmFolk(3, 40);
   let pics = 0, want = 0;
-  want++; if (await shot('P1')) pics++;
-  const p1 = await ev(() => { const g = VR.game, V = g.villages, p = g.player, FG = VR.FolkGPU; let vis = 0, drawn = 0, near = 0; for (const a of V.agents) { if (!a.vis) continue; vis++; if (a.drawn) drawn++; if (Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) < 24) near++; } return { agents: V.agents.length, inView: vis, drawn, near, smooth: FG ? FG.stats.drawn : 0, shadows: FG ? FG.stats.shadows || 0 : 0 }; });
-  console.log(`  P1: ${JSON.stringify(p1)} (warm ${JSON.stringify(w1)})`);
+  await part('P1', async () => {
+    const w1 = await warmFolk(3, 40);
+    want++; if (await shot('P1')) pics++;
+    const p1 = await ev(() => { const g = VR.game, V = g.villages, p = g.player, FG = VR.FolkGPU; let vis = 0, drawn = 0, near = 0; for (const a of V.agents) { if (!a.vis) continue; vis++; if (a.drawn) drawn++; if (Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) < 24) near++; } return { agents: V.agents.length, inView: vis, drawn, near, smooth: FG ? FG.stats.drawn : 0, shadows: FG ? FG.stats.shadows || 0 : 0 }; });
+    console.log(`  P1: ${JSON.stringify(p1)} (warm ${JSON.stringify(w1)})`);
+  });
   // ---------------------------------------------------------------- the portrait: two people two blocks before the eye
-  {
+  await part('the portrait', async () => {
     const yaw = await ev(() => VR.game.player.yaw), eye = [px, feet1 + 1.62, pz];
     const fx = -Math.sin(yaw), fz = -Math.cos(yaw), sx = Math.cos(yaw), sz = -Math.sin(yaw);
     const at = (d, s) => [px + fx * d + sx * s, pz + fz * d + sz * s];
@@ -170,9 +181,9 @@ async function runPage(tag, dist) {
     want++; if (await shot('portrait')) pics++;
     if (info.on) check(w && w.drawn >= 2, `${tag}: the two at two blocks drawn smooth (${w ? w.drawn : 0})`);
     await unstage();
-  }
+  });
   // ---------------------------------------------------------------- the forty: costs on Balanced (voxel, smooth) and Very Low
-  {
+  await part('the forty', async () => {
     await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.horizon = 1; g.applySettings('*'); if (VR.Crowd && VR.Crowd.STREET) { VR.Crowd.STREET._cap = VR.Crowd.STREET.capDefault; VR.Crowd.STREET._capP = Object.assign({}, VR.Crowd.STREET.cap); VR.Crowd.STREET.capDefault = 64; VR.Crowd.STREET.cap.potato = 64; VR.Crowd.STREET.cap.low = 64; } });
     const [yaw, pitch] = aim(px, pz, feet1, 1.62, tx, F + 1 + 1.5, tz);
     await ev(([y, p]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = p; }, [yaw, pitch]);
@@ -209,9 +220,9 @@ async function runPage(tag, dist) {
     console.log(`measure ${tag} potato, the forty: ${JSON.stringify(costs[tag].potato)}`);
     await unstage();
     await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.horizon = 1; g.applySettings('*'); if (VR.Crowd && VR.Crowd.STREET && VR.Crowd.STREET._cap) { VR.Crowd.STREET.capDefault = VR.Crowd.STREET._cap; VR.Crowd.STREET.cap = VR.Crowd.STREET._capP; } });
-  }
+  });
   // ---------------------------------------------------------------- a village street: five villagers 3–6 blocks before the eye
-  if (site.village && site.village.plaza) {
+  await part('the street', async () => { if (site.village && site.village.plaza) {
     const P = site.village.plaza, vx = P.x + 0.5 - 6, vz = P.z + 0.5;
     const feet = await place(vx, vz, async () => (await groundY(vx, vz, 140)) + 1, 0, 0, 62);
     const yaw = -Math.PI / 2;   // (looking toward +x, across the plaza)
@@ -231,7 +242,7 @@ async function runPage(tag, dist) {
       await ev(() => { VR.game.settings.smoothFolk = 1; });
     }
     await unstage();
-  } else check(false, `${tag}: the village of cell 0,1 for the street`);
+  } else check(false, `${tag}: the village of cell 0,1 for the street`); });
   check(pics === want, `${tag}: every picture written (${pics} of ${want})`);
   const errs = logs.filter(l => l.startsWith('[pageerror]'));
   console.log(`--- ${tag} logs (${logs.length})`); for (const l of logs.slice(0, 12)) console.log(l);
