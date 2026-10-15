@@ -530,6 +530,14 @@
     };
     P.get = (x, y, z) => g.get(x - x0, y - y0, z - z0);
     P.tagAt = (x, y, z) => (P.get(x, y, z) >>> 26) & 7;
+    // (an ellipsoid with its material: a bun is hair, a chef's hat cloth — not the part's own tag, the head's skin)
+    P.ell = function (cx, cy, cz, rx, ry, rz, c, keep, t) {
+      for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) for (let z = Math.floor(cz - rz); z <= Math.ceil(cz + rz); z++) for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 + ((z - cz) / rz) ** 2 > 1) continue;
+        if (keep && !keep(x, y, z)) continue;
+        P.set(x, y, z, c, 0, t);
+      }
+    };
     P.paintT = (x, y, z, c, t) => { if (P.has(x, y, z)) P.set(x, y, z, c, 0, t); };
     return P;
   }
@@ -580,7 +588,149 @@
     const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult;
     return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[V.familyOf(L)] || 0.6, kid, stoop: L.age === 'elder' ? 0.12 : 0 });
   };
-  function buildPerson(L) {
+  // ============================== the fine face (t-folk, Echte Menschen: the smooth path only)
+  // The surface nets give a vertex the mean colour of the voxel faces round it, so a one-voxel eye or lip at 32 a block
+  // (3 cm) fades into the skin of the smooth head — the eyes thin slits, the lips gone. The smooth path takes the head at
+  // 64 a block: the 32-a-block head with its face wiped (the skin plain, the eye sockets filled, the nose and the glasses
+  // off) taken up smoothly (a fine voxel is set where the trilinear blend of the coarse voxels round it reaches ½: the
+  // corners round off, a one-voxel brim or braid stays), then the face drawn anew at 1.5 cm a voxel: the eyes three
+  // voxels wide — the white, the iris, the white — under the upper lid's line, the brows, a nose standing out from the
+  // bridge to its tip, two lips, a child's rosy cheeks, an elder's lines, the frames of glasses round the eyes and back to
+  // the ears, a moustache over the lower lip. The lids (blinking) and the talking mouth at the same scale.
+  // C: { head (the 32 head's VoxGrid), A (the skull), eyeY, skin, hair, eye, kid, elder, beard, glasses, frame, freckles,
+  // lashes, bald } → { head, lids, mouth }: VoxGrids with res 2 in fine units (a fine voxel X spans the head's
+  // [X/2, X/2 + ½]); head.face: the features' places in the head's units (the tests measure there)
+  function fineFace(C) {
+    const g = C.head, A = C.A, skin = C.skin;
+    const SK = (c, t) => ((c & 0xffffff) | (1 << 25) | ((t || TG.skin) << 26)) >>> 0;
+    // the coarse head wiped
+    const w = new Uint32Array(g.c.length);
+    for (let i = 0; i < g.c.length; i++) { const v = g.c[i]; if (!v) continue; const t = (v >>> 26) & 7; w[i] = t === TG.skin || t === TG.eye ? SK(skin) : v; }
+    const wi = (x, y, z) => { const X = x + g.ox, Y = y + g.oy, Z = z + g.oz; return g.in(X, Y, Z) ? g.i(X, Y, Z) : -1; };
+    const wat = (x, y, z) => { const i = wi(x, y, z); return i < 0 ? 0 : w[i]; };
+    for (const ex of A.eyes) { const i = wi(ex, C.eyeY, A.z0); if (i >= 0) w[i] = SK(skin); }
+    if (!C.kid) { const i = wi(0, 2, A.z0 - 1); if (i >= 0) w[i] = 0; }
+    if (C.glasses) for (let z = -g.oz; z < g.sz - g.oz; z++) for (let x = -g.ox; x < g.sx - g.ox; x++) { const i = wi(x, C.eyeY, z); if (i >= 0 && w[i] && ((w[i] >>> 26) & 7) === TG.metal) w[i] = 0; }
+    // its box, taken up to 64 a block (three fine voxels' margin round it: the nose's tip, the glasses' arms)
+    let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
+    for (let Y = 0; Y < g.sy; Y++) for (let Z = 0; Z < g.sz; Z++) for (let X = 0; X < g.sx; X++) if (w[g.i(X, Y, Z)]) { const x = X - g.ox, y = Y - g.oy, z = Z - g.oz; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z; }
+    const fx0 = 2 * x0 - 3, fy0 = 2 * y0 - 3, fz0 = 2 * z0 - 3, fx1 = 2 * x1 + 4, fy1 = 2 * y1 + 4, fz1 = 2 * z1 + 4;
+    const OX = -fx0, OY = -fy0, OZ = -fz0, SX = fx1 - fx0 + 1, SY = fy1 - fy0 + 1, SZ = fz1 - fz0 + 1;
+    const grid = () => { const q = new VR.VoxGrid(SX, SY, SZ, OX, OY, OZ); q.res = 2; return q; };
+    const F = grid();
+    for (let Y = fy0; Y <= fy1; Y++) for (let Z = fz0; Z <= fz1; Z++) for (let X = fx0; X <= fx1; X++) {
+      const x = Math.floor(X / 2), y = Math.floor(Y / 2), z = Math.floor(Z / 2), dx = X & 1 ? 1 : -1, dy = Y & 1 ? 1 : -1, dz = Z & 1 ? 1 : -1;
+      let s = 0, best = 0, bw = 0;
+      for (let k = 0; k < 8; k++) {
+        const ax = k & 1, ay = (k >> 1) & 1, az = (k >> 2) & 1;
+        const v = wat(x + (ax ? dx : 0), y + (ay ? dy : 0), z + (az ? dz : 0)); if (!v) continue;
+        const wt = (ax ? 0.25 : 0.75) * (ay ? 0.25 : 0.75) * (az ? 0.25 : 0.75);
+        s += wt; if (wt > bw) { bw = wt; best = v; }
+      }
+      if (s >= 0.5) F.c[F.i(X + OX, Y + OY, Z + OZ)] = best;
+    }
+    // the hollows no ray reaches (the hair's shell over the skull's rounded crown leaves tunnels): filled, so the mesh has
+    // no inner surfaces (a flood from the box's border through the empty voxels; what it does not reach is inside)
+    {
+      const N = F.c.length, seen = new Uint8Array(N), stack = [];
+      for (let b = 0; b < SY; b++) for (let c = 0; c < SZ; c++) for (let a = 0; a < SX; a++) {
+        if (a > 0 && a < SX - 1 && b > 0 && b < SY - 1 && c > 0 && c < SZ - 1) continue;
+        const i = F.i(a, b, c); if (!F.c[i] && !seen[i]) { seen[i] = 1; stack.push(i); }
+      }
+      const SXZ = SX * SZ;
+      while (stack.length) {
+        const i = stack.pop(), a = i % SX, c = ((i / SX) | 0) % SZ, b = (i / SXZ) | 0;
+        if (a > 0) { const j = i - 1; if (!seen[j] && !F.c[j]) { seen[j] = 1; stack.push(j); } }
+        if (a < SX - 1) { const j = i + 1; if (!seen[j] && !F.c[j]) { seen[j] = 1; stack.push(j); } }
+        if (c > 0) { const j = i - SX; if (!seen[j] && !F.c[j]) { seen[j] = 1; stack.push(j); } }
+        if (c < SZ - 1) { const j = i + SX; if (!seen[j] && !F.c[j]) { seen[j] = 1; stack.push(j); } }
+        if (b > 0) { const j = i - SXZ; if (!seen[j] && !F.c[j]) { seen[j] = 1; stack.push(j); } }
+        if (b < SY - 1) { const j = i + SXZ; if (!seen[j] && !F.c[j]) { seen[j] = 1; stack.push(j); } }
+      }
+      for (let i = 0; i < N; i++) if (!F.c[i] && !seen[i]) { const up = i + SXZ < N ? F.c[i + SXZ] : 0; F.c[i] = up || F.c[i - 1] || F.c[i + 1] || SK(skin); }
+    }
+    // ---- the face at 1.5 cm a voxel (fine units; the face looks toward −z; left and right mirrored about the skull's middle)
+    const idx = (q, X, Y, Z) => { const a = X + OX, b = Y + OY, c = Z + OZ; return q.in(a, b, c) ? q.i(a, b, c) : -1; };
+    const fget = (X, Y, Z) => { const i = idx(F, X, Y, Z); return i < 0 ? 0 : F.c[i]; };
+    const fset = (q, X, Y, Z, c, t) => { const i = idx(q, X, Y, Z); if (i >= 0) q.c[i] = SK(c, t); };
+    const frontZ = (X, Y) => { for (let Z = fz0; Z <= fz1; Z++) if (fget(X, Y, Z)) return Z; return null; };
+    // (the face is drawn on skin only: a ranger's visor, a fringe, a beard keep theirs — `over` paints on anything)
+    const skinAt = (X, Y, Z) => ((fget(X, Y, Z) >>> 26) & 7) === TG.skin;
+    const paint = (X, Y, c, t, over) => { const Z = frontZ(X, Y); if (Z !== null && (over || skinAt(X, Y, Z))) fset(F, X, Y, Z, c, t); };
+    const bL = A.xl + A.xr;                       // the left one of the two middle columns (the bridge, the philtrum)
+    const mir = (X) => 2 * bL + 1 - X;
+    const both = (X, Y, c, t, over) => { paint(X, Y, c, t, over); paint(mir(X), Y, c, t, over); };
+    const Ye = 2 * C.eyeY + 1, eL = bL - 2;      // the eye row; the left iris's column (the eye: eL − 1 … eL + 1)
+    const LASH = 0x2A1D1C, PINK = 0xFF7E86;
+    // the eyes: the white, the iris, the white, a voxel deep in a shallow socket (the lids close it); the iris dark enough
+    // to read on every skin, the outer white a shade greyer (the eye's round)
+    const iris = mix(C.eye, 0x0A0806, 0.35), white = 0xF2EEE6, whiteO = 0xDED8CE;
+    const eyeAt = [];
+    for (const X0 of [eL - 1, eL, eL + 1]) for (const X of [X0, mir(X0)]) {
+      const Z = frontZ(X, Ye); if (Z === null || !skinAt(X, Ye, Z)) continue;
+      const c = X0 === eL ? iris : X0 === eL - 1 ? whiteO : white;
+      F.c[idx(F, X, Ye, Z)] = 0; fset(F, X, Ye, Z + 1, c, TG.eye); eyeAt.push([X, Z]);
+    }
+    // the upper lid's line over the eye (darker with lashes, a flick at the outer corner), a shade under it
+    // (the features that must stay crisp carry a tag of their own — the lid's line the eye's, the brows the hair's, the
+    // lips another: the smooth surface keeps a crease where two tags meet instead of blending their colours)
+    const lid = mix(skin, LASH, C.kid ? 0.42 : C.lashes ? 0.7 : 0.55);
+    for (const X of [eL - 1, eL, eL + 1]) { both(X, Ye + 1, lid, TG.eye); both(X, Ye - 1, mul(skin, 0.94)); }
+    if (C.lashes && !C.kid) both(eL - 2, Ye + 1, mix(skin, LASH, 0.5), TG.eye);
+    // the brows: four voxels from over the eye's inner corner outward, the hair's colour over the skin (an elder's greyer)
+    const browC = C.elder ? mix(skin, mix(C.hair, 0xE6E6E6, 0.45), 0.5) : C.bald ? mix(skin, 0x3A2A20, 0.45) : mix(skin, mul(C.hair, 0.72), 0.62);
+    for (let X = eL - 2; X <= eL + 1; X++) both(X, Ye + 2, browC, TG.hair);
+    // the nose: the bridge between the eyes stays in the face's plane (the eyes are a voxel in), below it the nose stands
+    // a voxel out down to its tip; a child's is a small button. The nostrils' wings a shade beside the tip
+    // (a grown-up's tip, the nose's lowest row, two voxels out: the smoothing takes some of it back)
+    const noseRows = C.kid ? [Ye - 2, Ye - 3] : [Ye - 1, Ye - 2, Ye - 3];
+    for (const Y of noseRows) for (const X of [bL, bL + 1]) {
+      const Z = frontZ(X, Y); if (Z === null || !skinAt(X, Y, Z)) continue;
+      fset(F, X, Y, Z - 1, mul(skin, 1.02));
+      if (!C.kid && Y === Ye - 3) fset(F, X, Y, Z - 2, mul(skin, 1.03));
+    }
+    both(bL - 1, Ye - 3, mul(skin, 0.9));
+    // the lips under it: the upper lip four voxels wide, darker at the corners, the lower lip fuller in the middle; an
+    // elder's thinner; a moustache over the beard's lower lip
+    const ty = Ye - 4, by = Ye - 5;
+    // (the upper lip the skin darkened toward a deep rose, the lower one lighter toward a soft rose — it catches the light:
+    // on a fair skin the rose reads, on a dark one the lower lip's lighter tone)
+    const kL = C.elder ? 0.7 : C.kid ? 0.85 : 1;
+    const lipU = mix(mul(skin, 0.75), 0xA84050, 0.32 * kL), lipL = mix(skin, 0xC86A78, 0.42 * kL), lipC = mix(mul(skin, 0.8), 0xA84050, 0.2 * kL);
+    if (C.beard) {
+      const mo = mul(C.hair, 0.95);
+      both(bL - 1, ty, mo, TG.hair, true); both(bL, ty, mo, TG.hair, true);
+      both(bL, by, lipL, TG.other, true);
+    } else if (C.kid) { both(bL, ty, lipU, TG.other); both(bL, by, lipL, TG.other); }
+    else { both(bL, ty, lipU, TG.other); both(bL - 1, ty, lipC, TG.other); both(bL, by, lipL, TG.other); }
+    // cheeks, freckles, an elder's lines
+    if (C.kid) for (const X of [eL - 1, eL]) both(X, Ye - 3, mix(skin, PINK, 0.24));
+    if (C.freckles) for (const [X, Y] of [[eL - 1, Ye - 2], [eL, Ye - 3], [eL + 1, Ye - 2]]) both(X, Y, mul(skin, 0.86));
+    if (C.elder) { both(eL - 2, Ye, mul(skin, 0.9)); both(eL - 2, Ye - 1, mul(skin, 0.92)); both(bL - 2, ty, mul(skin, 0.92)); both(bL - 2, ty + 1, mul(skin, 0.94)); }
+    // glasses: the frame's top over each eye and across the nose's root (the bridge), its outer sides, a fine lower rim (half
+    // the frame's tone: a full dark ring read as a mask), the arms back over the ears
+    if (C.glasses) {
+      const fr = C.frame, low = mix(skin, fr, 0.4);
+      for (let X = eL - 2; X <= eL + 2; X++) { both(X, Ye + 1, fr, TG.metal); if (X <= eL + 1) both(X, Ye - 1, low, TG.metal); }
+      both(eL - 2, Ye, fr, TG.metal);
+      for (let Z = fz0; Z <= 1; Z++) for (const side of [-1, 1]) {
+        // the head's side at the frame's row: the outermost voxel this deep, the arm a voxel beyond it
+        let X = null;
+        if (side < 0) { for (let x = fx0; x <= fx1; x++) if (fget(x, Ye + 1, Z)) { X = x - 1; break; } }
+        else { for (let x = fx1; x >= fx0; x--) if (fget(x, Ye + 1, Z)) { X = x + 1; break; } }
+        if (X !== null && (side < 0 ? X < eL - 1 : X > mir(eL - 1))) fset(F, X, Ye + 1, Z, fr, TG.metal);
+      }
+    }
+    // the lids (drawn while blinking): skin in each eye's socket; the talking mouth: dark before the lips
+    const lids = grid(), mouth = grid();
+    for (const [X, Z] of eyeAt) fset(lids, X, Ye, Z, mul(skin, 0.9));
+    for (const X of [bL, bL + 1]) for (const Y of [ty, by]) { const Z = frontZ(X, Y); if (Z !== null) fset(mouth, X, Y, Z - 1, 0x5A1E26); }
+    // where the features are (the head's units)
+    const hu = (X) => (X + 0.5) / 2;
+    F.face = { eyesX: [hu(eL), hu(mir(eL))], eyeY: (Ye + 0.5) / 2, mouthX: (bL + 1) / 2, mouthY: (by + 1) / 2 + 0.25, noseY: (Ye - 2) / 2 + 0.25, cheekX: hu(eL), cheekY: hu(Ye - 2) };
+    return { head: F, lids, mouth };
+  }
+  function buildPerson(L, opts) {
     const kid = L.age === 'child', elder = L.age === 'elder';
     const role = V.ROLES[L.role] || V.ROLES.farmer;
     const sd = strHash(V.lookKey(L));
@@ -660,7 +810,7 @@
       for (let y = 0; y <= A.top; y++) for (let x = A.xl - 1; x <= A.xr + 1; x++) H(x, y, A.z1 + 1);
       for (let x = A.xl - 1; x <= A.xr + 1; x++) H(x, 0, A.z1 + 2);
     } else if (hs === 'bun') {
-      head.ell(cx, A.top + 1.5, A.z1 + 1.5, 1.7, 1.5, 1.7, hcF);
+      head.ell(cx, A.top + 1.5, A.z1 + 1.5, 1.7, 1.5, 1.7, hcF, null, TG.hair);
       for (let x = A.xl + 1; x <= A.xr - 1; x++) head.set(x, A.top + 1, A.z1, mul(hc, 0.75), 0, TG.hair);
     } else if (hs === 'pony') {
       const tie = [0xE84A6A, 0x4AA0E8, 0xF0C040, 0x7AD07A][(sd >> 3) & 3], px = Math.round(cx);
@@ -681,7 +831,7 @@
         head.set(sx, (kid ? -4 : -6), A.z1, 0xE84A6A, 0, TG.other);
       }
     } else if (hs === 'afro') {
-      head.ell(cx, A.top - 0.5, zc + 0.3, (A.xr - A.xl) / 2 + 3, 4.2, 4.2, hcF, (x, y, z) => !(z <= A.z0 && y < A.top) && y >= 2 && !head.has(x, y, z));
+      head.ell(cx, A.top - 0.5, zc + 0.3, (A.xr - A.xl) / 2 + 3, 4.2, 4.2, hcF, (x, y, z) => !(z <= A.z0 && y < A.top) && y >= 2 && !head.has(x, y, z), TG.hair);
     }
     // beard and moustache
     if (L.beard && !kid) {
@@ -700,10 +850,11 @@
       F(-1, my, mix(hc, LIP, 0.2), TG.hair); F(1, my, mix(hc, LIP, 0.2), TG.hair);
     }
     // glasses (scholars, teachers, some elders): rims round the eyes, the bridge, the arms over the ears
-    if (role.glasses || (elder && rnd(3) < 0.45)) {
+    const glasses = !!(role.glasses || (elder && rnd(3) < 0.45)), frameC = elder ? 0x5A4A30 : 0x2A2A32;
+    if (glasses) {
       // (thin dark frames at 3 cm a voxel: the bridge over the nose between the eyes, the outer rims on the face's edge
       // beside them, the arms back over the ears; the brows stay — a light frame over the brows read as goggles)
-      const fr = elder ? 0x5A4A30 : 0x2A2A32, rim = mix(skin, fr, 0.55);   // (the rims on the face half the frame's tone: a dark band read as sunglasses)
+      const fr = frameC, rim = mix(skin, fr, 0.55);   // (the rims on the face half the frame's tone: a dark band read as sunglasses)
       F(0, eyeY, rim, TG.metal); F(A.xl, eyeY, rim, TG.metal); F(A.xr, eyeY, rim, TG.metal);
       for (const sx of [A.xl - 1, A.xr + 1]) for (let z = A.z0 + 1; z <= 0; z++) if (!head.has(sx, eyeY, z)) head.set(sx, eyeY, z, fr, 0, TG.metal);
     }
@@ -716,14 +867,14 @@
       disc(H1 - 1, 5.6, straw, 0, TG.other); disc(H1, 2.8, straw, 0, TG.other); disc(H1 + 1, 2.6, straw, 0, TG.other); disc(H1, 2.9, 0xB04A36, 2.3);
     } else if (hat === 'chef') {
       for (let y = A.top; y <= H1; y++) disc(y, 3.1, 0xFFFFFF, 2.2);
-      head.ell(cx, H1 + 2.5, zc, 3.8, 2.4, 3.6, (x, y, z) => mul(0xF8F8F4, 0.94 + H3(x, y, z, 14) * 0.08), (x, y) => y > H1);
+      head.ell(cx, H1 + 2.5, zc, 3.8, 2.4, 3.6, (x, y, z) => mul(0xF8F8F4, 0.94 + H3(x, y, z, 14) * 0.08), (x, y) => y > H1, TG.cloth);
     } else if (hat === 'hard') {
-      head.ell(cx, A.top - 0.5, zc, 3.9, 3.4, 4.1, (x, y, z) => (Math.abs(x - cx) < 0.6 && y > A.top + 1) ? 0xF8C84A : mul(0xF0A020, 0.95 + H3(x, y, z, 15) * 0.08), (x, y, z) => y >= A.top - 1 && !(z <= A.z0 && y < A.top));
-      for (let x = A.xl - 1; x <= A.xr + 1; x++) for (let z = A.z0 - 2; z <= A.z0 - 1; z++) head.set(x, A.top - 1, z, 0xE89418, 0, TG.cloth);
+      head.ell(cx, A.top - 0.5, zc, 3.9, 3.4, 4.1, (x, y, z) => (Math.abs(x - cx) < 0.6 && y > A.top + 1) ? 0xF8C84A : mul(0xF0A020, 0.95 + H3(x, y, z, 15) * 0.08), (x, y, z) => y >= A.top - 1 && !(z <= A.z0 && y < A.top), TG.other);
+      for (let x = A.xl - 1; x <= A.xr + 1; x++) for (let z = A.z0 - 2; z <= A.z0 - 1; z++) head.set(x, A.top - 1, z, 0xE89418, 0, TG.other);
     } else if (hat === 'top') {
       disc(H1, 4.2, 0x1A1A22); for (let y = H1 + 1; y <= H1 + 5; y++) disc(y, 2.7, y === H1 + 1 ? 0x8A2A3A : mul(0x22222A, 0.96 + H3(0, y, 0, 3) * 0.08));
     } else if (hat === 'visor') {
-      head.ell(cx, A.top - 2, zc, 3.9, 4.4, 4.1, (x, y, z) => mul(0x3A4A3A, 0.93 + H3(x, y, z, 16) * 0.1), (x, y, z) => y >= eyeY - 1 && !(z <= A.z0 && y < A.top - 1 && x >= A.xl && x <= A.xr));
+      head.ell(cx, A.top - 2, zc, 3.9, 4.4, 4.1, (x, y, z) => mul(0x3A4A3A, 0.93 + H3(x, y, z, 16) * 0.1), (x, y, z) => y >= eyeY - 1 && !(z <= A.z0 && y < A.top - 1 && x >= A.xl && x <= A.xr), TG.cloth);
       for (let x = A.xl; x <= A.xr; x++) { head.set(x, eyeY, A.z0 - 1, 0x3AF0FF, 1, TG.metal); head.set(x, eyeY + 1, A.z0 - 1, 0x1C2A2C, 0, TG.metal); }
     } else if (hat === 'goggles') {
       for (let z = A.z0 + 1; z <= A.z1 + 1; z++) for (const sx of [A.xl - 1, A.xr + 1]) head.set(sx, A.top - 1, z, 0x5A3A2A, 0, TG.leather);
@@ -739,8 +890,8 @@
       head.set(A.xr + 1, H1, A.z0 + 1, 0xE84A6A, 0, TG.other); head.set(A.xr + 2, H1, A.z0 + 1, 0xF6D23A, 0, TG.other);
     } else if (hat === 'beanie') {
       const bc = [0xE84A4A, 0x4A8AE8, 0xF0C040, 0x6AC06A, 0xC070E0][(sd >> 5) % 5];
-      head.ell(cx, A.top - 0.5, zc, 3.9, 3, 3.9, (x, y) => (y & 1) ? bc : mul(bc, 0.84), (x, y, z) => y >= A.top - 1 && !(z <= A.z0 && y < A.top));
-      head.ell(cx, A.top + 3, zc, 1.1, 1.1, 1.1, 0xFFFFFF);
+      head.ell(cx, A.top - 0.5, zc, 3.9, 3, 3.9, (x, y) => (y & 1) ? bc : mul(bc, 0.84), (x, y, z) => y >= A.top - 1 && !(z <= A.z0 && y < A.top), TG.cloth);
+      head.ell(cx, A.top + 3, zc, 1.1, 1.1, 1.1, 0xFFFFFF, null, TG.cloth);
     } else if (hat === 'kidcap') {
       const bc = [0xE84A4A, 0x4A8AE8, 0x40C0C0, 0xF08A30][(sd >> 7) & 3];
       for (let y = A.top; y <= H1; y++) disc(y, 3.3, bc);
@@ -1088,7 +1239,9 @@
     // ============================== the rig
     const hipY = S.hip, headY = S.head, shY = S.sh, hx = S.hx;
     const legXl = -S.legX - (kid ? 0 : 0), legXr = S.legX;
-    return {
+    // (the smooth path: the head, its lids and its talking mouth at 64 a block — fineFace)
+    const fine = opts && opts.fine ? fineFace({ head: head.g, A, eyeY, skin, hair: hc, eye: L.eye, kid, elder, beard: !!(L.beard && !kid), glasses, frame: frameC, freckles: !!L.freckles, lashes: !!L.lashes, bald }) : null;
+    const def = {
       // stride: the largest swing of a thigh (rad) the outfit allows — a robe's or a coat's legs stay inside its hem
       unit: 32, h: kid ? 1.1 : 1.8, w: 0.3, gait: 'biped', kid, eyeY, person: true, fam, stride: STRIDE[fam] || 0.6,
       parts: { hips, body, head, arm_l: upper, arm_r: upper, fore_l: foreL, fore_r: foreR, leg_l: thigh, leg_r: thigh, shin_l: shin, shin_r: shin, lids, mouth },
@@ -1097,6 +1250,8 @@
       order: ['hips', 'body', 'head', 'lids', 'mouth', 'arm_l', 'arm_r', 'fore_l', 'fore_r', 'leg_l', 'leg_r', 'shin_l', 'shin_r'],
       skel: S,
     };
+    if (fine) def.fine = fine;
+    return def;
   }
 
   // half-resolution copy for distant villagers
@@ -1118,9 +1273,11 @@
   const parts = (P) => { const o = {}; for (const k in P) o[k] = { grid: P[k].g || P[k], pivot: [0, 0, 0] }; return o; };
   V.JOINTS = ['body', 'head', 'arm_l', 'arm_r', 'fore_l', 'fore_r', 'leg_l', 'leg_r', 'shin_l', 'shin_r'];
   // the villagers: buildPerson (t-folk); the trailer heroes: their own build
-  const buildFor = (L) => (L.role === 'hero' ? build(L) : buildPerson(L));
+  const buildFor = (L, opts) => (L.role === 'hero' ? build(L) : buildPerson(L, opts));
   V.buildPerson = buildPerson;
   V.buildHiRes = function (L) { const m = buildFor(L); m.parts = parts(m.parts); return m; };
+  // the smooth path's rig (folksmooth.js FS.personFromLook, in the worker): buildHiRes and the fine head (def.fine)
+  V.buildFine = function (L) { const m = buildFor(L, { fine: true }); m.parts = parts(m.parts); return m; };
   V.buildLow = function (L) {
     const m = buildFor(L);
     const out = {}; for (const k in m.parts) out[k] = { grid: downsample(m.parts[k].g || m.parts[k]), pivot: [0, 0, 0] };

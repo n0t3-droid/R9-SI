@@ -29,11 +29,12 @@
       h1 = Math.imul(h1 ^ i, 16777619); h1 = Math.imul(h1 ^ v, 16777619);
       h2 = Math.imul(h2 ^ (v + i * 0x45D9F3B), 0x2C1B3C6D); h2 ^= h2 >>> 15;
     }
-    return g.sx + 'x' + g.sy + 'x' + g.sz + '@' + g.ox + ',' + g.oy + ',' + g.oz + ':' + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
+    return (g.res > 1 ? 'r' + g.res + '/' : '') + g.sx + 'x' + g.sy + 'x' + g.sz + '@' + g.ox + ',' + g.oy + ',' + g.oz + ':' + (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36);
   };
 
   // ---------------------------------------------------------------- a part's grid → the smooth mesh
-  // g: { sx, sy, sz, ox, oy, oz, c: Uint32Array } (a VoxGrid or its copy); opts: the smoothing (FS.OPTS)
+  // g: { sx, sy, sz, ox, oy, oz, c: Uint32Array, res } (a VoxGrid or its copy; res 2: a finer grid — the fine head at 64 a
+  // block — its voxel x spans [(x − ox) / 2, (x − ox + 1) / 2] of the part's units); opts: the smoothing (FS.OPTS)
   // → { data: Uint8Array (20 bytes a vertex), idx: Uint16Array, nv, nt, ms } in the part's own units (a voxel x spans
   // [x − ox, x − ox + 1], as meshGrid); null when the grid is empty or too big for 16-bit indices
   const SVB = () => VR.SmoothVox && VR.SmoothVox.BITS;
@@ -49,7 +50,9 @@
       any = true;
     }
     if (!any) return null;
-    const o = Object.assign({}, FS.OPTS, opts || {});
+    const res = g.res > 1 ? g.res : 1, inv = 1 / res;
+    // (a finer grid's occlusion looks as far as the coarse one's: its rays res times as many voxels long)
+    const o = Object.assign({}, FS.OPTS, res > 1 ? { aoScale: res } : null, opts || {});
     let m = SV.nets({ NX: g.sx, NY: g.sy, NZ: g.sz, V, step: 1 }, o);
     if (o.flat !== false) m = SV.flatten(m);
     if (m.nv > 65535) return null;
@@ -58,7 +61,7 @@
     // the emissive flag in the alpha byte
     const nv = m.nv, buf = new ArrayBuffer(nv * 20), f32 = new Float32Array(buf), i8 = new Int8Array(buf), u8 = new Uint8Array(buf);
     for (let i = 0; i < nv; i++) {
-      f32[i * 5] = m.pos[i * 3] - g.ox; f32[i * 5 + 1] = m.pos[i * 3 + 1] - g.oy; f32[i * 5 + 2] = m.pos[i * 3 + 2] - g.oz;
+      f32[i * 5] = (m.pos[i * 3] - g.ox) * inv; f32[i * 5 + 1] = (m.pos[i * 3 + 1] - g.oy) * inv; f32[i * 5 + 2] = (m.pos[i * 3 + 2] - g.oz) * inv;
       const nx = m.nrm[i * 3], ny = m.nrm[i * 3 + 1], nz = m.nrm[i * 3 + 2];
       i8[i * 20 + 12] = Math.round(nx * 127); i8[i * 20 + 13] = Math.round(ny * 127); i8[i * 20 + 14] = Math.round(nz * 127);
       const em = (m.val[i] & B.EMIS) !== 0;
@@ -106,7 +109,7 @@
     if (x1 < 0) return null;
     const sx = x1 - x0 + 1, sy = y1 - y0 + 1, sz = z1 - z0 + 1, c = new Uint32Array(sx * sy * sz);
     for (let y = 0; y < sy; y++) for (let z = 0; z < sz; z++) { const s = ((y + y0) * SZ + z + z0) * SX + x0; c.set(C.subarray(s, s + sx), (y * sz + z) * sx); }
-    return { sx, sy, sz, ox: g.ox - x0, oy: g.oy - y0, oz: g.oz - z0, c };
+    return { sx, sy, sz, ox: g.ox - x0, oy: g.oy - y0, oz: g.oz - z0, c, res: g.res > 1 ? g.res : 1 };
   };
 
   // ---------------------------------------------------------------- a person: every part's mesh in one buffer
@@ -151,17 +154,19 @@
 
   // ---------------------------------------------------------------- a person from its look, all in the worker
   // The rig's grids are built where they are meshed (the worker has folkmodel.js: build.js) — building them on the main
-  // thread cost some 6 ms a person and cutting and hashing them as much again. → FS.person's answer and the rig's draw
-  // record { unit, layout, rig, order, kid, h } (rig), or { error }
+  // thread cost some 6 ms a person and cutting and hashing them as much again. The head, its lids and its talking mouth
+  // come at 64 a block (folkmodel.js Folk.buildFine: the face drawn at 1.5 cm a voxel — a one-voxel eye at 32 a block faded
+  // into the smooth skin). → FS.person's answer and the rig's draw record { unit, layout, rig, order, kid, h } (rig), or
+  // { error }
   FS.personFromLook = function (look, opts) {
     const Folk = VR.Folk; if (!Folk || !Folk.buildHiRes) return { error: 'no folk rig', transfer: [] };
     const t0 = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
-    let def; try { def = Folk.buildHiRes(look); } catch (e) { return { error: 'rig: ' + (e && e.message), transfer: [] }; }
+    let def; try { def = Folk.buildFine ? Folk.buildFine(look) : Folk.buildHiRes(look); } catch (e) { return { error: 'rig: ' + (e && e.message), transfer: [] }; }
     if (!def || !def.person) return { error: 'not a person', transfer: [] };
     const parts = [], seen = new Map();
     def.order.forEach((name, bone) => {
       const pr = def.parts[name]; if (!pr) return;
-      const g0 = pr.grid || pr;
+      const g0 = (def.fine && def.fine[name]) || pr.grid || pr;
       let key = seen.get(g0);
       if (key === undefined) { const c = FS.crop(g0); if (!c) { seen.set(g0, null); return; } key = FS.keyOf(c); seen.set(g0, key); parts.push(Object.assign({ key, bone }, c)); }
       else if (key !== null) parts.push({ key, bone });

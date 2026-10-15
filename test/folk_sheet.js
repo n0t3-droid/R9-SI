@@ -100,10 +100,14 @@ const cast = [
   ['mayor', 'adult', 909, null], ['builder', 'adult', 1010, null], ['office', 'adult', 1111, null], ['child', 'child', 1212, 'hall'],
 ];
 const meshCache = new Map(); let tParts = 0, tMs = 0, hits = 0;
+// (smooth: as the worker meshes a person — folksmooth.js FS.personFromLook — the head, its lids and its talking mouth at
+// 64 a block, Folk.buildFine's def.fine, every part cut to what it holds)
 function partMeshes(def, smooth) {
   const out = {};
   for (const name in def.parts) {
-    const g = def.parts[name].grid, key = (smooth ? 's:' : 'v:') + FS.keyOf(g);
+    const g = smooth ? FS.crop((def.fine && def.fine[name]) || def.parts[name].grid) : def.parts[name].grid;
+    if (!g) continue;
+    const key = (smooth ? 's:' : 'v:') + FS.keyOf(g);
     let m = meshCache.get(key);
     if (!m) { if (smooth) { const r = FS.mesh(g); tMs += r ? r.ms : 0; m = unpack(r); } else m = unpack(V.meshVoxGrid(g)); meshCache.set(key, m); } else hits++;
     tParts++;
@@ -116,7 +120,7 @@ function drawPerson(cv, def, meshes, x, z, yaw, pose, scale, hide) {
   const mats = FS.rigMats(def, base, pose, {});
   for (const name of def.order) { if (hide && hide[name]) continue; const M = meshes[name]; if (M) cv.mesh(M, mats[name]); }
 }
-const people = cast.map(([role, age, seed, style]) => { const L = Folk.look(seed, role, age, null, style); return { L, def: Folk.buildHiRes(L), kid: age === 'child' }; });
+const people = cast.map(([role, age, seed, style]) => { const L = Folk.look(seed, role, age, null, style); return { L, def: Folk.buildFine(L), kid: age === 'child' }; });
 const idle = FA.sample(FA.clips.idle, 0.7, {});
 const BG = [0.62, 0.74, 0.88, 0.86, 0.84, 0.8];
 for (const smooth of [false, true]) {
@@ -145,7 +149,7 @@ for (const smooth of [false, true]) {
 {
   // the hall city's townsfolk (villagers.js V.WEISS): a robe, a coat, a tunic, a gown and a cape twice each, smooth
   const want = ['robe', 'coat', 'tunic', 'gown', 'cape', 'robe', 'coat', 'tunic', 'gown', 'cape'], hall = [];
-  for (const g of want) for (let s2 = 1 + hall.length * 97; s2 < 5000; s2++) { const L = Folk.look(s2, s2 & 1 ? 'crafter' : 'gardener', 'adult', null, 'hall'); if (L.garb === g) { hall.push({ L, def: Folk.buildHiRes(L), kid: false }); break; } }
+  for (const g of want) for (let s2 = 1 + hall.length * 97; s2 < 5000; s2++) { const L = Folk.look(s2, s2 & 1 ? 'crafter' : 'gardener', 'adult', null, 'hall'); if (L.garb === g) { hall.push({ L, def: Folk.buildFine(L), kid: false }); break; } }
   const cv = new Canvas(1280, 720, BG);
   cv.cam([0, 1.45, -5.2], [0, 1.0, 0], 50);
   hall.forEach((p, i) => drawPerson(cv, p.def, partMeshes(p.def, true), (i - (hall.length - 1) / 2) * 0.62, (i & 1) * 0.35, 0.25 * ((i % 3) - 1) + (i >= 5 ? Math.PI : 0), idle, 1, { lids: true, mouth: true }));
@@ -158,7 +162,7 @@ for (const smooth of [false, true]) {
   for (let s2 = 1; s2 < 999; s2++) { const L = Folk.look(s2, 'crafter', 'adult'); if (L.beard) { six[0] = L; break; } }
   const cv = new Canvas(1280, 720, BG);
   cv.cam([0, 1.5, -2.0], [0, 1.45, 0], 36);
-  six.forEach((L, i) => { const def = Folk.buildHiRes(L); drawPerson(cv, def, partMeshes(def, true), (i - 2.5) * 0.36, 0, 0, idle, L.age === 'child' ? 0.82 : 1, { lids: true, mouth: true }); });
+  six.forEach((L, i) => { const def = Folk.buildFine(L); drawPerson(cv, def, partMeshes(def, true), (i - 2.5) * 0.36, 0, 0, idle, L.age === 'child' ? 0.82 : 1, { lids: true, mouth: true }); });
   fs.writeFileSync(path.join(OUT, 'folk_sheet_faces.png'), cv.png());
   check(cv.drawn > 50000, `six faces at two blocks, smooth (${cv.drawn} pixels)`);
 }

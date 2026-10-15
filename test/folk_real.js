@@ -133,10 +133,12 @@ function closed(mesh) {
   for (const i of P.idx) if (i >= P.nv) inRange = false;
   check(!P.error && bonesOk && inRange && used.size >= def.order.length - 2, `a person in one buffer: ${P.nv} vertices, ${P.nt} triangles, ${used.size} parts named (of ${def.order.length}), indices in range, ${P.ms.toFixed(0)} ms meshing`);
   check(used.has(def.order.indexOf('arm_l')) && used.has(def.order.indexOf('arm_r')), 'the left and the right arm: one mesh, two parts');
-  // the worker's way (folksmooth.js FS.personFromLook): the look in, the rig built, cut, meshed and merged there, the
-  // rig's joints back for the draw — the same buffer as the parts sent from outside
-  const Q = FS.personFromLook(L);
-  check(!Q.error && Q.nv === P.nv && Q.nt === P.nt && Q.rig && Q.rig.order.length === def.order.length && JSON.stringify(Q.rig.layout) === JSON.stringify(def.layout), `a person from its look alone: ${Q.nv} vertices, the rig's joints back (built in ${(Q.buildMs || 0).toFixed(1)} ms)`);
+  // the worker's way (folksmooth.js FS.personFromLook): the look in, the rig built (with the fine head: §2b), cut, meshed
+  // and merged there, the rig's joints back for the draw — the same buffer as the same parts sent from outside
+  const Q = FS.personFromLook(L), dF = Folk.buildFine(L), partsF = [], seenF = new Map();
+  dF.order.forEach((name, bone) => { const g = (dF.fine && dF.fine[name]) || dF.parts[name].grid; let k = seenF.get(g); if (k === undefined) { const cg = FS.crop(g); if (!cg) return; k = FS.keyOf(cg); seenF.set(g, k); partsF.push(Object.assign({ key: k, bone }, cg)); } else partsF.push({ key: k, bone }); });
+  const PF = FS.person({ parts: partsF });
+  check(!Q.error && Q.nv === PF.nv && Q.nt === PF.nt && Q.rig && Q.rig.order.length === def.order.length && JSON.stringify(Q.rig.layout) === JSON.stringify(def.layout), `a person from its look alone: ${Q.nv} vertices, the rig's joints back (built in ${(Q.buildMs || 0).toFixed(1)} ms)`);
   check(FS.personFromLook(Folk.heroLook({ suit: 0 })).error === 'not a person', 'the trailer heroes keep their own build (no smooth mesh)');
   // the smooth person is posed exactly as the voxel one: FolkSmooth.rigMats (folkgpu.js's bones) against the matrices
   // entities.js drawModel hands the GL for every part, with a walking pose, a turn, a pitch and a child's scale
@@ -169,6 +171,76 @@ function closed(mesh) {
     console.log(`    ${style || 'village'}: 40 people, ${hits} part meshes from the LRU, ${miss} made (${ms.toFixed(0)} ms), ${(bytes / 40 / 1024).toFixed(0)} KB and ${(nt / 40) | 0} triangles a person, the LRU ${(FS.cache.bytes / 1048576).toFixed(1)} MB`);
     check(rate >= 0.4, `${style || 'village'}: the LRU's hit rate over 40 villagers ${(rate * 100).toFixed(0)} % (≥ 40 %)`);
   }
+}
+
+// ---------------------------------------------------------------- §2b the fine face
+// The surface nets give every vertex the mean colour of the voxel faces round it: a one-voxel eye or lip at 32 a block
+// (3 cm) faded into the skin of the smooth head (folk_sheet_portrait.png: the eyes thin slits, the lips gone). The smooth
+// path builds the head at 64 a block (Folk.buildFine: the 32-a-block head's skull, hair, beard and hat taken up smoothly,
+// the face drawn anew at 1.5 cm a voxel — eyes with their whites round a dark iris in a shallow socket, the upper lid's
+// line, brows, a nose standing out with its tip, two lips; the blink lids and the talking mouth at the same scale).
+// Measured on the head's mesh as the worker makes it (in the head's own units, 32 a block: the fine mesh is scaled down)
+console.log('§2b the fine face');
+{
+  const beardL = (() => { for (let s = 1; s < 999; s++) { const q = Folk.look(s, 'crafter', 'adult'); if (q.beard) return q; } })();
+  const cast = [[Object.assign(Folk.look(22, 'scholar', 'adult'), { hs: 'short' }), 'a scholar with glasses'], [Folk.look(11, 'crafter', 'adult'), 'a crafter'],
+    [Folk.look(77, 'child', 'child'), 'a child'], [beardL, 'a bearded crafter'], [Folk.look(808, 'elder', 'elder'), 'an elder'], [Folk.look(4, 'crafter', 'adult', null, 'hall'), 'a Weißstadt crafter']];
+  // (rosy: the red against the green and blue — a ratio, so the faces' shading does not change it)
+  const rosy = (u8, i) => u8[i * 20 + 16] / Math.max(1, (u8[i * 20 + 17] + u8[i * 20 + 18]) / 2), lumOf = (u8, i) => u8[i * 20 + 16] * 0.3 + u8[i * 20 + 17] * 0.59 + u8[i * 20 + 18] * 0.11;
+  for (const [L, who] of cast) {
+    const def = Folk.buildFine ? Folk.buildFine(L) : null, fh = def && def.fine && def.fine.head;
+    check(!!fh && fh.res === 2 && !!def.fine.lids && !!def.fine.mouth, `${who}: the smooth path's head, lids and mouth at 64 a block`);
+    if (!fh) continue;
+    const coarse = def.parts.head.grid;
+    const c = FS.crop(fh), m = FS.mesh(c), cl = closed(m), m32 = FS.mesh(FS.crop(coarse));
+    console.log(`    ${who}: the fine head ${m.nv} vertices, ${m.nt} triangles (at 32 a block ${m32.nv} and ${m32.nt}), ${m.ms.toFixed(1)} ms; ${cl.odd} open edges of ${cl.edges}`);
+    check(cl.odd === 0, `${who}: the fine head's mesh is closed`);
+    check(m.nt <= 5000, `${who}: the fine head within its budget (${m.nt} triangles ≤ 5000)`);
+    // its place: the fine mesh in the head's own units lies where the coarse head is (± a voxel)
+    const { f32, u8 } = unpack(m.data, m.nv);
+    let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, by1 = -Infinity; for (let i = 0; i < m.nv; i++) { bx0 = Math.min(bx0, f32[i * 5]); bx1 = Math.max(bx1, f32[i * 5]); by0 = Math.min(by0, f32[i * 5 + 1]); by1 = Math.max(by1, f32[i * 5 + 1]); }
+    const q = unpack(m32.data, m32.nv); let cx0 = Infinity, cx1 = -Infinity, cy0 = Infinity, cy1 = -Infinity; for (let i = 0; i < m32.nv; i++) { cx0 = Math.min(cx0, q.f32[i * 5]); cx1 = Math.max(cx1, q.f32[i * 5]); cy0 = Math.min(cy0, q.f32[i * 5 + 1]); cy1 = Math.max(cy1, q.f32[i * 5 + 1]); }
+    check(Math.abs(bx0 - cx0) < 1 && Math.abs(bx1 - cx1) < 1 && Math.abs(by0 - cy0) < 1 && Math.abs(by1 - cy1) < 1.2, `${who}: the fine head stands where the coarse one does (x ${f2(bx0)}…${f2(bx1)} against ${f2(cx0)}…${f2(cx1)}, y ${f2(by0)}…${f2(by1)} against ${f2(cy0)}…${f2(cy1)})`);
+    // the face's features, on the vertices that look forward (−z): the eyes (each a white and a dark iris, darker than
+    // the cheek), the lips (rosier than the cheek), the nose's tip before the cheeks
+    const A = fh.face, fwd = (i) => ((u8[i * 20 + 14] << 24) >> 24) < -50;
+    const near = (x, y, rx, ry) => { const out = []; for (let i = 0; i < m.nv; i++) if (fwd(i) && Math.abs(f32[i * 5] - x) <= rx && Math.abs(f32[i * 5 + 1] - y) <= ry) out.push(i); return out; };
+    const cheek = near(A.cheekX, A.cheekY, 0.35, 0.3), lc = cheek.length ? cheek.map(i => lumOf(u8, i)).reduce((a, b) => a + b) / cheek.length : 0, rc = cheek.length ? cheek.map(i => rosy(u8, i)).reduce((a, b) => a + b) / cheek.length : 0;
+    const eyes = [];
+    for (const ex of A.eyesX) {
+      // (the whites lighter than the cheek; the iris darker than half the brightest white — on a dark skin the eye reads
+      // by its whites, the iris as dark as the skin)
+      const e = near(ex, A.eyeY, 0.85, 0.3), wl = e.length ? Math.max(...e.map(i => lumOf(u8, i))) : 0;
+      const white = e.filter(i => lumOf(u8, i) > Math.max(150, lc + 25)).length, dark = e.filter(i => lumOf(u8, i) < wl * 0.45).length;
+      eyes.push({ white, dark, n: e.length });
+    }
+    console.log(`      the eyes: ${eyes.map(e => `${e.white} white, ${e.dark} dark of ${e.n}`).join(' · ')} (the cheek's light ${lc.toFixed(0)})`);
+    check(eyes.every(e => e.white >= 2 && e.dark >= 1), `${who}: both eyes show their whites round a dark iris`);
+    check(Math.abs(eyes[0].white - eyes[1].white) <= 2 && Math.abs(eyes[0].dark - eyes[1].dark) <= 2, `${who}: the two eyes alike (mirrored)`);
+    if (!L.beard) {
+      // the lips a colour of their own: the farthest of the mouth's vertices from the cheek's mean colour, and redder
+      const cm = [0, 1, 2].map(k => cheek.length ? cheek.map(i => u8[i * 20 + 16 + k]).reduce((a, b) => a + b) / cheek.length : 0);
+      const lips = near(A.mouthX, A.mouthY, 0.8, 0.45);
+      let best = 0, bestR = 0; for (const i of lips) { const d = Math.hypot(u8[i * 20 + 16] - cm[0], u8[i * 20 + 17] - cm[1], u8[i * 20 + 18] - cm[2]); if (d > best) { best = d; bestR = rosy(u8, i); } }
+      // (rosier than the cheek on a fair skin; on a darker one the lower lip is the lighter tone)
+      const fair = lc > 140;
+      check(best > 25 && (!fair || bestR > rc), `${who}: the lips a colour of their own (${best.toFixed(0)} from the cheek's${fair ? `, red ${bestR.toFixed(2)} × the green and blue against ${rc.toFixed(2)}` : ''})`);
+    }
+    let noseZ = Infinity, cheekZ = Infinity;
+    for (let i = 0; i < m.nv; i++) { const x = f32[i * 5], y = f32[i * 5 + 1], z = f32[i * 5 + 2]; if (Math.abs(x - A.mouthX) < 0.35 && y > A.noseY - 0.4 && y < A.noseY + 0.6) noseZ = Math.min(noseZ, z); if (Math.abs(x - A.cheekX) < 0.3 && Math.abs(y - A.cheekY) < 0.3) cheekZ = Math.min(cheekZ, z); }
+    check(cheekZ - noseZ >= (L.age === 'child' ? 0.25 : 0.4), `${who}: the nose stands out of the face (${f2(cheekZ - noseZ)} head units before the cheek)`);
+    // the lids, drawn while blinking, close both eyes: they cover the eye cells
+    const lg = def.fine.lids; let covered = 0;
+    for (const ex of A.eyesX) { let hit = false; for (let y = 0; y < lg.sy && !hit; y++) for (let z = 0; z < lg.sz && !hit; z++) for (let x = 0; x < lg.sx; x++) { if (!lg.c[lg.i(x, y, z)]) continue; const hx = (x - lg.ox + 0.5) / 2, hy = (y - lg.oy + 0.5) / 2; if (Math.abs(hx - ex) < 0.5 && Math.abs(hy - A.eyeY) < 0.4) { hit = true; break; } } if (hit) covered++; }
+    check(covered === 2, `${who}: the blink lids cover both eyes (${covered} of 2)`);
+  }
+  // the worker's person takes the fine head: its head bone carries the fine mesh (more vertices than the coarse head's)
+  FS.cache = null;
+  const L = Folk.look(11, 'crafter', 'adult'), Q = FS.personFromLook(L), def = Folk.buildHiRes(L), hb = def.order.indexOf('head');
+  let nHead = 0; const pu = new Uint8Array(Q.data.buffer, Q.data.byteOffset, Q.nv * 20); for (let i = 0; i < Q.nv; i++) if (pu[i * 20 + 15] === hb) nHead++;
+  const m32 = FS.mesh(FS.crop(def.parts.head.grid));
+  check(!Q.error && nHead > m32.nv * 2, `the worker's smooth person wears the fine head (${nHead} head vertices; the coarse head ${m32.nv}), ${Q.nv} vertices and ${Q.nt} triangles in all`);
+  check(def.fine === undefined, 'the voxel people (Very Low, Low, the far LOD) keep the head at 32 a block: buildHiRes builds no fine head');
 }
 
 // ---------------------------------------------------------------- §3 clothes and hair
