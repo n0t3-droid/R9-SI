@@ -117,8 +117,10 @@ vec3 nebula(vec3 dir, float dayK) {
   float soft = smoothstep(0.42, 0.78, nd);
   float ridge = 1.0 - abs(2.0 * nd - 1.0);
   float dense = smoothstep(0.5, 0.7, n1);
-  float lane = smoothstep(0.92, 0.99, ridge) * dense;
-  float rim = smoothstep(0.74, 0.92, ridge) * (1.0 - smoothstep(0.92, 0.99, ridge)) * dense;
+  // (t-sky2, continued: the lanes a little wider and softer, the rims fainter — the thin dark crests read as ink lines,
+  // the frames' dust is soft dark gas)
+  float lane = smoothstep(0.84, 0.99, ridge) * dense;
+  float rim = smoothstep(0.66, 0.86, ridge) * (1.0 - smoothstep(0.84, 0.99, ridge)) * dense;
 #endif
   vec3 col = mix(vec3(0.22, 0.06, 0.46), vec3(0.10, 0.36, 1.0), smoothstep(0.3, 0.7, n1));
   col = mix(col, vec3(1.0, 0.30, 0.68), smoothstep(0.48, 0.78, n2) * 0.9);
@@ -149,7 +151,7 @@ vec3 nebula(vec3 dir, float dayK) {
 #else
   float clump = mix(1.0, smoothstep(0.44, 0.66, n1 * 0.8 + n2 * 0.3), dayK * 0.9);
 #endif
-  float dusty = (1.0 - 0.65 * soft) * (1.0 - (0.2 + 0.4 * dayK) * lane) * (1.0 + (0.3 + 0.5 * dayK) * rim);   // (the lanes and rims faint at night: the night keeps its soft look)
+  float dusty = (1.0 - 0.65 * soft) * (1.0 - (0.2 + 0.35 * dayK) * lane) * (1.0 + (0.2 + 0.25 * dayK) * rim);   // (the lanes and rims faint at night: the night keeps its soft look)
   float dens = band * (0.35 + 1.35 * n1 * n1) * clump * dusty + (1.0 - band) * mix(wisp, cloud * dusty, dayK) + core * 0.6;
   // sparkling star clusters inside the band
   vec3 g = floor(dir * 520.0);
@@ -161,9 +163,10 @@ vec3 nebula(vec3 dir, float dayK) {
 // away from the sun is not a flat full disc but shows a lit side and a soft terminator, and one seen toward it is not a
 // black disc (the trailer's planets: lit from one side, the night side dark, t1_05)
 vec3 bodyLight(vec3 C, vec3 L) { return normalize(L - C * (dot(L, C) * 0.7)); }
-// the ring's density at a radius (in planet radii), shared by the ring and its shadow on the body
+// the ring's density at a radius (in planet radii), shared by the ring and its shadow on the body (t-sky2, continued: a
+// broad sheet of four or five soft bands, as the trailer's ring — the thin bright lines read as wire hoops)
 float ringDens(float rr) {
-  float ring = 0.55 + 0.45 * sin(rr * 38.0) * sin(rr * 11.0 + 1.3);
+  float ring = (0.78 + 0.22 * sin(rr * 24.0 + 0.8)) * (0.8 + 0.2 * sin(rr * 9.0 + 2.0));
   return ring * smoothstep(1.3, 1.4, rr) * smoothstep(2.45, 2.3, rr) * (1.0 - smoothstep(1.83, 1.86, rr) * smoothstep(1.92, 1.89, rr));
 }
 vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
@@ -226,7 +229,8 @@ vec4 gasGiant(vec3 dir, vec3 C, float R, vec3 L) {
       float s0 = -dot(P, Lb);
       float sh = 1.0;
       if (s0 > 0.0 && length(P + Lb * s0) < 1.0) sh = 0.12;
-      vec3 rc = mix(vec3(0.95, 0.80, 0.92), vec3(0.62, 0.74, 0.98), smoothstep(1.6, 2.2, rr));
+      // (t-sky2, continued: the trailer's ring colours — lilac inside, cyan in the middle, peach outside)
+      vec3 rc = mix(mix(vec3(0.95, 0.64, 0.95), vec3(0.48, 0.9, 0.98), smoothstep(1.5, 1.8, rr)), vec3(1.0, 0.74, 0.54), smoothstep(1.95, 2.3, rr));
       vec3 rcol = rc * (0.25 + 1.1 * max(0.15, abs(dot(RN, L)))) * sh;
       float a = ring * 0.85;
       res.rgb = mix(res.rgb, rcol, a);
