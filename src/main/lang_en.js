@@ -1252,6 +1252,11 @@
     'g.fest.elder': ['Just like when I was young.', 'Look at them go!', 'The lanterns are lovely this year.', 'Ahh, the old songs.'],
     'g.fest.fwKid': ['Ooooh!', 'Wow!!', 'Another one!', 'So pretty!'],
     'g.fest.fwAdult': ['Aaah!', 'Beautiful!', 'Bravo!', 'Look at that one!'],
+    // ---- t-life: ships that stay, the Regisseur des Lebens (padlife.js, lifedirector.js)
+    'g.set.padLife': 'Ships that stay: landings, crew, drone',
+    'g.set.padLife.tip': 'On the Gate Temple\'s apron and at every landing pad a craft lands, stays one to three minutes (its crew gets out, a drone circles) and flies off to the horizon; the next one is already waiting. Very Low keeps only the craft.',
+    'g.set.lifeDir': 'Life director: small scenes around you',
+    'g.set.lifeDir.tip': 'Every 20–40 seconds something happens near you: birds across the sun, a lamplighter at dusk, pigeons, kids with a ball, a street musician, a balloon over the hills, shooting stars … by place and hour. Very Low keeps only birds, lanterns and chimneys.',
     // ---- talking to a villager
     'g.talk.years': '{n} years',
     'g.talk.role': '{role} of {v} · {trait}, loves {likes}',

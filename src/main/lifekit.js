@@ -19,6 +19,10 @@
   LK.wrap = (a) => { while (a > Math.PI) a -= TAU; while (a < -Math.PI) a += TAU; return a; };
   LK.smooth = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
   LK.yawOf = (dx, dz) => Math.atan2(-dx, -dz);   // the heading of a direction (the models face −z)
+  // the cost tier of a settings record (as the living air's, airlife.js): 0 Very Low · 1 Low · 2 Balanced · 3 High · 4 Ultra;
+  // a custom setup: its particle level (0 … 2)
+  const PRESET_TIER = { potato: 0, low: 1, balanced: 2, high: 3, ultra: 4 };
+  LK.tierOf = (S) => { if (!S) return 2; if (PRESET_TIER[S.preset] !== undefined) return PRESET_TIER[S.preset]; const p = Number.isFinite(S.particles) ? Math.round(S.particles) : 2; return Math.max(0, Math.min(2, p)); };
 
   // ---------------------------------------------------------------- a walkable polyline
   LK.path = function (pts) {
@@ -55,6 +59,7 @@
     const dt = Math.min(0.5, Math.max(0, t - (a.poseT === undefined ? t : a.poseT))); a.poseT = t;
     const P = FA.pose(a, a.state || 'idle', dt, (a.walk || 0) * 3, a.walkAmt || 0, !!a.run, a.poseOut || (a.poseOut = {}));
     if (a.headYaw && P.head) P.head[1] += a.headYaw;
+    if (a.posefx) a.posefx(P, t);   // an actor's own touch on the pose (the musician's strumming arms, a kick)
     if (a.shadeT === undefined || t - a.shadeT > 0.3) { a.shade = ent.sunShade(a.pos, 1.2); a.shadeT = t; }
     const light = ent.lightAt(a.pos[0], a.pos[1] + 1.2, a.pos[2]);
     const dp = a.dpos || (a.dpos = [0, 0, 0]);
@@ -118,7 +123,7 @@
       const basket = part(6, 4, 6, [3, 0, 3], (gr) => { gr.box(0, 0, 0, 5, 3, 5, (x, y, z) => ((x + y + z) & 1 ? 0x9A6A3A : 0x7A4E28)); gr.box(1, 3, 1, 4, 3, 4, 0x4A3220); });
       const ropes = part(14, 8, 14, [7, 0, 7], (gr) => { for (let y = 0; y < 8; y++) { const k = Math.round(2 + y * 0.6); for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) gr.set(7 + sx * Math.min(6, k), y, 7 + sz * Math.min(6, k), 0x3A2A1E); } });
       const flame = part(3, 4, 3, [1, 0, 1], (gr) => { gr.box(0, 0, 0, 2, 1, 2, 0xFF8A1A, { emis: 1 }); gr.set(1, 2, 1, 0xFFD24A, 1); gr.set(1, 3, 1, 0xFFF2A0, 1); });
-      return { unit: 3, radius: 7, parts: { basket, ropes, flame, envelope: env }, layout: { basket: [0, 0, 0], ropes: [0, 4, 0], flame: [0, 5, 0], envelope: [0, 11, 0] } };
+      return { unit: 3, radius: 9, parts: { basket, ropes, flame, envelope: env }, layout: { basket: [0, 0, 0], ropes: [0, 4, 0], flame: [0, 5, 0], envelope: [0, 11, 0] } };
     };
     // the hover-cart (1 voxel = 1/8 m): a white bed 3 m long on a glowing cyan skirt, crates of produce, an orange canopy
     M.life_cart = () => ({
@@ -134,6 +139,28 @@
         }),
       }, layout: { body: [0, 0, 0] },
     });
+    // a dog that is nobody's pet (1 voxel = 1/16 m): a brown coat with a white chest and muzzle, floppy ears, a long tail —
+    // the companions' joints (body, head, ears, tail, four legs), so their pose (walk, sit; drink: the head down) drives it
+    M.life_dog = () => {
+      const fur = 0x9a6a3a, fur2 = 0x7a4e28, white = 0xf4efe6, nose = 0x1a1412, eye = 0x1a1210, paw = 0x5a3a20;
+      return {
+        h: 0.8, w: 0.3, parts: {
+          body: part(9, 8, 15, [4, 4, 7], (gr) => gr.ell(4.5, 4, 7.5, 3.8, 3.4, 7, (x, y, z) => (y <= 2 && z <= 5 ? white : (x + z) % 7 === 0 ? fur2 : fur))),
+          head: part(9, 8, 10, [4, 3, 6], (gr) => { gr.ell(4.5, 4, 5, 3.4, 3.2, 3.6, (x, y, z) => (z <= 3 && y <= 3 ? white : fur)); gr.box(3, 1, 0, 5, 3, 2, white); gr.set(4, 3, 0, nose); gr.set(2, 5, 2, eye); gr.set(6, 5, 2, eye); }),
+          ear_l: part(2, 5, 3, [1, 4, 1], (gr) => gr.box(0, 0, 0, 1, 4, 2, fur2)),
+          ear_r: part(2, 5, 3, [1, 4, 1], (gr) => gr.box(0, 0, 0, 1, 4, 2, fur2)),
+          tail: part(2, 3, 9, [1, 1, 0], (gr) => { for (let z = 0; z < 9; z++) gr.box(0, Math.min(2, z >> 2), z, 1, Math.min(2, z >> 2), z, z > 6 ? white : fur); }),
+          leg_fl: part(3, 6, 3, [1, 6, 1], (gr) => { gr.box(0, 0, 0, 2, 5, 2, fur); gr.box(0, 0, 0, 2, 0, 2, paw); }),
+          leg_fr: part(3, 6, 3, [1, 6, 1], (gr) => { gr.box(0, 0, 0, 2, 5, 2, fur); gr.box(0, 0, 0, 2, 0, 2, paw); }),
+          leg_bl: part(3, 6, 3, [1, 6, 1], (gr) => { gr.box(0, 0, 0, 2, 5, 2, fur); gr.box(0, 0, 0, 2, 0, 2, paw); }),
+          leg_br: part(3, 6, 3, [1, 6, 1], (gr) => { gr.box(0, 0, 0, 2, 5, 2, fur); gr.box(0, 0, 0, 2, 0, 2, paw); }),
+        },
+        layout: { body: [0, 7, 0], head: [0, 11, -7.5], ear_l: [-2.6, 14, -7], ear_r: [2.6, 14, -7], tail: [0, 9, 7], leg_fl: [-2.2, 6, -4.5], leg_fr: [2.2, 6, -4.5], leg_bl: [-2.2, 6, 4.5], leg_br: [2.2, 6, 4.5] },
+        gait: 'quad',
+      };
+    };
+    // a fishing rod (1 voxel = 1/16 m): a cane 2.5 m long, a cork grip, the line hanging from its tip
+    M.life_rod = () => ({ unit: 16, radius: 1.5, parts: { body: part(2, 30, 40, [1, 0, 2], (gr) => { for (let k = 0; k < 40; k++) gr.set(1, Math.round(k * 0.55), k, k < 6 ? 0xC8A060 : 0x6A4A2A); for (let y = 0; y < 22; y++) gr.set(1, 21 - y, 39, 0xE8E8E8); }) }, layout: { body: [0, 0, 0] } });
     // a ball (1 voxel = 1/16 m): red and white
     M.life_ball = () => ({ unit: 16, radius: 0.3, parts: { body: part(6, 6, 6, [3, 0, 3], (gr) => gr.ell(3, 3, 3, 2.9, 2.9, 2.9, (x, y) => (y > 2 ? 0xE8483A : 0xF4F0E6))) }, layout: { body: [0, 0, 0] } });
     // a lute (1 voxel = 1/16 m): a round body, a neck, a sound hole

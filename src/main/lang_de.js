@@ -1252,6 +1252,11 @@
     'g.fest.elder': ['Genau wie früher, als ich jung war.', 'Guck sie dir an!', 'Die Laternen sind dieses Jahr besonders schön.', 'Ach, die alten Lieder.'],
     'g.fest.fwKid': ['Ooooh!', 'Wow!!', 'Noch eins!', 'So schön!'],
     'g.fest.fwAdult': ['Aaah!', 'Wunderschön!', 'Bravo!', 'Guck mal, das da!'],
+    // ---- t-life: ships that stay, the Regisseur des Lebens (padlife.js, lifedirector.js)
+    'g.set.padLife': 'Schiffe, die bleiben: Landungen, Crew, Drohne',
+    'g.set.padLife.tip': 'Auf dem Vorfeld des Tor-Tempels und an jeder Landeplattform landet ein Schiff, bleibt ein bis drei Minuten (Crew steigt aus, Drohne kreist) und fliegt zum Horizont; das nächste wartet schon. Auf Sehr niedrig nur die Schiffe.',
+    'g.set.lifeDir': 'Regisseur des Lebens: kleine Szenen ringsum',
+    'g.set.lifeDir.tip': 'Alle 20–40 Sekunden passiert in deiner Nähe etwas: Vögel vor der Sonne, ein Laternenanzünder in der Dämmerung, Tauben, Kinder mit Ball, ein Straßenmusiker, ein Ballon über den Hügeln, Sternschnuppen … je nach Ort und Stunde. Auf Sehr niedrig nur Vögel, Laternen und Kamine.',
     // ---- mit jemandem im Dorf reden
     'g.talk.years': '{n} Jahre',
     'g.talk.role': '{role} in {v} · {trait}, mag {likes}',

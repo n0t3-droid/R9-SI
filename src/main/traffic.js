@@ -1,8 +1,15 @@
 // ============================================================================
-// Sky traffic: mini-voxel starships drop out of hyperspace, cross the sky in
-// formations (fighters, freighters, cruisers, the odd capital carrier), bank
-// through gentle curves and jump away again. When raider drones attack, a
-// defence wing arrives and fights them.
+// Sky traffic: mini-voxel starships cross the sky in formations (fighters,
+// freighters, cruisers, the odd capital carrier) and bank through gentle curves.
+// t-life (docs/superpowers/plans/2026-10-09-t-life.md §3.1, the owner: "die
+// Shuttles verschwinden"): every flight comes in from the horizon and goes out to
+// the other one — no warp flash in sight. Its ends lie 640 blocks out on either
+// side of the player, its path passes 80–250 blocks from them, and it fades in and
+// out with the distance (470 … 610: drawn see-through meanwhile), so nothing pops.
+// One, two or three flights are kept in the air (Very Low · Low · Balanced and up;
+// Very Low flies single craft), so a craft is almost always in the sky over a
+// plaza. When raider drones attack (not in a peaceful world), a defence wing
+// arrives and fights them.
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -12,6 +19,8 @@
   const TAU = Math.PI * 2;
   const TYPES = [['interceptor', 30], ['racer', 12], ['gunship', 16], ['freighter', 16], ['dropship', 10], ['shuttle', 10], ['cruiser', 6], ['carrier', 2.5]];
   const SPEED = { interceptor: [38, 55], racer: [48, 66], gunship: [30, 40], freighter: [20, 28], dropship: [26, 34], shuttle: [26, 34], cruiser: [16, 22], carrier: [10, 14] };
+  const HZ = 640, FADE0 = 470, FADE1 = 610;   // the horizon flights' ends, and where they fade (blocks from the focus)
+  const smooth = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
 
   class Traffic {
     constructor(g) {
@@ -19,7 +28,13 @@
       this.ships = [];
       this.t = 6 + Math.random() * 8;
       this.time = 0;
+      this.keepT = 0; this.pending = 0;
     }
+    // how many flights are kept in the air (Very Low 1, Low 2, else 3) and the most craft at once
+    keepN() { const p = this.g.settings && this.g.settings.preset; return p === 'potato' ? 1 : p === 'low' ? 2 : 3; }
+    maxN() { const p = this.g.settings && this.g.settings.preset; return p === 'potato' ? 2 : p === 'low' ? 4 : 9; }
+    // a flight on its way out: past its middle and beyond 520 blocks (the next one may come)
+    leaving(s, fp) { return s.t > 0.5 && Math.hypot(s.pos[0] - fp[0], s.pos[2] - fp[2]) > 520; }
     focus() { const g = this.g; if (g.state === 'play' && g.player) return g.player.pos; if (g.titleCam) return [g.titleCam.x, g.titleCam.y - 30, g.titleCam.z]; return null; }
     // (a peaceful world flies no gunship: t-life, peace.js)
     pickType(rng) { const peace = this.peace(), list = peace ? TYPES.filter(t => t[0] !== 'gunship') : TYPES; let tot = 0; for (const t of list) tot += t[1]; let r = rng.next() * tot; for (const t of list) { r -= t[1]; if (r <= 0) return t[0]; } return 'interceptor'; }
@@ -30,29 +45,38 @@
       if (!SS || !this.focus()) return;
       const rng = new VR.RNG((Math.random() * 4294967295) >>> 0);
       const arch = opts.arch && VR.Starship.ARCH[opts.arch] ? opts.arch : this.pickType(rng);
-      SS.design((Math.random() * 4294967295) >>> 0, arch, null, (d) => this.launch(d, rng, opts));
+      this.pending++;
+      SS.design((Math.random() * 4294967295) >>> 0, arch, null, (d) => { this.pending = Math.max(0, this.pending - 1); this.launch(d, rng, opts); });
     }
     launch(d, rng, opts) {
       const fp = this.focus(); if (!fp) return;
       const m = d.meta, arch = m.arch;
       const big = arch === 'carrier' || arch === 'cruiser';
       const sp = SPEED[arch] || [30, 40], speed = rng.range(sp[0], sp[1]);
-      const a = rng.range(0, TAU), pass = rng.range(big ? 60 : 30, big ? 140 : 110) * (rng.chance(0.5) ? 1 : -1), D = rng.range(150, 230);
+      // (a horizon flight: from 640 blocks out to 640 blocks out on the other side, passing 80–250 blocks from the focus)
+      const horizon = !opts.dock && !opts.circle && !opts.defender;
+      // (an act of the Regisseur des Lebens, lifedirector.js — opts.over: {a: the heading, pass, alt, t0, contrail, convoy:
+      // the craft in line astern, tag}: a low pass over the player, or the sunrise convoy high up)
+      const ov = opts.over || null;
+      const a = ov && ov.a !== undefined ? ov.a : rng.range(0, TAU), pass = ov && ov.pass !== undefined ? ov.pass : (horizon ? rng.range(80, 250) : rng.range(big ? 60 : 30, big ? 140 : 110)) * (rng.chance(0.5) ? 1 : -1), D = horizon ? HZ : rng.range(150, 230);
       const fx = Math.cos(a), fz = Math.sin(a), rx = -fz, rz = fx;
-      const alt = M.clamp(fp[1] + rng.range(big ? 55 : 25, big ? 110 : 75), 96, big ? 236 : 226);
+      const alt = ov && ov.alt !== undefined ? fp[1] + ov.alt : M.clamp(fp[1] + rng.range(big ? 55 : 25, big ? 110 : 75), 96, big ? 236 : 226);
       let A = [fp[0] - fx * D + rx * pass, alt + rng.range(-8, 8), fp[2] - fz * D + rz * pass];
       let B = [fp[0] + fx * D + rx * pass * 0.4, alt + rng.range(-12, 12), fp[2] + fz * D + rz * pass * 0.4];
       let C = [(A[0] + B[0]) / 2 + rx * rng.range(-60, 60), (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * rng.range(-60, 60)];
+      if (ov) { A[1] = alt; B[1] = alt + 6; B[0] = fp[0] + fx * D + rx * pass; B[2] = fp[2] + fz * D + rz * pass; C = [(A[0] + B[0]) / 2, alt - 2 * (ov.dip || 0), (A[2] + B[2]) / 2]; }
       // a docking flight comes in over the plaza from the south and sets down on the apron in front of the portal
       const dock = opts.dock ? this.dockPoint() : null;
       if (dock) { A = [dock[0] + rng.range(-40, 40), 120, dock[2] + 190]; C = [dock[0] + rng.range(-10, 10), 104, dock[2] + 70]; B = [dock[0], dock[1] + m.height * 0.5 + 2.5, dock[2]]; }
       const len = Math.hypot(B[0] - A[0], B[2] - A[2]) * 1.1;
       const squad = !opts.defender && !opts.circle && (arch === 'interceptor' || arch === 'racer' || arch === 'gunship' || arch === 'shuttle' || arch === 'dropship') && rng.chance(0.5);
-      const n = opts.defender ? 1 : squad ? rng.irange(2, 4) : arch === 'interceptor' || arch === 'racer' ? (rng.chance(0.55) ? rng.irange(2, 3) : 1) : arch === 'gunship' && rng.chance(0.3) ? 2 : 1;
+      let n = opts.defender ? 1 : squad ? rng.irange(2, 4) : arch === 'interceptor' || arch === 'racer' ? (rng.chance(0.55) ? rng.irange(2, 3) : 1) : arch === 'gunship' && rng.chance(0.3) ? 2 : 1;
+      if (this.g.settings && this.g.settings.preset === 'potato') n = 1;   // (Very Low flies single craft)
+      if (ov) n = ov.convoy || 1;
       for (let k = 0; k < n; k++) {
         // a V formation: wingmen fall back and out, staggered in height
-        const off = k === 0 ? [0, 0, 0] : [(k % 2 ? -1 : 1) * (m.width + (squad ? 6 : 3)) * Math.ceil(k / 2), (squad ? -1.5 : 0) * Math.ceil(k / 2) + rng.range(-1, 1), (m.length + (squad ? 7 : 4)) * Math.ceil(k / 2)];
-        this.ships.push({ d, A, B, C, off, t: -k * 0.02, dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), dock: dock ? { phase: 'in', parkT: 0, parkDur: rng.range(9, 15) } : null, defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0 });
+        const off = k === 0 ? [0, 0, 0] : ov ? [0, -k * 1.5, k * (m.length + 26)] : [(k % 2 ? -1 : 1) * (m.width + (squad ? 6 : 3)) * Math.ceil(k / 2), (squad ? -1.5 : 0) * Math.ceil(k / 2) + rng.range(-1, 1), (m.length + (squad ? 7 : 4)) * Math.ceil(k / 2)];
+        this.ships.push({ tag: ov ? ov.tag : null, contrail: !!(ov && ov.contrail), d, A, B, C, off, t: (ov && ov.t0 ? ov.t0 : 0) - k * 0.02 * (ov ? 0 : 1), dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), dock: dock ? { phase: 'in', parkT: 0, parkDur: rng.range(9, 15) } : null, defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0, horizon, wing: k > 0, alpha: horizon ? 0 : 1, arrived: horizon, wt: horizon ? 1 : undefined });
       }
     }
     spawnDefenders() {
@@ -65,12 +89,15 @@
       this.time += dt;
       if (!fp || (g.state === 'play' && g.dim !== 'overworld')) return;
       this.t -= dt;
-      const maxShips = g.settings.preset === 'potato' ? 2 : g.settings.preset === 'low' ? 4 : 9;
+      const maxShips = this.maxN();
+      // the flights kept in the air: when fewer than keepN are on their way in or overhead, the next one sets off
+      let live = 0; for (const s of this.ships) if (s.horizon && !s.wing && !s.dead && !this.leaving(s, fp)) live++;
+      this.keepT -= dt;
+      if (live + this.pending < this.keepN() && this.keepT <= 0 && this.ships.length < maxShips) { this.keepT = 3; this.spawnFlight(); }
+      // (now and then one more, for variety, up to the most at once; the apron's landings are the pads' now: padlife.js)
       if (this.t <= 0) {
         this.t = 11 + Math.random() * 22;
-        const dp = this.dockPoint();
-        if (this.ships.length < maxShips && dp && !this.ships.some(s => s.dock) && Math.hypot(dp[0] - fp[0], dp[2] - fp[2]) < 900 && Math.random() < 0.2) this.spawnFlight({ arch: Math.random() < 0.6 ? 'shuttle' : 'dropship', dock: true });
-        else if (this.ships.length < maxShips) this.spawnFlight();
+        if (this.ships.length < maxShips && !this.pending) this.spawnFlight();
       }
       if (g.state === 'play' && g.raidActive && !this.peace() && !this.ships.some(s => s.defender) && !this.defended) { this.defended = true; this.spawnDefenders(); }
       if (!g.raidActive) this.defended = false;
@@ -82,6 +109,7 @@
         if (s.dead) { this.ships.splice(i, 1); continue; }
         const d = Math.hypot(s.pos[0] - fp[0], s.pos[1] - fp[1], s.pos[2] - fp[2]);
         near = Math.min(near, d);
+        if (s.horizon) s.alpha = 1 - smooth((Math.hypot(s.pos[0] - fp[0], s.pos[2] - fp[2]) - FADE0) / (FADE1 - FADE0));
         // the speed each craft really makes (its plume is hot and short when it idles at the apron)
         if (s.lastPos) { const v = Math.hypot(s.pos[0] - s.lastPos[0], s.pos[1] - s.lastPos[1], s.pos[2] - s.lastPos[2]) / Math.max(dt, 1e-3); s.spd = s.spd === undefined ? v : s.spd + (v - s.spd) * Math.min(1, dt * 3); }
         s.lastPos = s.pos.slice();
@@ -150,6 +178,8 @@
       if (s.dock) return this.flyDock(s, dt);
       s.t += dt / s.dur;
       if (s.t < 0) return;
+      // a horizon flight just ends out there (faded out: no flash); the others jump away
+      if (s.t >= 1 && s.horizon) { s.dead = true; return; }
       if (s.t >= 1 && !s.warpOut) { s.warpOut = true; s.wt = 0; this.flash(s, false); }
       const t = Math.min(1, s.t), P = this.bez(s, t), P2 = this.bez(s, Math.min(1, t + 0.01));
       const yaw = Math.atan2(-(P2[0] - P[0]), -(P2[2] - P[2]));
@@ -199,7 +229,7 @@
       if (dist > 260 || s.t < 0 || !m) return;
       const c = Math.cos(s.heading), sn = Math.sin(s.heading), f = [-sn, -c];
       const sp = s.spd !== undefined ? s.spd : 40, hov = sp < 6;
-      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], sp, { thrust: hov ? 0.45 : 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : hov ? [1, 0.6, 0.28] : [0.52, 0.92, 1], minor: ei > 1, smokeLife: s.big ? 4.5 : 7, smokeK: 1.15 }); } }
+      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], sp, { thrust: hov ? 0.45 : 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : hov ? [1, 0.6, 0.28] : [0.52, 0.92, 1], minor: ei > 1, smokeLife: s.contrail ? 14 : s.big ? 4.5 : 7, smokeK: s.contrail ? 1.6 : 1.15 }); } }
       for (const e of m.exhaust) {
         if (Math.random() > 0.55) continue;
         const x = s.pos[0] + e[0] * c + e[2] * sn, z = s.pos[2] - e[0] * sn + e[2] * c;
@@ -213,16 +243,22 @@
       let prog = null;
       for (const s of this.ships) {
         const d = s.d; if (!d.gpu || s.t < 0) continue;
-        if (layer !== 'opaque' && !d.gpu.glass) continue;
+        const al = s.alpha === undefined ? 1 : s.alpha;
+        if (al < 0.02 || (al < 0.99 && (layer === 'opaque' || !SS.drawAlpha))) continue;
+        if (al >= 0.99 && layer !== 'opaque' && !d.gpu.glass) continue;
         const m = d.meta, rad = Math.max(m.length, m.width, m.height) * 0.75;
         const dx = s.pos[0] - cam.x, dy = s.pos[1] - cam.y, dz = s.pos[2] - cam.z;
         if (dx * dx + dz * dz > 650 * 650) continue;
         if (!VR.mat4.boxInFrustum(r.planes, dx - rad, dy - rad, dz - rad, dx + rad, dy + rad, dz + rad)) continue;
         let stretch = 1;
         if (s.warpOut) stretch = 1 + s.wt * 14; else if (s.wt !== undefined && s.wt < 0.35) stretch = 1 + (0.35 - s.wt) * 20;
-        if (!prog) prog = SS.begin(r, E, layer);
         const inst = { d, pos: [s.pos[0], s.pos[1] - m.height * 0.5, s.pos[2]], yaw: s.heading, pitch: 0, roll: s.roll, gear: 0 };
-        SS.drawOne(r, prog, inst, cam, layer, { sky: 1, bl: [0, 0, 0] }, stretch, false);
+        // fading at the horizon: see-through in the translucent pass (its own depth written)
+        if (al < 0.99) { if (prog) { SS.end(r, layer); prog = null; } SS.drawAlpha(r, E, inst, cam, al, { sky: 1, bl: [0, 0, 0] }); continue; }
+        if (!prog) prog = SS.begin(r, E, layer);
+        // (beyond 40 blocks the stand-in seats and the cabin inside the closed hull are not drawn: nobody sees them)
+        const far = dx * dx + dy * dy + dz * dz > 1600;
+        SS.drawOne(r, prog, inst, cam, layer, { sky: 1, bl: [0, 0, 0] }, stretch, false, layer === 'opaque' && far, far);
       }
       if (prog) SS.end(r, layer);
     }
