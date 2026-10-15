@@ -282,7 +282,9 @@
     resize(force) {
       const gl = this.gl;
       const dpr = Math.min(window.devicePixelRatio || 1, this.q.maxDpr || 1.5);
-      const W = Math.max(2, Math.floor(this.canvas.clientWidth * dpr)), H = Math.max(2, Math.floor(this.canvas.clientHeight * dpr));
+      let W = Math.max(2, Math.floor(this.canvas.clientWidth * dpr)), H = Math.max(2, Math.floor(this.canvas.clientHeight * dpr));
+      // F10 · dprLite (ipu.js backing): never larger than the physical screen; on Ultra · Leicht at most 1920 × 1080 worth of pixels
+      if (this.q.dprLite && VR.IPU) { const sc = window.screen || {}, b = VR.IPU.backing(this.canvas.clientWidth, this.canvas.clientHeight, window.devicePixelRatio || 1, this.q.maxDpr || 1.5, sc.width, sc.height, true, !!this.q.dprCap, this._bk || (this._bk = {})); W = b.W; H = b.H; }
       const sc = this.q.scale;
       const w = Math.max(2, Math.floor(W * sc)), h = Math.max(2, Math.floor(H * sc));
       if (!force && W === this.W && H === this.H && w === this.w && h === this.h) return;
@@ -297,11 +299,15 @@
       if (outChanged) for (const k of ['histFB0', 'histTex0', 'histFB1', 'histTex1']) del(k);
       if (this.bloom) for (const b of this.bloom) { gl.deleteFramebuffer(b.fb); gl.deleteTexture(b.tex); }
       const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
-      this.sceneCol = GL.tex2D(w, h, cfmt, gl.RGBA, ctype, {});
+      // F10 · hdrLite: the scene colour, its copy, the bloom chain and the rays in R11F_G11F_B10F (ipu.js; the TSR history
+      // below keeps cfmt: it is fed back every frame)
+      this._sf = null; const sf = this.sceneFmt().gl;
+      this.sceneCol = GL.tex2D(w, h, sf[0], sf[1], sf[2], {});
       this.sceneDepth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       this.sceneFB = GL.fbo([this.sceneCol], this.sceneDepth);
+      if (!this.sceneFB && this._sf.name === 'R11F_G11F_B10F') { GL.r11 = false; return this.resize(true); }   // (F10: refused after all → RGBA16F)
       if (!this.sceneFB && this.hdr) { this.hdr = false; return this.resize(true); }
-      this.copyCol = GL.tex2D(w, h, cfmt, gl.RGBA, ctype, {});
+      this.copyCol = GL.tex2D(w, h, sf[0], sf[1], sf[2], {});
       this.copyDepth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       this.copyFB = GL.fbo([this.copyCol], this.copyDepth);
       this.ldrTex = GL.tex2D(W, H, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, {});
@@ -317,13 +323,23 @@
       this.bloom = [];
       let bw = Math.max(1, w >> 1), bh = Math.max(1, h >> 1);
       for (let i = 0; i < 5; i++) {
-        const t = GL.tex2D(bw, bh, cfmt, gl.RGBA, ctype, {});
+        const t = GL.tex2D(bw, bh, sf[0], sf[1], sf[2], {});
         this.bloom.push({ tex: t, fb: GL.fbo([t]), w: bw, h: bh });
         bw = Math.max(1, bw >> 1); bh = Math.max(1, bh >> 1);
       }
       const rw = Math.max(1, w >> 2), rh = Math.max(1, h >> 2);
-      this.raysTex = GL.tex2D(rw, rh, cfmt, gl.RGBA, ctype, {}); this.raysFB = GL.fbo([this.raysTex]); this.raysW = rw; this.raysH = rh;
+      this.raysTex = GL.tex2D(rw, rh, sf[0], sf[1], sf[2], {}); this.raysFB = GL.fbo([this.raysTex]); this.raysW = rw; this.raysH = rh;
       this.ensureShadowMap();
+    }
+    // F10 · hdrLite (ipu.js): the scene targets' format { name, bytes, gl: [internal, format, type] } — R11F_G11F_B10F with the
+    // switch where the probe passed, else RGBA16F / RGBA8 as before; made once per resize (the mirror and the far cache read it)
+    sceneFmt() {
+      if (this._sf) return this._sf;
+      const gl = this.gl, IPU = VR.IPU, lite = !!(this.q && this.q.hdrLite) && this.hdr;
+      const f = IPU ? IPU.colorFormat(this.hdr, lite, lite && IPU.probe(gl, GL.ext)) : { name: this.hdr ? 'RGBA16F' : 'RGBA8', bytes: this.hdr ? 8 : 4 };
+      f.gl = f.name === 'R11F_G11F_B10F' ? [gl.R11F_G11F_B10F, gl.RGB, gl.HALF_FLOAT] : this.hdr ? [gl.RGBA16F, gl.RGBA, gl.HALF_FLOAT] : [gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE];
+      if (this.stats) this.stats.sceneFmt = f.name;
+      return (this._sf = f);
     }
     ensureShadowMap() {
       const gl = this.gl, size = this.q.shadows;
@@ -1166,11 +1182,11 @@
     fcCancel(st) { if (st.back) { st.spare = st.back; st.back = null; } }
     // the buffers of a layer at the size of its view (made or resized when needed)
     fcEnsure(L, tw, th) {
-      const gl = this.gl;
-      if (L.fb && L.tw === tw && L.th === th && L.hdr === this.hdr) return true;
+      const gl = this.gl, sf = this.sceneFmt();   // (F10 · hdrLite: the scene's format)
+      if (L.fb && L.tw === tw && L.th === th && L.hdr === this.hdr && L.fmt === sf.name) return true;
       if (L.fb) { gl.deleteFramebuffer(L.fb); gl.deleteTexture(L.col); gl.deleteTexture(L.depth); L.fb = null; }
-      const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
-      L.col = GL.tex2D(tw, th, cfmt, gl.RGBA, ctype, { filter: gl.LINEAR });
+      L.fmt = sf.name;
+      L.col = GL.tex2D(tw, th, sf.gl[0], sf.gl[1], sf.gl[2], { filter: gl.LINEAR });
       L.depth = GL.tex2D(tw, th, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       L.fb = GL.fbo([L.col], L.depth);
       L.tw = tw; L.th = th; L.hdr = this.hdr;
@@ -1872,13 +1888,13 @@
     ensureReflection() {
       const gl = this.gl, k = this.q.water >= 2 && !this.q.reflLite ? 0.5 : 0.25;   // (F9 · Spiegelung leicht: a quarter, read edge-aware)
       const rw = Math.max(16, Math.floor(this.w * k)), rh = Math.max(9, Math.floor(this.h * k));
-      if (this.reflFB && rw === this.reflW && rh === this.reflH && this.reflHdr === this.hdr) return true;
+      const sf = this.sceneFmt();   // (F10 · hdrLite: the scene's format)
+      if (this.reflFB && rw === this.reflW && rh === this.reflH && this.reflHdr === this.hdr && this.reflFmt === sf.name) return true;
       if (this.reflFB) gl.deleteFramebuffer(this.reflFB);
       if (this.reflCol) gl.deleteTexture(this.reflCol);
       if (this.reflDepth) gl.deleteTexture(this.reflDepth);
-      this.reflFB = null;
-      const cfmt = this.hdr ? gl.RGBA16F : gl.RGBA8, ctype = this.hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
-      this.reflCol = GL.tex2D(rw, rh, cfmt, gl.RGBA, ctype, { filter: gl.LINEAR });
+      this.reflFB = null; this.reflFmt = sf.name;
+      this.reflCol = GL.tex2D(rw, rh, sf.gl[0], sf.gl[1], sf.gl[2], { filter: gl.LINEAR });
       this.reflDepth = GL.tex2D(rw, rh, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       this.reflFB = GL.fbo([this.reflCol], this.reflDepth);
       this.reflW = rw; this.reflH = rh; this.reflHdr = this.hdr;
