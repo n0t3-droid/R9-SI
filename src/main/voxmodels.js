@@ -187,6 +187,19 @@
       gait: 'quad',
     };
   };
+  // Pond Duck (t-land): a small duck swimming round the ponds of the land between — a speckled brown body over a pale
+  // breast, a dark tail, a green head with a white collar, a yellow-orange bill (it floats: its feet stay under water)
+  M.pond_duck = () => {
+    const body = 0x8a6a4a, pale = 0xc8ab88, tail = 0x3a2a22, head = 0x2a7a4a, collar = 0xf2f2ea, bill = 0xf2a83a, eye = 0x101010;
+    return {
+      h: 0.45, w: 0.25, parts: {
+        body: part(6, 6, 10, [3, 0, 4], (g) => { g.ell(3, 2.4, 5, 2.9, 2.3, 4.6, (x, y, z) => z > 7 ? tail : y >= 3 ? body : pale, { shade: 0.16 }); g.box(2, 4, 8, 3, 5, 9, tail); }),
+        head: part(4, 5, 6, [2, 0, 4], (g) => { g.box(1, 0, 3, 2, 1, 4, collar); g.ell(2, 2.9, 3.6, 1.7, 1.9, 1.9, head, { shade: 0.1 }); g.box(1, 2, 0, 2, 2, 1, bill); g.box(0, 3, 3, 0, 3, 3, eye); g.box(3, 3, 3, 3, 3, 3, eye); }),
+      },
+      layout: { body: [0, 0, 0], head: [0, 4, -3] },
+      gait: 'quad',
+    };
+  };
   // Crystal Crab: violet crystal shell
   M.crystal_crab = () => {
     const shell = 0x8a4ad0, cry = 0xd08aff, leg = 0x5a2a8a;

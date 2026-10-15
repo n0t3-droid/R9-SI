@@ -261,7 +261,11 @@
     return r;
   };
   const STATE_TINT = [0, 0x7fbf55, 0x5fa83a, 0x3f76e4, 0x80a755, 0x619961, 0xb38a55, 0x6fae3a];   // (grass, foliage, water as the plains; birch, spruce, dry as the mesher's fixed ones)
-  LOD.util = { bcol, scol, tint, mixc, hh, leafCol, TREES, TRUNKS };
+  // (t-land, vgen 10) the land's woods where the biome table has no trees (the sky meadow): VR.Land.lodTree answers
+  // [cover, kind, height] for a woods' cell, null elsewhere and in every older world
+  const landTree = (g, X, Z, key) => (VR.Land && VR.Land.lodTree) ? VR.Land.lodTree(g, X, Z, key) : null;
+  LOD.util = { bcol, scol, tint, mixc, hh, leafCol, TREES, TRUNKS, landTree };
+
   // the side colour of a floating island seen from afar (ring 1's forms, ring 2's tiles): ember and prism rock as they
   // are; vgen 9 (t-beauty) the warm strata of its upper sides over a little of the rock below (gen_realm.js lays ochre,
   // umber and terracotta under the soil and moss at the tips), vgen 8 grey stone
@@ -391,10 +395,10 @@
       let t = lk.t, s = lk.s, kd = lk.kd, h = lk.h;
       const ax = lk.ax, cliff = lk.cliff, water = lk.water, cold = lk.cold;
       // trees: near levels get little voxel trees (trunk + canopy), far levels blend canopy colour & height into the cell
-      const tr = TREES[key];
+      const tr = TREES[key] || landTree(g, X, Z, key);
       if (!water && tr && kd !== 6 || (!water && tr && (key === 'snowy_taiga' || key === 'grove'))) {
         const cover = tr[0];
-        if (step <= 8) {
+        if (step <= (tr[3] || 8)) {
           if (i >= 0 && j >= 0 && i < n && j < n && hh(X, Z, 91) < cover * (step === 4 ? 1 : 1.15) && !(vsites.length && inVil(X, Z, 4))) {
             const th = tr[2] * (0.75 + hh(X, Z, 92) * 0.5);
             let lc = leafCol(tr[1], B); if (cold) lc = mixc(lc, snow, 0.55);
@@ -402,8 +406,15 @@
           }
         } else if (cover > 0.05 && !(vsites.length && inVil(X, Z, 0))) {
           const lc = leafCol(tr[1], B);
-          t = mixc(t, lc, Math.min(1, cover * 1.1)); s = mixc(s, lc, cover * 0.6);
-          h = y + 1 + cover * tr[2] * 0.7; if (cover > 0.4) kd = 5;
+          if (tr[4]) {
+            // (t-land, tr[4]) the land's woods: a canopy kept as land with one leaf colour and 2-block terraces, so a
+            // wood's cells merge into big quads (Very Low's horizon at the hills view no heavier than before)
+            t = mixc(t, lc, cover > 0.4 ? 1 : 0.6); s = mixc(s, lc, 0.6);
+            h = Math.max(y + 1, Math.round((y + 1 + cover * tr[2] * 0.7) / 2) * 2);
+          } else {
+            t = mixc(t, lc, Math.min(1, cover * 1.1)); s = mixc(s, lc, cover * 0.6);
+            h = y + 1 + cover * tr[2] * 0.7; if (cover > 0.4) kd = 5;
+          }
           if (cold) t = mixc(t, snow, 0.5);
         }
       }

@@ -161,6 +161,10 @@
       // 4) spread sideways
       const next = lvl >= 8 ? 1 : lvl + (isLava ? 2 : 1);
       if (next > 7) return;
+      // over its own falling or flowing fluid a block pours on down, and a falling one over any of its own: spreading
+      // sideways in mid-air grew a woken waterfall into a hanging cone of water as wide as its island and a spill over a
+      // ledge into a wall (test/fall_wake.js); over ground it spreads (the puddle at a fall's foot), over a lake as before
+      if (same(below) && (lvl >= 8 || lvOf(below) !== 0)) return;
       if (same(below) || !(T.flags[below] & F.SOLID) && !canFlow(below) && !(T.flags[below] & F.FLUID)) { /* on fluid or odd surface: still spread */ }
       // prefer directions leading to a drop within 4 blocks
       const dirs = [0, 1, 2, 3];
