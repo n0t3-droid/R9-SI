@@ -176,7 +176,7 @@
     let rx, rz, fx, fz, fy;
     if (load === 'bag' || load === 'basket' || load === 'can') { rx = a * 0.35; rz = sx * (0.16 + w) * amt; fx = 0.05 * amt; fz = 0; fy = 0; }
     else if (load === 'cane') { rx = a * 0.5 + 0.12 * amt; rz = sx * (0.08 + w) * amt; fx = (0.35 + 0.25 * Math.max(0, al)) * amt; fz = 0; fy = 0; }
-    else if (load === 'tray') { rx = 0.12 * amt; rz = sx * 0.1 * amt; fx = 1.45 * amt; fz = 0; fy = -sx * 0.25 * amt; }
+    else if (load === 'tray') { rx = 0.12 * amt; rz = sx * 0.1 * amt; fx = 1.45 * amt; fz = 0; fy = sx * 0.3 * amt; }
     else {
       rx = a + (run ? 0.3 : 0) * amt; rz = sx * (0.1 + w) * amt;
       fx = ((run ? 1.2 : 0.26) + (run ? 0.3 : 0.6) * Math.max(0, al)) * amt;
@@ -263,7 +263,7 @@
   const toBody = (P, X, o) => { const R = bodyR(P, M3c); return mulTV(R, X, o); };
   // the things in the hands: a bag, a basket or a can hangs straight down (its pose turns it back against the arm, the
   // hand and the body), a cane too (its tip under the hand), a tray stays level (as the hand holds it)
-  const IT = { bag: 1, basket: 1, can: 1 };
+  const IT = { bag: 1, basket: 1, can: 1, tray: 1 };
   function holdItems(G, P) {
     if (G.carry && IT[G.carry]) hangItem(P, 'r');
     if (G.cane) hangItem(P, 'l');
@@ -283,9 +283,9 @@
   FA.handOnHip = function (G, s, out) {
     if (!G.arm) return out;
     const sx = s === 'l' ? -1 : 1, kid = G.kid;
-    const W = V3c; W[0] = sx * (G.hw + (kid ? 1.6 : 2.3) + (G.wide ? 2.6 : 0)); W[1] = kid ? 2.5 : 3.5; W[2] = 0.4;
+    const W = V3c; W[0] = sx * (G.hw + (kid ? 1.6 : 2.6) + (G.wide ? 2.6 : 0)); W[1] = kid ? 2.5 : 3.5; W[2] = 0.4;
     FA.armIK(G, s, [W[0], W[1], W[2]], [sx, 0.15, 0.55], out);
-    return FA.handAim(out, s, [sx * 0.15, -0.75, -0.65], sx * -1.2, out);
+    return FA.handAim(out, s, [sx * 0.3, -0.75, -0.6], sx * -1.2, out);
   };
   // ---- talking: the speaker's forearms up at the waist with small swings and now and then an open-palm beat; the
   // listener's hands clasped before the belly. t seconds, seed the person's
@@ -482,7 +482,8 @@
       dst.head[1] += 0.12 * Math.sin(t * 0.31 + a.seedW);
     } else if (name === 'talk') FA.gesture(G, t, a.seedW | 0, !!a.speaking, dst);
     else if (name === 'idle') {
-      if (G.carry && IT[G.carry]) restCarry(dst, 'r');
+      if (G.carry === 'tray') armSwing(dst, 'r', 0, 0, false, 1, 'tray', 0);
+      else if (G.carry && IT[G.carry]) restCarry(dst, 'r');
       if (G.cane) restCane(dst);
       const h = a.anim && a.anim.hh;
       if (h && h.k > 0) {
@@ -501,7 +502,9 @@
   function hipClock(a, G, d) {
     const st = a.anim, sd = a.seedW | 0;
     const h = st.hh || (st.hh = { t: 0, next: 8 + (sd % 23), until: 0, side: sd & 1 ? 'r' : 'l', k: 0 });
-    if (G.kid) { h.k = 0; return; }
+    // (a hand on the hip needs the wrist to bend: the smooth people's hands — G.hands, set by the draw — not the voxel
+    // people's, whose hand goes on in the forearm's line)
+    if (G.kid || G.hands === false) { h.k = Math.max(0, h.k - Math.abs(d) / 0.7); return; }
     if (d > 0) {
       h.t += d;
       if (h.t >= h.next && h.until <= h.next) { h.until = h.t + 6 + ((sd * 7 + (h.t | 0)) % 7); h.side = G.carry ? 'l' : G.cane ? 'r' : ((sd + (h.t | 0)) & 1 ? 'r' : 'l'); }

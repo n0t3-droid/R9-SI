@@ -121,7 +121,7 @@ const child = Folk.look(77, 'child', 'child'), bagL = find(q => q.tool === 'bag'
   // a hand on the hip: the wrist on the hip bone, the elbow out; it comes now and then while standing
   const L = crafter, G = Folk.gaitFor(L), def = Folk.buildHiRes(L), P = FA.handOnHip(G, 'r', {});
   for (const j of FA.JOINTS) if (!P[j]) P[j] = [0, 0, 0, 0, 0, 0];
-  const g = armGeo(def, P, 'r'), hipX = (G.hw + 2.3);
+  const g = armGeo(def, P, 'r'), hipX = (G.hw + 2.6);
   console.log(`    a hand on the hip: the wrist at (${g.wrB.map(f2).join(', ')}) in the body, the upper arm ${f2(g.abd)}° out, the elbow ${f2(g.flex)}°`);
   check(Math.abs(g.wrB[0] - hipX) < 1.5 && Math.abs(g.wrB[1] - 3.5) < 1.5 && g.abd > 25 && g.flex > 60 && g.flex < 125, `a hand on the hip: the wrist on the hip's side, the elbow out ${f2(g.abd)}° and bent ${f2(g.flex)}°`);
   const a = { seedW: 9 }; let on = 0, n = 0; const out = {};
@@ -165,13 +165,71 @@ const SAMPLES = [];
   let bad = [], worstF = 0;
   for (const [who, L, P] of SAMPLES) for (const s of ['l', 'r']) { const fx = P['fore_' + s][0], g = armGeo(Folk.buildHiRes(L), P, s); worstF = Math.max(worstF, g.flex); if (fx < -0.01 || g.flex > 150) bad.push(`${who} ${s} (${f2(fx)} rad, ${f2(g.flex)}°)`); }
   check(!bad.length, `the elbow stays in its range in every pose (${SAMPLES.length} poses, 0–150°, the most ${f2(worstF)}°)${bad.length ? ': ' + bad.slice(0, 6).join(', ') : ''}`);
-  const defs = new Map(); let hits = [], tot = 0;
+  // (the smooth people's rig — the hands their own parts, bent at the wrist — in every pose; the voxel people's — the hand
+  // in the forearm's line — in every pose but the hand on the hip, which only the smooth people take: folkanim.js hipClock)
+  const defs = new Map(); let hits = [], tot = 0, n = 0;
   for (const [who, L, P] of SAMPLES) {
     if (who.startsWith('clip ')) continue;
-    let def = defs.get(L); if (!def) defs.set(L, def = Folk.buildHiRes(L));
-    const r = inside(def, P); tot += r.tot; if (r.n) hits.push(`${who} (${r.n})`);
+    let d = defs.get(L); if (!d) defs.set(L, d = [Folk.buildHiRes(L), Folk.buildFine(L)]);
+    for (const [def, rig] of [[d[1], 'smooth'], [d[0], 'voxel']]) {
+      if (rig === 'voxel' && who.endsWith('hand on hip')) continue;
+      const r = inside(def, P); tot += r.tot; n++; if (r.n) hits.push(`${who}, ${rig} (${r.n})`);
+    }
   }
-  check(!hits.length, `no forearm or hand inside the torso (${SAMPLES.length} poses, ${tot} voxels)${hits.length ? ': ' + hits.slice(0, 8).join(', ') : ''}`);
+  check(!hits.length, `no forearm or hand inside the torso (${n} poses of the two rigs, ${tot} voxels)${hits.length ? ': ' + hits.slice(0, 8).join(', ') : ''}`);
+}
+
+// ---------------------------------------------------------------- §2 hands and the hand pivot
+// the smooth people's hands are parts of their own (the wrist bends; what they hold hangs at the hand's grip), the voxel
+// people's stay in the forearm (the same part count: Very Low's draws do not change); a hand has a palm, the fingers as
+// one block and a thumb apart from them, the palm's side paler; a bag hangs straight down at every moment of the walk with
+// its handles in the fist; an elder's cane stands on the floor
+console.log('§2 hands');
+{
+  const dL = Folk.look(5, 'farmer', 'adult'); dL.skin = Folk.SKIN[6];
+  const fine = Folk.buildFine(dL), vox = Folk.buildHiRes(dL);
+  check(!!fine.parts.hand_l && !!fine.parts.hand_r && fine.rig.hand_r && fine.rig.hand_r[0] === 'fore_r', `the smooth rig has hands of its own at the wrists (${fine.order.length} parts: ${fine.order.filter(n => /hand|item/.test(n)).join(', ')})`);
+  check(vox.order.length === 13 && !vox.parts.hand_r, `the voxel rig keeps the hand in the forearm (${vox.order.length} parts, as v0.46: Very Low draws the same)`);
+  const h = fine.parts.hand_r.grid || fine.parts.hand_r, at = (g, x, y, z) => { const X = x + g.ox, Y = y + g.oy, Z = z + g.oz; return g.in(X, Y, Z) ? g.c[g.i(X, Y, Z)] : 0; };
+  let thumb = 0; for (let y = -6; y <= 0; y++) for (const x of [-1, 0]) if (at(h, x, y, -2)) thumb++;
+  const notch = !at(h, -1, -4, -1) && !!at(h, -1, -4, -2) && !!at(h, 0, -4, -1);
+  let n = 0; for (const v of h.c) if (v) n++;
+  check(thumb >= 3 && notch, `a hand: a thumb of ${thumb} voxels ahead of the palm, a notch between it and the fingers (${n} voxels; v0.46: a 3 × 3 mitten)`);
+  const lum = (c) => ((c >> 16) & 255) * 0.3 + ((c >> 8) & 255) * 0.59 + (c & 255) * 0.11;
+  check(lum(at(h, -1, -2, 0)) > lum(at(h, 0, -2, 0)) + 8, `the palm's side paler than the back of the hand on a dark skin (${lum(at(h, -1, -2, 0)).toFixed(0)} against ${lum(at(h, 0, -2, 0)).toFixed(0)})`);
+  const hl = fine.parts.hand_l.grid || fine.parts.hand_l;
+  check(!!at(hl, 0, -2, 0) && lum(at(hl, 0, -2, 0)) > lum(at(hl, -1, -2, 0)), 'the left hand mirrors the right (its palm toward the body too)');
+  // the grip inside the closed fingers
+  const G0 = fine.grip, gx = G0[0] + 0.5, gy = G0[1] + 0.5, gz = G0[2] + 0.5;
+  let fx0 = 9, fx1 = -9, fy0 = 9, fy1 = -9, fz0 = 9, fz1 = -9;
+  for (let y = -6; y <= -4; y++) for (let z = -1; z <= 1; z++) for (const x of [-1, 0]) if (at(h, x, y, z)) { fx0 = Math.min(fx0, x); fx1 = Math.max(fx1, x + 1); fy0 = Math.min(fy0, y); fy1 = Math.max(fy1, y + 1); fz0 = Math.min(fz0, z); fz1 = Math.max(fz1, z + 1); }
+  check(gx >= fx0 && gx <= fx1 && gy >= fy0 && gy <= fy1 && gz >= fz0 && gz <= fz1, `the hand's grip (${[gx, gy, gz].map(f2).join(', ')}) inside the fingers (${fx0}…${fx1}, ${fy0}…${fy1}, ${fz0}…${fz1})`);
+}
+{
+  // a bag at the grip, straight down through the walk, its handles in the fist
+  const def = Folk.buildFine(bagL), G = Folk.gaitFor(bagL), out = {};
+  FA.stride(G, 1.6, 0.1, false);
+  let worst = 0, gap = 0;
+  for (let k = 0; k < 32; k++) {
+    G.ph = k / 32 * Math.PI * 2; FA.walkPerson(G, 1, out);
+    const M = FS.rigMats(def, m4.create(), out, {}), I = M.item_r, ya = [I[4], I[5], I[6]];
+    worst = Math.max(worst, deg(angle(ya, [0, 1, 0])));
+    const grip = pt(M.item_r, 0, 0, 0), hand = pt(M.hand_r, def.grip[0], def.grip[1], def.grip[2]);
+    gap = Math.max(gap, len(sub(grip, hand)));
+  }
+  check(worst < 3 && gap < 0.01, `a bag hangs straight down from the hand's grip through the walk (at worst ${f2(worst)}° off the vertical; the grip ${f2(gap)} units from the hand's)`);
+  const g = def.parts.item_r.grid || def.parts.item_r; let top = -99; for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) if (g.c[g.i(x, y, z)]) top = Math.max(top, y - g.oy);
+  check(top >= -1 && top <= 1, `the bag's handles reach up into the fist (their top row ${top} at the grip)`);
+}
+{
+  // an elder's cane stands on the floor
+  const L = caneL, def = Folk.buildFine(L), G = Folk.gaitFor(L), a = { seedW: 4 }, out = {};
+  let P; for (let k = 0; k < 30; k++) P = FA.pose(a, 'idle', 1 / 30, 0, 0, false, out, undefined, G);
+  const M = FS.rigMats(def, m4.create(), P, {});
+  let tip = Infinity, sole = Infinity;
+  for (const v of voxOf(def, M, 'item_l')) tip = Math.min(tip, v.p[1] - 0.5);
+  for (const k of ['shin_l', 'shin_r']) for (const v of voxOf(def, M, k)) sole = Math.min(sole, v.p[1] - 0.5);
+  check(G.cane && Number.isFinite(tip) && Math.abs(tip - sole) <= 1.2, `an elder's cane stands on the floor (its tip ${f2(tip - sole)} units from the soles' level)`);
 }
 
 // ---------------------------------------------------------------- §6 sitting

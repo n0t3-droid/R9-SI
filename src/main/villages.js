@@ -1402,6 +1402,7 @@
         if (!model && !sm) continue;
         const light = ent.lightAt(a.pos[0], a.pos[1] + 1.2, a.pos[2]);
         // the budget (src/shared/folkcrowd.js): a villager far from the eye is posed every 2nd, 4th or 8th frame; between two its last pose holds
+        if (a.gait) a.gait.hands = sm;   // (t-folk2: the smooth people's wrists bend — a hand on the hip; folkanim.js hipClock)
         const pose = (!VR.Crowd || VR.Crowd.due(a, d2) || !a.poseOut) ? this.pose(a, t) : a.poseOut;
         const sleeping = a.pose === 'sleep';
         if (a.shadeT === undefined || t - a.shadeT > 0.25) { a.shade = ent.sunShade(a.pos, 1.2); a.shadeT = t; }   // terrain-shadow ray only 4× a second per villager
