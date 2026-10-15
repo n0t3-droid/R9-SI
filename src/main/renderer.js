@@ -142,7 +142,7 @@
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
-      P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky', this.q.lite ? ['LITE'] : []);   // LITE: two-octave nebula, no dust (Very Low)
+      P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky', (this.q.lite ? ['LITE'] : []).concat(this.q.wxDrama ? ['WXDRAMA'] : []));   // LITE: two-octave nebula, no dust (Very Low) · WXDRAMA (t-motion): the storm's side, the bolt, the rainbow
       P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud');
       P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff');   // t-clouds: cumulus, fog banks, anchors (balanced and above)
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
@@ -158,7 +158,7 @@
       P.voxInst = GL.program(S.VOX_VS, S.VOX_FS, 'voxInst', ['INST']);   // (the Baustelle's scaffold: one mesh, many instances)
       P.part = GL.program(S.PART_VS, S.PART_FS, 'part');
       P.line = GL.program(S.LINE_VS, S.LINE_FS, 'line');
-      P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain');
+      P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain', this.q.wxDrama ? ['WXDRAMA'] : []);   // (t-motion: the rain blown sideways in sheets)
       P.decal = GL.program(S.DECAL_VS, S.DECAL_FS, 'decal');
       P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod');
       // (the smooth props' programs are compiled on their first use, propProgram: Very Low never compiles them)
@@ -430,9 +430,9 @@
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
       const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre: its own program define; texLite: the sampler)
-      const prevM = !!this.q.motion;   // (t-motion: the MOTION define of the terrain and the palms)
+      const prevM = !!this.q.motion, prevD = !!this.q.wxDrama, prevC = !!this.q.cloudShadow;   // (t-motion: the MOTION, WXDRAMA and CLOUDSH defines)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.motion !== prevM) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.motion !== prevM || !!this.q.wxDrama !== prevD || !!this.q.cloudShadow !== prevC) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
@@ -817,6 +817,10 @@
       if (u.u_night) gl.uniform1f(u.u_night, E.night);
       if (u.u_dim) gl.uniform1i(u.u_dim, E.dimId);
       if (u.u_skyMagic) gl.uniform1f(u.u_skyMagic, this.q.magic);
+      // t-motion · Wetter-Drama (env.js E.storm / E.bolt) and the snow cover (E.snowCover)
+      if (u.u_storm) { const st = E.storm || [1, 0, 0, 0]; gl.uniform4f(u.u_storm, st[0], st[1], st[2], st[3]); }
+      if (u.u_bolt) { const b = E.bolt || [1, 0, 0, 0]; gl.uniform4f(u.u_bolt, b[0], b[1], b[2], b[3]); }
+      if (u.u_snowCover) gl.uniform1f(u.u_snowCover, E.snowCover || 0);
       // the sky bodies (skybodies.js): directions and angular radii of the giant, the blue planet and the four moons
       const B = E.bodies;
       if (B) {
@@ -1690,11 +1694,13 @@
     updatePuffs(E, cam) {
       const cov = Math.round(E.cloudCover * 20) / 20, wind = E.time * 0.9, cell = VR.Clouds.CELL;
       const ocx = Math.floor((cam.x + wind) / cell), ocz = Math.floor(cam.z / cell);
-      const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + Math.floor(cam.x / 96) + ',' + Math.floor(cam.z / 96);
+      const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + Math.floor(cam.x / 96) + ',' + Math.floor(cam.z / 96) + ',' + (this.valleyFogV | 0);   // (t-motion: the valley fog's version)
       if (key === this.puffKey) return;
       this.puffKey = key;
       const f = VR.Clouds.field(cam, wind, { cover: cov }), gl = this.gl;
-      const lists = [VR.Clouds.pack(f.fog), VR.Clouds.pack(f.cumulus)];
+      let fogL = f.fog;
+      if (this.valleyFog && this.valleyFog.length) { const d2 = (q) => (q[0] - cam.x) * (q[0] - cam.x) + (q[2] - cam.z) * (q[2] - cam.z); fogL = this.valleyFog.concat(f.fog).sort((a, b) => d2(b) - d2(a)); }   // (t-motion: the morning's banks in the valleys, game.js — far to near with the others)
+      const lists = [VR.Clouds.pack(fogL), VR.Clouds.pack(f.cumulus)];
       for (let i = 0; i < 2; i++) {
         const v = this.puffVAO[i];
         gl.bindBuffer(gl.ARRAY_BUFFER, v.buf); gl.bufferData(gl.ARRAY_BUFFER, lists[i], gl.DYNAMIC_DRAW);
@@ -2169,6 +2175,7 @@
       gl.uniform1f(p.u.u_snow, F.precip.snow ? 1 : 0);
       gl.uniform3f(p.u.u_right, this.camRight[0], this.camRight[1], this.camRight[2]);
       gl.uniform3f(p.u.u_ambSky, E.ambSky[0], E.ambSky[1], E.ambSky[2]);
+      if (p.u.u_rainWind) { const wd = E.windDir || [1, 0]; gl.uniform3f(p.u.u_rainWind, wd[0], wd[1], E.wind || 1); }   // (t-motion: WXDRAMA's slant and sheets)
       // upload heights
       if (F.precip.heights) {
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.texHeights);

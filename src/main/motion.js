@@ -36,6 +36,19 @@
   };
   M.hash3 = function (x, y, z) { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x9e3779b1); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
 
+  // ---- the rainbow (Wetter-Drama; the sky shader's WXDRAMA block, the same numbers): th degrees from the antisolar point.
+  // The primary from 40.6° (violet) to 42.4° (red outside), the secondary from 50.1° (red inside) to 53° (violet), 0.38 of
+  // the primary's strength; the sky inside the primary a little brighter, Alexander's dark band between the two
+  const BOWG = M.BOW = { p1: [40.6, 1.8], p2: [53.0, 2.9], k2: 0.38, inside: [38.0, 40.8], alex: [42.2, 43.5, 49.0, 50.2], hueSpan: 0.78 };
+  const ssm = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+  const hue = (p) => { const h = (1 - clamp01(p)) * BOWG.hueSpan * 6; return [0, 4, 2].map(o => clamp01(Math.abs(((h + o) % 6) - 3) - 1)); };
+  M.rainbowAt = function (th) {
+    const p1 = (th - BOWG.p1[0]) / BOWG.p1[1], p2 = (BOWG.p2[0] - th) / BOWG.p2[1];
+    const b1 = ssm(0, 0.18, p1) * (1 - ssm(0.82, 1, p1)), b2 = ssm(0, 0.18, p2) * (1 - ssm(0.82, 1, p2)) * BOWG.k2;
+    const h1 = hue(p1), h2 = hue(p2);
+    return { r: h1[0] * b1 + h2[0] * b2, g: h1[1] * b1 + h2[1] * b2, b: h1[2] * b1 + h2[2] * b2, b1, b2, inside: 1 - ssm(BOWG.inside[0], BOWG.inside[1], th), alex: ssm(BOWG.alex[0], BOWG.alex[1], th) * (1 - ssm(BOWG.alex[2], BOWG.alex[3], th)) };
+  };
+
   // ---- the new air's caps per tier (live particles of each kind at most): 0 Very Low · 1 Low · 2 Balanced · 3 High · 4 Ultra
   const KINDS = ['steam', 'tmote', 'sparkle', 'leaf', 'splash'];
   const CAPS = [

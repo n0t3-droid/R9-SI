@@ -47,6 +47,10 @@ uniform float u_cirrus;      // high cirrus streaks: 1 on balanced and above, 0 
 uniform float u_animOn;      // Animierte Anzeigen (settings.anim): 1 animates the holo displays, the portal veil and the hall's light pulses
 uniform float u_pulseA;      // texture layers of the Hangar Hall's pulsing wall strips (-1 when not loaded)
 uniform float u_pulseB;
+#ifdef WXDRAMA
+uniform vec4 u_storm;        // t-motion · Wetter-Drama: the storm's side (x, z: unit, where it comes from), its front 0..1, the rainbow 0..1
+uniform vec4 u_bolt;         // t-motion: the bolt's heading (x, z: unit), its shape seed, its flash 0..1
+#endif
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -465,6 +469,41 @@ vec3 skyColor(vec3 dir, bool withSun) {
         col += vec3(0.1, 0.9, 0.5) * a * band * u_night * 0.8 + vec3(0.5, 0.2, 0.9) * a * band * band * u_night * 0.4;
       }
     }
+#ifdef WXDRAMA
+    // t-motion · Wetter-Drama (weather.js, env.js E.storm / E.bolt): the storm's front darkens the sky from its side, a dark
+    // wall of cloud low over the horizon there; the bolt, a jagged stroke from the cloud base down behind the hills, and its
+    // flash lighting the sky round it (the land in front stands dark: the hills as silhouettes); the rainbow after the rain
+    // at 42° round the antisolar point — red outside, violet inside — with the secondary faint at 51° (reversed) and
+    // Alexander's dark band between (motion.js rainbowAt: the same numbers, test/motion_weather.js)
+    if (u_storm.z > 0.001) {
+      vec2 hd = normalize(dir.xz + vec2(1e-5, 0.0));
+      float side = smoothstep(-0.35, 0.95, dot(hd, u_storm.xy));
+      float wall = side * (1.0 - smoothstep(0.0, 0.45, max(dir.y, 0.0)));
+      col *= 1.0 - u_storm.z * (0.18 + 0.45 * side + 0.25 * wall);
+    }
+    if (u_bolt.w > 0.001) {
+      vec2 hd = normalize(dir.xz + vec2(1e-5, 0.0));
+      float across = hd.x * u_bolt.y - hd.y * u_bolt.x, along = dot(hd, u_bolt.xy), e = dir.y, sd0 = u_bolt.z;
+      float jag = 0.018 * sin(e * 41.0 + sd0) + 0.009 * sin(e * 97.0 + sd0 * 1.7) + 0.004 * sin(e * 213.0 + sd0 * 2.3) + (e - 0.02) * 0.08 * sin(sd0 * 0.37);
+      float d = abs(across - jag), front = step(0.0, along);
+      float span = smoothstep(-0.03, 0.0, e) * (1.0 - smoothstep(0.30, 0.34, e)) * front;
+      float db = abs(across - jag - (0.19 - e) * 0.35 - 0.006 * sin(e * 150.0 + sd0));
+      float br = exp(-db * db / 0.0000025) * step(0.06, e) * step(e, 0.19) * front;
+      float fl = u_bolt.w;
+      col += vec3(0.85, 0.88, 1.0) * (exp(-d * d / 0.0000035) * span * 9.0 + br * 4.0 + exp(-d * d / 0.0004) * span * 0.7) * fl;
+      col += vec3(0.55, 0.55, 0.78) * fl * (0.25 + 1.4 * exp(-(1.0 - along) * 6.0)) * (1.0 - smoothstep(0.0, 0.6, max(e, 0.0)));
+    }
+    if (u_storm.w > 0.001) {
+      float th = degrees(acos(clamp(dot(dir, -u_sunDir), -1.0, 1.0)));
+      float p1 = (th - 40.6) / 1.8, p2 = (53.0 - th) / 2.9;
+      float b1 = smoothstep(0.0, 0.18, p1) * (1.0 - smoothstep(0.82, 1.0, p1)), b2 = smoothstep(0.0, 0.18, p2) * (1.0 - smoothstep(0.82, 1.0, p2)) * 0.38;
+      vec3 h1 = clamp(abs(mod((1.0 - clamp(p1, 0.0, 1.0)) * 0.78 * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+      vec3 h2 = clamp(abs(mod((1.0 - clamp(p2, 0.0, 1.0)) * 0.78 * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+      float inside = 1.0 - smoothstep(38.0, 40.8, th), alex = smoothstep(42.2, 43.5, th) * (1.0 - smoothstep(49.0, 50.2, th));
+      float k = u_storm.w * smoothstep(-0.02, 0.06, dir.y);
+      col = col * (1.0 - 0.1 * alex * k) + (h1 * b1 + h2 * b2) * 0.32 * k * (0.4 + col) + vec3(0.04) * inside * k;
+    }
+#endif
   }
   return col;
 }
@@ -702,6 +741,7 @@ flat in float v_fade;
 #endif
 #ifdef MOTION
 in float v_sheen;   // t-motion: a passing gust brightens grass and leaves (TERRAIN_VS, wind.js)
+uniform float u_snowCover;   // t-motion: a snow day's cover on the open ground (env.js: it builds in ~3 min of snow, melts in ~10)
 #endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
@@ -804,6 +844,11 @@ void main() {
   }
 #ifdef MOTION
   alb.rgb *= 1.0 + v_sheen;   // t-motion · the wind's waves over the meadow: grass and leaves bent by a gust show their paler side
+  if (u_snowCover > 0.001 && (face == 2u || ((v_w5 >> 13u) & 1u) == 1u)) {   // a snow day: the flakes settle on the open tops
+    vec2 sp = v_localPos.xz + vec2(u_camInt.xz);
+    float patchy = smoothstep(0.25, 0.75, texture(u_noise, sp / 23.0).r * 0.7 + texture(u_noise, sp / 5.0).g * 0.3 + u_snowCover * 0.6 - 0.2);
+    alb.rgb = mix(alb.rgb, vec3(0.9, 0.92, 0.97), u_snowCover * patchy * smoothstep(0.86, 1.0, v_sky));
+  }
 #endif
   if (((v_w3 >> 15u) & 1u) == 1u) {
 #ifdef MODEL
@@ -2515,6 +2560,9 @@ uniform float u_snow;
 uniform sampler2D u_heights;             // 128x128 top heights around camera
 uniform vec2 u_heightOrigin;             // world xz of heights texel 0
 uniform vec3 u_right;
+#ifdef WXDRAMA
+uniform vec3 u_rainWind;                 // t-motion: the wind's heading (x, z) and strength — the rain blows sideways in sheets
+#endif
 out float v_a;
 out vec2 v_c;
 out float v_snow;
@@ -2527,12 +2575,33 @@ void main() {
   float yy = mod(-u_time * fallSpeed * (0.8 + a_seed.z * 0.4) + a_seed.z * 97.0, H) - H * 0.4;
   vec3 wp = vec3(wxz.x + 0.5, u_camPos.y + yy, wxz.y + 0.5);
   if (u_snow > 0.5) { wp.x += sin(u_time * 1.3 + a_seed.z * 20.0) * 0.6; wp.z += cos(u_time * 1.1 + a_seed.z * 17.0) * 0.6; }
+#ifdef WXDRAMA
+  // t-motion: the drops drift downwind as they fall (the slope grows with the wind: about 30° in a storm), the streak
+  // leans along their path, and denser sheets of rain sweep downwind across the view
+  float slope = u_snow > 0.5 ? 0.0 : u_rainWind.z * 0.19;
+  vec2 drift = -u_rainWind.xy * slope * yy;   // (none at the eye's height: above it upwind, below it downwind — the field stays round the eye)
+  wp.xz += drift;
+  vec2 hu = (wxz + drift - u_heightOrigin + 0.5) / 128.0;
+#else
   vec2 hu = (wxz - u_heightOrigin + 0.5) / 128.0;
+#endif
   float top = texture(u_heights, hu).r * 255.0;
   v_a = step(top + 1.0, wp.y) * (1.0 - smoothstep(R * 0.6, R, length(xz)));
+#ifdef WXDRAMA
+  if (u_snow < 0.5) {
+    vec2 pq = vec2(-u_rainWind.y, u_rainWind.x);
+    float band = 0.5 + 0.5 * sin(dot(wp.xz, u_rainWind.xy) * 0.11 - u_time * (1.5 + u_rainWind.z) + 2.0 * sin(dot(wp.xz, pq) * 0.05));
+    v_a *= 0.45 + 0.55 * smoothstep(0.3, 0.85, band);
+  }
+#endif
   vec3 rel = wp - u_camPos;
   vec2 size = u_snow > 0.5 ? vec2(0.07, 0.07) : vec2(0.02, 0.45);
+#ifdef WXDRAMA
+  vec3 upv = normalize(vec3(-u_rainWind.x * slope, 1.0, -u_rainWind.y * slope));
+  vec3 p = rel + u_right * a_corner.x * size.x + upv * a_corner.y * size.y;
+#else
   vec3 p = rel + u_right * a_corner.x * size.x + vec3(0.0, 1.0, 0.0) * a_corner.y * size.y;
+#endif
   v_c = a_corner;
   v_snow = u_snow;
   gl_Position = u_viewProj * vec4(p, 1.0);

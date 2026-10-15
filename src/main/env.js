@@ -210,14 +210,29 @@
       E.puddle = o.wetOn ? this.puddle : 0;
       // lightning: the bolt lights the sky (weather.js decides when; the thunder follows by sound)
       const fl = this.wx.flash;
-      if (fl > 0.001) { E.ambSky = E.ambSky.map(v => v + fl * 1.8); E.zenith = E.zenith.map(v => v + fl * 0.6); }
+      // t-motion · Wetter-Drama (o.drama): the storm's front darkens the sky from its side, the bolt is drawn in the sky and
+      // its flash lights the sky behind the hills more than the land (they stand as silhouettes), the rainbow after the rain
+      // while the sun shines, the washed light after it (the haze thinner, the colours fuller)
+      const drama = !!o.drama && dim === 'overworld', WX = this.wx;
+      const st = E.storm || (E.storm = [1, 0, 0, 0]), bo = E.bolt || (E.bolt = [1, 0, 0, 0]);
+      const fa = (WX.windAngle || 0) + Math.PI;   // the side the wind (and the storm) comes from
+      st[0] = Math.cos(fa); st[1] = Math.sin(fa); st[2] = drama ? WX.front : 0;
+      st[3] = drama ? WX.bow * M.smoothstep(0.02, 0.12, sy) * (1 - M.smoothstep(0.62, 0.72, sy)) * (1 - rain) : 0;   // (the bow needs the sun up and lower than its 42°)
+      const B0 = WX.boltInfo;
+      if (B0) { bo[0] = B0.dx; bo[1] = B0.dz; bo[2] = B0.shape; } bo[3] = drama && B0 ? fl : 0;
+      if (fl > 0.001) { const k = drama ? 0.45 : 1; E.ambSky = E.ambSky.map(v => v + fl * 1.8 * k); E.zenith = E.zenith.map(v => v + fl * 0.6); }
+      if (drama && WX.washed > 0.001) { const wk = WX.washed; E.fog[2] *= 1 - 0.45 * wk; E.saturation = (E.saturation === undefined ? GRADE.sat : E.saturation); this.washK = wk; } else this.washK = 0;
+      // the snow cover (t-motion, the MOTION terrain shader): the ground whitens in ~3 minutes of snow, melts over ~10
+      const sn = this.snow > 0.3 ? 1 : 0;
+      this.snowCover = (this.snowCover || 0) + (sn - (this.snowCover || 0)) * (1 - Math.exp(-dt / (sn > (this.snowCover || 0) ? 60 : 200)));
+      E.snowCover = o.motion ? this.snowCover : 0;
       // eye adaptation
       const target = 1 + (1 - (o.eyeSky === undefined ? 1 : o.eyeSky)) * 0.9 + night * 0.35;
       this.exposure += (target - this.exposure) * Math.min(1, dt * 1.5);
       // the day's exposure is the grade's (expo); the night keeps the v0.41 level (0.94), which already matches the frames
       E.exposure = this.exposure * (o.exposureMul || 1) * (GRADE.expo + (0.94 - GRADE.expo) * night) * Math.pow(2, W.exp);
       E.grade = mix3([1.02, 1.0, 0.97], [0.92, 0.97, 1.08], night);
-      E.saturation = GRADE.sat - rain * 0.2;
+      E.saturation = GRADE.sat - rain * 0.2 + 0.08 * (this.washK || 0);   // (t-motion: the washed light after the rain)
       E.vivid = 0.6;
       E.bloomThreshold = GRADE.bloomThr; E.bloomStrength = GRADE.bloomStr + night * 0.04;
       E.contrast = GRADE.contrast; E.vignette = GRADE.vignette; E.nebula = GRADE.nebula; E.sunDisc = GRADE.sunDisc;

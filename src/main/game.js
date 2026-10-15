@@ -1050,7 +1050,7 @@
       const b = w ? VR.BIOMES[w.biomeAt(Math.floor(pos[0]), Math.floor(pos[2]))] : null;
       const eye = w ? w.getLight(Math.floor(pos[0]), Math.floor(pos[1]), Math.floor(pos[2])) : 0xf000;
       const hz = this.horizon && this.horizon.enabled() ? this.horizon.radius : 0;
-      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather }, extra || {}));
+      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather, drama: !!this.settings.wxDrama, motion: !!this.settings.motion }, extra || {}));   // (t-motion: drama, motion)
     }
     titleFrame(dt) {
       const c = this.titleCam, w = this.world;
@@ -1174,6 +1174,13 @@
       if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
       if (this.motionAir) this.motionAir.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, drama: !!this.settings.wxDrama });   // (t-motion)
       if (this.particles.setWind) this.particles.setWind(E, dt);   // (t-motion: smoke and mist take up the world's wind)
+      // t-motion · Wetter-Drama: the morning's fog banks in the valleys round the eye (where the clouds are sprites), every 3 s
+      if ((this.valleyT = (this.valleyT || 0) - dt) <= 0) {
+        this.valleyT = 3;
+        const r = this.renderer, C = VR.Clouds, on = !!this.settings.wxDrama && r && r.q && r.q.clouds >= 2 && this.dim === 'overworld' && C && C.valleyFog;
+        const list = on ? C.valleyFog({ x: eye[0], z: eye[2] }, (x, z) => (w.isLoaded(x, z) ? w.topAt(x, z) : -1), this.env.timeOfDay, this.env.wx.kind === 'nebel' ? 1 : 0, VR.C.SEA) : [];
+        if (r && (list.length || (r.valleyFog && r.valleyFog.length))) { r.valleyFog = list; r.valleyFogV = (r.valleyFogV | 0) + 1; }
+      }
       this.particles.update(dt, eye);
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
       this.waterFx(dt, p, eye, underwater, inLava, E);

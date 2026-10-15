@@ -122,6 +122,33 @@
     fog.sort((a, b) => near(b) - near(a));
     return { cumulus: cu, fog };
   }
+  // ---- t-motion · Wetter-Drama: the morning's fog banks in the valleys round the eye, burnt off as the sun climbs.
+  // morningFog(tod): tod in ticks (0 sunrise, 6000 noon) → 0..1: coming in from 21 000, full from 22 500 to 1 000, gone by 3 200
+  function morningFog(tod) {
+    const t = (((tod - 21000) % 24000) + 24000) % 24000;
+    if (t > 6200) return 0;
+    return smooth(0, 1500, t) * (1 - smooth(4000, 6200, t));
+  }
+  // the valleys: a grid of heights round the camera (hAt(x, z), every VALLEY.step blocks); a node lower than the mean of
+  // its eight neighbours two steps off by VALLEY.dip blocks holds a flat bank a few blocks over the ground (over the sea
+  // level where it is lower). thick: 1 on a Nebel morning, 0 on a clear one. Sprites as fogBanks' (world space)
+  const VALLEY = { step: 28, n: 5, dip: 3 };
+  function valleyFog(cam, hAt, tod, thick, sea) {
+    const k = morningFog(tod); if (k < 0.02) return [];
+    const S = VALLEY.step, N = VALLEY.n, M = N + 2, W = 2 * M + 1, gx0 = Math.round(cam.x / S), gz0 = Math.round(cam.z / S);
+    const hs = new Float32Array(W * W);
+    for (let j = -M; j <= M; j++) for (let i = -M; i <= M; i++) hs[(j + M) * W + i + M] = hAt((gx0 + i) * S, (gz0 + j) * S);
+    const H = (i, j) => hs[(j + M) * W + i + M];
+    const out = [], ring = [[-2, 0], [2, 0], [0, -2], [0, 2], [-1, -1], [1, 1], [-1, 1], [1, -1]];
+    for (let j = -N; j <= N; j++) for (let i = -N; i <= N; i++) {
+      const h = H(i, j); if (!(h > 0)) continue;
+      let m = 0; for (const [a, b] of ring) m += H(i + a, j + b); m /= ring.length;
+      if (h > m - VALLEY.dip) continue;
+      const gx = gx0 + i, gz = gz0 + j, x = gx * S + (hash(gx, gz, 130) - 0.5) * 12, z = gz * S + (hash(gx, gz, 132) - 0.5) * 12, hb = hAt(x, z);
+      out.push([x, Math.max(hb > 0 ? hb : h, sea || 0) + 3 + hash(gx, gz, 131) * 3, z, 34 + hash(gx, gz, 133) * 22, (0.26 + 0.4 * clamp(thick || 0, 0, 1)) * k, 0.22, Math.floor(hash(gx, gz, 134) * 4) % 4]);
+    }
+    return out;
+  }
   // the packed instance data of a sprite list (SPRITE_FLOATS per sprite): the renderer uploads this
   function pack(list) {
     const out = new Float32Array(list.length * SPRITE_FLOATS);
@@ -166,5 +193,5 @@
     return out;
   }
 
-  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, HIGH, BOX_HIGH, hash, vnoise, cellOn, boxThr, clearDay, highFade, cumulusCell, fogBanks, anchors, field, pack, density, atlas };
+  VR.Clouds = { CELL, RANGE, MAX_CUMULUS, FOG, ANCHOR, SPRITE_FLOATS, HIGH, BOX_HIGH, hash, vnoise, cellOn, boxThr, clearDay, highFade, cumulusCell, fogBanks, anchors, field, pack, density, atlas, VALLEY, morningFog, valleyFog };
 })(VR);
