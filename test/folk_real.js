@@ -282,6 +282,40 @@ console.log('§3 clothes and hair');
   check(fold >= 4, `a robe's hem has folds (${fold} of its ${ring} hem voxels a step further out)`);
   const head = d1.parts.head.grid; let shell = 0; for (let x = -2; x <= 2; x++) for (let z = -2; z <= 1; z++) if ((at(head, x, 7, z) >>> 26 & 7) === Folk.TAG.hair) shell++;
   check(shell >= 12, `the hair is a shell over the skull (${shell} hair voxels a row over the crown)`);
+  // no head lets the light through: seen from the front and from the side, every cell inside the head's outline is covered
+  // (run 3's street: the temples' hair stood a voxel off the crown's rounded edge — a tunnel from the face to the back of
+  // the head under the hat's brim, the wall behind it two white dots beside the eyes, as voxels and smooth alike).
+  // A see-through cell: one the projection along the axis leaves empty, closed round by covered cells
+  const seeThrough = (g, axis) => {
+    const W = axis === 'z' ? g.sx : g.sz, Hh = g.sy, m = new Uint8Array(W * Hh), seen = new Uint8Array(W * Hh), st = [];
+    for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) if (g.c[g.i(x, y, z)]) m[(axis === 'z' ? x : z) + y * W] = 1;
+    const push = (a, b) => { if (a < 0 || a >= W || b < 0 || b >= Hh) return; const i = a + b * W; if (!m[i] && !seen[i]) { seen[i] = 1; st.push(i); } };
+    for (let a = 0; a < W; a++) { push(a, 0); push(a, Hh - 1); }
+    for (let b = 0; b < Hh; b++) { push(0, b); push(W - 1, b); }
+    while (st.length) { const i = st.pop(), a = i % W, b = (i / W) | 0; push(a + 1, b); push(a - 1, b); push(a, b + 1); push(a, b - 1); }
+    let n = 0; for (let i = 0; i < W * Hh; i++) if (!m[i] && !seen[i]) n++;
+    return n;
+  };
+  const castH = [];
+  for (const role of ['farmer', 'baker', 'builder', 'mayor', 'ranger', 'pilot', 'healer', 'gardener', 'scholar']) castH.push([Object.assign(Folk.look(31 + castH.length * 7, role, 'adult'), { beard: false }), role]);
+  for (const kh of ['beanie', 'kidcap', 'bow']) castH.push([Object.assign(Folk.look(5 + castH.length, 'child', 'child'), { kidHat: kh }), 'a child in a ' + kh]);
+  castH.push([Object.assign(Folk.look(808, 'elder', 'elder'), { elderHat: 'flat', hs: 'short' }), 'an elder in a flat cap']);
+  for (const hs of ['short', 'long', 'bob', 'bun', 'pony', 'curly', 'spiky', 'braids', 'afro', 'bald']) {
+    castH.push([Object.assign(Folk.look(61 + castH.length * 3, 'crafter', 'adult'), { hs, beard: hs === 'bald' }), hs + ' hair']);
+    castH.push([Object.assign(Folk.look(91 + castH.length * 5, 'child', 'child'), { hs, kidHat: null }), 'a child, ' + hs + ' hair']);
+  }
+  castH.push([Folk.look(11, 'farmer', 'adult'), "run 3's farmer on the street"]);
+  const ROLES = Object.keys(Folk.ROLES || {}).filter(r => !/^(hero|child|elder)$/.test(r));
+  for (let k = 0; k < 160; k++) { const age = k % 7 === 3 ? 'child' : k % 5 === 2 ? 'elder' : 'adult'; castH.push([Folk.look(5000 + k * 37, age === 'adult' ? ROLES[k % ROLES.length] || 'farmer' : age, age, null, k % 3 ? null : 'hall'), 'look ' + (5000 + k * 37)]); }
+  let leaky = [], fineLeaky = [], fines = 0;
+  for (const [L, who] of castH) {
+    const def = Folk.buildHiRes(L), g = def.parts.head.grid || def.parts.head;
+    const n = seeThrough(g, 'z') + seeThrough(g, 'x');
+    if (n) leaky.push(`${who} (${n})`);
+    if (fines < 40 && Folk.buildFine) { fines++; const f = Folk.buildFine(L).fine.head, nf = seeThrough(f, 'z') + seeThrough(f, 'x'); if (nf) fineLeaky.push(`${who} (${nf})`); }
+  }
+  check(!leaky.length, `no head lets the light through, seen from the front or the side (${castH.length} heads as voxels${leaky.length ? '; through: ' + leaky.slice(0, 8).join(', ') + (leaky.length > 8 ? ` and ${leaky.length - 8} more` : '') : ''})`);
+  check(!fineLeaky.length, `no fine head lets the light through (${fines} heads at 64 a block${fineLeaky.length ? '; through: ' + fineLeaky.slice(0, 8).join(', ') : ''})`);
 }
 
 // ---------------------------------------------------------------- §4 movement

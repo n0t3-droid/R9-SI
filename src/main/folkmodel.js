@@ -795,6 +795,10 @@
       // the shell: over the crown, the temples (above the ears), the back
       shellTop(A.top + 1);
       for (const sx of [A.xl - 1, A.xr + 1]) for (let y = A.top - 2; y <= A.top; y++) for (let z = A.z0 + 1; z <= A.z1; z++) H(sx, y, z);
+      // (the crown's rounded edge under the temples' shell filled with hair: the shell a voxel off the skull there left a
+      // tunnel from the face to the back of the head — run 3's street: the wall behind it two light dots beside the eyes,
+      // under a hat's brim most of all, as voxels and smooth alike)
+      for (const x of [A.xl, A.xr]) for (let y = A.top - 2; y <= A.top; y++) for (let z = A.z0 + 1; z <= A.z1; z++) if (!head.has(x, y, z)) H(x, y, z);
       for (let y = 2; y <= A.top; y++) for (let x = A.xl; x <= A.xr; x++) { if (y === A.top && (x === A.xl || x === A.xr)) continue; H(x, y, A.z1 + 1); }
       // bangs over the forehead now and then (a fringe a voxel in front of the hairline)
       if ((hs === 'bob' || hs === 'long' || hs === 'pony' || hs === 'short') && rnd(5) < 0.45) for (let x = A.xl + 1; x <= A.xr - 1; x++) H(x, A.top, A.z0 - 1);
@@ -804,7 +808,9 @@
     }
     const low = kid ? -4 : -6;
     if (hs === 'long') {
-      for (let y = low; y <= A.top; y++) for (let x = A.xl - 1; x <= A.xr + 1; x++) { if (y < low + 2 && H3(x, y, 1, 7) < 0.4) continue; H(x, y, A.z1 + 1); if (y < A.top - 1 && y > low) H(x, y, A.z1 + 2); }
+      // (the ends ragged from below: a strand's last row goes only where the row under it went too — a gap over a lower
+      // strand let the light through the hair)
+      for (let y = low; y <= A.top; y++) for (let x = A.xl - 1; x <= A.xr + 1; x++) { if (y < low + 2 && H3(x, low, 1, 7) < 0.4 && (y === low || H3(x, y, 1, 7) < 0.4)) continue; H(x, y, A.z1 + 1); if (y < A.top - 1 && y > low) H(x, y, A.z1 + 2); }
       for (const sx of [A.xl - 1, A.xr + 1]) for (let y = (kid ? -2 : -3); y <= A.top; y++) for (let z = A.z0 + 2; z <= A.z1 + 1; z++) { if (y < 0 && H3(z, y, sx, 8) < 0.35) continue; H(sx, y, z); }
     } else if (hs === 'bob') {
       for (const sx of [A.xl - 1, A.xr + 1]) for (let y = 0; y <= A.top; y++) for (let z = A.z0 + 1; z <= A.z1 + 1; z++) H(sx, y, z);
