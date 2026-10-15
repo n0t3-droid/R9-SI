@@ -3,7 +3,7 @@
 // a browser slot is won in a race every half hour or so: four runs in four races took hours, one race does them all.
 // Each run is a child process (its own browser, closed before the next starts) with its own environment; the logs go to
 // .tmp_tests/ultralite_<tag>.log and .tmp_tests/smoke.log, the numbers to .tmp_tests/ultralite_<tag>.json.
-//   RUNS=vlc_before,vlc_after,run3,smoke (default)   BASE=file:///…/index.html (the branch base's dist, for vlc_before)
+//   RUNS=vlc_before,vlc_after,run3,smoke (default; also run3b, merged, classic)   BASE=file:///…/index.html (the branch base's dist, for vlc_before)
 // usage: RUNS=… BASE=… bash test/wt_run.sh ultralite_runs.mjs 14400
 import { spawnSync } from 'child_process';
 import fs from 'fs';
@@ -21,6 +21,7 @@ const RUNS = {
   // (after the merge of v042: the four switches still draw the same pictures cheaper — the plaza and the lake's mirror)
   merged: ['ultralite.mjs', 3600, { SCENES: 'plaza,lake', WALK: '0', TAG: 'merged' }],
   smoke: ['smoke.mjs', 1800, {}],
+  classic: ['classic_v2.mjs', 1800, {}],   // (the look's grid test: the shadow lookup's wrap offset sits in every preset's shaders)
 };
 const want = (process.env.RUNS || 'vlc_before,vlc_after,run3,smoke').split(',');
 let fails = 0;
@@ -28,7 +29,7 @@ for (const name of want) {
   const r = RUNS[name]; if (!r) { console.log(`  ✗ ${name}: no such run`); fails++; continue; }
   const [file, to, env] = r;
   if ('DIST' in env && !env.DIST) { console.log(`  ✗ ${name}: BASE (the base build's index.html) is not set`); fails++; continue; }
-  const log = `${TMP}/${name === 'smoke' ? 'smoke' : 'ultralite_' + name}.log`;
+  const log = `${TMP}/${name === 'smoke' ? 'smoke' : name === 'classic' ? 'classic_v2' : 'ultralite_' + name}.log`;
   const E = { ...process.env }; for (const k of ['MODE', 'PRESETS', 'N', 'TAG', 'DIST', 'SCENES', 'WALK', 'RD']) delete E[k];
   Object.assign(E, env);
   const fd = fs.openSync(log, 'w'), t0 = Date.now();
