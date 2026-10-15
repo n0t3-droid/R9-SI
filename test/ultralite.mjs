@@ -35,7 +35,7 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
 const page = await ctx.newPage();
 const logs = [];
-page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|missing/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
+page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|missing|did not answer|replaced/i.test(s)) logs.push(`[${t}] ${s.slice(0, 700)}`); });
 page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 await page.goto(DIST);
 const wait = (ms) => page.waitForTimeout(ms);
