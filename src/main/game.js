@@ -33,6 +33,12 @@
   PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1; PRESETS.ultraLite.smoothFolk = 1;
   // t-folk2: the people in the shadow map (folkgpu.js castShadows) where there is one — Balanced and up
   for (const p in PRESETS) PRESETS[p].folkShadow = PRESETS[p].shadows > 0 ? 1 : 0;
+  // t-motion (WOW III · Alles bewegt sich): motion = the wind in everything (the MOTION shaders, the hung pieces' sway
+  // levels in the mesh, the new air), cloudShadow = the clouds' shadows on the land (where the clouds are sprites),
+  // wxDrama = the storm's front, the bolts, the rainbow, the valley fog. Very Low none (it stays as fast as before), Low the
+  // wind and the weather, Balanced and up all three
+  const MO_SW = ['motion', 'cloudShadow', 'wxDrama'];
+  for (const p in PRESETS) { PRESETS[p].motion = p === 'potato' ? 0 : 1; PRESETS[p].cloudShadow = p === 'potato' || p === 'low' ? 0 : 1; PRESETS[p].wxDrama = p === 'potato' ? 0 : 1; }
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)
@@ -141,6 +147,8 @@
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
       if (key !== '*' && F9_SW.includes(key)) S.preset = 'custom';   // (F9: a switch of Ultra · Leicht changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
+      if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
+      for (const k of MO_SW) if (S[k] === undefined) S[k] = PRESETS[S.preset] ? PRESETS[S.preset][k] : (k === 'cloudShadow' ? +((S.clouds | 0) >= 2) : 1);   // (settings saved before t-motion follow their preset)
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -153,8 +161,9 @@
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
-      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite });   // (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
+      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite, motion: !!S.motion, cloudShadow: !!S.cloudShadow, wxDrama: !!S.wxDrama });   // (t-motion: motion · cloudShadow · wxDrama) (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
       if (this.world) { const wp = this.propMask(); if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
+      if (this.world && (this.world.motion | 0) !== (S.motion ? 1 : 0)) { this.world.motion = S.motion ? 1 : 0; this.remeshAll(); }   // (t-motion: the hung pieces' sway levels come with the mesh)
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
       // F-Far: ring 1 as the preset asked (the governor never lowers it: no rung touches it); the render distance stays
@@ -386,7 +395,7 @@
       // (the panorama is a vgen-5 world without crystals: GEN.noCry — no crystal on the start screen either)
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5, noCrystal: true }, custom: VR.CUSTOM });
       this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5, noCrystal: true }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
       this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
       this.env.setTime(12800 + Math.random() * 1200); // golden hour → dusk: planets rising
@@ -448,7 +457,7 @@
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: this.store, savedKeys, renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time || 1000);
@@ -652,7 +661,7 @@
       const dim = meta.type === 'flat' ? 'flat' : 'overworld';
       this.dim = dim;
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: null, savedKeys: new Set(), renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time); this.env.day = meta.day;

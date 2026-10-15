@@ -2015,5 +2015,12 @@
     'town.sign.workshop': 'Workshop',
     'town.sign.maps': 'Maps',
     'town.sign.cafe': 'Café',
+    // t-motion · WOW III (src/main/motion.js): the wind in everything, the clouds' shadows, the weather's drama
+    'g.set.motion': 'Wind in everything: grass in waves, lanterns, awnings, palm fronds',
+    'g.set.motion.tip': 'Gusts roll over the meadows as waves, lanterns and signs swing on their hooks, awnings and laundry flutter, palm fronds bend. Off on Very Low.',
+    'g.set.cloudShadow': 'Cloud shadows over the land',
+    'g.set.cloudShadow.tip': 'The clouds\' shadows drift with the wind over meadows, hills and roofs. From Balanced up.',
+    'g.set.wxDrama': 'Weather drama: storm front, lightning, rainbow, fog banks',
+    'g.set.wxDrama.tip': 'A storm rolls in from one side, the wind picks up, lightning outlines the hills, the rain blows sideways; afterwards a rainbow. In the morning fog banks lie in the valleys. Off on Very Low.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -571,6 +571,10 @@ flat out float v_fade;
 #ifdef ZINV
 invariant gl_Position;   // F10 · zPre: the cut-out layer's depth prepass and its colour pass place every fragment alike
 #endif
+#ifdef MOTION
+out float v_sheen;       // t-motion: how much a passing gust brightens this grass or leaf face (wind.js windSheen)
+${VR.Wind ? VR.Wind.glsl() : ''}
+#endif
 void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
@@ -594,6 +598,34 @@ void main() {
   bool ctmFace = ((a_w5 >> 14u) & 1u) == 1u;   // connected glass: bits 5-7 are its frame mask, not sway
   uint sway = ctmFace ? 0u : (a_w5 >> 5u) & 3u;
   uint leaf = ctmFace ? 0u : (a_w5 >> 7u) & 1u;
+#ifdef MOTION
+  // t-motion · wind in everything (wind.js): the gust bands travel over the land; a plant leans into them (base stiff,
+  // tip free), leaves rustle harder in them, grass and leaves brighten as they bend (the waves read from afar); a hung
+  // thing (the leaf bit with a sway level: a lantern, a sign, laundry, an awning's valance) swings as one piece about
+  // its hook, the level its depth under it
+  v_sheen = 0.0;
+  bool green = !ctmFace && float((a_tint >> 5u) & 63u) / 63.0 > float((a_tint >> 11u) & 31u) / 31.0 * 1.08 && float((a_tint >> 5u) & 63u) / 63.0 > float(a_tint & 31u) / 31.0 * 1.08;
+  if (sway > 0u || leaf > 0u || green) {
+    vec3 ap = wp + vec3(u_camInt);
+    vec2 wq = vec2(-u_windDir.y, u_windDir.x);
+    float G = windGust(ap.x, ap.z, u_time, u_windDir.x, u_windDir.y, u_gust);
+    if (green) v_sheen = windSheen(G) * min(u_wind, 1.5);
+    if (sway > 0u && leaf > 0u) {
+      float lv = float(sway);
+      rel.xz += u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + wq * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+      rel.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+    } else if (sway > 0u || leaf > 0u) {
+      float t = u_time * 1.6;
+      float ph = ap.x * 0.37 + ap.z * 0.29;
+      float amp = (sway > 0u ? float(sway) / 3.0 * 0.11 : 0.025) * u_wind * (1.0 + 0.5 * u_gust);
+      float along = sin(t + ph) * amp + sin(t * 2.3 + ph * 1.7) * amp * 0.35;
+      float across = cos(t * 0.9 + ph * 1.3) * amp * 0.8;
+      rel.xz += u_windDir * along + wq * across;
+      if (leaf > 0u) rel.y += sin(t * 1.7 + ph * 2.1) * 0.015 * u_wind + sin(u_time * 5.3 + ph * 3.1) * 0.012 * u_wind * G;
+      if (sway > 0u) { float ln = windLeanAlong(float(sway), u_wind, G); rel.xz += u_windDir * ln; rel.y -= ln * 0.1 * float(sway); }
+    }
+  }
+#else
   if (sway > 0u || leaf > 0u) {
     vec3 ap = wp + vec3(u_camInt);
     float t = u_time * 1.6;
@@ -604,6 +636,7 @@ void main() {
     rel.xz += u_windDir * along + vec2(-u_windDir.y, u_windDir.x) * across;
     if (leaf > 0u) rel.y += sin(t * 1.7 + ph * 2.1) * 0.015 * u_wind;
   }
+#endif
   uint kind = (a_w5 >> 8u) & 7u;
   uint face = a_w5 & 7u;
   if (kind == 1u && face == 2u) {
@@ -666,6 +699,9 @@ in vec3 v_tint;
 in vec3 v_localPos;
 #ifdef FADE
 flat in float v_fade;
+#endif
+#ifdef MOTION
+in float v_sheen;   // t-motion: a passing gust brightens grass and leaves (TERRAIN_VS, wind.js)
 #endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
@@ -766,6 +802,9 @@ void main() {
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
   }
+#ifdef MOTION
+  alb.rgb *= 1.0 + v_sheen;   // t-motion · the wind's waves over the meadow: grass and leaves bent by a gust show their paler side
+#endif
   if (((v_w3 >> 15u) & 1u) == 1u) {
 #ifdef MODEL
     bool own = false;   // a ship's blocks move with it: no world cell to hash
@@ -959,6 +998,11 @@ uniform vec2 u_windDir;
 uniform mat4 u_shadowMat;
 out vec4 v_shadow;
 #endif
+#ifdef MOTION
+uniform float u_gust;
+uniform vec3 u_camPos;   // t-motion: the camera's world position (the palm's place in the gust bands)
+${VR.Wind ? VR.Wind.glsl() : ''}
+#endif
 out vec2 v_uv;
 out vec3 v_col;
 out vec3 v_n;
@@ -970,14 +1014,24 @@ void main() {
   float sc = a_inst1.x, ph = a_inst1.z;
   vec3 p = a_pos * sc;
   p.x += a_inst1.y * a_bend;                       // the lean: the top stays, the trunk bends with its depth
-  float gust = 0.6 + 0.4 * sin(u_time * 0.31 + ph * 0.23);
-  float amp = u_wind * a_sway * sc * 0.16 * gust;
   float c = cos(a_inst0.w), s = sin(a_inst0.w);
   vec3 q = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z);
   vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
+#ifdef MOTION
+  // t-motion · the fronds bend from the crown (props.js weights: t², base stiff, tip free), each flaps with its own phase,
+  // the gust bands sweep through the crown and droop it (wind.js windFrond*)
+  vec3 wpos = a_inst0.xyz + u_camPos;
+  float G = windGust(wpos.x, wpos.z, u_time, u_windDir.x, u_windDir.y, u_gust);
+  float amp = windFrondAmp(a_sway, sc, u_wind, G);
+  q.xz += u_windDir * windFrondAlong(amp, a_frond, ph, u_time) + vec2(-u_windDir.y, u_windDir.x) * windFrondAcross(amp, a_frond, ph, u_time, p.y);
+  q.y += windFrondUp(amp, a_frond, ph, u_time, G);
+#else
+  float gust = 0.6 + 0.4 * sin(u_time * 0.31 + ph * 0.23);
+  float amp = u_wind * a_sway * sc * 0.16 * gust;
   float w1 = 0.65 + 0.35 * sin(u_time * 1.7 + ph);
   float w2 = 0.3 * sin(u_time * 2.6 + ph * 1.3 + p.y * 0.7);
   q.xz += u_windDir * (amp * w1) + vec2(-u_windDir.y, u_windDir.x) * (amp * w2);
+#endif
   vec3 rel = q * on + a_inst0.xyz;
   v_uv = a_uv; v_col = a_col; v_n = nq; v_rel = rel; v_sky = a_inst2.x; v_block = a_inst2.yzw;
 #ifdef SHADOWS

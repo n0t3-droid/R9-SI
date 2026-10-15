@@ -135,12 +135,14 @@
   // Panorama glass (the only glass whose frames join, v0.31): per block type its frame family (0 = none) — the frame
   // variants sit in 16 texture layers from o.ctm. Every other glass keeps its own frame per block (v0.33.2: the
   // joined-up window glass, plain / stained glass and panes of v0.33 are single blocks again). Built on first use.
-  let CTMK = null, CTML = null, VEILT = null;
+  let CTMK = null, CTML = null, VEILT = null, SWINGT = null;
   function ctmTables() {
-    const n = R.types.length; CTMK = new Int32Array(n); CTML = new Uint8Array(n); VEILT = new Uint8Array(n);
+    const n = R.types.length; CTMK = new Int32Array(n); CTML = new Uint8Array(n); VEILT = new Uint8Array(n); SWINGT = new Uint8Array(n);
     for (const t of R.types) if (t.o.ctm) { CTMK[t.id] = 0x10000 | t.o.ctm; CTML[t.id] = 1; }
     // the portal veil (a texture with meta.veil): drawn by the translucent shader's veil branch (KIND.PORTAL, emitVeilQuad)
     for (const t of R.types) { const m = R.texMeta[R.T.tex[t.defaultState * 6] & 0xfff]; if (m && m.veil) VEILT[t.id] = 1; }
+    // t-motion: the lanterns that can hang from a block (their 'hanging' state swings about the hook with job.motion)
+    for (const t of R.types) if (/^(lantern|copper_lantern|spirit_lantern)$/.test(t.name) && t.has('hanging')) SWINGT[t.id] = 1;
   }
   // a look or a variant changed the tables (looks.js): the parts built from them are made again
   VR.meshCacheClear = function () { partCache.clear(); CTMK = null; CTML = null; };
@@ -435,7 +437,7 @@
     const connGroup = (s) => { const t = R.types[TTYPE[s]]; return t ? (t.o.conn || 0) : 0; };
     const HD = [5, 0, 4, 1]; // facing idx (n,e,s,w) → face dir
     const nbState = (bi, d) => B[bi + DOFF[d]];
-    const vxM = VR.VX ? { B, L, bufs: vxSplit ? [bufs[3], bufs[1], bufs[2]] : bufs, far: vxSplit ? bufs[4] : null, detail: !(vxSplit && job.vxDetail === false), DOFF, layerTile: R.texIndex['vx_tile'] | 0, layerGloss: R.texIndex['vx_tile_gloss'] | 0, layerGlass: R.texIndex['vx_glass'] | 0, layerHolo: R.texIndex['vx_holo'] | 0, layerSmooth: R.texIndex['vx_smooth'] | 0, layerSmoothGloss: R.texIndex['vx_smooth_gloss'] | 0, layerMat: [0].concat(['fabric', 'leather', 'wood', 'marble', 'metal', 'plant', 'stone'].map(m => R.texIndex['vx_mat_' + m] | 0)), ox: job.ox | 0, oy: (job.sy | 0) * 16, oz: job.oz | 0 } : null;
+    const vxM = VR.VX ? { B, L, bufs: vxSplit ? [bufs[3], bufs[1], bufs[2]] : bufs, far: vxSplit ? bufs[4] : null, detail: !(vxSplit && job.vxDetail === false), DOFF, layerTile: R.texIndex['vx_tile'] | 0, layerGloss: R.texIndex['vx_tile_gloss'] | 0, layerGlass: R.texIndex['vx_glass'] | 0, layerHolo: R.texIndex['vx_holo'] | 0, layerSmooth: R.texIndex['vx_smooth'] | 0, layerSmoothGloss: R.texIndex['vx_smooth_gloss'] | 0, layerMat: [0].concat(['fabric', 'leather', 'wood', 'marble', 'metal', 'plant', 'stone'].map(m => R.texIndex['vx_mat_' + m] | 0)), ox: job.ox | 0, oy: (job.sy | 0) * 16, oz: job.oz | 0, motion: !!job.motion } : null;   // (t-motion: motion — the hung pieces' sway levels, VX.hangOf)
     for (let y = 0; y < 16; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const bi = P(x, y, z), b = B[bi];
       if (!b) continue;
@@ -568,9 +570,13 @@
         const p = f.p, uv = f.uv;
         buf.ensure(f.double ? 8 : 4);
         const tall = t.o.tall && t.has('half') && t.get(b, 'half') === 1;
+        // t-motion: a hanging lantern (job.motion) swings about its hook — the leaf bit, its depth under the block's top as
+        // the sway level (wind.js hang)
+        const hung = job.motion && SWINGT[TTYPE[b]] === 1 && t.get(b, 'hanging') === 1;
         for (let k = 0; k < 4; k++) {
           let sway = 0;
           if (fflags & FF.WAVE) { const py = p[k * 3 + 1]; sway = tall ? (py > 0.5 ? 3 : 2) : (py > 0.3 ? (t.o.tall ? 2 : 3) : 0); }
+          if (hung) { const d = (1 - p[k * 3 + 1]) / 0.7; sway = d <= 0 ? 0 : d >= 1 ? 3 : Math.round(d * 3); buf.v(x + p[k * 3] + ox, y + p[k * 3 + 1] + oy, z + p[k * 3 + 2] + oz, w3, uv[k * 2], uv[k * 2 + 1], (w5base & ~0xE0) | (sway << 5) | (sway ? 0x80 : 0), light, tint); continue; }
           buf.v(x + p[k * 3] + ox, y + p[k * 3 + 1] + oy, z + p[k * 3 + 2] + oz, w3, uv[k * 2], uv[k * 2 + 1], w5base | (sway << 5), light, tint);
         }
         if (f.double) {
@@ -578,6 +584,7 @@
             const k = 3 - kk;
             let sway = 0;
             if (fflags & FF.WAVE) { const py = p[k * 3 + 1]; sway = tall ? (py > 0.5 ? 3 : 2) : (py > 0.3 ? (t.o.tall ? 2 : 3) : 0); }
+            if (hung) { const d = (1 - p[k * 3 + 1]) / 0.7; sway = d <= 0 ? 0 : d >= 1 ? 3 : Math.round(d * 3); buf.v(x + p[k * 3] + ox, y + p[k * 3 + 1] + oy, z + p[k * 3 + 2] + oz, w3, uv[k * 2], uv[k * 2 + 1], (w5base & ~0xE7) | VR.OPP[f.dir & 7] | (sway << 5) | (sway ? 0x80 : 0), light, tint); continue; }
             buf.v(x + p[k * 3] + ox, y + p[k * 3 + 1] + oy, z + p[k * 3 + 2] + oz, w3, uv[k * 2], uv[k * 2 + 1], (w5base & ~7) | VR.OPP[f.dir & 7] | (sway << 5), light, tint);
           }
         }

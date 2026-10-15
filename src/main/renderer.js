@@ -130,7 +130,7 @@
     }
     buildPrograms() {
       const md = this.multi ? ['MULTIDRAW'] : [];
-      const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs)
+      const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs) · MOTION (t-motion): the wind in everything (wind.js; off on Very Low)
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
@@ -169,7 +169,7 @@
     zProgram() {
       const P = this.P;
       if (P.cutZ) return P.cutZ;
-      const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []);
+      const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []);   // (t-motion: the colour pass's MOTION too — the same displaced fragments)
       const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE']);
       if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
       return (P.cutZ = p);
@@ -430,8 +430,9 @@
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
       const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre: its own program define; texLite: the sampler)
+      const prevM = !!this.q.motion;   // (t-motion: the MOTION define of the terrain and the palms)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.motion !== prevM) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
@@ -1453,8 +1454,8 @@
     // the prop programs, compiled on first use with the terrain's shadow defines (buildPrograms drops them with P)
     propProgram(shadow) {
       const P = this.P, S = VR.SHADERS;
-      if (shadow) return P.propShadow || (P.propShadow = GL.program(S.PROP_VS, S.PROP_SHADOW_FS, 'propShadow', []));
-      if (!P.prop) P.prop = GL.program(S.PROP_VS, S.PROP_FS, 'prop', this.propDefines());
+      if (shadow) return P.propShadow || (P.propShadow = GL.program(S.PROP_VS, S.PROP_SHADOW_FS, 'propShadow', this.q.motion ? ['MOTION'] : []));   // (t-motion: the shadow bends with the fronds)
+      if (!P.prop) P.prop = GL.program(S.PROP_VS, S.PROP_FS, 'prop', this.propDefines().concat(this.q.motion ? ['MOTION'] : []));
       return P.prop;
     }
     furnProgram(shadow) {
@@ -1531,6 +1532,8 @@
       gl.uniformMatrix4fv(u.u_viewProj, false, shadow ? this.shadowMat : this.viewProj);
       if (u.u_wind) gl.uniform1f(u.u_wind, E.wind);
       if (u.u_windDir) { const wd = E.windDir || [1, 0]; gl.uniform2f(u.u_windDir, wd[0], wd[1]); }
+      if (u.u_gust) gl.uniform1f(u.u_gust, E.gust || 0);   // (t-motion: MOTION's palms stand in the gust bands)
+      if (u.u_camPos) { const pc = this.propCam; if (pc) gl.uniform3f(u.u_camPos, pc[0], pc[1], pc[2]); else if (this.cam) gl.uniform3f(u.u_camPos, this.cam.x, this.cam.y, this.cam.z); }   // (the point the instances are relative to: propGather's camPos)
       if (u.u_emissiveBoost) gl.uniform1f(u.u_emissiveBoost, E.emissiveBoost || 0);
       if (!shadow) {
         if (u.u_shadowMat) gl.uniformMatrix4fv(u.u_shadowMat, false, this.shadowMat);
@@ -1557,6 +1560,7 @@
       if ((!lvl0 && !furn) || !this.propSecs || !this.propSecs.size) return;
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
+      this.propCam = camPos;   // (t-motion: MOTION's palms find their place in the gust bands from it)
       this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0, !!shadow, split);
       const cullWas = gl.isEnabled(gl.CULL_FACE);
       // the palms: two-sided fronds

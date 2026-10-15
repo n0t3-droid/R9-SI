@@ -1061,8 +1061,55 @@
     }
   }
 
+  // ---------------------------------------------------------------- t-motion · hung pieces (wind.js hang)
+  // When the mesh job asks for motion (M.motion: the MOTION shaders, every preset but Very Low), a piece that hangs or
+  // flaps gets the leaf bit and a sway level per vertex (w5 bits 5–7): the vertex shader swings it as one piece about its
+  // hook. The level is the depth under the hook (a lantern on its chain, a sign under its bracket, laundry on its line) or
+  // the distance from the wall (an awning's cloth and its valance), in thirds. fx, fy, fz: the vertex in its cell (0..1,
+  // world-turned); local(): the same point turned back to the piece's own frame (the painters turn by c.facing: one
+  // quarter-turn maps (x, z) to (1 − z, x)). VX.hangOf returns null for anything that does not hang.
+  const HANG_HOOK = { lantern: 1, sign: 1, laundry: 1, awning: 1 };
+  const lvOf = (d) => (d <= 0 ? 0 : d >= 1 ? 3 : Math.round(d * 3));
+  function localOf(fx, fz, q, out) { let a = fx, b = fz; for (let r = 0; r < q; r++) { const t = a; a = b; b = 1 - t; } out[0] = a; out[1] = b; return out; }
+  const LXZ = [0, 0];
+  VX.hangLocal = localOf;
+  VX.hangOf = function (sp, c) {
+    if (!sp) return null;
+    const q = ((c.facing | 0) % 4 + 4) % 4;
+    if (sp.model) {
+      const m = sp.model, nm = m.name || '';
+      if (/^vm_town_awning_/.test(nm)) {
+        // the striped awning (3 × 1 × 2, the wall at +z): the cloth's distance from the wall plate
+        const p = m.parts[c.part | 0]; if (!p) return null;
+        return (fx, fy, fz) => { localOf(fx, fz, q, LXZ); return lvOf(1.08 - (p.pz + LXZ[1]) / m.D); };
+      }
+      if (/^vm_town_sign_/.test(nm)) {
+        // the shop sign (a board under two brackets at 13/16): a gentle swing, at most level 2
+        return (fx, fy) => Math.min(2, lvOf((0.8125 - fy) / 0.62));
+      }
+      return null;
+    }
+    if (!HANG_HOOK[sp.kind]) return null;
+    switch (sp.kind) {
+      case 'lantern': {
+        // only a lantern that hangs (the painter's own test: something above it)
+        const up = c.nc[2];
+        if (!(up === SOLID || up === WALL || up === FLOOR || up === ROOF || up === OTHER)) return null;
+        return (fx, fy) => lvOf((1 - fy) / 0.75);
+      }
+      case 'sign': return (fx, fy) => lvOf((0.875 - fy) / 0.62);
+      case 'awning': return (fx, fy, fz) => { localOf(fx, fz, q, LXZ); return lvOf(1.05 - LXZ[1]); };
+      case 'laundry': {
+        // the clothes under the line (y 7/8); the posts at the line's ends stand still
+        const rEnd = !(c.x & 1), lEnd = !((c.x >> 1) & 1);
+        return (fx, fy, fz) => { localOf(fx, fz, q, LXZ); if ((rEnd && LXZ[0] > 0.874) || (lEnd && LXZ[0] < 0.126)) return 0; return lvOf((0.9375 - fy) / 0.7); };
+      }
+    }
+    return null;
+  };
+
   // ---------------------------------------------------------------- mesher entry
-  // M: { B, L, bufs, DOFF, layerTile, layerGloss, layerGlass, ox, oy, oz, far, detail }
+  // M: { B, L, bufs, DOFF, layerTile, layerGloss, layerGlass, ox, oy, oz, far, detail, motion }
   const lightFor = [0, 0, 0, 0, 0, 0];
   VX.meshBlock = function (M, x, y, z, bi, s) {
     init();
@@ -1143,6 +1190,7 @@
     const bufs = M.bufs, smooth = sp.res >= 16;   // fine models get smooth lacquer surfaces instead of the bevel tile
     // wind: a model part's sway level (voxplants.js: the crown and the leaves move, the trunk's base stays) in the w5 sway bits
     const swayB = sp.model && sp.model.partSway ? ((sp.model.partSway[c.part | 0] | 0) & 3) << 5 : 0;
+    const hang = M.motion ? VX.hangOf(sp, c) : null;   // (t-motion: a hung piece's levels per vertex, the leaf bit)
     const macro = VR.LOOK.macro;
     for (let q = 0; q < quads.length; q += RS) {
       const d = quads[q], col = quads[q + 1] & 0xffff, fl = quads[q + 2];
@@ -1158,7 +1206,9 @@
       buf.ensure(4);
       for (let k = 0; k < 4; k++) {
         const o = q + 3 + k * 6;
-        buf.v(x + quads[o] / 32, y + quads[o + 1] / 32, z + quads[o + 2] / 32, layer, quads[o + 3], quads[o + 4], w5base | (quads[o + 5] << 3), light, col);
+        let w5 = w5base | (quads[o + 5] << 3);
+        if (hang) { const lv = hang(quads[o] / 32, quads[o + 1] / 32, quads[o + 2] / 32); if (lv) w5 = (w5 & ~0xE0) | (lv << 5) | 0x80; }
+        buf.v(x + quads[o] / 32, y + quads[o + 1] / 32, z + quads[o + 2] / 32, layer, quads[o + 3], quads[o + 4], w5, light, col);
       }
     }
   };
