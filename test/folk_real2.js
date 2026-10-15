@@ -347,7 +347,7 @@ console.log('§4 shadows like props');
     bufferSubData(t, off, src) { bound[t].data.set(new Uint8Array(src.buffer, src.byteOffset, src.byteLength), off); }, copyBufferSubData(r, w, ro, wo, n) { bound[w].data.set(bound[r].data.subarray(ro, ro + n), wo); },
     enableVertexAttribArray() {}, vertexAttribPointer() {}, createTexture() { return { tex: true }; }, deleteTexture() {}, deleteFramebuffer() {}, bindTexture() {}, texImage2D() {}, texParameteri() {}, activeTexture() {}, texSubImage2D() {},
     useProgram() {}, uniform1i(k, v) { calls.uniforms[k] = v; }, uniform1f(k, v) { calls.uniforms[k] = v; }, uniform2f() {}, uniform3f(k, a, b, c) { calls.uniforms[k] = [a, b, c]; }, uniformMatrix4fv(k, t, m) { calls.uniforms[k] = Float32Array.from(m); },
-    enable() {}, disable() {}, depthFunc() {}, depthMask() {}, viewport() {}, drawElements() { calls.draws++; },
+    enable(k) { calls.on = calls.on || new Set(); calls.on.add(k); }, disable(k) { if (calls.on) calls.on.delete(k); }, isEnabled(k) { return !!(calls.on && calls.on.has(k)); }, depthFunc() {}, depthMask() {}, viewport() {}, drawElements() { calls.draws++; },
     bindFramebuffer(t, f) { calls.fb.push(f); }, blitFramebuffer(...a) { calls.blits.push(a.slice(0, 4)); },
   });
   V.GL = { ext: { multiDraw: { multiDrawElementsWEBGL() { calls.multi++; } } }, program: () => ({ p: {}, u: new Proxy({}, { get: (t, k) => k }) }), tex2D: () => ({ copy: true }), fbo: () => ({ fbo: true }) };
@@ -360,7 +360,9 @@ console.log('§4 shadows like props');
   const frame = (positions) => { r.frameNo++; ppl.forEach((rec, i) => FG.queue(rec, positions[i], 0, FA.sample(FA.clips.idle, 0, {}), { sky: 1, bl: [0, 0, 0] }, {})); FG.flush(r, { sunDir: [0.3, 0.9, 0.3], moonDir: [0, -1, 0] }, cam); };
   frame([[2, 70, -3], [3, 70, -4], [-1, 70, -5]]);
   r.frameNo++; calls.blits.length = 0; calls.multi = 0;
+  gl.enable(gl.CULL_FACE); gl.enable(gl.POLYGON_OFFSET_FILL);   // (as the map's own pass may leave them)
   const ok1 = FG.castShadows(r, {}, cam);
+  check(gl.isEnabled(gl.CULL_FACE) && gl.isEnabled(gl.POLYGON_OFFSET_FILL), `the pass leaves the culling and the polygon offset as it found them`);
   const full = calls.blits.length === 1 && calls.blits[0].join() === '0,0,1024,1024';
   check(ok1 && full && calls.multi === 1 && r.shadowRead && r.shadowRead.copy, `the first frame: the whole map copied (${calls.blits.length} blit), the three drawn in ${calls.multi} draw, the frame reads the copy`);
   const zr = 0.5 * Math.hypot(r.shadowMat[2], r.shadowMat[6], r.shadowMat[10]), zb = calls.uniforms.u_zBias;

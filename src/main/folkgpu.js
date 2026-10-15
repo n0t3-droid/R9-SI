@@ -505,6 +505,8 @@ void main() { o = vec4(1.0); }`;
     // the people into D: depth only, last frame's bones moved to this camera, written nearer the light by the bias
     gl.bindFramebuffer(gl.FRAMEBUFFER, SM.fb);
     gl.viewport(0, 0, size, size);
+    // (the culling and the polygon offset as the map's own pass left them, after this one)
+    const cull0 = gl.isEnabled(gl.CULL_FACE), poly0 = gl.isEnabled(gl.POLYGON_OFFSET_FILL);
     gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.CULL_FACE); gl.disable(gl.POLYGON_OFFSET_FILL);
     gl.useProgram(p.p);
     gl.activeTexture(gl.TEXTURE0 + FG.BONE_UNIT); gl.bindTexture(gl.TEXTURE_2D, BT.tex); gl.uniform1i(p.u.u_bones, FG.BONE_UNIT);
@@ -523,6 +525,7 @@ void main() { o = vec4(1.0); }`;
       else for (let i = 0; i < SM.n; i++) { gl.uniform1i(p.u.u_person, i); gl.drawElements(gl.TRIANGLES, SM.counts[i], gl.UNSIGNED_INT, SM.offsets[i]); draws++; }
     }
     gl.bindVertexArray(null);
+    if (cull0) gl.enable(gl.CULL_FACE); if (poly0) gl.enable(gl.POLYGON_OFFSET_FILL);
     r.shadowRead = SM.tex;
     SM.frames++;
     FG.stats.castMs = performance.now() - t0; FG.stats.castDraws = draws; FG.stats.casters = SM.n; FG.stats.castRects = SM.rects.length;
