@@ -251,6 +251,10 @@ async function ownChecks(A, record) {
     out.pbr = s; console.log('  pbr', JSON.stringify(s));
     check(s.lab[0] && s.lab[0] !== 'g.set.pbr' && s.tip[0] !== 'g.set.pbr.tip', `the gloss switch has its label and tip (${s.lab[0]})`);
   }
+  // the hero textures (texHi, High): the 64 × 64 set forged in a worker (or taken from the cache) and in the renderer
+  const hi = await A.ev(() => { const g = VR.game, r = g.renderer; return { on: !!r.q.texHi, layers: r.texHiN || 0, mb: r.texHiBytes ? +(r.texHiBytes / 1048576).toFixed(2) : 0, ms: g.texHiMs || null, forgeMs: g.texHiForgeMs || null, cached: g.texHiFromCache, err: g.texHiErr || null }; });
+  out.texHi = hi; console.log('  texHi', JSON.stringify(hi));
+  if (hi.on) check(hi.layers === 16 && hi.mb > 0.5 && hi.mb < 1.2, `the hero textures are on the GPU (${hi.layers} layers, ${hi.mb} MB; ${hi.ms} ms from the request, the forge ${hi.forgeMs} ms${hi.cached ? ', from the cache' : ''})`);
   if (has.wet) {
     // the drying curve in the page: an hour of rain, then the sky clears — wet after 2, 5, 10 minutes
     const d = await A.ev(() => { const W = VR.Wet, s = W.state(); for (let t = 0; t < 600; t++) W.step(s, 1, 1); const at = {}; for (let t = 1; t <= 600; t++) { W.step(s, 0, 1); if (t === 120 || t === 300 || t === 600) at[t] = +s.wet.toFixed(3); } return at; });

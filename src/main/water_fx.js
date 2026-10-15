@@ -12,8 +12,10 @@
     SHALLOW: [0.04, 0.58, 0.62],         // the water's own colour in the shallows (turquoise) …
     DEEP: [0.012, 0.11, 0.30],           // … and deep (blue), lit by the sky
     TD: 0.2,                             // how fast the own colour turns deep, per block
-    SHORE_D: 1.3,                        // the bank's foam reaches this deep (blocks under the surface)
-    SHORE_THR: [0.05, 1.2], SHORE_SOFT: 0.08,  // the noise threshold at the bank and how far it rises by SHORE_D; its soft edge
+    SHORE_D: 1.0,                        // the bank's foam reaches this deep (blocks under the surface)
+    // the noise threshold at the bank and how far it rises by SHORE_D; its soft edge (run 2: a threshold of 0.05 at the
+    // bank drew a solid white band along the river like snow — now about half the noise foams at the waterline)
+    SHORE_THR: [0.46, 0.66], SHORE_SOFT: 0.08,
     CREST: [0.5, 0.86], CREST_AK: [0.35, 1.0], CREST_N: [0.3, 0.62],   // foam on crests: the height (−1…1), the body·storm factor, the noise
     CAUSTIC_OCT: [0, 2, 3],              // the caustics' octaves per water tier (0 Very Low: none)
   };
