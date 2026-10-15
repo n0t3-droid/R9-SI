@@ -431,6 +431,27 @@
               out.spawns.push(['mist', fx + out1[0] - (out1[0] > 0 ? 1 : 0) + 1, foot - 3, fz + out1[1] - (out1[1] > 0 ? 1 : 0) + 1, fluid === S.lava ? 1 : 0]);
             }
           }
+          // vgen 10 (t-beauty): the spring pool is held on its rim — a side of a pool cell that is neither the island's
+          // ground at the pool's height, another pool cell nor the curtain gets a lip of the island's top block. (Run
+          // c3, far_3: grass creeping under a rim pool woke it, the pool spilled over its open side, and the spill ran
+          // down to the ground beside the fall as one stream — the pole the fall was made not to be; beauty_rules 10.)
+          if (g.vgen >= 10) {
+            const ax = out1[0] > 0 ? 1 : 0, az = out1[1] > 0 ? 1 : 0, own = new Set(), pools = [];
+            for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+              const sx = fx + ox - ax, sz = fz + oz - az, J = g.islandAt(sx, sz), cx2 = sx + out1[0], cz2 = sz + out1[1], J2 = g.islandAt(cx2, cz2);
+              if (J && J.isle === I) { pools.push([sx, sz, J.top]); own.add(sx + ',' + sz); }   // (a pool cell)
+              if (!(J2 && J2.isle === I && J2.top >= ft.top)) own.add(cx2 + ',' + cz2);          // (a curtain cell: the fall's own way down)
+            }
+            const lip = fluid === S.lava ? S.redsand : g.climateAt(fx, fz).t < -0.35 ? S.snowblock : S.grass;
+            for (const [px, pz, h] of pools) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const nx = px + dx, nz = pz + dz, lx = nx - x0, lz = nz - z0;
+              if (own.has(nx + ',' + nz) || lx < 0 || lx > 15 || lz < 0 || lz > 15 || h < 1 || h > 254) continue;
+              const N = g.islandAt(nx, nz);
+              if (N && N.isle === I && N.top >= h) continue;
+              const i = (h << 8) | (lz << 4) | lx;
+              if (!blocks[i] || !(R.T.flags[blocks[i]] & F.SOLID)) blocks[i] = lip;
+            }
+          }
         }
       }
     }

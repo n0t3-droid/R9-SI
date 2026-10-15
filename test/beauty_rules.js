@@ -476,6 +476,53 @@ console.log('10 · a fall that is touched spills a little, it does not flood (si
     for (const [k, v] of B) { if (!v || !(R.T.flags[v] & F.FLUID)) continue; const [x, y] = k.split(',').map(Number); if (y === 71 && x < 0) ledge++; else if (y === 61) ground++; else if (y > 61 && y < 71 && x >= 0) { if (x === 0) stream++; else air++; } }
     check(ledge >= 3 && stream >= 9 && ground >= 20 && air === 0, `a source on a ledge: ${ledge} on the ledge, a stream of ${stream} down its edge, ${ground} spread where it lands, ${air} in the air beside the stream`);
   }
+  // run c3 (far_3): the flood gone, a woken rim pool still spilled over its open side — grass creeping under it, a random
+  // tick — and the spill ran down to the ground beside the fall as one stream, a puddle at its foot: the pole the fall
+  // was made not to be. vgen 10 holds every spring pool on its rim (a lip of the island's top on each open side): every
+  // pool of the Sky Isles and of far_3's island woken at once (its floor changed, as the grass did), 600 ticks — nothing
+  // falls into the air under a curtain's foot. vgen 9 (released) spills.
+  {
+    const wakeAll = (vgen) => {
+      const g = V.makeGen('overworld', SEED, { vgen }), cols = new Map();
+      const col = (cx, cz) => { const k = cx + ',' + cz; let c = cols.get(k); if (!c) { const ch = g.generate(cx, cz); c = { cx, cz, blocks: ch.blocks, sec: [] }; for (let sy = 0; sy < 16; sy++) c.sec.push({ count: 1 }); cols.set(k, c); } return c; };
+      let sim = null;
+      const world = {
+        col, getLight: () => 0xf000,
+        getBlock: (x, y, z) => (y < 0 || y > 255) ? 0 : col(x >> 4, z >> 4).blocks[(y << 8) | ((z & 15) << 4) | (x & 15)],
+        setBlock(x, y, z, s, flags) { const c = col(x >> 4, z >> 4), i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i]; if (old === s) return; c.blocks[i] = s; if (!(flags & 2)) sim.onBlockChanged(x, y, z, old, s); },
+      };
+      sim = new VR.Sim({ world, player: { pos: [0, 128, 0], mode: 'creative' }, skyBright: 1, particles: { breakBlock() {}, smoke() {} }, audio: { play() {} }, dim: 'overworld', entities: null, dropsFor() {}, dropStack() {} });
+      sim.randomTicks = () => {};
+      const falling = (b) => b && (R.T.flags[b] & F.FLUID) && R.types[R.T.type[b]].get(b, 'level') >= 8;
+      const C = HEART.ISLES, falls = [];
+      for (const [xa, xb, za, zb] of [[C.x - 150, C.x + 130, C.z - 130, C.z + 130], [-600, -506, 410, 506]]) for (let cz = za >> 4; cz <= zb >> 4; cz++) for (let cx = xa >> 4; cx <= xb >> 4; cx++) {
+        const c = col(cx, cz);
+        for (let k = 0; k < 256; k++) { let run = 0, top = -1; for (let y = 250; y >= 1; y--) { const b = c.blocks[(y << 8) | k]; if (falling(b)) { if (!run) top = y; run++; continue; } if (run >= 6 && !b) falls.push({ x: cx * 16 + (k & 15), z: cz * 16 + (k >> 4), top, foot: top - run + 1 }); run = 0; } }
+      }
+      // their spring pools: the source blocks beside a curtain's top
+      const pools = new Map();
+      for (const f of falls) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = f.x + dx, z = f.z + dz, b = world.getBlock(x, f.top, z); if (b && (R.T.flags[b] & F.FLUID) && R.types[R.T.type[b]].get(b, 'level') === 0) pools.set(x + ',' + f.top + ',' + z, [x, f.top, z]); }
+      // the air under every foot (25 blocks of it, six round each curtain column): the fluid there
+      const under = () => { const seen = new Set(); for (const f of falls) for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) for (let y = f.foot - 25; y < f.foot - 1; y++) { const b = world.getBlock(f.x + dx, y, f.z + dz); if (b && (R.T.flags[b] & F.FLUID)) seen.add((f.x + dx) + ',' + y + ',' + (f.z + dz)); } return seen.size; };
+      const u0 = under(), GR = R.byName.grass_block.defaultState, DI = R.byName.dirt.defaultState;
+      for (const [x, y, z] of pools.values()) { const fl = world.getBlock(x, y - 1, z); world.setBlock(x, y - 1, z, fl === GR ? DI : GR, 1); }
+      for (let t = 0; t < 600; t++) sim.step(false);
+      return { falls: falls.length, pools: pools.size, u0, u1: under() };
+    };
+    // (the lips are all vgen 10 changes round the isles: the islands' chunks of the two worlds block by block)
+    {
+      const g9 = V.makeGen('overworld', SEED, { vgen: 9 }), g10 = V.makeGen('overworld', SEED, { vgen: 10 }), C = HEART.ISLES, TOP = /^(grass_block|red_sand|snow_block)$/;
+      let diff = 0, lips = 0;
+      for (const [xa, xb, za, zb] of [[C.x - 150, C.x + 130, C.z - 130, C.z + 130], [-600, -506, 410, 506]]) for (let cz = za >> 4; cz <= zb >> 4; cz++) for (let cx = xa >> 4; cx <= xb >> 4; cx++) {
+        const a = g9.generate(cx, cz).blocks, b = g10.generate(cx, cz).blocks;
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) { diff++; if (TOP.test(nameOf(b[i])) && (!a[i] || !(R.T.flags[a[i]] & F.SOLID))) lips++; }
+      }
+      check(diff > 0 && lips === diff && diff <= 60, `vgen 10 differs from vgen 9 round the isles by the pools' lips alone (${lips} of ${diff} changed blocks: the island's top block where air or a plant stood)`);
+    }
+    const P9 = wakeAll(9), P10 = wakeAll(10);
+    console.log(`     vgen 9 (released): ${P9.pools} pools woken over ${P9.falls} curtain columns — ${P9.u1 - P9.u0} fluid blocks fell into the air under the feet`);
+    check(P10.pools >= 12 && P10.falls >= 20 && P10.u1 === P10.u0, `vgen 10: every woken spring pool stays on its rim — ${P10.pools} pools over ${P10.falls} curtain columns, ${P10.u1 - P10.u0} fluid blocks under the feet after 600 ticks (${P10.u0} → ${P10.u1})`);
+  }
 }
 
 // ---------------------------------------------------------------- 11 · a street climbs in half steps (vgen 10)
