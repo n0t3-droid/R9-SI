@@ -256,10 +256,23 @@
     const prevFeat = OG.features;
     OG.features = function (w, fcx, fcz, chests) {
       if (!LAND.on(this) || !HEART.noRandom(this, fcx * 16 + 8, fcz * 16 + 8)) return prevFeat.call(this, w, fcx, fcz, chests);
-      LAND._noRuin = true;
-      try { return prevFeat.call(this, w, fcx, fcz, chests); } finally { LAND._noRuin = false; }
+      LAND._noRuin = true; LAND._featG = this;
+      try { return prevFeat.call(this, w, fcx, fcz, chests); } finally { LAND._noRuin = false; LAND._featG = null; }
     };
   }
+  // The overworld's sulfur springs (a pit of water in sulfur and cinnabar) stood in the ways — two on the walk out of the
+  // temple: in the land between none is built within 9 blocks of a way, a piece, a field, a clearing or a pond (a spring
+  // is the last draw of its chunk's features: everything else stays where it was; the others stay too).
+  if (STR && STR.sulfurSpring && !STR._landSpring) {
+    const prevSpring = STR.sulfurSpring;
+    STR.sulfurSpring = function (w, x, y, z) { const g = LAND._featG; if (g && LAND.springOff(g, x, z)) return; return prevSpring.apply(this, arguments); };
+    STR._landSpring = true;
+  }
+  LAND.springOff = function (g, x, z) {
+    const P = LAND.plan(g);
+    for (let dz = -9; dz <= 9; dz++) for (let dx = -9; dx <= 9; dx++) if (dx * dx + dz * dz <= 81 && LAND.keepAt(P, x + dx, z + dz)) return true;
+    return false;
+  };
 
   // ============================================================================ the land plan
   // Built once per world (per worker) from the terrain functions alone — no village site or plan is asked (a worker

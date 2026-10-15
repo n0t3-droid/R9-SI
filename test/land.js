@@ -77,6 +77,20 @@ if (want(1)) {
   const dk = [...cells.values()].filter(c => c.deck && c.d > 0.95).slice(0, 6);
   let dOk = 0; for (const c of dk) { const n0 = nameOf(blockAt(c.x, c.y, c.z)), n1 = nameOf(blockAt(c.x, c.y + 1, c.z)); if ((n0 === 'spruce_planks' && n1 === 'spruce_fence') || (/stone_bricks$/.test(n0) && n1 === 'stone_brick_wall')) dOk++; }
   check(dk.length === 0 || dOk >= dk.length - 1, `the bridges' edges carry a parapet (${dOk} of ${dk.length})`);
+  // the overworld's sulfur springs (a pit of water in sulfur and cinnabar) stood in the ways — two on the walk out of the
+  // temple (land.mjs run 1: the walk's camera stood in one): none is built within 9 blocks of a way, a piece, a field, a
+  // clearing or a pond; elsewhere in the land they stay (the features' draws are the same)
+  const SS = V.GEN.STRUCT, OG = V.OverworldGen.prototype, springs = [];
+  const prevSpring = SS.sulfurSpring; SS.sulfurSpring = function (w, x, y, z) { springs.push([x, y, z]); };
+  const dummy = { get: () => 0, set: () => {}, ok: () => true, place: () => false };
+  for (let fcz = -45; fcz < 45; fcz++) for (let fcx = -45; fcx < 45; fcx++) { try { OG.features.call(g, dummy, fcx, fcz, []); } catch (e) { /* a tree that asks more of the writer: its chunk has no spring draw then */ } }
+  SS.sulfurSpring = prevSpring;
+  const nearKeep = (x, z) => { for (let dz = -9; dz <= 9; dz++) for (let dx = -9; dx <= 9; dx++) if (dx * dx + dz * dz <= 81 && LAND.keepAt(P, x + dx, z + dz)) return true; return false; };
+  const atWay = springs.filter(([x, , z]) => nearKeep(x, z)), built = (x, y, z) => nameOf(blockAt(x, y - 3, z)) === 'magma_block' && nameOf(blockAt(x, y - 2, z)) === 'fuming_sulfur';
+  const inWay = atWay.filter(([x, y, z]) => built(x, y, z)), kept = springs.filter(([x, y, z]) => !nearKeep(x, z) && built(x, y, z));
+  let wet = 0, wayN = 0; for (const [x, , z] of atWay) for (let dz = -7; dz <= 7; dz++) for (let dx = -7; dx <= 7; dx++) { const c = cells.get(ck(x + dx, z + dz)); if (!c || c.deck) continue; wayN++; if (!WAY.has(nameOf(blockAt(c.x, c.y, c.z)))) wet++; }
+  check(atWay.length > 0 && inWay.length === 0 && wayN > 0 && wet === 0, `no sulfur spring breaks a way: ${inWay.length} of the ${atWay.length} springs by the land's ways and pieces built (${inWay.map(s => '(' + s[0] + ', ' + s[2] + ')').join(' ')}), the ${wayN} way cells round them all paved (${wet} not)`);
+  check(kept.length > 0, `the springs away from the ways stay (${kept.length} of ${springs.length - atWay.length} checked in their chunks)`);
 }
 
 // ---------------------------------------------------------------- 2 · woods and meadows
