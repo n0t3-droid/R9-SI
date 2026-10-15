@@ -228,7 +228,8 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
   // t-polish · the cart is the streets' regular: its own clock (28–40 s apart, pure); in a town by day the first one comes
   // within 40 s of arriving — in the generated Weißstadt's street at noon (seed 53, t-town's P1: the street toward the
   // plaza) and on Nova Haven's avenue (t-beauty's street_3) — and it is in the view at once and stays a while (t-life's
-  // picture: started, but out of the frame)
+  // picture: started, but out of the frame), seen: nothing solid between the eye and its upper half (t-polish's browser
+  // run 2: in the frame by its place, behind the shop fronts and the palms), and through the view's middle third
   {
     let minG = 1e9, maxG = 0;
     for (const seed of [1, -77, 4242]) for (let m = 0; m < 3000; m++) { const d = LD.cartTime(seed, m + 1) - LD.cartTime(seed, m); minG = Math.min(minG, d); maxG = Math.max(maxG, d); }
@@ -255,20 +256,20 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
       g.settings.fov = 66;
       const A = new LD.Actor(g);
       // the director runs from the moment the eye arrives; the first cart within 40 s, then where it is
-      let t = 0, ev = null, t0 = null, firstSeen = null, seen = 0, nearest = 1e9;
+      let t = 0, ev = null, t0 = null, firstSeen = null, seen = 0, mid = 0, nearest = 1e9;
       const tanH = A.tanH, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
       for (let i = 0; i < 20 * 60; i++) {
         t += 0.05; g.time = t; A.update(0.05);
         if (!ev) { ev = A.events.find(e => e.kind === 'cart') || null; if (ev) t0 = t; continue; }
         if (!A.events.includes(ev) || t - t0 > 12) break;
         const ex = ev.pos[0] - sc.feet[0], ez = ev.pos[2] - sc.feet[2], fwd = ex * fx + ez * fz, lat = Math.abs(ex * -fz + ez * fx);
-        if (fwd > 1 && lat < fwd * tanH * 0.95 && Math.hypot(ex, ez) < 48) { seen += 0.05; if (firstSeen === null) firstSeen = t - t0; nearest = Math.min(nearest, Math.hypot(ex, ez)); }
+        if (fwd > 1 && lat < fwd * tanH * 0.95 && Math.hypot(ex, ez) < 48 && A.seen([ev.pos[0], ev.pos[1] - 0.45, ev.pos[2]], 1.2)) { seen += 0.05; if (lat < fwd * tanH * 0.3) mid += 0.05; if (firstSeen === null) firstSeen = t - t0; nearest = Math.min(nearest, Math.hypot(ex, ez)); }
       }
-      const ok = ev && t0 <= 40 && firstSeen !== null && firstSeen <= 3 && seen >= 4;
+      const ok = ev && t0 <= 40 && firstSeen !== null && firstSeen <= 3 && seen >= 4 && mid >= 1;
       if (!ok) out.push(sc.name);
-      console.log(`    ${sc.name}: the place ${A.stats().place}, a cart ${ev ? 'started ' + t0.toFixed(1) + ' s after the arrival (' + (ev.run.length) + ' points, ' + ev.path.L.toFixed(0) + ' m)' : 'never'}; in the view ${firstSeen === null ? 'never' : firstSeen.toFixed(1) + ' s after its start, for ' + seen.toFixed(1) + ' s, nearest ' + nearest.toFixed(0) + ' m'}`);
+      console.log(`    ${sc.name}: the place ${A.stats().place}, a cart ${ev ? 'started ' + t0.toFixed(1) + ' s after the arrival (' + (ev.run.length) + ' points, ' + ev.path.L.toFixed(0) + ' m)' : 'never'}; in the view ${firstSeen === null ? 'never' : firstSeen.toFixed(1) + ' s after its start, for ' + seen.toFixed(1) + ' s (' + mid.toFixed(1) + ' s in its middle third), nearest ' + nearest.toFixed(0) + ' m'} (${ev ? (ev.run.length && Math.abs((ev.run[0][0] - ev.run[ev.run.length - 1][0]) * fx + (ev.run[0][2] - ev.run[ev.run.length - 1][2]) * fz) > 10 ? 'along' : 'across') : '—'})`);
     }
-    check(SCENES.length === 2 && !out.length, `the cart within 40 s in the street at noon and in the view at once, for seconds (${SCENES.length - out.length} of ${SCENES.length} places${out.length ? ': not at ' + out.join(', ') : ''})`);
+    check(SCENES.length === 2 && !out.length, `the cart within 40 s in the street at noon, in the view and seen at once, for seconds, through the view's middle (${SCENES.length - out.length} of ${SCENES.length} places${out.length ? ': not at ' + out.join(', ') : ''})`);
   }
   // the eye goes far away (a flight, a teleport): an act left 200 blocks behind ends (nothing is spent on it any more)
   {

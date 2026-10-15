@@ -8,7 +8,7 @@
 //  3 the hall from inside — Very Low at P1 (t-town's camera): the frame, the triangles, and where they go (the horizon,
 //    the people) in rounds in turns (item 3 is written up, not built: for the record);
 //  4 the cart — the Weißstadt's street at noon (P1) and Nova Haven's avenue (t-beauty's street_3): not forced, a cart
-//    within 40 s of the arrival, the picture when it is in the frame.
+//    within 40 s of the arrival, the picture when it is seen in the view's middle third.
 // Pictures: test/shots/polish_sky_<place>.png, polish_mill_a/b.png, polish_cart.png, polish_cart_nova.png,
 // polish_p1_potato.png; numbers in .tmp_tests/polish.json.
 // usage: nohup bash test/wt_run.sh polish.mjs 3600 > .tmp_tests/polish.log 2>&1 &   ONLY=sky,mill,cart,p1,bench
@@ -136,19 +136,22 @@ if (on('sky')) {
   }
 }
 
-// ------------------------------------------------------------ the sky pass: this build's against v0.46's, in turns
-// the sky drawn alone N times into the scene target at the preset's size, the GPU waited for with a one-pixel read; the
-// two programs in the same page and the same state, the order alternating round by round; the verdict the median of the
-// rounds' ratios (one load spike moves one round, not it)
-const SKYBENCH = ([N, cam, yaw, pitch, tod, base]) => {
+// ------------------------------------------------------------ the sky pass: this build's against v0.46's, in pairs
+// the sky drawn alone into the scene target, the GPU waited for with a one-pixel read after every draw; v0.46's program
+// and this build's in the same page and state, in pairs, the order turning pair by pair (ABBA); the verdict the median of
+// the pairs' ratios (a load spike moves a pair, not it). On High a quarter of the pixels (half the width and height: the
+// view's ray comes from v_uv, so it is the same view, the per-pixel cost; run 1 drew the full 1280 × 720, 3.5 s a draw
+// on this shared machine, and blocks of 12 draws a side swung 0.68–1.26 with the load)
+const SKYBENCH = ([pairs, cam, yaw, pitch, tod, base, div]) => {
   const g = VR.game, R = g.renderer, gl = R.gl;
   if (!window.__baseSky || window.__baseSky.lite !== !!R.q.lite) window.__baseSky = { lite: !!R.q.lite, p: VR.GL.program(base.vs, base.fs, 'sky_base', R.q.lite ? ['LITE'] : []) };
   g.env.setTime(tod); g.env.anim = 80;
   const E = g.env.update(0, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 4, horizon: 0, freezeTime: true, freezeWeather: true });
   R.setupCamera({ x: cam[0], y: cam[1], z: cam[2], yaw, pitch, fov: 72 * Math.PI / 180 });
+  const w = Math.round(R.w / div), h = Math.round(R.h / div);
   const sync = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, null); const px = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
   const once = (p) => {
-    gl.bindFramebuffer(gl.FRAMEBUFFER, R.sceneFB); gl.viewport(0, 0, R.w, R.h);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, R.sceneFB); gl.viewport(0, 0, w, h);
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
     gl.useProgram(p.p); R.common(p, E);
     if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, 0);
@@ -156,25 +159,28 @@ const SKYBENCH = ([N, cam, yaw, pitch, tod, base]) => {
     if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, R.q.clouds >= 2 ? 1 : 0);
     R.fs(p);
   };
-  const time = (p) => { once(p); once(p); sync(); const t0 = performance.now(); for (let i = 0; i < N; i++) once(p); sync(); return (performance.now() - t0) / N; };
-  const A = window.__baseSky.p, B = R.P.sky, flip = (window.__benchRound = (window.__benchRound || 0) + 1) % 2;
-  let a, b; if (flip) { a = time(A); b = time(B); } else { b = time(B); a = time(A); }
-  return { a, b, w: R.w, h: R.h, lite: !!R.q.lite };
+  const time = (p) => { const t0 = performance.now(); once(p); sync(); return performance.now() - t0; };
+  const A = window.__baseSky.p, B = R.P.sky;
+  sync(); time(A); time(B);   // (warm: the programs' first draws)
+  const r = [];
+  for (let i = 0; i < pairs; i++) { let a, b; if (i & 1) { b = time(B); a = time(A); } else { a = time(A); b = time(B); } r.push([a, b]); }
+  return { r, w, h, lite: !!R.q.lite };
 };
-const bench = async (label, rounds, args) => {
-  const r = []; for (let i = 0; i < rounds; i++) r.push(await ev(SKYBENCH, args));
-  const med = (v) => { const s = [...v].sort((x, y) => x - y); return s[s.length >> 1]; };
-  const res = { size: r[0].w + 'x' + r[0].h, lite: r[0].lite, base: +med(r.map(x => x.a)).toFixed(2), now: +med(r.map(x => x.b)).toFixed(2), ratio: +med(r.map(x => x.b / x.a)).toFixed(3), ratios: r.map(x => +(x.b / x.a).toFixed(3)) };
+const bench = async (label, calls, args) => {
+  let r = [], w = 0, h = 0, lite = false; for (let i = 0; i < calls; i++) { const x = await ev(SKYBENCH, args); r = r.concat(x.r); w = x.w; h = x.h; lite = x.lite; }
+  const q = (v, f) => { const s = [...v].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * f))]; };
+  const rat = r.map(x => x[1] / x[0]);
+  const res = { size: w + 'x' + h, lite, pairs: r.length, base: +q(r.map(x => x[0]), 0.5).toFixed(1), now: +q(r.map(x => x[1]), 0.5).toFixed(1), ratio: +q(rat, 0.5).toFixed(3), q25: +q(rat, 0.25).toFixed(3), q75: +q(rat, 0.75).toFixed(3) };
   out.bench[label] = res; save();
   console.log(`sky pass ${label}: ${JSON.stringify(res)}`);
   return res;
 };
 if (on('bench') && BASE_SKY) {
   try {
-    const hi = await bench('high_canyon_noon', 9, [12, [250, 150, 380], 1.36, PITCH, 6000, BASE_SKY]);
-    check(hi.ratio <= 1.05, `High: the sky pass with the filaments ${hi.now} ms against v0.46's ${hi.base} ms (${hi.size}; the rounds' median ratio ${hi.ratio} ≤ 1.05)`);
-    const up = await bench('high_canyon_noon_up', 7, [12, [250, 150, 380], 1.36, 0.9, 6000, BASE_SKY]);
-    console.log(`  (looking up into the nebula: ${up.ratio})`);
+    const hi = await bench('high_canyon_noon', 3, [12, [250, 150, 380], 1.36, PITCH, 6000, BASE_SKY, 2]);
+    check(hi.ratio <= 1.05, `High: the sky pass with the filaments ${hi.now} ms against v0.46's ${hi.base} ms (${hi.size} of the preset's twice that; the median of ${hi.pairs} pairs' ratios ${hi.ratio} ≤ 1.05, quartiles ${hi.q25}–${hi.q75})`);
+    const up = await bench('high_canyon_noon_up', 2, [12, [250, 150, 380], 1.36, 0.9, 6000, BASE_SKY, 2]);
+    console.log(`  (looking up into the nebula: ${up.ratio}, quartiles ${up.q25}–${up.q75})`);
   } catch (e) { check(false, 'the High sky bench: ' + String(e.message || e).slice(0, 200)); }
 }
 
@@ -215,6 +221,7 @@ if (on('cart')) {
   ];
   for (const sc of SC) {
     try {
+      try { fs.unlinkSync(shotPath(sc.name)); } catch (e) { /* (no picture of an earlier run) */ }
       await teleport(sc.feet[0], 140, sc.feet[2], 0, 0, sc.fov, 6000); await settle(120000);
       const feet = sc.feet.slice(); if (feet[1] === null) feet[1] = (await groundY(feet[0], feet[2], 140)) + 1;
       const [yaw, pitch] = aimAt(feet, sc.at);
@@ -224,17 +231,19 @@ if (on('cart')) {
       for (let i = 0; i < 40 && !(await ev(() => { const g = VR.game, p = g.player.pos; return [...g.villages.known.values()].some(v => Math.hypot(v.plan.x - p[0], v.plan.z - p[2]) < 300); })); i++) await step(30);
       // the arrival: from here the director runs as in play (a frame every 33 ms of game time)
       await ev(() => { const L = VR.game.lifeDirector; if (L) L.events.length = 0; });
+      // (the picture when the cart is in the view's middle third and seen — nothing solid between the eye and its upper
+      // half, the director's own test: run 2 shot it at the frame's edge, behind a shop front and a palm)
       let t = 0, ev0 = null, inView = null;
       for (; t < 45; t += 0.5) {
         await step(15);
-        const s = await ev(() => { const g = VR.game, L = g.lifeDirector, R = g.renderer; const e = L && L.events.find(x => x.kind === 'cart'); if (!e || !e.pos) return { place: L && L.st.place, cart: false }; const c = R.viewProj, x = e.pos[0] - R.cam.x, y = e.pos[1] + 0.8 - R.cam.y, z = e.pos[2] - R.cam.z; const cx = c[0] * x + c[4] * y + c[8] * z + c[12], cy = c[1] * x + c[5] * y + c[9] * z + c[13], cw = c[3] * x + c[7] * y + c[11] * z + c[15]; return { place: L.st.place, cart: true, age: e.age, sx: cw > 0 ? cx / cw : 9, sy: cw > 0 ? cy / cw : 9, d: Math.hypot(x, z) }; });
+        const s = await ev(() => { const g = VR.game, L = g.lifeDirector, R = g.renderer; const e = L && L.events.find(x => x.kind === 'cart'); if (!e || !e.pos || !e.age) return { place: L && L.st.place, cart: !!e }; const c = R.viewProj, x = e.pos[0] - R.cam.x, y = e.pos[1] + 0.8 - R.cam.y, z = e.pos[2] - R.cam.z; const cx = c[0] * x + c[4] * y + c[8] * z + c[12], cy = c[1] * x + c[5] * y + c[9] * z + c[13], cw = c[3] * x + c[7] * y + c[11] * z + c[15]; return { place: L.st.place, cart: true, age: e.age, sx: cw > 0 ? cx / cw : 9, sy: cw > 0 ? cy / cw : 9, d: Math.hypot(x, z), seen: L.seen ? L.seen([e.pos[0], e.pos[1] - 0.45, e.pos[2]], 1.2) : true }; });
         if (s.cart && !ev0) ev0 = { t, place: s.place };
-        if (s.cart && Math.abs(s.sx) < 0.7 && Math.abs(s.sy) < 0.8) { inView = Object.assign({ t }, s); break; }
-        if (ev0 && t - ev0.t > 14) break;
+        if (s.cart && s.seen && Math.abs(s.sx) < 0.3 && Math.abs(s.sy) < 0.8) { inView = Object.assign({ t }, s); break; }
+        if (ev0 && t - ev0.t > 16) break;
       }
       if (inView) { await draw(false, null); await shoot(sc.name); }
       out.cart.push({ name: sc.name, settle: st, started: ev0, inView }); save();
-      check(!!ev0 && ev0.t <= 40 && !!inView && fs.existsSync(shotPath(sc.name)), `${sc.what} at noon (place ${ev0 ? ev0.place : '—'}): a cart ${ev0 ? 'started ' + ev0.t.toFixed(1) + ' s after the arrival' : 'never came'}${inView ? `, in the frame ${(inView.t - ev0.t).toFixed(1)} s later (${inView.d.toFixed(0)} m, at ${inView.sx.toFixed(2)}, ${inView.sy.toFixed(2)}): test/shots/${sc.name}.png` : ''}`);
+      check(!!ev0 && ev0.t <= 40 && !!inView && fs.existsSync(shotPath(sc.name)), `${sc.what} at noon (place ${ev0 ? ev0.place : '—'}): a cart ${ev0 ? 'started ' + ev0.t.toFixed(1) + ' s after the arrival' : 'never came'}${inView ? `, seen in the view's middle third ${(inView.t - ev0.t).toFixed(1)} s later (${inView.d.toFixed(0)} m, at ${inView.sx.toFixed(2)}, ${inView.sy.toFixed(2)}): test/shots/${sc.name}.png` : ', never seen in the middle of the view'}`);
     } catch (e) { check(false, `${sc.what}: ${String(e.message || e).slice(0, 200)}`); }
   }
 }
@@ -243,8 +252,8 @@ if (on('cart')) {
 await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
 if (on('bench') && BASE_SKY) {
   try {
-    const lo = await bench('potato_canyon_dusk', 11, [24, [250, 150, 380], 1.36, PITCH, 13000, BASE_SKY]);
-    check(lo.ratio <= 1.05, `Very Low: the sky pass ${lo.now} ms against v0.46's ${lo.base} ms (${lo.size}, LITE ${lo.lite}; the rounds' median ratio ${lo.ratio} ≤ 1.05 — the same shader: the filaments are not in it)`);
+    const lo = await bench('potato_canyon_dusk', 3, [12, [250, 150, 380], 1.36, PITCH, 13000, BASE_SKY, 1]);
+    check(lo.ratio <= 1.05, `Very Low: the sky pass ${lo.now} ms against v0.46's ${lo.base} ms (${lo.size}, LITE ${lo.lite}; the median of ${lo.pairs} pairs' ratios ${lo.ratio} ≤ 1.05, quartiles ${lo.q25}–${lo.q75} — the same shader: the filaments are not in it)`);
   } catch (e) { check(false, 'the Very Low sky bench: ' + String(e.message || e).slice(0, 200)); }
 }
 if (on('p1')) {
@@ -256,7 +265,8 @@ if (on('p1')) {
     // rounds of N frames in turns: as it is · without the horizon · without the people (the villagers and the crowd)
     const N = 8, R = { all: [], noHorizon: [], noPeople: [] };
     let parts = null;
-    for (let k = 0; k < 5; k++) for (const mode of ['all', 'noHorizon', 'noPeople']) {
+    // (7 rounds; the best and the median of each: run 2's rounds 3–5 took seconds a frame, the shared machine stalled)
+    for (let k = 0; k < 7; k++) for (const mode of ['all', 'noHorizon', 'noPeople']) {
       const r = await ev(([n, mode]) => new Promise((ok) => {
         const g = VR.game, gl = g.renderer.gl, H = g.horizon, V = g.villages, C = VR.Crowd;
         const hd = H && H.draw, vd = V && V.draw, cd = C && C.draw;
@@ -268,10 +278,10 @@ if (on('p1')) {
       }), [N, mode]);
       R[mode].push(r.ms); if (mode === 'all') parts = r;
     }
-    const med = (v) => { const s = [...v].sort((a, b) => a - b); return +s[s.length >> 1].toFixed(2); };
-    out.p1 = { settle: st, ms: med(R.all), noHorizon: med(R.noHorizon), noPeople: med(R.noPeople), rounds: R, last: parts }; save();
+    const med = (v) => { const s = [...v].sort((a, b) => a - b); return +s[s.length >> 1].toFixed(2); }, best = (v) => +Math.min(...v).toFixed(2);
+    out.p1 = { settle: st, ms: med(R.all), best: best(R.all), noHorizon: med(R.noHorizon), noHorizonBest: best(R.noHorizon), noPeople: med(R.noPeople), noPeopleBest: best(R.noPeople), rounds: R, last: parts }; save();
     console.log(`very low at P1: ${JSON.stringify(out.p1)}`);
-    check(out.p1.ms > 0, `Very Low at P1 (for the record; item 3 written up, not built): ${out.p1.ms} ms a frame (${parts.tris} triangles, of them the horizon ${parts.horizonTris}; ${parts.draws} draws; ${parts.people} people drawn) — without the horizon ${out.p1.noHorizon} ms, without the people ${out.p1.noPeople} ms`);
+    check(out.p1.ms > 0, `Very Low at P1 (for the record; item 3 written up, not built): ${out.p1.best} ms a frame at best, ${out.p1.ms} the median (${parts.tris} triangles, of them the horizon ${parts.horizonTris}; ${parts.draws} draws; ${parts.people} people drawn) — without the horizon ${out.p1.noHorizonBest} / ${out.p1.noHorizon} ms, without the people ${out.p1.noPeopleBest} / ${out.p1.noPeople} ms`);
   } catch (e) { check(false, 'Very Low at P1: ' + String(e.message || e).slice(0, 200)); }
 }
 const errs = logs.filter(l => /pageerror/.test(l));
