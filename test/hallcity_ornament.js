@@ -518,6 +518,28 @@ for (const [label, H] of HALLS) {
     void Cd;
     check(pn > 0 && walk === 0, `the piers' cells leave the walkable floor (${walk} of ${pn} walkable)`);
   }
+  // ---------------------------------------------------------------- 14. round 3: the arcade's piers as clustered columns (P3)
+  console.log(`14. round 3 — the arcade's piers clustered columns (${label})`);
+  {
+    // every pier of the arcade between the nave and an aisle (3 × 3 at |u| 27–29, v ≡ 4–6 mod 10) faced on all four sides
+    // with pillar shafts from its plinth to a capital under the gold band (the references' white clustered piers; they
+    // were brick)
+    let piers = 0, good = 0, faces = 0, pil = 0;
+    for (let k = -8; k <= 4; k++) {
+      const vp = 10 * k + 5; if (vp - 1 < Hh.V0 + 3 || vp + 1 > Hh.V1 || Math.abs(vp) <= 4) continue;
+      for (const s of [-1, 1]) {
+        piers++; let p = 0, n = 0, cap = 0;
+        for (let a = 27; a <= 29; a++) for (let v = vp - 1; v <= vp + 1; v++) {
+          if (a === 28 && v === vp) continue;   // (the core)
+          for (let y = F + 2; y <= F + 16; y++) { n++; if (atN(s * a, y, v) === 'quartz_pillar') p++; }
+          if (/chiseled/.test(atN(s * a, F + 17, v))) cap++;
+        }
+        faces += n; pil += p;
+        if (p >= 0.9 * n && cap >= 6) good++;
+      }
+    }
+    check(piers >= 20 && good === piers, `the arcade's piers are clustered columns — pillar shafts on every face, a capital under the gold band (${good} of ${piers}; ${pil} of ${faces} face cells)`);
+  }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();
   for (const b of plan.chunks.values()) { for (let i = 3; i < b.o.length; i += 4) { const n = nm(b.o[i]); if (/crystal|prism|aether/.test(n)) bad.add(n); } for (let i = 4; i < b.f.length; i += 5) { const n = nm(b.f[i]); if (/crystal|prism|aether/.test(n)) bad.add(n); } }

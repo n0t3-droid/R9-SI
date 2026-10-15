@@ -259,7 +259,7 @@
     yield;
 
     // ================================================================ the walls, the piers, the arcade and the clerestory
-    const STONE = st('quartz_bricks'), SMOOTH = st('smooth_quartz'), BAND = st(VR.R.byName.vx_town_band ? 'vx_town_band' : 'chiseled_quartz_block'), CHIS = st('chiseled_quartz_block');
+    const STONE = st('quartz_bricks'), SMOOTH = st('smooth_quartz'), BAND = st(VR.R.byName.vx_town_band ? 'vx_town_band' : 'chiseled_quartz_block'), CHIS = st('chiseled_quartz_block'), PILLAR = st('quartz_pillar', { axis: 0 });
     const GLASS = st('glass'), FROST = st('frosted_glass');
     for (let v = H.V0; v <= 80; v++) {
       if ((v & 7) === 0) yield;
@@ -280,7 +280,12 @@
         if (a >= H.P0 && a <= H.P1 && v <= H.V1) {
           // the clerestory over the arcade, the piers, the arches' spandrels
           fill(x, z, F + H.CLR, F + H.SPR, STONE);
-          if (isPierV(v) && Math.abs(v) > 3) { fill(x, z, F + 1, F + H.CLR - 1, STONE); put(x, F + 1, z, SMOOTH); put(x, F + H.ARC, z, BAND); }
+          if (isPierV(v) && Math.abs(v) > 3) {
+            fill(x, z, F + 1, F + H.CLR - 1, STONE); put(x, F + 1, z, SMOOTH); put(x, F + H.ARC, z, BAND);
+            // (round 3) a clustered column: every face of the pier pillar shafts from its plinth to a chiseled capital
+            // under the gold band (the references' white piers; they were brick)
+            if (a !== 28 || ((v % 10) + 10) % 10 !== 5) { for (let y = F + 2; y <= F + H.ARC - 2; y++) put(x, y, z, PILLAR); put(x, F + H.ARC - 1, z, CHIS); }
+          }
           else {
             // a round arch over the opening (radius 3.5 about the opening's middle, v ≡ 0 mod 10): the gold archivolt on its soffit
             const dd = Math.abs((((v + 5) % 10) + 10) % 10 - 5);
