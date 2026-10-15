@@ -133,10 +133,6 @@ function closed(mesh) {
   for (const i of P.idx) if (i >= P.nv) inRange = false;
   check(!P.error && bonesOk && inRange && used.size >= def.order.length - 2, `a person in one buffer: ${P.nv} vertices, ${P.nt} triangles, ${used.size} parts named (of ${def.order.length}), indices in range, ${P.ms.toFixed(0)} ms meshing`);
   check(used.has(def.order.indexOf('arm_l')) && used.has(def.order.indexOf('arm_r')), 'the left and the right arm: one mesh, two parts');
-  // the parts' ranges (folkgpu.js, the split draw: a part at a time with its own matrix): one after the other over all the
-  // indices, each range's vertices of its own bone
-  { const R = P.ranges || []; let next = 0, ok = R.length >= 3 * 10; for (let q = 0; q < R.length; q += 3) { if (R[q + 1] !== next) ok = false; for (let i = R[q + 1]; i < R[q + 1] + R[q + 2]; i += 97) if (pu[P.idx[i] * 20 + 15] !== R[q]) ok = false; next = R[q + 1] + R[q + 2]; }
-    check(ok && next === P.idx.length, `the person's ranges: ${R.length / 3} parts over all ${P.idx.length} indices, each of its own bone`); }
   // the worker's way (folksmooth.js FS.personFromLook): the look in, the rig built (with the fine head: §2b), cut, meshed
   // and merged there, the rig's joints back for the draw — the same buffer as the same parts sent from outside
   const Q = FS.personFromLook(L), dF = Folk.buildFine(L), partsF = [], seenF = new Map();

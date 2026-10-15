@@ -1,8 +1,9 @@
 // t-folk (the owner: „natürlich keine Lego-Villagers, wir wollen schon Realismus"): the people in the game, before and
 // after — one page per build, BEFORE_DIST (an earlier build: the old rig, its block people) and this checkout's dist,
 // both on Balanced (the smooth people's tier; the pictures at the trailer's places):
-//   street    a village street (the taiga village of cell 0,1, its plaza, the fountain behind them): five villagers — a
-//             farmer, a child, a gardener, a crafter, an elder — standing 3 to 6 blocks before the eye, looking at it —
+//   street    a village street (the taiga village of cell 0,1: the road south of its plaza, looking up it to the plaza and its
+//             fountain): five villagers — a farmer, a child, a gardener, a crafter, an elder — standing on the road 3 to 6
+//             blocks before the eye, looking at it —
 //             test/shots/folk_real_street_<tag>.png (and, after, the same with Echte Menschen off: the new proportions as
 //             voxels, what Very Low and Low draw — folk_real_street_vox_<tag>.png)
 //   portrait  two people two blocks before the eye in the hall city's street (a Weißstadt coat, a village farmer) —
@@ -38,7 +39,7 @@ if (costs.before && costs[TAG] && costs.before.potato && costs[TAG].potato) {
   // Very Low: the villagers' own cost (their draw's time on the main thread and their triangles) — the frame's time is
   // reported (two pages minutes apart on a shared machine: its load is not the same)
   const b = costs.before.potato, a = costs[TAG].potato;
-  check(a.voxel.folk <= b.voxel.folk * 1.15 + 0.3 && a.voxel.folkTris <= b.voxel.folkTris, `Very Low, the forty in view: the villagers' draw ${a.voxel.folk} ms and ${a.voxel.folkTris} triangles against ${b.voxel.folk} ms and ${b.voxel.folkTris} before (the frame ${a.voxel.ms} ms against ${b.voxel.ms}; without the people ${a.none.ms} against ${b.none.ms})`);
+  check(a.voxel.folkMin <= b.voxel.folkMin * 1.15 + 0.3 && a.voxel.folkTris <= b.voxel.folkTris, `Very Low, the forty in view: the villagers' draw ${a.voxel.folkMin} ms (the least of the rounds; median ${a.voxel.folk}) and ${a.voxel.folkTris} triangles against ${b.voxel.folkMin} ms (${b.voxel.folk}) and ${b.voxel.folkTris} before (the frame ${a.voxel.msMin} / ${a.voxel.ms} ms against ${b.voxel.msMin} / ${b.voxel.ms}; without the people ${a.none.msMin} against ${b.none.msMin})`);
 }
 console.log('costs ' + JSON.stringify(costs));
 await browser.close();
@@ -134,11 +135,11 @@ async function runPage(tag, dist) {
   };
   // one cost round: n frames (after two to warm) in a mode — 'none' the frame without the people's draw, 'voxel' the
   // people as voxels (Echte Menschen off), 'smooth' (on: one draw a person, the bones' matrices indexed in the vertex
-  // shader), 'split' (on, a draw a part with its matrix: folkgpu.js FG.SPLIT). → the frame's ms, draws, triangles, the
-  // people's draw (ms, draws, triangles), the frame's parts (ms), the smooth people drawn
+  // shader). → the frame's ms, draws, triangles, the people's draw (ms, draws, triangles), the frame's parts (ms), the
+  // smooth people drawn
   const round = (n, mode) => ev(([n, mode]) => new Promise((ok, no) => {
     const g = VR.game, gl = g.renderer.gl, V = g.villages, R = g.renderer, FG = VR.FolkGPU;
-    if (FG) { g.settings.smoothFolk = mode === 'smooth' || mode === 'split' ? 1 : 0; FG.SPLIT = mode === 'split'; }
+    if (FG) g.settings.smoothFolk = mode === 'smooth' ? 1 : 0;
     window.__norender = false;
     const acc = {}, wrapped = [];
     const wrap = (o, name, key) => { if (!o || typeof o[name] !== 'function') return; const f0 = o[name]; o[name] = function (...a) { const t = performance.now(); try { return f0.apply(this, a); } finally { acc[key] = (acc[key] || 0) + performance.now() - t; } }; wrapped.push([o, name, f0]); };
@@ -151,7 +152,7 @@ async function runPage(tag, dist) {
     for (const [nm, ti] of [['drawArrays', (m, f, n) => n], ['drawElements', (m, n) => n], ['drawArraysInstanced', (m, f, n, k) => n * k], ['drawElementsInstanced', (m, n, ty, o, k) => n * k]]) {
       G0[nm] = gl[nm]; gl[nm] = function (...a) { const tri = a[0] === gl.TRIANGLES ? ti(...a) / 3 : a[0] === gl.TRIANGLE_STRIP ? Math.max(0, ti(...a) - 2) : 0; cnt.d++; cnt.t += tri; if (inFolk) { cnt.fd++; cnt.ft += tri; } return G0[nm].apply(gl, a); };
     }
-    const restore = () => { for (const [o, nm, f0] of wrapped) o[nm] = f0; V.draw = vd; for (const nm in G0) gl[nm] = G0[nm]; window.__norender = true; if (FG) FG.SPLIT = false; };
+    const restore = () => { for (const [o, nm, f0] of wrapped) o[nm] = f0; V.draw = vd; for (const nm in G0) gl[nm] = G0[nm]; window.__norender = true; };
     let k = -2, sum = 0, d = 0, t = 0, fd = 0, ft = 0;
     const f = () => {
       try {
@@ -163,14 +164,16 @@ async function runPage(tag, dist) {
         if (++k < n) { setTimeout(f, 0); return; }
         const parts = {}; for (const key of ['mirror', 'props', 'mobs', 'hall', 'crowd', 'ships', 'traffic', 'particles']) if (acc[key]) parts[key] = +(acc[key] / n).toFixed(1);
         restore();
-        ok({ ms: +(sum / n).toFixed(1), draws: Math.round(d / n), tris: Math.round(t / n), folk: +((acc.folk || 0) / n).toFixed(2), folkDraws: Math.round(fd / n), folkTris: Math.round(ft / n), render: +((acc.render || 0) / n).toFixed(1), parts, smooth: (mode === 'smooth' || mode === 'split') && FG ? FG.stats.drawn : 0, particles: g.particles ? g.particles.n : -1 });
+        ok({ ms: +(sum / n).toFixed(1), draws: Math.round(d / n), tris: Math.round(t / n), folk: +((acc.folk || 0) / n).toFixed(2), folkDraws: Math.round(fd / n), folkTris: Math.round(ft / n), render: +((acc.render || 0) / n).toFixed(1), parts, smooth: mode === 'smooth' && FG ? FG.stats.drawn : 0, particles: g.particles ? g.particles.n : -1 });
       } catch (e) { restore(); no(String(e && e.stack || e)); }
     };
     f();
   }), [n, mode]);
-  const median = (rs) => { const out = {}; for (const key of ['ms', 'draws', 'tris', 'folk', 'folkDraws', 'folkTris', 'render', 'smooth', 'particles']) { const v = rs.map(q => q[key]).sort((a, b) => a - b); out[key] = v[(v.length - 1) >> 1]; } out.rounds = rs.map(q => q.ms); out.parts = rs[(rs.length - 1) >> 1].parts; return out; };
+  // (the median of the rounds, and their least — a round the machine's other browsers stalled for seconds (run 2: one
+  // round in three, in any mode) only adds: the least is the stall-free cost)
+  const median = (rs) => { const out = {}; for (const key of ['ms', 'draws', 'tris', 'folk', 'folkDraws', 'folkTris', 'render', 'smooth', 'particles']) { const v = rs.map(q => q[key]).sort((a, b) => a - b); out[key] = v[(v.length - 1) >> 1]; } out.msMin = Math.min(...rs.map(q => q.ms)); out.folkMin = Math.min(...rs.map(q => q.folk)); out.rounds = rs.map(q => q.ms); out.parts = rs[(rs.length - 1) >> 1].parts; return out; };
   // interleaved rounds of the modes (the machine's load drifts out); → { mode: medians }
-  const costRounds = async (modes, rounds = 3) => { const R = {}; for (const m of modes) R[m] = []; for (let k = 0; k < rounds; k++) for (const m of modes) R[m].push(await round(N, m)); const out = {}; for (const m of modes) out[m] = median(R[m]); return out; };
+  const costRounds = async (modes, rounds = 5) => { const R = {}; for (const m of modes) R[m] = []; for (let k = 0; k < rounds; k++) for (const m of modes) R[m].push(await round(N, m)); const out = {}; for (const m of modes) out[m] = median(R[m]); return out; };
 
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   await preset('balanced');
@@ -192,8 +195,9 @@ async function runPage(tag, dist) {
   let pics = 0, want = 0;
   // ---------------------------------------------------------------- a village street: five villagers 3–6 blocks before the eye
   await part('the street', async () => { if (site && site.village && site.village.plaza) {
-    // (from the plaza's +z side looking −z: the fountain behind the five, the benches and the stalls aside)
-    const P = site.village.plaza, vx = P.x + 0.5, vz = P.z + 0.5 + 6;
+    // (on the road south of the plaza, 29 blocks down it, looking up it (−z) to the plaza: houses on both sides, the
+    // fountain far behind the five — run 2 stood them in the fountain's basin)
+    const P = site.village.plaza, vx = P.x + 6.5, vz = P.z + 29.5;
     const feet = await place(vx, vz, async () => (await groundY(vx, vz, 140)) + 1, 0, 0, 62);
     const yaw = 0;
     await ev(([y]) => { const pl = VR.game.player; pl.yaw = y; pl.pitch = -0.08; }, [yaw]);
@@ -260,7 +264,7 @@ async function runPage(tag, dist) {
     const w = await prewarm();
     await frames(2);
     costs[tag] = {};
-    const modes = info.smooth ? ['none', 'voxel', 'smooth', 'split'] : ['none', 'voxel'];
+    const modes = info.smooth ? ['none', 'voxel', 'smooth'] : ['none', 'voxel'];
     costs[tag].balanced = await costRounds(modes);
     console.log(`measure ${tag} balanced, the forty: ${JSON.stringify(costs[tag].balanced)}`);
     if (info.smooth) {
@@ -269,7 +273,7 @@ async function runPage(tag, dist) {
       costs[tag].meshes = fg;
       console.log(`  the meshes ${JSON.stringify(fg)} (prewarm ${JSON.stringify(w)})`);
       check(B.smooth.smooth >= 36, `${tag}: the forty drawn smooth (${B.smooth.smooth})`);
-      check(B.smooth.folkDraws < B.voxel.folkDraws, `${tag}: the smooth crowd in fewer draws (the villagers' ${B.smooth.folkDraws} against ${B.voxel.folkDraws} as voxels; ${B.smooth.folkTris} against ${B.voxel.folkTris} triangles; their draw ${B.smooth.folk} against ${B.voxel.folk} ms; the frame ${B.smooth.ms} / ${B.voxel.ms} / without them ${B.none.ms} ms)`);
+      check(B.smooth.folkDraws < B.voxel.folkDraws, `${tag}: the smooth crowd in fewer draws (the villagers' ${B.smooth.folkDraws} against ${B.voxel.folkDraws} as voxels; ${B.smooth.folkTris} against ${B.voxel.folkTris} triangles; their draw ${B.smooth.folkMin} against ${B.voxel.folkMin} ms; the frame's least ${B.smooth.msMin} smooth / ${B.voxel.msMin} voxels / ${B.none.msMin} without them, medians ${B.smooth.ms} / ${B.voxel.ms} / ${B.none.ms} ms)`);
       check(fg.bytes <= 32 << 20 && fg.failed === 0, `${tag}: the meshes within their budget (${fg.mbGPU} MB on the GPU for ${fg.people} people, none failed)`);
       await ev(() => { VR.game.settings.smoothFolk = 1; });
       want++; if ((await shot('crowd')).ok) pics++;
