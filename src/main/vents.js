@@ -14,8 +14,8 @@
   // amid the ragged end: rise), how it moves (side; vy — on down the fall's way, a lava fall's smoke up), how long it
   // lives, how big it is and grows, its own opacity (beauty_rules 9: the plume's heart at most 0.7 opaque)
   const MIST = {
-    water: { spread: 2.6, rise: 4, side: 1.2, vy: [-5, -3], life: [5, 6.5], size: [1.5, 2.1], grav: 0.6, drag: 0.4, grow: 1.0, alpha: 0.11 },
-    lava: { spread: 2.4, rise: 3, side: 1.0, vy: [1.4, 2.4], life: [5, 7], size: [1.0, 1.5], grav: -0.15, drag: 0.35, grow: 1.2, alpha: 0.08 },
+    water: { spread: 2.6, rise: 4, side: 1.2, vy: [-5, -3], life: [5, 6.5], size: [1.5, 2.1], grav: 0.6, drag: 0.4, grow: 1.0, alpha: 0.11, turb: 1.4, wind: 0.12 },
+    lava: { spread: 2.4, rise: 3, side: 1.0, vy: [1.4, 2.4], life: [5, 7], size: [1.0, 1.5], grav: -0.15, drag: 0.35, grow: 1.2, alpha: 0.08, turb: 0.9, wind: 0.2 },
   };
   class Vents {
     constructor(game) {
@@ -48,7 +48,7 @@
           // a grey smoke puff rising off the vent (it grows as it climbs, the column breaks up near the top)
           P.spawn(x + (Math.random() - 0.5) * 0.9, y + 0.1, z + (Math.random() - 0.5) * 0.9,
             (Math.random() - 0.5) * 0.25, 1.4 + Math.random() * 0.8, (Math.random() - 0.5) * 0.25,
-            { life: 5 + Math.random() * 2.5, size: 0.7 + Math.random() * 0.35, grav: -0.25, drag: 0.35, col: [0.7, 0.66, 0.66], grow: 0.9, collide: false, emis: 0 });
+            { life: 5 + Math.random() * 2.5, size: 0.7 + Math.random() * 0.35, grav: -0.25, drag: 0.35, col: [0.7, 0.66, 0.66], grow: 0.9, collide: false, emis: 0, wind: 0.22, turb: 0.5 });   // (t-motion: the column leans with the wind and churns)
           // a warm ember now and then: the heat shimmer over the seam
           if (!low && Math.random() < 0.6) P.spawn(x, y + 0.2, z, (Math.random() - 0.5) * 0.6, 1.2 + Math.random() * 1.2, (Math.random() - 0.5) * 0.6,
             { life: 1.2 + Math.random() * 0.8, size: 0.07, grav: -0.1, drag: 0.3, col: [1, 0.62, 0.22], emis: 1, collide: false });
@@ -69,7 +69,7 @@
           if (dx * dx + dz * dz > REACH_MIST * REACH_MIST) continue;
           const M = lava ? MIST.lava : MIST.water;
           o.life = M.life[0] + r() * (M.life[1] - M.life[0]); o.size = M.size[0] + r() * (M.size[1] - M.size[0]);
-          o.grav = M.grav; o.drag = M.drag; o.col = lava ? SMOKE : SPRAY; o.alpha = M.alpha; o.grow = M.grow;
+          o.grav = M.grav; o.drag = M.drag; o.col = lava ? SMOKE : SPRAY; o.alpha = M.alpha; o.grow = M.grow; o.turb = M.turb || 0; o.wind = M.wind || 0;   // (t-motion: the plume billows and drifts)
           P.spawn(x + (r() - 0.5) * M.spread, y + r() * M.rise, z + (r() - 0.5) * M.spread, (r() - 0.5) * M.side, M.vy[0] + r() * (M.vy[1] - M.vy[0]), (r() - 0.5) * M.side, o);
           if (lava && !low && r() < 0.6) { e.life = 1 + r() * 0.8; P.spawn(x + (r() - 0.5) * 1.5, y + r() * 3, z + (r() - 0.5) * 1.5, (r() - 0.5) * 1.2, -1 - r(), (r() - 0.5) * 1.2, e); }
         }

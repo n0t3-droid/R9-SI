@@ -112,8 +112,8 @@
       this.waterScan = (this.waterScan || 0) - dt;
       if (this.waterScan <= 0) {
         this.waterScan = 2;
-        const falls = [], px = Math.floor(p.pos[0]), pz = Math.floor(p.pos[2]);
-        for (let dz = -24; dz <= 24; dz += 2) for (let dx = -24; dx <= 24; dx += 2) {
+        const falls = [], px = Math.floor(p.pos[0]), pz = Math.floor(p.pos[2]), FR = this.settings.motion ? 40 : 24;   // (t-motion: the falls' mist from further off)
+        for (let dz = -FR; dz <= FR; dz += 2) for (let dx = -FR; dx <= FR; dx += 2) {
           const x = px + dx, z = pz + dz;
           if (!w.isLoaded(x, z)) continue;
           const y = w.topAt(x, z), s = w.getBlock(x, y, z);
@@ -124,10 +124,15 @@
         this.waterFalls = falls;
       }
       const falls = this.waterFalls || [];
+      // t-motion: with the wind in everything on, the foot of a fall throws up a billowing column of mist (turbulent puffs that
+      // grow as they rise and drift with the wind) and a fine spray of droplets
+      const mo = !!this.settings.motion, rate = mo ? 12 : 5;
       for (const f of falls) {
-        if (Math.random() > dt * 5 / Math.max(1, falls.length)) continue;
+        if (Math.random() > dt * rate / Math.max(1, falls.length)) continue;
         const r = () => Math.random() - 0.5;
-        this.particles.spawn(f[0] + r() * 1.2, f[1] + 0.2, f[2] + r() * 1.2, r() * 0.8, 0.4 + Math.random() * 0.6, r() * 0.8, { life: 2.4, size: 0.6 + Math.random() * 0.4, grav: -0.25, drag: 1.4, col: [0.93, 0.96, 1], emis: 0.12, collide: false });
+        if (!mo) { this.particles.spawn(f[0] + r() * 1.2, f[1] + 0.2, f[2] + r() * 1.2, r() * 0.8, 0.4 + Math.random() * 0.6, r() * 0.8, { life: 2.4, size: 0.6 + Math.random() * 0.4, grav: -0.25, drag: 1.4, col: [0.93, 0.96, 1], emis: 0.12, collide: false }); continue; }
+        this.particles.spawn(f[0] + r() * 1.6, f[1] + 0.3, f[2] + r() * 1.6, r() * 1.2, 0.8 + Math.random() * 0.9, r() * 1.2, { life: 3.6 + Math.random() * 1.6, size: 0.7 + Math.random() * 0.6, grav: -0.12, drag: 1.1, col: [0.93, 0.96, 1], emis: 0.12, collide: false, grow: 0.55, alpha: 0.42, turb: 1.6, wind: 0.15 });
+        if (Math.random() < 0.6) { const a = Math.random() * 6.283, sp = 1.8 + Math.random() * 1.6; this.particles.spawn(f[0] + r(), f[1] + 0.6, f[2] + r(), Math.cos(a) * sp, 1.5 + Math.random() * 1.5, Math.sin(a) * sp, { life: 0.9 + Math.random() * 0.4, size: 0.05 + Math.random() * 0.04, grav: 7, drag: 0.4, col: [0.86, 0.93, 1], emis: 0.3, collide: false }); }
       }
     }
     // F7: a swimmer's eye rides the swell (the surface's own waves, water_wave.js); nothing when the feet are dry
@@ -179,6 +184,7 @@
       if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
       if (this.airLife) this.airLife.setOn(S.airLife !== false, VR.AirLife.tierOf(S));
+      if (this.motionAir) this.motionAir.setOn(S.airLife !== false, VR.AirLife.tierOf(S));   // (t-motion: the new air rides the living air's switch and tiers)
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
       if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
       this.applyLook();
@@ -358,6 +364,7 @@
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
       this.airLife = new VR.AirLife(this);   // the living air (F3 · Da-Sein): caps per tier, see airlife.js
+      this.motionAir = VR.MotionAir ? new VR.MotionAir(this) : null;   // t-motion: steam, motes under the trees, sparkle on water, storm leaves, rain splashes (motion.js)
       this.trails = VR.Trails ? new VR.Trails(this) : null;
       this.vents = VR.Vents ? new VR.Vents(this) : null;
       this.director = VR.Director ? new VR.Director(this) : null;
@@ -1165,6 +1172,8 @@
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
       if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
+      if (this.motionAir) this.motionAir.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, drama: !!this.settings.wxDrama });   // (t-motion)
+      if (this.particles.setWind) this.particles.setWind(E, dt);   // (t-motion: smoke and mist take up the world's wind)
       this.particles.update(dt, eye);
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
       this.waterFx(dt, p, eye, underwater, inLava, E);

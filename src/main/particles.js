@@ -15,6 +15,11 @@
       this.layer = new Float32Array(CAP); this.uv = new Float32Array(CAP * 4); this.col = new Float32Array(CAP * 3);
       this.emis = new Float32Array(CAP); this.fade = new Uint8Array(CAP); this.collide = new Uint8Array(CAP); this.grow = new Float32Array(CAP);
       this.alpha = new Float32Array(CAP);   // a particle's own opacity (o.alpha, default 1): the falls' mist is a thin veil (vents.js)
+      // t-motion: o.wind — how fast the particle takes up the world's wind (1/s: smoke bends downwind as it rises); o.turb —
+      // a curl of sines stirs it (blocks/s²: the falls' mist billows). The world's wind velocity (wx, wz) and the clock
+      // are set every frame (game.js: setWind); 0 keeps a particle as it was
+      this.windK = new Float32Array(CAP); this.turb = new Float32Array(CAP);
+      this.wx = 0; this.wz = 0; this.clock = 0;
       this.data = new Float32Array(CAP * 14);
       this.count = 0;
       this.budget = 1;
@@ -32,6 +37,7 @@
       const c = o.col || [1, 1, 1]; this.col[i * 3] = c[0]; this.col[i * 3 + 1] = c[1]; this.col[i * 3 + 2] = c[2];
       this.emis[i] = o.emis || 0; this.fade[i] = o.fade === false ? 0 : 1; this.collide[i] = o.collide === false ? 0 : 1; this.grow[i] = o.grow || 0;
       this.alpha[i] = o.alpha === undefined ? 1 : o.alpha;
+      this.windK[i] = o.wind || 0; this.turb[i] = o.turb || 0;
       return i;
     }
     tintFor(state, layer) {
@@ -101,6 +107,20 @@
         this.lamps = L;
       }
       const L = this.lamps, col = this._haloCol || (this._haloCol = [1, 0.74, 0.42]);
+      // t-motion: with the wind in everything on, every lamp keeps one steady halo that flickers gently — a warm flame
+      // (two sines) or a cool tech light that breathes (VR.Motion.flicker, one phase per lamp) — drawn once a frame
+      const Mo = VR.Motion, S = this.game.settings;
+      if (Mo && Mo.flicker && S && S.motion) {
+        const o = this._ho || (this._ho = { life: 0, size: 0.44, grav: 0, drag: 0, col: [1, 1, 1], emis: 1, collide: false, fade: false, force: true });
+        o.life = dt * 1.5 + 1e-4;
+        for (let i = 0; i < L.length; i += 4) {
+          Particles.haloColor(L[i + 3], col);
+          const f = Mo.flicker(this.clock, Mo.hash3(L[i], L[i + 1], L[i + 2]), col[2] < col[0]) * 0.62;
+          o.col[0] = col[0] * f; o.col[1] = col[1] * f; o.col[2] = col[2] * f;
+          this.spawn(L[i], L[i + 1], L[i + 2], 0, 0, 0, o);
+        }
+        return;
+      }
       for (let i = 0; i < L.length; i += 4) if (Math.random() < dt * 1.5) { Particles.haloColor(L[i + 3], col); this.glow(L[i], L[i + 1], L[i + 2], col, 1.1, 0.42, 0.04); }
     }
     // the states that get a halo (Uint8Array by state, 1 = a point light), read from the registry once it is complete
@@ -117,6 +137,8 @@
       if (b > r) { out[0] = r / m; out[1] = g / m; out[2] = b / m; } else { out[0] = 1; out[1] = 0.74; out[2] = 0.42; }
       return out;
     }
+    // t-motion: the world's wind (E.windDir × E.wind, blocks/s) for the particles that take it up
+    setWind(E, dt) { const wd = E && E.windDir, k = E ? (E.wind || 0) * 2.2 : 0; this.wx = wd ? wd[0] * k : 0; this.wz = wd ? wd[1] * k : 0; this.clock += dt || 0; }
     update(dt, camPos) {
       const w = this.game.world;
       let i = 0;
@@ -125,6 +147,9 @@
         if (this.life[i] <= 0) { this.kill(i); continue; }
         const vi = i * 3;
         this.v[vi + 1] -= this.grav[i] * dt;
+        const wk = this.windK[i], tb = this.turb[i];
+        if (wk) { const a = 1 - Math.exp(-wk * dt); this.v[vi] += (this.wx - this.v[vi]) * a; this.v[vi + 2] += (this.wz - this.v[vi + 2]) * a; }
+        if (tb) { const px = this.p[vi], py = this.p[vi + 1], pz = this.p[vi + 2], t = this.clock; this.v[vi] += tb * dt * Math.sin(py * 0.9 + t * 1.3 + pz * 0.4); this.v[vi + 1] += tb * dt * 0.6 * Math.sin(px * 0.7 + pz * 0.8 + t * 1.1); this.v[vi + 2] += tb * dt * Math.cos(px * 0.8 - t * 1.2 + py * 0.5); }
         const d = Math.exp(-this.drag[i] * dt);
         this.v[vi] *= d; this.v[vi + 1] *= d; this.v[vi + 2] *= d;
         const nx = this.p[vi] + this.v[vi] * dt, ny = this.p[vi + 1] + this.v[vi + 1] * dt, nz = this.p[vi + 2] + this.v[vi + 2] * dt;
@@ -158,7 +183,7 @@
       if (i === j) return;
       const cp3 = (a) => { a[i * 3] = a[j * 3]; a[i * 3 + 1] = a[j * 3 + 1]; a[i * 3 + 2] = a[j * 3 + 2]; };
       cp3(this.p); cp3(this.v); cp3(this.col);
-      for (const a of [this.life, this.max, this.size, this.grav, this.drag, this.layer, this.emis, this.fade, this.collide, this.grow, this.alpha]) a[i] = a[j];
+      for (const a of [this.life, this.max, this.size, this.grav, this.drag, this.layer, this.emis, this.fade, this.collide, this.grow, this.alpha, this.windK, this.turb]) a[i] = a[j];
       for (let k = 0; k < 4; k++) this.uv[i * 4 + k] = this.uv[j * 4 + k];
     }
   }
