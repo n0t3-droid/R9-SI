@@ -59,7 +59,7 @@
     if (P && P._vistaLm) return P._vistaLm;
     const out = [], pc = (k) => P ? P.pieces.filter(p => p.kind === k) : [];
     out.push({ id: 'temple', x: 0, z: -15, top: Y + 87, base: Y, r: 52, great: true });
-    out.push({ id: 'dome', x: 69, z: -5, top: Y + 32, base: Y, r: 13, great: false });
+    out.push({ id: 'dome', x: 69, z: -5, top: Y + 31, base: Y, r: 13, great: false });
     const CIT = VR.CitadelGen, C = HEART.CITADEL;
     let ctop = 249;
     if (CIT && CIT.heartSite) { try { const s = CIT.heartSite(g, C), m = s.towers.find(t => t.kind === 'main'); if (m) ctop = s.y + 2 + m.h; } catch (e) { /* the fixed site's numbers */ } }
@@ -608,7 +608,7 @@
   // tiles that hold their anchor (each drawn once a level): the temple (the horizon only — the far ring has its
   // skyline), the land's towers and the isles' falls.
   VISTA.lodBoxes = function (g, x0, z0, x1, z1, ring) {
-    if (!VISTA.on(g)) return null;
+    if (!VISTA.on(g) || x1 < -820 || x0 > 820 || z1 < -820 || z0 > 820) return null;
     const out = [], P = LAND.plan(g), inT = (x, z) => x >= x0 && x < x1 && z >= z0 && z < z1;
     if (ring !== 1 && inT(0, -10)) VISTA.templeBoxes(out);
     for (const p of P.pieces) {
@@ -617,6 +617,7 @@
       else if (p.kind === 'lookout') { box(out, p.x, p.z, 2.5, p.y, p.top, STONE); box(out, p.x, p.z, 3.5, p.top, p.top + 1, WOOD); box(out, p.x, p.z, 0.6, p.top + 1, p.top + 2, LAMP, 4); }
       else if (p.kind === 'belvedere') { box(out, p.x, p.z, 2.5, p.y, p.top - 5, STONE); box(out, p.x, p.z, 3, p.top - 5, p.top - 3, SLATE); box(out, p.x, p.z, 1.5, p.top - 3, p.top - 1, SLATE); box(out, p.x, p.z, 0.6, p.top - 1, p.top, LAMP, 4); }
       else if (p.kind === 'monopteros') { box(out, p.x, p.z, 6, p.y - 2, p.y, WHITE); box(out, p.x, p.z, 4.3, p.y, p.y + 7, WHITE); box(out, p.x, p.z, 5, p.y + 7, p.y + 9, WHITE); box(out, p.x, p.z, 3, p.y + 9, p.y + 12, WHITE); box(out, p.x, p.z, 0.8, p.y + 12, p.top, GOLD, 4); }
+      else if (p.kind === 'obelisk') { box(out, p.x, p.z, 2.5, p.y - 1, p.y + 1, STONE); box(out, p.x, p.z, 1.5, p.y + 1, p.y + 9, WHITE); box(out, p.x, p.z, 0.5, p.y + 9, p.top - 1, WHITE); box(out, p.x, p.z, 0.6, p.top - 1, p.top, GOLD, 4); }
       else if (p.kind === 'windmill') { box(out, p.x, p.z, 2.4, p.y - 8, p.y + 3, WHITE); box(out, p.x, p.z, 1.6, p.y + 3, p.y + 5, ROOF); }
       else if (p.kind === 'waterfall' && p.curtain && p.curtain.length) { const xs = p.curtain.map(c => c[0]), zs = p.curtain.map(c => c[1]); out.push({ x0: Math.min(...xs), x1: Math.max(...xs) + 1, z0: Math.min(...zs), z1: Math.max(...zs) + 1, y0: SEA, y1: p.top + 1, c: FOAM, k: 0 }); }
     }
@@ -646,22 +647,29 @@
       const px = sx * 40; out.push({ x0: px - 2, x1: px + 3, y0: Y + 1, y1: Y + 47, z0: 6, z1: 11, c: SL, k: 0 }); out.push({ x0: px - 7, x1: px + 8, y0: Y + 47, y1: Y + 50, z0: 1, z1: 16, c: SLD, k: 0 }); out.push({ x0: px - 7.2, x1: px + 8.2, y0: Y + 48, y1: Y + 49, z0: 0.8, z1: 16.2, c: CY, k: 4 });
     }
     // the domed hall: the drum, the dome in two steps, the lantern (amber glass) and its spire
-    out.push({ x0: 56, x1: 83, y0: Y + 1, y1: Y + 8, z0: -18, z1: 9, c: SL, k: 0 }, { x0: 58, x1: 81, y0: Y + 8, y1: Y + 15, z0: -16, z1: 7, c: SL, k: 0 }, { x0: 62, x1: 77, y0: Y + 15, y1: Y + 20, z0: -12, z1: 3, c: SL, k: 0 });
-    out.push({ x0: 66, x1: 73, y0: Y + 20, y1: Y + 26, z0: -8, z1: -1, c: AMB, k: 4 }, { x0: 67, x1: 72, y0: Y + 26, y1: Y + 29, z0: -7, z1: -2, c: SLD, k: 0 }, { x0: 69, x1: 70, y0: Y + 29, y1: Y + 33, z0: -5, z1: -4, c: [255, 58, 58], k: 4 });
+    out.push({ x0: 57, x1: 82, y0: Y + 1, y1: Y + 8, z0: -17, z1: 8, c: SL, k: 0 }, { x0: 59, x1: 80, y0: Y + 8, y1: Y + 14, z0: -15, z1: 6, c: SL, k: 0 }, { x0: 62, x1: 77, y0: Y + 14, y1: Y + 19, z0: -12, z1: 3, c: SL, k: 0 });
+    out.push({ x0: 66, x1: 73, y0: Y + 19, y1: Y + 24, z0: -8, z1: -1, c: AMB, k: 4 }, { x0: 66, x1: 73, y0: Y + 24, y1: Y + 25, z0: -8, z1: -1, c: BAR, k: 4 }, { x0: 67, x1: 72, y0: Y + 25, y1: Y + 27, z0: -7, z1: -2, c: SLD, k: 0 }, { x0: 69, x1: 70, y0: Y + 27, y1: Y + 31, z0: -5, z1: -4, c: [255, 58, 58], k: 4 });
     return out;
   };
   // the designed isles' falls, as gen_realm.js lays them (the same walk out from the centre, the same curtain's foot):
   // {x, z, top, foot, lava}
   VISTA.isleFalls = function (g) {
     if (g._vistaFalls) return g._vistaFalls;
-    const out = [];
+    const out = []; let bridges = null;
     if (VR.IslesGen && g.islandAt) for (const I of VR.IslesGen.list(g)) for (let f = 0; f < (I.falls || 0); f++) {
       const a = ((I.seed * 0.618 + f * 0.37) % 1) * Math.PI * 2;
       let fx = 0, fz = 0, ft = null;
       for (let r = 0; r < I.r * 1.4; r += 1) { const px = Math.round(I.x + Math.cos(a) * r), pz = Math.round(I.z + Math.sin(a) * r), J = g.islandAt(px, pz); if (J && J.isle === I) { fx = px; fz = pz; ft = J; } else if (ft) break; }
       if (!ft) continue;
       const o1 = [Math.round(Math.cos(a)), Math.round(Math.sin(a))], fs = ((I.seed | 0) * 31 + f * 17) >>> 0, base = 18 + fs % 12;
-      out.push({ x: fx + o1[0] - (o1[0] > 0 ? 1 : 0), z: fz + o1[1] - (o1[1] > 0 ? 1 : 0), top: ft.top, foot: ft.top - base - 6, lava: !!I.lava, isle: I.name });
+      const x = fx + o1[0] - (o1[0] > 0 ? 1 : 0), z = fz + o1[1] - (o1[1] > 0 ? 1 : 0);
+      // (a curtain over another island's top ends on it: not a fall into the void)
+      // (nor one that meets a bridge or the viaduct between the isles under its lip)
+      if (!bridges) { bridges = new Set(); const ch = VR.IslesGen.build(g); for (const b of ch.values()) { for (let i = 0; i < b.o.length; i += 4) if (b.o[i + 3]) bridges.add(b.o[i] * 65536 + b.o[i + 2]); } }
+      // (and where every cell of the 2 × 2 is the isle's own ground, the water only fills the rim pool: no curtain)
+      let over = false, free = 0; for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const J = g.islandAt(x + ox, z + oz); if ((J && J.isle !== I && J.top < ft.top) || bridges.has((x + ox) * 65536 + z + oz)) over = true; if (!J || J.isle !== I || J.top < ft.top - 1) free++; }
+      if (over || !free) continue;
+      out.push({ x, z, top: ft.top, foot: ft.top - base - 6, lava: !!I.lava, isle: I.name });
     }
     return (g._vistaFalls = out);
   };

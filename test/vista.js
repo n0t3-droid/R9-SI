@@ -8,7 +8,11 @@
 //   3. vista points: about one every 200 blocks of way, ≥ 90 apart; each a spur with its bench, lanterns and walls in
 //      its chunk; from each the landmark's top is above the horizon line and unoccluded within 300 m by the heightfield,
 //      and the line of sight is free of blocks in the generated chunks within 120 blocks; listed as a 'vista' spawn
-//   (the later sections — silhouettes, far forms, layers — come with their steps)
+//   4. silhouettes: the domed hall's lantern spire (the beacon ≥ 1.5 times the dome's height), the fluted towers' light
+//      bands, the citadel's taller spires and side pinnacles, a fall off every isle into the void, the lighthouse ≥ 40
+//      high on the lake's far coast; the horizon tiles and the far ring's forms reach the landmarks' tops; Very Low's
+//      horizon in the hills view at most ×1.03 the triangles of vgen 10
+//   (the later sections — layers, the wow moments — come with their steps)
 //   bash test/wt_run.sh vista.js 900        (SEED=… another world; ONLY=1,2 some sections)
 const V = require('./load_shared.js');
 const R = V.R, LAND = V.Land, VI = V.Vista, SEA = V.C.SEA;
@@ -125,6 +129,63 @@ if (want(3)) {
   let third = 0; for (const v of vs) { const [ex, ey, ez] = v.eye, [qx, qy, qz] = v.aim, d = Math.hypot(qx - ex, qz - ez), a = Math.atan2(qy - ey, d) - v.pitch, ndc = Math.tan(a) / Math.tan(v.fov * Math.PI / 360); if (ndc > 1 / 3 && ndc < 1) third++; }
   check(third === vs.length, `the composition puts the landmark's top in the upper third of the frame (${third} of ${vs.length})`);
   console.log('  ' + vs.map(v => `${v.id} ${v.lm} (${v.x}, ${v.z}) ${v.d} m, rise ${v.rise}, ${v.frame}`).join('\n  '));
+  console.log(`  (${secs()})`);
+}
+
+// ---------------------------------------------------------------- 4 · silhouettes and far forms
+if (want(4)) {
+  console.log('4 · the landmarks read from afar: the dome\'s lantern spire, the towers\' light bands, the citadel, the isles\' falls, the lighthouse, the far forms');
+  const Y = V.Heart.PLAT, g10 = V.makeGen('overworld', SEED, { vgen: 10 });
+  const colOf = (gg, x, y0, y1, z) => { const c = gg.generate(x >> 4, z >> 4), out = []; for (let y = y0; y <= y1; y++) out.push(nameOf(c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)])); return out; };
+  // the domed hall: its dome's top, the lantern and the spire with the beacon 1.5 times the dome's height
+  const col = colOf(g, 69, Y + 1, Y + 40, -5), top = (arr, re) => { let t = -1; arr.forEach((n, i) => { if (re.test(n)) t = i; }); return t; };
+  const beacon = top(col, /^beacon_red$/), domeTop = (() => { const c10 = colOf(g10, 69, Y + 1, Y + 20, -5); return top(c10, /temple_stone/); })();
+  let amber = 0, pil = 0; for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) for (let y = Y + 20; y <= Y + 23; y++) { const n = nameOf(blockAt(69 + dx, y, -5 + dz)); if (n === 'amber_window') amber++; else if (n === 'temple_pilaster') pil++; }
+  const ratio = (beacon + 1) / (domeTop + 1);
+  check(beacon >= 0 && ratio >= 1.5 && amber >= 16 && pil >= 8, `the domed hall's lantern spire: the beacon ${beacon + 1} over the plaza, ${ratio.toFixed(2)} times the dome's ${domeTop + 1} (≥ 1.5); the lantern ${amber} amber panes between ${pil} pilasters`);
+  const col10 = colOf(g10, 69, Y + 1, Y + 40, -5);
+  check(top(col10, /^beacon_red$/) === Y + 28 - (Y + 1), `vgen 10 keeps its dome with the antenna (the beacon at ${top(col10, /^beacon_red$/) + Y + 1})`);
+  // the fluted towers: every other rib a cyan light strip, the doubled rings
+  const towerCount = (gg, tx, tz, re) => { let n = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) { const c = gg.generate((tx + dx) >> 4, (tz + dz) >> 4), cl = (((tz + dz) & 15) << 4) | ((tx + dx) & 15); for (let y = Y + 1; y <= Y + 90; y++) if (re.test(nameOf(c.blocks[(y << 8) | cl]))) n++; } return n; };
+  const tw = [[50, -24], [-50, -24], [24, -37], [-24, -37]].map(([x, z]) => [towerCount(g, x, z, /^neon_cyan$/), towerCount(g, x, z, /^temple_light_bar$/), towerCount(g10, x, z, /^temple_light_bar$/)]);
+  check(tw.every(t => t[0] >= 150 && t[1] > t[2]), `the temple's fluted towers carry light bands: cyan strips on every other rib (${tw.map(t => t[0]).join(', ')} blocks), the amber rings doubled (${tw.map(t => t[1] + ' against ' + t[2]).join(', ')})`);
+  // the citadel's cluster
+  const CIT = V.CitadelGen, s11 = CIT.heartSite(g, V.Heart.CITADEL), s10 = CIT.heartSite(g10, V.Heart.CITADEL), m11 = s11.towers.find(t => t.kind === 'main');
+  const sec11 = s11.towers.filter(t => t.kind === 'sec').map(t => t.h / m11.h), sec10 = s10.towers.filter(t => t.kind === 'sec').map(t => t.h / m11.h), fl = s11.towers.filter(t => t.kind === 'flank');
+  check(Math.min(...sec11) >= 0.6 && Math.min(...sec11) > Math.max(...sec10) - 0.12 && fl.length === 8, `the citadel's secondary spires ${sec11.map(f => f.toFixed(2)).join(', ')} of the main (vgen 10: ${sec10.map(f => f.toFixed(2)).join(', ')}), ${fl.length} side pinnacles on the main spire's setbacks`);
+  let flOk = 0; for (const T of fl) { const b0 = s11.y + 1 + T.t0; let stone = 0; for (let y = b0 + 2; y <= b0 + T.h - 2; y++) if (/spire_/.test(nameOf(blockAt(T.x, y, T.z)))) stone++; if (stone >= T.h - 5 && nameOf(blockAt(T.x, b0 + T.h + 1, T.z)) === 'beacon_red') flOk++; }
+  check(flOk === fl.length, `every side pinnacle stands in its chunk with its beacon (${flOk} of ${fl.length})`);
+  // the isles' falls: one off every isle at least, streaming into the void, the same as the far forms draw
+  const isles = V.IslesGen.list(g), falls = VI.isleFalls(g), W = R.byName.water.id, L = R.byName.lava.id;
+  let fallOk = 0; for (const f of falls) { let best = 0, bx = 0, bz = 0; for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { let fluid = 0; for (let y = f.foot + 6; y <= f.top; y++) { const b = blockAt(f.x + ox + 0.5, y, f.z + oz + 0.5), t = b ? R.T.type[b] : -1; if (t === W || t === L) fluid++; } if (fluid > best) { best = fluid; bx = ox; bz = oz; } } const air = !blockAt(f.x + bx + 0.5, f.foot - 2, f.z + bz + 0.5) && !blockAt(f.x + bx + 0.5, f.foot - 30, f.z + bz + 0.5); if (best >= (f.top - f.foot - 6) * 0.75 && air) fallOk++; }
+  check(isles.every(I => falls.some(f => f.isle === I.name)) && fallOk === falls.length, `every one of the ${isles.length} isles pours a fall into the void (${falls.length} falls; ${fallOk} in the chunks as the far forms draw them, the air open under their feet)`);
+  // the lighthouse: tall, on the lake's far coast
+  const lh = pieces('lighthouse')[0], Lk = LAND.LAKE;
+  check(!!lh && lh.top - lh.y >= 40 && lh.x > Lk.x + 60 && nameOf(blockAt(lh.lamp[0], lh.lamp[1], lh.lamp[2])) === 'tide_lantern', `a tall lighthouse on the lake's far (east) coast: (${lh && lh.x}, ${lh && lh.z}), ${lh && lh.top - lh.y} high, its lamp lit`);
+  // the far forms: the horizon tile and the far ring's form over each landmark reach its top (vgen 10: the temple's tile
+  // stays low — the temple was drawn by the chunks alone)
+  const LMs = VI.landmarks(g, P).filter(l => /^(temple|dome|lighthouse|lookout|belvedere|monopteros|obelisk|mill)/.test(l.id));
+  let lodOk = 0, farOk = 0; const lodBad = [];
+  for (const l of LMs) {
+    const t0 = V.LOD.build(g, { level: 0, tx: Math.floor(l.x / 128), tz: Math.floor(l.z / 128) }), t2 = V.LOD.build(g, { level: 2, tx: Math.floor(l.x / 512), tz: Math.floor(l.z / 512) });
+    if (t0.maxY >= l.top - 4 && t2.maxY >= l.top - 4) lodOk++; else if (lodBad.length < 4) lodBad.push(`${l.id} top ${l.top}: ${t0.maxY} / ${t2.maxY}`);
+    if (l.id === 'temple' || l.id === 'dome') { farOk++; continue; }   // (the far ring draws the temple from its skyline)
+    const f = V.Far.form(g, { tx: Math.floor(l.x / 64), tz: Math.floor(l.z / 64), cell: 4 }); if (f && f.maxY >= l.top - 4) farOk++; else if (lodBad.length < 6) lodBad.push(`${l.id} far ${f && f.maxY}`);
+  }
+  const tT10 = V.LOD.build(g10, { level: 0, tx: 0, tz: -1 });
+  check(lodOk === LMs.length && farOk === LMs.length && tT10.maxY < 100, `the horizon tiles (levels 0 and 2) and the far ring's forms over the temple, the dome, the lighthouse, the lookout, the belvederes, the monopteros, the obelisks and the windmills reach their tops (${lodOk} and ${farOk} of ${LMs.length}${lodBad.length ? '; ' + lodBad.join(', ') : ''}; vgen 10's temple tile tops at ${tT10.maxY})`);
+  const fallForms = falls.filter(f => { const t = V.LOD.build(g, { level: 1, tx: Math.floor(f.x / 256), tz: Math.floor(f.z / 256) }); return t && t.maxY >= f.top - 2; }).length;
+  check(fallForms === falls.length, `the isles' falls stand in the horizon tiles (${fallForms} of ${falls.length})`);
+  // Very Low's horizon in the hills view (land.js §7's tile set: horizon setting 2, the tiles in the look south): the
+  // landmarks' boxes cost next to nothing
+  const N = 32, tsz = (Lv) => N * (4 << Lv), CX = 0.5, CZ = -292.5, Rh = 2048, Lr = 3, split = 1.35, tiles = [];
+  const dist = (Lv, tx, tz) => { const S = tsz(Lv), xa = tx * S, za = tz * S; return Math.hypot(Math.max(xa - CX, 0, CX - (xa + S)), Math.max(za - CZ, 0, CZ - (za + S))); };
+  const visit = (Lv, tx, tz) => { const d = dist(Lv, tx, tz); if (d > Rh) return; if (Lv > 0 && d < split * tsz(Lv)) { for (const [a, b] of [[tx * 2, tz * 2], [tx * 2 + 1, tz * 2], [tx * 2, tz * 2 + 1], [tx * 2 + 1, tz * 2 + 1]]) visit(Lv - 1, a, b); return; } tiles.push([Lv, tx, tz]); };
+  for (let tz = Math.floor((CZ - Rh) / tsz(Lr)); tz <= Math.floor((CZ + Rh) / tsz(Lr)); tz++) for (let tx = Math.floor((CX - Rh) / tsz(Lr)); tx <= Math.floor((CX + Rh) / tsz(Lr)); tx++) visit(Lr, tx, tz);
+  const inLook = ([Lv, tx, tz]) => { const S = tsz(Lv); for (const [px, pz] of [[tx * S + S / 2, tz * S + S / 2], [tx * S, tz * S], [tx * S + S, tz * S], [tx * S, tz * S + S], [tx * S + S, tz * S + S]]) { const dx = px - CX, dz = pz - CZ, d = Math.hypot(dx, dz) || 1; if (dz / d > Math.cos(62 * Math.PI / 180)) return true; } return false; };
+  const view = tiles.filter(inLook), tris = (gg) => { let n = 0; for (const [Lv, tx, tz] of view) { const t = V.LOD.build(gg, { level: Lv, tx, tz }); if (t && !t.empty) n += t.count / 3; } return n; };
+  const a10 = tris(g10), a11 = tris(g);
+  check(a11 <= a10 * 1.03, `Very Low's horizon in the hills view: ${Math.round(a11)} triangles against vgen 10's ${Math.round(a10)} (×${(a11 / a10).toFixed(3)}, at most ×1.03; ${view.length} tiles)`);
   console.log(`  (${secs()})`);
 }
 
