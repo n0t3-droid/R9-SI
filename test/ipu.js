@@ -1,7 +1,7 @@
 // F10 · Bandbreite (src/main/ipu.js and its places in renderer.js / game.js), no browser — a stub GL that remembers every
 // texture's format, every full-screen draw and every blit:
-//  a · the defaults: the five switches on for Ultra · Leicht and on every preset of an integrated GPU (the owner's Radeon
-//      Graphics 0x1638 through ANGLE); off on a dedicated GPU and in SwiftShader
+//  a · the defaults: the switches on for Ultra · Leicht and on every preset of an integrated GPU (the owner's Radeon
+//      Graphics 0x1638 through ANGLE) — zPre not on Very Low, texLite nowhere; off on a dedicated GPU and in SwiftShader
 //  b · hdrLite: the probe (a 4 × 4 R11F_G11F_B10F target must be complete) and its fallback (incomplete, no
 //      EXT_color_buffer_float, VR.GL.noFloatColor) — the scene colour, its copy, the bloom chain, the rays, the mirror and
 //      the far cache in R11F_G11F_B10F, the TSR history in RGBA16F; off: everything as before
@@ -62,11 +62,14 @@ console.log('a · the defaults');
   const VEGA = 'ANGLE (AMD, AMD Radeon(TM) Graphics (0x00001638) Direct3D11 vs_5_0 ps_5_0, D3D11)';
   const all = (o, v) => IPU.SW.every(k => o[k] === v);
   check(IPU.SW.join() === 'hdrLite,postLite,zPre,texLite,dprLite', 'five switches', IPU.SW.join(' · '));
-  check(all(IPU.defaults('ultraLite', 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11)'), true), 'Ultra · Leicht: on (any GPU)');
-  check(['low', 'balanced', 'high', 'ultra'].every(p => all(IPU.defaults(p, VEGA), true)), 'the owner\'s Radeon Graphics (an integrated Vega): on for every preset from Low up');
+  // (texLite on no preset and no GPU — every form of it changed far slopes, plan: the player's choice; zPre not on Very Low)
+  const lite = (o, potato) => IPU.SW.every(k => o[k] === (k !== 'texLite' && !(potato && k === 'zPre')));
+  check(IPU.OPT_IN.join() === 'texLite' && IPU.SW.every(k => IPU.defaults('ultraLite', VEGA).texLite === false), 'texLite: turned on by no preset and no GPU (it softens far slopes: the player\'s choice)');
+  check(lite(IPU.defaults('ultraLite', 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11)')), 'Ultra · Leicht: on (any GPU), texLite aside');
+  check(['low', 'balanced', 'high', 'ultra'].every(p => lite(IPU.defaults(p, VEGA))), 'the owner\'s Radeon Graphics (an integrated Vega): on for every preset from Low up, texLite aside');
   const vl = IPU.defaults('potato', VEGA);
-  check(vl.zPre === false && IPU.SW.filter(k => k !== 'zPre').every(k => vl[k] === true), 'Very Low there: all but zPre (its prepass draws the cut-out layer twice)', JSON.stringify(vl));
-  check(all(IPU.defaults('high', 'Intel(R) Iris(R) Xe Graphics'), true) && all(IPU.defaults('low', 'Apple M2'), true) && all(IPU.defaults('balanced', 'Adreno (TM) 650'), true), 'Iris, Apple M, Adreno: on');
+  check(lite(vl, true), 'Very Low there: hdrLite, postLite, dprLite — not zPre (its prepass draws the cut-out layer twice)', JSON.stringify(vl));
+  check(lite(IPU.defaults('high', 'Intel(R) Iris(R) Xe Graphics')) && lite(IPU.defaults('low', 'Apple M2')) && lite(IPU.defaults('balanced', 'Adreno (TM) 650')), 'Iris, Apple M, Adreno: on');
   check(all(IPU.defaults('high', 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11)'), false) && all(IPU.defaults('ultra', 'AMD Radeon RX 6700 XT'), false), 'a dedicated GPU: off (Ultra · Leicht aside)');
   check(all(IPU.defaults('potato', 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)'), false), 'SwiftShader (the tests\' browser): off — the presets as before');
 }
@@ -157,7 +160,7 @@ console.log('c · postLite: the full-screen passes of a frame and their bytes');
   console.log(`     1920 × 1080 Ultra: ${ub(big0.b)} → ${ub(big1.b)} without water (${(IPU.ms(big0.b.all - big1.b.all, 20)).toFixed(2)} ms at 20 GB/s)`);
 }
 
-console.log('e · zPre and texLite: their programs; off: the terrain programs as before');
+console.log('e · zPre and texLite: their programs and the sampler; off: the terrain programs as before');
 {
   const progs = [], orig = V.GL.program;
   V.GL.program = (vs, fs, name, defs) => { progs.push({ name, defs: (defs || []).slice() }); return orig(vs, fs, name, defs); };
@@ -172,14 +175,17 @@ console.log('e · zPre and texLite: their programs; off: the terrain programs as
   const fsSrc = require('fs').readFileSync(__dirname + '/../src/main/shaders.js', 'utf8');
   check(/#ifdef ZPRE\n\s+o_col = vec4\(1\.0 \/ 255\.0[^\n]*return;/.test(fsSrc) && /#ifdef ZINV\ninvariant gl_Position;/.test(fsSrc), 'the shader: ZPRE returns right after the alpha test; ZINV declares gl_Position invariant');
   const t = defsOf(r, { zPre: false, texLite: true });
-  check(t.terrain === 'SHADOWS HSHADOW FADE TEXLITE' && t.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE TEXLITE', 'texLite: TEXLITE in the opaque and cut-out programs', `${t.terrain} · ${t.terrainCut}`);
-  // the anisotropic filtering: 4 → 2 and back (setAniso through applyQ)
-  const anis = []; V.GL.ext.aniso = { MAX_TEXTURE_MAX_ANISOTROPY_EXT: 'MAXA', TEXTURE_MAX_ANISOTROPY_EXT: 'A' };
-  const r2 = make({}); r2.texAlbedo = {}; r2.texMaterial = {};
-  const tp = gl.texParameterf; gl.texParameterf = (a, b, v) => { if (b === 'A') anis.push(v); };
-  r2.qBase = {}; r2.setQuality({ texLite: true }); r2.setQuality({ texLite: false });
+  check(t.terrain === off.terrain && t.terrainCut === off.terrainCut && !/TEXLITE/.test(fsSrc), 'texLite: the terrain programs as they were (its far mip bias was measured and dropped: plan) — the sampler alone', `${t.terrain} · ${t.terrainCut}`);
+  // the anisotropic filtering (setAniso through applyQ): the level each texture is left with
+  V.GL.ext.aniso = { MAX_TEXTURE_MAX_ANISOTROPY_EXT: 'MAXA', TEXTURE_MAX_ANISOTROPY_EXT: 'A' };
+  const r2 = make({}); r2.texAlbedo = { n: 'albedo' }; r2.texMaterial = { n: 'material' };
+  const lvl = {}, tp = gl.texParameterf; gl.texParameterf = (a, b, v) => { if (b === 'A' && gl.__tex) lvl[gl.__tex.n] = v; };
+  r2.qBase = {}; r2.setAniso(4); const was = `${lvl.albedo}/${lvl.material}`;
+  r2.setQuality({ texLite: true }); const on = `${lvl.albedo}/${lvl.material}`;
+  r2.setAniso(r2.anisoLevel || 4); const again = `${lvl.albedo}/${lvl.material}`;   // (a texture set swapped in later)
+  r2.setQuality({ texLite: false }); const back = `${lvl.albedo}/${lvl.material}`;
   gl.texParameterf = tp; V.GL.ext.aniso = null;
-  check(anis.join() === '2,2,4,4', 'texLite: anisotropic filtering 4 → 2 (albedo and material), off: 4 again', anis.join());
+  check(was === '4/4' && on === '2/2' && again === '2/2' && back === '4/4', 'texLite: both textures filtered 2× anisotropic (a later texture set too); off: 4× again', `colour/material: ${was} → ${on} (${again}) → ${back}`);
   V.GL.program = orig;
 }
 

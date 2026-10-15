@@ -26,9 +26,10 @@
   // t-folk: Echte Menschen (folkgpu.js) — the villagers smooth within 24 blocks from Balanced up; Very Low and Low keep the
   // voxel people (with the same real proportions)
   // F10 · Bandbreite (ipu.js): five switches for the GPUs that share the system's memory — off on every preset but Ultra ·
-  // Leicht; on an integrated GPU every preset turns them on (ipuDefaults: a preset change, and once at the first start there)
+  // Leicht; on an integrated GPU every preset turns them on (ipuDefaults: a preset change, and once at the first start there).
+  // texLite on no preset (it softens far slopes: the player's choice)
   const F10_SW = ['hdrLite', 'postLite', 'zPre', 'texLite', 'dprLite'];
-  for (const p in PRESETS) for (const k of F10_SW) PRESETS[p][k] = p === 'ultraLite';
+  for (const p in PRESETS) for (const k of F10_SW) PRESETS[p][k] = p === 'ultraLite' && k !== 'texLite';
   PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1; PRESETS.ultraLite.smoothFolk = 1;
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every

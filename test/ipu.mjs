@@ -8,13 +8,15 @@
 //            counted (stats.fsPasses) and their bytes (stats.fsList, ipu.js bytes), the scene format; the picture of the
 //            same view (the clocks pinned, the TSR jitter restarted, what moves left out) and its ΔE (CIE76) against the
 //            switches off: mean, the share of pixels above 2.3 (a just noticeable difference), the worst
-//   checks   the switches cost less (the frame with all on ≤ all off at High and Ultra · Leicht); the pictures the same
-//            (ΔE mean < 1.0); the fallback forced (VR.GL.noFloatColor = true): RGBA16F and the picture of the switches off;
-//            zPre: fewer fragments run the full shader; Very Low with the defaults: nothing on (SwiftShader is no iGPU)
+//   checks   the pictures the same (ΔE mean < 1.0); the fallback forced (VR.GL.noFloatColor = true): RGBA16F and the
+//            picture of the switches off; zPre: fewer fragments run the full shader; the defaults here: nothing on
+//            (SwiftShader is no iGPU); dprLite: the backing store within the screen. MODE=ab: the cost of a configuration
+//            against off, measured in turns (≤ ×1.03; with zPre reported only — SwiftShader cannot show its gain)
 //   pictures test/shots/ipu_<scene>_<preset>_<config>_<TAG>.png, the difference maps ipu_<…>_diff_<TAG>.png — LOOK at them
 // usage: bash test/wt_run.sh ipu.mjs 3000 · SCENES=hall,plaza,lake PRESETS=high,ultraLite,potato CONFIGS=off,hdrLite,…,all
 //   N=3 timed frames · DIST=file:///…/index.html (another build) TAG=before · MODE=quick (the plaza, High, off/hdrLite/all)
 //   VIEW=1920x1080 the page at 1080p (texLite: the far mip bias and the skipped material read judged where it shows most)
+//   MODE=ab ROUNDS=4 AB=off:all (AB_<preset>=…, AB_<scene>_<preset>=… per preset or scene; '' skips it)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import fs from 'fs';
@@ -243,23 +245,26 @@ const save = () => fs.writeFileSync(`/home/dev/vr/.tmp_tests/ipu_${TAG}.json`, J
 // 10 % apart; in turns both see the same drift. AB="off:all,off:texLite" · the medians and their ratio
 const ROUNDS = +(process.env.ROUNDS || 4);
 const abRun = async (sc, p, A, B, K) => {
-  const out = { [A]: [], [B]: [] };
+  const out = { [A]: [], [B]: [] }, qs = {};
   for (let r = 0; r < ROUNDS; r++) for (const cf of (r % 2 ? [B, A] : [A, B])) {
-    await config(cf); await warmVx(); await warmUp(K);
+    qs[cf] = (await config(cf)).q; await warmVx(); await warmUp(K);
     const c0 = cpuNow(); await timed(K, N); out[cf].push((cpuNow() - c0) / N);
   }
   await config('off');
   const med = (a) => { const b = a.slice().sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
   const a = med(out[A]), b = med(out[B]);
-  return { A, B, a: r1(a), b: r1(b), ratio: Math.round(b / a * 1000) / 1000, runsA: out[A].map(r1), runsB: out[B].map(r1) };
+  return { A, B, qB: qs[B], a: r1(a), b: r1(b), ratio: Math.round(b / a * 1000) / 1000, runsA: out[A].map(r1), runsB: out[B].map(r1) };
 };
 if (MODE === 'ab') {
-  const pairs = (process.env.AB || 'off:all').split(',').map(x => x.split(':'));
+  // the pairs: AB_<scene>_<preset>, else AB_<preset>, else AB, else off:all ('' measures nothing there)
+  const env = process.env, pairsOf = (sc, p) => { const s = env[`AB_${sc}_${p}`] ?? env[`AB_${p}`] ?? env.AB ?? 'off:all'; return s ? s.split(',').map(x => x.split(':')) : []; };
   for (const sc of SCENES) {
     const c = CAM[sc]; if (!c) continue;
     let first = true;
     for (const p of PRESETS) {
       if (!info.presets.includes(p)) continue;
+      const pairs = pairsOf(sc, p);
+      if (!pairs.length) continue;
       await setPreset(p);
       await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
       if (sc === 'forest' && !forestBuilt) { const f = await forest(); forestBuilt = true; await settle(400); await step(6); console.log(`  forest: ${f.trees} trees, ${f.blocks} blocks set`); }
@@ -268,8 +273,12 @@ if (MODE === 'ab') {
       for (const [A, B] of pairs) {
         const m = await abRun(sc, p, A, B, K);
         (res.ab[sc] || (res.ab[sc] = {}))[p + ' ' + A + ':' + B] = m;
-        console.log(`  ab ${sc} ${p} ${A} → ${B}: CPU ${m.a} → ${m.b} ms a frame (×${m.ratio}; ${A} ${m.runsA.join(' ')} · ${B} ${m.runsB.join(' ')})`);
-        if (p === 'potato' && A === 'off') check(m.ratio <= 1.03, `${sc} Very Low: ${B} costs no more than off (×${m.ratio}, the noise of this machine ±3 %)`);
+        console.log(`  ab ${sc} ${p} ${A} → ${B} (${m.qB}): CPU ${m.a} → ${m.b} ms a frame (×${m.ratio}; ${A} ${m.runsA.join(' ')} · ${B} ${m.runsB.join(' ')})`);
+        // the cost checked against off (±3 %: this machine's noise in turns) — but not for zPre: SwiftShader shades a
+        // fragment before its depth test whenever the shader can discard, so the prepass is a second draw here and its
+        // gain, the fragments that skip the full shader on a GPU, is counted in the full run (renderer.zCount)
+        if (A === 'off' && !/zPre/.test(m.qB)) check(m.ratio <= 1.03, `${sc} ${p}: ${B} costs no more than off (×${m.ratio}, the noise of this machine ±3 %)`);
+        else if (A === 'off') console.log(`     (${B} has zPre: a second draw of the cut-out layer in SwiftShader — not checked here)`);
         save();
       }
     }
@@ -282,7 +291,7 @@ for (const sc of MODE === 'ab' ? [] : SCENES) {
   let first = true;
   for (const p of PRESETS) {
     if (!info.presets.includes(p)) { console.log(`  no preset ${p} in this build`); continue; }
-    if (sc === 'sun' && p !== 'high' && !process.env.PRESETS) continue;   // (the rays' scene: High only)
+    if (sc === 'sun' && p !== 'high' && !process.env.SUN_ALL) continue;   // (the rays' scene: High only; SUN_ALL=1 every preset)
     const rd = await setPreset(p);
     await place(c[0], c[1], c[2], c[3], c[4], first ? 1500 : 400);
     if (sc === 'forest' && !forestBuilt) { const f = await forest(); forestBuilt = true; await settle(400); await step(6); console.log(`  forest: ${f.trees} trees, ${f.blocks} blocks set`); }
@@ -312,7 +321,8 @@ for (const sc of MODE === 'ab' ? [] : SCENES) {
     }
     if (R.all && R.off) {
       check(R.all.dE.mean < 1.0, `${sc} ${p}: the picture with every switch on is the same (ΔE mean ${R.all.dE.mean} < 1.0; ${R.all.dE.over} % of the pixels above 2.3, the worst ${R.all.dE.worst})`);
-      if (p !== 'potato') check(R.all.cpuMs <= R.off.cpuMs * 1.02, `${sc} ${p}: every switch on costs no more (CPU ${R.off.cpuMs} → ${R.all.cpuMs} ms a frame)`);
+      // (the cost: reported here, checked in MODE=ab — one measurement each on this shared machine drifts by up to 10 %)
+      console.log(`     every switch on: CPU ${R.off.cpuMs} → ${R.all.cpuMs} ms a frame (×${Math.round(R.all.cpuMs / R.off.cpuMs * 1000) / 1000}; one measurement each — MODE=ab checks the cost)`);
     }
   }
   await holdFar(false);

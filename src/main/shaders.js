@@ -715,9 +715,6 @@ void main() {
   if (kind == 5u) layer += mod(floor(u_time * 12.0 + cellF.x * 3.0 + cellF.z * 7.0), 8.0);
   // R9 Super Resolution renders below screen size: pick the texture detail of the full-size image
   float mipK = u_mipScale > 0.0 ? u_mipScale : 1.0;
-#ifdef TEXLITE
-  mipK *= 1.0 + 0.41421 * smoothstep(24.0, 40.0, length(v_rel));   // F10 · texLite: half a mip level coarser far away (eased in from 24 m)
-#endif
   vec2 dx = dFdx(uv) * mipK, dy = dFdy(uv) * mipK;
   if (rot == 1u || rot == 3u) { dx = dx.yx; dy = dy.yx; }
   // Klassisch: crisp texels up close, as in the original game — the sample snaps to its texel's centre and only the

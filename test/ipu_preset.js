@@ -1,8 +1,9 @@
 // F10 · Bandbreite: the five switches in the settings and the presets (game.js, settings_reg.js, ipu.js), no browser:
-//  a · the presets: off on every preset but Ultra · Leicht (on there); a switch changed by hand makes it „Eigene"
-//  b · an integrated GPU (the owner's Radeon Graphics through ANGLE): any preset turns them on; the first start on that GPU
-//      turns them on once, a switch turned off by hand stays off until the next preset change; a dedicated GPU and
-//      SwiftShader keep the presets' values
+//  a · the presets: off on every preset but Ultra · Leicht (on there — texLite aside: no preset turns it on, it softens far
+//      slopes); a switch changed by hand makes it „Eigene"
+//  b · an integrated GPU (the owner's Radeon Graphics through ANGLE): any preset turns them on (Very Low: not zPre); the
+//      first start on that GPU turns them on once, a switch changed by hand stays until the next preset change; a dedicated
+//      GPU and SwiftShader keep the presets' values
 //  c · applySettings hands them to the renderer (its qBase), dprCap only on Ultra · Leicht
 //  d · the settings rows: Bild · Qualität, a switch each, cost low, label and tip in both languages
 //   bash test/wt_run.sh ipu_preset.js
@@ -31,14 +32,16 @@ const game = (gpu, preset) => {
   return g;
 };
 const all = (o, v) => SW.every(k => o[k] === v);
+// on: every switch but texLite (no preset turns it on: it softens far slopes — the player's choice), and on Very Low not zPre
+const on = (o, potato) => SW.every(k => o[k] === (k !== 'texLite' && !(potato && k === 'zPre')));
 
 console.log('a · the presets');
 {
-  check(all(P.ultraLite, true), 'Ultra · Leicht: the five switches on');
+  check(on(P.ultraLite), 'Ultra · Leicht: the switches on (texLite aside)');
   check(Object.keys(P).filter(p => p !== 'ultraLite').every(p => all(P[p], false)), 'every other preset: off (Very Low too)', Object.keys(P).join(' '));
   const g = game(RTX, 'high');
   g.applyPreset('ultraLite');
-  check(g.settings.preset === 'ultraLite' && all(g.settings, true), 'choosing Ultra · Leicht turns them on');
+  check(g.settings.preset === 'ultraLite' && on(g.settings), 'choosing Ultra · Leicht turns them on');
   g.applyPreset('high');
   check(g.settings.preset === 'high' && all(g.settings, false), 'High afterwards: off again (a dedicated GPU)');
   g.settings.zPre = true; g.applySettings('zPre');
@@ -48,13 +51,13 @@ console.log('a · the presets');
 console.log('b · an integrated GPU');
 {
   const g = game(VEGA, 'balanced');
-  check(g.ipuDefaults(false) === true && all(g.settings, true), 'the first start on the Radeon Graphics: the five switches on (Balanced)');
-  g.settings.texLite = false;
-  check(g.ipuDefaults(false) === false && g.settings.texLite === false, 'the next start: a switch turned off by hand stays off');
+  check(g.ipuDefaults(false) === true && on(g.settings), 'the first start on the Radeon Graphics: the switches on (Balanced; texLite aside)');
+  g.settings.hdrLite = false; g.settings.texLite = true;
+  check(g.ipuDefaults(false) === false && g.settings.hdrLite === false && g.settings.texLite === true, 'the next start: a switch changed by hand stays as it is');
   g.applyPreset('potato');
-  check(g.settings.preset === 'potato' && SW.every(k => g.settings[k] === (k !== 'zPre')), 'a preset change: on again — Very Low too, but for zPre (its prepass draws the cut-out layer twice)');
+  check(g.settings.preset === 'potato' && on(g.settings, true), 'a preset change: the defaults again — Very Low too, but for zPre (its prepass draws the cut-out layer twice)');
   g.applyPreset('high');
-  check(all(g.settings, true), 'High: on');
+  check(on(g.settings), 'High: on');
   for (const [name, gpu] of [['a GeForce', RTX], ['SwiftShader', SWS]]) {
     const d = game(gpu, 'high');
     const changed = d.ipuDefaults(false);
@@ -68,9 +71,11 @@ console.log('c · to the renderer');
   const g = game(RTX, 'ultraLite');
   g.applySettings('*');
   const q = g.renderer.set;
-  check(q && all(q, true) && q.dprCap === true, 'Ultra · Leicht: the renderer gets the five switches and the 1920 × 1080 cap', q ? SW.concat('dprCap').map(k => k + ' ' + q[k]).join(' · ') : 'nothing');
+  check(q && on(q) && q.dprCap === true, 'Ultra · Leicht: the renderer gets the switches and the 1920 × 1080 cap', q ? SW.concat('dprCap').map(k => k + ' ' + q[k]).join(' · ') : 'nothing');
   const v = game(VEGA, 'high'); v.ipuDefaults(true); v.applySettings('*');
-  check(all(v.renderer.set, true) && v.renderer.set.dprCap === false, 'High on the Radeon Graphics: the switches, no 1080p cap (only Ultra · Leicht has it)');
+  check(on(v.renderer.set) && v.renderer.set.dprCap === false, 'High on the Radeon Graphics: the switches, no 1080p cap (only Ultra · Leicht has it)');
+  v.settings.texLite = true; v.applySettings('texLite');
+  check(v.renderer.set.texLite === true && v.settings.preset === 'custom', 'texLite turned on by hand: the renderer gets it, the preset is „Eigene"');
   const h = game(RTX, 'potato'); h.applySettings('*');
   check(all(h.renderer.set, false) && h.renderer.set.dprCap === false, 'Very Low on a GeForce: all off — the renderer as before');
 }

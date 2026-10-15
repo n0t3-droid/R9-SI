@@ -3,7 +3,8 @@
 // own, every byte a pass reads or writes goes over the bus the CPU uses too). The pure rules the renderer and the game
 // share; node-tested (test/ipu.js). Plan: docs/superpowers/plans/2026-10-15-f-ipu.md
 //   IPU.SW                  the five switches: hdrLite · postLite · zPre · texLite · dprLite
-//   IPU.defaults(p, gpu)    their defaults: on for Ultra · Leicht and on every preset of an integrated GPU
+//   IPU.defaults(p, gpu)    their defaults: on for Ultra · Leicht and on every preset of an integrated GPU (zPre not on
+//                           Very Low; texLite, IPU.OPT_IN, nowhere — the player's choice)
 //   IPU.probe(gl, ext)      can R11F_G11F_B10F be rendered to here (probed once; VR.GL.noFloatColor = true says no)
 //   IPU.colorFormat(...)    the scene targets' format and its bytes a pixel
 //   IPU.backing(...)        the canvas's backing store: never larger than the physical screen, ≤ 1920 × 1080 on lite
@@ -19,10 +20,13 @@
   // the switches' defaults: the preset Ultra · Leicht, or any preset on an integrated GPU (each switch makes the frame
   // cheaper there and leaves the picture as it was) — but zPre not on Very Low: its prepass draws the cut-out layer twice,
   // which pays only where that layer's shading is heavy (fancy leaves, the material tiers); SwiftShader cannot show its
-  // gain (plan), so Very Low — never slower — keeps one pass
+  // gain (plan), so Very Low — never slower — keeps one pass. texLite is on nowhere: every form of it measured (2×
+  // anisotropic, the far mip bias, the material's filtering alone) changed the grass slopes at a glancing angle (ΔE 0.7–1.3,
+  // 8–16 % of the pixels above 2.3 at the lake: plan) — a switch for the player who trades that softness for speed
+  IPU.OPT_IN = ['texLite'];
   IPU.defaults = function (preset, gpu) {
     const on = preset === 'ultraLite' || IPU.integrated(gpu), o = {};
-    for (const k of IPU.SW) o[k] = on && !(k === 'zPre' && preset === 'potato');
+    for (const k of IPU.SW) o[k] = on && !IPU.OPT_IN.includes(k) && !(k === 'zPre' && preset === 'potato');
     return o;
   };
 
