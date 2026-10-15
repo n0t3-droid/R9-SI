@@ -504,10 +504,13 @@
     const h = st.hh || (st.hh = { t: 0, next: 8 + (sd % 23), until: 0, side: sd & 1 ? 'r' : 'l', k: 0 });
     // (a hand on the hip needs the wrist to bend: the smooth people's hands — G.hands, set by the draw — not the voxel
     // people's, whose hand goes on in the forearm's line)
-    if (G.kid || G.hands === false) { h.k = Math.max(0, h.k - Math.abs(d) / 0.7); return; }
+    // (the free hand only: whatever the right holds — a bag, a hammer, a hoe, a book — keeps it off the hip, as the cane
+    // keeps the left; both hands full, none)
+    const busyR = !!(G.item && G.item !== 'cane'), busyL = !!G.cane;
+    if (G.kid || G.hands === false || (busyR && busyL)) { h.k = Math.max(0, h.k - Math.abs(d) / 0.7); return; }
     if (d > 0) {
       h.t += d;
-      if (h.t >= h.next && h.until <= h.next) { h.until = h.t + 6 + ((sd * 7 + (h.t | 0)) % 7); h.side = G.carry ? 'l' : G.cane ? 'r' : ((sd + (h.t | 0)) & 1 ? 'r' : 'l'); }
+      if (h.t >= h.next && h.until <= h.next) { h.until = h.t + 6 + ((sd * 7 + (h.t | 0)) % 7); h.side = busyR ? 'l' : busyL ? 'r' : ((sd + (h.t | 0)) & 1 ? 'r' : 'l'); }
       if (h.t >= h.until && h.until > h.next) h.next = h.t + 20 + ((sd * 13 + (h.t | 0)) % 21);
       const on = h.t >= h.next && h.t < h.until;
       h.k = Math.max(0, Math.min(1, h.k + (on ? d : -d) / 0.7));

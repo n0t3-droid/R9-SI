@@ -124,9 +124,15 @@ const child = Folk.look(77, 'child', 'child'), bagL = find(q => q.tool === 'bag'
   const g = armGeo(def, P, 'r'), hipX = (G.hw + 2.6);
   console.log(`    a hand on the hip: the wrist at (${g.wrB.map(f2).join(', ')}) in the body, the upper arm ${f2(g.abd)}° out, the elbow ${f2(g.flex)}°`);
   check(Math.abs(g.wrB[0] - hipX) < 1.5 && Math.abs(g.wrB[1] - 3.5) < 1.5 && g.abd > 25 && g.flex > 60 && g.flex < 125, `a hand on the hip: the wrist on the hip's side, the elbow out ${f2(g.abd)}° and bent ${f2(g.flex)}°`);
-  const a = { seedW: 9 }; let on = 0, n = 0; const out = {};
-  for (let k = 0; k < 90 * 30; k++) { FA.pose(a, 'idle', 1 / 30, 0, 0, false, out, undefined, G); n++; if (a.anim.hh && a.anim.hh.k > 0.99) on++; }
+  const a = { seedW: 9 }; let on = 0, n = 0; const out = {}, sides = new Set();
+  for (let k = 0; k < 90 * 30; k++) { FA.pose(a, 'idle', 1 / 30, 0, 0, false, out, undefined, G); n++; if (a.anim.hh && a.anim.hh.k > 0.99) { on++; sides.add(a.anim.hh.side); } }
   check(on > 0.08 * n && on < 0.5 * n, `standing 90 s, a hand on the hip ${f2(on / n * 100)} % of the time (8–50 %)`);
+  // the free hand only: what the right hand holds (the crafter's hammer) keeps it off the hip, the elder's cane the left
+  check(G.item && G.item !== 'cane' && sides.size === 1 && sides.has('l'), `the hand on the hip the free one: the ${G.item} in the right, the left on the hip (${[...sides].join(', ')})`);
+  const Le = Folk.look(111, 'elder', 'elder', null, null), Ge = Folk.gaitFor(Le), ae = { seedW: 5 }, se = new Set();
+  for (let k = 0; k < 90 * 30; k++) { FA.pose(ae, 'idle', 1 / 30, 0, 0, false, out, undefined, Ge); if (ae.anim.hh && ae.anim.hh.k > 0.99) se.add(ae.anim.hh.side); }
+  const bothFull = Ge.cane && Ge.item && Ge.item !== 'cane';
+  check(Ge.cane && (bothFull ? se.size === 0 : se.size === 1 && se.has('r')), `an elder with a cane in the left: ${bothFull ? 'both hands full, no hand on the hip' : 'the right on the hip, never the left'} (the right holds ${Ge.item}; ${[...se].join(', ') || 'none in 90 s'})`);
 }
 {
   // talking: the speaker's forearms up with small swings, the listener's hands clasped before the belly
