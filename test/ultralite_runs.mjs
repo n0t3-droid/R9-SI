@@ -16,6 +16,8 @@ const RUNS = {
   vlc_before: ['ultralite.mjs', 3600, { MODE: 'potato', PRESETS: 'potato,high', N: '5', TAG: 'vlc_before', DIST: process.env.BASE || '' }],
   vlc_after: ['ultralite.mjs', 3600, { MODE: 'potato', PRESETS: 'potato,high', N: '5', TAG: 'vlc_after' }],
   run3: ['ultralite.mjs', 5400, { SCENES: 'hall,plaza,village,lake', TAG: 'run3' }],
+  // (run 3 was cut off by the stop of 10 Oct 00:40 after the lake's Ultra: the rest of it — the lake's pair and the walks)
+  run3b: ['ultralite.mjs', 5400, { SCENES: 'lake', TAG: 'run3b' }],
   smoke: ['smoke.mjs', 1800, {}],
 };
 const want = (process.env.RUNS || 'vlc_before,vlc_after,run3,smoke').split(',');
