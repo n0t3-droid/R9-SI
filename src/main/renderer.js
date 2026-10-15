@@ -104,6 +104,12 @@
       const pbrBytes = new Uint8Array(tex.layers * 4).fill(0); for (let l = 0; l < tex.layers; l++) pbrBytes[l * 4 + 2] = 128;
       if (VR.R && VR.R.texNames && VR.PBR && VR.R.texNames.length === tex.layers) pbrBytes.set(VR.PBR.row(VR.R.texNames).subarray(0, tex.layers * 4));
       this.texPbr = GL.tex2D(tex.layers, 1, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: pbrBytes, wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
+      // t-material · hero textures (tex_hi.js): the table (a layer's hero + 1) all 0 and a one-texel set until the 64 × 64 set
+      // comes from the worker or the cache (uploadTexHi) — the TEXHI programs then read it; the others never bind it
+      this.texHiMap = GL.tex2D(tex.layers, 1, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: new Uint8Array((tex.layers + 3) & ~3), wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
+      this.texHiAlb = this.texHiArray({ size: 1, levels: 1, layers: 1, albedo: [new Uint8Array([128, 128, 128, 0])] }, 'albedo', true);
+      this.texHiMat = this.texHiArray({ size: 1, levels: 1, layers: 1, material: [new Uint8Array([128, 128, 217, 0])] }, 'material', false);
+      this.texHiN = 0;
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
@@ -130,7 +136,32 @@
       const gl = this.gl, ext = GL.ext.aniso;
       if (!ext) return;
       const mx = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-      for (const t of [this.texAlbedo, this.texMaterial]) { gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texParameterf(gl.TEXTURE_2D_ARRAY, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mx, level)); }
+      for (const t of [this.texAlbedo, this.texMaterial].concat(this.texHiN ? [this.texHiAlb, this.texHiMat] : [])) { gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texParameterf(gl.TEXTURE_2D_ARRAY, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mx, level)); }
+    }
+    // t-material · hero textures: one array of the 64 × 64 set (or the one-texel stand-in), filtered as the block textures
+    texHiArray(tex, which, srgb) {
+      const gl = this.gl, t = gl.createTexture(), lv = tex[which];
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, tex.levels, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, tex.size, tex.size, tex.layers);
+      for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, tex.levels > 1 ? gl.NEAREST_MIPMAP_LINEAR : gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      return t;
+    }
+    // the 64 × 64 set from the worker or the cache: its arrays replace the stand-in, the table names each hero's layer
+    uploadTexHi(tex) {
+      const gl = this.gl, R = VR.R, HI = VR.TexHi;
+      if (!gl || !tex || tex.type !== 'texhi' || !HI || !R || !R.texNames || R.texNames.length !== this.layers || !this.texHiMap) return false;
+      const alb = this.texHiArray(tex, 'albedo', true), mat = this.texHiArray(tex, 'material', false);
+      gl.deleteTexture(this.texHiAlb); gl.deleteTexture(this.texHiMat);
+      this.texHiAlb = alb; this.texHiMat = mat; this.texHiN = tex.layers;
+      const map = new Uint8Array((this.layers + 3) & ~3); map.set(HI.map(R.texNames, tex.names));
+      gl.bindTexture(gl.TEXTURE_2D, this.texHiMap); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.layers, 1, gl.RED, gl.UNSIGNED_BYTE, map);
+      this.texHiBytes = HI.bytes(tex.layers);
+      if (this.anisoLevel) this.setAniso(this.anisoLevel);
+      return true;
     }
     buildPrograms() {
       const md = this.multi ? ['MULTIDRAW'] : [];
@@ -139,8 +170,9 @@
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
       const pb = VR.PBR ? VR.PBR.defines(this.q) : [];   // t-material: PBR (tier ≥ 1), SSR (tier 2); none on the lite look (Very Low)
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb]));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb)));   // (F10 · zPre: invariant positions)
+      const th = this.q.texHi && !this.q.lite ? ['TEXHI'] : [];   // t-material · hero textures (Balanced and up; never Very Low)
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb, ...th]));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb, th)));   // (F10 · zPre: invariant positions)
       P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE', ...pb]));
       P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
       P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT', ...pb.filter(d => d !== 'SSR')]);
@@ -435,10 +467,10 @@
     applyQ(full) {
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
       const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre: its own program define; texLite: the sampler)
-      const prevPbr = this.q.pbr | 0;   // (t-material: the gloss tier is a program define)
+      const prevPbr = this.q.pbr | 0, prevHi = !!this.q.texHi;   // (t-material: the gloss tier and the hero textures are program defines)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
       this.q.ssr = (this.q.pbr | 0) >= 2 && !this.q.lite;   // (t-material: the screen-space mirror comes with gloss tier 2)
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || (this.q.pbr | 0) !== prevPbr) this.buildPrograms();
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || (this.q.pbr | 0) !== prevPbr || !!this.q.texHi !== prevHi) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
@@ -845,6 +877,11 @@
       if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
       if (p.u.u_pbr && this.texPbr) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.texPbr); gl.uniform1i(p.u.u_pbr, 10); }   // (t-material: the material table)
+      if (p.u.u_hiMap && this.texHiMap) {   // (t-material · hero textures: the 64 × 64 set and its table)
+        gl.activeTexture(gl.TEXTURE11); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texHiAlb); if (p.u.u_albedoHi) gl.uniform1i(p.u.u_albedoHi, 11);
+        gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texHiMat); if (p.u.u_materialHi) gl.uniform1i(p.u.u_materialHi, 12);
+        gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, this.texHiMap); gl.uniform1i(p.u.u_hiMap, 13);
+      }
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowRead || this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {

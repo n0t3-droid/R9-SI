@@ -343,6 +343,7 @@
     'g.set.water': 'Water',
     'g.set.water.tip': 'Mirroring lakes, turquoise shallows, foam on banks and wave crests, light networks on the bottom; on high the water mirrors the stars and the nebula at night — costs a little.',
     'g.set.waterV': ['Simple', 'Mirror', 'Brilliant'],
+    'g.set.texHi': 'Detail textures', 'g.set.texHi.tip': 'The 16 most-seen materials (grass, soil, sand, rock, marble, slabs, oak …) at double resolution (64 × 64): a finer grain up close, the same colours from afar. ~0.7 MB of graphics memory; forged once in the background, then taken from the cache. Not in the Classic look.',
     'g.aq.ul.far': 'far cache redrawn less often',
     'g.aq.ul.shadow': 'shadow tiles redrawn less often',
     'g.aq.ul.refl': 'lighter water mirror',

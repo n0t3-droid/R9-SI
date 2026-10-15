@@ -84,7 +84,7 @@
   REC.lawn_edge = () => TX.natural([0x4e8a3a, 0x5a9a42, 0x66a84a, 0x72b452], { period: 3, oct: 3, seed: 5125, contrast: 0.7, shades: 6 });
 
   // ---- interior floors & tiles ----
-  const veins = (img, col, freq, width, seed) => { img.forEach((x, y, i) => { const v = Math.abs(Math.sin(x * freq + y * 0.07 + TX.fbm(x, y, 5, 3, seed) * 7)); if (v < width) { img.set(x, y, TX.mix(img.get(x, y), C(col), 0.7 - v / width * 0.5), 1); } }); return img; };
+  const veins = (img, col, freq, width, seed) => { img.forEach((x, y, i) => { const v = Math.abs(Math.sin(x / TX.SC * freq + y / TX.SC * 0.07 + TX.fbm(x, y, 5, 3, seed) * 7)); if (v < width) { img.set(x, y, TX.mix(img.get(x, y), C(col), 0.7 - v / width * 0.5), 1); } }); return img; };
   REC.marble_white = () => smooth(veins(TX.natural([0xd9d9dd, 0xe6e6ea, 0xf0f0f3, 0xf8f8fa], { period: 5, oct: 3, seed: 5130, contrast: 0.45, shades: 5 }), 0xa8aab2, 0.22, 0.07, 5131), 0.12);
   REC.marble_dark = () => smooth(veins(TX.natural([0x1c1e22, 0x272a2f, 0x31343a, 0x3c4046], { period: 5, oct: 3, seed: 5132, contrast: 0.5, shades: 5 }), 0x9a9ca4, 0.2, 0.05, 5133), 0.12);
   REC.travertine = () => smooth(TX.natural([0xd6c9b0, 0xe0d5be, 0xe9dfca, 0xf1e9d8], { period: 4, oct: 3, seed: 5134, contrast: 0.6, shades: 6, bands: 0.5, bandWarp: 4 }), 0.4);

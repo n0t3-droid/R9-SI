@@ -15,8 +15,10 @@
   REC.temple_stone = () => {
     const img = TX.natural(SLATE, { period: 4, oct: 3, seed: 4102, contrast: 1.1, rough: 0.75 });
     // two vertical grooves per block face and a thin top seam: the trailer's ribbed masonry
-    for (let y = 0; y < N; y++) for (const x of [0, 1, 16, 17]) { img.mul(x, y, x === 1 || x === 17 ? 0.62 : 0.78); img.H(x, y, 0.25); }
-    for (let x = 0; x < N; x++) { img.mul(x, 0, 0.7); img.H(x, 0, 0.3); img.mul(x, 1, 1.12); }
+    // (t-material: at 64 × 64 every groove and seam texel is SC texels wide — the same on the block)
+    const SC = TX.SC || 1;
+    for (let y = 0; y < N; y++) for (const x0 of [0, 1, 16, 17]) for (let k = 0; k < SC; k++) { const x = x0 * SC + k; img.mul(x, y, x0 === 1 || x0 === 17 ? 0.62 : 0.78); img.H(x, y, 0.25); }
+    for (let x = 0; x < N; x++) for (let k = 0; k < SC; k++) { img.mul(x, k, 0.7); img.H(x, k, 0.3); img.mul(x, SC + k, 1.12); }
     return img;
   };
   REC.temple_stone_band = () => {

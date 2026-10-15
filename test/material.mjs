@@ -173,13 +173,16 @@ async function openWorld(dist, preset) {
     await page.bringToFront().catch(() => {});
     // (run 1 lost its last views to one screenshot that never came — the river's, as t-land's run 1 did: try twice, say
     //  whether the page still answers)
-    for (let k = 0; k < 2; k++) {
-      try { await page.screenshot({ path, timeout: 150000 }); return st; } catch (e) {
-        const alive = await Promise.race([ev(() => Math.round(performance.now())).then(() => 'answers', () => 'error'), wait(20000).then(() => 'silent')]);
-        console.log(`  !! screenshot ${path.replace(/^.*\//, '')} failed (${String(e.message || e).split('\n')[0].slice(0, 120)}); the page ${alive}`);
-        if (alive !== 'answers') throw e;
-      }
+    try { await page.screenshot({ path, timeout: 90000 }); return st; } catch (e) {
+      const alive = await Promise.race([ev(() => Math.round(performance.now())).then(() => 'answers', () => 'error'), wait(20000).then(() => 'silent')]);
+      console.log(`  !! screenshot ${path.replace(/^.*\//, '')} failed (${String(e.message || e).split('\n')[0].slice(0, 120)}); the page ${alive}`);
+      if (alive !== 'answers') throw e;
     }
+    // (run 2 lost the river's again, the page answering: the compositor's frame never came. The canvas itself, read in
+    //  the task that drew it — the HUD is hidden, so it is the same picture)
+    const url = await ev(([frames]) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [2]);
+    await sharp(Buffer.from(url.split(',')[1], 'base64')).resize(1280, 720).png().toFile(path);
+    console.log(`  (${path.replace(/^.*\//, '')}: read from the canvas)`);
     return st;
   };
   return { ctx, page, logs, ev, wait, step, settle, warmVx, groundY, pose, picture, weather, ok };

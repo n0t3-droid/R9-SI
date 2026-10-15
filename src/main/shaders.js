@@ -649,6 +649,11 @@ uniform float u_emissiveBoost;
 uniform float u_normalStrength;
 uniform float u_holoLayer;
 uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade, the normal map turns with the tile (Nahtlos: macro mottling)
+#ifdef TEXHI
+uniform sampler2DArray u_albedoHi;     // t-material · hero textures (tex_hi.js): the most-seen materials at 64 × 64 …
+uniform sampler2DArray u_materialHi;
+uniform sampler2D u_hiMap;             // … and per layer its hero + 1 (0: none), one row
+#endif
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -819,14 +824,26 @@ void main() {
     vec2 tx = fu * 32.0, seam = floor(tx + 0.5), tw = max((abs(dx) + abs(dy)) * 32.0, vec2(1e-3));
     fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
   }
+#ifdef TEXHI
+  // t-material · hero textures: a layer with a 64 × 64 version is read from it (the same gradients: its own mips pick the
+  // detail by distance); never in the Klassisch look, which keeps its 16-texel ground
+  int hiK = int(texelFetch(u_hiMap, ivec2(int(layer), 0), 0).r * 255.0 + 0.5);
+  bool hiOn = hiK > 0 && u_blockVar < 0.5;
+  vec4 alb = hiOn ? textureGrad(u_albedoHi, vec3(fu, float(hiK - 1)), dx, dy) : textureGrad(u_albedo, vec3(fu, layer), dx, dy);
+#else
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
+#endif
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
 #ifdef ZPRE
   o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
 #endif
 #endif
+#ifdef TEXHI
+  vec4 mat = hiOn ? textureGrad(u_materialHi, vec3(fu, float(hiK - 1)), dx, dy) : textureGrad(u_material, vec3(fu, layer), dx, dy);
+#else
   vec4 mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
+#endif
   vec3 tint = v_tint;
   // a recoloured block (B1): the texture's detail in its own colour, the whole face (the tint mask of a grass side too)
   if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, tint);

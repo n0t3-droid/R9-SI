@@ -244,6 +244,13 @@
         const tr = [noise.buffer, out.avgColor.buffer];
         for (const a of out.albedo) tr.push(a.buffer); for (const a of out.material) tr.push(a.buffer);
         post({ type: 'textures', id: m.id, albedo: out.albedo, material: out.material, levels: out.levels, size: out.size, layers: out.layers, missing: out.missing, avgColor: out.avgColor, noise }, tr);
+      } else if (m.type === 'texhi') {
+        // t-material · hero textures (tex_hi.js): the most-seen materials at 64 × 64, by the same recipes
+        const out = VR.TexHi && VR.TexHi.forge ? VR.TexHi.forge(m) : null;
+        if (!out) { post({ type: 'texhi', id: m.id, err: 'no hero forge here' }); return; }
+        const tr = [out.avgColor.buffer];
+        for (const a of out.albedo) tr.push(a.buffer); for (const a of out.material) tr.push(a.buffer);
+        post({ type: 'texhi', id: m.id, albedo: out.albedo, material: out.material, levels: out.levels, size: out.size, layers: out.layers, names: out.names, missing: out.missing, avgColor: out.avgColor, ms: out.ms }, tr);
       } else if (m.type === 'spawn') {
         const g = getGen(m.dim);
         const p = m.near && g.findSpawn.length >= 2 ? g.findSpawn(m.near[0], m.near[1]) : g.findSpawn();

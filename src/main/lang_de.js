@@ -343,6 +343,7 @@
     'g.set.water': 'Wasser',
     'g.set.water.tip': 'Spiegelnde Seen, türkise Untiefen, Gischt an Ufern und Wellenkämmen, Lichtnetze am Grund; hoch spiegelt das Wasser nachts Sterne und Nebel — kostet etwas.',
     'g.set.waterV': ['Einfach', 'Spiegel', 'Brillant'],
+    'g.set.texHi': 'Detail-Texturen', 'g.set.texHi.tip': 'Die 16 häufigsten Materialien (Gras, Erde, Sand, Fels, Marmor, Platten, Eiche …) in doppelter Auflösung (64 × 64): feinere Körnung aus der Nähe, dieselben Farben von fern. ~0,7 MB Grafikspeicher; einmal im Hintergrund geschmiedet, danach aus dem Zwischenspeicher. Nicht im Klassisch-Look.',
     'g.aq.ul.far': 'Fern-Cache seltener neu',
     'g.aq.ul.shadow': 'Schatten-Kacheln seltener neu',
     'g.aq.ul.refl': 'Wasserspiegel leichter',

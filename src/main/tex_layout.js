@@ -4,7 +4,7 @@
 // ============================================================================
 (function (VR) {
   'use strict';
-  VR.TEX_LEVELS = 6;    // mip levels: 32, 16, 8, 4, 2, 1
+  VR.TEX_LEVELS = (VR.TEX_N || 32) === 64 ? 7 : 6;    // mip levels: 32, 16, 8, 4, 2, 1 (t-material · hero textures: 64 … 1)
   VR.TEX_NOISE = 256;   // the tileable noise texture (VR.buildNoiseTexture)
 
   // which layers are faces of full opaque cubes (they get the rim), which are cut-out (alpha-coverage mips), which

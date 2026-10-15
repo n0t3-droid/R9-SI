@@ -4,8 +4,11 @@
 // ============================================================================
 (function (VR) {
   'use strict';
-  const N = 32, NN = N * N;
-  const TX = VR.TX = { N };
+  // (t-material · hero textures: the worker evaluates these modules once more with VR.TEX_N = 64 on a namespace of its
+  // own — tex_hi.js. SC is the texels per 32-grid texel: the structure of every generator below (joints, seams, bevels,
+  // grooves, bands) keeps its size on the block, the noise and the specks get finer. At 32 every expression is the old one)
+  const N = VR.TEX_N || 32, NN = N * N, SC = N / 32;
+  const TX = VR.TX = { N, SC };
 
   class Img {
     constructor() {
@@ -105,7 +108,7 @@
       let f = TX.fbm(x, y, o.period || 4, o.oct || 3, s, o.gain || 0.55);
       if (o.stretchY) f = TX.fbm(x, y * (o.stretchY), o.period || 4, o.oct || 3, s);
       if (o.cells) { const c = TX.cells(x, y, o.cells, s + 3); f = f * 0.5 + (1 - c[0]) * 0.5; if (o.cellEdge && c[1] - c[0] < o.cellEdge) f *= 0.55; }
-      if (o.bands) f = f * 0.6 + (Math.sin((y + TX.fbm(x, y, 2, 2, s + 9) * o.bandWarp) * o.bands) * 0.5 + 0.5) * 0.4;
+      if (o.bands) f = f * 0.6 + (Math.sin((y / SC + TX.fbm(x, y, 2, 2, s + 9) * o.bandWarp) * o.bands) * 0.5 + 0.5) * 0.4;
       const sp = hh(x, y, s + 99);
       if (o.speck && sp < o.speck) f = o.speckDark ? f * 0.45 : Math.min(1, f + 0.35);
       if (o.speck2 && hh(x, y, s + 199) < o.speck2) f = Math.min(1, f + 0.5);
@@ -131,10 +134,10 @@
     }
   };
   // bevel: darken/lighten border + height falloff
-  TX.bevel = function (img, x0, y0, x1, y1, k, hk) {
+  TX.bevel = function (img, x0, y0, x1, y1, k, hk, w) {   // (w: the line's width in texels, 1 when not given)
     k = k === undefined ? 0.18 : k; hk = hk === undefined ? 0.25 : hk;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      const top = y === y0, left = x === x0, bot = y === y1, right = x === x1;
+      const top = !(w > 1) ? y === y0 : y < y0 + w, left = !(w > 1) ? x === x0 : x < x0 + w, bot = !(w > 1) ? y === y1 : y > y1 - w, right = !(w > 1) ? x === x1 : x > x1 - w;
       if (top || left) { img.mul(x, y, 1 + k); }
       if (bot || right) { img.mul(x, y, 1 - k); }
       if (top || left || bot || right) img.H(x, y, img.gH(x, y) - hk);
@@ -145,8 +148,8 @@
     o = o || {};
     const img = TX.natural(pal, { period: 2, oct: 2, contrast: 0.7, seed: o.seed || 5, shades: 5, rough: 0.55 });
     const b = o.border === undefined ? 1 : o.border;
-    if (b) TX.bevel(img, 0, 0, N - 1, N - 1, 0.16, 0.3);
-    if (o.inner) TX.bevel(img, 3, 3, N - 4, N - 4, -0.1, -0.1);
+    if (b) TX.bevel(img, 0, 0, N - 1, N - 1, 0.16, 0.3, SC);
+    if (o.inner) TX.bevel(img, 3 * SC, 3 * SC, N - 1 - 3 * SC, N - 1 - 3 * SC, -0.1, -0.1, SC);
     img.forEach((x, y, i) => { img.h[i] = img.h[i] * 0.4 + 0.5; });
     return img;
   };
@@ -154,13 +157,13 @@
   TX.bricks = function (pal, mortar, o) {
     o = o || {};
     const img = new Img(), s = o.seed || 3;
-    const rows = o.rows || 4, per = o.per || 2, mw = o.mortarW === undefined ? 1 : o.mortarW;
+    const rows = o.rows || 4, per = o.per || 2, mw = (o.mortarW === undefined ? 1 : o.mortarW) * SC;
     const bh = N / rows, bw = N / per;
     const P = TX.pal(pal, o.shades || 6);
     const M = typeof mortar === 'number' ? C(mortar) : mortar;
     img.forEach((x, y, i) => {
       const r = Math.floor(y / bh);
-      const off = (o.offset === false ? 0 : (r % 2) * bw / 2) + (o.jagged ? Math.floor(hh(r, 0, s) * 4) * 2 : 0);
+      const off = (o.offset === false ? 0 : (r % 2) * bw / 2) + (o.jagged ? Math.floor(hh(r, 0, s) * 4) * 2 * SC : 0);
       const xx = ((x + off) % N + N) % N;
       const c = Math.floor(xx / bw);
       const lx = xx - c * bw, ly = y - r * bh;
@@ -177,8 +180,8 @@
       img.set(x, y, col, 1);
       let h = 0.75 + (f - 0.5) * 0.3;
       // bevel inside brick
-      if (ly === mw || lx === mw) { img.mul(x, y, 1.12); }
-      if (ly === Math.floor(bh) - 1 || lx === Math.floor(bw) - 1) { img.mul(x, y, 0.85); h -= 0.1; }
+      if (SC === 1 ? ly === mw || lx === mw : (ly >= mw && ly < mw + SC) || (lx >= mw && lx < mw + SC)) { img.mul(x, y, 1.12); }
+      if (SC === 1 ? ly === Math.floor(bh) - 1 || lx === Math.floor(bw) - 1 : ly >= Math.floor(bh) - SC || lx >= Math.floor(bw) - SC) { img.mul(x, y, 0.85); h -= 0.1; }
       img.h[i] = h; img.ro[i] = o.rough || 0.85;
     });
     if (o.cracks) TX.cracks(img, o.cracks, s + 7);
@@ -227,13 +230,14 @@
     img.forEach((x, y, i) => {
       const b = Math.floor(y / bh), ly = y - b * bh;
       const seam = (x + Math.floor(hh(b, 1, s) * N)) % N;
-      const grain = TX.fbm(x * 0.25, y * 2.2, 8, 2, s + b) * 0.6 + Math.sin((x + hh(b, 3, s) * 40) * 0.35 + TX.fbm(x, y, 4, 2, s) * 3) * 0.12;
+      const grain = TX.fbm(x * 0.25, y * 2.2, 8, 2, s + b) * 0.6 + Math.sin((x / SC + hh(b, 3, s) * 40) * 0.35 + TX.fbm(x, y, 4, 2, s) * 3) * 0.12;
       let f = 0.45 + (hh(b, 2, s) - 0.5) * 0.25 + (grain - 0.3) * 0.7;
       let h = 0.7;
-      if (ly === 0) { f -= 0.28; h = 0.3; }
-      if (ly === 1) f += 0.08;
-      if (seam < 1 && o.seams !== false) { f -= 0.3; h = 0.35; }
-      if (o.nails && (ly === 2) && (seam === 2 || seam === N - 3)) f -= 0.25;
+      const l32 = SC === 1 ? ly : Math.floor(ly / SC), s32 = SC === 1 ? seam : Math.floor(seam / SC);   // (in the 32-grid)
+      if (l32 === 0) { f -= 0.28; h = 0.3; }
+      if (l32 === 1) f += 0.08;
+      if (s32 < 1 && o.seams !== false) { f -= 0.3; h = 0.35; }
+      if (o.nails && (l32 === 2) && (s32 === 2 || s32 === 32 - 3)) f -= 0.25;
       img.set(x, y, TX.ramp(P, Math.max(0, Math.min(0.999, f))), 1);
       img.h[i] = h + grain * 0.15; img.ro[i] = 0.8;
     });
@@ -247,10 +251,10 @@
     img.forEach((x, y, i) => {
       const col = TX.fbm(x * 3.0, y * 0.35, 4, 3, s);
       let f = col * 0.8 + TX.vnoise(x, y, 16, s + 3) * 0.2;
-      if (o.stripes) f = f * 0.7 + (Math.sin(y * o.stripes) * 0.5 + 0.5) * 0.3; // birch-like horizontal marks
-      const groove = Math.abs(Math.sin((x + TX.fbm(x, y, 4, 2, s + 5) * 6) * 0.8));
+      if (o.stripes) f = f * 0.7 + (Math.sin(y / SC * o.stripes) * 0.5 + 0.5) * 0.3; // birch-like horizontal marks
+      const groove = Math.abs(Math.sin((x / SC + TX.fbm(x, y, 4, 2, s + 5) * 6) * 0.8));
       f = f * 0.75 + groove * 0.25;
-      if (o.marks && hh(Math.floor(x / 3), Math.floor(y / 2), s + 2) < o.marks) f *= 0.35;
+      if (o.marks && hh(Math.floor(x / (3 * SC)), Math.floor(y / (2 * SC)), s + 2) < o.marks) f *= 0.35;
       f = Math.max(0, Math.min(0.999, (f - 0.45) * 1.8 + 0.5));
       img.set(x, y, TX.ramp(P, f), 1);
       img.h[i] = f; img.ro[i] = 0.9;
@@ -444,7 +448,7 @@
       const i = y * N + x;
       const hl = img.h[y * N + ((x + N - 1) % N)], hr = img.h[y * N + ((x + 1) % N)];
       const hu = img.h[((y + N - 1) % N) * N + x], hd = img.h[((y + 1) % N) * N + x];
-      let nx = (hl - hr) * 2.2, ny = (hu - hd) * 2.2;
+      let nx = (hl - hr) * 2.2 * SC, ny = (hu - hd) * 2.2 * SC;   // (t-material: the slope per block, at any size)
       const len = Math.hypot(nx, ny, 1);
       nx /= len; ny /= len;
       const a = img.c[i * 4 + 3];

@@ -130,4 +130,6 @@
   VR.Settings.add({ key: 'pbr', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.pbr', tip: 'g.set.pbr.tip', cost: 'mid', def: 1, min: 0, max: 2, step: 1, vals: 'g.set.pbrV' });
   // the water's tier (F7's presets had it, the panel did not): 0 the sky only · 1 the mirror, the depth's colour, foam, caustics · 2 the half-size mirror, the whole sky in it, the light shafts under water
   VR.Settings.add({ key: 'water', g: 'img', sec: 'objects', t: 'slider', lab: 'g.set.water', tip: 'g.set.water.tip', cost: 'mid', def: 1, min: 0, max: 2, step: 1, vals: 'g.set.waterV' });
+  // the hero textures (tex_hi.js): the most-seen materials at 64 × 64 (Balanced and up; ~0.7 MB on the GPU)
+  VR.Settings.add({ key: 'texHi', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.texHi', tip: 'g.set.texHi.tip', cost: 'mid', def: true });
 })(typeof VR !== 'undefined' ? VR : self.VR);
