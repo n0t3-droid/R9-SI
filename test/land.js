@@ -89,7 +89,8 @@ if (want(1)) {
   const atWay = springs.filter(([x, , z]) => nearKeep(x, z)), built = (x, y, z) => nameOf(blockAt(x, y - 3, z)) === 'magma_block' && nameOf(blockAt(x, y - 2, z)) === 'fuming_sulfur';
   const inWay = atWay.filter(([x, y, z]) => built(x, y, z)), kept = springs.filter(([x, y, z]) => !nearKeep(x, z) && built(x, y, z));
   let wet = 0, wayN = 0; for (const [x, , z] of atWay) for (let dz = -7; dz <= 7; dz++) for (let dx = -7; dx <= 7; dx++) { const c = cells.get(ck(x + dx, z + dz)); if (!c || c.deck) continue; wayN++; if (!WAY.has(nameOf(blockAt(c.x, c.y, c.z)))) wet++; }
-  check(atWay.length > 0 && inWay.length === 0 && wayN > 0 && wet === 0, `no sulfur spring breaks a way: ${inWay.length} of the ${atWay.length} springs by the land's ways and pieces built (${inWay.map(s => '(' + s[0] + ', ' + s[2] + ')').join(' ')}), the ${wayN} way cells round them all paved (${wet} not)`);
+  // (since t-beauty no sulfur spring is placed in the designed land at all: zero springs by the ways is the rule kept)
+  check(inWay.length === 0 && wet === 0 && (atWay.length === 0 || wayN > 0), `no sulfur spring breaks a way: ${inWay.length} of the ${atWay.length} springs by the land's ways and pieces built (${inWay.map(s => '(' + s[0] + ', ' + s[2] + ')').join(' ')}), the ${wayN} way cells round them all paved (${wet} not)`);
   check(kept.length > 0, `the springs away from the ways stay (${kept.length} of ${springs.length - atWay.length} checked in their chunks)`);
 }
 

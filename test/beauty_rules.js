@@ -517,7 +517,9 @@ console.log('10 · a fall that is touched spills a little, it does not flood (si
         const a = g9.generate(cx, cz).blocks, b = g10.generate(cx, cz).blocks;
         for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) { diff++; if (TOP.test(nameOf(b[i])) && (!a[i] || !(R.T.flags[a[i]] & F.SOLID))) lips++; }
       }
-      check(diff > 0 && lips === diff && diff <= 60, `vgen 10 differs from vgen 9 round the isles by the pools' lips alone (${lips} of ${diff} changed blocks: the island's top block where air or a plant stood)`);
+      // (since t-land, vgen 10 also lays the land's woods and ways round the isles: the lips are among the changes, the
+      // rest is the land's — land.js and land_v9_same.js pin that)
+      check(diff > 0 && lips >= 8, `vgen 10 differs from vgen 9 round the isles by the pools' lips, 8 at least (${lips} lips among ${diff} changed blocks: the island's top block where air or a plant stood)`);
     }
     const P9 = wakeAll(9), P10 = wakeAll(10);
     console.log(`     vgen 9 (released): ${P9.pools} pools woken over ${P9.falls} curtain columns — ${P9.u1 - P9.u0} fluid blocks fell into the air under the feet`);
@@ -582,7 +584,8 @@ const W10 = world(10);
         if (b[j] === SLAB && !a[j] && PAVE.test(nameOf(b[j - 256]))) slabs++; else if (other.length < 4) other.push(`${cx * 16 + (i & 15)}, ${y}, ${cz * 16 + (i >> 4)}: ${nameOf(a[j])} → ${nameOf(b[j])}`);
       }
     }
-    check(diff > 0 && slabs === diff, `vgen 10 differs from vgen 9 only by the ramps' slabs (${slabs} slabs of ${diff} changed blocks over ${P10.chunks.size} chunks${other.length ? '; other: ' + other.join('; ') : ''})`);
+    // (since t-land, vgen 10 also paves the plaza's ways here: the slabs are among the changes)
+    check(diff > 0 && slabs >= 40, `vgen 10 differs from vgen 9 by the ramps' slabs (${slabs} slabs among ${diff} changed blocks over ${P10.chunks.size} chunks${other.length ? '; other: ' + other.join('; ') : ''})`);
   }
 }
 
@@ -622,7 +625,7 @@ if (!process.env.SKIP_COST) {
   for (const [scene, at] of [['crescent_end', [-100.5, -91.5]], ['between_rows', [20.5, -116.5]]]) {
     const t0 = performance.now(), a = windowTris(W8, at, 82), b = windowTris(W9, at, 82), c = windowTris(W10, at, 82);
     check(b <= a * 1.01, `${scene}: vgen 9 ${b.toFixed(0)} triangles a column, vgen 8 ${a.toFixed(0)} (${(b / a * 100 - 100).toFixed(1)} %, ${((performance.now() - t0) / 1000).toFixed(0)} s)`);
-    check(c <= b * 1.01, `${scene}: vgen 10 (the streets' half steps) ${c.toFixed(0)} triangles a column, vgen 9 ${b.toFixed(0)} (${(c / b * 100 - 100).toFixed(1)} %)`);
+    check(c <= b * 1.04, `${scene}: vgen 10 (the streets' half steps, and t-land's ways and plants) ${c.toFixed(0)} triangles a column, vgen 9 ${b.toFixed(0)} (${(c / b * 100 - 100).toFixed(1)} %, limit 4 %)`);
   }
 }
 
