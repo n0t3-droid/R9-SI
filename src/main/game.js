@@ -37,7 +37,7 @@
   // the sky's reflection · 2 and the screen-space mirror (High and up); Very Low none (its lite programs never carry it)
   const PBR_TIER = { potato: 0, low: 1, balanced: 1, high: 2, ultra: 2, ultraLite: 2 };
   for (const p in PRESETS) PRESETS[p].pbr = PBR_TIER[p] | 0;
-  const MAT_SW = ['pbr'];
+  const MAT_SW = ['pbr', 'water'];   // (water: F7's tier, now a row in the settings too)
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)

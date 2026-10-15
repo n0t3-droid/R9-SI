@@ -1348,6 +1348,9 @@ uniform sampler2D u_pbr;      // t-material: the material table (tex_pbr.js; a: 
 uniform float u_glassRefr;    // t-material: 1 when the scene copy holds this frame's opaque world (pbr 2): window panes filter it
 #endif
 ${(VR.WaterWave ? VR.WaterWave.glsl() : '')}
+#ifndef LITE
+${(VR.WaterFx ? VR.WaterFx.glsl() : '')}
+#endif
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -1511,9 +1514,15 @@ void main() {
     vec3 n = NORMALS[face];
     float ak = waterBody(thick) * u_stormK;
     vec2 wq = u_blockVar > 0.5 ? (floor(wp.xz * 16.0) + 0.5) / 16.0 : wp.xz;
+#ifndef LITE
+    float whN = 0.0;   // (t-material: the height over its amplitude, −1…1 — the crests' foam)
+#endif
     if (face == 2u) {
       float wh = 0.0;
       n = gerstnerN(wq, u_time, kind == 6u ? flowDir(v_w3) : u_windDir, kind == 6u ? ak * 0.6 : ak, wh);
+#ifndef LITE
+      whN = wh / max((WV_A[0] + WV_A[1] + WV_A[2]) * (kind == 6u ? ak * 0.6 : ak), 1e-4);
+#endif
     } else if (kind == 6u) {
       // a falling sheet (waterfall): streaks run down the face
       vec3 tg = (face == 0u || face == 1u) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
@@ -1554,15 +1563,37 @@ void main() {
     vec3 bioN = wcol / max(max(wcol.r, max(wcol.g, wcol.b)), 1e-3);
     vec3 absCol = mix(vec3(0.26, 0.6, 0.92) + vec3(0.0, 0.04, 0.0) * bandN, bioN * vec3(0.62, 0.9, 1.0), 0.75);
     vec3 under = mix(refr * mix(vec3(1.0), absCol, 0.72), deep, clamp(absorb, 0.0, 0.96));
+#ifndef LITE
+    // t-material · the trailer's water (water_fx.js; tier ≥ 1, never Very Low): the colour follows the depth — the floor seen
+    // through the path of water loses its red first (turquoise over the bright sand), the water's own colour turns from
+    // turquoise to deep blue, and the designed deep body takes over past a few blocks
+    float pathL = thick * dist / max(linDepth(gl_FragCoord.z), 0.06), vdep = pathL * max(V.y, 0.0);
+    if (u_waterTier > 0.5 && face == 2u) {
+      vec3 Tr = exp(-WFX_ABS * pathL);
+      vec3 litW = u_ambSky * skyL * 0.85 + blockL * 0.45 + lc * 0.14 * v_sky + 0.012;
+      vec3 own = mix(wfxTint(pathL) * litW, deep, smoothstep(3.5, 12.0, pathL));
+      under = mix(under, refr * Tr + own * (1.0 - dot(Tr, vec3(0.2, 0.5, 0.3))), 0.85);
+    }
+#endif
     // caustics (tier >= 1): the sun's light network on the floor seen through shallow water
     if (u_waterTier > 0.5 && face == 2u && thick < 6.0 && sunUp > 0.001) {
       vec3 D = -V;
       vec2 fl = wp.xz + D.xz / max(-D.y, 0.25) * thick * 0.75;
+#ifndef LITE
+      under += u_sunColor * sunUp * wfxCaustic(fl, u_time, u_waterTier > 1.5 ? 3 : 2) * 0.26 * exp(-thick * 0.3) * (1.0 - u_rain);   // (t-material: two octaves on tier 1)
+#else
       under += u_sunColor * sunUp * causticAt(fl, u_time) * 0.22 * exp(-thick * 0.3) * (1.0 - u_rain);
+#endif
     }
     vec3 R = reflect(-V, n);
     R.y = abs(R.y);
+#ifndef LITE
+    // (t-material: on tier 2 the sky the water mirrors is the whole sky — at night its stars and the nebula — where the
+    // planar mirror does not reach)
+    vec3 refl = skyColor(R, u_waterTier > 1.5 && u_reflOn < 0.5) * mix(0.25, 1.0, skyL);
+#else
     vec3 refl = skyColor(R, false) * mix(0.25, 1.0, skyL);
+#endif
     refl = mix(refl, refl * vec3(0.62, 0.84, 1.0) + body * 0.25, 0.4);
     if (u_reflOn > 0.5) {
       // the planar reflection (renderer.js): the mirrored near world and sky, shifted by the slope of the surface
@@ -1580,12 +1611,32 @@ void main() {
     float dd = nh * nh * (a2 - 1.0) + 1.0;
     float sp = (a2 / (3.14159 * dd * dd)) * (0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0)) * 0.035 + pow(nh, 60.0) * 0.12;
     col += lc * sp * (sp > 0.004 ? shadowAt(NORMALS[face], L) : 1.0) * smoothstep(0.6, 1.0, v_sky) * (1.0 - u_rain);
+#ifndef LITE
+    // t-material: the sun's glitter — tiny facets of the chop that flash into the eye for a moment each
+    if (u_waterTier > 0.5 && face == 2u && sunUp > 0.001) {
+      vec2 gc = floor(wp.xz * 7.0);
+      float gh = hash12(gc + floor(u_time * 6.0 + hash12(gc + 9.1) * 6.0));
+      vec3 gnm = normalize(n + vec3(gh - 0.5, 0.0, hash12(gc + 3.7) - 0.5) * 0.35);
+      col += lc * pow(max(dot(reflect(-V, gnm), L), 0.0), 900.0) * step(0.8, gh) * 7.0 * smoothstep(0.6, 1.0, v_sky) * (1.0 - u_rain);
+    }
+#endif
     // shore foam
     // (a broken, drifting line from the noise where the water is a few tenths of a block deep, not a regular stripe)
     // (thin: a step between two water levels also measures as shallow, so the foam must stay a whisper there)
     float foamN = texture(u_noise, wp.xz / 5.0 + vec2(u_time * 0.02, -u_time * 0.015)).r;
+#ifndef LITE
+    if (u_waterTier > 0.5) {
+      // t-material: foam on the banks (a noise mask by the depth under the surface) and on the crests of a rough water
+      float fn2 = texture(u_noise, wp.xz / 1.7 - vec2(u_time * 0.05, u_time * 0.03)).g;
+      float fm = max(wfxShore(vdep, foamN * 0.65 + fn2 * 0.35), wfxCrest(whN, ak, fn2));
+      col = mix(col, vec3(0.92, 0.96, 1.0) * (u_ambSky * skyL + blockL + lc * 0.45 * v_sky + 0.02), clamp(fm, 0.0, 1.0) * 0.8 * float(face == 2u));
+    } else {
+#endif
     float foam = (1.0 - smoothstep(0.0, 0.2, thick)) * smoothstep(0.45, 0.7, foamN);
     col = mix(col, vec3(0.9) * (u_ambSky * skyL + blockL + lc * 0.3), clamp(foam, 0.0, 1.0) * 0.28 * float(face == 2u));
+#ifndef LITE
+    }
+#endif
     col = applyFog(col, v_rel, dist);
     // the depth-fade edge: where the water is a few centimetres deep it lets the shore through, so no edge cuts
     o_col = vec4(col, face == 2u ? mix(0.55, 1.0, smoothstep(0.03, 0.7, thick)) : (kind == 6u ? 0.8 : 1.0));

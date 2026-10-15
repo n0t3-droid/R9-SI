@@ -128,4 +128,6 @@
 (function (VR) {
   'use strict';
   VR.Settings.add({ key: 'pbr', g: 'img', sec: 'light', t: 'slider', lab: 'g.set.pbr', tip: 'g.set.pbr.tip', cost: 'mid', def: 1, min: 0, max: 2, step: 1, vals: 'g.set.pbrV' });
+  // the water's tier (F7's presets had it, the panel did not): 0 the sky only · 1 the mirror, the depth's colour, foam, caustics · 2 the half-size mirror, the whole sky in it, the light shafts under water
+  VR.Settings.add({ key: 'water', g: 'img', sec: 'objects', t: 'slider', lab: 'g.set.water', tip: 'g.set.water.tip', cost: 'mid', def: 1, min: 0, max: 2, step: 1, vals: 'g.set.waterV' });
 })(typeof VR !== 'undefined' ? VR : self.VR);

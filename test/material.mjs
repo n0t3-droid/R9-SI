@@ -35,7 +35,7 @@ const SEED = process.env.SEED || '53', TAG = process.env.TAG || 'after', N = +(p
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const DIST = process.env.DIST || 'file:///home/dev/vr/dist/index.html';
 const MORNING = 2000, DAY = 8000, NOON = 6000, GOLDEN = 12500, NIGHT = 16000;
-const TODN = { [MORNING]: 'morning', [DAY]: 'day', [NOON]: 'noon', [GOLDEN]: 'golden', [NIGHT]: 'night' };
+const TODN = { [MORNING]: 'morning', 4000: 'am', [DAY]: 'day', [NOON]: 'noon', [GOLDEN]: 'golden', [NIGHT]: 'night' };
 const EYE = 1.62;
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
@@ -75,10 +75,34 @@ const VIEWS = [
     for (let j = bend.i - 8; j >= bend.i - 40 && !cam; j -= 4) for (let up = 3; up <= 14 && !cam; up++) { const p = Rv.pts[j], y = SEA + up; if (eyeOpen(p[0], y, p[1]) && clearLine([p[0], y, p[1]], tgt)) cam = [p[0], y, p[1]]; }
     if (cam) VIEWS.splice(VIEWS.findIndex(v => v.name === 'hall'), 0, { name: 'river', feet: [cam[0], cam[1] - EYE, cam[2]], at: tgt, times: [NOON, NIGHT], fov: 70 });
   }
+  // a villa's glass front (the city's plan for this seed): the lot whose street side has the most glass panes facing open
+  // air, from 15 blocks out at eye height, the line to the glass clear of the plan's blocks
+  {
+    const R = V.R, VG = V.VillageGen, site = VG.sitesFor(g, 0, -9).find(x => x.home), plan = site && VG.plan(g, site), city = plan && plan.nova;
+    if (city) {
+      const at = new Map();
+      for (const [, b] of plan.chunks) { for (let i = 0; i < b.f.length; i += 5) for (let y = b.f[i + 2]; y <= b.f[i + 3]; y++) at.set(b.f[i] + ',' + y + ',' + b.f[i + 1], b.f[i + 4]); for (let i = 0; i < b.o.length; i += 4) at.set(b.o[i] + ',' + b.o[i + 1] + ',' + b.o[i + 2], b.o[i + 3]); }
+      const nm = (q) => q ? R.types[R.T.type[q]].name : 'air', glass = [];
+      for (const [k, q] of at) if (/^vx_nova_window|^panorama_|vx_nova_glass/.test(nm(q))) glass.push(k.split(',').map(Number));
+      let best = null;
+      for (const lot of city.lots) {
+        const mine = glass.filter(([x, , z]) => Math.abs(x - lot.ox) < 16 && Math.abs(z - lot.oz) < 16);
+        for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const face = mine.filter(([x, y, z]) => !at.get((x + dx) + ',' + y + ',' + (z + dz)));
+          if (face.length < 12) continue;
+          const cx = face.reduce((a, q) => a + q[0], 0) / face.length, cy = face.reduce((a, q) => a + q[1], 0) / face.length, cz = face.reduce((a, q) => a + q[2], 0) / face.length;
+          let clear = true; for (let t = 1; t < 14 && clear; t++) for (let y = lot.F + 1; y <= lot.F + 3; y++) if (at.get(Math.floor(cx + dx * t) + ',' + y + ',' + Math.floor(cz + dz * t))) clear = false;
+          if (clear && (!best || face.length > best.n)) best = { n: face.length, c: [cx + 0.5, cy + 0.5, cz + 0.5], feet: [cx + 0.5 + dx * 15, lot.F + 1, cz + 0.5 + dz * 15] };
+        }
+      }
+      if (best) VIEWS.splice(VIEWS.findIndex(v => v.name === 'villa') + 1, 0, { name: 'glass', feet: best.feet, at: best.c, times: [GOLDEN, NIGHT], fov: 66 });
+    }
+  }
   console.log('views', JSON.stringify(VIEWS.map(v => [v.name, v.feet.map(q => q === null ? null : +(+q).toFixed(1))])));
 }
 if (process.env.CAMS_ONLY) process.exit(0);
 const want = (v) => !ONLY || ONLY.includes(v.name) || ONLY.includes(v.name.split('_')[0]);
+const BONLY = process.env.BEFORE_ONLY ? process.env.BEFORE_ONLY.split(',') : null;   // the build before shoots only these (its other pictures kept from run 1)
 
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 
@@ -155,7 +179,7 @@ async function openWorld(dist, preset) {
 const notBlank = async (path) => { try { const { data, info } = await sharp(path).raw().toBuffer({ resolveWithObject: true }); let s = 0, s2 = 0, n = 0; for (let i = 0; i < data.length; i += info.channels * 7) { const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]; s += l; s2 += l * l; n++; } const m = s / n; return Math.sqrt(Math.max(0, s2 / n - m * m)) > 6; } catch (e) { return false; } };
 
 // ---------------------------------------------------------------- the pictures of one build
-async function shoot(tag, dist) {
+async function shoot(tag, dist, only) {
   const record = { tag, seed: SEED, dist, views: [] }, recPath = `${SHOTS}material_${tag}.json`;
   const A = await openWorld(dist, 'high');
   check(A.ok, `${tag}: the world is loaded (${secs()})`);
@@ -163,7 +187,7 @@ async function shoot(tag, dist) {
   console.log(tag, 'world', JSON.stringify(meta));
   await A.settle(80);
   let pics = 0, wanted = 0; const blank = [];
-  for (const v of VIEWS.filter(want)) {
+  for (const v of VIEWS.filter(want).filter(v => !only || only.includes(v.name))) {
     const t0 = Date.now();
     const [fx, fy, fz] = v.feet;
     await A.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [fx, fz]);
@@ -293,7 +317,7 @@ async function costs() {
 
 // ---------------------------------------------------------------- the run
 if (!process.env.NO_PICS) {
-  if (process.env.BEFORE_DIST) { const B = await shoot('before', process.env.BEFORE_DIST); await B.A.ctx.close(); }
+  if (process.env.BEFORE_DIST) { const B = await shoot('before', process.env.BEFORE_DIST, BONLY); await B.A.ctx.close(); }
   if (!process.env.NO_AFTER) {
     const A = await shoot(TAG, DIST);
     await ownChecks(A.A, A.record);
