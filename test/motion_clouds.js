@@ -73,8 +73,21 @@ check(/on = this\.q\.cloudShadow && this\.q\.clouds >= 2/.test(RS), 'the mask is
 
 // ---- 5. the drift follows the wind; the cirrus far up, slow
 console.log('drift');
-const env = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'main', 'env.js'), 'utf8');
-check(/cd\[0\] \+= E\.windDir\[0\] \* k; cd\[1\] \+= E\.windDir\[1\] \* k;/.test(env), 'the clouds drift along the wind\'s heading (env.js cloudDrift)');
+// (the real Env: the first browser run found E.windDir undefined — env.js read it off the weather's eased visuals, which
+// have none — and the drift threw on it; here the env's own frame is run with a seeded weather)
+require('../src/main/skybodies.js'); require('../src/main/weather.js'); require('../src/main/env.js');
+{
+  const Env = VR.Env, en = new Env(), o = { dim: 'overworld', biome: null, eyeSky: 1, wetOn: true, lowK: 0, freezeWeather: false, freezeTime: false, motion: true, drama: true };
+  en.wx.setSeed(53); en.setTime(6000);
+  let threw = null; try { for (let i = 0; i < 50; i++) en.update(0.1, o); } catch (e) { threw = e; }
+  const E = en.E, wd = E.windDir, g0 = E.gust;
+  check(!threw && wd && Math.abs(Math.hypot(wd[0], wd[1]) - 1) < 1e-9 && wd[0] === en.wx.windDir[0] && wd[1] === en.wx.windDir[1] && Number.isFinite(g0) && g0 === en.wx.gust, `the env hands on the weather's wind: E.windDir (${wd ? wd.map(v => v.toFixed(3)).join(', ') : 'undefined'}) is the weather's heading, E.gust (${g0}) its gust${threw ? ' — threw ' + threw.message : ''}`);
+  const c0 = E.cloudDrift.slice(); for (let i = 0; i < 100; i++) en.update(0.1, o);
+  const d = [E.cloudDrift[0] - c0[0], E.cloudDrift[1] - c0[1]], dl = Math.hypot(d[0], d[1]);
+  check(dl > 5 && (d[0] * E.windDir[0] + d[1] * E.windDir[1]) / dl > 0.99, `the clouds drift along the wind's heading (env.js cloudDrift: ${dl.toFixed(1)} blocks in 10 s)`);
+  const en2 = new Env(); en2.wx.setSeed(53); for (let i = 0; i < 5; i++) en2.update(0.1, Object.assign({}, o, { motion: false }));
+  check(en2.E.cloudDrift === null, 'without the switch no drift of its own (the old +x drift by the clock)');
+}
 check(/dr\[0\] \/ 4000/.test(RS), 'the cirrus drift at 1/4000 of the drift in their noise space (far above: a fifth of the cumulus\' angular speed)');
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

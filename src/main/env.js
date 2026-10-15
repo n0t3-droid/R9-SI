@@ -151,10 +151,12 @@
       E.blockTint = [1.0, 0.84, 0.64];
       E.emissiveBoost = 0.45 + night * 1.1;
       E.wind = W.wind;
-      E.windDir = W.windDir; E.gust = W.gust || 0;   // the wind's heading and its gusts (weather.js): the water's swell, the plants, leaves and the air life follow them
+      // (t-motion: from the weather itself — W, its eased visuals, has neither, so E.windDir and E.gust were always undefined
+      // and 0: the water's swell, the swimmer's bob, the gusts and every wind-borne thing stood still or ran along +x)
+      E.windDir = this.wx.windDir || [1, 0]; E.gust = this.wx.gust || 0;   // the wind's heading and its gusts (weather.js): the water's swell, the plants, leaves and the air life follow them
       // t-motion: the clouds drift along the wind's heading, faster in a strong wind (renderer.js: the cumulus, the box clouds,
       // the cirrus far up at a fifth of it, the cloud shadows); without the switch the old drift (+x)
-      if (o.motion) { const cd = this.cloudDrift || (this.cloudDrift = [this.anim * 0.9, 0]), k = 1.3 * (0.6 + 0.4 * (W.wind || 1)) * dt; cd[0] += E.windDir[0] * k; cd[1] += E.windDir[1] * k; E.cloudDrift = cd; } else E.cloudDrift = null;
+      if (o.motion) { const cd = this.cloudDrift || (this.cloudDrift = [this.anim * 0.9, 0]), k = 1.3 * (0.6 + 0.4 * (W.wind || 1)) * dt, wd = E.windDir || [1, 0]; cd[0] += wd[0] * k; cd[1] += wd[1] * k; E.cloudDrift = cd; } else E.cloudDrift = null;
       E.cloudCover = W.cloud;
       // celestial bodies ride the same sky rotation
       // the planets never set (TRAILER.md §2.1): the ringed giant circles at ~33° elevation, the blue

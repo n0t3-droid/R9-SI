@@ -846,10 +846,10 @@
         gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, this.hmapTex); gl.uniform1i(p.u.u_hmap, 6);
         gl.uniform4f(p.u.u_hsh, this.q.hshadowDist || 72, this.hTop || 255, 7, 0);
       }
-      // t-motion: the clouds' shadow mask (unit 13; updateCloudShadow keeps it): strength 0 until it exists
+      // t-motion: the clouds' shadow mask (unit 14 — t-material takes 10–13; updateCloudShadow keeps it): strength 0 until it exists
       if (p.u.u_cloudShadow) {
         const m = this.csTex ? this.csM : null;
-        gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, this.csTex || this.texNoise); gl.uniform1i(p.u.u_cloudShadow, 13);
+        gl.activeTexture(gl.TEXTURE14); gl.bindTexture(gl.TEXTURE_2D, this.csTex || this.texNoise); gl.uniform1i(p.u.u_cloudShadow, 14);
         if (p.u.u_cloudShadowM) gl.uniform4f(p.u.u_cloudShadowM, m ? m[0] : 0, m ? m[1] : 0, m ? m[2] : 0, m ? m[3] : 0);
       }
     }
