@@ -1,5 +1,5 @@
 // Beauty from every angle (plan docs/superpowers/plans/2026-10-08-t-beauty.md) — the generator rules behind the
-// audit's pictures (test/beauty_audit.mjs). Everything is vgen 9 (new worlds); a vgen-8 world keeps its chunks.
+// audit's pictures (test/beauty_audit.mjs). Everything is vgen 9 or 10 (new worlds); an older world keeps its chunks.
 //   1. no random ruin in the Heartland's designed land: the obsidian ruined gates (and the other random surface
 //      structures) stay out of the Heartland's designed radius (HEART.R0) — a vgen-8 world keeps them where they were
 //   2. every street of Nova Haven ends at a street, the plaza or a turning circle: a round paved bulb with the cyan line
@@ -14,6 +14,9 @@
 //   8. a fall off a floating island pours off the rim and dissolves into mist (t1_07 · t1_09): its 2 × 2 curtain ends
 //      18 … 35 below the rim, each cell at its own height (a ragged end), and the chunk lists a mist spawn at its foot —
 //      vgen 8's falls ran 90 … 100 blocks to the ground as straight blue poles (the audit's water_1, water_r1, far_3)
+//   9. the spray at a fall's foot (vents.js): a plume of mist under the ragged end, never a ball (its opacity modelled)
+//  10. a fall that is touched spills a little, it does not flood (sim.js)
+//  11. vgen 10: a street climbs in half steps — no whole-block step across a street (vgen 9 kept as released, v0.45)
 //   bash test/wt_run.sh beauty_rules.js 600
 const V = require('./load_shared.js');
 const R = V.R, F = V.F, VG = V.VillageGen, HEART = V.Heart;
@@ -475,6 +478,67 @@ console.log('10 · a fall that is touched spills a little, it does not flood (si
   }
 }
 
+// ---------------------------------------------------------------- 11 · a street climbs in half steps (vgen 10)
+// beauty_audit run c2's street_2: Palm Row rises a block at x ≈ 51 (81 → 82), and the step's face read as a low wall
+// across the street eleven blocks ahead — four such steps, 80 → 81 → 82 at both its ends. vgen 10: where a street's
+// surface rises a block, the two samples below the rise are paved half a block higher (a light grey slab, the kerb's
+// own, on the paving; the light lines at the kerbs stay as they are), so it climbs in half steps. vgen 9 keeps its city
+// as released (v0.45): nothing but those slabs differs between the two.
+console.log('11 · a street climbs in half steps (vgen 10)');
+const W10 = world(10);
+{
+  const site = (g) => VG.sitesFor(g, 0, -9).find(x => x.home);
+  const P9 = VG.plan(W9.g, site(W9.g)), P10 = VG.plan(W10.g, site(W10.g));
+  const PAVE = /^vx_floor_plaza/, SLAB = R.byName.vollton_light_grey_slab.state({ type: 'bottom' });
+  // the surface of a paved cell: the top of its paving (the first plaza block from y 95 down), half a block more under
+  // a bottom slab of light grey; null where there is no paving
+  const surf = (W, x, z) => { for (let y = 95; y > 70; y--) if (PAVE.test(nameOf(W.at(x, y, z)))) return W.at(x, y + 1, z) === SLAB ? y + 1.5 : y + 1; return null; };
+  // along a road's centre line and two lines 1.5 to either side of it (inside its light lines), sample by sample: the
+  // rises and falls of the surface (a turning circle's bed and its ring are no street)
+  const walk = (W, P, rd) => {
+    const out = { half: 0, full: [] };
+    for (const off of [-1.5, 0, 1.5]) {
+      let last = null;
+      for (let k = 0; k < rd.pts.length; k++) {
+        const [px, pz] = rd.pts[k], q = rd.pts[Math.min(rd.pts.length - 1, k + 1)], p0 = rd.pts[Math.max(0, k - 1)], a = Math.atan2(q[1] - p0[1], q[0] - p0[0]);
+        if ((P.nova.turns || []).some(t => Math.hypot(px - t.x, pz - t.z) <= t.bed + 1.5)) { last = null; continue; }
+        const x = Math.floor(px - Math.sin(a) * off), z = Math.floor(pz + Math.cos(a) * off), s = surf(W, x, z);
+        if (s === null) { last = null; continue; }
+        if (last !== null) { const d = Math.abs(s - last); if (d === 0.5) out.half++; else if (d >= 1) out.full.push(`${rd.name} ${off} at ${x}, ${z}: ${last} → ${s}`); }
+        last = s;
+      }
+    }
+    return out;
+  };
+  const pr9 = walk(W9, P9, P9.nova.roads.find(r => r.name === 'palmrow'));
+  check(pr9.full.length === 12 && pr9.half === 0, `vgen 9 keeps its streets as released: Palm Row steps a whole block 4 times on each of its three lines (${pr9.full.length} whole steps, ${pr9.half} half)`);
+  let half = 0; const full = [];
+  for (const rd of P10.nova.roads) { const r = walk(W10, P10, rd); half += r.half; full.push(...r.full); }
+  check(full.length === 0 && half >= 24, `vgen 10: every street climbs in half steps (${half} half steps, ${full.length} whole${full.length ? ': ' + full.slice(0, 6).join('; ') : ''})`);
+  // the light lines stay one line each at the kerbs, lit and unbroken (the slabs lie inside them)
+  {
+    const LINE = new Set();
+    for (const [, b] of P10.chunks) for (let i = 0; i < b.o.length; i += 4) { const n = nameOf(b.o[i + 3]); if (n === 'vx_floor_plaza_line' || n === 'vx_floor_plaza_line_amber') LINE.add(b.o[i] + ',' + b.o[i + 2]); }
+    let n = 0, covered = 0;
+    for (const rd of P10.nova.roads) for (const sd of ['L', 'R']) for (const [x, z] of ((rd.kerb && rd.kerb[sd]) || [])) { n++; const s = surf(W10, x, z); if (!LINE.has(x + ',' + z) || s === null || s % 1 !== 0) covered++; }
+    check(n > 300 && covered === 0, `vgen 10: the kerbs' light lines stay lit and uncovered (${covered} of ${n} kerb cells covered or unlit)`);
+  }
+  // nothing else differs: the city's chunks of the two worlds block by block (y 70 … 100), the only change a slab of
+  // light grey on a road's paving
+  {
+    let diff = 0, slabs = 0; const other = [];
+    for (const key of P10.chunks.keys()) {
+      const [cx, cz] = key.split(',').map(Number), a = W9.chunk(cx, cz).blocks, b = W10.chunk(cx, cz).blocks;
+      for (let y = 70; y <= 100; y++) for (let i = 0; i < 256; i++) {
+        const j = (y << 8) | i; if (a[j] === b[j]) continue;
+        diff++;
+        if (b[j] === SLAB && !a[j] && PAVE.test(nameOf(b[j - 256]))) slabs++; else if (other.length < 4) other.push(`${cx * 16 + (i & 15)}, ${y}, ${cz * 16 + (i >> 4)}: ${nameOf(a[j])} → ${nameOf(b[j])}`);
+      }
+    }
+    check(diff > 0 && slabs === diff, `vgen 10 differs from vgen 9 only by the ramps' slabs (${slabs} slabs of ${diff} changed blocks over ${P10.chunks.size} chunks${other.length ? '; other: ' + other.join('; ') : ''})`);
+  }
+}
+
 // ---------------------------------------------------------------- 5 · Very Low
 // the mesher's triangles per chunk column within Very Low's render distance (4 chunks) of the audit's two Very Low
 // scenes (test/beauty_audit.mjs COST=1: the crescent's west end — its turning circle — and the lawn between the villa
@@ -509,8 +573,9 @@ if (!process.env.SKIP_COST) {
     return tris / want.length;
   };
   for (const [scene, at] of [['crescent_end', [-100.5, -91.5]], ['between_rows', [20.5, -116.5]]]) {
-    const t0 = performance.now(), a = windowTris(W8, at, 82), b = windowTris(W9, at, 82);
+    const t0 = performance.now(), a = windowTris(W8, at, 82), b = windowTris(W9, at, 82), c = windowTris(W10, at, 82);
     check(b <= a * 1.01, `${scene}: vgen 9 ${b.toFixed(0)} triangles a column, vgen 8 ${a.toFixed(0)} (${(b / a * 100 - 100).toFixed(1)} %, ${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+    check(c <= b * 1.01, `${scene}: vgen 10 (the streets' half steps) ${c.toFixed(0)} triangles a column, vgen 9 ${b.toFixed(0)} (${(c / b * 100 - 100).toFixed(1)} %)`);
   }
 }
 
