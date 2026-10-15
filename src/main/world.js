@@ -548,7 +548,18 @@
       if (!this.seamPending()) this.seamDone();
     }
     get SEAM_HOLD() { return 8; }
-    seamHeld(key) { const h = this.seamHold; if (!h || !h.size) return false; const f = h.get(key); return f !== undefined && this.frame - f < this.SEAM_HOLD; }
+    // when its hold runs out (a burst of arrivals keeps the queue busy) the column takes the marks the spreading has left
+    // on it so far, once: it is meshed with them, and the flush at the end of the spreading marks it again only if it was
+    // touched after that (before: every touched section once more). It is not held again until the spreading is done.
+    seamHeld(key) {
+      const h = this.seamHold; if (!h || !h.size) return false;
+      const f = h.get(key); if (f === undefined || f === -1e9) return false;
+      if (this.frame - f < this.SEAM_HOLD) return true;
+      h.set(key, -1e9);
+      const ch = this.changed, c = this.cols.get(key), SC = VR.SECS;
+      if (c && ch.size) for (let sy = 0; sy < c.sec.length; sy++) { const v = key * SC + sy; if (ch.delete(v)) { const s = c.sec[sy]; s.dirty = true; s.ver++; } }
+      return false;
+    }
     // the spreading, until the budget (ms) is spent (undefined: to the end); the same walk as _propagate
     seamStep(budgetMs) {
       let q = this.sq, qh = this.sqH || 0, qt = this.sqT || 0;

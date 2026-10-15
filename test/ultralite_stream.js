@@ -182,6 +182,18 @@ console.log('g · the seam light in the takt: the same light, spread over frames
   w3.frame = f0 + w3.SEAM_HOLD - 1; const heldLate = w3.seamHeld(k0);
   w3.frame = f0 + w3.SEAM_HOLD; const heldOver = w3.seamHeld(k0);
   check(heldNow && heldLate && !heldOver && w3.seamPending(), 'a column waits for a spreading seam at most SEAM_HOLD frames, even while the spreading goes on', `SEAM_HOLD ${w3.SEAM_HOLD}`);
+  // when its hold runs out the column takes the marks the spreading has left on it so far: meshed then, it is not marked
+  // again for them at the end of the spreading (a node replay with bursts of arrivals meshed 56 of 1 632 sections twice
+  // before, 17 after: the rest were touched again after their mesh)
+  const { w: w4 } = makeWorld(true);
+  for (const o of order) w4.onColumn(msgOf(o));
+  const c4 = w4.cols.get(k0), SC = V.SECS, f4 = w4.frame;
+  for (let sy = 0; sy < c4.sec.length; sy++) w4.changed.add(k0 * SC + sy);   // (the spreading's touches on it so far)
+  w4.frame = f4 + w4.SEAM_HOLD;
+  const out = !w4.seamHeld(k0), pendingThen = w4.seamPending();
+  for (const s of c4.sec) s.dirty = false;   // (meshed now, as scheduleMeshes would)
+  w4.seamDone();
+  check(out && pendingThen && c4.sec.every(s => !s.dirty), 'a column whose hold ran out is meshed with the marks the spreading left on it — the end of the spreading does not mark it again for them', `${c4.sec.filter(s => s.dirty).length} of ${c4.sec.length} sections marked again`);
 }
 
 console.log('h · the mesh-job starts stop at the frame\'s share of the budget');
