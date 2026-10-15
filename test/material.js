@@ -98,5 +98,27 @@ console.log('e · the shader text');
   check(fsPbr > 0 && fs.lastIndexOf('#ifdef PBR', fsPbr) > fs.lastIndexOf('#endif', fsPbr), 'pbrShade lives inside #ifdef PBR');
 }
 
+console.log('f · glass and the light lines');
+{
+  const S = V.SHADERS, ts = S.TRANS_FS, i = ts.indexOf('t-material · glass'), j = ts.lastIndexOf('#ifdef PBR', i);
+  check(i > 0 && j > ts.lastIndexOf('#endif', i) && /u_glassRefr/.test(ts.slice(i)) && /glowK/.test(ts.slice(i)), 'the glass shading (Fresnel sky and sun, the filter through the copy, the night windows) sits behind #ifdef PBR');
+  // the light lines' block light: the paving two blocks beside a line is washed in its colour (it was not)
+  const R = V.R, T = R.T, line = R.byName.vx_floor_plaza_line, amber = R.byName.vx_floor_plaza_line_amber, pave = R.byName.vx_floor_plaza.defaultState;
+  const nib = (e) => [(e >> 8) & 15, (e >> 4) & 15, e & 15];
+  check(JSON.stringify(nib(T.emit[line.defaultState])) === '[0,7,9]' && JSON.stringify(nib(T.emit[amber.defaultState])) === '[9,5,1]', 'the cyan line emits [0, 7, 9], the amber [9, 5, 1]', `${nib(T.emit[line.defaultState])} · ${nib(T.emit[amber.defaultState])}`);
+  const col = new Uint16Array(65536);
+  for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) col[(80 << 8) | (z << 4) | x] = x === 8 ? line.defaultState : pave;
+  const light = V.computeColumnLight(col, true), at = (x, y, z) => nib(light[(y << 8) | (z << 4) | x]);
+  const a1 = at(9, 81, 8), a2 = at(10, 81, 8), a3 = at(11, 81, 8);
+  check(a1[2] >= 7 && a2[2] >= 6 && a3[2] >= 5, 'the air over the paving one, two, three blocks beside the line holds its light (blue ≥ 7, 6, 5)', `${a1} · ${a2} · ${a3}`);
+  // the flood's cost in the workers: a column of paving with sixteen lines, the new emission against the old
+  const old = T.emit[line.defaultState]; const cpu = (f, n) => { let best = 1e9; for (let r = 0; r < 5; r++) { const c0 = process.cpuUsage(); for (let k = 0; k < n; k++) f(); const c1 = process.cpuUsage(c0); best = Math.min(best, (c1.user + c1.system) / 1000 / n); } return best; };
+  const many = new Uint16Array(65536); for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) many[(80 << 8) | (z << 4) | x] = (x % 4 === 0) ? line.defaultState : pave;
+  const tNew = cpu(() => V.computeColumnLight(many, true), 20);
+  T.emit[line.defaultState] = (0 << 8) | (3 << 4) | 4; const tOld = cpu(() => V.computeColumnLight(many, true), 20); T.emit[line.defaultState] = old;
+  console.log(`     a column of paving with 64 line blocks: ${tNew.toFixed(2)} ms to light (the old emission ${tOld.toFixed(2)} ms)`);
+  check(tNew < tOld * 1.6 + 0.3, 'the brighter lines cost the workers' + "'" + ' light flood little (a worst case: a line every fourth block)', `×${(tNew / tOld).toFixed(2)}`);
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

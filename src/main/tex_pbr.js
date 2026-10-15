@@ -4,12 +4,12 @@
 // pieces, painted hulls, varnished wood) and a scale on the painter's roughness (the painter's per-texel roughness stays
 // the detail; tex_core.js writes it into the material texture's blue channel). Matte things (plants, the ground, cloth)
 // get nothing and a little more roughness: the shader skips their gloss altogether. Window panes carry a flag: they glow
-// warm from inside at night (TRANS_FS). One RGBA8 row for the terrain programs (u_pbr, one texel a layer): r metal,
+// warm from inside at night (TRANS_FS; 2: glass, 4: only when the pane is tinted). One RGBA8 row for the terrain programs (u_pbr, one texel a layer): r metal,
 // g coat, b the roughness scale (128 = ×1, 255 ≈ ×2), a flags. Pure JS (the main thread and the node tests).
 // ============================================================================
 (function (VR) {
   'use strict';
-  const PBR = VR.PBR = { WIN: 1, GLASS: 2 };
+  const PBR = VR.PBR = { WIN: 1, GLASS: 2, TINTED: 4 };
   // the rules, in order: the first whose pattern matches the name decides; a rule's fields default to metal 0, coat 0,
   // rk 1 (the roughness scale), flags 0
   const RULES = [
@@ -18,7 +18,9 @@
     // the ground, plants and cloth: matte (their gloss is skipped; the rain still wets them — wet.js)
     [/leaves|leaf|grass|fern|flower|sapling|vine|moss|mycel|podzol|dirt|soil|mud|\bsand\b|^sand$|gravel|clay|snow|wool|carpet|rug|cloth|fabric|felt|hay|straw|wheat|crop|bush|hedge|lichen|mushroom|kelp|coral|sponge|vx_mat_plant|vx_mat_fabric/, { rk: 1.35 }],
     // window panes: glass that glows from inside at night (the VX windows' glass voxels too; a white pane does not)
-    [/^ctm:|^window_(black|white)|^mod_glass|^spire_window|^vx_glass$|^stained_glass:/, { coat: 1, flags: 1 | 2 }],
+    // (the VX glass voxels are windows and railings alike: only a tinted pane glows — flag 4)
+    [/^vx_glass$/, { coat: 1, flags: 1 | 2 | 4 }],
+    [/^ctm:|^window_(black|white)|^mod_glass|^spire_window|^stained_glass:/, { coat: 1, flags: 1 | 2 }],
     // other glass: smooth, no glow (railings, plain glass's frame, frosted, ice)
     [/glass|^ice$|packed_ice|blue_ice/, { coat: 1, flags: 2 }],
     // ores sit in rock (before the metal words)

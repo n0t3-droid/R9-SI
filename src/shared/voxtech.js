@@ -511,8 +511,8 @@
     W('vx_tech_hex_white', 'White Hex Wall', { pat: 'hexpanel', col: T.white, col2: T.whiteD, gloss: true });
     // floors
     FL('vx_floor_plaza', 'Plaza Tiles', { pat: 'plaza', col: 0xD6DBE2, col2: 0xAAB2BC });
-    FL('vx_floor_plaza_line', 'Plaza Light-Line', { pat: 'line', col: 0xD6DBE2, col2: 0xAAB2BC, glow: T.cyan }, { light: [0, 3, 4] });
-    FL('vx_floor_plaza_line_amber', 'Plaza Light-Line · Amber', { pat: 'line', family: 'amber', col: 0xD6DBE2, col2: 0xAAB2BC, glow: T.amber }, { light: [4, 2, 0] });
+    FL('vx_floor_plaza_line', 'Plaza Light-Line', { pat: 'line', col: 0xD6DBE2, col2: 0xAAB2BC, glow: T.cyan }, { light: [0, 7, 9] });   // (t-material: was [0, 3, 4] — the line now washes the paving beside it in cyan at dusk and at night)
+    FL('vx_floor_plaza_line_amber', 'Plaza Light-Line · Amber', { pat: 'line', family: 'amber', col: 0xD6DBE2, col2: 0xAAB2BC, glow: T.amber }, { light: [9, 5, 1] });   // (t-material: was [4, 2, 0])
     FL('vx_floor_deck', 'Hangar Deck', { pat: 'deck', col: 0xAEB7C2, col2: 0x6E7884 });
     FL('vx_floor_hex', 'Hex Deck', { pat: 'hex', col: 0xA4AEBB, col2: 0x6A7482, seamGlow: true }, { light: [0, 3, 4] });
     FL('vx_floor_pad', 'Landing Pad Ring', { pat: 'pad', col: 0x5A6472, col2: 0x2E3440, glow: T.cyan, glow2: T.amber }, { light: [3, 8, 11] });

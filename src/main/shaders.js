@@ -1343,6 +1343,10 @@ uniform float u_reflUp;               // 1: the mirror is a quarter size and rea
 uniform float u_waterTier;    // 0 Very Low (sky-LUT reflection only, no caustics), 1 and 2: caustics on the floor
 uniform vec2 u_windDir;       // the wind's heading (weather.js), the swell runs with it
 uniform float u_stormK;       // the storm factor of the waves (water_wave.js)
+#ifdef PBR
+uniform sampler2D u_pbr;      // t-material: the material table (tex_pbr.js; a: 1 a window pane, 2 glass, 4 glows only when tinted)
+uniform float u_glassRefr;    // t-material: 1 when the scene copy holds this frame's opaque world (pbr 2): window panes filter it
+#endif
 ${(VR.WaterWave ? VR.WaterWave.glsl() : '')}
 #ifdef MODEL
 uniform mat3 u_normalMat;
@@ -1632,6 +1636,38 @@ void main() {
   float ndl = max(dot(n, L), 0.0);
   vec3 lighting = u_ambSky * skyL * mix(0.62, 1.0, faceShade) + lc * ndl * smoothstep(0.55, 0.95, v_sky) * (ndl > 0.0 ? shadowAt(NORMALS[face], L) : 1.0) + blockL + 0.012;
   vec3 col = alb.rgb * lighting;
+#ifdef PBR
+  // t-material · glass (plan step 4): smooth, so the sky and the sun mirror in it sharply by Fresnel (the block lights' colour
+  // where the sky does not reach); each pane a hair off true, so the reflections break from pane to pane; a window pane (the
+  // table's flag) filters what lies behind it by its tint where the scene copy holds the world (High: u_glassRefr) and glows
+  // warm from inside at night, room by room — some rooms dark, a white pane (a railing) never
+  vec4 pbg = texelFetch(u_pbr, ivec2(int(layer), 0), 0);
+  uint gfl = uint(pbg.a * 255.0 + 0.5);
+  vec3 wpg = v_localPos + vec3(u_camInt), cellG = floor(wpg - n * 0.02);
+  vec3 gn = normalize(n + (vec3(hash13(cellG), hash13(cellG + 3.1), hash13(cellG + 7.7)) - 0.5) * 0.035);
+  float nvG = clamp(dot(gn, V), 1e-3, 1.0), FG = 0.04 + 0.96 * pow(1.0 - nvG, 5.0), soG = smoothstep(0.3, 0.95, v_sky);
+  vec3 envG = skyColor(reflect(-V, gn), false) * soG + blockL * (0.5 - 0.3 * soG);
+  vec3 sunG = ndl > 0.0 ? lc * pow(max(dot(gn, normalize(L + V)), 0.0), 600.0) * 8.0 * smoothstep(0.55, 0.95, v_sky) * shadowAt(NORMALS[face], L) : vec3(0.0);
+  float ta = alb.a, paneK = 1.0 - ta;
+  vec3 tintG = mix(vec3(1.0), alb.rgb / max(max(alb.r, max(alb.g, alb.b)), 1e-3), 0.75);
+  float glowK = 0.0; vec3 glowC = vec3(0.0);
+  if ((gfl & 1u) != 0u && u_night > 0.01) {
+    vec3 room = floor(wpg / vec3(3.0, 2.0, 3.0));
+    float tinted = (gfl & 4u) != 0u ? smoothstep(0.06, 0.2, 1.0 - min(tintG.r, min(tintG.g, tintG.b))) : 1.0;
+    glowK = step(hash13(room + 17.0), 0.7) * (0.55 + 0.75 * hash13(room + 5.0)) * tinted * u_night;
+    glowC = mix(vec3(1.0, 0.70, 0.40), vec3(1.0, 0.86, 0.64), hash13(room + 9.0)) * mix(vec3(1.0), tintG, 0.3) * 1.4;
+  }
+  float aG; vec3 cG;
+  if (u_glassRefr > 0.5 && (gfl & 1u) != 0u && paneK > 0.5) {
+    vec3 behind = texture(u_sceneColor, clamp(suv + (gn.xz - n.xz) * 0.5, 0.001, 0.999)).rgb;
+    vec3 pane = mix(behind * tintG, glowC, glowK * 0.85) * (1.0 - FG) + envG * FG + sunG;
+    cG = mix(col + envG * FG + sunG, pane, paneK); aG = 1.0;
+  } else {
+    aG = clamp(ta + paneK * (FG + glowK * 0.8), 0.0, 1.0);
+    cG = (col * ta + envG * FG * (1.0 - 0.5 * ta) + sunG + glowC * glowK * paneK * (1.0 - FG)) / max(aG, 0.06);
+  }
+  o_col = vec4(applyFog(cG, v_rel, dist), aG);
+#else
   vec3 H = normalize(L + V);
   col += lc * pow(max(dot(n, H), 0.0), 120.0) * 1.5 * smoothstep(0.55, 0.95, v_sky);
   float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
@@ -1640,6 +1676,7 @@ void main() {
   col += matEnv(reflect(-V, n)) * pow(1.0 - max(dot(n, V), 0.0), 3.0) * 0.3 * skyL;
   col = applyFog(col, v_rel, dist);
   o_col = vec4(col, clamp(alb.a + fres * 0.3, 0.0, 1.0));
+#endif
 }`;
 
   // ------------------------------------------------------------ shadow depth

@@ -482,6 +482,7 @@
       }
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
       sec.transW = this.transWaterOf(trans);   // (F10 · postLite: water or aether among its translucent faces)
+      sec.transG = this.transGlassOf(trans);   // (t-material: glass among them — the window panes read the copy on High)
       sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
       this.visDirty = true;
       this.nearShadow(sec);
@@ -526,6 +527,7 @@
       sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
       sec.transW = this.transWaterOf(st.d[2]);   // (F10 · postLite: water or aether among its translucent faces)
+      sec.transG = this.transGlassOf(st.d[2]);   // (t-material)
       sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
       this.visDirty = true;
       this.nearShadow(sec);
@@ -1808,6 +1810,23 @@
       for (let i = 5; i < d.length; i += 8) { const k = (d[i] >> 8) & 7; if (k === 1 || k === 6 || k === 7) return true; }
       return false;
     }
+    // t-material: does a translucent layer hold glass (the mesher's kind 0: panes, stained glass, VX glass) — once per upload
+    transGlassOf(d) {
+      if (!d) return false;
+      for (let i = 5; i < d.length; i += 8) if (((d[i] >> 8) & 7) === 0) return true;
+      return false;
+    }
+    // t-material: glass in this frame's view (as waterInView)
+    glassInView(vis) {
+      const cam = this.cam, P = this.planes;
+      for (let i = 0; i < vis.length; i++) {
+        const s = vis[i];
+        if (!s.transG || !s.mesh[2] || (s.fade !== undefined && s.fade <= 0)) continue;
+        const ox = s.ox - cam.x, oy = s.oy - cam.y, oz = s.oz - cam.z;
+        if (mat4.boxInFrustum(P, ox, oy, oz, ox + 16, oy + 16, oz + 16)) return true;
+      }
+      return false;
+    }
     // water or aether in this frame's view (a visible section with such a translucent layer inside the frustum)
     waterInView(vis) {
       const cam = this.cam, P = this.planes;
@@ -1835,7 +1854,7 @@
     refrCopy(F, E, vis) {
       const gl = this.gl;
       let col = true, dep = true;
-      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy / plRays false: one part off, for the measurement)
+      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis) || ((this.q.pbr | 0) >= 2 && this.glassInView(vis)); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy / plRays false: one part off, for the measurement; t-material: the window panes read it on High)
       this.copied = col;
       if (!col && !dep) return;
       const n = this.w * this.h, sb = this.sceneFmt().bytes;
@@ -1989,6 +2008,7 @@
         gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
         if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
         if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, F.underwater ? 1 : 0);
+        if (p.u.u_glassRefr) gl.uniform1f(p.u.u_glassRefr, (this.q.pbr | 0) >= 2 && this.copied ? 1 : 0);   // (t-material: the panes filter the copy)
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
         this.shadowOffUni(p.u);
