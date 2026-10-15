@@ -1955,6 +1955,7 @@
       if (F.horizon && !fc) { this.gpuPass('far'); F.horizon.draw(this, E); }
       // voxel models & meshes
       if (F.drawOpaque) { this.gpuPass('models'); F.drawOpaque(this, E); }
+      if (this.l2Ssao) this.l2Ssao(F, E);   // (t-light2: the contact shadows from this depth — the next frame reads them, light2_gl.js)
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
       this.reflOn = false;
       this.stats.reflMs = 0;
@@ -1997,6 +1998,7 @@
       }
       this.gpuPass('rest');
       if (F.drawTranslucent) F.drawTranslucent(this, E);
+      if (this.l2Beams) this.l2Beams(F, E);   // (t-light2: the lighthouses' beams at night, light2_gl.js)
       // precipitation
       if (F.precip && F.precip.amount > 0.01) this.drawPrecip(F, E);
       // particles
@@ -2006,6 +2008,7 @@
       if (F.outlines) for (const o of F.outlines) this.drawOutline(o);
       if (F.guide) this.drawGuide(F.guide);
       if (F.crack) this.drawCrack(F.crack);
+      if (this.l2Vol) this.l2Vol(F, E);   // (t-light2: the light in the air, from this depth before the hand clears it — light2_gl.js)
       // first-person hand (separate depth range)
       if (F.drawHand) { gl.clear(gl.DEPTH_BUFFER_BIT); F.drawHand(this, E); }
       // ---------------- R9 Super Resolution
@@ -2319,6 +2322,7 @@
         this.tex(0, this.sceneCol, p.u.u_src);
         gl.uniform2f(p.u.u_texel, 1 / this.w, 1 / this.h);
         gl.uniform1f(p.u.u_threshold, E.bloomThreshold || 1.1);
+        if (this.l2Post) this.l2Post(p, E, 'bloom', F);   // (t-light2: the glow's threshold by the hour)
         this.fsMark('bloomPre', b0.w, b0.h, this.w * this.h * sb, b0.w * b0.h * sb);
         this.fs(p);
         p = this.P.down; gl.useProgram(p.p);
@@ -2342,7 +2346,7 @@
       }
       // god rays
       let raysOn = false;
-      if (this.q.rays && E.dimId === 0 && !F.underwater) {
+      if (this.q.rays && E.dimId === 0 && !F.underwater && !this.l2VolOn) {   // (t-light2: the volumetric light in their place where it runs)
         const L = E.sunDir[1] > 0 ? E.sunDir : E.moonDir;
         const c = [L[0] * 100, L[1] * 100, L[2] * 100, 1];
         const m = this.viewProj;
@@ -2397,6 +2401,7 @@
       // sharpen more when the scene was rendered below screen resolution (less after super resolution)
       const up = Math.max(0, 1 - this.w / this.W) * (this.upTex ? 0.5 : 1);
       gl.uniform1f(p.u.u_sharpen, this.q.sharpen === 0 ? 0 : Math.min(1, (this.q.sharpen || 0.35) + up * 1.6));
+      if (this.l2Post) this.l2Post(p, E, 'composite', F);   // (t-light2: the grade by the hour, the flare, the volumetric light)
       { const b0 = this.bloom[0], nW = this.W * this.H; this.fsMark('composite', this.W, this.H, (this.upTex ? nW * 8 : this.w * this.h * sb) + (useBloom ? b0.w * b0.h * sb : 0) + (raysOn ? this.raysW * this.raysH * sb : 0), nW * 4); }
       this.fs(p);
       if (fx) {

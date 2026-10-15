@@ -10,6 +10,10 @@
 //  d · the air: the height fog's integral against a march, denser low, the morning layer
 //  e · the grade: the tone curve monotone with its ends, the split toning's lean per hour, the bloom by the hour
 //  f · the contact shadows' taps and the blue noise; the flare's ghosts on the sun's axis
+//  g · the contact shadows' pass (AO_FS line by line in JS) on a depth buffer of a floor and a wall: the open floor and
+//      the wall's middle stay open, the corner darkens, alike on Low, Balanced and High
+//  h · the light in the air (its strength indoors, in the rain, by the moon), the valley mist's colour, the lighthouse's
+//      beams (night only, opposite, the cone's mesh closed); the composite's and the fog's hooks in the shaders
 //   bash test/wt_run.sh light2.js
 const fs = require('fs'), path = require('path');
 const V = require('./load_shared.js');
@@ -99,6 +103,10 @@ console.log('b · the shaders');
   // with the defines on: the light model's code is in, the old ambient replaced after it
   const tf = pre(S1.TERRAIN_FS, ['FADE', 'SHADOWS', 'LIGHT2', 'L2AO', 'AIR2']), tv = pre(S1.TERRAIN_VS, ['FADE', 'SHADOWS', 'L2AO']);
   check(/l2Hemi\(n\)/.test(tf) && /l2Pool\(bl\)/.test(tf) && /l2Wrap\(dot\(n, L\)/.test(tf) && /vec3 l2Fog\(/.test(tf), 'LIGHT2 / AIR2 bring the hemisphere, the pools, the leaves\' wrap and the air into the terrain');
+  // the contact shadows read where the ambient is made: the terrain's sky light (and half the lamps'), the palms' sky
+  // light, the furniture's ambient — never the sun's (direct) term
+  const pf = pre(S1.PROP_FS, ['SHADOWS', 'LIGHT2', 'L2AO']), ff = pre(S1.FURN_FS, ['SHADOWS', 'LIGHT2', 'L2AO']);
+  check(/amb \*= l2a; blockL \*= mix\(1\.0, l2a, u_l2AoK\.z\)/.test(tf) && /lighting -= l2Hemi\(N\) \* skyL \* 0\.95 \* \(1\.0 - l2Ao\(\)\)/.test(pf) && /amb \*= l2Ao\(\)/.test(ff) && !/direct \*=? ?l2/.test(tf), 'the contact shadows darken the ambient of the terrain, the palms and the furniture, not the sun');
   check(/v_l2AoClip = u_l2AoVP \* vec4\(rel \+ u_l2AoDelta, 1\.0\)/.test(tv) && !/v_l2AoClip/.test(pre(S1.TERRAIN_VS, ['MODEL', 'L2AO'])), 'the terrain\'s vertex shader writes the reprojected place (not for a ship: MODEL)');
   // the renderer (stub GL): Very Low's programs carry no light define, High's do
   const consts = {}, progs = [];
@@ -204,6 +212,73 @@ console.log('f · the taps, the noise, the flare');
   const G = L2.ghosts(0.8, 0.3);
   const onAxis = G.every(g => Math.abs((g[0] - 0.8) * (0.5 - 0.3) - (g[1] - 0.3) * (0.5 - 0.8)) < 1e-9);
   check(onAxis && G.some(g => g[0] < 0.5) && G.some(g => g[0] > 0.5), 'the flare\'s ghosts lie on the line from the sun through the centre, on both sides of it');
+}
+console.log('g · the contact shadows in a corner (AO_FS line by line on a depth buffer: a floor and a wall)');
+{
+  // the eye 1.6 above a floor, 5 from a wall ahead, looking 18° down; 320 × 180, 70° high, the game's near and far
+  const W = 320, H = 180, n = 0.06, f = 1200, t = 1 / Math.tan(35 * Math.PI / 180), p0 = t / (W / H), p5 = t;
+  const pitch = -18 * Math.PI / 180, cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const dep = new Float64Array(W * H), what = new Uint8Array(W * H);
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const nx = (i + 0.5) / W * 2 - 1, ny = (j + 0.5) / H * 2 - 1;
+    const vy = ny / p5, vz = -1;                                     // the view ray (its view z is −1 per unit t)
+    const dy = vy * cp - vz * sp, dz = vy * sp + vz * cp;            // turned about x by the pitch: the world's ray
+    let tt = Infinity, k = 0;
+    if (dy < 0) { const tf = -1.6 / dy; if (tf < tt) { tt = tf; k = 1; } }
+    if (dz < 0) { const tw = -5 / dz; if (tw < tt && 1.6 + dy * tw >= 0) { tt = tw; k = 2; } }
+    const zl = tt, zn = (f + n) / (f - n) - 2 * f * n / ((f - n) * zl);
+    dep[j * W + i] = isFinite(zl) ? zn * 0.5 + 0.5 : 1; what[j * W + i] = k;
+  }
+  const tex = (u, v) => { const i = Math.min(W - 1, Math.max(0, Math.floor(u * W))), j = Math.min(H - 1, Math.max(0, Math.floor(v * H))); return dep[j * W + i]; };
+  const linZ = (d) => { const z = d * 2 - 1; return 2 * n * f / (f + n - z * (f - n)); };
+  const viewAt = (u, v, zl) => [(u * 2 - 1) * zl / p0, (v * 2 - 1) * zl / p5, -zl];
+  const posAt = (u, v) => viewAt(u, v, linZ(tex(u, v)));
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const ao = (i, j, lv, phi) => {
+    const taps = L2.TAPS[lv], turns = L2.TURNS[lv], R = L2.AO.radius[lv], str = L2.AO.strength[lv], bias = L2.AO.bias;
+    const u = (i + 0.5) / W, v = (j + 0.5) / H, tx = 1 / W, ty = 1 / H, d0 = tex(u, v);
+    if (d0 >= 0.999999) return 1;
+    const z0 = linZ(d0), P = viewAt(u, v, z0);
+    const pr = posAt(u + tx, v), pl = posAt(u - tx, v), pu = posAt(u, v + ty), pd = posAt(u, v - ty);
+    const dx = Math.abs(pr[2] - P[2]) < Math.abs(P[2] - pl[2]) ? sub(pr, P) : sub(P, pl);
+    const dyv = Math.abs(pu[2] - P[2]) < Math.abs(P[2] - pd[2]) ? sub(pu, P) : sub(P, pd);
+    let N = cross(dx, dyv); const nl = Math.hypot(N[0], N[1], N[2]); N = N.map(x => x / nl); if (N[2] < 0) N = N.map(x => -x);
+    let rs = R * (p5 * H * 0.5) / z0; if (rs < 1.5) return 1; rs = Math.min(rs, 160);
+    let sum = 0;
+    for (let k = 0; k < taps; k++) {
+      const a = (k + 0.5) / taps, ang = a * turns * Math.PI * 2 + (phi || 0);
+      const Q = posAt(u + Math.cos(ang) * a * rs * tx, v + Math.sin(ang) * a * rs * ty), w = sub(Q, P);
+      const vv = dot(w, w), vn = dot(w, N), fall = Math.max(R * R - vv, 0) / (R * R);
+      sum += fall * fall * Math.max(vn - bias, 0) / (vv + 0.01);
+    }
+    return Math.max(0, 1 - sum * str * (2 / taps));
+  };
+  // the column through the middle: where the floor meets the wall
+  const ic = W >> 1; let jc = -1; for (let j = 1; j < H; j++) if (what[j * W + ic] === 2 && what[(j - 1) * W + ic] === 1) { jc = j; break; }
+  // (the mean over 16 turns of the taps: the blue noise turns them per pixel, the blur takes the mean of the neighbours)
+  const mean = (i, j, lv) => { let s = 0; for (let k = 0; k < 16; k++) s += ao(i, j, lv, k / 16 * Math.PI * 2); return s / 16; };
+  const res = [1, 2, 3].map(lv => ({ lv, open: mean(ic, 6, lv), corner: Math.min(mean(ic, jc - 1, lv), mean(ic, jc, lv)), wall: mean(ic, Math.min(H - 3, jc + 40), lv) }));
+  check(jc > 0 && res.every(r => r.open > 0.97 && r.wall > 0.97), `open floor and the wall's middle stay open: ${res.map(r => r2(r.open) + ' / ' + r2(r.wall)).join(' · ')} (4 · 8 · 12 taps)`);
+  check(res.every(r => r.corner < 0.72 && r.corner > 0.4), `the corner darkens: ${res.map(r => r2(r.corner)).join(' · ')}`);
+  check(Math.max(...res.map(r => r.corner)) - Math.min(...res.map(r => r.corner)) < 0.08, 'Low, Balanced and High darken it alike (the taps differ, not the look)');
+}
+console.log('h · the light in the air, the mist, the beams, the hooks');
+{
+  const out = L2.volK(true, 0, 1), inn = L2.volK(true, 0, 0.1), wet = L2.volK(true, 1, 1), moon = L2.volK(false, 0, 1);
+  check(inn > out * 2.5 && wet < out * 0.5 && moon > out, `the light in the air: indoors ×${r2(inn / out)} (the dust in a sunbeam), in the rain ×${r2(wet / out)}, by the moon ×${r2(moon / out)} (its light is dimmer)`);
+  check(L2.VOL.steps <= 16 && L2.VOL.reach <= 160 && L2.VOL.g > 0 && L2.VOL.g < 0.6, `the march: ${L2.VOL.steps} steps over at most ${L2.VOL.reach} blocks, forward phase g ${L2.VOL.g}`);
+  const E = { horizon: [0.62, 0.72, 0.86], fogColor: [0.7, 0.76, 0.84], sunDir: [-0.36, 0.41, 0.84] }, m = L2.mistColor(E);
+  check(m.every((v, i) => v >= Math.min(E.horizon[i], E.fogColor[i]) * 0.99 && v <= Math.max(E.horizon[i], E.fogColor[i]) * 1.09), `the valley mist between the horizon's colour and the fog's (${m.map(r3).join(' ')})`);
+  check(L2.beamK(0) === 0 && L2.beamK(0.2) === 0 && Math.abs(L2.beamK(1) - L2.BEAM.k) < 1e-9, 'the lighthouse\'s beams: none by day, full at night');
+  const da = L2.beamAngle(3.3, 1) - L2.beamAngle(3.3, 0), turn = L2.beamAngle(L2.BEAM.period, 0) - L2.beamAngle(0, 0);
+  check(Math.abs(da - Math.PI) < 1e-9 && Math.abs(turn - Math.PI * 2) < 1e-9, `two beams opposite each other, a turn every ${L2.BEAM.period} s`);
+  const bm = L2.beamMesh(), nv = bm.v.length / 3, last = nv - 2;
+  check(Math.abs(bm.v[1] - bm.v[last * 3 + 1]) < 1e-6 && Math.abs(bm.v[2] - bm.v[last * 3 + 2]) < 1e-6 && Math.max(...bm.i) < nv, `the cone's mesh is closed (${nv} vertices, ${bm.i.length / 3} triangles)`);
+  // the hooks: the composite grades after the gamma and adds the flare and the volumetric light; applyFog hands over to the air
+  const cf = pre(S1.COMPOSITE_FS, ['GRADE2', 'L2VOL']), af = pre(S1.TERRAIN_FS, ['FADE', 'AIR2']);
+  check(/c = pow\(clamp\(c, 0\.0, 1\.0\), vec3\(1\.0 \/ 2\.2\)\);\nc = l2Grade\(c, v_uv\);/.test(cf) && /c \+= l2VolAt\(uv\)/.test(cf) && /c \+= l2Flare\(v_uv\)/.test(cf), 'the composite: the grade in display space after the gamma, the flare and the light in the air before the tone map');
+  check(/vec3 applyFog\(vec3 col, vec3 rel, float dist\) \{\nreturn l2Fog\(col, rel, dist\);\n\}/.test(af), 'applyFog hands over to the air (one haze for all that is fogged)');
 }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

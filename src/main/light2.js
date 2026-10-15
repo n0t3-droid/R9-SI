@@ -61,7 +61,7 @@
   // terrain); the composite gets the grade and the volumetric light's upsample.
   const AO_PROGS = { terrain: 1, terrainCut: 1, terrainCutZ: 1, prop: 1, furn: 1 };
   const LIGHT_PROGS = { terrain: 1, terrainCut: 1, terrainCutZ: 1, shipOpaque: 1, shipCutout: 1, prop: 1, furn: 1, vox: 1, voxInst: 1, mesh: 1, lod: 1, form: 1, lodFar: 1, folk: 1, folkSun: 1 };
-  const FOG_PROGS = Object.assign({ trans: 1, shipTrans: 1, part: 1 }, LIGHT_PROGS);
+  const FOG_PROGS = Object.assign({ trans: 1, shipTrans: 1, part: 1, trail: 1 }, LIGHT_PROGS);
   L2.definesFor = function (name, q) {
     q = q || L2.q;
     const out = [];
@@ -159,7 +159,14 @@
     const morning = sstep(-1800, -200, mt) * (1 - sstep(1200, 3000, mt));
     const rho = f[0] * (1 + 2.2 * morning), k = f[1] * (1 + 0.8 * morning), base = f[2] - 1.5 * morning;
     const rain = E.rain || 0;
-    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 900 * (1 - 0.4 * rain), apMax: 0.62, morning, moods: m };
+    // the mist toward the sun glows (forward scattering): a little by day, most in the golden hour
+    const sunK = byMood(m, { day: 0.25, gold: 0.55, dusk: 0.35, night: 0 });
+    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 900 * (1 - 0.4 * rain), apMax: 0.62, sunK, morning, moods: m };
+  };
+  // the valley mist's colour: between the horizon's and the fog's, a little lighter by day
+  L2.mistColor = function (E) {
+    const h = E.horizon || [0.6, 0.7, 0.8], f = E.fogColor || h, m = L2.moods(E.sunDir[1]), lift = 1 + 0.08 * m.day;
+    return [(h[0] + f[0]) * 0.5 * lift, (h[1] + f[1]) * 0.5 * lift, (h[2] + f[2]) * 0.5 * lift];
   };
 
   // ---------------------------------------------------------------- step 5 · the grade
@@ -206,13 +213,30 @@
 
   // ---------------------------------------------------------------- step 2 · the contact shadows' taps
   // scalable ambient obscurance (McGuire et al. 2012): tap i of n on a spiral of `turns` turns in the unit disc, rotated
-  // by phi — the radius grows with the index, so the taps cover the disc evenly in area
+  // by phi — the radius grows linearly with the index (more taps near the centre, where the near geometry weighs most)
   L2.saoTap = function (i, n, turns, phi) {
     const a = (i + 0.5) / n, ang = a * turns * Math.PI * 2 + phi;
     return [Math.cos(ang) * a, Math.sin(ang) * a];
   };
   L2.TAPS = [0, 4, 8, 12];
   L2.TURNS = [0, 2, 5, 7];
+  // by the level (1 Low · 2 Balanced · 3 High and Ultra): the disc's radius (blocks), the strength (fewer taps, more of it:
+  // the near taps weigh most — the levels darken a corner alike, test/light2.js g); the bias (blocks: a
+  // flat floor does not shade itself); where it is read: the depth's tolerance (relative) and the lamps' share
+  L2.AO = { radius: [0, 1.2, 1.2, 1.2], strength: [0, 1.1, 0.9, 0.82], bias: 0.03, tol: 0.05, block: 0.5 };
+
+  // ---------------------------------------------------------------- step 3 · the light in the air
+  // the march: its steps, its reach (blocks; at most the shadow map's), the phase's g (forward: the shafts toward the sun
+  // brightest); the strength over the air's haze for the sun and for the moon; indoors more (the dust in a sunbeam through a
+  // window: the eye's sky light low); a ray to the sky a part of it (the sky's glow is the sky shader's); the haze's scale
+  // height longer than the fog's (the shafts reach up the trees)
+  L2.VOL = { steps: 16, reach: 120, g: 0.35, sun: 0.6, moon: 2.2, indoor: 2.0, sky: 0.4, kScale: 0.7 };
+  L2.volK = function (sunUp, rain, eyeSky) {
+    const V = L2.VOL, e = eyeSky === undefined ? 1 : clamp(eyeSky, 0, 1);
+    return (sunUp ? V.sun : V.moon) * (1 - 0.6 * clamp(rain || 0, 0, 1)) * (1 + V.indoor * (1 - e));
+  };
+  // the sun's flare: its strength (HDR, before the exposure) and the disc's radius (screen heights) its visibility is read in
+  L2.FLARE = { k: 0.05, disc: 0.012 };
   // blue noise (void and cluster, Ulichney 1993): an N × N tiling threshold map whose values are spread with no low
   // frequencies — the per-pixel rotation of the taps and the volumetric march's start. Made once (~10 ms for 64²)
   L2.blueNoise = function (N, seed) {
@@ -247,6 +271,7 @@
     out.k = [K.dir, K.xFace, K.wrapLeaf, K.wrapSkin];
     out.pool = [K.poolHot, K.poolK, K.poolTail, K.poolHue];
     out.air = L2.air(E, ticks || 0);
+    out.mist = L2.mistColor(E);
     out.grade = L2.grade(E);
     return out;
   };
@@ -399,9 +424,11 @@ void main() {
   o = vec4(s / w, c.g, 0.0, 1.0);
 }`;
   // the volumetric light at quarter resolution: along the ray to the scene's depth (at most u_vol.y), u_vol.x steps
-  // started at a blue-noise offset, the light's visibility from the shadow map at each (the map is affine along the ray:
-  // its coordinates are interpolated), the density of the air at the step's height, a Henyey-Greenstein phase; out: the
-  // in-scattered light (rgb) and the linear depth (a) for the composite's depth-aware upsample
+  // started at a blue-noise offset and spaced quadratically (denser near the eye, where a shaft is widest on the screen),
+  // the light's visibility from the shadow map at each (the map is affine along the ray: its coordinates are
+  // interpolated), the density of the air at the step's height, a Henyey-Greenstein phase; a ray to the sky takes
+  // u_volSky of it (the sky's own glow is the sky shader's); out: the in-scattered light (rgb) and the linear depth (a)
+  // for the composite's depth-aware upsample
   L2.VOL_FS = `
 uniform highp sampler2D u_depth;
 uniform highp sampler2DShadow u_shadowMap;
@@ -414,6 +441,7 @@ uniform vec4 u_vol;        // x the steps, y the march's reach (blocks), z the d
 uniform vec4 u_volH;       // x the eye's height, y k (1 / the haze's scale height), z the haze's base, w the shadow map's bias
 uniform vec3 u_volCol;     // the light's colour × strength
 uniform vec3 u_volL;       // toward the light
+uniform float u_volSky;    // the share of a ray to the sky
 uniform float u_phase;
 in vec2 v_uv;
 out vec4 o;
@@ -431,16 +459,16 @@ void main() {
   float acc = 0.0;
   for (int i = 0; i < 16; i++) {
     if (float(i) >= n) break;
-    float t = (float(i) + j) * dt, f = t / max(T, 1e-4);
+    float u = (float(i) + j) / n, f = u * u, t = f * T;
     vec3 sc = mix(s0, s1, f) * 0.5 + 0.5;
     float vis = 1.0;
     if (sc.x > 0.0 && sc.y > 0.0 && sc.x < 1.0 && sc.y < 1.0 && sc.z < 1.0) vis = texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - u_volH.w));
     float h = u_volH.x + dir.y * t;
-    acc += vis * exp(-u_volH.y * max(h - u_volH.z, -30.0)) * dt;
+    acc += vis * exp(-u_volH.y * max(h - u_volH.z, -30.0)) * 2.0 * u * dt;
   }
   float c = dot(dir, u_volL), g = u_vol.w, g2 = g * g;
   float ph = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5);
-  o = vec4(u_volCol * (acc * u_vol.z * ph), linZ(d));
+  o = vec4(u_volCol * (acc * u_vol.z * ph * (d >= 0.999999 ? u_volSky : 1.0)), linZ(d));
 }`;
   // the composite's part (COMPOSITE_FS includes it): the grade, the vignette, the flare, the volumetric light's upsample
   L2.glslComposite = function () {
@@ -452,7 +480,7 @@ uniform vec4 u_l2Curve;    // x the toe, y the mid-point's gamma, z the S's stre
 uniform vec3 u_l2Dark;     // the darks lean to (display space)
 uniform vec3 u_l2Light;    // the lights lean to
 uniform vec4 u_l2Vig;      // x the vignette's strength, y the aspect, z the mid-tones' saturation, w the flare's strength
-uniform vec4 u_l2Sun;      // xy the sun's place on the screen (uv), z its visibility (0 hidden … 1), w unused
+uniform vec4 u_l2Sun;      // xy the sun's place on the screen (uv), z the flare's gate (0: none), w the sun disc's radius (uv)
 uniform vec4 u_l2Ghost[5]; // per ghost: xy its place, z its radius (screen heights), w unused
 uniform vec3 u_l2GhostC[5];
 vec3 l2Curve(vec3 x) {
@@ -473,21 +501,32 @@ vec3 l2Grade(vec3 c, vec2 uv) {
   s *= 1.0 - u_l2Vig.x * smoothstep(0.25, 0.95, dot(v, v) * 2.2);
   return clamp(s, 0.0, 1.0);
 }
-// the flare (added in HDR before the tone map, only with the sun in the frame and seen)
+// the flare (added in HDR before the tone map, only with the sun in the frame and seen): how much of the sun's disc is
+// seen, from the scene's brightness there (a cloud, a roof or a tree in front of it dims it — the same five texels for
+// every pixel), then the ghosts
 vec3 l2Flare(vec2 uv) {
   if (u_l2Sun.z <= 0.0) return vec3(0.0);
+  float seen = 0.0;
+  for (int i = 0; i < 5; i++) {
+    float a = float(i) * 1.5707963;
+    vec2 off = i == 0 ? vec2(0.0) : vec2(cos(a) / u_l2Vig.y, sin(a)) * u_l2Sun.w * 0.6;
+    seen += smoothstep(1.5, 5.0, dot(texture(u_scene, u_l2Sun.xy + off).rgb, vec3(0.2126, 0.7152, 0.0722)));
+  }
+  seen *= 0.2;
+  if (seen <= 0.0) return vec3(0.0);
   vec3 f = vec3(0.0);
   for (int i = 0; i < 5; i++) {
     vec2 d = (uv - u_l2Ghost[i].xy) * vec2(u_l2Vig.y, 1.0);
     float r = length(d) / u_l2Ghost[i].z;
     f += u_l2GhostC[i] * (1.0 - smoothstep(0.55, 1.0, r)) * (0.6 + 0.4 * smoothstep(0.3, 0.95, r));
   }
-  return f * u_l2Sun.z * u_l2Vig.w;
+  return f * seen * u_l2Sun.z * u_l2Vig.w;
 }
 #endif
 #ifdef L2VOL
 // t-light2 · the volumetric light, upsampled: the four quarter-res texels round the pixel, each weighed bilinearly and by
 // how close its depth is to the pixel's own
+uniform float u_l2VolOn;            // this frame (the light up and its shadow map there)
 uniform sampler2D u_l2Vol;          // rgb the in-scattered light, a the linear depth
 uniform highp sampler2D u_l2Depth;  // the full-res depth
 uniform vec2 u_l2VolSize;           // the quarter-res target's size (texels)
@@ -505,6 +544,53 @@ vec3 l2VolAt(vec2 uv) {
 #endif
 `;
   };
+  // ---------------------------------------------------------------- step 6 · the lighthouse's beams (light2_gl.js l2Beams)
+  // two beams from the lamp, opposite each other, sweeping round (a turn every BEAM.period seconds), a little below the
+  // horizon; each an open cone drawn additively (no depth write): bright through its middle, soft at its edges (the
+  // facing ratio), fading along its length and with the distance. At night and late dusk.
+  L2.BEAM = { len: 150, r0: 0.35, r1: 7, tilt: -0.045, period: 9, k: 0.55, reach: 460, col: [1.0, 0.93, 0.74], seg: 20 };
+  // the beams' strength by the night's weight (0 by day; full from E.night 0.6)
+  L2.beamK = (night) => L2.BEAM.k * sstep(0.25, 0.6, night || 0);
+  // the heading of beam i (0, 1) at time t (seconds)
+  L2.beamAngle = (t, i) => (t / L2.BEAM.period) * Math.PI * 2 + i * Math.PI;
+  // the cone as a mesh: x along the axis (0 at the lamp, 1 at the end), yz the unit ring
+  L2.beamMesh = function (seg) {
+    seg = seg || L2.BEAM.seg;
+    const v = [], idx = [];
+    for (let i = 0; i <= seg; i++) { const a = i / seg * Math.PI * 2; v.push(0, Math.cos(a), Math.sin(a), 1, Math.cos(a), Math.sin(a)); }
+    for (let i = 0; i < seg; i++) { const a = i * 2, b = a + 1, c = a + 2, d = a + 3; idx.push(a, b, d, a, d, c); }
+    return { v: new Float32Array(v), i: new Uint16Array(idx) };
+  };
+  L2.BEAM_VS = `
+in vec3 a_pos;
+uniform mat4 u_viewProj;
+uniform vec3 u_origin;     // the lamp, camera-relative
+uniform vec3 u_axis;       // the beam's direction (unit)
+uniform vec3 u_shape;      // its length, its radius at the lamp, at the end
+out float v_t;
+out vec3 v_rel;
+out vec3 v_n;
+void main() {
+  vec3 ax = u_axis, side = normalize(vec3(-ax.z, 0.0, ax.x)), up = cross(side, ax);
+  float r = mix(u_shape.y, u_shape.z, a_pos.x);
+  v_n = side * a_pos.y + up * a_pos.z;
+  v_rel = u_origin + ax * (a_pos.x * u_shape.x) + v_n * r;
+  v_t = a_pos.x;
+  gl_Position = u_viewProj * vec4(v_rel, 1.0);
+}`;
+  L2.BEAM_FS = `
+uniform vec3 u_col;        // the light × the night's strength
+in float v_t;
+in vec3 v_rel;
+in vec3 v_n;
+out vec4 o;
+void main() {
+  vec3 V = normalize(-v_rel);
+  float face = abs(dot(normalize(v_n), V));
+  float along = (1.0 - v_t) * (1.0 - v_t) * smoothstep(0.0, 0.02, v_t);
+  o = vec4(u_col * (face * face * along * exp(-length(v_rel) / 520.0)), 1.0);
+}`;
+
   // the light's programs and their define sets (the offline compile check and test/light2.js)
   L2.passDefines = (taps) => ['TAPS ' + (taps | 0), 'TURNS ' + (L2.TURNS[L2.TAPS.indexOf(taps)] || 5) + '.0'];
   L2.programs = function (S) {
@@ -512,6 +598,7 @@ vec3 l2VolAt(vec2 uv) {
       ['l2ao', S.FS_VS, L2.AO_FS, [L2.passDefines(4), L2.passDefines(8), L2.passDefines(12)]],
       ['l2blur', S.FS_VS, L2.BLUR_FS, [[]]],
       ['l2vol', S.FS_VS, L2.VOL_FS, [[]]],
+      ['l2beam', L2.BEAM_VS, L2.BEAM_FS, [[]]],
     ];
   };
   // the define sets of the terrain-like programs (the offline check compiles every one)

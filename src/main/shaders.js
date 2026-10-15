@@ -511,6 +511,9 @@ vec3 hazeColor(vec3 dir) {
 }
 ${(VR.Light2 && VR.Light2.glslCommon) ? VR.Light2.glslCommon() : ''}
 vec3 applyFog(vec3 col, vec3 rel, float dist) {
+#ifdef AIR2
+  return l2Fog(col, rel, dist);   // t-light2: the air — the same haze, with the valleys' height fog and aerial perspective
+#else
   vec3 dir = rel / max(dist, 0.001);
   vec3 fc = u_dim == 1 || u_dim == 2 ? u_fogColor : mix(hazeColor(dir), u_fogColor, 0.35);
   float hd = max(length(rel.xz), abs(rel.y) * 0.35);
@@ -518,6 +521,7 @@ vec3 applyFog(vec3 col, vec3 rel, float dist) {
   f = max(f, (1.0 - exp(-dist * u_fog.z)) * 0.85);
   if (u_fog.w > 0.5) { f = 1.0 - exp(-dist * 0.07); fc = u_fogColor; }
   return mix(col, fc, clamp(f, 0.0, 1.0));
+#endif
 }
 `;
 
@@ -877,6 +881,9 @@ void main() {
   // t-light2: the sky's light from above, the ground's bounce from below (the shade cool, its underside warm)
   amb = (noshade ? u_l2Sky * 0.92 : l2Hemi(n) * (face <= 1u ? u_l2K.y : 1.0)) * skyL;
 #endif
+#ifdef L2AO
+  { float l2a = l2Ao(); amb *= l2a; blockL *= mix(1.0, l2a, u_l2AoK.z); }   // t-light2: the contact shadows — the sky's light and some of the lamps', never the sun
+#endif
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
   if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
@@ -1063,6 +1070,14 @@ void main() {
   if (!solid) ndl = l2Wrap(dot(N, L), u_l2K.z);   // t-light2: the fronds' wrap, as the terrain's leaves
   lighting = l2Hemi(N) * skyL * 0.95 + lc * ndl * sh * outdoors + blockL * 0.9 + vec3(0.012, 0.012, 0.016);
 #endif
+#ifdef L2AO
+  // t-light2: the contact shadows take from the sky's light only (the palm's foot in the ground, the fronds' overlap)
+#ifdef LIGHT2
+  lighting -= l2Hemi(N) * skyL * 0.95 * (1.0 - l2Ao());
+#else
+  lighting -= u_ambSky * skyL * 0.92 * (1.0 - l2Ao());
+#endif
+#endif
   // a frond lets the light through: lit from behind it glows a warmer green (the trunk does not)
   if (!solid) lighting += lc * max(dot(-N, L), 0.0) * 0.45 * sh * outdoors * vec3(1.0, 1.05, 0.7);
   vec3 col = alb * lighting;
@@ -1236,6 +1251,9 @@ void main() {
   vec3 amb = u_ambSky * skyL * mix(0.45, 1.0, up);
 #ifdef LIGHT2
   amb = l2Hemi(N) * skyL;   // t-light2: the sky from above, the ground's bounce from below
+#endif
+#ifdef L2AO
+  amb *= l2Ao();   // t-light2: the contact shadows (under the table, in the sofa's corner)
 #endif
   vec3 blk = blockL * mix(0.5, 1.0, up);
   vec3 col = alb * ((amb + lc * ndl * sh * outdoors) * v_ao + blk * v_ao + vec3(0.012, 0.012, 0.016)) * (1.0 - metal * 0.85);
@@ -2187,6 +2205,7 @@ uniform float u_shafts;     // F7: underwater light shafts (tier 2), 0 above the
 uniform float u_crossing;   // F7: the surface passing the eye (1 at the moment, fading): a ripple across the picture
 uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed in the world
 uniform vec3 u_shaftCol;
+${(VR.Light2 && VR.Light2.glslComposite) ? VR.Light2.glslComposite() : ''}
 in vec2 v_uv;
 out vec4 o;
 // HDR → 0..1 for the sharpening weights (keeps bright lights from ringing)
@@ -2222,6 +2241,12 @@ void main() {
   } else c = texture(u_scene, uv).rgb;
   c += texture(u_bloom, uv).rgb * u_bloomStrength;
   if (u_useRays > 0.5) c += texture(u_rays, uv).rgb;
+#ifdef L2VOL
+  if (u_l2VolOn > 0.5) c += l2VolAt(uv);   // t-light2: the light in the air (the volumetric light, upsampled by depth)
+#endif
+#ifdef GRADE2
+  c += l2Flare(v_uv);   // t-light2: the sun's flare
+#endif
   if (u_shafts > 0.0) {
     // light shafts: columns of light from the surface, where the view ray points up toward it, drifting slowly
     vec4 wr = u_invVP * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
@@ -2244,6 +2269,9 @@ void main() {
   if (u_damage > 0.0) c = mix(c, vec3(0.7, 0.05, 0.05), u_damage * (0.3 + 0.7 * smoothstep(0.2, 0.75, length(vc))) * 0.55);
   if (u_portal > 0.0) c = mix(c, vec3(0.9, 0.45, 0.15), u_portal * 0.35);
   c = pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));
+#ifdef GRADE2
+  c = l2Grade(c, v_uv);   // t-light2: the grade by the hour (display space: the curve, the split toning, the vignette)
+#endif
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
   o = vec4(c, 1.0);
