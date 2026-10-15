@@ -25,6 +25,8 @@
 //  11. round 2c: the market's goods piled before every stall (the keeper's place free, the walk five blocks), the
 //      workshops' goods beside their arches, lanterns on the loggia columns lighting the walk warm (P3)
 //  12. round 2c: flying buttresses from every outer buttress over the aisle roof to the clerestory, never over glass (P5)
+//  13. round 3 (continuation 3): the apse's order — engaged piers between its tall windows on the gallery, the wall's face
+//      white smooth stone instead of brick, a gold course at the springing; the piers off the walkable floor (P4 / P8)
 // usage: bash test/wt_run.sh hallcity_ornament.js 600
 const V = require('./load_shared.js');
 const path = require('path');
@@ -468,6 +470,53 @@ for (const [label, H] of HALLS) {
     }
     check(n > 0 && fly === n, `a flying buttress from every outer buttress over the aisle roof to the clerestory, falling toward the wall (${fly} of ${n})`);
     check(overGlass === 0, `the flyers stand over the roof's stone ribs, never over its glass (${overGlass} cells)`);
+  }
+  // ---------------------------------------------------------------- 13. round 3: the apse's order (P4 / P8)
+  console.log(`13. round 3 — the apse's piers between its windows, its white face, the springing's gold course (${label})`);
+  {
+    // between every two of the apse's tall windows and at its ends (the axes 15°, 45° … 165° round the apse's centre) an
+    // engaged pier stands on the gallery one block proud of the wall's face: pillar shafts rising at least 18 blocks, a
+    // capital at the springing (the references' white piers between the tall windows)
+    const rows = [];
+    for (let j = 0; j < 6; j++) {
+      const th = (j + 0.5) * Math.PI / 6;
+      let shafts = 0, caps = 0;
+      for (let u = -30; u <= 30; u++) for (let v = Hh.V1 + 1; v <= Hh.V1 + 30; v++) {
+        const d = Math.hypot(u, v - Hh.V1); if (d < 26 || d >= 27) continue;
+        const ph = Math.atan2(v - Hh.V1, u), t = d * Math.sin(ph - th);
+        if (Math.cos(ph - th) <= 0 || Math.abs(t) > 2.5) continue;
+        let p = 0; for (let y = F + 9; y <= F + 31; y++) if (atN(u, y, v) === 'quartz_pillar') p++;
+        if (p >= 18) shafts++;
+        for (let y = F + 28; y <= F + 31; y++) if (/chiseled/.test(atN(u, y, v))) { caps++; break; }
+      }
+      rows.push({ j, shafts, caps });
+    }
+    const ok = rows.filter(r0 => r0.shafts >= 2 && r0.caps >= 2).length;
+    check(ok === 6, `six engaged piers between and beside the apse's windows, each with pillar shafts 18 high or more and a capital (${ok} of 6: ${rows.map(r0 => `${r0.j * 30 + 15}° ${r0.shafts} shafts / ${r0.caps} capitals`).join(' · ')})`);
+    // the wall's face over the gallery white smooth stone, not brick: the inner ring's stone cells from the gallery to the
+    // springing (the windows' glass and reveals, the niches aside)
+    let brick = 0, stone = 0, band = 0, bn = 0;
+    for (let u = -30; u <= 30; u++) for (let v = Hh.V1 + 1; v <= Hh.V1 + 30; v++) {
+      const d = Math.hypot(u, v - Hh.V1); if (d < 27 || d >= 27.9 || Math.abs(u) >= 30) continue;
+      for (let y = F + 9; y <= F + 30; y++) { const n = atN(u, y, v); if (/quartz_bricks/.test(n)) { brick++; stone++; } else if (/quartz|travertine|band|chiseled/.test(n) && !/stairs|slab/.test(n)) stone++; }
+      bn++; if (/band/.test(atN(u, F + 31, v)) || /band/.test(atN(u, F + 30, v))) band++;
+    }
+    check(stone > 400 && brick <= 0.1 * stone, `the apse's face over the gallery is white smooth stone, not brick (${brick} brick of ${stone} stone cells)`);
+    check(bn > 60 && band >= 0.8 * bn, `a gold course at the springing round the apse (${band} of ${bn})`);
+    // the piers stand on the gallery: their cells are not walkable (the budget counts the floor that is free)
+    const Cd = VG.HALL_CODE, gw = Hh.gw, gv0 = Hh.gv0;
+    let walk = 0, pn = 0;
+    for (let j = 0; j < 6; j++) {
+      const th = (j + 0.5) * Math.PI / 6;
+      for (let u = -30; u <= 30; u++) for (let v = Hh.V1 + 1; v <= Hh.V1 + 30; v++) {
+        const d = Math.hypot(u, v - Hh.V1); if (d < 26 || d >= 27) continue;
+        const ph = Math.atan2(v - Hh.V1, u), t = d * Math.sin(ph - th);
+        if (Math.cos(ph - th) <= 0 || Math.abs(t) > 2.5 || atN(u, F + 20, v) !== 'quartz_pillar') continue;
+        pn++; if (VG.HALL_WALKABLE.has(Hh.grid[(u + 48) + (v - gv0) * gw])) walk++;
+      }
+    }
+    void Cd;
+    check(pn > 0 && walk === 0, `the piers' cells leave the walkable floor (${walk} of ${pn} walkable)`);
   }
   // ---------------------------------------------------------------- 7. no crystal
   const bad = new Set();

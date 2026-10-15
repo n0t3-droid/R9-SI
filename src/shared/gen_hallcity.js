@@ -268,7 +268,10 @@
         const a = Math.abs(u), [x, z] = W2(u, v);
         const top = F + roofH(u, v);
         if (reg === 'wall') {
-          fill(x, z, F, top, STONE);
+          // (round 3) the apse wall's face over the gallery smooth white stone (it was brick: from the stair the end of the
+          // hall read as a grey brick wall between its windows); its outer rings, seen from outside, stay brick
+          if (v > H.V1 && a < H.A0 && dApse(u, v) < 28) { fill(x, z, F, F + H.GAL, STONE); fill(x, z, F + H.GAL + 1, top, SMOOTH); }
+          else fill(x, z, F, top, STONE);
           // the outer walls' plinth course and cornice (the gold band outside)
           put(x, F + 1, z, SMOOTH);
           if (a >= H.W0 && v <= H.V1) put(x, F + H.WALLTOP, z, BAND);
@@ -669,6 +672,32 @@
         if (t === 0) { P(uu, F + H.GAL + 1, vv, 'lantern', { hanging: 0 }); const [x, z] = W2(uu, vv); plan.lamps.push([x, F + H.GAL + 1, z]); }
       }
     }
+    // (round 3) the apse's order: an engaged pier on the gallery at every niche — between every two of the tall windows and
+    // beside the outer ones (the axes 15°, 45° … 165°) — five wide and one block proud of the wall's face: pillar shafts
+    // from the gallery floor to the springing, the niche cut through its foot (an arch: stair shoulders, a keystone, a
+    // gold course over it), a chiseled capital, and the gold course of the springing round the whole apse over it (the
+    // references' white piers between the tall windows; the dome's outer ring over the piers is stone, so no sky light is
+    // lost). The piers' cells leave the walkable floor.
+    for (let v = H.V1 + 1; v <= H.V1 + H.AR; v++) for (let u = -H.AR; u <= H.AR; u++) {
+      if (region(u, v) !== 'in') continue;
+      const d = dApse(u, v); if (d < 26) continue;
+      const ph = Math.atan2(v - H.V1, u), j = Math.round(ph / (Math.PI / 6) - 0.5), th = (j + 0.5) * Math.PI / 6;
+      if (j < 0 || j > 5) continue;
+      const t = d * Math.sin(ph - th); if (Math.abs(t) > 2.5) continue;
+      const mid = Math.abs(t) <= 1.5, key = Math.abs(t) < 0.5;
+      // (a shoulder faces along the wall away from the niche's middle: hall-local facing 0 −v · 1 +u · 2 +v · 3 −u)
+      const du = -Math.sin(th) * Math.sign(t), dv = Math.cos(th) * Math.sign(t), fs = Math.abs(du) >= Math.abs(dv) ? (du > 0 ? 1 : 3) : (dv > 0 ? 2 : 0);
+      for (let y = F + H.GAL + 1; y <= F + H.SPR - 2; y++) {
+        let b = 'quartz_pillar';
+        if (mid && y <= F + H.GAL + 3) b = null;                                          // the niche's opening (3 high)
+        else if (mid && y === F + H.GAL + 4) b = key ? null : 'smooth_quartz_stairs';     // its round head: shoulders
+        else if (mid && y === F + H.GAL + 5) b = key ? CHIS : BAND;                       // a keystone in a gold course
+        P(u, y, v, b, b === 'quartz_pillar' ? { axis: 0 } : b === 'smooth_quartz_stairs' ? { facing: fs, half: 1 } : undefined);
+      }
+      P(u, F + H.SPR - 1, v, CHIS); P(u, F + H.SPR, v, BAND);                             // the capital, the springing's course
+      setC(u, v, C.WALL);
+    }
+    for (let v = H.V1 + 1; v <= H.V1 + H.AW; v++) for (let u = -H.AW; u <= H.AW; u++) if (region(u, v) === 'wall' && Math.abs(u) < H.A0 && dApse(u, v) < 28) P(u, F + H.SPR, v, BAND);
     const galSeats = [];
     for (const uc of [-18, -12, 12, 18]) { P(uc, F + H.GAL + 1, H.GAL0 + 3, 'vx_bench', { facing: 0 }); const [x, z] = W2(uc, H.GAL0 + 3); galSeats.push([x, F + H.GAL + 1, z, L.facing(0)]); }
     for (const [uc, vc] of [[-22, 56], [22, 56], [-12, 68], [12, 68], [0, 74]]) if (region(uc, vc) === 'in') putModel(P, 'vm_planter', 0, uc, F + H.GAL + 1, vc);
