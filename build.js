@@ -34,7 +34,9 @@ const workerSrc = shared + '\n' + js('main', TEX) + '\n' + js('main', WORKER_MAI
 // the texture cache's key (tex_cache.js): a hash of the worker's bundle (the shared code the block registry and the
 // recipes come from, the recipes, the forge) and of the cache itself. Any change there forges the textures again, once;
 // a change on the main thread alone (the UI, the game's own logic) keeps the cached textures.
-const texHash = require('crypto').createHash('sha256').update(workerSrc).update(js('main', ['tex_cache'])).digest('hex').slice(0, 16);
+// (t-folk: the villagers' rig and their smooth meshing make no texture — they stay out of the key, so a change to the
+// people does not forge every texture again)
+const texHash = require('crypto').createHash('sha256').update(js('shared', SHARED.filter(f => f !== 'folksmooth')) + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js')).update(js('main', ['tex_cache'])).digest('hex').slice(0, 16);
 const uiShared = js('main', LANG) + '\n' + js('shared', UI_SHARED);
 // (W2) the ✨ wizard in the game: the Studio's block colours, Baukasten and Genie, compiled only on the first ✨ (a function
 // the browser parses lazily: nothing runs on a start that never opens the wizard); the block colours read the game's textures
