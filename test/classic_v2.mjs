@@ -26,7 +26,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
 const LOOKS = (process.env.LOOKS || 'classic,seamless').split(',');
-await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 6; g.settings.look = lk; g.applySettings('*'); }, [process.env.PRESET || 'high', LOOKS[0]]);
+await ev(([p, lk]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.horizon = 1; g.settings.renderDist = 6; g.settings.look = lk; g.settings.fov = 72; g.applySettings('*'); }, [process.env.PRESET || 'high', LOOKS[0]]);   // fov 72: the grid analysis (FOCAL) assumes it; the game's default is 75 since F3
 await ev(`VR.game.createWorld({name:'Blocks v2',mode:'creative',difficulty:'peaceful',type:'flat',seed:'31',cheats:true,kit:true})`);
 for (let i = 0; i < 90; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; g.env.setTime(5200); });
@@ -177,7 +177,7 @@ for (const lk of LOOKS) {
 // the Very Low preset (flat materials, 55 % Super Resolution): the same look on the weakest PCs — the frames build up
 // the full-resolution image, so a shot takes a few more of them
 if (LOOKS.includes('classic') && !process.env.NO_POTATO) {
-  await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.look = 'classic'; g.applySettings('*'); g.chat('/look classic'); });
+  await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.look = 'classic'; g.settings.fov = 72; g.applySettings('*'); g.chat('/look classic'); });
   for (let i = 0; i < 120; i++) { if (await ev(() => VR.game.texRim === VR.LOOK.rim && VR.LOOK.mode === 'classic')) break; await step(2); await wait(100); }
   await settle(80);
   const q = await ev(() => ({ lite: VR.game.renderer.q.lite, tsr: VR.game.renderer.q.tsr, w: VR.game.renderer.w, W: VR.game.renderer.W }));

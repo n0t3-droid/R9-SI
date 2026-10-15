@@ -262,6 +262,14 @@
   };
   const STATE_TINT = [0, 0x7fbf55, 0x5fa83a, 0x3f76e4, 0x80a755, 0x619961, 0xb38a55, 0x6fae3a];   // (grass, foliage, water as the plains; birch, spruce, dry as the mesher's fixed ones)
   LOD.util = { bcol, scol, tint, mixc, hh, leafCol, TREES, TRUNKS };
+  // the side colour of a floating island seen from afar (ring 1's forms, ring 2's tiles): ember and prism rock as they
+  // are; vgen 9 (t-beauty) the warm strata of its upper sides over a little of the rock below (gen_realm.js lays ochre,
+  // umber and terracotta under the soil and moss at the tips), vgen 8 grey stone
+  LOD.isleSide = function (g, P, cl) {
+    if (cl.ember > 0.45) return P.ochre;
+    if (cl.prism > 0.45) return P.duskrock;
+    return g && g.vgen >= 9 ? mixc(mixc(P.ochre, P.umber, 0.45), P.stone, 0.25) : P.stone;
+  };
   // the site cells a tile's villages are looked up in (villagesNear's cells; the worker computes the cold ones first)
   LOD.tileCells = function (g, job) {
     const VG = VR.VillageGen; if (!VG || g.singleBiome >= 0 || job.level > 1) return [];
@@ -567,7 +575,7 @@
         const I0 = isl[idx(i, j)]; if (!I0) continue;
         const k = idx(i, j), B = BIOMES[BIO[k]], cl = CL[k];
         const t0 = cl.ember > 0.45 ? redsand : cl.t < -0.35 ? snow : tint(grassTop, B.grass);
-        const side = cl.ember > 0.45 ? ochre : cl.prism > 0.45 ? duskrock : stone;
+        const side = LOD.isleSide(g, P, cl);
         const x = i * S, z = j * S, yt = I0.top + 1, yb = I0.bottom;
         quad([x, yt, z], [x, yt, z + S], [x + S, yt, z + S], [x + S, yt, z], 2, 0, 0, t0, 255);
         quad([x, yb, z], [x + S, yb, z], [x + S, yb, z + S], [x, yb, z + S], 3, 0, 0, mixc(side, [20, 20, 30], 0.35), 150);
@@ -585,7 +593,9 @@
         }
       }
     }
-    // ---- giant crystal spires (exact, from the realm feature generator) on nearer tiles
+    // ---- giant crystal spires (exact, from the realm feature generator) on nearer tiles; a world without crystals
+    // (vgen ≥ 9, VR.GEN.noCry) has rock pinnacles of duskrock there instead: drawn in their stone's colour, not glowing
+    const noCry = !!(VR.GEN && VR.GEN.noCry && VR.GEN.noCry(g));
     if (L <= 2 && VR.RealmFeatures && g.climateAt) {
       let any = false;
       for (let k = 0; k < N * N && !any; k++) { const key = BIOMES[BIO[k]].key; if (key === 'prism_fields' || key === 'crystal_highlands') any = true; }
@@ -593,7 +603,7 @@
         const cols = new Map();
         const rec = {
           ok: () => true, get: () => 0,
-          set(x, y, z, s) { if (!s) return; const t = R.types[R.T.type[s]]; if (!t || t.name.indexOf('crystal_block') < 0) return; const ck = (x >> 1) * 65536 + (z >> 1); let c = cols.get(ck); if (!c) { c = { x: x >> 1, z: z >> 1, y0: y, y1: y, s }; cols.set(ck, c); } else { if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y; } },
+          set(x, y, z, s) { if (!s) return; const t = R.types[R.T.type[s]]; if (!t || (t.name.indexOf('crystal_block') < 0 && !(noCry && (t.name === 'duskrock' || t.name === 'dusk_aether')))) return; const ck = (x >> 1) * 65536 + (z >> 1); let c = cols.get(ck); if (!c) { c = { x: x >> 1, z: z >> 1, y0: y, y1: y, s }; cols.set(ck, c); } else { if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y; } },
           place(x, y, z, s) { this.set(x, y, z, s); return true; },
         };
         const cx0 = Math.floor(x0 / 16), cz0 = Math.floor(z0 / 16), cn = (n * S) >> 4;
@@ -603,16 +613,18 @@
           if (key !== 'prism_fields' && key !== 'crystal_highlands') continue;
           try { VR.RealmFeatures(g, rec, cx, cz, [], true); } catch (e) { /* keep going */ }
         }
+        const kd = noCry ? 0 : 4;
         for (const c of cols.values()) {
+          if (noCry && c.y1 - c.y0 < 3) continue;   // (the rocks round a pinnacle's foot are too small for the horizon)
           const col = scol(c.s, 0x9a6aff);
           const x = c.x * 2 - x0, z = c.z * 2 - z0;
           if (x < -2 || z < -2 || x > n * S + 2 || z > n * S + 2) continue;
           const y0 = c.y0, y1 = c.y1 + 1;
-          quad([x, y1, z], [x, y1, z + 2], [x + 2, y1, z + 2], [x + 2, y1, z], 2, 4, 0, col, 255);
-          quad([x + 2, y1, z + 2], [x + 2, y0, z + 2], [x + 2, y0, z], [x + 2, y1, z], 0, 4, 0, col, 210);
-          quad([x, y1, z], [x, y0, z], [x, y0, z + 2], [x, y1, z + 2], 1, 4, 0, col, 210);
-          quad([x, y1, z + 2], [x, y0, z + 2], [x + 2, y0, z + 2], [x + 2, y1, z + 2], 4, 4, 0, col, 230);
-          quad([x + 2, y1, z], [x + 2, y0, z], [x, y0, z], [x, y1, z], 5, 4, 0, col, 230);
+          quad([x, y1, z], [x, y1, z + 2], [x + 2, y1, z + 2], [x + 2, y1, z], 2, kd, 0, col, 255);
+          quad([x + 2, y1, z + 2], [x + 2, y0, z + 2], [x + 2, y0, z], [x + 2, y1, z], 0, kd, 0, col, 210);
+          quad([x, y1, z], [x, y0, z], [x, y0, z + 2], [x, y1, z + 2], 1, kd, 0, col, 210);
+          quad([x, y1, z + 2], [x, y0, z + 2], [x + 2, y0, z + 2], [x + 2, y1, z + 2], 4, kd, 0, col, 230);
+          quad([x + 2, y1, z], [x + 2, y0, z], [x, y0, z], [x, y1, z], 5, kd, 0, col, 230);
         }
       }
     }

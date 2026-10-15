@@ -139,7 +139,8 @@
         const dx = m.pos[0] - p.pos[0], dz = m.pos[2] - p.pos[2], d2 = dx * dx + dz * dz;
         if (m.dead) { m.deathT += dt; if (m.deathT > 0.8) { this.onMobDeath(m); this.mobs.splice(i, 1); } continue; }
         if (!m.pet && (d2 > 140 * 140 || (!w.isLoaded(Math.floor(m.pos[0]), Math.floor(m.pos[2]))))) { this.mobs.splice(i, 1); continue; }
-        if (m.def.hostile && p.mode === 'zen') { this.mobs.splice(i, 1); continue; }
+        // (Zen, and a peaceful world — t-life: a hostile mob left from before is not kept)
+        if (m.def.hostile && (p.mode === 'zen' || g.difficulty === 'peaceful')) { this.mobs.splice(i, 1); continue; }
         m.hurt = Math.max(0, m.hurt - dt);
         this.ai(m, dt, d2);
         this.physics(m, dt, get, nb);
@@ -372,8 +373,11 @@
       g.gadgets && g.gadgets.onMobKilled && g.gadgets.onMobKilled(m);
     }
     fireBolt(origin, dir, speed, dmg, owner, col) {
+      // a peaceful world (t-life, peace.js): nothing hostile fires at all, and a shot of the player's own is harmless light
+      const peace = VR.Peace ? VR.Peace.on(this.game) : this.game.difficulty === 'peaceful';
+      if (peace && owner && owner.def && owner.def.hostile) return;
       const l = Math.hypot(dir[0], dir[1], dir[2]) || 1;
-      this.bolts.push({ pos: origin.slice(), vel: [dir[0] / l * speed, dir[1] / l * speed, dir[2] / l * speed], dmg, owner, life: 2.5, col: col || [0.3, 1, 1] });
+      this.bolts.push({ pos: origin.slice(), vel: [dir[0] / l * speed, dir[1] / l * speed, dir[2] / l * speed], dmg: peace ? 0 : dmg, harmless: peace, owner, life: 2.5, col: col || [0.3, 1, 1] });
       this.game.audio.play('laser');
     }
     updateBolt(b, dt, get) {
@@ -393,7 +397,7 @@
       for (let k = 0; k < 3; k++) { const t = (k / 3) * Math.min(len, et); g.particles.spawn(b.pos[0] + dn[0] * t, b.pos[1] + dn[1] * t, b.pos[2] + dn[2] * t, 0, 0, 0, { life: 0.12, size: 0.07, grav: 0, col: b.col, emis: 1, collide: false }); }
       if (eh) {
         const hp = [b.pos[0] + dn[0] * et, b.pos[1] + dn[1] * et, b.pos[2] + dn[2] * et];
-        if (eh === p) p.damage(b.dmg, 'laser', b.pos); else this.hurtMob(eh, b.dmg, b.pos);
+        if (b.harmless) { /* light only (a peaceful world): it sparkles where it lands */ } else if (eh === p) p.damage(b.dmg, 'laser', b.pos); else this.hurtMob(eh, b.dmg, b.pos);
         g.particles.spark(hp[0], hp[1], hp[2], b.col, 10, 3);
         return true;
       }

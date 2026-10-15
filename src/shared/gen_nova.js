@@ -384,18 +384,31 @@
     // the patio in a planter, round trees and blossom bushes, loungers on the lawn
     // (green all over: the body is moss, and grass only on a top whose four sides are covered — a grass block's side
     //  is dirt, and on the steps' edges it read as brown cliffs)
+    // vgen 9 (t-beauty): a smooth hill — the dome's steps at most one block between neighbours (the cells relaxed from
+    // the rim inward) and grass on every top, so the Nahtlos look draws one soft green slope; vgen 8's steps of two to
+    // four read from the garden as dark stepped boxes of moss
+    const soft = !!(o && o.vgen >= 9);
+    // (soft: the cells the garden's bushes, flowers and round trees take over afterwards stay out of the hill — a bush set
+    //  into a mound's flank left a step of two beside it)
+    const keepOut = new Set();
+    if (soft) { for (const [u, v] of [[7, G.v1 + 4], [17, G.v1 + 4], [9, G.v1 + 9], [15, G.v1 + 9], [10, G.v1 + 4], [14, G.v1 + 4]]) keepOut.add(u + ',' + v); for (const u of [9, 15]) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) keepOut.add((u + a) + ',' + (G.v1 + 6 + b)); }
     const mound = (cu, cv, ru, rv, h) => {
       const top = {}, at = (u, v) => top[u + ',' + v] | 0;
       for (let v = Math.floor(cv - rv); v <= Math.ceil(cv + rv); v++) for (let u = Math.floor(cu - ru); u <= Math.ceil(cu + ru); u++) {
-        if (u < 1 || u >= W - 1 || v <= G.v1 + 2 || v >= D - 1 || isPath(u, v)) continue;
+        if (u < 1 || u >= W - 1 || v <= G.v1 + 2 || v >= D - 1 || isPath(u, v) || keepOut.has(u + ',' + v)) continue;
         const d = Math.hypot((u + 0.5 - cu) / ru, (v + 0.5 - cv) / rv); if (d >= 1) continue;
         const hh = Math.round(h * Math.sqrt(1 - d * d)); if (hh >= 1) top[u + ',' + v] = hh;
+      }
+      if (soft) for (let pass = 0; pass < 8; pass++) {
+        let changed = false;
+        for (const k in top) { const [u, v] = k.split(',').map(Number); const lo = Math.min(at(u + 1, v), at(u - 1, v), at(u, v + 1), at(u, v - 1)); if (top[k] > lo + 1) { top[k] = lo + 1; changed = true; } }
+        if (!changed) break;
       }
       for (const k in top) {
         const [u, v] = k.split(',').map(Number), hh = top[k];
         for (let y = 0; y < hh - 1; y++) put(u, y, v, 'moss_block');
         const covered = at(u + 1, v) >= hh && at(u - 1, v) >= hh && at(u, v + 1) >= hh && at(u, v - 1) >= hh;
-        put(u, hh - 1, v, covered ? 'grass_block' : 'moss_block');
+        put(u, hh - 1, v, soft || covered ? 'grass_block' : 'moss_block');
       }
       return at;
     };
@@ -613,7 +626,9 @@
 
     // ---- the facades: the operations a composition calls (s: 0 front −v, 1 +u, 2 back +v, 3 −u; fixed: the wall plane)
     const FACE = [0, 1, 2, 3];
-    const win = (s, a0, a1, y0, y1, fixed) => { for (let a = a0; a <= a1; a++) for (let y = y0; y <= y1; y++) put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.win, { facing: FACE[s] }); };
+    // (the openings of every side, for vgen 9's blank-wall pass below: "side|along|row" of a window, a door or a bay)
+    const opened = new Set(), mark = (s, a, y) => opened.add(s + '|' + a + '|' + y);
+    const win = (s, a0, a1, y0, y1, fixed) => { for (let a = a0; a <= a1; a++) for (let y = y0; y <= y1; y++) { put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.win, { facing: FACE[s] }); mark(s, a, y); } };
     const lintel = (s, a0, a1, y, fixed) => { for (let a = a0; a <= a1; a++) put((s & 1) ? fixed : a, y, (s & 1) ? a : fixed, M.fascia, { glow: 2 }); };
     // the cells behind a window open into the room (the ground floor's white lining too)
     const openBehind = (s, a0, a1, y0, y1, fixed, deep) => { const inw = s === 0 ? 1 : s === 2 ? -1 : s === 1 ? -1 : 1; for (let a = a0; a <= a1; a++) for (let y = y0; y <= y1; y++) for (let k = 1; k <= deep; k++) put((s & 1) ? fixed + inw * k : a, y, (s & 1) ? a : fixed + inw * k, null); };
@@ -624,7 +639,7 @@
       for (let k = 1; k <= dep; k++) for (let a = a0; a <= a1; a++) {
         const oo = outK(k), u = (s & 1) ? oo : a, v = (s & 1) ? a : oo;
         if (R.isG && !o2.hang) { put(u, 0, v, M.plinth); foot.add(u + ',' + v); }
-        for (let y = y0; y <= y1; y++) put(u, y, v, M.bay);
+        for (let y = y0; y <= y1; y++) { put(u, y, v, M.bay); mark(s, a, y); }
         if (o2.hang) put(u, y0, v, M.fascia, { glow: 2 });
         else if (k === dep) { const fu = (s & 1) ? fr : a, fv = (s & 1) ? a : fr; put(fu, y0, fv, M.base, { facing: (s + 2) & 3 }); }
       }
@@ -641,7 +656,7 @@
         info.bays.push({ side: s, a0: w0, a1: w1, out, y0: wy0, y1: wy1 });
       }
     };
-    const door = (s, u, y, v, hinge) => { put(u, y, v, M.door, { facing: s, half: 0, hinge: hinge | 0, open: 0 }); put(u, y + 1, v, M.door, { facing: s, half: 1, hinge: hinge | 0, open: 0 }); };
+    const door = (s, u, y, v, hinge) => { put(u, y, v, M.door, { facing: s, half: 0, hinge: hinge | 0, open: 0 }); put(u, y + 1, v, M.door, { facing: s, half: 1, hinge: hinge | 0, open: 0 }); mark(s, (s & 1) ? v : u, y); mark(s, (s & 1) ? v : u, y + 1); };
     const F_ = {
       bay, win, lintel, door,
       // a window band in the wall plane with its lintel; upper storeys' walls are one thick, the ground floor's two
@@ -673,9 +688,33 @@
 
     // ---- the glass wall to the back garden (the hall): one clear sheet floor to ceiling with a slim mullion every five
     //      blocks, the garden door in the middle
-    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) put(u, y, G.v1, M.sheet, { facing: 0, post: (u - 2) % 5 === 0 ? 1 : 0 });
+    for (let u = G.u0 + 2; u <= G.u1 - 2; u++) for (let y = 1; y <= G.clear; y++) { put(u, y, G.v1, M.sheet, { facing: 0, post: (u - 2) % 5 === 0 ? 1 : 0 }); mark(2, u, y); }
     for (let y = 1; y <= G.clear; y++) { put(G.u0 + 1, y, G.v1, M.wall); put(G.u1 - 1, y, G.v1, M.wall); }
     door(2, EU, 1, G.v1, 1);
+    // ---- vgen 9 (t-beauty): no blank wall. Along every side of every storey, a run of plain wall longer than four
+    //      blocks at the window rows gets a window band of two or three in its middle with its lintel, again until none
+    //      is left (vgen 8: the corner villa showed its neighbour a nine-block grey first floor and a top box blank at the
+    //      back and one side, the bungalow's pavilion a blank side, the long villa's first floor and the tower house's
+    //      ground floor runs of five); the family as vgen 8 built it keeps every wall
+    if (o && o.vgen >= 9) {
+      for (const [R, rs, isG] of [[G, GR, true], [U, UR, false], [T, TR, false]]) {
+        if (!R) continue;
+        const rows = isG ? [2, 3, 4] : [R.y + 2, R.y + 3];
+        for (const s of FACE) {
+          const fixed = s === 0 ? R.v0 : s === 2 ? R.v1 : s === 1 ? R.u1 : R.u0, lo = (s & 1) ? R.v0 : R.u0, hi = (s & 1) ? R.v1 : R.u1;
+          // (a run counts the corner blocks too — a side six blocks long with no window reads blank — but a window never
+          //  takes a corner)
+          const blank = (a) => { const u = (s & 1) ? fixed : a, v = (s & 1) ? a : fixed; if (a < lo || a > hi || !ringOf(rs, u, v)) return false; for (const y of rows) if (opened.has(s + '|' + a + '|' + y)) return false; return true; };
+          for (let guard = 0; guard < 4; guard++) {
+            let best = null;
+            for (let a = lo, run = 0; a <= hi; a++) { if (blank(a)) { run++; if (run > 4 && (!best || run > best[1])) best = [a - run + 1, run]; } else run = 0; }
+            if (!best) break;
+            const w = best[1] >= 7 ? 3 : 2, a0 = Math.max(lo + 1, Math.min(hi - w, best[0] + ((best[1] - w) >> 1)));
+            F_.band(s, a0, a0 + w - 1, rows[0], rows[rows.length - 1], fixed, !isG);
+          }
+        }
+      }
+    }
     yield;
 
     // ---- the hall: the cove over the pad, spots, the partition, the pad with its ring of light, benches, plants

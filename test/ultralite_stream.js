@@ -33,19 +33,42 @@ console.log('a · the budget rule');
   check(ST.jobs(ST.MIN) >= 2 && ST.jobs(ST.MAX) === Math.round(ST.MAX * 4), 'mesh-job starts: four per millisecond, at least two', ST.jobs(ST.MIN) + ' … ' + ST.jobs(ST.MAX));
 }
 
-console.log('b · the byte cap');
+console.log('b · the byte cap (beside F10\'s byte budget: the sixth argument of drain)');
 {
   const q = new V.Stream.UploadScheduler({ msPerByte: 1e-9 });
   let ran = 0;
   for (let i = 0; i < 10; i++) q.push({ key: i, x: i, z: 0, bytes: 600 * 1024, run: () => { ran++; } });
-  const r = q.drain(100, () => 0, 0, 0, ST.BYTES);
+  const r = q.drain(100, () => 0, 0, 0, undefined, ST.BYTES);
   check(ST.BYTES === 2 * 1024 * 1024 && r.ran === 3 && r.left === 7, 'ten uploads of 600 KB: three go up this frame (2 MB), the rest wait', `${r.ran} ran, ${r.left} left`);
   const r2 = q.drain(100, () => 0, 0, 0);
   check(r2.ran === 7, 'without a byte cap (every preset but Ultra · Leicht) the ms budget alone decides, as before');
   const q2 = new V.Stream.UploadScheduler({ msPerByte: 1e-9 });
   q2.push({ key: 'big', x: 0, z: 0, bytes: 5 * 1024 * 1024, run: () => { ran++; } });
-  const runs = []; for (let f = 0; f < 6; f++) runs.push(q2.drain(100, () => 0, 0, 0, ST.BYTES).ran);
+  const runs = []; for (let f = 0; f < 6; f++) runs.push(q2.drain(100, () => 0, 0, 0, undefined, ST.BYTES).ran);
   check(runs.join('') === '000010', 'a 5 MB upload waits four frames, then goes up alone', runs.join(''));
+  // a mesh in packets (F10: it may straddle frames, the old mesh draws until the commit): the cap holds for every packet
+  const q3 = new V.Stream.UploadScheduler({ msPerByte: 1e-9 });
+  const wrote = []; let left = 5 * 1024 * 1024, committed = 0;
+  q3.push({ x: 0, z: 0, bytes: left, step: (max) => { const b = Math.min(left, Math.floor(max / 16) * 16); left -= b; wrote.push(b); return b; }, commit: () => { committed++; } });
+  for (let f = 0; f < 4; f++) q3.drain(100, null, 0, 0, undefined, ST.BYTES);
+  check(wrote.length === 3 && Math.max(...wrote) <= ST.BYTES && committed === 1, 'a 5 MB mesh in packets: at most 2 MB a frame, whole after three frames', wrote.map(b => Math.round(b / 1024)).join(' + ') + ' KB');
+  // both lanes waiting: the far lane (horizon tiles, far forms) keeps its share of the cap, as of the milliseconds
+  const q4 = new V.Stream.UploadScheduler({ msPerByte: 1e-9 });
+  let nearB = 0, farB = 0;
+  for (let i = 0; i < 10; i++) q4.push({ x: 8, z: 8 + i, bytes: 600 * 1024, run: () => { nearB += 600 * 1024; } });
+  for (let i = 0; i < 20; i++) q4.push({ x: 8, z: 8, lane: 1, prio: i, bytes: 100 * 1024, run: () => { farB += 100 * 1024; } });
+  q4.drain(100, null, 0, 0, undefined, ST.BYTES);
+  check(nearB + farB <= ST.BYTES && farB >= V.Stream.FAR_SHARE * ST.BYTES - 100 * 1024 && nearB > 0, 'both lanes waiting: the far lane keeps its share of the 2 MB (F10\'s FAR_SHARE), the frame no more than the cap', Math.round(nearB / 1024) + ' KB near + ' + Math.round(farB / 1024) + ' KB far');
+  // through the world: in the takt its drain passes the cap, without it not (the scheduler's ms budget made generous)
+  const viaWorld = (takt) => {
+    const { w } = makeWorld(takt), Q = w.uploadQ;
+    Q.cpuEst = Q.msPerByte = 1e-9; if (takt) w.streamMs = 4;
+    let n = 0; for (let i = 0; i < 10; i++) Q.push({ x: 8, z: 8, bytes: 600 * 1024, run: () => { n++; } });
+    w.drainUploads(8, 8, 1000);
+    return n;
+  };
+  const on = viaWorld(true), off = viaWorld(false);
+  check(on === 3 && off === 10, 'World.drainUploads: in the takt three of ten 600 KB uploads go up a frame, without it all ten', on + ' vs ' + off);
 }
 
 console.log('c · away from the player');

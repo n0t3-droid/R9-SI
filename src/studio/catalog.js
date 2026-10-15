@@ -204,6 +204,7 @@
       if (lazyIO) { const ph = document.createElement('div'); ph.className = 'th ph'; c.appendChild(ph); lazyIO.observe(c); } else { const cv = picture(e.id, 128, 84); cv.className = 'th'; c.appendChild(cv); }
       c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n" title="${esc(disp(e.id))}">${esc(disp(e.id))}</div><div class="s">${esc(e.kinds.filter(x => x !== 'other').map(kindLabel).join(' · ') || e.id)}</div></div>`);
       c.appendChild(favButton(e.id, () => { if (S.cat === 'fav') C.list(); C.chips(); }));
+      if (VM.MODELS[e.id] && VR.FormTools) c.appendChild(VR.FormTools.glattButton(e.id, c));   // t-form: ✦ Glatt
       // ✏️ the block's 🎨 Aussehen (B1: colour, material, Als Variante)
       if (VR.LookPanel && VR.Looks && VR.Looks.kindOf(e.id)) { const eb = document.createElement('button'); eb.className = 'editb'; eb.dataset.act = 'lookCard'; eb.textContent = '✏️'; eb.title = TX('live.st.editCard', null, 'Aussehen ändern — Farbe, Material, Variante', 'Change its look — colour, material, variant'); eb.onclick = (ev) => { ev.stopPropagation(); CAT.edit = true; select(e.id); }; c.appendChild(eb); }
       c.onclick = () => select(e.id);
@@ -235,6 +236,7 @@
       const kind = hs ? '🏠 ' + L('cat.house', 'Haus') : mod ? (C.isFacade(id) ? '▤ ' + L('mode.facade', 'Fassade') : '▣ ' + L('mode.furn', 'Möbel')) : blk ? blk.kinds.filter(x => x !== 'other').map(kindLabel).join(' · ') || id : L('cat.item', 'Gegenstand');
       c.insertAdjacentHTML('beforeend', `<div class="cap"><div class="n" title="${esc(disp(id))}">${esc(disp(id))}</div><div class="s">${esc(kind)}</div></div>`);
       c.appendChild(favButton(id, () => { C.chips(); C.list(); }));
+      if (mod && VR.FormTools) c.appendChild(VR.FormTools.glattButton(id, c));   // t-form: ✦ Glatt
       if (blk || mod || hs) {
         const e = document.createElement('button'); e.className = 'editb'; e.textContent = '✏️'; e.title = L('cat.edit', 'Bearbeiten');
         // (the card it was opened from is shown first: ← back returns to it)

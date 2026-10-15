@@ -6,6 +6,9 @@
 //  · Sky islands with waterfalls / aetherfalls drifting over every biome
 //  · Starforge outposts: landing pad + docked shuttle, control tower, turrets,
 //    elevated maglev rails; crystal meteor craters
+// New worlds (vgen ≥ 9, VR.GEN.noCry) have no crystals: the prism lands keep their violet meadows and highlands with
+// rock pinnacles of their duskrock where the spires stood, flowers for the small clusters, blossom trees on the islands,
+// and the craters hold a dark meteorite (docs/superpowers/plans/2026-10-09-f-nocrystal.md).
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -32,6 +35,9 @@
       hullSlab: st('hull_slab', { type: 0 }), darkSlab: st('dark_hull_slab', { type: 0 }), darkSlabTop: st('dark_hull_slab', { type: 1 }), beacon: st('launch_beacon'), turret: st('turret'),
       antenna: st('antenna'), prail: st('powered_rail', { shape: 0, powered: 1 }), prailX: st('powered_rail', { shape: 1, powered: 1 }), stripeO: st('hull_stripe_orange', { axis: 2 }), stripeB: st('hull_stripe_blue', { axis: 2 }),
       magma: st('magma_block'), obsidian: st('obsidian'),
+      // (vgen 9: the crystal-free pieces)
+      duskAether: st('dusk_aether'), mossB: st('moss_block'), mossC: st('moss_carpet'), allium: st('allium'), lilac0: st('lilac', { half: 0 }), lilac1: st('lilac', { half: 1 }),
+      azalea: st('azalea'), fAzalea: st('flowering_azalea'), smoothBasalt: st('smooth_basalt'), basaltY: st('basalt', { axis: 0 }),
     });
     return S;
   }
@@ -219,6 +225,12 @@
     return out;
   };
 
+  // the banded ochre strata of the ember lands by height (one table per world; the canyon's hoodoos read it too)
+  function realmBands(g) {
+    const S = states();
+    return g.realmBands || (g.realmBands = (() => { const r = new VR.RNG(g.seed ^ 0xbadc0de); const arr = new Uint16Array(256); const pal = [S.ochre, S.ochre, S.umber, S.terraOrange, S.terraRed, S.ochre, S.terraBrown, S.umber, S.terraYellow]; for (let y = 0; y < 256; y++) arr[y] = pal[r.int(pal.length)]; for (let i = 0; i < 30; i++) { const y = r.int(256); for (let k = 0; k < 2 + r.int(3) && y + k < 256; k++) arr[y + k] = r.chance(0.5) ? S.ochre : S.umber; } return arr; })());
+  }
+  VR.realmBands = realmBands;
   function topSolid(blocks, col) {
     let y = 254;
     while (y > 1) { const b = blocks[(y << 8) | col]; if (b && !(R.T.flags[b] & (F.FLUID | F.REPLACE | F.PLANT | F.LEAVES)) && (R.T.flags[b] & F.SOLID)) break; y--; }
@@ -231,8 +243,8 @@
     const x0 = cx * 16, z0 = cz * 16;
     const cls = VR.OverworldGen.climateOf(out);   // the columns' climates, as generate made them (the same values as climateAt)
     const rng = new VR.RNG(M.hash2(cx, cz, g.seed + 777));
-    const T = R.T;
-    const bands = g.realmBands || (g.realmBands = (() => { const r = new VR.RNG(g.seed ^ 0xbadc0de); const arr = new Uint16Array(256); const pal = [S.ochre, S.ochre, S.umber, S.terraOrange, S.terraRed, S.ochre, S.terraBrown, S.umber, S.terraYellow]; for (let y = 0; y < 256; y++) arr[y] = pal[r.int(pal.length)]; for (let i = 0; i < 30; i++) { const y = r.int(256); for (let k = 0; k < 2 + r.int(3) && y + k < 256; k++) arr[y + k] = r.chance(0.5) ? S.ochre : S.umber; } return arr; })());
+    const T = R.T, noCry = GEN.noCry(g);
+    const bands = realmBands(g);
     for (let col = 0; col < 256; col++) {
       const lx = col & 15, lz = col >> 4, x = x0 + lx, z = z0 + lz;
       const key = B[biome[col]].key;
@@ -305,7 +317,7 @@
         if (blocks[ai] === 0 && gb === S.grass) {
           const r = rng.next();
           const cc = CRY[Math.floor((g.nCry.n2(x, z) * 0.5 + 0.5) * 4.999)];
-          if (r < 0.018) blocks[ai] = cryCluster(cc, 4, rng.chance(0.4));
+          if (r < 0.018) { const big = rng.chance(0.4); if (!noCry) blocks[ai] = cryCluster(cc, 4, big); else if (big && blocks[ai + 256] === 0) { blocks[ai] = S.lilac0; blocks[ai + 256] = S.lilac1; } else blocks[ai] = S.allium; }   // (vgen 9: violet flowers)
           else if (r < 0.26) blocks[ai] = S.shortgrass;
           else if (r < 0.3 && blocks[ai + 256] === 0) { blocks[ai] = st('tall_grass', { half: 0 }); blocks[ai + 256] = st('tall_grass', { half: 1 }); }
           else if (r < 0.315) blocks[ai] = st('allium');
@@ -319,7 +331,8 @@
       }
     }
     // ---- sky islands (terrain) ----
-    const ISL = g._islStates || (g._islStates = { tuff: st('tuff') || S.stone, andesite: st('andesite') || S.stone, granite: st('granite') || S.stone });
+    const ISL = g._islStates || (g._islStates = { tuff: st('tuff') || S.stone, andesite: st('andesite') || S.stone, granite: st('granite') || S.stone,
+      moss: st('moss_block') || S.dirt, strata: [S.ochre, S.umber, S.terraOrange, S.ochre, S.terraBrown, S.umber, S.terraRed].map(s => s || S.dirt) });
     const isl = new Array(256);
     for (let col = 0; col < 256; col++) {
       const x = x0 + (col & 15), z = z0 + (col >> 4);
@@ -339,11 +352,17 @@
           const depth = I.top - y, band = (y + ((I.isle ? I.isle.seed : 0) & 7)) % 9;
           if (prism) s = Math.abs(v) < 0.05 ? S.aetherStone : S.duskrock;
           else if (ember) s = band < 3 ? S.ochre : S.umber;
+          else if (g.vgen >= 9 && !(I.isle && I.isle.designed) && depth > 4 && (depth <= 4 + 6 + ((I.isle ? I.isle.seed : 0) % 5) || y - I.bottom <= 2)) {
+            // vgen 9 (t-beauty): the trailer's islands (TRAILER.md §3.6, t1_07 · t1_09): under four of soil, six to ten
+            // bands of warm strata (ochre, umber, terracotta), and at the dangling tips moss among the dark tuff — seen
+            // from a ridge, vgen 8's islands hung as grey cones of stone over the horizon (beauty_audit run 2, far_2)
+            s = y - I.bottom <= 2 && depth > 10 ? (rng.chance(0.55) ? ISL.moss : ISL.tuff) : ISL.strata[(y + ((I.isle ? I.isle.seed : 0) & 7)) % ISL.strata.length];
+          }
           else if (depth <= 6) s = band < 2 ? S.coarse || S.dirt : S.dirt;
           else if (y - I.bottom <= 3) s = ISL.tuff;
           else s = Math.abs(v) < 0.05 ? ISL.andesite : band === 0 ? ISL.granite : band === 4 ? ISL.andesite : S.stone;
           if (rng.chance(0.004)) s = st(rng.chance(0.6) ? 'iron_ore' : 'diamond_ore');
-          if (!prism && !ember && y - I.bottom <= 2 && rng.chance(0.05)) s = cryBlock(CRY[rng.int(5)]); // glowing crystal tips
+          if (!prism && !ember && y - I.bottom <= 2 && rng.chance(0.05)) { const c = CRY[rng.int(5)]; if (!noCry) s = cryBlock(c); } // glowing crystal tips (vgen 9: the tuff stays)
         }
         blocks[i] = s;
       }
@@ -371,23 +390,57 @@
           const fluid = I.lava ? S.lava : cl.ember > 0.45 ? S.lava : cl.prism > 0.35 ? S.aether : S.water;
           const typ = R.types[R.T.type[fluid]];
           const out1 = [Math.round(Math.cos(a)), Math.round(Math.sin(a))];
+          // vgen 9: the fall's lead cell — the first of its 2 × 2 cells off the island (the cells over the rim column keep
+          // the pool's lip; the curtain proper is the cells outside) — lists the mist spawn of the whole fall
+          let lead = -1;
+          if (g.vgen >= 9) for (let k = 0; k < 4 && lead < 0; k++) {
+            const J = g.islandAt(fx + out1[0] + (k & 1) - (out1[0] > 0 ? 1 : 0), fz + out1[1] + (k >> 1) - (out1[1] > 0 ? 1 : 0));
+            if (!(J && J.isle === I)) lead = k;
+          }
           for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
             // spring pool on the rim, falling curtain just outside it
             const sx = fx + ox - (out1[0] > 0 ? 1 : 0), sz = fz + oz - (out1[1] > 0 ? 1 : 0);
             const lx = sx - x0, lz = sz - z0;
             if (lx >= 0 && lx < 16 && lz >= 0 && lz < 16) {
               const J = g.islandAt(sx, sz);
-              if (J && J.isle === I) { blocks[((J.top) << 8) | (lz << 4) | lx] = fluid; }
+              if (J && J.isle === I) {
+                const pi = ((J.top) << 8) | (lz << 4) | lx;
+                blocks[pi] = fluid;
+                // vgen 9 (t-beauty): the grass and flowers the top grew there go with the soil — vgen 8 left them
+                // standing on the pool's water (the audit's lake scan: nothing hovers)
+                if (g.vgen >= 9) {
+                  const PL = g._poolPlants || (g._poolPlants = new Set(['short_grass', 'tall_grass', 'fern', 'poppy', 'dandelion', 'cornflower', 'allium', 'azure_bluet'].map(n => R.byName[n] && R.byName[n].id).filter(v => v !== undefined)));
+                  for (let k = pi + 256; k < pi + 768 && k < blocks.length && blocks[k] && PL.has(R.T.type[blocks[k]]); k += 256) blocks[k] = 0;
+                }
+              }
             }
             const cx2 = fx + out1[0] + ox - (out1[0] > 0 ? 1 : 0), cz2 = fz + out1[1] + oz - (out1[1] > 0 ? 1 : 0);
             const qx = cx2 - x0, qz = cz2 - z0;
             if (qx < 0 || qx >= 16 || qz < 0 || qz >= 16) continue;
             const col = (qz << 4) | qx;
-            for (let y = ft.top; y > 2; y--) {
+            // vgen 9 (t-beauty): the fall pours off the rim and dissolves into mist (the trailer's t1_07 · t1_09; TRAILER.md
+            // §3.6) — its curtain ends 18 … 29 below the rim, each cell 0, 2, 4 or 6 further (its own step: a ragged
+            // end), and the chunk of the lead cell lists a mist spawn at its foot (vents.js puffs the spray there); vgen
+            // 8's ran 90 … 100 blocks to the ground as straight blue poles (beauty_audit run 2: water_1, water_r1,
+            // far_3). A short drop still lands.
+            let yEnd = 2, foot = 0;
+            if (g.vgen >= 9) {
+              const fs = ((I.seed | 0) * 31 + f * 17) >>> 0, base = 18 + fs % 12;
+              foot = ft.top - base;
+              yEnd = Math.max(2, foot - ((ox + oz * 2 + (fs >>> 4)) & 3) * 2);
+            }
+            let y = ft.top;
+            for (; y > yEnd; y--) {
               const i = (y << 8) | col, b = blocks[i];
               if (b && (R.T.flags[b] & F.SOLID)) break;
               if (b && (R.T.flags[b] & F.FLUID) && y < ft.bottom) break;
               blocks[i] = typ.state({ level: 8 });
+            }
+            // (one spawn a fall, by its lead cell, when its curtain ended in the air: the mist round the foot, at the
+            //  middle of the 2 × 2 cells)
+            if (g.vgen >= 9 && ox + oz * 2 === lead && y === yEnd && !blocks[(yEnd << 8) | col]) {
+              if (!out.spawns) out.spawns = [];
+              out.spawns.push(['mist', fx + out1[0] - (out1[0] > 0 ? 1 : 0) + 1, foot - 3, fz + out1[1] - (out1[1] > 0 ? 1 : 0) + 1, fluid === S.lava ? 1 : 0]);
             }
           }
         }
@@ -410,6 +463,7 @@
     const key0 = B[g.biomeFor(cl0, h0)].key;
     // villages keep their streets clear: no spires, giant trees or basalt pillars inside them
     const inVillage = (x, z, pad) => !!(g.villageNear && g.villageNear(x, z, pad));
+    const noCry = GEN.noCry(g);
     if (key0 === 'prism_fields' || key0 === 'crystal_highlands') {
       const spires = rng.chance(key0 === 'crystal_highlands' ? 0.55 : 0.32) ? 1 + (rng.chance(0.3) ? 1 : 0) : 0;
       for (let i = 0; i < spires; i++) {
@@ -417,7 +471,8 @@
         const y = g.surfaceY(x, z) + 1;
         if (y <= SEA + 1 || inVillage(x, z, 12)) continue;
         const cc = CRY[Math.floor((g.nCry.n2(x, z) * 0.5 + 0.5) * 4.999)];
-        spire(w, x, y, z, rng, cc, key0 === 'crystal_highlands' ? 1.25 : 1);
+        if (noCry) rockSpire(g, w, x, y, z, rng, key0 === 'crystal_highlands' ? 1.25 : 1);   // vgen 9: a rock pinnacle of the biome's duskrock
+        else spire(w, x, y, z, rng, cc, key0 === 'crystal_highlands' ? 1.25 : 1);
       }
       const trees = rng.chance(0.7) ? 1 + rng.int(3) : 0;
       for (let i = 0; i < trees; i++) {
@@ -435,7 +490,7 @@
       if (!I || I.k < 0.35 || (I.isle && I.isle.designed)) continue; // the Sky Isles plant their own gardens
       const cl = g.climateAt(x, z);
       if (cl.ember > 0.45) continue;
-      if (cl.prism > 0.45 && rng.chance(0.35)) spire(w, x, I.top + 1, z, rng, CRY[rng.int(5)], 0.6);
+      if (cl.prism > 0.45 && rng.chance(0.35)) { if (noCry) prismTree(w, x, I.top + 1, z, rng); else spire(w, x, I.top + 1, z, rng, CRY[rng.int(5)], 0.6); }   // (vgen 9: a blossom tree)
       else if (rng.chance(0.75)) { if (rng.chance(0.3)) GEN.TREES.cherry(w, x, I.top + 1, z, rng); else if (cl.t < -0.3) GEN.TREES.spruce(w, x, I.top + 1, z, rng); else GEN.TREES.fancyOak ? GEN.TREES.fancyOak(w, x, I.top + 1, z, rng) : GEN.TREES.oak(w, x, I.top + 1, z, rng); }
     }
     void chests;
@@ -474,6 +529,37 @@
       const a = rng.next() * Math.PI * 2, d = r0 + 1 + rng.next() * 4;
       const sx = Math.round(x + Math.cos(a) * d), sz = Math.round(z + Math.sin(a) * d);
       for (let yy = y + 3; yy > y - 5; yy--) { const b = w.get(sx, yy - 1, sz); if (b > 0 && (R.T.flags[b] & F.OPAQUE)) { w.place(sx, yy, sz, cryCluster(color, 4, rng.chance(0.4))); break; } }
+    }
+  }
+  // vgen 9: a rock pinnacle cluster where a crystal spire would stand — the spire's own draws for its height, girth, lean
+  // and companions (the rest of the chunk's features keep theirs), shaped as nature's needles (GEN.pinnacle): duskrock
+  // with thin aether-vein lines (glowing texels, no block light), a mossy blunt top with a bush, two to four smaller
+  // needles round its foot, and rocks with moss and violet flowers where the shards lay
+  function rockSpire(g, w, x, y, z, rng, scale) {
+    const S = states();
+    const h = Math.round((12 + rng.next() * 26) * scale);
+    const r0 = (1.6 + rng.next() * 1.8) * Math.sqrt(scale);
+    const la = rng.next() * Math.PI * 2, lean = rng.next() * 0.22;
+    const mat = (px, py, pz) => Math.abs(g.nVein.n3(px, py * 1.3, pz)) < 0.045 ? S.duskAether : S.duskrock;
+    const seed = M.hash2(x, z, g.seed + 0x9e11);
+    const top = GEN.pinnacle(w, x, y, z, { h, r: r0 + 0.6, lean: [Math.cos(la) * lean * h * 0.3, Math.sin(la) * lean * h * 0.3], mat, top: S.mossB, seed });
+    const tx = Math.round(x + Math.cos(la) * lean * h * 0.3), tz = Math.round(z + Math.sin(la) * lean * h * 0.3);
+    w.place(tx, top + 1, tz, (seed & 1) ? S.fAzalea : S.azalea);
+    const subs = 2 + rng.int(3);
+    for (let i = 0; i < subs; i++) {
+      const a = rng.next() * Math.PI * 2, d = r0 + 1.5 + rng.next() * 2;
+      const sx = Math.round(x + Math.cos(a) * d), sz = Math.round(z + Math.sin(a) * d);
+      const sh = Math.round(h * (0.25 + rng.next() * 0.35));
+      GEN.pinnacle(w, sx, y, sz, { h: sh, r: Math.max(0.8, r0 * 0.45), lean: [Math.cos(a) * sh * 0.12, Math.sin(a) * sh * 0.12], mat, top: S.mossB, seed: seed + i + 1 });
+    }
+    // rocks and flowers round the foot, on the ground (the spire's shard draws)
+    for (let i = 0; i < 10; i++) {
+      const a = rng.next() * Math.PI * 2, d = r0 + 1 + rng.next() * 4;
+      const sx = Math.round(x + Math.cos(a) * d), sz = Math.round(z + Math.sin(a) * d);
+      for (let yy = y + 3; yy > y - 5; yy--) {
+        const b = w.get(sx, yy - 1, sz);
+        if (b > 0 && (R.T.flags[b] & F.OPAQUE)) { if (rng.chance(0.4)) { if (w.place(sx, yy, sz, S.duskrock)) w.place(sx, yy + 1, sz, S.mossC); } else w.place(sx, yy, sz, S.allium); break; }
+      }
     }
   }
   function prismTree(w, x, y, z, rng) {
@@ -556,7 +642,7 @@
     const S = states();
     const y = g.surfaceY(x, z);
     if (y <= SEA) return;
-    const cc = CRY[rng.int(5)];
+    const cc = CRY[rng.int(5)], noCry = GEN.noCry(g);
     for (let dx = -r - 2; dx <= r + 2; dx++) for (let dz = -r - 2; dz <= r + 2; dz++) {
       const d = Math.hypot(dx, dz);
       const px = x + dx, pz = z + dz;
@@ -567,7 +653,12 @@
         for (let yy = sy + 3; yy > y - depth; yy--) w.set(px, yy, pz, 0);
         const fy = y - depth;
         w.set(px, fy, pz, (M.hash2(px, pz, 7) & 3) === 0 ? S.aetherStone : S.duskrock);
-        if (d < 1.6) { for (let k = 0; k < 3; k++) w.set(px, fy + 1 + k, pz, cryBlock(cc)); w.set(px, fy + 4, pz, cryCluster(cc, 4, true)); }
+        if (noCry) {
+          // vgen 9: a dark meteorite in the middle (a rounded lump of basalt round a magma core whose glow shows at its
+          // sides) and glowing magma spots in the crater floor where the small clusters were
+          if (d < 1.6) { const edge = Math.abs(dx) + Math.abs(dz); w.set(px, fy + 1, pz, edge === 1 ? S.magma : S.basaltY); if (edge <= 1) w.set(px, fy + 2, pz, edge === 0 ? S.smoothBasalt : S.basaltY); if (edge === 0) w.set(px, fy + 3, pz, S.smoothBasalt); }
+          else if ((M.hash2(px, pz, 9) & 7) === 0) w.set(px, fy, pz, S.magma);
+        } else if (d < 1.6) { for (let k = 0; k < 3; k++) w.set(px, fy + 1 + k, pz, cryBlock(cc)); w.set(px, fy + 4, pz, cryCluster(cc, 4, true)); }
         else if ((M.hash2(px, pz, 9) & 7) === 0) w.set(px, fy + 1, pz, cryCluster(cc, 4, false));
       } else if (d <= r + 2) {
         const sy = g.surfaceY(px, pz);

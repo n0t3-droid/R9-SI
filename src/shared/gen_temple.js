@@ -48,6 +48,7 @@
       CON1: st('vx_console', { facing: 1 }), CON3: st('vx_console', { facing: 3 }), STOOL: st('vx_stool'), STOOLO: st('vx_stool_orange'), HTABLE: st('vx_holo_table'),
       CRY: st('violet_crystal_cluster', { facing: 4, size: 1 }), CRYB: st('violet_crystal_block'), CRYA: st('azure_crystal_cluster', { facing: 4, size: 1 }), CRYAB: st('azure_crystal_block'),
       SOFA: st('vx_sofa_white', { facing: 0 }), HAZ: st('hazard_stripes'), WHITE: st('hull_plating'),
+      LANTERN: st('vx_lantern') || st('lantern'),   // (vgen 9: the terraces' lanterns)
     };
   }
 
@@ -326,20 +327,37 @@
     const placed = new Map();
     const pk = (x, y, z) => (x + 512) * 1048576 + (z + 512) * 512 + y;
     const w = { set: (x, y, z, s) => { placed.set(pk(x, y, z), s); put(x, y, z, s); }, place: (x, y, z, s) => { const k = pk(x, y, z); if (placed.get(k)) return false; placed.set(k, s); put(x, y, z, s); return true; }, get: (x, y, z) => placed.get(pk(x, y, z)) || 0, ok: () => true };
-    const tree = (x, y, z) => GEN.TREES.roundTree(w, x, y, z, rng);
+    // vgen 9 (t-beauty): the plaza's trees are the city's round tree (vm_tree_round_l) in a raised bed — a light grey
+    // kerb one block high round dark soil and ferns — instead of a blob of leaf blocks (from 150 m at the golden hour
+    // they read as dark stepped cubes beside Nova Haven's round trees)
+    const tree = g.vgen >= 9 && VR.Plants && R.byName.vm_tree_round_l ? (x, y, z) => {
+      const KB = st('vollton_light_grey'), SOIL = st('podzol'), FERN = st('vx_fern_lush');
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const ex = Math.abs(dx) === 2, ez = Math.abs(dz) === 2;
+        if (ex && ez) continue;                                            // (the bed's corners cut: an octagon)
+        put(x + dx, y, z + dz, ex || ez ? KB : SOIL);
+        if (!ex && !ez && Math.abs(dx) === 1 && Math.abs(dz) === 1) put(x + dx, y + 1, z + dz, FERN);
+      }
+      for (const [px, py, pz, s] of VR.Plants.parts('vm_tree_round_l', x - 2, y + 1, z - 2, 0)) put(px, py, pz, s);
+    } : (x, y, z) => GEN.TREES.roundTree(w, x, y, z, rng);
     for (let z = 46; z <= 130; z += 24) for (const sx of [-1, 1]) {
       tree(sx * 28, Y + 1, z);
       for (let k = -6; k <= 6; k++) if (Math.abs(k) > 2) put(sx * 20, Y + 1, z + k, K.HEDGE);
       put(sx * 34, Y + 1, z - 4, K.BUSH); put(sx * 34, Y + 1, z + 4, K.BUSH);
     }
-    for (const [x, z] of [[-57, 136], [57, 136], [-58, 60], [58, 60]]) { for (let k = 0; k < 4; k++) put(x, Y + 1 + k, z, K.CRYB); put(x, Y + 5, z, K.CRY); put(x + 1, Y + 1, z, K.CRY); put(x, Y + 1, z + 1, K.CRYA); }
+    // (vgen 9, VR.GEN.noCry: no crystals — a palm in a planter with two hedges at its foot in each corner)
+    const noCry = VR.GEN.noCry(g);
+    for (const [x, z] of [[-57, 136], [57, 136], [-58, 60], [58, 60]]) {
+      if (noCry) { put(x, Y + 1, z, K.PLANTER); if (VR.Plants) VR.Plants.palm(put, x, Y + 2, z, 7); put(x + 1, Y + 1, z, K.HEDGE); put(x, Y + 1, z + 1, K.HEDGE); continue; }
+      for (let k = 0; k < 4; k++) put(x, Y + 1 + k, z, K.CRYB); put(x, Y + 5, z, K.CRY); put(x + 1, Y + 1, z, K.CRY); put(x, Y + 1, z + 1, K.CRYA);
+    }
     // ---- terrace gardens
     for (const sx of [-1, 1]) {
       const tx = sx * 40;
       tree(tx, Y + 9, 23);
       for (let x = 26; x <= 54; x++) if ((x % 3) !== 1) put(sx * x, Y + 9, 29, K.HEDGE);
       for (let z = 17; z <= 29; z++) if ((z % 3) !== 1) put(sx * 55, Y + 9, z, K.HEDGE);
-      for (const [dx, dz] of [[-9, 19], [-6, 18], [8, 27]]) { put(sx * (40 + dx), Y + 9, dz, K.CRYB); put(sx * (40 + dx), Y + 10, dz, K.CRY); }
+      for (const [dx, dz] of [[-9, 19], [-6, 18], [8, 27]]) { put(sx * (40 + dx), Y + 9, dz, noCry ? K.HEDGE : K.CRYB); put(sx * (40 + dx), Y + 10, dz, noCry ? K.LANTERN : K.CRY); }   // (vgen 9: a hedge with a lantern on it)
       put(sx * 30, Y + 9, 18, K.LAMP0); put(sx * 30, Y + 10, 18, K.LAMP1); put(sx * 50, Y + 9, 18, K.LAMP0); put(sx * 50, Y + 10, 18, K.LAMP1);
       for (const [dx, dz] of [[-13, 26], [12, 22], [-3, 27]]) put(sx * (40 + dx), Y + 9, dz, K.BUSH);
       put(sx * 27, Y + 9, 17, K.PLANTER); put(sx * 53, Y + 9, 17, K.PLANTER);

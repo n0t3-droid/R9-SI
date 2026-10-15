@@ -122,6 +122,7 @@
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 64, 64, gl.RED, gl.FLOAT, table);
     }
     setAniso(level) {
+      this.anisoLevel = level;   // (F10: a texture set swapped in later gets the same)
       const gl = this.gl, ext = GL.ext.aniso;
       if (!ext) return;
       const mx = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
@@ -358,31 +359,15 @@
       this.resize(full || this.q.scale !== prevScale);
     }
     // GPU frame time (EXT_disjoint_timer_query_webgl2): tells the smart-quality controller whether the GPU or
-    // the main thread is the bottleneck; undefined when the browser does not expose it
+    // the main thread is the bottleneck; undefined when the browser does not expose it. With the F3 overlay open
+    // (profDetail) every pass gets its own query: GPU-Profil, gpuprof.js — the overlay shows the time per pass.
     gpuTimerBegin() {
-      const gl = this.gl, ext = this.gpuExt;
-      if (ext === undefined) { this.gpuExt = gl.getExtension('EXT_disjoint_timer_query_webgl2') || null; this.gpuQ = []; this.gpuFree = []; return this.gpuTimerBegin(); }
-      if (!ext || this.gpuActive) return;
-      // read back finished queries (oldest first)
-      while (this.gpuQ.length) {
-        const q = this.gpuQ[0];
-        const done = gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE);
-        if (!done) break;
-        this.gpuQ.shift();
-        const disjoint = gl.getParameter(ext.GPU_DISJOINT_EXT);
-        if (!disjoint) { const ns = gl.getQueryParameter(q, gl.QUERY_RESULT); const ms = ns / 1e6; if (ms > 0 && ms < 1000) this.gpuMs = this.gpuMs === undefined ? ms : this.gpuMs + (ms - this.gpuMs) * 0.1; }
-        this.gpuFree.push(q);
-      }
-      if (this.gpuQ.length >= 4) return;   // never stall on results
-      const q = this.gpuFree.pop() || gl.createQuery();
-      gl.beginQuery(ext.TIME_ELAPSED_EXT, q);
-      this.gpuActive = q;
+      if (!this.prof) this.prof = new VR.GpuProf(this.gl);
+      this.prof.begin(!!this.profDetail);
+      if (this.prof.total !== undefined) this.gpuMs = this.prof.total;
     }
-    gpuTimerEnd() {
-      if (!this.gpuActive) return;
-      this.gl.endQuery(this.gpuExt.TIME_ELAPSED_EXT);
-      this.gpuQ.push(this.gpuActive); this.gpuActive = null;
-    }
+    gpuPass(name) { if (this.prof) this.prof.mark(name); }
+    gpuTimerEnd() { if (this.prof) this.prof.end(); }
 
     // ------------------------------------------------ section meshes
     allocMesh(n) {
@@ -415,6 +400,159 @@
       this.visDirty = true;
       this.nearShadow(sec);
     }
+    // ---- F10 · a section's mesh in packets (world.js queues it; the upload scheduler spends the frame's bytes on it).
+    // newStage keeps the mesh's layers; stagePart writes up to maxBytes of them in layer order (opaque, cutout, trans,
+    // vxFar — whole vertices; a layer takes its arena range on its first packet, a big layer is split across frames);
+    // commitStage swaps the staged ranges in once every byte is up — until then the section draws its old mesh (or
+    // nothing), never half of a new one; dropStage gives the ranges back (a newer mesh, an unloaded column).
+    // The mini-voxel detail (vx) stays in RAM as before (vxResidency) and the prop anchors come with the commit.
+    newStage(opaque, cutout, trans, vx, vxFar, props) {
+      const d = [opaque || null, cutout || null, trans || null, null, vxFar || null];
+      let bytes = 0;
+      for (let l = 0; l < 5; l++) if (d[l]) bytes += (d[l].length >> 3) * VSTRIDE;
+      return { d, vx: vx || null, props: props || null, m: [null, null, null, null, null], l: 0, o: 0, bytes };
+    }
+    stagePart(st, maxBytes) {
+      const gl = this.gl;
+      let done = 0;
+      while (st.l < 5) {
+        const l = st.l, d = st.d[l], n = d ? d.length >> 3 : 0;
+        if (st.o >= n) { st.l++; st.o = 0; continue; }
+        const k = Math.min(n - st.o, Math.floor((maxBytes - done) / VSTRIDE));
+        if (k <= 0) break;
+        if (!st.m[l]) st.m[l] = this.allocMesh(n);
+        const m = st.m[l];
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
+        gl.bufferSubData(gl.ARRAY_BUFFER, (m.off + st.o) * VSTRIDE, d, st.o * 8, k * 8);
+        st.o += k; done += k * VSTRIDE;
+      }
+      return done;
+    }
+    commitStage(st, sec, col, sy) {
+      this.propSet(sec, st.props);
+      if (sec.mesh.length < 5) sec.mesh.push(null, null);
+      for (let l = 0; l < 5; l++) {
+        const o = sec.mesh[l];
+        if (o) o.arena.release(o.off, o.cap);
+        sec.mesh[l] = st.m[l]; st.m[l] = null;
+      }
+      const vn = st.vx ? st.vx.length >> 3 : 0;
+      sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
+      sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
+      sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
+      this.visDirty = true;
+      this.nearShadow(sec);
+    }
+    dropStage(st) {
+      for (let l = 0; l < 5; l++) { const m = st.m[l]; if (m) { m.arena.release(m.off, m.cap); st.m[l] = null; } }
+      st.l = 5;
+    }
+    // ---- F10 · what an upload costs on this machine. Once as a world starts: a 1 MB buffer, gl.finish(), then the upload
+    // and gl.finish() again (twice; the faster counts) — finish waits for the GPU process and the GPU, so the copy into a
+    // GPU that shares the system memory is in the number (the JS call alone returns after a memcpy).
+    calibrateUploads() {
+      const gl = this.gl;
+      if (!gl || !gl.finish || !gl.bufferSubData) return null;
+      const N = 1 << 20, data = new Uint8Array(N);
+      for (let i = 0; i < N; i += 64) data[i] = i >> 6;   // (not all zeros: no shortcut for a cleared buffer)
+      const b = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, N, gl.DYNAMIC_DRAW);
+      gl.finish();
+      let best = Infinity;
+      for (let r = 0; r < 2; r++) { const t0 = performance.now(); gl.bufferSubData(gl.ARRAY_BUFFER, 0, data); gl.finish(); best = Math.min(best, performance.now() - t0); }
+      gl.deleteBuffer(b);
+      this.upCal = { ms: Math.max(0.05, best), bytes: N };
+      return this.upCal;
+    }
+    // ---- F10 · the GPU side of the uploads, seen through fences: at the end of a frame that uploaded (and of every 4th
+    // frame within 120 frames of the last upload: the base line) a fence; polled at the next frames with
+    // clientWaitSync(sync, 0, 0) — timeout 0, never blocking; at most four pending. The lag from the fence to its seen
+    // signal and the frame's bytes go to the scheduler's fit (stream.js gpuSample). A settled world sets none.
+    upGauge(Q, now) {
+      const gl = this.gl;
+      if (!Q || !gl || !gl.fenceSync || !gl.clientWaitSync) return;
+      const R = this.upRing || (this.upRing = { s: [null, null, null, null], t: new Float64Array(4), b: new Float64Array(4), h: 0, n: 0, quiet: 1e9, k: 0 });
+      while (R.n) {
+        const i = R.h, st = gl.clientWaitSync(R.s[i], 0, 0);
+        if (st === gl.TIMEOUT_EXPIRED) break;
+        if (st !== gl.WAIT_FAILED) Q.gpuSample(R.b[i], now - R.t[i]);
+        gl.deleteSync(R.s[i]); R.s[i] = null; R.h = (i + 1) & 3; R.n--;
+      }
+      const L = Q.last, bytes = L && !L.gauged ? L.bytes : 0;   // (this frame's drain, counted once)
+      if (L) L.gauged = true;
+      R.quiet = bytes > 0 ? 0 : R.quiet + 1;
+      if (R.n >= 4 || (bytes <= 0 && (R.quiet > 120 || (++R.k & 3)))) return;
+      const i = (R.h + R.n) & 3;
+      R.s[i] = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0); R.t[i] = now; R.b[i] = bytes; R.n++;
+    }
+    // ---- F10 · the block look's textures (game.js reloadTextures: Klassisch ↔ Nahtlos, ~20 MB) through the upload queue:
+    // new arrays are filled a slice of layers at a time (each mip level of each array) within the frame's bytes, ahead of
+    // the sections, and swapped in once complete — the old look draws until then, no block half in one look and half in
+    // the other. A newer set aborts this one (its arrays deleted); dropped for any other reason (its world went away) it
+    // is finished at once, so the look is never lost.
+    queueTextures(tex, Q, done) {
+      const gl = this.gl, R = this, tok = this.texTok = (this.texTok || 0) + 1, L = tex.layers, N = tex.size, lvls = [tex.albedo, tex.material];
+      let made = null, a = 0, lv = 0, z = 0, bytes = 0;
+      for (let l = 0; l < tex.levels; l++) bytes += 2 * (N >> l) * (N >> l) * 4 * L;
+      const step = (max) => {
+        if (!made) made = [R.texArray(tex, true), R.texArray(tex, false)];
+        let wrote = 0;
+        while (a < 2) {
+          const n = N >> lv, per = n * n * 4;
+          let k = Math.min(L - z, Math.floor((max - wrote) / per));
+          if (k <= 0) { if (wrote || max < per * 0.25) break; k = 1; }   // (one layer at least: never stuck behind a small budget)
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, made[a]);
+          gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, lv, 0, 0, z, n, n, k, gl.RGBA, gl.UNSIGNED_BYTE, lvls[a][lv], z * per);
+          z += k; wrote += k * per;
+          if (z >= L) { z = 0; lv++; if (lv >= tex.levels) { lv = 0; a++; } }
+        }
+        return wrote;
+      };
+      const commit = () => {
+        const old = [R.texAlbedo, R.texMaterial];
+        R.texAlbedo = made[0]; R.texMaterial = made[1]; made = null;
+        gl.deleteTexture(old[0]); gl.deleteTexture(old[1]);
+        if (VR.GL.ext && VR.GL.ext.aniso) R.setAniso(R.anisoLevel || 4);
+        if (done) done();
+      };
+      Q.push({ prio: -1, x: 0, z: 0, bytes, alive: () => R.texTok === tok, step, commit,
+        abort: () => {
+          if (R.texTok === tok) { while (a < 2) step(Infinity); commit(); return; }   // (not replaced: finished at once)
+          if (made) { gl.deleteTexture(made[0]); gl.deleteTexture(made[1]); made = null; }
+        } });
+    }
+    // an empty texture array for a texture set, with the block textures' sampling (as init's)
+    texArray(tex, srgb) {
+      const gl = this.gl, t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, tex.levels, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, tex.size, tex.size, tex.layers);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl.NEAREST_MIPMAP_LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      return t;
+    }
+    // ---- F10 · a section's mini-voxel detail through the upload queue (vxResidency asks once per section): packets
+    // within the frame's bytes, in place once complete; dropped data (the player went away, a new mesh) aborts it
+    queueVx(s, Q) {
+      const d = s.vxData, n = d.length >> 3, R = this;
+      const it = { x: s.ox + 8, z: s.oz + 8, bytes: n * VSTRIDE, m: null, o: 0,
+        alive: () => s.vxData === d && !s.mesh[3],
+        step: (max) => {
+          const k = Math.min(n - it.o, Math.floor(max / VSTRIDE));
+          if (k <= 0) return 0;
+          if (!it.m) it.m = R.allocMesh(n);
+          const gl = R.gl;
+          gl.bindBuffer(gl.ARRAY_BUFFER, it.m.arena.buf);
+          gl.bufferSubData(gl.ARRAY_BUFFER, (it.m.off + it.o) * VSTRIDE, d, it.o * 8, k * 8);
+          it.o += k;
+          return k * VSTRIDE;
+        },
+        commit: () => { s.vxQ = null; s.mesh[3] = it.m; it.m = null; R.nearShadow(s); },
+        abort: () => { if (s.vxQ === it) s.vxQ = null; if (it.m) { it.m.arena.release(it.m.off, it.m.cap); it.m = null; } } };
+      s.vxQ = it;
+      Q.push(it);
+    }
     // a changed section inside the cached shadow map's area: redraw the map next frame
     nearShadow(sec) {
       if (this.sht) { this.shtMark(sec); return; }   // F9 · Schatten-Takt: only the tiles under it
@@ -444,7 +582,8 @@
         if (s.mesh[3]) { if (d2 > down2) { s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap); s.mesh[3] = null; } continue; }
         if (d2 > keep2) { s.vxData = null; s.vxDropped = true; continue; }
         if (d2 < up2) {
-          if (uploads < 4) { this.uploadVx(s); uploads++; }
+          if (this.upQ) { if (!s.vxQ) this.queueVx(s, this.upQ); }   // (F10: the world's upload queue — one budget for everything)
+          else if (uploads < 4) { this.uploadVx(s); uploads++; }
           else if (d2 < bestD) { best = s; bestD = d2; }
         }
       }
@@ -571,6 +710,11 @@
       const v3 = (n, a) => { if (u[n]) gl.uniform3f(u[n], a[0], a[1], a[2]); };
       v3('u_sunDir', E.sunDir); v3('u_moonDir', E.moonDir); v3('u_sunColor', E.sunColor); v3('u_moonColor', E.moonColor);
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
+      // t-sky: the sky's middle stop, the stops' heights and the space by day (env.js VR.Sky)
+      v3('u_skyMid', E.skyMid || E.horizon);
+      // (the shader takes the reciprocals of the widths: a multiply per pixel instead of a division)
+      if (u.u_skyStops) { const s = E.skyStops || [0.25, 0.1, 1.0, 0.45]; gl.uniform4f(u.u_skyStops, 1 / Math.max(1e-3, s[0]), s[1], 1 / Math.max(1e-3, s[2] - s[1]), s[3] === undefined ? 0.45 : s[3]); }
+      if (u.u_skySpace) { const s = E.skySpace || [0.2, 0.9, 0.5, 1.3]; gl.uniform4f(u.u_skySpace, s[0], 1 / Math.max(1e-3, s[1] - s[0]), s[2], s[3]); }
       v3('u_fogColor', E.fogColor); v3('u_blockLightTint', E.blockTint); v3('u_planetDir', E.planetDir); v3('u_planet2Dir', E.planet2Dir); v3('u_ringNormal', E.ringNormal);
       if (u.u_fog) gl.uniform4f(u.u_fog, E.fog[0], E.fog[1], E.fog[2], E.fog[3]);
       // the grade's knobs (env.js VR.Grade): the cosmic veil, the sun's disc in HDR, the Klassisch block edges
@@ -1157,7 +1301,7 @@
     propSet(sec, props) {
       const PR = VR.Props, n = props ? props.length / 6 : 0;
       if (!n || !PR) { sec.propN = 0; sec.propData = null; sec.propKind = null; sec.propSlot = null; this.propSecs.delete(sec); return; }
-      const data = new Float64Array(n * PR.INST), kind = new Uint8Array(n), slot = new Int16Array(n);
+      const data = new Float64Array(n * PR.INST), kind = new Int32Array(n), slot = new Int16Array(n);   // (t-form: the surface-nets models' kinds start at 4096)
       for (let i = 0; i < n; i++) {
         const o = i * 6;
         kind[i] = props[o + 3];
@@ -1175,7 +1319,7 @@
       const key = PR.furnKey(kind, facing | 0), md = key && PR.FURN[key];
       if (!md) return (byKind[ck] = -1);
       let i = S.findIndex(sl => sl.key === key);
-      if (i < 0) { i = S.length; S.push({ key, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null }); this.furnWarm(key); }
+      if (i < 0) { i = S.length; S.push({ key, rad: Math.max(md.size[0], md.size[2]) / 2 + 0.3, h: md.size[1] + 0.5, near: new Float32Array(PR.INST * 16), far: new Float32Array(PR.INST * 16), nn: 0, nf: 0, gNear: null, gFar: null, fine: !!md.fine, fl: null, nfi: 0, gFine: null }); this.furnWarm(key); }   // (t-form: fine — a surface-nets model's 32-a-block surface, drawn close by)
       return (byKind[ck] = i);
     }
     // a new model is built in an idle tick, one a tick, when its first piece arrives with a section (a cold build takes
@@ -1239,14 +1383,17 @@
     propDefines() { return (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []); }
     // the anchors in reach, camera-relative: list A (full palms, nearer than D1), list B (crosses, nearer than D2), and
     // the furniture by model (near F1, far F2, in the frustum)
-    propGather(cam, lvl, D1, D2, furn, planes, refl, split) {
+    propGather(cam, lvl, D1, D2, furn, planes, refl, shadow, split) {
       const PR = VR.Props, K = PR.INST, FURN0 = PR.FURN0, r1 = D1 * D1, r2m = D2 * D2;
       // refl (t-smooth2): 1 the mirror on tier 1 — the furniture's far forms only; 2 the mirror on tier 2 — the models
       // within 16 blocks, the far forms to 64 (the mirror is half the frame and rippled: run 2 measured +64 draws and
       // +126 k triangles at the pool with the main pass's radii)
       const lod = this.q.vxLod || 48, F1 = Math.max(14, Math.min(28, lod * 0.6)) * (refl === 2 ? 0.6 : 1), F2 = refl === 2 ? 64 : Math.max(48, 2 * lod), f1 = refl === 1 ? 0 : F1 * F1, f2 = F2 * F2;
+      // t-form: a surface-nets model's fine surface (32 a block) nearer than F0 (a quarter of vxLod, 8…18 blocks) in the
+      // main pass; its shadow and its mirror image take the 16-a-block one. Niedrig (vxLod < SmoothVox.FINE_LOD): none
+      const SVx = VR.SmoothVox, F0 = !refl && !shadow && lod >= ((SVx && SVx.FINE_LOD) || 44) ? Math.max(8, Math.min(18, lod * 0.25)) : 0, f0 = F0 * F0;
       const slots = this.furnSlots || [];
-      for (let s = 0; s < slots.length; s++) { slots[s].nn = 0; slots[s].nf = 0; }
+      for (let s = 0; s < slots.length; s++) { slots[s].nn = 0; slots[s].nf = 0; slots[s].nfi = 0; }
       let A = this.propA, B = this.propB, nA = 0, nB = 0, nF = 0;
       for (const sec of this.propSecs) {
         const d = sec.propData, kind = sec.propKind, n = sec.propN, ms = sec.propSlot;
@@ -1259,7 +1406,8 @@
             const R = sl.rad;
             if (planes && !mat4.boxInFrustum(planes, dx - R, dy - 0.2, dz - R, dx + R, dy + sl.h, dz + R)) continue;
             let L, at;
-            if (r2 < f1) { if ((sl.nn + 1) * K > sl.near.length) { const N = new Float32Array(sl.near.length * 2); N.set(sl.near); sl.near = N; } L = sl.near; at = sl.nn++ * K; }
+            if (sl.fine && r2 < f0) { if (!sl.fl || (sl.nfi + 1) * K > sl.fl.length) { const N = new Float32Array(sl.fl ? sl.fl.length * 2 : K * 16); if (sl.fl) N.set(sl.fl); sl.fl = N; } L = sl.fl; at = sl.nfi++ * K; }
+            else if (r2 < f1) { if ((sl.nn + 1) * K > sl.near.length) { const N = new Float32Array(sl.near.length * 2); N.set(sl.near); sl.near = N; } L = sl.near; at = sl.nn++ * K; }
             else { if ((sl.nf + 1) * K > sl.far.length) { const N = new Float32Array(sl.far.length * 2); N.set(sl.far); sl.far = N; } L = sl.far; at = sl.nf++ * K; }
             for (let k = 3; k < K; k++) L[at + k] = d[o + k];
             L[at] = dx; L[at + 1] = dy; L[at + 2] = dz;
@@ -1326,7 +1474,7 @@
       if ((!lvl0 && !furn) || !this.propSecs || !this.propSecs.size) return;
       const ps = this.propInit(); if (!ps) return;
       const gl = this.gl, D1 = this.q.vxLod || 48;
-      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0, split);
+      this.propGather(camPos, lvl, lvl >= 2 ? D1 : 0, lvl ? 2 * D1 : 0, furn, shadow ? this.shadowPlanes : this.planes, refl | 0, !!shadow, split);
       const cullWas = gl.isEnabled(gl.CULL_FACE);
       // the palms: two-sided fronds
       if (this.propNA || this.propNB) {
@@ -1344,10 +1492,12 @@
         for (const sl of slots) {
           if (sl.nn) { if (!sl.gNear) { const m = PR.furnModel(sl.key); sl.gNear = this.propVao(m.near); } this.propFlush(sl.gNear, sl.nn, sl.near, u, ps.furnTex, 0, sl.gNear.nOpaque); }
           if (sl.nf) { if (!sl.gFar) { const m = PR.furnModel(sl.key); sl.gFar = m.far ? this.propVao(m.far) : { n: 0 }; } if (sl.gFar.n) this.propFlush(sl.gFar, sl.nf, sl.far, u, ps.furnTex, 0, sl.gFar.nOpaque); }
+          if (sl.nfi) { if (!sl.gFine) { const m = PR.furnModel(sl.key); sl.gFine = m.fine ? this.propVao(m.fine) : { n: 0 }; } if (sl.gFine.n) this.propFlush(sl.gFine, sl.nfi, sl.fl, u, ps.furnTex, 0, sl.gFine.nOpaque); }   // t-form
         }
         if (!shadow && !refl) {
           gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
           for (const sl of slots) if (sl.nn && sl.gNear && sl.gNear.n > sl.gNear.nOpaque) this.propFlush(sl.gNear, sl.nn, null, u, ps.furnTex, sl.gNear.nOpaque, sl.gNear.n - sl.gNear.nOpaque);
+          for (const sl of slots) if (sl.nfi && sl.gFine && sl.gFine.n > sl.gFine.nOpaque) this.propFlush(sl.gFine, sl.nfi, null, u, ps.furnTex, sl.gFine.nOpaque, sl.gFine.n - sl.gFine.nOpaque);   // t-form
           gl.depthMask(true); gl.disable(gl.BLEND);
         }
       }
@@ -1548,6 +1698,7 @@
       this.frameNo++;
       this.gpuTimerBegin();
       this.stats.draws = 0; this.stats.tris = 0; this.stats.guide = 0;
+      this.upQ = world && world.uploadQ && world.uploadQ.drain ? world.uploadQ : null;   // (F10: the one upload queue — vxResidency, upGauge)
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
@@ -1556,6 +1707,7 @@
       this.stats.sections = vis.length;
       if (world) this.updateHmap(world);
       // shadows (the cached map as before, or F9's Schatten-Takt: shadowFrame)
+      this.gpuPass('shadow');
       this.shadowFrame(world, E, F.cam);
       // ---------------- scene
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
@@ -1564,10 +1716,12 @@
       gl.clearColor(E.fogColor[0], E.fogColor[1], E.fogColor[2], 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       // F9 · Fern-Cache: the sky and the far world composited from the cache (null: drawn as before)
+      if (world && this.q.farCache && VR.UL) this.gpuPass('farcache');
       const fc = world && this.q.farCache && VR.UL ? this.farFrame(F, E, world, vis, camPos) : null;
       if (!this.q.farCache && this.fc) this.fcDrop();
       const near = fc ? fc.near : vis;
       // sky
+      this.gpuPass('sky');
       gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
       if (!fc) {
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
@@ -1581,6 +1735,7 @@
       // terrain opaque + cutout
       if (world) {
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
+          this.gpuPass(layer === 0 ? 'opaque' : 'cutout');
           gl.useProgram(p.p);
           this.common(p, E);
           this.bindTerrainTextures(p);
@@ -1607,28 +1762,31 @@
         }
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
-      if (world) this.liveProps(E, camPos, fc);
+      if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.liveProps(E, camPos, fc); }
       // far-terrain horizon (cut away where real chunks are drawn; with the Fern-Cache it is in the cache)
-      if (F.horizon && !fc) F.horizon.draw(this, E);
+      if (F.horizon && !fc) { this.gpuPass('far'); F.horizon.draw(this, E); }
       // voxel models & meshes
-      if (F.drawOpaque) F.drawOpaque(this, E);
+      if (F.drawOpaque) { this.gpuPass('models'); F.drawOpaque(this, E); }
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
       this.reflOn = false;
       this.stats.reflMs = 0;
       if (world && this.q.water > 0 && !F.underwater && !this.noRefl) {
         if (this.q.reflEvery > 1 && this.reflKept && this.frameNo % this.q.reflEvery) this.reflOn = true;   // F9 (a governor rung on Ultra · Leicht): last frame's mirror again
-        else { const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; this.reflKept = this.reflOn; }
+        else { this.gpuPass('mirror'); const tr = performance.now(); this.reflectPass(F, E, world, vis, camPos); this.stats.reflMs = performance.now() - tr; this.reflKept = this.reflOn; }
       } else this.reflKept = false;
       // ---------------- copy scene for refraction
+      this.gpuPass('copy');
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.sceneFB);
       gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, this.copyFB);
       gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.COLOR_BUFFER_BIT, gl.NEAREST);
       gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
       // clouds (behind translucent terrain; depth tested)
+      this.gpuPass('clouds');
       this.drawClouds(E);
       // translucent terrain
       if (world) {
+        this.gpuPass('water');
         const p = this.P.trans;
         gl.useProgram(p.p);
         this.common(p, E);
@@ -1652,6 +1810,7 @@
         gl.disable(gl.BLEND);
         gl.enable(gl.CULL_FACE);
       }
+      this.gpuPass('rest');
       if (F.drawTranslucent) F.drawTranslucent(this, E);
       // precipitation
       if (F.precip && F.precip.amount > 0.01) this.drawPrecip(F, E);
@@ -1666,10 +1825,12 @@
       if (F.drawHand) { gl.clear(gl.DEPTH_BUFFER_BIT); F.drawHand(this, E); }
       // ---------------- R9 Super Resolution
       this.upTex = null;
-      if (this.jit) this.superRes(F);
+      if (this.jit) { this.gpuPass('tsr'); this.superRes(F); }
       // ---------------- post
+      this.gpuPass('post');
       this.post(F, E);
       this.gpuTimerEnd();
+      if (this.upQ) this.upGauge(this.upQ, performance.now());   // (F10: a fence after the frame that uploaded)
       this.stats.ms = performance.now() - t0;
     }
 

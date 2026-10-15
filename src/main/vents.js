@@ -2,26 +2,30 @@
 // Vents & beams (TRAILER.md §2.2, §3.5, §3.7): the Ember Canyon's lava vents breathe smoke columns and drift glowing
 // embers (the generator lists them as spawns of their chunks; world.js hands them over on arrival), and the Spire
 // Citadel's main spire throws a blue sparkle beam into the sky. Both are particles spawned within reach of the eye
-// only. The Low preset draws fewer of them and Very Low none.
+// only. The Low preset draws fewer of them and Very Low none. A fall off a floating island (vgen 9) breaks up in the
+// air: its foot lists a 'mist' spawn and soft white spray puffs there (a lava fall smokes and sparks).
 // ============================================================================
 (function (VR) {
   'use strict';
   const HEART = VR.Heart;
-  const REACH_VENT = 230, REACH_BEAM = 760, REACH_BEACON = 420, BLINK = 1.6, FLASH = 0.22;
+  const REACH_VENT = 230, REACH_BEAM = 760, REACH_BEACON = 420, REACH_MIST = 320, BLINK = 1.6, FLASH = 0.22;
+  const SPRAY = [0.92, 0.96, 1.0], SMOKE = [0.5, 0.46, 0.46], EMBER = [1, 0.55, 0.2];
   class Vents {
     constructor(game) {
       this.g = game;
       this.list = new Map();          // 'x,y,z' → [x, y, z] of the vents the loaded chunks reported
       this.beacons = new Map();       // 'x,y,z' → [x, y, z] of the red tip beacons (spires, watch towers)
-      this.acc = 0; this.beam = 0; this.t = 0; this.lit = false;
+      this.mists = new Map();         // 'x,y,z' → [x, y, z, lava] of the falls' feet (gen_realm.js, vgen 9)
+      this.acc = 0; this.macc = 0; this.beam = 0; this.t = 0; this.lit = false;
     }
-    reset() { this.list.clear(); this.beacons.clear(); this.acc = 0; this.beam = 0; this.t = 0; this.lit = false; }
-    // the chunk's spawn records: the vents and beacons among them (other kinds belong to other modules)
+    reset() { this.list.clear(); this.beacons.clear(); this.mists.clear(); this.acc = 0; this.macc = 0; this.beam = 0; this.t = 0; this.lit = false; }
+    // the chunk's spawn records: the vents, beacons and mists among them (other kinds belong to other modules)
     absorb(spawns) {
       for (const s of spawns) {
         if (!s) continue;
         if (s[0] === 'vent') this.list.set(s[1] + ',' + s[2] + ',' + s[3], [s[1], s[2], s[3]]);
         else if (s[0] === 'beacon') this.beacons.set(s[1] + ',' + s[2] + ',' + s[3], [s[1], s[2], s[3]]);
+        else if (s[0] === 'mist') this.mists.set(s[1] + ',' + s[2] + ',' + s[3], [s[1], s[2], s[3], s[4] | 0]);
       }
     }
     update(dt, eye) {
@@ -41,6 +45,21 @@
           // a warm ember now and then: the heat shimmer over the seam
           if (!low && Math.random() < 0.6) P.spawn(x, y + 0.2, z, (Math.random() - 0.5) * 0.6, 1.2 + Math.random() * 1.2, (Math.random() - 0.5) * 0.6,
             { life: 1.2 + Math.random() * 0.8, size: 0.07, grav: -0.1, drag: 0.3, col: [1, 0.62, 0.22], emis: 1, collide: false });
+        }
+      }
+      // the falls' feet: the curtain breaks up into spray — a soft white puff round the ragged end every quarter second
+      // (Low: every 0.9 s), sinking slowly and spreading as it thins; a lava fall's foot smokes and throws a few sparks
+      this.macc += dt;
+      if (this.macc >= (low ? 0.9 : 0.25) && this.mists.size) {
+        this.macc = 0;
+        for (const [x, y, z, lava] of this.mists.values()) {
+          const dx = x - eye[0], dz = z - eye[2];
+          if (dx * dx + dz * dz > REACH_MIST * REACH_MIST) continue;
+          P.spawn(x + (Math.random() - 0.5) * 2.4, y - 2 + Math.random() * 5, z + (Math.random() - 0.5) * 2.4,
+            (Math.random() - 0.5) * 0.9, -0.7 - Math.random() * 0.6, (Math.random() - 0.5) * 0.9,
+            { life: 4 + Math.random() * 2, size: 1.1 + Math.random() * 0.7, grav: -0.08, drag: 0.5, col: lava ? SMOKE : SPRAY, grow: 1.1, collide: false, emis: 0 });
+          if (lava && !low && Math.random() < 0.6) P.spawn(x + (Math.random() - 0.5) * 1.5, y + Math.random() * 3, z + (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.2, -1 - Math.random(), (Math.random() - 0.5) * 1.2,
+            { life: 1 + Math.random() * 0.8, size: 0.08, grav: 2, drag: 0.4, col: EMBER, emis: 1, collide: false });
         }
       }
       // the red tip beacons blink: one flash every 1.6 s, a glow burst off each beacon cell within reach (TRAILER §3.7)

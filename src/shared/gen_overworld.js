@@ -87,6 +87,7 @@
       opts = opts || {};
       this.seed = seed >>> 0;
       this.vgen = opts.vgen || 1; // village generator version (see gen_village.js)
+      this.noCrystal = !!opts.noCrystal; // F-NoCrystal: no crystals at any vgen (the title panorama); vgen ≥ 9 has none anyway (GEN.noCry)
       this.amplified = opts.worldType === 'amplified';
       this.large = opts.worldType === 'large';
       this.singleBiome = opts.worldType === 'single' ? (BI[opts.biome] !== undefined ? BI[opts.biome] : BI.plains) : -1;
@@ -614,7 +615,7 @@
             const belowB = blocks[((y - 1) << 8) | col];
             if (belowSolid) {
               if (belowB === S.stone || belowB === S.deep) blocks[((y - 1) << 8) | col] = rng.chance(0.1) ? S.calcite : S.packed;
-              const r = rng.next(); if (r < 0.3) blocks[bi] = st('snow', { layers: rng.int(3) }); else if (r < 0.36) blocks[bi] = st('ice_crystal', { facing: 4, size: rng.int(3) });
+              const r = rng.next(); if (r < 0.3) blocks[bi] = st('snow', { layers: rng.int(3) }); else if (r < 0.36) blocks[bi] = GEN.noCry(this) ? st('snow', { layers: rng.int(3) }) : st('ice_crystal', { facing: 4, size: rng.int(3) });   // (vgen 9: snow, no ice crystal)
             } else if (aboveSolid) {
               const ab = blocks[((y + 1) << 8) | col]; if (ab === S.stone || ab === S.deep) blocks[((y + 1) << 8) | col] = S.packed;
               if (rng.chance(0.12)) { const len = 1 + rng.int(3); for (let k = 0; k < len; k++) { if (blocks[((y - k) << 8) | col] !== 0) break; blocks[((y - k) << 8) | col] = st('icicle', { dir: 1 }); } }
@@ -676,13 +677,19 @@
       if (key0.indexOf('frozen_ocean') >= 0 && rng.chance(0.3)) { const x = fx0 + 3 + rng.int(10), z = fz0 + 3 + rng.int(10); for (let i = 0; i < 1; i++) { const h = 5 + rng.int(12), r = 3 + rng.int(4); for (let dy = -6; dy < h; dy++) { const rr = Math.round(r * (1 - Math.max(0, dy) / h)); for (let dx = -rr; dx <= rr; dx++) for (let dz = -rr; dz <= rr; dz++) if (dx * dx + dz * dz <= rr * rr + rng.next()) w.set(x + dx, SEA + dy, z + dz, dy > h - 3 && rng.chance(0.5) ? S.snowblock : rng.chance(0.08) ? S.blueice : S.packed); } } }
       // structures (rare)
       const sr = rng.next();
+      // vgen 9 (t-beauty): no random ruin, well, camp, tower or sulfur spring on the surface of the Heartland's designed
+      // land — 244 of its 5 664 chunks carried an obsidian ruined gate (beside the temple, at the crescent's end, on the
+      // plaza's rim), and where the city or the terraces levelled the ground over one, its obsidian was left hanging in
+      // the air; a sulfur spring beside the plaza left its crust floating over the slope
+      const designed = this.vgen >= 9 && VR.Heart && VR.Heart.noRandom && VR.Heart.noRandom(this, fx0 + 8, fz0 + 8);
       if (sr < 0.11) { const x = fx0 + 4 + rng.int(8), z = fz0 + 4 + rng.int(8), y = 12 + rng.int(40); if (y < this.surfaceY(x, z) - 10) SS.dungeon(w, x, y, z, rng, chests); }
+      else if (designed) { /* the designed land keeps its own pieces */ }
       else if (sr < 0.14 && key0 === 'desert') { const x = fx0 + 8, z = fz0 + 8; SS.well(w, x, this.surfaceY(x, z) + 1, z, rng); }
       else if (sr < 0.16 && h0 > SEA + 2 && key0 !== 'river') { const x = fx0 + 6, z = fz0 + 6; SS.ruinedGate(w, x, this.surfaceY(x, z) + 1, z, rng, chests); }
       else if (sr < 0.2 && key0 === 'dappled_forest') { const x = fx0 + 8, z = fz0 + 8; SS.camp(w, x, this.surfaceY(x, z) + 1, z, rng, chests); }
       else if (sr < 0.215 && (key0 === 'plains' || key0 === 'meadow' || key0 === 'forest' || key0 === 'windswept_hills') && h0 > SEA + 3) { const x = fx0 + 8, z = fz0 + 8; SS.tower(w, x, this.surfaceY(x, z) + 1, z, rng, chests); }
-      if (rng.chance(0.045)) { const x = fx0 + 5 + rng.int(6), z = fz0 + 5 + rng.int(6), y = 12 + rng.int(36); if (y < this.surfaceY(x, z) - 12) SS.geode(w, x, y, z, rng); }
-      if ((cl0.w < -0.4 && cl0.e > 0.2) && rng.chance(0.12) && h0 > SEA + 1 && h0 < 110) { const x = fx0 + 6 + rng.int(4), z = fz0 + 6 + rng.int(4); SS.sulfurSpring(w, x, this.surfaceY(x, z), z, rng); }
+      if (rng.chance(0.045)) { const x = fx0 + 5 + rng.int(6), z = fz0 + 5 + rng.int(6), y = 12 + rng.int(36); if (y < this.surfaceY(x, z) - 12) SS.geode(w, x, y, z, rng, GEN.noCry(this)); }   // (vgen 9: a dripstone pocket, the same draws)
+      if (!designed && (cl0.w < -0.4 && cl0.e > 0.2) && rng.chance(0.12) && h0 > SEA + 1 && h0 < 110) { const x = fx0 + 6 + rng.int(4), z = fz0 + 6 + rng.int(4); SS.sulfurSpring(w, x, this.surfaceY(x, z), z, rng); }
     }
     tree(w, key, x, y, z, rng) {
       const T = GEN.TREES;

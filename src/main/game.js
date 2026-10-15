@@ -171,10 +171,18 @@
       const upload = (tex, fromCache) => {
         const r = this.renderer, gl = r && r.gl;
         if (req !== this.texReq || tex.type !== 'textures' || !gl || !r.texAlbedo || tex.layers !== r.layers) return;
+        // F10: ~20 MB in one frame was a hitch on a GPU that shares the system memory: the set goes through the world's
+        // upload queue into new arrays, swapped in when complete (renderer.queueTextures); without a world, at once as before
+        const Q = this.world && this.world.uploadQ;
+        if (r.queueTextures && Q && Q.drain) { r.queueTextures(tex, Q, () => applied(tex, fromCache)); return; }
         for (const [t, lv] of [[r.texAlbedo, tex.albedo], [r.texMaterial, tex.material]]) {
           gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
           for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
         }
+        applied(tex, fromCache);
+      };
+      // the textures are on the GPU: the icons, the recolour table and the bookkeeping follow
+      const applied = (tex, fromCache) => {
         Object.assign(this.tex, { albedo: tex.albedo, material: tex.material, avgColor: tex.avgColor }); this.texRim = rim;
         if (VR.LiveLoop) VR.LiveLoop.updateLum(this);   // the recolour table follows the textures of the look
         this.texFromCache = fromCache; this.texMs = Math.round(performance.now() - t0);
@@ -349,8 +357,9 @@
     startTitle() {
       this.state = 'title';
       this.teardownWorld();
-      this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5 }, custom: VR.CUSTOM });
-      this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5 }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
+      // (the panorama is a vgen-5 world without crystals: GEN.noCry — no crystal on the start screen either)
+      this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5, noCrystal: true }, custom: VR.CUSTOM });
+      this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5, noCrystal: true }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
       this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
       this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
@@ -386,7 +395,7 @@
     async createWorld(o) {
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
-      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty, type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 8 }; // vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
+      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty || (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'), type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 9 }; // vgen 9: no crystals of any kind (f-nocrystal: GEN.noCry; t-town's villages too) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
     }
@@ -400,7 +409,7 @@
       this.keepInventory = meta.keep;
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
-      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style });
+      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null });   // (townWords: the shop signs' words in the player's language, voxtown.js)
       // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
       if (VR.LiveLoop) VR.LiveLoop.openWorld(this, meta);
       const dim = meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld');
@@ -598,7 +607,7 @@
       this.ui.loading(T('g.load.joining', { name: mp.hostName || T('g.mp.friend') }), 0.05);
       this.teardownWorld();
       const W = wel.w || {};
-      const meta = { id: 'guest-' + String(W.id || 'x').replace(/[^a-z0-9]/gi, '').slice(0, 30), guest: true, name: T('g.mp.withName', { world: W.name || 'World', name: mp.hostName || T('g.talk.friend') }), seed: (W.seed >>> 0), mode: ['survival', 'creative', 'zen'].includes(W.mode) ? W.mode : 'creative', difficulty: W.difficulty || 'normal', type: W.type || 'default', cheats: !!W.cheats, keep: !!W.keep, kit: true, time: +wel.time || 1000, day: +wel.day || 0, dim: 'overworld', worldSpawn: Array.isArray(wel.home) ? wel.home : null, vgen: +W.vgen || 1 };
+      const meta = { id: 'guest-' + String(W.id || 'x').replace(/[^a-z0-9]/gi, '').slice(0, 30), guest: true, name: T('g.mp.withName', { world: W.name || 'World', name: mp.hostName || T('g.talk.friend') }), seed: (W.seed >>> 0), mode: ['survival', 'creative', 'zen'].includes(W.mode) ? W.mode : 'creative', difficulty: W.difficulty || (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'), type: W.type || 'default', cheats: !!W.cheats, keep: !!W.keep, kit: true, time: +wel.time || 1000, day: +wel.day || 0, dim: 'overworld', worldSpawn: Array.isArray(wel.home) ? wel.home : null, vgen: +W.vgen || 1 };
       this.meta = meta;
       this.hostLook = wel.look === 'seamless' || wel.look === 'classic' ? wel.look : null; this.applyLook();   // the host's block look
       this.difficulty = meta.difficulty; this.keepInventory = meta.keep;
@@ -606,7 +615,7 @@
       // the host's world style, as multiplayer allows it (buildings, furniture, trees — the land stays shared)
       this.guestStyle = wel.style && typeof wel.style === 'object' ? wel.style : null;
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
-      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style });
+      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null });   // (townWords: the shop signs' words in the player's language, voxtown.js)
       const dim = meta.type === 'flat' ? 'flat' : 'overworld';
       this.dim = dim;
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: null, savedKeys: new Set(), renderDist: this.settings.renderDist });
@@ -657,9 +666,10 @@
     giveKit(meta) {
       const inv = this.player.inv;
       if (meta.mode !== 'survival') {
-        const kit = ['grass_block', 'oak_planks', 'stone_bricks', 'glass', 'violet_crystal_block', 'hull_plating', 'neon_cyan', 'lantern', 'oak_log'];
+        const noCry = (meta.vgen | 0) >= 9;   // (a vgen-9 world has no crystals: none in the kit either)
+        const kit = ['grass_block', 'oak_planks', 'stone_bricks', 'glass', noCry ? 'neon_magenta' : 'violet_crystal_block', 'hull_plating', 'neon_cyan', 'lantern', 'oak_log'];
         kit.forEach((id, i) => { if (R.byName[id] || VR.ITEMS[id]) inv.slots[i] = { id, n: 64 }; });
-        const extra = ['builder_wand', 'laser_blaster', 'jetpack', 'hoverbike', 'shuttle_beacon', 'torch', 'azure_crystal_cluster', 'water_bucket', 'tech_panel', 'landing_pad', 'cherry_leaves', 'quartz_block'];
+        const extra = ['builder_wand', 'laser_blaster', 'jetpack', 'hoverbike', 'shuttle_beacon', 'torch', noCry ? 'vx_lamppost' : 'azure_crystal_cluster', 'water_bucket', 'tech_panel', 'landing_pad', 'cherry_leaves', 'quartz_block'];
         extra.forEach((id, i) => { if (R.byName[id] || VR.ITEMS[id]) inv.slots[9 + i] = { id, n: VR.maxStack(id) }; });
       } else if (meta.kit) {
         inv.add('wooden_pickaxe', 1); inv.add('wooden_axe', 1); inv.add('bread', 6); inv.add('torch', 12); inv.add('apple', 3);
@@ -725,6 +735,7 @@
         else if (this.state === 'play') { if (!this.studioOpen) this.playFrame(dt); }
         if (this.mp) this.mp.update(dt);
         if (this.bench) this.benchTick();
+        if (this.sweep) this.sweep.tick();   // 📊 Stufentest
         this.capturePreview();   // the settings' live preview: the frame just drawn, if one was asked for
       } catch (e) { console.error(e); if (!this.errShown) { this.errShown = true; this.ui && this.ui.chatLine && this.ui.chatLine(T('g.chat.error', { msg: e.message }), '#ff8a8a'); } }
       this.input.endFrame();
@@ -772,6 +783,14 @@
       if (this.ui && this.ui.benchDone) this.ui.benchDone(this.benchResult);
       return this.benchResult;
     }
+    // 📊 Stufentest (sweep.js): every step measured in turn; false when one runs, the Automatik runs, or no world is up
+    sweepStart() {
+      if (this.sweep || this.bench || !VR.Sweep) return false;
+      const sw = new VR.Sweep(this);
+      if (!sw.start()) return false;
+      this.sweep = sw;
+      return true;
+    }
     // the quality governor made visible: the ⚙ line lists the steps it has taken (GPU ladder, then CPU ladder)
     aqWhat() {
       const aq = this.aq; if (!aq) return '';
@@ -802,7 +821,7 @@
     // Every step is probed: if it does not buy frame rate it is undone and the other ladder is tried.
     // Everything is undone again when the frame rate has been fine for a while. The user's settings never change.
     smartQuality(dt, S, w) {
-      if (this.bench) return;   // the Automatik run measures the scene as it is: the governor waits
+      if (this.bench || this.sweep) return;   // the Automatik run (or the Stufentest) measures the scene as it is: the governor waits
       const r = this.renderer, hz = this.horizon;
       const aq = this.aqState();
       if (!S.dynRes || !this.fps) {
@@ -1081,7 +1100,8 @@
       if (this.director) this.director.update(dt);
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
-      w.viewDir = [-Math.sin(p.yaw), -Math.cos(p.yaw)];   // the way the player looks (flat): uploads ahead come first
+      const vd = w.viewDir || (w.viewDir = [0, 0]); vd[0] = -Math.sin(p.yaw); vd[1] = -Math.cos(p.yaw);   // the way the player looks (flat): uploads in the view first (F10: no new array a frame)
+      { const r0 = this.renderer, asp = r0 && r0.H ? r0.W / r0.H : 16 / 9; w.viewCos = Math.cos(Math.atan(Math.tan((this.settings.fov || 75) * Math.PI / 360) * asp)); }   // (F10: the horizontal half field of view)
       // F9 · Weltgenerierung im Takt (Ultra · Leicht or the switch): the world streams within the frame's headroom
       w.streamTakt = !!this.settings.streamTakt && !!VR.UL;
       if (w.streamTakt) w.streamMs = VR.UL.Stream.budget(this.renderer.gpuMs, this.jsMs);
@@ -1186,13 +1206,22 @@
       const t = p.target, ts = t ? R.types[R.T.type[t.state]] : null;
       const aq = this.aq || {};
       return `R9-SI  ${Math.round(this.fps || 0)} fps  scale ${Math.round(r.q.scale * 100)}%  js ${(this.jsMs || 0).toFixed(1)} ms${r.gpuMs !== undefined ? '  gpu ' + r.gpuMs.toFixed(1) + ' ms' : ''}  smart ${aq.stack ? 'G' + aq.g + ' C' + aq.c + (aq.gpuBound ? ' gpu-bound' : aq.cpuBound ? ' cpu-bound' : '') : 'off'}\n` +
+        (r.prof && r.prof.line() ? r.prof.line() + (r.prof.peaks() ? '  ·  max ' + r.prof.peaks() : '') + '\n' : '') +
         `XYZ ${p.pos[0].toFixed(2)} / ${p.pos[1].toFixed(2)} / ${p.pos[2].toFixed(2)}\nChunk ${x >> 4} ${z >> 4}  Facing ${['N', 'E', 'S', 'W'][VR.Place.playerFacing(p.yaw)]}\n` +
         `Biome ${b ? b.name : '?'}  Light sky ${l >>> 12} rgb ${(l >> 8) & 15},${(l >> 4) & 15},${l & 15}\n` +
         `Time ${Math.floor(this.env.timeOfDay)} day ${this.env.day}  rain ${E.rain.toFixed(2)}  snow ${E.snow.toFixed(2)}  wind ${E.wind.toFixed(1)}\n` +
         `Weather ${this.env.wx.info()}  fog ${this.env.wx.v.fog.toFixed(2)}  bolts ${this.env.wx.strikes}  slot ends in ${Math.max(0, Math.round((this.env.wx.slotEnd - this.env.wx.ticks) / 1200))} min` + (this.ambience ? `\nAmbience ${this.ambience.info()}` : '') + '\n' +
         `Sections ${r.stats.sections} draws ${r.stats.draws} tris ${(r.stats.tris / 1000).toFixed(0)}k  GPU ${r.gpuMemoryMB().toFixed(0)} MB\n` +
         `Columns ${w.cols.size} pending ${w.pending.size} jobs ${this.pool.busy}` + (this.horizon && this.horizon.enabled() ? `  Horizon ${this.horizon.stats.tiles} tiles ${this.horizon.stats.drawn} drawn ${(this.horizon.stats.tris / 1000).toFixed(0)}k tris ${this.horizon.stats.mb.toFixed(0)} MB` : '') + '\n' +
+        this.upLine(r) + '\n' +
         (ts ? `Target ${ts.name} ${JSON.stringify(ts.decode(t.state))}` : '');
+    }
+    // F10 · the streaming's line on the ⚙ screen (F3): what went up this frame against the frame's budget, the cost the
+    // machine was measured at, what waits, and the hitches (frames over twice the usual one) of the last 10 s
+    upLine(r) {
+      const s = r.stats, v = { ms: (s.uploadMs || 0).toFixed(1), kb: Math.round(s.uploadKB || 0), budget: Math.round(s.upBudgetKB || 0), mbs: Math.round(s.upMBs || 0), q: s.upQueue || 0, h: s.hitches || 0 };
+      return VR.I18N ? VR.I18N.tx('g.f3.stream', v, 'Hochladen {ms} ms · {kb}/{budget} KB · {mbs} MB/s · wartet {q} · Ruckler {h} (10 s)', 'Upload {ms} ms · {kb}/{budget} KB · {mbs} MB/s · waiting {q} · hitches {h} (10 s)')
+        : `Upload ${v.ms} ms · ${v.kb}/${v.budget} KB · ${v.mbs} MB/s · waiting ${v.q} · hitches ${v.h} (10 s)`;
     }
     handleKeys() {
       const i = this.input, ui = this.ui;
@@ -1220,7 +1249,7 @@
       if (i.hit('Slash')) { ui.openChat('/'); return; }
       if (i.hit('F1')) { this.hideHud = !this.hideHud; document.getElementById('hud').style.visibility = this.hideHud ? 'hidden' : 'visible'; }
       if (i.hit('F2')) this.screenshot();
-      if (i.hit('F3')) { this.debugOn = !this.debugOn; if (!this.debugOn) ui.debug(null); }
+      if (i.hit('F3')) { this.debugOn = !this.debugOn; this.renderer.profDetail = this.debugOn; if (!this.debugOn) ui.debug(null); }
       // piloting a ship: F5 / C cycle the ship's own views and Q looks back (flight.js) — nothing gets dropped
       const piloting = !!this.flight;
       if (i.hit('F5') && !piloting) this.camMode = (this.camMode + 1) % 3;

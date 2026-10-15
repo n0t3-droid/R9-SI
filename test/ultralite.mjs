@@ -64,6 +64,7 @@ const stub = () => ev(() => {
     this.setupCamera(F.cam);
     if (!window.__shadowOnly || !F.world) return;
     this.frameNo++;
+    this.upQ = F.world.uploadQ && F.world.uploadQ.drain ? F.world.uploadQ : null;   // (as render() does: since F10 the VX detail goes through the world's upload queue)
     const vis = this.collectVisible(F.world, F.cam);
     this.vxResidency(vis, [F.cam.x, F.cam.y, F.cam.z]);
     window.__sync(); const t0 = performance.now();
@@ -111,10 +112,14 @@ let window_last = null;   // (the last state settle saw: what is still loading w
 const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game, w = g.world; const p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { const ex = c.cx - pcx, ez = c.cz - pcz; if (ex * ex + ez * ez > rd * rd) continue; for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; } /* (the edge columns are loaded for their neighbours and never meshed: only the view's columns count) */ let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, arr: w.arrivals ? w.arrivals.length : 0 }; }); window_last = s; if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && s.arr === 0 && i > 2) return true; await wait(60); } return false; };
 const warmVx = () => ev(() => {
   const g = VR.game, r = g.renderer, p = g.player; if (!r.vxResidency || !g.world) return -1;
+  // (since F10 vxResidency queues the detail on the world's upload queue — this world's, not the last one drawn —
+  // and the frames upload it within their budget: here it is drained at once)
+  const Q = g.world.uploadQ && g.world.uploadQ.drain ? g.world.uploadQ : null, queued = !!(r.queueVx && Q);
+  if (queued) r.upQ = Q;
   const cam = [p.pos[0], p.pos[1] + (p.eye || 1.62), p.pos[2]], list = [];
   for (const c of g.world.cols.values()) for (const s of c.sec) if (s && s.hasMesh) list.push(s);
   const D = (r.q && r.q.vxLod) || 48, up2 = D * D; let n = 0;
-  for (; n < 600; n++) { let w8 = 0; for (const s of list) { if (!s.vxData || s.mesh[3]) continue; const dx = s.ox + 8 - cam[0], dy = s.oy + 8 - cam[1], dz = s.oz + 8 - cam[2]; if (dx * dx + dy * dy * 0.5 + dz * dz < up2) w8++; } if (!w8) break; r.vxResidency(list, cam); }
+  for (; n < 600; n++) { let w8 = 0; for (const s of list) { if (!s.vxData || s.mesh[3]) continue; const dx = s.ox + 8 - cam[0], dy = s.oy + 8 - cam[1], dz = s.oz + 8 - cam[2]; if (dx * dx + dy * dy * 0.5 + dz * dz < up2) w8++; } if (!w8) break; r.vxResidency(list, cam); if (queued) Q.drain(1e6, null, 0, 0); }
   return n;
 });
 const groundY = (x, z) => ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = 160; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) return y; } return 80; }, [x, z]);
