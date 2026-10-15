@@ -13,7 +13,7 @@
 //   Very Low and High: MODE=potato measures their frames at the three scenes (PRESETS=potato,high; with DIST=<a v0.43
 //            dist> TAG=before: the before numbers)
 // usage: bash test/wt_run.sh ultralite.mjs 3600   ·   MODE=potato DIST=file:///…/index.html TAG=before …
-//   SCENES=hall,plaza,village (default; `lake` adds the water mirror's scene: a lake 210 m east of the hall, the camera on
+//   VGEN=8 the worlds' generator (default 8: the scenes are vgen 8's) · SCENES=hall,plaza,village (default; `lake` adds the water mirror's scene: a lake 210 m east of the hall, the camera on
 //   its east shore looking west over the water to the hills) · WALK=0 skips the walks · N=3 timed frames · RD=8 caps every
 //   preset's render distance (one worker on this 2-CPU machine: Ultra's 16 chunks would take many minutes a scene; the far
 //   ring stays 64; Very Low keeps its own 4)
@@ -26,6 +26,9 @@ const DIST = process.env.DIST || 'file:///home/dev/vr/dist/index.html';
 const SCENES = (process.env.SCENES || 'hall,plaza,village').split(',');
 const WALK = process.env.WALK !== '0' && MODE === 'full';
 const RD = +(process.env.RD || 8);
+// (the scenes were chosen in seed 4242's vgen 8 — the lake's water at y 63, the village, the fork: the worlds are made with
+// it; a new world's default is vgen 9 since v042, where the lake stands higher and the camera would be under water)
+const VGEN = +(process.env.VGEN || 8);
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
@@ -140,7 +143,7 @@ const holdFar = (on) => ev((on) => { const pool = VR.game.pool; if (on) pool.__h
 // createWorld tears the old one down; startWorld ends in 'loading' (the loop is not stepped before that), then the frames
 // are stepped until it plays
 const freshWorld = async (name) => {
-  await ev((n) => VR.game.createWorld({ name: n, mode: 'creative', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: true }), name);
+  await ev(([n, v]) => VR.game.createWorld({ name: n, mode: 'creative', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: true, vgen: v }), [name, VGEN]);
   for (let i = 0; i < 480; i++) { if (await ev((n) => { const g = VR.game; return !!(g.meta && g.meta.name === n && g.world && g.state === 'loading'); }, name)) break; await wait(250); }
   for (let i = 0; i < 400; i++) { if (await ev(() => VR.game.state) === 'play') break; await step(10); await wait(50); }
   await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; g.hideHud = true; g.env.setTime(6000); });
@@ -232,7 +235,7 @@ for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && V
 const have = await ev(() => Object.keys(VR.Game.PRESETS || {}));
 console.log(TAG, 'presets in this build:', have.join(' '), '· GPU:', await ev(() => VR.GL.rendererName));
 await setPreset('high');
-await ev(`VR.game.createWorld({name:'Ultra Leicht',mode:'creative',difficulty:'peaceful',type:'default',seed:'4242',cheats:true,kit:true})`);
+await ev((v) => VR.game.createWorld({ name: 'Ultra Leicht', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: '4242', cheats: true, kit: true, vgen: v }), VGEN);
 for (let i = 0; i < 150; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
 check(await ev(() => VR.game.state) === 'play', `${TAG}: the world is loaded`);
 await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; for (const id of ['hud', 'ui']) { const h = document.getElementById(id); if (h) h.style.display = 'none'; } g.env.setTime(6000); });

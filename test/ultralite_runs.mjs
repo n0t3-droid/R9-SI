@@ -30,7 +30,7 @@ for (const name of want) {
   const [file, to, env] = r;
   if ('DIST' in env && !env.DIST) { console.log(`  ✗ ${name}: BASE (the base build's index.html) is not set`); fails++; continue; }
   const log = `${TMP}/${name === 'smoke' ? 'smoke' : name === 'classic' ? 'classic_v2' : 'ultralite_' + name}.log`;
-  const E = { ...process.env }; for (const k of ['MODE', 'PRESETS', 'N', 'TAG', 'DIST', 'SCENES', 'WALK', 'RD']) delete E[k];
+  const E = { ...process.env }; for (const k of ['MODE', 'PRESETS', 'N', 'TAG', 'DIST', 'SCENES', 'WALK', 'RD', 'VGEN']) delete E[k];
   Object.assign(E, env);
   const fd = fs.openSync(log, 'w'), t0 = Date.now();
   console.log(`== ${name} (${file} ${JSON.stringify(env)}) ${new Date().toTimeString().slice(0, 8)}`);
