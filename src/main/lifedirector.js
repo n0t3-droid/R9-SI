@@ -96,6 +96,13 @@
   // the slots: t_k = 30 k + j, j ∈ [−5, 5] (pure)
   LD.slotTime = (seed, k) => 30 * k + (h(seed, k, 0x51) - 0.5) * 10;
   LD.slotAt = function (seed, t) { let k = Math.floor(t / 30) + 1; while (LD.slotTime(seed, k) > t) k--; return k; };
+  // t-polish · the cart is the streets' regular: by day in a town (a street, a plaza, a hall city) a hover-cart comes on
+  // its own clock besides the acts — cart m at c_m = 34 m + j(seed, m), j ∈ [−3, 3] s → 28–40 s apart, so within 40 s of
+  // arriving one comes (pure: every guest sees the same). It was one act in six of the slots: unseen for minutes.
+  LD.CART_PLACES = ['street', 'plaza', 'hall'];
+  LD.cartTime = (seed, m) => 34 * m + (h(seed, m, 0xca7) - 0.5) * 6;
+  LD.cartAt = function (seed, t) { let m = Math.floor(t / 34) + 1; while (LD.cartTime(seed, m) > t) m--; return m; };
+  LD.cartRegular = (ctx) => !!ctx && LD.CART_PLACES.includes(ctx.place) && LD.allowed('cart', ctx);
   // the act of slot k (null: quiet)
   LD.pick = function (seed, k, ctx) {
     const C = LD.candidates(ctx); if (!C.length) return null;
@@ -293,11 +300,13 @@
   // ---- a hover-cart glides along the street across your view, crates of produce under its awning, a cyan glow beneath
   ACT.cart = {
     start(D, ev) {
-      // across the view (a street seen from its side), else along it (a street you look down: it comes toward you and
-      // passes beside you)
+      // across the view (a street seen from its side) — t-polish: the run cut to the view and 3 m beyond its edges, so the
+      // cart comes in at once (an uncut run began 26 m to the side: t-life's picture shot it before it was in the frame) —
+      // else along it (a street you look down: it comes toward you and passes beside you), first at ±1.5 m: inside the
+      // street lamps of a narrow street (the Weißstadt's stand at ±3 and cut the runs at ±2.6)
       const d0 = 11 + 5 * rnd(ev, 1); let run = null, along = false;
-      for (const d of [d0, d0 + 4, d0 - 3, d0 + 8]) if ((run = D.runAcross(d, 18))) break;
-      if (!run) for (const off of [2.6, -2.6, 4, -4]) if ((run = D.runAlong(off, 18))) { along = true; break; }
+      for (const d of [d0, d0 + 4, d0 - 3, d0 + 8]) if ((run = D.runAcross(d, 18))) { run = D.inView(run, d); if (run.length >= 14) break; run = null; }
+      if (!run) for (const off of [1.5, -1.5, 2.6, -2.6, 4, -4]) if ((run = D.runAlong(off, 14))) { along = true; break; }
       if (!run) return false;
       ev.run = along ? run.slice().reverse() : rnd(ev, 2) < 0.5 ? run : run.slice().reverse(); ev.L = 0; ev.sp = 3.2;
       const P = []; for (const p of ev.run) P.push([p[0], p[1] + 0.45, p[2]]); ev.path = LK.path(P);
@@ -566,6 +575,13 @@
       const a = side(-1).reverse(), b = side(1), run = a.concat([[cx, y0, cz]], b);
       return run.length >= min ? run : null;
     }
+    // the tangent of half the view's width (the settings' vertical fov, the canvas's aspect)
+    get tanH() { const g = this.g, fov = (g.settings && g.settings.fov) || 70, r = g.renderer, asp = r && r.W && r.H ? r.W / r.H : 16 / 9; return Math.tan(fov * Math.PI / 360) * asp; }
+    // a run across the view dist ahead cut to the view's width and 3 m beyond it (t-polish: an act along it is seen at once)
+    inView(run, dist) {
+      const f = this.fwd, eye = this.eye, sx = -f[1], sz = f[0], lim = dist * this.tanH + 3;
+      return run.filter(p => Math.abs((p[0] - eye[0]) * sx + (p[2] - eye[2]) * sz) <= lim);
+    }
     // a walkable run along the view, off to one side by off metres, from 3 to 40 m ahead (≥ min metres): its points, or null
     runAlong(off, min) {
       const f = this.fwd, eye = this.eye, sx = -f[1], sz = f[0], out = [];
@@ -671,6 +687,10 @@
       const k = LD.slotAt(this.seed, this.clock);
       if (this.lastK === null) this.lastK = k;            // (the first act comes with the next slot)
       else if (k > this.lastK) { this.lastK = k; if (this.auto !== false) this.slot(k); }   // (auto false: only forced acts — a test)
+      // t-polish: the streets' regular — by day in a town a cart on its own clock (28–40 s apart), one at a time
+      const ck = LD.cartAt(this.seed, this.clock);
+      if (this.lastCart === undefined) this.lastCart = ck;
+      else if (ck > this.lastCart) { this.lastCart = ck; if (this.auto !== false && LD.cartRegular(ctx) && !this.events.some(e => e.kind === 'cart')) this.start('cart', { k: 900000 + ck }); }
       const e0 = g.player.pos;
       for (let i = this.events.length - 1; i >= 0; i--) {
         const ev = this.events[i], A = ACT[ev.kind];

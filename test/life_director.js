@@ -225,6 +225,51 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
     }
     check(found > 0 && twice === 0, `the context changes between two slots: never the same act twice in a row (${twice} of ${found} such pairs)`);
   }
+  // t-polish · the cart is the streets' regular: its own clock (28–40 s apart, pure); in a town by day the first one comes
+  // within 40 s of arriving — in the generated Weißstadt's street at noon (seed 53, t-town's P1: the street toward the
+  // plaza) and on Nova Haven's avenue (t-beauty's street_3) — and it is in the view at once and stays a while (t-life's
+  // picture: started, but out of the frame)
+  {
+    let minG = 1e9, maxG = 0;
+    for (const seed of [1, -77, 4242]) for (let m = 0; m < 3000; m++) { const d = LD.cartTime(seed, m + 1) - LD.cartTime(seed, m); minG = Math.min(minG, d); maxG = Math.max(maxG, d); }
+    let bad = 0; for (let t = 0; t < 20000; t += 3.3) { const m = LD.cartAt(4242, t); if (!(LD.cartTime(4242, m) <= t && LD.cartTime(4242, m + 1) > t)) bad++; }
+    check(minG >= 27.9 && maxG <= 40 && !bad && LD.cartRegular(ctxOf('hall', 'noon')) && LD.cartRegular(ctxOf('street', 'morning')) && !LD.cartRegular(ctxOf('street', 'dusk')) && !LD.cartRegular(ctxOf('hills', 'noon')) && !LD.cartRegular(ctxOf('street', 'noon', { tier: 0 })),
+      `the cart's own clock: ${minG.toFixed(1)} – ${maxG.toFixed(1)} s apart (cartAt right at every time: ${bad} wrong); a regular of the streets, plazas and hall cities by day, not at dusk, not on the hills, not on Very Low`);
+    const VG = V.VillageGen, R2 = V.R;
+    const og = new V.OverworldGen(53, { worldType: 'default', vgen: 10 });
+    const cache = new Map();
+    const colOf = (cx, cz) => { const k = cx + ',' + cz; let c = cache.get(k); if (!c) { c = og.generate(cx, cz); cache.set(k, c); } return c; };
+    const getB = (x, y, z) => { x = Math.floor(x); y = Math.floor(y); z = Math.floor(z); if (y < 0) return 1; const c = colOf(x >> 4, z >> 4); if (y >= c.blocks.length >> 8) return 0; return c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; };
+    const topB = (x, z) => { for (let y = 200; y > 0; y--) { const s = getB(x, y, z); if (s && (R2.T.flags[s] & (V.F.SOLID | V.F.FLUID))) return y; } return 0; };
+    // the two places' plans (the villages the game would know there)
+    let hall = null, nova = null;
+    for (let j = -3; j <= 1 && !(hall && nova); j++) for (let i = -3; i <= 1; i++) { const s = VG.site(og, i, j); if (!s) continue; if (!hall && s.style === 'hall' && i === -2 && j === -1) hall = VG.plan(og, s); if (!nova && s.name === 'Nova Haven') nova = VG.plan(og, s); }
+    const SCENES = [];
+    if (hall) { const H = hall.hall; SCENES.push({ name: 'the Weißstadt\'s street', plan: hall, feet: [H.cx - 24.5, H.F + 1, H.cz - 0.5], at: [H.cx + 40, H.F + 9, H.cz - 0.5] }); }
+    if (nova) SCENES.push({ name: 'Nova Haven\'s avenue', plan: nova, feet: [1.5, topB(1, -63) + 1, -62.5], at: [1, 83, -100] });
+    const out = [];
+    for (const sc of SCENES) {
+      const P = sc.plan, eyeY = sc.feet[1] + 1.62, dx = sc.at[0] - sc.feet[0], dz = sc.at[2] - sc.feet[2], yaw = Math.atan2(-dx, -dz);
+      const known = new Map([[P.id, { plan: Object.assign({}, P, { rad: P.rad || (P.style === 'hall' ? 150 : 75) }) }]]);
+      const g = mk('high', sc.feet, yaw, 6000, { world: { getBlock: getB, topAt: topB }, villages: { known, festivalNear: () => null, F: { rockets: [] }, festState() { return this.F; } } });
+      g.settings.fov = 66;
+      const A = new LD.Actor(g);
+      // the director runs from the moment the eye arrives; the first cart within 40 s, then where it is
+      let t = 0, ev = null, t0 = null, firstSeen = null, seen = 0, nearest = 1e9;
+      const tanH = A.tanH, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+      for (let i = 0; i < 20 * 60; i++) {
+        t += 0.05; g.time = t; A.update(0.05);
+        if (!ev) { ev = A.events.find(e => e.kind === 'cart') || null; if (ev) t0 = t; continue; }
+        if (!A.events.includes(ev) || t - t0 > 12) break;
+        const ex = ev.pos[0] - sc.feet[0], ez = ev.pos[2] - sc.feet[2], fwd = ex * fx + ez * fz, lat = Math.abs(ex * -fz + ez * fx);
+        if (fwd > 1 && lat < fwd * tanH * 0.95 && Math.hypot(ex, ez) < 48) { seen += 0.05; if (firstSeen === null) firstSeen = t - t0; nearest = Math.min(nearest, Math.hypot(ex, ez)); }
+      }
+      const ok = ev && t0 <= 40 && firstSeen !== null && firstSeen <= 3 && seen >= 4;
+      if (!ok) out.push(sc.name);
+      console.log(`    ${sc.name}: the place ${A.stats().place}, a cart ${ev ? 'started ' + t0.toFixed(1) + ' s after the arrival (' + (ev.run.length) + ' points, ' + ev.path.L.toFixed(0) + ' m)' : 'never'}; in the view ${firstSeen === null ? 'never' : firstSeen.toFixed(1) + ' s after its start, for ' + seen.toFixed(1) + ' s, nearest ' + nearest.toFixed(0) + ' m'}`);
+    }
+    check(SCENES.length === 2 && !out.length, `the cart within 40 s in the street at noon and in the view at once, for seconds (${SCENES.length - out.length} of ${SCENES.length} places${out.length ? ': not at ' + out.join(', ') : ''})`);
+  }
   // the eye goes far away (a flight, a teleport): an act left 200 blocks behind ends (nothing is spent on it any more)
   {
     const g = mk('high', [0, 81, 14], 0, 12600), A = new LD.Actor(g); A.auto = false; A.update(0.05);
