@@ -21,7 +21,7 @@
 // regress: skip  (a showcase with two world loads; the gates are test/life_sched.js, life_director.js, life_peace.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
-const TAG = process.env.TAG || 'after', N = +(process.env.N || 8), SEED = process.env.SEED || '53';
+const TAG = process.env.TAG || 'after', N = +(process.env.N || 24), SEED = process.env.SEED || '53';
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null, ONLY_BEFORE = process.env.ONLY_BEFORE ? process.env.ONLY_BEFORE.split(',') : null;
 const RUNS = [];
 if (process.env.BEFORE_DIST) RUNS.push(['before', process.env.BEFORE_DIST]);
@@ -31,11 +31,13 @@ const HALL = { cx: -944, cz: -296, F: 73 };
 // [name, feet [x, y, z] (y null: on the ground + up), look-at [x, y, z] (y null: the ground there + up), time, fov, force]
 const SCENES = [
   { name: 'hangar', feet: [-42, 89, 26], at: [17.6, 85, 33.3], tod: 4000, fov: 74 },
-  { name: 'apron', feet: [26, 81, 44], at: [47, 84, 62], tod: 4000, fov: 70 },
+  // (from the east terrace's edge, over the apron from behind its parked craft: run 1's eye at 26, 81, 44 looked into a
+  //  plaza tree at 28, 46)
+  { name: 'apron', feet: [50, 89, 30], at: [46.5, 82, 61], tod: 4000, fov: 70 },
   { name: 'hall', feet: [0.5, 82.4, 9], at: [0.5, 83.2, -10], tod: 4000, fov: 74 },
   { name: 'plaza_dusk', feet: [-8, 82.5, -52], at: [6, 82.6, -80], tod: 12600, fov: 72, force: ['lanterns'] },
   { name: 'street_noon', feet: [HALL.cx - 24.5, HALL.F + 1, HALL.cz - 0.5], at: [HALL.cx + 40, HALL.F + 9, HALL.cz - 0.5], tod: 6000, fov: 66, force: ['pigeons', 'cart'] },
-  { name: 'hills', feet: [30, null, -196], up: 14, at: [0, null, -330], atUp: 34, tod: 4500, fov: 70, force: ['balloon'] },
+  { name: 'hills', feet: [30, null, -196], up: 30, at: [0, null, -330], atUp: 30, tod: 4500, fov: 70, force: ['balloon'] },
 ];
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 let fails = 0;
@@ -60,7 +62,10 @@ async function runPage(tag, dist) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   // the game loop by hand: dt per step, no picture drawn (the camera is still set up, so the frustum is right)
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
-  const settle = async (max = 60) => { for (let i = 0; i < max; i++) { await step(10); const s = await ev(() => { const g = VR.game, w = g.world; let dirty = 0; for (const c of w.cols.values()) for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0 }; }); if (s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && i > 2) break; await wait(60); } };
+  // until the ground round the eye is there: every column within the view distance (less half a column: the outer ring
+  // waits for neighbours that are never loaded) generated, meshed and uploaded, twice in a row (a busy machine takes
+  // a minute; the old test's "every section clean" never came true and shot whatever had loaded by its 40th round)
+  const settle = async (max = 60) => { let calm = 0, s = null; for (let i = 0; i < max; i++) { await step(10); s = await ev(() => { const g = VR.game, w = g.world, p = g.player.pos, pcx = Math.floor(p[0]) >> 4, pcz = Math.floor(p[2]) >> 4, rd = w.renderDist, r2 = (rd - 0.5) * (rd - 0.5); let dirty = 0, miss = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > r2) continue; const c = w.col(pcx + dx, pcz + dz); if (!c) { miss++; continue; } for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; } return { miss, dirty, up: w.uploadQ ? w.uploadQ.size : 0, rounds: 0 }; }); s.rounds = i + 1; if (s.miss === 0 && s.dirty === 0 && s.up === 0) { if (++calm >= 2) break; } else calm = 0; await wait(60); } return s; };
   const shotPath = (name) => `/home/dev/vr/test/shots/life_${name}_${tag}.png`;
   const shot = async (name, frames = 4) => {
     await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames);
@@ -84,32 +89,34 @@ async function runPage(tag, dist) {
   });
   // the sky craft within 550 blocks of the eye, once a second for `sec` seconds of game time
   const skySample = async (sec) => { const n = []; for (let i = 0; i < sec; i++) { await step(30); n.push((await count()).sky); } return { min: Math.min(...n), mean: +(n.reduce((a, b) => a + b, 0) / n.length).toFixed(2), max: Math.max(...n), zeroSeconds: n.filter(v => v === 0).length }; };
-  // the frame cost: n frames drawn, 3 rounds, the median round (ms per frame, draws)
+  // the frame cost: one round of n frames drawn (ms per frame, draws); measure: 3 rounds, the median round
+  const measure1 = (n) => ev((n) => new Promise((ok) => {
+    const g = VR.game, gl = g.renderer.gl; window.__norender = false;
+    let k = -2, sum = 0, d = 0;
+    const f = () => { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(1), draws: Math.round(d / n) }); } };
+    f();
+  }), n);
   const measure = async (n) => {
     const rounds = [];
-    for (let k = 0; k < 3; k++) {
-      rounds.push(await ev((n) => new Promise((ok) => {
-        const g = VR.game, gl = g.renderer.gl; window.__norender = false;
-        let k = -2, sum = 0, d = 0;
-        const f = () => { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(1), draws: Math.round(d / n) }); } };
-        f();
-      }), n));
-    }
+    for (let k = 0; k < 3; k++) rounds.push(await measure1(n));
     rounds.sort((a, b) => a.ms - b.ms);
     return Object.assign({ rounds: rounds.map(r => r.ms) }, rounds[1]);
   };
   const place = async (sc) => {
     let feet = sc.feet.slice(), at = sc.at.slice();
     await ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 140, z); }, [feet[0], feet[2]]);
-    await settle(40);
+    await settle(400);
     if (feet[1] === null) feet[1] = (await groundY(feet[0], feet[2], 160)) + 1 + (sc.up || 0);
     if (at[1] === null) at[1] = (await groundY(at[0], at[2], 180)) + 1 + (sc.atUp || 0);
     const eye = feet[1] + 1.62, dx = at[0] - feet[0], dz = at[2] - feet[2];
     const yaw = Math.atan2(-dx, -dz), pitch = Math.atan2(at[1] - eye, Math.hypot(dx, dz));
     await ev(([f, yaw, pitch, fov, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(f[0], f[1], f[2]); p.yaw = yaw; p.pitch = pitch; p.fovKick = 0; p.vel = [0, 0, 0]; g.settings.fov = fov; g.env.setTime(tod); }, [feet, yaw, pitch, sc.fov, sc.tod]);
-    await settle(50); await step(10);
+    const s = await settle(400); await step(10);
+    loaded.push(`${sc.name}: ${s.miss} missing, ${s.dirty} unmeshed after ${s.rounds} rounds`);
+    if (s.miss || s.dirty) unloaded++;
     return { feet, at };
   };
+  const loaded = []; let unloaded = 0;
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   await ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.settings.renderDist = 8; g.settings.horizon = 1; g.applySettings('*'); });
   await ev(`VR.game.createWorld({name:'Lebendig',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
@@ -130,7 +137,7 @@ async function runPage(tag, dist) {
     if (sc.name === 'hangar' || sc.name === 'apron') await ev(() => { const g = VR.game; if (g.padLife && g.padLife.jump) g.padLife.jump('apron', 'crew'); if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) g.hall.flight.jumpPhase('pad', 0.2); });
     if (sc.name === 'hall') await ev(() => { const g = VR.game; if (g.hall && g.hall.flight && g.hall.flight.jumpPhase) { g.hall.flight.update(0.03); const L = g.hall.flight.plan && g.hall.flight.plan.legs.find(l => l.name === 'pad'); g.hall.flight.jumpPhase('pad', L ? Math.min(0.6, 21 / L.T) : 0.3); } if (g.hall && g.hall.jump) g.hall.jump(8); });
     if (sc.force) await ev(([kinds, at]) => { const g = VR.game; if (!g.lifeDirector || !g.lifeDirector.force) return; for (const k of kinds) g.lifeDirector.force(k, { look: at }); }, [sc.force, pl.at]);
-    await step(sc.name === 'plaza_dusk' ? 260 : 90);   // the lighter has walked a few lamps, the cart rolls into view, the crew is out
+    await step(sc.name === 'plaza_dusk' ? 600 : 90);   // the lighter has walked a few lamps (20 s at 1.35 m/s), the cart rolls into view, the crew is out
     const c = await count(); counts[`${sc.name}/${tag}`] = c;
     console.log(`  ${sc.name} ${tag}: ${JSON.stringify(c)}`);
     if (await shot(sc.name)) pics++;
@@ -147,6 +154,7 @@ async function runPage(tag, dist) {
     }
   }
   check(pics === want && want > 0, `${tag}: every picture is written (${pics} of ${want})`);
+  check(unloaded === 0, `${tag}: every scene's ground was loaded before its picture (${loaded.join('; ')})`);
   // the costs: Very Low at the hangar view and the plaza, High at the hangar view
   if (!process.env.NOCOST && (!ONLY || ONLY.includes('hangar'))) {
     const C = costs[tag] = {};
@@ -159,6 +167,23 @@ async function runPage(tag, dist) {
         await step(30);
         C[preset + '/' + name] = await measure(N);
         console.log(`  cost ${tag} ${preset} ${name}: ${JSON.stringify(C[preset + '/' + name])} counts ${JSON.stringify(await count())}`);
+        // the after build: t-life's own share of the frame here — the same view with its two switches off and on, the
+        // rounds alternating (off, on, off, on …) so the machine's load falls on both alike; on: an act of the tier runs
+        if (has.pad && has.dir) {
+          const ab = { off: [], on: [], dOff: [], dOn: [] };
+          for (let r = 0; r < 4; r++) for (const mode of ['off', 'on']) {
+            await ev(([m, p]) => { const g = VR.game, s = g.settings; s.padLife = m === 'on'; s.lifeDir = m === 'on'; if (m === 'on' && g.padLife && g.padLife.jump && name === 'hangar') g.padLife.jump('apron', 'crew'); }, [mode, preset]);
+            await step(6);
+            if (mode === 'on') await ev((p) => { const L = VR.game.lifeDirector; if (L && !L.events.length) L.force(p === 'potato' ? 'birds' : 'balloon'); }, preset);
+            await step(4);
+            const m = await measure1(N); ab[mode].push(m.ms); ab[mode === 'on' ? 'dOn' : 'dOff'].push(m.draws);
+          }
+          await ev(() => { const s = VR.game.settings; s.padLife = true; s.lifeDir = true; });
+          const med = (a) => { const b = a.slice().sort((x, y) => x - y); return +((b[(b.length - 1) >> 1] + b[b.length >> 1]) / 2).toFixed(2); };
+          C[preset + '/' + name + '/lifeOff'] = { ms: med(ab.off), draws: med(ab.dOff), rounds: ab.off };
+          C[preset + '/' + name + '/lifeOn'] = { ms: med(ab.on), draws: med(ab.dOn), rounds: ab.on };
+          console.log(`  cost ${tag} ${preset} ${name} t-life off/on (alternating): off ${med(ab.off)} ms ${med(ab.dOff)} draws · on ${med(ab.on)} ms ${med(ab.dOn)} draws  (${JSON.stringify(ab)})`);
+        }
       }
     }
   }

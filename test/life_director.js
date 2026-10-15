@@ -182,6 +182,42 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
   const g1 = mk('high', [0, 81, 14], 0, 9000); g1.settings.lifeDir = false; const A1 = new LD.Actor(g1);
   for (let i = 0; i < 20 * 120; i++) { A1.update(0.05); A1.draw(rr, {}, 'opaque', g1.cam); }
   check(A1.stats().started === 0 && calls.part === 0 && calls.model === 0, 'lifeDir off: no act, nothing spent');
+
+  // a street with café tables (the Weißstadt's main street, run 1 of test/life.mjs: the pigeons found no spot): tables
+  // and chairs stand in a checkerboard across the view 6–13 m ahead; the pigeons and the kids find level ground past
+  // them or beside them, never on a table, within 24 m
+  {
+    const T = (x, z) => z >= 1 && z <= 8 && Math.abs(x) <= 6 && ((x + z) & 1) === 0;
+    const W2 = { getBlock: (x, y, z) => (y <= 80 ? STONE : y === 81 && T(x, z) ? STONE : 0), topAt: (x, z) => (T(x, z) ? 81 : 80) };
+    const out = [];
+    for (const n of ['pigeons', 'kids']) for (const seedK of [0, 1, 2, 3]) {
+      const g = mk('high', [0.5, 81, 14.5], 0, 9000, { world: W2 }), A = new LD.Actor(g); A.auto = false; A.update(0.05);
+      const ev = A.start(n, { k: 100 + seedK });
+      if (!ev) { out.push(n + seedK + ': no spot'); continue; }
+      const spots = n === 'pigeons' ? ev.b.map(b => [b.x, b.z]) : ev.k2.map(k => [k.home[0], k.home[2]]);
+      for (const [x, z] of spots) { if (T(Math.floor(x), Math.floor(z))) out.push(n + seedK + ': on a table'); if (Math.hypot(x - 0.5, z - 14.5) > 24) out.push(n + seedK + ': too far'); }
+    }
+    check(!out.length, `among café tables the pigeons and the kids find level ground (8 of 8 starts${out.length ? ': ' + out.join(' · ') : ''})`);
+  }
+  // the tier drops (⚙ Very Low chosen while an act runs): the acts above it end at once; the lantern lighter goes, his
+  // lamps light on by themselves
+  {
+    const g = mk('high', [0, 81, 14], 0, 12600), A = new LD.Actor(g); A.auto = false; A.update(0.05);
+    A.force('balloon'); A.force('lanterns'); A.update(0.05);
+    const before = A.events.map(e => e.kind).sort().join(), fig0 = !!(A.events.find(e => e.kind === 'lanterns') || {}).fig;
+    g.settings.preset = 'potato'; A.update(0.05);
+    const L = A.events.find(e => e.kind === 'lanterns');
+    for (let i = 0; i < 400 && L && L.lit < L.route.length; i++) A.update(0.05);
+    check(before === 'balloon,lanterns' && fig0 && !A.events.some(e => e.kind === 'balloon') && L && !L.fig && L.lit === L.route.length, `Very Low chosen mid-act: the balloon ends, the lamplighter goes and the lamps light by themselves (${before} → ${A.events.map(e => e.kind).join()}, lit ${L && L.lit} of ${L && L.route.length})`);
+  }
+  // the eye goes far away (a flight, a teleport): an act left 200 blocks behind ends (nothing is spent on it any more)
+  {
+    const g = mk('high', [0, 81, 14], 0, 12600), A = new LD.Actor(g); A.auto = false; A.update(0.05);
+    A.force('lanterns'); A.force('chimneys'); A.update(0.05);
+    const n0 = A.events.length;
+    g.player.pos[0] += 260; g.cam.x += 260; A.update(0.05);
+    check(n0 === 2 && A.events.length === 0, `an act 200 blocks behind the eye ends (${n0} → ${A.events.length})`);
+  }
 }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

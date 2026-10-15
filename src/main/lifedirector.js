@@ -165,6 +165,7 @@
     },
     update(D, ev, dt) {
       const R = ev.route;
+      if (ev.fig && D.tier < 1) { ev.fig = null; ev.age = Math.min(ev.age, 2 + ev.lit * 2.4); }   // (Very Low chosen: he goes, the lamps light on by themselves)
       if (ev.fig) {
         const F = ev.fig;
         if (ev.i < R.length) {
@@ -262,8 +263,15 @@
   ACT.pigeons = {
     start(D, ev) {
       const S = D.openGround(7 + 5 * rnd(ev, 1), (rnd(ev, 2) - 0.5) * 0.9, 2); if (!S) return false;
-      ev.c = S; ev.n = 10 + Math.floor(rnd(ev, 3) * 6); ev.burst = 7 + 4 * rnd(ev, 4); ev.b = [];
-      for (let i = 0; i < ev.n; i++) { const a = rnd(ev, 10 + i) * TAU, rr = Math.sqrt(rnd(ev, 30 + i)) * 2.4; ev.b.push({ x: S[0] + Math.cos(a) * rr, y: S[1], z: S[2] + Math.sin(a) * rr, yaw: rnd(ev, 50 + i) * TAU, ph: rnd(ev, 70 + i) * 6, vx: 0, vy: 0, vz: 0 }); }
+      ev.c = S; ev.burst = 7 + 4 * rnd(ev, 4); ev.b = [];
+      // (each bird where its own ground is level with the spot: never in a planter or on a café chair)
+      const want = 10 + Math.floor(rnd(ev, 3) * 6);
+      for (let i = 0; i < want; i++) for (let t = 0; t < 3; t++) {
+        const a = rnd(ev, 10 + i + 97 * t) * TAU, rr = Math.sqrt(rnd(ev, 30 + i + 97 * t)) * 2.2, x = S[0] + Math.cos(a) * rr, z = S[2] + Math.sin(a) * rr;
+        if (D.ground(x, z, S[1]) !== S[1]) continue;
+        ev.b.push({ x, y: S[1], z, yaw: rnd(ev, 50 + i) * TAU, ph: rnd(ev, 70 + i) * 6, vx: 0, vy: 0, vz: 0 }); break;
+      }
+      ev.n = ev.b.length; if (ev.n < 6) return false;
       ev.dur = ev.burst + 7;
       D.st.pigeons = ev.n;
     },
@@ -379,6 +387,7 @@
       const S = D.openGround(8 + 5 * rnd(ev, 1), (rnd(ev, 2) - 0.5) * 0.6, 3.5); if (!S) return false;
       const f = D.fwd, sx = -f[1], sz = f[0], half = 3.2;
       const A = [S[0] - sx * half, S[1], S[2] - sz * half], B = [S[0] + sx * half, S[1], S[2] + sz * half];
+      if (D.ground(A[0], A[2], S[1]) !== S[1] || D.ground(B[0], B[2], S[1]) !== S[1]) return false;
       ev.k2 = [A, B].map((p, i) => ({ look: LK.folk(ev.seed + i * 977, 'child', 'child'), pos: p.slice(), home: p.slice(), yaw: LK.yawOf((i ? A : B)[0] - p[0], (i ? A : B)[2] - p[2]), state: 'idle', walk: 0, walkAmt: 0, kid: true, seed: i * 2.1, kick: 0 }));
       for (const K of ev.k2) K.posefx = (P) => { if (K.kick > 0) { const u = 1 - K.kick / 0.45; if (P.leg_r) { P.leg_r[0] = -0.9 + 1.7 * u; } if (P.shin_r) P.shin_r[0] = -0.3; } };
       ev.ball = { pos: [A[0] + sx * 0.6, A[1] + 0.15, A[2] + sz * 0.6], from: null, to: null, t: 0, T: 1, spin: 0 }; ev.side = 0; ev.next = 1.2;
@@ -534,12 +543,20 @@
     top(x, z) { const w = this.g.world; return w && w.topAt ? w.topAt(Math.floor(x), Math.floor(z)) : 80; }
     // the stand height at (x, z) near y0: the first solid block (from 6 above down to 10 below) with two free above it
     ground(x, z, y0) { for (let y = Math.floor(y0) + 6; y > y0 - 10; y--) { if (this.solid(this.get(x, y, z)) && !this.solid(this.get(x, y + 1, z)) && !this.solid(this.get(x, y + 2, z))) return y + 1; } return null; }
-    // open level ground around a point dist ahead (ang: off the view): [x, y, z] or null
+    // open level ground around a point dist ahead (ang: off the view): [x, y, z] or null. Where that spot is taken (café
+    // tables and chairs in a street, a step, a planter) the next ones are tried — further on, nearer, straight ahead, to
+    // either side within the view — in a fixed order (every guest finds the same spot)
     openGround(dist, ang, rad) {
-      const f = this.fwd, a = Math.atan2(f[1], f[0]) + ang, eye = this.eye, x = eye[0] + Math.cos(a) * dist, z = eye[2] + Math.sin(a) * dist;
-      const y = this.ground(x, z, eye[1] - 1.6); if (y === null) return null;
-      for (let k = 0; k < 8; k++) { const b = k / 8 * TAU, gy = this.ground(x + Math.cos(b) * rad, z + Math.sin(b) * rad, y); if (gy === null || Math.abs(gy - y) > 0.01) return null; }
-      return [x, y, z];
+      const f = this.fwd, a0 = Math.atan2(f[1], f[0]), eye = this.eye;
+      for (const dd of [dist, dist + 4, dist + 8, Math.max(4, dist - 4)]) for (const aa of [ang, 0, -ang, 0.55, -0.55]) {
+        if (aa === -ang && ang === 0) continue;
+        const a = a0 + aa, x = eye[0] + Math.cos(a) * dd, z = eye[2] + Math.sin(a) * dd;
+        const y = this.ground(x, z, eye[1] - 1.6); if (y === null) continue;
+        let ok = true;   // (two rings round it: the rim and half way in)
+        for (let k = 0; k < 16 && ok; k++) { const b = k / 8 * TAU + (k >= 8 ? 0.4 : 0), r = k < 8 ? rad : rad * 0.5, gy = this.ground(x + Math.cos(b) * r, z + Math.sin(b) * r, y); if (gy === null || Math.abs(gy - y) > 0.01) ok = false; }
+        if (ok) return [x, y, z];
+      }
+      return null;
     }
     // a walkable run across the view dist ahead (≥ min metres): its points, or null
     runAcross(dist, min) {
@@ -654,11 +671,16 @@
       const k = LD.slotAt(this.seed, this.clock);
       if (this.lastK === null) this.lastK = k;            // (the first act comes with the next slot)
       else if (k > this.lastK) { this.lastK = k; if (this.auto !== false) this.slot(k); }   // (auto false: only forced acts — a test)
+      const e0 = g.player.pos;
       for (let i = this.events.length - 1; i >= 0; i--) {
         const ev = this.events[i], A = ACT[ev.kind];
         ev.age += dt;
         let alive;
-        try { alive = A.update(this, ev, dt) !== false && ev.age < ev.dur; } catch (e) { alive = false; if (!this.warned) { this.warned = true; console.warn('life director', ev.kind, e); } }
+        // (an act above the tier ends at once — Very Low chosen while it runs; an act the eye has left 200 blocks behind
+        // ends too: a flight, a teleport — unless the eye is near the act itself, the balloon it flew to)
+        const far = Math.hypot(e0[0] - ev.eye0[0], e0[2] - ev.eye0[2]) > 200 && !(ev.pos && Math.hypot(e0[0] - ev.pos[0], e0[2] - ev.pos[2]) < 150);
+        if (LD.ACTS[ev.kind].tier > this.tier || far) alive = false;
+        else try { alive = A.update(this, ev, dt) !== false && ev.age < ev.dur; } catch (e) { alive = false; if (!this.warned) { this.warned = true; console.warn('life director', ev.kind, e); } }
         if (!alive) { if (A.end) A.end(this, ev); this.events.splice(i, 1); }
       }
     }
@@ -673,7 +695,7 @@
     start(kind, o) {
       const A = ACT[kind], R = LD.ACTS[kind]; if (!A || !R) return null;
       const k = o && o.k !== undefined ? o.k : (this.lastK || 0) * 64 + 17 + this.events.length;
-      const ev = { kind, k, seed: (Math.floor(h(this.seed, k, 0x9e1) * 4294967295) | 0), age: 0, dur: R.dur };
+      const ev = { kind, k, seed: (Math.floor(h(this.seed, k, 0x9e1) * 4294967295) | 0), age: 0, dur: R.dur, eye0: this.g.player.pos.slice() };
       let ok;
       try { ok = A.start(this, ev) !== false; } catch (e) { ok = false; console.warn('life director', kind, e); }
       if (!ok) return null;
