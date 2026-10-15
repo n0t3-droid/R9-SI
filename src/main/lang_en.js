@@ -333,7 +333,7 @@
     'g.set.zPre': 'Foliage depth first (leaves, grass, fences)',
     'g.set.zPre.tip': 'Leaves, grass and fences are first drawn into the depth only, then with light and colour — each pixel is lit once instead of once for every leaf behind it.',
     'g.set.texLite': 'Lighter textures far away',
-    'g.set.texLite.tip': 'Less filtering work on slanted surfaces (2× instead of 4× anisotropic), far blocks half a step coarser and without their fine relief beyond 32 m — near ones stay the same.',
+    'g.set.texLite.tip': 'Less filtering work on slanted surfaces (2× instead of 4× anisotropic), far blocks read half a step coarser — near ones stay the same.',
     'g.set.dprLite': 'Resolution no higher than the screen',
     'g.set.dprLite.tip': 'The picture is never computed larger than the screen has pixels (Windows scaling 125 or 150 %); on Ultra · Leicht at most 1920 × 1080, the browser scales up the rest.',
     'g.aq.ul.far': 'far cache redrawn less often',

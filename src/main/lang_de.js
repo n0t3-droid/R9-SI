@@ -333,7 +333,7 @@
     'g.set.zPre': 'Laub zuerst nur in die Tiefe (Blätter, Gras, Zäune)',
     'g.set.zPre.tip': 'Blätter, Gras und Zäune werden zuerst nur in die Tiefe gezeichnet, danach mit Licht und Farbe — so wird jeder Bildpunkt einmal beleuchtet statt für jedes Blatt dahinter.',
     'g.set.texLite': 'Texturen in der Ferne leichter',
-    'g.set.texLite.tip': 'Weniger Filterarbeit auf schrägen Flächen (2-fach statt 4-fach anisotrop), ferne Blöcke eine halbe Stufe gröber und ab 32 m ohne ihr Feinrelief — in der Nähe bleibt alles gleich.',
+    'g.set.texLite.tip': 'Weniger Filterarbeit auf schrägen Flächen (2-fach statt 4-fach anisotrop), ferne Blöcke eine halbe Stufe gröber gelesen — in der Nähe bleibt alles gleich.',
     'g.set.dprLite': 'Auflösung höchstens wie der Bildschirm',
     'g.set.dprLite.tip': 'Das Bild wird nie größer gerechnet, als der Bildschirm Pixel hat (Windows-Skalierung 125 oder 150 %); bei Ultra · Leicht höchstens 1920 × 1080, den Rest vergrößert der Browser.',
     'g.aq.ul.far': 'Fern-Cache seltener neu',

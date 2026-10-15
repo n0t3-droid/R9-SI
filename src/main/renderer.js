@@ -89,7 +89,6 @@
       };
       this.texAlbedo = mk(tex.albedo, true);
       this.texMaterial = mk(tex.material);
-      this.texSrc = tex;   // (F10 · texLite: the layer table is made from its material)
       this.setAniso(4);
       // noise
       this.texNoise = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: tex.noise, wrap: gl.REPEAT, filter: gl.LINEAR });
@@ -116,25 +115,6 @@
       }
       this.emptyVAO = gl.createVertexArray();
       this.resize(true);
-    }
-    // F10 · texLite: a row with a texel per texture layer — r 255 when the layer has an emissive texel (its material is always
-    // read), g its mean roughness (what a far fragment takes without reading the material). Made from the material set in
-    // use (texSrc: the game's texture record, which a look switch refills) when it changed.
-    layTex() {
-      const src = this.texSrc, m = src && src.material && src.material[0];
-      if (this.texLay && this.texLayFor === m) return this.texLay;
-      const gl = this.gl, L = src ? src.layers : 1, N = src ? src.size : 1, W = Math.max(1, Math.min(L, gl.getParameter(gl.MAX_TEXTURE_SIZE) || 2048));
-      const out = new Uint8Array((W * 2 + 3) & ~3);
-      for (let l = 0; l < W; l++) {
-        if (!m) { out[l * 2] = 255; continue; }
-        let em = 0, rs = 0; const o = l * N * N * 4;
-        for (let i = 0; i < N * N; i++) { const a = m[o + i * 4 + 3]; if (a > em) em = a; rs += m[o + i * 4 + 2]; }
-        out[l * 2] = em > 5 ? 255 : 0; out[l * 2 + 1] = Math.round(rs / (N * N));
-      }
-      if (this.texLay) gl.deleteTexture(this.texLay);
-      this.texLay = GL.tex2D(W, 1, gl.RG8, gl.RG, gl.UNSIGNED_BYTE, { data: out, filter: gl.NEAREST });
-      this.texLayFor = m;
-      return this.texLay;
     }
     setAvgLum(table) {
       const gl = this.gl; if (!this.texAvgLum || !table) return;
@@ -856,7 +836,6 @@
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
       if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
-      if (p.u.u_lay) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.layTex()); gl.uniform1i(p.u.u_lay, 10); }   // (F10 · texLite)
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {

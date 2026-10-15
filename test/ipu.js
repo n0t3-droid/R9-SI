@@ -178,15 +178,6 @@ console.log('e · zPre and texLite: their programs; off: the terrain programs as
   r2.qBase = {}; r2.setQuality({ texLite: true }); r2.setQuality({ texLite: false });
   gl.texParameterf = tp; V.GL.ext.aniso = null;
   check(anis.join() === '2,2,4,4', 'texLite: anisotropic filtering 4 → 2 (albedo and material), off: 4 again', anis.join());
-  // the layer table: emissive layers flagged, the mean roughness
-  const N = 2, L = 3, mat = new Uint8Array(N * N * 4 * L);
-  for (let i = 0; i < N * N; i++) { mat[(0 * N * N + i) * 4 + 2] = 100; mat[(1 * N * N + i) * 4 + 2] = 200; mat[(2 * N * N + i) * 4 + 2] = 50; }
-  mat[(1 * N * N + 2) * 4 + 3] = 180;   // layer 1: one glowing texel
-  const r3 = make({}); r3.texSrc = { layers: L, size: N, material: [mat] };
-  let data = null; const ti = gl.texImage2D; gl.texImage2D = (...a) => { if (a[2] === 'RG8') data = a[8]; return ti(...a); };
-  r3.layTex(); const again = r3.layTex();
-  gl.texImage2D = ti;
-  check(data && data[0] === 0 && data[1] === 100 && data[2] === 255 && data[3] === 200 && data[4] === 0 && data[5] === 50 && again === r3.texLay, 'the layer table: the glowing layer is always read, the others take their mean roughness; made once per material set', data ? Array.from(data.slice(0, 6)).join(',') : 'none');
   V.GL.program = orig;
 }
 

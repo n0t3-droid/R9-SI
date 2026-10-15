@@ -625,9 +625,6 @@ uniform float u_emissiveBoost;
 uniform float u_normalStrength;
 uniform float u_holoLayer;
 uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade, the normal map turns with the tile (Nahtlos: macro mottling)
-#ifdef TEXLITE
-uniform highp sampler2D u_lay;   // F10 · texLite: per texture layer r = it has emissive texels, g = its mean roughness (renderer layTable)
-#endif
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -719,8 +716,7 @@ void main() {
   // R9 Super Resolution renders below screen size: pick the texture detail of the full-size image
   float mipK = u_mipScale > 0.0 ? u_mipScale : 1.0;
 #ifdef TEXLITE
-  float dT = length(v_rel);
-  mipK *= 1.0 + 0.41421 * smoothstep(24.0, 40.0, dT);   // F10 · texLite: half a mip level coarser far away (eased in from 24 m)
+  mipK *= 1.0 + 0.41421 * smoothstep(24.0, 40.0, length(v_rel));   // F10 · texLite: half a mip level coarser far away (eased in from 24 m)
 #endif
   vec2 dx = dFdx(uv) * mipK, dy = dFdy(uv) * mipK;
   if (rot == 1u || rot == 3u) { dx = dx.yx; dy = dy.yx; }
@@ -738,17 +734,7 @@ void main() {
   o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
 #endif
 #endif
-#ifdef TEXLITE
-  // F10 · texLite: beyond 32 m a layer without emissive texels is not read for its material — no normal map (its mips are
-  // nearly flat there), its mean roughness; a layer that glows is always read
-  vec4 mat;
-  int li = int(layer);
-  vec2 lay = dT > 32.0 && li < textureSize(u_lay, 0).x ? texelFetch(u_lay, ivec2(li, 0), 0).rg : vec2(1.0);
-  if (lay.r < 0.5) mat = vec4(0.5, 0.5, lay.g, 0.0);
-  else mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
-#else
   vec4 mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
-#endif
   vec3 tint = v_tint;
   // a recoloured block (B1): the texture's detail in its own colour, the whole face (the tint mask of a grass side too)
   if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, tint);
