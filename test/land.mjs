@@ -76,6 +76,7 @@ async function openWorld(dist, preset) {
   const logs = [];
   page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|missing/i.test(s)) logs.push(`[${t}] ${s.slice(0, 500)}`); });
   page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1200)));
+  page.on('crash', () => { logs.push('[pageerror] the page crashed'); console.log('  !! the page crashed'); });
   await page.goto(dist);
   const wait = (ms) => page.waitForTimeout(ms);
   const ev = (fn, arg) => page.evaluate(fn, arg);
@@ -114,7 +115,14 @@ async function openWorld(dist, preset) {
   const picture = async (path, tod, frames = 4) => {
     const vx = await warmVx();
     await ev(([frames, tod]) => { window.__norender = false; const g = VR.game, V = g.villages, p = g.player; g.env.setTime(tod); const keep = V && V.agents ? V.agents : null; if (keep) V.agents = keep.filter(a => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) > 8); for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); if (keep) V.agents = keep; window.__norender = true; }, [frames, tod]);
-    await page.screenshot({ path, timeout: 180000 });
+    // (run 1 lost its last shots to one screenshot that never came: try twice, say whether the page still answers)
+    for (let k = 0; k < 2; k++) {
+      try { await page.screenshot({ path, timeout: 150000 }); return vx; } catch (e) {
+        const alive = await Promise.race([ev(() => Math.round(performance.now())).then(() => 'answers', () => 'error'), wait(20000).then(() => 'silent')]);
+        console.log(`  !! screenshot ${path.replace(/^.*\//, '')} failed (${String(e.message || e).split('\n')[0].slice(0, 120)}); the page ${alive}`);
+        if (alive !== 'answers') throw e;
+      }
+    }
     return vx;
   };
   // the counts round a point: canopy, way, plant, crop and water columns, lanterns (every column within r)
@@ -165,7 +173,8 @@ async function shoot(tag, dist, keepOpen) {
     const st = await A.settle(150, 30); await A.step(6);
     const path = `/home/dev/vr/test/shots/land_${s.name}_${tag}.png`;
     wanted++;
-    await A.picture(path, s.tod);
+    console.log(`  · ${s.name}: settled ${JSON.stringify(st)} (${secs()}), the picture…`);
+    try { await A.picture(path, s.tod); } catch (e) { console.log(`  !! ${s.name}: no picture (${String(e.message || e).split('\n')[0].slice(0, 160)})`); break; }
     if (fs.existsSync(path)) { pics++; if (!(await notBlank(path))) blank.push(path); }
     s.counts = await A.counts(s.x, s.z, 72);
     s.ms = Date.now() - t0;
