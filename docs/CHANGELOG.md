@@ -108,6 +108,29 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🧑 Real people II, ✨ the nebula's filaments, 🌬 windmills, 🛒 the cart, 📉 Bandbreite (v0.47)
+**🧑 Real people II.** Arms hang soft (7° out, elbows 13° bent) and swing from the shoulder; a hand on the hip now
+and then; talking people gesture; café guests sit with the knees bent, shoes on the floor and a forearm on the table;
+carried things hang straight from the fist; forty people in one draw instead of forty-one; eye whites stay cool under
+warm light; the people stand in the shadow map (folkShadow, Balanced and up).
+
+**✨ The nebula's filaments.** Fine bright threads and knots over the soft clouds, as the trailer's t1_05 shows them
+(the frames' high-frequency measure 242, the game 222–231 from 57–112 before), on High and Balanced.
+
+**🌬 🛒 The windmills' sails turn** with the wind as a model round the hub (2.5 s lag, still below wind 0.1 and on Very
+Low); **the cart** comes on its own 28–40 s clock in towns by day and runs where the eye can see it.
+
+**📉 Bandbreite — the renderer for integrated GPUs.** Five switches, on for Ultra · Leicht and for every preset on an
+integrated GPU: 11-bit-float scene targets with a probed fallback (hdrLite), the colour copy only with water in view
+and god rays from a quarter-res mask (postLite), a depth prepass for the cut-out layer — full-shader cut-out fragments
+−46 % in the forest (zPre, Low and up), the backing store never larger than the screen (dprLite), and texLite as an
+opt-in. Bytes per frame at 720p: Low 57 → 40 MB, High 64 → 27 MB, Ultra · Leicht 89 → 45 MB; the pictures the same
+(ΔE < 1). Measured in the hall city: the horizon LOD, not the exterior ornament, is the cost at Very Low (470k of 743k
+triangles at P1).
+
+**Known gaps.** The people's sun shadows are confirmed in the maths, not yet by eye on a real GPU; seated robes hide
+the legs; looking straight up on High costs +8–13 % for the filaments; a cart every ~34 s.
+
 ### 🌌 The sky, 🧑 real people, 🌿 the land between, 🚀 a living world, ⚡ Ultra · Leicht (v0.46)
 **🌌 The sky, perfected.** By day the upper half is space — dense stars and a structured nebula (pink, orange, violet
 streaks with dark lanes and lit edges) above a clean blue band and a bright white-cyan haze at the horizon; the sun a
