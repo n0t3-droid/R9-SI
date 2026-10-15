@@ -415,20 +415,35 @@ if (want(6)) {
 
 // ---------------------------------------------------------------- 7 · the woods from afar
 if (want(7)) {
-  console.log('7 · the horizon shows the woods as canopies; its cost at the hills view');
-  // a horizon tile over the north-western woods: canopy cells (leaves, kind 5) in the land's tile, none in vgen 9's
+  console.log('7 · the horizon shows the woods as canopies; its cost at the hills view on Very Low');
   const g9 = V.makeGen('overworld', SEED, { vgen: 9 });
-  const leafCells = (gg, L, tx, tz) => { const t = V.LOD.build(gg, { level: L, tx, tz }); if (!t || t.empty) return 0; const u8 = new Uint8Array(t.verts); let n = 0; for (let i = 6; i < u8.length; i += 12) if ((u8[i] >> 3) === 5) n++; return n; };
-  // the tile whose middle lies deepest in a wood (searched over the north-west)
+  // a horizon tile over the north-western woods: the land answers for its cells (VR.Land.lodTree) and they stand raised
+  // over the same tile without the canopies; vgen 9's tile asks the land for nothing
+  let asked = 0; const lt0 = LAND.lodTree; LAND.lodTree = function () { const r = lt0.apply(this, arguments); if (r) asked++; return r; };
+  const tile = (gg, L, tx, tz) => V.LOD.build(gg, { level: L, tx, tz });
   let best = null;
   for (let tz = -6; tz <= -2; tz++) for (let tx = -5; tx <= -2; tx++) { const T = 32 * 8, x = tx * T + T / 2, z = tz * T + T / 2; if (x * x + z * z > 640 * 640) continue; const d = LAND.woodAt(g, x, z).d; if (!best || d > best.d) best = { tx, tz, d }; }
-  const n10 = leafCells(g, 1, best.tx, best.tz), n9 = leafCells(g9, 1, best.tx, best.tz);
-  check(n10 > 50 && n9 === 0, `a horizon tile over the woods (level 1, ${best.tx}, ${best.tz}) draws them as canopies (${n10} leaf vertices; vgen 9: ${n9})`);
-  // the cost: the horizon's triangles round the hills view (Very Low's horizon: its finest tiles from 64 blocks out)
-  const cam = [0, -292];
-  const tris = (gg) => { let t3 = 0; for (const [L, r0, r1] of [[0, 64, 320], [1, 320, 640], [2, 640, 1280]]) { const T = 32 * (4 << L); for (let tz = Math.floor((cam[1] - r1) / T); tz <= Math.floor((cam[1] + r1) / T); tz++) for (let tx = Math.floor((cam[0] - r1) / T); tx <= Math.floor((cam[0] + r1) / T); tx++) { const d = Math.hypot(tx * T + T / 2 - cam[0], tz * T + T / 2 - cam[1]); if (d < r0 || d > r1) continue; const t = V.LOD.build(gg, { level: L, tx, tz }); if (t && !t.empty) t3 += t.count / 3; } } return t3; };
+  asked = 0; const t10 = tile(g, 1, best.tx, best.tz), a10 = asked;
+  asked = 0; const t9 = tile(g9, 1, best.tx, best.tz), a9 = asked;
+  LAND.LOD_OFF = true; const tOff = tile(V.makeGen('overworld', SEED, { vgen: 10 }), 1, best.tx, best.tz); LAND.LOD_OFF = false;
+  LAND.lodTree = lt0;
+  // the top faces' mean height over their area (vertices: int16 x, y, z ×8 · face | kind << 3 …, 12 bytes, 4 a quad)
+  const meanTop = (t) => { const i16 = new Int16Array(t.verts), u8 = new Uint8Array(t.verts); let s0 = 0, A = 0; for (let v = 0; v + 3 < u8.length / 12; v += 4) { if ((u8[v * 12 + 6] & 7) !== 2) continue; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (let q = v; q < v + 4; q++) { const x = i16[q * 6], z = i16[q * 6 + 2]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const a = (x1 - x0) * (z1 - z0); s0 += a * i16[v * 6 + 1] / 8; A += a; } return A ? s0 / A : 0; };
+  const m10 = meanTop(t10), mOff = meanTop(tOff);
+  check(a10 > 50 && a9 === 0 && m10 >= mOff + 1, `a horizon tile over the woods (level 1, ${best.tx}, ${best.tz}) draws them as canopies (${a10} canopy cells; its top faces ${m10.toFixed(1)} high on average against ${mOff.toFixed(1)} without them; vgen 9 asks for ${a9})`);
+  // the cost: Very Low's horizon (setting 2: 2 km, tiles to level 3, split 1.35, no far ring) as horizon.js picks its
+  // tiles round the hills view (0.5, -292.5), the ones in its look (south, ±62°) — run 2 measured its triangles in the
+  // browser ×1.156 with the canopies as kind-5 cells (they never merge); the land's canopies now merge (one leaf colour,
+  // 2-block terraces)
+  const N = 32, tsz = (L) => N * (4 << L), CX = 0.5, CZ = -292.5, R = 2048, Lr = 3, split = 1.35, tiles = [];
+  const dist = (L, tx, tz) => { const S = tsz(L), x0 = tx * S, z0 = tz * S; return Math.hypot(Math.max(x0 - CX, 0, CX - (x0 + S)), Math.max(z0 - CZ, 0, CZ - (z0 + S))); };
+  const visit = (L, tx, tz) => { const d = dist(L, tx, tz); if (d > R) return; if (L > 0 && d < split * tsz(L)) { for (const [a, b] of [[tx * 2, tz * 2], [tx * 2 + 1, tz * 2], [tx * 2, tz * 2 + 1], [tx * 2 + 1, tz * 2 + 1]]) visit(L - 1, a, b); return; } tiles.push([L, tx, tz]); };
+  for (let tz = Math.floor((CZ - R) / tsz(Lr)); tz <= Math.floor((CZ + R) / tsz(Lr)); tz++) for (let tx = Math.floor((CX - R) / tsz(Lr)); tx <= Math.floor((CX + R) / tsz(Lr)); tx++) visit(Lr, tx, tz);
+  const inLook = ([L, tx, tz]) => { const S = tsz(L); for (const [px, pz] of [[tx * S + S / 2, tz * S + S / 2], [Math.max(tx * S, Math.min(CX, tx * S + S)), Math.max(tz * S, Math.min(CZ, tz * S + S))], [tx * S, tz * S], [tx * S + S, tz * S], [tx * S, tz * S + S], [tx * S + S, tz * S + S]]) { const dx = px - CX, dz = pz - CZ, d = Math.hypot(dx, dz) || 1; if (dz / d > Math.cos(62 * Math.PI / 180)) return true; } return false; };
+  const view = tiles.filter(inLook);
+  const tris = (gg) => { let n = 0; for (const [L, tx, tz] of view) { const t = tile(gg, L, tx, tz); if (t && !t.empty) n += t.count / 3; } return n; };
   const a = tris(g9), b = tris(g);
-  check(b <= a * 1.08, `the horizon round the hills view: ${Math.round(b)} triangles against vgen 9's ${Math.round(a)} (×${(b / a).toFixed(3)}, at most ×1.08)`);
+  check(b <= a * 1.03, `Very Low's horizon in the hills view: ${Math.round(b)} triangles against vgen 9's ${Math.round(a)} (×${(b / a).toFixed(3)}, at most ×1.03; ${view.length} tiles)`);
   console.log(`  (${secs()})`);
 }
 

@@ -397,8 +397,15 @@
           }
         } else if (cover > 0.05 && !(vsites.length && inVil(X, Z, 0))) {
           const lc = leafCol(tr[1], B);
-          t = mixc(t, lc, Math.min(1, cover * 1.1)); s = mixc(s, lc, cover * 0.6);
-          h = y + 1 + cover * tr[2] * 0.7; if (cover > 0.4 && !tr[4]) kd = 5;   // (tr[4]: a canopy kept as land, its cells merge — t-land's woods)
+          if (tr[4]) {
+            // (t-land, tr[4]) the land's woods: a canopy kept as land with one leaf colour and 2-block terraces, so a
+            // wood's cells merge into big quads (Very Low's horizon at the hills view no heavier than before)
+            t = mixc(t, lc, cover > 0.4 ? 1 : 0.6); s = mixc(s, lc, 0.6);
+            h = Math.max(y + 1, Math.round((y + 1 + cover * tr[2] * 0.7) / 2) * 2);
+          } else {
+            t = mixc(t, lc, Math.min(1, cover * 1.1)); s = mixc(s, lc, cover * 0.6);
+            h = y + 1 + cover * tr[2] * 0.7; if (cover > 0.4) kd = 5;
+          }
           if (cold) t = mixc(t, snow, 0.5);
         }
       }

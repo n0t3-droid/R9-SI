@@ -814,6 +814,9 @@
   // every other cell, and every older world, null (test/land_v9_same.js hashes their tiles with and without this file).
   const LODK = ['oak', 'birch', 'dark_oak', 'spruce', 'cherry'], LODH = [8, 9, 8, 11, 7], LT = [0, 'oak', 8, 4, 0];
   LAND.LOD_NEAR = 1;   // the canopy is in the cell on every tile (no little voxel trees: Very Low's horizon at the hills view +6 % triangles, not +23 %)
+  // the canopy kept as land (lod.js tr[4]): one leaf colour, 2-block terraces, so a wood's cells merge — as kind-5 cells
+  // (never merged) Very Low's horizon in the hills view drew ×1.040 the triangles of vgen 9, now ×1.015 (test/land.js §7)
+  LAND.LOD_FLAT = true;
   LAND.lodTree = function (g, X, Z, key) {
     if (key !== 'sky_meadow' || !LAND.on(g)) return null;
     if (LAND.zoneAt(g, X, Z)) return null;
