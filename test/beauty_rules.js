@@ -362,9 +362,49 @@ console.log('8 · a fall off a floating island pours off the rim and dissolves i
   check(nv === 0 && vl.spawned.length === 0, `Very Low: none (${nv})`);
   check(far.near(ms[0]).length === 0, `nothing beyond the reach (${far.near(ms[0]).length} from 900 blocks)`);
   const p0 = hi.near(ms[0])[0];
-  // (run c2's pictures — water_1, water_r1, far_3: the first puffs, opaque white discs of 1 … 2 blocks, hung under the
-  //  isles as white balls on strings; a puff is a thin veil now, wide and see-through, the many of a foot one haze)
-  check(p0 && p0.o.collide === false && p0.o.grow > 0 && p0.o.size >= 2 && p0.o.alpha > 0 && p0.o.alpha <= 0.3 && !p0.o.emis && p0.o.col[2] >= 0.9, `a puff is a thin white veil that grows as it thins (${p0 ? JSON.stringify({ size: +p0.o.size.toFixed(2), grow: p0.o.grow, alpha: p0.o.alpha, col: p0.o.col, life: +p0.o.life.toFixed(1) }) : '-'})`);
+  check(p0 && p0.o.collide === false && p0.o.grow > 0 && p0.o.alpha > 0 && p0.o.alpha <= 0.3 && !p0.o.emis && p0.o.col[2] >= 0.9, `a puff is see-through spray that grows as it thins (${p0 ? JSON.stringify({ size: +p0.o.size.toFixed(2), grow: p0.o.grow, alpha: p0.o.alpha, col: p0.o.col, life: +p0.o.life.toFixed(1) }) : '-'})`);
+  // what a viewer sees of one foot (the curves): the real vents.js and particles.js run for 14 s round a foot, and the
+  // live particles' discs — the particle shader's (1 − smoothstep(0.3, 1, d)) × the instance alpha — are laid over each
+  // other along the view on a grid of quarter blocks: the opacity of the mist, its heart, its reach. Run c2's pictures
+  // (water_1, water_r1, far_3): opaque discs of one or two blocks hung under the isles as white balls on strings — 1.00
+  // at the heart; 902a59f's wide thin veils, all round the foot, piled up into a white ball of their own (0.97 at its
+  // heart, 16 blocks across, nothing under it). The fall goes on as spray under its ragged end, slowing, widening and
+  // thinning — a plume of mist, never a ball; a lava fall's end smokes upward
+  {
+    require('../src/main/particles.js');
+    const plumeOf = (lava) => {
+      let sd = 4242; const rnd = Math.random; Math.random = () => { sd = (Math.imul(sd, 1103515245) + 12345) >>> 0; return sd / 4294967296; };
+      const P = new VR.Particles({ world: null, skyBright: 1 }), foot = [0.5, 100, 0.5], eye = [0.5, 100, 120];
+      const Vn = new VR.Vents({ settings: { preset: 'high' }, particles: P });
+      Vn.absorb([['mist', foot[0], foot[1], foot[2], lava ? 1 : 0]]);
+      const RES = 0.25, X0 = -24, Y0 = foot[1] - 40, NX = 192, NY = 216, out = [];
+      for (let f = 0; f < 14 * 30; f++) {
+        Vn.update(1 / 30, eye); P.update(1 / 30, eye);
+        if (f < 9 * 30 || f % 15) continue;
+        const T = new Float32Array(NX * NY).fill(1), D = P.data;
+        for (let k = 0; k < P.n; k++) {
+          const o = k * 14, x = D[o] + eye[0], y = D[o + 1] + eye[1], z = D[o + 2] + eye[2], s = D[o + 3], a = D[o + 13];
+          if (Math.abs(z - foot[2]) > 40 || Math.abs(x - foot[0]) > 40 || P.emis[k]) continue;   // (the foot's own spray: not the citadel's beam, not a spark)
+          for (let j = Math.max(0, Math.floor((y - s - Y0) / RES)); j < Math.min(NY, Math.ceil((y + s - Y0) / RES)); j++) for (let i = Math.max(0, Math.floor((x - s - X0) / RES)); i < Math.min(NX, Math.ceil((x + s - X0) / RES)); i++) {
+            const d = Math.hypot((X0 + (i + 0.5) * RES - x) / s, (Y0 + (j + 0.5) * RES - y) / s); if (d >= 1) continue;
+            const q = d <= 0.3 ? 0 : (d - 0.3) / 0.7, aa = 1 - q * q * (3 - 2 * q); if (aa < 0.05) continue;
+            T[j * NX + i] *= 1 - aa * a;
+          }
+        }
+        let peak = 0, below = 0, above = 0;
+        for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const op = 1 - T[j * NX + i], py = Y0 + (j + 0.5) * RES; if (op > peak) peak = op; if (op > 0.08) { if (py < foot[1]) below = Math.max(below, foot[1] - py); else above = Math.max(above, py - foot[1]); } }
+        const width = (yy) => { const j = Math.floor((yy - Y0) / RES); let c = 0; for (let i = 0; i < NX; i++) if (1 - T[j * NX + i] > 0.08) c++; return c * RES; };
+        out.push({ peak, below, above, w0: width(foot[1]), w6: width(foot[1] - 6) });
+      }
+      Math.random = rnd;
+      const avg = (k) => out.reduce((s, q) => s + q[k], 0) / out.length;
+      return { peak: Math.max(...out.map(q => q.peak)), below: avg('below'), above: avg('above'), w0: avg('w0'), w6: avg('w6') };
+    };
+    const W = plumeOf(false), L = plumeOf(true), fx = (q) => `the heart ${q.peak.toFixed(2)}, ${q.below.toFixed(1)} under the foot, ${q.above.toFixed(1)} over it, ${q.w0.toFixed(1)} wide at the foot, ${q.w6.toFixed(1)} six under it`;
+    check(W.peak <= 0.7, `a fall's mist is a veil, never a ball: its heart at most 0.7 opaque (${fx(W)})`);
+    check(W.below >= 10 && W.above <= 4 && W.w6 >= 5 && W.w6 > W.w0, `the spray goes on falling under the ragged end, widening as it thins (${W.below.toFixed(1)} under the foot, ${W.above.toFixed(1)} over it; ${W.w0.toFixed(1)} → ${W.w6.toFixed(1)} wide)`);
+    check(L.peak <= 0.7 && L.above >= 8 && L.below <= 3, `a lava fall's end smokes upward, thin (${fx(L)})`);
+  }
   // particles.js draws a particle's own opacity: the instance alpha of a veil is its alpha (× the fade), of a spark 1
   {
     require('../src/main/particles.js');
