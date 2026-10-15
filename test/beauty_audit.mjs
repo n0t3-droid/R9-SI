@@ -1,5 +1,5 @@
 // Beauty from every angle (plan docs/superpowers/plans/2026-10-08-t-beauty.md): an audit by pictures of a NEW world
-// made with the default generator (Nova Haven, vgen 8), on the High preset as a player gets it (only the dynamic
+// made with the default generator (Nova Haven; vgen 9 on this branch, vgen 8 before), on the High preset as a player gets it (only the dynamic
 // resolution held off, so every picture is drawn at full size), at four times of day — morning 08:00 (2000), noon
 // (6000), the golden hour 18:30 (12500), night 22:00 (16000) — from the viewpoints a trailer camera would choose:
 //   hills   (a) from the terraced hills down at Nova Haven, 80–250 m away
@@ -11,15 +11,23 @@
 //   far     (g) the far world from ridges: the horizon, the far ring, the sky
 //   <site>_r1, <site>_r2  (h) two seeded "random" cameras per site (the same every run)
 // The camera is teleported (as the other tests set the player's position); nothing is built, no setting beyond the
-// preset and the time is touched. The villagers right at the lens (within 8 blocks) and the wandering animals are
+// preset and the time is touched. The camera rule (continuation 2 — run 2's far_1 stood inside the station's hull and
+// villa_1 in front of a garden mound): every eye is clear — no solid block within a block of it, the view ray free of
+// opaque blocks and leaves for its first six blocks; else the eye rises a block at a time (up to 24) and, failing that,
+// steps back along the view two blocks at a time (up to 12) and rises again (fixed cameras keep their look-at point).
+// The villagers right at the lens (within 8 blocks) and the wandering animals are
 // left out of the pictures. Pictures: test/shots/beauty_<site>_<n>_<TAG>.png (1280 × 720; a camera's extra times of
 // day as beauty_<site>_<n>_<time>_<TAG>.png); the cameras, the ground under them and the timings in
 // test/shots/beauty_<TAG>.json.
 // COST=1: the Very Low (potato) cost at two scenes — ms per frame (the GPU drained), draws, triangles; the median of
-// the rounds — and with COST_DIST=file:///…/index.html the same for that build, the two pages measured in turns.
-// Checks: the world is vgen 8 with Nova Haven, every picture is written and not blank, no page error.
+// the rounds — in a fresh page made on Very Low (the High page closed first), and with COST_DIST=file:///…/index.html
+// the same for that build, the two pages measured in turns; then this build's Very Low pictures, the page before closed.
+// VGEN=10: this build's world made with that generator version (default: the build's own for a new world).
+// Checks: the world is vgen 8 or later with Nova Haven, every picture is written and not blank, every eye is clear, the
+// cost measured at both scenes and its pictures written, no page error.
 // usage: BEFORE_DIST=file:///…/index.html TAG=after nohup bash test/wt_run.sh beauty_audit.mjs 7200 > .tmp_tests/beauty_audit.log 2>&1 &
 //   BEFORE_DIST: a build before, shot first (…_before.png), then DIST (default this checkout's dist) as …_<TAG>.png
+//   BEFORE_ONLY=far_1,villa_1: the build before shoots only these (the rest of its pictures kept from an earlier run)
 //   ONLY=hills,street_1 (sites or shot names) · SEED=4242 · NO_EXTRA=1 (each camera at its own time only) · NO_AFTER=1
 // regress: skip  (a showcase: the pictures are the evidence; the gates are the node tests, test/beauty_rules.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -166,7 +174,8 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 
 // ---------------------------------------------------------------- a page with a world
-async function openWorld(dist, preset) {
+// (vgen: the world's generator version, 0 = the build's default for a new world)
+async function openWorld(dist, preset, vgen = 0) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await ctx.newPage();
   const logs = [];
@@ -183,20 +192,42 @@ async function openWorld(dist, preset) {
   // only paces the loading; run 1 of this test spent 100 s a camera with 7 000 sections still waiting at 12 jobs a
   // frame): the rate is the preset's again for every drawn picture and for the cost
   const boost = (on) => ev((on) => { const g = VR.game, q = g.renderer && g.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
+  // (continuation 2: run 2's settles never ended — 1 100 … 1 400 sections stayed dirty within the view however long it
+  //  waited, every column shown, the pool idle: the re-meshes the world leaves for later. The dirty count is now the
+  //  sections with blocks in the inner view (two columns in from its rim), and a settle whose view is all shown ends
+  //  when that count has not fallen for four rounds)
   const settle = async (max = 60, farMax = 30) => {
-    let s = null;
+    let s = null, last = Infinity, stall = 0;
     await boost(true);
     for (let i = 0; i < max; i++) {
       await step(20);
-      s = await ev(() => { const g = VR.game, w = g.world, p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0, dirtyAll = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; dirtyAll += n; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; } let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } const h = g.horizon, f = h && h.far, fr = f && f.report ? f.report() : null; return { busy: g.pool.busy, pend: w.pending.size, dirty, dirtyAll, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, hz: h ? h.inflight : 0, far: fr ? fr.inflight + fr.want : 0 }; });
-      const near = s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0;
-      s.i = i;
+      s = await ev(() => { const g = VR.game, w = g.world, p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), ri = Math.max(1, rd - 2), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0, dirtyAll = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if ((sc.dirty || sc.pending) && sc.count > 0) n++; dirtyAll += n; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= ri * ri) dirty += n; } let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } const h = g.horizon, f = h && h.far, fr = f && f.report ? f.report() : null; return { busy: g.pool.busy, pend: w.pending.size, dirty, dirtyAll, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, hz: h ? h.inflight : 0, far: fr ? fr.inflight + fr.want : 0 }; });
+      const shown = s.pend === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0;
+      stall = shown && s.dirty >= last ? stall + 1 : 0; last = s.dirty;
+      const near = shown && ((s.busy === 0 && s.dirty === 0) || stall >= 4);
+      s.i = i; s.stall = stall;
       if (near && i > 2 && ((s.hz === 0 && s.far === 0) || i >= farMax)) break;
       await wait(30);
     }
     await boost(false);
     return s;
   };
+  // the camera rule: nothing solid round the eye (a wall, rock, a crown or trunk within 0.9 of it at its height, the
+  // cell 0.6 under it free: the eye above the ground), the view ray free of anything solid for its first 2.5 blocks and
+  // of opaque blocks and leaves for its first `need` — else up a block at a time (to 24), else back along the view two
+  // at a time (to 12) and up again. (Every VX/VM piece is solid; flowers and grass are not.)
+  const clearEye = (x, y, z, yaw, pitch, need) => ev(([x, y, z, yaw, pitch, need]) => {
+    const w = VR.game.world, R = VR.R, F = VR.F;
+    const fl = (x, y, z) => { const s = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return s ? R.T.flags[s] : 0; };
+    const cp = Math.cos(pitch), dx = -Math.sin(yaw) * cp, dy = Math.sin(pitch), dz = -Math.cos(yaw) * cp, hx = Math.hypot(dx, dz) || 1;
+    const box = (x, y, z) => { for (const b of [-0.6, 0, 0.9]) for (let a = -1; a <= 1; a++) for (let c = -1; c <= 1; c++) if (fl(x + a * 0.9, y + b, z + c * 0.9) & F.SOLID) return false; return true; };
+    const ray = (x, y, z) => { for (let t = 0.5; t <= need; t += 0.25) if (fl(x + dx * t, y + dy * t, z + dz * t) & (t <= 2.5 ? F.SOLID : F.OPAQUE | F.LEAVES)) return false; return true; };
+    for (let back = 0; back <= 12; back += 2) {
+      const bx = x - dx / hx * back, bz = z - dz / hx * back;
+      for (let up = 0; up <= 24; up++) if (box(bx, y + up, bz) && ray(bx, y + up, bz)) return { x: bx, y: y + up, z: bz, up, back };
+    }
+    return { x, y, z, up: 0, back: 0, stuck: true };
+  }, [x, y, z, yaw, pitch, need]);
   // the detailed pieces (VX: crowns, furniture, facade pieces) within the detail distance, uploaded before a picture
   const warmVx = () => ev(() => {
     const g = VR.game, r = g.renderer, p = g.player; if (!r.vxResidency || !g.world) return -1;
@@ -212,7 +243,7 @@ async function openWorld(dist, preset) {
   });
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.applySettings('*'); }, preset);
-  await ev(`VR.game.createWorld({name:'Beauty',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
+  await ev(`VR.game.createWorld({name:'Beauty',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true${vgen ? ',vgen:' + (+vgen) : ''}})`);
   for (let i = 0; i < 150; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   const ok = await ev(() => VR.game.state) === 'play';
   await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; for (const id of ['hud', 'ui', 'hints']) { const h = document.getElementById(id); if (h) h.style.display = 'none'; } });
@@ -222,10 +253,11 @@ async function openWorld(dist, preset) {
   const picture = async (path, tod, frames = 4) => {
     const vx = await warmVx();
     await ev(([frames, tod]) => { window.__norender = false; const g = VR.game, V = g.villages, p = g.player; g.env.setTime(tod); const keep = V && V.agents ? V.agents : null; if (keep) V.agents = keep.filter(a => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) > 8); for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); if (keep) V.agents = keep; window.__norender = true; }, [frames, tod]);
+    await page.bringToFront().catch(() => {});
     await page.screenshot({ path, timeout: 180000 });
     return vx;
   };
-  return { ctx, page, logs, ev, wait, step, settle, warmVx, groundY, pose, picture, ok };
+  return { ctx, page, logs, ev, wait, step, settle, warmVx, groundY, pose, picture, clearEye, ok };
 }
 
 // a picture is not blank: the luminance spreads (a black or a one-colour frame fails)
@@ -234,13 +266,14 @@ const notBlank = async (path) => { try { const { data, info } = await sharp(path
 // ---------------------------------------------------------------- the audit of one build
 // (the random cameras' first guesses: the middle of their site)
 const MID = { temple: [0, -10], street: [0, -100], backs: [0, -120], villa: [75, -107], hills: [0, -250], far: [0, -400], water: [235, 45] };
-async function audit(tag, dist, keepOpen) {
-  const record = { tag, seed: SEED, dist, shots: [], cost: null }, recPath = `/home/dev/vr/test/shots/beauty_${tag}.json`;
-  const A = await openWorld(dist, 'high');
+async function audit(tag, dist, only, vgen = 0) {
+  // (a partial run — BEFORE_ONLY — keeps the full record of the earlier run beside its own)
+  const record = { tag, seed: SEED, dist, vgen: vgen || null, shots: [], cost: null }, recPath = `/home/dev/vr/test/shots/beauty_${tag}${only ? '_' + only.join('_') : ''}.json`;
+  const A = await openWorld(dist, 'high', vgen);
   check(A.ok, `${tag}: the world is loaded (${secs()})`);
   const meta = await A.ev(() => { const g = VR.game, w = g.world, gen = w && w.genOpts; const VG = VR.VillageGen; return { vgen: (g.meta && g.meta.vgen) || (gen && gen.vgen) || 0, preset: g.settings.preset, rd: w.renderDist, far: g.settings.far, look: VR.LOOK ? VR.LOOK.mode : '?', nh: !!(VG && VG.NOVA_HAVEN) }; });
   console.log(tag, 'world', JSON.stringify(meta));
-  check(meta.vgen >= 8 && meta.nh && meta.preset === 'high', `${tag}: a new default world (vgen ${meta.vgen}) with Nova Haven on High (${JSON.stringify(meta)})`);
+  check(meta.vgen >= 8 && (!vgen || meta.vgen === vgen) && meta.nh && meta.preset === 'high', `${tag}: a new ${vgen ? 'vgen-' + vgen : 'default'} world (vgen ${meta.vgen}) with Nova Haven on High (${JSON.stringify(meta)})`);
   await A.settle(80);
   let pics = 0, wanted = 0;
   const blank = [];
@@ -262,6 +295,13 @@ async function audit(tag, dist, keepOpen) {
       const dx = s.at[0] - s.x, dy = s.at[1] - eyeY, dz = s.at[2] - s.z;
       s.yaw = +Math.atan2(-dx, -dz).toFixed(3); s.pitch = +Math.atan2(dy, Math.hypot(dx, dz)).toFixed(3);
     }
+    // the camera rule: the eye clear of walls and ground (a fixed camera keeps its look-at point)
+    const C = await A.clearEye(s.x, s.feet + EYE, s.z, s.yaw, s.pitch, 6);
+    s.lift = C.up; s.back = C.back; s.stuck = !!C.stuck;
+    if (C.up || C.back) {
+      s.x = +C.x.toFixed(2); s.z = +C.z.toFixed(2); s.feet = +(C.y - EYE).toFixed(2);
+      if (s.at) { const dx = s.at[0] - s.x, dy = s.at[1] - C.y, dz = s.at[2] - s.z; s.yaw = +Math.atan2(-dx, -dz).toFixed(3); s.pitch = +Math.atan2(dy, Math.hypot(dx, dz)).toFixed(3); }
+    }
     await A.pose(s.x, s.feet, s.z, s.yaw, s.pitch, s.fov, s.tod);
     // (the far cameras' columns load slowly — run 2 left 200 … 350 of them unshown after 60 rounds: up to 150 now, a
     //  camera whose near world is all there stops as soon as it is)
@@ -269,7 +309,7 @@ async function audit(tag, dist, keepOpen) {
     return st;
   };
   // every build starts its random cameras afresh (the same seeded draws, the same first guesses)
-  const shots = SHOTS.map(s0 => { const s = Object.assign({}, s0); if (s.random) { s.rnd = rngOf(s.name); s.x = MID[s.random][0]; s.z = MID[s.random][1]; } return s; });
+  const shots = SHOTS.filter(s0 => !only || only.includes(s0.name)).map(s0 => { const s = Object.assign({}, s0); if (s.random) { s.rnd = rngOf(s.name); s.x = MID[s.random][0]; s.z = MID[s.random][1]; } return s; });
   // (a first visit to the first camera without a picture: the world, the far ring and the horizon settle there once —
   //  t-city2 found the first pictures after a world's load unusable)
   if (shots.length) { const s0 = Object.assign({}, shots[0]); if (s0.random) s0.rnd = rngOf(s0.name); await place(s0); await A.ev(() => { window.__norender = false; const g = VR.game; for (let i = 0; i < 4; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } window.__norender = true; }); await A.settle(30); }
@@ -289,43 +329,50 @@ async function audit(tag, dist, keepOpen) {
       s.pics.push({ path: path.replace(/^.*test\/shots\//, 'test/shots/'), tod: times[k], vx });
     }
     s.ms = Date.now() - t0;
-    console.log(`  ${s.name}${s.random ? ' (' + s.what + ')' : ''}: (${s.x}, ${s.feet}, ${s.z}) yaw ${s.yaw} pitch ${s.pitch} fov ${s.fov} · ${times.map(t => TODN[t]).join(', ')} · ${(s.ms / 1000).toFixed(0)} s · load ${s.s1 ? s.s1.i + 1 : '?'} rounds · settle ${JSON.stringify(st)} (${secs()})`);
-    record.shots.push({ name: s.name, site: s.random || s.name.split('_')[0], x: s.x, feet: s.feet, z: s.z, yaw: s.yaw, pitch: s.pitch, fov: s.fov, ground: s.ground, what: s.what, pics: s.pics, ms: s.ms });
+    console.log(`  ${s.name}${s.random ? ' (' + s.what + ')' : ''}: (${s.x}, ${s.feet}, ${s.z}) yaw ${s.yaw} pitch ${s.pitch} fov ${s.fov} · ${times.map(t => TODN[t]).join(', ')} · ${(s.ms / 1000).toFixed(0)} s · load ${s.s1 ? s.s1.i + 1 : '?'} rounds · settle ${JSON.stringify(st)}${s.lift || s.back ? ' · eye cleared: up ' + s.lift + ', back ' + s.back : ''}${s.stuck ? ' · EYE NOT CLEAR' : ''} (${secs()})`);
+    record.shots.push({ name: s.name, site: s.random || s.name.split('_')[0], x: s.x, feet: s.feet, z: s.z, yaw: s.yaw, pitch: s.pitch, fov: s.fov, ground: s.ground, what: s.what, lift: s.lift, back: s.back, stuck: s.stuck, pics: s.pics, ms: s.ms });
     try { fs.writeFileSync(recPath, JSON.stringify(record, null, 1)); } catch (e) { /* the record is a convenience */ }
   }
   check(pics === wanted && wanted > 0, `${tag}: every picture is written (${pics} of ${wanted})`);
   check(blank.length === 0, `${tag}: no picture is blank (${blank.length}${blank.length ? ': ' + blank.join(', ') : ''})`);
-  A.record = record; A.recPath = recPath; A.tag = tag;
-  if (keepOpen) return A;
+  const stuck = record.shots.filter(q => q.stuck).map(q => q.name), moved = record.shots.filter(q => q.lift || q.back).map(q => `${q.name} (up ${q.lift}, back ${q.back})`);
+  check(stuck.length === 0, `${tag}: every eye is clear of walls and ground (${stuck.length ? 'not: ' + stuck.join(', ') : 'all'}; moved by the rule: ${moved.join(', ') || 'none'})`);
   const errs = A.logs.filter(l => l.startsWith('[pageerror]'));
   console.log(`--- ${tag} logs (${A.logs.length})`); for (const l of A.logs.slice(0, 12)) console.log(l);
   check(errs.length === 0, `${tag}: no page error (${errs.length})`);
   await A.ctx.close();
-  return null;
+  return { record, recPath };
 }
 // BEFORE_DIST (optional): the build before, shot first as …_before.png; then this checkout's dist as …_<TAG>.png
-if (process.env.BEFORE_DIST) await audit('before', process.env.BEFORE_DIST, false);
-const A = process.env.NO_AFTER ? null : await audit(TAG, DIST, true);
+// (VGEN: the world of this build made with that generator version instead of the build's default — the build before
+//  always makes its own default)
+const VGEN = +(process.env.VGEN || 0);
+if (process.env.BEFORE_DIST) await audit('before', process.env.BEFORE_DIST, process.env.BEFORE_ONLY ? process.env.BEFORE_ONLY.split(',') : null);
+const A = process.env.NO_AFTER ? null : await audit(TAG, DIST, null, VGEN);
 const record = A ? A.record : { cost: null }, recPath = A ? A.recPath : `/home/dev/vr/test/shots/beauty_${TAG}.json`;
 
 // ---------------------------------------------------------------- the Very Low cost (COST=1)
 // two scenes of the city at eye height (the crescent's west end, the lawn between the rows), the GPU drained after each
-// frame; with COST_DIST the build before is opened beside it and the two are measured in turns
-if (process.env.COST && A) {
+// frame: this build — and with COST_DIST the build before — each in a fresh page whose world is made on Very Low, the
+// two measured in turns; then the page before is closed and this page's pictures of the two scenes are taken. (Run c2
+// measured the page of the 52 High pictures, switched to Very Low, beside a fresh page of the build before — their draws
+// and triangles did not compare — and its Very Low picture then timed out after 180 s with the two pages open)
+if (process.env.COST && !process.env.NO_AFTER) {
   const SCENES = [['crescent_end', -100.5, -91.5, [-125, 82, -100]], ['between_rows', 20.5, -116.5, [20, 84, -95]]];
-  const pages = [['this', A]];
+  const pages = [];
   try {
-    await A.ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
-    if (process.env.COST_DIST) { const B = await openWorld(process.env.COST_DIST, 'potato'); check(B.ok, `the build before is loaded for the cost (${secs()})`); pages.push(['before', B]); }
+    const T = await openWorld(DIST, 'potato', VGEN); check(T.ok, `this build is loaded on Very Low for the cost (${secs()})`); pages.push(['this', T]);
+    if (process.env.COST_DIST) { const B = await openWorld(process.env.COST_DIST, 'potato'); check(B.ok, `the build before is loaded on Very Low for the cost (${secs()})`); pages.push(['before', B]); }
     const measure = (P, n) => P.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
+    const poseAt = async (P, x, z, at) => {
+      const gy = await P.groundY(x, z), eyeY = gy + 1 + EYE, dx = at[0] - x, dy = at[1] - eyeY, dz = at[2] - z;
+      await P.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [x, z]); await P.settle(40, 4);
+      await P.pose(x, eyeY - EYE, z, Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)), 70, GOLDEN);
+      await P.settle(80, 4); await P.step(6);
+    };
     record.cost = {};
     for (const [scene, x, z, at] of SCENES) {
-      for (const [, P] of pages) {
-        const gy = await P.groundY(x, z), eyeY = gy + 1 + EYE, dx = at[0] - x, dy = at[1] - eyeY, dz = at[2] - z;
-        await P.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [x, z]); await P.settle(40, 4);
-        await P.pose(x, eyeY - EYE, z, Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)), 70, GOLDEN);
-        await P.settle(80, 4); await P.step(6);
-      }
+      for (const [, P] of pages) await poseAt(P, x, z, at);
       const rounds = {};
       for (let r = 0; r < 5; r++) {
         const order = r & 1 ? pages.slice().reverse() : pages;
@@ -335,18 +382,19 @@ if (process.env.COST && A) {
       for (const lbl of Object.keys(rounds)) { const ms = rounds[lbl].map(q => q.ms).sort((a, b) => a - b); out[lbl] = { msMedian: ms[ms.length >> 1], ms, draws: rounds[lbl][2].draws, tris: rounds[lbl][2].tris }; }
       if (out.before && out.this) out.ratio = +(out.this.msMedian / out.before.msMedian).toFixed(3);
       record.cost[scene] = out;
-      console.log(`very low · ${scene}: ${JSON.stringify(out)}`);
-      await A.picture(`/home/dev/vr/test/shots/beauty_potato_${scene}_${TAG}.png`, GOLDEN, 16);
+      console.log(`very low · ${scene}: ${JSON.stringify(out)} (${secs()})`);
     }
+    check(SCENES.every(([s]) => record.cost[s] && record.cost[s].this), `the Very Low cost is measured at ${SCENES.length} scenes`);
     try { fs.writeFileSync(recPath, JSON.stringify(record, null, 1)); } catch (e) { /* the record is a convenience */ }
     for (const [lbl, P] of pages) if (lbl !== 'this') { const errs = P.logs.filter(l => l.startsWith('[pageerror]')); check(errs.length === 0, `${lbl}: no page error (${errs.length})`); await P.ctx.close(); }
-  } catch (e) { check(false, `the Very Low cost is measured (${String(e.message || e).slice(0, 300)})`); }
-}
-if (A) {
-  const errs = A.logs.filter(l => l.startsWith('[pageerror]'));
-  console.log(`--- ${TAG} logs (${A.logs.length})`); for (const l of A.logs.slice(0, 12)) console.log(l);
-  check(errs.length === 0, `${TAG}: no page error (${errs.length})`);
-  await A.ctx.close();
+    // (the page before is closed: this page's Very Low pictures alone)
+    let vlPics = 0;
+    for (const [scene, x, z, at] of SCENES) { await poseAt(T, x, z, at); const path = `/home/dev/vr/test/shots/beauty_potato_${scene}_${TAG}.png`; await T.picture(path, GOLDEN, 16); if (fs.existsSync(path) && await notBlank(path)) vlPics++; }
+    check(vlPics === SCENES.length, `the Very Low pictures are written (${vlPics} of ${SCENES.length}, ${secs()})`);
+    const errs = T.logs.filter(l => l.startsWith('[pageerror]'));
+    check(errs.length === 0, `this build on Very Low: no page error (${errs.length})`);
+    await T.ctx.close();
+  } catch (e) { check(false, `the Very Low cost (${String(e.message || e).slice(0, 300)})`); }
 }
 await browser.close();
 console.log(`(${secs()})`);

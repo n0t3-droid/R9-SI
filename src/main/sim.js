@@ -153,6 +153,10 @@
         if (canFlow(below)) { if (below) { this.game.particles.breakBlock(x, y - 1, z, below); } w.setBlock(x, y - 1, z, t.with(t.defaultState, 'level', 8), 4); return; }
         if (isLava && (T.flags[below] & F.WATER) && (T.flags[below] & F.FLUID)) { w.setBlock(x, y - 1, z, R.byName.stone.defaultState, 4); return; }
         if (same(below) && lvOf(below) !== 0 && lvOf(below) < 8) { w.setBlock(x, y - 1, z, t.with(below, 'level', 8), 4); return; }
+        // falling fluid over a fall of its kind feeds the fall and does not spread sideways (t-beauty, beauty_rules 10:
+        // every block of a touched curtain spread at once, each new block fell and spread again — a floating island
+        // hung in a cone of 85 000 water blocks after 30 s); fluid landing on a lake (its sources) still spreads on it
+        if (same(below) && lvOf(below) >= 8) return;
       }
       // 4) spread sideways
       const next = lvl >= 8 ? 1 : lvl + (isLava ? 2 : 1);

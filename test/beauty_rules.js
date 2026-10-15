@@ -1,5 +1,5 @@
 // Beauty from every angle (plan docs/superpowers/plans/2026-10-08-t-beauty.md) — the generator rules behind the
-// audit's pictures (test/beauty_audit.mjs). Everything is vgen 9 (new worlds); a vgen-8 world keeps its chunks.
+// audit's pictures (test/beauty_audit.mjs). Everything is vgen 9 or 10 (new worlds); an older world keeps its chunks.
 //   1. no random ruin in the Heartland's designed land: the obsidian ruined gates (and the other random surface
 //      structures) stay out of the Heartland's designed radius (HEART.R0) — a vgen-8 world keeps them where they were
 //   2. every street of Nova Haven ends at a street, the plaza or a turning circle: a round paved bulb with the cyan line
@@ -14,6 +14,9 @@
 //   8. a fall off a floating island pours off the rim and dissolves into mist (t1_07 · t1_09): its 2 × 2 curtain ends
 //      18 … 35 below the rim, each cell at its own height (a ragged end), and the chunk lists a mist spawn at its foot —
 //      vgen 8's falls ran 90 … 100 blocks to the ground as straight blue poles (the audit's water_1, water_r1, far_3)
+//   9. the spray at a fall's foot (vents.js): a plume of mist under the ragged end, never a ball (its opacity modelled)
+//  10. a fall that is touched spills a little, it does not flood (sim.js)
+//  11. vgen 10: a street climbs in half steps — no whole-block step across a street (vgen 9 kept as released, v0.45)
 //   bash test/wt_run.sh beauty_rules.js 600
 const V = require('./load_shared.js');
 const R = V.R, F = V.F, VG = V.VillageGen, HEART = V.Heart;
@@ -362,9 +365,225 @@ console.log('8 · a fall off a floating island pours off the rim and dissolves i
   check(nv === 0 && vl.spawned.length === 0, `Very Low: none (${nv})`);
   check(far.near(ms[0]).length === 0, `nothing beyond the reach (${far.near(ms[0]).length} from 900 blocks)`);
   const p0 = hi.near(ms[0])[0];
-  check(p0 && p0.o.collide === false && p0.o.grow > 0 && p0.o.size >= 1 && !p0.o.emis && p0.o.col[2] >= 0.9, `a puff is soft white spray that grows as it thins (${p0 ? JSON.stringify({ size: +p0.o.size.toFixed(2), grow: p0.o.grow, col: p0.o.col, life: +p0.o.life.toFixed(1) }) : '-'})`);
+  check(p0 && p0.o.collide === false && p0.o.grow > 0 && p0.o.alpha > 0 && p0.o.alpha <= 0.3 && !p0.o.emis && p0.o.col[2] >= 0.9, `a puff is see-through spray that grows as it thins (${p0 ? JSON.stringify({ size: +p0.o.size.toFixed(2), grow: p0.o.grow, alpha: p0.o.alpha, col: p0.o.col, life: +p0.o.life.toFixed(1) }) : '-'})`);
+  // what a viewer sees of one foot (the curves): the real vents.js and particles.js run for 14 s round a foot, and the
+  // live particles' discs — the particle shader's (1 − smoothstep(0.3, 1, d)) × the instance alpha — are laid over each
+  // other along the view on a grid of quarter blocks: the opacity of the mist, its heart, its reach. Run c2's pictures
+  // (water_1, water_r1, far_3): opaque discs of one or two blocks hung under the isles as white balls on strings — 1.00
+  // at the heart; 902a59f's wide thin veils, all round the foot, piled up into a white ball of their own (0.97 at its
+  // heart, 16 blocks across, nothing under it). The fall goes on as spray under its ragged end, slowing, widening and
+  // thinning — a plume of mist, never a ball; a lava fall's end smokes upward
+  {
+    require('../src/main/particles.js');
+    const plumeOf = (lava) => {
+      let sd = 4242; const rnd = Math.random; Math.random = () => { sd = (Math.imul(sd, 1103515245) + 12345) >>> 0; return sd / 4294967296; };
+      const P = new VR.Particles({ world: null, skyBright: 1 }), foot = [0.5, 100, 0.5], eye = [0.5, 100, 120];
+      const Vn = new VR.Vents({ settings: { preset: 'high' }, particles: P });
+      Vn.absorb([['mist', foot[0], foot[1], foot[2], lava ? 1 : 0]]);
+      const RES = 0.25, X0 = -24, Y0 = foot[1] - 40, NX = 192, NY = 216, out = [];
+      for (let f = 0; f < 14 * 30; f++) {
+        Vn.update(1 / 30, eye); P.update(1 / 30, eye);
+        if (f < 9 * 30 || f % 15) continue;
+        const T = new Float32Array(NX * NY).fill(1), D = P.data;
+        for (let k = 0; k < P.n; k++) {
+          const o = k * 14, x = D[o] + eye[0], y = D[o + 1] + eye[1], z = D[o + 2] + eye[2], s = D[o + 3], a = D[o + 13];
+          if (Math.abs(z - foot[2]) > 40 || Math.abs(x - foot[0]) > 40 || P.emis[k]) continue;   // (the foot's own spray: not the citadel's beam, not a spark)
+          for (let j = Math.max(0, Math.floor((y - s - Y0) / RES)); j < Math.min(NY, Math.ceil((y + s - Y0) / RES)); j++) for (let i = Math.max(0, Math.floor((x - s - X0) / RES)); i < Math.min(NX, Math.ceil((x + s - X0) / RES)); i++) {
+            const d = Math.hypot((X0 + (i + 0.5) * RES - x) / s, (Y0 + (j + 0.5) * RES - y) / s); if (d >= 1) continue;
+            const q = d <= 0.3 ? 0 : (d - 0.3) / 0.7, aa = 1 - q * q * (3 - 2 * q); if (aa < 0.05) continue;
+            T[j * NX + i] *= 1 - aa * a;
+          }
+        }
+        let peak = 0, below = 0, above = 0;
+        for (let j = 0; j < NY; j++) for (let i = 0; i < NX; i++) { const op = 1 - T[j * NX + i], py = Y0 + (j + 0.5) * RES; if (op > peak) peak = op; if (op > 0.08) { if (py < foot[1]) below = Math.max(below, foot[1] - py); else above = Math.max(above, py - foot[1]); } }
+        const width = (yy) => { const j = Math.floor((yy - Y0) / RES); let c = 0; for (let i = 0; i < NX; i++) if (1 - T[j * NX + i] > 0.08) c++; return c * RES; };
+        out.push({ peak, below, above, w0: width(foot[1]), w6: width(foot[1] - 6) });
+      }
+      Math.random = rnd;
+      const avg = (k) => out.reduce((s, q) => s + q[k], 0) / out.length;
+      return { peak: Math.max(...out.map(q => q.peak)), below: avg('below'), above: avg('above'), w0: avg('w0'), w6: avg('w6') };
+    };
+    const W = plumeOf(false), L = plumeOf(true), fx = (q) => `the heart ${q.peak.toFixed(2)}, ${q.below.toFixed(1)} under the foot, ${q.above.toFixed(1)} over it, ${q.w0.toFixed(1)} wide at the foot, ${q.w6.toFixed(1)} six under it`;
+    check(W.peak <= 0.7, `a fall's mist is a veil, never a ball: its heart at most 0.7 opaque (${fx(W)})`);
+    check(W.below >= 10 && W.above <= 4 && W.w6 >= 5 && W.w6 > W.w0, `the spray goes on falling under the ragged end, widening as it thins (${W.below.toFixed(1)} under the foot, ${W.above.toFixed(1)} over it; ${W.w0.toFixed(1)} → ${W.w6.toFixed(1)} wide)`);
+    check(L.peak <= 0.7 && L.above >= 8 && L.below <= 3, `a lava fall's end smokes upward, thin (${fx(L)})`);
+  }
+  // particles.js draws a particle's own opacity: the instance alpha of a veil is its alpha (× the fade), of a spark 1
+  {
+    require('../src/main/particles.js');
+    const P = new VR.Particles({ world: null, skyBright: 1 });
+    P.spawn(0, 0, 0, 0, 0, 0, { life: 4, size: 2, alpha: 0.25, collide: false, grav: 0 });
+    P.spawn(0, 0, 0, 0, 0, 0, { life: 4, size: 0.1, collide: false, grav: 0 });
+    P.update(0.016, [0, 0, 0]);
+    const a0 = P.data[13], a1 = P.data[14 + 13];
+    check(Math.abs(a0 - 0.25) < 0.01 && Math.abs(a1 - 1) < 0.01, `particles.js: a veil of alpha 0.25 is drawn at ${a0.toFixed(2)}, a spark at ${a1.toFixed(2)}`);
+  }
   hi.Vn.reset();
   check(hi.Vn.mists.size === 0, `a new world brings its own falls (reset clears the mists)`);
+}
+
+// ---------------------------------------------------------------- 10 · a fall that is touched spills, it does not flood
+// The audit's run c2 (far_3): a minute near a floating island's falls and the island hung in a cone of water 60 blocks
+// deep. The game's block simulation (sim.js) left the generated falls alone until a block beside one changed — a grass
+// block creeping onto the dirt beside a rim pool — and then every block of the falling curtain, with falling water under
+// it, spread sideways at once, every new block falling and spreading again: 450 000 water blocks round one island in
+// 4 000 ticks (node, vgen 8 and 9 alike). Falling water over falling water of its kind feeds the fall below and does not
+// spread sideways (water landing on a lake still spreads on it): the touched fall spills a few streams off its pool's
+// rim, as water does, and that is all. (Random ticks are left out here: the change beside the pool is made by hand.)
+console.log('10 · a fall that is touched spills a little, it does not flood (sim.js)');
+{
+  require('../src/main/sim.js');
+  const floodTest = (vgen, ticks) => {
+    const g = V.makeGen('overworld', SEED, { vgen }), cols = new Map();
+    const col = (cx, cz) => { const k = cx + ',' + cz; let c = cols.get(k); if (!c) { const ch = g.generate(cx, cz); c = { cx, cz, blocks: ch.blocks, sec: [] }; for (let sy = 0; sy < 16; sy++) c.sec.push({ count: 1 }); cols.set(k, c); } return c; };
+    let sim = null;
+    const world = {
+      col, getLight: () => 0xf000,
+      getBlock: (x, y, z) => (y < 0 || y > 255) ? 0 : col(x >> 4, z >> 4).blocks[(y << 8) | ((z & 15) << 4) | (x & 15)],
+      setBlock(x, y, z, s, flags) { const c = col(x >> 4, z >> 4), i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i]; if (old === s) return; c.blocks[i] = s; if (!(flags & 2)) sim.onBlockChanged(x, y, z, old, s); },
+    };
+    const game = { world, player: { pos: [-470.5, 128, 420.5], mode: 'creative' }, skyBright: 1, particles: { breakBlock() {}, smoke() {} }, audio: { play() {} }, dim: 'overworld', entities: null, dropsFor() {}, dropStack() {} };
+    sim = new VR.Sim(game);
+    sim.randomTicks = () => {};
+    // the island of the audit's far_3 (centre -553/458, r 15, three falls): its first fall's rim pool, the grass beside it
+    const I = g.islandAt(-553, 458).isle, a = ((I.seed * 0.618) % 1) * Math.PI * 2;
+    let fx = 0, fz = 0, ft = null;
+    for (let r = 0; r < I.r * 1.4; r++) { const px = Math.round(I.x + Math.cos(a) * r), pz = Math.round(I.z + Math.sin(a) * r), J = g.islandAt(px, pz); if (J && J.isle === I) { fx = px; fz = pz; ft = J; } else if (ft) break; }
+    const box = (f) => { let n = 0; for (let z = Math.floor(I.z) - 45; z <= Math.floor(I.z) + 45; z++) for (let x = Math.floor(I.x) - 45; x <= Math.floor(I.x) + 45; x++) for (let y = 60; y < 200; y++) { const b = world.getBlock(x, y, z); if (b && f(b)) n++; } return n; };
+    const fluid = (b) => R.T.flags[b] & F.FLUID;
+    const f0 = box(fluid);
+    // the trigger: grass creeps onto the dirt under the rim pool (water above is no cover), as a random tick does
+    const under = world.getBlock(fx, ft.top - 1, fz);
+    world.setBlock(fx, ft.top - 1, fz, under === R.byName.grass_block.defaultState ? R.byName.dirt.defaultState : R.byName.grass_block.defaultState, 1);
+    for (let t = 0; t < ticks; t++) sim.step(false);
+    return { f0, f1: box(fluid), pool: [fx, ft.top, fz] };
+  };
+  const T9 = floodTest(9, 600), T8 = floodTest(8, 600);
+  check(T9.f1 - T9.f0 <= 1500, `vgen 9: a touched fall spills ${T9.f1 - T9.f0} fluid blocks round its island in 30 s (${T9.f0} → ${T9.f1}; the pool at ${T9.pool})`);
+  check(T8.f1 - T8.f0 <= 1500, `vgen 8: the same in an old world (${T8.f0} → ${T8.f1})`);
+  // water still flows as water: a source on a ledge runs to its edge, pours over it as one stream, spreads where it
+  // lands (a stone ledge at y 70 for x < 0, the ground at y 60)
+  {
+    const B = new Map(), key = (x, y, z) => x + ',' + y + ',' + z, STONE = R.byName.stone.defaultState, WATER = R.byName.water.defaultState;
+    const getBlock = (x, y, z) => { const v = B.get(key(x, y, z)); if (v !== undefined) return v; return y <= 60 || (x < 0 && y <= 70) ? STONE : 0; };
+    let sim = null;
+    const world = { getBlock, getLight: () => 0xf000, col: () => null, setBlock(x, y, z, s, flags) { const old = getBlock(x, y, z); if (old === s) return; B.set(key(x, y, z), s); if (!(flags & 2)) sim.onBlockChanged(x, y, z, old, s); } };
+    sim = new VR.Sim({ world, player: { pos: [0, 80, 0], mode: 'creative' }, skyBright: 1, particles: { breakBlock() {}, smoke() {} }, audio: { play() {} }, dim: 'overworld', entities: null, dropsFor() {}, dropStack() {} });
+    sim.randomTicks = () => {};
+    world.setBlock(-3, 71, 0, WATER, 1);
+    for (let t = 0; t < 900; t++) sim.step(false);
+    let ledge = 0, air = 0, ground = 0, stream = 0;
+    for (const [k, v] of B) { if (!v || !(R.T.flags[v] & F.FLUID)) continue; const [x, y] = k.split(',').map(Number); if (y === 71 && x < 0) ledge++; else if (y === 61) ground++; else if (y > 61 && y < 71 && x >= 0) { if (x === 0) stream++; else air++; } }
+    check(ledge >= 3 && stream >= 9 && ground >= 20 && air === 0, `a source on a ledge: ${ledge} on the ledge, a stream of ${stream} down its edge, ${ground} spread where it lands, ${air} in the air beside the stream`);
+  }
+  // run c3 (far_3): the flood gone, a woken rim pool still spilled over its open side — grass creeping under it, a random
+  // tick — and the spill ran down to the ground beside the fall as one stream, a puddle at its foot: the pole the fall
+  // was made not to be. vgen 10 holds every spring pool on its rim (a lip of the island's top on each open side): every
+  // pool of the Sky Isles and of far_3's island woken at once (its floor changed, as the grass did), 600 ticks — nothing
+  // falls into the air under a curtain's foot. vgen 9 (released) spills.
+  {
+    const wakeAll = (vgen) => {
+      const g = V.makeGen('overworld', SEED, { vgen }), cols = new Map();
+      const col = (cx, cz) => { const k = cx + ',' + cz; let c = cols.get(k); if (!c) { const ch = g.generate(cx, cz); c = { cx, cz, blocks: ch.blocks, sec: [] }; for (let sy = 0; sy < 16; sy++) c.sec.push({ count: 1 }); cols.set(k, c); } return c; };
+      let sim = null;
+      const world = {
+        col, getLight: () => 0xf000,
+        getBlock: (x, y, z) => (y < 0 || y > 255) ? 0 : col(x >> 4, z >> 4).blocks[(y << 8) | ((z & 15) << 4) | (x & 15)],
+        setBlock(x, y, z, s, flags) { const c = col(x >> 4, z >> 4), i = (y << 8) | ((z & 15) << 4) | (x & 15), old = c.blocks[i]; if (old === s) return; c.blocks[i] = s; if (!(flags & 2)) sim.onBlockChanged(x, y, z, old, s); },
+      };
+      sim = new VR.Sim({ world, player: { pos: [0, 128, 0], mode: 'creative' }, skyBright: 1, particles: { breakBlock() {}, smoke() {} }, audio: { play() {} }, dim: 'overworld', entities: null, dropsFor() {}, dropStack() {} });
+      sim.randomTicks = () => {};
+      const falling = (b) => b && (R.T.flags[b] & F.FLUID) && R.types[R.T.type[b]].get(b, 'level') >= 8;
+      const C = HEART.ISLES, falls = [];
+      for (const [xa, xb, za, zb] of [[C.x - 150, C.x + 130, C.z - 130, C.z + 130], [-600, -506, 410, 506]]) for (let cz = za >> 4; cz <= zb >> 4; cz++) for (let cx = xa >> 4; cx <= xb >> 4; cx++) {
+        const c = col(cx, cz);
+        for (let k = 0; k < 256; k++) { let run = 0, top = -1; for (let y = 250; y >= 1; y--) { const b = c.blocks[(y << 8) | k]; if (falling(b)) { if (!run) top = y; run++; continue; } if (run >= 6 && !b) falls.push({ x: cx * 16 + (k & 15), z: cz * 16 + (k >> 4), top, foot: top - run + 1 }); run = 0; } }
+      }
+      // their spring pools: the source blocks beside a curtain's top
+      const pools = new Map();
+      for (const f of falls) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const x = f.x + dx, z = f.z + dz, b = world.getBlock(x, f.top, z); if (b && (R.T.flags[b] & F.FLUID) && R.types[R.T.type[b]].get(b, 'level') === 0) pools.set(x + ',' + f.top + ',' + z, [x, f.top, z]); }
+      // the air under every foot (25 blocks of it, six round each curtain column): the fluid there
+      const under = () => { const seen = new Set(); for (const f of falls) for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) for (let y = f.foot - 25; y < f.foot - 1; y++) { const b = world.getBlock(f.x + dx, y, f.z + dz); if (b && (R.T.flags[b] & F.FLUID)) seen.add((f.x + dx) + ',' + y + ',' + (f.z + dz)); } return seen.size; };
+      const u0 = under(), GR = R.byName.grass_block.defaultState, DI = R.byName.dirt.defaultState;
+      for (const [x, y, z] of pools.values()) { const fl = world.getBlock(x, y - 1, z); world.setBlock(x, y - 1, z, fl === GR ? DI : GR, 1); }
+      for (let t = 0; t < 600; t++) sim.step(false);
+      return { falls: falls.length, pools: pools.size, u0, u1: under() };
+    };
+    // (the lips are all vgen 10 changes round the isles: the islands' chunks of the two worlds block by block)
+    {
+      const g9 = V.makeGen('overworld', SEED, { vgen: 9 }), g10 = V.makeGen('overworld', SEED, { vgen: 10 }), C = HEART.ISLES, TOP = /^(grass_block|red_sand|snow_block)$/;
+      let diff = 0, lips = 0;
+      for (const [xa, xb, za, zb] of [[C.x - 150, C.x + 130, C.z - 130, C.z + 130], [-600, -506, 410, 506]]) for (let cz = za >> 4; cz <= zb >> 4; cz++) for (let cx = xa >> 4; cx <= xb >> 4; cx++) {
+        const a = g9.generate(cx, cz).blocks, b = g10.generate(cx, cz).blocks;
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) { diff++; if (TOP.test(nameOf(b[i])) && (!a[i] || !(R.T.flags[a[i]] & F.SOLID))) lips++; }
+      }
+      check(diff > 0 && lips === diff && diff <= 60, `vgen 10 differs from vgen 9 round the isles by the pools' lips alone (${lips} of ${diff} changed blocks: the island's top block where air or a plant stood)`);
+    }
+    const P9 = wakeAll(9), P10 = wakeAll(10);
+    console.log(`     vgen 9 (released): ${P9.pools} pools woken over ${P9.falls} curtain columns — ${P9.u1 - P9.u0} fluid blocks fell into the air under the feet`);
+    check(P10.pools >= 12 && P10.falls >= 20 && P10.u1 === P10.u0, `vgen 10: every woken spring pool stays on its rim — ${P10.pools} pools over ${P10.falls} curtain columns, ${P10.u1 - P10.u0} fluid blocks under the feet after 600 ticks (${P10.u0} → ${P10.u1})`);
+  }
+}
+
+// ---------------------------------------------------------------- 11 · a street climbs in half steps (vgen 10)
+// beauty_audit run c2's street_2: Palm Row rises a block at x ≈ 51 (81 → 82), and the step's face read as a low wall
+// across the street eleven blocks ahead — four such steps, 80 → 81 → 82 at both its ends. vgen 10: where a street's
+// surface rises a block, the two samples below the rise are paved half a block higher (a light grey slab, the kerb's
+// own, on the paving; the light lines at the kerbs stay as they are), so it climbs in half steps. vgen 9 keeps its city
+// as released (v0.45): nothing but those slabs differs between the two.
+console.log('11 · a street climbs in half steps (vgen 10)');
+const W10 = world(10);
+{
+  const site = (g) => VG.sitesFor(g, 0, -9).find(x => x.home);
+  const P9 = VG.plan(W9.g, site(W9.g)), P10 = VG.plan(W10.g, site(W10.g));
+  const PAVE = /^vx_floor_plaza/, SLAB = R.byName.vollton_light_grey_slab.state({ type: 'bottom' });
+  // the surface of a paved cell: the top of its paving (the first plaza block from y 95 down), half a block more under
+  // a bottom slab of light grey; null where there is no paving
+  const surf = (W, x, z) => { for (let y = 95; y > 70; y--) if (PAVE.test(nameOf(W.at(x, y, z)))) return W.at(x, y + 1, z) === SLAB ? y + 1.5 : y + 1; return null; };
+  // along a road's centre line and two lines 1.5 to either side of it (inside its light lines), sample by sample: the
+  // rises and falls of the surface (a turning circle's bed and its ring are no street)
+  const walk = (W, P, rd) => {
+    const out = { half: 0, full: [] };
+    for (const off of [-1.5, 0, 1.5]) {
+      let last = null;
+      for (let k = 0; k < rd.pts.length; k++) {
+        const [px, pz] = rd.pts[k], q = rd.pts[Math.min(rd.pts.length - 1, k + 1)], p0 = rd.pts[Math.max(0, k - 1)], a = Math.atan2(q[1] - p0[1], q[0] - p0[0]);
+        if ((P.nova.turns || []).some(t => Math.hypot(px - t.x, pz - t.z) <= t.bed + 1.5)) { last = null; continue; }
+        const x = Math.floor(px - Math.sin(a) * off), z = Math.floor(pz + Math.cos(a) * off), s = surf(W, x, z);
+        if (s === null) { last = null; continue; }
+        if (last !== null) { const d = Math.abs(s - last); if (d === 0.5) out.half++; else if (d >= 1) out.full.push(`${rd.name} ${off} at ${x}, ${z}: ${last} → ${s}`); }
+        last = s;
+      }
+    }
+    return out;
+  };
+  const pr9 = walk(W9, P9, P9.nova.roads.find(r => r.name === 'palmrow'));
+  check(pr9.full.length === 12 && pr9.half === 0, `vgen 9 keeps its streets as released: Palm Row steps a whole block 4 times on each of its three lines (${pr9.full.length} whole steps, ${pr9.half} half)`);
+  let half = 0; const full = [];
+  for (const rd of P10.nova.roads) { const r = walk(W10, P10, rd); half += r.half; full.push(...r.full); }
+  check(full.length === 0 && half >= 24, `vgen 10: every street climbs in half steps (${half} half steps, ${full.length} whole${full.length ? ': ' + full.slice(0, 6).join('; ') : ''})`);
+  // the light lines stay one line each at the kerbs, lit and unbroken (the slabs lie inside them)
+  {
+    const LINE = new Set();
+    for (const [, b] of P10.chunks) for (let i = 0; i < b.o.length; i += 4) { const n = nameOf(b.o[i + 3]); if (n === 'vx_floor_plaza_line' || n === 'vx_floor_plaza_line_amber') LINE.add(b.o[i] + ',' + b.o[i + 2]); }
+    let n = 0, covered = 0;
+    for (const rd of P10.nova.roads) for (const sd of ['L', 'R']) for (const [x, z] of ((rd.kerb && rd.kerb[sd]) || [])) { n++; const s = surf(W10, x, z); if (!LINE.has(x + ',' + z) || s === null || s % 1 !== 0) covered++; }
+    check(n > 300 && covered === 0, `vgen 10: the kerbs' light lines stay lit and uncovered (${covered} of ${n} kerb cells covered or unlit)`);
+  }
+  // nothing else differs: the city's chunks of the two worlds block by block (y 70 … 100), the only change a slab of
+  // light grey on a road's paving
+  {
+    let diff = 0, slabs = 0; const other = [];
+    for (const key of P10.chunks.keys()) {
+      const [cx, cz] = key.split(',').map(Number), a = W9.chunk(cx, cz).blocks, b = W10.chunk(cx, cz).blocks;
+      for (let y = 70; y <= 100; y++) for (let i = 0; i < 256; i++) {
+        const j = (y << 8) | i; if (a[j] === b[j]) continue;
+        diff++;
+        if (b[j] === SLAB && !a[j] && PAVE.test(nameOf(b[j - 256]))) slabs++; else if (other.length < 4) other.push(`${cx * 16 + (i & 15)}, ${y}, ${cz * 16 + (i >> 4)}: ${nameOf(a[j])} → ${nameOf(b[j])}`);
+      }
+    }
+    check(diff > 0 && slabs === diff, `vgen 10 differs from vgen 9 only by the ramps' slabs (${slabs} slabs of ${diff} changed blocks over ${P10.chunks.size} chunks${other.length ? '; other: ' + other.join('; ') : ''})`);
+  }
 }
 
 // ---------------------------------------------------------------- 5 · Very Low
@@ -401,8 +620,9 @@ if (!process.env.SKIP_COST) {
     return tris / want.length;
   };
   for (const [scene, at] of [['crescent_end', [-100.5, -91.5]], ['between_rows', [20.5, -116.5]]]) {
-    const t0 = performance.now(), a = windowTris(W8, at, 82), b = windowTris(W9, at, 82);
+    const t0 = performance.now(), a = windowTris(W8, at, 82), b = windowTris(W9, at, 82), c = windowTris(W10, at, 82);
     check(b <= a * 1.01, `${scene}: vgen 9 ${b.toFixed(0)} triangles a column, vgen 8 ${a.toFixed(0)} (${(b / a * 100 - 100).toFixed(1)} %, ${((performance.now() - t0) / 1000).toFixed(0)} s)`);
+    check(c <= b * 1.01, `${scene}: vgen 10 (the streets' half steps) ${c.toFixed(0)} triangles a column, vgen 9 ${b.toFixed(0)} (${(c / b * 100 - 100).toFixed(1)} %)`);
   }
 }
 
