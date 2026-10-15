@@ -408,7 +408,8 @@ function walkRun(L, v, run, secs) {
   const E = Folk.look(111, 'elder', 'elder'), GE = Folk.gaitFor(E), b = { seedW: 5 };
   const Ps = FA.pose(b, 'idle', 1 / 30, 0, 0, false, {}, undefined, GE);
   FA.stride(GE, 1.5, 0.2, false); const Pw = FA.pose(b, 'idle', 1 / 30, 0, 1, false, {}, undefined, GE);
-  check(Ps.body[0] > 0.08 && Pw.body[0] > 0.08 && Ps.head[0] < -0.05, `an elder stoops (the back ${Ps.body[0].toFixed(2)} rad standing, ${Pw.body[0].toFixed(2)} walking; the head up ${(-Ps.head[0]).toFixed(2)})`);
+  // (t-folk2: the torso points up, so its −rx bends it forward — v0.46 had +rx and leaned the elders back)
+  check(Ps.body[0] < -0.08 && Pw.body[0] < -0.08 && Ps.head[0] > 0.05, `an elder stoops (the back ${(-Ps.body[0]).toFixed(2)} rad forward standing, ${(-Pw.body[0]).toFixed(2)} walking; the head up ${Ps.head[0].toFixed(2)})`);
 }
 {
   // the head: a person looking at something 90° to its right turns the head 40° at most, the shoulders the rest

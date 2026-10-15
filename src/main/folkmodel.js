@@ -545,8 +545,8 @@
   // upper arm's frame), the chin (the head's pivot), the legs' and arms' distance from the middle line, the torso's half
   // width; the head's pivot sits half a unit right on the child (its skull is 6 wide: centred on the body)
   const SKEL = V.SKEL = {
-    adult: { H: 58, hip: 29, knee: -14, sh: 46, elbow: -10, head: 50, legX: 2.5, armX: 6, hw: 4, hx: 0 },
-    child: { H: 45, hip: 20, knee: -10, sh: 32, elbow: -6, head: 36, legX: 1.5, armX: 5, hw: 3, hx: 0.5 },
+    adult: { H: 58, hip: 29, knee: -14, sh: 46, elbow: -10, head: 50, legX: 2.5, armX: 6, hw: 4, hx: 0, fore: 8, hand: 6 },
+    child: { H: 45, hip: 20, knee: -10, sh: 32, elbow: -6, head: 36, legX: 1.5, armX: 5, hw: 3, hx: 0.5, fore: 5, hand: 4 },
   };
   // the torso's rows (y relative to the hip joint): [half width, front z, back z]; the corners are cut (a rounder body)
   const TORSO = {
@@ -584,9 +584,18 @@
   const STRIDE = { robe: 0.28, coat: 0.32, frock: 0.34, whitecoat: 0.32, dress: 0.36, tunic: 0.45, suit: 0.5, gown: 0.28, cape: 0.45 };
   // a person's legs for the gait (folkanim.js FA.gait): the hip joint's height, the thigh and the shin (model units), the
   // draw scale, the widest swing the clothes allow — without building the model (the villagers' pose needs it each frame)
+  // (t-folk2: the arms' bones for the arm solve — the upper arm to the elbow, the forearm to the wrist, the shoulder joint
+  // over the hip joint —, the torso's and the legs' widths, what the hands hold — a bag, a basket or a can hangs from the
+  // right, a barista's tray lies on it, an elder's cane in the left —, the clothes for sitting: a robe or a gown drapes over
+  // the knees (2), a coat's or a dress's skirt lies on the thighs (1))
+  const SKIRT = { robe: 2, gown: 2, coat: 1, frock: 1, whitecoat: 1, cape: 1, tunic: 1, dress: 1 };
+  V.toolOf = function (L) { const role = V.ROLES[L.role] || V.ROLES.farmer; return L.age === 'child' ? null : L.tool !== undefined && L.tool !== null ? L.tool : L.role === 'hero' ? null : role.tool; };
   V.gaitFor = function (L) {
-    const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult;
-    return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[V.familyOf(L)] || 0.6, kid, stoop: L.age === 'elder' ? 0.12 : 0 });
+    const kid = L.age === 'child', S = kid ? SKEL.child : SKEL.adult, fam = V.familyOf(L), role = V.ROLES[L.role] || V.ROLES.farmer;
+    const tool = V.toolOf(L), carry = tool === 'bag' || tool === 'basket' || tool === 'can' || tool === 'tray' ? tool : null;
+    return VR.FolkAnim.gait({ unit: 32, scale: kid ? 0.82 : 1, hip: S.hip, thigh: -S.knee, shin: S.hip + S.knee, stride: STRIDE[fam] || 0.6, kid, stoop: L.age === 'elder' ? 0.12 : 0,
+      arm: { L1: -S.elbow, L2: S.fore, x: S.armX, y: S.sh - S.hip }, hw: S.hw, legX: S.legX, wide: fam === 'robe' || fam === 'gown' ? 1 : 0,
+      carry, cane: !kid && L.age === 'elder' && role.tool === 'cane', item: tool, skirt: SKIRT[fam] || 0 });
   };
   // ============================== the fine face (t-folk, Echte Menschen: the smooth path only)
   // The surface nets give a vertex the mean colour of the voxel faces round it, so a one-voxel eye or lip at 32 a block
