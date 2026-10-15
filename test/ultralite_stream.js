@@ -8,6 +8,7 @@
 //  e · the queue follows the player: queued generations and meshes are re-ordered by the current distance
 //  f · off (every preset but Ultra · Leicht): the world streams exactly as before
 //  g · the seam light in the takt: the same light, spread over frames · h · the mesh-job starts stop at half the budget
+//  i · walking (real town columns, one simulated worker): the takt meshes no more sections per column than the old way
 //   bash test/wt_run.sh ultralite_stream.js
 const V = require('./load_shared.js');
 global.window = undefined;
@@ -175,6 +176,49 @@ console.log('h · the mesh-job starts stop at the frame\'s share of the budget')
   };
   const on = starts(true), off = starts(false);
   check(on >= 1 && on <= 3 && off >= 8, 'starts of 0.6 ms each: in the takt (budget 2 ms) they stop after about 1 ms, without it the count rule alone', `${on} vs ${off}`);
+}
+
+console.log('i · walking: the takt meshes no more than before');
+{
+  // run 3b's browser walks (the same 200 m, each preset in a fresh world) counted 870 mesh results on Ultra · Leicht against
+  // 545 on Ultra. The same kind of walk here, the takt's own mechanics alone: real Nova Haven columns (seed 4242, vgen 8)
+  // answered by one worker (two jobs in flight; a generation 6 frames, a mesh 1), the player walking north from the hall at
+  // 4.3 m/s after 300 frames of loading — the meshes per generated column with the takt and without
+  const gen = V.makeGen('overworld', 4242, { vgen: 8 }), cache = new Map();
+  const colMsg = (cx, cz) => {
+    const k = cx + ',' + cz; let o = cache.get(k);
+    if (!o) { const c = gen.generate(cx, cz); o = { c, light: V.computeColumnLight(c.blocks, true) }; cache.set(k, o); }
+    return { type: 'gen', cx, cz, blocks: o.c.blocks.slice(), light: o.light.slice(), biome: o.c.biome, caveBiome: o.c.caveBiome, grass: o.c.tints.grass, foliage: o.c.tints.foliage, water: o.c.tints.water };
+  };
+  const walk = (takt) => {
+    const pool = { workers: [{ inflight: 0 }], queue: [], queueFar: [], queueDirty: false, flight: [], gen: 0, mesh: 0,
+      submit(msg, tr, cb, prio) { this.queue.push({ msg, cb, prio: prio || 0 }); this.queueDirty = true; }, pump() {}, broadcast() {}, direct() {},
+      tick(f) {
+        const done = this.flight.filter(j => j.at <= f); this.flight = this.flight.filter(j => j.at > f);
+        for (const j of done) {
+          if (j.msg.type === 'gen') { this.gen++; j.cb(colMsg(j.msg.cx, j.msg.cz)); }
+          else if (j.msg.type === 'mesh') { this.mesh++; j.cb({ type: 'mesh', vis: 0x7fff, opaque: new Float32Array(8), cutout: null, trans: null, vx: null, vxFar: null, props: null }); }
+          else j.cb({ type: 'error' });
+        }
+        if (this.queueDirty) { this.queue.sort((a, b) => a.prio - b.prio); this.queueDirty = false; }
+        while (this.flight.length < 2 && this.queue.length) {
+          const j = this.queue.shift();
+          if (j.msg.cancel && j.msg.cancel()) { delete j.msg.cancel; j.cb({ type: 'cancelled' }); continue; }
+          this.flight.push({ msg: j.msg, cb: j.cb, at: f + (j.msg.type === 'gen' ? 6 : 1) });
+        }
+        this.workers[0].inflight = this.flight.length;
+      } };
+    const w = new V.World({ vents: null }, { dim: 'overworld', seed: 4242, genOpts: {}, pool, renderer: { freeSection() {}, uploadSection() {}, q: { vxLod: 48, upload: 3 } }, renderDist: 3 });
+    w.streamTakt = takt; w.viewDir = [0, -1];
+    const per = new Map(), ms0 = w.meshSection.bind(w);
+    w.meshSection = function (c, sy, ...a) { const k = c.key * 64 + sy; per.set(k, (per.get(k) || 0) + 1); return ms0(c, sy, ...a); };
+    let z = -9.5, now = 1000;
+    for (let f = 0; f < 600; f++) { if (f > 300) z -= 4.3 / 30; if (takt) w.streamMs = 4; w.update(0.5, 80, z, now); pool.tick(f); now += 33.3; }
+    let twice = 0; for (const v of per.values()) if (v > 1) twice++;
+    return { gen: pool.gen, mesh: pool.mesh, twice };
+  };
+  const off = walk(false), on = walk(true);
+  check(off.gen > 40 && on.gen > 40 && on.mesh / on.gen <= (off.mesh / off.gen) * 1.1, 'walking north from the hall: the takt meshes no more sections per generated column than the old way (its arrivals, the seams spread over frames and their hold cost no extra meshing)', `takt ${on.mesh} meshes for ${on.gen} columns (${(on.mesh / on.gen).toFixed(2)} each, ${on.twice} sections twice), without ${off.mesh} for ${off.gen} (${(off.mesh / off.gen).toFixed(2)}, ${off.twice} twice)`);
 }
 
 console.log('f · off: as before');
