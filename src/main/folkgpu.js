@@ -222,6 +222,10 @@ out vec4 v_color;
 out vec3 v_rel;
 flat out vec4 v_light;
 flat out vec3 v_bl;
+#ifdef SUN
+uniform mat4 u_shadowMat;
+out vec4 v_shadow;
+#endif
 void main() {
   int b = int(a_bone + 0.5) * 4, p = PERSON;
   mat4 M = mat4(texelFetch(u_bones, ivec2(b, p), 0), texelFetch(u_bones, ivec2(b + 1, p), 0), texelFetch(u_bones, ivec2(b + 2, p), 0), texelFetch(u_bones, ivec2(b + 3, p), 0));
@@ -231,6 +235,9 @@ void main() {
   v_color = vec4(pow(a_color.rgb, vec3(2.2)), a_color.a);
   v_light = texelFetch(u_bones, ivec2(${BW - 2}, p), 0);
   v_bl = texelFetch(u_bones, ivec2(${BW - 1}, p), 0).xyz;
+#ifdef SUN
+  v_shadow = u_shadowMat * vec4(wp.xyz + normalize(v_n) * 0.04, 1.0);
+#endif
   gl_Position = u_viewProj * wp;
 }`;
   const FOLK_FS = () => `
@@ -240,6 +247,26 @@ in vec4 v_color;
 in vec3 v_rel;
 flat in vec4 v_light;   // the sky light, the terrain's shade (0 sun … 1 shaded), the hurt flash, no fog
 flat in vec3 v_bl;      // the block light
+#ifdef SUN
+// t-folk2: the people receive the shadow map (the frame's copy with the people in it: a person in a building's or another's
+// shadow is in it) — the terrain's four taps; the bias a little over the depth the people were written nearer the light
+uniform highp sampler2DShadow u_shadowMap;
+uniform float u_shadowTexel;
+uniform vec2 u_shadowOff;
+uniform float u_sunBias;
+in vec4 v_shadow;
+float folkSun() {
+  vec3 sc = v_shadow.xyz / v_shadow.w * 0.5 + 0.5;
+  if (sc.x <= 0.001 || sc.x >= 0.999 || sc.y <= 0.001 || sc.y >= 0.999 || sc.z >= 1.0) return 1.0;
+  float t = u_shadowTexel, b = u_sunBias;
+  vec2 su = fract(sc.xy + u_shadowOff);
+  float s = texture(u_shadowMap, vec3(su + vec2(-0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, -0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(-0.6, 0.6) * t, sc.z - b));
+  s += texture(u_shadowMap, vec3(su + vec2(0.6, 0.6) * t, sc.z - b));
+  return s * 0.25;
+}
+#endif
 out vec4 o;
 void main() {
   vec3 alb = v_color.rgb;
@@ -253,7 +280,12 @@ void main() {
   float outdoor = smoothstep(0.5, 0.95, v_light.x);
   float wrapL = max((dot(n, L) + 0.3) / 1.3, 0.0);
   vec3 hemi = mix(u_ambSky * vec3(0.62, 0.56, 0.5), u_ambSky * 1.06, n.y * 0.5 + 0.5);
-  vec3 light = hemi * sk + lc * wrapL * outdoor * 0.9 * (1.0 - v_light.y) + pow(v_bl, vec3(1.7)) * 1.35 * u_blockLightTint + 0.03;
+#ifdef SUN
+  float sun = (1.0 - v_light.y) * (outdoor > 0.0 ? folkSun() : 1.0);
+#else
+  float sun = 1.0 - v_light.y;
+#endif
+  vec3 light = hemi * sk + lc * wrapL * outdoor * 0.9 * sun + pow(v_bl, vec3(1.7)) * 1.35 * u_blockLightTint + 0.03;
   // t-folk2: an eye takes the light's brightness, not its colour, and a little of its own — the whites stay white (a
   // shade cool) by a lantern and at dusk, the iris dark (the owner: amber eyes under warm light)
   if (eye > 0.5) { float l = dot(light, vec3(0.2126, 0.7152, 0.0722)); light = mix(light, vec3(l) * vec3(0.95, 0.985, 1.05), 0.85) + vec3(0.045, 0.05, 0.058); }
@@ -267,11 +299,12 @@ void main() {
   if (v_light.w < 0.5) col = applyFog(col, v_rel, length(v_rel));
   o = vec4(col, 1.0);
 }`;
-  FG.program = function (r) {
-    const P = r.P, key = 'folk2';
+  // (sun: the variant that reads the shadow map — the 'map' mode's)
+  FG.program = function (r, sun) {
+    const P = r.P, key = sun ? 'folk2s' : 'folk2';
     if (P[key] !== undefined) return P[key];
     const multi = !!(VR.GL.ext && VR.GL.ext.multiDraw), S = VR.SHADERS;
-    try { P[key] = VR.GL.program(FOLK_VS(multi), FOLK_FS().replace('__COMMON__', S.COMMON), 'folk', multi ? ['MULTIDRAW'] : []); P[key].multi = multi; }
+    try { P[key] = VR.GL.program(FOLK_VS(multi), FOLK_FS().replace('__COMMON__', S.COMMON), sun ? 'folkSun' : 'folk', (multi ? ['MULTIDRAW'] : []).concat(sun ? ['SUN'] : [])); P[key].multi = multi; }
     catch (e) { console.error(e); P[key] = null; }
     return P[key];
   };
@@ -319,6 +352,8 @@ void main() {
       D[L + 4] = it.bl[0]; D[L + 5] = it.bl[1]; D[L + 6] = it.bl[2]; D[L + 7] = 0;
       if (k >= counts.length) { const c = new Int32Array(counts.length * 2); c.set(counts); counts = c; const f = new Int32Array(offsets.length * 2); f.set(offsets); offsets = f; }
       counts[k] = rec.count; offsets[k] = rec.iOff * 4;
+      if (SM.pos.length < (k + 1) * 3) { const q = new Float64Array(SM.pos.length * 2 + 48); q.set(SM.pos); SM.pos = q; }
+      SM.pos[k * 3] = it.pos[0]; SM.pos[k * 3 + 1] = it.pos[1]; SM.pos[k * 3 + 2] = it.pos[2];
       rec.used = performance.now();
       k++;
     }
@@ -328,7 +363,7 @@ void main() {
     const n = FG.n; FG.n = 0;
     FG.stats.drawn = 0; FG.stats.tris = 0; FG.stats.draws = 0;
     if (!n) return 0;
-    const gl = r.gl, p = FG.program(r);
+    const gl = r.gl, sun = !!(FG.game && FG.shadowMode(FG.game.settings, r.q) === 'map' && r.shadowValid && r.shadowTex), p = FG.program(r, sun);
     if (!p || !AR.vao) { if (!p) for (let i = 0; i < n; i++) FG.items[i].rec.state = 3; return 0; }
     bonesTex(gl, n);
     const k = FG.rows(cam, n);
@@ -338,6 +373,14 @@ void main() {
     gl.useProgram(p.p); r.common(p, E);
     gl.uniformMatrix4fv(p.u.u_viewProj, false, r.viewProj);
     gl.uniform1i(p.u.u_bones, FG.BONE_UNIT);
+    if (sun) {
+      gl.uniformMatrix4fv(p.u.u_shadowMat, false, r.shadowMat);
+      gl.uniform1f(p.u.u_shadowTexel, 1 / (r.shadowSize || 1024));
+      const o = r.shadowOff; gl.uniform2f(p.u.u_shadowOff, o ? o[0] : 0, o ? o[1] : 0);
+      const M = r.shadowMat, zr = 0.5 * Math.hypot(M[2], M[6], M[10]);
+      gl.uniform1f(p.u.u_sunBias, 0.0006 + (FG.SHADOW_EPS + 0.12) * zr);
+      gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, r.shadowRead || r.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3);
+    }
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE);
     gl.bindVertexArray(AR.vao);
     const ext = p.multi ? VR.GL.ext.multiDraw : null;
@@ -347,8 +390,144 @@ void main() {
     gl.bindVertexArray(null);
     FG.stats.drawn = k; FG.stats.tris = tris;
     if (r.stats) { r.stats.draws += FG.stats.draws; r.stats.tris += tris; }
+    // (the casters of the next frame's shadow pass: these rows, ranges and places, seen from this camera)
+    SM.n = k; SM.at = r.frameNo; SM.cam[0] = cam.x; SM.cam[1] = cam.y; SM.cam[2] = cam.z; SM.counts = counts; SM.offsets = offsets;
     evict(gl, performance.now());
     return k;
+  };
+
+  // ---------------------------------------------------------------- t-folk2: the people in the shadow map
+  // The owner: the shadows are blots. The people cast and receive the shadow map's shadows like the props — but the map is
+  // kept for many frames (renderer.js renderShadows / the Schatten-Takt), and a moving person drawn into it would leave
+  // its shadow behind. So the people get a copy: a second depth texture D of the map's size. When the map changed (a new
+  // render, tiles redrawn, the maps swapped) D takes all of it (a blit), else only the rectangles last frame's people
+  // covered come back from the map; then every smooth person drawn last frame (within NEAR) is drawn into D — one
+  // multi-draw, depth only, with last frame's bones moved to this frame's camera (the pass runs before this frame's
+  // poses: a planted foot does not move, so the contact is exact). The terrain, the props and the people read D for the
+  // frame (renderer.js: shadowRead). The receivers subtract a bias of 0.0006 (some 0.3 blocks) before they compare: the
+  // people are written that much nearer the light (and 0.04 blocks more), so the ground finds their shadow at their feet.
+  // On the toroidal map (Schatten-Takt: REPEAT, an offset) the people are written at the wrapped texels, in up to four
+  // shifted copies where they straddle the wrap.
+  // The modes (FG.shadowMode): 'map' with a shadow map, the smooth people and the switch (Balanced and up); 'ellipse' the
+  // soft blot stretched from the sun where there is no map but the drop shadows are on (Low; the voxel people when Echte
+  // Menschen is off); 'none' on Very Low (as v0.46: it never had one).
+  const SM = FG.sm = { at: -9, tex: null, fb: null, size: 0, gl: null, src: null, renders: -1, wrap: 0, n: 0, cam: [0, 0, 0], counts: null, offsets: null, pos: new Float64Array(48), rects: [], prog: undefined, frames: 0, full: 0 };
+  FG.shadowMode = function (s, q) {
+    if (!s) return 'none';
+    if (s.smoothFolk && (s.folkShadow === undefined || !!s.folkShadow) && q && q.shadows > 0) return 'map';
+    return q && q.dropShadow ? 'ellipse' : 'none';
+  };
+  FG.SHADOW_EPS = 0.04;   // blocks the people are written nearer the light than the receivers' bias asks
+  const CAST_VS = (multi) => `${multi ? '#extension GL_ANGLE_multi_draw : require' : ''}
+layout(location=0) in vec3 a_pos;
+layout(location=3) in float a_bone;
+uniform highp sampler2D u_bones;
+uniform mat4 u_shadowW;
+uniform vec3 u_shift;
+uniform float u_zBias;
+#ifdef MULTIDRAW
+#define PERSON gl_DrawID
+#else
+uniform int u_person;
+#define PERSON u_person
+#endif
+void main() {
+  int b = int(a_bone + 0.5) * 4, p = PERSON;
+  mat4 M = mat4(texelFetch(u_bones, ivec2(b, p), 0), texelFetch(u_bones, ivec2(b + 1, p), 0), texelFetch(u_bones, ivec2(b + 2, p), 0), texelFetch(u_bones, ivec2(b + 3, p), 0));
+  vec4 wp = M * vec4(a_pos, 1.0);
+  gl_Position = u_shadowW * vec4(wp.xyz + u_shift, 1.0);
+  gl_Position.z -= u_zBias * gl_Position.w;
+}`;
+  const CAST_FS = `
+out vec4 o;
+void main() { o = vec4(1.0); }`;
+  function castProgram(r) {
+    const P = r.P;
+    if (P.folkCast !== undefined) return P.folkCast;
+    const multi = !!(VR.GL.ext && VR.GL.ext.multiDraw);
+    try { P.folkCast = VR.GL.program(CAST_VS(multi), CAST_FS, 'folkCast', multi ? ['MULTIDRAW'] : []); P.folkCast.multi = multi; }
+    catch (e) { console.error(e); P.folkCast = null; }
+    return P.folkCast;
+  }
+  function ensureCopy(gl, size, wrap) {
+    if (SM.tex && SM.gl === gl && SM.size === size) { if (SM.wrap !== wrap) { gl.bindTexture(gl.TEXTURE_2D, SM.tex); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap); SM.wrap = wrap; } return true; }
+    FG.dropCopy(gl);
+    const GL = VR.GL;
+    SM.tex = GL.tex2D(size, size, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.LINEAR, compare: true, wrap });
+    SM.fb = GL.fbo([], SM.tex);
+    if (!SM.fb) { gl.deleteTexture(SM.tex); SM.tex = null; return false; }
+    SM.gl = gl; SM.size = size; SM.wrap = wrap; SM.src = null; SM.rects.length = 0;
+    return true;
+  }
+  FG.dropCopy = function (gl) { if (SM.tex && gl) { gl.deleteTexture(SM.tex); if (SM.fb) gl.deleteFramebuffer(SM.fb); } SM.tex = null; SM.fb = null; SM.size = 0; SM.src = null; SM.rects.length = 0; };
+  // the write matrices: the lookup matrix, moved by the toroidal offset (and −2 on an axis where a copy wraps), the NDC
+  // the receivers' texel would have
+  const W = new Float32Array(16), ndc = [0, 0];
+  const toNdc = (M, x, y, z, o) => { o[0] = M[0] * x + M[4] * y + M[8] * z + M[12]; o[1] = M[1] * x + M[5] * y + M[9] * z + M[13]; return o; };
+  // → true when D is the frame's map (r.shadowRead set): called by renderer.js right after its shadowFrame
+  FG.castShadows = function (r, E, cam) {
+    r.shadowRead = null;
+    const g = FG.game, gl = r.gl;
+    // (the casters are last frame's flush: none drawn then — no villagers near, the switch off — none cast now)
+    if (!g || FG.shadowMode(g.settings, r.q) !== 'map' || !r.shadowValid || !r.shadowTex || !r.shadowFB || !SM.n || SM.at !== r.frameNo - 1 || !AR.vao || !BT.tex) { if (SM.tex && (!g || FG.shadowMode(g.settings, r.q) !== 'map')) FG.dropCopy(gl); return false; }
+    const p = castProgram(r); if (!p) return false;
+    const t0 = performance.now(), size = r.shadowSize, wrap = r.sht ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+    if (!ensureCopy(gl, size, wrap)) return false;
+    const M = r.shadowMat, off = r.shadowOff || [0, 0];
+    // the people's footprints (the root raised 0.9, ± 1.3 blocks) in the write NDC, and which wrapped copies they need
+    const tpb = 0.5 * size * Math.hypot(M[0], M[4], M[8]), rad = 1.3 * tpb * 2 / size;   // (texels a block; the radius in NDC)
+    let need = 0;   // bits: 1 copy (0,0), 2 (−2,0), 4 (0,−2), 8 (−2,−2)
+    const fx = [], fy = [];
+    for (let i = 0; i < SM.n; i++) {
+      toNdc(M, SM.pos[i * 3] - cam.x, SM.pos[i * 3 + 1] + 0.9 - cam.y, SM.pos[i * 3 + 2] - cam.z, ndc);
+      const bx = ndc[0] + 2 * off[0], by = ndc[1] + 2 * off[1];
+      fx.push(bx); fy.push(by);
+      const x0 = bx - rad < 1, x1 = bx + rad > 1, y0 = by - rad < 1, y1 = by + rad > 1;
+      if (x0 && y0) need |= 1; if (x1 && y0) need |= 2; if (x0 && y1) need |= 4; if (x1 && y1) need |= 8;
+    }
+    // the map changed since the last copy: all of it; else last frame's rectangles back
+    const renders = r.stats.shadowRenders || 0, changed = SM.src !== r.shadowTex || SM.renders !== renders || (r.sht && r.sht.drawn > 0);
+    gl.disable(gl.SCISSOR_TEST);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, r.shadowFB); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, SM.fb);
+    if (changed) { gl.blitFramebuffer(0, 0, size, size, 0, 0, size, size, gl.DEPTH_BUFFER_BIT, gl.NEAREST); SM.full++; }
+    else for (const q of SM.rects) gl.blitFramebuffer(q[0], q[1], q[2], q[3], q[0], q[1], q[2], q[3], gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+    SM.src = r.shadowTex; SM.renders = renders;
+    // this frame's rectangles (texels), per copy: the union of the people's footprints
+    SM.rects.length = 0;
+    for (let c = 0; c < 4; c++) {
+      if (!(need & (1 << c))) continue;
+      const sx = c & 1 ? -2 : 0, sy = c & 2 ? -2 : 0;
+      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+      for (let i = 0; i < fx.length; i++) { a0 = Math.min(a0, fx[i] + sx - rad); a1 = Math.max(a1, fx[i] + sx + rad); b0 = Math.min(b0, fy[i] + sy - rad); b1 = Math.max(b1, fy[i] + sy + rad); }
+      const X0 = Math.max(0, Math.floor((a0 * 0.5 + 0.5) * size) - 2), X1 = Math.min(size, Math.ceil((a1 * 0.5 + 0.5) * size) + 2), Y0 = Math.max(0, Math.floor((b0 * 0.5 + 0.5) * size) - 2), Y1 = Math.min(size, Math.ceil((b1 * 0.5 + 0.5) * size) + 2);
+      if (X1 > X0 && Y1 > Y0) SM.rects.push([X0, Y0, X1, Y1, sx, sy]);
+    }
+    // the people into D: depth only, last frame's bones moved to this camera, written nearer the light by the bias
+    gl.bindFramebuffer(gl.FRAMEBUFFER, SM.fb);
+    gl.viewport(0, 0, size, size);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.disable(gl.CULL_FACE); gl.disable(gl.POLYGON_OFFSET_FILL);
+    gl.useProgram(p.p);
+    gl.activeTexture(gl.TEXTURE0 + FG.BONE_UNIT); gl.bindTexture(gl.TEXTURE_2D, BT.tex); gl.uniform1i(p.u.u_bones, FG.BONE_UNIT);
+    gl.uniform3f(p.u.u_shift, SM.cam[0] - cam.x, SM.cam[1] - cam.y, SM.cam[2] - cam.z);
+    const zr = 0.5 * Math.hypot(M[2], M[6], M[10]);   // (window depth a block)
+    gl.uniform1f(p.u.u_zBias, 2 * (0.0006 + FG.SHADOW_EPS * zr));
+    gl.bindVertexArray(AR.vao);
+    const ext = p.multi ? VR.GL.ext.multiDraw : null;
+    let draws = 0;
+    for (const q of SM.rects) {
+      W.set(M); const tx = 2 * off[0] + q[4], ty = 2 * off[1] + q[5];
+      // (W = T(tx, ty, 0) · M: the translation's x and y rows take tx·w and ty·w)
+      for (let k = 0; k < 4; k++) { W[k * 4] += tx * M[k * 4 + 3]; W[k * 4 + 1] += ty * M[k * 4 + 3]; }
+      gl.uniformMatrix4fv(p.u.u_shadowW, false, W);
+      if (ext) { ext.multiDrawElementsWEBGL(gl.TRIANGLES, SM.counts, 0, gl.UNSIGNED_INT, SM.offsets, 0, SM.n); draws++; }
+      else for (let i = 0; i < SM.n; i++) { gl.uniform1i(p.u.u_person, i); gl.drawElements(gl.TRIANGLES, SM.counts[i], gl.UNSIGNED_INT, SM.offsets[i]); draws++; }
+    }
+    gl.bindVertexArray(null);
+    r.shadowRead = SM.tex;
+    SM.frames++;
+    FG.stats.castMs = performance.now() - t0; FG.stats.castDraws = draws; FG.stats.casters = SM.n; FG.stats.castRects = SM.rects.length;
+    if (r.stats) r.stats.draws += draws;
+    return true;
   };
 
   // ---------------------------------------------------------------- the people's shadows on the ground
@@ -367,11 +546,13 @@ uniform float u_kMul;
 out vec2 v_q;
 out float v_a;
 void main() {
+  // (a negative radius: the round contact shadow under the soles — not stretched from the sun, t-folk2)
+  float rr = abs(a_inst.w);
   vec2 s = -normalize(u_light.xz + vec2(1e-4, 0.0));
-  float len = clamp(0.5 / max(0.12, u_light.y), 1.0, 2.6);
+  float len = a_inst.w < 0.0 ? 1.0 : clamp(0.5 / max(0.12, u_light.y), 1.0, 2.6);
   vec2 t = vec2(-s.y, s.x);
-  vec2 c = a_inst.xz + s * a_inst.w * (len - 1.0) * 0.85;
-  vec2 p = c + s * a_corner.y * a_inst.w * len + t * a_corner.x * a_inst.w;
+  vec2 c = a_inst.xz + s * rr * (len - 1.0) * 0.85;
+  vec2 p = c + s * a_corner.y * rr * len + t * a_corner.x * rr;
   v_q = a_corner;
   v_a = a_k * u_kMul * (1.0 - smoothstep(22.0, 32.0, length(vec3(p.x, a_inst.y, p.y))));
   gl_Position = u_viewProj * vec4(p.x, a_inst.y + 0.03, p.y, 1.0);
@@ -412,7 +593,7 @@ void main() { float r = dot(v_q, v_q); if (r > 1.0) discard; float a = 1.0 - r; 
     const sun = E.sunDir[1] > 0.02, L = sun ? E.sunDir : E.moonDir;
     gl.uniform3f(p.u.u_light, L[0], Math.max(0.05, L[1]), L[2]);
     // (by day the sun's; at dusk it fades; by night a faint one under the moon)
-    gl.uniform1f(p.u.u_kMul, sun ? 0.45 + 0.55 * Math.min(1, (E.sunDir[1] - 0.02) / 0.2) : 0.4);
+    gl.uniform1f(p.u.u_kMul, sun ? 0.45 + 0.55 * Math.min(1, (E.sunDir[1] - 0.02) / 0.2) : 0.4);   // (the contact shadows are drawn with it as well)
     gl.enable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ZERO, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1, -2);
@@ -425,6 +606,10 @@ void main() { float r = dot(v_q, v_q); if (r > 1.0) discard; float a = 1.0 - r; 
     return n;
   };
 
-  // ---------------------------------------------------------------- the setting (⚙ Bild · Dinge & Effekte)
-  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'smoothFolk', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.smoothFolk', tip: 'g.set.smoothFolk.tip', cost: 'mid', def: true });
+  // ---------------------------------------------------------------- the settings (⚙ Bild · Dinge & Effekte)
+  if (VR.Settings && VR.Settings.add) {
+    VR.Settings.add({ key: 'smoothFolk', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.smoothFolk', tip: 'g.set.smoothFolk.tip', cost: 'mid', def: true });
+    // (t-folk2: the people in the shadow map — their copy of the map and one depth draw a frame; needs the shadows on)
+    VR.Settings.add({ key: 'folkShadow', g: 'img', sec: 'objects', t: 'switch', lab: 'g.set.folkShadow', tip: 'g.set.folkShadow.tip', cost: 'mid', def: true });
+  }
 })(VR);

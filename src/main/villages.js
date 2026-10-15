@@ -1387,6 +1387,10 @@
       // then (and beyond) the voxel self: with the switch on the half-resolution one, so the full voxel model is never
       // built only to be shown for a moment. A mesh is asked for from FG.ASK blocks, also for the people behind the eye
       const FG = VR.FolkGPU, smooth = !!(FG && FG.on(g)), N2 = smooth ? FG.NEAR * FG.NEAR : 0;
+      // (t-folk2: the people's shadows — FG.shadowMode: 'map' the shadow map's (Balanced and up), 'ellipse' the soft blot
+      // stretched from the sun (Low), 'none' (Very Low))
+      const shMode = FG ? FG.shadowMode(g.settings, r.q) : 'none';
+      if (FG) FG.game = g;
       if (smooth && (g.frame & 15) === 0) for (const a of this.agents) { const rec = a.fg || (a.fg = FG.recFor(a.p.look)); if (rec.state === 0) FG.want(g, rec, (a.pos[0] - cam.x) ** 2 + (a.pos[2] - cam.z) ** 2); }
       this.pick(r.planes, cam, cap, FD);
       for (const a of this.agents) {
@@ -1418,11 +1422,17 @@
         else if (a.pose === 'crouch') pos = [a.pos[0], a.pos[1] - (a.kid ? 0.14 : 0.24), a.pos[2]];
         if (a.drawOffY) pos = [pos[0], pos[1] + a.drawOffY, pos[2]];
         // (t-folk: the person's soft shadow on the ground — deeper in the open sun, faint in the terrain's shade and at night)
-        if (smooth && !sleeping && d2 < FG.SH_D * FG.SH_D) FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
+        // (in the 'map' mode a small round contact shadow under the soles stays — the ground's occlusion, not the sun's: the
+        // people stand on the floor indoors too, where the hall's roof keeps the sun off; the sun's shadow is the map's)
+        if (shMode !== 'none' && !sleeping && d2 < FG.SH_D * FG.SH_D) {
+          if (shMode === 'ellipse') FG.shadow(a.pos, cam, a.kid ? 0.24 : 0.32, (0.16 + 0.34 * light.sky * light.sky * (1 - 0.7 * (a.shade || 0))) * (a.pose === 'sit' ? 0.7 : 1));
+          else if (a.pose !== 'sit') FG.shadow(a.pos, cam, -(a.kid ? 0.16 : 0.21), 0.3 + 0.1 * light.sky);
+        }
         if (sm) { FG.queue(rec, pos, a.yaw, pose, light, opts); continue; }
         ent.drawModel(r, p, model, pos, cam, a.yaw, pose, light, opts);
       }
-      if (smooth) { FG.drawShadows(r, E); FG.flush(r, E, cam); }
+      if (shMode !== 'none') FG.drawShadows(r, E);
+      if (smooth) FG.flush(r, E, cam);
       if (this.drawBoats) this.drawBoats(r, E, cam);
     }
     // the body pose: FolkAnim clips (crossfaded) under the parametric walk cycle, then the head look-at, blinking and

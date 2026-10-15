@@ -318,6 +318,72 @@ console.log('§3 one draw for the crowd');
   V.FolkGPU.clear(gl);
 }
 
+// ---------------------------------------------------------------- §4 shadows like props
+// the mode per preset (Very Low none, Low the ellipse, Balanced and up the shadow map); the people's pass on a recording
+// fake GL: the first frame copies the whole map, the next only last frame's rectangles; the people are written nearer the
+// light by the receivers' bias (and 0.04 blocks); on the toroidal map a person at the wrap is written twice; the frame
+// reads the copy (shadowRead)
+console.log('§4 shadows like props');
+{
+  require('./dom_stub.js'); require('../src/main/i18n.js'); require('../src/main/lang_en.js'); require('../src/main/lang_de.js'); require('../src/main/settings_reg.js'); require('../src/main/game.js');
+  const P = V.Game.PRESETS, FG = V.FolkGPU, modes = {};
+  for (const k of ['potato', 'low', 'balanced', 'high', 'ultra', 'ultraLite']) modes[k] = FG.shadowMode(P[k], { shadows: P[k].shadows > 0 ? 1024 : 0, dropShadow: !!P[k].dropShadow });
+  check(modes.potato === 'none' && modes.low === 'ellipse' && ['balanced', 'high', 'ultra', 'ultraLite'].every(k => modes[k] === 'map'), `the people's shadows per preset: ${Object.entries(modes).map(([k, v]) => k + ' ' + v).join(', ')}`);
+  check(FG.shadowMode(Object.assign({}, P.balanced, { folkShadow: 0 }), { shadows: 1024, dropShadow: true }) === 'ellipse' && FG.shadowMode(Object.assign({}, P.balanced, { smoothFolk: 0 }), { shadows: 1024, dropShadow: true }) === 'ellipse', 'the switch off (or Echte Menschen off): the ellipse again');
+  check(P.potato.folkShadow === 0 && P.low.folkShadow === 0 && P.balanced.folkShadow === 1 && P.ultra.folkShadow === 1, 'the switch in the presets: off on Very Low and Low (no shadow map), on from Balanced');
+  // the pass on a fake GL
+  const calls = { blits: [], draws: 0, multi: 0, uniforms: {}, fb: [] }, K = {}; let id = 0;
+  for (const k of ['ARRAY_BUFFER', 'ELEMENT_ARRAY_BUFFER', 'COPY_READ_BUFFER', 'COPY_WRITE_BUFFER', 'STATIC_DRAW', 'FLOAT', 'BYTE', 'UNSIGNED_BYTE', 'UNSIGNED_INT', 'TRIANGLES', 'TEXTURE_2D', 'RGBA32F', 'RGBA', 'NEAREST', 'LINEAR', 'TEXTURE_MIN_FILTER', 'TEXTURE_MAG_FILTER', 'TEXTURE_WRAP_S', 'TEXTURE_WRAP_T', 'CLAMP_TO_EDGE', 'REPEAT', 'DEPTH_TEST', 'CULL_FACE', 'SCISSOR_TEST', 'POLYGON_OFFSET_FILL', 'LEQUAL', 'FRAMEBUFFER', 'READ_FRAMEBUFFER', 'DRAW_FRAMEBUFFER', 'DEPTH_BUFFER_BIT', 'DEPTH_COMPONENT24', 'DEPTH_COMPONENT']) K[k] = 200 + (id++);
+  K.TEXTURE0 = 1000;
+  const bound = {}, gl = Object.assign({}, K, {
+    createBuffer() { return { data: new Uint8Array(0) }; }, deleteBuffer() {}, createVertexArray() { return {}; }, deleteVertexArray() {}, bindVertexArray() {},
+    bindBuffer(t, b) { bound[t] = b; }, bufferData(t, size) { bound[t].data = new Uint8Array(typeof size === 'number' ? size : size.byteLength); },
+    bufferSubData(t, off, src) { bound[t].data.set(new Uint8Array(src.buffer, src.byteOffset, src.byteLength), off); }, copyBufferSubData(r, w, ro, wo, n) { bound[w].data.set(bound[r].data.subarray(ro, ro + n), wo); },
+    enableVertexAttribArray() {}, vertexAttribPointer() {}, createTexture() { return { tex: true }; }, deleteTexture() {}, deleteFramebuffer() {}, bindTexture() {}, texImage2D() {}, texParameteri() {}, activeTexture() {}, texSubImage2D() {},
+    useProgram() {}, uniform1i(k, v) { calls.uniforms[k] = v; }, uniform1f(k, v) { calls.uniforms[k] = v; }, uniform2f() {}, uniform3f(k, a, b, c) { calls.uniforms[k] = [a, b, c]; }, uniformMatrix4fv(k, t, m) { calls.uniforms[k] = Float32Array.from(m); },
+    enable() {}, disable() {}, depthFunc() {}, depthMask() {}, viewport() {}, drawElements() { calls.draws++; },
+    bindFramebuffer(t, f) { calls.fb.push(f); }, blitFramebuffer(...a) { calls.blits.push(a.slice(0, 4)); },
+  });
+  V.GL = { ext: { multiDraw: { multiDrawElementsWEBGL() { calls.multi++; } } }, program: () => ({ p: {}, u: new Proxy({}, { get: (t, k) => k }) }), tex2D: () => ({ copy: true }), fbo: () => ({ fbo: true }) };
+  const r = { gl, P: {}, common() {}, viewProj: new Float32Array(16), stats: { draws: 0, tris: 0, shadowRenders: 1 }, frameNo: 1, shadowValid: true, shadowTex: { map: 1 }, shadowFB: { mapFB: 1 }, shadowSize: 1024, shadowOff: [0, 0], q: { shadows: 1024 } };
+  // the renderer's lookup matrix: an orthographic box ±40 blocks across, ±260 deep, the light from up high
+  const lv = m4.create(); m4.lookAt(lv, 0, 0, 0, -0.3, -0.9, -0.3, 0, 1, 0); const pr = m4.create(); m4.ortho(pr, -40, 40, -40, 40, -260, 260); r.shadowMat = m4.mul(m4.create(), pr, lv);
+  const g = { renderer: r, settings: Object.assign({}, P.balanced) }; FG.game = g;
+  const cam = { x: 0, y: 70, z: 0 }, ppl = [];
+  for (let i = 0; i < 3; i++) { const L = Folk.look(9100 + i, 'crafter', 'adult', null, 'hall'), rec = FG.recFor(L), m = FS.personFromLook(L); m.type = 'folkmesh'; FG.inflight = 1; FG.got(g, rec, m); ppl.push(rec); }
+  const frame = (positions) => { r.frameNo++; ppl.forEach((rec, i) => FG.queue(rec, positions[i], 0, FA.sample(FA.clips.idle, 0, {}), { sky: 1, bl: [0, 0, 0] }, {})); FG.flush(r, { sunDir: [0.3, 0.9, 0.3], moonDir: [0, -1, 0] }, cam); };
+  frame([[2, 70, -3], [3, 70, -4], [-1, 70, -5]]);
+  r.frameNo++; calls.blits.length = 0; calls.multi = 0;
+  const ok1 = FG.castShadows(r, {}, cam);
+  const full = calls.blits.length === 1 && calls.blits[0].join() === '0,0,1024,1024';
+  check(ok1 && full && calls.multi === 1 && r.shadowRead && r.shadowRead.copy, `the first frame: the whole map copied (${calls.blits.length} blit), the three drawn in ${calls.multi} draw, the frame reads the copy`);
+  const zr = 0.5 * Math.hypot(r.shadowMat[2], r.shadowMat[6], r.shadowMat[10]), zb = calls.uniforms.u_zBias;
+  check(Math.abs(zb - 2 * (0.0006 + 0.04 * zr)) < 1e-9 && zr > 0, `the people written ${f2((zb / 2) / zr)} blocks nearer the light (the receivers' bias ${f2(0.0006 / zr)} and 0.04)`);
+  const rect = FG.sm.rects[0], tpb = 1024 / 80;
+  check(FG.sm.rects.length === 1 && rect[2] - rect[0] < 14 * tpb && rect[3] - rect[1] < 14 * tpb, `their footprint one rectangle of ${rect[2] - rect[0]} × ${rect[3] - rect[1]} texels (not the whole map)`);
+  // the next frame: the map unchanged — only last frame's rectangle comes back
+  frame([[2.3, 70, -3], [3, 70, -4.2], [-1, 70, -5]]);
+  r.frameNo++; calls.blits.length = 0; calls.multi = 0;
+  FG.castShadows(r, {}, cam);
+  check(calls.blits.length === 1 && calls.blits[0].join() === rect.slice(0, 4).join() && calls.multi === 1, `the next frame: only last frame's rectangle restored (${calls.blits.map(b => b.join(',')).join(' ')})`);
+  // the map redrawn (a new render): all of it again
+  r.stats.shadowRenders++; frame([[2.3, 70, -3], [3, 70, -4.2], [-1, 70, -5]]); r.frameNo++; calls.blits.length = 0; FG.castShadows(r, {}, cam);
+  check(calls.blits.length === 1 && calls.blits[0].join() === '0,0,1024,1024', 'the map redrawn: copied whole again');
+  // the toroidal map: a person at the wrap is written in two copies
+  // (the offset that puts the first person right on the wrap: its window x + 2·offset = 1)
+  { const M = r.shadowMat, nx = M[0] * 2 + M[4] * 0.9 + M[8] * -3 + M[12]; r.shadowOff = [(1 - nx) / 2, 0.1]; }
+  frame([[2, 70, -3], [3, 70, -4], [-1, 70, -5]]); r.frameNo++; calls.multi = 0; FG.castShadows(r, {}, cam);
+  check(calls.multi >= 2 && FG.sm.rects.length >= 2, `on the toroidal map the people at the wrap are written in ${FG.sm.rects.length} copies`);
+  r.shadowOff = [0, 0];
+  // nobody drawn last frame (no villagers near): no pass, the frame reads the map itself
+  r.frameNo += 2; const none = FG.castShadows(r, {}, cam);
+  check(!none && r.shadowRead === null, 'no people drawn the frame before: no pass, the map itself is read');
+  // Low: the ellipse — no pass
+  g.settings = Object.assign({}, P.low); r.q = { shadows: 0, dropShadow: true }; frame([[2, 70, -3], [3, 70, -4], [-1, 70, -5]]); r.frameNo++;
+  check(!FG.castShadows(r, {}, cam) && r.shadowRead === null, 'on Low no pass: the ellipse');
+  FG.clear(gl); FG.dropCopy(gl);
+}
+
 // ---------------------------------------------------------------- §6 sitting
 console.log('§6 sitting');
 {

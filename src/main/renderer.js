@@ -754,7 +754,7 @@
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
       if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
-      if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
+      if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowRead || this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {
         gl.activeTexture(gl.TEXTURE6); gl.bindTexture(gl.TEXTURE_2D, this.hmapTex); gl.uniform1i(p.u.u_hmap, 6);
@@ -1454,7 +1454,7 @@
         if (u.u_shadowMat) gl.uniformMatrix4fv(u.u_shadowMat, false, this.shadowMat);
         if (u.u_shadowTexel) gl.uniform1f(u.u_shadowTexel, 1 / (this.shadowSize || 1024));
         this.shadowOffUni(u);
-        if (u.u_shadowMap && this.shadowTex) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowTex); gl.uniform1i(u.u_shadowMap, 3); }
+        if (u.u_shadowMap && this.shadowTex) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowRead || this.shadowTex); gl.uniform1i(u.u_shadowMap, 3); }
       }
       return u;
     }
@@ -1717,6 +1717,8 @@
       // shadows (the cached map as before, or F9's Schatten-Takt: shadowFrame)
       this.gpuPass('shadow');
       this.shadowFrame(world, E, F.cam);
+      // (t-folk2: the people's copy of the map with them in it — folkgpu.js castShadows; the frame reads shadowRead)
+      this.shadowRead = null; if (VR.FolkGPU && VR.FolkGPU.castShadows) VR.FolkGPU.castShadows(this, E, F.cam);
       // ---------------- scene
       gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB);
       gl.viewport(0, 0, this.w, this.h);
