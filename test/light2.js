@@ -302,11 +302,16 @@ console.log('h · the light in the air, the mist, the beams, the hooks');
   // in the light shows the air most (a shaft between dark trunks), a ray all in the light or all in shadow as the haze —
   // so the open land keeps a clear air and the wood, the hall and the street between houses show their shafts
   const sb = (lit) => L2.volShaft(lit);
-  check(Math.abs(sb(1) - 1) < 1e-9 && Math.abs(sb(0) - 1) < 1e-9 && sb(0.5) > 8 && sb(0.2) > sb(0.05) * 2 && sb(0.5) >= sb(0.3), `the shafts: a ray half in shadow ×${r2(sb(0.5))}, a fifth lit ×${r2(sb(0.2))}, a twentieth ×${r2(sb(0.05))}, all lit or all dark ×1`);
+  check(Math.abs(sb(1) - 1) < 1e-9 && Math.abs(sb(0) - 1) < 1e-9 && sb(0.3) > 12 && sb(0.2) > sb(0.05) * 2, `the shafts: a ray a third lit ×${r2(sb(0.3))}, a fifth lit ×${r2(sb(0.2))}, a twentieth ×${r2(sb(0.05))}, all lit or all dark ×1`);
+  // (run 3: over the open lake and the temple's plaza — long rays, most of them lit — the symmetric weight (×11 at 0.7
+  // lit) veiled a third of the picture, while in the wood (short rays, a fifth lit) nothing showed: so the weight leans
+  // to the darker rays, the far air counts less, and the light in the air is denser where the eye stands in shadow)
+  check(sb(0.8) < sb(0.3) * 0.35 && sb(0.7) < sb(0.2) * 0.6, `an open ray (0.8 lit) ×${r2(sb(0.8))}, 0.7 lit ×${r2(sb(0.7))}: far less than a shaft in the shade`);
   // (a shaft pixel against its dark neighbour in a wood: a fifth of the ray lit against a twentieth)
   check((0.2 * sb(0.2)) / (0.05 * sb(0.05)) > 6, `in a wood a shaft stands out of its dark neighbours ${r2((0.2 * sb(0.2)) / (0.05 * sb(0.05)))}× (without the boost 4×)`);
+  check(L2.VOL.fade >= 40 && L2.VOL.fade <= 120 && L2.VOL.cover >= 1 && L2.VOL.cover <= 3, `the far air counts less (e^(−t / ${L2.VOL.fade})), the eye in shadow ×${1 + L2.VOL.cover}`);
   const vf = pre(L2.VOL_FS, []), lc = pre(L2.glslCommon(), ['LIGHT2']);
-  check(/lit = acc \/ max\(tot, 1e-6\)/.test(vf) && /u_volShaft \* 4\.0 \* lit \* \(1\.0 - lit\)/.test(vf), 'the march weighs its light by how much of the ray is in shadow (u_volShaft, L2.volShaft\'s mirror)');
+  check(/lit = acc \/ max\(tot, 1e-6\)/.test(vf) && /u_volShaft \* 6\.75 \* lit \* \(1\.0 - lit\) \* \(1\.0 - lit\)/.test(vf) && /exp\(-t \* u_volF\.x\)/.test(vf) && /u_volF\.y \* \(1\.0 - eye\)/.test(vf), 'the march weighs its light by how much of the ray is in shadow (u_volShaft, L2.volShaft\'s mirror), the far air less, the eye\'s shade more');
   check(/uniform vec3 u_l2Glow;/.test(lc) && /u_l2Glow \* max\(d, 0\.0\)/.test(lc), 'the hemisphere carries the afterglow on the faces toward the low sun (u_l2Glow, L2.hemi\'s mirror)');
   const E = { horizon: [0.62, 0.72, 0.86], fogColor: [0.7, 0.76, 0.84], sunDir: [-0.36, 0.41, 0.84] }, m = L2.mistColor(E);
   check(m.every((v, i) => v >= Math.min(E.horizon[i], E.fogColor[i]) * 0.99 && v <= Math.max(E.horizon[i], E.fogColor[i]) * 1.09), `the valley mist between the horizon's colour and the fog's (${m.map(r3).join(' ')})`);

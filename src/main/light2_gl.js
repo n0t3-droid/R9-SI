@@ -177,6 +177,7 @@
     gl.uniform3f(p.u.u_volL, L[0], L[1], L[2]);
     if (p.u.u_volSky) gl.uniform1f(p.u.u_volSky, K.sky);
     if (p.u.u_volShaft) gl.uniform1f(p.u.u_volShaft, K.shaft);
+    if (p.u.u_volF) gl.uniform2f(p.u.u_volF, 1 / K.fade, K.cover);
     gl.uniform1f(p.u.u_phase, this.jit ? (this.frameNo * 0.6180339887) % 1 : 0);
     const px = V.w * V.h;
     this.fsMark('l2vol', V.w, V.h, px * 4 * (K.steps + 2), px * 8, px * (K.steps + 2));

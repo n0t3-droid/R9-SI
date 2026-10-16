@@ -32,6 +32,11 @@ const TIMES = { noon: 6000, golden: 10800, dusk: 12600, night: 16500 };
 const TLIST = (process.env.TIMES || 'noon,golden,dusk,night').split(',');
 const VIEWS = (process.env.VIEWS || 'avenue,temple,hills,lake,villa,hangar,trees,hallcity').split(',');
 let CONFIGS = (process.env.CONFIGS || 'off,on').split(',');
+// XCONF: extra configurations for some views at the XTIMES, each "name:switch+switch@view,view" joined by "|" — e.g.
+// novol:l2Light+l2Ssao+l2Air+l2Grade@trees,hallcity,sun (the light without the volumetric pass: on − novol is that pass's
+// light alone); "sun" is the golden-hour picture into the sun
+const XCONF = (process.env.XCONF || '').split('|').filter(Boolean).map(s => { const [a, b] = s.split('@'), [name, conf] = a.split(':'); return { name, conf, views: (b || '').split(',') }; });
+const XTIMES = (process.env.XTIMES || 'noon,golden').split(',');
 const EYE = 1.62;
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
@@ -198,7 +203,13 @@ const picture = async (P, path, k) => {
     if (!F) return { err: 'no frame kept' };
     window.__norender = false;
     r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false;
-    for (let i = 0; i < k; i++) r.render(F);
+    // the people within 6 blocks of the eye stand aside for the picture (run 3: a passer-by in front of the lens hid
+    // the avenue at every hour) — the villages' people and the crowd's heroes, drawn from their lists at draw time
+    const V = g.villages, C = VR.Crowd, c = F.cam, keepV = V && V.agents, keepC = C && C.heroes;
+    const away = (a) => !a || !a.pos || Math.hypot(a.pos[0] - c.x, a.pos[2] - c.z) > 6;
+    if (keepV) V.agents = keepV.filter(away);
+    if (keepC) C.heroes = keepC.filter(away);
+    try { for (let i = 0; i < k; i++) r.render(F); } finally { if (keepV) V.agents = keepV; if (keepC) C.heroes = keepC; }
     const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
     let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
@@ -338,6 +349,19 @@ for (const v of order) {
         if (cf === 'off' && TAG !== TAG_BASE && fs.existsSync(shotPath(`${v}_${t}_off_${TAG_BASE}`))) { const d = await dE(shotPath(`${v}_${t}_off_${TAG_BASE}`), path); R.pics[t + '_off'].dEbase = d; cmp = ` · against ${TAG_BASE} ΔE ${d ? d.mean : '?'}`; }
         console.log(`    ${t} ${cf} [${q.q}]: L* ${st.L} ±${st.sd}, glow ${st.glow} %, lower half a*b* ${st.lowAB.join(' ')}, ${m.draws} draws, ${m.fs} full-screen passes${cmp}`);
       }
+      // the extra configurations of this view at this time (XCONF): against 'on', what the pass left out gives
+      if (XTIMES.includes(t)) for (const X of XCONF.filter(x => x.views.includes(v))) {
+        const q = await config(A.ev, X.conf), path = shotPath(`${v}_${t}_${X.name}_${TAG}`);
+        wanted++;
+        const m = await picture(A, path, K);
+        if (m.err) { console.log(`    ${t} ${X.name}: ${m.err}`); continue; }
+        const st = await stats(path);
+        if (notBlank(st)) pics++; else blank.push(path);
+        R.pics[t + '_' + X.name] = Object.assign({ q: q.q }, m, st);
+        let cmp = '';
+        if (R.pics[t + '_on']) { const d = await dE(shotPath(`${v}_${t}_on_${TAG}`), path); R.pics[t + '_' + X.name].dE = d; cmp = ` · against on ΔE ${d.mean} (${d.over} % > 2.3)`; }
+        console.log(`    ${t} ${X.name} [${q.q}]: L* ${st.L} ±${st.sd}, glow ${st.glow} %${cmp}`);
+      }
     }
     // into the sun (from the hills' terrace, 136 high, at the golden hour turned to the sun 7° up: the flare's ghosts
     // and the light in the air toward it — none of the eight views has the sun in its frame)
@@ -347,8 +371,9 @@ for (const v of order) {
       const yaw = Math.atan2(-sd[0], -sd[2]), pitch = Math.atan2(sd[1], Math.hypot(sd[0], sd[2])) - 0.06;
       await A.pose(pose.x, pose.feet, pose.z, yaw, pitch, 70);
       await A.settle(300, 60); await A.step(4); await A.warmVx(); await A.step(2);
-      for (const cf of CONFIGS) {
-        const q = await config(A.ev, cf), path = shotPath(`sun_golden_${cf}_${TAG}`);
+      for (const cf of CONFIGS.concat(XCONF.filter(x => x.views.includes('sun')).map(x => x.name))) {
+        const X = XCONF.find(x => x.name === cf && x.views.includes('sun'));
+        const q = await config(A.ev, X ? X.conf : cf), path = shotPath(`sun_golden_${cf}_${TAG}`);
         wanted++;
         const m = await picture(A, path, K);
         if (m.err) { console.log(`    into the sun ${cf}: ${m.err}`); continue; }

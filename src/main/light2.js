@@ -102,8 +102,9 @@
   // the shade's colour (the sky's light) per mood, over env.js's sky light: by day a cool neutral — env's is lavender (blue
   // over red 1.76 at noon) and the town lies in the low sun's long shadows most of the day, so this colour IS the
   // picture; the frames' shade is a cool grey (b* −6 … +6) — at the golden hour a cool neutral, at dusk violet, at night
-  // teal (run 3's tuning against the on2 pictures); the ground's bounce warm (the sunlit ground)
-  const SKYTINT = { day: [1.08, 1.0, 0.82], gold: [1.05, 1.0, 0.84], dusk: [1.06, 0.92, 1.0], night: [0.74, 1.06, 0.98] };
+  // a cyan-blue (run 3's tuning against the on2 pictures; a greener teal turned the people's faces green at night); the
+  // ground's bounce warm (the sunlit ground)
+  const SKYTINT = { day: [1.08, 1.0, 0.82], gold: [1.05, 1.0, 0.84], dusk: [1.06, 0.92, 1.0], night: [0.8, 1.0, 1.0] };
   // the sky light's level over env's: the frames' shade is lighter than the game's (their darkest land L* 15–22 by day,
   // the game's 7–12) — the light lifted here, in the light, so the sky's own fit (t-sky2) is not touched by the grade
   const SKYK = { day: 1.3, gold: 1.4, dusk: 1.45, night: 1.15 };
@@ -117,7 +118,7 @@
   L2.skyK = (m) => byMood(m, SKYK);
   // the sun's light on the lit things by the hour (the sky keeps env.js's sun): by day env.js's own a little stronger,
   // in the golden hour gold and stronger, at dusk a warm rose
-  const SUNTINT = { day: [1, 1, 1], gold: [1.22, 1.0, 0.74], dusk: [1.15, 0.92, 0.85], night: [1, 1, 1] };
+  const SUNTINT = { day: [1, 1, 1], gold: [1.18, 1.0, 0.8], dusk: [1.15, 0.92, 0.85], night: [1, 1, 1] };
   const SUNK = { day: 1.06, gold: 1.25, dusk: 1.1, night: 1.0 };
   L2.sunTint = function (m) { const t = byMood(m, SUNTINT), k = byMood(m, SUNK); return [t[0] * k, t[1] * k, t[2] * k]; };
   // a colour with the luminance of another
@@ -208,11 +209,13 @@
     // is warm over a cool shade, at dusk more so)
     // (run 3's tuning: the on2 pictures were 3–8 L* darker than the light off and greyer (C* down to half at dusk) — the
     // S eased (0.45 → 0.3: it pressed the shaded lawns down), the curve's middle kept so the sky keeps t-sky2's fit (test
-    // e: within 3.5 L* of the old curve), the mid-tones' saturation up, the vignette lighter, the glow by day wider)
+    // e: within 3.5 L* of the old curve), the mid-tones' saturation up, the vignette lighter, the glow by day wider;
+    // after run 3: the golden hour's split 10.1 against the frames' 6.2 — its lights' lean eased; at night the many light
+    // lines' glow washed the avenue's paving cyan — the night's glow narrower, threshold 0.62, strength 0.25)
     day: { toe: 0.014, mid: 0.5, s: 0.3, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.1, vig: 0.16, bThr: 1.05, bStr: 0.13 },
-    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 0.985, dark: [-0.02, 0.0, 0.04], light: [0.075, 0.028, -0.055], sat: 1.16, vig: 0.2, bThr: 0.9, bStr: 0.17 },
+    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 0.985, dark: [-0.02, 0.0, 0.04], light: [0.062, 0.022, -0.045], sat: 1.16, vig: 0.2, bThr: 0.9, bStr: 0.17 },
     dusk: { toe: 0.022, mid: 0.5, s: 0.28, sh: 0.975, dark: [0.01, -0.014, 0.05], light: [0.065, 0.018, -0.035], sat: 1.15, vig: 0.24, bThr: 0.75, bStr: 0.22 },
-    night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.55, bStr: 0.32 },
+    night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.62, bStr: 0.25 },
   };
   L2.GRADE = GRADE;
   L2.grade = function (E) {
@@ -257,15 +260,20 @@
   // brightest); the strength over the air's haze for the sun and for the moon; indoors more (the dust in a sunbeam through a
   // window: the eye's sky light low); a ray to the sky a part of it (the sky's glow is the sky shader's); the haze's scale
   // height longer than the fog's (the shafts reach up the trees)
-  // shaft: the shafts' boost — a ray part in the light and part in shadow shows the air most (a shaft between dark
-  // trunks, under a vault's ribs, between houses), a ray all lit or all dark as the haze (the open land's air stays clear)
-  L2.VOL = { steps: 16, reach: 120, g: 0.35, sun: 0.3, moon: 1.6, indoor: 2.5, sky: 0.25, kScale: 0.7, shaft: 12 };
+  // shaft: the shafts' boost — a ray part in the light and mostly in shadow shows the air most (a shaft between dark
+  // trunks, under a vault's ribs, between houses), a ray all lit or all dark as the haze (the open land's air stays
+  // clear); fade: the far air counts less (blocks: e^(−t / fade) — the far haze is the air's, l2Fog); cover: the light in
+  // the air denser where the eye stands in shadow (in a wood, under the vault, in a street's shade: the lit air beside it
+  // glows), ×(1 + cover). g: forward — the shafts toward the light bright, the air away from it clear (run 3: the
+  // symmetric weight and g 0.35 veiled the open lake and the temple's plaza, while the wood showed nothing)
+  L2.VOL = { steps: 16, reach: 120, g: 0.55, sun: 0.4, moon: 1.6, indoor: 2.5, sky: 0.25, kScale: 0.7, shaft: 20, fade: 64, cover: 1.5 };
   L2.volK = function (sunUp, rain, eyeSky) {
     const V = L2.VOL, e = eyeSky === undefined ? 1 : clamp(eyeSky, 0, 1);
     return (sunUp ? V.sun : V.moon) * (1 - 0.6 * clamp(rain || 0, 0, 1)) * (1 + V.indoor * (1 - e));
   };
-  // (JS mirror of the march's weight: lit = the share of the ray in the light, its density-weighted length)
-  L2.volShaft = (lit) => 1 + L2.VOL.shaft * 4 * lit * (1 - lit);
+  // (JS mirror of the march's weight: lit = the share of the ray in the light, its density-weighted length; the weight
+  // 6.75 · lit · (1 − lit)² peaks at a third lit)
+  L2.volShaft = (lit) => 1 + L2.VOL.shaft * 6.75 * lit * (1 - lit) * (1 - lit);
   // the sun's flare: its strength (HDR, before the exposure) and the disc's radius (screen heights) its visibility is read in
   L2.FLARE = { k: 0.05, disc: 0.012 };
   // blue noise (void and cluster, Ulichney 1993): an N × N tiling threshold map whose values are spread with no low
@@ -476,7 +484,8 @@ uniform vec4 u_volH;       // x the eye's height, y k (1 / the haze's scale heig
 uniform vec3 u_volCol;     // the light's colour × strength
 uniform vec3 u_volL;       // toward the light
 uniform float u_volSky;    // the share of a ray to the sky
-uniform float u_volShaft;  // the shafts' boost (L2.volShaft): a ray part lit, part in shadow shows the air most
+uniform float u_volShaft;  // the shafts' boost (L2.volShaft): a ray part lit, mostly in shadow shows the air most
+uniform vec2 u_volF;       // x 1 / the far air's fade (blocks), y the eye's shade: the air ×(1 + y) where the eye is in shadow
 uniform float u_phase;
 in vec2 v_uv;
 out vec4 o;
@@ -491,20 +500,22 @@ void main() {
   float n = u_vol.x, dt = T / n;
   float j = fract(texture(u_blue, gl_FragCoord.xy / 64.0).r + u_phase);
   vec3 s0 = (u_shadowMat * vec4(0.0, 0.0, 0.0, 1.0)).xyz, s1 = (u_shadowMat * vec4(dir * T, 1.0)).xyz;
-  float acc = 0.0, tot = 0.0;
+  float acc = 0.0, tot = 0.0, eye = 1.0;
   for (int i = 0; i < 16; i++) {
     if (float(i) >= n) break;
     float u = (float(i) + j) / n, f = u * u, t = f * T;
     vec3 sc = mix(s0, s1, f) * 0.5 + 0.5;
     float vis = 1.0;
     if (sc.x > 0.0 && sc.y > 0.0 && sc.x < 1.0 && sc.y < 1.0 && sc.z < 1.0) vis = texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - u_volH.w));
+    if (i == 0) eye = vis;
     float h = u_volH.x + dir.y * t;
-    float w = exp(-u_volH.y * max(h - u_volH.z, -30.0)) * 2.0 * u * dt;
+    float w = exp(-u_volH.y * max(h - u_volH.z, -30.0)) * exp(-t * u_volF.x) * 2.0 * u * dt;
     acc += vis * w; tot += w;
   }
-  // the shafts: weighed by how much of the ray is in shadow (a ray all lit or all dark: the haze as it is)
+  // the shafts: weighed by how much of the ray is in shadow (a ray all lit or all dark: the haze as it is; most where a
+  // third is lit), denser where the eye itself stands in shadow
   float lit = acc / max(tot, 1e-6);
-  acc *= 1.0 + u_volShaft * 4.0 * lit * (1.0 - lit);
+  acc *= (1.0 + u_volShaft * 6.75 * lit * (1.0 - lit) * (1.0 - lit)) * (1.0 + u_volF.y * (1.0 - eye));
   float c = dot(dir, u_volL), g = u_vol.w, g2 = g * g;
   float ph = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5);
   o = vec4(u_volCol * (acc * u_vol.z * ph * (d >= 0.999999 ? u_volSky : 1.0)), linZ(d));
