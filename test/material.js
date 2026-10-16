@@ -37,10 +37,17 @@ console.log('a · the material table');
   check(wins.length >= 3 && wins.every(n => (of(n).flags & P.WIN) && of(n).coat === 1), 'window panes glow at night (the flag) and are smooth', wins.map(fmt).join(' · '));
   check(['glass_rail', 'frosted_glass', 'glass'].every(n => !(of(n).flags & P.WIN) && (of(n).flags & P.GLASS)), 'railings, frosted and plain glass are glass that does not glow');
   check(['item:quartz', 'ore:gold:stone'].every(n => of(n).metal === 0 && of(n).coat === 0), 'items and ores take nothing');
+  // (run 4: Weißstadt's hall floor — grey pavers — stayed matte. Honed pavers: a soft polish over the rough stone, its own
+  //  roughness in the flags' upper four bits; polished stone keeps the sharp coat, glass its flags in the lower bits)
+  const hon = ['paver_grey', 'granite_paver'];
+  check(hon.every(n => names.includes(n) && of(n).coat >= 0.35 && of(n).coat <= 0.5 && Math.abs(of(n).cr - 0.32) < 0.02 && P.crBits(of(n).cr) === 8), 'the hall\'s grey and granite pavers are honed: a soft polish (coat 0.35–0.5, its roughness 0.32 → bits 8)', hon.map(n => `${fmt(n)} cr ${of(n).cr}`).join(' · '));
+  check(['marble_white', 'travertine', 'vx_tile_gloss', 'hull:white'].every(n => P.crBits(of(n).cr) === 0) && P.crBits(undefined) === 0 && P.crBits(0.08 + 15 * 0.03) === 15 && P.crBits(2) === 15, 'polish, gloss tiles and hulls keep the sharp coat (bits 0); the bits clamp to 0–15');
   const row = P.row(names);
   let ok = row.length >= L * 4;
-  for (let l = 0; l < L && ok; l++) { const m = P.of(names[l]); if (row[l * 4] !== Math.round(m.metal * 255) || row[l * 4 + 1] !== Math.round(m.coat * 255) || row[l * 4 + 3] !== m.flags) ok = false; }
-  check(ok, `every layer has its four bytes in the row (${L} layers, ${row.length} bytes)`);
+  for (let l = 0; l < L && ok; l++) { const m = P.of(names[l]); if (row[l * 4] !== Math.round(m.metal * 255) || row[l * 4 + 1] !== Math.round(m.coat * 255) || row[l * 4 + 3] !== ((m.flags & 15) | (P.crBits(m.cr) << 4))) ok = false; }
+  check(ok, `every layer has its four bytes in the row (${L} layers, ${row.length} bytes): metal, coat, the roughness scale, the flags | the coat's roughness << 4`);
+  const iP = names.indexOf('paver_grey'), iG = names.indexOf('vx_glass');
+  check(row[iP * 4 + 3] === 128 && (row[iG * 4 + 3] & 15) === (P.WIN | P.GLASS | P.TINTED) && (row[iG * 4 + 3] >> 4) === 0, 'the bytes: the pavers 8 << 4, a window pane its flags 1 | 2 | 4 below', `${row[iP * 4 + 3]} · ${row[iG * 4 + 3]}`);
   const nCoat = names.filter(n => P.of(n).coat > 0).length, nMetal = names.filter(n => P.of(n).metal > 0).length;
   console.log(`     ${nCoat} layers with a coat, ${nMetal} metallic, ${L - nCoat - nMetal} as before`);
 }
@@ -129,7 +136,10 @@ console.log('g · the screen-space mirror (tier 2)');
   const i = fs.indexOf('layout(location=1) out vec4 o_ssr;'), j = fs.lastIndexOf('#ifdef SSR', i);
   check(i > 0 && j > 0 && j > fs.lastIndexOf('#endif', i), 'the terrain writes the mirror\'s second target only with SSR (tier 2)');
   check(/o_ssr = vec4\(octEnc\(g_ssrN\)/.test(fs) && /g_ssrW = g_ssrW \* \(1.0 - Fc\) \+ Fc/.test(fs), 'the normal, the Fresnel weight (base and coat) and the roughness go into it');
-  check(/vec3 nc = normalize\(mix\(n, Ng, 0\.88\)\)/.test(fs) && /if \(Fc > g_ssrW \* 0\.5\) g_ssrN = nc;/.test(fs), 'a clear coat mirrors along the smooth surface (its normal mostly the geometric one: no mottled smear from the texture\'s relief)');
+  check(/vec3 nc = normalize\(mix\(n, Ng, 0\.88 \* \(1\.0 - pud\)\)\)/.test(fs) && /if \(Fc > g_ssrW \* 0\.5\) g_ssrN = nc;/.test(fs), 'a clear coat mirrors along the smooth surface (its normal mostly the geometric one: no mottled smear from the texture\'s relief); a puddle along its own rain rings');
+  check(/float rc = mix\(0\.08 \+ float\(uint\(pb\.a \* 255\.0 \+ 0\.5\) >> 4u\) \* 0\.03, 0\.04, pud\);/.test(fs), 'the coat\'s roughness comes from the table\'s upper four bits (0.08 + 0.03 a step, as tex_pbr.js writes it); a puddle is sharp');
+  check(/float Fc = max\(\(0\.04 \+ 0\.96 \* fvc\) \* coat, pud \* 0\.48\);/.test(fs), 'a puddle mirrors at least about half of what it faces (run 4: hardly visible where one looks down at it)');
+  check(V.PBR.CR0 === 0.08 && V.PBR.CR_STEP === 0.03, 'the table and the shader agree on the coat\'s roughness steps');
   check(typeof S.SSR_FS === 'string' && /for \(int i = 0; i < 16; i\+\+\)/.test(S.SSR_FS) && /for \(int k = 0; k < 5; k\+\+\)/.test(S.SSR_FS) && !/u_frame|h12\(/.test(S.SSR_FS), 'the march: 16 growing steps, 5 halvings at a crossing before it is judged, the same ray every frame (no jitter: no spray of lone hits)');
   check(/textureSize\(u_ssr, 0\)/.test(S.SSR_APPLY_FS) && /m\.a \* 6\.0/.test(S.SSR_APPLY_FS) && /r\.y \* 2\.6/.test(S.SSR_APPLY_FS) && /smoothstep\(0\.25, 0\.65, s\.a\)/.test(S.SSR_APPLY_FS), 'the apply gathers the hits over a footprint that grows with the roughness, drawn out up and down the screen (a glossy floor\'s streaks)');
   check(/smoothstep\(0.0, 0.07, e.x\)/.test(S.SSR_FS) && /dot\(R, V\)/.test(S.SSR_FS), 'it fades at the screen\'s edge and for rays back toward the eye');

@@ -5,7 +5,8 @@
 // the detail; tex_core.js writes it into the material texture's blue channel). Matte things (plants, the ground, cloth)
 // get nothing and a little more roughness: the shader skips their gloss altogether. Window panes carry a flag: they glow
 // warm from inside at night (TRANS_FS; 2: glass, 4: only when the pane is tinted). One RGBA8 row for the terrain programs (u_pbr, one texel a layer): r metal,
-// g coat, b the roughness scale (128 = ×1, 255 ≈ ×2), a flags. Pure JS (the main thread and the node tests).
+// g coat, b the roughness scale (128 = ×1, 255 ≈ ×2), a the flags (low four bits) and the coat's own roughness (high four
+// bits: a honed stone's soft polish). Pure JS (the main thread and the node tests).
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -33,6 +34,9 @@
     [/^hull/, { metal: 0.15, coat: 0.75, rk: 0.85 }],
     // the landing pad and the hangar's deck: a sealed, glossy floor
     [/landing_pad|hazard_stripes|deck_plate/, { coat: 0.45 }],
+    // honed pavers (Weißstadt's hall streets, the sidewalks): a rough stone under a soft polish — they mirror the lamps,
+    // the shopfronts and the sky softly, blurred (the coat's own roughness, cr)
+    [/^paver_grey$|^granite_paver$/, { coat: 0.4, cr: 0.32 }],
     // polished stone: marble, travertine, quartz, porcelain, terrazzo, the polished cuts
     [/marble|travertine|quartz|porcelain|terrazzo|^polished_|calcite|micro_cement|concrete_smooth/, { coat: 0.6 }],
     // gloss tiles and the mini-voxel pieces' lacquer (the plaza's paving, the white tech walls, the hall's panels, the
@@ -45,11 +49,15 @@
     [/glazed|roof|slate|^concrete:/, { coat: 0.15 }],
   ];
   PBR.RULES = RULES;
+  // the coat's own roughness (cr): a sharp polish 0.08 by default; the flags byte carries it in its upper four bits,
+  // 0.08 + 0.03 per step (TERRAIN_FS pbrShade) — the glass flags stay in the lower bits
+  PBR.CR0 = 0.08; PBR.CR_STEP = 0.03;
+  PBR.crBits = (cr) => Math.max(0, Math.min(15, Math.round(((cr === undefined ? PBR.CR0 : cr) - PBR.CR0) / PBR.CR_STEP)));
   // the material of one texture layer ('#frame' parts count the same)
   PBR.of = function (name) {
     const s = String(name || '').toLowerCase().split('#')[0];
-    for (const [re, o] of RULES) if (re.test(s)) return { metal: o.metal || 0, coat: o.coat || 0, rk: o.rk || 1, flags: o.flags || 0 };
-    return { metal: 0, coat: 0, rk: 1, flags: 0 };
+    for (const [re, o] of RULES) if (re.test(s)) return { metal: o.metal || 0, coat: o.coat || 0, rk: o.rk || 1, flags: o.flags || 0, cr: o.cr || PBR.CR0 };
+    return { metal: 0, coat: 0, rk: 1, flags: 0, cr: PBR.CR0 };
   };
   // the row for the shader: four bytes a layer, in the order of the names
   PBR.row = function (names) {
@@ -57,7 +65,7 @@
     for (let l = 0; l < names.length; l++) {
       const m = PBR.of(names[l]), o = l * 4;
       out[o] = Math.round(m.metal * 255); out[o + 1] = Math.round(m.coat * 255);
-      out[o + 2] = Math.max(0, Math.min(255, Math.round(m.rk * 128))); out[o + 3] = m.flags;
+      out[o + 2] = Math.max(0, Math.min(255, Math.round(m.rk * 128))); out[o + 3] = (m.flags & 15) | (PBR.crBits(m.cr) << 4);
     }
     return out;
   };

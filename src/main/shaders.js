@@ -778,10 +778,15 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, fl
 #endif
   if (coat > 0.004) {
     // (run 3: the coat mirrored along the texture's relief — the hangar's polished floor showed the walls as a mottled
-    // smear. A coat is a smooth film over the relief: its mirror follows the surface, the relief shows a hair through)
-    vec3 nc = normalize(mix(n, Ng, 0.88));
+    // smear. A coat is a smooth film over the relief: its mirror follows the surface, the relief shows a hair through;
+    // a puddle's water is flat itself, so its own rain rings ripple what it mirrors)
+    vec3 nc = normalize(mix(n, Ng, 0.88 * (1.0 - pud)));
     float nvc = clamp(dot(nc, V), 1e-3, 1.0), fvc = pow5(1.0 - nvc);
-    float rc = mix(0.08, 0.04, pud), Fc = (0.04 + 0.96 * fvc) * coat;
+    // the coat's own roughness from the table (the flags' upper four bits: a sharp polish 0.08, a honed stone softer);
+    // water is sharp. (run 4: the puddles after the rain hardly showed — water mirrors a few percent where one looks down
+    // at it, over pale tiles. A puddle mirrors at least about half of what it faces, as the eye remembers one)
+    float rc = mix(0.08 + float(uint(pb.a * 255.0 + 0.5) >> 4u) * 0.03, 0.04, pud);
+    float Fc = max((0.04 + 0.96 * fvc) * coat, pud * 0.48);
     c = c * (1.0 - Fc) + pbrEnv(reflect(-V, nc), rc, so, blockL) * Fc;
     if (ndl > 0.0) c += lsun * ndl * pbrSun(nc, V, L, rc, vec3(0.04)) * coat;
 #ifdef SSR
