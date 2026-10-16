@@ -159,7 +159,8 @@ try {
 } catch (e) { console.log('  (no base shaders: ' + String(e.message).split('\n')[0] + ')'); }
 const LITE_DEFS = ['LITE'];   // the Very Low programs: the lite look and none of the fronts' switches
 if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'RAIN_VS', 'RAIN_FS', 'PART_VS', 'PART_FS', 'FURN_VS', 'PUFF_VS', 'PUFF_FS']) {
-  const mine = pp(VR.SHADERS[k], LITE_DEFS), was = pp(baseS[k], LITE_DEFS);
+  const tidy = (t) => t.split('\n').map((l) => l.replace(/\s+$/, '')).filter((l) => l.length).join('\n');   // (a blank line changes no program)
+  const mine = tidy(pp(VR.SHADERS[k], LITE_DEFS)), was = tidy(pp(baseS[k], LITE_DEFS));
   // (the base text's own COMMON resolved the same way: both strings come with COMMON inlined)
   let at = -1; if (mine !== was) { const a = mine.split('\n'), b = was.split('\n'); at = a.findIndex((l, i) => l !== b[i]); }
   check(mine === was, `${k} on Very Low (LITE, after the preprocessor) is v0.46's text (${mine.length} characters${at < 0 ? '' : ', first different line ' + (at + 1) + ': ' + mine.split('\n')[at].trim().slice(0, 80)})`);
