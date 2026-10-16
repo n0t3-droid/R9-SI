@@ -156,7 +156,7 @@ function sheets() {
   const shot = (v, t) => { const p = `${SHOTS}wow48_${v}_${t}.png`; return fs.existsSync(p) ? p : null; };
   const main = { cols: ['Trailer', 'Vorher (v0.47)', 'Nachher (v0.48)'], w: 560, rows: SHEET.map(([v, f, l]) => ({ label: l + (f ? `  [Trailer ${f}]` : '  [kein Trailerbild]'), imgs: [f ? FRAMES + f + '.jpg' : null, shot(v, 'before'), shot(v, 'after')] })) };
   const after = { cols: [], w: 720, rows: [] };
-  for (let i = 0; i + 1 < SHEET.length; i += 2) after.rows.push({ label: `${SHEET[i][2]}   |   ${SHEET[i + 1][2]}`, imgs: [shot(SHEET[i][0], 'after'), shot(SHEET[i + 1][0], 'after')] });
+  for (let i = 0; i + 1 < SHEET.length; i += 2) after.rows.push({ label: SHEET[i][2], labels: [SHEET[i][2], SHEET[i + 1][2]], imgs: [shot(SHEET[i][0], 'after'), shot(SHEET[i + 1][0], 'after')] });   // (sheet.py: one label per picture)
   for (const [name, spec] of [['wow48_sheet', main], ['wow48_sheet_after', after]]) {
     const sp = `${ROOT}.tmp_tests/${name}.json`;
     fs.writeFileSync(sp, JSON.stringify(spec, null, 1));
