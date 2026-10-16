@@ -1184,6 +1184,15 @@ void main() {
     float e = emissiveFace ? max(emis, 0.85) : emis;
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
   }
+#ifdef PBR
+  // t-polish2 · a glowing pane carries the sky (t1_24, t3_05): the fine VX pieces' glowing voxels (the table's flag 8 —
+  // Villa Nova's turquoise glass, its amber frames and lines) mirror the sky by Fresnel over their glow, by the sky light:
+  // straight on the glow, toward the facade's edge the sky (the emissive mix above had left them one flat colour)
+  if (emissiveFace && (uint(texelFetch(u_pbr, ivec2(int(layer), 0), 0).a * 255.0 + 0.5) & 8u) != 0u) {
+    float fg = (0.04 + 0.96 * pow5(1.0 - clamp(dot(N, V), 1e-3, 1.0))) * skyL * 0.85;
+    col = mix(col, pbrSky(reflect(-V, N), 0.06), fg);
+  }
+#endif
 #ifdef MOTION
   // t-motion · the light lines run: a bright packet travels along every upward light (motion.js FLOW, the same numbers)
   if (emissiveFace && face == 2u && kind == 0u && u_animOn > 0.5) {
