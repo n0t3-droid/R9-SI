@@ -833,6 +833,20 @@ float shadowAt(vec3 N, vec3 L) {
 // t-material · PBR-lite (plan 2026-10-15-t-material.md, step 1). The material table (tex_pbr.js): per layer r metal, g a
 // clear coat (polish, lacquer, gloss tiles, painted hulls), b a scale on the painter's roughness (128 = ×1), a flags.
 uniform sampler2D u_pbr;
+// t-polish2 · rain under roofs: the rain's height map round the camera (game.js, wet.js fillMap: each column's top
+// rain-stopping block — solid, glass, fluid, leaves — R8) on unit 9. Glass passes the sky light, so the sky light cannot tell
+// a street under a glass vault from one in the open; a face gets the rain where the air cell in front of it lies above its
+// column's top (wet.js faceOpen). u_rainMap: xy the map's origin (world x, z of texel 0), z 1 when it holds this frame's
+// columns (0: the sky light alone decides, as before), w its size
+uniform sampler2D u_rainTop;
+uniform vec4 u_rainMap;
+float rainOpen(vec3 wq, vec3 N) {
+  if (u_rainMap.z < 0.5) return 1.0;
+  vec3 c = floor(wq + N * 0.5);
+  vec2 t = c.xz - u_rainMap.xy;
+  if (t.x < 0.0 || t.y < 0.0 || t.x >= u_rainMap.w || t.y >= u_rainMap.w) return 1.0;
+  return step(texelFetch(u_rainTop, ivec2(t), 0).r * 255.0 + 0.5, c.y);
+}
 #ifdef SSR
 // t-material · the screen-space mirror (step 2, High): the terrain's second target — the shaded normal (octahedral, y up),
 // how much of the fragment is mirror (its Fresnel weight) and the mirror's roughness; renderer.js ssrPass reads it
@@ -1064,7 +1078,7 @@ void main() {
   // hollows of a low-frequency field whose edge falls with the fill — they shrink from their rims as they dry
   vec3 wq = v_localPos + vec3(u_camInt);
   if (u_wet > 0.001 || u_puddle > 0.001) {
-    float open = smoothstep(0.86, 0.99, v_sky), upW = smoothstep(0.55, 0.92, N.y);
+    float open = smoothstep(0.86, 0.99, v_sky) * rainOpen(wq, N), upW = smoothstep(0.55, 0.92, N.y);   // (t-polish2: and under no roof — glass passes the sky light, not the rain)
     float streak = upW > 0.5 ? 1.0 : smoothstep(0.3, 0.72, texture(u_noise, vec2((wq.x + wq.z) * 0.37, wq.y * 0.05 - u_time * 0.002)).g);
     wetK = u_wet * open * mix(0.55 * streak, 1.0, upW);
     pud = 0.0;

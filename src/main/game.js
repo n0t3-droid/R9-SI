@@ -1255,16 +1255,23 @@
       const outline = t && !this.hideHud ? { x: t.x, y: t.y, z: t.z, boxes: t.boxes || VR.PHYS.selection(t.state) } : null;
       const crack = p.breaking && t ? { x: t.x, y: t.y, z: t.z, boxes: t.boxes || VR.PHYS.selection(t.state), layer: R.texIndex['destroy#' + Math.min(9, Math.floor(p.breaking.p * 10))] } : null;
       // precipitation (heights around camera)
-      let precip = null;
-      if ((E.rain > 0.01 || E.snow > 0.01) && (this.dim === 'overworld' || this.dim === 'drift')) {
+      let precip = null, rainMap = null;
+      // (t-polish2: the rain's height map also while the ground is wet — the PBR terrain reads it so a floor under a glass
+      // roof stays dry: wet.js faceOpen, renderer.bindRainMap; never on Very Low, which has no wet ground)
+      const rq = this.renderer && this.renderer.q, wetMap = (E.wet > 0.001 || E.puddle > 0.001) && !!rq && (rq.pbr | 0) >= 1 && !rq.lite;
+      if ((E.rain > 0.01 || E.snow > 0.01 || wetMap) && (this.dim === 'overworld' || this.dim === 'drift')) {
         // height field for rain occlusion: refreshed when the camera moved a few blocks or every ~20 frames
         if (!this.hmap) { this.hmap = new Uint8Array(128 * 128); this.hmapAt = null; }
-        let dirty = false;
         const hx = Math.floor(cam.x) - 64, hz = Math.floor(cam.z) - 64;
         if (!this.hmapAt || Math.abs(this.hmapAt[0] - hx) > 6 || Math.abs(this.hmapAt[1] - hz) > 6 || this.frame % 20 === 0) {
-          for (let z = 0; z < 128; z++) for (let x = 0; x < 128; x++) this.hmap[z * 128 + x] = w.topAt(hx + x, hz + z);
-          this.hmapAt = [hx, hz]; dirty = true;
+          if (VR.Wet && VR.Wet.fillMap) VR.Wet.fillMap(w, hx, hz, this.hmap);   // (t-polish2: a chunk column at a time, the tops clamped to 255)
+          else for (let z = 0; z < 128; z++) for (let x = 0; x < 128; x++) this.hmap[z * 128 + x] = w.topAt(hx + x, hz + z);
+          this.hmapAt = [hx, hz]; this.hmapVer = (this.hmapVer | 0) + 1;
         }
+        if (wetMap) rainMap = { heights: this.hmap, hx: this.hmapAt[0], hz: this.hmapAt[1], ver: this.hmapVer | 0 };
+      }
+      if ((E.rain > 0.01 || E.snow > 0.01) && (this.dim === 'overworld' || this.dim === 'drift')) {
+        const dirty = this.hmapVer !== this.hmapSent; this.hmapSent = this.hmapVer;
         const b = VR.BIOMES[w.biomeAt(Math.floor(cam.x), Math.floor(cam.z))];
         // snow where the weather says snow, and where it is cold enough for rain to fall as snow
         const coldHere = b && (b.precip === 'snow' || (b.temp - Math.max(0, cam.y - 90) * 0.0025) < 0.15);
@@ -1278,7 +1285,7 @@
       this.smartQuality(dt, S, w);
       if (this.horizon) this.horizon.update(cam);
       this.renderer.render({
-        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, outline, crack, precip,
+        cam, world: w, env: E, horizon: this.horizon, underwater: underwater || inLava, crossing: (this.crossT || 0) / 0.9, particles: this.particles, outline, crack, precip, rainMap,
         damage: this.damageFlash * 0.8 + (p.mode === 'survival' && p.health <= 4 ? 0.25 + Math.sin(this.time * 4) * 0.1 : 0),
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,

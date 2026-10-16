@@ -877,6 +877,20 @@
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
       if (this.l2Uniforms) this.l2Uniforms(p, E);   // (t-light2: the light's values, light2_gl.js)
     }
+    // t-polish2 · rain under roofs: the rain's height map (game.js F.rainMap while the ground is wet — the precipitation's
+    // 128² R8 texture, uploaded once per refresh) for the PBR terrain programs on unit 9; without this frame's map the
+    // shader's flag (u_rainMap.z) is 0 and the sky light alone decides, as before. The sampler is always bound (unit 9 holds
+    // a 2D texture), so it never shares unit 0 with the albedo array
+    bindRainMap(p) {
+      const gl = this.gl, m = this.rainMapF;
+      if (m && m.heights && this.rainMapVer !== m.ver) {
+        gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D, this.texHeights);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 128, 128, gl.RED, gl.UNSIGNED_BYTE, m.heights);
+        this.rainMapVer = m.ver; this.precipOrigin = null;   // (the rain pass uploads its own copy again on its next refresh)
+      }
+      gl.activeTexture(gl.TEXTURE9); gl.bindTexture(gl.TEXTURE_2D, this.texHeights); gl.uniform1i(p.u.u_rainTop, 9);
+      if (p.u.u_rainMap) gl.uniform4f(p.u.u_rainMap, m ? m.hx : 0, m ? m.hz : 0, m && m.heights ? 1 : 0, 128);
+    }
     bindTerrainTextures(p) {
       const gl = this.gl;
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texAlbedo); if (p.u.u_albedo) gl.uniform1i(p.u.u_albedo, 0);
@@ -885,6 +899,7 @@
       if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
       if (p.u.u_pbr && this.texPbr) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.texPbr); gl.uniform1i(p.u.u_pbr, 10); }   // (t-material: the material table)
+      if (p.u.u_rainTop) this.bindRainMap(p);   // (t-polish2: the rain's height map, unit 9 — rain under glass roofs)
       if (p.u.u_hiMap && this.texHiMap) {   // (t-material · hero textures: the 64 × 64 set and its table)
         // (units 11, 13, 15: t-light2 reads its contact shadows on unit 12 and t-motion the cloud shadows on 14 in these
         //  same programs — one unit, one sampler type)
@@ -2055,6 +2070,7 @@
       this.stats.fsPasses = 0; if (this.stats.fsList) this.stats.fsList.length = 0;   // (F10 · Bandbreite: the full-screen passes, fsMark)
       this.upQ = world && world.uploadQ && world.uploadQ.drain ? world.uploadQ : null;   // (F10: the one upload queue — vxResidency, upGauge)
       if (this.l2Frame) this.l2Frame(F, E);   // (t-light2: the light's values this frame, light2_gl.js)
+      this.rainMapF = F.rainMap || null;   // (t-polish2: the rain's height map while the ground is wet — bindRainMap)
       this.resize(false);
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
