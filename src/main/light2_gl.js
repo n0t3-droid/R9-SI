@@ -30,10 +30,10 @@
     let es = 1;
     if (w && w.getLight && c) es = (w.getLight(Math.floor(c.x), Math.floor(c.y), Math.floor(c.z)) >>> 12) / 15;
     this.l2EyeSky = this.l2EyeSky === undefined ? es : this.l2EyeSky + (es - this.l2EyeSky) * 0.1;
-    // the moon a cool key light (the lit things' u_moonColor, set again in l2Uniforms: E itself is not changed — a frame
-    // drawn twice from the same E stays the same)
+    // the moon a cool key light, teal like the night's shade (the lit things' u_moonColor, set again in l2Uniforms: E
+    // itself is not changed — a frame drawn twice from the same E stays the same)
     const k = L2.K.moon, m = E.moonColor || [0, 0, 0];
-    this.l2.moon = q.l2Light ? [m[0] * k * 0.9, m[1] * k * 0.98, m[2] * k * 1.12] : null;
+    this.l2.moon = q.l2Light ? [m[0] * k * 0.8, m[1] * k * 1.04, m[2] * k * 1.0] : null;
   };
 
   // ---------------------------------------------------------------- the uniforms (common() calls it for every program)
@@ -44,12 +44,14 @@
     if (!l || !this.l2Active) {
       // (a program with the defines but the light off this frame — another dimension: the plain values)
       if (u.u_l2Sky && E && E.ambSky) { gl.uniform3f(u.u_l2Sky, E.ambSky[0], E.ambSky[1], E.ambSky[2]); gl.uniform3f(u.u_l2Ground, E.ambSky[0] * 0.6, E.ambSky[1] * 0.6, E.ambSky[2] * 0.6); }
+      if (u.u_l2Glow) gl.uniform3f(u.u_l2Glow, 0, 0, 0);
       if (u.u_l2Pool) gl.uniform4f(u.u_l2Pool, L2.K.poolHot, L2.K.poolK, L2.K.poolTail, L2.K.poolHue);
       if (u.u_l2K) gl.uniform4f(u.u_l2K, 0, 0.94, L2.K.wrapLeaf, L2.K.wrapSkin);
       if (u.u_l2Fog) { gl.uniform4f(u.u_l2Fog, 0, 0.06, 62, 64); gl.uniform4f(u.u_l2Fog2, 0, 0, 0, 0); gl.uniform3f(u.u_l2FogCol, 0, 0, 0); }
       return;
     }
     if (u.u_l2Sky) { gl.uniform3f(u.u_l2Sky, l.sky[0], l.sky[1], l.sky[2]); gl.uniform3f(u.u_l2Ground, l.ground[0], l.ground[1], l.ground[2]); }
+    if (u.u_l2Glow) gl.uniform3f(u.u_l2Glow, l.glow[0], l.glow[1], l.glow[2]);
     if (u.u_l2K) gl.uniform4f(u.u_l2K, l.k[0], l.k[1], l.k[2], l.k[3]);
     if (u.u_l2Az) gl.uniform2f(u.u_l2Az, l.az[0], l.az[1]);
     if (u.u_l2Pool) gl.uniform4f(u.u_l2Pool, l.pool[0], l.pool[1], l.pool[2], l.pool[3]);
@@ -174,6 +176,7 @@
     gl.uniform3f(p.u.u_volCol, c[0], c[1], c[2]);
     gl.uniform3f(p.u.u_volL, L[0], L[1], L[2]);
     if (p.u.u_volSky) gl.uniform1f(p.u.u_volSky, K.sky);
+    if (p.u.u_volShaft) gl.uniform1f(p.u.u_volShaft, K.shaft);
     gl.uniform1f(p.u.u_phase, this.jit ? (this.frameNo * 0.6180339887) % 1 : 0);
     const px = V.w * V.h;
     this.fsMark('l2vol', V.w, V.h, px * 4 * (K.steps + 2), px * 8, px * (K.steps + 2));

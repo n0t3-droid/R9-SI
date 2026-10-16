@@ -131,14 +131,32 @@ console.log('c · the light model');
   const E0 = new V.Env(); E0.wx.setSeed(7); E0.wx.force('klar');
   const at = (ticks) => { E0.setTime(ticks); for (let i = 0; i < 80; i++) E0.update(1, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 4096, freezeTime: true, freezeWeather: true }); return E0.E; };
   const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  // (run 3's tuning, the frames against the on2 pictures: the town lies in the low sun's long shadows most of the day, so
+  // the shade's colour IS the picture — env's sky light is lavender (blue over red 1.76 at noon), the frames' shade a
+  // cool grey (b* −6 … +6) and lighter than the game's; so the sky light by day is a cool neutral and a step brighter
+  // (L2.skyK), at dusk violet, at night teal; and the bright sky round the low sun lights the faces toward it warm)
+  const hue = {};
   for (const [name, t] of [['noon', 6000], ['golden', 10800], ['dusk', 12600], ['night', 16500]]) {
     const E = JSON.parse(JSON.stringify(at(t)));
     const h = L2.hemiColors(E), top = L2.hemi([0, 1, 0], h.sky, h.ground, [1, 0], 0), side = L2.hemi([1, 0, 0], h.sky, h.ground, [1, 0], 0), bot = L2.hemi([0, -1, 0], h.sky, h.ground, [1, 0], 0);
-    const lt = lum(top), rs = lum(side) / lt, rb = lum(bot) / lt;
+    const lt = lum(top), rs = lum(side) / lt, rb = lum(bot) / lt, k = L2.skyK(h.moods);
     const old = [1, 0.5 * (0.8636 + 0.9256), 0.721];
     const cool = top[2] / top[0], warm = bot[2] / bot[0];
-    check(Math.abs(lt - lum(E.ambSky)) / lum(E.ambSky) < 0.02 && rs < old[1] && rb < old[2] && rs > rb && rb > 0.35, `${name}: top · side · bottom = 1 · ${r2(rs)} · ${r2(rb)} (the old per-face shade 1 · ${r2(old[1])} · ${r2(old[2])}: more depth; the top keeps the ambient's brightness)`);
+    hue[name] = top;
+    check(Math.abs(lt - lum(E.ambSky) * k) / (lum(E.ambSky) * k) < 0.02 && k >= 1 && rs < old[1] && rb < old[2] && rs > rb && rb > 0.35, `${name}: top · side · bottom = 1 · ${r2(rs)} · ${r2(rb)} (the old per-face shade 1 · ${r2(old[1])} · ${r2(old[2])}: more depth), the top ×${r2(k)} the ambient's brightness`);
     check(cool > warm, `${name}: the shade from the sky cooler than the bounce from the ground (blue over red: top ${r2(cool)}, bottom ${r2(warm)})`);
+    // the afterglow: by day and at night none; at the golden hour and at dusk a wall toward the sun warmer than one away
+    const g = h.glow, to = L2.hemi([0, 0, 1], h.sky, h.ground, [0, 1], L2.K.dir, g), aw = L2.hemi([0, 0, -1], h.sky, h.ground, [0, 1], L2.K.dir, g);
+    if (name === 'noon' || name === 'night') check(lum(g) < 1e-6, `${name}: no afterglow (${g.map(r3).join(' ')})`);
+    else check(to[0] / to[2] > (aw[0] / aw[2]) * 1.15 && lum(to) > lum(aw), `${name}: the afterglow — a wall toward the low sun warmer (red over blue ${r2(to[0] / to[2])}) than one away (${r2(aw[0] / aw[2])})`);
+  }
+  {
+    const br = (c) => c[2] / c[0];
+    const env0 = at(6000), envBR = env0.ambSky[2] / env0.ambSky[0];
+    check(br(hue.noon) > 1.05 && br(hue.noon) < 1.45 && br(hue.noon) < envBR * 0.85, `noon: the shade a cool neutral, not lavender (blue over red ${r2(br(hue.noon))}; env's sky light ${r2(envBR)})`);
+    check(br(hue.golden) > 1.0 && br(hue.golden) < 1.45, `the golden hour: the shade a cool neutral (blue over red ${r2(br(hue.golden))})`);
+    check(hue.dusk[0] > hue.dusk[1] && hue.dusk[2] > hue.dusk[1], `dusk: the shade violet (${hue.dusk.map(r3).join(' ')})`);
+    check(hue.night[1] > hue.night[0] * 1.3 && hue.night[2] > hue.night[0] * 1.3, `night: the shade teal (${hue.night.map(r3).join(' ')})`);
   }
   // the sky leans toward the light's side: a side face toward the light's azimuth brighter than one away
   const sky = [0.4, 0.45, 0.6], gr = [0.25, 0.25, 0.2];
@@ -148,8 +166,10 @@ console.log('c · the light model');
   const P = (d) => L2.pool(1 - d / 15), O = (d) => L2.poolOld(1 - d / 15);
   let mono = true; for (let l = 1; l <= 15; l++) if (L2.pool(l / 15) < L2.pool((l - 1) / 15) - 1e-9) mono = false;
   check(mono, 'the lamps\' light rises toward the lamp (monotone in the level)');
-  check(P(0) >= 1.6 * O(0) && P(1) > O(1), `a hot spot at the lamp: ${r2(P(0))} against the old ${r2(O(0))} (a block off ${r2(P(1))} against ${r2(O(1))})`);
-  check(P(8) < O(8) * 0.7 && P(5) < O(5) && P(14) < 0.03, `a pool, not a ramp: 5 blocks off ${r3(P(5))} against the old ${r3(O(5))}, 8 off ${r3(P(8))} against ${r3(O(8))}, 14 off ${r3(P(14))} (a street lit by many lamps keeps its warmth between them)`);
+  check(P(0) >= 1.6 * O(0) && P(1) > 1.6 * O(1) && P(2) > 1.25 * O(2), `a hot spot at the lamp: ${r2(P(0))} against the old ${r2(O(0))} (a block off ${r2(P(1))} against ${r2(O(1))}, two off ${r2(P(2))} against ${r2(O(2))})`);
+  // (run 2: with the tail at 0.65 of the old ramp the hall city's street between its lanterns lost its warmth — so between
+  // the lamps the light stays near the old ramp's, and only the far tail falls under it)
+  check(P(5) > O(5) * 0.8 && P(8) < O(8) * 0.85 && P(8) > O(8) * 0.6 && P(14) < 0.03, `a pool that keeps the warmth between lamps: 5 blocks off ${r3(P(5))} against the old ${r3(O(5))}, 8 off ${r3(P(8))} against ${r3(O(8))}, 14 off ${r3(P(14))}`);
 }
 
 console.log('d · the air');
@@ -185,6 +205,16 @@ console.log('e · the grade');
   const lumOf = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   check(Math.abs(lumOf(L2.split([0.4, 0.4, 0.4], L2.GRADE.gold.dark, L2.GRADE.gold.light)) - 0.4) < 1e-6, 'the split toning keeps the luma');
   check(L2.GRADE.night.bThr < L2.GRADE.dusk.bThr && L2.GRADE.dusk.bThr < L2.GRADE.day.bThr && L2.GRADE.night.bStr > L2.GRADE.day.bStr, `the glow by the hour: the bloom's threshold ${L2.GRADE.day.bThr} by day → ${L2.GRADE.night.bThr} at night, its strength ${L2.GRADE.day.bStr} → ${L2.GRADE.night.bStr}`);
+  // the sky's fit holds: t-sky2 fitted the sky's stops through the old composite (its S-curve 0.3 in linear light, then
+  // the gamma); the grade replaces that curve, so over the sky's values it stays within a few L* of it — the light is
+  // lifted in the light model, not by the curve
+  {
+    const sm = (t) => t * t * (3 - 2 * t), oldT = (t) => Math.pow(Math.min(1, t + 0.3 * (sm(t) - t)), 1 / 2.2);
+    const Lof = (d) => { const c = d <= 0.04045 ? d / 12.92 : Math.pow((d + 0.055) / 1.055, 2.4); return c > 0.008856 ? 116 * Math.cbrt(c) - 16 : 903.3 * c; };
+    let worst = 0, at = '';
+    for (const k of Object.keys(L2.GRADE)) for (let i = 1; i <= 60; i++) { const t = i / 100, d = Math.abs(Lof(L2.curve(Math.pow(t, 1 / 2.2), L2.GRADE[k])) - Lof(oldT(t))); if (d > worst) { worst = d; at = k + ' ' + t; } }
+    check(worst < 3.5, `the tone curve of every hour within 3.5 L* of the old one over the sky's values (worst ${r2(worst)} at ${at})`);
+  }
   // (the sun's height: noon (ticks 6000) 0.41, ticks 10800 0.13, 12600 −0.066, 16500 −0.38 — env.js)
   const m = L2.moods(0.41), m2 = L2.moods(0.13), m3 = L2.moods(-0.066), m4 = L2.moods(-0.38), m5 = L2.moods(0);
   check(m.day > 0.99 && m2.gold > 0.85 && m3.dusk > 0.95 && m4.night > 0.99 && m5.dusk > 0.9, `the hour's moods: noon day ${r2(m.day)}, the sun 7° up gold ${r2(m2.gold)}, at the horizon dusk ${r2(m5.dusk)}, 4° under dusk ${r2(m3.dusk)}, 22° under night ${r2(m4.night)}`);
@@ -268,6 +298,16 @@ console.log('h · the light in the air, the mist, the beams, the hooks');
   const out = L2.volK(true, 0, 1), inn = L2.volK(true, 0, 0.1), wet = L2.volK(true, 1, 1), moon = L2.volK(false, 0, 1);
   check(inn > out * 2.5 && wet < out * 0.5 && moon > out, `the light in the air: indoors ×${r2(inn / out)} (the dust in a sunbeam), in the rain ×${r2(wet / out)}, by the moon ×${r2(moon / out)} (its light is dimmer)`);
   check(L2.VOL.steps <= 16 && L2.VOL.reach <= 160 && L2.VOL.g > 0 && L2.VOL.g < 0.6, `the march: ${L2.VOL.steps} steps over at most ${L2.VOL.reach} blocks, forward phase g ${L2.VOL.g}`);
+  // the shafts (run 2: in the wood the light in the air was 0.01 of the scene — none to see): a ray part in shadow, part
+  // in the light shows the air most (a shaft between dark trunks), a ray all in the light or all in shadow as the haze —
+  // so the open land keeps a clear air and the wood, the hall and the street between houses show their shafts
+  const sb = (lit) => L2.volShaft(lit);
+  check(Math.abs(sb(1) - 1) < 1e-9 && Math.abs(sb(0) - 1) < 1e-9 && sb(0.5) > 8 && sb(0.2) > sb(0.05) * 2 && sb(0.5) >= sb(0.3), `the shafts: a ray half in shadow ×${r2(sb(0.5))}, a fifth lit ×${r2(sb(0.2))}, a twentieth ×${r2(sb(0.05))}, all lit or all dark ×1`);
+  // (a shaft pixel against its dark neighbour in a wood: a fifth of the ray lit against a twentieth)
+  check((0.2 * sb(0.2)) / (0.05 * sb(0.05)) > 6, `in a wood a shaft stands out of its dark neighbours ${r2((0.2 * sb(0.2)) / (0.05 * sb(0.05)))}× (without the boost 4×)`);
+  const vf = pre(L2.VOL_FS, []), lc = pre(L2.glslCommon(), ['LIGHT2']);
+  check(/lit = acc \/ max\(tot, 1e-6\)/.test(vf) && /u_volShaft \* 4\.0 \* lit \* \(1\.0 - lit\)/.test(vf), 'the march weighs its light by how much of the ray is in shadow (u_volShaft, L2.volShaft\'s mirror)');
+  check(/uniform vec3 u_l2Glow;/.test(lc) && /u_l2Glow \* max\(d, 0\.0\)/.test(lc), 'the hemisphere carries the afterglow on the faces toward the low sun (u_l2Glow, L2.hemi\'s mirror)');
   const E = { horizon: [0.62, 0.72, 0.86], fogColor: [0.7, 0.76, 0.84], sunDir: [-0.36, 0.41, 0.84] }, m = L2.mistColor(E);
   check(m.every((v, i) => v >= Math.min(E.horizon[i], E.fogColor[i]) * 0.99 && v <= Math.max(E.horizon[i], E.fogColor[i]) * 1.09), `the valley mist between the horizon's colour and the fog's (${m.map(r3).join(' ')})`);
   check(L2.beamK(0) === 0 && L2.beamK(0.2) === 0 && Math.abs(L2.beamK(1) - L2.BEAM.k) < 1e-9, 'the lighthouse\'s beams: none by day, full at night');

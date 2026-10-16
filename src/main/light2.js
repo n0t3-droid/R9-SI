@@ -99,33 +99,46 @@
   L2.byMood = byMood;
 
   // ---------------------------------------------------------------- step 1 · the light model
-  // the shade's colour leans blue (the sky's light), the ground's bounce warm (the sunlit ground), per mood
-  const SKYTINT = { day: [0.94, 1.0, 1.1], gold: [0.88, 0.97, 1.2], dusk: [0.96, 0.93, 1.12], night: [0.84, 0.96, 1.25] };
-  const GROUND = { day: [1.06, 1.0, 0.72], gold: [1.18, 0.96, 0.66], dusk: [1.02, 0.86, 0.9], night: [0.86, 0.92, 1.08] };
-  const GROUNDK = { day: 0.6, gold: 0.56, dusk: 0.52, night: 0.5 };   // the bounce's luminance over the sky's
-  L2.K = { dir: 0.08, xFace: 0.94, wrapLeaf: 0.45, wrapSkin: 0.42, poolHot: 2.4, poolK: 0.14, poolTail: 0.2, poolHue: 1.25, moon: 1.3 };
-  // the sun's light on the lit things by the hour (the sky keeps env.js's sun): by day env.js's own, in the golden hour
-  // gold and stronger, at dusk a warm rose
-  const SUNTINT = { day: [1, 1, 1], gold: [1.2, 1.02, 0.8], dusk: [1.15, 0.92, 0.85], night: [1, 1, 1] };
-  const SUNK = { day: 1.0, gold: 1.15, dusk: 1.1, night: 1.0 };
+  // the shade's colour (the sky's light) per mood, over env.js's sky light: by day a cool neutral — env's is lavender (blue
+  // over red 1.76 at noon) and the town lies in the low sun's long shadows most of the day, so this colour IS the
+  // picture; the frames' shade is a cool grey (b* −6 … +6) — at the golden hour a cool neutral, at dusk violet, at night
+  // teal (run 3's tuning against the on2 pictures); the ground's bounce warm (the sunlit ground)
+  const SKYTINT = { day: [1.08, 1.0, 0.82], gold: [1.05, 1.0, 0.84], dusk: [1.06, 0.92, 1.0], night: [0.74, 1.06, 0.98] };
+  // the sky light's level over env's: the frames' shade is lighter than the game's (their darkest land L* 15–22 by day,
+  // the game's 7–12) — the light lifted here, in the light, so the sky's own fit (t-sky2) is not touched by the grade
+  const SKYK = { day: 1.3, gold: 1.4, dusk: 1.45, night: 1.15 };
+  const GROUND = { day: [1.06, 1.0, 0.72], gold: [1.18, 0.96, 0.66], dusk: [1.02, 0.86, 0.9], night: [0.9, 0.95, 1.0] };
+  const GROUNDK = { day: 0.62, gold: 0.58, dusk: 0.54, night: 0.5 };   // the bounce's luminance over the sky's
+  // the afterglow: the bright sky round the low sun (env's E.sunset) lights the faces toward it — at the golden hour and
+  // most at dusk, when the sun itself is gone and this is the warm light of the picture (t1_01: the faces toward the
+  // sunset ochre, the faces away violet-navy)
+  const GLOWK = { day: 0, gold: 0.9, dusk: 1.6, night: 0 };
+  L2.K = { dir: 0.08, xFace: 0.94, wrapLeaf: 0.45, wrapSkin: 0.42, poolHot: 2.6, poolK: 0.13, poolTail: 0.2, poolHue: 1.25, moon: 1.0 };
+  L2.skyK = (m) => byMood(m, SKYK);
+  // the sun's light on the lit things by the hour (the sky keeps env.js's sun): by day env.js's own a little stronger,
+  // in the golden hour gold and stronger, at dusk a warm rose
+  const SUNTINT = { day: [1, 1, 1], gold: [1.22, 1.0, 0.74], dusk: [1.15, 0.92, 0.85], night: [1, 1, 1] };
+  const SUNK = { day: 1.06, gold: 1.25, dusk: 1.1, night: 1.0 };
   L2.sunTint = function (m) { const t = byMood(m, SUNTINT), k = byMood(m, SUNK); return [t[0] * k, t[1] * k, t[2] * k]; };
   // a colour with the luminance of another
   const toLum = (c, L) => { const l = lum(c) || 1; return [c[0] * L / l, c[1] * L / l, c[2] * L / l]; };
-  // the hemisphere's two colours this frame: sky (from above) and ground (from below), from E.ambSky
+  // the hemisphere's colours this frame: sky (from above), ground (from below), from E.ambSky; the afterglow from
+  // E.sunset
   L2.hemiColors = function (E) {
-    const m = L2.moods(E.sunDir[1]), a = E.ambSky, La = lum(a);
-    const st = byMood(m, SKYTINT), gt = byMood(m, GROUND), gk = byMood(m, GROUNDK);
+    const m = L2.moods(E.sunDir[1]), a = E.ambSky, La = lum(a) * L2.skyK(m);
+    const st = byMood(m, SKYTINT), gt = byMood(m, GROUND), gk = byMood(m, GROUNDK), s = E.sunset || [0, 0, 0], gw = byMood(m, GLOWK);
     const sky = toLum([a[0] * st[0], a[1] * st[1], a[2] * st[2]], La);
     const ground = toLum([a[0] * gt[0], a[1] * gt[1], a[2] * gt[2]], La * gk);
-    return { sky, ground, moods: m };
+    return { sky, ground, glow: [s[0] * gw, s[1] * gw, s[2] * gw], moods: m };
   };
   // the hemispheric ambient for a normal (JS mirror of l2Hemi): the sky from above, the ground from below, linear in n.y
-  // (a Lambert surface under two half-spheres), a little brighter on the side of the sky toward the light
-  L2.hemi = function (n, sky, ground, az, dirK) {
+  // (a Lambert surface under two half-spheres), a little brighter on the side of the sky toward the light, and the
+  // afterglow on the faces toward the low sun
+  L2.hemi = function (n, sky, ground, az, dirK, glow) {
     const k = clamp(0.5 + 0.5 * n[1], 0, 1), side = 1 - Math.abs(n[1]);
-    const d = az ? (n[0] * az[0] + n[2] * az[1]) : 0;
-    const f = 1 + (dirK === undefined ? L2.K.dir : dirK) * d * side;
-    return [mix(ground[0], sky[0], k) * f, mix(ground[1], sky[1], k) * f, mix(ground[2], sky[2], k) * f];
+    const d = (az ? (n[0] * az[0] + n[2] * az[1]) : 0) * side;
+    const f = 1 + (dirK === undefined ? L2.K.dir : dirK) * d, g = glow || [0, 0, 0], gd = Math.max(d, 0);
+    return [mix(ground[0], sky[0], k) * f + g[0] * gd, mix(ground[1], sky[1], k) * f + g[1] * gd, mix(ground[2], sky[2], k) * f + g[2] * gd];
   };
   // the lamps' light (JS mirror of l2Pool): the brightest channel's level m (0..1: 15 at the lamp, −1/15 a block) gives
   // the distance d = 15 (1 − m); the light falls like a lamp's, 1 / (1 + d²·k), a hot spot at the lamp, the tail faded
@@ -193,10 +206,13 @@
     // (the day's leaning from the frames' land, test/land_ref.js: their sunlit paving and walls white-cyan, their darks the
     // warm greens — so by day the lights lean a little cool and the darks a little warm; from the golden hour the light
     // is warm over a cool shade, at dusk more so)
-    day: { toe: 0.012, mid: 0.5, s: 0.45, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.08, vig: 0.2, bThr: 1.15, bStr: 0.10 },
-    gold: { toe: 0.016, mid: 0.48, s: 0.45, sh: 0.98, dark: [-0.022, 0.0, 0.045], light: [0.07, 0.025, -0.05], sat: 1.12, vig: 0.24, bThr: 0.95, bStr: 0.15 },
-    dusk: { toe: 0.024, mid: 0.48, s: 0.4, sh: 0.97, dark: [0.004, -0.014, 0.055], light: [0.06, 0.015, -0.03], sat: 1.1, vig: 0.28, bThr: 0.75, bStr: 0.2 },
-    night: { toe: 0.03, mid: 0.46, s: 0.3, sh: 0.97, dark: [-0.024, 0.016, 0.05], light: [0.05, 0.02, -0.025], sat: 1.06, vig: 0.32, bThr: 0.55, bStr: 0.32 },
+    // (run 3's tuning: the on2 pictures were 3–8 L* darker than the light off and greyer (C* down to half at dusk) — the
+    // S eased (0.45 → 0.3: it pressed the shaded lawns down), the curve's middle kept so the sky keeps t-sky2's fit (test
+    // e: within 3.5 L* of the old curve), the mid-tones' saturation up, the vignette lighter, the glow by day wider)
+    day: { toe: 0.014, mid: 0.5, s: 0.3, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.1, vig: 0.16, bThr: 1.05, bStr: 0.13 },
+    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 0.985, dark: [-0.02, 0.0, 0.04], light: [0.075, 0.028, -0.055], sat: 1.16, vig: 0.2, bThr: 0.9, bStr: 0.17 },
+    dusk: { toe: 0.022, mid: 0.5, s: 0.28, sh: 0.975, dark: [0.01, -0.014, 0.05], light: [0.065, 0.018, -0.035], sat: 1.15, vig: 0.24, bThr: 0.75, bStr: 0.22 },
+    night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.55, bStr: 0.32 },
   };
   L2.GRADE = GRADE;
   L2.grade = function (E) {
@@ -241,11 +257,15 @@
   // brightest); the strength over the air's haze for the sun and for the moon; indoors more (the dust in a sunbeam through a
   // window: the eye's sky light low); a ray to the sky a part of it (the sky's glow is the sky shader's); the haze's scale
   // height longer than the fog's (the shafts reach up the trees)
-  L2.VOL = { steps: 16, reach: 120, g: 0.35, sun: 0.3, moon: 1.6, indoor: 2.5, sky: 0.25, kScale: 0.7 };
+  // shaft: the shafts' boost — a ray part in the light and part in shadow shows the air most (a shaft between dark
+  // trunks, under a vault's ribs, between houses), a ray all lit or all dark as the haze (the open land's air stays clear)
+  L2.VOL = { steps: 16, reach: 120, g: 0.35, sun: 0.3, moon: 1.6, indoor: 2.5, sky: 0.25, kScale: 0.7, shaft: 12 };
   L2.volK = function (sunUp, rain, eyeSky) {
     const V = L2.VOL, e = eyeSky === undefined ? 1 : clamp(eyeSky, 0, 1);
     return (sunUp ? V.sun : V.moon) * (1 - 0.6 * clamp(rain || 0, 0, 1)) * (1 + V.indoor * (1 - e));
   };
+  // (JS mirror of the march's weight: lit = the share of the ray in the light, its density-weighted length)
+  L2.volShaft = (lit) => 1 + L2.VOL.shaft * 4 * lit * (1 - lit);
   // the sun's flare: its strength (HDR, before the exposure) and the disc's radius (screen heights) its visibility is read in
   L2.FLARE = { k: 0.05, disc: 0.012 };
   // blue noise (void and cluster, Ulichney 1993): an N × N tiling threshold map whose values are spread with no low
@@ -275,7 +295,7 @@
   L2.frame = function (E, q, ticks, out) {
     out = out || {};
     const h = L2.hemiColors(E), K = L2.K;
-    out.sky = h.sky; out.ground = h.ground; out.moods = h.moods;
+    out.sky = h.sky; out.ground = h.ground; out.glow = h.glow; out.moods = h.moods;
     // the brighter side of the sky: toward the sun by day and at dusk, toward the moon at night
     const L = E.sunDir[1] > -0.1 ? E.sunDir : E.moonDir, hl = Math.hypot(L[0], L[2]) || 1;
     out.az = [L[0] / hl, L[2] / hl];
@@ -299,9 +319,11 @@ uniform vec3 u_l2Ground;   // the ground's bounce from below
 uniform vec4 u_l2K;        // x the sky's lean toward the light's azimuth, y the x-faces' shade, z the leaves' wrap, w the skin's
 uniform vec2 u_l2Az;       // the light's azimuth (unit, x z)
 uniform vec4 u_l2Pool;     // the lamps: x the hot spot, y the falloff (1/blocks²), z the tail's fade (level), w the hue's power
+uniform vec3 u_l2Glow;     // the afterglow: the bright sky round the low sun, on the faces toward it (the golden hour, dusk)
 vec3 l2Hemi(vec3 n) {
   vec3 c = mix(u_l2Ground, u_l2Sky, clamp(0.5 + 0.5 * n.y, 0.0, 1.0));
-  return c * (1.0 + u_l2K.x * dot(n.xz, u_l2Az) * (1.0 - abs(n.y)));
+  float d = dot(n.xz, u_l2Az) * (1.0 - abs(n.y));
+  return c * (1.0 + u_l2K.x * d) + u_l2Glow * max(d, 0.0);
 }
 vec3 l2Pool(vec3 bl) {
   float m = max(bl.r, max(bl.g, bl.b));
@@ -454,6 +476,7 @@ uniform vec4 u_volH;       // x the eye's height, y k (1 / the haze's scale heig
 uniform vec3 u_volCol;     // the light's colour × strength
 uniform vec3 u_volL;       // toward the light
 uniform float u_volSky;    // the share of a ray to the sky
+uniform float u_volShaft;  // the shafts' boost (L2.volShaft): a ray part lit, part in shadow shows the air most
 uniform float u_phase;
 in vec2 v_uv;
 out vec4 o;
@@ -468,7 +491,7 @@ void main() {
   float n = u_vol.x, dt = T / n;
   float j = fract(texture(u_blue, gl_FragCoord.xy / 64.0).r + u_phase);
   vec3 s0 = (u_shadowMat * vec4(0.0, 0.0, 0.0, 1.0)).xyz, s1 = (u_shadowMat * vec4(dir * T, 1.0)).xyz;
-  float acc = 0.0;
+  float acc = 0.0, tot = 0.0;
   for (int i = 0; i < 16; i++) {
     if (float(i) >= n) break;
     float u = (float(i) + j) / n, f = u * u, t = f * T;
@@ -476,8 +499,12 @@ void main() {
     float vis = 1.0;
     if (sc.x > 0.0 && sc.y > 0.0 && sc.x < 1.0 && sc.y < 1.0 && sc.z < 1.0) vis = texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - u_volH.w));
     float h = u_volH.x + dir.y * t;
-    acc += vis * exp(-u_volH.y * max(h - u_volH.z, -30.0)) * 2.0 * u * dt;
+    float w = exp(-u_volH.y * max(h - u_volH.z, -30.0)) * 2.0 * u * dt;
+    acc += vis * w; tot += w;
   }
+  // the shafts: weighed by how much of the ray is in shadow (a ray all lit or all dark: the haze as it is)
+  float lit = acc / max(tot, 1e-6);
+  acc *= 1.0 + u_volShaft * 4.0 * lit * (1.0 - lit);
   float c = dot(dir, u_volL), g = u_vol.w, g2 = g * g;
   float ph = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5);
   o = vec4(u_volCol * (acc * u_vol.z * ph * (d >= 0.999999 ? u_volSky : 1.0)), linZ(d));
