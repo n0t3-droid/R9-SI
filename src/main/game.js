@@ -33,6 +33,12 @@
   PRESETS.potato.smoothFolk = 0; PRESETS.low.smoothFolk = 0; PRESETS.balanced.smoothFolk = 1; PRESETS.high.smoothFolk = 1; PRESETS.ultra.smoothFolk = 1; PRESETS.ultraLite.smoothFolk = 1;
   // t-folk2: the people in the shadow map (folkgpu.js castShadows) where there is one — Balanced and up
   for (const p in PRESETS) PRESETS[p].folkShadow = PRESETS[p].shadows > 0 ? 1 : 0;
+  // t-motion (WOW III · Alles bewegt sich): motion = the wind in everything (the MOTION shaders, the hung pieces' sway
+  // levels in the mesh, the new air), cloudShadow = the clouds' shadows on the land (where the clouds are sprites),
+  // wxDrama = the storm's front, the bolts, the rainbow, the valley fog. Very Low none (it stays as fast as before), Low the
+  // wind and the weather, Balanced and up all three
+  const MO_SW = ['motion', 'cloudShadow', 'wxDrama'];
+  for (const p in PRESETS) { PRESETS[p].motion = p === 'potato' ? 0 : 1; PRESETS[p].cloudShadow = p === 'potato' || p === 'low' ? 0 : 1; PRESETS[p].wxDrama = p === 'potato' ? 0 : 1; }
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)
@@ -106,8 +112,8 @@
       this.waterScan = (this.waterScan || 0) - dt;
       if (this.waterScan <= 0) {
         this.waterScan = 2;
-        const falls = [], px = Math.floor(p.pos[0]), pz = Math.floor(p.pos[2]);
-        for (let dz = -24; dz <= 24; dz += 2) for (let dx = -24; dx <= 24; dx += 2) {
+        const falls = [], px = Math.floor(p.pos[0]), pz = Math.floor(p.pos[2]), FR = this.settings.motion ? 40 : 24;   // (t-motion: the falls' mist from further off)
+        for (let dz = -FR; dz <= FR; dz += 2) for (let dx = -FR; dx <= FR; dx += 2) {
           const x = px + dx, z = pz + dz;
           if (!w.isLoaded(x, z)) continue;
           const y = w.topAt(x, z), s = w.getBlock(x, y, z);
@@ -118,10 +124,15 @@
         this.waterFalls = falls;
       }
       const falls = this.waterFalls || [];
+      // t-motion: with the wind in everything on, the foot of a fall throws up a billowing column of mist (turbulent puffs that
+      // grow as they rise and drift with the wind) and a fine spray of droplets
+      const mo = !!this.settings.motion, rate = mo ? 16 : 5;
       for (const f of falls) {
-        if (Math.random() > dt * 5 / Math.max(1, falls.length)) continue;
+        if (Math.random() > dt * rate / Math.max(1, falls.length)) continue;
         const r = () => Math.random() - 0.5;
-        this.particles.spawn(f[0] + r() * 1.2, f[1] + 0.2, f[2] + r() * 1.2, r() * 0.8, 0.4 + Math.random() * 0.6, r() * 0.8, { life: 2.4, size: 0.6 + Math.random() * 0.4, grav: -0.25, drag: 1.4, col: [0.93, 0.96, 1], emis: 0.12, collide: false });
+        if (!mo) { this.particles.spawn(f[0] + r() * 1.2, f[1] + 0.2, f[2] + r() * 1.2, r() * 0.8, 0.4 + Math.random() * 0.6, r() * 0.8, { life: 2.4, size: 0.6 + Math.random() * 0.4, grav: -0.25, drag: 1.4, col: [0.93, 0.96, 1], emis: 0.12, collide: false }); continue; }
+        this.particles.spawn(f[0] + r() * 1.6, f[1] + 0.3, f[2] + r() * 1.6, r() * 1.2, 0.8 + Math.random() * 0.9, r() * 1.2, { life: 3.6 + Math.random() * 1.6, size: 1.1 + Math.random() * 0.8, grav: -0.12, drag: 1.1, col: [0.93, 0.96, 1], emis: 0.12, collide: false, grow: 0.7, alpha: 0.5, turb: 1.6, wind: 0.15 });
+        if (Math.random() < 0.6) { const a = Math.random() * 6.283, sp = 1.8 + Math.random() * 1.6; this.particles.spawn(f[0] + r(), f[1] + 0.6, f[2] + r(), Math.cos(a) * sp, 1.5 + Math.random() * 1.5, Math.sin(a) * sp, { life: 0.9 + Math.random() * 0.4, size: 0.05 + Math.random() * 0.04, grav: 7, drag: 0.4, col: [0.86, 0.93, 1], emis: 0.3, collide: false }); }
       }
     }
     // F7: a swimmer's eye rides the swell (the surface's own waves, water_wave.js); nothing when the feet are dry
@@ -141,6 +152,8 @@
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
       if (key !== '*' && F9_SW.includes(key)) S.preset = 'custom';   // (F9: a switch of Ultra · Leicht changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
+      if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
+      for (const k of MO_SW) if (S[k] === undefined) S[k] = PRESETS[S.preset] ? PRESETS[S.preset][k] : (k === 'cloudShadow' ? +((S.clouds | 0) >= 2) : 1);   // (settings saved before t-motion follow their preset)
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -153,8 +166,9 @@
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
-      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite });   // (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
+      if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite, motion: !!S.motion, cloudShadow: !!S.cloudShadow, wxDrama: !!S.wxDrama });   // (t-motion: motion · cloudShadow · wxDrama) (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
       if (this.world) { const wp = this.propMask(); if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
+      if (this.world && (this.world.motion | 0) !== (S.motion ? 1 : 0)) { this.world.motion = S.motion ? 1 : 0; this.remeshAll(); }   // (t-motion: the hung pieces' sway levels come with the mesh)
       this.folkBase = S.folk || 100; this.slowBase = !!S.slow;
       if (this.horizon) this.horizon.setLevel(S.horizon);
       // F-Far: ring 1 as the preset asked (the governor never lowers it: no rung touches it); the render distance stays
@@ -169,7 +183,8 @@
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
       if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
-      if (this.airLife) this.airLife.setOn(S.airLife !== false, VR.AirLife.tierOf(S));
+      if (this.airLife) { this.airLife.setOn(S.airLife !== false, VR.AirLife.tierOf(S)); this.airLife.ffReach = S.motion ? 24 : 14; }   // (t-motion: the fireflies rise over the lawns beyond a plaza too)
+      if (this.motionAir) this.motionAir.setOn(S.airLife !== false, VR.AirLife.tierOf(S));   // (t-motion: the new air rides the living air's switch and tiers)
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
       if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
       this.applyLook();
@@ -349,6 +364,7 @@
       this.icons = new VR.Icons(tex);
       this.particles = new VR.Particles(this);
       this.airLife = new VR.AirLife(this);   // the living air (F3 · Da-Sein): caps per tier, see airlife.js
+      this.motionAir = VR.MotionAir ? new VR.MotionAir(this) : null;   // t-motion: steam, motes under the trees, sparkle on water, storm leaves, rain splashes (motion.js)
       this.trails = VR.Trails ? new VR.Trails(this) : null;
       this.vents = VR.Vents ? new VR.Vents(this) : null;
       this.director = VR.Director ? new VR.Director(this) : null;
@@ -386,7 +402,7 @@
       // (the panorama is a vgen-5 world without crystals: GEN.noCry — no crystal on the start screen either)
       this.pool.broadcast({ type: 'init', seed: this.titleSeed, opts: { vgen: 5, noCrystal: true }, custom: VR.CUSTOM });
       this.world = new VR.World(this, { dim: 'overworld', seed: this.titleSeed, genOpts: { vgen: 5, noCrystal: true }, pool: this.pool, renderer: this.renderer, renderDist: Math.min(this.settings.renderDist, 8) });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.titleCam = { x: 0.5, y: 110, z: 0.5, yaw: 0, pitch: -0.12, fov: 70 * Math.PI / 180 };
       this.env.wx.setSeed(null);                       // the title has no weather: the panorama stays as it was
       this.env.setTime(12800 + Math.random() * 1200); // golden hour → dusk: planets rising
@@ -448,7 +464,7 @@
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: this.store, savedKeys, renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time || 1000);
@@ -652,7 +668,7 @@
       const dim = meta.type === 'flat' ? 'flat' : 'overworld';
       this.dim = dim;
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: null, savedKeys: new Set(), renderDist: this.settings.renderDist });
-      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask();
+      this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time); this.env.day = meta.day;
@@ -1034,7 +1050,7 @@
       const b = w ? VR.BIOMES[w.biomeAt(Math.floor(pos[0]), Math.floor(pos[2]))] : null;
       const eye = w ? w.getLight(Math.floor(pos[0]), Math.floor(pos[1]), Math.floor(pos[2])) : 0xf000;
       const hz = this.horizon && this.horizon.enabled() ? this.horizon.radius : 0;
-      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather }, extra || {}));
+      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather, drama: !!this.settings.wxDrama, motion: !!this.settings.motion }, extra || {}));   // (t-motion: drama, motion)
     }
     titleFrame(dt) {
       const c = this.titleCam, w = this.world;
@@ -1156,6 +1172,15 @@
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
       if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
+      if (this.motionAir) this.motionAir.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, drama: !!this.settings.wxDrama });   // (t-motion)
+      if (this.particles.setWind) this.particles.setWind(E, dt);   // (t-motion: smoke and mist take up the world's wind)
+      // t-motion · Wetter-Drama: the morning's fog banks in the valleys round the eye (where the clouds are sprites), every 3 s
+      if ((this.valleyT = (this.valleyT || 0) - dt) <= 0) {
+        this.valleyT = 3;
+        const r = this.renderer, C = VR.Clouds, on = !!this.settings.wxDrama && r && r.q && r.q.clouds >= 2 && this.dim === 'overworld' && C && C.valleyFog;
+        const list = on ? C.valleyFog({ x: eye[0], z: eye[2] }, (x, z) => (w.isLoaded(x, z) ? w.topAt(x, z) : -1), this.env.timeOfDay, this.env.wx.kind === 'nebel' ? 1 : 0, VR.C.SEA) : [];
+        if (r && (list.length || (r.valleyFog && r.valleyFog.length))) { r.valleyFog = list; r.valleyFogV = (r.valleyFogV | 0) + 1; }
+      }
       this.particles.update(dt, eye);
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
       this.waterFx(dt, p, eye, underwater, inLava, E);

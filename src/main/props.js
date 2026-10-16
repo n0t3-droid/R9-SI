@@ -147,7 +147,7 @@
       const leaf = lerp3(lin(PAL.leafA, 1), lin(PAL.leafB, 1), h), tip = lin(PAL.tip, 1);
       frond(k, (t, o) => PR.frondPoint(k, t, o), a.az, dead ? 0.3 : 0.84, dead ? 0.15 : 0.42,
         (t) => dead ? lin(PAL.dead, 0.82 + 0.22 * hash(k, Math.round(t * 8), 0, 7)) : leaf.map((c, q) => c * (1 - 0.32 * t) + tip[q] * 0.32 * t),
-        (t) => dead ? 0.25 * t : 0.35 + 0.65 * t, k);
+        (t) => dead ? 0.25 * t : 0.12 + 0.88 * t * t, k);   // t-motion: a frond bends from the crown — its base stiff (the crownshaft's 0.12), its tip free (t²)
     }
     // two spear leaves: the young fronds still folded, standing up out of the crown's middle (always on)
     for (const [az, el] of [[0.6, 1.35], [3.4, 1.22]]) {

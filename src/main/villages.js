@@ -301,7 +301,7 @@
           if (!c) continue;
           const dd = (c[0] - pl[0]) ** 2 + (c[2] - pl[2]) ** 2;
           if (dd > 200 * 200) continue;
-          if (Math.random() < 0.55) g.particles.spawn(c[0] + 0.5 + (Math.random() - 0.5) * 0.2, c[1] + 1.05, c[2] + 0.5 + (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.25 + 0.15, 0.8 + Math.random() * 0.35, (Math.random() - 0.5) * 0.25, { life: 3 + Math.random() * 1.5, size: 0.1 + Math.random() * 0.08, grav: -0.12, col: [0.86, 0.86, 0.9], drag: 0.35, collide: false, grow: 0.16 });
+          if (Math.random() < 0.55) g.particles.spawn(c[0] + 0.5 + (Math.random() - 0.5) * 0.2, c[1] + 1.05, c[2] + 0.5 + (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.25 + 0.15, 0.8 + Math.random() * 0.35, (Math.random() - 0.5) * 0.25, { life: 3 + Math.random() * 1.5, size: 0.1 + Math.random() * 0.08, grav: -0.12, col: [0.86, 0.86, 0.9], drag: 0.35, collide: false, grow: 0.16, wind: 0.45 });   // (t-motion: wind — the smoke bends downwind as it rises)
         }
         if (vil.plan.pad && vil.plan.pad.x !== undefined && tod > 12500 && tod < 23500 && Math.random() < 0.2) { const pd = vil.plan.pad; g.particles.glow(pd.x + (Math.random() - 0.5) * 11, pd.y + 0.2, pd.z + (Math.random() - 0.5) * 11, [0.3, 1, 1], 1.5, 0.06, 0.4); }
       }

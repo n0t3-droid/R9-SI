@@ -464,7 +464,7 @@
         const k = 1 - q.u / 40;
         for (const e of m.exhaust) if (Math.random() < dt * 5 * k) {
           loc[0] = e[0]; loc[1] = e[1]; loc[2] = e[2] + 0.2; PL.toWorld(I.pos, I.yaw, loc, wpos);
-          P.spawn(wpos[0] + (Math.random() - 0.5) * e[3], wpos[1] + 0.2, wpos[2] + (Math.random() - 0.5) * e[3], (Math.random() - 0.5) * 0.15, 0.35 + Math.random() * 0.3, (Math.random() - 0.5) * 0.15, { life: 2.2 + Math.random(), size: 0.12 + e[3] * 0.25, grav: -0.05, col: [0.86, 0.88, 0.92], drag: 0.6, grow: 0.5, collide: false });
+          P.spawn(wpos[0] + (Math.random() - 0.5) * e[3], wpos[1] + 0.2, wpos[2] + (Math.random() - 0.5) * e[3], (Math.random() - 0.5) * 0.15, 0.35 + Math.random() * 0.3, (Math.random() - 0.5) * 0.15, { life: 2.2 + Math.random(), size: 0.12 + e[3] * 0.25, grav: -0.05, col: [0.86, 0.88, 0.92], drag: 0.6, grow: 0.5, collide: false, wind: 0.4, turb: 0.4 });   // (t-motion: the vapour curls off with the wind)
         }
         if (dist < 25 && g.audio && g.audio.ctx && g.audio.tone && (c.tick -= dt) <= 0) { c.tick = 0.35 + Math.random() * 1.2 / Math.max(0.2, k); g.audio.tone(2600 + Math.random() * 1800, 0.012 * k * (1 - dist / 25), 0.03, 'triangle'); }
       }

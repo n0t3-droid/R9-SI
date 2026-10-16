@@ -208,6 +208,7 @@
       this.changed = new Set();
       this.fancyLeaves = true; this.smooth = true;
       this.smoothProps = 0;   // t-smooth: the prop groups drawn smooth (1 palms, 2 furniture; game.js propMask)
+      this.motion = 0;        // t-motion: the mesher writes the hung pieces' sway levels (game.js: the 'motion' setting)
       this.meshBudget = 6;
       this.lastCol = null;
       this.shDirty = new Set(); this.shGone = new Set(); // columns whose shadow heights must reach the GPU
@@ -828,7 +829,7 @@
           }
         }
       }
-      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true };
+      return { type: 'mesh', key: c.key, sy, ver: c.sec[sy].ver, blocks, light, grass, foliage, water, ox: c.cx * 16, oz: c.cz * 16, fancyLeaves: this.fancyLeaves, smooth: this.smooth, smoothProps: this.smoothProps === true ? 1 : (this.smoothProps | 0), vxLod: true, motion: this.motion ? 1 : 0 };   // (t-motion: the hung pieces' sway levels)
     }
     markDirty(x, y, z) {
       const sy = y >> 4;

@@ -140,6 +140,46 @@
   }
   const windDirVec = (a) => [Math.cos(a), Math.sin(a)];
 
+  // ---- t-motion · the weather's drama (WOW III): pure functions of the seed and the world's tick, so the host and every
+  // guest see the same storm come in and the same rainbow after it
+  //   front  the storm's front: 0 far, rising (smoothstep) over the last FRONT_S seconds before a storm slot, 1 in it —
+  //          the wind rises and the sky darkens from the side the wind comes from before the rain
+  //   bow    the rainbow after a wet slot: once a slot of rain or storm gives way to a dry one, for BOW.min … BOW.max
+  //          seconds (seeded per slot), faded in and out; env.js shows it only while the sun is up
+  //   washed the clear, washed light after the rain (the same window, WASH_S seconds)
+  const FRONT_S = 90, WASH_S = 300, BOW = { min: 120, max: 240, fadeIn: 12, fadeOut: 30 };
+  const smooth01 = (x) => { const t = clamp01(x); return t * t * (3 - 2 * t); };
+  const WET = { regen: 1, gewitter: 1 };
+  function frontAt(seed, A, climate, mode) {
+    if (seed == null || !climate || climate === 'none' || mode === 'off' || mode === 'calm') return 0;
+    if (kindAt(seed, A, climate, mode) === 'gewitter') return 1;
+    const s = slotAt(seed, A);
+    if (slotKind(seed, slotAt(seed, s.end), climate) !== 'gewitter') return 0;
+    return smooth01(1 - (s.end - A) / 20 / FRONT_S);
+  }
+  // the seconds since a wet slot gave way to this dry one (−1: the slot before was dry, or this one is wet)
+  function sinceWet(seed, A, climate, mode) {
+    if (seed == null || !climate || climate === 'none' || mode === 'off') return -1;
+    const k = kindAt(seed, A, climate, mode);
+    if (WET[k]) return -1;
+    const s = slotAt(seed, A);
+    if (s.start <= 0) return -1;
+    const prev = kindAt(seed, s.start - 1, climate, mode);
+    return WET[prev] ? (A - s.start) / 20 : -1;
+  }
+  // the rainbow's strength 0..1, t seconds after the rain, in a window of `dur` seconds
+  function bowEnv(t, dur) { if (!(t >= 0) || t > dur) return 0; return smooth01(t / BOW.fadeIn) * smooth01((dur - t) / BOW.fadeOut); }
+  const bowDur = (seed, k) => BOW.min + hash01(seed == null ? 0 : seed, k | 0, 0x77, 0) * (BOW.max - BOW.min);
+  function bowAt(seed, A, climate, mode) { const t = sinceWet(seed, A, climate, mode); return t < 0 ? 0 : bowEnv(t, bowDur(seed, slotAt(seed, A).k)); }
+  function washedAt(seed, A, climate, mode) { const t = sinceWet(seed, A, climate, mode); return t < 0 ? 0 : 1 - smooth01(t / WASH_S); }
+  // a bolt's place from the storm's count: its heading round the front's (± 70°), its seed for the jagged path; its
+  // distance follows the thunder's delay (sound at 343 m/s: the delay of 0.5–4 s puts it 170–1370 blocks off)
+  function boltOf(seed, n, frontAng, delay) {
+    const h1 = hash01(seed == null ? 0 : seed, n | 0, 0x5b, 0), h2 = hash01(seed == null ? 0 : seed, n | 0, 0x5c, 0);
+    const a = frontAng + (h1 - 0.5) * 2.44;
+    return { ang: a, dx: Math.cos(a), dz: Math.sin(a), shape: h2 * 1000, dist: delay * 343 };
+  }
+
   class Weather {
     // o.onThunder(delay): called delay seconds after each bolt (the sound follows the light)
     constructor(o) {
@@ -153,6 +193,9 @@
       this.v = { rain: 0, snow: 0, fog: 0, cloud: VIS.klar.cloud, sun: 1, dark: 0, exp: 0, wind: 1 };
       this.windAngle = 0; this.windDir = [1, 0];     // the heading of the wind (radians, unit vector): the water's swell runs with it
       this.windAng = 0; this.gust = 0;   // the wind's direction (radians) and the gust now (0..1): plant sway (env.js)
+      // t-motion · the drama: the front (eased), the rainbow and the washed light (eased), the last bolt, a forced change
+      // from wet to dry (the clock when /wetter cleared a storm: the forced rainbow)
+      this.front = 0; this.bow = 0; this.washed = 0; this.boltInfo = null; this.forcedDry = -1; this.prevKind = 'klar';
     }
     // the world's seed (null: no world, e.g. the title screen): new seed, no forced state, no bolts pending
     setSeed(seed) {
@@ -183,11 +226,26 @@
       if (this.forced) kind = this.clamp(this.forced);
       else if (c.freeze) { if (this.frozen === null) this.frozen = this.kind; kind = this.frozen; }
       else { this.frozen = null; kind = this.oneShot ? 'klar' : kindAt(this.seed, A, climate, this.mode); }
+      // t-motion · the drama's timeline: from the schedule (the same for everyone), or for a forced state its own (a storm
+      // forced is here at once; a storm forced away leaves a rainbow behind)
+      if (WET[this.prevKind] && !WET[kind] && (this.forced || this.oneShot)) this.forcedDry = this.clock;
+      if (WET[kind]) this.forcedDry = -1;
+      this.prevKind = kind;
+      let front, bow, washed;
+      if (this.forced || this.oneShot || c.freeze) {
+        front = kind === 'gewitter' ? 1 : 0;
+        const tw = this.forcedDry >= 0 ? this.clock - this.forcedDry : -1;
+        bow = tw < 0 ? 0 : bowEnv(tw, bowDur(this.seed, this.slot)); washed = tw < 0 ? 0 : 1 - smooth01(tw / WASH_S);
+      } else { front = frontAt(this.seed, A, climate, this.mode); bow = bowAt(this.seed, A, climate, this.mode); washed = washedAt(this.seed, A, climate, this.mode); }
+      const ea = 1 - Math.exp(-dt / 4);
+      this.front += (front - this.front) * ea; this.bow += (bow - this.bow) * ea; this.washed += (washed - this.washed) * ea;
       this.kind = kind;
       // the visuals ease toward the state; Nebel lies thicker in valleys and near water
       const V = VIS[kind] || VIS.klar;
       const loc = this.forced ? 1 : 0.55 + 0.45 * clamp01(+c.lowK || 0);
       const T = { rain: V.rain, snow: V.snow, fog: kind === 'nebel' ? loc : V.fog, cloud: V.cloud, sun: V.sun, dark: V.dark, exp: V.exp, wind: V.wind };
+      // (t-motion: before the rain the front brings the storm's wind and darkens the sky)
+      if (front > 0 && kind !== 'gewitter') { T.wind = Math.max(T.wind, VIS.gewitter.wind * front); T.dark = Math.max(T.dark, 0.3 * front); T.cloud = Math.max(T.cloud, VIS.gewitter.cloud * front); }
       const a = 1 - Math.exp(-dt / TAU);
       for (const k in T) this.v[k] += (T[k] - this.v[k]) * a;
       // the wind: its direction turns slowly over the world's day, and gusts come and go (F3 · Da-Sein)
@@ -213,10 +271,12 @@
       this.strikes++; this.sinceStrike = 0;
       const delay = 0.5 + this.rng() * 3.5;
       this.thunders.push({ at: this.clock + delay, delay });
+      // (t-motion: the bolt's place — round the side the storm comes from, as far off as its thunder is late)
+      this.boltInfo = boltOf(this.seed, this.strikes, this.windAngle + Math.PI, delay);
     }
     info() { return label(this.kind) + (this.forced ? (VR.I18N && VR.I18N.tx ? VR.I18N.tx('g.wx.cmd', null, ' (Befehl)', ' (command)') : ' (Befehl)') : ''); }
   }
 
-  VR.WX = { KINDS, VIS, WEIGHTS, FOG_DAY, DAY, climateOf, slotAt, slotLen, kindAt, fogDay, hash01, parse, label, flashAt, windAngle, gustAt, windDirVec };
+  VR.WX = { KINDS, VIS, WEIGHTS, FOG_DAY, DAY, climateOf, slotAt, slotLen, kindAt, fogDay, hash01, parse, label, flashAt, windAngle, gustAt, windDirVec, FRONT_S, WASH_S, BOW, frontAt, sinceWet, bowEnv, bowDur, bowAt, washedAt, boltOf, slotKind };
   VR.Weather = Weather;
 })(VR);

@@ -47,6 +47,26 @@ uniform float u_cirrus;      // high cirrus streaks: 1 on balanced and above, 0 
 uniform float u_animOn;      // Animierte Anzeigen (settings.anim): 1 animates the holo displays, the portal veil and the hall's light pulses
 uniform float u_pulseA;      // texture layers of the Hangar Hall's pulsing wall strips (-1 when not loaded)
 uniform float u_pulseB;
+#ifdef MOTION
+uniform vec2 u_cirrusDrift;  // t-motion: the cirrus' drift in its noise's space (renderer.js: the clouds' drift far up, a fifth of the cumulus' speed)
+#endif
+#ifdef CLOUDSH
+// t-motion · the cloud shadows (clouds.js shadowMask, renderer.js): the cumulus' footprints, 128² over 1024 blocks in cloud
+// space, 1 clear … 0 under a cloud's heart. u_cloudShadowM: xy the mask's origin in world blocks (the drift taken off), z 1 /
+// its size, w the strength (the sun up, the sky not overcast). cloudShadow(world position): the point's way to the sun
+// meets the cloud layer at y 210 — t-light2 multiplies it into its sun term
+uniform sampler2D u_cloudShadow;
+uniform vec4 u_cloudShadowM;
+float cloudShadow(vec3 wp) {
+  vec2 p = wp.xz + u_sunDir.xz * ((210.0 - wp.y) / max(u_sunDir.y, 0.12));
+  float m = texture(u_cloudShadow, (p - u_cloudShadowM.xy) * u_cloudShadowM.z).r;
+  return 1.0 - u_cloudShadowM.w * (1.0 - m);
+}
+#endif
+#ifdef WXDRAMA
+uniform vec4 u_storm;        // t-motion · Wetter-Drama: the storm's side (x, z: unit, where it comes from), its front 0..1, the rainbow 0..1
+uniform vec4 u_bolt;         // t-motion: the bolt's heading (x, z: unit), its shape seed, its flash 0..1
+#endif
 
 // connected glass (w5 bit 14): one 32-texel tile per face, clamped inside it (an edge texel never wraps onto the frame
 // of the opposite edge); bits 5, 6, 7, 15 say the face's top, right, bottom, left edge joins the same glass — the
@@ -419,7 +439,11 @@ vec3 skyColor(vec3 dir, bool withSun) {
 #ifndef LITE
     if (u_cirrus > 0.0 && dir.y > 0.1) {
       vec2 q = dir.xz / (dir.y + 0.1);
+#ifdef MOTION
+      float a = vnoise(vec2(q.x * 0.35 + q.y * 0.2, q.y * 5.0 + 3.0) + u_cirrusDrift);   // (t-motion: the cirrus drift slowly with the wind, far above the cumulus)
+#else
       float a = vnoise(vec2(q.x * 0.35 + q.y * 0.2, q.y * 5.0 + 3.0) + vec2(u_time * 0.0025, 0.0));
+#endif
       float b = vnoise(vec2(q.x * 0.6 - 7.0, q.y * 13.0 - 1.0));
       float st = smoothstep(0.74, 0.9, a * 0.7 + b * 0.38) * smoothstep(0.55, 0.72, vnoise(q * 0.22 + 17.0));
       st *= smoothstep(0.14, 0.28, dir.y) * (1.0 - smoothstep(0.55, 0.8, dir.y));   // (none right over the horizon: the haze band stays clean)
@@ -465,6 +489,43 @@ vec3 skyColor(vec3 dir, bool withSun) {
         col += vec3(0.1, 0.9, 0.5) * a * band * u_night * 0.8 + vec3(0.5, 0.2, 0.9) * a * band * band * u_night * 0.4;
       }
     }
+#ifdef WXDRAMA
+    // t-motion · Wetter-Drama (weather.js, env.js E.storm / E.bolt): the storm's front darkens the sky from its side, a dark
+    // wall of cloud low over the horizon there; the bolt, a jagged stroke from the cloud base down behind the hills, and its
+    // flash lighting the sky round it (the land in front stands dark: the hills as silhouettes); the rainbow after the rain
+    // at 42° round the antisolar point — red outside, violet inside — with the secondary faint at 51° (reversed) and
+    // Alexander's dark band between (motion.js rainbowAt: the same numbers, test/motion_weather.js)
+    if (u_storm.z > 0.001) {
+      vec2 hd = normalize(dir.xz + vec2(1e-5, 0.0));
+      float side = smoothstep(-0.35, 0.95, dot(hd, u_storm.xy));
+      float wall = side * (1.0 - smoothstep(0.0, 0.45, max(dir.y, 0.0)));
+      // (a deep slate, never black: at most 0.7 darker, the colour drained toward a cool grey — motion.js STORM)
+      float lum = dot(col, vec3(0.3, 0.59, 0.11));
+      col = mix(col, vec3(lum) * vec3(0.78, 0.86, 1.0), u_storm.z * 0.55) * (1.0 - u_storm.z * (0.22 + 0.3 * side + 0.18 * wall));
+    }
+    if (u_bolt.w > 0.001) {
+      vec2 hd = normalize(dir.xz + vec2(1e-5, 0.0));
+      float across = hd.x * u_bolt.y - hd.y * u_bolt.x, along = dot(hd, u_bolt.xy), e = dir.y, sd0 = u_bolt.z;
+      float jag = 0.018 * sin(e * 41.0 + sd0) + 0.009 * sin(e * 97.0 + sd0 * 1.7) + 0.004 * sin(e * 213.0 + sd0 * 2.3) + (e - 0.02) * 0.08 * sin(sd0 * 0.37);
+      float d = abs(across - jag), front = step(0.0, along);
+      float span = smoothstep(-0.03, 0.0, e) * (1.0 - smoothstep(0.30, 0.34, e)) * front;
+      float db = abs(across - jag - (0.19 - e) * 0.35 - 0.006 * sin(e * 150.0 + sd0));
+      float br = exp(-db * db / 0.000006) * step(0.06, e) * step(e, 0.19) * front;
+      float fl = u_bolt.w;
+      col += vec3(0.85, 0.88, 1.0) * (exp(-d * d / 0.00001) * span * 10.0 + br * 5.0 + exp(-d * d / 0.0014) * span * 1.4) * fl;   // (a white-hot core about two pixels wide, its glow a degree round it)
+      col += vec3(0.55, 0.55, 0.78) * fl * (0.25 + 1.4 * exp(-(1.0 - along) * 6.0)) * (1.0 - smoothstep(0.0, 0.6, max(e, 0.0)));
+    }
+    if (u_storm.w > 0.001) {
+      float th = degrees(acos(clamp(dot(dir, -u_sunDir), -1.0, 1.0)));
+      float p1 = (th - 40.6) / 1.8, p2 = (53.0 - th) / 2.9;
+      float b1 = smoothstep(0.0, 0.18, p1) * (1.0 - smoothstep(0.82, 1.0, p1)), b2 = smoothstep(0.0, 0.18, p2) * (1.0 - smoothstep(0.82, 1.0, p2)) * 0.38;
+      vec3 h1 = clamp(abs(mod((1.0 - clamp(p1, 0.0, 1.0)) * 0.78 * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+      vec3 h2 = clamp(abs(mod((1.0 - clamp(p2, 0.0, 1.0)) * 0.78 * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+      float inside = 1.0 - smoothstep(38.0, 40.8, th), alex = smoothstep(42.2, 43.5, th) * (1.0 - smoothstep(49.0, 50.2, th));
+      float k = u_storm.w * smoothstep(-0.02, 0.06, dir.y);
+      col = col * (1.0 - 0.1 * alex * k) + (h1 * b1 + h2 * b2) * 0.32 * k * (0.4 + col) + vec3(0.04) * inside * k;
+    }
+#endif
   }
   return col;
 }
@@ -571,6 +632,11 @@ flat out float v_fade;
 #ifdef ZINV
 invariant gl_Position;   // F10 · zPre: the cut-out layer's depth prepass and its colour pass place every fragment alike
 #endif
+#ifdef MOTION
+out float v_sheen;       // t-motion: how much a passing gust brightens this grass or leaf face (wind.js windSheen)
+flat out float v_ground; // t-motion: a green block's top — the wind's strength (its gust bands are drawn per pixel), 0 otherwise
+${VR.Wind ? VR.Wind.glsl() : ''}
+#endif
 void main() {
 #ifdef FADE
 #ifdef MULTIDRAW
@@ -594,6 +660,36 @@ void main() {
   bool ctmFace = ((a_w5 >> 14u) & 1u) == 1u;   // connected glass: bits 5-7 are its frame mask, not sway
   uint sway = ctmFace ? 0u : (a_w5 >> 5u) & 3u;
   uint leaf = ctmFace ? 0u : (a_w5 >> 7u) & 1u;
+#ifdef MOTION
+  // t-motion · wind in everything (wind.js): the gust bands travel over the land; a plant leans into them (base stiff,
+  // tip free), leaves rustle harder in them, grass and leaves brighten as they bend (the waves read from afar); a hung
+  // thing (the leaf bit with a sway level: a lantern, a sign, laundry, an awning's valance) swings as one piece about
+  // its hook, the level its depth under it
+  v_sheen = 0.0; v_ground = 0.0;
+  bool green = !ctmFace && float((a_tint >> 5u) & 63u) / 63.0 > float((a_tint >> 11u) & 31u) / 31.0 * 1.08 && float((a_tint >> 5u) & 63u) / 63.0 > float(a_tint & 31u) / 31.0 * 1.08;
+  // (a green block's top: the meadow's waves on the ground, drawn per pixel by TERRAIN_FS — a merged face spans many blocks)
+  if (green && sway == 0u && leaf == 0u && (a_w5 & 7u) == 2u) v_ground = min(u_wind, 1.25);
+  else if (sway > 0u || leaf > 0u || green) {
+    vec3 ap = wp + vec3(u_camInt);
+    vec2 wq = vec2(-u_windDir.y, u_windDir.x);
+    float G = windGust(ap.x, ap.z, u_time, u_windDir.x, u_windDir.y, u_gust);
+    if (green) v_sheen = windSheen(G) * min(u_wind, 1.5);
+    if (sway > 0u && leaf > 0u) {
+      float lv = float(sway);
+      rel.xz += u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + wq * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+      rel.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+    } else if (sway > 0u || leaf > 0u) {
+      float t = u_time * 1.6;
+      float ph = ap.x * 0.37 + ap.z * 0.29;
+      float amp = (sway > 0u ? float(sway) / 3.0 * 0.11 : 0.025) * u_wind * (1.0 + 0.5 * u_gust);
+      float along = sin(t + ph) * amp + sin(t * 2.3 + ph * 1.7) * amp * 0.35;
+      float across = cos(t * 0.9 + ph * 1.3) * amp * 0.8;
+      rel.xz += u_windDir * along + wq * across;
+      if (leaf > 0u) rel.y += sin(t * 1.7 + ph * 2.1) * 0.015 * u_wind + sin(u_time * 5.3 + ph * 3.1) * 0.012 * u_wind * G;
+      if (sway > 0u) { float ln = windLeanAlong(float(sway), u_wind, G); rel.xz += u_windDir * ln; rel.y -= ln * 0.1 * float(sway); }
+    }
+  }
+#else
   if (sway > 0u || leaf > 0u) {
     vec3 ap = wp + vec3(u_camInt);
     float t = u_time * 1.6;
@@ -604,6 +700,7 @@ void main() {
     rel.xz += u_windDir * along + vec2(-u_windDir.y, u_windDir.x) * across;
     if (leaf > 0u) rel.y += sin(t * 1.7 + ph * 2.1) * 0.015 * u_wind;
   }
+#endif
   uint kind = (a_w5 >> 8u) & 7u;
   uint face = a_w5 & 7u;
   if (kind == 1u && face == 2u) {
@@ -666,6 +763,14 @@ in vec3 v_tint;
 in vec3 v_localPos;
 #ifdef FADE
 flat in float v_fade;
+#endif
+#ifdef MOTION
+in float v_sheen;   // t-motion: a passing gust brightens grass and leaves (TERRAIN_VS, wind.js)
+flat in float v_ground;   // t-motion: a green block's top (TERRAIN_VS): the wind's strength — its gust bands are drawn here, per pixel
+uniform float u_snowCover;   // t-motion: a snow day's cover on the open ground (env.js: it builds in ~3 min of snow, melts in ~10)
+uniform vec2 u_windDir;      // (t-motion: the same uniforms as TERRAIN_VS: the ground's gust bands)
+uniform float u_gust;
+${VR.Wind ? VR.Wind.glsl() : ''}
 #endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
@@ -766,6 +871,23 @@ void main() {
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
   }
+#ifdef MOTION
+  // t-motion · the wind's waves over the meadow: grass and leaves bent by a gust show their paler side; on a green block's
+  // top the bands run over the ground itself, per pixel (wind.js windGroundSheen: brighter and a touch yellower under a
+  // gust, a little darker in the lull, the meadow's mean unchanged)
+  float sheen = v_sheen;
+  if (v_ground > 0.0) {
+    vec3 gp = v_localPos + vec3(u_camInt);
+    sheen = windGroundSheen(windGust(gp.x, gp.z, u_time, u_windDir.x, u_windDir.y, u_gust), u_gust) * v_ground;
+  }
+  alb.rgb *= 1.0 + sheen;
+  alb.rgb = mix(alb.rgb, alb.rgb * vec3(1.06, 1.04, 0.86), clamp(sheen * 1.5, 0.0, 0.4));
+  if (u_snowCover > 0.001 && (face == 2u || ((v_w5 >> 13u) & 1u) == 1u)) {   // a snow day: the flakes settle on the open tops
+    vec2 sp = v_localPos.xz + vec2(u_camInt.xz);
+    float patchy = smoothstep(0.25, 0.75, texture(u_noise, sp / 23.0).r * 0.7 + texture(u_noise, sp / 5.0).g * 0.3 + u_snowCover * 0.6 - 0.2);
+    alb.rgb = mix(alb.rgb, vec3(0.9, 0.92, 0.97), u_snowCover * patchy * smoothstep(0.86, 1.0, v_sky));
+  }
+#endif
   if (((v_w3 >> 15u) & 1u) == 1u) {
 #ifdef MODEL
     bool own = false;   // a ship's blocks move with it: no world cell to hash
@@ -859,6 +981,9 @@ void main() {
   float ndl = noshade ? 0.65 : max(dot(n, L), 0.0);
   float outdoors = smoothstep(0.55, 0.95, sky);
   float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
+#ifdef CLOUDSH
+  sh *= cloudShadow(v_localPos + vec3(u_camInt));   // t-motion: cloud shadow (t-light2 multiplies it into its sun term)
+#endif
   vec3 direct = lc * ndl * sh * outdoors;
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
@@ -886,6 +1011,14 @@ void main() {
     float e = emissiveFace ? max(emis, 0.85) : emis;
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
   }
+#ifdef MOTION
+  // t-motion · the light lines run: a bright packet travels along every upward light (motion.js FLOW, the same numbers)
+  if (emissiveFace && face == 2u && kind == 0u && u_animOn > 0.5) {
+    vec3 fp = v_localPos + vec3(u_camInt);
+    float fq = (fract((fp.x + fp.z) * 0.0625 - u_time * 0.5) - 0.5) * 12.0;
+    col *= 0.9 + 0.6 * exp(-fq * fq);
+  }
+#endif
   if (u_holoLayer > 0.5 && abs(layer - u_holoLayer) < 0.5) {
     // holograms: rolling scanlines, a bright sweep and a faint flicker
     vec3 hp = v_localPos + vec3(u_camInt);
@@ -909,7 +1042,38 @@ void main() {
       float rowF = pl.y * 6.0, row = floor(rowF);
       float bar = step(0.55, hash12(vec2(row, floor(pl.x * 3.0 + u_time * 2.0 * (0.6 + fract(row * 0.37)))))) * step(0.3, fract(rowF)) * (1.0 - step(0.75, fract(rowF)));
       vec3 ink = vec3(0.35, 0.95, 1.0);
+#ifdef MOTION
+      // t-motion: every 9 s a panel switches between the radar, a map (a grid, contour lines, a marker pinging along its
+      // route) and the readouts (a trace and level bars); a bright scan line wipes down it in 0.6 s, the new picture
+      // above the line, the old one below (each panel on its own phase: motion.js HOLO, the same numbers)
+      float cyc = u_time / 9.0 + hc * 2.7, cf = fract(cyc) * 9.0, wy = 1.5 - cf * 5.0;
+      float mode = mod(floor(cyc) - (d.y > wy ? 0.0 : 1.0), 3.0);
+      float wipe = (1.0 - smoothstep(0.0, 0.07, abs(d.y - wy))) * step(cf, 0.62);
+      vec3 hol;
+      if (mode < 0.5) hol = ink * (wedge * 0.85 + rings * 0.55 + cross + blip * 1.4) + ink * bar * (1.0 - inR) * 0.75;
+      else if (mode < 1.5) {
+        vec2 gq = abs(fract(d * 2.0 + 0.5) - 0.5);
+        float grid = 1.0 - smoothstep(0.0, 0.035, min(gq.x, gq.y));
+        float hf = fract(vnoise(d * 1.1 + hc * 17.0) * 6.0);
+        float cont = 1.0 - smoothstep(0.0, 0.09, min(hf, 1.0 - hf));
+        vec2 mp = vec2(sin(u_time * 0.37 + hc * 6.0), sin(u_time * 0.23 + hc * 3.0)) * 1.05;
+        float md = length(d - mp), pr = fract(u_time * 0.8);
+        float mark = 1.0 - smoothstep(0.05, 0.12, md);
+        float ping = (1.0 - smoothstep(0.0, 0.035, abs(md - pr * 0.7))) * (1.0 - pr);
+        hol = ink * (grid * 0.3 + cont * 0.5 + mark * 1.6 + ping * 0.9);
+      } else {
+        float ty = 0.75 + 0.45 * sin(d.x * 3.1 + u_time * 2.3 + hc * 9.0) * (0.6 + 0.4 * sin(d.x * 7.3 - u_time * 1.1));
+        float trace = (1.0 - smoothstep(0.0, 0.05, abs(d.y - ty))) * step(0.0, d.y);
+        float bf = (d.x + 1.5) * 3.0, bi = floor(bf);
+        float lvl = 0.55 + 0.4 * sin(u_time * (1.0 + hash12(vec2(bi, 3.0)) * 2.0) + bi * 1.7 + hc * 5.0);
+        float bars = step(-1.35, d.y) * step(d.y, -1.35 + lvl * 1.15) * step(0.18, fract(bf)) * step(fract(bf), 0.82);
+        float axis = (1.0 - smoothstep(0.0, 0.03, abs(d.y))) * 0.4;
+        hol = ink * (trace * 1.3 + bars * 0.7 + axis);
+      }
+      col = col * 0.42 + hol + ink * wipe * 1.6;
+#else
       col = col * 0.42 + ink * (wedge * 0.85 + rings * 0.55 + cross + blip * 1.4) + ink * bar * (1.0 - inR) * 0.75;
+#endif
     }
   }
   if (u_animOn > 0.5 && u_pulseA > -0.5 && (abs(layer - u_pulseA) < 0.5 || abs(layer - u_pulseB) < 0.5)) {
@@ -959,6 +1123,11 @@ uniform vec2 u_windDir;
 uniform mat4 u_shadowMat;
 out vec4 v_shadow;
 #endif
+#ifdef MOTION
+uniform float u_gust;
+uniform vec3 u_camPos;   // t-motion: the camera's world position (the palm's place in the gust bands)
+${VR.Wind ? VR.Wind.glsl() : ''}
+#endif
 out vec2 v_uv;
 out vec3 v_col;
 out vec3 v_n;
@@ -970,14 +1139,24 @@ void main() {
   float sc = a_inst1.x, ph = a_inst1.z;
   vec3 p = a_pos * sc;
   p.x += a_inst1.y * a_bend;                       // the lean: the top stays, the trunk bends with its depth
-  float gust = 0.6 + 0.4 * sin(u_time * 0.31 + ph * 0.23);
-  float amp = u_wind * a_sway * sc * 0.16 * gust;
   float c = cos(a_inst0.w), s = sin(a_inst0.w);
   vec3 q = vec3(c * p.x - s * p.z, p.y, s * p.x + c * p.z);
   vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
+#ifdef MOTION
+  // t-motion · the fronds bend from the crown (props.js weights: t², base stiff, tip free), each flaps with its own phase,
+  // the gust bands sweep through the crown and droop it (wind.js windFrond*)
+  vec3 wpos = a_inst0.xyz + u_camPos;
+  float G = windGust(wpos.x, wpos.z, u_time, u_windDir.x, u_windDir.y, u_gust);
+  float amp = windFrondAmp(a_sway, sc, u_wind, G);
+  q.xz += u_windDir * windFrondAlong(amp, a_frond, ph, u_time) + vec2(-u_windDir.y, u_windDir.x) * windFrondAcross(amp, a_frond, ph, u_time, p.y);
+  q.y += windFrondUp(amp, a_frond, ph, u_time, G);
+#else
+  float gust = 0.6 + 0.4 * sin(u_time * 0.31 + ph * 0.23);
+  float amp = u_wind * a_sway * sc * 0.16 * gust;
   float w1 = 0.65 + 0.35 * sin(u_time * 1.7 + ph);
   float w2 = 0.3 * sin(u_time * 2.6 + ph * 1.3 + p.y * 0.7);
   q.xz += u_windDir * (amp * w1) + vec2(-u_windDir.y, u_windDir.x) * (amp * w2);
+#endif
   vec3 rel = q * on + a_inst0.xyz;
   v_uv = a_uv; v_col = a_col; v_n = nq; v_rel = rel; v_sky = a_inst2.x; v_block = a_inst2.yzw;
 #ifdef SHADOWS
@@ -1071,6 +1250,18 @@ uniform mat4 u_viewProj;
 uniform mat4 u_shadowMat;
 out vec4 v_shadow;
 #endif
+#ifdef MOTION
+// t-motion · the smooth pieces that hang swing as one about their hook, as the terrain's hung pieces do (wind.js hang):
+// u_hang (renderer.js hangOf, one a slot) x 1 a lantern under its hook at y = u_hang.y, its lever u_hang.z long; x 2 an
+// awning's cloth, its wall at z = u_hang.y (the piece's own frame), u_hang.z deep; 0 a piece that stands still
+uniform vec4 u_hang;
+uniform float u_time;
+uniform float u_wind;
+uniform vec2 u_windDir;
+uniform float u_gust;
+uniform vec3 u_camPos;
+${VR.Wind ? VR.Wind.glsl() : ''}
+#endif
 out vec2 v_uv;
 out vec3 v_col;
 out vec3 v_n;
@@ -1083,6 +1274,15 @@ out vec3 v_block;
 void main() {
   float c = cos(a_inst0.w), s = sin(a_inst0.w);
   vec3 q = vec3(c * a_pos.x - s * a_pos.z, a_pos.y, s * a_pos.x + c * a_pos.z);
+#ifdef MOTION
+  if (u_hang.x > 0.5) {
+    float lv = 3.0 * clamp(((u_hang.x < 1.5 ? u_hang.y - a_pos.y : u_hang.y - a_pos.z)) / u_hang.z, 0.0, 1.0);
+    vec3 ap = a_inst0.xyz + u_camPos;   // (the piece's place: one phase for the whole piece)
+    float G = windGust(ap.x, ap.z, u_time, u_windDir.x, u_windDir.y, u_gust);
+    q.xz += u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + vec2(-u_windDir.y, u_windDir.x) * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+    q.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+  }
+#endif
   vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
   vec3 rel = q + a_inst0.xyz;
   vec3 col = a_col;
@@ -1396,6 +1596,12 @@ void main() {
     float rim = 1.0 - smoothstep(0.0, 0.75, rd);
     float band = 1.0 - smoothstep(0.3, 1.9 + wob * 0.6, rd);
     float e = clamp(band * (0.2 + 0.8 * swirl) * 0.8 + fil * band, 0.0, 1.0);
+#ifdef MOTION
+    // t-motion: rings run out from the veil's middle to its rim (rd falls toward the rim, so the crests of
+    // sin(rd·3.2 + t·2.2) move outward at 0.7 blocks a second), bright where the veil is clear, and its energy breathes
+    // (motion.js VEIL, the same numbers)
+    if (u_animOn > 0.5) e = clamp((e + smoothstep(0.55, 1.0, sin(rd * 3.2 + u_time * 2.2)) * smoothstep(0.9, 2.4, rd) * 0.3) * (0.9 + 0.1 * sin(u_time * 1.7)), 0.0, 1.0);
+#endif
     vec3 hot = mix(vec3(1.0, 0.62, 0.28), vec3(1.0, 0.92, 0.8), 1.0 - smoothstep(0.0, 0.3, rd)) * 2.8;
     vec3 vcol = mix(vec3(0.12, 0.38, 1.0) * 0.9, vec3(0.5, 0.82, 1.0) * 2.4, e);
     vcol = mix(vcol, hot, rim);
@@ -1714,8 +1920,14 @@ out float v_alpha;
 out float v_var;
 out float v_dist;
 out float v_near;
+#ifdef WXDRAMA
+out vec3 v_dir;    // t-motion: the sprite's heading from the eye (the bolt's flash lights the clouds round its heading most)
+#endif
 void main() {
   vec3 rel = u_origin + a_c.xyz;
+#ifdef WXDRAMA
+  v_dir = rel / max(length(rel), 1.0);
+#endif
   vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
   float hi = clamp((rel.y / max(length(rel), 1.0) - u_cloudHigh.x) * u_cloudHigh.y, 0.0, 1.0);
   v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x * (1.0 - u_cloudHigh.z * hi * hi * (3.0 - 2.0 * hi)); v_var = a_p.z; v_dist = length(rel.xz);
@@ -1735,6 +1947,9 @@ in float v_alpha;
 in float v_var;
 in float v_dist;
 in float v_near;
+#ifdef WXDRAMA
+in vec3 v_dir;
+#endif
 out vec4 o;
 void main() {
   // the sample stays inside its own quarter of the atlas (half a texel in from the edge): no seam from the neighbour
@@ -1757,6 +1972,17 @@ void main() {
   vec3 col = mix(shadeC, litC, lit) + u_sunset * 0.18 * (1.0 - lit);
   col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))), u_rain * 0.6);
   col = mix(col, u_skyHorizon * 1.1 + ambC * 0.5, u_fogK * 0.45);
+#ifdef WXDRAMA
+  // t-motion · Wetter-Drama: a storm's clouds (the front, or the rain) hang dark and heavy — a slate grey, their bases
+  // darker, dim at night — and the bolt's flash lights them from within, most round its heading and on their bases
+  // (motion.js STORM; the third browser run's storm clouds stood white against the dark sky)
+  float sk = clamp(max(u_storm.z, u_rain), 0.0, 1.0) * (1.0 - u_fogK);
+  col = mix(col, vec3(0.16, 0.18, 0.22) * (0.55 + 0.6 * lit) * (0.15 + 0.85 * u_sunK) + u_ambSky * 0.12, sk * 0.82);
+  if (u_bolt.w > 0.001 && u_fogK < 0.5) {   // (the cumulus only: the final browser run's flash lit a fog sprite's hard-edged quad)
+    vec2 bh = normalize(v_dir.xz + vec2(1e-5, 0.0));
+    col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.35 + 0.65 * smoothstep(0.2, 0.97, dot(bh, u_bolt.xy))) * (0.6 + 0.8 * (1.0 - v_uv.y));
+  }
+#endif
   float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
   col = mix(col, u_skyHorizon, smoothstep(260.0, 600.0, v_dist) * 0.5);
   float solid = mix(smoothstep(0.1, 0.55, d), d, u_fogK);   // cumulus: the edge is soft, the body solid; fog banks: soft mist
@@ -2461,6 +2687,9 @@ uniform float u_snow;
 uniform sampler2D u_heights;             // 128x128 top heights around camera
 uniform vec2 u_heightOrigin;             // world xz of heights texel 0
 uniform vec3 u_right;
+#ifdef WXDRAMA
+uniform vec3 u_rainWind;                 // t-motion: the wind's heading (x, z) and strength — the rain blows sideways in sheets
+#endif
 out float v_a;
 out vec2 v_c;
 out float v_snow;
@@ -2473,12 +2702,33 @@ void main() {
   float yy = mod(-u_time * fallSpeed * (0.8 + a_seed.z * 0.4) + a_seed.z * 97.0, H) - H * 0.4;
   vec3 wp = vec3(wxz.x + 0.5, u_camPos.y + yy, wxz.y + 0.5);
   if (u_snow > 0.5) { wp.x += sin(u_time * 1.3 + a_seed.z * 20.0) * 0.6; wp.z += cos(u_time * 1.1 + a_seed.z * 17.0) * 0.6; }
+#ifdef WXDRAMA
+  // t-motion: the drops drift downwind as they fall (the slope grows with the wind: about 30° in a storm), the streak
+  // leans along their path, and denser sheets of rain sweep downwind across the view
+  float slope = u_snow > 0.5 ? 0.0 : u_rainWind.z * 0.19;
+  vec2 drift = -u_rainWind.xy * slope * yy;   // (none at the eye's height: above it upwind, below it downwind — the field stays round the eye)
+  wp.xz += drift;
+  vec2 hu = (wxz + drift - u_heightOrigin + 0.5) / 128.0;
+#else
   vec2 hu = (wxz - u_heightOrigin + 0.5) / 128.0;
+#endif
   float top = texture(u_heights, hu).r * 255.0;
   v_a = step(top + 1.0, wp.y) * (1.0 - smoothstep(R * 0.6, R, length(xz)));
+#ifdef WXDRAMA
+  if (u_snow < 0.5) {
+    vec2 pq = vec2(-u_rainWind.y, u_rainWind.x);
+    float band = 0.5 + 0.5 * sin(dot(wp.xz, u_rainWind.xy) * 0.11 - u_time * (1.5 + u_rainWind.z) + 2.0 * sin(dot(wp.xz, pq) * 0.05));
+    v_a *= 0.45 + 0.55 * smoothstep(0.3, 0.85, band);
+  }
+#endif
   vec3 rel = wp - u_camPos;
   vec2 size = u_snow > 0.5 ? vec2(0.07, 0.07) : vec2(0.02, 0.45);
+#ifdef WXDRAMA
+  vec3 upv = normalize(vec3(-u_rainWind.x * slope, 1.0, -u_rainWind.y * slope));
+  vec3 p = rel + u_right * a_corner.x * size.x + upv * a_corner.y * size.y;
+#else
   vec3 p = rel + u_right * a_corner.x * size.x + vec3(0.0, 1.0, 0.0) * a_corner.y * size.y;
+#endif
   v_c = a_corner;
   v_snow = u_snow;
   gl_Position = u_viewProj * vec4(p, 1.0);

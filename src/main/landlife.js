@@ -144,9 +144,21 @@
         if (d2 > 900 * 900) { this.fx.delete(mk); continue; }
         if (M.kind === 'mist') {
           if (d2 > FX * FX) continue;
-          M.acc += dt * (low ? 2.5 : 6) * M.k;
+          // t-motion · with Wind in allem the foot of a fall throws up a billowing column of mist: thinner, bigger puffs that
+          // rise higher, churn (turbulence) and drift with the wind, and a fine spray of droplets bursting out of the pool
+          // (VR.Motion.FALLS; the third browser run's falls showed a thin wisp — the column game.js waterFx was meant to
+          // throw never came: the land's falls are stacked falling water, its scan never finds a foot)
+          const FM = g.settings && g.settings.motion && VR.Motion && VR.Motion.FALLS;
+          M.acc += dt * (FM ? (low ? FM.rate[0] : FM.rate[1]) : (low ? 2.5 : 6)) * M.k;
           while (M.acc >= 1) {
             M.acc -= 1;
+            if (FM) {
+              const r = Math.random;
+              P.spawn(M.x + 0.5 + (r() - 0.5) * FM.spread, M.y + 0.2 + r() * 0.8, M.z + 0.5 + (r() - 0.5) * FM.spread, (r() - 0.5) * 1.2, FM.vy[0] + r() * (FM.vy[1] - FM.vy[0]), (r() - 0.5) * 1.2,
+                { life: FM.life[0] + r() * (FM.life[1] - FM.life[0]), size: FM.size[0] + r() * (FM.size[1] - FM.size[0]), grav: -0.18, drag: 0.8, col: [0.9, 0.94, 0.98], grow: FM.grow, emis: 0.15, collide: false, alpha: FM.alpha, turb: FM.turb, wind: FM.wind });
+              if (!low && r() < FM.spray) { const a = r() * 6.283, s = 1.6 + r() * 1.8; P.spawn(M.x + 0.5 + (r() - 0.5) * 1.6, M.y + 0.5, M.z + 0.5 + (r() - 0.5) * 1.6, Math.cos(a) * s, 1.8 + r() * 1.8, Math.sin(a) * s, { life: 0.8 + r() * 0.5, size: 0.05 + r() * 0.04, grav: 7, drag: 0.4, col: [0.86, 0.93, 1], emis: 0.3, collide: false }); }
+              continue;
+            }
             P.spawn(M.x + 0.5 + (Math.random() - 0.5) * 2.4, M.y + 0.2, M.z + 0.5 + (Math.random() - 0.5) * 2.4, (Math.random() - 0.5) * 0.9, 0.5 + Math.random() * 0.7, (Math.random() - 0.5) * 0.9,
               { life: 2.2 + Math.random() * 1.6, size: 0.45 + Math.random() * 0.35, grav: -0.05, drag: 0.5, col: [0.86, 0.91, 0.96], grow: 1.1, emis: 0.15, collide: false });
           }

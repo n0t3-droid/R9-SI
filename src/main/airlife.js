@@ -78,6 +78,7 @@
       this.tier = 2; this.on = true; this.time = 0;
       this.acc = { mote: 0, pollen: 0, leaf: 0, snow: 0 };
       this.ff = []; this.bf = []; this.flocks = []; this.flowers = []; this.flowerT = 0; this.birdT = 25;
+      this.ffReach = 14;      // how far round the eye the fireflies rise (t-motion: 24 with Wind in allem — the lawns beyond a plaza; game.js)
       this.drawn = { mote: 0, pollen: 0, firefly: 0, leaf: 0, snow: 0, butterfly: 0, bird: 0 };   // particles made per kind (the test reads them)
       this.ms = 0;            // the CPU time of an update (a moving average, ms)
       this.msSum = 0; this.msN = 0;   // the same time summed over a window (the test takes the mean of its window)
@@ -165,15 +166,16 @@
 
       // ---- fireflies in the grass at night (agents: they blink, with a little wander)
       if (outdoor && (E.night || 0) > 0.55 && !rain && cap.firefly > 0) {
-        if (this.ff.length < cap.firefly && Math.random() < dt * 5) {
-          const x = eye[0] + (Math.random() * 2 - 1) * 14, z = eye[2] + (Math.random() * 2 - 1) * 14, top = w.topAt(Math.floor(x), Math.floor(z));
+        const FR = this.ffReach || 14;
+        if (this.ff.length < cap.firefly && Math.random() < dt * 5 * FR / 14) {
+          const x = eye[0] + (Math.random() * 2 - 1) * FR, z = eye[2] + (Math.random() * 2 - 1) * FR, top = w.topAt(Math.floor(x), Math.floor(z));
           if (isGrass(w, Math.floor(x), top, Math.floor(z))) this.ff.push({ x, y: top + 1.2 + Math.random() * 1.6, z, ph: Math.random() * 6.28, fr: 1.2 + Math.random() * 1.0, wx: (Math.random() - 0.5) * 0.4, wz: (Math.random() - 0.5) * 0.4, life: 10 + Math.random() * 8 });
         }
       }
       for (let i = this.ff.length - 1; i >= 0; i--) {
         const f = this.ff[i];
         f.life -= dt;
-        if (f.life <= 0 || d2(f.x, f.z, eye) > 26 * 26) { this.ff.splice(i, 1); continue; }
+        if (f.life <= 0 || d2(f.x, f.z, eye) > (this.ffReach + 12) * (this.ffReach + 12)) { this.ff.splice(i, 1); continue; }
         const s = this.time * 0.31 + f.ph;
         f.x += (Math.sin(s) * 0.35 + f.wx) * dt; f.z += (Math.cos(s * 1.1) * 0.35 + f.wz) * dt; f.y += Math.sin(this.time * 0.7 + f.ph) * 0.12 * dt;
         const b = Math.pow(Math.max(0, Math.sin(this.time * f.fr + f.ph)), 5);   // a glow that swells and dies away

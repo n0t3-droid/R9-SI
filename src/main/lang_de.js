@@ -2015,5 +2015,12 @@
     'town.sign.workshop': 'Werkstatt',
     'town.sign.maps': 'Karten',
     'town.sign.cafe': 'Café',
+    // t-motion · WOW III (src/main/motion.js): the wind in everything, the clouds' shadows, the weather's drama
+    'g.set.motion': 'Wind in allem: Gras in Wellen, Laternen, Markisen, Palmwedel',
+    'g.set.motion.tip': 'Böen laufen als Wellen über die Wiesen, Laternen und Schilder schwingen an ihrem Haken, Markisen und Wäsche flattern, Palmwedel biegen sich. Auf Sehr niedrig aus.',
+    'g.set.cloudShadow': 'Wolkenschatten über dem Land',
+    'g.set.cloudShadow.tip': 'Die Schatten der Wolken ziehen mit dem Wind über Wiesen, Hügel und Dächer. Ab Ausgewogen.',
+    'g.set.wxDrama': 'Wetter-Drama: Gewitterfront, Blitze, Regenbogen, Nebelbänke',
+    'g.set.wxDrama.tip': 'Ein Gewitter zieht von einer Seite heran, der Wind frischt auf, Blitze zeichnen die Hügel nach, der Regen weht schräg; danach ein Regenbogen. Morgens liegen Nebelbänke in den Tälern. Auf Sehr niedrig aus.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
