@@ -878,8 +878,10 @@
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
       if (p.u.u_pbr && this.texPbr) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.texPbr); gl.uniform1i(p.u.u_pbr, 10); }   // (t-material: the material table)
       if (p.u.u_hiMap && this.texHiMap) {   // (t-material · hero textures: the 64 × 64 set and its table)
+        // (units 11, 13, 15: t-light2 reads its contact shadows on unit 12 and t-motion the cloud shadows on 14 in these
+        //  same programs — one unit, one sampler type)
         gl.activeTexture(gl.TEXTURE11); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texHiAlb); if (p.u.u_albedoHi) gl.uniform1i(p.u.u_albedoHi, 11);
-        gl.activeTexture(gl.TEXTURE12); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texHiMat); if (p.u.u_materialHi) gl.uniform1i(p.u.u_materialHi, 12);
+        gl.activeTexture(gl.TEXTURE15); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texHiMat); if (p.u.u_materialHi) gl.uniform1i(p.u.u_materialHi, 15);
         gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, this.texHiMap); gl.uniform1i(p.u.u_hiMap, 13);
       }
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowRead || this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }

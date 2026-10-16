@@ -155,5 +155,21 @@ console.log('g · the screen-space mirror (tier 2)');
   check(['high', 'ultra', 'ultraLite'].every(p => P[p].pbr === 2) && ['potato', 'low', 'balanced'].every(p => P[p].pbr < 2), 'it runs on High and Ultra (gloss tier 2); Balanced keeps the sky\'s reflection with its Fresnel');
 }
 
+console.log('h · the texture units of the terrain programs (the merge with t-light2 and t-motion)');
+{
+  // common() and bindTerrainTextures() bind every sampler of the terrain programs; one unit must never carry two samplers
+  // (of two types it is an error on every draw). t-light2 reads its contact shadows on unit 12 (from common()), t-motion
+  // the cloud shadows on 14, in the same programs; the folk bones' 10 is the folk program's own
+  const src = require('fs').readFileSync(__dirname + '/../src/main/renderer.js', 'utf8');
+  const body = (head) => { const a = src.indexOf(head), b = src.indexOf('\n    }\n', a); return a > 0 && b > a ? src.slice(a, b) : ''; };
+  const text = body('    common(p, E) {') + body('    bindTerrainTextures(p) {');
+  const units = {};
+  for (const m of text.matchAll(/uniform1i\(p\.u\.(u_\w+), (\d+)\)/g)) (units[m[2]] = units[m[2]] || new Set()).add(m[1]);
+  const shared = Object.entries(units).filter(([, s]) => s.size > 1).map(([u, s]) => u + ': ' + [...s].join(', '));
+  check(Object.keys(units).length >= 8 && shared.length === 0, 'every sampler the terrain programs bind has a unit of its own', shared.join(' · ') || Object.entries(units).map(([u, s]) => u + ' ' + [...s][0]).join(', '));
+  const mine = ['u_pbr', 'u_albedoHi', 'u_materialHi', 'u_hiMap'].map(n => +Object.keys(units).find(u => units[u].has(n)));
+  check(mine.every(u => u >= 0 && u < 16 && u !== 12 && u !== 14), 'the material table and the hero textures sit on units 10, 11, 15, 13 — not t-light2\'s 12, not t-motion\'s 14', mine.join(', '));
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
