@@ -36,6 +36,27 @@ console.log('3 · the wood\'s shafts: the march weighted by the canopy\'s gaps (
   check(V.Light2.defaults('potato').l2Vol === false && V.Light2.defaults('balanced').l2Vol === false && V.Light2.defaults('high').l2Vol === true, 'the volumetric light stays High and Ultra\'s (Very Low, Low, Balanced: no march, no cost)');
 }
 
+console.log('4 · the golden hour\'s grade toward the frames (light2.js GRADE.gold; measured by test/land_grade.js)');
+{
+  const L2 = V.Light2, LG = require('./land_grade.js'), g = L2.GRADE.gold, g48 = LG.GRADE48.gold;
+  // the measure's own footing: the grade taken back out of a picture gives the colour it was made from
+  let worst = 0;
+  for (const c of [[0.1, 0.12, 0.2], [0.45, 0.3, 0.2], [0.6, 0.62, 0.5], [0.8, 0.7, 0.55], [0.3, 0.5, 0.25]]) for (const [u, v] of [[0.5, 0.5], [0.1, 0.2]]) {
+    const G = LG.gradeAt(LG.GRADE48, { day: 0.06, gold: 0.94, dusk: 0, night: 0 }), b = LG.ungradeJS(LG.gradeJS(c, u, v, 16 / 9, G), u, v, 16 / 9, G);
+    worst = Math.max(worst, ...b.map((x, i) => Math.abs(x - c[i])));
+  }
+  check(worst < 0.004, 'land_grade.js: the grade taken back out of a picture gives back its colour (the measure\'s footing)', worst.toFixed(4));
+  // the stop: the lights' lean halved (v0.48's golden split 9.2 against the frames' 6.2), the mid-tones less saturated
+  const lean = (G, l) => { const c = L2.split([l, l, l], G.dark, G.light); return c[0] - c[2]; };
+  check(lean(g, 0.85) > 0.02 && lean(g, 0.85) < lean(g48, 0.85) * 0.6 && lean(g, 0.1) < -0.01 && JSON.stringify(g.dark) === JSON.stringify(g48.dark), 'the lights\' warm lean about half of v0.48\'s, the shade\'s cool lean kept', [lean(g48, 0.85), lean(g, 0.85), lean(g, 0.1)].map(x => x.toFixed(3)).join(' · '));
+  check(g.sat < g48.sat && g.sat >= 1 && g.s <= g48.s && g.mid === g48.mid && g.toe === g48.toe && g.sh === g48.sh, 'the mid-tones\' saturation 1.16 → ' + g.sat + ', the S ' + g48.s + ' → ' + g.s + '; the curve\'s ends and middle kept (the sky\'s fit)');
+  // a warm sunlit wall in the middle of the picture: less orange than v0.48 graded it, still warm
+  const m = { day: 0.06, gold: 0.94, dusk: 0, night: 0 }, wall = [0.78, 0.6, 0.42];
+  const a = LG.gradeJS(wall, 0.5, 0.5, 16 / 9, LG.gradeAt(LG.GRADE48, m)), b = LG.gradeJS(wall, 0.5, 0.5, 16 / 9, LG.gradeAt(L2.GRADE, m));
+  check(b[0] - b[2] < a[0] - a[2] && b[0] - b[2] > 0.3, 'a sunlit wall: less orange than v0.48 graded it, still warm (r − b)', [a[0] - a[2], b[0] - b[2]].map(x => x.toFixed(3)).join(' → '));
+  for (const k of ['day', 'dusk', 'night']) check(JSON.stringify(L2.GRADE[k]).replace(/,"b(Thr|Str)":[\d.]+/g, '') === JSON.stringify(LG.GRADE48[k]), 'the ' + k + '\'s grade untouched');
+}
+
 console.log('5 · Villa Nova\'s windows carry the sky (tex_pbr.js GLOWSKY, TERRAIN_FS)');
 {
   check(P.GLOWSKY === 8 && (P.of('vx_smooth').flags & P.GLOWSKY) && !(P.of('vx_tile').flags & P.GLOWSKY) && !(P.of('vx_glass').flags & P.GLOWSKY) && !(P.of('vx_smooth_gloss').flags & P.GLOWSKY), 'the flag sits on the fine VX pieces\' plain layer only (not the 8³ pieces\', not glass, not the lacquer)', JSON.stringify(P.of('vx_smooth')));
