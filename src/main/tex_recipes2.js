@@ -17,7 +17,8 @@
     const img = base.clone();
     const P = typeof fringeCol[0] === 'number' && fringeCol.length > 3 ? TX.pal(fringeCol, 4) : null;
     for (let x = 0; x < N; x++) {
-      const d = depth + Math.floor(hh(x, 0, seed) * 4) + (x % 3 === 0 ? 2 : 0);
+      const x32 = TX.SC > 1 ? Math.floor(x / TX.SC) : x;   // (t-material: the fringe's teeth in the 32-grid at any size)
+      const d = (depth + Math.floor(hh(x32, 0, seed) * 4) + (x32 % 3 === 0 ? 2 : 0)) * (TX.SC || 1);
       for (let y = 0; y < d; y++) {
         const c = P ? TX.ramp(P, 0.3 + hh(x, y, seed + 1) * 0.6) : TX.scale(fringeCol, 0.85 + hh(x, y, seed) * 0.3);
         img.set(x, y, c, tintMask ? 1 : 1); img.H(x, y, 0.8);

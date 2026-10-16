@@ -225,7 +225,7 @@
 
   // ---------------- wood ----------------
   PRE.planks = (w) => { const P = WOOD[w]; const img = TX.planks(P.planks, { seed: 200 + w.length * 7, nails: w === 'bamboo' ? false : true }); if (w === 'bamboo') { for (let y = 0; y < N; y++) for (let x = 0; x < N; x += 8) img.mul(x, y, 0.8); } if (P.glow) img.forEach((x, y, i) => { if (hh(x, y, 9) < 0.01) { img.set(x, y, C(P.glow)); img.em[i] = 0.6; } }); return img; };
-  PRE.log = (w) => { const P = WOOD[w]; const img = TX.bark(P.bark, { seed: 300 + w.length * 11, marks: P.marks ? 0.12 : 0 }); if (P.marks) img.forEach((x, y) => { if (hh(Math.floor(x / 4), Math.floor(y / 2), 311 + w.length) < 0.18) img.set(x, y, C(P.marks)); }); if (P.glow) img.forEach((x, y, i) => { if (TX.fbm(x, y, 8, 2, 317) > 0.7) { img.set(x, y, TX.mix(C(P.glow), [1, 1, 1], 0.2)); img.em[i] = 0.7; } }); return K(img); };
+  PRE.log = (w) => { const P = WOOD[w]; const img = TX.bark(P.bark, { seed: 300 + w.length * 11, marks: P.marks ? 0.12 : 0 }); if (P.marks) img.forEach((x, y) => { if (hh(Math.floor(x / (4 * TX.SC)), Math.floor(y / (2 * TX.SC)), 311 + w.length) < 0.18) img.set(x, y, C(P.marks)); }); if (P.glow) img.forEach((x, y, i) => { if (TX.fbm(x, y, 8, 2, 317) > 0.7) { img.set(x, y, TX.mix(C(P.glow), [1, 1, 1], 0.2)); img.em[i] = 0.7; } }); return K(img); };
   PRE.log_top = (w) => { const P = WOOD[w]; return K(TX.logTop(P.ring, P.bark, { seed: 400 + w.length * 13 })); };
   PRE.stripped_log = (w) => { const P = WOOD[w]; return K(TX.bark(P.stripped, { seed: 500 + w.length * 17 })); };
   PRE.stripped_log_top = (w) => { const P = WOOD[w]; return K(TX.logTop(P.ring, P.stripped, { seed: 600 + w.length * 19 })); };

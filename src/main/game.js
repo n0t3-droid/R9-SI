@@ -39,6 +39,14 @@
   // wind and the weather, Balanced and up all three
   const MO_SW = ['motion', 'cloudShadow', 'wxDrama'];
   for (const p in PRESETS) { PRESETS[p].motion = p === 'potato' ? 0 : 1; PRESETS[p].cloudShadow = p === 'potato' || p === 'low' ? 0 : 1; PRESETS[p].wxDrama = p === 'potato' ? 0 : 1; }
+  // t-material · Glanz & Spiegelungen (tex_pbr.js, shaders.js PBR): 0 the old highlight · 1 the gloss of the materials with
+  // the sky's reflection · 2 and the screen-space mirror (High and up); Very Low none (its lite programs never carry it)
+  const PBR_TIER = { potato: 0, low: 1, balanced: 1, high: 2, ultra: 2, ultraLite: 2 };
+  for (const p in PRESETS) PRESETS[p].pbr = PBR_TIER[p] | 0;
+  // t-material · hero textures (tex_hi.js): the most-seen materials at 64 × 64 from Balanced up (~0.7 MB on the GPU, forged
+  // once in a worker and kept in the texture cache); Very Low and Low: none, nothing forged
+  for (const p in PRESETS) PRESETS[p].texHi = !(p === 'potato' || p === 'low');
+  const MAT_SW = ['pbr', 'water', 'texHi'];   // (water: F7's tier, now a row in the settings too)
   // look: the block look (v0.39) — 'seamless' (Nahtlos: smooth hills, joined glass, no block borders — the default since
   // v0.43, the trailer's look, also for players whose saved settings never chose one) or 'classic' (Klassisch, every
   // block on its own like the original game)
@@ -75,6 +83,8 @@
       if (s.rdMax === undefined && s.preset) out.rdMax = PRESETS[s.preset] ? PRESETS[s.preset].rdMax : 24;
       // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
+      // t-material: settings saved before the gloss tiers follow their preset (a custom one: the gloss without the mirror, none when lite)
+      for (const k of MAT_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? 0 : 1);
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -154,6 +164,7 @@
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
       if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
       for (const k of MO_SW) if (S[k] === undefined) S[k] = PRESETS[S.preset] ? PRESETS[S.preset][k] : (k === 'cloudShadow' ? +((S.clouds | 0) >= 2) : 1);   // (settings saved before t-motion follow their preset)
+      if (key !== '*' && MAT_SW.includes(key)) S.preset = 'custom';   // (t-material: the gloss tier)
       if (S.horizon === undefined) S.horizon = PRESETS[S.preset] ? PRESETS[S.preset].horizon : 2;
       if (S.sunShadows === undefined) S.sunShadows = true;
       if (S.sharpen === undefined) S.sharpen = true;
@@ -166,6 +177,7 @@
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
+      if (r) { const qb = r.qBase || (r.qBase = {}); qb.pbr = S.pbr === undefined ? (S.lite ? 0 : 1) : Math.max(0, Math.min(2, S.pbr | 0)); qb.texHi = !!S.texHi && !S.lite; }   // t-material: the gloss tier (renderer: the PBR / SSR defines), the hero textures (TEXHI)
       if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite, motion: !!S.motion, cloudShadow: !!S.cloudShadow, wxDrama: !!S.wxDrama });   // (t-motion: motion · cloudShadow · wxDrama) (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
       if (this.world) { const wp = this.propMask(); if (this.world.smoothProps !== wp) { this.world.smoothProps = wp; this.remeshAll(); } }   // the anchors come with the mesh: a change remeshes
       if (this.world && (this.world.motion | 0) !== (S.motion ? 1 : 0)) { this.world.motion = S.motion ? 1 : 0; this.remeshAll(); }   // (t-motion: the hung pieces' sway levels come with the mesh)
@@ -188,6 +200,25 @@
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
       if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
       this.applyLook();
+      if (this.loadTexHi) this.loadTexHi();   // t-material · hero textures: switched on (or the first start with them): the set is fetched once
+    }
+    // t-material · hero textures (tex_hi.js): the 64 × 64 set of the most-seen materials, from the texture cache or forged in
+    // a worker (in the background: the game plays on with the 32 × 32 set meanwhile), then uploaded; once a session
+    loadTexHi() {
+      const r = this.renderer, HI = VR.TexHi;
+      if (!r || !r.texHiMap || !HI || !r.q.texHi || r.q.lite || this.texHiBusy || r.texHiN || !this.pool) return;
+      this.texHiBusy = true;
+      const t0 = performance.now(), key = VR.TexCache ? VR.TexCache.key({ hi: 1, bevel: 1 }) : null;
+      const done = (tex, cached) => {
+        this.texHiBusy = false;
+        if (!tex || tex.type !== 'texhi') { this.texHiErr = (tex && (tex.err || tex.msg)) || 'none'; return; }
+        if (r.uploadTexHi(tex)) { this.texHiMs = Math.round(performance.now() - t0); this.texHiFromCache = cached; this.texHiForgeMs = tex.ms || 0; }
+      };
+      (key ? VR.TexCache.get(key) : Promise.resolve(null)).then((tex) => {
+        if (tex) { done(tex, true); return; }
+        const wi = this.pool.workers.length > 1 ? 1 : 0;
+        this.pool.direct(wi, { type: 'texhi', bevel: 1 }, null, (t) => { if (t && t.type === 'texhi' && key) VR.TexCache.put(key, t); done(t, false); });
+      });
     }
     // ---------------------------------------------------------------- the block look (v0.39)
     // Klassisch / Nahtlos (Settings → Graphics → Blöcke, /look): the registry flags here and in every worker, a re-mesh,
@@ -1184,6 +1215,7 @@
       this.particles.update(dt, eye);
       if (this.renderer && this.renderer.q && this.renderer.q.lampGlow) this.particles.lampGlows(dt, eye, E.night || 0);
       this.waterFx(dt, p, eye, underwater, inLava, E);
+      if (VR.Wet && VR.Wet.drips) VR.Wet.drips(this, dt);   // t-material: drops from the eaves while the roofs are wet (wet.js)
       if (this.trails) this.trails.update(dt);
       if (this.vents) this.vents.update(dt, eye);
       // camera

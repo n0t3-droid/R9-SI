@@ -100,6 +100,16 @@
       const famBytes = new Uint8Array((tex.layers + 3) & ~3);
       if (VR.R && VR.R.texNames && VR.matFamilies && VR.R.texNames.length === tex.layers) famBytes.set(VR.matFamilies(VR.R.texNames));
       this.texFam = GL.tex2D(tex.layers, 1, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: famBytes, wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
+      // t-material: the PBR-lite material table (tex_pbr.js), four bytes a layer: metal, clear coat, roughness scale, flags
+      const pbrBytes = new Uint8Array(tex.layers * 4).fill(0); for (let l = 0; l < tex.layers; l++) pbrBytes[l * 4 + 2] = 128;
+      if (VR.R && VR.R.texNames && VR.PBR && VR.R.texNames.length === tex.layers) pbrBytes.set(VR.PBR.row(VR.R.texNames).subarray(0, tex.layers * 4));
+      this.texPbr = GL.tex2D(tex.layers, 1, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: pbrBytes, wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
+      // t-material · hero textures (tex_hi.js): the table (a layer's hero + 1) all 0 and a one-texel set until the 64 × 64 set
+      // comes from the worker or the cache (uploadTexHi) — the TEXHI programs then read it; the others never bind it
+      this.texHiMap = GL.tex2D(tex.layers, 1, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: new Uint8Array((tex.layers + 3) & ~3), wrap: gl.CLAMP_TO_EDGE, filter: gl.NEAREST });
+      this.texHiAlb = this.texHiArray({ size: 1, levels: 1, layers: 1, albedo: [new Uint8Array([128, 128, 128, 0])] }, 'albedo', true);
+      this.texHiMat = this.texHiArray({ size: 1, levels: 1, layers: 1, material: [new Uint8Array([128, 128, 217, 0])] }, 'material', false);
+      this.texHiN = 0;
       // height texture for precipitation occlusion (128x128 R8)
       this.heightData = new Uint8Array(128 * 128);
       this.texHeights = GL.tex2D(128, 128, gl.R8, gl.RED, gl.UNSIGNED_BYTE, { data: this.heightData, filter: gl.NEAREST });
@@ -126,7 +136,32 @@
       const gl = this.gl, ext = GL.ext.aniso;
       if (!ext) return;
       const mx = gl.getParameter(ext.MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-      for (const t of [this.texAlbedo, this.texMaterial]) { gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texParameterf(gl.TEXTURE_2D_ARRAY, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mx, level)); }
+      for (const t of [this.texAlbedo, this.texMaterial].concat(this.texHiN ? [this.texHiAlb, this.texHiMat] : [])) { gl.bindTexture(gl.TEXTURE_2D_ARRAY, t); gl.texParameterf(gl.TEXTURE_2D_ARRAY, ext.TEXTURE_MAX_ANISOTROPY_EXT, Math.min(mx, level)); }
+    }
+    // t-material · hero textures: one array of the 64 × 64 set (or the one-texel stand-in), filtered as the block textures
+    texHiArray(tex, which, srgb) {
+      const gl = this.gl, t = gl.createTexture(), lv = tex[which];
+      gl.bindTexture(gl.TEXTURE_2D_ARRAY, t);
+      gl.texStorage3D(gl.TEXTURE_2D_ARRAY, tex.levels, srgb ? gl.SRGB8_ALPHA8 : gl.RGBA8, tex.size, tex.size, tex.layers);
+      for (let i = 0; i < tex.levels; i++) { const n = tex.size >> i; gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, i, 0, 0, 0, n, n, tex.layers, gl.RGBA, gl.UNSIGNED_BYTE, lv[i]); }
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, tex.levels > 1 ? gl.NEAREST_MIPMAP_LINEAR : gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl.REPEAT);
+      return t;
+    }
+    // the 64 × 64 set from the worker or the cache: its arrays replace the stand-in, the table names each hero's layer
+    uploadTexHi(tex) {
+      const gl = this.gl, R = VR.R, HI = VR.TexHi;
+      if (!gl || !tex || tex.type !== 'texhi' || !HI || !R || !R.texNames || R.texNames.length !== this.layers || !this.texHiMap) return false;
+      const alb = this.texHiArray(tex, 'albedo', true), mat = this.texHiArray(tex, 'material', false);
+      gl.deleteTexture(this.texHiAlb); gl.deleteTexture(this.texHiMat);
+      this.texHiAlb = alb; this.texHiMat = mat; this.texHiN = tex.layers;
+      const map = new Uint8Array((this.layers + 3) & ~3); map.set(HI.map(R.texNames, tex.names));
+      gl.bindTexture(gl.TEXTURE_2D, this.texHiMap); gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, this.layers, 1, gl.RED, gl.UNSIGNED_BYTE, map);
+      this.texHiBytes = HI.bytes(tex.layers);
+      if (this.anisoLevel) this.setAniso(this.anisoLevel);
+      return true;
     }
     buildPrograms() {
       const md = this.multi ? ['MULTIDRAW'] : [];
@@ -134,12 +169,14 @@
       const P = this.P = {};
       const bindUBO = (p) => { if (this.multi) { const gl = this.gl; const bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); } return p; };
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE']));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [])));   // (F10 · zPre: invariant positions)
-      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE']));
-      P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL']);
-      P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT']);
-      P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL']);
+      const pb = VR.PBR ? VR.PBR.defines(this.q) : [];   // t-material: PBR (tier ≥ 1), SSR (tier 2); none on the lite look (Very Low)
+      const th = this.q.texHi && !this.q.lite ? ['TEXHI'] : [];   // t-material · hero textures (Balanced and up; never Very Low)
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb, ...th]));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb, th)));   // (F10 · zPre: invariant positions)
+      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE', ...pb]));
+      P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
+      P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT', ...pb.filter(d => d !== 'SSR')]);
+      P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
       P.shadow = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadow', [...md]));
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
       P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky', (this.q.lite ? ['LITE'] : []).concat(this.q.wxDrama ? ['WXDRAMA'] : []).concat(this.q.motion ? ['MOTION'] : []));   // LITE: two-octave nebula, no dust (Very Low) · WXDRAMA (t-motion): the storm's side, the bolt, the rainbow
@@ -431,8 +468,10 @@
       const prevSh = !!this.q.shadows, prevH = !!this.q.hshadow, prevScale = this.q.scale, prevSize = this.q.shadows, prevLite = !!this.q.lite;
       const prevZ = !!this.q.zPre, prevT = !!this.q.texLite;   // (F10 · zPre: its own program define; texLite: the sampler)
       const prevM = !!this.q.motion, prevD = !!this.q.wxDrama, prevC = !!this.q.cloudShadow;   // (t-motion: the MOTION, WXDRAMA and CLOUDSH defines)
+      const prevPbr = this.q.pbr | 0, prevHi = !!this.q.texHi;   // (t-material: the gloss tier and the hero textures are program defines)
       Object.assign(this.q, this.qBase || {}, this.qOver || {});
-      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.motion !== prevM || !!this.q.wxDrama !== prevD || !!this.q.cloudShadow !== prevC) this.buildPrograms();
+      this.q.ssr = (this.q.pbr | 0) >= 2 && !this.q.lite;   // (t-material: the screen-space mirror comes with gloss tier 2)
+      if (!!this.q.shadows !== prevSh || !!this.q.hshadow !== prevH || !!this.q.lite !== prevLite || !!this.q.zPre !== prevZ || !!this.q.motion !== prevM || !!this.q.wxDrama !== prevD || !!this.q.cloudShadow !== prevC || (this.q.pbr | 0) !== prevPbr || !!this.q.texHi !== prevHi) this.buildPrograms();
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
@@ -477,6 +516,7 @@
       }
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
       sec.transW = this.transWaterOf(trans);   // (F10 · postLite: water or aether among its translucent faces)
+      sec.transG = this.transGlassOf(trans);   // (t-material: glass among them — the window panes read the copy on High)
       sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
       this.visDirty = true;
       this.nearShadow(sec);
@@ -521,6 +561,7 @@
       sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
       sec.transW = this.transWaterOf(st.d[2]);   // (F10 · postLite: water or aether among its translucent faces)
+      sec.transG = this.transGlassOf(st.d[2]);   // (t-material)
       sec.ox = col.cx * 16; sec.oy = sy * 16; sec.oz = col.cz * 16;
       this.visDirty = true;
       this.nearShadow(sec);
@@ -840,6 +881,14 @@
       gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, this.texNoise); if (p.u.u_noise) gl.uniform1i(p.u.u_noise, 2);
       if (p.u.u_avgLum && this.texAvgLum) { gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, this.texAvgLum); gl.uniform1i(p.u.u_avgLum, 7); }
       gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, this.texFam); if (p.u.u_fam) gl.uniform1i(p.u.u_fam, 4);
+      if (p.u.u_pbr && this.texPbr) { gl.activeTexture(gl.TEXTURE10); gl.bindTexture(gl.TEXTURE_2D, this.texPbr); gl.uniform1i(p.u.u_pbr, 10); }   // (t-material: the material table)
+      if (p.u.u_hiMap && this.texHiMap) {   // (t-material · hero textures: the 64 × 64 set and its table)
+        // (units 11, 13, 15: t-light2 reads its contact shadows on unit 12 and t-motion the cloud shadows on 14 in these
+        //  same programs — one unit, one sampler type)
+        gl.activeTexture(gl.TEXTURE11); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texHiAlb); if (p.u.u_albedoHi) gl.uniform1i(p.u.u_albedoHi, 11);
+        gl.activeTexture(gl.TEXTURE15); gl.bindTexture(gl.TEXTURE_2D_ARRAY, this.texHiMat); if (p.u.u_materialHi) gl.uniform1i(p.u.u_materialHi, 15);
+        gl.activeTexture(gl.TEXTURE13); gl.bindTexture(gl.TEXTURE_2D, this.texHiMap); gl.uniform1i(p.u.u_hiMap, 13);
+      }
       if (p.u.u_shadowMap) { gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, this.shadowRead || this.shadowTex); gl.uniform1i(p.u.u_shadowMap, 3); }
       if (p.u.u_holoLayer) { if (this.holoLayer === undefined) this.holoLayer = (VR.R && VR.R.texIndex && VR.R.texIndex['vx_holo']) || 0; gl.uniform1f(p.u.u_holoLayer, this.holoLayer); }
       if (p.u.u_hmap && this.hmapTex) {
@@ -1855,6 +1904,23 @@
       for (let i = 5; i < d.length; i += 8) { const k = (d[i] >> 8) & 7; if (k === 1 || k === 6 || k === 7) return true; }
       return false;
     }
+    // t-material: does a translucent layer hold glass (the mesher's kind 0: panes, stained glass, VX glass) — once per upload
+    transGlassOf(d) {
+      if (!d) return false;
+      for (let i = 5; i < d.length; i += 8) if (((d[i] >> 8) & 7) === 0) return true;
+      return false;
+    }
+    // t-material: glass in this frame's view (as waterInView)
+    glassInView(vis) {
+      const cam = this.cam, P = this.planes;
+      for (let i = 0; i < vis.length; i++) {
+        const s = vis[i];
+        if (!s.transG || !s.mesh[2] || (s.fade !== undefined && s.fade <= 0)) continue;
+        const ox = s.ox - cam.x, oy = s.oy - cam.y, oz = s.oz - cam.z;
+        if (mat4.boxInFrustum(P, ox, oy, oz, ox + 16, oy + 16, oz + 16)) return true;
+      }
+      return false;
+    }
     // water or aether in this frame's view (a visible section with such a translucent layer inside the frustum)
     waterInView(vis) {
       const cam = this.cam, P = this.planes;
@@ -1882,7 +1948,7 @@
     refrCopy(F, E, vis) {
       const gl = this.gl;
       let col = true, dep = true;
-      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy / plRays false: one part off, for the measurement)
+      if (this.q.postLite && this.q.plCopy !== false) { col = this.waterInView(vis) || ((this.q.pbr | 0) >= 2 && this.glassInView(vis)); dep = col || !!this.jit || this.raysAt(F, E) > 0.02; }   // (plCopy / plRays false: one part off, for the measurement; t-material: the window panes read it on High)
       this.copied = col;
       if (!col && !dep) return;
       const n = this.w * this.h, sb = this.sceneFmt().bytes;
@@ -1916,6 +1982,62 @@
       gl.uniform1f(p.u.u_raysStrength, strength);
       this.fsMark('rays', rw, rh, rw * rh * sb, rw * rh * sb, rw * rh * 28);
       this.fs(p);
+    }
+    // ---- t-material · the screen-space mirror (plan 2026-10-15-t-material.md, step 2; gloss tier 2 = High and up). The
+    // terrain draws into its own framebuffer — the scene's colour and depth and a second target (RGBA8: the normal, the
+    // mirror's weight and roughness), so no other pass ever writes that target; ssrPass then marches the reflected rays at
+    // half size and mixes the hits into the scene by the full-size weight. Off: nothing is made, nothing is drawn.
+    ssrFree() {
+      const gl = this.gl, S = this.ssr; if (!S) return;
+      for (const f of [S.mrtFB, S.fb, S.applyFB]) if (f) gl.deleteFramebuffer(f);
+      for (const t of [S.mat, S.tex]) if (t) gl.deleteTexture(t);
+      this.ssr = null;
+    }
+    ssrBegin() {
+      const gl = this.gl;
+      this.ssrOn = false;
+      // (a driver that cannot draw into the two targets: the mirror stays off for this scene format — not built and thrown
+      //  away again every frame; a new format tries once more)
+      if (!this.q.ssr || !this.sceneFB || this.ssrBroken === this.sceneFmt().name) { if (this.ssr) this.ssrFree(); return false; }
+      let S = this.ssr;
+      if (!S || S.col !== this.sceneCol || S.w !== this.w || S.h !== this.h || S.fmt !== this.sceneFmt().name) {
+        this.ssrFree();
+        const w = this.w, h = this.h, hw = Math.max(1, w >> 1), hh = Math.max(1, h >> 1), hdr = this.hdr;
+        const mat = GL.tex2D(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { filter: gl.NEAREST });
+        const tex = GL.tex2D(hw, hh, hdr ? gl.RGBA16F : gl.RGBA8, gl.RGBA, hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, { filter: gl.LINEAR });
+        S = this.ssr = { col: this.sceneCol, w, h, hw, hh, fmt: this.sceneFmt().name, mat, tex, mrtFB: GL.fbo([this.sceneCol, mat], this.sceneDepth), fb: GL.fbo([tex]), applyFB: GL.fbo([this.sceneCol]) };
+        if (!S.mrtFB || !S.fb || !S.applyFB) { this.ssrFree(); this.ssrBroken = S.fmt; return false; }
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.mrtFB);
+      gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]);
+      this.ssrOn = true;
+      return true;
+    }
+    ssrPass(F, E) {
+      const gl = this.gl, S = this.ssr, P = this.P, t0 = performance.now();
+      if (!S) return;
+      if (!P.ssr) { P.ssr = GL.program(VR.SHADERS.FS_VS, VR.SHADERS.SSR_FS, 'ssr'); P.ssrApply = GL.program(VR.SHADERS.FS_VS, VR.SHADERS.SSR_APPLY_FS, 'ssrApply'); }
+      gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
+      // the march, half size
+      let p = P.ssr; gl.useProgram(p.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.fb); gl.viewport(0, 0, S.hw, S.hh);
+      this.tex(0, this.sceneDepth, p.u.u_depth); this.tex(1, S.mat, p.u.u_mat); this.tex(2, this.sceneCol, p.u.u_color);
+      gl.uniformMatrix4fv(p.u.u_vp, false, this.viewProj); gl.uniformMatrix4fv(p.u.u_invVP, false, this.invViewProj);
+      gl.uniform2f(p.u.u_nearFar, 0.06, (F.cam && F.cam.far) || 1200);
+      const sb = this.sceneFmt().bytes, n = this.w * this.h, hn = S.hw * S.hh;
+      this.fsMark('ssr', S.hw, S.hh, hn * (4 + 4) + hn * 17 * 4 + hn * sb, hn * (this.hdr ? 8 : 4), hn * 18);
+      this.fs(p);
+      // the apply, full size over the scene's colour
+      p = P.ssrApply; gl.useProgram(p.p);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, S.applyFB); gl.viewport(0, 0, this.w, this.h);
+      this.tex(0, S.mat, p.u.u_mat); this.tex(1, S.tex, p.u.u_ssr);
+      gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      this.fsMark('ssrApply', this.w, this.h, n * 4 + hn * (this.hdr ? 8 : 4), n * sb);
+      this.fs(p);
+      gl.disable(gl.BLEND);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, this.w, this.h);
+      gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+      this.stats.ssr = { ms: +(performance.now() - t0).toFixed(2), w: S.hw, h: S.hh };
     }
     tex(unit, t, loc) { const gl = this.gl; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); if (loc) gl.uniform1i(loc, unit); }
 
@@ -1969,9 +2091,10 @@
       if (this.q.cloudShadow) this.updateCloudShadow(E, F.cam);   // (t-motion: the clouds' shadow mask)
       // terrain opaque + cutout
       if (world) {
+        const ssr = this.ssrBegin();   // t-material: on High the terrain writes the mirror's second target too (ssrPass)
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
           this.gpuPass(layer === 0 ? 'opaque' : 'cutout');
-          if (layer === 1 && this.zCount) this.zCountPass(near, E, camPos);   // (test hook: test/ipu.mjs)
+          if (layer === 1 && this.zCount) { this.zCountPass(near, E, camPos); if (ssr) gl.bindFramebuffer(gl.FRAMEBUFFER, this.ssr.mrtFB); }   // (test hook: test/ipu.mjs; t-material: back to the mirror's framebuffer)
           if (layer === 1 && this.q.zPre) { this.gpuPass('zpre'); this.zPrepass(near, E, camPos); this.gpuPass('cutout'); }   // (F10 · zPre)
           gl.useProgram(p.p);
           this.common(p, E);
@@ -2000,6 +2123,7 @@
           }
           gl.enable(gl.CULL_FACE);
         }
+        if (ssr) { this.gpuPass('ssr'); this.ssrPass(F, E); }   // (t-material: the screen-space mirror, right after the terrain)
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
       if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.liveProps(E, camPos, fc); }
@@ -2038,6 +2162,7 @@
         gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
         if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
         if (p.u.u_underwater) gl.uniform1f(p.u.u_underwater, F.underwater ? 1 : 0);
+        if (p.u.u_glassRefr) gl.uniform1f(p.u.u_glassRefr, (this.q.pbr | 0) >= 2 && this.copied ? 1 : 0);   // (t-material: the panes filter the copy)
         if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
         if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
         this.shadowOffUni(p.u);

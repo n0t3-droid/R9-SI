@@ -1,0 +1,201 @@
+// t-material · PBR-lite (plan docs/superpowers/plans/2026-10-15-t-material.md, step 1), no browser:
+//  a · the material table (tex_pbr.js): name → metal, clear coat, roughness scale, flags for the materials the frames show
+//      glossy (marble, the plaza's gloss tiles, the hall's white stone, the hulls, varnished wood, metals, window panes)
+//      and the ones that stay matte (grass, soil, sand, cloth, leaves); every layer has its four bytes
+//  b · the painter's outputs: the mean roughness it writes for those materials (the per-texel detail the table scales)
+//  c · the programs' defines: none of the new code on the lite look (Very Low), PBR from tier 1, SSR from tier 2
+//  d · the presets, the settings row and its texts; applySettings hands the tier to the renderer; a change by hand makes
+//      the preset „Eigene"
+//  e · the shader text: the gloss code sits behind #ifdef PBR in the terrain programs
+//   bash test/wt_run.sh material.js 300
+require('./dom_stub.js');
+const V = require('./load_shared.js');
+for (const f of ['tex_core', 'tex_recipes1', 'tex_recipes2', 'tex_recipes3', 'tex_recipes4', 'tex_recipes5', 'tex_recipes6', 'tex_items', 'tex_groceries', 'tex_vox', 'tex_layout', 'tex_mat', 'tex_build', 'tex_pbr']) require('../src/main/' + f + '.js');
+require('../src/main/i18n.js'); require('../src/main/lang_en.js'); require('../src/main/lang_de.js');
+require('../src/main/settings_reg.js');
+require('../src/main/bench.js'); require('../src/main/ultralite.js'); require('../src/main/ipu.js');
+require('../src/main/game.js');
+require('../src/main/shaders.js');
+let fails = 0;
+const check = (ok, msg, info) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg + (info !== undefined ? '  (' + info + ')' : '')); };
+const R = V.R, P = V.PBR, names = R.texNames, L = names.length;
+
+console.log('a · the material table');
+{
+  const of = (n) => P.of(n), fmt = (n) => { const m = of(n); return `${n}: metal ${m.metal} coat ${m.coat} rk ${m.rk} flags ${m.flags}`; };
+  const glossy = ['marble_white', 'travertine', 'quartz_bricks', 'polished_andesite', 'vx_tile_gloss', 'vx_smooth_gloss', 'vollton_gloss', 'porcelain_tile', 'vx_mat_marble'];
+  check(glossy.every(n => names.includes(n) && of(n).coat >= 0.5 && of(n).metal === 0), 'polished stone, the gloss tiles and the VX lacquer carry a clear coat ≥ 0.5, no metal', glossy.map(fmt).join(' · '));
+  const metals = ['block:gold', 'block:iron', 'copper:block:0', 'vx_mat_metal', 'mod_steel'];
+  check(metals.every(n => names.includes(n) && of(n).metal >= 0.9), 'the metal blocks and the brushed steel are metal', metals.map(fmt).join(' · '));
+  const hulls = ['hull:white', 'hull:gray', 'hull_stripe:orange'];
+  check(hulls.every(n => names.includes(n) && of(n).coat >= 0.6 && of(n).metal < 0.5), 'the hulls are painted metal under a lacquer', hulls.map(fmt).join(' · '));
+  check(['oak_herringbone', 'vx_mat_wood'].every(n => names.includes(n) && of(n).coat >= 0.4), 'parquet and the furniture wood are varnished', fmt('oak_herringbone'));
+  const matte = names.filter(n => /^(grass_top|grass_side|dirt|sand|gravel|podzol)$|^leaves:|^wool:|^short_grass|^flower:/.test(n));
+  check(matte.length >= 20 && matte.every(n => of(n).coat === 0 && of(n).metal === 0 && of(n).rk >= 1), `the ground, the leaves, the flowers and the wool stay matte (${matte.length} layers)`, matte.slice(0, 6).map(fmt).join(' · '));
+  check(['planks:oak', 'stone', 'cobblestone', 'bricks', 'stucco_white'].every(n => of(n).coat === 0 && of(n).metal === 0), 'rustic planks, stone, cobble, bricks and stucco keep their own (rough) look');
+  const wins = ['ctm:white:0', 'window_black', 'vx_glass', 'stained_glass:blue'].filter(n => names.includes(n));
+  check(wins.length >= 3 && wins.every(n => (of(n).flags & P.WIN) && of(n).coat === 1), 'window panes glow at night (the flag) and are smooth', wins.map(fmt).join(' · '));
+  check(['glass_rail', 'frosted_glass', 'glass'].every(n => !(of(n).flags & P.WIN) && (of(n).flags & P.GLASS)), 'railings, frosted and plain glass are glass that does not glow');
+  check(['item:quartz', 'ore:gold:stone'].every(n => of(n).metal === 0 && of(n).coat === 0), 'items and ores take nothing');
+  // (run 4: Weißstadt's hall floor — grey pavers — stayed matte. Honed pavers: a soft polish over the rough stone, its own
+  //  roughness in the flags' upper four bits; polished stone keeps the sharp coat, glass its flags in the lower bits)
+  const hon = ['paver_grey', 'granite_paver'];
+  check(hon.every(n => names.includes(n) && of(n).coat >= 0.35 && of(n).coat <= 0.5 && Math.abs(of(n).cr - 0.32) < 0.02 && P.crBits(of(n).cr) === 8), 'the hall\'s grey and granite pavers are honed: a soft polish (coat 0.35–0.5, its roughness 0.32 → bits 8)', hon.map(n => `${fmt(n)} cr ${of(n).cr}`).join(' · '));
+  check(['marble_white', 'travertine', 'vx_tile_gloss', 'hull:white'].every(n => P.crBits(of(n).cr) === 0) && P.crBits(undefined) === 0 && P.crBits(0.08 + 15 * 0.03) === 15 && P.crBits(2) === 15, 'polish, gloss tiles and hulls keep the sharp coat (bits 0); the bits clamp to 0–15');
+  const row = P.row(names);
+  let ok = row.length >= L * 4;
+  for (let l = 0; l < L && ok; l++) { const m = P.of(names[l]); if (row[l * 4] !== Math.round(m.metal * 255) || row[l * 4 + 1] !== Math.round(m.coat * 255) || row[l * 4 + 3] !== ((m.flags & 15) | (P.crBits(m.cr) << 4))) ok = false; }
+  check(ok, `every layer has its four bytes in the row (${L} layers, ${row.length} bytes): metal, coat, the roughness scale, the flags | the coat's roughness << 4`);
+  const iP = names.indexOf('paver_grey'), iG = names.indexOf('vx_glass');
+  check(row[iP * 4 + 3] === 128 && (row[iG * 4 + 3] & 15) === (P.WIN | P.GLASS | P.TINTED) && (row[iG * 4 + 3] >> 4) === 0, 'the bytes: the pavers 8 << 4, a window pane its flags 1 | 2 | 4 below', `${row[iP * 4 + 3]} · ${row[iG * 4 + 3]}`);
+  const nCoat = names.filter(n => P.of(n).coat > 0).length, nMetal = names.filter(n => P.of(n).metal > 0).length;
+  console.log(`     ${nCoat} layers with a coat, ${nMetal} metallic, ${L - nCoat - nMetal} as before`);
+}
+
+console.log('b · the painter\'s outputs');
+{
+  const want = ['marble_white', 'vx_tile_gloss', 'hull:white', 'quartz_bricks', 'travertine', 'grass_top', 'dirt', 'sand', 'wool:white', 'vx_smooth_gloss'];
+  const sub = want.filter(n => names.includes(n));
+  const out = V.buildTextureArrays({ names: sub, cubeMask: new Uint8Array(sub.length).fill(1), bevel: 1, bevelAll: false, classic: false });
+  const N = out.size, mean = {};
+  sub.forEach((n, l) => { let s = 0; const m = out.material[0], b = l * N * N * 4; for (let i = 0; i < N * N; i++) s += m[b + i * 4 + 2]; mean[n] = +(s / N / N / 255).toFixed(3); });
+  console.log('     mean roughness', JSON.stringify(mean));
+  check(mean.marble_white <= 0.2 && mean.vx_tile_gloss <= 0.35 && mean['hull:white'] <= 0.4 && mean.vx_smooth_gloss <= 0.3, 'the painter writes marble, the gloss tiles, the VX lacquer and the hull smooth');
+  check(mean.quartz_bricks <= 0.5 && mean.travertine <= 0.45, 'the hall\'s white stone is honed (≤ 0.5)');
+  check(['grass_top', 'dirt', 'sand'].every(n => mean[n] >= 0.85) && mean['wool:white'] >= 0.9, 'grass, soil and sand ≥ 0.85, wool ≥ 0.9 (matte)');
+  const eff = (n) => Math.min(1, mean[n] * P.of(n).rk);
+  check(['grass_top', 'dirt', 'sand', 'wool:white'].every(n => eff(n) >= 0.93), 'and the table makes them rougher still (≥ 0.93: the shader skips their gloss)', ['grass_top', 'dirt', 'sand', 'wool:white'].map(n => n + ' ' + eff(n).toFixed(2)).join(', '));
+}
+
+console.log('c · the programs\' defines');
+{
+  const d = P.defines;
+  check(d({ lite: true, pbr: 2 }).length === 0, 'the lite look (Very Low) gets none of the new code, whatever the tier');
+  check(d({ pbr: 0 }).length === 0 && d({}).length === 0, 'tier 0: none');
+  check(JSON.stringify(d({ pbr: 1 })) === '["PBR"]' && JSON.stringify(d({ pbr: 2 })) === '["PBR","SSR"]', 'tier 1: PBR; tier 2: PBR and SSR');
+}
+
+console.log('d · the presets, the settings row, applySettings');
+{
+  const G = V.Game, PR = G.PRESETS, proto = G.prototype;
+  const tiers = ['potato', 'low', 'balanced', 'high', 'ultra', 'ultraLite'].map(p => PR[p].pbr);
+  check(JSON.stringify(tiers) === '[0,1,1,2,2,2]', 'the tiers: Very Low 0, Low 1, Balanced 1, High 2, Ultra 2, Ultra · Leicht 2', JSON.stringify(tiers));
+  const it = V.Settings.byKey('pbr');
+  check(!!it && it.t === 'slider' && it.min === 0 && it.max === 2 && it.cost === 'mid' && it.sec === 'light', 'a slider 0–2 in Bild · Licht, cost 🟡', it && JSON.stringify({ t: it.t, min: it.min, max: it.max, cost: it.cost, sec: it.sec }));
+  const I = V.I18N;
+  for (const lang of ['de', 'en']) {
+    I.lang = lang;
+    const d = I.dict[lang] || {}, lab = d[it.lab], tip = d[it.tip], vals = d[it.vals];
+    check(typeof lab === 'string' && typeof tip === 'string' && Array.isArray(vals) && vals.length === 3, `its label, tip and three values in ${lang}`, `${lab} — ${tip} — ${vals}`);
+  }
+  const r = { qBase: null, set: null, setQuality(q) { this.set = Object.assign({}, this.qBase || {}, q); this.qBase = Object.assign(this.qBase || {}, q); }, setOverride() {} };
+  const g = { settings: Object.assign({}, PR.high, { preset: 'high' }), renderer: r, applySettings: proto.applySettings, saveSettings() {}, applyLook() {}, aqApply() {}, propMask: proto.propMask, ipuDefaults: proto.ipuDefaults };
+  g.applySettings('*');
+  check(r.set && r.set.pbr === 2, 'applySettings hands the tier to the renderer', r.set && r.set.pbr);
+  g.settings.pbr = 1; g.applySettings('pbr');
+  check(r.set.pbr === 1 && g.settings.preset === 'custom', 'a tier chosen by hand reaches the renderer and makes the preset „Eigene"', g.settings.preset);
+}
+
+console.log('e · the shader text');
+{
+  const S = V.SHADERS, fs = S.TERRAIN_FS;
+  check(/#ifdef PBR[\s\S]*uniform sampler2D u_pbr;/.test(fs), 'the terrain shader reads the table only with PBR (u_pbr)');
+  check(/#if defined\(PBR\)[\s\S]*pbrShade\(/.test(fs) && /#elif !defined\(LITE\)/.test(fs), 'the gloss replaces the old highlight with PBR; without it the old highlight stays (not on LITE)');
+  const fsPbr = fs.indexOf('vec3 pbrShade(');
+  // the stack of the open #if… at a place in the text (nested blocks such as #ifdef SSR close before it)
+  const openAt = (src, pos) => { const st = []; for (const line of src.slice(0, pos).split('\n')) { const t = line.trim();
+    if (/^#if/.test(t)) st.push(t); else if (/^#endif/.test(t)) st.pop(); } return st; };
+  check(fsPbr > 0 && openAt(fs, fsPbr).includes('#ifdef PBR'), 'pbrShade lives inside #ifdef PBR', fsPbr > 0 ? openAt(fs, fsPbr).join(' · ') : 'none');
+}
+
+console.log('f · glass and the light lines');
+{
+  const S = V.SHADERS, ts = S.TRANS_FS, i = ts.indexOf('t-material · glass'), j = ts.lastIndexOf('#ifdef PBR', i);
+  check(i > 0 && j > ts.lastIndexOf('#endif', i) && /u_glassRefr/.test(ts.slice(i)) && /glowK/.test(ts.slice(i)), 'the glass shading (Fresnel sky and sun, the filter through the copy, the night windows) sits behind #ifdef PBR');
+  // the light lines' block light: the paving two blocks beside a line is washed in its colour (it was not)
+  const R = V.R, T = R.T, line = R.byName.vx_floor_plaza_line, amber = R.byName.vx_floor_plaza_line_amber, pave = R.byName.vx_floor_plaza.defaultState;
+  const nib = (e) => [(e >> 8) & 15, (e >> 4) & 15, e & 15];
+  check(JSON.stringify(nib(T.emit[line.defaultState])) === '[0,7,9]' && JSON.stringify(nib(T.emit[amber.defaultState])) === '[9,5,1]', 'the cyan line emits [0, 7, 9], the amber [9, 5, 1]', `${nib(T.emit[line.defaultState])} · ${nib(T.emit[amber.defaultState])}`);
+  const col = new Uint16Array(65536);
+  for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) col[(80 << 8) | (z << 4) | x] = x === 8 ? line.defaultState : pave;
+  const light = V.computeColumnLight(col, true), at = (x, y, z) => nib(light[(y << 8) | (z << 4) | x]);
+  const a1 = at(9, 81, 8), a2 = at(10, 81, 8), a3 = at(11, 81, 8);
+  check(a1[2] >= 7 && a2[2] >= 6 && a3[2] >= 5, 'the air over the paving one, two, three blocks beside the line holds its light (blue ≥ 7, 6, 5)', `${a1} · ${a2} · ${a3}`);
+  // the flood's cost in the workers: a column of paving with sixteen lines, the new emission against the old
+  const old = T.emit[line.defaultState]; const cpu = (f, n) => { let best = 1e9; for (let r = 0; r < 5; r++) { const c0 = process.cpuUsage(); for (let k = 0; k < n; k++) f(); const c1 = process.cpuUsage(c0); best = Math.min(best, (c1.user + c1.system) / 1000 / n); } return best; };
+  const many = new Uint16Array(65536); for (let x = 0; x < 16; x++) for (let z = 0; z < 16; z++) many[(80 << 8) | (z << 4) | x] = (x % 4 === 0) ? line.defaultState : pave;
+  const tNew = cpu(() => V.computeColumnLight(many, true), 20);
+  T.emit[line.defaultState] = (0 << 8) | (3 << 4) | 4; const tOld = cpu(() => V.computeColumnLight(many, true), 20); T.emit[line.defaultState] = old;
+  console.log(`     a column of paving with 64 line blocks: ${tNew.toFixed(2)} ms to light (the old emission ${tOld.toFixed(2)} ms)`);
+  check(tNew < tOld * 1.6 + 0.3, 'the brighter lines cost the workers' + "'" + ' light flood little (a worst case: a line every fourth block)', `×${(tNew / tOld).toFixed(2)}`);
+}
+
+console.log('g · the screen-space mirror (tier 2)');
+{
+  const S = V.SHADERS, fs = S.TERRAIN_FS;
+  const i = fs.indexOf('layout(location=1) out vec4 o_ssr;'), j = fs.lastIndexOf('#ifdef SSR', i);
+  check(i > 0 && j > 0 && j > fs.lastIndexOf('#endif', i), 'the terrain writes the mirror\'s second target only with SSR (tier 2)');
+  check(/o_ssr = vec4\(octEnc\(g_ssrN\)/.test(fs) && /g_ssrW = g_ssrW \* \(1.0 - Fc\) \+ Fc/.test(fs), 'the normal, the Fresnel weight (base and coat) and the roughness go into it');
+  check(/vec3 nc = normalize\(mix\(n, Ng, 0\.88 \* \(1\.0 - pud\)\)\)/.test(fs) && /if \(Fc > g_ssrW \* 0\.5\) g_ssrN = nc;/.test(fs), 'a clear coat mirrors along the smooth surface (its normal mostly the geometric one: no mottled smear from the texture\'s relief); a puddle along its own rain rings');
+  check(/float rc = mix\(0\.08 \+ float\(uint\(pb\.a \* 255\.0 \+ 0\.5\) >> 4u\) \* 0\.03, 0\.04, pud\);/.test(fs), 'the coat\'s roughness comes from the table\'s upper four bits (0.08 + 0.03 a step, as tex_pbr.js writes it); a puddle is sharp');
+  check(/float Fc = max\(\(0\.04 \+ 0\.96 \* fvc\) \* coat, pud \* 0\.48\);/.test(fs), 'a puddle mirrors at least about half of what it faces (run 4: hardly visible where one looks down at it)');
+  check(V.PBR.CR0 === 0.08 && V.PBR.CR_STEP === 0.03, 'the table and the shader agree on the coat\'s roughness steps');
+  // (run 5: the hangar's floor shimmered as a static — the weight and the ray followed the texture's relief texel by
+  //  texel, and the rays met the floor's own raised marks first)
+  check(/vec3 ns = normalize\(mix\(n, Ng, 0\.88\)\); float fs = pow5\(1\.0 - clamp\(dot\(ns, V\), 1e-3, 1\.0\)\);/.test(fs) && /g_ssrR = r; g_ssrN = ns; \}/.test(fs) && !/g_ssrN = n;/.test(fs), 'the mirror\'s weight and its ray follow the smooth surface, not the texture\'s relief');
+  check(/if \(b \* dot\(R, N\) > 0\.1\) \{/.test(S.SSR_FS), 'a plane does not see itself: a crossing less than a tenth of a block over the surface is passed and the march goes on');
+  check(typeof S.SSR_FS === 'string' && /for \(int i = 0; i < 16; i\+\+\)/.test(S.SSR_FS) && /for \(int k = 0; k < 5; k\+\+\)/.test(S.SSR_FS) && !/u_frame|h12\(/.test(S.SSR_FS), 'the march: 16 growing steps, 5 halvings at a crossing before it is judged, the same ray every frame (no jitter: no spray of lone hits)');
+  check(/textureSize\(u_ssr, 0\)/.test(S.SSR_APPLY_FS) && /m\.a \* 6\.0/.test(S.SSR_APPLY_FS) && /r\.y \* 2\.6/.test(S.SSR_APPLY_FS) && /smoothstep\(0\.25, 0\.65, s\.a\)/.test(S.SSR_APPLY_FS), 'the apply gathers the hits over a footprint that grows with the roughness, drawn out up and down the screen (a glossy floor\'s streaks)');
+  check(/smoothstep\(0.0, 0.07, e.x\)/.test(S.SSR_FS) && /dot\(R, V\)/.test(S.SSR_FS), 'it fades at the screen\'s edge and for rays back toward the eye');
+  check(typeof S.SSR_APPLY_FS === 'string' && /s.rgb \/ max\(s.a, 1e-3\)/.test(S.SSR_APPLY_FS), 'the apply mixes the half-size hit by the full-size weight');
+  // the octahedral normal's round trip (the shader's two functions, here in JS)
+  const enc = (n) => { const l = Math.abs(n[0]) + Math.abs(n[1]) + Math.abs(n[2]); let x = n[0] / l, y = n[1] / l, z = n[2] / l; if (y >= 0) return [x, z]; return [(1 - Math.abs(z)) * (x >= 0 ? 1 : -1), (1 - Math.abs(x)) * (z >= 0 ? 1 : -1)]; };
+  const dec = (e) => { let x = e[0], z = e[1], y = 1 - Math.abs(x) - Math.abs(z); if (y < 0) { const nx = (1 - Math.abs(z)) * (x >= 0 ? 1 : -1), nz = (1 - Math.abs(x)) * (z >= 0 ? 1 : -1); x = nx; z = nz; } const l = Math.hypot(x, y, z); return [x / l, y / l, z / l]; };
+  const q8 = (v) => Math.round((v * 0.5 + 0.5) * 255) / 255 * 2 - 1;
+  let worst = 0;
+  for (let k = 0; k < 2000; k++) { const a = Math.random() * 6.283, b = Math.acos(Math.random() * 2 - 1), n = [Math.sin(b) * Math.cos(a), Math.cos(b), Math.sin(b) * Math.sin(a)]; const e = enc(n).map(q8), m = dec(e); worst = Math.max(worst, Math.acos(Math.min(1, n[0] * m[0] + n[1] * m[1] + n[2] * m[2])) * 180 / Math.PI); }
+  check(worst < 1.5, 'the normal survives the 8-bit target within 1.5°', worst.toFixed(2) + '°');
+  const P = V.Game.PRESETS;
+  check(['high', 'ultra', 'ultraLite'].every(p => P[p].pbr === 2) && ['potato', 'low', 'balanced'].every(p => P[p].pbr < 2), 'it runs on High and Ultra (gloss tier 2); Balanced keeps the sky\'s reflection with its Fresnel');
+}
+
+console.log('h · the texture units of the terrain programs (the merge with t-light2 and t-motion)');
+{
+  // common() and bindTerrainTextures() bind every sampler of the terrain programs; one unit must never carry two samplers
+  // (of two types it is an error on every draw). t-light2 reads its contact shadows on unit 12 (from common()), t-motion
+  // the cloud shadows on 14, in the same programs; the folk bones' 10 is the folk program's own
+  const src = require('fs').readFileSync(__dirname + '/../src/main/renderer.js', 'utf8');
+  const body = (head) => { const a = src.indexOf(head), b = src.indexOf('\n    }\n', a); return a > 0 && b > a ? src.slice(a, b) : ''; };
+  const text = body('    common(p, E) {') + body('    bindTerrainTextures(p) {');
+  const units = {};
+  for (const m of text.matchAll(/uniform1i\(p\.u\.(u_\w+), (\d+)\)/g)) (units[m[2]] = units[m[2]] || new Set()).add(m[1]);
+  const shared = Object.entries(units).filter(([, s]) => s.size > 1).map(([u, s]) => u + ': ' + [...s].join(', '));
+  check(Object.keys(units).length >= 8 && shared.length === 0, 'every sampler the terrain programs bind has a unit of its own', shared.join(' · ') || Object.entries(units).map(([u, s]) => u + ' ' + [...s][0]).join(', '));
+  const mine = ['u_pbr', 'u_albedoHi', 'u_materialHi', 'u_hiMap'].map(n => +Object.keys(units).find(u => units[u].has(n)));
+  check(mine.every(u => u >= 0 && u < 16 && u !== 12 && u !== 14), 'the material table and the hero textures sit on units 10, 11, 15, 13 — not t-light2\'s 12, not t-motion\'s 14', mine.join(', '));
+}
+
+console.log('i · the mirror on a driver that cannot draw into its two targets');
+{
+  // a framebuffer that stays incomplete (GL.fbo answers null): the mirror is off, the frame goes on — and it is not
+  // built again every frame (the textures and the framebuffers made and thrown away 60 times a second); a new scene
+  // format (the float targets falling back to 8 bits) tries once more
+  require('../src/main/gl.js'); require('../src/main/renderer.js');
+  const G = V.GL, R0 = V.Renderer.prototype, keep = { tex2D: G.tex2D, fbo: G.fbo };
+  let made = 0, fbos = 0;
+  G.tex2D = () => ({ t: ++made }); G.fbo = () => { fbos++; return null; };
+  const glStub = new Proxy({}, { get: (o, k) => (k in o ? o[k] : (typeof k === 'string' && /^[A-Z_0-9]+$/.test(k) ? 1 : () => {})) });
+  const r = Object.create(R0);
+  Object.assign(r, { gl: glStub, q: { ssr: true }, sceneFB: {}, sceneCol: {}, sceneDepth: {}, w: 64, h: 36, hdr: false, ssr: null, fmtName: 'rgba8' });
+  r.sceneFmt = function () { return { name: this.fmtName, bytes: 4 }; };
+  const runs = []; for (let f = 0; f < 5; f++) runs.push(r.ssrBegin());
+  const made5 = made, fbos5 = fbos;
+  r.fmtName = 'r11g11b10f'; runs.push(r.ssrBegin()); r.ssrBegin();
+  G.tex2D = keep.tex2D; G.fbo = keep.fbo;
+  check(runs.every(x => x === false) && !r.ssrOn && !r.ssr, 'an incomplete framebuffer leaves the mirror off and the frame drawn without it', JSON.stringify(runs));
+  check(made5 === 2 && fbos5 === 3, 'it is tried once, not every frame (five frames: two textures, three framebuffers)', `${made5} textures, ${fbos5} framebuffers`);
+  check(made === 4 && fbos === 6, 'a new scene format tries once more', `${made} textures, ${fbos} framebuffers in all`);
+}
+
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);

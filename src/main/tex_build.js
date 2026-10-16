@@ -47,9 +47,9 @@
   // soft bevel + edge definition for cube faces (normal-mapped groove, gentle AO rim). colour false (Klassisch v2):
   // the groove only — the outline below draws the edge's colour, one crisp texel
   function stylize(img, strength, colour) {
-    const s = strength;
+    const s = strength, SC = TX.SC || 1;   // (t-material: the rim as wide on the block at 64 × 64)
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-      const e = Math.min(x, y, N - 1 - x, N - 1 - y);
+      const e = SC === 1 ? Math.min(x, y, N - 1 - x, N - 1 - y) : Math.floor(Math.min(x, y, N - 1 - x, N - 1 - y) / SC);
       if (e > 1) continue;
       const i = y * N + x;
       const k = e === 0 ? 1 : 0.4;
@@ -255,7 +255,7 @@
       if (relief && isCube && VR.matRelief) {
         const fam = VR.matFamily(names[l]);
         for (let g = 1, k = 0; k < 3 && VR.matNormalRms(mat0) < VR.MAT_MIN_RMS; k++, g *= 3) {
-          VR.matRelief(img, fam, l, g);
+          VR.matRelief(img, fam, opts.ids ? opts.ids[l] : l, g);   // (opts.ids: a subset's layer numbers in the whole set — the hero textures' relief is the one of their 32 × 32 layer)
           if (chunked) hCell = img.h.slice();
           TX.toArrays(img, alb0, mat0, 0);
           if (chunked) cellNormals(mat0, hCell, isLeaf ? 1 : 0.45);

@@ -8,7 +8,11 @@ const PAD = V.MESH_PAD || 1, PS = V.MESH_PS || 18, PSS = PS * PS;
 // the hashes moved once, with the trailer's plants (voxplants.js: seven late models): the cutout texture indices after them
 // moved up by 7 (the texture word of 36 quads in four sections); the geometry, the other streams and the colours are the
 // same, compared word by word. Before that: classic 03c11a5c64, seamless 78cb0c3268. classic: Klassisch v2 (per-block variation, the normal map turning with the tile); the gfx branch's own mesher writes exactly this — the faster mesher keeps it
-const EXPECT = { classic: '85e924f064', seamless: 'fd3e627e68' };
+// t-material (15 Oct): the plaza light-lines emit more ([0, 3, 4] → [0, 7, 9], amber [4, 2, 0] → [9, 5, 1]: they wash the paving
+// beside them in their colour) — the town scene's light words move and nothing else: 2.73 M words compared, 1 842 light
+// words in the 2 sections with its 102 line blocks, no other word, no stream of another length (scratch mesh_proof.js,
+// plan 2026-10-15-t-material.md). Before: classic 85e924f064, seamless fd3e627e68.
+const EXPECT = { classic: '8077f52d64', seamless: 'd456d66b68' };
 function fnv(h, a) { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; }
 function jobs(opts, CX, CZ) {
   const g = V.makeGen('overworld', 12345, opts);

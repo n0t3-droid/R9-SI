@@ -746,6 +746,11 @@ uniform float u_emissiveBoost;
 uniform float u_normalStrength;
 uniform float u_holoLayer;
 uniform float u_blockVar;     // Klassisch: w3 bit 15 marks natural blocks for their own shade, the normal map turns with the tile (Nahtlos: macro mottling)
+#ifdef TEXHI
+uniform sampler2DArray u_albedoHi;     // t-material · hero textures (tex_hi.js): the most-seen materials at 64 × 64 …
+uniform sampler2DArray u_materialHi;
+uniform sampler2D u_hiMap;             // … and per layer its hero + 1 (0: none), one row
+#endif
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -815,6 +820,92 @@ float shadowAt(vec3 N, vec3 L) {
 #endif
   return s;
 }
+#ifdef PBR
+// t-material · PBR-lite (plan 2026-10-15-t-material.md, step 1). The material table (tex_pbr.js): per layer r metal, g a
+// clear coat (polish, lacquer, gloss tiles, painted hulls), b a scale on the painter's roughness (128 = ×1), a flags.
+uniform sampler2D u_pbr;
+#ifdef SSR
+// t-material · the screen-space mirror (step 2, High): the terrain's second target — the shaded normal (octahedral, y up),
+// how much of the fragment is mirror (its Fresnel weight) and the mirror's roughness; renderer.js ssrPass reads it
+layout(location=1) out vec4 o_ssr;
+float g_ssrW = 0.0, g_ssrR = 1.0;
+vec3 g_ssrN = vec3(0.0, 1.0, 0.0);   // the normal the mirror is marched with (the coat's, smooth, where a coat dominates)
+vec2 octEnc(vec3 n) { n /= abs(n.x) + abs(n.y) + abs(n.z); return n.y >= 0.0 ? n.xz : (1.0 - abs(n.zx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); }
+#endif
+float pow5(float x) { float x2 = x * x; return x2 * x2 * x; }
+// rain rings on a puddle: the slope where drops land (one hashed spot per cell, each ring grows and fades; TRANS_FS's ringN)
+vec2 pudRing(vec2 p, float t) {
+  vec2 g = floor(p), acc = vec2(0.0);
+  for (int j = -1; j <= 0; j++) for (int i = -1; i <= 0; i++) {
+    vec2 cell = g + vec2(float(i), float(j));
+    float h1 = hash12(cell), h2 = hash12(cell + vec2(17.3, 5.1)), age = fract(t * 0.7 + h1 * 7.0), rad = age * 0.42;
+    vec2 dv = p - (cell + vec2(h1, h2));
+    float dd = length(dv), e = dd - rad;
+    acc += dv / max(dd, 1e-3) * (cos(e * 42.0) * exp(-e * e * 110.0) * (1.0 - age));
+  }
+  return acc * 0.3;
+}
+// the sky seen in a reflection: the sky's gradient (matEnv) and the low sun's warm glow toward it; a rough surface sees it
+// blurred toward the mean of the sky
+vec3 pbrSky(vec3 R, float r) {
+  vec3 s = matEnv(R);
+  float ts = max(dot(R, u_sunDir), 0.0), t2 = ts * ts, t4 = t2 * t2, t8 = t4 * t4;
+  s += u_sunset * (t8 * 0.8) + u_sunColor * (t8 * t8 * t4 * 0.3 * (1.0 - r));
+  return mix(s, u_ambSky * 0.85 + u_skyHorizon * 0.15, r * r);
+}
+// the environment a surface reflects: the sky where the sky light reaches it, the block lights' colour where it does not
+// (a glossy hall floor shines in the colour of its lamps)
+vec3 pbrEnv(vec3 R, float r, float so, vec3 blockL) { return pbrSky(R, r) * so + blockL * (0.55 - 0.35 * so); }
+// GGX (Trowbridge-Reitz) with Schlick's Fresnel and a Kelemen visibility; the lobe capped (no fireflies under the jitter)
+vec3 pbrSun(vec3 n, vec3 V, vec3 L, float r, vec3 F0) {
+  vec3 H = normalize(L + V);
+  float nh = max(dot(n, H), 0.0), vh = max(dot(V, H), 0.0), a = r * r, a2 = a * a, d = nh * nh * (a2 - 1.0) + 1.0;
+  float D = min(a2 / (3.14159 * d * d), 48.0);
+  return D * (F0 + (1.0 - F0) * pow5(1.0 - vh)) * (0.25 / max(vh * vh, 0.06));
+}
+// the gloss of one fragment: col is its lit colour (diffuse, ambient, block light), lsun the sun's light reaching it
+// (shadow and the open sky applied), so the sky's specular occlusion. Matte things (rough, no coat, no metal) return col.
+vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, float ndl, float rough, float layer, float so, vec3 blockL, float wetK, float pud) {
+  vec4 pb = texelFetch(u_pbr, ivec2(int(layer), 0), 0);
+  float metal = pb.r, coat = max(pb.g, max(wetK * 0.75, pud));   // (the rain's film is a coat of water)
+  float r = clamp(rough * pb.b * 1.9922, 0.045, 1.0);
+  if (r > 0.8 && coat < 0.004 && metal < 0.004) return col;
+  float nv = clamp(dot(n, V), 1e-3, 1.0), fv = pow5(1.0 - nv);
+  vec3 R = reflect(-V, n);
+  vec3 F0 = mix(vec3(0.04), alb, metal);
+  vec3 Fr = (F0 + (max(vec3(1.0 - r), F0) - F0) * fv) * (1.0 - smoothstep(0.7, 0.92, r));   // Schlick with roughness
+  // the base: a metal keeps little of its diffuse; the reflection takes its share of the rest
+  vec3 c = col * (1.0 - 0.8 * metal) * (1.0 - Fr * (1.0 - metal)) + pbrEnv(R, r, so, blockL) * Fr;
+  if (ndl > 0.0 && r < 0.92) c += lsun * ndl * pbrSun(n, V, L, max(r, 0.08), F0);
+  // the clear coat: a second, sharp interface over it (the polish, the lacquer, the water of a puddle)
+#ifdef SSR
+  // (run 5: the hangar's floor still shimmered as a static — the mirror's weight and its ray followed the texture's relief
+  //  texel by texel, and at a grazing angle the relief swings the Fresnel from a tenth to a half. The world it mirrors is
+  //  weighed and marched along the smooth surface; the relief stays in the sky's reflection above)
+  { vec3 ns = normalize(mix(n, Ng, 0.88)); float fs = pow5(1.0 - clamp(dot(ns, V), 1e-3, 1.0));
+    g_ssrW = dot((F0 + (max(vec3(1.0 - r), F0) - F0) * fs) * (1.0 - smoothstep(0.7, 0.92, r)), vec3(0.3, 0.59, 0.11)); g_ssrR = r; g_ssrN = ns; }
+#endif
+  if (coat > 0.004) {
+    // (run 3: the coat mirrored along the texture's relief — the hangar's polished floor showed the walls as a mottled
+    // smear. A coat is a smooth film over the relief: its mirror follows the surface, the relief shows a hair through;
+    // a puddle's water is flat itself, so its own rain rings ripple what it mirrors)
+    vec3 nc = normalize(mix(n, Ng, 0.88 * (1.0 - pud)));
+    float nvc = clamp(dot(nc, V), 1e-3, 1.0), fvc = pow5(1.0 - nvc);
+    // the coat's own roughness from the table (the flags' upper four bits: a sharp polish 0.08, a honed stone softer);
+    // water is sharp. (run 4: the puddles after the rain hardly showed — water mirrors a few percent where one looks down
+    // at it, over pale tiles. A puddle mirrors at least about half of what it faces, as the eye remembers one)
+    float rc = mix(0.08 + float(uint(pb.a * 255.0 + 0.5) >> 4u) * 0.03, 0.04, pud);
+    float Fc = max((0.04 + 0.96 * fvc) * coat, pud * 0.48);
+    c = c * (1.0 - Fc) + pbrEnv(reflect(-V, nc), rc, so, blockL) * Fc;
+    if (ndl > 0.0) c += lsun * ndl * pbrSun(nc, V, L, rc, vec3(0.04)) * coat;
+#ifdef SSR
+    g_ssrW = g_ssrW * (1.0 - Fc) + Fc; g_ssrR = mix(r, rc, min(1.0, coat * 2.0));
+    if (Fc > g_ssrW * 0.5) g_ssrN = nc;
+#endif
+  }
+  return c;
+}
+#endif
 void main() {
 #ifdef MODEL
   if (u_clipNear > 0.0 && length(v_rel) < u_clipNear) discard;
@@ -853,14 +944,26 @@ void main() {
     vec2 tx = fu * 32.0, seam = floor(tx + 0.5), tw = max((abs(dx) + abs(dy)) * 32.0, vec2(1e-3));
     fu = (seam + clamp((tx - seam) / tw, -0.5, 0.5)) / 32.0;
   }
+#ifdef TEXHI
+  // t-material · hero textures: a layer with a 64 × 64 version is read from it (the same gradients: its own mips pick the
+  // detail by distance); never in the Klassisch look, which keeps its 16-texel ground
+  int hiK = int(texelFetch(u_hiMap, ivec2(int(layer), 0), 0).r * 255.0 + 0.5);
+  bool hiOn = hiK > 0 && u_blockVar < 0.5;
+  vec4 alb = hiOn ? textureGrad(u_albedoHi, vec3(fu, float(hiK - 1)), dx, dy) : textureGrad(u_albedo, vec3(fu, layer), dx, dy);
+#else
   vec4 alb = textureGrad(u_albedo, vec3(fu, layer), dx, dy);
+#endif
 #ifdef CUTOUT
   if (alb.a < 0.5) discard;
 #ifdef ZPRE
   o_col = vec4(1.0 / 255.0, 0.0, 0.0, 1.0); return;   // F10 · zPre: the depth only (the colour writes are off; a test counts with it)
 #endif
 #endif
+#ifdef TEXHI
+  vec4 mat = hiOn ? textureGrad(u_materialHi, vec3(fu, float(hiK - 1)), dx, dy) : textureGrad(u_material, vec3(fu, layer), dx, dy);
+#else
   vec4 mat = textureGrad(u_material, vec3(fu, layer), dx, dy);
+#endif
   vec3 tint = v_tint;
   // a recoloured block (B1): the texture's detail in its own colour, the whole face (the tint mask of a grass side too)
   if (lookOn(v_w5)) alb.rgb = lookRecolor(alb.rgb, layer, tint);
@@ -946,6 +1049,22 @@ void main() {
       }
     }
   }
+#ifdef PBR
+  // t-material · the wet world (wet.js: u_wet stays after the rain and dries over ten minutes, u_puddle the puddles' fill):
+  // only where the rain reaches (the open sky), the walls less and in streaks where the water runs down, the puddles in the
+  // hollows of a low-frequency field whose edge falls with the fill — they shrink from their rims as they dry
+  vec3 wq = v_localPos + vec3(u_camInt);
+  if (u_wet > 0.001 || u_puddle > 0.001) {
+    float open = smoothstep(0.86, 0.99, v_sky), upW = smoothstep(0.55, 0.92, N.y);
+    float streak = upW > 0.5 ? 1.0 : smoothstep(0.3, 0.72, texture(u_noise, vec2((wq.x + wq.z) * 0.37, wq.y * 0.05 - u_time * 0.002)).g);
+    wetK = u_wet * open * mix(0.55 * streak, 1.0, upW);
+    pud = 0.0;
+    if (u_puddle > 0.001 && upW > 0.5) {
+      float low = texture(u_noise, wq.xz * 0.012).r * 0.65 + texture(u_noise, wq.xz * 0.05).g * 0.35, edge = 0.31 + 0.13 * u_puddle;
+      pud = open * upW * (1.0 - smoothstep(edge - 0.035, edge, low)) * smoothstep(0.0, 0.12, u_puddle);
+    }
+  }
+#endif
   vec2 nxy = mat.rg * 2.0 - 1.0;
   // Klassisch: the normal map turns with the tile, so a turned grass top is lit as its texels lie and every block's
   // edges catch the low sun alike (unturned, the edges of neighbouring blocks lit up at random and pairs of blocks
@@ -960,6 +1079,10 @@ void main() {
   vec3 n = normalize(N * sqrt(max(0.0, 1.0 - dot(nxy, nxy))) + T * nxy.x + Bt * nxy.y);
   if (u_matTier > 1.5) n = normalize(n - (bumpW - dot(bumpW, n) * n));
   if (noshade) n = vec3(0.0, 1.0, 0.0);
+#ifdef PBR
+  // (t-material) a puddle is flat water: the texture's relief drowns in it, the rain draws its rings on it
+  if (pud > 0.01) { n = normalize(mix(n, N, pud)); if (u_rain > 0.02) { vec2 rg = pudRing(wq.xz * 1.6, u_time) * (u_rain * pud); n = normalize(vec3(n.x + rg.x, n.y, n.z + rg.y)); } }
+#endif
   float rough = clamp(mat.b + dRough, 0.02, 1.0);
   if (fam == 3) rough = 0.97;                             // fabric: matte, no highlight
   rough = mix(rough, 0.25 * rough + 0.03, wetK * 0.85);   // wet: smoother
@@ -988,9 +1111,20 @@ void main() {
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
+#ifdef PBR
+  // (t-material) wet things darken by how much water they soak: soil, sand, stone, wood a lot; polish, tiles, metal hardly
+  // (run 2: the plaza's tiles hardly changed in the rain — a film of water dims every surface a little, and a puddle's
+  // water over the ground a lot, so the mirror stands out on a darker ground)
+  { float pr = clamp((mat.b - 0.45) / 0.45, 0.0, 1.0); pr = pr * pr * (3.0 - 2.0 * pr) * (1.0 - texelFetch(u_pbr, ivec2(int(layer), 0), 0).g);
+    alb.rgb *= (1.0 - wetK * (0.42 * pr + 0.12 * (1.0 - pr))) * (1.0 - 0.34 * pud); }
+#else
   if (face == 2u) alb.rgb *= 1.0 - 0.14 * u_wet;
+#endif
   vec3 col = alb.rgb * lighting;
-#ifndef LITE
+#if defined(PBR)
+  // t-material: the gloss of the material (pbrShade above) in place of the one sun highlight
+  if (!noshade) col = pbrShade(col, alb.rgb, n, N, V, L, lc * (sh * outdoors), ndl, rough, layer, skyL * ao, blockL, wetK, pud);
+#elif !defined(LITE)
   // specular highlights (sun glints on smooth surfaces)
   if (rough < 0.75 && ndl > 0.0) {
     vec3 H = normalize(L + V);
@@ -998,6 +1132,7 @@ void main() {
     col += lc * sp * sh * outdoors * (1.0 + u_rain * 1.5);
   }
 #endif
+#ifndef PBR
   if (u_matTier > 0.5) {
     // F2 · the response: metal reflects the sky tinted by its colour, wet surfaces and puddles mirror it at grazing angles
     // (outdoors only), varnished wood takes a soft sheen (tier 3)
@@ -1007,6 +1142,7 @@ void main() {
     col = mix(col, envC, outdoors * clamp(wetK * (0.1 + 0.9 * fresW) + pud * (0.6 + 0.4 * fresW), 0.0, 0.9));
     if (fam == 2 && u_matTier > 2.5 && ndl > 0.0) { vec3 Hs = normalize(L + V); col += lc * pow(max(dot(n, Hs), 0.0), 22.0) * 0.1 * sh * outdoors; }
   }
+#endif
   if (emis > 0.02 || emissiveFace) {
     float e = emissiveFace ? max(emis, 0.85) : emis;
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
@@ -1098,6 +1234,10 @@ void main() {
   float dist = length(v_rel);
   col = applyFog(col, v_rel, dist);
   o_col = vec4(col, 1.0);
+#ifdef SSR
+  // (no mirror on what glows or burns; it fades with the distance as the fog takes the floor)
+  o_ssr = vec4(octEnc(g_ssrN) * 0.5 + 0.5, (emis > 0.02 || emissiveFace || kind == 2u || kind == 3u || kind == 4u) ? 0.0 : g_ssrW * (1.0 - smoothstep(48.0, 80.0, dist)), g_ssrR);
+#endif
 }`;
 
   // ------------------------------------------------------------ smooth props (t-smooth, props.js): instanced palms
@@ -1455,7 +1595,14 @@ uniform float u_reflUp;               // 1: the mirror is a quarter size and rea
 uniform float u_waterTier;    // 0 Very Low (sky-LUT reflection only, no caustics), 1 and 2: caustics on the floor
 uniform vec2 u_windDir;       // the wind's heading (weather.js), the swell runs with it
 uniform float u_stormK;       // the storm factor of the waves (water_wave.js)
+#ifdef PBR
+uniform sampler2D u_pbr;      // t-material: the material table (tex_pbr.js; a: 1 a window pane, 2 glass, 4 glows only when tinted)
+uniform float u_glassRefr;    // t-material: 1 when the scene copy holds this frame's opaque world (pbr 2): window panes filter it
+#endif
 ${(VR.WaterWave ? VR.WaterWave.glsl() : '')}
+#ifndef LITE
+${(VR.WaterFx ? VR.WaterFx.glsl() : '')}
+#endif
 #ifdef MODEL
 uniform mat3 u_normalMat;
 uniform float u_clipNear;
@@ -1625,9 +1772,15 @@ void main() {
     vec3 n = NORMALS[face];
     float ak = waterBody(thick) * u_stormK;
     vec2 wq = u_blockVar > 0.5 ? (floor(wp.xz * 16.0) + 0.5) / 16.0 : wp.xz;
+#ifndef LITE
+    float whN = 0.0;   // (t-material: the height over its amplitude, −1…1 — the crests' foam)
+#endif
     if (face == 2u) {
       float wh = 0.0;
       n = gerstnerN(wq, u_time, kind == 6u ? flowDir(v_w3) : u_windDir, kind == 6u ? ak * 0.6 : ak, wh);
+#ifndef LITE
+      whN = wh / max((WV_A[0] + WV_A[1] + WV_A[2]) * (kind == 6u ? ak * 0.6 : ak), 1e-4);
+#endif
     } else if (kind == 6u) {
       // a falling sheet (waterfall): streaks run down the face
       vec3 tg = (face == 0u || face == 1u) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
@@ -1668,15 +1821,37 @@ void main() {
     vec3 bioN = wcol / max(max(wcol.r, max(wcol.g, wcol.b)), 1e-3);
     vec3 absCol = mix(vec3(0.26, 0.6, 0.92) + vec3(0.0, 0.04, 0.0) * bandN, bioN * vec3(0.62, 0.9, 1.0), 0.75);
     vec3 under = mix(refr * mix(vec3(1.0), absCol, 0.72), deep, clamp(absorb, 0.0, 0.96));
+#ifndef LITE
+    // t-material · the trailer's water (water_fx.js; tier ≥ 1, never Very Low): the colour follows the depth — the floor seen
+    // through the path of water loses its red first (turquoise over the bright sand), the water's own colour turns from
+    // turquoise to deep blue, and the designed deep body takes over past a few blocks
+    float pathL = thick * dist / max(linDepth(gl_FragCoord.z), 0.06), vdep = pathL * max(V.y, 0.0);
+    if (u_waterTier > 0.5 && face == 2u) {
+      vec3 Tr = exp(-WFX_ABS * pathL);
+      vec3 litW = u_ambSky * skyL * 0.85 + blockL * 0.45 + lc * 0.14 * v_sky + 0.012;
+      vec3 own = mix(wfxTint(pathL) * litW, deep, smoothstep(3.5, 12.0, pathL));
+      under = mix(under, refr * Tr + own * (1.0 - dot(Tr, vec3(0.2, 0.5, 0.3))), 0.85);
+    }
+#endif
     // caustics (tier >= 1): the sun's light network on the floor seen through shallow water
     if (u_waterTier > 0.5 && face == 2u && thick < 6.0 && sunUp > 0.001) {
       vec3 D = -V;
       vec2 fl = wp.xz + D.xz / max(-D.y, 0.25) * thick * 0.75;
+#ifndef LITE
+      under += u_sunColor * sunUp * wfxCaustic(fl, u_time, u_waterTier > 1.5 ? 3 : 2) * 0.26 * exp(-thick * 0.3) * (1.0 - u_rain);   // (t-material: two octaves on tier 1)
+#else
       under += u_sunColor * sunUp * causticAt(fl, u_time) * 0.22 * exp(-thick * 0.3) * (1.0 - u_rain);
+#endif
     }
     vec3 R = reflect(-V, n);
     R.y = abs(R.y);
+#ifndef LITE
+    // (t-material: on tier 2 the sky the water mirrors is the whole sky — at night its stars and the nebula — where the
+    // planar mirror does not reach)
+    vec3 refl = skyColor(R, u_waterTier > 1.5 && u_reflOn < 0.5) * mix(0.25, 1.0, skyL);
+#else
     vec3 refl = skyColor(R, false) * mix(0.25, 1.0, skyL);
+#endif
     refl = mix(refl, refl * vec3(0.62, 0.84, 1.0) + body * 0.25, 0.4);
     if (u_reflOn > 0.5) {
       // the planar reflection (renderer.js): the mirrored near world and sky, shifted by the slope of the surface
@@ -1684,7 +1859,13 @@ void main() {
       refl = pr * vec3(0.86, 0.94, 1.0) + body * 0.1;
     }
     float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
+#ifndef LITE
+    // (t-material, run 2: the clear water's bright floor took the mirror's contrast — the lake held the floating islands
+    // only faintly. Tier ≥ 1 lets the far water mirror fully, as real water does: clear at the feet, a mirror further out)
+    fres = u_waterTier > 0.5 ? min(fres, 0.82) : min(fres * 0.85, 0.66);
+#else
     fres = min(fres * 0.85, 0.66);
+#endif
     if (u_underwater > 0.5) { fres = face == 3u ? 0.0 : fres * 0.3; }
     vec3 col = mix(under * (1.0 - 0.22 * seamK), refl, clamp(fres, 0.0, 1.0));
     // sun sparkle: a GGX lobe whose width follows the slope (steep water glitters wider and dimmer), plus a sheen
@@ -1694,12 +1875,34 @@ void main() {
     float dd = nh * nh * (a2 - 1.0) + 1.0;
     float sp = (a2 / (3.14159 * dd * dd)) * (0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0)) * 0.035 + pow(nh, 60.0) * 0.12;
     col += lc * sp * (sp > 0.004 ? shadowAt(NORMALS[face], L) : 1.0) * smoothstep(0.6, 1.0, v_sky) * (1.0 - u_rain);
+#ifndef LITE
+    // t-material: the sun's glitter — tiny facets of the chop that flash into the eye for a moment each
+    if (u_waterTier > 0.5 && face == 2u && sunUp > 0.001) {
+      vec2 gc = floor(wp.xz * 7.0);
+      float gh = hash12(gc + floor(u_time * 6.0 + hash12(gc + 9.1) * 6.0));
+      vec3 gnm = normalize(n + vec3(gh - 0.5, 0.0, hash12(gc + 3.7) - 0.5) * 0.35);
+      col += lc * pow(max(dot(reflect(-V, gnm), L), 0.0), 900.0) * step(0.8, gh) * 7.0 * smoothstep(0.6, 1.0, v_sky) * (1.0 - u_rain);
+    }
+#endif
     // shore foam
     // (a broken, drifting line from the noise where the water is a few tenths of a block deep, not a regular stripe)
     // (thin: a step between two water levels also measures as shallow, so the foam must stay a whisper there)
     float foamN = texture(u_noise, wp.xz / 5.0 + vec2(u_time * 0.02, -u_time * 0.015)).r;
+#ifndef LITE
+    if (u_waterTier > 0.5) {
+      // t-material: foam on the banks (a noise mask by the depth under the surface) and on the crests of a rough water
+      float fn2 = texture(u_noise, wp.xz / 1.7 - vec2(u_time * 0.05, u_time * 0.03)).g;
+      // (run 2: far off the bank's foam averaged into a milky band across the lake — it fades by 60 blocks, where its
+      // flecks are smaller than a pixel)
+      float fm = max(wfxShore(vdep, foamN * 0.65 + fn2 * 0.35), wfxCrest(whN, ak, fn2)) * (1.0 - smoothstep(22.0, 60.0, dist));
+      col = mix(col, vec3(0.92, 0.96, 1.0) * (u_ambSky * skyL + blockL + lc * 0.45 * v_sky + 0.02), clamp(fm, 0.0, 1.0) * 0.75 * float(face == 2u));
+    } else {
+#endif
     float foam = (1.0 - smoothstep(0.0, 0.2, thick)) * smoothstep(0.45, 0.7, foamN);
     col = mix(col, vec3(0.9) * (u_ambSky * skyL + blockL + lc * 0.3), clamp(foam, 0.0, 1.0) * 0.28 * float(face == 2u));
+#ifndef LITE
+    }
+#endif
     col = applyFog(col, v_rel, dist);
     // the depth-fade edge: where the water is a few centimetres deep it lets the shore through, so no edge cuts
     o_col = vec4(col, face == 2u ? mix(0.55, 1.0, smoothstep(0.03, 0.7, thick)) : (kind == 6u ? 0.8 : 1.0));
@@ -1750,6 +1953,38 @@ void main() {
   float ndl = max(dot(n, L), 0.0);
   vec3 lighting = u_ambSky * skyL * mix(0.62, 1.0, faceShade) + lc * ndl * smoothstep(0.55, 0.95, v_sky) * (ndl > 0.0 ? shadowAt(NORMALS[face], L) : 1.0) + blockL + 0.012;
   vec3 col = alb.rgb * lighting;
+#ifdef PBR
+  // t-material · glass (plan step 4): smooth, so the sky and the sun mirror in it sharply by Fresnel (the block lights' colour
+  // where the sky does not reach); each pane a hair off true, so the reflections break from pane to pane; a window pane (the
+  // table's flag) filters what lies behind it by its tint where the scene copy holds the world (High: u_glassRefr) and glows
+  // warm from inside at night, room by room — some rooms dark, a white pane (a railing) never
+  vec4 pbg = texelFetch(u_pbr, ivec2(int(layer), 0), 0);
+  uint gfl = uint(pbg.a * 255.0 + 0.5);
+  vec3 wpg = v_localPos + vec3(u_camInt), cellG = floor(wpg - n * 0.02);
+  vec3 gn = normalize(n + (vec3(hash13(cellG), hash13(cellG + 3.1), hash13(cellG + 7.7)) - 0.5) * 0.035);
+  float nvG = clamp(dot(gn, V), 1e-3, 1.0), FG = 0.04 + 0.96 * pow(1.0 - nvG, 5.0), soG = smoothstep(0.3, 0.95, v_sky);
+  vec3 envG = skyColor(reflect(-V, gn), false) * soG + blockL * (0.5 - 0.3 * soG);
+  vec3 sunG = ndl > 0.0 ? lc * pow(max(dot(gn, normalize(L + V)), 0.0), 600.0) * 8.0 * smoothstep(0.55, 0.95, v_sky) * shadowAt(NORMALS[face], L) : vec3(0.0);
+  float ta = alb.a, paneK = 1.0 - ta;
+  vec3 tintG = mix(vec3(1.0), alb.rgb / max(max(alb.r, max(alb.g, alb.b)), 1e-3), 0.75);
+  float glowK = 0.0; vec3 glowC = vec3(0.0);
+  if ((gfl & 1u) != 0u && u_night > 0.01) {
+    vec3 room = floor(wpg / vec3(3.0, 2.0, 3.0));
+    float tinted = (gfl & 4u) != 0u ? smoothstep(0.06, 0.2, 1.0 - min(tintG.r, min(tintG.g, tintG.b))) : 1.0;
+    glowK = step(hash13(room + 17.0), 0.7) * (0.55 + 0.75 * hash13(room + 5.0)) * tinted * u_night;
+    glowC = mix(vec3(1.0, 0.70, 0.40), vec3(1.0, 0.86, 0.64), hash13(room + 9.0)) * mix(vec3(1.0), tintG, 0.3) * 1.4;
+  }
+  float aG; vec3 cG;
+  if (u_glassRefr > 0.5 && (gfl & 1u) != 0u && paneK > 0.5) {
+    vec3 behind = texture(u_sceneColor, clamp(suv + (gn.xz - n.xz) * 0.5, 0.001, 0.999)).rgb;
+    vec3 pane = mix(behind * tintG, glowC, glowK * 0.85) * (1.0 - FG) + envG * FG + sunG;
+    cG = mix(col + envG * FG + sunG, pane, paneK); aG = 1.0;
+  } else {
+    aG = clamp(ta + paneK * (FG + glowK * 0.8), 0.0, 1.0);
+    cG = (col * ta + envG * FG * (1.0 - 0.5 * ta) + sunG + glowC * glowK * paneK * (1.0 - FG)) / max(aG, 0.06);
+  }
+  o_col = vec4(applyFog(cG, v_rel, dist), aG);
+#else
   vec3 H = normalize(L + V);
   col += lc * pow(max(dot(n, H), 0.0), 120.0) * 1.5 * smoothstep(0.55, 0.95, v_sky);
   float fres = 0.04 + 0.96 * pow(1.0 - max(dot(n, V), 0.0), 5.0);
@@ -1758,6 +1993,7 @@ void main() {
   col += matEnv(reflect(-V, n)) * pow(1.0 - max(dot(n, V), 0.0), 3.0) * 0.3 * skyL;
   col = applyFog(col, v_rel, dist);
   o_col = vec4(col, clamp(alb.a + fres * 0.3, 0.0, 1.0));
+#endif
 }`;
 
   // ------------------------------------------------------------ shadow depth
@@ -2531,6 +2767,92 @@ uniform sampler2D u_src;
 in vec2 v_uv;
 out vec4 o;
 void main() { o = texture(u_src, v_uv); }`;
+
+  // ------------------------------------------------------------ t-material · the screen-space mirror (High and up)
+  // Half size: for a glossy pixel (the terrain's second target says how much of it is mirror) the reflected ray marches
+  // through the depth buffer in 14 growing steps (a jittered start, ~70 blocks at most), a hit is refined by three halvings
+  // and read from the scene's colour; the confidence fades at the screen's edge, for rough mirrors and for rays back toward
+  // the eye. Out: the hit premultiplied by its confidence (a miss: 0, the sky's reflection of the gloss pass stays).
+  S.SSR_FS = `
+uniform highp sampler2D u_depth;
+uniform sampler2D u_mat;
+uniform sampler2D u_color;
+uniform mat4 u_vp;
+uniform mat4 u_invVP;
+uniform vec2 u_nearFar;
+in vec2 v_uv;
+out vec4 o;
+float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
+vec3 octDec(vec2 e) { vec3 n = vec3(e.x, 1.0 - abs(e.x) - abs(e.y), e.y); if (n.y < 0.0) n.xz = (1.0 - abs(n.zx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); return normalize(n); }
+void main() {
+  o = vec4(0.0);
+  vec4 m = texture(u_mat, v_uv);
+  if (m.b < 0.01) return;
+  float d = texture(u_depth, v_uv).r;
+  if (d >= 0.99999) return;
+  vec4 wp = u_invVP * vec4(v_uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+  vec3 P = wp.xyz / wp.w, N = octDec(m.rg * 2.0 - 1.0), V = normalize(-P);
+  // (run 2: per-pixel jitter and a rough-scattered ray left a sparse spray of hits — single bright texels on the plaza and
+  // the hangar floor. Every ray is now the mirror ray, the same each frame; a crossing is refined first and only then
+  // judged: a surface the ray reaches is a hit, one it passes behind (a pole, a railing) a miss. The apply pass blurs by
+  // the roughness instead)
+  float rough = m.a;
+  vec3 R = reflect(-V, N);
+  if (dot(R, N) < 0.02) return;
+  vec3 Q = P + N * 0.04;
+  float t = 0.12, st = 0.12, prevT = 0.0;
+  vec2 huv = vec2(-1.0);
+  for (int i = 0; i < 16; i++) {
+    vec4 c = u_vp * vec4(Q + R * t, 1.0);
+    if (c.w < 0.07) break;
+    vec2 uv = c.xy / c.w * 0.5 + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+    if (c.w - lin(texture(u_depth, uv).r) > 0.0) {
+      float a = prevT, b = t;
+      for (int k = 0; k < 5; k++) { float mt = (a + b) * 0.5; vec4 cm = u_vp * vec4(Q + R * mt, 1.0); if (cm.w - lin(texture(u_depth, cm.xy / cm.w * 0.5 + 0.5).r) > 0.0) b = mt; else a = mt; }
+      vec4 cb = u_vp * vec4(Q + R * b, 1.0); vec2 buv = cb.xy / cb.w * 0.5 + 0.5;
+      // (run 5: a floor of mini-voxel tiles met its own raised marks and joints first, a hair above it at a grazing
+      //  angle — a static of its own colours. A plane does not see itself: a crossing less than a tenth of a block over
+      //  the surface is passed and the march goes on)
+      if (b * dot(R, N) > 0.1) {
+        if (cb.w - lin(texture(u_depth, buv).r) < 0.1 + b * 0.025) huv = buv;
+        break;
+      }
+    }
+    prevT = t; st *= 1.33; t += st;
+  }
+  if (huv.x < 0.0) return;
+  vec2 e = min(huv, 1.0 - huv);
+  float conf = smoothstep(0.0, 0.07, e.x) * smoothstep(0.0, 0.07, e.y) * (1.0 - smoothstep(0.55, 0.9, rough)) * (1.0 - smoothstep(0.35, 0.8, dot(R, V)));
+  o = vec4(texture(u_color, huv).rgb * conf, conf);
+}`;
+  // the apply: full size, over the scene's colour (blended SRC_ALPHA, ONE_MINUS_SRC_ALPHA) — the hit replaces the share of
+  // the pixel that is mirror (the full-size weight keeps the glossy area's edges sharp; the half-size hit is premultiplied)
+  S.SSR_APPLY_FS = `
+uniform sampler2D u_mat;
+uniform sampler2D u_ssr;
+in vec2 v_uv;
+out vec4 o;
+void main() {
+  vec4 m = texture(u_mat, v_uv);
+  if (m.b < 0.003) discard;
+  // the hits, gathered over a footprint that grows with the roughness (a polished floor sharp, a honed one soft), drawn
+  // out up and down the screen as a glossy floor smears what it mirrors toward the eye (run 4: the hangar's floor mirrored
+  // the holo walls' fine data as a mottle; streaked, it reads as gloss); a texel's hit counts by its own weight, so a lone
+  // hit spreads thin instead of standing out
+  vec2 px = 1.0 / vec2(textureSize(u_ssr, 0)), r = px * (1.0 + m.a * 6.0);
+  vec4 s = texture(u_ssr, v_uv) * 2.0
+         + texture(u_ssr, v_uv + vec2(0.0, r.y)) + texture(u_ssr, v_uv - vec2(0.0, r.y))
+         + (texture(u_ssr, v_uv + vec2(0.0, r.y * 2.6)) + texture(u_ssr, v_uv - vec2(0.0, r.y * 2.6))) * 0.7
+         + (texture(u_ssr, v_uv + vec2(r.x * 0.8, 0.0)) + texture(u_ssr, v_uv - vec2(r.x * 0.8, 0.0))) * 0.6;
+  s /= 6.6;
+  // (run 4: the plaza still showed a spray of lone hits — the flowers and the lamps by the kerb, thin things the rays
+  // reach only now and then. A mirror shows where most of its neighbourhood agrees: sparse hits fade out, a wall, a
+  // ship or a line of light comes through whole)
+  float a = m.b * s.a * smoothstep(0.25, 0.65, s.a);
+  if (a < 0.003) discard;
+  o = vec4(s.rgb / max(s.a, 1e-3), a);
+}`;
 
   // F9 · Fern-Cache (renderer.js farFrame): the cached sky and far world, reprojected into this frame. The cache was drawn
   // from an eye a little off this one (≤ 1.5 m, ≤ 6°) with a wider view; a pixel finds its cached texel by the rotation,
