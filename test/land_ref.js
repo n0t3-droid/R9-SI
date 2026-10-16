@@ -11,6 +11,8 @@
 // off — the split of warm light over cool shade, the mean ΔE of the bands — at noon, the golden hour and dusk (the mean
 // over the views); at night the shade keeps a cool lean and the lamps a warm one. No pictures: the frames only.
 // usage: node test/land_ref.js  (TAG=after · OFF_TAG=… · VIEWS=avenue,… · after test/light2.mjs wrote its pictures)
+// regress: skip  (a measurement over test/light2.mjs's pictures, which change with every run of it — the node gates of
+// the light are test/light2.js; run this by hand after the browser run)
 const fs = require('fs'), path = require('path');
 const SR = require('./sky_ref.js');
 const sharp = require('/home/dev/.npm-global/lib/node_modules/sharp');
