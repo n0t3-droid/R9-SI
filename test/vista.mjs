@@ -1,8 +1,10 @@
 // Aussichten — the postcard test (t-vista, vgen 11; plan docs/superpowers/plans/2026-10-15-t-vista.md §5).
-// Twelve vista points of a new default world (seed 4242) — the best of each landmark first (two at most), then the next
-// best — photographed from their compositions (the eye in the spur's mouth looking down the walk, the landmark's top in the upper
-// third, fov 62) at the golden hour and at night, on the High preset as a player gets it (only the dynamic resolution
-// held off; the wow moments off for the pictures):
+// Twelve vista points of a new default world (seed 4242) — the wow vistas first (the landmark big from there: the game
+// swings the view to them), the best of each landmark first (two at most), then the next best — photographed from their
+// compositions (the eye over the way at the walk's start, a little over a standing eye, looking down the walk between
+// its lantern posts, the landmark's top in the upper third, the lens 46–62° by the landmark's size) at the golden hour
+// and at night, on the High preset as a player gets it (only the dynamic resolution held off; the wow moments off for
+// the pictures):
 //   after:  the world as created now (vgen 11: the vistas, the windows, the silhouettes)
 //   before: the same build, the same seed, a vgen-10 world (t-land's land as shipped in v0.46), the same cameras
 // → test/shots/vista_<id>_<golden|night>_<before|after>.png (1280 × 720) and test/shots/vista_sheet.jpg (a row per vista:
@@ -45,15 +47,16 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const V = require('/home/dev/vr/test/load_shared.js');
 const g11 = V.makeGen('overworld', +SEED, { vgen: 11 }), P = V.Land.plan(g11);
 const pick = () => {
-  const by = P.vistas.slice().sort((a, b) => b.score - a.score), out = [], n = {};
+  // (the wow vistas first — the postcards the game stages with a swing — then the quiet ones, each by its score)
+  const by = P.vistas.slice().sort((a, b) => (b.wow ? 1 : 0) - (a.wow ? 1 : 0) || b.score - a.score), out = [], n = {};
   for (const cap of [2, 3]) for (const v of by) { if (out.length >= 12) break; if (out.includes(v) || (n[v.lm] || 0) >= cap) continue; out.push(v); n[v.lm] = (n[v.lm] || 0) + 1; }
   return out;
 };
 const VISTAS = pick().filter(v => !ONLY || ONLY.includes(v.id)).map(v => {
   const Ln = P.lines[v.line], a = Ln.pts[Math.max(0, v.i - 6)], b = Ln.pts[Math.min(Ln.pts.length - 1, v.i + 6)];
-  return { id: v.id, lm: v.lm, x: v.x, y: v.y, z: v.z, d: v.d, score: v.score, frame: v.frame, eye: v.eye, yaw: v.yaw, pitch: v.pitch, fov: v.fov || FOV, aim: v.aim, box: v.box, u: v.u, wayYaw: Math.atan2(-(b[0] - a[0]), -(b[1] - a[1])) };
+  return { id: v.id, lm: v.lm, x: v.x, y: v.y, z: v.z, d: v.d, score: v.score, frame: v.frame, eye: v.eye, yaw: v.yaw, pitch: v.pitch, fov: v.fov || FOV, aim: v.aim, box: v.box, u: v.u, wow: v.wow !== false, wayYaw: Math.atan2(-(b[0] - a[0]), -(b[1] - a[1])) };
 });
-console.log(`the vistas (${P.vistas.length} in the world, ${VISTAS.length} photographed): ` + VISTAS.map(v => `${v.id} ${v.lm} ${v.d} m`).join(' · '));
+console.log(`the vistas (${P.vistas.length} in the world, ${P.vistas.filter(v => v.wow).length} with a wow moment; ${VISTAS.length} photographed): ` + VISTAS.map(v => `${v.id} ${v.lm} ${v.d} m ${v.fov}°${v.wow ? ' ★' : ''}`).join(' · '));
 if (process.env.CAMS_ONLY) { for (const v of VISTAS) console.log(JSON.stringify(v)); process.exit(0); }
 
 // ---------------------------------------------------------------- the camera's projection (the game's: vertical fov, 16:9)
@@ -315,7 +318,7 @@ async function closePage(tag, A) {
 
 // ---------------------------------------------------------------- the wow moment in the page
 async function wow(A) {
-  const v = VISTAS[VISTAS.length - 1];   // (the last one photographed: its chunks are loaded)
+  const v = VISTAS.slice().reverse().find(q => q.wow) || VISTAS[VISTAS.length - 1];   // (the last wow vista photographed: its chunks are loaded)
   await A.pose(v.x + 0.5, v.y + 1, v.z + 0.5, v.wayYaw, 0, 75, GOLDEN);
   const st = await A.settle(240, 60);
   const pre = await A.ev((id) => { const g = VR.game, w = g.wow; return { has: !!w, known: w ? w.list.has(id) : false, n: w ? w.list.size : 0, seen: (g.meta.wowSeen || []).slice(), screen: g.ui.screen, blocking: g.ui.blocking, state: w ? w.state() : null }; }, v.id);

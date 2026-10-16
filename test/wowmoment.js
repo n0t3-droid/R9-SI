@@ -136,7 +136,15 @@ console.log('2 · once per world: the swing, the HUD, the caption, the seen stat
   // another world
   const g3 = mkGame({ meta: { id: 'w2', name: 'Zwei', vgen: 11 } }), A3 = new W.Actor(g3); A3.absorb(VISTAS); at(g3, 'v0'); run(A3, g3, 0.3);
   check(A3.active && A3.active.id === 'v0', 'another world: the same vista starts its moment again');
-  A3.destroy(); A.destroy(); A2.destroy();
+  // a quiet vista (its spawn's 13th field 0: the landmark too small from there for a wow — gen_vista.js) keeps its bench
+  // and its view, but never swings the camera; a spawn without the field (12 fields) is a wow vista
+  const QUIET = ['vista', 'vq', 700, 71, 50, 702.0, 73.82, 47.0, 0.4, 0.02, 46, 'temple', 0], LOUD = ['vista', 'vl', 760, 71, 50, 762.0, 73.82, 47.0, 0.4, 0.02, 46, 'temple', 1];
+  const g4 = mkGame(), A4 = new W.Actor(g4); A4.absorb([QUIET, LOUD]);
+  g4.player.pos = [700.5, 71, 50.5]; run(A4, g4, 1);
+  const quiet = !A4.active && A4.count === 0 && !W.seen(g4.meta, 'vq');
+  g4.player.pos = [760.5, 71, 50.5]; run(A4, g4, 0.5);
+  check(quiet && A4.active && A4.active.id === 'vl' && A4.list.get('vq').wow === false && A3.list.get('v0').wow === true, `a quiet vista (the landmark too small from it) starts no moment and is not marked seen; a wow vista and one without the field do (${quiet ? 'quiet' : 'not quiet'}, ${A4.active ? A4.active.id : 'none'})`);
+  A4.destroy(); A3.destroy(); A.destroy(); A2.destroy();
   // the caption in English, and for a landmark without its own name
   I18N.set('en'); const en = W.title('temple'), other = W.title('nonesuch'); I18N.set('de'); const de2 = W.title('nonesuch');
   check(en === 'The Gate Temple' && other === 'A View' && de2 === 'Aussicht', `the caption in English („${en}"), a landmark without a name: „${de2}" / „${other}"`);
@@ -252,7 +260,7 @@ console.log('6 · the vistas of a vgen-11 world: spawns, triggers, the picture\'
   let right = 0, eyeAir = 0, path = 0, pushAir = 0; const bad = [];
   for (const v of P.vistas) {
     const s = A.list.get(v.id); if (!s) continue;
-    const pk = W.pick(A.list.values(), {}, s.x + 0.5, s.y, s.z + 0.5); if (pk && pk.id === v.id) right++;
+    const pk = W.pick(A.list.values(), {}, s.x + 0.5, s.y, s.z + 0.5); if (s.wow ? pk && pk.id === v.id : !pk || pk.id !== v.id) right++;
     // the picture's eye: its cell and a small box round it (the near plane) in the air
     const [ex, ey, ez] = s.eye; let air = true;
     for (const [dx, dy, dz] of [[0, 0, 0], [0.2, 0, 0], [-0.2, 0, 0], [0, 0.2, 0], [0, -0.2, 0], [0, 0, 0.2], [0, 0, -0.2]]) if (solid(blockAt(ex + dx, ey + dy, ez + dz))) { air = false; if (bad.length < 5) bad.push(`${v.id}: the eye in ${nameOf(blockAt(ex + dx, ey + dy, ez + dz))}`); break; }
@@ -270,7 +278,8 @@ console.log('6 · the vistas of a vgen-11 world: spawns, triggers, the picture\'
     let pc = true; for (let k = 1; k <= 8; k++) { const t = k / 8; if (solid(blockAt(ex + (px - ex) * t, ey + (py - ey) * t, ez + (pz - ez) * t))) pc = false; }
     if (pc) pushAir++;
   }
-  check(right === P.vistas.length, `standing at a vista's start picks that vista (${right} of ${P.vistas.length})`);
+  const nWow = P.vistas.filter(v => v.wow).length;
+  check(right === P.vistas.length && nWow >= 10 && nWow === [...A.list.values()].filter(q => q.wow).length, `standing at a wow vista's start picks it, at a quiet one (the landmark too small from it) none (${right} of ${P.vistas.length}; ${nWow} wow vistas, ${P.vistas.length - nWow} quiet)`);
   check(eyeAir === P.vistas.length, `every picture's eye is in the air (${eyeAir} of ${P.vistas.length}${bad.length ? '; ' + bad.join('; ') : ''})`);
   check(path === P.vistas.length, `the swing from the walker's eye to the picture passes no block (${path} of ${P.vistas.length})`);
   check(pushAir === P.vistas.length, `the drift in along the look stays in the air (${pushAir} of ${P.vistas.length})`);

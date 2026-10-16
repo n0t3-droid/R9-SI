@@ -12,7 +12,8 @@
 //      bands, the citadel's taller spires and side pinnacles, a fall off every isle into the void, the lighthouse ≥ 40
 //      high on the lake's far coast; the horizon tiles and the far ring's forms reach the landmarks' tops; Very Low's
 //      horizon in the hills view at most ×1.03 the triangles of vgen 10
-//   5. layers: every vista has its foreground frame (a crown at the picture's side, or the arch over its spur), its middle
+//   5. layers: every vista has its foreground frame (the posts and walls or the arch; a crown at the picture's side at
+//      four in five), its middle
 //      distance (a grove beside the sight axis, the woods or the lake) and the landmark far, its top in the upper third
 //   bash test/wt_run.sh vista.js 900        (SEED=… another world; ONLY=1,2 some sections)
 const V = require('./load_shared.js');
@@ -105,7 +106,7 @@ if (want(3)) {
     for (let dz = -12; dz <= 12; dz++) for (let dx = -12; dx <= 12; dx++) {
       const x = v.x + dx, z = v.z + dz; if (Math.hypot(dx, dz) > 12) continue;
       const a = nameOf(blockAt(x, v.y + 1, z)), b = nameOf(blockAt(x, v.y + 2, z)), c = nameOf(blockAt(x, v.y + 3, z)), f = nameOf(blockAt(x, v.y, z));
-      if (a === 'vx_bench') bench++; if (b === 'lantern' || c === 'lantern' || nameOf(blockAt(x, v.y + 4, z)) === 'lantern') lant++; if (/wall|balustrade/.test(a)) wall++; if (/flagstone|plaza/.test(f)) pave++;
+      if (a === 'vx_bench') bench++; if (b === 'lantern' || c === 'lantern' || nameOf(blockAt(x, v.y + 4, z)) === 'lantern' || nameOf(blockAt(x, v.y + 6, z)) === 'lantern') lant++; if (/wall|balustrade/.test(a)) wall++; if (/flagstone|plaza/.test(f)) pave++;   // (lanterns: on the posts at y + 2, the arch's on its piers at y + 6)
     }
     const sp = (chunk(v.x >> 4, v.z >> 4).spawns || []).some(s => s[0] === 'vista' && s[1] === v.id);
     if (bench >= 1 && lant >= 4 && wall >= 10 && pave >= 12 && sp) built++; else if (bad.length < 4) bad.push(`${v.id} bench ${bench} lanterns ${lant} walls ${wall} paving ${pave} spawn ${sp}`);
@@ -208,18 +209,22 @@ if (want(5)) {
     const t = Math.tan(v.fov * Math.PI / 360), asp = 16 / 9; return f2 <= 0 ? null : [r / (f2 * t * asp), u2 / (f2 * t), f2];
   };
   // the foreground: the tree pair's crowns at the picture's sides, or the arch round the landmark
-  let fg = 0; const fgBad = [];
+  let fg = 0, crowned = 0; const fgBad = [], crBad = [];
   for (const v of vs) {
-    const trees = (P.trees || []).filter(t => Math.hypot(t.x - v.x, t.z - v.z) < 16 && Math.hypot(t.x - v.x, t.z - v.z) > 6);
+    const trees = (P.trees || []).filter(t => t.frame ? t.frame === v.id : Math.hypot(t.x - v.x, t.z - v.z) < 16 && Math.hypot(t.x - v.x, t.z - v.z) > 6);   // (its frame trees; vgen 11 marks them)
     // (a crown's inner edge, 4 blocks from its trunk toward the sight axis, inside the picture's side)
     const sides = trees.map(t => { const ax = v.eye[0] + v.u[0] * 8, az = v.eye[2] + v.u[1] * 8, dx = ax - t.x, dz = az - t.z, l = Math.hypot(dx, dz) || 1; return proj(v, t.x + 0.5 + dx / l * 4, t.y + 5, t.z + 0.5 + dz / l * 4); }).filter(Boolean).filter(q => Math.abs(q[0]) > 0.3 && Math.abs(q[0]) < 1.05);
-    // the spur's mouth: a lantern post either side (a lantern on a post, within 6 blocks of its start)
-    let piers = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) if (dx * dx + dz * dz <= 36 && /wall|pillar/.test(nameOf(blockAt(v.x + dx, v.y + 1, v.z + dz))) && nameOf(blockAt(v.x + dx, v.y + 2, v.z + dz)) === 'lantern') piers++;
+    // a lantern post either side of the walk (a lantern on a post, within 7 blocks of its start: the posts stand 5 out, 3
+    // to the side)
+    let piers = 0; for (let dz = -7; dz <= 7; dz++) for (let dx = -7; dx <= 7; dx++) if (dx * dx + dz * dz <= 49 && /wall|pillar/.test(nameOf(blockAt(v.x + dx, v.y + 1, v.z + dz))) && nameOf(blockAt(v.x + dx, v.y + 2, v.z + dz)) === 'lantern') piers++;
     let arch = false;
     if (v.arch) { const piers = []; for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) { const n = nameOf(blockAt(v.x + dx, v.y + 3, v.z + dz)); if (/quartz_pillar|stone_bricks/.test(n) && /stone_bricks|quartz|chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 5, v.z + dz)))) piers.push([v.x + dx, v.z + dz]); } arch = piers.length >= 2; }
-    if (piers >= 2 && (sides.length >= 1 || arch)) fg++; else if (fgBad.length < 4) fgBad.push(`${v.id} (${piers} mouth posts; ${trees.length} trees, ${sides.length} at the sides)`);
+    if (piers >= 2 || arch) fg++; else if (fgBad.length < 4) fgBad.push(`${v.id} (${piers} posts; ${trees.length} trees, ${sides.length} at the sides)`);
+    if (sides.length >= 1 || arch) crowned++; else if (crBad.length < 6) crBad.push(v.id);
   }
-  check(fg === vs.length, `every vista has its foreground frame: the lantern posts at the spur's mouth, the walls, and a crown at the picture's side or the arch over the spur (${fg} of ${vs.length}${fgBad.length ? '; ' + fgBad.join(', ') : ''}; arches: ${vs.filter(v => v.arch).length})`);
+  // (the crowns where a tree may stand: never over a way, in another way's window or over the landmark — t-vista's
+  // tuning; at least four vistas in five)
+  check(fg === vs.length && crowned >= Math.ceil(vs.length * 0.8), `every vista has its foreground frame — the lantern posts along the walk and its walls, or the arch over it (${fg} of ${vs.length}${fgBad.length ? '; ' + fgBad.join(', ') : ''}) — and a crown at the picture's side or the arch in ${crowned} (at least four in five${crBad.length ? '; without: ' + crBad.join(', ') : ''}; arches: ${vs.filter(v => v.arch).length})`);
   // the middle distance: the vista's grove inside the picture, beside the landmark (or the woods or the water there)
   let mid = 0, inPic = 0;
   for (const v of vs) {

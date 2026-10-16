@@ -31,11 +31,11 @@
   W.allowed = (s) => !!s && s.enabled !== false && !s.guest && !s.guests && !s.busy && !(s.wait > 0);
   W.seen = (meta, id) => !!(meta && Array.isArray(meta.wowSeen) && meta.wowSeen.indexOf(id) >= 0);
   W.mark = (meta, id) => { if (!meta) return; if (!Array.isArray(meta.wowSeen)) meta.wowSeen = []; if (meta.wowSeen.indexOf(id) < 0) meta.wowSeen.push(id); };
-  // the vista nearest the feet (x, y, z) not yet seen in this world, within REACH (and 3 blocks of height), or null
+  // the wow vista nearest the feet (x, y, z) not yet seen in this world, within REACH (and 3 blocks of height), or null
   W.pick = (list, meta, x, y, z) => {
     let best = null, bd = W.REACH * W.REACH;
     for (const v of list) {
-      if (W.seen(meta, v.id) || Math.abs(y - v.y) > 3) continue;
+      if (v.wow === false || W.seen(meta, v.id) || Math.abs(y - v.y) > 3) continue;
       const dx = v.x + 0.5 - x, dz = v.z + 0.5 - z, d = dx * dx + dz * dz;
       if (d <= bd) { bd = d; best = v; }
     }
@@ -62,9 +62,10 @@
   // ---- the game's actor
   class Actor {
     constructor(game) { this.g = game; this.list = new Map(); this.acc = 0; this.wait = 0; this.active = null; this.t = 0; this.dom = null; this.a = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 1 }; this.b = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 1 }; this.out = {}; this.saved = null; this.count = 0; }
-    // the 'vista' spawns of a loaded column: ['vista', id, x, y, z, eyeX, eyeY, eyeZ, yaw, pitch, fov, landmark]
+    // the 'vista' spawns of a loaded column: ['vista', id, x, y, z, eyeX, eyeY, eyeZ, yaw, pitch, fov, landmark, wow] —
+    // wow 0: a quiet vista (its landmark too small from there to swing the view for; its bench and its view stay)
     absorb(spawns) {
-      for (const s of spawns) if (s && s[0] === 'vista' && !this.list.has(s[1])) this.list.set(s[1], { id: s[1], x: s[2], y: s[3], z: s[4], eye: [s[5], s[6], s[7]], yaw: s[8], pitch: s[9], fov: s[10], lm: s[11] });
+      for (const s of spawns) if (s && s[0] === 'vista' && !this.list.has(s[1])) this.list.set(s[1], { id: s[1], x: s[2], y: s[3], z: s[4], eye: [s[5], s[6], s[7]], yaw: s[8], pitch: s[9], fov: s[10], lm: s[11], wow: s[12] !== 0 });
     }
     state() {
       const g = this.g, mp = g.mp, Z = VR.Zeit;

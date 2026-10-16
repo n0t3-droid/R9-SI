@@ -32,6 +32,7 @@
   // the ground (the design's height — within ±2 of the generated surface on the open land — raised over the temple and
   // the city's lots, their bulk blocks a view too) and where trees can stand (the woods' density, none in a zone)
   const RC = 8, RN = 224, R0 = -RC * RN / 2;
+  const TOWERS = [[50, -24, 4, 74], [-50, -24, 4, 74], [24, -37, 3.5, 60], [-24, -37, 3.5, 60], [40, 8, 7, 50], [-40, 8, 7, 50], [69, -5, 12, 24]];
   VISTA.rasters = function (g) {
     if (g._vistaR) return g._vistaR;
     const H = new Float32Array(RN * RN), W = new Uint8Array(RN * RN);
@@ -41,6 +42,9 @@
       let h = D ? D.H : 70;
       if (X >= -55 && X <= 55 && Z >= -40 && Z <= 20) h = Math.max(h, Math.abs(X) <= 16 ? Y + 44 : Y + 28);   // the temple's tiers and wings
       else if (X >= -120 && X <= 116 && Z >= -176 && Z <= -12) h = Math.max(h, Y + 8);                          // Nova Haven's lots
+      // the temple's fluted towers, its pad towers and the domed hall (test/vista_preview.js: a vista looked at the
+      // citadel through the domed hall)
+      for (const [tx, tz, r, top] of TOWERS) if (Math.abs(X - tx) <= r + RC / 2 && Math.abs(Z - tz) <= r + RC / 2) h = Math.max(h, Y + top);
       H[k] = h;
       if (!D || h <= SEA + 2 || LAND.zoneAt(g, X, Z)) continue;
       W[k] = Math.round(255 * LAND.woodAt(g, X, Z).d);
@@ -329,11 +333,13 @@
     }
     // ---- 3. the vista points (VISTA.choose) and their spurs, frames and groves; 4. the sight windows
     VISTA.choose(g, P);
-    for (const V of P.vistas) { VISTA.buildSpur(g, P, K, V); VISTA.dressFrame(g, P, V); }
+    for (const V of P.vistas) VISTA.buildSpur(g, P, K, V);
     VISTA.openWindows(g, P);
     // ---- 5. where a way still looks into empty country for more than 60 blocks: an obelisk on the best rise ahead
     VISTA.fill(g, P, K);
-    for (const V of P.vistas) VISTA.dressGrove(g, P, V);
+    // ---- 6. the frames and the groves, after the windows: a frame tree never in a way's window (test/vista.js: an oak
+    // in a window toward the citadel), its own vista's cone cut round it
+    for (const V of P.vistas) { VISTA.dressFrame(g, P, V); VISTA.dressGrove(g, P, V); }
     P.vistaMs = Date.now() - t0;
   }, { order: 5.5 }));
 
@@ -343,7 +349,9 @@
   // eye reads (2–30° up), room for the spur toward it; the score likes a rise, a big landmark, a near-straight-on view.
   // Then greedily the best, none within 150 of another, a landmark not twice within 400.
   VISTA.SPACING = 150;
-  const WEIGHT = { temple: 1.4, citadel: 1.35, isles: 1.4, lighthouse: 1.15, falls: 1.0, nova: 1.0, station: 1.05, lookout: 0.9, hills: 0.95 };
+  VISTA.POSTS = 5;                // the lantern posts along the walk (blocks from the way's middle), the picture's lower corners
+  const ASPECT = 16 / 9;          // (the composition's frame: the game's window on a desktop)
+  const WEIGHT ={ temple: 1.4, citadel: 1.35, isles: 1.4, lighthouse: 1.15, falls: 1.0, nova: 1.0, station: 1.05, lookout: 0.9, hills: 0.95 };
   VISTA.horizonOk = function (g, Rr, ex, ey, ez, q) {
     // the terrain behind the landmark along the same bearing: its elevation stays under the top's (a silhouette on sky)
     const vx = q.x - ex, vz = q.z - ez, d = Math.hypot(vx, vz), elTop = (q.top - ey) / d;
@@ -375,14 +383,17 @@
         // the cheap tests first (range, size, the line over the land), then the costly ones for the best few
         const ok = [];
         for (const T of targets) {
-          const { L, q } = T, vx = q.x - px, vz = q.z - pz, d = Math.hypot(vx, vz); if (d < 70 || d > rangeOf(L)) continue;
+          const { L, q } = T, vx = q.x - px, vz = q.z - pz, d = Math.hypot(vx, vz); if (d < (L.id === 'hills' ? 200 : 70) || d > rangeOf(L)) continue;
           const elTop = Math.atan2(q.top - ey, d), elBase = Math.atan2((L.base || Y) - ey, d), size = elTop - Math.max(elBase, -6 * DEG);
           if (elTop < 2 * DEG || elTop > 30 * DEG || size < 2.5 * DEG) continue;
           one.x = q.x; one.z = q.z; one.top = q.top; one.r = q.r; one.base = L.base; one.id = L.id;
           if (!VISTA.sees(g, Rr, P, px, ey, pz, null, null, 0, one, false)) continue;
           const ux = vx / d, uz = vz / d, side = Math.abs(ux * tz / tl - uz * tx / tl);   // 1 = straight off the way's side
-          const sc = (WEIGHT[L.id] || 1) * Math.min(1.6, size / (6 * DEG)) * (1 + 0.12 * Math.max(-2, Math.min(6, rise))) * (0.75 + 0.25 * side) * (1 + h01(px, pz, 0x715) * 0.05);
-          ok.push({ T, d, ux, uz, elTop, sc });
+          // (the bigger the landmark stands, the better — up to 15° of the eye's height: vista.mjs's first pictures of
+          // the temple from 500–630 m were a tenth of the frame; the trailer's landmarks fill it. The hills' crest — a
+          // wall of green from under 200 m — reads from further out)
+          const sc = (WEIGHT[L.id] || 1) * Math.min(2.5, size / (6 * DEG)) * (1 + 0.12 * Math.max(-2, Math.min(6, rise))) * (0.75 + 0.25 * side) * (1 + h01(px, pz, 0x715) * 0.05);
+          ok.push({ T, d, ux, uz, elTop, size, sc });
         }
         ok.sort((a, b) => b.sc - a.sc);
         let best = null;
@@ -398,7 +409,7 @@
             drop = Math.max(drop, y - g0);
           }
           if (!room) continue;
-          best = { li, i, x: px, z: pz, y, lm: L.id, q, u: [ux, uz], d, sc: o.sc * (1 + 0.04 * Math.min(5, drop)), rise, drop, elTop: o.elTop };
+          best = { li, i, x: px, z: pz, y, lm: L.id, q, u: [ux, uz], d, sc: o.sc * (1 + 0.04 * Math.min(5, drop)), rise, drop, elTop: o.elTop, size: o.size };
           break;
         }
         if (best) cand.push(best);
@@ -435,18 +446,34 @@
         sel.push(c);
       }
     });
-    // the record: the spur, the composition (the eye in the spur's mouth, a little over a standing eye, looking down the
-    // walk — its walls the leading lines from the picture's lower corners, the bench and the lanterns at its end, the
-    // landmark's top a quarter of the frame's height under its top edge; vista.mjs's first run stood the eye 3 blocks
-    // back across the way, low: the far verge and the gate's piers filled the picture), the leading lines (the walls)
+    // the record: the spur, the composition, the leading lines (the walls). A little over a standing eye, looking down
+    // the walk — its walls the leading lines from the picture's lower corners, the lantern posts halfway along it in the
+    // lower corners (±0.72 of the half width), the bench and the end lanterns in the lower third, the landmark's top a
+    // quarter of the frame's height under its top edge. The lens narrows for a small landmark (62° → 46°: it stands up to
+    // 30 % of the frame's height) and the eye steps back over the way as far as the lens needs to keep the posts in
+    // the corners. (vista.mjs's runs: the eye 3 back across the way and low — the far verge and the gate's piers filled
+    // the picture; the eye in the mouth at 62° — the walls from the corners, but the temple from 400–630 m a tenth of
+    // the frame and the mouth posts beside the eye, cut by the frame's edge or not in it at all, 21 of 21)
     sel.forEach((c, k) => {
-      const [ux, uz] = c.u, ex = c.x + ux * 0.5, ez = c.z + uz * 0.5, ey = c.y + EYE + 2.2, fov = 62;
+      const [ux, uz] = c.u, fov = Math.round(Math.max(46, Math.min(62, c.size / DEG / 0.3))), th = Math.tan(fov * DEG / 2);
+      const te = Math.min(0.5, VISTA.POSTS - 3 / (0.72 * ASPECT * th));
+      // (on the spur's axis — the middle of its first cell, as buildSpur lays it out: the way's point itself stood up to
+      // a block to the side, one post at the frame's edge)
+      const ex = Math.round(c.x) + 0.5 + ux * te, ez = Math.round(c.z) + 0.5 + uz * te, ey = c.y + EYE + 2.2;
       const vx = c.q.x - ex, vz = c.q.z - ez, d = Math.hypot(vx, vz), elTop = Math.atan2(c.q.top - ey, d);
-      const pitch = elTop - Math.atan(0.45 * Math.tan(fov * DEG / 2));
+      // (a high landmark — the isles, the station on its peak — is not looked up at by more than 6°: its top climbs into
+      // the frame's upper part instead, so the walk's end still closes the picture's foot)
+      const pitch = Math.max(Math.min(elTop - Math.atan(0.45 * th), 6 * DEG), elTop - Math.atan(0.9 * th));
       const yaw = Math.atan2(-vx, -vz);
       const lead = [-2, 2].map(o => [[c.x + ux * 2 - uz * o, c.y + 1.5, c.z + uz * 2 + ux * o], [c.x + ux * (VISTA.SPUR + 1) - uz * o, c.y + 1.5, c.z + uz * (VISTA.SPUR + 1) + ux * o]]);
       const r = c.q.r, box = [c.q.x - r, c.q.base, c.q.z - r, c.q.x + r, c.q.top, c.q.z + r];
-      P.vistas.push({ id: 'v' + k, line: c.li, i: c.i, x: Math.round(c.x), z: Math.round(c.z), y: c.y, u: c.u, lm: c.lm, aim: [c.q.x, c.q.top, c.q.z], d: Math.round(c.d), rise: +c.rise.toFixed(1), drop: c.drop, eye: [+ex.toFixed(2), +ey.toFixed(2), +ez.toFixed(2)], yaw: +yaw.toFixed(4), pitch: +pitch.toFixed(4), fov, lead, box, frame: elTop < 9 * DEG && c.q.r < 40 ? 'arch' : 'trees', score: +c.sc.toFixed(3) });
+      // the arch over the walk where the landmark stands in its opening from this eye: its top a degree and a half under
+      // the lintel, its width inside the piers (vista.mjs: from the mouth the lighthouse's top hid behind the lintel)
+      let archT = null;
+      if (elTop < 9 * DEG && c.q.r < 40) for (const ta of [4.5, 5.5]) { const ahead = ta - te; if (Math.atan2(c.y + 4.5 - ey, ahead) - elTop >= 1.5 * DEG && Math.atan2(1.5, ahead) - Math.atan2(c.q.r, d) >= DEG) { archT = ta; break; } }
+      // the wow moment (wowmoment.js) only where the landmark stands big — 11° of the eye's height, or the isles' flock
+      // from under 260 m (vista.mjs: from 400–700 m a lighthouse or the temple a sliver over the land: a bench, a view, no swing)
+      P.vistas.push({ id: 'v' + k, line: c.li, i: c.i, x: Math.round(c.x), z: Math.round(c.z), y: c.y, u: c.u, lm: c.lm, aim: [c.q.x, c.q.top, c.q.z], d: Math.round(c.d), rise: +c.rise.toFixed(1), drop: c.drop, eye: [+ex.toFixed(2), +ey.toFixed(2), +ez.toFixed(2)], te: +te.toFixed(2), yaw: +yaw.toFixed(4), pitch: +pitch.toFixed(4), fov, lead, box, frame: archT !== null ? 'arch' : 'trees', archT, wow: c.size >= 11 * DEG || (c.lm === 'isles' && c.d <= 260), score: +c.sc.toFixed(3) });
     });
     return P.vistas;
   };
@@ -479,27 +506,14 @@
     const at = (t, o) => [Math.round(sx + ux * t - uz * o - 0.5), Math.round(sz + uz * t + ux * o - 0.5)];
     { const [bx, bz] = at(L - 0.5, 0); put(bx, y + 1, bz, st('vx_bench', { facing: FACE4(ux, uz) })); }
     for (const o of [-3, 3]) { const [lx, lz] = at(L + 1.6, o); put(lx, y + 1, lz, POST); put(lx, y + 2, lz, LANT); }
-    // the spur's mouth: a lantern post either side (like the two at its end), off the way — the first place from the mouth
-    // outward that is off it. (vista.mjs's first runs: four-high gate piers at ±2 hid a third of the picture and stood on
-    // the way at 19 of 21 spurs; piers of two and a cap at ±3, the eye in the mouth, still filled a corner)
-    const MPOST = white ? (st('quartz_pillar', { axis: 0 }) || POST) : POST;
-    for (const o of [-3, 3]) {
-      let pc = null;
-      for (const t of [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5]) { const c = at(t, o); if (!P.cells.has(ck(c[0], c[1]))) { pc = c; break; } }   // (past 3 the spur's room is off the way: choose())
-      if (!pc) continue;
-      const [lx, lz] = pc, g0 = gy(lx, lz);
-      for (let yy = g0 + 1; yy <= y; yy++) put(lx, yy, lz, BASE);   // (its footing where the land falls away)
-      put(lx, y + 1, lz, MPOST); put(lx, y + 2, lz, LANT); put(lx, y + 3, lz, 0);
-      keepSet(P, lx, lz, LAND.KEEP.PIECE);
-    }
-    // the arch (V.frame 'arch': the landmark low enough to stand in its opening): two piers on the walls 4.5 out, a lintel
-    // with a keystone over the walk — the picture's frame in the foreground
+    // the arch (V.frame 'arch': the landmark stands in its opening from the composition's eye, V.archT out — choose()):
+    // two piers on the walls, a lintel with a keystone over the walk — the picture's frame in the foreground
     if (V.frame === 'arch') {
       const PIER = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, LIN = white ? (st('smooth_quartz') || BASE) : st('stone_bricks'), KEY = white ? (st('chiseled_quartz_block') || LIN) : st('chiseled_stone_bricks');
       const done = new Set(), offWay = (ta) => [-2, 2].every(o => { const c = at(ta, o); return !P.cells.has(ck(c[0], c[1])); });
-      const ta = [4.5, 5.5].find(offWay);   // (4 ahead of the eye: the opening round the landmark; its piers never on the way)
+      const ta = [V.archT || 4.5].find(offWay);   // (its piers never on the way)
       if (ta !== undefined) {
-        for (let o = -2; o <= 2; o += 0.5) {
+        for (const o of [-2, 2, -1.5, 1.5, -1, 1, -0.5, 0.5, 0]) {   // (the piers first: on a slanting walk a lintel cell rounded onto a pier's took it)
           const [ax, az] = at(ta, o), k = ax * 65536 + az; if (done.has(k)) continue; done.add(k);
           if (Math.abs(o) >= 2) { for (let yy = y + 1; yy <= y + 4; yy++) put(ax, yy, az, PIER); put(ax, y + 5, az, LIN); put(ax, y + 6, az, st('lantern', { hanging: 0 })); }
           else put(ax, y + 5, az, Math.abs(o) < 0.5 ? KEY : LIN);
@@ -508,8 +522,32 @@
         V.arch = true;
       }
     }
+    // a lantern post either side of the walk halfway along it (like the two at its end), the picture's lower corners —
+    // four lights converging on the landmark. (vista.mjs's runs: four-high gate piers at ±2 hid a third of the picture
+    // and stood on the way at 19 of 21 spurs; posts at the mouth stood beside the eye, cut by the frame's edge or out of
+    // it at all 21; test/vista_preview.js measures them.) Where the arch stands, it is the frame instead.
+    const MPOST = white ? (st('quartz_pillar', { axis: 0 }) || POST) : POST;
+    // (the cell whose middle lies nearest the post's place in the spur's frame — a rounded point strays up to a block on
+    // a slanting spur: test/vista_preview.js found the posts from 2.4 to 3.9 off the axis — outside the walls, off the way)
+    const cellNear = (t, o) => {
+      const [bx, bz] = at(t, o); let best = null, bd = 1e9;
+      for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+        const x = bx + dx, z = bz + dz, cx = x + 0.5 - sx, cz = z + 0.5 - sz, tt = cx * ux + cz * uz, oo = -cx * uz + cz * ux;
+        if (Math.abs(oo) <= 2.5 || Math.sign(oo) !== Math.sign(o) || P.cells.has(ck(x, z))) continue;
+        const e = (tt - t) * (tt - t) + (oo - o) * (oo - o); if (e < bd) { bd = e; best = [x, z]; }
+      }
+      return bd <= 1.2 ? best : null;
+    };
+    if (!V.arch) for (const o of [-3, 3]) {
+      const pc = cellNear(VISTA.POSTS, o);
+      if (!pc) continue;
+      const [lx, lz] = pc, g0 = gy(lx, lz);
+      for (let yy = g0 + 1; yy <= y; yy++) put(lx, yy, lz, BASE);   // (its footing where the land falls away)
+      put(lx, y + 1, lz, MPOST); put(lx, y + 2, lz, LANT); put(lx, y + 3, lz, 0);
+      keepSet(P, lx, lz, LAND.KEEP.PIECE);
+    }
     // the spawn the game's wow moment reads: the trigger (the spur's start), the composition
-    LAND.addSpawn(P, ['vista', V.id, V.x, y + 1, V.z, V.eye[0], V.eye[1], V.eye[2], V.yaw, V.pitch, V.fov, V.lm], V.x, V.z);
+    LAND.addSpawn(P, ['vista', V.id, V.x, y + 1, V.z, V.eye[0], V.eye[1], V.eye[2], V.yaw, V.pitch, V.fov, V.lm, V.wow ? 1 : 0], V.x, V.z);
     P.pieces.push({ kind: 'vista', id: V.id, x: V.x, z: V.z, y, lm: V.lm });
   };
 
@@ -563,6 +601,7 @@
           if (run >= 40 && cands.length) {
             const c = cands.reduce((a, b) => (b.w / (1 + b.d / 900) > a.w / (1 + a.d / 900) ? b : a));
             const w = corridor(c.px, c.ey, c.pz, c.q, 6, 220);
+            if (w.len > 0) { const l = Math.hypot(c.q.x - c.px, c.q.z - c.pz) || 1; (P._wayLines || (P._wayLines = [])).push([c.px, c.pz, (c.q.x - c.px) / l, (c.q.z - c.pz) / l, w.len, c.lm]); }
             P.windows.push({ line: li, dir, i: c.i, x: Math.round(c.px), z: Math.round(c.pz), lm: c.lm, len: w.len, cut: w.cut });
             run = Math.abs(i - c.i); cands = [];
           }
@@ -607,26 +646,64 @@
       VISTA.openWindows(g, P, true);
     }
   };
-  // ---- a vista's frame and its middle ground: a tree pair at the spur's start (the picture's sides; planted before the
-  // windows, they are the frame the view is cut in), an arch over the spur where the landmark is low enough to stand in
-  // its opening (buildSpur), a grove 50–200 blocks out beside the sight axis (after the windows: none in a corridor)
-  const planTree = (g, P, x, z, kind, view) => {
+  // ---- a vista's frame and its middle ground: a tree pair beside the walk (the picture's sides; in its own vista's cone —
+  // the view is cut round them — but never in a way's window), an arch over the spur where the landmark stands in its
+  // opening (buildSpur), a grove 50–200 blocks out beside the sight axis (none in a corridor)
+  const planTree = (g, P, x, z, kind, view, frameOf, crown) => {
     x = Math.round(x); z = Math.round(z);
     if (LAND.zoneAt(g, x, z) || P.cells.has(ck(x, z)) || (LAND.keepAt(P, x, z) & (1 | 2 | 4 | 16 | (view ? 32 : 0)))) return false;
+    // (a frame tree: its crown never in a way's window — test/vista.js: two oaks in windows toward the citadel and the
+    // monopteros; its own vista's cone is cut round it)
+    // (a window from the way beside the vista toward its own landmark is the vista's view: the frame stands in it)
+    if (frameOf && P._wayLines) for (const [px, pz, ux, uz, len, lm] of P._wayLines) {
+      if (lm === frameOf.lm && Math.hypot(px - frameOf.x, pz - frameOf.z) < 20) continue;
+      const t = (x + 0.5 - px) * ux + (z + 0.5 - pz) * uz; if (t > 1 && t < len + crown && Math.abs(-(x + 0.5 - px) * uz + (z + 0.5 - pz) * ux) < crown + 1.5) return false;
+    }
+    // (a frame tree's crown never over a way: test/vista.js found an oak's boughs at head height over one)
+    if (crown) for (let dz = -crown; dz <= crown; dz++) for (let dx = -crown; dx <= crown; dx++) if (dx * dx + dz * dz <= crown * crown && P.cells.has(ck(x + dx, z + dz))) return false;
     const y0 = groundOf(g, P)(x, z); if (y0 <= SEA + 2) return false;
     if (P.trees.some(t => Math.abs(t.x - x) < 4 && Math.abs(t.z - z) < 4)) return false;
-    P.trees.push({ x, z, y: y0 + 1, kind });
+    P.trees.push(frameOf ? { x, z, y: y0 + 1, kind, frame: frameOf.id } : { x, z, y: y0 + 1, kind });
     return true;
   };
+  // a world point in a vista's picture: [x, y] in −1…1 (right, up) and the depth, or null behind the eye
+  VISTA.ndc = function (V, x, y, z) {
+    const dx = x - V.eye[0], dy = y - V.eye[1], dz = z - V.eye[2], sy = Math.sin(V.yaw), cy = Math.cos(V.yaw);
+    const f = -dx * sy - dz * cy, r = dx * cy - dz * sy, cp = Math.cos(V.pitch), sp = Math.sin(V.pitch), f2 = f * cp + dy * sp, u2 = -f * sp + dy * cp;
+    const t = Math.tan(V.fov * DEG / 2); return f2 <= 0.05 ? null : [r / (f2 * t * ASPECT), u2 / (f2 * t), f2];
+  };
+  // the landmark's box across the picture: [left, right] in −1…1
+  const boxSpan = (V) => { let l = 9, r = -9; const [x0, y0, z0, x1, y1, z1] = V.box; for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) { const q = VISTA.ndc(V, x, y, z); if (q) { l = Math.min(l, q[0]); r = Math.max(r, q[0]); } } return [l, r]; };
   VISTA.dressFrame = function (g, P, V) {
     const [ux, uz] = V.u;
     P.trees = P.trees || [];
     // a cherry's arching crown or a broad oak's either side, far enough out that the crowns close the picture's sides and
-    // leave the landmark free (from the eye ~50° off the axis, the crowns reaching in to ~25°)
+    // leave the landmark free (from the eye ~50° off the axis, the crowns reaching in to ~25° — and never over the
+    // landmark's box: test/vista_preview.js saw a cherry pair hide the isles, looked at from under them)
     V.framed = 0;
-    const fk = h01(V.x, V.z, 0x7a1) < 0.5 ? 4 : 0;
-    // (3.5 further out along the walk than the first design: the eye moved from 3 behind the spur's start into its mouth)
-    for (const sd of [-1, 1]) for (const [ft, fo] of (fk === 4 ? [[8.5, 11], [9.5, 12], [7.5, 10], [10.5, 12], [6.5, 10], [9.5, 10]] : [[7.5, 9], [8.5, 10], [6.5, 9], [9.5, 9], [8.5, 8], [10.5, 10]])) { const o = sd * fo; if (planTree(g, P, V.x + ux * ft - uz * o, V.z + uz * ft + ux * o, fk, false)) { V.framed++; break; } }
+    // (a cherry's boughs arch 8–9 blocks: in a narrower lens they reach across the axis — test/vista_preview.js: a pink
+    // crown over half the picture under the isles — so it frames the wide pictures, a broad oak the narrow ones)
+    const fk = V.fov >= 56 && h01(V.x, V.z, 0x7a1) < 0.5 ? 4 : 0;
+    const span = boxSpan(V), reach = fk === 4 ? 8.5 : 5, clearOf = (x, z, sd) => {
+      const ex = V.eye[0] + ux * 8, ez = V.eye[2] + uz * 8, dx = ex - x, dz = ez - z, l = Math.hypot(dx, dz) || 1;
+      const q = VISTA.ndc(V, x + 0.5 + dx / l * reach, V.y + 7, z + 0.5 + dz / l * reach);   // (the crown's inner edge: a cherry's boughs arch far)
+      const q4 = VISTA.ndc(V, x + 0.5 + dx / l * 4, V.y + 5, z + 0.5 + dz / l * 4);           // (its body: inside the picture's side, or it frames nothing)
+      return !!q && !!q4 && Math.abs(q4[0]) < 0.97 && (sd > 0 ? q[0] > span[1] + 0.08 : q[0] < span[0] - 0.08);
+    };
+    // (3.5 further out along the walk than the first design: the eye moved from 3 behind the spur's start into its mouth;
+    // laid out for the 62° lens with the eye in the mouth — a narrower lens, the eye further back: the trunks turned in
+    // by as much as the picture's half width narrows, so the crowns still close its sides)
+    const te = V.te === undefined ? 0.5 : V.te, halfH = Math.atan(Math.tan(V.fov * DEG / 2) * ASPECT), narrow = Math.atan(Math.tan(31 * DEG) * ASPECT) - halfH;
+    const designed = (fk === 4 ? [[8.5, 11], [9.5, 12], [7.5, 10], [10.5, 12], [6.5, 10], [9.5, 10], [8.5, 14], [10.5, 15]] : [[7.5, 9], [8.5, 10], [6.5, 9], [9.5, 9], [8.5, 8], [10.5, 10], [8.5, 12], [10.5, 13]])
+      .map(([ft, fo0]) => [ft, narrow > 0.01 ? (ft - te) * Math.tan(Math.atan2(fo0, ft - 0.5) - narrow) : fo0]);
+    // (and where those are taken — the way, a field, a window: further along, the trunk 2–11° outside the picture's
+    // side, its crown reaching in)
+    const more = []; for (const dd of [8, 10, 12, 14]) for (const a of [2, 5, 8, 11]) more.push([te + dd, dd * Math.tan(halfH + a * DEG)]);
+    for (const sd of [-1, 1]) for (const [ft, fo] of designed.concat(more)) {
+      const o = sd * fo, x = V.x + ux * ft - uz * o, z = V.z + uz * ft + ux * o;
+      if (!clearOf(Math.round(x), Math.round(z), sd)) continue;
+      if (planTree(g, P, x, z, fk, false, V, fk === 4 ? 7 : 5)) { V.framed++; break; }
+    }
   };
   VISTA.dressGrove = function (g, P, V) {
     const [ux, uz] = V.u, kindHere = (x, z) => { const q = LAND.woodAt(g, x, z); return q.kind === 3 ? 0 : q.kind; };
