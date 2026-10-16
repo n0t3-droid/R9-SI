@@ -143,7 +143,10 @@ async function gridOn(name, h, pitch, dists) {
     let best = null;
     for (let P = pred * 0.98; P <= pred * 1.02; P += pred * 0.002) { const r = fold(P); if (!best || r.border > best.border) best = Object.assign({ P }, r); }
     const atBorder = best.darkest >= 30 || best.darkest <= 1;
-    const grid = best.border >= 0.08 && atBorder;
+    // (v0.48: the contact shadows under the tufts and the gust bands on the ground add a dark line mid-block in some
+    // rows — the grid counts when the border's dip is at least four fifths of the darkest one's, so the block lines stay
+    // the picture's strongest periodic dark)
+    const grid = best.border >= 0.08 && (atBorder || best.border >= 0.8 * best.darkDip);
     out.push({ row: ys, D: +D.toFixed(1), period: +pred.toFixed(1), bestPeriod: +best.P.toFixed(1), borderDip: +(best.border * 100).toFixed(1), darkestBin: best.darkest, darkestDip: +(best.darkDip * 100).toFixed(1), grid });
   }
   return out;
