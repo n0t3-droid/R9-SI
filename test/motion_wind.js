@@ -136,17 +136,20 @@ for (const gu of [0, 0.5, 1]) {
   check(W.GROUND.wind === 1.25 && /vec3\(1\.06, 1\.04, 0\.86\), clamp\(sheen \* 1\.5, 0\.0, 0\.4\)\)/.test(FS) && W.GROUND.warm.join() === '1.06,1.04,0.86' && W.GROUND.warmK === 1.5 && W.GROUND.warmMax === 0.4, 'the crest turns a touch paler and yellower (the blades\' undersides; GROUND.warm)');
 }
 
-// ---- 7. Very Low: the terrain shaders without MOTION (and the other t-motion defines) are v0.46's text, word for word
+// ---- 7. Very Low: the shaders as the preprocessor leaves them for the lite look (LITE defined, none of the fronts'
+// defines) are v0.46's text, word for word — t-motion's MOTION/CLOUDSH/WXDRAMA code is behind its defines, and so is
+// every sibling front's (t-material's PBR/SSR/TEXHI, t-light2's), so the merged file is checked the same way
 console.log('Very Low keeps its shaders');
-const strip = (src, defs) => {
-  const out = [], st = [];
-  for (const line of src.split('\n')) {
-    const m = line.match(/^\s*#(ifdef|ifndef)\s+(\w+)/);
-    if (m) { if (defs.includes(m[2])) { st.push({ mine: true, keep: m[1] === 'ifndef' }); continue; } st.push({ mine: false }); }
-    else if (/^\s*#else\b/.test(line) && st.length && st[st.length - 1].mine) { st[st.length - 1].keep = !st[st.length - 1].keep; continue; }
-    else if (/^\s*#endif\b/.test(line) && st.length) { const f = st.pop(); if (f.mine) continue; }
-    if (st.every(f => !f.mine || f.keep)) out.push(line);
-  }
+const pp = (src, defs) => {   // (the small preprocessor test/water_fx.js uses: #ifdef/#ifndef/#if defined()/#elif/#else/#endif)
+  const out = [], st = [], ev = (e) => !!eval(e.replace(/defined\s*\(\s*(\w+)\s*\)/g, (_, d) => defs.includes(d) ? 'true' : 'false'));
+  for (const line of src.split('\n')) { const t = line.trim(); let m;
+    if ((m = /^#ifdef\s+(\w+)/.exec(t))) { const v = defs.includes(m[1]); st.push({ on: v, done: v }); continue; }
+    if ((m = /^#ifndef\s+(\w+)/.exec(t))) { const v = !defs.includes(m[1]); st.push({ on: v, done: v }); continue; }
+    if ((m = /^#if\s+(.*)$/.exec(t))) { const v = ev(m[1]); st.push({ on: v, done: v }); continue; }
+    if ((m = /^#elif\s+(.*)$/.exec(t))) { const q = st[st.length - 1], v = !q.done && ev(m[1]); q.on = v; q.done = q.done || v; continue; }
+    if (/^#else/.test(t)) { const q = st[st.length - 1]; q.on = !q.done; q.done = true; continue; }
+    if (/^#endif/.test(t)) { st.pop(); continue; }
+    if (st.every(q => q.on)) out.push(line); }
   return out.join('\n');
 };
 let baseS = null;
@@ -154,11 +157,12 @@ try {
   const root = path.join(__dirname, '..'), src = require('child_process').execFileSync('git', ['-C', root, 'show', '9b48d51:src/main/shaders.js'], { maxBuffer: 1 << 26 }).toString();
   const ctx = { VR: { Looks: VR.Looks, WaterWave: VR.WaterWave } }; require("vm").runInNewContext(src, ctx); baseS = ctx.VR.SHADERS;   // (the same shared helpers the page has: the look recolour, the water waves)
 } catch (e) { console.log('  (no base shaders: ' + String(e.message).split('\n')[0] + ')'); }
-const OURS = ['MOTION', 'CLOUDSH', 'WXDRAMA'];
+const LITE_DEFS = ['LITE'];   // the Very Low programs: the lite look and none of the fronts' switches
 if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'RAIN_VS', 'RAIN_FS', 'PART_VS', 'PART_FS', 'FURN_VS', 'PUFF_VS', 'PUFF_FS']) {
-  const mine = strip(VR.SHADERS[k], OURS), was = baseS[k];
+  const mine = pp(VR.SHADERS[k], LITE_DEFS), was = pp(baseS[k], LITE_DEFS);
   // (the base text's own COMMON resolved the same way: both strings come with COMMON inlined)
-  check(mine === strip(was, OURS), `${k} without ${OURS.join('/')} is v0.46's text (${mine.length} characters${mine === strip(was, OURS) ? '' : ', first difference at ' + [...mine].findIndex((c, i) => c !== was[i])})`);
+  let at = -1; if (mine !== was) { const a = mine.split('\n'), b = was.split('\n'); at = a.findIndex((l, i) => l !== b[i]); }
+  check(mine === was, `${k} on Very Low (LITE, after the preprocessor) is v0.46's text (${mine.length} characters${at < 0 ? '' : ', first different line ' + (at + 1) + ': ' + mine.split('\n')[at].trim().slice(0, 80)})`);
 }
 
 // ---- 8. the mesher writes the hung levels only when the job asks for motion
