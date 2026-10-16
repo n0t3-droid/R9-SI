@@ -14,6 +14,10 @@
 //          frond flaps up and down with its own phase, the gust droops the crown
 //   sheen  grass and leaves bent by a gust show their paler side: the faces brighten a little where a gust passes, so
 //          the waves read from afar
+//   ground the meadow's waves on the ground itself (the third browser run: the bands moved only the tufts, the green
+//          tops of the grass blocks stood still): a green block's top brightens — paler, a touch yellow — under a gust
+//          and darkens a little in the lull between, centred on the field's mean so the meadow keeps its brightness;
+//          drawn per pixel (TERRAIN_FS), as a merged top face spans many blocks
 // Pure functions, no state. VR.Wind.glsl() is the shaders' text (shaders.js inserts it under #ifdef MOTION).
 // ============================================================================
 (function (VR) {
@@ -25,6 +29,9 @@
   const SHEEN = W.SHEEN = 0.16;       // how much a full gust brightens grass and leaves
   const HANG = W.HANG = { amp: 0.06, w: 2.6, w2: 4.3, kx: 0.09, kz: 0.06, flutter: 0.003, fw: 9.0 };
   const FROND = W.FROND = { amp: 0.16, flap: 0.45, droop: 0.35 };
+  // the ground's bands: k the swing per unit of gust; mid the field's mean of g² (0.5 + 0.36·sin + 0.24·sin, squared), so
+  // the bands are centred on it at every gust; wind the strongest wind they follow; warm the paler, yellower crest
+  const GROUND = W.GROUND = { k: 0.5, mid: 0.344, wind: 1.25, warm: [1.06, 1.04, 0.86], warmK: 1.5, warmMax: 0.4 };
   const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
   // ---- the travelling gust pattern at (x, z), time t, the wind heading (dx, dz) (unit), weather.js's gust 0..1 → 0..1
@@ -56,6 +63,9 @@
     return { along: amp * w1, across: amp * w2, up: amp * (FROND.flap * Math.sin(t * 3.1 + slot * 2.3 + ph) - FROND.droop * G) };
   };
   W.sheen = (G) => SHEEN * clamp(G, 0, 1);
+  // ---- the ground's bands: a green top in the gust G (W.gust at its place) with the weather's gust `gust`: how much
+  // brighter (+) or darker (−) it is; the caller scales it by the wind (≤ GROUND.wind)
+  W.groundSheen = (G, gust) => GROUND.k * (clamp(G, 0, 1) - GROUND.mid * (GUST.base + (1 - GUST.base) * clamp(gust, 0, 1)));
   // a tint (rgb565) that is green: grass and foliage get the sheen, water and white faces do not
   W.greenTint = function (t565) {
     const r = ((t565 >> 11) & 31) / 31, g = ((t565 >> 5) & 63) / 63, b = (t565 & 31) / 31;
@@ -113,6 +123,9 @@ float windFrondUp(float amp, float slot, float ph, float t, float G) {
 }
 float windSheen(float G) {
   return ${f(SHEEN)} * clamp(G, 0.0, 1.0);
+}
+float windGroundSheen(float G, float gust) {
+  return ${f(GROUND.k)} * (clamp(G, 0.0, 1.0) - ${f(GROUND.mid)} * (${f(GUST.base)} + ${f(1 - GUST.base)} * clamp(gust, 0.0, 1.0)));
 }
 `;
   };

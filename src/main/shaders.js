@@ -632,6 +632,7 @@ invariant gl_Position;   // F10 · zPre: the cut-out layer's depth prepass and i
 #endif
 #ifdef MOTION
 out float v_sheen;       // t-motion: how much a passing gust brightens this grass or leaf face (wind.js windSheen)
+flat out float v_ground; // t-motion: a green block's top — the wind's strength (its gust bands are drawn per pixel), 0 otherwise
 ${VR.Wind ? VR.Wind.glsl() : ''}
 #endif
 void main() {
@@ -662,9 +663,11 @@ void main() {
   // tip free), leaves rustle harder in them, grass and leaves brighten as they bend (the waves read from afar); a hung
   // thing (the leaf bit with a sway level: a lantern, a sign, laundry, an awning's valance) swings as one piece about
   // its hook, the level its depth under it
-  v_sheen = 0.0;
+  v_sheen = 0.0; v_ground = 0.0;
   bool green = !ctmFace && float((a_tint >> 5u) & 63u) / 63.0 > float((a_tint >> 11u) & 31u) / 31.0 * 1.08 && float((a_tint >> 5u) & 63u) / 63.0 > float(a_tint & 31u) / 31.0 * 1.08;
-  if (sway > 0u || leaf > 0u || green) {
+  // (a green block's top: the meadow's waves on the ground, drawn per pixel by TERRAIN_FS — a merged face spans many blocks)
+  if (green && sway == 0u && leaf == 0u && (a_w5 & 7u) == 2u) v_ground = min(u_wind, 1.25);
+  else if (sway > 0u || leaf > 0u || green) {
     vec3 ap = wp + vec3(u_camInt);
     vec2 wq = vec2(-u_windDir.y, u_windDir.x);
     float G = windGust(ap.x, ap.z, u_time, u_windDir.x, u_windDir.y, u_gust);
@@ -761,7 +764,11 @@ flat in float v_fade;
 #endif
 #ifdef MOTION
 in float v_sheen;   // t-motion: a passing gust brightens grass and leaves (TERRAIN_VS, wind.js)
+flat in float v_ground;   // t-motion: a green block's top (TERRAIN_VS): the wind's strength — its gust bands are drawn here, per pixel
 uniform float u_snowCover;   // t-motion: a snow day's cover on the open ground (env.js: it builds in ~3 min of snow, melts in ~10)
+uniform vec2 u_windDir;      // (t-motion: the same uniforms as TERRAIN_VS: the ground's gust bands)
+uniform float u_gust;
+${VR.Wind ? VR.Wind.glsl() : ''}
 #endif
 layout(location=0) out vec4 o_col;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
@@ -863,7 +870,16 @@ void main() {
 #endif
   }
 #ifdef MOTION
-  alb.rgb *= 1.0 + v_sheen;   // t-motion · the wind's waves over the meadow: grass and leaves bent by a gust show their paler side
+  // t-motion · the wind's waves over the meadow: grass and leaves bent by a gust show their paler side; on a green block's
+  // top the bands run over the ground itself, per pixel (wind.js windGroundSheen: brighter and a touch yellower under a
+  // gust, a little darker in the lull, the meadow's mean unchanged)
+  float sheen = v_sheen;
+  if (v_ground > 0.0) {
+    vec3 gp = v_localPos + vec3(u_camInt);
+    sheen = windGroundSheen(windGust(gp.x, gp.z, u_time, u_windDir.x, u_windDir.y, u_gust), u_gust) * v_ground;
+  }
+  alb.rgb *= 1.0 + sheen;
+  alb.rgb = mix(alb.rgb, alb.rgb * vec3(1.06, 1.04, 0.86), clamp(sheen * 1.5, 0.0, 0.4));
   if (u_snowCover > 0.001 && (face == 2u || ((v_w5 >> 13u) & 1u) == 1u)) {   // a snow day: the flakes settle on the open tops
     vec2 sp = v_localPos.xz + vec2(u_camInt.xz);
     float patchy = smoothstep(0.25, 0.75, texture(u_noise, sp / 23.0).r * 0.7 + texture(u_noise, sp / 5.0).g * 0.3 + u_snowCover * 0.6 - 0.2);

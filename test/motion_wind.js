@@ -36,6 +36,7 @@ for (let i = 0; i < 2000; i++) {
     [W.frond(w, slot, ph, sc, t, wind, G, py).across, fnJS.windFrondAcross(fnJS.windFrondAmp(w, sc, wind, G), slot, ph, t, py)],
     [W.frond(w, slot, ph, sc, t, wind, G, py).up, fnJS.windFrondUp(fnJS.windFrondAmp(w, sc, wind, G), slot, ph, t, G)],
     [W.sheen(G), fnJS.windSheen(G)],
+    [W.groundSheen(G, gu), fnJS.windGroundSheen ? fnJS.windGroundSheen(G, gu) : NaN],
   ];
   for (const [p, q] of pairs) worst = Math.max(worst, Math.abs(p - q));
 }
@@ -113,6 +114,27 @@ const rgb565 = (r, g, b) => ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
 check(W.greenTint(rgb565(0x80, 0xA7, 0x55)) === 1 && W.greenTint(rgb565(0x61, 0x99, 0x61)) === 1, 'grass and foliage tints are green');
 check(W.greenTint(rgb565(0x3F, 0x76, 0xE4)) === 0 && W.greenTint(0xFFFF) === 0 && W.greenTint(rgb565(0xB3, 0x8A, 0x55)) === 0, 'water, white and the dry grass of the badlands are not');
 check(W.sheen(0) === 0 && near(W.sheen(1), W.SHEEN, 1e-12) && W.SHEEN <= 0.2, `a full gust brightens grass by ${W.SHEEN * 100} % at most`);
+// the ground's bands (the third browser run: the meadow's green tops stood still while the tufts swayed): centred on the
+// field's mean at every gust (the meadow keeps its brightness), a swing that reads (a fifth or more from lull to crest),
+// travelling downwind with the gust field; per pixel in TERRAIN_FS for a green block's top, flagged by TERRAIN_VS
+console.log('ground bands');
+for (const gu of [0, 0.5, 1]) {
+  let s = 0, n = 0, lo = 1, hi = -1;
+  for (let i = 0; i < 20000; i++) { const x = (R() - 0.5) * 3000, z = (R() - 0.5) * 3000, t = R() * 500, a = R() * 6.283; const v = W.groundSheen(W.gust(x, z, t, Math.cos(a), Math.sin(a), gu), gu); s += v; n++; lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  check(Math.abs(s / n) < 0.015 && hi - lo >= 0.2 && hi <= 0.34 && lo >= -0.2, `gust ${gu}: the ground's bands are centred (mean ${(s / n).toFixed(4)}) and swing ${lo.toFixed(3)} … +${hi.toFixed(3)} (lull to crest ≥ 0.2, within −0.2 … +0.34)`);
+}
+{
+  const dx = 0.6, dz = 0.8, x0 = 40, z0 = 90, N = 300, line = (t, sh) => { const o = []; for (let k = 0; k < N; k++) { const s = k * 0.5 + sh; o.push(W.groundSheen(W.gust(x0 + dx * s, z0 + dz * s, t, dx, dz, 0.3), 0.3)); } return o; };
+  const A = line(20, 0); let best = null;
+  for (let sh = -10; sh <= 10; sh += 0.25) { const B = line(20.5, sh); let d = 0; for (let k = 0; k < N; k++) d += (A[k] - B[k]) ** 2; if (!best || d < best.d) best = { sh, d }; }
+  check(best.sh >= 2.5 && best.sh <= 4.5, `the ground's bands travel downwind with the gusts (${best.sh.toFixed(2)} blocks in 0.5 s)`);
+}
+{
+  const VS = VR.SHADERS.TERRAIN_VS, FS = VR.SHADERS.TERRAIN_FS;
+  check(/#ifdef MOTION[\s\S]*flat out float v_ground;/.test(VS) && /if \(green && sway == 0u && leaf == 0u && \(a_w5 & 7u\) == 2u\) v_ground = min\(u_wind, 1\.25\);/.test(VS), 'TERRAIN_VS flags a green block\'s top for the per-pixel bands (the wind up to 1.25), no plant, no leaf');
+  check(/#ifdef MOTION[\s\S]*flat in float v_ground;[\s\S]*uniform vec2 u_windDir;[\s\S]*uniform float u_gust;[\s\S]*float windGroundSheen\(float G, float gust\)/.test(FS) && /if \(v_ground > 0\.0\) \{[\s\S]{0,200}sheen = windGroundSheen\(windGust\(gp\.x, gp\.z, u_time, u_windDir\.x, u_windDir\.y, u_gust\), u_gust\) \* v_ground;/.test(FS), 'TERRAIN_FS draws the ground\'s bands per pixel from the same gust field (wind.js)');
+  check(W.GROUND.wind === 1.25 && /vec3\(1\.06, 1\.04, 0\.86\), clamp\(sheen \* 1\.5, 0\.0, 0\.4\)\)/.test(FS) && W.GROUND.warm.join() === '1.06,1.04,0.86' && W.GROUND.warmK === 1.5 && W.GROUND.warmMax === 0.4, 'the crest turns a touch paler and yellower (the blades\' undersides; GROUND.warm)');
+}
 
 // ---- 7. Very Low: the terrain shaders without MOTION (and the other t-motion defines) are v0.46's text, word for word
 console.log('Very Low keeps its shaders');
