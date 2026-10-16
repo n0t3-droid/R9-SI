@@ -1942,7 +1942,9 @@
     ssrBegin() {
       const gl = this.gl;
       this.ssrOn = false;
-      if (!this.q.ssr || !this.sceneFB) { if (this.ssr) this.ssrFree(); return false; }
+      // (a driver that cannot draw into the two targets: the mirror stays off for this scene format — not built and thrown
+      //  away again every frame; a new format tries once more)
+      if (!this.q.ssr || !this.sceneFB || this.ssrBroken === this.sceneFmt().name) { if (this.ssr) this.ssrFree(); return false; }
       let S = this.ssr;
       if (!S || S.col !== this.sceneCol || S.w !== this.w || S.h !== this.h || S.fmt !== this.sceneFmt().name) {
         this.ssrFree();
@@ -1950,7 +1952,7 @@
         const mat = GL.tex2D(w, h, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { filter: gl.NEAREST });
         const tex = GL.tex2D(hw, hh, hdr ? gl.RGBA16F : gl.RGBA8, gl.RGBA, hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, { filter: gl.LINEAR });
         S = this.ssr = { col: this.sceneCol, w, h, hw, hh, fmt: this.sceneFmt().name, mat, tex, mrtFB: GL.fbo([this.sceneCol, mat], this.sceneDepth), fb: GL.fbo([tex]), applyFB: GL.fbo([this.sceneCol]) };
-        if (!S.mrtFB || !S.fb || !S.applyFB) { this.ssrFree(); this.ssrBroken = true; return false; }
+        if (!S.mrtFB || !S.fb || !S.applyFB) { this.ssrFree(); this.ssrBroken = S.fmt; return false; }
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.mrtFB);
       gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]);

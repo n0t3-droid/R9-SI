@@ -175,5 +175,27 @@ console.log('h · the texture units of the terrain programs (the merge with t-li
   check(mine.every(u => u >= 0 && u < 16 && u !== 12 && u !== 14), 'the material table and the hero textures sit on units 10, 11, 15, 13 — not t-light2\'s 12, not t-motion\'s 14', mine.join(', '));
 }
 
+console.log('i · the mirror on a driver that cannot draw into its two targets');
+{
+  // a framebuffer that stays incomplete (GL.fbo answers null): the mirror is off, the frame goes on — and it is not
+  // built again every frame (the textures and the framebuffers made and thrown away 60 times a second); a new scene
+  // format (the float targets falling back to 8 bits) tries once more
+  require('../src/main/gl.js'); require('../src/main/renderer.js');
+  const G = V.GL, R0 = V.Renderer.prototype, keep = { tex2D: G.tex2D, fbo: G.fbo };
+  let made = 0, fbos = 0;
+  G.tex2D = () => ({ t: ++made }); G.fbo = () => { fbos++; return null; };
+  const glStub = new Proxy({}, { get: (o, k) => (k in o ? o[k] : (typeof k === 'string' && /^[A-Z_0-9]+$/.test(k) ? 1 : () => {})) });
+  const r = Object.create(R0);
+  Object.assign(r, { gl: glStub, q: { ssr: true }, sceneFB: {}, sceneCol: {}, sceneDepth: {}, w: 64, h: 36, hdr: false, ssr: null, fmtName: 'rgba8' });
+  r.sceneFmt = function () { return { name: this.fmtName, bytes: 4 }; };
+  const runs = []; for (let f = 0; f < 5; f++) runs.push(r.ssrBegin());
+  const made5 = made, fbos5 = fbos;
+  r.fmtName = 'r11g11b10f'; runs.push(r.ssrBegin()); r.ssrBegin();
+  G.tex2D = keep.tex2D; G.fbo = keep.fbo;
+  check(runs.every(x => x === false) && !r.ssrOn && !r.ssr, 'an incomplete framebuffer leaves the mirror off and the frame drawn without it', JSON.stringify(runs));
+  check(made5 === 2 && fbos5 === 3, 'it is tried once, not every frame (five frames: two textures, three framebuffers)', `${made5} textures, ${fbos5} framebuffers`);
+  check(made === 4 && fbos === 6, 'a new scene format tries once more', `${made} textures, ${fbos} framebuffers in all`);
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
