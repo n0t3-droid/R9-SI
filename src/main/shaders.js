@@ -2606,7 +2606,10 @@ void main() {
          + (texture(u_ssr, v_uv + vec2(0.0, r.y * 2.6)) + texture(u_ssr, v_uv - vec2(0.0, r.y * 2.6))) * 0.7
          + (texture(u_ssr, v_uv + vec2(r.x * 0.8, 0.0)) + texture(u_ssr, v_uv - vec2(r.x * 0.8, 0.0))) * 0.6;
   s /= 6.6;
-  float a = m.b * s.a;
+  // (run 4: the plaza still showed a spray of lone hits — the flowers and the lamps by the kerb, thin things the rays
+  // reach only now and then. A mirror shows where most of its neighbourhood agrees: sparse hits fade out, a wall, a
+  // ship or a line of light comes through whole)
+  float a = m.b * s.a * smoothstep(0.25, 0.65, s.a);
   if (a < 0.003) discard;
   o = vec4(s.rgb / max(s.a, 1e-3), a);
 }`;
