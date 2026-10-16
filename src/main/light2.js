@@ -155,8 +155,19 @@
   // ---------------------------------------------------------------- step 4 · the air
   // the height fog: density ρ(y) = ρ0 · exp(−k (y − base)); its optical depth along a ray from the eye (height ye) over
   // the distance D rising by dy: ρ0 · exp(−k (ye − base)) · D · (1 − exp(−k dy)) / (k dy)
+  // Below the valley floor the haze stops thickening: from FLOOR blocks under its base down it keeps that density (the
+  // deepest valley; the march's light in the air the same). And far below the sea level there is no valley haze at all:
+  // an eye 12 … 24 blocks under the base fades it out (L2.fogEye — the flat world's ground at y 4, the deep caves; with
+  // the old clamp at 40 under the base the flat world stood in 17 times the valley's haze, 16 % of it 11 blocks off
+  // by day: classic_v2's block grid washed out). The Heartland's eyes and valleys (≥ the base − 8) are unchanged. The
+  // ray's two ends are held at the floor (a ray all under it: the floor's density along its whole length; one that
+  // dips under it: never denser than the floor).
+  L2.FOG_FLOOR = 8;
+  L2.fogEye = (eyeY, base) => sstep(base - 24, base - 12, eyeY);
   L2.fogOD = function (ye, dy, D, rho0, k, base) {
-    const y0 = Math.max(ye - base, -40);
+    const fy = base - L2.FOG_FLOOR, e = Math.max(ye, fy);
+    dy = Math.max(ye + dy, fy) - e;
+    const y0 = e - base;
     const kd = k * dy;
     const g = Math.abs(kd) > 1e-4 ? (1 - Math.exp(-kd)) / kd : 1 - kd * 0.5;
     return rho0 * Math.exp(-k * y0) * D * g;
@@ -164,7 +175,7 @@
   // the same by marching (the test's reference)
   L2.fogODMarch = function (ye, dy, D, rho0, k, base, n) {
     n = n || 2000; let s = 0;
-    for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, y = ye + dy * t; s += rho0 * Math.exp(-k * Math.max(y - base, -40)); }
+    for (let i = 0; i < n; i++) { const t = (i + 0.5) / n, y = ye + dy * t; s += rho0 * Math.exp(-k * Math.max(y - base, -L2.FOG_FLOOR)); }
     return s * D / n;
   };
   // the air by the hour: the haze's density at the valley floor (per block), its scale height, its base, the aerial
@@ -382,9 +393,10 @@ vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   float ad = dist * u_l2Fog2.x, ap = (1.0 - exp(-ad * ad)) * u_l2Fog2.y;
   col = mix(col, hz, ap);
   // the height fog along the ray
-  float k = u_l2Fog.y, dy = rel.y, kd = k * dy;
+  // (under the valley floor, L2.FOG_FLOOR blocks below the base, the haze keeps the floor's density: the ray's ends held there)
+  float k = u_l2Fog.y, fy = u_l2Fog.z - ${L2.FOG_FLOOR.toFixed(1)}, ye = max(u_l2Fog.w, fy), dy = max(u_l2Fog.w + rel.y, fy) - ye, kd = k * dy;
   float g = abs(kd) > 1e-4 ? (1.0 - exp(-kd)) / kd : 1.0 - kd * 0.5;
-  float od = u_l2Fog.x * exp(-k * max(u_l2Fog.w - u_l2Fog.z, -40.0)) * dist * g;
+  float od = u_l2Fog.x * exp(-k * (ye - u_l2Fog.z)) * dist * g;
   float hf = 1.0 - exp(-od);
   float toSun = max(dot(dir, u_sunDir), 0.0), t2 = toSun * toSun, t4 = t2 * t2;
   vec3 mist = u_l2FogCol + u_sunColor * (t4 * t4 * u_l2Fog2.z);
@@ -514,7 +526,7 @@ void main() {
     if (sc.x > 0.0 && sc.y > 0.0 && sc.x < 1.0 && sc.y < 1.0 && sc.z < 1.0) vis = texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - u_volH.w));
     if (i == 0) eye = vis;
     float h = u_volH.x + dir.y * t;
-    float w = exp(-u_volH.y * max(h - u_volH.z, -30.0)) * exp(-t * u_volF.x) * 2.0 * u * dt;
+    float w = exp(-u_volH.y * max(h - u_volH.z, ${(-L2.FOG_FLOOR).toFixed(1)})) * exp(-t * u_volF.x) * 2.0 * u * dt;
     acc += vis * w; tot += w;
   }
   // the shafts: weighed by how much of the ray is in shadow (a ray all lit or all dark: the haze as it is; most where a

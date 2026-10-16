@@ -182,6 +182,18 @@ console.log('d · the air');
   check(worst < 0.005, `the height fog's integral along a ray matches a 2000-step march (worst ${r3(worst * 100)} %)`);
   const low = L2.fogOD(66, 0, 200, 0.002, 1 / 14, 62), high = L2.fogOD(100, 0, 200, 0.002, 1 / 14, 62);
   check(low > high * 5, `denser in the valley: 200 blocks level at y 66 ${r3(low)} against y 100 ${r3(high)}`);
+  // (classic_v2 after run 4: the flat world's grass lies at y 4, 58 blocks under the haze's base — with the clamp at 40
+  // under it the air there was 17 times the valley's, 16 % of mist 11 blocks off at noon, and the block grid's lines
+  // dipped half as deep. Below the base − FLOOR the haze keeps that density; an eye far under the sea level has none)
+  const day = L2.air({ sunDir: [-0.36, 0.41, 0.84], rain: 0 }, 6000), fl = L2.FOG_FLOOR;
+  const atFloor = L2.fogOD(day.base - fl, 0, 100, day.rho, day.k, day.base), deep = L2.fogOD(9.6, 0, 100, day.rho, day.k, day.base);
+  const deepM = L2.fogODMarch(9.6, -5, 12, day.rho, day.k, day.base), deepA = L2.fogOD(9.6, -5, 12, day.rho, day.k, day.base);
+  const dip = L2.fogOD(70, -40, 100, day.rho, day.k, day.base), floorD = day.rho * Math.exp(fl * day.k) * 100;
+  check(fl >= 4 && fl <= 12 && Math.abs(deep - atFloor) < 1e-12 && Math.abs(deepA - deepM) / deepM < 0.005 && dip <= floorD * 1.0001, `below the valley floor (${fl} under the base) the haze keeps that density: at y 9.6 ${r3(deep * 10)} ‰ per block as at y ${day.base - fl} (the old clamp: ${r3(day.rho * Math.exp(40 * day.k) * 1000)} ‰), over 100 blocks from y 70 down to 30 ${r3(dip)} (the floor's ${r3(floorD)} at most)`);
+  const hf = (ey) => 1 - Math.exp(-L2.fogOD(ey, -5, 12, day.rho * L2.fogEye(ey, day.base), day.k, day.base));
+  check(L2.fogEye(9.6, day.base) === 0 && L2.fogEye(30, 62) === 0 && L2.fogEye(day.base - 12, day.base) === 1 && L2.fogEye(63, 62) === 1 && L2.fogEye(44, 62) > 0 && L2.fogEye(44, 62) < 1, `no valley haze far under the sea level: the flat world's eye (y 9.6) ${r3(hf(9.6) * 100)} % of mist 12 blocks off at noon, the lake's shore (y 64) ${r3(hf(64) * 100)} %, a cave at y 44 ×${r2(L2.fogEye(44, 62))}`);
+  const vf0 = pre(L2.VOL_FS, []), lc0 = pre(L2.glslCommon(), ['AIR2']), lit = `${(-fl).toFixed(1)}`;
+  check(vf0.includes(`max(h - u_volH.z, ${lit})`) && lc0.includes(`fy = u_l2Fog.z - ${fl.toFixed(1)}, ye = max(u_l2Fog.w, fy), dy = max(u_l2Fog.w + rel.y, fy) - ye`) && lc0.includes('exp(-k * (ye - u_l2Fog.z))'), `the shaders keep the same floor (${lit}): the march's air and the haze (its ray's ends held at the floor, as L2.fogOD)`);
   const E = { sunDir: [0.5, 0.21, 0.84], rain: 0 };
   const dawn = L2.air(E, 500), noon = L2.air({ sunDir: [-0.36, 0.41, 0.84], rain: 0 }, 6000);
   check(dawn.morning > 0.9 && noon.morning === 0 && dawn.rho > noon.rho * 2 && dawn.base < noon.base, `the morning layer: at 06:30 (ticks 500) the haze ${r3(dawn.rho * 1000)} ‰ and lower (base ${r2(dawn.base)}), at noon ${r3(noon.rho * 1000)} ‰`);

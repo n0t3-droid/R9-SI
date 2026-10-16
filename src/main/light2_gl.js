@@ -59,8 +59,8 @@
     if (q2(this) && u.u_sunColor && u.u_l2Sky && E && E.sunColor) { const t = l.sunTint, c = E.sunColor; gl.uniform3f(u.u_sunColor, c[0] * t[0], c[1] * t[1], c[2] * t[2]); }   // (the sun by the hour on the lit things)
     if (u.u_l2Fog) {
       // the air: the height fog from this eye (the far cache's own eye in its strips), the aerial perspective, the mist
-      const a = l.air, c = this.cam, m = l.mist;
-      gl.uniform4f(u.u_l2Fog, a.rho, a.k, a.base, c ? c.y : 64);
+      const a = l.air, c = this.cam, m = l.mist, ey = c ? c.y : 64;
+      gl.uniform4f(u.u_l2Fog, a.rho * L2.fogEye(ey, a.base), a.k, a.base, ey);   // (no valley haze far under the sea level)
       gl.uniform4f(u.u_l2Fog2, 1 / a.apDist, a.apMax, a.sunK, 0);
       gl.uniform3f(u.u_l2FogCol, m[0], m[1], m[2]);
     }
