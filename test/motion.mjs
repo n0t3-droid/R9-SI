@@ -100,10 +100,13 @@ async function openWorld(dist, preset) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
   const boost = (on) => ev((on) => { const g = VR.game, q = g.renderer && g.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
-  const settle = async (max = 60, farMax = 30) => {
+  // (minMs: a view is not given up before this much wall-clock time — run 3's street stopped at its iteration cap after
+  // 204 s with 499 sections still to mesh under the machine's load, the hall's nave shown as its far LOD; hardMs: the cap)
+  const settle = async (max = 60, farMax = 30, minMs = 0, hardMs = 600000) => {
     let s = null;
+    const t0 = Date.now();
     await boost(true);
-    for (let i = 0; i < max; i++) {
+    for (let i = 0; i < max || (Date.now() - t0 < minMs && Date.now() - t0 < hardMs); i++) {
       await step(20, 16);
       s = await ev(() => { const g = VR.game, w = g.world, p = g.player, rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; } let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } const h = g.horizon, f = h && h.far, fr = f && f.report ? f.report() : null; return { busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, hz: h ? h.inflight : 0, far: fr ? fr.inflight + fr.want : 0 }; });
       const near = s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0;
@@ -185,7 +188,7 @@ async function shoot(tag, dist) {
       // starships), the life director's balloons and carts, the trams, the people and the animals — their motion is not
       // this branch's, and when they come by differs from one run to the next (run 2's night: a ship before, none after)
       await A.ev(() => { const g = VR.game; g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = function () {}; } } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') { g.__frozen.push([V, k, V[k]]); V[k] = function () {}; } });
-      const st = await A.settle(120, 20); await A.step(150);   // (5 s: what the actors left in the air — a ship's vapour — fades; the steady air stays)
+      const st = await A.settle(120, 20, 240000, 480000); await A.step(150);   // (5 s: what the actors left in the air — a ship's vapour — fades; the steady air stays)
       await A.warmVx();
       Object.assign(out, { x: +v.x.toFixed(2), feet: +(eyeY - EYE).toFixed(2), z: +v.z.toFixed(2), yaw: +yaw.toFixed(3), pitch: +pitch.toFixed(3), tod, settle: st });
       const base = `/home/dev/vr/test/shots/motion_${v.name}${tag === 'after' ? '' : '_' + tag}`;
