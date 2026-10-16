@@ -248,6 +248,7 @@
       E.contrast = GRADE.contrast; E.vignette = GRADE.vignette; E.nebula = GRADE.nebula; E.sunDisc = GRADE.sunDisc;
       // t-sky: the god rays at 40 % by day (a high sun's rays streak the clean day sky the trailer shows), full round dusk
       E.rays = GRADE.rays * (SKY.on ? 1 - 0.92 * wDay : 1); E.gridK = GRADE.gridK;   // t-sky2: 8 % by day (the frames' day has no rays; with the sun in view every ray sampled its core and veiled the whole sky, L* +6 at the top)
+      if (VR.Sky3 && VR.Sky3.frame) VR.Sky3.frame(E, this);   // t-sky3: the moons in their phases, the shooting star, the aurora (sky3.js; nothing with the sky's switch off)
       return E;
     }
     lightning() { this.wx.strike(); }

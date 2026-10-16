@@ -2054,5 +2054,11 @@
     'g.set.cloudShadow.tip': 'The clouds\' shadows drift with the wind over meadows, hills and roofs. From Balanced up.',
     'g.set.wxDrama': 'Weather drama: storm front, lightning, rainbow, fog banks',
     'g.set.wxDrama.tip': 'A storm rolls in from one side, the wind picks up, lightning outlines the hills, the rain blows sideways; afterwards a rainbow. In the morning fog banks lie in the valleys. Off on Very Low.',
+    // t-sky3 · WOW V · Der Himmel (src/main/sky3.js): the sky's level and the clouds with volume
+    'g.set.sky3': 'Sky: sunset glow, moons, shooting stars, aurora',
+    'g.set.sky3V': ['Simple', 'Beautiful', 'Splendid'],
+    'g.set.sky3.tip': 'The sky by the hour: the golden hour, sunsets in layered bands with a large sun disc, the afterglow and the earth\'s shadow; at night two moons in their phases and shooting stars. From Balanced up also an aurora on some nights, cloud banks out to the horizon and sunbeams through the gaps in the clouds. On Very Low as before.',
+    'g.set.cloudVol': 'Clouds with volume',
+    'g.set.cloudVol.tip': 'Cumulus clouds as bodies: sunlit tops, shaded flat bases, a glowing rim against the sun, golden in the golden hour, pink at dusk, blue-grey in the moonlight; under a rain deck dark rags of cloud drift by. From Balanced up.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

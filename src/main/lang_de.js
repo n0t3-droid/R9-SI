@@ -2054,5 +2054,11 @@
     'g.set.cloudShadow.tip': 'Die Schatten der Wolken ziehen mit dem Wind über Wiesen, Hügel und Dächer. Ab Ausgewogen.',
     'g.set.wxDrama': 'Wetter-Drama: Gewitterfront, Blitze, Regenbogen, Nebelbänke',
     'g.set.wxDrama.tip': 'Ein Gewitter zieht von einer Seite heran, der Wind frischt auf, Blitze zeichnen die Hügel nach, der Regen weht schräg; danach ein Regenbogen. Morgens liegen Nebelbänke in den Tälern. Auf Sehr niedrig aus.',
+    // t-sky3 · WOW V · Der Himmel (src/main/sky3.js): the sky's level and the clouds with volume
+    'g.set.sky3': 'Himmel: Abendrot, Monde, Sternschnuppen, Polarlicht',
+    'g.set.sky3V': ['Einfach', 'Schön', 'Prächtig'],
+    'g.set.sky3.tip': 'Der Himmel nach Tageszeit: die goldene Stunde, das Abendrot in Farbbändern mit großer Sonnenscheibe, das Nachglühen und der Erdschatten; nachts zwei Monde in ihren Phasen und Sternschnuppen. Ab Ausgewogen dazu Polarlicht in manchen Nächten, Wolkenbänke bis zum Horizont und Sonnenstrahlen durch die Wolkenlücken. Auf Sehr niedrig wie bisher.',
+    'g.set.cloudVol': 'Wolken mit Volumen',
+    'g.set.cloudVol.tip': 'Die Haufenwolken als Körper: sonnige Kuppen, schattige flache Böden, ein leuchtender Rand im Gegenlicht, golden in der goldenen Stunde, rosa in der Dämmerung, blaugrau im Mondlicht; unter einer Regendecke ziehen dunkle Wolkenfetzen. Ab Ausgewogen.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

@@ -122,6 +122,8 @@
   // t-light2 · WOW I · Das Licht (light2.js L2.ROWS): the light model, the contact shadows, the light in the air, the air,
   // the grade — Bild · Licht & Schatten, each with its cost
   if (VR.Light2 && VR.Light2.ROWS) for (const it of VR.Light2.ROWS) S.add(Object.assign({}, it));
+  // t-sky3 · WOW V · Der Himmel (sky3.js S3.ROWS): Himmel (0 · 1 · 2) in Licht & Schatten, Wolken mit Volumen in Dinge & Effekte
+  if (VR.Sky3 && VR.Sky3.ROWS) for (const it of VR.Sky3.ROWS) S.add(Object.assign({}, it));
   // F10 · Bandbreite (ipu.js): the five switches for graphics chips that share the system's memory (each saves memory traffic;
   // the picture stays) — on for Ultra · Leicht and on every preset of an integrated GPU (game.js ipuDefaults)
   for (const k of ['hdrLite', 'postLite', 'zPre', 'texLite', 'dprLite']) S.add({ key: k, g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.' + k, tip: 'g.set.' + k + '.tip', cost: 'low', def: false });
