@@ -2596,12 +2596,16 @@ out vec4 o;
 void main() {
   vec4 m = texture(u_mat, v_uv);
   if (m.b < 0.003) discard;
-  // the hits, gathered over a footprint that grows with the roughness (a polished floor sharp, a honed one soft); a
-  // texel's hit counts by its own weight, so a lone hit spreads thin instead of standing out
-  vec2 px = 1.0 / vec2(textureSize(u_ssr, 0)), r = px * (0.6 + m.a * 5.0);
-  vec4 s = texture(u_ssr, v_uv) * 2.0 + texture(u_ssr, v_uv + vec2(r.x, r.y)) + texture(u_ssr, v_uv + vec2(-r.x, r.y))
-         + texture(u_ssr, v_uv + vec2(r.x, -r.y)) + texture(u_ssr, v_uv + vec2(-r.x, -r.y));
-  s /= 6.0;
+  // the hits, gathered over a footprint that grows with the roughness (a polished floor sharp, a honed one soft), drawn
+  // out up and down the screen as a glossy floor smears what it mirrors toward the eye (run 4: the hangar's floor mirrored
+  // the holo walls' fine data as a mottle; streaked, it reads as gloss); a texel's hit counts by its own weight, so a lone
+  // hit spreads thin instead of standing out
+  vec2 px = 1.0 / vec2(textureSize(u_ssr, 0)), r = px * (1.0 + m.a * 6.0);
+  vec4 s = texture(u_ssr, v_uv) * 2.0
+         + texture(u_ssr, v_uv + vec2(0.0, r.y)) + texture(u_ssr, v_uv - vec2(0.0, r.y))
+         + (texture(u_ssr, v_uv + vec2(0.0, r.y * 2.6)) + texture(u_ssr, v_uv - vec2(0.0, r.y * 2.6))) * 0.7
+         + (texture(u_ssr, v_uv + vec2(r.x * 0.8, 0.0)) + texture(u_ssr, v_uv - vec2(r.x * 0.8, 0.0))) * 0.6;
+  s /= 6.6;
   float a = m.b * s.a;
   if (a < 0.003) discard;
   o = vec4(s.rgb / max(s.a, 1e-3), a);
