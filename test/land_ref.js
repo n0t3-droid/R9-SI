@@ -10,13 +10,13 @@
 // The checks (the light off against on, TAG's pictures): with the light on the land is nearer the frames than with it
 // off — the split of warm light over cool shade, the mean ΔE of the bands — at noon, the golden hour and dusk (the mean
 // over the views); at night the shade keeps a cool lean and the lamps a warm one. No pictures: the frames only.
-// usage: node test/land_ref.js  (TAG=after · VIEWS=avenue,… · after test/light2.mjs wrote its pictures)
+// usage: node test/land_ref.js  (TAG=after · OFF_TAG=… · VIEWS=avenue,… · after test/light2.mjs wrote its pictures)
 const fs = require('fs'), path = require('path');
 const SR = require('./sky_ref.js');
 const sharp = require('/home/dev/.npm-global/lib/node_modules/sharp');
 const FRAMES_DIR = path.join(__dirname, '..', 'docs', 'trailer', 'frames');
-const SHOTS = path.join(__dirname, 'shots');
-const TAG = process.env.TAG || 'after';
+const SHOTS = '/home/dev/vr/test/shots';   // (test/wt_run.sh points it at this checkout's)
+const TAG = process.env.TAG || 'after', OFF_TAG = process.env.OFF_TAG || TAG;   // (OFF_TAG: the light-off pictures of another run)
 const VIEWS = (process.env.VIEWS || 'avenue,temple,hills,lake,villa,trees,hallcity').split(',');
 const KIND_OF = { noon: 'day', golden: 'golden', dusk: 'dusk' };
 const NBL = 4;
@@ -77,7 +77,7 @@ if (require.main === module) (async () => {
   check(target.day && target.golden && target.dusk && target.golden.split > 0 && target.dusk.split > target.golden.split && target.day.split < target.golden.split, `the frames: by day a white-cyan light (split ${target.day && r1(target.day.split)}), the golden hour warm over cool (${target.golden && r1(target.golden.split)}), dusk more so (${target.dusk && r1(target.dusk.split)})`);
 
   // ---- the game's pictures (when there are any)
-  const shot = (v, t, c) => path.join(SHOTS, `light2_${v}_${t}_${c}_${TAG}.png`);
+  const shot = (v, t, c) => path.join(SHOTS, `light2_${v}_${t}_${c}_${c === 'off' ? OFF_TAG : TAG}.png`);
   const have = VIEWS.filter(v => fs.existsSync(shot(v, 'noon', 'on')) && fs.existsSync(shot(v, 'noon', 'off')));
   if (!have.length) { console.log(`(no pictures of TAG ${TAG} with the light on and off: the frames only)`); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); process.exit(fails ? 1 : 0); }
   const game = {};

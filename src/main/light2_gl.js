@@ -33,10 +33,11 @@
     // the moon a cool key light (the lit things' u_moonColor, set again in l2Uniforms: E itself is not changed — a frame
     // drawn twice from the same E stays the same)
     const k = L2.K.moon, m = E.moonColor || [0, 0, 0];
-    this.l2.moon = q.l2Light ? [m[0] * k * 0.92, m[1] * k * 0.98, m[2] * k * 1.08] : null;
+    this.l2.moon = q.l2Light ? [m[0] * k * 0.9, m[1] * k * 0.98, m[2] * k * 1.12] : null;
   };
 
   // ---------------------------------------------------------------- the uniforms (common() calls it for every program)
+  const q2 = (r) => !!(r.q && r.q.l2Light);
   R.l2Uniforms = function (p, E) {
     const u = p.u, gl = this.gl, l = this.l2;
     if (u.u_l2AoK) this.l2AoUniforms(u);
@@ -53,6 +54,7 @@
     if (u.u_l2Az) gl.uniform2f(u.u_l2Az, l.az[0], l.az[1]);
     if (u.u_l2Pool) gl.uniform4f(u.u_l2Pool, l.pool[0], l.pool[1], l.pool[2], l.pool[3]);
     if (l.moon && u.u_moonColor && u.u_l2Sky) gl.uniform3f(u.u_moonColor, l.moon[0], l.moon[1], l.moon[2]);   // (the lit things only: the sky's moon stays the sky's)
+    if (q2(this) && u.u_sunColor && u.u_l2Sky && E && E.sunColor) { const t = l.sunTint, c = E.sunColor; gl.uniform3f(u.u_sunColor, c[0] * t[0], c[1] * t[1], c[2] * t[2]); }   // (the sun by the hour on the lit things)
     if (u.u_l2Fog) {
       // the air: the height fog from this eye (the far cache's own eye in its strips), the aerial perspective, the mist
       const a = l.air, c = this.cam, m = l.mist;

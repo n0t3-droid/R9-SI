@@ -149,7 +149,7 @@ console.log('c · the light model');
   let mono = true; for (let l = 1; l <= 15; l++) if (L2.pool(l / 15) < L2.pool((l - 1) / 15) - 1e-9) mono = false;
   check(mono, 'the lamps\' light rises toward the lamp (monotone in the level)');
   check(P(0) >= 1.6 * O(0) && P(1) > O(1), `a hot spot at the lamp: ${r2(P(0))} against the old ${r2(O(0))} (a block off ${r2(P(1))} against ${r2(O(1))})`);
-  check(P(8) < O(8) * 0.6 && P(14) < 0.02, `a pool, not a ramp: 8 blocks off ${r3(P(8))} against the old ${r3(O(8))}, 14 off ${r3(P(14))}`);
+  check(P(8) < O(8) * 0.7 && P(5) < O(5) && P(14) < 0.03, `a pool, not a ramp: 5 blocks off ${r3(P(5))} against the old ${r3(O(5))}, 8 off ${r3(P(8))} against ${r3(O(8))}, 14 off ${r3(P(14))} (a street lit by many lamps keeps its warmth between them)`);
 }
 
 console.log('d · the air');

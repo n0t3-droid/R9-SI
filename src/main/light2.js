@@ -102,8 +102,13 @@
   // the shade's colour leans blue (the sky's light), the ground's bounce warm (the sunlit ground), per mood
   const SKYTINT = { day: [0.94, 1.0, 1.1], gold: [0.88, 0.97, 1.2], dusk: [0.96, 0.93, 1.12], night: [0.84, 0.96, 1.25] };
   const GROUND = { day: [1.06, 1.0, 0.72], gold: [1.18, 0.96, 0.66], dusk: [1.02, 0.86, 0.9], night: [0.86, 0.92, 1.08] };
-  const GROUNDK = { day: 0.6, gold: 0.56, dusk: 0.5, night: 0.42 };   // the bounce's luminance over the sky's
-  L2.K = { dir: 0.08, xFace: 0.94, wrapLeaf: 0.45, wrapSkin: 0.42, poolHot: 2.4, poolK: 0.25, poolTail: 0.25, poolHue: 1.25, moon: 1.7 };
+  const GROUNDK = { day: 0.6, gold: 0.56, dusk: 0.52, night: 0.5 };   // the bounce's luminance over the sky's
+  L2.K = { dir: 0.08, xFace: 0.94, wrapLeaf: 0.45, wrapSkin: 0.42, poolHot: 2.4, poolK: 0.14, poolTail: 0.2, poolHue: 1.25, moon: 1.3 };
+  // the sun's light on the lit things by the hour (the sky keeps env.js's sun): by day env.js's own, in the golden hour
+  // gold and stronger, at dusk a warm rose
+  const SUNTINT = { day: [1, 1, 1], gold: [1.2, 1.02, 0.8], dusk: [1.15, 0.92, 0.85], night: [1, 1, 1] };
+  const SUNK = { day: 1.0, gold: 1.15, dusk: 1.1, night: 1.0 };
+  L2.sunTint = function (m) { const t = byMood(m, SUNTINT), k = byMood(m, SUNK); return [t[0] * k, t[1] * k, t[2] * k]; };
   // a colour with the luminance of another
   const toLum = (c, L) => { const l = lum(c) || 1; return [c[0] * L / l, c[1] * L / l, c[2] * L / l]; };
   // the hemisphere's two colours this frame: sky (from above) and ground (from below), from E.ambSky
@@ -150,7 +155,8 @@
   };
   // the air by the hour: the haze's density at the valley floor (per block), its scale height, its base, the aerial
   // perspective's distance, the morning layer (thicker and lower round sunrise); the sea level is the Heartland's 62
-  const FOG = { day: [0.0016, 1 / 16, 62], gold: [0.0024, 1 / 14, 62], dusk: [0.003, 1 / 13, 60], night: [0.0022, 1 / 12, 60] };
+  // (by day a light haze — the far shore stays crisp at noon; the valleys fill toward evening, at night and at dawn)
+  const FOG = { day: [0.0007, 1 / 14, 62], gold: [0.0016, 1 / 13, 62], dusk: [0.0022, 1 / 12, 60], night: [0.0016, 1 / 12, 60] };
   L2.air = function (E, ticks) {
     const m = L2.moods(E.sunDir[1]);
     const f = byMood(m, FOG);
@@ -160,8 +166,10 @@
     const rho = f[0] * (1 + 2.2 * morning), k = f[1] * (1 + 0.8 * morning), base = f[2] - 1.5 * morning;
     const rain = E.rain || 0;
     // the mist toward the sun glows (forward scattering): a little by day, most in the golden hour
-    const sunK = byMood(m, { day: 0.25, gold: 0.55, dusk: 0.35, night: 0 });
-    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 900 * (1 - 0.4 * rain), apMax: 0.62, sunK, morning, moods: m };
+    const sunK = byMood(m, { day: 0.12, gold: 0.3, dusk: 0.2, night: 0 });
+    // the aerial perspective: 1 − exp(−(d / apDist)²) of apMax — the near and the middle ground clear, the far planes
+    // a step paler each (t1_05, t3_06)
+    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: 0.55, sunK, morning, moods: m };
   };
   // the valley mist's colour: between the horizon's and the fog's, a little lighter by day
   L2.mistColor = function (E) {
@@ -182,10 +190,13 @@
   // the grade per mood: the curve (toe, mid, s, sh), the split toning (the darks' and the lights' leaning, in display
   // space), the mid-tones' saturation, the vignette, the bloom's threshold and strength
   const GRADE = {
-    day: { toe: 0.012, mid: 0.5, s: 0.32, sh: 0.985, dark: [-0.012, 0.004, 0.022], light: [0.018, 0.008, -0.016], sat: 1.06, vig: 0.22, bThr: 1.15, bStr: 0.10 },
-    gold: { toe: 0.016, mid: 0.48, s: 0.36, sh: 0.98, dark: [-0.02, 0.0, 0.04], light: [0.05, 0.016, -0.04], sat: 1.1, vig: 0.26, bThr: 1.0, bStr: 0.13 },
-    dusk: { toe: 0.024, mid: 0.46, s: 0.34, sh: 0.97, dark: [0.012, -0.012, 0.05], light: [0.04, 0.0, 0.02], sat: 1.08, vig: 0.3, bThr: 0.85, bStr: 0.16 },
-    night: { toe: 0.02, mid: 0.42, s: 0.38, sh: 0.97, dark: [-0.024, 0.018, 0.05], light: [0.05, 0.02, -0.02], sat: 1.04, vig: 0.34, bThr: 0.62, bStr: 0.22 },
+    // (the day's leaning from the frames' land, test/land_ref.js: their sunlit paving and walls white-cyan, their darks the
+    // warm greens — so by day the lights lean a little cool and the darks a little warm; from the golden hour the light
+    // is warm over a cool shade, at dusk more so)
+    day: { toe: 0.012, mid: 0.5, s: 0.45, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.08, vig: 0.2, bThr: 1.15, bStr: 0.10 },
+    gold: { toe: 0.016, mid: 0.48, s: 0.45, sh: 0.98, dark: [-0.022, 0.0, 0.045], light: [0.07, 0.025, -0.05], sat: 1.12, vig: 0.24, bThr: 0.95, bStr: 0.15 },
+    dusk: { toe: 0.024, mid: 0.48, s: 0.4, sh: 0.97, dark: [0.004, -0.014, 0.055], light: [0.06, 0.015, -0.03], sat: 1.1, vig: 0.28, bThr: 0.75, bStr: 0.2 },
+    night: { toe: 0.03, mid: 0.46, s: 0.3, sh: 0.97, dark: [-0.024, 0.016, 0.05], light: [0.05, 0.02, -0.025], sat: 1.06, vig: 0.32, bThr: 0.55, bStr: 0.32 },
   };
   L2.GRADE = GRADE;
   L2.grade = function (E) {
@@ -230,7 +241,7 @@
   // brightest); the strength over the air's haze for the sun and for the moon; indoors more (the dust in a sunbeam through a
   // window: the eye's sky light low); a ray to the sky a part of it (the sky's glow is the sky shader's); the haze's scale
   // height longer than the fog's (the shafts reach up the trees)
-  L2.VOL = { steps: 16, reach: 120, g: 0.35, sun: 0.6, moon: 2.2, indoor: 2.0, sky: 0.4, kScale: 0.7 };
+  L2.VOL = { steps: 16, reach: 120, g: 0.35, sun: 0.3, moon: 1.6, indoor: 2.5, sky: 0.25, kScale: 0.7 };
   L2.volK = function (sunUp, rain, eyeSky) {
     const V = L2.VOL, e = eyeSky === undefined ? 1 : clamp(eyeSky, 0, 1);
     return (sunUp ? V.sun : V.moon) * (1 - 0.6 * clamp(rain || 0, 0, 1)) * (1 + V.indoor * (1 - e));
@@ -272,6 +283,7 @@
     out.pool = [K.poolHot, K.poolK, K.poolTail, K.poolHue];
     out.air = L2.air(E, ticks || 0);
     out.mist = L2.mistColor(E);
+    out.sunTint = L2.sunTint(h.moods);
     out.grade = L2.grade(E);
     return out;
   };
@@ -332,7 +344,7 @@ vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   f = max(f, (1.0 - exp(-dist * u_fog.z)) * 0.85);
   if (u_dim != 0) return mix(col, fc, clamp(f, 0.0, 1.0));
   // aerial perspective: toward the horizon's colour with the distance (the far hills a step paler and bluer per plane)
-  float ap = (1.0 - exp(-dist * u_l2Fog2.x)) * u_l2Fog2.y;
+  float ad = dist * u_l2Fog2.x, ap = (1.0 - exp(-ad * ad)) * u_l2Fog2.y;
   col = mix(col, hz, ap);
   // the height fog along the ray
   float k = u_l2Fog.y, dy = rel.y, kd = k * dy;
