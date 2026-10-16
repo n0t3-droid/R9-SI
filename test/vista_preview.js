@@ -19,7 +19,7 @@ let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 const SEED = +(process.env.SEED || 4242), ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const W = +(process.env.W || 320), H = Math.round(W * 9 / 16), ASPECT = 16 / 9;
-const SHOTS = __dirname + '/shots';
+const SHOTS = __dirname.replace(/\/\.tmp_tests$/, '/test') + '/shots';   // (test/wt_run.sh runs a copy in .tmp_tests: the pictures still go to test/shots)
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(1) + ' s';
 const g = V.makeGen('overworld', SEED, { vgen: 11 }), P = LAND.plan(g);
 console.log(`the plan: ${P.vistas.length} vista points (${secs()})`);
