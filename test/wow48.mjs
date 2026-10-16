@@ -45,10 +45,11 @@ import { execFileSync } from 'child_process';
 import fs from 'fs';
 const require = createRequire(import.meta.url);
 const SEED = process.env.SEED || '53', TAG = process.env.TAG || 'after', BUDGET = +(process.env.BUDGET || 240);
-const DIST = process.env.DIST || 'file:///home/dev/vr/dist/index.html';
+const ROOT = new URL('../', import.meta.url).pathname;   // this checkout (the test runs from test/ or from .tmp_tests/)
+const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const PRESET = 'high', RD = 8, EYE = 1.62;
-const SHOTS = '/home/dev/vr/test/shots/';
+const SHOTS = ROOT + 'test/shots/';
 // the fronts' times of day
 const L2T = { noon: 6000, golden: 10800, dusk: 12600, night: 16500 };   // test/light2.mjs TIMES
 const MAT = { am: 4000, noon: 6000, golden: 12500, night: 16000 };      // test/material.mjs
@@ -60,7 +61,7 @@ const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } 
 const r2 = (x) => Math.round(x * 100) / 100;
 
 // ---------------------------------------------------------------- the cameras (node: the shared code, the same seed)
-const V = require('/home/dev/vr/test/load_shared.js');
+const V = require(new URL('../test/load_shared.js', import.meta.url).pathname);   // this checkout's shared code (from test/ or from .tmp_tests/)
 let meadow = null, hillsY = 136, vCit = null, vLh = null, vNote = '';
 {
   // t-motion's meadow (motion.mjs: land.mjs's way — the first eye round the east crossing, in the open, whose lines to the
@@ -150,14 +151,14 @@ const SHEET = [
   ['vista_lighthouse', 't1_07', `12 Aussicht ${vLh ? vLh.id : '?'}: Leuchtturm unter den Inseln (${vLh ? vLh.d : '?'} m), goldene Stunde`],
 ];
 function sheets() {
-  const PY = '/root/r9coord/sheet.py', FRAMES = '/home/dev/vr/docs/trailer/frames/';
+  const PY = '/root/r9coord/sheet.py', FRAMES = ROOT + 'docs/trailer/frames/';
   if (!fs.existsSync(PY)) { console.log(`  (no ${PY}: no sheet)`); return; }
   const shot = (v, t) => { const p = `${SHOTS}wow48_${v}_${t}.png`; return fs.existsSync(p) ? p : null; };
   const main = { cols: ['Trailer', 'Vorher (v0.47)', 'Nachher (v0.48)'], w: 560, rows: SHEET.map(([v, f, l]) => ({ label: l + (f ? `  [Trailer ${f}]` : '  [kein Trailerbild]'), imgs: [f ? FRAMES + f + '.jpg' : null, shot(v, 'before'), shot(v, 'after')] })) };
   const after = { cols: [], w: 720, rows: [] };
   for (let i = 0; i + 1 < SHEET.length; i += 2) after.rows.push({ label: `${SHEET[i][2]}   |   ${SHEET[i + 1][2]}`, imgs: [shot(SHEET[i][0], 'after'), shot(SHEET[i + 1][0], 'after')] });
   for (const [name, spec] of [['wow48_sheet', main], ['wow48_sheet_after', after]]) {
-    const sp = `/home/dev/vr/.tmp_tests/${name}.json`;
+    const sp = `${ROOT}.tmp_tests/${name}.json`;
     fs.writeFileSync(sp, JSON.stringify(spec, null, 1));
     try { console.log('  sheet ' + execFileSync('python3', [PY, `${SHOTS}${name}.jpg`, sp]).toString().trim()); } catch (e) { console.log(`  !! ${name}: ${String(e.message || e).split('\n')[0].slice(0, 200)}`); }
   }
