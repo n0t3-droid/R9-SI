@@ -12,6 +12,30 @@ const S = V.SHADERS, P = V.PBR, R = V.R;
 // the text between `#ifdef X` and its `#endif` that holds `needle` (the nearest #ifdef before it, no #endif between)
 const inside = (src, needle, def) => { const i = src.indexOf(needle); if (i < 0) return false; const j = src.lastIndexOf('#ifdef ' + def, i), k = src.lastIndexOf('#endif', i); return j > 0 && j > k; };
 
+console.log('3 · the wood\'s shafts: the march weighted by the canopy\'s gaps (light2.js volGap, VOL_FS)');
+{
+  const L2 = V.Light2;
+  check(L2.crossings([1, 1, 1, 1]) === 0 && L2.crossings([0, 0, 0]) === 0 && L2.crossings([0, 1, 0, 1]) === 3 && Math.abs(L2.crossings([0, 0.5, 1]) - 1) < 1e-9, 'the crossings: 0 for a ray all lit or all in shade, one per edge between light and shade', L2.crossings([0, 1, 0, 1]));
+  const noon = 0.4, gold = 0.12;
+  check(L2.volGap(0, 6, noon) === 1 && L2.volGap(0.3, 6, noon) > 1, 'the open land (no canopy over the eye) is untouched, however broken its rays');
+  check(L2.volGap(1, 0, noon) === 1 && L2.volGap(1, 1, noon) === 1, 'under the canopy a ray that crosses no shaft (all shade, or one edge) is untouched');
+  const g2 = L2.volGap(1, 2, noon), g3 = L2.volGap(1, 3, noon), g5 = L2.volGap(1, 5, noon);
+  check(g2 > 1 && g3 > g2 && g5 === g3 && g3 === 1 + L2.VOL.gap, 'a ray that crosses shafts under the canopy: its air ×(1 + gap) from three crossings on', [g2, g3, g5].map(x => x.toFixed(2)).join(' · '));
+  check(L2.volGap(1, 3, gold) < L2.volGap(1, 3, noon) && L2.volGap(1, 3, gold) > 1 + L2.VOL.gap * 0.3, 'strongest with the sun high (noon\'s shafts were missing); at the golden hour a third of it (its shafts showed already)', L2.volGap(1, 3, gold).toFixed(2));
+  // the canopy over the eye: light2.mjs's wood (oaks 5 apart, crowns 5 wide, 4–6 high) and the open ground
+  const leaves = new Set();
+  for (let i = 0; i < 9; i++) for (let j = 0; j < 7; j++) { const x = i * 5 + (j % 2) * 2, z = j * 6 + (i % 3), h = 4 + ((i * 7 + j * 3) % 3); for (let dy = -2; dy <= 1; dy++) { const r = dy === 1 ? 1 : 2; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) leaves.add((x + dx) + ',' + (h + dy) + ',' + (z + dz)); } }
+  const isLeaf = (x, y, z) => leaves.has(x + ',' + y + ',' + z);
+  const inWood = L2.canopy(isLeaf, 21, 1, 19), open = L2.canopy(isLeaf, 120, 1, 120);
+  const lone = L2.canopy((x, y, z) => x === 3 && z === 0 && y === 5, 0, 1, 0);
+  check(inWood >= 0.8 && open === 0 && lone < 0.2, 'the canopy over an eye in light2.mjs\'s wood (its broken crowns count full), under one column of a crown a little, on open ground none', [inWood, lone, open].map(x => x.toFixed(2)).join(' · '));
+  const fs = L2.VOL_FS;
+  check(/crs \+= abs\(vis - pv\)/.test(fs) && /acc \*= 1\.0 \+ u_volGap\.y \* u_volGap\.x \* smoothstep\(1\.0, 3\.0, crs\)/.test(fs), 'the march counts the crossings and weighs its air as L2.volGap does');
+  const gsrc = require('fs').readFileSync(__dirname + '/../src/main/light2_gl.js', 'utf8');
+  check(/u_volGap, this\.l2Canopy \|\| 0, sunUp \? K\.gap \* L2\.volGapSun\(L\[1\]\) : 0\)/.test(gsrc) && /L2\.canopy\(/.test(gsrc), 'light2_gl.js hands the canopy and the gain by the sun\'s height to the march (the moon\'s light none)');
+  check(V.Light2.defaults('potato').l2Vol === false && V.Light2.defaults('balanced').l2Vol === false && V.Light2.defaults('high').l2Vol === true, 'the volumetric light stays High and Ultra\'s (Very Low, Low, Balanced: no march, no cost)');
+}
+
 console.log('5 · Villa Nova\'s windows carry the sky (tex_pbr.js GLOWSKY, TERRAIN_FS)');
 {
   check(P.GLOWSKY === 8 && (P.of('vx_smooth').flags & P.GLOWSKY) && !(P.of('vx_tile').flags & P.GLOWSKY) && !(P.of('vx_glass').flags & P.GLOWSKY) && !(P.of('vx_smooth_gloss').flags & P.GLOWSKY), 'the flag sits on the fine VX pieces\' plain layer only (not the 8³ pieces\', not glass, not the lacquer)', JSON.stringify(P.of('vx_smooth')));

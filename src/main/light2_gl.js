@@ -29,19 +29,30 @@
     const w = F.world, c = F.cam;
     let es = 1;
     if (w && w.getLight && c) es = (w.getLight(Math.floor(c.x), Math.floor(c.y), Math.floor(c.z)) >>> 12) / 15;
-    this.l2EyeSky = this.l2EyeSky === undefined ? es : this.l2EyeSky + (es - this.l2EyeSky) * 0.1;
+    // (t-polish2: a jump — a teleport, a respawn, a cut — sets the eased values at once instead of easing from the place
+    // before: 6 blocks or more since the last frame)
+    const at = this.l2At || (this.l2At = [NaN, NaN, NaN]), jump = !c || !(Math.abs(c.x - at[0]) + Math.abs(c.y - at[1]) + Math.abs(c.z - at[2]) < 6);
+    if (c) { at[0] = c.x; at[1] = c.y; at[2] = c.z; }
+    this.l2EyeSky = this.l2EyeSky === undefined || jump ? es : this.l2EyeSky + (es - this.l2EyeSky) * 0.1;
+    // t-polish2 · the canopy over the eye (L2.canopy: leaves over nine columns round it), every eighth frame, eased — the
+    // volumetric light's gap weight (High/Ultra); 0 in the open
+    if (q.l2Vol && w && w.getBlock && c && ((this.frameNo & 7) === 0 || jump)) {
+      const RR = VR.R, FF = VR.F, cv = L2.canopy((x, y, z) => { const s = w.getBlock(x, y, z); return !!s && (RR.T.flags[s] & FF.LEAVES) !== 0; }, Math.floor(c.x), Math.floor(c.y), Math.floor(c.z));
+      this.l2CanopyT = cv;
+    }
+    this.l2Canopy = jump ? (this.l2CanopyT || 0) : (this.l2Canopy || 0) + ((this.l2CanopyT || 0) - (this.l2Canopy || 0)) * 0.1;
     // t-polish2 · the room's air (L2.ROOM): indoors, the lamps' colour round the eye (seven cells, every fourth frame),
     // eased like the eye's sky light; outdoors its density falls to 0
     if (q.l2Air) {
       const R = L2.ROOM, room = this.l2Room || (this.l2Room = [0, 0, 0, 0]), tgt = this.l2RoomT || (this.l2RoomT = [0, 0, 0]);
       const ind = L2.roomIndoor(this.l2EyeSky);
-      if (ind > 0.001 && w && w.getLight && c && (this.frameNo & 3) === 0) {
+      if (ind > 0.001 && w && w.getLight && c && ((this.frameNo & 3) === 0 || jump)) {
         const S = this.l2RoomS || (this.l2RoomS = R.pts.map(() => [0, 0, 0]));
         const cx = Math.floor(c.x), cy = Math.floor(c.y), cz = Math.floor(c.z);
         R.pts.forEach((p, i) => { const l = w.getLight(cx + p[0], cy + p[1], cz + p[2]) | 0; S[i][0] = (l >> 8) & 15; S[i][1] = (l >> 4) & 15; S[i][2] = l & 15; });
         L2.roomColor(S, tgt);
       }
-      for (let i = 0; i < 3; i++) room[i] += (tgt[i] - room[i]) * 0.1;
+      for (let i = 0; i < 3; i++) room[i] = jump ? tgt[i] : room[i] + (tgt[i] - room[i]) * 0.1;
       room[3] = R.rho * ind;
     } else if (this.l2Room) this.l2Room[3] = 0;
     // the moon a cool key light, teal like the night's shade (the lit things' u_moonColor, set again in l2Uniforms: E
@@ -194,6 +205,7 @@
     if (p.u.u_volSky) gl.uniform1f(p.u.u_volSky, K.sky);
     if (p.u.u_volShaft) gl.uniform1f(p.u.u_volShaft, K.shaft);
     if (p.u.u_volF) gl.uniform2f(p.u.u_volF, 1 / K.fade, L2.volCover(sunUp));
+    if (p.u.u_volGap) gl.uniform2f(p.u.u_volGap, this.l2Canopy || 0, sunUp ? K.gap * L2.volGapSun(L[1]) : 0);   // (t-polish2: the canopy's gaps)
     gl.uniform1f(p.u.u_phase, this.jit ? (this.frameNo * 0.6180339887) % 1 : 0);
     const px = V.w * V.h;
     this.fsMark('l2vol', V.w, V.h, px * 4 * (K.steps + 2), px * 8, px * (K.steps + 2));
