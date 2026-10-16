@@ -724,6 +724,7 @@ uniform sampler2D u_pbr;
 // how much of the fragment is mirror (its Fresnel weight) and the mirror's roughness; renderer.js ssrPass reads it
 layout(location=1) out vec4 o_ssr;
 float g_ssrW = 0.0, g_ssrR = 1.0;
+vec3 g_ssrN = vec3(0.0, 1.0, 0.0);   // the normal the mirror is marched with (the coat's, smooth, where a coat dominates)
 vec2 octEnc(vec3 n) { n /= abs(n.x) + abs(n.y) + abs(n.z); return n.y >= 0.0 ? n.xz : (1.0 - abs(n.zx)) * vec2(n.x >= 0.0 ? 1.0 : -1.0, n.z >= 0.0 ? 1.0 : -1.0); }
 #endif
 float pow5(float x) { float x2 = x * x; return x2 * x2 * x; }
@@ -759,7 +760,7 @@ vec3 pbrSun(vec3 n, vec3 V, vec3 L, float r, vec3 F0) {
 }
 // the gloss of one fragment: col is its lit colour (diffuse, ambient, block light), lsun the sun's light reaching it
 // (shadow and the open sky applied), so the sky's specular occlusion. Matte things (rough, no coat, no metal) return col.
-vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 V, vec3 L, vec3 lsun, float ndl, float rough, float layer, float so, vec3 blockL, float wetK, float pud) {
+vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, float ndl, float rough, float layer, float so, vec3 blockL, float wetK, float pud) {
   vec4 pb = texelFetch(u_pbr, ivec2(int(layer), 0), 0);
   float metal = pb.r, coat = max(pb.g, max(wetK * 0.75, pud));   // (the rain's film is a coat of water)
   float r = clamp(rough * pb.b * 1.9922, 0.045, 1.0);
@@ -773,14 +774,19 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 V, vec3 L, vec3 lsun, float ndl, 
   if (ndl > 0.0 && r < 0.92) c += lsun * ndl * pbrSun(n, V, L, max(r, 0.08), F0);
   // the clear coat: a second, sharp interface over it (the polish, the lacquer, the water of a puddle)
 #ifdef SSR
-  g_ssrW = dot(Fr, vec3(0.3, 0.59, 0.11)); g_ssrR = r;
+  g_ssrW = dot(Fr, vec3(0.3, 0.59, 0.11)); g_ssrR = r; g_ssrN = n;
 #endif
   if (coat > 0.004) {
-    float rc = mix(0.08, 0.04, pud), Fc = (0.04 + 0.96 * fv) * coat;
-    c = c * (1.0 - Fc) + pbrEnv(R, rc, so, blockL) * Fc;
-    if (ndl > 0.0) c += lsun * ndl * pbrSun(n, V, L, rc, vec3(0.04)) * coat;
+    // (run 3: the coat mirrored along the texture's relief — the hangar's polished floor showed the walls as a mottled
+    // smear. A coat is a smooth film over the relief: its mirror follows the surface, the relief shows a hair through)
+    vec3 nc = normalize(mix(n, Ng, 0.88));
+    float nvc = clamp(dot(nc, V), 1e-3, 1.0), fvc = pow5(1.0 - nvc);
+    float rc = mix(0.08, 0.04, pud), Fc = (0.04 + 0.96 * fvc) * coat;
+    c = c * (1.0 - Fc) + pbrEnv(reflect(-V, nc), rc, so, blockL) * Fc;
+    if (ndl > 0.0) c += lsun * ndl * pbrSun(nc, V, L, rc, vec3(0.04)) * coat;
 #ifdef SSR
     g_ssrW = g_ssrW * (1.0 - Fc) + Fc; g_ssrR = mix(r, rc, min(1.0, coat * 2.0));
+    if (Fc > g_ssrW * 0.5) g_ssrN = nc;
 #endif
   }
   return c;
@@ -983,7 +989,7 @@ void main() {
   vec3 col = alb.rgb * lighting;
 #if defined(PBR)
   // t-material: the gloss of the material (pbrShade above) in place of the one sun highlight
-  if (!noshade) col = pbrShade(col, alb.rgb, n, V, L, lc * (sh * outdoors), ndl, rough, layer, skyL * ao, blockL, wetK, pud);
+  if (!noshade) col = pbrShade(col, alb.rgb, n, N, V, L, lc * (sh * outdoors), ndl, rough, layer, skyL * ao, blockL, wetK, pud);
 #elif !defined(LITE)
   // specular highlights (sun glints on smooth surfaces)
   if (rough < 0.75 && ndl > 0.0) {
@@ -1057,7 +1063,7 @@ void main() {
   o_col = vec4(col, 1.0);
 #ifdef SSR
   // (no mirror on what glows or burns; it fades with the distance as the fog takes the floor)
-  o_ssr = vec4(octEnc(n) * 0.5 + 0.5, (emis > 0.02 || emissiveFace || kind == 2u || kind == 3u || kind == 4u) ? 0.0 : g_ssrW * (1.0 - smoothstep(48.0, 80.0, dist)), g_ssrR);
+  o_ssr = vec4(octEnc(g_ssrN) * 0.5 + 0.5, (emis > 0.02 || emissiveFace || kind == 2u || kind == 3u || kind == 4u) ? 0.0 : g_ssrW * (1.0 - smoothstep(48.0, 80.0, dist)), g_ssrR);
 #endif
 }`;
 

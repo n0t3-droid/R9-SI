@@ -328,6 +328,15 @@ async function costs() {
     for (const v of [0, 1, 2]) { const ms = rounds[v].map(q => q.ms).sort((a, b) => a - b); out.high['pbr' + v] = { msMedian: ms[ms.length >> 1], ms, draws: rounds[v][1].draws }; }
     out.high.ssrMs = await H.ev(() => (VR.game.renderer.stats.ssr || {}).ms || null);
     console.log(`high · plaza · gloss tiers: ${JSON.stringify(out.high)} (${secs()})`);
+    // the hero textures off and on, in turns (the 64 × 64 set stays uploaded; the switch is the program's define)
+    const hasHi = await H.ev(() => !!(VR.Settings && VR.Settings.byKey('texHi')) && (VR.game.renderer.texHiN | 0) > 0);
+    if (hasHi) {
+      const setHi = (v) => H.ev((v) => { const g = VR.game; g.settings.texHi = v; g.applySettings('texHi'); g.settings.dynRes = false; }, v);
+      const rh = { off: [], on: [] };
+      for (let r = 0; r < 5; r++) for (const v of (r & 1 ? [true, false] : [false, true])) { await setHi(v); await H.step(2); rh[v ? 'on' : 'off'].push(await measure(H, Math.max(4, N >> 1))); }
+      for (const k of ['off', 'on']) { const ms = rh[k].map(q => q.ms).sort((a, b) => a - b); out.high['texHi_' + k] = { msMedian: ms[ms.length >> 1], ms }; }
+      console.log(`high · plaza · hero textures off / on: ${out.high.texHi_off.msMedian} / ${out.high.texHi_on.msMedian} ms (${secs()})`);
+    } else console.log('  (the hero textures are not up on this page: no measure)');
   }
   await H.ctx.close();
   try { fs.writeFileSync(`${SHOTS}material_cost.json`, JSON.stringify(out, null, 1)); } catch (e) { /* convenience */ }
