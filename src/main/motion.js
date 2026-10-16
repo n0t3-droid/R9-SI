@@ -246,7 +246,8 @@
             const u = Math.random() - 0.5, v = Math.random() - 0.5, sp = 0.3 + Math.random() * 0.5, warm = Math.random() < 0.3;
             // a point on the cell's face, just off the veil (the in-plane axes are the two the normal does not use)
             const x = V[i] + 0.5 + (nx ? sd * 0.55 : u), y = V[i + 1] + 0.5 + (ny ? sd * 0.55 : v), z = V[i + 2] + 0.5 + (nz ? sd * 0.55 : (nx ? u : v));
-            O.life = LIFE.veil * (0.7 + Math.random() * 0.6); O.size = 0.035 + Math.random() * 0.03; O.grav = 0.03; O.drag = 0.35; O.col = warm ? VEIL_WARM : VEIL_COOL; O.emis = 1; O.fade = true; O.alpha = 1; O.grow = 0; O.wind = 0.05; O.turb = 0.25;
+            O.life = LIFE.veil * (0.7 + Math.random() * 0.6); O.size = 0.07 + Math.random() * 0.06;   // (big enough to read from across the plaza)
+            O.grav = 0.03; O.drag = 0.35; O.col = warm ? VEIL_WARM : VEIL_COOL; O.emis = 1; O.fade = true; O.alpha = 1; O.grow = 0; O.wind = 0.05; O.turb = 0.25;
             this.spawn(P, x, y, z, nx * sd * sp + (Math.random() - 0.5) * 0.1, ny * sd * sp - 0.08, nz * sd * sp + (Math.random() - 0.5) * 0.1);
           }
         } else this.acc.veil = 0;

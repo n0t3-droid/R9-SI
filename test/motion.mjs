@@ -181,14 +181,14 @@ async function shoot(tag, dist) {
       if (v.name === 'storm') { const a = await A.ev(() => (VR.game.env.wx.windAngle || 0) + Math.PI); yaw = Math.atan2(-Math.cos(a), -Math.sin(a)); pitch = 0.06; }
       if (v.name === 'rainbow') { const s = await A.ev(() => VR.game.env.E.sunDir.slice()); yaw = Math.atan2(s[0], s[2]); pitch = (42 * Math.PI / 180 - Math.asin(Math.max(-1, Math.min(1, s[1])))) * 0.45; out.sun = s.map(q => +q.toFixed(3)); }
       await A.pose(v.x, eyeY - EYE, v.z, yaw, pitch, v.fov, tod);
-      const st = await A.settle(120, 20); await A.step(6);
-      await A.warmVx();
-      Object.assign(out, { x: +v.x.toFixed(2), feet: +(eyeY - EYE).toFixed(2), z: +v.z.toFixed(2), yaw: +yaw.toFixed(3), pitch: +pitch.toFixed(3), tod, settle: st });
-      const base = `/home/dev/vr/test/shots/motion_${v.name}${tag === 'after' ? '' : '_' + tag}`;
-      // the actors hold still during the sequence, in both builds: the ships (traffic, pads, the hangar's loop, the
+      // the actors hold still from here to the sequence's end, in both builds: the ships (traffic, pads, the hangar's loop, the
       // starships), the life director's balloons and carts, the trams, the people and the animals — their motion is not
       // this branch's, and when they come by differs from one run to the next (run 2's night: a ship before, none after)
       await A.ev(() => { const g = VR.game; g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = function () {}; } } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') { g.__frozen.push([V, k, V[k]]); V[k] = function () {}; } });
+      const st = await A.settle(120, 20); await A.step(150);   // (5 s: what the actors left in the air — a ship's vapour — fades; the steady air stays)
+      await A.warmVx();
+      Object.assign(out, { x: +v.x.toFixed(2), feet: +(eyeY - EYE).toFixed(2), z: +v.z.toFixed(2), yaw: +yaw.toFixed(3), pitch: +pitch.toFixed(3), tod, settle: st });
+      const base = `/home/dev/vr/test/shots/motion_${v.name}${tag === 'after' ? '' : '_' + tag}`;
       await A.picture(`${base}_f0.png`, 4);
       if (v.name === 'storm') out.bolt = await A.ev(() => { const wx = VR.game.env.wx, W = VR.WX; if (!W.boltOf) return null; const fa = (wx.windAngle || 0) + Math.PI; for (let n = wx.strikes; n < wx.strikes + 400; n++) { let d = W.boltOf(wx.seed, n + 1, fa, 1).ang - fa; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < 0.45) { wx.strikes = n; return +d.toFixed(3); } } return null; });
       await A.step(6); await A.picture(`${base}_f1.png`, 4, v.name === 'storm' ? 'strike' : null);
