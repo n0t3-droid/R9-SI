@@ -687,6 +687,11 @@
         }
       }
     }
+    // 7. the Heartland's landmarks the skylines lack (t-vista, vgen 11): the land's towers, the isles' falls
+    if (VR.Vista && VR.Vista.lodBoxes) {
+      let lb = null; try { lb = VR.Vista.lodBoxes(g, x0, z0, x1, z1, 1); } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; lb = null; }
+      if (lb && lb.length) { Bd.part = 'box'; for (const b of lb) Bd.box(b.x0 - x0, b.y0, b.z0 - z0, b.x1 - x0, b.y1, b.z1 - z0, b.c, b.c, b.k, b.k === 0 ? 1 : 3); }
+    }
     const out = Bd.finish();
     out.tris = out.count / 3;
     lap('citadels');

@@ -453,6 +453,18 @@
       M.bar++;
       M.next = t0 + barLen;
     }
+    // ✨ a wow moment (t-vista, wowmoment.js): the four-bar rise of klang.js's swellPlan over the day's music plan, in the
+    // music bus (bells with a reverb tail); the calm layer waits until it has sounded. Returns the notes scheduled
+    swell(day, bar) {
+      if (!this.ctx || this.vol.music <= 0 || !K.swellPlan) return 0;
+      const c = this.ctx, t0 = c.currentTime + 0.05, M = this.music, L = bar > 0 ? bar : 1, notes = K.swellPlan(K.musicPlan(day | 0), 4, L);
+      for (const n of notes) {
+        if (n.kind === 'bell') { const i = this.noteCount & 511; this.noteLog[i] = n.midi; this.noteCount++; const f = 440 * Math.pow(2, (n.midi - 69) / 12); this.tone(f, n.gain, n.dur, 'sine', true, t0 + n.t, this.musDuck); this.tone(f * 2.01, n.gain * 0.3, n.dur * 0.7, 'sine', false, t0 + n.t + 0.01, this.musDuck); }
+        else this.calmNote(n.midi, n.kind, n.dur, t0 + n.t, n.gain);
+      }
+      M.next = Math.max(M.next || 0, t0 + 4 * L + 0.4);
+      return notes.length;
+    }
     // one scheduled note of the calm layer: logged (for the tests), then played into the ducked music bus
     calmNote(midi, kind, dur, t, gain) {
       const i = this.noteCount & 511;

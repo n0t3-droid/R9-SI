@@ -98,6 +98,20 @@
       const towers = CIT.layout(x, z, y, rng, true);
       const pad = { x: x + 26, z: z - 4 };
       const site = { id: 'heart', i: Math.floor(x / CELL), j: Math.floor(z / CELL), x, z, y, towers, pad, seed: rng.int(1 << 30), pal: 0, cry: 1, R: 34, home: true, viaducts: [] };
+      // (vgen 11, t-vista: the cluster reads from afar — the five secondary spires 0.62–0.86 of the main one (were
+      // 0.45–0.73), the pinnacles round its foot 1.4 times as tall, and side pinnacles on the main spire's two lower
+      // setbacks, four on each, between the cyan window bands)
+      if (g.vgen >= 11) {
+        const main = towers.find(t => t.kind === 'main');
+        for (const T of towers) {
+          if (T.kind === 'sec') T.h = Math.min(main.h - 8, Math.round(main.h * (0.62 + 0.24 * Math.max(0, Math.min(1, (T.h / main.h - 0.45) / 0.28)))));
+          else if (T.kind === 'pin') T.h = Math.round(T.h * 1.4);
+        }
+        [[STEPS[0], 16, 1.8, 0], [STEPS[1], 12, 1.5, Math.PI / 4]].forEach(([sf, h, r, a0]) => {
+          const t0 = Math.round(sf * main.h), rr = prof(main.r, sf) + 0.6;
+          for (let k = 0; k < 4; k++) { const a = a0 + Math.PI / 8 + k * Math.PI / 2; towers.push({ x: main.x + Math.round(Math.cos(a) * rr), z: main.z + Math.round(Math.sin(a) * rr), h, r, kind: 'flank', t0 }); }
+        });
+      }
       // viaducts: from the plinth rim toward the Gate Plaza's south rim and east into the canyon
       const toward = (tx, tz, len) => { const a = Math.atan2(tz - z, tx - x); return { x0: x + Math.round(Math.cos(a) * (site.R - 2)), z0: z + Math.round(Math.sin(a) * (site.R - 2)), a, len, y0: y + 1 }; };
       site.viaducts.push(toward(0, 150, 300), toward(x + 300, z + 60, 200));
@@ -136,11 +150,11 @@
 
   // ---------------------------------------------------------------- one spire
   function spire(w, T, y0, P, g) {
-    const h = T.h, r0 = T.r, pin = T.kind === 'pin', main = T.kind === 'main';
+    const h = T.h, r0 = T.r, pin = T.kind === 'pin' || T.kind === 'flank', main = T.kind === 'main';
     const flutes = main ? 12 : 8;
     // foundation: a full pier from the rock up to the terrace
     const gmin = g ? Math.min(g.surfaceY(T.x, T.z), g.surfaceY(T.x + 3, T.z), g.surfaceY(T.x - 3, T.z), g.surfaceY(T.x, T.z + 3), g.surfaceY(T.x, T.z - 3)) : y0 - 5;
-    const tmin = Math.max(-48, gmin - y0 - 1);
+    const tmin = T.kind === 'flank' ? 0 : Math.max(-48, gmin - y0 - 1);
     const winBands = pin ? [] : [0.1, 0.32, 0.56, 0.75];
     const trims = pin ? [0.5] : STEPS;
     for (let t = tmin; t <= h + 1; t++) {
@@ -314,9 +328,9 @@
         for (const T of s.towers) {
           const reach = T.r + 3 + (T.kind === 'watch' ? 8 : 0);
           if (T.x + reach < x0 || T.x - reach > x0 + 16 || T.z + reach < z0 || T.z - reach > z0 + 16) continue;
-          if (T.kind === 'watch') watchTower(w, T, s.y + 1, P, g); else spire(w, T, s.y + 1, P, g);
+          if (T.kind === 'watch') watchTower(w, T, s.y + 1, P, g); else spire(w, T, s.y + 1 + (T.t0 || 0), P, g);
           // the red tip beacon of every spire and watch tower: vents.js makes it blink (the spawn sits on the beacon cell)
-          if (T.kind !== 'pin' && T.x >= x0 && T.x < x0 + 16 && T.z >= z0 && T.z < z0 + 16) { if (!out.spawns) out.spawns = []; out.spawns.push(['beacon', T.x, s.y + 1 + T.h + (T.kind === 'watch' ? 15 : 1), T.z]); }
+          if (T.kind !== 'pin' && T.x >= x0 && T.x < x0 + 16 && T.z >= z0 && T.z < z0 + 16) { if (!out.spawns) out.spawns = []; out.spawns.push(['beacon', T.x, s.y + 1 + (T.t0 || 0) + T.h + (T.kind === 'watch' ? 15 : 1), T.z]); }
         }
         // crystal groves on the slopes around the terrace
         const crng = new VR.RNG(s.seed ^ 0x51);
@@ -366,6 +380,7 @@
     const bodyC = s.pal === 1 ? [0x8A, 0x66, 0x40] : [0xC4, 0xA4, 0x7A];
     for (const T of s.towers) {
       if (T.kind === 'pin') { B.push({ x: T.x, z: T.z, y0: s.y + 1, y1: s.y + 1 + T.h, r: T.r * 0.7 + 0.5, c: bodyC, kd: 0 }); continue; }
+      if (T.kind === 'flank') { const b0 = s.y + 1 + T.t0; B.push({ x: T.x, z: T.z, y0: b0, y1: b0 + T.h * 0.6, r: T.r * 0.8 + 0.4, c: bodyC, kd: 0 }, { x: T.x, z: T.z, y0: b0 + T.h * 0.6, y1: b0 + T.h, r: T.r * 0.4 + 0.3, c: bodyC, kd: 0 }, { x: T.x, z: T.z, y0: b0 + T.h, y1: b0 + T.h + 1, r: 0.5, c: [0xFF, 0x3A, 0x3A], kd: 4 }); continue; }
       if (T.kind === 'watch') {
         B.push({ x: T.x, z: T.z, y0: s.y + 1, y1: s.y + 1 + T.h, r: T.r, c: bodyC, kd: 0 });
         B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h - 14, y1: s.y + 1 + T.h - 10, r: 10, c: bodyC, kd: 0 });

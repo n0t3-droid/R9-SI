@@ -3,7 +3,7 @@
 //      than one block, every way cell over water a deck (a bridge), a lantern every 12 blocks and a bench and a
 //      milestone every 40; in the generated chunks the way is there (its surface at the plan's height, headroom free)
 //   (the later sections — woods, farms, water, rocks, animals — come with their pieces)
-//   bash test/wt_run.sh land.js 600        (SEED=… another world; ONLY=1,2 some sections)
+//   bash test/wt_run.sh land.js 600        (SEED=… another world; ONLY=1,2 some sections; VGEN=11 a world with the vistas)
 const V = require('./load_shared.js');
 const R = V.R, LAND = V.Land, SEA = V.C.SEA;
 let fails = 0;
@@ -13,7 +13,8 @@ const SEED = +(process.env.SEED || 4242);
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',').map(Number) : null;
 const want = (k) => !ONLY || ONLY.includes(k);
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(1) + ' s';
-const g = V.makeGen('overworld', SEED, { vgen: 10 });
+const VG = +(process.env.VGEN || 10);   // (VGEN=11: the same checks on a world with t-vista's vistas)
+const g = V.makeGen('overworld', SEED, { vgen: VG });
 check(!!LAND && LAND.on(g) && !LAND.on(V.makeGen('overworld', SEED, { vgen: 9 })), 'the land layer is on for vgen 10 and off for vgen 9');
 const t0 = Date.now();
 const P = LAND.plan(g);
@@ -427,7 +428,7 @@ if (want(7)) {
   for (let tz = -6; tz <= -2; tz++) for (let tx = -5; tx <= -2; tx++) { const T = 32 * 8, x = tx * T + T / 2, z = tz * T + T / 2; if (x * x + z * z > 640 * 640) continue; const d = LAND.woodAt(g, x, z).d; if (!best || d > best.d) best = { tx, tz, d }; }
   asked = 0; const t10 = tile(g, 1, best.tx, best.tz), a10 = asked;
   asked = 0; const t9 = tile(g9, 1, best.tx, best.tz), a9 = asked;
-  LAND.LOD_OFF = true; const tOff = tile(V.makeGen('overworld', SEED, { vgen: 10 }), 1, best.tx, best.tz); LAND.LOD_OFF = false;
+  LAND.LOD_OFF = true; const tOff = tile(V.makeGen('overworld', SEED, { vgen: VG }), 1, best.tx, best.tz); LAND.LOD_OFF = false;
   LAND.lodTree = lt0;
   // the top faces' mean height over their area (vertices: int16 x, y, z ×8 · face | kind << 3 …, 12 bytes, 4 a quad)
   const meanTop = (t) => { const i16 = new Int16Array(t.verts), u8 = new Uint8Array(t.verts); let s0 = 0, A = 0; for (let v = 0; v + 3 < u8.length / 12; v += 4) { if ((u8[v * 12 + 6] & 7) !== 2) continue; let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (let q = v; q < v + 4; q++) { const x = i16[q * 6], z = i16[q * 6 + 2]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } const a = (x1 - x0) * (z1 - z0); s0 += a * i16[v * 6 + 1] / 8; A += a; } return A ? s0 / A : 0; };

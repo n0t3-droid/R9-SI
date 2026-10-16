@@ -578,6 +578,12 @@
         }
       }
     }
+    // ---- the Heartland's landmarks (t-vista, vgen 11): the temple, the land's towers, the isles' falls — every level, from
+    // the tile that holds each anchor (Very Low, Low and Balanced have no far ring: the temple stood only in the chunks)
+    if (VR.Vista && VR.Vista.lodBoxes) {
+      let lb = null; try { lb = VR.Vista.lodBoxes(g, x0, z0, x0 + T, z0 + T, 2); } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; lb = null; }
+      if (lb) for (const b of lb) box(b.x0 - x0, b.y0, b.z0 - z0, b.x1 - x0, b.y1, b.z1 - z0, b.c, b.k, b.k === 0 ? 1 : 3);
+    }
     // ---- floating sky islands
     if (g.islandAt) {
       const isl = new Array(N * N);

@@ -54,7 +54,7 @@
 
   // ---------------------------------------------------------------- the material of one cell
   // returns -1 for "not part of the temple", 0 for air, else a block state
-  function makeMat(K) {
+  function makeMat(K, v11) {
     const fx = T.front, bx = T.back;
     // tiers: [x half-width, z0, z1, y0, y1]
     const TIERS = [[22, bx, fx, Y + 1, Y + 20], [16, -30, 14, Y + 21, Y + 34], [10, -22, 8, Y + 35, Y + 44]];
@@ -150,8 +150,11 @@
         if (t > h) return d > rr - 1.01 ? K.SMOOTH : K.SMOOTH;
         if (d < rr - 1.01) return K.SMOOTH;
         const a8 = Math.atan2(dz, dx) / Math.PI * 4 + 8, frac = a8 - Math.floor(a8), sect = (a8 | 0) & 7;
-        if (frac < 0.15 || frac > 0.85) return K.PIL;                      // ribs on the eight edges
-        if (t % 12 === 11) return K.BAR;                                   // orange rings
+        // (vgen 11, t-vista: the towers read from afar — every other rib a cyan light strip, the orange rings doubled,
+        // a cyan crown ring under the cap)
+        if (frac < 0.15 || frac > 0.85) return v11 && (Math.round(a8) & 1) === 0 && t >= 5 && t <= h - 3 ? K.CYAN : K.PIL;   // ribs on the eight edges
+        if (t % 12 === 11 || (v11 && t % 12 === 10)) return K.BAR;          // orange rings
+        if (v11 && t === h) return K.CYAN;
         if (t > 4 && t < h - 4 && Math.abs(frac - 0.5) < 0.2 && (sect & 1) === 0 && (t % 12) >= 2 && (t % 12) <= 8) return K.SLIT;
         return K.WALL;
       }
@@ -174,6 +177,18 @@
         const dx = x - 69, dz = z + 5, d = Math.hypot(dx, dz);
         if (d <= 13.5) {
           if (y >= Y + 1 && y <= Y + 7) { if (d > 12.5) return -1; if (d > 11.5) return (y === Y + 7) ? K.BAR : (Math.round(Math.atan2(dz, dx) / Math.PI * 12) % 3 === 0 ? K.SLIT : K.WALL); return K.SMOOTH; }
+          // (vgen 11, t-vista: a lantern on the dome's crown — a glazed octagon of amber glass between pilasters round a
+          // glowing floor, a light bar, a cupola — and its spire, the beacon 1.5 times the dome's height over the plaza)
+          if (v11 && y >= Y + 19) {
+            const od = oct(dx, dz), t = y - (Y + 19);
+            if (t === 0 && od <= 3.2) return K.BAND;
+            if (t >= 1 && t <= 4 && od <= 2.6) { if (od <= 1.6) return t === 1 ? K.NEONA : 0; const a = Math.atan2(dz, dx) / Math.PI * 4 + 8, fr = a - Math.floor(a); return fr < 0.2 || fr > 0.8 ? K.PIL : K.WIN; }
+            if (t === 5 && od <= 2.8) return K.BAR;
+            if (t === 6 && od <= 2.0) return K.SMOOTH;
+            if (t === 7 && od <= 1.2) return K.SMOOTH;
+            if (dx === 0 && dz === 0 && t >= 8 && t <= 11) return t === 11 ? K.BEACON : t === 10 ? K.ANT : K.PIL;
+            if (t >= 1) return -1;
+          }
           if (y > Y + 7 && y <= Y + 21) {
             const dy = y - (Y + 7), rd = Math.hypot(d, dy * 1.05);
             if (rd > 12.6) return -1;
@@ -208,7 +223,7 @@
   // build it in slices (TEMPLE.advance, worker_main.js). TEMPLE.build runs it to the end, once per generator.
   TEMPLE.buildSteps = function* (g) {
     if (g._temple) return g._temple;
-    const K = mats(), mat = makeMat(K);
+    const K = mats(), mat = makeMat(K, g.vgen >= 11);
     // vgen 6 (the trailer's Gate Temple: landing-strip lights, the 7-high hex corridor). Older worlds keep the temple they
     // were made with (AGENTS.md: old worlds' generated chunks stay identical), so their terrain is the HEAD one.
     const v6 = g.vgen >= 6;
@@ -229,7 +244,7 @@
       if (oct(ax - 50, z + 24) <= 6) top = Math.max(top, Y + 90);
       if (oct(ax - 24, z + 37) <= 5.5) top = Math.max(top, Y + 76);
       if (oct(ax - 40, z - 8) <= 8.5) top = Math.max(top, Y + 52);
-      if (Math.hypot(x - 69, z + 5) <= 14) top = Math.max(top, Y + 30);
+      if (Math.hypot(x - 69, z + 5) <= 14) top = Math.max(top, Y + 31);
       if (ax >= 23 && ax <= 56 && z >= 16 && z <= 38) top = Math.max(top, Y + 10);
       return top;
     };
