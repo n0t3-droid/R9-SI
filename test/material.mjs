@@ -167,16 +167,19 @@ async function openWorld(dist, preset) {
   }, kind);
   // a picture: the frames drawn with the villagers at the lens left out; the time of day set first. Returns the
   // renderer's stats of the last frame
+  let shotDead = false;
   const picture = async (path, tod, frames = 4) => {
     await warmVx();
     const st = await ev(([frames, tod]) => { window.__norender = false; const g = VR.game, V = g.villages, p = g.player; g.env.setTime(tod); const keep = V && V.agents ? V.agents : null; if (keep) V.agents = keep.filter(a => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) > 8); for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); if (keep) V.agents = keep; window.__norender = true; const s = g.renderer.stats || {}; return { draws: s.draws, tris: s.tris, ms: +(s.ms || 0).toFixed(1), refl: s.reflSecs || 0, ssr: s.ssr || null, pbr: g.renderer.q.pbr, fs: s.fsPasses }; }, [frames, tod]);
     await page.bringToFront().catch(() => {});
     // (run 1 lost its last views to one screenshot that never came — the river's, as t-land's run 1 did: try twice, say
-    //  whether the page still answers)
-    try { await page.screenshot({ path, timeout: 90000 }); return st; } catch (e) {
+    //  whether the page still answers. Runs 4 and 5: once the compositor's frame fails to come it never comes again on
+    //  this page — every later picture waited 110 s for nothing; after the first failure the canvas is read at once)
+    if (!shotDead) try { await page.screenshot({ path, timeout: 90000 }); return st; } catch (e) {
       const alive = await Promise.race([ev(() => Math.round(performance.now())).then(() => 'answers', () => 'error'), wait(20000).then(() => 'silent')]);
       console.log(`  !! screenshot ${path.replace(/^.*\//, '')} failed (${String(e.message || e).split('\n')[0].slice(0, 120)}); the page ${alive}`);
       if (alive !== 'answers') throw e;
+      shotDead = true;
     }
     // (run 2 lost the river's again, the page answering: the compositor's frame never came. The canvas itself, read in
     //  the task that drew it — the HUD is hidden, so it is the same picture)

@@ -140,6 +140,10 @@ console.log('g · the screen-space mirror (tier 2)');
   check(/float rc = mix\(0\.08 \+ float\(uint\(pb\.a \* 255\.0 \+ 0\.5\) >> 4u\) \* 0\.03, 0\.04, pud\);/.test(fs), 'the coat\'s roughness comes from the table\'s upper four bits (0.08 + 0.03 a step, as tex_pbr.js writes it); a puddle is sharp');
   check(/float Fc = max\(\(0\.04 \+ 0\.96 \* fvc\) \* coat, pud \* 0\.48\);/.test(fs), 'a puddle mirrors at least about half of what it faces (run 4: hardly visible where one looks down at it)');
   check(V.PBR.CR0 === 0.08 && V.PBR.CR_STEP === 0.03, 'the table and the shader agree on the coat\'s roughness steps');
+  // (run 5: the hangar's floor shimmered as a static — the weight and the ray followed the texture's relief texel by
+  //  texel, and the rays met the floor's own raised marks first)
+  check(/vec3 ns = normalize\(mix\(n, Ng, 0\.88\)\); float fs = pow5\(1\.0 - clamp\(dot\(ns, V\), 1e-3, 1\.0\)\);/.test(fs) && /g_ssrR = r; g_ssrN = ns; \}/.test(fs) && !/g_ssrN = n;/.test(fs), 'the mirror\'s weight and its ray follow the smooth surface, not the texture\'s relief');
+  check(/if \(b \* dot\(R, N\) > 0\.1\) \{/.test(S.SSR_FS), 'a plane does not see itself: a crossing less than a tenth of a block over the surface is passed and the march goes on');
   check(typeof S.SSR_FS === 'string' && /for \(int i = 0; i < 16; i\+\+\)/.test(S.SSR_FS) && /for \(int k = 0; k < 5; k\+\+\)/.test(S.SSR_FS) && !/u_frame|h12\(/.test(S.SSR_FS), 'the march: 16 growing steps, 5 halvings at a crossing before it is judged, the same ray every frame (no jitter: no spray of lone hits)');
   check(/textureSize\(u_ssr, 0\)/.test(S.SSR_APPLY_FS) && /m\.a \* 6\.0/.test(S.SSR_APPLY_FS) && /r\.y \* 2\.6/.test(S.SSR_APPLY_FS) && /smoothstep\(0\.25, 0\.65, s\.a\)/.test(S.SSR_APPLY_FS), 'the apply gathers the hits over a footprint that grows with the roughness, drawn out up and down the screen (a glossy floor\'s streaks)');
   check(/smoothstep\(0.0, 0.07, e.x\)/.test(S.SSR_FS) && /dot\(R, V\)/.test(S.SSR_FS), 'it fades at the screen\'s edge and for rays back toward the eye');

@@ -774,7 +774,11 @@ vec3 pbrShade(vec3 col, vec3 alb, vec3 n, vec3 Ng, vec3 V, vec3 L, vec3 lsun, fl
   if (ndl > 0.0 && r < 0.92) c += lsun * ndl * pbrSun(n, V, L, max(r, 0.08), F0);
   // the clear coat: a second, sharp interface over it (the polish, the lacquer, the water of a puddle)
 #ifdef SSR
-  g_ssrW = dot(Fr, vec3(0.3, 0.59, 0.11)); g_ssrR = r; g_ssrN = n;
+  // (run 5: the hangar's floor still shimmered as a static — the mirror's weight and its ray followed the texture's relief
+  //  texel by texel, and at a grazing angle the relief swings the Fresnel from a tenth to a half. The world it mirrors is
+  //  weighed and marched along the smooth surface; the relief stays in the sky's reflection above)
+  { vec3 ns = normalize(mix(n, Ng, 0.88)); float fs = pow5(1.0 - clamp(dot(ns, V), 1e-3, 1.0));
+    g_ssrW = dot((F0 + (max(vec3(1.0 - r), F0) - F0) * fs) * (1.0 - smoothstep(0.7, 0.92, r)), vec3(0.3, 0.59, 0.11)); g_ssrR = r; g_ssrN = ns; }
 #endif
   if (coat > 0.004) {
     // (run 3: the coat mirrored along the texture's relief — the hangar's polished floor showed the walls as a mottled
@@ -2581,8 +2585,13 @@ void main() {
       float a = prevT, b = t;
       for (int k = 0; k < 5; k++) { float mt = (a + b) * 0.5; vec4 cm = u_vp * vec4(Q + R * mt, 1.0); if (cm.w - lin(texture(u_depth, cm.xy / cm.w * 0.5 + 0.5).r) > 0.0) b = mt; else a = mt; }
       vec4 cb = u_vp * vec4(Q + R * b, 1.0); vec2 buv = cb.xy / cb.w * 0.5 + 0.5;
-      if (cb.w - lin(texture(u_depth, buv).r) < 0.1 + b * 0.025) huv = buv;
-      break;
+      // (run 5: a floor of mini-voxel tiles met its own raised marks and joints first, a hair above it at a grazing
+      //  angle — a static of its own colours. A plane does not see itself: a crossing less than a tenth of a block over
+      //  the surface is passed and the march goes on)
+      if (b * dot(R, N) > 0.1) {
+        if (cb.w - lin(texture(u_depth, buv).r) < 0.1 + b * 0.025) huv = buv;
+        break;
+      }
     }
     prevT = t; st *= 1.33; t += st;
   }
