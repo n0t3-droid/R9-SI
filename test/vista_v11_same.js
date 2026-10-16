@@ -9,7 +9,7 @@ const V = require('./load_shared.js');
 const COLS = [[0, 0], [5, 5], [-5, 5], [7, -6], [-8, -6], [13, -4], [20, -15], [17, 9], [21, 14], [28, 2], [36, 2], [-39, 2], [-17, -30], [-6, -35], [33, -15], [-26, 24], [-31, 18], [16, -20], [12, 4], [-14, -9]];
 const TILES = [[0, -4, -4], [0, 3, -2], [1, -3, 0], [2, 0, -1], [0, 2, 1], [0, -2, 0]];   // horizon tiles [level, tx, tz]
 const FORMS = [[1, 1, 4], [5, 2, 4], [-3, -8, 4], [-7, 5, 4]];                           // far forms [tx, tz, cell]
-const PINS = {"plan":"ad987e25","chunks":"e9369675","lod":"72bfe214","far":"4f540cff"};
+const PINS = {"plan":"f45b49f7","chunks":"e9369675","lod":"72bfe214","far":"4f540cff"};
 const fnv = (h, a) => { for (let i = 0; i < a.length; i++) { h ^= a[i]; h = Math.imul(h, 16777619) >>> 0; } return h; };
 const str = (h, s) => { for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h; };
 const mesh = (h, t) => { if (!t) return str(h, 'null'); for (const k of Object.keys(t).sort()) { const v = t[k]; if (v instanceof ArrayBuffer) h = fnv(h, new Uint8Array(v)); else if (v && v.buffer && v.length !== undefined) h = fnv(h, new Uint8Array(v.buffer, v.byteOffset, v.byteLength)); else if (typeof v === 'number' || typeof v === 'boolean') h = str(h, k + v); } return h; };

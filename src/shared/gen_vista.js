@@ -8,7 +8,7 @@
 //   · sight windows: walking either way along a way, a landmark is in view at least every 60 blocks — where only the
 //     woods close a view the terrain allows, a corridor toward the landmark is kept free of trees (LAND.KEEP.VIEW);
 //   · vista points every ~200 blocks: a spur jutting from the way toward a great landmark — paved, a low balustrade
-//     along both sides (the leading lines), a bench facing the view, lanterns — framed by a tree pair or an arch at its
+//     along both sides (the leading lines), a bench facing the view, lanterns — framed by a tree pair at its
 //     start, a grove in the middle distance beside the sight axis, the view cone free of trees; the composition (eye,
 //     yaw, pitch with the landmark's top in the upper third, the leading lines, the landmark's box) is recorded and
 //     listed as a 'vista' spawn of its chunk (the game's wow moments, wowmoment.js);
@@ -467,13 +467,12 @@
       const yaw = Math.atan2(-vx, -vz);
       const lead = [-2, 2].map(o => [[c.x + ux * 2 - uz * o, c.y + 1.5, c.z + uz * 2 + ux * o], [c.x + ux * (VISTA.SPUR + 1) - uz * o, c.y + 1.5, c.z + uz * (VISTA.SPUR + 1) + ux * o]]);
       const r = c.q.r, box = [c.q.x - r, c.q.base, c.q.z - r, c.q.x + r, c.q.top, c.q.z + r];
-      // the arch over the walk where the landmark stands in its opening from this eye: its top a degree and a half under
-      // the lintel, its width inside the piers (vista.mjs: from the mouth the lighthouse's top hid behind the lintel)
-      let archT = null;
-      if (elTop < 9 * DEG && c.q.r < 40) for (const ta of [4.5, 5.5]) { const ahead = ta - te; if (Math.atan2(c.y + 4.5 - ey, ahead) - elTop >= 1.5 * DEG && Math.atan2(1.5, ahead) - Math.atan2(c.q.r, d) >= DEG) { archT = ta; break; } }
+      // (no arch over the walk any more: from the composition's eye an arch 5 blocks out filled half the picture with
+      // its piers and lintel — vista.mjs, the lighthouse from 403 m: a brick doorway and a sliver of lake — and its
+      // vistas' landmarks are small anyway; the lantern posts and the frame trees frame them like the others)
       // the wow moment (wowmoment.js) only where the landmark stands big — 11° of the eye's height, or the isles' flock
       // from under 260 m (vista.mjs: from 400–700 m a lighthouse or the temple a sliver over the land: a bench, a view, no swing)
-      P.vistas.push({ id: 'v' + k, line: c.li, i: c.i, x: Math.round(c.x), z: Math.round(c.z), y: c.y, u: c.u, lm: c.lm, aim: [c.q.x, c.q.top, c.q.z], d: Math.round(c.d), rise: +c.rise.toFixed(1), drop: c.drop, eye: [+ex.toFixed(2), +ey.toFixed(2), +ez.toFixed(2)], te: +te.toFixed(2), yaw: +yaw.toFixed(4), pitch: +pitch.toFixed(4), fov, lead, box, frame: archT !== null ? 'arch' : 'trees', archT, wow: c.size >= 11 * DEG || (c.lm === 'isles' && c.d <= 260), score: +c.sc.toFixed(3) });
+      P.vistas.push({ id: 'v' + k, line: c.li, i: c.i, x: Math.round(c.x), z: Math.round(c.z), y: c.y, u: c.u, lm: c.lm, aim: [c.q.x, c.q.top, c.q.z], d: Math.round(c.d), rise: +c.rise.toFixed(1), drop: c.drop, eye: [+ex.toFixed(2), +ey.toFixed(2), +ez.toFixed(2)], te: +te.toFixed(2), yaw: +yaw.toFixed(4), pitch: +pitch.toFixed(4), fov, lead, box, frame: 'trees', wow: c.size >= 11 * DEG || (c.lm === 'isles' && c.d <= 260), score: +c.sc.toFixed(3) });
     });
     return P.vistas;
   };
@@ -506,26 +505,10 @@
     const at = (t, o) => [Math.round(sx + ux * t - uz * o - 0.5), Math.round(sz + uz * t + ux * o - 0.5)];
     { const [bx, bz] = at(L - 0.5, 0); put(bx, y + 1, bz, st('vx_bench', { facing: FACE4(ux, uz) })); }
     for (const o of [-3, 3]) { const [lx, lz] = at(L + 1.6, o); put(lx, y + 1, lz, POST); put(lx, y + 2, lz, LANT); }
-    // the arch (V.frame 'arch': the landmark stands in its opening from the composition's eye, V.archT out — choose()):
-    // two piers on the walls, a lintel with a keystone over the walk — the picture's frame in the foreground
-    if (V.frame === 'arch') {
-      const PIER = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, LIN = white ? (st('smooth_quartz') || BASE) : st('stone_bricks'), KEY = white ? (st('chiseled_quartz_block') || LIN) : st('chiseled_stone_bricks');
-      const done = new Set(), offWay = (ta) => [-2, 2].every(o => { const c = at(ta, o); return !P.cells.has(ck(c[0], c[1])); });
-      const ta = [V.archT || 4.5].find(offWay);   // (its piers never on the way)
-      if (ta !== undefined) {
-        for (const o of [-2, 2, -1.5, 1.5, -1, 1, -0.5, 0.5, 0]) {   // (the piers first: on a slanting walk a lintel cell rounded onto a pier's took it)
-          const [ax, az] = at(ta, o), k = ax * 65536 + az; if (done.has(k)) continue; done.add(k);
-          if (Math.abs(o) >= 2) { for (let yy = y + 1; yy <= y + 4; yy++) put(ax, yy, az, PIER); put(ax, y + 5, az, LIN); put(ax, y + 6, az, st('lantern', { hanging: 0 })); }
-          else put(ax, y + 5, az, Math.abs(o) < 0.5 ? KEY : LIN);
-        }
-        { const [kx, kz] = at(ta, 0); put(kx, y + 6, kz, KEY); }
-        V.arch = true;
-      }
-    }
     // a lantern post either side of the walk halfway along it (like the two at its end), the picture's lower corners —
     // four lights converging on the landmark. (vista.mjs's runs: four-high gate piers at ±2 hid a third of the picture
     // and stood on the way at 19 of 21 spurs; posts at the mouth stood beside the eye, cut by the frame's edge or out of
-    // it at all 21; test/vista_preview.js measures them.) Where the arch stands, it is the frame instead.
+    // it at all 21; test/vista_preview.js measures them.)
     const MPOST = white ? (st('quartz_pillar', { axis: 0 }) || POST) : POST;
     // (the cell whose middle lies nearest the post's place in the spur's frame — a rounded point strays up to a block on
     // a slanting spur: test/vista_preview.js found the posts from 2.4 to 3.9 off the axis — outside the walls, off the way)
@@ -538,7 +521,7 @@
       }
       return bd <= 1.2 ? best : null;
     };
-    if (!V.arch) for (const o of [-3, 3]) {
+    for (const o of [-3, 3]) {
       const pc = cellNear(VISTA.POSTS, o);
       if (!pc) continue;
       const [lx, lz] = pc, g0 = gy(lx, lz);
@@ -647,8 +630,8 @@
     }
   };
   // ---- a vista's frame and its middle ground: a tree pair beside the walk (the picture's sides; in its own vista's cone —
-  // the view is cut round them — but never in a way's window), an arch over the spur where the landmark stands in its
-  // opening (buildSpur), a grove 50–200 blocks out beside the sight axis (none in a corridor)
+  // the view is cut round them — but never in a way's window), a grove 50–200 blocks out beside the sight axis (none in
+  // a corridor)
   const planTree = (g, P, x, z, kind, view, frameOf, crown) => {
     x = Math.round(x); z = Math.round(z);
     if (LAND.zoneAt(g, x, z) || P.cells.has(ck(x, z)) || (LAND.keepAt(P, x, z) & (1 | 2 | 4 | 16 | (view ? 32 : 0)))) return false;
