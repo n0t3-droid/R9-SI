@@ -105,12 +105,20 @@ if (want(3)) {
     for (let dz = -12; dz <= 12; dz++) for (let dx = -12; dx <= 12; dx++) {
       const x = v.x + dx, z = v.z + dz; if (Math.hypot(dx, dz) > 12) continue;
       const a = nameOf(blockAt(x, v.y + 1, z)), b = nameOf(blockAt(x, v.y + 2, z)), c = nameOf(blockAt(x, v.y + 3, z)), f = nameOf(blockAt(x, v.y, z));
-      if (a === 'vx_bench') bench++; if (b === 'lantern' || c === 'lantern' || nameOf(blockAt(x, v.y + 5, z)) === 'lantern') lant++; if (/wall|balustrade/.test(a)) wall++; if (/flagstone|plaza/.test(f)) pave++;
+      if (a === 'vx_bench') bench++; if (b === 'lantern' || c === 'lantern' || nameOf(blockAt(x, v.y + 4, z)) === 'lantern') lant++; if (/wall|balustrade/.test(a)) wall++; if (/flagstone|plaza/.test(f)) pave++;
     }
     const sp = (chunk(v.x >> 4, v.z >> 4).spawns || []).some(s => s[0] === 'vista' && s[1] === v.id);
     if (bench >= 1 && lant >= 4 && wall >= 10 && pave >= 12 && sp) built++; else if (bad.length < 4) bad.push(`${v.id} bench ${bench} lanterns ${lant} walls ${wall} paving ${pave} spawn ${sp}`);
   }
   check(built === vs.length, `every vista's spur stands in its chunk with its bench, lanterns, walls and paving, and its chunk lists the 'vista' spawn (${built} of ${vs.length}${bad.length ? '; ' + bad.join('; ') : ''})`);
+  // the way stays open: on every way cell within 14 blocks of a vista point, and on every way cell under a town gate, the
+  // two blocks over the way's surface are free (vista.mjs's first run: the spurs' gate piers stood on the way)
+  const solidAt = (x, y, z) => { const b = blockAt(x, y, z); return !!b && !!(RT.flags[b] & (F.SOLID | F.OPAQUE)) && !(RT.flags[b] & F.PLANT); };
+  let blocked = 0, cellsSeen = 0; const blk = [];
+  const near = (cx, cz, r) => { for (const c of P.cells.values()) if (Math.abs(c.x - cx) <= r && Math.abs(c.z - cz) <= r && !c.deck) { cellsSeen++; for (const dy of [1, 2]) if (solidAt(c.x, c.y + dy, c.z)) { blocked++; if (blk.length < 5) blk.push(`${nameOf(blockAt(c.x, c.y + dy, c.z))} at (${c.x}, ${c.y + dy}, ${c.z})`); break; } } };
+  for (const v of vs) near(v.x, v.z, 14);
+  for (const p of pieces('gate')) near(p.x, p.z, 5);
+  check(blocked === 0 && cellsSeen > 400, `the ways stay open by the vista points and under the gates: ${blocked} of ${cellsSeen} way cells blocked at foot or head height${blk.length ? ' (' + blk.join(', ') + ')' : ''}`);
   // the landmark's top above the horizon line and unoccluded within 300 m by the heightfield; the line of sight free of
   // blocks in the generated chunks within 120 blocks
   const Rr = VI.rasters(g);
@@ -205,8 +213,8 @@ if (want(5)) {
     const trees = (P.trees || []).filter(t => Math.hypot(t.x - v.x, t.z - v.z) < 16 && Math.hypot(t.x - v.x, t.z - v.z) > 6);
     // (a crown's inner edge, 4 blocks from its trunk toward the sight axis, inside the picture's side)
     const sides = trees.map(t => { const ax = v.eye[0] + v.u[0] * 8, az = v.eye[2] + v.u[1] * 8, dx = ax - t.x, dz = az - t.z, l = Math.hypot(dx, dz) || 1; return proj(v, t.x + 0.5 + dx / l * 4, t.y + 5, t.z + 0.5 + dz / l * 4); }).filter(Boolean).filter(q => Math.abs(q[0]) > 0.3 && Math.abs(q[0]) < 1.05);
-    // the gate's piers at the spur's start (four high, a lantern on each)
-    let piers = 0; for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) if (/chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 4, v.z + dz))) && nameOf(blockAt(v.x + dx, v.y + 5, v.z + dz)) === 'lantern') piers++;
+    // the gate's low piers at the spur's mouth (a cap and a lantern on each)
+    let piers = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) if (/chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 3, v.z + dz))) && nameOf(blockAt(v.x + dx, v.y + 4, v.z + dz)) === 'lantern') piers++;
     let arch = false;
     if (v.arch) { const piers = []; for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) { const n = nameOf(blockAt(v.x + dx, v.y + 3, v.z + dz)); if (/quartz_pillar|stone_bricks/.test(n) && /stone_bricks|quartz|chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 5, v.z + dz)))) piers.push([v.x + dx, v.z + dz]); } arch = piers.length >= 2; }
     if (piers >= 2 && (sides.length >= 1 || arch)) fg++; else if (fgBad.length < 4) fgBad.push(`${v.id} (${piers} piers; ${trees.length} trees, ${sides.length} at the sides)`);

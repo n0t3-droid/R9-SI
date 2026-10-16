@@ -264,8 +264,17 @@
     const H = 6, half = 3;
     const cells = [];
     for (let o = -half; o <= half; o++) { const x = Math.round(px + nx * o), z = Math.round(pz + nz * o); if (!cells.some(c => c[0] === x && c[1] === z)) cells.push([x, z, o]); }
-    for (const [x, z, o] of cells) {
-      if (Math.abs(o) === half) {   // a pier from the ground
+    // (a pier never on the way: where two ways meet it steps outward until it is off it, the lintel reaching it)
+    for (const c of cells.slice()) if (Math.abs(c[2]) === half && P.cells.has(ck(c[0], c[1]))) {
+      for (let k = 1; k <= 3; k++) {
+        const o2 = c[2] + Math.sign(c[2]) * k, x2 = Math.round(px + nx * o2), z2 = Math.round(pz + nz * o2);
+        cells.push([c[0], c[1], c[2], true]); c[0] = x2; c[1] = z2;   // (the cell it left: the lintel's)
+        if (!P.cells.has(ck(x2, z2))) break;
+      }
+    }
+    for (const [x, z, o, lintel] of cells) {
+      if (Math.abs(o) === half && !lintel) {   // a pier from the ground
+        if (P.cells.has(ck(x, z))) continue;
         const g0 = gy(x, z);
         for (let yy = Math.min(g0, y) - 1; yy <= y + H; yy++) put(x, yy, z, yy === y + H ? S.cap : S.pier);
         put(x, y + H + 1, z, st('lantern', { hanging: 0 }));
@@ -468,21 +477,34 @@
     const at = (t, o) => [Math.round(sx + ux * t - uz * o - 0.5), Math.round(sz + uz * t + ux * o - 0.5)];
     { const [bx, bz] = at(L - 0.5, 0); put(bx, y + 1, bz, st('vx_bench', { facing: FACE4(ux, uz) })); }
     for (const o of [-3, 3]) { const [lx, lz] = at(L + 1.6, o); put(lx, y + 1, lz, POST); put(lx, y + 2, lz, LANT); }
-    // the gate into the spur: a pier either side, four high with a lantern on it (the picture's frame in the foreground)
+    // the gate into the spur: a low pier either side of its mouth, a cap and a lantern on each — the picture's frame in
+    // its lower corners — and never on the way (vista.mjs's first run: four-high piers at ±2 hid a third of the view, and
+    // on 19 of 21 spurs they stood on the way's cells): the first place from the mouth outward that is off the way
     const PIERB = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, CAP = white ? (st('chiseled_quartz_block') || BASE) : st('chiseled_stone_bricks');
-    for (const o of [-2, 2]) { const [lx, lz] = at(1.2, o); for (let yy = y + 1; yy <= y + 3; yy++) put(lx, yy, lz, PIERB); put(lx, y + 4, lz, CAP); put(lx, y + 5, lz, LANT); }
+    for (const o of [-3, 3]) {
+      let pc = null;
+      for (const t of [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5]) { const c = at(t, o); if (!P.cells.has(ck(c[0], c[1]))) { pc = c; break; } }   // (past 3 the spur's room is off the way: choose())
+      if (!pc) continue;
+      const [lx, lz] = pc, g0 = gy(lx, lz);
+      for (let yy = g0 + 1; yy <= y; yy++) put(lx, yy, lz, BASE);   // (its footing where the land falls away)
+      put(lx, y + 1, lz, PIERB); put(lx, y + 2, lz, PIERB); put(lx, y + 3, lz, CAP); put(lx, y + 4, lz, LANT);
+      keepSet(P, lx, lz, LAND.KEEP.PIECE);
+    }
     // the arch (V.frame 'arch': the landmark low enough to stand in its opening): two piers on the walls 2.5 out, a lintel
     // with a keystone over the walk — the picture's frame in the foreground
     if (V.frame === 'arch') {
       const PIER = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, LIN = white ? (st('smooth_quartz') || BASE) : st('stone_bricks'), KEY = white ? (st('chiseled_quartz_block') || LIN) : st('chiseled_stone_bricks');
-      const done = new Set();
-      for (let o = -2; o <= 2; o += 0.5) {
-        const [ax, az] = at(2.5, o), k = ax * 65536 + az; if (done.has(k)) continue; done.add(k);
-        if (Math.abs(o) >= 2) { for (let yy = y + 1; yy <= y + 4; yy++) put(ax, yy, az, PIER); put(ax, y + 5, az, LIN); put(ax, y + 6, az, st('lantern', { hanging: 0 })); }
-        else put(ax, y + 5, az, Math.abs(o) < 0.5 ? KEY : LIN);
+      const done = new Set(), offWay = (ta) => [-2, 2].every(o => { const c = at(ta, o); return !P.cells.has(ck(c[0], c[1])); });
+      const ta = [2.5, 3.5, 4.5].find(offWay);   // (its piers never on the way)
+      if (ta !== undefined) {
+        for (let o = -2; o <= 2; o += 0.5) {
+          const [ax, az] = at(ta, o), k = ax * 65536 + az; if (done.has(k)) continue; done.add(k);
+          if (Math.abs(o) >= 2) { for (let yy = y + 1; yy <= y + 4; yy++) put(ax, yy, az, PIER); put(ax, y + 5, az, LIN); put(ax, y + 6, az, st('lantern', { hanging: 0 })); }
+          else put(ax, y + 5, az, Math.abs(o) < 0.5 ? KEY : LIN);
+        }
+        { const [kx, kz] = at(ta, 0); put(kx, y + 6, kz, KEY); }
+        V.arch = true;
       }
-      { const [kx, kz] = at(2.5, 0); put(kx, y + 6, kz, KEY); }
-      V.arch = true;
     }
     // the spawn the game's wow moment reads: the trigger (the spur's start), the composition
     LAND.addSpawn(P, ['vista', V.id, V.x, y + 1, V.z, V.eye[0], V.eye[1], V.eye[2], V.yaw, V.pitch, V.fov, V.lm], V.x, V.z);
