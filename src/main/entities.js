@@ -279,6 +279,11 @@
       } else if (A.flee > 0) {
         tx = m.pos[0] + (m.pos[0] - p.pos[0]); tz = m.pos[2] + (m.pos[2] - p.pos[2]); speed *= 1.6;
       } else {
+        // (t-wild, wildlife.js) a deer in its line at dawn walks its slot of the line; a sheep of a drifting herd keeps
+        // round the herd's point — and grazes where it stands
+        const lt = m.line && VR.Wild && VR.Wild.lineTarget ? VR.Wild.lineTarget(m, dt) : null;
+        if (lt) { A.target = A.target || [0, 0]; A.target[0] = lt[0]; A.target[1] = lt[1]; A.t = 0.5; }
+        else if (m.herd && VR.Wild && VR.Wild.herdTarget && A.t <= 0) { A.t = 4 + Math.random() * 7; const ht = VR.Wild.herdTarget(m); A.target = ht && Math.random() < 0.75 ? [ht[0], ht[1]] : null; }
         if (A.t <= 0) {
           A.t = 2 + Math.random() * 5;
           A.target = Math.random() < 0.6 ? [m.pos[0] + (Math.random() - 0.5) * 16, m.pos[2] + (Math.random() - 0.5) * 16] : null;
@@ -490,7 +495,7 @@
       const gait = m.def ? VR.getVoxModel(this.game.renderer.gl, m.def.model).def.gait : 'biped';
       const s = Math.sin(m.walk * 3) * 0.7 * (m.walkAmt || 0);
       const P = {};
-      if (gait === 'quad') { P.leg_fl = [s, 0, 0]; P.leg_br = [s, 0, 0]; P.leg_fr = [-s, 0, 0]; P.leg_bl = [-s, 0, 0]; P.head = [Math.sin(t * 0.7 + m.id) * 0.1, Math.sin(t * 0.3 + m.id) * 0.2, 0]; P.claw_l = [0, Math.sin(t * 2) * 0.2, 0]; P.claw_r = [0, -Math.sin(t * 2) * 0.2, 0]; }
+      if (gait === 'quad') { P.leg_fl = [s, 0, 0]; P.leg_br = [s, 0, 0]; P.leg_fr = [-s, 0, 0]; P.leg_bl = [-s, 0, 0]; P.head = [Math.sin(t * 0.7 + m.id) * 0.1, Math.sin(t * 0.3 + m.id) * 0.2, 0]; P.claw_l = [0, Math.sin(t * 2) * 0.2, 0]; P.claw_r = [0, -Math.sin(t * 2) * 0.2, 0]; if (m.graze && (m.walkAmt || 0) < 0.4) P.head[0] = -0.85 + Math.max(0, Math.sin(t * 2.3 + m.id)) * 0.12; }   // (t-wild: grazing, the head down)
       // pose angles: positive X rotation swings a limb forward (models face -z) and tilts the head up
       else if (gait === 'biped') { P.leg_l = [s, 0, 0]; P.leg_r = [-s, 0, 0]; P.arm_l = [-s * 0.8 + (m.swing || 0) * 1.2, 0, 0]; P.arm_r = [s * 0.8 + (m.swing || 0) * 1.4, 0, 0]; if (m.def && m.def.hostile) { P.arm_l[0] += 1.3; P.arm_r[0] += 1.3; } }
       else if (gait === 'wings') { const f = Math.sin(t * 1.6 + m.id) * 0.35; P.wing_l = [0, 0, f]; P.wing_r = [0, 0, -f]; P.tail = [Math.sin(t * 1.3) * 0.15, Math.sin(t * 0.9) * 0.2, 0]; }

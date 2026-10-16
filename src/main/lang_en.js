@@ -2054,5 +2054,15 @@
     'g.set.cloudShadow.tip': 'The clouds\' shadows drift with the wind over meadows, hills and roofs. From Balanced up.',
     'g.set.wxDrama': 'Weather drama: storm front, lightning, rainbow, fog banks',
     'g.set.wxDrama.tip': 'A storm rolls in from one side, the wind picks up, lightning outlines the hills, the rain blows sideways; afterwards a rainbow. In the morning fog banks lie in the valleys. Off on Very Low.',
+    'g.set.wildBirds': 'Bird flocks: a murmuration at dusk, gulls, a heron',
+    'g.set.wildBirds.tip': 'At dusk a cloud of hundreds of starlings sweeps over the lake and the fields, folds and turns and settles in a tree line for the night; at dawn it rises again. By day gulls wheel over the lake, and a heron stands at a pond\'s edge and takes off slowly when you come within eight blocks. The murmuration from Balanced up; off on Very Low.',
+    'g.set.wildFish': 'Fish shoals: fish at the pier, carp in the ponds',
+    'g.set.wildFish.tip': 'Under the pier, in the waterfall\'s pool and in the shallows near you a shoal of small fish swirls, flashing in the sun as it turns, and scatters when you come close; carp cruise in the ponds. Off on Very Low.',
+    'g.set.wildBugs': 'Butterflies & dragonflies: a swarm over the flowers, dragonflies at the ponds',
+    'g.set.wildBugs.tip': 'A swarm of butterflies lives on a flower meadow, fluttering from bloom to bloom and rising round you as you walk through; dragonflies hover over the ponds and dart away. Off on Very Low.',
+    'g.set.wildRays': 'Sky rays: great rays between the floating isles',
+    'g.set.wildRays.tip': 'Three or four great, gentle sky rays glide a slow circuit between the floating isles, trailing sparks of light, and glow at night. Every player sees them in the same place. From Balanced up.',
+    'g.set.wildHerds': 'Herds on the move: deer at dawn, sheep, rabbits, a fox',
+    'g.set.wildHerds.tip': 'At dawn the deer cross the meadow in a line and graze, the sheep drift over the pasture as one herd, rabbits hop at the field edges and dash into the hedge, and at dusk a fox trots along the hedge. Nothing hunts here. Off on Very Low.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
