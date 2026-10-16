@@ -171,13 +171,13 @@
     this.shadowOffUni(p.u);
     gl.uniform2f(p.u.u_nf, 0.06, F.cam.far || 1200);
     const air = l.air;
-    gl.uniform4f(p.u.u_vol, K.steps, Math.min(K.reach, (q.shadowDist || 64) * 0.95), air.rho * k, K.g);
+    gl.uniform4f(p.u.u_vol, K.steps, Math.min(K.reach, (q.shadowDist || 64) * 0.95), air.rho * k, L2.volG(sunUp));
     gl.uniform4f(p.u.u_volH, F.cam.y, air.k * K.kScale, air.base, 0.0008);
     gl.uniform3f(p.u.u_volCol, c[0], c[1], c[2]);
     gl.uniform3f(p.u.u_volL, L[0], L[1], L[2]);
     if (p.u.u_volSky) gl.uniform1f(p.u.u_volSky, K.sky);
     if (p.u.u_volShaft) gl.uniform1f(p.u.u_volShaft, K.shaft);
-    if (p.u.u_volF) gl.uniform2f(p.u.u_volF, 1 / K.fade, K.cover);
+    if (p.u.u_volF) gl.uniform2f(p.u.u_volF, 1 / K.fade, L2.volCover(sunUp));
     gl.uniform1f(p.u.u_phase, this.jit ? (this.frameNo * 0.6180339887) % 1 : 0);
     const px = V.w * V.h;
     this.fsMark('l2vol', V.w, V.h, px * 4 * (K.steps + 2), px * 8, px * (K.steps + 2));

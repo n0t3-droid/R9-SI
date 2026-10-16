@@ -266,7 +266,12 @@
   // the air denser where the eye stands in shadow (in a wood, under the vault, in a street's shade: the lit air beside it
   // glows), ×(1 + cover). g: forward — the shafts toward the light bright, the air away from it clear (run 3: the
   // symmetric weight and g 0.35 veiled the open lake and the temple's plaza, while the wood showed nothing)
-  L2.VOL = { steps: 16, reach: 120, g: 0.55, sun: 0.4, moon: 1.6, indoor: 2.5, sky: 0.25, kScale: 0.7, shaft: 20, fade: 64, cover: 1.5 };
+  // The moon (run 4: at dusk, the moon 4° up, the eye's shade and the new weight drew a grainy blue fan over the villa's
+  // lawn): its phase run 3's (gMoon 0.35), no eye's shade, its strength 0.7 — its light in the air under run 3's for
+  // every ray (test/light2.js h)
+  L2.VOL = { steps: 16, reach: 120, g: 0.55, gMoon: 0.35, sun: 0.4, moon: 0.7, indoor: 2.5, sky: 0.25, kScale: 0.7, shaft: 20, fade: 64, cover: 1.5 };
+  L2.volG = (sunUp) => (sunUp ? L2.VOL.g : L2.VOL.gMoon);
+  L2.volCover = (sunUp) => (sunUp ? L2.VOL.cover : 0);
   L2.volK = function (sunUp, rain, eyeSky) {
     const V = L2.VOL, e = eyeSky === undefined ? 1 : clamp(eyeSky, 0, 1);
     return (sunUp ? V.sun : V.moon) * (1 - 0.6 * clamp(rain || 0, 0, 1)) * (1 + V.indoor * (1 - e));

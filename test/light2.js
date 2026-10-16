@@ -310,6 +310,18 @@ console.log('h · the light in the air, the mist, the beams, the hooks');
   // (a shaft pixel against its dark neighbour in a wood: a fifth of the ray lit against a twentieth)
   check((0.2 * sb(0.2)) / (0.05 * sb(0.05)) > 6, `in a wood a shaft stands out of its dark neighbours ${r2((0.2 * sb(0.2)) / (0.05 * sb(0.05)))}× (without the boost 4×)`);
   check(L2.VOL.fade >= 40 && L2.VOL.fade <= 120 && L2.VOL.cover >= 1 && L2.VOL.cover <= 3, `the far air counts less (e^(−t / ${L2.VOL.fade})), the eye in shadow ×${1 + L2.VOL.cover}`);
+  // (run 4: at dusk — the sun under the horizon, the moon 4° up — the moon's light in the air with the new weight, the
+  // eye's shade (×2.5) and its own strength 1.6 drew a grainy blue fan over the villa's lawn and a veil over the lake's
+  // isles; run 3's moon had shown soft rays. So the moon keeps run 3's phase (g 0.35), no eye's shade, and a density
+  // that keeps its light in the air under run 3's for every ray: the share lit, the ray's length, the angle to the moon)
+  {
+    const hg = (g, c) => (1 - g * g) / Math.pow(1 + g * g - 2 * g * c, 1.5);
+    const run3 = (lit, T, c) => 1.6 * lit * T * (1 + 12 * 4 * lit * (1 - lit)) * hg(0.35, c);
+    const now = (lit, T, c) => L2.VOL.moon * lit * L2.VOL.fade * (1 - Math.exp(-T / L2.VOL.fade)) * L2.volShaft(lit) * (1 + L2.volCover(false) * 1) * hg(L2.volG(false), c);
+    let worst = 0, at = '';
+    for (let li = 1; li <= 50; li++) for (const T of [8, 20, 40, 80, 120]) for (let ci = -10; ci <= 10; ci++) { const lit = li / 50, c = ci / 10, r = now(lit, T, c) / run3(lit, T, c); if (r > worst) { worst = r; at = `lit ${lit}, ${T} blocks, cos ${c}`; } }
+    check(worst <= 1.0 && L2.volCover(true) === L2.VOL.cover && L2.volG(true) === L2.VOL.g, `the moon's light in the air never stronger than run 3's (worst ×${r2(worst)} at ${at}); the sun keeps the eye's shade ×${1 + L2.volCover(true)} and g ${L2.volG(true)}`);
+  }
   const vf = pre(L2.VOL_FS, []), lc = pre(L2.glslCommon(), ['LIGHT2']);
   check(/lit = acc \/ max\(tot, 1e-6\)/.test(vf) && /u_volShaft \* 6\.75 \* lit \* \(1\.0 - lit\) \* \(1\.0 - lit\)/.test(vf) && /exp\(-t \* u_volF\.x\)/.test(vf) && /u_volF\.y \* \(1\.0 - eye\)/.test(vf), 'the march weighs its light by how much of the ray is in shadow (u_volShaft, L2.volShaft\'s mirror), the far air less, the eye\'s shade more');
   check(/uniform vec3 u_l2Glow;/.test(lc) && /u_l2Glow \* max\(d, 0\.0\)/.test(lc), 'the hemisphere carries the afterglow on the faces toward the low sun (u_l2Glow, L2.hemi\'s mirror)');
