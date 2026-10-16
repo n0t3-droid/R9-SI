@@ -239,7 +239,9 @@
       let r = rMax;
       for (let k = 0; k < 12; k++) {
         const a = k / 12 * TAU;
-        for (let d = 1; d <= r; d += 0.75) { const s2 = this.surface(x + Math.cos(a) * d, z + Math.sin(a) * d, S.top); if (!s2 || Math.abs(s2.top - S.top) > 0 || s2.depth < 1) { r = Math.min(r, d - 0.8); break; } }
+        // (a post of the pier is one column: the water goes on past it)
+        const wet = (d) => { const s2 = this.surface(x + Math.cos(a) * d, z + Math.sin(a) * d, S.top); return !!s2 && s2.top === S.top && s2.depth >= 1; };
+        for (let d = 1; d <= r; d += 0.75) if (!wet(d) && !wet(d + 1.5)) { r = Math.min(r, d - 0.8); break; }
       }
       if (r < 1.6) return null;
       const bottom = S.top - S.depth + 1, y1 = S.y - 0.35, y0b = Math.max(bottom + 0.3, S.y - 2.4);
@@ -258,7 +260,10 @@
       const sc = W.sched(this.seed, day, tod), wet = (E.rain || 0) > 0.15 || (E.snow || 0) > 0.15, cap = this.b.cap;
       const ctx = this.ctx || (this.ctx = {});
       ctx.clock = clock; ctx.tod = tod; ctx.day = day; ctx.sc = sc; ctx.wet = wet; ctx.E = E; ctx.eye = eye;
-      ctx.moving = Math.hypot(g.player.vel ? g.player.vel[0] : 0, g.player.vel ? g.player.vel[2] : 0) > 1.2;
+      // (walking: the player's speed, or how far the eye went since the last frame — a step taken however it was taken)
+      const lp = this.lastP || (this.lastP = [p[0], p[1], p[2]]), moved = Math.hypot(p[0] - lp[0], p[2] - lp[2]) / dt;
+      lp[0] = p[0]; lp[1] = p[1]; lp[2] = p[2];
+      ctx.moving = Math.hypot(g.player.vel ? g.player.vel[0] : 0, g.player.vel ? g.player.vel[2] : 0) > 1.2 || (moved > 1.2 && moved < 60);
       if (g.airLife) g.airLife.noButterflies = cap.bfly > 0;   // (the swarm takes over from the living air's butterfly dots)
       const T = this.stats.ms, A = this.stats.avg;
       let t0 = performance.now(), t1;
@@ -504,9 +509,9 @@
           if (b) SH.push(this.newShoal(a.key, b, nF, false));
         }
         // the shallows round the eye: water at sea level with two blocks of depth, the nearest ahead first
-        if (SH.length < nS && !SH.some(s => s.eyeOwn) && !SH.some(s => Math.hypot(s.b.x - eye[0], s.b.z - eye[2]) < 30)) {
+        if (SH.length < nS && !SH.some(s => s.eyeOwn) && !SH.some(s => Math.hypot(s.b.x - eye[0], s.b.z - eye[2]) < 30) && this.waterNear(eye)) {
           const yaw = this.g.player.yaw, f = [-Math.sin(yaw), -Math.cos(yaw)];
-          for (let k = 0; k < 24; k++) {
+          for (let k = 0; k < 12; k++) {
             const a = Math.atan2(f[1], f[0]) + ((k & 1) ? 1 : -1) * Math.ceil(k / 2) * 0.35, dd = 7 + (k % 3) * 3;
             const x = Math.floor(eye[0] + Math.cos(a) * dd) + 0.5, z = Math.floor(eye[2] + Math.sin(a) * dd) + 0.5;
             const b = this.waterDisc(x, z, eye[1] - 1.6, 5, 2);
@@ -538,6 +543,12 @@
         W.shoalTarget(s.seed, ctx.clock * 0.6, s.b, s.fl.tgt);
         s.acc += dt; if (s.acc >= 1 / 20) { s.fl.step(Math.min(0.1, s.acc)); s.acc = 0; }
       }
+    }
+    // is there water at the surface round the eye (eight columns 6 and 11 blocks out)? (a cheap look before the search)
+    waterNear(eye) {
+      const w = this.g.world, MK = mask();
+      for (let k = 0; k < 16; k++) { const a = k / 8 * TAU, d = k < 8 ? 6 : 11, x = Math.floor(eye[0] + Math.cos(a) * d), z = Math.floor(eye[2] + Math.sin(a) * d); if (w.isLoaded(x, z) && (MK[w.getBlock(x, w.topAt(x, z), z)] & 8)) return true; }
+      return false;
     }
     newShoal(key, b, n, eyeOwn, P) {
       const seed = (W.h(this.seed, Math.floor(b.x), Math.floor(b.z)) * 4294967295) >>> 0;
