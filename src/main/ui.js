@@ -80,6 +80,7 @@
         <div class="logo" style="font-size:64px">R9&#8209;SI</div>
         <div id="loadmsg" style="margin:26px 0 12px;font-size:18px;letter-spacing:2px" data-t="g.load.world"></div>
         <div class="bar"><div id="loadbar"></div></div>
+        <div class="ldetail" id="loaddetail"></div>
         <div class="tip" id="loadtip"></div>
       </div>
       <div id="hud">
@@ -238,7 +239,7 @@
         case 'docreate': {
           const pick = (id) => $('#' + id + ' .on').dataset.v;
           const mode = pick('cw_mode');
-          g.createWorld({ name: $('#cw_name').value.trim() || T('start.newWorldName'), mode, difficulty: mode === 'zen' ? 'peaceful' : pick('cw_diff'), type: pick('cw_type'), seed: $('#cw_seed').value.trim(), cheats: $('#cw_cheats').checked, keep: $('#cw_keep').checked, kit: $('#cw_kit').checked });
+          g.createWorld({ name: $('#cw_name').value.trim() || T('start.newWorldName'), mode, difficulty: mode === 'zen' ? 'peaceful' : pick('cw_diff'), type: pick('cw_type'), seed: $('#cw_seed').value.trim(), cheats: $('#cw_cheats').checked, keep: $('#cw_keep').checked, kit: $('#cw_kit').checked, first: true });   // (first: t-first — it may open on its finest vista)
           break;
         }
         case 'playsel': if (this.selWorld) g.loadWorld(this.selWorld); break;
@@ -283,9 +284,11 @@
         wl.appendChild(d);
       }
     }
-    loading(msg, frac) {
+    loading(msg, frac, detail) {
       if (this.screen !== 'loading') { this.show('loading'); this.tipTimer = 0; }
       $('#loadmsg').textContent = msg;
+      // t-first: the counts of the needed sections under the bar; the world's sky shows through while it renders behind
+      { const d = $('#loaddetail'); if (d) d.textContent = detail || ''; const L = $('#loading'); if (L) L.classList.toggle('sky', this.game.state === 'loading'); }
       $('#loadbar').style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%';
       if (!this.tipAt || performance.now() - this.tipAt > 4500) { this.tipAt = performance.now(); const tips = TL('g.load.tips'); $('#loadtip').textContent = tips.length ? tips[Math.floor(Math.random() * tips.length)] : ''; }
     }

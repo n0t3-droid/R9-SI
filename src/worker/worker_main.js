@@ -69,7 +69,7 @@
   // way. A home city's plan is built after the temple it stands on.
   // init and custom replace the generators: a job still waiting then is answered {type:'cancelled'} (its owner asks
   // again if it still wants it).
-  const PLAN_SLICE_MS = 20, PLAN_JOBS = { gen: 1, relight: 1, lod: 1, spawn: 1, villageplan: 1, form: 1 };   // (form: F-Far's ring 1, far.js)
+  const PLAN_SLICE_MS = 20, PLAN_JOBS = { gen: 1, relight: 1, lod: 1, spawn: 1, villageplan: 1, form: 1, vistas: 1 };   // (form: F-Far's ring 1, far.js; vistas: t-first's spawn, first.js)
   let epoch = 0;
   const post = (msg, tr) => { if (VR.VillageGen && VR.VillageGen.probe && VR.VillageGen.probe.miss) return; self.postMessage(msg, tr); };
   // the needs of a job, in the order they are met: {temple: true}, or {site, lod} for a town's plan
@@ -255,6 +255,14 @@
         const g = getGen(m.dim);
         const p = m.near && g.findSpawn.length >= 2 ? g.findSpawn(m.near[0], m.near[1]) : g.findSpawn();
         post({ type: 'spawn', id: m.id, pos: p });
+      } else if (m.type === 'vistas') {
+        // t-first (first.js): the vista points of this world (gen_vista.js) for a new world's first spawn — [] where there
+        // are none; the land plan is the one the first chunks need anyway (a town plan it waits for parks the job: VG.probe)
+        const g = getGen(m.dim), VI = VR.Vista, LANDm = VR.Land;
+        let list = [];
+        try { if (VI && LANDm && VI.on(g)) list = (LANDm.plan(g).vistas || []).map(v => ({ id: v.id, x: v.x, y: v.y, z: v.z, u: v.u, eye: v.eye, yaw: v.yaw, pitch: v.pitch, fov: v.fov, lm: v.lm, wow: !!v.wow, score: v.score, aim: v.aim, d: v.d })); }
+        catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; list = []; }
+        post({ type: 'vistas', id: m.id, list });
       } else if (m.type === 'surface') {
         const g = getGen(m.dim);
         const res = m.points.map(([x, z]) => g.surfaceY ? g.surfaceY(x, z) : 64);

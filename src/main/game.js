@@ -331,6 +331,7 @@
 
     // ---------------------------------------------------------------- boot
     async boot() {
+      this.bootT0 = performance.now();   // (t-first: the start screen's first paint is measured from here)
       try { this.renderer = new VR.Renderer(this.canvas); }
       catch (e) { this.fatal(T('g.fatal.webgl', { msg: e.message })); return; }
       // the graphics context can be taken away (a driver reset, the GPU out of memory on a small machine, a tab
@@ -355,10 +356,15 @@
       if (VR.Touch) VR.Touch.mount(this);   // the touch layer (F5): shown only on a touch screen, in a game with no menu
       this.mp = VR.MP ? new VR.MP(this) : null;
       if (this.mp) this.mp.init();
-      this.ui.loading(T('g.load.textures'), 0.05);
+      // t-first: the start screen at once — its tiles in the first paint, the sky behind them when the textures are in
+      // (titlescene.js); a ▶ before that waits for bootReady (start.js). The Studio's ▶ (#play=) keeps the loading screen
+      this.bootReady = new Promise((res) => { this.bootDone = res; });
+      if (VR.TitleScene && !/[#&]play=/.test(location.hash || '')) { this.ui.show('title'); requestAnimationFrame(() => { this.titleShownMs = performance.now() - this.bootT0; setTimeout(() => { this.titlePaintMs = performance.now() - this.bootT0; }, 0); }); }
+      else this.ui.loading(T('g.load.textures'), 0.05);
       const unlockAudio = () => { this.audio.resume(); };
       window.addEventListener('pointerdown', unlockAudio); window.addEventListener('keydown', unlockAudio);
       await this.store.open();
+      this.storeOpened = true; if (this.ui.screen === 'title' && VR.Start && VR.Start.render) VR.Start.render();   // (t-first: the worlds, now that they can be read)
       // the player's R9 Studio designs (houses re-built in the Crafter, repainted furniture) — same-origin storage
       if (VR.Custom) { try { VR.Custom.apply(VR.Custom.load()); } catch (e) { console.warn('studio designs', e); } }
       window.addEventListener('storage', (e) => {
@@ -429,6 +435,7 @@
       const playId = (/[#&]play=([^&]+)/.exec(location.hash || '') || [])[1];
       if (playId) { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* */ } this.playWorldId(decodeURIComponent(playId)); }
       else this.startTitle();
+      if (this.bootDone) this.bootDone();   // (t-first: a ▶ pressed meanwhile goes on now)
     }
     fatal(msg) {
       document.getElementById('ui').innerHTML = `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;color:#e8f0ff;font-family:sans-serif;text-align:center;padding:20px"><h2>${T('g.fatal.title')}</h2><div>${msg}</div><div style="color:#93a4c4">${T('g.fatal.hint')}</div></div>`;
@@ -484,6 +491,7 @@
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
       const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty || (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'), type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 11 }; // vgen 11: the vistas (t-vista: eye-catchers, sight windows, vista spurs, the landmarks' silhouettes; vgen 10, t-land's land between, shipped with v0.46) · vgen 9: no crystals of any kind (f-nocrystal: GEN.noCry; t-town's villages too) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
+      if (o.first && VR.First) VR.First.mark(this, meta);   // (t-first: made from the start screen — it may open on its finest vista)
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
     }
@@ -510,14 +518,20 @@
       this.env.setTime(meta.time || 1000);
       this.env.day = meta.day || 0;
       this.env.wx.setSeed(meta.seed);                   // the world's weather: the same for the host and every guest
+      if (VR.First) VR.First.onLoad(this, meta);       // (t-first: a new world's first day stays clear)
       this.zenFreezeTime = !!meta.zenFreezeTime; this.zenFreezeWeather = !!meta.zenFreezeWeather;
       const entry = this.pendingEntry || 'title'; this.pendingEntry = null;
       if (meta.player) this.player.load(meta.player);
       else {
-        const pos = await new Promise((res) => this.pool.direct(0, { type: 'spawn', dim }, null, (m) => res(m.pos || [0.5, 100, 0.5])));
-        this.player.teleport(pos[0], pos[1] + 0.2, pos[2]);
-        this.player.spawn = [pos[0], pos[1] + 0.2, pos[2]];
-        this.player.yaw = pos[3] !== undefined ? pos[3] : Math.random() * Math.PI * 2;
+        // t-first: a new world from the start screen opens on its finest vista at the golden hour (first.js); else the
+        // generator's spawn
+        const fs = VR.First ? await VR.First.spawnFor(this, meta, dim) : null;
+        const pos = fs ? fs.pos : await new Promise((res) => this.pool.direct(0, { type: 'spawn', dim }, null, (m) => res(m.pos || [0.5, 100, 0.5])));
+        const up = fs ? 0 : 0.2;
+        this.player.teleport(pos[0], pos[1] + up, pos[2]);
+        this.player.spawn = [pos[0], pos[1] + up, pos[2]];
+        this.player.yaw = fs ? fs.yaw : pos[3] !== undefined ? pos[3] : Math.random() * Math.PI * 2;
+        if (fs) { this.player.pitch = fs.pitch; this.player.viewYaw = fs.yaw; }
         this.giveKit(meta);
       }
       this.landOnEntry(entry, !meta.player);
@@ -1115,6 +1129,12 @@
     loadingFrame(dt) {
       const p = this.player, w = this.world;
       w.update(p.pos[0], p.pos[1], p.pos[2], performance.now());
+      // t-first: the phases of the needed sections (first.js: generated → meshed → uploaded → the far land, a sentence
+      // each and the counts under the bar; it ends when they are up — never longer than the world needs); else as before
+      const LS = VR.First ? VR.First.loadStep(this) : null;
+      let near = 1, frac = 1;
+      if (LS) this.ui.loading(LS.text, LS.frac, LS.counts);
+      else {
       // progress: columns within radius 3 loaded + meshed near player
       const pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4;
       let need = 0, have = 0;
@@ -1127,15 +1147,16 @@
       // … and the coarse far-horizon ring (the whole radius in big tiles) so the world is complete to the horizon on the first frame
       const hz = this.horizon && this.horizon.enabled() ? this.horizon : null;
       const coarse = hz ? (hz.stats.coarse === undefined ? 0 : hz.stats.coarse) : 1;
-      const near = have / need, frac = near * 0.8 + coarse * 0.2;
+      near = have / need; frac = near * 0.8 + coarse * 0.2;
       if (near >= 1 && !this.nearReadyAt) this.nearReadyAt = performance.now();
       this.ui.loading(T(near < 0.5 ? 'g.load.terrain' : near < 1 ? 'g.load.meshes' : 'g.load.horizon'), 0.05 + frac * 0.95);
+      }
       const E = this.envFor(p.eyePos(), dt);
       const lcam = { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: this.settings.fov * Math.PI / 180, far: this.farFor(w) };
       if (this.horizon) this.horizon.update(lcam);
       this.renderer.render({ cam: lcam, world: w, env: E, horizon: this.horizon });
       // the coarse horizon is worth a few seconds of waiting, not more (slow machines fill it in while playing)
-      if (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000) {
+      if (LS ? LS.done : (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000)) {
         this.nearReadyAt = 0;
         // settle the player on the ground if spawn height was approximate
         if (!this.meta.player && !this.meta.guest) { let y = Math.floor(p.pos[1]); while (y < 250 && VR.PHYS.overlaps((x, yy, z) => w.getBlock(x, yy, z), p.pos[0] - 0.3, y, p.pos[2] - 0.3, p.pos[0] + 0.3, y + 1.8, p.pos[2] + 0.3)) y++; p.pos[1] = y; p.spawn = p.pos.slice(); }
@@ -1143,6 +1164,7 @@
         this.state = 'play';
         if (this.mp && !this.meta.guest) this.mp.startHosting();
         this.ui.show(null);
+        if (VR.First) VR.First.arrive(this);   // (t-first: a vista start's arrival — the white veil, the sun's flare, the wow moment)
         this.input.captured = true;
         this.ui.updateHUD(true);
         if (this.meta.guest) this.ui.chatLine(T('g.chat.joined', { name: this.mp && this.mp.hostName ? this.mp.hostName : T('g.mp.friend') }), '#9affd8');
@@ -1174,6 +1196,8 @@
       if (driving) gad.drive(dt, input, this.ui.blocking);
       else if (this.director && this.director.active) { /* the director moves the player */ }
       else if (this.wow && this.wow.active) { /* a wow moment holds the view: the player stands (t-vista) */ }
+      else if (this.arrival && this.arrival.holds()) { /* t-first: the arrival's veil holds the view (first.js) */ }
+      else if (this.photoCam && this.photoCam.on) this.photoCam.update(dt, input);   // (t-first: 📷 the free camera glides, the player stands — photomode.js)
       else if (!this.ui.blocking || this.ui.screen === null) {
         // ✨ arrived in front of something new: the flight starts a moment later (the Studio's blocks are built by then)
         if (this.revealPending && !p.hold && !this.studioOpen && !this.ui.screen && (this.revealWait = (this.revealWait || 0) + dt) > 0.4) { this.revealWait = 0; this.reveal(); }
@@ -1192,6 +1216,7 @@
       if (this.padLife) this.padLife.update(dt); if (this.lifeDirector) this.lifeDirector.update(dt);   // (t-life)
       if (this.director) this.director.update(dt);
       if (this.wow) this.wow.update(dt);   // (t-vista: four times a second a look at the vistas loaded)
+      if (this.arrival) this.arrival.update(dt);   // (t-first: the veil, then the wow moment, then the HUD fades in)
       if (this.trams) this.trams.update(dt);
       if (this.tickFurnaces) this.tickFurnaces(dt);
       const vd = w.viewDir || (w.viewDir = [0, 0]); vd[0] = -Math.sin(p.yaw); vd[1] = -Math.cos(p.yaw);   // the way the player looks (flat): uploads in the view first (F10: no new array a frame)
@@ -1242,6 +1267,7 @@
       if (this.vehicleCam) { const vc = this.vehicleCam(cam); if (vc) cam = vc; }
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
+      if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {
         const d = this.camMode === 1 ? 4 : -4, dir = p.lookDir();
         const ray = VR.PHYS.raycast((x, y, z) => w.getBlock(x, y, z), eye[0], eye[1], eye[2], -dir[0] * Math.sign(d), -dir[1] * Math.sign(d), -dir[2] * Math.sign(d), Math.abs(d));
@@ -1334,6 +1360,7 @@
       if (i.hit('Escape')) {
         if (this.director && this.director.active) { this.director.stop(); return; }
         if (this.wow && this.wow.active) { this.wow.skip(); return; }   // (t-vista: Escape ends a wow moment, not the game)
+        if (this.arrival && this.arrival.holds()) { this.arrival.skip(); return; }   // (t-first: Escape ends the arrival)
         if (this.photo) { this.photoMode(false); return; }
         if (ui.screen === 'inventory') ui.closeInventory();
         else if (ui.screen === 'pause') ui.resume();
@@ -1343,6 +1370,7 @@
         else if (!ui.screen) ui.pause();
         return;
       }
+      if ((this.arrival && this.arrival.holds()) || (this.photoCam && this.photoCam.on)) return;   // (t-first: the arrival reads any key itself; the 📷 photo mode has keys of its own)
       if (i.hit('KeyE') && this.player && !this.player.dead) { if (ui.screen === 'inventory') ui.closeInventory(); else if (!ui.screen) ui.openInventory(); return; }
       // ⇧M: 🪞 Spiegel-Bauen (aus → X → Z → 4-fach → 8-fach → aus); M alone stays the Weltkarte
       if (i.hit('KeyM') && (i.down('ShiftLeft') || i.down('ShiftRight'))) { if (!ui.screen && this.mirror) this.mirror.key(); return; }
