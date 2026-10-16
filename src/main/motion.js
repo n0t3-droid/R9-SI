@@ -38,6 +38,10 @@
     if (warm) return 0.9 + 0.06 * Math.sin(t * 7.3 + h * 11.0) + 0.04 * Math.sin(t * 13.7 + h * 5.0);
     return 0.94 + 0.06 * Math.sin(t * 1.3 + h * 6.283);
   };
+  // the halo itself (particles.js lampGlows, Balanced and up): a soft disc round the lamp's head, wider than the head (the
+  // third browser run: the 0.44-block disc sat inside the cyan lamps' heads and never showed) and thin, so it reads as the
+  // light in the air round the lamp, not a ball
+  M.HALO = { size: 1.0, alpha: 0.42 };
   M.hash3 = function (x, y, z) { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x9e3779b1); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
 
   // ---- the rainbow (Wetter-Drama; the sky shader's WXDRAMA block, the same numbers): th degrees from the antisolar point.
@@ -81,6 +85,12 @@
     const cyc = t / HOLO.period + hc * HOLO.phase, cf = (cyc - Math.floor(cyc)) * HOLO.period, wy = 1.5 - cf * HOLO.wipe;
     return ((Math.floor(cyc) - (dy > wy ? 0 : 1)) % HOLO.modes + HOLO.modes) % HOLO.modes;
   };
+  // the light lines run (TERRAIN_FS, MOTION, with Animierte Anzeigen): a bright packet travels along every upward light —
+  // the plazas' floor lines, the tiers' light bars, the landing strip's bars — one every 1/k blocks along x + z at w/k
+  // blocks a second (a line along x or along z carries its packets along itself), the rest a little dimmer: b0 + b1·e^(−q²),
+  // q the distance from the packet in its widths (sharp); the mean stays the old light (b0 + b1·√π/sharp ≈ 0.99)
+  const FLOW = M.FLOW = { k: 0.0625, w: 0.5, sharp: 12, b0: 0.9, b1: 0.6 };
+  M.flowLight = function (s, t) { const p = s * FLOW.k - t * FLOW.w, q = (p - Math.floor(p) - 0.5) * FLOW.sharp; return FLOW.b0 + FLOW.b1 * Math.exp(-q * q); };
   // the trams at dusk and night: the leading nose white, the trailing one red, the four window bays of each side lit; the
   // pantograph sparks now and then while a tram runs (TRAM.spark a second per car). Car places (blocks): the noses 2.95 ahead
   // of the car's centre, the bays along it (voxmodels.js tramCar: z 6–41 of 48 at 8 a block), 1.9 up, just outside the sides
@@ -101,6 +111,7 @@
   // the life of each kind (s): the caps hold the spawn rate to cap / life a second
   const LIFE = { steam: 2.6, tmote: 6, sparkle: 0.12, leaf: 6, splash: 0.35, veil: 4 };
   const VEIL_COOL = [0.65, 0.95, 1.3], VEIL_WARM = [1.3, 0.85, 0.45];   // the veil's motes: its blue-white energy, a few warm off the rim
+  const VEIL_SCAN = M.VEIL_SCAN = { r: 30, ry: 8 };   // how far round the eye the veils are looked for (blocks: across, up and down)
   M.AIR_KINDS = KINDS; M.AIR_CAPS = CAPS; M.AIR_LIFE = LIFE;
   M.budgetFor = function (tier) { const t = Math.max(0, Math.min(CAPS.length - 1, tier | 0)); return { tier: t, cap: Object.assign({}, CAPS[t]), kinds: KINDS.filter(k => CAPS[t][k] > 0) }; };
 
@@ -136,15 +147,16 @@
       out.sort((a, b) => Math.hypot(a[0] - eye[0], a[2] - eye[2]) - Math.hypot(b[0] - eye[0], b[2] - eye[2]));
       this.tables = out.slice(0, 16);
     }
-    // the portal veils round the eye (every 2.5 s: a 2-block grid over 37 × 17 × 37 blocks, 3249 reads; at most 48 cells),
-    // each with its plane's normal from its neighbours (a veil running along x faces ±z, along z ±x, a flat one up)
+    // the portal veils round the eye (every 2.5 s: a 2-block grid over 61 × 17 × 61 blocks, 8649 reads; at most 48 cells),
+    // each with its plane's normal from its neighbours (a veil running along x faces ±z, along z ±x, a flat one up). (The
+    // third browser run: the gate's veil stood 33 blocks from the plaza's eye, out of the old 18-block reach — no motes)
     findVeils(w, eye) {
-      const R = VR.R, T = R && R.T, vt = R && R.byName && R.byName.portal_veil, V = this.veils;
+      const R = VR.R, T = R && R.T, vt = R && R.byName && R.byName.portal_veil, V = this.veils, VR2 = VEIL_SCAN.r, VY = VEIL_SCAN.ry;
       V.length = 0;
       if (!vt || !T || !T.type) return;
       const id = vt.id, is = (x, y, z) => { const s = w.getBlock(x, y, z); return !!s && T.type[s] === id; };
       const ex = Math.floor(eye[0]), ey = Math.floor(eye[1]), ez = Math.floor(eye[2]);
-      for (let y = ey - 8; y <= ey + 8 && V.length < 48 * 6; y += 2) for (let z = ez - 18; z <= ez + 18 && V.length < 48 * 6; z += 2) for (let x = ex - 18; x <= ex + 18 && V.length < 48 * 6; x += 2) {
+      for (let y = ey - VY; y <= ey + VY && V.length < 48 * 6; y += 2) for (let z = ez - VR2; z <= ez + VR2 && V.length < 48 * 6; z += 2) for (let x = ex - VR2; x <= ex + VR2 && V.length < 48 * 6; x += 2) {
         if (!is(x, y, z)) continue;
         const ax = is(x + 1, y, z) || is(x - 1, y, z), az = is(x, y, z + 1) || is(x, y, z - 1);
         if (ax && az) V.push(x, y, z, 0, 1, 0); else if (az) V.push(x, y, z, 1, 0, 0); else V.push(x, y, z, 0, 0, 1);
@@ -168,7 +180,8 @@
         for (let k = 0; k < 4 && this.acc.steam >= 1; k++) {
           const tb = this.tables[(Math.random() * this.tables.length) | 0];
           this.acc.steam -= 1; this.drawn.steam++;
-          O.life = LIFE.steam * (0.8 + Math.random() * 0.4); O.size = 0.035 + Math.random() * 0.02; O.grav = -0.06; O.drag = 0.9; O.col = [0.96, 0.96, 0.98]; O.emis = 0.15; O.fade = true; O.alpha = 0.32; O.grow = 0.14; O.wind = 0.5; O.turb = 0.35;
+          // (wisps that read from across the street: the third run's 0.035-block ones were a pixel at ten blocks)
+          O.life = LIFE.steam * (0.8 + Math.random() * 0.4); O.size = 0.055 + Math.random() * 0.03; O.grav = -0.06; O.drag = 0.9; O.col = [0.96, 0.96, 0.98]; O.emis = 0.15; O.fade = true; O.alpha = 0.38; O.grow = 0.22; O.wind = 0.5; O.turb = 0.35;
           this.spawn(P, tb[0] + 0.35 + Math.random() * 0.3, tb[1] + 0.95, tb[2] + 0.35 + Math.random() * 0.3, (Math.random() - 0.5) * 0.04, 0.18 + Math.random() * 0.1, (Math.random() - 0.5) * 0.04);
         }
       }

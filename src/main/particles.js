@@ -111,7 +111,8 @@
       // (two sines) or a cool tech light that breathes (VR.Motion.flicker, one phase per lamp) — drawn once a frame
       const Mo = VR.Motion, S = this.game.settings;
       if (Mo && Mo.flicker && S && S.motion) {
-        const o = this._ho || (this._ho = { life: 0, size: 0.44, grav: 0, drag: 0, col: [1, 1, 1], emis: 1, collide: false, fade: false, force: true });
+        const HL = Mo.HALO || { size: 0.44, alpha: 1 };   // (a soft disc wider than the lamp's head: it shows round it)
+        const o = this._ho || (this._ho = { life: 0, size: HL.size, grav: 0, drag: 0, col: [1, 1, 1], emis: 1, collide: false, fade: false, force: true, alpha: HL.alpha });
         o.life = dt * 1.5 + 1e-4;
         for (let i = 0; i < L.length; i += 4) {
           Particles.haloColor(L[i + 3], col);

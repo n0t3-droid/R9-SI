@@ -53,6 +53,22 @@ check(cmin >= 0.879 && cmax <= 1.0 + 1e-9, `a cool tech light breathes between $
 check(step < 0.06, `the flicker is smooth from frame to frame (largest step ${step.toFixed(4)})`);
 check(apart > 0.05, 'two lamps flicker on their own phases');
 
+// ---- 3b. the halo shows round the lamp (the third browser run: the 0.44-block disc sat inside the cyan lamps' heads and
+// never showed): one soft, thin disc a frame round each lamp's head, wider than the head, in the lamp's own cool colour
+console.log('halo');
+{
+  const RR = VR.R, lampT = RR.byName.vx_lamppost_tech, head = lampT.state(Object.assign({}, lampT.decode(lampT.defaultState), { head: 1 })), post = lampT.state(Object.assign({}, lampT.decode(lampT.defaultState), { head: 0 }));
+  const w = { getBlock: (x, y, z) => (x === 5 && z === 5 && y === 66) ? head : (x === 5 && z === 5 && y === 65) ? post : 0 };
+  const PP = new VR.Particles({ world: w, settings: { motion: true } });
+  PP.lampGlows(1 / 60, [5.5, 65.6, 12.5], 1);
+  check(PP.n === 1 && Math.abs(PP.p[0] - 5.5) < 1e-9 && Math.abs(PP.p[1] - 66.5) < 1e-9 && Math.abs(PP.p[2] - 5.5) < 1e-9, `one halo, at the lamp's head (not its post): ${PP.n} at y ${PP.p[1]}`);
+  check(PP.size[0] >= 0.9 && PP.alpha[0] <= 0.5 && PP.alpha[0] >= 0.3 && M.HALO.size >= 0.9, `a soft disc ${(2 * PP.size[0]).toFixed(1)} blocks wide (wider than the head), ${PP.alpha[0].toFixed(2)} opaque at most: the light in the air round it`);
+  check(PP.col[2] > PP.col[0] && PP.col[1] > PP.col[0], `in the lamp's own cool colour (${[0, 1, 2].map(k => PP.col[k].toFixed(2)).join(', ')})`);
+  const PQ = new VR.Particles({ world: w, settings: { motion: false } });
+  PQ.lampGlows(1 / 60, [5.5, 65.6, 12.5], 1);
+  check(PQ.n <= 1 && (PQ.n === 0 || PQ.size[0] < 0.5), 'without Wind in allem the older halos (a random small glow now and then)');
+}
+
 // ---- 4. the glitter path: the mirror of the view meets the sun
 console.log('glitter');
 const sun = [Math.cos(0.3) * Math.cos(0.25), Math.sin(0.25), Math.sin(0.3) * Math.cos(0.25)];

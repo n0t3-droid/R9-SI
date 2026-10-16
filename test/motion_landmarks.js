@@ -91,6 +91,10 @@ check(TFS.includes(`sin(rd * ${VL.k.toFixed(1)} + u_time * ${VL.w.toFixed(1)})`)
   check(r2.a.veils.length / 6 >= 8 && r2.a.veils.every((_, i) => i % 6 !== 5 || r2.a.veils[i] === 1), `the veil's cells are found and face ±z (${r2.a.veils.length / 6} cells on a 2-block grid)`);
   check(m.length > 60 && front + back === m.length && front > 0.3 * m.length && back > 0.3 * m.length, `motes drift out of the veil on both sides: ${m.length} in 10 s (${front} in front, ${back} behind)`);
   check(m.length <= Math.ceil(10 * Mo.budgetFor(2).cap.veil / Mo.AIR_LIFE.veil) + 4 && r0.P.list.length === 0, `they keep to their cap (Balanced ${Mo.budgetFor(2).cap.veil} live, life ${Mo.AIR_LIFE.veil} s); Very Low none`);
+  // (the third browser run: the gate's veil stood 33 blocks from the plaza's eye — out of the old 18-block reach)
+  const far = new VR.MotionAir({}); far.setOn(true, 2); far.findVeils(w, [0, 62, 10 + 28]);
+  const farN = far.veils.length / 6; far.findVeils(w, [0, 62, 10 + 40]);
+  check(farN >= 8 && far.veils.length === 0 && Mo.VEIL_SCAN.r >= 28, `a veil 28 blocks off is found (${farN} cells), one 40 blocks off is not (reach ${Mo.VEIL_SCAN.r})`);
 }
 
 // ---- 4. the holo screens: a new picture every 9 s, a scan wipe from the top down
@@ -102,6 +106,20 @@ check(Mo.holoMode(9.3, 0, 0.5) === 1 && Mo.holoMode(9.3, 0, -0.5) === 0 && Mo.ho
 check(Mo.holoMode(12, 0.13, 0) !== Mo.holoMode(12, 0.5, 0), 'neighbouring panels switch at their own times');
 const TER = VR.SHADERS.TERRAIN_FS;
 check(TER.includes(`u_time / ${HO.period.toFixed(1)} + hc * ${HO.phase}`) && TER.includes(`1.5 - cf * ${HO.wipe.toFixed(1)}`) && TER.includes('mod(floor(cyc) - (d.y > wy ? 0.0 : 1.0), 3.0)'), 'TERRAIN_FS (MOTION) cycles the panels with motion.js HOLO\'s numbers');
+
+// ---- 4b. the light lines run (the third browser run's night: the plaza's lines stood still): a bright packet travels along
+// every upward light (the plazas' floor lines, the tiers' light bars, the landing strip) — along x + z, so a line along x
+// or along z carries its packets along itself — the rest a little dimmer, the mean the old light
+console.log('the light lines');
+{
+  const FL = Mo.FLOW;
+  const peak = (t, z0) => { let best = -1, bx = 0; for (let x = 0; x < 1 / FL.k; x += 0.01) { const v = Mo.flowLight(x + z0, t); if (v > best) { best = v; bx = x; } } return bx; };
+  const p0 = peak(1.0, 3), p1 = peak(1.25, 3), speed = ((p1 - p0 + 1 / FL.k) % (1 / FL.k)) / 0.25;
+  check(Math.abs(speed - FL.w / FL.k) < 0.1, `a packet runs along a line at ${speed.toFixed(2)} blocks/s (${(FL.w / FL.k).toFixed(1)}: one every ${1 / FL.k} blocks)`);
+  let s = 0, lo = 9, hi = 0, n = 0; for (let x = 0; x < 64; x += 0.01) { const v = Mo.flowLight(x, 7.3); s += v; n++; lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  check(Math.abs(s / n - 1) < 0.02 && lo >= FL.b0 - 1e-9 && hi <= FL.b0 + FL.b1 + 1e-9 && hi > 1.45, `the line keeps its light on average (${(s / n).toFixed(3)}): ${lo.toFixed(2)} between the packets, ${hi.toFixed(2)} in one`);
+  check(/#ifdef MOTION\s*\n\s*\/\/ t-motion · the light lines run[^\n]*\n\s*if \(emissiveFace && face == 2u && kind == 0u && u_animOn > 0\.5\) \{\s*\n\s*vec3 fp = v_localPos \+ vec3\(u_camInt\);\s*\n\s*float fq = \(fract\(\(fp\.x \+ fp\.z\) \* 0\.0625 - u_time \* 0\.5\) - 0\.5\) \* 12\.0;\s*\n\s*col \*= 0\.9 \+ 0\.6 \* exp\(-fq \* fq\);/.test(VR.SHADERS.TERRAIN_FS) && FL.k === 0.0625 && FL.w === 0.5 && FL.sharp === 12 && FL.b0 === 0.9 && FL.b1 === 0.6, 'TERRAIN_FS (MOTION) runs the upward lights with motion.js FLOW\'s numbers (the Animierte-Anzeigen switch on)');
+}
 
 // ---- 5. the trams: white ahead, red behind, the windows lit, the glows ride along; sparks now and then
 console.log('the trams');

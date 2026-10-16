@@ -1009,6 +1009,14 @@ void main() {
     float e = emissiveFace ? max(emis, 0.85) : emis;
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
   }
+#ifdef MOTION
+  // t-motion · the light lines run: a bright packet travels along every upward light (motion.js FLOW, the same numbers)
+  if (emissiveFace && face == 2u && kind == 0u && u_animOn > 0.5) {
+    vec3 fp = v_localPos + vec3(u_camInt);
+    float fq = (fract((fp.x + fp.z) * 0.0625 - u_time * 0.5) - 0.5) * 12.0;
+    col *= 0.9 + 0.6 * exp(-fq * fq);
+  }
+#endif
   if (u_holoLayer > 0.5 && abs(layer - u_holoLayer) < 0.5) {
     // holograms: rolling scanlines, a bright sweep and a faint flicker
     vec3 hp = v_localPos + vec3(u_camInt);
