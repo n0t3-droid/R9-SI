@@ -133,13 +133,25 @@ try {
   const ctx = { VR: { Looks: VR.Looks, WaterWave: VR.WaterWave } }; require("vm").runInNewContext(src, ctx); baseS = ctx.VR.SHADERS;   // (the same shared helpers the page has: the look recolour, the water waves)
 } catch (e) { console.log('  (no base shaders: ' + String(e.message).split('\n')[0] + ')'); }
 const OURS = ['MOTION', 'CLOUDSH', 'WXDRAMA'];
-if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'RAIN_VS', 'RAIN_FS', 'PART_VS', 'PART_FS']) {
+if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'RAIN_VS', 'RAIN_FS', 'PART_VS', 'PART_FS', 'FURN_VS']) {
   const mine = strip(VR.SHADERS[k], OURS), was = baseS[k];
   // (the base text's own COMMON resolved the same way: both strings come with COMMON inlined)
   check(mine === strip(was, OURS), `${k} without ${OURS.join('/')} is v0.46's text (${mine.length} characters${mine === strip(was, OURS) ? '' : ', first difference at ' + [...mine].findIndex((c, i) => c !== was[i])})`);
 }
 
 // ---- 8. the mesher writes the hung levels only when the job asks for motion
+// ---- 7b. the smooth pieces that hang (FURN_VS, MOTION): the town's awnings and the hanging lanterns are drawn smooth on
+// Low and up (smoothvox.js auto kinds, props2.js 'lantern:1'), so their swing is the furniture shader's — the same hang
+// functions, one phase a piece, the lever from renderer.js hangOf: still at the hook or the wall, full at the free edge
+console.log('hung smooth pieces');
+{
+  const FV = VR.SHADERS.FURN_VS, RS = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'renderer.js'), 'utf8');
+  check(/#ifdef MOTION[\s\S]*uniform vec4 u_hang;[\s\S]*float lv = 3\.0 \* clamp\(\(\(u_hang\.x < 1\.5 \? u_hang\.y - a_pos\.y : u_hang\.y - a_pos\.z\)\) \/ u_hang\.z, 0\.0, 1\.0\);[\s\S]*windHangAlong\(ap\.x, ap\.y, ap\.z, u_time, u_wind, G, lv\)/.test(FV), 'FURN_VS swings a hung piece with the terrain\'s hang functions (its lever from u_hang)');
+  check(/if \(\/\^lantern:1\$\/\.test\(key\)\) h = \[1, 1\.0, 0\.8\];/.test(RS) && /\/\^auto:vm_town_awning_\/\.test\(key\)[^\n]*h = \[2, D \/ 2 \+ 0\.08 \* D, D\];/.test(RS) && /P\.furn = GL\.program\(S\.FURN_VS, S\.FURN_FS, 'furn', this\.propDefines\(\)\.concat\(this\.q\.motion \? \['MOTION'\] : \[\]\)\)/.test(RS), 'renderer.js: the hanging lantern (\'lantern:1\') and the town awnings swing; the furniture program takes MOTION from the switch');
+  // the lever as the shader computes it (the awning 2 deep: its wall at z +1, the free edge at −1; the lantern: hook at 1)
+  const lever = (h, y, z) => 3 * Math.min(1, Math.max(0, (h[0] < 1.5 ? h[1] - y : h[1] - z) / h[2])), D = 2, aw = [2, D / 2 + 0.08 * D, D], la = [1, 1.0, 0.8];
+  check(lever(aw, 0.5, 1.0) < 0.5 && lever(aw, 0.5, -1.0) === 3 && lever(la, 1.0, 0) === 0 && lever(la, 0.2, 0) === 3, `the awning still at its wall (level ${lever(aw, 0.5, 1.0).toFixed(2)}), its free edge at 3; the lantern still at its hook, its foot at 3`);
+}
 console.log('hung pieces in the mesh');
 const R2 = V.R, PAD = V.MESH_PAD || 2, PS = V.MESH_PS || 20, PSS = PS * PS;
 const st = (n, p) => { const t = R2.byName[n]; if (!t) throw new Error('no block ' + n); return p ? t.state(Object.assign({}, t.decode(t.defaultState), p)) : t.defaultState; };

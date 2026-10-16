@@ -1224,6 +1224,18 @@ uniform mat4 u_viewProj;
 uniform mat4 u_shadowMat;
 out vec4 v_shadow;
 #endif
+#ifdef MOTION
+// t-motion · the smooth pieces that hang swing as one about their hook, as the terrain's hung pieces do (wind.js hang):
+// u_hang (renderer.js hangOf, one a slot) x 1 a lantern under its hook at y = u_hang.y, its lever u_hang.z long; x 2 an
+// awning's cloth, its wall at z = u_hang.y (the piece's own frame), u_hang.z deep; 0 a piece that stands still
+uniform vec4 u_hang;
+uniform float u_time;
+uniform float u_wind;
+uniform vec2 u_windDir;
+uniform float u_gust;
+uniform vec3 u_camPos;
+${VR.Wind ? VR.Wind.glsl() : ''}
+#endif
 out vec2 v_uv;
 out vec3 v_col;
 out vec3 v_n;
@@ -1236,6 +1248,15 @@ out vec3 v_block;
 void main() {
   float c = cos(a_inst0.w), s = sin(a_inst0.w);
   vec3 q = vec3(c * a_pos.x - s * a_pos.z, a_pos.y, s * a_pos.x + c * a_pos.z);
+#ifdef MOTION
+  if (u_hang.x > 0.5) {
+    float lv = 3.0 * clamp(((u_hang.x < 1.5 ? u_hang.y - a_pos.y : u_hang.y - a_pos.z)) / u_hang.z, 0.0, 1.0);
+    vec3 ap = a_inst0.xyz + u_camPos;   // (the piece's place: one phase for the whole piece)
+    float G = windGust(ap.x, ap.z, u_time, u_windDir.x, u_windDir.y, u_gust);
+    q.xz += u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + vec2(-u_windDir.y, u_windDir.x) * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+    q.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+  }
+#endif
   vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
   vec3 rel = q + a_inst0.xyz;
   vec3 col = a_col;
