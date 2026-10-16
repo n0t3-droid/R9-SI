@@ -339,16 +339,16 @@ for (const v of order) {
         console.log(`    ${t} ${cf} [${q.q}]: L* ${st.L} ±${st.sd}, glow ${st.glow} %, lower half a*b* ${st.lowAB.join(' ')}, ${m.draws} draws, ${m.fs} full-screen passes${cmp}`);
       }
     }
-    // into the sun (the lake at the golden hour, turned to the sun 7° up: the flare's ghosts and the light in the air
-    // toward it — none of the eight views has the sun in its frame)
-    if (v === 'lake' && !process.env.NO_SUN && TLIST.includes('golden')) {
+    // into the sun (from the hills' terrace, 136 high, at the golden hour turned to the sun 7° up: the flare's ghosts
+    // and the light in the air toward it — none of the eight views has the sun in its frame)
+    if (v === 'hills' && !process.env.NO_SUN && TLIST.includes('golden')) {
       await setTime(A.ev, TIMES.golden);
       const sd = await A.ev(() => VR.game.env.E.sunDir.slice());
-      const yaw = Math.atan2(-sd[0], -sd[2]), pitch = Math.atan2(sd[1], Math.hypot(sd[0], sd[2])) - 0.1;
+      const yaw = Math.atan2(-sd[0], -sd[2]), pitch = Math.atan2(sd[1], Math.hypot(sd[0], sd[2])) - 0.06;
       await A.pose(pose.x, pose.feet, pose.z, yaw, pitch, 70);
       await A.settle(300, 60); await A.step(4); await A.warmVx(); await A.step(2);
       for (const cf of CONFIGS) {
-        const q = await config(A.ev, cf), path = shotPath(`lakesun_golden_${cf}_${TAG}`);
+        const q = await config(A.ev, cf), path = shotPath(`sun_golden_${cf}_${TAG}`);
         wanted++;
         const m = await picture(A, path, K);
         if (m.err) { console.log(`    into the sun ${cf}: ${m.err}`); continue; }
