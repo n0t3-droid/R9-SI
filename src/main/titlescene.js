@@ -76,7 +76,7 @@
       if (w) { if (w.lastUpd !== undefined && now > w.lastUpd) w.uploadQ.frame(now - w.lastUpd, now); w.lastUpd = now; w.drainUploads(this.cam.x, this.cam.z, now); g.pool.pump(); }
       if (!this.landAt && (this.landReady() || now - this.t0 > 12000)) this.landAt = now;
       if (this.landAt) this.reveal = Math.min(1, (now - this.landAt) / 1000 / TS.REVEAL);
-      if (!TS.due(this.acc) && !sized) { if (g.horizon) g.horizon.update(this.cam); return; }
+      if (!TS.due(this.acc) && !sized) return;   // (30 fps: the frame between keeps the last picture; the horizon asks again at the next)
       this.acc = 0;
       this.draw(this.t % TS.LOOP);
     }

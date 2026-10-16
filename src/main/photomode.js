@@ -43,6 +43,24 @@
   };
   PM.timeStep = (tod, dir, dt) => ((tod + dir * PM.TIME_RATE * dt) % 24000 + 24000) % 24000;
 
+  // ---- a line of its own over the picture (the HUD and its hint line are hidden in the mode), and the shutter's flash;
+  // neither is in the saved picture (it is read from the canvas)
+  let noteEl = null, noteT = 0;
+  PM.note = function (text, ms) {
+    if (typeof document === 'undefined') return;
+    if (!noteEl) { noteEl = document.createElement('div'); noteEl.id = 'photonote'; noteEl.style.cssText = 'position:absolute;left:50%;bottom:6%;transform:translateX(-50%);max-width:min(92vw,980px);padding:8px 16px;border-radius:12px;background:rgba(6,9,18,0.72);color:#eef4ff;font:600 15px/1.35 var(--st-font, sans-serif);text-align:center;pointer-events:none;z-index:31;transition:opacity .4s;opacity:0'; (document.getElementById('app') || document.body).appendChild(noteEl); }
+    clearTimeout(noteT);
+    if (!text) { noteEl.style.opacity = '0'; return; }
+    noteEl.textContent = text; noteEl.style.opacity = '1';
+    noteT = setTimeout(() => { if (noteEl) noteEl.style.opacity = '0'; }, ms || 3000);
+  };
+  PM.flash = function () {
+    if (typeof document === 'undefined') return;
+    const f = document.createElement('div'); f.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;background:#fff;opacity:0.75;pointer-events:none;z-index:32;transition:opacity .35s ease-out';
+    (document.getElementById('app') || document.body).appendChild(f);
+    requestAnimationFrame(() => requestAnimationFrame(() => { f.style.opacity = '0'; setTimeout(() => f.remove(), 420); }));
+  };
+
   // ---- the game's actor
   class Photo {
     constructor(g) { this.g = g; this.on = false; this.s = null; this.first = false; this.busy = false; }
@@ -53,17 +71,19 @@
       this.on = true; this.first = true;
       this.keep = { hideHud: g.hideHud, tod: g.env.ticks };
       this.held = g.env.timeOfDay;   // (the time of day stands while the mode is on; [ ] move it)
+      // (not where the world's time is someone else's or shared: a guest, a host with friends in the world)
+      this.timeOk = !(g.meta && g.meta.guest) && !(g.mp && g.mp.remote && g.mp.remote.size > 0);
       g.hideHud = true;
       if (g.input && g.input.requestLock) g.input.requestLock();   // (the mouse looks round at once — a click is a photo)
       let seen = false; try { seen = localStorage.getItem(HINT_KEY) === '1'; localStorage.setItem(HINT_KEY, '1'); } catch (err) { seen = false; }
-      g.ui.hint(seen ? tx('g.photo.short', null, '📷 Fotomodus · F2 oder Klick: Foto · Esc: zurück', '📷 Photo mode · F2 or click: photo · Esc: back') : tx('g.photo.hint', null, '📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück', '📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · F2, Enter or click: photo (2×) · Esc: back'), seen ? 2600 : 9000);
+      PM.note(seen ? tx('g.photo.short', null, '📷 Fotomodus · F2 oder Klick: Foto · Esc: zurück', '📷 Photo mode · F2 or click: photo · Esc: back') : tx('g.photo.hint', null, '📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück', '📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · F2, Enter or click: photo (2×) · Esc: back'), seen ? 2600 : 9000);
     }
     leave() {
       const g = this.g; if (!this.on) return;
       this.on = false;
       if (this.keep) { g.hideHud = this.keep.hideHud; g.env.setTime(this.keep.tod); }   // (the time of day as it was: the photo mode changes nothing in the world)
       const hud = document.getElementById('hud'); if (hud) hud.style.visibility = g.hideHud ? 'hidden' : 'visible';
-      if (g.ui) g.ui.hint(null);
+      PM.note(null);
     }
     // a frame in the mode: the look (the mouse), the glide, the roll, the time, a picture
     update(dt, I) {
@@ -75,8 +95,7 @@
       const PH = VR.PHYS;
       PM.glide(s, k, dt, w && PH ? (st, dx, dy, dz) => { const pos = [st.x, st.y - 0.15, st.z]; PH.move((x, y, z) => w.getBlock(x, y, z), pos, 0.15, 0.3, dx, dy, dz, 0, w.nbFn()); st.x = pos[0]; st.y = pos[1] + 0.15; st.z = pos[2]; } : null);
       const td = (dn('BracketRight') || dn('Period') ? 1 : 0) - (dn('BracketLeft') || dn('Comma') ? 1 : 0);
-      if (td) this.held = PM.timeStep(this.held, td, dt);
-      g.env.setTime(this.held);   // (held: the env's own step this frame is undone the next)
+      if (this.timeOk) { if (td) this.held = PM.timeStep(this.held, td, dt); g.env.setTime(this.held); }   // (held: the env's own step this frame is undone the next)
       if (!this.first && I.hit('KeyP')) { g.photoMode(false); return; }   // (P or F8 again: back)
       if (!this.first && !this.busy && (I.hit('F2') || I.hit('Enter') || I.hit('NumpadEnter') || (I.dragLook ? I.clickAction(0) : I.mouse.clicked[0]))) this.shoot();
       this.first = false;
@@ -92,10 +111,11 @@
       this.busy = true;
       r.capNext = { k: PM.SCALE, cb: (img) => this.save(img) };
       if (g.audio) g.audio.play('click');
+      PM.flash();
     }
     save(img) {
       const g = this.g, done = () => { this.busy = false; };
-      if (!img || typeof document === 'undefined') { g.ui.hint(tx('g.photo.fail', null, '📷 Dieses Foto ging nicht — der Grafikspeicher reicht nicht für die doppelte Größe.', '📷 That photo did not work — the graphics memory is too small for twice the size.'), 3200); done(); return; }
+      if (!img || typeof document === 'undefined') { PM.note(tx('g.photo.fail', null, '📷 Dieses Foto ging nicht — der Grafikspeicher reicht nicht für die doppelte Größe.', '📷 That photo did not work — the graphics memory is too small for twice the size.'), 3200); done(); return; }
       const m = g.meta || {}; m.photoN = (m.photoN | 0) + 1;
       const name = PM.fileName(m.name, m.photoN);
       const c = document.createElement('canvas'); c.width = img.w; c.height = img.h;
@@ -109,7 +129,7 @@
         /*DL*/let embedded = true; try { embedded = window.self !== window.top; } catch (e) { embedded = true; }
         if (!embedded) { try { const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); shown = true; } catch (e) { shown = false; } }/*/DL*/
         if (!shown && g.ui.showShot) g.ui.showShot(url);
-        if (g.ui.toast) g.ui.toast('📷 ' + tx('g.photo.saved', { n: name, w: img.w, h: img.h }, 'Gespeichert: {n} ({w} × {h})', 'Saved: {n} ({w} × {h})'), '', null);
+        PM.note('📷 ' + tx('g.photo.saved', { n: name, w: img.w, h: img.h }, 'Gespeichert: {n} ({w} × {h})', 'Saved: {n} ({w} × {h})'), 3500);
         PM.last = { name, w: img.w, h: img.h, bytes: blob.size, url };
         setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) { /* */ } }, 60000);   // (the overlay closes after 10 s)
         if (g.saveMeta) { try { g.saveMeta(); } catch (e) { /* */ } }
