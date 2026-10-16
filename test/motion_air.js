@@ -63,6 +63,7 @@ console.log('halo');
   PP.lampGlows(1 / 60, [5.5, 65.6, 12.5], 1);
   check(PP.n === 1 && Math.abs(PP.p[0] - 5.5) < 1e-9 && Math.abs(PP.p[1] - 66.5) < 1e-9 && Math.abs(PP.p[2] - 5.5) < 1e-9, `one halo, at the lamp's head (not its post): ${PP.n} at y ${PP.p[1]}`);
   check(PP.size[0] >= 0.9 && PP.alpha[0] <= 0.5 && PP.alpha[0] >= 0.3 && M.HALO.size >= 0.9, `a soft disc ${(2 * PP.size[0]).toFixed(1)} blocks wide (wider than the head), ${PP.alpha[0].toFixed(2)} opaque at most: the light in the air round it`);
+  check(PP.emis[0] <= 0.1 && Math.max(PP.col[0], PP.col[1], PP.col[2]) <= 1.0, `no emissive boost, the colour within 1: the halo never saturates to a white ball under the night's level (emis ${PP.emis[0]}, peak ${Math.max(PP.col[0], PP.col[1], PP.col[2]).toFixed(2)})`);
   check(PP.col[2] > PP.col[0] && PP.col[1] > PP.col[0], `in the lamp's own cool colour (${[0, 1, 2].map(k => PP.col[k].toFixed(2)).join(', ')})`);
   const PQ = new VR.Particles({ world: w, settings: { motion: false } });
   PQ.lampGlows(1 / 60, [5.5, 65.6, 12.5], 1);

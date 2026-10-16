@@ -111,12 +111,12 @@
       // (two sines) or a cool tech light that breathes (VR.Motion.flicker, one phase per lamp) — drawn once a frame
       const Mo = VR.Motion, S = this.game.settings;
       if (Mo && Mo.flicker && S && S.motion) {
-        const HL = Mo.HALO || { size: 0.44, alpha: 1 };   // (a soft disc wider than the lamp's head: it shows round it)
-        const o = this._ho || (this._ho = { life: 0, size: HL.size, grav: 0, drag: 0, col: [1, 1, 1], emis: 1, collide: false, fade: false, force: true, alpha: HL.alpha });
+        const HL = Mo.HALO || { size: 0.44, alpha: 1, emis: 1, gain: 0.62 };   // (a soft disc wider than the lamp's head: it shows round it)
+        const o = this._ho || (this._ho = { life: 0, size: HL.size, grav: 0, drag: 0, col: [1, 1, 1], emis: HL.emis === undefined ? 1 : HL.emis, collide: false, fade: false, force: true, alpha: HL.alpha });
         o.life = dt * 1.5 + 1e-4;
         for (let i = 0; i < L.length; i += 4) {
           Particles.haloColor(L[i + 3], col);
-          const f = Mo.flicker(this.clock, Mo.hash3(L[i], L[i + 1], L[i + 2]), col[2] < col[0]) * 0.62;
+          const f = Mo.flicker(this.clock, Mo.hash3(L[i], L[i + 1], L[i + 2]), col[2] < col[0]) * (HL.gain === undefined ? 0.62 : HL.gain);
           o.col[0] = col[0] * f; o.col[1] = col[1] * f; o.col[2] = col[2] * f;
           this.spawn(L[i], L[i + 1], L[i + 2], 0, 0, 0, o);
         }

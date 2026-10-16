@@ -41,7 +41,9 @@
   // the halo itself (particles.js lampGlows, Balanced and up): a soft disc round the lamp's head, wider than the head (the
   // third browser run: the 0.44-block disc sat inside the cyan lamps' heads and never showed) and thin, so it reads as the
   // light in the air round the lamp, not a ball
-  M.HALO = { size: 1.0, alpha: 0.42 };
+  // (v0.48, the merged build's night pictures: with t-light2's night level the halo came out a hard white ball — the lamp's
+  // colour times the flicker, times the particles' emissive ×4; now no emissive boost and a gentler disc: it never saturates)
+  M.HALO = { size: 1.0, alpha: 0.36, emis: 0, gain: 0.9 };
   M.hash3 = function (x, y, z) { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x9e3779b1); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
 
   // ---- the rainbow (Wetter-Drama; the sky shader's WXDRAMA block, the same numbers): th degrees from the antisolar point.
@@ -197,7 +199,7 @@
           const tb = this.tables[(Math.random() * this.tables.length) | 0];
           this.acc.steam -= 1; this.drawn.steam++;
           // (wisps that read from across the street: the third run's 0.035-block ones were a pixel at ten blocks)
-          O.life = LIFE.steam * (0.8 + Math.random() * 0.4); O.size = 0.055 + Math.random() * 0.03; O.grav = -0.06; O.drag = 0.9; O.col = [0.96, 0.96, 0.98]; O.emis = 0.15; O.fade = true; O.alpha = 0.38; O.grow = 0.22; O.wind = 0.5; O.turb = 0.35;
+          O.life = LIFE.steam * (0.8 + Math.random() * 0.4); O.size = 0.055 + Math.random() * 0.03; O.grav = -0.06; O.drag = 0.9; O.col = [0.96 * (sunUp ? 1 : 0.5), 0.96 * (sunUp ? 1 : 0.5), 0.98 * (sunUp ? 1 : 0.5)]; O.emis = sunUp ? 0.15 : 0;   // (at night the steam is lit by the lamps, not white: v0.48's merged pictures) O.fade = true; O.alpha = 0.38; O.grow = 0.22; O.wind = 0.5; O.turb = 0.35;
           this.spawn(P, tb[0] + 0.35 + Math.random() * 0.3, tb[1] + 0.95, tb[2] + 0.35 + Math.random() * 0.3, (Math.random() - 0.5) * 0.04, 0.18 + Math.random() * 0.1, (Math.random() - 0.5) * 0.04);
         }
       }
