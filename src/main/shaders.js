@@ -499,7 +499,9 @@ vec3 skyColor(vec3 dir, bool withSun) {
       vec2 hd = normalize(dir.xz + vec2(1e-5, 0.0));
       float side = smoothstep(-0.35, 0.95, dot(hd, u_storm.xy));
       float wall = side * (1.0 - smoothstep(0.0, 0.45, max(dir.y, 0.0)));
-      col *= 1.0 - u_storm.z * (0.18 + 0.45 * side + 0.25 * wall);
+      // (a deep slate, never black: at most 0.7 darker, the colour drained toward a cool grey — motion.js STORM)
+      float lum = dot(col, vec3(0.3, 0.59, 0.11));
+      col = mix(col, vec3(lum) * vec3(0.78, 0.86, 1.0), u_storm.z * 0.55) * (1.0 - u_storm.z * (0.22 + 0.3 * side + 0.18 * wall));
     }
     if (u_bolt.w > 0.001) {
       vec2 hd = normalize(dir.xz + vec2(1e-5, 0.0));
@@ -1918,8 +1920,14 @@ out float v_alpha;
 out float v_var;
 out float v_dist;
 out float v_near;
+#ifdef WXDRAMA
+out vec3 v_dir;    // t-motion: the sprite's heading from the eye (the bolt's flash lights the clouds round its heading most)
+#endif
 void main() {
   vec3 rel = u_origin + a_c.xyz;
+#ifdef WXDRAMA
+  v_dir = rel / max(length(rel), 1.0);
+#endif
   vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
   float hi = clamp((rel.y / max(length(rel), 1.0) - u_cloudHigh.x) * u_cloudHigh.y, 0.0, 1.0);
   v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x * (1.0 - u_cloudHigh.z * hi * hi * (3.0 - 2.0 * hi)); v_var = a_p.z; v_dist = length(rel.xz);
@@ -1939,6 +1947,9 @@ in float v_alpha;
 in float v_var;
 in float v_dist;
 in float v_near;
+#ifdef WXDRAMA
+in vec3 v_dir;
+#endif
 out vec4 o;
 void main() {
   // the sample stays inside its own quarter of the atlas (half a texel in from the edge): no seam from the neighbour
@@ -1961,6 +1972,17 @@ void main() {
   vec3 col = mix(shadeC, litC, lit) + u_sunset * 0.18 * (1.0 - lit);
   col = mix(col, vec3(dot(col, vec3(0.3, 0.59, 0.11))), u_rain * 0.6);
   col = mix(col, u_skyHorizon * 1.1 + ambC * 0.5, u_fogK * 0.45);
+#ifdef WXDRAMA
+  // t-motion · Wetter-Drama: a storm's clouds (the front, or the rain) hang dark and heavy — a slate grey, their bases
+  // darker, dim at night — and the bolt's flash lights them from within, most round its heading and on their bases
+  // (motion.js STORM; the third browser run's storm clouds stood white against the dark sky)
+  float sk = clamp(max(u_storm.z, u_rain), 0.0, 1.0) * (1.0 - u_fogK);
+  col = mix(col, vec3(0.16, 0.18, 0.22) * (0.55 + 0.6 * lit) * (0.15 + 0.85 * u_sunK) + u_ambSky * 0.12, sk * 0.82);
+  if (u_bolt.w > 0.001) {
+    vec2 bh = normalize(v_dir.xz + vec2(1e-5, 0.0));
+    col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.35 + 0.65 * smoothstep(0.2, 0.97, dot(bh, u_bolt.xy))) * (0.6 + 0.8 * (1.0 - v_uv.y));
+  }
+#endif
   float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
   col = mix(col, u_skyHorizon, smoothstep(260.0, 600.0, v_dist) * 0.5);
   float solid = mix(smoothstep(0.1, 0.55, d), d, u_fogK);   // cumulus: the edge is soft, the body solid; fog banks: soft mist

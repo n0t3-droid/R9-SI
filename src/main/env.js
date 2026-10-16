@@ -226,6 +226,9 @@
       const B0 = WX.boltInfo;
       if (B0) { bo[0] = B0.dx; bo[1] = B0.dz; bo[2] = B0.shape; } bo[3] = drama && B0 ? fl : 0;
       if (fl > 0.001) { const k = drama ? 0.45 : 1; E.ambSky = E.ambSky.map(v => v + fl * 1.8 * k); E.zenith = E.zenith.map(v => v + fl * 0.6); }
+      // (the far land's haze under the storm: a dark slate, not the rain's light grey — the hills stand dark against the
+      // bolt's sky; VR.Motion.stormFog)
+      if (drama && st[2] > 0.001 && E.fog[3] !== 1 && VR.Motion && VR.Motion.stormFog) E.fogColor = VR.Motion.stormFog(E.fogColor, st[2], rain);
       if (drama && WX.washed > 0.001) { const wk = WX.washed; E.fog[2] *= 1 - 0.45 * wk; E.saturation = (E.saturation === undefined ? GRADE.sat : E.saturation); this.washK = wk; } else this.washK = 0;
       // the snow cover (t-motion, the MOTION terrain shader): the ground whitens in ~3 minutes of snow, melts over ~10
       const sn = this.snow > 0.3 ? 1 : 0;

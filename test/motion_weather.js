@@ -107,6 +107,23 @@ check(M.rainbowAt(46).alex > 0.95 && M.rainbowAt(40).alex === 0 && M.rainbowAt(5
 const sky = VR.SHADERS.SKY_FS;
 check(sky.includes('(th - 40.6) / 1.8') && sky.includes('(53.0 - th) / 2.9') && sky.includes('* 0.38') && sky.includes('0.78 * 6.0'), "the sky shader's rainbow has the test's numbers");
 
+// ---- 3b. the storm's look (the third browser run: the storm's side went black and its clouds stood white against it):
+// a deep slate sky, never black, darkest at the storm side's horizon; dark clouds the bolt lights from within; the far
+// land's haze a dark slate, so the hills stand dark against the bolt's sky
+console.log('the storm\'s look');
+{
+  const ST = M.STORM, fs = require('fs'), path = require('path'), g = (v) => (Number.isInteger(v) ? v.toFixed(1) : String(v));   // (a number as the shader writes it)
+  check(Math.abs(M.stormSky(1, 1, 1) - 0.3) < 1e-9 && M.stormSky(1, 0, 0) > 0.75 && M.stormSky(0, 1, 1) === 1, `the sky darkens to ${M.stormSky(1, 1, 1).toFixed(2)} at the storm side's horizon (never black), ${M.stormSky(1, 0, 0).toFixed(2)} away from it, not at all without a front`);
+  const f0 = [0.42, 0.47, 0.55], f1 = M.stormFog(f0, 1, 1), fh = M.stormFog(f0, 1, 0), fn = M.stormFog(f0, 0, 1);
+  check(f1[0] < f0[0] * 0.6 && f1[2] / f1[0] > f0[2] / f0[0] && fh[0] > f1[0] && fh[0] < f0[0] && fn.every((v, i) => v === f0[i]), `the far land's haze: ${f0.map(v => v.toFixed(2)).join('/')} → ${f1.map(v => v.toFixed(2)).join('/')} in the storm (cooler), half of it before the rain, none without a front`);
+  const sky = VR.SHADERS.SKY_FS, pv = VR.SHADERS.PUFF_VS, pf = VR.SHADERS.PUFF_FS;
+  check(sky.includes(`col = mix(col, vec3(lum) * vec3(${ST.slate.map(g).join(', ')}), u_storm.z * ${g(ST.drain)}) * (1.0 - u_storm.z * (${g(ST.d[0])} + ${g(ST.d[1])} * side + ${g(ST.d[2])} * wall));`), 'the sky shader darkens the storm\'s side with motion.js STORM\'s numbers');
+  check(/#ifdef WXDRAMA\s*\nout vec3 v_dir;/.test(pv) && pv.includes('v_dir = rel / max(length(rel), 1.0);') && /#ifdef WXDRAMA\s*\nin vec3 v_dir;/.test(pf), 'the puff clouds know their heading from the eye (WXDRAMA)');
+  check(pf.includes(`col = mix(col, vec3(${ST.cloud.map(g).join(', ')}) * (0.55 + 0.6 * lit) * (0.15 + 0.85 * u_sunK) + u_ambSky * 0.12, sk * ${g(ST.cloudK)});`) && pf.includes(`col += vec3(${ST.flash.map(g).join(', ')}) * u_bolt.w *`) && pf.includes('float sk = clamp(max(u_storm.z, u_rain), 0.0, 1.0) * (1.0 - u_fogK);'), 'a storm\'s clouds go slate grey (the front or the rain; not the isles\' fog banks) and the flash lights them, with STORM\'s numbers');
+  const RS = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'renderer.js'), 'utf8'), ES = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'env.js'), 'utf8');
+  check(/P\.puff = GL\.program\(S\.PUFF_VS, S\.PUFF_FS, 'puff', this\.q\.wxDrama \? \['WXDRAMA'\] : \[\]\);/.test(RS) && /if \(drama && st\[2\] > 0\.001 && E\.fog\[3\] !== 1 && VR\.Motion && VR\.Motion\.stormFog\) E\.fogColor = VR\.Motion\.stormFog\(E\.fogColor, st\[2\], rain\);/.test(ES), 'the puff program takes WXDRAMA from the switch; env.js darkens the haze only with Wetter-Drama (not under water)');
+}
+
 // ---- 4. the morning's fog banks: in the valleys, burnt off by mid-morning
 console.log('valley fog');
 check(C.morningFog(23000) === 1 && C.morningFog(500) === 1 && C.morningFog(6000) === 0 && C.morningFog(3300) === 0 && C.morningFog(2500) > 0 && C.morningFog(2500) < 1, `at dawn full, burning off after sunrise (${C.morningFog(2500).toFixed(2)} at 2 500 ticks), gone by noon`);

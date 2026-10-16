@@ -57,6 +57,16 @@
     return { r: h1[0] * b1 + h2[0] * b2, g: h1[1] * b1 + h2[1] * b2, b: h1[2] * b1 + h2[2] * b2, b1, b2, inside: 1 - ssm(BOWG.inside[0], BOWG.inside[1], th), alex: ssm(BOWG.alex[0], BOWG.alex[1], th) * (1 - ssm(BOWG.alex[2], BOWG.alex[3], th)) };
   };
 
+  // ---- the storm's look (Wetter-Drama: the sky shader, the puff clouds and env.js use these numbers; the third browser run
+  // showed the storm's side black and its clouds white against it): the sky darkens by front·(d0 + d1·side + d2·wall) — at
+  // most 0.7, a deep slate, never black — its colour drained toward a cool grey (slate) by front·drain; a storm's clouds
+  // (the front, or the rain) go a slate grey (cloud, by cloudK), dim at night, and the bolt's flash lights them from within
+  // (flash: most round its heading and on their bases); the far land's haze darkens by fog·front (half of it before the
+  // rain, all of it in the rain), a little cooler (fogTint), so the hills stand dark against the bolt's sky
+  const STORM = M.STORM = { d: [0.22, 0.3, 0.18], drain: 0.55, slate: [0.78, 0.86, 1.0], cloud: [0.16, 0.18, 0.22], cloudK: 0.82, flash: [0.7, 0.72, 0.95], fog: 0.45, fogTint: [0.92, 0.96, 1.04] };
+  M.stormSky = function (front, side, wall) { return 1 - clamp01(front) * (STORM.d[0] + STORM.d[1] * clamp01(side) + STORM.d[2] * clamp01(wall)); };
+  M.stormFog = function (fog, front, rain, out) { const k = clamp01(front) * (0.5 + 0.5 * clamp01(rain)) * STORM.fog, o = out || [0, 0, 0]; for (let i = 0; i < 3; i++) o[i] = fog[i] * (1 - k) * (1 + (STORM.fogTint[i] - 1) * k); return o; };
+
   // ---- step 5 · the living landmarks (vents.js, trams.js and the shaders' MOTION blocks use these numbers; Low and up)
   // the citadel's beam breathes on a 4 s cycle (pulse 0 … 1): its stream runs at 0.45 + 1.1·pulse of the old 46 sparks a
   // second — the same number on average — brighter at the peak, and at each peak a ring of sparks shoots up the beam

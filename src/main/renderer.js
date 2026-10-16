@@ -144,7 +144,7 @@
       P.shadowCut = bindUBO(GL.program(S.SHADOW_VS, S.SHADOW_FS, 'shadowCut', [...md, 'CUTOUT']));
       P.sky = GL.program(S.FS_VS, S.SKY_FS, 'sky', (this.q.lite ? ['LITE'] : []).concat(this.q.wxDrama ? ['WXDRAMA'] : []).concat(this.q.motion ? ['MOTION'] : []));   // LITE: two-octave nebula, no dust (Very Low) · WXDRAMA (t-motion): the storm's side, the bolt, the rainbow
       P.cloud = GL.program(S.CLOUD_VS, S.CLOUD_FS, 'cloud');
-      P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff');   // t-clouds: cumulus, fog banks, anchors (balanced and above)
+      P.puff = GL.program(S.PUFF_VS, S.PUFF_FS, 'puff', this.q.wxDrama ? ['WXDRAMA'] : []);   // t-clouds: cumulus, fog banks, anchors (balanced and above) · WXDRAMA (t-motion): a storm's clouds dark, lit by the bolt
       P.bloomPre = GL.program(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre');
       P.down = GL.program(S.FS_VS, S.DOWN_FS, 'down');
       P.up = GL.program(S.FS_VS, S.UP_FS, 'up');

@@ -155,7 +155,7 @@ try {
   const ctx = { VR: { Looks: VR.Looks, WaterWave: VR.WaterWave } }; require("vm").runInNewContext(src, ctx); baseS = ctx.VR.SHADERS;   // (the same shared helpers the page has: the look recolour, the water waves)
 } catch (e) { console.log('  (no base shaders: ' + String(e.message).split('\n')[0] + ')'); }
 const OURS = ['MOTION', 'CLOUDSH', 'WXDRAMA'];
-if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'RAIN_VS', 'RAIN_FS', 'PART_VS', 'PART_FS', 'FURN_VS']) {
+if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'RAIN_VS', 'RAIN_FS', 'PART_VS', 'PART_FS', 'FURN_VS', 'PUFF_VS', 'PUFF_FS']) {
   const mine = strip(VR.SHADERS[k], OURS), was = baseS[k];
   // (the base text's own COMMON resolved the same way: both strings come with COMMON inlined)
   check(mine === strip(was, OURS), `${k} without ${OURS.join('/')} is v0.46's text (${mine.length} characters${mine === strip(was, OURS) ? '' : ', first difference at ' + [...mine].findIndex((c, i) => c !== was[i])})`);
