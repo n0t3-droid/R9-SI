@@ -67,13 +67,16 @@
     absorb(spawns) {
       for (const s of spawns) if (s && s[0] === 'vista' && !this.list.has(s[1])) this.list.set(s[1], { id: s[1], x: s[2], y: s[3], z: s[4], eye: [s[5], s[6], s[7]], yaw: s[8], pitch: s[9], fov: s[10], lm: s[11], wow: s[12] !== 0 });
     }
+    // (a vehicle holds the view while gadgets.controlling — riding a bike, a tram, a ship, a seat, flying a drone; the
+    // camera hook g.vehicleCam is always installed and says nothing: vista.mjs's first in-page run found every moment
+    // refused by it)
     state() {
       const g = this.g, mp = g.mp, Z = VR.Zeit;
       return {
         enabled: g.settings ? g.settings.wowMoments !== false : true,
         guest: !!(g.meta && g.meta.guest) || !!(mp && mp.isClient),
         guests: !!(mp && mp.isHost && mp.remote && mp.remote.size > 0),
-        busy: g.state !== 'play' || !!g.studioOpen || !!g.photo || !!(g.ui && (g.ui.screen || g.ui.typing || g.ui.blocking)) || !!(g.director && g.director.active) || !!(g.gadgets && g.gadgets.controlling) || !!g.vehicleCam || !!g.revealPending || !!(g.wonders && g.wonders.rise) || !!(Z && (Z.active || Z.busy)) || !!(g.player && g.player.dead),
+        busy: g.state !== 'play' || !!g.studioOpen || !!g.photo || !!(g.ui && (g.ui.screen || g.ui.typing || g.ui.blocking)) || !!(g.director && g.director.active) || !!(g.gadgets && g.gadgets.controlling) || !!g.revealPending || !!(g.wonders && g.wonders.rise) || !!(Z && (Z.active || Z.busy)) || !!(g.player && g.player.dead),
         wait: this.wait,
       };
     }

@@ -179,6 +179,9 @@ console.log('3 · the opt-out (⚙ Spiel → „Wow-Momente") and the rules');
   }
   { VR.Zeit = { active: true }; const g = mkGame(), A = new W.Actor(g); A.absorb(VISTAS); at(g, 'v0'); run(A, g, 2); check(!A.active && A.count === 0, 'none while the Zeitraffer replays'); delete VR.Zeit; }
   { const g = mkGame({ mp: { isHost: true, remote: new Map() } }), A = new W.Actor(g); A.absorb(VISTAS); at(g, 'v0'); run(A, g, 0.5); check(A.count === 1, 'hosting with nobody joined: it plays'); A.destroy(); }
+  // the game as it runs: gadgets.js always installs its camera hook (g.vehicleCam, a camera only while riding or flying
+  // a drone) — on foot the moment plays (vista.mjs's first in-page run: never, busy by the hook alone)
+  { const g = mkGame({ vehicleCam: () => null, gadgets: { controlling: false } }), A = new W.Actor(g); A.absorb(VISTAS); at(g, 'v0'); run(A, g, 0.5); check(A.count === 1 && !!A.active, `on foot with the gadgets' camera hook installed: it plays (${A.count} moment; busy: ${A.state().busy})`); A.destroy(); }
   { const g = mkGame(), A = new W.Actor(g); A.absorb(VISTAS); at(g, 'v0'); run(A, g, 0.5); g.settings.wowMoments = false; run(A, g, 4.5); at(g, 'v1'); run(A, g, W.GAP + 2); check(A.count === 1 && !A.active, 'switched off after one: no further moment'); A.destroy(); }
   // the gap: two vistas 60 blocks apart, walked in a quarter minute
   {
