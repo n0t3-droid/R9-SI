@@ -108,6 +108,70 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 💡 The light, 🪞 materials & water, 🌬 everything moves, 🏞 vistas & wow moments (v0.48 — the WOW release)
+The owner's brief: "we want to get users to go everywhere they look or navigate — WOW, so beautiful, so cool,
+unbelievable. Make a beauty of a game!" Four fronts, every effect behind a switch with a cost tier; Very Low keeps the
+same programs and meshes as v0.47 (measured: the frame ×0.95–1.0, the pictures ΔE ≤ 0.03).
+
+**💡 The light** (Low and up, the full set from Balanced). A new light model in every surface program (`LIGHT2`): the
+sky's light from above and the ground's warm bounce from below — the shade is a colour now, not a darkening (the avenue's
+shaded paving a cool white-grey instead of washed lilac: lower-half b* −17 → −7.8); leaves, grass, flowers and skin take
+the sun softly round their edges; the lamps lay warm pools with teal shade between them, the moon is a cool key light.
+Contact shadows (`L2AO`, half-res scalable ambient obscurance, into the ambient only — never the sun): the creases under
+eaves, benches, kerbs and palm bases. Light in the air (`l2Vol`, High/Ultra, a quarter-res march of 16 steps from the
+shadow map): shafts through the hall's vault and between the trees, the haze lit round the sun in the golden hour. The
+air (`AIR2`): an exponential height fog along the view ray that gives the valleys depth and keeps the far hills their
+blue. A grade per hour (`GRADE2`, formulas, no LUT): the golden hour golden (temple L* 44.9 → 51.9), dusk lifted out of
+the murk (villa 32.9 → 38.1), the night teal and amber, a sun flare and an afterglow on the faces toward the sun. Costs on
+High: contact shadows ~1.4 %, light in the air ~0.2 %, the grade ≤ 2.5 %; 14 → 18 full-screen passes.
+
+**🪞 Materials & water.** PBR-lite (`pbr` 1 from Low, 2 on High/Ultra): a material table (metal, clear coat, roughness
+scale, window flag — 242 layers coated, 43 metallic, 1 557 untouched), GGX + Schlick for the sun, the sky mirrored by
+Fresnel on polish, tiles, lacquer, hulls and metal; honed pavers in the hall city. The screen-space mirror (High/Ultra):
+the hangar's navy floor mirrors the holo walls and the craft's lights, the plaza's paving its kerb, flowers and light
+lines, drawn out a little as a polished floor smears them (+3.3 ms at 720p, the march at half size). The wet world
+(`wet.js`): the ground wets in ~20 s of rain and dries over ten minutes, puddles cover a fifth of the open ground in a full
+rain and shrink from their rims, mirror the clouds and ripple with the drops; drops fall from wet eaves. Glass mirrors
+the sky and the sun, filters what lies behind by its tint, rooms glow warm at night. The plaza's light lines emit twice
+as bright and wash the paving beside them. Hero textures (`texHi`, Balanced and up): the sixteen most-seen materials at
+64 × 64, forged once in a worker (0.67 MB on the GPU). Water (`water_fx.js`): the colour follows the depth — turquoise
+over the shallows' sand, deep blue beyond —, a broken foam line on the banks, foam on the crests, the sun's glitter,
+caustics in two or three octaves, and at night the whole sky — stars and nebula — in the water where the planar mirror
+does not reach.
+
+**🌬 Everything moves** (`motion`, `cloudShadow`, `wxDrama`; Low the wind and the weather, Balanced and up all three).
+Gust bands travel over the meadows (one wind formula in JS and GLSL, 7 blocks/s downwind): grass, flowers and crowns lean
+and brighten in them, soft bands roll over the ground itself; hung pieces swing as one about their hook (signs, laundry,
+awnings, hanging lanterns — in the voxel mesh and in the smooth furniture); palm fronds bend from the crown. The air:
+steam off the café cups, motes in the sunbeams under the trees, glints on the glitter path, smoke and vapour in the
+wind, a billowing mist column at the falls, flickering lamp halos. Weather drama, seeded so a host and every guest see
+the same: a storm front darkens the sky from its side and raises the wind 90 s ahead, a drawn bolt lights the cloud deck
+from within with the tree line black against it, rain slanted in sheets, splashes; a rainbow 2–4 min after the rain (the
+primary at 40.6–42.4°, the faint reversed secondary at 50.1–53°, Alexander's band between); washed light, valley fog banks
+at dawn that burn off, snow that settles. Clouds drift along the wind, the cirrus at a fifth of the angular speed, and
+their shadows sweep the land (a 128² mask, Balanced and up). Living landmarks: the citadel's beam breathes on a 4 s cycle
+with a ring at each peak, the watchtower ring's running lights, the portal veil's rings, breath and light motes, the holo
+panels' 9 s cycle with a scan wipe, the trams' lights and pantograph sparks, the isles' falls streaming into the void.
+Measured in the test (mean pixel change between frames): meadow ×4.4, night plaza ×3.0, storm ×2.7, rainbow ×2.2, falls
+×2.0. A bug fixed on the way: `E.windDir` / `E.gust` had been undefined since F3 — the swell, the swimmer's bob, the
+palms and the gusts follow the weather again on every preset.
+
+**🏞 Vistas & wow moments** (`vgen` 11 — new worlds; worlds of vgen ≤ 10 keep every chunk, byte-identical). The land is
+composed now, not only laid out: eye-catchers at the outward ends of the ways (windmills, a shrine, a lookout), sight
+windows cut into the tree lines so a landmark is in view every 60 blocks of every way (blind stretches 27 of 186 → 1), and
+21 vista spurs — a bench between two lantern posts on the walk's axis, the landmark in the upper third, near, middle
+and far layers in every picture. Silhouettes that read from afar: the domed hall's lantern spire, the towers' light
+bands, the citadel's taller cluster, the landmarks as far forms in the horizon LOD. The first visit to one of the 13
+great vistas is a wow moment (`wowmoment.js`): the view swings for four seconds to its picture with a four-bar swell of
+the day's music and a caption ("The Spire Citadel"), then gives the view back — skippable, and off in the settings.
+Triangles ×1.001–1.004, 54 draws as before.
+
+**Known gaps.** The hall city's floor is a soft polish, not yet the trailer's clear mirror (needs a polished floor block
+from the generator); glass roofs count as open sky for the rain; the Villa Nova windows glow but do not mirror the sky;
+the wood's shafts barely show at noon; the golden hour runs a little warmer than the frames; the street view's motion
+measure stayed under its ×2 gate (the people's idle motion in the "before"); the ground's gust bands are subtle when no
+gust blows; the leading-line measure found no lines in the vista pictures.
+
 ### 🧑 Real people II, ✨ the nebula's filaments, 🌬 windmills, 🛒 the cart, 📉 Bandbreite (v0.47)
 **🧑 Real people II.** Arms hang soft (7° out, elbows 13° bent) and swing from the shoulder; a hand on the hip now
 and then; talking people gesture; café guests sit with the knees bent, shoes on the floor and a forearm on the table;
