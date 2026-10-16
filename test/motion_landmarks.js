@@ -94,7 +94,8 @@ check(TFS.includes(`sin(rd * ${VL.k.toFixed(1)} + u_time * ${VL.w.toFixed(1)})`)
   // (the third browser run: the gate's veil stood 33 blocks from the plaza's eye — out of the old 18-block reach)
   const far = new VR.MotionAir({}); far.setOn(true, 2); far.findVeils(w, [0, 62, 10 + 28]);
   const farN = far.veils.length / 6; far.findVeils(w, [0, 62, 10 + 40]);
-  check(farN >= 8 && far.veils.length === 0 && Mo.VEIL_SCAN.r >= 28, `a veil 28 blocks off is found (${farN} cells), one 40 blocks off is not (reach ${Mo.VEIL_SCAN.r})`);
+  const lowA = new VR.MotionAir({}); lowA.setOn(true, 1); lowA.findVeils(w, [0, 62, 10 + 28]);
+  check(farN >= 8 && far.veils.length === 0 && Mo.VEIL_SCAN.r >= 28 && lowA.veils.length === 0 && Mo.VEIL_SCAN.rLow === 18, `a veil 28 blocks off is found (${farN} cells), one 40 blocks off is not (reach ${Mo.VEIL_SCAN.r}; Low keeps ${Mo.VEIL_SCAN.rLow}: its scan stays at 3249 reads)`);
 }
 
 // ---- 4. the holo screens: a new picture every 9 s, a scan wipe from the top down

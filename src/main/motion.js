@@ -125,7 +125,7 @@
   // the life of each kind (s): the caps hold the spawn rate to cap / life a second
   const LIFE = { steam: 2.6, tmote: 6, sparkle: 0.12, leaf: 6, splash: 0.35, veil: 4 };
   const VEIL_COOL = [0.65, 0.95, 1.3], VEIL_WARM = [1.3, 0.85, 0.45];   // the veil's motes: its blue-white energy, a few warm off the rim
-  const VEIL_SCAN = M.VEIL_SCAN = { r: 30, ry: 8 };   // how far round the eye the veils are looked for (blocks: across, up and down)
+  const VEIL_SCAN = M.VEIL_SCAN = { r: 30, rLow: 18, ry: 8 };   // how far round the eye the veils are looked for (blocks: across — Balanced and up, Low —, up and down)
   M.AIR_KINDS = KINDS; M.AIR_CAPS = CAPS; M.AIR_LIFE = LIFE;
   M.budgetFor = function (tier) { const t = Math.max(0, Math.min(CAPS.length - 1, tier | 0)); return { tier: t, cap: Object.assign({}, CAPS[t]), kinds: KINDS.filter(k => CAPS[t][k] > 0) }; };
 
@@ -161,11 +161,11 @@
       out.sort((a, b) => Math.hypot(a[0] - eye[0], a[2] - eye[2]) - Math.hypot(b[0] - eye[0], b[2] - eye[2]));
       this.tables = out.slice(0, 16);
     }
-    // the portal veils round the eye (every 2.5 s: a 2-block grid over 61 × 17 × 61 blocks, 8649 reads; at most 48 cells),
+    // the portal veils round the eye (every 2.5 s: a 2-block grid over 61 × 17 × 61 blocks, 8649 reads, on Low 37 × 17 × 37; at most 48 cells),
     // each with its plane's normal from its neighbours (a veil running along x faces ±z, along z ±x, a flat one up). (The
     // third browser run: the gate's veil stood 33 blocks from the plaza's eye, out of the old 18-block reach — no motes)
     findVeils(w, eye) {
-      const R = VR.R, T = R && R.T, vt = R && R.byName && R.byName.portal_veil, V = this.veils, VR2 = VEIL_SCAN.r, VY = VEIL_SCAN.ry;
+      const R = VR.R, T = R && R.T, vt = R && R.byName && R.byName.portal_veil, V = this.veils, VR2 = this.tier >= 2 ? VEIL_SCAN.r : VEIL_SCAN.rLow, VY = VEIL_SCAN.ry;   // (Low: the old 18 — 3249 reads; Balanced+: 30 — 8649, about 1 ms every 2.5 s)
       V.length = 0;
       if (!vt || !T || !T.type) return;
       const id = vt.id, is = (x, y, z) => { const s = w.getBlock(x, y, z); return !!s && T.type[s] === id; };
