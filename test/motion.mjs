@@ -185,10 +185,15 @@ async function shoot(tag, dist) {
       await A.warmVx();
       Object.assign(out, { x: +v.x.toFixed(2), feet: +(eyeY - EYE).toFixed(2), z: +v.z.toFixed(2), yaw: +yaw.toFixed(3), pitch: +pitch.toFixed(3), tod, settle: st });
       const base = `/home/dev/vr/test/shots/motion_${v.name}${tag === 'after' ? '' : '_' + tag}`;
+      // the actors hold still during the sequence, in both builds: the ships (traffic, pads, the hangar's loop, the
+      // starships), the life director's balloons and carts, the trams, the people and the animals — their motion is not
+      // this branch's, and when they come by differs from one run to the next (run 2's night: a ship before, none after)
+      await A.ev(() => { const g = VR.game; g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = function () {}; } } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') { g.__frozen.push([V, k, V[k]]); V[k] = function () {}; } });
       await A.picture(`${base}_f0.png`, 4);
       if (v.name === 'storm') out.bolt = await A.ev(() => { const wx = VR.game.env.wx, W = VR.WX; if (!W.boltOf) return null; const fa = (wx.windAngle || 0) + Math.PI; for (let n = wx.strikes; n < wx.strikes + 400; n++) { let d = W.boltOf(wx.seed, n + 1, fa, 1).ang - fa; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < 0.45) { wx.strikes = n; return +d.toFixed(3); } } return null; });
       await A.step(6); await A.picture(`${base}_f1.png`, 4, v.name === 'storm' ? 'strike' : null);
       await A.step(6); await A.picture(`${base}_f2.png`, 4);
+      await A.ev(() => { const g = VR.game; for (const [o, k, f] of g.__frozen || []) o[k] = f; g.__frozen = null; });
       const st2 = await A.ev(() => { const g = VR.game, E = g.env.E || {}, wx = g.env.wx; return { kind: wx.kind, rain: +(E.rain || 0).toFixed(2), wind: +(E.wind || 0).toFixed(2), bow: E.storm ? +E.storm[3].toFixed(2) : null, front: E.storm ? +E.storm[2].toFixed(2) : null, flash: +(wx.flash || 0).toFixed(2), parts: g.particles ? g.particles.n : 0, csBuilds: (g.renderer.stats || {}).csBuilds || 0 }; });
       const F = [await load(`${base}_f0.png`), await load(`${base}_f1.png`), await load(`${base}_f2.png`)];
       const c01 = change(F[0], F[1]), c12 = change(F[1], F[2]);
@@ -232,17 +237,21 @@ if (!process.env.NO_COST) {
   const s = VIEWS.find(v => v.name === 'meadow') || VIEWS[0];
   const pages = [], rec = { view: s.name, cost: null };
   try {
-    const A2 = await openWorld(DIST, 'potato'); check(A2.ok, `the build is loaded on Very Low for the cost (${secs()})`); pages.push(['after', A2]);
-    if (!process.env.NO_BEFORE) { const B = await openWorld(BEFORE, 'potato'); check(B.ok, `the build before is loaded on Very Low (${secs()})`); pages.push(['before', B]); }
-    const measure = (Pg, n) => Pg.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
-    for (const [, Pg] of pages) {
+    // (a page's screenshot only comes while it is the only page: this build's Very Low picture before the build before's
+    // page opens, the build before's after this one's page has closed — runs 1 and 2 lost it)
+    const place = async (Pg) => {
       await Pg.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [s.x, s.z]); await Pg.settle(60, 6);
       const gy = await Pg.groundY(s.x, s.z), eyeY = typeof s.eye === 'object' ? s.eye.y : gy + 1 + s.eye;
       const dx = s.at[0] - s.x, dy = s.at[1] - eyeY, dz = s.at[2] - s.z;
       await Pg.pose(s.x, eyeY - EYE, s.z, Math.atan2(-dx, -dz), Math.atan2(dy, Math.hypot(dx, dz)), s.fov, s.tod);
       const st = await Pg.settle(200, 200); await Pg.step(6);
       console.log(`  · ${s.name} on Very Low settled ${JSON.stringify(st)} (${secs()})`);
-    }
+    };
+    const A2 = await openWorld(DIST, 'potato'); check(A2.ok, `the build is loaded on Very Low for the cost (${secs()})`); pages.push(['after', A2]);
+    await place(A2);
+    try { await A2.picture(`/home/dev/vr/test/shots/motion_potato_${s.name}_after.png`, 8); } catch (e) { console.log('  !! no Very Low picture (after)'); }
+    if (!process.env.NO_BEFORE) { const B = await openWorld(BEFORE, 'potato'); check(B.ok, `the build before is loaded on Very Low (${secs()})`); pages.push(['before', B]); await place(B); }
+    const measure = (Pg, n) => Pg.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
     const rounds = {};
     for (let r = 0; r < ROUNDS; r++) { const order = r & 1 ? pages.slice().reverse() : pages; for (const [lbl, Pg] of order) (rounds[lbl] = rounds[lbl] || []).push(await measure(Pg, N)); }
     const out = {};
@@ -254,9 +263,9 @@ if (!process.env.NO_COST) {
     const set = await pages[0][1].ev(() => { const s = VR.game.settings; return { motion: s.motion, cloudShadow: s.cloudShadow, wxDrama: s.wxDrama }; });
     check(!set.motion && !set.cloudShadow && !set.wxDrama, `Very Low has none of the three switches on (${JSON.stringify(set)})`);
     try { fs.writeFileSync('/home/dev/vr/test/shots/motion_cost.json', JSON.stringify(rec, null, 1)); } catch (e) { /* a convenience */ }
-    // the pictures last, one page at a time
-    for (const [lbl, Pg] of pages.slice().reverse()) {
-      try { await Pg.picture(`/home/dev/vr/test/shots/motion_potato_${s.name}_${lbl}.png`, 8); } catch (e) { console.log(`  !! no Very Low picture (${lbl})`); }
+    // this build's page closes first; the build before's picture comes when its page is alone
+    for (const [lbl, Pg] of pages) {
+      if (lbl === 'before') { try { await Pg.picture(`/home/dev/vr/test/shots/motion_potato_${s.name}_before.png`, 8); } catch (e) { console.log('  !! no Very Low picture (before)'); } }
       const errs = Pg.logs.filter(l => l.startsWith('[pageerror]')); check(errs.length === 0, `${lbl} (Very Low page): no page error (${errs.length})`); await Pg.ctx.close();
     }
   } catch (e) { check(false, `the Very Low cost is measured (${String(e.message || e).slice(0, 300)})`); }

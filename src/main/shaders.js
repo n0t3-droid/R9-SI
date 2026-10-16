@@ -508,9 +508,9 @@ vec3 skyColor(vec3 dir, bool withSun) {
       float d = abs(across - jag), front = step(0.0, along);
       float span = smoothstep(-0.03, 0.0, e) * (1.0 - smoothstep(0.30, 0.34, e)) * front;
       float db = abs(across - jag - (0.19 - e) * 0.35 - 0.006 * sin(e * 150.0 + sd0));
-      float br = exp(-db * db / 0.0000025) * step(0.06, e) * step(e, 0.19) * front;
+      float br = exp(-db * db / 0.000006) * step(0.06, e) * step(e, 0.19) * front;
       float fl = u_bolt.w;
-      col += vec3(0.85, 0.88, 1.0) * (exp(-d * d / 0.0000035) * span * 9.0 + br * 4.0 + exp(-d * d / 0.0004) * span * 0.7) * fl;
+      col += vec3(0.85, 0.88, 1.0) * (exp(-d * d / 0.00001) * span * 10.0 + br * 5.0 + exp(-d * d / 0.0014) * span * 1.4) * fl;   // (a white-hot core about two pixels wide, its glow a degree round it)
       col += vec3(0.55, 0.55, 0.78) * fl * (0.25 + 1.4 * exp(-(1.0 - along) * 6.0)) * (1.0 - smoothstep(0.0, 0.6, max(e, 0.0)));
     }
     if (u_storm.w > 0.001) {

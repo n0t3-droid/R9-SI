@@ -126,12 +126,12 @@
       const falls = this.waterFalls || [];
       // t-motion: with the wind in everything on, the foot of a fall throws up a billowing column of mist (turbulent puffs that
       // grow as they rise and drift with the wind) and a fine spray of droplets
-      const mo = !!this.settings.motion, rate = mo ? 12 : 5;
+      const mo = !!this.settings.motion, rate = mo ? 16 : 5;
       for (const f of falls) {
         if (Math.random() > dt * rate / Math.max(1, falls.length)) continue;
         const r = () => Math.random() - 0.5;
         if (!mo) { this.particles.spawn(f[0] + r() * 1.2, f[1] + 0.2, f[2] + r() * 1.2, r() * 0.8, 0.4 + Math.random() * 0.6, r() * 0.8, { life: 2.4, size: 0.6 + Math.random() * 0.4, grav: -0.25, drag: 1.4, col: [0.93, 0.96, 1], emis: 0.12, collide: false }); continue; }
-        this.particles.spawn(f[0] + r() * 1.6, f[1] + 0.3, f[2] + r() * 1.6, r() * 1.2, 0.8 + Math.random() * 0.9, r() * 1.2, { life: 3.6 + Math.random() * 1.6, size: 0.7 + Math.random() * 0.6, grav: -0.12, drag: 1.1, col: [0.93, 0.96, 1], emis: 0.12, collide: false, grow: 0.55, alpha: 0.42, turb: 1.6, wind: 0.15 });
+        this.particles.spawn(f[0] + r() * 1.6, f[1] + 0.3, f[2] + r() * 1.6, r() * 1.2, 0.8 + Math.random() * 0.9, r() * 1.2, { life: 3.6 + Math.random() * 1.6, size: 1.1 + Math.random() * 0.8, grav: -0.12, drag: 1.1, col: [0.93, 0.96, 1], emis: 0.12, collide: false, grow: 0.7, alpha: 0.5, turb: 1.6, wind: 0.15 });
         if (Math.random() < 0.6) { const a = Math.random() * 6.283, sp = 1.8 + Math.random() * 1.6; this.particles.spawn(f[0] + r(), f[1] + 0.6, f[2] + r(), Math.cos(a) * sp, 1.5 + Math.random() * 1.5, Math.sin(a) * sp, { life: 0.9 + Math.random() * 0.4, size: 0.05 + Math.random() * 0.04, grav: 7, drag: 0.4, col: [0.86, 0.93, 1], emis: 0.3, collide: false }); }
       }
     }
