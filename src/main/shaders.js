@@ -1978,7 +1978,7 @@ void main() {
   // (motion.js STORM; the third browser run's storm clouds stood white against the dark sky)
   float sk = clamp(max(u_storm.z, u_rain), 0.0, 1.0) * (1.0 - u_fogK);
   col = mix(col, vec3(0.16, 0.18, 0.22) * (0.55 + 0.6 * lit) * (0.15 + 0.85 * u_sunK) + u_ambSky * 0.12, sk * 0.82);
-  if (u_bolt.w > 0.001) {
+  if (u_bolt.w > 0.001 && u_fogK < 0.5) {   // (the cumulus only: the final browser run's flash lit a fog sprite's hard-edged quad)
     vec2 bh = normalize(v_dir.xz + vec2(1e-5, 0.0));
     col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.35 + 0.65 * smoothstep(0.2, 0.97, dot(bh, u_bolt.xy))) * (0.6 + 0.8 * (1.0 - v_uv.y));
   }
