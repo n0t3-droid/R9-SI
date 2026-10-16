@@ -89,6 +89,8 @@
   R.l2Ssao = function (F, E) {
     const q = this.q, lv = Math.min(3, q.l2Ssao | 0), gl = this.gl, K = L2.AO;
     if (!lv || !this.l2Active || !this.sceneDepth) return;
+    // under the governor's first rung (shadowEvery 2) every other frame keeps the last one's (the reprojection holds)
+    if ((q.shadowEvery | 0) > 1 && (this.frameNo & 1) && this.l2AoAt === this.frameNo - 1) return;
     gl.activeTexture(gl.TEXTURE0);
     const A = this.l2AoTargets();
     if (!A) return;
@@ -301,7 +303,7 @@
   // has a texture), read only in the main view and only when it is from the frame before
   R.l2AoUniforms = function (u) {
     const gl = this.gl, A = this.l2A, c = this.cam, e = this.l2AoEye;
-    const ok = !!(this.l2Active && A && A.ok && this.viewProj === this.l2MainVP && this.l2AoAt === this.frameNo - 1 && this.l2AoSize === this.w * 65536 + this.h && c && e);
+    const ok = !!(this.l2Active && A && A.ok && this.viewProj === this.l2MainVP && this.l2AoAt >= this.frameNo - 2 && this.l2AoAt < this.frameNo && this.l2AoSize === this.w * 65536 + this.h && c && e);
     gl.uniform4f(u.u_l2AoK, ok ? 1 : 0, L2.AO.tol, L2.AO.block, 0);
     if (ok) {
       if (u.u_l2AoVP) gl.uniformMatrix4fv(u.u_l2AoVP, false, this.l2AoVP);
