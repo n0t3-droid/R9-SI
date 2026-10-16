@@ -187,6 +187,7 @@
       this.seed = null; this.mode = 'normal';
       this.forced = null;          // a state the player or the host asked for (/wetter, multiplayer); null = the schedule
       this.oneShot = false; this.oneShotSlot = null; this.frozen = null;
+      this.clearUntil = 0;         // t-first: clear until this absolute tick (a new world's first day, first.js)
       this.kind = 'klar'; this.slot = -1; this.slotEnd = 0; this.clock = 0; this.ticks = 0;
       this.inStorm = false; this.bolt = 0; this.strikes = 0; this.sinceStrike = 1e9; this.flash = 0; this.thunders = [];
       this.rng = makeRng(0);
@@ -200,7 +201,7 @@
     // the world's seed (null: no world, e.g. the title screen): new seed, no forced state, no bolts pending
     setSeed(seed) {
       this.seed = seed == null ? null : (seed >>> 0);
-      this.forced = null; this.oneShot = false; this.oneShotSlot = null; this.frozen = null;
+      this.forced = null; this.oneShot = false; this.oneShotSlot = null; this.frozen = null; this.clearUntil = 0;
       this.rng = makeRng(this.seed == null ? 0 : this.seed);
       this.inStorm = false; this.bolt = 0; this.thunders = []; this.sinceStrike = 1e9;
     }
@@ -223,16 +224,17 @@
       this.slot = slotK; this.slotEnd = sEnd;
       if (this.oneShot) { if (this.oneShotSlot === null) this.oneShotSlot = slotK; if (slotK !== this.oneShotSlot) this.oneShot = false; }
       let kind;
+      const calm = this.oneShot || this.clearUntil > A;   // (t-first: a new world's first day stays clear, like "klar bis zum nächsten Wetter")
       if (this.forced) kind = this.clamp(this.forced);
       else if (c.freeze) { if (this.frozen === null) this.frozen = this.kind; kind = this.frozen; }
-      else { this.frozen = null; kind = this.oneShot ? 'klar' : kindAt(this.seed, A, climate, this.mode); }
+      else { this.frozen = null; kind = calm ? 'klar' : kindAt(this.seed, A, climate, this.mode); }
       // t-motion · the drama's timeline: from the schedule (the same for everyone), or for a forced state its own (a storm
       // forced is here at once; a storm forced away leaves a rainbow behind)
-      if (WET[this.prevKind] && !WET[kind] && (this.forced || this.oneShot)) this.forcedDry = this.clock;
+      if (WET[this.prevKind] && !WET[kind] && (this.forced || calm)) this.forcedDry = this.clock;
       if (WET[kind]) this.forcedDry = -1;
       this.prevKind = kind;
       let front, bow, washed;
-      if (this.forced || this.oneShot || c.freeze) {
+      if (this.forced || calm || c.freeze) {
         front = kind === 'gewitter' ? 1 : 0;
         const tw = this.forcedDry >= 0 ? this.clock - this.forcedDry : -1;
         bow = tw < 0 ? 0 : bowEnv(tw, bowDur(this.seed, this.slot)); washed = tw < 0 ? 0 : 1 - smooth01(tw / WASH_S);

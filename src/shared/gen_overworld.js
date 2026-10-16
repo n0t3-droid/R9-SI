@@ -88,6 +88,7 @@
       this.seed = seed >>> 0;
       this.vgen = opts.vgen || 1; // village generator version (see gen_village.js)
       this.noCrystal = !!opts.noCrystal; // F-NoCrystal: no crystals at any vgen (the title panorama); vgen ≥ 9 has none anyway (GEN.noCry)
+      this.noLand = !!opts.noLand;       // t-first: the living title's far tiles without t-land's plan (gen_land.js LAND.on)
       this.amplified = opts.worldType === 'amplified';
       this.large = opts.worldType === 'large';
       this.singleBiome = opts.worldType === 'single' ? (BI[opts.biome] !== undefined ? BI[opts.biome] : BI.plains) : -1;

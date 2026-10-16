@@ -20,7 +20,7 @@
   if (!HEART || !OG || !GEN) return;
   const LAND = VR.Land = {};
   LAND.VGEN = 10;
-  LAND.on = (g) => !!(g && g.vgen >= LAND.VGEN && HEART.on(g));
+  LAND.on = (g) => !!(g && g.vgen >= LAND.VGEN && HEART.on(g) && !g.noLand);   // (noLand: the living title's far tiles, titlescene.js)
   const ss = M.smoothstep, lerp = M.lerp;
   const h01 = (x, z, s) => (M.hash2(x | 0, z | 0, s | 0) >>> 0) / 4294967296;
   LAND.h01 = h01;
