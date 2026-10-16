@@ -151,8 +151,10 @@
     findTables(eye) {
       const V = this.g.villages, out = [];
       if (V && V.known) for (const v of V.known.values()) {
-        const P = v && v.plan; if (!P || !P.shops || Math.hypot(P.x - eye[0], P.z - eye[2]) > 260) continue;
-        for (const sh of P.shops) if (sh && sh.kind === 'cafe' && sh.seats) for (const s of sh.seats) {
+        const P = v && v.plan; if (!P || Math.hypot(P.x - eye[0], P.z - eye[2]) > 260) continue;
+        // (the hall city keeps its café's seats on the café's workplace, plan.work — plan.shops lists its shops without
+        // seats: the final browser run's street had no wisp)
+        for (const sh of (P.work || []).concat(P.shops || [])) if (sh && sh.kind === 'cafe' && sh.seats) for (const s of sh.seats) {
           const f = s[3] & 3, tx = s[0] + VR.HF_DX[f], tz = s[2] + VR.HF_DZ[f];
           if (Math.hypot(tx - eye[0], tz - eye[2]) > 40) continue;
           if (!out.some(t => t[0] === tx && t[2] === tz)) out.push([tx, s[1], tz]);

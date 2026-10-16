@@ -120,6 +120,21 @@ check(r4.a.drawn.splash > 0 && r4.a.drawn.splash <= Math.ceil(10 * cap3.splash /
 const calm = run(3, DAY, [30, 65.6, 30], 300);
 check(calm.a.drawn.leaf === 0 && calm.a.drawn.splash === 0, 'a calm dry day: no storm leaves, no splashes');
 
+// ---- 5b. the steam in a real hall city (the final browser run's street: no wisp at all — the hall city keeps its café's
+// seats on the café's workplace, plan.work, and plan.shops lists the shops without seats)
+console.log('the café in a real hall city');
+{
+  const VG = V.VillageGen, g = new V.OverworldGen(53, { worldType: 'default', vgen: 10 });
+  let site = null; for (let i = -6; i <= 6 && !site; i++) for (let j = -6; j <= 6 && !site; j++) { const s = VG.site(g, i, j); if (s && s.style === 'hall') site = s; }
+  const plan = site ? VG.plan(g, site) : null, cafe = plan && plan.work.find(w => w.kind === 'cafe');
+  check(!!cafe && cafe.seats.length > 0 && plan.shops.every(sh => !sh.seats), `seed 53's hall city keeps its café's ${cafe ? cafe.seats.length : 0} seats on plan.work (plan.shops has none)`);
+  if (cafe) {
+    const s = cafe.seats[0], a = new A({ villages: { known: new Map([['w', { plan }]]) } });
+    a.findTables([s[0] + 0.5, s[1] + 1.6, s[2] + 0.5]);
+    check(a.tables.length >= 4 && a.tables.every(t => Math.hypot(t[0] - s[0], t[2] - s[2]) <= 40.5), `the steam finds its tables (${a.tables.length} within 40 blocks of a café seat)`);
+  }
+}
+
 // ---- 6. the fireflies rise over the lawns beyond a plaza (the third browser run's night plaza: its lawns lay beyond the
 // fireflies' 14 blocks): with Wind in allem 24 (game.js sets airLife.ffReach), without it 14 as before
 console.log('fireflies');
