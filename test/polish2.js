@@ -32,5 +32,22 @@ console.log('5 · Villa Nova\'s windows carry the sky (tex_pbr.js GLOWSKY, TERRA
   check(k > fs.indexOf('col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);'), 'after the emissive mix (it would overwrite it)');
 }
 
+console.log('8 · the Hangar Hall\'s air (light2.js ROOM, l2Fog under AIR2)');
+{
+  const L2 = V.Light2, RM = L2.ROOM;
+  check(L2.roomIndoor(1) === 0 && L2.roomIndoor(0.1) === 1 && L2.roomIndoor(0.55) > 0.3 && L2.roomIndoor(0.55) < 0.7, 'only indoors: the eye\'s sky light 1 → none, 0.1 → full', [L2.roomIndoor(1), L2.roomIndoor(0.55).toFixed(2), L2.roomIndoor(0.1)].join(' · '));
+  const t40 = L2.roomHaze(40, RM.rho), t8 = L2.roomHaze(8, RM.rho), t200 = L2.roomHaze(200, RM.rho);
+  check(t40 > 0.15 && t40 < 0.3 && t8 < 0.06 && Math.abs(t200 - L2.roomHaze(RM.max, RM.rho)) < 1e-9, 'thin: the hall\'s far end (40 blocks) a fifth toward the lamps\' colour, 8 blocks hardly, the haze ends at the room\'s reach', [t8, t40, t200].map(x => x.toFixed(3)).join(' · '));
+  // the hangar's strips: cyan block light round the eye → a cyan haze; a lantern's room → a warm one; no light → none
+  const cy = L2.roomColor([[0, 9, 12], [0, 7, 9], [0, 10, 13], [1, 8, 11], [0, 6, 8], [0, 11, 14], [0, 5, 7]]), warm = L2.roomColor([[12, 8, 4], [10, 7, 3], [9, 6, 3]]), dark = L2.roomColor([[0, 0, 0], [0, 0, 0]]);
+  check(cy[2] > cy[1] && cy[1] > cy[0] * 4 && cy[2] < 0.3, 'the hangar\'s cyan strips give a cyan haze, a dim one (HDR < 0.3)', cy.map(x => x.toFixed(3)).join(', '));
+  check(warm[0] > warm[2] * 2 && dark[0] + dark[1] + dark[2] === 0, 'a lantern\'s room a warm one, a dark room none');
+  const fs = S.COMMON || '', src = L2.glslCommon();
+  check(/uniform vec4 u_l2Room;/.test(src) && inside(src, 'uniform vec4 u_l2Room;', 'AIR2') && inside(src, 'if (u_l2Room.w > 0.0)', 'AIR2'), 'the room haze is AIR2\'s (Low and up; Very Low\'s programs never see it)');
+  check(src.indexOf('if (u_l2Room.w > 0.0)') < src.indexOf('return mix(col, fc, clamp(f, 0.0, 1.0));', src.indexOf('if (u_l2Room.w > 0.0)')) && src.indexOf('if (u_dim != 0) return') < src.indexOf('if (u_l2Room.w > 0.0)'), 'after the open air, before the distance fog; never under water or in another dimension');
+  const gsrc = require('fs').readFileSync(__dirname + '/../src/main/light2_gl.js', 'utf8');
+  check(/u_l2Room, 0, 0, 0, 0/.test(gsrc) && /u\.u_l2Room\) \{ const r = this\.l2Room/.test(gsrc) && /L2\.roomIndoor\(this\.l2EyeSky\)/.test(gsrc), 'light2_gl.js sets it every frame from the eye (indoors only) and zero where the light is off');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

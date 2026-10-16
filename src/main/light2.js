@@ -196,6 +196,21 @@
     // a step paler each (t1_05, t3_06)
     return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: 0.55, sunK, morning, moods: m };
   };
+  // t-polish2 · the room's air (gap 8, the Hangar Hall: t1_12, t1_13 — the hall's air holds the cyan of its strips): where
+  // the eye stands indoors (its sky light low) the air takes the colour of the lamps round it — the block light of a few
+  // cells round the eye, averaged and eased — thin: col → mix(col, room, 1 − e^(−min(d, max)·rho)). Outdoors nothing (the
+  // valley haze and the volumetric light are the open air's). One mix in l2Fog (AIR2), no pass.
+  L2.ROOM = { rho: 0.0062, max: 48, k: 0.34, sky: [0.25, 0.85], pts: [[0, 0, 0], [4, 0, 0], [-4, 0, 0], [0, 0, 4], [0, 0, -4], [0, 3, 0], [0, -1, 0]] };
+  L2.roomIndoor = (eyeSky) => 1 - sstep(L2.ROOM.sky[0], L2.ROOM.sky[1], eyeSky);
+  L2.roomHaze = (d, rho) => 1 - Math.exp(-Math.min(Math.max(d, 0), L2.ROOM.max) * rho);
+  // the haze's colour (HDR) from the block light at the sample points: [r, g, b] 0..15 each
+  L2.roomColor = function (samples, out) {
+    out = out || [0, 0, 0]; out[0] = out[1] = out[2] = 0;
+    if (!samples.length) return out;
+    for (const s of samples) for (let i = 0; i < 3; i++) { const v = s[i] / 15; out[i] += v * v; }
+    for (let i = 0; i < 3; i++) out[i] = out[i] / samples.length * L2.ROOM.k;
+    return out;
+  };
   // the valley mist's colour: between the horizon's and the fog's, a little lighter by day
   L2.mistColor = function (E) {
     const h = E.horizon || [0.6, 0.7, 0.8], f = E.fogColor || h, m = L2.moods(E.sunDir[1]), lift = 1 + 0.08 * m.day;
@@ -380,6 +395,7 @@ float l2Ao() {
 uniform vec4 u_l2Fog;      // x the density at the base (per block), y k (1 / scale height), z the base's height, w the eye's height
 uniform vec4 u_l2Fog2;     // x 1 / the aerial perspective's distance, y its most, z the sun's in-scatter, w the night's dimming
 uniform vec3 u_l2FogCol;   // the valley haze's colour
+uniform vec4 u_l2Room;     // t-polish2: the room's air — rgb its colour (the lamps round the eye), w its density (0 outdoors)
 vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   vec3 dir = rel / max(dist, 0.001);
   if (u_fog.w > 0.5) return mix(col, u_fogColor, clamp(1.0 - exp(-dist * 0.07), 0.0, 1.0));
@@ -401,6 +417,8 @@ vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   float toSun = max(dot(dir, u_sunDir), 0.0), t2 = toSun * toSun, t4 = t2 * t2;
   vec3 mist = u_l2FogCol + u_sunColor * (t4 * t4 * u_l2Fog2.z);
   col = mix(col, mist, clamp(hf, 0.0, 0.92));
+  // t-polish2 · the room's air (light2.js ROOM): indoors the air holds the lamps' colour, thin (0 outdoors: w = 0)
+  if (u_l2Room.w > 0.0) col = mix(col, u_l2Room.rgb, 1.0 - exp(-min(dist, ${L2.ROOM.max.toFixed(1)}) * u_l2Room.w));
   return mix(col, fc, clamp(f, 0.0, 1.0));
 }
 #endif
