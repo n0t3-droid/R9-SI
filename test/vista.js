@@ -213,13 +213,13 @@ if (want(5)) {
     const trees = (P.trees || []).filter(t => Math.hypot(t.x - v.x, t.z - v.z) < 16 && Math.hypot(t.x - v.x, t.z - v.z) > 6);
     // (a crown's inner edge, 4 blocks from its trunk toward the sight axis, inside the picture's side)
     const sides = trees.map(t => { const ax = v.eye[0] + v.u[0] * 8, az = v.eye[2] + v.u[1] * 8, dx = ax - t.x, dz = az - t.z, l = Math.hypot(dx, dz) || 1; return proj(v, t.x + 0.5 + dx / l * 4, t.y + 5, t.z + 0.5 + dz / l * 4); }).filter(Boolean).filter(q => Math.abs(q[0]) > 0.3 && Math.abs(q[0]) < 1.05);
-    // the gate's low piers at the spur's mouth (a cap and a lantern on each)
-    let piers = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) if (/chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 3, v.z + dz))) && nameOf(blockAt(v.x + dx, v.y + 4, v.z + dz)) === 'lantern') piers++;
+    // the spur's mouth: a lantern post either side (a lantern on a post, within 6 blocks of its start)
+    let piers = 0; for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) if (dx * dx + dz * dz <= 36 && /wall|pillar/.test(nameOf(blockAt(v.x + dx, v.y + 1, v.z + dz))) && nameOf(blockAt(v.x + dx, v.y + 2, v.z + dz)) === 'lantern') piers++;
     let arch = false;
     if (v.arch) { const piers = []; for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) { const n = nameOf(blockAt(v.x + dx, v.y + 3, v.z + dz)); if (/quartz_pillar|stone_bricks/.test(n) && /stone_bricks|quartz|chiseled/.test(nameOf(blockAt(v.x + dx, v.y + 5, v.z + dz)))) piers.push([v.x + dx, v.z + dz]); } arch = piers.length >= 2; }
-    if (piers >= 2 && (sides.length >= 1 || arch)) fg++; else if (fgBad.length < 4) fgBad.push(`${v.id} (${piers} piers; ${trees.length} trees, ${sides.length} at the sides)`);
+    if (piers >= 2 && (sides.length >= 1 || arch)) fg++; else if (fgBad.length < 4) fgBad.push(`${v.id} (${piers} mouth posts; ${trees.length} trees, ${sides.length} at the sides)`);
   }
-  check(fg === vs.length, `every vista has its foreground frame: the gate's two piers at the spur's start and a crown at the picture's side or the arch over the spur (${fg} of ${vs.length}${fgBad.length ? '; ' + fgBad.join(', ') : ''}; arches: ${vs.filter(v => v.arch).length})`);
+  check(fg === vs.length, `every vista has its foreground frame: the lantern posts at the spur's mouth, the walls, and a crown at the picture's side or the arch over the spur (${fg} of ${vs.length}${fgBad.length ? '; ' + fgBad.join(', ') : ''}; arches: ${vs.filter(v => v.arch).length})`);
   // the middle distance: the vista's grove inside the picture, beside the landmark (or the woods or the water there)
   let mid = 0, inPic = 0;
   for (const v of vs) {

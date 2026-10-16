@@ -435,10 +435,12 @@
         sel.push(c);
       }
     });
-    // the record: the spur, the composition (the eye 3 behind the spur's start and 1.2 over the eye's height, the
-    // landmark's top a quarter of the frame's height under its top edge), the leading lines (the walls)
+    // the record: the spur, the composition (the eye in the spur's mouth, a little over a standing eye, looking down the
+    // walk — its walls the leading lines from the picture's lower corners, the bench and the lanterns at its end, the
+    // landmark's top a quarter of the frame's height under its top edge; vista.mjs's first run stood the eye 3 blocks
+    // back across the way, low: the far verge and the gate's piers filled the picture), the leading lines (the walls)
     sel.forEach((c, k) => {
-      const [ux, uz] = c.u, ex = c.x - ux * 3, ez = c.z - uz * 3, ey = c.y + EYE + 1.2, fov = 62;
+      const [ux, uz] = c.u, ex = c.x + ux * 0.5, ez = c.z + uz * 0.5, ey = c.y + EYE + 2.2, fov = 62;
       const vx = c.q.x - ex, vz = c.q.z - ez, d = Math.hypot(vx, vz), elTop = Math.atan2(c.q.top - ey, d);
       const pitch = elTop - Math.atan(0.45 * Math.tan(fov * DEG / 2));
       const yaw = Math.atan2(-vx, -vz);
@@ -477,25 +479,25 @@
     const at = (t, o) => [Math.round(sx + ux * t - uz * o - 0.5), Math.round(sz + uz * t + ux * o - 0.5)];
     { const [bx, bz] = at(L - 0.5, 0); put(bx, y + 1, bz, st('vx_bench', { facing: FACE4(ux, uz) })); }
     for (const o of [-3, 3]) { const [lx, lz] = at(L + 1.6, o); put(lx, y + 1, lz, POST); put(lx, y + 2, lz, LANT); }
-    // the gate into the spur: a low pier either side of its mouth, a cap and a lantern on each — the picture's frame in
-    // its lower corners — and never on the way (vista.mjs's first run: four-high piers at ±2 hid a third of the view, and
-    // on 19 of 21 spurs they stood on the way's cells): the first place from the mouth outward that is off the way
-    const PIERB = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, CAP = white ? (st('chiseled_quartz_block') || BASE) : st('chiseled_stone_bricks');
+    // the spur's mouth: a lantern post either side (like the two at its end), off the way — the first place from the mouth
+    // outward that is off it. (vista.mjs's first runs: four-high gate piers at ±2 hid a third of the picture and stood on
+    // the way at 19 of 21 spurs; piers of two and a cap at ±3, the eye in the mouth, still filled a corner)
+    const MPOST = white ? (st('quartz_pillar', { axis: 0 }) || POST) : POST;
     for (const o of [-3, 3]) {
       let pc = null;
       for (const t of [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5]) { const c = at(t, o); if (!P.cells.has(ck(c[0], c[1]))) { pc = c; break; } }   // (past 3 the spur's room is off the way: choose())
       if (!pc) continue;
       const [lx, lz] = pc, g0 = gy(lx, lz);
       for (let yy = g0 + 1; yy <= y; yy++) put(lx, yy, lz, BASE);   // (its footing where the land falls away)
-      put(lx, y + 1, lz, PIERB); put(lx, y + 2, lz, PIERB); put(lx, y + 3, lz, CAP); put(lx, y + 4, lz, LANT);
+      put(lx, y + 1, lz, MPOST); put(lx, y + 2, lz, LANT); put(lx, y + 3, lz, 0);
       keepSet(P, lx, lz, LAND.KEEP.PIECE);
     }
-    // the arch (V.frame 'arch': the landmark low enough to stand in its opening): two piers on the walls 2.5 out, a lintel
+    // the arch (V.frame 'arch': the landmark low enough to stand in its opening): two piers on the walls 4.5 out, a lintel
     // with a keystone over the walk — the picture's frame in the foreground
     if (V.frame === 'arch') {
       const PIER = white ? (st('quartz_pillar', { axis: 0 }) || BASE) : BASE, LIN = white ? (st('smooth_quartz') || BASE) : st('stone_bricks'), KEY = white ? (st('chiseled_quartz_block') || LIN) : st('chiseled_stone_bricks');
       const done = new Set(), offWay = (ta) => [-2, 2].every(o => { const c = at(ta, o); return !P.cells.has(ck(c[0], c[1])); });
-      const ta = [2.5, 3.5, 4.5].find(offWay);   // (its piers never on the way)
+      const ta = [4.5, 5.5].find(offWay);   // (4 ahead of the eye: the opening round the landmark; its piers never on the way)
       if (ta !== undefined) {
         for (let o = -2; o <= 2; o += 0.5) {
           const [ax, az] = at(ta, o), k = ax * 65536 + az; if (done.has(k)) continue; done.add(k);
@@ -623,7 +625,8 @@
     // leave the landmark free (from the eye ~50° off the axis, the crowns reaching in to ~25°)
     V.framed = 0;
     const fk = h01(V.x, V.z, 0x7a1) < 0.5 ? 4 : 0;
-    for (const sd of [-1, 1]) for (const [ft, fo] of (fk === 4 ? [[5, 11], [6, 12], [4, 10], [7, 12], [3, 10], [6, 10]] : [[4, 9], [5, 10], [3, 9], [6, 9], [5, 8], [7, 10]])) { const o = sd * fo; if (planTree(g, P, V.x + ux * ft - uz * o, V.z + uz * ft + ux * o, fk, false)) { V.framed++; break; } }
+    // (3.5 further out along the walk than the first design: the eye moved from 3 behind the spur's start into its mouth)
+    for (const sd of [-1, 1]) for (const [ft, fo] of (fk === 4 ? [[8.5, 11], [9.5, 12], [7.5, 10], [10.5, 12], [6.5, 10], [9.5, 10]] : [[7.5, 9], [8.5, 10], [6.5, 9], [9.5, 9], [8.5, 8], [10.5, 10]])) { const o = sd * fo; if (planTree(g, P, V.x + ux * ft - uz * o, V.z + uz * ft + ux * o, fk, false)) { V.framed++; break; } }
   };
   VISTA.dressGrove = function (g, P, V) {
     const [ux, uz] = V.u, kindHere = (x, z) => { const q = LAND.woodAt(g, x, z); return q.kind === 3 ? 0 : q.kind; };
