@@ -30,8 +30,16 @@ for (const [name, g, cols] of scenes) {
 }
 const hex = h.toString(16).padStart(8, '0');
 console.log(`${n} columns, ${blocksN} blocks, ${(performance.now() - t0).toFixed(0)} ms cold · hash ${hex}`);
-if (process.argv.includes('--write')) { console.log('record in test/gen_same.js: EXPECT =', JSON.stringify(hex)); process.exit(0); }
-const ok = hex === EXPECT;
+// vgen 12 (t-polish2: Weißstadt's polished nave floor) has its own pin — the scenes above keep EXPECT: seed 53's hall city,
+// four chunks over its street and plaza (the cells only vgen 12 lays in porcelain and andesite)
+const EXPECT12 = 'b59b0b12';
+let h12 = 2166136261 >>> 0;
+{ const g12 = V.makeGen('overworld', 53, { vgen: 12 }); for (const [cx, cz] of [[-59, -19], [-60, -19], [-61, -19], [-59, -18]]) { const c = g12.generate(cx, cz); h12 = fnv(h12, c.blocks); if (c.biome) h12 = fnv(h12, c.biome); } }
+const hex12 = h12.toString(16).padStart(8, '0');
+console.log(`     vgen 12 · Weißstadt's nave, seed 53: 4 columns, hash ${hex12}`);
+if (process.argv.includes('--write')) { console.log('record in test/gen_same.js: EXPECT =', JSON.stringify(hex), '· EXPECT12 =', JSON.stringify(hex12)); process.exit(0); }
+const ok = hex === EXPECT, ok12 = hex12 === EXPECT12;
 console.log(ok ? '  ✓ the generated terrain is the same as before' : `  ✗ the terrain changed (expected ${EXPECT})`);
-console.log(ok ? 'ALL OK' : 'FAILED 1');
-process.exit(ok ? 0 : 1);
+console.log(ok12 ? '  ✓ vgen 12\'s hall city is as pinned' : `  ✗ vgen 12's hall city changed (expected ${EXPECT12})`);
+console.log(ok && ok12 ? 'ALL OK' : 'FAILED ' + ((ok ? 0 : 1) + (ok12 ? 0 : 1)));
+process.exit(ok && ok12 ? 0 : 1);
