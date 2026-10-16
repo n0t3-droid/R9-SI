@@ -570,7 +570,11 @@ vec3 hazeColor(vec3 dir) {
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.6, clamp(-dir.y * 2.0, 0.0, 1.0));
   return col;
 }
+${(VR.Light2 && VR.Light2.glslCommon) ? VR.Light2.glslCommon() : ''}
 vec3 applyFog(vec3 col, vec3 rel, float dist) {
+#ifdef AIR2
+  return l2Fog(col, rel, dist);   // t-light2: the air — the same haze, with the valleys' height fog and aerial perspective
+#else
   vec3 dir = rel / max(dist, 0.001);
   vec3 fc = u_dim == 1 || u_dim == 2 ? u_fogColor : mix(hazeColor(dir), u_fogColor, 0.35);
   float hd = max(length(rel.xz), abs(rel.y) * 0.35);
@@ -578,6 +582,7 @@ vec3 applyFog(vec3 col, vec3 rel, float dist) {
   f = max(f, (1.0 - exp(-dist * u_fog.z)) * 0.85);
   if (u_fog.w > 0.5) { f = 1.0 - exp(-dist * 0.07); fc = u_fogColor; }
   return mix(col, fc, clamp(f, 0.0, 1.0));
+#endif
 }
 `;
 
@@ -629,6 +634,7 @@ out vec3 v_localPos;
 #ifdef FADE
 flat out float v_fade;
 #endif
+${(VR.Light2 && VR.Light2.glslVS) ? VR.Light2.glslVS() : ''}
 #ifdef ZINV
 invariant gl_Position;   // F10 · zPre: the cut-out layer's depth prepass and its colour pass place every fragment alike
 #endif
@@ -723,6 +729,9 @@ void main() {
   v_shadow = u_shadowMat * vec4(rel + n * 0.04, 1.0);
 #endif
   gl_Position = u_viewProj * vec4(rel, 1.0);
+#if defined(L2AO) && !defined(MODEL)
+  v_l2AoClip = u_l2AoVP * vec4(rel + u_l2AoDelta, 1.0);   // t-light2: where this was in the last frame's view (its contact shadows)
+#endif
 }`;
 
   S.TERRAIN_FS = `
@@ -1094,6 +1103,9 @@ void main() {
   float skyL = sky * sky * (3.0 - 2.0 * sky);
   vec3 bl = v_block;
   vec3 blockL = pow(bl, vec3(1.7)) * 1.35 * u_blockLightTint;
+#ifdef LIGHT2
+  blockL = l2Pool(bl);   // t-light2: the lamps' light in pools (light2.js)
+#endif
   float ao = 1.0 - v_ao * 0.2;
   float faceShade = face == 2u ? 1.0 : face == 3u ? 0.55 : (face <= 1u ? 0.78 : 0.88);
   if (noshade) faceShade = 0.92;
@@ -1102,6 +1114,10 @@ void main() {
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
   float ndl = noshade ? 0.65 : max(dot(n, L), 0.0);
+#ifdef LIGHT2
+  // t-light2: leaves, grass and flowers take the light softly round their edges (a wrap)
+  if (!noshade && ((v_w5 >> 14u) & 1u) == 0u && ((v_w5 >> 5u) & 7u) != 0u) ndl = l2Wrap(dot(n, L), u_l2K.z) * step(-0.2, dot(N, L));
+#endif
   float outdoors = smoothstep(0.55, 0.95, sky);
   float sh = (ndl > 0.0 && outdoors > 0.0 && dot(N, L) > -0.2) ? shadowAt(N, L) : 1.0;
 #ifdef CLOUDSH
@@ -1109,6 +1125,13 @@ void main() {
 #endif
   vec3 direct = lc * ndl * sh * outdoors;
   vec3 amb = u_ambSky * skyL * mix(0.62, 1.0, faceShade);
+#ifdef LIGHT2
+  // t-light2: the sky's light from above, the ground's bounce from below (the shade cool, its underside warm)
+  amb = (noshade ? u_l2Sky * 0.92 : l2Hemi(n) * (face <= 1u ? u_l2K.y : 1.0)) * skyL;
+#endif
+#ifdef L2AO
+  { float l2a = l2Ao(); amb *= l2a; blockL *= mix(1.0, l2a, u_l2AoK.z); }   // t-light2: the contact shadows — the sky's light and some of the lamps', never the sun
+#endif
   vec3 lighting = (amb + direct) * ao + blockL * ao * mix(0.8, 1.0, faceShade) + vec3(0.012, 0.012, 0.016);
   // wet ground: the top faces darken a little in the rain (u_wet is 0 when dry or when wetGround is off)
 #ifdef PBR
@@ -1274,6 +1297,7 @@ out vec3 v_n;
 out vec3 v_rel;
 out float v_sky;
 out vec3 v_block;
+${(VR.Light2 && VR.Light2.glslVS) ? VR.Light2.glslVS() : ''}
 void main() {
   float on = mod(floor(a_inst1.w / exp2(a_frond)), 2.0) >= 1.0 ? 1.0 : 0.0;
   float sc = a_inst1.x, ph = a_inst1.z;
@@ -1303,6 +1327,9 @@ void main() {
   v_shadow = u_shadowMat * vec4(rel + nq * 0.04, 1.0);
 #endif
   gl_Position = u_viewProj * vec4(rel, 1.0);
+#if defined(L2AO) && !defined(MODEL)
+  v_l2AoClip = u_l2AoVP * vec4(rel + u_l2AoDelta, 1.0);   // t-light2: where this was in the last frame's view (its contact shadows)
+#endif
 }`;
   S.PROP_FS = `
 uniform sampler2D u_tex;
@@ -1344,6 +1371,9 @@ void main() {
   vec3 N = gl_FrontFacing ? normalize(v_n) : -normalize(v_n);   // two-sided: a frond is lit from both faces
   float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
+#ifdef LIGHT2
+  blockL = l2Pool(v_block);   // t-light2: the lamps' pools
+#endif
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
@@ -1355,6 +1385,18 @@ void main() {
   float sh = 1.0;
 #endif
   vec3 lighting = u_ambSky * skyL * 0.92 + lc * ndl * sh * outdoors + blockL * 0.9 + vec3(0.012, 0.012, 0.016);
+#ifdef LIGHT2
+  if (!solid) ndl = l2Wrap(dot(N, L), u_l2K.z);   // t-light2: the fronds' wrap, as the terrain's leaves
+  lighting = l2Hemi(N) * skyL * 0.95 + lc * ndl * sh * outdoors + blockL * 0.9 + vec3(0.012, 0.012, 0.016);
+#endif
+#ifdef L2AO
+  // t-light2: the contact shadows take from the sky's light only (the palm's foot in the ground, the fronds' overlap)
+#ifdef LIGHT2
+  lighting -= l2Hemi(N) * skyL * 0.95 * (1.0 - l2Ao());
+#else
+  lighting -= u_ambSky * skyL * 0.92 * (1.0 - l2Ao());
+#endif
+#endif
   // a frond lets the light through: lit from behind it glows a warmer green (the trunk does not)
   if (!solid) lighting += lc * max(dot(-N, L), 0.0) * 0.45 * sh * outdoors * vec3(1.0, 1.05, 0.7);
   vec3 col = alb * lighting;
@@ -1411,6 +1453,7 @@ flat out float v_mat;
 out float v_ao;
 out float v_sky;
 out vec3 v_block;
+${(VR.Light2 && VR.Light2.glslVS) ? VR.Light2.glslVS() : ''}
 void main() {
   float c = cos(a_inst0.w), s = sin(a_inst0.w);
   vec3 q = vec3(c * a_pos.x - s * a_pos.z, a_pos.y, s * a_pos.x + c * a_pos.z);
@@ -1433,6 +1476,9 @@ void main() {
   v_shadow = u_shadowMat * vec4(rel + nq * 0.03, 1.0);
 #endif
   gl_Position = u_viewProj * vec4(rel, 1.0);
+#if defined(L2AO) && !defined(MODEL)
+  v_l2AoClip = u_l2AoVP * vec4(rel + u_l2AoDelta, 1.0);   // t-light2: where this was in the last frame's view (its contact shadows)
+#endif
 }`;
   // the materials (props.js PR.MAT): 0 fabric, 1 wood, 2 metal, 3 glass, 4 light, 5 matte, 6 gloss, 7 leaf, 8 marble,
   // 9 leather, 10 a lamp shade (lit from inside), 11 the contact shadow. The terrain's light (the sky as a hemisphere, the
@@ -1515,6 +1561,9 @@ void main() {
   if (klassisch && m != 12) { rough = max(rough, 0.34); sheen *= 0.6; }   // Klassisch: the blocks' matter, less gloss
   float skyL = v_sky * v_sky * (3.0 - 2.0 * v_sky);
   vec3 blockL = pow(v_block, vec3(1.7)) * 1.35 * u_blockLightTint;
+#ifdef LIGHT2
+  blockL = l2Pool(v_block);   // t-light2: the lamps' pools
+#endif
   float sunUp = smoothstep(-0.12, 0.12, u_sunDir.y);
   vec3 L = sunUp > 0.001 ? u_sunDir : u_moonDir;
   vec3 lc = sunUp > 0.001 ? u_sunColor * sunUp : u_moonColor;
@@ -1540,6 +1589,12 @@ void main() {
     return;
   }
   vec3 amb = u_ambSky * skyL * mix(0.45, 1.0, up);
+#ifdef LIGHT2
+  amb = l2Hemi(N) * skyL;   // t-light2: the sky from above, the ground's bounce from below
+#endif
+#ifdef L2AO
+  amb *= l2Ao();   // t-light2: the contact shadows (under the table, in the sofa's corner)
+#endif
   vec3 blk = blockL * mix(0.5, 1.0, up);
   vec3 col = alb * ((amb + lc * ndl * sh * outdoors) * v_ao + blk * v_ao + vec3(0.012, 0.012, 0.016)) * (1.0 - metal * 0.85);
 #ifndef LITE
@@ -2383,6 +2438,9 @@ void main() {
 #endif
     float ndl = max(dot(N, L), 0.0);
     vec3 amb = u_ambSky * mix(0.62, 1.0, faceShade);
+#ifdef LIGHT2
+    amb = l2Hemi(N) * (v_face <= 1u ? u_l2K.y : 1.0);   // t-light2: the near terrain's hemisphere
+#endif
     col = alb * (amb + lc * ndl * 0.92) * (0.3 + 0.7 * v_shade) + alb * 0.012;
     if (v_kind == 2u) col = alb * (1.5 + vnoise(wp * 0.3 + u_time * 0.2) * 1.2) * vec3(1.0, 0.8, 0.6);
     else if (v_kind == 3u) col = vec3(0.12, 0.75, 1.0) * (1.4 + vnoise(wp * 0.2 + u_time * 0.1) * 1.6);
@@ -2470,6 +2528,11 @@ void main() {
   float wrapL = max((dot(n, L) + 0.3) / 1.3, 0.0);
   vec3 hemi = mix(u_ambSky * vec3(0.62, 0.56, 0.5), u_ambSky * 1.06, n.y * 0.5 + 0.5);
   vec3 light = hemi * sk + lc * wrapL * outdoor * 0.9 * (1.0 - u_sunShadow) + pow(u_blockLight, vec3(1.7)) * 1.35 * u_blockLightTint + 0.03;
+#ifdef LIGHT2
+  // t-light2: the hemisphere, the skin's softer wrap, the lamps' pools
+  hemi = l2Hemi(n) * 1.04; wrapL = l2Wrap(dot(n, L), u_l2K.w);
+  light = hemi * sk + lc * wrapL * outdoor * 0.9 * (1.0 - u_sunShadow) + l2Pool(u_blockLight) + 0.03;
+#endif
   vec3 col = alb * light;
   vec3 V = normalize(-v_rel);
   float rim = pow(1.0 - max(dot(n, V), 0.0), 3.0);
@@ -2604,6 +2667,7 @@ uniform float u_shafts;     // F7: underwater light shafts (tier 2), 0 above the
 uniform float u_crossing;   // F7: the surface passing the eye (1 at the moment, fading): a ripple across the picture
 uniform mat4 u_invVP;       // F7: pixel → view ray, so the shafts stay fixed in the world
 uniform vec3 u_shaftCol;
+${(VR.Light2 && VR.Light2.glslComposite) ? VR.Light2.glslComposite() : ''}
 in vec2 v_uv;
 out vec4 o;
 // HDR → 0..1 for the sharpening weights (keeps bright lights from ringing)
@@ -2639,6 +2703,12 @@ void main() {
   } else c = texture(u_scene, uv).rgb;
   c += texture(u_bloom, uv).rgb * u_bloomStrength;
   if (u_useRays > 0.5) c += texture(u_rays, uv).rgb;
+#ifdef L2VOL
+  if (u_l2VolOn > 0.5) c += l2VolAt(uv);   // t-light2: the light in the air (the volumetric light, upsampled by depth)
+#endif
+#ifdef GRADE2
+  c += l2Flare(v_uv);   // t-light2: the sun's flare
+#endif
   if (u_shafts > 0.0) {
     // light shafts: columns of light from the surface, where the view ray points up toward it, drifting slowly
     vec4 wr = u_invVP * vec4(v_uv * 2.0 - 1.0, 1.0, 1.0);
@@ -2661,6 +2731,9 @@ void main() {
   if (u_damage > 0.0) c = mix(c, vec3(0.7, 0.05, 0.05), u_damage * (0.3 + 0.7 * smoothstep(0.2, 0.75, length(vc))) * 0.55);
   if (u_portal > 0.0) c = mix(c, vec3(0.9, 0.45, 0.15), u_portal * 0.35);
   c = pow(clamp(c, 0.0, 1.0), vec3(1.0 / 2.2));
+#ifdef GRADE2
+  c = l2Grade(c, v_uv);   // t-light2: the grade by the hour (display space: the curve, the split toning, the vignette)
+#endif
   // dither
   c += (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0;
   o = vec4(c, 1.0);
@@ -2937,6 +3010,9 @@ void main() {
   float sk = u_sky * u_sky;
   float shade = 0.7 + 0.3 * max(v_n.y, 0.0) - 0.15 * max(-v_n.y, 0.0);
   vec3 light = u_ambSky * sk * shade + lc * ndl * smoothstep(0.55, 0.95, u_sky) * 0.9 + pow(u_blockLight, vec3(1.7)) * 1.35 * u_blockLightTint + 0.02;
+#ifdef LIGHT2
+  light = l2Hemi(normalize(v_n)) * sk + lc * ndl * smoothstep(0.55, 0.95, u_sky) * 0.9 + l2Pool(u_blockLight) + 0.02;   // t-light2
+#endif
   float shK = abs(v_color.a);
   vec3 col = a.rgb * light * min(shK, 1.0);
   if (shK > 1.5 && shK < 2.5) col = a.rgb * (1.3 + u_night * 0.6); // emissive voxel faces (|shade| = 2)

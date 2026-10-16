@@ -280,12 +280,18 @@ void main() {
   float outdoor = smoothstep(0.5, 0.95, v_light.x);
   float wrapL = max((dot(n, L) + 0.3) / 1.3, 0.0);
   vec3 hemi = mix(u_ambSky * vec3(0.62, 0.56, 0.5), u_ambSky * 1.06, n.y * 0.5 + 0.5);
+#ifdef LIGHT2
+  hemi = l2Hemi(n) * 1.04; wrapL = l2Wrap(dot(n, L), u_l2K.w);   // t-light2: the hemisphere, the skin's softer wrap
+#endif
 #ifdef SUN
   float sun = (1.0 - v_light.y) * (outdoor > 0.0 ? folkSun() : 1.0);
 #else
   float sun = 1.0 - v_light.y;
 #endif
   vec3 light = hemi * sk + lc * wrapL * outdoor * 0.9 * sun + pow(v_bl, vec3(1.7)) * 1.35 * u_blockLightTint + 0.03;
+#ifdef LIGHT2
+  light = hemi * sk + lc * wrapL * outdoor * 0.9 * sun + l2Pool(v_bl) + 0.03;   // t-light2: the lamps' pools
+#endif
   // t-folk2: an eye takes the light's brightness, not its colour, and a little of its own — the whites stay white (a
   // shade cool) by a lantern and at dusk, the iris dark (the owner: amber eyes under warm light)
   if (eye > 0.5) { float l = dot(light, vec3(0.2126, 0.7152, 0.0722)); light = mix(light, vec3(l) * vec3(0.95, 0.985, 1.05), 0.85) + vec3(0.045, 0.05, 0.058); }

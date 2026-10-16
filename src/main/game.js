@@ -23,6 +23,10 @@
   const F9_SW = ['farCache', 'shadowTakt', 'streamTakt', 'reflLite'];
   for (const p in PRESETS) for (const k of F9_SW) PRESETS[p][k] = false;
   PRESETS.ultraLite = Object.assign({}, PRESETS.ultra, { farCache: true, shadowTakt: true, streamTakt: true, reflLite: true });
+  // t-light2 · WOW I · Das Licht (light2.js): the light's five switches by preset — Licht-Modell, Kontaktschatten (0–3),
+  // Lichtstrahlen im Raum, Luft & Dunst, Farbstimmung; Very Low none of them (its programs and passes as before)
+  const L2_SW = VR.Light2 ? VR.Light2.SW : [];
+  if (VR.Light2) for (const p in PRESETS) Object.assign(PRESETS[p], VR.Light2.defaults(p));
   // t-folk: Echte Menschen (folkgpu.js) — the villagers smooth within 24 blocks from Balanced up; Very Low and Low keep the
   // voxel people (with the same real proportions)
   // F10 · Bandbreite (ipu.js): five switches for the GPUs that share the system's memory — off on every preset but Ultra ·
@@ -81,6 +85,8 @@
       // as High (renderDist 14) and is not the lite look of a weak PC
       if (s.far === undefined && s.preset) out.far = PRESETS[s.preset] ? PRESETS[s.preset].far : ((s.renderDist || 0) >= 14 && !s.lite ? 64 : 0);
       if (s.rdMax === undefined && s.preset) out.rdMax = PRESETS[s.preset] ? PRESETS[s.preset].rdMax : 24;
+      // t-light2: settings saved before the light's switches follow their preset (a custom one: Balanced's, none when lite)
+      for (const k of L2_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? VR.Light2.off()[k] : PRESETS.balanced[k]);
       // t-folk: Echte Menschen follows the saved preset (a custom one: on when it keeps Balanced's detail ring and is not lite)
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
       // t-material: settings saved before the gloss tiers follow their preset (a custom one: the gloss without the mirror, none when lite)
@@ -161,6 +167,7 @@
       if (key === 'bau') S.bauSet = true;   // 🏗 a „Bauen" chosen in the settings survives a preset change (applyPreset)
       if (key !== '*' && ['renderDist', 'scale', 'shadows', 'clouds', 'particles', 'bloom', 'rays', 'fxaa', 'magic', 'dynRes', 'fancyLeaves', 'horizon', 'sunShadows', 'sharpen', 'tsr', 'vxLod', 'lite', 'wetGround', 'matTier', 'anim', 'smoothPlants', 'smoothFurn'].includes(key)) S.preset = 'custom';
       if (key !== '*' && F9_SW.includes(key)) S.preset = 'custom';   // (F9: a switch of Ultra · Leicht changed by hand)
+      if (key !== '*' && L2_SW.includes(key)) S.preset = 'custom';   // (t-light2: a light switch changed by hand)
       if (key !== '*' && F10_SW.includes(key)) S.preset = 'custom';   // (F10 · Bandbreite: the same)
       if (key !== '*' && MO_SW.includes(key)) S.preset = 'custom';   // (t-motion: the same)
       for (const k of MO_SW) if (S[k] === undefined) S[k] = PRESETS[S.preset] ? PRESETS[S.preset][k] : (k === 'cloudShadow' ? +((S.clouds | 0) >= 2) : 1);   // (settings saved before t-motion follow their preset)
@@ -176,6 +183,7 @@
       if (S.smoothFurn === undefined) S.smoothFurn = PRESETS[S.preset] ? PRESETS[S.preset].smoothFurn : 1;   // t-smooth: Echte Möbel (0 the voxel pieces · 1 smooth)
       // sun rays through the heightmap reach as far as the loaded land (shadow maps only cover the near field)
       const hDist = Math.min(160, Math.max(56, S.renderDist * 16 * 0.75));
+      if (r && VR.Light2) { const qb = r.qBase || (r.qBase = {}), d = VR.Light2.off(); for (const k of L2_SW) qb[k] = S[k] === undefined ? d[k] : (typeof d[k] === 'number' ? Math.max(0, Math.min(VR.Light2.MAX[k] || 3, S[k] | 0)) : !!S[k]); }   // t-light2: the light's switches (renderer: their defines and passes)
       if (r && VR.IPU) { const qb = r.qBase || (r.qBase = {}); for (const k of F10_SW) qb[k] = !!S[k]; qb.dprCap = !!S.dprLite && S.preset === 'ultraLite'; }   // F10 · Bandbreite (ipu.js): the five switches; dprCap: 1920 × 1080 on Ultra · Leicht
       if (r) { const qb = r.qBase || (r.qBase = {}); qb.pbr = S.pbr === undefined ? (S.lite ? 0 : 1) : Math.max(0, Math.min(2, S.pbr | 0)); qb.texHi = !!S.texHi && !S.lite; }   // t-material: the gloss tier (renderer: the PBR / SSR defines), the hero textures (TEXHI)
       if (r) r.setQuality({ upload: S.upload || 2.5, scale: S.scale, shadows: SHADOW_RES[S.shadows], shadowDist: SHADOW_DIST[S.shadows], shadowEvery: 1, bloom: S.bloom, rays: S.rays, fxaa: S.fxaa, clouds: S.clouds, magic: S.magic, horizon: S.horizon, hshadow: !!S.sunShadows, hshadowDist: hDist, sharpen: S.sharpen ? (S.lite ? 0.5 : 0.35) : 0, tsr: !!S.tsr, vxLod: S.vxLod || 48, smoothProps: S.smoothPlants | 0, smoothFurn: S.smoothFurn ? 1 : 0, lite: !!S.lite , matTier: S.matTier || 0, dropShadow: !!S.dropShadow, lampGlow: !!S.lampGlow, water: S.water === undefined ? 1 : S.water, anim: S.anim !== false, shadowTakt: !!S.shadowTakt, farCache: !!S.farCache, reflLite: !!S.reflLite, motion: !!S.motion, cloudShadow: !!S.cloudShadow, wxDrama: !!S.wxDrama });   // (t-motion: motion · cloudShadow · wxDrama) (F9 · Schatten-Takt, Fern-Cache, Spiegelung leicht: off unless Ultra · Leicht or the player turns them on)
