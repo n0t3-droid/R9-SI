@@ -57,6 +57,10 @@
     return { r: h1[0] * b1 + h2[0] * b2, g: h1[1] * b1 + h2[1] * b2, b: h1[2] * b1 + h2[2] * b2, b1, b2, inside: 1 - ssm(BOWG.inside[0], BOWG.inside[1], th), alex: ssm(BOWG.alex[0], BOWG.alex[1], th) * (1 - ssm(BOWG.alex[2], BOWG.alex[3], th)) };
   };
 
+  // ---- the falls' mist column (landlife.js: the land's falls, the 'mist' spawns at their foot; with Wind in allem): puffs a
+  // second per unit of the spawn's strength (Low, Balanced+), their spread, rise (blocks/s), life (s), size and growth
+  // (blocks, blocks/s), opacity, turbulence and wind (particles.js), and the chance of a spray droplet with each (not Low)
+  M.FALLS = { rate: [4, 10], spread: 2.8, vy: [1.0, 2.2], life: [3.2, 4.8], size: [0.7, 1.3], grow: 0.9, alpha: 0.55, turb: 1.6, wind: 0.15, spray: 0.5 };
   // ---- the storm's look (Wetter-Drama: the sky shader, the puff clouds and env.js use these numbers; the third browser run
   // showed the storm's side black and its clouds white against it): the sky darkens by front·(d0 + d1·side + d2·wall) — at
   // most 0.7, a deep slate, never black — its colour drained toward a cool grey (slate) by front·drain; a storm's clouds

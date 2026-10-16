@@ -167,6 +167,23 @@ console.log('the isles\' falls');
   check(off.P.list.length === on.P.list.length - str.length && !low.v.streams, 'without Wind in allem the mist as before; Low none');
 }
 
+// ---- 6b. the land's falls throw up a billowing column of mist (the third browser run: a thin wisp at the foot — the
+// waterFx column never came, the land's falls are stacked falling water): landlife.js's 'mist' spawns with Wind in allem
+console.log('the land\'s falls');
+{
+  require('../src/main/landlife.js');
+  const FM = Mo.FALLS;
+  const run = (motion, preset) => { const P = fakeP(); P.spawn = function (x, y, z, vx, vy, vz, o) { P.list.push({ x, y, z, vx, vy, vz, size: o.size, life: o.life, alpha: o.alpha === undefined ? 1 : o.alpha, turb: o.turb || 0, wind: o.wind || 0, grow: o.grow || 0, grav: o.grav }); return 0; };
+    const g = { particles: P, settings: { preset, motion }, player: { pos: [10.5, 70, 10.5] }, env: { timeOfDay: 6000, E: { night: 0 } } }, L = new VR.LandLife(g, null);
+    L.absorb([['mist', 0, 63, 0, 3]]); for (let k = 0; k < 600; k++) L.effects(1 / 60, preset); return P.list; };
+  const on = run(true, 'high'), off = run(false, 'high'), low = run(true, 'low');
+  const col = on.filter(p => p.turb > 0), spray = on.filter(p => p.grav > 5);
+  check(col.length >= 0.85 * 10 * FM.rate[1] * 3 && col.every(p => p.turb === FM.turb && p.wind === FM.wind && p.alpha === FM.alpha && p.vy >= FM.vy[0] && p.size >= FM.size[0]), `with Wind in allem the foot throws up a churning column: ${col.length} puffs in 10 s (${FM.rate[1]}·3 a second), rising ${FM.vy[0]}–${FM.vy[1]} blocks/s, ${FM.size[0]}–${FM.size[1]} blocks, growing, drifting with the wind`);
+  check(spray.length > 0.3 * col.length && spray.length < 0.7 * col.length, `a fine spray bursts out of the pool (${spray.length} droplets)`);
+  check(off.length > 0 && off.every(p => !p.turb && p.alpha === 1) && off.length < col.length, `without it the old wisps (${off.length} in 10 s)`);
+  check(low.filter(p => p.turb > 0).length < col.length * 0.5 && !low.some(p => p.grav > 5), `Low: a thinner column (${low.length}), no spray`);
+}
+
 // ---- 7. the cost
 console.log('cost');
 const veilRate = Mo.budgetFor(2).cap.veil / Mo.AIR_LIFE.veil;
