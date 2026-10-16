@@ -120,5 +120,19 @@ check(r4.a.drawn.splash > 0 && r4.a.drawn.splash <= Math.ceil(10 * cap3.splash /
 const calm = run(3, DAY, [30, 65.6, 30], 300);
 check(calm.a.drawn.leaf === 0 && calm.a.drawn.splash === 0, 'a calm dry day: no storm leaves, no splashes');
 
+// ---- 6. the fireflies rise over the lawns beyond a plaza (the third browser run's night plaza: its lawns lay beyond the
+// fireflies' 14 blocks): with Wind in allem 24 (game.js sets airLife.ffReach), without it 14 as before
+console.log('fireflies');
+{
+  const PLAZA = stOf('stone_bricks') || STONE, GR = GRASS;
+  const lawn = { topAt: () => 63, getBlock: (x, y, z) => y < 63 ? STONE : y === 63 ? ((Math.abs(x) >= 17 && Math.abs(x) <= 22) ? GR : PLAZA) : 0 };
+  const night = { sunDir: [0, -1, 0], night: 1, rain: 0, snow: 0, wind: 1, windDir: [1, 0] };
+  const ffRun = (reach) => { const al = new VR.AirLife({}); al.setOn(true, 3); al.ffReach = reach; const parts = { n: 0, spawn() { return 0; } }; for (let i = 0; i < 900; i++) al.update(1 / 30, { w: lawn, eye: [0.5, 65.6, 0.5], E: night, particles: parts }); return al; };
+  const near = ffRun(14), wide = ffRun(24);
+  const xs = wide.ff.map(f => Math.abs(f.x));
+  check(near.ff.length === 0 && wide.ff.length > 10 && Math.min(...xs) > 11 && Math.max(...xs) < 29, `the lawns 17–22 blocks off: no fireflies at the old reach, ${wide.ff.length} with Wind in allem's (over the lawns, wandered to ${Math.min(...xs).toFixed(1)}–${Math.max(...xs).toFixed(1)} blocks out)`);
+  check(wide.ff.length <= 40, `they keep to their cap (High: 40; ${wide.ff.length})`);
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

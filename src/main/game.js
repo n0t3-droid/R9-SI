@@ -183,7 +183,7 @@
       if (this.env && this.env.wx) this.env.wx.setMode(S.wx);
       if (this.ambience) this.ambience.setOptions({ nature: S.natSound !== 'off', weather: S.wx !== 'off' });
       if (this.particles) this.particles.budget = [0.25, 0.6, 1][S.particles];
-      if (this.airLife) this.airLife.setOn(S.airLife !== false, VR.AirLife.tierOf(S));
+      if (this.airLife) { this.airLife.setOn(S.airLife !== false, VR.AirLife.tierOf(S)); this.airLife.ffReach = S.motion ? 24 : 14; }   // (t-motion: the fireflies rise over the lawns beyond a plaza too)
       if (this.motionAir) this.motionAir.setOn(S.airLife !== false, VR.AirLife.tierOf(S));   // (t-motion: the new air rides the living air's switch and tiers)
       if (this.ui) { this.ui.fps(S.showFps ? '' : null); }
       if (key === 'mpHost' && this.mp) this.mp.setLobby();   // 👥 „Friends can join" off: the lobby stops showing your name
