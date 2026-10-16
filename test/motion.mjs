@@ -187,7 +187,9 @@ async function shoot(tag, dist) {
       // the actors hold still from here to the sequence's end, in both builds: the ships (traffic, pads, the hangar's loop, the
       // starships), the life director's balloons and carts, the trams, the people and the animals — their motion is not
       // this branch's, and when they come by differs from one run to the next (run 2's night: a ship before, none after)
-      await A.ev(() => { const g = VR.game; g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = function () {}; } } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') { g.__frozen.push([V, k, V[k]]); V[k] = function () {}; } });
+      // (the entities' land life keeps its effects — the falls' mist, the fish, the lighthouse: the final run's falls showed no
+      // column because freezing the entities froze landlife.js's effects with the mobs)
+      await A.ev(() => { const g = VR.game; g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = k === 'entities' ? function (dt) { const L = this.land; if (L && L.effects && g.particles && g.settings.preset !== 'potato') L.effects(dt, g.settings.preset); } : function () {}; } } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') { g.__frozen.push([V, k, V[k]]); V[k] = function () {}; } });
       const st = await A.settle(120, 20, 240000, 480000); await A.step(150);   // (5 s: what the actors left in the air — a ship's vapour — fades; the steady air stays)
       await A.warmVx();
       Object.assign(out, { x: +v.x.toFixed(2), feet: +(eyeY - EYE).toFixed(2), z: +v.z.toFixed(2), yaw: +yaw.toFixed(3), pitch: +pitch.toFixed(3), tod, settle: st });
