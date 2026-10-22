@@ -243,12 +243,13 @@ async function runPreset(preset, base) {
           const s0 = await st(P);
           if (y >= 400) await waitTex(P, 90000);
           await P.settle(120);
-          const tags = hi ? [['chase', 1, 0.1], ['cockpit', 0, -0.06]] : [['cockpit', 0, -0.06]];
+          // (Very Low: the chase view — its cockpit view looks at the stand-in cockpit's front wall, as it does on the ground)
+          const tags = hi ? [['chase', 1, 0.1], ['cockpit', 0, -0.06]] : [['chase', 1, 0.1]];
           const row = Rr.climb[y] = { regime: s0.regime, y: s0.y };
           for (const [nm, v, hp] of tags) {
             await view(P, v, hp); await P.step(3);
             await P.ev(() => { window.__Fc = window.__F; });
-            const path = SHOTS + `ascent_${String(y).padStart(4, '0')}${nm === 'chase' || !hi ? '' : '_cockpit'}_${tag}.png`;
+            const path = SHOTS + `ascent_${String(y).padStart(4, '0')}${nm === 'chase' ? '' : '_cockpit'}_${tag}.png`;
             const m = await picture(P, '__Fc', path, K);
             const sp = m.err ? { sd: 0, mean: 0 } : await spread(path);
             row[nm] = { draws: m.draws, err: m.err, pic: sp };
@@ -299,7 +300,7 @@ async function runPreset(preset, base) {
       for (const [nm, tk] of [['day', 5200], ['night', 20500]]) {
         try {
           await P.ev((tk) => { const g = VR.game; g.env.day = 2; g.env.setTime(tk); VR.SpaceFlight.debug.orbit(g, 0, 40, 3063); }, tk);
-          await view(P, 1, 0.12);
+          await view(P, 1, 0.45);
           await waitTex(P, 60000); await P.step(10);
           const s3 = await st(P);
           await P.ev(() => { window.__Fo = window.__F; });
