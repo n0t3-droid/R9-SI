@@ -2,11 +2,11 @@
 // One page of this build (seed 53, a new default world, High as a player gets it, the dynamic resolution held off, the
 // view distance 8), each shot framed in the page from where the animals are (wildlife.js report()), then pictured twice
 // with the same camera: the five switches on (test/shots/wild_<shot>_on.png) and off — the v0.48 look (…_off.png):
-//   murm     the murmuration at dusk over the lake (the camera ~80 from the cloud, the lake and the isles behind)
+//   murm     the murmuration at the golden hour over the lake, from the shore 150-190 from the cloud; murm_close: 70 from it
 //   heron    a heron in a lily pond's shallows (and carp, dragonflies); heron_fly: the eye within 7 — it takes off
 //   shoal    the shoal under the pier, from the pier's end, the sun high
 //   bfly     a butterfly swarm on a flower drift; bfly_rise: walking through it, the near ones rise
-//   rays     the Himmelsrochen between the isles, from over the lake (afternoon); rays_dusk: their lines glowing
+//   rays     the Himmelsrochen under and between the isles, from the beach (afternoon); rays_dusk: their lines and trails
 //   lake     the release's lake view (wow48_lake: the beach, the isles; gulls, rays where they are)
 //   deer     the deer's line at dawn crossing the meadow from a wood's edge
 // → test/shots/wild_sheet.jpg (off | on per shot) and test/shots/wild.json (per shot: the camera, what the report saw).
@@ -24,11 +24,13 @@ import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import { createRequire } from 'module';
 import fs from 'fs';
 const require = createRequire(import.meta.url);
+// (every path from this checkout: the test runs from test/ or from .tmp_tests/ — one level under the root either way)
+const ROOT = new URL('../', import.meta.url).pathname;
 const SEED = process.env.SEED || '53', N = +(process.env.N || 12), ROUNDS = +(process.env.ROUNDS || 5);
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
-const DIST = process.env.DIST || 'file:///home/dev/vr/dist/index.html';
-const BEFORE = process.env.BEFORE_DIST || 'file:///home/dev/vr/.tmp_tests/before_dist/index.html';
-const SHOTS = '/home/dev/vr/test/shots/';
+const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
+const BEFORE = process.env.BEFORE_DIST || 'file://' + ROOT + '.tmp_tests/before_dist/index.html';
+const SHOTS = ROOT + 'test/shots/';
 const EYE = 1.62, RD = 8;
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
@@ -38,7 +40,7 @@ const want = (n) => !ONLY || ONLY.includes(n);
 // ---------------------------------------------------------------- the places (node: the shared code, the same seed)
 const PL = {};
 {
-  const V = require('/home/dev/vr/test/load_shared.js');
+  const V = require(ROOT + 'test/load_shared.js');
   const g = V.makeGen('overworld', +SEED, { vgen: 11 }), L = V.Land, P = L.plan(g), SEA = V.C.SEA;
   const ponds = P.pieces.filter(p => p.kind === 'pond').sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
   const pier = P.pieces.find(p => p.kind === 'pier');
@@ -46,8 +48,8 @@ const PL = {};
   PL.pasture = P.pieces.find(p => p.kind === 'pasture' && p.farm === 'farm_c');
   // the deer: an anchor whose line (the game's own W.deerPath over the generated blocks) leads 18 blocks and more into
   // the open, the nearest to the origin
-  require('/home/dev/vr/src/main/wildsim.js'); global.window = global.window || {}; global.performance = global.performance || { now: () => Date.now() };
-  require('/home/dev/vr/src/main/wildgpu.js'); require('/home/dev/vr/src/main/wildlife.js');
+  require(ROOT + 'src/main/wildsim.js'); global.window = global.window || {}; global.performance = global.performance || { now: () => Date.now() };
+  require(ROOT + 'src/main/wildgpu.js'); require(ROOT + 'src/main/wildlife.js');
   const CH = new Map(), blk = (x, y, z) => { y = Math.floor(y); if (y < 0 || y > 255) return 0; const X = Math.floor(x), Z = Math.floor(z), k = (X >> 4) + ',' + (Z >> 4); let c = CH.get(k); if (!c) { c = g.generate(X >> 4, Z >> 4); CH.set(k, c); } return c.blocks[(y << 8) | ((Z & 15) << 4) | (X & 15)]; };
   const RT = V.R.T, FL = V.F;
   const top = (x, z) => { for (let y = 200; y > 30; y--) { const b = blk(x, y, z); if (b && (RT.flags[b] & (FL.SOLID | FL.LEAVES | FL.FLUID)) && !(RT.flags[b] & FL.REPLACE)) return y; } return 0; };
@@ -109,10 +111,12 @@ async function openWorld(dist, preset) {
     return false;
   };
   const wild = (on) => ev((on) => { const g = VR.game, W = VR.Wild; for (const k of W.KEYS) g.settings[k] = on; }, on);
+  // how many blocks stand in the line from a to b (every half block; air, water and the water's plants see through)
+  const blocked = (a, b) => ev(([a, b]) => { const w = VR.game.world, F = VR.F, T = VR.R.T; let n = 0, last = ''; const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]); for (let t = 0.5; t < L - 1.2; t += 0.5) { const x = Math.floor(a[0] + (b[0] - a[0]) * t / L), y = Math.floor(a[1] + (b[1] - a[1]) * t / L), z = Math.floor(a[2] + (b[2] - a[2]) * t / L), k = x + ',' + y + ',' + z; if (k === last) continue; last = k; const s = w.getBlock(x, y, z); if (s && !(T.flags[s] & (F.FLUID | F.WATERLOG))) n++; } return n; }, [a, b]);
   const report = () => ev(() => (VR.game.wild ? VR.game.wild.report() : null));
   // the actors that come and go (ships, the director's acts, trams, the hall's craft) hold still through a pair
   const freeze = (on) => ev((on) => { const g = VR.game; if (on) { g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = function () {}; } } } else { for (const [o, k, f] of g.__frozen || []) o[k] = f; g.__frozen = null; } }, on);
-  return { ctx, page, logs, ev, wait, step, settle, groundY, look, picture, wild, report, freeze, ok };
+  return { ctx, page, logs, ev, wait, step, settle, groundY, look, picture, wild, report, freeze, blocked, ok };
 }
 const load = async (path) => { const { data, info } = await sharp(path).removeAlpha().raw().toBuffer({ resolveWithObject: true }); return { d: data, w: info.width, h: info.height }; };
 const diff = (A, B) => { let s = 0, big = 0; const n = A.w * A.h; for (let i = 0, p = 0; i < n; i++, p += 3) { const d = Math.abs(A.d[p] - B.d[p]) + Math.abs(A.d[p + 1] - B.d[p + 1]) + Math.abs(A.d[p + 2] - B.d[p + 2]); s += d; if (d > 24) big++; } return { mean: +(s / n / 3).toFixed(3), share: +(big / n).toFixed(4) }; };
@@ -155,17 +159,24 @@ async function shot(name, setup, extra) {
 // travel: fly there, the chunks settled
 const go = async (x, y, z, tod) => { await A.ev(([x, y, z, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); if (tod !== null) g.env.setTime(tod); }, [x, y, z, tod === undefined ? null : tod]); await A.settle(150, 8); };
 
-// 1 the murmuration at dusk over the lake: from the beach, it comes in and swirls; the camera 80 from the cloud
+// 1 the murmuration at the golden hour over the lake: from the shore (the beach west of the lake), 150-190 blocks from the
+// cloud — the whole of it against the evening sky, the lake and the isles behind; then 70 from it (murm_close: the birds)
 await shot('murm', async (out) => {
-  const L = PL.lake;
   await go(235, 75, 35, 11600);
   await A.step(900);   // (30 s: the flock comes in from afar and swirls round its stage)
   let r = await A.report();
   if (!r || !r.murm) { out.error = 'no murmuration'; return null; }
-  const c = r.murm.ctr, bx = 235 - c[0], bz = 35 - c[2], bl = Math.hypot(bx, bz) || 1;
-  const ex = c[0] + bx / bl * 80, ez = c[2] + bz / bl * 80, gy = await A.groundY(ex, ez);
+  const c = r.murm.ctr, bx = 205 - c[0], bz = 10 - c[2], bl = Math.hypot(bx, bz) || 1, dd = Math.min(bl, 170);
+  const ex = c[0] + bx / bl * dd, ez = c[2] + bz / bl * dd, gy = await A.groundY(ex, ez);
   out.murm = r.murm;
-  return { x: ex, y: Math.max(gy + 1 + EYE + 2, PL.sea + 4), z: ez, tx: c[0], ty: c[1], tz: c[2], fov: 70 };
+  return { x: ex, y: Math.max(gy + 1 + EYE + 1, PL.sea + 3), z: ez, tx: c[0], ty: c[1] + 4, tz: c[2], fov: 70 };
+}, async (out) => {
+  const r = await A.report(); if (!r || !r.murm) return;
+  const c = r.murm.ctr, cam = out.cam, bx = cam.x - c[0], bz = cam.z - c[2], bl = Math.hypot(bx, bz) || 1;
+  const ex = c[0] + bx / bl * 70, ez = c[2] + bz / bl * 70, gy = await A.groundY(ex, ez), ey = Math.max(gy + 1 + EYE + 1, PL.sea + 3);
+  out.murmClose = { cam: [+ex.toFixed(1), +ey.toFixed(1), +ez.toFixed(1)], ctr: c, spread: r.murm.spread };
+  await A.look(ex, ey, ez, c[0], c[1], c[2], 70, null); await A.step(2);
+  await A.picture(`${SHOTS}wild_murm_close_on.png`, 4);
 });
 // 2 the heron at the nearest lily pond (and carp, dragonflies), morning; then within 7 — it takes off
 await shot('heron', async (out) => {
@@ -176,10 +187,17 @@ await shot('heron', async (out) => {
   const h = r && r.herons && r.herons[0];
   if (!h) { out.error = 'no heron: ' + JSON.stringify(r && { herons: r.herons, cap: r.cap.heron }); return null; }
   out.heron = h;
-  const ax = h.pos[0] - (P0.x + 0.5), az = h.pos[2] - (P0.z + 0.5), al = Math.hypot(ax, az) || 1;
-  // from the side, 13 out: the bird, the pond behind it
-  const sx = -az / al, sz = ax / al, ex = h.pos[0] + sx * 11 + ax / al * 5, ez = h.pos[2] + sz * 11 + az / al * 5, gy = await A.groundY(ex, ez);
-  return { x: ex, y: gy + 1 + EYE, z: ez, tx: h.pos[0], ty: h.pos[1] + 0.9, tz: h.pos[2], fov: 62 };
+  // the clearest view of it from 9-13 blocks (sixteen places round it; the fewest blocks — reeds, bamboo, a bank —
+  // between the eye and the bird; over the pond's water first)
+  let best = null;
+  for (const dd of [10, 12.5, 9]) for (let k = 0; k < 16; k++) {
+    const a = k / 16 * Math.PI * 2, ex = h.pos[0] + Math.cos(a) * dd, ez = h.pos[2] + Math.sin(a) * dd, gy = await A.groundY(ex, ez), ey = Math.max(gy + 1 + EYE + 0.4, h.pos[1] + 1.8);
+    const n = await A.blocked([ex, ey, ez], [h.pos[0], h.pos[1] + 1.0, h.pos[2]]), score = n * 10 + Math.abs(ey - (h.pos[1] + 2.4));
+    if (!best || score < best.score) best = { score, n, ex, ey, ez };
+    if (best.n === 0 && best.score < 2) break;
+  }
+  out.heronView = { blocked: best.n, at: [+best.ex.toFixed(1), +best.ey.toFixed(1), +best.ez.toFixed(1)] };
+  return { x: best.ex, y: best.ey, z: best.ez, tx: h.pos[0], ty: h.pos[1] + 0.9, tz: h.pos[2], fov: 58 };
 }, async (out) => {
   // within 7: it takes off — the camera stays, the eye (the player) steps in; 2.4 s later, mid-air
   const h = out.heron, cam = out.cam;
@@ -224,18 +242,23 @@ await shot('bfly', async (out) => {
   await A.picture(`${SHOTS}wild_bfly_rise_on.png`, 3);
 });
 // 5 the rays between the isles: from over the lake, the nearest ray framed (afternoon), then their lines at dusk
+// (from the beach where the release's lake view stands: the isles over the lake, the rays gliding under and between them;
+// the nearest pair framed when it comes within 80-170 — the game runs on until one does)
 const rayShot = (name, tod) => shot(name, async (out) => {
-  const L = PL.lake, ex = L.x - 20, ez = L.z - 60;
-  await go(ex, PL.sea + 30, ez, tod);
-  await A.step(60);
-  let r = await A.report();
+  const ex = 201.5, ez = 6.5;
+  await go(ex, 70, ez, tod);
+  const ey = (await A.groundY(ex, ez)) + 1 + EYE;
+  let r = null, best = null;
+  for (let k = 0; k < 24 && !best; k++) {
+    await A.step(60);
+    r = await A.report();
+    if (!r || !r.rays || !r.rays.length) continue;
+    let bd = 1e9; for (let i = 0; i < r.rays.length; i += 2) { const R = r.rays[i], d = Math.hypot(R[0] - ex, R[2] - ez); if (d > 80 && d < 170 && d < bd) { bd = d; best = R; } }
+  }
   if (!r || !r.rays || !r.rays.length) { out.error = 'no rays'; return null; }
-  // the ray nearest the eye that is 50–160 away
-  let best = null, bd = 1e9; for (const R of r.rays) { const d = Math.hypot(R[0] - ex, R[2] - ez); if (d > 40 && d < 170 && d < bd) { bd = d; best = R; } }
   if (!best) best = r.rays[0];
-  out.ray = best;
-  const ey = PL.sea + 8;
-  return { x: ex, y: ey, z: ez, tx: best[0], ty: best[1] + 6, tz: best[2], fov: 66 };
+  out.ray = best; out.rays = r.rays;
+  return { x: ex, y: ey, z: ez, tx: best[0], ty: best[1] + 2, tz: best[2], fov: 62 };
 });
 await rayShot('rays', 9800);
 await rayShot('rays_dusk', 13300);
@@ -268,7 +291,7 @@ await shot('deer', async (out) => {
 try {
   const rows = [];
   for (const s of rec.shots) if (!s.error && fs.existsSync(`${SHOTS}wild_${s.name}_on.png`)) rows.push([s.name, `${SHOTS}wild_${s.name}_off.png`, `${SHOTS}wild_${s.name}_on.png`]);
-  for (const [n, p] of [['heron_fly', 'wild_heron_fly_on.png'], ['bfly_rise', 'wild_bfly_rise_on.png']]) if (fs.existsSync(SHOTS + p)) rows.push([n, null, SHOTS + p]);
+  for (const [n, p] of [['murm_close', 'wild_murm_close_on.png'], ['heron_fly', 'wild_heron_fly_on.png'], ['bfly_rise', 'wild_bfly_rise_on.png']]) if (fs.existsSync(SHOTS + p)) rows.push([n, null, SHOTS + p]);
   const Wc = 640, Hc = 360, comps = [];
   for (let i = 0; i < rows.length; i++) {
     const [n, off, on] = rows[i];
