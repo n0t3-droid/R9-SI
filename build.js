@@ -25,6 +25,7 @@ MAIN.splice(MAIN.indexOf('game'), 0, 'newlife');   // u-home: VR.NewLife (src/ma
 MAIN.splice(MAIN.indexOf('lifedirector'), 0, 'eventlog');   // e-log: VR.EventLog (src/main/eventlog.js), the never-boring measure
 SHARED.push('bodytex'); MAIN.push('space_shaders', 'spacescene');   // u-space0: the bodies' textures (main and workers), the space scene (after game.js: it wraps two of its methods)
 MAIN.splice(MAIN.indexOf('photomode') + 1, 0, 'funke');   // e-funke: VR.Funke (src/main/funke.js), the companion drone
+MAIN.push('quests');   // a-quests: VR.Quests (src/main/quests.js) — after adventure.js and photomode.js, whose parts it wraps (shop.js is listed already)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

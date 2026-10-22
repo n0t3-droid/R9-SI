@@ -569,6 +569,21 @@
 #meins .advtile:hover, #meins .advtile:focus-visible { border-color: #ffd166; box-shadow: 0 0 0 3px rgba(255, 209, 102, .35), 0 10px 30px rgba(0, 0, 0, .4); outline: none; }
 #pause .advbtn.on { border-color: rgba(255, 209, 102, .7); box-shadow: 0 0 0 1px rgba(255, 209, 102, .3), 0 0 16px rgba(255, 190, 80, .25); }
 @media (max-width: 700px) { #advhud { left: 8px; top: 8px; } #advhud .ring { width: 48px; height: 48px; } .advsum { grid-template-columns: 80px 1fr; } .advsum .bigring { width: 80px; height: 80px; } }
+/* a-quests: the create form on a 720-px screen (a-core's open item) — name and seed side by side, tighter rows, the
+   action row sticky at the bottom: „Welt erstellen" is in view without scrolling */
+@media (max-height: 820px) {
+  #create .panel.box { display: grid; grid-template-columns: 1fr 1fr; column-gap: 14px; padding-top: 16px; padding-bottom: 14px; }
+  #create .panel.box > * { grid-column: 1 / -1; }
+  #create .panel.box > .field:has(#cw_name) { grid-column: 1; grid-row: 2; }
+  #create .panel.box > .field:has(#cw_seed) { grid-column: 2; grid-row: 2; }
+  #create .panel.box h2 { margin-bottom: 4px; }
+  #create .field { margin: 5px 0; gap: 4px; }
+  #create .seg button { min-height: 40px; padding-top: 5px; padding-bottom: 5px; }
+  #create .advwaynote { margin-top: 1px; font-size: 13px; }
+  #create .hr { margin: 6px 0; }
+  #create label.note { min-height: 34px; }
+}
+@media (max-height: 680px) { #create .panel.box > .row.gap:last-child { position: sticky; bottom: -14px; z-index: 2; padding: 8px 0 6px; background: linear-gradient(180deg, rgba(12, 17, 34, 0), rgba(12, 17, 34, .96) 35%); } }   /* (where it would scroll: the row stays in view) */
 @media (prefers-reduced-motion: reduce) { #advup .rays, #advup .sparks { display: none; } #advup.on, #advup.off, #advhud.up .ring, #advhud.pop, #advhud .fl { animation-duration: .01s; } #advhud .ring .arc { transition: none; } }
 `;
 })(VR);
