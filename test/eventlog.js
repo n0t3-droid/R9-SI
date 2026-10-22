@@ -94,6 +94,15 @@ L.bind(g); L.reset(world);
   const f = iv([0.5, 81.62, -9.5], 1).frac, ty = Math.tan(FOV / 2), tx = ty * 16 / 9, want = Math.PI * (1 / (10 * ty)) * (1 / (10 * tx)) / 4;
   check(near(f, want, 2e-4), `a 1-m sphere 10 m ahead covers ${(f * 100).toFixed(2)} % of the screen (π·rx·ry/4: ${(want * 100).toFixed(2)} %)`);
   check(iv([0.5, 82, 0.5], 5).frac === 1, 'the eye inside the sphere: the whole screen');
+  // a big thing the eye stands at (inside its sphere: a Baustelle's box is 40 m and more): in view when it lies ahead —
+  // its own walls between the eye and its centre do not hide it (the session's house stood unseen before this)
+  setShapes([[10, -40, 40, -10, 92, 0]]);   // a 30 × 30 m house, its walls from x 10; the eye at x 0.5
+  look(0.5, 81.62, -25, -Math.PI / 2, 0);   // looking east (+x), at it
+  check(iv([25, 85, -25], 26).inView && iv([25, 85, -25], 26).frac === 1, 'standing at a big site (inside its sphere), looking at it: in view, though its own walls stand between the eye and its centre');
+  look(0.5, 81.62, -25, Math.PI / 2, 0);    // looking west, away from it
+  check(!iv([25, 85, -25], 26).inView, '…looking away from it: not');
+  check(!iv([60, 85, -25], 15).inView, '…and a thing behind the house, seen from outside its sphere, stays hidden by it');
+  setShapes([]); look(0.5, 81.62, 0.5, 0, 0);
   const w = L.emit('wow', 'citadel', 3, null, 'wow'), c = L.emit('discovery', 'deer', 2, null, 'codex');
   check(w.inView && w.frac === 1 && c.inView && c.frac === 0, 'pos null: on the screen by itself (a wow moment takes the whole view, a toast none of it)');
   const r = L.emit('ambient', 'cat', 2, [0.5, 81, -10], 'test', 0.6);

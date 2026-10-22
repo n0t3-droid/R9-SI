@@ -10,8 +10,8 @@
 //   discovery · encounter · story · social · sky · space · travel · build · milestone. w: 1 ambient · 2 noticeable ·
 //   3 remarkable · 4 major · 5 peak (A§10). inView: inside the camera's frustum and a clear line over the height map
 //   (the columns' sun-blocking runs, world.js shadowCol — the arrays renderer.updateHmap uploads): a hill or a roof
-//   hides, a canopy's shade does not. frac: the share of the screen it covers. pos null: on the screen by itself (a
-//   wow moment takes the camera: frac 1; a toast: frac 0).
+//   hides, a canopy's shade does not; the eye inside the thing's sphere sees it when it lies ahead). frac: the share of
+//   the screen it covers. pos null: on the screen by itself (a wow moment takes the camera: frac 1; a toast: frac 0).
 //   The sample: movers — moving actors in view (villagers, animals, the sky traffic, the pads' craft, trams, the life
 //   director's acts), counted to 9, mv per class (v a s c t l); landmark — the id of the most prominent known landmark
 //   in view within 3 km (the Heartland's, and any a test or the game adds to EventLog.landmarks); sky — a sky act in
@@ -94,11 +94,16 @@
     const ry = rad / (d * B.ty), rx = rad / (d * B.tx);
     return Math.min(1, Math.PI * rx * ry / 4);
   }
+  // in view: the eye at the thing (inside its sphere — a Baustelle's box is 40 m and more) sees it when it lies ahead (its
+  // own walls between the eye and its centre do not hide it); from outside, the frustum and the line to its sphere's
+  // surface (it stops there: the thing itself never hides itself)
   const VIS = { inView: false, frac: 0 };
   function see(g, x, y, z, rad) {
     const B = basis(g); VIS.inView = false; VIS.frac = 0;
     if (!B.ok) return VIS;
-    if (!inFrustum(B, x, y, z, rad) || !clear(g, B.ex, B.ey, B.ez, x, y, z, Math.max(1.5, rad * 0.5))) return VIS;
+    const dx = x - B.ex, dy = y - B.ey, dz = z - B.ez, d = Math.hypot(dx, dy, dz);
+    if (d <= rad) { if (d < 1.5 || dx * B.fx + dy * B.fy + dz * B.fz > 0) { VIS.inView = true; VIS.frac = 1; } return VIS; }
+    if (!inFrustum(B, x, y, z, rad) || !clear(g, B.ex, B.ey, B.ez, x, y, z, Math.max(1.5, rad))) return VIS;
     VIS.inView = true; VIS.frac = fracOf(B, x, y, z, rad);
     return VIS;
   }

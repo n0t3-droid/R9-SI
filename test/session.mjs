@@ -247,17 +247,23 @@ const evName = (e) => SUB_DE[e.sub] || (e.kind === 'discovery' ? 'Entdeckt ' + e
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
-// the twelve frames: one per slot of dur / 12, at the slot's heaviest event in view (a second after it began) or its middle
+// the time a session was played: a session its real-time budget cut short ends there, not at DUR
+const playedT = (rec) => Math.min(rec.dur, rec.played > 0 ? rec.played : rec.dur);
+// a frame: the events of its slot [a, b), the sample nearest its time, the part it falls in
+function frameAt(rec, i, t, a, b) {
+  const events = rec.events.filter(e => e.t >= a && e.t < b);
+  const sample = rec.samples.reduce((m, q) => (!m || Math.abs(q.t - t) < Math.abs(m.t - t) ? q : m), null);
+  const part = (rec.parts.filter(p => !p.skipped && p.t0 <= t).slice(-1)[0] || {}).de || '';
+  return { i, t, a, b, events, sample, part };
+}
+// the twelve frames: one per slot of the played time / 12, at the slot's heaviest event in view (a second after it
+// began) or its middle
 function chooseFrames(rec) {
-  const dur = rec.dur, out = [];
+  const T1 = playedT(rec), out = [];
   for (let k = 0; k < SLOTS; k++) {
-    const a = k * dur / SLOTS, b = (k + 1) * dur / SLOTS;
-    const inSlot = rec.events.filter(e => e.t >= a && e.t < b);
-    const best = inSlot.filter(e => e.inView).sort((p, q) => q.w - p.w || p.t - q.t)[0];
-    const t = best ? Math.min(b - 0.25, best.t + 1) : (a + b) / 2;
-    const s = rec.samples.reduce((m, q) => (!m || Math.abs(q.t - t) < Math.abs(m.t - t) ? q : m), null);
-    const part = (rec.parts.filter(p => !p.skipped && p.t0 <= t).slice(-1)[0] || {}).de || '';
-    out.push({ i: k + 1, t, a, b, events: inSlot, sample: s, part });
+    const a = k * T1 / SLOTS, b = (k + 1) * T1 / SLOTS;
+    const best = rec.events.filter(e => e.t >= a && e.t < b && e.inView).sort((p, q) => q.w - p.w || p.t - q.t)[0];
+    out.push(frameAt(rec, k + 1, best ? Math.min(b - 0.25, best.t + 1) : (a + b) / 2, a, b));
   }
   return out;
 }
@@ -274,32 +280,32 @@ async function buildSheet(rec, frames, out) {
   const G = 8, LH = 44, COLS = 4, ROWS = 3, HEAD = 78, TL = 150;
   const SW = COLS * PW + (COLS + 1) * G, SH = HEAD + ROWS * (PH + LH + G) + G + TL;
   const comps = [];
-  const m = rec.metrics, v = rec.verdict, gl = m.gaps.longest;
+  const m = rec.metrics, v = rec.verdict, gl = m.gaps.longest, T1 = playedT(rec), cutShort = T1 < rec.dur - 1;
   let svg = `<svg width="${SW}" height="${SH}" xmlns="http://www.w3.org/2000/svg"><style>text{font-family:'DejaVu Sans',sans-serif}</style>`;
   const T = (x, y, s, size, fill, weight) => { svg += `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}"${weight ? ` font-weight="${weight}"` : ''}>${esc(s)}</text>`; };
-  T(G, 26, `Sitzung · ${TYPE_DE[rec.type] || rec.type} (${rec.type}) — Saat ${rec.seed} · Ausgewogen ${VW}×${VH} · ${mmss(rec.dur)} Spielzeit · ${clock(rec.tod0)} → ${clock(rec.tod1)} Uhr · Tag ${rec.day} · ${rec.build || ''}`, 18, '#f0f0f5', 600);
+  T(G, 26, `Sitzung · ${TYPE_DE[rec.type] || rec.type} (${rec.type}) — Saat ${rec.seed} · Ausgewogen ${VW}×${VH} · ${mmss(T1)} Spielzeit${cutShort ? ` von ${mmss(rec.dur)} (Zeitbudget)` : ''} · ${clock(rec.tod0)} → ${clock(rec.tod1)} Uhr · Tag ${rec.day} · ${rec.build || ''}`, 18, '#f0f0f5', 600);
   const mt = `Ereignisse ≥ 2 im Blick ${m.weighted.perMin.toFixed(2)}/min · längste Lücke ${Math.round(gl.d)} s (${mmss(gl.a)}–${mmss(gl.b)}) · p90 ${Math.round(m.gaps.p90)} s · Beweger ${m.movers.toFixed(2)} · Wahrzeichen/Himmel ${m.lmSky.toFixed(2)} · Vielfalt ${m.variety.n} · Spam ${m.spam.n} · freihändig ${m.handsFree.toFixed(2)}`;
   T(G, 50, mt, 14, '#c9cbd6');
   T(G, 70, `Ziele (${v.base}) erreicht: ${v.met} / ${v.total} — ${v.rows.filter(r => !r.ok).map(r => r.key).join(', ') || 'alle'}`, 14, v.met === v.total ? '#7ce39a' : '#ff9a8a', 600);
   frames.forEach((f, i) => {
     const cx = G + (i % COLS) * (PW + G), cy = HEAD + Math.floor(i / COLS) * (PH + LH + G) + G;
     if (f.file && fs.existsSync(f.file)) comps.push({ file: f.file, left: cx, top: cy });
-    else { svg += `<rect x="${cx}" y="${cy}" width="${PW}" height="${PH}" fill="#1a1b24"/>`; T(cx + 12, cy + 24, 'kein Bild', 14, '#888'); }
+    else { svg += `<rect x="${cx}" y="${cy}" width="${PW}" height="${PH}" fill="#1a1b24"/>`; T(cx + 12, cy + 24, f.gone ? 'nicht gespielt' : 'kein Bild', 14, '#888'); }
     const [l1, l2] = f.labels;
     svg += `<rect x="${cx}" y="${cy + PH}" width="${PW}" height="${LH}" fill="#14151d"/>`;
     T(cx + 6, cy + PH + 17, l1, 13, '#eef0f6', 600); T(cx + 6, cy + PH + 36, l2, 11.5, '#aab0c0');
     if (f.t >= gl.a && f.t <= gl.b && gl.d >= 30) { svg += `<rect x="${cx + PW - 128}" y="${cy + 6}" width="122" height="22" rx="4" fill="#c0392b" opacity="0.9"/>`; T(cx + PW - 122, cy + 22, `LÜCKE ${Math.round(gl.d)} s`, 13, '#fff', 700); }
   });
   // the timeline: inputs, movers, landmark/sky, the events (weighted in view green, the rest grey), the gaps ≥ 45 s red
-  const y0 = SH - TL + 6, x0 = 70, x1 = SW - 16, X = (t) => x0 + (x1 - x0) * Math.max(0, Math.min(1, t / rec.dur));
+  const y0 = SH - TL + 6, x0 = 70, x1 = SW - 16, X = (t) => x0 + (x1 - x0) * Math.max(0, Math.min(1, t / T1));
   T(G, y0 + 8, 'Eingabe', 11, '#aab0c0'); T(G, y0 + 24, 'Beweger', 11, '#aab0c0'); T(G, y0 + 40, 'Wahrz./Himmel', 10, '#aab0c0'); T(G, y0 + 72, 'Ereignisse', 11, '#aab0c0');
   const IC = { micro: '#8a8f9c', build: '#ffb347', idle: '#5fd38d', intent: '#4fc3ff' };
   for (const s of rec.samples) { const xa = X(s.t - 1), xb = X(s.t); svg += `<rect x="${xa.toFixed(1)}" y="${y0}" width="${Math.max(0.6, xb - xa).toFixed(1)}" height="10" fill="${IC[s.input] || '#555'}"/>`; if (s.movers) svg += `<rect x="${xa.toFixed(1)}" y="${y0 + 16}" width="${Math.max(0.6, xb - xa).toFixed(1)}" height="8" fill="#c8a2ff"/>`; if (s.landmark || s.sky) svg += `<rect x="${xa.toFixed(1)}" y="${y0 + 32}" width="${Math.max(0.6, xb - xa).toFixed(1)}" height="8" fill="#ffd36e"/>`; }
   for (const gp of m.gaps.list) if (gp.d >= 45) { svg += `<rect x="${X(gp.a).toFixed(1)}" y="${y0 + 48}" width="${(X(gp.b) - X(gp.a)).toFixed(1)}" height="40" fill="#e74c3c" opacity="0.22"/>`; T(X(gp.a) + 3, y0 + 86, `${Math.round(gp.d)} s`, 11, '#ff8f80', 700); }
   svg += `<line x1="${x0}" y1="${y0 + 80}" x2="${x1}" y2="${y0 + 80}" stroke="#555a66" stroke-width="1"/>`;
   for (const e of rec.events) { const wt = e.w >= 2 && e.inView, h = wt ? 6 + 6 * e.w : 6; svg += `<line x1="${X(e.t).toFixed(1)}" y1="${y0 + 80}" x2="${X(e.t).toFixed(1)}" y2="${(y0 + 80 - h).toFixed(1)}" stroke="${wt ? '#5fe08a' : '#6b7080'}" stroke-width="${wt ? 2 : 1}"/>`; }
-  for (const f of frames) { svg += `<circle cx="${X(f.t).toFixed(1)}" cy="${y0 + 98}" r="7" fill="#2b2f3d"/>`; T(X(f.t) - (f.i >= 10 ? 7 : 3.5), y0 + 102, String(f.i), 10, '#eef0f6'); }
-  for (let t = 0; t <= rec.dur; t += 30) T(X(t) - 10, y0 + 118, mmss(t), 10, '#7d8292');
+  for (const f of frames) { if (f.gone) continue; svg += `<circle cx="${X(f.t).toFixed(1)}" cy="${y0 + 98}" r="7" fill="#2b2f3d"/>`; T(X(f.t) - (f.i >= 10 ? 7 : 3.5), y0 + 102, String(f.i), 10, '#eef0f6'); }
+  for (let t = 0; t <= T1; t += 30) T(X(t) - 10, y0 + 118, mmss(t), 10, '#7d8292');
   T(x0, y0 + 136, 'grün: Gewicht ≥ 2 im Blick · grau: Gewicht 1 / außer Sicht · rot: Lücke ≥ 45 s · Eingabe: grau Tasten, orange Bauen, grün Zuschauen', 10, '#7d8292');
   svg += '</svg>';
   const parts = [];
@@ -309,11 +315,16 @@ async function buildSheet(rec, frames, out) {
   return { w: SW, h: SH };
 }
 // a session's record → the metrics, the verdict, the gaps described, the frames chosen
-function analyze(rec) {
-  rec.metrics = SS.analyze({ events: rec.events, samples: rec.samples, t0: 0, t1: rec.dur, exclude: rec.exclude || [] });
+// (keep: the frames already pictured — SHEET_ONLY — keep their times and pictures; a frame without its slot written down
+// had the slot of dur / 12 (the first runs), and one that falls after the played time is marked as not played)
+function analyze(rec, keep) {
+  const T1 = playedT(rec);
+  rec.metrics = SS.analyze({ events: rec.events, samples: rec.samples, t0: 0, t1: T1, exclude: rec.exclude || [] });
   rec.verdict = SS.verdict(rec.metrics, rec.type);
   rec.gaps = rec.metrics.gaps.list.slice().sort((a, b) => b.d - a.d).slice(0, 3).map(g => SS.describeGap(g, rec.samples, rec.events));
-  rec.frames = chooseFrames(rec).map(f => ({ i: f.i, t: +f.t.toFixed(2), labels: frameLabels(f, rec) }));
+  const old = keep && rec.frames && rec.frames.length ? rec.frames : null;
+  const fr = old ? old.map((f, k) => { const a = f.a !== undefined ? f.a : k * rec.dur / SLOTS, b = Math.min(T1, f.b !== undefined ? f.b : (k + 1) * rec.dur / SLOTS); return Object.assign(frameAt(rec, f.i, f.t, a, b), { file: f.file, pic: f.pic, gone: a >= T1 - 1e-6 }); }) : chooseFrames(rec);
+  rec.frames = fr.map(f => ({ i: f.i, t: +f.t.toFixed(2), a: +f.a.toFixed(2), b: +f.b.toFixed(2), labels: f.gone ? [`${f.i} · nicht gespielt`, 'das Zeitbudget der Sitzung war vorher aufgebraucht'] : frameLabels(f, rec), file: f.gone ? undefined : f.file, pic: f.gone ? undefined : f.pic, gone: f.gone || undefined }));
   return rec;
 }
 const summary = (rec) => {
@@ -387,9 +398,10 @@ if (DRY) {
 // ============================================================================ SHEET_ONLY: a sheet again from a session's JSON and frames
 if (SHEET_ONLY) {
   const rec = JSON.parse(fs.readFileSync(`${SHOTS}session_${SHEET_ONLY}.json`, 'utf8'));
-  analyze(rec);
-  const frames = rec.frames.map(f => Object.assign({}, f, { file: `${SHOTS}session_${rec.type}_${String(f.i).padStart(2, '0')}.jpg` }));
+  analyze(rec, true);
+  const frames = rec.frames.map(f => Object.assign({}, f, { file: f.gone ? null : `${SHOTS}session_${rec.type}_${String(f.i).padStart(2, '0')}.jpg` }));
   await buildSheet(rec, frames, `${SHOTS}session_${rec.type}_sheet.png`);
+  fs.writeFileSync(`${SHOTS}session_${rec.type}.json`, JSON.stringify(rec, null, 1));   // (the metrics again: a cut-short session's end is its played time)
   console.log('sheet', `${SHOTS}session_${rec.type}_sheet.png`, summary(rec));
   process.exit(0);
 }
