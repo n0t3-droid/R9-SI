@@ -11,6 +11,9 @@
 //       hidden, nothing within 6 m in the frame's upper half — seeds 53, 4242, 31337, 7 (the before: vgen 12, t-first's
 //       pick by score, the vista's own composition)
 //   4 · VR.First.pick: the sight-ok wow vista with the best score; none ok → the best score; no records → none
+//   5 · Heimkehr's facing (VR.Travel.facing): at Herzwelt's spawn of seed 4242 (the Hangar Hall, its craft 2 m behind
+//       the pad) the view leaves the craft and the nearest geometry in the frame's centre third is ≥ 8 m away (the
+//       ground under the feet not counted); a wall 2 m ahead turns the view; a vista's walk faces its view
 //   bash test/wt_run.sh arrival.js 1800        (SEEDS=53,4242,… the arrival's seeds · ONLY=1,2,… some parts)
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -174,6 +177,38 @@ if (on(4)) {
   check(FI.pick([]) === null && FI.pick(null) === null && FI.pick([mk('q', 3, false, { ok: true })]) === null, 'no wow vista: none (the generator\'s spawn)');
   const A = FI.arrivalOf(L1[1]);
   check(A.id === 'v1' && A.fov === 34 && A.yaw === 1.1 && A.pitch === 0.2 && A.look && A.look.yaw === 1 && A.look.pitch === 0.1 && FI.arrivalOf(mk('w', 1, true)).fov === 50, 'the arrival plays the moment from its own camera (the vista\'s composition kept for the eyes after it); without one the composition');
+}
+
+// ================================================================ 5 · Heimkehr faces out
+if (on(5)) {
+  console.log('5 · Heimkehr\'s facing (VR.Travel.facing)');
+  const TR = V.Travel;
+  if (!TR || !TR.facing) check(false, 'VR.Travel.facing exists');
+  else {
+    // Herzwelt's spawn of an old-style world (seed 4242): the Hangar Hall's pad, the hangar's craft (an entity: a box round
+    // its spawn record, a shuttle's 24 × 24 × 11 while its design is built) 14.5 blocks north of it
+    const g = V.makeGen('overworld', 4242, { vgen: 13 }), W = world(g), sp = g.findSpawn(), eye = [sp[0], sp[1] + 1.62, sp[2]];
+    let craft = null; for (let cz = -2; cz <= 1 && !craft; cz++) for (let cx = -2; cx <= 1 && !craft; cx++) for (const s of (g.generate(cx, cz).spawns || [])) if (s[0] === 'starship' && s[6] === 'hangar') craft = [s[2], s[3], s[4]];
+    const boxes = craft ? [[craft[0] - 12, craft[1] - 1, craft[2] - 12, craft[0] + 12, craft[1] + 10, craft[2] + 12]] : [];
+    const get = (x, y, z) => W.blockAt(x, y, z);
+    // (the before: dims.mjs's picture faced yaw 0, north — into the craft)
+    const before = TR.facing(get, eye, boxes, { yaw0: 0, feet: sp[1], want: 1e9, n: 1 });
+    const f = TR.facing(get, eye, boxes, { feet: sp[1] });
+    const toCraft = craft ? Math.atan2(-(craft[0] - eye[0]), -(craft[2] - eye[2])) : 0, off = Math.abs(Math.atan2(Math.sin(f.yaw - toCraft), Math.cos(f.yaw - toCraft))) / DEG;
+    console.log(`     the spawn ${sp.slice(0, 3).join(', ')}, the craft at ${craft ? craft.join(', ') : '—'}: facing north (the before) the frame's middle third meets something at ${before.clear.toFixed(1)} m; the scan faces ${(f.yaw / DEG).toFixed(0)}° (${off.toFixed(0)}° off the craft) with ${f.clear.toFixed(1)} m`);
+    check(!!craft && before.clear < 8, `the before: nose to nose with the hangar's craft (${before.clear.toFixed(1)} m)`);
+    check(f.clear >= 8 && off > 40, `Heimkehr to Herzwelt's spawn faces out: the nearest geometry in the frame's middle third ${f.clear.toFixed(1)} m away (≥ 8), ${off.toFixed(0)}° away from the craft`);
+    const k = TR.facing(get, eye, boxes, { yaw0: sp[3], feet: sp[1] });
+    check(k.kept && Math.abs(k.yaw - sp[3]) < 1e-9 && k.clear >= 8, `the world's own spawn yaw (the generator's ${(sp[3] / DEG).toFixed(0)}°, toward the portal) is kept when it has room (${k.clear.toFixed(1)} m)`);
+    // a wall 2 m ahead (a bed against a wall) turns the view; open land everywhere else
+    const wallGet = (x, y, z) => (y <= 63 ? 1 : (z === -3 && y <= 80 && Math.abs(x) <= 30) ? 1 : 0);
+    const fw = TR.facing(wallGet, [0.5, 65.62, 0.5], [], { yaw0: 0, feet: 64 });
+    check(!fw.kept && fw.clear >= 8 && Math.abs(Math.atan2(Math.sin(fw.yaw), Math.cos(fw.yaw))) > 60 * DEG, `a wall 2 m ahead: the view turns away (${(fw.yaw / DEG).toFixed(0)}°, ${fw.clear.toFixed(1)} m)`);
+    // a new world's home is its vista's walk (t-first): its view is kept (seed 53's arrival)
+    const g53 = V.makeGen('overworld', 53, { vgen: 13 }), P53 = LAND.plan(g53), v = FI.pick(VI.arrivals(g53, P53)), A = FI.arrivalOf(v), feet = FI.feet(v), W53 = world(g53);
+    const fv = TR.facing((x, y, z) => W53.blockAt(x, y, z), [feet[0], feet[1] + 1.62, feet[2]], [], { yaw0: A.yaw, feet: feet[1], keep0: true });
+    check(fv.kept && Math.abs(fv.yaw - A.yaw) < 1e-9, `a vista start's home: its walk's view kept (${v.id} ${v.lm}; the bench and the parapet ${fv.clear.toFixed(1)} m ahead in the lower middle, the landmark beyond)`);
+  }
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
