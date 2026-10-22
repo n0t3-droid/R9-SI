@@ -16,6 +16,7 @@
 //  h · Heimkehr in a moment: the home's 5 × 5 kept over a trip (meshes not freed, out of the renderer's prop list),
 //      adopted on the way home (no generation asked for them, shown at once, spawns replayed), not on a changed look or
 //      another save (freed), a kept column stays clean when its neighbours arrive, the early arrival, the far lane
+//  i · the cost: what NewLife adds to a frame on the CPU (the settle test, the compass line every 0.2 s), in µs
 //   bash test/wt_run.sh newlife.js
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -462,6 +463,26 @@ TR.FADE_IN = 5; TR.FADE_OUT = 5;
     g.teardownWorld();
     check(!NL.keepInfo(g).overworld && g.freed.length > 0, 'the title (no trip): the keep is freed');
     check(V.Settings.byKey('homeKeep') && V.Settings.byKey('homeKeep').def === true, 'the switch: ⚙ Spiel · homeKeep (on)');
+  }
+
+  // ================================================================ i · the cost (Very Low never slower)
+  // NewLife adds no draw, pass or program. What it adds on the CPU: one test in Travel.update every frame (the recall's
+  // settle when a ship waits), the compass line every 0.2 s, one lookup per arriving column. Best of 5 rounds, µs.
+  console.log('i · the cost per frame');
+  {
+    const cpu = (f, n) => { let best = 1e9; for (let r = 0; r < 5; r++) { const c0 = process.cpuUsage(); for (let i = 0; i < n; i++) f(i); const c1 = process.cpuUsage(c0); best = Math.min(best, (c1.user + c1.system) / n); } return best; };
+    const g = mkGame(META()), meta = META({ universe: { v: 1, home: { dim: 'drift', pos: [8.5, 100, 0.5], since: 1 } } });
+    const p = await play(g, meta);
+    p.pos = [0.5, 81, 230.5]; p.yaw = 0.3;
+    g.nl = { settle: [] };
+    const tick = cpu(() => NL.tick(g, 0.016), 200000);
+    let n = 0; const line = cpu(() => { n += NL.compassLine(g).length; }, 20000);
+    const home = META({ universe: { v: 1, home: { dim: 'overworld', pos: [0.5, 81, 4.5] } } }); g.meta = home;
+    const lineHome = cpu(() => { n += NL.compassLine(g).length; }, 20000);
+    g.meta = meta;
+    const perFrame = tick + Math.max(line, lineHome) / 12;   // (the compass: every 0.2 s — one frame in 12 at 60 fps)
+    console.log(`      tick ${tick.toFixed(3)} µs/frame · compass line ${line.toFixed(2)} µs (away) / ${lineHome.toFixed(2)} µs (on the home's world) every 0.2 s · ${perFrame.toFixed(3)} µs a frame in all`);
+    check(tick < 0.5 && line < 60 && lineHome < 60 && perFrame < 6 && n > 0, `what NewLife adds to a frame: ${perFrame.toFixed(3)} µs (a 60-fps frame is 16 667 µs)`);
   }
   console.log(fails ? 'FAILED ' + fails : 'ALL OK');
   process.exit(fails ? 1 : 0);
