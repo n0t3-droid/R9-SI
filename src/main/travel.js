@@ -36,13 +36,17 @@
   Travel.posOf = (meta, dim) => { const a = meta && meta.pos && meta.pos[dim]; return finite(a, 3) ? [a[0], a[1], a[2], r3(a[3]), r3(a[4])] : null; };
   // the gate of a dim leads there — or home, when you are in that dim already
   Travel.gateTarget = (cur, portalDim, meta) => (cur === portalDim ? D.home(meta) : portalDim);
-  // Heimkehr's target: Herzwelt's spawn and bed (spawnOnly: the world's own spawn, /spawn)
-  Travel.homeTarget = (g, spawnOnly) => {
+  // Herzwelt's spawn and bed (spawnOnly: the world's own spawn, /spawn) — 🌍's target, and Heimkehr's for the home there
+  Travel.herzTarget = (g, spawnOnly) => {
     if (!g || !g.meta) return null;
     const home = D.home(g.meta), p = g.player;
     if (spawnOnly || !p || !finite(p.spawn, 3)) return { dim: home, pos: g.worldSpawn().slice(0, 3), bed: null };
     return { dim: home, pos: p.spawn.slice(0, 3), bed: finite(p.spawnBed, 3) ? p.spawnBed.slice(0, 3) : null };
   };
+  // Heimkehr's target: the player's home on whatever world it is (newlife.js), else Herzwelt's spawn and bed   // u-home
+  Travel.homeTarget = (g, spawnOnly) => { if (!spawnOnly && VR.NewLife && g && g.meta) { const t = VR.NewLife.target(g); if (t) return t; } return Travel.herzTarget(g, spawnOnly); };   // u-home
+  // the world the player calls home (newlife.js: the home's world; without it Herzwelt)   // u-home
+  const homeDimOf = (g) => (VR.NewLife && g && g.meta ? VR.NewLife.homeDim(g) : D.home(g && g.meta));   // u-home
   // the gate blocks: a block type with o.portal (blocks3.js) leads to that dim — a table by type id, made once
   let PT = null;
   Travel.portalTable = () => {
@@ -100,7 +104,7 @@
     const S = st(g), meta = g.meta, from = g.dim;
     const trip = S.trip = { from, to, via, meta, t0: now(), tSwitch: 0, tPlay: 0, ride: null, instant: !!(o.instant || via === 'respawn') };
     S.gateT = 0; S.gateDim = null;
-    veilShow(to, trip.instant, D.home(meta) === to);
+    veilShow(to, trip.instant, homeDimOf(g) === to);   // u-home: 🏠 on the veil when the trip goes to the home's world
     let arrive = null;
     try { arrive = await arrivalOf(g, to, via, o); } catch (e) { console.warn('travel: no arrival', e); }
     if (!trip.instant) await sleep(Math.max(0, Travel.FADE_IN - (now() - trip.t0)));
@@ -129,7 +133,7 @@
   // where the trip ends: Heimkehr → Herzwelt's spawn or bed; `at`; the place you left that world; else its own spawn
   async function arrivalOf(g, to, via, o) {
     const p = g.player, yaw = p ? p.yaw : 0, pitch = p ? p.pitch : 0;
-    if (via === 'home' || via === 'respawn' || via === 'spawn') { const t = Travel.homeTarget(g, via === 'spawn'); return { pos: t.pos, bed: t.bed, yaw, pitch, home: true }; }
+    if (via === 'home' || via === 'respawn' || via === 'spawn' || via === 'herz') { const t = via === 'herz' ? Travel.herzTarget(g) : Travel.homeTarget(g, via === 'spawn'); return { pos: t.pos, bed: t.bed, yaw, pitch, home: true }; }   // u-home: 'herz' — 🌍 Herzwelt's spot
     if (finite(o.at, 3)) return { pos: o.at.slice(0, 3), yaw, pitch };
     const q = Travel.posOf(g.meta, to);
     if (q) return { pos: q.slice(0, 3), yaw: q[3], pitch: q[4] };
@@ -179,9 +183,10 @@
     leadLoadingBack(g, trip);
     trip.tPlay = now();
     Travel.last = { from: trip.from, to: trip.to, via: trip.via, veilMs: Math.round(trip.tSwitch - trip.t0), loadMs: Math.round(trip.tPlay - trip.tSwitch), totalMs: Math.round(trip.tPlay - trip.t0) };
+    if (VR.NewLife) VR.NewLife.arrived(g, trip);   // u-home: the far lane back, the trip's phases, Heimkehr's ships to the home pad
     S.trip = null; S.armed = false;   // (arrived in a gate: it waits until you have stepped out)
     veilHide();
-    const home = g.dim === D.home(g.meta);
+    const home = g.dim === homeDimOf(g);   // u-home: „wieder daheim" on the home's world
     if (g.ui && g.ui.chatLine) g.ui.chatLine(T(home ? 'g.travel.home' : 'g.travel.arrived', { dim: Travel.dimName(g.dim) }), home ? '#9affd8' : '#9ad8ff');
     if (trip.ride) S.ride = trip.ride;
     try { g.saveMeta(); } catch (e) { console.warn(e); }
@@ -207,6 +212,7 @@
     const S = g.travel || st(g);
     if (S.arriving && g.state === 'play') arrived(g, S);
     if (S.ride) rideTick(g, S, dt);
+    if (g.nl && VR.NewLife) VR.NewLife.tick(g, dt);   // u-home: a recalled ship set down on the ground under the home pad
     if (S.trip) return;
     const p = g.player, ui = g.ui;
     const frozen = !p || p.dead || (ui && ui.blocking) || (g.director && g.director.active) || (g.wow && g.wow.active) || g.studioOpen;

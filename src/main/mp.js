@@ -297,12 +297,14 @@
       if (d.to !== this.myPeer() || !g.player || !d.p) return;
       const P = this.sanePlayer(d.p);
       try { if (P.inv) g.player.inv.load(P.inv); ['health', 'food', 'sat', 'xp', 'level'].forEach(k => { if (typeof P[k] === 'number') g.player[k] = P[k]; }); if (P.spawn) g.player.spawn = P.spawn; g.player.inv.changed = true; g.ui.updateHUD(true); } catch (e) { console.warn(e); }
+      if (P.home && VR.NewLife) VR.NewLife.fromPdata(g, P.home);   // u-home: my home from the host's world
     }
     sanePlayer(p) {
       const o = {};
       if (p.inv && typeof p.inv === 'object') o.inv = p.inv;
       for (const k of ['health', 'food', 'sat', 'xp', 'level']) if (typeof p[k] === 'number' && isFinite(p[k])) o[k] = p[k];
       if (Array.isArray(p.spawn) && p.spawn.length === 3 && p.spawn.every(v => typeof v === 'number' && isFinite(v))) o.spawn = p.spawn;
+      if (p.home && VR.NewLife) { const h = VR.NewLife.sane(p.home); if (h) o.home = h; }   // u-home: a guest's home, checked
       return o;
     }
     // a guest asks for the changes in some columns
@@ -408,6 +410,7 @@
       const g = this.g; if (this.role !== 'client' || !g.player) return;
       const p = g.player.toJSON();
       const data = { p: { inv: p.inv, health: p.health, food: p.food, sat: p.sat, xp: p.xp, level: p.level, spawn: p.spawn } };
+      if (VR.NewLife) { const h = VR.NewLife.pdataOf(g); if (h) data.p.home = h; }   // u-home: a guest's home on another world rides along (the host keeps it)
       if (JSON.stringify(data).length > 3900) data.p.inv = { slots: (p.inv.slots || []).slice(0, 36) };
       if (force) this.emitNow('pdata', data); else this.send('pdata', data);
     }

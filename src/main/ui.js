@@ -248,7 +248,8 @@
         case 'resume': this.resume(); break;
         case 'studiolive': if (!g.openStudio()) this.hint(T('g.pause.studioGuest'), 2400); break;
         case 'lookedit': if (VR.LiveLoop) VR.LiveLoop.fromPause(g); break;   // ✏️ Aussehen ändern (B1)
-        case 'sethome': if (g.setSpawnHere()) { this.hint(T('g.pause.spawnSet'), 2600); if (this.chatLine) this.chatLine(T('g.pause.spawnSetChat'), '#9affd8'); } break;
+        case 'sethome': { const r = g.setSpawnHere(); if (r && r !== 'moved') { this.hint(T('g.pause.spawnSet'), 2600); if (this.chatLine) this.chatLine(T('g.pause.spawnSetChat'), '#9affd8'); } if (r && VR.NewLife && this.screen === 'pause') VR.NewLife.pauseMenu(this); break; }   // u-home: 'moved' — a new home on this world (newlife.js says where); the row shows the new buttons
+        case 'goherz': this.resume(); if (VR.NewLife) VR.NewLife.goHerz(g); break;   // u-home: 🌍 Herzwelt — always one click away
         case 'quit': g.quitToTitle(); break;
         case 'respawn': g.player.respawn(); this.resume(); break;
         case 'gohome': this.resume(); g.goHome(); break;
@@ -379,6 +380,7 @@
       this.show('pause');
       { const b = $('#studiolive'); if (b) b.style.display = this.game.meta && this.game.meta.guest ? 'none' : ''; }
       if (VR.LiveLoop) VR.LiveLoop.pauseMenu(this);   // ✏️ Aussehen ändern — what the crosshair pointed at (B1)
+      if (VR.NewLife) VR.NewLife.pauseMenu(this);   // u-home: 🏠 Zuhause (<Welt>) · 🌍 Herzwelt when you live elsewhere; 📍 „Hier wohne ich" off the home's world
       this.buildZenPanel();
       this.buildMpPanel();
       if (VR.Legal && !$('#pause [data-legal]')) { const q = $('#pause [data-act="quit"]'); if (q) q.after(VR.Legal.button('btn small')); }   // 📜 Impressum · Datenschutz (src/main/legal.js)

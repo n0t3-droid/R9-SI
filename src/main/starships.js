@@ -524,6 +524,7 @@
     // ---------------------------------------------------------------- persistence
     beforeSave(meta) {
       meta.starships = this.ships.filter(s => s.d.meta).map(s => ({ seed: s.d.seed, arch: s.d.meta.arch, palette: s.d.palette || null, pos: s.pos.map(v => Math.round(v * 100) / 100), yaw: s.yaw, key: s.key }));
+      if (VR.NewLife) VR.NewLife.shipsSave(this, meta);   // u-home: a ship Heimkehr just brought home keeps its place in the save while its design is still being built
       if (VR.Travel) VR.Travel.shipsSave(this, meta);   // u-dims: each ship keeps its world (meta.starships[i].dim); the other worlds' ships stay in the list
       meta.starshipSpawns = [...this.spawned];
     }
