@@ -109,6 +109,7 @@
         if (s.dead) { this.ships.splice(i, 1); continue; }
         const d = Math.hypot(s.pos[0] - fp[0], s.pos[1] - fp[1], s.pos[2] - fp[2]);
         near = Math.min(near, d);
+        if (VR.EventLog) VR.EventLog.pass(s, d);   // e-log: a craft's nearest pass (eventlog.js)
         if (s.horizon) s.alpha = 1 - smooth((Math.hypot(s.pos[0] - fp[0], s.pos[2] - fp[2]) - FADE0) / (FADE1 - FADE0));
         // the speed each craft really makes (its plume is hot and short when it idles at the apron)
         if (s.lastPos) { const v = Math.hypot(s.pos[0] - s.lastPos[0], s.pos[1] - s.lastPos[1], s.pos[2] - s.lastPos[2]) / Math.max(dt, 1e-3); s.spd = s.spd === undefined ? v : s.spd + (v - s.spd) * Math.min(1, dt * 3); }

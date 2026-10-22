@@ -1262,6 +1262,7 @@
         if (this.camMode === 2) { cam.yaw += Math.PI; cam.pitch = -cam.pitch; }
       }
       this.cam = cam;
+      if (VR.EventLog) VR.EventLog.frame(this, dt);   // e-log: the event log's clock, input and 1-Hz sample (eventlog.js)
       // selection / crack
       const t = p.target;
       const outline = t && !this.hideHud ? { x: t.x, y: t.y, z: t.z, boxes: t.boxes || VR.PHYS.selection(t.state) } : null;
