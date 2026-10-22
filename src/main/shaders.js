@@ -339,6 +339,9 @@ vec3 meteors(vec3 dir) {
   return acc;
 }
 
+#ifdef SKY3
+${VR.Sky3 && VR.Sky3.glslSky ? VR.Sky3.glslSky() : ''}
+#endif
 vec3 skyColor(vec3 dir, bool withSun) {
   if (u_dim == 1) return u_fogColor;
   if (u_dim == 2) {
@@ -372,6 +375,9 @@ vec3 skyColor(vec3 dir, bool withSun) {
   float aurK = smoothstep(0.5, 0.98, toSun) * (1.0 - smoothstep(0.52, 0.8, h));
   col = max(col, u_skyMid * (2.0 * aurK * aurK * u_skyDay.z * (1.0 - u_rain)));
   col += u_sunColor * (ts16 * ts16 * ts16 * ts8 * ts4) * u_skyStops.w * (1.0 - u_rain);   // the sun's halo, toSun^60 (t-sky: u_skyStops.w, tighter by day)
+#ifdef SKY3
+  col = s3Layers(col, dir, h);   // t-sky3: the sun-side band (gold → peach → pink) and the earth's shadow with its belt (sky3.js)
+#endif
   if (dir.y < 0.0) col = mix(col, u_skyHorizon * 0.55, clamp(-dir.y * 2.5, 0.0, 1.0));
   if (withSun) {
     float clear = 1.0 - u_rain;
@@ -414,11 +420,15 @@ vec3 skyColor(vec3 dir, bool withSun) {
     // the sun (t-sky2: a soft glow, as the trailer's — a Gaussian core of about 1.1° where the hard disc was, in a warm
     // halo of about 3.5° that is not clipped to a flat disc; only near the sun, the rest of the sky skips it)
     float sd = dot(dir, u_sunDir);
+#ifdef SKY3
+    if (sd > 0.95) col += s3SunDisc(dir, sd) * clear;   // t-sky3: the sun a disc with a soft limb in its corona (sky3.js)
+#else
     if (sd > 0.985) {
       float e = 1.0 - sd, sl = dot(u_sunColor, vec3(0.3, 0.59, 0.11));
       vec3 sc = u_sunColor * (max(sl, 0.9) / max(sl, 1e-3));   // the disc stays bright down to the horizon (its light on the land dims, not the disc)
       col += sc * (u_sunDisc * exp(-e * 7000.0) + vec3(1.1, 0.85, 0.55) * exp(-e * 500.0)) * clear;
     }
+#endif
     float md = dot(dir, u_moonDir);
     if (md > 0.9992) {
       vec3 up = abs(u_moonDir.y) < 0.99 ? vec3(0,1,0) : vec3(1,0,0);
@@ -2214,12 +2224,18 @@ out float v_near;
 #ifdef WXDRAMA
 out vec3 v_dir;    // t-motion: the sprite's heading from the eye (the bolt's flash lights the clouds round its heading most)
 #endif
+#ifdef CLOUD3
+out vec3 v_dir3;   // t-sky3: the fragment's heading from the eye (the silver lining round the sun's direction)
+#endif
 void main() {
   vec3 rel = u_origin + a_c.xyz;
 #ifdef WXDRAMA
   v_dir = rel / max(length(rel), 1.0);
 #endif
   vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
+#ifdef CLOUD3
+  v_dir3 = p / max(length(p), 1.0);
+#endif
   float hi = clamp((rel.y / max(length(rel), 1.0) - u_cloudHigh.x) * u_cloudHigh.y, 0.0, 1.0);
   v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x * (1.0 - u_cloudHigh.z * hi * hi * (3.0 - 2.0 * hi)); v_var = a_p.z; v_dist = length(rel.xz);
   // a sprite the camera is inside (the citadel's anchors) or almost touches fades out: no white wall in front of the lens
@@ -2241,8 +2257,32 @@ in float v_near;
 #ifdef WXDRAMA
 in vec3 v_dir;
 #endif
+#ifdef CLOUD3
+in vec3 v_dir3;
+${VR.Sky3 && VR.Sky3.glslPuff ? VR.Sky3.glslPuff() : ''}
+#endif
 out vec4 o;
 void main() {
+#ifdef CLOUD3
+  {
+    // t-sky3 · Wolken mit Volumen (sky3.js c3Shade: the atlas of thickness, normal and occlusion lit as a volume by the hour)
+    vec4 c3 = c3Shade(vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5, v_uv, v_dist, normalize(v_dir3));
+    if (c3.a < 0.0) discard;
+    vec3 col = c3.rgb;
+#ifdef WXDRAMA
+    // the storm's clouds (t-motion's slate, motion.js STORM) and the bolt's flash in them, on the lit volume
+    float sk = clamp(max(u_storm.z, u_rain), 0.0, 1.0) * (1.0 - u_fogK);
+    col = mix(col, vec3(0.16, 0.18, 0.22) * (0.55 + 0.6 * clamp(dot(col, vec3(0.3, 0.59, 0.11)), 0.0, 1.0)) + u_ambSky * 0.12, sk * 0.6);
+    if (u_bolt.w > 0.001 && u_fogK < 0.5) {
+      vec2 bh = normalize(v_dir.xz + vec2(1e-5, 0.0));
+      col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.35 + 0.65 * smoothstep(0.2, 0.97, dot(bh, u_bolt.xy))) * (0.6 + 0.8 * (1.0 - v_uv.y));
+    }
+#endif
+    float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
+    o = vec4(col, c3.a * v_alpha * fade * v_near);
+    return;
+  }
+#endif
   // the sample stays inside its own quarter of the atlas (half a texel in from the edge): no seam from the neighbour
   vec2 at = vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5 + clamp(v_uv, vec2(0.5 / 128.0), vec2(1.0 - 0.5 / 128.0)) * 0.5;
   vec4 t = texture(u_cloudTex, at);
