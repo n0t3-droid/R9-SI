@@ -1150,7 +1150,7 @@
         this.input.captured = true;
         this.ui.updateHUD(true);
         if (this.meta.guest) this.ui.chatLine(T('g.chat.joined', { name: this.mp && this.mp.hostName ? this.mp.hostName : T('g.mp.friend') }), '#9affd8');
-        else this.ui.chatLine(T('g.chat.welcome', { name: this.meta.name }), '#9ad8ff');
+        else if (!(VR.Travel && VR.Travel.busy(this))) this.ui.chatLine(T('g.chat.welcome', { name: this.meta.name }), '#9ad8ff');   // u-dims: a trip's arrival says where you are instead (travel.js)
         if (this.player.mode === 'zen') this.ui.chatLine(T('g.chat.zen'), '#b8ffcf');
         this.autosaveAt = performance.now() + 60000;
         this.startPrewarm();
