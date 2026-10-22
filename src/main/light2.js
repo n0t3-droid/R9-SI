@@ -195,9 +195,11 @@
     // at the golden hour — 0.3 veiled the far land toward the sun in pink)
     const sunK = byMood(m, { day: 0.12, gold: 0.15, dusk: 0.2, night: 0 });
     // the aerial perspective: 1 − exp(−(d / apDist)²) of apMax — the near and the middle ground clear, the far planes
-    // a step paler each (t1_05, t3_06)
-    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: 0.55, sunK, morning, moods: m };
+    // a step paler each (t1_05, t3_06). (f-sky4, R50-01 after sky3.mjs run 1: at the golden hour 0.55 of the luminous
+    // horizon washed the far land to a pink-white; the frames' far islands keep their green under a blue haze — 0.35)
+    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: byMood(m, AP), sunK, morning, moods: m };
   };
+  const AP = { day: 0.55, gold: 0.35, dusk: 0.55, night: 0.55 };
   // t-polish2 · the room's air (gap 8, the Hangar Hall: t1_12, t1_13 — the hall's air holds the cyan of its strips): where
   // the eye stands indoors (its sky light low) the air takes the colour of the lamps round it — the block light of a few
   // cells round the eye, averaged and eased — thin: col → mix(col, room, 1 − e^(−min(d, max)·rho)). Outdoors nothing (the
@@ -226,10 +228,18 @@
   L2.FARLIT = { night: 1.6, pierce: 1600 };
   L2.farLight = (nightW) => 1 + L2.FARLIT.night * clamp(nightW, 0, 1);
   L2.farPierce = (d) => Math.exp(-Math.max(d, 0) / L2.FARLIT.pierce);
-  // the valley mist's colour: between the horizon's and the fog's, a little lighter by day
+  // the valley mist's colour: between the horizon's and the fog's, a little lighter by day.
+  // (f-sky4, R50-01 after sky3.mjs run 1: at the golden hour that was the luminous horizon's pink-white — 229,216,217 on
+  // the screen — and the far land and the valleys under the isles read as milk; the frames' far land is blue 109,148,189
+  // away from their sun and a pale blue-lilac 192,198,227 beside it. So at the golden hour the mist takes a pale blue-lilac
+  // of its own (MIST_GOLD, ~188,195,228 through the golden grade), less in rain; toward the sun it still glows warm: l2Fog
+  // adds the sun's colour × sunK there)
+  L2.MIST_GOLD = [0.42, 0.49, 0.8];
   L2.mistColor = function (E) {
     const h = E.horizon || [0.6, 0.7, 0.8], f = E.fogColor || h, m = L2.moods(E.sunDir[1]), lift = 1 + 0.08 * m.day;
-    return [(h[0] + f[0]) * 0.5 * lift, (h[1] + f[1]) * 0.5 * lift, (h[2] + f[2]) * 0.5 * lift];
+    const w = m.gold * (1 - clamp(E.rain || 0, 0, 1)), c = L2.MIST_GOLD, o = [0, 0, 0];
+    for (let i = 0; i < 3; i++) { const v = (h[i] + f[i]) * 0.5 * lift; o[i] = v + (c[i] - v) * w; }
+    return o;
   };
 
   // ---------------------------------------------------------------- step 5 · the grade

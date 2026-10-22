@@ -355,6 +355,17 @@ console.log('h · f-sky4: the golden hour with structure (R50-01), the storm\'s 
   // the sun-side mist halved (the review: 0.3 veiled the far land toward the sun)
   const air = L2.air(E, 10800);
   check(air.sunK <= 0.155, `the mist toward the sun halved at the golden hour (sunK ${air.sunK.toFixed(3)} ≤ 0.155)`);
+  // the far land's air at the golden hour (sky3.mjs run 1: the far land and the valleys under the isles still a pink-white
+  // milk — the valley mist took the luminous horizon's colour, 229,216,217 on the screen, and the aerial perspective 55 %
+  // of the horizon's; the frames' far land: blue 109,148,189 away from their sun, a pale blue-lilac 192,198,227 beside
+  // it, warm only at it): the valley mist a pale blue-lilac that glows warm toward the sun, the aerial perspective lighter
+  // so the far land keeps its own colour
+  const show = (c) => { const d = M.display(c, E, G, [0.5, 0.5], 16 / 9), l = SR.lch(SR.lab(d)); return { rgb: d.map(Math.round), L: l.L, C: l.C, h: l.h }; };
+  const tint = L2.sunTint(L2.moods(E.sunDir[1])), mist = L2.mistColor(E);
+  const mAway = show(mist), mSun = show(mist.map((v, i) => v + E.sunColor[i] * tint[i] * air.sunK));
+  check(mAway.h >= 240 && mAway.h <= 300 && mAway.C >= 12 && mAway.L <= 82, `the golden valley mist a pale blue-lilac, not milk: ${mAway.rgb.join(',')} (h ${mAway.h.toFixed(0)}°, C* ${mAway.C.toFixed(0)}, L* ${mAway.L.toFixed(0)})`);
+  check(mSun.rgb[0] - mSun.rgb[2] > mAway.rgb[0] - mAway.rgb[2] + 15, `toward the sun it glows warm: ${mSun.rgb.join(',')} against ${mAway.rgb.join(',')}`);
+  check(air.apMax <= 0.4 && L2.air(envAt(6000), 6000).apMax >= 0.55, `the far land keeps its colour: the aerial perspective at most ${air.apMax.toFixed(2)} of the horizon's at the golden hour (≤ 0.4; the day's 0.55 kept)`);
   // R50-11 · a storm's clouds have weight: in a thunderstorm the clouds' light (S3.cloudLight) is an overcast grey — the
   // sun's light on them nearly gone, the base ≈ 0.25 of a fair cloud's lit top, the base under 0.55 of the storm cloud's
   // own top — and the puffs carry a gradient and ragged bases (CLOUD3)
