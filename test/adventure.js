@@ -386,6 +386,13 @@ if (!A) { console.log('  ✗ VR.Adventure missing (src/main/adventure.js)'); con
   // the survival XP (crafting.js:266) listens and gives nothing
   const x4 = meta.adventure.me.xp; A.award('survival', { n: 20 });
   check(meta.adventure.me.xp === x4, 'the survival XP: nothing (A§0.3)');
+  // 💡 an invention (inventions.js tells its listeners): 10 XP once each — only in play
+  const x5 = meta.adventure.me.xp;
+  A.onInvention({ type: 'found', k: 'lamp' }); A.onInvention({ type: 'found', k: 'lamp' }); A.onInvention({ type: 'sync' });
+  check(meta.adventure.me.xp - x5 === 10, 'an invention found: 10 XP, once (' + (meta.adventure.me.xp - x5) + ')');
+  g.state = 'title'; const x6 = meta.adventure.me.xp; A.onInvention({ type: 'found', k: 'kite' }); A.award('biome', { id: 'from-the-title' });
+  check(meta.adventure.me.xp === x6, 'nothing counts while the world is not being played (the start screen, the Studio)');
+  g.state = 'play';
   // the HUD: written on a change only
   A.renderHud(true);
   const w0 = A.stats.hudWrites;

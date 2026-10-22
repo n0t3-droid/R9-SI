@@ -116,7 +116,8 @@
   // ---------------------------------------------------------------- the awards
   // the hooks call this; bookkeeping only (the HUD follows in the next frame)
   A.award = function (kind, ctx) {
-    const g = game(); if (g && g.meta !== A.meta) A.bind();
+    const g = game(); if (!g || g.state !== 'play') return null;   // (the start screen, the Studio, a loading world: nothing counts)
+    if (g.meta !== A.meta) A.bind();
     const rec = A.rec; if (!rec || !rec.on) return null;
     const r = Adv.award(rec.me, kind, ctx, Date.now(), A.sess);
     if (!r) return null;
@@ -144,6 +145,9 @@
   };
   // codex.js: an event every time it happens — a blueprint built (3 an hour), the first flight at a helm
   A.codexEvent = (name) => (name === 'blueprint' ? A.award('blueprint', {}) : name === 'ship' ? A.award('flight', {}) : null);
+  // 💡 inventions.js tells its listeners when a new invention is found (10 XP, once each) — its own API, no line there
+  A.onInvention = (e) => (e && e.type === 'found' && e.k ? A.award('invention', { id: e.k }) : null);
+  if (VR.Inventions && VR.Inventions.on) VR.Inventions.on(A.onInvention);
   // twice a second: the binding, the ring's visibility, a ship's or a jetpack's distance (5 XP a km), a waiting level-up
   A.tick = function () {
     const g = game(); if (!g) return;
@@ -477,9 +481,9 @@
 #advhud .st { color: #fff3c4; font-size: 14px; }
 #advhud .pts { font: 800 12px/1 var(--font); color: #1a1206; background: linear-gradient(135deg, #ffe58f, #ffae42); border-radius: 999px; padding: 3px 9px; letter-spacing: .5px; box-shadow: 0 0 10px rgba(255, 196, 80, .65); }
 #advhud .pts.none { display: none; }
-#advhud .fl { position: absolute; left: 66px; top: 24px; display: flex; align-items: center; gap: 6px; font: 800 16px/1 var(--font); color: #fff2c4; text-shadow: 0 0 8px rgba(255, 186, 70, .95), 0 1px 2px #000; white-space: nowrap; animation: advFloat 1.5s ease-out forwards; }
+#advhud .fl { position: absolute; left: 0; top: 64px; display: flex; align-items: center; gap: 6px; font: 800 16px/1 var(--font); color: #fff2c4; text-shadow: 0 0 8px rgba(255, 186, 70, .95), 0 1px 2px #000; white-space: nowrap; animation: advFloat 1.5s ease-out forwards; }
 #advhud .ft { display: inline-flex; align-items: center; gap: 3px; } #advhud .ft svg { width: 16px; height: 16px; }
-@keyframes advFloat { 0% { opacity: 0; transform: translate(0, 8px) scale(.85); } 15% { opacity: 1; transform: translate(0, 0) scale(1.08); } 100% { opacity: 0; transform: translate(6px, -30px) scale(1); } }
+@keyframes advFloat { 0% { opacity: 0; transform: translate(0, 12px) scale(.85); } 15% { opacity: 1; transform: translate(0, 0) scale(1.08); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(0, -8px) scale(1); } }
 #advhud.up .ring { animation: advPulse 1.3s ease-out; }
 @keyframes advPulse { 0% { transform: scale(1); } 25% { transform: scale(1.25); filter: drop-shadow(0 0 18px rgba(255, 214, 110, 1)); } 100% { transform: scale(1); } }
 #advhud.pop { animation: advPop .7s cubic-bezier(.2, 1.6, .4, 1); }
