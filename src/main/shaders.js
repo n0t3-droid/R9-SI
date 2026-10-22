@@ -167,7 +167,7 @@ vec3 nebula(vec3 dir, float dayK) {
   float c2 = cd * cd, c4 = c2 * c2, c8 = c4 * c4, c16 = c8 * c8;   // (cd^60 and cd^12 as products: no pow per pixel)
   float core = (c16 * c16 * c16 * c8 * c4 * 2.2 + c8 * c4 * 0.5) * (1.0 - 0.4 * dayK);   // (by day a smaller glare: the planets stay clear)
 #ifdef SKY3
-  core = (c16 * c16 * c16 * c8 * c4 * 1.8 + c16 * c8 * 0.3) * (1.0 - 0.4 * dayK);   // t-sky3: a smaller glow round the core (it read as a second moon)
+  core = (c16 * c16 * c16 * c8 * c4 * 1.8 + c8 * c4 * 0.35) * (1.0 - 0.4 * dayK);   // t-sky3: the core's own disc smaller (it read as a second moon), its wide glow 0.7 of before (cut to cd^24 the second run's day sky lost 2–5 L* round it: t3_05 has the warm glow)
 #endif
   col += vec3(1.0, 0.78, 0.6) * core;
   // off the band: at night t-sky's thin wisps; by day (dayK) the veil's clouds over every view's top, sharp-edged so the
@@ -2300,6 +2300,7 @@ out vec3 v_dir;    // t-motion: the sprite's heading from the eye (the bolt's fl
 #endif
 #ifdef CLOUD3
 out vec3 v_dir3;   // t-sky3: the fragment's heading from the eye (the silver lining round the sun's direction)
+out float v_y3;    // and its height in the world (the cluster's shading, sky3.js c3Shade)
 #endif
 void main() {
   vec3 rel = u_origin + a_c.xyz;
@@ -2309,6 +2310,7 @@ void main() {
   vec3 p = rel + (u_camRight * a_corner.x + u_camUp * a_corner.y * a_p.y) * a_c.w;
 #ifdef CLOUD3
   v_dir3 = p / max(length(p), 1.0);
+  v_y3 = a_c.y + u_camUp.y * a_corner.y * a_p.y * a_c.w;
 #endif
   float hi = clamp((rel.y / max(length(rel), 1.0) - u_cloudHigh.x) * u_cloudHigh.y, 0.0, 1.0);
   v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x * (1.0 - u_cloudHigh.z * hi * hi * (3.0 - 2.0 * hi)); v_var = a_p.z; v_dist = length(rel.xz);
@@ -2333,6 +2335,7 @@ in vec3 v_dir;
 #endif
 #ifdef CLOUD3
 in vec3 v_dir3;
+in float v_y3;
 ${VR.Sky3 && VR.Sky3.glslPuff ? VR.Sky3.glslPuff() : ''}
 #endif
 out vec4 o;
@@ -2340,6 +2343,7 @@ void main() {
 #ifdef CLOUD3
   {
     // t-sky3 · Wolken mit Volumen (sky3.js c3Shade: the atlas of thickness, normal and occlusion lit as a volume by the hour)
+    c3Y = v_y3;
     vec4 c3 = c3Shade(vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5, v_uv, v_dist, normalize(v_dir3));
     if (c3.a < 0.0) discard;
     vec3 col = c3.rgb;
@@ -2353,7 +2357,9 @@ void main() {
     }
 #endif
     float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
-    o = vec4(col, c3.a * v_alpha * fade * v_near);
+    // (the thick core opaque: a cumulus sprite's 0.92 let the moon and the bright stars through; a sprite faded on purpose — the
+    // high ones by day, clouds.js HIGH — keeps its alpha)
+    o = vec4(col, c3.a * mix(v_alpha, 1.0, c3Core * smoothstep(0.86, 0.91, v_alpha)) * fade * v_near);
     return;
   }
 #endif

@@ -183,10 +183,13 @@
   // Each: hor, mid, zen (linear HDR before the exposure), stops [h1, h2a, h2b, halo]; space: the share of the day's space
   // over the top (stars, nebula); sunset: the warm glow's strength (env.js E.sunset's factor). Fitted through this
   // model of the sky (test/sky3_model.js: the gradient, the glows and t-sky3's layers through the composite and
-  // t-light2's grade, sampled as test/sky3.mjs measures) to the frames' bands (docs/trailer/sky_ref.json)
+  // t-light2's grade, sampled as test/sky3.mjs measures) to the frames' bands (docs/trailer/sky_ref.json); then refitted
+  // the dusk around the second browser run (its residual per view and band, measured − model, held: 5.5 → 4.7 predicted;
+  // the golden hour's refit gained 0.1 and its bands 3–5 are a zig-zag in the frames — pink between two blues — that one
+  // smooth gradient cannot follow, so it stays)
   const PAL = S3.PAL = {
     gold: { hor: [1.44, 1.147, 1.652], mid: [0.5, 0.323, 0.541], zen: [0.114, 0.141, 0.381], stops: [0.386, 0.297, 0.837, 0.5], space: 0.15, sunset: 0.6 },
-    dusk: { hor: [0.476, 0.504, 1.522], mid: [0.247, 0.279, 0.639], zen: [0.019, 0.046, 0.122], stops: [0.265, 0.373, 0.629, 0.45], space: 0.9, sunset: 0.2 },
+    dusk: { hor: [0.493, 0.456, 1.771], mid: [0.265, 0.291, 0.681], zen: [0.018, 0.045, 0.129], stops: [0.223, 0.303, 0.67, 0.45], space: 0.9, sunset: 0.2 },
   };
   // the weights by the sun's height: the day above ~17°, the golden hour from ~10° down to the horizon (fading by −1°), the
   // dusk round the sunset and after it, the night (env.js's) under ~−16°
@@ -719,6 +722,8 @@ uniform vec3 u_c3L;        // toward the light in the billboard's frame (x right
 uniform vec4 u_c3K;        // x the self-shadow's density, y the silver lining, z the wrap, w the powder
 uniform vec3 u_c3Haze;     // the far ones' colour (the sky at the horizon)
 vec2 c3At(vec2 cell, vec2 uv) { return cell + clamp(uv, vec2(0.5 / 128.0), vec2(1.0 - 0.5 / 128.0)) * 0.5; }
+float c3Core = 0.0;         // the thick core of this texel (PUFF_FS: there the sprite is opaque — the second run's moon shone through)
+float c3Y = 210.0;         // the texel's height in the world (PUFF_FS sets it from the vertex shader: one shading over a cluster's sprites)
 vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   vec4 t = texture(u_cloudTex, c3At(cell, uv));
   float th = t.r;
@@ -733,6 +738,10 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   }
   float cov = smoothstep(0.0, 0.08, th);
   if (cov < 0.01) return vec4(0.0, 0.0, 0.0, -1.0);
+  c3Core = smoothstep(0.12, 0.3, th);
+  // the flat base a soft fringe, not a cut: a cluster's sprites stand on one another, and their bases drawn hard read as
+  // stacked slabs (the second run's golden hour)
+  cov *= mix(0.3, 1.0, smoothstep(0.0, 0.06, texture(u_cloudTex, c3At(cell, uv - vec2(0.0, 0.06))).r));
   vec3 N = vec3(t.gb * 2.0 - 1.0, 0.0);
   N.z = sqrt(max(0.0, 1.0 - dot(N.xy, N.xy)));
   float ao = t.a;
@@ -747,14 +756,17 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   vec3 sun = u_c3Sun * ndl * T * mix(1.0, powder, u_c3K.w * max(L.z, 0.0));
   // a low sun lights the upper lobes; the lower parts lie in the shade of the lobes in front and of the haze
   float lowSun = clamp(1.0 - u_c3Ld.y * 3.0, 0.0, 1.0);
-  sun *= mix(1.0, 0.25 + 0.75 * smoothstep(0.05, 0.8, uv.y), lowSun * 0.7);
+  // (by the height in the cluster, not in the sprite: a cell's sprites share their centre's height but not their bases, and
+  // shaded each by its own the second run's clusters read as stacked slabs)
+  float hc = smoothstep(196.0, 224.0, c3Y);
+  sun *= mix(1.0, 0.25 + 0.75 * hc, lowSun * 0.7);
   // against the light: the body dark, the thin edges bright (the silver lining: forward scattering round the light)
   float cs = dot(vdir, u_c3Ld), g2 = 0.5625, ph = (1.0 - g2) / pow(max(1.0 + g2 - 1.5 * cs, 1e-3), 1.5);
   float back = smoothstep(0.55, 0.97, cs), edge = 1.0 - smoothstep(0.02, 0.3, th);
   // (the lining brightest on the edges that face the light across the sprite: lit all round, the lab's sprites read as stickers)
   float toL = mix(1.0, clamp(dot(normalize(N.xy + vec2(1e-4, 0.0)), ld) * 0.5 + 0.5, 0.0, 1.0), smoothstep(0.05, 0.3, lxy));
   sun += u_c3Sun * ((ph * 0.11 * exp(-th * 7.0) + edge * edge * 2.6 * (0.3 + 0.7 * toL) * smoothstep(0.7, 0.995, cs)) * u_c3K.y * smoothstep(0.0, 0.04, th));
-  vec3 amb = mix(u_c3Low, u_c3Top, clamp(N.y * 0.5 + 0.5, 0.0, 1.0)) * (0.35 + 0.65 * ao) * (1.0 - 0.55 * back);
+  vec3 amb = mix(u_c3Low, u_c3Top, clamp(N.y * 0.25 + 0.25 + 0.5 * hc, 0.0, 1.0)) * (0.35 + 0.65 * ao) * (1.0 - 0.55 * back);
   vec3 col = sun * (0.55 + 0.45 * ao) + amb;
   col = mix(col, u_c3Haze, smoothstep(260.0, 700.0, dist) * 0.45);
   return vec4(col, cov);

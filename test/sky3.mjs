@@ -206,6 +206,8 @@ async function shoot(V, preset) {
   if (lastPlace !== V.place) { st = await settle(); lastPlace = V.place; } else await step(12);
   if ((V.wx || 'klar') !== 'klar' || V.wxEase) await easeWeather();
   await ev(() => { const e = VR.game.entities; if (e && e.mobs) e.mobs.length = 0; });
+  // (the shooting star: the life director's balloon hung right over it in the second run — its acts off for this view)
+  if (V.meteor) await ev(() => { const L = VR.game.lifeDirector; if (L && L.events) L.events.length = 0; });
   await ev(([t, yaw, pitch]) => { const g = VR.game, p = g.player; g.env.setTime(t); p.yaw = yaw; p.pitch = pitch; }, [todN, yaw, pitch]);
   await step(4);
   const name = `sky3_${V.name}${preset === 'high' ? '' : '_' + preset}_${TAG}`;
@@ -243,7 +245,7 @@ for (const V of ORDER) {
 await weather('klar'); lastWx = 'klar';
 
 // ---------------------------------------------------------------- Very Low: three pictures, the sky pass alone
-let skyRatio = null, skyA = [], skyB = [];
+let skyRatio = null, skyA = [], skyB = [], sameSky = null;
 if (!ONLY || ONLY.includes('potato')) {
   await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
   await easeWeather();
@@ -276,22 +278,37 @@ if (!ONLY || ONLY.includes('potato')) {
     return { ms: (performance.now() - t0) / N, w: R.w, h: R.h, lite: !!R.q.lite };
   };
   const benchArgs = [24, PLACES.canyon.cam, PLACES.canyon.yaw, PITCH, 11900];
-  let before = null;
-  if (DIST_BEFORE) {
-    before = await ctx.newPage();
-    attach(before, 'before');
-    await before.goto(DIST_BEFORE, { waitUntil: 'domcontentloaded', timeout: 180000 });
-    for (let i = 0; i < 240; i++) { await before.waitForTimeout(500); if (await before.evaluate(() => typeof VR !== 'undefined' && VR.game && VR.game.state === 'title').catch(() => false)) break; }
-    await before.evaluate(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
-  }
+  // both builds on a fresh page at the title (the second run measured this build on the test's page, its world's workers
+  // busy beside it, against the build before at the title: ×1.18 from the setup alone); and the sky program's own source
+  // compared — Very Low's rule is the same programs
+  const titlePage = async (url, tag) => {
+    const pg = await ctx.newPage();
+    attach(pg, tag);
+    await pg.goto(url, { waitUntil: 'domcontentloaded', timeout: 180000 });
+    for (let i = 0; i < 240; i++) { await pg.waitForTimeout(500); if (await pg.evaluate(() => typeof VR !== 'undefined' && VR.game && VR.game.state === 'title').catch(() => false)) break; }
+    await pg.evaluate(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
+    return pg;
+  };
+  // (the compiled program's active uniforms: the source text carries every tier's #ifdef blocks; test/sky3.js b compares
+  // Very Low's preprocessed text itself)
+  const SRC = () => { const R = VR.game.renderer, gl = R.gl, p = R.P.sky.p, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS), out = []; for (let i = 0; i < n; i++) { const u = gl.getActiveUniform(p, i); out.push(u.name + ':' + u.type + ':' + u.size); } return out.sort().join(' '); };
+  let before = null, after = null;
+  if (DIST_BEFORE) { before = await titlePage(DIST_BEFORE, 'before'); after = await titlePage(DIST, 'after-title'); }
+  const benchA = (args) => (after ? after.evaluate(SKYBENCH, args) : ev(SKYBENCH, args));
   for (let b = 0; b < 11; b++) {
     if (before && b % 2 === 0) skyB.push(await before.evaluate(SKYBENCH, benchArgs));
-    skyA.push(await ev(SKYBENCH, benchArgs));
+    skyA.push(await benchA(benchArgs));
     if (before && b % 2 === 1) skyB.push(await before.evaluate(SKYBENCH, benchArgs));
+  }
+  if (before && after) {
+    const sa = await after.evaluate(SRC), sb = await before.evaluate(SRC);
+    sameSky = sa === sb && sa.length > 100;
+    console.log(`potato sky program: ${sameSky ? 'the same active uniforms as the build before' : 'DIFFERENT uniforms from the build before: ' + sa + ' | ' + sb} (${sa.split(' ').length} / ${sb.split(' ').length})`);
+    await after.close().catch(() => {});
   }
   const med = (v) => { const s = [...v].sort((a, b) => a - b); return s[s.length >> 1]; };
   skyRatio = before ? med(skyA.map((x, i) => x.ms / skyB[i].ms)) : null;
-  console.log('potato sky pass ' + JSON.stringify({ tag: TAG, size: skyA[0].w + 'x' + skyA[0].h, lite: skyA[0].lite, ms: skyA.map(s => +s.ms.toFixed(2)), median: +med(skyA.map(s => s.ms)).toFixed(2), before: before ? { ms: skyB.map(s => +s.ms.toFixed(2)), median: +med(skyB.map(s => s.ms)).toFixed(2) } : null, ratio: skyRatio === null ? null : +skyRatio.toFixed(3) }));
+  console.log('potato sky pass ' + JSON.stringify({ tag: TAG, size: skyA[0].w + 'x' + skyA[0].h, lite: skyA[0].lite, ms: skyA.map(s => +s.ms.toFixed(2)), median: +med(skyA.map(s => s.ms)).toFixed(2), before: before ? { size: skyB[0].w + 'x' + skyB[0].h, ms: skyB.map(s => +s.ms.toFixed(2)), median: +med(skyB.map(s => s.ms)).toFixed(2) } : null, ratio: skyRatio === null ? null : +skyRatio.toFixed(3) }));
   if (before) await before.close().catch(() => {});
 }
 
@@ -315,7 +332,22 @@ let hiSky = null;
     out.size = R.w + 'x' + R.h;
     return out;
   };
-  try { hiSky = await ev(HB, [8, PLACES.canyon.cam, PLACES.canyon.yaw, PITCH, 11900]); console.log('high sky pass ' + JSON.stringify(hiSky)); } catch (e) { console.log('  (high sky bench: ' + String(e.message).split('\n')[0] + ')'); }
+  try { hiSky = await ev(HB, [4, PLACES.canyon.cam, PLACES.canyon.yaw, PITCH, 11900]); console.log('high sky pass ' + JSON.stringify(hiSky)); } catch (e) { console.log('  (high sky bench: ' + String(e.message).split('\n')[0] + ')'); }
+  // the cost under the same load: both builds on fresh title pages at High, in turns (the machine is shared: the second
+  // run's own numbers were 2.5–4× run 1's for the load alone)
+  if (DIST_BEFORE) {
+    try {
+      const mk = async (url, tag) => { const pg = await ctx.newPage(); attach(pg, tag); await pg.goto(url, { waitUntil: 'domcontentloaded', timeout: 180000 }); for (let i = 0; i < 240; i++) { await pg.waitForTimeout(500); if (await pg.evaluate(() => typeof VR !== 'undefined' && VR.game && VR.game.state === 'title').catch(() => false)) break; } await pg.evaluate(() => { const g = VR.game; window.requestAnimationFrame = () => 0; g.applyPreset('high'); g.settings.dynRes = false; g.applySettings('*'); }); return pg; };
+      const pb = await mk(DIST_BEFORE, 'hi-before'), pa = await mk(DIST, 'hi-after'), A = [], B = [];
+      const args = [3, PLACES.canyon.cam, PLACES.canyon.yaw, PITCH, 11900];
+      for (let r = 0; r < 3; r++) { if (r % 2 === 0) B.push(await pb.evaluate(HB, args)); A.push(await pa.evaluate(HB, args)); if (r % 2 === 1) B.push(await pb.evaluate(HB, args)); }
+      const md = (v) => { const s = [...v].sort((x, y) => x - y); return s[s.length >> 1]; }, o = { size: A[0].size };
+      for (const k of ['noon', 'dusk', 'night']) o[k] = { after: md(A.map(x => x[k])), before: md(B.map(x => x[k])), ratio: +(md(A.map((x, i) => x[k] / B[i][k]))).toFixed(3) };
+      hiSky = Object.assign(hiSky || {}, { pair: o });
+      console.log('high sky pass, both builds at the title in turns ' + JSON.stringify(o));
+      await pb.close().catch(() => {}); await pa.close().catch(() => {});
+    } catch (e) { console.log('  (high pair bench: ' + String(e.message).split('\n')[0] + ')'); }
+  }
 }
 
 // ---------------------------------------------------------------- the checks
@@ -350,7 +382,8 @@ if (before) for (const h of ['noon', 'golden', 'dusk']) {
   check(ma <= mb + 0.5, `${h}: the mean ΔE over its views ${mb.toFixed(2)} → ${ma.toFixed(2)} (not worse)`);
 }
 if (skyRatio !== null) check(skyRatio <= 1.05, `Very Low: the sky pass not slower than the build before's (the rounds' median ratio ${skyRatio.toFixed(3)})`);
-fs.writeFileSync(TMP + 'sky3_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, view: r.view, place: r.place, hour: r.hour, kind: r.kind, preset: r.preset, note: r.note, H: r.H, sky: r.sky, space: r.space, stars: r.stars, chroma: r.chroma, haze: r.haze, dE: r.dE, curve: r.curve ? r.curve.map(b => ({ n: b.n, rgb: b.rgb, lab: b.lab, L: b.L, C: b.C, h: b.h })) : null, geo: r.geo })), sky: { ratio: skyRatio, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) }, hiSky }, null, 1));
+if (sameSky !== null) check(sameSky, 'Very Low: the sky program uses the same uniforms as the build before\'s (no new work in it)');
+fs.writeFileSync(TMP + 'sky3_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, view: r.view, place: r.place, hour: r.hour, kind: r.kind, preset: r.preset, note: r.note, H: r.H, sky: r.sky, space: r.space, stars: r.stars, chroma: r.chroma, haze: r.haze, dE: r.dE, curve: r.curve ? r.curve.map(b => ({ n: b.n, rgb: b.rgb, lab: b.lab, L: b.L, C: b.C, h: b.h })) : null, geo: r.geo })), sky: { ratio: skyRatio, same: sameSky, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) }, hiSky }, null, 1));
 
 // ---------------------------------------------------------------- the sheet: the game beside the trailer frame of its hour
 {
