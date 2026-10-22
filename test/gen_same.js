@@ -37,9 +37,19 @@ let h12 = 2166136261 >>> 0;
 { const g12 = V.makeGen('overworld', 53, { vgen: 12 }); for (const [cx, cz] of [[-59, -19], [-60, -19], [-61, -19], [-59, -18]]) { const c = g12.generate(cx, cz); h12 = fnv(h12, c.blocks); if (c.biome) h12 = fnv(h12, c.biome); } }
 const hex12 = h12.toString(16).padStart(8, '0');
 console.log(`     vgen 12 · Weißstadt's nave, seed 53: 4 columns, hash ${hex12}`);
-if (process.argv.includes('--write')) { console.log('record in test/gen_same.js: EXPECT =', JSON.stringify(hex), '· EXPECT12 =', JSON.stringify(hex12)); process.exit(0); }
-const ok = hex === EXPECT, ok12 = hex12 === EXPECT12;
+// vgen 13 (f-arrival: the trees' tops on their crowns, the vistas' views cleared as cones, the frames out of the eye's
+// face) has its own pin: seed 53's arrival — four chunks along the temple vista's cone — and two of seed 4242's woods (a
+// spruce stand on the ridge, a cherry grove)
+const EXPECT13 = 'a6bd3215';
+let h13 = 2166136261 >>> 0;
+{ for (const [seed, cols] of [[53, [[18, -12], [16, -11], [13, -10], [11, -8]]], [4242, [[-40, -2], [-24, 7]]]]) { const g13 = V.makeGen('overworld', seed, { vgen: 13 }); for (const [cx, cz] of cols) { const c = g13.generate(cx, cz); h13 = fnv(h13, c.blocks); if (c.biome) h13 = fnv(h13, c.biome); } } }
+const hex13 = h13.toString(16).padStart(8, '0');
+console.log(`     vgen 13 · seed 53's arrival cone and seed 4242's woods: 6 columns, hash ${hex13}`);
+if (process.argv.includes('--write')) { console.log('record in test/gen_same.js: EXPECT =', JSON.stringify(hex), '· EXPECT12 =', JSON.stringify(hex12), '· EXPECT13 =', JSON.stringify(hex13)); process.exit(0); }
+const ok = hex === EXPECT, ok12 = hex12 === EXPECT12, ok13 = hex13 === EXPECT13;
 console.log(ok ? '  ✓ the generated terrain is the same as before' : `  ✗ the terrain changed (expected ${EXPECT})`);
 console.log(ok12 ? '  ✓ vgen 12\'s hall city is as pinned' : `  ✗ vgen 12's hall city changed (expected ${EXPECT12})`);
-console.log(ok && ok12 ? 'ALL OK' : 'FAILED ' + ((ok ? 0 : 1) + (ok12 ? 0 : 1)));
-process.exit(ok && ok12 ? 0 : 1);
+console.log(ok13 ? '  ✓ vgen 13\'s arrival cone and woods are as pinned' : `  ✗ vgen 13's arrival cone and woods changed (expected ${EXPECT13})`);
+const nf = (ok ? 0 : 1) + (ok12 ? 0 : 1) + (ok13 ? 0 : 1);
+console.log(nf ? 'FAILED ' + nf : 'ALL OK');
+process.exit(nf ? 1 : 0);

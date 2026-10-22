@@ -177,12 +177,92 @@
   }
   function leadLoading(g, trip) { if (!g.ui || trip.uiLoading) return; trip.uiLoading = g.ui.loading; g.ui.loading = (msg, frac) => veilProgress(msg, frac); }
   function leadLoadingBack(g, trip) { if (g.ui && trip.uiLoading) { g.ui.loading = trip.uiLoading; trip.uiLoading = null; } }
+  // ---------------------------------------------------------------- f-arrival · Heimkehr faces out (R50-06)
+  // docs/superpowers/plans/2026-10-23-f-arrival.md §3.4. Heimkehr kept the yaw you had on the world you left: on an
+  // old world's spawn (the Hangar Hall's pad) that was often nose to nose with the hangar's craft, 2 m away. Now the
+  // arrival home looks out: the bearing (of 32) whose frame's middle third has the most room — rays at the eye through
+  // the loaded blocks and the ships' boxes, the ground under the feet not counted, 48 blocks at most —, the world's own
+  // spawn yaw (meta.spawnYaw: the generator's, or a vista start's view) kept when it has 8 m. Pure: get(x, y, z) → a
+  // block state; boxes [[x0, y0, z0, x1, y1, z1]…]; o {yaw0, pitch0, keep0, feet (the y of the feet), n, max, fov}.
+  // → {yaw, pitch, clear, kept}
+  Travel.FACE = { n: 32, max: 48, fov: 75, want: 8 };
+  Travel.facing = (get, eye, boxes, o) => {
+    o = o || {};
+    const R = VR.R, F = VR.F, n = o.n || Travel.FACE.n, max = o.max || Travel.FACE.max, th = Math.tan((o.fov || Travel.FACE.fov) * Math.PI / 360), A = 16 / 9;
+    const feet = Number.isFinite(o.feet) ? Math.floor(o.feet + 0.01) : Math.floor(eye[1] - 1.62 + 0.01);
+    const solid = (s) => { if (!s) return false; const f = R.T.flags[s]; return !!((f & (F.OPAQUE | F.LEAVES)) || ((f & F.SOLID) && !(f & F.PLANT))); };
+    const ray = (d) => {   // the nearest hit along d: a block (not the ground under the feet) or a box
+      let best = max;
+      for (const b of boxes || []) {
+        let t0 = -Infinity, t1 = Infinity;
+        for (let k = 0; k < 3; k++) { const iv = 1 / (d[k] || 1e-12), a = (b[k] - eye[k]) * iv, c = (b[k + 3] - eye[k]) * iv; t0 = Math.max(t0, Math.min(a, c)); t1 = Math.min(t1, Math.max(a, c)); }
+        if (t1 >= t0 && t1 > 0) best = Math.min(best, Math.max(0, t0));
+      }
+      let x = Math.floor(eye[0]), y = Math.floor(eye[1]), z = Math.floor(eye[2]);
+      const sx = d[0] > 0 ? 1 : -1, sy = d[1] > 0 ? 1 : -1, sz = d[2] > 0 ? 1 : -1;
+      const tdx = Math.abs(1 / (d[0] || 1e-12)), tdy = Math.abs(1 / (d[1] || 1e-12)), tdz = Math.abs(1 / (d[2] || 1e-12));
+      let tx = (d[0] > 0 ? x + 1 - eye[0] : eye[0] - x) * tdx, ty = (d[1] > 0 ? y + 1 - eye[1] : eye[1] - y) * tdy, tz = (d[2] > 0 ? z + 1 - eye[2] : eye[2] - z) * tdz, t = 0;
+      while (t < best) {
+        if (y >= feet && solid(get(x, y, z))) return t;
+        if (y < feet - 1 && d[1] < 0) break;   // (under the ground's own level: the floor, not a wall)
+        if (tx < ty && tx < tz) { t = tx; tx += tdx; x += sx; } else if (ty < tz) { t = ty; ty += tdy; y += sy; } else { t = tz; tz += tdz; z += sz; }
+      }
+      return best;
+    };
+    const clearAt = (yaw, pitch) => {   // the frame's middle third (its middle ninth: a third across, a third up): 5 × 3 rays
+      const cp = Math.cos(pitch || 0), sp = Math.sin(pitch || 0), f = [-Math.sin(yaw) * cp, sp, -Math.cos(yaw) * cp], r = [Math.cos(yaw), 0, -Math.sin(yaw)];
+      const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]], d = [0, 0, 0];
+      let m = max;
+      for (let j = 0; j < 3; j++) for (let i = 0; i < 5; i++) {
+        const a = (-1 / 3 + i / 4 * (2 / 3)) * th * A, b = (-1 / 3 + j / 2 * (2 / 3)) * th;
+        for (let k = 0; k < 3; k++) d[k] = f[k] + r[k] * a + u[k] * b;
+        const l = Math.hypot(d[0], d[1], d[2]); d[0] /= l; d[1] /= l; d[2] /= l;
+        m = Math.min(m, ray(d));
+      }
+      return m;
+    };
+    const want = o.want || Travel.FACE.want, p0 = Number.isFinite(o.pitch0) ? o.pitch0 : 0;
+    // (a curated view — a vista start's home looks along its walk, its low walls, bench and lanterns the picture's foot,
+    // at its landmark — is kept as it is: o.keep0)
+    if (Number.isFinite(o.yaw0)) { const c0 = clearAt(o.yaw0, p0); if (c0 >= want || o.keep0) return { yaw: o.yaw0, pitch: p0, clear: c0, kept: true }; }
+    let best = null;
+    for (let k = 0; k < n; k++) {
+      const yaw = k * 2 * Math.PI / n, c = clearAt(yaw, p0);
+      const turn = Number.isFinite(o.yaw0) ? Math.abs(Math.atan2(Math.sin(yaw - o.yaw0), Math.cos(yaw - o.yaw0))) : 0;
+      if (!best || c > best.clear + 1 || (Math.abs(c - best.clear) <= 1 && turn < best.turn)) best = { yaw, clear: c, turn };
+    }
+    return { yaw: best.yaw, pitch: p0, clear: best.clear, kept: false };
+  };
+  // the ships near the home as boxes (a ship whose design is still being built: a shuttle's box round its spot)
+  Travel.shipBoxes = (g, eye, r) => {
+    const out = [], S = g && g.starships; if (!S || !S.ships) return out;
+    for (const s of S.ships) {
+      if (!s || !s.pos || Math.abs(s.pos[0] - eye[0]) > r || Math.abs(s.pos[2] - eye[2]) > r) continue;
+      const m = s.d && s.d.meta, hw = m && m.bounds ? Math.max(m.bounds[3] - m.bounds[0], m.bounds[5] - m.bounds[2]) / 2 + 0.5 : 12, h = m && m.height ? m.height : 10;
+      out.push([s.pos[0] - hw, s.pos[1] - 1, s.pos[2] - hw, s.pos[0] + hw, s.pos[1] + h, s.pos[2] + hw]);
+    }
+    return out;
+  };
+  // the first frame home: the player faces out (the veil opens on that)
+  Travel.faceHome = (g, trip) => {
+    const p = g && g.player, w = g && g.world; if (!p || !w || !p.pos) return null;
+    const eye = [p.pos[0], p.pos[1] + (p.eye || 1.62), p.pos[2]], m = g.meta || {};
+    const ws = Array.isArray(m.worldSpawn) ? m.worldSpawn : p.spawn;
+    const atSpawn = Array.isArray(ws) && Math.hypot(ws[0] - p.pos[0], ws[2] - p.pos[2]) < 2.5;
+    const yaw0 = atSpawn && Number.isFinite(m.spawnYaw) ? m.spawnYaw : undefined, vista = atSpawn && !!m.vistaId;   // (a vista start: its walk's view, kept)
+    const pitch0 = vista && Number.isFinite(m.spawnPitch) ? m.spawnPitch : 0;
+    const f = Travel.facing((x, y, z) => w.getBlock(x, y, z), eye, Travel.shipBoxes(g, eye, 48), { yaw0, pitch0, feet: p.pos[1], keep0: vista });
+    p.yaw = f.yaw; if ('viewYaw' in p) p.viewYaw = f.yaw; p.pitch = f.pitch;
+    if (trip) trip.face = { yaw: +f.yaw.toFixed(3), pitch: +f.pitch.toFixed(3), clear: +f.clear.toFixed(1), kept: f.kept };
+    return f;
+  };
   // the first frame in the new world: the veil opens, a line says where you are, the save knows it
   function arrived(g, S) {
     const trip = S.arriving; S.arriving = null;
     leadLoadingBack(g, trip);
+    if (trip && (trip.via === 'home' || trip.via === 'herz' || trip.via === 'spawn' || trip.via === 'respawn')) { try { Travel.faceHome(g, trip); } catch (e) { console.warn('travel: facing', e); } }   // f-arrival (R50-06)
     trip.tPlay = now();
-    Travel.last = { from: trip.from, to: trip.to, via: trip.via, veilMs: Math.round(trip.tSwitch - trip.t0), loadMs: Math.round(trip.tPlay - trip.tSwitch), totalMs: Math.round(trip.tPlay - trip.t0) };
+    Travel.last = { from: trip.from, to: trip.to, via: trip.via, veilMs: Math.round(trip.tSwitch - trip.t0), loadMs: Math.round(trip.tPlay - trip.tSwitch), totalMs: Math.round(trip.tPlay - trip.t0), face: trip.face || null };   // (f-arrival: face — Heimkehr's view out)
     if (VR.NewLife) VR.NewLife.arrived(g, trip);   // u-home: the far lane back, the trip's phases, Heimkehr's ships to the home pad
     S.trip = null; S.armed = false;   // (arrived in a gate: it waits until you have stepped out)
     veilHide();

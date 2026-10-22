@@ -972,13 +972,16 @@
   }
   LAND.plantTree = plantTree;
   const SP = 5, SOLO = 22;
-  function dressTrees(g, P, cx, cz, out) {
-    const x0 = cx * 16, z0 = cz * 16, w = new GEN.ColumnWriter(cx, cz, out.blocks), BIm = VR.BIOME.sky_meadow;
-    const meadowAt = (x, z, y) => g.biomeFor(g.climateAt(x, z), y - 1) === BIm;
-    // the woods: a jittered grid, one candidate a cell, kept by the wood's density there
-    for (let gz = Math.floor((z0 - 7) / SP); gz <= Math.floor((z0 + 22) / SP); gz++) for (let gx = Math.floor((x0 - 7) / SP); gx <= Math.floor((x0 + 22) / SP); gx++) {
+  // the trees of the land whose foot lies in [x0, x1] × [z0, z1] (and keep(x, z), when given), planted into the writer w —
+  // the woods (a jittered grid, one candidate a cell, kept by the wood's density there), the parkland's solo trees (a
+  // big tree alone in the meadow now and then: one candidate per 22 blocks), the plan's own (dressTrees per chunk, and
+  // f-arrival's sight model — gen_vista.js VISTA.sight — over a view: the same trees, planted into a recorder)
+  const meadowOf = (g) => { const BIm = VR.BIOME.sky_meadow; return (x, z, y) => g.biomeFor(g.climateAt(x, z), y - 1) === BIm; };
+  LAND.woodsTrees = function (g, P, w, x0, z0, x1, z1, keep) {
+    const meadowAt = meadowOf(g);
+    for (let gz = Math.floor(z0 / SP); gz <= Math.floor(z1 / SP); gz++) for (let gx = Math.floor(x0 / SP); gx <= Math.floor(x1 / SP); gx++) {
       const hx = M.hash2(gx, gz, g.seed ^ 0x7ee51) >>> 0, x = gx * SP + (hx % SP), z = gz * SP + ((hx >>> 8) % SP);
-      if (x < x0 - 7 || x > x0 + 22 || z < z0 - 7 || z > z0 + 22) continue;
+      if (x < x0 || x > x1 || z < z0 || z > z1 || (keep && !keep(x, z))) continue;
       const q = LAND.woodAt(g, x, z);
       if (((hx >>> 16) & 1023) / 1024 >= q.d * 0.85) continue;
       if (!treeOk(g, P, x, z)) continue;
@@ -986,12 +989,14 @@
       if (y <= SEA + 2 || !meadowAt(x, z, y)) continue;
       plantTree(w, q.kind, x, y, z, new VR.RNG((hx ^ 0x5bd1e995) >>> 0));
     }
-    // the parkland: a big tree alone in the meadow now and then (one candidate per 22 blocks)
-    for (let gz = Math.floor((z0 - 8) / SOLO); gz <= Math.floor((z0 + 23) / SOLO); gz++) for (let gx = Math.floor((x0 - 8) / SOLO); gx <= Math.floor((x0 + 23) / SOLO); gx++) {
+  };
+  LAND.soloTrees = function (g, P, w, x0, z0, x1, z1, keep) {
+    const meadowAt = meadowOf(g);
+    for (let gz = Math.floor(z0 / SOLO); gz <= Math.floor(z1 / SOLO); gz++) for (let gx = Math.floor(x0 / SOLO); gx <= Math.floor(x1 / SOLO); gx++) {
       const hx = M.hash2(gx, gz, g.seed ^ 0x501a) >>> 0;
       if ((hx & 1023) / 1024 > 0.42) continue;
       const x = gx * SOLO + 3 + ((hx >>> 10) % (SOLO - 6)), z = gz * SOLO + 3 + ((hx >>> 18) % (SOLO - 6));
-      if (x < x0 - 8 || x > x0 + 23 || z < z0 - 8 || z > z0 + 23) continue;
+      if (x < x0 || x > x1 || z < z0 || z > z1 || (keep && !keep(x, z))) continue;
       if (LAND.woodAt(g, x, z).d > 0.05 || !treeOk(g, P, x, z)) continue;
       if (LAND.keepAt(P, x + 2, z) || LAND.keepAt(P, x - 2, z) || LAND.keepAt(P, x, z + 2) || LAND.keepAt(P, x, z - 2)) continue;
       const y = g.surfaceY(x, z) + 1;
@@ -999,8 +1004,16 @@
       const rng = new VR.RNG((hx ^ 0x2545f491) >>> 0), r = rng.next();
       if (r < 0.5) GEN.TREES.fancyOak(w, x, y, z, rng); else if (r < 0.8) GEN.TREES.roundTree(w, x, y, z, rng, { r: 3.2, h: 4 }); else GEN.TREES.oak(w, x, y, z, rng, { h: 6 });
     }
+  };
+  LAND.planTree = function (g, w, t) { const rng = new VR.RNG(M.hash2(t.x, t.z, g.seed ^ 0x9091) >>> 0); if (t.kind === 'poplar') GEN.TREES.poplar(w, t.x, t.y, t.z, rng, { color: t.color }); else plantTree(w, t.kind, t.x, t.y, t.z, rng, true); };
+  function dressTrees(g, P, cx, cz, out) {
+    const x0 = cx * 16, z0 = cz * 16, w = new GEN.ColumnWriter(cx, cz, out.blocks);
+    w.v13 = GEN.treeFix(g);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
+    LAND.woodsTrees(g, P, w, x0 - 7, z0 - 7, x0 + 22, z0 + 22);
+    LAND.soloTrees(g, P, w, x0 - 8, z0 - 8, x0 + 23, z0 + 23);
     // the plan's own trees (the poplar rows along the farm lanes, the orchards' neighbours)
-    if (P.treesBy) { const list = P.treesBy.get(cx * 4096 + cz); if (list) for (const t of list) { const rng = new VR.RNG(M.hash2(t.x, t.z, g.seed ^ 0x9091) >>> 0); if (t.kind === 'poplar') GEN.TREES.poplar(w, t.x, t.y, t.z, rng, { color: t.color }); else plantTree(w, t.kind, t.x, t.y, t.z, rng, true); } }
+    if (P.treesBy) { const list = P.treesBy.get(cx * 4096 + cz); if (list) for (const t of list) LAND.planTree(g, w, t); }
+    if (w.v13) GEN.pruneLeaves(out.blocks, SEA + 2, 240);   // (f-arrival, vgen 13: no stray leaf cell left beside a crown)
   }
   // the ground: the woods' floor (ferns, litter, moss, mushrooms, podzol and coarse earth under the dark woods and the
   // conifers), the woods' edges (tall grass, bushes), the meadow (grass, tall grass in patches, flower drifts: one kind

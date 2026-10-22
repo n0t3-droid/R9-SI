@@ -469,6 +469,7 @@
     }
     // ---- multi-column features from the 3x3 neighbourhood ----
     const w = new GEN.ColumnWriter(cx, cz, blocks);
+    w.v13 = GEN.treeFix(g);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) realmFeatures(g, w, cx + dx, cz + dz, out.chests);
     // ---- large structures (outposts, craters) ----
     structures(g, w, cx, cz, out);
