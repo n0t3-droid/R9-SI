@@ -5,7 +5,8 @@
 //   analyze({events, samples, t0, t1, exclude}) — events {t, kind, sub, w, inView}; samples {t, movers, landmark, sky,
 //   input, place, x, z}; exclude: windows [a, b] whose time leaves the clock (a part skipped because its feature does not
 //   exist yet: its minutes leave the targets). The definitions:
-//   · weighted: events of weight ≥ 2 in view; per minute of the session's (active) time;
+//   · weighted: events of weight ≥ 2 in view; per minute of the session's (active) time; one moment told by two sources
+//     (the same sub within 2 s: the festival and its milestone toast) counts once, the heavier (merged: how many);
 //   · gaps: between consecutive weighted events, the session's edges included (start → first, last → end); the longest
 //     (the first of equals) and the p90 (nearest rank); a session with none has one gap, its whole length;
 //   · movers · landmark · sky · lmSky: the shares of the samples with a moving actor in view, a known landmark, a sky event,
@@ -20,7 +21,7 @@
 (function (VR) {
   'use strict';
   const SS = VR.SessionStats = VR.SessionStats || {};
-  const WIN = 600, SPAM = 8, MAJOR_GAP = 60;
+  const WIN = 600, SPAM = 8, MAJOR_GAP = 60, ONE = 2;
 
   SS.p90 = function (list) {
     if (!list || !list.length) return 0;
@@ -49,9 +50,18 @@
     const dur = C.dur, minutes = dur / 60, per10 = (n) => (minutes > 0 ? n * 10 / minutes : 0);
     const m = { t0, t1, dur, minutes, events: { n: evs.length, inView: evs.filter(e => e.inView).length }, samples: smp.length };
 
-    // the weighted events and the gaps between them (on the active clock)
-    const W = evs.filter(e => e.w >= 2 && e.inView);
-    m.weighted = { n: W.length, perMin: minutes > 0 ? W.length / minutes : 0 };
+    // the weighted events — one moment told by two sources (the festival opening and its milestone toast; two craft of
+    // one flyby: the same sub within 2 s) counts once, the heavier — and the gaps between them (on the active clock)
+    const W = [];
+    let merged = 0;
+    for (const e of evs) {
+      if (!(e.w >= 2 && e.inView)) continue;
+      let j = W.length - 1;
+      while (j >= 0 && !(e.sub && W[j].sub === e.sub) && e.t - W[j].t < ONE) j--;
+      if (j >= 0 && e.sub && W[j].sub === e.sub && e.t - W[j].t < ONE) { merged++; if (e.w > W[j].w) W[j] = Object.assign({}, e, { t: W[j].t }); continue; }
+      W.push(e);
+    }
+    m.weighted = { n: W.length, perMin: minutes > 0 ? W.length / minutes : 0, merged };
     const gaps = [];
     let pa = t0, pc = 0;
     for (const e of W) { const c = C.at(e.t); gaps.push({ a: pa, b: e.t, d: +(c - pc).toFixed(3) }); pa = e.t; pc = c; }

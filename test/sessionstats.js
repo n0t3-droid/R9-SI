@@ -81,6 +81,12 @@ const S = (t, o) => Object.assign({ t, movers: 0, landmark: '', sky: '', input: 
   check(m.spam.n === 2 && near(m.spam.per10, 20) && m.spam.pairs.length === 2, `spam: two weighted pairs closer than 8 s (0.5–5, 20–26) → ${m.spam.n}, ${m.spam.per10} per 10 minutes`);
 }
 {
+  // one moment told by two sources (the festival opens, its milestone toast comes with it): it counts once, the heavier
+  const ev = [E(10, 3, true, 'social', 'festival'), E(10.2, 2, true, 'travel', 'flyby'), E(10.4, 2, true, 'milestone', 'festival'), E(11.5, 2, true, 'travel', 'flyby'), E(40, 2, true, 'sky', 'balloon')];
+  const m = SS.analyze({ t0: 0, t1: 60, events: ev, samples: [] });
+  check(m.weighted.n === 3 && m.weighted.merged === 2 && m.spam.n === 1 && m.gaps.list.length === 4, `one moment told twice within 2 s (the festival and its milestone toast; a flyby seen twice) counts once: ${m.weighted.n} weighted, ${m.weighted.merged} merged, spam ${m.spam.n}`);
+}
+{
   const m = SS.analyze({ t0: 0, t1: 300, events: [E(10, 4, true, 'encounter'), E(50, 4, true, 'story'), E(200, 5, true, 'milestone'), E(250, 4, false, 'encounter')], samples: [] });
   check(m.majors.n === 3 && near(m.majors.perMin, 0.6) && m.majors.close === 1, `majors (weight ≥ 4 in view): ${m.majors.n}, ${m.majors.perMin} a minute, ${m.majors.close} pair under 60 s`);
   check(m.encounters.n === 2 && near(m.encounters.per10, 4) && m.story.n === 1 && near(m.story.per10, 2), `encounters ${m.encounters.n} (${m.encounters.per10} / 10 min, in view or not), story beats ${m.story.n} (${m.story.per10} / 10 min)`);
