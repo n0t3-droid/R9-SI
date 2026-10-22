@@ -145,12 +145,16 @@ try {
     await ev(() => VR.game.env.setTime(5200));
     const st = await arrive({ x: out[0], y: out[1] + 6, z: out[2] + 30 });
     console.log('     ' + JSON.stringify(st));
-    await run(60);
-    // the pad as the columns tell it (the same pure reading liberate.js does)
-    const pad = await ev((o) => { const g = VR.game, w = g.world; let best = null; for (const c of w.cols.values()) { if (!c.ready || !c.spawns) continue; for (const s of VR.Liberate.fromSpawns(c.spawns, (x, y, z) => w.getBlock(x, y, z))) { const d = Math.hypot(s.x - o[0], s.z - o[2]); if (!best || d < best.d) best = Object.assign({ d }, s); } } return best; }, out);
+    // the pad as the columns tell it (the same pure reading liberate.js does: the parked ship's spawn, then the beacon
+    // once its column is in — it may stand in the next one)
+    let pad = null;
+    for (let i = 0; i < 80 && !(pad && pad.loaded); i++) {
+      await run(10); await wait(150);
+      pad = await ev((o) => { const g = VR.game, w = g.world, L = VR.Liberate; let best = null; for (const c of w.cols.values()) { if (!c.ready || !c.spawns) continue; for (const q of L.padsOf(c.spawns)) { const d = Math.hypot(q.x - o[0], q.z - o[2]); if (d < 160 && (!best || d < best.d)) best = Object.assign({ d }, q); } } if (!best) return null; best.loaded = w.isLoaded(best.beacon[0], best.beacon[2]); best.outpost = best.loaded && L.isOutpost(best, (x, y, z) => w.getBlock(x, y, z)); return best; }, out);
+    }
     console.log('     the pad: ' + JSON.stringify(pad));
-    check(!!pad && pad.d < 120, 'its pad in the loaded columns, the launch beacon on it (' + (pad ? pad.id + ', ' + pad.d.toFixed(0) + ' m from the worker\'s place' : 'none') + ')');
-    if (!pad) return;
+    check(!!pad && pad.outpost, 'its pad in the loaded columns, the launch beacon on it (' + (pad ? pad.id + ', ' + pad.d.toFixed(0) + ' m from the worker\'s place' : 'none') + ')');
+    if (!pad || !pad.outpost) return;
     out = [pad.x, pad.y, pad.z]; N.pad = pad;
     await ev((id) => { window.__site = id; }, pad.id);
     const w = await ev(() => { const g = VR.game; return { on: VR.Foes.on(g), adv: !!(VR.Adventure.on && VR.Adventure.on()), foes: window.__ft.foes().length, sites: VR.Liberate.sites().size }; });

@@ -171,18 +171,24 @@
   };
   // outposts in a column's spawns: the pad's parked ship ['starship', seed, x, y + 1, z, dir] with the launch beacon
   // (or already our Leuchtfeuer) at rot(−6, 6) on the pad — a village's pad has none
-  L.fromSpawns = function (spawns, getBlock) {
-    const out = [], R = VR.R; if (!Array.isArray(spawns) || !R) return out;
-    const lb = R.byName.launch_beacon, lf = R.byName.leuchtfeuer;
+  // (the pads first — every parked ship's spawn; then the beacon decides. The beacon may stand in the next column, so
+  // the glue waits until that one is loaded: L.pend)
+  L.padsOf = function (spawns) {
+    const out = []; if (!Array.isArray(spawns)) return out;
     for (const s of spawns) {
       if (!Array.isArray(s) || s[0] !== 'starship' || s.length < 6) continue;
-      const x = s[2] | 0, y1 = s[3] | 0, z = s[4] | 0, dir = s[5] | 0, b = L.beaconOf(x, y1 - 1, z, dir);
-      const st = getBlock(b[0], b[1], b[2]), ty = st ? R.T.type[st] : -1;
-      if (!((lb && ty === lb.id) || (lf && ty === lf.id))) continue;
-      out.push({ id: x + '_' + z, x, y: y1 - 1, z, dir, beacon: b });
+      const x = s[2] | 0, y1 = s[3] | 0, z = s[4] | 0, dir = s[5] | 0;
+      out.push({ id: x + '_' + z, x, y: y1 - 1, z, dir, beacon: L.beaconOf(x, y1 - 1, z, dir) });
     }
     return out;
   };
+  L.isOutpost = function (pad, getBlock) {
+    const R = VR.R; if (!R || !pad) return false;
+    const lb = R.byName.launch_beacon, lf = R.byName.leuchtfeuer, b = pad.beacon;
+    const st = getBlock(b[0], b[1], b[2]), ty = st ? R.T.type[st] : -1;
+    return !!((lb && ty === lb.id) || (lf && ty === lf.id));
+  };
+  L.fromSpawns = (spawns, getBlock) => L.padsOf(spawns).filter(p => L.isOutpost(p, getBlock));
   L.travelTargets = function (freed, here) {
     const out = [];
     for (const f of freed || []) { const b = f.beacon || [f.x, f.y, f.z]; const d = Math.hypot(b[0] - here[0], b[2] - here[2]); if (d < 8) continue; out.push(Object.assign({ d }, f)); }
@@ -206,11 +212,11 @@
   const rec = () => (VR.Adventure && VR.Adventure.rec) || null;
   L.cost = { frames: 0, ms: 0, fx: 0, fxMs: 0 };
   // this world's sites (a fresh table for every world)
-  const W0 = { world: null, sites: new Map(), ruins: new Map(), asked: -1e9, askAt: null, listener: null, vil: new Map() };
+  const W0 = { world: null, sites: new Map(), ruins: new Map(), asked: -1e9, askAt: null, listener: null, vil: new Map(), pend: new Map() };
   L.W = W0;
   function bind(g) {
     if (W0.world === g.world) return;
-    W0.world = g.world; W0.sites = new Map(); W0.ruins = new Map(); W0.asked = -1e9; W0.askAt = null; W0.vil = new Map();
+    W0.world = g.world; W0.sites = new Map(); W0.ruins = new Map(); W0.asked = -1e9; W0.askAt = null; W0.vil = new Map(); W0.pend = new Map();
     L.moment = null; L.calmSt = null; L.closePuzzle(); L.ringSite = null;
     const r0 = rec();
     if (r0 && r0.sites) for (const id in r0.sites) { const s = L.load(r0, id); if (s) { s.known = true; W0.sites.set(s.id, s); } }   // (saved only once seen: known)
@@ -231,7 +237,11 @@
     if (!c) return;
     if (c.spawns && c.spawns.length) {
       const w = g.world;
-      for (const o of L.fromSpawns(c.spawns, (x, y, z) => w.getBlock(x, y, z))) L.know(g, o);
+      for (const pad of L.padsOf(c.spawns)) {
+        if (W0.sites.has(pad.id) && W0.sites.get(pad.id).known) continue;
+        if (!w.isLoaded(pad.beacon[0], pad.beacon[2])) { W0.pend.set(pad.id, pad); continue; }   // (its beacon's column comes later)
+        if (L.isOutpost(pad, (x, y, z) => w.getBlock(x, y, z))) L.know(g, pad);
+      }
     }
     if (c.blockEntities && c.blockEntities.size) for (const [k, v] of c.blockEntities) if (v && v.loot === 'ruin') {
       const x = c.cx * 16 + (k & 15), z = c.cz * 16 + ((k >> 4) & 15), id = 'r' + x + '_' + z;
@@ -317,7 +327,9 @@
   };
   // four times a second: the beacons' state, the sparks of a disturbed outpost, the Helfer of a freed one
   L.look = function (g) {
-    const p = g.player.pos, P = g.particles, En = g.entities;
+    const p = g.player.pos, P = g.particles, En = g.entities, w = g.world;
+    // a pad whose beacon's column was not loaded yet: decided once it is (an outpost's beacon, or a village's pad)
+    if (W0.pend.size) for (const [id, pad] of W0.pend) { if (!w.isLoaded(pad.beacon[0], pad.beacon[2])) continue; W0.pend.delete(id); if (L.isOutpost(pad, (x, y, z) => w.getBlock(x, y, z))) L.know(g, pad); }
     for (const s of W0.sites.values()) {
       if (!s.known) continue;
       const d = Math.hypot(p[0] - s.x, p[2] - s.z);

@@ -217,7 +217,7 @@ async function glue() {
     getBlock(x, y, z) { const k = x + ',' + y + ',' + z; if (edits.has(k)) return edits.get(k); return y <= 63 ? STONE : 0; },
     setBlock(x, y, z, s) { edits.set(x + ',' + y + ',' + z, s); return true; },
     topAt(x, z) { for (let y = 72; y > 63; y--) if (this.getBlock(x, y, z)) return y; return 63; },
-    isLoaded() { return true; }, getLight() { return 15 << 12; }, nbFn() { return null; },
+    isLoaded(x, z) { return !(this.unl && this.unl.has(Math.floor(x / 16) + ',' + Math.floor(z / 16))); }, getLight() { return 15 << 12; }, nbFn() { return null; },
   });
   let NEXT = 1;
   class En {
@@ -254,6 +254,18 @@ async function glue() {
   const s1 = L.siteOf(X1 + '_' + Z1);
   check(!!s1 && s1.known && s1.tier === 4, 'the outpost found in its column (' + (s1 ? s1.id + ', tier ' + s1.tier : 'none') + ')');
   check(g.world.getBlock(b1[0], b1[1], b1[2]) === LF.state({ frei: 0 }), 'its launch beacon became the red-violet Leuchtfeuer');
+  {
+    // a pad whose beacon stands in the next column, not loaded yet: decided when that column comes
+    const X4 = 3010, Z4 = 300, b4 = L.beaconOf(X4, 63, Z4, 0);
+    g.world.unl = new Set([Math.floor(b4[0] / 16) + ',' + Math.floor(b4[2] / 16)]);
+    check(Math.floor(b4[0] / 16) !== Math.floor(X4 / 16), 'a pad at ' + X4 + ': its beacon (x ' + b4[0] + ') in the next column');
+    pad(X4, Z4); sec(0.3);
+    const s4a = L.siteOf(X4 + '_' + Z4);
+    check(!s4a || !s4a.known, 'not decided while the beacon\'s column is missing');
+    g.world.unl = null; sec(0.3);
+    const s4 = L.siteOf(X4 + '_' + Z4);
+    check(!!s4 && s4.known && g.world.getBlock(b4[0], b4[1], b4[2]) === LF.state({ frei: 0 }), 'known once it came: its Leuchtfeuer placed');
+  }
   // the guardians and an encounter
   let minTele = 9, maxTok = 0; const teleAt = new Map(); let strikes = 0, hits0 = Fo.cost.hits;
   const watch = () => { p.health = 20; let tok = 0; for (const m of g.entities.mobs) { const f = m.foe; if (!f) continue; if (f.tok) tok++; if (f.st === 'tele' && !teleAt.has(m.id)) teleAt.set(m.id, g.time); if (f.st === 'strike' && teleAt.has(m.id)) { minTele = Math.min(minTele, g.time - teleAt.get(m.id)); teleAt.delete(m.id); strikes++; } if (f.st !== 'tele' && f.st !== 'strike') teleAt.delete(m.id); } maxTok = Math.max(maxTok, tok); };

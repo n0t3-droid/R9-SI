@@ -38,6 +38,7 @@
   F.REST = { normal: 150, rare: 400 };   // s a zone rests after an encounter (2–4 encounters per 10 min at most)
   F.DOWN_T = { stray: 2.4, drone: 1.3, shadow: 1.4 };   // s of the power-down (the dissolving)
   F.ZONE_R = { outpost: 40, ruin: 32 };
+  const PAD_R = 8.5;   // blocks: the outpost's pad and its parked ship — the strays walk round it
   // the kinds (hp in half-hearts: A§5's hearts × 2). att: kind, tele (the warning), strike, recover, cool [a, b] s,
   // dmg (half-hearts), range (m). keep [a, b]: the distance it likes; notice: how far it sees
   F.KINDS = {
@@ -242,7 +243,10 @@
     }
     switch (f.st) {
       case 'patrol': {
-        if (!f.tgt || f.t >= f.wait) { const a = W.rnd() * TAU, r = K.fixed ? 0 : 2 + W.rnd() * 5; f.tgt = [f.home[0] + Math.cos(a) * r, f.home[2] + Math.sin(a) * r]; f.wait = 2.5 + W.rnd() * 4; f.t = 0; }
+        if (!f.tgt || f.t >= f.wait) {
+          const a = W.rnd() * TAU, r = K.fixed ? 0 : 2 + W.rnd() * 5; f.tgt = [f.home[0] + Math.cos(a) * r, f.home[2] + Math.sin(a) * r]; f.wait = 2.5 + W.rnd() * 4; f.t = 0;
+          const z = f.zone; if (z && z.kind === 'outpost' && !K.fixed) { const zx = f.tgt[0] - z.x, zz = f.tgt[1] - z.z, zd = Math.hypot(zx, zz) || 1; if (zd < PAD_R) { f.tgt[0] = z.x + zx / zd * PAD_R; f.tgt[1] = z.z + zz / zd * PAD_R; } }   // (round the pad, not through the parked ship)
+        }
         if (K.fixed) { stop(m, dt); m.yaw += dt * 0.35; }
         else steer(m, f.tgt[0], f.tgt[1], K.speed * 0.45, dt);
         hover(m, W, f, K, dt);
@@ -835,10 +839,10 @@
     }
   };
   const mine = (En, siteId, pred) => { let n = 0; for (const m of En.mobs) { const f = m.foe; if (f && !f.gone && !f.remote && f.site === siteId && (!pred || pred(f))) n++; } return n; };
-  F.spot = function (g, x, z, r, rnd) {
-    const w = g.world;
+  F.spot = function (g, x, z, r, rnd, rmin) {
+    const w = g.world, r0 = rmin || 0;
     for (let k = 0; k < 10; k++) {
-      const a = rnd() * TAU, d = r * Math.sqrt(rnd()), xx = Math.floor(x + Math.cos(a) * d), zz = Math.floor(z + Math.sin(a) * d);
+      const a = rnd() * TAU, d = r0 + (r - r0) * Math.sqrt(rnd()), xx = Math.floor(x + Math.cos(a) * d), zz = Math.floor(z + Math.sin(a) * d);
       if (!w.isLoaded(xx, zz)) continue;
       const y = w.topAt(xx, zz), b = w.getBlock(xx, y, zz), R = VR.R, Fl = VR.F;
       if (!b || !(R.T.flags[b] & Fl.SOLID) || (R.T.flags[b] & Fl.FLUID)) continue;
@@ -864,7 +868,7 @@
   F.guard = function (g, En, s, idx, calm, ctx) {
     const L = VR.Liberate;
     const kind = !calm && idx === 0 && s.tier >= 4 && L.towerSpot ? 'crane' : (idx % 2 ? 'sentry' : 'driller');
-    const pt = kind === 'crane' ? L.towerSpot(s, g) : F.spot(g, s.x, s.z, 9, Math.random);
+    const pt = kind === 'crane' ? L.towerSpot(s, g) : F.spot(g, s.x, s.z, 14, Math.random, PAD_R);   // (round the pad: its middle holds the parked ship)
     if (!pt || !F.spawnOk(pt, ctx, kind).ok) return null;
     const m = En.summon('foe_' + kind, pt[0], pt[1], pt[2]); if (!m) return null;
     m.foe = F.make(kind, m.id, pt); m.foe.site = s.id; m.foe.zone = { id: 'o:' + s.id, kind: 'outpost', x: s.x, z: s.z, r: F.ZONE_R.outpost };
