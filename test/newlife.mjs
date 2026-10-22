@@ -9,10 +9,14 @@
 //      „🏠 ↑ Driftinseln — zum Schiff" (newlife_compass.png), ⏸ (newlife_pause_herz.png); 🏠 (the button) → the trip
 //      home, the shuttle recalled to the home pad (newlife_recall.png); 40 m off and a death → newlife_respawn_drift.png
 //      at home; 🌍 → Herzwelt
-//  3 · the frame at Herzwelt's spawn in both builds, Very Low and High (rounds in turns: ms, draws, triangles)
-//  4 · page A: ⏏ to the title, the worlds: newlife_card.png („Wohnt auf den Driftinseln · zuletzt auf Herzwelt" with the
-//      disc), newlife_worlds.png, every world's disc (newlife_discs.png); the sheet newlife_sheet.jpg
-//   nohup bash test/wt_run.sh newlife.mjs 4800 > .tmp_tests/newlife.log 2>&1 &
+//  3 · page A: ⏏ to the title, the worlds: newlife_card.png („Wohnt auf den Driftinseln · zuletzt auf Herzwelt" with the
+//      disc), newlife_worlds.png, every world's disc (newlife_discs.png)
+//  4 · the frame at Herzwelt's spawn in both builds on two fresh pages (the same history: the world made, settled),
+//      Very Low and High, rounds in turns (ms, draws, triangles); the sheet newlife_sheet.jpg
+// (run 1: a shot taken with page.screenshot waited 150 s for a frame now and then on the busy machine — the world's
+// pictures come from the canvas now, the DOM's after a shorter first try; the cost on pages with different histories
+// counted other things — fresh pages now)
+//   nohup bash test/wt_run.sh newlife.mjs 5400 > .tmp_tests/newlife.log 2>&1 &
 //   ROUNDS=2 · NO_COST=1 · N=8 · SEED=4242 · BEFORE_DIST=file:///…/index.html
 // regress: skip  (a showcase with pictures and the time against the build before; the gate is test/newlife.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -58,12 +62,21 @@ async function openWorld(dist, preset, rd) {
     await boost(false);
     return s;
   };
+  // the page with its DOM (pause menu, compass, cards): a short first try, then longer ones, a frame drawn between
+  const draw = (frames) => ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames);
   const picture = async (path, frames = 4, clip) => {
-    await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames);
-    for (let k = 0; k < 2; k++) {
-      try { await page.screenshot(Object.assign({ path, timeout: 150000 }, clip ? { clip } : {})); return true; } catch (e) { console.log(`  !! screenshot ${path.replace(/^.*\//, '')} failed (${String(e.message || e).split('\n')[0].slice(0, 120)})`); }
+    await draw(frames);
+    for (const ms of [45000, 90000, 150000]) {
+      try { await page.screenshot(Object.assign({ path, timeout: ms }, clip ? { clip } : {})); return true; } catch (e) { console.log(`  !! screenshot ${path.replace(/^.*\//, '')} failed after ${ms / 1000} s (${String(e.message || e).split('\n')[0].slice(0, 100)})`); }
+      await draw(1);
     }
     return false;
+  };
+  // the world alone: the canvas right after its frames (no compositor frame to wait for); page.screenshot if that fails
+  const grab = async (path, frames = 4) => {
+    const url = await ev((frames) => { try { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; } catch (e) { window.__norender = true; return null; } }, frames);
+    if (url && url.length > 2000) { fs.writeFileSync(path, Buffer.from(url.split(',')[1], 'base64')); return true; }
+    return picture(path, frames);
   };
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   await ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; if (rd) g.settings.renderDist = rd; g.applySettings('*'); }, [preset, rd]);
@@ -71,7 +84,7 @@ async function openWorld(dist, preset, rd) {
   for (let i = 0; i < 240; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   const ok = await ev(() => VR.game.state) === 'play';
   await ev(() => { const g = VR.game; window.__raf = window.requestAnimationFrame.bind(window); window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.env.wx.force('klar'); g.env.setTime(6000); if (!document.getElementById('__nohint')) { const st = document.createElement('style'); st.id = '__nohint'; st.textContent = '#hints,#lockhint{display:none !important}'; document.head.appendChild(st); } });
-  return { ctx, page, logs, ev, wait, step, settle, picture, ok };
+  return { ctx, page, logs, ev, wait, step, settle, picture, grab, ok };
 }
 // a trip started by `start` (in the page): the frames stepped until the first frame in `to`
 // (both builds: the near 5 × 5 round the player sampled after every batch of frames — the first column, all of them
@@ -143,11 +156,20 @@ check(runs.on.every(x => x.arrived) && runs.off.every(x => x.arrived) && runs.be
 check(runs.on.every(x => x.phases && x.phases.adopted >= 20), `keep on: the home's columns are adopted (${runs.on.map(x => x.phases && x.phases.adopted).join(', ')})`);
 check(runs.off.every(x => x.phases && x.phases.adopted === 0), 'keep off: nothing adopted');
 if (B) check(mOn !== null && mB !== null && mOn < mB * 0.5, `Heimkehr with the home kept: ${mOn} ms against ${mB} ms before (×${mB ? (mOn / mB).toFixed(2) : '?'}); keep off ${mOff} ms (×${mB ? (mOff / mB).toFixed(2) : '?'})`);
+if (B) {   // (page B's part is done: closed, the story has the machine)
+  const errs = B.logs.filter(l => l.startsWith('[pageerror]'));
+  check(errs.length === 0, `page B: no page error (${errs.length})`);
+  await B.ctx.close();
+}
 
 // ================================================================ 2 · the story (page A)
 console.log(`the story (${secs()})`);
 const S = rec.story;
-// a shuttle left on Herzwelt's apron
+// every chat line from here on (#chatlog lets a line go after 10 s)
+await A.ev(() => { const ui = VR.game.ui; if (!ui.__cl) { ui.__cl = ui.chatLine; window.__said = []; ui.chatLine = function (t, c) { window.__said.push(String(t)); return ui.__cl.call(this, t, c); }; } });
+// a shuttle left on Herzwelt's apron (the temple's own hangar shuttle stands there too: the world made it — it stays)
+S.ownShips = await A.ev(() => VR.game.starships.ships.filter(q => q.key).map(q => ({ key: q.key, seed: q.d.seed, pos: q.pos.map(v => +v.toFixed(1)) })));
+console.log('  the world\'s own ships on Herzwelt', JSON.stringify(S.ownShips));
 await A.ev(() => { const g = VR.game; g.starships.spawn(7777, 'shuttle', null, [0.5, 81, 34.5], 0, null); });
 for (let i = 0; i < 120; i++) { await A.step(10, 33); if (await A.ev(() => { const s = VR.game.starships.ships.find(q => q.d.seed === 7777); return !!(s && s.d.meta); })) break; await A.wait(200); }   // (its design built: a ship without one is not in the save yet)
 S.shipOnHerz = await A.ev(() => { const s = VR.game.starships.ships.find(q => q.d.seed === 7777); return s ? { pos: s.pos.map(v => +v.toFixed(1)), built: !!s.d.meta } : null; });
@@ -162,7 +184,7 @@ check(S.rowDriftBefore.some(b => b.act === 'sethome' && b.text === '📍 Hier wo
 await A.picture(SHOTS + 'newlife_pause_drift0.png', 3);
 check(await click(A, 'sethome'), 'the 📍 button is clicked');
 await A.step(4, 33);
-S.home = await A.ev(() => { const g = VR.game; return { home: g.meta.universe && g.meta.universe.home, chat: [...document.querySelectorAll('#chatlog div')].slice(-2).map(d => d.textContent) }; });
+S.home = await A.ev(() => { const g = VR.game; return { home: g.meta.universe && g.meta.universe.home, chat: (window.__said || []).slice(-2) }; });
 console.log('  home', JSON.stringify(S.home));
 check(S.home.home && S.home.home.dim === 'drift', 'the drift is the home now (meta.universe.home)');
 S.rowDrift = await pauseRow(A);
@@ -195,15 +217,42 @@ check(sHome.arrived && sHome.nl && sHome.nl.via === 'home', '🏠 travels home t
 check(sHome.nl && sHome.nl.adopted >= 20, `the drift home's columns are adopted (${sHome.nl && sHome.nl.adopted}; ${sHome.last && sHome.last.totalMs} ms)`);
 await A.settle(80, 8);
 await A.step(60, 33);   // (the shuttle's design, set down on the ground under the pad)
-S.recall = await A.ev(() => { const g = VR.game, p = g.player, h = g.meta.universe.home, s = g.starships.ships.find(q => q.d.seed === 7777); g.saveMeta(); const e = (g.meta.starships || []).find(q => q.seed === 7777); return { home: h.pos, player: p.pos.map(v => +v.toFixed(1)), ship: s ? s.pos.map(v => +v.toFixed(1)) : null, built: !!(s && s.d.meta), saved: e ? e.dim : null, chat: [...document.querySelectorAll('#chatlog div')].slice(-3).map(d => d.textContent) }; });
+S.recall = await A.ev(() => { const g = VR.game, p = g.player, h = g.meta.universe.home, s = g.starships.ships.find(q => q.d.seed === 7777); g.saveMeta(); const e = (g.meta.starships || []).find(q => q.seed === 7777); return { home: h.pos, player: p.pos.map(v => +v.toFixed(1)), ship: s ? s.pos.map(v => +v.toFixed(1)) : null, built: !!(s && s.d.meta), saved: e ? e.dim : null, here: g.starships.ships.map(q => q.d.seed), ownStay: (g.meta.starships || []).filter(q => q.key && q.dim === 'overworld').map(q => q.key), settling: g.nl && g.nl.settle ? g.nl.settle.length : 0, chat: (window.__said || []).slice(-3) }; });
 console.log('  recall', JSON.stringify(S.recall));
 check(S.recall.ship && Math.hypot(S.recall.ship[0] - S.recall.home[0], S.recall.ship[2] - S.recall.home[2]) < 30 && S.recall.saved === 'drift', 'the shuttle left on Herzwelt is at the drift home\'s pad (and saved there)');
-// look at the shuttle for the picture
-await A.ev(() => { const g = VR.game, p = g.player, s = g.starships.ships.find(q => q.d.seed === 7777); if (s) { const dx = s.pos[0] - p.pos[0], dz = s.pos[2] - p.pos[2]; p.yaw = Math.atan2(-dx, -dz); p.pitch = -0.08; } g.env.setTime(6000); });
+check(S.recall.ship && Math.abs(S.recall.ship[1] - S.recall.home[1]) <= 8 && !S.recall.settling, `set down near the home's level (${S.recall.ship && S.recall.ship[1]} against ${S.recall.home[1]})`);
+check(S.recall.chat.includes('🚀 Dein Schiff ist zurück am Landeplatz'), '„🚀 Dein Schiff ist zurück am Landeplatz" (one ship: the temple\'s own stayed)');
+check(!S.ownShips.length || S.ownShips.every(o => S.recall.ownStay.includes(o.key)), `the temple's own ship stays on Herzwelt (${JSON.stringify(S.recall.ownStay)})`);
+// a place to look at the shuttle from: 16 bearings round it (from the home's side first), the eye in the air and the
+// line to the ship clear; the player flies there
+S.vantage = await A.ev(() => {
+  const g = VR.game, w = g.world, p = g.player, fl = VR.R.T.flags, SOL = VR.F.SOLID, h = g.meta.universe.home.pos;
+  const s = g.starships.ships.find(q => q.d.seed === 7777); if (!s) return null;
+  const m = s.d.meta, t = [s.pos[0], s.pos[1] + (m ? m.height * 0.45 : 2), s.pos[2]], R = Math.max(16, (m ? Math.max(m.length, m.width) : 12) * 1.3);
+  const solid = (x, y, z) => { const b = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(b && (fl[b] & SOL)); };
+  const a0 = Math.atan2(h[0] - s.pos[0], h[2] - s.pos[2]);
+  let best = null;
+  for (let k = 0; k < 16; k++) {
+    const a = a0 + ((k + 1) >> 1) * (k & 1 ? 1 : -1) * Math.PI / 8;
+    const e = [t[0] + Math.sin(a) * R, t[1] + 5, t[2] + Math.cos(a) * R];
+    if (solid(e[0], e[1], e[2]) || solid(e[0], e[1] - 1, e[2]) || solid(e[0], e[1] - 1.7, e[2])) continue;
+    const L = Math.hypot(t[0] - e[0], t[1] - e[1], t[2] - e[2]), n = Math.ceil(L * 2); let hits = 0;
+    for (let i = 1; i < n; i++) { const f = i / n; if (L * (1 - f) < 6) break; if (solid(e[0] + (t[0] - e[0]) * f, e[1] + (t[1] - e[1]) * f, e[2] + (t[2] - e[2]) * f)) hits++; }
+    if (!best || hits < best.hits) best = { hits, e, k };
+    if (!hits) break;
+  }
+  if (!best) return null;
+  const e = best.e; p.flying = true; p.teleport(e[0], e[1] - 1.62, e[2]);
+  const dx = t[0] - e[0], dy = t[1] - e[1], dz = t[2] - e[2];
+  p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)) - 0.02; g.env.setTime(6000);
+  return { eye: e.map(v => +v.toFixed(1)), hits: best.hits, k: best.k, R: +R.toFixed(1) };
+});
+console.log('  vantage', JSON.stringify(S.vantage));
 await A.step(10, 33);
-check(await A.picture(SHOTS + 'newlife_recall.png', 4), 'test/shots/newlife_recall.png — the shuttle at the home pad');
+await A.settle(20, 2);
+check(await A.grab(SHOTS + 'newlife_recall.png', 4), 'test/shots/newlife_recall.png — the shuttle at the home pad');
 // a death 40 m off: back at home, in the drift
-S.death = await A.ev(() => { const g = VR.game, p = g.player, h = g.meta.universe.home; p.teleport(h.pos[0] + 40, h.pos[1], h.pos[2]); p.die('void'); return { dead: p.dead, screen: g.ui.screen }; });
+S.death = await A.ev(() => { const g = VR.game, p = g.player, h = g.meta.universe.home; p.flying = false; p.teleport(h.pos[0] + 40, h.pos[1], h.pos[2]); p.die('void'); return { dead: p.dead, screen: g.ui.screen }; });
 await A.step(4, 33);
 await A.ev(() => { const b = document.querySelector('#death [data-act="respawn"]'); if (b) b.click(); else { VR.game.player.respawn(); VR.game.ui.resume(); } });
 await A.step(30, 33);
@@ -212,40 +261,17 @@ S.respawn = await A.ev(() => { const g = VR.game, p = g.player, h = g.meta.unive
 console.log('  respawn', JSON.stringify(S.respawn));
 check(S.respawn.dim === 'drift' && !S.respawn.dead && S.respawn.d < 4, `a death in the drift: back at the home there (${S.respawn.d} blocks, no trip)`);
 await A.ev(() => { const g = VR.game, p = g.player, s = g.starships.ships.find(q => q.d.seed === 7777); if (s) { const dx = s.pos[0] - p.pos[0], dz = s.pos[2] - p.pos[2]; p.yaw = Math.atan2(-dx, -dz) + 0.5; p.pitch = -0.04; } });
-check(await A.picture(SHOTS + 'newlife_respawn_drift.png', 4), 'test/shots/newlife_respawn_drift.png — awake at home on the Driftinseln');
+check(await A.grab(SHOTS + 'newlife_respawn_drift.png', 4), 'test/shots/newlife_respawn_drift.png — awake at home on the Driftinseln');
 // 🌍 back to Herzwelt (the card's „zuletzt auf Herzwelt")
 await A.ev(() => VR.game.ui.pause());
 await trip(A, 'overworld', () => { document.querySelector('#pause [data-act="goherz"]').click(); }, 'story: 🌍 Herzwelt again');
 await A.settle(100, 10);
+S.backOnHerz = await A.ev(() => { const g = VR.game; return { dim: g.dim, own: g.starships.ships.filter(q => q.key).map(q => q.key), seven: g.starships.ships.some(q => q.d.seed === 7777) }; });
+console.log('  back on Herzwelt', JSON.stringify(S.backOnHerz));
+check(S.backOnHerz.dim === 'overworld' && !S.backOnHerz.seven && (!S.ownShips.length || S.ownShips.every(o => S.backOnHerz.own.includes(o.key))), 'back on Herzwelt: the temple\'s own ship still at its pad, the shuttle stayed home in the drift');
 save();
 
-// ================================================================ 3 · the frame before / after (Herzwelt's spawn)
-if (B && !process.env.NO_COST) {
-  const measure = (Pg, n) => Pg.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
-  const hold = (Pg) => Pg.ev(() => { const g = VR.game; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror', 'wow', 'wild']) { const o = g[k]; if (o && typeof o.update === 'function' && !o.__held) { o.__up = o.update; o.update = function () {}; o.__held = true; } } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') V[k] = function () {}; });
-  for (const [preset, rd] of [['potato', 0], ['high', 6]]) {
-    for (const Pg of [B, A]) { await Pg.ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; if (rd) g.settings.renderDist = rd; g.applySettings('*'); }, [preset, rd]); await toSpawn(Pg); }
-    for (const Pg of [B, A]) { await Pg.page.bringToFront(); const st = await Pg.settle(preset === 'high' ? 90 : 60, 10); console.log(`  ${preset} settled`, JSON.stringify(st)); await hold(Pg); }
-    const rounds = { before: [], after: [] };
-    for (let r = 0; r < 3; r++) for (const [lbl, Pg] of (r & 1 ? [['after', A], ['before', B]] : [['before', B], ['after', A]])) { await Pg.page.bringToFront(); await Pg.wait(100); rounds[lbl].push(await measure(Pg, N)); }
-    const out = {};
-    for (const lbl of ['before', 'after']) { const ms = rounds[lbl].map(q => q.ms).sort((a, b) => a - b), mid = rounds[lbl][1]; out[lbl] = { msMedian: ms[1], ms, draws: mid.draws, tris: mid.tris }; }
-    const pr = rounds.after.map((q, i) => q.ms / rounds.before[i].ms).sort((a, b) => a - b);
-    out.pairRatio = +pr[1].toFixed(3); out.ratio = +(out.after.msMedian / out.before.msMedian).toFixed(3);
-    out.sameWork = out.after.draws === out.before.draws && Math.abs(out.after.tris - out.before.tris) <= 0.002 * Math.max(1, out.before.tris);
-    rec.cost[preset] = out; save();
-    console.log(`  ${preset} · spawn`, JSON.stringify(out));
-    if (preset === 'potato') check(out.sameWork && out.pairRatio <= 1.10, `Very Low at the spawn: the same work (draws ${out.after.draws}/${out.before.draws}, triangles ${out.after.tris}/${out.before.tris}), the frame ×${out.pairRatio} (pairs), ${out.after.msMedian} against ${out.before.msMedian} ms`);
-    else console.log(`  (High at the spawn: draws ${out.after.draws}/${out.before.draws}, triangles ${out.after.tris}/${out.before.tris}, the frame ×${out.pairRatio} (pairs), ${out.after.msMedian} against ${out.before.msMedian} ms — reported)`);
-  }
-}
-if (B) {
-  const errs = B.logs.filter(l => l.startsWith('[pageerror]'));
-  check(errs.length === 0, `page B: no page error (${errs.length})`);
-  await B.ctx.close();
-}
-
-// ================================================================ 4 · the world card on the start screen
+// ================================================================ 3 · the world card on the start screen
 console.log(`the world card (${secs()})`);
 await A.page.bringToFront();
 await A.ev(() => VR.game.quitToTitle());
@@ -255,18 +281,21 @@ await A.wait(1500);
 rec.card = await A.ev(() => { const c = document.querySelector('#worldlist .wcard'); if (!c) return null; const r = c.getBoundingClientRect(), wl = c.querySelector('.wl'), cv = wl && wl.querySelector('canvas'); return { text: wl ? wl.textContent : null, disc: !!cv, box: [r.x, r.y, r.width, r.height] }; });
 console.log('  card', JSON.stringify(rec.card));
 check(rec.card && rec.card.text === 'Wohnt auf den Driftinseln · zuletzt auf Herzwelt' && rec.card.disc, 'the world card: „Wohnt auf den Driftinseln · zuletzt auf Herzwelt" with the body\'s disc');
-await A.ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, 4);
-await A.page.screenshot({ path: SHOTS + 'newlife_worlds.png' });
-if (rec.card) { const b = rec.card.box; await A.page.screenshot({ path: SHOTS + 'newlife_card.png', clip: { x: Math.max(0, b[0] - 8), y: Math.max(0, b[1] - 8), width: Math.min(1280, b[2] + 16), height: b[3] + 16 } }); }
-check(fs.existsSync(SHOTS + 'newlife_card.png'), 'test/shots/newlife_card.png');
-// every world's disc, 96 px each, on one strip
-await A.ev(() => {
-  const ids = ['overworld', 'drift', 'underforge', 'hollow', 'flat', 'opal', 'basalt', 'aqua', 'zinn', 'ocker'], n = 96;
-  const box = document.createElement('div'); box.id = '__discs'; box.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;background:#0a0c14;padding:10px;display:flex;gap:10px';
-  for (const id of ids) { const c = document.createElement('canvas'); c.width = n; c.height = n; const ctx = c.getContext('2d'), img = ctx.createImageData(n, n); img.data.set(VR.NewLife.discPixels(id, n)); ctx.putImageData(img, 0, 0); box.appendChild(c); }
-  document.body.appendChild(box);
-});
-await A.page.screenshot({ path: SHOTS + 'newlife_discs.png', clip: { x: 0, y: 0, width: 10 * 106 + 10, height: 116 } });
+if (rec.card) { const b = rec.card.box; check(await A.picture(SHOTS + 'newlife_card.png', 4, { x: Math.max(0, b[0] - 8), y: Math.max(0, b[1] - 8), width: Math.min(1280, b[2] + 16), height: b[3] + 16 }), 'test/shots/newlife_card.png'); }
+await A.picture(SHOTS + 'newlife_worlds.png', 1);
+// every world's disc, 96 px each, on one strip (drawn on a canvas of its own: no compositor frame to wait for)
+{
+  const url = await A.ev(() => {
+    const ids = ['overworld', 'drift', 'underforge', 'hollow', 'flat', 'opal', 'basalt', 'aqua', 'zinn', 'ocker'], n = 96, gap = 10;
+    const c = document.createElement('canvas'); c.width = ids.length * (n + gap) + gap; c.height = n + 2 * gap;
+    const ctx = c.getContext('2d'); ctx.fillStyle = '#0a0c14'; ctx.fillRect(0, 0, c.width, c.height);
+    const t = document.createElement('canvas'); t.width = n; t.height = n; const tc = t.getContext('2d');
+    ids.forEach((id, i) => { const img = tc.createImageData(n, n); img.data.set(VR.NewLife.discPixels(id, n)); tc.clearRect(0, 0, n, n); tc.putImageData(img, 0, 0); ctx.drawImage(t, gap + i * (n + gap), gap); });
+    return c.toDataURL('image/png');
+  });
+  if (url) fs.writeFileSync(SHOTS + 'newlife_discs.png', Buffer.from(url.split(',')[1], 'base64'));
+  check(!!url, 'test/shots/newlife_discs.png — every world\'s disc');
+}
 {
   const errs = A.logs.filter(l => l.startsWith('[pageerror]'));
   console.log(`--- page A logs (${A.logs.length})`); for (const l of A.logs.slice(0, 12)) console.log(l);
@@ -274,6 +303,34 @@ await A.page.screenshot({ path: SHOTS + 'newlife_discs.png', clip: { x: 0, y: 0,
   check(!A.logs.some(l => /shader|compile|link/i.test(l)), 'page A: every shader compiles');
 }
 await A.ctx.close();
+save();
+
+// ================================================================ 4 · the frame before / after on fresh pages (Herzwelt's spawn)
+// (run 1 measured on pages A and B after their trips: other ships and other animals round the spawn — 54 draws against
+// 51 on the same triangles. Fresh pages have the same history: the world made, settled, held)
+if (beforeOk && !process.env.NO_COST) {
+  console.log(`the frame before / after (${secs()})`);
+  const measure = (Pg, n) => Pg.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
+  const hold = (Pg) => Pg.ev(() => { const g = VR.game; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror', 'wow', 'wild']) { const o = g[k]; if (o && typeof o.update === 'function' && !o.__held) { o.__up = o.update; o.update = function () {}; o.__held = true; } } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') V[k] = function () {}; });
+  const B2 = await openWorld(BEFORE, 'potato', 0), A2 = await openWorld(DIST, 'potato', 0);
+  check(B2.ok && A2.ok, `two fresh pages (before, this build) have their worlds (${secs()})`);
+  for (const [preset, rd, R, n] of [['potato', 0, 5, 16], ['high', 6, 3, 8]]) {
+    for (const Pg of [B2, A2]) { await Pg.ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; if (rd) g.settings.renderDist = rd; g.applySettings('*'); }, [preset, rd]); await toSpawn(Pg); }
+    for (const Pg of [B2, A2]) { await Pg.page.bringToFront(); const st = await Pg.settle(preset === 'high' ? 90 : 60, 10); console.log(`  ${preset} settled`, JSON.stringify(st)); await hold(Pg); }
+    const rounds = { before: [], after: [] };
+    for (let r = 0; r < R; r++) for (const [lbl, Pg] of (r & 1 ? [['after', A2], ['before', B2]] : [['before', B2], ['after', A2]])) { await Pg.page.bringToFront(); await Pg.wait(100); rounds[lbl].push(await measure(Pg, n)); }
+    const out = {}, mid = R >> 1;
+    for (const lbl of ['before', 'after']) { const ms = rounds[lbl].map(q => q.ms).sort((a, b) => a - b); out[lbl] = { msMedian: ms[mid], ms, draws: rounds[lbl][mid].draws, tris: rounds[lbl][mid].tris }; }
+    const pr = rounds.after.map((q, i) => q.ms / rounds.before[i].ms).sort((a, b) => a - b);
+    out.pairRatio = +pr[mid].toFixed(3); out.ratio = +(out.after.msMedian / out.before.msMedian).toFixed(3);
+    out.sameWork = Math.abs(out.after.draws - out.before.draws) <= 1 && Math.abs(out.after.tris - out.before.tris) <= 0.002 * Math.max(1, out.before.tris);
+    rec.cost[preset] = out; save();
+    console.log(`  ${preset} · spawn`, JSON.stringify(out));
+    if (preset === 'potato') check(out.sameWork && out.pairRatio <= 1.10, `Very Low at the spawn: the same work (draws ${out.after.draws}/${out.before.draws}, triangles ${out.after.tris}/${out.before.tris}), the frame ×${out.pairRatio} (pairs), ${out.after.msMedian} against ${out.before.msMedian} ms`);
+    else console.log(`  (High at the spawn: draws ${out.after.draws}/${out.before.draws}, triangles ${out.after.tris}/${out.before.tris}, the frame ×${out.pairRatio} (pairs), ${out.after.msMedian} against ${out.before.msMedian} ms — reported)`);
+  }
+  for (const [nm, Pg] of [['B2', B2], ['A2', A2]]) { const errs = Pg.logs.filter(l => l.startsWith('[pageerror]')); check(errs.length === 0, `fresh page ${nm}: no page error (${errs.length})`); await Pg.ctx.close(); }
+}
 await browser.close();
 save();
 // the sheet
@@ -283,6 +340,7 @@ try {
     { label: '', labels: ['Herzwelt: Kompass ↑ Driftinseln', 'Herzwelt: Pause, 📍 Hier wohne ich'], imgs: [SHOTS + 'newlife_compass.png', SHOTS + 'newlife_pause_herz.png'] },
     { label: '', labels: ['Heimkehr: das Shuttle am Landeplatz', 'Tod im Drift: wach zu Hause'], imgs: [SHOTS + 'newlife_recall.png', SHOTS + 'newlife_respawn_drift.png'] },
     { label: '', labels: ['Weltenliste', 'die Weltkarte'], imgs: [SHOTS + 'newlife_worlds.png', SHOTS + 'newlife_card.png'] },
+    { label: '', labels: ['jede Welt als kleine Scheibe: Herzwelt, Driftinseln, Unterschmiede, Hohlwelt, Flachwelt, Opal, Basalt, Aquamarin, Zinnober, Ocker'], imgs: [SHOTS + 'newlife_discs.png'] },
   ] };
   fs.writeFileSync(SHOTS + 'newlife_sheet.json', JSON.stringify(spec));
   console.log('  ' + execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'newlife_sheet.jpg', SHOTS + 'newlife_sheet.json']).toString().trim());
