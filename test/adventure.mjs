@@ -242,11 +242,12 @@ try {
 } finally {
   fs.writeFileSync(SHOTS + 'adventure_numbers.json', JSON.stringify(N, null, 1));
   try {
+    // (the sheet's labels: plain letters — sheet.py's font has no emoji and no „ quotes)
     const spec = { cols: [], w: 640, rows: [
-      { label: 'create', labels: ['1 · Neue Welt: Spielweg ⚔ Abenteuer', '3 · Stufe 5 (CSS bei 0,7 s)'], imgs: [pics.create || null, pics.levelup || null] },
-      { label: 'menu', labels: ['4 · Pause: ⚔ Abenteuer', '4 · die Karte „Abenteuer"'], imgs: [pics.pause || null, pics.card || null] },
-      { label: 'stats', labels: ['4 · Deine Werte', '2 · der Ring im Spiel'], imgs: [pics.stats || null, pics.hud || null] },
-      { label: 'meins', labels: ['0 · 🎒 Meins: ⚔ Abenteuer-Welt beginnen', ''], imgs: [pics.meins || null, null] },
+      { label: 'create', labels: ['1 - Neue Welt: Spielweg Abenteuer (Profi)', '3 - Stufe 5 (CSS bei 0,7 s)'], imgs: [pics.create || null, pics.levelup || null] },
+      { label: 'menu', labels: ['4 - Pause: Abenteuer nach Meins', '4 - die Karte Abenteuer'], imgs: [pics.pause || null, pics.card || null] },
+      { label: 'stats', labels: ['4 - Deine Werte', '2 - der Ring im Spiel'], imgs: [pics.stats || null, pics.hud || null] },
+      { label: 'meins', labels: ['0 - Meins: Abenteuer-Welt beginnen (Einfach)', ''], imgs: [pics.meins || null, null] },
     ] };
     fs.writeFileSync(SHOTS + 'adventure_sheet.json', JSON.stringify(spec));
     execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'adventure_sheet.jpg', SHOTS + 'adventure_sheet.json'], { stdio: 'inherit' });
