@@ -468,7 +468,7 @@
       w.cols.set(c.key, c); if (w.shDirty) w.shDirty.add(c.key); if (w.shGone) w.shGone.delete(c.key);
       if ((c.H >> 4) > (w.maxSec || 16)) w.maxSec = c.H >> 4;
       if (c.spawns && g.vents && g.vents.absorb) g.vents.absorb(c.spawns);
-      kept.add(c.key);
+      kept.add(c);   // (the column itself: one unloaded and loaded again later is a new column, not a kept one)
     }
     w.lastCol = null; w.visDirty = true; if (g.renderer) g.renderer.visDirty = true;
     g.nlAdopted = E.cols.length; g.nlAdoptedMB = E.mb;
@@ -532,7 +532,7 @@
         for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
           if (!dx && !dz) continue;
           const n = this.col(m.cx + dx, m.cz + dz);
-          if (n && K.has(n.key)) (snap || (snap = [])).push(n, n.sec.map((s) => [s.dirty, s.ver]));
+          if (n && K.has(n)) (snap || (snap = [])).push(n, n.sec.map((s) => [s.dirty, s.ver]));
         }
         if (snap) { touched = new Set(); this._touch = function (col, x, y, z) { touched.add(col.key); return touch0.call(this, col, x, y, z); }; }
       }
@@ -540,7 +540,7 @@
       const c = m && this.cols.get(VR.ckey(m.cx, m.cz)); if (c && sp) c.spawns0 = sp;
       if (snap) for (let i = 0; i < snap.length; i += 2) {
         const n = snap[i], st = snap[i + 1];
-        if (touched.has(n.key)) { K.delete(n.key); continue; }
+        if (touched.has(n.key)) { K.delete(n); continue; }
         for (let j = 0; j < st.length && j < n.sec.length; j++) { n.sec[j].dirty = st[j][0]; n.sec[j].ver = st[j][1]; }
       }
     };

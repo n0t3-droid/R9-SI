@@ -413,13 +413,21 @@ TR.FADE_IN = 5; TR.FADE_OUT = 5;
     w2.onColumn({ cx: nb2.cx, cz: nb2.cz, blocks: nb2.blocks, light: nb2.light.fill(0xf000), biome: nb2.biome, caveBiome: nb2.caveBiome, grass: nb2.grass, foliage: nb2.foliage, water: nb2.water, spawns: [] });
     check(outer2.sec.some(s => s.dirty), 'a newcomer whose light walks into a kept column: that one is meshed again');
     void mid;
+    // a kept column unloaded and loaded again later is an ordinary column: a neighbour's arrival marks it as before
+    const msg = (c) => ({ cx: c.cx, cz: c.cz, blocks: c.blocks, light: c.light, biome: c.biome, caveBiome: c.caveBiome, grass: c.grass, foliage: c.foliage, water: c.water, spawns: [] });
+    w2.unloadColumn(w2.cols.get(V.ckey(cx0 + 2, cz0 + 1)));
+    w2.onColumn(msg(mkCol(cx0 + 2, cz0 + 1)));
+    const f2 = w2.cols.get(V.ckey(cx0 + 2, cz0 + 1));
+    for (const s of f2.sec) s.dirty = false;
+    w2.onColumn(msg(mkCol(cx0 + 3, cz0 + 1)));
+    check(f2.sec.every(s => s.dirty), 'a kept column unloaded and loaded again is an ordinary one: its neighbour marks it for meshing as before');
     // a changed look while away: not adopted, freed
     await TR.go(g, { dim: 'drift', via: 'cmd' }); settle(g);
     check(NL.keepInfo(g).overworld, 'kept again on the next trip');
     g.settings.fancyLeaves = !g.settings.fancyLeaves;
     g.freed.length = 0;
     g.goHome(); await waitDim(g, 'overworld'); settle(g);
-    check(g.nlAdopted === 0 && g.freed.length >= 25 * 4 && !NL.keepInfo(g).overworld, 'leaves changed meanwhile: the kept meshes are freed, the world loads as before', g.freed.length);
+    check(g.nlAdopted === 0 && g.freed.length >= 24 * 4 && !NL.keepInfo(g).overworld, 'leaves changed meanwhile: the kept meshes are freed, the world loads as before', g.freed.length + ' sections (24 columns with meshes: one was loaded afresh above)');
     // the switch off: nothing kept
     g.settings.homeKeep = false;
     await TR.go(g, { dim: 'drift', via: 'cmd' }); settle(g);
