@@ -593,6 +593,8 @@
     el.className = ''; void el.offsetWidth; el.className = 'on';
     clearTimeout(L.banT); L.banT = setTimeout(() => { el.className = 'off'; L.banT = setTimeout(() => { el.className = ''; }, 900); }, 4200);
   };
+  // the moment and its banner hold the view (adventure.js A.busy: a level-up waits for them)
+  L.busy = function () { if (L.moment) return true; const el = typeof document !== 'undefined' && document.getElementById ? document.getElementById('libban') : null; return !!(el && /\b(on|off)\b/.test(el.className || '')); };
   L.bloom = function () {
     if (typeof document === 'undefined' || !document.createElement) return;
     css();
