@@ -74,19 +74,31 @@ async function openWorld(dist, preset, rd) {
   return { ctx, page, logs, ev, wait, step, settle, picture, ok };
 }
 // a trip started by `start` (in the page): the frames stepped until the first frame in `to`
+// (both builds: the near 5 × 5 round the player sampled after every batch of frames — the first column, all of them
+// generated, every section meshed, every section up — ms since the trip started, in the page's clock)
 async function trip(A, to, start, label) {
-  await A.ev(() => { window.__lastTrip = VR.Travel.last; });
+  await A.ev(() => { window.__lastTrip = VR.Travel.last; window.__ph = { t0: performance.now(), sw: 0, col: 0, gen: 0, mesh: 0, up: 0 }; });
   const t0 = Date.now();
   await A.ev(start);
   let s = null;
   for (let i = 0; i < 900; i++) {
     await A.step(10, 33);
-    s = await A.ev((to) => { const g = VR.game, L = VR.Travel.last; return { state: g.state, dim: g.dim, busy: VR.Travel.busy(g), arrived: !!(L && L !== window.__lastTrip && L.to === to), last: L, nl: VR.NewLife ? VR.NewLife.lastTrip : null }; }, to);
+    s = await A.ev((to) => {
+      const g = VR.game, L = VR.Travel.last, P = window.__ph, now = performance.now(), w = g.world, p = g.player;
+      if (!P.sw && g.state !== 'play') P.sw = now;
+      if (P.sw && w && p && g.dim === to && (g.state === 'loading' || g.state === 'play')) {
+        const pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let cols = 0, secs = 0, clean = 0, up = 0;
+        for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const c = w.col(pcx + dx, pcz + dz); if (!c) continue; cols++; for (const sc of c.sec) { if (!(sc.count > 0)) continue; secs++; if (!sc.dirty && !sc.pending) clean++; if (sc.meshed) up++; } }
+        if (cols && !P.col) P.col = now; if (cols === 25 && !P.gen) P.gen = now; if (cols === 25 && clean === secs && !P.mesh) P.mesh = now; if (cols === 25 && up === secs && !P.up) P.up = now;
+      }
+      const rel = (v) => (v ? Math.round(v - P.t0) : null);
+      return { state: g.state, dim: g.dim, busy: VR.Travel.busy(g), arrived: !!(L && L !== window.__lastTrip && L.to === to), last: L, nl: VR.NewLife ? VR.NewLife.lastTrip : null, ph: { switch: rel(P.sw), col: rel(P.col), gen: rel(P.gen), mesh: rel(P.mesh), up: rel(P.up) } };
+    }, to);
     if (s.arrived && s.state === 'play') break;
     await A.wait(20);
   }
   s.wallMs = Date.now() - t0;
-  console.log(`  trip ${label}: ${JSON.stringify(s.last)} · ${s.wallMs} ms wall (stepped)${s.nl && s.nl.to === to ? ' · phases ' + JSON.stringify(s.nl) : ''} (${secs()})`);
+  console.log(`  trip ${label}: ${JSON.stringify(s.last)} · ${s.wallMs} ms wall (stepped) · sampled ${JSON.stringify(s.ph)}${s.nl && s.nl.to === to ? ' · phases ' + JSON.stringify(s.nl) : ''} (${secs()})`);
   return s;
 }
 const click = (A, act) => A.ev((act) => { const b = document.querySelector('#pause [data-act="' + act + '"]'); if (!b) return false; b.click(); return true; }, act);
@@ -112,7 +124,7 @@ async function heimkehr(Pg, label, keep) {
   await trip(Pg, 'drift', () => { VR.Travel.go(VR.game, { dim: 'drift', via: 'cmd' }); }, label + ': /dim drift');
   await Pg.settle(40, 4);
   const s = await trip(Pg, 'overworld', () => { VR.game.goHome(); }, label + ': Heimkehr');
-  const r = { label, keep, totalMs: s.last && s.last.totalMs, loadMs: s.last && s.last.loadMs, veilMs: s.last && s.last.veilMs, wallMs: s.wallMs, phases: s.nl && s.nl.to === 'overworld' ? s.nl : null, arrived: s.arrived };
+  const r = { label, keep, totalMs: s.last && s.last.totalMs, loadMs: s.last && s.last.loadMs, veilMs: s.last && s.last.veilMs, wallMs: s.wallMs, sampled: s.ph, phases: s.nl && s.nl.to === 'overworld' ? s.nl : null, arrived: s.arrived };
   rec.heimkehr.push(r); save();
   await Pg.settle(120, 20);
   return r;
