@@ -1567,14 +1567,15 @@
     }
     // t-motion · a smooth piece that hangs (FURN_VS u_hang): [mode, hook, lever] — 1 a lantern hanging from its hook (the
     // 'lantern:1' variant: a chain to the block above; y from the floor of its cell), 2 the town's awnings (their wall at
-    // +z of their own frame: the cloth's distance from it, as voxarch.js VX.hangOf); [0, 0, 1] a piece that stands still
+    // +z of their own frame: the cloth's distance from it, as voxarch.js VX.hangOf); [0, 0, 1] a piece that stands still.
+    // (t-polish2, gap 7: a fourth number — 1 for cloth, the awnings: FURN_VS swings it ×gain and ripples its valance)
     hangOf(key) {
       const c = this._hang || (this._hang = new Map());
       let h = c.get(key);
       if (h) return h;
-      h = [0, 0, 1];
-      if (/^lantern:1$/.test(key)) h = [1, 1.0, 0.8];
-      else if (/^auto:vm_town_awning_/.test(key)) { const PR = VR.Props, m = PR && PR.furnModel ? PR.furnModel(key) : null, D = m && m.size ? m.size[2] : 2; h = [2, D / 2 + 0.08 * D, D]; }
+      h = [0, 0, 1, 0];
+      if (/^lantern:1$/.test(key)) h = [1, 1.0, 0.8, 0];
+      else if (/^auto:vm_town_awning_/.test(key)) { const PR = VR.Props, m = PR && PR.furnModel ? PR.furnModel(key) : null, D = m && m.size ? m.size[2] : 2; h = [2, D / 2 + 0.08 * D, D, 1]; }
       c.set(key, h);
       return h;
     }
@@ -1691,15 +1692,15 @@
         if (!ps.furnTex) ps.furnTex = this.propTex(PR.furnAtlas());
         gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
         for (const sl of slots) {
-          if (u.u_hang) { const h = this.hangOf(sl.key); gl.uniform4f(u.u_hang, h[0], h[1], h[2], 0); }   // (t-motion)
+          if (u.u_hang) { const h = this.hangOf(sl.key); gl.uniform4f(u.u_hang, h[0], h[1], h[2], h[3]); }   // (t-motion)
           if (sl.nn) { if (!sl.gNear) { const m = PR.furnModel(sl.key); sl.gNear = this.propVao(m.near); } this.propFlush(sl.gNear, sl.nn, sl.near, u, ps.furnTex, 0, sl.gNear.nOpaque); }
           if (sl.nf) { if (!sl.gFar) { const m = PR.furnModel(sl.key); sl.gFar = m.far ? this.propVao(m.far) : { n: 0 }; } if (sl.gFar.n) this.propFlush(sl.gFar, sl.nf, sl.far, u, ps.furnTex, 0, sl.gFar.nOpaque); }
           if (sl.nfi) { if (!sl.gFine) { const m = PR.furnModel(sl.key); sl.gFine = m.fine ? this.propVao(m.fine) : { n: 0 }; } if (sl.gFine.n) this.propFlush(sl.gFine, sl.nfi, sl.fl, u, ps.furnTex, 0, sl.gFine.nOpaque); }   // t-form
         }
         if (!shadow && !refl) {
           gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-          for (const sl of slots) if (sl.nn && sl.gNear && sl.gNear.n > sl.gNear.nOpaque) { if (u.u_hang) { const h = this.hangOf(sl.key); gl.uniform4f(u.u_hang, h[0], h[1], h[2], 0); } this.propFlush(sl.gNear, sl.nn, null, u, ps.furnTex, sl.gNear.nOpaque, sl.gNear.n - sl.gNear.nOpaque); }
-          for (const sl of slots) if (sl.nfi && sl.gFine && sl.gFine.n > sl.gFine.nOpaque) { if (u.u_hang) { const h = this.hangOf(sl.key); gl.uniform4f(u.u_hang, h[0], h[1], h[2], 0); } this.propFlush(sl.gFine, sl.nfi, null, u, ps.furnTex, sl.gFine.nOpaque, sl.gFine.n - sl.gFine.nOpaque); }   // t-form
+          for (const sl of slots) if (sl.nn && sl.gNear && sl.gNear.n > sl.gNear.nOpaque) { if (u.u_hang) { const h = this.hangOf(sl.key); gl.uniform4f(u.u_hang, h[0], h[1], h[2], h[3]); } this.propFlush(sl.gNear, sl.nn, null, u, ps.furnTex, sl.gNear.nOpaque, sl.gNear.n - sl.gNear.nOpaque); }
+          for (const sl of slots) if (sl.nfi && sl.gFine && sl.gFine.n > sl.gFine.nOpaque) { if (u.u_hang) { const h = this.hangOf(sl.key); gl.uniform4f(u.u_hang, h[0], h[1], h[2], h[3]); } this.propFlush(sl.gFine, sl.nfi, null, u, ps.furnTex, sl.gFine.nOpaque, sl.gFine.n - sl.gFine.nOpaque); }   // t-form
           gl.depthMask(true); gl.disable(gl.BLEND);
         }
       }

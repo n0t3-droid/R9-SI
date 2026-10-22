@@ -1485,8 +1485,12 @@ void main() {
     float lv = 3.0 * clamp(((u_hang.x < 1.5 ? u_hang.y - a_pos.y : u_hang.y - a_pos.z)) / u_hang.z, 0.0, 1.0);
     vec3 ap = a_inst0.xyz + u_camPos;   // (the piece's place: one phase for the whole piece)
     float G = windGust(ap.x, ap.z, u_time, u_windDir.x, u_windDir.y, u_gust);
-    q.xz += u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + vec2(-u_windDir.y, u_windDir.x) * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
-    q.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+    // (t-polish2, gap 7: cloth — u_hang.w, the town's awnings — swings ×gain and ripples along its width, the piece's x,
+    // up and out of the wall at its own −z; a lantern as before: wind.js CLOTH)
+    float cg = u_hang.w > 0.5 ? ${(VR.Wind && VR.Wind.CLOTH ? VR.Wind.CLOTH.gain : 2.4).toFixed(2)} : 1.0;
+    q.xz += (u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + vec2(-u_windDir.y, u_windDir.x) * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv)) * cg;
+    q.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) * cg;
+    if (u_hang.w > 0.5) { float rp = windClothRip(a_pos.x, ap.x, ap.z, u_time, u_wind, G, lv); q.y += rp; q.xz += vec2(s, -c) * rp * ${(VR.Wind && VR.Wind.CLOTH ? VR.Wind.CLOTH.out : 0.6).toFixed(2)}; }
   }
 #endif
   vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
