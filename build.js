@@ -76,6 +76,9 @@ fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
 // page, the same lines (an error's line in the player page is that line in the debug page).
 const Strip = require('./src/build/strip.js');
 const stripMemo = new Map();   // (the worker and the libraries are the same script in two pages: stripped once)
+// a page is written whole or not at all (a temporary file renamed): a browser test loading dist/ while another test
+// builds never reads half a page
+const putPage = (file, text) => { const p = path.join(ROOT, 'dist', file), t = p + '.' + process.pid + '.tmp'; fs.writeFileSync(t, text); fs.renameSync(t, p); };
 const writePage = (file, html) => {
   const out = html.replace(Strip.SCRIPT_RE, (m, open, attrs, code, close) => {
     const key = attrs + '\u0000' + code;
@@ -88,10 +91,10 @@ const writePage = (file, html) => {
     const s = stripMemo.get(key);
     return s === null ? m : open + s + close;
   });
-  fs.writeFileSync(path.join(ROOT, 'dist', file), out);
+  putPage(file, out);
 };
 const gamePage = `<!doctype html>\n<html lang="en"><head>${head}</head><body>${body}</body></html>\n`;
-fs.writeFileSync(path.join(ROOT, 'dist/index.debug.html'), gamePage);
+putPage('index.debug.html', gamePage);
 writePage('index.html', gamePage);
 // the published page can't hand out files: drop the direct-download branch there (screenshots still show in an overlay)
 const bodyArtifact = body.replace(/\/\*DL\*\/[\s\S]*?\/\*\/DL\*\//g, '');
