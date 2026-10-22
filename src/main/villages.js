@@ -1283,6 +1283,7 @@
         this.talkText(T('g.gift.done', { n: rw[1], item: VR.itemName ? VR.itemName(rw[0]) : rw[0] }));
         g.audio.play('levelup'); this.hearts(a); this.renderRep();
         if (g.codex && g.codex.event) g.codex.event('quest');
+        if (VR.Adventure) VR.Adventure.award('quest', { size: 'S', id: a.p.id });   // a-core: a request done is a small quest of the Abenteuer (20 XP, 15 Sterntaler; adventure.js)
         return;
       }
       p.inv.consumeHeld(1);

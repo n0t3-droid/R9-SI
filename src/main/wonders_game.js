@@ -271,6 +271,7 @@
       const g = this.g, name = this.name(s.type);
       this.st[s.key] = Object.assign(this.st[s.key] || { type: s.type, seed: s.seed, r: s.r, heart: h }, { status: 'found', found: Date.now() });
       this.banner(T('g.wonder.found', { name }));
+      if (VR.Adventure) VR.Adventure.award('wonder', { id: s.key });   // a-core: a wonder found is Abenteuer XP, once each (adventure.js)
       if (g.audio) g.audio.play('fanfare');
       if (g.codex && g.codex.unlock) g.codex.unlock('w:' + s.type, true);
       if (VR.Wonders && VR.Wonders.giveGift) VR.Wonders.giveGift(s.type, s.seed);   // the gift: the Studio's ✨ chip (any world)

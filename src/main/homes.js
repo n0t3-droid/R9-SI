@@ -111,6 +111,7 @@
       for (let k = 1; k <= 3; k++) { if (solidAt(o[0], o[1] - k, o[2])) break; this.setBlock(o[0], o[1] - k, o[2], mat); }
     }
     st.custom.push({ kind: 'home', beds: res.beds, door: res.door, inside: res.inside, outside: res.outside, seats: [], table: null, lights: [], work: [], box: res.box, F: res.F, chimney: null });
+    if (VR.Adventure) VR.Adventure.award('home', { id: vil.id + ':' + res.door.join(',') });   // a-core: a family moved into a house you built (60 XP, once per house; adventure.js)
     this.onCustomHome(vil);
   };
 })(VR);
