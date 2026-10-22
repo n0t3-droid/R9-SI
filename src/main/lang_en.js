@@ -49,7 +49,7 @@
     'g.adv.enc.normal': 'normal',
     'g.adv.enc.rare': 'rare',
     'g.adv.encNote': 'Without encounters everything else stays: levels, Heliataler, quests and the story.',
-    'g.adv.encKids': '🧸 Child-safe: an adventure without encounters.',
+    'g.adv.encKids': '🧸 Child-safe: adventures only without encounters.',
     'g.adv.confirm': 'Machines and shadows appear — at the outposts, in ruins and at night. Your home and the villages stay safe.',
     'g.adv.confirmCalm': 'From now on everything you do counts: exploring, building, discovering and helping bring experience and Heliataler. There are no foes here yet.',
     'g.adv.confirmGentle': 'From now on everything you do counts: exploring, building, discovering and helping bring experience and Heliataler — without any encounters.',

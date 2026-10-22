@@ -623,7 +623,7 @@
 }
 /* f-names: the one question — three cards (two under Kindersicher), each a title and one line; the lit card glows in its
    own colour (green: peaceful, gold: gentle, coral: encounters). Einfach stacks them, big and clear */
-#create .advcards button { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; text-align: left; min-height: 66px; padding: 9px 12px; }
+#create .advcards button { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 3px; text-align: left; min-height: 66px; padding: 9px 12px; }   /* (top: the titles of a row stay on one line when one card's line wraps) */
 #create .advcards button b { font-weight: 700; line-height: 1.15; }
 #create .advcards button small { margin: 0; line-height: 1.25; }
 #create .advcards .advc-free.on { border-color: #7dffb4; background: linear-gradient(135deg, rgba(125, 255, 180, .2), rgba(58, 240, 255, .08)); box-shadow: 0 0 14px rgba(125, 255, 180, .28); }
@@ -632,10 +632,13 @@
 #create .advwaynote { font-size: 13px; color: var(--st-mute, #a9b8d2); }
 html:not(.pro) #create .panel.box > .field:has(#cw_name) { grid-column: 1 / -1; }   /* (Einfach: no seed beside the name) */
 html:not(.pro) #create .advcards { flex-direction: column; }
-html:not(.pro) #create .advcards button { min-height: 72px; padding: 12px 16px; }
+html:not(.pro) #create .advcards button { min-height: 72px; padding: 12px 16px; justify-content: center; }
 html:not(.pro) #create .advcards button b { font-size: calc(var(--st-fs, 18px) * 1.08); }
 html:not(.pro) #create .advcards button small { font-size: calc(var(--st-fs, 18px) * .8); }
 #adventure .advways .seg button { text-align: left; }
+#adventure .advways .seg button[data-v="free"].on { border-color: #7dffb4; background: linear-gradient(135deg, rgba(125, 255, 180, .2), rgba(58, 240, 255, .08)); box-shadow: 0 0 14px rgba(125, 255, 180, .28); }   /* (the pause card's cards glow like the create form's) */
+#adventure .advways .seg button[data-v="gentle"].on { border-color: #ffd166; background: linear-gradient(135deg, rgba(255, 209, 102, .22), rgba(58, 240, 255, .06)); box-shadow: 0 0 14px rgba(255, 209, 102, .3); }
+#adventure .advways .seg button[data-v="enc"].on { border-color: #ff9a6b; background: linear-gradient(135deg, rgba(255, 154, 107, .22), rgba(255, 74, 216, .08)); box-shadow: 0 0 14px rgba(255, 154, 107, .3); }
 @media (max-height: 680px) { #create .panel.box > .row.gap:last-child { position: sticky; bottom: -14px; z-index: 2; padding: 8px 0 6px; background: linear-gradient(180deg, rgba(12, 17, 34, 0), rgba(12, 17, 34, .96) 35%); } }   /* (where it would scroll: the row stays in view) */
 @media (prefers-reduced-motion: reduce) { #advup .rays, #advup .sparks { display: none; } #advup.on, #advup.off, #advhud.up .ring, #advhud.pop, #advhud .fl { animation-duration: .01s; } #advhud .ring .arc { transition: none; } }
 `;

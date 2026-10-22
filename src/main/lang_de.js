@@ -49,7 +49,7 @@
     'g.adv.enc.normal': 'normal',
     'g.adv.enc.rare': 'selten',
     'g.adv.encNote': 'Ohne Begegnungen bleibt alles andere: Stufen, Heliataler, Aufgaben und die Geschichte.',
-    'g.adv.encKids': '🧸 Kindersicher: ein Abenteuer ohne Begegnungen.',
+    'g.adv.encKids': '🧸 Kindersicher: Abenteuer nur ohne Begegnungen.',
     'g.adv.confirm': 'Maschinen und Schatten tauchen auf — in den Außenposten, in Ruinen und nachts. Dein Zuhause und die Dörfer bleiben sicher.',
     'g.adv.confirmCalm': 'Ab jetzt zählt alles, was du tust: Erkunden, Bauen, Entdecken und Helfen bringen Erfahrung und Heliataler. Gegner gibt es hier noch keine.',
     'g.adv.confirmGentle': 'Ab jetzt zählt alles, was du tust: Erkunden, Bauen, Entdecken und Helfen bringen Erfahrung und Heliataler — ganz ohne Begegnungen.',
