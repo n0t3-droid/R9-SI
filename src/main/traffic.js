@@ -21,6 +21,7 @@
   const SPEED = { interceptor: [38, 55], racer: [48, 66], gunship: [30, 40], freighter: [20, 28], dropship: [26, 34], shuttle: [26, 34], cruiser: [16, 22], carrier: [10, 14] };
   const HZ = 640, FADE0 = 470, FADE1 = 610;   // the horizon flights' ends, and where they fade (blocks from the focus)
   const smooth = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+  const COL_DEF = [0.4, 1, 0.6], COL_HOV = [1, 0.6, 0.28], COL_RUN = [0.52, 0.92, 1];   // (f-flow: the plumes' colours, shared)
 
   class Traffic {
     constructor(g) {
@@ -39,6 +40,8 @@
     // (a peaceful world flies no gunship: t-life, peace.js)
     pickType(rng) { const peace = this.peace(), list = peace ? TYPES.filter(t => t[0] !== 'gunship') : TYPES; let tot = 0; for (const t of list) tot += t[1]; let r = rng.next() * tot; for (const t of list) { r -= t[1]; if (r <= 0) return t[0]; } return 'interceptor'; }
     peace() { const g = this.g; return VR.Peace ? VR.Peace.on(g) : g.difficulty === 'peaceful'; }
+    // f-flow (R50-03): the life director is on — its acts are the close passes; the other horizon flights pass far
+    calm() { const D = this.g.lifeDirector; return !!(this.g.state === 'play' && D && D.calm && D.calm()); }
     spawnFlight(opts) {
       opts = opts || {};
       const g = this.g, SS = g.starships;
@@ -49,22 +52,38 @@
       SS.design((Math.random() * 4294967295) >>> 0, arch, null, (d) => { this.pending = Math.max(0, this.pending - 1); this.launch(d, rng, opts); });
     }
     launch(d, rng, opts) {
-      const fp = this.focus(); if (!fp) return;
+      let fp = this.focus(); if (!fp) return;
       const m = d.meta, arch = m.arch;
       const big = arch === 'carrier' || arch === 'cruiser';
-      const sp = SPEED[arch] || [30, 40], speed = rng.range(sp[0], sp[1]);
+      const sp = SPEED[arch] || [30, 40]; let speed = rng.range(sp[0], sp[1]);   // (f-flow: a let — a pass on time fits it)
       // (a horizon flight: from 640 blocks out to 640 blocks out on the other side, passing 80–250 blocks from the focus)
       const horizon = !opts.dock && !opts.circle && !opts.defender;
       // (an act of the Regisseur des Lebens, lifedirector.js — opts.over: {a: the heading, pass, alt, t0, contrail, convoy:
       // the craft in line astern, tag}: a low pass over the player, or the sunrise convoy high up)
       const ov = opts.over || null;
-      const a = ov && ov.a !== undefined ? ov.a : rng.range(0, TAU), pass = ov && ov.pass !== undefined ? ov.pass : (horizon ? rng.range(80, 250) : rng.range(big ? 60 : 30, big ? 140 : 110)) * (rng.chance(0.5) ? 1 : -1), D = horizon ? HZ : rng.range(150, 230);
+      // ---- f-flow (R50-03): opts.near {a, pass, alt, t0, tag} — the life director's close pass ('flyby'): across the view,
+      // the pass in front of the eye, a straight line at its height, its own formation. While the director is on, every
+      // other horizon flight passes far: a straight line 330–450 to the side (no turn toward the focus at its end), its
+      // nearest point ≥ 290 m (no event, no trail; still a craft in the sky). With the director off, on the title and in
+      // other dimensions the traffic flies as before.
+      const nr = opts.near || null, calm = horizon && !ov && !nr && this.calm(), ln = ov || nr;
+      // (ln.at: where the director expects the eye at the pass — a walking player is 60 m on by then)
+      if (ln && ln.at) fp = [ln.at[0], fp[1], ln.at[2]];
+      let pass;
+      if (ln && ln.pass !== undefined) pass = ln.pass;
+      else pass = (calm ? rng.range(330, 450) : horizon ? rng.range(80, 250) : rng.range(big ? 60 : 30, big ? 140 : 110)) * (rng.chance(0.5) ? 1 : -1);
+      const a = ln && ln.a !== undefined ? ln.a : rng.range(0, TAU), D = horizon ? HZ : rng.range(150, 230);
       const fx = Math.cos(a), fz = Math.sin(a), rx = -fz, rz = fx;
-      const alt = ov && ov.alt !== undefined ? fp[1] + ov.alt : M.clamp(fp[1] + rng.range(big ? 55 : 25, big ? 110 : 75), 96, big ? 236 : 226);
+      const alt = ln && ln.alt !== undefined ? fp[1] + ln.alt : M.clamp(fp[1] + rng.range(big ? 55 : 25, big ? 110 : 75), 96, big ? 236 : 226);
       let A = [fp[0] - fx * D + rx * pass, alt + rng.range(-8, 8), fp[2] - fz * D + rz * pass];
       let B = [fp[0] + fx * D + rx * pass * 0.4, alt + rng.range(-12, 12), fp[2] + fz * D + rz * pass * 0.4];
       let C = [(A[0] + B[0]) / 2 + rx * rng.range(-60, 60), (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * rng.range(-60, 60)];
-      if (ov) { A[1] = alt; B[1] = alt + 6; B[0] = fp[0] + fx * D + rx * pass; B[2] = fp[2] + fz * D + rz * pass; C = [(A[0] + B[0]) / 2, alt - 2 * (ov.dip || 0), (A[2] + B[2]) / 2]; }
+      if (ln) { A[1] = alt; B[1] = alt + (nr ? rng.range(-3, 5) : 6); B[0] = fp[0] + fx * D + rx * pass; B[2] = fp[2] + fz * D + rz * pass; C = [(A[0] + B[0]) / 2, alt - 2 * ((ov && ov.dip) || 0), (A[2] + B[2]) / 2]; }
+      // (ln.when: the moment the director wants the lead at its nearest point, the path's middle — its speed fitted to
+      // it within the craft's own range −30 … +30 %: v0.49's came 10 s early to 19 s late, the eye walked on meanwhile)
+      if (ln && ln.when !== undefined) { const rem = ln.when - this.time, L0 = Math.hypot(B[0] - A[0], B[2] - A[2]) * 1.1; if (rem > 2) speed = M.clamp((0.5 - (ln.t0 || 0)) * L0 / rem, sp[0] * 0.7, sp[1] * 1.3); }
+      else if (calm) { B[0] = fp[0] + fx * D + rx * pass; B[2] = fp[2] + fz * D + rz * pass; const w = rng.range(-30, 30); C = [(A[0] + B[0]) / 2 + rx * w, (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * w]; }
+      // ---- f-flow end
       // a docking flight comes in over the plaza from the south and sets down on the apron in front of the portal
       const dock = opts.dock ? this.dockPoint() : null;
       if (dock) { A = [dock[0] + rng.range(-40, 40), 120, dock[2] + 190]; C = [dock[0] + rng.range(-10, 10), 104, dock[2] + 70]; B = [dock[0], dock[1] + m.height * 0.5 + 2.5, dock[2]]; }
@@ -76,7 +95,7 @@
       for (let k = 0; k < n; k++) {
         // a V formation: wingmen fall back and out, staggered in height
         const off = k === 0 ? [0, 0, 0] : ov ? [0, -k * 1.5, k * (m.length + 26)] : [(k % 2 ? -1 : 1) * (m.width + (squad ? 6 : 3)) * Math.ceil(k / 2), (squad ? -1.5 : 0) * Math.ceil(k / 2) + rng.range(-1, 1), (m.length + (squad ? 7 : 4)) * Math.ceil(k / 2)];
-        this.ships.push({ tag: ov ? ov.tag : null, contrail: !!(ov && ov.contrail), d, A, B, C, off, t: (ov && ov.t0 ? ov.t0 : 0) - k * 0.02 * (ov ? 0 : 1), dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), dock: dock ? { phase: 'in', parkT: 0, parkDur: rng.range(9, 15) } : null, defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0, horizon, wing: k > 0, alpha: horizon ? 0 : 1, arrived: horizon, wt: horizon ? 1 : undefined });
+        this.ships.push({ tag: ov ? ov.tag : nr ? nr.tag : null, near: !!nr, far: calm, contrail: !!(ov && ov.contrail), d, A, B, C, off, t: (ov && ov.t0 ? ov.t0 : nr && nr.t0 ? nr.t0 : 0) - k * 0.02 * (ov ? 0 : 1), dur: len / speed, speed, age: 0, heading: 0, roll: 0, pitch: 0, gear: 0, prevYaw: null, pos: A.slice(), arch, big, fire: rng.range(1, 3), dock: dock ? { phase: 'in', parkT: 0, parkDur: rng.range(9, 15) } : null, defender: !!opts.defender, circle: opts.circle || null, life: opts.life || 0, horizon, wing: k > 0, alpha: horizon ? 0 : 1, arrived: horizon, wt: horizon ? 1 : undefined });
       }
     }
     spawnDefenders() {
@@ -230,7 +249,16 @@
       if (dist > 260 || s.t < 0 || !m) return;
       const c = Math.cos(s.heading), sn = Math.sin(s.heading), f = [-sn, -c];
       const sp = s.spd !== undefined ? s.spd : 40, hov = sp < 6;
-      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], sp, { thrust: hov ? 0.45 : 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : hov ? [1, 0.6, 0.28] : [0.52, 0.92, 1], minor: ei > 1, smokeLife: s.contrail ? 14 : s.big ? 4.5 : 7, smokeK: s.contrail ? 1.6 : 1.15 }); } }
+      // ---- f-flow (R50-04): a contrail dies in 6 s (was 14), its points 2 m apart; the other smoke within 6 s (was 7); the
+      // engine's keys, position and options kept on the craft (no arrays or records a frame)
+      if (g.trails && !s.warpOut) {
+        if (!s.tid) { s.tid = 'tr' + (Math.random() * 1e9 | 0); s.tk = m.exhaust.map((q, ei) => s.tid + ei); s.ep = [0, 0, 0]; s.eo = { thrust: 0, size: 0, col: null, minor: false, smokeLife: 0, smokeK: 0, smokeStep: 0, smokeMax: 0 }; }
+        const O = s.eo, P3 = s.ep;
+        O.thrust = hov ? 0.45 : 0.8; O.col = s.defender ? COL_DEF : hov ? COL_HOV : COL_RUN;
+        O.smokeLife = s.contrail ? 6 : s.big ? 4.5 : 6; O.smokeK = s.contrail ? 1.6 : 1.15; O.smokeStep = s.contrail ? 2 : 1.1; O.smokeMax = s.contrail ? 180 : 160;
+        for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; P3[0] = s.pos[0] + e[0] * c + e[2] * sn; P3[1] = s.pos[1] + e[1]; P3[2] = s.pos[2] - e[0] * sn + e[2] * c; O.size = e[3] * (s.big ? 1.2 : 0.9); O.minor = ei > 1; g.trails.engine(s.tk[ei] || (s.tid + ei), P3, sp, O); }
+      }
+      // ---- f-flow end
       for (const e of m.exhaust) {
         if (Math.random() > 0.55) continue;
         const x = s.pos[0] + e[0] * c + e[2] * sn, z = s.pos[2] - e[0] * sn + e[2] * c;

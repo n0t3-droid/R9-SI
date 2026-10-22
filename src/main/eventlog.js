@@ -37,6 +37,7 @@
   for (let i = 0; i < N; i++) REC.push({ n: 0, t: 0, kind: '', sub: '', w: 0, x: 0, y: 0, z: 0, src: '', inView: false, frac: 0 });
   for (let i = 0; i < NS; i++) SMP.push({ t: 0, movers: 0, mv: '', landmark: '', sky: '', input: 'idle', x: 0, z: 0, place: '', tod: 0 });
   const lastSeen = [0, -Infinity, -Infinity, -Infinity, -Infinity, -Infinity];
+  const lastHalf = [0, -Infinity, -Infinity, -Infinity, -Infinity, -Infinity];   // (f-flow: seen ≥ half — 0.5 % of the screen, or no place)
   let acc = 0, inMax = 0, siteSeen = new WeakMap();
   L.count = 0; L.nSamples = 0; L.g = null; L.world = undefined; L.landmarks = null;
   L.cost = { frames: 0, ms: 0, worst: 0, samples: 0, sampleMs: 0, emits: 0, emitMs: 0, errors: 0 }; L.error = null;
@@ -45,7 +46,7 @@
   L.bind = (g) => { L.g = g || null; };
   L.reset = function (world) {
     L.count = 0; L.nSamples = 0; L.world = world; acc = 0; inMax = 0; siteSeen = new WeakMap();
-    for (let i = 1; i < lastSeen.length; i++) lastSeen[i] = -Infinity;
+    for (let i = 1; i < lastSeen.length; i++) { lastSeen[i] = -Infinity; lastHalf[i] = -Infinity; }
   };
   const ready = (g) => { if (!L.on || !g || g.state !== 'play') return false; if (g.world !== L.world) L.reset(g.world); return true; };
 
@@ -123,6 +124,7 @@
     R.n = L.count; R.t = +(g.time || 0); R.kind = K; R.sub = sub === undefined || sub === null ? '' : String(sub); R.w = w | 0; R.src = src ? String(src) : '';
     R.x = x; R.y = y; R.z = z; R.inView = iv; R.frac = fr;
     if (R.inView) for (let k = 1; k <= Math.min(5, R.w); k++) lastSeen[k] = R.t;
+    if (R.inView && !(R.frac > 0 && R.frac < 0.005)) for (let k = 1; k <= Math.min(5, R.w); k++) lastHalf[k] = R.t;   // (f-flow: sessionstats' seen ≥ 0.5)
     const C = L.cost; C.emits++; C.emitMs += now() - t0;
     return copy(R);
   };
@@ -146,7 +148,7 @@
     cat: A('ambient', 2, 0.6, true, (ev) => at(ev.q, 0.3)),
     pigeons: A('ambient', 2, 3, true, (ev) => (ev.c ? put(ev.c[0], ev.c[1] + 0.5, ev.c[2]) : null)),
     cart: A('travel', 2, 2, true, (ev) => runMid(ev.run, 1), (ev) => (ev.pos && ev.y !== null && ev.y !== undefined ? put(ev.pos[0], ev.y + 0.6, ev.pos[2]) : runMid(ev.run, 1))),
-    meteor: A('sky', 2, 8, false, (ev) => (ev.m && ev.m[0] && ev.m[0].p ? put(ev.m[0].p[0], ev.m[0].p[1], ev.m[0].p[2]) : null)),
+    meteor: A('sky', 2, 30, false, (ev) => (ev.m && ev.m[0] && ev.m[0].p ? put(ev.m[0].p[0], ev.m[0].p[1], ev.m[0].p[2]) : null)),   // (f-flow: r its streak, ~60 m — not its 8-m head)
     balloon: A('sky', 2, 8, true, (ev) => at(ev, 4)),
     bells: A('social', 2, 12, true, (ev) => (ev.c ? put(ev.c[0], ev.c[1] + 4, ev.c[2]) : null)),
     fireworks: A('sky', 3, 15, false, (ev, D) => festPlaza(D)),
@@ -156,6 +158,11 @@
     skyray: A('sky', 3, 20, true, (ev) => (ev.c ? put(ev.c[0], ev.c[1], ev.c[2]) : null), (ev) => (ev.age > 0 && ev.pos ? put(ev.pos[0], ev.pos[1], ev.pos[2]) : ev.c ? put(ev.c[0], ev.c[1], ev.c[2]) : null)),
     fisher: A('social', 2, 1.5, false, (ev) => at(ev.b, 0.8)),
     flyover: null, convoy: null,
+    // f-flow: the close pass is the traffic's to log too (its nearest point); t-wild's animals the director features
+    flyby: null,
+    heron: A('ambient', 2, 1.5, true, (ev) => at(ev.h, 0.6)),
+    rays: A('sky', 3, 9, true, (ev) => at(ev)),
+    murm: A('sky', 3, 18, true, (ev) => at(ev)),
   };
   // an act begins (lifedirector.js start)
   L.act = function (ev, D) {
@@ -179,10 +186,10 @@
     if (s._elD === undefined || d < s._elD) { s._elD = d; return null; }
     if (d <= s._elD + 1) return null;
     s._elDone = 1;
-    const dm = s._elD, low = !!s.contrail, convoy = !low && !!s.tag;
-    if (dm > (low || convoy ? 400 : 250)) return null;
+    const dm = s._elD, low = !!s.contrail, near = !low && !!s.near, convoy = !low && !near && !!s.tag;   // (f-flow: the director's close pass, 'flyby')
+    if (dm > (low || convoy || near ? 400 : 250)) return null;
     const m = s.d && s.d.meta;
-    return L.emit('travel', s.defender ? 'defence' : low ? 'lowpass' : convoy ? 'convoy' : 'flyby', dm <= 120 || low || convoy ? 2 : 1, s.pos, 'traffic', m && m.length ? m.length * 0.5 : 8);
+    return L.emit('travel', s.defender ? 'defence' : low ? 'lowpass' : convoy ? 'convoy' : 'flyby', dm <= 120 || low || convoy || near ? 2 : 1, s.pos, 'traffic', m && m.length ? m.length * 0.5 : 8);
   };
   // a pad's visitor touches down (padlife.js craft: the first two seconds of its stay, once per visit)
   L.landed = function (c, q) {
@@ -322,8 +329,9 @@
     for (let n = L.count; n >= Math.max(1, L.count - N + 1); n--) { const R = REC[(n - 1) % N]; if (R.w >= (minW | 0) && (!inViewOnly || R.inView)) return copy(R); }
     return null;
   };
-  // seconds since the last event of weight ≥ minW in view (Infinity: none yet) — the Regie's trigger (A§10)
-  L.sinceSeen = function (minW) { const g = game(), k = Math.max(1, Math.min(5, minW | 0)); return lastSeen[k] === -Infinity ? Infinity : +((g && g.time) || 0) - lastSeen[k]; };
+  // seconds since the last event of weight ≥ minW in view (Infinity: none yet) — the Regie's trigger (A§10); half (f-flow):
+  // only those seen ≥ half (≥ 0.5 % of the screen, or without a place) — the life director's pace and idle fill
+  L.sinceSeen = function (minW, half) { const g = game(), k = Math.max(1, Math.min(5, minW | 0)), A = half ? lastHalf : lastSeen; return A[k] === -Infinity ? Infinity : +((g && g.time) || 0) - A[k]; };
   L.dump = function () { return { count: L.count, nSamples: L.nSamples, events: L.events(0), samples: L.samples(), cost: Object.assign({}, L.cost), error: L.error }; };
 
   // ---------------------------------------------------------------- the instrument never breaks the game

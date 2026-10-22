@@ -36,7 +36,8 @@
 //   TAG=before DIST=file:///home/dev/vr/dist/index.html nohup bash test/wt_run.sh wow48.mjs 5400 > .tmp_tests/wow48_before.log 2>&1 &
 //   DIST: the page (default: this checkout's dist — wt_run.sh rewrites the path; in the v042 worktree v042's) · TAG=after |
 //   before · ONLY=sun,storm (views) · SEED=53 · BUDGET=240 (s of settling a view) · LH=v2 (the lighthouse's vista by its
-//   id) · CAMS_ONLY=1 (print the cameras) · SHEET=1 · SHEET_ONLY=1
+//   id) · CAMS_ONLY=1 (print the cameras) · SHEET=1 · SHEET_ONLY=1 · TRAIL=1 (f-flow: the meadow again with a forced low pass and
+//   its contrail: wow48_meadow_trail_<TAG>.png)
 // regress: skip  (a showcase: the pictures are the evidence)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
@@ -382,6 +383,20 @@ async function shootView(A, v, path) {
   const tp = Date.now();
   out.st = await A.picture(path, o);
   out.picS = Math.round((Date.now() - tp) / 1000);
+  // f-flow (R50-04): TRAIL=1 — the meadow again with a low pass forced across the view (the life director's 'flyover', its
+  // contrail): stepped until its lead has passed the middle of its path and 2.5 s on → wow48_meadow_trail_<TAG>.png
+  if (process.env.TRAIL && v.name === 'meadow') {
+    const tp2 = path.replace('wow48_meadow_', 'wow48_meadow_trail_');
+    out.trail = await A.ev(() => { const g = VR.game, D = g.lifeDirector; if (!D) return { ok: false, why: 'no director' }; D.update(0.01); const ok = !!D.force('flyover', { k: 777001 }); return { ok, tag: ok ? 'ld777001' : null }; });   // (force() says whether it started; the act's tag is 'ld' + its k)
+    // (the craft's design is built by a worker: the pass starts when it is there — up to 60 s by the clock; then a second
+    // of play at a time until the lead is past its nearest point)
+    const lead = () => A.ev((tag) => { const T = VR.game.traffic, s = T.ships.find(z => z.tag === tag && !z.wing); return s ? { t: +s.t.toFixed(3), pos: s.pos.map(x => Math.round(x)) } : { none: true, pending: T.pending | 0 }; }, out.trail.tag);
+    for (let i = 0; i < 120 && out.trail.ok; i++) { const q = await lead(); out.trail.lead = q; if (!q.none) break; await A.wait(500); await A.step(2); }
+    for (let i = 0; i < 60 && out.trail.ok && !out.trail.lead.none; i++) { await A.step(30); const q = await lead(); if (q.none) break; out.trail.lead = q; if (q.t > 0.56) break; }
+    await A.step(75);
+    out.trail.pic = await A.picture(tp2, { tod: null, frames: 4 });
+    console.log(`  the meadow with a low pass: ${JSON.stringify(out.trail)}`);
+  }
   if (v.front === 'material') await A.weather('dry');
   return out;
 }

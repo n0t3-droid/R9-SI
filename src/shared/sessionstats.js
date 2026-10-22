@@ -17,11 +17,30 @@
 //     the pairs closer than 60 s; encounters and story beats (in view or not) per 10 minutes.
 //   TARGETS (E§7 + A§10's majors), typeOf (the walk is measured as the builder), verdict(m, type, {chapterOpen}),
 //   describeGap(gap, samples, events), table(rows) (markdown), p90(list).
+//   f-flow (R50-03, docs/superpowers/plans/2026-10-23-f-flow.md §2.2): "seen" is weighed by the screen share the log
+//   records — SS.seen(e): out of view 0; in view 1 from SEEN_FULL (1 % of the screen), below it frac / SEEN_FULL; an event
+//   without a place (a toast: frac 0 in view) or without a frac (older logs) counts 1. The counts (weighted.n, perMin)
+//   add the seen share; the yes/no measures (the gaps, spam, majors, variety) take an event as seen from SEEN_HALF (0.5:
+//   half a full sighting); weighted.full = the weighted events seen so, seenShare = the mean seen of the weighted in view.
+//   repeat: the most frequent kind:sub among all of the session's events and its share (the act that repeats), with the
+//   most frequent kind among the events seen beside it — a verdict row ≤ 0.40 for every player type.
 // ============================================================================
 (function (VR) {
   'use strict';
   const SS = VR.SessionStats = VR.SessionStats || {};
   const WIN = 600, SPAM = 8, MAJOR_GAP = 60, ONE = 2;
+  // ---- f-flow: seen by the screen share
+  SS.SEEN_FULL = 0.01; SS.SEEN_HALF = 0.5;
+  SS.seen = function (e) {
+    if (!e || !e.inView) return 0;
+    const f = e.frac;
+    if (f === undefined || f === null || !(f > 0)) return 1;   // (a toast — in view, no place — or an older log: whole)
+    return Math.min(1, f / SS.SEEN_FULL);
+  };
+  const seenOK = (e) => SS.seen(e) >= SS.SEEN_HALF - 1e-12;
+  // the most frequent key among a list and its share
+  const topOf = (list, key) => { const c = new Map(); let best = '', bn = 0; for (const e of list) { const k = key(e); const n = (c.get(k) || 0) + 1; c.set(k, n); if (n > bn) { bn = n; best = k; } } return { name: best, n: bn, of: list.length, share: list.length ? bn / list.length : 0 }; };
+  // ---- f-flow end
 
   SS.p90 = function (list) {
     if (!list || !list.length) return 0;
@@ -51,17 +70,22 @@
     const m = { t0, t1, dur, minutes, events: { n: evs.length, inView: evs.filter(e => e.inView).length }, samples: smp.length };
 
     // the weighted events — one moment told by two sources (the festival opening and its milestone toast; two craft of
-    // one flyby: the same sub within 2 s) counts once, the heavier — and the gaps between them (on the active clock)
-    const W = [];
+    // one flyby: the same sub within 2 s) counts once, the heavier (f-flow: and the better seen of the two) — and the
+    // gaps between them (on the active clock; f-flow: those seen ≥ 0.5 end a gap)
+    const IV = [];
     let merged = 0;
     for (const e of evs) {
       if (!(e.w >= 2 && e.inView)) continue;
-      let j = W.length - 1;
-      while (j >= 0 && !(e.sub && W[j].sub === e.sub) && e.t - W[j].t < ONE) j--;
-      if (j >= 0 && e.sub && W[j].sub === e.sub && e.t - W[j].t < ONE) { merged++; if (e.w > W[j].w) W[j] = Object.assign({}, e, { t: W[j].t }); continue; }
-      W.push(e);
+      const s = SS.seen(e); if (!(s > 0)) continue;
+      let j = IV.length - 1;
+      while (j >= 0 && !(e.sub && IV[j].sub === e.sub) && e.t - IV[j].t < ONE) j--;
+      if (j >= 0 && e.sub && IV[j].sub === e.sub && e.t - IV[j].t < ONE) { merged++; const q = IV[j], sk = Math.max(q._seen, s); if (e.w > q.w) IV[j] = Object.assign({}, e, { t: q.t, _seen: sk }); else q._seen = sk; continue; }
+      IV.push(Object.assign({}, e, { _seen: s }));
     }
-    m.weighted = { n: W.length, perMin: minutes > 0 ? W.length / minutes : 0, merged };
+    const W = IV.filter(e => e._seen >= SS.SEEN_HALF - 1e-12);
+    let seenSum = 0; for (const e of IV) seenSum += e._seen;
+    m.weighted = { n: seenSum, perMin: minutes > 0 ? seenSum / minutes : 0, merged, full: W.length, inView: IV.length };
+    m.seenShare = IV.length ? seenSum / IV.length : 0;
     const gaps = [];
     let pa = t0, pc = 0;
     for (const e of W) { const c = C.at(e.t); gaps.push({ a: pa, b: e.t, d: +(c - pc).toFixed(3) }); pa = e.t; pc = c; }
@@ -79,8 +103,9 @@
     m.inputs = { micro: share(s => s.input === 'micro'), intent: share(s => s.input === 'intent'), idle: share(s => s.input === 'idle'), build: share(s => s.input === 'build') };
     m.handsFree = m.inputs.intent + m.inputs.idle;
 
-    // variety: the best 10-minute window (on the play clock: a window is 600 s of the session as it ran)
-    const seen = evs.filter(e => e.inView);
+    // variety: the best 10-minute window (on the play clock: a window is 600 s of the session as it ran; f-flow: the
+    // events seen ≥ 0.5)
+    const seen = evs.filter(seenOK);
     const kindsIn = (a, b) => { const k = new Set(); for (const e of seen) if (e.t >= a && e.t <= b) k.add(e.kind); return k; };
     let best = null;
     if (t1 - t0 <= WIN) best = kindsIn(t0, t1);
@@ -96,12 +121,16 @@
     const pairs = [];
     for (let i = 1; i < W.length; i++) if (C.at(W[i].t) - C.at(W[i - 1].t) < SPAM) pairs.push([W[i - 1].t, W[i].t]);
     m.spam = { n: pairs.length, per10: per10(pairs.length), pairs };
-    const Mj = evs.filter(e => e.w >= 4 && e.inView);
+    const Mj = evs.filter(e => e.w >= 4 && seenOK(e));
     let close = 0; for (let i = 1; i < Mj.length; i++) if (C.at(Mj[i].t) - C.at(Mj[i - 1].t) < MAJOR_GAP) close++;
     m.majors = { n: Mj.length, perMin: minutes > 0 ? Mj.length / minutes : 0, close };
     const enc = evs.filter(e => e.kind === 'encounter').length, story = evs.filter(e => e.kind === 'story').length;
     m.encounters = { n: enc, per10: per10(enc) };
     m.story = { n: story, per10: per10(story) };
+    // f-flow: the act that repeats — over all of the session's events; the kind seen most beside it
+    m.events.seen = seen.length;
+    m.repeat = topOf(evs, e => e.kind + ':' + (e.sub || ''));
+    m.repeat.kind = topOf(seen, e => e.kind);
     return m;
   };
 
@@ -110,14 +139,15 @@
   // minute; longest, p90 seconds; movers, lmSky, handsFree shares; variety kinds in 10 minutes; spam, encounters, story
   // per 10 minutes; majors a minute (A§10: at most one of weight ≥ 4 per 60 s)
   SS.TARGETS = {
-    builder: { perMin: ['>=', 1.5], longest: ['<=', 90], p90: ['<=', 50], movers: ['>=', 0.70], lmSky: ['>=', 0.60], variety: ['>=', 8], spam: ['<=', 2], encounters: ['range', 0, 0], story: null, handsFree: ['>=', 0.30], majors: ['<=', 1] },
-    adventurer: { perMin: ['>=', 2.5], longest: ['<=', 60], p90: ['<=', 35], movers: ['>=', 0.75], lmSky: ['>=', 0.50], variety: ['>=', 10], spam: ['<=', 3], encounters: ['range', 2, 4], story: ['>=', 1], handsFree: ['>=', 0.40], majors: ['<=', 1] },
-    pilot: { perMin: ['>=', 2.0], longest: ['<=', 75], p90: ['<=', 45], movers: ['>=', 0.50], lmSky: ['>=', 0.80], variety: ['>=', 8], spam: ['<=', 2], encounters: ['range', 0, 1], story: null, handsFree: ['>=', 0.60], majors: ['<=', 1] },
+    builder: { perMin: ['>=', 1.5], longest: ['<=', 90], p90: ['<=', 50], movers: ['>=', 0.70], lmSky: ['>=', 0.60], variety: ['>=', 8], spam: ['<=', 2], encounters: ['range', 0, 0], story: null, handsFree: ['>=', 0.30], majors: ['<=', 1], repeat: ['<=', 0.40] },
+    adventurer: { perMin: ['>=', 2.5], longest: ['<=', 60], p90: ['<=', 35], movers: ['>=', 0.75], lmSky: ['>=', 0.50], variety: ['>=', 10], spam: ['<=', 3], encounters: ['range', 2, 4], story: ['>=', 1], handsFree: ['>=', 0.40], majors: ['<=', 1], repeat: ['<=', 0.40] },
+    pilot: { perMin: ['>=', 2.0], longest: ['<=', 75], p90: ['<=', 45], movers: ['>=', 0.50], lmSky: ['>=', 0.80], variety: ['>=', 8], spam: ['<=', 2], encounters: ['range', 0, 1], story: null, handsFree: ['>=', 0.60], majors: ['<=', 1], repeat: ['<=', 0.40] },
   };
   SS.ROWS = [
-    ['perMin', 'weight ≥ 2 in view / min'], ['longest', 'longest gap (s)'], ['p90', 'p90 gap (s)'], ['movers', 'moving actor in view'],
+    ['perMin', 'weight ≥ 2 seen / min'], ['longest', 'longest gap (s)'], ['p90', 'p90 gap (s)'], ['movers', 'moving actor in view'],
     ['lmSky', 'landmark or sky in view'], ['variety', 'variety (kinds / 10 min)'], ['spam', 'spam (< 8 s, / 10 min)'],
     ['encounters', 'encounters / 10 min'], ['story', 'story beats / 10 min'], ['handsFree', 'hands-free share'], ['majors', 'majors (w ≥ 4) / min'],
+    ['repeat', 'most repeated event (share of all)'],
   ];
   // the other session types measured by a player type's targets (the walk of wave 3 is the builder's open world)
   SS.ALIAS = { walk: 'builder', explorer: 'builder' };
@@ -132,6 +162,7 @@
       case 'encounters': return m.encounters ? m.encounters.per10 : 0;
       case 'story': return m.story ? m.story.per10 : 0;
       case 'majors': return m.majors ? m.majors.perMin : 0;
+      case 'repeat': return m.repeat ? m.repeat.share : 0;
       default: return +m[key] || 0;
     }
   };
@@ -177,7 +208,7 @@
     }
     for (const k in inputs) inputs[k] = S.length ? inputs[k] / S.length : 0;
     const pos = (s) => (s && Number.isFinite(s.x) ? [s.x, s.z] : null);
-    const inside = (events || []).filter(e => e.t > a && e.t < b).map(e => ({ t: e.t, kind: e.kind, sub: e.sub, w: e.w, inView: !!e.inView }));
+    const inside = (events || []).filter(e => e.t > a && e.t < b).map(e => ({ t: e.t, kind: e.kind, sub: e.sub, w: e.w, inView: !!e.inView, seen: +SS.seen(e).toFixed(2) }));   // (f-flow: and how much of it was seen)
     return { a, b, d: gap.d, samples: S.length, places, landmarks, sky: S.length ? sky / n : 0, movers: S.length ? mv / n : 0, moversShare: S.length ? mvN / n : 0, inputs, from: pos(S[0]), to: pos(S[S.length - 1]), inside };
   };
 

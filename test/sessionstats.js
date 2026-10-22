@@ -112,14 +112,14 @@ const S = (t, o) => Object.assign({ t, movers: 0, landmark: '', sky: '', input: 
 
   const good = { weighted: { perMin: 2 }, gaps: { longest: { d: 80 }, p90: 40 }, movers: 0.8, lmSky: 0.7, variety: { n: 9, full: true, window: 600 }, spam: { per10: 1 }, majors: { perMin: 0.2 }, encounters: { per10: 0 }, story: { per10: 0 }, handsFree: 0.35 };
   const V = SS.verdict(good, 'builder');
-  check(V.type === 'builder' && V.met === V.total && V.total === 10 && V.rows.every(r => r.ok), `a session at the builder's targets meets all ${V.total} (${V.met})`);
+  check(V.type === 'builder' && V.met === V.total && V.total === 11 && V.rows.every(r => r.ok), `a session at the builder's targets meets all ${V.total} (${V.met}; f-flow: the repeat row is the eleventh)`);
   const bad = Object.assign({}, good, { gaps: { longest: { d: 120 }, p90: 40 }, handsFree: 0.1 });
   const B = SS.verdict(bad, 'walk');
   check(B.type === 'walk' && B.base === 'builder' && B.met === B.total - 2 && !B.rows.find(r => r.key === 'longest').ok && !B.rows.find(r => r.key === 'handsFree').ok, `a 120-s gap and a hands-free share of 0.1 miss two rows (${B.met}/${B.total})`);
   const A = SS.verdict(Object.assign({}, good, { encounters: { per10: 3 }, story: { per10: 0 } }), 'adventurer', { chapterOpen: true });
-  check(A.rows.find(r => r.key === 'encounters').ok && !A.rows.find(r => r.key === 'story').ok && A.total === 11, `the adventurer: 3 encounters in the 2–4 range, no beat while a chapter is open misses (${A.met}/${A.total})`);
+  check(A.rows.find(r => r.key === 'encounters').ok && !A.rows.find(r => r.key === 'story').ok && A.total === 12, `the adventurer: 3 encounters in the 2–4 range, no beat while a chapter is open misses (${A.met}/${A.total})`);
   const A2 = SS.verdict(Object.assign({}, good, { encounters: { per10: 3 } }), 'adventurer');
-  check(A2.total === 10 && !A2.rows.find(r => r.key === 'story'), 'no chapter open: the story row is not counted');
+  check(A2.total === 11 && !A2.rows.find(r => r.key === 'story'), 'no chapter open: the story row is not counted');
   const short = SS.verdict(Object.assign({}, good, { variety: { n: 9, full: false, window: 300 } }), 'builder');
   const vr = short.rows.find(r => r.key === 'variety');
   check(vr.ok && /300|5/.test(vr.note || ''), `a session shorter than 10 minutes notes its window for variety (${vr.note})`);
@@ -140,6 +140,50 @@ const S = (t, o) => Object.assign({ t, movers: 0, landmark: '', sky: '', input: 
   check(near(G.inputs.micro, 60 / 80) && near(G.inputs.idle, 20 / 80), `the input meanwhile ${JSON.stringify(G.inputs)}`);
   check(G.from && G.from[0] === 10 && G.to && G.to[0] === 89, `from (${G.from}) to (${G.to})`);
   check(G.inside.length === 2 && G.inside.some(e => e.sub === 'birds') && G.inside.some(e => e.sub === 'flyby' && !e.inView), 'what happened inside it but did not count: the birds (weight 1), the flyby out of view');
+}
+
+// ---------------------------------------------------------------- f-flow (R50-03): "seen" weighed by the screen share
+// full from 1 % of the screen, below it by its share; a toast (in view, no place: frac 0) and an event without a frac
+// (older logs) count whole; the counts add the seen share, the yes/no measures (gaps, spam, majors, variety) take an
+// event as seen from 0.5
+{
+  const F = (t, w, frac, kind, sub, inView) => Object.assign(E(t, w, inView, kind, sub), frac === undefined ? {} : { frac });
+  check(typeof SS.seen === 'function' && near(SS.SEEN_FULL, 0.01), 'SS.seen exists, full from 1 % of the screen (SEEN_FULL 0.01)');
+  if (typeof SS.seen === 'function') {
+    check(SS.seen(F(1, 2, 0.5, 'sky', 'x', false)) === 0 && SS.seen(F(1, 2)) === 1 && SS.seen(F(1, 2, 0)) === 1 && near(SS.seen(F(1, 2, 0.004)), 0.4) && SS.seen(F(1, 2, 0.01)) === 1 && SS.seen(F(1, 2, 0.18)) === 1,
+      `seen: out of view 0 · no frac 1 · a toast 1 · 0.4 % → ${SS.seen(F(1, 2, 0.004))} · 1 % → 1 · 18 % → 1`);
+  }
+  // the critic's balloon (0.3 %) and a fly-by filling 18 %: no longer the same
+  const ev = [F(10, 2, 0.003, 'sky', 'balloon'), F(40, 2, 0.18, 'travel', 'flyby'), F(70, 2, undefined, 'discovery', 'deer'), F(100, 2, 0.004, 'ambient', 'cat'), F(130, 4, 0.002, 'story', 'beat')];
+  const m = SS.analyze({ t0: 0, t1: 160, events: ev, samples: [] });
+  check(near(m.weighted.n, 0.3 + 1 + 1 + 0.4 + 0.2, 1e-9) && near(m.weighted.perMin, m.weighted.n / (160 / 60), 1e-9), `the count adds the seen share: ${m.weighted.n.toFixed(2)} (0.3 + 1 + 1 + 0.4 + 0.2), ${m.weighted.perMin.toFixed(3)} a minute`);
+  check(m.weighted.full === 2 && JSON.stringify(m.gaps.list.map(g => g.d)) === '[40,30,90]', `only an event seen ≥ 0.5 ends a gap (${m.weighted.full}: the fly-by and the toast): gaps ${m.gaps.list.map(g => g.d).join(', ')}`);
+  check(m.majors.n === 0, `a major at 0.2 % of the screen is not a major seen (${m.majors.n})`);
+  check(m.variety.n === 2 && m.variety.kinds.join() === 'discovery,travel', `variety counts the kinds seen ≥ 0.5 (${m.variety.kinds.join(', ')})`);
+  check(near(m.seenShare, (0.3 + 1 + 1 + 0.4 + 0.2) / 5, 1e-9), `the mean seen share of the weighted events in view: ${m.seenShare && m.seenShare.toFixed(3)}`);
+  const sp = SS.analyze({ t0: 0, t1: 60, events: [F(10, 2, 0.05), F(14, 2, 0.002), F(30, 2, 0.05), F(35, 2, 0.02)], samples: [] });
+  check(sp.spam.n === 1 && sp.spam.pairs[0][0] === 30, `spam: the pair 30–35 (both seen), not 10–14 (the second at 0.2 %): ${sp.spam.n} pair(s)`);
+  // one moment told by two sources keeps the better seen of the two
+  const mg = SS.analyze({ t0: 0, t1: 60, events: [F(10, 3, 0.002, 'social', 'festival'), F(10.5, 2, 0.03, 'milestone', 'festival')], samples: [] });
+  check(mg.weighted.merged === 1 && near(mg.weighted.n, 1) && mg.weighted.full === 1, `merged within 2 s: the better seen kept (${mg.weighted.n}, ${mg.weighted.full} full)`);
+}
+// ---------------------------------------------------------------- f-flow (R50-03): the act that repeats
+// repeat — the most frequent kind:sub among all of a session's events (in view or not, the critic's count) and its share;
+// beside it the most frequent kind among the events seen; a verdict row ≤ 0.40 for every player type
+{
+  const ev = [];
+  for (let i = 0; i < 8; i++) ev.push(E(10 + i * 12, i % 3 ? 1 : 2, i % 4 !== 0, 'travel', 'flyby'));
+  ev.push(E(12, 2, true, 'ambient', 'pigeons'), E(41, 2, true, 'sky', 'balloon'), E(59, 3, true, 'wow', 'isles'), E(79, 2, true, 'discovery', 'sheep'), E(80, 2, false, 'travel', 'landing'));
+  const m = SS.analyze({ t0: 0, t1: 101, events: ev, samples: [] });
+  check(m.repeat && m.repeat.name === 'travel:flyby' && m.repeat.n === 8 && near(m.repeat.share, 8 / 13, 1e-9), `the critic's builder: 8 of 13 events a fly-by (${m.repeat && m.repeat.name} ${m.repeat && m.repeat.share.toFixed(2)})`);
+  check(m.repeat && m.repeat.kind && m.repeat.kind.name === 'travel', `the kind seen most: ${m.repeat && m.repeat.kind && m.repeat.kind.name} (${m.repeat && m.repeat.kind && m.repeat.kind.share.toFixed(2)})`);
+  const V = SS.verdict(m, 'builder'), r = V.rows.find(q => q.key === 'repeat');
+  check(!!r && !r.ok && r.target === '≤ 0.4', `the verdict: repeat ${r && r.text} against ${r && r.target} → missed`);
+  const ok = SS.analyze({ t0: 0, t1: 300, events: [E(10, 2, true, 'travel', 'flyby'), E(40, 2, true, 'sky', 'balloon'), E(70, 2, true, 'ambient', 'pigeons'), E(100, 2, true, 'social', 'kids'), E(130, 2, true, 'travel', 'flyby')], samples: [] });
+  check(near(ok.repeat.share, 0.4) && SS.verdict(ok, 'walk').rows.find(q => q.key === 'repeat').ok, `two fly-bys in five events: 0.40 — met (${ok.repeat.share})`);
+  const none = SS.analyze({ t0: 0, t1: 60, events: [], samples: [] });
+  check(none.repeat && none.repeat.share === 0 && none.repeat.n === 0, 'no events: nothing repeats (0)');
+  check(/repeat|wiederholt|most repeated/i.test(SS.table([['builder', m]])), 'the table has the repeat row');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

@@ -33,7 +33,7 @@ check(names.every(n => { const A = LD.ACTS[n]; return A.tier >= 0 && A.tier <= 3
 }
 
 // ---------------------------------------------------------------- the choice: pure, never twice in a row
-const ALLHAS = { lamps: true, chimneys: true, fountain: true, water: true };
+const ALLHAS = { lamps: true, chimneys: true, fountain: true, water: true, heron: true, rays: true, murm: true };   // (f-flow: t-wild's animals in view)
 const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest: false, tier: 2, has: ALLHAS }, o || {});
 {
   let repeats = 0, impure = 0, total = 0, quiet = 0;
@@ -99,8 +99,8 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
   check(['kids', 'musician', 'dog', 'pigeons'].every(n => C('plaza', 'afternoon').includes(n)), 'afternoon: the plaza fills — kids, the musician, the dog, pigeons');
   check(['lanterns', 'chimneys', 'musician'].every(n => C('plaza', 'dusk').includes(n)), 'dusk: the lantern lighter, chimneys, music');
   check(C('wild', 'night').includes('meteor') && C('wild', 'night').includes('flyover'), 'night: meteors, a lit low pass');
-  let off = 0; for (const p of LD.PLACES) for (const hr of LD.HOURS) for (const n of C(p, hr, 0)) if (!['birds', 'lanterns', 'chimneys'].includes(n)) off++;
-  check(!off, `Very Low runs only birds, lanterns and chimneys (${off} others)`);
+  let off = 0; for (const p of LD.PLACES) for (const hr of LD.HOURS) for (const n of C(p, hr, 0)) if (!['birds', 'lanterns', 'chimneys', 'flyby'].includes(n)) off++;
+  check(!off, `Very Low runs only birds, lanterns, chimneys and the fly-by (f-flow: the traffic's pass, no cost of its own) (${off} others)`);
   let empty = []; for (const p of LD.PLACES) for (const hr of LD.HOURS) if (!C(p, hr, 2).length) empty.push(p + '@' + hr);
   check(empty.length <= 2, `on Balanced nearly every place and hour has an act (${empty.length} empty: ${empty.join(' ')})`);
   check(LD.hourOf(0) === 'dawn' && LD.hourOf(3000) === 'morning' && LD.hourOf(6000) === 'noon' && LD.hourOf(9000) === 'afternoon' && LD.hourOf(12600) === 'dusk' && LD.hourOf(18000) === 'night' && LD.hourOf(23000) === 'dawn', 'the hours: dawn 22500–1500, morning, noon 5000–7000, afternoon, dusk 11000–13800, night');
@@ -147,12 +147,15 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
     convoy: [[0, 81, 14], 0, 23000], cat: [[0, 81, 0.5], -Math.PI / 2, 9000], pigeons: [[0, 81, 14], 0, 6000], cart: [[0, 81, 14], 0, 4000],
     meteor: [[0, 81, 14], 0, 18000], balloon: [[0, 81, 14], 0, 4000], bells: [[0, 81, 14], 0, 6000], fireworks: [[0, 81, 14], 0, 13000],
     kids: [[0, 81, 20], 0, 9000], musician: [[0, 81, 14], 0, 9000], dog: [[0, 81, 14], 0, 9000], skyray: [[0, 81, 14], 0, 9000], fisher: [[-10, 81, 0], Math.PI / 2, 9000],
+    // f-flow: the close pass; t-wild's heron, rays and murmuration in view (a stand-in wild below)
+    flyby: [[0, 81, 14], 0, 6000], heron: [[0, 81, 14], 0, 6000], rays: [[0, 81, 14], 0, 6000], murm: [[0, 81, 14], 0, 12000],
   };
+  const WILD = () => ({ on: true, herons: [{ state: 'stand', t: 0, pos: [-8, 81, -12] }], rays: [Float32Array.from([0, 120, -100, 0, 0, 0, 0, 18])], murm: { state: 'fly', fl: { ctr: [10, 110, -150], spread: () => 25 } } });
   const res = [];
   for (const n of names) {
     const sc = SC[n]; if (!sc) { res.push(n + ':no scene'); continue; }
     for (const k in calls) calls[k] = 0;
-    const g = mk('high', sc[0], sc[1], sc[2], { fest: n === 'fireworks' }), A = new LD.Actor(g); A.auto = false;
+    const g = mk('high', sc[0], sc[1], sc[2], Object.assign({ fest: n === 'fireworks' }, LD.WILD && LD.WILD[n] ? { wild: WILD() } : {})), A = new LD.Actor(g); A.auto = false;
     let ok = true, ended = false, steps = 0, lit = 0;
     try {
       A.update(0.05);
@@ -163,7 +166,8 @@ const ctxOf = (place, hour, o) => Object.assign({ place, hour, wet: false, fest:
     const dur = LD.ACTS[n].dur;
     if (!ok || !ended || steps * 0.05 > dur + 12) res.push(n + ':' + (ok ? 'ran ' + (steps * 0.05).toFixed(0) + ' s' : 'error'));
     if (n === 'lanterns' && lit < 3) res.push('lanterns: lit ' + lit);
-    const drawn = LD.ACT[n].draw ? calls.model > 0 : true, seen = calls.part + calls.model + calls.flights + g.villages.F.rockets.length > 0;
+    const wildOn = !!(LD.WILD && LD.WILD[n]) && (n !== 'heron' || g.wild.herons[0].state === 'crouch');   // (f-flow: t-wild's animal featured — the heron sent up)
+    const drawn = LD.ACT[n].draw ? calls.model > 0 : true, seen = calls.part + calls.model + calls.flights + g.villages.F.rockets.length > 0 || wildOn;
     if (!drawn || !seen) res.push(n + ': nothing shown');
   }
   check(!res.length, `every act starts in its scene, runs, shows and ends within its time (${names.length - res.length} of ${names.length}${res.length ? ': ' + res.join(' · ') : ''})`);

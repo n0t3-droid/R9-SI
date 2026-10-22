@@ -19,6 +19,17 @@
 //   musician, the dog, the sky ray, the fisher (and meteor showers). Switch: settings.lifeDir (⚙ Bild · Dinge & Effekte;
 //   padLife for the ships). Presentation only: nothing here is a block, nothing is saved, nothing collides.
 //   LD.hourOf, LD.placeOf, LD.ACTS, LD.allowed, LD.candidates, LD.slotTime, LD.slotAt, LD.pick: pure (test/life_director.js).
+//   f-flow (R50-03, docs/superpowers/plans/2026-10-23-f-flow.md §2.3; test/flow.js): the Regisseur rotates and paces. The
+//   fly-bys are one family (LD.FLY: the low pass, the new close pass 'flyby' — the sky traffic's horizon flights pass
+//   far while the director is on, traffic.js calm() — and the convoy). An act may start when the same act did not start
+//   within 60 s (t-wild's sightings 300 s) and a fly-by when no fly-by started within 60 s and they stay ≤ ⅓ of the last
+//   12 acts (LD.okNow); among the allowed the slot's own pick comes first, then the least recently played (LD.order). No
+//   act starts within 15 s of the last start or of the last weighted event seen (EventLog.sinceSeen), during a wow
+//   moment, or while a fly-by's pass is still to come: a slot waits up to 15 s. When nothing has started and nothing was
+//   seen for 20 s, the director plays the next thing worth seeing now (the rotation's next act, or t-wild's heron, rays
+//   or murmuration in view: 'heron' sends a standing heron up, 'rays' and 'murm' let the spectacle be the moment). The
+//   acts are staged in the view (the passes in front, the balloon at 45–80 m). D.forecast(k): the act a coming slot will
+//   play (Funke's "Nächster Wow").
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -63,7 +74,7 @@
   const DAY = ['morning', 'noon', 'afternoon'], SUN = ['morning', 'noon', 'afternoon', 'dusk'];
   // wx: 'dry' (no rain, or under the hall's vault), 'any'; need: a ctx.has flag; fest: a festival evening near
   LD.ACTS = {
-    birds: { tier: 0, places: OUT, hours: SUN, wx: 'dry', dur: 16 },
+    birds: { tier: 0, places: OUT, hours: SUN.concat(['dawn']), wx: 'dry', dur: 16 },   // (f-flow: and at dawn once the sun is up)
     lanterns: { tier: 0, places: ['plaza', 'street', 'hall', 'hangar'], hours: ['dusk'], wx: 'any', need: 'lamps', dur: 110 },
     chimneys: { tier: 0, places: ['plaza', 'street', 'hills', 'wild'], hours: ['dawn', 'morning', 'dusk', 'night'], wx: 'any', need: 'chimneys', dur: 32 },
     flyover: { tier: 1, places: OUT, hours: LD.HOURS, wx: 'dry', dur: 30 },
@@ -71,15 +82,22 @@
     cat: { tier: 1, places: ['plaza', 'street', 'hills', 'hall'], hours: ['morning', 'noon', 'afternoon', 'dusk', 'night'], wx: 'dry', dur: 34 },
     pigeons: { tier: 1, places: ['plaza', 'street', 'hall', 'hangar'], hours: DAY, wx: 'dry', dur: 22 },
     cart: { tier: 1, places: ['street', 'plaza', 'hall', 'hangar'], hours: DAY, wx: 'any', dur: 24 },
-    meteor: { tier: 1, places: OUT, hours: ['night'], wx: 'dry', dur: 9 },
+    meteor: { tier: 1, places: OUT, hours: ['night', 'dawn'], wx: 'dry', dur: 9 },   // (f-flow: and at dawn while it is dark)
     balloon: { tier: 1, places: ['hills', 'wild', 'plaza', 'street', 'water', 'isles'], hours: DAY, wx: 'dry', dur: 80 },
-    bells: { tier: 1, places: ['plaza', 'street', 'hall', 'hangar'], hours: ['noon'], wx: 'any', dur: 12 },
+    bells: { tier: 1, places: ['plaza', 'street', 'hall', 'hangar'], hours: ['noon'], wx: 'any', dur: 12, heard: true },   // (f-flow heard: played out of the view too)
     fireworks: { tier: 1, places: TOWN, hours: ['dusk', 'night'], wx: 'any', fest: true, dur: 8 },
     kids: { tier: 2, places: TOWN, hours: DAY, wx: 'dry', dur: 34 },
-    musician: { tier: 2, places: ['plaza', 'hall', 'street'], hours: ['afternoon', 'dusk', 'night'], wx: 'dry', dur: 28 },
+    musician: { tier: 2, places: ['plaza', 'hall', 'street'], hours: ['afternoon', 'dusk', 'night'], wx: 'dry', dur: 28, heard: true },
     dog: { tier: 2, places: ['plaza', 'hall'], hours: DAY, wx: 'any', need: 'fountain', dur: 30 },
     skyray: { tier: 2, places: ['isles', 'hangar', 'wild', 'water'], hours: ['morning', 'noon', 'afternoon', 'dusk', 'night'], wx: 'dry', dur: 42 },
     fisher: { tier: 2, places: ['water'], hours: ['dawn', 'morning', 'noon', 'afternoon', 'dusk'], wx: 'any', need: 'water', dur: 32 },
+    // ---- f-flow: the traffic's close pass, an act (tier 0: Very Low keeps its passes — the same flights, no cost of its
+    // own); t-wild's animals near and in view, the director's to feature (again: the wait before the same act again, s)
+    flyby: { tier: 0, places: OUT, hours: LD.HOURS, wx: 'dry', dur: 45 },
+    heron: { tier: 2, places: OUT, hours: LD.HOURS, wx: 'dry', need: 'heron', dur: 14, again: 180 },
+    rays: { tier: 2, places: OUT, hours: LD.HOURS, wx: 'dry', need: 'rays', dur: 30, again: 300 },
+    murm: { tier: 2, places: OUT, hours: LD.HOURS, wx: 'dry', need: 'murm', dur: 30, again: 300 },
+    // ---- f-flow end
   };
   LD.NAMES = Object.keys(LD.ACTS);
   // ctx: {place, hour, wet (rain or snow now; never under the hall's vault), fest, tier, has: {lamps, chimneys, fountain, water}}
@@ -112,6 +130,40 @@
     return R.length ? R[Math.floor(h(seed, k, 0x7c1) * R.length)] : null;
   };
 
+  // ---------------------------------------------------------------- f-flow: the rotation and the pacing (pure)
+  // LD.FLY: the fly-bys, one family; LD.WILD: t-wild's animals the director features; LD.ROT: gap — the same act not again
+  // within it (s; an act's own `again` overrides), the fly-bys not within it of each other; flyShare — the fly-bys at most
+  // this share of the last `window` acts; pace — no act within it after a start or a weighted event seen; wait — how long
+  // a slot waits for the pace; idle — after it without a start or a sight the director plays the next thing now
+  LD.FLY = { flyover: 1, flyby: 1, convoy: 1 };
+  LD.PASS_TRY = [[1, 1], [1.3, 1], [0.8, 1.35], [1.5, 1.6]];   // (a pass's nearest point: its distance and height × these, in turn)
+  LD.WILD = { heron: 1, rays: 1, murm: 1 };
+  LD.ROT = { gap: 60, flyShare: 1 / 3, window: 12, pace: 15, wait: 15, idle: 20, eta: 16, seen: 0.001 };   // (eta: a pass's lead time; seen: the screen share an act needs — 0.1 %, a blob of 11 px at 480 × 270)
+  // may `kind` start at time t after the acts hist ([[t, kind], …], the oldest first)
+  LD.okNow = function (kind, hist, t) {
+    const A = LD.ACTS[kind]; if (!A) return false;
+    const again = A.again || LD.ROT.gap, fly = !!LD.FLY[kind];
+    let n = 0, flyN = 0;
+    for (let i = hist.length - 1; i >= 0; i--) {
+      const q = hist[i], dt = t - q[0];
+      if (q[1] === kind && dt < again) return false;
+      if (fly && LD.FLY[q[1]] && dt < LD.ROT.gap) return false;
+      if (n < LD.ROT.window) { n++; if (LD.FLY[q[1]]) flyN++; }
+    }
+    return !fly || flyN + 1 <= (n + 1) * LD.ROT.flyShare + 1e-9;
+  };
+  const NAMEH = {};
+  const nameH = (c) => NAMEH[c] || (NAMEH[c] = [...c].reduce((a, ch) => (Math.imul(a, 31) + ch.charCodeAt(0)) | 0, 7));
+  // the candidates C in the order the rotation plays them at slot k, time t: the allowed ones — the slot's own pick
+  // first, then the least recently played (never played first), ties by a hash of (seed, k, act)
+  LD.order = function (seed, k, C, hist, t, first) {
+    const last = (c) => { for (let i = hist.length - 1; i >= 0; i--) if (hist[i][1] === c) return hist[i][0]; return -Infinity; };
+    const ok = C.filter(c => LD.okNow(c, hist, t)).map(c => ({ c, f: c === first ? 0 : 1, l: last(c), r: h(seed, k, nameH(c)) }));
+    ok.sort((a, b) => a.f - b.f || a.l - b.l || a.r - b.r);
+    return ok.map(q => q.c);
+  };
+  // ---- f-flow end
+
   // ---------------------------------------------------------------- the acts in the game
   // each: start(D, ev) → false when it finds no place to happen; update(D, ev, dt) → false when done; draw(D, ev, r, E,
   // cam, prog()) for its figures and models (the vox program, opaque); end(D, ev). ev: {kind, k, seed, age, dur, …}
@@ -128,8 +180,8 @@
       if (sd[1] < 0.08) return false;
       const sa = Math.atan2(sd[2], sd[0]), fa = Math.atan2(f[1], f[0]);
       let dir;
-      if (Math.abs(LK.wrap(sa - fa)) < 1.1 && sd[1] < 0.8) { dir = sd.slice(); ev.sun = true; }
-      else { const el = 0.32 + 0.22 * rnd(ev, 1), ca = fa + (rnd(ev, 2) - 0.5) * 0.6; dir = [Math.cos(ca) * Math.cos(el), Math.sin(el), Math.sin(ca) * Math.cos(el)]; }
+      if (Math.abs(LK.wrap(sa - fa)) < 1.1 && sd[1] < 0.42) { dir = sd.slice(); ev.sun = true; }   // (f-flow: a sun higher than 25° is over the frame)
+      else { const el = 0.26 + 0.2 * rnd(ev, 1), ca = fa + (rnd(ev, 2) - 0.5) * 0.6; dir = [Math.cos(ca) * Math.cos(el), Math.sin(el), Math.sin(ca) * Math.cos(el)]; }
       const R = 48 + 16 * rnd(ev, 3), c = [eye[0] + dir[0] * R, eye[1] + dir[1] * R, eye[2] + dir[2] * R];
       const hl = Math.hypot(dir[0], dir[2]) || 1, side = [-dir[2] / hl, dir[0] / hl], s = rnd(ev, 4) < 0.5 ? 1 : -1;
       ev.from = [c[0] - side[0] * 70 * s, c[1] - 6, c[2] - side[1] * 70 * s]; ev.to = [c[0] + side[0] * 70 * s, c[1] + 6, c[2] + side[1] * 70 * s];
@@ -220,22 +272,40 @@
   };
 
   // ---- a ship's low pass with its contrail (by night its lights): the sky traffic flies it (traffic.js opts.over)
+  // (f-flow: across the view, 50–85 m in front of the eye and 16–28 m up — inside the frame; v0.49's half passed behind the
+  // eye and the other half 40–60 m overhead, over the top of the view; its pass comes ~11–20 s after the start: ev.eta)
   ACT.flyover = {
     start(D, ev) {
       const T = D.g.traffic; if (!T || !T.spawnFlight) return false;
-      const fa = Math.atan2(D.fwd[1], D.fwd[0]), cross = fa + (rnd(ev, 1) < 0.5 ? 1 : -1) * (Math.PI / 2 - 0.5 * rnd(ev, 2));
-      ev.tag = 'ld' + ev.k;
-      T.spawnFlight({ arch: ['shuttle', 'interceptor', 'racer', 'dropship'][Math.floor(rnd(ev, 3) * 4)], over: { a: cross, pass: -(18 + 22 * rnd(ev, 4)), alt: 38 + 26 * rnd(ev, 5), t0: 0.06, contrail: true, tag: ev.tag } });
+      const sg = rnd(ev, 1) < 0.5 ? 1 : -1, fa = Math.atan2(D.fwd[1], D.fwd[0]), cross = fa + sg * (Math.PI / 2 - 0.4 * rnd(ev, 2));
+      ev.tag = 'ld' + ev.k; ev.eta = LD.ROT.eta;
+      const at = D.ahead(ev.eta), q = D.passPick(at, cross, sg, 50 + 35 * rnd(ev, 4), 16 + 12 * rnd(ev, 5), 8); if (!q) return false;   // (its nearest point in the view now)
+      T.spawnFlight({ arch: ['shuttle', 'interceptor', 'racer', 'dropship'][Math.floor(rnd(ev, 3) * 4)], over: { a: cross, pass: q.pass, alt: q.alt, t0: 0.12, contrail: true, tag: ev.tag, at, when: T.time + ev.eta } });
     },
     update(D, ev) { const T = D.g.traffic; if (ev.age > 3 && T && !T.ships.some(s => s.tag === ev.tag)) return false; },
   };
-  // ---- the sunrise convoy: three to five freighters in line, high up, their lights still on
+  // ---- f-flow: a close pass — a horizon flight of the sky traffic across the view, 70–120 m in front, 20–40 m up, in its
+  // own formation (the bigger craft more often: a fighter at 100 m is a dot); the traffic logs it at its nearest point
+  ACT.flyby = {
+    start(D, ev) {
+      const T = D.g.traffic; if (!T || !T.spawnFlight) return false;
+      const sg = rnd(ev, 1) < 0.5 ? 1 : -1, fa = Math.atan2(D.fwd[1], D.fwd[0]), cross = fa + sg * (Math.PI / 2 - 0.3 * rnd(ev, 2));
+      ev.tag = 'ld' + ev.k; ev.eta = LD.ROT.eta;
+      const AR = ['freighter', 'shuttle', 'dropship', 'cruiser', 'freighter', 'interceptor', 'racer', 'shuttle'];
+      const at = D.ahead(ev.eta), q = D.passPick(at, cross, sg, 70 + 50 * rnd(ev, 4), 20 + 20 * rnd(ev, 5), 10); if (!q) return false;
+      T.spawnFlight({ arch: AR[Math.floor(rnd(ev, 3) * AR.length)], near: { a: cross, pass: q.pass, alt: q.alt, t0: 0.12, tag: ev.tag, at, when: T.time + ev.eta } });
+    },
+    update(D, ev) { const T = D.g.traffic; if (ev.age > 3 && T && !T.ships.some(s => s.tag === ev.tag)) return false; },
+  };
+  // ---- the sunrise convoy: three to five freighters in line, high up, their lights still on (f-flow: in front of the eye)
   ACT.convoy = {
     start(D, ev) {
       const T = D.g.traffic; if (!T || !T.spawnFlight) return false;
-      const fa = Math.atan2(D.fwd[1], D.fwd[0]) + (rnd(ev, 1) - 0.5) * 1.2 + Math.PI / 2;
-      ev.tag = 'ld' + ev.k;
-      T.spawnFlight({ arch: rnd(ev, 2) < 0.6 ? 'freighter' : 'shuttle', over: { a: fa, pass: (rnd(ev, 3) < 0.5 ? 1 : -1) * (120 + 80 * rnd(ev, 4)), alt: 80 + 30 * rnd(ev, 5), t0: 0.05, convoy: D.tier >= 2 ? 5 : 3, tag: ev.tag } });
+      const sg = rnd(ev, 3) < 0.5 ? 1 : -1, fa = Math.atan2(D.fwd[1], D.fwd[0]) + sg * (Math.PI / 2 + (rnd(ev, 1) - 0.5) * 0.6);
+      ev.tag = 'ld' + ev.k; ev.eta = 22;
+      // (f-flow: 110–150 m in front and 45–60 m up — at 120–200 m and 80–110 m up v0.49's flew over the top of the frame)
+      const at = D.ahead(ev.eta), q = D.passPick(at, fa, sg, 110 + 40 * rnd(ev, 4), 45 + 15 * rnd(ev, 5), 15); if (!q) return false;
+      T.spawnFlight({ arch: rnd(ev, 2) < 0.6 ? 'freighter' : 'shuttle', over: { a: fa, pass: q.pass, alt: q.alt, t0: 0.05, convoy: D.tier >= 2 ? 5 : 3, tag: ev.tag, at, when: T.time + ev.eta } });
     },
     update(D, ev) { const T = D.g.traffic; if (ev.age > 3 && T && !T.ships.some(s => s.tag === ev.tag)) return false; },
   };
@@ -330,7 +400,7 @@
       const n = D.tier >= 2 ? 1 + Math.floor(rnd(ev, 1) * 4) : 1, fa = Math.atan2(D.fwd[1], D.fwd[0]), eye = D.eye;
       ev.m = [];
       for (let i = 0; i < n; i++) {
-        const az = fa + (rnd(ev, 10 + i) - 0.5) * 1.6, el = 0.45 + 0.4 * rnd(ev, 20 + i), R = 300;
+        const az = fa + (rnd(ev, 10 + i) - 0.5) * 1.6, el = 0.3 + 0.25 * rnd(ev, 20 + i), R = 300;   // (f-flow: 17–31° up, in the frame — 26–49° began above it)
         const p = [eye[0] + Math.cos(az) * Math.cos(el) * R, eye[1] + Math.sin(el) * R, eye[2] + Math.sin(az) * Math.cos(el) * R];
         const sd = rnd(ev, 30 + i) < 0.5 ? 1 : -1, sx = -Math.sin(az) * sd, sz = Math.cos(az) * sd, sp = 90 + 50 * rnd(ev, 40 + i);
         ev.m.push({ t0: i === 0 ? 0.2 : 1 + 6 * rnd(ev, 50 + i), life: 1 + 0.6 * rnd(ev, 60 + i), p, v: [sx * sp * 0.8, -sp * 0.55, sz * sp * 0.8] });
@@ -347,12 +417,14 @@
     },
   };
 
-  // ---- a hot-air balloon drifting with the wind over the hills, its burner roaring now and then
+  // ---- a hot-air balloon drifting with the wind over the hills, its burner roaring now and then (f-flow: 45–80 m out — at
+  // 85–145 m it covered 0.3–0.6 % of the screen, hardly there — and 12–25° up, inside the frame)
   ACT.balloon = {
     start(D, ev) {
-      const fa = Math.atan2(D.fwd[1], D.fwd[0]) + (rnd(ev, 1) - 0.5) * 1.1, R = 85 + 60 * rnd(ev, 2), eye = D.eye;
+      const fa = Math.atan2(D.fwd[1], D.fwd[0]) + (rnd(ev, 1) - 0.5) * 1.1, R = 45 + 35 * rnd(ev, 2), eye = D.eye;
       const x = eye[0] + Math.cos(fa) * R, z = eye[2] + Math.sin(fa) * R, top = D.top(x, z);
-      ev.pos = [x, Math.max(top, eye[1] - 1.6) + 34 + 22 * rnd(ev, 3), z];
+      // (f-flow: 12–25° over the eye's level, at least 12 m over the ground — 22–40 m up at 45 m was over the frame)
+      ev.pos = [x, Math.max(top + 12, eye[1] + R * Math.tan((12 + 13 * rnd(ev, 3)) * Math.PI / 180)), z];
       const w = D.E.windDir || [1, 0], sp = 1.3 + 0.8 * rnd(ev, 4);
       ev.v = [w[0] * sp, 0, w[1] * sp]; ev.yaw = rnd(ev, 5) * TAU; ev.burn = 3; ev.y0 = ev.pos[1];
       D.st.balloon = 1;
@@ -385,6 +457,7 @@
   ACT.fireworks = {
     start(D, ev) {
       const V = D.g.villages, vil = V && V.festivalNear ? V.festivalNear() : null; if (!vil || !V.festState) return false;
+      const pz0 = vil.plan.plaza; if (!D.seenAt([pz0.x + 0.5, pz0.y + 28, pz0.z + 0.5], 15)) return false;   // (f-flow: the salvo where it is seen)
       const F = V.festState(vil), pz = vil.plan.plaza, PR = pz.r || 4, COLS = [[1, 0.3, 0.35], [0.35, 1, 0.5], [0.4, 0.6, 1], [1, 0.82, 0.3], [0.85, 0.45, 1], [0.35, 1, 1]];
       const n = 4 + Math.floor(rnd(ev, 1) * 3);
       for (let k = 0; k < n; k++) { const cor = [[-1, -1], [1, -1], [-1, 1], [1, 1]][k & 3]; F.rockets.push({ p: [pz.x + 0.5 + cor[0] * (PR + 3), pz.y + 1, pz.z + 0.5 + cor[1] * (PR + 3)], v: [(rnd(ev, 10 + k) - 0.5) * 3, 27 + 7 * rnd(ev, 20 + k), (rnd(ev, 30 + k) - 0.5) * 3], fuse: 1.1 + 0.5 * rnd(ev, 40 + k) + k * 0.3, col: COLS[k % COLS.length], col2: COLS[(k + 2) % COLS.length], type: ['peony', 'ring', 'willow', 'palm', 'crossette'][k % 5], whistle: false }); }
@@ -527,6 +600,26 @@
     },
   };
 
+  // ---- f-flow: t-wild's animals (wildlife.js draws them; the director only chooses the moment)
+  // a heron standing at a pond in view 12–45 m ahead lifts off and flies to the far side (its own flight, wildlife.js)
+  ACT.heron = {
+    start(D, ev) {
+      const H = D.wildHeron(); if (!H || !D.seenAt([H.pos[0], H.pos[1] + 0.6, H.pos[2]], 1.5)) return false;
+      H.state = 'crouch'; H.t = 0; ev.h = H; ev.pos = H.pos;
+    },
+    update() { },
+  };
+  // the Himmelsrochen gliding by within 260 m in view, or the murmuration in view at dusk: the moment is theirs
+  ACT.rays = {
+    start(D, ev) { const q = D.wildRay(); if (!q) return false; ev.ray = q.i; ev.pos = q.pos; ev.r = q.r; },
+    update(D, ev) { const W = D.g.wild, R = W && W.rays && W.rays[ev.ray]; if (R) { ev.pos[0] = R[0]; ev.pos[1] = R[1]; ev.pos[2] = R[2]; } },
+  };
+  ACT.murm = {
+    start(D, ev) { const q = D.wildMurm(); if (!q) return false; ev.pos = q.pos; ev.r = q.r; },
+    update(D, ev) { const W = D.g.wild, Mu = W && W.murm; if (Mu && Mu.fl && Mu.fl.ctr) { ev.pos[0] = Mu.fl.ctr[0]; ev.pos[1] = Mu.fl.ctr[1]; ev.pos[2] = Mu.fl.ctr[2]; } },
+  };
+  // ---- f-flow end
+
   // ---------------------------------------------------------------- the director in the game
   const LAMP_RE = /^(vx_lamppost|vx_lamppost_crystal|vx_lamppost_tech|vx_lamppost_black|vx_arc_lamp|vm_arc_lamp|vx_garden_lamp|vm_town_lamp)$/;
   let LAMPS = null;
@@ -540,8 +633,110 @@
       this.events = []; this.lastK = null; this.ctx = null; this.ctxT = 0; this.time = 0; this.rainT = -1e9;
       this.lamps = { at: null, list: [], scan: null, done: false };
       this.on = true; this.tier = 2; this.history = [];
-      this.st = { started: 0, kinds: {}, lit: 0, lamps: 0, place: '', hour: '', pick: null, slot: 0 };
+      this.st = { started: 0, kinds: {}, lit: 0, lamps: 0, place: '', hour: '', pick: null, slot: 0, filled: 0 };
+      // f-flow: the acts started ([t, kind], the rotation's memory), the last start, a slot waiting for the pace, the cart's
+      // wait, the end of a fly-by's moment (nothing else meanwhile), the idle check's clock
+      this.acts = []; this.lastStart = 0; this.pend = null; this.cartPend = 0; this.flyUntil = 0; this.idleT = 1; this.fillN = 0;
     }
+    // ---- f-flow: the director's pace — may an act start now: 15 s after the last start and the last weighted event seen
+    // (EventLog), not during a wow moment, not before a fly-by's pass is over
+    calm() { return !!this.on; }
+    sinceSeen() { const L = VR.EventLog; return L && L.on !== false && L.sinceSeen ? L.sinceSeen(2, true) : Infinity; }
+    paced() {
+      const t = this.time, R = LD.ROT;
+      if (t - this.lastStart < R.pace || t < this.flyUntil) return false;
+      if (this.g.wow && this.g.wow.active) return false;
+      return this.sinceSeen() >= R.pace;
+    }
+    // the acts in order until one starts (one may find no place), within the cap of acts at once
+    play(order, o) {
+      if (this.events.length >= (this.tier >= 2 ? 4 : 2)) return null;
+      for (let i = 0; i < order.length && i < 5; i++) { const kind = order[i]; if (this.events.some(e => e.kind === kind)) continue; const ev = this.start(kind, o); if (ev) return ev; }
+      return null;
+    }
+    // nothing started and nothing seen for ROT.idle s: the next thing worth seeing now — t-wild's animal in view first (it
+    // is there now), else the rotation's next act (the next slot's, pulled forward)
+    idle(ctx) {
+      const t = this.time, R = LD.ROT;
+      if (Math.min(t - this.lastStart, this.sinceSeen()) < R.idle || t < this.flyUntil || this.pend || (this.g.wow && this.g.wow.active)) return;
+      const k = (this.lastK || 0) + 1, order = LD.order(this.seed, k, LD.candidates(ctx), this.acts, t, LD.pick(this.seed, k, ctx));
+      const wild = order.filter(c => LD.WILD[c]), rest = order.filter(c => !LD.WILD[c]);
+      const ev = this.play(wild.concat(rest), { k: 700000 + k * 16 + (this.fillN++ & 15) });
+      if (ev) this.st.filled++;
+      else this.lastStart = t - R.idle + 5;   // (nothing could start: again in 5 s)
+    }
+    // the act a coming slot k will play: the rotation replayed from the acts so far (no pacing, no wild sighting)
+    forecast(k) {
+      const ctx = this.ctx; if (!ctx) return null;
+      if (this.lastK === null) return LD.pick(this.seed, k, ctx);
+      const C = LD.candidates(ctx); if (!C.length) return null;
+      const hist = this.acts.slice(-24), last = this.history.length ? this.history[this.history.length - 1] : null;
+      let kind = null, prev = last && last[0] === this.lastK ? last[1] : null;
+      for (let j = this.lastK + 1; j <= k; j++) {
+        // (as slot() chooses: its own pick unless the previous slot's, the rotation's order, never the previous slot's)
+        let own = LD.pick(this.seed, j, ctx); if (own && own === prev) own = null;
+        const t = this.time + (LD.slotTime(this.seed, j) - this.clock), order = LD.order(this.seed, j, C, hist, t, own);
+        kind = null; for (const c of order) if (c !== prev && !LD.WILD[c]) { kind = c; break; }
+        if (kind) hist.push([t, kind]);
+        prev = kind;
+      }
+      return kind;
+    }
+    // where the eye will be in t seconds at its present pace (a walking player is 60 m on when a pass comes)
+    ahead(t) {
+      const p = this.g.player.pos, v = this.g.player.vel, sp = v ? Math.hypot(v[0], v[2]) : 0;
+      if (!(sp > 0.5) || !(t > 0)) return [p[0], p[1], p[2]];
+      const k = Math.min(sp, 8) * t / sp;
+      return [p[0] + v[0] * k, p[1], p[2] + v[2] * k];
+    }
+    // t-wild's animals near and in view (the stage of 'heron', 'rays', 'murm'): in the view's cone, at a distance
+    inSight(p, minD, maxD, cone) {
+      const e = this.eye, dx = p[0] - e[0], dy = p[1] - e[1], dz = p[2] - e[2], dh = Math.hypot(dx, dz), d = Math.hypot(dh, dy);
+      if (!(d >= minD && d <= maxD)) return false;
+      const f = this.fwd, fw = dx * f[0] + dz * f[1]; if (fw <= 0) return false;
+      if (Math.abs(dx * -f[1] + dz * f[0]) > fw * this.tanH * (cone || 0.85)) return false;
+      const half = ((this.g.settings && this.g.settings.fov) || 70) * Math.PI / 360;
+      return Math.abs(Math.atan2(dy, dh)) <= half * 0.9;
+    }
+    // f-flow: what the never-boring measure will see — a point in the view now (eventlog.js's inView: the frustum and
+    // nothing in the way), on ≥ 0.1 % of the screen (a thing one can make out); without the log, or a forced act: yes
+    seenAt(q, r) {
+      const L = VR.EventLog; if (this.forcing || !L || !L.inView || !q) return true;
+      const v = L.inView(q, r, this.g);
+      return !!v.inView && !(v.frac > 0 && v.frac < LD.ROT.seen);
+    }
+    // an act's stage (eventlog.js's own mapper: where the log will put its event) seen now
+    stageSeen(kind, ev) {
+      const L = VR.EventLog, M = L && L.ACTS ? L.ACTS[kind] : null; if (!M || !L.inView) return true;
+      let q = null; try { q = M.at(ev, this); } catch (e) { q = null; }
+      return !q || this.seenAt(q, M.r);
+    }
+    // a pass's nearest point (the path's middle: `dist` m in front of where the eye will be, `alt` m up) — the first of
+    // four (farther, lower, higher) in the view now; null: no sky to see it in (a roof, a wall, a look at one's feet)
+    passPick(at, a, sg, dist, alt, r) {
+      const sx = -Math.sin(a), sz = Math.cos(a);
+      for (const [kd, ka] of LD.PASS_TRY) {
+        const pass = -sg * dist * kd, al = alt * ka;
+        if (this.seenAt([at[0] + sx * pass, at[1] + al, at[2] + sz * pass], r || 10)) return { pass, alt: al };
+      }
+      return this.forcing ? { pass: -sg * dist, alt } : null;
+    }
+    wildHeron() {
+      const W = this.g.wild; if (!W || !W.herons || !W.herons.length) return null;
+      for (const H of W.herons) if (H && H.state === 'stand' && H.pos && this.inSight(H.pos, 12, 45) && this.seen(H.pos, 0.8)) return H;
+      return null;
+    }
+    wildRay() {
+      const W = this.g.wild; if (!W || !W.rays || !W.rays.length) return null;
+      for (let i = 0; i < W.rays.length; i++) { const R = W.rays[i]; if (R && this.inSight(R, 20, 260)) return { i, pos: [R[0], R[1], R[2]], r: Math.max(4, (R[7] || 16) * 0.5) }; }
+      return null;
+    }
+    wildMurm() {
+      const W = this.g.wild, Mu = W && W.murm; if (!Mu || Mu.state !== 'fly' || !Mu.fl || !Mu.fl.ctr) return null;
+      const c = Mu.fl.ctr; if (!this.inSight(c, 20, 420, 1)) return null;
+      return { pos: [c[0], c[1], c[2]], r: Math.max(8, Mu.fl.spread ? Mu.fl.spread() : 20) };
+    }
+    // ---- f-flow end
     // ---- what the acts read
     get E() { return (this.g.env && this.g.env.E) || {}; }
     get P() { return this.g.particles; }
@@ -707,6 +902,7 @@
       const wet = (E.rain || 0) > 0.15 || (E.snow || 0) > 0.15;
       const fest = !!(g.villages && g.villages.festivalNear && g.villages.festivalNear());
       const has = { lamps: place === 'plaza' || place === 'street' || place === 'hall' || place === 'hangar', chimneys: !!(vil && vil.plan.chimneys && vil.plan.chimneys.some(c => c && Math.hypot(c[0] - p[0], c[2] - p[2]) < 90)), fountain: !!(vil && vil.plaza && Math.hypot(vil.plaza.x - p[0], vil.plaza.z - p[2]) < 45), water: info.water };
+      if (this.tier >= 2 && g.wild && g.wild.on !== false) { has.heron = !!this.wildHeron(); has.rays = !!this.wildRay(); has.murm = !!this.wildMurm(); }   // (f-flow: t-wild's animals in view)
       return { place, hour, tod, wet, fest, tier: this.tier, has, vil };
     }
     update(dt) {
@@ -721,10 +917,19 @@
       const k = LD.slotAt(this.seed, this.clock);
       if (this.lastK === null) this.lastK = k;            // (the first act comes with the next slot)
       else if (k > this.lastK) { this.lastK = k; if (this.auto !== false) this.slot(k); }   // (auto false: only forced acts — a test)
-      // t-polish: the streets' regular — by day in a town a cart on its own clock (28–40 s apart), one at a time
+      // t-polish: the streets' regular — by day in a town a cart on its own clock (28–40 s apart), one at a time (f-flow:
+      // it keeps its clock but waits up to 15 s for the pace, and the rotation lets one come a minute)
       const ck = LD.cartAt(this.seed, this.clock);
       if (this.lastCart === undefined) this.lastCart = ck;
-      else if (ck > this.lastCart) { this.lastCart = ck; if (this.auto !== false && LD.cartRegular(ctx) && !this.events.some(e => e.kind === 'cart')) this.start('cart', { k: 900000 + ck }); }
+      else if (ck > this.lastCart) { this.lastCart = ck; if (this.auto !== false && LD.cartRegular(ctx)) this.cartPend = this.time + LD.ROT.wait; }
+      if (this.cartPend) {
+        if (this.time > this.cartPend || !LD.cartRegular(ctx) || this.events.some(e => e.kind === 'cart') || !LD.okNow('cart', this.acts, this.time)) this.cartPend = 0;
+        else if (this.paced()) { this.cartPend = 0; this.start('cart', { k: 900000 + ck }); }
+      }
+      // f-flow: a slot waiting for the pace (a newer slot replaces it); the idle fill, once a second
+      if (this.pend && (this.time > this.pend.until || this.pend.k < this.lastK)) this.pend = null;
+      if (this.pend && this.auto !== false && this.paced()) { const q = this.pend; this.pend = null; this.play(LD.order(this.seed, q.k, LD.candidates(ctx), this.acts, this.time, q.first), { k: q.k }); }
+      if (this.auto !== false && (this.idleT -= dt) <= 0) { this.idleT = 1; this.idle(ctx); }
       const e0 = g.player.pos;
       for (let i = this.events.length - 1; i >= 0; i--) {
         const ev = this.events[i], A = ACT[ev.kind];
@@ -744,11 +949,17 @@
       // (the place or the hour changed since the last slot — its neighbours were picked for another context: the slot
       // after the same act stays quiet, so it never comes twice in a row)
       const last = this.history.length ? this.history[this.history.length - 1] : null;
-      if (kind && last && last[0] === k - 1 && last[1] === kind) kind = null;
-      this.st.pick = kind; this.st.slot = k;
-      this.history.push([k, kind, ctx.place, ctx.hour]); if (this.history.length > 40) this.history.shift();
-      if (!kind || this.events.some(e => e.kind === kind) || this.events.length >= (this.tier >= 2 ? 4 : 2)) return;
-      this.start(kind, { k });
+      const prev = last && last[0] === k - 1 ? last[1] : null;
+      if (kind && kind === prev) kind = null;
+      // f-flow: the rotation — the slot's own pick first when it may come, else the least recently played (never the
+      // previous slot's); the slot waits for the pace
+      const order = LD.order(this.seed, k, LD.candidates(ctx), this.acts, this.time, kind).filter(c => c !== prev);
+      const first = order.length ? order[0] : null;
+      this.st.pick = first; this.st.slot = k;
+      this.history.push([k, first, ctx.place, ctx.hour]); if (this.history.length > 40) this.history.shift();
+      if (!first) return;
+      if (!this.paced()) { this.pend = { k, first, until: this.time + LD.ROT.wait }; return; }
+      this.play(order, { k });
     }
     start(kind, o) {
       const A = ACT[kind], R = LD.ACTS[kind]; if (!A || !R) return null;
@@ -757,7 +968,15 @@
       let ok;
       try { ok = A.start(this, ev) !== false; } catch (e) { ok = false; console.warn('life director', kind, e); }
       if (!ok) return null;
+      // f-flow: an act plays only where it is seen — its stage out of the view, behind a wall or too small: undone, the
+      // next in the order comes (the passes chose a nearest point in the view: passPick; the carillon and the musician are
+      // heard: they play anyway)
+      if (!LD.FLY[kind] && !R.heard && !this.stageSeen(kind, ev)) { if (A.end) { try { A.end(this, ev); } catch (e) { /* undone */ } } this.st.unseen = (this.st.unseen || 0) + 1; return null; }
       this.events.push(ev); this.st.started++; this.st.kinds[kind] = (this.st.kinds[kind] || 0) + 1;
+      // f-flow: the rotation's memory, the pace's clock, a fly-by's moment (its pass ~eta s on, and 8 s after it)
+      this.acts.push([this.time, kind]); if (this.acts.length > 48) this.acts.shift();
+      this.lastStart = this.time;
+      if (LD.FLY[kind]) this.flyUntil = this.time + (ev.eta || 14) + 8;
       if (VR.EventLog) VR.EventLog.act(ev, this);   // e-log: an act begins (eventlog.js, the never-boring measure)
       return ev;
     }
@@ -766,7 +985,8 @@
       if (!this.on && this.g.settings && this.g.settings.lifeDir === false) return false;
       this.ctx = this.context();
       if (kind === 'lanterns') { const L = this.lamps; L.at = null; for (let i = 0; i < 400 && (!L.at || L.scan); i++) this.scanLamps(0); }
-      return !!this.start(kind, o || {});
+      this.forcing = true;   // (f-flow: a forced act plays where it was asked to — the picture tests aim the camera first)
+      try { return !!this.start(kind, o || {}); } finally { this.forcing = false; }
     }
     draw(r, E, layer, cam) {
       if (!this.on || layer !== 'opaque' || !this.events.length) return;
@@ -777,7 +997,7 @@
     }
     stats() {
       const kinds = {}; for (const ev of this.events) kinds[ev.kind] = (kinds[ev.kind] || 0) + 1;
-      return { kinds, started: this.st.started, startedKinds: Object.assign({}, this.st.kinds), lit: this.st.lit || 0, lamps: this.st.lamps || 0, place: this.st.place, hour: this.st.hour, pick: this.st.pick, slot: this.st.slot, lampsSeen: this.lamps.list.length, history: this.history.slice(-6) };
+      return { kinds, started: this.st.started, startedKinds: Object.assign({}, this.st.kinds), lit: this.st.lit || 0, lamps: this.st.lamps || 0, place: this.st.place, hour: this.st.hour, pick: this.st.pick, slot: this.st.slot, lampsSeen: this.lamps.list.length, history: this.history.slice(-6), filled: this.st.filled, acts: this.acts.slice(-12) };
     }
     destroy() { this.events.length = 0; }
   };
