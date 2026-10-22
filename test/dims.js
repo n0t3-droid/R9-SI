@@ -21,6 +21,7 @@ require('../src/main/i18n.js'); require('../src/main/lang_en.js'); require('../s
 require('../src/main/presence.js'); require('../src/main/player.js');
 require('../src/main/weather.js'); require('../src/main/skybodies.js'); require('../src/main/env.js');
 require('../src/main/world.js');
+require('../src/main/horizon.js');
 require('../src/main/crafting.js');
 require('../src/main/starships.js');
 require('../src/main/settings_reg.js');
@@ -403,6 +404,42 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await play(gs, ms);
     gs.chat('/dim drift');
     check(gs.dim === 'overworld' && !TR.busy(gs), '/dim is a command: not without cheats in survival (the gates and Heimkehr work in every mode)');
+  }
+
+  // ================================================================ h · the horizon over a round trip
+  // (browser run 2: Heimkehr 15–18 s with warm generators — the coarse horizon was built again every time, its LOD
+  // tiles at the far lane's 30 % beside the chunks; node: the warm coarse ring alone is ~4 s of one worker)
+  console.log('h · the horizon over a round trip');
+  {
+    const freed = [], gl = { deleteVertexArray(v) { freed.push(v); }, deleteBuffer() {} };
+    const h = new V.Horizon({ renderer: { gl }, pool: { workers: [] } });
+    const tile = (o) => Object.assign({ L: 4, tx: 0, tz: 0, S: 2048, state: 0, used: 0, empty: false }, o);
+    h.tiles.set('4:0:0', tile({ state: 1, vao: 'v1', vbo: 'b1', ibo: 'i1', bytes: 100 }));   // on the GPU
+    h.tiles.set('4:1:0', tile({ state: 1, empty: true }));                                    // ready, nothing in it
+    h.tiles.set('4:2:0', tile({ state: 0 }));                                                 // asked for: its job goes with the pool
+    h.tiles.set('4:3:0', tile({ state: 0, queued: true }));                                   // answered, in the old world's upload queue
+    h.tiles.set('4:4:0', tile({ state: 2, failedAt: 0 }));                                    // failed
+    h.bytes = 100; h.inflight = 3; h.drawList.push({});
+    let farReset = 0; h.far = { reset() { farReset++; } };
+    check(typeof h.keepReady === 'function', 'VR.Horizon.keepReady exists');
+    if (typeof h.keepReady === 'function') h.keepReady();
+    check(JSON.stringify([...h.tiles.keys()]) === JSON.stringify(['4:0:0', '4:1:0']) && h.bytes === 100 && freed.length === 0, 'keepReady: the tiles on the GPU (and the empty ones) stay, nothing is freed', JSON.stringify([...h.tiles.keys()]));
+    check(h.inflight === 0 && h.drawList.length === 0 && farReset === 1, 'keepReady: what was still asked for is forgotten (inflight 0), ring 1 starts again');
+    h.reset();
+    check(h.tiles.size === 0 && h.bytes === 0 && freed.length === 1 && freed[0] === 'v1', 'reset (the title, another save) frees them as before');
+  }
+  {
+    const g = mkGame(META()), meta = META();
+    const hz = g.horizon = { resets: 0, keeps: 0, reset() { this.resets++; }, keepReady() { this.keeps++; }, setLevel() {}, setFar() {}, enabled() { return false; }, farPlane() { return 0; }, update() {}, stats: {} };
+    await play(g, meta);
+    const r0 = hz.resets, k0 = hz.keeps;
+    check(r0 === 1 && k0 === 0, 'a world\'s start resets the horizon (as before)', [r0, k0].join(','));
+    await TR.go(g, { dim: 'drift', via: 'cmd' }); settle(g);
+    check(g.dim === 'drift' && hz.keeps === k0 + 1 && hz.resets === r0, 'the trip to the drift keeps Herzwelt\'s horizon (keepReady, no reset)', [hz.resets, hz.keeps].join(','));
+    await TR.go(g, { dim: 'overworld', via: 'home' }); settle(g);
+    check(g.dim === 'overworld' && hz.keeps === k0 + 2 && hz.resets === r0, 'Heimkehr finds it there (the same world key: no reset on the way home either)', [hz.resets, hz.keeps].join(','));
+    g.teardownWorld();
+    check(hz.resets === r0 + 1 && hz.keeps === k0 + 2, 'leaving the world (the title) resets it as before');
   }
   console.log(fails ? 'FAILED ' + fails : 'ALL OK');
   process.exit(fails ? 1 : 0);

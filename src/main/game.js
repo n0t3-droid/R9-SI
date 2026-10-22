@@ -474,7 +474,7 @@
       if (this.trams) { this.trams.destroy(); this.trams = null; }
       if (this.padLife) { this.padLife.destroy(); this.padLife = null; } if (this.lifeDirector) { this.lifeDirector.destroy(); this.lifeDirector = null; }   // (t-life: the pads' visitors, the Regisseur des Lebens)
       if (this.wow) { this.wow.destroy(); this.wow = null; }   // (t-vista)
-      if (this.horizon) this.horizon.reset();
+      if (this.horizon) { if (VR.Travel && VR.Travel.busy(this) && this.horizon.keepReady) this.horizon.keepReady(); else this.horizon.reset(); }   // u-dims: a trip keeps Herzwelt's horizon for the way home (Heimkehr: the coarse ring is there on the first frame)
       if (this.furnaces) this.furnaces.clear();
       this.dim = 'overworld'; if (VR.Travel) VR.Travel.onTeardown(this);   // u-dims: the title and the next start begin at Herzwelt (a trip left this.dim elsewhere); a gate's charge ends
       this.renderer && (this.renderer.visDirty = true);
