@@ -11,7 +11,10 @@
 //   numbers   the frame times through the hand-off (rendered, synced: no frame over 2× the median); Very Low's climb frame
 //             (1,500 m) against the plaza frame on the same page (rounds in turns, the medians: not dearer); the regimes
 //             as they come; the entry's glow, its landing place and that place's local time; no page error
-// → .tmp_tests/ascent_run.json.   usage: nohup bash test/wt_run.sh ascent.mjs 3600 > .tmp_tests/ascent.log 2>&1 &
+//   before/after (BASE_DIST = v0.49's dist/index.html, built from 0d0144b in .tmp_tests/base0d0): the ground frame (the
+//             plaza) on each preset in the base build first (ascent_plaza_base_<tag>.png), then in this one — the same
+//             picture (mean |Δ| and the share of pixels off by more than 24 levels; birds and motes move) and its cost
+// → .tmp_tests/ascent_run.json.   usage: BASE_DIST=… nohup bash test/wt_run.sh ascent.mjs 5400 > .tmp_tests/ascent.log 2>&1 &
 //   PRESETS=high,potato · ONLY=climb,handoff,orbit,jump,entry · SEED=53 · RD=8 · ROUNDS=3 · K=3 (frames a picture)
 // regress: skip  (a showcase: the pictures are the evidence; the gates are test/ascent.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
@@ -21,6 +24,7 @@ import { execSync, execFileSync } from 'child_process';
 const ROOT = new URL('../', import.meta.url).pathname;   // this checkout (the test runs from test/ or from .tmp_tests/)
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const SHOTS = ROOT + 'test/shots/';
+const BASE = process.env.BASE_DIST || (fs.existsSync(ROOT + '.tmp_tests/base0d0/dist/index.html') ? 'file://' + ROOT + '.tmp_tests/base0d0/dist/index.html' : '');
 const SEED = process.env.SEED || '53', RD = +(process.env.RD || 8), ROUNDS = +(process.env.ROUNDS || 3), K = +(process.env.K || 3);
 const PRESETS = (process.env.PRESETS || 'high,potato').split(',');
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
@@ -42,6 +46,15 @@ const spread = async (path) => {
   const m = s / n; return { mean: r1(m), sd: r1(Math.sqrt(Math.max(0, s2 / n - m * m))) };
 };
 
+// two pictures of the same view: the mean |Δ| (0–255, over r g b) and the share of pixels off by more than 24 levels
+const pixDiff = async (a, b) => {
+  const A = await sharp(a).raw().toBuffer({ resolveWithObject: true }), B = await sharp(b).raw().toBuffer({ resolveWithObject: true });
+  if (A.info.width !== B.info.width || A.info.height !== B.info.height) return { mean: 255, big: 1 };
+  const C = A.info.channels; let s = 0, big = 0, n = 0;
+  for (let i = 0; i < A.data.length; i += C) { const d0 = Math.abs(A.data[i] - B.data[i]), d1 = Math.abs(A.data[i + 1] - B.data[i + 1]), d2 = Math.abs(A.data[i + 2] - B.data[i + 2]); s += d0 + d1 + d2; if (Math.max(d0, d1, d2) > 24) big++; n++; }
+  return { mean: Math.round(s / n / 3 * 100) / 100, big: Math.round(big / n * 10000) / 10000 };
+};
+
 // ---------------------------------------------------------------- the browser, a page (space0.mjs's helpers)
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const cpuNow = () => {
@@ -51,14 +64,14 @@ const cpuNow = () => {
   while (st.length) { for (const c of kids.get(st.pop()) || []) { st.push(c); try { const s = fs.readFileSync(`/proc/${c}/stat`, 'utf8'), f = s.slice(s.lastIndexOf(')') + 2).split(' '); t += +f[11] + +f[12]; } catch (e) { } } }
   return t * 10;
 };
-async function openPage() {
+async function openPage(url = DIST) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
   const page = await ctx.newPage();
   const logs = [];
   page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail|missing|incomplete/i.test(s)) logs.push(`[${t}] ${s.slice(0, 600)}`); });
   page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
   page.on('crash', () => { logs.push('[pageerror] the page crashed'); console.log('  !! the page crashed'); });
-  await page.goto(DIST);
+  await page.goto(url);
   const wait = (ms) => page.waitForTimeout(ms);
   const ev = (fn, arg) => page.evaluate(fn, arg);
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
@@ -137,8 +150,40 @@ const spaceReady = (P) => P.ev(() => { const need = VR.SpaceScene.cur_need || []
 const waitTex = async (P, maxMs) => { const t0 = Date.now(); let s = null; for (;;) { await P.step(6); s = await spaceReady(P); if ((s.need && s.done === s.need) || Date.now() - t0 > maxMs) return s; await P.wait(60); } };
 const view = (P, v, hp, hy) => P.ev(([v, hp, hy]) => { const fl = VR.game.flight; fl.view = v; VR.game.camMode = v === 0 ? 0 : 1; fl.headPitch = hp; fl.headYaw = hy || 0; fl.backT = 0; fl.recenter = false; fl.mouseIdle = 0; fl.chaseYaw = null; fl.shot = null; fl.shakeAmp = 0; fl.bump = 0; }, [v, hp, hy]);
 
+// the plaza view: the Gate Temple from the plaza path at noon (space0.mjs), the animation clock pinned so the two builds
+// draw the same moment; the frame kept as __Fplaza and pictured
+async function plaza(P, path) {
+  const px = 4.5, pz = 74.5;
+  await P.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [px, pz]);
+  await P.settle(1500);
+  const gy = await P.groundY(px, pz), eyeY = gy + 1 + 1.62, at = [0, 93, 0];
+  await P.ev(([x, y, z, at]) => { const g = VR.game, p = g.player; g.env.day = 2; g.env.setTime(6000); p.teleport(x, y - 1.62, z); p.yaw = p.viewYaw = Math.atan2(-(at[0] - x), -(at[2] - z)); p.pitch = Math.atan2(at[1] - y, Math.hypot(at[0] - x, at[2] - z)); g.settings.fov = 70; }, [px, eyeY, pz, at]);
+  await P.settle(400);
+  await P.ev(() => { const e = VR.game.env; e.anim = 600; e.cloudDrift = [540, 0]; });
+  await P.step(4);
+  await P.ev(() => { window.__Fplaza = window.__F; });
+  return picture(P, '__Fplaza', path, K);
+}
+// v0.49's ground frame on its own page (BASE_DIST): the picture and the cost, then the page closed
+async function basePlaza(preset) {
+  const tag = TAGP[preset] || preset;
+  console.log(`\nv0.49 · ${NAMEP[preset] || preset} (${secs()})`);
+  const P = await openPage(BASE);
+  try {
+    if (!await makeWorld(P, preset)) { console.log('  (v0.49: no world)'); return null; }
+    const path = SHOTS + `ascent_plaza_base_${tag}.png`, m = await plaza(P, path);
+    if (m.err) { console.log('  (v0.49: ' + m.err + ')'); return null; }
+    const wc = [], cc = [];
+    for (let i = 0; i < ROUNDS; i++) { const c = await cost(P, '__Fplaza', 2, 6); wc.push(c.wallMs); cc.push(c.cpuMs); }
+    const out = { wall: r1(med(wc)), cpu: r1(med(cc)), draws: m.draws, tris: m.tris, path, errors: errsOf(P).length };
+    console.log(`  v0.49's plaza frame: ${out.wall} ms (CPU ${out.cpu}), ${out.draws} draws (${secs()})`);
+    return out;
+  } catch (e) { console.log('  (v0.49: ' + String(e.message || e).slice(0, 300) + ')'); return null; }
+  finally { await P.ctx.close().catch(() => {}); }
+}
+
 // ---------------------------------------------------------------- a preset
-async function runPreset(preset) {
+async function runPreset(preset, base) {
   const tag = TAGP[preset] || preset, Rr = rec.presets[tag] = { climb: {}, cost: {} };
   const hi = preset !== 'potato';
   console.log(`\n${NAMEP[preset] || preset} (${secs()})`);
@@ -150,16 +195,19 @@ async function runPreset(preset) {
     check(ok, `the world is loaded (${secs()})`);
     if (!ok) return;
     // ---- the plaza (the frame the costs compare with): the temple from the plaza path at noon (space0.mjs)
-    const px = 4.5, pz = 74.5;
-    await P.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [px, pz]);
-    await P.settle(1500);
-    const gy = await P.groundY(px, pz), eyeY = gy + 1 + 1.62, at = [0, 93, 0];
-    await P.ev(([x, y, z, at]) => { const g = VR.game, p = g.player; g.env.day = 2; g.env.setTime(6000); p.teleport(x, y - 1.62, z); p.yaw = p.viewYaw = Math.atan2(-(at[0] - x), -(at[2] - z)); p.pitch = Math.atan2(at[1] - y, Math.hypot(at[0] - x, at[2] - z)); g.settings.fov = 70; }, [px, eyeY, pz, at]);
-    await P.settle(400);
-    await P.step(4);
-    await P.ev(() => { window.__Fplaza = window.__F; });
-    const pm = await picture(P, '__Fplaza', SHOTS + `ascent_plaza_${tag}.png`, K);
+    const pm = await plaza(P, SHOTS + `ascent_plaza_${tag}.png`);
     check(!pm.err, `the plaza frame (${pm.err || pm.draws + ' draws'})`);
+    // the ground before/after: this build's plaza frame against v0.49's (taken just before on its own page)
+    if (base && !pm.err) {
+      const wc = [], cc = [];
+      for (let i = 0; i < ROUNDS; i++) { const c = await cost(P, '__Fplaza', 2, 6); wc.push(c.wallMs); cc.push(c.cpuMs); }
+      const now = { wall: r1(med(wc)), cpu: r1(med(cc)), draws: pm.draws, tris: pm.tris };
+      const d = await pixDiff(base.path, SHOTS + `ascent_plaza_${tag}.png`);
+      Rr.ground = { base, now, diff: d };
+      console.log(`  the ground before/after: v0.49 ${base.wall} ms (CPU ${base.cpu}, ${base.draws} draws) · now ${now.wall} ms (CPU ${now.cpu}, ${now.draws} draws) · the picture mean |Δ| ${d.mean}, ${r1(d.big * 100)} % of pixels off > 24`);
+      check(d.mean < 2 && d.big < 0.02, `${NAMEP[preset]}: the ground frame is v0.49's (mean |Δ| ${d.mean}, ${r1(d.big * 100)} % > 24)`);
+      if (!hi) check(now.wall <= base.wall * 1.1 || now.cpu <= base.cpu * 1.1, `Very Low: the ground frame not dearer than v0.49 (${now.wall} vs ${base.wall} ms, CPU ${now.cpu} vs ${base.cpu})`);
+    }
     // ---- the shuttle on the apron, boarded, the engines running
     const ap = await P.ev(() => VR.SpaceFlight.apron());
     const ay = await P.groundY(ap.x, ap.z);
@@ -328,7 +376,7 @@ async function runPreset(preset) {
   finally { await P.ctx.close().catch(() => {}); }
 }
 
-for (const p of PRESETS) await runPreset(p);
+for (const p of PRESETS) await runPreset(p, BASE ? await basePlaza(p) : null);
 await browser.close();
 
 // ---------------------------------------------------------------- the sheet: the climb (High chase · High cockpit · Very Low), then the rest
@@ -339,6 +387,7 @@ try {
   rows.push({ label: 'orbit', imgs: [f('ascent_orbit_day_high.png'), f('ascent_orbit_night_high.png'), f('ascent_orbit_day_vl.png')] });
   rows.push({ label: 'way down', imgs: [f('ascent_reentry_high.png'), f('ascent_land_high.png'), f('ascent_orbit_cockpit_high.png')] });
   rows.push({ label: 'Reisesprung', imgs: [f('ascent_jump_mid_high.png'), f('ascent_jump_opal_high.png'), f('ascent_plaza_vl.png')] });
+  rows.push({ label: 'ground v0.49 / now', imgs: [f('ascent_plaza_base_high.png'), f('ascent_plaza_high.png'), f('ascent_plaza_base_vl.png')] });
   const spec = ROOT + '.tmp_tests/ascent_sheet.json';
   fs.writeFileSync(spec, JSON.stringify({ cols: ['High · chase', 'High · cockpit', 'Very Low'], w: 560, rows }));
   execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'ascent_sheet.jpg', spec], { stdio: 'inherit' });
