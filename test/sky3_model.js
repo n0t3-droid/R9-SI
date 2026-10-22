@@ -90,10 +90,10 @@ function sunDisc(E, U, dir) {
   const disc = 1 - ss(r - S[1], r + S[1], th);
   const q = clamp(th / r, 0, 1), limb = 0.72 + 0.28 * Math.sqrt(1 - q * q);
   const t = th / (r * 4), cor = Math.exp(-t * t * 3) * 0.6 + Math.exp(-t * 1.6) * 0.25;
-  const W = U.u_s3SunW || null;   // (f-sky4: the white-hot core — u_s3SunW: x its share of white, y its radius over the disc's)
-  const core = W ? W[0] * (1 - ss(0, r * W[1], th)) : 0;
-  const lc = (sc[0] + sc[1] + sc[2]) / 3;
-  return sc.map((v, i) => (v + (lc - v) * core) * disc * limb * S[2] * (W ? 1 + W[2] * core : 1) + v * [1.05, 0.82, 0.55][i] * S[3] * cor);
+  const W = U.u_s3SunW || null;   // (f-sky4: the white-hot core — u_s3SunW: x its share of white, y its radius over the disc's, w its fully white share)
+  const core = W ? W[0] * (1 - ss(r * W[1] * W[3], r * W[1], th)) : 0;
+  const lc = sc[0] * 0.3 + sc[1] * 0.59 + sc[2] * 0.11;
+  return sc.map((v, i) => (v + (lc - v) * core) * (W ? 1 + W[2] * core : 1) * disc * limb * S[2] + v * [1.05, 0.82, 0.55][i] * S[3] * cor);
 }
 // the sky in dir with the sun's disc (the model's HDR, clear weather)
 function skyWithSun(E, dir, U) { const c = skyHDR(E, dir, U), d = sunDisc(E, U, dir), k = 1 - (E.rain || 0); return c.map((v, i) => v + d[i] * k); }

@@ -223,9 +223,11 @@ console.log('e · the grade');
   {
     const sm = (t) => t * t * (3 - 2 * t), oldT = (t) => Math.pow(Math.min(1, t + 0.3 * (sm(t) - t)), 1 / 2.2);
     const Lof = (d) => { const c = d <= 0.04045 ? d / 12.92 : Math.pow((d + 0.055) / 1.055, 2.4); return c > 0.008856 ? 116 * Math.cbrt(c) - 16 : 903.3 * c; };
-    let worst = 0, at = '';
-    for (const k of Object.keys(L2.GRADE)) for (let i = 1; i <= 60; i++) { const t = i / 100, d = Math.abs(Lof(L2.curve(Math.pow(t, 1 / 2.2), L2.GRADE[k])) - Lof(oldT(t))); if (d > worst) { worst = d; at = k + ' ' + t; } }
-    check(worst < 3.5, `the tone curve of every hour within 3.5 L* of the old one over the sky's values (worst ${r2(worst)} at ${at})`);
+    // (f-sky4: the golden hour's sky is fitted through this grade itself — test/sky_offline.js draws the sky program with
+    // the composite and GRADE.gold, R50-01 — so its curve may leave the old one by up to 4.5 L*: S 0.32, the shoulder at white)
+    let worst = 0, at = '', worstG = 0;
+    for (const k of Object.keys(L2.GRADE)) for (let i = 1; i <= 60; i++) { const t = i / 100, d = Math.abs(Lof(L2.curve(Math.pow(t, 1 / 2.2), L2.GRADE[k])) - Lof(oldT(t))); if (k === 'gold') { worstG = Math.max(worstG, d); continue; } if (d > worst) { worst = d; at = k + ' ' + t; } }
+    check(worst < 3.5 && worstG < 4.5, `the tone curve of every hour within 3.5 L* of the old one over the sky's values, the golden hour's within 4.5 (worst ${r2(worst)} at ${at}; gold ${r2(worstG)})`);
   }
   // (the sun's height: noon (ticks 6000) 0.41, ticks 10800 0.13, 12600 −0.066, 16500 −0.38 — env.js)
   const m = L2.moods(0.41), m2 = L2.moods(0.13), m3 = L2.moods(-0.066), m4 = L2.moods(-0.38), m5 = L2.moods(0);

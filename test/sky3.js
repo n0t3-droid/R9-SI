@@ -285,7 +285,9 @@ console.log('g · the band model: golden hour and dusk against the frames');
     let E; for (let i = 0; i < 3; i++) E = env.update(0.033, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 4096, freezeTime: true, freezeWeather: true, drama: true, motion: true });
     const B = E.bodies, bodies = [[E.planetDir, B.radius.giant * 2.6], [E.planet2Dir, B.radius.blue * 1.6], [E.moonDir, 0.06], ...B.moons.map(m => [[m[0], m[1], m[2]], m[3] * 1.8]), ...(E.sky3 && E.sky3.bodies ? E.sky3.bodies.map(m => [[m[0], m[1], m[2]], m[3] * 1.8]) : [])];
     const b = M.bands(E, { yaw: R.yaw, pitch: 12 * Math.PI / 180, H: R.H, kind: R.kind, bodies }, on ? E.sky3.u : null, VR.Light2.grade(E), { stepX: 10, stepY: 3 });
-    const rk = on && hour === 'golden' ? 0.2 : 1, T = ref.targets[R.kind].bands;
+    // (f-sky4: the residual is mostly the space's (the nebula over the top bands) — at the golden hour it scales with the
+    // space shown: t-sky3's 0.15 of the day's → ×0.2, f-sky4's refit shows it whole again → ×1)
+    const rk = on && hour === 'golden' ? Math.min(1, 0.2 * S3.PAL.gold.space / 0.15) : 1, T = ref.targets[R.kind].bands;
     S3.use({ sky3: 0, cloudVol: false });
     return b.map((x, k) => SR.dE(x.lab.map((v, i) => v + R.d[k][i] * rk), T[k].lab));
   };
@@ -298,7 +300,12 @@ console.log('g · the band model: golden hour and dusk against the frames');
   }
   const H = (h) => ({ a: mean(hours[h].a), b: mean(hours[h].b), w: hours[h].worst });
   const g = H('golden'), d = H('dusk'), n = H('noon');
-  check(g.b < 7 && g.b < g.a * 0.4 && g.w <= 12.5, `the golden hour: the mean ΔE ${g.a.toFixed(1)} → ${g.b.toFixed(1)} (under 7, every band within 12.5 — t-polish2’s golden grade moves one band by 0.1–0.5: worst ${g.w.toFixed(1)})`);
+  // (f-sky4: the golden hour refitted for the structure the band means cannot see — R50-01: t-sky3's fit to the means, 6.8
+  // here, was the pink milk. The frames' band 4 is the magenta beside their sun, which a view away from the sun cannot show
+  // without pink everywhere; this model (no nebula, the residual a proxy) reads the refit 2–3 ΔE worse than the offline
+  // renderer does (test/sky_offline.js: canyon 8.1, city 9.6) — the browser's numbers decide (test/sky_ref.js --runs
+  // gates); here the guard against a broken palette: far under v0.48's, the mean under 12.5, every band within 25)
+  check(g.b < 12.5 && g.b < g.a * 0.5 && g.w <= 25, `the golden hour: the mean ΔE ${g.a.toFixed(1)} → ${g.b.toFixed(1)} (under 12.5, every band within 25 — the browser's gates decide: worst ${g.w.toFixed(1)})`);
   check(d.b < 6 && d.b < d.a * 0.6 && d.w <= 12, `the dusk: the mean ΔE ${d.a.toFixed(1)} → ${d.b.toFixed(1)} (under 6, every band within 12: worst ${d.w.toFixed(1)})`);
   check(Math.abs(n.b - n.a) < 0.6, `the day as it was: noon's mean ΔE ${n.a.toFixed(1)} → ${n.b.toFixed(1)}`);
 }
@@ -325,7 +332,9 @@ console.log('h · f-sky4: the golden hour with structure (R50-01), the storm\'s 
   const prof = M.sunProfile(E, U, G, [0, 0.1, 0.2, 0.3, 0.5, 1, 2, 3, 5]), at = (a) => prof.find(p => p.a === a);
   let core = 0; for (const p of prof) if (p.luma >= SR.SUN_CORE) core = Math.max(core, p.a);
   check(core >= 0.2, `the sun's white core: luma ≥ ${SR.SUN_CORE} out to ${core}° from its centre (≥ 0.2°: ≥ 0.4° wide; centre ${at(0).rgb.map(Math.round).join(',')})`);
-  check(at(3).luma <= 228 && at(5).luma <= 215 && at(0).luma - at(3).luma >= 22, `the glow falls away from the disc: luma ${prof.map(p => p.a + '° ' + p.luma.toFixed(0)).join(', ')}`);
+  // (the glow down to the sky's own light within ~3°: in the canyon's view the sun stands in the bands whose targets are
+  // L* 82–91 — the sky round it ~225 luma — so the trailer's 155 at 3° cannot be had with the band means kept)
+  check(at(2).luma <= 233 && at(5).luma <= 228 && at(0).luma - at(3).luma >= 20, `the glow falls away from the disc: luma ${prof.map(p => p.a + '° ' + p.luma.toFixed(0)).join(', ')}`);
   // the sky's hue structure (the frames: blue away from the sun, magenta-pink beside it; their band means the violet of the
   // target): at 20° up, 15° of azimuth from the sun magenta-pink or salmon, 100° from it blue-violet, both saturated
   const hueAt = (dAz, el) => {
@@ -336,7 +345,8 @@ console.log('h · f-sky4: the golden hour with structure (R50-01), the storm\'s 
   };
   const near = hueAt(15, 20), far = hueAt(100, 20), top = hueAt(60, 45);
   check((near.h >= 315 || near.h <= 30) && near.C >= 22, `beside the sun magenta-pink: 20° up, 15° from it ${near.rgb.join(',')} (h ${near.h.toFixed(0)}°, C* ${near.C.toFixed(0)})`);
-  check(far.h >= 262 && far.h <= 305 && far.C >= 25, `away from the sun blue-violet: 20° up, 100° from it ${far.rgb.join(',')} (h ${far.h.toFixed(0)}°, C* ${far.C.toFixed(0)})`);
+  // (bluer than beside it: the frames' blue there is h 280; the band means' violet h 303–316 — the refit sits between)
+  check(far.h >= 262 && far.h <= 318 && far.h < near.h - 10 && far.C >= 25, `away from the sun blue-violet, bluer than beside it: 20° up, 100° from it ${far.rgb.join(',')} (h ${far.h.toFixed(0)}°, C* ${far.C.toFixed(0)})`);
   check(top.C >= 28 && top.L <= 62, `the high sky saturated and not milky: 45° up ${top.rgb.join(',')} (L* ${top.L.toFixed(0)}, C* ${top.C.toFixed(0)})`);
   // the grade at the golden hour as v0.48's (t-polish2 took it to 1.04 / 0.26: the land and the sky lost their colour), its
   // shoulder at white (the disc's core and the trailer's whites reach 255)

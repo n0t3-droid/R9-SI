@@ -190,8 +190,9 @@
     const morning = sstep(-1800, -200, mt) * (1 - sstep(1200, 3000, mt));
     const rho = f[0] * (1 + 2.2 * morning), k = f[1] * (1 + 0.8 * morning), base = f[2] - 1.5 * morning;
     const rain = E.rain || 0;
-    // the mist toward the sun glows (forward scattering): a little by day, most in the golden hour
-    const sunK = byMood(m, { day: 0.12, gold: 0.3, dusk: 0.2, night: 0 });
+    // the mist toward the sun glows (forward scattering): a little by day, most in the golden hour (f-sky4, R50-01: halved
+    // at the golden hour — 0.3 veiled the far land toward the sun in pink)
+    const sunK = byMood(m, { day: 0.12, gold: 0.15, dusk: 0.2, night: 0 });
     // the aerial perspective: 1 − exp(−(d / apDist)²) of apMax — the near and the middle ground clear, the far planes
     // a step paler each (t1_05, t3_06)
     return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: 0.55, sunK, morning, moods: m };
@@ -257,7 +258,11 @@
     // the halved lean at 2.3 — over both sets (test/land_grade.js, 320 × 180) v0.48 sits at 6.2; now the lights ×0.85 and
     // the shade's cool lean ×1.5: split 6.1, bands ΔE 30.9 / 29.8 → 29.3 / 28.3)
     day: { toe: 0.014, mid: 0.5, s: 0.3, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.1, vig: 0.16, bThr: 1.05, bStr: 0.13 },
-    gold: { toe: 0.016, mid: 0.5, s: 0.26, sh: 0.985, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.04, vig: 0.2, bThr: 0.9, bStr: 0.17 },
+    // (f-sky4, docs/reviews/v0.49.md R50-01: with t-sky3's band fit on top, 1.04 / 0.26 left the golden hour grey — the land's
+    // saturation 115 in the frames, 69 in v0.49's lake; refitted together with the sky (sky3.js PAL.gold): the saturation
+    // 1.2, the S back to 0.32, the shoulder at white (the sun's core and the trailer's whites reach 255), the bloom's
+    // threshold over the sky (1.3: at 0.9 the whole bright horizon bloomed into a veil))
+    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 1.0, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.2, vig: 0.2, bThr: 1.3, bStr: 0.17 },
     dusk: { toe: 0.022, mid: 0.5, s: 0.28, sh: 0.975, dark: [0.01, -0.014, 0.05], light: [0.065, 0.018, -0.035], sat: 1.15, vig: 0.24, bThr: 0.75, bStr: 0.22 },
     night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.62, bStr: 0.25 },
   };
