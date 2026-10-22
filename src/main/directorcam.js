@@ -1,7 +1,8 @@
 // ============================================================================
 // Die Reisekamera (e-ctx; docs/superpowers/specs/2026-10-22-erlebnis-design.md §2 and §5, plan docs/superpowers/plans/
 // 2026-10-22-e-ctx.md §2.3): a trip by intent is cut like a film. One shot per phase — the call (behind you, the ship
-// coming in and landing, through the boarding), the take-off (the low chase from behind and below), the cruise (a chase,
+// coming in; when it comes down over its pad, the low pad shot with you and the ship side by side, through the
+// boarding), the take-off (the low chase from behind and below), the cruise (a chase,
 // a side tracking shot and a fly-by from a point ahead, cut in turn), the approach (the target in the upper third, the
 // ship small in the lower third), the landing (the low chase) and the arrival (3 s, the target framed like a wow moment,
 // a slow push-in); a walk is a slow follow shot with the target framed ahead.
@@ -68,10 +69,12 @@
     const open = D.OPEN[s.phase] || 'chase';
     if (!seq.kind) return open;
     if (s.phase !== seq.phase) {
-      if (open === seq.kind) return null;                        // (the call's shot runs on through the boarding)
+      if (open === seq.kind || (open === 'call' && seq.kind === 'callland')) return null;   // (the call's shots run on through the boarding)
       if (seq.t >= D.MIN - 1e-3 || seq.kind === 'call' || seq.kind === 'walk') return open;
       return null;                                               // (the shot keeps its 4 s first)
     }
+    // the called ship comes down over its pad: the cut to the low pad shot (once the call's shot had its 4 s)
+    if (s.phase === 'call' && seq.kind === 'call' && seq.t >= D.MIN - 1e-3 && (s.stage === 'hover' || s.stage === 'settle')) return 'callland';
     if (s.phase !== 'cruise' || seq.t < D.MIN - 1e-3) return s.phase === 'approach' && seq.t >= 2 * D.MAX - 1e-3 ? 'approach' : null;
     const yr = Math.abs(s.yawRate || 0), turn = yr > 0.12 && Math.abs(seq.yr0) <= 0.12;
     const b = s.bank || 0, flip = Math.abs(b) > 0.1 && Math.sign(b) !== Math.sign(seq.bank0 || 0) && Math.abs(seq.bank0 || 0) > 0.02;
@@ -86,7 +89,7 @@
     if (seq.kind) seq.t += dt;
     const c = D.cut(seq, s);
     if (c) { seq.kind = c; seq.t = 0; seq.phase = s.phase; seq.hist.push(c); seq.side = -seq.side; seq.anchor = null; seq.cur = null; seq.passed = false; seq.n++; }
-    else if (D.OPEN[s.phase] === seq.kind || (s.phase === 'cruise' && CRUISE.indexOf(seq.kind) >= 0)) seq.phase = s.phase;   // (a new phase waits for its shot until the old one had its 4 s)
+    else if (D.OPEN[s.phase] === seq.kind || (s.phase === 'cruise' && CRUISE.indexOf(seq.kind) >= 0) || (seq.kind === 'callland' && (s.phase === 'call' || s.phase === 'board'))) seq.phase = s.phase;   // (a new phase waits for its shot until the old one had its 4 s)
     seq.yr0 = Math.abs(s.yawRate || 0) > 0.12 ? (s.yawRate || 0) : 0;
     if (Math.abs(s.bank || 0) > 0.02) seq.bank0 = s.bank;
     return seq.kind;
@@ -163,6 +166,20 @@
       V[0] = A[0] + A[3] * push; V[1] = A[1] + 0.2 * push; V[2] = A[2] + A[4] * push;
       const fov = fov0 * 0.85; lookAt(out, V, Tp);
       out.pitch -= Math.atan(Math.tan(fov / 2) / 3); out.fov = fov;   // (the target in the upper third)
+    } else if (k === 'callland') {
+      // the pad shot: low on the ground off to the side of the hero and the pad, both in the frame — the ship settles
+      // down beside you
+      const P = ctx.player || S.pos, Sh = ctx.ship || S.pos, pad = ctx.spot || Sh;
+      if (!seq.anchor) {
+        let ux = pad[0] - P[0], uz = pad[2] - P[2]; const Lp = Math.hypot(ux, uz) || 1; ux /= Lp; uz /= Lp;
+        const sd = seq.side, off = Lp * 0.6 + size * 1.5 + 10, mx = (P[0] + pad[0]) / 2 - ux * Lp * 0.15, mz = (P[2] + pad[2]) / 2 - uz * Lp * 0.15;
+        const x = mx - uz * sd * off, z = mz + ux * sd * off;
+        seq.anchor = [x, gy(x, z, P[1] - 1) + 1.4, z];
+      }
+      const A = seq.anchor;
+      W[0] = (P[0] + Sh[0]) / 2; W[2] = (P[2] + Sh[2]) / 2; W[1] = Math.min((P[1] + 1.6 + Sh[1]) / 2, P[1] + 1.6 + size * 1.2);
+      V[0] = A[0]; V[1] = A[1]; V[2] = A[2];
+      D.lift(gnd, V, W); lookAt(out, V, W); out.fov = fov0;
     } else if (k === 'call') {
       const P = ctx.player || S.pos, Sh = ctx.ship || null;
       let tx, ty, tz;
@@ -192,7 +209,7 @@
   // c: the intent (intent.js), base: the camera the game (or the flight) made this frame, where: 'foot' | 'ship'
   const CTX = { subj: null, target: null, player: null, ship: null, spot: null, start: null, ground: null, base: null };
   const SUBJ = { pos: [0, 0, 0], vel: [0, 0, 0], heading: 0, size: 6, yawRate: 0, roll: 0 };
-  const SST = { phase: '', speed: 0, yawRate: 0, bank: 0, passed: false };
+  const SST = { phase: '', speed: 0, yawRate: 0, bank: 0, passed: false, stage: null };
   const P0 = {};
   D.travel = function (g, c, base, where) {
     if (!c || !c.seq) return null;
@@ -210,12 +227,12 @@
       if (phase === 'call' || phase === 'board') phase = 'takeoff';
     } else {
       const s = c.ship;
-      if ((phase === 'call' || phase === 'board') && s && s.d && s.d.meta) { const md = s.d.meta; CTX.ship = [s.pos[0], s.pos[1] + md.height * 0.5, s.pos[2]]; S.pos[0] = CTX.ship[0]; S.pos[1] = CTX.ship[1]; S.pos[2] = CTX.ship[2]; S.size = Math.max(md.length, md.width) * 0.5; S.vel = s.vel || [0, 0, 0]; S.heading = s.yaw; }
+      if ((phase === 'call' || phase === 'board') && s && s.d && s.d.meta) { const md = s.d.meta; CTX.ship = [s.pos[0], s.pos[1] + md.height * 0.5, s.pos[2]]; S.pos[0] = CTX.ship[0]; S.pos[1] = CTX.ship[1]; S.pos[2] = CTX.ship[2]; S.size = Math.max(md.length, md.width) * 0.5; S.vel = s.vel || [0, 0, 0]; S.heading = s.yaw; CTX.spot = c.pad || null; }
       else { S.pos[0] = p.pos[0]; S.pos[1] = p.pos[1] + 1; S.pos[2] = p.pos[2]; S.size = 1; S.vel = p.vel || [0, 0, 0]; S.heading = p.yaw; }
       if (phase === 'arrive' || phase === 'walk') { S.heading = p.yaw; }
     }
     CTX.subj = S; CTX.target = c.target; CTX.ground = c.ground; CTX.base = base;
-    SST.phase = phase; SST.speed = Math.hypot(S.vel[0], S.vel[1], S.vel[2]); SST.yawRate = S.yawRate; SST.bank = S.roll; SST.passed = seq.passed;
+    SST.phase = phase; SST.speed = Math.hypot(S.vel[0], S.vel[1], S.vel[2]); SST.yawRate = S.yawRate; SST.bank = S.roll; SST.passed = seq.passed; SST.stage = where === 'ship' ? null : c.shipStage || null;
     if (phase === 'walk') SST.speed = 0;
     D.step(seq, SST, dt);
     const out = D.pose(seq, CTX, null, P0);

@@ -73,12 +73,15 @@ await ev(() => {
     const x = c.getContext('2d'); x.drawImage(src, 0, 0);
     const kx = src.width / innerWidth, ky = src.height / innerHeight;
     const box = (el) => { const r = el.getBoundingClientRect(); return [r.left * kx, r.top * ky, r.width * kx, r.height * ky]; };
-    const vis = (el) => { if (!el) return false; const s = getComputedStyle(el); return s.display !== 'none' && s.visibility !== 'hidden' && +s.opacity > 0.05 && el.getBoundingClientRect().width > 0; };
-    for (const el of document.querySelectorAll('.lbx')) if (vis(el)) { const b = box(el); x.fillStyle = '#000'; x.fillRect(b[0], b[1], b[2], b[3]); }
+    // (an element switched on fades in over a CSS transition that runs in real time, between our frames: it counts as
+    // shown at its end state — the prompt, the bar, the caption — and the letterbox at its full 7.5 % height)
+    const vis = (el) => { if (!el) return false; const s = getComputedStyle(el); return s.display !== 'none' && s.visibility !== 'hidden' && (+s.opacity > 0.05 || el.classList.contains('on')) && el.getBoundingClientRect().width > 0; };
+    for (const el of document.querySelectorAll('.lbx')) if (el.classList.contains('on')) { const b = box(el), h = 0.075 * innerHeight * ky; x.fillStyle = '#000'; x.fillRect(b[0], el.classList.contains('t') ? 0 : src.height - h, b[2], h); }
     const txt = (el, size, col, bg) => { if (!vis(el)) return; const b = box(el); if (bg) { x.fillStyle = bg; x.fillRect(b[0], b[1], b[2], b[3]); } x.font = `600 ${size * kx}px sans-serif`; x.fillStyle = col; x.textAlign = 'center'; const lines = el.innerText.split('\n'); lines.forEach((l, i) => x.fillText(l, b[0] + b[2] / 2, b[1] + (i + 0.8) * size * 1.25 * ky)); };
-    txt(document.getElementById('ctxprompt'), 14, '#f4f7ff', 'rgba(6,9,20,0.42)');
-    txt(document.getElementById('intentbar'), 15, '#eef6ff');
-    txt(document.getElementById('intentcap'), 30, '#ffffff');
+    const onEl = (id) => { const el = document.getElementById(id); return el && el.classList.contains('on') ? el : null; };   // (these three show by their 'on' class)
+    txt(onEl('ctxprompt'), 14, '#f4f7ff', 'rgba(6,9,20,0.42)');
+    txt(onEl('intentbar'), 15, '#eef6ff');
+    txt(onEl('intentcap'), 30, '#ffffff');
     const mk = document.getElementById('intentmark'); if (vis(mk)) { const b = box(mk); x.strokeStyle = '#9affd8'; x.lineWidth = 2 * kx; x.strokeRect(b[0] + b[2] / 2 - 8 * kx, b[1] + 4 * ky, 16 * kx, 16 * ky); txt(mk.querySelector('b'), 13, '#e8fff6'); }
     const ch = document.getElementById('crosshair'); if (vis(ch)) { const b = box(ch); x.strokeStyle = 'rgba(255,255,255,0.9)'; x.lineWidth = 2; const cx = b[0] + b[2] / 2, cy = b[1] + b[3] / 2; if (ch.classList.contains('hf-ring')) { x.beginPath(); x.arc(cx, cy, 9 * kx, 0, 6.3); x.stroke(); } x.fillStyle = '#fff'; x.fillRect(cx - 2, cy - 2, 4, 4); if (!ch.classList.contains('hf-dot') && !ch.classList.contains('hf-ring')) { x.fillRect(cx - 9, cy - 1, 18, 2); x.fillRect(cx - 1, cy - 9, 2, 18); } }
     // the HUD's own elements: shown or faded, as boxes with their names (the canvas cannot hold their DOM pictures)
@@ -154,6 +157,7 @@ if (want('A')) {
     return out;
   }, PLAZA);
   await ev(() => window.__E.frames(12));
+  await settle(20, 2, 2);   // (the placed blocks meshed before their pictures)
   for (const [kind, at, name] of placed) {
     if (!at) { kinds.push([kind, '(no block)']); continue; }
     await ev((a) => { const g = VR.game, p = g.player; p.teleport(a[0] + 0.5, a[1], a[2] - 2.2); window.__E.lookAt(a[0] + 0.5, a[1] + 0.45, a[2] + 0.5); }, at);

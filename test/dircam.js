@@ -81,6 +81,16 @@ const land = shots.find(s => s.kind === 'land'), arr = shots.find(s => s.kind ==
 check(land && arr && arr.t0 >= land.t0 + 4 - 0.01, `the landing shot keeps its 4 s before the arrival's framing (land ${land && land.t0.toFixed(1)}, arrive ${arr && arr.t0.toFixed(1)})`);
 const seq2 = D.seqState(); for (let t = 0; t < 30; t += dt) D.step(seq2, { phase: 'cruise', speed: 6, yawRate: 0 }, dt);
 check(!seq2.hist.includes('flyby'), 'a slow cruise never cuts to a fly-by');
+// the call with the ship's stages: in over the land (cruise) 0–12 s, over its pad (hover) 12–14, coming down (settle)
+// 14–18, the boarding 18–20, the take-off: the pad shot when it comes down, through the boarding
+const seq3 = D.seqState(), cs3 = [];
+const st3 = (t) => (t < 18 ? { phase: 'call', stage: t < 12 ? 'cruise' : t < 14 ? 'hover' : 'settle' } : t < 20 ? { phase: 'board', stage: 'down' } : { phase: 'takeoff', speed: 8 });
+for (let t = 0; t < 26; t += dt) { const k = D.step(seq3, st3(t), dt); if (!cs3.length || cs3[cs3.length - 1].k !== k) cs3.push({ k, t }); }
+console.log('    ' + cs3.map(s => `${s.k} ${s.t.toFixed(1)}`).join(' · '));
+const pl = cs3.find(s => s.k === 'callland');
+check(cs3[0].k === 'call' && pl && Math.abs(pl.t - 12) < 0.1 && cs3[2] && cs3[2].k === 'takeoff' && cs3[2].t >= 20 - 1e-6, 'the call: behind you while the ship comes in, the pad shot as it comes down (12 s), on through the boarding, the take-off after');
+const seq4 = D.seqState(); for (let t = 0; t < 3; t += dt) D.step(seq4, { phase: 'call', stage: t < 1 ? 'cruise' : 'hover' }, dt);
+check(seq4.kind === 'call', 'a ship that is over its pad within 4 s: the call\'s shot keeps its 4 s first');
 
 console.log('d · the free look');
 const L = D.lookState();
@@ -106,6 +116,20 @@ for (const kind of ['takeoff', 'chase', 'side', 'flyby', 'approach', 'land', 'ar
   if (!fin || p.z <= 0 || Math.abs(p.x) > 1 || Math.abs(p.y) > 1) { okAll = false; bad.push(kind + (fin ? ` (${p.x.toFixed(2)}, ${p.y.toFixed(2)})` : ' NaN')); }
 }
 check(okAll, 'take-off, chase, side, fly-by, approach, land, arrive, call, walk: finite, the subject in the frame' + (bad.length ? ': ' + bad.join(', ') : ''));
+// the pad shot: you and the ship coming down over the pad 16 m away, both in the frame, the camera low on the ground
+{
+  const sq = D.seqState(); sq.kind = 'callland'; sq.t = 0.5;
+  const P = [0.5, 81, 48.5], pad = [-11.5, 81, 59.5];
+  let all = true, low = true, why = '';
+  for (const h of [22, 12, 2]) {   // hovering, settling, down
+    const ship = { pos: [pad[0], pad[1] + h + 3, pad[2]], vel: [0, -2, 0], heading: 0.8, size: 7, yawRate: 0, roll: 0 };
+    const cam = D.pose(sq, { subj: ship, target, player: P, ship: ship.pos, spot: pad, ground: () => 80, base: { fov: 70 * DEG } }, D.lookState(), {});
+    const pp = project([P[0], P[1] + 1, P[2]], cam), ps = project(ship.pos, cam);
+    if (!(pp.z > 0 && ps.z > 0 && Math.abs(pp.x) < 0.95 && Math.abs(pp.y) < 0.95 && Math.abs(ps.x) < 0.95 && Math.abs(ps.y) < 0.95)) { all = false; why += ` h ${h}: you (${pp.x.toFixed(2)}, ${pp.y.toFixed(2)}) ship (${ps.x.toFixed(2)}, ${ps.y.toFixed(2)})`; }
+    if (cam.y > 80 + 6) low = false;
+  }
+  check(all && low, 'the pad shot: you and the ship coming down beside you both in the frame, the camera low' + why);
+}
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
