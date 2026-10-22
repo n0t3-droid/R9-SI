@@ -78,13 +78,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   check(typeof D.gen('drift') === 'function' && D.gen('nowhere') === null, 'gen(dim): the registry\'s factory, none for an unknown dim');
   check(D.home({}) === 'overworld' && D.home({ type: 'flat' }) === 'flat' && D.home({ type: 'default', dim: 'drift' }) === 'overworld', 'home(meta): flat for a flat world, else overworld');
-  check(JSON.stringify(D.travelable({})) === JSON.stringify(['overworld', 'underforge', 'hollow', 'drift']) && JSON.stringify(D.travelable({ type: 'flat' })) === JSON.stringify(['flat', 'underforge', 'hollow', 'drift']), 'travelable: home and the three gate dims', D.travelable({}).join(','));
+  const MOONS = D.has('basalt') ? ['basalt', 'opal'] : [];   // u-moons1: the moons join /dim
+  check(JSON.stringify(D.travelable({})) === JSON.stringify(['overworld', 'underforge', 'hollow', 'drift'].concat(MOONS)) && JSON.stringify(D.travelable({ type: 'flat' })) === JSON.stringify(['flat', 'underforge', 'hollow', 'drift'].concat(MOONS)), 'travelable: home and the three gate dims (and the moons)', D.travelable({}).join(','));
   check(D.name('drift')[0] === 'g.dim.drift' && FIVE.every(d => V.I18N.dict.de[D.name(d)[0]] && V.I18N.dict.en[D.name(d)[0]]), 'every dim has a name in both tables');
   // dimOf: what a save opens — every old save as before
   const OLD_OPEN = (m) => (m.type === 'flat' ? 'flat' : (m.dim || 'overworld'));
   for (const m of [{}, { dim: 'overworld' }, { type: 'flat' }, { type: 'flat', dim: 'flat' }, { type: 'flat', dim: 'overworld' }, { type: 'default', dim: 'overworld' }]) check(D.dimOf(m) === OLD_OPEN(m), `dimOf(${JSON.stringify(m)}) = ${OLD_OPEN(m)} as before`);
   check(D.dimOf({ dim: 'drift' }) === 'drift' && D.dimOf({ type: 'flat', dim: 'hollow' }) === 'hollow', 'dimOf opens a registered dim (a save left in the drift opens there)');
-  check(D.dimOf({ dim: 'opal' }) === 'overworld' && D.dimOf({ type: 'flat', dim: 'opal' }) === 'flat', 'a dim this build does not know opens at home (never a half-made world)');
+  check(D.dimOf({ dim: 'nowhere' }) === 'overworld' && D.dimOf({ type: 'flat', dim: 'nowhere' }) === 'flat', 'a dim this build does not know opens at home (never a half-made world)');   // u-moons1: opal is a world now — the unknown one is 'nowhere'
 
   // ================================================================ b · the hooks read it
   console.log('b · the hooks read the registry');
@@ -331,7 +332,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check(ref({ meta: Object.assign(META(), { guest: true }) }) === 'g.travel.guest', 'a guest does not travel (a hint)');
     check(ref({ mp: { isHost: true, remote: new Map([['p1', {}]]) } }) === 'g.travel.guests', 'a host with guests does not travel (a hint)');
     check(ref({ mp: { isHost: true, remote: new Map() } }) === null, 'a host alone travels');
-    check(ref({ dim: 'drift' }) === 'g.travel.here' && TR.canGo({ state: 'play', dim: 'overworld', meta: META(), world, player: { pos: [0, 0, 0] } }, 'opal') === 'g.travel.unknown', 'already there / an unknown world: a hint');
+    check(ref({ dim: 'drift' }) === 'g.travel.here' && TR.canGo({ state: 'play', dim: 'overworld', meta: META(), world, player: { pos: [0, 0, 0] } }, 'nowhere') === 'g.travel.unknown', 'already there / an unknown world: a hint');   // u-moons1: (opal is a world now)
     for (const k2 of ['g.travel.guest', 'g.travel.guests', 'g.travel.here', 'g.travel.unknown', 'g.travel.busy']) check(V.I18N.dict.de[k2] && V.I18N.dict.en[k2], `${k2} in both tables`);
     // a host alone closes the room before leaving home
     let stopped = 0;
