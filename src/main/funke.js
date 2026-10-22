@@ -906,7 +906,7 @@ void main() {
         m4.translate(M, M, 0, Math.sin(T0 * 2.4) * 0.012, 0);
         OPTS.baseMat = M; OPTS.scale = F.SEAT_SCALE;
       }
-      const dx = P[0] - cam.x, dy = P[1] - cam.y, dz = P[2] - cam.z, R0 = 0.5;
+      const dx = P[0] - cam.x, dy = P[1] - cam.y, dz = P[2] - cam.z, R0 = 0.32 * OPTS.scale / F.SCALE;   // (the rotors' reach; run 1's 0.5 drew it beside the first-person eye, out of the view)
       if (!m4.boxInFrustum(r.planes, dx - R0, dy - R0, dz - R0, dx + R0, dy + R0, dz + R0)) return;   // not seen: nothing at all
       const prog = ent.beginVox(r, E);
       if (prog.u.u_clipNear) gl.uniform1f(prog.u.u_clipNear, 0);
@@ -956,7 +956,7 @@ void main() {
       gl.uniform1f(p.u.u_width, 0.045); gl.uniform4f(p.u.u_tint, 1.25, 1.25, 1.25, 1.0 * fade); gl.drawArrays(gl.TRIANGLES, 0, B.rib);
       // the pillar of light where the line reaches its target (plain, a soft glow up from the ground)
       if (B.n > B.rib) { gl.uniform4f(p.u.u_wave, 0, 0, 0, 0); gl.uniform1f(p.u.u_width, 0.35); gl.uniform4f(p.u.u_tint, 0.6, 0.95, 1, 0.5 * fade); gl.drawArrays(gl.TRIANGLES, B.rib, B.n - B.rib); }
-      F.cost.draws += 3;
+      F.cost.draws += 3; this.g.renderer.stats.draws += B.n > B.rib ? 4 : 3;
     }
     drawScan(gl, p, cam, T0) {
       const list = this.scanData, nb = list.length, O = this.scanO, age = T0 - this.scanT0, R = this.scanR;
@@ -988,7 +988,7 @@ void main() {
         gl.bindVertexArray(B.vao);
         gl.uniform4f(p.u.u_tint, 1, 1, 1, fade); gl.drawArrays(gl.TRIANGLES, 0, this.scanFaces);
         gl.uniform4f(p.u.u_tint, 1.3, 1.3, 1.3, fade); gl.drawArrays(gl.LINES, this.scanFaces, B.n - this.scanFaces);
-        F.cost.draws += 2;
+        F.cost.draws += 2; this.g.renderer.stats.draws += 2;
       }
       // the wave's ring on the ground, running out and fading
       if (wave < R + 3) {
@@ -998,7 +998,7 @@ void main() {
         gl.uniform3f(p.u.u_offset, O[0] - cam.x, O[1] + 0.15 - cam.y, O[2] - cam.z); gl.uniform1f(p.u.u_scale, Math.max(0.5, wave)); gl.uniform1f(p.u.u_width, 0.22);
         gl.uniform4f(p.u.u_wave, 0, 0, 0, 0); gl.uniform4f(p.u.u_tint, 1, 1, 1, 0.75 * (1 - wave / (R + 3)));
         gl.drawArrays(gl.TRIANGLES, 0, G.n);
-        F.cost.draws++;
+        F.cost.draws++; this.g.renderer.stats.draws++;
       }
     }
     destroy() { this.endLine(); this.photoEnd(); this.scanJob = null; this.scanData = null; this.wayT = 0; this.scanT = 0; }
