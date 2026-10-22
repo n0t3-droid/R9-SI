@@ -369,7 +369,7 @@
   // env: the Env (its day, ticks, weather seed); E: its frame. E.sky3 holds the schedules' state and the uniforms (o.u:
   // name → Float32Array, filled in place: no allocation per frame for them); nothing of E's own values changes (with the
   // sky's level on env.js takes the palette of the golden hour and the dusk from S3.palette)
-  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_c3K'];
+  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_s3Field', 'u_c3K'];
   const U3 = S3.U3 = ['u_c3Sun', 'u_c3Top', 'u_c3Low', 'u_c3Ld', 'u_c3Haze'];
   S3.state = function () {
     const u = {};
@@ -433,6 +433,9 @@
     // sun through the cloud gaps (stronger the more cloud there is, none in the rain)
     const el = Y.el;
     set4(u.u_s3Bank, lv >= 2 && over ? clamp(0.12 + 0.8 * cover, 0, 0.95) * (1 - 0.5 * rain) : 0, dx / 2600, dz / 2600, 0);
+    // the cumulus field beyond the sprites' window, in perspective on the cloud plane (y 210): the plane's height over the
+    // eye and the eye in cloud space are the renderer's (sky3_gl.js sets x, y, z each frame); w the cover (level 2)
+    u.u_s3Field[3] = lv >= 2 && over ? cover * (1 - 0.6 * rain) : 0;
     set4(u.u_s3Fan, lv >= 2 && over ? (1 - sstep(5, 14, el)) * sstep(-2.5, 0.5, el) * sstep(0.12, 0.45, cover) * (1 - rain) * 0.5 : 0, (E.time || 0) * 0.004, 0, 0);
     // the clouds' light (the sprites, the box clouds, the far banks)
     set3(u.u_c3Sun, C.sun); set3(u.u_c3Top, C.top); set3(u.u_c3Low, C.low); set3(u.u_c3Ld, C.L);
@@ -597,6 +600,7 @@ vec3 s3BoxCloud(vec3 n, float vh, float shade) {
 uniform vec4 u_s3Aur;      // x the aurora's strength (0: none), y its curtains' seed, z the time (s), w its span round north (rad)
 uniform vec4 u_s3Bank;     // x the far banks' cover (0: none), yz their drift
 uniform vec4 u_s3Fan;      // x the ray fan's strength, y its drift
+uniform vec4 u_s3Field;    // the cumulus field beyond the sprites: x the cloud plane over the eye (blocks), yz the eye in cloud space, w the cover
 float s3BankA = 0.0;       // (the far banks' coverage of this pixel: the sky probe leaves them out — they are clouds)
 vec3 s3Aurora(vec3 dir) {
   if (u_s3Aur.x <= 0.001 || dir.y < 0.0) return vec3(0.0);
@@ -653,6 +657,26 @@ vec3 s3Banks(vec3 col, vec3 dir) {
     s3BankA = max(s3BankA, inside);
   }
   return col;
+}
+// the cumulus field in perspective: where the ray meets the cloud plane beyond the sprites' window, clumps of a noise in
+// cloud space by the cover, lit by the hour, hazed toward the horizon, blurred into a band far out
+vec3 s3Field(vec3 col, vec3 dir) {
+  if (u_s3Field.w < 0.02 || u_s3Field.x < 4.0 || dir.y < 0.003 || dir.y > 0.32) return col;
+  float t = u_s3Field.x / dir.y, D = t * length(dir.xz);
+  float vis = smoothstep(380.0, 560.0, D);
+  if (vis <= 0.0) return col;
+  vec2 q = (u_s3Field.yz + dir.xz * t) / 150.0;
+  float n = vnoise(q) * 0.62 + vnoise(q * 2.6 + 3.1) * 0.38;
+  float thr = 1.0 - u_s3Field.w * 0.85;
+  float c = smoothstep(thr, thr + 0.18, n);
+  float far = smoothstep(1800.0, 7000.0, D);
+  c = mix(c, smoothstep(0.1, 0.9, u_s3Field.w) * 0.75, far * 0.75);
+  float up = smoothstep(-0.1, 0.05, u_sunDir.y);
+  vec3 fc = mix(u_c3Low, u_c3Top, 0.5 + 0.3 * (1.0 - smoothstep(thr, 1.0, n))) + u_c3Sun * ((0.35 + 0.4 * (1.0 - smoothstep(thr, thr + 0.5, n))) * up);
+  fc = mix(fc, u_skyHorizon * 1.02, 0.25 + 0.55 * smoothstep(600.0, 6000.0, D));
+  float a = c * vis * 0.9;
+  s3BankA = max(s3BankA, a);
+  return mix(col, fc, a);
 }
 vec3 s3Fan(vec3 dir) {
   if (u_s3Fan.x <= 0.001) return vec3(0.0);

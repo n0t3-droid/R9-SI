@@ -563,6 +563,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
 #ifdef SKY3HI
     // t-sky3: the aurora over the north horizon on some nights, the far cloud banks along the horizon, the low sun's rays
     col += s3Aurora(dir) * clear;
+    col = s3Field(col, dir);
     col = s3Banks(col, dir);
     col += s3Fan(dir);
 #endif

@@ -16,6 +16,11 @@
     const o = E && E.sky3, gl = this.gl;
     if (!o || !o.u) return;
     const U = o.u;
+    if (u.u_s3Field) {
+      // the cumulus field: the cloud plane (y 210) over the eye, the eye in cloud space (the drift added: clouds.js)
+      const c = this.cam || { x: 0, y: 64, z: 0 }, f = U.u_s3Field, dr = E.cloudDrift;
+      f[0] = 210 - c.y; f[1] = c.x + (dr ? dr[0] : (E.time || 0) * 0.9); f[2] = c.z + (dr ? dr[1] : 0);
+    }
     for (const k of S3.U4) { const loc = u[k]; if (loc) { const a = U[k]; gl.uniform4f(loc, a[0], a[1], a[2], a[3]); } }
     for (const k of S3.U3) { const loc = u[k]; if (loc) { const a = U[k]; gl.uniform3f(loc, a[0], a[1], a[2]); } }
     if (u.u_c3L) {

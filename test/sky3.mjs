@@ -118,6 +118,7 @@ VIEWS.push({ name: 'gap', place: 'canyon', hour: 'golden', wx: 'bewoelkt', aim: 
 VIEWS.push({ name: 'storm', place: 'canyon', hour: 'noon', wx: 'regen', measure: false });
 VIEWS.push({ name: 'aurora', place: 'city', hour: 'night', yaw: 0, pitch: 10 * Math.PI / 180, aurora: true, measure: false });
 VIEWS.push({ name: 'meteor', place: 'city', hour: 'night', meteor: true, measure: false });
+VIEWS.push({ name: 'moons', place: 'canyon', hour: 'afterglow', moons: true, measure: false });
 const SHOOT = VIEWS.filter(v => !ONLY || ONLY.includes(v.name));
 
 const place = (P, tod, yaw, pitch, pins) => ev(([cam, yaw, pitch, tod, pins]) => {
@@ -188,6 +189,13 @@ async function shoot(V, preset) {
     } else { yaw = 0.8; pitch = 30 * Math.PI / 180; note = 'no VR.Sky3: north-east at night, 30° up'; }
   }
   await ev((d) => { VR.game.env.day = d; }, dayN);
+  if (V.moons) {
+    // t-sky3: an evening with the small moon a crescent beside the setting sun (VR.Sky3.moonsAt), the camera on it; the build
+    // before shoots the same place and hour
+    const c = await ev(() => { const S = VR.Sky3; if (!S || !S.moonsAt) return null; const th = 12300 / 24000 * Math.PI * 2, el = Math.sin(th) * 0.42, az = th + 0.4, sun = [Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)]; for (let d = 0; d < 40; d++) { const m = S.moonsAt(d * 24000 + 12300, sun)[1]; if (m.k < 0.35 && m.dir[1] > 0.06) return { d, dir: m.dir, k: m.k }; } return null; });
+    if (c) { dayN = c.d; todN = 12300; yaw = Math.atan2(-c.dir[0], -c.dir[2]); pitch = Math.asin(c.dir[1]) - 0.06; note = `the small moon a crescent, day ${c.d} (lit ${c.k.toFixed(2)})`; }
+    else { todN = 12300; note = 'no VR.Sky3: the canyon after the sunset'; }
+  }
   if (V.aim === 'sun') {
     // facing the sun at that hour (its azimuth from env.js: the day's angle + 0.4)
     const th = tod / 24000 * Math.PI * 2, az = th + 0.4; yaw = Math.atan2(-Math.cos(az), -Math.sin(az));
@@ -348,7 +356,7 @@ fs.writeFileSync(TMP + 'sky3_' + TAG + '.json', JSON.stringify({ tag: TAG, resul
 {
   const PAIRS = [['canyon_noon', 't1_05', 'Canyon, Mittag'], ['city_noon', 't3_05', 'Stadt, Mittag'], ['up', 't3_08', 'Zenit, Mittag'], ['canyon_golden', 't1_07', 'Canyon, goldene Stunde'], ['isles_golden', 't1_09', 'Inseln, goldene Stunde'],
     ['gap', 't1_07', 'Wolkenluecke, goldene Stunde'], ['canyon_dusk', 't1_01', 'Canyon, Sonnenuntergang'], ['isles_dusk', 't3_01', 'Inseln, Sonnenuntergang'], ['canyon_afterglow', 't3_02', 'Canyon, Nachgluehen'], ['canyon_dawn', 't1_03', 'Canyon, Morgengrauen'],
-    ['canyon_night', 't1_05', 'Canyon, Nacht'], ['upnight', 't1_01', 'Zenit, Nacht'], ['aurora', null, 'Polarlicht, Nacht'], ['meteor', null, 'Sternschnuppe, Nacht'], ['storm', null, 'Regen: Wolkendecke und Fetzen']];
+    ['canyon_night', 't1_05', 'Canyon, Nacht'], ['upnight', 't1_01', 'Zenit, Nacht'], ['aurora', null, 'Polarlicht, Nacht'], ['meteor', null, 'Sternschnuppe, Nacht'], ['moons', 't1_07', 'Mondsichel neben der Sonne'], ['storm', null, 'Regen: Wolkendecke und Fetzen']];
   const CW = 480, CH = 270, LH = 20, parts = [];
   const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
   const label = (txt, w) => Buffer.from(`<svg width="${w}" height="${LH}" xmlns="http://www.w3.org/2000/svg"><rect width="100%" height="100%" fill="#111"/><text x="6" y="14" font-family="sans-serif" font-size="12" fill="#eee">${esc(txt)}</text></svg>`);
