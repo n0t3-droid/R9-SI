@@ -229,8 +229,9 @@ void main() {
     }
     vec3 alb = A.rgb;
     float hc = Bt.b * 255.0, lights = Bt.r;
-    // ice: the texels' flag with a frayed edge
-    float ice = smoothstep(0.3, 0.7, Bt.a + (vnoise3(N * 1400.0) - 0.5) * 0.5 * step(0.01, Bt.a) * step(Bt.a, 0.99));
+    // ice: the texels' flag with a frayed edge (the noise only where the flag is between its texels)
+    float ice = Bt.a;
+    if (ice > 0.01 && ice < 0.99) ice = smoothstep(0.3, 0.7, ice + (vnoise3(N * 1400.0) - 0.5) * 0.5);
     // the coast where the height code crosses the sea (between the texels: round shores), the sea's depth in metres
     float water = 1.0 - smoothstep(126.5, 129.5, hc), depth = max(0.0, (128.0 - hc) / 3.0);
     // the land seen from orbit: a fifth of the biomes' game colour given up to its grey (the patchwork reads as land),
@@ -279,7 +280,8 @@ void main() {
     // sunglint (GGX on a wind-roughened sea)
     if (water > 0.001) {
       vec3 seaC = mix(vec3(0.030, 0.30, 0.33), vec3(0.010, 0.10, 0.24), smoothstep(0.7, 5.0, depth));
-      seaC = mix(mix(seaC, vec3(0.004, 0.022, 0.08), smoothstep(6.0, 22.0, depth)), vec3(0.62, 0.74, 0.86) * (1.0 + detailN(N, 1900.0) * 0.5 + detailN(N, 520.0) * 0.4), ice);   // (the floes' cracks and ridges)
+      seaC = mix(seaC, vec3(0.004, 0.022, 0.08), smoothstep(6.0, 22.0, depth));
+      if (ice > 0.0) seaC = mix(seaC, vec3(0.62, 0.74, 0.86) * (1.0 + detailN(N, 1900.0) * 0.5 + detailN(N, 520.0) * 0.4), ice);   // (the floes' cracks and ridges)
       vec3 H = normalize(L - Db);
       float F = 0.02 + 0.98 * pow(1.0 - muv, 5.0);
       float spec = ggx(max(dot(N, H), 0.0), 0.22) * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
