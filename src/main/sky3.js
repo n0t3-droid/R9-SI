@@ -797,7 +797,7 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   // f-sky4 (R50-11) · c3Rag, the ragged base: its coverage eaten upward by a noise along it, deeper in a storm — a row of
   // puffs no longer stands on one ruled line (the review: "thirty separate cartoon puffs in rows, each with a hard flat base")
   float hb = uv.y - 0.28;   // the height over the atlas's flat base (S3.ATLAS base −0.44 → uv 0.28)
-  float c3Rag = u_c3Storm.z * (0.35 + 0.65 * u_c3Storm.x);
+  float c3Rag = u_c3Storm.z * (0.6 + 0.4 * u_c3Storm.x);
   if (c3Rag > 0.0 && hb < c3Rag + 0.04) {
     float rn = vnoise(vec2(uv.x * 7.0 + c3Seed * 31.7, c3Seed * 13.1)) * 0.7 + vnoise(vec2(uv.x * 19.0 - c3Seed * 17.3, 4.7)) * 0.3;
     cov *= smoothstep(0.0, 0.035, hb - c3Rag * rn);
@@ -833,7 +833,7 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   // a storm's base u_c3Storm.y of its top's light (heavy, slate), a fair cloud's u_c3Storm.w (volume, not a sticker)
   // (after the haze: far off the haze's light lies over the cloud, but a storm's far bases stay dark — offline the haze
   // mixed in after the fall left the storm's far clouds at a base/top of 0.73)
-  float hl = smoothstep(0.0, 0.55, hb), hv = clamp(mix(0.6 * hc + 0.4 * hl, 0.2 * hc + 0.8 * hl, u_c3Storm.x), 0.0, 1.0);   // (a storm: each puff's own base dark)
+  float hl = smoothstep(0.0, 0.55, hb), hv = clamp(mix(0.85 * hc + 0.15 * hl, 0.2 * hc + 0.8 * hl, u_c3Storm.x), 0.0, 1.0);   // (a storm: each puff's own base dark)
   c3Grad = mix(mix(u_c3Storm.w, u_c3Storm.y, u_c3Storm.x), 1.0, hv);
   col = mix(col, u_c3Haze, smoothstep(260.0, 700.0, dist) * 0.45);
   col *= c3Grad;
