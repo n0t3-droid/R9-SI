@@ -300,6 +300,17 @@ console.log('8 · the AI in a stub world');
   F.calm(c, W9);
   let att9 = 0; for (let i = 0; i < 30 * 30; i++) { W9.out.events.length = 0; stepAll([c], 1 / 30, W9); att9 += W9.out.events.filter(e => e.k === 'tele').length; }
   check(c.foe.st === 'calm' && att9 === 0 && F.optic(c)[1] > F.optic(c)[0], 'calmed: it kneels, its optic green (' + F.optic(c).map(v => v.toFixed(2)).join(',') + '), no attack in 30 s');
+  // listening ([V] Beruhigen, the timing ring open): it holds still, faces the player, never attacks — and moves again after
+  const W10 = world({ seed: 10 }), h = mob('sentry', 32, [0, 64, -3.2], W10);
+  h.foe.st = 'approach'; h.foe.t = 0; h.foe.cool = 0; h.foe.listen = true; h.yaw = 2;
+  const h0 = h.pos.slice(); let att10 = 0;
+  for (let i = 0; i < 30 * 4; i++) { W10.out.events.length = 0; stepAll([h], 1 / 30, W10); att10 += W10.out.events.filter(e => e.k === 'tele').length; }
+  const moved10 = Math.hypot(h.pos[0] - h0[0], h.pos[2] - h0[2]), face10 = Math.abs(Math.atan2(Math.sin(h.yaw - Math.atan2(-(W10.player.pos[0] - h.pos[0]), -(W10.player.pos[2] - h.pos[2]))), Math.cos(h.yaw - Math.atan2(-(W10.player.pos[0] - h.pos[0]), -(W10.player.pos[2] - h.pos[2])))));
+  const tok10 = W10.tokens.count;
+  h.foe.listen = false;
+  for (let i = 0; i < 30 * 3; i++) stepAll([h], 1 / 30, W10);
+  const after10 = Math.hypot(h.pos[0] - h0[0], h.pos[2] - h0[2]);
+  check(moved10 < 0.05 && att10 === 0 && tok10 === 0 && face10 < 0.3 && after10 > 1, 'listening to [V]: a Wächter 3.2 m off holds still for 4 s (' + moved10.toFixed(2) + ' m), faces the player (' + face10.toFixed(2) + ' rad), no attack (' + att10 + '); after it steps back again (' + after10.toFixed(1) + ' m)');
   const red = F.optic(mob('driller', 31, [0, 64, 0]));
   check(red[0] > red[1] && red[2] > red[1], 'disturbed: the optic glows red-violet (' + red.map(v => v.toFixed(2)).join(',') + ')');
 }

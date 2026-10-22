@@ -241,6 +241,13 @@
         } else if (f.burn > 0) f.burn = Math.max(0, f.burn - dt * 2);
       }
     }
+    // listening ([V] Beruhigen, the timing ring open): it holds still and looks at the one who speaks to it, no attack
+    if (f.listen && (f.st === 'patrol' || f.st === 'notice' || f.st === 'approach' || f.st === 'tele' || f.st === 'recover' || f.st === 'stagger')) {
+      release(m, W); if (f.st === 'tele') { f.st = 'approach'; f.t = 0; }
+      stop(m, dt); hover(m, W, f, K, dt); if (pp) faceTo(m, dx, dz, dt, 5);
+      f.flare = Math.max(0, f.flare - dt * 3); f.cool = Math.max(f.cool, 1.5);
+      return;
+    }
     switch (f.st) {
       case 'patrol': {
         if (!f.tgt || f.t >= f.wait) {
