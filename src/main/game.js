@@ -1183,7 +1183,7 @@
       // the coarse horizon is worth a few seconds of waiting, not more (slow machines fill it in while playing); an arrival's
       // white rises over the loading screen before the world opens under it (first.js holdLoading)
       const early = !!(VR.NewLife && VR.NewLife.loading(this));   // u-home: a trip arrives as soon as the 5 × 5 round the arrival are in (the far ring fills in while you play)
-      if (early || (LS ? LS.done && !VR.First.holdLoading(this, true, dt) : (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000))) {
+      if (early || (LS ? LS.done && !VR.First.holdLoading(this, true, dt) : (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000))) {   // u-home: early ||
         this.nearReadyAt = 0;
         // settle the player on the ground if spawn height was approximate
         if (!this.meta.player && !this.meta.guest) { let y = Math.floor(p.pos[1]); while (y < 250 && VR.PHYS.overlaps((x, yy, z) => w.getBlock(x, yy, z), p.pos[0] - 0.3, y, p.pos[2] - 0.3, p.pos[0] + 0.3, y + 1.8, p.pos[2] + 0.3)) y++; p.pos[1] = y; p.spawn = p.pos.slice(); }
