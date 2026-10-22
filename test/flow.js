@@ -179,5 +179,33 @@ console.log(`    an hour: ${S.length} acts started (${Object.entries(S.reduce((m
   }
   check(n === 32 && front === n, `the close pass and the low pass cross in front of the eye, inside the view (${front} of ${n})`);
 }
+// the session run of 22 Oct (v0.49 + f-flow, run 2): 6 of the walk's 7 acts in its 121-s gap and 3 of the builder's 3
+// passes were started out of the view — behind the eye, above the frame, under a wall. An act starts only where the log
+// will see it (its stage in the view now, ≥ 0.5 % of the screen: eventlog.js's inView, sessionstats' seen ≥ 0.5); a pass
+// only when its nearest point is in the view now, and it comes when the director said (the craft's speed fitted)
+{
+  const gs = makeGame('high', true), A = gs.lifeDirector; A.auto = false;
+  const at = (x, z, yaw, pitch) => { gs.player.pos = [x, 81, z]; gs.player.yaw = yaw; Object.assign(gs.cam, { x, y: 82.62, z, yaw, pitch: pitch || 0 }); A.update(0.1); };
+  L.reset(null); L.bind(gs); L.on = true;
+  // the village's chimneys (VX + 12, VZ + 12 and VX − 10, VZ + 14) seen from 10 m south of the plaza: facing them, behind
+  at(VX + 0.5, VZ - 10, Math.PI); const fwd = A.start('chimneys', { k: 3001 }); A.events.length = 0; A.acts.length = 0;
+  at(VX + 0.5, VZ - 10, 0); const back = A.start('chimneys', { k: 3002 }); A.events.length = 0; A.acts.length = 0;
+  check(!!fwd && !back, `an act plays only where it is seen: the chimneys' smoke facing them ${fwd ? 'starts' : 'does not start'}, with them behind the eye ${back ? 'starts' : 'does not start'}`);
+  // a pass with the eye looking down at its feet (a Baustelle): not now; looking ahead: yes
+  at(1500.5, 1500.5, 0, -1.2); const down = A.start('flyby', { k: 3003 }); A.events.length = 0; A.acts.length = 0; gs.traffic.ships.length = 0;
+  at(1500.5, 1500.5, 0, 0); const ahead = A.start('flyby', { k: 3004 }); A.events.length = 0; A.acts.length = 0; gs.traffic.ships.length = 0;
+  check(!down && !!ahead, `a close pass waits for a view of the sky: looking down ${down ? 'starts' : 'does not start'}, looking ahead ${ahead ? 'starts' : 'does not start'}`);
+  // on time: 24 passes (all kinds of craft): the lead's nearest point to the eye within 3 s of the director's moment
+  const T = gs.traffic, late = [];
+  for (let k = 0; k < 24; k++) {
+    T.ships.length = 0; A.events.length = 0; A.acts.length = 0; at(1500.5, 1500.5, k * 0.7, 0);
+    const kind = k % 3 === 2 ? 'flyover' : 'flyby', ev = A.start(kind, { k: 4000 + k }); if (!ev) { late.push(kind + ' did not start'); continue; }
+    const lead = T.ships.find(s => s.tag === ev.tag && !s.wing); if (!lead) { late.push(kind + ' no craft'); continue; }
+    let best = 1e9, bt = 0; const t0 = T.time;
+    for (let i = 0; i < 600 && !lead.dead && lead.t < 1; i++) { T.update(0.1); const d = Math.hypot(lead.pos[0] - 1500.5, lead.pos[2] - 1500.5); if (d < best) { best = d; bt = T.time; } }
+    const want = t0 + ev.eta; if (!(Math.abs(bt - want) <= 3)) late.push(`${kind} ${lead.arch} ${(bt - want).toFixed(1)} s`);
+  }
+  check(!late.length, `the passes come on time: the nearest point within 3 s of the director's moment in 24 of 24 (${late.slice(0, 4).join(', ') || 'all'})`);
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

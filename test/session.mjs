@@ -603,6 +603,33 @@ if (!process.env.NO_BENCH && (Date.now() - T0) / 1000 < 4500) {   // (the bench 
   for (const k in recs) { recs[k].bench = bench; fs.writeFileSync(`${SHOTS}session_${k}.json`, JSON.stringify(recs[k], null, 1)); }
   for (const p in bench) check(bench[p].on.logMs <= 0.05, `${p}: the log ${(bench[p].on.logMs * 1000).toFixed(1)} µs a frame with its sampler, ${(bench[p].samplerOff.logMs * 1000).toFixed(1)} µs without (frame ${bench[p].on.loopMs} ms on, ${bench[p].off.loopMs} ms off)`);
 }
+// ============================================================================ f-flow (R50-04): the contrail itself
+// after the sessions and the bench: Balanced again, 960 × 540, 13:30, where the walk ended, the eye 11° up; a low pass
+// forced across the view (the life director's 'flyover', its contrail); three pictures — 0.5, 2.5 and 4.5 s after its
+// nearest point (test/shots/session_trail_1..3.png) — and the line detector over them (no constant-width segment > 150 px)
+if (!process.env.NO_TRAIL) {
+  try {
+    await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.applySettings('*'); window.__S.set({ kind: 'idle' }); });
+    await page.setViewportSize({ width: 960, height: 540 });
+    await ev(() => { const g = VR.game, p = g.player; window.dispatchEvent(new Event('resize')); p.pitch = 0.2; g.env.setTime(7500); g.env.rain = 0; g.env.rainTarget = 0; });
+    await settle(40, 6, 3);
+    await ev(() => window.__S.frames(30, false));
+    const f = await ev(() => { const D = VR.game.lifeDirector; if (!D) return { ok: false }; D.update(0.01); const ok = !!D.force('flyover', { k: 777001 }); return { ok, tag: ok ? 'ld777001' : null }; });
+    const lead = () => ev((tag) => { const T = VR.game.traffic, s = T.ships.find(z => z.tag === tag && !z.wing); return s ? { t: +s.t.toFixed(3), arch: s.arch, d: +Math.hypot(s.pos[0] - VR.game.player.pos[0], s.pos[2] - VR.game.player.pos[2]).toFixed(0) } : { none: true, pending: T.pending | 0 }; }, f.tag);
+    let q = { none: true };
+    for (let i = 0; i < 120 && f.ok && q.none; i++) { q = await lead(); if (q.none) { await wait(500); await ev(() => window.__S.frames(2, false)); } }
+    for (let i = 0; i < 90 && f.ok && !q.none && q.t < 0.5; i++) { await ev(() => window.__S.frames(10, false)); q = await lead(); }
+    const shots = [], TL = require(ROOT + 'test/trail_lines.js');
+    for (let k = 1; k <= 3 && f.ok && !q.none; k++) {
+      await ev(() => window.__S.frames(k === 1 ? 14 : 59, false));
+      const url = await ev(() => { const g = VR.game; window.__norender = false; const t0 = performance.now(); g.last = t0 - 1000 / 30; g.loop(t0); window.__norender = true; try { g.renderer.gl.finish(); } catch (e) { /* none */ } const src = g.canvas || document.getElementById('gl'), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); return c.toDataURL('image/png'); });
+      const file = `${SHOTS}session_trail_${k}.png`; fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64'));
+      const r = await TL.measure(file); shots.push({ file: file.replace(ROOT, ''), longest: r.longest, segs: r.sky.slice(0, 3).map(s => `${s.len} px ${s.deg}° w${s.width}`) });
+    }
+    console.log(`  the contrail: ${JSON.stringify({ forced: f, lead: q, shots })} (${secs()})`);
+    check(shots.length === 3 && shots.every(s => s.longest <= 150), `the contrail of a forced low pass: ${shots.length} pictures, its longest straight constant-width segment ${shots.length ? Math.max(...shots.map(s => s.longest)) : '-'} px (≤ 150)`);
+  } catch (e) { console.log('  !! the contrail pictures: ' + String(e && e.message || e).slice(0, 300)); }
+}
 if (Object.keys(recs).length) console.log('\n' + SS.table(Object.entries(recs).map(([k, r]) => [k, r.metrics])));
 console.log(`--- logs (${logs.length})`); for (const l of logs.slice(0, 20)) console.log(l);
 check(!logs.some(l => l.startsWith('[pageerror]')), `no page error (${logs.filter(l => l.startsWith('[pageerror]')).length})`);

@@ -387,7 +387,7 @@ async function shootView(A, v, path) {
   // contrail): stepped until its lead has passed the middle of its path and 2.5 s on → wow48_meadow_trail_<TAG>.png
   if (process.env.TRAIL && v.name === 'meadow') {
     const tp2 = path.replace('wow48_meadow_', 'wow48_meadow_trail_');
-    out.trail = await A.ev(() => { const g = VR.game, D = g.lifeDirector; if (!D) return { ok: false, why: 'no director' }; D.update(0.01); const ev = D.force('flyover', { k: 777001 }); return { ok: !!ev, tag: ev ? ev.tag : null }; });
+    out.trail = await A.ev(() => { const g = VR.game, D = g.lifeDirector; if (!D) return { ok: false, why: 'no director' }; D.update(0.01); const ok = !!D.force('flyover', { k: 777001 }); return { ok, tag: ok ? 'ld777001' : null }; });   // (force() says whether it started; the act's tag is 'ld' + its k)
     // (the craft's design is built by a worker: the pass starts when it is there — up to 60 s by the clock; then a second
     // of play at a time until the lead is past its nearest point)
     const lead = () => A.ev((tag) => { const T = VR.game.traffic, s = T.ships.find(z => z.tag === tag && !z.wing); return s ? { t: +s.t.toFixed(3), pos: s.pos.map(x => Math.round(x)) } : { none: true, pending: T.pending | 0 }; }, out.trail.tag);

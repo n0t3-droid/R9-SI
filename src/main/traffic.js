@@ -55,7 +55,7 @@
       let fp = this.focus(); if (!fp) return;
       const m = d.meta, arch = m.arch;
       const big = arch === 'carrier' || arch === 'cruiser';
-      const sp = SPEED[arch] || [30, 40], speed = rng.range(sp[0], sp[1]);
+      const sp = SPEED[arch] || [30, 40]; let speed = rng.range(sp[0], sp[1]);   // (f-flow: a let — a pass on time fits it)
       // (a horizon flight: from 640 blocks out to 640 blocks out on the other side, passing 80–250 blocks from the focus)
       const horizon = !opts.dock && !opts.circle && !opts.defender;
       // (an act of the Regisseur des Lebens, lifedirector.js — opts.over: {a: the heading, pass, alt, t0, contrail, convoy:
@@ -79,6 +79,9 @@
       let B = [fp[0] + fx * D + rx * pass * 0.4, alt + rng.range(-12, 12), fp[2] + fz * D + rz * pass * 0.4];
       let C = [(A[0] + B[0]) / 2 + rx * rng.range(-60, 60), (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * rng.range(-60, 60)];
       if (ln) { A[1] = alt; B[1] = alt + (nr ? rng.range(-3, 5) : 6); B[0] = fp[0] + fx * D + rx * pass; B[2] = fp[2] + fz * D + rz * pass; C = [(A[0] + B[0]) / 2, alt - 2 * ((ov && ov.dip) || 0), (A[2] + B[2]) / 2]; }
+      // (ln.when: the moment the director wants the lead at its nearest point, the path's middle — its speed fitted to
+      // it within the craft's own range −30 … +30 %: v0.49's came 10 s early to 19 s late, the eye walked on meanwhile)
+      if (ln && ln.when !== undefined) { const rem = ln.when - this.time, L0 = Math.hypot(B[0] - A[0], B[2] - A[2]) * 1.1; if (rem > 2) speed = M.clamp((0.5 - (ln.t0 || 0)) * L0 / rem, sp[0] * 0.7, sp[1] * 1.3); }
       else if (calm) { B[0] = fp[0] + fx * D + rx * pass; B[2] = fp[2] + fz * D + rz * pass; const w = rng.range(-30, 30); C = [(A[0] + B[0]) / 2 + rx * w, (A[1] + B[1]) / 2 + rng.range(-10, 14), (A[2] + B[2]) / 2 + rz * w]; }
       // ---- f-flow end
       // a docking flight comes in over the plaza from the south and sets down on the apron in front of the portal
