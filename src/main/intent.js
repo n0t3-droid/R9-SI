@@ -470,6 +470,14 @@
     c.ending = { t: 0, from: Object.assign({}, c.lastCam) };
   }
   I.cancel = (g, why) => end(g, why || 'input', false);
+  // the save (game.js saveMeta, after the ships wrote their records): a called ship still in the air is written standing on
+  // its pad, facing the way — a reload never finds it hanging in the sky
+  I.beforeSave = function (g, m) {
+    const S = g && g.starships; if (!S || !m || !Array.isArray(m.starships)) return;
+    const list = S.ships.filter(s => s.d && s.d.meta);
+    const fix = (c) => { if (!c || !c.ship || c.shipLanded || !c.arr) return; const r = m.starships[list.indexOf(c.ship)]; if (!r) return; const P = c.arr; r.pos = [P.spot[0], P.spot[1], P.spot[2]].map(v => Math.round(v * 100) / 100); r.yaw = P.face; };
+    fix(I.cur); for (const q of detached) fix(q.c);
+  };
   const detached = [];
 
   // ---------------------------------------------------------------- the frame
@@ -576,6 +584,8 @@
   }
   function onPhase(g, c) {
     const t = c.target;
+    // the music rises as the ship lifts and again on the arrival (as a wow moment does)
+    if ((c.phase === 'takeoff' || (c.phase === 'arrive' && c.means !== 'walk')) && g.audio && g.audio.swell) { try { g.audio.swell(g.env ? g.env.day | 0 : 0, c.phase === 'takeoff' ? 1.4 : 0.8); } catch (e) { /* no music */ } }
     if (c.phase === 'arrive') {
       if (VR.EventLog) VR.EventLog.emit('travel', c.means === 'walk' ? 'walk_arrive' : 'arrive', c.means === 'walk' ? 1 : 3, [t.pos[0], t.pos[1], t.pos[2]], 'intent', Math.max(4, (t.top - t.base) / 2 || 6));
       if (c.means !== 'walk') caption(g, t.name);

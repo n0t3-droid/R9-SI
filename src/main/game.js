@@ -810,6 +810,7 @@
       if (VR.LiveLoop) VR.LiveLoop.metaVars(this, m);   // the variants its saved columns contain (B1)
       if (this.gadgets) this.gadgets.beforeSave(m);
       if (this.starships) this.starships.beforeSave(m);
+      if (VR.Intent && VR.Intent.beforeSave) VR.Intent.beforeSave(this, m);   // e-ctx: a called ship still in the air is saved standing on its pad
       if (this.companions) this.companions.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
       if (this.wonders) this.wonders.beforeSave(m);

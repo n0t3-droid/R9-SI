@@ -275,7 +275,7 @@ if (want('C')) {
   console.log('    ' + JSON.stringify(OUT.hud));
   check(off(faded, 'hotbar') && off(faded, 'stats') && off(faded, 'minimap') && /hf-dot/.test(faded.crosshair), 'standing still 10 s: the hotbar, the hearts and the map faded, a dot');
   check(!off(back, 'hotbar') && !off(back, 'stats'), 'a slot change and a hurt: the hotbar and the hearts are back');
-  check(off(again, 'hotbar') && !off(again, 'stats'), '8 s later: the hotbar faded again, the hearts stay (below 70 %… changed 9 s ago? — below half? no: they show while hurt below 100 %)' .replace(/ \(.*\)/, ''));
+  check(off(again, 'hotbar') && off(again, 'stats'), '9 s later (hearts at 65 %, unchanged for 9 s): both faded again');
   check(['hotbar', 'stats', 'minimap'].every(id => !off(always, id)), 'Immer: everything shown');
   check(!off(danger, 'stats'), 'hearts at 20 %: never hidden');
 }
