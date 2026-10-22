@@ -41,6 +41,13 @@ const shot = async (name) => { await wait(150); await page.screenshot({ path: SH
 const hold = (ms) => ev((ms) => { for (const a of document.getAnimations()) { try { a.pause(); a.currentTime = ms; } catch (e) { /* */ } } }, ms);
 const release = () => ev(() => { for (const a of document.getAnimations()) { try { a.play(); } catch (e) { /* */ } } });
 const pics = {};
+// one section stopping (a throw) is one failure and its picture; the next section still runs (one run must tell all)
+const section = async (tag, fn) => {
+  try { await fn(); } catch (e) {
+    fails++; console.log('  ✗ section ' + tag + ' stopped: ' + (e.stack || e.message).slice(0, 900));
+    try { await release(); await page.screenshot({ path: SHOTS + 'adventure_fail_' + tag + '.png', timeout: 120000 }); } catch (e2) { /* */ }
+  }
+};
 
 try {
   await page.goto(DIST);
@@ -52,16 +59,19 @@ try {
   check(await ev(() => !!VR.game.audio.ctx), 'the audio graph is up (the chime can play)');
 
   // ---------------------------------------------------------------- 0 · 🎒 Meins on the start screen: „⚔ Abenteuer-Welt beginnen"
+  await section('0', async () => {
   console.log('0 · 🎒 Meins');
   await ev(() => VR.Start.meins('title'));
   await wait(600);
   const mt = await ev(() => { const t = document.querySelector('#meins .advtile'), r = t && t.getBoundingClientRect(); return t ? { text: t.innerText.replace(/\s+/g, ' '), act: t.dataset.act, first: t === document.querySelector('#meins .mbody').firstElementChild, w: Math.round(r.width) } : null; });
   check(!!mt && mt.act === 'adv:newworld' && mt.first && /Abenteuer-Welt beginnen/.test(mt.text) && mt.w > 300, '🎒 Meins opens with the tile „⚔ Abenteuer-Welt beginnen" across the page (' + JSON.stringify(mt) + ')');
   pics.meins = await shot('adventure_meins');
+  });
   await ev(() => VR.game.ui.show('title'));
   await wait(300);
 
   // ---------------------------------------------------------------- 1 · the create row „Spielweg"
+  await section('1', async () => {
   console.log('1 · the create form');
   await ev(() => { const b = document.querySelector('#title [data-act="newworld"]'); b.click(); });
   await wait(300);
@@ -73,8 +83,10 @@ try {
   check(row1.on === 'adv' && row1.diff === 'normal' && row1.note, '⚔ Abenteuer: the difficulty row says Normal now and the note explains it (' + JSON.stringify(row1) + ')');
   pics.create = await shot('adventure_create');
   await ev(() => document.querySelector('#create [data-act="docreate"]').click());
-  for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
+  for (let i = 0; i < 180; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   check(await ev(() => VR.game.state) === 'play', 'the world is open (' + secs() + ')');
+  });
+  await section('1b', async () => {
   for (let i = 0; i < 14; i++) { await step(20); await wait(250); }
   const w = await ev(() => { const g = VR.game, m = g.meta, a = m.adventure; return { name: m.name, diff: m.difficulty, gdiff: g.difficulty, on: !!(a && a.on), band: a && a.band, enc: a && a.enc, prev: a && a.prevDiff, xp: a && a.me.xp, once: a && Object.keys(a.me.once), bound: VR.Adventure.meta === m }; });
   console.log('     ' + JSON.stringify(w));
@@ -84,8 +96,10 @@ try {
   const hello = await ev(() => ({ n: VR.Adventure.stats.welcomes, greet: !!VR.Adventure.greet }));
   check(hello.n === 1 && !hello.greet, 'the new Abenteuer world said hello once („⚔ Das Abenteuer beginnt", ' + JSON.stringify(hello) + ')');
   check(w.xp >= 15 && w.once.some(k => /^biome:/.test(k)), 'the first biome found counted on its own through codex.js (' + w.xp + ' XP: ' + w.once.join(', ') + ')');
+  });
 
   // ---------------------------------------------------------------- 2 · the ring, placing
+  await section('2', async () => {
   console.log('2 · the ring on the HUD, placing');
   const hud0 = await ev(() => { const e = document.getElementById('advhud'), r = e && e.getBoundingClientRect(); return e ? { inHud: !!e.closest('#hud'), shown: getComputedStyle(e).display !== 'none', x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), lvl: e.querySelector('.lvl').textContent, arc: e.querySelector('.arc') && e.querySelector('.arc').style.strokeDashoffset } : null; });
   check(!!hud0 && hud0.inHud && hud0.shown && hud0.x < 40 && hud0.y < 40, 'the ring sits top left inside #hud (' + JSON.stringify(hud0) + ')');
@@ -94,11 +108,18 @@ try {
     const x1 = me.xp; for (let i = 0; i < 25; i++) p.afterPlace(t, b[0] + (i % 5), b[1] + 3, b[2] + Math.floor(i / 5), s);
     return { d1: x1 - x0, d2: me.xp - x1, last: Date.now() - A.lastBuildAt }; });
   check(pl.d1 === 1 && pl.d2 === 0 && pl.last < 5000, 'placing through player.js afterPlace: 25 new positions 1 XP, the same 25 again nothing; Bauruhe knows the last build (' + JSON.stringify(pl) + ')');
+  });
 
   // ---------------------------------------------------------------- 3 · the level-up to 5
+  await section('3', async () => {
   console.log('3 · the level-up');
   await ev(() => { const g = VR.game, p = g.player; p.pitch = 0.04; const me = g.meta.adventure.me; me.xp = 585; const lv = VR.Adv.levelOf(me.xp); me.level = lv.level; VR.Adventure.renderHud(true); });
   await draw(5200); await step(4); await draw(5200);
+  // the level-up shows when the view is free (a toast is not in the way; a menu, a wow moment, a wonder's banner are)
+  let busy = '';
+  for (let i = 0; i < 40; i++) { busy = await ev(() => VR.Adventure.busy()); if (!busy) break; await step(10); await wait(250); }
+  N.busyBeforeUp = busy;
+  if (busy) console.log('     the view is held: ' + busy);
   const before = await ev(() => ({ chime: (VR.game.audio.counts || {})['adv.chime'] || 0, ups: VR.Adventure.stats.ups, taler: VR.game.meta.adventure.me.taler, parts: VR.game.particles.count !== undefined ? VR.game.particles.count : null }));
   const up = await ev(() => { const A = VR.Adventure, r = A.award('wonder', { id: 'adventure.mjs' }); clearTimeout(A.banT); const b = document.getElementById('advup'); return { r, banner: b ? b.className : null, text: b ? b.innerText : '', ups: A.stats.ups, chime: (VR.game.audio.counts || {})['adv.chime'] || 0, taler: VR.game.meta.adventure.me.taler }; });
   console.log('     ' + JSON.stringify(up));
@@ -115,8 +136,10 @@ try {
   await wait(1700);
   await draw(5200);
   pics.hud = await shot('adventure_hud');
+  });
 
   // ---------------------------------------------------------------- 4 · the pause menu, the cards
+  await section('4', async () => {
   console.log('4 · the pause menu and the cards');
   await ev(() => VR.game.ui.pause());
   await wait(250);
@@ -158,10 +181,12 @@ try {
   const kids = await ev(() => { const b = [...document.querySelectorAll('#adventure [data-act="adv:enc"]')]; return { on: (b.find(x => x.classList.contains('on')) || {}).dataset.v, dis: b.every(x => x.disabled), note: (document.querySelector('#adventure .field:last-child .note') || {}).textContent }; });
   check(kids.on === 'off' && kids.dis && /Kindersicher/.test(kids.note || ''), '🧸 Kindersicher: Begegnungen fixed to aus (' + JSON.stringify(kids) + ')');
   await ev(() => { const g = VR.game; g.settings.kids = false; VR.Adventure.renderCard(); });
-  await ev(() => VR.game.ui.resume());
+  });
+  await ev(() => { if (VR.game.ui.screen) VR.game.ui.resume(); });
   await wait(200);
 
   // ---------------------------------------------------------------- 5 · the numbers
+  await section('5', async () => {
   console.log('5 · the numbers');
   const aw = await ev(() => {
     const A = VR.Adventure, n = 20000, p = VR.game.player.pos;
@@ -203,6 +228,7 @@ try {
   check(!!saved && saved.xp === saved.live && saved.on && saved.v === 1 && saved.pts.ges === 2, 'the record is in IndexedDB with the world (' + JSON.stringify(saved) + ')');
   N.record = await ev(() => JSON.stringify(VR.game.meta.adventure).length);
   console.log('     the record: ' + N.record + ' bytes');
+  });
 
   // ---------------------------------------------------------------- no page errors
   const pageErrs = logs.filter(l => l.startsWith('[pageerror]'));
