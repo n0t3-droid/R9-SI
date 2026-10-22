@@ -477,7 +477,7 @@
     if (ui && (ui.screen || ui.typing)) return;
     const inShip = !!(g.starships && g.starships.pilot && g.flight);
     if (c.phase !== 'arrive' && I.wantsControl(In, c.cs, inShip)) { end(g, 'input'); return; }
-    if (c.phase === 'arrive' && In && (In.pressed.size > 0 || (In.mouse.clicked && In.mouse.clicked.some(Boolean)))) { c.phaseT = 99; return; }   // (any key: the arrival's framing ends)
+    if (c.phase === 'arrive' && In && (In.pressed.size > 0 || (In.mouse.clicked && In.mouse.clicked.some(Boolean)))) { c.skip = true; return; }   // (any key: the arrival's framing ends)
     if (c.means === 'walk' && c.phase === 'walk' && In) {
       const p = g.player, f = I.follow(c.path, [p.pos[0], p.pos[2]], c.fst);
       c.saved = { pm: In.padMove, dx: In.mouse.dx, dy: In.mouse.dy };
@@ -542,7 +542,7 @@
   function step(g, c, dt) {
     const p = g.player;
     if (c.ending) { c.ending.t += dt; if (c.ending.t >= I.BLEND) I.cur = null; return; }
-    c.t += dt; c.phaseT += dt;
+    c.t += dt; c.phaseT += dt; c.dt = dt;
     const tp = c.target.pos;
     let dist = Math.hypot(tp[0] - p.pos[0], tp[2] - p.pos[2]);
     const s = { means: c.means, phaseT: c.phaseT, dist, shipLanded: c.shipLanded, boarded: c.boarded };
@@ -564,6 +564,8 @@
       if (!A && fl.state !== 'landed' && c.phase !== 'arrive') { end(g, 'input'); return; }
       if (g.flight !== fl) { end(g, 'state', true); return; }
     }
+    // the arrival's framing lasts its 3 s from the moment its shot opens (the landing's shot keeps its 4 s first)
+    if (c.phase === 'arrive' && c.means !== 'walk') s.phaseT = c.skip ? 99 : !camOn(g) || !c.seq ? c.phaseT : c.seq.kind === 'arrive' ? Math.min(c.phaseT, c.seq.t) : 0;
     const next = I.phaseOf(c.phase, s);
     if (next !== c.phase) { c.prev = c.phase; c.phase = next; c.phaseT = 0; onPhase(g, c); if (!I.cur) return; }
     c.dist = s.dist;
@@ -586,6 +588,7 @@
     }
   }
 
+  const camOn = (g) => !(g.settings && g.settings.travelCam === false);
   // ---------------------------------------------------------------- the cameras
   const OWN = {}, BL = {};
   // on foot (game.js, after vehicleCam): the call, the boarding, the walk, the blend back
