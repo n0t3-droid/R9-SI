@@ -49,12 +49,12 @@ const ex = (x) => Number(x).toExponential(1);
 const rng = (() => { let s = 1234567; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; })();
 // a number as the spec writes it: rel. ≤ 0.5 %, or half its last written digit when it has fewer than three significant
 // digits (so "7 min" means 6.5–7.5 and "0.42°" means 0.415–0.425)
-function num(label, got, spec, unitTxt) {
+function num(label, got, spec, unitTxt, src) {
   const s = String(spec).replace(/,/g, ''), want = parseFloat(s);
   const dec = (s.split('.')[1] || '').length, sig = s.replace('.', '').replace(/^0+/, '').length;
   const tol = Math.max(Math.abs(want) * 0.005, sig < 3 ? 0.5 * Math.pow(10, -dec) : 0);
   const u = unitTxt ? ' ' + unitTxt : '';
-  check(Math.abs(got - want) <= tol + 1e-12, `${label}: ${Number(got.toPrecision(5))}${u} (spec ${spec}${u}, ±${Number(tol.toPrecision(2))})`);
+  check(Math.abs(got - want) <= tol + 1e-12, `${label}: ${Number(got.toPrecision(5))}${u} (${src || 'spec'} ${spec}${u}, ±${Number(tol.toPrecision(2))})`);
 }
 
 const S = U.home;
@@ -327,7 +327,7 @@ section('(f) spheres of influence and the dominant body');
 {
   for (const [id, want] of [['herz', '777'], ['aqua', '131'], ['zinn', '55.2'], ['opal', '30.0'], ['basalt', '188'], ['ocker', '702'], ['amarant', '245,500']]) {
     const b = B(id), p = B(b.parent);
-    num(`r_SOI = a (μ/μ_parent)^(2/5): ${b.name.de}`, S.soi(id) / KM, want, 'km');
+    num(`r_SOI = a (μ/μ_parent)^(2/5): ${b.name.de}`, S.soi(id) / KM, want, 'km', 'by hand (plan §2):');
     check(Math.abs(S.soi(id) - U.soiRadius(b.orbit.a, b.mu, p.mu)) < 1e-6, `… the same as U.soiRadius (${b.name.de})`);
   }
   check(S.soi('helia') === Infinity && S.soi('swarm') === 0, 'Helia\'s sphere is everything; the swarm has no sphere of its own (μ 0)');
@@ -717,11 +717,42 @@ section('(n) local skies');
     }
     check(best <= 0.02, `localSky: ${f3(best * 1000, 2)} µs a call (≤ 0.02 ms; best of five rounds of ${n})`);
   }
+  // the chart ↔ space hand-over (u-ascent's climb, u-cruise's descent): a point and a velocity on a world's map ↔ the
+  // inertial state round the body's centre; a ship hovering 2,500 m over the Heartland already moves at ω·r through space
+  {
+    const t = 4321.5, r = [0, 0, 0], v = [0, 0, 0], p = [0, 0, 0], q = [0, 0, 0];
+    S.chartToInertial('herz', [0, 2563, 0], [0, 0, 0], t, r, v);
+    num('a ship hovering 2,500 m over the Heartland moves through space at', len(v), '217.9', 'm/s', 'ω·r:');
+    let worstP = 0, worstV = 0;
+    for (const id of ['herz', 'opal', 'basalt']) for (let k = 0; k < 300; k++) {
+      const pos = [(rng() - 0.5) * 60e3, 63 + rng() * 3000, (rng() - 0.5) * 60e3], vel = [(rng() - 0.5) * 400, (rng() - 0.5) * 50, (rng() - 0.5) * 400];
+      S.chartToInertial(id, pos, vel, t + k, r, v); S.inertialToChart(id, r, v, t + k, p, q);
+      worstP = Math.max(worstP, len(sub(p, pos))); worstV = Math.max(worstV, len(sub(q, vel)));
+    }
+    check(worstP < 1e-3 && worstV < 1e-9, `map → space → map on Herzwelt, Opal and Basalt: ${ex(worstP)} m, ${ex(worstV)} m/s (< 1 mm, < 1e-9 m/s)`);
+    // the hand-over keeps the ground: a ship that coasts one second in space lands one second later where the turning ground
+    // has carried the map point under it (no slide at the hand-off)
+    S.chartToInertial('herz', [100, 2563, -50], [0, 0, 0], t, r, v);
+    const r1 = [r[0] + v[0], r[1] + v[1], r[2] + v[2]];
+    S.inertialToChart('herz', r1, v, t + 1, p, q);
+    const slid = Math.hypot(p[0] - 100, p[2] + 50);
+    check(slid < 0.01 * len(v), `one second after the hand-off a hovering ship is still over its map point: ${f3(slid, 2)} m (the turning frame's curvature; forgetting ω × r would slide it ${f3(len(v), 0)} m)`);
+  }
+  // the sky from any point in space (the space scene's camera): the same directions as a world's sky from that point
+  {
+    const t = 2222, st = S.state(t), rHz = st.b.herz.r, obs = add(Array.from(rHz), [0, 0, B('herz').R + 3000]);
+    const sp = S.skyFrom(obs, t);
+    const amar = sp.bodies.find(e => e.id === 'amarant'), herzE = sp.bodies.find(e => e.id === 'herz');
+    check(sp.bodies.length === S.ids.length - 1 && !!herzE, 'skyFrom: the sun and every body (the one below the ship too)');
+    const want = unit(sub(Array.from(st.b.amarant.r), obs));
+    check(angle(Array.from(amar.dir), want) < 1e-12 && Math.abs(deg(2 * herzE.ang) - deg(2 * Math.asin(B('herz').R / (B('herz').R + 3000)))) < 1e-9, `… directions in the system frame; Herzwelt below ${f3(deg(2 * herzE.ang), 1)}° wide (§5.4: 152°)`);
+    check(sp.eclipse >= 0 && sp.eclipse <= 1, `… and the eclipse of the sun there (${f3(sp.eclipse, 2)}${sp.eclipseBy ? ' by ' + sp.eclipseBy : ''})`);
+  }
   // the fixed ↔ inertial helpers (the rotating ground and space)
   {
     const t = 1234, rF = C.toSphere(0, 0, new Float64Array(3)), rf = [rF[0] * B('herz').R, rF[1] * B('herz').R, rF[2] * B('herz').R];
     const r = [0, 0, 0], v = [0, 0, 0]; S.fixedToInertial('herz', rf, [0, 0, 0], t, r, v);
-    num('the ground at the Heartland moves eastward through space at', len(v), '212.6', 'm/s');
+    num('the ground at the Heartland moves eastward through space at', len(v), '212.6', 'm/s', 'ω·r:');
     const r2 = [0, 0, 0], v2 = [0, 0, 0]; S.inertialToFixed('herz', r, v, t, r2, v2);
     check(len(sub(r2, rf)) < 1e-6 && len(v2) < 1e-9, '… and back: at rest on the ground');
   }

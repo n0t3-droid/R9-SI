@@ -604,18 +604,35 @@
     flux(id) { const b = this.by[id]; const d = len(this.pos(id, 0, v3())) * L / AU; return SOLAR * (this.star ? this.star.L : 1) / (d * d); },
     // the ground's speed through space at a chart point (m/s): ω × the distance from the spin axis
     surfaceSpeed(id, x, z) { const b = this.by[id], n = this.chart(id).toSphere(x, z, v3()); return Math.abs(b.spin.w) * b.R * Math.hypot(n[0], n[1]); },
-    // a body-fixed (turning) state → the body-centred inertial one (system axes), and back
+    // a body-fixed (turning) state → the body-centred inertial one (system axes), and back: v_inertial = B·v_fixed + ω × r
     fixedToInertial(id, rF, vF, t, r, v) {
-      const b = this.by[id], B = spinInto(b, t, new Float64Array(9)), w = b.spin.w, ax = b.spin.axis;
-      mulInto(B, rF, r); const vv = mulInto(B, vF || [0, 0, 0], v3());
+      const b = this.by[id], B = spinInto(b, t, this._Bs || (this._Bs = new Float64Array(9))), w = b.spin.w, ax = b.spin.axis;
+      mulInto(B, rF, r); const vv = vF ? mulInto(B, vF, _e) : set3(_e, 0, 0, 0);
       set3(v, vv[0] + w * (ax[1] * r[2] - ax[2] * r[1]), vv[1] + w * (ax[2] * r[0] - ax[0] * r[2]), vv[2] + w * (ax[0] * r[1] - ax[1] * r[0]));
       return r;
     },
     inertialToFixed(id, r, v, t, rF, vF) {
-      const b = this.by[id], B = spinInto(b, t, new Float64Array(9)), w = b.spin.w, ax = b.spin.axis;
-      const vr = [v[0] - w * (ax[1] * r[2] - ax[2] * r[1]), v[1] - w * (ax[2] * r[0] - ax[0] * r[2]), v[2] - w * (ax[0] * r[1] - ax[1] * r[0])];
-      mulTInto(B, r, rF); mulTInto(B, vr, vF);
+      const b = this.by[id], B = spinInto(b, t, this._Bs || (this._Bs = new Float64Array(9))), w = b.spin.w, ax = b.spin.axis;
+      set3(_e, v[0] - w * (ax[1] * r[2] - ax[2] * r[1]), v[1] - w * (ax[2] * r[0] - ax[0] * r[2]), v[2] - w * (ax[0] * r[1] - ax[1] * r[0]));
+      mulTInto(B, r, rF); mulTInto(B, _e, vF);
       return rF;
+    },
+    // a point and a velocity on a world's map (x, block height y, z; the local frame's x east, y up, z south) ↔ the inertial
+    // state round the body's centre (system axes): the climb's hand-off to space and the descent back onto the map
+    chartToInertial(id, pos, vel, t, r, v) {
+      const b = this.by[id], ch = this.chart(id), n = ch.toSphere(pos[0], pos[2], this._cn || (this._cn = v3())), rad = b.R + (pos[1] - ch.datum);
+      const rF = set3(this._crF || (this._crF = v3()), n[0] * rad, n[1] * rad, n[2] * rad);
+      const F = ch.frame(pos[0], pos[2], this._cF || (this._cF = new Float64Array(9))), vF = mulTInto(F, vel || [0, 0, 0], this._cvF || (this._cvF = v3()));
+      return this.fixedToInertial(id, rF, vF, t, r, v);
+    },
+    inertialToChart(id, r, v, t, pos, vel) {
+      const b = this.by[id], ch = this.chart(id), rF = this._crF || (this._crF = v3()), vF = this._cvF || (this._cvF = v3());
+      this.inertialToFixed(id, r, v, t, rF, vF);
+      const d = len(rF), n = set3(this._cn || (this._cn = v3()), rF[0] / d, rF[1] / d, rF[2] / d), xz = ch.toPlane(n, this._cxz || (this._cxz = [0, 0]));
+      const F = ch.frame(xz[0], xz[1], this._cF || (this._cF = new Float64Array(9)));
+      pos[0] = xz[0]; pos[1] = ch.datum + d - b.R; pos[2] = xz[1];
+      if (vel) mulInto(F, vF, vel);
+      return pos;
     },
     // where `from`'s centre is (and how it moves) relative to `to`'s, summed along the tree (no 10⁹-m cancellation)
     offset(from, to, t, r, v) {
@@ -785,30 +802,29 @@
     },
     // the eclipse seen from a body's centre (the fraction of the star's disc; `only`: by that body alone)
     eclipseAt(id, t, only) { const st = this.cached(t); return this.eclipseFrom(st.b[id].r, t, id, this._er || (this._er = { frac: 0, by: null }), only).frac; },
-    // the sky from a point fixed on body `id` (rFixed in its body frame); directions in the body frame unless `M` (a
-    // row-major system → output matrix) is given
-    skyAt(id, rFixed, t, out, M) {
-      const b = this.by[id], st = this.cached(t), me = st.b[id], star = this.list[0];
+    // the sky from a point of the system frame (rSys): the sun and every body but `skip` (the observer's own world), with
+    // directions in the system frame — or M·d when M (row-major, system → output) is given; the space scene's camera
+    skyFrom(rSys, t, out, M, skip) {
+      const st = this.cached(t), star = this.list[0];
       out = out || makeSky();
-      if (out.body !== id) {
+      const key = skip || '';
+      if (out._key !== key) {
         // one list of entries per observer body, kept in `out` (switching worlds allocates only the first time)
         const pool = out._pool || (out._pool = {});
-        let pl = pool[id];
+        let pl = pool[key];
         if (!pl) {
-          pl = pool[id] = { bodies: [], byId: {}, parent: null };
-          for (const o of this.list) if (o !== star && o !== b) { const e = makeEntry(o.id); pl.bodies.push(e); pl.byId[o.id] = e; }
-          pl.parent = b.parent && b.parent !== star.id ? pl.byId[b.parent] : null;
+          pl = pool[key] = { bodies: [], byId: {}, parent: null };
+          for (const o of this.list) if (o !== star && o.id !== skip) { const e = makeEntry(o.id); pl.bodies.push(e); pl.byId[o.id] = e; }
+          const sb = skip ? this.by[skip] : null;
+          pl.parent = sb && sb.parent && sb.parent !== star.id ? pl.byId[sb.parent] : null;
         }
-        out.bodies = pl.bodies; out._byId = pl.byId; out.parent = pl.parent;
+        out.bodies = pl.bodies; out._byId = pl.byId; out.parent = pl.parent; out._key = key;
       }
-      out.body = id; out.t = t;
-      const Mx = M || null, B = me.B;
-      // the observer in the system frame
-      const obs = mulInto(B, rFixed, this._obs || (this._obs = v3())); obs[0] += me.r[0]; obs[1] += me.r[1]; obs[2] += me.r[2];
-      const ox = obs[0], oy = obs[1], oz = obs[2];
+      out.body = skip || null; out.t = t;
+      const ox = rSys[0], oy = rSys[1], oz = rSys[2];
       // the star
       set3(_d, -ox, -oy, -oz); const ds = len(_d); _d[0] /= ds; _d[1] /= ds; _d[2] /= ds;
-      if (Mx) mulInto(Mx, _d, out.sun.dir); else mulTInto(B, _d, out.sun.dir);
+      if (M) mulInto(M, _d, out.sun.dir); else copy3(_d, out.sun.dir);
       out.sun.dist = ds; out.sun.ang = Math.asin(Math.min(1, star.R / ds));
       const dAU = ds * L / AU; out.sun.flux = SOLAR * (this.star ? this.star.L : 1) / (dAU * dAU);
       // every other body
@@ -816,15 +832,23 @@
       for (let k = 0; k < bl.length; k++) {
         const e = bl[k], o = this.by[e.id], p = st.b[e.id].r;
         set3(_d, p[0] - ox, p[1] - oy, p[2] - oz); const db = len(_d); _d[0] /= db; _d[1] /= db; _d[2] /= db;
-        if (Mx) { mulInto(Mx, _d, e.dir); mulInto(Mx, o.spin.axis, e.pole); } else { mulTInto(B, _d, e.dir); mulTInto(B, o.spin.axis, e.pole); }
+        if (M) { mulInto(M, _d, e.dir); mulInto(M, o.spin.axis, e.pole); } else { copy3(_d, e.dir); copy3(o.spin.axis, e.pole); }
         e.dist = db; e.ang = o.R > 0 ? Math.asin(Math.min(1, o.R / db)) : 0;
         // the phase: the angle at the body between the star (at the origin) and the observer
         const pr = len(p), ca = pr > 0 ? (p[0] * _d[0] + p[1] * _d[1] + p[2] * _d[2]) / pr : 1;
         e.alpha = Math.acos(clamp1(ca)); e.phase = 0.5 * (1 + ca);
       }
-      const ec = this.eclipseFrom(obs, t, id, this._er2 || (this._er2 = { frac: 0, by: null }));
+      const ec = this.eclipseFrom(rSys, t, skip, this._er2 || (this._er2 = { frac: 0, by: null }));
       out.eclipse = ec.frac; out.eclipseBy = ec.by;
       return out;
+    },
+    // the sky from a point fixed on body `id` (rFixed in its body frame); directions in the body frame unless `M` (a
+    // row-major system → output matrix) is given
+    skyAt(id, rFixed, t, out, M) {
+      const me = this.cached(t).b[id], B = me.B;
+      const obs = mulInto(B, rFixed, this._obs || (this._obs = v3())); obs[0] += me.r[0]; obs[1] += me.r[1]; obs[2] += me.r[2];
+      if (!M) { M = this._BT || (this._BT = new Float64Array(9)); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) M[i * 3 + j] = B[j * 3 + i]; }
+      return this.skyFrom(obs, t, out, M, id);
     },
     chart(id) { return this._charts[id] || (this._charts[id] = makeChart(this, this.by[id])); },
     // the sky over a chart point of a world (dim id or body id; chartPos [x, z] or [x, y, z] with y the block height, the
