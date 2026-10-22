@@ -71,10 +71,31 @@ ${legal}
 <script>${guard(mainSrc)}</script>`;
 const head = `<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>R9-SI</title>${fonts}<style>${css}</style>`;
 fs.mkdirSync(path.join(ROOT, 'dist'), { recursive: true });
-fs.writeFileSync(path.join(ROOT, 'dist/index.html'), `<!doctype html>\n<html lang="en"><head>${head}</head><body>${body}</body></html>\n`);
+// (f-build, R50-09) the player pages go out without comments and indentation — src/build/strip.js, test/strip.js — and
+// every stripped script must parse, or the build stops. dist/index.debug.html is the game with its source text: the same
+// page, the same lines (an error's line in the player page is that line in the debug page).
+const Strip = require('./src/build/strip.js');
+const stripMemo = new Map();   // (the worker and the libraries are the same script in two pages: stripped once)
+const writePage = (file, html) => {
+  const out = html.replace(Strip.SCRIPT_RE, (m, open, attrs, code, close) => {
+    const key = attrs + '\u0000' + code;
+    if (!stripMemo.has(key)) {
+      let s = null;
+      try { s = Strip.script(attrs, code); if (s !== null && Strip.kind(attrs) === 'classic') new (require('vm').Script)(s, { filename: 'dist/' + file }); }
+      catch (e) { console.error('STRIPPING FAILED in dist/' + file + ': ' + e.message + ' — build stopped (dist/index.debug.html has the source text)'); process.exit(1); }
+      stripMemo.set(key, s);
+    }
+    const s = stripMemo.get(key);
+    return s === null ? m : open + s + close;
+  });
+  fs.writeFileSync(path.join(ROOT, 'dist', file), out);
+};
+const gamePage = `<!doctype html>\n<html lang="en"><head>${head}</head><body>${body}</body></html>\n`;
+fs.writeFileSync(path.join(ROOT, 'dist/index.debug.html'), gamePage);
+writePage('index.html', gamePage);
 // the published page can't hand out files: drop the direct-download branch there (screenshots still show in an overlay)
 const bodyArtifact = body.replace(/\/\*DL\*\/[\s\S]*?\/\*\/DL\*\//g, '');
-fs.writeFileSync(path.join(ROOT, 'dist/artifact.html'), `<title>R9-SI</title>${fonts}<style>${css}</style>\n${bodyArtifact}\n`);
+writePage('artifact.html', `<title>R9-SI</title>${fonts}<style>${css}</style>\n${bodyArtifact}\n`);
 // ---- the Model Studio: the live catalogue + editor page. Main thread: registry, model language, furniture and facade
 // packs, the VX material textures. Worker (the game's own worker + a studio extension): block textures, whole
 // catalogue houses built with the villa generator, lit and meshed with the game's mesher.
@@ -159,9 +180,9 @@ const inGame = studioBody.replace('<!--PLAYTAG-->', ' · ▶ Spielen').replace('
 // the standalone Studio is its own artifact (another web origin, its own storage): it says so, and knows where the game is
 const GAME_URL = 'https://claude.ai/artifact/EP9fJV6R8Grw4ev5RVUP4r';
 const standalone = studioBody.replace('<!--PLAYTAG-->', '').replace('<script type="text/js-worker"', `<script>window.__R9_STANDALONE = true; window.__R9_GAME_URL = '${GAME_URL}';</script>\n<script type="text/js-worker"`);
-fs.writeFileSync(path.join(ROOT, 'dist/studio.html'), `<!doctype html>\n<html lang="de"><head>${studioHead}</head><body>${inGame}</body></html>\n`);
+writePage('studio.html', `<!doctype html>\n<html lang="de"><head>${studioHead}</head><body>${inGame}</body></html>\n`);
 // (the charset first: a host that serves the page as it is — not wrapped in its own document — still reads it as UTF-8)
-fs.writeFileSync(path.join(ROOT, 'dist/studio_artifact.html'), `<meta charset="utf-8"><title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>\n${standalone}\n`);
+writePage('studio_artifact.html', `<meta charset="utf-8"><title>R9 Model Studio</title>${studioFonts}<style>${studioCss}</style>\n${standalone}\n`);
 if (exists('dist/studio_index.html')) fs.unlinkSync(path.join(ROOT, 'dist/studio_index.html'));
 const kb = (f) => (fs.statSync(path.join(ROOT, f)).size / 1024).toFixed(0) + ' KB';
-console.log('built dist/index.html', kb('dist/index.html'), '· artifact.html', kb('dist/artifact.html'), '· studio.html', kb('dist/studio.html'), '· studio_artifact.html', kb('dist/studio_artifact.html'));
+console.log('built dist/index.html', kb('dist/index.html'), '· artifact.html', kb('dist/artifact.html'), '· studio.html', kb('dist/studio.html'), '· studio_artifact.html', kb('dist/studio_artifact.html'), '· index.debug.html', kb('dist/index.debug.html'));
