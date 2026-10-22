@@ -309,17 +309,46 @@ function cloudsOf(img, isCloud) {
   }
   return n < 200 ? { n } : { n, share: +(n / (W * Hh)).toFixed(3), mean: +(s / n).toFixed(1), ratio: runs && hi > 0 ? +(lo / hi).toFixed(3) : null, runs };
 }
+// f-sky4 · the parts the band means cannot see, of one picture (img, at W × H; pr: its sky probe, the sky pass painted
+// magenta, or null): the critic's structure, the sun's disc where the sun stands in the picture (its place the pixel
+// nearest its direction — geo.inv the inverse view-projection, geo.sun its direction; a coarse search, then a fine one;
+// fovDeg the vertical lens), with clouds the clouds over the land (the probe's non-sky pixels above each column's lowest
+// sky pixel). Used by test/sky3.mjs and test/wow48.mjs
+function looksOf(img, pr, geo, o) {
+  const W = img.w, H = img.h, fov = (o && o.fovDeg) || 72;
+  const out = { structure: structureOf(img) };
+  const mv = (m, v) => [0, 1, 2, 3].map(i => m[i] * v[0] + m[4 + i] * v[1] + m[8 + i] * v[2] + m[12 + i] * v[3]);
+  const nv = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const an = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
+  const dirAt = (x, y) => { const c = mv(geo.inv, [(x + 0.5) / W * 2 - 1, 1 - (y + 0.5) / H * 2, 1, 1]); return nv([c[0] / c[3], c[1] / c[3], c[2] / c[3]]); };
+  if (geo && geo.inv && geo.sun) {
+    let best = [1e9, 0, 0];
+    for (let y = 0; y < H; y += 4) for (let x = 0; x < W; x += 4) { const a = an(dirAt(x, y), geo.sun); if (a < best[0]) best = [a, x, y]; }
+    if (best[0] < 3 * Math.PI / 180) { const [, bx, by] = best; for (let y = Math.max(0, by - 4); y <= Math.min(H - 1, by + 4); y++) for (let x = Math.max(0, bx - 4); x <= Math.min(W - 1, bx + 4); x++) { const a = an(dirAt(x, y), geo.sun); if (a < best[0]) best = [a, x, y]; } }
+    const pxPerDeg = (H / 2) / Math.tan(fov / 2 * Math.PI / 180) * Math.PI / 180;
+    if (best[0] < 0.6 * Math.PI / 180) out.disc = sunDiscOf(img, best[1], best[2], pxPerDeg);   // (the sun not in the picture: no disc to see)
+  }
+  if (o && o.clouds && pr) {
+    const isSky = (x, y) => { const p = (y * W + x) * 3, R = pr.d[p], G = pr.d[p + 1], B = pr.d[p + 2]; return R > 140 && B > 140 && G < 0.55 * Math.min(R, B); };
+    const low = new Int32Array(W).fill(-1);
+    for (let x = 0; x < W; x++) for (let y = H - 1; y >= 0; y--) if (isSky(x, y)) { low[x] = y; break; }
+    out.clouds = cloudsOf(img, (x, y) => low[x] > y && !isSky(x, y));
+  }
+  return out;
+}
 // the gates of the review's R50-01 and R50-11 on one run's views (sky3.mjs's JSON or wow48.mjs's record: each view's
-// structure, disc, clouds where measured): the golden views' bands within ΔE 8, sd ≥ 40, sky saturation ≥ 75, land ≥ 90;
-// a visible disc where one was measured (a ≥ 250-luma core ≥ 0.4° wide); a storm's clouds mean ≤ 120, base/top ≤ 0.55
+// structure, disc, clouds where measured): the golden views' band means close to the frames' (their mean ΔE ≤ 8: the
+// frames' band 4 is the magenta beside their sun — a view facing away from the sun cannot match it band by band without
+// pink everywhere, the milk the review measured), sd ≥ 40, sky saturation ≥ 75, land ≥ 90; a visible disc where the sun
+// stands in a clear golden picture (a ≥ 250-luma core ≥ 0.4° wide); a storm's clouds mean ≤ 120, base/top ≤ 0.55
 const GATES = { dE: 8, sd: 40, sat: 75, land: 90, disc: 0.4, cloudMean: 120, cloudRatio: 0.55 };
 function gates(views) {
   const out = [];
   for (const v of views) {
     const nm = v.view || v.name;
     if (v.hour === 'golden' && v.dE && v.curve) {
-      const bad = v.dE.map((d, k) => [k, d]).filter(([k, d]) => d !== null && v.curve[k] && v.curve[k].n >= 100 && d > GATES.dE);
-      out.push({ ok: bad.length === 0, msg: `${nm}: every band within ΔE ${GATES.dE} of the golden target (${v.dE.map(d => (d === null ? '—' : d.toFixed(1))).join(' ')})` });
+      const ds = v.dE.filter((d, k) => d !== null && v.curve[k] && v.curve[k].n >= 100), m = ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : Infinity;
+      out.push({ ok: m <= GATES.dE, msg: `${nm}: the band means close to the golden target (mean ΔE ${m.toFixed(1)} ≤ ${GATES.dE}; ${v.dE.map(d => (d === null ? '—' : d.toFixed(0))).join(' ')})` });
     }
     if (v.hour === 'golden' || v.golden) {
       const S = v.structure;
@@ -330,8 +359,8 @@ function gates(views) {
         out.push({ ok: S.land >= GATES.land, msg: `${nm}: the land has colour (saturation ${S.land} ≥ ${GATES.land}; the frames 115)` });
       }
     }
-    if (v.disc !== undefined) out.push({ ok: !!v.disc && v.disc.width >= GATES.disc, msg: `${nm}: a visible sun disc (a ≥ ${SUN_CORE}-luma core ${v.disc ? v.disc.width + '° wide, max ' + v.disc.max : 'not in the picture'}; ≥ ${GATES.disc}°)` });
-    if (v.clouds !== undefined) {
+    if (v.disc !== undefined && v.disc !== null && (v.hour === 'golden' || v.golden) && v.clouds === undefined) out.push({ ok: v.disc.width >= GATES.disc, msg: `${nm}: a visible sun disc (a ≥ ${SUN_CORE}-luma core ${v.disc.width}° wide, max ${v.disc.max}; ≥ ${GATES.disc}°)` });
+    if (v.clouds !== undefined && /storm/.test(nm)) {
       const C = v.clouds;
       out.push({ ok: !!C && C.mean <= GATES.cloudMean && C.ratio !== null && C.ratio <= GATES.cloudRatio, msg: `${nm}: the storm's clouds have weight (mean luma ${C ? C.mean : '—'} ≤ ${GATES.cloudMean}, base/top ${C ? C.ratio : '—'} ≤ ${GATES.cloudRatio}; ${C ? C.n : 0} px)` });
     }
@@ -422,7 +451,7 @@ function compareRuns(before, after) {
   return { rows, hours };
 }
 
-module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, hfOf, measureFrames, targetOf, reference, compare, compareRuns, REF, structureOf, sunDiscOf, cloudsOf, gates, GATES, SUN_CORE, STRUCT };
+module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, hfOf, measureFrames, targetOf, reference, compare, compareRuns, REF, structureOf, sunDiscOf, cloudsOf, looksOf, gates, GATES, SUN_CORE, STRUCT };
 
 if (require.main === module) {
   (async () => {

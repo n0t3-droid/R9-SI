@@ -10,6 +10,7 @@
 // sun's disc. Not drawn: the land, the cumulus sprites, the volumetric light, the old god rays, the TSR.
 //   node test/sky_offline.js run <tag> [views]   (views: canyon_golden,isles_golden,… · sun · lake; default the golden set)
 //   node test/sky_offline.js prep|post <tag> [views]   (the two halves; python3 test/sky_offline.py .tmp_tests/skyoff/<tag>)
+//   node test/sky_offline.js glsl <tag>   (the preset's sky, cumulus, box-cloud and composite programs compiled and linked)
 //   env: PRESET=high (or balanced, low) · W=640 H=360 (the sky3.mjs views; wow48's sun/lake 1280 × 720) · SEED=4242
 // → test/shots/skyoff_<view>_<tag>.png, .tmp_tests/skyoff/<tag>/result.json
 // regress: skip  (a tool)
@@ -21,6 +22,9 @@ const SRC = ROOT + 'src/main';
 require(SRC + '/weather.js'); require(SRC + '/skybodies.js'); require(SRC + '/gl.js'); require(SRC + '/light2.js');
 require(SRC + '/sky3.js'); require(SRC + '/shaders.js'); require(SRC + '/clouds.js'); require(SRC + '/env.js');
 const S = VR.SHADERS, S3 = VR.Sky3, L2 = VR.Light2, SR = require('./sky_ref.js'), mat4 = V.mat4 || VR.mat4;
+// PATCH=<file.js>: a fitting experiment — a module run here with VR loaded (it may change VR.Sky3.PAL, SKYL, VR.Light2.GRADE,
+// VR.Sky …) before the frames are computed; QX='{"sky3":0}': the preset's switches changed
+if (process.env.PATCH) require(path.resolve(process.env.PATCH))(VR);
 const [cmd = 'run', tag = 'now', viewsArg] = process.argv.slice(2);
 const OUT = ROOT + '.tmp_tests/skyoff/' + tag + '/', SHOTS = ROOT + 'test/shots/';
 fs.mkdirSync(SHOTS, { recursive: true });
@@ -225,7 +229,20 @@ async function post(views) {
 
 (async () => {
   const views = viewsArg ? viewsArg.split(',') : DEFAULT_VIEWS;
-  const q = Object.assign({}, Q[PRESET], process.env.NOBLOOM ? { bloom: false } : {});
+  const q = Object.assign({}, Q[PRESET], process.env.NOBLOOM ? { bloom: false } : {}, process.env.QX ? JSON.parse(process.env.QX) : {});
+  if (cmd === 'glsl') {
+    // the preset's programs that the sky's and the light's switches touch, compiled and linked by Mesa (no browser): the
+    // sky, the cumulus sprites, the box clouds, the composite — a shader typo found before a browser run is spent on it
+    S3.use(q); L2.use(q);
+    const dx = (q.wxDrama ? ['WXDRAMA'] : []).concat(q.motion ? ['MOTION'] : []);
+    const progs = { sky: programText(S.FS_VS, S.SKY_FS, 'sky', (q.lite ? ['LITE'] : []).concat(dx)), puff: programText(S.PUFF_VS, S.PUFF_FS, 'puff', q.wxDrama ? ['WXDRAMA'] : []), composite: programText(S.FS_VS, S.COMPOSITE_FS, 'composite', []) };
+    if (S.CLOUD_VS && S.CLOUD_FS) progs.cloud = programText(S.CLOUD_VS, S.CLOUD_FS, 'cloud', dx);
+    fs.mkdirSync(OUT, { recursive: true });
+    fs.writeFileSync(OUT + 'views.json', JSON.stringify({ programs: progs, views: [] }));
+    execFileSync('python3', [path.join(__dirname, 'sky_offline.py'), OUT], { stdio: 'inherit' });
+    console.log(`compiled and linked ${Object.keys(progs).join(', ')} (${PRESET}; defines: ${Object.entries(progs).map(([k, v]) => k + ' ' + v.defines.join('+')).join(' · ')})`);
+    return;
+  }
   if (cmd === 'prep' || cmd === 'run') { prep(views, q); console.log(`prepared ${views.length} views (${PRESET}) in ${OUT.replace(ROOT, '')}`); }
   if (cmd === 'run') execFileSync('python3', [path.join(__dirname, 'sky_offline.py'), OUT], { stdio: 'inherit' });
   if (cmd === 'post' || cmd === 'run') await post(views);

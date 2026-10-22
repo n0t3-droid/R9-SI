@@ -24,6 +24,12 @@
 // Checks: the pictures written, no page error; by day, golden and dusk every measured band within ΔE 12 of the target and
 // (with BEFORE_JSON) the mean ΔE per hour not worse than before; at night a dark sky with stars; Very Low: its sky pass not
 // slower than DIST_BEFORE's (median ratio ≤ 1.05).
+// f-sky4 (docs/reviews/v0.49.md R50-01, R50-11): per view also the critic's structure (test/sky_ref.js structureOf: the top
+// 40 %'s luma sd and saturation, the bottom 40 %'s saturation), the sun's disc where the sun is in the picture (sunDiscOf:
+// the ≥ 250-luma core's width in degrees), the clouds of the storm and the gap (cloudsOf on the sky probe: their mean luma,
+// base over top); the review's gates (sky_ref.js gates) over the golden views and the storm. VARIANTS='{"tag": {"gold":
+// {...}, "sun": {...}, "grade": {...}, "stops": [["warm2", 9, [r, g, b]], …]}}' shoots the golden views again with
+// each palette variant set in the page (no new world, no settle: a variant costs two pictures a view) → sky3_<view>_<TAG>_<tag>
 // usage: TAG=before DIST=file://$PWD/.tmp_tests/dist_before/index.html nohup bash test/wt_run.sh sky3.mjs 3600 > .tmp_tests/sky3_before.log 2>&1 &
 //        TAG=after DIST_BEFORE=file://$PWD/.tmp_tests/dist_before/index.html BEFORE_JSON=.tmp_tests/sky3_before.json nohup bash test/wt_run.sh sky3.mjs 3600 > .tmp_tests/sky3_after.log 2>&1 &
 //        ONLY=canyon_noon,up (views) · SEED=4242 · RD=8
@@ -36,6 +42,7 @@ const require = createRequire(import.meta.url);
 const ROOT = new URL('../', import.meta.url).pathname;   // this checkout (from test/ or from .tmp_tests/)
 const SR = require(ROOT + 'test/sky_ref.js');
 const { load, curveOf, spaceOf, bandRows, compare, NB, REF, starsOf, chromaOf, hazeOf } = SR;
+const VARIANTS = process.env.VARIANTS ? JSON.parse(process.env.VARIANTS) : null;
 const TAG = process.env.TAG || 'after', SEED = process.env.SEED || '4242', RD = +(process.env.RD || 8);
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const DIST_BEFORE = process.env.DIST_BEFORE || '';
@@ -114,8 +121,8 @@ for (const h of ['noon', 'golden', 'dusk', 'night']) VIEWS.push({ name: 'city_' 
 for (const h of ['noon', 'golden', 'dusk']) VIEWS.push({ name: 'isles_' + h, place: 'isles', hour: h });
 VIEWS.push({ name: 'up', place: 'city', hour: 'noon', pitch: 85 * Math.PI / 180, measure: false });
 VIEWS.push({ name: 'upnight', place: 'city', hour: 'night', pitch: 85 * Math.PI / 180, measure: false });
-VIEWS.push({ name: 'gap', place: 'canyon', hour: 'golden', wx: 'bewoelkt', aim: 'sun', pitch: 8 * Math.PI / 180, measure: false });
-VIEWS.push({ name: 'storm', place: 'canyon', hour: 'noon', wx: 'regen', measure: false });
+VIEWS.push({ name: 'gap', place: 'canyon', hour: 'golden', wx: 'bewoelkt', aim: 'sun', pitch: 8 * Math.PI / 180, measure: false, clouds: true });
+VIEWS.push({ name: 'storm', place: 'canyon', hour: 'noon', wx: 'regen', measure: false, clouds: true });
 VIEWS.push({ name: 'aurora', place: 'city', hour: 'night', yaw: 0, pitch: 10 * Math.PI / 180, aurora: true, measure: false });
 VIEWS.push({ name: 'meteor', place: 'city', hour: 'night', meteor: true, measure: false });
 VIEWS.push({ name: 'moons', place: 'canyon', hour: 'afterglow', moons: true, measure: false });
@@ -162,8 +169,10 @@ async function measure(name, geo, kind) {
   const chroma = chromaOf(img, 0, bandRows(Hl, NB - 3)[1], inMask);
   const haze = hazeOf(img, Hl, inMask);
   let skyN = 0; for (let i = 0; i < W * H; i++) skyN += mask[i];
-  return { H: Hl, y0, sky: +(skyN / (W * H)).toFixed(3), curve, space, stars, chroma, haze: { L0: haze.L0, width: haze.width } };
+  return { H: Hl, y0, sky: +(skyN / (W * H)).toFixed(3), curve, space, stars, chroma, haze: { L0: haze.L0, width: haze.width }, ...looks(img, pr, geo, false) };
 }
+// f-sky4 · the parts the band means cannot see (test/sky_ref.js looksOf): the structure, the disc, the clouds
+const looks = (img, pr, geo, withClouds) => SR.looksOf(img, pr, geo, { fovDeg: 72, clouds: withClouds });
 const fmtCurve = (c) => c.map(b => (b.lab ? `${b.rgb.map(v => Math.round(v)).join(',')}` : '—')).join(' | ');
 
 // ---------------------------------------------------------------- the shots
@@ -221,10 +230,42 @@ async function shoot(V, preset) {
     await draw(false);
     m = await measure(name, geo, hr[1]);
   }
-  const target = m && hr[1] ? ref.targets[hr[1]] : null;
+  if (!m && V.clouds) {
+    // (f-sky4: the storm's and the gap's clouds — the sky probe for the mask, no bands)
+    await draw(true);
+    await page.screenshot({ path: TMP + 'sky3probe_' + name + '.png', timeout: 240000 });
+    await draw(false);
+    m = looks(await load(SHOTS + name + '.png', W, H), await load(TMP + 'sky3probe_' + name + '.png', W, H), geo, true);
+  }
+  const target = m && hr[1] && m.curve ? ref.targets[hr[1]] : null;
   const dEs = target ? compare(m.curve, target) : null;
   const r = { name, view: V.name, place: V.place, hour: V.hour, kind: hr[1], preset, note, settleS: st, geo: { sun: geo.sun, night: geo.night, ticks: geo.ticks, day: geo.day, yaw: geo.yaw, pitch: geo.pitch }, ...(m || {}), dE: dEs };
   results.push(r);
+  if (m && m.structure) console.log(`   structure sd ${m.structure.sd} sat ${m.structure.sat} land ${m.structure.land} (luma ${m.structure.luma})${m.disc ? ` · disc ${m.disc.width}° max ${m.disc.max} rings ${Object.values(m.disc.ring).join('/')}` : ''}${m.clouds ? ` · clouds ${JSON.stringify(m.clouds)}` : ''}`);
+  // (f-sky4: the palette variants on the golden views — set in the page, the picture and the probe again, put back after)
+  if (VARIANTS && preset === 'high' && V.hour === 'golden' && V.measure !== false) for (const [vt, VV] of Object.entries(VARIANTS)) {
+    await ev((VV) => {
+      const S3 = VR.Sky3, L2 = VR.Light2;
+      window.__keep = JSON.stringify({ gold: S3.PAL.gold, skyl: S3.SKYL, grade: L2.GRADE.gold });
+      if (VV.gold) Object.assign(S3.PAL.gold, VV.gold);
+      if (VV.sun) Object.assign(S3.SKYL.sun, VV.sun);
+      if (VV.grade) Object.assign(L2.GRADE.gold, VV.grade);
+      for (const [tab, el, val] of VV.stops || []) { const T = S3.SKYL[tab], e = T.find(q => q[0] === el); if (e) e[1] = val; else { T.push([el, val]); T.sort((a, b) => a[0] - b[0]); } }
+    }, VV);
+    const vn = `${name}_${vt}`;
+    await step(2); await draw(false);
+    await page.screenshot({ path: SHOTS + vn + '.png', timeout: 240000 });
+    const vgeo = await geoOf();
+    await draw(true);
+    await page.screenshot({ path: TMP + 'sky3probe_' + vn + '.png', timeout: 240000 });
+    await draw(false);
+    const vm = await measure(vn, vgeo, hr[1]);
+    await ev(() => { const S3 = VR.Sky3, L2 = VR.Light2, k = JSON.parse(window.__keep); Object.assign(S3.PAL.gold, k.gold); for (const t of Object.keys(k.skyl)) S3.SKYL[t] = k.skyl[t]; Object.assign(L2.GRADE.gold, k.grade); });
+    const vd = compare(vm.curve, ref.targets[hr[1]]);
+    results.push({ name: vn, view: V.name + '+' + vt, variant: vt, place: V.place, hour: V.hour, kind: hr[1], preset, ...vm, dE: vd });
+    console.log(`   variant ${vt}: ΔE ${vd.map(v => (v === null ? '—' : v.toFixed(1))).join(' ')}  mean ${mean(vd)} · L* ${vm.curve.map(b => (b.lab ? b.L.toFixed(0) : '—')).join(' ')} · structure sd ${vm.structure.sd} sat ${vm.structure.sat} land ${vm.structure.land}${vm.disc ? ` · disc ${vm.disc.width}°` : ''}`);
+  }
+  await step(2);
   console.log(`[${secs()}] ${name}${st ? ' (settled ' + st + ' s)' : ''}${note ? '  ' + note : ''}`);
   if (m) {
     console.log(`   H ${m.H} sky ${m.sky} stars ${m.stars.map(v => (v === null ? '—' : v)).join(' ')} chroma ${m.chroma ? m.chroma.mean + ' var ' + m.chroma.var : '—'} haze ${m.haze.L0} / ${m.haze.width}`);
@@ -352,7 +393,7 @@ let hiSky = null;
 
 // ---------------------------------------------------------------- the checks
 console.log(`\n== checks (${TAG}) [${secs()}]`);
-const hi = results.filter(r => r.preset === 'high');
+const hi = results.filter(r => r.preset === 'high' && !r.variant);
 for (const r of results) check(fs.existsSync(SHOTS + r.name + '.png') && fs.statSync(SHOTS + r.name + '.png').size > 20000, `picture ${r.name} written`);
 check(logs.filter(l => /pageerror|\berror\]|\[shot\]/.test(l)).length === 0, 'no page or WebGL errors' + (logs.length ? ' (' + logs.length + ' log lines)' : ''));
 const LIM = 12;
@@ -383,7 +424,12 @@ if (before) for (const h of ['noon', 'golden', 'dusk']) {
 }
 if (skyRatio !== null) check(skyRatio <= 1.05, `Very Low: the sky pass not slower than the build before's (the rounds' median ratio ${skyRatio.toFixed(3)})`);
 if (sameSky !== null) check(sameSky, 'Very Low: the sky program uses the same uniforms as the build before\'s (no new work in it)');
-fs.writeFileSync(TMP + 'sky3_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, view: r.view, place: r.place, hour: r.hour, kind: r.kind, preset: r.preset, note: r.note, H: r.H, sky: r.sky, space: r.space, stars: r.stars, chroma: r.chroma, haze: r.haze, dE: r.dE, curve: r.curve ? r.curve.map(b => ({ n: b.n, rgb: b.rgb, lab: b.lab, L: b.L, C: b.C, h: b.h })) : null, geo: r.geo })), sky: { ratio: skyRatio, same: sameSky, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) }, hiSky }, null, 1));
+// f-sky4 · the review's gates (test/sky_ref.js gates: the golden views' bands, structure and disc; the storm's clouds); the
+// variants' for the record
+for (const g of SR.gates(hi)) check(g.ok, 'gate ' + g.msg);
+const vres = results.filter(r => r.variant);
+if (vres.length) { console.log('\nthe variants (for the record)'); for (const g of SR.gates(vres)) console.log((g.ok ? '  ✓ ' : '  · ') + g.msg); }
+fs.writeFileSync(TMP + 'sky3_' + TAG + '.json', JSON.stringify({ tag: TAG, results: results.map(r => ({ name: r.name, view: r.view, variant: r.variant, place: r.place, hour: r.hour, kind: r.kind, preset: r.preset, note: r.note, H: r.H, sky: r.sky, space: r.space, stars: r.stars, chroma: r.chroma, haze: r.haze, dE: r.dE, curve: r.curve ? r.curve.map(b => ({ n: b.n, rgb: b.rgb, lab: b.lab, L: b.L, C: b.C, h: b.h })) : null, geo: r.geo, structure: r.structure, disc: r.disc, clouds: r.clouds })), sky: { ratio: skyRatio, same: sameSky, a: skyA.map(s => s.ms), b: skyB.map(s => s.ms) }, hiSky }, null, 1));
 
 // ---------------------------------------------------------------- the sheet: the game beside the trailer frame of its hour
 {
