@@ -43,6 +43,7 @@
   F.SNAP = 24;         // m: beyond this the drone snaps to its place (a teleport)
   F.LAG = 2.6;         // m it may trail behind its place
   F.ASK_T = 8;         // s: asking again within this goes on to the next trick
+  F.KIND_WAIT = { vista: 240, _: 600 };   // s before the same kind is told again unprompted (asked: any time)
   F.SCALE = 0.62;      // the drone's size (≈ 35 cm)
   F.SEAT_SCALE = 0.55; // on the dashboard
   F.cost = { frames: 0, ms: 0, worst: 0, draws: 0, drawMs: 0, scanMs: 0 };
@@ -310,7 +311,7 @@
   if (MM && Grid) {
     const part = (sx, sy, sz, pv, fn) => { const gr = new Grid(sx, sy, sz, pv[0], pv[1], pv[2]); fn(gr); return { grid: gr, pivot: [0, 0, 0] }; };
     MM.funke = () => {
-      const W = 0xf4f7fb, W2 = 0xdfe7ef, O = 0xff7c2c, O2 = 0xe8641c, C = 0x46f0ff, C2 = 0xb8fbff, D = 0x18232e, G = 0x8c98a6, M2 = 0xb4bfca;
+      const W = 0xf4f7fb, W2 = 0xdfe7ef, O = 0xff7c2c, O2 = 0xe8641c, C = 0x46f0ff, C2 = 0xb8fbff, C3 = 0x23b9d6, D = 0x18232e, G = 0x8c98a6, M2 = 0xb4bfca;
       return {
         h: 0.5, w: 0.28, fly: true, radius: 0.7, gait: 'hover',
         parts: {
@@ -321,9 +322,9 @@
             g.set(4, 7, 4, G); g.set(3, 7, 4, M2); g.set(5, 7, 4, M2);
           }),
           // the eye: a 3 × 3 cyan light, a bright corner (the glint)
-          eye: part(3, 3, 1, [1.5, 1.5, 1], (g) => { g.box(0, 0, 0, 2, 2, 0, C, { emis: 1 }); g.set(2, 2, 0, C2, 1); }),
+          eye: part(3, 3, 1, [1.5, 1.5, 1], (g) => { g.box(0, 0, 0, 2, 2, 0, (x, y) => ((x === 1 || y === 1) ? C : C3), { emis: 1 }); g.set(2, 2, 0, C2, 1); }),
           // the stubby antenna with its glowing tip
-          antenna: part(1, 4, 1, [0.5, 0, 0.5], (g) => { g.box(0, 0, 0, 0, 2, 0, G); g.set(0, 3, 0, C, 1); }),
+          antenna: part(1, 3, 1, [0.5, 0, 0.5], (g) => { g.box(0, 0, 0, 0, 1, 0, G); g.set(0, 2, 0, C, 1); }),
           rotor_l: part(5, 1, 5, [2.5, 0.5, 2.5], (g) => { g.box(0, 0, 2, 4, 0, 2, M2); g.box(2, 0, 0, 2, 0, 4, M2); }),
           rotor_r: part(5, 1, 5, [2.5, 0.5, 2.5], (g) => { g.box(0, 0, 2, 4, 0, 2, M2); g.box(2, 0, 0, 2, 0, 4, M2); }),
           // the side pods the rotors sit on, and the glow ring underneath
@@ -417,6 +418,7 @@ void main() {
 
   // ---------------------------------------------------------------- the store (per browser: the greeting and the tips said)
   const KEY = 'r9si.funke';
+  const MEM = { hello: false, help: {} };   // (said in this session: the same when the browser keeps no storage)
   F.store = function () { let o = null; try { o = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { o = null; } if (!o || typeof o !== 'object') o = {}; if (!o.help || typeof o.help !== 'object') o.help = {}; return o; };
   F.save = function (o) { try { localStorage.setItem(KEY, JSON.stringify(o)); return true; } catch (e) { return false; } };
 
@@ -436,18 +438,25 @@ void main() {
       this.pv = [0, 0, 0]; this.yaw = 0; this.roll = 0; this.pitch = 0; this.spin = 0;
       this.budget = new Budget(); this.lost = new Lost(); this.said = new Set(); this.n = 0;
       this.visible = false; this.brainT = 0.5; this.wowAt = -Infinity; this.targetsAt = -Infinity; this.targets = [];
-      this.line = null; this.startT = null; this.askT = -Infinity; this.askI = 0; this.blinkT = 2;
+      this.line = null; this.startT = null; this.askT = -Infinity; this.askI = 0; this.blinkT = 2; this.inputT = -Infinity;
       this.wayT = 0; this.wayPts = 0; this.wayTg = null; this.wayDirty = false; this.wayP = new Float32Array(26 * 3); this.wayD = new Float32Array(26); this.wayO = [0, 0, 0]; this.wayEnd = false;
       this.scanJob = null; this.scanT = 0; this.scanR = F.SCAN_R; this.scanO = [0, 0, 0]; this.scanN = 0; this.scanData = null; this.scanDirty = false; this.scanAsked = false;
       this.shot = null; this.ph = null; this.light = { sky: 1, bl: [0.32, 0.55, 0.62] }; this.lightT = 0;
       this.seat = null; this.seatM = VR.mat4 ? VR.mat4.create() : null; this.wp = [0, 0, 0];
-      this.out = null; this.hint = null; this.padCache = {};
+      this.out = null; this.hint = null; this.padCache = {}; this.kindT = {};
       F.last = null;
     }
     // ---- what it may do
     on() { const g = this.g, S = g.settings || {}, p = g.player; return S.funke !== false && g.state === 'play' && !!p && !p.dead && !g.studioOpen && !(g.director && g.director.active); }
     busy() { const g = this.g, ui = g.ui; return !!(ui && (ui.screen || ui.typing)) || !!(g.wow && g.wow.active) || !!(g.arrival && g.arrival.holds && g.arrival.holds()) || !!(g.photoCam && g.photoCam.on) || !!(VR.Zeit && VR.Zeit.active) || !!this.ph; }
     einfach() { const U = VR.UIPrefs; try { return !(U && U.get && U.get().pro); } catch (e) { return true; } }
+    // the player is there: a key, the mouse, a pad or a finger within the last minute (Funke never talks to an empty room)
+    present(t) { return t - this.inputT < 60; }
+    feel(T) {
+      const I = this.g.input; if (!I) return;
+      const m = I.mouse;
+      if ((I.keys && I.keys.size) || (m && (m.dx || m.dy || (m.down && (m.down[0] || m.down[2])))) || (I.padDown && I.padDown.size) || (I.tDown && I.tDown.size)) this.inputT = T;
+    }
     inVehicle() { const g = this.g; return !!g.flight || !!(g.gadgets && g.gadgets.controlling); }
     buildFocus() {
       const g = this.g, BH = VR.Bauhand, p = g.player, I = g.input, ms = I && I.mouse;
@@ -460,7 +469,8 @@ void main() {
       if (!this.on()) { this.visible = false; this.wayT = 0; this.scanT = 0; this.scanJob = null; if (this.line) this.endLine(); if (this.ph) this.photoEnd(); return; }
       dt = clamp(dt || 0, 0, 0.1);
       const T = g.time || 0, p = g.player;
-      if (this.startT === null) { this.startT = T; this.sparkle(); }
+      const first = this.startT === null; if (first) this.startT = T;
+      this.feel(T);
       if (this.buildFocus()) this.budget.build(T);
       this.visible = !(g.arrival && g.arrival.holds && g.arrival.holds());
       // where it wants to be
@@ -468,7 +478,7 @@ void main() {
       if (!this.seat) {
         this.place(T);
         F.spring(this.S, this.anchor, dt, this.ph || this.wayT > 0 ? 9 : 6, this.inVehicle() ? 4 : F.LAG);
-        if (this.S.snapped && T - this.startT > 1) this.sparkle();
+        if (first || (this.S.snapped && T - this.startT > 1)) this.sparkle();
         this.attitude(dt, T);
       }
       this.spin += dt * (this.seat ? 14 : 34);
@@ -510,7 +520,7 @@ void main() {
       if (blocked(A[0], A[1], A[2])) {
         const mx = 2 * hx - A[0], mz = 2 * hz - A[2];
         if (!blocked(mx, A[1], mz)) { A[0] = mx; A[2] = mz; }
-        else { A[0] = P[0] - fx * 0.2; A[1] = P[1] + 2.3 + bob; A[2] = P[2] - fz * 0.2; if (this.solid(A[0], A[1], A[2])) { A[0] = hx; A[1] = hy + 0.2; A[2] = hz; } }
+        else { A[0] = P[0] - fx * 0.2; A[1] = P[1] + 2.3 + bob; A[2] = P[2] - fz * 0.2; if (this.solid(A[0], A[1], A[2])) { A[0] = hx - fx * 0.5; A[1] = hy + 0.1; A[2] = hz - fz * 0.5; } }
       }
     }
     // banking: roll from the sideways acceleration, pitch from the forward one; the yaw turns toward its look
@@ -549,16 +559,18 @@ void main() {
       const g = this.g, p = g.player;
       if (T - this.targetsAt >= 5) { this.targetsAt = T; this.targets = this.targetList(); }
       const r = this.lost.step(T, p.pos[0], p.pos[2], this.targets);
+      if (!this.present(T)) return;
       if (r && !this.busy() && !this.line && this.budget.can(T, false)) { const tg = this.target(false); if (tg) this.way(tg, false, r === 'circle' ? 'circle' : 'lost'); }
       if (this.line || this.busy() || !this.budget.can(T, false)) return;
       // the greeting (once per browser), then the first-time help (Einfach), then the next wow
       const st = F.store();
-      if (!st.hello && T - this.startT >= 6) { if (this.say('hello', null, false)) { st.hello = Date.now(); F.save(st); } return; }
+      if (!st.hello && !MEM.hello && T - this.startT >= 6) { if (this.say('hello', null, false)) { MEM.hello = true; st.hello = Date.now(); F.save(st); } return; }
       if (this.einfach() && this.helpTick(st)) return;
       if (T - this.wowAt >= 5) {
         this.wowAt = T;
-        const c = F.pickWow(this.wowCands(), this.said, 'auto');
-        if (c && this.sayWow(c, false)) this.said.add(c.id);
+        const K = this.kindT, cands = this.wowCands().filter(c => !(T - (K[c.kind] === undefined ? -Infinity : K[c.kind]) < (F.KIND_WAIT[c.kind] || F.KIND_WAIT._)));
+        const c = F.pickWow(cands, this.said, 'auto');
+        if (c && this.sayWow(c, false)) { this.said.add(c.id); K[c.kind] = T; }
       }
     }
     // the targets the lost detector watches (≤ 64, nearest first): villages, vistas, waypoints, landmarks, the intent's
@@ -623,7 +635,7 @@ void main() {
     nearVista() { const g = this.g, P = g.player.pos; if (!g.wow || !g.wow.list) return null; let best = null, bd = 120; for (const v of g.wow.list.values()) { if (v.wow === false) continue; const d = Math.hypot(v.x - P[0], v.z - P[2]); if (d < bd) { bd = d; best = v; } } return best && VR.WowMoment ? VR.WowMoment.title(best.lm) : null; }
     // the first-time tips (Einfach): something new near → its line, once per browser
     helpTick(st) {
-      const g = this.g, p = g.player, R = VR.R, h = st.help, want = (k) => !h[k];
+      const g = this.g, p = g.player, R = VR.R, h = st.help, want = (k) => !h[k] && !MEM.help[k];
       let k = null, vars = null;
       const tg = p.target, tt = tg && R && R.types[R.T.type[tg.state]], nm = tt ? tt.name : '';
       if (nm && (tt.o.ui === 'chest' || tt.o.ui === 'voidchest') && want('chest')) k = 'chest';
@@ -636,7 +648,7 @@ void main() {
       if (!k && want('water') && p.mode === 'survival' && p.air !== undefined && p.air < 200) k = 'water';
       if (!k) return false;
       if (!this.say('help.' + k, vars, false)) return false;
-      h[k] = Date.now(); F.save(st);
+      h[k] = Date.now(); MEM.help[k] = true; F.save(st);
       return true;
     }
 
@@ -700,7 +712,7 @@ void main() {
     // a 🧭 hint of the game shown as Funke's line (Einfach, not muted, not building)
     relayHint(id, o) {
       const g = this.g, T0 = g.time || 0;
-      if (!this.on() || !this.einfach() || this.budget.muted(T0) || this.budget.quiet(T0) || this.busy() || this.inVehicle()) return false;
+      if (!this.on() || !this.einfach() || !this.present(T0) || this.budget.muted(T0) || this.budget.quiet(T0) || this.busy() || this.inVehicle()) return false;
       this.show(String((o && o.text) || ''), { hint: id, picto: o && o.picto, onDismiss: o && o.onDismiss });
       if (typeof document !== 'undefined') { const h = document.getElementById('hints'); if (h) h.classList.add('funke'); }
       return true;
@@ -884,7 +896,8 @@ void main() {
           for (const [k, d, s] of q) vtx(A, v++, P[k], P[k + 1], P[k + 2], 0.42, 0.93, 1, 1, d, ux, uy, uz, s);
         }
         // a pillar of light where the line reaches the target
-        if (this.wayEnd) { const k = (n - 1) * 3, d = D[n - 1]; const pts = [[0, -1], [0, 1], [7, 1], [0, -1], [7, 1], [7, -1]]; for (const [h, s] of pts) vtx(A, v++, P[k], P[k + 1] - 1.2 + h, P[k + 2], 0.42, 0.93, 1, h ? 0.15 : 1, d, 0, 1, 0, s); }
+        B.rib = v;
+        if (this.wayEnd) { const k = (n - 1) * 3, d = D[n - 1]; const pts = [[0, -1], [0, 1], [7, 1], [0, -1], [7, 1], [7, -1]]; for (const [h, s] of pts) vtx(A, v++, P[k], P[k + 1] - 1.2 + h, P[k + 2], 0.42, 0.93, 1, h ? 0 : 0.8, d, 0, 1, 0, s); }
         B.n = v; gl.bindBuffer(gl.ARRAY_BUFFER, B.vbo); gl.bufferSubData(gl.ARRAY_BUFFER, 0, A, 0, v * STRIDE); this.wayDirty = false;
       }
       const k = this.wayT, fade = Math.min(1, (F.WAY_T - k) / 0.3, k / 0.8), O = this.wayO, L = Math.max(4, this.wayLen || 1);
@@ -892,10 +905,12 @@ void main() {
       gl.uniform3f(p.u.u_offset, O[0] - cam.x, O[1] - cam.y, O[2] - cam.z); gl.uniform1f(p.u.u_scale, 1);
       gl.uniform4f(p.u.u_wave, (F.WAY_T - k) * 7, 2, 2.2, L + 0.01);
       // a faint x-ray pass (never lost behind a hill), the soft glow, the bright core
-      gl.disable(gl.DEPTH_TEST); gl.uniform1f(p.u.u_width, 0.05); gl.uniform4f(p.u.u_tint, 0.5, 0.8, 1, 0.16 * fade); gl.drawArrays(gl.TRIANGLES, 0, B.n);
+      gl.disable(gl.DEPTH_TEST); gl.uniform1f(p.u.u_width, 0.05); gl.uniform4f(p.u.u_tint, 0.5, 0.8, 1, 0.16 * fade); gl.drawArrays(gl.TRIANGLES, 0, B.rib);
       gl.enable(gl.DEPTH_TEST);
-      gl.uniform1f(p.u.u_width, 0.17); gl.uniform4f(p.u.u_tint, 0.45, 0.85, 1, 0.24 * fade); gl.drawArrays(gl.TRIANGLES, 0, B.n);
-      gl.uniform1f(p.u.u_width, 0.045); gl.uniform4f(p.u.u_tint, 1.25, 1.25, 1.25, 1.0 * fade); gl.drawArrays(gl.TRIANGLES, 0, B.n);
+      gl.uniform1f(p.u.u_width, 0.17); gl.uniform4f(p.u.u_tint, 0.45, 0.85, 1, 0.24 * fade); gl.drawArrays(gl.TRIANGLES, 0, B.rib);
+      gl.uniform1f(p.u.u_width, 0.045); gl.uniform4f(p.u.u_tint, 1.25, 1.25, 1.25, 1.0 * fade); gl.drawArrays(gl.TRIANGLES, 0, B.rib);
+      // the pillar of light where the line reaches its target (plain, a soft glow up from the ground)
+      if (B.n > B.rib) { gl.uniform4f(p.u.u_wave, 0, 0, 0, 0); gl.uniform1f(p.u.u_width, 0.35); gl.uniform4f(p.u.u_tint, 0.6, 0.95, 1, 0.5 * fade); gl.drawArrays(gl.TRIANGLES, B.rib, B.n - B.rib); }
       F.cost.draws += 3;
     }
     drawScan(gl, p, cam, T0) {

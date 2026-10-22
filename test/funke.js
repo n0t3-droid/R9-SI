@@ -249,6 +249,27 @@ check(!!F && typeof F.ask === 'function' && !!F.Budget && !!F.Lost && !!F.Actor,
   g.settings.funke = false; const n0 = lines.length; A.way({ pos: [0, 64, -50], name: 'Aus', kind: 'test' }, true); step(30, 1 / 30);
   check(!A.visible && lines.length === n0, 'switched off: no drone and no line');
   g.settings.funke = true; step(10, 1 / 30);
+  // nobody at the controls: no unprompted line (never talk to an empty room); a key → the greeting comes
+  {
+    const B = new F.Actor(g), heard = []; B.out = (s) => heard.push(s);
+    for (let i = 0; i < 600; i++) { g.time += 1 / 30; B.update(1 / 30); }
+    const quiet = heard.length;
+    g.input.keys = new Set(['KeyW']); g.time += 1 / 30; B.update(1 / 30); g.input.keys = new Set();
+    for (let i = 0; i < 90; i++) { g.time += 1 / 30; B.update(1 / 30); }
+    check(quiet === 0 && heard.length === 1, `nobody at the controls for 20 s: ${quiet} lines; after a key: ${heard.length} („${heard[0] || '—'}")`);
+    g.time += 100; for (let i = 0; i < 300; i++) { g.time += 1 / 30; B.update(1 / 30); }
+    check(heard.length === 1, 'over a minute after the last input it is quiet again (the 90-s wait is over: only the absence keeps it quiet)');
+  }
+  // the next wow, unprompted: a ship lands at the apron every one to three minutes — told, but not every one (a kind waits
+  // 10 minutes before it is news again)
+  {
+    const C = new F.Actor(g), heard = []; C.out = (s) => heard.push(s);
+    g.padLife = { on: true, clock: 0, pads: new Map([['apron', { key: 'apron', seed: 5, x: player.pos[0] + 30, z: player.pos[2] }]]) };
+    for (let i = 0; i < 1800; i++) { g.time += 0.5; g.padLife.clock += 0.5; C.inputT = g.time; C.update(0.5); }
+    const ships = heard.filter(s => /Schiff/.test(s));
+    check(ships.length >= 1 && ships.length <= 2, `15 minutes by the apron: ${ships.length} landing(s) told („${ships[0] || '—'}"), of ${Math.round(900 / 120)} or so`);
+    g.padLife = null;
+  }
   // the cost of a frame (CPU): the update over 20 000 frames walking about
   const t0 = process.cpuUsage(); const N = 20000;
   for (let i = 0; i < N; i++) { player.pos[0] = 0.5 + Math.sin(i / 300) * 20; player.pos[2] = 0.5 + Math.cos(i / 370) * 20; player.yaw = i / 500; g.time += 1 / 60; g.frame++; g.cam.x = player.pos[0]; g.cam.z = player.pos[2]; A.update(1 / 60); }
