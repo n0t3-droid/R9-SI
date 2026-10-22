@@ -232,7 +232,7 @@
         const accel = this.onGround ? 14 : 3.2;
         const a = 1 - Math.exp(-dt * accel);
         v[0] += (wx * sp - v[0]) * a; v[2] += (wz * sp - v[2]) * a;
-        v[1] -= 30 * dt;
+        v[1] -= (this.grav || (this.grav = VR.DimReg.gravity(this.game.dim))) * dt;   // u-dims: 30 × g / 9.81 of this world (VR.DimReg; 30 at home)
         if (v[1] < -78) v[1] = -78;
         this.jumpCooldown -= dt;
         // auto-jump: walking into a one-block step lifts you over it (F5), a wall never does

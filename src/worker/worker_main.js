@@ -138,12 +138,12 @@
         const col = g.generate(m.cx, m.cz);
         // the world's own style: its rules on everything generated, its water colour
         if (STYLE_ON(m.dim)) { VR.WorldStyle.applyGen(col.blocks, STYLE_MAP); if (STYLE.water) VR.WorldStyle.applyWater(col.tints.water, STYLE.water); }
-        const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
+        const sky = VR.DimReg.sky(m.dim);   // u-dims: the dim registry's sky (src/shared/dimreg.js)
         const light = VR.computeColumnLight(col.blocks, sky);
         post({ type: 'gen', id: m.id, dim: m.dim, cx: m.cx, cz: m.cz, blocks: col.blocks, light, biome: col.biome, caveBiome: col.caveBiome, grass: col.tints.grass, foliage: col.tints.foliage, water: col.tints.water, chests: col.chests, spawns: col.spawns || [], sv: STYLE_ON(m.dim) ? STYLE.sv : 0, ms: performance.now() - t0 + (m.planMs || 0) },
           [col.blocks.buffer, light.buffer, col.tints.grass.buffer, col.tints.foliage.buffer, col.tints.water.buffer]);
       } else if (m.type === 'relight') {
-        const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
+        const sky = VR.DimReg.sky(m.dim);   // u-dims: the dim registry's sky (src/shared/dimreg.js)
         const g = getGen(m.dim);
         let tints = null, biome = null, caveBiome = null;
         // a saved column made under other rules: what the generator put there (and the player left alone) takes the
@@ -187,7 +187,7 @@
         r.type = r.error ? 'error' : 'folkmesh'; r.id = m.id; if (r.error) r.msg = r.error;
         post(r, tr);
       } else if (m.type === 'lightonly') {
-        const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
+        const sky = VR.DimReg.sky(m.dim);   // u-dims: the dim registry's sky (src/shared/dimreg.js)
         const light = VR.computeColumnLight(m.blocks, sky);
         post({ type: 'lightonly', id: m.id, light }, [light.buffer]);
       } else if (m.type === 'shipmesh') {
