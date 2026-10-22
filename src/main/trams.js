@@ -122,7 +122,7 @@
     poll(dt) {
       const g = this.g, p = g.player;
       this.pollT -= dt;
-      if (this.pollT > 0 || this.busy || !p || g.dim !== 'overworld') return;
+      if (this.pollT > 0 || this.busy || !p || !VR.DimReg.actorsHome(g.dim)) return;   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
       this.pollT = 4;
       if (this.pollAt && Math.hypot(p.pos[0] - this.pollAt[0], p.pos[2] - this.pollAt[1]) < 160) return;
       this.busy = true;

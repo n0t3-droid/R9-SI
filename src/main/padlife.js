@@ -353,7 +353,7 @@
     update(dt) {
       const g = this.g, S = g.settings || {}, pl = g.player;
       this.clock += dt;
-      this.on = S.padLife !== false && g.dim === 'overworld' && g.state === 'play';
+      this.on = S.padLife !== false && VR.DimReg.actorsHome(g.dim) && g.state === 'play';   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
       this.tier = PL.tierOf(S);
       const st = this.st; st.pads = this.pads.size; st.crafts = 0; st.parked = 0; st.crew = 0; st.drones = 0; st.visible = 0;
       if (!this.on || !pl || !g.starships) { for (const p of this.pads.values()) { p.live = null; p.ground = null; } return; }

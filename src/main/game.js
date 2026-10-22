@@ -521,6 +521,7 @@
       this.difficulty = meta.difficulty;
       this.keepInventory = meta.keep;
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
+      if (VR.Bodies) genOpts.bgen = VR.Bodies.bgenOf(VR.Bodies.stamp(meta));   // u-moons1: the moons' generator version in the save (old worlds keep their moons)
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
       this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null, keep: !!(VR.Travel && VR.Travel.busy(this)) });   // (townWords: the shop signs' words in the player's language, voxtown.js) (u-dims · keep: a trip keeps the workers' generators warm)
       // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
@@ -1268,6 +1269,7 @@
       const inLava = !!(R.T.flags[headState] & F.LAVA);
       const E = this.envFor(eye, dt, { underwater: underwater || inLava, waterColor: inLava ? [0.9, 0.3, 0.05] : waterColor, freezeTime: this.zenFreezeTime && p.mode !== 'survival', freezeWeather: this.zenFreezeWeather && p.mode !== 'survival' });
       this.skyBright = Math.max(0.12, Math.min(1, E.ambSky[1] * 1.6));
+      if (VR.BodyLife) VR.BodyLife.update(this, dt, eye, E);   // u-moons1: the moons' life — geysers, dust in vacuum arcs, impacts, the suit's sound, the codex finds (bodylife.js; returns at once elsewhere)
       if (this.wonders) this.wonders.update(dt, E);   // ✨ sites, the rise, discovery, the Wunderkompass
       if (this.airLife) this.airLife.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles });   // the living air is spawned before the particles move (F3)
       if (this.motionAir) this.motionAir.update(dt, { w, eye, E, underwater: underwater || inLava, particles: this.particles, drama: !!this.settings.wxDrama });   // (t-motion)

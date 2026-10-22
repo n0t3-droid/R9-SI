@@ -286,7 +286,7 @@
     }
     want() {
       const g = this.g, pl = g.player;
-      if (g.state !== 'play' || (g.dim && g.dim !== 'overworld') || !pl || !g.starships) return false;
+      if (g.state !== 'play' || !VR.DimReg.actorsHome(g.dim || 'overworld') || !pl || !g.starships) return false;   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
       if (g.settings && g.settings.anim === false) return false;
       const d = Math.hypot(pl.pos[0] - AX, pl.pos[2] - MOUTH);
       return this.active ? d < HF.OFF : d < HF.ON;

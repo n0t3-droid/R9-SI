@@ -57,4 +57,7 @@
   DimReg.add('underforge', { sky: false, code: 1, g: G_HOME, ceiling: true, travel: true, gen: (seed) => new VR.UnderforgeGen(seed), name: ['g.dim.underforge', 'Unterschmiede', 'Underforge'], veil: ['#ffe0b0', '#ff8a3a', '#3a0d06'] });
   DimReg.add('hollow', { sky: false, code: 2, g: G_HOME, travel: true, gen: (seed) => new VR.HollowGen(seed), name: ['g.dim.hollow', 'Hohlwelt', 'The Hollow'], veil: ['#efe4ff', '#9a7ae0', '#120a24'] });
   DimReg.add('drift', { sky: true, code: 3, g: G_HOME, travel: true, gen: (seed, opts) => new VR.DriftGen(seed, opts), name: ['g.dim.drift', 'Driftinseln', 'Drift Isles'], veil: ['#f2feff', '#9ee6ff', '#173a66'] });
+  // u-moons1: the first bodies one can stand on (src/shared/bodies.js, gen_body.js) — airless (u_dim 5), their own g, no village life
+  DimReg.add('basalt', { sky: true, code: 5, g: 1.62, travel: true, mp: 'convoy', body: 'basalt', gen: (seed, opts) => new VR.BodyGen(seed, 'basalt', opts), name: ['g.dim.basalt', 'Basalt', 'Basalt'], veil: ['#f1efe9', '#9b9892', '#0c0c11'] });
+  DimReg.add('opal', { sky: true, code: 5, g: 0.49, travel: true, mp: 'convoy', body: 'opal', gen: (seed, opts) => new VR.BodyGen(seed, 'opal', opts), name: ['g.dim.opal', 'Opal', 'Opal'], veil: ['#ffffff', '#cfe4f6', '#0f1a2e'] });
 })(VR);

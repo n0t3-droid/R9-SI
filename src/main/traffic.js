@@ -87,7 +87,7 @@
     update(dt) {
       const g = this.g, fp = this.focus();
       this.time += dt;
-      if (!fp || (g.state === 'play' && g.dim !== 'overworld')) return;
+      if (!fp || (g.state === 'play' && !VR.DimReg.actorsHome(g.dim))) return;   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
       this.t -= dt;
       const maxShips = this.maxN();
       // the flights kept in the air: when fewer than keepN are on their way in or overhead, the next one sets off

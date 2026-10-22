@@ -51,7 +51,7 @@
   function climateOf(b, dim) {
     if (dim === 'underforge' || dim === 'hollow') return 'none';
     if (!b) return 'temperate';
-    if (b.cave || b.forge || b.hollow) return 'none';
+    if (b.cave || b.forge || b.hollow || b.moon) return 'none';   // u-moons1: (b.moon: no air, no weather)
     if (b.precip === 'snow' || b.temp < 0.15) return 'cold';
     if (b.precip === 'none' || b.down <= 0) return 'dry';
     return b.down >= 0.75 ? 'wet' : 'temperate';

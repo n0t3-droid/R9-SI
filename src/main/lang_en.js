@@ -2379,5 +2379,23 @@
     'g.set.spaceDetail': 'Space detail',
     'g.set.spaceDetail.tip': 'How fine planets, moons, the ring and the stars are in the space view: texture size, fine clouds, star fields. Follows the preset.',
     'g.set.spaceDetailV': ['Very low', 'Low', 'Medium', 'High'],
+    // u-moons1 · the moons Basalt and Opal (src/shared/bodies.js, gen_body.js, src/main/bodysky.js, bodylife.js)
+    'g.dim.basalt': 'Basalt',
+    'g.dim.opal': 'Opal',
+    'g.biome.basalt_mare': 'Mare', 'g.biome.basalt_highlands': 'Highlands', 'g.biome.basalt_crater': 'Young Crater',
+    'g.biome.opal_plains': 'Ice Plains', 'g.biome.opal_lineae': 'Lineae', 'g.biome.opal_chaos': 'Chaos Terrain', 'g.biome.opal_stripes': 'Tiger Stripes',
+    'g.codex.cat.moons': 'Moons',
+    'g.codex.biomeHintMoon': 'On a moon of Amarant – with cheats: /dim basalt or /dim opal',
+    'g.moon.hello': 'Welcome to {name}',
+    'g.moon.hello.basalt': 'A sixth of the gravity: a jump carries you 8 m high. No air – only your breath in the suit.',
+    'g.moon.hello.opal': 'A twentieth of the gravity: a jump carries you 27 m high. In the south the geysers erupt.',
+    'g.codex.moon.basalt': ['Basalt', 'A moon of rock without air: dark lava plains, the maria, bright old highlands and craters of every size. The gravity is a sixth of Heartworld\'s, a day lasts an hour.', 'Travel with /dim basalt (cheats on) – soon by shuttle.'],
+    'g.codex.moon.opal': ['Opal', 'An ice moon brighter than fresh snow. Red-brown streaks run across the ice, and four tiger stripes split open, where geysers shoot ice into space. Amarant always stands in the same place in the south. On real ice moons such stripes lie at the south pole.', 'Travel with /dim opal (cheats on) – soon by shuttle.'],
+    'g.codex.moon.amarantrise': ['Amarant rises', 'On Basalt the gas giant rises and sets every three to four hours – almost fifty times as wide as Helia, its ring seen almost exactly edge-on.', 'Wait on Basalt until Amarant climbs over the horizon.'],
+    'g.codex.moon.crater': ['A great crater', 'Great craters have a flat floor, a central peak and terraces on the wall: the ground springs back after the impact. The crater by the landing stands for one 23 kilometres across.', 'Stand in a great crater on Basalt.'],
+    'g.codex.moon.impact': ['An impact', 'Without air nothing burns up: a rock strikes at full speed – a flash, then the dust flies in long arcs. In the game it happens more often than in reality.', 'Keep your eyes open on Basalt.'],
+    'g.codex.moon.geyser': ['A geyser', 'Ice shoots two to three kilometres high out of the tiger stripes. It falls back as snow, some of it flies into space. Against the light the column glows brightest.', 'Stand near a vent on Opal when it erupts.'],
+    'g.codex.moon.eclipse': ['Eclipse', 'Seen from Opal, Amarant slides in front of the sun every day: night falls in the middle of the day, Amarant\'s edge glows as a thin ring, and the ring shines against the light.', 'Watch Helia disappear behind Amarant on Opal.'],
+    'g.codex.moon.jump': ['The big jump', 'On Opal a jump carries you higher than a house. Without air nothing slows you: even the dust flies in clean arcs and hangs for a long time.', 'Jump 20 metres high on Opal.'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

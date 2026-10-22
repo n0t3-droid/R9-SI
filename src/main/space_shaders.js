@@ -526,6 +526,268 @@ void main() {
   o = vec4(col, 0.0);
 }`;
 
+  // ================================================================ u-moons1 · the sky over an airless body
+  // shaders.js takes two pieces into its COMMON (two marked lines; this file loads before it — build.js): bodySkyPre()
+  // before its skyColor renames that one skyColorHome, bodySky() after it brings the uniforms, the functions and a new
+  // skyColor that draws a body's sky when u_dim is 5 — all of it inside #ifdef BODYSKY, a define only the sky program
+  // gets and only while a body's sky is shown (bodysky.js: the define hook, the programs rebuilt on the trip). So every
+  // program of Herzwelt, Very Low's included, is the text it was (test/vl_programs.js compares them preprocessed).
+  // In the local frame (x map east, y up, z map south): black by day and by night; the stars (they stand in the sky's own
+  // frame while the moon turns: u_bsInert) and the galaxy's band, dimmed by the eye's adaptation; Helia's small disc and
+  // its glare; the other worlds as lit discs; Amarant at its true size and phase — the oblate ellipsoid, bodytex.js's
+  // zones and belts with their wander, streaks and the great storm, the zonal flow, limb darkening, the ring's shadow, a
+  // hazy limb that lights up against Helia (the eclipse) — and the ring (τ(r) as bodytex.js's, the lit or unlit face,
+  // the planet's shadow, glowing backlit); the geysers' plumes as columns of ice that scatter forward; the far ground
+  // below the true horizon (its dip from the eye's height and the moon's radius) where the world's columns end.
+  const lin = (c) => c.map(v => Math.pow(v / 255, 2.2));
+  const f3 = (a) => a.map(v => (+v).toFixed(5)).join(', ');
+  const nrm = (a) => { const l = Math.hypot(a[0], a[1], a[2]); return a.map(v => v / l); };
+  // bodytex.js's palette (Amarant's zones and belts north → south, the ring's particles), here in linear light
+  const ZONE = [238, 226, 204], ZONE2 = [232, 210, 200], ZONE3 = [244, 236, 220], BELT = [172, 132, 200], BELT2 = [148, 108, 184], BELT3 = [196, 156, 182], BELT4 = [126, 98, 170], POLE = [122, 118, 166];
+  const BANDS = [[66, POLE], [58, BELT4], [51, ZONE2], [45, BELT3], [38, ZONE], [32, BELT], [24, ZONE2], [9, BELT2], [-7, ZONE3], [-20, BELT], [-27, ZONE], [-33, BELT2], [-40, ZONE2], [-46, BELT3], [-53, ZONE], [-61, BELT4], [-90, POLE]];
+  const GN = nrm([0.42, 0.5, -0.76]), gc0 = [0.8, -0.35, 0.2], gd = gc0[0] * GN[0] + gc0[1] * GN[1] + gc0[2] * GN[2], GC = nrm([gc0[0] - GN[0] * gd, gc0[1] - GN[1] * gd, gc0[2] - GN[2] * gd]);   // (spacescene.js's galaxy)
+  const BODY_SKY = `
+#ifdef BODYSKY
+#undef skyColor
+// ---- u-moons1 · the sky over an airless body (space_shaders.js SH.bodySky; the uniforms from bodysky.js)
+uniform vec4 u_bsSun;      // Helia: unit direction, angular radius (rad)
+uniform vec4 u_bsSunK;     // x the disc's radiance, y the glare (the free part of the disc above the horizon), z the stars (the eye's adaptation), w tier (0 Very Low … 3 High)
+uniform vec3 u_bsSunCol;   // Helia's light (linear)
+uniform mat3 u_bsInert;    // local → the sky's own frame (the stars and the galaxy stand in it while the moon turns)
+uniform vec4 u_bsPar;      // Amarant: unit direction to its centre, its distance in equatorial radii
+uniform vec4 u_bsPole;     // its pole — the ring's normal (unit), w: polar over equatorial radius
+uniform vec4 u_bsParX;     // its prime meridian (unit, across the pole), w: the bands' flow time (s)
+uniform vec4 u_bsParK;     // x the cosine of the ring's reach from its centre, y the ring's shadow on it (0 | 1), z its night side's glow, w Helia's angular radius there
+uniform vec4 u_bsB[5];     // the other worlds: unit direction, angular radius (0: none)
+uniform vec4 u_bsBc[5];    // their colour in Helia's light (linear), w: their air's limb
+uniform vec4 u_bsGround;   // the far ground: its colour (linear, lit), w: the horizon's dip (the sine of its angle, ≥ 0)
+uniform vec4 u_bsJ[4];     // the plumes: the vent from the eye (blocks), w: the column's top over it now (0: none)
+uniform vec4 u_bsJs;       // their strengths (1 while the vent fires, fading as the ice falls back)
+uniform vec4 u_bsJk;       // x the plumes' brightness, y the horizon's distance (blocks), z the moon's radius (blocks), w the eye over the ground
+uniform vec2 u_bsLum;      // x Amarant's and its ring's brightness, y the other worlds' — the eye's exposure undone for them, so they read
+                           //   the same by day and by night (the bands stay bands; a stated licence: an eye adapted to the dark ground would see a white disc)
+const float BS_D2R = 0.0174532925;
+const vec4 BS_BANDS[17] = vec4[17](${BANDS.map(([e, c]) => `vec4(${(+e).toFixed(1)}, ${f3(lin(c))})`).join(', ')});
+const vec3 BS_GN = vec3(${f3(GN)}), BS_GC = vec3(${f3(GC)});
+// the stars: two grids of cells (the clear ones, the faint dust — Very Low the first), one star in a lucky cell, put on the
+// sphere; N(> b) ∝ b^−1.5; no air, so they burn steady
+vec3 bsStars(vec3 D) {
+  vec3 col = vec3(0.0);
+  for (int k = 0; k < 2; k++) {
+    if (k == 1 && u_bsSunK.w < 0.5) break;
+    float N = k == 0 ? 230.0 : 520.0, dens = k == 0 ? 0.0085 : 0.011;
+    vec3 sp = D * N, g = floor(sp);
+    float s = hash13(g + float(k) * 71.3);
+    if (s < 1.0 - dens) continue;
+    vec3 c = normalize(g + 0.5 + (vec3(hash13(g + 1.7), hash13(g + 2.3), hash13(g + 3.1)) - 0.5) * 0.7) * N;
+    float r2 = dot(sp - c, sp - c);
+    float b = min(0.035 * pow(max((1.0 - s) / dens, 0.002), -0.6667), 4.0) * (k == 0 ? 1.0 : 0.4);
+    float t = hash13(g + 9.0);
+    vec3 tint = t < 0.12 ? vec3(1.0, 0.68, 0.42) : t < 0.36 ? vec3(1.0, 0.88, 0.74) : t < 0.8 ? vec3(0.96, 0.96, 1.0) : vec3(0.74, 0.8, 1.0);
+    col += tint * b * exp(-r2 * 7.0);
+  }
+  return col;
+}
+// the galaxy's band: a great circle, star clouds, a dust rift toward the warm core (spacescene.js BG_FS, cheaper)
+vec3 bsGalaxy(vec3 D) {
+  float b = dot(D, BS_GN), wide = exp(-b * b / 0.05);
+  if (wide < 0.01) return vec3(0.0);
+  float along = dot(normalize(D - BS_GN * b), BS_GC), core = exp(-(1.0 - along) * 3.0);
+  float thin = exp(-b * b / (0.0045 + 0.012 * core));
+  float n1 = vnoise3(D * 7.0), n2 = u_bsSunK.w > 0.5 ? vnoise3(D * 19.0 + 4.0) : 0.5;
+  float clouds = 0.45 + 0.9 * n1 * n1 + 0.35 * n2;
+  float rift = 1.0 - 0.75 * exp(-b * b / 0.0009) * smoothstep(0.2, 0.9, along) * smoothstep(0.35, 0.7, n2 + 0.2);
+  return mix(vec3(0.72, 0.78, 1.0), vec3(1.0, 0.84, 0.66), core) * (thin * clouds * (0.55 + 1.6 * core) + wide * 0.18) * rift * 0.03;
+}
+// Helia's disc, limb-darkened (the worlds in front cover it) and its glare (over everything: the eye's own)
+vec3 bsSunDisc(vec3 D) {
+  if (dot(D, u_bsSun.xyz) < 0.999) return vec3(0.0);
+  float q = length(cross(D, u_bsSun.xyz)) / u_bsSun.w;
+  if (q >= 1.25) return vec3(0.0);
+  return u_bsSunCol * u_bsSunK.x * (0.42 + 0.58 * sqrt(max(0.0, 1.0 - q * q))) * (1.0 - smoothstep(0.92, 1.25, q));
+}
+vec3 bsGlare(vec3 D) {
+  if (u_bsSunK.y <= 0.0 || dot(D, u_bsSun.xyz) <= 0.0) return vec3(0.0);
+  float a = length(cross(D, u_bsSun.xyz)), fade = 1.0 - smoothstep(0.2, 0.43, a), z = a / (u_bsSun.w * 1.6);
+  float core = fade / (1.0 + z * z);
+  float halo = (0.08 * exp(-a / 0.03) + 0.008 * exp(-a / 0.12) + 0.0015 * exp(-a / 0.45)) * fade;   // (no air: only the eye's own scatter)
+  return u_bsSunCol * u_bsSunK.y * (core * 0.5 + halo);
+}
+// the other worlds: small spheres lit by Helia (the parallax of the light is nothing at these distances), a thin limb
+// where they have air
+vec3 bsBodies(vec3 D, vec3 col, float px) {
+  for (int k = 0; k < 5; k++) {
+    vec4 B = u_bsB[k];
+    if (B.w <= 0.0) continue;
+    float c = dot(D, B.xyz);
+    if (c <= 0.0) continue;
+    float q = length(cross(D, B.xyz)) / B.w;
+    if (q > 1.08) continue;
+    vec3 o = (D - B.xyz * c) / B.w;
+    float qq = min(q, 1.0);
+    vec3 N = o - B.xyz * sqrt(max(0.0, 1.0 - qq * qq));
+    vec3 bc = u_bsBc[k].rgb * (max(dot(N, u_bsSun.xyz), 0.0) + 0.003) * u_bsLum.y;
+    col = mix(col, bc, 1.0 - smoothstep(1.0 - 1.5 * px / B.w, 1.0, q));
+    if (u_bsBc[k].w > 0.0) col += vec3(0.35, 0.55, 1.0) * u_bsSunCol * u_bsBc[k].w * 0.06 * exp(-abs(q - 1.0) / 0.025) * smoothstep(-0.2, 0.4, dot(o, u_bsSun.xyz) / max(q, 1e-3));
+  }
+  return col;
+}
+// the ring's optical depth normal to its plane and its particles' colour, r in Amarant's equatorial radii (bodytex.js)
+float bsRingTau(float r) {
+  if (r < 1.24 || r > 2.27) return 0.0;
+  if (r < 1.53) {
+    float pl = smoothstep(1.355, 1.36, r) * (1.0 - smoothstep(1.38, 1.385, r)) + smoothstep(1.41, 1.415, r) * (1.0 - smoothstep(1.432, 1.437, r)) + smoothstep(1.465, 1.47, r) * (1.0 - smoothstep(1.485, 1.49, r));
+    return 0.07 + 0.05 * smoothstep(1.24, 1.5, r) + 0.2 * pl + 0.15 * smoothstep(1.5, 1.53, r);
+  }
+  if (r < 1.95) return 0.75 + 0.55 * smoothstep(1.53, 1.62, r) + 0.75 * smoothstep(1.6, 1.68, r) * (1.0 - smoothstep(1.84, 1.9, r)) + 0.25 * sin(r * 61.0) * smoothstep(1.6, 1.66, r) * (1.0 - smoothstep(1.86, 1.9, r));
+  if (r < 2.028) { float g = (r - 1.99) / 0.006; return 0.04 + 0.06 * exp(-g * g); }
+  if (abs(r - 2.214) < 0.00265) return 0.0;
+  return 0.95 - 0.4 * smoothstep(2.03, 2.26, r) + 0.06 * sin(r * 140.0) * (1.0 - smoothstep(2.2, 2.26, r));
+}
+vec3 bsRingCol(float r) {
+  if (r < 1.53) return mix(vec3(${f3(lin([150, 138, 128]))}), vec3(${f3(lin([238, 226, 206]))}), smoothstep(1.48, 1.56, r));
+  if (r < 1.95) return vec3(${f3(lin([238, 226, 206]))});
+  if (r < 2.028) return vec3(${f3(lin([118, 110, 104]))});
+  return vec3(${f3(lin([222, 212, 196]))});
+}
+// Amarant's zones and belts by latitude (degrees), soft edges 1.1° each side (bodytex.js bandAt)
+vec3 bsBand(float lat) {
+  float prevEdge = 90.0;
+  for (int i = 0; i < 17; i++) {
+    vec4 e = BS_BANDS[i];
+    if (lat >= e.x || i == 16) {
+      vec3 c = e.yzw;
+      if (i > 0) c = mix(c, BS_BANDS[max(i - 1, 0)].yzw, smoothstep(prevEdge - 1.1, prevEdge + 1.1, lat) * 0.5);
+      if (i < 16) c = mix(c, BS_BANDS[min(i + 1, 16)].yzw, (1.0 - smoothstep(e.x - 1.1, e.x + 1.1, lat)) * 0.5);
+      return c;
+    }
+    prevEdge = e.x;
+  }
+  return BS_BANDS[16].yzw;
+}
+// Amarant and its ring over what is behind them: the ray in the giant's frame (equatorial radii) against the ellipsoid
+// (stretched along the pole into the unit sphere) and the ring's plane, the nearer in front
+vec3 bsAmarant(vec3 D, vec3 col, float px) {
+  vec3 C = u_bsPar.xyz;
+  if (dot(D, C) < u_bsParK.x) return col;
+  vec3 P = u_bsPole.xyz, L = u_bsSun.xyz;
+  float f = u_bsPole.w, k1 = 1.0 / f - 1.0, dist = u_bsPar.w;
+  vec3 O = -C * dist;
+  vec3 Os = O + P * (dot(O, P) * k1), Ds = D + P * (dot(D, P) * k1);
+  float a = dot(Ds, Ds), b = dot(Os, Ds), c = dot(Os, Os) - 1.0, h = b * b - a * c;
+  float rc = sqrt(max(c + 1.0 - b * b / a, 0.0));                    // the ray's closest approach (stretched radii)
+  float cover = b < 0.0 ? clamp(0.5 - (rc - 1.0) / (dist * px * 1.2), 0.0, 1.0) : 0.0;   // the limb's pixel coverage (in front of the eye only)
+  float tP = cover > 0.0 ? (-b - sqrt(max(h, 0.0))) / a : -1.0;
+  float dp = dot(D, P), tR = abs(dp) > 1e-7 ? -dot(O, P) / dp : -1.0;
+  vec3 X = O + D * tR;
+  float rR = length(X);
+  bool ring = tR > 0.0 && rR > 1.24 && rR < 2.27;
+  float lp = dot(L, P);
+  if (tP > 0.0) {
+    vec3 Ph = O + D * tP;
+    vec3 N = normalize(Ph + P * (dot(Ph, P) * (1.0 / (f * f) - 1.0)));
+    float sl = clamp(dot(N, P), -1.0, 1.0), lat = asin(sl) / BS_D2R, cphi = sqrt(max(0.0, 1.0 - sl * sl));
+    vec3 E1 = u_bsParX.xyz, E2 = cross(P, E1);
+    float band = clamp(2.6 * sin(lat * BS_D2R * 9.3 + 0.35), -1.0, 1.0);
+    float lam = atan(dot(N, E2), dot(N, E1)) + u_bsParX.w * 2.2e-5 * band;   // (the zonal flow: every band its own speed)
+    vec3 q3 = vec3(cphi * cos(lam), sl, cphi * sin(lam));
+    float turb = (vnoise3(vec3(q3.x * 2.6, q3.y * 26.0, q3.z * 2.6)) - 0.5) * 3.0;
+    if (u_bsSunK.w > 0.5) turb += (vnoise3(vec3(q3.x * 7.0, q3.y * 70.0, q3.z * 7.0) + 5.0) - 0.5) * 1.2;
+    vec3 alb = bsBand(lat + turb);
+    alb *= 1.0 + (vnoise3(vec3(q3.x * 5.0 + 11.0, q3.y * 90.0, q3.z * 5.0)) - 0.5) * (alb.b > alb.g + 0.08 ? 0.22 : 0.11);
+    // the great storm (−23.5°, λ 1.1, 7.5° × 4.2° half-sizes): a teal eye in a pale collar, a darker ring round it
+    float dl = (mod(lam - 1.1 + 3.14159265, 6.2831853) - 3.14159265) / BS_D2R * cphi, dq = lat + 23.5;
+    float sq = sqrt(dl * dl / 56.25 + dq * dq / 17.64);
+    if (sq < 1.35) {
+      alb = mix(alb, vec3(${f3(lin([112, 92, 156]))}), (1.0 - smoothstep(1.05, 1.35, sq)) * 0.55);
+      alb = mix(alb, vec3(${f3(lin([228, 238, 236]))}), 1.0 - smoothstep(0.8, 1.08, sq));
+      alb = mix(alb, vec3(${f3(lin([64, 178, 186]))}), 1.0 - smoothstep(0.25, 0.78, sq));
+    }
+    // the light: limb darkening (Minnaert 1.05), a soft terminator in the deep haze; the ring's shadow across the bands
+    float mus = dot(N, L), muv = max(dot(N, -D), 0.0);
+    float lit = pow(max(mus, 0.0), 1.05) * pow(max(muv, 0.02), 0.05) * smoothstep(-0.04, 0.04, mus) + 0.012 * smoothstep(-0.2, 0.02, mus) * (1.0 - smoothstep(0.02, 0.1, mus));
+    float tr = 1.0;
+    if (u_bsParK.y > 0.5 && abs(lp) > 1e-4) { float tl = -dot(Ph, P) / lp; if (tl > 0.0) tr = exp(-bsRingTau(length(Ph + L * tl)) / abs(lp)); }
+    vec3 pc = alb * u_bsSunCol * lit * tr + vec3(0.08, 0.08, 0.16) * u_bsSunCol * pow(1.0 - muv, 3.0) * smoothstep(-0.1, 0.3, mus) * tr;
+    pc += alb * u_bsParK.z * (1.0 - smoothstep(-0.1, 0.1, mus));   // the night side in the ring's light
+    col = mix(col, pc * u_bsLum.x, cover);
+  }
+  if (rc > 1.0 && rc < 1.04) {
+    // over the limb: the haze above the cloud tops on Helia's side; against the light a thin bright rim (the eclipse)
+    vec3 Pc = Os - Ds * (b / a), Nc = normalize(Pc + P * (dot(Pc, P) * (f - 1.0)));
+    float hh = rc - 1.0, side = smoothstep(-0.15, 0.3, dot(Nc, L));
+    float fwd = exp(-(1.0 - dot(D, L)) * 12.0);
+    col += vec3(0.55, 0.52, 0.75) * u_bsSunCol * (exp(-hh / 0.006) * side * 0.25 + exp(-hh / 0.0035) * fwd * 2.5) * (1.0 - cover) * u_bsLum.x;
+  }
+  if (ring && (tP <= 0.0 || tR < tP)) {
+    float tau = bsRingTau(rR);
+    if (u_bsSunK.w > 1.5) tau *= 1.0 + (hash13(vec3(floor(rR * 6000.0), 1.0, 3.0)) - 0.5) * 0.25;   // (the finest ringlets)
+    vec3 alb = bsRingCol(rR);
+    float muv = max(abs(dp), 0.004), mu0 = max(abs(lp), 0.004);
+    vec3 Ls = normalize(L + P * (lp * k1));
+    float tc = -dot(X, Ls), sh = 1.0;
+    if (tc > 0.0) { float dm = length(X + Ls * tc), w = max(1e-4, u_bsParK.w * tc); sh = smoothstep(1.0 - w, 1.0 + w, dm); }
+    float cph = dot(L, -D), opp = 1.0 + 0.9 * exp(-(1.0 - cph) * 18.0);
+    float dusty = 1.0 - smoothstep(0.3, 0.9, tau), fwd = 1.0 + dusty * 3.0 * exp(-(1.0 + cph) * 6.0);
+    vec3 I;
+    if (dot(O, P) * lp > 0.0) I = alb * 0.75 * (mu0 / (mu0 + muv)) * (1.0 - exp(-tau * (1.0 / mu0 + 1.0 / muv))) * opp;
+    else { float e0 = exp(-tau / mu0), ev = exp(-tau / muv); float trn = abs(mu0 - muv) < 1e-3 ? (tau / mu0) * e0 : mu0 / (mu0 - muv) * (e0 - ev); I = alb * 0.75 * trn * fwd; }
+    I = I * u_bsSunCol * sh + alb * u_bsSunCol * 0.012 * (1.0 - exp(-tau));   // (+ Amarant's own light on it)
+    float al = 1.0 - exp(-tau / muv);
+    col = col * (1.0 - al) + I * u_bsLum.x;
+  }
+  return col;
+}
+// the geysers' plumes: jets of ice over their vents, narrow at the vent and spreading as they rise (±2.6°); the way of
+// the view through each (its closest approach to the column's axis). The ice thins as it spreads, so a jet is brightest
+// at its foot and fades upward into a faint veil (run 1's columns, as bright at the top as wide, read as searchlights);
+// the stripe's many small jets side by side as filaments (High: a noise across the column); bright against Helia (ice
+// scatters forward), lit where Helia stands over the horizon at the jet's height (the tops keep the light after the
+// ground's sunset) and dark while Amarant hides Helia (u_bsJk.x carries the free part of Helia's disc)
+vec3 bsPlumes(vec3 D, vec3 col) {
+  float pl = 0.0;
+  for (int j = 0; j < 4; j++) {
+    vec4 J = u_bsJ[j];
+    float js = j == 0 ? u_bsJs.x : j == 1 ? u_bsJs.y : j == 2 ? u_bsJs.z : u_bsJs.w;
+    if (J.w <= 0.0 || js <= 0.0) continue;
+    vec3 V = J.xyz;
+    float den = max(1.0 - D.y * D.y, 1e-4), dv = dot(D, V);
+    float s = (dv - D.y * V.y) / den, hh = (D.y * dv - V.y) / den;
+    if (s <= 0.0 || hh < 0.0 || hh > J.w * 1.08) continue;
+    if (D.y < -u_bsGround.w && s > u_bsJk.y) continue;      // (behind the curve of the ground)
+    vec3 q = D * s - V - vec3(0.0, hh, 0.0);
+    float w = 2.5 + hh * 0.035, r2 = dot(q, q) / (w * w);
+    if (r2 > 6.0) continue;
+    float fil = 1.0;
+    if (u_bsSunK.w > 0.5) { float lat = (q.z * D.x - q.x * D.z) / (w * sqrt(den)) + 0.35 * sin(hh * 0.004 + float(j) * 2.1); fil = 0.1 + 1.8 * vnoise3(vec3(lat * 2.4 + float(j) * 13.0, hh * 0.006, float(j) * 3.7)); }
+    float fall = (exp(-hh / 320.0) + 0.08 * exp(-hh / (0.5 * J.w))) * (1.0 - smoothstep(0.78 * J.w, 1.08 * J.w, hh));
+    float lit = smoothstep(-0.003, 0.003, u_bsSun.y + sqrt(2.0 * max(hh + V.y + u_bsJk.w, 0.0) / u_bsJk.z));
+    pl += exp(-r2) * fil * fall * 0.45 * lit * js;
+  }
+  if (pl <= 0.0) return col;
+  float ph = 0.25 + 2.2 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 5.0);
+  return col + vec3(0.86, 0.93, 1.0) * u_bsSunCol * ph * pl * u_bsJk.x;
+}
+vec3 bodySky(vec3 dir, bool withSun) {
+  vec3 D = normalize(dir);
+  float px = max(length(fwidth(D)), 1e-5);
+  vec3 F = u_bsInert * D;
+  vec3 col = (bsStars(F) + bsGalaxy(F)) * u_bsSunK.z;
+  if (withSun) col += bsSunDisc(D);
+  col = bsBodies(D, col, px);
+  col = bsAmarant(D, col, px);
+  col = bsPlumes(D, col);
+  // the far ground below the true horizon (where the world's columns end): its lit colour, a one-pixel edge
+  col = mix(col, u_bsGround.rgb, 1.0 - smoothstep(-u_bsGround.w - px, -u_bsGround.w + px, D.y));
+  if (withSun) col += bsGlare(D);
+  return col;
+}
+vec3 skyColor(vec3 dir, bool withSun) { return u_dim == 5 ? bodySky(dir, withSun) : skyColorHome(dir, withSun); }
+#endif
+`;
+  SH.bodySkyPre = () => '#ifdef BODYSKY\n#define skyColor skyColorHome\n#endif\n';
+  SH.bodySky = () => BODY_SKY;
+
   const FULL_VS = QUAD_VS;   // (the background is the quad shader with u_half 0: the full-screen triangle)
   SH.programs = () => ({
     bg: { vs: FULL_VS, fs: BG_FS }, herz: { vs: QUAD_VS, fs: HERZ_FS }, giant: { vs: QUAD_VS, fs: GIANT_FS },

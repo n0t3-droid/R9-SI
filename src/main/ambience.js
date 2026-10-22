@@ -154,6 +154,7 @@
         crickets: nat && night > 0.4 && warm && dryAir ? night * clamp01(0.3 + S.trees / 6) * 0.3 : 0,
         rain: wx && !(b.down <= 0) ? rain * 0.5 : 0,                     // no rain sound in a desert
       };
+      if (b.moon) for (const k in g) g[k] = 0;   // u-moons1: no air on a moon — no wind, no birds, nothing carries (the suit's own sound: bodylife.js)
       for (const k in g) L[k].g.gain.setTargetAtTime(g[k], t, 0.4);
       const muffled = S.indoors;
       this.muffle.frequency.setTargetAtTime(muffled ? 800 : 20000, t, 0.3);

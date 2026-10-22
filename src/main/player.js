@@ -290,7 +290,7 @@
         // a landing after a fall dips the eye (presence.js: from 0.6 blocks on, up to 0.14)
         if (this.fallStart !== null) { const amp = VR.Presence.landingDip(this.fallStart - this.pos[1]); if (amp > 0) { this.dipAmp = amp; this.dipT = 0; } }
         if (this.fallStart !== null && !this.creative) {
-          const d = this.fallStart - this.pos[1];
+          const d = (this.fallStart - this.pos[1]) * (VR.DimReg ? VR.DimReg.g(this.game.dim) / 9.81 : 1);   // u-moons1: a fall counts by its landing speed (U§4.3: 25 m on Opal = 1.25 m at home)
           const below = get(Math.floor(this.pos[0]), Math.floor(this.pos[1] - 0.05), Math.floor(this.pos[2]));
           const soft = TF[below] & (F.BOUNCY) || (R.types[R.T.type[below]] && /hay|slime|honey|bed/.test(R.types[R.T.type[below]].name));
           if (d > 3.4 && !this.inWater) this.damage(Math.floor(d - 3) * (soft ? 0.2 : 1), 'fall');

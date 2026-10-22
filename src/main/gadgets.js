@@ -1073,7 +1073,7 @@
         return;
       }
       g.raidActive = false;
-      if (p.mode !== 'survival' || g.difficulty === 'peaceful' || !g.entities || g.dim !== 'overworld') return;
+      if (p.mode !== 'survival' || g.difficulty === 'peaceful' || !g.entities || !VR.DimReg.actorsHome(g.dim)) return;   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
       st.checkT -= dt; if (st.checkT > 0) return;
       st.checkT = 20;
       const tod = g.env.timeOfDay;
@@ -1104,7 +1104,7 @@
     // ================================================================ meteors
     updateMeteors(dt) {
       const g = this.g, p = g.player, E = g.env.E;
-      if (p.mode === 'survival' && g.dim === 'overworld' && g.difficulty !== 'peaceful') {
+      if (p.mode === 'survival' && VR.DimReg.actorsHome(g.dim) && g.difficulty !== 'peaceful') {   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
         this.meteorT -= dt;
         if (this.meteorT <= 0) { this.meteorT = 100 + Math.random() * 160; if (E.night > 0.55 && Math.random() < 0.4 && !(g.mp && g.mp.isClient)) this.spawnMeteor(); }
       }

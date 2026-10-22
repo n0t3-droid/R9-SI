@@ -116,5 +116,15 @@
     return out;
   }
 
-  VR.Klang = { FAMILIES, RECIPES, HIT, NAME_RULES, SOUND, familyOf, pitchFactor, timbre, stepGain, UI, DB18, SCALE, rng, seedOf, musicPlan, degreeMidi, swellPlan };
+  // u-moons1 · the suit on an airless moon (bodylife.js plays it; nothing carries through the vacuum, so this is all one
+  // hears besides what one touches): the breath — a soft swell of breathy noise, every 3.6 s at rest, down to 1.6 s after
+  // a sprint or a big jump (exert 0 … 1), falling back over ~20 s — and the fan's low hum under it, with a little air
+  const SUIT = {
+    breath: { every: 3.6, fast: 1.6, dur: 1.4, f: 640, q: 0.8, g: 0.045, gOut: 0.03 },
+    hum: { f: 118, g: 0.010, f2: 236, g2: 0.003, air: 340, airG: 0.006 },
+    calm: 20,
+  };
+  const breathEvery = (exert) => SUIT.breath.every + (SUIT.breath.fast - SUIT.breath.every) * Math.max(0, Math.min(1, +exert || 0));
+
+  VR.Klang = { FAMILIES, RECIPES, HIT, NAME_RULES, SOUND, familyOf, pitchFactor, timbre, stepGain, UI, DB18, SCALE, rng, seedOf, musicPlan, degreeMidi, swellPlan, SUIT, breathEvery };   // (u-moons1: SUIT, breathEvery)
 })(VR);

@@ -2379,5 +2379,23 @@
     'g.set.spaceDetail': 'Weltraum-Detail',
     'g.set.spaceDetail.tip': 'Wie fein Planeten, Monde, Ring und Sterne in der Raumansicht sind: Texturgröße, feine Wolken, Sternfelder. Folgt der Voreinstellung.',
     'g.set.spaceDetailV': ['Sehr niedrig', 'Niedrig', 'Mittel', 'Hoch'],
+    // u-moons1 · die Monde Basalt und Opal (src/shared/bodies.js, gen_body.js, src/main/bodysky.js, bodylife.js)
+    'g.dim.basalt': 'Basalt',
+    'g.dim.opal': 'Opal',
+    'g.biome.basalt_mare': 'Mare', 'g.biome.basalt_highlands': 'Hochland', 'g.biome.basalt_crater': 'Junger Krater',
+    'g.biome.opal_plains': 'Eisebene', 'g.biome.opal_lineae': 'Lineae', 'g.biome.opal_chaos': 'Chaos-Gelände', 'g.biome.opal_stripes': 'Tigerstreifen',
+    'g.codex.cat.moons': 'Monde',
+    'g.codex.biomeHintMoon': 'Auf einem Mond Amarants – mit Cheats: /dim basalt oder /dim opal',
+    'g.moon.hello': 'Willkommen auf {name}',
+    'g.moon.hello.basalt': 'Ein Sechstel der Schwerkraft: ein Sprung trägt dich 8 m hoch. Keine Luft – nur dein Atem im Anzug.',
+    'g.moon.hello.opal': 'Ein Zwanzigstel der Schwerkraft: ein Sprung trägt dich 27 m hoch. Im Süden brechen die Geysire aus.',
+    'g.codex.moon.basalt': ['Basalt', 'Ein Mond aus Gestein ohne Luft: dunkle Lavaebenen, die Maria, helles altes Hochland und Krater in allen Größen. Die Schwerkraft ist ein Sechstel der Herzwelt, ein Tag dauert eine Stunde.', 'Reise mit /dim basalt (Cheats an) – bald mit dem Shuttle.'],
+    'g.codex.moon.opal': ['Opal', 'Ein Eismond, heller als frischer Schnee. Rotbraune Streifen ziehen über das Eis, und vier Tigerstreifen reißen auf, aus denen Geysire Eis ins All schießen. Amarant steht immer am selben Platz im Süden. Auf echten Eismonden liegen solche Streifen am Südpol.', 'Reise mit /dim opal (Cheats an) – bald mit dem Shuttle.'],
+    'g.codex.moon.amarantrise': ['Amarant geht auf', 'Auf Basalt geht der Gasriese alle drei bis vier Stunden auf und unter – fast fünfzigmal so breit wie Helia, mit seinem Ring fast genau von der Kante.', 'Warte auf Basalt, bis Amarant über den Horizont steigt.'],
+    'g.codex.moon.crater': ['Ein großer Krater', 'Große Krater haben einen flachen Boden, einen Zentralberg und Terrassen an der Wand: der Boden federt nach dem Einschlag zurück. Der Krater bei der Landestelle steht für einen von 23 Kilometern.', 'Stell dich auf Basalt in einen großen Krater.'],
+    'g.codex.moon.impact': ['Ein Einschlag', 'Ohne Luft verglüht nichts: ein Gesteinsbrocken schlägt ungebremst ein – ein Blitz, dann fliegt der Staub in langen Bögen. Im Spiel passiert das öfter als in echt.', 'Halte auf Basalt die Augen offen.'],
+    'g.codex.moon.geyser': ['Ein Geysir', 'Aus den Tigerstreifen schießt Eis zwei bis drei Kilometer hoch. Es fällt als Schnee zurück, ein Teil fliegt ins All. Gegen das Licht leuchtet die Säule am hellsten.', 'Steh auf Opal nahe an einem Schlot, wenn er ausbricht.'],
+    'g.codex.moon.eclipse': ['Finsternis', 'Von Opal aus schiebt sich Amarant jeden Tag vor die Sonne: Mitten am Tag wird es Nacht, Amarants Rand leuchtet als dünner Ring, und der Ring glüht im Gegenlicht.', 'Erlebe auf Opal, wie Helia hinter Amarant verschwindet.'],
+    'g.codex.moon.jump': ['Der große Sprung', 'Auf Opal trägt dich ein Sprung höher als ein Haus. Ohne Luft bremst nichts: Selbst der Staub fliegt in sauberen Bögen und schwebt lange.', 'Spring auf Opal 20 Meter hoch.'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
