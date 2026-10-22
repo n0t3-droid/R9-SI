@@ -95,6 +95,8 @@ async function openWorld(dist, preset) {
   for (let i = 0; i < 150; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   const ok = await ev(() => VR.game.state) === 'play';
   await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.env.wx.force('klar'); window.requestAnimationFrame = () => 0; g.hideHud = true; for (const id of ['hud', 'ui', 'hints']) { const h = document.getElementById(id); if (h) h.style.display = 'none'; } if (!document.getElementById('__nohint')) { const st = document.createElement('style'); st.id = '__nohint'; st.textContent = '#hint,#hints,#lockhint{display:none !important}'; document.head.appendChild(st); } });
+  // the top under the Sky Isles (their rock starts at 115): the first block — leaves too — scanning down from yMax
+  const below = (x, z, yMax) => ev(([x, z, yMax]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = yMax; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & (F.OPAQUE | F.FLUID | F.LEAVES | F.SOLID))) return y; } return 63; }, [x, z, yMax]);
   const groundY = (x, z) => ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = 200; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & (F.OPAQUE | F.FLUID)) && !(R.T.flags[s] & F.LEAVES)) return y; } return 80; }, [x, z]);
   // the eye at (x, eyeY, z) looking at (tx, ty, tz)
   const look = (x, eyeY, z, tx, ty, tz, fov, tod) => ev(([x, y, z, tx, ty, tz, fov, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y - 1.62, z); const dx = tx - x, dy = ty - y, dz = tz - z; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.fovKick = 0; p.vel = [0, 0, 0]; g.settings.fov = fov; if (tod !== null) g.env.setTime(tod); }, [x, eyeY, z, tx, ty, tz, fov, tod === undefined ? null : tod]);
@@ -112,7 +114,7 @@ async function openWorld(dist, preset) {
   const report = () => ev(() => (VR.game.wild ? VR.game.wild.report() : null));
   // the actors that come and go (ships, the director's acts, trams, the hall's craft) hold still through a pair
   const freeze = (on) => ev((on) => { const g = VR.game; if (on) { g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = function () {}; } } } else { for (const [o, k, f] of g.__frozen || []) o[k] = f; g.__frozen = null; } }, on);
-  return { ctx, page, logs, ev, wait, step, settle, groundY, look, picture, wild, report, freeze, blocked, ok };
+  return { ctx, page, logs, ev, wait, step, settle, groundY, below, look, picture, wild, report, freeze, blocked, ok };
 }
 const load = async (path) => { const { data, info } = await sharp(path).removeAlpha().raw().toBuffer({ resolveWithObject: true }); return { d: data, w: info.width, h: info.height }; };
 const diff = (A, B) => { let s = 0, big = 0; const n = A.w * A.h; for (let i = 0, p = 0; i < n; i++, p += 3) { const d = Math.abs(A.d[p] - B.d[p]) + Math.abs(A.d[p + 1] - B.d[p + 1]) + Math.abs(A.d[p + 2] - B.d[p + 2]); s += d; if (d > 24) big++; } return { mean: +(s / n / 3).toFixed(3), share: +(big / n).toFixed(4) }; };
@@ -179,7 +181,7 @@ await shot('murm', async (out) => {
 }, async (out) => {
   const r = await A.report(); if (!r || !r.murm) return;
   const c = r.murm.ctr, cam = out.cam, bx = cam.x - c[0], bz = cam.z - c[2], bl = Math.hypot(bx, bz) || 1;
-  const ex = c[0] + bx / bl * 70, ez = c[2] + bz / bl * 70, top = await A.ev(([x, z]) => VR.game.world.topAt(Math.floor(x), Math.floor(z)), [ex, ez]), ey = Math.max(top + 1 + EYE + 1, PL.sea + 3);   // (over a tree's crown, not in it)
+  const ex = c[0] + bx / bl * 70, ez = c[2] + bz / bl * 70, top = await A.below(ex, ez, 108), ey = Math.max(top + 1 + EYE + 1, PL.sea + 3);   // (over a tree's crown, not in it; under the isles, not on one)
   out.murmClose = { cam: [+ex.toFixed(1), +ey.toFixed(1), +ez.toFixed(1)], ctr: c, spread: r.murm.spread };
   await A.look(ex, ey, ez, c[0], c[1], c[2], 70, null); await A.step(2);
   await A.picture(`${SHOTS}wild_murm_close_on.png`, 4);
@@ -260,7 +262,7 @@ await shot('bfly', async (out) => {
 const rayShot = (name, tod) => shot(name, async (out) => {
   const ex = 243, ez = 49;
   await go(ex, 75, ez, tod);
-  const ey = Math.max((await A.ev(([x, z]) => VR.game.world.topAt(Math.floor(x), Math.floor(z)), [ex, ez])) + 1 + EYE, PL.sea + 3);
+  const ey = Math.max((await A.below(ex, ez, 108)) + 1 + EYE, PL.sea + 3);
   let r = null, best = null;
   for (let k = 0; k < 30 && !best; k++) {
     await A.step(45);
@@ -286,18 +288,24 @@ await shot('deer', async (out) => {
   const D = PL.deer; if (!D) { out.error = 'no deer anchor with an open line'; return null; }
   const end = D.path[D.path.length - 1], mx = (D.x + end[0]) / 2, mz = (D.z + end[1]) / 2, dx = end[0] - D.x, dz = end[1] - D.z, dl = Math.hypot(dx, dz) || 1;
   const ex = mx - dz / dl * 20, ez = mz + dx / dl * 20;
-  await go(ex, D.y + 8, ez, 23300);
-  await A.step(60);
-  // the group comes (landlife once a second) and the line forms; 9 s of walking
+  // (run 2 arrived at dawn: the line formed and was walked while the chunks settled. Now the place settles in the night,
+  //  with no deer about, and then the dawn comes: the group arrives, the leader walks out, the picture mid-line)
+  await go(ex, D.y + 8, ez, 20500);
+  await A.ev(() => VR.game.env.setTime(22500));
   let lined = 0;
-  for (let k = 0; k < 6 && !lined; k++) { await A.step(60); lined = await A.ev(() => { const E = VR.game.entities; return E ? E.mobs.filter(m => m.line).length : 0; }); }
-  await A.step(270);
+  for (let k = 0; k < 8 && !lined; k++) { await A.step(45); lined = await A.ev(() => { const E = VR.game.entities; return E ? E.mobs.filter(m => m.line).length : 0; }); }
+  await A.step(240);
   const deer = await A.ev(() => VR.game.entities.mobs.filter(m => m.kind === 'glimmer_deer').map(m => ({ pos: m.pos.map(v => +v.toFixed(1)), line: !!m.line, li: m.li, graze: !!m.graze })));
   out.deer = deer; out.lined = lined;
   if (!deer.length) { out.error = 'no deer came'; return null; }
-  let cx = 0, cy = 0, cz = 0; for (const d of deer) { cx += d.pos[0]; cy += d.pos[1]; cz += d.pos[2]; } cx /= deer.length; cy /= deer.length; cz /= deer.length;
-  const gy = await A.groundY(ex, ez);
-  return { x: ex, y: gy + 1 + EYE + 1, z: ez, tx: cx, ty: cy + 0.9, tz: cz, fov: 58 };
+  // (the line's deer if they walk one, else the group nearest the anchor; the clearest view from 15 blocks — run 2's
+  //  camera stood behind a sunflower field)
+  const near = deer.filter(d => d.line).length ? deer.filter(d => d.line) : deer.filter(d => Math.hypot(d.pos[0] - D.x, d.pos[2] - D.z) < 40);
+  const grp = near.length ? near : deer;
+  let cx = 0, cy = 0, cz = 0; for (const d of grp) { cx += d.pos[0]; cy += d.pos[1]; cz += d.pos[2]; } cx /= grp.length; cy /= grp.length; cz /= grp.length;
+  const v = await clearView([cx, cy, cz], 15, 2.2);
+  out.deerView = { blocked: v.n, n: grp.length };
+  return { x: v.x, y: v.y, z: v.z, tx: cx, ty: cy + 0.9, tz: cz, fov: 52 };
 });
 
 // 8 rabbits at a field's edge by day (the pasture's lane by farm_c: bushes and hedges at the foot of the fields), seen
@@ -316,7 +324,7 @@ await shot('rabbit', async (out) => {
 await shot('fox', async (out) => {
   await go(88, 90, 57, 11200);
   let r = null, f = null;
-  for (let k = 0; k < 10 && !f; k++) { await A.step(60); r = await A.report(); f = r && r.fox && r.fox.state !== 'slip' ? r.fox : null; }
+  for (let k = 0; k < 16 && !f; k++) { await A.step(60); r = await A.report(); f = r && r.fox && r.fox.state !== "slip" ? r.fox : null; }
   if (!f) { out.error = 'no fox (cover ' + (r && r.cover) + ')'; return null; }
   out.fox = f;
   const v = await clearView(f.pos, 10, 1.9);

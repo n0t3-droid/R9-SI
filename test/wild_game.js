@@ -228,7 +228,10 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
 {
   // a wood west of the anchor (x < −8): the line walks east into the open
   const wood = { getBlock: (x, y, z) => (y < 80 ? STONE : y === 80 ? GRASS : x < -8 && y >= 84 && y <= 86 ? LEAVES : 0), topAt: (x) => (x < -8 ? 86 : 80), isLoaded: () => true };
-  const A = { x: -6, y: 81, z: 0, n: 3 }, L = W.deerPath(wood, A, 53);
+  // (the columns not there yet: no answer — undefined, ask again — not "no way out", which would stay for good)
+  const A = { x: -6, y: 81, z: 0, n: 3 }, part = Object.assign({}, wood, { isLoaded: (x) => x < 0 }), early = W.deerPath(part, A, 53), last = W.deerPath(part, A, 53, true);
+  check(early === undefined && last !== undefined, `the deer's line waits for its columns (${early === undefined ? 'ask again' : JSON.stringify(early && early.L)}), and at last takes what there is (${last ? last.L.toFixed(0) + ' blocks' : last})`);
+  const L = W.deerPath(wood, A, 53);
   check(!!L && L.pts[L.pts.length - 1][0] > 5 && L.L >= 12, `the deer's line leads out of the wood into the open (${L ? L.L.toFixed(0) + ' blocks to x ' + L.pts[L.pts.length - 1][0].toFixed(0) : '—'})`);
   if (L) {
     L.n = 3;

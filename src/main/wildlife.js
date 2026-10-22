@@ -122,17 +122,19 @@
   W.herdsOn = (g) => !!(g && g.settings && g.settings.wildHerds && W.CAPS.deerLine[W.tierOf(g.settings)] > 0);
   // the deer's line at dawn: from a wood's edge (the anchor) out into the most open direction — 16 directions scored by
   // the open, walkable ground (grass under air, no step over a block, no crown within 2) out to 26 blocks. → {pts:
-  // [[x, z]], L, s, gap, speed, n, done} or null (no 10 blocks of open ground)
-  W.deerPath = function (w, A, seed) {
+  // [[x, z]], L, s, gap, speed, n, done}, null (no 12 blocks of open ground) or undefined (columns on the way have not
+  // come yet: ask again — run 2's deer asked right after the eye arrived, got "no way" and kept it); final: answer with
+  // what there is (the columns out of reach may never come)
+  W.deerPath = function (w, A, seed, final) {
     if (!w || !w.topAt || !w.isLoaded) return null;
     const MK = mask(), get = (x, y, z) => w.getBlock(x, y, z);
-    let best = null;
+    let best = null, waiting = false;
     for (let k = 0; k < 16; k++) {
       const a = (k + W.h(seed, A.x, A.z) * 0.9) / 16 * TAU, dx = Math.cos(a), dz = Math.sin(a), pts = [];
       let y0 = w.topAt(Math.floor(A.x), Math.floor(A.z)), ok = 0;
       for (let d = 2; d <= 26; d += 2) {
         const x = Math.floor(A.x + 0.5 + dx * d), z = Math.floor(A.z + 0.5 + dz * d);
-        if (!w.isLoaded(x, z)) break;
+        if (!w.isLoaded(x, z)) { waiting = true; break; }
         const y = w.topAt(x, z), b = get(x, y, z);
         if (!(MK[b] & 2) || Math.abs(y - y0) > 1) break;
         let crown = false; for (let q = -2; q <= 2 && !crown; q += 2) for (let r = -2; r <= 2 && !crown; r += 2) if (MK[get(x + q, w.topAt(x + q, z + r), z + r)] & 16) crown = true;
@@ -141,6 +143,7 @@
       }
       if (ok >= 12 && (!best || ok > best.ok)) best = { ok, pts };
     }
+    if (waiting && !final) return undefined;
     if (!best) return null;
     const pts = [[A.x + 0.5, A.z + 0.5]].concat(best.pts), s = [0];
     for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
@@ -724,9 +727,11 @@
       // the fox at dusk: along a hedge (a run of cover) near the eye, a pounce at nothing, into the hedge at the end
       const okF = cap.fox && ctx.sc.fox && !ctx.wet;
       if (!okF) this.fox = null;
-      else if (!this.fox && S.done && (this.foxT = (this.foxT || 0) - dt) <= 0) {
-        this.foxT = 20;
+      else if (!this.fox && S.done && !S.miss && (this.foxT = (this.foxT || 0) - dt) <= 0) {
+        // (only on a whole scan — run 2's first look met a hedge whose columns had not come and waited 20 s; no hedge:
+        //  another look in 6 s)
         const path = this.hedgeRun(eye);
+        this.foxT = path ? 0 : 6;
         if (path) this.fox = { path, s: 0, state: 'trot', t: 0, pos: [path.pts[0][0], path.pts[0][1], path.pts[0][2]], yaw: 0, walk: 0, walkAmt: 1, id: 5, pounced: false, jump: 0, pet: { state: 'follow' }, kind: 'wild_fox' };
       }
       if (this.fox) this.foxStep(this.fox, dt, ctx);

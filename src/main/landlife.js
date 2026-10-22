@@ -120,7 +120,9 @@
         const t = ((ticks % 24000) + 24000) % 24000, dawn = t >= 22300 || t < 1700;
         if (!mine.length) { A.line = null; return; }
         if (dawn && A.line === undefined || dawn && A.line === null) {
-          const L = W.deerPath(g.world, A, seed);
+          A.lineTries = (A.lineTries || 0) + 1;
+          const L = W.deerPath(g.world, A, seed, A.lineTries > 8);
+          if (L === undefined) return;   // (the way's columns have not come yet: again in a second, eight times at most)
           A.line = L || false;
           if (L) { L.n = mine.length; mine.forEach((m, i) => { m.line = L; m.li = i; m.graze = false; m.home = { x: A.x, z: A.z, r: 34 }; }); }
         }
