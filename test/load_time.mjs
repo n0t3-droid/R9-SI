@@ -150,5 +150,6 @@ try {
   console.log('  sheet test/shots/load_time_sheet.jpg');
 } catch (e) { console.log('  (no sheet: ' + String(e.message || e).slice(0, 200) + ')'); }
 if (!process.env.KEEP) for (const t of ['v048', 'v049', 'cur']) fs.rmSync('/tmp/r9lt_' + t, { recursive: true, force: true });
-console.log(`\n${fails ? 'FAILED ' + fails : 'ALL OK'} (${secs()})`);
+console.log(`\n(${secs()})`);
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

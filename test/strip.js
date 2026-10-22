@@ -330,5 +330,6 @@ try {
   fs.rmSync(COPY, { recursive: true, force: true });
 }
 
-console.log(`\n${fails ? 'FAILED ' + fails : 'ALL OK'} (${secs()})`);
+console.log(`\n(${secs()})`);
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
