@@ -13,6 +13,10 @@
 //     flowers, rising round you as you walk through; dragonflies hovering and darting over the ponds
 //   Himmelsrochen (wildRays): three or four great sky rays on a slow circuit between the Sky Isles (wildsim.js: where
 //     they are is a pure function of the world's clock — every guest sees them in the same place), a trail of light motes
+//  f-wild2 (R50-10, docs/superpowers/plans/2026-10-23-f-wild2.md): the murmuration flies figures (ribbons, a waist, a
+//    ball that splits) and is drawn as birds near and a density cloud far (drawCloud, the translucent pass); once a
+//    dusk a young ray glides low past the player's cell (passUpd); the shoal swims close under the surface, comes to a
+//    still player's shadow and flashes as it turns
 //   Herden ziehen (wildHerds): the deer cross the meadow in a line at dawn and graze, the sheep drift as one herd
 //     (landlife.js / entities.js ask Wild.lineTarget / herdTarget); rabbits at the field edges that bolt into the hedge;
 //     a fox along the hedge at dusk (it never catches anything)
@@ -193,7 +197,7 @@
   // ---------------------------------------------------------------- the actor
   const RAYCOL = [[0.32, 0.85, 1.0], [0.72, 0.5, 1.0]], MOTECOL = [[0.5, 0.95, 1.0], [0.82, 0.62, 1.0]];
   const TKEY = []; for (let k = 0; k < 8; k++) TKEY.push('wray' + (k >> 1) + (k & 1 ? 'r' : 'l'));
-  const KINDCAP = { flock: 400, gull: 16, fish: 340, carp: 64, bfly: 128, dfly: 64, ray: 8 };
+  const KINDCAP = { flock: 900, gull: 16, fish: 340, carp: 64, bfly: 128, dfly: 64, ray: 8 };   // (f-wild2: the murmuration's 840 boids on Ultra)
   const PIECES = ['birds', 'fish', 'bugs', 'rays', 'herds'];
   class Actor {
     constructor(game) {
@@ -251,8 +255,9 @@
       }
       r -= 0.3;
       if (r < 1.6) return null;
-      const bottom = S.top - S.depth + 1, y1 = S.y - 0.35, y0b = Math.max(bottom + 0.3, S.y - 2.4);
-      return { x, z, r, y0: Math.min(y0b, y1 - 0.45), y1, surf: S.y, sky: Math.max(0.35, lightOf(this.g.world, x, S.top + 1, z)) };
+      // (f-wild2: close under the surface, 0.15–1.1 — where the eye on the pier and the shore sees them)
+      const bottom = S.top - S.depth + 1, y1 = S.y - 0.15, y0b = Math.max(bottom + 0.25, S.y - 1.1);
+      return { x, z, r, y0: Math.min(y0b, y1 - 0.4), y1, surf: S.y, top: S.top, bottom, sky: Math.max(0.35, lightOf(this.g.world, x, S.top + 1, z)) };
     }
     update(dt) {
       const g = this.g, S = g.settings || {};
@@ -270,7 +275,8 @@
       // (walking: the player's speed, or how far the eye went since the last frame — a step taken however it was taken)
       const lp = this.lastP || (this.lastP = [p[0], p[1], p[2]]), moved = Math.hypot(p[0] - lp[0], p[2] - lp[2]) / dt;
       lp[0] = p[0]; lp[1] = p[1]; lp[2] = p[2];
-      ctx.moving = Math.hypot(g.player.vel ? g.player.vel[0] : 0, g.player.vel ? g.player.vel[2] : 0) > 1.2 || (moved > 1.2 && moved < 60);
+      ctx.speed = Math.max(Math.hypot(g.player.vel ? g.player.vel[0] : 0, g.player.vel ? g.player.vel[2] : 0), moved < 60 ? moved : 0);
+      ctx.moving = ctx.speed > 1.2;
       if (g.airLife) g.airLife.noButterflies = cap.bfly > 0;   // (the swarm takes over from the living air's butterfly dots)
       const T = this.stats.ms, A = this.stats.avg;
       let t0 = performance.now(), t1;
@@ -304,7 +310,8 @@
         if (st.y === null) { const w = g.world, X = Math.floor(st.x), Z = Math.floor(st.z); st.y = (w.isLoaded(X, Z) ? w.topAt(X, Z) : ctx.eye[1] - 1.6) + 40; }
         if (Math.hypot(st.x - ctx.eye[0], st.z - ctx.eye[2]) > 700) return;
         const fl = new W.Flock(n, (W.h(this.seed, key, 0x6b) * 4294967295) >>> 0);
-        Mu = this.murm = { key, n, st, fl, perch: null, roost: null, roostScan: null, noRoost: false, landed: new Uint8Array(n), acc: 0, ex: 0, ph, state: 'away', t: 0 };
+        // (f-wild2: each bird its own place in the murmuration's figures — W.murmTargets fills the offsets while it swirls)
+        Mu = this.murm = { key, n, st, fl, S: W.murmPlaces(n), bofs: new Float32Array(n * 3), perch: null, roost: null, roostScan: null, noRoost: false, landed: new Uint8Array(n), acc: 0, ex: 0, ph, state: 'away', t: 0 };
         if (ph !== 'perch') this.murmIn(Mu, ctx);
       }
       const fl = Mu.fl;
@@ -326,12 +333,16 @@
       const tg = fl.tgt, swirl = ph === 'swirl' || ph === 'rise';
       // (the lobes: the cloud parts into wings and folds back while it swirls; roosting and leaving it holds together)
       if (fl.lofs) { if (swirl) W.murmLobes(this.seed ^ Mu.key, ctx.clock, fl.lobes, fl.P.lobeR || 30, fl.lofs); else fl.lofs.fill(0); }
-      if (swirl) W.murmTarget(this.seed ^ Mu.key, ctx.clock, Mu.st, tg);
+      // (f-wild2: swirling, the birds fly the figures — ribbons, a waist, a ball that splits; roosting and leaving the
+      //  flock holds together round its target)
+      fl.bofs = swirl ? Mu.bofs : null;
+      if (swirl) { W.murmTarget(this.seed ^ Mu.key, ctx.clock, Mu.st, tg); W.murmTargets(this.seed ^ Mu.key, ctx.clock, Mu.S, n, Mu.bofs, tg); }
       else if (ph === 'roost' && Mu.perch) { tg[0] = Mu.roost[0]; tg[1] = Mu.roost[1] + 6; tg[2] = Mu.roost[2]; }
       else { const a = W.h(this.seed, Mu.key, 9) * TAU; tg[0] = Mu.st.x + Math.cos(a) * 500; tg[1] = Mu.st.y + 30; tg[2] = Mu.st.z + Math.sin(a) * 500; if ((Mu.leaveT = (Mu.leaveT || 0) + dt) > 70) { Mu.state = 'away'; Mu.leaveT = 0; return; } }
-      // the step: 30 times a second at most (15 when far); the draw extrapolates in between
+      // the step: 30 times a second near, 20 from afar (W.MURM_HZ, f-wild2: 2.4× the boids in t-wild's CPU); the draw
+      // extrapolates in between
       Mu.acc += dt;
-      const h = Math.hypot(fl.ctr[0] - ctx.eye[0], fl.ctr[2] - ctx.eye[2]) > 260 ? 1 / 15 : 1 / 30;
+      const h = Math.hypot(fl.ctr[0] - ctx.eye[0], fl.ctr[2] - ctx.eye[2]) > W.MURM_FAR ? 1 / W.MURM_HZ[1] : 1 / W.MURM_HZ[0];
       if (Mu.acc >= h) {
         const st = Math.min(Mu.acc, 0.1); Mu.acc = 0;
         fl.step(st);
@@ -531,9 +542,15 @@
       for (const s of SH) {
         const d = Math.hypot(s.b.x - eye[0], s.b.z - eye[2]);
         if (d > 56) continue;   // (too small to see: no step)
-        const c = s.fl.ctr, near = Math.hypot(c[0] - eye[0], c[2] - eye[2]) < 4.5 && Math.abs(eye[1] - s.b.surf) < 3.5;
-        s.fl.fear = near ? eye : null;
-        W.shoalTarget(s.seed, ctx.clock, s.b, s.fl.tgt);
+        // (f-wild2) a still player at the water — on the pier, on the shore, not in it — casts a shadow on the surface
+        // and the shoal gathers in it, beside you where you look down; a running or swimming player scatters them
+        const c = s.fl.ctr, feet = eye[1] - 1.62, swim = feet < s.b.surf + 0.3, fast = ctx.speed > 2.6;
+        s.fl.fear = Math.hypot(c[0] - eye[0], c[2] - eye[2]) < 4.5 && Math.abs(eye[1] - s.b.surf) < 3.5 && (swim || fast) ? eye : null;
+        const FE = this.feet || (this.feet = [0, 0, 0]); FE[0] = eye[0]; FE[1] = feet; FE[2] = eye[2];
+        const sh = !swim && !fast && d < s.b.r + 12 ? W.shadowOnWater(FE, ctx.E.sunDir, s.b.surf, this.shA || (this.shA = [0, 0])) : null;
+        s.follow = !!(sh && this.openWater(s.b, sh));
+        if (s.follow) { s.fl.tgt[0] = sh[0]; s.fl.tgt[2] = sh[1]; s.fl.tgt[1] = s.b.y0 + (s.b.y1 - s.b.y0) * 0.65; }
+        else W.shoalTarget(s.seed, ctx.clock, s.b, s.fl.tgt);
         s.acc += dt; if (s.acc >= 1 / 30) { s.fl.step(Math.min(0.1, s.acc)); s.acc = 0; }
       }
       // carp: in the ponds within 40
@@ -564,6 +581,19 @@
       C.set(a.key, { b, t: this.time });
       if (C.size > 24) C.delete(C.keys().next().value);
       return b;
+    }
+    // (f-wild2) the point p = [x, z] moved into the shoal's water: inside its disc and with open sky above the water
+    // (not under a pier's deck — the fish there are hidden), the nearest such place round it; false when there is none
+    openWater(b, p) {
+      const w = this.g.world, R = VR.R, F = VR.F, dx = p[0] - b.x, dz = p[1] - b.z, dd = Math.hypot(dx, dz), lim = Math.max(0.5, b.r - 0.8);
+      if (dd > lim) { p[0] = b.x + dx / dd * lim; p[1] = b.z + dz / dd * lim; }
+      const open = (x, z) => { const X = Math.floor(x), Z = Math.floor(z); for (let y = b.top + 1; y <= b.top + 4; y++) { const q = w.getBlock(X, y, Z); if (q && (R.T.flags[q] & F.SOLID)) return false; } return true; };
+      if (open(p[0], p[1])) return true;
+      for (const r of [1.5, 2.5, 3.5]) for (let k = 0; k < 8; k++) {
+        const x = p[0] + Math.cos(k / 8 * TAU) * r, z = p[1] + Math.sin(k / 8 * TAU) * r;
+        if (Math.hypot(x - b.x, z - b.z) <= lim && open(x, z)) { p[0] = x; p[1] = z; return true; }
+      }
+      return false;
     }
     // is there water at the surface round the eye (eight columns 6 and 11 blocks out)? (a cheap look before the search)
     waterNear(eye) {
@@ -677,8 +707,10 @@
       if (Math.hypot(ctx.eye[0] - C.x, ctx.eye[2] - C.z) > 1100) return;
       if (!this.loop) { const I = VR.IslesGen && VR.IslesGen.list ? VR.IslesGen.list({ seed: g.meta.seed }) : null; this.loop = W.rayLoop(I || []); }
       const P = g.particles, TR = g.trails, rate = cap.motes, night = ctx.E.night || 0;
+      // (f-wild2) the pass at dusk: one young ray leaves the circuit for a glide low past the player's cell
+      const pass = this.passUpd(ctx, n);
       for (let k = 0; k < n; k++) {
-        const st = W.rayState(this.seed, ctx.clock, k, 4, this.loop, this.rs);
+        const st = (pass && pass.k === k && W.passAt(pass, this.loop, this.seed, ctx.clock, this.rs)) || W.rayState(this.seed, ctx.clock, k, 4, this.loop, this.rs);
         const R = this.rays[k] || (this.rays[k] = new Float32Array(8)); R.set(st);
         this.rays.length = k + 1;
         const d = Math.hypot(st[0] - ctx.eye[0], st[1] - ctx.eye[1], st[2] - ctx.eye[2]);
@@ -706,6 +738,30 @@
           P.spawn(x, y, z, (Math.random() - 0.5) * 0.3, -0.12 - Math.random() * 0.2, (Math.random() - 0.5) * 0.3, { life: 3.2 + Math.random() * 1.6, size: 0.22 + Math.random() * 0.16, grav: 0, drag: 0.5, col, emis: 1, collide: false, fade: true, force: true });
         }
       }
+    }
+
+    // (f-wild2) the pass at dusk: planned once a day when its moment comes near (W.passTime: the same for every guest),
+    // for the cell the player is in then; none in the rain, none when it would have had to leave already. → the plan
+    // while the ray is on it, else null
+    passUpd(ctx, n) {
+      const P = this.pass || (this.pass = { day: null, plan: null, tried: false });
+      if (P.day !== ctx.day) { P.day = ctx.day; P.plan = null; P.tried = false; }
+      const Tn = (ctx.day * 24000 + W.passTime(this.seed, ctx.day)) / 20;
+      if (!P.tried && ctx.clock > Tn - 110 && ctx.clock < Tn - 10) {
+        P.tried = true;
+        const plan = ctx.wet ? null : W.passPlan(this.seed, ctx.day, ctx.eye, this.loop, (x, z) => this.topUnder(x, z), n);
+        P.plan = plan && plan.T0 > ctx.clock + 0.2 ? plan : null;
+      }
+      return P.plan && ctx.clock >= P.plan.T0 && ctx.clock <= P.plan.T1 ? P.plan : null;
+    }
+    // the top a low glide must clear at (x, z) under the Sky Isles' rock: the highest block below y 112 (the ground,
+    // the trees, the lake's water — not a waterfall's falling water above the sea), or null when the column is not here
+    topUnder(x, z) {
+      const w = this.g.world;
+      if (!w.isLoaded(x, z)) return null;
+      const R = VR.R, F = VR.F, SEA = (VR.C && VR.C.SEA) || 63;
+      for (let y = Math.min(112, w.topAt(x, z) + 1); y > 1; y--) { const b = w.getBlock(x, y, z); if (!b) continue; if ((R.T.flags[b] & F.FLUID) && y > SEA + 2) continue; return y + 1; }
+      return null;
     }
 
     // ================================================================ rabbits and the fox
@@ -825,27 +881,32 @@
 
     // ================================================================ the draw
     draw(r, E, layer, cam) {
-      if (!this.on || !this.live || layer !== 'opaque') return;
+      if (!this.on || !this.live) return;
+      if (layer === 'trans') { this.drawCloud(r, E, cam || r.cam); return; }
+      if (layer !== 'opaque') return;
       const t0 = performance.now(), gl = r.gl, list = this.list, cap = this.b.cap;
       cam = cam || r.cam; list.length = 0;
       const cx = cam.x, cy = cam.y, cz = cam.z, put = WG.put, night = E.night || 0;
       // the murmuration (one draw), the gulls
       const Mu = this.murm;
       if (Mu && cap.murm) {
-        // each boid a party of W.MURM_K birds (wildgpu.js 'flock'): spread round it in the sky, close together on the perch
-        const K = WG.kind(gl, 'flock', KINDCAP.flock), D = K.data, fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0, P = Mu.perch;
+        // each boid a party of W.MURM_K birds (wildgpu.js 'flock'): spread round it in the sky, close together on the
+        // perch; (f-wild2) the party draws its first W.birdsVisible(d) birds as dashes — all near, a few sparkle birds
+        // far off — and the density cloud (drawCloud, the translucent pass) carries the rest
+        const K = WG.kind(gl, 'flock', KINDCAP.flock), D = K.data, fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0, P = Mu.perch, S = WG.STRIDE;
         const dc = Mu.state === 'seated' && Mu.roost ? Math.hypot(Mu.roost[0] - cx, Mu.roost[2] - cz) : Math.hypot(fl.ctr[0] - cx, fl.ctr[2] - cz);
         const roosting = Mu.ph === 'roost' && P;
         let n = 0;
         if (Mu.state !== 'away' && dc < (Mu.state === 'seated' ? 90 : 520)) for (let i = 0; i < Mu.n && n < K.cap; i++) {
           const o = i * 3, sit = Mu.landed[i] === 1, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2];
           const x = fl.pos[o] + (sit ? 0 : vx * ex) - cx, y = fl.pos[o + 1] + (sit ? 0 : vy * ex) - cy, z = fl.pos[o + 2] + (sit ? 0 : vz * ex) - cz;
-          // (the birds' size: half a block, growing with the distance — a speck never thinner than a few pixels)
-          const d = Math.sqrt(x * x + y * y + z * z), s = 0.55 * Math.max(1, Math.min(3.2, d / 55));
+          // (the birds' size: half a block, a little more far off; the shader keeps a dash at least ~1.3 px thick)
+          const d = Math.sqrt(x * x + y * y + z * z), s = 0.55 * Math.max(1, Math.min(1.5, d / 80));
           const hv = Math.hypot(vx, vz) + 1e-4, k = 0.86 + 0.24 * ((i * 0.618) % 1);
           // the party's spread: 1 in the sky; closing to its perch while it lands; small on the perch
           const spread = sit ? 0.22 : roosting ? 0.22 + 0.78 * sm(Math.hypot(P[o] - fl.pos[o], P[o + 1] - fl.pos[o + 1], P[o + 2] - fl.pos[o + 2]) / 14) : 1;
           put(D, n++, x, y, z, s, sit ? (i * 2.4) % TAU : yawOf(vx, vz), sit ? 0 : Math.atan2(vy, hv) * 0.8, sit ? 0 : fl.bank[i], fl.phase[i], 0.9 * k, 0.88 * k, 0.95 * k, 1, sit ? 0.02 : 0.45 + 0.5 * fl.flap[i], 0, sit ? -0.55 : 0.05, spread, 0, 0.12);
+          D[(n - 1) * S + 19] = sit || Mu.state !== 'fly' ? W.MURM_K : W.birdsVisible(d);
         }
         if (n) list.push([K, n]);
       }
@@ -859,7 +920,8 @@
         const K = WG.kind(gl, 'fish', KINDCAP.fish), D = K.data; let n = 0;
         for (const s of this.shoals) {
           const fl = s.fl; if (Math.hypot(s.b.x - cx, s.b.z - cz) > 56) continue;
-          for (let i = 0; i < s.n && n < K.cap; i++) { const o = i * 3, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2], k = 0.85 + 0.3 * ((i * 0.618) % 1); put(D, n++, fl.pos[o] - cx, fl.pos[o + 1] - cy, fl.pos[o + 2] - cz, 0.3 * k, yawOf(vx, vz), Math.atan2(vy, Math.hypot(vx, vz) + 1e-4) * 0.6, 0, fl.phase[i], 1, 1, 1, s.b.sky, 0, 0, 0, 0.09, 0, 1.0); }
+          // (f-wild2: a little larger; each fish rolls into its turn, its silver flank flashing — the glow slot's flash)
+          for (let i = 0; i < s.n && n < K.cap; i++) { const o = i * 3, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2], k = 0.85 + 0.3 * ((i * 0.618) % 1), bk = Math.max(-0.9, Math.min(0.9, fl.bank[i] * 1.6)), fx = sm((Math.abs(bk) - 0.12) / 0.4); put(D, n++, fl.pos[o] - cx, fl.pos[o + 1] - cy, fl.pos[o + 2] - cz, 0.36 * k, yawOf(vx, vz), Math.atan2(vy, Math.hypot(vx, vz) + 1e-4) * 0.6, bk, fl.phase[i], 1, 1, 1, s.b.sky, 0, 0, 0, 0.09, fx, 1.6); }
         }
         if (n) list.push([K, n]);
       }
@@ -889,7 +951,10 @@
       // the sky rays (glowing brighter at night)
       if (this.rays.length) {
         const K = WG.kind(gl, 'ray', KINDCAP.ray), D = K.data; let n = 0;
-        for (let k = 0; k < this.rays.length; k++) { const R = this.rays[k], x = R[0] - cx, y = R[1] - cy, z = R[2] - cz; if (x * x + z * z > 1100 * 1100) continue; put(D, n++, x, y, z, R[7], R[3], R[4], R[5], R[6], 1, 1, 1, 1, 0.42, 2.4, 0.06, 0, 0.42 + 0.58 * night, 0.35, k & 1 ? 0.65 : 0); }
+        // (f-wild2: the wing curve's beat, lag and droop — wildsim.js rayWing, the shader's mode 4; the glow along the
+        //  wing edges brighter from the golden hour on and at night)
+        const RY = W.RAY, tod = this.ctx ? this.ctx.tod : 6000, dusk = sm((tod - 10200) / 1400) * (1 - sm((tod - 13600) / 1200)), gw = 0.35 + 0.65 * Math.max(night, dusk);
+        for (let k = 0; k < this.rays.length; k++) { const R = this.rays[k], x = R[0] - cx, y = R[1] - cy, z = R[2] - cz; if (x * x + z * z > 1100 * 1100) continue; put(D, n++, x, y, z, R[7], R[3], R[4], R[5], R[6], 1, 1, 1, 1, RY.wingA, RY.wingK, RY.rest, 0, gw, 0.35, k & 1 ? 0.65 : 0); }
         if (n) list.push([K, n]);
       }
       this.stats.draws = list.length ? WG.draw(r, E, list) : 0;
@@ -897,6 +962,34 @@
       // the voxel animals: the herons, the rabbits, the fox
       this.drawVox(r, E, cam);
       this.stats.drawMs = this.stats.drawMs * 0.9 + (performance.now() - t0) * 0.1;
+    }
+    // (f-wild2) the murmuration's density cloud, in the translucent pass: each boid far enough that its party draws only
+    // some of its birds is one impostor whose optical depth carries the rest — the boids' density round it (Flock.dens)
+    // and how far its wings turn to the eye (W.puffTau); overlapping, they blend into a dark core with a lighter rim
+    drawCloud(r, E, cam) {
+      const Mu = this.murm, cap = this.b.cap, list = this.list;
+      list.length = 0;
+      if (!Mu || !cap.murm || Mu.state !== 'fly') return;
+      const fl = Mu.fl, cx = cam.x, cy = cam.y, cz = cam.z;
+      if (Math.hypot(fl.ctr[0] - cx, fl.ctr[2] - cz) > 520) return;
+      const gl = r.gl, K = WG.kind(gl, 'puff', KINDCAP.flock), D = K.data, ex = Mu.ex, KB = W.MURM_K, R = W.PUFF.R, put = WG.put;
+      let n = 0;
+      for (let i = 0; i < Mu.n && n < K.cap; i++) {
+        const o = i * 3, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2];
+        const x = fl.pos[o] + vx * ex - cx, y = fl.pos[o + 1] + vy * ex - cy, z = fl.pos[o + 2] + vz * ex - cz, d = Math.sqrt(x * x + y * y + z * z) + 1e-4;
+        const kv = W.birdsVisible(d);
+        if (kv >= KB) continue;
+        // the wings' plane: the boid's up, banked about its heading; its turn to the eye's ray
+        const sv = Math.hypot(vx, vy, vz) + 1e-6, fx = vx / sv, fy = vy / sv, fz = vz / sv, hl = Math.hypot(fx, fz) + 1e-6, rx = -fz / hl, rz = fx / hl;
+        const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy, b = fl.bank[i], cb = Math.cos(b), sb = Math.sin(b);
+        const nx = ux * cb + rx * sb, ny = uy * cb, nz = uz * cb + rz * sb, ndv = Math.abs(nx * x + ny * y + nz * z) / d;
+        const tau = W.puffTau(fl.dens[i], ndv, kv, KB, Mu.n);
+        if (tau < 0.004) continue;
+        put(D, n++, x, y, z, R, 0, 0, 0, 0, 0.022, 0.02, 0.026, tau, 0, 0, 0, 0, 0, 0, 0);
+      }
+      if (!n) return;
+      list.push([K, n]);
+      this.stats.drawsT = WG.draw(r, E, list);
     }
     drawVox(r, E, cam) {
       const g = this.g, ent = g.entities;
@@ -954,6 +1047,10 @@
         rabbits: this.rabbits.map(q => ({ state: q.state, pos: q.pos.map(v => +v.toFixed(1)) })), fox: this.fox ? { state: this.fox.state, pos: this.fox.pos.map(v => +v.toFixed(1)) } : null,
         drifts: this.scan.drifts ? this.scan.drifts.length : 0, cover: this.scan.cover.length,
         ms: Object.assign({}, this.stats.avg), drawMs: +this.stats.drawMs.toFixed(3), draws: this.stats.draws, inst: this.stats.n.inst || 0,
+        // (f-wild2) the murmuration's figure, the pass at dusk
+        figure: Mu && Mu.state === 'fly' && this.ctx ? W.murmFigure(this.seed ^ Mu.key, this.ctx.clock) : null,
+        pass: this.pass ? { day: this.pass.day, tried: this.pass.tried, plan: this.pass.plan ? { k: this.pass.plan.k, T0: +this.pass.plan.T0.toFixed(1), Tn: +this.pass.plan.Tn.toFixed(1), T1: +this.pass.plan.T1.toFixed(1), P: this.pass.plan.P.map(v => +v.toFixed(1)), scale: +this.pass.plan.scale.toFixed(2) } : null } : null,
+        clock: this.ctx ? +this.ctx.clock.toFixed(2) : null,
       };
     }
   }

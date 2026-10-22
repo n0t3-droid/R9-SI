@@ -24,7 +24,9 @@
   // per tier: 0 Very Low · 1 Low · 2 Balanced · 3 High · 4 Ultra. Very Low: nothing new drawn; Low: the small things;
   // Balanced and up: all of it
   W.CAPS = {
-    murm: [0, 0, 200, 300, 360],     // the murmuration's boids (one flock; each drawn as MURM_K birds)
+    // (f-wild2: 2.4× t-wild's 200 / 300 / 360 — the CPU held in its tier: every third boid steers a step, nine blocks of
+    //  neighbourhood, 20 steps a second from afar — test/wild_sim.js § 2 measures it against t-wild's flock)
+    murm: [0, 0, 480, 720, 840],     // the murmuration's boids (one flock; each drawn as MURM_K birds)
     gull: [0, 3, 5, 7, 9],           // gulls over the lake by day
     heron: [0, 1, 1, 2, 2],          // herons at the ponds
     fish: [0, 32, 48, 64, 80],       // fish in a shoal
@@ -88,7 +90,12 @@
   // waveA · fearR, fearA (the scatter from a fear point)
   // roost (the murmuration): the target pulls only beyond tgtR and only across (the flock roams its stage free and keeps
   // its own shape), heights held in a band of ±bandY round it (wY); lobes: the flock parts into wings (murmLobes)
-  W.FLOCK = { roost: 1, r: 11, K: 7, maxC: 32, sepR: 6, wSep: 30, wAli: 2.2, wCoh: 0.25, cohY: 4, wTgt: 8, tgtR: 40, bandY: 6, wY: 0.6, lobes: 3, lobeR: 34, flat: 1.2, vmin: 7, vmax: 12, amax: 34, stride: 2, wave: [5, 10], waveV: 26, waveW: 4.5, waveMax: 110, waveA: 22, fearR: 6, fearA: 30 };
+  // (f-wild2: the murmuration flies figures — each bird its own place along the figure's spine, Flock.bofs from
+  //  W.murmTargets — so its pull starts at 15, not 40, and the lobes are gone from it; nine blocks of neighbourhood,
+  //  at most 20 met, every third bird steering a step: 2.4× the boids for t-wild's CPU)
+  W.FLOCK = { roost: 1, r: 9, K: 7, maxC: 26, sepR: 5.5, wSep: 30, wAli: 2.2, wCoh: 0.25, cohY: 4, wTgt: 8, tgtR: 15, bandY: 3, wY: 0.6, lobes: 0, lobeR: 34, flat: 1.2, vmin: 7, vmax: 12, amax: 34, stride: 3, wave: [5, 10], waveV: 26, waveW: 4.5, waveMax: 110, waveA: 22, fearR: 6, fearA: 30 };
+  // the murmuration's steps a second: near (within MURM_FAR blocks of the eye) and from afar (the draw extrapolates)
+  W.MURM_HZ = [30, 20]; W.MURM_FAR = 120;
   W.SHOAL = { roost: 0, lobes: 0, r: 2.0, K: 8, maxC: 24, sepR: 0.85, wSep: 22, wAli: 2.8, wCoh: 0.7, cohY: 1.4, wTgt: 2.0, tgtR: 1.8, flat: 2.4, vmin: 0.5, vmax: 2.4, amax: 10, stride: 1, wave: null, waveV: 0, waveW: 0, waveA: 0, fearR: 3.5, fearA: 16 };
   const GN = 1024, GM = GN - 1;   // the grid's hash table (a power of two)
   class Flock {
@@ -103,6 +110,9 @@
       this.rand = W.rng(seed); this.frame = 0; this.time = 0;
       this.bound = null;                  // a cylinder of water to stay in: {x, z, r, y0, y1}
       this.fear = null;                   // a point to scatter from ([x, y, z])
+      // (f-wild2) bofs: each bird's own offset from the target (n × 3: its place in the murmuration's figure), or null;
+      // dens: the neighbours each bird met within r when it last steered, smoothed — the density cloud's field
+      this.bofs = null; this.dens = new Float32Array(n);
       // lobes: bird i follows the target moved by its lobe's offset (lobe i % lobes; murmLobes sets them from the clock)
       // — the cloud parts into two or three wings that swing apart and fold back into one
       this.lobes = this.P.lobes | 0; this.lofs = this.lobes > 1 ? new Float32Array(this.lobes * 3) : null;
@@ -162,6 +172,7 @@
             if (++seen >= MAXC) break scan;
           }
         }
+        this.dens[i] += (seen - this.dens[i]) * 0.35;
         if (cnt) {
           const q = 1 / cnt;
           ax += (ux * q - vx) * P.wAli + mx * q * P.wCoh + sx * P.wSep;
@@ -170,7 +181,9 @@
         }
         // the target's pull (stronger the farther), the climb's damping (they fly level: sheets)
         // (none within tgtR of it: the cloud is not drawn to a point — the birds sweep through the target's zone and turn)
-        const lo = this.lofs ? (i % this.lobes) * 3 : -1, lx = lo >= 0 ? this.lofs[lo] : 0, ly = lo >= 0 ? this.lofs[lo + 1] : 0, lz = lo >= 0 ? this.lofs[lo + 2] : 0;
+        // (the bird's own place in the figure when it has one, else its lobe's)
+        const bo = this.bofs, lo = this.lofs ? (i % this.lobes) * 3 : -1;
+        const lx = bo ? bo[i * 3] : lo >= 0 ? this.lofs[lo] : 0, ly = bo ? bo[i * 3 + 1] : lo >= 0 ? this.lofs[lo + 1] : 0, lz = bo ? bo[i * 3 + 2] : lo >= 0 ? this.lofs[lo + 2] : 0;
         const tx = tg[0] + lx - px, ty = tg[1] + ly - py, tz = tg[2] + lz - pz;
         if (P.roost) {
           // the roost's pull (the murmuration): only beyond a wide circle round the target and only across (the birds turn
@@ -255,7 +268,8 @@
     const R1 = 28 + 12 * h(1), R2 = 10 + 8 * h(2), w1 = 0.1 + 0.04 * h(3), w2 = 0.21 + 0.08 * h(4), p1 = TAU * h(5), p2 = TAU * h(6);
     out[0] = st.x + R1 * Math.cos(w1 * t + p1) + R2 * Math.cos(w2 * t + p2);
     out[2] = st.z + R1 * 0.85 * Math.sin(w1 * t + p1) + R2 * Math.sin(w2 * 1.3 * t + p2);
-    out[1] = st.y + 6 + 5 * Math.sin(0.17 * t + p1) + 3 * Math.sin(0.41 * t + p2);
+    // (f-wild2: a calmer rise and fall — the figures carry the heights now, between the water and the isles' rock)
+    out[1] = st.y + 4 + 3 * Math.sin(0.17 * t + p1) + 2 * Math.sin(0.41 * t + p2);
     return out;
   };
   // the murmuration's lobes: n offsets (out: n × 3) that swing apart up to R and fold back to nothing, slowly (a breath
@@ -269,6 +283,87 @@
     }
     return out;
   };
+  // ---------------------------------------------------------------- f-wild2: the figures and the density cloud
+  // The murmuration's figures (R50-10: "the classic starling murmuration shape: ribbons, a waist, a ball that splits").
+  // Each figure is a spine in the flock's own frame (a: along its axis, b: across, y: up); every bird has its own place
+  // s ∈ [0, 1) along it (W.murmPlaces: the golden-ratio sequence, the same for every guest) and steers toward the
+  // target + its place (Flock.bofs). A figure holds 16 s, then morphs into the next in 6 s; the order is the clock's and
+  // the world's (W.murmFigure — the same for host and guests); the axis turns slowly. Heights are held between the water
+  // and the isles' rock (MURM_Y).
+  W.FIGS = ['ball', 'ribbon', 'waist', 'split', 'column', 'arc'];
+  W.MURM_FIG = { dur: 16, blend: 6, len: 200, wav: 20, gw: 56, gs: 90, aw: 80, ah: 50, ch: 40, rot: 0.035 };
+  W.MURM_Y = [72, 107];
+  W.murmPlaces = function (n) { const S = new Float32Array(n); for (let i = 0; i < n; i++) S[i] = (i * 0.6180339887) % 1; return S; };
+  // which figure at the clock t (s): {a, b, w (0 … 1 the morph from a to b), k (the slot)}; each cycle of the six in a
+  // seeded order of its own
+  const FIGO = [];
+  const figAt = (seed, k) => {
+    const c = Math.floor(k / W.FIGS.length), j = k - c * W.FIGS.length;
+    // (a seeded permutation per cycle: Fisher-Yates on the cycle's hash; kept in a small cache of the last cycle)
+    const perm = (cc) => { const o = W.FIGS.slice(); for (let i = o.length - 1; i > 0; i--) { const r = Math.floor(W.h(seed, cc, 0x4f + i) * (i + 1)) % (i + 1); const t = o[i]; o[i] = o[r]; o[r] = t; } return o; };
+    let o = FIGO[0] && FIGO[0].seed === seed && FIGO[0].c === c ? FIGO[0].o : null;
+    if (!o) {
+      o = perm(c);
+      // (no figure twice in a row across the cycles' seam: the cycle's first trades places with its second)
+      if (c > 0 && o[0] === perm(c - 1)[W.FIGS.length - 1]) { const t = o[0]; o[0] = o[1]; o[1] = t; }
+      FIGO[0] = { seed, c, o };
+    }
+    return o[j];
+  };
+  W.murmFigure = function (seed, t) {
+    const F = W.MURM_FIG, k = Math.floor(Math.max(0, t) / F.dur), u = (Math.max(0, t) - k * F.dur - (F.dur - F.blend)) / F.blend;
+    const w = u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
+    return { a: figAt(seed, k), b: figAt(seed, k + 1), w, k };
+  };
+  // a place s on a figure's spine at the clock t: out = [a, y, b] in the flock's frame
+  const sg = (x) => (x < 0 ? -1 : 1);
+  W.murmSpine = function (fig, s, t, out) {
+    const F = W.MURM_FIG, c = s - 0.5;
+    let a = 0, y = 0, b = 0;
+    if (fig === 'ribbon') { a = c * F.len; b = Math.sin(c * Math.PI) * 16; y = Math.sin(c * 6.2832 + t * 0.3) * F.wav; }   // an S-curve that rises and falls
+    else if (fig === 'waist') { a = sg(c) * Math.sqrt(Math.abs(2 * c)) * F.gw; y = Math.sin(c * 9) * 3; }   // crowded to the ends: an hourglass
+    else if (fig === 'split') { a = sg(c) * Math.pow(Math.abs(2 * c), 0.25) * F.gs; }                       // two balls, a bridge of stragglers
+    else if (fig === 'column') { const th = c * 3; a = Math.sin(th * 0.5) * 14; b = Math.cos(th) * 8; y = c * F.ch; }   // a tilted funnel
+    else if (fig === 'arc') { const th = c * 2.4; a = Math.sin(th) * F.aw; y = (Math.cos(th) - 0.7) * F.ah; }             // a bow
+    out[0] = a; out[1] = y; out[2] = b;   // ('ball': every place at the middle — the pull's radius makes the ball)
+    return out;
+  };
+  // every bird's offset from the target (out: n × 3, in blocks): its place on the figure (or the morph of two), turned
+  // by the figure's slow axis, its height held in MURM_Y. fig: hold one figure (the tests)
+  const QA = [0, 0, 0], QB = [0, 0, 0];
+  W.murmTargets = function (seed, t, S, n, out, tgt, fig) {
+    const F = W.MURM_FIG, M = fig ? null : W.murmFigure(seed, t), fa = fig || M.a, fb = fig || M.b, w = fig ? 0 : M.w;
+    const rot = t * F.rot + W.h(seed, 3, 0x41) * TAU, ca = Math.cos(rot), sa = Math.sin(rot), ty = tgt ? tgt[1] : 0, Y = W.MURM_Y;
+    for (let i = 0; i < n; i++) {
+      W.murmSpine(fa, S[i], t, QA);
+      let a = QA[0], y = QA[1], b = QA[2];
+      if (w > 0) { W.murmSpine(fb, S[i], t, QB); a += (QB[0] - a) * w; y += (QB[1] - y) * w; b += (QB[2] - b) * w; }
+      out[i * 3] = ca * a - sa * b; out[i * 3 + 2] = sa * a + ca * b;
+      out[i * 3 + 1] = Math.max(Y[0], Math.min(Y[1], ty + y)) - ty;
+    }
+    return out;
+  };
+  // The density cloud (wildgpu.js 'puff'): from afar each boid's party is drawn as one soft impostor — a camera-facing
+  // disc whose optical depth follows the boids' density round it (Flock.dens) and how far its wings turn to the eye (a
+  // banked party shows them: the turning wave sweeps through as a dark band; a level one seen from the side is thin);
+  // overlapping discs blend as 1 − e^−Στ. It carries the share of the party's birds not drawn as birds (birdsVisible:
+  // all K within kFar[0] blocks, kMin sparkle birds beyond kFar[1]) — no pop where one hands over to the other.
+  // R: its radius (blocks) · tau0, gam, dref, base: the depth's model · nRef: the boids it is tuned for (fewer boids:
+  // each carries more) · fog: the share of the distance the flock's own air counts (a dark mass stays dark at dusk)
+  W.PUFF = { R: 5.2, tau0: 0.22, gam: 1.75, dref: 9, base: 0.25, nRef: 720, kFar: [100, 160], kMin: 2, fog: 0.55, cut: 1.6 };
+  W.birdsVisible = function (d) {
+    const P = W.PUFF, K = W.MURM_K;
+    if (d <= P.kFar[0]) return K;
+    if (d >= P.kFar[1]) return P.kMin;
+    return K + (P.kMin - K) * (d - P.kFar[0]) / (P.kFar[1] - P.kFar[0]);
+  };
+  // the impostor's optical depth at its middle: dens (neighbours met), ndv (|the wings' normal · the eye's ray|), kVis
+  // (the party's birds drawn), K (a party's birds), n (the flock's boids)
+  W.puffTau = function (dens, ndv, kVis, K, n) {
+    const P = W.PUFF, q = Math.max(0.15, Math.min(3, dens / P.dref)), share = Math.max(0, K - kVis) / K;
+    return share <= 0 ? 0 : P.tau0 * (P.nRef / Math.max(1, n)) * Math.pow(q, P.gam) * (P.base + (1 - P.base) * Math.min(1, Math.abs(ndv))) * share;
+  };
+
   // a shoal's: a slow loop round the middle of its water
   W.shoalTarget = function (seed, t, B, out) {
     const h = (k) => W.h(seed, k, 0x5f), R = B.r * (0.3 + 0.2 * h(1)), w = (0.25 + 0.15 * h(2)) * (h(3) < 0.5 ? 1 : -1);
@@ -391,7 +486,17 @@
   // ---------------------------------------------------------------- the sky rays' circuit
   // RAY: the mesh's span is 1 (wingtip to wingtip); a great ray 15–22 of it, its young one beside it 0.6 of that; speed
   // blocks/s; the wing wave's period (s); the circuit's height (alt ± altA: under the isles' lowest rock, between them)
-  W.RAY = { span: 1, minScale: 15, maxScale: 22, young: 0.6, speed: 5.4, period: 4.6, alt: 107, altA: 5, side: 4.5, up: 3, pairBack: 7, pairSide: 15 };
+  // (f-wild2: the young one 0.45 of its parent — 6.75–9.9 blocks across, the size of the one that makes the pass at dusk;
+  //  wingA, wingK, rest: the wing curve's beat at the tips (rad), its lag along the span (rad), its droop at rest)
+  W.RAY = { span: 1, minScale: 15, maxScale: 22, young: 0.45, speed: 5.4, period: 4.6, alt: 107, altA: 5, side: 4.5, up: 3, pairBack: 7, pairSide: 15, wingA: 0.52, wingK: 1.5, rest: -0.07 };
+  // the wing curve (f-wild2): the angle (rad) a section of the wing at s (0 the root at the body's edge … 1 the tip)
+  // turns about the body's long axis at the beat's phase — the root still, the tips beating ±wingA, the tip a quarter
+  // beat behind the root: a slow wave that runs out along the wing (wildgpu.js turns each vertex by it: a curved wing)
+  W.rayWing = function (s, phase, A, k, rest) {
+    const R = W.RAY; A = A === undefined ? R.wingA : A; k = k === undefined ? R.wingK : k; rest = rest === undefined ? R.rest : rest;
+    s = Math.max(0, Math.min(1, s));
+    return rest * s * s + A * Math.pow(s, 1.4) * Math.sin(phase - k * s);
+  };
   // the rock of an island at a height: the widest it can be there (gen_realm islandShape at its worst: the warp's 1.28,
   // the underside's jag 1) — an inverted cone from y − 2 down to y − 2 − r·deep; up to the dome and the trees the full disc
   W.coneR = function (I, y) {
@@ -475,6 +580,129 @@
     out[6] = clock * TAU / R.period + k * 1.9 + (young ? 0.8 : 0);
     const big = R.minScale + (R.maxScale - R.minScale) * W.h(seed, j, 0x5c);
     out[7] = young ? big * R.young : big;
+    return out;
+  };
+
+  // ---------------------------------------------------------------- f-wild2: the pass at dusk
+  // Once a dusk one young ray leaves the circuit, glides down to a point low over the water or the land of the player's
+  // cell (PASS.cell blocks — everyone in the cell sees the same pass), crosses it coming from the isles 7–10 blocks over
+  // the top there, climbs away in a wide turn and rejoins the circuit at its slot (blended in and out of the circuit
+  // over the first and last `ramp` of each half). A pure function of (seed, day, the cell, the world's tops): the same
+  // for host and guests. topAt(x, z) → the y over the highest block of the column (water, leaves and all), or null
+  // where the column is not known (it counts as the cell's own top).
+  W.PASS = { cell: 24, speed: 8.5, over: [7, 10], reach: 520, win: [11300, 12400], ramp: 0.24, clear: 5, step: 1 };
+  W.passTime = (seed, day) => W.PASS.win[0] + Math.floor(W.h(seed, day | 0, 0x9a5) * (W.PASS.win[1] - W.PASS.win[0]));
+  const loopCtr = (loop) => { if (!loop.ctr) { let x = 0, y = 0, z = 0; for (const p of loop.pts) { x += p[0]; y += p[1]; z += p[2]; } const n = loop.pts.length; loop.ctr = [x / n, y / n, z / n]; } return loop.ctr; };
+  // a Catmull-Rom through the control points (open, the ends mirrored), resampled every `step` blocks of its length:
+  // {tab: Float32Array of x, y, z per sample, at: the length at each control point, L}
+  const crPath = (pts, step) => {
+    const n = pts.length, ext = (a, b) => [2 * a[0] - b[0], 2 * a[1] - b[1], 2 * a[2] - b[2]];
+    const Q = (i) => (i < 0 ? ext(pts[0], pts[1]) : i >= n ? ext(pts[n - 1], pts[n - 2]) : pts[i]);
+    const xs = [pts[0][0]], ys = [pts[0][1]], zs = [pts[0][2]], ls = [0], at = [0];
+    let L = 0;
+    for (let i = 0; i < n - 1; i++) {
+      const a = Q(i - 1), b = Q(i), c = Q(i + 1), d = Q(i + 2);
+      for (let k = 1; k <= 24; k++) {
+        const t = k / 24, x = cr(a[0], b[0], c[0], d[0], t), y = cr(a[1], b[1], c[1], d[1], t), z = cr(a[2], b[2], c[2], d[2], t);
+        L += Math.hypot(x - xs[xs.length - 1], y - ys[ys.length - 1], z - zs[zs.length - 1]); xs.push(x); ys.push(y); zs.push(z); ls.push(L);
+      }
+      at.push(L);
+    }
+    const m = Math.floor(L / step) + 2, tab = new Float32Array(m * 3);
+    for (let j = 0, q = 0; j < m; j++) {
+      const s = Math.min(L, j * step);
+      while (q < ls.length - 2 && ls[q + 1] < s) q++;
+      const u = (s - ls[q]) / ((ls[q + 1] - ls[q]) || 1e-6);
+      tab[j * 3] = xs[q] + (xs[q + 1] - xs[q]) * u; tab[j * 3 + 1] = ys[q] + (ys[q + 1] - ys[q]) * u; tab[j * 3 + 2] = zs[q] + (zs[q + 1] - zs[q]) * u;
+    }
+    return { tab, at, L };
+  };
+  const PST = [0, 0, 0, 0, 0, 0, 0, 0];
+  W.passPlan = function (seed, day, eye, loop, topAt, nRays) {
+    const Pp = W.PASS, cell = Pp.cell, cx = Math.floor(eye[0] / cell) * cell + cell / 2, cz = Math.floor(eye[2] / cell) * cell + cell / 2, C = loopCtr(loop);
+    let ax = cx - C[0], az = cz - C[2]; const dl = Math.hypot(ax, az);
+    if (dl > Pp.reach) return null;
+    if (dl < 1) { ax = 1; az = 0; } else { ax /= dl; az /= dl; }
+    // (the tops, each column asked once; a column not known counts as the cell's own top)
+    const memo = new Map(), own0 = topAt(Math.floor(cx), Math.floor(cz)), own = own0 === null || own0 === undefined ? eye[1] - 1.62 : own0;
+    const T = (x, z) => { x = Math.floor(x); z = Math.floor(z); const k = x * 65536 + z; let t = memo.get(k); if (t === undefined) { t = topAt(x, z); if (t === null || t === undefined) t = own; memo.set(k, t); } return t; };
+    // the highest top within the body's half width (6) of the line from (x, z) to (x2, z2), sampled every `st` blocks
+    // along and across (a thin roof ridge or a lantern must not slip between the samples where the glide is low)
+    const topAlong = (x, z, x2, z2, st) => { st = st || 2; const L = Math.hypot(x2 - x, z2 - z), ux = L > 0 ? (x2 - x) / L : 0, uz = L > 0 ? (z2 - z) / L : 0; let m = -1e9; for (let a = -6; a <= L + 6; a += st) for (let b = -6; b <= 6.01; b += st) m = Math.max(m, T(x + ux * a - uz * b, z + uz * a + ux * b)); return m; };
+    // the way across the cell: from the isles where it can, else turned toward the lowest way across (a lighthouse, a
+    // tree line in the way) — twelve ways round, the lowest run of tops ±40 along it, a turn costing a little
+    let dx = ax, dz = az, run = 1e9, score = 1e9;
+    for (let q = 0; q < 12; q++) {
+      const da = (q < 7 ? q : q - 12) * TAU / 12, c = Math.cos(da), s = Math.sin(da), ux = ax * c - az * s, uz = ax * s + az * c;
+      const r = topAlong(cx - ux * 40, cz - uz * 40, cx + ux * 40, cz + uz * 40, 1.25), sc = r + 0.6 * Math.abs(da);
+      if (sc < score - 1e-9) { score = sc; run = r; dx = ux; dz = uz; }
+    }
+    const sd = W.h(seed, day | 0, 0x5d) < 0.5 ? 1 : -1, sx = -dz * sd, sz = dx * sd;   // (the side it turns out to)
+    const over = Pp.over[0] + W.h(seed, day | 0, 0x5e) * (Pp.over[1] - Pp.over[0]);
+    const Pn = [cx, Math.max(own + over, run + Pp.clear - 0.5), cz];
+    const Tn = (day * 24000 + W.passTime(seed, day)) / 20, sp = Pp.speed;
+    // the way through its control points: from its slot on the circuit at T0, down to the pass point, out and back up to
+    // its slot at T1 (lift: the inner points clear of the tops round them and along their segments)
+    const build = (k, T0, T1, lift) => {
+      W.rayState(seed, T0, k, 4, loop, PST); const S0 = [PST[0], PST[1], PST[2]], f0 = [-Math.sin(PST[3]), -Math.cos(PST[3])];
+      W.rayState(seed, T1, k, 4, loop, PST); const S1 = [PST[0], PST[1], PST[2]], f1 = [-Math.sin(PST[3]), -Math.cos(PST[3])];
+      const pts = [S0, [S0[0] + f0[0] * 22, S0[1] - 3, S0[2] + f0[1] * 22],
+        [Pn[0] - dx * 70, (S0[1] + Pn[1]) / 2, Pn[2] - dz * 70], [Pn[0] - dx * 24, Pn[1] + 1.2, Pn[2] - dz * 24], Pn,
+        [Pn[0] + dx * 26 + sx * 5, Pn[1] + 2, Pn[2] + dz * 26 + sz * 5], [Pn[0] + dx * 62 + sx * 26, Pn[1] + 14, Pn[2] + dz * 62 + sz * 26],
+        [S1[0] - f1[0] * 22, S1[1] - 4, S1[2] - f1[1] * 22], S1];
+      if (lift) for (let pass = 0; pass < 2; pass++) for (let i = 1; i < pts.length - 1; i++) {
+        if (i === 4) continue;
+        const p = pts[i], a = pts[i - 1], b = pts[i + 1], need = Math.max(topAlong(a[0], a[2], p[0], p[2]), topAlong(p[0], p[2], b[0], b[2])) + Pp.clear;
+        if (p[1] < need) p[1] = need;
+      }
+      return crPath(pts, Pp.step);
+    };
+    let best = null;
+    for (let k = 1; k < Math.min(4, nRays || 4); k += 2) {
+      // T0: the moment it leaves, so that it is at the pass point at Tn (bisection: T0 + its way down / speed = Tn);
+      // T1: the moment it is back (T1 = Tn + its way back / speed)
+      let lo = Tn - 100, hi = Tn - 4;
+      for (let it = 0; it < 16; it++) { const m = (lo + hi) / 2, p = build(k, m, Tn + 30, false); if (m + p.at[4] / sp > Tn) hi = m; else lo = m; }
+      const T0g = (lo + hi) / 2;
+      lo = Tn + 4; hi = Tn + 120;
+      for (let it = 0; it < 16; it++) { const m = (lo + hi) / 2, p = build(k, T0g, m, false); if (m - Tn > (p.L - p.at[4]) / sp) hi = m; else lo = m; }
+      const path = build(k, T0g, (lo + hi) / 2, true), T0 = Tn - path.at[4] / sp, T1 = T0 + path.L / sp;
+      if (!best || path.L < best.L) best = { k, T0, Tn, T1, L: path.L, sN: path.at[4], P: Pn, D: [dx, dz], cell: [cx, cz], tab: path.tab, scale: W.rayState(seed, Tn, k, 4, loop, PST)[7] };
+    }
+    return best;
+  };
+  // where the passing ray is at the clock: out = [x, y, z, yaw, pitch, bank, phase, scale] (as rayState), or null
+  // before and after its pass
+  const PA = [0, 0, 0], PB = [0, 0, 0], PC = [0, 0, 0], PS = [0, 0, 0, 0, 0, 0, 0, 0];
+  const sm01 = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+  const passPos = (plan, loop, seed, t, o) => {
+    const Pp = W.PASS, T = plan.tab, m = T.length / 3, s = Math.max(0, Math.min(plan.L, (t - plan.T0) * Pp.speed)), f = s / Pp.step;
+    const i = Math.min(m - 2, Math.floor(f)), u = f - i;
+    o[0] = T[i * 3] + (T[i * 3 + 3] - T[i * 3]) * u; o[1] = T[i * 3 + 1] + (T[i * 3 + 4] - T[i * 3 + 1]) * u; o[2] = T[i * 3 + 2] + (T[i * 3 + 5] - T[i * 3 + 2]) * u;
+    const w = sm01((t - plan.T0) / (Pp.ramp * (plan.Tn - plan.T0))) * sm01((plan.T1 - t) / (Pp.ramp * (plan.T1 - plan.Tn)));
+    if (w < 1) { W.rayState(seed, t, plan.k, 4, loop, PS); o[0] = PS[0] + (o[0] - PS[0]) * w; o[1] = PS[1] + (o[1] - PS[1]) * w; o[2] = PS[2] + (o[2] - PS[2]) * w; }
+    return o;
+  };
+  W.passAt = function (plan, loop, seed, clock, out) {
+    if (!plan || !(clock >= plan.T0 && clock <= plan.T1)) return null;
+    passPos(plan, loop, seed, clock, PC); passPos(plan, loop, seed, clock - 0.3, PA); passPos(plan, loop, seed, clock + 0.3, PB);
+    const vx = PB[0] - PA[0], vy = PB[1] - PA[1], vz = PB[2] - PA[2], hl = Math.hypot(vx, vz) || 1e-6;
+    out[0] = PC[0]; out[1] = PC[1]; out[2] = PC[2];
+    out[3] = Math.atan2(-vx, -vz); out[4] = Math.atan2(vy, hl);
+    // the bank: into the turn (the heading's change per block, as the circuit's)
+    const h0 = Math.atan2(PC[2] - PA[2], PC[0] - PA[0]), h1 = Math.atan2(PB[2] - PC[2], PB[0] - PC[0]);
+    let dh = h1 - h0; if (dh > Math.PI) dh -= TAU; else if (dh < -Math.PI) dh += TAU;
+    out[5] = Math.max(-0.55, Math.min(0.55, -dh / (hl / 2) * 22));
+    out[6] = clock * TAU / W.RAY.period + plan.k * 1.9 + 0.8;
+    out[7] = plan.scale;
+    return out;
+  };
+  // the player's shadow on a water surface at y = surf (the sun's direction sunDir, toward the sun): out = [x, z], or
+  // null when the sun is down (no shadow to follow)
+  W.shadowOnWater = function (feet, sunDir, surf, out) {
+    if (!sunDir || !(sunDir[1] > 0.08)) return null;
+    const k = (feet[1] - surf) / sunDir[1];
+    out[0] = feet[0] - sunDir[0] * k; out[1] = feet[2] - sunDir[2] * k;
     return out;
   };
 })(typeof VR !== 'undefined' ? VR : (globalThis.VR = globalThis.VR || {}));

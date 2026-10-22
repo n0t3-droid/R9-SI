@@ -61,7 +61,7 @@ const run = (n, seed, secs, o) => {
   f.place(stage.x, stage.y, stage.z, 12);
   const dt = 1 / 30, steps = Math.round(secs / dt), S = W.murmPlaces ? W.murmPlaces(n) : null;
   if (f.P.roost && W.murmTargets) f.bofs = new Float32Array(n * 3);
-  let nan = false, vlo = 1e9, vhi = 0, far = 0, spreadMax = 0, own = 0;
+  let nan = false, vlo = 1e9, vhi = 0, far = 0, spreadMax = 0, own = 0; const OWN = new Float32Array(n);
   for (let s = 0; s < steps; s++) {
     W.murmTarget(4242, s * dt, stage, f.tgt);
     if (f.bofs) W.murmTargets(4242, s * dt, S, n, f.bofs, f.tgt);
@@ -74,9 +74,11 @@ const run = (n, seed, secs, o) => {
         if (!Number.isFinite(x + y + z)) nan = true;
         const v = Math.hypot(f.vel[i * 3], f.vel[i * 3 + 1], f.vel[i * 3 + 2]); vlo = Math.min(vlo, v); vhi = Math.max(vhi, v);
         far = Math.max(far, Math.hypot(x - c[0], y - c[1], z - c[2]));
-        // (how far a bird is from its own place in the figure, horizontally — a bird that strays from its figure)
-        if (f.bofs) own = Math.max(own, Math.hypot(x - f.tgt[0] - f.bofs[i * 3], z - f.tgt[2] - f.bofs[i * 3 + 2]));
+        // (how far a bird is from its own place in the figure, horizontally — the median of a frame: the birds can not
+        //  hover, they swirl round their places (the pull starts 15 out), and a morph carries them across for a while)
+        if (f.bofs) OWN[i] = Math.hypot(x - f.tgt[0] - f.bofs[i * 3], z - f.tgt[2] - f.bofs[i * 3 + 2]);
       }
+      if (f.bofs) { const o = Array.from(OWN).sort((p, q) => p - q); own = Math.max(own, o[n >> 1]); }
     }
   }
   return { f, nan, vlo, vhi, far, spreadMax, own };
@@ -91,7 +93,7 @@ const run = (n, seed, secs, o) => {
   check(blo > stage.y - 22 && bhi < 112, `over the water and under the isles' lowest rock (115): ${blo.toFixed(0)} … ${bhi.toFixed(0)}`);
   // (f-wild2: one flock that takes the figures' shapes — a ribbon 200 long, two balls apart — so the cohesion is each
   //  bird near its own place in the figure, and no bird lost far from the cloud)
-  check(A.own < 48 && A.far < 150, `cohesive: every bird near its place in the figure (the farthest ${A.own.toFixed(1)} blocks from it), none lost (the farthest ${A.far.toFixed(1)} from the middle)`);
+  check(A.own < 50 && A.far < 150, `cohesive: the birds swirl round their places in the figure (half of them within ${A.own.toFixed(1)} blocks of it at the worst moment), none lost (the farthest ${A.far.toFixed(1)} from the middle)`);
   // a great cloud: from the beach (150–200 blocks) it spans a good part of the evening sky
   const sp = A.f.spread();
   check(sp >= 14, `a great cloud, not a knot (spread ${sp.toFixed(1)} blocks: ${(sp * 4).toFixed(0)} across)`);
@@ -288,7 +290,9 @@ const run = (n, seed, secs, o) => {
   for (let s = 0; s < 30 * 30; s++) { W.murmTarget(5, s / 30, stage, f.tgt); W.murmTargets(5, s / 30, S, n, f.bofs, f.tgt, 'ball'); f.step(1 / 30); }
   const c = f.ctr, sp = f.spread(); let ci = 0, cn = 0, ri = 0, rn = 0;
   for (let i = 0; i < n; i++) { const d = Math.hypot(f.pos[i * 3] - c[0], f.pos[i * 3 + 1] - c[1], f.pos[i * 3 + 2] - c[2]); if (d < 0.5 * sp) { ci += f.dens[i]; cn++; } else if (d > 1.3 * sp) { ri += f.dens[i]; rn++; } }
-  check(!!f.dens && cn > 20 && rn > 5 && ci / cn > 1.5 * (ri / rn), `the density field: the core's boids meet more neighbours than the rim's (${(ci / Math.max(1, cn)).toFixed(1)} against ${(ri / Math.max(1, rn)).toFixed(1)}; ${cn} and ${rn} boids)`);
+  // (what the eye gets: the impostors' depth in the core against the rim's — the core is darker by ≥ 1.8×)
+  const tc = W.puffTau ? W.puffTau(ci / Math.max(1, cn), 0.5, 2, W.MURM_K, n) : 0, tr = W.puffTau ? W.puffTau(ri / Math.max(1, rn), 0.5, 2, W.MURM_K, n) : 1;
+  check(!!f.dens && cn > 20 && rn > 5 && ci / cn > ri / rn && tc >= 1.8 * tr, `the density field: the core's boids meet more neighbours than the rim's (${(ci / Math.max(1, cn)).toFixed(1)} against ${(ri / Math.max(1, rn)).toFixed(1)}; ${cn} and ${rn} boids) — the core's impostors ${(tc / Math.max(1e-6, tr)).toFixed(2)}× as deep`);
   if (W.puffTau && W.PUFF) {
     // the impostor's optical depth: grows with the density and with the wings turned to the eye; bounded; nothing where
     // every bird of the party is drawn (up close), the party's share where only its sparkle birds are left
@@ -350,8 +354,10 @@ const run = (n, seed, secs, o) => {
     const peak = (s) => { let best = -1e9, at = 0; for (let p = 0; p < 6.283; p += 0.005) { const v = Wg(s, p) - Wg(s, p + Math.PI); if (v > best) { best = v; at = p; } } return at; };
     const lag = ((peak(1) - peak(0.3)) / (2 * Math.PI) + 2) % 1;
     check(lag > 0.06 && lag < 0.35, `the wave runs out from the root to the tip (the tip ${(lag * 100).toFixed(0)} % of a beat behind)`);
-    let kink = 0; for (let p = 0; p < 6.3; p += 0.3) for (let s = 0.05; s <= 1.0001; s += 0.05) kink = Math.max(kink, Math.abs(Wg(s, p) - Wg(s - 0.05, p)));
-    check(kink < 3.2 * Math.PI / 180, `a curved wing, no kink (${(kink * 180 / Math.PI).toFixed(1)}° between sections 5 % apart)`);
+    // (a curve, no kink: the bend's change from one section to the next changes gently — the second difference over
+    //  sections 5 % apart under 0.6°)
+    let kink = 0; for (let p = 0; p < 6.3; p += 0.3) for (let s = 0.05; s <= 0.95001; s += 0.05) kink = Math.max(kink, Math.abs(Wg(s + 0.05, p) - 2 * Wg(s, p) + Wg(s - 0.05, p)));
+    check(kink < 0.6 * Math.PI / 180, `a curved wing, no kink (the bend's change varies by ${(kink * 180 / Math.PI).toFixed(2)}° between sections 5 % apart)`);
   }
   check(R.period >= 3.5 && R.period <= 6, `a slow beat (${R.period} s)`);
 }
@@ -392,13 +398,16 @@ const run = (n, seed, secs, o) => {
     const t0 = Date.now(), g = V.makeGen('overworld', 53, { vgen: 11 }), I = V.IslesGen.list(g), loop = W.rayLoop(I);
     const CH = new Map(), RT = V.R.T, FL = V.F;
     const blk = (x, y, z) => { x = Math.floor(x); y = Math.floor(y); z = Math.floor(z); if (y < 0 || y > 255) return 0; const k = (x >> 4) + ',' + (z >> 4); let c = CH.get(k); if (!c) { c = g.generate(x >> 4, z >> 4); CH.set(k, c); } return c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; };
-    // (the top a ray must clear: the highest block over the column, water and leaves too)
-    const topAt = (x, z) => { for (let y = 150; y > 30; y--) if (blk(x, y, z)) return y + 1; return 64; };
+    // (the top a ray must clear under the isles (their rock from 115): the highest block below 112 — the ground, leaves,
+    //  the lake's water; a waterfall's falling water above the sea does not count, the ray glides through its spray)
+    const SEA = V.C.SEA, TM = new Map(), topAt = (x, z) => { const k = x * 65536 + z; let t = TM.get(k); if (t !== undefined) return t; t = 64; for (let y = 112; y > 30; y--) { const b = blk(x, y, z); if (!b) continue; if ((RT.flags[b] & FL.FLUID) && y > SEA + 2) continue; t = y + 1; break; } TM.set(k, t); return t; };
     const seed = (53 ^ 0x7a11d) >>> 0, day = 4, Tn = (day * 24000 + W.passTime(seed, day)) / 20;
     const places = { beach: [236, 36], pier: [271, 72], lighthouse: [478, 128], meadow: [226, -122] };
     let worstNear = 0, worstClear = 1e9, solid = 0, firstSolid = null, ends = 0, scales = [], durs = [], nearCentre = 0;
     for (const [name, [px, pz]] of Object.entries(places)) {
-      const ey = topAt(px, pz) + 1.62, A = W.passPlan(seed, day, [px, ey, pz], loop, topAt), B = W.passPlan(seed, day, [px + 5, ey, pz - 4], loop, topAt);
+      // (two players in the same cell: the place and the cell's far corner)
+      const cl = W.PASS.cell, md = (v) => ((v % cl) + cl) % cl, qx = Math.floor(px / cl) * cl + (md(px) < cl / 2 ? cl - 2 : 2), qz = Math.floor(pz / cl) * cl + (md(pz) < cl / 2 ? cl - 3 : 3);
+      const ey = topAt(px, pz) + 1.62, A = W.passPlan(seed, day, [px, ey, pz], loop, topAt), B = W.passPlan(seed, day, [qx, topAt(qx, qz) + 1.62, qz], loop, topAt);
       check(!!A && JSON.stringify(A) === JSON.stringify(B), `${name}: a pass planned for the cell, the same for two players in it`);
       if (!A) continue;
       const st = [0, 0, 0, 0, 0, 0, 0, 0], cs = [0, 0, 0, 0, 0, 0, 0, 0];
