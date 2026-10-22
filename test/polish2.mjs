@@ -481,8 +481,8 @@ const SHEET = [
   ['vista_lh', 'vista_lh_vnight', 't1_07', `2 Leuchtturm-Aussicht (${vLh ? vLh.id : '?'}) bei Nacht`],
   // (gap 3 taken back: its after is the canopy weight's attempt of the second run — the final march is v0.48's, so the
   //  final wood is the picture before; the attempt's pictures are kept as polish2_wood_*_gapboost.png)
-  ['shafts', 'wood_noon', 't1_09', '3 Wald zu Mittag: rechts der Versuch (Lichtschacht-Gewicht) - zurueckgenommen, er bleichte die Lichtung aus; final = links (v0.48)', 'gapboost'],
-  ['shafts_golden', 'wood_golden', 't1_07', '3 Wald, goldene Stunde: rechts der Versuch - zurueckgenommen; final = links (v0.48)', 'gapboost'],
+  ['shafts', 'wood_noon', 't1_09', '3 Wald, Mittag: rechts der Versuch, zurueckgenommen (final = v0.48)', 'gapboost'],
+  ['shafts_golden', 'wood_golden', 't1_07', '3 Wald, goldene Stunde: rechts der Versuch, zurueckgenommen', 'gapboost'],
   ['golden', 'hills_golden', 't1_07', '4 Goldene Stunde: Huegel'],
   ['golden_av', 'avenue_golden', 't1_09', '4 Goldene Stunde: Allee'],
   ['villa', 'glass_glass', 't1_24', '5 Villa Nova: Fenster spiegeln den Himmel, goldene Stunde'],
