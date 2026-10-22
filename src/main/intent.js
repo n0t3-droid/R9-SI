@@ -327,9 +327,9 @@
     return best;
   }
   const canConjure = (g) => !!(g.starships && g.player && (g.player.creative || g.player.mode === 'zen') && !(g.meta && g.meta.guest) && !(g.mp && g.mp.isClient));
-  function conjure(g, target) {
+  function conjure(g, target, again) {
     const S = g.starships, p = g.player;
-    let h = 2166136261; for (const ch of String((g.meta && g.meta.seed) || 0) + ':ectx') { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+    let h = 2166136261; for (const ch of String((g.meta && g.meta.seed) || 0) + ':ectx' + (again ? ':' + again : '')) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
     const pal = VR.Starship && VR.Starship.PAL && VR.Starship.PAL.find(q => q.key === 'starforge') ? 'starforge' : null;
     // it comes from beyond the target's side, over the horizon, toward you
     const dx = target.pos[0] - p.pos[0], dz = target.pos[2] - p.pos[2], L = Math.hypot(dx, dz) || 1;
@@ -338,6 +338,13 @@
     s.state = 'flying'; s.gear = 0; s.ectxBusy = true;
     ownRef = s;
     return s;
+  }
+  // a conjured shuttle whose design never came goes again (and its design with it, so a later call asks anew)
+  function dropShip(g, s) {
+    const S = g.starships; if (!S || !s) return;
+    const i = S.ships.indexOf(s); if (i >= 0) S.ships.splice(i, 1);
+    if (s.d && !s.d.meta && S.designs && S.designs.get(s.d.key) === s.d && !S.ships.some(q => q.d === s.d)) S.designs.delete(s.d.key);
+    if (ownRef === s) ownRef = null;
   }
   function remember(g, s) {
     ownRef = s;
@@ -397,7 +404,7 @@
   function startCall(g, c, ship) {
     const p = g.player, S = g.starships;
     c.ship = ship || conjure(g, c.target);
-    c.ship.ectxBusy = true;
+    c.ship.ectxBusy = true; c.conjured = !ship;
     if (ship && ship.d && ship.d.meta) say(g, 'g.int.coming', { name: ship.d.meta.name }, 'Dein Schiff kommt: {name}', 'Your ship is coming: {name}', 3000);
     else say(g, 'g.int.coming', { name: tx('g.int.myShuttle', null, 'Dein Shuttle', 'Your shuttle') }, 'Dein Schiff kommt: {name}', 'Your ship is coming: {name}', 3000);
     c.arr = null; c.arrT = 0; c.shipLanded = false; c.boardT = 0;
@@ -562,7 +569,11 @@
     const s = { means: c.means, phaseT: c.phaseT, dist, shipLanded: c.shipLanded, boarded: c.boarded };
     if (c.means === 'walk') { s.dist = Math.hypot(c.goal[0] - p.pos[0], c.goal[2] - p.pos[2]); s.reach = 2.2; }
     if (c.phase === 'call') {
-      if (!c.arr && !c.noFlight) { if (!planArrival(g, c) && c.phaseT > 20) { end(g, 'noPad'); say(g, 'g.int.noWay', null, 'Ich finde keinen Weg dorthin', 'I cannot find a way there'); return; } }
+      if (!c.arr && !c.noFlight && !planArrival(g, c)) {
+        // a design that never came (its worker was replaced and the job lost): the shuttle you conjured is built again, once
+        if (c.conjured && !c.again && c.phaseT > 8 && !(c.ship.d && c.ship.d.meta)) { c.again = 1; dropShip(g, c.ship); c.ship = conjure(g, c.target, 1); c.ship.ectxBusy = true; }
+        else if (c.phaseT > 20) { end(g, 'noPad'); say(g, 'g.int.noWay', null, 'Ich finde keinen Weg dorthin', 'I cannot find a way there'); return; }
+      }
       if (c.arr) flyShip(g, c, dt);
       s.shipLanded = c.shipLanded;
     } else if (c.phase === 'board') {
