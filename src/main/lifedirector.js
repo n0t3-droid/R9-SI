@@ -712,7 +712,7 @@
     update(dt) {
       const g = this.g, S = g.settings || {};
       this.clock += dt; this.time += dt; this.dt = dt;
-      this.on = S.lifeDir !== false && g.state === 'play' && (g.dim || 'overworld') === 'overworld' && !!g.player && !!g.world && !!g.particles;
+      this.on = S.lifeDir !== false && g.state === 'play' && VR.DimReg.actorsHome(g.dim || 'overworld') && !!g.player && !!g.world && !!g.particles;   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
       this.tier = LK.tierOf(S);
       if (!this.on) { this.events.length = 0; return; }
       if ((this.ctxT -= dt) <= 0) { this.ctxT = 1; this.ctx = this.context(); this.st.place = this.ctx.place; this.st.hour = this.ctx.hour; }

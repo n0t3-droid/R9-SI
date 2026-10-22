@@ -78,7 +78,7 @@
         const ground = w.getBlock(x, top, z);
         const b = VR.BIOMES[w.biomeAt(x, z)];
         const key = b ? b.key : '';
-        if (Math.random() < 0.35 && counts.ambient < 6 && g.dim === 'overworld') {
+        if (Math.random() < 0.35 && counts.ambient < 6 && VR.DimReg.actorsHome(g.dim)) {   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
           // ambient: sky rays near islands/altitude by day, wisps at night
           if (night && counts.ambient < 6) { this.summon('shard_wisp', x + 0.5, top + 2 + Math.random() * 3, z + 0.5); counts.ambient++; }
           else if (!night && Math.random() < 0.25) { const m = this.summon('sky_ray', x + 0.5, Math.max(top + 30, 140 + Math.random() * 40), z + 0.5); m.alt = m.pos[1]; counts.ambient++; }
@@ -98,7 +98,7 @@
           continue;
         }
         // 🐾 a wild companion is rare: meadows, a little more often near a village; never in zen (the zen check above)
-        if (counts.wild < 3 && !night && g.dim === 'overworld' && (ground === VR.GEN.S().grass || ground === VR.GEN.S().podzol)) {
+        if (counts.wild < 3 && !night && VR.DimReg.actorsHome(g.dim) && (ground === VR.GEN.S().grass || ground === VR.GEN.S().podzol)) {   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
           const opts = Object.keys(MOBS).filter(k => MOBS[k].companion && MOBS[k].biomes.test(key));
           if (opts.length && Math.random() < (this.nearVillage(x, z) ? 0.01 : 0.003)) { this.summon(opts[Math.floor(Math.random() * opts.length)], x + 0.5, top + 1, z + 0.5); counts.wild++; continue; }
         }

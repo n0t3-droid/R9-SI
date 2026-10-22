@@ -64,7 +64,7 @@
       this.job = null; this.rise = null; this.hearts = new Map();
       this.beams = []; for (const k in this.st) { const e = this.st[k]; if (e && e.beam && STANDS(e)) this.beams.push(e.beam); }
     }
-    get on() { const g = this.g; return !!(VR.Wonders && g.world && g.dim === 'overworld' && g.meta && g.meta.type !== 'flat'); }
+    get on() { const g = this.g; return !!(VR.Wonders && g.world && VR.DimReg.actorsHome(g.dim) && g.meta && g.meta.type !== 'flat'); }   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
     spawn() { const ws = this.g.worldSpawn ? this.g.worldSpawn() : [0.5, 64, 0.5]; return [ws[0], ws[2]]; }
     name(type) { const t = VR.Wonders && VR.Wonders.type(type); return T('g.wonder.n.' + type, null, t ? t.de : type); }
     beforeSave(meta) { if (!meta.guest) meta.wonders = this.st; }

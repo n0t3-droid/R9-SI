@@ -15,7 +15,7 @@
     ['raid', 'turret'], ['kill', 'iron_sword'], ['deep', 'deepstone'], ['sky', 'white_wool'], ['night', 'lantern'], ['sleep', 'red_bed'], ['village', 'vx_lamppost'],
     ['villager', 'vx_bed_red'], ['quest', 'emerald'], ['home', 'vx_bed_blue'], ['festival', 'lantern'], ['autopilot', 'shuttle_beacon'],
   ];
-  const CATS = { milestones: 'g.codex.cat.milestones', wonders: 'g.codex.cat.wonders', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift', inventions: 'g.codex.cat.inventions' };
+  const CATS = { milestones: 'g.codex.cat.milestones', wonders: 'g.codex.cat.wonders', creatures: 'g.codex.cat.creatures', realm: 'g.codex.cat.realm', overworld: 'g.codex.cat.overworld', caves: 'g.codex.cat.caves', forge: 'g.codex.cat.forge', hollow: 'g.codex.cat.hollow', drift: 'g.codex.cat.drift', moons: 'g.codex.cat.moons', inventions: 'g.codex.cat.inventions' };   // u-moons1: Monde
   const INV_TRIGGERS = { oak_log: 'log', birch_log: 'log', spruce_log: 'log', jungle_log: 'log', acacia_log: 'log', dark_oak_log: 'log', cherry_log: 'log', mangrove_log: 'log', cobblestone: 'stone', iron_ingot: 'iron', diamond: 'diamond', crystal_shard_violet: 'crystal', crystal_shard_azure: 'crystal', crystal_shard_verdant: 'crystal', crystal_shard_rose: 'crystal', crystal_shard_amber: 'crystal', aether_bucket: 'aether', star_core: 'star_core', laser_blaster: 'blaster', crafting_table: 'table', torch: 'torch', furnace: 'furnace' };
 
   class Codex {
@@ -33,9 +33,11 @@
       if (VR.Wonders) for (const t of VR.Wonders.TYPES) add('w:' + t.id, 'wonders', null, () => { const L = TL('g.codex.w.' + t.id); return { name: L[0] || t.de, desc: L[1] || '', hint: L[2] || '' }; });
       for (const k in VR.MOBS || {}) { if (VR.MOBS[k] === VR.MOBS.glimmer_deer && k !== 'glimmer_deer') continue; add('c:' + k, 'creatures', 'egg_' + k, () => { const name = T('g.mob.' + k, null, title(k)); return { name, desc: T('g.codex.metCreature', { name }), hint: T('g.codex.creatureHint') }; }); }
       for (const b of VR.BIOMES) {
-        const catKey = b.realm ? 'realm' : b.cave ? 'caves' : b.forge ? 'forge' : b.hollow ? 'hollow' : b.drift ? 'drift' : 'overworld';
-        add('b:' + b.key, catKey, null, () => { const name = T('g.biome.' + b.key, null, b.name); return { name, desc: T('g.codex.foundBiome', { name }), hint: T(catKey === 'caves' ? 'g.codex.biomeHintCave' : 'g.codex.biomeHint') }; });
+        const catKey = b.moon ? 'moons' : b.realm ? 'realm' : b.cave ? 'caves' : b.forge ? 'forge' : b.hollow ? 'hollow' : b.drift ? 'drift' : 'overworld';   // u-moons1: (b.moon: a moon's biome)
+        add('b:' + b.key, catKey, null, () => { const name = T('g.biome.' + b.key, null, b.name); return { name, desc: T('g.codex.foundBiome', { name }), hint: T(catKey === 'caves' ? 'g.codex.biomeHintCave' : catKey === 'moons' ? 'g.codex.biomeHintMoon' : 'g.codex.biomeHint') }; });
       }
+      // u-moons1: the moons' pages (bodylife.js finds them: a geyser seen, the eclipse, Amarant rising, a 20-m jump …)
+      if (VR.BodyLife) for (const id of VR.BodyLife.PAGES) add('moon:' + id, 'moons', null, () => { const L = TL('g.codex.moon.' + id); return { name: L[0] || id, desc: L[1] || '', hint: L[2] || '' }; });
       // 💡 Erfindungen (src/main/inventions.js): one entry per invention, found when the profile has made it
       const IV = VR.Inventions;
       if (IV) for (const c of IV.LIST) add('i:' + c.k, 'inventions', c.id, () => { const x = IV.text(c.k); return { name: x.name, desc: x.line, hint: T('g.codex.inventHint') }; }, () => IV.has(c.k));
@@ -88,7 +90,7 @@
     }
     // the entries with their texts in the language of the moment: {id, cat, name, desc, hint, icon, found}
     list() {
-      const order = ['milestones', 'wonders', 'creatures', 'realm', 'overworld', 'caves', 'forge', 'hollow', 'drift', 'inventions'];
+      const order = ['milestones', 'wonders', 'creatures', 'realm', 'overworld', 'caves', 'forge', 'hollow', 'drift', 'moons', 'inventions'];   // u-moons1
       return this.entries.map(e => Object.assign({ id: e.id, catKey: e.catKey, cat: T(CATS[e.catKey]), icon: e.icon, found: e.live ? !!e.live() : !!this.found[e.id] }, e.text())).sort((a, b) => order.indexOf(a.catKey) - order.indexOf(b.catKey));
     }
     toJSON() { return this.found; }

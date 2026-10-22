@@ -24,6 +24,7 @@ MAIN.splice(MAIN.indexOf('game'), 0, 'travel');   // u-dims: VR.Travel (src/main
 MAIN.splice(MAIN.indexOf('lifedirector'), 0, 'eventlog');   // e-log: VR.EventLog (src/main/eventlog.js), the never-boring measure
 SHARED.push('bodytex'); MAIN.push('space_shaders', 'spacescene');   // u-space0: the bodies' textures (main and workers), the space scene (after game.js: it wraps two of its methods)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies'); SHARED.splice(SHARED.indexOf('gen_dims') + 1, 0, 'gen_body'); TEX.splice(TEX.indexOf('tex_items'), 0, 'tex_body');   // u-moons1: the bodies' profiles and blocks (before blocks4 closes the registry), their generator, their textures
+MAIN.splice(MAIN.indexOf('space_shaders'), 1); MAIN.splice(MAIN.indexOf('shaders'), 0, 'space_shaders'); MAIN.push('bodysky', 'bodylife');   // u-moons1: the space GLSL before shaders.js (its COMMON takes the airless sky from it), the moons' sky and life
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

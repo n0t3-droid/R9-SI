@@ -14,7 +14,40 @@
 //  g · walking: a jump on Opal 27.6 ± 0.5 m high (player.js's own numbers, DimReg's gravity), on Basalt 8.4 m; the fall
 //      damage counts the fall as d·g/9.81 (U§4.3): a 25-m fall on Opal hurts no more than 1.3 m at home
 //  h · the column time: a moon's chunk no slower than the overworld's (the same chunk coordinates, the same machine)
+//  i · the sky and the light (bodysky.js): Helia sharp, no twilight; Amarant at its true size, the ring edge-on, the
+//      eclipse; the env without air; with space_shaders.js loaded before shaders.js every program without BODYSKY is the
+//      text it was; the geysers' schedule and heights; the suit's breath; the codex pages
 //   bash test/wt_run.sh bodies.js 300
+if (process.argv[2] === '--sky-text') {
+  // (a child process: the shader sources with and without space_shaders.js loaded first, preprocessed without BODYSKY)
+  const R0 = __dirname + '/../', load = (withSS) => {
+    for (const k of Object.keys(require.cache)) delete require.cache[k];
+    global.window = { devicePixelRatio: 1, screen: { width: 1280, height: 720 } }; global.WebGLFramebuffer = class {}; delete global.VR;
+    require(R0 + 'test/dom_stub.js'); const V0 = require(R0 + 'test/load_shared.js'); global.self = global;
+    for (const f of ['gl', 'light2', 'sky3', 'water_fx'].concat(withSS ? ['space_shaders'] : []).concat(['shaders'])) require(R0 + 'src/main/' + f + '.js');
+    return V0.SHADERS;
+  };
+  const pre = (src, defs) => {
+    const D = new Set(defs), out = [], stack = [], on = () => stack.every(s => s.on);
+    for (const line of src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n')) {
+      const t = line.trim(); let m;
+      if ((m = /^#ifdef\s+(\w+)/.exec(t))) { const o = D.has(m[1]); stack.push({ on: o, done: o }); continue; }
+      if ((m = /^#ifndef\s+(\w+)/.exec(t))) { const o = !D.has(m[1]); stack.push({ on: o, done: o }); continue; }
+      if ((m = /^#if\s+(.*)$/.exec(t))) { const o = !!Function('return ' + m[1].replace(/defined\s*\(\s*(\w+)\s*\)/g, (q, n) => (D.has(n) ? '1' : '0')).replace(/\b[A-Z_][A-Z_0-9]*\b/g, (n) => (D.has(n) ? '1' : '0')))(); stack.push({ on: o, done: o }); continue; }
+      if (/^#else/.test(t)) { const s = stack[stack.length - 1]; s.on = !s.done; s.done = true; continue; }
+      if (/^#endif/.test(t)) { stack.pop(); continue; }
+      if (!on()) continue;
+      const c = line.replace(/\/\/.*$/, '').trim(); if (c) out.push(c);
+      if ((m = /^#define\s+(\w+)/.exec(t))) D.add(m[1]);
+    }
+    return out.join('\n');
+  };
+  const A = load(false), B2 = load(true);
+  let diff = 0, n = 0;
+  for (const k of Object.keys(A)) { if (typeof A[k] !== 'string') continue; n++; for (const defs of [[], ['LITE'], ['SKY3', 'SKY3HI'], ['LITE', 'MOTION']]) if (pre(A[k], defs) !== pre(B2[k], defs)) diff++; }
+  console.log(JSON.stringify({ n, diff, grow: pre(B2.SKY_FS, ['BODYSKY']).length - pre(B2.SKY_FS, []).length }));
+  process.exit(0);
+}
 require('./dom_stub.js');
 const V = require('./load_shared.js');
 require('../src/main/presence.js'); require('../src/main/player.js');
@@ -286,6 +319,58 @@ console.log('g · walking: the jump, the fall');
   const dO = fall('opal', 25), dH = fall('overworld', 6), dO2 = fall('opal', 90);
   check(dO === 0, 'a 25-m fall on Opal hurts nothing (it counts as 1.25 m at home)', dO);
   check(dH > 0 && dO2 > 0, 'a 6-m fall at home hurts as before; 90 m on Opal (4.5 m at home) hurts too', dH + ' · ' + dO2);
+}
+
+// ================================================================ i · the sky, the light, the geysers, the suit
+console.log('i · the sky and the light (bodysky.js), the geysers and the suit (bodylife.js, klang.js)');
+{
+  for (const f of ['klang', 'bodysky', 'bodylife', 'i18n', 'lang_en', 'lang_de']) require('../src/main/' + f + '.js');
+  const BS = V.BodySky, BLf = V.BodyLife, U = V.Universe, D2 = 180 / Math.PI, eye = [0.5, 73.6, 0.5];
+  // Basalt by day (t 0: Helia 27.6° high) and by night (t 1200: Helia −23°, Amarant 32.8° high and full)
+  const day = BS.compute('basalt', eye, 0, { tier: 3 }), night = BS.compute('basalt', eye, 1200, { tier: 3 });
+  check(day && day.light.lightK > 0.99 && Math.abs(day.light.sunDir[1] - Math.sin(27.6 / D2)) < 0.01, 'Basalt by day: Helia\'s whole disc over the horizon, the light from its true direction', (day.light.sunEl * D2).toFixed(1) + '°');
+  const amb = day.light.ambSky[1] / day.light.sunColor[1], sky0 = day.sky;
+  check(amb > 0.005 && amb < 0.12, 'the shadows\' light is the dark dust\'s bounce (no sky light)', (amb * 100).toFixed(1) + ' % of the sun');
+  check(Math.abs(Math.asin(1 / sky0.par[3]) * D2 - 4.91) < 0.05, 'Amarant at its true size from Basalt (9.8° wide)', (2 * Math.asin(1 / sky0.par[3]) * D2).toFixed(2) + '°');
+  const open = (s) => Math.abs(Math.asin(s.par[0] * s.pole[0] + s.par[1] * s.pole[1] + s.par[2] * s.pole[2])) * D2;
+  check(open(sky0) < 2.5, 'its ring nearly edge-on from Basalt (Basalt orbits in the ring\'s plane, 1.5°)', open(sky0).toFixed(2) + '°');
+  check(night.light.lightK === 0 && night.light.sunDir[1] < -0.99 && night.light.sunColor[1] === 0 && night.light.moonColor[1] > 0.005 && night.light.moonDir[1] > 0.5, 'Basalt by night: no sunlight at all, Amarant\'s light from Amarant', 'Amarant\'s light ' + night.light.moonColor[1].toFixed(3));
+  check(night.expo > day.expo * 2 && night.sky.sunK[2] > day.sky.sunK[2], 'the eye opens at night, the stars come out', day.expo + ' → ' + night.expo);
+  check(Math.abs(day.light.dip - Math.sqrt(2 * 1.6 / PB.R)) < 1e-4 && day.sky.ground[3] === day.light.dip, 'the far ground below the true horizon: dip √(2h/R)', (day.light.dip * D2).toFixed(2) + '°');
+  // Helia sinking: the light goes out as its disc crosses the true horizon (no air, no twilight), not over ±7°
+  let tSet = 0; for (let t = 300; t < 900; t += 2) { const r = BS.compute('basalt', eye, t, {}); if (r.light.sunEl < 0) { tSet = t; break; } }
+  const a0 = BS.compute('basalt', eye, tSet - 20, {}).light, a1 = BS.compute('basalt', eye, tSet + 20, {}).light;
+  check(a0.lightK > 0.99 && a1.lightK === 0 && a0.sunColor[1] * Math.max(0.05, ((x) => { let q = (x + 0.12) / 0.24; q = Math.max(0, Math.min(1, q)); return q * q * (3 - 2 * q); })(a0.sunDir[1])) > 2.5, 'the sunset is a step: full light 20 s before Helia\'s disc sinks, none 20 s after', 'set at t ' + tSet + ' s');
+  // Opal: Amarant 26.8° wide, fixed in the south; the eclipse
+  const o0 = BS.compute('opal', eye, 1200, {}), oe = BS.compute('opal', eye, 3420, {});
+  check(Math.abs(2 * Math.asin(1 / o0.sky.par[3]) * D2 - 26.75) < 0.2 && o0.sky.par[2] > 0.7 && Math.abs(o0.light.parEl * D2 - 34.8) < 1, 'Opal: Amarant 26.8° wide, 35° high in the south (locked)', (2 * Math.asin(1 / o0.sky.par[3]) * D2).toFixed(2) + '°, az ' + (Math.atan2(o0.sky.par[0], o0.sky.par[2]) * D2).toFixed(0) + '°');
+  check(open(o0.sky) < 4, 'its ring nearly edge-on from Opal (3°)', open(o0.sky).toFixed(2) + '°');
+  check(oe.light.eclipse > 0.95 && oe.light.sunEl > 0.5 && oe.light.lightK < 0.05 && oe.light.sunColor[1] === 0 && oe.sky.sunK[1] < 0.05, 'the eclipse: Helia high behind Amarant, its light and glare gone', 'Helia ' + (oe.light.sunEl * D2).toFixed(0) + '° high, eclipse ' + oe.light.eclipse.toFixed(2));
+  check(o0.light.ambSky[1] / Math.max(1e-6, o0.light.sunColor[1] * ((x) => { let q = (x + 0.12) / 0.24; q = Math.max(0, Math.min(1, q)); return q * q * (3 - 2 * q); })(o0.light.sunDir[1])) > amb * 3, 'Opal\'s bright ice lights its shadows far more than Basalt\'s dust');
+  // the env: no air — no rain, wind, clouds, rays; the far land fades into the far ground's colour
+  const E = { storm: [1, 0, 0, 0], bolt: [1, 0, 0, 0.5], rain: 1, wind: 2 }, env = { day: 0, ticks: 24000 * 0 + 0, timeOfDay: 0 };
+  BS.env(E, env, { dim: 'basalt', renderDist: 8, biome: { key: 'basalt_mare' } }, 0.016);
+  check(BS.want && E.rain === 0 && E.wind === 0 && E.cloudCover === 0 && E.rays === 0 && E.bolt[3] === 0 && E.fogColor === E.horizon && E.fog[0] > 64 && E.bodySky, 'the env on a moon: no rain, wind, clouds, rays; the haze is the far ground\'s colour; the sky\'s uniforms');
+  const E2 = {}; BS.env(E2, env, { dim: 'overworld' }, 0.016);
+  check(!BS.want && !E2.bodySky && Object.keys(E2).length === 1, 'at home BodySky leaves the env as it was (and the sky program without BODYSKY)');
+  // the geysers: every 40–90 s for 10–18 s, the same for everyone, jets 2–3 km
+  const vents = gO.vents(), prof = PO, g = V.DimReg.gravity('opal');
+  let gaps = [], durs = [], tops = [], same = true;
+  for (const v of vents.slice(0, 12)) {
+    let last = null;
+    for (let t = 0; t < 1200; t += 1) { const c = BLf.cycle(v, t, prof); if (!last || c.start !== last.start) { if (last) gaps.push(c.start - last.start); durs.push(c.dur); last = c; } }
+    for (let t = 0; t < 600; t += 5) { const p = BLf.plume(v, t, prof, g); tops.push(p.top); const q = BLf.plume(v, t, prof, g); if (q.top !== p.top) same = false; }
+  }
+  check(Math.min(...gaps) >= 32 && Math.max(...gaps) <= 108 && Math.min(...durs) >= 10 && Math.max(...durs) <= 18, 'a vent erupts every 40–90 s (± a fifth) for 10–18 s', 'gaps ' + Math.min(...gaps).toFixed(0) + '–' + Math.max(...gaps).toFixed(0) + ' s, ' + Math.min(...durs).toFixed(0) + '–' + Math.max(...durs).toFixed(0) + ' s');
+  check(Math.max(...tops) >= 1900 && Math.max(...tops) <= 3000.5 && same, 'the jets climb to 2–3 km under Opal\'s gravity (deterministic: host and guests alike)', 'highest ' + Math.max(...tops).toFixed(0) + ' m');
+  const pv = BLf.plume(vents[0], BLf.cycle(vents[0], 300, prof).start + 5, prof, g);
+  check(pv.firing && pv.top > 300 && pv.top < 600, 'five seconds into an eruption the ice is a few hundred metres up (v0 ≈ 85 m/s, not a rocket)', pv.top.toFixed(0) + ' m, v0 ' + pv.v0.toFixed(0) + ' m/s');
+  // the suit, the pages
+  check(V.Klang.breathEvery(0) === 3.6 && V.Klang.breathEvery(1) === 1.6, 'the suit\'s breath every 3.6 s at rest, 1.6 s after a sprint or a big jump');
+  const I = V.I18N, pagesOk = BLf.PAGES.every(id => Array.isArray(I.dict.de['g.codex.moon.' + id]) && I.dict.de['g.codex.moon.' + id].length === 3 && Array.isArray(I.dict.en['g.codex.moon.' + id]));
+  check(BLf.PAGES.length === 8 && pagesOk && I.dict.de['g.codex.cat.moons'] === 'Monde', 'eight codex pages „Monde", each with a name, a text and a hint in both languages');
+  const st = JSON.parse(require('child_process').execFileSync(process.execPath, [__filename, '--sky-text'], { encoding: 'utf8', maxBuffer: 1 << 26 }).trim().split('\n').pop());
+  check(st.n > 30 && st.diff === 0 && st.grow > 2000, 'space_shaders.js before shaders.js: every program without BODYSKY is the text it was (' + st.n + ' sources × 4 define sets); BODYSKY adds the airless sky (' + st.grow + ' chars)');
 }
 
 // ================================================================ h · the column time
