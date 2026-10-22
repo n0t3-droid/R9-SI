@@ -91,9 +91,11 @@
   const IDS = { helia: ['helia', 'sun', 'star'], amarant: ['amarant'], herz: ['herz', 'herzwelt', 'overworld'], aqua: ['aqua', 'aquamarin'], zinn: ['zinn', 'zinnober'], opal: ['opal'], basalt: ['basalt'], ocker: ['ocker'] };
   SS.fromUniverse = function (st, out) {
     if (!st) return false;
-    const src = st.bodies || st;
+    const src = st.bodies || st.b || st;   // (VR.Universe.state(t) → { t, b: { helia: { r, v, rel, B }, … } })
     const pick = (id) => { for (const k of IDS[id]) { const r = Array.isArray(src) ? src.find(q => q && (q.id === k || q.name === k)) : src[k]; if (r) return r; } return null; };
-    const vec = (r) => { const v = r && (r.p || r.pos || r.r || r.position); return Array.isArray(v) || (v && v.length === 3) ? [+v[0], +v[1], +v[2]] : null; };
+    // (VR.Universe works in the ecliptic with z up; the scene is y up: scene (x, y, z) = universe (y, z, x) — a cyclic
+    // turn, so the handedness stays; the table below was built the same way: Amarant at t = 1000 s agrees to 0.2 %)
+    const vec = (r) => { const v = r && (r.p || r.pos || r.r || r.position); return Array.isArray(v) || (v && v.length === 3) ? (st.b ? [+v[1], +v[2], +v[0]] : [+v[0], +v[1], +v[2]]) : null; };
     const got = {};
     for (const id in IDS) { const r = pick(id), p = vec(r); if (!p || !p.every(Number.isFinite)) return false; got[id] = { p, r }; }
     // positions from the universe; orientations (spin) from it when given, else as the fallback turns them
