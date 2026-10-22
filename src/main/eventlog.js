@@ -39,7 +39,7 @@
   const lastSeen = [0, -Infinity, -Infinity, -Infinity, -Infinity, -Infinity];
   let acc = 0, inMax = 0, siteSeen = new WeakMap();
   L.count = 0; L.nSamples = 0; L.g = null; L.world = undefined; L.landmarks = null;
-  L.cost = { frames: 0, ms: 0, worst: 0, samples: 0, sampleMs: 0, emits: 0, emitMs: 0 };
+  L.cost = { frames: 0, ms: 0, worst: 0, samples: 0, sampleMs: 0, emits: 0, emitMs: 0, errors: 0 }; L.error = null;
   const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
   const game = () => L.g || VR.game || null;
   L.bind = (g) => { L.g = g || null; };
@@ -109,16 +109,14 @@
   const copy = (R) => ({ n: R.n, t: R.t, kind: R.kind, sub: R.sub, w: R.w, x: R.x, y: R.y, z: R.z, src: R.src, inView: R.inView, frac: R.frac });
   L.emit = function (kind, sub, w, pos, src, r) {
     const g = game(); if (!ready(g)) return null;
-    const t0 = now(), R = REC[L.count % N];
+    const t0 = now(), K = String(kind || 'ambient');
+    let x, y, z, iv, fr;   // (where and whether it is seen first: a record is written whole or not at all)
+    if (pos) { x = +pos[0]; y = +pos[1]; z = +pos[2]; const v = see(g, x, y, z, r > 0 ? r : 2); iv = v.inView; fr = v.frac; }
+    else { const p = g.player && g.player.pos; x = p ? p[0] : 0; y = p ? p[1] : 0; z = p ? p[2] : 0; iv = true; fr = K === 'wow' || K === 'story' ? 1 : 0; }
+    const R = REC[L.count % N];
     L.count++;
-    R.n = L.count; R.t = +(g.time || 0); R.kind = String(kind || 'ambient'); R.sub = sub === undefined || sub === null ? '' : String(sub); R.w = w | 0; R.src = src ? String(src) : '';
-    if (pos) {
-      R.x = +pos[0]; R.y = +pos[1]; R.z = +pos[2];
-      const v = see(g, R.x, R.y, R.z, r > 0 ? r : 2); R.inView = v.inView; R.frac = v.frac;
-    } else {
-      const p = g.player && g.player.pos; R.x = p ? p[0] : 0; R.y = p ? p[1] : 0; R.z = p ? p[2] : 0;
-      R.inView = true; R.frac = R.kind === 'wow' || R.kind === 'story' ? 1 : 0;
-    }
+    R.n = L.count; R.t = +(g.time || 0); R.kind = K; R.sub = sub === undefined || sub === null ? '' : String(sub); R.w = w | 0; R.src = src ? String(src) : '';
+    R.x = x; R.y = y; R.z = z; R.inView = iv; R.frac = fr;
     if (R.inView) for (let k = 1; k <= Math.min(5, R.w); k++) lastSeen[k] = R.t;
     const C = L.cost; C.emits++; C.emitMs += now() - t0;
     return copy(R);
@@ -321,5 +319,11 @@
   };
   // seconds since the last event of weight ≥ minW in view (Infinity: none yet) — the Regie's trigger (A§10)
   L.sinceSeen = function (minW) { const g = game(), k = Math.max(1, Math.min(5, minW | 0)); return lastSeen[k] === -Infinity ? Infinity : +((g && g.time) || 0) - lastSeen[k]; };
-  L.dump = function () { return { count: L.count, nSamples: L.nSamples, events: L.events(0), samples: L.samples(), cost: Object.assign({}, L.cost) }; };
+  L.dump = function () { return { count: L.count, nSamples: L.nSamples, events: L.events(0), samples: L.samples(), cost: Object.assign({}, L.cost), error: L.error }; };
+
+  // ---------------------------------------------------------------- the instrument never breaks the game
+  // where the game calls in (the frame and the six hooks) an error inside the log is caught and counted (cost.errors;
+  // L.error keeps the first one's stack); after three the log switches itself off — the frame, the act, the pass go on
+  const fail = (e) => { const C = L.cost; C.errors++; if (!L.error) L.error = String((e && e.stack) || e).slice(0, 400); if (C.errors >= 3) L.on = false; return null; };
+  for (const k of ['frame', 'emit', 'act', 'pass', 'landed', 'found']) { const f = L[k]; L[k] = function (a, b, c, d, e, h) { try { return f(a, b, c, d, e, h); } catch (err) { return fail(err); } }; }
 })(VR);

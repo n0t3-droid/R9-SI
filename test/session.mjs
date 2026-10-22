@@ -487,13 +487,13 @@ async function session(type, setup, script) {
     const r = await play(t0, DUR, false); tNow = r.t; P.t1 = +tNow.toFixed(2); rec.parts.push(P);
   }
   await ev(() => window.__S.set({ kind: 'idle' }));
-  const end = await ev(([t0]) => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, events: L.events(0).filter(e => e.t >= t0 - 1e-6), samples: L.samples(t0 - 1e-6), cost: Object.assign({}, L.cost), stat: window.__S.stat, log: window.__S.log, pos: g.player.pos.slice() }; }, [t0]);
+  const end = await ev(([t0]) => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, events: L.events(0).filter(e => e.t >= t0 - 1e-6), samples: L.samples(t0 - 1e-6), cost: Object.assign({}, L.cost), error: L.error, stat: window.__S.stat, log: window.__S.log, pos: g.player.pos.slice() }; }, [t0]);
   rec.tod1 = Math.round(end.tod);
   rec.played = +(end.t - t0).toFixed(2);
   rec.events = end.events.filter(e => e.t - t0 <= DUR + 1e-6).map(e => Object.assign({}, e, { t: +(e.t - t0).toFixed(3) }));
   rec.samples = end.samples.filter(s => s.t - t0 <= DUR + 1e-6).map(s => Object.assign({}, s, { t: +(s.t - t0).toFixed(3) }));
   const c0 = start.cost, c1 = end.cost, fr = c1.frames - c0.frames, sm = c1.samples - c0.samples;
-  rec.cost = { frames: fr, msPerFrame: +((c1.ms - c0.ms) / Math.max(1, fr)).toFixed(5), worstMs: +c1.worst.toFixed(3), samples: sm, msPerSample: +((c1.sampleMs - c0.sampleMs) / Math.max(1, sm)).toFixed(4), emits: c1.emits - c0.emits, msPerEmit: +((c1.emitMs - c0.emitMs) / Math.max(1, c1.emits - c0.emits)).toFixed(4) };
+  rec.cost = { frames: fr, msPerFrame: +((c1.ms - c0.ms) / Math.max(1, fr)).toFixed(5), worstMs: +c1.worst.toFixed(3), samples: sm, msPerSample: +((c1.sampleMs - c0.sampleMs) / Math.max(1, sm)).toFixed(4), emits: c1.emits - c0.emits, msPerEmit: +((c1.emitMs - c0.emitMs) / Math.max(1, c1.emits - c0.emits)).toFixed(4), errors: (c1.errors | 0) - (c0.errors | 0), error: end.error || null };
   const rs = RUN.renders.slice(r0).sort((a, b) => a - b);
   rec.run = { overBudget, realS: Math.round((Date.now() - real0) / 1000), pictures: rs.length, renderMsMedian: rs.length ? Math.round(rs[rs.length >> 1]) : 0, picHz: 2 / RUN.picEvery, waits: RUN.waits - w0[0], waitS: Math.round(RUN.waitS - w0[1]), hops: end.stat.hops, jumps: end.stat.jumps, walkerLog: end.log.slice(-40), end: end.pos.map(v => +v.toFixed(1)) };
   analyze(rec);
@@ -519,6 +519,7 @@ async function session(type, setup, script) {
   check(rec.played >= 290, `${type}: ${rec.played.toFixed(0)} s of play`);
   check(rec.samples.length >= rec.played * 0.95 - 2 && rec.events.length > 0, `${type}: ${rec.samples.length} samples and ${rec.events.length} events recorded`);
   check(fs.existsSync(`${SHOTS}session_${type}.json`) && !!sheet, `${type}: session_${type}.json and session_${type}_sheet.png written (${frames.filter(f => f.file).length} of 12 frames)`);
+  check(rec.cost.errors === 0, `${type}: the log never failed (${rec.cost.errors} errors${rec.cost.error ? ': ' + rec.cost.error.split('\n')[0] : ''})`);
   check(rec.cost.msPerFrame <= 0.05, `${type}: the log costs ${(rec.cost.msPerFrame * 1000).toFixed(1)} µs a frame (≤ 50), ${rec.cost.msPerSample} ms a sample, over ${rec.cost.frames} frames`);
   return rec;
 }

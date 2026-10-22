@@ -233,6 +233,24 @@ const run = (sec, each) => { const n = Math.round(sec * 30); for (let i = 0; i <
   L.bind(g); L.reset(world);
 }
 
+// ---------------------------------------------------------------- the instrument never breaks the game
+{
+  look(0.5, 81.62, 0.5, 0, 0);
+  const broken = { col() { throw new Error('a broken column'); } };
+  g.world = broken; L.reset(broken);
+  let threw = 0; const quiet = (f) => { try { f(); } catch (e) { threw++; } };
+  const n0 = L.count;
+  quiet(() => L.emit('ambient', 'cat', 2, [0.5, 82, -20], 'test'));
+  quiet(() => run(1.1));   // (the sample's landmark line of sight reads the broken columns)
+  check(threw === 0 && L.cost.errors === 2 && /broken column/.test(L.error || '') && L.count === n0, `an error inside the log is caught where the game calls in, counted, never thrown into the game, and leaves no half record (errors ${L.cost.errors}, count +${L.count - n0}: ${String(L.error).split('\n')[0]})`);
+  quiet(() => { for (let i = 0; i < 4; i++) L.emit('ambient', 'cat', 2, [0.5, 82, -20], 'test'); });
+  check(threw === 0 && L.on === false && L.cost.errors === 3, `after three errors the log switches itself off (a broken instrument costs nothing; errors ${L.cost.errors})`);
+  const n1 = L.count;
+  quiet(() => { L.act({ kind: 'birds', from: [0, 90, -30], to: [10, 90, -30] }, {}); L.pass({ t: 0.3 }, 50); L.landed({ d: {} }, { phase: 'parked', u: 0.2, pos: [0, 81, -9] }); L.found('b:x'); run(1.1); });
+  check(threw === 0 && L.count === n1, '…and stays quiet: the hooks and the frame record nothing and throw nothing');
+  L.on = true; L.cost.errors = 0; L.error = null; g.world = world; L.reset(world);
+}
+
 // ---------------------------------------------------------------- the cost
 {
   L.reset(world); look(0.5, 81.62, 0.5, 0, 0);
