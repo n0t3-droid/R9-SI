@@ -2160,6 +2160,8 @@
     'g.int.cancel': 'You have the controls',
     'g.int.take': 'Move: take over · Mouse: look around',
     'g.int.bar': '{ph} · {to} · {d} to go',
+    'g.int.walkTo': 'On the way {to}',
+    'g.int.wp': 'Waypoint {n}',
     'g.int.arrive': 'Arrived: {name}',
     'g.int.ph.call': 'Your ship is coming',
     'g.int.ph.board': 'Boarding',

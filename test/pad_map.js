@@ -44,8 +44,8 @@ st = P.poll([p], prev); prev = st;
 check(st.down.includes('jump') && !st.pressed.includes('jump'), 'a held A stays down, not pressed again');
 p = release(p, 0); st = P.poll([p], prev); prev = st;
 check(!st.down.includes('jump') && st.released.includes('jump'), 'releasing A reports one release');
-const mapped = [[1, 'sneak'], [2, 'undo'], [3, 'inv'], [8, 'map'], [10, 'sprint'], [11, 'cam']];
-check(mapped.every(([b, a]) => { const q = P.poll([press(pad(), b)], null); return q.down.includes(a); }), 'B sneaks, X undoes, Y opens the inventory, View opens the map, stick click sprints, R3 switches the camera');
+const mapped = [[1, 'sneak'], [2, 'veh'], [3, 'inv'], [8, 'map'], [10, 'sprint'], [11, 'cam'], [13, 'undo']];   // (e-ctx: X — the west face button — is the Aktion, undo moved to the D-pad's down)
+check(mapped.every(([b, a]) => { const q = P.poll([press(pad(), b)], null); return q.down.includes(a); }), 'B sneaks, X is the Aktion (V), Y opens the inventory, View opens the map, stick click sprints, R3 switches the camera, the D-pad\'s down undoes');
 let q = P.poll([press(pad(), 9)], null);
 check(q.physPressed.includes('Escape') && q.down.length === 0, 'Start presses Escape (pause); it is no game action of its own');
 q = P.poll([press(pad(), 7, 0.9)], null);

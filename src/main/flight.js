@@ -561,6 +561,7 @@
       else if (this.view === 1) out = this.chaseCam(cam, dt);
       else out = this.cineCam(cam, dt);
       out.fixed = true; out.fov = out.fov || fov; if (this.view !== 0) out.far = (cam.far || 1000) + 60;
+      if (VR.Intent && VR.Intent.shipCam) { const ic = VR.Intent.shipCam(this, out); if (ic) { out = ic; g.camMode = 1; } }   // e-ctx: a trip by intent is filmed (directorcam.js); the flight's own view is the blend's end
       if (p) { p.yaw = out.yaw; p.pitch = clamp(out.pitch, -1.55, 1.55); }
       return out;
     }
@@ -640,6 +641,7 @@
       // the Gate Temple's apron is a landing site too: the autopilot docks on the runway in front of the portal
       const H = VR.Heart;
       if (H && Math.hypot(H.TEMPLE.x - p[0], H.TEMPLE.front + 10 - p[2]) > 140) list.push({ id: 'temple', name: T('g.fl.templeName'), x: H.TEMPLE.x, z: H.TEMPLE.front + 10, y: H.PLAT + 1, dock: true });
+      if (VR.Intent && VR.Intent.flyTargets) for (const s of VR.Intent.flyTargets(g, p)) list.push(s);   // e-ctx: G's targets grow — the landmarks, the wonders, the waypoints (intent.js)
       return list.sort((a, c) => Math.hypot(a.x - p[0], a.z - p[2]) - Math.hypot(c.x - p[0], c.z - p[2]));
     }
     toggleAuto() {
@@ -650,7 +652,7 @@
       if (this.auto) { i = list.findIndex(v => v.id === this.auto.site.id) + 1; if (i <= 0 || i >= Math.min(list.length, 6)) { this.stopAuto(T('g.fl.autoOff2')); return; } }
       this.startAuto(list[i]);
     }
-    startAuto(site) {
+    startAuto(site) {   // (e-ctx: any site — a village, the temple's apron, or a landmark, a wonder, a waypoint from VR.Intent with its rad)
       const g = this.g, b = this.b, p = b.pos;
       if (!this.running) this.autoStart();
       const dx = site.x - p[0], dz = site.z - p[2], L = Math.hypot(dx, dz) || 1;

@@ -27,6 +27,7 @@
     { id: 'break', icon: '⛏', k: 'touch.break', fb: 'Abbauen', en: 'Break', cls: 'tb-break' },
     { id: 'inv', icon: '🎒', k: 'touch.inv', fb: 'Inventar', en: 'Inventory', cls: 'tb-inv' },
     { id: 'sprint', icon: '🏃', k: 'touch.sprint', fb: 'Sprint', en: 'Sprint', cls: 'tb-sprint' },
+    { id: 'veh', icon: '◉', k: 'touch.act', fb: 'Aktion', en: 'Action', cls: 'tb-act' },   // e-ctx: the round Aktion button — its icon follows the action (ctx.js)
   ];
   TOUCH.mount = function (g) {
     game = g;
@@ -76,6 +77,7 @@
       const i = input(); if (!i) return;
       e.classList.add('on');
       if (id === 'jump' || id === 'sprint') { i.tDown.add(id === 'jump' ? 'jump' : 'sprint'); i.tPressed.add(id === 'jump' ? 'jump' : 'sprint'); }
+      if (id === 'veh') { i.tDown.add('veh'); i.tPressed.add('veh'); }   // e-ctx
       if (id === 'inv') i.tPressed.add('inv');
       if (id === 'place') { i.mouse.down[2] = true; i.mouse.clicked[2] = true; }
       if (id === 'break') { i.mouse.down[0] = true; i.mouse.clicked[0] = true; }
@@ -84,6 +86,7 @@
       ev.preventDefault();
       const i = input(); e.classList.remove('on'); if (!i) return;
       if (id === 'jump' || id === 'sprint') { const a = id === 'jump' ? 'jump' : 'sprint'; if (i.tRelease) i.tRelease.add(a); else i.tDown.delete(a); }   // (let go at the frame's end: a tap still counts)
+      if (id === 'veh') { if (i.tRelease) i.tRelease.add('veh'); else i.tDown.delete('veh'); }   // e-ctx (held: the Heimkehr ring)
       if (id === 'place') { i.mouse.down[2] = false; i.mouse.releasedBtn[2] = true; }
       if (id === 'break') { i.mouse.down[0] = false; i.mouse.releasedBtn[0] = true; }
     };

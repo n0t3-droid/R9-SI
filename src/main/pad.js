@@ -2,7 +2,7 @@
 // 🎮 Gamepad (F5 · Steuerung): the standard layout read each frame, no DOM in
 // the mapping itself (tested in node: test/pad_map.js).
 //   sticks: left = walk (analog), right = look; a radial dead zone of 0.15
-//   A jump · B sneak (menus: back) · X undo · Y inventory · View map · Start pause (Escape)
+//   A jump · B sneak (menus: back) · X Aktion (V, ctx.js — e-ctx) · Y inventory · View map · Start pause (Escape) · D-pad down undo
 //   LB / RB turn the hotbar · LT place (right button) · RT break (left button, held)
 //   stick click sprint · R3 camera · D-pad: menu focus, and left / right turn the hotbar
 //   in a ship (VR.game.flight) ship(polled) gives the ship's keys instead (input.js): see ship() below
@@ -20,7 +20,7 @@
   const MAP = {
     0: { act: 'jump', menu: 'ok' },
     1: { act: 'sneak', menu: 'back' },
-    2: { act: 'undo' },
+    2: { act: 'veh' },   // e-ctx: the west face button is the Aktion (erlebnis §1)
     3: { act: 'inv' },
     4: { wheel: -1 },
     5: { wheel: 1 },
@@ -30,7 +30,7 @@
     9: { phys: 'Escape' },
     10: { act: 'sprint' },
     11: { act: 'cam' },
-    12: { dpad: 'up' }, 13: { dpad: 'down' }, 14: { dpad: 'left' }, 15: { dpad: 'right' },
+    12: { dpad: 'up' }, 13: { dpad: 'down', act: 'undo' }, 14: { dpad: 'left' }, 15: { dpad: 'right' },   // e-ctx: undo moved from X to the D-pad's down (menus: still a focus move)
   };
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
   function stick(x, y, dz) {

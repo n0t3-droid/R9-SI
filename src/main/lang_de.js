@@ -2160,6 +2160,8 @@
     'g.int.cancel': 'Du steuerst selbst',
     'g.int.take': 'Bewegen: selbst steuern · Maus: umsehen',
     'g.int.bar': '{ph} · {to} · noch {d}',
+    'g.int.walkTo': 'Unterwegs {to}',
+    'g.int.wp': 'Wegpunkt {n}',
     'g.int.arrive': 'Angekommen: {name}',
     'g.int.ph.call': 'Dein Schiff kommt',
     'g.int.ph.board': 'Einsteigen',

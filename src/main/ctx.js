@@ -251,7 +251,7 @@
       const list = CONE; list.length = 0;
       const Vg = g.villages;
       if (Vg && Vg.agents) for (const a of Vg.agents) { if (!a || !a.pos || Math.abs(a.pos[0] - eye[0]) > 6 || Math.abs(a.pos[2] - eye[2]) > 6) continue; list.push({ kind: questGiver(a) ? 'quest' : 'villager', name: a.p && a.p.name ? a.p.name : '', pos: [a.pos[0], a.pos[1] + 1.1, a.pos[2]], r: 0.45, ref: a }); }
-      if (En && En.mobs) for (const m of En.mobs) { if (!m || m.dead || !m.def || !m.def.companion || !m.pos || Math.abs(m.pos[0] - eye[0]) > 6 || Math.abs(m.pos[2] - eye[2]) > 6) continue; list.push({ kind: 'pet', name: m.name || '', pos: [m.pos[0], m.pos[1] + (m.h || 0.6) * 0.5, m.pos[2]], r: Math.max(0.3, m.w || 0.4), ref: m }); }
+      if (En && En.mobs) for (const m of En.mobs) { if (!m || m.dead || !m.def || !m.def.companion || !m.pos || Math.abs(m.pos[0] - eye[0]) > 6 || Math.abs(m.pos[2] - eye[2]) > 6) continue; list.push({ kind: 'pet', name: (m.pet && m.pet.name) || '', pos: [m.pos[0], m.pos[1] + (m.h || 0.6) * 0.5, m.pos[2]], r: Math.max(0.3, m.w || 0.4), ref: m }); }
       for (const f of C.hooks.near) { try { const q = f(g, eye, dir); if (q) list.push(q); } catch (e) { /* a sibling's hook never breaks the key */ } }
       near = list.length ? C.pickNear(eye, dir, list) : null;
     }
@@ -271,7 +271,7 @@
   function entityNear(g, e, d) {
     if (!e) return null;
     if (e.kind === 'starship' && e.d) return { kind: 'ship', name: e.d.meta ? e.d.meta.name : '', dist: d, ang: 0, ref: e };
-    if (e.def && e.def.companion) return { kind: 'pet', name: e.name || '', dist: d, ang: 0, ref: e };
+    if (e.def && e.def.companion) return { kind: 'pet', name: (e.pet && e.pet.name) || '', dist: d, ang: 0, ref: e };
     if (e.vil && e.p) return { kind: questGiver(e) ? 'quest' : 'villager', name: e.p.name || '', dist: d, ang: 0, ref: e };
     if (e.type === 'hoverbike' || e.kind === 'hoverbike' || (e.onUse && e.spd !== undefined)) return { kind: 'vehicle', dist: d, ang: 0, ref: e };
     if (e.onUse && g.trams && g.trams.cars && g.trams.cars.indexOf(e) >= 0) return { kind: 'vehicle', dist: d, ang: 0, ref: e };
@@ -282,7 +282,6 @@
   C.act = function (g, res) {
     const p = g.player; if (!res || !p) return false;
     const n = res.near, ref = res.ref;
-    if (VR.EventLog && res.act !== 'whisper') VR.EventLog.emit('social', 'ctx_' + res.act, 1, null, 'ctx');
     switch (res.act) {
       case 'talk': if (ref && ref.onUse) { ref.onUse(p); return true; } if (ref && g.villages && g.villages.openTalk) { g.villages.openTalk(ref); return true; } return false;
       case 'use': if (n && n.block && g.interactBlock) return !!g.interactBlock(n.block[0], n.block[1], n.block[2], n.block[3], p); return false;

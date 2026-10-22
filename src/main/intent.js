@@ -139,7 +139,9 @@
     // the floor along the way: the highest ground near each 12-m step (± one step), for the rise and the descent
     const n = Math.max(2, Math.ceil(d / 12)), raw = [], floor = [];
     let top = spot[1];
-    for (let i = 0; i <= n; i++) { const u = i / n, gy = ground(spot[0] + dx * u, spot[2] + dz * u); raw.push(gy === null || gy === undefined ? -1e9 : gy); if (gy !== null && gy !== undefined && gy > top) top = gy; }
+    let unknown = 0;
+    for (let i = 0; i <= n; i++) { const u = i / n, gy = ground(spot[0] + dx * u, spot[2] + dz * u); raw.push(gy === null || gy === undefined ? -1e9 : gy); if (gy === null || gy === undefined) unknown++; else if (gy > top) top = gy; }
+    if (unknown > n * 0.3) top = Math.max(top, spot[1] + 70);   // (a way over land not loaded yet: it could rise — come in high)
     for (let i = 0; i <= n; i++) floor.push(Math.max(raw[Math.max(0, i - 1)], raw[i], raw[Math.min(n, i + 1)]));
     const H = Math.max(top + 30, spot[1] + 40);
     if (!Number.isFinite(s0[1])) s0[1] = H;
@@ -363,9 +365,9 @@
     const ship = inShip || guest ? null : pickShip(g, target);
     const m = I.meansFor({ dist, inShip, sameWorld, ship: !!ship || canConjure(g), spaceOk: !!I.spaceHandler });
     if (!m.means) {
-      if (m.why === 'noShip') say(g, 'g.int.noShip', { to: toPhrase(target) }, 'Kein Schiff in Reichweite', 'No ship within reach');
+      if (m.why === 'noShip') say(g, 'g.int.noShip', { to: toPhrase(target) }, 'Kein Schiff in Reichweite — {to} ist zu Fuß zu weit', 'No ship within reach — {to} is too far to walk');
       else if (m.why === 'other') say(g, 'g.int.other', null, 'Reisen zu anderen Welten kommen bald', 'Trips to other worlds are coming soon');
-      else say(g, 'g.int.far', null, 'Zu weit', 'Too far');
+      else say(g, 'g.int.far', null, 'Zu weit für eine Reise von hier', 'Too far to travel from here');
       return false;
     }
     if (m.means === 'space') return !!I.spaceHandler(g, target);
@@ -390,14 +392,14 @@
     else if (!c.pathComplete) path.push([gx + 0.5, gz + 0.5]);                    // (the rest straight, with step-ups)
     c.path = path; c.fst = I.followState(); c.goal = [gx + 0.5, gy, gz + 0.5]; c.prog = { d: Infinity, t: 0 }; c.jumpT = 0; c.repaths = 0;
     g.camMode = 1;
-    say(g, 'g.int.walkTo', { to: toPhrase(t) }, 'Unterwegs ' + toPhrase(t), 'On the way ' + toPhrase(t), 2200);
+    say(g, 'g.int.walkTo', { to: toPhrase(t) }, 'Unterwegs {to}', 'On the way {to}', 2200);
   }
   function startCall(g, c, ship) {
     const p = g.player, S = g.starships;
     c.ship = ship || conjure(g, c.target);
     c.ship.ectxBusy = true;
-    if (ship && ship.d && ship.d.meta) say(g, 'g.int.coming', { name: ship.d.meta.name }, 'Dein Schiff kommt', 'Your ship is coming', 3000);
-    else say(g, 'g.int.coming', { name: tx('g.int.myShuttle', null, 'Dein Shuttle', 'Your shuttle') }, 'Dein Shuttle kommt', 'Your shuttle is coming', 3000);
+    if (ship && ship.d && ship.d.meta) say(g, 'g.int.coming', { name: ship.d.meta.name }, 'Dein Schiff kommt: {name}', 'Your ship is coming: {name}', 3000);
+    else say(g, 'g.int.coming', { name: tx('g.int.myShuttle', null, 'Dein Shuttle', 'Your shuttle') }, 'Dein Schiff kommt: {name}', 'Your ship is coming: {name}', 3000);
     c.arr = null; c.arrT = 0; c.shipLanded = false; c.boardT = 0;
     g.camMode = 1;
     // a ship standing by you already: no flight in
@@ -457,6 +459,7 @@
   // the trip ends: the camera blends back over 0.4 s (cut: at once), the walk's camera and the HUD come back
   function end(g, why, cut) {
     const c = I.cur; if (!c) return;
+    if (c.injJump && g.input && g.input.tDown) { g.input.tDown.delete('jump'); c.injJump = false; }   // (never leave a jump held)
     if (c.ship && c.ship.ectxBusy && c.arr && !c.shipLanded) { c.ship.ectxDetached = true; detached.push({ c, ship: c.ship }); }   // a called ship on its way still lands
     else if (c.ship) c.ship.ectxBusy = false;
     if (c.fl && c.fl.auto && c.fl.auto.site && c.fl.auto.site.ectx && why !== 'done') c.fl.stopAuto(null);
@@ -622,7 +625,7 @@
   let dom = null, barText = '', markShown = false, glide = [0, 0];
   function mount() {
     if (dom || typeof document === 'undefined') return dom;
-    const app = document.getElementById('app') || document.body, hud = document.getElementById('hud');
+    const hud = document.getElementById('hud'), app = hud || document.getElementById('app') || document.body;   // (in the HUD: it goes with the HUD — the title, F1, the photo mode)
     if (!document.getElementById('intentstyle')) {
       const s = document.createElement('style'); s.id = 'intentstyle';
       s.textContent = '.lbx{position:absolute;left:0;right:0;height:0;background:#000;z-index:25;pointer-events:none;transition:height .6s ease}.lbx.t{top:0}.lbx.b{bottom:0}.lbx.on{height:7.5vh}' +
@@ -634,9 +637,9 @@
     const t = document.createElement('div'); t.className = 'lbx t'; app.appendChild(t);
     const b = document.createElement('div'); b.className = 'lbx b'; app.appendChild(b);
     const bar = document.createElement('div'); bar.id = 'intentbar'; app.appendChild(bar);
-    const cap = document.createElement('div'); cap.id = 'intentcap'; cap.innerHTML = '<span></span>'; app.appendChild(cap);
-    const mk = document.createElement('div'); mk.id = 'intentmark'; mk.innerHTML = '<i></i><b></b>'; (hud || app).appendChild(mk);
-    return (dom = { t, b, bar, cap, mk, ch: document.getElementById('crosshair') });
+    const cap = document.createElement('div'); cap.id = 'intentcap'; const capS = document.createElement('span'); cap.appendChild(capS); app.appendChild(cap);
+    const mk = document.createElement('div'); mk.id = 'intentmark'; mk.appendChild(document.createElement('i')); const mkL = document.createElement('b'); mk.appendChild(mkL); (hud || app).appendChild(mk);
+    return (dom = { t, b, bar, cap, capS, mk, mkL, ch: document.getElementById('crosshair') });
   }
   function chrome(g, on) {
     const d = mount(); if (!d) return;
@@ -649,7 +652,7 @@
     const d = mount(); if (!d) return;
     const ph = c.phase === 'done' ? 'arrive' : c.phase;
     const left = c.dist !== undefined ? c.dist : 0;
-    const txt = tx('g.int.bar', { ph: tx('g.int.ph.' + ph, null, ph, ph), to: toPhrase(c.target), d: distTxt(Math.max(0, left)) }, '', '') + '|' + tx('g.int.take', null, 'Bewegen: selbst steuern · Maus: umsehen', 'Move: take over · Mouse: look around');
+    const txt = tx('g.int.bar', { ph: tx('g.int.ph.' + ph, null, ph, ph), to: toPhrase(c.target), d: distTxt(Math.max(0, left)) }, '{ph} · {to} · noch {d}', '{ph} · {to} · {d} to go') + '|' + tx('g.int.take', null, 'Bewegen: selbst steuern · Maus: umsehen', 'Move: take over · Mouse: look around');
     if (txt === barText) return;
     barText = txt;
     const [a, b] = txt.split('|');
@@ -657,7 +660,7 @@
   }
   function caption(g, text) {
     const d = mount(); if (!d) return;
-    if (text) { d.cap.firstChild.textContent = text; d.cap.classList.add('on'); } else d.cap.classList.remove('on');
+    if (text) { d.capS.textContent = text; d.cap.classList.add('on'); } else d.cap.classList.remove('on');
     void g;
   }
   // the marker on the aimed target and the crosshair's glide toward it (after the camera, every frame while aimed)
@@ -675,7 +678,7 @@
         const sx = (nx * 0.5 + 0.5) * W, syy = (0.5 - ny * 0.5) * H;
         d.mk.style.display = 'block'; d.mk.style.left = sx.toFixed(1) + 'px'; d.mk.style.top = syy.toFixed(1) + 'px';
         const lab = a.name + ' · ' + distTxt(a.dist);
-        if (d.mk.lastChild.textContent !== lab) d.mk.lastChild.textContent = lab;
+        if (d.mkL.textContent !== lab) d.mkL.textContent = lab;
         // the crosshair glides up to 3°' worth toward it
         const lim = Math.tan(3 * DEG) / ty * H * 0.5, ox = sx - W / 2, oy = syy - H / 2, L = Math.hypot(ox, oy) || 1, k = Math.min(1, lim / L);
         gx = ox * k; gy = oy * k;
