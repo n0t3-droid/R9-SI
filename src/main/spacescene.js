@@ -175,7 +175,7 @@
       const N = pointWhere(u, 2 * D2R, norm(add(mul(bs.amarant.axis, 0.85), mul(Np, 0.15)))), pos = overBody(eph, 'herz', N, ALT);
       const dA = norm(sub(bs.amarant.p, pos)), el = Math.asin(dot(dA, N)), h = perp(dA, N), e2 = el - 6 * D2R;
       const lf = lookFrame(add(mul(h, Math.cos(e2)), mul(N, Math.sin(e2))), N);
-      return { name, pos, fwd: lf.fwd, up: lf.up, fov: 60 * D2R, nadir: chartAhead(eph, N, h, AHEAD), body: 'herz', ref: 'herz', pair: 'amarant' };
+      return { name, pos, fwd: lf.fwd, up: lf.up, fov: 42 * D2R, nadir: chartAhead(eph, N, h, AHEAD), body: 'herz', ref: 'herz', pair: 'amarant' };   // (a longer lens: the giant and its ring fill the picture's middle)
     }
     if (name === 'zinn') {
       // 3 km over Zinnober where Amarant (37° wide, fixed in its sky) sits just over the limb (the limb dips 25°): near
