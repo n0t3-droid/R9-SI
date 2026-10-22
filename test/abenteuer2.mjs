@@ -47,7 +47,7 @@ const run = async (n, opt) => {
       for (let i = 0; i < m; i++) {
         if (o.god) { const p = g.player; if (p.mode === 'survival') p.health = 20; if (VR.Foes.hp !== null) VR.Foes.hp = VR.Foes.hpMax(); }
         g.last = performance.now() - 33; g.loop(performance.now());
-        if (o.cb && ft.cb[o.cb]) ft.cb[o.cb](o.arg);
+        if (o.cb && ft.cb[o.cb]) ft.cb[o.cb](o.arg2 !== undefined ? o.arg2 : o.arg);
         if (o.until && ft.c[o.until](o.arg)) return { n: i + 1, hit: true };
       }
       return { n: m, hit: false };
@@ -116,6 +116,8 @@ try {
         wispNear: () => window.__ft.foes().filter(m => m.foe.k === 'wisp' && m.foe.st !== 'patrol').length >= 2,
       },
       cb: {
+        // the capture ring held: a hit's knock-back may not carry the test's player out of the circle (a player walks back)
+        ringHold: (q) => { window.__ft.cb.watch(); const p = g().player, s = window.__ft.site(), b = s.beacon; if (Math.hypot(p.pos[0] - b[0] - 0.5, p.pos[2] - b[2] - 0.5) > 9) { p.teleport(q[0], q[1], q[2]); p.vel[0] = 0; p.vel[2] = 0; } },
         // the most attacking at once, the waves seen, the shortest warning
         watch: () => { const ft = window.__ft, W = ft.w || (ft.w = { tok: 0, wave: 0, tele: new Map(), minTele: 9, strikes: 0, bolts: 0 }); W.tok = Math.max(W.tok, ft.tok()); const t = g().time || 0; for (const m of ft.foes()) { const f = m.foe; if (f.wave) W.wave = Math.max(W.wave, ft.foes().filter(x => x.foe.wave).length); if (f.st === 'tele' && !W.tele.has(m.id)) W.tele.set(m.id, t); else if (f.st === 'strike' && W.tele.has(m.id)) { W.minTele = Math.min(W.minTele, t - W.tele.get(m.id)); W.tele.delete(m.id); W.strikes++; } else if (f.st !== 'tele' && f.st !== 'strike') W.tele.delete(m.id); } W.bolts = Math.max(W.bolts, VR.Foes.bolts.length); },
       },
@@ -246,6 +248,7 @@ try {
       const K = VR.Foes.KINDS[m.foe.k], cc = ft.camAt([m.pos[0], m.pos[1] + K.h * 0.55, m.pos[2]], 3.2, 0.9, m.yaw + Math.PI);
       if (!cc) return null;
       ft.look(cc); m.vel[0] = 0; m.vel[2] = 0;
+      for (const x of ft.foes()) if (x !== m) { if (x.foe.tok) { VR.Foes.W.tokens.give(x.id); x.foe.tok = false; } if (x.foe.st === 'tele' || x.foe.st === 'strike') { x.foe.st = 'approach'; x.foe.t = 0; } x.foe.cool = 9; }   // (the others hold back while this one listens: the picture and the press)
       const C = VR.Ctx, res = C.resolve(C.gather(g));
       const txt = C.text(res);
       const ok = res && res.act === 'calm' ? C.act(g, res) : false;
@@ -283,13 +286,14 @@ try {
   await section('7', async () => {
     console.log('7 · the capture ring and the drone waves');
     await ev(() => { const g = VR.game, s = window.__ft.site(), p = g.player, q = window.__ft.outer(3.5); p.flying = false; p.teleport(q[0], q[1], q[2]); window.__ft.w = null; });   // (just off the pad's corner, outside the parked ship)
-    let r = await run(900, { until: 'ringNear', arg: 3, god: true, cb: 'watch' });
+    const spot = await ev(() => window.__ft.outer(3.5));
+    let r = await run(900, { until: 'ringNear', arg: 3, god: true, cb: 'ringHold', arg2: spot });
     const d = await ev(() => { const ft = window.__ft, p = VR.game.player, L = VR.Liberate, ws = ft.foes().filter(m => m.foe.wave); let cx = 0, cy = 0, cz = 0; for (const m of ws) { cx += m.pos[0]; cy += m.pos[1]; cz += m.pos[2]; } const n = ws.length || 1; ft.aim([cx / n, cy / n + 0.3, cz / n]); return { drones: ws.length, ring: L.ringSite ? +(L.ringSite.ringObj.p * 100).toFixed(0) : null, st: ws.map(m => m.foe.st), tok: ft.w.tok }; });
     console.log('     ' + JSON.stringify(d) + ' after ' + r.n + ' frames');
     check(r.hit && d.drones >= 3, 'the first wave: ' + d.drones + ' shadow drones round the player at ' + d.ring + ' % of the ring');
     await draw();
     pics.drones = await shot('foe_drones');
-    r = await run(2400, { until: 'moment', arg: 0.01, god: true, cb: 'watch' });
+    r = await run(2400, { until: 'moment', arg: 0.01, god: true, cb: 'ringHold', arg2: spot });
     const w = await ev(() => { const ft = window.__ft; return { tok: ft.w.tok, wave: ft.w.wave, minTele: +ft.w.minTele.toFixed(2), strikes: ft.w.strikes, bolts: ft.w.bolts }; });
     console.log('     ' + JSON.stringify(w) + ' after ' + r.n + ' more frames');
     N.ring = w;
@@ -373,7 +377,7 @@ try {
     await ev(() => { const g = VR.game; g.env.setTime(6000); const p = g.player; p.flying = false; window.__help = VR.Adventure.rec.helper; VR.Adventure.rec.helper = null; });   // (no Helfer coming back in the blocks without foes)
     await ev(() => {
       const g = VR.game, Fo = VR.Foes;
-      window.__ft.clear = () => { const En = g.entities; En.mobs = En.mobs.filter(m => !m.foe); Fo.bolts.length = 0; Fo.bits.length = 0; Fo.W.tokens.clear(); Fo.enc0 = null; };
+      window.__ft.clear = () => { const En = g.entities; for (let i = En.mobs.length - 1; i >= 0; i--) if (En.mobs[i].foe) En.mobs.splice(i, 1); Fo.bolts.length = 0; Fo.bits.length = 0; Fo.W.tokens.clear(); Fo.enc0 = null; };
       window.__ft.spawn12 = () => {
         const En = g.entities, p = g.player.pos, w = g.world, ids = [];
         const kinds = ['driller', 'driller', 'driller', 'driller', 'sentry', 'sentry', 'sentry', 'sentry', 'drone', 'drone', 'drone', 'drone'];
@@ -382,7 +386,7 @@ try {
       };
     });
     // the place: 70 blocks off the freed outpost (no Helfer round, no beacon light)
-    await ev(() => { const g = VR.game, s = window.__ft.site(), b = s.beacon, dx = b[0] - s.x, dz = b[2] - s.z, l = Math.hypot(dx, dz) || 1, x = Math.floor(b[0] - dz / l * 70), z = Math.floor(b[2] + dx / l * 70); g.player.teleport(x + 0.5, g.world.topAt(x, z) + 1, z + 0.5); for (const m of g.entities.mobs) if (m.foe && m.foe.mine) m.foe.gone = true; });
+    await ev(() => { const g = VR.game, s = window.__ft.site(), b = s.beacon, dx = b[0] - s.x, dz = b[2] - s.z, l = Math.hypot(dx, dz) || 1; let d = 72, x = 0, z = 0; for (; d >= 40; d -= 8) { x = Math.floor(b[0] - dz / l * d); z = Math.floor(b[2] + dx / l * d); if (g.world.isLoaded(x, z)) break; } g.player.flying = false; g.player.teleport(x + 0.5, g.world.topAt(x, z) + 1, z + 0.5); });   // (off the freed outpost: its trader stays at its post, 64 blocks away)
     await run(30);
     const n12 = await ev(() => { window.__ft.clear(); return window.__ft.spawn12(); });
     await run(60, { god: true });
