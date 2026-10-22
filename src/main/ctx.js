@@ -161,6 +161,22 @@
     }
     return best ? Object.assign({}, best.q, { dist: best.surf, ang: best.ang, eff: best.eff }) : null;
   };
+  // a ship's hull along the look ray (pure over occ(x, y, z) → is that block cell the hull): the distance to the first
+  // hull cell within reach, or null. A ship's hit box is the axis-aligned box round its turned footprint — beside a
+  // parked ship you stand inside it, and the ray "hits" at 0 m whatever you look at (a browser pilot run: after a trip
+  // every V said „Einsteigen" and boarded instead of the next trip); the hull itself decides.
+  C.hullAlong = function (eye, dir, reach, occ, step) {
+    reach = reach || C.REACH; step = step || 0.2;
+    const dl = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+    let px = NaN, py = NaN, pz = NaN;
+    for (let t = 0; t <= reach + 1e-9; t += step) {
+      const x = Math.floor(eye[0] + dir[0] / dl * t), y = Math.floor(eye[1] + dir[1] / dl * t), z = Math.floor(eye[2] + dir[2] / dl * t);
+      if (x === px && y === py && z === pz) continue;
+      px = x; py = y; pz = z;
+      if (occ(x, y, z)) return t;
+    }
+    return null;
+  };
   // ---------------------------------------------------------------- tap or hold (pure)
   // a press shorter than TAP is the action (on release); held, the ring fills from TAP to HOLD and Heimkehr fires once;
   // let go between: nothing. ring false (a vehicle, a tool): never a ring, never Heimkehr.
@@ -245,7 +261,10 @@
     const En = g.entities;
     if (En && En.rayEntity) {
       const hit = En.rayEntity(eye, dir, C.REACH);
-      if (hit && (!near || hit.dist < near.dist)) { const n2 = entityNear(g, hit.ent, hit.dist); if (n2) near = n2; }
+      // (a ship: its hull along the ray, not its box — see hullAlong)
+      const SS = g.starships, sh = hit && hit.ent && hit.ent.kind === 'starship' && SS && SS.inOcc && hit.ent.d && hit.ent.d.occ && hit.ent.d.meta ? hit.ent : null;
+      const hd = sh ? C.hullAlong(eye, dir, C.REACH, (x, y, z) => SS.inOcc(sh, x, y, z)) : hit ? hit.dist : null;
+      if (hit && hd !== null && (!near || hd < near.dist)) { const n2 = entityNear(g, hit.ent, hd); if (n2) near = n2; }
     }
     if (!near) {
       const list = CONE; list.length = 0;

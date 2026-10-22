@@ -128,6 +128,12 @@ const n2 = C.pickNear(eye, [Math.sin(-40 * DEG), 0, -Math.cos(40 * DEG)], [thing
 check(!n2, 'a thing 40° aside is not picked');
 const n3 = C.pickNear(eye, [0, 0, -1], [things[3]]);
 check(n3 && n3.name === 'Kestrel' && n3.dist <= 4.5, `a ship: its hull counts (the surface, not the centre): ${n3 && n3.dist.toFixed(1)} m`);
+// a parked ship's hull as cells x 2..9, y 0..3, z −6..−2 (turned: its box reaches round you), you stand at the box's corner
+const hull = (x, y, z) => x >= 2 && x <= 9 && y >= 0 && y <= 3 && z >= -6 && z <= -2;
+const eyeS = [0.5, 1.6, -0.5];
+const hTo = C.hullAlong(eyeS, [1, 0, -1], 4.5, hull), hAway = C.hullAlong(eyeS, [-1, 0.2, 0.3], 4.5, hull), hPast = C.hullAlong(eyeS, [0, 0.1, -1], 4.5, hull);
+check(hTo !== null && hTo > 1.5 && hTo < 3.5, `beside a parked ship, looking at its hull: hit at ${hTo !== null ? hTo.toFixed(1) : '—'} m`);
+check(hAway === null && hPast === null, 'looking away from it, or along it past its nose: no hit (its box would say 0 m — after a trip every V boarded)');
 // press: tap, hold, cancel
 const run = (seq, ring) => { const st = C.pressState(), out = []; for (const [down, dt] of seq) { const r = C.press(st, down, dt, ring); out.push(r); } return out; };
 let o = run([[true, 0], [true, 0.1], [false, 0.016]], true);
