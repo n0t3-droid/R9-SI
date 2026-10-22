@@ -156,6 +156,9 @@ async function runPreset(preset) {
     const ok = await makeWorld(P, preset);
     check(ok, `the world is loaded (${secs()})`);
     if (!ok) return;
+    // the chat commands are a Profi thing (start.js: Einfach answers every command outside its friendly list with a note —
+    // run 2 met it), and the chat's lines are kept for the log
+    await P.ev(() => { if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); const ui = VR.game.ui, cl = ui.chatLine.bind(ui); window.__lines = []; ui.chatLine = (t, c) => { window.__lines.push(String(t)); return cl(t, c); }; });
     // the plaza: the temple from the plaza path at noon (light2.mjs 'temple')
     const px = 4.5, pz = 74.5;
     await P.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, [px, pz]);
@@ -181,6 +184,8 @@ async function runPreset(preset) {
         if (sun !== null) { const sp = BT.toSphere(p.pos[0], p.pos[2]), e = SS.ephemeris(SS.worldTime(d, tk), {}), s = SS.localSun(e, sp[0], sp[1]); p.yaw = p.viewYaw = SS.yawFor(s.az + sun, p.pos[0], p.pos[2]); }
         g.chat('/raum ' + cmd);
       }, [v.day, v.ticks, v.sun, v.cmd]);
+      const opened = await P.ev(() => ({ open: !!VR.game.space, line: (window.__lines || []).slice(-1)[0] || '' }));
+      if (!opened.open) { check(false, `${v.id}: /raum ${v.cmd} did not open the view (the chat: “${opened.line}”)`); continue; }
       // stepped till the view is shown and every texture it asked for is in (the worker's jobs), 240 s at most
       let st = null;
       for (let i = 0; i < 600; i++) {
