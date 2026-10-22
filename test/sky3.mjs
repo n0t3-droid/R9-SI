@@ -28,7 +28,7 @@
 // 40 %'s luma sd and saturation, the bottom 40 %'s saturation), the sun's disc where the sun is in the picture (sunDiscOf:
 // the ≥ 250-luma core's width in degrees), the clouds of the storm and the gap (cloudsOf on the sky probe: their mean luma,
 // base over top); the review's gates (sky_ref.js gates) over the golden views and the storm. VARIANTS='{"tag": {"gold":
-// {...}, "sun": {...}, "grade": {...}, "stops": [["warm2", 9, [r, g, b]], …]}}' shoots the golden views again with
+// {...}, "sun": {...}, "grade": {...}, "fog": {"gold": [ρ, k, base]}, "stops": [["warm2", 9, [r, g, b]], …]}}' shoots the golden views again with
 // each palette variant set in the page (no new world, no settle: a variant costs two pictures a view) → sky3_<view>_<TAG>_<tag>
 // usage: TAG=before DIST=file://$PWD/.tmp_tests/dist_before/index.html nohup bash test/wt_run.sh sky3.mjs 3600 > .tmp_tests/sky3_before.log 2>&1 &
 //        TAG=after DIST_BEFORE=file://$PWD/.tmp_tests/dist_before/index.html BEFORE_JSON=.tmp_tests/sky3_before.json nohup bash test/wt_run.sh sky3.mjs 3600 > .tmp_tests/sky3_after.log 2>&1 &
@@ -246,7 +246,8 @@ async function shoot(V, preset) {
   if (VARIANTS && preset === 'high' && V.hour === 'golden' && V.measure !== false) for (const [vt, VV] of Object.entries(VARIANTS)) {
     await ev((VV) => {
       const S3 = VR.Sky3, L2 = VR.Light2;
-      window.__keep = JSON.stringify({ gold: S3.PAL.gold, skyl: S3.SKYL, grade: L2.GRADE.gold });
+      window.__keep = JSON.stringify({ gold: S3.PAL.gold, skyl: S3.SKYL, grade: L2.GRADE.gold, fog: L2.FOG || null });
+      if (VV.fog && L2.FOG) for (const k of Object.keys(VV.fog)) L2.FOG[k] = VV.fog[k].slice();
       if (VV.gold) Object.assign(S3.PAL.gold, VV.gold);
       if (VV.sun) Object.assign(S3.SKYL.sun, VV.sun);
       if (VV.grade) Object.assign(L2.GRADE.gold, VV.grade);
@@ -260,7 +261,7 @@ async function shoot(V, preset) {
     await page.screenshot({ path: TMP + 'sky3probe_' + vn + '.png', timeout: 240000 });
     await draw(false);
     const vm = await measure(vn, vgeo, hr[1]);
-    await ev(() => { const S3 = VR.Sky3, L2 = VR.Light2, k = JSON.parse(window.__keep); Object.assign(S3.PAL.gold, k.gold); for (const t of Object.keys(k.skyl)) S3.SKYL[t] = k.skyl[t]; Object.assign(L2.GRADE.gold, k.grade); });
+    await ev(() => { const S3 = VR.Sky3, L2 = VR.Light2, k = JSON.parse(window.__keep); Object.assign(S3.PAL.gold, k.gold); for (const t of Object.keys(k.skyl)) S3.SKYL[t] = k.skyl[t]; Object.assign(L2.GRADE.gold, k.grade); if (k.fog && L2.FOG) for (const f of Object.keys(k.fog)) L2.FOG[f] = k.fog[f]; });
     const vd = compare(vm.curve, ref.targets[hr[1]]);
     results.push({ name: vn, view: V.name + '+' + vt, variant: vt, place: V.place, hour: V.hour, kind: hr[1], preset, ...vm, dE: vd });
     console.log(`   variant ${vt}: ΔE ${vd.map(v => (v === null ? '—' : v.toFixed(1))).join(' ')}  mean ${mean(vd)} · L* ${vm.curve.map(b => (b.lab ? b.L.toFixed(0) : '—')).join(' ')} · structure sd ${vm.structure.sd} sat ${vm.structure.sat} land ${vm.structure.land}${vm.disc ? ` · disc ${vm.disc.width}°` : ''}`);

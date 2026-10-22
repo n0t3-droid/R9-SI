@@ -182,6 +182,7 @@
   // perspective's distance, the morning layer (thicker and lower round sunrise); the sea level is the Heartland's 62
   // (by day a light haze — the far shore stays crisp at noon; the valleys fill toward evening, at night and at dawn)
   const FOG = { day: [0.0007, 1 / 14, 62], gold: [0.0016, 1 / 13, 62], dusk: [0.0022, 1 / 12, 60], night: [0.0016, 1 / 12, 60] };
+  L2.FOG = FOG;   // (f-sky4: open to the tests — sky3.mjs's palette variants try the golden valley haze too)
   L2.air = function (E, ticks) {
     const m = L2.moods(E.sunDir[1]);
     const f = byMood(m, FOG);
