@@ -210,7 +210,10 @@
     const ext = opts.ext || [5, 8], half = Math.ceil(Math.max(ext[0], ext[1])) + 1, px = player[0], pz = player[2];
     const tw = opts.toward ? Math.atan2(opts.toward[0] - px, opts.toward[1] - pz) : 0;
     let best = null, bs = Infinity;
-    for (const r of [16, 19, 22, 25, 28, Math.max(13, half + 4)]) {
+    // 12–30 m first; a busy square (lamps, benches, trees in their beds): farther out, up to 50 m
+    const rings = [16, 19, 22, 25, 28, Math.max(13, half + 4), 0, 33, 38, 44, 50];
+    for (const r of rings) {
+      if (r === 0) { if (best) break; continue; }
       for (let k = 0; k < 16; k++) {
         const a = tw + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (TAU / 16);
         const cx = Math.round(px + Math.sin(a) * r), cz = Math.round(pz + Math.cos(a) * r);
@@ -294,8 +297,17 @@
   const lang = () => (VR.I18N && VR.I18N.lang === 'en' ? 'en' : 'de');
   const toPhrase = (t) => tx(t.toKey || 'g.ctx.toThing', { name: t.name }, (VR.Ctx && VR.Ctx.LABELS[t.toKey] ? VR.Ctx.LABELS[t.toKey][0] : 'zu {name}').replace('{name}', t.name), (VR.Ctx && VR.Ctx.LABELS[t.toKey] ? VR.Ctx.LABELS[t.toKey][1] : 'to {name}').replace('{name}', t.name));
   const distTxt = (m) => (VR.Ctx ? VR.Ctx.dist(m) : Math.round(m) + ' m');
-  // the ground a pad may stand on: the top block of a loaded column — water, lava, leaves, wood, glass, roofs, crops: no
-  const BAD = /leaves|log|wood|vx_|glass|fence|door|wheat|carrot|potato|beet|farmland|planks|bed|lamp|torch|chest|landing_pad|hazard|crystal|ice$|slab|stairs|wall/;
+  // the ground a pad may stand on (pure over a block's flags and name): a solid full cube or an opaque VX block (the Gate
+  // Plaza's tiles are vx_floor_plaza: shape voxel, opaque) — the land, a paved plaza, a street; not water or lava, not
+  // leaves, glass or ice, not a chest, a bed or a door (they do something), not a tree's wood or a roof's planks, not a
+  // village's own landing pad (its shuttle stands there)
+  const BAD = /glass|ice$|log|wood|planks|landing_pad|hazard|crystal|farmland/;
+  I.padOk = function (fl, name) {
+    const F = VR.F || { SOLID: 1, OPAQUE: 2, FULL: 4, TRANS: 16, FLUID: 32, WATER: 64, LAVA: 128, LEAVES: 2048, INTERACT: 1 << 21 };
+    if (!(fl & F.SOLID) || !((fl & (F.FULL | F.OPAQUE)) || (name && /_path$/.test(name)))) return false;   // (a path is 15/16 high: fine)
+    if (fl & (F.FLUID | F.WATER | F.LAVA | F.LEAVES | F.INTERACT | F.TRANS)) return false;
+    return !(name && BAD.test(name));
+  };
   function groundFn(g) {
     const w = g.world, Rg = VR.R, F = VR.F;
     return (x, z) => {
@@ -304,8 +316,9 @@
       let y = c.height[((z & 15) << 4) | (x & 15)];
       for (let k = 0; k < 3 && y > 1; k++) { const b = w.getBlock(x, y, z); if (b && (Rg.T.flags[b] & F.SOLID)) break; y--; }
       const b = w.getBlock(x, y, z);
-      if (!b || (Rg.T.flags[b] & (F.WATER | F.LAVA))) return -1;
-      const t = Rg.types[Rg.T.type[b]]; if (t && BAD.test(t.name)) return -1;
+      if (!b) return -1;
+      const t = Rg.types[Rg.T.type[b]];
+      if (!I.padOk(Rg.T.flags[b], t && t.name)) return -1;
       if (w.getBlock(x, y + 1, z) && (Rg.T.flags[w.getBlock(x, y + 1, z)] & F.SOLID)) return -1;
       return y;
     };

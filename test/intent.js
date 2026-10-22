@@ -134,6 +134,18 @@ const pond = (x, z) => (Math.hypot(x + 25, z - 60) < 22 ? -1 : 81);   // a pond 
 const pp = I.pickPad(pond, [0.5, 82, 40.5], { toward: [-420, 380], ext: [5, 8] });
 check(pp && Math.hypot(pp[0] + 25, pp[2] - 60) >= 22 + 5, `a pond on the target side: the pad is on dry land (${pp && Math.hypot(pp[0] + 25, pp[2] - 60).toFixed(1)} m from its middle)`);
 check(!I.pickPad((x, z) => null, [0.5, 82, 40.5], { toward: [-420, 380], ext: [5, 8] }), 'nothing loaded: no pad (yet)');
+const busy = (x, z) => (Math.hypot(x - 0.5, z - 40.5) < 30 ? -1 : 81);   // lamps, benches and beds all round within 30 m
+const pb = I.pickPad(busy, [0.5, 82, 40.5], { toward: [-420, 380], ext: [5, 8] }), db = pb && Math.hypot(pb[0] - 0.5, pb[2] - 40.5);
+check(pb && db > 30 && db <= 51, `a busy square: the pad farther out (${db && db.toFixed(1)} m)`);
+// what a pad may stand on (the flags of src/shared/registry.js): a solid full cube, or an opaque VX block — the Gate
+// Plaza's tiles are vx_floor_plaza (shape voxel: SOLID + OPAQUE, no FULL); a browser run found no pad on the plaza when
+// every vx_ block was refused
+const FL = { SOLID: 1, OPAQUE: 2, FULL: 4, TRANS: 16, FLUID: 32, WATER: 64, LAVA: 128, LEAVES: 2048, INTERACT: 1 << 21 };
+const cube = FL.SOLID | FL.OPAQUE | FL.FULL, vxTile = FL.SOLID | FL.OPAQUE;
+const okPad = [['vx_floor_plaza', vxTile], ['vx_floor_plaza_line', vxTile], ['grass_block', cube], ['dirt_path', FL.SOLID], ['stone_bricks', cube], ['sand', cube]];
+const noPad = [['water', FL.FLUID | FL.WATER], ['oak_leaves', FL.SOLID | FL.FULL | FL.LEAVES], ['glass', FL.SOLID | FL.FULL | FL.TRANS], ['chest', FL.SOLID | FL.INTERACT], ['stone_slab', FL.SOLID], ['vx_bench', FL.SOLID], ['vx_bed_red', FL.SOLID | FL.INTERACT], ['oak_log', cube], ['oak_planks', cube], ['landing_pad', cube], ['packed_ice', cube], ['poppy', 0]];
+check(typeof I.padOk === 'function' && okPad.every(([n, f]) => I.padOk(f, n)), 'a pad stands on the land, a paved plaza (its VX tiles), a street: ' + okPad.map(q => q[0]).join(', '));
+check(typeof I.padOk === 'function' && noPad.every(([n, f]) => !I.padOk(f, n)), 'not on water, leaves, glass, a chest, a slab, a tree, a roof, a village pad, ice or a flower: ' + noPad.filter(([n, f]) => I.padOk && I.padOk(f, n)).map(q => q[0]).join(', '));
 
 console.log('g · the walk');
 const pathL = [[0, 0], [10, 0], [10, 10], [20, 10]];
