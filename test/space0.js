@@ -220,7 +220,10 @@ console.log('bodytex');
   check(P.r.w === 512 && P.r.y1 - P.r.y0 === 128 && P.r.a.length === 512 * 128 * 4, 'patch: 128 rows of 512 texels');
   check(P.ms <= 800, `patch: ${P.ms.toFixed(0)} ms of CPU for 128 rows (a job; the 512² patch is four of them)`);
   const jh = BT.jobs('patch', 3, { cx: 0, cz: 0 }), JH = cpuMs(() => BT.job(jh[Math.floor(jh.length / 2)], gen));
-  check(jh.every(j => (j.y1 - j.y0) * j.w <= 65536) && JH.ms <= 800, `patch on High: ${jh.length} jobs of ≤ 65,536 texels, the middle one ${JH.ms.toFixed(0)} ms (budget 800 ms)`);
+  // (space0.mjs run 3: a page's worker on the busy test machine took 1.0 s for 131k texels of Herzwelt and up to 0.9 s for
+  // 65k of the patch — 2.5–3.5× node's time: a job of the generator's bodies holds 32k texels, ≤ 0.3 s here)
+  const jhz = BT.jobs('herz', 0), JZ = cpuMs(() => BT.job(Object.assign({ seed: 1 }, jhz[1]), gen));
+  check(jh.every(j => (j.y1 - j.y0) * j.w <= 32768) && jhz.every(j => (j.y1 - j.y0) * j.w <= 32768) && JH.ms <= 300 && JZ.ms <= 300, `the generator's jobs hold ≤ 32,768 texels: High's patch in ${jh.length} (the middle one ${JH.ms.toFixed(0)} ms), Very Low's Herzwelt in ${jhz.length} (${JZ.ms.toFixed(0)} ms; ≤ 300 ms in node, ≤ 0.8 s in a busy page)`);
   const Pc = BT.job({ type: 'bodytex', body: 'patch', w: 512, h: 512, y0: 248, y1: 264, cx: 0, cz: 0, step: 100 }, gen);
   let lights = 0, lit = 0; for (let i = 0; i < Pc.b.length; i += 4) { lights = Math.max(lights, Pc.b[i]); if (Pc.b[i] > 20) lit++; }
   const mid = (8 * 512 + 256) * 4;

@@ -75,12 +75,12 @@
   };
   BT.MOONS = ['aqua', 'zinn', 'opal', 'basalt', 'ocker'];
   BT.TWO = { herz: 1, patch: 1 };   // the bodies with a second texture (B)
-  // the row jobs of one texture: ~131k texels a job for Herzwelt's globe (≈ 0.5 s), 65k for the patch (its villages and
-  // finer clouds: ≈ 0.45 s), more for the cheap ones
+  // the row jobs of one texture: 32k texels a job for the generator's bodies (≈ 0.1 s in node, ≤ 0.4 s in a page's busy
+  // worker — space0.mjs run 3 measured 1.0 s for 131k), more for the cheap ones; the pool's workers share them
   BT.jobs = function (body, tier, extra) {
     const kind = BT.MOONS.includes(body) ? 'moon' : body, sz = BT.size(kind, tier);
     const w = sz[0], h = body === 'patch' ? sz[0] : sz[1];
-    const per = body === 'herz' ? 131072 : body === 'patch' ? 65536 : body === 'ring' ? 1 << 20 : 98304;
+    const per = body === 'herz' || body === 'patch' ? 32768 : body === 'ring' ? 1 << 20 : 98304;
     const rows = Math.max(1, Math.floor(per / w)), out = [];
     for (let y0 = 0; y0 < h; y0 += rows) out.push(Object.assign({ type: 'bodytex', body, w, h, y0, y1: Math.min(h, y0 + rows) }, body === 'patch' ? { step: sz[1] } : null, extra || null));
     return out;
@@ -173,6 +173,7 @@
   }
   function herz(g, m, w, h, y0, y1, a, b) {
     const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M, POP = new VR.Simplex((g.seed ^ 0x9e0) >>> 0);
+    const oct = w >= 1024 ? 5 : 4;   // (the fifth octave's cells are ~0.6 km: below a Very Low texel, only noise there)
     for (let j = y0; j < y1; j++) {
       const th = (j + 0.5) / h * Math.PI;
       for (let i = 0; i < w; i++) {
@@ -185,10 +186,10 @@
         // the lights, statistically (a village a 640² cell, ~35 % of the cells; a texel ~1.2 km): one liveable texel in
         // twelve lit, gathered into clusters of ~15 km and empty land between (points and webs from far, not a glow) —
         // far views only
-        const hsh = M.hashf2(i, j, g.seed ^ 0x11657), pl = 0.1 * (0.15 + 1.7 * ss(-0.15, 0.45, POP.n3(N[0] * 7, N[1] * 7, N[2] * 7)));
-        let L = o[5] && hsh < pl ? 60 + (hsh / pl) * 140 : 0;
+        let L = 0;
+        if (o[5]) { const hsh = M.hashf2(i, j, g.seed ^ 0x11657); if (hsh < 0.19) { const pl = 0.1 * (0.15 + 1.7 * ss(-0.15, 0.45, POP.n3(N[0] * 7, N[1] * 7, N[2] * 7))); if (hsh < pl) L = 60 + (hsh / pl) * 140; } }   // (pl ≤ 0.185)
         if (Math.hypot(p[0], p[1]) < 1500) L = 255;
-        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 5) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
+        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], oct) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }
     }
   }
