@@ -13,7 +13,8 @@
 //   4 · VR.First.pick: the sight-ok wow vista with the best score; none ok → the best score; no records → none
 //   5 · Heimkehr's facing (VR.Travel.facing): at Herzwelt's spawn of seed 4242 (the Hangar Hall, its craft 2 m behind
 //       the pad) the view leaves the craft and the nearest geometry in the frame's centre third is ≥ 8 m away (the
-//       ground under the feet not counted); a wall 2 m ahead turns the view; a vista's walk faces its view
+//       ground under the feet not counted); a wall 2 m ahead turns the view; a vista's walk faces its view, at its pitch
+//   6 · (CAMS=<file.json> only) the cameras test/first.mjs read from the pages, measured as in 3
 //   bash test/wt_run.sh arrival.js 1800        (SEEDS=53,4242,… the arrival's seeds · ONLY=1,2,… some parts)
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -206,9 +207,30 @@ if (on(5)) {
     check(!fw.kept && fw.clear >= 8 && Math.abs(Math.atan2(Math.sin(fw.yaw), Math.cos(fw.yaw))) > 60 * DEG, `a wall 2 m ahead: the view turns away (${(fw.yaw / DEG).toFixed(0)}°, ${fw.clear.toFixed(1)} m)`);
     // a new world's home is its vista's walk (t-first): its view is kept (seed 53's arrival)
     const g53 = V.makeGen('overworld', 53, { vgen: 13 }), P53 = LAND.plan(g53), v = FI.pick(VI.arrivals(g53, P53)), A = FI.arrivalOf(v), feet = FI.feet(v), W53 = world(g53);
-    const fv = TR.facing((x, y, z) => W53.blockAt(x, y, z), [feet[0], feet[1] + 1.62, feet[2]], [], { yaw0: A.yaw, feet: feet[1], keep0: true });
-    check(fv.kept && Math.abs(fv.yaw - A.yaw) < 1e-9, `a vista start's home: its walk's view kept (${v.id} ${v.lm}; the bench and the parapet ${fv.clear.toFixed(1)} m ahead in the lower middle, the landmark beyond)`);
+    const fv = TR.facing((x, y, z) => W53.blockAt(x, y, z), [feet[0], feet[1] + 1.62, feet[2]], [], { yaw0: A.yaw, pitch0: v.pitch, feet: feet[1], keep0: true });
+    check(fv.kept && Math.abs(fv.yaw - A.yaw) < 1e-9 && fv.pitch === v.pitch, `a vista start's home: its walk's view kept, at the walk's pitch (${v.id} ${v.lm}; its low walls, bench and lanterns ${fv.clear.toFixed(1)} m ahead at the middle third's foot and sides, the landmark beyond)`);
+    // the pitch counts: a view tilted up passes over a wall 3 m ahead that a level view meets
+    const wall3 = (x, y, z) => (y <= 63 ? 1 : (z === -3 && y === 64) ? 1 : 0);
+    const lv = TR.facing(wall3, [0.5, 65.62, 0.5], [], { yaw0: 0, feet: 64, want: 1e9, n: 1 }), up = TR.facing(wall3, [0.5, 65.62, 0.5], [], { yaw0: 0, pitch0: 0.3, feet: 64, want: 1e9, n: 1 });
+    check(lv.clear < 4 && up.clear > 8 && up.pitch === 0.3, `the middle third at the view's own pitch: a knee-high wall 3 m ahead ${lv.clear.toFixed(1)} m level, ${up.clear.toFixed(1)} m looking 17° up`);
   }
+}
+
+// ================================================================ 6 · the browser's cameras (test/first.mjs part D)
+// CAMS=<file.json> [{tag, seed, vgen, id, lm, cam: {eye, yaw, pitch, fov (degrees)}}…] — the camera each page drew its
+// arrival with, measured as in 3; written to <file>.truth.json (first.mjs runs this with ONLY=6)
+if (process.env.CAMS) {
+  const fs = require('fs'), list = JSON.parse(fs.readFileSync(process.env.CAMS, 'utf8')), res = [];
+  console.log('6 · the browser\'s cameras (' + list.length + ', ' + TW + ' × ' + TH + ' rays)');
+  for (const c of list) {
+    const g = V.makeGen('overworld', +c.seed, { vgen: +c.vgen }), P = LAND.plan(g), rec = P.vistas.find(q => q.id === c.id);
+    const lm = c.lm || (rec && rec.lm);
+    if (!lm || !VI.landmarks(g, P).some(l => l.id === lm)) { console.log(`     ${c.tag}: no landmark ${lm} in seed ${c.seed}'s plan (vgen ${c.vgen})`); res.push(Object.assign({}, c, { truth: null })); continue; }
+    const t = truth(g, P, { lm }, c.cam, TW, TH);
+    res.push(Object.assign({}, c, { lm, truth: t }));
+    console.log(`     ${c.tag}: seed ${c.seed} (vgen ${c.vgen}) ${c.id} ${lm} at ${(+c.cam.fov).toFixed(1)}°: the landmark ${pct(t.share)} of the frame, ${pct(t.hidden)} hidden (${t.by}), upper half within 6 m ${pct(t.near)} (${secs()})`);
+  }
+  fs.writeFileSync(process.env.CAMS.replace(/\.json$/, '') + '.truth.json', JSON.stringify(res, null, 1));
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

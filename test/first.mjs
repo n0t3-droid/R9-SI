@@ -12,9 +12,12 @@
 //   C · Very Low and High, both builds side by side in two pages: the title (Very Low: one still frame of the sky, no
 //       world, no workers), then a world's play frame at a fixed pose — draws, triangles, sections, full-screen passes and
 //       the time (the two pages measured in turns, so the machine's load falls on both alike)
-// → test/shots/first_<name>.png, test/shots/first_sheet.jpg (python3 /root/r9coord/sheet.py), test/shots/first.json
+//   D · (ONLY=…,D; f-arrival) the arrival of seeds 53, 4242, 31337, 7 on both builds: the frame the veil opens on, its
+//       camera measured with real blocks (test/arrival.js part 6), 🏠 Heimkehr's frame in the first seed's world
+// → test/shots/first_<name>.png, test/shots/first_sheet.jpg (python3 /root/r9coord/sheet.py), test/shots/first.json,
+//   test/shots/first_arrival_sheet.jpg (D)
 //   bash test/wt_run.sh first.mjs 3600        (BASE=…/dist/index.html the build before — default .tmp_tests/base/dist;
-//   without it the before parts are skipped · ONLY=A,B,C the parts)
+//   without it the before parts are skipped · ONLY=A,B,C the parts (D on request) · DSEEDS=53,4242,… D's seeds)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import fs from 'fs';
@@ -314,6 +317,138 @@ if (ONLY.includes('C')) {
     console.log(`     its time (taken in turns, to a pixel read): ${a.ms} ms (best ${a.best}) against ${b.ms} ms (best ${b.best})`);
   }
   for (const [, page, ctx] of pages) { await page.close(); await ctx.close(); }
+}
+
+// ================================================================ D · the arrival of four seeds (f-arrival, R50-02, R50-06)
+// docs/superpowers/plans/2026-10-23-f-arrival.md. ▶ Losspielen on each build (Balanced, a browser context of its own per
+// world) for seeds 53, 4242, 31337 and 7 (DSEEDS): the frame the veil opens on, once the white has gone (the moment's
+// hold at its real time: first_d<seed>_<build>.png) and again after ~20 s with the moment held (the far land in:
+// first_d<seed>_<build>_held.png); the camera each page drew is measured in node with rays through the generated chunks
+// (test/arrival.js part 6): the landmark's share of the frame, the part of it hidden, anything within 6 m in the upper
+// half — this build: ≥ 8 %, ≤ 10 %, nothing. Then, in the first seed's world on each build: /dim drift and 🏠 Heimkehr
+// — the frame the veil opens on at home, a vista start's home being its walk (first_dhome<seed>_<build>.png), and the
+// nearest geometry in that frame's middle third (the test's own rays at the player's camera)
+const DSEEDS = (process.env.DSEEDS || '53,4242,31337,7').split(',');
+// the nearest geometry in the middle third (a third across, a third up) of the player's frame: 9 × 5 rays through the
+// loaded blocks (no plants, no fluids; the ground under the feet not counted) and the ships near by as boxes
+const midThird = (page) => ev(page, () => {
+  const g = VR.game, w = g.world, p = g.player, R = VR.R, F = VR.F, fov = ((g.settings && g.settings.fov) || 75) * Math.PI / 180, th = Math.tan(fov / 2), A = g.canvas.width / g.canvas.height;
+  const eye = [p.pos[0], p.pos[1] + (p.eye || 1.62), p.pos[2]], feet = Math.floor(p.pos[1] + 0.01), yaw = p.yaw, pitch = p.pitch || 0;
+  const f = [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)], r = [Math.cos(yaw), 0, -Math.sin(yaw)];
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  const boxes = []; for (const s of (g.starships && g.starships.ships) || []) { if (!s || !s.pos || Math.hypot(s.pos[0] - eye[0], s.pos[2] - eye[2]) > 60) continue; const m = s.d && s.d.meta, hw = m && m.bounds ? Math.max(m.bounds[3] - m.bounds[0], m.bounds[5] - m.bounds[2]) / 2 : 10, h = m && m.height ? m.height : 8; boxes.push([s.pos[0] - hw, s.pos[1], s.pos[2] - hw, s.pos[0] + hw, s.pos[1] + h, s.pos[2] + hw]); }
+  let near = 60, what = 'nothing within 60 m';
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 9; i++) {
+    const a = (-1 / 3 + i / 8 * (2 / 3)) * th * A, b = (-1 / 3 + j / 4 * (2 / 3)) * th, d = [0, 1, 2].map(k => f[k] + r[k] * a + u[k] * b), l = Math.hypot(d[0], d[1], d[2]); for (let k = 0; k < 3; k++) d[k] /= l;
+    for (const bx of boxes) { let t0 = -Infinity, t1 = Infinity; for (let k = 0; k < 3; k++) { const iv = 1 / (d[k] || 1e-12), q0 = (bx[k] - eye[k]) * iv, q1 = (bx[k + 3] - eye[k]) * iv; t0 = Math.max(t0, Math.min(q0, q1)); t1 = Math.min(t1, Math.max(q0, q1)); } if (t1 >= t0 && t1 > 0 && Math.max(0, t0) < near) { near = Math.max(0, t0); what = 'a ship'; } }
+    for (let t = 0.05; t < near; t += 0.05) {
+      const x = Math.floor(eye[0] + d[0] * t), y = Math.floor(eye[1] + d[1] * t), z = Math.floor(eye[2] + d[2] * t);
+      if (y < feet) { if (d[1] < 0) break; continue; }
+      const s = w.getBlock(x, y, z); if (!s) continue; const fl = R.T.flags[s];
+      if ((fl & F.PLANT) || (fl & F.FLUID) || !((fl & (F.OPAQUE | F.LEAVES)) || (fl & F.SOLID))) continue;
+      near = t; what = R.types[R.T.type[s]].name + ' (' + (x - Math.floor(eye[0])) + ', ' + (y - feet) + ', ' + (z - Math.floor(eye[2])) + ')'; break;
+    }
+  }
+  return { near: +near.toFixed(1), what, yaw: +yaw.toFixed(3), pitch: +pitch.toFixed(3), fovDeg: Math.round(fov * 180 / Math.PI) };
+});
+async function arrivalRun(build, url, seed, home) {
+  const tag = build + seed, ctx = await context(tag), page = await open(ctx, url, BAL), r = { build, seed };
+  try {
+    if (!(await untilState(page, 'title', 240000))) { r.err = 'no start screen'; return r; }
+    await wait(page, 1500);
+    const t0 = Date.now();
+    await ev(page, (SEED) => { const g = VR.game, cw = g.createWorld.bind(g); g.createWorld = (o) => cw(Object.assign({}, o, o.seed ? {} : { seed: SEED })); VR.Start.newWorld(); }, seed);
+    // the loading screen in real time, until its bar is nearly full or the white begins to rise; then by hand
+    let low = false;
+    for (let i = 0; i < 720; i++) {
+      await wait(page, 250);
+      const s = await ev(page, () => { const g = VR.game, b = document.getElementById('loadbar'); return { st: g.state, w: b ? parseFloat(b.style.width) || 0 : 0, ar: g.arrival ? g.arrival.phase : null }; });
+      if (s.st === 'loading' && s.w < 50) low = true;
+      if (s.st === 'play' || s.ar || (low && s.w > 90)) break;
+    }
+    await manual(page);
+    for (let i = 0; i < 3000; i++) {
+      const s = await ev(page, () => ({ st: VR.game.state, ph: VR.game.arrival ? VR.game.arrival.phase : null }));
+      if (s.st === 'play') break;
+      if (s.ph === 'in') { await step(page, 1, 33, false); continue; }
+      await step(page, 5, 33, false); await wait(page, 60);
+    }
+    r.loadMs = Date.now() - t0;
+    const cam = () => ev(page, () => { const g = VR.game, W = g.wow, m = g.meta, A = W && W.active, b = W && W.b; return { vgen: m.vgen | 0, vista: m.vistaId || null, vs: m.vistaStart, id: A ? A.id : null, lm: A ? A.lm || null : null, phase: g.arrival ? g.arrival.phase : null, curve: A ? +VR.WowMoment.curve(W.t).toFixed(3) : null, cam: b ? { eye: [b.x, b.y, b.z], yaw: b.yaw, pitch: b.pitch, fov: b.fov * 180 / Math.PI } : null, tod: Math.round(g.env.timeOfDay), seed: m.seed }; });
+    r.at = await cam();
+    // the white thins over the composition (t-first: 84 frames to the moment's hold, the caption up)
+    await step(page, 84, 33, true);
+    r.moment = await cam();
+    r.shot = await shot(page, 'd' + seed + '_' + build);
+    // the moment held while the far land comes in (~20 s of the machine's time, a frame drawn every 10)
+    const hold = () => ev(page, () => { const W = VR.game.wow; if (W && W.active) W.t = VR.WowMoment.RISE + 0.1; });
+    for (let k = 0; k < 6; k++) { await hold(); await step(page, 10, 33, true); await wait(page, 1500); }
+    await hold(); await step(page, 2, 33, true);
+    r.held = await cam();
+    r.shotHeld = await shot(page, 'd' + seed + '_' + build + '_held');
+    console.log(`   ${build} seed ${seed}: loaded in ${r.loadMs} ms, vgen ${r.at.vgen}, ${r.at.vista} (${r.at.lm}) — the arrival's camera ${r.held.cam ? 'fov ' + r.held.cam.fov.toFixed(1) + '°, yaw ' + r.held.cam.yaw.toFixed(2) + ', pitch ' + r.held.cam.pitch.toFixed(3) : '—'} (curve ${r.moment.curve} → ${r.held.curve}) (${secs()})`);
+    if (home) {
+      // the moment runs out (the HUD back), then the drift and 🏠 Heimkehr
+      await step(page, 160, 33, false); await wait(page, 1600);
+      const tripTo = async (to, start) => {
+        await ev(page, (st) => { window.__lt = VR.Travel.last; const g = VR.game; if (st === 'home') { if (g.ui && g.ui.resume) g.ui.resume(); g.goHome(); } else VR.Travel.go(g, { dim: st, via: 'cmd' }); }, start);
+        for (let i = 0; i < 900; i++) { await step(page, 10, 33, false); const s = await ev(page, (to) => { const g = VR.game, L = VR.Travel.last; return { st: g.state, arrived: !!(L && L !== window.__lt && L.to === to) }; }, to); if (s.arrived && s.st === 'play') return true; await wait(page, 60); }
+        return false;
+      };
+      r.toDrift = await tripTo('drift', 'drift');
+      await step(page, 40, 33, false); await wait(page, 3000);
+      r.homeOk = await tripTo('overworld', 'home');
+      r.home = await ev(page, () => { const g = VR.game, p = g.player, L = VR.Travel.last; return { last: L, dim: g.dim, pos: p.pos.map(v => +v.toFixed(1)), spawn: p.spawn ? p.spawn.map(v => +v.toFixed(1)) : null }; });
+      await step(page, 24, 33, true);   // (the veil's 0.65 s)
+      r.homeMid = await midThird(page);
+      r.shotHome = await shot(page, 'dhome' + seed + '_' + build);
+      console.log(`   ${build} Heimkehr: ${JSON.stringify(r.home.last)} · the frame's middle third: ${JSON.stringify(r.homeMid)}`);
+    }
+  } catch (e) { r.err = String(e.message || e).split('\n')[0]; console.log('   (' + tag + ': ' + r.err + ')'); }
+  await page.close(); await ctx.close();
+  return r;
+}
+if (ONLY.includes('D')) {
+  console.log('D · the arrival of seeds ' + DSEEDS.join(', ') + ' — ' + secs());
+  const runs = [];
+  for (const [i, seed] of DSEEDS.entries()) for (const [build, url] of [['base', BASE], ['new', NEW]]) { if (url) runs.push(await arrivalRun(build, url, seed, i === 0)); }
+  // the cameras measured in node (test/arrival.js part 6: the same rays as its part 3, through the generated chunks)
+  const cams = [];
+  for (const q of runs) { const c = q.held && q.held.cam ? q.held : q.moment; if (c && c.cam) cams.push({ tag: q.build + q.seed, build: q.build, seed: +q.seed, vgen: c.vgen || 12, id: c.id || c.vista, lm: c.lm, cam: c.cam }); }
+  const CF = SHOTS + 'first_d_cams.json'; fs.writeFileSync(CF, JSON.stringify(cams, null, 1));
+  let truths = [];
+  try {
+    const log = execFileSync('node', [ROOT + 'test/arrival.js'], { env: Object.assign({}, process.env, { ONLY: '6', CAMS: CF }), maxBuffer: 1 << 24, timeout: 1800000 }).toString();
+    console.log(log.split('\n').filter(l => /^\s+(base|new)\d/.test(l)).join('\n'));
+    truths = JSON.parse(fs.readFileSync(CF.replace(/\.json$/, '') + '.truth.json', 'utf8'));
+  } catch (e) { console.log('   (no truth: ' + String(e.message).split('\n')[0] + ')'); }
+  const T = (b, s) => (truths.find(t => t.build === b && t.seed === +s) || {}).truth || null;
+  const pc = (v) => (v * 100).toFixed(1) + ' %';
+  OUT.arrivals = runs.map(q => Object.assign({}, q, { truth: T(q.build, q.seed) }));
+  for (const seed of DSEEDS) {
+    const a = runs.find(q => q.build === 'new' && q.seed === seed), b = runs.find(q => q.build === 'base' && q.seed === seed), ta = T('new', seed), tb = T('base', seed);
+    check(!!a && !a.err && a.at.vs === 2 && !!a.at.vista && a.at.vgen === 13 && a.moment.curve === 1, `seed ${seed}: the new world (vgen ${a && a.at ? a.at.vgen : '?'}) opened on its vista ${a && a.at ? a.at.vista + ' (' + a.at.lm + ')' : '—'}, the moment from its first frame (curve ${a && a.moment ? a.moment.curve : '?'})`);
+    check(!!ta && ta.share >= 0.08 && ta.hidden <= 0.10 && ta.near === 0, `seed ${seed}: the arrival's frame shows its landmark — ${ta ? pc(ta.share) : '—'} of the frame (≥ 8 %), ${ta ? pc(ta.hidden) : '—'} hidden (≤ 10 %), within 6 m in the upper half ${ta ? pc(ta.near) : '—'}; before: ${tb ? pc(tb.share) + ', ' + pc(tb.hidden) + ' hidden (' + tb.by + '), near ' + pc(tb.near) : '—'}`);
+  }
+  const h = runs.find(q => q.build === 'new' && q.home), hb = runs.find(q => q.build === 'base' && q.home);
+  if (h) {
+    const f = h.home && h.home.last && h.home.last.face;
+    check(h.homeOk && h.home.dim === 'overworld' && !!f, `🏠 Heimkehr from the drift (${h.home && h.home.last ? h.home.last.totalMs + ' ms' : '?'}): home, the view chosen (${f ? JSON.stringify(f) : '—'})`);
+    check(!!f && f.kept && h.homeMid && Math.abs(h.homeMid.yaw - f.yaw) < 0.01, `a vista start's home faces its walk's view, the landmark ahead (yaw ${f ? f.yaw : '?'}; the middle third's nearest: ${h.homeMid ? h.homeMid.near + ' m, ' + h.homeMid.what : '—'}; before: ${hb && hb.homeMid ? hb.homeMid.near + ' m, ' + hb.homeMid.what + ', yaw ' + hb.homeMid.yaw : '—'})`);
+  }
+  // the sheet: before | after for every seed (the held frame; the first second's beside it), Heimkehr's frame
+  try {
+    const P = (n) => { const f = SHOTS + 'first_' + n + '.png'; return fs.existsSync(f) ? f : null; };
+    const lab = (b, s, held) => { const q = runs.find(x => x.build === b && x.seed === s), t = T(b, s), c = q && (held ? q.held : q.moment); return (b === 'base' ? 'vorher (v0.49) ' : 'nachher ') + (c ? (c.vista || '') + ' ' + (c.lm || '') + (c.cam ? ' ' + c.cam.fov.toFixed(0) + ' Grad' : '') : '') + (t ? ' | Wahrzeichen ' + pc(t.share) + ', verdeckt ' + pc(t.hidden) + (t.near ? ', nah ' + pc(t.near) : '') : '') + (held ? '' : ' | erste Sekunde'); };
+    const rows = [];
+    for (const s of DSEEDS) {
+      rows.push({ label: 'Seed ' + s, labels: [lab('base', s, true), lab('new', s, true)], imgs: [P('d' + s + '_base_held'), P('d' + s + '_new_held')] });
+      rows.push({ label: 'Seed ' + s, labels: [lab('base', s, false), lab('new', s, false)], imgs: [P('d' + s + '_base'), P('d' + s + '_new')] });
+    }
+    if (h) rows.push({ label: 'Heimkehr', labels: ['vorher: Heimkehr (Seed ' + DSEEDS[0] + ') ' + (hb && hb.homeMid ? hb.homeMid.near + ' m' : ''), 'nachher: Heimkehr ' + (h.homeMid ? h.homeMid.near + ' m' : '')], imgs: [P('dhome' + DSEEDS[0] + '_base'), P('dhome' + DSEEDS[0] + '_new')] });
+    fs.writeFileSync(SHOTS + 'first_arrival_sheet.json', JSON.stringify({ cols: ['vorher', 'nachher'], w: 560, rows: rows.filter(r => r.imgs.some(Boolean)) }));
+    console.log('   sheet ' + execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'first_arrival_sheet.jpg', SHOTS + 'first_arrival_sheet.json']).toString().trim());
+  } catch (e) { console.log('   (no arrival sheet: ' + e.message + ')'); }
 }
 
 // ================================================================ the sheet (python3 /root/r9coord/sheet.py)
