@@ -307,7 +307,7 @@ let hiSky = null;
       R.setupCamera({ x: cam[0], y: cam[1], z: cam[2], yaw, pitch, fov: 72 * Math.PI / 180 });
       const p = R.P.sky;
       const sync = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, null); const px = new Uint8Array(4); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
-      const once = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, R.sceneFB); gl.viewport(0, 0, R.w, R.h); gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE); gl.useProgram(p.p); R.common(p, E); if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, 0); gl.uniformMatrix4fv(p.u.u_invViewProj, false, R.invViewProj); if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, 1); if (R.sky3Uniforms) R.sky3Uniforms(p, E); R.fs(p); };
+      const once = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, R.sceneFB); gl.viewport(0, 0, R.w, R.h); gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE); gl.useProgram(p.p); R.common(p, E); if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, 0); gl.uniformMatrix4fv(p.u.u_invViewProj, false, R.invViewProj); if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, 1); R.fs(p); };   // (R.common sets the sky's values: sky3_gl.js)
       once(); sync();
       const t0 = performance.now(); for (let i = 0; i < N; i++) once(); sync();
       out[k] = +((performance.now() - t0) / N).toFixed(2);

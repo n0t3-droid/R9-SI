@@ -412,11 +412,11 @@
     const m = vis > 0.001 && lv ? S3.meteorAt(seed, A) : null;
     o.meteor = m ? Object.assign(m, { vis: m.bright * vis }) : null;
     if (m) {
-      const head = slerp(m.from, m.to, m.p), tail = slerp(m.from, m.to, Math.max(0, m.p - 0.4));
+      const head = slerp(m.from, m.to, m.p), tail = slerp(m.from, m.to, Math.max(0, m.p - 0.6));   // (the train 60 % of its path: the lab's 40 % with a t² fade read as a dash)
       set4(u.u_s3Met, head[0], head[1], head[2], m.bright * vis); set4(u.u_s3MetT, tail[0], tail[1], tail[2], m.hue < 0.25 ? 1 : 0);
     } else { set4(u.u_s3Met, 0, 1, 0, 0); set4(u.u_s3MetT, 0, 1, 0, 0); }
     // the nebula as smoke (the filaments faint, the swirl eased, the lanes soft); the rain's closed deck and its scud
-    set4(u.u_s3Neb, 0.22, 0.4, over ? sstep(0.12, 0.55, rain) : 0, 0.35);
+    set4(u.u_s3Neb, 0.06, 0.4, over ? sstep(0.12, 0.55, rain) : 0, 0.25);   // (the filaments at 0.22 still drew ripples on the lab's zenith: near off)
     // the high streaks by the hour: lit by the clouds' light from the afternoon through the afterglow, more of them round the sunset
     const elc = Math.asin(clamp(E.sunDir[1], -1, 1)) * 180 / Math.PI, golden = sstep(-6, -1, elc) * (1 - sstep(10, 18, elc));
     set4(u.u_s3Cir, 0.3 + 0.7 * golden * (1 - night), 0.55 * golden * (1 - rain), 0, 0);
@@ -568,7 +568,7 @@ vec3 s3Meteor(vec3 dir) {
   float t = clamp(dot(dir - tail, ab) / max(dot(ab, ab), 1e-8), 0.0, 1.0);
   vec3 dd = dir - (tail + ab * t), dh = dir - head;
   float w2 = 5e-6;   // (the streak's core about 0.13° wide: a pixel or two)
-  float core = exp(-dot(dd, dd) / w2) * t * t, glow = exp(-dot(dh, dh) / (w2 * 6.0));
+  float core = exp(-dot(dd, dd) / w2) * t, glow = exp(-dot(dh, dh) / (w2 * 6.0));
   vec3 c = mix(vec3(1.0, 0.95, 0.84), vec3(0.62, 1.0, 0.78), u_s3MetT.w);
   return c * (core * 2.6 + glow * 5.0) * u_s3Met.w;
 }
@@ -628,33 +628,41 @@ vec3 s3Aurora(vec3 dir) {
 }
 vec3 s3Banks(vec3 col, vec3 dir) {
   float e = dir.y;
-  if (u_s3Bank.x < 0.01 || e < -0.01 || e > 0.17) return col;
+  if (u_s3Bank.x < 0.01 || e < -0.01 || e > 0.065) return col;
   float a = atan(dir.z, dir.x);
   vec2 sh = normalize(u_sunDir.xz + vec2(1e-5, 0.0));
   float sa = dot(normalize(dir.xz + vec2(1e-5, 0.0)), sh);   // 1 toward the sun's azimuth
   float up = smoothstep(-0.1, 0.05, u_sunDir.y);
+  float back = smoothstep(0.4, 1.0, sa) * up;
   for (int i = 0; i < 2; i++) {
     float fi = float(i);
-    // the azimuth in cells (the far layer's wider), one heaped cloud in a cell that holds one: a flat base, a rounded top
-    // with the cauliflower's lobes on it
-    float x = a * (7.0 + fi * 5.0) + u_s3Bank.y * (0.6 + fi * 0.6) + fi * 37.0;
+    // two rows as perspective has them: i 0 the far row, small heaps close-set low over the horizon and hazy; i 1 the
+    // nearer row, fewer and bigger heaps whose flat bases stand a little higher. A heap is up to three domes along its cell
+    // (the cauliflower: the biggest in the middle), their union its outline, inside the cell (no cut at its edges). (The
+    // lab's first look: one bell per cell over a wide flat one read as hats on brims, all alike.)
+    float x = a * mix(17.0, 6.5, fi) + u_s3Bank.y * (0.5 + fi * 0.7) + fi * 37.0;
     float cell = floor(x), f = fract(x);
-    if (s3h1(cell * 1.7 + fi * 13.0) < 1.0 - u_s3Bank.x) continue;
-    float wv = 0.7 + 0.3 * s3h1(cell + 5.3), uu = (f - 0.5) / (0.5 * wv);
-    if (abs(uu) >= 1.0) continue;
-    float dome = sqrt(1.0 - uu * uu);
-    float lobes = s3n1(x * 6.0 + 11.0) * 0.6 + s3n1(x * 14.0 - 3.0) * 0.4;
-    float base = 0.006 + fi * 0.014, hgt = (0.026 + fi * 0.04) * (0.6 + 0.4 * s3h1(cell + 9.1)) * dome * (0.72 + 0.28 * lobes);
-    float top = base + hgt, soft = 0.0025 + 0.004 * fi;
-    float inside = smoothstep(top + soft * 0.5, top - soft, e) * smoothstep(base - 0.004, base + 0.002, e) * smoothstep(1.0, 0.85, abs(uu));
+    if (s3h1(cell * 1.7 + fi * 13.0) < 1.0 - u_s3Bank.x * (1.1 - 0.25 * fi)) continue;
+    float top = 0.0;
+    for (int k = 0; k < 3; k++) {
+      float fk = float(k), hk = s3h1(cell * 3.1 + fk * 7.7 + fi);
+      float c = 0.5 + (fk - 1.0) * 0.2 + (hk - 0.5) * 0.1;
+      float r = k == 1 ? 0.24 + 0.06 * hk : 0.13 + 0.06 * hk;
+      float u = (f - c) / r;
+      if (abs(u) < 1.0) top = max(top, sqrt(1.0 - u * u) * (k == 1 ? 1.0 : 0.55 + 0.35 * hk));
+    }
+    if (top <= 0.0) continue;
+    float lobes = s3n1(x * 11.0 + 11.0) * 0.6 + s3n1(x * 29.0 - 3.0) * 0.4;
+    float base = mix(0.0035, 0.011, fi), hgt = mix(0.014, 0.046, fi) * (0.55 + 0.45 * s3h1(cell + 9.1)) * top * (0.7 + 0.3 * lobes);
+    float tp = base + hgt, soft = mix(0.0012, 0.0025, fi);
+    float inside = smoothstep(tp + soft, tp - soft, e) * smoothstep(base - 0.0025, base + 0.001, e);
     if (inside <= 0.0) continue;
     float v = clamp((e - base) / max(hgt, 1e-4), 0.0, 1.0);
     // the tops lit, the flat bases in shade; toward the sun a darker body with a bright rim (the light behind it)
-    float back = smoothstep(0.4, 1.0, sa) * up;
-    float rim = smoothstep(top - soft * 5.0, top, e) * back;
+    float rim = smoothstep(tp - soft * 6.0, tp, e) * back;
     vec3 bc = mix(u_c3Low, u_c3Top, v) * (1.0 - 0.35 * back) + u_c3Sun * (v * 0.75 * (1.0 - back * 0.7) + rim * 1.4) * up;
-    bc = mix(bc, u_skyHorizon * 1.02, 0.42 - 0.22 * fi);
-    col = mix(col, bc, inside * (0.88 - 0.12 * fi));
+    bc = mix(bc, u_skyHorizon * 1.02, 0.5 - 0.22 * fi);
+    col = mix(col, bc, inside * (0.85 - 0.1 * fi));
     s3BankA = max(s3BankA, inside);
   }
   return col;
@@ -743,7 +751,9 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   // against the light: the body dark, the thin edges bright (the silver lining: forward scattering round the light)
   float cs = dot(vdir, u_c3Ld), g2 = 0.5625, ph = (1.0 - g2) / pow(max(1.0 + g2 - 1.5 * cs, 1e-3), 1.5);
   float back = smoothstep(0.55, 0.97, cs), edge = 1.0 - smoothstep(0.02, 0.3, th);
-  sun += u_c3Sun * ((ph * 0.11 * exp(-th * 7.0) + edge * edge * 2.6 * smoothstep(0.7, 0.995, cs)) * u_c3K.y * smoothstep(0.0, 0.04, th));
+  // (the lining brightest on the edges that face the light across the sprite: lit all round, the lab's sprites read as stickers)
+  float toL = mix(1.0, clamp(dot(normalize(N.xy + vec2(1e-4, 0.0)), ld) * 0.5 + 0.5, 0.0, 1.0), smoothstep(0.05, 0.3, lxy));
+  sun += u_c3Sun * ((ph * 0.11 * exp(-th * 7.0) + edge * edge * 2.6 * (0.3 + 0.7 * toL) * smoothstep(0.7, 0.995, cs)) * u_c3K.y * smoothstep(0.0, 0.04, th));
   vec3 amb = mix(u_c3Low, u_c3Top, clamp(N.y * 0.5 + 0.5, 0.0, 1.0)) * (0.35 + 0.65 * ao) * (1.0 - 0.55 * back);
   vec3 col = sun * (0.55 + 0.45 * ao) + amb;
   col = mix(col, u_c3Haze, smoothstep(260.0, 700.0, dist) * 0.45);
