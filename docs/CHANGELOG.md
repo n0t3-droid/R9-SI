@@ -108,6 +108,51 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🌅 The sky, 🐦 the wild, 🎬 the first minute, ✨ the gaps closed, 🌍 the foundations of the universe (v0.49)
+**🌅 The sky perfected** (`sky3`, `cloudVol`; Low and up, the far layers from Balanced; Very Low as before). Measured
+against the trailer frames per band: the golden hour ΔE 26.7 → 6.8, dusk 11.7 → 5.1 (noon unchanged at 5.1). The
+cumulus have volume — sunlit tops, flat shaded bases, a bright rim against the sun, the hour's colour —, far cloud banks
+lie in perspective toward the horizon and light falls in rays through the gaps; the sun is a larger soft disc at the
+horizon, the afterglow stays after it has set, the earth's shadow rises opposite; the nebula reads as smoke, the two
+moons show phases set by the sun, bright stars twinkle, seeded shooting stars cross about every 90 s, and on about one
+night in three an aurora hangs in curtains over the north (the same for host and guests). Rain closes the sky with a grey
+deck and ragged low cloud. A bug fixed on the way: the sky's switches had never reached the presets.
+
+**🐦 The wild as a spectacle** (`wild*`; nothing hunts, nothing is hurt; Very Low draws none of it). At dusk thousands of
+starlings fold into one speckled cloud over the lake beside the lighthouse; pairs of Himmelsrochen — great gentle sky rays
+of our own design — glide between the floating isles with cyan trails; about sixty silver fish swirl in the shallows and a
+shoal sits under the pier; a heron lifts off from the pond when you come near; forty butterflies rise as you walk through
+a flower drift; deer cross the meadow in a line at dawn, rabbits sit at the field's edge, a fox walks the hedge at dusk.
+One instanced draw per kind (0.13–0.38 ms of CPU on High).
+
+**🎬 The first minute** (new worlds made from the start screen). The start screen's buttons stand within 150 ms over a
+living title — the Spire Citadel in low sun, the ringed giant and the isles, the camera arcing slowly (Very Low: one
+still frame). The loading screen shows the sky with a sentence per phase („Die Hügel werden geformt …"). Then a white
+fade clears on the world's finest vista at the golden hour of a clear first day with the place's name and the sun's
+flare, and the HUD fades in. **📷 Fotomodus** (F8): a free camera, tilt, the time held, a picture at twice the
+screen's size. Old worlds, the Studio's landing and spawn point start as before.
+
+**✨ The gaps of v0.48 closed.** New worlds (`vgen` 12): Weißstadt's hall street is polished porcelain that mirrors the
+plaza's lights, the people and the lamp posts. At night the Spire Citadel reads from 630 m — cyan slits, orange rings, red
+beacons, a blue beam — in the far forms too; the lantern halos are smaller; the floor under a glass roof stays dry in the
+rain; the awnings swing like cloth and the café's steam rises in wisps; the Hangar Hall's air holds the lamps' cyan; the
+golden hour sits nearer the frames.
+
+**🌍 The foundations of the universe** (the plan: docs/superpowers/specs/2026-10-22-universe-design.md, the facts:
+docs/universe/REFERENCE.md — 750 lines from NASA, ESA, JWST, Juno, Cassini, the Mars rovers, Bennu and Ryugu, the ISS).
+Our sun is **Helia**; home is **Herzwelt**, a moon of the ringed giant **Amarant** the sky shows; its siblings are
+Aquamarin, Zinnober, Opal, Basalt and Ocker. `VR.Universe` holds the system on Kepler rails at 1/64 of real size with
+true gravity ratios (node-tested: Kepler's equation to 1e-12, energy kept over 100 orbits, the textbook transfers). The
+worlds of a save are now registered dims, and **the three gates work**: stand two seconds in one and a veil carries you to
+the Driftinseln, the Unterschmiede or the Hohlwelt; each world remembers where you were, and **🏠 Heimkehr** (pause menu
+or /home) brings you back to Herzwelt from anywhere, your ship with you. `VR.EventLog` records what happens in view —
+the instrument of the never-boring measure every release review uses from now on.
+
+**Known gaps.** The clouds are still sprites (no self-shadowing); the murmuration reads as specks more than a dark
+folding mass; the fox was never pictured; the title's citadel is a placeholder of boxes; the wood's light shafts are as
+in v0.48; Villa Nova's windows glow but do not mirror; Heimkehr takes 17 s on a software renderer; the never-boring
+sessions ran two minutes instead of five.
+
 ### 💡 The light, 🪞 materials & water, 🌬 everything moves, 🏞 vistas & wow moments (v0.48 — the WOW release)
 The owner's brief: "we want to get users to go everywhere they look or navigate — WOW, so beautiful, so cool,
 unbelievable. Make a beauty of a game!" Four fronts, every effect behind a switch with a cost tier; Very Low keeps the
