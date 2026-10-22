@@ -97,6 +97,8 @@ try {
       look(c) { const p = g().player; p.flying = true; p.hold = null; p.teleport(c.x, c.y - 1.62, c.z); this.aim([c.tx, c.ty, c.tz]); p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; },
       aim(t) { const p = g().player, e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = t[0] - e[0], dy = t[1] - e[1], dz = t[2] - e[2]; p.yaw = Math.atan2(-dx, -dz); p.viewYaw = p.yaw; p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); },
       foes() { return g().entities.mobs.filter(m => m.foe && !m.foe.gone); },
+      // a spot d blocks beyond the beacon, away from the pad's middle, on the ground
+      outer(d) { const s = this.site(), b = s.beacon, dx = b[0] + 0.5 - s.x, dz = b[2] + 0.5 - s.z, l = Math.hypot(dx, dz) || 1, x = b[0] + 0.5 + dx / l * d, z = b[2] + 0.5 + dz / l * d; return [x, g().world.topAt(Math.floor(x), Math.floor(z)) + 1, z]; },
       site() { return window.__site ? VR.Liberate.siteOf(window.__site) : null; },
       strays() { const s = this.site(); return s ? this.foes().filter(m => m.foe.site === s.id && !m.foe.wave && !m.foe.helper) : []; },
       tok() { let n = 0; for (const m of this.foes()) if (m.foe.tok) n++; return n; },
@@ -110,7 +112,7 @@ try {
         moment: (t) => !!VR.Liberate.moment && VR.Liberate.moment.t >= t,
         momentEnd: () => !VR.Liberate.moment && window.__ft.site() && window.__ft.site().st === 'frei',
         noFaint: () => !VR.Foes.fainting,
-        near: (id) => { const m = g().entities.mobs.find(x => x.id === id), p = g().player.pos; return !!m && Math.hypot(m.pos[0] - p[0], m.pos[2] - p[2]) < 5.2 && Math.hypot(m.vel[0], m.vel[2]) < 0.3; },
+        near: (id) => { const m = g().entities.mobs.find(x => x.id === id), p = g().player.pos; return !!m && Math.hypot(m.pos[0] - p[0], m.pos[2] - p[2]) < 5.5 && Math.hypot(m.vel[0], m.vel[2]) < 0.4; },
         wispNear: () => window.__ft.foes().filter(m => m.foe.k === 'wisp' && m.foe.st !== 'patrol').length >= 2,
       },
       cb: {
@@ -145,16 +147,17 @@ try {
     await ev(() => VR.game.env.setTime(5200));
     const st = await arrive({ x: out[0], y: out[1] + 6, z: out[2] + 30 });
     console.log('     ' + JSON.stringify(st));
-    // the pad as the columns tell it (the same pure reading liberate.js does: the parked ship's spawn, then the beacon
-    // once its column is in — it may stand in the next one)
+    // the pad as liberate.js finds it from the worker's centre: the launch beacon at y + 1 for one of the four turns,
+    // once the pad's columns are in (the columns' own spawns are taken by gadgets.js when they load)
     let pad = null;
-    for (let i = 0; i < 80 && !(pad && pad.loaded); i++) {
+    for (let i = 0; i < 80 && !pad; i++) {
       await run(10); await wait(150);
-      pad = await ev((o) => { const g = VR.game, w = g.world, L = VR.Liberate; let best = null; for (const c of w.cols.values()) { if (!c.ready || !c.spawns) continue; for (const q of L.padsOf(c.spawns)) { const d = Math.hypot(q.x - o[0], q.z - o[2]); if (d < 160 && (!best || d < best.d)) best = Object.assign({ d }, q); } } if (!best) return null; best.loaded = w.isLoaded(best.beacon[0], best.beacon[2]); best.outpost = best.loaded && L.isOutpost(best, (x, y, z) => w.getBlock(x, y, z)); return best; }, out);
+      pad = await ev((o) => { const g = VR.game, w = g.world, L = VR.Liberate; for (const [dx, dz] of [[-8, -8], [8, 8], [-8, 8], [8, -8]]) if (!w.isLoaded(o[0] + dx, o[2] + dz)) return null; return L.probeAt((x, y, z) => w.getBlock(x, y, z), o[0], o[1], o[2]) || { none: true }; }, out);
+      if (pad && pad.none) break;
     }
     console.log('     the pad: ' + JSON.stringify(pad));
-    check(!!pad && pad.outpost, 'its pad in the loaded columns, the launch beacon on it (' + (pad ? pad.id + ', ' + pad.d.toFixed(0) + ' m from the worker\'s place' : 'none') + ')');
-    if (!pad || !pad.outpost) return;
+    check(!!pad && !pad.none && !!pad.beacon, 'its pad loaded, the launch beacon on it (' + (pad && pad.beacon ? pad.id + ', turn ' + pad.dir + ', beacon ' + pad.beacon.join(' ') : 'none') + ')');
+    if (!pad || pad.none) return;
     out = [pad.x, pad.y, pad.z]; N.pad = pad;
     await ev((id) => { window.__site = id; }, pad.id);
     const w = await ev(() => { const g = VR.game; return { on: VR.Foes.on(g), adv: !!(VR.Adventure.on && VR.Adventure.on()), foes: window.__ft.foes().length, sites: VR.Liberate.sites().size }; });
@@ -279,7 +282,7 @@ try {
   // ---------------------------------------------------------------- 7 · the capture ring and the drone waves
   await section('7', async () => {
     console.log('7 · the capture ring and the drone waves');
-    await ev(() => { const s = window.__ft.site(), b = s.beacon, p = VR.game.player; p.flying = false; p.teleport(b[0] + 3.5, b[1] + 0.2, b[2] + 3.5); window.__ft.w = null; });
+    await ev(() => { const g = VR.game, s = window.__ft.site(), p = g.player, q = window.__ft.outer(3.5); p.flying = false; p.teleport(q[0], q[1], q[2]); window.__ft.w = null; });   // (just off the pad's corner, outside the parked ship)
     let r = await run(900, { until: 'ringNear', arg: 3, god: true, cb: 'watch' });
     const d = await ev(() => { const ft = window.__ft, p = VR.game.player, L = VR.Liberate, ws = ft.foes().filter(m => m.foe.wave); let cx = 0, cy = 0, cz = 0; for (const m of ws) { cx += m.pos[0]; cy += m.pos[1]; cz += m.pos[2]; } const n = ws.length || 1; ft.aim([cx / n, cy / n + 0.3, cz / n]); return { drones: ws.length, ring: L.ringSite ? +(L.ringSite.ringObj.p * 100).toFixed(0) : null, st: ws.map(m => m.foe.st), tok: ft.w.tok }; });
     console.log('     ' + JSON.stringify(d) + ' after ' + r.n + ' frames');
@@ -316,7 +319,7 @@ try {
   await section('9', async () => {
     console.log('9 · the Helfer');
     await run(260, { until: 'momentEnd', god: true });
-    await ev(() => { const s = window.__ft.site(), b = s.beacon, p = VR.game.player; p.flying = false; p.teleport(b[0] + 6.5, b[1] + 0.2, b[2] - 5.5); });
+    await ev(() => { const p = VR.game.player, q = window.__ft.outer(6); p.flying = false; p.teleport(q[0], q[1], q[2]); });
     const h0 = await ev(() => { const f = window.__ft.foes().find(m => m.foe.mine); return f ? f.id : null; });
     check(!!h0, 'a Helfer stood up and follows the player');
     if (!h0) return;

@@ -189,6 +189,17 @@
     return !!((lb && ty === lb.id) || (lf && ty === lf.id));
   };
   L.fromSpawns = (spawns, getBlock) => L.padsOf(spawns).filter(p => L.isOutpost(p, getBlock));
+  // an outpost from its centre alone (the worker's /locate gives x, y, z, not the turn): the beacon at y + 1 for each of
+  // the four turns — the one that stands there tells the turn (the column's spawns are gone by then: gadgets.js takes
+  // them when the column loads)
+  L.probeAt = function (getBlock, x, y, z) {
+    for (const dy of [0, 1, -1]) for (let dir = 0; dir < 4; dir++) {
+      const pad = { id: Math.round(x) + '_' + Math.round(z), x: Math.round(x), y: Math.round(y) + dy, z: Math.round(z), dir };
+      pad.beacon = L.beaconOf(pad.x, pad.y, pad.z, dir);
+      if (L.isOutpost(pad, getBlock)) return pad;
+    }
+    return null;
+  };
   L.travelTargets = function (freed, here) {
     const out = [];
     for (const f of freed || []) { const b = f.beacon || [f.x, f.y, f.z]; const d = Math.hypot(b[0] - here[0], b[2] - here[2]); if (d < 8) continue; out.push(Object.assign({ d }, f)); }
@@ -228,7 +239,7 @@
     }
     if (g.world && g.world.listeners) {
       W0.listener = { onColumnLoaded: (c) => L.onColumn(g, c) };
-      g.world.listeners.push(W0.listener);
+      g.world.listeners.unshift(W0.listener);   // (first: the game's own listener hands the spawns on and clears them)
       for (const c of g.world.cols.values()) if (c.ready) L.onColumn(g, c);
     }
   }
@@ -251,7 +262,7 @@
   L.know = function (g, o) {
     let s = W0.sites.get(o.id);
     if (!s) { s = L.site(o); W0.sites.set(s.id, s); }
-    else if (o.dir !== undefined) { s.dir = o.dir; s.beacon = L.beaconOf(s.x, s.y, s.z, s.dir); s.y = o.y; }
+    else if (o.dir !== undefined) { s.y = o.y; s.dir = o.dir; s.beacon = o.beacon ? o.beacon.slice() : L.beaconOf(s.x, s.y, s.z, s.dir); s.tier = L.tierOf(s.x, s.z); }
     s.known = true;
     L.ensureBeacon(g, s);
     return s;
@@ -330,6 +341,14 @@
     const p = g.player.pos, P = g.particles, En = g.entities, w = g.world;
     // a pad whose beacon's column was not loaded yet: decided once it is (an outpost's beacon, or a village's pad)
     if (W0.pend.size) for (const [id, pad] of W0.pend) { if (!w.isLoaded(pad.beacon[0], pad.beacon[2])) continue; W0.pend.delete(id); if (L.isOutpost(pad, (x, y, z) => w.getBlock(x, y, z))) L.know(g, pad); }
+    // an outpost the worker named (its centre): looked for once its pad is loaded
+    for (const s of W0.sites.values()) {
+      if (s.known || s.probed || Math.abs(s.x - p[0]) > 160 || Math.abs(s.z - p[2]) > 160) continue;
+      if (!w.isLoaded(s.x - 8, s.z - 8) || !w.isLoaded(s.x + 8, s.z + 8) || !w.isLoaded(s.x - 8, s.z + 8) || !w.isLoaded(s.x + 8, s.z - 8)) continue;
+      s.probed = true;
+      const pad = L.probeAt((x, y, z) => w.getBlock(x, y, z), s.x, s.y, s.z);
+      if (pad) L.know(g, pad);
+    }
     for (const s of W0.sites.values()) {
       if (!s.known) continue;
       const d = Math.hypot(p[0] - s.x, p[2] - s.z);

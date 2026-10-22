@@ -141,6 +141,17 @@ console.log('5 · finding the outposts');
   check(L.tierOf(200, 300) === 3 && L.tierOf(1200, 0) === 4 && L.tierOf(2000, 1500) === 5, 'the Lichtleiter\'s size by distance: 3×3 near, 4×4, 5×5 far');
 }
 
+{
+  // an outpost from its centre alone (the worker's /locate): the beacon found for each turn, y off by one forgiven
+  for (let dir = 0; dir < 4; dir++) {
+    const R = V.R, lb = R.byName.launch_beacon.defaultState, b = L.beaconOf(500, 70, -300, dir), y0 = dir === 3 ? 71 : 70;
+    const get = (x, y, z) => (x === b[0] && y === b[1] && z === b[2] ? lb : 0);
+    const q = L.probeAt(get, 500, y0, -300);
+    check(!!q && q.dir === dir && q.beacon[0] === b[0] && q.beacon[2] === b[2] && q.id === '500_-300', 'from the centre alone: the beacon for turn ' + dir + (dir === 3 ? ' (the worker\'s y one too high)' : '') + ' found');
+  }
+  check(L.probeAt(() => 0, 500, 70, -300) === null, 'no beacon anywhere: no outpost (a village\'s pad)');
+}
+
 // ---------------------------------------------------------------- 6 · the Leuchtfeuer block
 console.log('6 · the Leuchtfeuer block');
 {
@@ -265,6 +276,17 @@ async function glue() {
     g.world.unl = null; sec(0.3);
     const s4 = L.siteOf(X4 + '_' + Z4);
     check(!!s4 && s4.known && g.world.getBlock(b4[0], b4[1], b4[2]) === LF.state({ frei: 0 }), 'known once it came: its Leuchtfeuer placed');
+  }
+  {
+    // an outpost only the worker named (its column's spawns gone, as gadgets.js takes them): found by its beacon
+    const X5 = 3600, Z5 = 900, b5 = L.beaconOf(X5, 63, Z5, 2);
+    g.world.setBlock(b5[0], b5[1], b5[2], LB);
+    L.knowFar([X5, 63, Z5]);
+    check(!L.siteOf(X5 + '_' + Z5).known, 'a place the worker named: not known before its pad is seen');
+    const keep = p.pos.slice(); p.pos = [X5 + 20, 64, Z5 + 20]; sec(0.4);
+    const s5 = L.siteOf(X5 + '_' + Z5);
+    check(s5.known && s5.dir === 2 && g.world.getBlock(b5[0], b5[1], b5[2]) === LF.state({ frei: 0 }), 'found by its beacon (turn ' + s5.dir + '), its Leuchtfeuer placed');
+    p.pos = keep; sec(0.1);
   }
   // the guardians and an encounter
   let minTele = 9, maxTok = 0; const teleAt = new Map(); let strikes = 0, hits0 = Fo.cost.hits;
