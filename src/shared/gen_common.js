@@ -98,6 +98,26 @@
 
   // ---------------------------------------------------------------------------
   // Tree builders. w: writer, (x,y,z) = base (first log block), rng
+  // f-arrival (vgen 13; docs/superpowers/plans/2026-10-23-f-arrival.md): a chunk writer of a vgen-13 world carries
+  // w.v13 — then a tree's top stands on its crown: the spruce's point on its top layer (a radius-0 layer put nothing, so
+  // every spruce wore its tip a block over an empty layer: the floating leaf of the v0.49 arrival), the round tree's top
+  // leaf on its ball, the cherry's droops hung from its boughs. Older worlds keep their trees (the flag unset there).
+  GEN.TREE_VGEN = 13;
+  GEN.treeFix = (g) => !!g && (g.vgen | 0) >= GEN.TREE_VGEN;
+  // a leaf with no leaf, log or solid block on any of its six sides — a crown's stray cell — becomes air; the chunk's own
+  // inner columns only (a border cell's outer neighbour is another chunk's); returns how many went (vgen 13's woods)
+  GEN.pruneLeaves = function (blocks, y0, y1) {
+    const T = R.T, FL = VR.F.LEAVES, SO = VR.F.SOLID, OP = VR.F.OPAQUE, PL = VR.F.PLANT;
+    const held = (s) => { if (!s) return false; const f = T.flags[s]; return !!((f & FL) || (f & OP) || ((f & SO) && !(f & PL))); };
+    let n = 0;
+    for (let y = Math.max(2, y0 | 0); y <= Math.min(253, y1 | 0); y++) for (let lz = 1; lz < 15; lz++) for (let lx = 1; lx < 15; lx++) {
+      const i = (y << 8) | (lz << 4) | lx, s = blocks[i];
+      if (!s || !(T.flags[s] & FL)) continue;
+      if (held(blocks[i - 256]) || held(blocks[i + 256]) || held(blocks[i - 1]) || held(blocks[i + 1]) || held(blocks[i - 16]) || held(blocks[i + 16])) continue;
+      blocks[i] = 0; n++;
+    }
+    return n;
+  };
   const st = (n, p) => R.S(n, p);
   const leafState = (name) => st(name, { persistent: 0, distance: 1 });
   const logState = (name, axis) => st(name, { axis: axis || 0 });
@@ -157,7 +177,12 @@
     ground(w, x, y, z, GEN.S().dirt);
     trunk(w, x, y, z, h + 1, log);
     blob(w, x, y + h + 1, z, r, r * 0.85, r, leaf, rng, 0.35);
-    if (rng.chance(0.5)) w.place(x, y + h + 1 + Math.ceil(r * 0.85), z, leaf);
+    if (rng.chance(0.5)) {
+      let ty = y + h + 1 + Math.ceil(r * 0.85);
+      // (vgen 13: on the ball's highest leaf in its own column — the fuzz left a gap under it in 4 of 10 big balls)
+      if (w.v13 && w.get) for (let yy = ty; yy >= y + h + 1; yy--) { const s = w.get(x, yy, z); if (s > 0 && (R.T.flags[s] & VR.F.LEAVES)) { ty = Math.min(ty, yy + 1); break; } }
+      w.place(x, ty, z, leaf);
+    }
   };
   TREES.spruce = function (w, x, y, z, rng, o) {
     o = o || {};
@@ -167,6 +192,7 @@
     const start = o.pine ? h - 3 : 1 + rng.int(2);
     for (let ly = y + h + 1; ly >= y + start; ly--) {
       leafLayer(w, x, ly, z, r, leaf, rng, 0);
+      if (!r && w.v13) w.place(x, ly, z, leaf);   // (vgen 13: the point's foot — leafLayer leaves a radius-0 layer empty)
       if (r >= maxR || (r >= 1 && ly % 2 === 0 && rng.chance(0.5))) r = r > 1 ? 1 : r; else r++;
       if (r > maxR) r = maxR;
     }
@@ -308,6 +334,7 @@
         const a = rng.next() * Math.PI * 2, rr = 3 + rng.int(2);
         const px = Math.round(bx + Math.cos(a) * rr), pz = Math.round(bz + Math.sin(a) * rr);
         w.place(px, by + 1, pz, leaf); if (rng.chance(0.5)) w.place(px, by, pz, leaf);
+        if (w.v13) w.place(px, by + 2, pz, leaf);   // (vgen 13: hung from its bough — the cell over it joins the crown)
       }
     }
   };

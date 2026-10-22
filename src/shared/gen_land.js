@@ -974,6 +974,7 @@
   const SP = 5, SOLO = 22;
   function dressTrees(g, P, cx, cz, out) {
     const x0 = cx * 16, z0 = cz * 16, w = new GEN.ColumnWriter(cx, cz, out.blocks), BIm = VR.BIOME.sky_meadow;
+    w.v13 = GEN.treeFix(g);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
     const meadowAt = (x, z, y) => g.biomeFor(g.climateAt(x, z), y - 1) === BIm;
     // the woods: a jittered grid, one candidate a cell, kept by the wood's density there
     for (let gz = Math.floor((z0 - 7) / SP); gz <= Math.floor((z0 + 22) / SP); gz++) for (let gx = Math.floor((x0 - 7) / SP); gx <= Math.floor((x0 + 22) / SP); gx++) {
@@ -1001,6 +1002,7 @@
     }
     // the plan's own trees (the poplar rows along the farm lanes, the orchards' neighbours)
     if (P.treesBy) { const list = P.treesBy.get(cx * 4096 + cz); if (list) for (const t of list) { const rng = new VR.RNG(M.hash2(t.x, t.z, g.seed ^ 0x9091) >>> 0); if (t.kind === 'poplar') GEN.TREES.poplar(w, t.x, t.y, t.z, rng, { color: t.color }); else plantTree(w, t.kind, t.x, t.y, t.z, rng, true); } }
+    if (w.v13) GEN.pruneLeaves(out.blocks, SEA + 2, 240);   // (f-arrival, vgen 13: no stray leaf cell left beside a crown)
   }
   // the ground: the woods' floor (ferns, litter, moss, mushrooms, podzol and coarse earth under the dark woods and the
   // conifers), the woods' edges (tall grass, bushes), the meadow (grass, tall grass in patches, flower drifts: one kind
