@@ -213,7 +213,13 @@
     W0.world = g.world; W0.sites = new Map(); W0.ruins = new Map(); W0.asked = -1e9; W0.askAt = null; W0.vil = new Map();
     L.moment = null; L.calmSt = null; L.closePuzzle(); L.ringSite = null;
     const r0 = rec();
-    if (r0 && r0.sites) for (const id in r0.sites) { const s = L.load(r0, id); if (s) W0.sites.set(s.id, s); }
+    if (r0 && r0.sites) for (const id in r0.sites) { const s = L.load(r0, id); if (s) { s.known = true; W0.sites.set(s.id, s); } }   // (saved only once seen: known)
+    // a freed site stays freed even where its progress record is missing (an older save): from meta.adventure.freed
+    if (r0) for (const f of L.freedList(r0)) {
+      if (W0.sites.has(f.id) || !/^-?\d+_-?\d+$/.test(f.id)) { const s0 = W0.sites.get(f.id); if (s0 && s0.st !== 'frei') { s0.st = 'frei'; s0.day = f.day; } continue; }
+      const s = L.site({ x: f.x, y: f.y, z: f.z, dir: 0, strays: 0 }); s.id = f.id; if (f.beacon) s.beacon = f.beacon; s.st = 'frei'; s.day = f.day; s.t = f.t; s.known = true;
+      W0.sites.set(s.id, s);
+    }
     if (g.world && g.world.listeners) {
       W0.listener = { onColumnLoaded: (c) => L.onColumn(g, c) };
       g.world.listeners.push(W0.listener);
@@ -412,11 +418,11 @@
     if (S.drawn !== S.c) {
       S.drawn = S.c;
       const a0 = (S.c - S.w / 2 - 90) * Math.PI / 180, a1 = (S.c + S.w / 2 - 90) * Math.PI / 180, r = 44;
-      calmEl.querySelector('.arc').setAttribute('d', `M ${(Math.cos(a0) * r).toFixed(2)} ${(Math.sin(a0) * r).toFixed(2)} A ${r} ${r} 0 ${S.w > 180 ? 1 : 0} 1 ${(Math.cos(a1) * r).toFixed(2)} ${(Math.sin(a1) * r).toFixed(2)}`);
+      const arc = calmEl.querySelector('.arc'); if (arc) arc.setAttribute('d', `M ${(Math.cos(a0) * r).toFixed(2)} ${(Math.sin(a0) * r).toFixed(2)} A ${r} ${r} 0 ${S.w > 180 ? 1 : 0} 1 ${(Math.cos(a1) * r).toFixed(2)} ${(Math.sin(a1) * r).toFixed(2)}`);
       const key = VR.Binds && VR.Binds.label ? VR.Binds.label('KeyV', VR.I18N && VR.I18N.lang) : 'V';
-      calmEl.querySelector('.tx').textContent = T('g.lib.calm.hint', { key });
+      const tx = calmEl.querySelector('.tx'); if (tx) tx.textContent = T('g.lib.calm.hint', { key });
     }
-    const nd = calmEl.querySelector('.nd'); nd.setAttribute('transform', 'rotate(' + L.calmNeedle(S, g.time || 0).toFixed(1) + ')');
+    const nd = calmEl.querySelector('.nd'); if (nd) nd.setAttribute('transform', 'rotate(' + L.calmNeedle(S, g.time || 0).toFixed(1) + ')');
     calmEl.className = S.flash > 0 ? 'miss' : (L.calmPress(S, g.time || 0) ? 'hot' : '');
   };
 
@@ -451,7 +457,7 @@
     return `<svg viewBox="0 0 100 100"><rect x="3" y="3" width="94" height="94" rx="12" class="bg${locked ? ' lk' : ''}"/>${d ? `<path d="${d}" stroke="${c}" stroke-width="${w}" stroke-linecap="round" fill="none"${lit ? ' filter="url(#llglow)"' : ''}/><circle cx="50" cy="50" r="${m ? 10 : 0}" fill="${c}"/>` : ''}</svg>`;
   };
   L.renderPuzzle = function () {
-    const P = L.puz, el = typeof document !== 'undefined' && document.querySelector('#lichtleiter .panel'); if (!P || !el) return;
+    const P = L.puz, el = typeof document !== 'undefined' && document.querySelector && document.querySelector('#lichtleiter .panel'); if (!P || !el) return;
     const pz = P.s.pz, fl = L.flood(pz), n = pz.n;
     let h = `<svg width="0" height="0" style="position:absolute"><defs><filter id="llglow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs></svg>`;
     h += `<div class="llhead"><h2>💠 ${esc(T('g.lib.puz.title'))}</h2><button type="button" class="btn small" data-ll="close">${esc(T('g.lib.puz.later'))}</button></div>`;
@@ -533,16 +539,20 @@
     const En = g.entities, Fo = F(); if (!En || !Fo) return;
     const calm = [];
     for (const m of En.mobs) { const f = m.foe; if (f && !f.gone && !f.remote && f.site === s.id && (f.st === 'calm' || f.st === 'patrol' || f.st === 'approach')) calm.push(m); }
-    while (calm.length < 2) { const m = Fo.guard(g, En, s, calm.length + 1, true, Object.assign(Fo.ctx(g), { enc: 'normal', lastBuild: -1e12, freed: [], villages: [], homes: [] })); if (!m) break; calm.push(m); }
-    const r0 = rec(); let follower = null;
-    for (const m of En.mobs) if (m.foe && m.foe.helper && !m.foe.trader && !m.foe.gone) follower = m;
-    calm.forEach((m, i) => {
+    // (the site is free already: its own zone is given here, so the new ones may rise on its pad)
+    const here = Object.assign(Fo.ctx(g), { enc: 'normal', lastBuild: -1e12, freed: [], villages: [], homes: [], zones: [{ id: 'o:' + s.id, kind: 'outpost', x: s.x, z: s.z, r: 40 }] });
+    while (calm.length < 2) { const m = Fo.guard(g, En, s, calm.length + 1, true, here); if (!m) break; calm.push(m); }
+    const r0 = rec(); let follower = null, trader = null, crew = 0;
+    for (const m of En.mobs) { const f = m.foe; if (!f || f.gone) continue; if (f.mine) follower = m; if (f.trader && f.site === s.id) trader = m; }
+    let newFollower = false;
+    calm.forEach((m) => {
       const f = m.foe; f.st = 'helper'; f.t = 0; f.helper = true; f.calm = 1; f.kneel = 1;
-      if (i === 0 && !follower) { follower = m; f.follow = null; f.site = null; if (r0) r0.helper = { k: f.k }; Fo.stats.helpers++; }
-      else { f.trader = true; f.site = s.id; const q = L.rot(s.dir, 4, -4); f.follow = [s.x + q[0] + 0.5, s.y + 1, s.z + q[1] + 0.5]; }
+      if (!follower && f.k !== 'crane') { follower = m; newFollower = true; f.mine = true; f.follow = null; f.site = null; if (r0) r0.helper = { k: f.k }; Fo.stats.helpers++; }
+      else if (!trader) { trader = m; f.trader = true; f.site = s.id; const q = L.rot(s.dir, 4, -4); f.follow = [s.x + q[0] + 0.5, s.y + 1, s.z + q[1] + 0.5]; }
+      else { f.site = s.id; const q = L.rot(s.dir, -3 + 3 * (crew % 3), 3 + 2.5 * Math.floor(crew / 3)); crew++; f.follow = [s.x + q[0] + 0.5, s.y + 1, s.z + q[1] + 0.5]; }   // (the rest: the outpost's crew, about the pad)
       if (g.particles) g.particles.spark(m.pos[0], m.pos[1] + 0.8, m.pos[2], [0.4, 1, 0.6], 18, 3, 1);
     });
-    if (follower) setTimeout(() => { const fk = g.funke; if (fk && fk.on && fk.on() && fk.show) fk.show(T('g.lib.funke.helper')); }, 4600);
+    if (newFollower) setTimeout(() => { const fk = g.funke; if (fk && fk.on && fk.on() && fk.show) fk.show(T('g.lib.funke.helper')); }, 4600);
   };
   // the trading post keeps its Helfer (back after a reload)
   L.ensureTrader = function (g, En, s) {
@@ -557,13 +567,13 @@
   L.stepHelpers = function (g, dt) {
     const En = g.entities, r0 = rec(), Fo = F(); if (!En || !Fo || !r0 || !r0.helper) return;
     if ((L.helpT = (L.helpT || 0) - dt) > 0) return; L.helpT = 1;
-    let fol = null; for (const m of En.mobs) if (m.foe && !m.foe.gone && m.foe.helper && !m.foe.trader) fol = m;
+    let fol = null; for (const m of En.mobs) if (m.foe && !m.foe.gone && m.foe.mine) fol = m;
     const p = g.player.pos;
     if (!fol) {
       const k = Fo.KINDS[r0.helper.k] && Fo.STRAYS.indexOf(r0.helper.k) >= 0 && r0.helper.k !== 'crane' ? r0.helper.k : 'driller';
       const pt = Fo.spot(g, p[0], p[2], 4, Math.random); if (!pt) return;
       fol = En.summon('foe_' + k, pt[0], pt[1], pt[2]); if (!fol) return;
-      fol.foe = Fo.make(k, fol.id, pt); fol.foe.st = 'helper'; fol.foe.helper = true; fol.foe.calm = 1;
+      fol.foe = Fo.make(k, fol.id, pt); fol.foe.st = 'helper'; fol.foe.helper = true; fol.foe.mine = true; fol.foe.calm = 1;
     }
     // at night, near home, it sits by the door
     const NL = VR.NewLife, h = NL && NL.home ? NL.home(g) : null, night = g.env && g.env.E && g.env.E.night > 0.6;
@@ -602,7 +612,7 @@
     let h = `<div class="llhead"><h2>⚡ ${esc(T('g.lib.fast.title'))}</h2><button type="button" class="btn small" data-lf="close">${esc(T('g.lib.fast.close'))}</button></div>`;
     if (!list.length) h += `<div class="note">${esc(T('g.lib.fast.none'))}</div>`;
     for (const q of list.slice(0, 8)) { const st = L.siteOf(q.id) || L.site(q); h += `<button type="button" class="btn lfgo" data-lf="go" data-id="${esc(q.id)}">${esc(T('g.lib.fast.go', { name: L.nameOf(st), d: VR.Ctx && VR.Ctx.dist ? VR.Ctx.dist(q.d) : Math.round(q.d) + ' m' }))}</button>`; }
-    el.querySelector('.panel').innerHTML = h;
+    const pan = el.querySelector('.panel'); if (pan) pan.innerHTML = h;
     for (const b of el.querySelectorAll('[data-lf]')) b.onclick = () => { if (b.getAttribute('data-lf') === 'go') { const q = list.find(x => x.id === b.getAttribute('data-id')); if (g.ui && g.ui.resume) g.ui.resume(); if (q) L.fastGo(g, q); } else if (g.ui && g.ui.resume) g.ui.resume(); };
     if (g.ui && g.ui.show) g.ui.show('libfast');
     return true;
@@ -612,7 +622,7 @@
     if (L.fade) return false;
     const b = q.beacon || [q.x, q.y + 1, q.z], d = L.rot(0, 0, 0);
     L.fade = { t: 0, to: [b[0] + 0.5 + 2.5, b[1] + 0.2, b[2] + 0.5 + 2.5], moved: false }; void d;
-    F() && F().veil && (function () { const el = document.getElementById('foeveil'); if (el) el.querySelector('span').textContent = ''; })();
+    F() && F().veil && (function () { const el = document.getElementById('foeveil'); const sp = el && el.querySelector('span'); if (sp) sp.textContent = ''; })();
     L.veil(true);
     if (g.audio && g.audio.play) g.audio.play('warp');
     return true;

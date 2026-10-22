@@ -55,9 +55,10 @@
   F.KIND_LIST = ['driller', 'sentry', 'crane', 'drone', 'wisp'];
   F.STRAYS = ['driller', 'sentry', 'crane'];
   // the mob kinds entities.js knows them by (foe, never hostile: an Abenteuer world is peaceful, A§1 — the legacy
-  // hostiles are removed there, these are not)
+  // hostiles are removed there, these are not). Not enumerable: the codex's creature pages (for…in VR.MOBS) stay as
+  // they are for every builder, who never meets a foe; summon('foe_…') still finds them
   VR.MOBS = VR.MOBS || {};
-  for (const k of F.KIND_LIST) { const K = F.KINDS[k]; VR.MOBS['foe_' + k] = { model: K.model, hp: K.hp, speed: K.speed, w: K.w, h: K.h, fly: K.fly, foe: true, foeKind: k, drops: [], xp: 0 }; }
+  for (const k of F.KIND_LIST) { const K = F.KINDS[k]; Object.defineProperty(VR.MOBS, 'foe_' + k, { value: { model: K.model, hp: K.hp, speed: K.speed, w: K.w, h: K.h, fly: K.fly, foe: true, foeKind: k, drops: [], xp: 0 }, enumerable: false, writable: true, configurable: true }); }
 
   // the warning: never shorter than 0.6 s; Leicht gives a quarter more time. Spannung changes the pauses, the counts
   // and the bolts' speed — never the warning
@@ -721,7 +722,7 @@
     if (typeof document === 'undefined' || !document.createElement) return;
     let el = document.getElementById('foeveil');
     if (!el) { css(); el = document.createElement('div'); el.id = 'foeveil'; el.innerHTML = '<span></span>'; (document.getElementById('app') || document.body).appendChild(el); }
-    el.querySelector('span').textContent = on ? T('g.foe.faint') : '';
+    const sp = el.querySelector('span'); if (sp) sp.textContent = on ? T('g.foe.faint') : '';
     el.className = on ? 'on' : '';
   };
 
@@ -796,7 +797,7 @@
       const A = VR.Adventure;
       if (A && A.award) A.award('foe', { kind: f.k, zone: f.zone ? f.zone.id : undefined });
       const r0 = rec(); if (r0 && d.taler > 0 && A) { Adv().earn(r0.me, d.taler); A.floatTaler = (A.floatTaler || 0) + d.taler; if (A.schedule) A.schedule(); }
-      if (f.site && VR.Liberate && VR.Liberate.resolved) VR.Liberate.resolved(g, f.site, 'down');
+      if (f.site && !f.wave && K.fam === 'stray' && VR.Liberate && VR.Liberate.resolved) VR.Liberate.resolved(g, f.site, 'down');
     }
   };
   // a calmed stray (liberate.js's timing ring)
@@ -820,6 +821,7 @@
     const ctx = F.ctx(g), p = g.player.pos;
     for (const z of ctx.zones) {
       const d = Math.hypot(p[0] - z.x, p[2] - z.z);
+      if (ctx.kids && z.site && L.state(z.site) === 'stoer' && d < 140) { L.setStrays(z.site, z.site.res | 0); L.save(null, z.site); continue; }   // (Kindersicher: no machine at all — the Lichtleiter alone frees it)
       if (z.kind === 'outpost' && z.site && L.state(z.site) === 'stoer' && d < 76 && !ctx.kids) F.guardians(g, En, z, ctx);
       if (ctx.enc !== 'off' && ctx.night && d < 52 && (z.kind === 'ruin' || (z.kind === 'outpost' && z.site && L.state(z.site) !== 'frei'))) F.shadows(g, En, z, ctx);
     }
@@ -841,9 +843,9 @@
   // where they were calmed; the powered-down ones are gone for good (site.res counts both, site.cal the calmed)
   F.guardians = function (g, En, z, ctx) {
     const L = VR.Liberate, s = z.site;
-    if (!(s.strays >= 0)) L.setStrays(s, F.groupSize(GW.band, GW.s, L.rng(s.id)));
-    let liveD = 0, liveC = 0;
-    for (const m of En.mobs) { const f = m.foe; if (!f || f.gone || f.remote || f.site !== s.id) continue; if (f.st === 'calm') liveC++; else if (f.st !== 'down' && f.st !== 'leave') liveD++; }
+    if (typeof s.strays !== 'number') { L.setStrays(s, F.groupSize(GW.band, GW.s, L.rng(s.id))); L.save(null, s); }   // (null ≥ 0 is true in JS: the type decides; kept in the record from now on)
+    let liveD = 0, liveC = 0;   // (one powering down still counts until it is gone and resolved: no stand-in meanwhile)
+    for (const m of En.mobs) { const f = m.foe; if (!f || f.gone || f.remote || f.site !== s.id || f.wave || f.helper) continue; if (f.st === 'calm') liveC++; else liveD++; }
     const wantD = Math.max(0, s.strays - s.res), wantC = Math.max(0, s.cal | 0);
     if (liveD >= wantD && liveC >= wantC) return;
     const pctx = Object.assign({}, ctx, { enc: 'normal' });   // (guardians stand in their outpost also without Begegnungen; the 48-block rule and Bauruhe hold)

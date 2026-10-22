@@ -249,6 +249,7 @@
     if (plain(raw.bosses)) r.bosses = raw.bosses;
     r.chapter = int(raw.chapter, 0, 99, 0);
     if (plain(raw.beats)) r.beats = raw.beats;
+    if (plain(raw.sites)) r.sites = raw.sites; if (plain(raw.foeSaid)) r.foeSaid = raw.foeSaid; if (plain(raw.helper)) r.helper = raw.helper;   // a-foes: the outposts' progress, Funke's once-words, the Helfer (each sanitised where it is read: liberate.js L.load, foes.js)
     r.prevDiff = DIFFS.indexOf(raw.prevDiff) >= 0 ? raw.prevDiff : null;
     r.faints = Array.isArray(raw.faints) ? raw.faints.filter(t => typeof t === 'number' && Number.isFinite(t)).slice(-4) : [];
     const m = plain(raw.me) ? raw.me : {}, me = r.me;

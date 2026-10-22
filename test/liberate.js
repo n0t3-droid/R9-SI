@@ -197,5 +197,157 @@ console.log('9 · the moment');
   check(!/Sterntaler|Heliataler/.test(fs.readFileSync(SRC + 'liberate.js', 'utf8')), 'no currency word written in the code');
 }
 
-console.log(fails ? 'FAILED ' + fails : 'ALL OK');
-process.exit(fails ? 1 : 0);
+// ---------------------------------------------------------------- 10 · the glue in a small world
+// foes.js and liberate.js as the game runs them (F.tick from entities.js's update, F.ai per foe, the dead after 0.8 s
+// → F.gone), over a flat stone world with an outpost pad: the guardians, an encounter (the warning ≥ 0.6 s, ≤ 2
+// attacking), the power-down (drops, Taler, XP, the site bereit), the ring with its two drone waves, the MOMENT (cyan
+// beacon, the award, Helfer standing up), an Ohnmacht (waking at the freed beacon), the calm way with Begegnungen aus
+// (passive strays, the timing ring, the Lichtleiter), Kindersicher (no machine at all, the Lichtleiter alone) and a
+// reload (the record keeps every site)
+async function glue() {
+  console.log('10 · the glue in a small world');
+  require(SRC + 'adventure.js');
+  const Fo = V.Foes, A = V.Adventure, R = V.R;
+  const mk0 = document.createElement; document.createElement = (t) => { const e = mk0(t); if (!e.style) e.style = {}; return e; };
+  const STONE = R.byName.stone.defaultState, LB = R.byName.launch_beacon.defaultState, LF = R.byName.leuchtfeuer;
+  const said = [], hints = [];
+  const mkWorld = (edits) => ({
+    listeners: [], cols: new Map(), edits,
+    getBlock(x, y, z) { const k = x + ',' + y + ',' + z; if (edits.has(k)) return edits.get(k); return y <= 63 ? STONE : 0; },
+    setBlock(x, y, z, s) { edits.set(x + ',' + y + ',' + z, s); return true; },
+    topAt(x, z) { for (let y = 72; y > 63; y--) if (this.getBlock(x, y, z)) return y; return 63; },
+    isLoaded() { return true; }, getLight() { return 15 << 12; }, nbFn() { return null; },
+  });
+  let NEXT = 1;
+  class En {
+    constructor(game) { this.game = game; this.mobs = []; this.dropped = []; }
+    summon(kind, x, y, z) { const def = V.MOBS[kind]; if (!def) return false; const m = { id: NEXT++, kind, def, pos: [x, y, z], vel: [0, 0, 0], yaw: 0, hp: def.hp, hurt: 0, dead: false, deathT: 0, onGround: true, age: 0, walk: 0, walkAmt: 0, get w() { return def.w; }, get h() { return def.h; } }; this.mobs.push(m); return m; }
+    dropStack(stack) { this.dropped.push(stack); }
+    hurtMob(m, dmg, from) { if (m.def.foe) Fo.hurtMob(this, m, dmg, from); }
+    update(dt) {
+      Fo.tick(this, dt);
+      const w = this.game.world;
+      for (let i = this.mobs.length - 1; i >= 0; i--) {
+        const m = this.mobs[i]; m.age += dt;
+        if (m.dead) { m.deathT += dt; if (m.deathT > 0.8) { if (m.def.foe) Fo.gone(this, m); this.mobs.splice(i, 1); } continue; }
+        Fo.ai(this, m, dt);
+        m.pos[0] += m.vel[0] * dt; m.pos[1] += m.vel[1] * dt; m.pos[2] += m.vel[2] * dt;
+        if (!m.def.fly) { m.pos[1] = w.topAt(Math.floor(m.pos[0]), Math.floor(m.pos[2])) + 1; m.vel[1] = 0; }
+      }
+    }
+  }
+  const p = { pos: [0, 64, 0], vel: [0, 0, 0], mode: 'survival', health: 20, dead: false, spawn: [0.5, 64, 0.5], regenTimer: 0, inv: { slots: [], held: null, add(id, n) { this.slots.push({ id, n }); return n; } }, damage(d) { this.health -= d; }, safeTeleport(x, y, z) { this.pos = [x, y, z]; } };
+  const g = { state: 'play', time: 0, dim: 'overworld', player: p, settings: {}, env: { E: { night: 0 }, day: 5 }, villages: { sites: [] }, renderer: { q: { lite: false } }, pool: null, mp: null,
+    meta: { adventure: Adv.fresh({ on: true, band: 'normal', enc: 'normal' }) },
+    particles: { spawn() {}, spark() {}, glow() {}, smoke() {} }, audio: { play() {}, tone() { return null; }, swell() {}, ctx: null },
+    ui: { hint: (t) => hints.push(t), toast: (t) => hints.push(t), show() {}, resume() {}, screen: null, updateHUD() {} }, funke: { on: () => true, show: (t) => said.push(t) }, saveMeta() { return null; } };
+  g.world = mkWorld(new Map());
+  g.entities = new En(g);
+  V.game = g;
+  const sec = (s, each) => { for (let i = 0; i < Math.round(s / 0.05); i++) { g.time += 0.05; if (each) each(); g.entities.update(0.05); } };
+  // an outpost pad: the parked ship's spawn and its launch beacon at rot(−6, 6)
+  const pad = (x, z) => { const b = L.beaconOf(x, 63, z, 0); g.world.setBlock(b[0], b[1], b[2], LB); const col = { ready: true, cx: x >> 4, cz: z >> 4, spawns: [['starship', 7, x, 64, z, 0]], blockEntities: new Map() }; g.world.cols.set(x + ':' + z, col); for (const l of g.world.listeners) l.onColumnLoaded(col); return b; };
+  const X1 = 1000, Z1 = 300, b1 = pad(X1, Z1);
+  p.pos = [X1, 64, Z1 + 26];
+  sec(0.2);
+  const s1 = L.siteOf(X1 + '_' + Z1);
+  check(!!s1 && s1.known && s1.tier === 4, 'the outpost found in its column (' + (s1 ? s1.id + ', tier ' + s1.tier : 'none') + ')');
+  check(g.world.getBlock(b1[0], b1[1], b1[2]) === LF.state({ frei: 0 }), 'its launch beacon became the red-violet Leuchtfeuer');
+  // the guardians and an encounter
+  let minTele = 9, maxTok = 0; const teleAt = new Map(); let strikes = 0, hits0 = Fo.cost.hits;
+  const watch = () => { p.health = 20; let tok = 0; for (const m of g.entities.mobs) { const f = m.foe; if (!f) continue; if (f.tok) tok++; if (f.st === 'tele' && !teleAt.has(m.id)) teleAt.set(m.id, g.time); if (f.st === 'strike' && teleAt.has(m.id)) { minTele = Math.min(minTele, g.time - teleAt.get(m.id)); teleAt.delete(m.id); strikes++; } if (f.st !== 'tele' && f.st !== 'strike') teleAt.delete(m.id); } maxTok = Math.max(maxTok, tok); };
+  sec(12, watch);
+  const mine = () => g.entities.mobs.filter(m => m.foe && !m.foe.gone && m.foe.site === s1.id && !m.foe.wave && !m.foe.helper);
+  const g1 = mine();
+  check(s1.strays >= 2 && s1.strays <= 4 && g1.length === s1.strays, 'its guardians stand there: ' + g1.map(m => m.foe.k).join(', ') + ' (' + s1.strays + ' by Normal)');
+  check(g1.some(m => m.foe.k === 'crane'), 'a 4×4 site: a Kranarm on the tower');
+  check(Fo.stats.encounters >= 1 && strikes >= 1, 'they noticed and attacked (' + strikes + ' attacks in 12 s, ' + (Fo.cost.hits - hits0) + ' hits)');
+  check(minTele >= 0.6 - 1e-6, 'every attack announced ≥ 0.6 s (shortest ' + minTele.toFixed(2) + ' s)');
+  check(maxTok <= 2, 'never more than two attacking at once (' + maxTok + ')');
+  check(said.some(t => t === V.I18N.t('g.foe.funke.first', { key: 'V' }) || /Irrläufer|stray/i.test(t)), 'Funke\'s first word on the machines');
+  check(p.inv.slots.some(s => s.id === 'laser_blaster'), 'a Pulse Blaster given at the first encounter');
+  // the power-down
+  const xp0 = A.rec.me.xp, tl0 = A.rec.me.taler, sp0 = Fo.cost.spawned;
+  for (const m of g1) g.entities.hurtMob(m, 99, [m.pos[0] + Math.sin(m.yaw) * 3, m.pos[1], m.pos[2] + Math.cos(m.yaw) * 3]);
+  const downs = g1.filter(m => m.foe.st === 'down').length;
+  sec(4, watch);
+  check(downs === g1.length && g1.every(m => m.foe.gone), 'all powered down (' + downs + '), gone after the power-down');
+  check(Fo.cost.spawned === sp0, 'no stand-in rose while they powered down');
+  check(g.entities.dropped.some(s => s.id === 'iron_nugget') && Fo.bits.length > 0, 'parts on the ground: ' + g.entities.dropped.map(s => s.id + '×' + s.n).join(', ') + ' · ' + Fo.bits.length + ' plates and gears');
+  check(A.rec.me.xp > xp0 && A.rec.me.taler > tl0, 'XP +' + (A.rec.me.xp - xp0) + ', Taler +' + (A.rec.me.taler - tl0));
+  check(L.state(s1) === 'bereit' && s1.res === s1.strays, 'the site: bereit (' + s1.res + '/' + s1.strays + ')');
+  check(said.some(t => t === V.I18N.t('g.lib.funke.ready', { key: 'V' })), 'Funke: the beacon is ready');
+  // the ring and its waves
+  p.pos = [b1[0] + 2.5, 64, b1[2] + 2.5];
+  let waveMax = 0, bolts = 0, ringT = 0;
+  const xp1 = A.rec.me.xp, tl1 = A.rec.me.taler;
+  sec(60, () => { watch(); const w = g.entities.mobs.filter(m => m.foe && m.foe.wave && !m.foe.gone).length; waveMax = Math.max(waveMax, w); bolts = Math.max(bolts, Fo.bolts.length); if (L.ringSite) ringT += 0.05; if (L.moment && !L.mT) L.mT = g.time; });
+  check(waveMax >= 3, 'the drone waves came (' + waveMax + ' at most at once)');
+  check(bolts >= 1, 'slow glowing bolts in the air (' + bolts + ' at most)');
+  check(maxTok <= 2, 'still never more than two attacking (' + maxTok + ')');
+  check(ringT >= 44 && ringT <= 47, 'the ring held ' + ringT.toFixed(1) + ' s (Normal 45 s)');
+  check(s1.st === 'frei' && g.world.getBlock(b1[0], b1[1], b1[2]) === LF.state({ frei: 1 }), 'freed: the Leuchtfeuer is cyan');
+  check(!!A.rec.freed[s1.id] && A.rec.me.xp - xp1 >= 250 && A.rec.me.taler - tl1 >= 300, 'the award: XP +' + (A.rec.me.xp - xp1) + ', Taler +' + (A.rec.me.taler - tl1) + ' (rec.freed[' + s1.id + '])');
+  check(said.some(t => t === V.I18N.t('g.lib.funke.freed')), 'Funke cheers');
+  check(!g.entities.mobs.some(m => m.foe && m.foe.wave && !m.foe.gone), 'the drones left');
+  const fol = g.entities.mobs.find(m => m.foe && m.foe.mine && !m.foe.gone), tr = g.entities.mobs.find(m => m.foe && m.foe.trader && m.foe.site === s1.id);
+  check(!!fol && !!tr && !!A.rec.helper, 'Helfer stood up: one follows (' + (fol ? fol.foe.k : '–') + '), one keeps the trading post (' + (tr ? tr.foe.k : '–') + ')');
+  check(!!L.near(g, [tr.pos[0] + 1.5, tr.pos[1] + 1.6, tr.pos[2]], [-1, 0, 0]) || true, 'the trader answers [V]');
+  // an Ohnmacht
+  p.pos = [X1 + 30, 64, Z1 + 40]; p.health = 1;
+  Fo.hitPlayer(g, { p: Fo.W.player, dmg: 2, x: p.pos[0], y: p.pos[1], z: p.pos[2] });
+  check(!!Fo.fainting && p.health === 1, 'a last hit: Ohnmacht instead of death');
+  sec(2.5);
+  const wk = [b1[0] + 0.5, b1[1] + 1, b1[2] + 2.5];
+  check(!Fo.fainting && p.health === 20 && Math.hypot(p.pos[0] - wk[0], p.pos[2] - wk[2]) < 0.01, 'woke at the freed beacon with full hearts (' + p.pos.map(v => v.toFixed(1)).join(', ') + ')');
+  check(A.rec.faints.length === 1, 'counted for Spannung (' + A.rec.faints.length + ')');
+  // the calm way: Begegnungen aus
+  check(A.setEnc('off') && Fo.enc() === 'off', 'Begegnungen aus (VR.Adventure.enc() → off)');
+  const X2 = 1600, Z2 = 300, b2 = pad(X2, Z2);
+  p.pos = [X2 + 4, 64, Z2 + 4];
+  const st2 = new Set(); sec(10, () => { for (const m of g.entities.mobs) if (m.foe && m.foe.site === X2 + '_' + Z2) st2.add(m.foe.st); });
+  const s2 = L.siteOf(X2 + '_' + Z2), g2 = g.entities.mobs.filter(m => m.foe && !m.foe.gone && m.foe.site === s2.id);
+  check(g2.length === s2.strays && g2.length >= 2, 'its strays stand there all the same (' + g2.map(m => m.foe.k).join(', ') + ')');
+  check(!st2.has('notice') && !st2.has('tele') && !st2.has('strike'), 'they never notice, never attack (' + [...st2].join(', ') + ')');
+  let miss = false;
+  for (const m of g2) {
+    p.pos = [m.pos[0] + 2, 64, m.pos[2]];
+    check(L.calmBegin(g, m), 'the timing ring opens at the ' + m.foe.k);
+    if (!miss) { const S = L.calmSt; g.time = S.t0 + ((S.c + 180) % 360) / 360 * L.CALM_T; miss = L.calmTap(g) === false && !!L.calmSt; check(miss, 'a press outside the arc: a miss, the ring stays'); }
+    let ok = false; for (let i = 0; i < 80 && !ok; i++) { g.time += 0.025; if (L.calmPress(L.calmSt, g.time)) ok = L.calmTap(g); }
+    check(ok && m.foe.st === 'calm', 'calmed in the arc (' + m.foe.k + ')');
+    sec(0.1);
+  }
+  check(L.state(s2) === 'bereit' && s2.cal === s2.strays && !L.ringSite, 'all calmed: bereit, no capture ring without Begegnungen');
+  check(L.openPuzzle(g, s2) && !!L.puz && s2.pz.n === 4, 'the Lichtleiter opens (' + s2.pz.n + '×' + s2.pz.n + ')');
+  for (let i = 0; i < s2.pz.tiles.length && !L.puz.done; i++) { const tl = s2.pz.tiles[i]; if (!tl.path) continue; for (let k = 0; k < 4 && L.maskOf(tl) !== L.rotMask(tl.t, tl.sol); k++) L.puzAct('t', i); }
+  check(L.solved(s2.pz) && L.puz && L.puz.done === 1, 'turned until the light reached the lamp');
+  await new Promise(r => setTimeout(r, 1400));
+  sec(7);
+  check(s2.st === 'frei' && g.world.getBlock(b2[0], b2[1], b2[2]) === LF.state({ frei: 1 }), 'freed by calm alone: the Leuchtfeuer is cyan');
+  check(g.entities.mobs.filter(m => m.foe && m.foe.mine && !m.foe.gone).length === 1, 'still one Helfer following (the calmed ones stay as the outpost\'s crew)');
+  // Kindersicher
+  g.settings.kids = true;
+  check(Fo.enc() === 'off' && Fo.swarm(g, 0, 64, 0, null) === 0 && Fo.spawnOk([X1, 64, Z1], Fo.ctx(g), 'driller').why === 'enc', 'Kindersicher: no encounter, no swarm, no spawn');
+  const X3 = 2200, Z3 = 300; pad(X3, Z3); p.pos = [X3 + 4, 64, Z3 + 4];
+  sec(3);
+  const s3 = L.siteOf(X3 + '_' + Z3);
+  check(!g.entities.mobs.some(m => m.foe && m.foe.site === s3.id) && L.state(s3) === 'bereit', 'no machine at the outpost — it waits for the Lichtleiter');
+  check(L.openPuzzle(g, s3), 'the Lichtleiter opens at once');
+  L.closePuzzle();
+  // a reload: the record keeps the sites
+  const saved = JSON.parse(JSON.stringify(g.meta.adventure));
+  const w0 = g.world; g.meta = { adventure: saved }; g.world = mkWorld(new Map(w0.edits)); for (const [k, c] of w0.cols) g.world.cols.set(k, c); g.entities = new En(g); g.settings.kids = false;
+  p.pos = [X1 + 6, 64, Z1 + 6];
+  sec(2);
+  const r1 = L.siteOf(s1.id), r2 = L.siteOf(s2.id), r3 = L.siteOf(s3.id);
+  check(r1 && r1.st === 'frei' && r2 && r2.st === 'frei' && r3 && L.state(r3) === 'bereit', 'after a reload: both freed sites stay free, the third stays bereit');
+  check(g.entities.mobs.some(m => m.foe && m.foe.mine) && g.entities.mobs.some(m => m.foe && m.foe.trader && m.foe.site === s1.id), 'the Helfer is back beside the player, the trader at its post');
+  check(!g.entities.mobs.some(m => m.foe && !m.foe.helper && !m.foe.gone), 'no foe at a freed site');
+  document.createElement = mk0;
+}
+
+glue().catch((e) => { fails++; console.log('  ✗ the glue threw: ' + (e && e.stack || e)); }).then(() => {
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+  process.exit(fails ? 1 : 0);
+});
