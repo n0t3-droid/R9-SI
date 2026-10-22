@@ -22,6 +22,7 @@ const MAIN = ['gl', 'gpuprof', 'light2', 'sky3', 'water_fx', 'shaders', 'skybodi
 SHARED.splice(SHARED.indexOf('gen_dims'), 0, 'dimreg');   // u-dims: the dim registry (src/shared/dimreg.js, VR.DimReg) before the generators
 MAIN.splice(MAIN.indexOf('game'), 0, 'travel');   // u-dims: VR.Travel (src/main/travel.js) — trips between the worlds of a save, the gates, Heimkehr
 MAIN.splice(MAIN.indexOf('lifedirector'), 0, 'eventlog');   // e-log: VR.EventLog (src/main/eventlog.js), the never-boring measure
+SHARED.push('bodytex'); MAIN.push('space_shaders', 'spacescene');   // u-space0: the bodies' textures (main and workers), the space scene (after game.js: it wraps two of its methods)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles

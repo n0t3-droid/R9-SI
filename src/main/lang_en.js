@@ -2171,5 +2171,17 @@
     'g.set.wildRays.tip': 'Great, gentle sky rays, each with its young one at its side, glide a slow circuit under and between the floating isles, trailing glowing lines and sparks of light, and glow at night. Every player sees them in the same place. From Balanced up.',
     'g.set.wildHerds': 'Herds on the move: deer at dawn, sheep, rabbits, a fox',
     'g.set.wildHerds.tip': 'At dawn the deer cross the meadow in a line and graze, the sheep drift over the pasture as one herd, rabbits hop at the field edges and dash into the hedge, and at dusk a fox trots along the hedge. Nothing hunts here. Off on Very Low.',
+    // u-space0 · the space view (src/main/spacescene.js: /raum, space detail)
+    'g.space.on': '🪐 Space view: {place} — Esc or /raum takes you back, the mouse looks around',
+    'g.space.wait': '🪐 Preparing the space view …',
+    'g.space.off': 'Back on the ground',
+    'g.space.help': 'Space view: /raum herz · amarant · zinn · aqua — /raum alone takes you back',
+    'g.space.place.herz': 'three kilometres above Herzwelt',
+    'g.space.place.amarant': 'Amarant over Herzwelt\'s rim',
+    'g.space.place.zinn': 'Amarant over Zinnober',
+    'g.space.place.aqua': 'Aquamarin and Herzwelt',
+    'g.set.spaceDetail': 'Space detail',
+    'g.set.spaceDetail.tip': 'How fine planets, moons, the ring and the stars are in the space view: texture size, fine clouds, star fields. Follows the preset.',
+    'g.set.spaceDetailV': ['Very low', 'Low', 'Medium', 'High'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

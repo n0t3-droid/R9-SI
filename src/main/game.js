@@ -1618,6 +1618,7 @@
         case 'trailer': case 'cinema': if (this.director && this.director.play('trailer')) say(T('g.cmd.trailer')); else say(T('g.cmd.noTrailer')); break;
         case 'render': this.settings.renderDist = Math.max(3, Math.min(this.settings.rdMax || 24, parseInt(a[0], 10) || 8)); this.applySettings('renderDist'); say(T('g.cmd.render', { n: this.settings.renderDist })); break;
         case 'freeze': this.zenFreezeTime = !this.zenFreezeTime; say(T(this.zenFreezeTime ? 'g.cmd.freezeOn' : 'g.cmd.freezeOff')); break;
+        case 'raum': case 'space': if (this.raumCommand) this.raumCommand(a[0]); break;   // u-space0: /raum <herz|amarant|zinn|aqua> — the space view (spacescene.js)
         case 'locate': this.pool.direct(0, { type: 'locate', dim: this.dim, biome: a[0], x: Math.floor(p.pos[0]), z: Math.floor(p.pos[2]) }, null, (m) => { if (m.pos) say(T('g.cmd.located', { what: a[0], x: m.pos[0], y: m.pos[1], z: m.pos[2], y2: m.pos[1] + 2 })); else say(T('g.cmd.notFound'), '#ff8a8a'); }); break;
         case 'summon': if (this.entities && this.entities.summon) { if (!this.entities.summon(a[0], p.pos[0] + Math.sin(-p.yaw) * 3, p.pos[1], p.pos[2] - Math.cos(p.yaw) * 3)) say(T('g.cmd.noMob'), '#ff8a8a'); } break;
         default: if (this.extraCommand && this.extraCommand(cmd, a)) break; say(T('g.cmd.unknown'), '#ff8a8a');

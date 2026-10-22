@@ -2171,5 +2171,17 @@
     'g.set.wildRays.tip': 'Große, sanfte Himmelsrochen – jeder mit seinem Jungen an der Seite – gleiten auf einer langsamen Runde unter und zwischen den schwebenden Inseln, ziehen leuchtende Spuren und Lichtfunken hinter sich her und leuchten nachts. Für alle Mitspieler am selben Ort. Ab Ausgewogen.',
     'g.set.wildHerds': 'Herden ziehen: Rehe im Morgengrauen, Schafe, Kaninchen, Fuchs',
     'g.set.wildHerds.tip': 'Im Morgengrauen ziehen die Rehe in einer Reihe über die Wiese und äsen, die Schafe wandern als eine Herde über die Weide, an den Feldrändern hoppeln Kaninchen und flitzen in die Hecke, und in der Dämmerung schnürt ein Fuchs an der Hecke entlang. Niemand jagt hier. Auf Sehr niedrig aus.',
+    // u-space0 · die Raumansicht (src/main/spacescene.js: /raum, Weltraum-Detail)
+    'g.space.on': '🪐 Raumansicht: {place} — Esc oder /raum führt zurück, die Maus schaut sich um',
+    'g.space.wait': '🪐 Die Raumansicht wird vorbereitet …',
+    'g.space.off': 'Zurück auf dem Boden',
+    'g.space.help': 'Raumansicht: /raum herz · amarant · zinn · aqua — /raum allein führt zurück',
+    'g.space.place.herz': 'drei Kilometer über der Herzwelt',
+    'g.space.place.amarant': 'Amarant über dem Rand der Herzwelt',
+    'g.space.place.zinn': 'Amarant über Zinnober',
+    'g.space.place.aqua': 'Aquamarin und die Herzwelt',
+    'g.set.spaceDetail': 'Weltraum-Detail',
+    'g.set.spaceDetail.tip': 'Wie fein Planeten, Monde, Ring und Sterne in der Raumansicht sind: Texturgröße, feine Wolken, Sternfelder. Folgt der Voreinstellung.',
+    'g.set.spaceDetailV': ['Sehr niedrig', 'Niedrig', 'Mittel', 'Hoch'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

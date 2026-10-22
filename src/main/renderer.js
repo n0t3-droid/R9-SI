@@ -2126,7 +2126,7 @@
       // sky
       this.gpuPass('sky');
       gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
-      if (!fc) {
+      if (!fc && !F.noSky) {   // u-space0: F.noSky — the space scene draws its own sky (spacescene.js)
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
         if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
