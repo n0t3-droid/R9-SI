@@ -159,6 +159,7 @@
     const F = this.festState(vil);
     if (!F.opened && dPl < 60) {
       F.opened = true;
+      if (VR.EventLog) VR.EventLog.emit('social', 'festival', 3, [pz.x + 0.5, pz.y + 2, pz.z + 0.5], 'festival', 12);   // e-log: the festival opens (eventlog.js)
       if (g.codex && g.codex.event) g.codex.event('festival');
       const mayor = vil.agents.find(a => !a.kid && F.roles.get(a) === 'dance') || vil.agents[0];
       if (mayor) mayor.say(T('g.fest.mayor'), 4.5);

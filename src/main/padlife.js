@@ -384,6 +384,7 @@
       // (its design freed meanwhile — the eye away for over a minute, Starships.gc — the craft is built anew)
       if (!SS.designs.has(c.d.key)) c.d = SS.design(PL.craftSeed(pad.seed, q.m), c.arch, PL.PALS[q.m % 3]);
       c.seen = this.clock; c.q = q;
+      if (VR.EventLog) VR.EventLog.landed(c, q);   // e-log: a visitor touches down (eventlog.js)
       const d = c.d; d.last = performance.now();
       const I = c.inst; I.d = d;
       // (the pose is the ground under the gear; the craft's own y is its feet)

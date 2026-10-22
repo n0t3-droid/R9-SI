@@ -101,6 +101,7 @@
       if (g.audio && g.audio.swell) g.audio.swell(g.env ? g.env.day | 0 : 0, W.DUR / 4);
       const d = this.ui(); this.capText.textContent = W.title(v.lm); d.style.display = 'block'; d.style.opacity = 0;
       this.first = true;
+      if (VR.EventLog) VR.EventLog.emit('wow', v.lm || 'view', 3, null, 'wow');   // e-log: the view swings to a vista (eventlog.js)
     }
     run(dt) {
       const g = this.g;

@@ -45,6 +45,7 @@
     unlock(id, quiet) {
       if (this.found[id]) return false;
       const e = this.byId.get(id); if (!e) return false;
+      if (VR.EventLog) VR.EventLog.found(id);   // e-log: a discovery, a wonder's quiet unlock too (eventlog.js)
       this.found[id] = Date.now();
       if (quiet) return true;
       const g = this.g;

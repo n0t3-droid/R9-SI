@@ -757,6 +757,7 @@
       try { ok = A.start(this, ev) !== false; } catch (e) { ok = false; console.warn('life director', kind, e); }
       if (!ok) return null;
       this.events.push(ev); this.st.started++; this.st.kinds[kind] = (this.st.kinds[kind] || 0) + 1;
+      if (VR.EventLog) VR.EventLog.act(ev, this);   // e-log: an act begins (eventlog.js, the never-boring measure)
       return ev;
     }
     // start an act now (a camera director, the picture tests): look = a point to face first
