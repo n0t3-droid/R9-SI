@@ -38,7 +38,7 @@
     { id: 'cmd', group: 'act', names: ['Slash'], def: ['Slash', ''] },
     { id: 'photo', group: 'act', names: ['KeyP', 'F8'], def: ['KeyP', 'F8'] },   // (t-first: F8 opens the 📷 Fotomodus too)
     { id: 'zoom', group: 'act', names: ['KeyC'], def: ['KeyC', ''] },
-    { id: 'veh', group: 'act', names: ['KeyV'], def: ['KeyV', ''] },
+    { id: 'veh', group: 'act', names: ['KeyV'], def: ['KeyV', ''] },   // e-ctx: the Aktion key (ctx.js) — the id stays veh, so saved bindings keep working; its label ctl.veh „Aktion (Kontext)"
     { id: 'auto', group: 'act', names: ['KeyG'], def: ['KeyG', ''] },
     { id: 'fill', group: 'act', names: ['KeyF'], def: ['KeyF', ''] },
     { id: 'hollow', group: 'act', names: ['KeyH'], def: ['KeyH', ''] },

@@ -77,6 +77,8 @@
 #touch .tb .ti { font-size: 22px; line-height: 1; }
 #touch .tb.on { background: rgba(58, 240, 255, 0.32); border-color: var(--accent); }
 #touch .tb-sprint { grid-column: 1 / span 2; min-height: 48px; flex-direction: row; gap: 8px; }
+#touch .tb-act { position: absolute; right: calc(100% + 14px); bottom: 4px; width: 92px; height: 92px; border-radius: 50%; }   /* e-ctx: the round Aktion button */
+#touch .tb-act .ti { font-size: 30px; }
 /* the hotbar moves up above the buttons while the touch layer shows */
 #ui.touchon #hotbar { bottom: 240px; }   /* above the stick and the button cluster */
 @media (max-width: 700px) {

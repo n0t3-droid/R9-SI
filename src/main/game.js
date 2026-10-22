@@ -815,6 +815,7 @@
       if (VR.LiveLoop) VR.LiveLoop.metaVars(this, m);   // the variants its saved columns contain (B1)
       if (this.gadgets) this.gadgets.beforeSave(m);
       if (this.starships) this.starships.beforeSave(m);
+      if (VR.Intent && VR.Intent.beforeSave) VR.Intent.beforeSave(this, m);   // e-ctx: a called ship still in the air is saved standing on its pad
       if (this.companions) this.companions.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
       if (this.wonders) this.wonders.beforeSave(m);
@@ -1219,6 +1220,7 @@
       this.time += dt;
       if (VR.LiveLoop) VR.LiveLoop.tick(this);   // a look changed: the sections that show it are meshed again, a few a frame
       this.handleKeys();
+      if (VR.Intent) VR.Intent.pre(this, dt);   // e-ctx: a trip by intent — any movement key takes over; the walk's stick (intent.js)
       const gad = this.gadgets, driving = gad && gad.controlling;
       if (this.entities && !this.ui.blocking && !driving) this.entities.playerAttack();
       if (driving) gad.drive(dt, input, this.ui.blocking);
@@ -1231,6 +1233,7 @@
         if (this.revealPending && !p.hold && !this.studioOpen && !this.ui.screen && (this.revealWait = (this.revealWait || 0) + dt) > 0.4) { this.revealWait = 0; this.reveal(); }
         else { if (gad) gad.preUpdate(dt, input, p); p.update(dt, input); }
       }
+      if (VR.Intent) VR.Intent.post(this, dt);   // e-ctx: the input as the player gave it
       if (this.sim) this.sim.update(dt, !!(this.mp && this.mp.isClient));   // a guest: only the sliding doors (the host runs the world)
       if (this.companions) this.companions.update(dt);
       if (this.entities) this.entities.update(dt);
@@ -1249,6 +1252,7 @@
       if (this.arrival) this.arrival.update(dt);   // (t-first: the veil, then the wow moment, then the HUD fades in)
       if (this.trams) this.trams.update(dt);
       if (VR.Travel) VR.Travel.update(this, dt);   // u-dims: a gate's two seconds, a trip's arrival, the ship that came along
+      if (VR.Intent) VR.Intent.tick(this, dt);   // e-ctx: the targets, the aim, a trip's phases and its called ship (intent.js)
       if (this.tickFurnaces) this.tickFurnaces(dt);
       const vd = w.viewDir || (w.viewDir = [0, 0]); vd[0] = -Math.sin(p.yaw); vd[1] = -Math.cos(p.yaw);   // the way the player looks (flat): uploads in the view first (F10: no new array a frame)
       { const r0 = this.renderer, asp = r0 && r0.H ? r0.W / r0.H : 16 / 9; w.viewCos = Math.cos(Math.atan(Math.tan((this.settings.fov || 75) * Math.PI / 360) * asp)); }   // (F10: the horizontal half field of view)
@@ -1297,6 +1301,7 @@
       p.viewYaw = PR.turnFollow(p.viewYaw, p.yaw, dt, !!S.turnInertia);
       let cam = { x: eye[0] + Math.cos(p.viewYaw) * bb.x, y: eye[1] + bb.y - dip + (p.stepSmooth || 0) + swim, z: eye[2] - Math.sin(p.viewYaw) * bb.x, yaw: p.viewYaw, pitch: p.pitch + PR.nudgeAt(p.nudgeT, p.nudgeAmp), roll: PR.rollAt(p.bob * 2, bob), fov: PR.fovDeg(S.fov, p.fovKick) * Math.PI / 180 * (this.zoom ? 0.3 : 1), far: this.farFor(w, 220) };
       if (this.vehicleCam) { const vc = this.vehicleCam(cam); if (vc) cam = vc; }
+      if (VR.Intent) { const ic = VR.Intent.cam(this, cam); if (ic) cam = ic; }   // e-ctx: the travel camera on foot (directorcam.js)
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
       if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
@@ -1310,6 +1315,7 @@
       }
       this.cam = cam;
       if (VR.EventLog) VR.EventLog.frame(this, dt);   // e-log: the event log's clock, input and 1-Hz sample (eventlog.js)
+      if (VR.Ctx) VR.Ctx.tick(this, dt); if (VR.Intent) VR.Intent.ui(this); if (VR.HudFade) VR.HudFade.tick(this, dt);   // e-ctx: the Aktion key and its prompt, the aimed target's marker, the fading HUD
       // selection / crack
       const t = p.target;
       const outline = t && !this.hideHud ? { x: t.x, y: t.y, z: t.z, boxes: t.boxes || VR.PHYS.selection(t.state) } : null;

@@ -16,7 +16,7 @@
 // Checks: a Heartland world of vgen ≥ 11; each session ≥ 290 s of play with ~1 sample a second and its events; the JSON and the sheet written; the log
 // ≤ 0.05 ms a frame; no page error.
 //   nohup bash test/wt_run.sh session.mjs 5400 > .tmp_tests/session.log 2>&1 &
-//   ONLY=builder|walk · DUR=300 · SEED=4242 · NO_BENCH=1 · ALL=1 (every picture too) · DRY=1 (node only: the routes, the walker and the Bauhand on a
+//   ONLY=builder|walk|pilot (pilot only when asked: e-ctx's trips by intent) · DUR=300 · SEED=4242 · NO_BENCH=1 · ALL=1 (every picture too) · DRY=1 (node only: the routes, the walker and the Bauhand on a
 //   stand-in, a synthetic sheet in the scratch folder) · SHEET_ONLY=builder|walk (rebuild a sheet from its JSON and frames)
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
@@ -188,6 +188,28 @@ function pageHelpers(win, VRx) {
       default: S.done = true;
     }
   }
+  // e-ctx · a trip by intent: look at the target (VR.Intent's list), tap V, then hands off until the trip is over
+  function intent(g, p, I, dt) {
+    const M = S.mode, In = VR.Intent; release(I);
+    if (!In || !In.start) { S.done = true; return; }
+    if (!M.started) {
+      const q = (In.targets || []).find(t => t.id === M.target);
+      if (!q) { if (S.t > 6) { S.log.push(['intent', 'no target', M.target]); S.done = true; } return; }
+      const e = p.eyePos(), dx = q.pos[0] - e[0], dy = q.pos[1] - e[1], dz = q.pos[2] - e[2];
+      p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); if (p.viewYaw !== undefined) p.viewYaw = p.yaw;
+      if (M.aimT === undefined) M.aimT = S.t;
+      if (S.t - M.aimT > 0.5 && M.pressT === undefined) { I.keys.add('KeyV'); I.pressed.add('KeyV'); M.pressT = S.t; return; }
+      if (M.pressT !== undefined && !M.released && S.t - M.pressT > 0.05) { I.keys.delete('KeyV'); I.released.add('KeyV'); M.released = true; return; }
+      if (M.released) {
+        const c = In.current && In.current();
+        if (c) { M.started = S.t; S.log.push(['intent', M.target, c.means, +(+g.time).toFixed(1)]); }
+        else if (S.t - M.pressT > 2) { S.log.push(['intent', 'not started', M.target, VR.Ctx && VR.Ctx.current() ? VR.Ctx.current().id : '?']); S.done = true; }
+      }
+      return;
+    }
+    const c = In.current && In.current();
+    if (!c) { S.log.push(['intent', 'over', M.target, +(+g.time).toFixed(1)]); S.done = true; }
+  }
   S.control = function (dt) {
     const g = VR.game, p = g && g.player, I = g && g.input, M = S.mode; if (!p || !I) return;
     S.t += dt;
@@ -195,6 +217,7 @@ function pageHelpers(win, VRx) {
     if (M.kind === 'look') { release(I); p.yaw += (M.speed || 0.3) * dt; p.pitch += ((M.pitch || 0) - p.pitch) * Math.min(1, dt * 2); if (S.t >= (M.sec || 1)) S.done = true; return; }
     if (M.kind === 'walk') { walk(g, p, I, dt); return; }
     if (M.kind === 'bauhand') { bauhand(g, p, I, dt); return; }
+    if (M.kind === 'intent') { intent(g, p, I, dt); return; }   // e-ctx
     release(I);
   };
   // n frames of 1/30 s, the last one drawn and captured when asked
@@ -555,6 +578,16 @@ try {
     { name: 'to_nova', de: 'Weg nach Nova Haven', mode: { kind: 'walk', route: ROUTES.walkA }, max: 200 },
     { name: 'city_plaza', de: 'Stadtplatz: umsehen', mode: { kind: 'look', sec: 15, speed: 0.45 }, max: 15 },
     { name: 'city', de: 'Durch die Stadt', mode: { kind: 'walk', route: ROUTES.walkB }, max: DUR },
+  ]);
+  // e-ctx · the pilot (erlebnis §7), Herzwelt's part: trips by intent — V on the citadel from the Gate Plaza, then the isles,
+  // then Nova Haven; the orbit, Basalt and Heimkehr from space wait for u-ascent / u-moons1 (their minutes leave the targets)
+  if (ONLY && ONLY.includes('pilot')) recs.pilot = await session('pilot', { tod: 5200, at: [0.5, 81, 48.5], yaw: 0.85, notes: ['e-ctx: the Herzwelt part of the pilot session — trips by intent (VR.Intent): the citadel, the isles, Nova Haven; orbit, Basalt and Heimkehr from space are later waves'] }, [
+    { name: 'plaza', de: 'Torplatz: umsehen', mode: { kind: 'look', sec: 6, speed: 0.3 }, max: 6 },
+    { name: 'to_citadel', de: 'Reise zur Turmzitadelle', need: () => !!(window.VR && VR.Intent && VR.Intent.start), why: 'VR.Intent fehlt (Welle 4, e-ctx)', mode: { kind: 'intent', target: 'citadel' }, max: 150 },
+    { name: 'citadel', de: 'An der Zitadelle: umsehen', mode: { kind: 'look', sec: 10, speed: 0.3 }, max: 10 },
+    { name: 'to_isles', de: 'Reise zu den Himmelsinseln', need: () => !!(window.VR && VR.Intent && VR.Intent.start), why: 'VR.Intent fehlt', mode: { kind: 'intent', target: 'isles' }, max: 150 },
+    { name: 'isles', de: 'Bei den Inseln: umsehen', mode: { kind: 'look', sec: 8, speed: 0.3 }, max: 8 },
+    { name: 'to_nova', de: 'Reise nach Nova Haven', need: () => !!(window.VR && VR.Intent && VR.Intent.start), why: 'VR.Intent fehlt', mode: { kind: 'intent', target: 'nova' }, max: DUR },
   ]);
 } catch (e) { check(false, 'the sessions ran (' + String(e && e.stack || e).slice(0, 600) + ')'); }
 
