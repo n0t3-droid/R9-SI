@@ -106,6 +106,9 @@ float fbm3L(vec3 p){ return vnoise3(p) * 0.6667 + vnoise3(p * 2.03 + 17.1) * 0.3
 // (dayK 0) t-sky's band and thin wisps, the lanes and rims faint. Noise calls: High 13 (was 16: the dust's four octaves
 // became two, n3 the low hue field); Very Low (LITE) 3 (was 4: two octaves of gas, one of colour, the hue zones from them; no
 // dust as before, no lanes, no swirl).
+#ifdef SKY3
+${VR.Sky3 && VR.Sky3.glslSky ? VR.Sky3.glslSky() : ''}
+#endif
 vec3 nebula(vec3 dir, float dayK) {
   vec3 G = normalize(vec3(0.32, 0.62, -0.72));
   float b = dot(dir, G);
@@ -125,9 +128,16 @@ vec3 nebula(vec3 dir, float dayK) {
   // the gas's domain: in the band as before (a little drawn out along it); off the band swirled by two low fields, so the
   // veil's clouds flow instead of lying on a grid
   vec3 q = p + (vec3(0.9, -0.5, 0.7) * (hz - 0.5) * 1.2 + vec3(-0.6, 0.3, 0.9) * (wz - 0.5) * 1.6) * (1.0 - band) + G * (b * 0.9);
+#ifdef SKY3
+  q = mix(p + G * (b * 0.9), q, u_s3Neb.y);   // t-sky3: the swirl eased (it drew marbled streaks: the frames' nebula is smoke)
+#endif
   float n1 = fbm3(q + vec3(0.0, u_time * 0.0015, 0.0));
   float n2 = fbm3(q * 2.1 + 11.0);
+#ifdef SKY3
+  float nd = fbm3L(q * 1.85 - 1.5 + G * (b * 1.6));   // t-sky3: the dust's domain less drawn out (its lanes were brushed streaks)
+#else
   float nd = fbm3L(q * 1.85 - 1.5 + G * (b * 4.8));   // the dust's domain: drawn out across the band, so its lanes run along it
+#endif
 #endif
   // the dust: soft dark clouds (as before), and where the gas is dense thin dark lanes — the ridged term's crests — with
   // lit edges beside them
@@ -141,6 +151,9 @@ vec3 nebula(vec3 dir, float dayK) {
   // the frames' dust is soft dark gas)
   float lane = smoothstep(0.84, 0.99, ridge) * dense;
   float rim = smoothstep(0.66, 0.86, ridge) * (1.0 - smoothstep(0.84, 0.99, ridge)) * dense;
+#ifdef SKY3
+  lane = smoothstep(0.62, 0.97, ridge) * dense * 0.85; rim *= u_s3Neb.w;   // t-sky3: soft wide dark lanes, faint rims (no brushed streaks)
+#endif
 #endif
   vec3 col = mix(vec3(0.22, 0.06, 0.46), vec3(0.10, 0.36, 1.0), smoothstep(0.3, 0.7, n1));
   col = mix(col, vec3(1.0, 0.30, 0.68), smoothstep(0.48, 0.78, n2) * 0.9);
@@ -153,6 +166,9 @@ vec3 nebula(vec3 dir, float dayK) {
   float cd = max(0.0, dot(dir, coreDir));
   float c2 = cd * cd, c4 = c2 * c2, c8 = c4 * c4, c16 = c8 * c8;   // (cd^60 and cd^12 as products: no pow per pixel)
   float core = (c16 * c16 * c16 * c8 * c4 * 2.2 + c8 * c4 * 0.5) * (1.0 - 0.4 * dayK);   // (by day a smaller glare: the planets stay clear)
+#ifdef SKY3
+  core = (c16 * c16 * c16 * c8 * c4 * 1.8 + c16 * c8 * 0.3) * (1.0 - 0.4 * dayK);   // t-sky3: a smaller glow round the core (it read as a second moon)
+#endif
   col += vec3(1.0, 0.78, 0.6) * core;
   // off the band: at night t-sky's thin wisps; by day (dayK) the veil's clouds over every view's top, sharp-edged so the
   // dark sky shows between them; by day the band too breaks into clouds (the frames' tops: vivid clouds, dark gaps)
@@ -173,6 +189,14 @@ vec3 nebula(vec3 dir, float dayK) {
 #endif
   float dusty = (1.0 - 0.65 * soft) * (1.0 - (0.2 + 0.35 * dayK) * lane) * (1.0 + (0.2 + 0.25 * dayK) * rim);   // (the lanes and rims faint at night: the night keeps its soft look)
   float dens = band * (0.35 + 1.35 * n1 * n1) * clump * dusty + (1.0 - band) * mix(wisp, cloud * dusty, dayK) + core * 0.6;
+#ifdef SKY3
+  {
+    // t-sky3: smoke, not paint — the clouds' edges soft, billows of the finer gas inside them (the frames' nebula, t1_05)
+    float cl2 = smoothstep(0.42, 0.74, n1 * 0.8 + n2 * 0.3) * (0.4 + n1) * smoothstep(0.1, 0.5, dir.y) * 0.8;
+    float clump2 = mix(1.0, smoothstep(0.38, 0.72, n1 * 0.8 + n2 * 0.3), dayK * 0.9);
+    dens = (band * (0.35 + 1.35 * n1 * n1) * clump2 * dusty + (1.0 - band) * mix(wisp, cl2 * dusty, dayK) + core * 0.6) * (0.62 + 0.76 * n2);
+  }
+#endif
   // sparkling star clusters inside the band
   vec3 g = floor(dir * 520.0);
   float s = hash13(g);
@@ -187,6 +211,9 @@ vec3 nebula(vec3 dir, float dayK) {
   // at dusk and at night 0.3 of it); one 3-D and one 2-D noise call where the mask is on, none on Very Low (not in its
   // shader). (A cell network — the ridges of isotropic noise — and straight parallel streaks were the two ways it went wrong)
   float fm = smoothstep(0.1, 0.36, dens) * smoothstep(0.4, 0.62, n2) * u_skyDay.w;
+#ifdef SKY3
+  fm *= u_s3Neb.x;   // t-sky3: the filaments faint (their bright crests read as gloss)
+#endif
   if (fm > 0.0) {   // (the noise only where the gas can carry a thread)
     vec3 qf = q * 4.0 + G * (b * 40.0) + vec3(n1 - 0.5, n2 - 0.5, hz - 0.5) * 3.6;
     float r1 = 1.0 - abs(2.0 * vnoise3(qf) - 1.0), r2 = 1.0 - abs(2.0 * vnoise(vec2(dot(qf, vec3(0.8, 0.0, 0.6)), dot(qf, vec3(-0.36, 0.8, 0.48))) * 2.17 + 5.3) - 1.0);
@@ -339,9 +366,6 @@ vec3 meteors(vec3 dir) {
   return acc;
 }
 
-#ifdef SKY3
-${VR.Sky3 && VR.Sky3.glslSky ? VR.Sky3.glslSky() : ''}
-#endif
 vec3 skyColor(vec3 dir, bool withSun) {
   if (u_dim == 1) return u_fogColor;
   if (u_dim == 2) {
@@ -396,25 +420,46 @@ vec3 skyColor(vec3 dir, bool withSun) {
       // u_skySpace.w (t-sky2: fitted to the frames' chroma), at night 0.9; u_nebula: the grade's knob (t-look)
       // (t-polish: on High and Balanced only where space shows — by day below the blue band cosmic is 0 and the nebula's
       // thirteen noise calls were spent for nothing; Very Low's three cost less than the branch on SwiftShader)
+#ifdef SKY3
+      vec3 s3Air = col;   // t-sky3: the sky's light in front of the planets by day (s3Pale)
+#endif
 #ifdef LITE
       col += nebula(dir, u_skyDay.z) * cosmic * mix(u_skySpace.w, 0.9, u_night) * u_nebula;
 #else
       if (cosmic > 0.0) col += nebula(dir, u_skyDay.z) * cosmic * mix(u_skySpace.w, 0.9, u_night) * u_nebula;
 #endif
       vec4 gg = gasGiant(dir, u_planetDir, u_giant.w, u_sunDir);
+#ifdef SKY3
+      gg = s3Pale(gg, s3Air);
+#endif
       col = mix(col, gg.rgb * (0.75 + 0.25 * u_night) + col * 0.15 * (1.0 - u_night), gg.a * mix(0.85, 1.0, u_night) * clear);
       // the big blue-green cratered planet hangs high in the sky (trailer shot B)
       vec4 rp = rockyPlanet(dir, u_planet2Dir, u_blue.w, u_sunDir);
+#ifdef SKY3
+      rp = s3Pale(rp, s3Air);
+#endif
       col += rp.rgb * (1.0 - rp.a) * planetsK * 0.6;
       col = mix(col, rp.rgb * (0.7 + 0.3 * u_night) + col * 0.2, rp.a * mix(0.85, 1.0, u_night) * clear);
       // the giant's moons ride along with it; a fourth drifts near the blue planet (skybodies.js: places and radii)
       vec4 mn = moonlet(dir, u_moon0.xyz, u_moon0.w, u_sunDir, 0.0);
+#ifdef SKY3
+      mn = s3Pale(mn, s3Air);
+#endif
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
       mn = moonlet(dir, u_moon1.xyz, u_moon1.w, u_sunDir, 7.3);
+#ifdef SKY3
+      mn = s3Pale(mn, s3Air);
+#endif
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
       mn = moonlet(dir, u_moon2.xyz, u_moon2.w, u_sunDir, 14.6);
+#ifdef SKY3
+      mn = s3Pale(mn, s3Air);
+#endif
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
       mn = moonlet(dir, u_moon3.xyz, u_moon3.w, u_sunDir, 21.9);
+#ifdef SKY3
+      mn = s3Pale(mn, s3Air);
+#endif
       col = mix(col, mn.rgb * (0.45 + 0.55 * u_night) + col * 0.1, mn.a * planetsK * clear);
     }
     // the sun (t-sky2: a soft glow, as the trailer's — a Gaussian core of about 1.1° where the hard disc was, in a warm
@@ -430,7 +475,13 @@ vec3 skyColor(vec3 dir, bool withSun) {
     }
 #endif
     float md = dot(dir, u_moonDir);
+#ifdef SKY3
+    col = s3Moons(col, dir, clear);   // t-sky3: the two moons lit from the sun's direction (their phases; sky3.js)
+    md = dot(dir, u_s3MoonA.xyz);     // (the night's glow round the big moon)
+    if (false) {
+#else
     if (md > 0.9992) {
+#endif
       vec3 up = abs(u_moonDir.y) < 0.99 ? vec3(0,1,0) : vec3(1,0,0);
       vec3 mx = normalize(cross(up, u_moonDir)), my = cross(u_moonDir, mx);
       vec2 mp = vec2(dot(dir, mx), dot(dir, my)) / 0.04;
@@ -458,6 +509,11 @@ vec3 skyColor(vec3 dir, bool withSun) {
       float st = smoothstep(0.74, 0.9, a * 0.7 + b * 0.38) * smoothstep(0.55, 0.72, vnoise(q * 0.22 + 17.0));
       st *= smoothstep(0.14, 0.28, dir.y) * (1.0 - smoothstep(0.55, 0.8, dir.y));   // (none right over the horizon: the haze band stays clean)
       vec3 cir = vec3(0.82, 0.86, 1.0) * (0.25 + 0.6 * (1.0 - u_night)) + u_sunColor * 0.05 + u_sunset * 0.3 * toSun;
+#ifdef SKY3
+      // t-sky3: the high streaks lit by the hour (pink-gold at the golden hour and the sunset: the frames' stratus), more of them then
+      cir = mix(cir, u_c3Top * 0.7 + u_c3Sun * 0.6, u_s3Cir.x);
+      st = max(st, smoothstep(0.62, 0.86, a * 0.7 + b * 0.38) * smoothstep(0.4, 0.62, vnoise(q * 0.22 + 17.0)) * smoothstep(0.12, 0.24, dir.y) * (1.0 - smoothstep(0.6, 0.85, dir.y)) * u_s3Cir.y);
+#endif
       col = mix(col, cir, st * u_cirrus * 0.5 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
     }
 #endif
@@ -492,13 +548,24 @@ vec3 skyColor(vec3 dir, bool withSun) {
         col += mix(vec3(0.8, 0.88, 1.0), vec3(1.0, 0.9, 0.8), fract(s2 * 337.0)) * starK * clear * (0.9 + 2.6 * smoothstep(0.993, 1.0, s2)) * exp(-d2 * d2 * mix(5.0, 14.0, u_night));
       }
 #endif
+#ifdef SKY3
+      col += s3Sparkle(sd3) * (starK * clear);   // t-sky3: a few bright stars twinkle with a soft cross
+      col += s3Meteor(dir) * clear;              // t-sky3: the seeded shooting star (the same for the host and the guests)
+#else
       if (u_night > 0.5) col += meteors(dir) * u_night * clear;   // t-sky: the meteors' loop only once the night is deep (by day and at dusk it drew nothing or a faint trace)
+#endif
       if (u_dim == 3) {
         float a = vnoise(vec2(dir.x * 3.0 + u_time * 0.02, dir.z * 1.5)) * smoothstep(0.1, 0.5, dir.y) * smoothstep(0.95, 0.4, dir.y);
         float band = pow(max(0.0, sin(dir.x * 6.0 + dir.z * 3.0 + vnoise(dir.xz * 2.0 + u_time * 0.03) * 4.0)), 8.0);
         col += vec3(0.1, 0.9, 0.5) * a * band * u_night * 0.8 + vec3(0.5, 0.2, 0.9) * a * band * band * u_night * 0.4;
       }
     }
+#ifdef SKY3HI
+    // t-sky3: the aurora over the north horizon on some nights, the far cloud banks along the horizon, the low sun's rays
+    col += s3Aurora(dir) * clear;
+    col = s3Banks(col, dir);
+    col += s3Fan(dir);
+#endif
 #ifdef WXDRAMA
     // t-motion · Wetter-Drama (weather.js, env.js E.storm / E.bolt): the storm's front darkens the sky from its side, a dark
     // wall of cloud low over the horizon there; the bolt, a jagged stroke from the cloud base down behind the hills, and its
@@ -2149,6 +2216,9 @@ void main() {
   vec3 col = skyColor(dir, true);
   if (u_fog.w > 0.5) col = u_fogColor;
   if (u_skyProbe > 0.5) col = vec3(1.0, 0.0, 1.0);
+#ifdef SKY3HI
+  if (u_skyProbe > 0.5 && s3BankA > 0.5) col = vec3(0.0);   // (t-sky3: the far cloud banks are clouds, not sky)
+#endif
   o = vec4(col, 1.0);
 }`;
 
@@ -2195,6 +2265,9 @@ void main() {
   vec3 base = mix(vec3(0.97, 0.98, 1.0), vec3(0.42, 0.44, 0.48), u_rain);
   float shade = v_n.y > 0.5 ? 1.0 : v_n.y < -0.5 ? 0.58 : mix(0.66, 0.9, v_h);
   vec3 col = base * (u_ambSky * 1.05 * shade + lc * ndl * 0.6) + u_sunset * 0.35 * shade;
+#ifdef SKY3
+  col = s3BoxCloud(v_n, v_h, shade);   // t-sky3: lit by the hour (gold at the golden hour, rose at dusk, moon-grey at night)
+#endif
   // silver lining toward the sun
   float dist = length(v_rel);
   vec3 V = v_rel / dist;
