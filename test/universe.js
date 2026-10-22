@@ -808,7 +808,7 @@ section('(p) the wiring');
   const shared = (build.match(/const SHARED = \[([^\]]*)\]/) || [])[1] || '';
   check(/'universe'/.test(shared), 'build.js: universe in SHARED (main thread and workers)');
   check(/texHash[^\n]*f !== 'universe'/.test(build), 'build.js: universe stays out of the texture cache key (a change to the orbits forges no texture)');
-  check(/'universe'/.test(fs.readFileSync(path.join(__dirname, 'load_shared.js'), 'utf8')), 'test/load_shared.js loads universe');
+  check(/'universe'/.test(fs.readFileSync(path.join(__dirname, '..', 'test', 'load_shared.js'), 'utf8')), 'test/load_shared.js loads universe');   // (from the checkout's root: wt_run.sh runs a copy in .tmp_tests)
   const ctx = {}; vm.createContext(ctx); vm.runInContext(fs.readFileSync(SRC, 'utf8'), ctx, { filename: 'universe.js' });
   const U2 = ctx.VR && ctx.VR.Universe;
   check(!!U2, 'the module runs alone in a bare context (a worker without core.js)');
