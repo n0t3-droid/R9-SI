@@ -18,7 +18,10 @@
 //  4 · pages B' and C' on High (view 8, ring 1's far forms off in both): the same plaza, the same work in both builds,
 //      the frame before/after.
 //   nohup bash test/wt_run.sh dims.mjs 5400 > .tmp_tests/dims.log 2>&1 &
+//  5 · (HOME_VL=1: this part alone; f-arrival) Heimkehr on Very Low in both builds, the frames stepped: left from home
+//      and from away, ≤ 6 s, facing out (test/shots/dims_home_vl_{after,before}.png)
 //   NO_COST=1 · NO_HIGH=1 · ROUNDS=9 · N=30 · ROUNDS_HIGH=5 · N_HIGH=10 · SEED=4242 · BEFORE_DIST=file:///…/index.html
+//   HOME_VL=1 · ROUNDS_H=2 · CMP_VGEN=12
 // regress: skip  (a showcase with pictures and the cost against the build before; the gate is test/dims.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
@@ -121,6 +124,51 @@ async function trip(A, to, start, label) {
   rec.trips.push(r); save();
   console.log(`  trip ${label}: ${JSON.stringify(r.last)} · ${r.wallMs} ms wall (stepped) (${secs()})`);
   return s;
+}
+
+// ================================================================ 5 · (HOME_VL=1 alone) Heimkehr on Very Low, both builds (f-arrival)
+// The game's own loop runs a frame every few seconds on SwiftShader on this machine (part 3's run: the gate's 2 s took
+// 140 s, its Heimkehr's 28.7 s were a handful of frames — u-dims measured 28–30 s the same way), so the trips are timed
+// as u-home's newlife.mjs times them: the frames stepped by the test, nothing drawn until the arrival, VR.Travel.last's
+// ms from the veil's start to the first play frame. Pages B (this build) and C (the build before), Very Low, the same
+// land (vgen CMP_VGEN), in turns × ROUNDS_H: from home (the spawn's ring loaded when leaving: kept) and from 150 blocks
+// away (nothing kept): /dim drift, 🏠. This build: ≤ 6 s both ways, facing out (the frame's middle third ≥ 8 m);
+// test/shots/dims_home_vl_{after,before}.png the frame each opens on.
+if (process.env.HOME_VL) {
+  const out = { after: [], before: [] }, pages = [];
+  const pB = await openWorld(DIST, 'potato', 0, false, null, { vgen: CMP_VGEN }); check(pB.ok, `page B (this build, Very Low) is loaded (${secs()})`); pages.push(['after', pB]);
+  if (fs.existsSync(BEFORE.replace(/^file:\/\//, ''))) { const pC = await openWorld(BEFORE, 'potato', 0, false, null, { vgen: CMP_VGEN }); check(pC.ok, `page C (the build before, Very Low) is loaded (${secs()})`); pages.push(['before', pC]); }
+  for (const [, P] of pages) { await P.page.bringToFront(); await P.settle(80, 10); }
+  const R_H = +(process.env.ROUNDS_H || 2);
+  for (let r = 0; r < R_H; r++) for (const [lbl, P] of (r & 1 ? pages.slice().reverse() : pages)) {
+    await P.page.bringToFront();
+    for (const from of ['home', 'away']) {
+      await P.ev((away) => { const g = VR.game, p = g.player, s = p.spawn; p.flying = !!away; p.noclip = !!away; if (away) p.teleport(s[0] + 150, s[1] + 40, s[2]); else p.teleport(s[0], s[1], s[2]); p.yaw = 0; p.pitch = 0; }, from === 'away');
+      await P.settle(60, 6);
+      await trip(P, 'drift', () => { VR.Travel.go(VR.game, { dim: 'drift', via: 'cmd' }); }, `${lbl} (Very Low): /dim drift from ${from}`);
+      await P.settle(30, 4);
+      const s = await trip(P, 'overworld', () => { const g = VR.game; if (g.ui && g.ui.resume) g.ui.resume(); g.goHome(); }, `${lbl} (Very Low): Heimkehr, left from ${from}`);
+      out[lbl].push({ from, round: r, ms: s && s.last ? s.last.totalMs : null, loadMs: s && s.last ? s.last.loadMs : null, face: s && s.last ? s.last.face || null : null });
+    }
+  }
+  const med = (a) => { const b = a.filter(v => v !== null).sort((p, q) => p - q); return b.length ? b[b.length >> 1] : null; };
+  for (const [lbl, P] of pages) {
+    await P.page.bringToFront(); await P.step(24, 33);   // (the veil's 0.65 s)
+    out[lbl + 'Mid'] = await midThird(P);
+    await P.picture(SHOTS + 'dims_home_vl_' + lbl + '.png', 4);
+  }
+  rec.homeVL = out; save();
+  const mh = med(out.after.filter(q => q.from === 'home').map(q => q.ms)), ma = med(out.after.filter(q => q.from === 'away').map(q => q.ms));
+  const bh = med(out.before.filter(q => q.from === 'home').map(q => q.ms)), ba = med(out.before.filter(q => q.from === 'away').map(q => q.ms));
+  console.log('  Heimkehr on Very Low (stepped)', JSON.stringify(out));
+  check(mh !== null && ma !== null && mh <= 6000 && ma <= 6000, `Heimkehr on Very Low (SwiftShader, stepped): left from home ${mh} ms, from 150 blocks away ${ma} ms (≤ 6 s; the build before: ${bh} ms, ${ba} ms)`);
+  const fa = out.after.map(q => q.face).filter(Boolean), mid = out.afterMid;
+  check(fa.length === out.after.length && fa.every(f => f.clear >= 8) && mid && mid.near >= 8, `every Heimkehr faces out: ${fa.map(f => (f.yaw * 180 / Math.PI).toFixed(0) + '° ' + f.clear + ' m').join(', ')}; the last frame's middle third ${mid ? mid.near + ' m (' + mid.what + ')' : '—'} (the build before: ${out.beforeMid ? out.beforeMid.near + ' m, ' + out.beforeMid.what : '—'})`);
+  for (const [lbl, P] of pages) { const errs = P.logs.filter(l => l.startsWith('[pageerror]')); check(errs.length === 0, `page ${lbl}: no page error (${errs.length})`); await P.ctx.close(); }
+  await browser.close();
+  console.log(`(${secs()})`);
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+  process.exit(fails ? 1 : 0);
 }
 
 // ================================================================ 1 · the gate, the drift, Heimkehr (pictures)
