@@ -366,7 +366,7 @@ vec3 meteors(vec3 dir) {
   return acc;
 }
 
-${VR.SpaceShaders && VR.SpaceShaders.bodySkyPre ? VR.SpaceShaders.bodySkyPre() : ''}   // u-moons1: on a body's sky this one is skyColorHome (space_shaders.js, BODYSKY only)
+${/* u-moons1: on a body's sky this one is skyColorHome (space_shaders.js, BODYSKY only; a JS comment: the GLSL keeps its text) */ VR.SpaceShaders && VR.SpaceShaders.bodySkyPre ? VR.SpaceShaders.bodySkyPre() : ''}
 vec3 skyColor(vec3 dir, bool withSun) {
   if (u_dim == 1) return u_fogColor;
   if (u_dim == 2) {
@@ -608,7 +608,7 @@ vec3 skyColor(vec3 dir, bool withSun) {
   }
   return col;
 }
-${VR.SpaceShaders && VR.SpaceShaders.bodySky ? VR.SpaceShaders.bodySky() : ''}   // u-moons1: the sky over an airless body (space_shaders.js, BODYSKY only)
+${/* u-moons1: the sky over an airless body (space_shaders.js, BODYSKY only; a JS comment: the GLSL keeps its text) */ VR.SpaceShaders && VR.SpaceShaders.bodySky ? VR.SpaceShaders.bodySky() : ''}
 #ifdef HSHADOW
 // ---- heightmap sun shadows: every loaded column's sun-blocking layer [bottom, top] lives in a
 // 1024² toroidal texture (texel = world x,z & 1023). A ray marches from the surface toward the sun;
