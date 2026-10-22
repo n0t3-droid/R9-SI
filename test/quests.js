@@ -10,7 +10,7 @@
 //   5. the riddles: three answers each, one right, each fact with its REFERENCE.md section, the order shuffled per quest
 //   6. generation ≤ 0.2 ms
 //   7. the glue in a stub page: an Abenteuer world only, the talk (offer, accept, the riddle, hand-in), rewards by size
-//      through VR.Adventure (XP, Sterntaler) and the village's love (hearts), the givers' marks, the journal, J
+//      through VR.Adventure (XP, Heliataler) and the village's love (hearts), the givers' marks, the journal, J
 //   8. every text key the quests use is in both tables, German first
 //   bash test/wt_run.sh quests.js 300
 const DOM = require('./dom_stub.js');
@@ -348,7 +348,7 @@ const A = VR.Adventure;
   check(Q.get(A.rec, sch.p.id) && A.rec.me.xp === xp0, 'a wrong answer: nothing lost, the quest stays');
   const right2 = DOM.body.querySelector('#tk_opts').children.find(b => b.dataset && b.dataset.q === 'answer' && +b.dataset.i === rq.q.order.indexOf(0));
   right2.click();
-  check(!Q.get(A.rec, sch.p.id) && A.rec.me.xp - xp0 === 20 && A.rec.me.taler - tal0 === 15 && st.rep - rep0 === 2, 'the right answer: 20 XP, 15 Sterntaler, the village\'s love +2 (one heart) — a small quest (' + (A.rec.me.xp - xp0) + ' XP, ' + (A.rec.me.taler - tal0) + ' Taler)');
+  check(!Q.get(A.rec, sch.p.id) && A.rec.me.xp - xp0 === 20 && A.rec.me.taler - tal0 === 15 && st.rep - rep0 === 2, 'the right answer: 20 XP, 15 Heliataler, the village\'s love +2 (one heart) — a small quest (' + (A.rec.me.xp - xp0) + ' XP, ' + (A.rec.me.taler - tal0) + ' Taler)');
   check(/Ocker|Sonne|Ring|Komet|Licht|Mond|Stern|Station|Uranus|Titan|Bennu|Polarlicht|Enceladus|Phobos/.test(mgr.last || ''), 'the answer explains the fact: „' + String(mgr.last).slice(0, 90) + ' …"');
   // a medium quest through the glue: a build, placed through VR.Adventure.placed
   const smith = people.find(a => !Q.get(A.rec, a.p.id) && a !== sch && a.p.role !== 'child');
@@ -360,7 +360,7 @@ const A = VR.Adventure;
   check(g.player.inv.count(bq.q.block) === bq.q.n, 'Bauen: the kit is given when accepting (' + bq.q.n + ' × ' + bq.q.block + ')');
   const xp1 = A.rec.me.xp, tal1 = A.rec.me.taler, rep1 = st.rep;
   for (let i = 0; i < bq.q.n; i++) A.placed(bq.q.at.x + i, bq.q.at.y, bq.q.at.z);
-  check(!Q.get(A.rec, smith.p.id) && A.rec.me.xp - xp1 >= 50 && A.rec.me.taler - tal1 >= 40 && st.rep - rep1 === 4, 'placed: done on the spot — 50 XP, 40 Sterntaler, two hearts (' + (A.rec.me.xp - xp1) + ' XP incl. placing)');
+  check(!Q.get(A.rec, smith.p.id) && A.rec.me.xp - xp1 >= 50 && A.rec.me.taler - tal1 >= 40 && st.rep - rep1 === 4, 'placed: done on the spot — 50 XP, 40 Heliataler, two hearts (' + (A.rec.me.xp - xp1) + ' XP incl. placing)');
   check(g.ui.toasts.some(t => /✦/.test(t)), 'a toast says so: ' + g.ui.toasts.slice(-1)[0]);
   // a large quest's reward
   const freeA = people.find(a => !Q.get(A.rec, a.p.id) && a !== sch && a !== smith);
@@ -369,7 +369,7 @@ const A = VR.Adventure;
   const xp2 = A.rec.me.xp, tal2 = A.rec.me.taler;
   Q.emit('freed', { id: lq.q.at.id });
   Q.talk(mgr, freeA);
-  check(A.rec.me.xp - xp2 === 120 && A.rec.me.taler - tal2 === 100, 'a large quest: 120 XP, 100 Sterntaler (handed in at the giver)');
+  check(A.rec.me.xp - xp2 === 120 && A.rec.me.taler - tal2 === 100, 'a large quest: 120 XP, 100 Heliataler (handed in at the giver)');
   // the journal on J
   const J0 = Q.journal();
   check(J0 && g.ui.screen === 'journal' && DOM.body.querySelector('#journal'), 'J opens the Tagebuch (#journal)');

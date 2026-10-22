@@ -13,7 +13,7 @@
 //                 emissive, turning; drawn after the villagers (Villages.prototype.draw, wrapped), one per marked giver
 //   the Tagebuch  J (binds.js 'journal') or the pause menu: open, ready, done; where, how far, which way, the hour, the
 //                 reward; 🧭 tracks one — the map's ✦ and the compass line (map.js wrapped), Q.target() for Funke
-//   rewards       by size through VR.Adventure.award('quest', {size}) (S 20 XP + 15 Sterntaler, M 50 + 40, L 120 +
+//   rewards       by size through VR.Adventure.award('quest', {size}) (S 20 XP + 15 Heliataler, M 50 + 40, L 120 +
 //                 100), friendship hearts (the village's love), sometimes an item
 //   costs         nothing per frame without a UI: a 2-Hz timer (Abenteuer worlds only) marks the givers and checks the
 //                 targets; the marker draw early-outs when nothing is marked
@@ -626,7 +626,7 @@
     setOpts(list);
     return Q.still(r, g.env ? g.env.timeOfDay : 0);
   }
-  // the reward (at the giver or where it was done): VR.Adventure's XP and Sterntaler, the village's love, maybe an item
+  // the reward (at the giver or where it was done): VR.Adventure's XP and Heliataler, the village's love, maybe an item
   Q.complete = function (mgr, a, r) {
     const g = game(), r0 = rec(); if (!g || !r0 || !r) return '';
     const f = Q.finish(r0, r.pid, Date.now(), dayOf(g)); if (!f.ok) return '';

@@ -9,7 +9,7 @@
 //     on ask, or when the player seems lost (F.Lost: 90 s of moving without getting nearer to any target or reaching a
 //     new place, or walking in circles);
 //   · Nächster Wow — one line about something worth seeing soon (F.wowCandidates: the golden hour, the sunset, the
-//     night, an aurora night, a shooting star and where, the murmuration at dusk, the sky rays, the life director's
+//     night, an aurora night, a shooting star and where, the murmuration at dusk, the cloud rays, the life director's
 //     coming slots, the apron's next landing, the lantern festival, an unseen vista) — so nobody misses the best things;
 //   · Scan — the chests and ores within 32 blocks (+8 per Spürsinn point) glow through the ground for 8 s;
 //   · Foto — a picture from Funke's own spot with the player in it (the photo mode's 2× save);
@@ -178,7 +178,7 @@
     if (W && !c.wet && c.sw && c.sw.wildBirds !== false && W.CAPS.murm[clamp(c.tier | 0, 0, 4)] > 0) {
       add('murm:' + dayOf(10400), 'murm', 3, inWin(10400, 13400) ? 0 : until(10400), null, 'wild');
     }
-    // the sky rays between the isles (t-wild: from Balanced, their switch) — near the isles, any hour
+    // the cloud rays between the isles (t-wild: from Balanced, their switch) — near the isles, any hour
     if (W && c.heart !== false && c.sw && c.sw.wildRays !== false && W.CAPS.ray[clamp(c.tier | 0, 0, 4)] > 0 && Math.hypot(P[0] - ISLES[0], P[2] - ISLES[1]) < 420) {
       add('rays:' + day, 'rays', 3, 0, null, 'wild', [ISLES[0], 115, ISLES[1]]);
     }

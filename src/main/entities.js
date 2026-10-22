@@ -79,7 +79,7 @@
         const b = VR.BIOMES[w.biomeAt(x, z)];
         const key = b ? b.key : '';
         if (Math.random() < 0.35 && counts.ambient < 6 && g.dim === 'overworld') {
-          // ambient: sky rays near islands/altitude by day, wisps at night
+          // ambient: cloud rays near islands/altitude by day, wisps at night
           if (night && counts.ambient < 6) { this.summon('shard_wisp', x + 0.5, top + 2 + Math.random() * 3, z + 0.5); counts.ambient++; }
           else if (!night && Math.random() < 0.25) { const m = this.summon('sky_ray', x + 0.5, Math.max(top + 30, 140 + Math.random() * 40), z + 0.5); m.alt = m.pos[1]; counts.ambient++; }
           continue;

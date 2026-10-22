@@ -123,8 +123,8 @@ try {
   const before = await ev(() => ({ chime: (VR.game.audio.counts || {})['adv.chime'] || 0, ups: VR.Adventure.stats.ups, taler: VR.game.meta.adventure.me.taler, parts: VR.game.particles.count !== undefined ? VR.game.particles.count : null }));
   const up = await ev(() => { const A = VR.Adventure, r = A.award('wonder', { id: 'adventure.mjs' }); clearTimeout(A.banT); const b = document.getElementById('advup'); return { r, banner: b ? b.className : null, text: b ? b.innerText : '', ups: A.stats.ups, chime: (VR.game.audio.counts || {})['adv.chime'] || 0, taler: VR.game.meta.adventure.me.taler }; });
   console.log('     ' + JSON.stringify(up));
-  check(up.r && up.r.xp === 80 && up.r.level === 5 && up.r.up === 1 && up.r.gift === 50, 'a wonder (80 XP) lifts level 4 to 5, a gift level: 50 Sterntaler');
-  check(up.banner === 'on' && /Stufe 5/.test(up.text) && /Wertpunkt/.test(up.text) && /50 Sterntaler/.test(up.text) && /ABENTEUER/.test(up.text), 'the banner: ✦ ABENTEUER ✦ · Stufe 5 · +1 Wertpunkt · 🎁 Geschenk: 50 Sterntaler');
+  check(up.r && up.r.xp === 80 && up.r.level === 5 && up.r.up === 1 && up.r.gift === 50, 'a wonder (80 XP) lifts level 4 to 5, a gift level: 50 Heliataler');
+  check(up.banner === 'on' && /Stufe 5/.test(up.text) && /Wertpunkt/.test(up.text) && /50 Heliataler/.test(up.text) && /ABENTEUER/.test(up.text), 'the banner: ✦ ABENTEUER ✦ · Stufe 5 · +1 Wertpunkt · 🎁 Geschenk: 50 Heliataler');
   check(up.ups === before.ups + 1 && up.chime === before.chime + 1 && up.taler === before.taler + 50, 'one level-up, one chime in the day\'s key, the gift in the wallet');
   await step(5); await draw();
   await hold(700);
@@ -150,7 +150,7 @@ try {
   await wait(300);
   const card = await ev(() => { const c = document.querySelector('#adventure .panel'); return { screen: VR.game.ui.screen, way: c.querySelector('[data-act="adv:way"].on') && c.querySelector('[data-act="adv:way"].on').dataset.v, band: c.querySelector('[data-act="adv:band"].on') && c.querySelector('[data-act="adv:band"].on').dataset.v, enc: c.querySelector('[data-act="adv:enc"].on') && c.querySelector('[data-act="adv:enc"].on').dataset.v, lv: (c.querySelector('.advsum .lv') || {}).textContent, xp: (c.querySelector('.advsum .xp') || {}).textContent, tal: (c.querySelector('.advsum .tal') || {}).textContent, pts: (c.querySelector('.advsum .ptsl') || {}).textContent, h: Math.round(c.getBoundingClientRect().height) }; });
   console.log('     ' + JSON.stringify(card));
-  check(card.screen === 'adventure' && card.way === 'adv' && card.band === 'normal' && card.enc === 'normal' && card.lv === 'Stufe 5' && /Sterntaler/.test(card.tal) && /Punkt/.test(card.pts), 'the card „⚔ Abenteuer": Spielweg, Schwierigkeit, Begegnungen, Stufe 5, the Sterntaler, the free points');
+  check(card.screen === 'adventure' && card.way === 'adv' && card.band === 'normal' && card.enc === 'normal' && card.lv === 'Stufe 5' && /Heliataler/.test(card.tal) && /Punkt/.test(card.pts), 'the card „⚔ Abenteuer": Spielweg, Schwierigkeit, Begegnungen, Stufe 5, the Heliataler, the free points');
   check(card.h <= 700, 'the card fits a 720-px screen (' + card.h + ' px)');
   pics.card = await shot('adventure_card');
   await ev(() => document.querySelector('#adventure [data-act="adv:stats"]').click());

@@ -3,7 +3,7 @@
 //   1. the four shops and who keeps them (the cashier → Supermarkt, the smith → Werkstatt, the pilot → Hangar, the
 //      builder → Baumarkt); every id in every catalogue exists in the game
 //   2. the supermarket sells the groceries catalogue at its own prices (groceries.js 50–77, VR.SHOP)
-//   3. buying: the Sterntaler paid, the things in the backpack; too few Taler (how many are missing), a full backpack,
+//   3. buying: the Heliataler paid, the things in the backpack; too few Taler (how many are missing), a full backpack,
 //      an upgrade step by step to its top, a one-step module bought once, a kit as a whole or not at all
 //   4. selling: the Werkstatt and the Hangar buy metals and crystals (A§4's prices); the supermarket buys nothing; in
 //      Kreativ / Zen nobody buys (everything is free there); nothing to sell
@@ -66,7 +66,7 @@ console.log('2 · the supermarket: the groceries catalogue at its prices');
   const nonPromo = cat.filter(e => e.cat !== 'promo');
   check(nonPromo.every(e => e.price === VR.SHOP.price(e.id)), 'outside the offers the price is VR.SHOP.price (groceries.js)');
   check(cat.filter(e => e.cat === 'promo').some(e => e.price < VR.SHOP.price(e.id)), 'the offers are cheaper (Angebote)');
-  check(S.quote(me0(10), 'supermarkt', 'bakery:bread').price === 3, 'bread costs 3 Sterntaler');
+  check(S.quote(me0(10), 'supermarkt', 'bakery:bread').price === 3, 'bread costs 3 Heliataler');
 }
 
 // ---------------------------------------------------------------- 3 · buying
@@ -111,7 +111,7 @@ console.log('4 · selling');
 {
   let me = me0(0), inv = new Inv(); inv.add('iron_ingot', 10); inv.add('gold_ingot', 2);
   let r = S.sell(me, inv, 'werkstatt', 'iron_ingot', 10, 'survival');
-  check(r.ok && r.got === 20 && me.taler === 20 && inv.count('iron_ingot') === 0, 'ten iron ingots at the Werkstatt: 20 Sterntaler (2 each, A§4)');
+  check(r.ok && r.got === 20 && me.taler === 20 && inv.count('iron_ingot') === 0, 'ten iron ingots at the Werkstatt: 20 Heliataler (2 each, A§4)');
   r = S.sell(me, inv, 'hangar', 'gold_ingot', 5, 'survival');
   check(r.ok && r.got === 12 && inv.count('gold_ingot') === 0, 'gold at the Hangar: 6 each — only what you have (2 of 5)');
   r = S.sell(me, inv, 'werkstatt', 'iron_ingot', 1, 'survival');
@@ -172,7 +172,7 @@ const A = VR.Adventure;
   btns()[0].click();
   check(g.ui.screen === 'shop' && DOM.body.querySelector('#shop'), 'the Hangar opens as a screen (#shop)');
   const panel = DOM.body.querySelector('#shop .panel');
-  check(panel && /Hangar/.test(panel.innerHTML) && /Oren/.test(panel.innerHTML) && /Sterntaler/.test(panel.innerHTML), 'with its keeper and the Sterntaler you have');
+  check(panel && /Hangar/.test(panel.innerHTML) && /Oren/.test(panel.innerHTML) && /Heliataler/.test(panel.innerHTML), 'with its keeper and the Heliataler you have');
   A.rec.me.taler = 700;
   S.render();
   const r1 = S.act('buy', 'up:engine');

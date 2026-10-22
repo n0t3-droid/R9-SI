@@ -2,11 +2,11 @@
 // docs/superpowers/specs/2026-10-22-abenteuer-design.md §2–§4, §12, §15). Every rule a check:
 //   1. the curve: need(L) = 60 + 30 L, the totals 600 / 1,950 / 6,900 / 14,850 / 39,750 at 5 / 10 / 20 / 30 / 50, the
 //      level of every XP at the boundaries, the cap and the stars beyond it
-//   2. every award row of A§2: its XP, its Sterntaler, its limit (once, per id, per window, per 25 blocks, per km)
+//   2. every award row of A§2: its XP, its Heliataler, its limit (once, per id, per window, per 25 blocks, per km)
 //   3. the farming guards: positions counted per session, ×0.5 for every five of a kind within ten minutes, a zone
 //      provoked again within two minutes, the windows kept in the save
 //   4. the five stats: 0–10, one point per level, respec, their effects
-//   5. the Sterntaler: earn, pay, the price table of A§4, buying step by step, too few, never real money
+//   5. the Heliataler: earn, pay, the price table of A§4, buying step by step, too few, never real money
 //   6. Spannung (A§12): the bands, an encounter, two faints, a band down only when asked
 //   7. the save: a JSON round trip, garbage and old records loaded sane, a world without meta.adventure stays without one
 //   8. the level-up chime: the day's pentatonic scale, rising, short
@@ -225,8 +225,8 @@ console.log('4 · the five stats');
   check(ew.hp === 30 && near(ew.energy, 1) && ew.scan === 32, 'effects of nonsense points are bounded (0–10)');
 }
 
-// ---------------------------------------------------------------- 5 · Sterntaler
-console.log('5 · the Sterntaler and the prices');
+// ---------------------------------------------------------------- 5 · Heliataler
+console.log('5 · the Heliataler and the prices');
 {
   const me = me0();
   check(Adv.earn(me, 120) === 120 && me.taler === 120, 'earn');

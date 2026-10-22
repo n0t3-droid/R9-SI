@@ -7,7 +7,7 @@
 //   the guards     placed positions counted per session, ×0.5 for every five foes of a kind within ten minutes, nothing
 //                  from a zone provoked again within two minutes; the limits' windows are saved (a reload resets none)
 //   the stats      five, 0–10 each, one point per level, a free respec (the game allows it at home), their effects
-//   the Sterntaler the wallet (earned in the world — never real money), the prices of A§4, the upgrades' effects
+//   the Heliataler the wallet (earned in the world — never real money), the prices of A§4, the upgrades' effects
 //   Spannung       s ∈ [0, 1] kept in the band (A§12), after each encounter and two faints
 //   the save       meta.adventure = { v: 1, on, band, enc, since, tension, freed, bosses, chapter, beats, prevDiff, faints,
 //                  me: { xp, level, stars, pts, taler, owned, quests, once, lim } } — load() makes anything sane
@@ -170,7 +170,7 @@
     return { hp, hearts: hp / 2, energy: 1 + 0.08 * q.ene, boost: 1 + 0.06 * q.ene, scan: 32 + 8 * q.spu, chests: q.spu >= 5, speed: 1 + 0.05 * q.ges, hints: (q.ges >= 5 ? 1 : 0) + (q.ges >= 10 ? 1 : 0), boostTime: 1 + 0.08 * q.pil, turn: 1 + 0.03 * q.pil };
   };
 
-  // ---------------------------------------------------------------- the Sterntaler (A§4): earned in the world only
+  // ---------------------------------------------------------------- the Heliataler (A§4): earned in the world only
   Adv.earn = (me, n) => { const k = Math.floor(num(n, 0)); if (k <= 0) return 0; const b = me.taler | 0; me.taler = Math.min(TALER_MAX, b + k); return me.taler - b; };
   Adv.pay = (me, n) => { const k = Math.floor(num(n, 0)); if (k <= 0 || (me.taler | 0) < k) return false; me.taler -= k; return true; };
   Adv.PRICES = { engine: [600, 1500, 3500], shield: [500, 1200, 3000], jump: [1000, 2500, 5000], suitHeat: [800], suitCold: [600], suitPressure: [600], suitRad: [1200], boots: [400], anchor: [300], scanner: [400], repair: [900], camera: [200] };

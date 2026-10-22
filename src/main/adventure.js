@@ -9,7 +9,7 @@
 //   the awards    award(kind, ctx) from one marked line each in crafting.js, codex.js, villages.js, homes.js,
 //                 wonders_game.js and wowmoment.js; placing takes g.onBlockPlaced (player.js afterPlace calls it);
 //                 the flown distance and the binding to the world come from a timer twice a second — nothing per frame
-//   the HUD       a ring with the level, the Sterntaler and the free points, top left inside #hud (it hides with the
+//   the HUD       a ring with the level, the Heliataler and the free points, top left inside #hud (it hides with the
 //                 HUD: F1, the wow moment, the photo mode); written only when its numbers change, the motion is CSS
 //   the level-up  a banner with rays and sparks, a chime in the day's key (klang.js), golden motes round the player —
 //                 waiting while a menu, a wow moment, the director, the photo mode or a wonder's banner holds the view
@@ -180,10 +180,12 @@
     nb.__adv = true; VR.Player.prototype.breakTime = nb;
   }
 
-  // ---------------------------------------------------------------- the HUD: the ring, the Sterntaler, the free points
+  // ---------------------------------------------------------------- the HUD: the ring, the Heliataler, the free points
   const RING = (id, off) => `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3bf"/><stop offset=".5" stop-color="#ffc94d"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs><circle class="bg" cx="32" cy="32" r="27"/><circle class="arc" cx="32" cy="32" r="27" pathLength="100" stroke="url(#${id})" stroke-dasharray="100" stroke-dashoffset="${off === undefined ? 100 : off}"/></svg>`;
-  // the Sterntaler (our own): a gold disc, a raised rim, a five-pointed star stamped in its middle
-  const COIN = (id) => `<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><defs><radialGradient id="${id}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff3b0"/><stop offset=".55" stop-color="#ffc83d"/><stop offset="1" stop-color="#c97a10"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#${id})" stroke="#8a5208" stroke-width="1"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#fff1a8" stroke-opacity=".6" stroke-width=".8"/><path d="M12 5.8L13.47 9.98 17.9 10.08 14.38 12.77 15.64 17.02 12 14.5 8.36 17.02 9.62 12.77 6.1 10.08 10.53 9.98Z" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6" stroke-linejoin="round"/></svg>`;
+  // the Heliataler (our own; f-names — the name and the mark of Helia, the sun of Herzwelt): a gold disc, a raised rim,
+  // the sun stamped in its middle — a disc and eight rays (shop.js draws the same coin)
+  const SUN = '<path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#b86b0c" stroke-width="2.3" stroke-linecap="round"/><path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#fff6c8" stroke-width="1.2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6"/>';
+  const COIN = (id) => `<svg class="coin" data-coin="helia" viewBox="0 0 24 24" aria-hidden="true"><defs><radialGradient id="${id}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff3b0"/><stop offset=".55" stop-color="#ffc83d"/><stop offset="1" stop-color="#c97a10"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#${id})" stroke="#8a5208" stroke-width="1"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#fff1a8" stroke-opacity=".6" stroke-width=".8"/>${SUN}</svg>`;
   A.ensureHud = function () {
     if (!hasDoc) return null;
     const hud = document.getElementById('hud'); if (!hud) return null;
@@ -227,7 +229,7 @@
     const f = () => { A.renderHud(); A.flushFloat(); };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(f); else setTimeout(f, 16);
   };
-  // „+20 EP" rising beside the ring (CSS), the Sterntaler of the award with it
+  // „+20 EP" rising beside the ring (CSS), the Heliataler of the award with it
   A.flushFloat = function () {
     const xp = A.floatXP, tl = A.floatTaler; A.floatXP = 0; A.floatTaler = 0;
     const el = A.hudEl; if (!el || el.style.display === 'none' || (!xp && !tl)) return;
