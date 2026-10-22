@@ -498,7 +498,7 @@
       this.keepInventory = meta.keep;
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
-      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null });   // (townWords: the shop signs' words in the player's language, voxtown.js)
+      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null, keep: !!(VR.Travel && VR.Travel.busy(this)) });   // (townWords: the shop signs' words in the player's language, voxtown.js) (u-dims · keep: a trip keeps the workers' generators warm)
       // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
       if (VR.LiveLoop) VR.LiveLoop.openWorld(this, meta);
       const dim = VR.Travel ? VR.Travel.openDim(this, meta) : (meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld'));   // u-dims: the world the save was left in (VR.DimReg.dimOf: old saves as before; an unknown one → home)

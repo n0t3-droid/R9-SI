@@ -120,11 +120,12 @@
   function run(m) {
     try {
       if (m.type === 'init') {
+        const keep = !!m.keep && (m.seed >>> 0) === seed && JSON.stringify(m.opts || {}) === JSON.stringify(opts);   // u-dims: a trip between the worlds of one save keeps the generators warm (Heimkehr: the Heartland's plans are not built again)
         seed = m.seed >>> 0; opts = m.opts || {}; epoch++;
         if (m.custom !== undefined && VR.Custom) VR.Custom.apply(m.custom);   // the player's Studio designs
         if (m.townWords && VR.Town && VR.Town.setWords) VR.Town.setWords(m.townWords);   // the shop signs' words in the player's language (voxtown.js)
         setStyle(m.style);
-        for (const k in gens) delete gens[k];
+        if (!keep) for (const k in gens) delete gens[k];   // u-dims (keep: see above)
         post({ type: 'ready' });
       } else if (m.type === 'style') {
         setStyle(m.style);

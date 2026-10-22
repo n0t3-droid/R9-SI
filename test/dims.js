@@ -104,6 +104,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     self.onmessage({ data: { type: 'init', seed: 5, opts: { vgen: 11 } } });
     const sp = await ask({ type: 'spawn', dim: 'underforge', near: [0, 0] });
     check(sp && sp.pos && sp.pos.every(Number.isFinite), 'the Underforge\'s spawn with a near point is a real place', sp && JSON.stringify(sp.pos));
+    // a trip keeps the worker's generators warm (keep: the same seed and options) — the Heartland's plans are not built
+    // again on Heimkehr; any other init starts afresh
+    const mk = V.makeGen; let made = 0; V.makeGen = function () { made++; return mk.apply(this, arguments); };
+    const genOnce = async () => { const n0 = made; await ask({ type: 'gen', dim: 'drift', cx: 1, cz: 1 }); await ask({ type: 'gen', dim: 'hollow', cx: 1, cz: 1 }); return made - n0; };
+    await genOnce(); const g0 = await genOnce();   // (made once, then reused)
+    self.onmessage({ data: { type: 'init', seed: 5, opts: { vgen: 11 }, keep: true } }); const g1 = await genOnce();
+    self.onmessage({ data: { type: 'init', seed: 5, opts: { vgen: 11 } } }); const g2 = await genOnce();
+    self.onmessage({ data: { type: 'init', seed: 6, opts: { vgen: 11 }, keep: true } }); const g3 = await genOnce();
+    self.onmessage({ data: { type: 'init', seed: 6, opts: { vgen: 10 }, keep: true } }); const g4 = await genOnce();
+    V.makeGen = mk;
+    check(g0 === 0 && g1 === 0, 'init with keep (a trip, the same seed and options): the generators stay', [g0, g1].join(','));
+    check(g2 === 2 && g3 === 2 && g4 === 2, 'init without keep, or another seed or other options: made afresh', [g2, g3, g4].join(','));
   }
   {
     const env = new V.Env();
@@ -134,7 +146,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       state: 'title', frame: 0, time: 0, settings: { renderDist: 4, fancyLeaves: false, motion: 0 }, loadingCalls: 0, saved, said, hints, jobs,
       ui: { loading: loadingStub, show() {}, hint(t) { if (t) hints.push(t); }, chatLine(t) { said.push(t); }, toast(a, b) { said.push(a + ' ' + b); }, updateHUD() {}, resume() {}, vehicleHud() {}, screen: null, blocking: false },
       store: { bind(id) { this.worldId = id; }, async savedKeys() { return new Set(); }, saveWorld(m) { saved.push(JSON.parse(JSON.stringify(m))); return Promise.resolve(); }, saveColumn() { return Promise.resolve(); }, async loadColumn() { return null; } },
-      pool: { workers: [{ inflight: 0 }], broadcast() {}, clear() {}, submit() {}, direct(wi, msg, tr, cb) { jobs.push(msg); if (msg.type === 'spawn') setTimeout(() => cb({ type: 'spawn', id: msg.id, pos: (SPAWN[msg.dim] || [0.5, 100, 0.5]).slice() }), 1); else if (msg.type === 'starship' && o.ship) setTimeout(() => cb(o.ship(msg)), 1); } },
+      pool: { workers: [{ inflight: 0 }], inits: [], broadcast(m) { if (m && m.type === 'init') this.inits.push(!!m.keep); }, clear() {}, submit() {}, direct(wi, msg, tr, cb) { jobs.push(msg); if (msg.type === 'spawn') setTimeout(() => cb({ type: 'spawn', id: msg.id, pos: (SPAWN[msg.dim] || [0.5, 100, 0.5]).slice() }), 1); else if (msg.type === 'starship' && o.ship) setTimeout(() => cb(o.ship(msg)), 1); } },
       renderer: { freeSection() {}, visDirty: false, gl: {} },
       env: { ticks: 6000, day: 2, get timeOfDay() { return this.ticks % 24000; }, setTime(t) { this.ticks = t; }, wx: { setSeed() {}, force() {} } },
       input: { captured: true, releaseLock() {}, requestLock() {} },
@@ -176,6 +188,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check(p.hold && close([p.hold.x, p.hold.y, p.hold.z], SPAWN.drift, 0.3), 'arrival at the drift\'s spawn (the worker\'s spawn job for the drift)', p.hold && JSON.stringify([p.hold.x, p.hold.y, p.hold.z]));
     check(g.jobs.some(j => j.type === 'spawn' && j.dim === 'drift'), 'the spawn was asked of the worker for the drift');
     check(g.loadingCalls === loads0, 'the game\'s loading screen stayed shut during the trip (the veil shows the phases; the pointer stays locked)', g.loadingCalls - loads0);
+    check(JSON.stringify(g.pool.inits) === JSON.stringify([false, true]), 'the workers keep their generators for the trip (init keep: true), not for a world\'s first start', JSON.stringify(g.pool.inits));
     const veil = document.getElementById('travelVeil');
     check(!!veil, 'the veil is in the page');
     settle(g);
