@@ -1151,12 +1151,15 @@
       if (near >= 1 && !this.nearReadyAt) this.nearReadyAt = performance.now();
       this.ui.loading(T(near < 0.5 ? 'g.load.terrain' : near < 1 ? 'g.load.meshes' : 'g.load.horizon'), 0.05 + frac * 0.95);
       }
-      const E = this.envFor(p.eyePos(), dt);
-      const lcam = { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: this.settings.fov * Math.PI / 180, far: this.farFor(w) };
+      // t-first: behind the loading screen only the sky (the half-built world showed its holes through it — first.mjs run 1),
+      // from the camera the arrival's veil opens on, the time held for it (first.js loadCam); the far tiles are still asked for
+      const E = this.envFor(p.eyePos(), dt, LS && this.arrivalPending ? { freezeTime: true } : null);
+      const lcam = LS ? Object.assign(VR.First.loadCam(this), { far: this.farFor(w) }) : { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: this.settings.fov * Math.PI / 180, far: this.farFor(w) };
       if (this.horizon) this.horizon.update(lcam);
-      this.renderer.render({ cam: lcam, world: w, env: E, horizon: this.horizon });
-      // the coarse horizon is worth a few seconds of waiting, not more (slow machines fill it in while playing)
-      if (LS ? LS.done : (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000)) {
+      this.renderer.render({ cam: lcam, world: LS ? null : w, env: E, horizon: LS ? null : this.horizon });
+      // the coarse horizon is worth a few seconds of waiting, not more (slow machines fill it in while playing); an arrival's
+      // white rises over the loading screen before the world opens under it (first.js holdLoading)
+      if (LS ? LS.done && !VR.First.holdLoading(this, true, dt) : (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000)) {
         this.nearReadyAt = 0;
         // settle the player on the ground if spawn height was approximate
         if (!this.meta.player && !this.meta.guest) { let y = Math.floor(p.pos[1]); while (y < 250 && VR.PHYS.overlaps((x, yy, z) => w.getBlock(x, yy, z), p.pos[0] - 0.3, y, p.pos[2] - 0.3, p.pos[0] + 0.3, y + 1.8, p.pos[2] + 0.3)) y++; p.pos[1] = y; p.spawn = p.pos.slice(); }

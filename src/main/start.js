@@ -358,6 +358,7 @@
     if (playing && !hintState.wasPlay) { hintState.lastPos = null; handIn(g); }
     hintState.wasPlay = playing;
     if (!playing) { if (H.current()) H.dismiss(); return; }
+    if (g.photoCam && g.photoCam.on) { if (H.current()) H.dismiss(); return; }   // (t-first · 📷: the photo mode has its own line — no move hint over the picture)
     if (g.ui.screen || g.ui.typing || (g.wow && g.wow.active) || g.arrival) return;   // a menu is open (or the arrival, a wow moment holds the view): wait
     const now = performance.now();
     if (!hintState.lastPos) { hintState.lastPos = p.pos.slice(); hintState.standAt = now; }

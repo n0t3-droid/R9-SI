@@ -98,22 +98,59 @@
   };
 
   // ---------------------------------------------------------------- the arrival
-  FI.PRE = 2; FI.FLARE = 0.6; FI.SKIP = 0.3; FI.HUD_IN = 1.2;
+  // (first.mjs run 1: the veil opened on the player's own eyes — the spur's wall, the held block and the hand filled the
+  // first picture — and then swung to the composition and back. Now: the white rises over the loading screen (IN), the
+  // world opens under it, the veil opens on the vista's composition itself — the wow moment's camera from its first frame,
+  // held while the white thins, its caption coming as the white goes — then the moment's hold and its way down into the
+  // player's eyes; the hand, the outline and the minimap stay away until the HUD fades in)
+  FI.PRE = 2; FI.FLARE = 0.6; FI.SKIP = 0.3; FI.HUD_IN = 1.2; FI.IN = 0.4;
   // the white veil: 1 → 0 over PRE seconds, slow at first (the white lingers), then the picture comes
   FI.veil = (t) => 1 - smooth(t / FI.PRE);
+  // the white rising over the loading screen: 0 → 1 over IN seconds
+  FI.whiteIn = (t) => smooth(t / FI.IN);
   // the sun's flare: full while the white is thick, gone FLARE seconds after it
   FI.flare = (t) => 1 - smooth((t - FI.PRE * 0.35) / (FI.PRE * 0.65 + FI.FLARE));
+  // the place's caption while the white thins: none while it is thick, full when it is gone
+  FI.capVeil = (v) => clamp01((0.6 - v) / 0.45);
+  // a direction d on the screen of a camera {yaw, pitch, fov (vertical)}: [x, y] in 0..1 (y down), null behind it or far
+  // outside the frame — the flare's place (the renderer's own projection: forward (−sin yaw, ·, −cos yaw))
+  FI.sunScreen = function (d, cam, aspect) {
+    const cp = Math.cos(cam.pitch), f = [-Math.sin(cam.yaw) * cp, Math.sin(cam.pitch), -Math.cos(cam.yaw) * cp], rx = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)];
+    const up = [rx[1] * f[2] - rx[2] * f[1], rx[2] * f[0] - rx[0] * f[2], rx[0] * f[1] - rx[1] * f[0]];
+    const z = d[0] * f[0] + d[1] * f[1] + d[2] * f[2]; if (!(z > 0.01)) return null;
+    const th = Math.tan(cam.fov / 2), x = (d[0] * rx[0] + d[1] * rx[1] + d[2] * rx[2]) / z / (th * (aspect || 16 / 9)), y = (d[0] * up[0] + d[1] * up[1] + d[2] * up[2]) / z / th;
+    const sx = 0.5 + x / 2, sy = 0.5 - y / 2;
+    return sx > -0.1 && sx < 1.1 && sy > -0.1 && sy < 1.1 ? [sx, sy] : null;
+  };
+  // the wow moment plays for this arrival: the setting on, the vista one that swings
+  const momentOn = (g, v) => !!(g.wow && v && v.wow !== false && (!g.settings || g.settings.wowMoments !== false));
+  // the camera the loading screen draws its sky with: the composition the veil opens on (an arrival), else the eyes
+  FI.loadCam = function (g) {
+    const p = g.player, S = g.settings || {}, A = g.arrivalPending, v = A && A.vista;
+    if (v && v.eye && S.wowMoments !== false) return { x: v.eye[0], y: v.eye[1], z: v.eye[2], yaw: v.yaw, pitch: v.pitch, fov: v.fov * Math.PI / 180 };
+    return { x: p.pos[0], y: p.pos[1] + p.eye, z: p.pos[2], yaw: p.yaw, pitch: p.pitch, fov: (S.fov || 75) * Math.PI / 180 };
+  };
   const anyKey = (I) => !!I && (I.pressed.size > 0 || (I.mouse && I.mouse.clicked && I.mouse.clicked.some(Boolean)) || (I.padPressed && I.padPressed.size > 0) || (I.tPressed && I.tPressed.size > 0));
   class Arrival {
     // o: {vista (the record of the wow moment to play, or null), sun: [x, y] of the sun on the screen (0..1, y down) or null}
-    constructor(g, o) { this.g = g; this.v = (o && o.vista) || null; this.sun = (o && o.sun) || null; this.phase = 'new'; this.t = 0; this.k = 0; this.from = 1; this.dom = null; this.first = true; }
-    holds() { return this.phase === 'veil' || this.phase === 'out'; }
-    veilNow() { return this.phase === 'veil' ? FI.veil(this.t) : this.phase === 'out' ? this.from * (1 - clamp01(this.k / FI.SKIP)) : 0; }
+    // phases: in (the white rising over the loading screen) → full → veil (the picture through the thinning white) →
+    // moment (the wow moment's hold and its way back to the eyes) → done; out: a key — the white goes in SKIP seconds
+    constructor(g, o) { this.g = g; this.v = (o && o.vista) || null; this.sun = (o && o.sun) || null; this.phase = 'new'; this.t = 0; this.k = 0; this.from = 1; this.dom = null; this.first = true; this.on = false; this.saved = null; }
+    holds() { return this.phase === 'in' || this.phase === 'full' || this.phase === 'veil' || this.phase === 'out'; }
+    veilNow() { return this.phase === 'in' ? FI.whiteIn(this.t) : this.phase === 'full' ? 1 : this.phase === 'veil' ? FI.veil(this.t) : this.phase === 'out' ? this.from * (1 - clamp01(this.k / FI.SKIP)) : 0; }
+    // over the loading screen: the white rises (game.js loadingFrame holds the world back meanwhile — FI.holdLoading)
+    rise() { this.phase = 'in'; this.t = 0; this.ui(); this.paint(); }
+    stepIn(dt) { this.t += dt; if (this.t >= FI.IN) { this.phase = 'full'; this.t = 0; } this.paint(); return this.phase === 'in'; }
     begin() {
-      const g = this.g;
+      const g = this.g, v = this.v;
       this.phase = 'veil'; this.t = 0; this.first = true;
       const hud = document.getElementById('hud'); if (hud) { hud.style.transition = 'none'; hud.style.opacity = '0'; }
-      if (g.wow) g.wow.wait = Math.max(g.wow.wait || 0, FI.PRE + 1);   // (the wow actor's own poll stays away: the arrival starts the moment)
+      if (!this.saved) { this.saved = { hideHud: g.hideHud }; g.hideHud = true; }   // (the hand, the block outline, the minimap)
+      // the moment from the first frame: its camera at the composition, the clock held at the rise's end while the white
+      // thins (update); without it the veil opens on the eyes — the vista seen all the same (no swing when walking off)
+      this.on = momentOn(g, v);
+      if (this.on) { g.wow.wait = 0; g.wow.start(v); g.wow.t = VR.WowMoment.RISE; }
+      else if (v && VR.WowMoment) { VR.WowMoment.mark(g.meta, v.id); if (g.saveMeta) { try { g.saveMeta(); } catch (e) { /* the next autosave */ } } }
       this.ui(); this.paint();
     }
     ui() {
@@ -121,60 +158,69 @@
       const d = document.createElement('div'); d.id = 'arrival';
       d.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none;z-index:28';
       const glow = document.createElement('div'), white = document.createElement('div');
-      const sx = this.sun ? (this.sun[0] * 100).toFixed(1) : '50', sy = this.sun ? (this.sun[1] * 100).toFixed(1) : '40';
-      glow.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;background:radial-gradient(circle at ' + sx + '% ' + sy + '%, rgba(255,250,232,1) 0%, rgba(255,226,170,0.85) 5%, rgba(255,190,120,0.42) 14%, rgba(255,160,96,0.14) 30%, rgba(255,150,90,0) 52%)';
-      white.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;background:#fffaf2';
-      if (!this.sun) glow.style.display = 'none';
+      glow.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;display:none';
+      white.style.cssText = 'position:absolute;left:0;top:0;right:0;bottom:0;background:#fffaf2;opacity:0';
       d.appendChild(glow); d.appendChild(white);
       (document.getElementById('app') || document.body).appendChild(d);
-      this.dom = d; this.glow = glow; this.white = white;
+      this.dom = d; this.glow = glow; this.white = white; this.sunSet = null;
       return d;
     }
     paint() {
       if (!this.dom) return;
-      const v = this.veilNow(), f = this.phase === 'veil' ? FI.flare(this.t) : this.phase === 'out' ? v : this.phase === 'moment' ? FI.flare(FI.PRE + this.t) : 0;
+      if (this.sun && this.sunSet !== this.sun) {
+        this.sunSet = this.sun;
+        const sx = (this.sun[0] * 100).toFixed(1), sy = (this.sun[1] * 100).toFixed(1);
+        this.glow.style.background = 'radial-gradient(circle at ' + sx + '% ' + sy + '%, rgba(255,250,232,1) 0%, rgba(255,226,170,0.85) 5%, rgba(255,190,120,0.42) 14%, rgba(255,160,96,0.14) 30%, rgba(255,150,90,0) 52%)';
+        this.glow.style.display = 'block';
+      }
+      const v = this.veilNow(), f = this.phase === 'in' || this.phase === 'full' ? 0 : this.phase === 'veil' ? FI.flare(this.t) : this.phase === 'out' ? v : this.phase === 'moment' ? FI.flare(FI.PRE + this.t) : 0;
       this.white.style.opacity = v.toFixed(3); this.glow.style.opacity = Math.max(0, f).toFixed(3);
+      // the caption only as the white goes (the wow actor set it this frame from its own clock)
+      const W = this.g.wow;
+      if (this.on && W && W.dom && this.phase === 'veil') W.dom.style.opacity = Math.min(+W.dom.style.opacity || 0, FI.capVeil(v)).toFixed(3);
     }
     update(dt) {
-      const g = this.g;
+      const g = this.g, WM = VR.WowMoment;
       if (this.phase === 'veil') {
         this.t += dt;
         if (anyKey(g.input) && !this.first) { this.skip(); return; }
         this.first = false;
-        if (this.t >= FI.PRE) this.moment(); else this.paint();
+        if (this.on && g.wow && g.wow.active === this.v) g.wow.t = WM.RISE;   // (the picture holds while the white thins)
+        if (this.t >= FI.PRE) { this.phase = 'moment'; this.t = 0; if (!(this.on && g.wow && g.wow.active)) { this.finish(); return; } }
+        this.paint();
       } else if (this.phase === 'out') {
         this.k += dt; this.paint();
-        if (this.k >= FI.SKIP) this.finish();
+        if (this.k >= FI.SKIP) { if (this.on && g.wow && g.wow.active) { this.phase = 'moment'; this.t = FI.FLARE + FI.PRE; this.paint(); } else this.finish(); }
       } else if (this.phase === 'moment') {
         this.t += dt; this.paint();
         if (!(g.wow && g.wow.active)) this.finish();
       }
     }
-    // the swing (t-vista's wow moment) right after the veil — when the wow moments are on and the vista swings
-    moment() {
-      const g = this.g, v = this.v;
-      const on = !!(g.wow && v && v.wow !== false && (!g.settings || g.settings.wowMoments !== false));
-      if (on) { g.wow.wait = 0; g.wow.start(v); this.phase = 'moment'; this.t = 0; this.paint(); }
-      else this.finish();
-    }
+    // a key while the white is there: it goes in SKIP seconds, the camera turns back to the eyes from where it is
     skip() {
       const g = this.g;
       if (this.phase !== 'veil') return;
       this.from = FI.veil(this.t); this.k = 0; this.phase = 'out';
-      if (this.v && VR.WowMoment) { VR.WowMoment.mark(g.meta, this.v.id); if (g.saveMeta) { try { g.saveMeta(); } catch (e) { /* the next autosave */ } } }
+      if (this.on && g.wow && g.wow.active) g.wow.skip();
       this.paint();
+    }
+    restore() {
+      const g = this.g;
+      if (this.saved) { g.hideHud = this.saved.hideHud; this.saved = null; }
+      return typeof document !== 'undefined' ? document.getElementById('hud') : null;
     }
     finish() {
       this.phase = 'done';
       if (this.dom) { this.dom.remove(); this.dom = null; }
-      const hud = typeof document !== 'undefined' ? document.getElementById('hud') : null;
+      const hud = this.restore();
       if (hud) {
+        hud.style.visibility = this.g.hideHud ? 'hidden' : 'visible';
         hud.style.transition = 'opacity ' + FI.HUD_IN + 's ease'; hud.style.opacity = '1';
         if (typeof setTimeout === 'function') setTimeout(() => { if (hud.style.opacity === '1') { hud.style.transition = ''; hud.style.opacity = ''; } }, FI.HUD_IN * 1000 + 200);
       }
       if (this.g.arrival === this) this.g.arrival = null;
     }
-    destroy() { this.phase = 'done'; if (this.dom) { this.dom.remove(); this.dom = null; } const hud = typeof document !== 'undefined' ? document.getElementById('hud') : null; if (hud) { hud.style.transition = ''; hud.style.opacity = ''; } }
+    destroy() { this.phase = 'done'; if (this.dom) { this.dom.remove(); this.dom = null; } const hud = this.restore(); if (hud) { hud.style.transition = ''; hud.style.opacity = ''; } }
   }
   FI.Arrival = Arrival;
 
@@ -208,23 +254,29 @@
   };
   // a world's start: its first day's clear sky again after a reload on that day
   FI.onLoad = function (g, meta) { if (meta && meta.clearUntil > 0 && g.env && g.env.wx) g.env.wx.clearUntil = meta.clearUntil; };
-  // the loading screen's end: the arrival begins (the sun's place on the screen from the last loading frame's camera)
+  // the loading screen's last moments (game.js loadingFrame, the world ready): an arrival's white rises over it first —
+  // true while it rises (the world waits under the loading screen), false once it stands (or for any other world)
+  FI.holdLoading = function (g, done, dt) {
+    if (!done) return false;
+    if (g.arrivalPending && !g.arrival) { const A = new Arrival(g, { vista: g.arrivalPending.vista }); g.arrival = A; A.rise(); return true; }
+    const A = g.arrival;
+    return !!(A && A.phase === 'in' && A.stepIn(dt));
+  };
+  // the loading screen's end: the arrival begins — the sun's place on the screen from the camera the veil opens on
   FI.arrive = function (g) {
     const A0 = g.arrivalPending; g.arrivalPending = null;
     if (!A0) return null;
+    let A = g.arrival;
+    if (!A || A.phase === 'done' || A.v !== A0.vista) { if (A) A.destroy(); A = g.arrival = new Arrival(g, { vista: A0.vista }); }
     let sun = null;
     try {
-      const r = g.renderer, m = r && r.viewProj, s = g.env && g.env.E && g.env.E.sunDir;
-      if (m && s && s[1] > -0.02) {
-        const c = [s[0] * 100, s[1] * 100, s[2] * 100];
-        const cx = m[0] * c[0] + m[4] * c[1] + m[8] * c[2] + m[12], cy = m[1] * c[0] + m[5] * c[1] + m[9] * c[2] + m[13], cw = m[3] * c[0] + m[7] * c[1] + m[11] * c[2] + m[15];
-        if (cw > 0) { const x = (cx / cw) * 0.5 + 0.5, y = 0.5 - (cy / cw) * 0.5; if (x > -0.1 && x < 1.1 && y > -0.1 && y < 1.1) sun = [x, y]; }
-      }
+      const s = g.env && g.env.E && g.env.E.sunDir, v = A0.vista, p = g.player, r = g.renderer;
+      const cam = momentOn(g, v) && v.eye ? { yaw: v.yaw, pitch: v.pitch, fov: v.fov * Math.PI / 180 } : p ? { yaw: p.yaw, pitch: p.pitch, fov: ((g.settings && g.settings.fov) || 75) * Math.PI / 180 } : null;
+      if (s && cam && s[1] > -0.02) sun = FI.sunScreen(s, cam, r && r.H ? r.W / r.H : 16 / 9);
     } catch (e) { sun = null; }
-    if (g.arrival) g.arrival.destroy();
-    g.arrival = new Arrival(g, { vista: A0.vista, sun });
-    g.arrival.begin();
-    return g.arrival;
+    A.sun = sun;
+    A.begin();
+    return A;
   };
 
   // a world that goes (quit, another world) takes its arrival with it

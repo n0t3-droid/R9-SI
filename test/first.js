@@ -156,20 +156,48 @@ console.log('5 · the arrival');
   const v = { id: 'v0', x: 10, y: 79, z: 12, eye: [10.5, 83.8, 12.5], yaw: 1, pitch: 0.05, fov: 46, lm: 'temple', wow: true };
   let G = mkGame(), A = new FI.Arrival(G, { vista: v, sun: null });
   G.arrival = A; A.begin();
-  check(A.holds() && !G.wow.active && hudEl.style.opacity === '0', 'it begins: the player held, the HUD transparent, the veil up');
-  for (let i = 0; i < 60; i++) { A.update(1 / 30); G.wow.update(1 / 30); }
-  check(!!G.wow.active && G.wow.active.id === 'v0' && W.seen(G.meta, 'v0'), `after the ${FI.PRE} s veil the wow moment plays (its swing, swell and caption — t-vista's) and the vista is seen`);
+  check(A.holds() && !!G.wow.active && W.seen(G.meta, 'v0') && hudEl.style.opacity === '0', 'it begins: the player held, the HUD transparent, the veil up — over the vista\'s picture (the wow moment from the first frame, the vista seen)');
+  for (let i = 0; i < 60; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
+  check(!!G.wow.active && G.wow.active.id === 'v0' && A.phase === 'moment', `after the ${FI.PRE} s veil the moment goes on (t-vista's hold, swell and caption, then the way back to the eyes)`);
   for (let i = 0; i < 200; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
   check(!G.wow.active && !A.holds() && hudEl.style.opacity === '1' && /opacity/.test(hudEl.style.transition || ''), 'after the moment the HUD fades in (opacity 0 → 1 with a transition)');
-  // skipped: any key during the veil — no swing, the vista marked seen, the HUD back
-  G = mkGame(); A = new FI.Arrival(G, { vista: v, sun: null }); G.arrival = A; A.begin();
-  A.update(1 / 30); G.input.pressed.add('KeyW'); A.update(1 / 30); G.input.pressed.clear();
-  for (let i = 0; i < 30; i++) { A.update(1 / 30); G.wow.update(1 / 30); }
-  check(!G.wow.active && W.seen(G.meta, 'v0') && !A.holds() && A.veilNow() === 0, 'a key during the veil skips it: the veil goes in 0.3 s, no swing, the vista seen');
-  // wow moments off: the veil alone
+  // wow moments off: the veil alone (over the player's own eyes), the vista marked seen all the same
   G = mkGame(); G.settings.wowMoments = false; A = new FI.Arrival(G, { vista: v, sun: null }); G.arrival = A; A.begin();
-  for (let i = 0; i < 90; i++) { A.update(1 / 30); G.wow.update(1 / 30); }
-  check(!G.wow.active && !A.holds(), 'with „Wow-Momente" off the veil alone');
+  for (let i = 0; i < 90; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
+  check(!G.wow.active && !A.holds() && !G.arrival && G.hideHud === false && W.seen(G.meta, 'v0'), 'with „Wow-Momente" off the veil alone');
+  // (run 1's pictures: the veil opened on the player's own eye — the spur's wall, the held block and the hand filled the
+  // first picture — and then swung to the composition and back. Now the white rises over the loading screen, the veil opens
+  // on the composition itself (the wow moment's camera, its caption coming as the white goes), then the camera eases down
+  // into the player's eyes; the hand, the outline and the minimap stay away until the HUD fades in)
+  check(near(FI.whiteIn(0), 0) && near(FI.whiteIn(FI.IN), 1) && FI.IN > 0.2 && FI.IN <= 0.6, `the white rises over the loading screen in ${FI.IN} s`);
+  G = mkGame(); G.arrivalPending = { vista: v };
+  let held = 0; for (let i = 0; i < 60 && FI.holdLoading(G, true, 1 / 30); i++) held++;
+  check(!!G.arrival && G.arrival.phase === 'full' && held >= Math.floor(FI.IN * 30) - 1 && held <= Math.ceil(FI.IN * 30) + 1 && G.arrival.veilNow() === 1, `the loading screen stays while the white rises (${held} frames), then the world may open under it`);
+  check(!FI.holdLoading(mkGame(), true, 1 / 30) && !FI.holdLoading(Object.assign(mkGame(), { arrivalPending: { vista: v } }), false, 1 / 30), 'no arrival, or the world not ready yet: nothing held');
+  A = FI.arrive(G);
+  check(A === G.arrival && A.phase === 'veil' && !!G.wow.active && G.wow.active.id === 'v0' && near(W.curve(G.wow.t), 1) && G.hideHud === true, 'the veil opens on the composition: the wow moment runs from the start, its camera at the picture (curve 1), the hand and the HUD away');
+  let capMax = 0, pinned = true;
+  for (let i = 0; i < Math.round(FI.PRE * 30) - 2; i++) { G.wow.update(1 / 30); A.update(1 / 30); if (A.veilNow() > 0.6) capMax = Math.max(capMax, +G.wow.dom.style.opacity); if (!near(W.curve(G.wow.t), 1)) pinned = false; }
+  check(pinned && capMax <= 0.05, `the picture holds while the white thins (the caption under ${capMax.toFixed(2)} while the white is thick)`);
+  for (let i = 0; i < 6; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
+  check(A.phase === 'moment' && +G.wow.dom.style.opacity > 0.9 && G.hideHud === true, `then the moment: the caption up (${G.wow.dom.style.opacity}), the hold and the camera's way down into the eyes`);
+  for (let i = 0; i < 150 && G.arrival; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
+  check(!G.wow.active && !G.arrival && G.hideHud === false && hudEl.style.opacity === '1' && hudEl.style.visibility === 'visible', 'after it the hand and the HUD come back (fading in)');
+  // a key while the white is thick: out in 0.3 s, the camera turns back from where it is
+  G = mkGame(); G.arrivalPending = { vista: v }; while (FI.holdLoading(G, true, 1 / 30)); A = FI.arrive(G);
+  G.wow.update(1 / 30); A.update(1 / 30); G.input.pressed.add('Space'); G.wow.update(1 / 30); A.update(1 / 30); G.input.pressed.clear();
+  for (let i = 0; i < 12; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
+  check(!A.holds() && A.veilNow() === 0 && G.wow.t >= W.RISE + W.HOLD, 'a key during the veil: the white goes in 0.3 s and the camera falls back to the eyes at once');
+  for (let i = 0; i < 90 && G.arrival; i++) { G.wow.update(1 / 30); A.update(1 / 30); }
+  check(!G.arrival && G.hideHud === false, '… and the HUD comes back after it');
+  // the sun on the screen (the flare's place) from the camera the veil opens on
+  const cam0 = { yaw: 0.7, pitch: 0.05, fov: 60 * DEG };
+  const ahead = FI.sunScreen(fwd(0.7, 0.05), cam0, 16 / 9), right = FI.sunScreen(fwd(0.7 - 20 * DEG, 0.05), cam0, 16 / 9), up = FI.sunScreen(fwd(0.7, 0.05 + 10 * DEG), cam0, 16 / 9);
+  check(ahead && near(ahead[0], 0.5, 1e-9) && near(ahead[1], 0.5, 1e-9) && right && right[0] > 0.6 && near(right[1], 0.5, 0.01) && up && up[1] < 0.4 && FI.sunScreen(fwd(0.7 + Math.PI, 0), cam0, 16 / 9) === null, `the sun's place on the screen: ahead (0.50, 0.50), 20° right (${right ? right[0].toFixed(2) : '—'}), 10° up (y ${up ? up[1].toFixed(2) : '—'}), behind none`);
+  // the loading screen's camera: the composition's for an arrival (the sky behind the loading screen is the sky the veil opens on)
+  const pl = { pos: [10, 80, 10], eye: 1.62, yaw: 2, pitch: 0.1 };
+  const lc = FI.loadCam({ arrivalPending: { vista: v }, settings: { wowMoments: true, fov: 75 }, player: pl }), lc2 = FI.loadCam({ settings: { fov: 75 }, player: pl });
+  check(near(lc.x, v.eye[0]) && near(lc.y, v.eye[1]) && near(lc.yaw, v.yaw) && near(lc.fov, v.fov * DEG, 1e-9) && near(lc2.y, 81.62, 1e-9) && near(lc2.yaw, 2) && near(lc2.fov, 75 * DEG, 1e-9), 'the loading screen looks where the veil opens: the composition (an arrival) or the eyes');
 }
 
 // ---------------------------------------------------------------- 6 · the living title
@@ -184,16 +212,24 @@ console.log('6 · the living title');
   const C = V.Heart.CITADEL, aspect = 16 / 9;
   const inFrame = (cam, d, marginX, marginY) => { const f = fwd(cam.yaw, cam.pitch), rx = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)], up = [rx[1] * f[2] - rx[2] * f[1], rx[2] * f[0] - rx[0] * f[2], rx[0] * f[1] - rx[1] * f[0]]; const z = d[0] * f[0] + d[1] * f[1] + d[2] * f[2]; if (z <= 0) return null; const th = Math.tan(cam.fov / 2), x = (d[0] * rx[0] + d[1] * rx[1] + d[2] * rx[2]) / z / (th * aspect), y = (d[0] * up[0] + d[1] * up[1] + d[2] * up[2]) / z / th; return Math.abs(x) <= 1 - (marginX || 0) && Math.abs(y) <= 1 - (marginY || 0) ? [x, y] : null; };
   const SB = VR.SkyBodies.atTicks(TS.TOD), sun = FI.sunAt(TS.TOD);
-  let cit = 0, sunIn = 0, gasIn = 0, n = 0;
+  // (first.mjs run 2: the citadel in the picture's middle stood behind the tiles and the buttons — the start screen hid
+  // its own landmark. Now it stands in the right third, right of the tiles on a 1920-wide screen, its spires before the
+  // low sun — a silhouette in the sun's glow, the sun peeking out beside them as the camera arcs — and the ringed giant
+  // in the upper left beside the logo)
+  const frac = (p) => [0.5 + p[0] / 2, 0.5 - p[1] / 2];
+  let cit = 0, sunIn = 0, gasIn = 0, n = 0, sunBy = 0, minX = 1, maxX = 0, gasUL = 0, sunDx = [];
   for (let k = 0; k < 60; k++) {
     const cam = TS.cam(k), tip = [C.x - cam.x, 240 - cam.y, C.z - cam.z], foot = [C.x - cam.x, C.y + 4 - cam.y, C.z - cam.z];
-    n++; if (inFrame(cam, tip, 0.25, 0.05) && inFrame(cam, foot, 0.25, 0.05)) cit++;
-    if (inFrame(cam, sun, 0.04, 0.04)) sunIn++;
-    if (inFrame(cam, SB.giant, 0.04, 0.04)) gasIn++;
+    const pt = inFrame(cam, tip, 0.04, 0.04), pf = inFrame(cam, foot, 0.04, 0.04), ps = inFrame(cam, sun, 0.04, 0.04), pg = inFrame(cam, SB.giant, 0.04, 0.04);
+    n++;
+    if (pt && pf) { const a = frac(pt), b = frac(pf); minX = Math.min(minX, a[0], b[0]); maxX = Math.max(maxX, a[0], b[0]); if (a[0] >= 0.75 && b[0] >= 0.75 && a[0] <= 0.96 && b[0] <= 0.96) cit++; if (ps) { const s = frac(ps), dx = s[0] - (a[0] + b[0]) / 2; sunDx.push(dx); if (Math.abs(dx) <= 0.08 && s[1] > a[1] - 0.02) sunBy++; } }
+    if (ps) sunIn++;
+    if (pg) { gasIn++; const q = frac(pg); if (q[0] <= 0.4 && q[1] <= 0.3) gasUL++; }
   }
   check(TS.TOD === FI.GOLD, `the title's sky is the golden hour (${TS.TOD})`);
-  check(cit === n, `the citadel's spires from their foot to the tip stand in the middle half of the picture all the loop (${cit} of ${n} seconds)`);
-  check(sunIn === n && gasIn === n, `the low sun and the ringed giant are in the frame all the loop (sun ${sunIn}, giant ${gasIn} of ${n})`);
+  check(cit === n, `the citadel's spires, foot to tip, stand in the right third all the loop — right of the tiles on a 1920-wide screen (x ${minX.toFixed(2)}–${maxX.toFixed(2)}; ${cit} of ${n} seconds)`);
+  check(sunIn === n && gasIn === n && gasUL === n, `the low sun and the ringed giant are in the frame all the loop, the giant in the upper left (sun ${sunIn}, giant ${gasIn}, upper left ${gasUL} of ${n})`);
+  check(sunBy === n && Math.min(...sunDx) < -0.005 && Math.max(...sunDx) > 0.02, `the sun stands by the spires all the loop — behind them, then peeking out beside them as the camera arcs (its offset ${Math.min(...sunDx).toFixed(3)} … ${Math.max(...sunDx).toFixed(3)} of the width)`);
   const cS = TS.cam(0);
   check(cS.y > 140 && cS.y < 220, `the camera flies over the Ember Canyon, ${cS.y.toFixed(0)} high (the mesas 92–106, the spire's tip 249)`);
   check(TS.mode({ preset: 'potato' }) === 'still' && TS.mode({ preset: 'low' }) === 'drift' && TS.mode({ preset: 'ultra' }) === 'drift', 'Very Low: one still frame of the sky; Low and up: the drift');

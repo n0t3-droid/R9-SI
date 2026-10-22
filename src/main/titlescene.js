@@ -25,17 +25,20 @@
   TS.genOpts = () => ({ vgen: 11, noLand: true, noCrystal: true });
   TS.mode = (S) => (S && (S.preset === 'potato' || S.lite) ? 'still' : 'drift');
   TS.due = (acc) => acc >= 1 / TS.FPS - 1e-4;
-  // the camera: an arc round the citadel (HEART.CITADEL) at ~300 blocks, from the east-south-east — the view's yaw 120° ± 6°
-  // (the sun at 10800 stands 29–41° right of it, the giant 31–43° left), 170 ± 6 high over the canyon, the distance
-  // breathing ± 12; the pitch 10° up, so the spires stand in the lower middle and the sky with the giant fills the top
+  // the camera: an arc round the citadel (HEART.CITADEL) at ~360 blocks east of it — the bearing 88° ± 4° — the view turned
+  // 39° past it, so the spires stand in the picture's right third (right of the tiles on a 1920-wide screen; first.mjs
+  // run 2: in the middle they stood behind the tiles and the buttons) with the low sun (yaw 85°, 7.4° high) behind them —
+  // a silhouette in its glow, the sun peeking out beside the spires as the camera arcs — the ringed giant in the upper
+  // left beside the logo, the isles and the lake in the middle; 184 ± 5 high over the canyon, the distance breathing ± 12,
+  // the pitch 13° up (the coarse far tiles under the camera stay out of the picture's foot)
   const DEG = Math.PI / 180;
-  TS.VIEW = { yaw: 120 * DEG, amp: 6 * DEG, dist: 300, dd: 12, h: 170, dh: 6, look: 178, pitch: 10 * DEG, fov: 66 * DEG };
+  TS.VIEW = { bear: 88 * DEG, amp: 4 * DEG, dist: 360, dd: 12, h: 184, dh: 5, off: 39 * DEG, pitch: 13.3 * DEG, fov: 66 * DEG };
   TS.cam = function (t, out) {
     const H = VR.Heart && VR.Heart.CITADEL ? VR.Heart.CITADEL : { x: -420, z: 380, y: 112 }, V = TS.VIEW, w = 2 * Math.PI * t / TS.LOOP;
-    const yaw = V.yaw + V.amp * Math.sin(w), d = V.dist + V.dd * Math.sin(w + 1.3), y = V.h + V.dh * Math.sin(w + 2.1);
+    const bear = V.bear + V.amp * Math.sin(w), d = V.dist + V.dd * Math.sin(w + 1.3), y = V.h + V.dh * Math.sin(w + 2.1);
     const o = out || {};
-    o.x = H.x + Math.sin(yaw) * d; o.z = H.z + Math.cos(yaw) * d; o.y = y;   // (forward is (−sin yaw, −cos yaw): the camera stands d behind the citadel)
-    o.yaw = yaw; o.pitch = V.pitch + Math.atan2(V.look - y, d) * 0.25; o.fov = V.fov; o.roll = 0;
+    o.x = H.x + Math.sin(bear) * d; o.z = H.z + Math.cos(bear) * d; o.y = y;   // (forward is (−sin yaw, −cos yaw): looking along bear the citadel is ahead)
+    o.yaw = bear + V.off; o.pitch = V.pitch + 0.004 * Math.sin(w + 0.7); o.fov = V.fov; o.roll = 0;
     return o;
   };
 
