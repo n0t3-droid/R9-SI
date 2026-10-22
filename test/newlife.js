@@ -233,9 +233,14 @@ TR.FADE_IN = 5; TR.FADE_OUT = 5;
     NL.pauseMenu({ game: g });
     const bz = pause.querySelector('[data-act="goherz"]');
     check(bh.textContent === '🏠 Zuhause (Driftinseln)' && bz && bz.textContent === '🌍 Herzwelt' && bs.textContent === '📍 Hier wohne ich' && bs.getAttribute('data-t') === 'g.nl.liveHere', 'the pause menu\'s row: 🏠 Zuhause (Driftinseln) · 🌍 Herzwelt · 📍 Hier wohne ich', [bh.textContent, bz && bz.textContent, bs.textContent].join(' | '));
-    // a guest: no 🌍
-    meta.guest = true; M = NL.pauseModel(g); meta.guest = false;
+    check(bs.style.flexBasis === '100%', 'with the 🌍 shown the 📍 takes the next line', bs.style.flexBasis);
+    // a guest: no 🌍 — and the 📍 back beside the 🏠 at an equal share (flex 1 1 0%, as start.js made the row: not the
+    // width of its words, which pushed „Zu meinem Platz" under it in run 2's picture)
+    meta.guest = true; M = NL.pauseModel(g);
     check(!M.herz.show, 'a guest sees no 🌍');
+    NL.pauseMenu({ game: g });
+    check(bz.style.display === 'none' && bs.style.flexBasis === '0%', 'no 🌍: the 📍 shares the row with the 🏠 half and half', JSON.stringify([bz.style.display, bs.style.flexBasis]));
+    meta.guest = false;
     pause.remove();
   }
 

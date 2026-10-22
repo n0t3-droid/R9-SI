@@ -197,7 +197,8 @@
     bh.textContent = M.home.label;
     bz.textContent = M.herz.label; bz.title = M.herz.tip;
     const zs = styleOf(bz); zs.display = M.herz.show ? '' : 'none'; zs.flex = '1';
-    if (bs) { bs.setAttribute('data-t', M.pin.key); bs.setAttribute('data-tt', M.pin.tipKey); bs.textContent = M.pin.label; bs.title = M.pin.tip; styleOf(bs).flexBasis = M.herz.show ? '100%' : ''; }
+    // (the row's buttons are flex 1 1 0% — start.js: an equal share each; with the 🌍 shown the 📍 takes a line of its own)
+    if (bs) { bs.setAttribute('data-t', M.pin.key); bs.setAttribute('data-tt', M.pin.tipKey); bs.textContent = M.pin.label; bs.title = M.pin.tip; styleOf(bs).flexBasis = M.herz.show ? '100%' : '0%'; }
     if (row) styleOf(row).flexWrap = 'wrap';
   };
 
