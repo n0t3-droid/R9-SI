@@ -21,6 +21,7 @@
   const SPEED = { interceptor: [38, 55], racer: [48, 66], gunship: [30, 40], freighter: [20, 28], dropship: [26, 34], shuttle: [26, 34], cruiser: [16, 22], carrier: [10, 14] };
   const HZ = 640, FADE0 = 470, FADE1 = 610;   // the horizon flights' ends, and where they fade (blocks from the focus)
   const smooth = (u) => (u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u));
+  const COL_DEF = [0.4, 1, 0.6], COL_HOV = [1, 0.6, 0.28], COL_RUN = [0.52, 0.92, 1];   // (f-flow: the plumes' colours, shared)
 
   class Traffic {
     constructor(g) {
@@ -230,7 +231,16 @@
       if (dist > 260 || s.t < 0 || !m) return;
       const c = Math.cos(s.heading), sn = Math.sin(s.heading), f = [-sn, -c];
       const sp = s.spd !== undefined ? s.spd : 40, hov = sp < 6;
-      if (g.trails && !s.warpOut) { if (!s.tid) s.tid = 'tr' + (Math.random() * 1e9 | 0); for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; g.trails.engine(s.tid + ei, [s.pos[0] + e[0] * c + e[2] * sn, s.pos[1] + e[1], s.pos[2] - e[0] * sn + e[2] * c], sp, { thrust: hov ? 0.45 : 0.8, size: e[3] * (s.big ? 1.2 : 0.9), col: s.defender ? [0.4, 1, 0.6] : hov ? [1, 0.6, 0.28] : [0.52, 0.92, 1], minor: ei > 1, smokeLife: s.contrail ? 14 : s.big ? 4.5 : 7, smokeK: s.contrail ? 1.6 : 1.15 }); } }
+      // ---- f-flow (R50-04): a contrail dies in 6 s (was 14), its points 2 m apart; the other smoke within 6 s (was 7); the
+      // engine's keys, position and options kept on the craft (no arrays or records a frame)
+      if (g.trails && !s.warpOut) {
+        if (!s.tid) { s.tid = 'tr' + (Math.random() * 1e9 | 0); s.tk = m.exhaust.map((q, ei) => s.tid + ei); s.ep = [0, 0, 0]; s.eo = { thrust: 0, size: 0, col: null, minor: false, smokeLife: 0, smokeK: 0, smokeStep: 0, smokeMax: 0 }; }
+        const O = s.eo, P3 = s.ep;
+        O.thrust = hov ? 0.45 : 0.8; O.col = s.defender ? COL_DEF : hov ? COL_HOV : COL_RUN;
+        O.smokeLife = s.contrail ? 6 : s.big ? 4.5 : 6; O.smokeK = s.contrail ? 1.6 : 1.15; O.smokeStep = s.contrail ? 2 : 1.1; O.smokeMax = s.contrail ? 180 : 160;
+        for (let ei = 0; ei < m.exhaust.length; ei++) { const e = m.exhaust[ei]; P3[0] = s.pos[0] + e[0] * c + e[2] * sn; P3[1] = s.pos[1] + e[1]; P3[2] = s.pos[2] - e[0] * sn + e[2] * c; O.size = e[3] * (s.big ? 1.2 : 0.9); O.minor = ei > 1; g.trails.engine(s.tk[ei] || (s.tid + ei), P3, sp, O); }
+      }
+      // ---- f-flow end
       for (const e of m.exhaust) {
         if (Math.random() > 0.55) continue;
         const x = s.pos[0] + e[0] * c + e[2] * sn, z = s.pos[2] - e[0] * sn + e[2] * c;
