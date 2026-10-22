@@ -25,6 +25,7 @@ require('../src/main/lang_de.js');
 require('../src/main/settings_reg.js');
 require('../src/main/klang.js');
 let fails = 0;
+const later = [];   // (checks that finish after a promise)
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
 const near = (a, b, e) => Math.abs(a - b) <= (e === undefined ? 1e-9 : e);
 const Adv = VR.Adv;
@@ -441,6 +442,24 @@ if (!A) { console.log('  ✗ VR.Adventure missing (src/main/adventure.js)'); con
   const sm = JSON.parse(JSON.stringify(meta));
   VR.game = mkGame(sm); A.bind();
   check(A.on() && sm.adventure.me.xp === meta.adventure.me.xp && sm.adventure.me.level === meta.adventure.me.level, 'a saved Abenteuer world opens where it was (level ' + sm.adventure.me.level + ')');
+  // 🎒 Meins on the start screen: the tile „⚔ Abenteuer-Welt beginnen" (A§1) — a new world that starts as an Abenteuer
+  const meins = DOM.mkEl('div'); meins.setAttribute('id', 'meins'); const mbody = DOM.mkEl('div'); mbody.className = 'mbody'; meins.appendChild(mbody); DOM.body.appendChild(meins);
+  VR.Start = { meinsFrom: 'title', meinsChip: 'all', worldsCache: [{ name: 'Abenteuer-Welt' }, { name: 'Meine Welt' }] };
+  A.meinsTile();
+  const tile = mbody.querySelector('.advtile');
+  check(!!tile && tile.getAttribute('data-act') === 'adv:newworld' && /Abenteuer-Welt beginnen/.test(tile.textContent), '🎒 Meins: the tile „⚔ Abenteuer-Welt beginnen" (' + (tile ? tile.textContent : '—') + ')');
+  A.meinsTile(); check(mbody.querySelectorAll('.advtile').length === 1, 'one tile, however often the page is drawn');
+  VR.Start.meinsFrom = 'pause'; mbody.children.length = 0; A.meinsTile();
+  check(!mbody.querySelector('.advtile'), 'not from the pause menu (in a world the card switches it on)');
+  VR.Start.meinsFrom = 'title'; VR.Start.meinsChip = 'house'; A.meinsTile();
+  check(!mbody.querySelector('.advtile'), 'not on the houses\' chip');
+  VR.Start.meinsChip = 'all';
+  const made = [], tg = mkGame({ id: 'title' }); tg.state = 'title'; tg.createWorld = (o) => { made.push(o); }; VR.game = tg;
+  later.push(A.newWorld().then((ok) => {
+    const o = made[0], P = A.pendingCreate;
+    check(ok && o && o.name === 'Abenteuer-Welt 2' && o.difficulty === 'peaceful' && o.mode === 'zen' && P && P.band === 'normal' && P.enc === 'normal', 'the tile makes „Abenteuer-Welt 2" (peaceful, Zen like ▶ Losspielen) and marks it for the Abenteuer (' + JSON.stringify([o, P]) + ')');
+    A.pendingCreate = null; VR.game = g; A.bind();
+  }));
   VR.game = g; A.bind();
 }
 
@@ -473,5 +492,7 @@ console.log('11 · the texts, German first');
   check(/Stufe 5/.test(lvDe) && /Level 5/.test(lvEn), 'the banner: „' + lvDe + '" / "' + lvEn + '"');
 }
 
-console.log(fails ? 'FAILED ' + fails : 'ALL OK');
-process.exit(fails ? 1 : 0);
+Promise.all(later).catch((e) => { fails++; console.log('  ✗ ' + (e && e.stack || e)); }).then(() => {
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+  process.exit(fails ? 1 : 0);
+});

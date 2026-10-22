@@ -32,7 +32,7 @@
     'g.adv.confirm', 'g.adv.confirmCalm', 'g.adv.yes', 'g.adv.no', 'g.adv.offNote', 'g.adv.teaser', 'g.adv.level', 'g.adv.levelMax', 'g.adv.xp', 'g.adv.xpStar', 'g.adv.taler',
     'g.adv.pts1', 'g.adv.pts', 'g.adv.pts0', 'g.adv.toStats', 'g.adv.stats', 'g.adv.stat.aus', 'g.adv.stat.ene', 'g.adv.stat.spu', 'g.adv.stat.ges', 'g.adv.stat.pil',
     'g.adv.eff.aus', 'g.adv.eff.ene', 'g.adv.eff.spu', 'g.adv.eff.ges', 'g.adv.eff.pil', 'g.adv.plusTip', 'g.adv.respec', 'g.adv.respecTip', 'g.adv.respecFar', 'g.adv.statsNote',
-    'g.adv.up.kick', 'g.adv.up.title', 'g.adv.up.star', 'g.adv.up.pt1', 'g.adv.up.pts', 'g.adv.up.gift', 'g.adv.up.how', 'g.adv.float', 'g.adv.welcome', 'g.adv.welcomeSub',
+    'g.adv.up.kick', 'g.adv.up.title', 'g.adv.up.star', 'g.adv.up.pt1', 'g.adv.up.pts', 'g.adv.up.gift', 'g.adv.up.how', 'g.adv.float', 'g.adv.welcome', 'g.adv.welcomeSub', 'g.adv.newWorld', 'g.adv.newWorldSub', 'g.adv.worldName',
     'g.set.advHud', 'g.set.advHud.tip', 'g.set.storyOffer', 'g.set.storyOffer.tip', 'g.btn.back'];
 
   const A = VR.Adventure = {
@@ -404,6 +404,29 @@
     A.cwPrev = null;
   };
 
+  // ---------------------------------------------------------------- 🎒 Meins on the start screen: „⚔ Abenteuer-Welt beginnen" (A§1)
+  // the way in for Einfach (no create form there): a tile on top of the page (all things, the worlds) that makes a new
+  // world the way ▶ Losspielen does (Zen, peaceful) and marks it for the Abenteuer
+  A.meinsTile = function () {
+    const ST = VR.Start, body = hasDoc && document.querySelector('#meins .mbody'); if (!ST || !body) return false;
+    if (ST.meinsFrom === 'pause' || (ST.meinsChip !== 'all' && ST.meinsChip !== 'worlds') || body.querySelector('.advtile')) return false;
+    const b = mk('button', 'advtile'); b.setAttribute('type', 'button'); b.setAttribute('data-act', 'adv:newworld');
+    if (b.dataset) b.dataset.act = 'adv:newworld';
+    b.appendChild(mk('b', '', T('g.adv.newWorld'))); b.appendChild(mk('small', '', T('g.adv.newWorldSub')));
+    if (body.firstChild && body.insertBefore) body.insertBefore(b, body.firstChild); else body.appendChild(b);
+    return true;
+  };
+  A.newWorld = async function () {
+    const g = game(), ST = VR.Start;
+    if (ST && ST.ready) { if (!(await ST.ready(g))) return false; } else if (!g || g.state !== 'title') return false;   // (t-first: the start screen may stand before the game is ready)
+    if (typeof g.createWorld !== 'function') return false;
+    const base = T('g.adv.worldName'), ws = (ST && ST.worldsCache) || [];
+    const n = ws.filter(w => w && String(w.name || '').startsWith(base)).length;
+    A.pendingCreate = { at: Date.now(), band: 'normal', enc: g.settings && g.settings.kids ? 'off' : 'normal' };
+    g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
+    return true;
+  };
+
   // ---------------------------------------------------------------- the actions (before ui.js's own)
   A.act = function (a, b, ui) {
     const v = b && b.dataset ? b.dataset.v : undefined;
@@ -422,6 +445,7 @@
       case 'adv:pt': A.addPoint(b.dataset.stat); A.renderStats(); return true;
       case 'adv:respec': A.respec(); A.renderStats(); return true;
       case 'adv:cway': createWay(v); return true;
+      case 'adv:newworld': A.newWorld(); return true;
       case 'docreate': A.beforeCreate(); return false;   // (ui.js makes the world)
       default: return false;
     }
@@ -450,6 +474,7 @@
     const op = ui.pause; ui.pause = function () { const r = op.apply(this, arguments); try { pauseButton(); } catch (e) { console.warn('adventure', e); } return r; };
     const os = ui.show; ui.show = function (id) { const r = os.apply(this, arguments); try { if (id === 'create') createRow(); A.renderHud(); } catch (e) { console.warn('adventure', e); } return r; };
     const oa = ui.act; ui.act = function (a, b) { if (A.act(a, b, this)) return; return oa.apply(this, arguments); };
+    const ST = VR.Start; if (ST && ST.renderMeins && !ST.renderMeins.__adv) { const orm = ST.renderMeins; ST.renderMeins = async function () { const r = await orm.apply(this, arguments); try { A.meinsTile(); } catch (e) { console.warn('adventure', e); } return r; }; ST.renderMeins.__adv = true; }
     if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { try { if (ui.screen === 'create') createRow(); if (ui.screen === 'adventure') A.renderCard(); if (ui.screen === 'advstats') A.renderStats(); } catch (e) { console.warn('adventure', e); } });
     if (!A.timer) A.timer = setInterval(A.tick, 500);
   };
@@ -537,6 +562,9 @@
 .advresp { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
 .advresp .note, .advsn { font-size: 14px; color: var(--muted); }
 .advsn { margin-top: 10px; line-height: 1.35; }
+#meins .advtile { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 18px; border-radius: 16px; border: 2px solid rgba(255, 209, 102, .55); background: linear-gradient(120deg, rgba(255, 190, 80, .22), rgba(20, 28, 52, .92) 62%); color: var(--st-ink, #eef4ff); font: 700 calc(var(--st-fs, 18px) * 1.05) var(--st-font, sans-serif); text-align: left; cursor: pointer; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); }
+#meins .advtile small { font-weight: 500; font-size: calc(var(--st-fs, 18px) * .78); color: var(--st-mute, #a9b8d2); }
+#meins .advtile:hover, #meins .advtile:focus-visible { border-color: #ffd166; box-shadow: 0 0 0 3px rgba(255, 209, 102, .35), 0 10px 30px rgba(0, 0, 0, .4); outline: none; }
 #pause .advbtn.on { border-color: rgba(255, 209, 102, .7); box-shadow: 0 0 0 1px rgba(255, 209, 102, .3), 0 0 16px rgba(255, 190, 80, .25); }
 @media (max-width: 700px) { #advhud { left: 8px; top: 8px; } #advhud .ring { width: 48px; height: 48px; } .advsum { grid-template-columns: 80px 1fr; } .advsum .bigring { width: 80px; height: 80px; } }
 @media (prefers-reduced-motion: reduce) { #advup .rays, #advup .sparks { display: none; } #advup.on, #advup.off, #advhud.up .ring, #advhud.pop, #advhud .fl { animation-duration: .01s; } #advhud .ring .arc { transition: none; } }
