@@ -383,7 +383,8 @@
       let W = Math.max(2, Math.floor(this.canvas.clientWidth * dpr)), H = Math.max(2, Math.floor(this.canvas.clientHeight * dpr));
       // F10 · dprLite (ipu.js backing): never larger than the physical screen; on Ultra · Leicht at most 1920 × 1080 worth of pixels
       if (this.q.dprLite && VR.IPU) { const sc = window.screen || {}, b = VR.IPU.backing(this.canvas.clientWidth, this.canvas.clientHeight, window.devicePixelRatio || 1, this.q.maxDpr || 1.5, sc.width, sc.height, true, !!this.q.dprCap, this._bk || (this._bk = {})); W = b.W; H = b.H; }
-      const sc = this.q.scale;
+      if (this.capK) { W = Math.floor(W * this.capK); H = Math.floor(H * this.capK); }   // (t-first · 📷: the photo's frame at k × the screen)
+      const sc = this.capK ? 1 : this.q.scale;
       const w = Math.max(2, Math.floor(W * sc)), h = Math.max(2, Math.floor(H * sc));
       if (!force && W === this.W && H === this.H && w === this.w && h === this.h) return;
       // only touch the canvas when its size really changes: re-assigning width/height reallocates the drawing buffer
@@ -403,6 +404,7 @@
       this.sceneCol = GL.tex2D(w, h, sf[0], sf[1], sf[2], {});
       this.sceneDepth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
       this.sceneFB = GL.fbo([this.sceneCol], this.sceneDepth);
+      if (!this.sceneFB && this.capK) { this.capFail = true; return; }   // (t-first · 📷: too big for this GPU — the photo is refused, the formats stay)
       if (!this.sceneFB && this._sf.name === 'R11F_G11F_B10F') { GL.r11 = false; return this.resize(true); }   // (F10: refused after all → RGBA16F)
       if (!this.sceneFB && this.hdr) { this.hdr = false; return this.resize(true); }
       this.copyCol = GL.tex2D(w, h, sf[0], sf[1], sf[2], {});
@@ -2250,6 +2252,30 @@
       this.gpuTimerEnd();
       if (this.upQ) this.upGauge(this.upQ, performance.now());   // (F10: a fence after the frame that uploaded)
       this.stats.ms = performance.now() - t0;
+      if (this.capNext && !this.capK) this.captureNow(F);   // (t-first · 📷: a photo asked for — this frame once more at 2×)
+    }
+    // t-first · 📷 Fotomodus (photomode.js): the frame just drawn once more at k × the screen's pixels — scale 1, no upscaler —
+    // read back from the drawing buffer, then the size as it was and the frame again at it (in the same task: the canvas
+    // never shows the big one). k is cut to what the GPU takes; a size it refuses gives null. capNext = { k, cb(img|null) }
+    captureNow(F) {
+      const job = this.capNext; this.capNext = null; if (!job) return;
+      const gl = this.gl, vp = gl.getParameter(gl.MAX_VIEWPORT_DIMS) || [4096, 4096];
+      const lim = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 4096, vp[0], vp[1]);
+      const k = Math.max(1, Math.min(job.k || 2, lim / Math.max(1, this.W, this.H)));
+      let out = null;
+      try {
+        this.capK = k; this.capFail = false; this.resize(true);
+        if (this.sceneFB && !this.capFail) {
+          this.render(F);
+          const w = this.W, h = this.H, data = new Uint8Array(w * h * 4);
+          gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data);
+          out = { w, h, k, data };
+        }
+      } catch (e) { console.warn('photo', e); out = null; }
+      this.capK = 0; this.capFail = false; this.resize(true);
+      try { this.render(F); } catch (e) { /* the next frame draws */ }
+      try { job.cb(out); } catch (e) { console.warn('photo', e); }
     }
 
     // ------------------------------------------------ planar water reflection (F7)

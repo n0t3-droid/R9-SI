@@ -36,7 +36,7 @@
     { id: 'wp', group: 'act', names: ['KeyN'], def: ['KeyN', ''] },
     { id: 'chat', group: 'act', names: ['KeyT'], def: ['KeyT', ''] },
     { id: 'cmd', group: 'act', names: ['Slash'], def: ['Slash', ''] },
-    { id: 'photo', group: 'act', names: ['KeyP'], def: ['KeyP', ''] },
+    { id: 'photo', group: 'act', names: ['KeyP', 'F8'], def: ['KeyP', 'F8'] },   // (t-first: F8 opens the 📷 Fotomodus too)
     { id: 'zoom', group: 'act', names: ['KeyC'], def: ['KeyC', ''] },
     { id: 'veh', group: 'act', names: ['KeyV'], def: ['KeyV', ''] },
     { id: 'auto', group: 'act', names: ['KeyG'], def: ['KeyG', ''] },

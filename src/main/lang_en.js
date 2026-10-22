@@ -52,6 +52,12 @@
     'g.load.terrain': 'Generating terrain…',
     'g.load.meshes': 'Building meshes…',
     'g.load.horizon': 'Preloading the horizon…',
+    // t-first · the loading screen's phases (first.js): one sentence each, the counts under the bar
+    'g.load.p.gen': 'Shaping the hills …',
+    'g.load.p.mesh': 'Building the town …',
+    'g.load.p.up': 'Setting the light …',
+    'g.load.p.far': 'Painting the distance …',
+    'g.load.counts': 'Generated {g}/{gn} · Built {m}/{n} · Uploaded {u}/{n}',
     'g.load.saving': 'Saving…',
     'g.load.sleeping': 'Sleeping…',
     'g.load.joining': 'Joining {name}…',
@@ -703,6 +709,9 @@
     'g.wow.lookout': 'The Lookout on the Ridge',
     'g.wow.hills': 'The Pod Hills',
     'g.wow.view': 'A View',
+    // t-first · a new world opens on its finest vista at the golden hour (first.js)
+    'g.set.vistaStart': 'Start at a vista point',
+    'g.set.vistaStart.tip': 'A new world begins at its finest vista point, in the golden hour under a clear sky — with a wow moment. Off: in the temple\'s hangar hall.',
     // creatures and biomes (names in the codex)
     'g.mob.glimmer_deer': 'Glimmer Deer', 'g.mob.moss_boar': 'Moss Boar', 'g.mob.sky_ray': 'Sky Ray', 'g.mob.crystal_crab': 'Crystal Crab', 'g.mob.ember_husk': 'Ember Husk',
     'g.mob.void_stalker': 'Void Stalker', 'g.mob.shard_wisp': 'Shard Wisp', 'g.mob.pond_duck': 'Pond Duck', 'g.mob.bloom_sheep': 'Bloom Sheep', 'g.mob.hover_drone': 'Hover Drone',
@@ -995,6 +1004,11 @@
     'g.chat.zen': 'Zen Builder: no mobs, no damage, no hunger. Freeze time & weather in the Esc menu.',
     'g.chat.noShot': 'Screenshot not available here.',
     'g.chat.photo': 'Photo mode — F2 to capture · Esc to exit',
+    // t-first · 📷 photo mode (photomode.js)
+    'g.photo.hint': '📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · F2, Enter or click: photo (2×) · Esc: back',
+    'g.photo.short': '📷 Photo mode · F2 or click: photo · Esc: back',
+    'g.photo.saved': 'Saved: {n} ({w} × {h})',
+    'g.photo.fail': '📷 That photo did not work — the graphics memory is too small for twice the size.',
     'g.chat.bedGone': 'Your bed is missing — back to your spot.',
     'g.chat.spawnSetGuest': 'Your spot is here now. (In a friend\'s world only the host can sleep through the night.)',
     'g.chat.morning': 'Good morning! Your spot is here now.',

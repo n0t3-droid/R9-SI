@@ -52,6 +52,12 @@
     'g.load.terrain': 'Land wird geformt …',
     'g.load.meshes': 'Blöcke werden gebaut …',
     'g.load.horizon': 'Der Horizont wird vorgeladen …',
+    // t-first · the loading screen's phases (first.js): one sentence each, the counts under the bar
+    'g.load.p.gen': 'Die Hügel werden geformt …',
+    'g.load.p.mesh': 'Die Stadt wird gebaut …',
+    'g.load.p.up': 'Das Licht wird gesetzt …',
+    'g.load.p.far': 'Die Ferne wird gemalt …',
+    'g.load.counts': 'Erzeugt {g}/{gn} · Gebaut {m}/{n} · Hochgeladen {u}/{n}',
     'g.load.saving': 'Speichern …',
     'g.load.sleeping': 'Gute Nacht …',
     'g.load.joining': 'Auf dem Weg zu {name} …',
@@ -703,6 +709,9 @@
     'g.wow.lookout': 'Der Aussichtsturm auf dem Grat',
     'g.wow.hills': 'Die Kuppelhügel',
     'g.wow.view': 'Aussicht',
+    // t-first · a new world opens on its finest vista at the golden hour (first.js)
+    'g.set.vistaStart': 'Start auf dem Aussichtspunkt',
+    'g.set.vistaStart.tip': 'Eine neue Welt beginnt an ihrem schönsten Aussichtspunkt, zur goldenen Stunde und bei klarem Himmel — mit einem Wow-Moment. Aus: in der Hangarhalle des Tempels.',
     // Wesen und Biome (Namen im Codex)
     'g.mob.glimmer_deer': 'Glimmerhirsch', 'g.mob.moss_boar': 'Mooskeiler', 'g.mob.sky_ray': 'Himmelsrochen', 'g.mob.crystal_crab': 'Kristallkrabbe', 'g.mob.ember_husk': 'Glutschale',
     'g.mob.void_stalker': 'Leerenschleicher', 'g.mob.shard_wisp': 'Scherbenirrlicht', 'g.mob.pond_duck': 'Teichente', 'g.mob.bloom_sheep': 'Blütenschaf', 'g.mob.hover_drone': 'Schwebedrohne',
@@ -995,6 +1004,11 @@
     'g.chat.zen': 'Zen-Bauen: keine Monster, kein Schaden, kein Hunger. Zeit & Wetter hältst du im Esc-Menü an.',
     'g.chat.noShot': 'Hier geht kein Foto.',
     'g.chat.photo': 'Foto-Modus — F2 macht das Foto · Esc beendet',
+    // t-first · 📷 Fotomodus (photomode.js)
+    'g.photo.hint': '📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück',
+    'g.photo.short': '📷 Fotomodus · F2 oder Klick: Foto · Esc: zurück',
+    'g.photo.saved': 'Gespeichert: {n} ({w} × {h})',
+    'g.photo.fail': '📷 Dieses Foto ging nicht — der Grafikspeicher reicht nicht für die doppelte Größe.',
     'g.chat.bedGone': 'Dein Bett ist weg — zurück an deinen Platz.',
     'g.chat.spawnSetGuest': 'Mein Platz ist jetzt hier. (In der Welt eines Freundes kann nur der Host die Nacht durchschlafen.)',
     'g.chat.morning': 'Guten Morgen! Mein Platz ist jetzt hier.',

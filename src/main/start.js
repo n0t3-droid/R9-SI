@@ -39,6 +39,8 @@
     const title = $('#title'); if (!title) return;
     const splash = $('#splash'), gpu = $('#gpuinfo');
     title.innerHTML = '';
+    // (t-first: the golden-hour backdrop behind the tiles until the living title's first frame — titlescene.js adds .live)
+    const bg = el('div', 'tbg'); bg.setAttribute('aria-hidden', 'true'); title.appendChild(bg);
     const box = el('div', 'start');
     const strip = el('div', 'strip');
     const sw = el('div', '', ''); sw.id = 'proSwitch';
@@ -108,14 +110,19 @@
   ST.render = () => { texts(); ST.listWorlds().then(() => texts()); };
   ST.listWorlds = async function () {
     const g = game(); if (!g || !g.store) return [];
+    if (g.state === 'boot' && g.bootReady && !g.storeOpened) return ST.worldsCache || [];   // (t-first: the start screen stands before the store is open — '▶ …' until then)
     let ws = []; try { ws = await g.store.listWorlds(); } catch (e) { ws = []; }
     ST.worldsCache = ws.filter(w => w && w.id && !w.guest).sort((a, b) => (b.lastPlayed || 0) - (a.lastPlayed || 0));
     return ST.worldsCache;
   };
 
   // ---------------------------------------------------------------- ▶ one click into a world
+  // (t-first: the start screen stands before the textures are in — a ▶ then shows their loading screen and goes on when
+  // the game is ready: g.bootReady)
+  const ready = async (g) => { if (g && g.state === 'boot' && g.bootReady) { if (g.ui) g.ui.loading(t('g.load.textures'), 0.05); await g.bootReady; } return !!g && g.state === 'title'; };
+  ST.ready = ready;
   ST.play = async function () {
-    const g = game(); if (!g || g.state !== 'title') return false;
+    const g = game(); if (!(await ready(g))) return false;
     if (VR.Hints) VR.Hints.done('play');
     const ws = await ST.listWorlds();
     if (!ws.length) return ST.newWorld();
@@ -124,20 +131,20 @@
   };
   // „Meine Welt" (Zen, Realm), „Meine Welt 2", …
   ST.newWorld = async function () {
-    const g = game(); if (!g || g.state !== 'title') return false;
+    const g = game(); if (!(await ready(g))) return false;
     const ws = await ST.listWorlds(), base = tx('start.myWorld', null, 'Meine Welt', 'My World');
     const n = ws.filter(w => String(w.name || '').startsWith(base)).length;
-    g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
+    g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true, first: true });   // (first: t-first — it opens on its finest vista)
     return true;
   };
   // 🧸 Kindersicher: a peaceful Zen world (no hostile creatures) — the last one of that kind, or a new "Kinderwelt"
   ST.kids = async function () {
-    const g = game(); if (!g || g.state !== 'title') return false;
+    const g = game(); if (!(await ready(g))) return false;
     g.settings.kids = true; g.saveSettings();
     const ws = await ST.listWorlds();
     const zen = ws.find(w => w && w.mode === 'zen' && w.difficulty === 'peaceful');
     if (zen) { g.loadWorld(zen); return true; }
-    g.createWorld({ name: tx('start.kidsWorld', null, 'Kinderwelt', 'Kids world'), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
+    g.createWorld({ name: tx('start.kidsWorld', null, 'Kinderwelt', 'Kids world'), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true, first: true });
     return true;
   };
   ST.bauen = async function () {
@@ -218,7 +225,7 @@
           <div id="zenpanel" class="col gap"></div>
           <button type="button" class="btn studio pro" data-act="studiolive" id="studiolive" data-t="g.pause.studio" data-tt="g.pause.studioTip"></button>
           <button type="button" class="btn pro" data-act="codex" data-t="g.pause.codex"></button>
-          <button type="button" class="btn pro" data-act="photo" data-t="g.pause.photo"></button>
+          <button type="button" class="btn" data-act="photo" data-t="g.pause.photo"></button>
         </div>
         <div class="pgrp pbottom">
           <button type="button" class="btn" data-act="settings" data-t="g.pause.settings"></button>
@@ -351,7 +358,8 @@
     if (playing && !hintState.wasPlay) { hintState.lastPos = null; handIn(g); }
     hintState.wasPlay = playing;
     if (!playing) { if (H.current()) H.dismiss(); return; }
-    if (g.ui.screen || g.ui.typing) return;   // a menu is open: wait
+    if (g.photoCam && g.photoCam.on) { if (H.current()) H.dismiss(); return; }   // (t-first · 📷: the photo mode has its own line — no move hint over the picture)
+    if (g.ui.screen || g.ui.typing || (g.wow && g.wow.active) || g.arrival) return;   // a menu is open (or the arrival, a wow moment holds the view): wait
     const now = performance.now();
     if (!hintState.lastPos) { hintState.lastPos = p.pos.slice(); hintState.standAt = now; }
     const inp = g.input, keys = !!(inp && (inp.down('KeyW') || inp.down('KeyA') || inp.down('KeyS') || inp.down('KeyD')));
