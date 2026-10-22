@@ -34,13 +34,6 @@
     const at = this.l2At || (this.l2At = [NaN, NaN, NaN]), jump = !c || !(Math.abs(c.x - at[0]) + Math.abs(c.y - at[1]) + Math.abs(c.z - at[2]) < 6);
     if (c) { at[0] = c.x; at[1] = c.y; at[2] = c.z; }
     this.l2EyeSky = this.l2EyeSky === undefined || jump ? es : this.l2EyeSky + (es - this.l2EyeSky) * 0.1;
-    // t-polish2 · the canopy over the eye (L2.canopy: leaves over nine columns round it), every eighth frame, eased — the
-    // volumetric light's gap weight (High/Ultra); 0 in the open
-    if (q.l2Vol && w && w.getBlock && c && ((this.frameNo & 7) === 0 || jump)) {
-      const RR = VR.R, FF = VR.F, cv = L2.canopy((x, y, z) => { const s = w.getBlock(x, y, z); return !!s && (RR.T.flags[s] & FF.LEAVES) !== 0; }, Math.floor(c.x), Math.floor(c.y), Math.floor(c.z));
-      this.l2CanopyT = cv;
-    }
-    this.l2Canopy = jump ? (this.l2CanopyT || 0) : (this.l2Canopy || 0) + ((this.l2CanopyT || 0) - (this.l2Canopy || 0)) * 0.1;
     // t-polish2 · the room's air (L2.ROOM): indoors, the lamps' colour round the eye (seven cells, every fourth frame),
     // eased like the eye's sky light; outdoors its density falls to 0
     if (q.l2Air) {
@@ -205,7 +198,6 @@
     if (p.u.u_volSky) gl.uniform1f(p.u.u_volSky, K.sky);
     if (p.u.u_volShaft) gl.uniform1f(p.u.u_volShaft, K.shaft);
     if (p.u.u_volF) gl.uniform2f(p.u.u_volF, 1 / K.fade, L2.volCover(sunUp));
-    if (p.u.u_volGap) gl.uniform2f(p.u.u_volGap, this.l2Canopy || 0, sunUp ? K.gap * L2.volGapSun(L[1]) : 0);   // (t-polish2: the canopy's gaps)
     gl.uniform1f(p.u.u_phase, this.jit ? (this.frameNo * 0.6180339887) % 1 : 0);
     const px = V.w * V.h;
     this.fsMark('l2vol', V.w, V.h, px * 4 * (K.steps + 2), px * 8, px * (K.steps + 2));

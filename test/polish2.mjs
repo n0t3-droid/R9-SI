@@ -479,9 +479,10 @@ const SHEET = [
   ['floor_noon', 'hall_noon', 't1_22', '1 Hallenboden: Strasse unterm Glasdach, Mittag'],
   ['vista', 'vista_cit_vnight', 't1_05', `2 Zitadelle aus ${vCit ? vCit.d : '?'} m bei Nacht: Lichter in der Ferne, kleinere Laternenhalos`],
   ['vista_lh', 'vista_lh_vnight', 't1_07', `2 Leuchtturm-Aussicht (${vLh ? vLh.id : '?'}) bei Nacht`],
-  ['shafts', 'wood_noon', 't1_09', '3 Wald (natuerlich) zu Mittag: Lichtschaechte'],
-  ['shafts_golden', 'wood_golden', 't1_07', '3 Wald (natuerlich), goldene Stunde'],
-  ['shafts_planted', 'trees_noon', 't1_09', '3 Gepflanzter Wald (light2.mjs) zu Mittag: geschlossenes Dach'],
+  // (gap 3 taken back: its after is the canopy weight's attempt of the second run — the final march is v0.48's, so the
+  //  final wood is the picture before; the attempt's pictures are kept as polish2_wood_*_gapboost.png)
+  ['shafts', 'wood_noon', 't1_09', '3 Wald zu Mittag: rechts der Versuch (Lichtschacht-Gewicht) - zurueckgenommen, er bleichte die Lichtung aus; final = links (v0.48)', 'gapboost'],
+  ['shafts_golden', 'wood_golden', 't1_07', '3 Wald, goldene Stunde: rechts der Versuch - zurueckgenommen; final = links (v0.48)', 'gapboost'],
   ['golden', 'hills_golden', 't1_07', '4 Goldene Stunde: Huegel'],
   ['golden_av', 'avenue_golden', 't1_09', '4 Goldene Stunde: Allee'],
   ['villa', 'glass_glass', 't1_24', '5 Villa Nova: Fenster spiegeln den Himmel, goldene Stunde'],
@@ -494,8 +495,10 @@ function sheet() {
   const PY = '/root/r9coord/sheet.py';
   if (!fs.existsSync(PY)) { console.log(`  (no ${PY}: no sheet)`); return; }
   // the pairs under the gaps' names (polish2_<gap>_{before,after}.png) and the sheet
-  for (const [gap, view] of SHEET) for (const t of ['before', 'after']) if (fs.existsSync(shot(view, t))) fs.copyFileSync(shot(view, t), `${SHOTS}polish2_${gap}_${t}.png`);
-  const spec = { cols: ['Trailer', 'Vorher (v0.48)', 'Nachher'], w: 560, rows: SHEET.map(([gap, , f, l]) => ({ label: l + (f ? `  [Trailer ${f}]` : '  [kein Trailerbild]'), imgs: [f ? FRAMES + f + '.jpg' : null, fs.existsSync(`${SHOTS}polish2_${gap}_before.png`) ? `${SHOTS}polish2_${gap}_before.png` : null, fs.existsSync(`${SHOTS}polish2_${gap}_after.png`) ? `${SHOTS}polish2_${gap}_after.png` : null] })) };
+  // (a row's fifth field names the tag its right-hand picture comes from: 'gapboost', an attempt taken back)
+  for (const [gap, view, , , at] of SHEET) for (const t of ['before', at || 'after']) if (fs.existsSync(shot(view, t))) fs.copyFileSync(shot(view, t), `${SHOTS}polish2_${gap}_${t}.png`);
+  const pic = (gap, t) => (fs.existsSync(`${SHOTS}polish2_${gap}_${t}.png`) ? `${SHOTS}polish2_${gap}_${t}.png` : null);
+  const spec = { cols: ['Trailer', 'Vorher (v0.48)', 'Nachher'], w: 560, rows: SHEET.map(([gap, , f, l, at]) => ({ label: l + (f ? `  [Trailer ${f}]` : '  [kein Trailerbild]'), imgs: [f ? FRAMES + f + '.jpg' : null, pic(gap, 'before'), pic(gap, at || 'after')] })) };
   const sp = `${ROOT}.tmp_tests/polish2_sheet.json`;
   fs.writeFileSync(sp, JSON.stringify(spec, null, 1));
   try { console.log('  sheet ' + execFileSync('python3', [PY, `${SHOTS}polish2_sheet.jpg`, sp]).toString().trim()); } catch (e) { console.log(`  !! the sheet: ${String(e.message || e).split('\n')[0].slice(0, 200)}`); }
@@ -505,16 +508,21 @@ async function report() {
   const load = (t) => { try { return JSON.parse(fs.readFileSync(`${SHOTS}polish2_${t}.json`, 'utf8')); } catch (e) { return null; } };
   const B = load('before'), A = load('after'), out = {};
   const both = (f) => [B ? f(B) : null, A ? f(A) : null];
-  // gap 3: on − novol (the volumetric pass's light alone) at noon — and the natural wood at the golden hour
+  // gap 3: on − novol (the volumetric pass's light alone) at noon — and the natural wood at the golden hour. The wood's
+  // 'after' of the second run is the canopy weight's attempt (kept as tag 'gapboost'; taken back: the final march is
+  // v0.48's, test/polish2.js 3): how much the pass adds and how much of the picture it blows out (> L* 85)
   for (const [v, t0] of [['wood', 'noon'], ['wood', 'golden'], ['trees', 'noon'], ['lake', 'noon'], ['temple', 'noon']]) {
-    const d = [];
-    for (const t of ['before', 'after']) { const on = shot(`${v}_${t0}`, t), nv = shot(`${v}_${t0}_novol`, t); d.push(fs.existsSync(on) && fs.existsSync(nv) ? await dEsoft(on, nv) : null); }
+    const d = [], tags = v === 'wood' ? ['before', 'gapboost'] : ['before', 'after'];
+    for (const t of tags) {
+      const on = shot(`${v}_${t0}`, t), nv = shot(`${v}_${t0}_novol`, t);
+      if (!fs.existsSync(on) || !fs.existsSync(nv)) { d.push(null); continue; }
+      const e = await dEsoft(on, nv), so = await statsOf(on), sn = await statsOf(nv);
+      d.push(Object.assign(e, { b85: r2(so.b85 - sn.b85) }));
+    }
     out[`shafts_${v}_${t0}`] = d;
-    console.log(`  3 · ${v} at ${t0}, on − novol ΔE: before ${d[0] ? d[0].mean : '—'} · after ${d[1] ? d[1].mean : '—'}`);
+    console.log(`  3 · ${v} at ${t0}, on − novol ΔE (the share it blows out > L* 85): ${tags[0]} ${d[0] ? d[0].mean + ' (' + d[0].b85 + ' %)' : '—'} · ${tags[1]} ${d[1] ? d[1].mean + ' (' + d[1].b85 + ' %)' : '—'}`);
   }
-  const sw = out.shafts_wood_noon;
-  if (sw && sw[0] && sw[1]) check(sw[1].mean >= 0.6 && sw[1].mean >= 2 * sw[0].mean, `3 · the natural wood's shafts at noon show: on − novol ΔE ${sw[0].mean} → ${sw[1].mean} (≥ 0.6, ≥ ×2)`);
-  // (the open land has no canopy over the eye: its air is untouched — the same light of the pass before and after)
+  // (the open land has no canopy over the eye: the pass's light there as before)
   for (const v of ['lake', 'temple']) { const d = out[`shafts_${v}_noon`]; if (d && d[0] && d[1]) check(d[1].mean <= d[0].mean + 0.3, `3 · the open ${v} not veiled more than before: on − novol ΔE ${d[0].mean} → ${d[1].mean}`); }
   // gap 4: the golden land against the frames (world A's six views: the same world in both builds — the hall city's floor
   // is vgen 12's porcelain after, which moves its land by itself)

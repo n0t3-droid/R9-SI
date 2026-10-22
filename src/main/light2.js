@@ -313,7 +313,7 @@
   // The moon (run 4: at dusk, the moon 4° up, the eye's shade and the new weight drew a grainy blue fan over the villa's
   // lawn): its phase run 3's (gMoon 0.35), no eye's shade, its strength 0.7 — its light in the air under run 3's for
   // every ray (test/light2.js h)
-  L2.VOL = { steps: 16, reach: 120, g: 0.55, gMoon: 0.35, sun: 0.4, moon: 0.7, indoor: 2.5, sky: 0.25, kScale: 0.7, shaft: 20, fade: 64, cover: 1.5, gap: 12 };
+  L2.VOL = { steps: 16, reach: 120, g: 0.55, gMoon: 0.35, sun: 0.4, moon: 0.7, indoor: 2.5, sky: 0.25, kScale: 0.7, shaft: 20, fade: 64, cover: 1.5 };
   L2.volG = (sunUp) => (sunUp ? L2.VOL.g : L2.VOL.gMoon);
   L2.volCover = (sunUp) => (sunUp ? L2.VOL.cover : 0);
   L2.volK = function (sunUp, rain, eyeSky) {
@@ -323,23 +323,9 @@
   // (JS mirror of the march's weight: lit = the share of the ray in the light, its density-weighted length; the weight
   // 6.75 · lit · (1 − lit)² peaks at a third lit)
   L2.volShaft = (lit) => 1 + L2.VOL.shaft * 6.75 * lit * (1 - lit) * (1 - lit);
-  // t-polish2 · the canopy's gaps (gap 3: the wood's shafts barely showed at noon — on − novol ΔE 0.03): the march counts the
-  // ray's crossings between light and shade (Σ|vis_i − vis_i−1|: 0 in the open or all in shade, 2 and more where it crosses
-  // shafts) and, under a canopy (the eye's: leaves over the columns round it, L2.canopy), the air of a ray that crosses
-  // shafts is ×(1 + gap·canopy·smoothstep(1, 3, crossings)), strongest with the sun high (noon), a little at the golden
-  // hour (it showed there already). The open land has no canopy: its air is untouched (run 3's veil cannot come back).
-  L2.volGap = (canopy, crossings, sunY) => 1 + L2.VOL.gap * clamp(canopy, 0, 1) * sstep(1, 3, crossings) * L2.volGapSun(sunY);
-  L2.volGapSun = (sunY) => 0.35 + 0.65 * sstep(0.12, 0.32, sunY === undefined ? 0.4 : sunY);
-  // the crossings of a march's visibilities (the JS mirror of the shader's count)
-  L2.crossings = (vis) => { let c = 0; for (let i = 1; i < vis.length; i++) c += Math.abs(vis[i] - vis[i - 1]); return c; };
-  // the canopy over the eye: of nine columns round it (3 blocks apart), the share with leaves within 12 blocks over the eye
-  // (isLeaf(x, y, z) → bool), eased in: a wood's broken canopy (half its columns) counts full, a lone crown a little
-  L2.CANOPY = { step: 3, up: 12, lo: 0.1, hi: 0.6 };
-  L2.canopy = function (isLeaf, ex, ey, ez) {
-    const C = L2.CANOPY; let n = 0;
-    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { for (let u = 1; u <= C.up; u++) if (isLeaf(ex + dx * C.step, ey + u, ez + dz * C.step)) { n++; break; } }
-    return sstep(C.lo, C.hi, n / 9);
-  };
+  // (t-polish2 tried a canopy weight on top — the air of a ray crossing light and shade under leaves ×13 at noon: in its
+  // second browser run it drew nothing under the canopy and turned a wood's opening toward the sunlit land into a white,
+  // blocky veil; taken back — the march is v0.48's. Plan 2026-10-16-t-polish2.md §3 Results)
   // the sun's flare: its strength (HDR, before the exposure) and the disc's radius (screen heights) its visibility is read in
   L2.FLARE = { k: 0.05, disc: 0.012 };
   // blue noise (void and cluster, Ulichney 1993): an N × N tiling threshold map whose values are spread with no low
@@ -557,7 +543,6 @@ uniform vec3 u_volL;       // toward the light
 uniform float u_volSky;    // the share of a ray to the sky
 uniform float u_volShaft;  // the shafts' boost (L2.volShaft): a ray part lit, mostly in shadow shows the air most
 uniform vec2 u_volF;       // x 1 / the far air's fade (blocks), y the eye's shade: the air ×(1 + y) where the eye is in shadow
-uniform vec2 u_volGap;     // t-polish2: x the canopy over the eye (0 in the open), y the gain by the sun's height (L2.volGap)
 uniform float u_phase;
 in vec2 v_uv;
 out vec4 o;
@@ -572,15 +557,14 @@ void main() {
   float n = u_vol.x, dt = T / n;
   float j = fract(texture(u_blue, gl_FragCoord.xy / 64.0).r + u_phase);
   vec3 s0 = (u_shadowMat * vec4(0.0, 0.0, 0.0, 1.0)).xyz, s1 = (u_shadowMat * vec4(dir * T, 1.0)).xyz;
-  float acc = 0.0, tot = 0.0, eye = 1.0, pv = 0.0, crs = 0.0;
+  float acc = 0.0, tot = 0.0, eye = 1.0;
   for (int i = 0; i < 16; i++) {
     if (float(i) >= n) break;
     float u = (float(i) + j) / n, f = u * u, t = f * T;
     vec3 sc = mix(s0, s1, f) * 0.5 + 0.5;
     float vis = 1.0;
     if (sc.x > 0.0 && sc.y > 0.0 && sc.x < 1.0 && sc.y < 1.0 && sc.z < 1.0) vis = texture(u_shadowMap, vec3(fract(sc.xy + u_shadowOff), sc.z - u_volH.w));
-    if (i == 0) eye = vis; else crs += abs(vis - pv);
-    pv = vis;
+    if (i == 0) eye = vis;
     float h = u_volH.x + dir.y * t;
     float w = exp(-u_volH.y * max(h - u_volH.z, ${(-L2.FOG_FLOOR).toFixed(1)})) * exp(-t * u_volF.x) * 2.0 * u * dt;
     acc += vis * w; tot += w;
@@ -589,7 +573,6 @@ void main() {
   // third is lit), denser where the eye itself stands in shadow
   float lit = acc / max(tot, 1e-6);
   acc *= (1.0 + u_volShaft * 6.75 * lit * (1.0 - lit) * (1.0 - lit)) * (1.0 + u_volF.y * (1.0 - eye));
-  acc *= 1.0 + u_volGap.y * u_volGap.x * smoothstep(1.0, 3.0, crs);   // (t-polish2: the canopy's gaps — L2.volGap)
   float c = dot(dir, u_volL), g = u_vol.w, g2 = g * g;
   float ph = (1.0 - g2) / pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5);
   o = vec4(u_volCol * (acc * u_vol.z * ph * (d >= 0.999999 ? u_volSky : 1.0)), linZ(d));

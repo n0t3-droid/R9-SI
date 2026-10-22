@@ -67,27 +67,17 @@ console.log('2 · the vistas at night: the far citadel\'s lights (gen_citadel.js
   check(/o\.size = HL\.size \* \(HZ\[L\[i \+ 3\]\] \? small : 1\);/.test(psrc), 'particles.js sizes each lamp\'s halo by its kind');
 }
 
-console.log('3 · the wood\'s shafts: the march weighted by the canopy\'s gaps (light2.js volGap, VOL_FS)');
+console.log('3 · the wood\'s shafts: the canopy weight taken back — the march is v0.48\'s (light2.js VOL_FS, light2_gl.js)');
 {
-  const L2 = V.Light2;
-  check(L2.crossings([1, 1, 1, 1]) === 0 && L2.crossings([0, 0, 0]) === 0 && L2.crossings([0, 1, 0, 1]) === 3 && Math.abs(L2.crossings([0, 0.5, 1]) - 1) < 1e-9, 'the crossings: 0 for a ray all lit or all in shade, one per edge between light and shade', L2.crossings([0, 1, 0, 1]));
-  const noon = 0.4, gold = 0.12;
-  check(L2.volGap(0, 6, noon) === 1 && L2.volGap(0.3, 6, noon) > 1, 'the open land (no canopy over the eye) is untouched, however broken its rays');
-  check(L2.volGap(1, 0, noon) === 1 && L2.volGap(1, 1, noon) === 1, 'under the canopy a ray that crosses no shaft (all shade, or one edge) is untouched');
-  const g2 = L2.volGap(1, 2, noon), g3 = L2.volGap(1, 3, noon), g5 = L2.volGap(1, 5, noon);
-  check(g2 > 1 && g3 > g2 && g5 === g3 && g3 === 1 + L2.VOL.gap, 'a ray that crosses shafts under the canopy: its air ×(1 + gap) from three crossings on', [g2, g3, g5].map(x => x.toFixed(2)).join(' · '));
-  check(L2.volGap(1, 3, gold) < L2.volGap(1, 3, noon) && L2.volGap(1, 3, gold) > 1 + L2.VOL.gap * 0.3, 'strongest with the sun high (noon\'s shafts were missing); at the golden hour a third of it (its shafts showed already)', L2.volGap(1, 3, gold).toFixed(2));
-  // the canopy over the eye: light2.mjs's wood (oaks 5 apart, crowns 5 wide, 4–6 high) and the open ground
-  const leaves = new Set();
-  for (let i = 0; i < 9; i++) for (let j = 0; j < 7; j++) { const x = i * 5 + (j % 2) * 2, z = j * 6 + (i % 3), h = 4 + ((i * 7 + j * 3) % 3); for (let dy = -2; dy <= 1; dy++) { const r = dy === 1 ? 1 : 2; for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) leaves.add((x + dx) + ',' + (h + dy) + ',' + (z + dz)); } }
-  const isLeaf = (x, y, z) => leaves.has(x + ',' + y + ',' + z);
-  const inWood = L2.canopy(isLeaf, 21, 1, 19), open = L2.canopy(isLeaf, 120, 1, 120);
-  const lone = L2.canopy((x, y, z) => x === 3 && z === 0 && y === 5, 0, 1, 0);
-  check(inWood >= 0.8 && open === 0 && lone < 0.2, 'the canopy over an eye in light2.mjs\'s wood (its broken crowns count full), under one column of a crown a little, on open ground none', [inWood, lone, open].map(x => x.toFixed(2)).join(' · '));
-  const fs = L2.VOL_FS;
-  check(/crs \+= abs\(vis - pv\)/.test(fs) && /acc \*= 1\.0 \+ u_volGap\.y \* u_volGap\.x \* smoothstep\(1\.0, 3\.0, crs\)/.test(fs), 'the march counts the crossings and weighs its air as L2.volGap does');
+  // (the second browser run, a natural wood at noon — test/shots/polish2_wood_noon_gapboost.png: the weight ×(1 + 12 ·
+  //  canopy · crossings) drew nothing under the canopy and turned the opening toward the sunlit land into a white, blocky
+  //  veil — a ray out of the wood crosses the trunks' shadows and then 100 blocks of lit air. Taken back; plan §3 Results)
+  const L2 = V.Light2, fs = L2.VOL_FS;
+  check(!/u_volGap|crs \+=|pv = vis/.test(fs) && /if \(i == 0\) eye = vis;\n/.test(fs) && /acc \*= \(1\.0 \+ u_volShaft \* 6\.75 \* lit \* \(1\.0 - lit\) \* \(1\.0 - lit\)\) \* \(1\.0 \+ u_volF\.y \* \(1\.0 - eye\)\);\n  float c = dot\(dir, u_volL\)/.test(fs), 'VOL_FS: no canopy weight, no crossings — the shaft weight and the eye\'s shade as in v0.48');
+  check(L2.VOL.gap === undefined && L2.volGap === undefined && L2.canopy === undefined, 'light2.js: no gap gain, no canopy measure');
   const gsrc = require('fs').readFileSync(__dirname + '/../src/main/light2_gl.js', 'utf8');
-  check(/u_volGap, this\.l2Canopy \|\| 0, sunUp \? K\.gap \* L2\.volGapSun\(L\[1\]\) : 0\)/.test(gsrc) && /L2\.canopy\(/.test(gsrc), 'light2_gl.js hands the canopy and the gain by the sun\'s height to the march (the moon\'s light none)');
+  check(!/u_volGap|l2Canopy|L2\.canopy\(/.test(gsrc), 'light2_gl.js: no canopy scan over the eye (it cost a leaf search every eighth frame)');
+  check(/const at = this\.l2At \|\| \(this\.l2At = \[NaN, NaN, NaN\]\), jump = /.test(gsrc) && /this\.l2EyeSky = this\.l2EyeSky === undefined \|\| jump \? es :/.test(gsrc), 'kept: a camera jump sets the eye\'s eased sky light and room air at once');
   check(V.Light2.defaults('potato').l2Vol === false && V.Light2.defaults('balanced').l2Vol === false && V.Light2.defaults('high').l2Vol === true, 'the volumetric light stays High and Ultra\'s (Very Low, Low, Balanced: no march, no cost)');
 }
 
