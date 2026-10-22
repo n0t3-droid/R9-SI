@@ -94,6 +94,7 @@
       const g = this.g;
       this.active = v; this.t = 0; this.e = 0; this.capMax = 1; this.count++;
       W.mark(g.meta, v.id);
+      if (VR.Adventure) VR.Adventure.award('wow', { id: v.id });   // a-core: a vista's wow moment is Abenteuer XP, once per vista (adventure.js)
       if (g.saveMeta) { try { g.saveMeta(); } catch (e) { /* saved with the next autosave */ } }
       const b = this.b; b.x = v.eye[0]; b.y = v.eye[1]; b.z = v.eye[2]; b.yaw = v.yaw; b.pitch = v.pitch; b.fov = v.fov * Math.PI / 180;
       this.saved = { hideHud: g.hideHud };

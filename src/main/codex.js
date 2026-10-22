@@ -52,9 +52,10 @@
       if (g.settings.toasts !== false && g.ui) g.ui.toast(T(e.catKey === 'milestones' ? 'g.codex.toastMilestone' : 'g.codex.toastFound'), e.text().name, e.icon && VR.itemDef(e.icon) ? e.icon : null);
       else if (g.audio) g.audio.play('achievement');
       if (g.audio && e.catKey === 'milestones') g.audio.play('achievement');
+      if (VR.Adventure) VR.Adventure.codexUnlock(id);   // a-core: a first find (a biome, a milestone, a creature met) is Abenteuer XP (adventure.js)
       return true;
     }
-    event(name) { this.unlock('m:' + name); }
+    event(name) { this.unlock('m:' + name); if (VR.Adventure) VR.Adventure.codexEvent(name); }   // a-core: the Abenteuer counts the repeatable ones (a blueprint built, the first flight)
     // item milestones only mean something in Survival
     get surv() { return this.g.player && this.g.player.mode === 'survival'; }
     onCraft(id) { const k = INV_TRIGGERS[id]; if (k && this.surv) this.unlock('m:' + k); }

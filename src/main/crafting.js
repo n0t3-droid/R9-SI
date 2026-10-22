@@ -264,6 +264,7 @@
     };
     g.addXP = (n) => {
       const p = g.player;
+      if (VR.Adventure) VR.Adventure.award('survival', { n });   // a-core: the Abenteuer listens and gives nothing for it — this XP comes from creatures and raids (A§0.3; adventure.js)
       p.xp += n / (7 + p.level * 2);
       while (p.xp >= 1) { p.xp -= 1; p.level++; g.audio.play('levelup'); }
       g.ui.updateHUD(true);
