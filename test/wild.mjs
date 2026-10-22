@@ -287,6 +287,40 @@ await shot('deer', async (out) => {
   return { x: ex, y: gy + 1 + EYE + 1, z: ez, tx: cx, ty: cy + 0.9, tz: cz, fov: 58 };
 });
 
+// the clearest view of a point from d blocks (sixteen places round it; the fewest blocks between) → {x, y, z, n}
+const clearView = async (P, dd, lift, prefer) => {
+  let best = null;
+  for (let k = 0; k < 16; k++) {
+    const a = k / 16 * Math.PI * 2 + (prefer || 0), ex = P[0] + Math.cos(a) * dd, ez = P[2] + Math.sin(a) * dd, gy = await A.groundY(ex, ez), ey = Math.max(gy + 1 + EYE, P[1] + lift);
+    const n = await A.blocked([ex, ey, ez], [P[0], P[1] + 0.4, P[2]]), score = n * 10 + Math.abs(ey - P[1] - lift) + k * 0.01;
+    if (!best || score < best.score) best = { score, n, x: ex, y: ey, z: ez };
+  }
+  return best;
+};
+// 8 rabbits at a field's edge by day (the pasture's lane by farm_c: bushes and hedges at the foot of the fields), seen
+// from 12.5 blocks — near enough to see them nibble, far enough that they only sit up
+await shot('rabbit', async (out) => {
+  await go(240, 90, -100, 4800);
+  let r = null, q = null;
+  for (let k = 0; k < 6 && !q; k++) { await A.step(120); r = await A.report(); q = r && r.rabbits && r.rabbits.find(b => b.state !== 'bolt'); }
+  if (!q) { out.error = 'no rabbit (cover ' + (r && r.cover) + ')'; return null; }
+  out.rabbit = q;
+  const v = await clearView(q.pos, 12.5, 1.9);
+  out.rabbitView = { blocked: v.n };
+  return { x: v.x, y: v.y, z: v.z, tx: q.pos[0], ty: q.pos[1] + 0.25, tz: q.pos[2], fov: 40 };
+});
+// 9 the fox at dusk along a hedge (a straight hedgerow by the way east of the origin), from its open side
+await shot('fox', async (out) => {
+  await go(88, 90, 57, 11200);
+  let r = null, f = null;
+  for (let k = 0; k < 10 && !f; k++) { await A.step(60); r = await A.report(); f = r && r.fox && r.fox.state !== 'slip' ? r.fox : null; }
+  if (!f) { out.error = 'no fox (cover ' + (r && r.cover) + ')'; return null; }
+  out.fox = f;
+  const v = await clearView(f.pos, 10, 1.9);
+  out.foxView = { blocked: v.n };
+  return { x: v.x, y: v.y, z: v.z, tx: f.pos[0], ty: f.pos[1] + 0.4, tz: f.pos[2], fov: 44 };
+});
+
 // ---------------------------------------------------------------- the sheet: off | on per shot (and the extras)
 try {
   const rows = [];
