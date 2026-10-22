@@ -335,13 +335,15 @@
         break;
       }
       case 'helper': {
-        f.helper = true; f.calm = 1; f.flare = 0; f.kneel = Math.max(0, f.kneel - dt * 1.5);
-        const hp = f.follow ? f.follow : pp;
+        f.helper = true; f.calm = 1; f.flare = 0;
+        const hp = f.follow ? f.follow : pp, near = f.sit ? 0.8 : 4.2;   // (at night by the home's door: close, and it sits)
+        let sat = false;
         if (hp && !K.fixed) {
           const hx = hp[0] - m.pos[0], hz = hp[2] - m.pos[2], d = Math.hypot(hx, hz);
-          if (d > 4.2) steer(m, hp[0] - hx / d * 3, hp[2] - hz / d * 3, Math.min(K.speed * 1.4, 0.8 + d * 0.5), dt);
-          else { stop(m, dt); faceTo(m, hx, hz, dt, 3); }
+          if (d > near) steer(m, f.sit ? hp[0] : hp[0] - hx / d * 3, f.sit ? hp[2] : hp[2] - hz / d * 3, Math.min(K.speed * 1.4, 0.8 + d * 0.5), dt);
+          else { stop(m, dt); if (!f.sit) faceTo(m, hx, hz, dt, 3); sat = !!f.sit; }
         } else stop(m, dt);
+        f.kneel = sat ? Math.min(1, f.kneel + dt * 2) : Math.max(0, f.kneel - dt * 1.5);
         hover(m, W, f, K, dt);
         break;
       }
