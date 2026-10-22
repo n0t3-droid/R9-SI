@@ -441,7 +441,7 @@ async function overlay(dir) {
 function compareRuns(before, after) {
   const mean = (v) => { const w = (v || []).filter(x => x !== null && x !== undefined); return w.length ? w.reduce((a, b) => a + b, 0) / w.length : null; };
   const rows = [], hours = {};
-  for (const a of after.results.filter(r => r.dE && r.preset === 'high')) {
+  for (const a of after.results.filter(r => r.dE && r.preset === 'high' && !r.variant)) {
     const b = before.results.find(x => x.view === a.view && x.preset === a.preset && x.dE);
     rows.push({ view: a.view, hour: a.hour, before: b ? b.dE : null, after: a.dE, mb: b ? mean(b.dE) : null, ma: mean(a.dE) });
     const h = hours[a.hour] || (hours[a.hour] = { a: [], b: [] });
@@ -475,7 +475,7 @@ if (require.main === module) {
       }
       // f-sky4 · the structure, the disc and the clouds of the run after (the review's R50-01 and R50-11 gates)
       const after = JSON.parse(fs.readFileSync(args[2], 'utf8'));
-      const G = gates((after.results || after.views || []).filter(v => !v.preset || v.preset === 'high'));
+      const G = gates((after.results || after.views || []).filter(v => (!v.preset || v.preset === 'high') && !v.variant));   // (sky3.mjs's palette variants are for the record)
       if (G.length) console.log('the review\'s gates (structure, the sun\'s disc, the storm\'s clouds) on ' + args[2]);
       for (const g of G) check(g.ok, g.msg);
       console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
