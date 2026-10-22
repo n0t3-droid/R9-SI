@@ -71,6 +71,12 @@ console.log('a · the switches');
   const DE = fs.readFileSync(SRC + '/lang_de.js', 'utf8'), EN = fs.readFileSync(SRC + '/lang_en.js', 'utf8');
   const keys = rows.flatMap(r => [r.lab, r.tip].concat(r.vals ? [r.vals] : []));
   check(keys.every(k => DE.includes(`'${k}'`) && EN.includes(`'${k}'`)), 'their labels and tips in German and English: ' + keys.join(' '));
+  // game.js hands the switches to the presets, to the saved settings and to the renderer (as t-light2's): without it every
+  // preset drew the old sky (the first lab run: sky3 0 on High)
+  const G = fs.readFileSync(SRC + '/game.js', 'utf8');
+  check(/for \(const p in PRESETS\) Object\.assign\(PRESETS\[p\], VR\.Sky3\.defaults\(p\)\)/.test(G), 'game.js: every preset takes its sky switches (VR.Sky3.defaults)');
+  check(/for \(const k of S3_SW\) if \(s\[k\] === undefined && s\.preset\)/.test(G), 'game.js: settings saved before follow their preset');
+  check(/for \(const k of S3_SW\) qb\[k\] =/.test(G), 'game.js: the renderer gets the switches (its defines)');
 }
 
 // ---------------------------------------------------------------- b · Very Low keeps its shaders
