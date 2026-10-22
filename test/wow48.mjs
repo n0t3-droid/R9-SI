@@ -388,7 +388,11 @@ async function shootView(A, v, path) {
   if (process.env.TRAIL && v.name === 'meadow') {
     const tp2 = path.replace('wow48_meadow_', 'wow48_meadow_trail_');
     out.trail = await A.ev(() => { const g = VR.game, D = g.lifeDirector; if (!D) return { ok: false, why: 'no director' }; D.update(0.01); const ev = D.force('flyover', { k: 777001 }); return { ok: !!ev, tag: ev ? ev.tag : null }; });
-    for (let i = 0; i < 40 && out.trail.ok; i++) { await A.step(30); const q = await A.ev((tag) => { const s = VR.game.traffic.ships.find(z => z.tag === tag && !z.wing); return s ? { t: +s.t.toFixed(3), pos: s.pos.map(x => Math.round(x)) } : null; }, out.trail.tag); out.trail.lead = q; if (!q || q.t > 0.56) break; }
+    // (the craft's design is built by a worker: the pass starts when it is there — up to 60 s by the clock; then a second
+    // of play at a time until the lead is past its nearest point)
+    const lead = () => A.ev((tag) => { const T = VR.game.traffic, s = T.ships.find(z => z.tag === tag && !z.wing); return s ? { t: +s.t.toFixed(3), pos: s.pos.map(x => Math.round(x)) } : { none: true, pending: T.pending | 0 }; }, out.trail.tag);
+    for (let i = 0; i < 120 && out.trail.ok; i++) { const q = await lead(); out.trail.lead = q; if (!q.none) break; await A.wait(500); await A.step(2); }
+    for (let i = 0; i < 60 && out.trail.ok && !out.trail.lead.none; i++) { await A.step(30); const q = await lead(); if (q.none) break; out.trail.lead = q; if (q.t > 0.56) break; }
     await A.step(75);
     out.trail.pic = await A.picture(tp2, { tod: null, frames: 4 });
     console.log(`  the meadow with a low pass: ${JSON.stringify(out.trail)}`);
