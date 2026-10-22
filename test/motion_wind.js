@@ -160,7 +160,10 @@ try {
 const LITE_DEFS = ['LITE'];   // the Very Low programs: the lite look and none of the fronts' switches
 if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'RAIN_VS', 'RAIN_FS', 'PART_VS', 'PART_FS', 'FURN_VS', 'PUFF_VS', 'PUFF_FS']) {
   const tidy = (t) => t.split('\n').map((l) => l.replace(/\s+$/, '')).filter((l) => l.length).join('\n');   // (a blank line changes no program)
-  const mine = tidy(pp(VR.SHADERS[k], LITE_DEFS)), was = tidy(pp(baseS[k], LITE_DEFS));
+  // (u-ascent: the climb's bend — u_curve, 0 on the ground: the same picture — is Very Low's one new line pair in
+  // TERRAIN_VS, on purpose; test/vl_programs.js counts it)
+  const noAscent = (t) => t.split('\n').filter((l) => !/\bu_curve\b|\bu_climbCut\b/.test(l)).join('\n');
+  const mine = tidy(noAscent(pp(VR.SHADERS[k], LITE_DEFS))), was = tidy(pp(baseS[k], LITE_DEFS));
   // (the base text's own COMMON resolved the same way: both strings come with COMMON inlined)
   let at = -1; if (mine !== was) { const a = mine.split('\n'), b = was.split('\n'); at = a.findIndex((l, i) => l !== b[i]); }
   check(mine === was, `${k} on Very Low (LITE, after the preprocessor) is v0.46's text (${mine.length} characters${at < 0 ? '' : ', first different line ' + (at + 1) + ': ' + mine.split('\n')[at].trim().slice(0, 80)})`);
