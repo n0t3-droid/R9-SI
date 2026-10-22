@@ -377,6 +377,7 @@
     respawn() {
       this.dead = false; this.health = 20; this.food = 20; this.sat = 5; this.air = 300; this.onFire = 0;
       const g = this.game, sp = this.spawn && this.spawn.every(v => isFinite(v)) ? this.spawn : g.worldSpawn();
+      if (VR.NewLife && VR.NewLife.respawn(g, this)) { g.ui && g.ui.updateHUD(true); return; }   // u-home: at your home on whatever world it is — there, or the instant trip there (newlife.js)
       if (VR.Travel && VR.Travel.respawn(g, this)) { g.ui && g.ui.updateHUD(true); return; }   // u-dims: on another world — its own place if you set one there, else home at once (never a respawn into its void)
       // a bed spawn remembers the bed; if it was broken meanwhile we fall back to the world spawn
       this.safeTeleport(sp[0], sp[1], sp[2], { bed: this.spawnBed || null });

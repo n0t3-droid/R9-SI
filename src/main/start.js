@@ -169,6 +169,7 @@
     $('.wn', c).textContent = w.name || tx('start.world', null, 'Welt', 'World');
     const when = w.lastPlayed ? new Date(w.lastPlayed).toLocaleString(VR.I18N ? VR.I18N.locale() : undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
     $('.wm', c).innerHTML = esc(modeName(w.mode)) + (when ? ' · ' + esc(when) : '') + `<span class="pro"> · Seed ${w.seed >>> 0}</span>`;
+    if (VR.NewLife) VR.NewLife.card(c, w);   // u-home: „Wohnt auf den Driftinseln · zuletzt auf Herzwelt", the home's body as a small lit disc
     const acts = $('.wacts', c);
     const BTN = [['play', tx('start.w.play', null, '▶ Spielen', '▶ Play'), 'primary'], ['bauen', tx('start.w.bauen', null, '🏗 Bauen', '🏗 Build'), ''], ['rename', tx('start.w.rename', null, '✎ Name', '✎ Rename'), ''], ['del', tx('start.del', null, '🗑 Löschen', '🗑 Delete'), 'danger']];
     if (zeit) BTN.splice(2, 0, ['zeit', tx('meins.zeit', null, '📽 Zeitraffer', '📽 Time-lapse'), '']);

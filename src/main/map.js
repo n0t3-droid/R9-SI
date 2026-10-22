@@ -181,6 +181,7 @@
           s += `<br><span style="color:#ffd166">⌂</span> ${nv.site.name} ${Math.round(nv.dist)}m ${arrow}`;
         }
       }
+      if (VR.NewLife) s += VR.NewLife.compassLine(g);   // u-home: 🏠 the way home on its world, ↑ to the ship on any other
       if (s !== this.lastCompass) { this.lastCompass = s; this.compass.innerHTML = s; }
     }
     // ---------------------------------------------------------------- big map

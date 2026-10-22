@@ -482,6 +482,7 @@
       if (this.wild) this.wild.destroy(); this.wild = VR.Wild && VR.Wild.Actor ? new VR.Wild.Actor(this) : null;   // (t-wild: the animal world)
     }
     teardownWorld() {
+      if (VR.NewLife) VR.NewLife.beforeTeardown(this);   // u-home: a trip keeps the 5 × 5 round the way home (meshes and all) for Heimkehr; anything else frees what was kept
       if (VR.Baustelle && VR.Baustelle.reset) VR.Baustelle.reset(this.gadgets && this.gadgets.blue);   // (a construction site's bar and meshes go with the world)
       if (this.world) { this.world.destroy(); this.world = null; }
       this.pool && this.pool.clear();
@@ -529,6 +530,7 @@
       const savedKeys = await this.store.savedKeys(dim);
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: this.store, savedKeys, renderDist: this.settings.renderDist });
       this.world.fancyLeaves = this.settings.fancyLeaves; this.world.smoothProps = this.propMask(); this.world.motion = this.settings.motion ? 1 : 0;
+      if (VR.NewLife) VR.NewLife.adopt(this);   // u-home: the columns kept for this world come back at once (Heimkehr in a moment)
       this.player = new VR.Player(this);
       this.player.mode = meta.mode;
       this.env.setTime(meta.time || 1000);
@@ -704,6 +706,7 @@
     // 📍 in the pause menu: your spawn point is where you stand
     setSpawnHere() {
       const p = this.player; if (!p || p.dead || !this.meta || this.meta.guest) return false;
+      if (VR.NewLife) { const r = VR.NewLife.pin(this); if (r) return r; }   // u-home: 📍 makes this world your home — 'spot' (the same world) or 'moved' (a new life here)
       if (VR.Travel && VR.Travel.awaySpawn(this, [Math.floor(p.pos[0]) + 0.5, Math.floor(p.pos[1] + 0.01), Math.floor(p.pos[2]) + 0.5], null)) { this.saveMeta(); return true; }   // u-dims: on another world 📍 marks that world's place; Herzwelt's spawn stays
       p.spawn = [Math.floor(p.pos[0]) + 0.5, Math.floor(p.pos[1] + 0.01), Math.floor(p.pos[2]) + 0.5]; p.spawnBed = null;
       this.saveMeta();
@@ -717,6 +720,7 @@
       return [0.5, 100, 0.5];
     }
     goHome() {
+      if (VR.NewLife && VR.NewLife.goHome(this)) return;   // u-home: to the home on whatever world it is — there, or the trip there; the ships left elsewhere come too (newlife.js)
       if (VR.Travel && VR.Travel.goHome(this)) return;   // u-dims: from another world the trip home — Herzwelt's spawn or bed, the ship you fly along (travel.js)
       const p = this.player; if (!p || p.dead) return;
       if (this.gadgets && this.gadgets.riding) { this.ui.chatLine(T('g.chat.landFirst'), '#ff8a8a'); return; }
@@ -1178,7 +1182,8 @@
       this.renderer.render({ cam: lcam, world: LS ? null : w, env: E, horizon: LS ? null : this.horizon });
       // the coarse horizon is worth a few seconds of waiting, not more (slow machines fill it in while playing); an arrival's
       // white rises over the loading screen before the world opens under it (first.js holdLoading)
-      if (LS ? LS.done && !VR.First.holdLoading(this, true, dt) : (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000)) {
+      const early = !!(VR.NewLife && VR.NewLife.loading(this));   // u-home: a trip arrives as soon as the 5 × 5 round the arrival are in (the far ring fills in while you play)
+      if (early || (LS ? LS.done && !VR.First.holdLoading(this, true, dt) : (frac >= 1 || (near >= 1 && performance.now() - this.nearReadyAt > 6000) || performance.now() - this.loadStart > 25000))) {   // u-home: early ||
         this.nearReadyAt = 0;
         // settle the player on the ground if spawn height was approximate
         if (!this.meta.player && !this.meta.guest) { let y = Math.floor(p.pos[1]); while (y < 250 && VR.PHYS.overlaps((x, yy, z) => w.getBlock(x, yy, z), p.pos[0] - 0.3, y, p.pos[2] - 0.3, p.pos[0] + 0.3, y + 1.8, p.pos[2] + 0.3)) y++; p.pos[1] = y; p.spawn = p.pos.slice(); }
@@ -1597,7 +1602,7 @@
         if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0(T('g.cmd.spawn')); return; }
         if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0(T('g.cmd.helpHome')); return; }
         if (c0 === 'pfeifen') { if (this.companions) this.companions.call(); else say0(T('g.pet.none')); return; }
-        if (c0 === 'sethome') { const p = this.player; if (!(VR.Travel && VR.Travel.awaySpawn(this, p.pos, null))) { p.spawn = p.pos.slice(); p.spawnBed = null; } say0(T('g.cmd.sethome')); return; }   // u-dims: on another world that world's place, Herzwelt's spawn stays
+        if (c0 === 'sethome') { const p = this.player; if (!(VR.NewLife && VR.NewLife.pin(this, p.pos, true)) && !(VR.Travel && VR.Travel.awaySpawn(this, p.pos, null))) { p.spawn = p.pos.slice(); p.spawnBed = null; } say0(T('g.cmd.sethome')); return; }   // u-dims: on another world that world's place, Herzwelt's spawn stays · u-home: this world becomes your home (newlife.js)
         if (c0 === 'spiegel' || c0 === 'mirror') { if (this.mirror) this.mirror.command(a0); return; }   // 🪞 x|z|4|8|aus (Überleben: a kind hint)
         if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? T('g.cmd.players', { list: L.map(q => q.name + (q.host ? ' ' + T('g.mp.hostTag') : '') + ' ' + Math.round(q.dist) + 'm').join(', ') }) : T('g.cmd.onlyYou')); return; }
         if (c0 === 'tphost' && this.mp && this.mp.isClient) { this.mp.teleportToHost(); return; }
