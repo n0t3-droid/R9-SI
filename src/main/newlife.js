@@ -29,6 +29,7 @@
     NEAR_R: 2,        // the early arrival's ring (the loading screen's own, first.js NEAR_R)
     COMPASS_NEAR: 24, // m: closer than this the compass says nothing about home
     PAD_HEART: 600,   // m: a Heartland home this near the Gate Temple parks its ships on the temple's apron
+    STAY_NEAR: 3,     // m: a world's own ship this near the place the world made it stays on its world (no recall)
     lastTrip: null,   // the last trip's phases (arrived)
   };
 
@@ -204,12 +205,13 @@
   const ARROWS = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
   NL.compassLine = function (g) {
     const p = g && g.player, m = g && g.meta; if (!p || !m || !p.pos) return '';
-    const h = NL.homeOf(m, p), here = g.dim || D.home(m), icon = '<br><span style="color:#9affd8">🏠</span> ';
-    if (h.dim !== here) return icon + '↑ ' + esc(tx('g.nl.cAway', { world: name(h.dim) }, '{world} — zum Schiff', '{world} — to the ship'));
+    // (a dark shadow under the line: legible on the bright hall and on snow, where the muted 11-px text alone fades)
+    const h = NL.homeOf(m, p), here = g.dim || D.home(m), icon = '<br><span style="text-shadow:0 1px 2px #000,0 0 4px rgba(0,0,0,.9)"><span style="color:#9affd8">🏠</span> ';
+    if (h.dim !== here) return icon + '↑ ' + esc(tx('g.nl.cAway', { world: name(h.dim) }, '{world} — zum Schiff', '{world} — to the ship')) + '</span>';
     const dx = h.pos[0] - p.pos[0], dz = h.pos[2] - p.pos[2], d = Math.hypot(dx, dz);
     if (!(d > NL.COMPASS_NEAR)) return '';
     const a = Math.atan2(dx, -dz), rel = ((Math.round((a + p.yaw) * 180 / Math.PI) % 360) + 540) % 360 - 180;
-    return icon + esc(tx('g.nl.cHome', { m: Math.round(d) }, 'Zuhause {m} m', 'Home {m} m')) + ' ' + ARROWS[((Math.round(rel / 45) % 8) + 8) % 8];
+    return icon + esc(tx('g.nl.cHome', { m: Math.round(d) }, 'Zuhause {m} m', 'Home {m} m')) + ' ' + ARROWS[((Math.round(rel / 45) % 8) + 8) % 8] + '</span>';
   };
 
   // ---------------------------------------------------------------- the world card (start.js worldCard)
@@ -376,14 +378,21 @@
     const a = (k % 6) * (Math.PI / 3) + Math.PI / 6, rr = 14 + Math.floor(k / 6) * 12;
     return [Math.floor(home.pos[0] + Math.cos(a) * rr) + 0.5, Math.floor(home.pos[1]), Math.floor(home.pos[2] + Math.sin(a) * rr) + 0.5];
   };
+  // a world's own ship (the Gate Temple's hangar shuttle, starships.js onColumnLoaded) is keyed by the place the world made
+  // it, "x,y,z": still standing there it belongs to that world and stays; flown away and left, it is yours and comes home
+  NL.atBirth = function (e) {
+    const k = e && typeof e.key === 'string' ? e.key.split(',').map(Number) : null;
+    return !!(k && k.length === 3 && k.every(Number.isFinite) && Array.isArray(e.pos) && Math.hypot(e.pos[0] - k[0], e.pos[1] - k[1], e.pos[2] - k[2]) < NL.STAY_NEAR);
+  };
   // every ship left on another world (starships.js keeps them in `elsewhere`) to the home pad — at home only
   NL.recall = function (g) {
     const S = g && g.starships, list = S && S.elsewhere; if (!list || !list.length || !g.meta) return 0;
     const h = NL.home(g); if (h.dim !== (g.dim || D.home(g.meta))) return 0;
-    const st = g.nl || (g.nl = {}), q = st.settle || (st.settle = []), out = list.splice(0, list.length);
+    const st = g.nl || (g.nl = {}), q = st.settle || (st.settle = []), out = [], stay = [];
+    for (const e of list) (e && Number.isFinite(e.seed) && !NL.atBirth(e) ? out : stay).push(e);
+    list.length = 0; for (const e of stay) list.push(e);   // (the ones that stay keep their world in the save)
     let n = 0;
     for (const e of out) {
-      if (!e || !Number.isFinite(e.seed)) continue;
       const pad = NL.padFor(h, g.meta, n);
       const s = S.spawn(e.seed, e.arch, e.palette, pad, e.yaw || 0, e.key);
       s.recalled = true;
@@ -394,14 +403,19 @@
     return n;
   };
   // (Travel.update, every play frame: nothing unless a recalled ship waits for its design and the ground under the pad)
+  // The ground at the home's level first — the floor under the pad, not an isle hanging above it (the Driftinseln) — and
+  // only when nothing is there (a pad over the void) the ground higher up; a look 4 times a second, the pad's column loaded
   NL.tick = function (g, dt) {
     const st = g.nl, q = st && st.settle; if (!q || !q.length) return;
-    const S = g.starships; if (!S) { q.length = 0; return; }
+    const S = g.starships, w = g.world; if (!S || !w) { q.length = 0; return; }
     for (let i = q.length - 1; i >= 0; i--) {
       const it = q[i]; it.t += dt;
       if (it.t > 20 || S.ships.indexOf(it.s) < 0) { q.splice(i, 1); continue; }
-      if (!it.s.d.meta || !it.s.d.allCells) continue;
-      const y = S.groundY(it.s, it.y + 24, 64);
+      if (!it.s.d.meta || !it.s.d.allCells || it.t < (it.next || 0)) continue;
+      it.next = it.t + 0.25;
+      if (w.isLoaded && !w.isLoaded(Math.floor(it.s.pos[0]), Math.floor(it.s.pos[2]))) continue;
+      let y = S.groundY(it.s, it.y + 6, 40);
+      if (y === null) y = S.groundY(it.s, it.y + 24, 64);
       if (y === null) continue;
       it.s.pos[1] = y; q.splice(i, 1);
     }

@@ -11,7 +11,8 @@
 //  e · the compass line (distance, arrow, away: ↑ to the ship)
 //  f · the world card's text (de / en, „zuletzt", the orbit form) and the body's disc (lit side, night side, corners,
 //      palettes per world, deterministic)
-//  g · ships left on another world come home with Heimkehr (to the pad, a slot apart, set on the ground)
+//  g · ships left on another world come home with Heimkehr (to the pad, a slot apart, set on the ground at the home's level;
+//      a world's own ship still where the world made it stays there)
 //  h · Heimkehr in a moment: the home's 5 × 5 kept over a trip (meshes not freed, out of the renderer's prop list),
 //      adopted on the way home (no generation asked for them, shown at once, spawns replayed), not on a changed look or
 //      another save (freed), a kept column stays clean when its neighbours arrive, the early arrival, the far lane
@@ -247,6 +248,7 @@ TR.FADE_IN = 5; TR.FADE_OUT = 5;
     p.pos = [0.5, 80, 230.5]; p.yaw = 0;   // the home 230 m north (−z); looking north
     const l1 = NL.compassLine(g);
     check(/Zuhause 230 m/.test(l1) && /↑/.test(l1), 'the home 230 m ahead: „🏠 Zuhause 230 m ↑"', l1);
+    check(/text-shadow/.test(l1), 'the line carries a shadow (legible on the bright hall)', l1);
     p.yaw = Math.PI;   // looking south: the home behind
     check(/↓/.test(NL.compassLine(g)), 'turned round: ↓');
     p.yaw = Math.PI / 2;   // looking west (−x): north is to the right
@@ -306,28 +308,46 @@ TR.FADE_IN = 5; TR.FADE_OUT = 5;
     check(Math.hypot(pC[0] - 44.5, pC[2] + 2.5) >= 10 && Math.hypot(pC[0] - 44.5, pC[2] + 2.5) <= 20 && pC[1] === 131, 'another world: beside the home', JSON.stringify(pC));
     check(close(NL.padFor({ dim: 'overworld', pos: [2000, 70, 2000] }, META(), 0).slice(0, 1), [2000], 30), 'a Herzwelt home far from the temple: beside the home');
     // a ship on Herzwelt, the home in the drift: Heimkehr brings it to the drift
-    const meta = META({ starships: [{ seed: 21, arch: 'shuttle', palette: null, pos: [10, 81, 10], yaw: 0, key: null, dim: 'overworld' }, { seed: 22, arch: 'racer', palette: null, pos: [60, 90, 60], yaw: 0, key: null, dim: 'hollow' }] });
+    // (23: the world's own ship, still where the world made it — it stays; 24: one the world made, flown away and left — it comes)
+    const meta = META({ starships: [{ seed: 21, arch: 'shuttle', palette: null, pos: [10, 81, 10], yaw: 0, key: null, dim: 'overworld' }, { seed: 22, arch: 'racer', palette: null, pos: [60, 90, 60], yaw: 0, key: null, dim: 'hollow' },
+      { seed: 23, arch: 'shuttle', palette: null, pos: [0, 81, 30], yaw: 0, key: '0,81,30', dim: 'overworld' }, { seed: 24, arch: null, palette: null, pos: [140, 84, 100], yaw: 0, key: '100,81,100', dim: 'overworld' }] });
     const g = mkGame(META(), { ship: shipAnswer });
     let p = await play(g, meta);
     await TR.go(g, { dim: 'drift', via: 'cmd' }); settle(g); p = g.player;
     p.pos = [44.5, 131, -2.5]; g.setSpawnHere();
     await TR.go(g, { dim: 'overworld', via: 'cmd' }); settle(g);
-    check(g.starships.ships.some(s => s.d.seed === 21), 'on Herzwelt: the shuttle stands there');
+    check(g.starships.ships.some(s => s.d.seed === 21) && g.starships.ships.some(s => s.d.seed === 23), 'on Herzwelt: the shuttle stands there, and the world\'s own');
     await TR.go(g, { dim: 'drift', via: 'home' }); settle(g);
     await sleep(20);
     const here = g.starships.ships.map(s => s.d.seed).sort().join(',');
-    check(here === '21,22', 'Heimkehr to the drift: both ships left elsewhere are here now', here);
+    check(here === '21,22,24', 'Heimkehr to the drift: the ships left elsewhere are here now — not the world\'s own ship still where the world made it', here);
     const s21 = g.starships.ships.find(s => s.d.seed === 21);
     check(s21 && Math.hypot(s21.pos[0] - 44.5, s21.pos[2] + 2.5) < 30, 'beside the home (the home pad)', s21 && JSON.stringify(s21.pos));
-    check(g.said.some(t => /Schiffe/.test(t) && /2/.test(t)), 'a line says two ships came', g.said.slice(-1)[0]);
+    check(g.said.some(t => /Schiffe/.test(t) && /3/.test(t)), 'a line says three ships came', g.said.slice(-1)[0]);
     g.saveMeta();
     const sv = g.saved[g.saved.length - 1].starships;
-    check(sv.filter(s => s.dim === 'drift').length === 2, 'the save: both in the drift', JSON.stringify(sv.map(s => [s.seed, s.dim])));
-    // the settle: on the ground under the pad once the design is built (a world of air with a floor at y 125 there)
-    g.world.getBlock = (x, y, z) => (y === 125 ? V.R.byName.stone.defaultState : 0);
+    check(sv.filter(s => s.dim === 'drift').length === 3, 'the save: three in the drift', JSON.stringify(sv.map(s => [s.seed, s.dim])));
+    check(sv.some(s => s.seed === 23 && s.dim === 'overworld' && s.key === '0,81,30'), 'the save: the world\'s own ship still on Herzwelt, at its place', JSON.stringify(sv.filter(s => s.seed === 23)));
+    // the settle: on the ground under the pad once the design is built — a world of air with a floor at y 125 (the home
+    // stands at 131) and an isle hanging at y 149 above: the floor at the home's level, not the isle above it
+    const stone = V.R.byName.stone.defaultState;
+    const loaded = new Set();   // (the pad's column comes in after a while: nothing is set down before)
+    g.world.isLoaded = (x, z) => loaded.has((x >> 4) + ',' + (z >> 4));
+    g.world.getBlock = (x, y, z) => (loaded.has((x >> 4) + ',' + (z >> 4)) && (y === 125 || y === 149) ? stone : 0);
+    for (let k = 0; k < 4; k++) { TR.update(g, 0.1); await sleep(5); }
+    check(g.nl && g.nl.settle && g.nl.settle.length === 3, 'the pad\'s column not loaded yet: the ships wait above it', g.nl && g.nl.settle && g.nl.settle.length);
+    for (const s of g.starships.ships) for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) loaded.add(((Math.floor(s.pos[0]) >> 4) + dx) + ',' + ((Math.floor(s.pos[2]) >> 4) + dz));
     for (let k = 0; k < 10; k++) { TR.update(g, 0.1); await sleep(5); }
     const s21b = g.starships.ships.find(s => s.d.seed === 21);
-    check(s21b && s21b.pos[1] === 126, 'set down on the ground under the pad', s21b && s21b.pos[1]);
+    check(s21b && s21b.pos[1] === 126, 'set down on the ground under the pad at the home\'s level (not on the isle 18 above)', s21b && s21b.pos[1]);
+    check(!(g.nl && g.nl.settle && g.nl.settle.length), 'every recalled ship is set down', g.nl && g.nl.settle && g.nl.settle.length);
+    // nothing near the home's level (a pad over the void): the isle above, as a parked ship would
+    {
+      const S = g.starships, s = S.ships.find(q => q.d.seed === 24);
+      g.world.getBlock = (x, y, z) => (y === 149 ? stone : 0); g.world.isLoaded = () => true;
+      s.pos[1] = 131; g.nl.settle.push({ s, y: 131, t: 0 }); TR.update(g, 0.1);
+      check(s.pos[1] === 150 && !g.nl.settle.length, 'a pad over the void: on the isle above', s.pos[1]);
+    }
     // a trip that is not Heimkehr recalls nothing
     const g2 = mkGame(META(), { ship: shipAnswer }), m2 = META({ starships: [{ seed: 31, arch: 'shuttle', palette: null, pos: [1, 81, 1], yaw: 0, key: null, dim: 'drift' }] });
     await play(g2, m2);
