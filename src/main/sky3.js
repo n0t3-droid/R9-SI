@@ -195,7 +195,7 @@
   // day's), the planets less pale (pale), the stratus lit pink (cirPink, cirMore); the magenta-pink toward the sun is
   // the sun-side band's (SKYL warm2 at 9°))
   const PAL = S3.PAL = {
-    gold: { hor: [1.054, 0.953, 1.056], mid: [0.27, 0.2, 0.4], zen: [0.06, 0.09, 0.289], stops: [0.393, 0.341, 0.773, 0.05], space: 1.0, neb: 2.5, pale: 0.35, sunset: 0.35, cirPink: 1, cirMore: 0.1 },
+    gold: { hor: [1.054, 0.953, 1.056], mid: [0.27, 0.2, 0.4], zen: [0.06, 0.09, 0.289], stops: [0.393, 0.341, 0.773, 0.05], space: 1.0, neb: 2.5, pale: 0.35, sunset: 0.35, cirPink: 1, cirMore: 0.15 },
     // (f-sky4: t-sky3's golden palette, kept for the low sun — the dusk's fit holds a quarter of the golden palette at the
     // sunset (S3.weights at 0.6°) and stays as it was; the refit above takes over from 1.5° to 5° up: S3.goldK)
     goldLow: { hor: [1.44, 1.147, 1.652], mid: [0.5, 0.323, 0.541], zen: [0.114, 0.141, 0.381], stops: [0.386, 0.297, 0.837, 0.5], space: 0.15, neb: 1, sunset: 0.6 },
@@ -386,7 +386,7 @@
     // are an overcast's — the light from above a lighter grey (top ×), from below a dark slate (low ×: a storm base ≈ 0.25
     // of a fair cloud's lit top); in the puffs (glslPuff, u_c3Storm) the body darkens from its top to its base (base: the
     // base's light over the top's in a storm, fair: in fair weather) and the base is torn (rag: its depth, of the sprite)
-    storm: { top: 1.3, low: 0.75, base: 0.1, fair: 0.82, rag: 0.09 },
+    storm: { top: 1.45, low: 0.75, base: 0.06, fair: 0.82, rag: 0.09 },
   };
   // the storm's strength: rain under a closed cover (0 fair … 1 a thunderstorm)
   S3.stormK = (E) => clamp(E.rain || 0, 0, 1) * (0.55 + 0.45 * sstep(0.45, 0.9, clamp(E.cloudCover || 0, 0, 1)));
@@ -833,7 +833,7 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   // a storm's base u_c3Storm.y of its top's light (heavy, slate), a fair cloud's u_c3Storm.w (volume, not a sticker)
   // (after the haze: far off the haze's light lies over the cloud, but a storm's far bases stay dark — offline the haze
   // mixed in after the fall left the storm's far clouds at a base/top of 0.73)
-  float hl = smoothstep(0.0, 0.55, hb), hv = clamp(mix(0.85 * hc + 0.15 * hl, 0.2 * hc + 0.8 * hl, u_c3Storm.x), 0.0, 1.0);   // (a storm: each puff's own base dark)
+  float hl = smoothstep(0.0, mix(0.55, 0.7, u_c3Storm.x), hb), hv = clamp(mix(0.85 * hc + 0.15 * hl, 0.0 * hc + 1.0 * hl, u_c3Storm.x), 0.0, 1.0);   // (a storm: each puff's own base dark)
   c3Grad = mix(mix(u_c3Storm.w, u_c3Storm.y, u_c3Storm.x), 1.0, hv);
   col = mix(col, u_c3Haze, smoothstep(260.0, 700.0, dist) * 0.45);
   col *= c3Grad;

@@ -268,7 +268,7 @@ async function shoot(V, preset) {
   }
   await step(2);
   console.log(`[${secs()}] ${name}${st ? ' (settled ' + st + ' s)' : ''}${note ? '  ' + note : ''}`);
-  if (m) {
+  if (m && m.curve) {   // (f-sky4: the storm's and the gap's measure has the clouds, not the bands)
     console.log(`   H ${m.H} sky ${m.sky} stars ${m.stars.map(v => (v === null ? '—' : v)).join(' ')} chroma ${m.chroma ? m.chroma.mean + ' var ' + m.chroma.var : '—'} haze ${m.haze.L0} / ${m.haze.width}`);
     console.log('   curve  ' + fmtCurve(m.curve));
     console.log('   L*     ' + m.curve.map(b => (b.lab ? b.L.toFixed(0) : '—')).join(' '));
