@@ -22,7 +22,9 @@
 //     S.soi(id) · S.hill(id) · S.dominant(rSys, t) · S.offset(from, to, t, r, v) · S.toFrame(from, to, r, v, t, ro, vo)
 //     S.soiExit(frame, r, v, t) · S.ghost(frame, r, v, t, out?)  the ghost path: 128 points + one patch
 //     S.fixedToInertial · S.inertialToFixed · S.surfaceSpeed   the turning ground ↔ space (Herzwelt turns in 20 min!)
-//     S.skyAt(id, rFixed, t, out?) · S.localSky(dim, chartPos, t, out?) · S.eclipseAt(id, t) · S.eclipseFrom(rSys, t, skip)
+//     S.chartToInertial(id, [x, y, z], [vx, vy, vz], t, r, v) · S.inertialToChart   a world's map ↔ space (the hand-off)
+//     S.skyFrom(rSys, t, out?) · S.skyAt(id, rFixed, t, out?) · S.localSky(dim, chartPos, t, out?)
+//     S.eclipseAt(id, t, only?) · S.eclipseFrom(rSys, t, skip, res?, only?)
 //     S.chart(id): azimuthal equidistant plane ↔ sphere (toSphere, toPlane, frame, latLon, localTicks)
 //     S.solarDay · S.synodic · S.geoRadius · S.flux · S.orbitNormal · S.table()
 //   U.triad(a1, a2, b1, b2, m) · U.slerpRot(m, k, out) · U.slerpDir(a, b, k, out) · U.matToQuat · U.quatToMat

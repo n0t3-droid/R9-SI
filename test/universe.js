@@ -786,6 +786,20 @@ section('(o) TRIAD and the postcard blend');
   check(U.climbK(250) === 0 && U.climbK(300) === 0 && U.climbK(2500) === 1 && Math.abs(U.climbK(1400) - 0.5) < 1e-12, 'the climb\'s blend: smootherstep(300, 2,500 m) — 0 below the clouds, 1 at the edge');
 }
 
+// ============================================================================================ (q) the pinned sky
+// Every world shares this sky through the world clock, so a change to the system's data moves the bodies in every saved
+// world: like gen_same for the generator, the ephemeris is pinned (positions rounded to the metre at five moments, the
+// spins at two). A deliberate change updates SKY_PIN with a note in the commit.
+section('(q) the pinned sky');
+{
+  const SKY_PIN = 'f9a1464e3518333b';
+  const h = require('crypto').createHash('sha256');
+  for (const t of [0, 300, 12345.678, 1e6, 3.3e7]) { const st = S.state(t); for (const id of S.ids) h.update(id + ':' + Array.from(st.b[id].r).map(Math.round).join(',') + ';'); }
+  for (const t of [300, 1e6]) { const st = S.state(t); for (const id of S.ids) h.update(id + ':' + Array.from(st.b[id].B).map(x => Math.round(x * 1e9)).join(',') + ';'); }
+  const pin = h.digest('hex').slice(0, 16);
+  check(pin === SKY_PIN, `the sky is pinned: ${pin}${pin === SKY_PIN ? '' : ' (expected ' + SKY_PIN + ' — a deliberate change of the system updates SKY_PIN and says so in the commit)'}`);
+}
+
 // ============================================================================================ (p) wiring
 section('(p) the wiring');
 {
