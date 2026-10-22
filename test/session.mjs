@@ -1,0 +1,574 @@
+// regress: skip — „nie langweilig", played: the scripted sessions of erlebnis §7 (plan docs/superpowers/plans/2026-10-22-e-log.md §2.6). One browser run a wave.
+// Two 5-minute sessions in a new default world (seed 4242, the Heartland, vgen 11), Creative · Friedlich, Balanced at 960 × 540, de-DE, the weather held clear:
+//   builder — look round on the Hangar Hall's deck (the spawn) → out of the portal, over the Gate Plaza, the ways east to the river meadow → the Bauhand: a
+//             Bungalow (the bench when no ghost fits) → watch the Baustelle rise → walk on: the farm way north, the stone bridge over the river, on;
+//   walk    — the Gate Plaza → the way east and north to Nova Haven (day 0 is its festival evening) → its ring road to the city's plaza (a look round) → the
+//             radial road, the east branch, the southern arc, the west branch, the plaza again, the ring west, the way back toward the temple.
+// The simulation at the game's full rate (every frame of 1/30 s simulated, none drawn) and a picture at 2 Hz drawn and captured in the page (the canvas →
+// 480 × 270 JPEG; no page.screenshot — it timed out at 150 s on this machine in other runs). The world streams ahead of the walker: before every half
+// second of play the columns within 64 m must be loaded and the sections within 32 m meshed (the clock waits, the workers do not). The walker is a
+// pure-pursuit steer on the real player physics (W held, auto-jump, a jump when stuck, a 4-m hop along the way after 5 s stuck: counted). Parts whose
+// feature does not exist yet are skipped and logged (travel by intent VR.Intent and Funke VR.Funke: wave 4), and their minutes leave the targets.
+// → test/shots/session_<type>.json (the log, the samples, the parts, the metrics and the verdict against E§7's targets, the three longest gaps described,
+//   the run's own numbers), session_<type>_sheet.png (12 frames — one per 25-s slot, at its heaviest event in view or its middle — each labelled; the
+//   timeline with every event, the inputs, the movers, landmarks and sky, the gaps; the verdict in the header), session_<type>_01…12.jpg and _gap.jpg;
+//   then the log's own cost per frame on Very Low and High: on · the sampler off · off.
+// Checks: a Heartland world of vgen ≥ 11; each session ≥ 290 s of play with ~1 sample a second and its events; the JSON and the sheet written; the log
+// ≤ 0.05 ms a frame; no page error.
+//   nohup bash test/wt_run.sh session.mjs 5400 > .tmp_tests/session.log 2>&1 &
+//   ONLY=builder|walk · DUR=300 · SEED=4242 · NO_BENCH=1 · ALL=1 (every picture too) · DRY=1 (node only: the routes, the walker and the Bauhand on a
+//   stand-in, a synthetic sheet in the scratch folder) · SHEET_ONLY=builder|walk (rebuild a sheet from its JSON and frames)
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { execSync } from 'child_process';
+import fs from 'fs';
+const require = createRequire(import.meta.url);
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const SHOTS = ROOT + 'test/shots/';
+const DIST = process.env.DIST || new URL('../dist/index.html', import.meta.url).href;
+const SEED = +(process.env.SEED || 4242), DUR = +(process.env.DUR || 300), VW = 960, VH = 540, PW = 480, PH = 270, SLOTS = 12;
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
+const DRY = !!process.env.DRY, SHEET_ONLY = process.env.SHEET_ONLY || '';
+const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
+let fails = 0;
+const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
+const SS = require(ROOT + 'src/shared/sessionstats.js');
+fs.mkdirSync(SHOTS, { recursive: true });
+
+// ============================================================================ the routes (node: the same land plan as the page's workers)
+function planRoutes() {
+  const V = require(ROOT + 'test/load_shared.js');
+  const gen = V.makeGen('overworld', SEED, { vgen: 11 }), LP = V.Land.plan(gen);
+  const idOf = (id) => LP.sites.findIndex(s => s.id === id);
+  // the way between two sites (the longest of them when the network has two), from a to b, as [x, z]
+  const way = (a, b) => {
+    const ia = idOf(a), ib = idOf(b); let best = null;
+    for (const l of LP.lines) if ((l.a === ia && l.b === ib) || (l.a === ib && l.b === ia)) if (!best || l.pts.length > best.pts.length) best = l;
+    if (!best) throw new Error(`no way ${a} → ${b}`);
+    const pts = best.pts.map(p => [p[0], p[1]]);
+    return best.a === ia ? pts : pts.reverse();
+  };
+  const near = (pts, q) => { let bi = 0, bd = Infinity; pts.forEach((p, i) => { const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2; if (d < bd) { bd = d; bi = i; } }); return bi; };
+  const upTo = (pts, q) => pts.slice(0, near(pts, q) + 1);
+  const from = (pts, q) => pts.slice(near(pts, q));
+  const span = (pts, a, b) => { const i = near(pts, a), j = near(pts, b); return i <= j ? pts.slice(i, j + 1) : pts.slice(j, i + 1).reverse(); };
+  const join = (...parts) => { const out = []; for (const part of parts) for (const p of part) { const l = out[out.length - 1]; if (!l || Math.hypot(p[0] - l[0], p[1] - l[1]) > 0.5) out.push([+p[0], +p[1]]); } return out; };
+  const len = (pts) => { let s = 0; for (let i = 1; i < pts.length; i++) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return s; };
+  // Nova Haven's roads (its village plan): found by a point each passes near
+  const VG = V.VillageGen, city = VG.plan(gen, VG.nearest(gen, 0, -140, 1400));
+  const roads = city.roads.map(r => r.map(q => [q[0], q.length > 2 ? q[2] : q[1]]));
+  const roadNear = (q) => { let best = null, bd = Infinity; for (const r of roads) { const d = Math.min(...r.map(p => Math.hypot(p[0] - q[0], p[1] - q[1]))); if (d < bd) { bd = d; best = r; } } return best; };
+  const ring = roadNear([60, -73]), radial = roadNear([2, -80]), east = roadNear([20, -131]), west = roadNear([-20, -131]), arc = roadNear([-30, -156]);
+  const plaza = city.plaza ? [city.plaza.x + 0.5, city.plaza.z + 0.5] : [-0.5, -54.5];
+  // the river meadow: the flattest open grass near (272, −40), between farm_c and the river (no tree, no path, no field on a 17 × 17 lot)
+  const RT = V.R.T, FL = V.F, CH = new Map();
+  const blk = (x, y, z) => { const X = Math.floor(x), Z = Math.floor(z), k = (X >> 4) + ',' + (Z >> 4); let c = CH.get(k); if (!c) { c = gen.generate(X >> 4, Z >> 4); CH.set(k, c); } return y < 0 || y > 255 ? 0 : c.blocks[(y << 8) | ((Z & 15) << 4) | (X & 15)]; };
+  const nm = (s) => (s ? V.R.types[RT.type[s]].name : 'air');
+  const colAt = (x, z) => { for (let y = 140; y > 50; y--) { const b = blk(x, y, z); if (!b || (RT.flags[b] & (FL.REPLACE | FL.PLANT))) continue; return { y, n: nm(b), leaves: !!(RT.flags[b] & FL.LEAVES) }; } return null; };
+  const OPEN = /^(grass_block|dirt|coarse_dirt|podzol|moss_block)$/;
+  let M = null;
+  for (let x = 244; x <= 300; x += 4) for (let z = -72; z <= -12; z += 4) {
+    const c0 = colAt(x, z); if (!c0 || !OPEN.test(c0.n)) continue;
+    let ok = true, lo = 999, hi = -999;
+    for (let dz = -8; dz <= 8 && ok; dz++) for (let dx = -8; dx <= 8; dx++) { const c = colAt(x + dx, z + dz); if (!c || c.leaves || !OPEN.test(c.n)) { ok = false; break; } lo = Math.min(lo, c.y); hi = Math.max(hi, c.y); }
+    if (!ok || hi - lo > 2) continue;
+    const score = Math.hypot(x - 272, z + 40) + (hi - lo) * 6;
+    if (!M || score < M.score) M = { x: x + 0.5, z: z + 0.5, y: c0.y + 1, score: +score.toFixed(1), flat: hi - lo, top: c0.n };
+  }
+  if (!M) { const c = colAt(272, -40); M = { x: 272.5, z: -39.5, y: c ? c.y + 1 : 81, score: -1, flat: -1, top: c ? c.n : '?' }; }
+  const STAND = [M.x - 11, M.z];
+  const l11 = way('temple_e', 'city_e'), l13 = way('temple_e', 'farm_c');
+  // farm_c → cross_e: the network has a short spur (out of the farm's yard) and the way north (the longer one)
+  const fc = LP.lines.filter(l => (LP.sites[l.a].id === 'farm_c' && LP.sites[l.b].id === 'cross_e') || (LP.sites[l.a].id === 'cross_e' && LP.sites[l.b].id === 'farm_c')).map(l => (LP.sites[l.a].id === 'farm_c' ? l.pts : l.pts.slice().reverse()).map(p => [p[0], p[1]])).sort((a, b) => a.length - b.length);
+  const farmShort = fc.length > 1 ? fc[0] : [], l3 = fc[fc.length - 1];
+  const l23 = way('cross_e', 'meadow_e'), l7 = way('meadow_e', 'farm_e'), l17 = way('temple_w', 'city_w');
+  const GATE = [[0.5, 4.5], [0.5, 20], [0.5, 40], [0.5, 58], [30, 66], [59, 74]];
+  const builderA = join(GATE, upTo(l11, l13[0]), l13, [[230, -43], STAND]);
+  const builderB = join([STAND, [230, -43]], farmShort, from(l3, farmShort.length ? farmShort[farmShort.length - 1] : [200, -56]), l23, l7);
+  const walkA = join([[10.5, 60.5], [30, 66], [59, 74]], l11, span(ring, [112, -97], [1, -65]), [plaza]);
+  const walkB = join([plaza], span(radial, [0, -59], [0, -101]), span(east, [0, -101], [13, -158]), span(arc, [9, -155], [-15, -155]), span(west, [-16, -153], [0, -101]), span(radial, [0, -101], [0, -59]), [plaza], span(ring, [1, -65], [-112, -97]), l17.slice().reverse());
+  return { M, STAND, builderA, builderB, walkA, walkB, len, plaza, landmarks: V.Vista && V.Vista.landmarks ? V.Vista.landmarks(gen, LP).filter(q => q.great).map(q => ({ id: q.id, x: q.x, z: q.z, base: q.base, top: q.top, r: q.r })) : [] };
+}
+
+// ============================================================================ in the page: the walker, the Bauhand, the frames, the pictures
+// (a function the page runs as it is; DRY runs it in node on a stand-in — it must not reach outside its arguments)
+function pageHelpers(win, VRx) {
+  const VR = VRx || win.VR;
+  const S = win.__S = { mode: { kind: 'idle' }, done: false, t: 0, pics: [], stat: { hops: 0, jumps: 0 }, log: [], R: null, st: null, B: null };
+  const wrap = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+  const release = (I) => { if (I && I.keys) { I.keys.delete('KeyW'); I.keys.delete('Space'); } };
+  const turnTo = (p, x, z, dt, rate) => { const d = wrap(Math.atan2(-(x - p.pos[0]), -(z - p.pos[2])) - p.yaw); p.yaw += Math.max(-rate * dt, Math.min(rate * dt, d)); return Math.abs(d); };
+  S.route = function (pts) { const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])); return { pts, cum, L: cum[cum.length - 1] || 0, s: 0, seg: 0 }; };
+  S.pointAt = function (R, s) {
+    const n = R.pts.length; if (n < 2) return R.pts[0] ? R.pts[0].slice() : [0, 0];
+    s = Math.max(0, Math.min(R.L, s));
+    let i = Math.max(0, Math.min(n - 2, R.seg));
+    while (i > 0 && R.cum[i] > s) i--;
+    while (i < n - 2 && R.cum[i + 1] < s) i++;
+    const a = R.pts[i], b = R.pts[i + 1], l = (R.cum[i + 1] - R.cum[i]) || 1, u = (s - R.cum[i]) / l;
+    return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+  };
+  // how far along the route the player is: the nearest point on the segments round the last one (never backwards)
+  S.progress = function (R, x, z) {
+    const n = R.pts.length; if (n < 2) return R.L;
+    let bs = R.s, bd = Infinity, bi = R.seg;
+    for (let i = Math.max(0, R.seg - 2); i <= Math.min(n - 2, R.seg + 40); i++) {
+      const a = R.pts[i], b = R.pts[i + 1], ex = b[0] - a[0], ez = b[1] - a[1], l2 = ex * ex + ez * ez || 1e-9;
+      const u = Math.max(0, Math.min(1, ((x - a[0]) * ex + (z - a[1]) * ez) / l2)), px = a[0] + ex * u, pz = a[1] + ez * u, d = (x - px) * (x - px) + (z - pz) * (z - pz);
+      if (d < bd) { bd = d; bs = R.cum[i] + Math.sqrt(l2) * u; bi = i; }
+    }
+    if (bs > R.s) { R.s = bs; R.seg = bi; }
+    return R.s;
+  };
+  // the stand height at (x, z) near y0: a solid block with two free above it (null: not loaded or none)
+  S.groundY = function (x, z, y0) {
+    const g = VR.game, w = g.world, T = VR.R.T, F = VR.F, X = Math.floor(x), Z = Math.floor(z);
+    const solid = (b) => !!(b && (T.flags[b] & F.SOLID) && !(T.flags[b] & F.REPLACE));
+    for (let y = Math.floor(y0) + 8; y > y0 - 24; y--) if (solid(w.getBlock(X, y, Z)) && !solid(w.getBlock(X, y + 1, Z)) && !solid(w.getBlock(X, y + 2, Z))) return y + 1;
+    return null;
+  };
+  S.set = function (mode) {
+    S.mode = mode || { kind: 'idle' }; S.done = false; S.t = 0;
+    const g = VR.game; if (g && g.input) release(g.input);
+    if (S.mode.kind === 'walk') { S.R = S.route(S.mode.route); S.st = { s0: 0, t0: 0, jumpT: 0, lastJump: -9 }; }
+    if (S.mode.kind === 'bauhand') S.B = { phase: 'start', ding: S.mode.ding, name: S.mode.name, tries: 0, t: 0, dy: 0, whys: [], plan: null, site: null, sitePhase: '', fallback: false, target: S.mode.target, watchDone: 0 };
+    return true;
+  };
+  function walk(g, p, I, dt) {
+    const R = S.R, st = S.st;
+    if (g.wow && g.wow.active) { release(I); return; }                 // a wow moment holds the view: the player stands
+    const s = S.progress(R, p.pos[0], p.pos[2]);
+    if (s >= R.L - 1.2) { release(I); S.done = true; return; }
+    const tg = S.pointAt(R, s + 3.5), off = turnTo(p, tg[0], tg[1], dt, 3.2);
+    p.pitch += (-0.06 - p.pitch) * Math.min(1, dt * 3);
+    if (off > 1.1) I.keys.delete('KeyW'); else I.keys.add('KeyW');
+    if (s > st.s0 + 0.5) { st.s0 = s; st.t0 = S.t; }
+    const still = S.t - st.t0;
+    if (st.jumpT > 0) { st.jumpT -= dt; if (st.jumpT <= 0) I.keys.delete('Space'); }
+    else if (still > 1.5 && S.t - st.lastJump > 1.2) { I.keys.add('Space'); st.jumpT = 0.25; st.lastJump = S.t; S.stat.jumps++; }
+    if (still > 5) {
+      const q = S.pointAt(R, s + 4), gy = S.groundY(q[0], q[1], p.pos[1]);
+      if (gy !== null) { p.pos[0] = q[0]; p.pos[1] = gy; p.pos[2] = q[1]; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } S.stat.hops++; S.log.push(['hop', +(+g.time).toFixed(1), Math.round(q[0]), Math.round(q[1])]); R.s = Math.min(R.L, s + 4); }
+      st.s0 = R.s; st.t0 = S.t;
+    }
+  }
+  function bauhand(g, p, I, dt) {
+    release(I);
+    const B = S.B, BH = VR.Bauhand, tg = B.target; B.t += dt;
+    if (!BH) { B.whys.push('no VR.Bauhand'); B.phase = 'failed'; S.done = true; return; }
+    const aim = () => { const want = Math.atan2(-(tg[0] - p.pos[0]), -(tg[2] - p.pos[2])) + B.dy, d = wrap(want - p.yaw); p.yaw += Math.max(-3 * dt, Math.min(3 * dt, d)); const eye = p.pos[1] + 1.62, dist = Math.hypot(tg[0] - p.pos[0], tg[2] - p.pos[2]), pt = -Math.atan2(eye - (tg[1] + 0.2), Math.max(4, dist)); p.pitch += (pt - p.pitch) * Math.min(1, dt * 4); };
+    switch (B.phase) {
+      case 'start': try { BH.hold(B.ding, { name: B.name }); B.phase = 'aim'; B.t = 0; } catch (e) { B.whys.push('hold ' + B.ding + ': ' + (e && e.message)); B.phase = 'retry'; } break;
+      case 'aim': {
+        aim(); if (B.t < 1) break;
+        const gh = BH.ghost;
+        if (gh && gh.prep && B.t < 9) break;                              // (the plan is still being prepared)
+        if (gh && gh.ok) { let pl = null; try { pl = BH.place(); } catch (e) { B.whys.push('place: ' + (e && e.message)); } if (pl) { B.plan = { id: pl.id, kind: pl.kind, ding: B.ding, ox: pl.ox, oz: pl.oz, F: pl.F, t: +(+g.time).toFixed(1) }; B.phase = 'placed'; B.t = 0; } else { B.whys.push('place refused'); B.phase = 'retry'; } }
+        else { B.whys.push(gh ? (gh.why || 'red') : 'no ghost'); B.phase = 'retry'; }
+        break;
+      }
+      case 'retry':
+        B.tries++;
+        if (B.tries >= 7) { try { BH.putAway(true); } catch (e) { /* already away */ } if (!B.fallback) { B.fallback = true; B.ding = 'm:vm_bench'; B.name = 'Bank'; B.tries = 0; B.dy = 0; B.phase = 'start'; } else { B.phase = 'failed'; S.done = true; } }
+        else { B.dy = (B.tries % 2 ? 1 : -1) * Math.ceil(B.tries / 2) * 0.3; B.phase = 'aim'; B.t = 0; }
+        break;
+      case 'placed': try { BH.putAway(); } catch (e) { /* already away */ } B.phase = 'watch'; B.t = 0; break;
+      case 'watch': {
+        const bl = g.gadgets && g.gadgets.blue, L = bl && bl.sites, s = L && L.length ? L[L.length - 1] : null;
+        if (s && s.box) {
+          if (!B.site) B.site = { box: s.box.slice(), mode: s.mode };
+          const b = s.box, cx = (b[0] + b[3]) / 2 + 0.5, cz = (b[2] + b[5]) / 2 + 0.5, eye = p.pos[1] + 1.62, dist = Math.hypot(cx - p.pos[0], cz - p.pos[2]);
+          turnTo(p, cx, cz, dt, 1.5); p.pitch += (Math.atan2((b[1] + b[4]) / 2 - eye, Math.max(4, dist)) - p.pitch) * Math.min(1, dt * 2);
+          B.sitePhase = s.phase;
+          if (s.phase === 'done' || s.phase === 'gone' || s.phase === 'cancel') { B.watchDone += dt; if (B.watchDone > 5) { B.phase = 'done'; S.done = true; } }
+        } else if (B.t > 8) { B.phase = 'done'; S.done = true; }
+        if (B.t > 70) { B.phase = 'done'; S.done = true; }
+        break;
+      }
+      default: S.done = true;
+    }
+  }
+  S.control = function (dt) {
+    const g = VR.game, p = g && g.player, I = g && g.input, M = S.mode; if (!p || !I) return;
+    S.t += dt;
+    if (p.hold) { release(I); return; }
+    if (M.kind === 'look') { release(I); p.yaw += (M.speed || 0.3) * dt; p.pitch += ((M.pitch || 0) - p.pitch) * Math.min(1, dt * 2); if (S.t >= (M.sec || 1)) S.done = true; return; }
+    if (M.kind === 'walk') { walk(g, p, I, dt); return; }
+    if (M.kind === 'bauhand') { bauhand(g, p, I, dt); return; }
+    release(I);
+  };
+  // n frames of 1/30 s, the last one drawn and captured when asked
+  S.frames = function (n, render) {
+    const g = VR.game; if (!g || g.state !== 'play') return { t: g ? g.time : 0, state: g ? g.state : 'none', done: S.done };
+    let rms = 0;
+    for (let i = 0; i < n; i++) {
+      const last = !!render && i === n - 1;
+      win.__norender = !last;
+      S.control(1 / 30);
+      const t0 = performance.now();
+      g.last = t0 - 1000 / 30; g.loop(t0);
+      if (last) { try { g.renderer.gl.finish(); } catch (e) { /* no GL in a stand-in */ } rms = performance.now() - t0; S.capture(); }
+    }
+    win.__norender = true;
+    const p = g.player;
+    return { t: g.time, rms, done: S.done, x: p.pos[0], y: p.pos[1], z: p.pos[2], hold: !!p.hold, wow: !!(g.wow && g.wow.active) };
+  };
+  S.capture = function () {
+    const g = VR.game, src = g.canvas || (typeof document !== 'undefined' ? document.getElementById('gl') : null); if (!src || !src.width) return false;
+    const c = S.cv || (S.cv = document.createElement('canvas')); c.width = 480; c.height = 270;
+    try { c.getContext('2d').drawImage(src, 0, 0, 480, 270); S.pics.push({ t: g.time, url: c.toDataURL('image/jpeg', 0.74) }); return true; } catch (e) { S.log.push(['capture', String(e && e.message)]); return false; }
+  };
+  S.picsAt = function (ts) { return ts.map(t => { let best = null, bd = Infinity; for (const q of S.pics) { const d = Math.abs(q.t - t); if (d < bd) { bd = d; best = q; } } return best ? { t: best.t, url: best.url } : null; }); };
+  // the world ahead: columns missing within r chunks, sections still to mesh within rm
+  S.ready = function (r, rm) {
+    const g = VR.game, w = g.world, p = g.player; if (!w || !p) return { miss: 99, dirty: 0 };
+    const pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let miss = 0, dirty = 0;
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      const d2 = dx * dx + dz * dz; if (d2 > r * r) continue;
+      const c = w.col(pcx + dx, pcz + dz); if (!c) { miss++; continue; }
+      if (d2 <= rm * rm) for (const s of c.sec) if (s && (s.dirty || s.pending)) dirty++;
+    }
+    return { miss, dirty };
+  };
+  S.pump = function (r, rm) { const g = VR.game, p = g.player; try { g.world.update(p.pos[0], p.pos[1], p.pos[2], performance.now()); } catch (e) { /* the next frame */ } return S.ready(r, rm); };
+  S.status = function () { const B = S.B; return { mode: S.mode.kind, done: S.done, t: +S.t.toFixed(2), stat: Object.assign({}, S.stat), log: S.log.slice(-30), B: B ? { phase: B.phase, ding: B.ding, tries: B.tries, whys: B.whys.slice(-14), plan: B.plan, site: B.site, sitePhase: B.sitePhase, fallback: B.fallback } : null, route: S.R ? { L: +S.R.L.toFixed(1), s: +S.R.s.toFixed(1) } : null }; };
+  return S;
+}
+
+// ============================================================================ the analysis, the frames, the sheet (node)
+const SUB_DE = { birds: 'Vögel', chimneys: 'Kaminrauch', lanterns: 'Laternenanzünder', cat: 'Katze', pigeons: 'Tauben', cart: 'Schwebekarren', meteor: 'Sternschnuppe', balloon: 'Ballon', bells: 'Glocken', fireworks: 'Feuerwerk', kids: 'Kinder', musician: 'Musikant', dog: 'Hund', skyray: 'Himmelsrochen', fisher: 'Angler', flyby: 'Vorbeiflug', lowpass: 'Tiefflug', convoy: 'Konvoi', defence: 'Abwehr', landing: 'Landung', festival: 'Fest', site: 'Baustelle', site_done: 'Haus steht' };
+const PLACE_DE = { plaza: 'Platz', street: 'Straße', hall: 'Halle', hangar: 'Hangar', hills: 'Hügel', isles: 'Inseln', water: 'Wasser', wild: 'Land', '': '—' };
+const LM_DE = { temple: 'Tor-Tempel', citadel: 'Zitadelle', isles: 'Himmelsinseln', nova: 'Nova Haven', station: 'Bergstation', hills: 'Kuppelhügel', lighthouse: 'Leuchtturm', falls: 'Wasserfall', lookout: 'Aussichtsturm' };
+const SKY_DE = { low_sun: 'tiefe Sonne', giant: 'Ringplanet', blue: 'blauer Planet', meteor: 'Sternschnuppe', skyray: 'Himmelsrochen', fireworks: 'Feuerwerk' };
+const TYPE_DE = { builder: 'Bauen', walk: 'Spaziergang', adventurer: 'Abenteuer', pilot: 'Pilot' };
+const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const clock = (tod) => { const h = ((tod / 1000) + 6) % 24; return `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`; };
+const evName = (e) => SUB_DE[e.sub] || (e.kind === 'discovery' ? 'Entdeckt ' + e.sub : e.kind === 'milestone' ? 'Meilenstein ' + e.sub : e.kind === 'wow' ? 'Wow ' + (LM_DE[e.sub] || e.sub) : e.sub || e.kind);
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const cut = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
+
+// the twelve frames: one per slot of dur / 12, at the slot's heaviest event in view (a second after it began) or its middle
+function chooseFrames(rec) {
+  const dur = rec.dur, out = [];
+  for (let k = 0; k < SLOTS; k++) {
+    const a = k * dur / SLOTS, b = (k + 1) * dur / SLOTS;
+    const inSlot = rec.events.filter(e => e.t >= a && e.t < b);
+    const best = inSlot.filter(e => e.inView).sort((p, q) => q.w - p.w || p.t - q.t)[0];
+    const t = best ? Math.min(b - 0.25, best.t + 1) : (a + b) / 2;
+    const s = rec.samples.reduce((m, q) => (!m || Math.abs(q.t - t) < Math.abs(m.t - t) ? q : m), null);
+    const part = (rec.parts.filter(p => !p.skipped && p.t0 <= t).slice(-1)[0] || {}).de || '';
+    out.push({ i: k + 1, t, a, b, events: inSlot, sample: s, part });
+  }
+  return out;
+}
+function frameLabels(f, rec) {
+  const s = f.sample || {};
+  const l1 = `${f.i} · ${mmss(f.t)} · ${PLACE_DE[s.place] !== undefined ? PLACE_DE[s.place] : s.place || '—'} · ${f.part}`;
+  const evs = f.events.slice().sort((p, q) => q.w - p.w || p.t - q.t).slice(0, 4).map(e => `${evName(e)} ${e.w}${e.inView ? '✓' : '✗'}`);
+  const more = f.events.length > 4 ? ` +${f.events.length - 4}` : '';
+  const env = [s.movers ? `${s.movers} Beweger` : '0 Beweger', s.landmark ? LM_DE[s.landmark] || s.landmark : '', s.sky ? SKY_DE[s.sky] || s.sky : ''].filter(Boolean).join(' · ');
+  return [cut(l1, 74), cut((evs.length ? evs.join(' · ') + more : '— nichts —') + '  |  ' + env, 92)];
+}
+async function buildSheet(rec, frames, out) {
+  const sharp = (await import('/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js')).default;
+  const G = 8, LH = 44, COLS = 4, ROWS = 3, HEAD = 78, TL = 150;
+  const SW = COLS * PW + (COLS + 1) * G, SH = HEAD + ROWS * (PH + LH + G) + G + TL;
+  const comps = [];
+  const m = rec.metrics, v = rec.verdict, gl = m.gaps.longest;
+  let svg = `<svg width="${SW}" height="${SH}" xmlns="http://www.w3.org/2000/svg"><style>text{font-family:'DejaVu Sans',sans-serif}</style>`;
+  const T = (x, y, s, size, fill, weight) => { svg += `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}"${weight ? ` font-weight="${weight}"` : ''}>${esc(s)}</text>`; };
+  T(G, 26, `Sitzung · ${TYPE_DE[rec.type] || rec.type} (${rec.type}) — Saat ${rec.seed} · Ausgewogen ${VW}×${VH} · ${mmss(rec.dur)} Spielzeit · ${clock(rec.tod0)} → ${clock(rec.tod1)} Uhr · Tag ${rec.day} · ${rec.build || ''}`, 18, '#f0f0f5', 600);
+  const mt = `Ereignisse ≥ 2 im Blick ${m.weighted.perMin.toFixed(2)}/min · längste Lücke ${Math.round(gl.d)} s (${mmss(gl.a)}–${mmss(gl.b)}) · p90 ${Math.round(m.gaps.p90)} s · Beweger ${m.movers.toFixed(2)} · Wahrzeichen/Himmel ${m.lmSky.toFixed(2)} · Vielfalt ${m.variety.n} · Spam ${m.spam.n} · freihändig ${m.handsFree.toFixed(2)}`;
+  T(G, 50, mt, 14, '#c9cbd6');
+  T(G, 70, `Ziele (${v.base}) erreicht: ${v.met} / ${v.total} — ${v.rows.filter(r => !r.ok).map(r => r.key).join(', ') || 'alle'}`, 14, v.met === v.total ? '#7ce39a' : '#ff9a8a', 600);
+  frames.forEach((f, i) => {
+    const cx = G + (i % COLS) * (PW + G), cy = HEAD + Math.floor(i / COLS) * (PH + LH + G) + G;
+    if (f.file && fs.existsSync(f.file)) comps.push({ file: f.file, left: cx, top: cy });
+    else { svg += `<rect x="${cx}" y="${cy}" width="${PW}" height="${PH}" fill="#1a1b24"/>`; T(cx + 12, cy + 24, 'kein Bild', 14, '#888'); }
+    const [l1, l2] = f.labels;
+    svg += `<rect x="${cx}" y="${cy + PH}" width="${PW}" height="${LH}" fill="#14151d"/>`;
+    T(cx + 6, cy + PH + 17, l1, 13, '#eef0f6', 600); T(cx + 6, cy + PH + 36, l2, 11.5, '#aab0c0');
+    if (f.t >= gl.a && f.t <= gl.b && gl.d >= 30) { svg += `<rect x="${cx + PW - 128}" y="${cy + 6}" width="122" height="22" rx="4" fill="#c0392b" opacity="0.9"/>`; T(cx + PW - 122, cy + 22, `LÜCKE ${Math.round(gl.d)} s`, 13, '#fff', 700); }
+  });
+  // the timeline: inputs, movers, landmark/sky, the events (weighted in view green, the rest grey), the gaps ≥ 45 s red
+  const y0 = SH - TL + 6, x0 = 70, x1 = SW - 16, X = (t) => x0 + (x1 - x0) * Math.max(0, Math.min(1, t / rec.dur));
+  T(G, y0 + 8, 'Eingabe', 11, '#aab0c0'); T(G, y0 + 24, 'Beweger', 11, '#aab0c0'); T(G, y0 + 40, 'Wahrz./Himmel', 10, '#aab0c0'); T(G, y0 + 72, 'Ereignisse', 11, '#aab0c0');
+  const IC = { micro: '#8a8f9c', build: '#ffb347', idle: '#5fd38d', intent: '#4fc3ff' };
+  for (const s of rec.samples) { const xa = X(s.t - 1), xb = X(s.t); svg += `<rect x="${xa.toFixed(1)}" y="${y0}" width="${Math.max(0.6, xb - xa).toFixed(1)}" height="10" fill="${IC[s.input] || '#555'}"/>`; if (s.movers) svg += `<rect x="${xa.toFixed(1)}" y="${y0 + 16}" width="${Math.max(0.6, xb - xa).toFixed(1)}" height="8" fill="#c8a2ff"/>`; if (s.landmark || s.sky) svg += `<rect x="${xa.toFixed(1)}" y="${y0 + 32}" width="${Math.max(0.6, xb - xa).toFixed(1)}" height="8" fill="#ffd36e"/>`; }
+  for (const gp of m.gaps.list) if (gp.d >= 45) { svg += `<rect x="${X(gp.a).toFixed(1)}" y="${y0 + 48}" width="${(X(gp.b) - X(gp.a)).toFixed(1)}" height="40" fill="#e74c3c" opacity="0.22"/>`; T(X(gp.a) + 3, y0 + 86, `${Math.round(gp.d)} s`, 11, '#ff8f80', 700); }
+  svg += `<line x1="${x0}" y1="${y0 + 80}" x2="${x1}" y2="${y0 + 80}" stroke="#555a66" stroke-width="1"/>`;
+  for (const e of rec.events) { const wt = e.w >= 2 && e.inView, h = wt ? 6 + 6 * e.w : 6; svg += `<line x1="${X(e.t).toFixed(1)}" y1="${y0 + 80}" x2="${X(e.t).toFixed(1)}" y2="${(y0 + 80 - h).toFixed(1)}" stroke="${wt ? '#5fe08a' : '#6b7080'}" stroke-width="${wt ? 2 : 1}"/>`; }
+  for (const f of frames) { svg += `<circle cx="${X(f.t).toFixed(1)}" cy="${y0 + 98}" r="7" fill="#2b2f3d"/>`; T(X(f.t) - (f.i >= 10 ? 7 : 3.5), y0 + 102, String(f.i), 10, '#eef0f6'); }
+  for (let t = 0; t <= rec.dur; t += 30) T(X(t) - 10, y0 + 118, mmss(t), 10, '#7d8292');
+  T(x0, y0 + 136, 'grün: Gewicht ≥ 2 im Blick · grau: Gewicht 1 / außer Sicht · rot: Lücke ≥ 45 s · Eingabe: grau Tasten, orange Bauen, grün Zuschauen', 10, '#7d8292');
+  svg += '</svg>';
+  const parts = [];
+  for (const c of comps) parts.push({ input: await sharp(c.file).resize(PW, PH).toBuffer(), left: c.left, top: c.top });
+  parts.push({ input: Buffer.from(svg), left: 0, top: 0 });
+  await sharp({ create: { width: SW, height: SH, channels: 3, background: '#0b0c12' } }).composite(parts).png().toFile(out);
+  return { w: SW, h: SH };
+}
+// a session's record → the metrics, the verdict, the gaps described, the frames chosen
+function analyze(rec) {
+  rec.metrics = SS.analyze({ events: rec.events, samples: rec.samples, t0: 0, t1: rec.dur, exclude: rec.exclude || [] });
+  rec.verdict = SS.verdict(rec.metrics, rec.type);
+  rec.gaps = rec.metrics.gaps.list.slice().sort((a, b) => b.d - a.d).slice(0, 3).map(g => SS.describeGap(g, rec.samples, rec.events));
+  rec.frames = chooseFrames(rec).map(f => ({ i: f.i, t: +f.t.toFixed(2), labels: frameLabels(f, rec) }));
+  return rec;
+}
+const summary = (rec) => {
+  const m = rec.metrics, gl = m.gaps.longest;
+  return `${rec.type}: ${m.weighted.n} weighted in view (${m.weighted.perMin.toFixed(2)}/min), longest gap ${gl.d.toFixed(0)} s (${mmss(gl.a)}–${mmss(gl.b)}), p90 ${m.gaps.p90.toFixed(0)} s, movers ${m.movers.toFixed(2)}, landmark/sky ${m.lmSky.toFixed(2)}, variety ${m.variety.n} (${m.variety.kinds.join(',')}), spam ${m.spam.n}, hands-free ${m.handsFree.toFixed(2)} — targets ${rec.verdict.met}/${rec.verdict.total}`;
+};
+
+// ============================================================================ DRY: everything node can check before the one browser run
+if (DRY) {
+  const OUT = process.env.DRY_OUT || (ROOT + '.tmp_tests/session_dry/');
+  fs.mkdirSync(OUT, { recursive: true });
+  const R = planRoutes();
+  console.log('meadow', JSON.stringify(R.M), 'stand', R.STAND.map(v => +v.toFixed(1)), 'landmarks', R.landmarks.map(q => q.id).join(','));
+  for (const k of ['builderA', 'builderB', 'walkA', 'walkB']) {
+    const P = R[k]; let jump = 0; for (let i = 1; i < P.length; i++) jump = Math.max(jump, Math.hypot(P[i][0] - P[i - 1][0], P[i][1] - P[i - 1][1]));
+    console.log(`  ${k}: ${P.length} points, ${R.len(P).toFixed(0)} m, from (${P[0].map(v => v.toFixed(0))}) to (${P[P.length - 1].map(v => v.toFixed(0))}), longest step ${jump.toFixed(1)} m`);
+    check(P.length >= 3 && R.len(P) > 100, `${k}: a route of ${R.len(P).toFixed(0)} m`);
+  }
+  check(R.M && R.M.flat >= 0 && R.M.flat <= 2, `the river meadow: open, flat grass at (${R.M.x}, ${R.M.z}), relief ${R.M.flat}`);
+  // the walker on a stand-in: a point that walks 4.3 m/s along its yaw while W is held
+  const keys = new Set(), fg = { state: 'play', time: 0, player: { pos: [0.5, 81, 4.5], yaw: Math.PI, pitch: 0, vel: [0, 0, 0], hold: null }, input: { keys }, world: { getBlock: (x, y) => (y <= 80 ? 1 : 0) }, wow: null, gadgets: null };
+  const fvr = { game: fg, R: { T: { flags: [0, 1] } }, F: { SOLID: 1, REPLACE: 2 } };
+  const W = {}; pageHelpers(W, fvr); const S = W.__S;
+  const walkIt = (route, maxS, blockAt) => {
+    fg.player.pos = [route[0][0], 81, route[0][1]]; S.set({ kind: 'walk', route }); let t = 0, dev = 0;
+    for (; t < maxS && !S.done; t += 1 / 30) {
+      S.control(1 / 30); fg.time += 1 / 30;
+      if (keys.has('KeyW')) { const p = fg.player, nx = p.pos[0] - Math.sin(p.yaw) * 4.3 / 30, nz = p.pos[2] - Math.cos(p.yaw) * 4.3 / 30; if (!(blockAt && blockAt(nx, nz))) { p.pos[0] = nx; p.pos[2] = nz; } }
+      const q = S.pointAt(S.R, S.R.s); dev = Math.max(dev, Math.hypot(fg.player.pos[0] - q[0], fg.player.pos[2] - q[1]));
+    }
+    return { t, dev, done: S.done, hops: S.stat.hops, L: S.R.L };
+  };
+  for (const k of ['builderA', 'builderB', 'walkA', 'walkB']) {
+    const h0 = S.stat.hops, r = walkIt(R[k], 600);
+    console.log(`  walker on ${k}: ${r.done ? 'arrived' : 'NOT arrived'} after ${r.t.toFixed(0)} s (${(r.L / r.t).toFixed(2)} m/s), the farthest off the way ${r.dev.toFixed(2)} m, hops ${r.hops - h0}`);
+    check(r.done && r.dev < 3 && r.hops === h0 && r.L / r.t > 3.4, `the walker follows ${k} to its end (${(r.L / r.t).toFixed(2)} m/s, ≤ ${r.dev.toFixed(1)} m off, no hop)`);
+  }
+  const wall = (x, z) => z > 30 && z < 31.5;   // a wall across the hall's way out: the walker jumps, then hops past it
+  const h1 = S.stat.hops, j1 = S.stat.jumps, rw = walkIt(R.builderA.slice(0, 6), 120, wall);
+  check(rw.done && S.stat.hops > h1 && S.stat.jumps > j1, `stuck at a wall: it jumps (${S.stat.jumps - j1}) and hops along the way (${S.stat.hops - h1}), and arrives`);
+  // the Bauhand on a stand-in: a ghost that turns cyan after a moment, a site that rises and stands
+  let ghostAt = 0;
+  const site = { mode: 'show', phase: 'earth', box: [270, 81, -46, 280, 88, -36] };
+  fvr.Bauhand = { state: 'closed', ghost: null, hold(ding) { this.state = 'holding'; this.ding = ding; ghostAt = fg.time + 1.5; }, place() { fg.gadgets = { blue: { sites: [site] } }; return { id: 'bh1', kind: 'house', ox: 270, oz: -46, F: 81 }; }, putAway() { this.state = 'closed'; } };
+  Object.defineProperty(fvr.Bauhand, 'ghost', { get() { return fvr.Bauhand.state === 'holding' && fg.time > ghostAt ? { ok: fg.time > ghostAt + 2, why: 'zu steil' } : null; }, configurable: true });
+  fg.player.pos = [R.STAND[0], 81, R.STAND[1]]; S.set({ kind: 'bauhand', ding: 'h:6', name: 'Bungalow', target: [R.M.x, R.M.y, R.M.z] });
+  for (let t = 0; t < 90 && !S.done; t += 1 / 30) { S.control(1 / 30); fg.time += 1 / 30; if (fg.gadgets && site.phase === 'earth' && S.B.t > 3) site.phase = 'build'; if (site.phase === 'build' && S.B.t > 12) site.phase = 'done'; }
+  const st = S.status();
+  console.log('  bauhand on a stand-in', JSON.stringify(st.B));
+  check(S.done && st.B.phase === 'done' && st.B.plan && st.B.plan.kind === 'house' && st.B.site && st.B.whys.length >= 1, `the Bauhand part: holds, retries a red ghost (${st.B.whys.join('; ')}), places the house, watches the site to its end`);
+  // a synthetic session → the analysis and the sheet
+  const sharp = (await import('/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js')).default;
+  const rec = { type: 'builder', seed: SEED, dur: 300, tod0: 2500, tod1: 8500, day: 0, build: 'dry', parts: [{ name: 'spawn', de: 'Ankunft', t0: 0, t1: 8 }, { name: 'meadow', de: 'Zur Flusswiese', t0: 8, t1: 100 }, { name: 'bauhand', de: 'Bauhand: Bungalow', t0: 100, t1: 160 }, { name: 'walkon', de: 'Weiter', t0: 160, t1: 300 }], events: [], samples: [] };
+  const kinds = ['ambient', 'travel', 'social', 'sky', 'build', 'discovery'], subs = ['birds', 'flyby', 'kids', 'balloon', 'site', 'plains'];
+  for (let t = 3; t < 300; t += 7 + (t % 23)) { const i = Math.floor(t) % 6; if (t > 120 && t < 200) continue; rec.events.push({ n: rec.events.length + 1, t, kind: kinds[i], sub: subs[i], w: 1 + (i % 3), inView: i % 4 !== 0, frac: 0.01, x: 0, y: 0, z: 0, src: 'dry' }); }
+  for (let t = 1; t <= 300; t++) rec.samples.push({ t, movers: t % 3 ? 1 : 0, mv: 'v1', landmark: t % 5 ? '' : 'temple', sky: t > 250 ? 'low_sun' : '', input: t < 8 ? 'idle' : t < 100 ? 'micro' : t < 160 ? (t < 110 ? 'build' : 'idle') : 'micro', x: t, z: -t, place: t < 100 ? 'hangar' : 'wild', tod: 2500 + t * 20 });
+  analyze(rec);
+  console.log('  ' + summary(rec));
+  const frames = [];
+  for (const f of rec.frames) { const file = `${OUT}dry_${String(f.i).padStart(2, '0')}.jpg`; await sharp({ create: { width: PW, height: PH, channels: 3, background: { r: 40 + f.i * 15, g: 90, b: 140 } } }).jpeg().toFile(file); frames.push(Object.assign({ file }, f)); }
+  const dim = await buildSheet(rec, frames, OUT + 'dry_sheet.png');
+  check(fs.existsSync(OUT + 'dry_sheet.png') && dim.w > 1900, `a synthetic sheet: ${OUT}dry_sheet.png (${dim.w} × ${dim.h})`);
+  check(rec.gaps.length === 3 && rec.gaps[0].d >= rec.gaps[1].d && rec.frames.length === 12, `the three longest gaps described (${rec.gaps.map(g => Math.round(g.d)).join(', ')} s), twelve frames chosen`);
+  check(typeof SS.table([['builder', rec.metrics]]) === 'string', 'the metrics table for the plan');
+  console.log(SS.table([['builder', rec.metrics], ['walk', rec.metrics]]));
+  console.log(`(${secs()})`);
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+  process.exit(fails ? 1 : 0);
+}
+
+// ============================================================================ SHEET_ONLY: a sheet again from a session's JSON and frames
+if (SHEET_ONLY) {
+  const rec = JSON.parse(fs.readFileSync(`${SHOTS}session_${SHEET_ONLY}.json`, 'utf8'));
+  analyze(rec);
+  const frames = rec.frames.map(f => Object.assign({}, f, { file: `${SHOTS}session_${rec.type}_${String(f.i).padStart(2, '0')}.jpg` }));
+  await buildSheet(rec, frames, `${SHOTS}session_${rec.type}_sheet.png`);
+  console.log('sheet', `${SHOTS}session_${rec.type}_sheet.png`, summary(rec));
+  process.exit(0);
+}
+
+// ============================================================================ the browser run
+const { chromium } = await import('/home/dev/.npm-global/lib/node_modules/playwright/index.mjs');
+const ROUTES = planRoutes();
+console.log(`routes (${secs()}): meadow ${JSON.stringify(ROUTES.M)}; builder ${ROUTES.len(ROUTES.builderA).toFixed(0)} + ${ROUTES.len(ROUTES.builderB).toFixed(0)} m; walk ${ROUTES.len(ROUTES.walkA).toFixed(0)} + ${ROUTES.len(ROUTES.walkB).toFixed(0)} m; landmarks ${ROUTES.landmarks.map(q => q.id).join(',')}`);
+let BUILD = ''; try { BUILD = execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim(); } catch (e) { BUILD = '?'; }
+const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
+const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, locale: 'de-DE' });
+const page = await ctx.newPage();
+const logs = [];
+page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 400)}`); });
+page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1200)));
+page.on('crash', () => { logs.push('[pageerror] the page crashed'); console.log('  !! the page crashed'); });
+const ev = (fn, arg) => page.evaluate(fn, arg);
+const wait = (ms) => page.waitForTimeout(ms);
+const RUN = { renders: [], picEvery: 1, waits: 0, waitS: 0 };
+await page.goto(DIST);
+for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
+await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.autoJump = 'on'; g.settings.wowMoments = true; g.applySettings('*'); });
+await ev((seed) => VR.game.createWorld({ name: 'Sitzung', mode: 'creative', difficulty: 'peaceful', type: 'default', seed: String(seed), cheats: true, kit: true }), SEED);
+let inPlay = false;
+for (let i = 0; i < 300 && !inPlay; i++) { await wait(1000); inPlay = await ev(() => !!(VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)).catch(() => false); }
+const meta = await ev(() => { const g = VR.game; return { state: g.state, vgen: (g.meta && g.meta.vgen) | 0, type: g.meta && g.meta.type, preset: g.settings.preset, eventlog: !!VR.EventLog, pos: g.player.pos.map(v => +v.toFixed(1)), W: g.renderer.W, H: g.renderer.H }; });
+console.log(`world (${secs()}): ${JSON.stringify(meta)}`);
+check(inPlay && meta.vgen >= 11 && meta.type === 'default' && meta.eventlog, `a new default world (the Heartland, vgen ${meta.vgen}) with VR.EventLog, Balanced (${meta.preset}, ${meta.W}×${meta.H})`);
+if (!inPlay || !meta.eventlog) { console.log(`--- logs (${logs.length})`); for (const l of logs.slice(0, 20)) console.log(l); await browser.close(); console.log('FAILED ' + Math.max(1, fails)); process.exit(1); }
+// the clock is ours: no animation frames, the renderer only draws when asked; the weather held; uploads boosted; the world's known landmarks
+await ev((lms) => {
+  const g = VR.game;
+  window.requestAnimationFrame = () => 0;
+  if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; }
+  window.__norender = true;
+  g.zenFreezeWeather = true; g.env.rain = 0; g.env.rainTarget = 0;
+  if (g.renderer.q) g.renderer.q.upload = 24;
+  if (VR.EventLog) VR.EventLog.landmarks = lms.filter(q => !['temple', 'citadel', 'isles', 'nova', 'station', 'hills'].includes(q.id));
+}, ROUTES.landmarks);
+await page.evaluate(`(${pageHelpers.toString()})(window)`);
+const settle = async (maxS, r, rm) => { const t = Date.now(); let s = null; while (Date.now() - t < maxS * 1000) { s = await ev(([r, rm]) => window.__S.pump(r, rm), [r, rm]); if (s.miss === 0 && s.dirty === 0) break; await wait(60); } return s; };
+
+// half a second of play: the world ahead first, then 15 frames, the last drawn and captured (2 Hz; 1 Hz when a picture costs > 1.5 s)
+let chunkN = 0;
+async function play(t0, tEnd, untilDone) {
+  let last = null;
+  for (;;) {
+    let s = await ev(() => window.__S.ready(4, 2));
+    // (columns missing: up to 20 s; only sections to mesh — a Baustelle keeps rewriting them —: up to 6 s)
+    if (s.miss || s.dirty > 8) { const w0 = Date.now(), cap = s.miss ? 20000 : 6000; while ((s.miss || s.dirty > 8) && Date.now() - w0 < cap) { await wait(50); s = await ev(() => window.__S.pump(4, 2)); } RUN.waits++; RUN.waitS += (Date.now() - w0) / 1000; }
+    const pic = chunkN++ % RUN.picEvery === 0;
+    last = await ev(([n, r]) => window.__S.frames(n, r), [15, pic]);
+    if (pic) {
+      RUN.renders.push(last.rms);
+      if (RUN.renders.length === 24 && RUN.picEvery === 1) { const md = RUN.renders.slice().sort((a, b) => a - b)[12]; if (md > 1500) { RUN.picEvery = 2; console.log(`  (a picture costs ${md.toFixed(0)} ms: 1 Hz from now)`); } }
+    }
+    const t = last.t - t0;
+    if (t >= tEnd - 1e-3 || (untilDone && last.done) || last.state) return { t, last };
+  }
+}
+// a session: its setup, its parts in order, a look round to the end; then its log, samples, metrics, frames and sheet
+async function session(type, setup, script) {
+  console.log(`== ${type} (${secs()})`);
+  const real0 = Date.now(), r0 = RUN.renders.length, w0 = [RUN.waits, RUN.waitS];
+  const rec = { type, seed: SEED, preset: 'balanced', size: [VW, VH], dur: DUR, build: BUILD, parts: [], notes: setup.notes || [], exclude: [] };
+  await ev((o) => { const g = VR.game, p = g.player; p.flying = false; if (o.at) { p.teleport(o.at[0], o.at[1], o.at[2]); } if (o.yaw !== undefined) { p.yaw = o.yaw; p.viewYaw = o.yaw; } p.pitch = 0; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } g.env.setTime(o.tod); g.env.rain = 0; g.env.rainTarget = 0; window.__S.pics = []; window.__S.log = []; window.__S.stat = { hops: 0, jumps: 0 }; window.__S.set({ kind: 'idle' }); }, setup);
+  const st = await settle(90, 6, 3);
+  await ev(() => window.__S.frames(30, false));   // (a second to land on the ground)
+  console.log(`  settled ${JSON.stringify(st)} (${secs()})`);
+  const start = await ev(() => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, day: g.env.day | 0, cost: Object.assign({}, L.cost), count: L.count, n: L.nSamples }; });
+  const t0 = start.t; rec.tod0 = Math.round(start.tod); rec.day = start.day;
+  let tNow = 0;
+  for (const part of script) {
+    if (tNow >= DUR - 0.25) break;
+    const P = { name: part.name, de: part.de, t0: +tNow.toFixed(2) };
+    if (part.need) {
+      const has = await ev(part.need).catch(() => false);
+      if (!has || !part.mode) { P.skipped = true; P.why = has ? `${part.name} exists now — script this part (it has no steps yet)` : part.why; P.t1 = P.t0; rec.parts.push(P); console.log(`  · ${part.name}: skipped — ${P.why}`); continue; }
+    }
+    try {
+      await ev((m) => window.__S.set(m), part.mode);
+      const r = await play(t0, Math.min(DUR, tNow + (part.max || DUR)), true);
+      tNow = r.t; P.t1 = +tNow.toFixed(2); P.status = await ev(() => window.__S.status());
+      if (r.last.state) P.why = 'the game left play: ' + r.last.state;
+    } catch (e) { P.failed = String(e && e.message || e).slice(0, 300); P.t1 = +tNow.toFixed(2); tNow = (await ev(() => VR.game.time).catch(() => t0 + tNow)) - t0; }
+    rec.parts.push(P);
+    console.log(`  · ${part.name} ${P.t0}–${P.t1} s${P.failed ? ' FAILED ' + P.failed : ''} ${JSON.stringify(P.status && { stat: P.status.stat, route: P.status.route, B: P.status.B && { phase: P.status.B.phase, ding: P.status.B.ding, tries: P.status.B.tries, whys: P.status.B.whys.slice(-4), site: !!P.status.B.site } })} (${secs()})`);
+  }
+  if (tNow < DUR - 0.25) {
+    await ev(() => window.__S.set({ kind: 'look', sec: 999, speed: 0.25 }));
+    const P = { name: 'linger', de: 'Umsehen bis zum Ende', t0: +tNow.toFixed(2) };
+    const r = await play(t0, DUR, false); tNow = r.t; P.t1 = +tNow.toFixed(2); rec.parts.push(P);
+  }
+  await ev(() => window.__S.set({ kind: 'idle' }));
+  const end = await ev(([t0]) => { const g = VR.game, L = VR.EventLog; return { t: g.time, tod: g.env.timeOfDay, events: L.events(0).filter(e => e.t >= t0 - 1e-6), samples: L.samples(t0 - 1e-6), cost: Object.assign({}, L.cost), stat: window.__S.stat, log: window.__S.log, pos: g.player.pos.slice() }; }, [t0]);
+  rec.tod1 = Math.round(end.tod);
+  rec.played = +(end.t - t0).toFixed(2);
+  rec.events = end.events.filter(e => e.t - t0 <= DUR + 1e-6).map(e => Object.assign({}, e, { t: +(e.t - t0).toFixed(3) }));
+  rec.samples = end.samples.filter(s => s.t - t0 <= DUR + 1e-6).map(s => Object.assign({}, s, { t: +(s.t - t0).toFixed(3) }));
+  const c0 = start.cost, c1 = end.cost, fr = c1.frames - c0.frames, sm = c1.samples - c0.samples;
+  rec.cost = { frames: fr, msPerFrame: +((c1.ms - c0.ms) / Math.max(1, fr)).toFixed(5), worstMs: +c1.worst.toFixed(3), samples: sm, msPerSample: +((c1.sampleMs - c0.sampleMs) / Math.max(1, sm)).toFixed(4), emits: c1.emits - c0.emits, msPerEmit: +((c1.emitMs - c0.emitMs) / Math.max(1, c1.emits - c0.emits)).toFixed(4) };
+  const rs = RUN.renders.slice(r0).sort((a, b) => a - b);
+  rec.run = { realS: Math.round((Date.now() - real0) / 1000), pictures: rs.length, renderMsMedian: rs.length ? Math.round(rs[rs.length >> 1]) : 0, picHz: 2 / RUN.picEvery, waits: RUN.waits - w0[0], waitS: Math.round(RUN.waitS - w0[1]), hops: end.stat.hops, jumps: end.stat.jumps, walkerLog: end.log.slice(-40), end: end.pos.map(v => +v.toFixed(1)) };
+  analyze(rec);
+  // the twelve frames and the one in the middle of the longest gap
+  const gl = rec.metrics.gaps.longest, times = rec.frames.map(f => t0 + f.t).concat([t0 + (gl.a + gl.b) / 2]);
+  const pics = await ev((ts) => window.__S.picsAt(ts), times);
+  const frames = [];
+  for (let k = 0; k < rec.frames.length; k++) {
+    const f = rec.frames[k], q = pics[k], file = `${SHOTS}session_${type}_${String(f.i).padStart(2, '0')}.jpg`;
+    if (q && q.url) { fs.writeFileSync(file, Buffer.from(q.url.split(',')[1], 'base64')); f.file = file.replace(ROOT, ''); f.pic = +(q.t - t0).toFixed(2); }
+    frames.push(Object.assign({}, f, { file: q && q.url ? file : null }));
+  }
+  const gq = pics[pics.length - 1];
+  if (gq && gq.url) { fs.writeFileSync(`${SHOTS}session_${type}_gap.jpg`, Buffer.from(gq.url.split(',')[1], 'base64')); rec.gapFrame = { t: +(gq.t - t0).toFixed(2), file: `test/shots/session_${type}_gap.jpg` }; }
+  if (process.env.ALL) { const all = await ev(() => window.__S.pics.map(q => [q.t, q.url])); fs.mkdirSync(`${SHOTS}session_${type}`, { recursive: true }); all.forEach(([t, u]) => fs.writeFileSync(`${SHOTS}session_${type}/t${String(Math.round((t - t0) * 10)).padStart(5, '0')}.jpg`, Buffer.from(u.split(',')[1], 'base64'))); }
+  await ev(() => { window.__S.pics = []; });
+  let sheet = null;
+  try { sheet = await buildSheet(rec, frames, `${SHOTS}session_${type}_sheet.png`); } catch (e) { console.log('  !! the sheet: ' + String(e && e.message || e).slice(0, 300)); }
+  fs.writeFileSync(`${SHOTS}session_${type}.json`, JSON.stringify(rec, null, 1));
+  console.log('  ' + summary(rec));
+  console.log(`  gaps: ${rec.gaps.map(g => `${Math.round(g.d)} s ${mmss(g.a)}–${mmss(g.b)} at ${JSON.stringify(g.places)} movers ${g.movers.toFixed(1)} lm ${JSON.stringify(g.landmarks)} sky ${g.sky.toFixed(2)} input ${JSON.stringify(Object.fromEntries(Object.entries(g.inputs).map(([k, v]) => [k, +v.toFixed(2)])))}`).join(' | ')}`);
+  console.log(`  cost: ${JSON.stringify(rec.cost)} · run: ${JSON.stringify(Object.assign({}, rec.run, { walkerLog: rec.run.walkerLog.length }))} (${secs()})`);
+  check(rec.played >= 290, `${type}: ${rec.played.toFixed(0)} s of play`);
+  check(rec.samples.length >= rec.played * 0.95 - 2 && rec.events.length > 0, `${type}: ${rec.samples.length} samples and ${rec.events.length} events recorded`);
+  check(fs.existsSync(`${SHOTS}session_${type}.json`) && !!sheet, `${type}: session_${type}.json and session_${type}_sheet.png written (${frames.filter(f => f.file).length} of 12 frames)`);
+  check(rec.cost.msPerFrame <= 0.05, `${type}: the log costs ${(rec.cost.msPerFrame * 1000).toFixed(1)} µs a frame (≤ 50), ${rec.cost.msPerSample} ms a sample, over ${rec.cost.frames} frames`);
+  return rec;
+}
+
+const M = ROUTES.M, notes = ['travel by intent (VR.Intent, wave 4 e-ctx) does not exist yet: every walk is done with W — micro-control', 'the vista spawn (t-first, wave 2) is not in this base: the spawn is the Hangar Hall\'s deck', 'weather held clear (zenFreezeWeather) for comparable runs; t-wild\'s animals and t-sky3\'s meteors are not in this base and not hooked'];
+const intentPart = { name: 'intent', de: 'Reise per Absicht', need: () => !!(window.VR && VR.Intent && VR.Intent.start), why: 'VR.Intent fehlt (Welle 4, e-ctx): gegangen wird mit W' };
+const funkePart = { name: 'funke', de: 'Funke fragen', need: () => !!(window.VR && VR.Funke), why: 'VR.Funke fehlt (Welle 4, e-funke)' };
+const recs = {};
+try {
+  if (!ONLY || ONLY.includes('builder')) recs.builder = await session('builder', { tod: 2500, notes }, [
+    { name: 'spawn', de: 'Ankunft: Blick in die Halle', mode: { kind: 'look', sec: 8, speed: 0.4 }, max: 8 },
+    intentPart,
+    { name: 'meadow', de: 'Zur Flusswiese', mode: { kind: 'walk', route: ROUTES.builderA }, max: 200 },
+    { name: 'bauhand', de: 'Bauhand: Bungalow', mode: { kind: 'bauhand', ding: 'h:6', name: 'Bungalow', target: [M.x, M.y, M.z] }, max: 80 },
+    funkePart,
+    { name: 'walkon', de: 'Weiter: Feldweg, Brücke', mode: { kind: 'walk', route: ROUTES.builderB }, max: DUR },
+  ]);
+  if (!ONLY || ONLY.includes('walk')) recs.walk = await session('walk', { tod: 9200, at: [10.5, 81, 60.5], yaw: 0, notes }, [
+    { name: 'plaza', de: 'Torplatz: umsehen', mode: { kind: 'look', sec: 8, speed: 0.35 }, max: 8 },
+    intentPart,
+    { name: 'to_nova', de: 'Weg nach Nova Haven', mode: { kind: 'walk', route: ROUTES.walkA }, max: 200 },
+    { name: 'city_plaza', de: 'Stadtplatz: umsehen', mode: { kind: 'look', sec: 15, speed: 0.45 }, max: 15 },
+    { name: 'city', de: 'Durch die Stadt', mode: { kind: 'walk', route: ROUTES.walkB }, max: DUR },
+  ]);
+} catch (e) { check(false, 'the sessions ran (' + String(e && e.stack || e).slice(0, 600) + ')'); }
+
+// ============================================================================ the log's cost: Very Low and High — on · sampler off · off
+if (!process.env.NO_BENCH && (Date.now() - T0) / 1000 < 4500) {   // (the bench only while the run has time left: the sessions' files come first)
+  const bench = {};
+  for (const preset of ['potato', 'high']) {
+    try {
+      await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.applySettings('*'); }, preset);
+      await settle(25, 4, 0);
+      bench[preset] = await ev(() => {
+        const g = VR.game, L = VR.EventLog; window.__S.set({ kind: 'look', sec: 9999, speed: 0.2 });
+        const one = (on, samp, n) => { L.on = on; L.sampling = samp; const c0 = Object.assign({}, L.cost); let loop = 0; for (let i = 0; i < n; i++) { window.__S.control(1 / 30); const t = performance.now(); g.last = t - 1000 / 30; g.loop(t); loop += performance.now() - t; } const c1 = L.cost, f = c1.frames - c0.frames; return { loop: loop / n, log: f ? (c1.ms - c0.ms) / f : 0, samples: c1.samples - c0.samples, sample: c1.samples > c0.samples ? (c1.sampleMs - c0.sampleMs) / (c1.samples - c0.samples) : 0 }; };
+        const R = { on: [], samplerOff: [], off: [] };
+        for (let k = 0; k < 2; k++) { R.on.push(one(true, true, 150)); R.samplerOff.push(one(true, false, 150)); R.off.push(one(false, false, 150)); }
+        L.on = true; L.sampling = true; window.__S.set({ kind: 'idle' });
+        const avg = (A, f) => +(A.reduce((s, q) => s + q[f], 0) / A.length).toFixed(4);
+        const out = {}; for (const k in R) out[k] = { loopMs: avg(R[k], 'loop'), logMs: avg(R[k], 'log'), sampleMs: avg(R[k], 'sample') };
+        return out;
+      });
+      console.log(`  bench ${preset}: ${JSON.stringify(bench[preset])} (${secs()})`);
+    } catch (e) { console.log(`  !! bench ${preset}: ${String(e && e.message || e).slice(0, 200)}`); }
+  }
+  for (const k in recs) { recs[k].bench = bench; fs.writeFileSync(`${SHOTS}session_${k}.json`, JSON.stringify(recs[k], null, 1)); }
+  for (const p in bench) check(bench[p].on.logMs <= 0.05, `${p}: the log ${(bench[p].on.logMs * 1000).toFixed(1)} µs a frame with its sampler, ${(bench[p].samplerOff.logMs * 1000).toFixed(1)} µs without (frame ${bench[p].on.loopMs} ms on, ${bench[p].off.loopMs} ms off)`);
+}
+if (Object.keys(recs).length) console.log('\n' + SS.table(Object.entries(recs).map(([k, r]) => [k, r.metrics])));
+console.log(`--- logs (${logs.length})`); for (const l of logs.slice(0, 20)) console.log(l);
+check(!logs.some(l => l.startsWith('[pageerror]')), `no page error (${logs.filter(l => l.startsWith('[pageerror]')).length})`);
+await browser.close();
+console.log(`(${secs()})`);
+console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+process.exit(fails ? 1 : 0);
