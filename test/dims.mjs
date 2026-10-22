@@ -11,8 +11,10 @@
 //      Very Low (potato): the Nova Haven plaza (ipu.mjs's plaza), the actors held still, rounds in turns (ms per frame
 //      with the GPU drained, draws, triangles): ×1.00 ± 0.03 (or the same draws and triangles). Then on page B with the
 //      game's own frame loop running: a gate trip and Heimkehr timed (gate → first frame of the other world, ms).
-//   nohup bash test/wt_run.sh dims.mjs 3600 > .tmp_tests/dims.log 2>&1 &
-//   NO_COST=1 · ROUNDS=9 · N=30 · SEED=4242 · BEFORE_DIST=file:///…/index.html
+//  4 · pages B' and C' on High (view 8, ring 1's far forms off in both): the same plaza, the same work in both builds,
+//      the frame before/after.
+//   nohup bash test/wt_run.sh dims.mjs 5400 > .tmp_tests/dims.log 2>&1 &
+//   NO_COST=1 · NO_HIGH=1 · ROUNDS=9 · N=30 · ROUNDS_HIGH=5 · N_HIGH=10 · SEED=4242 · BEFORE_DIST=file:///…/index.html
 // regress: skip  (a showcase with pictures and the cost against the build before; the gate is test/dims.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
@@ -30,7 +32,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 
 // ---------------------------------------------------------------- a page with a world (motion.mjs's machinery)
-async function openWorld(dist, preset, rd, natural) {
+async function openWorld(dist, preset, rd, natural, extra) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
   const page = await ctx.newPage();
   const logs = [];
@@ -66,7 +68,7 @@ async function openWorld(dist, preset, rd, natural) {
   const cdp = await ctx.newCDPSession(page);
   const heapMB = async () => { await cdp.send('HeapProfiler.collectGarbage'); await wait(200); await cdp.send('HeapProfiler.collectGarbage'); const u = await cdp.send('Runtime.getHeapUsage'); return +(u.usedSize / 1048576).toFixed(2); };
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-  await ev(([p, rd]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; if (rd) g.settings.renderDist = rd; g.applySettings('*'); }, [preset, rd]);
+  await ev(([p, rd, ex]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; if (rd) g.settings.renderDist = rd; if (ex) Object.assign(g.settings, ex); g.applySettings('*'); }, [preset, rd, extra || null]);
   await ev(`VR.game.createWorld({name:'Welten',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
   for (let i = 0; i < 180; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   const ok = await ev(() => VR.game.state) === 'play';
@@ -196,11 +198,12 @@ if (!process.env.NO_COST) {
   const beforeOk = fs.existsSync(BEFORE.replace(/^file:\/\//, ''));
   if (!beforeOk) console.log(`  (no build before at ${BEFORE}: the cost is not compared)`);
   const PLAZA = [3.5, -96.5, 1.62, 0.3, 0.03];
-  const place = async (Pg) => {
+  const place = async (Pg, farMax = 200) => {
+    await Pg.page.bringToFront();
     await Pg.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 150, z); }, PLAZA);
     await Pg.settle(60, 6);
     await Pg.ev(([x, z, eye, yaw, pitch]) => { const g = VR.game, w = g.world, p = g.player, R = VR.R, F = VR.F; let y = 160; for (; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & F.OPAQUE) && !(R.T.flags[s] & F.LEAVES)) break; } p.teleport(x, y + 1 + eye - 1.62, z); p.yaw = yaw; p.pitch = pitch; p.vel = [0, 0, 0]; g.env.setTime(6000); }, PLAZA);
-    const st = await Pg.settle(200, 200); await Pg.step(6);
+    const st = await Pg.settle(200, farMax); await Pg.step(6);
     // the actors hold still in both builds (the same code in both): what moves is not this front's
     await Pg.ev(() => { const g = VR.game; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams', 'companions', 'entities', 'mirror', 'wow']) { const o = g[k]; if (o && typeof o.update === 'function') o.update = function () {}; } const V = g.villages; for (const k of ['updateAgent', 'updateBoats']) if (V && typeof V[k] === 'function') V[k] = function () {}; });
     return st;
@@ -208,6 +211,19 @@ if (!process.env.NO_COST) {
   // (each page in front while it is measured: a page behind another has its timers and frames held back)
   const measure = async (Pg, n) => { await Pg.page.bringToFront(); await Pg.wait(150); return measure1(Pg, n); };
   const measure1 = (Pg, n) => Pg.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
+  // rounds in turns (the order flips every round), each page n frames: medians, the lower halves, the pairs' ratio
+  const compare = async (pages, nRounds, n) => {
+    const rounds = {};
+    for (let r = 0; r < nRounds; r++) { const order = r & 1 ? pages.slice().reverse() : pages; for (const [lbl, Pg] of order) (rounds[lbl] = rounds[lbl] || []).push(await measure(Pg, n)); }
+    const out = {};
+    for (const lbl of Object.keys(rounds)) { const ms = rounds[lbl].map(q => q.ms).sort((a, b) => a - b), mid = rounds[lbl][nRounds >> 1], lo = ms.slice(0, Math.ceil(ms.length / 2)); out[lbl] = { msMedian: ms[ms.length >> 1], msLow: +(lo.reduce((a, b) => a + b, 0) / lo.length).toFixed(2), ms, draws: mid.draws, tris: mid.tris }; }
+    out.ratio = +(out.after.msMedian / out.before.msMedian).toFixed(3); out.lowRatio = +(out.after.msLow / out.before.msLow).toFixed(3);
+    // the rounds in pairs (the two pages measured back to back): the median of the pairs' ratios, the machine's drift out
+    const pr = rounds.after.map((q, i) => q.ms / rounds.before[i].ms).sort((a, b) => a - b);
+    out.pairRatio = +pr[pr.length >> 1].toFixed(3);
+    out.sameWork = out.after.draws === out.before.draws && Math.abs(out.after.tris - out.before.tris) <= 0.001 * out.before.tris;   // (the actors stand where they stood when held: a few triangles apart)
+    return out;
+  };
   const pages = [];
   try {
     const B = await openWorld(DIST, 'potato', 0, false); check(B.ok, `page B (this build, Very Low) is loaded (${secs()})`); pages.push(['after', B]);
@@ -215,15 +231,7 @@ if (!process.env.NO_COST) {
     await B.picture(SHOTS + 'dims_potato_plaza.png', 8);
     if (beforeOk) { const C = await openWorld(BEFORE, 'potato', 0, false); check(C.ok, `page C (the build before, Very Low) is loaded (${secs()})`); pages.push(['before', C]); console.log('  C settled', JSON.stringify(await place(C))); }
     if (pages.length === 2) {
-      const rounds = {};
-      for (let r = 0; r < ROUNDS; r++) { const order = r & 1 ? pages.slice().reverse() : pages; for (const [lbl, Pg] of order) (rounds[lbl] = rounds[lbl] || []).push(await measure(Pg, N)); }
-      const out = {};
-      for (const lbl of Object.keys(rounds)) { const ms = rounds[lbl].map(q => q.ms).sort((a, b) => a - b), mid = rounds[lbl][ROUNDS >> 1], lo = ms.slice(0, Math.ceil(ms.length / 2)); out[lbl] = { msMedian: ms[ms.length >> 1], msLow: +(lo.reduce((a, b) => a + b, 0) / lo.length).toFixed(2), ms, draws: mid.draws, tris: mid.tris }; }
-      out.ratio = +(out.after.msMedian / out.before.msMedian).toFixed(3); out.lowRatio = +(out.after.msLow / out.before.msLow).toFixed(3);
-      // the rounds in pairs (the two pages measured back to back): the median of the pairs' ratios, the machine's drift out
-      const pr = rounds.after.map((q, i) => q.ms / rounds.before[i].ms).sort((a, b) => a - b);
-      out.pairRatio = +pr[pr.length >> 1].toFixed(3);
-      out.sameWork = out.after.draws === out.before.draws && Math.abs(out.after.tris - out.before.tris) <= 0.001 * out.before.tris;   // (the actors stand where they stood when held: a few triangles apart)
+      const out = await compare(pages, ROUNDS, N);
       rec.cost = out; save();
       console.log('  very low · plaza', JSON.stringify(out));
       // ×1.00 ± 0.03 — swiftshader's noise between rounds is larger than that, so: never slower than ×1.03 (the pairs'
@@ -266,6 +274,25 @@ if (!process.env.NO_COST) {
     check(errs.length === 0, `page B: no page error (${errs.length})`);
     await B.ctx.close();
   } catch (e) { check(false, `the Very Low part ran (${String(e.message || e).slice(0, 300)})`); }
+  // ---------------------------------------------------------------- 4 · High: the same plaza, both builds (the cost before/after)
+  // High's switches (shadows, bloom, rays, materials, water) at view 8 with ring 1's far forms off in both builds (their
+  // minutes of worker time on this machine, as cost_before_after.mjs holds the view): the same work in both, timed in turns
+  if (!process.env.NO_HIGH && fs.existsSync(BEFORE.replace(/^file:\/\//, ''))) {
+    const pagesH = [];
+    try {
+      const BH = await openWorld(DIST, 'high', 8, false, { far: 0 }); check(BH.ok, `page B' (this build, High) is loaded (${secs()})`); pagesH.push(['after', BH]);
+      const sb = await place(BH, 150); console.log('  B\' settled', JSON.stringify(sb));
+      const CH = await openWorld(BEFORE, 'high', 8, false, { far: 0 }); check(CH.ok, `page C' (the build before, High) is loaded (${secs()})`); pagesH.push(['before', CH]);
+      const sc = await place(CH, 150); console.log('  C\' settled', JSON.stringify(sc));
+      const outH = await compare(pagesH, +(process.env.ROUNDS_HIGH || 5), +(process.env.N_HIGH || 10));
+      outH.settled = [sb && sb.hz === 0 && sb.far === 0, sc && sc.hz === 0 && sc.far === 0];
+      rec.costHigh = outH; save();
+      console.log('  high · plaza', JSON.stringify(outH));
+      check(outH.sameWork, `High: the same work in both builds (draws ${outH.after.draws}/${outH.before.draws}, triangles ${outH.after.tris}/${outH.before.tris}); the frame ×${outH.pairRatio} (pairs), ×${outH.ratio} (medians ${outH.after.msMedian} against ${outH.before.msMedian} ms)`);
+      for (const [lbl, Pg] of pagesH) { const errs = Pg.logs.filter(l => l.startsWith('[pageerror]')); check(errs.length === 0, `High page ${lbl}: no page error (${errs.length})`); }
+    } catch (e) { check(false, `the High part ran (${String(e.message || e).slice(0, 300)})`); }
+    for (const [, Pg] of pagesH) { try { await Pg.ctx.close(); } catch (e) { /* closed */ } }
+  }
 }
 await browser.close();
 console.log(`(${secs()})`);
