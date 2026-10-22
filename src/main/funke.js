@@ -188,7 +188,7 @@
       const s = c.ld.seed, clk = c.ld.clock, k0 = LD.slotAt(s, clk) + 1;
       for (let k = k0; k < k0 + 12; k++) {
         const eta = LD.slotTime(s, k) - clk; if (eta > 300) break;
-        const kind = LD.pick(s, k, c.ld.ctx);
+        const kind = c.ld.pick ? c.ld.pick(k) : LD.pick(s, k, c.ld.ctx);   // (f-flow: the director's forecast — its rotation — when it is there)
         if (kind && F.LD_W[kind]) add('ld:' + kind + ':' + k, kind, F.LD_W[kind], eta, null, 'ld');
       }
     }
@@ -638,7 +638,7 @@ void main() {
         tod: E ? E.timeOfDay : 6000, day: E ? E.day | 0 : 0, seed: (g.meta && g.meta.seed) | 0, wxSeed: E && E.wx ? E.wx.seed : 0,
         tier: VR.Wild && VR.Wild.tierOf ? VR.Wild.tierOf(S) : 2, sky3: VR.Sky3 && VR.Sky3.level ? VR.Sky3.level() : 0,
         sw: { wildBirds: S.wildBirds !== false, wildRays: S.wildRays !== false }, pos: p.pos, heart, place: ld && ld.st ? ld.st.place : '',
-        ld: ld && ld.on && ld.ctx ? { seed: ld.seed, clock: ld.clock, ctx: ld.ctx } : null, pads: null, vistas: [], villages: [],
+        ld: ld && ld.on && ld.ctx ? { seed: ld.seed, clock: ld.clock, ctx: ld.ctx, pick: ld.forecast ? (k) => ld.forecast(k) : null } : null, pads: null, vistas: [], villages: [],   // (f-flow: pick — the director's forecast)
         wet: !!(E && E.E && ((E.E.rain || 0) > 0.15 || (E.E.snow || 0) > 0.15)), dim: g.dim || 'overworld',
       };
       if (pl && pl.on !== false && pl.pads && S.padLife !== false) { c.pads = []; for (const pad of pl.pads.values()) c.pads.push({ key: pad.key, seed: pad.seed, x: pad.x, z: pad.z, clock: pl.clock, cache: this.padCache[pad.key] || (this.padCache[pad.key] = null) }); }
