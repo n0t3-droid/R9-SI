@@ -1237,6 +1237,7 @@
       if (this.traffic) this.traffic.update(dt);
       if (this.padLife) this.padLife.update(dt); if (this.lifeDirector) this.lifeDirector.update(dt);   // (t-life)
       if (this.wild) this.wild.update(dt);   // (t-wild: the animal world; Very Low: returns at once)
+      if (this.funke) this.funke.update(dt);   // e-funke: the companion drone (funke.js)
       if (this.director) this.director.update(dt);
       if (this.wow) this.wow.update(dt);   // (t-vista: four times a second a look at the vistas loaded)
       if (this.arrival) this.arrival.update(dt);   // (t-first: the veil, then the wow moment, then the HUD fades in)
@@ -1292,6 +1293,7 @@
       if (this.director && this.director.active) { const dc = this.director.cam(cam); if (dc) cam = dc; }
       if (this.wow && this.wow.active) { const wc = this.wow.cam(cam); if (wc) cam = wc; }   // (t-vista: the swing to the vista's picture and back)
       if (this.photoCam && this.photoCam.on) { const pc = this.photoCam.cam(cam); if (pc) cam = pc; }   // (t-first: 📷 the free camera)
+      if (this.funke && this.funke.shot) { const fc = this.funke.cam(cam); if (fc) cam = fc; }   // e-funke: the photo from Funke's spot
       if (!cam.fixed && (this.camMode === 1 || this.camMode === 2)) {
         const d = this.camMode === 1 ? 4 : -4, dir = p.lookDir();
         const ray = VR.PHYS.raycast((x, y, z) => w.getBlock(x, y, z), eye[0], eye[1], eye[2], -dir[0] * Math.sign(d), -dir[1] * Math.sign(d), -dir[2] * Math.sign(d), Math.abs(d));
@@ -1341,6 +1343,7 @@
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
+        funke: this.funke || null,   // e-funke: the drone, its light line and the scan (renderer: after the models, after the translucent)
         drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); if (this.padLife) this.padLife.draw(r, E2, 'opaque', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'opaque', cam); if (this.wild) this.wild.draw(r, E2, 'opaque', cam); },
         drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.padLife) this.padLife.draw(r, E2, 'trans', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'trans', cam); if (this.hall) this.hall.drawTrans(r, E2); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,

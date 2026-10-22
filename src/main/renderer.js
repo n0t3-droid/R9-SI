@@ -2184,6 +2184,7 @@
       if (F.horizon && !fc) { this.gpuPass('far'); F.horizon.draw(this, E); }
       // voxel models & meshes
       if (F.drawOpaque) { this.gpuPass('models'); F.drawOpaque(this, E); }
+      if (F.funke && F.funke.draw) F.funke.draw(this, E, F.cam);   // e-funke: the companion drone (funke.js)
       if (ssrLate) { this.gpuPass('ssr'); this.ssrPass(F, E); }   // (t-polish2 · gap 1: the mirror sees the furniture, the people, the ships)
       if (this.l2Ssao) this.l2Ssao(F, E);   // (t-light2: the contact shadows from this depth — the next frame reads them, light2_gl.js)
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
@@ -2229,6 +2230,7 @@
       }
       this.gpuPass('rest');
       if (F.drawTranslucent) F.drawTranslucent(this, E);
+      if (F.funke && F.funke.drawFx) F.funke.drawFx(this, E, F.cam);   // e-funke: the way's light line, the scan's glowing boxes
       if (this.l2Beams) this.l2Beams(F, E);   // (t-light2: the lighthouses' beams at night, light2_gl.js)
       // precipitation
       if (F.precip && F.precip.amount > 0.01) this.drawPrecip(F, E);

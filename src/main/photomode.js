@@ -97,6 +97,7 @@
       const td = (dn('BracketRight') || dn('Period') ? 1 : 0) - (dn('BracketLeft') || dn('Comma') ? 1 : 0);
       if (this.timeOk) { if (td) this.held = PM.timeStep(this.held, td, dt); g.env.setTime(this.held); }   // (held: the env's own step this frame is undone the next)
       if (!this.first && I.hit('KeyP')) { g.photoMode(false); return; }   // (P or F8 again: back)
+      if (!this.first && I.hit('KeyF') && VR.Funke && VR.Funke.photo) VR.Funke.photo(g);   // e-funke: „Funke, Foto!“ — a picture from Funke's spot, the player in it
       if (!this.first && !this.busy && (I.hit('F2') || I.hit('Enter') || I.hit('NumpadEnter') || (I.dragLook ? I.clickAction(0) : I.mouse.clicked[0]))) this.shoot();
       this.first = false;
     }
