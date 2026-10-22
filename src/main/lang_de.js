@@ -28,7 +28,7 @@
     'g.mode.survival': 'Überleben',
     'g.mode.creative': 'Kreativ',
     'g.mode.zen': 'Zen-Bauen',
-    // ---- a-core · ⚔ das Abenteuer (src/main/adventure.js): der Spielweg pro Welt, Stufen, Werte, Heliataler
+    // ---- a-core · ⚔ das Abenteuer (src/main/adventure.js): die eine Frage pro Welt (Frei bauen · sanft · mit Begegnungen), Stufen, Werte, Heliataler
     'g.adv.title': '⚔ Abenteuer',
     'g.adv.pause': '⚔ Abenteuer',
     'g.adv.pauseTip': 'Stufen, Werte und Heliataler in dieser Welt — an- und ausschaltbar',

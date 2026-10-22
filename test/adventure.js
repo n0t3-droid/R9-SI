@@ -430,7 +430,7 @@ if (!A) { console.log('  ✗ VR.Adventure missing (src/main/adventure.js)'); con
   const gm = { id: 'guest-x', guest: true, difficulty: 'normal' };
   VR.game = mkGame(gm); A.bind();
   check(!A.on() && !A.setOn(true) && !('adventure' in gm), 'a multiplayer guest: no Abenteuer (the host\'s comes with u-mp)');
-  // a world created with Spielweg „Abenteuer" (the create row): its record when it starts
+  // a world created with „⚔ Abenteuer mit Begegnungen" (the create form): its record when it starts
   const nm = { id: 'w2', name: 'Neu', difficulty: 'peaceful', mode: 'zen', created: Date.now() + 5 };
   A.pendingCreate = { at: Date.now() };
   VR.game = mkGame(nm); A.bind();

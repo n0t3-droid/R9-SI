@@ -1,6 +1,6 @@
 // Das Abenteuer in the page (a-core; plan docs/superpowers/plans/2026-10-22-a-core.md). One run, German UI, 1280 × 720:
 //   0. 🎒 Meins on the start screen opens with „⚔ Abenteuer-Welt beginnen" → adventure_meins.png
-//   1. the create form (Profi) shows the row „Spielweg"; ⚔ Abenteuer sets the difficulty row to Normal → adventure_create.png;
+//   1. the create form (Profi) asks „Wie willst du spielen?" (f-names); ⚔ mit Begegnungen lights the band Normal → adventure_create.png;
 //      ✓ Welt erstellen makes an Abenteuer world: its record on, the world itself peaceful, the band and Begegnungen from
 //      the difficulty row
 //   2. the ring on the HUD (inside #hud); the first biome found counts on its own (codex.js's hook); placing through
@@ -70,7 +70,7 @@ try {
   await ev(() => VR.game.ui.show('title'));
   await wait(300);
 
-  // ---------------------------------------------------------------- 1 · the create row „Spielweg"
+  // ---------------------------------------------------------------- 1 · the create form: one question, three cards (f-names)
   await section('1', async () => {
   console.log('1 · the create form');
   await ev(() => { const b = document.querySelector('#title [data-act="newworld"]'); b.click(); });
@@ -150,7 +150,7 @@ try {
   await wait(300);
   const card = await ev(() => { const c = document.querySelector('#adventure .panel'); return { screen: VR.game.ui.screen, way: c.querySelector('[data-act="adv:way"].on') && c.querySelector('[data-act="adv:way"].on').dataset.v, band: c.querySelector('[data-act="adv:band"].on') && c.querySelector('[data-act="adv:band"].on').dataset.v, enc: c.querySelector('[data-act="adv:enc"].on') && c.querySelector('[data-act="adv:enc"].on').dataset.v, lv: (c.querySelector('.advsum .lv') || {}).textContent, xp: (c.querySelector('.advsum .xp') || {}).textContent, tal: (c.querySelector('.advsum .tal') || {}).textContent, pts: (c.querySelector('.advsum .ptsl') || {}).textContent, h: Math.round(c.getBoundingClientRect().height) }; });
   console.log('     ' + JSON.stringify(card));
-  check(card.screen === 'adventure' && card.way === 'enc' && card.band === 'normal' && card.enc === 'normal' && card.lv === 'Stufe 5' && /Heliataler/.test(card.tal) && /Punkt/.test(card.pts), 'the card „⚔ Abenteuer": Spielweg, Schwierigkeit, Begegnungen, Stufe 5, the Heliataler, the free points');
+  check(card.screen === 'adventure' && card.way === 'enc' && card.band === 'normal' && card.enc === 'normal' && card.lv === 'Stufe 5' && /Heliataler/.test(card.tal) && /Punkt/.test(card.pts), 'the card „⚔ Abenteuer": the three cards (⚔ mit Begegnungen lit), Schwierigkeit, Begegnungen, Stufe 5, the Heliataler, the free points');
   check(card.h <= 700, 'the card fits a 720-px screen (' + card.h + ' px)');
   pics.card = await shot('adventure_card');
   await ev(() => document.querySelector('#adventure [data-act="adv:stats"]').click());
@@ -174,12 +174,13 @@ try {
   await ev(() => document.querySelector('#adventure [data-act="adv:way"][data-v="free"]').click()); await wait(150);
   const off = await ev(() => { const g = VR.game, a = g.meta.adventure; return { on: a.on, xp: a.me.xp, hud: getComputedStyle(document.getElementById('advhud')).display, dim: !!document.querySelector('#adventure .advsum.adv-dim'), foot: !!document.querySelector('#adventure .advfoot') }; });
   check(!off.on && off.xp > 600 && off.hud === 'none' && off.dim && off.foot, '„Frei bauen": the Abenteuer off, the ring gone, the level and the Taler kept and said so (' + JSON.stringify(off) + ')');
-  await ev(() => document.querySelector('#adventure [data-act="adv:way"][data-v="adv"]').click()); await wait(150);
-  const on2 = await ev(() => ({ on: VR.game.meta.adventure.on, ask: !!document.querySelector('#adventure .advask'), hud: getComputedStyle(document.getElementById('advhud')).display }));
-  check(on2.on && !on2.ask && on2.hud !== 'none', 'on again: no question (asked once), the ring back');
+  await ev(() => document.querySelector('#adventure [data-act="adv:way"][data-v="enc"]').click()); await wait(150);
+  const on2 = await ev(() => ({ on: VR.game.meta.adventure.on, enc: VR.game.meta.adventure.enc, ask: !!document.querySelector('#adventure .advask'), hud: getComputedStyle(document.getElementById('advhud')).display }));
+  check(on2.on && on2.enc === 'normal' && !on2.ask && on2.hud !== 'none', 'on again (⚔ mit Begegnungen): no question (asked once), the ring back (' + JSON.stringify(on2) + ')');
+  // (f-names: the card asks the create form's one question; 🧸 shows only the first two cards, „sanft" lit)
   await ev(() => { const g = VR.game; g.settings.kids = true; VR.Adventure.renderCard(); });
-  const kids = await ev(() => { const b = [...document.querySelectorAll('#adventure [data-act="adv:enc"]')]; return { on: (b.find(x => x.classList.contains('on')) || {}).dataset.v, dis: b.every(x => x.disabled), note: (document.querySelector('#adventure .field:last-child .note') || {}).textContent }; });
-  check(kids.on === 'off' && kids.dis && /Kindersicher/.test(kids.note || ''), '🧸 Kindersicher: Begegnungen fixed to aus (' + JSON.stringify(kids) + ')');
+  const kids = await ev(() => { const b = [...document.querySelectorAll('#adventure [data-act="adv:way"]')]; return { cards: b.map(x => x.dataset.v), on: (b.find(x => x.classList.contains('on')) || {}).dataset.v, enc: document.querySelectorAll('#adventure [data-act="adv:enc"]').length, note: (document.querySelector('#adventure .advfoot') || {}).textContent }; });
+  check(kids.cards.join() === 'free,gentle' && kids.on === 'gentle' && kids.enc === 0 && /Kindersicher/.test(kids.note || ''), '🧸 Kindersicher: only 🏗 Frei bauen and 🧭 sanft, sanft lit, no Begegnungen row (' + JSON.stringify(kids) + ')');
   await ev(() => { const g = VR.game; g.settings.kids = false; VR.Adventure.renderCard(); });
   });
   await ev(() => { if (VR.game.ui.screen) VR.game.ui.resume(); });
@@ -244,7 +245,7 @@ try {
   try {
     // (the sheet's labels: plain letters — sheet.py's font has no emoji and no „ quotes)
     const spec = { cols: [], w: 640, rows: [
-      { label: 'create', labels: ['1 - Neue Welt: Spielweg Abenteuer (Profi)', '3 - Stufe 5 (CSS bei 0,7 s)'], imgs: [pics.create || null, pics.levelup || null] },
+      { label: 'create', labels: ['1 - Neue Welt: Abenteuer mit Begegnungen (Profi)','3 - Stufe 5 (CSS bei 0,7 s)'], imgs: [pics.create || null, pics.levelup || null] },
       { label: 'menu', labels: ['4 - Pause: Abenteuer nach Meins', '4 - die Karte Abenteuer'], imgs: [pics.pause || null, pics.card || null] },
       { label: 'stats', labels: ['4 - Deine Werte', '2 - der Ring im Spiel'], imgs: [pics.stats || null, pics.hud || null] },
       { label: 'meins', labels: ['0 - Meins: Abenteuer-Welt beginnen (Einfach)', ''], imgs: [pics.meins || null, null] },

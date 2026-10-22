@@ -109,8 +109,8 @@ console.log('3 · the Heliataler and the Wolkenrochen / Cloud Ray');
   check(VR.MOB_EGGS && VR.MOB_EGGS.includes('sky_ray'), 'the creature\'s id sky_ray stays (saved entities, codex pages c:sky_ray)');
   // the coin's icon: Helia, a sun with rays — no five-pointed star (the old Sterntaler's mark)
   const STAR = 'M12 5.8L13.47 9.98', icons = [];
-  for (const f of ['src/main/adventure.js', 'src/main/shop.js']) { const s = fs.readFileSync(path.join(ROOT, f), 'utf8'); icons.push([f, /class="coin"/.test(s), s.includes(STAR), /data-coin="helia"/.test(s)]); }
-  check(icons.every(([, c, star, sun]) => c && !star && sun), 'the coin\'s icon is Helia\'s sun in the HUD and in the shops, the star is gone (' + icons.map(([f, c, star, sun]) => f.split('/').pop() + (sun ? ' sun' : '') + (star ? ' STAR' : '')).join(', ') + ')');
+  for (const f of ['src/main/adventure.js', 'src/main/shop.js', 'src/main/quests.js']) { const s = fs.readFileSync(path.join(ROOT, f), 'utf8'); icons.push([f, /class="coin"/.test(s), s.includes(STAR), /data-coin="helia"/.test(s)]); }
+  check(icons.every(([, c, star, sun]) => c && !star && sun), 'the coin\'s icon is Helia\'s sun in the HUD, the shops and the Tagebuch\'s rewards, the star is gone (' + icons.map(([f, c, star, sun]) => f.split('/').pop() + (sun ? ' sun' : '') + (star ? ' STAR' : '')).join(', ') + ')');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

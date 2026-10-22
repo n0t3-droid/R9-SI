@@ -80,7 +80,7 @@
     if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { texts(); worldsPanel(); createForm(); if (ui.screen === 'worlds') ST.worlds(ui); else if (ui.screen === 'meins') ST.renderMeins(); try { if (ui.renderHosts) ui.renderHosts(); if (ui.studioNote) ui.studioNote(); } catch (e) { /* not built yet */ } });
     // the worlds, read once now and again whenever the start screen shows
     ST.listWorlds().then(() => texts());
-    if (VR.Adventure && VR.Adventure.mount) VR.Adventure.mount(ui);   // a-core: ⚔ the pause card „Abenteuer", the stats card and the create row „Spielweg" (src/main/adventure.js)
+    if (VR.Adventure && VR.Adventure.mount) VR.Adventure.mount(ui);   // a-core: ⚔ the pause card „Abenteuer", the stats card and the create form's one question „Wie willst du spielen?" (src/main/adventure.js, f-names)
   }
   ST.mount = mount;
   // every label on the start screen (also after a language change, also after a Profi switch)
