@@ -711,6 +711,10 @@ html:not(.pro) .pro { display: none !important; }
 
 /* ---- the game's start screen ---- */
 #title .start { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 76px 16px 64px; overflow: auto; }
+/* t-first · the golden-hour backdrop behind the tiles until the living title's first frame (titlescene.js adds .live) —
+   its glow where the scene's low sun stands, by the citadel in the right third */
+#title .tbg { position: absolute; inset: 0; pointer-events: none; transition: opacity 1.2s ease; background: radial-gradient(ellipse 26% 20% at 88% 58%, rgba(255, 220, 160, 0.6), rgba(255, 170, 110, 0) 70%), linear-gradient(180deg, #0a0d2a 0%, #1c1e50 24%, #433d78 44%, #85679a 56%, #dc9c7c 63%, #f1c38f 66%, #5e4a64 69%, #2b2338 80%, #15111d 100%); }
+#title.live .tbg { opacity: 0; }
 #title .strip { position: absolute; top: 12px; right: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; z-index: 2; }
 #title .lnk, #worlds .lnk { font: 600 var(--st-fs) var(--st-font); color: var(--st-ink); background: var(--st-bg); border: 1px solid var(--st-line); border-radius: 12px; padding: 0 14px; min-height: 44px; cursor: pointer; letter-spacing: .3px; transition: border-color .15s, box-shadow .15s; }
 #title .lnk:hover, #title .lnk.on { border-color: var(--st-acc); box-shadow: 0 0 0 2px var(--st-acc-dim); }
@@ -2134,6 +2138,10 @@ vec3 gerstnerN(vec2 p, float t, vec2 wind, float ak, out float h) {
   const SHEEN = W.SHEEN = 0.16;       // how much a full gust brightens grass and leaves
   const HANG = W.HANG = { amp: 0.06, w: 2.6, w2: 4.3, kx: 0.09, kz: 0.06, flutter: 0.003, fw: 9.0 };
   const FROND = W.FROND = { amp: 0.16, flap: 0.45, droop: 0.35 };
+  // t-polish2 (gap 7 of docs/superpowers/plans/2026-10-16-t-polish2.md): cloth is not a lantern — an awning's cloth swings
+  // `gain` times the hung swing, and a ripple runs along its valance: rip blocks high at the valance (the square of the
+  // distance from the wall), w rad a second over k rad a block (w / k blocks a second), out of the wall by `out` of it
+  const CLOTH = W.CLOTH = { gain: 2.4, rip: 0.05, w: 5.5, k: 2.2, out: 0.6 };
   // the ground's bands: k the swing per unit of gust; mid the field's mean of g² (0.5 + 0.36·sin + 0.24·sin, squared), so
   // the bands are centred on it at every gust; wind the strongest wind they follow; warm the paler, yellower crest
   const GROUND = W.GROUND = { k: 0.5, mid: 0.344, wind: 1.25, warm: [1.06, 1.04, 0.86], warmK: 1.5, warmMax: 0.4 };
@@ -2158,6 +2166,17 @@ vec3 gerstnerN(vec2 p, float t, vec2 wind, float ak, out float h) {
     const sw = Math.sin(HANG.w * t + ph) * (0.75 + 0.5 * G) + 0.3 * Math.sin(HANG.w2 * t + 2 * ph + 1);
     const fl = h * HANG.flutter * Math.max(0, wind) * Math.sin(HANG.fw * t + x * 3.1 + y * 4 + z * 2.3);
     return { along: A * (0.35 + 0.9 * G + sw) + fl, across: A * 0.35 * Math.sin(2.1 * t + ph * 1.3 + 1.7), up: fl * 0.6 };
+  };
+  // ---- t-polish2 · cloth: the ripple along an awning's valance at s blocks along its width (the piece's own x), the piece
+  // at (x, z) (its phase), level lv (0..3: the distance from the wall in thirds); and a cloth vertex's whole displacement —
+  // the hung swing × gain, the ripple up and out of the wall (blocks)
+  W.clothRip = function (s, x, z, t, wind, G, lv) {
+    const h = clamp(lv, 0, 3) / 3, ph = x * HANG.kx + z * HANG.kz;
+    return h * h * CLOTH.rip * Math.max(0, wind) * (0.6 + 0.8 * clamp(G, 0, 1)) * Math.sin(CLOTH.k * s - CLOTH.w * t + 3 * ph);
+  };
+  W.cloth = function (x, y, z, t, wind, G, lv, s) {
+    const hg = W.hang(x, y, z, t, wind, G, lv), r = W.clothRip(s, x, z, t, wind, G, lv);
+    return { along: CLOTH.gain * hg.along, across: CLOTH.gain * hg.across, up: CLOTH.gain * hg.up + r, out: CLOTH.out * r };
   };
   // ---- a palm frond vertex: sway weight w (props.js: 0.12 at the crown, 1 at a frond's tip), its frond slot, the palm's
   // phase ph and scale sc, the gust G there: its displacement along the wind, across it and up (palm units)
@@ -2213,6 +2232,11 @@ float windHangUp(float x, float y, float z, float t, float wind, float G, float 
   float h = clamp(lv, 0.0, 3.0) / 3.0;
   float fl = h * ${f(HANG.flutter)} * max(0.0, wind) * sin(${f(HANG.fw)} * t + x * 3.1 + y * 4.0 + z * 2.3);
   return fl * 0.6;
+}
+float windClothRip(float s, float x, float z, float t, float wind, float G, float lv) {
+  float h = clamp(lv, 0.0, 3.0) / 3.0;
+  float ph = x * ${f(HANG.kx)} + z * ${f(HANG.kz)};
+  return h * h * ${f(CLOTH.rip)} * max(0.0, wind) * (0.6 + 0.8 * clamp(G, 0.0, 1.0)) * sin(${f(CLOTH.k)} * s - ${f(CLOTH.w)} * t + 3.0 * ph);
 }
 float windFrondAmp(float w, float sc, float wind, float G) {
   return max(0.0, wind) * w * sc * ${f(FROND.amp)} * (0.75 + 0.6 * G);
@@ -13605,6 +13629,7 @@ VR.VM_CELLS = {
       this.seed = seed >>> 0;
       this.vgen = opts.vgen || 1; // village generator version (see gen_village.js)
       this.noCrystal = !!opts.noCrystal; // F-NoCrystal: no crystals at any vgen (the title panorama); vgen ≥ 9 has none anyway (GEN.noCry)
+      this.noLand = !!opts.noLand;       // t-first: the living title's far tiles without t-land's plan (gen_land.js LAND.on)
       this.amplified = opts.worldType === 'amplified';
       this.large = opts.worldType === 'large';
       this.singleBiome = opts.worldType === 'single' ? (BI[opts.biome] !== undefined ? BI[opts.biome] : BI.plains) : -1;
@@ -19998,6 +20023,11 @@ VR.VM_CELLS = {
     RAD: 112, VGEN: 9,
   };
   VG.hallOn = (g) => !!(g && g.vgen >= H.VGEN);
+  // t-polish2 (vgen 12, new worlds): the nave's floor — the street, the plaza's paving outside its marble disc, the cross
+  // street — polished porcelain tile with polished andesite along the kerb lines and across the street every eight rows,
+  // so the mirror (t-material's screen-space reflections) finds a clear reflecting floor (t1_22); vgen ≤ 11 keep their pavers
+  H.FLOOR_VGEN = 12;
+  VG.hallFloorOn = (g) => !!(g && g.vgen >= H.FLOOR_VGEN);
   VG.hallFrame = (site) => (site.seed >>> 3) & 3;
   // the sky over a hall city stays clear: no floating island over it (vgen 9). The light engine's sky light falls straight
   // down a column (light_local.js), so an island anywhere over the hall shut its light off below — run 3's apse and the
@@ -20180,15 +20210,17 @@ VR.VM_CELLS = {
     yield;
     // the floor's materials by code
     const MAT = { street: st('paver_grey'), street2: st('granite_paver'), front: st('travertine'), plaza: st('marble_white'), ring: st('travertine'), lane: st('paver_grey'), aisle: st('marble_white'), fore: st('travertine'), yard: st('travertine') };
+    const polished = VG.hallFloorOn(g), PO = st('porcelain_tile'), PA = st('polished_andesite');   // (t-polish2: vgen 12's nave floor)
     for (let v = H.V0 + 3; v <= 80; v++) {
       if ((v & 15) === 0) yield;
       for (let u = -H.HW; u <= H.HW; u++) {
         const c = getC(u, v); if (!c || c === C.WALL) continue;
         const [x, z] = W2(u, v), a = Math.abs(u);
         let s;
-        if (c === C.STREET) s = (M.hash2(x, z, 931) & 7) === 0 ? MAT.street2 : MAT.street;
+        if (c === C.STREET) s = polished ? (a === H.ST || ((v % 8) + 8) % 8 === 0 ? PA : PO) : (M.hash2(x, z, 931) & 7) === 0 ? MAT.street2 : MAT.street;
         else if (c === C.FRONT) s = MAT.front;
-        else if (c === C.PLAZA) { const d = Math.hypot(u, v); s = d <= H.PR ? ((d >= 5 && d < 6) || (d >= 10 && d < 11) ? MAT.ring : MAT.plaza) : (M.hash2(x, z, 932) & 7) === 0 ? MAT.street2 : MAT.street; }
+        else if (c === C.PLAZA) { const d = Math.hypot(u, v); s = d <= H.PR ? ((d >= 5 && d < 6) || (d >= 10 && d < 11) ? MAT.ring : MAT.plaza) : polished ? PO : (M.hash2(x, z, 932) & 7) === 0 ? MAT.street2 : MAT.street; }
+        else if (c === C.CROSS && polished) s = PO;
         else if (c === C.LANE || c === C.CROSS) s = (M.hash2(x, z, 933) & 7) === 0 ? MAT.street2 : MAT.lane;
         else if (c === C.YARD) s = MAT.yard;
         else if (c === C.FORE || c === C.GALLERY || c === C.STAIR) s = MAT.fore;
@@ -24669,8 +24701,18 @@ VR.VM_CELLS = {
     return out;
   };
   // the far-horizon description: tapered boxes per tier (body), glowing slits and rings
-  CIT.lodBoxes = function (s) {
-    const B = [];
+  // (t-polish2, vgen 12 — gap 2 of docs/superpowers/plans/2026-10-16-t-polish2.md: the far citadel's lights read at night.
+  // The window slits stand out of the body — far.js and lod.js draw a slit ±(r + 0.6) along the tower, and r was half
+  // the tier's radius, so wherever the spire is wider than 1.2 blocks the slits lay inside its body: the far citadel had
+  // none —, 9 tall; the trim rings and the watchtower's ring 2 tall; the tip beacon 3 wide; the Heartland's citadel its
+  // beam over the main spire: boxes marked `night` (their strength up the beam), which only the far ring draws (far.js
+  // flags them in the vertex's aux byte, its shader draws them at night only) — the horizon tiles skip them. Worlds before
+  // vgen 12 (and a call without g) keep their boxes.)
+  CIT.FAR_VGEN = 12;
+  CIT.farLit = (g) => !!(g && g.vgen >= CIT.FAR_VGEN);
+  CIT.BEAM = { up: 60, seg: 4, r: 0.7, c: [0x73, 0xDB, 0xFF] };
+  CIT.lodBoxes = function (s, g) {
+    const B = [], lit = CIT.farLit(g);
     const bodyC = s.pal === 1 ? [0x8A, 0x66, 0x40] : [0xC4, 0xA4, 0x7A];
     for (const T of s.towers) {
       if (T.kind === 'pin') { B.push({ x: T.x, z: T.z, y0: s.y + 1, y1: s.y + 1 + T.h, r: T.r * 0.7 + 0.5, c: bodyC, kd: 0 }); continue; }
@@ -24678,7 +24720,7 @@ VR.VM_CELLS = {
       if (T.kind === 'watch') {
         B.push({ x: T.x, z: T.z, y0: s.y + 1, y1: s.y + 1 + T.h, r: T.r, c: bodyC, kd: 0 });
         B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h - 14, y1: s.y + 1 + T.h - 10, r: 10, c: bodyC, kd: 0 });
-        B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h - 12, y1: s.y + 1 + T.h - 11, r: 10.3, c: [0x3A, 0xF0, 0xFF], kd: 4 });
+        B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h - 12, y1: s.y + 1 + T.h - (lit ? 10 : 11), r: 10.3, c: [0x3A, 0xF0, 0xFF], kd: 4 });
         B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h, y1: s.y + 1 + T.h + 16, r: 1, c: [0xD8, 0xDC, 0xE4], kd: 0 });
         continue;
       }
@@ -24687,10 +24729,15 @@ VR.VM_CELLS = {
         const f0 = k / n, f1 = (k + 1) / n;
         const r = prof(T.r, (f0 + f1) / 2) + 0.4;
         B.push({ x: T.x, z: T.z, y0: s.y + 1 + f0 * T.h, y1: s.y + 1 + f1 * T.h, r, c: bodyC, kd: 0 });
-        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + STEPS[k] * T.h, y1: s.y + 1 + STEPS[k] * T.h + 1, r: prof(T.r, STEPS[k]) + 0.6, c: [0xFF, 0x9A, 0x2A], kd: 4 });
-        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h, y1: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h + 6, r: r * 0.5, w: 1.2, c: [0x3A, 0xF0, 0xFF], kd: 4, slits: true });
+        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + STEPS[k] * T.h, y1: s.y + 1 + STEPS[k] * T.h + (lit ? 2 : 1), r: prof(T.r, STEPS[k]) + 0.6, c: [0xFF, 0x9A, 0x2A], kd: 4 });
+        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h, y1: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h + (lit ? 9 : 6), r: lit ? r : r * 0.5, w: 1.2, c: [0x3A, 0xF0, 0xFF], kd: 4, slits: true });
       }
-      B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h, y1: s.y + 3 + T.h, r: 0.8, c: [0xFF, 0x3A, 0x3A], kd: 4 });
+      B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h, y1: s.y + 3 + T.h, r: lit ? 1.5 : 0.8, c: [0xFF, 0x3A, 0x3A], kd: 4 });
+      // the beam over the Heartland's main spire: seg pieces, each a step fainter (night: its strength, 1 at the tip)
+      if (lit && s.home && T.kind === 'main') {
+        const BM = CIT.BEAM, y0 = s.y + 3 + T.h, len = BM.up / BM.seg;
+        for (let q = 0; q < BM.seg; q++) B.push({ x: T.x, z: T.z, y0: y0 + q * len, y1: y0 + (q + 1) * len, r: BM.r, c: BM.c, kd: 4, night: 1 - q / BM.seg });
+      }
     }
     return B;
   };
@@ -26592,7 +26639,7 @@ VR.VM_CELLS = {
   if (!HEART || !OG || !GEN) return;
   const LAND = VR.Land = {};
   LAND.VGEN = 10;
-  LAND.on = (g) => !!(g && g.vgen >= LAND.VGEN && HEART.on(g));
+  LAND.on = (g) => !!(g && g.vgen >= LAND.VGEN && HEART.on(g) && !g.noLand);   // (noLand: the living title's far tiles, titlescene.js)
   const ss = M.smoothstep, lerp = M.lerp;
   const h01 = (x, z, s) => (M.hash2(x | 0, z | 0, s | 0) >>> 0) / 4294967296;
   LAND.h01 = h01;
@@ -29549,7 +29596,8 @@ VR.VM_CELLS = {
         const tx = s.x - x0, tz = s.z - z0, Rr = s.R, ty = s.y + 1;
         const tc = s.pal === 1 ? [0xD8, 0xC0, 0x90] : [0x9A, 0x9A, 0x96];
         box(tx - Rr, s.y - 6, tz - Rr, tx + Rr, ty, tz + Rr, tc, 0, 1);
-        for (const b of VR.CitadelGen.lodBoxes(s)) {
+        for (const b of VR.CitadelGen.lodBoxes(s, g)) {
+          if (b.night) continue;   // (t-polish2: the beam is the far ring's — the horizon tiles have no night switch)
           const bx = b.x - x0, bz = b.z - z0;
           if (b.slits) { const r = b.r, ww = b.w; box(bx - ww, b.y0, bz - r - 0.6, bx + ww, b.y1, bz + r + 0.6, b.c, b.kd, 0); box(bx - r - 0.6, b.y0, bz - ww, bx + r + 0.6, b.y1, bz + ww, b.c, b.kd, 0); continue; }
           box(bx - b.r, b.y0, bz - b.r, bx + b.r, b.y1, bz + b.r, b.c, b.kd, b.kd === 0 ? 1 : 3);
@@ -30124,14 +30172,16 @@ VR.VM_CELLS = {
       this.vert(bx, by, bz, face, kind, aux, c, shade); this.vert(cx, cy, cz, face, kind, aux, c, shade); this.vert(dx, dy, dz, face, kind, aux, c, shade);
       this.tri(v, v + 1, v + 2); this.tri(v, v + 2, v + 3);
     }
-    // a box: faces bit 1 = top, 2 = bottom; the four sides always (as lod.js)
-    box(x0, y0, z0, x1, y1, z1, ct, cs, kind, faces) {
-      if (faces & 1) this.quad(x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, 2, kind, 0, ct, 255);
-      if (faces & 2) this.quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, 3, kind, 0, cs, 150);
-      this.quad(x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0, 0, kind, 0, cs, 200);
-      this.quad(x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1, 1, kind, 0, cs, 200);
-      this.quad(x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1, 4, kind, 0, cs, 225);
-      this.quad(x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0, 5, kind, 0, cs, 225);
+    // a box: faces bit 1 = top, 2 = bottom; the four sides always (as lod.js); aux (default 0) on every vertex — t-polish2:
+    // a glowing box with bit 7 set is a night light (the citadel's beam), bits 0–6 its strength (LOD_FS under FORM)
+    box(x0, y0, z0, x1, y1, z1, ct, cs, kind, faces, aux) {
+      const a = aux | 0;
+      if (faces & 1) this.quad(x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, 2, kind, a, ct, 255);
+      if (faces & 2) this.quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, 3, kind, a, cs, 150);
+      this.quad(x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0, 0, kind, a, cs, 200);
+      this.quad(x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1, 1, kind, a, cs, 200);
+      this.quad(x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1, 4, kind, a, cs, 225);
+      this.quad(x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0, 5, kind, a, cs, 225);
     }
     finish() {
       if (!this.nv) return { empty: true, count: 0, minY: 0, maxY: 0, parts: this.parts };
@@ -30606,9 +30656,11 @@ VR.VM_CELLS = {
         if (s.x < x0 || s.x >= x1 || s.z < z0 || s.z >= z1) continue;
         const tx = s.x - x0, tz = s.z - z0, Rr = s.R, ty = s.y + 1, tcol = s.pal === 1 ? [0xD8, 0xC0, 0x90] : [0x9A, 0x9A, 0x96];
         Bd.box(tx - Rr, s.y - 6, tz - Rr, tx + Rr, ty, tz + Rr, tcol, tcol, 0, 1);
-        for (const b of VR.CitadelGen.lodBoxes(s)) {
+        for (const b of VR.CitadelGen.lodBoxes(s, g)) {
           const bx = b.x - x0, bz = b.z - z0;
           if (b.slits) { const r = b.r, ww = b.w; Bd.box(bx - ww, b.y0, bz - r - 0.6, bx + ww, b.y1, bz + r + 0.6, b.c, b.c, b.kd, 0); Bd.box(bx - r - 0.6, b.y0, bz - ww, bx + r + 0.6, b.y1, bz + ww, b.c, b.c, b.kd, 0); continue; }
+          // (t-polish2: the beam's boxes — night lights, their strength in the aux byte; no top or bottom: a column of light)
+          if (b.night) { Bd.box(bx - b.r, b.y0, bz - b.r, bx + b.r, b.y1, bz + b.r, b.c, b.c, b.kd, 0, 128 | Math.round(b.night * 127)); continue; }
           Bd.box(bx - b.r, b.y0, bz - b.r, bx + b.r, b.y1, bz + b.r, b.c, b.c, b.kd, b.kd === 0 ? 1 : 3);
         }
       }
@@ -30624,6 +30676,68 @@ VR.VM_CELLS = {
     return out;
   };
   const GREY = [128, 128, 128], ISLE_SHADE = [20, 20, 30];
+})(VR);
+
+/* shared/dimreg.js */
+// ============================================================================
+// VR.DimReg — the worlds of one save as dims (u-dims, docs/superpowers/specs/2026-10-22-universe-design.md §6.1).
+// One registry replaces the facts that were written into the code: which dim has a sky (world.js, the worker's column
+// light), its u_dim code (env.js → the sky shader), its gravity (player.js: 30 × g / 9.81, the genre's 30 at home), where
+// the actors live, the far horizon, hosting, and its world generator (gen_dims.js makeGen). Runs in the main thread and
+// in the workers (src/shared). The five dims of today keep their exact values; a dim this build does not know answers
+// the values the old code gave it (no sky, code 0, home's gravity, the overworld generator).
+// Ids: 'overworld' (Herzwelt), 'flat' (a flat world's home), 'underforge', 'hollow', 'drift'; later bodies 'opal' …,
+// small bodies 'rock.<k>', stations 'stn.<k>' — never a ':' (storage keys are world:dim:cx:cz, storage.js:70).
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const G_HOME = 9.81, GRAV_HOME = 30;   // the player's gravity at home (player.js) — every other world scales it by g
+  const DIMS = new Map();
+  const CODES = {};                       // id → u_dim, kept live as dims are added (env.js reads it as its DIM_ID)
+  const DEF = { sky: false, code: 0, g: G_HOME, ceiling: false, air: null, actors: 'none', horizon: false, mp: 'none', home: false, travel: false, gen: null, veil: null, name: null };
+  const DimReg = VR.DimReg = {
+    CODES,
+    // def: {sky, code (u_dim), g (m/s²), ceiling, air, actors ('home' | 'none'), horizon, mp ('host' | 'none' | 'convoy'),
+    //       home (a save's home dim), travel (reachable by gates and /dim), gen (seed, opts) → generator, veil (the
+    //       travel veil's colours, travel.js), name [key, de, en]}
+    add(id, def) {
+      if (!id || /:/.test(id)) throw new Error('DimReg: a dim id without ":" — ' + id);
+      const d = Object.assign({ id }, DEF, def || {});
+      DIMS.set(id, d); CODES[id] = d.code | 0;
+      return d;
+    },
+    get(id) { return DIMS.get(id) || null; },
+    has(id) { return DIMS.has(id); },
+    list() { return [...DIMS.keys()]; },
+    sky(id) { const d = DIMS.get(id); return d ? !!d.sky : false; },
+    code(id) { const d = DIMS.get(id); return d ? d.code | 0 : 0; },
+    g(id) { const d = DIMS.get(id); return d && d.g > 0 ? d.g : G_HOME; },
+    // the player's gravity there: the genre's 30 at home, every world in its true ratio (spec §4.3)
+    gravity(id) { return GRAV_HOME * (DimReg.g(id) / G_HOME); },
+    actorsHome(id) { const d = DIMS.get(id); return !!(d && d.actors === 'home'); },
+    horizon(id) { const d = DIMS.get(id); return !!(d && d.horizon); },
+    mp(id) { const d = DIMS.get(id); return d ? d.mp : 'none'; },
+    gen(id) { const d = DIMS.get(id); return d && d.gen ? d.gen : null; },
+    name(id) { const d = DIMS.get(id); return d && d.name ? d.name : ['g.dim.unknown', id, id]; },
+    // a save's home dim: a flat world lives on its flat land, every other on Herzwelt
+    home(meta) { return meta && meta.type === 'flat' ? 'flat' : 'overworld'; },
+    // the dim a save opens: the one it was left in when this build knows it, else home (a save of a newer build left on
+    // a world this one does not have opens at home, never on a half-made world); every old save opens as before
+    dimOf(meta) {
+      const home = DimReg.home(meta), d = meta && meta.dim;
+      if (!d || d === 'overworld' || d === 'flat' || !DIMS.has(d)) return home;
+      return d;
+    },
+    // where a save can travel: its home and every dim marked travel
+    travelable(meta) { const home = DimReg.home(meta), out = [home]; for (const [id, d] of DIMS) if (d.travel && id !== home) out.push(id); return out; },
+  };
+  // the generator of Herzwelt — or of a flat world's land: the world type decides, as makeGen always did
+  const homeGen = (seed, opts) => (opts && opts.worldType === 'flat' ? new VR.FlatGen() : new VR.OverworldGen(seed, opts));
+  DimReg.add('overworld', { sky: true, code: 0, g: G_HOME, actors: 'home', horizon: true, mp: 'host', home: true, gen: homeGen, name: ['g.dim.overworld', 'Herzwelt', 'Heartworld'], veil: ['#fff4d6', '#ffc978', '#3b2a5c'] });
+  DimReg.add('flat', { sky: true, code: 0, g: G_HOME, mp: 'host', home: true, gen: homeGen, name: ['g.dim.flat', 'Flachwelt', 'Flat world'], veil: ['#f4ffe8', '#b8e08a', '#24402a'] });
+  DimReg.add('underforge', { sky: false, code: 1, g: G_HOME, ceiling: true, travel: true, gen: (seed) => new VR.UnderforgeGen(seed), name: ['g.dim.underforge', 'Unterschmiede', 'Underforge'], veil: ['#ffe0b0', '#ff8a3a', '#3a0d06'] });
+  DimReg.add('hollow', { sky: false, code: 2, g: G_HOME, travel: true, gen: (seed) => new VR.HollowGen(seed), name: ['g.dim.hollow', 'Hohlwelt', 'The Hollow'], veil: ['#efe4ff', '#9a7ae0', '#120a24'] });
+  DimReg.add('drift', { sky: true, code: 3, g: G_HOME, travel: true, gen: (seed, opts) => new VR.DriftGen(seed, opts), name: ['g.dim.drift', 'Driftinseln', 'Drift Isles'], veil: ['#f2feff', '#9ee6ff', '#173a66'] });
 })(VR);
 
 /* shared/gen_dims.js */
@@ -30976,6 +31090,7 @@ VR.VM_CELLS = {
   VR.FlatGen = FlatGen;
 
   VR.makeGen = function (dim, seed, opts) {
+    const mk = VR.DimReg && VR.DimReg.gen(dim); if (mk) return mk(seed, opts);   // u-dims: the registry's generator (src/shared/dimreg.js); the branches below stay for a bundle without it
     if (dim === 'underforge') return new UnderforgeGen(seed);
     if (dim === 'hollow') return new HollowGen(seed);
     if (dim === 'drift') return new DriftGen(seed, opts);
@@ -37567,6 +37682,1657 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
   };
 })(VR);
 
+/* shared/adventure.js */
+// ============================================================================
+// Das Abenteuer — its rules (a-core; spec docs/superpowers/specs/2026-10-22-abenteuer-design.md §2–§4, §12, §15;
+// plan docs/superpowers/plans/2026-10-22-a-core.md). Pure: no DOM, no text, no clock of its own (every call takes `now`
+// in milliseconds), so the host, a guest and node agree. VR.Adventure (src/main/adventure.js) is the game's glue.
+//   the curve      need(L) = 60 + 30·L XP from level L to L+1; level 50 is the cap, beyond it a ⭐ every 2,000 XP
+//   the awards     the table of A§2 (AWARDS) with its limits; award(me, kind, ctx, now, sess) → what it gave
+//   the guards     placed positions counted per session, ×0.5 for every five foes of a kind within ten minutes, nothing
+//                  from a zone provoked again within two minutes; the limits' windows are saved (a reload resets none)
+//   the stats      five, 0–10 each, one point per level, a free respec (the game allows it at home), their effects
+//   the Sterntaler the wallet (earned in the world — never real money), the prices of A§4, the upgrades' effects
+//   Spannung       s ∈ [0, 1] kept in the band (A§12), after each encounter and two faints
+//   the save       meta.adventure = { v: 1, on, band, enc, since, tension, freed, bosses, chapter, beats, prevDiff, faints,
+//                  me: { xp, level, stars, pts, taler, owned, quests, once, lim } } — load() makes anything sane
+//   the chime      a level-up's notes in the day's pentatonic key (klang.js musicPlan)
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const Adv = VR.Adv = {};
+  const V = 1, CAP = 50, STAR = 2000, XP_MAX = 1e9, TALER_MAX = 999999, GIFT = 10, POS_MAX = 50000;
+  Object.assign(Adv, { V, CAP, STAR, XP_MAX, TALER_MAX, GIFT });
+  const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const int = (v, a, b, d) => clamp(Math.floor(num(v, d)), a, b);
+  const plain = (o) => !!o && typeof o === 'object' && !Array.isArray(o);
+  const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
+
+  // ---------------------------------------------------------------- the curve
+  Adv.need = (L) => (L >= CAP ? STAR : 60 + 30 * Math.max(0, L | 0));
+  // the XP from level 0 to level L: the sum of need(0 … L−1) = 15 L² + 45 L
+  Adv.total = (L) => { const l = clamp(L | 0, 0, CAP); return 15 * l * l + 45 * l; };
+  // {level, into (XP into it), need (XP of it), frac, stars}
+  Adv.levelOf = (xp) => {
+    const x = Math.max(0, num(xp, 0));
+    let L = clamp(Math.floor((-45 + Math.sqrt(2025 + 60 * x)) / 30), 0, CAP);
+    while (L < CAP && Adv.total(L + 1) <= x) L++;
+    while (L > 0 && Adv.total(L) > x) L--;
+    if (L >= CAP) { const over = x - Adv.total(CAP), stars = Math.floor(over / STAR), into = over - stars * STAR; return { level: CAP, into, need: STAR, frac: into / STAR, stars }; }
+    const need = Adv.need(L), into = x - Adv.total(L);
+    return { level: L, into, need, frac: into / need, stars: 0 };
+  };
+
+  // ---------------------------------------------------------------- the awards (A§2)
+  // xp / taler: a number · {S, M, L} by ctx.size · [lo, hi] (ctx.xp / ctx.taler held to it); once: true (one ever) or
+  // 'id' (one per ctx.id); per: units for one step of xp (place: new positions, distance: metres); lim: [n, seconds,
+  // 'xp' | 'n'] — at most n XP (or n awards) in a window that starts with the first award after the last one ran out;
+  // decay: [k, seconds] — ×0.5 for every k of a kind within the window (foes). milestone, creature and survival are
+  // a-core's own rows: a codex milestone, a creature met, and the survival XP that gives nothing (A§0.3: the survival
+  // XP comes from creatures and raids — no Abenteuer XP for harming anything)
+  const AWARDS = Adv.AWARDS = {
+    place: { xp: 1, per: 25, lim: [40, 600, 'xp'] },
+    home: { xp: 60, once: 'id' },
+    blueprint: { xp: 25, lim: [3, 3600, 'n'] },
+    biome: { xp: 15, once: 'id' },
+    wow: { xp: 20, once: 'id' },
+    wonder: { xp: 80, once: 'id' },
+    flight: { xp: 50, once: true },
+    orbit: { xp: 100, once: true },
+    landing: { xp: 150, taler: 100, once: 'id' },
+    system: { xp: 200, taler: 150, once: 'id' },
+    distance: { xp: 5, per: 1000, lim: [60, 600, 'xp'] },
+    quest: { xp: { S: 20, M: 50, L: 120 }, taler: { S: 15, M: 40, L: 100 } },
+    foe: { xp: [8, 30], decay: [5, 600] },
+    freed: { xp: 250, taler: 300, once: 'id' },
+    boss: { xp: 600, taler: 800, once: 'id' },
+    beat: { xp: [30, 150], once: 'id' },
+    photo: { xp: 10, lim: [5, 3600, 'n'] },
+    invention: { xp: 10, once: 'id' },
+    chest: { xp: 0, taler: [20, 150], once: 'id' },
+    milestone: { xp: 10, once: 'id' },
+    creature: { xp: 5, once: 'id' },
+    survival: { xp: 0 },
+  };
+  // the foes of A§5 by their hearts (Bohrläufer 8, Wächter 12, Kranarm 10, Schattendrohne 3, Schattenwesen 4)
+  Adv.FOE_XP = { driller: 16, sentry: 24, crane: 20, drone: 8, wisp: 10 };
+  Adv.ZONE_AGAIN = 120000;
+  // a placed position as one exact integer: x and z in 20 bits each (±524,288), the height in 12 (0 … 4,095)
+  Adv.posKey = (x, y, z) => ((x & 0xFFFFF) * 4096 + (y & 0xFFF)) * 1048576 + (z & 0xFFFFF);
+  // what a session counts (not saved): the positions placed, the part-steps of place and distance, the zones' provocations
+  Adv.session = () => ({ pos: new Set(), acc: {}, zones: {} });
+  const DEF_SESS = Adv.session();
+  // a contested zone's foes appear: true when the zone was provoked again within two minutes (its foes give nothing)
+  Adv.provoke = (sess, zone, now) => {
+    const z = (sess || DEF_SESS).zones, prev = z[zone];
+    const again = !!prev && now >= prev[0] && now - prev[0] < Adv.ZONE_AGAIN;
+    z[zone] = [now, again];
+    return again;
+  };
+  // the window [t0, used] of a limit: a fresh one when the last ran out (or the clock went back)
+  const win = (me, key, sec, now) => {
+    let w = me.lim[key];
+    if (!Array.isArray(w) || now < w[0] || now - w[0] >= sec * 1000) w = me.lim[key] = [now, 0];
+    return w;
+  };
+  const sizeOf = (spec, ctx) => (own(spec, ctx.size) ? ctx.size : 'S');
+  const val = (spec, ctx, key) => {
+    if (typeof spec === 'number') return spec;
+    if (Array.isArray(spec)) return clamp(Math.round(num(ctx[key], spec[0])), spec[0], spec[1]);
+    if (plain(spec)) return spec[sizeOf(spec, ctx)];
+    return 0;
+  };
+  const EMPTY = {};
+  // one award: {kind, xp, taler, level, up (levels gained), gift (Taler of the gift levels crossed), stars, starUp, why}
+  // why: '' given · 'once' had it · 'limit' the window is full · 'same' a position placed before · 'acc' counted, not yet a
+  // step · 'zone' a zone provoked again. null for an unknown kind
+  Adv.award = function (me, kind, ctx, now, sess) {
+    const A = own(AWARDS, kind) ? AWARDS[kind] : null; if (!A || !me) return null;
+    const c = ctx || EMPTY, t = num(now, 0), S = sess || DEF_SESS;
+    const r = { kind, xp: 0, taler: 0, level: me.level | 0, up: 0, gift: 0, stars: me.stars | 0, starUp: 0, why: '' };
+    let key = null;
+    if (A.once) { key = A.once === 'id' ? kind + ':' + (c.id === undefined ? '?' : c.id) : kind; if (me.once[key]) { r.why = 'once'; return r; } }
+    let xp = 0, taler = 0;
+    if (A.per) {
+      let units = 1;
+      if (kind === 'place') {
+        const k = Adv.posKey(c.x, c.y, c.z);
+        if (S.pos.has(k)) { r.why = 'same'; return r; }
+        if (S.pos.size >= POS_MAX) S.pos.clear();
+        S.pos.add(k);
+      } else units = Math.max(0, num(c.m, 0));
+      const a = (S.acc[kind] || 0) + units, steps = Math.floor(a / A.per);
+      S.acc[kind] = a - steps * A.per;
+      xp = steps * A.xp;
+      if (!xp) { r.why = 'acc'; return r; }
+    } else if (kind === 'foe') {
+      const zn = c.zone !== undefined ? S.zones[c.zone] : null;
+      if (zn && zn[1]) { r.why = 'zone'; return r; }
+      const base = c.xp !== undefined ? val(A.xp, c, 'xp') : clamp(Adv.FOE_XP[c.kind] || A.xp[0], A.xp[0], A.xp[1]);
+      const w = win(me, 'foe:' + (c.kind === undefined ? '?' : c.kind), A.decay[1], t);
+      xp = Math.round(base * Math.pow(0.5, Math.floor(w[1] / A.decay[0])));
+      w[1]++;
+    } else {
+      xp = val(A.xp, c, 'xp');
+      if (A.taler !== undefined) taler = val(A.taler, c, 'taler');
+    }
+    if (A.lim && xp > 0) {
+      const n = A.lim[0], w = win(me, kind, A.lim[1], t);
+      if (A.lim[2] === 'xp') { xp = Math.min(xp, Math.max(0, n - w[1])); w[1] += xp; }
+      else if (w[1] >= n) xp = 0; else w[1]++;
+      if (!xp) { r.why = 'limit'; return r; }
+    }
+    if (xp <= 0 && taler <= 0) return r;
+    if (key) me.once[key] = 1;
+    r.xp = xp; r.taler = taler;
+    if (xp > 0) gain(me, xp, r);
+    if (r.taler + r.gift > 0) Adv.earn(me, r.taler + r.gift);
+    return r;
+  };
+  // XP in: the level and the stars follow; every fifth level crossed is a gift of 10 × L Taler (L5 50 … L50 500)
+  function gain(me, xp, r) {
+    const L0 = me.level | 0, S0 = me.stars | 0;
+    me.xp = Math.min(XP_MAX, num(me.xp, 0) + xp);
+    const lv = Adv.levelOf(me.xp);
+    me.level = lv.level; me.stars = lv.stars;
+    r.level = me.level; r.stars = me.stars; r.up = Math.max(0, me.level - L0); r.starUp = Math.max(0, me.stars - S0);
+    for (let l = L0 + 1; l <= me.level; l++) if (l % 5 === 0) r.gift += GIFT * l;
+  }
+
+  // ---------------------------------------------------------------- the five stats (A§3)
+  const STATS = Adv.STATS = ['aus', 'ene', 'spu', 'ges', 'pil'];
+  Adv.PT_MAX = 10;
+  const ptsOf = (p) => { const o = {}; for (const k of STATS) o[k] = clamp(Math.floor(num(p && p[k], 0)), 0, Adv.PT_MAX); return o; };
+  Adv.spent = (me) => { let s = 0; for (const k of STATS) s += me.pts[k] | 0; return s; };
+  Adv.points = (me) => Math.max(0, Math.min(me.level | 0, CAP) - Adv.spent(me));
+  Adv.addPoint = (me, k) => { if (STATS.indexOf(k) < 0 || Adv.points(me) <= 0 || (me.pts[k] | 0) >= Adv.PT_MAX) return false; me.pts[k] = (me.pts[k] | 0) + 1; return true; };
+  Adv.respec = (me) => { const n = Adv.spent(me); for (const k of STATS) me.pts[k] = 0; return n; };
+  // what the points do: ❤ +1 heart per 2 (20 → 30 HP) · ⚡ +8 % energy, +6 % boost bar · 🧭 scan 32 + 8 blocks, the hidden
+  // chests at 5 · 🛠 +5 % mining and building, a hint at 5 and 10 · 🚀 +8 % boost time, +3 % turn rate
+  Adv.effects = (p) => {
+    const q = ptsOf(p), hp = 20 + 2 * Math.floor(q.aus / 2);
+    return { hp, hearts: hp / 2, energy: 1 + 0.08 * q.ene, boost: 1 + 0.06 * q.ene, scan: 32 + 8 * q.spu, chests: q.spu >= 5, speed: 1 + 0.05 * q.ges, hints: (q.ges >= 5 ? 1 : 0) + (q.ges >= 10 ? 1 : 0), boostTime: 1 + 0.08 * q.pil, turn: 1 + 0.03 * q.pil };
+  };
+
+  // ---------------------------------------------------------------- the Sterntaler (A§4): earned in the world only
+  Adv.earn = (me, n) => { const k = Math.floor(num(n, 0)); if (k <= 0) return 0; const b = me.taler | 0; me.taler = Math.min(TALER_MAX, b + k); return me.taler - b; };
+  Adv.pay = (me, n) => { const k = Math.floor(num(n, 0)); if (k <= 0 || (me.taler | 0) < k) return false; me.taler -= k; return true; };
+  Adv.PRICES = { engine: [600, 1500, 3500], shield: [500, 1200, 3000], jump: [1000, 2500, 5000], suitHeat: [800], suitCold: [600], suitPressure: [600], suitRad: [1200], boots: [400], anchor: [300], scanner: [400], repair: [900], camera: [200] };
+  Adv.BLUEPRINT = [50, 400];
+  Adv.bpPrice = (n) => clamp(Math.round(num(n, 50)), Adv.BLUEPRINT[0], Adv.BLUEPRINT[1]);
+  Adv.price = (me, item) => { if (!own(Adv.PRICES, item)) return null; const P = Adv.PRICES[item], s = me.owned[item] | 0; return s < P.length ? P[s] : null; };
+  Adv.buy = (me, item) => {
+    if (!own(Adv.PRICES, item)) return { ok: false, why: 'unknown' };
+    const P = Adv.PRICES[item], s = me.owned[item] | 0;
+    if (s >= P.length) return { ok: false, why: 'max', step: s };
+    if (!Adv.pay(me, P[s])) return { ok: false, why: 'poor', price: P[s], step: s };
+    me.owned[item] = s + 1;
+    return { ok: true, price: P[s], step: s + 1 };
+  };
+  // the upgrades in the Abenteuer: cruise +15 % a step · the ship disabled 10 → 8 → 6 → 3 s when hit (A§4's „10 → 6 → 3"
+  // over its three steps) · jump range 30 → 60 ly · a suit module stops its hazard costing hearts · boots, Funke's modules
+  Adv.SHIELD_SEC = [10, 8, 6, 3]; Adv.JUMP_LY = [30, 40, 50, 60];
+  Adv.upgrade = (me) => {
+    const o = (me && me.owned) || {}, st = (k) => clamp(o[k] | 0, 0, Adv.PRICES[k].length);
+    return { cruise: 1 + 0.15 * st('engine'), shieldSec: Adv.SHIELD_SEC[st('shield')], jumpLy: Adv.JUMP_LY[st('jump')], suit: { heat: st('suitHeat') > 0, cold: st('suitCold') > 0, pressure: st('suitPressure') > 0, rad: st('suitRad') > 0 }, jumpBoost: 1 + 0.25 * st('boots'), anchor: st('anchor') > 0, scanner: st('scanner') > 0, repair: st('repair') > 0, camera: st('camera') > 0 };
+  };
+  // selling at a freed outpost's trading post: iron 2, gold 6, crystal 8, ice core 5, asteroid metal 12 each
+  Adv.SELL = { iron_ingot: 2, gold_ingot: 6, crystal: 8, ice_core: 5, asteroid_metal: 12 };
+  Adv.sellPrice = (id) => { const s = String(id || ''); if (own(Adv.SELL, s)) return Adv.SELL[s]; return /^crystal_shard_/.test(s) ? Adv.SELL.crystal : 0; };
+
+  // ---------------------------------------------------------------- Spannung (A§12)
+  const BANDS = Adv.BANDS = { easy: [0.1, 0.5], normal: [0.3, 0.7], hard: [0.5, 0.9] };
+  Adv.BAND_ORDER = ['easy', 'normal', 'hard'];
+  const ENC = Adv.ENC = ['normal', 'rare', 'off'];
+  Adv.TENSION0 = 0.4; Adv.FAINT_WIN = 600000;
+  Adv.clampBand = (s, band) => { const b = own(BANDS, band) ? BANDS[band] : BANDS.normal; return clamp(num(s, Adv.TENSION0), b[0], b[1]); };
+  Adv.setBand = (rec, band) => { if (!own(BANDS, band)) return false; rec.band = band; rec.tension = Adv.clampBand(rec.tension, band); return true; };
+  // after an encounter: p = 1 − min(1, hearts lost / max hearts) · min(1.5, duration / expected); s ← s + 0.15 (p − 0.6)
+  Adv.encounter = (rec, o) => {
+    const lost = Math.max(0, num(o && o.lost, 0)), max = Math.max(1, num(o && o.max, 20)), dur = Math.max(0, num(o && o.dur, 0)), exp = Math.max(1e-3, num(o && o.expected, 40));
+    const p = 1 - Math.min(1, lost / max) * Math.min(1.5, dur / exp);
+    rec.tension = Adv.clampBand(rec.tension + 0.15 * (p - 0.6), rec.band);
+    return { p, s: rec.tension };
+  };
+  // a faint (Ohnmacht): two within ten minutes take 0.2 off and offer a band down — the player says yes (easier), never
+  // the game silently
+  Adv.faint = (rec, now) => {
+    const f = (Array.isArray(rec.faints) ? rec.faints : []).filter(t => now >= t && now - t < Adv.FAINT_WIN);
+    f.push(now); rec.faints = f;
+    if (f.length < 2) return { s: rec.tension, offer: false };
+    rec.faints = []; rec.tension = Adv.clampBand(rec.tension - 0.2, rec.band);
+    return { s: rec.tension, offer: rec.band !== 'easy' };
+  };
+  Adv.easier = (rec) => { const i = Adv.BAND_ORDER.indexOf(rec.band); if (i <= 0) return null; const b = Adv.BAND_ORDER[i - 1]; Adv.setBand(rec, b); return b; };
+  Adv.scale = (s) => 0.6 + 0.8 * clamp(num(s, Adv.TENSION0), 0, 1);
+  Adv.hints = (s) => (s <= 0.2 ? 3 : s <= 0.35 ? 2 : s <= 0.5 ? 1 : 0);
+  // the encounters in effect: a child-safe game (Kindersicher) never meets a foe
+  Adv.encOf = (rec, kids) => (kids ? 'off' : rec && ENC.indexOf(rec.enc) >= 0 ? rec.enc : 'normal');
+
+  // ---------------------------------------------------------------- the save (A§15)
+  const DIFFS = ['peaceful', 'easy', 'normal', 'hard'];
+  Adv.fresh = (o) => {
+    const r = { v: V, on: false, band: 'normal', enc: 'normal', since: 0, tension: Adv.TENSION0, freed: {}, bosses: {}, chapter: 0, beats: {}, prevDiff: null, faints: [],
+      me: { xp: 0, level: 0, stars: 0, pts: { aus: 0, ene: 0, spu: 0, ges: 0, pil: 0 }, taler: 0, owned: {}, quests: {}, once: {}, lim: {} } };
+    if (o) { if (o.on !== undefined) r.on = !!o.on; if (own(BANDS, o.band)) r.band = o.band; if (ENC.indexOf(o.enc) >= 0) r.enc = o.enc; if (o.since !== undefined) r.since = int(o.since, 0, 1e7, 0); }
+    r.tension = Adv.clampBand(r.tension, r.band);
+    return r;
+  };
+  // any record → a sane one (v 1 is the first version: a later one migrates here, field by field). Numbers finite and
+  // bounded, the level from the XP, never more points than levels (else all given back to spend again), owned steps
+  // within the price table, unknown items dropped, the other parts' records (freed, bosses, beats, quests) kept as they are
+  Adv.load = function (raw) {
+    const r = Adv.fresh();
+    if (!plain(raw)) return r;
+    r.on = raw.on === true;
+    if (own(BANDS, raw.band)) r.band = raw.band;
+    if (ENC.indexOf(raw.enc) >= 0) r.enc = raw.enc;
+    r.since = int(raw.since, 0, 1e7, 0);
+    r.tension = Adv.clampBand(num(raw.tension, Adv.TENSION0), r.band);
+    if (plain(raw.freed)) r.freed = raw.freed;
+    if (plain(raw.bosses)) r.bosses = raw.bosses;
+    r.chapter = int(raw.chapter, 0, 99, 0);
+    if (plain(raw.beats)) r.beats = raw.beats;
+    r.prevDiff = DIFFS.indexOf(raw.prevDiff) >= 0 ? raw.prevDiff : null;
+    r.faints = Array.isArray(raw.faints) ? raw.faints.filter(t => typeof t === 'number' && Number.isFinite(t)).slice(-4) : [];
+    const m = plain(raw.me) ? raw.me : {}, me = r.me;
+    me.xp = clamp(Math.floor(num(m.xp, 0)), 0, XP_MAX);
+    const lv = Adv.levelOf(me.xp); me.level = lv.level; me.stars = lv.stars;
+    me.pts = ptsOf(m.pts); if (Adv.spent(me) > me.level) for (const k of STATS) me.pts[k] = 0;
+    me.taler = clamp(Math.floor(num(m.taler, 0)), 0, TALER_MAX);
+    if (plain(m.owned)) for (const k in m.owned) if (own(Adv.PRICES, k)) { const s = int(m.owned[k], 0, Adv.PRICES[k].length, 0); if (s) me.owned[k] = s; }
+    if (plain(m.quests)) me.quests = m.quests;
+    if (plain(m.once)) for (const k in m.once) if (m.once[k]) me.once[k] = 1;
+    if (plain(m.lim)) for (const k in m.lim) { const w = m.lim[k]; if (Array.isArray(w) && w.length === 2 && Number.isFinite(w[0]) && Number.isFinite(w[1])) me.lim[k] = [w[0], Math.max(0, w[1])]; }
+    return r;
+  };
+
+  // ---------------------------------------------------------------- the level-up chime
+  // six bells up the day's pentatonic scale 70 ms apart (the start degree climbs with the level), then the chord and
+  // the octave held; a gift level (5, 10, …) adds a sparkle. degMidi: klang.js's (the same table is here for node and
+  // the worker). Notes {midi, kind: 'bell' | 'pad', t, dur, gain}
+  Adv.chime = function (plan, level, degMidi) {
+    const dm = typeof degMidi === 'function' ? degMidi : (p, d) => { const s = p.scale, k = ((d % 5) + 5) % 5; return p.root + s[k] + 12 * Math.floor(d / 5); };
+    const L = Math.max(0, level | 0), c0 = L % 5, up = plan.root > 62 ? 0 : 12, out = [], step = 0.07, top = 6 * step;
+    for (let i = 0; i < 6; i++) out.push({ midi: dm(plan, c0 + i) + up, kind: 'bell', t: i * step, dur: 0.8, gain: 0.04 + 0.008 * i });
+    for (const d of [c0 + 5, c0 + 7, c0 + 9]) out.push({ midi: dm(plan, d) + up - 12, kind: 'pad', t: top, dur: 1.4, gain: 0.03 });
+    out.push({ midi: dm(plan, c0 + 10) + up, kind: 'bell', t: top, dur: 1.5, gain: 0.07 });
+    if (L % 5 === 0) for (let i = 0; i < 4; i++) out.push({ midi: dm(plan, c0 + 11 + i) + up, kind: 'bell', t: top + 0.2 + i * 0.06, dur: 0.6, gain: 0.025 });
+    return out;
+  };
+})(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
+
+/* shared/universe.js */
+// ============================================================================
+// VR.Universe — the orbital mechanics core (u-orbit · docs/superpowers/specs/2026-10-22-universe-design.md §2–§4, §13;
+// the plan docs/superpowers/plans/2026-10-22-u-orbit.md; the facts docs/universe/REFERENCE.md §1.9, Appendix A).
+// Pure: the main thread and the workers run it; nothing here touches a page, a store or the network. The per-frame calls
+// (state, localSky, the Verlet step) allocate nothing when they are handed their `out`.
+//
+// Units: metres at game scale (real lengths ÷ 64), seconds of world time t = (day·24000 + ticks)/20 (U.worldSeconds).
+// Gravity is true per body (μ = g·R², so game μ = real μ ÷ 4096 and every orbital period is the real one ÷ 8).
+// Frames:  the system frame — Helia at the origin, Z = ecliptic north (the normal of Amarant's orbit), X the reference
+//          direction in the ecliptic; doubles everywhere, offsets between bodies summed along the body tree.
+//          a body-fixed frame — z = the spin axis, x = the prime meridian; B (3×3, row-major) maps body-fixed → system.
+//          a local frame — x = map east, y = up, z = map south (env.js's axes), from the body's chart.
+//
+//   U.kepler(M, e) · U.keplerH(M, e)            Kepler's equation, elliptic (Newton from Mikkola's start) and hyperbolic
+//   U.elToState(el, μ, t, r, v) · U.stateToEl   elements {a, e, i, node, peri, M0, t0} ↔ position and velocity
+//   U.coast(r0, v0, μ, dt, r, v)                coasting on any conic — universal variables, nothing integrated
+//   U.verletInit(s, μ) · U.verlet(s, dt, μ, ax, ay, az)   one velocity-Verlet step under thrust (s = {r, v, a})
+//   U.vCirc · vEsc · period · hohmann · soiRadius · hillRadius · dvFromOrbit   two-body helpers at any scale
+//   U.home (= the compiled Helia system, S) and U.compile(def) for the systems of other stars (u-stars):
+//     S.state(t, out?)  every body: r, v (system frame), rel (to the parent: r then v), B (body-fixed → system)
+//     S.pos · S.rel · S.spin · S.body(id) · S.ids · S.children
+//     S.soi(id) · S.hill(id) · S.dominant(rSys, t) · S.offset(from, to, t, r, v) · S.toFrame(from, to, r, v, t, ro, vo)
+//     S.soiExit(frame, r, v, t) · S.ghost(frame, r, v, t, out?)  the ghost path: 128 points + one patch
+//     S.fixedToInertial · S.inertialToFixed · S.surfaceSpeed   the turning ground ↔ space (Herzwelt turns in 20 min!)
+//     S.chartToInertial(id, [x, y, z], [vx, vy, vz], t, r, v) · S.inertialToChart   a world's map ↔ space (the hand-off)
+//     S.skyFrom(rSys, t, out?) · S.skyAt(id, rFixed, t, out?) · S.localSky(dim, chartPos, t, out?)
+//     S.eclipseAt(id, t, only?) · S.eclipseFrom(rSys, t, skip, res?, only?)
+//     S.chart(id): azimuthal equidistant plane ↔ sphere (toSphere, toPlane, frame, latLon, localTicks)
+//     S.solarDay · S.synodic · S.geoRadius · S.flux · S.orbitNormal · S.table()
+//   U.triad(a1, a2, b1, b2, m) · U.slerpRot(m, k, out) · U.slerpDir(a, b, k, out) · U.matToQuat · U.quatToMat
+//   U.smootherstep(e0, e1, x) · U.climbK(y)       the postcard blend of the climb (U§2.2, §5.1)
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const PI = Math.PI, TAU = 2 * PI, D2R = PI / 180;
+  // ---------------------------------------------------------------- constants (real values; the game divides lengths by L)
+  const AU = 1.495978707e11, MU_SUN = 1.32712440018e20, R_SUN = 6.957e8, MU_JUP = 1.26686534e17, MU_EARTH = 3.986004418e14;
+  const L = 64, SOLAR = 1361;
+  const SCALE = Object.freeze({ L, length: 1 / L, period: 1 / 8, walk: 30 / 9.81, betaOrbit: L });
+  const DAY = 1200, NOON = 300;                          // a world day in seconds; the Heartland's local noon (tick 6000)
+  const BANDS = Object.freeze({ air: 252, high: 300, edge: 2500 });   // U§5.1: the climb's bands over Herzwelt (m)
+  const DIM_BODY = Object.freeze({ overworld: 'herz', aqua: 'aqua', zinn: 'zinn', opal: 'opal', basalt: 'basalt', ocker: 'ocker' });
+
+  // ---------------------------------------------------------------- small vector helpers (no allocation)
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const len = (a) => Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
+  function crossInto(a, b, o) { const x = a[1] * b[2] - a[2] * b[1], y = a[2] * b[0] - a[0] * b[2], z = a[0] * b[1] - a[1] * b[0]; o[0] = x; o[1] = y; o[2] = z; return o; }
+  function unitInto(a, o) { const l = len(a) || 1; o[0] = a[0] / l; o[1] = a[1] / l; o[2] = a[2] / l; return o; }
+  function set3(o, x, y, z) { o[0] = x; o[1] = y; o[2] = z; return o; }
+  function copy3(a, o) { o[0] = a[0]; o[1] = a[1]; o[2] = a[2]; return o; }
+  const v3 = () => new Float64Array(3);
+  // row-major 3×3: m·v and mᵀ·v
+  function mulInto(m, a, o) { const x = m[0] * a[0] + m[1] * a[1] + m[2] * a[2], y = m[3] * a[0] + m[4] * a[1] + m[5] * a[2], z = m[6] * a[0] + m[7] * a[1] + m[8] * a[2]; o[0] = x; o[1] = y; o[2] = z; return o; }
+  function mulTInto(m, a, o) { const x = m[0] * a[0] + m[3] * a[1] + m[6] * a[2], y = m[1] * a[0] + m[4] * a[1] + m[7] * a[2], z = m[2] * a[0] + m[5] * a[1] + m[8] * a[2]; o[0] = x; o[1] = y; o[2] = z; return o; }
+  const wrapPi = (a) => a - TAU * Math.floor((a + PI) / TAU);
+  const clamp1 = (x) => (x < -1 ? -1 : x > 1 ? 1 : x);
+
+  // ================================================================ Kepler's equation
+  // elliptic (0 ≤ e < 1): E − e sin E = M. Mikkola's cubic start (1987) is good to ~1e-3; Newton then doubles the digits
+  // each step, so four steps reach the double's limit for e ≤ 0.97 (kepler.steps holds the count of the last call)
+  function kepler(M, e) {
+    if (e < 1e-15) { kepler.steps = 0; return M; }
+    const m = wrapPi(M), k = M - m;                       // m in [−π, π): the cubic start wants it there
+    const den = 4 * e + 0.5, al = (1 - e) / den, be = 0.5 * m / den;
+    const sq = Math.sqrt(be * be + al * al * al);
+    const z = be < 0 ? -Math.cbrt(sq - be) : Math.cbrt(be + sq);
+    let s = z - al / z;
+    s -= 0.078 * s * s * s * s * s / (1 + e);
+    let E = m + e * s * (3 - 4 * s * s), steps = 0;
+    for (; steps < 12;) {
+      const f = E - e * Math.sin(E) - m, fp = 1 - e * Math.cos(E), dE = f / fp;
+      E -= dE; steps++;
+      if (Math.abs(dE) <= 1e-15 * (1 + Math.abs(E))) break;
+    }
+    kepler.steps = steps;
+    return E + k;
+  }
+  kepler.steps = 0;
+  // hyperbolic: e sinh H − H = M. Newton from the right of the root (f is convex there), so it never overshoots
+  function keplerH(M, e) {
+    if (M === 0) return 0;
+    const m = Math.abs(M), f = (H) => e * Math.sinh(H) - H - m;
+    let H = Math.cbrt(6 * m / e);                        // f ≥ 0 here (sinh H ≥ H + H³/6)
+    const H2 = Math.asinh(2 * m / e);                     // and here for large M
+    if (H2 < H && f(H2) >= 0) H = H2;
+    for (let k = 0; k < 60; k++) {
+      const fp = e * Math.cosh(H) - 1, dH = f(H) / fp;
+      H -= dH;
+      if (Math.abs(dH) <= 1e-15 * (1 + Math.abs(H))) break;
+    }
+    return M < 0 ? -H : H;
+  }
+
+  // ================================================================ elements ↔ state
+  // el = {a, e, i, node, peri, M0, t0} (radians; elliptic): the perifocal frame P (to periapsis), Q, W (the normal)
+  function pqwInto(i, node, peri, P, Q, W) {
+    const cO = Math.cos(node), sO = Math.sin(node), cw = Math.cos(peri), sw = Math.sin(peri), ci = Math.cos(i), si = Math.sin(i);
+    set3(P, cO * cw - sO * sw * ci, sO * cw + cO * sw * ci, sw * si);
+    set3(Q, -cO * sw - sO * cw * ci, -sO * sw + cO * cw * ci, cw * si);
+    if (W) set3(W, sO * si, -cO * si, ci);
+  }
+  const _P = v3(), _Q = v3();
+  function elToState(el, mu, t, r, v) {
+    const a = el.a, e = el.e, n = Math.sqrt(mu / (a * a * a));
+    const E = kepler(el.M0 + n * (t - (el.t0 || 0)), e), cE = Math.cos(E), sE = Math.sin(E), fac = Math.sqrt(1 - e * e);
+    const x = a * (cE - e), y = a * fac * sE, rr = a * (1 - e * cE), k = Math.sqrt(mu * a) / rr;
+    pqwInto(el.i, el.node, el.peri, _P, _Q, null);
+    for (let j = 0; j < 3; j++) { r[j] = x * _P[j] + y * _Q[j]; if (v) v[j] = -k * sE * _P[j] + k * fac * cE * _Q[j]; }
+    return r;
+  }
+  function stateToEl(r, v, mu) {
+    const rr = len(r), vv = dot(v, v), rv = dot(r, v);
+    const h = crossInto(r, v, [0, 0, 0]), hh = len(h);
+    const vxh = crossInto(v, h, [0, 0, 0]);
+    const ev = [vxh[0] / mu - r[0] / rr, vxh[1] / mu - r[1] / rr, vxh[2] / mu - r[2] / rr], e = len(ev);
+    const energy = vv / 2 - mu / rr, a = -mu / (2 * energy), p = hh * hh / mu;
+    const i = Math.acos(clamp1(h[2] / hh));
+    const nv = [-h[1], h[0], 0], nn = Math.hypot(nv[0], nv[1]);
+    const hu = [h[0] / hh, h[1] / hh, h[2] / hh];
+    let node = nn > 1e-12 * hh ? Math.atan2(nv[1], nv[0]) : 0;
+    if (node < 0) node += TAU;
+    // the reference in the plane: the node line (or X for an orbit in the ecliptic)
+    const nref = nn > 1e-12 * hh ? [nv[0] / nn, nv[1] / nn, 0] : [1, 0, 0];
+    const ang = (u, w) => { const c = crossInto(u, w, [0, 0, 0]); return Math.atan2(dot(c, hu), dot(u, w)); };
+    let peri = 0, nu;
+    if (e > 1e-12) { const eu = [ev[0] / e, ev[1] / e, ev[2] / e]; peri = ang(nref, eu); nu = ang(eu, r); }
+    else nu = ang(nref, r);
+    if (peri < 0) peri += TAU;
+    let E = null, H = null, M;
+    if (e < 1) { E = Math.atan2(Math.sqrt(1 - e * e) * Math.sin(nu), e + Math.cos(nu)); M = E - e * Math.sin(E); if (M < 0) M += TAU; }
+    else { H = Math.asinh(Math.sqrt(e * e - 1) * Math.sin(nu) / (1 + e * Math.cos(nu))); M = e * Math.sinh(H) - H; }
+    const n = Math.sqrt(mu / Math.abs(a * a * a));
+    return { a, e, i, node, peri, nu, E, H, M, p, n, period: e < 1 ? TAU / n : Infinity, rp: p / (1 + e), ra: e < 1 ? p / (1 - e) : Infinity, h, evec: ev, energy, rv };
+  }
+
+  // ================================================================ coasting: universal variables (Stumpff C, S)
+  function stumpC(z) {
+    if (z > 1e-3) { const s = Math.sin(0.5 * Math.sqrt(z)); return 2 * s * s / z; }
+    if (z < -1e-3) { const s = Math.sinh(0.5 * Math.sqrt(-z)); return 2 * s * s / -z; }
+    return 0.5 - z * (1 / 24 - z * (1 / 720 - z * (1 / 40320 - z / 3628800)));
+  }
+  function stumpS(z) {
+    if (z > 0.5) { const s = Math.sqrt(z); return (s - Math.sin(s)) / (s * s * s); }
+    if (z < -0.5) { const s = Math.sqrt(-z); return (Math.sinh(s) - s) / (s * s * s); }
+    return 1 / 6 - z * (1 / 120 - z * (1 / 5040 - z * (1 / 362880 - z * (1 / 39916800 - z * (1 / 6227020800 - z * (1 / 1307674368000 - z / 355687428096000))))));
+  }
+  const _cr = v3(), _cv = v3();
+  // r0, v0 relative to the attracting centre; dt in seconds (either sign); r, v may be r0, v0 themselves
+  function coast(r0, v0, mu, dt, r, v) {
+    copy3(r0, _cr); copy3(v0, _cv);
+    const r0n = len(_cr), rv = dot(_cr, _cv), sqmu = Math.sqrt(mu), alpha = 2 / r0n - dot(_cv, _cv) / mu;
+    // an ellipse: within half a period either way (a small step back on a long ellipse must not become a whole orbit on)
+    if (alpha > 0) { const T = TAU / (sqmu * alpha * Math.sqrt(alpha)); dt -= T * Math.round(dt / T); }
+    if (dt === 0) { copy3(_cr, r); if (v) copy3(_cv, v); return r; }
+    const A = rv / sqmu, Bc = 1 - alpha * r0n, sdt = sqmu * dt;
+    const F = (x) => { const z = alpha * x * x; return A * x * x * stumpC(z) + Bc * x * x * x * stumpS(z) + r0n * x - sdt; };
+    // the bracket (F rises with χ: F' = r > 0)
+    let lo, hi, x;
+    if (alpha > 0) { hi = TAU / Math.sqrt(alpha); lo = -hi; x = sqmu * alpha * dt; }
+    else {
+      x = sdt / r0n;
+      if (alpha < -1e-12) {
+        const a = 1 / alpha, sg = dt > 0 ? 1 : -1;
+        const g = sg * Math.sqrt(-a) * Math.log((-2 * mu * alpha * dt) / (rv + sg * Math.sqrt(-mu * a) * (1 - r0n * alpha)));
+        if (isFinite(g)) x = g;
+      }
+      if (dt > 0) { lo = 0; hi = Math.max(Math.abs(x), 1e-6) * 2; while (F(hi) < 0) { lo = hi; hi *= 2; } }
+      else { hi = 0; lo = -Math.max(Math.abs(x), 1e-6) * 2; while (F(lo) > 0) { hi = lo; lo *= 2; } }
+    }
+    if (!(x > lo && x < hi)) x = 0.5 * (lo + hi);
+    for (let k = 0; k < 100; k++) {
+      const z = alpha * x * x, c = stumpC(z), s = stumpS(z);
+      const f = A * x * x * c + Bc * x * x * x * s + r0n * x - sdt;
+      const fp = A * x * (1 - z * s) + Bc * x * x * c + r0n;
+      if (f > 0) hi = x; else lo = x;
+      let xn = x - f / fp;
+      if (!(xn > lo && xn < hi)) xn = 0.5 * (lo + hi);
+      const dx = Math.abs(xn - x);
+      x = xn;
+      if (dx <= 1e-15 * Math.abs(x) || hi - lo <= 1e-15 * Math.abs(x)) break;
+    }
+    const z = alpha * x * x, c = stumpC(z), s = stumpS(z);
+    const f = 1 - x * x * c / r0n, g = dt - x * x * x * s / sqmu;
+    const rx = f * _cr[0] + g * _cv[0], ry = f * _cr[1] + g * _cv[1], rz = f * _cr[2] + g * _cv[2];
+    const rn = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    const fd = sqmu / (rn * r0n) * x * (z * s - 1), gd = 1 - x * x * c / rn;
+    if (v) set3(v, fd * _cr[0] + gd * _cv[0], fd * _cr[1] + gd * _cv[1], fd * _cr[2] + gd * _cv[2]);
+    return set3(r, rx, ry, rz);
+  }
+
+  // ================================================================ thrust: velocity Verlet (kick, drift, kick)
+  // s = {r, v, a}: a holds the gravity at r (verletInit once, then every step keeps it); the thrust (ax, ay, az) acts in
+  // both half kicks; the caller adds drag to it. 1/120 s keeps the energy within 1e-8 over ten low orbits.
+  function verletInit(s, mu) { const r = s.r, rr = len(r), k = -mu / (rr * rr * rr); s.a[0] = k * r[0]; s.a[1] = k * r[1]; s.a[2] = k * r[2]; return s; }
+  function verlet(s, dt, mu, ax, ay, az) {
+    const r = s.r, v = s.v, a = s.a, h = 0.5 * dt;
+    ax = ax || 0; ay = ay || 0; az = az || 0;
+    v[0] += (a[0] + ax) * h; v[1] += (a[1] + ay) * h; v[2] += (a[2] + az) * h;
+    r[0] += v[0] * dt; r[1] += v[1] * dt; r[2] += v[2] * dt;
+    const rr = Math.sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]), k = -mu / (rr * rr * rr);
+    a[0] = k * r[0]; a[1] = k * r[1]; a[2] = k * r[2];
+    v[0] += (a[0] + ax) * h; v[1] += (a[1] + ay) * h; v[2] += (a[2] + az) * h;
+    return s;
+  }
+
+  // ================================================================ two-body helpers (any scale; R§1.9, Appendix A)
+  const vCirc = (mu, r) => Math.sqrt(mu / r);
+  const vEsc = (mu, r) => Math.sqrt(2 * mu / r);
+  const period = (mu, a) => TAU * Math.sqrt(a * a * a / mu);
+  function hohmann(mu, r1, r2) {
+    const at = 0.5 * (r1 + r2), vp = Math.sqrt(mu * (2 / r1 - 1 / at)), va = Math.sqrt(mu * (2 / r2 - 1 / at));
+    const dv1 = Math.abs(vp - Math.sqrt(mu / r1)), dv2 = Math.abs(Math.sqrt(mu / r2) - va);
+    return { dv1, dv2, dv: dv1 + dv2, t: PI * Math.sqrt(at * at * at / mu), at };
+  }
+  const soiRadius = (a, mu, muP) => a * Math.pow(mu / muP, 0.4);
+  const hillRadius = (a, mu, muP, e) => a * (1 - (e || 0)) * Math.cbrt(mu / (3 * muP));
+  const dvFromOrbit = (vInf, mu, r) => Math.sqrt(vInf * vInf + 2 * mu / r) - Math.sqrt(mu / r);
+
+  // ================================================================ rotations: TRIAD, quaternions, the postcard blend
+  const _t = [v3(), v3(), v3(), v3(), v3(), v3()];
+  // R with R·a1 = b1 exactly and R·(a1×a2) ∥ (b1×b2): the attitude from two observed directions (the sun, the giant)
+  function triad(a1, a2, b1, b2, m) {
+    const [ta1, ta2, ta3, tb1, tb2, tb3] = _t;
+    unitInto(a1, ta1); unitInto(crossInto(a1, a2, ta2), ta2); crossInto(ta1, ta2, ta3);
+    unitInto(b1, tb1); unitInto(crossInto(b1, b2, tb2), tb2); crossInto(tb1, tb2, tb3);
+    m = m || new Float64Array(9);
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) m[i * 3 + j] = tb1[i] * ta1[j] + tb2[i] * ta2[j] + tb3[i] * ta3[j];
+    return m;
+  }
+  // q = [x, y, z, w] (w the scalar part)
+  function matToQuat(m, q) {
+    q = q || new Float64Array(4);
+    const tr = m[0] + m[4] + m[8];
+    if (tr > 0) { const s = 2 * Math.sqrt(tr + 1); q[3] = 0.25 * s; q[0] = (m[7] - m[5]) / s; q[1] = (m[2] - m[6]) / s; q[2] = (m[3] - m[1]) / s; }
+    else if (m[0] > m[4] && m[0] > m[8]) { const s = 2 * Math.sqrt(1 + m[0] - m[4] - m[8]); q[3] = (m[7] - m[5]) / s; q[0] = 0.25 * s; q[1] = (m[1] + m[3]) / s; q[2] = (m[2] + m[6]) / s; }
+    else if (m[4] > m[8]) { const s = 2 * Math.sqrt(1 + m[4] - m[0] - m[8]); q[3] = (m[2] - m[6]) / s; q[0] = (m[1] + m[3]) / s; q[1] = 0.25 * s; q[2] = (m[5] + m[7]) / s; }
+    else { const s = 2 * Math.sqrt(1 + m[8] - m[0] - m[4]); q[3] = (m[3] - m[1]) / s; q[0] = (m[2] + m[6]) / s; q[1] = (m[5] + m[7]) / s; q[2] = 0.25 * s; }
+    const l = Math.hypot(q[0], q[1], q[2], q[3]); q[0] /= l; q[1] /= l; q[2] /= l; q[3] /= l;
+    return q;
+  }
+  function quatToMat(q, m) {
+    m = m || new Float64Array(9);
+    const x = q[0], y = q[1], z = q[2], w = q[3];
+    m[0] = 1 - 2 * (y * y + z * z); m[1] = 2 * (x * y - z * w); m[2] = 2 * (x * z + y * w);
+    m[3] = 2 * (x * y + z * w); m[4] = 1 - 2 * (x * x + z * z); m[5] = 2 * (y * z - x * w);
+    m[6] = 2 * (x * z - y * w); m[7] = 2 * (y * z + x * w); m[8] = 1 - 2 * (x * x + y * y);
+    return m;
+  }
+  const _q = new Float64Array(4);
+  // the rotation k of the way from the identity to m (k 0 → identity, 1 → m) along the shortest arc
+  function slerpRot(m, k, out) {
+    matToQuat(m, _q);
+    if (_q[3] < 0) { _q[0] = -_q[0]; _q[1] = -_q[1]; _q[2] = -_q[2]; _q[3] = -_q[3]; }
+    const sn = Math.hypot(_q[0], _q[1], _q[2]), th = Math.atan2(sn, _q[3]);
+    if (sn < 1e-15) { _q[0] = _q[1] = _q[2] = 0; _q[3] = 1; }
+    else { const f = Math.sin(k * th) / sn; _q[0] *= f; _q[1] *= f; _q[2] *= f; _q[3] = Math.cos(k * th); }
+    return quatToMat(_q, out);
+  }
+  // a direction gliding along its great circle from a to b (the postcard bodies in the climb)
+  function slerpDir(a, b, k, out) {
+    out = out || v3();
+    const c = crossInto(a, b, _t[0]), sn = len(c), om = Math.atan2(sn, dot(a, b));
+    if (sn < 1e-12) { const w = 1 - k; set3(out, a[0] * w + b[0] * k, a[1] * w + b[1] * k, a[2] * w + b[2] * k); return unitInto(out, out); }
+    const fa = Math.sin((1 - k) * om) / Math.sin(om), fb = Math.sin(k * om) / Math.sin(om);
+    return set3(out, a[0] * fa + b[0] * fb, a[1] * fa + b[1] * fb, a[2] * fa + b[2] * fb);
+  }
+  const smootherstep = (e0, e1, x) => { let t = (x - e0) / (e1 - e0); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * t * (t * (t * 6 - 15) + 10); };
+  const climbK = (y) => smootherstep(BANDS.high, BANDS.edge, y);
+  const worldSeconds = (day, ticks) => (day * 24000 + ticks) / 20;
+
+  // ================================================================ the Helia system (real-equivalent; U§2.1)
+  // R in metres (real-equivalent: the game divides by 64), g in m/s² (or mu, real), orbits in metres or AU (real), angles in
+  // degrees. `ref: 'equator'`: the elements are relative to the parent's equator (Amarant's = the ring plane; x toward the
+  // equator's ascending node on the ecliptic). The free choices (nodes, starting anomalies, spin phases) are explained in the
+  // plan §3.2: Opal's node puts its orbit 1.12° below the ring plane on the night side at the start (a 5-min eclipse with
+  // Amarant's true oblate silhouette), Herzwelt's puts its orbit 8° above it there (no eclipse now; eclipse seasons twice a
+  // year), Amarant's start puts Helia 12° above the ring plane, sinking 0.44° a day of play.
+  const name = (de, en) => ({ de, en });
+  const HELIA = {
+    id: 'helia', name: name('Helia', 'Helia'),
+    star: { type: 'F5 V', T: 6550, L: 3.6, M: 1.33, R: 1.5, color: '#dddeff' },
+    bodies: [
+      { id: 'helia', kind: 'star', name: name('Helia', 'Helia'), R: 1.5 * R_SUN, mu: 1.33 * MU_SUN, spin: { tilt: 0, T: 3 * 86400 / 8 } },
+      { id: 'amarant', kind: 'giant', name: name('Amarant', 'Amaranth'), parent: 'helia', R: 60000e3, f: 0.098, mu: MU_JUP, air: 'H₂/He', landable: false,
+        orbit: { a: 1.9 * AU, e: 0, i: 0, node: 0, peri: 0, start: { sunOverEquator: 12, falling: true } },
+        // the pole 14° from the ecliptic's; 5.8 h real-equivalent: Saturn's q = ω²R³/GM with Jupiter's mass (its 9.8 %)
+        spin: { tilt: 14, toward: 0, T: 5.8 * 3600 / 8 },
+        ring: { inner: 74658 / 60268, outer: 136780 / 60268, thickness: 10,
+          bands: [{ name: 'C', r0: 74658, r1: 91975, tau: [0.05, 0.35] }, { name: 'B', r0: 91975, r1: 117507, tau: [0.4, 2.5] }, { name: 'A', r0: 122207, r1: 136780, tau: [0.4, 1.0] }],
+          gaps: [{ name: 'cassini', r0: 117507, r1: 122207, tau: [0, 0.1] }, { name: 'encke', r0: 133247.5, r1: 133572.5, tau: [0, 0] }],
+          moonlet: { r: 133410, R: 150 }, unit: 60268 } },
+      { id: 'herz', kind: 'world', name: name('Herzwelt', 'Heartworld'), parent: 'amarant', R: 6371e3, g: 9.81, air: 1, landable: true,
+        orbit: { a: 498700e3, e: 0, i: 8, node: 31.51, peri: 0, M0: 320, ref: 'equator' },
+        spin: { tilt: 0, solarDay: DAY, noon: NOON },
+        chart: { pole: 'north', c0: 0.42, psi: 0.4 } },
+      // Aquamarin's node near the sun's direction at the start: its shadow falls by Herzwelt's equator for the first two months,
+      // then sweeps the Heartland's 65.9° N in a five-week eclipse season (a node at 90° gave a total eclipse at the first noon)
+      { id: 'aqua', kind: 'ocean', name: name('Aquamarin', 'Aquamarine'), parent: 'herz', R: 2400e3, g: 2.01, air: 0.5, landable: true,
+        orbit: { a: 34500e3, e: 0, i: 172, node: 30, peri: 0, M0: 45, ref: 'equator' }, spin: { locked: true },
+        chart: { pole: 'sub', c0: 55 * D2R, psi: PI } },
+      { id: 'zinn', kind: 'volcanic', name: name('Zinnober', 'Cinnabar'), parent: 'amarant', R: 1820e3, g: 1.80, air: 0, landable: true,
+        orbit: { a: 190000e3, e: 0, i: 0, node: 0, peri: 0, M0: 30, ref: 'equator' }, spin: { locked: true },
+        chart: { pole: 'sub', c0: 55 * D2R, psi: PI } },
+      { id: 'opal', kind: 'ice', name: name('Opal', 'Opal'), parent: 'amarant', R: 1100e3, g: 0.49, air: 0, landable: true,
+        orbit: { a: 260000e3, e: 0, i: 3, node: 143.41, peri: 0, M0: 200, ref: 'equator' }, spin: { locked: true },
+        chart: { pole: 'sub', c0: 55 * D2R, psi: PI } },
+      { id: 'basalt', kind: 'cratered', name: name('Basalt', 'Basalt'), parent: 'amarant', R: 1740e3, g: 1.62, air: 0, landable: true,
+        orbit: { a: 700000e3, e: 0, i: 1.5, node: 200, peri: 0, M0: 100, ref: 'equator' }, spin: { axis: 'parent', T: 3600 },
+        chart: { pole: 'north', c0: 35 * D2R, psi: 0 } },
+      { id: 'ocker', kind: 'dust', name: name('Ocker', 'Ochre'), parent: 'amarant', R: 3390e3, g: 3.72, air: 0.006, landable: true,
+        orbit: { a: 1100000e3, e: 0, i: 2.5, node: 60, peri: 0, M0: 250, ref: 'equator' }, spin: { axis: 'parent', T: 2400 },
+        chart: { pole: 'north', c0: 35 * D2R, psi: 0 } },
+      { id: 'bernstein', kind: 'hothouse', name: name('Bernstein', 'Amber'), parent: 'helia', R: 6050e3, g: 8.9, air: 92, landable: false,
+        orbit: { a: 0.9 * AU, e: 0.006, i: 2.1, node: 40, peri: 120, M0: 75 }, spin: { tilt: 177, toward: 30, T: 243 * 86400 / 8 } },
+      { id: 'coelestin', kind: 'icegiant', name: name('Cölestin', 'Celestine'), parent: 'helia', R: 25000e3, f: 0.02, g: 9.0, air: 'H₂/He/CH₄', landable: false,
+        orbit: { a: 12 * AU, e: 0.04, i: 1.1, node: 110, peri: 300, M0: 200 }, spin: { tilt: 41, toward: 250, T: 16 * 3600 / 8 } },
+      // the Trümmerschwarm: a young collision family, 60 bodies of 40–600 m (real size) within 30 km — u-fields builds them;
+      // here the swarm's centre and its field
+      { id: 'swarm', kind: 'swarm', name: name('Trümmerschwarm', 'Rubble Swarm'), parent: 'helia', Rgame: 300, mu: 0, field: 30e3, landable: true,
+        orbit: { a: 3.4 * AU, e: 0.06, i: 4, node: 250, peri: 30, M0: 10 } },
+    ],
+  };
+
+  // ================================================================ compile a system definition into a working system
+  function compile(def) {
+    const S = { id: def.id, name: def.name, star: def.star, ids: [], list: [], by: {}, children: {} };
+    const Z = [0, 0, 1], X = [1, 0, 0];
+    // a frame from an axis: x = the axis' ascending node on the ecliptic (Z × axis), or X when the axis is Z
+    const frameOf = (axis) => {
+      const q = crossInto(Z, axis, [0, 0, 0]); let ql = len(q);
+      const x = ql > 1e-9 ? [q[0] / ql, q[1] / ql, q[2] / ql] : X.slice(), y = crossInto(axis, x, [0, 0, 0]);
+      return { x, y, z: [axis[0], axis[1], axis[2]] };
+    };
+    for (const d of def.bodies) {
+      const R = d.Rgame !== undefined ? d.Rgame : d.R / L;
+      const mu = d.mu !== undefined ? d.mu / (L * L) : d.g * R * R;
+      const b = { id: d.id, kind: d.kind, name: Object.assign({ key: 'uni.' + d.id }, d.name), parent: d.parent || null, R, Rreal: d.Rgame !== undefined ? d.Rgame : d.R,
+        f: d.f || 0, Rp: R * (1 - (d.f || 0)), mu, g: R > 0 ? mu / (R * R) : 0, air: d.air || 0, landable: !!d.landable, field: d.field || 0, def: d };
+      S.ids.push(b.id); S.list.push(b); S.by[b.id] = b; S.children[b.id] = [];
+      if (b.parent) S.children[b.parent].push(b.id);
+    }
+    // spin axes of the bodies with their own (tilt toward an ecliptic azimuth)
+    for (const b of S.list) {
+      const sp = b.def.spin || {};
+      if (sp.locked || sp.axis === 'parent') continue;
+      const t = (sp.tilt || 0) * D2R, a = (sp.toward || 0) * D2R;
+      b.axis = [Math.sin(t) * Math.cos(a), Math.sin(t) * Math.sin(a), Math.cos(t)];
+    }
+    // orbits
+    for (const b of S.list) {
+      const od = b.def.orbit; if (!od) continue;
+      const p = S.by[b.parent], muP = p.mu, a = od.a / L, e = od.e || 0;
+      const o = b.orbit = { a, e, i: (od.i || 0) * D2R, node: (od.node || 0) * D2R, peri: (od.peri || 0) * D2R, M0: (od.M0 || 0) * D2R, ref: od.ref || 'ecliptic', muP };
+      o.n = Math.sqrt(muP / (a * a * a)); o.T = TAU / o.n; o.fac = Math.sqrt(1 - e * e); o.sqmua = Math.sqrt(muP * a);
+      const P = v3(), Q = v3(), W = v3();
+      pqwInto(o.i, o.node, o.peri, P, Q, W);
+      if (o.ref === 'equator') {
+        const F = frameOf(p.axis);
+        const toSys = (u) => { const x = u[0], y = u[1], z = u[2]; for (let j = 0; j < 3; j++) u[j] = x * F.x[j] + y * F.y[j] + z * F.z[j]; };
+        toSys(P); toSys(Q); toSys(W);
+      }
+      o.P = P; o.Q = Q; o.W = W;
+      // the start rule: the sun stands `sunOverEquator` degrees over the body's equator at t = 0, sinking (or rising) —
+      // for a circular orbit in the ecliptic (Amarant): sin β = −sin ε cos(λ − φ), λ the body's longitude
+      if (od.start) {
+        const ax = b.axis, eps = Math.acos(clamp1(ax[2])), phi = Math.atan2(ax[1], ax[0]);
+        const c = -Math.sin(od.start.sunOverEquator * D2R) / Math.sin(eps);
+        o.M0 = phi + (od.start.falling ? -1 : 1) * Math.acos(clamp1(c));
+      }
+    }
+    // spins: locked, about the parent's axis, the noon rule, or a sidereal period
+    const yearOf = (b) => { let x = b; while (x.parent && S.by[x.parent].parent) x = S.by[x.parent]; return x.orbit ? x : null; };
+    for (const b of S.list) {
+      const sp = b.def.spin || {};
+      const s = b.spin = { locked: !!sp.locked, W0: (sp.W0 || 0) * D2R };
+      if (sp.locked) { b.axis = b.orbit.W; s.T = b.orbit.T; s.w = b.orbit.n; }
+      else {
+        if (sp.axis === 'parent') b.axis = S.by[b.parent].axis.slice();
+        if (sp.solarDay) {
+          // the mean solar day exactly `solarDay`: the sidereal rate adds the year's mean motion (prograde axis)
+          const y = yearOf(b), nY = y ? y.orbit.n : 0, sg = y && dot(b.axis, y.orbit.W) < 0 ? -1 : 1;
+          s.w = TAU / sp.solarDay + sg * nY; s.T = TAU / s.w;
+        } else if (sp.T) { s.w = TAU / sp.T; s.T = sp.T; }
+        else { s.w = 0; s.T = Infinity; }
+      }
+      s.axis = b.axis;
+      const F = frameOf(b.axis); s.q = F.x; s.p = F.y;
+    }
+    // the noon rule (Herzwelt): the mean sun (seen from the year's planet) on the prime meridian at t = noon
+    for (const b of S.list) {
+      const sp = b.def.spin || {};
+      if (sp.noon === undefined) continue;
+      const y = yearOf(b), r = v3(), v = v3();
+      relInto(y, sp.noon, r, v);
+      const s = [-r[0], -r[1], -r[2]], ax = b.spin.axis, k = dot(s, ax);
+      const se = [s[0] - k * ax[0], s[1] - k * ax[1], s[2] - k * ax[2]];
+      const lam = Math.atan2(dot(se, b.spin.p), dot(se, b.spin.q));
+      b.spin.W0 = lam - b.spin.w * (sp.noon % b.spin.T);
+    }
+    // spheres of influence and Hill spheres
+    for (const b of S.list) {
+      if (!b.parent) { b.soi = Infinity; b.hill = Infinity; continue; }
+      const p = S.by[b.parent];
+      b.soi = b.mu > 0 ? soiRadius(b.orbit.a, b.mu, p.mu) : 0;
+      b.hill = b.mu > 0 ? hillRadius(b.orbit.a, b.mu, p.mu, b.orbit.e) : 0;
+    }
+    // the ring in game metres
+    for (const b of S.list) {
+      const rd = b.def.ring; if (!rd) continue;
+      const k = b.R / rd.unit;
+      b.ring = { inner: rd.inner * b.R, outer: rd.outer * b.R, thickness: rd.thickness, normal: b.axis,
+        bands: rd.bands.map(x => ({ name: x.name, r0: x.r0 * k, r1: x.r1 * k, tau: x.tau.slice() })),
+        gaps: rd.gaps.map(x => ({ name: x.name, r0: x.r0 * k, r1: x.r1 * k, tau: x.tau.slice() })),
+        moonlet: { r: rd.moonlet.r * k, R: rd.moonlet.R } };
+    }
+    // charts and days
+    for (const b of S.list) {
+      b.day = solarDayOf(S, b);
+      if (b.def.chart) b.chartDef = b.def.chart;
+    }
+    S._charts = {};
+    S._st = null;                                   // the kept state of one moment (cached), shared by the skies
+    Object.assign(S, SYSTEM_METHODS);
+    return S;
+  }
+  // the mean solar day: the sidereal rate less the sun's mean motion as the body sees it (one turn a year of its planet)
+  function solarDayOf(S, b) {
+    if (!b.parent) return b.spin.T;
+    let y = b; while (y.parent && S.by[y.parent].parent) y = S.by[y.parent];
+    const nY = y.orbit.n, sg = dot(b.spin.axis, y.orbit.W) < 0 ? -1 : 1, w = b.spin.w - sg * nY;
+    return TAU / Math.abs(w);
+  }
+
+  // ---------------------------------------------------------------- the ephemeris of one body (relative to its parent)
+  // rel: Float64Array(6) — or r, v given separately (relInto(b, t, r, v))
+  function relInto(b, t, r, v) {
+    const o = b.orbit;
+    const M = o.M0 + o.n * (t % o.T), e = o.e;
+    const E = e === 0 ? M : kepler(M, e), cE = Math.cos(E), sE = Math.sin(E);
+    const x = o.a * (cE - e), y = o.a * o.fac * sE, rr = o.a * (1 - e * cE), k = o.sqmua / rr, vx = -k * sE, vy = k * o.fac * cE;
+    const P = o.P, Q = o.Q;
+    if (v === undefined) { // a packed Float64Array(6)
+      r[0] = x * P[0] + y * Q[0]; r[1] = x * P[1] + y * Q[1]; r[2] = x * P[2] + y * Q[2];
+      r[3] = vx * P[0] + vy * Q[0]; r[4] = vx * P[1] + vy * Q[1]; r[5] = vx * P[2] + vy * Q[2];
+    } else {
+      r[0] = x * P[0] + y * Q[0]; r[1] = x * P[1] + y * Q[1]; r[2] = x * P[2] + y * Q[2];
+      if (v) { v[0] = vx * P[0] + vy * Q[0]; v[1] = vx * P[1] + vy * Q[1]; v[2] = vx * P[2] + vy * Q[2]; }
+    }
+    return r;
+  }
+  // the body-fixed → system matrix (rows are the system's x, y, z; columns the body's axes)
+  function spinInto(b, t, B) {
+    const s = b.spin;
+    let xb0, xb1, xb2;
+    if (s.locked) {
+      // x toward the parent at the mean anomaly (a locked moon on an eccentric orbit librates — real)
+      const o = b.orbit, M = o.M0 + o.n * (t % o.T), c = Math.cos(M), sn = Math.sin(M);
+      xb0 = -(c * o.P[0] + sn * o.Q[0]); xb1 = -(c * o.P[1] + sn * o.Q[1]); xb2 = -(c * o.P[2] + sn * o.Q[2]);
+    } else {
+      const W = s.W0 + (s.w ? s.w * (t % s.T) : 0), c = Math.cos(W), sn = Math.sin(W);
+      xb0 = c * s.q[0] + sn * s.p[0]; xb1 = c * s.q[1] + sn * s.p[1]; xb2 = c * s.q[2] + sn * s.p[2];
+    }
+    const z = s.axis;
+    const yb0 = z[1] * xb2 - z[2] * xb1, yb1 = z[2] * xb0 - z[0] * xb2, yb2 = z[0] * xb1 - z[1] * xb0;
+    B[0] = xb0; B[1] = yb0; B[2] = z[0];
+    B[3] = xb1; B[4] = yb1; B[5] = z[1];
+    B[6] = xb2; B[7] = yb2; B[8] = z[2];
+    return B;
+  }
+
+  // ---------------------------------------------------------------- the chart: azimuthal equidistant about a pole P
+  // the plane's distance from P is the arc on the sphere, its azimuth the sphere's; the local frame at a point is the
+  // sphere's radial/azimuthal frame carried by the plane's own radial/azimuthal directions (orthonormal; continuous at P)
+  function makeChart(S, b) {
+    const cd = b.chartDef || { pole: 'north', c0: 0, psi: 0 };
+    const R = b.R, p = cd.pole === 'sub' ? [1, 0, 0] : [0, 0, 1], tw = cd.pole === 'sub' ? [0, 0, 1] : [1, 0, 0];
+    const w = crossInto(p, tw, [0, 0, 0]), ps = cd.psi, sp = Math.sin(ps), cp = Math.cos(ps);
+    const ex = [-sp * tw[0] + cp * w[0], -sp * tw[1] + cp * w[1], -sp * tw[2] + cp * w[2]];
+    const ez = [cp * tw[0] + sp * w[0], cp * tw[1] + sp * w[1], cp * tw[2] + sp * w[2]];
+    const Px = cd.c0 * R * sp, Pz = -cd.c0 * R * cp;
+    const datum = cd.datum !== undefined ? cd.datum : 63;
+    const n0 = v3();
+    const ch = {
+      body: b.id, R, c0: cd.c0, psi: ps, P: [Px, Pz], pole: Float64Array.from(p), ex: Float64Array.from(ex), ez: Float64Array.from(ez), datum, edge: PI * R,
+      toSphere(x, z, n) {
+        n = n || v3();
+        const dx = x - Px, dz = z - Pz, rho = Math.sqrt(dx * dx + dz * dz);
+        if (rho < 1e-12) return set3(n, p[0], p[1], p[2]);
+        const c = rho / R, ux = dx / rho, uz = dz / rho, cc = Math.cos(c), sc = Math.sin(c);
+        for (let j = 0; j < 3; j++) n[j] = cc * p[j] + sc * (ux * ex[j] + uz * ez[j]);
+        return n;
+      },
+      toPlane(n, out) {
+        out = out || [0, 0];
+        const cn = dot(n, p), tx = n[0] - cn * p[0], ty = n[1] - cn * p[1], tz = n[2] - cn * p[2], st = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        if (st < 1e-15) { out[0] = Px; out[1] = Pz + (cn < 0 ? PI * R : 0); return out; }
+        const c = Math.atan2(st, cn), ux = (tx * ex[0] + ty * ex[1] + tz * ex[2]) / st, uz = (tx * ez[0] + ty * ez[1] + tz * ez[2]) / st;
+        out[0] = Px + c * R * ux; out[1] = Pz + c * R * uz;
+        return out;
+      },
+      // rows: map x (east), up, map z (south) as body-fixed unit vectors
+      frame(x, z, m) {
+        m = m || new Float64Array(9);
+        const dx = x - Px, dz = z - Pz, rho = Math.sqrt(dx * dx + dz * dz);
+        if (rho < 1e-9) { for (let j = 0; j < 3; j++) { m[j] = ex[j]; m[3 + j] = p[j]; m[6 + j] = ez[j]; } return m; }
+        const c = rho / R, ux = dx / rho, uz = dz / rho, cc = Math.cos(c), sc = Math.sin(c);
+        for (let j = 0; j < 3; j++) {
+          const tang = ux * ex[j] + uz * ez[j], az = -uz * ex[j] + ux * ez[j];
+          const n = cc * p[j] + sc * tang, tp = sc * p[j] - cc * tang;      // up; toward P
+          m[j] = -ux * tp - uz * az; m[3 + j] = n; m[6 + j] = -uz * tp + ux * az;
+        }
+        return m;
+      },
+      latLon(x, z, out) { out = out || [0, 0]; const n = this.toSphere(x, z, n0); out[0] = Math.asin(clamp1(n[2])); out[1] = Math.atan2(n[1], n[0]); return out; },
+      // local solar time on Herzwelt: the world clock plus the longitude east of the chart's origin (1.9 s per km on the
+      // equator, U§4.5); ticks in [0, 24000)
+      localTicks(x, z, ticks) {
+        const lon = this.latLon(x, z, [0, 0])[1], lon0 = this.latLon(0, 0, [0, 0])[1];
+        const t = ticks + wrapPi(lon - lon0) / TAU * 24000;
+        return ((t % 24000) + 24000) % 24000;
+      },
+    };
+    return ch;
+  }
+
+  // ---------------------------------------------------------------- the sky from a point: directions, sizes, phases, eclipses
+  function makeEntry(id) { return { id, dir: v3(), ang: 0, dist: 0, phase: 0, alpha: 0, pole: v3(), el: 0 }; }
+  // a sky: the sun {dir, ang (angular radius), dist, el, flux W/m²}, the parent and every other body {id, dir, ang, dist,
+  // phase (lit fraction), alpha (phase angle), pole (its spin axis: a ring's normal, an oblate disc's minor axis), el},
+  // the eclipse (the fraction of the sun's disc covered) and by whom; lat, lon of the observer on its body
+  function makeSky() {
+    return { t: NaN, body: null, dim: null, lat: 0, lon: 0, sun: { dir: v3(), ang: 0, dist: 0, el: 0, flux: 0 }, parent: null, bodies: [], eclipse: 0, eclipseBy: null, _byId: {} };
+  }
+  // the area of the sun's disc (radius rs) covered by a disc of radius rb at a separation th, as a fraction
+  function overlap(rs, rb, th) {
+    if (th >= rs + rb) return 0;
+    if (th <= Math.abs(rb - rs)) return rb >= rs ? 1 : (rb * rb) / (rs * rs);
+    const a1 = rs * rs * Math.acos(clamp1((th * th + rs * rs - rb * rb) / (2 * th * rs)));
+    const a2 = rb * rb * Math.acos(clamp1((th * th + rb * rb - rs * rs) / (2 * th * rb)));
+    const a3 = 0.5 * Math.sqrt(Math.max(0, (-th + rs + rb) * (th + rs - rb) * (th - rs + rb) * (th + rs + rb)));
+    return (a1 + a2 - a3) / (PI * rs * rs);
+  }
+  const _o = v3(), _d = v3(), _e = v3(), _m = v3(), _sunD = v3();
+  // an oblate body against the sun: stretch space along the body's axis by Re/Rp — the spheroid becomes a sphere of radius
+  // Re, and lines stay lines, so a ray that grazes the spheroid grazes the sphere (the limb is exact at any distance).
+  // d: the unit direction to the body's centre, dist its distance, s: the unit direction to the sun; returns
+  // [separation, the sphere's angular radius] in the stretched space (the sun's small disc keeps its radius)
+  const _sep = [0, 0];
+  function stretched(b, d, dist, s) {
+    const k = b.R / b.Rp - 1, a = b.spin.axis;
+    // the observer relative to the centre (−d·dist) and the sun's direction, both stretched
+    const ra = -dist * dot(d, a);
+    set3(_m, -dist * d[0] + k * ra * a[0], -dist * d[1] + k * ra * a[1], -dist * d[2] + k * ra * a[2]);
+    const sa = dot(s, a); set3(_o, s[0] + k * sa * a[0], s[1] + k * sa * a[1], s[2] + k * sa * a[2]);
+    const om = len(_m), ol = len(_o);
+    const c = -(_m[0] * _o[0] + _m[1] * _o[1] + _m[2] * _o[2]) / (om * ol);
+    const cx = (_m[1] * _o[2] - _m[2] * _o[1]), cy = (_m[2] * _o[0] - _m[0] * _o[2]), cz = (_m[0] * _o[1] - _m[1] * _o[0]);
+    _sep[0] = Math.atan2(Math.sqrt(cx * cx + cy * cy + cz * cz) / (om * ol), c);
+    _sep[1] = Math.asin(Math.min(1, b.R / om));
+    return _sep;
+  }
+
+  const SYSTEM_METHODS = {
+    body(id) { return this.by[id]; },
+    state(t, out) {
+      if (!out) { out = { t: NaN, b: {} }; for (const id of this.ids) out.b[id] = { r: v3(), v: v3(), rel: new Float64Array(6), B: new Float64Array(9) }; }
+      out.t = t;
+      for (const b of this.list) {
+        const o = out.b[b.id];
+        if (!b.parent) { o.r.fill(0); o.v.fill(0); o.rel.fill(0); }
+        else {
+          relInto(b, t, o.rel);
+          const p = out.b[b.parent], rel = o.rel;
+          o.r[0] = p.r[0] + rel[0]; o.r[1] = p.r[1] + rel[1]; o.r[2] = p.r[2] + rel[2];
+          o.v[0] = p.v[0] + rel[3]; o.v[1] = p.v[1] + rel[4]; o.v[2] = p.v[2] + rel[5];
+        }
+        spinInto(b, t, o.B);
+      }
+      return out;
+    },
+    // the state at t, kept (the skies of one moment share it)
+    cached(t) { if (!this._st) this._st = this.state(t); else if (this._st.t !== t) this.state(t, this._st); return this._st; },
+    rel(id, t, r, v) { return relInto(this.by[id], t, r || v3(), v === undefined ? null : v); },
+    pos(id, t, r) {
+      r = r || v3(); set3(r, 0, 0, 0);
+      const tmp = _e;
+      for (let b = this.by[id]; b.parent; b = this.by[b.parent]) { relInto(b, t, tmp, null); r[0] += tmp[0]; r[1] += tmp[1]; r[2] += tmp[2]; }
+      return r;
+    },
+    spin(id, t, B) { return spinInto(this.by[id], t, B || new Float64Array(9)); },
+    orbitNormal(id) { const b = this.by[id]; return b.orbit ? Float64Array.from(b.orbit.W) : null; },
+    soi(id) { return this.by[id].soi; },
+    hill(id) { return this.by[id].hill; },
+    solarDay(id) { return this.by[id].day; },
+    // the synodic period of `target` in `obs`'s sky (one of them orbits the other): the spin against the orbit
+    synodic(obs, target) {
+      const o = this.by[obs], g = this.by[target];
+      let n, W;
+      if (o.parent === target) { n = o.orbit.n; W = o.orbit.W; } else if (g.parent === obs) { n = g.orbit.n; W = g.orbit.W; } else return null;
+      const sg = dot(W, o.spin.axis) < 0 ? -1 : 1;
+      return TAU / Math.abs(o.spin.w - sg * n);
+    },
+    // the synchronous orbit's radius (Herzwelt's geostationary ring, U§3)
+    geoRadius(id) { const b = this.by[id], T = b.spin.T; return Math.cbrt(b.mu * T * T / (4 * PI * PI)); },
+    // the star's light at the body (W/m²): the star's luminosity at the real-equivalent distance
+    flux(id) { const b = this.by[id]; const d = len(this.pos(id, 0, v3())) * L / AU; return SOLAR * (this.star ? this.star.L : 1) / (d * d); },
+    // the ground's speed through space at a chart point (m/s): ω × the distance from the spin axis
+    surfaceSpeed(id, x, z) { const b = this.by[id], n = this.chart(id).toSphere(x, z, v3()); return Math.abs(b.spin.w) * b.R * Math.hypot(n[0], n[1]); },
+    // a body-fixed (turning) state → the body-centred inertial one (system axes), and back: v_inertial = B·v_fixed + ω × r
+    fixedToInertial(id, rF, vF, t, r, v) {
+      const b = this.by[id], B = spinInto(b, t, this._Bs || (this._Bs = new Float64Array(9))), w = b.spin.w, ax = b.spin.axis;
+      mulInto(B, rF, r); const vv = vF ? mulInto(B, vF, _e) : set3(_e, 0, 0, 0);
+      set3(v, vv[0] + w * (ax[1] * r[2] - ax[2] * r[1]), vv[1] + w * (ax[2] * r[0] - ax[0] * r[2]), vv[2] + w * (ax[0] * r[1] - ax[1] * r[0]));
+      return r;
+    },
+    inertialToFixed(id, r, v, t, rF, vF) {
+      const b = this.by[id], B = spinInto(b, t, this._Bs || (this._Bs = new Float64Array(9))), w = b.spin.w, ax = b.spin.axis;
+      set3(_e, v[0] - w * (ax[1] * r[2] - ax[2] * r[1]), v[1] - w * (ax[2] * r[0] - ax[0] * r[2]), v[2] - w * (ax[0] * r[1] - ax[1] * r[0]));
+      mulTInto(B, r, rF); mulTInto(B, _e, vF);
+      return rF;
+    },
+    // a point and a velocity on a world's map (x, block height y, z; the local frame's x east, y up, z south) ↔ the inertial
+    // state round the body's centre (system axes): the climb's hand-off to space and the descent back onto the map
+    chartToInertial(id, pos, vel, t, r, v) {
+      const b = this.by[id], ch = this.chart(id), n = ch.toSphere(pos[0], pos[2], this._cn || (this._cn = v3())), rad = b.R + (pos[1] - ch.datum);
+      const rF = set3(this._crF || (this._crF = v3()), n[0] * rad, n[1] * rad, n[2] * rad);
+      const F = ch.frame(pos[0], pos[2], this._cF || (this._cF = new Float64Array(9))), vF = mulTInto(F, vel || [0, 0, 0], this._cvF || (this._cvF = v3()));
+      return this.fixedToInertial(id, rF, vF, t, r, v);
+    },
+    inertialToChart(id, r, v, t, pos, vel) {
+      const b = this.by[id], ch = this.chart(id), rF = this._crF || (this._crF = v3()), vF = this._cvF || (this._cvF = v3());
+      this.inertialToFixed(id, r, v, t, rF, vF);
+      const d = len(rF), n = set3(this._cn || (this._cn = v3()), rF[0] / d, rF[1] / d, rF[2] / d), xz = ch.toPlane(n, this._cxz || (this._cxz = [0, 0]));
+      const F = ch.frame(xz[0], xz[1], this._cF || (this._cF = new Float64Array(9)));
+      pos[0] = xz[0]; pos[1] = ch.datum + d - b.R; pos[2] = xz[1];
+      if (vel) mulInto(F, vF, vel);
+      return pos;
+    },
+    // where `from`'s centre is (and how it moves) relative to `to`'s, summed along the tree (no 10⁹-m cancellation)
+    offset(from, to, t, r, v) {
+      r = r || v3(); v = v || v3(); set3(r, 0, 0, 0); set3(v, 0, 0, 0);
+      const up = (id) => { const a = []; for (let b = this.by[id]; b; b = b.parent ? this.by[b.parent] : null) a.push(b.id); return a; };
+      const pf = up(from), pt = up(to), inT = new Set(pt);
+      const lca = pf.find(id => inT.has(id));
+      const tr = _e, tv = _o;
+      for (const id of pf) { if (id === lca) break; relInto(this.by[id], t, tr, tv); r[0] += tr[0]; r[1] += tr[1]; r[2] += tr[2]; v[0] += tv[0]; v[1] += tv[1]; v[2] += tv[2]; }
+      for (const id of pt) { if (id === lca) break; relInto(this.by[id], t, tr, tv); r[0] -= tr[0]; r[1] -= tr[1]; r[2] -= tr[2]; v[0] -= tv[0]; v[1] -= tv[1]; v[2] -= tv[2]; }
+      return r;
+    },
+    // a state relative to `from` → relative to `to` (the SOI hand-over)
+    toFrame(from, to, r, v, t, ro, vo) {
+      const orr = v3(), ov = v3(); this.offset(from, to, t, orr, ov);
+      set3(ro, r[0] + orr[0], r[1] + orr[1], r[2] + orr[2]); set3(vo, v[0] + ov[0], v[1] + ov[1], v[2] + ov[2]);
+      return ro;
+    },
+    // the deepest body whose sphere of influence holds a point of the system frame
+    dominant(rSys, t) {
+      const st = this.cached(t);
+      let cur = this.list[0].id;
+      for (let go = true; go;) {
+        go = false;
+        for (const c of this.children[cur]) {
+          const b = this.by[c]; if (!(b.soi > 0)) continue;
+          const p = st.b[c].r, dx = rSys[0] - p[0], dy = rSys[1] - p[1], dz = rSys[2] - p[2];
+          if (dx * dx + dy * dy + dz * dz < b.soi * b.soi) { cur = c; go = true; break; }
+        }
+      }
+      return cur;
+    },
+    // when a coasting ship (r, v relative to `frame`, at t) leaves the frame's sphere: {t, r, v} or null
+    soiExit(frame, r, v, t) {
+      const b = this.by[frame], mu = b.mu, rs = b.soi;
+      if (!(rs < Infinity)) return null;
+      if (len(r) >= rs) return { t, r: Float64Array.from(r), v: Float64Array.from(v) };
+      const el = stateToEl(r, v, mu);
+      if (el.e < 1 && el.ra <= rs) return null;
+      const e = el.e, cx = clamp1((el.p / rs - 1) / e), nux = Math.acos(cx);
+      let dt;
+      if (Math.abs(e - 1) < 1e-7) {          // Barker's equation for a near-parabola
+        const bk = (nu) => { const D = Math.tan(nu / 2); return D + D * D * D / 3; };
+        dt = 0.5 * Math.sqrt(el.p * el.p * el.p / mu) * (bk(nux) - bk(el.nu));
+      } else if (e < 1) {
+        const Ex = Math.atan2(Math.sqrt(1 - e * e) * Math.sin(nux), e + cx), Mx = Ex - e * Math.sin(Ex);
+        let M0 = el.M; if (M0 > PI) M0 -= TAU;
+        dt = (Mx - M0) / el.n;
+      } else {
+        const Hx = Math.asinh(Math.sqrt(e * e - 1) * Math.sin(nux) / (1 + e * cx)), Mx = e * Math.sinh(Hx) - Hx;
+        dt = (Mx - el.M) / el.n;
+      }
+      // polish on the ship's own conic: Newton on |r(τ)| = r_SOI
+      const rr = v3(), vv = v3();
+      for (let k = 0; k < 6; k++) {
+        coast(r, v, mu, dt, rr, vv);
+        const d = len(rr), rd = dot(rr, vv) / d, err = d - rs;
+        if (Math.abs(err) <= 1e-13 * rs || !(rd > 0)) break;
+        dt -= err / rd;
+      }
+      coast(r, v, mu, dt, rr, vv);
+      return { t: t + dt, r: rr, v: vv };
+    },
+    // the first entry of a coasting ship into a child's sphere between t and tEnd: {t, frame, r, v (relative to the child)}
+    soiEnter(frame, r, v, t, tEnd) {
+      const mu = this.by[frame].mu, kids = this.children[frame].filter(c => this.by[c].soi > 0);
+      if (!kids.length || !(tEnd > t)) return null;
+      // the ship sampled once (N + 1 points), each child's distance at the same moments; a crossing between two samples or
+      // a dip below the sphere between them (golden section on the dip) brackets the entry, which bisection then finds
+      const N = 256, h = (tEnd - t) / N, ship = this._ship || (this._ship = new Float64Array((N + 1) * 3)), dd = this._dd || (this._dd = new Float64Array(N + 1));
+      const rs = v3(), rc = v3();
+      for (let j = 0; j <= N; j++) { coast(r, v, mu, j * h, rs, null); ship[j * 3] = rs[0]; ship[j * 3 + 1] = rs[1]; ship[j * 3 + 2] = rs[2]; }
+      const dist = (c, tau) => { coast(r, v, mu, tau - t, rs, null); relInto(this.by[c], tau, rc, null); return Math.sqrt((rs[0] - rc[0]) ** 2 + (rs[1] - rc[1]) ** 2 + (rs[2] - rc[2]) ** 2) - this.by[c].soi; };
+      let best = null;
+      for (const c of kids) {
+        const cb = this.by[c];
+        for (let j = 0; j <= N; j++) { relInto(cb, t + j * h, rc, null); dd[j] = Math.sqrt((ship[j * 3] - rc[0]) ** 2 + (ship[j * 3 + 1] - rc[1]) ** 2 + (ship[j * 3 + 2] - rc[2]) ** 2) - cb.soi; }
+        if (dd[0] <= 0) { best = { t, c }; break; }
+        let hit = null;
+        for (let j = 1; j <= N && !hit; j++) {
+          if (best && t + (j - 1) * h > best.t) break;
+          if (dd[j] <= 0) { hit = [t + (j - 1) * h, t + j * h]; break; }
+          if (j < N && dd[j] < dd[j - 1] && dd[j] < dd[j + 1]) {
+            let a = t + (j - 1) * h, bb = t + (j + 1) * h; const gr = 0.6180339887498949;
+            let x1 = bb - gr * (bb - a), x2 = a + gr * (bb - a), f1 = dist(c, x1), f2 = dist(c, x2);
+            for (let k = 0; k < 80 && bb - a > 1e-7 * h; k++) {
+              if (f1 < f2) { bb = x2; x2 = x1; f2 = f1; x1 = bb - gr * (bb - a); f1 = dist(c, x1); }
+              else { a = x1; x1 = x2; f1 = f2; x2 = a + gr * (bb - a); f2 = dist(c, x2); }
+              if (Math.min(f1, f2) <= 0) break;
+            }
+            if (Math.min(f1, f2) <= 0) hit = [t + (j - 1) * h, f1 <= 0 ? x1 : x2];
+          }
+        }
+        if (!hit) continue;
+        let [a, bb] = hit;          // a outside, bb inside: bisect the crossing
+        for (let k = 0; k < 200; k++) { const m = 0.5 * (a + bb), dm = dist(c, m); if (dm > 0) a = m; else bb = m; if (Math.abs(dm) <= 1e-13 * cb.soi || bb - a <= 1e-13 * Math.max(1, Math.abs(bb))) break; }
+        const tc = Math.abs(dist(c, a)) < Math.abs(dist(c, bb)) ? a : bb;
+        if (!best || tc < best.t) best = { t: tc, c };
+      }
+      if (!best) return null;
+      const ro = v3(), vo = v3(), rcc = v3(), vcc = v3();
+      coast(r, v, mu, best.t - t, ro, vo);
+      relInto(this.by[best.c], best.t, rcc, vcc);
+      set3(ro, ro[0] - rcc[0], ro[1] - rcc[1], ro[2] - rcc[2]); set3(vo, vo[0] - vcc[0], vo[1] - vcc[1], vo[2] - vcc[2]);
+      return { t: best.t, frame: best.c, r: ro, v: vo };
+    },
+    // the ghost path (U§4.2): the ship's conic in its frame (n points, from where it is) and, when it crosses a sphere of
+    // influence, one patched conic in the next frame (with its anchor: the next frame's centre relative to this one's at
+    // the crossing). Points relative to the frame's centre, Float64Array(n·3).
+    ghost(frame, r, v, t, out, n) {
+      n = n || 128;
+      out = out || { frame, pts: new Float64Array(n * 3), closed: false, event: null, patch: null };
+      if (out.pts.length !== n * 3) out.pts = new Float64Array(n * 3);
+      out.frame = frame; out.event = null; out.patch = null;
+      const b = this.by[frame], mu = b.mu, el = stateToEl(r, v, mu);
+      const exit = this.soiExit(frame, r, v, t);
+      const horizon = el.e < 1 ? el.period : (exit ? exit.t - t : 0);
+      let tEnd = exit ? exit.t : t + horizon;
+      if (!(tEnd > t)) tEnd = t + 3600;
+      const enter = this.soiEnter(frame, r, v, t, tEnd);
+      let ev = null;
+      if (enter && (!exit || enter.t < exit.t)) ev = { kind: 'enter', t: enter.t, frame: enter.frame, r: enter.r, v: enter.v };
+      else if (exit) { const ro = v3(), vo = v3(); this.toFrame(frame, b.parent, exit.r, exit.v, exit.t, ro, vo); ev = { kind: 'exit', t: exit.t, frame: b.parent, r: ro, v: vo, rIn: exit.r }; }
+      out.closed = !ev && el.e < 1;
+      conicPoints(r, v, mu, ev ? ev.t - t : null, out.pts, n);
+      if (ev) {
+        out.event = ev;
+        const nb = this.by[ev.frame], pe = stateToEl(ev.r, ev.v, nb.mu);
+        const nx = this.soiExit(ev.frame, ev.r, ev.v, ev.t);
+        const span = nx ? nx.t - ev.t : (pe.e < 1 ? null : 10 * len(ev.r) / Math.max(1, len(ev.v)));
+        const pts = new Float64Array(n * 3);
+        conicPoints(ev.r, ev.v, nb.mu, span, pts, n);
+        const anchor = v3(), av = v3(); this.offset(ev.frame, frame, ev.t, anchor, av);
+        out.patch = { frame: ev.frame, pts, closed: !nx && pe.e < 1, anchor };
+      }
+      return out;
+    },
+    // ---------------------------------------------------------- skies
+    // the eclipse of the star seen from a system point: the fraction of its disc covered (the largest), and by whom
+    // (skip: the observer's own body; only: count this occulter alone)
+    eclipseFrom(rSys, t, skip, res, only) {
+      const st = this.cached(t), star = this.list[0];
+      res = res || { frac: 0, by: null };
+      res.frac = 0; res.by = null;
+      set3(_sunD, -rSys[0], -rSys[1], -rSys[2]);
+      const ds = len(_sunD); _sunD[0] /= ds; _sunD[1] /= ds; _sunD[2] /= ds;
+      const rsA = Math.asin(Math.min(1, star.R / ds));
+      for (const b of this.list) {
+        if (b === star || b.id === skip || !(b.R > 0) || (only && b.id !== only)) continue;
+        const p = st.b[b.id].r;
+        set3(_d, p[0] - rSys[0], p[1] - rSys[1], p[2] - rSys[2]);
+        const db = len(_d); if (db >= ds) continue;
+        _d[0] /= db; _d[1] /= db; _d[2] /= db;
+        const c = dot(_d, _sunD); if (c <= 0) continue;
+        // a cheap rejection before the trigonometry: 1 − cos x ≤ x²/2, so this body cannot touch the sun's disc
+        const x = b.R / db, reach = rsA + (x > 0.8 ? Math.asin(Math.min(1, x)) : 1.2 * x);   // asin x ≤ 1.2 x below 0.8
+        if (1 - c > 0.5 * reach * reach) continue;
+        crossInto(_d, _sunD, _o); const sn = len(_o), th = Math.atan2(sn, c);
+        const rb0 = Math.asin(Math.min(1, b.R / db));
+        if (th >= rsA + rb0) continue;               // outside the equatorial sphere: no part of the body is there
+        let f;
+        if (b.f) { const sp = stretched(b, _d, db, _sunD); f = overlap(rsA, sp[1], sp[0]); }
+        else f = overlap(rsA, rb0, th);
+        if (f > res.frac) { res.frac = f; res.by = b.id; }
+      }
+      return res;
+    },
+    // the eclipse seen from a body's centre (the fraction of the star's disc; `only`: by that body alone)
+    eclipseAt(id, t, only) { const st = this.cached(t); return this.eclipseFrom(st.b[id].r, t, id, this._er || (this._er = { frac: 0, by: null }), only).frac; },
+    // the sky from a point of the system frame (rSys): the sun and every body but `skip` (the observer's own world), with
+    // directions in the system frame — or M·d when M (row-major, system → output) is given; the space scene's camera
+    skyFrom(rSys, t, out, M, skip) {
+      const st = this.cached(t), star = this.list[0];
+      out = out || makeSky();
+      const key = skip || '';
+      if (out._key !== key) {
+        // one list of entries per observer body, kept in `out` (switching worlds allocates only the first time)
+        const pool = out._pool || (out._pool = {});
+        let pl = pool[key];
+        if (!pl) {
+          pl = pool[key] = { bodies: [], byId: {}, parent: null };
+          for (const o of this.list) if (o !== star && o.id !== skip) { const e = makeEntry(o.id); pl.bodies.push(e); pl.byId[o.id] = e; }
+          const sb = skip ? this.by[skip] : null;
+          pl.parent = sb && sb.parent && sb.parent !== star.id ? pl.byId[sb.parent] : null;
+        }
+        out.bodies = pl.bodies; out._byId = pl.byId; out.parent = pl.parent; out._key = key;
+      }
+      out.body = skip || null; out.t = t;
+      const ox = rSys[0], oy = rSys[1], oz = rSys[2];
+      // the star
+      set3(_d, -ox, -oy, -oz); const ds = len(_d); _d[0] /= ds; _d[1] /= ds; _d[2] /= ds;
+      if (M) mulInto(M, _d, out.sun.dir); else copy3(_d, out.sun.dir);
+      out.sun.dist = ds; out.sun.ang = Math.asin(Math.min(1, star.R / ds));
+      const dAU = ds * L / AU; out.sun.flux = SOLAR * (this.star ? this.star.L : 1) / (dAU * dAU);
+      // every other body
+      const bl = out.bodies;
+      for (let k = 0; k < bl.length; k++) {
+        const e = bl[k], o = this.by[e.id], p = st.b[e.id].r;
+        set3(_d, p[0] - ox, p[1] - oy, p[2] - oz); const db = len(_d); _d[0] /= db; _d[1] /= db; _d[2] /= db;
+        if (M) { mulInto(M, _d, e.dir); mulInto(M, o.spin.axis, e.pole); } else { copy3(_d, e.dir); copy3(o.spin.axis, e.pole); }
+        e.dist = db; e.ang = o.R > 0 ? Math.asin(Math.min(1, o.R / db)) : 0;
+        // the phase: the angle at the body between the star (at the origin) and the observer
+        const pr = len(p), ca = pr > 0 ? (p[0] * _d[0] + p[1] * _d[1] + p[2] * _d[2]) / pr : 1;
+        e.alpha = Math.acos(clamp1(ca)); e.phase = 0.5 * (1 + ca);
+      }
+      const ec = this.eclipseFrom(rSys, t, skip, this._er2 || (this._er2 = { frac: 0, by: null }));
+      out.eclipse = ec.frac; out.eclipseBy = ec.by;
+      return out;
+    },
+    // the sky from a point fixed on body `id` (rFixed in its body frame); directions in the body frame unless `M` (a
+    // row-major system → output matrix) is given
+    skyAt(id, rFixed, t, out, M) {
+      const me = this.cached(t).b[id], B = me.B;
+      const obs = mulInto(B, rFixed, this._obs || (this._obs = v3())); obs[0] += me.r[0]; obs[1] += me.r[1]; obs[2] += me.r[2];
+      if (!M) { M = this._BT || (this._BT = new Float64Array(9)); for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) M[i * 3 + j] = B[j * 3 + i]; }
+      return this.skyFrom(obs, t, out, M, id);
+    },
+    chart(id) { return this._charts[id] || (this._charts[id] = makeChart(this, this.by[id])); },
+    // the sky over a chart point of a world (dim id or body id; chartPos [x, z] or [x, y, z] with y the block height, the
+    // datum — sea level, 63 — the sphere's surface): directions in the local frame (x map east, y up, z map south)
+    localSky(dim, chartPos, t, out) {
+      const id = DIM_BODY[dim] || (this.by[dim] ? dim : null);
+      if (!id || !this.by[id].parent) return null;
+      const b = this.by[id], ch = this.chart(id);
+      const x = chartPos[0], z = chartPos.length > 2 ? chartPos[2] : chartPos[1], y = chartPos.length > 2 ? chartPos[1] : ch.datum;
+      const n = ch.toSphere(x, z, this._n || (this._n = v3())), rad = b.R + (y - ch.datum);
+      const rF = this._rF || (this._rF = v3()); set3(rF, n[0] * rad, n[1] * rad, n[2] * rad);
+      const F = ch.frame(x, z, this._F || (this._F = new Float64Array(9)));
+      // system → local = F · Bᵀ
+      const st = this.cached(t), B = st.b[id].B, M = this._M || (this._M = new Float64Array(9));
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) M[i * 3 + j] = F[i * 3] * B[j * 3] + F[i * 3 + 1] * B[j * 3 + 1] + F[i * 3 + 2] * B[j * 3 + 2];
+      out = this.skyAt(id, rF, t, out, M);
+      out.dim = dim; out.lat = Math.asin(clamp1(n[2])); out.lon = Math.atan2(n[1], n[0]);
+      out.sun.el = Math.asin(clamp1(out.sun.dir[1]));
+      for (const e of out.bodies) e.el = Math.asin(clamp1(e.dir[1]));
+      return out;
+    },
+    // the home-system table (the test prints it; the codex may show it)
+    table() {
+      const fx = (x, d) => Number(x).toFixed(d), km = (m) => (m / 1e3 >= 1000 ? Math.round(m / 1e3).toLocaleString('en-US') : fx(m / 1e3, m / 1e3 >= 100 ? 1 : 2));
+      const dur = (s) => (s >= 2 * 86400 ? fx(s / 86400, 1) + ' d' : s >= 2 * 3600 ? fx(s / 3600, 2) + ' h' : fx(s / 60, 1) + ' min');
+      return this.list.map(b => {
+        const p = b.parent ? this.by[b.parent] : null, top = p && !p.parent;
+        const sky = b.parent ? (top ? `${this.list[0].name.de} ${fx(2 * Math.asin(this.list[0].R / b.orbit.a) / D2R, 2)}°` : `${p.name.de} ${fx(2 * Math.asin(p.R / (b.orbit.a - b.R)) / D2R, 1)}°`) : '—';
+        return {
+          id: b.id, name: b.name.de, kind: b.kind, Rreal: b.def.Rgame !== undefined ? '(real) ' + fx(b.R, 0) + ' m' : km(b.Rreal), R: b.def.Rgame !== undefined ? fx(b.R / 1e3, 1) : km(b.R),
+          a: b.orbit ? (top ? fx(b.orbit.a * L / AU, 2) + ' AU' : km(b.orbit.a)) : '—', period: b.orbit ? dur(b.orbit.T) : '—',
+          g: b.mu > 0 ? fx(b.g, 2) : '—', vLow: b.mu > 0 ? fx(vCirc(b.mu, b.R), 0) : '—', tLow: b.mu > 0 ? fx(period(b.mu, b.R) / 60, 1) : '—',
+          vEsc: b.mu > 0 ? fx(vEsc(b.mu, b.R), 0) : '—', soi: b.soi === Infinity ? '∞' : b.soi > 0 ? km(b.soi) : '—',
+          day: b.spin.T === Infinity ? '—' : (b.spin.locked ? 'locked ' : '') + dur(b.day), sky,
+        };
+      });
+    },
+  };
+
+  // the conic's points from a state: the whole ellipse (span null) or the arc over `span` seconds, evenly in the anomaly
+  function conicPoints(r, v, mu, span, pts, n) {
+    const el = stateToEl(r, v, mu), e = el.e;
+    const h = el.h, hl = len(h), hu = [h[0] / hl, h[1] / hl, h[2] / hl];
+    let Pv;
+    if (e > 1e-10) Pv = [el.evec[0] / e, el.evec[1] / e, el.evec[2] / e]; else { const rl = len(r); Pv = [r[0] / rl, r[1] / rl, r[2] / rl]; }
+    const Qv = crossInto(hu, Pv, [0, 0, 0]);
+    const nu0 = e > 1e-10 ? el.nu : 0;
+    const put = (k, x, y) => { pts[k * 3] = x * Pv[0] + y * Qv[0]; pts[k * 3 + 1] = x * Pv[1] + y * Qv[1]; pts[k * 3 + 2] = x * Pv[2] + y * Qv[2]; };
+    if (e < 1) {
+      const a = el.a, bAx = a * Math.sqrt(1 - e * e);
+      const E0 = Math.atan2(Math.sqrt(1 - e * e) * Math.sin(nu0), e + Math.cos(nu0));
+      let E1;
+      if (span === null || span === undefined) E1 = E0 + TAU * (n - 1) / n;
+      else {
+        // the end of the arc: where the ship is after `span` (whole periods added back)
+        const rr = v3(); coast(r, v, mu, span, rr, null);
+        const nu1 = Math.atan2(dot(crossInto(Pv, rr, [0, 0, 0]), hu), dot(Pv, rr));
+        let e1 = Math.atan2(Math.sqrt(1 - e * e) * Math.sin(nu1), e + Math.cos(nu1));
+        while (e1 < E0) e1 += TAU;
+        E1 = e1 + TAU * Math.floor(span / el.period);
+      }
+      for (let k = 0; k < n; k++) { const E = E0 + (E1 - E0) * k / (n - 1); put(k, a * (Math.cos(E) - e), bAx * Math.sin(E)); }
+    } else {
+      const a = el.a, bAx = -a * Math.sqrt(e * e - 1);       // a < 0
+      const Hof = (nu) => Math.asinh(Math.sqrt(e * e - 1) * Math.sin(nu) / (1 + e * Math.cos(nu)));
+      const H0 = Hof(nu0);
+      let H1;
+      if (span === null || span === undefined) H1 = H0 + 3;
+      else { const rr = v3(); coast(r, v, mu, span, rr, null); const nu1 = Math.atan2(dot(crossInto(Pv, rr, [0, 0, 0]), hu), dot(Pv, rr)); H1 = Hof(nu1); }
+      for (let k = 0; k < n; k++) { const H = H0 + (H1 - H0) * k / (n - 1); put(k, a * (Math.cosh(H) - e), bAx * Math.sinh(H)); }
+    }
+    return pts;
+  }
+
+  // ================================================================ the module
+  const home = compile(HELIA);
+  const U = VR.Universe = {
+    AU, MU_SUN, R_SUN, MU_JUP, MU_EARTH, SOLAR, SCALE, DAY, NOON, BANDS, DIM_BODY, HELIA,
+    kepler, keplerH, elToState, stateToEl, coast, verletInit, verlet, stumpC, stumpS,
+    vCirc, vEsc, period, hohmann, soiRadius, hillRadius, dvFromOrbit,
+    triad, matToQuat, quatToMat, slerpRot, slerpDir, smootherstep, climbK, worldSeconds,
+    compile, home,
+    state: (t, out) => home.state(t, out),
+    localSky: (dim, pos, t, out) => home.localSky(dim, pos, t, out),
+    chart: (id) => home.chart(id),
+    dominant: (rSys, t) => home.dominant(rSys, t),
+  };
+})((typeof globalThis !== 'undefined' ? globalThis : self).VR || ((typeof globalThis !== 'undefined' ? globalThis : self).VR = {}));
+
+/* shared/bodytex.js */
+// ============================================================================
+// u-space0 · the bodies' textures for the space scene (docs/superpowers/plans/2026-10-22-u-space0.md §2.1).
+// Pure: the worker runs it (worker_main.js 'bodytex'), node tests too. Every texture is a set of rows of RGBA8, made in
+// row jobs of ≤ 0.8 s so the pool's workers share a big one.
+//   herz     Herzwelt, equirect (λ −π..π across, θ 0..π down): A = albedo (sRGB) + water, B = lights · clouds · the
+//            height code · ice — one sample of the world's own generator a texel through the chart (the far look: mipmaps average the
+//            km-sized mosaic of seas, forests and snowfields the overworld really is)
+//   patch    the plane round a nadir (the camera's ground point), square, `step` metres a texel: the same channels at
+//            100 m (Very Low) / 50 m (High) — the true mosaic under the camera, the villages' lights from the village
+//            cells' own spots
+//   amarant  the giant's zones (cream) and belts (lilac-violet — the trailer's licence, U§12), streaky edges, white ovals,
+//            the great storm, the polar polygon jet
+//   ring     2048 radial texels from 1.24 to 2.27 R: the particles' colour (sRGB) and τ/3 in alpha (REFERENCE §4.2)
+//   aqua · zinn · opal · basalt · ocker   the moons from palette noise on the sphere (seamless 3-D noise; their worlds
+//            and generators come with wave 4–5 — U§6.3)
+// Herzwelt's chart (U§4.5) is here too: azimuthal equidistant about the north pole, the Heartland (0, 0) 41.8 km from it,
+// true north 22.9° east of the map's north, λ 0 through the Heartland and growing to the east. (u-orbit's
+// VR.Universe.chart takes its place at the merge: same convention.)
+// ============================================================================
+(function (VR) {
+  'use strict';
+  const BT = VR.BodyTex = {};
+  const D2R = Math.PI / 180, TAU = Math.PI * 2;
+  const now = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const ss = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
+  const wrapPi = (a) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+  const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+  // ---------------------------------------------------------------- the chart
+  const C = BT.CHART = { R: 99550, pole: 41800, alpha: 22.9 * D2R };
+  C.Px = C.pole * Math.sin(C.alpha); C.Pz = -C.pole * Math.cos(C.alpha);
+  C.thetaH = C.pole / C.R;                       // the Heartland's colatitude (24.06°: 65.94° N)
+  C.phiH = Math.atan2(-C.Pz, -C.Px);             // the Heartland's azimuth about the pole on the plane
+  BT.toPlane = (th, lam) => { const rho = C.R * th, phi = C.phiH - lam; return [C.Px + rho * Math.cos(phi), C.Pz + rho * Math.sin(phi)]; };
+  BT.toSphere = (x, z) => { const dx = x - C.Px, dz = z - C.Pz; return [Math.hypot(dx, dz) / C.R, wrapPi(C.phiH - Math.atan2(dz, dx))]; };
+  // the unit normal of (θ, λ) in Herzwelt's body frame (y north; λ east-positive: at λ 0 east is −z)
+  BT.normal = (th, lam, out) => { const o = out || [0, 0, 0], s = Math.sin(th); o[0] = s * Math.cos(lam); o[1] = Math.cos(th); o[2] = -s * Math.sin(lam); return o; };
+  // how far the map's north is turned from true north at (x, z): the angle from map north (−z) to the pole's direction
+  BT.northTurn = (x, z) => Math.atan2(C.Px - x, -(C.Pz - z));
+  // the height code of the B texture: h metres over the sea → 0..255, 128 the shore; 3 a metre below the sea (to 42 m
+  // deep), h / (h + 48) above it (the peaks of 160 m still apart) — space_shaders.js hOf() is the inverse
+  BT.hcode = (h) => clamp(Math.round(h < 0 ? 128 + h * 3 : 128 + 127 * h / (h + 48)), 0, 255);
+  BT.hdecode = (code) => { const c = code - 128; return c < 0 ? c / 3 : 48 * c / Math.max(127 - c, 2.5); };
+
+  // ---------------------------------------------------------------- the ring (REFERENCE §4.2 scaled to Amarant)
+  // Saturn's main rings span 1.24–2.27 of its radius exactly as Amarant's do (U§2.1); the Cassini gap 73 km, the 5-km gap
+  const RING = BT.RING = { r0: 1.24, r1: 2.27, cB: 1.53, bA: 1.95, cassini: [1.95, 2.028], gap5: 2.214, gapW: 0.0053 };
+  // the optical depth τ(r) (normal to the ring), r in equatorial radii — the profile without the fine ringlets
+  BT.ringTau = function (r) {
+    if (r < RING.r0 || r > RING.r1) return 0;
+    if (r < RING.cB) {   // C: translucent, a few plateaus
+      const pl = ss(1.355, 1.36, r) * (1 - ss(1.38, 1.385, r)) + ss(1.41, 1.415, r) * (1 - ss(1.432, 1.437, r)) + ss(1.465, 1.47, r) * (1 - ss(1.485, 1.49, r));
+      return 0.07 + 0.05 * ss(1.24, 1.5, r) + 0.2 * pl + 0.15 * ss(1.5, 1.53, r);
+    }
+    if (r < RING.bA) {   // B: opaque, the core densest, a sharp outer edge
+      const inner = 0.75 + 0.55 * ss(1.53, 1.62, r);
+      const core = 0.75 * ss(1.6, 1.68, r) * (1 - ss(1.84, 1.9, r));
+      return inner + core + 0.25 * Math.sin(r * 61) * ss(1.6, 1.66, r) * (1 - ss(1.86, 1.9, r));
+    }
+    if (r < RING.cassini[1]) return 0.04 + 0.06 * Math.exp(-(((r - 1.99) / 0.006) ** 2));   // the Cassini gap, a faint ringlet
+    if (Math.abs(r - RING.gap5) < RING.gapW / 2) return 0;   // the 5-km gap (a moonlet's, U§7.1)
+    return 0.95 - 0.4 * ss(2.03, 2.26, r) + 0.06 * Math.sin(r * 140) * (1 - ss(2.2, 2.26, r));   // A: falling outward
+  };
+
+  // ---------------------------------------------------------------- sizes and jobs
+  const T = (tier) => clamp(tier | 0, 0, 3);
+  // [w, h] of a texture by the spaceDetail tier (0 Very Low … 3 High); patch: [texels a side, metres a texel]
+  BT.size = function (kind, tier) {
+    const t = T(tier);
+    if (kind === 'herz' || kind === 'amarant') return t >= 2 ? [1024, 512] : [512, 256];
+    if (kind === 'patch') return t >= 2 ? [1024, 50] : [512, 100];
+    if (kind === 'ring') return [2048, 1];
+    return t >= 2 ? [512, 256] : [256, 128];   // a moon
+  };
+  BT.MOONS = ['aqua', 'zinn', 'opal', 'basalt', 'ocker'];
+  BT.TWO = { herz: 1, patch: 1 };   // the bodies with a second texture (B)
+  // the row jobs of one texture: 32k texels a job for the generator's bodies (≈ 0.1 s in node, ≤ 0.4 s in a page's busy
+  // worker — space0.mjs run 3 measured 1.0 s for 131k), more for the cheap ones; the pool's workers share them
+  BT.jobs = function (body, tier, extra) {
+    const kind = BT.MOONS.includes(body) ? 'moon' : body, sz = BT.size(kind, tier);
+    const w = sz[0], h = body === 'patch' ? sz[0] : sz[1];
+    const per = body === 'herz' || body === 'patch' ? 32768 : body === 'ring' ? 1 << 20 : 98304;
+    const rows = Math.max(1, Math.floor(per / w)), out = [];
+    for (let y0 = 0; y0 < h; y0 += rows) out.push(Object.assign({ type: 'bodytex', body, w, h, y0, y1: Math.min(h, y0 + rows) }, body === 'patch' ? { step: sz[1] } : null, extra || null));
+    return out;
+  };
+  // the GPU bytes of the space layer's textures at a tier (two patches kept, mipmaps ⅓ more)
+  BT.gpuBytes = function (tier) {
+    const b = (w, h, n) => w * h * 4 * n * 4 / 3;
+    const H = BT.size('herz', tier), P = BT.size('patch', tier), A = BT.size('amarant', tier), Mo = BT.size('moon', tier);
+    return b(H[0], H[1], 2) + b(P[0], P[0], 4) + b(A[0], A[1], 1) + b(Mo[0], Mo[1], BT.MOONS.length) + 2048 * 4;
+  };
+
+  // ---------------------------------------------------------------- the job
+  BT.job = function (m, getGen) {
+    const t0 = now();
+    const w = m.w | 0, h = m.h | 0, y0 = clamp(m.y0 | 0, 0, h), y1 = clamp(m.y1 === undefined ? h : m.y1 | 0, y0, h), rows = y1 - y0;
+    const a = new Uint8Array(w * rows * 4), b = BT.TWO[m.body] ? new Uint8Array(w * rows * 4) : null;
+    const seed = (m.seed === undefined ? 0x5eed : m.seed) >>> 0;
+    if (m.body === 'herz' || m.body === 'patch') {
+      const g = getGen ? getGen('overworld') : null;
+      if (g && g.computeClimate) (m.body === 'herz' ? herz : patch)(g, m, w, h, y0, y1, a, b);
+    } else if (m.body === 'amarant') amarant(seed, w, h, y0, y1, a);
+    else if (m.body === 'ring') ring(seed, w, a);
+    else if (MOON[m.body]) moon(m.body, seed, w, h, y0, y1, a);
+    return { type: 'bodytex', id: m.id, body: m.body, key: m.key, w, h, y0, y1, a, b, ms: +(now() - t0).toFixed(1), transfer: b ? [a.buffer, b.buffer] : [a.buffer] };
+  };
+
+  // ---------------------------------------------------------------- Herzwelt's surface from the generator
+  const BAD = /ocean|river|beach|shore|swamp|mangrove|mushroom|peaks|ice_spikes|deep_dark|frozen_river|stony/;   // (gen_village.js: no village there)
+  const CANON = { c: 0, e: 0, w: 0, t: 0, h: 0, H: 70, A: 3, river: 0, mountain: 0, ember: 0, canyon: 0, prism: 0, hz1: 1, hz2: 0, hz3: 0, heart: 0 };
+  const COAST = [214, 204, 166], ICE = [206, 220, 236];   // (a water texel's albedo is the beach the coast blends into; the sea itself is the shader's, by depth)
+  // the sampler: a cell's colour by its biome (lod.js LOD.look once a biome, the canopy blended in — the far horizon's
+  // colours), the water by depth, snow by height; the clouds a field of our own on the sphere
+  function sampler(g) {
+    const LOD = VR.LOD, BI = VR.BIOMES, SEA = VR.C.SEA;
+    const P = LOD && LOD.palette ? LOD.palette() : null, lk = {}, cache = new Map();
+    const land = (bi, cl, X, Z, y) => {
+      let c = cache.get(bi);
+      if (!c) {
+        const B = BI[bi] || BI[0];
+        let t = [110, 140, 80], kd = 0;
+        // (one canonical cell a biome — the same colour whichever texel or row job meets the biome first)
+        if (P && B) { LOD.look(g, P, B, B.key, CANON, 0, 0, SEA + 8, 0, 64, lk); t = lk.t; kd = lk.kd; const tr = LOD.util.TREES[B.key]; if (tr && kd !== 6) t = LOD.util.mixc(t, LOD.util.leafCol(tr[1], B), Math.min(1, tr[0] * 1.1)); }
+        c = { t: [t[0], t[1], t[2]], kd, temp: B ? B.temp : 0.5, frozen: !!(B && B.frozen), live: !!(B && !B.ocean && !BAD.test(B.key)) };
+        cache.set(bi, c);
+      }
+      return c;
+    };
+    const snow = [212, 222, 234];   // (the snowfields a shade bluer and darker than the clouds over them)
+    // o: [r, g, b (sRGB albedo), water 0/1, ice 0/1, liveable 0/1, the height code]. The height code (BT.hcode) is
+    // continuous: the shader finds the coast where it crosses 128 between the texels — round shores, not squares —,
+    // colours the sea by its depth and shades the land's relief
+    return function (X, Z, o) {
+      const cl = g.computeClimate(X, Z), y = Math.round(cl.H), bi = g.biomeFor(cl, y), c = land(bi, cl, X, Z, y);
+      const cold = (c.temp - Math.max(0, y - 90) * 0.0025) < 0.15;
+      if (y < SEA) {
+        const ice = cold || c.frozen;
+        const t = ice ? ICE : COAST;   // (ICE the same shade as the snow)
+        o[0] = t[0]; o[1] = t[1]; o[2] = t[2]; o[3] = 1; o[4] = ice ? 1 : 0; o[5] = 0;
+      } else {
+        const t = cold || c.kd === 6 ? snow : c.t;
+        o[0] = t[0]; o[1] = t[1]; o[2] = t[2]; o[3] = 0; o[4] = 0;
+        o[5] = c.live && y > SEA + 2 && y <= 150 && cl.river < 0.3 && !(cl.ember > 0.45) ? 1 : 0;
+      }
+      o[6] = BT.hcode(cl.H - SEA);
+      return o;
+    };
+  }
+  // the clouds: a warped fbm on the unit sphere (Herzwelt's body frame), the same octaves for the globe and the patch
+  // (the patch adds finer ones), ~30 % covered — fields of ~10 km (Earth's fronts at 1/64), broken into cells down to a
+  // few hundred metres (the patch: tens)
+  function clouds(seed) {
+    const S = new VR.Simplex((seed ^ 0xc10d5) >>> 0), Wx = new VR.Simplex((seed ^ 0x77a1) >>> 0), Wy = new VR.Simplex((seed ^ 0x3b29) >>> 0);
+    return function (x, y, z, oct) {
+      const wx = Wx.n3(x * 1.7, y * 1.7, z * 1.7) * 0.22, wy = Wy.n3(x * 1.7 + 5, y * 1.7, z * 1.7) * 0.22;
+      const px = x + wx, py = y + wy, pz = z - wx * 0.6;
+      let v = 0, amp = 1, f = 9.5, norm = 0;
+      for (let o = 0; o < oct; o++) { v += S.n3(px * f, py * f, pz * f) * amp; norm += amp; amp *= o < 2 ? 0.7 : 0.55; f *= 2.07; }
+      v /= norm;
+      return ss(0.0, 0.3, v + 0.06 * Math.cos(y * 9.0));   // (a hint of latitude belts)
+    };
+  }
+  const putA = (a, i, o) => { a[i] = clamp(o[0], 0, 255); a[i + 1] = clamp(o[1], 0, 255); a[i + 2] = clamp(o[2], 0, 255); a[i + 3] = o[3] * 255; };
+  // the Heartland's own lights (gen_heart.js: the city, the temple's plaza, the citadel, the station, the isles):
+  // [x, z, radius m, strength]
+  const HEART_LIGHTS = [[0, -140, 190, 255], [0, -10, 110, 235], [-420, 380, 90, 190], [-380, -150, 70, 170], [330, 140, 90, 140], [0, -320, 160, 150]];
+  function heartLight(x, z, step) {
+    let v = 0;
+    for (const L of HEART_LIGHTS) { const d = Math.hypot(x - L[0], z - L[1]); const r = L[2] + step * 0.7; if (d < r) v = Math.max(v, L[3] * (1 - 0.5 * (d / r) * (d / r))); }
+    return v;
+  }
+  function herz(g, m, w, h, y0, y1, a, b) {
+    const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M, POP = new VR.Simplex((g.seed ^ 0x9e0) >>> 0);
+    const oct = w >= 1024 ? 5 : 4;   // (the fifth octave's cells are ~0.6 km: below a Very Low texel, only noise there)
+    for (let j = y0; j < y1; j++) {
+      const th = (j + 0.5) / h * Math.PI;
+      for (let i = 0; i < w; i++) {
+        const lam = (i + 0.5) / w * TAU - Math.PI;
+        const p = BT.toPlane(th, lam);
+        S(Math.round(p[0]), Math.round(p[1]), o);
+        const k = ((j - y0) * w + i) * 4;
+        putA(a, k, o);
+        BT.normal(th, lam, N);
+        // the lights, statistically (a village a 640² cell, ~35 % of the cells; a texel ~1.2 km): one liveable texel in
+        // twelve lit, gathered into clusters of ~15 km and empty land between (points and webs from far, not a glow) —
+        // far views only
+        let L = 0;
+        if (o[5]) { const hsh = M.hashf2(i, j, g.seed ^ 0x11657); if (hsh < 0.19) { const pl = 0.1 * (0.15 + 1.7 * ss(-0.15, 0.45, POP.n3(N[0] * 7, N[1] * 7, N[2] * 7))); if (hsh < pl) L = 60 + (hsh / pl) * 140; } }   // (pl ≤ 0.185)
+        if (Math.hypot(p[0], p[1]) < 1500) L = 255;
+        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], oct) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
+      }
+    }
+  }
+  // the village cells' own spots (gen_village.js VG.siteSteps replayed: the same RNG, the cheap tests from the climate —
+  // the real search also asks for flat ground, which a calm climate stands in for)
+  const FLAT = [[14, 0], [-14, 0], [0, 14], [0, -14], [24, 18], [-24, -18]];
+  function villages(g, x0, z0, x1, z1) {
+    const VG = VR.VillageGen, M = VR.M, BI = VR.BIOMES, SEA = VR.C.SEA, out = [];
+    if (!VG || !VG.par || !(g.singleBiome < 0)) return out;
+    const { CELL, M: MG, RAD } = VG.par(g);
+    const R1 = VR.Heart && VR.Heart.on && VR.Heart.on(g) ? VR.Heart.R1 : -1;
+    for (let j = Math.floor((z0 - 300) / CELL); j <= Math.floor((z1 + 300) / CELL); j++) for (let i = Math.floor((x0 - 300) / CELL); i <= Math.floor((x1 + 300) / CELL); i++) {
+      if (g.vgen >= 2 && Math.abs(i) <= 1 && Math.abs(j) <= 1 && i === 0 && j === 0) continue;   // the home city: the Heartland's own lights
+      const rng = new VR.RNG(M.hash2(i, j, g.seed + 90210));
+      if (!rng.chance(0.8)) continue;
+      for (let k = 0; k < 10; k++) {
+        const x = i * CELL + MG + rng.int(CELL - 2 * MG), z = j * CELL + MG + rng.int(CELL - 2 * MG);
+        if (R1 > 0 && Math.hypot(x, z) < R1) continue;
+        const cl = g.computeClimate(x, z), hh = Math.round(cl.H);
+        if (hh <= SEA + 2 || hh > 150) continue;
+        const bk = BI[g.biomeFor(cl, hh)];
+        if (!bk || bk.ocean || BAD.test(bk.key)) continue;
+        if ((cl.canyon || 0) > 0.18 || (cl.ember || 0) > 0.45 || cl.river > 0.3 || cl.A > 8 || cl.mountain > 0.35) continue;
+        // the search wants dry, gentle ground round the spot: six climate heights stand in for its 24 terrain samples
+        // (scratch measure on 169 cells: 88 % of these lights are real villages, 72 % of the villages lit)
+        let mx = hh, mn = hh, wet = 0;
+        for (const o of FLAT) { const c2 = g.computeClimate(x + o[0], z + o[1]); if (c2.H > mx) mx = c2.H; if (c2.H < mn) mn = c2.H; if (c2.H <= SEA + 1) wet++; }
+        if (mx - mn > 8 || wet > 1) continue;
+        // [x, z, radius, strength, the lit share of the radius (the village's own size, 0.55–1.1)]
+        out.push([x, z, g.vgen >= 9 ? 100 : RAD, 150 + ((M.hash2(i, j, 7) >>> 0) % 90), 0.55 + 0.55 * M.hashf2(i, j, 0x51e)]);
+        break;
+      }
+    }
+    return out;
+  }
+  function patch(g, m, w, h, y0, y1, a, b) {
+    const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M;
+    const step = m.step || 100, cx = m.cx || 0, cz = m.cz || 0, half = w * step / 2;
+    const X0 = cx - half, Z0 = cz - half;
+    const V = villages(g, X0, Z0 + y0 * step, X0 + w * step, Z0 + y1 * step);
+    for (let j = y0; j < y1; j++) {
+      const z = Z0 + (j + 0.5) * step;
+      const VR_ = V.filter(v => Math.abs(z - v[1]) < v[2] * v[4] + step * 0.4);   // (the villages this row meets)
+      for (let i = 0; i < w; i++) {
+        const x = X0 + (i + 0.5) * step;
+        S(Math.round(x), Math.round(z), o);
+        const k = ((j - y0) * w + i) * 4;
+        putA(a, k, o);
+        const sp = BT.toSphere(x, z); BT.normal(sp[0], sp[1], N);
+        let L = 0;
+        for (const v of VR_) { const dx = x - v[0], dz = z - v[1], r = v[2] * v[4] + step * 0.4; if (dx * dx + dz * dz < r * r) { const q = 1 - (dx * dx + dz * dz) / (r * r); L = Math.max(L, v[3] * q * Math.sqrt(q) * (0.55 + 0.45 * M.hashf2(Math.floor(x / step), Math.floor(z / step), 0x5e7))); } }
+        if (Math.abs(x) < 1400 && Math.abs(z) < 1400) L = Math.max(L, heartLight(x, z, step));
+        // the farmsteads and roads between: a faint scatter on liveable land
+        if (!L && o[5] && M.hashf2(Math.floor(x / 160), Math.floor(z / 160), g.seed ^ 0x7a3) < 0.07) L = 30;
+        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 9) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- Amarant: zones and belts
+  const ZONE = [238, 226, 204], ZONE2 = [232, 210, 200], ZONE3 = [244, 236, 220], BELT = [172, 132, 200], BELT2 = [148, 108, 184], BELT3 = [196, 156, 182], BELT4 = [126, 98, 170], POLE = [122, 118, 166], JET = [92, 80, 150];
+  // north → south: [latitude of the band's southern edge, colour] (the first band runs from the pole)
+  const BANDS = [[66, POLE], [58, BELT4], [51, ZONE2], [45, BELT3], [38, ZONE], [32, BELT], [24, ZONE2], [9, BELT2], [-7, ZONE3], [-20, BELT], [-27, ZONE], [-33, BELT2], [-40, ZONE2], [-46, BELT3], [-53, ZONE], [-61, BELT4], [-90, POLE]];
+  function bandAt(lat) {
+    let prevEdge = 90, prev = BANDS[0][1];
+    for (let i = 0; i < BANDS.length; i++) {
+      const [edge, col] = BANDS[i];
+      if (lat >= edge) {
+        // soft edges, 1.1° each side
+        const up = i > 0 ? ss(prevEdge - 1.1, prevEdge + 1.1, lat) : 0, dn = i < BANDS.length - 1 ? 1 - ss(edge - 1.1, edge + 1.1, lat) : 0;
+        let c = col;
+        if (up > 0) c = mix3(c, BANDS[i - 1][1], up * 0.5);
+        if (dn > 0 && i + 1 < BANDS.length) c = mix3(c, BANDS[i + 1][1], dn * 0.5);
+        return c;
+      }
+      prevEdge = edge; prev = col;
+    }
+    return prev;
+  }
+  function amarant(seed, w, h, y0, y1, a) {
+    const S = new VR.Simplex((seed ^ 0xa3a2) >>> 0), S2 = new VR.Simplex((seed ^ 0x51c7) >>> 0), M = VR.M;
+    const rng = new VR.RNG((seed ^ 0x0a1a) >>> 0), ovals = [];
+    for (let k = 0; k < 16; k++) ovals.push([rng.pick([-36.5, -30, -43, 27, 35, -23.5, 41]), rng.next() * TAU, 1.4 + rng.next() * 1.8]);
+    const storm = [-23.5, 1.1, 7.5, 4.2];   // the great storm: latitude, longitude (rad), half-sizes in degrees (lon, lat)
+    for (let j = y0; j < y1; j++) {
+      const lat = 90 - (j + 0.5) / h * 180, cphi = Math.cos(lat * D2R), sphi = Math.sin(lat * D2R);
+      for (let i = 0; i < w; i++) {
+        const lam = (i + 0.5) / w * TAU - Math.PI;
+        const px = cphi * Math.cos(lam), pz = cphi * Math.sin(lam);
+        // the band edges wander: noise drawn out along the longitude (the sphere point squeezed across the bands)
+        const turb = S.n3(px * 2.6, sphi * 26, pz * 2.6) * 1.5 + S2.n3(px * 7, sphi * 70, pz * 7) * 0.6;
+        const latE = lat + turb;
+        let c = bandAt(latE);
+        // streaks inside the bands, stronger in the belts
+        const st = S.n3(px * 5 + 11, sphi * 90, pz * 5) * 0.5 + S2.n3(px * 13, sphi * 160, pz * 13) * 0.25;
+        const belt = c[2] > c[1] + 25 ? 1 : 0.5;
+        const k1 = 1 + st * 0.11 * belt;
+        c = [c[0] * k1, c[1] * k1, c[2] * k1];
+        // festoons: blue-violet plumes from the northern equatorial belt into the bright zone
+        if (lat < 9 && lat > -4) { const f = S2.n3(px * 9, sphi * 22, pz * 9); if (f > 0.42) c = mix3(c, BELT4, ss(0.42, 0.6, f) * ss(-4, 7, lat) * 0.7); }
+        // white ovals along the belts' edges
+        for (const ov of ovals) { const dl = wrapPi(lam - ov[1]) / D2R * cphi, dp = lat - ov[0]; const q = (dl * dl) / (ov[2] * ov[2] * 2.2) + (dp * dp) / (ov[2] * ov[2] * 0.5); if (q < 1) c = mix3(c, [248, 244, 238], (1 - q) * 0.85); }
+        // the great storm: a teal eye in a pale collar, a darker ring round it, the inside swirled
+        { const dl = wrapPi(lam - storm[1]) / D2R * cphi, dp = lat - storm[0]; const q = Math.sqrt((dl * dl) / (storm[2] * storm[2]) + (dp * dp) / (storm[3] * storm[3]));
+          if (q < 1.35) { const sw = S.n3(dl * 0.35, dp * 0.35, 3.3) * 0.18; const qq = q + sw; c = mix3(c, [112, 92, 156], ss(1.35, 1.05, qq) * 0.55); c = mix3(c, [228, 238, 236], ss(1.08, 0.8, qq)); c = mix3(c, [64, 178, 186], ss(0.78, 0.25, qq)); } }
+        // the polar polygon jet (seven sides) round the north pole, a dark vortex at the south pole
+        if (lat > 64) {
+          const sec = TAU / 7, ang = ((lam % sec) + sec) % sec - sec / 2, r0 = 14.5 * Math.cos(Math.PI / 7) / Math.cos(ang);
+          const edge = 90 - r0, dj = Math.abs(lat - edge);
+          if (dj < 1.6) c = mix3(c, JET, (1 - dj / 1.6) * 0.75);
+          if (lat > edge) c = mix3(c, [108, 104, 156], 0.5);
+        }
+        if (lat < -72) c = mix3(c, [86, 76, 132], ss(-72, -86, lat) * 0.7);
+        const n = (M.hashf2(i, j, seed) - 0.5) * 5;
+        const k = ((j - y0) * w + i) * 4;
+        a[k] = clamp(c[0] + n, 0, 255); a[k + 1] = clamp(c[1] + n, 0, 255); a[k + 2] = clamp(c[2] + n, 0, 255); a[k + 3] = 255;
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- the ring's profile
+  function ring(seed, w, a) {
+    const S = new VR.Simplex((seed ^ 0x919) >>> 0);
+    const Cc = [150, 138, 128], Bc = [238, 226, 206], Gc = [118, 110, 104], Ac = [222, 212, 196];
+    for (let i = 0; i < w; i++) {
+      const r = RING.r0 + (i + 0.5) / w * (RING.r1 - RING.r0);
+      const base = BT.ringTau(r);
+      // ringlets: the fine radial structure (±18 % in B, waves in A, a little in C)
+      const fine = 1 + (r < RING.cB ? 0.1 : r < RING.bA ? 0.18 : 0.12) * S.n2(r * 900, 0.5) + 0.06 * S.n2(r * 3100, 3.5);
+      const tau = Math.min(3, Math.max(0, base * fine));
+      let c = r < RING.cB ? mix3(Cc, Bc, ss(1.48, 1.56, r)) : r < RING.bA ? Bc : r < RING.cassini[1] ? Gc : Ac;
+      if (r >= RING.bA && r < RING.cassini[1]) c = Gc;
+      const k = 1 + 0.05 * S.n2(r * 400, 7.5);
+      a[i * 4] = clamp(c[0] * k, 0, 255); a[i * 4 + 1] = clamp(c[1] * k, 0, 255); a[i * 4 + 2] = clamp(c[2] * k, 0, 255); a[i * 4 + 3] = Math.round(tau / 3 * 255);
+    }
+  }
+
+  // ---------------------------------------------------------------- the moons from palette noise
+  // each: f(p = unit normal, S = noise set, lat) → [r, g, b, alpha] (alpha: 255 rock · water glint · lava glow by kind)
+  function noiseSet(seed) { const o = []; for (let k = 0; k < 4; k++) o.push(new VR.Simplex((seed + k * 7919) >>> 0)); return o; }
+  const fbm = (s, x, y, z, oct, f) => { let v = 0, amp = 1, n = 0; for (let o = 0; o < oct; o++) { v += s.n3(x * f, y * f, z * f) * amp; n += amp; amp *= 0.5; f *= 2.02; } return v / n; };
+  // craters: cells on the sphere, one crater a cell with a chance; returns [rim, floor, rays] at the point
+  function craters(p, scale, seed, chance) {
+    const M = VR.M, x = p[0] * scale, y = p[1] * scale, z = p[2] * scale;
+    const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+    let rim = 0, flr = 0, ray = 0;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+      const cx = ix + dx, cy = iy + dy, cz = iz + dz, h = M.hashf3(cx, cy, cz, seed);
+      if (h > chance) continue;
+      const ox = cx + M.hashf3(cx, cy, cz, seed + 1), oy = cy + M.hashf3(cx, cy, cz, seed + 2), oz = cz + M.hashf3(cx, cy, cz, seed + 3);
+      const r = 0.12 + 0.38 * Math.pow(M.hashf3(cx, cy, cz, seed + 4), 2.2);
+      const d = Math.hypot(x - ox, y - oy, z - oz) / r;
+      if (d < 1.25) { rim = Math.max(rim, Math.exp(-(((d - 1) * 6) ** 2))); if (d < 1) flr = Math.max(flr, 1 - d * d); }
+      if (h < chance * 0.08 && d < 4) ray = Math.max(ray, (1 - d / 4) * 0.5 * (0.5 + 0.5 * Math.sin(Math.atan2(y - oy, x - ox) * 9 + cz)));
+    }
+    return [rim, flr, ray];
+  }
+  const MOON = {
+    aqua(p, S, lat, seed) {
+      const n = fbm(S[0], p[0], p[1], p[2], 5, 2.2), arc = 1 - Math.abs(fbm(S[1], p[0], p[1], p[2], 3, 1.6));
+      const isl = n * 0.55 + arc * 0.5 - 0.62;   // archipelagos along arcs
+      const cr = craters(p, 7, seed ^ 0x47, 0.22);
+      const atoll = ss(0.45, 0.7, cr[0]) * ss(-0.32, -0.2, n);
+      let c = [18, 78, 112];
+      c = mix3(c, [44, 150, 156], ss(-0.14, 0.0, isl));                              // the shallows
+      c = mix3(c, [70, 196, 186], ss(0.32, 0.5, cr[1]) * ss(-0.36, -0.24, n) * 0.75);   // the lagoons
+      const g = fbm(S[2], p[0], p[1], p[2], 3, 9);
+      const landK = Math.max(ss(-0.006, 0.006, isl), atoll);
+      const lc = mix3([214, 204, 160], mix3([72, 132, 74], [150, 140, 96], ss(-0.2, 0.4, g)), ss(0.006, 0.022, isl));
+      c = mix3(c, lc, landK);
+      const al = 1 - landK;
+      const cl = ss(0.25, 0.55, fbm(S[3], p[0] * 1.3, p[1] * 3.2, p[2] * 1.3, 4, 2.0));   // squall bands
+      c = mix3(c, [236, 240, 244], cl * 0.75);
+      return [c[0], c[1], c[2], al ? 255 - cl * 200 : 0];
+    },
+    zinn(p, S, lat, seed) {
+      const n = fbm(S[0], p[0], p[1], p[2], 5, 2.4), m = fbm(S[1], p[0], p[1], p[2], 4, 4.1);
+      let c = mix3([220, 192, 78], [232, 150, 58], ss(-0.1, 0.35, n));
+      c = mix3(c, [238, 236, 214], ss(0.2, 0.5, m) * 0.7);    // SO₂ frost
+      c = mix3(c, [176, 70, 44], ss(0.3, 0.55, -m) * 0.6);     // red sulfur
+      if (Math.abs(lat) > 58) c = mix3(c, [150, 112, 72], ss(58, 75, Math.abs(lat)) * 0.6);
+      const cr = craters(p, 6, seed ^ 0x2e, 0.3);
+      let glow = 0;
+      c = mix3(c, [44, 32, 28], ss(0.38, 0.52, cr[1]) * 0.85); glow = ss(0.75, 0.95, cr[1]);       // calderas, lava lakes
+      if (cr[0] > 0.2) c = mix3(c, [190, 64, 40], cr[0] * 0.6);                                     // red plume rings
+      return [c[0], c[1], c[2], 255 - glow * 255];
+    },
+    opal(p, S, lat, seed) {
+      const n = fbm(S[0], p[0], p[1], p[2], 4, 3);
+      let c = mix3([226, 232, 238], [246, 248, 250], ss(-0.3, 0.4, n));
+      let line = 0;
+      for (let k = 1; k <= 3; k++) { const f = fbm(S[k], p[0], p[1], p[2], 3, 1.4 + k * 0.7); line = Math.max(line, 1 - ss(0.0, 0.025 + k * 0.006, Math.abs(f))); }
+      c = mix3(c, [158, 102, 82], line * 0.75);                                                    // the lineae
+      if (lat < -60) { const sb = Math.sin((p[0] * 0.8 + p[2] * 0.6) * 42 + n * 4); c = mix3(c, [118, 146, 182], ss(0.82, 0.97, sb) * ss(-60, -70, lat) * 0.85); }   // the tiger stripes
+      const cr = craters(p, 9, seed ^ 0x0b, 0.06);
+      if (cr[0] > 0.3) c = mix3(c, [196, 214, 232], cr[0] * 0.5);
+      return [c[0], c[1], c[2], 255];
+    },
+    basalt(p, S, lat, seed) {
+      const n = fbm(S[0], p[0], p[1], p[2], 5, 1.7);
+      let c = mix3([92, 92, 96], [178, 174, 168], ss(-0.08, 0.12, n));     // maria and highlands
+      const cr = craters(p, 10, seed ^ 0x8a, 0.45), cr2 = craters(p, 26, seed ^ 0x8b, 0.5);
+      c = mix3(c, [206, 202, 194], Math.max(cr[0], cr2[0] * 0.6) * 0.55);
+      c = mix3(c, [120, 118, 116], cr[1] * 0.25);
+      c = mix3(c, [222, 220, 214], Math.max(cr[2], cr2[2]) * 0.8);          // young craters' rays
+      const g = (fbm(S[1], p[0], p[1], p[2], 3, 30) * 14);
+      return [c[0] + g, c[1] + g, c[2] + g, 255];
+    },
+    ocker(p, S, lat, seed) {
+      const n = fbm(S[0], p[0], p[1], p[2], 5, 2.1), m = fbm(S[1], p[0], p[1], p[2], 3, 1.2);
+      let c = mix3([196, 112, 62], [222, 160, 104], ss(-0.15, 0.3, n));
+      c = mix3(c, [112, 66, 46], ss(0.12, 0.38, m) * 0.75);                                         // dark albedo lands
+      const can = (1 - ss(0.018, 0.034, Math.abs(p[1] + 0.1 * Math.sin(Math.atan2(p[2], p[0]) * 2)))) * ss(0.15, 0.3, p[0]);   // the canyon
+      c = mix3(c, [92, 54, 40], can * 0.8);
+      const vd = Math.hypot(p[0] - 0.52, p[1] - 0.3, p[2] - 0.8); c = mix3(c, mix3([120, 70, 50], [210, 150, 110], ss(0.03, 0.05, vd)), (1 - ss(0.1, 0.13, vd)) * 0.6);   // the shield volcano
+      const cr = craters(p, 12, seed ^ 0x0c, 0.25); c = mix3(c, [150, 92, 60], cr[0] * 0.35);
+      if (Math.abs(lat) > 74) c = mix3(c, [242, 238, 232], ss(74, 80, Math.abs(lat)));               // the frost caps
+      return [c[0], c[1], c[2], 255];
+    },
+  };
+  const MOON_SEED = { aqua: 0xa9a, zinn: 0x217, opal: 0x0a1, basalt: 0xba5, ocker: 0x0c4 };
+  function moon(body, seed, w, h, y0, y1, a) {
+    const sd = (seed ^ MOON_SEED[body]) >>> 0, S = noiseSet(sd), f = MOON[body], p = [0, 0, 0];
+    for (let j = y0; j < y1; j++) {
+      const th = (j + 0.5) / h * Math.PI, lat = 90 - th / D2R;
+      for (let i = 0; i < w; i++) {
+        BT.normal(th, (i + 0.5) / w * TAU - Math.PI, p);
+        const c = f(p, S, lat, sd), k = ((j - y0) * w + i) * 4;
+        a[k] = clamp(c[0], 0, 255); a[k + 1] = clamp(c[1], 0, 255); a[k + 2] = clamp(c[2], 0, 255); a[k + 3] = clamp(c[3], 0, 255);
+      }
+    }
+  }
+})(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
+
 /* main/tex_core.js */
 // ============================================================================
 // Procedural texture painter — framework & generic generators (32x32 "VR style")
@@ -40659,7 +42425,7 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
   // way. A home city's plan is built after the temple it stands on.
   // init and custom replace the generators: a job still waiting then is answered {type:'cancelled'} (its owner asks
   // again if it still wants it).
-  const PLAN_SLICE_MS = 20, PLAN_JOBS = { gen: 1, relight: 1, lod: 1, spawn: 1, villageplan: 1, form: 1 };   // (form: F-Far's ring 1, far.js)
+  const PLAN_SLICE_MS = 20, PLAN_JOBS = { gen: 1, relight: 1, lod: 1, spawn: 1, villageplan: 1, form: 1, vistas: 1 };   // (form: F-Far's ring 1, far.js; vistas: t-first's spawn, first.js)
   let epoch = 0;
   const post = (msg, tr) => { if (VR.VillageGen && VR.VillageGen.probe && VR.VillageGen.probe.miss) return; self.postMessage(msg, tr); };
   // the needs of a job, in the order they are met: {temple: true}, or {site, lod} for a town's plan
@@ -40710,11 +42476,12 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
   function run(m) {
     try {
       if (m.type === 'init') {
+        const keep = !!m.keep && (m.seed >>> 0) === seed && JSON.stringify(m.opts || {}) === JSON.stringify(opts);   // u-dims: a trip between the worlds of one save keeps the generators warm (Heimkehr: the Heartland's plans are not built again)
         seed = m.seed >>> 0; opts = m.opts || {}; epoch++;
         if (m.custom !== undefined && VR.Custom) VR.Custom.apply(m.custom);   // the player's Studio designs
         if (m.townWords && VR.Town && VR.Town.setWords) VR.Town.setWords(m.townWords);   // the shop signs' words in the player's language (voxtown.js)
         setStyle(m.style);
-        for (const k in gens) delete gens[k];
+        if (!keep) for (const k in gens) delete gens[k];   // u-dims (keep: see above)
         post({ type: 'ready' });
       } else if (m.type === 'style') {
         setStyle(m.style);
@@ -40728,12 +42495,12 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
         const col = g.generate(m.cx, m.cz);
         // the world's own style: its rules on everything generated, its water colour
         if (STYLE_ON(m.dim)) { VR.WorldStyle.applyGen(col.blocks, STYLE_MAP); if (STYLE.water) VR.WorldStyle.applyWater(col.tints.water, STYLE.water); }
-        const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
+        const sky = VR.DimReg.sky(m.dim);   // u-dims: the dim registry's sky (src/shared/dimreg.js)
         const light = VR.computeColumnLight(col.blocks, sky);
         post({ type: 'gen', id: m.id, dim: m.dim, cx: m.cx, cz: m.cz, blocks: col.blocks, light, biome: col.biome, caveBiome: col.caveBiome, grass: col.tints.grass, foliage: col.tints.foliage, water: col.tints.water, chests: col.chests, spawns: col.spawns || [], sv: STYLE_ON(m.dim) ? STYLE.sv : 0, ms: performance.now() - t0 + (m.planMs || 0) },
           [col.blocks.buffer, light.buffer, col.tints.grass.buffer, col.tints.foliage.buffer, col.tints.water.buffer]);
       } else if (m.type === 'relight') {
-        const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
+        const sky = VR.DimReg.sky(m.dim);   // u-dims: the dim registry's sky (src/shared/dimreg.js)
         const g = getGen(m.dim);
         let tints = null, biome = null, caveBiome = null;
         // a saved column made under other rules: what the generator put there (and the player left alone) takes the
@@ -40777,7 +42544,7 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
         r.type = r.error ? 'error' : 'folkmesh'; r.id = m.id; if (r.error) r.msg = r.error;
         post(r, tr);
       } else if (m.type === 'lightonly') {
-        const sky = m.dim === 'overworld' || m.dim === 'drift' || m.dim === 'flat';
+        const sky = VR.DimReg.sky(m.dim);   // u-dims: the dim registry's sky (src/shared/dimreg.js)
         const light = VR.computeColumnLight(m.blocks, sky);
         post({ type: 'lightonly', id: m.id, light }, [light.buffer]);
       } else if (m.type === 'shipmesh') {
@@ -40845,6 +42612,14 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
         const g = getGen(m.dim);
         const p = m.near && g.findSpawn.length >= 2 ? g.findSpawn(m.near[0], m.near[1]) : g.findSpawn();
         post({ type: 'spawn', id: m.id, pos: p });
+      } else if (m.type === 'vistas') {
+        // t-first (first.js): the vista points of this world (gen_vista.js) for a new world's first spawn — [] where there
+        // are none; the land plan is the one the first chunks need anyway (a town plan it waits for parks the job: VG.probe)
+        const g = getGen(m.dim), VI = VR.Vista, LANDm = VR.Land;
+        let list = [];
+        try { if (VI && LANDm && VI.on(g)) list = (LANDm.plan(g).vistas || []).map(v => ({ id: v.id, x: v.x, y: v.y, z: v.z, u: v.u, eye: v.eye, yaw: v.yaw, pitch: v.pitch, fov: v.fov, lm: v.lm, wow: !!v.wow, score: v.score, aim: v.aim, d: v.d })); }
+        catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; list = []; }
+        post({ type: 'vistas', id: m.id, list });
       } else if (m.type === 'surface') {
         const g = getGen(m.dim);
         const res = m.points.map(([x, z]) => g.surfaceY ? g.surfaceY(x, z) : 64);
@@ -40892,6 +42667,8 @@ vec3 lookRecolor(vec3 alb, float layer, vec3 col) {
         // a Forge structure (🏭) from its DNA: lot-local cells (forge.js Forge.job — the game's placer gets them)
         const r = VR.Forge ? VR.Forge.job(m) : { type: 'forge', id: m.id, error: 'no forge' };
         post(r, r.ops ? [r.ops.buffer] : []);
+      } else if (m.type === 'bodytex') {   // u-space0: a body's texture rows for the space scene (src/shared/bodytex.js)
+        const r = VR.BodyTex.job(m, getGen), tr = r.transfer; delete r.transfer; post(r, tr);
       } else if (m.type === 'locate') {
         const g = getGen(m.dim);
         let found = null;
@@ -58561,6 +60338,74 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.mode.survival': 'Survival',
     'g.mode.creative': 'Creative',
     'g.mode.zen': 'Zen Builder',
+    // ---- a-core · ⚔ the Adventure (src/main/adventure.js): the way to play per world, levels, stats, Sterntaler
+    'g.adv.title': '⚔ Adventure',
+    'g.adv.pause': '⚔ Adventure',
+    'g.adv.pauseTip': 'Levels, stats and Sterntaler in this world — switch it on or off',
+    'g.adv.way': 'Way to play',
+    'g.adv.way.free': '🏗 Free building',
+    'g.adv.way.freeS': 'Build and explore at ease',
+    'g.adv.way.adv': '⚔ Adventure',
+    'g.adv.way.advS': 'Levels, stats, Sterntaler',
+    'g.adv.wayNote': 'In the Adventure the difficulty says how strong the encounters are — Peaceful means an adventure without any encounters.',
+    'g.adv.band': 'Difficulty',
+    'g.adv.band.easy': 'Easy',
+    'g.adv.band.normal': 'Normal',
+    'g.adv.band.hard': 'Hard',
+    'g.adv.enc': 'Encounters',
+    'g.adv.enc.normal': 'normal',
+    'g.adv.enc.rare': 'rare',
+    'g.adv.enc.off': 'off',
+    'g.adv.encNote': 'Without encounters everything else stays: levels, Sterntaler, quests and the story.',
+    'g.adv.encKids': '🧸 Child-safe: an adventure without encounters.',
+    'g.adv.confirm': 'Machines and shadows appear — at the outposts, in ruins and at night. Your home and the villages stay safe.',
+    'g.adv.confirmCalm': 'From now on everything you do counts: exploring, building, discovering and helping bring experience and Sterntaler. There are no foes here yet.',
+    'g.adv.yes': '⚔ Let’s go',
+    'g.adv.no': 'Not now',
+    'g.adv.offNote': 'Switched off, you keep your level, your Sterntaler and everything you achieved.',
+    'g.adv.teaser': 'With the Adventure everything you do counts: you rise in levels, collect Sterntaler and grow stronger.',
+    'g.adv.level': 'Level {n}',
+    'g.adv.levelMax': 'Level 50 · ⭐ {s}',
+    'g.adv.xp': '{a} / {b} XP to level {n}',
+    'g.adv.xpStar': '{a} / {b} XP to the next star',
+    'g.adv.taler': '{n} Sterntaler',
+    'g.adv.pts1': '1 point to give',
+    'g.adv.pts': '{n} points to give',
+    'g.adv.pts0': 'All points given',
+    'g.adv.toStats': 'Your stats →',
+    'g.adv.stats': 'Your stats',
+    'g.adv.stat.aus': '❤ Stamina',
+    'g.adv.stat.ene': '⚡ Energy',
+    'g.adv.stat.spu': '🧭 Insight',
+    'g.adv.stat.ges': '🛠 Skill',
+    'g.adv.stat.pil': '🚀 Pilot',
+    'g.adv.eff.aus': '{hp} health · +1 heart per 2 points',
+    'g.adv.eff.ene': 'Pulse and tools +{e} % · boost +{b} %',
+    'g.adv.eff.spu': 'Funke’s scan {r} blocks · from 5 the map shows hidden chests',
+    'g.adv.eff.ges': 'Mining and building +{s} % · a hint at 5 and at 10',
+    'g.adv.eff.pil': 'Boost time +{b} % · turning +{t} %',
+    'g.adv.plusTip': 'Put a point in',
+    'g.adv.respec': '↺ Reassign',
+    'g.adv.respecTip': 'Free — at home, at your place',
+    'g.adv.respecFar': 'Reassigning works at home, at your place (🏠 in the pause menu takes you there).',
+    'g.adv.statsNote': 'Skill already speeds up mining. The other stats take effect once Funke, the ships and the encounters join the Adventure.',
+    'g.adv.up.kick': '✦ ADVENTURE ✦',
+    'g.adv.up.title': 'Level {n}',
+    'g.adv.up.star': '⭐ Star {n}',
+    'g.adv.up.pt1': '+1 stat point',
+    'g.adv.up.pts': '+{n} stat points',
+    'g.adv.up.gift': '🎁 Gift: {n} Sterntaler',
+    'g.adv.up.how': 'Pause → ⚔ Adventure: give your points',
+    'g.adv.float': '+{n} XP',
+    'g.adv.welcome': '⚔ The Adventure begins',
+    'g.adv.welcomeSub': 'Exploring, building, discovering and helping now bring experience and Sterntaler.',
+    'g.adv.newWorld': '⚔ Start an Adventure world',
+    'g.adv.newWorldSub': 'A new world with levels, stats and Sterntaler',
+    'g.adv.worldName': 'Adventure World',
+    'g.set.advHud': 'Adventure: level and Sterntaler top left',
+    'g.set.advHud.tip': 'The ring shows your level and how far the next one is, beside it your Sterntaler. Only in Adventure worlds.',
+    'g.set.storyOffer': 'Adventure: Funke announces chapters',
+    'g.set.storyOffer.tip': 'Funke lets you know when a chapter of the story is ready. Off: it waits quietly in the journal.',
     // ---- the block look (Settings → Graphics, /look)
     'g.look.label': 'Blocks',
     'g.look.classic': 'Classic',
@@ -58585,6 +60430,12 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.load.terrain': 'Generating terrain…',
     'g.load.meshes': 'Building meshes…',
     'g.load.horizon': 'Preloading the horizon…',
+    // t-first · the loading screen's phases (first.js): one sentence each, the counts under the bar
+    'g.load.p.gen': 'Shaping the hills …',
+    'g.load.p.mesh': 'Building the town …',
+    'g.load.p.up': 'Setting the light …',
+    'g.load.p.far': 'Painting the distance …',
+    'g.load.counts': 'Generated {g}/{gn} · Built {m}/{n} · Uploaded {u}/{n}',
     'g.load.saving': 'Saving…',
     'g.load.sleeping': 'Sleeping…',
     'g.load.joining': 'Joining {name}…',
@@ -59236,6 +61087,9 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.wow.lookout': 'The Lookout on the Ridge',
     'g.wow.hills': 'The Pod Hills',
     'g.wow.view': 'A View',
+    // t-first · a new world opens on its finest vista at the golden hour (first.js)
+    'g.set.vistaStart': 'Start at a vista point',
+    'g.set.vistaStart.tip': 'A new world begins at its finest vista point, in the golden hour under a clear sky — with a wow moment. Off: in the temple\'s hangar hall.',
     // creatures and biomes (names in the codex)
     'g.mob.glimmer_deer': 'Glimmer Deer', 'g.mob.moss_boar': 'Moss Boar', 'g.mob.sky_ray': 'Sky Ray', 'g.mob.crystal_crab': 'Crystal Crab', 'g.mob.ember_husk': 'Ember Husk',
     'g.mob.void_stalker': 'Void Stalker', 'g.mob.shard_wisp': 'Shard Wisp', 'g.mob.pond_duck': 'Pond Duck', 'g.mob.bloom_sheep': 'Bloom Sheep', 'g.mob.hover_drone': 'Hover Drone',
@@ -59504,11 +61358,35 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.chat.landFirst': 'Land or get off first.',
     'g.chat.homeBed': 'Home to your bed.',
     'g.chat.homeSpawn': 'Back at your spot.',
+    // u-dims · the worlds of a save (src/shared/dimreg.js, src/main/travel.js): travel, gates, Heimkehr
+    'g.dim.overworld': 'Heartworld',
+    'g.dim.flat': 'Flat world',
+    'g.dim.underforge': 'Underforge',
+    'g.dim.hollow': 'The Hollow',
+    'g.dim.drift': 'Drift Isles',
+    'g.travel.gate': 'Stay a moment in the gate …',
+    'g.travel.going': 'On the way …',
+    'g.travel.goingHome': 'On the way home …',
+    'g.travel.arrived': '✦ {dim} — go back any time with 🏠 in the pause menu or /home',
+    'g.travel.home': '🏠 Home again: {dim}',
+    'g.travel.guest': 'As a guest you stay in your host\'s world.',
+    'g.travel.guests': 'With guests in your world you all stay here — you can travel when you play alone.',
+    'g.travel.busy': 'Already on the way …',
+    'g.travel.here': 'You are already here: {dim}',
+    'g.travel.unknown': 'There is no such world here: {id} — /dim lists them all',
+    'g.travel.notNow': 'Not right now — arrive first.',
+    'g.travel.list': 'Worlds: {list} · you are in: {dim}',
+    'g.travel.failed': 'The journey did not work — you are back in: {dim}',
     'g.chat.joined': "You joined {name}'s world! Esc → Multiplayer to teleport to them · T to chat",
     'g.chat.welcome': 'Welcome to {name}. Click the view to look around · E inventory · Esc menu',
     'g.chat.zen': 'Zen Builder: no mobs, no damage, no hunger. Freeze time & weather in the Esc menu.',
     'g.chat.noShot': 'Screenshot not available here.',
     'g.chat.photo': 'Photo mode — F2 to capture · Esc to exit',
+    // t-first · 📷 photo mode (photomode.js)
+    'g.photo.hint': '📷 Photo mode — mouse: look · W A S D: glide · Space / Shift: up / down · Q / E: tilt · [ ] or , .: time of day · F2, Enter or click: photo (2×) · Esc: back',
+    'g.photo.short': '📷 Photo mode · F2 or click: photo · Esc: back',
+    'g.photo.saved': 'Saved: {n} ({w} × {h})',
+    'g.photo.fail': '📷 That photo did not work — the graphics memory is too small for twice the size.',
     'g.chat.bedGone': 'Your bed is missing — back to your spot.',
     'g.chat.spawnSetGuest': 'Your spot is here now. (In a friend\'s world only the host can sleep through the night.)',
     'g.chat.morning': 'Good morning! Your spot is here now.',
@@ -60587,6 +62465,34 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.set.cloudShadow.tip': 'The clouds\' shadows drift with the wind over meadows, hills and roofs. From Balanced up.',
     'g.set.wxDrama': 'Weather drama: storm front, lightning, rainbow, fog banks',
     'g.set.wxDrama.tip': 'A storm rolls in from one side, the wind picks up, lightning outlines the hills, the rain blows sideways; afterwards a rainbow. In the morning fog banks lie in the valleys. Off on Very Low.',
+    // t-sky3 · WOW V · Der Himmel (src/main/sky3.js): the sky's level and the clouds with volume
+    'g.set.sky3': 'Sky: sunset glow, moons, shooting stars, aurora',
+    'g.set.sky3V': ['Simple', 'Beautiful', 'Splendid'],
+    'g.set.sky3.tip': 'The sky by the hour: the golden hour, sunsets in layered bands with a large sun disc, the afterglow and the earth\'s shadow; at night two moons in their phases and shooting stars. From Balanced up also an aurora on some nights, cloud banks out to the horizon and sunbeams through the gaps in the clouds. On Very Low as before.',
+    'g.set.cloudVol': 'Clouds with volume',
+    'g.set.cloudVol.tip': 'Cumulus clouds as bodies: sunlit tops, shaded flat bases, a glowing rim against the sun, golden in the golden hour, pink at dusk, blue-grey in the moonlight; under a rain deck dark rags of cloud drift by. From Balanced up.',
+    'g.set.wildBirds': 'Bird flocks: a murmuration at dusk, gulls, a heron',
+    'g.set.wildBirds.tip': 'At dusk a cloud of thousands of starlings sweeps low over the lake and the fields, parts, folds and turns and settles in a tree line for the night; at dawn it rises again. By day gulls wheel over the lake, and a heron stands at a pond\'s edge and takes off slowly when you come within eight blocks. The murmuration from Balanced up; off on Very Low.',
+    'g.set.wildFish': 'Fish shoals: fish at the pier, carp in the ponds',
+    'g.set.wildFish.tip': 'Under the pier, in the waterfall\'s pool and in the shallows near you a shoal of small fish swirls, flashing in the sun as it turns, and scatters when you come close; carp cruise in the ponds. Off on Very Low.',
+    'g.set.wildBugs': 'Butterflies & dragonflies: a swarm over the flowers, dragonflies at the ponds',
+    'g.set.wildBugs.tip': 'A swarm of butterflies lives on a flower meadow, fluttering from bloom to bloom and rising round you as you walk through; dragonflies hover over the ponds and dart away. Off on Very Low.',
+    'g.set.wildRays': 'Sky rays: great rays between the floating isles',
+    'g.set.wildRays.tip': 'Great, gentle sky rays, each with its young one at its side, glide a slow circuit under and between the floating isles, trailing glowing lines and sparks of light, and glow at night. Every player sees them in the same place. From Balanced up.',
+    'g.set.wildHerds': 'Herds on the move: deer at dawn, sheep, rabbits, a fox',
+    'g.set.wildHerds.tip': 'At dawn the deer cross the meadow in a line and graze, the sheep drift over the pasture as one herd, rabbits hop at the field edges and dash into the hedge, and at dusk a fox trots along the hedge. Nothing hunts here. Off on Very Low.',
+    // u-space0 · the space view (src/main/spacescene.js: /raum, space detail)
+    'g.space.on': '🪐 Space view: {place} — Esc or /raum takes you back, the mouse looks around',
+    'g.space.wait': '🪐 Preparing the space view …',
+    'g.space.off': 'Back on the ground',
+    'g.space.help': 'Space view: /raum herz · amarant · zinn · aqua — /raum alone takes you back',
+    'g.space.place.herz': 'three kilometres above Herzwelt',
+    'g.space.place.amarant': 'Amarant over Herzwelt\'s rim',
+    'g.space.place.zinn': 'Amarant over Zinnober',
+    'g.space.place.aqua': 'Aquamarin and Herzwelt',
+    'g.set.spaceDetail': 'Space detail',
+    'g.set.spaceDetail.tip': 'How fine planets, moons, the ring and the stars are in the space view: texture size, fine clouds, star fields. Follows the preset.',
+    'g.set.spaceDetailV': ['Very low', 'Low', 'Medium', 'High'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
 
@@ -60621,6 +62527,74 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.mode.survival': 'Überleben',
     'g.mode.creative': 'Kreativ',
     'g.mode.zen': 'Zen-Bauen',
+    // ---- a-core · ⚔ das Abenteuer (src/main/adventure.js): der Spielweg pro Welt, Stufen, Werte, Sterntaler
+    'g.adv.title': '⚔ Abenteuer',
+    'g.adv.pause': '⚔ Abenteuer',
+    'g.adv.pauseTip': 'Stufen, Werte und Sterntaler in dieser Welt — an- und ausschaltbar',
+    'g.adv.way': 'Spielweg',
+    'g.adv.way.free': '🏗 Frei bauen',
+    'g.adv.way.freeS': 'Bauen und entdecken in Ruhe',
+    'g.adv.way.adv': '⚔ Abenteuer',
+    'g.adv.way.advS': 'Stufen, Werte, Sterntaler',
+    'g.adv.wayNote': 'Im Abenteuer sagt die Schwierigkeit, wie stark die Begegnungen sind — Friedlich heißt: ein Abenteuer ganz ohne Begegnungen.',
+    'g.adv.band': 'Schwierigkeit',
+    'g.adv.band.easy': 'Leicht',
+    'g.adv.band.normal': 'Normal',
+    'g.adv.band.hard': 'Schwer',
+    'g.adv.enc': 'Begegnungen',
+    'g.adv.enc.normal': 'normal',
+    'g.adv.enc.rare': 'selten',
+    'g.adv.enc.off': 'aus',
+    'g.adv.encNote': 'Ohne Begegnungen bleibt alles andere: Stufen, Sterntaler, Aufgaben und die Geschichte.',
+    'g.adv.encKids': '🧸 Kindersicher: ein Abenteuer ohne Begegnungen.',
+    'g.adv.confirm': 'Maschinen und Schatten tauchen auf — in den Außenposten, in Ruinen und nachts. Dein Zuhause und die Dörfer bleiben sicher.',
+    'g.adv.confirmCalm': 'Ab jetzt zählt alles, was du tust: Erkunden, Bauen, Entdecken und Helfen bringen Erfahrung und Sterntaler. Gegner gibt es hier noch keine.',
+    'g.adv.yes': '⚔ Los geht’s',
+    'g.adv.no': 'Lieber nicht',
+    'g.adv.offNote': 'Ausgeschaltet bleiben dir deine Stufe, deine Sterntaler und alles Erreichte.',
+    'g.adv.teaser': 'Mit dem Abenteuer zählt alles, was du tust: Du steigst Stufen auf, sammelst Sterntaler und wirst stärker.',
+    'g.adv.level': 'Stufe {n}',
+    'g.adv.levelMax': 'Stufe 50 · ⭐ {s}',
+    'g.adv.xp': '{a} / {b} EP bis Stufe {n}',
+    'g.adv.xpStar': '{a} / {b} EP bis zum nächsten Stern',
+    'g.adv.taler': '{n} Sterntaler',
+    'g.adv.pts1': '1 Punkt frei',
+    'g.adv.pts': '{n} Punkte frei',
+    'g.adv.pts0': 'Alle Punkte verteilt',
+    'g.adv.toStats': 'Werte verteilen →',
+    'g.adv.stats': 'Deine Werte',
+    'g.adv.stat.aus': '❤ Ausdauer',
+    'g.adv.stat.ene': '⚡ Energie',
+    'g.adv.stat.spu': '🧭 Spürsinn',
+    'g.adv.stat.ges': '🛠 Geschick',
+    'g.adv.stat.pil': '🚀 Pilot',
+    'g.adv.eff.aus': '{hp} Lebenspunkte · +1 Herz je 2 Punkte',
+    'g.adv.eff.ene': 'Puls und Werkzeuge +{e} % · Schub +{b} %',
+    'g.adv.eff.spu': 'Funkes Suchkreis {r} Blöcke · ab 5 zeigt die Karte verborgene Truhen',
+    'g.adv.eff.ges': 'Abbauen und Bauen +{s} % · ein Tipp bei 5 und bei 10',
+    'g.adv.eff.pil': 'Schubzeit +{b} % · Wendigkeit +{t} %',
+    'g.adv.plusTip': 'Einen Punkt hineingeben',
+    'g.adv.respec': '↺ Neu verteilen',
+    'g.adv.respecTip': 'Kostenlos — zu Hause, an deinem Platz',
+    'g.adv.respecFar': 'Neu verteilen geht zu Hause, an deinem Platz (🏠 im Pausemenü bringt dich hin).',
+    'g.adv.statsNote': 'Geschick wirkt schon jetzt beim Abbauen. Die anderen Werte wirken, sobald Funke, die Schiffe und die Begegnungen ins Abenteuer kommen.',
+    'g.adv.up.kick': '✦ ABENTEUER ✦',
+    'g.adv.up.title': 'Stufe {n}',
+    'g.adv.up.star': '⭐ Stern {n}',
+    'g.adv.up.pt1': '+1 Wertpunkt',
+    'g.adv.up.pts': '+{n} Wertpunkte',
+    'g.adv.up.gift': '🎁 Geschenk: {n} Sterntaler',
+    'g.adv.up.how': 'Pause → ⚔ Abenteuer: Punkte verteilen',
+    'g.adv.float': '+{n} EP',
+    'g.adv.welcome': '⚔ Das Abenteuer beginnt',
+    'g.adv.welcomeSub': 'Erkunden, Bauen, Entdecken und Helfen bringen jetzt Erfahrung und Sterntaler.',
+    'g.adv.newWorld': '⚔ Abenteuer-Welt beginnen',
+    'g.adv.newWorldSub': 'Eine neue Welt mit Stufen, Werten und Sterntalern',
+    'g.adv.worldName': 'Abenteuer-Welt',
+    'g.set.advHud': 'Abenteuer: Stufe und Sterntaler oben links',
+    'g.set.advHud.tip': 'Der Ring zeigt deine Stufe und wie weit es bis zur nächsten ist, daneben deine Sterntaler. Nur in Abenteuer-Welten.',
+    'g.set.storyOffer': 'Abenteuer: Funke kündigt Kapitel an',
+    'g.set.storyOffer.tip': 'Funke sagt Bescheid, wenn ein Kapitel der Geschichte bereitliegt. Aus: Es wartet still im Tagebuch.',
     // ---- der Block-Look (Einstellungen → Grafik, /look)
     'g.look.label': 'Blöcke',
     'g.look.classic': 'Klassisch',
@@ -60645,6 +62619,12 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.load.terrain': 'Land wird geformt …',
     'g.load.meshes': 'Blöcke werden gebaut …',
     'g.load.horizon': 'Der Horizont wird vorgeladen …',
+    // t-first · the loading screen's phases (first.js): one sentence each, the counts under the bar
+    'g.load.p.gen': 'Die Hügel werden geformt …',
+    'g.load.p.mesh': 'Die Stadt wird gebaut …',
+    'g.load.p.up': 'Das Licht wird gesetzt …',
+    'g.load.p.far': 'Die Ferne wird gemalt …',
+    'g.load.counts': 'Erzeugt {g}/{gn} · Gebaut {m}/{n} · Hochgeladen {u}/{n}',
     'g.load.saving': 'Speichern …',
     'g.load.sleeping': 'Gute Nacht …',
     'g.load.joining': 'Auf dem Weg zu {name} …',
@@ -61296,6 +63276,9 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.wow.lookout': 'Der Aussichtsturm auf dem Grat',
     'g.wow.hills': 'Die Kuppelhügel',
     'g.wow.view': 'Aussicht',
+    // t-first · a new world opens on its finest vista at the golden hour (first.js)
+    'g.set.vistaStart': 'Start auf dem Aussichtspunkt',
+    'g.set.vistaStart.tip': 'Eine neue Welt beginnt an ihrem schönsten Aussichtspunkt, zur goldenen Stunde und bei klarem Himmel — mit einem Wow-Moment. Aus: in der Hangarhalle des Tempels.',
     // Wesen und Biome (Namen im Codex)
     'g.mob.glimmer_deer': 'Glimmerhirsch', 'g.mob.moss_boar': 'Mooskeiler', 'g.mob.sky_ray': 'Himmelsrochen', 'g.mob.crystal_crab': 'Kristallkrabbe', 'g.mob.ember_husk': 'Glutschale',
     'g.mob.void_stalker': 'Leerenschleicher', 'g.mob.shard_wisp': 'Scherbenirrlicht', 'g.mob.pond_duck': 'Teichente', 'g.mob.bloom_sheep': 'Blütenschaf', 'g.mob.hover_drone': 'Schwebedrohne',
@@ -61564,11 +63547,35 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.chat.landFirst': 'Erst landen oder absteigen.',
     'g.chat.homeBed': 'Zurück in deinem Bett.',
     'g.chat.homeSpawn': 'Zurück an deinem Platz.',
+    // u-dims · die Welten eines Spielstands (src/shared/dimreg.js, src/main/travel.js): Reisen, Tore, Heimkehr
+    'g.dim.overworld': 'Herzwelt',
+    'g.dim.flat': 'Flachwelt',
+    'g.dim.underforge': 'Unterschmiede',
+    'g.dim.hollow': 'Hohlwelt',
+    'g.dim.drift': 'Driftinseln',
+    'g.travel.gate': 'Bleib einen Moment im Tor …',
+    'g.travel.going': 'Unterwegs …',
+    'g.travel.goingHome': 'Auf dem Heimweg …',
+    'g.travel.arrived': '✦ {dim} — zurück geht es jederzeit mit 🏠 im Pausenmenü oder /home',
+    'g.travel.home': '🏠 Wieder daheim: {dim}',
+    'g.travel.guest': 'Als Gast bleibst du in der Welt deines Gastgebers.',
+    'g.travel.guests': 'Mit Gästen in deiner Welt bleibt ihr hier — reisen kannst du, wenn du allein spielst.',
+    'g.travel.busy': 'Die Reise läuft schon …',
+    'g.travel.here': 'Du bist schon hier: {dim}',
+    'g.travel.unknown': 'Diese Welt gibt es hier nicht: {id} — /dim zeigt alle',
+    'g.travel.notNow': 'Gerade nicht — erst einmal ankommen.',
+    'g.travel.list': 'Welten: {list} · du bist in: {dim}',
+    'g.travel.failed': 'Die Reise hat nicht geklappt — du bist wieder in: {dim}',
     'g.chat.joined': 'Du bist in der Welt von {name}! Esc → Zusammen spielen bringt dich zu ihm · T zum Chatten',
     'g.chat.welcome': 'Willkommen in {name}. Klick ins Bild, um dich umzusehen · E Inventar · Esc Menü',
     'g.chat.zen': 'Zen-Bauen: keine Monster, kein Schaden, kein Hunger. Zeit & Wetter hältst du im Esc-Menü an.',
     'g.chat.noShot': 'Hier geht kein Foto.',
     'g.chat.photo': 'Foto-Modus — F2 macht das Foto · Esc beendet',
+    // t-first · 📷 Fotomodus (photomode.js)
+    'g.photo.hint': '📷 Fotomodus — Maus: schauen · W A S D: gleiten · Leertaste / Umschalt: hoch / runter · Q / E: neigen · [ ] oder , .: Tageszeit · F2, Eingabe oder Klick: Foto (2×) · Esc: zurück',
+    'g.photo.short': '📷 Fotomodus · F2 oder Klick: Foto · Esc: zurück',
+    'g.photo.saved': 'Gespeichert: {n} ({w} × {h})',
+    'g.photo.fail': '📷 Dieses Foto ging nicht — der Grafikspeicher reicht nicht für die doppelte Größe.',
     'g.chat.bedGone': 'Dein Bett ist weg — zurück an deinen Platz.',
     'g.chat.spawnSetGuest': 'Mein Platz ist jetzt hier. (In der Welt eines Freundes kann nur der Host die Nacht durchschlafen.)',
     'g.chat.morning': 'Guten Morgen! Mein Platz ist jetzt hier.',
@@ -62647,6 +64654,34 @@ VR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};
     'g.set.cloudShadow.tip': 'Die Schatten der Wolken ziehen mit dem Wind über Wiesen, Hügel und Dächer. Ab Ausgewogen.',
     'g.set.wxDrama': 'Wetter-Drama: Gewitterfront, Blitze, Regenbogen, Nebelbänke',
     'g.set.wxDrama.tip': 'Ein Gewitter zieht von einer Seite heran, der Wind frischt auf, Blitze zeichnen die Hügel nach, der Regen weht schräg; danach ein Regenbogen. Morgens liegen Nebelbänke in den Tälern. Auf Sehr niedrig aus.',
+    // t-sky3 · WOW V · Der Himmel (src/main/sky3.js): the sky's level and the clouds with volume
+    'g.set.sky3': 'Himmel: Abendrot, Monde, Sternschnuppen, Polarlicht',
+    'g.set.sky3V': ['Einfach', 'Schön', 'Prächtig'],
+    'g.set.sky3.tip': 'Der Himmel nach Tageszeit: die goldene Stunde, das Abendrot in Farbbändern mit großer Sonnenscheibe, das Nachglühen und der Erdschatten; nachts zwei Monde in ihren Phasen und Sternschnuppen. Ab Ausgewogen dazu Polarlicht in manchen Nächten, Wolkenbänke bis zum Horizont und Sonnenstrahlen durch die Wolkenlücken. Auf Sehr niedrig wie bisher.',
+    'g.set.cloudVol': 'Wolken mit Volumen',
+    'g.set.cloudVol.tip': 'Die Haufenwolken als Körper: sonnige Kuppen, schattige flache Böden, ein leuchtender Rand im Gegenlicht, golden in der goldenen Stunde, rosa in der Dämmerung, blaugrau im Mondlicht; unter einer Regendecke ziehen dunkle Wolkenfetzen. Ab Ausgewogen.',
+    'g.set.wildBirds': 'Vogelschwärme: Schwarmwolke in der Dämmerung, Möwen, Reiher',
+    'g.set.wildBirds.tip': 'In der Abenddämmerung zieht eine Wolke aus Tausenden Staren tief über den See und die Felder, teilt sich, faltet und dreht sich und landet zur Nacht in einer Baumreihe; im Morgengrauen steigt sie wieder auf. Tagsüber kreisen Möwen über dem See, am Teichrand steht ein Reiher und fliegt gemächlich auf, wenn du näher als acht Blöcke kommst. Schwarm ab Ausgewogen; auf Sehr niedrig aus.',
+    'g.set.wildFish': 'Fischschwärme: Fische am Steg, Karpfen im Teich',
+    'g.set.wildFish.tip': 'Unter dem Steg, im Becken des Wasserfalls und im flachen Wasser neben dir kreist ein Schwarm kleiner Fische, der in der Sonne aufblitzt, wenn er wendet, und vor dir auseinanderstiebt; in den Teichen ziehen Karpfen. Auf Sehr niedrig aus.',
+    'g.set.wildBugs': 'Falter & Libellen: Schmetterlinge über den Blumen, Libellen am Teich',
+    'g.set.wildBugs.tip': 'Über einer Blumenwiese lebt ein Schwarm Schmetterlinge, der von Blüte zu Blüte flattert und um dich aufsteigt, wenn du hindurchgehst; über den Teichen stehen Libellen in der Luft und schießen davon. Auf Sehr niedrig aus.',
+    'g.set.wildRays': 'Himmelsrochen: große Rochen zwischen den Himmelsinseln',
+    'g.set.wildRays.tip': 'Große, sanfte Himmelsrochen – jeder mit seinem Jungen an der Seite – gleiten auf einer langsamen Runde unter und zwischen den schwebenden Inseln, ziehen leuchtende Spuren und Lichtfunken hinter sich her und leuchten nachts. Für alle Mitspieler am selben Ort. Ab Ausgewogen.',
+    'g.set.wildHerds': 'Herden ziehen: Rehe im Morgengrauen, Schafe, Kaninchen, Fuchs',
+    'g.set.wildHerds.tip': 'Im Morgengrauen ziehen die Rehe in einer Reihe über die Wiese und äsen, die Schafe wandern als eine Herde über die Weide, an den Feldrändern hoppeln Kaninchen und flitzen in die Hecke, und in der Dämmerung schnürt ein Fuchs an der Hecke entlang. Niemand jagt hier. Auf Sehr niedrig aus.',
+    // u-space0 · die Raumansicht (src/main/spacescene.js: /raum, Weltraum-Detail)
+    'g.space.on': '🪐 Raumansicht: {place} — Esc oder /raum führt zurück, die Maus schaut sich um',
+    'g.space.wait': '🪐 Die Raumansicht wird vorbereitet …',
+    'g.space.off': 'Zurück auf dem Boden',
+    'g.space.help': 'Raumansicht: /raum herz · amarant · zinn · aqua — /raum allein führt zurück',
+    'g.space.place.herz': 'drei Kilometer über der Herzwelt',
+    'g.space.place.amarant': 'Amarant über dem Rand der Herzwelt',
+    'g.space.place.zinn': 'Amarant über Zinnober',
+    'g.space.place.aqua': 'Aquamarin und die Herzwelt',
+    'g.set.spaceDetail': 'Weltraum-Detail',
+    'g.set.spaceDetail.tip': 'Wie fein Planeten, Monde, Ring und Sterne in der Raumansicht sind: Texturgröße, feine Wolken, Sternfelder. Folgt der Voreinstellung.',
+    'g.set.spaceDetailV': ['Sehr niedrig', 'Niedrig', 'Mittel', 'Hoch'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
 
