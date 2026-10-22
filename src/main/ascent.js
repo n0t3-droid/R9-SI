@@ -305,6 +305,7 @@
     if (from === 'air') a.ground = [pos[0], pos[1], pos[2]];
     A.fromMap(a.st, pos, vel, A.clock(fl) + (a.tOff || 0));
     fl.regime = 'climb'; fl.holdAlt = null; a.jump = null;
+    if (from === 'air') fl.alt = null;   // (a landed ship set up here kept its 0 m: the climb measures its own clearance)
     a.pos[0] = pos[0]; a.pos[1] = pos[1]; a.pos[2] = pos[2]; a.vel[0] = vel[0]; a.vel[1] = vel[1]; a.vel[2] = vel[2];
     unit(a.st.r, a.prevUp);
     if (A.onRegime) A.onRegime(fl, from, 'climb');
@@ -504,6 +505,7 @@
     A.frameFrom(_tmp, _up, a.S);
     unit(st.r, a.prevUp);
     fl.regime = 'space'; fl.auto = null; fl.state = 'flying';
+    fl.throttle = 0; fl.boost = false; fl.boostWant = false;   // (on the circle the ship coasts)
     if (!fl.running) { fl.power = 'running'; fl.startT = 3; }
     if (from === 'air') a.ground = [b.pos[0], b.pos[1], b.pos[2]];
     a.pos[0] = pos[0]; a.pos[1] = Math.min(pos[1], A.BAND.edge); a.pos[2] = pos[2];
@@ -581,7 +583,7 @@
       if (g.audio.turbine) g.audio.turbine(0.02 + fl.spool * 0.05, fl.spool);
     }
     if (g) g.flightWind = Math.min(0.9, qd / 25000);
-    const glow = A.glowOf(I.q);
+    const glow = A.glowFl(fl);
     const amp = S.camShake === false ? 0 : clamp(Math.min(1.6, qd / 15000) * 0.5 + glow * 0.9 + fl.bump + 0.02 * fl.spool, 0, 3);
     fl.bump = Math.max(0, fl.bump - dt * 2.2);
     fl.shakeAmp += (amp - fl.shakeAmp) * k1(5, dt);
@@ -593,9 +595,17 @@
     if (fl.fx) fl.fx(dt, Math.min(I.speed, 60));   // (the plume and its trail; in space too — the ship waits on its map spot)
   };
   // the plasma's glow 0…1 from the heating ρv³ (U§4.4: by ρ, not by height): faint from 0.15 MW, full at 0.6 MW (the entry
-  // from 3 km peaks near 0.6 MW at ~2,200 m: test/ascent.js f)
-  A.GLOW = Object.freeze({ q0: 0.15e6, q1: 0.6e6 });
-  A.glowOf = (q) => clamp(((q || 0) - A.GLOW.q0) / (A.GLOW.q1 - A.GLOW.q0), 0, 1);
+  // from 3 km over the Heartland peaks near 0.6 MW at ~2,200 m: test/ascent.js f). With qRef (the autopilot's predicted
+  // peak of this entry, entry.js) the scale is the entry's own: full at 80 % of its peak, never below 0.2 MW — on this
+  // small world a circle's way crosses the ground's turning at an angle that changes with the place, and the air meets
+  // the ship at 480–770 m/s; a slow entry (under ~0.08 MW) stays dark
+  A.GLOW = Object.freeze({ q0: 0.15e6, q1: 0.6e6, qMin: 0.2e6 });
+  A.glowOf = (q, qRef) => {
+    const G = A.GLOW; let q0 = G.q0, q1 = G.q1;
+    if (qRef > 0) { q1 = clamp(qRef * 0.8, G.qMin, G.q1); q0 = Math.min(G.q0, q1 * 0.4); }
+    return clamp(((q || 0) - q0) / (q1 - q0), 0, 1);
+  };
+  A.glowFl = (fl) => { const a = fl && fl.asc; return a ? A.glowOf(a.info.q, fl.auto && fl.auto.qRef) : 0; };
 
   // ---------------------------------------------------------------- the climb's sky (env.js → VR.Ascent.env)
   // k = climbK(y) (smootherstep 300 → 2,500): the postcard bodies glide to the true sky (directions on great circles,
@@ -623,13 +633,17 @@
     }
     return E;
   };
-  // the sky's thinning (airK) and space showing through it (fBg: the space background's share, 0…1)
-  A.thinSky = (E, airK, fBg) => {
-    const sc = (c, k) => (c ? c.map((x) => x * k) : c);
-    E.zenith = sc(E.zenith, airK); E.skyMid = sc(E.skyMid, Math.pow(airK, 0.7)); E.horizon = sc(E.horizon, Math.pow(airK, 0.35));
-    E.sunset = sc(E.sunset, Math.sqrt(airK));
+  // the sky's thinning (airK) and space showing through it (fBg: the space background's share, 0…1); ck = climbK(y): the
+  // band over the horizon keeps its glow low in the climb and goes faster the higher (the sky's horizon is the flat map's,
+  // 0°, while the limb sinks below it — above ~1,200 m a band there reads as a grey wall over the limb; the impostor's own
+  // air draws the limb's thin blue line where it is)
+  A.thinSky = (E, airK, fBg, ck) => {
+    const sc = (c, k) => (c ? c.map((x) => x * k) : c), k = ck || 0;
+    const hk = Math.pow(airK, 0.35 + k);
+    E.zenith = sc(E.zenith, airK); E.skyMid = sc(E.skyMid, Math.pow(airK, 0.7 + 0.5 * k)); E.horizon = sc(E.horizon, hk);
+    E.sunset = sc(E.sunset, Math.pow(airK, 0.5 + k));
     if (E.skyStops) { E.skyStops = E.skyStops.slice(); E.skyStops[0] *= 0.25 + 0.75 * Math.sqrt(airK); E.skyStops[3] *= airK; }
-    if (E.skyDay) { E.skyDay = E.skyDay.slice(); E.skyDay[0] *= Math.sqrt(airK); }
+    if (E.skyDay) { E.skyDay = E.skyDay.slice(); E.skyDay[0] *= hk; }
     if (E.skySpace) {
       // space shows from the horizon up as the air goes (by day too); its brightness by day to the night's
       const s = E.skySpace.slice(), f = 1 - airK;
@@ -642,7 +656,7 @@
     // t-sky3's layers: the golden bands, the aureole and the earth's shadow belong to the air
     const S3 = E.sky3 && (E.sky3.level || E.sky3.vol) ? E.sky3.u : null;   // (rewritten each frame only while t-sky3 is on)
     if (S3) {
-      const kk = Math.sqrt(airK);
+      const kk = Math.pow(airK, 0.5 + 0.5 * k);
       for (const n of ['u_s3Warm', 'u_s3Warm2', 'u_s3Glow', 'u_s3Belt']) { const u = S3[n]; if (u) { u[0] *= kk; u[1] *= kk; u[2] *= kk; } }
       if (S3.u_s3Belt) S3.u_s3Belt[3] *= kk;
       if (S3.u_s3Shade) { S3.u_s3Shade[0] *= airK; S3.u_s3Shade[1] *= airK; S3.u_s3Shade[2] *= airK; }
@@ -689,7 +703,7 @@
     const hzR = imp >= 0.999 ? (V.hzR || 0) * (V.hzK === undefined ? 1 : V.hzK) : 0;
     E.climb = { y, k, airK: ak, bg, body: A.bodyK(y), imp, t, curve: V.curve === false ? 0 : A.curve(y), cut0: hzR * 0.75, cut1: hzR * 0.95, hzR };
     A.blendSky(E, sky, k);
-    A.thinSky(E, ak, bg);
+    A.thinSky(E, ak, bg, k);
     A.thinFog(E, ak);
     // the last of the air's light goes before the hand-off (the space frame has no sky pass); the postcard's bodies go
     // under the true ones; the picture's grade turns to space's

@@ -102,7 +102,7 @@
   EN.predict = (stIn, phase, maxT) => {
     const U = UNI(), S = U.home, b = S.body('herz'), mu = b.mu, w = b.spin.w, ax = b.spin.axis, g0 = A.SHIP.g;
     const r = Float64Array.from(stIn.r), v = Float64Array.from(stIn.v);
-    let t = stIn.t, ph = phase || 'entry', dvUsed = 0;
+    let t = stIn.t, ph = phase || 'entry', dvUsed = 0, qMax = 0;
     const T = maxT || 260;
     const up = v3(), va = v3(), hh = v3(), acc = v3(), wr = v3();
     for (let s = 0, dt = 0.1; s < T; s += dt) {
@@ -125,12 +125,12 @@
       } else {
         // straight down (the flat jets keep the map velocity: the place stays)
         const pos = [0, 0, 0]; S.inertialToChart('herz', r, v, t, pos, null);
-        if (y < 400) return { x: pos[0], z: pos[2], y, t: s };
+        if (y < 400) return { x: pos[0], z: pos[2], y, t: s, qMax };
         // (the rest of the way is straight down: the place is known)
-        return { x: pos[0], z: pos[2], y, t: s + Math.max(0, y - 300) / 30 };
+        return { x: pos[0], z: pos[2], y, t: s + Math.max(0, y - 300) / 30, qMax };
       }
       const rho = A.rho(y);
-      if (rho > 0) { const kd = -rho * vaL / (2 * A.SHIP.beta); acc[0] += kd * va[0]; acc[1] += kd * va[1]; acc[2] += kd * va[2]; }
+      if (rho > 0) { const kd = -rho * vaL / (2 * A.SHIP.beta); acc[0] += kd * va[0]; acc[1] += kd * va[1]; acc[2] += kd * va[2]; const q = rho * vaL * vaL * vaL; if (q > qMax) qMax = q; }
       // semi-implicit Euler (a tenth of a second: a few metres of error over the whole entry)
       v[0] += acc[0] * dt; v[1] += acc[1] * dt; v[2] += acc[2] * dt;
       r[0] += v[0] * dt; r[1] += v[1] * dt; r[2] += v[2] * dt;
@@ -152,10 +152,10 @@
       if ((A_.predT = (A_.predT || 0) - dt) <= 0) {
         A_.predT = 3;
         const P = EN.predict(a.st, A_.phase);
-        if (P) { A_.pred = P; if (A_.site) { A_.site.x = P.x; A_.site.z = P.z; } A_.dist = Math.hypot(P.x - fl.b.pos[0], P.z - fl.b.pos[2]); A_.eta = P.t; }
+        if (P) { A_.pred = P; if (A_.site) { A_.site.x = P.x; A_.site.z = P.z; } A_.dist = Math.hypot(P.x - fl.b.pos[0], P.z - fl.b.pos[2]); A_.eta = P.t; if (P.qMax > 0) A_.qRef = Math.max(A_.qRef || 0, P.qMax); }
       }
     }
-    const I = a.info, glow = A.glowOf(I.q), P = g.particles, b = fl.b;
+    const glow = A.glowFl(fl), P = g.particles, b = fl.b;
     if (glow > 0.05 && P && ((g.settings && g.settings.particles) | 0) > 0 && fl.toWorld) {
       const n = fl.dirWorld([0, 0, -1]), Lb = (b.length || 12) * 0.5, H = (b.height || 4) * 0.4;
       const k = Math.min(6, 1 + glow * 5) * (g.settings.particles >= 2 ? 1 : 0.5);

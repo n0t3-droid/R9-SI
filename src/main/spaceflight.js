@@ -123,7 +123,7 @@
   };
   SF.say = (fl, key, vars) => { const g = fl.g; if (!key || !g || !g.ui) return; if (g.ui.chatLine) g.ui.chatLine(T(key, vars), '#9affd8'); };
   SF.hint = (fl, key, vars, ms) => { const g = fl.g; if (key && g && g.ui && g.ui.hint) g.ui.hint(T(key, vars), ms || 3200); };
-  SF.nameOf = (id) => { const b = UNI().home.body(id); if (!b) return id; const en = VR.I18N && VR.I18N.lang && VR.I18N.lang() === 'en'; return en ? b.name.en : b.name.de; };
+  SF.nameOf = (id) => { const b = UNI().home.body(id); if (!b) return id; const L = VR.I18N && VR.I18N.lang, en = (typeof L === 'function' ? L() : L) === 'en'; return en ? b.name.en : b.name.de; };
   SF.orbitText = (fl) => {
     const a = A.ascOf(fl), o = A.orbitOf(a.st);
     return { ap: Math.round(o.apo - A.DATUM), pe: Math.round(o.peri - A.DATUM), min: (o.period / 60).toFixed(1) };
@@ -175,6 +175,8 @@
       return true;
     }
     SF.start(fl, r === 'space' ? 'land' : 'descend');
+    // the entry's heating peak, flown ahead once (≈ 1–2 ms; the tick refines it every 3 s): the plasma's own scale
+    if (r === 'space' && fl.auto && VR.Entry && VR.Entry.predict) { const P = VR.Entry.predict(st, 'deorbit'); if (P && P.qMax > 0) fl.auto.qRef = P.qMax; }
     return true;
   };
 
@@ -561,7 +563,7 @@ void main() {
   let fxC = null, fxX = null, fxOn = false;
   SF.fx = function (g, fl) {
     const a = fl && fl.asc, I = a && a.info;
-    const glow = I ? A.glowOf(I.q) : 0, j = a && a.jump, flash = j ? SF.jumpFlash(j.J, j.s) : 0;
+    const glow = I ? A.glowFl(fl) : 0, j = a && a.jump, flash = j ? SF.jumpFlash(j.J, j.s) : 0;
     if (glow < 0.01 && flash < 0.01) { if (fxOn) { fxX.clearRect(0, 0, fxC.width, fxC.height); fxC.style.display = 'none'; fxOn = false; } return; }
     if (!fxC) {
       fxC = document.createElement('canvas'); fxC.id = 'ascFx';
@@ -662,6 +664,6 @@ void main() {
       fl.pitch = (pitch || 0) * Math.PI / 180; b.setAttitude(fl.pitch, 0); fl.orient();
       return true;
     },
-    state(g) { const fl = g.flight; if (!fl || !fl.asc) return { regime: fl ? fl.regime || 'air' : null }; const a = fl.asc, o = A.orbitOf(a.st); return { regime: fl.regime || 'air', frame: a.st.frame, y: +A.mapY(a.st).toFixed(1), speed: +a.info.speed.toFixed(1), q: a.info.q, glow: A.glowOf(a.info.q), ap: o.apo, pe: o.peri, e: o.e, period: o.period, auto: fl.auto ? fl.auto.space || 'village' : null, phase: fl.auto ? fl.auto.phase || null : null, jump: !!a.jump, pos: fl.b.pos.slice(), t: a.st.t }; },
+    state(g) { const fl = g.flight; if (!fl || !fl.asc) return { regime: fl ? fl.regime || 'air' : null }; const a = fl.asc, o = A.orbitOf(a.st); return { regime: fl.regime || 'air', frame: a.st.frame, y: +A.mapY(a.st).toFixed(1), speed: +a.info.speed.toFixed(1), q: a.info.q, glow: A.glowFl(fl), qRef: fl.auto && fl.auto.qRef || null, ap: o.apo, pe: o.peri, e: o.e, period: o.period, auto: fl.auto ? fl.auto.space || 'village' : null, phase: fl.auto ? fl.auto.phase || null : null, jump: !!a.jump, pos: fl.b.pos.slice(), t: a.st.t }; },
   };
 })(VR);

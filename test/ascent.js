@@ -283,6 +283,23 @@ check(pd < 2000, 'the speed is gone within 2 km of the first prediction (the wor
 check(!!landed && landed.t < 420, 'then the straight descent and the last 300 m as today\'s landing: down on the ground', landed ? f0(landed.t) + ' s from orbit, ' + f1(Math.hypot(landed.x - descStart.x, landed.z - descStart.z)) + ' m from where the speed went' : fl.regime + ' ' + fl.state + ' at ' + f0(s.pos[1]));
 check(descStart && Math.hypot(descStart.x, descStart.z) > 20000, 'the ship comes down far from the Heartland (anywhere on Herzwelt)', descStart ? f0(Math.hypot(descStart.x, descStart.z) / 1000) + ' km away' : '-');
 
+// the entry from another circle: 74 km east of the Heartland (Herzwelt is small — 43° of arc) the circle's way crosses
+// the ground's turning at an angle: the air meets the ship at 629 m/s, not 755, and the heating peaks at a third
+// (0.23 MW; the browser's first run: a glow of 0.2). The plasma's glow is the entry's own — its predicted peak — so
+// every flown entry shows it; a slow one (under 0.08 MW) stays dark, as it should
+{
+  A.orbitAt(fl, [74000, 3063, 0], fl.asc.st.t + 10);
+  fl.throttle = 0.4; A.orbitAt(fl, [74000, 3063, 0], fl.asc.st.t);
+  check(fl.throttle === 0 && !fl.boost, 'a ship put on a circle coasts (the lever at zero: the test\'s orbits stayed put)');
+  SF.land(fl);
+  const qRef = fl.auto && fl.auto.qRef;
+  check(qRef > 1.5e5 && qRef < 3.5e5, 'Landen predicts this entry\'s heating peak', qRef ? f1(qRef / 1e6 * 1000) + ' kW' : '-');
+  let gMax = 0, qM = 0;
+  for (let i = 0; i < 30 * 400 && fl.regime !== 'air'; i++) { frame(1 / 30); gMax = Math.max(gMax, A.glowFl(fl)); qM = Math.max(qM, fl.asc.info.q); }
+  check(gMax > 0.95 && A.glowOf(qM) < 0.4, 'its plasma glows fully at its own peak (the physical scale alone would give ' + f1(A.glowOf(qM) * 100) + ' %)', 'glow ' + gMax.toFixed(2) + ', peak ' + f1(qM / 1000) + ' kW');
+  check(A.glowOf(0.083e6, 0.083e6) < 0.05, 'a slow entry (0.08 MW) stays dark');
+}
+
 // ================================================================ (g) the postcard's glide
 console.log('(g) the postcard');
 const envSun = (tk) => { const th = tk / 24000 * Math.PI * 2, el = Math.sin(th) * 0.42, az = th + 0.4; return unit([Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)]); };
@@ -316,6 +333,12 @@ check(Math.abs(mid - k14) < 1e-6, 'between, Amarant glides along the great circl
 const Ed = mkE(6000); Ed.zenith = [0.2, 0.4, 0.9]; Ed.horizon = [0.8, 0.9, 1]; Ed.skyMid = [0.4, 0.6, 1]; Ed.fog = [100, 1000, 0.0002, 0];
 A.env(Ed, { pos: [0, 1200, 0], t: U.worldSeconds(3, 6000), dim: 'overworld' });
 check(Math.abs(Ed.zenith[2] - 0.9 * A.airK(1200)) < 1e-12 && Ed.horizon[2] > Ed.zenith[2] && Ed.fog[2] < 0.0002 * 0.2, 'the sky thins: the zenith first, the horizon band last, the haze with the air', 'zenith ' + Ed.zenith[2].toFixed(3) + ', horizon ' + Ed.horizon[2].toFixed(3));
+// the band over the horizon goes with the climb, faster the higher (the browser's pictures: a grey wall over the limb at
+// 1,200–2,100 m) — the low climb keeps its glow, by 1,500 m the sky above the limb is space's (the impostor's own air
+// draws the limb's thin band)
+const band = (y) => { const E = mkE(6000); E.horizon = [1, 1, 1]; E.skyMid = [1, 1, 1]; E.sunset = [1, 1, 1]; E.skyDay = [1, 8, 1, 1]; A.env(E, { pos: [0, y, 0], t: U.worldSeconds(3, 6000), dim: 'overworld' }); return { h: E.horizon[0], m: E.skyMid[0], s: E.sunset[0], hz: E.skyDay[0] }; };
+const b9 = band(900), b15 = band(1500), b21 = band(2100);
+check(b9.h > 0.4 && b15.h < 0.08 && b21.h < 0.01 && b15.hz < 0.08 && b15.s < 0.3 && b21.m < 0.01, 'the horizon\'s band and haze go with the climb: kept low, gone by 1,500–2,100 m', 'horizon ' + [b9.h, b15.h, b21.h].map(x => x.toFixed(3)).join(' → ') + ', haze at 1,500 m ' + b15.hz.toFixed(3));
 const Eo = mkE(6000), Eo0 = JSON.stringify(Eo); A.env(Eo, { pos: [0, 1500, 0], t: 100, dim: 'aqua' });
 check(JSON.stringify(Eo) === Eo0, 'other worlds: untouched');
 
@@ -341,6 +364,7 @@ const SH = src('src/main/shaders.js');
 check((SH.match(/u_curve/g) || []).length >= 4 && /u-ascent/.test(SH), 'shaders.js: the bend in the terrain and the tile programs');
 const RN = src('src/main/renderer.js'), HO = src('src/main/horizon.js'), EV = src('src/main/env.js'), GM = src('src/main/game.js'), CK = src('src/main/cockpit.js'), SS = src('src/main/spacescene.js'), SP = src('src/main/space_shaders.js');
 const SFs = src('src/main/spaceflight.js');
+check(/u_cirrus, this\.q\.clouds >= 2 \? \(E\.climb \?/.test(RN) && /u-ascent/.test(RN.split('\n').find(l => /u_cirrus, this\.q\.clouds >= 2 \? \(E\.climb/.test(l)) || ''), 'renderer.js: the high cirrus stay below the climb (they faded with the air, marked)');
 check(/u_curve/.test(RN) && /VR\.Ascent/.test(RN) && /u-ascent/.test(HO) && /VR\.Ascent\.env/.test(EV) && /VR\.Entry\.tickShift/.test(EV) && /u-ascent/.test(GM) && /u-ascent/.test(CK) && /u-ascent/.test(SS) && !/u-ascent/.test(SP) && /u_fadeOut/.test(SFs) && /u_cut/.test(SFs) && /SH\.programs = /.test(SFs), 'renderer, horizon, env, game, cockpit and the space scene hooked (marked); the space programs\' fade and cut wrapped from spaceflight.js (space_shaders.js untouched)');
 {
   const odd = '#version 300 es\nprecision highp float;\nout vec4 frag;\nvoid main() { frag = vec4(1.0); }', ok = '#version 300 es\nprecision highp float;\nout vec4 o;\nvoid main() { o = vec4(1.0); }';
@@ -348,6 +372,10 @@ check(/u_curve/.test(RN) && /VR\.Ascent/.test(RN) && /u-ascent/.test(HO) && /VR\
   require(ROOT + 'src/main/space_shaders.js'); SF.wrapPrograms();
   const PW = VR.SpaceShaders.programs(), names = Object.keys(PW), wr = names.filter(k => /spaceMain\(\);/.test(PW[k].fs) && /uniform vec4 u_fadeOut;/.test(PW[k].fs));
   check(names.length >= 6 && wr.length === names.length && /uniform vec4 u_cut;/.test(PW.herz.fs) && !/u_cut/.test(PW.bg.fs), 'every space program carries the fade, Herzwelt\'s the cut too', wr.length + ' of ' + names.length);
+}
+{
+  const I0 = VR.I18N, B = S.body('opal'); VR.I18N = { lang: 'en' }; const nE = SF.nameOf('opal'); VR.I18N = { lang: 'de' }; const nD = SF.nameOf('opal'); VR.I18N = I0;
+  check(nE === B.name.en && nD === B.name.de, 'the bodies\' names in the player\'s language (VR.I18N.lang is a string: the first run\'s jump threw)', nD + ' / ' + nE);
 }
 const LD = src('src/main/lang_de.js'), LE = src('src/main/lang_en.js');
 const keys = new Set(); for (const f of ['ascent', 'spaceflight', 'entry']) for (const m of src('src/main/' + f + '.js').matchAll(/'(g\.(?:asc|set)\.[A-Za-z0-9_.]+)'/g)) if (!m[1].endsWith('.')) keys.add(m[1]);
@@ -371,6 +399,19 @@ check(ms < 3, 'the ghost path (every 0.5 s) < 3 ms', ms.toFixed(2) + ' ms, ' + g
 const stP = A.newState(); A.circularAt(stP, [0, 3063, 0], 100);
 ms = median(() => { EN.predict(stP, 'deorbit'); }, 5, 1);
 check(ms < 6, 'the landing prediction (every 3 s) < 6 ms', ms.toFixed(2) + ' ms');
+
+// ================================================================ a ship set into the climb from the ground (a teleport)
+// (the browser's first run: a landed ship put at 300 m kept its old clearance of 0 m and fell back to the air regime the
+// first frame) — the clearance is unknown until the climb measures it
+console.log('a teleport into the climb');
+{
+  const s2 = mgr.spawn(4243, 'shuttle', null, [40.5, G, 0.5], 0);
+  const f2 = mgr.flightOf(s2);
+  f2.alt = 0; f2.power = 'running'; f2.startT = 3; f2.state = 'flying';
+  A.enterClimb(f2, [40.5, 300, 0.5], [0, 0, 0]);
+  for (let i = 0; i < 8; i++) A.simulate(f2, 1 / 30);
+  check(f2.regime === 'climb' && Math.abs(s2.pos[1] - 300) < 1, 'a landed ship put at 300 m stays in the climb (its old clearance forgotten)', (f2.regime || 'air') + ' at ' + f1(s2.pos[1]) + ' m');
+}
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

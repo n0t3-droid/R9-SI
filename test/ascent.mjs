@@ -159,6 +159,8 @@ async function plaza(P, path) {
   const gy = await P.groundY(px, pz), eyeY = gy + 1 + 1.62, at = [0, 93, 0];
   await P.ev(([x, y, z, at]) => { const g = VR.game, p = g.player; g.env.day = 2; g.env.setTime(6000); p.teleport(x, y - 1.62, z); p.yaw = p.viewYaw = Math.atan2(-(at[0] - x), -(at[2] - z)); p.pitch = Math.atan2(at[1] - y, Math.hypot(at[0] - x, at[2] - z)); g.settings.fov = 70; }, [px, eyeY, pz, at]);
   await P.settle(400);
+  await P.step(60);   // (the last columns' fade-in: two seconds of game time — run 1's v0.49 page was caught mid-fade)
+  await P.settle(60);
   await P.ev(() => { const e = VR.game.env; e.anim = 600; e.cloudDrift = [540, 0]; });
   await P.step(4);
   await P.ev(() => { window.__Fplaza = window.__F; });
@@ -173,8 +175,8 @@ async function basePlaza(preset) {
     if (!await makeWorld(P, preset)) { console.log('  (v0.49: no world)'); return null; }
     const path = SHOTS + `ascent_plaza_base_${tag}.png`, m = await plaza(P, path);
     if (m.err) { console.log('  (v0.49: ' + m.err + ')'); return null; }
-    const wc = [], cc = [];
-    for (let i = 0; i < ROUNDS; i++) { const c = await cost(P, '__Fplaza', 2, 6); wc.push(c.wallMs); cc.push(c.cpuMs); }
+    const wc = [], cc = [], hi = preset !== 'potato';
+    for (let i = 0; i < (hi ? 1 : ROUNDS); i++) { const c = await cost(P, '__Fplaza', hi ? 1 : 2, hi ? 3 : 6); wc.push(c.wallMs); cc.push(c.cpuMs); }
     const out = { wall: r1(med(wc)), cpu: r1(med(cc)), draws: m.draws, tris: m.tris, path, errors: errsOf(P).length };
     console.log(`  v0.49's plaza frame: ${out.wall} ms (CPU ${out.cpu}), ${out.draws} draws (${secs()})`);
     return out;
@@ -200,7 +202,7 @@ async function runPreset(preset, base) {
     // the ground before/after: this build's plaza frame against v0.49's (taken just before on its own page)
     if (base && !pm.err) {
       const wc = [], cc = [];
-      for (let i = 0; i < ROUNDS; i++) { const c = await cost(P, '__Fplaza', 2, 6); wc.push(c.wallMs); cc.push(c.cpuMs); }
+      for (let i = 0; i < (hi ? 1 : ROUNDS); i++) { const c = await cost(P, '__Fplaza', hi ? 1 : 2, hi ? 3 : 6); wc.push(c.wallMs); cc.push(c.cpuMs); }
       const now = { wall: r1(med(wc)), cpu: r1(med(cc)), draws: pm.draws, tris: pm.tris };
       const d = await pixDiff(base.path, SHOTS + `ascent_plaza_${tag}.png`);
       Rr.ground = { base, now, diff: d };
@@ -222,14 +224,15 @@ async function runPreset(preset, base) {
       const U = VR.Universe; let best = null;
       for (let tk = 0; tk < 24000; tk += 250) {
         const t = U.worldSeconds(2, tk), sky = U.localSky('overworld', [0, 1500, 40], t), a = sky._byId.amarant, el = Math.asin(a.dir[1]) * 180 / Math.PI, sel = Math.asin(sky.sun.dir[1]) * 180 / Math.PI;
-        const sc = (sel > 12 ? 1 : 0) * (el > 6 && el < 34 ? 2 - Math.abs(el - 18) / 30 : 0) + (sel > 12 ? 0.2 : 0);
-        if (!best || sc > best.sc) best = { tk, el: +el.toFixed(1), sel: +sel.toFixed(1), az: Math.atan2(-a.dir[0], -a.dir[2]), sc };
+        const sep = Math.acos(Math.max(-1, Math.min(1, a.dir[0] * sky.sun.dir[0] + a.dir[1] * sky.sun.dir[1] + a.dir[2] * sky.sun.dir[2]))) * 180 / Math.PI;
+        const sc = (sel > 12 ? 1 : 0) * (el > 6 && el < 34 ? 2 - Math.abs(el - 18) / 30 : 0) * (sep > 60 ? 1 + Math.min(sep, 120) / 120 : 0.1) + (sel > 12 ? 0.2 : 0);
+        if (!best || sc > best.sc) best = { tk, el: +el.toFixed(1), sel: +sel.toFixed(1), sep: +sep.toFixed(0), az: Math.atan2(-a.dir[0], -a.dir[2]), sc };
       }
       VR.game.env.day = 2; VR.game.env.setTime(best.tk);
       return best;
     });
     Rr.hour = hour;
-    console.log(`  the hour: tick ${hour.tk} (Helia ${hour.sel}°, Amarant ${hour.el}° high) (${secs()})`);
+    console.log(`  the hour: tick ${hour.tk} (Helia ${hour.sel}°, Amarant ${hour.el}° high, ${hour.sep}° from Helia) (${secs()})`);
     // ---- the climb: every 300 m, at rest in the sky (the hover hold), the nose 10° up toward Amarant
     if (want('climb')) {
       for (const y of ALTS) {
@@ -276,8 +279,8 @@ async function runPreset(preset, base) {
         await P.ev(() => { window.__Fh1 = window.__F; });
         await picture(P, '__Fh1', SHOTS + `ascent_handoff_climb_${tag}.png`, K);
         // through the edge: rendered every frame, each synced
-        await P.ev(() => { const g = VR.game, fl = g.flight, a = VR.Ascent.ascOf(fl), b = fl.b; VR.Ascent.enterClimb(fl, [b.pos[0], 2470, b.pos[2]], [0, 22, 0]); fl.throttle = 0.05; });
-        const trace = await P.ev(() => { const g = VR.game, out = []; window.__norender = false; for (let i = 0; i < 70; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); const s = VR.SpaceFlight.debug.state(g); out.push([+(performance.now() - t0).toFixed(1), s.regime, s.y]); } window.__norender = true; return out; });
+        await P.ev(() => { const g = VR.game, fl = g.flight, b = fl.b; VR.Ascent.enterClimb(fl, [b.pos[0], 2486, b.pos[2]], [0, 22, 0]); fl.throttle = 0.05; });
+        const trace = await P.ev(() => { const g = VR.game, out = []; window.__norender = false; for (let i = 0; i < 32; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); const s = VR.SpaceFlight.debug.state(g); out.push([+(performance.now() - t0).toFixed(1), s.regime, s.y]); } window.__norender = true; return out; });
         const ms = trace.map(x => x[0]).slice(3), m = med(ms), mx = Math.max(...ms), hand = trace.findIndex(x => x[1] === 'space');
         Rr.handoff = { median: r1(m), max: r1(mx), at: hand, trace };
         console.log(`  hand-off: frame ${hand} (${hand >= 0 ? trace[hand][2] : '-'} m), median ${r1(m)} ms, max ${r1(mx)} ms; around it ${trace.slice(Math.max(0, hand - 2), hand + 3).map(x => x[0]).join(' · ')}`);

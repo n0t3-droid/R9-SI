@@ -2131,7 +2131,7 @@
         const p = this.P.sky; gl.useProgram(p.p); this.common(p, E);
         if (p.u.u_skyProbe) gl.uniform1f(p.u.u_skyProbe, this.skyProbe ? 1 : 0);   // test hook: the sky paints magenta for a hole check
         gl.uniformMatrix4fv(p.u.u_invViewProj, false, this.invViewProj);
-        if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? 1 : 0);   // t-clouds: cirrus from balanced up
+        if (p.u.u_cirrus) gl.uniform1f(p.u.u_cirrus, this.q.clouds >= 2 ? (E.climb ? Math.pow(E.climb.airK || 0, 2) : 1) : 0);   // t-clouds: cirrus from balanced up · u-ascent: they stay below the climb (gone with the air)
         if (p.u.u_cirrusDrift) { const dr = E.cloudDrift || [E.time * 0.9, 0], qx = dr[0] / 4000, qz = dr[1] / 4000; gl.uniform2f(p.u.u_cirrusDrift, qx * 0.35 + qz * 0.2, qz * 5.0); }   // (t-motion: the cirrus far up, slow — parallax with the cumulus)
         this.fsMark('sky', this.w, this.h, 0, this.w * this.h * this.sceneFmt().bytes);
         this.fs(p);
