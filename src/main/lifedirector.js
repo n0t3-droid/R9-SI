@@ -84,10 +84,10 @@
     cart: { tier: 1, places: ['street', 'plaza', 'hall', 'hangar'], hours: DAY, wx: 'any', dur: 24 },
     meteor: { tier: 1, places: OUT, hours: ['night', 'dawn'], wx: 'dry', dur: 9 },   // (f-flow: and at dawn while it is dark)
     balloon: { tier: 1, places: ['hills', 'wild', 'plaza', 'street', 'water', 'isles'], hours: DAY, wx: 'dry', dur: 80 },
-    bells: { tier: 1, places: ['plaza', 'street', 'hall', 'hangar'], hours: ['noon'], wx: 'any', dur: 12 },
+    bells: { tier: 1, places: ['plaza', 'street', 'hall', 'hangar'], hours: ['noon'], wx: 'any', dur: 12, heard: true },   // (f-flow heard: played out of the view too)
     fireworks: { tier: 1, places: TOWN, hours: ['dusk', 'night'], wx: 'any', fest: true, dur: 8 },
     kids: { tier: 2, places: TOWN, hours: DAY, wx: 'dry', dur: 34 },
-    musician: { tier: 2, places: ['plaza', 'hall', 'street'], hours: ['afternoon', 'dusk', 'night'], wx: 'dry', dur: 28 },
+    musician: { tier: 2, places: ['plaza', 'hall', 'street'], hours: ['afternoon', 'dusk', 'night'], wx: 'dry', dur: 28, heard: true },
     dog: { tier: 2, places: ['plaza', 'hall'], hours: DAY, wx: 'any', need: 'fountain', dur: 30 },
     skyray: { tier: 2, places: ['isles', 'hangar', 'wild', 'water'], hours: ['morning', 'noon', 'afternoon', 'dusk', 'night'], wx: 'dry', dur: 42 },
     fisher: { tier: 2, places: ['water'], hours: ['dawn', 'morning', 'noon', 'afternoon', 'dusk'], wx: 'any', need: 'water', dur: 32 },
@@ -969,8 +969,9 @@
       try { ok = A.start(this, ev) !== false; } catch (e) { ok = false; console.warn('life director', kind, e); }
       if (!ok) return null;
       // f-flow: an act plays only where it is seen — its stage out of the view, behind a wall or too small: undone, the
-      // next in the order comes (the passes chose a nearest point in the view: passPick)
-      if (!LD.FLY[kind] && !this.stageSeen(kind, ev)) { if (A.end) { try { A.end(this, ev); } catch (e) { /* undone */ } } this.st.unseen = (this.st.unseen || 0) + 1; return null; }
+      // next in the order comes (the passes chose a nearest point in the view: passPick; the carillon and the musician are
+      // heard: they play anyway)
+      if (!LD.FLY[kind] && !R.heard && !this.stageSeen(kind, ev)) { if (A.end) { try { A.end(this, ev); } catch (e) { /* undone */ } } this.st.unseen = (this.st.unseen || 0) + 1; return null; }
       this.events.push(ev); this.st.started++; this.st.kinds[kind] = (this.st.kinds[kind] || 0) + 1;
       // f-flow: the rotation's memory, the pace's clock, a fly-by's moment (its pass ~eta s on, and 8 s after it)
       this.acts.push([this.time, kind]); if (this.acts.length > 48) this.acts.shift();
