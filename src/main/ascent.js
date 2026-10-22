@@ -684,8 +684,10 @@
     const y = o.pos[1];
     const U = UNI(), k = U.climbK(y), t = o.t !== undefined ? o.t : U.worldSeconds((env && env.day) | 0, env ? env.ticks : 0);
     const sky = A._sky = U.localSky('overworld', o.pos, t, A._sky || undefined);
-    const ak = A.airK(y), bg = A.bgK(y), V = A.view, hzR = (V.hzR || 0) * (V.hzK === undefined ? 1 : V.hzK);
-    E.climb = { y, k, airK: ak, bg, body: A.bodyK(y), imp: A.impK(y), t, curve: V.curve === false ? 0 : A.curve(y), cut0: hzR * 0.75, cut1: hzR * 0.95, hzR };
+    const ak = A.airK(y), bg = A.bgK(y), V = A.view, imp = A.impK(y);
+    // (the tiles give their far edge to the impostor only once it is whole there: below 700 m they keep all of it)
+    const hzR = imp >= 0.999 ? (V.hzR || 0) * (V.hzK === undefined ? 1 : V.hzK) : 0;
+    E.climb = { y, k, airK: ak, bg, body: A.bodyK(y), imp, t, curve: V.curve === false ? 0 : A.curve(y), cut0: hzR * 0.75, cut1: hzR * 0.95, hzR };
     A.blendSky(E, sky, k);
     A.thinSky(E, ak, bg);
     A.thinFog(E, ak);
@@ -706,6 +708,7 @@
   // Krümmung (Bild · Anzeige): the world bends in the climb as it does (off: the flat map out to the tiles' edge)
   if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'curvature', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.curvature', tip: 'g.set.curvature.tip', cost: 'low', def: true });
   A.game = null;
+  A.precompile = [];
 
   // ---------------------------------------------------------------- each play frame (spaceflight.js's playFrame wrapper)
   // what the pure part reads (the bend on, the tiles' radius and how far they are built), less to stream high up (the
@@ -724,6 +727,17 @@
       else if (A.rdBase && (!climb || y < 600)) { if (w.renderDist === 2) w.renderDist = A.rdBase; A.rdBase = 0; }
     }
     if (r && r.q) { if (climb && y > A.BAND.high) { if (r.q.farCache) { A.fcBase = true; r.q.farCache = false; } } else if (A.fcBase) { r.q.farCache = true; A.fcBase = false; } }
+    // the world's clock jumped (a command, a night's sleep, a test): in the climb the state follows the map (its place and
+    // map velocity kept — the sky and the ship agree again), in space the state keeps its own time (its offset moves)
+    if (fl && fl.asc && fl.regime && fl.regime !== 'air' && !fl.asc.jump) {
+      const a = fl.asc, tc = A.clock(fl);
+      if (Math.abs(tc + (a.tOff || 0) - a.st.t) > 2) {
+        if (climb && a.st.frame === 'herz') { A.toMap(a.st, _mapPos, _mapVel); A.fromMap(a.st, _mapPos.slice(), _mapVel.slice(), tc); a.tOff = 0; }
+        else a.tOff = a.st.t - tc;
+      }
+    }
+    // the space programs compiled one a frame from the door on (by 2,500 m all are there: no hitch at the hand-off)
+    if (climb && A.precompile.length && VR.SpaceFlight && VR.SpaceFlight.prog && VR.SpaceScene && VR.SpaceScene.state && r && r.gl) VR.SpaceFlight.prog(A.precompile.shift());
     if (fl && fl.asc) {
       if (climb && VR.Entry && VR.Entry.tick) VR.Entry.tick(g, fl, dt);
       if (VR.SpaceFlight && VR.SpaceFlight.fx) VR.SpaceFlight.fx(g, fl);
@@ -751,6 +765,7 @@
       const w = g.world, b = fl.b, x = Math.floor(b.pos[0]), z = Math.floor(b.pos[2]);
       a.ground = [x + 0.5, w && w.isLoaded && w.isLoaded(x, z) ? w.topAt(x, z) + 1 : 70, z + 0.5];
       if (!A.hinted && g.ui && g.ui.hint) { A.hinted = true; g.ui.hint(T('g.asc.climbHint'), 7000); }
+      A.precompile = ['herz', 'bg', 'giant', 'ring', 'moon', 'glare'];
     }
     if (to === 'space') {
       a.spaceT0 = performance.now(); a.freed = false;

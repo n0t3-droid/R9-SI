@@ -309,13 +309,6 @@
     return SF.jumpStart(fl, 'herz', { home: true, at: [site.x + 0.5, 2400, site.z + 0.5], site });
   };
 
-  // ================================================================ the game's glue (a page with the game)
-  if (typeof window === 'undefined' || !VR.Game) return;
-  SF.page = true;
-  const Game = VR.Game, SSm = () => VR.SpaceScene;
-  const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-  const toScene = (v, o) => { o = o || [0, 0, 0]; o[0] = v[1]; o[1] = v[2]; o[2] = v[0]; return o; };   // (scene (x, y, z) = universe (y, z, x))
-
   // ---------------------------------------------------------------- the space programs with a fade and Herzwelt's near cut
   // (a wrapper, so space_shaders.js stays u-space0's and u-moons1's): u_fadeOut = (1 − the colour's share, 1 − the alpha's,
   // log2 of an exposure gain) — all 0, as drawn: /raum sets nothing — and in Herzwelt's program u_cut (the sines of the
@@ -341,11 +334,23 @@ void main() {
   o.rgb *= (1.0 - u_fadeOut.x) * exp2(u_fadeOut.z);
   o.a *= 1.0 - u_fadeOut.y;
 }`;
-  const SH = VR.SpaceShaders;
-  if (SH && SH.programs && !SH.ascentWrapped) {
+  SF.wrapFS = wrapFS;
+  SF.wrapPrograms = () => {
+    const SH = VR.SpaceShaders;
+    if (!SH || !SH.programs || SH.ascentWrapped) return false;
     const orig = SH.programs; SH.ascentWrapped = true;
     SH.programs = () => { const P = orig(), o = {}; for (const k in P) o[k] = { vs: P[k].vs, fs: wrapFS(k, P[k].fs) }; return o; };
-  }
+    return true;
+  };
+  SF.wrapPrograms();
+
+
+  // ================================================================ the game's glue (a page with the game)
+  if (typeof window === 'undefined' || !VR.Game) return;
+  SF.page = true;
+  const Game = VR.Game, SSm = () => VR.SpaceScene;
+  const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const toScene = (v, o) => { o = o || [0, 0, 0]; o[0] = v[1]; o[1] = v[2]; o[2] = v[0]; return o; };   // (scene (x, y, z) = universe (y, z, x))
 
   // ---------------------------------------------------------------- the space scene's frame for a camera on the map
   // the camera's place on Herzwelt's map (or, away from it, the state's own place) → the scene's pose: the session axes
