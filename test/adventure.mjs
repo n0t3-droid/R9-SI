@@ -75,12 +75,12 @@ try {
   console.log('1 · the create form');
   await ev(() => { const b = document.querySelector('#title [data-act="newworld"]'); b.click(); });
   await wait(300);
-  const row0 = await ev(() => { const s = document.querySelector('#create #cw_way'); return s ? { on: s.querySelector('.on') && s.querySelector('.on').dataset.v, label: s.closest('.field').querySelector('label').textContent, after: s.closest('.field').previousElementSibling && s.closest('.field').previousElementSibling.querySelector('#cw_mode') ? 'mode' : '?', diff: document.querySelector('#cw_diff .on').dataset.v } : null; });
-  check(!!row0 && row0.on === 'free' && row0.label === 'Spielweg' && row0.after === 'mode', 'the create form has the row „Spielweg" after „Spielart", „Frei bauen" chosen (' + JSON.stringify(row0) + ')');
-  await ev(() => { document.querySelector('#cw_way [data-v="adv"]').click(); const n = document.querySelector('#cw_name'); n.value = 'Abenteuer-Test'; document.querySelector('#cw_seed').value = '4242'; });
+  const row0 = await ev(() => { const s = document.querySelector('#create #cw_way'); return s ? { on: s.querySelector('.on') && s.querySelector('.on').dataset.v, label: s.closest('.field').querySelector('label').textContent, after: s.closest('.field').previousElementSibling && s.closest('.field').previousElementSibling.querySelector('#cw_name') ? 'name' : '?', diff: document.querySelector('#cw_diff .on').dataset.v } : null; });
+  check(!!row0 && row0.on === 'free' && row0.label === 'Wie willst du spielen?' && row0.after === 'name', 'the create form asks „Wie willst du spielen?" right after the name, „Frei bauen" chosen (f-names; ' + JSON.stringify(row0) + ')');
+  await ev(() => { document.querySelector('#cw_way [data-v="enc"]').click(); const n = document.querySelector('#cw_name'); n.value = 'Abenteuer-Test'; document.querySelector('#cw_seed').value = '4242'; });
   await wait(200);
-  const row1 = await ev(() => ({ on: document.querySelector('#cw_way .on').dataset.v, diff: document.querySelector('#cw_diff .on').dataset.v, note: !document.querySelector('#create .advwaynote').hidden }));
-  check(row1.on === 'adv' && row1.diff === 'normal' && row1.note, '⚔ Abenteuer: the difficulty row says Normal now and the note explains it (' + JSON.stringify(row1) + ')');
+  const row1 = await ev(() => ({ on: document.querySelector('#cw_way .on').dataset.v, diff: document.querySelector('#cw_diff .on').dataset.v, zen: getComputedStyle(document.querySelector('#cw_mode [data-v="zen"]')).display }));
+  check(row1.on === 'enc' && row1.diff === 'normal' && row1.zen === 'none', '⚔ mit Begegnungen: the band Normal lit, Zen-Bauen not offered (' + JSON.stringify(row1) + ')');
   pics.create = await shot('adventure_create');
   await ev(() => document.querySelector('#create [data-act="docreate"]').click());
   for (let i = 0; i < 180; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
@@ -150,7 +150,7 @@ try {
   await wait(300);
   const card = await ev(() => { const c = document.querySelector('#adventure .panel'); return { screen: VR.game.ui.screen, way: c.querySelector('[data-act="adv:way"].on') && c.querySelector('[data-act="adv:way"].on').dataset.v, band: c.querySelector('[data-act="adv:band"].on') && c.querySelector('[data-act="adv:band"].on').dataset.v, enc: c.querySelector('[data-act="adv:enc"].on') && c.querySelector('[data-act="adv:enc"].on').dataset.v, lv: (c.querySelector('.advsum .lv') || {}).textContent, xp: (c.querySelector('.advsum .xp') || {}).textContent, tal: (c.querySelector('.advsum .tal') || {}).textContent, pts: (c.querySelector('.advsum .ptsl') || {}).textContent, h: Math.round(c.getBoundingClientRect().height) }; });
   console.log('     ' + JSON.stringify(card));
-  check(card.screen === 'adventure' && card.way === 'adv' && card.band === 'normal' && card.enc === 'normal' && card.lv === 'Stufe 5' && /Heliataler/.test(card.tal) && /Punkt/.test(card.pts), 'the card „⚔ Abenteuer": Spielweg, Schwierigkeit, Begegnungen, Stufe 5, the Heliataler, the free points');
+  check(card.screen === 'adventure' && card.way === 'enc' && card.band === 'normal' && card.enc === 'normal' && card.lv === 'Stufe 5' && /Heliataler/.test(card.tal) && /Punkt/.test(card.pts), 'the card „⚔ Abenteuer": Spielweg, Schwierigkeit, Begegnungen, Stufe 5, the Heliataler, the free points');
   check(card.h <= 700, 'the card fits a 720-px screen (' + card.h + ' px)');
   pics.card = await shot('adventure_card');
   await ev(() => document.querySelector('#adventure [data-act="adv:stats"]').click());

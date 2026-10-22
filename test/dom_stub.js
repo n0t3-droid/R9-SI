@@ -17,6 +17,8 @@ const mkEl = (tag) => {
   Object.defineProperty(el, 'className', { get: () => [...classes].join(' '), set: (v) => { classes.clear(); String(v).split(/\s+/).filter(Boolean).forEach(x => classes.add(x)); } });
   Object.defineProperty(el, 'textContent', { get: () => el._text || el.children.map(c => c.textContent).join(''), set: (v) => { el._text = String(v); el.children.length = 0; } });
   Object.defineProperty(el, 'innerHTML', { get: () => el._html, set: (v) => { el._html = String(v); el.children.length = 0; } });
+  Object.defineProperty(el, 'parentNode', { get: () => el.parent });   // (f-names: walking up to a form's .field)
+  Object.defineProperty(el, 'parentElement', { get: () => el.parent });
   el.appendChild = (c) => { c.parent = el; el.children.push(c); return c; };
   el.append = (...cs) => cs.forEach(c => el.appendChild(c));
   el.remove = () => { if (el.parent) el.parent.children = el.parent.children.filter(x => x !== el); el.parent = null; };

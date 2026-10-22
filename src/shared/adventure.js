@@ -263,6 +263,61 @@
     return r;
   };
 
+  // ---------------------------------------------------------------- one question for a new world (f-names, review R50-05)
+  // „Wie willst du spielen?" — 🏗 Frei bauen (the default: peaceful) · 🧭 Abenteuer, sanft (quests, levels, Taler, no
+  // encounters) · ⚔ Abenteuer mit Begegnungen. The form's state: { way, mode, diffFree, band, pro, kids, foes, zenFrom }
+  // (pro: Profi's form; kids: 🧸 Kindersicher; foes: the encounters exist yet; zenFrom: „mit Begegnungen" moved Zen to
+  // Überleben, leaving the card moves it back). formView → what the rows show; formWorld → what the world gets; the rule
+  // that ties them (test/create_form.js, every combination): the shown difficulty is the one the world gets — a free
+  // world's difficulty, or the encounters' band — and a hidden row means a peaceful world without encounters
+  Adv.WAYS = ['free', 'gentle', 'enc'];
+  Adv.MODES = ['survival', 'creative', 'zen'];
+  Adv.DIFFS = DIFFS;
+  const pick1 = (v, list, d) => (list.indexOf(v) >= 0 ? v : d);
+  Adv.form = (o) => {
+    o = o || {};
+    const st = { way: pick1(o.way, Adv.WAYS, 'free'), mode: pick1(o.mode, Adv.MODES, 'zen'), diffFree: pick1(o.diffFree, DIFFS, 'peaceful'), band: pick1(o.band, Adv.BAND_ORDER, 'normal'), pro: !!o.pro, kids: !!o.kids, foes: !!o.foes, zenFrom: !!o.zenFrom };
+    if (st.kids && st.way === 'enc') st.way = 'gentle';
+    return st;
+  };
+  // the Spielart the world gets: Einfach — Zen, but Überleben under „mit Begegnungen" (hearts count there); Profi — the
+  // lit one, never Zen under „mit Begegnungen" („keine Monster, kein Schaden")
+  const modeOf = (st) => (!st.pro ? (st.way === 'enc' ? 'survival' : 'zen') : st.way === 'enc' && st.mode === 'zen' ? 'survival' : st.mode);
+  Adv.formView = (st) => {
+    const way = st.kids && st.way === 'enc' ? 'gentle' : st.way, mode = modeOf(Object.assign({}, st, { way }));
+    const ways = st.kids ? ['free', 'gentle'] : Adv.WAYS.slice();
+    const modes = !st.pro ? [] : way === 'enc' ? ['survival', 'creative'] : Adv.MODES.slice();
+    const diffs = !st.pro || st.kids ? [] : way === 'free' ? (mode === 'zen' ? [] : DIFFS.slice()) : way === 'enc' ? Adv.BAND_ORDER.slice() : [];
+    const diff = !diffs.length ? null : way === 'enc' ? st.band : st.diffFree;
+    const note = st.kids ? 'kids' : way === 'enc' && !st.foes ? 'encLater' : null;
+    return { ways, way, modes, mode, diffs, diff, note };
+  };
+  Adv.formWorld = (st) => {
+    const v = Adv.formView(st);
+    // (only what is shown reaches the world: a hidden row gives its default — peaceful, the band Normal)
+    return { mode: v.mode, difficulty: v.way === 'free' && v.diff ? v.diff : 'peaceful', adventure: v.way === 'free' ? null : { on: true, band: v.way === 'enc' && v.diff ? v.diff : 'normal', enc: v.way === 'enc' ? 'normal' : 'off' } };
+  };
+  Adv.formPick = (st, what, val) => {
+    const n = Object.assign({}, st);
+    if (what === 'way') {
+      if (Adv.WAYS.indexOf(val) < 0 || (st.kids && val === 'enc')) return st;
+      n.way = val;
+      if (val === 'enc' && st.way !== 'enc' && st.mode === 'zen') { n.mode = 'survival'; n.zenFrom = true; }
+      else if (val !== 'enc' && st.way === 'enc' && st.zenFrom) { if (st.mode === 'survival') n.mode = 'zen'; n.zenFrom = false; }
+    } else if (what === 'mode') {
+      if (Adv.MODES.indexOf(val) < 0 || (st.way === 'enc' && val === 'zen')) return st;
+      n.mode = val; n.zenFrom = false;
+    } else if (what === 'diff') {
+      if (st.way === 'free' && DIFFS.indexOf(val) >= 0) n.diffFree = val;
+      else if (st.way === 'enc' && Adv.BAND_ORDER.indexOf(val) >= 0) n.band = val;
+      else return st;
+    } else if (what === 'pro' || what === 'kids' || what === 'foes') { n[what] = !!val; if (n.kids && n.way === 'enc') n.way = 'gentle'; }
+    else return st;
+    return n;
+  };
+  // the pause card asks the same question of a running world: off → free, encounters off → gentle, else → enc
+  Adv.wayOf = (rec, kids) => (!rec || !rec.on ? 'free' : kids || rec.enc === 'off' ? 'gentle' : 'enc');
+
   // ---------------------------------------------------------------- the level-up chime
   // six bells up the day's pentatonic scale 70 ms apart (the start degree climbs with the level), then the chord and
   // the octave held; a gift level (5, 10, …) adds a sparkle. degMidi: klang.js's (the same table is here for node and

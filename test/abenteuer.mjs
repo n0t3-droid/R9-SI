@@ -116,18 +116,18 @@ try {
     await wait(300);
     await ev(() => document.querySelector('#title [data-act="newworld"]').click());
     await wait(400);
-    await ev(() => { document.querySelector('#cw_way [data-v="adv"]').click(); document.querySelector('#cw_mode [data-v="survival"]').click(); const n = document.querySelector('#cw_name'); n.value = 'Aufträge'; document.querySelector('#cw_seed').value = '4242'; });
+    await ev(() => { document.querySelector('#cw_way [data-v="gentle"]').click(); document.querySelector('#cw_mode [data-v="survival"]').click(); const n = document.querySelector('#cw_name'); n.value = 'Aufträge'; document.querySelector('#cw_seed').value = '4242'; });
     await wait(300);
     const cf = await ev(() => {
       const b = document.querySelector('#create [data-act="docreate"]'), r = b.getBoundingClientRect();
       const scr = document.getElementById('create'), panel = scr.querySelector('.panel');
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, hit: !!hit && (hit === b || b.contains(hit)), scroll: [scr.scrollTop, panel.scrollTop], over: [scr.scrollHeight - scr.clientHeight, panel.scrollHeight - panel.clientHeight], panelH: Math.round(panel.getBoundingClientRect().height), text: b.textContent.trim(), note: !document.querySelector('#create .advwaynote').hidden, way: document.querySelector('#cw_way .on').dataset.v, mode: document.querySelector('#cw_mode .on').dataset.v, cols: getComputedStyle(panel).gridTemplateColumns };
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, hit: !!hit && (hit === b || b.contains(hit)), scroll: [scr.scrollTop, panel.scrollTop], over: [scr.scrollHeight - scr.clientHeight, panel.scrollHeight - panel.clientHeight], panelH: Math.round(panel.getBoundingClientRect().height), text: b.textContent.trim(), way: document.querySelector('#cw_way .on').dataset.v, mode: document.querySelector('#cw_mode .on').dataset.v, cols: getComputedStyle(panel).gridTemplateColumns };
     });
     console.log('     ' + JSON.stringify(cf));
     N.create = cf;
-    check(cf.text === 'Welt erstellen' && cf.top >= 0 && cf.bottom <= cf.vh && cf.hit && cf.scroll[0] === 0 && cf.scroll[1] === 0, '„Welt erstellen" in view at 1280 × 720 without scrolling (Profi, ⚔ Abenteuer with its note: the button ' + cf.top + '–' + cf.bottom + ' of ' + cf.vh + ' px, nothing over it)');
-    check(cf.way === 'adv' && cf.mode === 'survival' && cf.note, '⚔ Abenteuer and Überleben chosen, the note shown');
+    check(cf.text === 'Welt erstellen' && cf.top >= 0 && cf.bottom <= cf.vh && cf.hit && cf.scroll[0] === 0 && cf.scroll[1] === 0, '„Welt erstellen" in view at 1280 × 720 without scrolling (Profi, 🧭 Abenteuer, sanft: the button ' + cf.top + '–' + cf.bottom + ' of ' + cf.vh + ' px, nothing over it)');
+    check(cf.way === 'gentle' && cf.mode === 'survival', '🧭 Abenteuer, sanft and Überleben chosen (f-names: the one question)');
     pics.create = await shot('abenteuer_create_720');
     await ev(() => document.querySelector('#create [data-act="docreate"]').click());
     for (let i = 0; i < 180; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }

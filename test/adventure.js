@@ -459,7 +459,7 @@ if (!A) { console.log('  ✗ VR.Adventure missing (src/main/adventure.js)'); con
   const made = [], tg = mkGame({ id: 'title' }); tg.state = 'title'; tg.createWorld = (o) => { made.push(o); }; VR.game = tg;
   later.push(A.newWorld().then((ok) => {
     const o = made[0], P = A.pendingCreate;
-    check(ok && o && o.name === 'Abenteuer-Welt 2' && o.difficulty === 'peaceful' && o.mode === 'zen' && P && P.band === 'normal' && P.enc === 'normal', 'the tile makes „Abenteuer-Welt 2" (peaceful, Zen like ▶ Losspielen) and marks it for the Abenteuer (' + JSON.stringify([o, P]) + ')');
+    check(ok && o && o.name === 'Abenteuer-Welt 2' && o.difficulty === 'peaceful' && o.mode === 'zen' && P && P.band === 'normal' && P.enc === 'off', 'the tile makes „Abenteuer-Welt 2" (peaceful, Zen like ▶ Losspielen) and marks it for a gentle Abenteuer — no encounters (f-names, R50-05; ' + JSON.stringify([o, P]) + ')');
     A.pendingCreate = null; VR.game = g; A.bind();
   }));
   VR.game = g; A.bind();
