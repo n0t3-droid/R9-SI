@@ -853,7 +853,8 @@
       let prog = '';
       if (r.k === 'build' && r.st === 'open') prog = T('g.q.j.prog', { a: r.n | 0, b: r.q.n });
       if (r.k === 'repair' && r.st === 'open' && r.q.prog > 0) prog = T('g.q.repairing', { p: Math.round(r.q.prog * 100) });
-      const stub = (r.k === 'free' || r.k === 'travel') && r.st === 'open' ? `<div class="jl note">${esc(T('g.q.j.stub'))}</div>` : '';
+      const stub = ((r.k === 'free' && !(VR.Liberate && VR.Liberate.quest)) || r.k === 'travel') && r.st === 'open' ?   // a-foes: Befreien is real with VR.Liberate
+        `<div class="jl note">${esc(T('g.q.j.stub'))}</div>` : '';
       const isT = tr && tr.pid === r.pid, arm = Q.jArm === r.pid;
       return `<div class="jq${r.st === 'ready' ? ' ready' : ''}${isT ? ' tracked' : ''}"><div class="ji">${Q.ICON[r.k]}</div><div class="jb"><div class="jt"><b>${esc(Q.title(r))}</b><span class="jsz s${r.s}">${esc(T('g.q.j.size.' + r.s))}</span></div>`
         + `<div class="jl note">${esc(T('g.q.j.from', { g: r.g, v: r.v }))} · ${esc(T('g.q.kind.' + r.k))}</div>`
