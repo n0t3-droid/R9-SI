@@ -137,10 +137,14 @@ console.log('8 · the Hangar Hall\'s air (light2.js ROOM, l2Fog under AIR2)');
   const L2 = V.Light2, RM = L2.ROOM;
   check(L2.roomIndoor(1) === 0 && L2.roomIndoor(0.1) === 1 && L2.roomIndoor(0.55) > 0.3 && L2.roomIndoor(0.55) < 0.7, 'only indoors: the eye\'s sky light 1 → none, 0.1 → full', [L2.roomIndoor(1), L2.roomIndoor(0.55).toFixed(2), L2.roomIndoor(0.1)].join(' · '));
   const t40 = L2.roomHaze(40, RM.rho), t8 = L2.roomHaze(8, RM.rho), t200 = L2.roomHaze(200, RM.rho);
-  check(t40 > 0.15 && t40 < 0.3 && t8 < 0.06 && Math.abs(t200 - L2.roomHaze(RM.max, RM.rho)) < 1e-9, 'thin: the hall\'s far end (40 blocks) a fifth toward the lamps\' colour, 8 blocks hardly, the haze ends at the room\'s reach', [t8, t40, t200].map(x => x.toFixed(3)).join(' · '));
+  check(t40 > 0.24 && t40 < 0.34 && t8 < 0.07 && Math.abs(t200 - L2.roomHaze(RM.max, RM.rho)) < 1e-9, 'thin: the hall\'s far end (40 blocks) a third of the way to the lamps\' light, 8 blocks hardly, the haze ends at the room\'s reach', [t8, t40, t200].map(x => x.toFixed(3)).join(' · '));
   // the hangar's strips: cyan block light round the eye → a cyan haze; a lantern's room → a warm one; no light → none
   const cy = L2.roomColor([[0, 9, 12], [0, 7, 9], [0, 10, 13], [1, 8, 11], [0, 6, 8], [0, 11, 14], [0, 5, 7]]), warm = L2.roomColor([[12, 8, 4], [10, 7, 3], [9, 6, 3]]), dark = L2.roomColor([[0, 0, 0], [0, 0, 0]]);
-  check(cy[2] > cy[1] && cy[1] > cy[0] * 4 && cy[2] < 0.3, 'the hangar\'s cyan strips give a cyan haze, a dim one (HDR < 0.3)', cy.map(x => x.toFixed(3)).join(', '));
+  check(cy[2] > cy[1] && cy[1] > cy[0] * 4 && cy[2] > 0.35 && cy[2] < 0.7, 'the hangar\'s cyan strips give a cyan light in the air (HDR 0.35–0.7: it shows over the dark floor)', cy.map(x => x.toFixed(3)).join(', '));
+  // (the first browser run: the mix toward a dim cyan darkened the lit far end 2.6 L* — the air glows now, it never dims)
+  const far = L2.roomAir([0.8, 0.8, 0.8], cy, 40, RM.rho), dk = L2.roomAir([0.04, 0.04, 0.05], cy, 40, RM.rho), near = L2.roomAir([0.04, 0.04, 0.05], cy, 3, RM.rho);
+  check(far.every((c, i) => c >= [0.8, 0.8, 0.8][i]) && dk[1] > 0.1 && dk[2] > 0.14 && dk[0] === 0.04 && near[2] < 0.08, 'the air glows: a lit far wall keeps its light, the dark floor 40 blocks off takes a cyan glow, the near air hardly', `far ${far.map(x => x.toFixed(2))} · dark ${dk.map(x => x.toFixed(3))} · near ${near.map(x => x.toFixed(3))}`);
+  check(/col = max\(col, mix\(col, u_l2Room\.rgb, 1\.0 - exp\(-min\(dist, /.test(L2.glslCommon()), 'the shader: max(col, mix(col, room, haze)) — the same as L2.roomAir');
   check(warm[0] > warm[2] * 2 && dark[0] + dark[1] + dark[2] === 0, 'a lantern\'s room a warm one, a dark room none');
   const fs = S.COMMON || '', src = L2.glslCommon();
   check(/uniform vec4 u_l2Room;/.test(src) && inside(src, 'uniform vec4 u_l2Room;', 'AIR2') && inside(src, 'if (u_l2Room.w > 0.0)', 'AIR2'), 'the room haze is AIR2\'s (Low and up; Very Low\'s programs never see it)');

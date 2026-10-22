@@ -200,9 +200,15 @@
   // the eye stands indoors (its sky light low) the air takes the colour of the lamps round it — the block light of a few
   // cells round the eye, averaged and eased — thin: col → mix(col, room, 1 − e^(−min(d, max)·rho)). Outdoors nothing (the
   // valley haze and the volumetric light are the open air's). One mix in l2Fog (AIR2), no pass.
-  L2.ROOM = { rho: 0.0062, max: 48, k: 0.34, sky: [0.25, 0.85], pts: [[0, 0, 0], [4, 0, 0], [-4, 0, 0], [0, 0, 4], [0, 0, -4], [0, 3, 0], [0, -1, 0]] };
+  // (the first polish2.mjs run: a mix toward the dim cyan — k 0.34, HDR ≈ 0.18 — only darkened the hangar's lit far end, by
+  // 2.6 L*, and the air read as nothing. The air glows: it lifts what is darker than its light and never dims what is
+  // brighter — max(col, mix(col, room, haze)) — the room's light at full strength (k 1: the hangar's cyan ≈ 0.3, 0.5),
+  // a third of the way at the hall's 40 blocks)
+  L2.ROOM = { rho: 0.008, max: 48, k: 1.0, sky: [0.25, 0.85], pts: [[0, 0, 0], [4, 0, 0], [-4, 0, 0], [0, 0, 4], [0, 0, -4], [0, 3, 0], [0, -1, 0]] };
   L2.roomIndoor = (eyeSky) => 1 - sstep(L2.ROOM.sky[0], L2.ROOM.sky[1], eyeSky);
   L2.roomHaze = (d, rho) => 1 - Math.exp(-Math.min(Math.max(d, 0), L2.ROOM.max) * rho);
+  // the JS mirror of l2Fog's room air: a colour at d blocks in the room's air of colour `room` and density rho
+  L2.roomAir = (col, room, d, rho) => { const h = L2.roomHaze(d, rho); return col.map((c, i) => Math.max(c, c + (room[i] - c) * h)); };
   // the haze's colour (HDR) from the block light at the sample points: [r, g, b] 0..15 each
   L2.roomColor = function (samples, out) {
     out = out || [0, 0, 0]; out[0] = out[1] = out[2] = 0;
@@ -444,8 +450,9 @@ vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   float toSun = max(dot(dir, u_sunDir), 0.0), t2 = toSun * toSun, t4 = t2 * t2;
   vec3 mist = u_l2FogCol + u_sunColor * (t4 * t4 * u_l2Fog2.z);
   col = mix(col, mist, clamp(hf, 0.0, 0.92));
-  // t-polish2 · the room's air (light2.js ROOM): indoors the air holds the lamps' colour, thin (0 outdoors: w = 0)
-  if (u_l2Room.w > 0.0) col = mix(col, u_l2Room.rgb, 1.0 - exp(-min(dist, ${L2.ROOM.max.toFixed(1)}) * u_l2Room.w));
+  // t-polish2 · the room's air (light2.js ROOM): indoors the air glows with the lamps' colour — it lifts what is darker
+  // than its light, never dims what is brighter (0 outdoors: w = 0)
+  if (u_l2Room.w > 0.0) col = max(col, mix(col, u_l2Room.rgb, 1.0 - exp(-min(dist, ${L2.ROOM.max.toFixed(1)}) * u_l2Room.w)));
   return mix(col, fc, clamp(f, 0.0, 1.0));
 }
 #endif
