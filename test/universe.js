@@ -684,7 +684,11 @@ section('(n) local skies');
       if (hit) withEcl++; if (aq) withAq++;
     }
     check(withEcl > 0 && withEcl / orbits < 0.35, `Herzwelt in Amarant's shadow on ${withEcl} of ${orbits} orbits of a year (${f3(100 * withEcl / orbits, 0)} %: "only in rare seasons")`);
-    console.log(`    (Aquamarin crosses the sun as seen from Herzwelt's centre on ${withAq} of ${orbits} Herzwelt orbits: its shadow sweeps Herzwelt in those seasons)`);
+    console.log(`    (Aquamarin crosses the sun as seen from Herzwelt's centre on ${withAq} of ${orbits} Herzwelt orbits: its shadow is somewhere on Herzwelt then)`);
+    // the Heartland's true sky: no eclipse by Aquamarin for the first 30 days of play (its season comes later in the year)
+    const out = U.localSky('overworld', [0, 63, 0], 0); let firstAq = null;
+    for (let t = 0; t < 30 * 86400 && firstAq === null; t += 15) { U.localSky('overworld', [0, 63, 0], t, out); if (out.sun.dir[1] > 0 && out.eclipse > 0.05 && out.eclipseBy === 'aqua') firstAq = t; }
+    check(firstAq === null, 'the Heartland\'s true sky: no eclipse by Aquamarin in the first 30 days of play (its eclipse season comes later in the year)');
   }
   // close by: 5 % over Amarant's cloud tops on its night side the sun is gone, on its day side it shines; the sun's disc
   // half behind the limb seen from 1.05 R

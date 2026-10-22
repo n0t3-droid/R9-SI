@@ -291,8 +291,10 @@
         orbit: { a: 498700e3, e: 0, i: 8, node: 31.51, peri: 0, M0: 320, ref: 'equator' },
         spin: { tilt: 0, solarDay: DAY, noon: NOON },
         chart: { pole: 'north', c0: 0.42, psi: 0.4 } },
+      // Aquamarin's node near the sun's direction at the start: its shadow falls by Herzwelt's equator for the first two months,
+      // then sweeps the Heartland's 65.9° N in a five-week eclipse season (a node at 90° gave a total eclipse at the first noon)
       { id: 'aqua', kind: 'ocean', name: name('Aquamarin', 'Aquamarine'), parent: 'herz', R: 2400e3, g: 2.01, air: 0.5, landable: true,
-        orbit: { a: 34500e3, e: 0, i: 172, node: 90, peri: 0, M0: 45, ref: 'equator' }, spin: { locked: true },
+        orbit: { a: 34500e3, e: 0, i: 172, node: 30, peri: 0, M0: 45, ref: 'equator' }, spin: { locked: true },
         chart: { pole: 'sub', c0: 55 * D2R, psi: PI } },
       { id: 'zinn', kind: 'volcanic', name: name('Zinnober', 'Cinnabar'), parent: 'amarant', R: 1820e3, g: 1.80, air: 0, landable: true,
         orbit: { a: 190000e3, e: 0, i: 0, node: 0, peri: 0, M0: 30, ref: 'equator' }, spin: { locked: true },
