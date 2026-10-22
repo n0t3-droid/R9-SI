@@ -801,7 +801,8 @@ void main() {
       let th = s0 ? Math.atan2(Math.cos(this.wayYaw) * s0, -Math.sin(this.wayYaw) * s0) : Math.atan2(tg.pos[0] - P[0], tg.pos[2] - P[2]);
       const L = Math.min(F.WAY_L, Lh + (s0 ? 6 : 0)), n = clamp(Math.ceil(L / 2), 2, 25), step = L / n;
       O[0] = P[0]; O[1] = P[1]; O[2] = P[2];
-      let x = P[0] + Math.sin(th) * 0.45, z = P[2] + Math.cos(th) * 0.45, y = P[1] - 0.1, d = 0, end = false, i = 1;
+      const off = !this.seat && this.inVehicle() ? 2.5 : 0.45;   // (riding: it sits beside the eye — the line starts ahead)
+      let x = P[0] + Math.sin(th) * off, z = P[2] + Math.cos(th) * off, y = P[1] - 0.1, d = 0, end = false, i = 1;
       A[0] = x - O[0]; A[1] = y - O[1]; A[2] = z - O[2]; D[0] = 0;
       for (; i <= n; i++) {
         const tx = tg.pos[0] - x, tz = tg.pos[2] - z, rem = Math.hypot(tx, tz);
