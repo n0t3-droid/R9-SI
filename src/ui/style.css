@@ -51,7 +51,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 /* loading */
 #loading { flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(ellipse at 50% 60%, #121a38 0%, #05070e 70%); }
 /* t-first: while the world renders behind it the loading screen lets its sky show through; the counts under the bar */
-#loading.sky { background: radial-gradient(ellipse at 50% 55%, rgba(10, 14, 34, 0.36) 0%, rgba(5, 7, 14, 0.64) 72%); }
+/* (a soft dark plate behind the words — the low sun can stand right behind them — and a light vignette round the sky) */
+#loading.sky { background: radial-gradient(ellipse 44% 30% at 50% 52%, rgba(6, 9, 22, 0.56) 0%, rgba(6, 9, 22, 0.4) 55%, rgba(6, 9, 22, 0) 100%), radial-gradient(ellipse at 50% 55%, rgba(10, 14, 34, 0.14) 0%, rgba(5, 7, 14, 0.56) 80%); }
 #loading.sky #loadmsg, #loading.sky .tip, #loading.sky .logo { text-shadow: 0 1px 5px rgba(0, 0, 0, 0.85); }
 #loading .ldetail { margin-top: 10px; color: #c3cee3; font-size: 13px; letter-spacing: .4px; min-height: 1.3em; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
 .bar { width: min(520px, 80vw); height: 10px; border-radius: 6px; background: rgba(255,255,255,0.08); overflow: hidden; border: 1px solid var(--line); }

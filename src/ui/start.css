@@ -13,8 +13,9 @@ html:not(.pro) .pro { display: none !important; }
 
 /* ---- the game's start screen ---- */
 #title .start { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 76px 16px 64px; overflow: auto; }
-/* t-first · the golden-hour backdrop behind the tiles until the living title's first frame (titlescene.js adds .live) */
-#title .tbg { position: absolute; inset: 0; pointer-events: none; transition: opacity 1.2s ease; background: radial-gradient(ellipse 30% 20% at 74% 60%, rgba(255, 220, 160, 0.6), rgba(255, 170, 110, 0) 70%), linear-gradient(180deg, #0a0d2a 0%, #1c1e50 24%, #433d78 44%, #85679a 56%, #dc9c7c 63%, #f1c38f 66%, #5e4a64 69%, #2b2338 80%, #15111d 100%); }
+/* t-first · the golden-hour backdrop behind the tiles until the living title's first frame (titlescene.js adds .live) —
+   its glow where the scene's low sun stands, by the citadel in the right third */
+#title .tbg { position: absolute; inset: 0; pointer-events: none; transition: opacity 1.2s ease; background: radial-gradient(ellipse 26% 20% at 88% 58%, rgba(255, 220, 160, 0.6), rgba(255, 170, 110, 0) 70%), linear-gradient(180deg, #0a0d2a 0%, #1c1e50 24%, #433d78 44%, #85679a 56%, #dc9c7c 63%, #f1c38f 66%, #5e4a64 69%, #2b2338 80%, #15111d 100%); }
 #title.live .tbg { opacity: 0; }
 #title .strip { position: absolute; top: 12px; right: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; z-index: 2; }
 #title .lnk, #worlds .lnk { font: 600 var(--st-fs) var(--st-font); color: var(--st-ink); background: var(--st-bg); border: 1px solid var(--st-line); border-radius: 12px; padding: 0 14px; min-height: 44px; cursor: pointer; letter-spacing: .3px; transition: border-color .15s, box-shadow .15s; }
