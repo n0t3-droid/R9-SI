@@ -53,7 +53,7 @@ r = b.set('jump', 0, 'Escape');
 check(r.ok === false && r.reason === 'reserved' && sameArr(b.slots('jump'), ['Space', '']), 'Escape is refused (reserved) and the slot is unchanged');
 check(['Enter', 'Tab', 'F12', 'MetaLeft', 'AltLeft'].every(c => b.set('jump', 1, c).reason === 'reserved') && sameArr(b.slots('jump'), ['Space', '']), 'Enter, Tab, F12, Win and Alt are refused too');
 check(['a b', 'Key W;', 42, null, undefined, 'x'.repeat(40)].every(c => { const q = b.set('jump', 1, c); return q.ok === false && q.reason === 'invalid'; }), 'spaced, punctuated, non-string, over-long codes are refused as invalid');
-check(b.set('jump', 1, 'KeyJ').ok === true && sameArr(b.slots('jump'), ['Space', 'KeyJ']), 'the second slot takes an alternative key');
+check(b.set('jump', 1, 'KeyU').ok === true && sameArr(b.slots('jump'), ['Space', 'KeyU']), 'the second slot takes an alternative key');   // (a-quests: J is the Tagebuch's key now — U is free)
 check(b.set('jump', 1, '').ok === true && sameArr(b.slots('jump'), ['Space', '']), 'an empty code clears a slot');
 check(b.clear('jump', 0).ok === true && sameArr(b.slots('jump'), ['', '']) && sameArr(b.codesFor('Space'), []), 'an action with no key at all: codesFor gives []');
 check(new Bindings().set('fwd', 0, 'KeyW').conflicts.length === 0, 'setting an action to its own key is no conflict');
@@ -62,7 +62,7 @@ check(new Bindings().set('fwd', 5, 'KeyQ').ok === false, 'a slot other than 0 or
 
 console.log('c · reset');
 const c = new Bindings();
-c.set('fwd', 0, 'KeyK'); c.set('back', 0, 'KeyK'); c.set('jump', 1, 'KeyJ');
+c.set('fwd', 0, 'KeyK'); c.set('back', 0, 'KeyK'); c.set('jump', 1, 'KeyU');
 check(c.conflicts().length === 1 && !c.isDefault('fwd') && !c.isDefault('jump') && c.isDefault('left'), 'a changed action is not default; an untouched one is');
 c.reset('back');
 check(sameArr(c.slots('back'), ['KeyS', '']) && c.conflicts().length === 0 && sameArr(c.slots('fwd'), ['KeyK', '']), 'reset(back) restores S; the conflict is gone; forward keeps K');
@@ -101,8 +101,8 @@ check(B.label('') === '—' && B.label(null) === '—', 'an empty slot reads as 
 
 console.log('f · what input.js asks');
 const f = new Bindings();
-f.set('jump', 0, 'KeyJ');
-check(sameArr(f.codesFor('Space'), ['KeyJ']) && f.codesFor('KeyJ') === null, 'the game still asks for Space; it gets J (Space no longer jumps by itself)');
+f.set('jump', 0, 'KeyU');
+check(sameArr(f.codesFor('Space'), ['KeyU']) && f.codesFor('KeyU') === null, 'the game still asks for Space; it gets U (Space no longer jumps by itself)');
 check(sameArr(f.codesFor('KeyE'), ['KeyE']) && sameArr(f.codesFor('Digit3'), ['Digit3']), 'other names keep their defaults');
 check(B.byName('Digit9') !== B.byName('Digit8') && B.byName('Digit1') !== null, 'hotbar keys are separate actions');
 

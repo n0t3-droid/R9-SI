@@ -1028,6 +1028,7 @@
           if (role === 'cashier') {
             const till = sh.tills[a.p.idx % sh.tills.length];
             if (this.goTo(a, till.cashier[0], till.cashier[1], till.cashier[2], 0.8)) { a.pose = 'stand'; a.lookAt = [till.lane[0] + 0.5, till.lane[1] + 1.5, till.lane[2] + 0.5]; if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(FS('cashier', H2(91)), 3); }
+            if (VR.Shop && VR.Shop.till) VR.Shop.till(this, a, till, dt);   // a-quests: in an Abenteuer world the cashier invites you to the till once (shop.js)
           } else {
             if (!act.spot || act.t > 22) { act.t = 0; const c = sh.box; act.spot = [c[0] + 1 + (H2(92) % Math.max(1, c[3] - c[0] - 2)), c[1], c[2] + 1 + (H2(93) % Math.max(1, c[5] - c[2] - 2))]; }
             if (this.goTo(a, act.spot[0], act.spot[1], act.spot[2], 1.4)) { a.pose = 'work'; if (Math.random() < dt * 0.02 && this.near(a, 12)) a.say(FS('clerk', H2(94)), 3); }
@@ -1252,6 +1253,7 @@
     compass(dx, dz) { const a = Math.atan2(dx, -dz); const names = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw']; return T('g.dir.' + names[((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8]); }
     // quests: small, role-flavoured requests
     quest(a) {
+      { const s = VR.Quests && VR.Quests.talk(this, a); if (s !== null && s !== undefined) return s; }   // a-quests: in an Abenteuer world the quests of A§8 answer (quests.js)
       const st = a.vil.st, q = st.quests || (st.quests = {});
       const cur = q[a.p.id];
       if (cur && !cur.done) return T('g.quest.still', { n: cur.n, item: VR.itemName ? VR.itemName(cur.id) : cur.id });
@@ -1266,6 +1268,7 @@
       return T('g.quest.' + role) + T('g.quest.hold');
     }
     gift(a) {
+      if (VR.Quests && VR.Quests.gift(this, a)) return;   // a-quests: the held thing hands in an open Bringen quest (quests.js)
       const g = this.g, p = g.player, h = p.inv.held;
       const st = a.vil.st;
       if (!h) { this.talkText(T('g.gift.empty')); return; }
