@@ -491,16 +491,17 @@
     const g = En.game, t0 = now();
     if (!g || !g.player) return;
     const on = F.on(g);
+    if (F.fainting) F.stepFaint(g, dt);   // (a guest too: the host's foes reach it, its Ohnmacht ends here)
     if (!on) {
       if (F.count) { refresh(g); F.leaveAll(En.mobs, GW); let n = 0; for (const m of En.mobs) if (m.foe && !m.foe.gone) n++; F.count = n; }
       if (F.bolts.length) F.bolts.length = 0;
-      F.hud(g, false);
+      if (F.net.proxies.size) F.stepHearts(g, dt); else F.hud(g, false);   // (a guest among the host's foes keeps its hearts)
       if (VR.Liberate && VR.Liberate.tick) VR.Liberate.tick(g, dt, false);
       return;
     }
     refresh(g);
     if ((F.dirT -= dt) <= 0) { F.dirT = 0.5; try { F.director(g, En); } catch (e) { if (!F.warned) { F.warned = true; console.warn('foes', e); } } }
-    F.stepBolts(g, dt); F.stepBits(g, dt); F.stepHearts(g, dt); F.stepFaint(g, dt);
+    F.stepBolts(g, dt); F.stepBits(g, dt); F.stepHearts(g, dt);
     if (VR.Liberate && VR.Liberate.tick) VR.Liberate.tick(g, dt, true);
     const ms = now() - t0, C = F.cost; C.frames++; C.ms += ms; if (ms > C.worst) C.worst = ms;
   };

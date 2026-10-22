@@ -206,6 +206,7 @@ console.log('9 · the moment');
 // reload (the record keeps every site)
 async function glue() {
   console.log('10 · the glue in a small world');
+  { const r = rng(20261023); Math.random = r; }   // (the same run every time: the foes' places and patrols are random)
   require(SRC + 'adventure.js');
   const Fo = V.Foes, A = V.Adventure, R = V.R;
   const mk0 = document.createElement; document.createElement = (t) => { const e = mk0(t); if (!e.style) e.style = {}; return e; };
@@ -256,6 +257,7 @@ async function glue() {
   // the guardians and an encounter
   let minTele = 9, maxTok = 0; const teleAt = new Map(); let strikes = 0, hits0 = Fo.cost.hits;
   const watch = () => { p.health = 20; let tok = 0; for (const m of g.entities.mobs) { const f = m.foe; if (!f) continue; if (f.tok) tok++; if (f.st === 'tele' && !teleAt.has(m.id)) teleAt.set(m.id, g.time); if (f.st === 'strike' && teleAt.has(m.id)) { minTele = Math.min(minTele, g.time - teleAt.get(m.id)); teleAt.delete(m.id); strikes++; } if (f.st !== 'tele' && f.st !== 'strike') teleAt.delete(m.id); } maxTok = Math.max(maxTok, tok); };
+  p.pos = [X1 + 2, 64, Z1 + 11];   // (in sight of every guardian: they notice)
   sec(12, watch);
   const mine = () => g.entities.mobs.filter(m => m.foe && !m.foe.gone && m.foe.site === s1.id && !m.foe.wave && !m.foe.helper);
   const g1 = mine();
@@ -267,6 +269,7 @@ async function glue() {
   check(said.some(t => t === V.I18N.t('g.foe.funke.first', { key: 'V' }) || /Irrläufer|stray/i.test(t)), 'Funke\'s first word on the machines');
   check(p.inv.slots.some(s => s.id === 'laser_blaster'), 'a Pulse Blaster given at the first encounter');
   // the power-down
+  p.pos = [X1 + 2, 64, Z1 + 30];   // (out of the beacon's circle while they power down: the ring is timed from the step in)
   const xp0 = A.rec.me.xp, tl0 = A.rec.me.taler, sp0 = Fo.cost.spawned;
   for (const m of g1) g.entities.hurtMob(m, 99, [m.pos[0] + Math.sin(m.yaw) * 3, m.pos[1], m.pos[2] + Math.cos(m.yaw) * 3]);
   const downs = g1.filter(m => m.foe.st === 'down').length;
@@ -344,6 +347,22 @@ async function glue() {
   check(r1 && r1.st === 'frei' && r2 && r2.st === 'frei' && r3 && L.state(r3) === 'bereit', 'after a reload: both freed sites stay free, the third stays bereit');
   check(g.entities.mobs.some(m => m.foe && m.foe.mine) && g.entities.mobs.some(m => m.foe && m.foe.trader && m.foe.site === s1.id), 'the Helfer is back beside the player, the trader at its post');
   check(!g.entities.mobs.some(m => m.foe && !m.foe.helper && !m.foe.gone), 'no foe at a freed site');
+  // a guest: the host's foes come as copies over the topic `foe`; a hit from the host can make an Ohnmacht that ends
+  {
+    const hostFoes = [], o = [X1 + 40, 64, Z1 + 40];
+    for (const k of ['driller', 'sentry', 'drone']) { const m = { id: 900 + hostFoes.length, pos: [o[0] + hostFoes.length * 2, 64, o[2]], vel: [0, 0, 0], yaw: 0.5 }; m.foe = Fo.make(k, m.id, m.pos); m.foe.st = 'approach'; hostFoes.push(m); }
+    const msg = JSON.parse(JSON.stringify(Fo.message(hostFoes, o, { players: [o], hits: [['me', 2, 1]] })));
+    g.meta = { guest: true }; g.entities = new En(g); p.pos = [o[0], 64, o[2] - 4]; p.health = 1; p.mode = 'survival';
+    const mp = { role: 'client', hostPeer: 'host', myPeer: () => 'me', g };
+    check(!Fo.on(g), 'a guest: VR.Foes off (the host runs the foes)');
+    Fo.onNet(mp, { peer: 'host', data: msg });
+    const copies = g.entities.mobs.filter(m => m.foe && m.foe.remote);
+    check(copies.length === 3 && !!Fo.fainting, 'the host\'s three foes as copies; its hit on the guest: an Ohnmacht');
+    sec(2.6);
+    check(!Fo.fainting && p.health === 20, 'the guest wakes again with full hearts (' + p.health + ')');
+    Fo.onNet(mp, { peer: 'somebody', data: msg });
+    check(g.entities.mobs.filter(m => m.foe && m.foe.remote).length === 3, 'a message from anyone but the host is not taken');
+  }
   document.createElement = mk0;
 }
 
