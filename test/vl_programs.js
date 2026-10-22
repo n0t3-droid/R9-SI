@@ -65,10 +65,19 @@ try {
   const dump = (root, preset) => { const f = path.join(tmp, 'dump.json'); cp.execFileSync(process.execPath, [__filename, '--dump', root, preset, f], { stdio: ['ignore', 'ignore', 'ignore'] }); const a = JSON.parse(fs.readFileSync(f, 'utf8')); fs.rmSync(f); return a; };
   const firstDiff = (x, y) => { const p = (x || '').split('\n'), q = (y || '').split('\n'); for (let i = 0; i < Math.max(p.length, q.length); i++) if (p[i] !== q[i]) return i + ': ' + (p[i] || '∅').slice(0, 70) + ' | ' + (q[i] || '∅').slice(0, 70); return ''; };
   console.log(`Very Low's programs: this branch against ${base}`);
-  const a = dump(tmp, 'potato').map(pre), b = dump(here, 'potato').map(pre);
+  // u-ascent (updated on purpose, docs/superpowers/plans/2026-10-22-u-ascent.md §4): Very Low draws the climb too, so its
+  // terrain and tile programs carry the world's bend (u_curve: one multiply-add a vertex, 0 below 300 m) and the tiles'
+  // far edge in the climb (u_climbCut: one uniform branch a fragment, off on the ground). Those lines — and only those —
+  // are taken out before the comparison; they must be there, in the terrain and the tile programs
+  const ASC = /\bu_curve\b|\bu_climbCut\b/;
+  const strip = (t) => t.split('\n').filter(l => !ASC.test(l)).join('\n');
+  const a = dump(tmp, 'potato').map(pre), b0 = dump(here, 'potato').map(pre), b = b0.map(strip);
   const diff = []; for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) diff.push(i);
   check(a.length > 20 && a.length === b.length, `as many shader sources (${b.length}) as the base built (${a.length})`);
-  check(diff.length === 0, 'every one, preprocessed, the base\'s line for line (the gaps are Low-and-up switches)', diff.length ? 'differ: ' + diff.slice(0, 4).map(i => '#' + i + ' ' + firstDiff(a[i], b[i])).join(' · ') : b.length + ' sources');
+  check(diff.length === 0, 'every one, preprocessed, the base\'s line for line (the gaps are Low-and-up switches; u-ascent\'s bend and tile edge set aside)', diff.length ? 'differ: ' + diff.slice(0, 4).map(i => '#' + i + ' ' + firstDiff(a[i], b[i])).join(' · ') : b.length + ' sources');
+  const withBend = b0.filter(t => /rel\.y -= u_curve \* dot\(rel\.xz, rel\.xz\)/.test(t)).length, withCut = b0.filter(t => /u_climbCut\.y > 0\.0/.test(t)).length;
+  const ascLines = b0.reduce((n, t) => n + t.split('\n').filter(l => ASC.test(l)).length, 0);
+  check(withBend >= 2 && withCut >= 1 && a.every(t => !ASC.test(t)), `u-ascent's lines are the only Very Low difference: the bend in ${withBend} programs, the tiles' climb edge in ${withCut}`, ascLines + ' lines');
   // on Low the gaps' code is in (the comparison sees a change where there is one)
   const la = dump(tmp, 'low').map(pre), lb = dump(here, 'low').map(pre);
   let ld = 0; for (let i = 0; i < Math.max(la.length, lb.length); i++) if (la[i] !== lb[i]) ld++;

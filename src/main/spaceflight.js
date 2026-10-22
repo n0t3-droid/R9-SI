@@ -312,4 +312,351 @@
   // ================================================================ the game's glue (a page with the game)
   if (typeof window === 'undefined' || !VR.Game) return;
   SF.page = true;
+  const Game = VR.Game, SSm = () => VR.SpaceScene;
+  const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const toScene = (v, o) => { o = o || [0, 0, 0]; o[0] = v[1]; o[1] = v[2]; o[2] = v[0]; return o; };   // (scene (x, y, z) = universe (y, z, x))
+
+  // ---------------------------------------------------------------- the space programs with a fade and Herzwelt's near cut
+  // (a wrapper, so space_shaders.js stays u-space0's and u-moons1's): u_fadeOut = (1 − the colour's share, 1 − the alpha's,
+  // log2 of an exposure gain) — all 0, as drawn: /raum sets nothing — and in Herzwelt's program u_cut (the sines of the
+  // ground arcs from the camera's nadir where the impostor starts and where it is whole; z on) with u_nadirB (that nadir in
+  // the body frame). The climb draws the land beyond the horizon tiles with it; the tiles dissolve on the band after it
+  const CUT = `
+  if (u_cut.z > 0.5) {
+    vec3 Dc = normalize(v_dir);
+    vec3 Dq = vec3(dot(Dc, u_bu), dot(Dc, u_bv), dot(Dc, u_cdir));
+    float s2c = Dq.x * Dq.x + Dq.y * Dq.y, qc = u_d * sqrt(s2c);
+    if (qc < 1.0 && Dq.z > 0.0) {
+      float sqc = sqrt(1.0 - qc * qc);
+      vec3 Nq = vec3(u_d * Dq.z * Dq.x, u_d * Dq.z * Dq.y, -u_d * s2c) - Dq * sqc;
+      vec3 Nc = normalize(u_toBody * (Nq.x * u_bu + Nq.y * u_bv + Nq.z * u_cdir));
+      o *= smoothstep(u_cut.x, u_cut.y, length(cross(Nc, u_nadirB)));
+    }
+  }`;
+  const wrapFS = (name, fs) => fs.replace(/void main\(\)\s*\{/, 'void spaceMain() {') + `
+uniform vec4 u_fadeOut;   // u-ascent (spaceflight.js)
+${name === 'herz' ? 'uniform vec4 u_cut;\nuniform vec3 u_nadirB;' : ''}
+void main() {
+  spaceMain();${name === 'herz' ? CUT : ''}
+  o.rgb *= (1.0 - u_fadeOut.x) * exp2(u_fadeOut.z);
+  o.a *= 1.0 - u_fadeOut.y;
+}`;
+  const SH = VR.SpaceShaders;
+  if (SH && SH.programs && !SH.ascentWrapped) {
+    const orig = SH.programs; SH.ascentWrapped = true;
+    SH.programs = () => { const P = orig(), o = {}; for (const k in P) o[k] = { vs: P[k].vs, fs: wrapFS(k, P[k].fs) }; return o; };
+  }
+
+  // ---------------------------------------------------------------- the space scene's frame for a camera on the map
+  // the camera's place on Herzwelt's map (or, away from it, the state's own place) → the scene's pose: the session axes
+  // are the map's there (east, up, south), so the renderer's camera — the ship's cockpit, chase and cinematic views,
+  // unchanged — looks into it the way it looks over the map
+  const _M = M.m9(), _r = v3(), _v = v3(), _o = v3(), _q = [0, 0, 0];
+  SF.eph = {};
+  SF.S = { anc: null };
+  SF.cameraFrame = function (g, cam, t, st, b) {
+    const S = UNI().home, SS = SSm(), r = g.renderer;
+    SS.ephemeris(t, SF.eph);
+    const eph = SF.eph;
+    let body = 'herz';
+    if (!st || st.frame === 'herz') {
+      S.chartToInertial('herz', [cam.x, cam.y, cam.z], null, t, _r, _v);
+      A.localM(cam.x, cam.z, t, _M);
+    } else {
+      // away from Herzwelt (a moon's orbit, the jump): the state's place, the camera's offset from the ship in its frame
+      body = st.frame === 'helia' ? 'herz' : st.frame;
+      A.localFrame(st, _M);
+      const dx = cam.x - b.pos[0], dy = cam.y - b.pos[1], dz = cam.z - b.pos[2];
+      M.mulv(_M, [dx, dy, dz], _o);
+      const pB = S.pos(st.frame, t, v3()), pRef = S.pos(body, t, v3());
+      set3(_r, pB[0] + st.r[0] + _o[0] - pRef[0], pB[1] + st.r[1] + _o[1] - pRef[1], pB[2] + st.r[2] + _o[2] - pRef[2]);
+    }
+    const ref = eph.bodies[body], pos = [ref.p[0] + _r[1], ref.p[1] + _r[2], ref.p[2] + _r[0]];
+    const up = toScene([_M[1], _M[4], _M[7]]), south = toScene([_M[2], _M[5], _M[8]]);
+    // the patch round the nadir: on a 4-km grid a little ahead of the way (a new one every few kilometres, not every frame)
+    let nadir = null;
+    if (body === 'herz' && (!st || st.frame === 'herz')) {
+      const vx = b && b.vel ? b.vel[0] : 0, vz = b && b.vel ? b.vel[2] : 0, lead = Math.min(12000, Math.hypot(vx, vz) * 6) / Math.max(1, Math.hypot(vx, vz));
+      nadir = { x: Math.round((cam.x + vx * lead) / 4000) * 4000, z: Math.round((cam.z + vz * lead) / 4000) * 4000 };
+    }
+    const anc = SS.anchor({ name: 'ship', ref: body, pos, fwd: [-south[0], -south[1], -south[2]], up, fov: cam.fov || 1.2, nadir, body }, eph);
+    const tier = SS.tier(g);
+    if ((SF.needT = (SF.needT || 0) - 1) <= 0) { SF.needT = 15; SS.needs(g, anc, tier); }
+    SF.S.anc = anc;
+    const fr = SS.frameSetup(SF.S, eph, { H: r.H, tier, bloom: !!(r.q.bloom && r.hdr), patch: SS.state.patch });
+    // the nadir in Herzwelt's body frame (BodyTex: x the prime meridian, y the pole, z = x × y) for the impostor's cut
+    const n = S.chart('herz').toSphere(cam.x, cam.z, v3());
+    fr.nadirB = [n[0], n[2], -n[1]];
+    return fr;
+  };
+
+  // ---------------------------------------------------------------- drawing the scene's layers (the climb, the space frame)
+  // L: { bg, bodies, herz: [colour share, alpha share, exposure gain, additive] | null, cut: [sin a0, sin a1, on] | null,
+  //      strict: skip a draw whose texture is not there yet }
+  let blankT = null;
+  function prog(name) {
+    const ST = SSm().state; if (ST.progs[name] !== undefined) return ST.progs[name];
+    const src = VR.SpaceShaders.programs()[name];
+    try { ST.progs[name] = VR.GL.program(src.vs, src.fs, 'space.' + name, []); } catch (e) { console.error('space shader ' + name + ' failed: ' + (e && e.message)); ST.progs[name] = null; }
+    return ST.progs[name];
+  }
+  SF.prog = prog;
+  function setU(gl, p, k, v) {
+    const loc = p.u[k]; if (loc === undefined || loc === null) return;
+    if (typeof v === 'number') gl.uniform1f(loc, v);
+    else if (v.length === 2) gl.uniform2f(loc, v[0], v[1]);
+    else if (v.length === 3) gl.uniform3f(loc, v[0], v[1], v[2]);
+    else if (v.length === 4) gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
+    else if (v.length === 9) gl.uniformMatrix3fv(loc, false, v);
+    else if (v.length === 16) gl.uniformMatrix4fv(loc, false, v);
+  }
+  SF.drawLayers = function (r, fr, L) {
+    const gl = r.gl, ST = SSm().state, map = SSm().texMap || {};
+    if (!blankT) blankT = VR.GL.tex2D(1, 1, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: new Uint8Array([60, 70, 80, 255]) });
+    gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.disable(gl.CULL_FACE);
+    gl.bindVertexArray(r.emptyVAO);
+    let n = 0;
+    for (const d of fr.draws) {
+      const lay = d.prog === 'bg' ? L.bg : d.prog === 'herz' ? L.herz : L.bodies;
+      if (!lay || !(lay[0] > 0.001 || lay[1] > 0.001)) continue;
+      if (L.strict) { let miss = false; for (const k in d.tex) if (!ST.tex[map[d.tex[k]]]) miss = true; if (miss) continue; }
+      const p = prog(d.prog); if (!p) continue;
+      gl.useProgram(p.p);
+      if (d.prog === 'bg' && !lay[3]) gl.disable(gl.BLEND);
+      else { gl.enable(gl.BLEND); if (d.add || lay[3]) gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
+      setU(gl, p, 'u_viewProj', r.viewProj); setU(gl, p, 'u_invViewProj', r.invViewProj);
+      for (const k in d.u) setU(gl, p, k, d.u[k]);
+      setU(gl, p, 'u_fadeOut', [1 - lay[0], 1 - lay[1], Math.log2(Math.max(1e-6, lay[2] || 1)), 0]);
+      if (d.prog === 'herz') { setU(gl, p, 'u_cut', L.cut || [0, 0, 0, 0]); setU(gl, p, 'u_nadirB', fr.nadirB || [0, 1, 0]); }
+      let unit = 0;
+      for (const k in d.tex) { if (!p.u[k]) continue; gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, ST.tex[map[d.tex[k]]] || blankT); gl.uniform1i(p.u[k], unit); unit++; }
+      gl.drawArrays(gl.TRIANGLES, 0, d.full ? 3 : 6);
+      r.stats.draws++; r.stats.tris += d.full ? 1 : 2; n++;
+    }
+    gl.activeTexture(gl.TEXTURE0);
+    gl.disable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+    return n;
+  };
+  // the cut where the horizon tiles end (their radius in metres, the share of it the tiles keep; 0: no cut)
+  SF.cutFor = (hzR) => { const R = A.R(); return hzR > 0 ? [Math.sin(0.6 * hzR / R), Math.sin(0.75 * hzR / R), 1, 0] : null; };
+
+  // the climb's layers (renderer.js, right after its sky pass → VR.Ascent.drawSky): Herzwelt beyond the tiles from 400 m,
+  // space's background behind the thinning air from 1,200 m (added: the air's light stays), the true bodies over the
+  // postcard's from 2,150 m — each brought to the world's exposure (the space scene is made for its own)
+  SF.climbLayers = function (g, r, E, cam) {
+    const c = E.climb; if (!c) return 0;
+    if (c.space) return SF.spaceLayers(g, r, E, cam);
+    if (!(c.imp > 0.001 || c.bg > 0.001 || c.body > 0.001)) return 0;
+    const fl = g.flight, a = fl && fl.asc;
+    const fr = SF.cameraFrame(g, cam, c.t, a ? a.st : null, fl ? fl.b : null);
+    const Gn = fr.look.exposure / Math.max(0.05, E.exposure || 1);
+    return SF.drawLayers(r, fr, { bg: c.bg > 0.001 ? [c.bg, c.bg, Gn, 1] : null, bodies: c.body > 0.001 ? [c.body, c.body, Gn, 0] : null, herz: c.imp > 0.001 ? [c.imp, c.imp, Gn, 0] : null, cut: SF.cutFor(c.hzR), strict: true });
+  };
+  // the space frame's layers: all of them whole; Herzwelt's cut only while the horizon tiles still fade out
+  SF.spaceLayers = function (g, r, E, cam) {
+    const fr = SF.cur; if (!fr) return 0;
+    return SF.drawLayers(r, fr, { bg: [1, 1, 1, 0], bodies: [1, 1, 1, 0], herz: [1, 1, 1, 0], cut: E.climb.hzR > 0 ? SF.cutFor(E.climb.hzR) : null, strict: false });
+  };
+
+  // ---------------------------------------------------------------- the space frame (the play frame while the ship is in space)
+  // the ship's flight (controls, the space regime, sound, shake), the clock and the pool, the camera the ship's own; the
+  // render without the voxel world: space's layers, then (the first seconds) the horizon tiles dissolving into Herzwelt's
+  // impostor, the ship and its cockpit; the cockpit's screens and the HUD. The voxel world waits; after 60 s its chunks
+  // are let go (saved first where changed) — the horizon tiles stay for the way back
+  const ES2 = {};
+  SF.inSpace = (g) => { const fl = g && g.flight; return !!(fl && fl.asc && (fl.regime === 'space' || fl.asc.jump)); };
+  SF.frame = function (g, dt) {
+    const fl = g.flight, a = A.ascOf(fl), st = a.st, r = g.renderer, p = g.player, input = g.input, ui = g.ui, b = fl.b;
+    g.time += dt;
+    g.handleKeys();
+    const gad = g.gadgets;
+    if (gad && gad.controlling) gad.drive(dt, input, ui.blocking);
+    if (!SF.inSpace(g)) return;   // (back in the climb this very frame: the next frame is the play frame)
+    if (!a.spaceT0) a.spaceT0 = performance.now();
+    const since = (performance.now() - a.spaceT0) / 1000;
+    const eye = p.eyePos ? p.eyePos() : [b.pos[0], b.pos[1] + 2, b.pos[2]];
+    const Ew = g.envFor(eye, dt, { freezeTime: g.zenFreezeTime, freezeWeather: g.zenFreezeWeather });
+    if (g.pool && g.pool.pump) g.pool.pump();
+    if (g.starships) g.starships.update(dt);
+    if (g.particles) g.particles.update(dt, eye);
+    if (g.trails) g.trails.update(dt);
+    if (VR.Entry && VR.Entry.tick) VR.Entry.tick(g, fl, dt);
+    A.drawAttitude(fl);
+    let cam = { x: eye[0], y: eye[1], z: eye[2], yaw: p.yaw, pitch: p.pitch, roll: 0, fov: (g.settings.fov || 75) * Math.PI / 180, far: 12000 };
+    if (g.vehicleCam) { const vc = g.vehicleCam(cam); if (vc) cam = vc; }
+    cam.far = Math.max(cam.far || 0, 12000);
+    g.cam = cam;
+    const t = st.t;
+    const fr = SF.cur = SF.cameraFrame(g, cam, t, st, b);
+    // the env: space's (u-space0's look), the sun the scene's, the ship lit as in the last of the climb
+    const SE = SSm().env;
+    Object.assign(ES2, SE);
+    ES2.fog = [1e7, 2e7, 0, 0]; ES2.fogColor = [0, 0, 0];
+    ES2.sunDir = fr.sunS; ES2.moonDir = [-fr.sunS[0], -fr.sunS[1], -fr.sunS[2]];
+    ES2.exposure = fr.look.exposure; ES2.time = g.env.anim || g.time;
+    ES2.bloomStrength = 0.06; ES2.bloomThreshold = 1.4;
+    const k = 2.2 / Math.max(0.5, ES2.exposure) * (fr.sunVis === undefined ? 1 : 0.3 + 0.7 * fr.sunVis);
+    ES2.sunColor = [k, k, k * 1.02];
+    const pk = 0.04 * fr.look.dayK / Math.max(0.5, ES2.exposure);
+    ES2.ambSky = [pk * 0.7, pk * 0.85, pk * 1.2];   // (Herzwelt's light from below)
+    // the horizon tiles of the hand-off fade out over the first five seconds (their cut shrinks from the edge in)
+    const hz = g.horizon, onHerz = st.frame === 'herz', tilesK = onHerz && hz && hz.enabled() && !a.jump ? 1 - ss(1.5, 5, since) : 0;
+    const hzR = tilesK > 0.01 ? (A.view.hzR || 0) * tilesK : 0;
+    ES2.climb = { space: true, y: A.mapY(st), curve: hzR > 0 && A.view.curve !== false ? 0.5 / A.R() : 0, cut0: hzR * 0.75, cut1: hzR * 0.95, hzR, t };
+    ES2.bodies = null;
+    if (hzR > 0) hz.update(cam);
+    r.render({ cam, world: null, env: ES2, noSky: true, horizon: hzR > 0 ? hz : null, particles: g.particles,
+      drawOpaque: (r2, E2) => { if (g.starships) g.starships.draw(r2, E2, 'opaque'); },
+      drawTranslucent: (r2, E2) => { if (g.starships) g.starships.draw(r2, E2, 'trans'); if (g.trails) g.trails.draw(r2, E2); } });
+    if (g.cockpit) g.cockpit.updateHud(dt);
+    if (g.audio && g.audio.listen) g.audio.listen(eye, p.yaw, null, false);
+    if (g.audio && g.audio.updateMusic) g.audio.updateMusic(dt, { night: 1, cave: false, danger: false, space: true, festival: false, enabled: true, day: g.env.day, mobs: null, agents: null });
+    ui.updateHUD();
+    if (g.settings.showFps) ui.fps(T('g.hud.fps', { n: Math.round(g.fps || 0) }));
+    SF.fx(g, fl);
+    // the voxel world let go after a minute up here (the take-off's columns; the way back streams what it needs)
+    const w = g.world;
+    if (w && !a.freed && since > 60) { a.freed = true; for (const c of [...w.cols.values()]) w.unloadColumn(c); }
+    void Ew;
+  };
+  // the play frame: the space frame while the ship is up there (a /raum view keeps its own wrapper, spacescene.js)
+  const origPlay = Game.prototype.playFrame;
+  Game.prototype.playFrame = function (dt) {
+    if (!this.space && SF.inSpace(this)) return SF.frame(this, dt);
+    if (this.flight && this.flight.asc && VR.Ascent.frame) VR.Ascent.frame(this, dt);
+    return origPlay.call(this, dt);
+  };
+  // Heimkehr (🏠, /home) in the sky: the six-second home jump (game.js goHome's first line)
+  SF.goHome = function (g) {
+    const fl = g && g.flight; if (!fl || !fl.regime || fl.regime === 'air') return false;
+    if (A.ascOf(fl).jump) return true;
+    SF.say(fl, 'g.asc.homeGo');
+    SF.homeJump(fl);
+    return true;
+  };
+  SF.onJump = function (fl, what, j) {
+    const g = fl.g; if (!g) return;
+    if (what === 'start') { if (g.audio && g.audio.play) g.audio.play('boost'); if (g.ui && g.ui.chatLine) g.ui.chatLine(T(j.home ? 'g.asc.homeGo' : 'g.asc.jumpGo', { name: SF.nameOf(j.to) }), '#9affd8'); }
+    if (what === 'end' && !j.home && SF.landable(j.to) && SF.onLandBody) { /* (u-moons1: Landen travels there; until then the orbit) */ }
+  };
+  // a moon with its own world (u-moons1 registers Opal and Basalt): Landen there is the trip with the ship (VR.Travel)
+  SF.onLandBody = function (fl, body) {
+    const g = fl.g, dim = SF.DIM_OF[body];
+    if (!g || !VR.Travel || !VR.Travel.go || !dim) return false;
+    const a = A.ascOf(fl);
+    fl.regime = 'air'; fl.auto = null; a.jump = null;
+    try { VR.Travel.go(g, dim); } catch (e) { console.warn(e); SF.hint(fl, 'g.asc.noLand', { name: SF.nameOf(body) }); }
+    return true;
+  };
+
+  // ---------------------------------------------------------------- the screen's light: the plasma, the jump's flash
+  // one 2D canvas over the game's (no shader changes, the same on Very Low): the entry's plasma — a white-yellow core where
+  // the nose meets the air, a violet-blue sheath at its edge, orange wake streaks — and the jump's white-blue flash
+  let fxC = null, fxX = null, fxOn = false;
+  SF.fx = function (g, fl) {
+    const a = fl && fl.asc, I = a && a.info;
+    const glow = I ? A.glowOf(I.q) : 0, j = a && a.jump, flash = j ? SF.jumpFlash(j.J, j.s) : 0;
+    if (glow < 0.01 && flash < 0.01) { if (fxOn) { fxX.clearRect(0, 0, fxC.width, fxC.height); fxC.style.display = 'none'; fxOn = false; } return; }
+    if (!fxC) {
+      fxC = document.createElement('canvas'); fxC.id = 'ascFx';
+      Object.assign(fxC.style, { position: 'fixed', left: '0', top: '0', width: '100%', height: '100%', pointerEvents: 'none', zIndex: '4' });
+      document.body.appendChild(fxC); fxX = fxC.getContext('2d');
+    }
+    const W = Math.max(320, Math.round(window.innerWidth / 2)), H = Math.max(180, Math.round(window.innerHeight / 2));
+    if (fxC.width !== W || fxC.height !== H) { fxC.width = W; fxC.height = H; }
+    fxC.style.display = 'block'; fxOn = true;
+    const x = fxX; x.clearRect(0, 0, W, H);
+    if (glow > 0.01) {
+      // where the nose meets the air: the screen point of a spot ahead of the ship (the cockpit: the middle of the view)
+      const r = g.renderer, b = fl.b, cam = r.cam || g.cam || {};
+      let sx = W / 2, sy = H * 0.45, rad = Math.max(W, H) * 0.75;
+      if (fl.view !== 0 && r.viewProj && cam.x !== undefined) {
+        const n = fl.dirWorld([0, 0, -1]), Lb = (b.length || 12) * 0.6;
+        const px = b.pos[0] + n[0] * Lb - cam.x, py = b.pos[1] + (b.height || 4) * 0.4 + n[1] * Lb - cam.y, pz = b.pos[2] + n[2] * Lb - cam.z, m = r.viewProj;
+        const cw = m[3] * px + m[7] * py + m[11] * pz + m[15];
+        if (cw > 0.1) { sx = ((m[0] * px + m[4] * py + m[8] * pz + m[12]) / cw * 0.5 + 0.5) * W; sy = (0.5 - (m[1] * px + m[5] * py + m[9] * pz + m[13]) / cw * 0.5) * H; rad = Math.max(W, H) * 0.35; }
+      }
+      const t = performance.now() / 1000, fl1 = 0.85 + 0.15 * Math.sin(t * 37) * Math.sin(t * 13.1);
+      const gr = x.createRadialGradient(sx, sy, 0, sx, sy, rad);
+      gr.addColorStop(0, `rgba(255,250,225,${0.85 * glow * fl1})`);
+      gr.addColorStop(0.18, `rgba(255,214,140,${0.6 * glow * fl1})`);
+      gr.addColorStop(0.45, `rgba(170,120,255,${0.32 * glow})`);
+      gr.addColorStop(0.75, `rgba(90,110,255,${0.16 * glow})`);
+      gr.addColorStop(1, 'rgba(60,60,200,0)');
+      x.globalCompositeOperation = 'lighter';
+      x.fillStyle = gr; x.fillRect(0, 0, W, H);
+      // the wake: orange-yellow streaks from the edge of the sheath outward
+      x.lineCap = 'round';
+      for (let i = 0; i < 26; i++) {
+        const ph = (i * 2.399 + Math.floor(t * 9 + i * 0.37)) % 6.2832, r0 = rad * (0.25 + 0.2 * ((i * 0.618) % 1)), L = rad * (0.4 + 0.6 * (((i * 0.31) + t * 1.7) % 1));
+        x.strokeStyle = `rgba(255,${150 + (i % 5) * 18},70,${0.28 * glow})`; x.lineWidth = 1 + (i % 3);
+        x.beginPath(); x.moveTo(sx + Math.cos(ph) * r0, sy + Math.sin(ph) * r0); x.lineTo(sx + Math.cos(ph) * (r0 + L), sy + Math.sin(ph) * (r0 + L)); x.stroke();
+      }
+      x.globalCompositeOperation = 'source-over';
+    }
+    if (flash > 0.01) { x.fillStyle = `rgba(225,238,255,${Math.min(1, flash)})`; x.fillRect(0, 0, W, H); }
+  };
+
+  // ---------------------------------------------------------------- the nav tile in the climb and in space (cockpit.js)
+  // the planet as a disc, the orbit in its own plane seen from above it (its normal toward the viewer), Ap / Pe / the
+  // period, the patched conic dashed; the ship a marker. Every half second (the ghost path is a few hundred Kepler solves)
+  const nav = { t: 0, g: null, ok: false };
+  SF.navTile = function (x, I, b, g, fl, TW, TH) {
+    if (!fl || !fl.regime || fl.regime === 'air' || !fl.asc) return false;
+    const a = fl.asc, st = a.st, now = performance.now();
+    if (now - nav.t > 500) { nav.t = now; try { nav.g = SF.ghost(st, nav.g); nav.ok = true; } catch (e) { nav.ok = false; } }
+    const B = UNI().home.body(st.frame) || { R: 1 };
+    x.fillStyle = '#06101a'; x.fillRect(0, 0, TW, TH);
+    const cx = TW / 2, cy = TH / 2 + 4;
+    // the orbit's plane: x along the ship's place, y along its way (the normal toward us)
+    const r = st.r, h = cross(r, st.v, v3()); unit(h, h);
+    const ex = unit(r, v3()), ey = cross(h, ex, v3());
+    let maxR = B.R * 1.05;
+    const pts = nav.ok && nav.g ? nav.g.pts : null;
+    if (pts) for (let i = 0; i < pts.length; i += 3) maxR = Math.max(maxR, Math.hypot(pts[i], pts[i + 1], pts[i + 2]));
+    const k = (Math.min(TW, TH) * 0.42) / maxR;
+    x.fillStyle = st.frame === 'herz' ? '#1d4f6e' : '#5a4a3a';
+    x.beginPath(); x.arc(cx, cy, B.R * k, 0, 6.2832); x.fill();
+    x.strokeStyle = 'rgba(160,220,255,0.5)'; x.lineWidth = 1; x.stroke();
+    if (pts) {
+      x.strokeStyle = '#9affd8'; x.lineWidth = 1.4; x.beginPath();
+      for (let i = 0; i < pts.length; i += 3) { const px = pts[i] * ex[0] + pts[i + 1] * ex[1] + pts[i + 2] * ex[2], py = pts[i] * ey[0] + pts[i + 1] * ey[1] + pts[i + 2] * ey[2]; if (i) x.lineTo(cx + px * k, cy - py * k); else x.moveTo(cx + px * k, cy - py * k); }
+      if (nav.g.closed) x.closePath();
+      x.stroke();
+      const pt = nav.g.patch;
+      if (pt && pt.pts) {
+        x.setLineDash([3, 3]); x.strokeStyle = '#ffd88a'; x.beginPath();
+        const an = pt.anchor;
+        for (let i = 0; i < pt.pts.length; i += 3) { const qx = pt.pts[i] + an[0], qy = pt.pts[i + 1] + an[1], qz = pt.pts[i + 2] + an[2]; const px = qx * ex[0] + qy * ex[1] + qz * ex[2], py = qx * ey[0] + qy * ey[1] + qz * ey[2]; if (i) x.lineTo(cx + px * k, cy - py * k); else x.moveTo(cx + px * k, cy - py * k); }
+        x.stroke(); x.setLineDash([]);
+      }
+    }
+    // the ship
+    x.fillStyle = '#ffffff'; x.beginPath(); x.arc(cx + len(r) * k, cy, 2.6, 0, 6.2832); x.fill();
+    x.font = 'bold 9px monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#9affd8';
+    const o = A.orbitOf(st), base = st.frame === 'herz' ? A.DATUM : 0;
+    if (o.e < 1) x.fillText(T('g.asc.nav.orbit', { ap: Math.round(o.apo - base), pe: Math.round(o.peri - base), min: (o.period / 60).toFixed(1) }), cx, 8);
+    else x.fillText(T('g.asc.nav.escape'), cx, 8);
+    x.font = '8px monospace'; x.fillStyle = '#9ad8ff';
+    x.fillText(SF.nameOf(st.frame) + ' · ' + Math.round(I.speed) + ' m/s', cx, TH - 6);
+    return true;
+  };
+
+  // ---------------------------------------------------------------- the debug and test hooks (test/ascent.mjs)
+  SF.debug = {
+    // the ship in a circular orbit over a map point (x, z) at height y (map)
+    orbit(g, x, z, y) { const fl = g.flight; if (!fl) return false; A.orbitAt(fl, [x, y || SF.ORBIT, z]); return true; },
+    // the ship in the climb at height y over its place, at rest (the hover hold keeps it), the nose pitched `pitch` degrees
+    climb(g, y, pitch, heading) {
+      const fl = g.flight; if (!fl) return false; const b = fl.b;
+      if (!fl.running) { fl.power = 'running'; fl.startT = 3; }
+      fl.state = 'flying'; fl.throttle = 0; fl.auto = null;
+      if (heading !== undefined) b.heading = heading;
+      A.enterClimb(fl, [b.pos[0], y, b.pos[2]], [0, 0, 0]);
+      fl.pitch = (pitch || 0) * Math.PI / 180; b.setAttitude(fl.pitch, 0); fl.orient();
+      return true;
+    },
+    state(g) { const fl = g.flight; if (!fl || !fl.asc) return { regime: fl ? fl.regime || 'air' : null }; const a = fl.asc, o = A.orbitOf(a.st); return { regime: fl.regime || 'air', frame: a.st.frame, y: +A.mapY(a.st).toFixed(1), speed: +a.info.speed.toFixed(1), q: a.info.q, glow: A.glowOf(a.info.q), ap: o.apo, pe: o.peri, e: o.e, period: o.period, auto: fl.auto ? fl.auto.space || 'village' : null, phase: fl.auto ? fl.auto.phase || null : null, jump: !!a.jump, pos: fl.b.pos.slice(), t: a.st.t }; },
+  };
 })(VR);

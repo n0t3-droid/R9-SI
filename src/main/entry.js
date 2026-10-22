@@ -143,4 +143,29 @@
   // ================================================================ the game's glue (a page with the game)
   if (typeof window === 'undefined' || !VR.Game) return;
   EN.page = true;
+  // each frame of the climb and of space (ascent.js A.frame, spaceflight.js SF.frame): the landing place predicted every
+  // 3 s from the start of the entry (the autopilot's site: the nav tile and the HUD show it, the tiles and the chunks
+  // stream there as the ship slows), the sparks off the nose in the plasma (from Low up), the roar
+  EN.tick = function (g, fl, dt) {
+    const A_ = fl.auto, a = fl.asc; if (!a) return;
+    if (A_ && A_.space === 'land' && (A_.phase === 'entry' || A_.phase === 'deorbit') && a.st.frame === 'herz') {
+      if ((A_.predT = (A_.predT || 0) - dt) <= 0) {
+        A_.predT = 3;
+        const P = EN.predict(a.st, A_.phase);
+        if (P) { A_.pred = P; if (A_.site) { A_.site.x = P.x; A_.site.z = P.z; } A_.dist = Math.hypot(P.x - fl.b.pos[0], P.z - fl.b.pos[2]); A_.eta = P.t; }
+      }
+    }
+    const I = a.info, glow = A.glowOf(I.q), P = g.particles, b = fl.b;
+    if (glow > 0.05 && P && ((g.settings && g.settings.particles) | 0) > 0 && fl.toWorld) {
+      const n = fl.dirWorld([0, 0, -1]), Lb = (b.length || 12) * 0.5, H = (b.height || 4) * 0.4;
+      const k = Math.min(6, 1 + glow * 5) * (g.settings.particles >= 2 ? 1 : 0.5);
+      for (let i = 0; i < k; i++) {
+        if (Math.random() > 0.7) continue;
+        const w = fl.toWorld([(Math.random() - 0.5) * (b.width || 6) * 0.6, H + (Math.random() - 0.5) * H, -Lb]);
+        const sp = 18 + Math.random() * 30, hot = Math.random() < 0.4;
+        P.spawn(w[0], w[1], w[2], b.vel[0] - n[0] * sp + (Math.random() - 0.5) * 8, b.vel[1] - n[1] * sp + (Math.random() - 0.5) * 8, b.vel[2] - n[2] * sp + (Math.random() - 0.5) * 8,
+          { life: 0.35 + Math.random() * 0.4, size: 0.18 + Math.random() * 0.25, grav: 0, col: hot ? [1, 0.95, 0.75] : [1, 0.55 + Math.random() * 0.2, 0.2], emis: 1, drag: 2.5, grow: 0.6, collide: false });
+      }
+    }
+  };
 })(VR);

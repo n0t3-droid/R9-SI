@@ -289,7 +289,8 @@
       let n = 0, tris = 0;
       for (const t of list) {
         const ox = t.x0 - cam.x, oz = t.z0 - cam.z;
-        if (!mat4.boxInFrustum(r.planes, ox + t.bx0, t.minY - cam.y, oz + t.bz0, ox + t.bx1, t.maxY - cam.y, oz + t.bz1)) continue;
+        const cv = r.uCurve ? r.uCurve * (Math.max((ox + t.bx0) ** 2, (ox + t.bx1) ** 2) + Math.max((oz + t.bz0) ** 2, (oz + t.bz1) ** 2)) : 0;   // u-ascent: the bend lowers the far boxes
+        if (!mat4.boxInFrustum(r.planes, ox + t.bx0, t.minY - cam.y - cv, oz + t.bz0, ox + t.bx1, t.maxY - cam.y, oz + t.bz1)) continue;
         gl.uniform3f(p.u.u_tileOrigin, ox, -cam.y, oz);
         gl.bindVertexArray(t.vao);
         gl.drawElements(gl.TRIANGLES, t.count, t.type, 0);

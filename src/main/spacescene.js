@@ -102,7 +102,7 @@
     const fb = SS.fallback(st.t !== undefined ? st.t : 0, {});
     out.src = 'universe';
     const bs = out.bodies || (out.bodies = {});
-    for (const id in got) { const r = got[id].r, o = bs[id] || (bs[id] = {}); o.p = got[id].p; o.R = B[id].R; o.axis = (r.axis && r.axis.length === 3) ? norm(r.axis) : fb.bodies[id].axis; o.xb = (r.xb && r.xb.length === 3) ? norm(r.xb) : fb.bodies[id].xb; }
+    for (const id in got) { const r = got[id].r, o = bs[id] || (bs[id] = {}), Bm = st.b && r.B && r.B.length === 9 ? r.B : null; o.p = got[id].p; o.R = B[id].R; o.axis = Bm ? norm([Bm[5], Bm[8], Bm[2]]) : (r.axis && r.axis.length === 3) ? norm(r.axis) : fb.bodies[id].axis; o.xb = Bm ? norm([Bm[3], Bm[6], Bm[0]]) : (r.xb && r.xb.length === 3) ? norm(r.xb) : fb.bodies[id].xb; }   // u-ascent: the turn from VR.Universe's B (body → system; the pole its third column) — the climb's land and the impostor's are one ground
     return true;
   };
   SS.ephemeris = function (t, out) {

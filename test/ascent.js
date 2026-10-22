@@ -287,7 +287,7 @@ check(descStart && Math.hypot(descStart.x, descStart.z) > 20000, 'the ship comes
 console.log('(g) the postcard');
 const envSun = (tk) => { const th = tk / 24000 * Math.PI * 2, el = Math.sin(th) * 0.42, az = th + 0.4; return unit([Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)]); };
 const mkE = (tk) => { const th = tk / 24000 * Math.PI * 2, SB = VR.SkyBodies.at(th); const E = { sunDir: envSun(tk), moonDir: envSun(tk).map(x => -x), bodies: SB, planetDir: SB.giant, ringNormal: SB.ring, planet2Dir: SB.blue }; return E; };
-let gOk300 = true, gTrue = 0, sunMove = 0;
+let gOk300 = true, gTrue = 0, sunMove = 0, gGone = true;
 for (const day of [0, 3, 41, 200]) for (let tk = 0; tk < 24000; tk += 1500) {
   const t = U.worldSeconds(day, tk);
   const E3 = mkE(tk), E3b = JSON.stringify(mkE(tk));
@@ -296,13 +296,19 @@ for (const day of [0, 3, 41, 200]) for (let tk = 0; tk < 24000; tk += 1500) {
   const E25 = mkE(tk), sun0 = E25.sunDir.slice();
   A.env(E25, { pos: [0, 2500, 0], t, dim: 'overworld' });
   const sky = U.localSky('overworld', [0, 2500, 0], t), by = sky._byId;
-  gTrue = Math.max(gTrue, ang(E25.planetDir, by.amarant.dir), ang(E25.planet2Dir, by.aqua.dir), ang(E25.ringNormal, by.amarant.pole), ang(E25.sunDir, sky.sun.dir), Math.abs(E25.bodies.radius.giant - by.amarant.ang));
-  ['zinn', 'opal', 'basalt', 'ocker'].forEach((id, k) => { const m = E25.bodies.moons[k]; gTrue = Math.max(gTrue, ang([m[0], m[1], m[2]], by[id].dir), Math.abs(m[3] - by[id].ang)); });
+  gTrue = Math.max(gTrue, ang(E25.planetDir, by.amarant.dir), ang(E25.planet2Dir, by.aqua.dir), ang(E25.ringNormal, by.amarant.pole), ang(E25.sunDir, sky.sun.dir));
+  ['zinn', 'opal', 'basalt', 'ocker'].forEach((id, k) => { const m = E25.bodies.moons[k]; gTrue = Math.max(gTrue, ang([m[0], m[1], m[2]], by[id].dir)); });
+  if (E25.bodies.radius.giant !== 0 || E25.bodies.moons.some(m => m[3] !== 0)) gGone = false;
+  // (the sizes: the blend at its end, k = 1 — above 2,450 m the space scene's own bodies stand there instead)
+  const Ek = mkE(tk); A.blendSky(Ek, sky, 1);
+  gTrue = Math.max(gTrue, Math.abs(Ek.bodies.radius.giant - by.amarant.ang), Math.abs(Ek.bodies.radius.blue - by.aqua.ang));
+  ['zinn', 'opal', 'basalt', 'ocker'].forEach((id, k) => { gTrue = Math.max(gTrue, Math.abs(Ek.bodies.moons[k][3] - by[id].ang)); });
   sunMove = Math.max(sunMove, ang(sun0, E25.sunDir) / D2R);
 }
 check(gOk300, 'at 300 m the sky is the postcard\'s exactly (the ground\'s picture unchanged)');
 check(gTrue < 1e-9, 'at 2,500 m the bodies stand where VR.Universe has them (direction, size, the ring\'s pole)', 'worst ' + gTrue.toExponential(1));
 check(sunMove <= 2.7, 'the sun moves at most 2.7° on the way (it is nearly true already)', sunMove.toFixed(2) + '°');
+check(gGone, 'above 2,450 m the postcard\'s discs are gone: the space scene\'s true bodies stand there (no double Amarant)');
 const Em = mkE(6000); A.env(Em, { pos: [0, 1400, 0], t: U.worldSeconds(3, 6000), dim: 'overworld' });
 const sk14 = U.localSky('overworld', [0, 1400, 0], U.worldSeconds(3, 6000)), E0m = mkE(6000), k14 = U.climbK(1400);
 const mid = ang(E0m.planetDir, Em.planetDir) / Math.max(1e-9, ang(E0m.planetDir, sk14._byId.amarant.dir));
@@ -334,9 +340,11 @@ check((FL.match(/\/\/ u-ascent/g) || []).length >= 5 && /VR\.Ascent\.simulate\(t
 const SH = src('src/main/shaders.js');
 check((SH.match(/u_curve/g) || []).length >= 4 && /u-ascent/.test(SH), 'shaders.js: the bend in the terrain and the tile programs');
 const RN = src('src/main/renderer.js'), HO = src('src/main/horizon.js'), EV = src('src/main/env.js'), GM = src('src/main/game.js'), CK = src('src/main/cockpit.js'), SS = src('src/main/spacescene.js'), SP = src('src/main/space_shaders.js');
-check(/u_curve/.test(RN) && /VR\.Ascent/.test(RN) && /u-ascent/.test(HO) && /VR\.Ascent\.env|VR\.Entry\.tickShift/.test(EV) && /u-ascent/.test(GM) && /u-ascent/.test(CK) && /u-ascent/.test(SS) && /u_fadeOut/.test(SP) && /u_cut/.test(SP), 'renderer, horizon, env, game, cockpit, space scene and its shaders hooked (marked)');
+const SFs = src('src/main/spaceflight.js');
+check(/u_curve/.test(RN) && /VR\.Ascent/.test(RN) && /u-ascent/.test(HO) && /VR\.Ascent\.env/.test(EV) && /VR\.Entry\.tickShift/.test(EV) && /u-ascent/.test(GM) && /u-ascent/.test(CK) && /u-ascent/.test(SS) && !/u-ascent/.test(SP) && /u_fadeOut/.test(SFs) && /u_cut/.test(SFs) && /SH\.programs = /.test(SFs), 'renderer, horizon, env, game, cockpit and the space scene hooked (marked); the space programs\' fade and cut wrapped from spaceflight.js (space_shaders.js untouched)');
 const LD = src('src/main/lang_de.js'), LE = src('src/main/lang_en.js');
-const keys = new Set(); for (const f of ['ascent', 'spaceflight', 'entry']) for (const m of src('src/main/' + f + '.js').matchAll(/'(g\.asc\.[A-Za-z0-9_.]+)'/g)) keys.add(m[1]);
+const keys = new Set(); for (const f of ['ascent', 'spaceflight', 'entry']) for (const m of src('src/main/' + f + '.js').matchAll(/'(g\.(?:asc|set)\.[A-Za-z0-9_.]+)'/g)) if (!m[1].endsWith('.')) keys.add(m[1]);
+for (const m of ['orbit', 'circ', 'land', 'descend']) { keys.add('g.asc.site.' + m); keys.add('g.asc.go.' + m); }
 const missing = [...keys].filter(k => !LD.includes("'" + k + "'") || !LE.includes("'" + k + "'"));
 check(keys.size >= 10 && !missing.length, 'every g.asc.* text in German and English', keys.size + ' keys' + (missing.length ? ', missing ' + missing.join(' ') : ''));
 check(/key: 'curvature'/.test(src('src/main/ascent.js')), 'the switch „Krümmung" (curvature) via VR.Settings.add');

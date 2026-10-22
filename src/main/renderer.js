@@ -868,6 +868,7 @@
       if (u.u_storm) { const st = E.storm || [1, 0, 0, 0]; gl.uniform4f(u.u_storm, st[0], st[1], st[2], st[3]); }
       if (u.u_bolt) { const b = E.bolt || [1, 0, 0, 0]; gl.uniform4f(u.u_bolt, b[0], b[1], b[2], b[3]); }
       if (u.u_snowCover) gl.uniform1f(u.u_snowCover, E.snowCover || 0);
+      this.uCurve = E.climb ? E.climb.curve || 0 : 0; if (u.u_curve) gl.uniform1f(u.u_curve, this.uCurve); if (u.u_climbCut) gl.uniform2f(u.u_climbCut, E.climb ? E.climb.cut0 || 0 : 0, E.climb ? E.climb.cut1 || 0 : 0);   // u-ascent: the world's bend and the tiles' far edge in the climb (ascent.js)
       // the sky bodies (skybodies.js): directions and angular radii of the giant, the blue planet and the four moons
       const B = E.bodies;
       if (B) {
@@ -2135,6 +2136,7 @@
         this.fsMark('sky', this.w, this.h, 0, this.w * this.h * this.sceneFmt().bytes);
         this.fs(p);
       }
+      if (E.climb && VR.Ascent && VR.Ascent.drawSky) VR.Ascent.drawSky(this, E, F);   // u-ascent: space behind the thinning air, Herzwelt beyond the tiles (ascent.js, spaceflight.js)
       gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
       gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
       if (this.q.cloudShadow) this.updateCloudShadow(E, F.cam);   // (t-motion: the clouds' shadow mask)

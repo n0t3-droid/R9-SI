@@ -118,6 +118,21 @@
     S.chart('herz').toPlane(_n, _xz);
     return A.localM(_xz[0], _xz[1], st.t, out);
   };
+  // the frame the ship's model and cameras are drawn in, under a state: round Herzwelt the map's (east, up, south at the
+  // ground point under the ship); elsewhere (another body, the jump's system frame) the same axes made from the way up
+  // from the body's centre and its spin axis (columns east, up, south; row-major, local → system)
+  A.localFrame = (st, out) => {
+    out = out || m9();
+    if (st.frame === 'herz') return A.localAt(st, out);
+    const b = UNI().home.body(st.frame), ax = b && b.spin && b.spin.axis ? b.spin.axis : [0, 0, 1];
+    unit(st.r, _n);
+    let ex = ax[1] * _n[2] - ax[2] * _n[1], ey = ax[2] * _n[0] - ax[0] * _n[2], ez = ax[0] * _n[1] - ax[1] * _n[0], l = Math.hypot(ex, ey, ez);
+    if (l < 1e-9) { ex = 1; ey = 0; ez = 0; l = 1; }
+    ex /= l; ey /= l; ez /= l;
+    const sx = ey * _n[2] - ez * _n[1], sy = ez * _n[0] - ex * _n[2], sz = ex * _n[1] - ey * _n[0];   // south = east × up
+    out[0] = ex; out[3] = ey; out[6] = ez; out[1] = _n[0]; out[4] = _n[1]; out[7] = _n[2]; out[2] = sx; out[5] = sy; out[8] = sz;
+    return out;
+  };
   // true east on the map at (x, z): [east, south] components of the turning ground's way (the body-fixed pole is z)
   A.mapEast = (x, z, out) => {
     const F = UNI().home.chart('herz').frame(x, z, _F);
@@ -428,10 +443,11 @@
       A.toMap(st, _mapPos, _mapVel);
       if (fl.regime === 'climb' && y >= A.BAND.edge) A.toSpace(fl);
       else if (fl.regime === 'space' && y <= A.BAND.back) A.toClimb(fl);
+      // the ship on the map where the state is (in space too: the space frame draws it there, the voxel world waits)
+      a.pos[0] = _mapPos[0]; a.pos[1] = _mapPos[1]; a.pos[2] = _mapPos[2]; a.vel[0] = _mapVel[0]; a.vel[1] = _mapVel[1]; a.vel[2] = _mapVel[2];
+      b.pos[0] = _mapPos[0]; b.pos[1] = _mapPos[1]; b.pos[2] = _mapPos[2];
+      b.vel[0] = _mapVel[0]; b.vel[1] = _mapVel[1]; b.vel[2] = _mapVel[2];
       if (fl.regime === 'climb') {
-        a.pos[0] = _mapPos[0]; a.pos[1] = _mapPos[1]; a.pos[2] = _mapPos[2]; a.vel[0] = _mapVel[0]; a.vel[1] = _mapVel[1]; a.vel[2] = _mapVel[2];
-        b.pos[0] = _mapPos[0]; b.pos[1] = _mapPos[1]; b.pos[2] = _mapPos[2];
-        b.vel[0] = _mapVel[0]; b.vel[1] = _mapVel[1]; b.vel[2] = _mapVel[2];
         // back into the air regime: the top below 248 m (or the ground near: a mountain under the way down), the sink tamed
         const vy = _mapVel[1], tame = vy > -14.5 && vy < 0.5 && !(G && G.keepClimb);
         if (tame && (topOf(fl, y) < A.BAND.down || (fl.alt !== null && fl.alt !== undefined && fl.alt < 25))) A.leaveToAir(fl);
@@ -518,11 +534,10 @@
     }
     return S;
   };
-  // climb → space (2,500 m): the attitude becomes the inertial rotation, the ship stays drawn where it is on the map
+  // climb → space (2,500 m): the attitude becomes the inertial rotation (held against the local vertical from here)
   A.toSpace = (fl) => {
-    const a = ascOf(fl), b = fl.b;
+    const a = ascOf(fl);
     A.attitudeSys(fl, _S2); a.S.set(_S2);
-    b.vel[0] = 0; b.vel[1] = 0; b.vel[2] = 0;   // (on its map spot the ship stands still: the space frame draws it there)
     fl.regime = 'space';
     a.handT = fl.ascT || 0;
     if (A.onRegime) A.onRegime(fl, 'climb', 'space');
@@ -546,7 +561,7 @@
   // the ship's attitude as the map's Euler angles in the frame under it (space: for drawing the model and the cameras)
   A.drawAttitude = (fl) => {
     const a = ascOf(fl), b = fl.b;
-    A.localAt(a.st, _loc);
+    A.localFrame(a.st, _loc);
     mulTm(_loc, a.S, _Rm);
     const e = A.mToEuler(_Rm, a.eul || (a.eul = [0, 0, 0]));
     b.heading = e[0]; fl.pitch = e[1]; fl.roll = e[2];
@@ -654,6 +669,14 @@
   };
   // space's own background (the space scene's stars, galaxy band and Helia) behind the thinning air: none below 1,200 m
   A.bgK = (y) => ss(1200, 2400, y);
+  // the true bodies (Amarant, its ring, the moons, Helia's glare) over the postcard's near the hand-off; Herzwelt's
+  // impostor (the land beyond the tiles, the limb) from 400 m
+  A.bodyK = (y) => ss(2150, 2450, y);
+  A.impK = (y) => ss(400, 700, y);
+  // what the game tells the pure part each frame (ascent.js glue): the bend on, the tiles' radius (m), how far they are built
+  A.view = { curve: true, hzR: 0, hzK: 1 };
+  // space's grade (spacescene.js SS.env / SS.step): the picture turns to it near the hand-off
+  A.SPACE_GRADE = Object.freeze({ contrast: 0.05, saturation: 1.12, vignette: 0.3, vivid: 0.45, bloomThreshold: 1.4, bloomStrength: 0.06 });
   // the climb's sky on an env frame (env.js's last line): o.pos the eye on the map, o.t the world's seconds (or the env's
   // clock), o.dim. Nothing below 300 m or in other worlds — the ground's picture is the same picture
   A.env = (E, o, env) => {
@@ -661,15 +684,134 @@
     const y = o.pos[1];
     const U = UNI(), k = U.climbK(y), t = o.t !== undefined ? o.t : U.worldSeconds((env && env.day) | 0, env ? env.ticks : 0);
     const sky = A._sky = U.localSky('overworld', o.pos, t, A._sky || undefined);
-    const ak = A.airK(y), bg = A.bgK(y);
-    E.climb = { y, k, airK: ak, bg, t };
+    const ak = A.airK(y), bg = A.bgK(y), V = A.view, hzR = (V.hzR || 0) * (V.hzK === undefined ? 1 : V.hzK);
+    E.climb = { y, k, airK: ak, bg, body: A.bodyK(y), imp: A.impK(y), t, curve: V.curve === false ? 0 : A.curve(y), cut0: hzR * 0.75, cut1: hzR * 0.95, hzR };
     A.blendSky(E, sky, k);
     A.thinSky(E, ak, bg);
     A.thinFog(E, ak);
+    // the last of the air's light goes before the hand-off (the space frame has no sky pass); the postcard's bodies go
+    // under the true ones; the picture's grade turns to space's
+    const end = 1 - ss(2150, 2480, y), sc = (c) => (c ? c.map((x) => x * end) : c);
+    if (end < 1) { E.zenith = sc(E.zenith); E.skyMid = sc(E.skyMid); E.horizon = sc(E.horizon); E.sunset = sc(E.sunset); }
+    if (E.climb.body >= 1 && E.bodies) { const B = E.bodies; B.radius.giant = 0; B.radius.blue = 0; for (const m of B.moons) m[3] = 0; }
+    const gk = ss(1800, 2500, y), SG = A.SPACE_GRADE;
+    if (gk > 0) for (const key in SG) if (E[key] !== undefined) E[key] += (SG[key] - E[key]) * gk;
     return E;
   };
 
   // ================================================================ the game's glue (a page with the game)
   if (typeof window === 'undefined' || !VR.Game) return;
   A.page = true;
+  const G = VR.Game, FL = VR.Flight, SP = VR.Starships && VR.Starships.prototype;
+  // Krümmung (Bild · Anzeige): the world bends in the climb as it does (off: the flat map out to the tiles' edge)
+  if (VR.Settings && VR.Settings.add) VR.Settings.add({ key: 'curvature', g: 'img', sec: 'show', t: 'switch', lab: 'g.set.curvature', tip: 'g.set.curvature.tip', cost: 'low', def: true });
+  A.game = null;
+
+  // ---------------------------------------------------------------- each play frame (spaceflight.js's playFrame wrapper)
+  // what the pure part reads (the bend on, the tiles' radius and how far they are built), less to stream high up (the
+  // chunks' render distance 2 above 800 m: the tiles and the impostor carry the land), no Fern-Cache in the climb (it
+  // keeps the sky of a moment), the entry's landing place and its light
+  A.frame = function (g, dt) {
+    A.game = g;
+    const fl = g.flight, w = g.world, r = g.renderer, hz = g.horizon, S = g.settings || {};
+    A.view.curve = S.curvature !== false;
+    const hzOn = !!(hz && hz.enabled && hz.enabled());
+    A.view.hzR = hzOn ? hz.radius : (w ? w.renderDist * 16 : 0);
+    A.view.hzK = hzOn && hz.progress ? clamp((hz.progress() - 0.4) / 0.5, 0, 1) : 1;
+    const climb = !!(fl && fl.regime === 'climb' && fl.asc), y = climb ? A.mapY(fl.asc.st) : 0;
+    if (w) {
+      if (climb && y > 800) { if (w.renderDist !== 2) { A.rdBase = w.renderDist; w.renderDist = 2; } }
+      else if (A.rdBase && (!climb || y < 600)) { if (w.renderDist === 2) w.renderDist = A.rdBase; A.rdBase = 0; }
+    }
+    if (r && r.q) { if (climb && y > A.BAND.high) { if (r.q.farCache) { A.fcBase = true; r.q.farCache = false; } } else if (A.fcBase) { r.q.farCache = true; A.fcBase = false; } }
+    if (fl && fl.asc) {
+      if (climb && VR.Entry && VR.Entry.tick) VR.Entry.tick(g, fl, dt);
+      if (VR.SpaceFlight && VR.SpaceFlight.fx) VR.SpaceFlight.fx(g, fl);
+    }
+  };
+  // renderer.js, right after its sky pass: space behind the thinning air, Herzwelt beyond the tiles (spaceflight.js)
+  A.drawSky = function (r, E, F) {
+    const g = A.game;
+    if (!E.climb || !g || !VR.SpaceFlight || !VR.SpaceFlight.climbLayers || !VR.SpaceScene || !VR.SpaceScene.state) return;
+    VR.SpaceFlight.climbLayers(g, r, E, F.cam);
+  };
+  // the far plane in the climb: the tiles seen from up here
+  const origFar = G.prototype.farFor;
+  G.prototype.farFor = function (w, extra) {
+    const f = origFar.call(this, w, extra), fl = this.flight;
+    return fl && fl.regime === 'climb' && fl.asc ? Math.max(f, Math.hypot((A.view.hzR || 0) + 600, fl.asc.info.alt) + 300) : f;
+  };
+
+  // ---------------------------------------------------------------- the regime's edges: hints, the take-off spot, the frame
+  A.onRegime = function (fl, from, to) {
+    const g = fl.g, a = ascOf(fl);
+    if (!g) return;
+    if (from === 'air' && to === 'climb') {
+      // where a save puts the ship while it is up there: the ground under the door
+      const w = g.world, b = fl.b, x = Math.floor(b.pos[0]), z = Math.floor(b.pos[2]);
+      a.ground = [x + 0.5, w && w.isLoaded && w.isLoaded(x, z) ? w.topAt(x, z) + 1 : 70, z + 0.5];
+      if (!A.hinted && g.ui && g.ui.hint) { A.hinted = true; g.ui.hint(T('g.asc.climbHint'), 7000); }
+    }
+    if (to === 'space') {
+      a.spaceT0 = performance.now(); a.freed = false;
+      if (g.ui && g.ui.chatLine) g.ui.chatLine(T('g.asc.space', { v: Math.round(a.info.inertial || 0) }), '#9affd8');
+    }
+    if (g.renderer && (to === 'space' || from === 'space')) g.renderer.tsrReset = true;
+  };
+
+  // ---------------------------------------------------------------- what the HUD and the cockpit read
+  if (FL) {
+    const origInfo = FL.prototype.info;
+    FL.prototype.info = function () {
+      const o = origInfo.call(this);
+      if (this.regime && this.regime !== 'air' && this.asc) {
+        const I = this.asc.info;
+        o.speed = this.regime === 'space' ? I.inertial : I.speed; o.alt = I.alt; o.vs = I.vs; o.agl = null; o.regime = this.regime;
+      }
+      return o;
+    };
+  }
+  if (SP) {
+    const origHud = SP.hudText;
+    SP.hudText = function () {
+      const s = this.pilot, fl = s && s.flight;
+      if (!fl || !fl.regime || fl.regime === 'air' || !fl.asc) return origHud.call(this);
+      const a = fl.asc, I = a.info, o = A.orbitOf(a.st), base = a.st.frame === 'herz' ? A.DATUM : 0;
+      const n0 = (v) => Math.round(v).toLocaleString(VR.I18N && VR.I18N.lang === 'en' ? 'en-US' : 'de-DE');
+      const l1 = T('g.asc.hud', { v: n0(fl.regime === 'space' ? I.inertial : I.speed), alt: n0(I.alt), vs: (I.vs >= 0 ? '▲ ' : '▼ ') + Math.abs(I.vs).toFixed(0), g: (I.g || 0).toFixed(1) });
+      const l2 = o.e < 1 && o.peri - base > 0 ? T('g.asc.hudOrbit', { ap: n0(o.apo - base), pe: n0(o.peri - base), min: (o.period / 60).toFixed(1) }) : T('g.asc.hudSub');
+      const ap = fl.auto && fl.auto.site ? '<br><b style="color:#9affd8">' + T('g.asc.hudAuto', { site: fl.auto.site.name }) + '</b>' : '';
+      return `<b>${l1}</b> · ${s.d.meta.name}<br>${l2}${ap}<br><small>${T('g.asc.hudKeys')}</small>`;
+    };
+    // up there the pilot stays at the controls (the cabin's walk waits for the ground)
+    const origLeave = SP.leavePilot;
+    SP.leavePilot = function (s) {
+      const fl = s && s.flight;
+      if (fl && fl.regime && fl.regime !== 'air') { if (this.g.ui && this.g.ui.hint) this.g.ui.hint(T('g.asc.stay'), 2600); return; }
+      return origLeave.apply(this, arguments);
+    };
+    // quitting up there: the ship is parked on the spot it rose from, you step out beside it (the save stays valid)
+    const origShut = SP.shutdown;
+    SP.shutdown = function () {
+      const s = this.pilot, fl = s && s.flight, a = fl && fl.asc;
+      if (fl && fl.regime && fl.regime !== 'air' && a && a.ground) {
+        const gd = a.ground;
+        fl.regime = 'air'; fl.auto = null; a.jump = null;
+        s.pos[0] = gd[0]; s.pos[1] = gd[1]; s.pos[2] = gd[2]; s.vel[0] = s.vel[1] = s.vel[2] = 0;
+        fl.state = 'landed'; fl.pitch = 0; fl.roll = 0; fl.b.setAttitude(0, 0); fl.orient();
+      }
+      return origShut.apply(this, arguments);
+    };
+  }
+  // a save in the climb or in space writes the ship and the player at the spot they rose from (the world stays valid)
+  const origSave = G.prototype.saveMeta;
+  G.prototype.saveMeta = function () {
+    const fl = this.flight, a = fl && fl.asc;
+    if (!fl || !fl.regime || fl.regime === 'air' || !a || !a.ground || !this.player) return origSave.apply(this, arguments);
+    const s = this.starships && this.starships.pilot, p = this.player, sp = s ? s.pos.slice() : null, pp = p.pos;
+    const gd = a.ground;
+    if (s) { s.pos[0] = gd[0]; s.pos[1] = gd[1]; s.pos[2] = gd[2]; }
+    p.pos = [gd[0] + 3, gd[1], gd[2]];
+    try { return origSave.apply(this, arguments); } finally { if (s) { s.pos[0] = sp[0]; s.pos[1] = sp[1]; s.pos[2] = sp[2]; } p.pos = pp; }
+  };
 })(VR);
