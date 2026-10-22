@@ -2386,10 +2386,11 @@ void main() {
     float sk = clamp(max(u_storm.z, u_rain), 0.0, 1.0) * (1.0 - u_fogK);
     col = mix(col, (vec3(0.16, 0.18, 0.22) * (0.55 + 0.6 * clamp(dot(col, vec3(0.3, 0.59, 0.11)), 0.0, 1.0)) + u_ambSky * 0.12) * c3Grad, sk * 0.6);   // (f-sky4: the slate keeps the fall to the base)
     if (u_bolt.w > 0.001 && u_fogK < 0.5) {
-      // (f-sky4, R50-11: the flash a glow inside the clouds round the bolt's heading — 0.35 of it everywhere and the most on
-      // the bases lit the whole storm white, base and all; now 0.08 elsewhere and the bodies' inside, not their bases)
+      // (f-sky4, R50-11: the flash a glow in the cloud the bolt comes from — 0.35 of it on every cloud within ~60° and the
+      // most on the bases lit the whole storm white in the bolt's frame (offline: cloud mean 154, base/top 0.96); now the
+      // clouds within ~10° of its heading, a flicker of 0.06 on the rest; inside the body, under the same fall to the base)
       vec2 bh = normalize(v_dir.xz + vec2(1e-5, 0.0));
-      col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.08 + 0.92 * smoothstep(0.55, 0.97, dot(bh, u_bolt.xy))) * (0.45 + 0.55 * c3Core);
+      col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.06 + 0.94 * smoothstep(0.96, 0.995, dot(bh, u_bolt.xy))) * c3Grad * (0.45 + 0.55 * c3Core);
     }
 #endif
     float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);

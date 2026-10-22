@@ -105,6 +105,8 @@ function skyUniforms(E, q, cam) {
   u.u_nebula = E.nebula !== undefined ? E.nebula : 1; u.u_sunDisc = E.sunDisc !== undefined ? E.sunDisc : 16; u.u_gridK = E.gridK !== undefined ? E.gridK : 0.12;
   u.u_rain = E.rain; u.u_time = E.time; u.u_animOn = 1; u.u_night = E.night; u.u_dim = { i: E.dimId | 0 }; u.u_skyMagic = q.magic;
   u.u_storm = (E.storm || [1, 0, 0, 0]).slice(0, 4); u.u_bolt = (E.bolt || [1, 0, 0, 0]).slice(0, 4); u.u_snowCover = E.snowCover || 0;
+  // (BOLT=w: a bolt's flash of strength w straight ahead — wow48.mjs's storm frame: the next bolt within ±26° of the view)
+  if (process.env.BOLT) u.u_bolt = [-Math.sin(cam.yaw), -Math.cos(cam.yaw), 0.37, +process.env.BOLT];
   const B = E.bodies;
   if (B) { u.u_giant = [B.giant[0], B.giant[1], B.giant[2], B.radius.giant]; u.u_blue = [B.blue[0], B.blue[1], B.blue[2], B.radius.blue]; for (let i = 0; i < 4; i++) u['u_moon' + i] = B.moons[i].slice(0, 4); }
   // sky3_gl.js (the frame's uniforms in E.sky3.u; the cumulus field's eye in cloud space)
