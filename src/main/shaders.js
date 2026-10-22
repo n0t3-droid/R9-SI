@@ -684,6 +684,7 @@ uniform float u_time;
 uniform float u_wind;
 uniform vec2 u_windDir;                  // the wind's direction in x and z (weather.js, F3 · Da-Sein)
 uniform float u_gust;                    // 0..1: a gust swells the sway by up to half
+uniform float u_curve;                   // u-ascent: the world's bend in the climb, climbK(y)/2R (0 below 300 m: ascent.js)
 #ifdef MULTIDRAW
 layout(std140) uniform Origins { vec4 u_origins[512]; };
 #else
@@ -793,6 +794,7 @@ void main() {
     vec3 ap = wp + vec3(u_camInt);
     rel.y += (sin(ap.x * 0.8 + u_time * 1.4) * 0.5 + sin(ap.z * 0.7 + u_time * 1.1) * 0.5) * 0.035 - 0.04;
   }
+  rel.y -= u_curve * dot(rel.xz, rel.xz);   // u-ascent: the land bends away under the climb (a sphere's drop d²/2R)
   v_rel = rel;
   v_localPos = wp;
   v_uv = vec2(float(a_uvp & 255u), float(a_uvp >> 8u)) / 16.0;
@@ -2436,6 +2438,7 @@ layout(location=1) in uvec2 a_info;
 layout(location=2) in vec4 a_col;
 uniform mat4 u_viewProj;
 uniform vec3 u_tileOrigin;
+uniform float u_curve;        // u-ascent: the world's bend in the climb (ascent.js)
 out vec3 v_rel;
 out vec3 v_col;
 out float v_shade;
@@ -2444,6 +2447,7 @@ flat out uint v_kind;
 flat out uint v_aux;
 void main() {
   vec3 rel = u_tileOrigin + a_pos / 8.0;
+  rel.y -= u_curve * dot(rel.xz, rel.xz);   // u-ascent: the far land bends away under the climb
   v_rel = rel;
   v_col = pow(a_col.rgb, vec3(2.2));
   v_shade = a_col.a;
@@ -2462,6 +2466,7 @@ uniform ivec3 u_camInt;
 uniform float u_emissiveBoost;
 uniform float u_lodNear;
 uniform float u_blockVar;     // Klassisch: per-block shades and the block grid instead of the macro mottling
+uniform vec2 u_climbCut;      // u-ascent: in the climb the tiles' far edge dissolves (from, to: metres from the eye)
 ${'__COMMON__'}
 in vec3 v_rel;
 in vec3 v_col;
@@ -2483,6 +2488,7 @@ vec3 waveN(vec2 p) {
 }
 void main() {
   // real chunks are drawn here: the far terrain steps aside
+  if (u_climbCut.y > 0.0 && bayer4(gl_FragCoord.xy) < smoothstep(u_climbCut.x, u_climbCut.y, length(v_rel.xz))) discard;   // u-ascent: Herzwelt's impostor takes the land beyond (spaceflight.js)
   vec2 cl = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz & 15);
 #if defined(FAR1) || defined(FORM)
   // F-Far · three rings: per column R = the chunk's fade (ring 0), G = the form's (ring 1). Ring 1 draws where

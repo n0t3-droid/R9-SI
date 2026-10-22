@@ -722,6 +722,7 @@
       return [0.5, 100, 0.5];
     }
     goHome() {
+      if (VR.SpaceFlight && VR.SpaceFlight.goHome && VR.SpaceFlight.goHome(this)) return;   // u-ascent: in the sky the six-second home jump (spaceflight.js)
       if (VR.NewLife && VR.NewLife.goHome(this)) return;   // u-home: to the home on whatever world it is — there, or the trip there; the ships left elsewhere come too (newlife.js)
       if (VR.Travel && VR.Travel.goHome(this)) return;   // u-dims: from another world the trip home — Herzwelt's spawn or bed, the ship you fly along (travel.js)
       const p = this.player; if (!p || p.dead) return;
@@ -1131,7 +1132,7 @@
       const b = w ? VR.BIOMES[w.biomeAt(Math.floor(pos[0]), Math.floor(pos[2]))] : null;
       const eye = w ? w.getLight(Math.floor(pos[0]), Math.floor(pos[1]), Math.floor(pos[2])) : 0xf000;
       const hz = this.horizon && this.horizon.enabled() ? this.horizon.radius : 0;
-      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather, drama: !!this.settings.wxDrama, motion: !!this.settings.motion }, extra || {}));   // (t-motion: drama, motion)
+      return this.env.update(dt, Object.assign({ pos, dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather, drama: !!this.settings.wxDrama, motion: !!this.settings.motion }, extra || {}));   // (t-motion: drama, motion) (u-ascent: pos — the local time, the climb's sky)
     }
     titleFrame(dt) {
       const c = this.titleCam, w = this.world;

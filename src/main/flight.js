@@ -221,6 +221,7 @@
       this.rampOpen = !!open; this.sfx('servo'); return true;
     }
     assistLand(on) {
+      if (VR.SpaceFlight && VR.SpaceFlight.land(this)) return;   // u-ascent: V in the climb or in space lands from there (entry.js)
       if (!on) { this.state = 'flying'; this.holdAlt = null; return; }
       if (this.state === 'landed') return;
       this.state = 'landing'; this.throttle = 0; this.boost = false; this.holdAlt = null;
@@ -232,6 +233,7 @@
 
     // ---------------------------------------------------------------- physics
     simulate(dt) {
+      if (VR.Ascent && VR.Ascent.simulate(this, dt)) return;   // u-ascent: the climb (252–2,500 m) and space regimes fly in ascent.js
       const b = this.b, p = b.pos, v = b.vel, cr = this.cruise;
       if (this.power === 'starting') { this.startT += dt; if (this.startT >= TUNE.startTime) { this.power = 'running'; this.startT = TUNE.startTime; this.sfx('clunk', { vol: 0.5 }); } }
       for (let i = 0; i < 3; i++) { if (!isFinite(p[i])) p[i] = this.lastGood ? this.lastGood[i] : 100; if (!isFinite(v[i])) v[i] = 0; }
@@ -284,7 +286,7 @@
       if (this.state === 'landing') vyT = this.flareSink();
       else if (Math.abs(this.ctl.climb) > 0.01) { vyT = this.ctl.climb * TUNE.climb; this.holdAlt = null; }
       else { if (this.holdAlt === null) this.holdAlt = p[1] + vy * 0.3; vyT = clamp((this.holdAlt - p[1]) * 2.2, -TUNE.climb, TUNE.climb); }
-      if (p[1] + (b.height || 4) > 252 && vyT > 0) vyT = 0;
+      if (p[1] + (b.height || 4) > 252 && vyT > 0) { if (VR.Ascent && VR.Ascent.lift(this, vyT)) { this.lastGood = p.slice(); return; } vyT = 0; }   // u-ascent: past the cap a starship climbs on (ascent.js); the rest stops here
       // ground cushion: below 8 m the ship can't sink faster than max(1.5, 0.8 × height) (and it starts easing off above)
       const alt = this.alt;
       if (alt !== null) { const lim = Math.max(1.5, 0.8 * clamp(alt, 0, TUNE.cushion) + Math.sqrt(18 * Math.max(0, alt - TUNE.cushion))); if (vyT < -lim) vyT = -lim; }
@@ -461,6 +463,7 @@
 
     // ---------------------------------------------------------------- sound, shake, particles
     effects(dt) {
+      if (this.regime && this.regime !== 'air' && VR.Ascent) { VR.Ascent.effects(this, dt); return; }   // u-ascent: the climb's and space's sound and shake
       const g = this.g, b = this.b, v = b.vel, S = g.settings || {};
       const sp = this.speed = Math.hypot(v[0], v[1], v[2]);
       const cr = this.cruise;
@@ -645,6 +648,7 @@
       return list.sort((a, c) => Math.hypot(a.x - p[0], a.z - p[2]) - Math.hypot(c.x - p[0], c.z - p[2]));
     }
     toggleAuto() {
+      if (VR.SpaceFlight && VR.SpaceFlight.toggle(this)) return;   // u-ascent: G high in the air offers Zum Orbit first, in space the space modes
       const g = this.g, list = this.autoTargets();
       if (!list.length) { g.ui.hint(T('g.fl.noVillage'), 2600); return; }
       // G cycles through the villages, nearest first, then switches the autopilot off
@@ -723,6 +727,7 @@
     }
     // the autopilot flies through the same flight model: it sets the stick, the speed and the climb
     autoStep(dt) {
+      if (this.auto.space) { if (VR.Ascent) VR.Ascent.autoAir(this, dt); return; }   // u-ascent: the space modes (Zum Orbit, Landen, Heimkehr: spaceflight.js)
       const g = this.g, w = g.world, A = this.auto, b = this.b, p = b.pos, v = b.vel, cr = this.cruise;
       A.t += dt;
       if (A.landing) { this.ctl.turn = 0; this.ctl.climb = 0; this.ctl.strafe = 0; this.ctl.speed = 0; return; }

@@ -176,6 +176,7 @@ void main() { if (texture(u_tex, v_uv).r < 0.42) discard; o = vec4(u_col, 1.0); 
       if (mode) { x.fillStyle = I.boost ? '#7ad8ff' : '#9affd8'; x.fillText(mode, cx, 12); }
     }
     navTile(x, I, b, g, fl) {
+      if (VR.SpaceFlight && VR.SpaceFlight.navTile && VR.SpaceFlight.navTile(x, I, b, g, fl, TW, TH)) return;   // u-ascent: in the climb and in space the orbit and its ghost path (spaceflight.js)
       x.fillStyle = '#06161d'; x.fillRect(0, 0, TW, TH);
       const cx = TW / 2, cy = TH / 2 + 6, R0 = 50, hd = b.heading, p = b.pos, span = 64;   // the circle shows ±64 blocks
       // the ground below: the minimap's terrain snapshot, heading up
