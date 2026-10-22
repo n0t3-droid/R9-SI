@@ -182,8 +182,10 @@
         if (b > 0.04) { this.drawn.firefly++; spawn(f.x, f.y, f.z, 0, 0, 0, [0.9 * b, 1.0 * b, 0.4 * b], 0.10 + 0.05 * b, { life: dt * 1.5 + 1e-4, grav: 0, drag: 0, emis: 1, collide: false, fade: false }); }
       }
 
-      // ---- butterflies over the flowers by day (agents: they wander around a flower)
-      if (sunUp && outdoor && !rain && cap.butterfly > 0) {
+      // ---- butterflies over the flowers by day (agents: they wander around a flower); t-wild's swarm takes over from them
+      // when its switch is on (noButterflies: the swarm's real wings instead of the dots)
+      if (this.noButterflies) this.bf.length = 0;
+      if (sunUp && outdoor && !rain && cap.butterfly > 0 && !this.noButterflies) {
         this.flowerT -= dt;
         if (this.flowerT <= 0) {
           this.flowerT = 1.5;

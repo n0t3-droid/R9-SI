@@ -82,7 +82,7 @@
     herds(preset) {
       const g = this.g, E = this.E, p = g.player, w = g.world, ticks = g.env ? g.env.timeOfDay : 6000;
       if (!E || !w) return;
-      const own = new Map();
+      const own = new Map(), WH = !!(VR.Wild && VR.Wild.herdsOn && VR.Wild.herdsOn(g));   // (t-wild: the herds move)
       for (const m of E.mobs) if (m.anchor && !m.dead) { const a = own.get(m.anchor); if (a) a.push(m); else own.set(m.anchor, [m]); }
       for (const A of this.anchors.values()) {
         if (A.kind === 'fish') { const fx = A.x - p.pos[0], fz = A.z - p.pos[2]; if (fx * fx + fz * fz > 420 * 420) this.anchors.delete(A.key); continue; }
@@ -92,7 +92,7 @@
         const plan = VR.Land.faunaPlan(A.kind, ticks, preset, A.n);
         // out of their hour (or too many: the preset changed): they go while no one is looking closely
         if (mine.length > plan.n && d2 > 24 * 24) { for (let i = plan.n; i < mine.length; i++) { const k = E.mobs.indexOf(mine[i]); if (k >= 0) E.mobs.splice(k, 1); } continue; }
-        if (!plan.mob || d2 < NEAR * NEAR) continue;          // (never popping up right at the player)
+        if (!plan.mob || d2 < NEAR * NEAR) { if (WH && mine.length) this.herdMove(A, mine, ticks); continue; }   // (never popping up right at the player; t-wild: the herd moves on)
         if (mine.length && plan.rest !== undefined) for (const m of mine) m.rest = !!plan.rest;
         for (let k = mine.length; k < plan.n; k++) {
           const at = this.place(A, k);
@@ -101,6 +101,36 @@
           if (!m || m === true) continue;
           m.anchor = A.key; m.home = this.home(A); m.rest = !!plan.rest;
           if (A.kind === 'duck') { m.waterY = A.y - 0.12; m.pos[1] = m.waterY; }
+          mine.push(m);
+        }
+        if (WH) this.herdMove(A, mine, ticks);
+      }
+    }
+    // t-wild (Herden ziehen, wildlife.js): the sheep drift as one herd — the pasture's herd point wanders slowly inside its
+    // box and every sheep keeps its own slot round it, grazing; at dawn the deer of a wood's edge walk out into the meadow
+    // in single file (the leader on a path to the most open side, the others 2.3 behind each other) and graze at its end.
+    // Once a second (herds); off with the switch and on Very Low (they wander as before)
+    herdMove(A, mine, ticks) {
+      const W = VR.Wild, g = this.g, seed = (g.meta && g.meta.seed) | 0;
+      if (A.kind === 'sheep' && A.extra.length >= 4) {
+        const H = A.drift || (A.drift = { x: A.x + 0.5, z: A.z + 0.5, t: 0 });
+        W.herdStep(H, A.extra, (seed ^ Math.imul(A.x, 73856093) ^ Math.imul(A.z, 19349663)) | 0, 1);
+        for (const m of mine) { m.herd = H; m.graze = !m.rest; }
+      } else if (A.kind === 'deer') {
+        const t = ((ticks % 24000) + 24000) % 24000, dawn = t >= 22300 || t < 1700;
+        if (!mine.length) { A.line = null; return; }
+        if (dawn && A.line === undefined || dawn && A.line === null) {
+          A.lineTries = (A.lineTries || 0) + 1;
+          const L = W.deerPath(g.world, A, seed, A.lineTries > 8);
+          if (L === undefined) return;   // (the way's columns have not come yet: again in a second, eight times at most)
+          A.line = L || false;
+          if (L) { L.n = mine.length; mine.forEach((m, i) => { m.line = L; m.li = i; m.graze = false; m.home = { x: A.x, z: A.z, r: 34 }; }); }
+        }
+        const L = A.line;
+        if (L && L.done) {
+          // the end of the line: they graze spread round it
+          const e = L.pts[L.pts.length - 1];
+          for (const m of mine) if (m.line) { m.line = null; m.graze = true; m.home = { x: e[0] - 0.5, z: e[1] - 0.5, r: 6 }; }
         }
       }
     }

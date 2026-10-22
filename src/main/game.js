@@ -46,6 +46,11 @@
   // wind and the weather, Balanced and up all three
   const MO_SW = ['motion', 'cloudShadow', 'wxDrama'];
   for (const p in PRESETS) { PRESETS[p].motion = p === 'potato' ? 0 : 1; PRESETS[p].cloudShadow = p === 'potato' || p === 'low' ? 0 : 1; PRESETS[p].wxDrama = p === 'potato' ? 0 : 1; }
+  // t-wild (WOW VI · die Tierwelt, wildlife.js): the five switches — Vogelschwärme, Fischschwärme, Falter & Libellen,
+  // Himmelsrochen, Herden ziehen — off on Very Low (nothing new drawn), on elsewhere: the caps by tier decide the rest
+  // (wildsim.js Wild.CAPS: Low the small things, Balanced and up all)
+  const WILD_SW = VR.Wild && VR.Wild.KEYS ? VR.Wild.KEYS : [];
+  for (const p in PRESETS) for (const k of WILD_SW) PRESETS[p][k] = p !== 'potato';
   // t-material · Glanz & Spiegelungen (tex_pbr.js, shaders.js PBR): 0 the old highlight · 1 the gloss of the materials with
   // the sky's reflection · 2 and the screen-space mirror (High and up); Very Low none (its lite programs never carry it)
   const PBR_TIER = { potato: 0, low: 1, balanced: 1, high: 2, ultra: 2, ultraLite: 2 };
@@ -96,6 +101,7 @@
       if (s.smoothFolk === undefined && s.preset) out.smoothFolk = PRESETS[s.preset] ? PRESETS[s.preset].smoothFolk : ((s.vxLod | 0) >= 44 && !s.lite ? 1 : 0);
       // t-material: settings saved before the gloss tiers follow their preset (a custom one: the gloss without the mirror, none when lite)
       for (const k of MAT_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : (s.lite ? 0 : 1);
+      for (const k of WILD_SW) if (s[k] === undefined && s.preset) out[k] = PRESETS[s.preset] ? PRESETS[s.preset][k] : !s.lite;   // (t-wild: settings saved before the animals follow their preset — Very Low's stay off)
       if (!s.preset) { // auto-pick a preset by cores & memory now, refined by the GPU name once the context exists (see boot)
         const cores = navigator.hardwareConcurrency || 4, mem = navigator.deviceMemory || 8;
         out.preset = (cores <= 2 || mem <= 2) ? 'potato' : cores <= 4 ? 'low' : 'balanced';
@@ -466,6 +472,7 @@
     lifeStart() {
       if (this.padLife) this.padLife.destroy(); this.padLife = VR.PadLife ? new VR.PadLife.Actor(this) : null;
       if (this.lifeDirector) this.lifeDirector.destroy(); this.lifeDirector = VR.LifeDirector ? new VR.LifeDirector.Actor(this) : null;
+      if (this.wild) this.wild.destroy(); this.wild = VR.Wild && VR.Wild.Actor ? new VR.Wild.Actor(this) : null;   // (t-wild: the animal world)
     }
     teardownWorld() {
       if (VR.Baustelle && VR.Baustelle.reset) VR.Baustelle.reset(this.gadgets && this.gadgets.blue);   // (a construction site's bar and meshes go with the world)
@@ -480,6 +487,7 @@
       if (this.hall) { this.hall.destroy(); this.hall = null; }
       if (this.trams) { this.trams.destroy(); this.trams = null; }
       if (this.padLife) { this.padLife.destroy(); this.padLife = null; } if (this.lifeDirector) { this.lifeDirector.destroy(); this.lifeDirector = null; }   // (t-life: the pads' visitors, the Regisseur des Lebens)
+      if (this.wild) { this.wild.destroy(); this.wild = null; }   // (t-wild)
       if (this.wow) { this.wow.destroy(); this.wow = null; }   // (t-vista)
       if (this.horizon) { if (VR.Travel && VR.Travel.busy(this) && this.horizon.keepReady) this.horizon.keepReady(); else this.horizon.reset(); }   // u-dims: a trip keeps Herzwelt's horizon for the way home (Heimkehr: the coarse ring is there on the first frame)
       if (this.furnaces) this.furnaces.clear();
@@ -1201,6 +1209,7 @@
       if (this.starships) this.starships.update(dt);
       if (this.traffic) this.traffic.update(dt);
       if (this.padLife) this.padLife.update(dt); if (this.lifeDirector) this.lifeDirector.update(dt);   // (t-life)
+      if (this.wild) this.wild.update(dt);   // (t-wild: the animal world; Very Low: returns at once)
       if (this.director) this.director.update(dt);
       if (this.wow) this.wow.update(dt);   // (t-vista: four times a second a look at the vistas loaded)
       if (this.trams) this.trams.update(dt);
@@ -1303,7 +1312,7 @@
         photo: this.photo,
         outlines: gad && !this.hideHud ? gad.outlines() : null,
         guide: this.mirror ? this.mirror.guide() : null,   // 🪞 the mirror's axis (renderer.drawGuide)
-        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); if (this.padLife) this.padLife.draw(r, E2, 'opaque', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'opaque', cam); },
+        drawOpaque: (r, E2) => { if (this.entities) this.entities.draw(r, E2, cam); if (this.villages) this.villages.draw(r, E2, cam); if (this.hall) this.hall.draw(r, E2, cam); if (VR.Crowd && VR.Crowd.draw) VR.Crowd.draw(r, E2, cam); if (this.mp) this.mp.draw(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'opaque'); if (this.gadgets && this.gadgets.blue && this.gadgets.blue.drawSites) this.gadgets.blue.drawSites(r, E2, cam); if (this.starships) this.starships.draw(r, E2, 'opaque'); if (this.traffic) this.traffic.draw(r, E2, 'opaque'); if (this.padLife) this.padLife.draw(r, E2, 'opaque', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'opaque', cam); if (this.wild) this.wild.draw(r, E2, 'opaque', cam); },
         drawTranslucent: (r, E2) => { if (this.entities && this.entities.drawTranslucent) this.entities.drawTranslucent(r, E2, cam); if (this.gadgets) this.gadgets.drawShip(r, E2, 'trans'); if (this.starships) this.starships.draw(r, E2, 'trans'); if (this.traffic) this.traffic.draw(r, E2, 'trans'); if (this.padLife) this.padLife.draw(r, E2, 'trans', cam); if (this.lifeDirector) this.lifeDirector.draw(r, E2, 'trans', cam); if (this.hall) this.hall.drawTrans(r, E2); if (this.trails) this.trails.draw(r, E2); },
         drawHand: this.camMode === 0 && !this.hideHud && this.entities && this.entities.drawHand ? (r, E2) => this.entities.drawHand(r, E2, cam) : null,
       });

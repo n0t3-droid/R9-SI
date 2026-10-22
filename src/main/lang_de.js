@@ -2079,5 +2079,15 @@
     'g.set.sky3.tip': 'Der Himmel nach Tageszeit: die goldene Stunde, das Abendrot in Farbbändern mit großer Sonnenscheibe, das Nachglühen und der Erdschatten; nachts zwei Monde in ihren Phasen und Sternschnuppen. Ab Ausgewogen dazu Polarlicht in manchen Nächten, Wolkenbänke bis zum Horizont und Sonnenstrahlen durch die Wolkenlücken. Auf Sehr niedrig wie bisher.',
     'g.set.cloudVol': 'Wolken mit Volumen',
     'g.set.cloudVol.tip': 'Die Haufenwolken als Körper: sonnige Kuppen, schattige flache Böden, ein leuchtender Rand im Gegenlicht, golden in der goldenen Stunde, rosa in der Dämmerung, blaugrau im Mondlicht; unter einer Regendecke ziehen dunkle Wolkenfetzen. Ab Ausgewogen.',
+    'g.set.wildBirds': 'Vogelschwärme: Schwarmwolke in der Dämmerung, Möwen, Reiher',
+    'g.set.wildBirds.tip': 'In der Abenddämmerung zieht eine Wolke aus Tausenden Staren tief über den See und die Felder, teilt sich, faltet und dreht sich und landet zur Nacht in einer Baumreihe; im Morgengrauen steigt sie wieder auf. Tagsüber kreisen Möwen über dem See, am Teichrand steht ein Reiher und fliegt gemächlich auf, wenn du näher als acht Blöcke kommst. Schwarm ab Ausgewogen; auf Sehr niedrig aus.',
+    'g.set.wildFish': 'Fischschwärme: Fische am Steg, Karpfen im Teich',
+    'g.set.wildFish.tip': 'Unter dem Steg, im Becken des Wasserfalls und im flachen Wasser neben dir kreist ein Schwarm kleiner Fische, der in der Sonne aufblitzt, wenn er wendet, und vor dir auseinanderstiebt; in den Teichen ziehen Karpfen. Auf Sehr niedrig aus.',
+    'g.set.wildBugs': 'Falter & Libellen: Schmetterlinge über den Blumen, Libellen am Teich',
+    'g.set.wildBugs.tip': 'Über einer Blumenwiese lebt ein Schwarm Schmetterlinge, der von Blüte zu Blüte flattert und um dich aufsteigt, wenn du hindurchgehst; über den Teichen stehen Libellen in der Luft und schießen davon. Auf Sehr niedrig aus.',
+    'g.set.wildRays': 'Himmelsrochen: große Rochen zwischen den Himmelsinseln',
+    'g.set.wildRays.tip': 'Große, sanfte Himmelsrochen – jeder mit seinem Jungen an der Seite – gleiten auf einer langsamen Runde unter und zwischen den schwebenden Inseln, ziehen leuchtende Spuren und Lichtfunken hinter sich her und leuchten nachts. Für alle Mitspieler am selben Ort. Ab Ausgewogen.',
+    'g.set.wildHerds': 'Herden ziehen: Rehe im Morgengrauen, Schafe, Kaninchen, Fuchs',
+    'g.set.wildHerds.tip': 'Im Morgengrauen ziehen die Rehe in einer Reihe über die Wiese und äsen, die Schafe wandern als eine Herde über die Weide, an den Feldrändern hoppeln Kaninchen und flitzen in die Hecke, und in der Dämmerung schnürt ein Fuchs an der Hecke entlang. Niemand jagt hier. Auf Sehr niedrig aus.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

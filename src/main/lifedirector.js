@@ -490,6 +490,7 @@
   // ---- a sky ray: a great glowing manta gliding in slow circles over the Sky Isles (the creature of the isles, drawn big)
   ACT.skyray = {
     start(D, ev) {
+      if (D.g.wild && D.g.wild.b && D.g.wild.b.cap.ray > 0) return false;   // (t-wild: the Himmelsrochen fly between the isles: no blocky one here)
       const eye = D.eye, fa = Math.atan2(D.fwd[1], D.fwd[0]) + (rnd(ev, 1) - 0.5) * 0.8, R = 70 + 30 * rnd(ev, 2);
       ev.c = [eye[0] + Math.cos(fa) * R, eye[1] + 26 + 22 * rnd(ev, 3), eye[2] + Math.sin(fa) * R]; ev.r = 34 + 16 * rnd(ev, 4); ev.w = (rnd(ev, 5) < 0.5 ? 1 : -1) * 0.13; ev.a = rnd(ev, 6) * TAU; ev.pos = [0, 0, 0];
       ev.pose = { wing_l: [0, 0, 0], wing_r: [0, 0, 0], tail: [0, 0, 0] };
