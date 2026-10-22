@@ -326,7 +326,7 @@
       o *= smoothstep(u_cut.x, u_cut.y, length(cross(Nc, u_nadirB)));
     }
   }`;
-  const wrapFS = (name, fs) => fs.replace(/void main\(\)\s*\{/, 'void spaceMain() {') + `
+  const wrapFS = (name, fs) => !/\bout\s+(?:(?:high|medium|low)p\s+)?vec4\s+o\s*;/.test(fs) || (fs.match(/void main\(\)\s*\{/g) || []).length !== 1 ? fs : fs.replace(/void main\(\)\s*\{/, 'void spaceMain() {') + `
 uniform vec4 u_fadeOut;   // u-ascent (spaceflight.js)
 ${name === 'herz' ? 'uniform vec4 u_cut;\nuniform vec3 u_nadirB;' : ''}
 void main() {

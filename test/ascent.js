@@ -342,6 +342,13 @@ check((SH.match(/u_curve/g) || []).length >= 4 && /u-ascent/.test(SH), 'shaders.
 const RN = src('src/main/renderer.js'), HO = src('src/main/horizon.js'), EV = src('src/main/env.js'), GM = src('src/main/game.js'), CK = src('src/main/cockpit.js'), SS = src('src/main/spacescene.js'), SP = src('src/main/space_shaders.js');
 const SFs = src('src/main/spaceflight.js');
 check(/u_curve/.test(RN) && /VR\.Ascent/.test(RN) && /u-ascent/.test(HO) && /VR\.Ascent\.env/.test(EV) && /VR\.Entry\.tickShift/.test(EV) && /u-ascent/.test(GM) && /u-ascent/.test(CK) && /u-ascent/.test(SS) && !/u-ascent/.test(SP) && /u_fadeOut/.test(SFs) && /u_cut/.test(SFs) && /SH\.programs = /.test(SFs), 'renderer, horizon, env, game, cockpit and the space scene hooked (marked); the space programs\' fade and cut wrapped from spaceflight.js (space_shaders.js untouched)');
+{
+  const odd = '#version 300 es\nprecision highp float;\nout vec4 frag;\nvoid main() { frag = vec4(1.0); }', ok = '#version 300 es\nprecision highp float;\nout vec4 o;\nvoid main() { o = vec4(1.0); }';
+  check(SF.wrapFS('x', odd) === odd && /spaceMain\(\);/.test(SF.wrapFS('x', ok)) && (SF.wrapFS('x', ok).match(/void main\(\)/g) || []).length === 1, 'the wrapper takes only programs in u-space0\'s shape (out vec4 o; void main) — another stays as written');
+  require(ROOT + 'src/main/space_shaders.js'); SF.wrapPrograms();
+  const PW = VR.SpaceShaders.programs(), names = Object.keys(PW), wr = names.filter(k => /spaceMain\(\);/.test(PW[k].fs) && /uniform vec4 u_fadeOut;/.test(PW[k].fs));
+  check(names.length >= 6 && wr.length === names.length && /uniform vec4 u_cut;/.test(PW.herz.fs) && !/u_cut/.test(PW.bg.fs), 'every space program carries the fade, Herzwelt\'s the cut too', wr.length + ' of ' + names.length);
+}
 const LD = src('src/main/lang_de.js'), LE = src('src/main/lang_en.js');
 const keys = new Set(); for (const f of ['ascent', 'spaceflight', 'entry']) for (const m of src('src/main/' + f + '.js').matchAll(/'(g\.(?:asc|set)\.[A-Za-z0-9_.]+)'/g)) if (!m[1].endsWith('.')) keys.add(m[1]);
 for (const m of ['orbit', 'circ', 'land', 'descend']) { keys.add('g.asc.site.' + m); keys.add('g.asc.go.' + m); }
