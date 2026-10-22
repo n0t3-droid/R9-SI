@@ -571,7 +571,8 @@
         const tx = s.x - x0, tz = s.z - z0, Rr = s.R, ty = s.y + 1;
         const tc = s.pal === 1 ? [0xD8, 0xC0, 0x90] : [0x9A, 0x9A, 0x96];
         box(tx - Rr, s.y - 6, tz - Rr, tx + Rr, ty, tz + Rr, tc, 0, 1);
-        for (const b of VR.CitadelGen.lodBoxes(s)) {
+        for (const b of VR.CitadelGen.lodBoxes(s, g)) {
+          if (b.night) continue;   // (t-polish2: the beam is the far ring's — the horizon tiles have no night switch)
           const bx = b.x - x0, bz = b.z - z0;
           if (b.slits) { const r = b.r, ww = b.w; box(bx - ww, b.y0, bz - r - 0.6, bx + ww, b.y1, bz + r + 0.6, b.c, b.kd, 0); box(bx - r - 0.6, b.y0, bz - ww, bx + r + 0.6, b.y1, bz + ww, b.c, b.kd, 0); continue; }
           box(bx - b.r, b.y0, bz - b.r, bx + b.r, b.y1, bz + b.r, b.c, b.kd, b.kd === 0 ? 1 : 3);

@@ -114,7 +114,9 @@
         const HL = Mo.HALO || { size: 0.44, alpha: 1, emis: 1, gain: 0.62 };   // (a soft disc wider than the lamp's head: it shows round it)
         const o = this._ho || (this._ho = { life: 0, size: HL.size, grav: 0, drag: 0, col: [1, 1, 1], emis: HL.emis === undefined ? 1 : HL.emis, collide: false, fade: false, force: true, alpha: HL.alpha });
         o.life = dt * 1.5 + 1e-4;
+        const HZ = Particles.haloSizes(), small = HL.small === undefined ? 1 : HL.small;   // (t-polish2: a small lantern's halo smaller)
         for (let i = 0; i < L.length; i += 4) {
+          o.size = HL.size * (HZ[L[i + 3]] ? small : 1);
           Particles.haloColor(L[i + 3], col);
           const f = Mo.flicker(this.clock, Mo.hash3(L[i], L[i + 1], L[i + 2]), col[2] < col[0]) * (HL.gain === undefined ? 0.62 : HL.gain);
           o.col[0] = col[0] * f; o.col[1] = col[1] * f; o.col[2] = col[2] * f;
@@ -131,6 +133,15 @@
       const hs = new Uint8Array(n), AREA = Particles.HALO_AREA;
       for (let s = 1; s < n; s++) if (T.emit[s] && !AREA.test(VR.R.types[T.type[s]].name)) hs[s] = 1;
       return (Particles._hs = hs);
+    }
+    // t-polish2 · the small lights (Uint8Array by state, 1 = a small lantern, a candle, a torch: VR.Motion.HALO.small of the
+    // halo's size), read from the registry once it is complete
+    static haloSizes() {
+      const T = VR.R.T, n = T.type.length;
+      if (Particles._hz && Particles._hz.length === n) return Particles._hz;
+      const hz = new Uint8Array(n), SM = Particles.HALO_SMALL;
+      for (let s = 1; s < n; s++) if (T.emit[s] && SM.test(VR.R.types[T.type[s]].name)) hz[s] = 1;
+      return (Particles._hz = hz);
     }
     // the halo's colour: the warm glow of v0.42, or the light's own colour where it is cool (blue above red)
     static haloColor(s, out) {
@@ -192,5 +203,8 @@
   // pieces — window, slab edge, pad, treads — the temple's slits and light bars, the portal veil) and the recessed ceiling
   // spots (run 2: every villa's hall spots hung as big warm blobs in the air behind its glass)
   Particles.HALO_AREA = /plaza_line|_strip|led_|nova_|light_bar|neon_|hex_light|floor_hex|floor_pad|railing|cove|ledbar|portal_veil|temple_slit|^vx_spot$/;
+  // (t-polish2) the small lights: lanterns (the vista balconies', the paths'), candles, torches, sconces, the bollards' and
+  // the garden lamps' heads, the table lamps — not the lamp posts' heads, the pendants, the chandeliers
+  Particles.HALO_SMALL = /lantern|candle|torch|sconce|bollard|garden_lamp|table_lamp|light_table_/;
   VR.Particles = Particles;
 })(VR);

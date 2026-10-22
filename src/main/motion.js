@@ -43,7 +43,10 @@
   // light in the air round the lamp, not a ball
   // (v0.48, the merged build's night pictures: with t-light2's night level the halo came out a hard white ball — the lamp's
   // colour times the flicker, times the particles' emissive ×4; now no emissive boost and a gentler disc: it never saturates)
-  M.HALO = { size: 1.0, alpha: 0.36, emis: 0, gain: 0.9 };
+  // (t-polish2, gap 2: the vista balconies' four small lanterns each wore a 2-block disc — as big as their post is tall —
+  // and drew the eye from the landmark: a small lantern, a candle, a torch, a sconce, a bollard's head keeps `small` of
+  // the size (particles.js Particles.HALO_SMALL); the lamp posts' heads the full size)
+  M.HALO = { size: 1.0, alpha: 0.36, emis: 0, gain: 0.9, small: 0.6 };
   M.hash3 = function (x, y, z) { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x9e3779b1); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
 
   // ---- the rainbow (Wetter-Drama; the sky shader's WXDRAMA block, the same numbers): th degrees from the antisolar point.

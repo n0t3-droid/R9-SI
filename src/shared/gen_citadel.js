@@ -375,8 +375,18 @@
     return out;
   };
   // the far-horizon description: tapered boxes per tier (body), glowing slits and rings
-  CIT.lodBoxes = function (s) {
-    const B = [];
+  // (t-polish2, vgen 12 — gap 2 of docs/superpowers/plans/2026-10-16-t-polish2.md: the far citadel's lights read at night.
+  // The window slits stand out of the body — far.js and lod.js draw a slit ±(r + 0.6) along the tower, and r was half
+  // the tier's radius, so wherever the spire is wider than 1.2 blocks the slits lay inside its body: the far citadel had
+  // none —, 9 tall; the trim rings and the watchtower's ring 2 tall; the tip beacon 3 wide; the Heartland's citadel its
+  // beam over the main spire: boxes marked `night` (their strength up the beam), which only the far ring draws (far.js
+  // flags them in the vertex's aux byte, its shader draws them at night only) — the horizon tiles skip them. Worlds before
+  // vgen 12 (and a call without g) keep their boxes.)
+  CIT.FAR_VGEN = 12;
+  CIT.farLit = (g) => !!(g && g.vgen >= CIT.FAR_VGEN);
+  CIT.BEAM = { up: 60, seg: 4, r: 0.7, c: [0x73, 0xDB, 0xFF] };
+  CIT.lodBoxes = function (s, g) {
+    const B = [], lit = CIT.farLit(g);
     const bodyC = s.pal === 1 ? [0x8A, 0x66, 0x40] : [0xC4, 0xA4, 0x7A];
     for (const T of s.towers) {
       if (T.kind === 'pin') { B.push({ x: T.x, z: T.z, y0: s.y + 1, y1: s.y + 1 + T.h, r: T.r * 0.7 + 0.5, c: bodyC, kd: 0 }); continue; }
@@ -384,7 +394,7 @@
       if (T.kind === 'watch') {
         B.push({ x: T.x, z: T.z, y0: s.y + 1, y1: s.y + 1 + T.h, r: T.r, c: bodyC, kd: 0 });
         B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h - 14, y1: s.y + 1 + T.h - 10, r: 10, c: bodyC, kd: 0 });
-        B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h - 12, y1: s.y + 1 + T.h - 11, r: 10.3, c: [0x3A, 0xF0, 0xFF], kd: 4 });
+        B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h - 12, y1: s.y + 1 + T.h - (lit ? 10 : 11), r: 10.3, c: [0x3A, 0xF0, 0xFF], kd: 4 });
         B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h, y1: s.y + 1 + T.h + 16, r: 1, c: [0xD8, 0xDC, 0xE4], kd: 0 });
         continue;
       }
@@ -393,10 +403,15 @@
         const f0 = k / n, f1 = (k + 1) / n;
         const r = prof(T.r, (f0 + f1) / 2) + 0.4;
         B.push({ x: T.x, z: T.z, y0: s.y + 1 + f0 * T.h, y1: s.y + 1 + f1 * T.h, r, c: bodyC, kd: 0 });
-        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + STEPS[k] * T.h, y1: s.y + 1 + STEPS[k] * T.h + 1, r: prof(T.r, STEPS[k]) + 0.6, c: [0xFF, 0x9A, 0x2A], kd: 4 });
-        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h, y1: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h + 6, r: r * 0.5, w: 1.2, c: [0x3A, 0xF0, 0xFF], kd: 4, slits: true });
+        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + STEPS[k] * T.h, y1: s.y + 1 + STEPS[k] * T.h + (lit ? 2 : 1), r: prof(T.r, STEPS[k]) + 0.6, c: [0xFF, 0x9A, 0x2A], kd: 4 });
+        if (k < 4) B.push({ x: T.x, z: T.z, y0: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h, y1: s.y + 1 + [0.1, 0.32, 0.56, 0.75][k] * T.h + (lit ? 9 : 6), r: lit ? r : r * 0.5, w: 1.2, c: [0x3A, 0xF0, 0xFF], kd: 4, slits: true });
       }
-      B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h, y1: s.y + 3 + T.h, r: 0.8, c: [0xFF, 0x3A, 0x3A], kd: 4 });
+      B.push({ x: T.x, z: T.z, y0: s.y + 1 + T.h, y1: s.y + 3 + T.h, r: lit ? 1.5 : 0.8, c: [0xFF, 0x3A, 0x3A], kd: 4 });
+      // the beam over the Heartland's main spire: seg pieces, each a step fainter (night: its strength, 1 at the tip)
+      if (lit && s.home && T.kind === 'main') {
+        const BM = CIT.BEAM, y0 = s.y + 3 + T.h, len = BM.up / BM.seg;
+        for (let q = 0; q < BM.seg; q++) B.push({ x: T.x, z: T.z, y0: y0 + q * len, y1: y0 + (q + 1) * len, r: BM.r, c: BM.c, kd: 4, night: 1 - q / BM.seg });
+      }
     }
     return B;
   };

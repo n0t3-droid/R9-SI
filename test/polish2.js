@@ -12,6 +12,43 @@ const S = V.SHADERS, P = V.PBR, R = V.R;
 // the text between `#ifdef X` and its `#endif` that holds `needle` (the nearest #ifdef before it, no #endif between)
 const inside = (src, needle, def) => { const i = src.indexOf(needle); if (i < 0) return false; const j = src.lastIndexOf('#ifdef ' + def, i), k = src.lastIndexOf('#endif', i); return j > 0 && j > k; };
 
+console.log('2 · the vistas at night: the far citadel\'s lights (gen_citadel.js lodBoxes, vgen 12), the far lights in LOD_FS, the halos by the lamp');
+{
+  const CIT = V.CitadelGen, C = V.Heart.CITADEL;
+  const g11 = V.makeGen('overworld', 53, { vgen: 11 }), g12 = V.makeGen('overworld', 53, { vgen: 12 });
+  const siteOf = (g) => CIT.near(g, C.x - 40, C.z - 40, C.x + 40, C.z + 40, 0).find(s => s.home);
+  const s11 = siteOf(g11), s12 = siteOf(g12);
+  check(!!s11 && !!s12 && JSON.stringify(CIT.lodBoxes(s11, g11)) === JSON.stringify(CIT.lodBoxes(s11)) && !CIT.farLit(g11) && CIT.farLit(g12), 'worlds before vgen 12 keep their far citadel (the boxes as without the world)');
+  // the slits: far.js / lod.js draw a slit ±(r + 0.6) along the tower; the body box at the slit's middle has its own r
+  const poke = (B) => B.filter(b => b.slits).map(b => { const ym = (b.y0 + b.y1) / 2, body = B.find(q => q.kd === 0 && q.x === b.x && q.z === b.z && q.y0 <= ym && q.y1 > ym); return body ? b.r + 0.6 - body.r : 99; });
+  const B11 = CIT.lodBoxes(s11, g11), B12 = CIT.lodBoxes(s12, g12), p11 = poke(B11), p12 = poke(B12);
+  check(p11.filter(d => d <= 0).length > p11.length / 2, 'v0.48\'s far slits lay inside the spire\'s body (the far citadel showed none)', p11.filter(d => d <= 0).length + ' of ' + p11.length + ' inside');
+  check(p12.length === p11.length && p12.every(d => d >= 0.5), 'at vgen 12 every slit stands out of the body (≥ 0.5 block on each face)', 'least ' + Math.min(...p12).toFixed(2));
+  const sl12 = B12.filter(b => b.slits), tr12 = B12.filter(b => b.kd === 4 && !b.slits && b.c[1] === 0x9A), tip12 = B12.filter(b => b.kd === 4 && b.c[0] === 0xFF && b.c[1] === 0x3A && b.r > 1);
+  check(sl12.every(b => b.y1 - b.y0 === 9) && tr12.length > 0 && tr12.every(b => b.y1 - b.y0 === 2) && tip12.length > 0 && tip12.every(b => b.r === 1.5), 'the slits 9 tall, the trim rings 2, the tip beacons 3 wide', [sl12.length, tr12.length, tip12.length].join(' · '));
+  const beam = B12.filter(b => b.night), main = s12.towers.find(T => T.kind === 'main');
+  check(beam.length === CIT.BEAM.seg && beam.every(b => b.kd === 4 && b.x === main.x && b.z === main.z) && beam[0].y0 === s12.y + 3 + main.h && Math.abs(beam[beam.length - 1].y1 - beam[0].y0 - CIT.BEAM.up) < 1e-9 && beam.every((b, i) => i === 0 || b.night < beam[i - 1].night) && !B11.some(b => b.night), 'the Heartland\'s beam: over the main spire\'s tip, ' + CIT.BEAM.up + ' up in ' + CIT.BEAM.seg + ' pieces, fainter up the beam (vgen 12 only)', beam.map(b => b.night).join(' '));
+  // the meshes: ring 1 (far.js) carries the beam as night boxes (aux bit 7, its strength), ring 2 (lod.js) none and the same glowing geometry as before
+  const glowAux = (m) => { const u8 = new Uint8Array(m.verts.buffer || m.verts), n = u8.length / 12; let night = 0, glow = 0, strengths = new Set(); for (let i = 0; i < n; i++) { const k = u8[i * 12 + 6] >> 3, a = u8[i * 12 + 7]; if (k === 4) { glow++; if (a >= 128) { night++; strengths.add(a & 127); } } } return { night, glow, strengths: [...strengths].sort((x, y) => y - x) }; };
+  const f11 = glowAux(V.Far.form(g11, { tx: -7, tz: 5, cell: 4 })), f12 = glowAux(V.Far.form(g12, { tx: -7, tz: 5, cell: 4 }));
+  check(f11.night === 0 && f12.night === CIT.BEAM.seg * 16 && f12.strengths.join(' ') === '127 95 64 32', 'ring 1: the beam\'s four sides per piece flagged as night lights (aux 128 + strength), none before vgen 12', `${f12.night} of ${f12.glow} glowing vertices · strengths ${f12.strengths.join(' ')}`);
+  const l11 = glowAux(V.LOD.build(g11, { level: 0, tx: -4, tz: 2 })), l12 = glowAux(V.LOD.build(g12, { level: 0, tx: -4, tz: 2 }));
+  check(l12.night === 0 && l12.glow === l11.glow && l11.glow > 0, 'ring 2 (every preset): no beam, as many glowing vertices as before (the boxes only larger)', `${l11.glow} → ${l12.glow}`);
+  // the far lights: LOD_FS under LIGHT2 only (Very Low's program as before: test/vl_programs.js), the night switch under FORM
+  const L2 = V.Light2, fs = S.LOD_FS;
+  check(Math.abs(L2.farLight(1) - (1 + L2.FARLIT.night)) < 1e-9 && L2.farLight(0) === 1 && L2.farLight(1) * 0.85 * 1.3 > L2.GRADE.night.bThr * 1.5, 'at night a far light ×' + L2.farLight(1).toFixed(1) + ' — over the bloom\'s night threshold (' + L2.GRADE.night.bThr + '), so it glows; by day as before');
+  check(L2.farPierce(600) > 0.65 && L2.farPierce(1600) < 0.4 && L2.farPierce(0) === 1, 'it keeps exp(−d/' + L2.FARLIT.pierce + ') of itself through the haze: at 600 blocks ' + L2.farPierce(600).toFixed(2));
+  check(inside(fs, 'col *= 1.0 + ', 'LIGHT2') && inside(fs, 'col = mix(col, lit0, lk * exp(-dist / ', 'LIGHT2') && /else if \(v_kind == 7u\) lk = step\(0\.28, hash13\(floor\(vec3\(wp\.x, v_rel\.y \+ u_camFrac\.y \+ float\(u_camInt\.y\), wp\.y\) - N \* 0\.02\) \* 1\.37 \+ 5\.1\)\)/.test(fs), 'LOD_FS: the boost and the piercing under LIGHT2; a window counts where it is lit (the same hash as its lamplight)');
+  check(inside(fs, 'v_aux >= 128u', 'FORM') && /th >= float\(v_aux & 127u\) \/ 127\.0 \* \(1\.0 - smoothstep\(-0\.06, 0\.1, u_sunDir\.y\)\)\) discard;/.test(fs), 'the night lights drawn by the far ring\'s program only, at night, dithered by their strength');
+  // the halos: a small lantern 0.6 of the lamp post's
+  global.self = global; require('../src/main/motion.js'); require('../src/main/particles.js');
+  const Pa = V.Particles, hz = Pa.haloSizes(), hs = Pa.haloStates();
+  const st = (n) => { const t = R.byName[n]; for (let s = 1; t && s < R.T.type.length; s++) if (R.types[R.T.type[s]] === t && R.T.emit[s]) return s; return 0; };   // (a lit state)
+  check(V.Motion.HALO.small === 0.6 && V.Motion.HALO.size === 1 && hz[st('lantern')] && hz[st('vx_lantern')] && hz[st('candle')] && hz[st('torch')] && !hz[st('vx_lamppost')] && !hz[st('vm_town_lamp')] && hs[st('lantern')] && hs[st('vx_lamppost')], 'the halos by the lamp: lanterns, candles, torches 0.6 — the lamp posts\' heads 1.0 (the vista balconies\' lanterns no longer 2-block discs)');
+  const psrc = require('fs').readFileSync(__dirname + '/../src/main/particles.js', 'utf8');
+  check(/o\.size = HL\.size \* \(HZ\[L\[i \+ 3\]\] \? small : 1\);/.test(psrc), 'particles.js sizes each lamp\'s halo by its kind');
+}
+
 console.log('3 · the wood\'s shafts: the march weighted by the canopy\'s gaps (light2.js volGap, VOL_FS)');
 {
   const L2 = V.Light2;

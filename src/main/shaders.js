@@ -2373,6 +2373,9 @@ void main() {
   float th = bayer4(gl_FragCoord.xy), cR = min(bR, nR);
 #ifdef FORM
   if (th < cR || th >= nG) discard;
+  // t-polish2 · a night light (a glowing box with aux bit 7: the citadel's beam, CitadelGen.lodBoxes): drawn at night only,
+  // dithered by its strength (aux bits 0–6, fainter up the beam) and the night's weight
+  if (v_kind == 4u && v_aux >= 128u && th >= float(v_aux & 127u) / 127.0 * (1.0 - smoothstep(-0.06, 0.1, u_sunDir.y))) discard;
 #else
   if (th < max(cR, min(bG, nG) * u_g1)) discard;
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
@@ -2478,7 +2481,21 @@ void main() {
       col = mix(col, vec3(1.0, 0.66, 0.32) * (1.1 + u_emissiveBoost * 0.6) * (0.8 + 0.4 * hash13(bp + 2.3)), night * lit);
     }
   }
+#ifdef LIGHT2
+  // t-polish2 · the far lights at night (gap 2): the glowing kinds and the lit windows shine ×(1 + NIGHT·night) — over the
+  // bloom's night threshold, so they glow — and pierce the haze: a light keeps exp(−d / PIERCE) of itself through the
+  // fog instead of fading into its colour (Low and up; Very Low's program is as before)
+  float lk = 0.0;
+  if (v_kind == 4u) lk = 1.0;
+  else if (v_kind == 7u) lk = step(0.28, hash13(floor(vec3(wp.x, v_rel.y + u_camFrac.y + float(u_camInt.y), wp.y) - N * 0.02) * 1.37 + 5.1));
+  lk *= 1.0 - smoothstep(-0.06, 0.16, u_sunDir.y);
+  col *= 1.0 + ${(VR.Light2 && VR.Light2.FARLIT ? VR.Light2.FARLIT.night : 1.6).toFixed(2)} * lk;
+  vec3 lit0 = col;
   col = applyFog(col, v_rel, dist);
+  col = mix(col, lit0, lk * exp(-dist / ${(VR.Light2 && VR.Light2.FARLIT ? VR.Light2.FARLIT.pierce : 1600).toFixed(1)}));
+#else
+  col = applyFog(col, v_rel, dist);
+#endif
   o = vec4(col, 1.0);
 }`;
 

@@ -211,6 +211,13 @@
     for (let i = 0; i < 3; i++) out[i] = out[i] / samples.length * L2.ROOM.k;
     return out;
   };
+  // t-polish2 · the far lights at night (gap 2: the landmarks' lights did not read from afar — one-pixel lines, dim, eaten by
+  // the haze): in the far land's program (LOD_FS, under LIGHT2) the glowing kinds and the lit windows shine ×(1 + night ·
+  // night weight) — at night over the bloom's threshold (GRADE.night.bThr) — and keep exp(−d / pierce) of themselves
+  // through the fog (L2.farLight: the factor, L2.farPierce: the share kept at d blocks)
+  L2.FARLIT = { night: 1.6, pierce: 1600 };
+  L2.farLight = (nightW) => 1 + L2.FARLIT.night * clamp(nightW, 0, 1);
+  L2.farPierce = (d) => Math.exp(-Math.max(d, 0) / L2.FARLIT.pierce);
   // the valley mist's colour: between the horizon's and the fog's, a little lighter by day
   L2.mistColor = function (E) {
     const h = E.horizon || [0.6, 0.7, 0.8], f = E.fogColor || h, m = L2.moods(E.sunDir[1]), lift = 1 + 0.08 * m.day;

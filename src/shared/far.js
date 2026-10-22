@@ -198,14 +198,16 @@
       this.vert(bx, by, bz, face, kind, aux, c, shade); this.vert(cx, cy, cz, face, kind, aux, c, shade); this.vert(dx, dy, dz, face, kind, aux, c, shade);
       this.tri(v, v + 1, v + 2); this.tri(v, v + 2, v + 3);
     }
-    // a box: faces bit 1 = top, 2 = bottom; the four sides always (as lod.js)
-    box(x0, y0, z0, x1, y1, z1, ct, cs, kind, faces) {
-      if (faces & 1) this.quad(x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, 2, kind, 0, ct, 255);
-      if (faces & 2) this.quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, 3, kind, 0, cs, 150);
-      this.quad(x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0, 0, kind, 0, cs, 200);
-      this.quad(x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1, 1, kind, 0, cs, 200);
-      this.quad(x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1, 4, kind, 0, cs, 225);
-      this.quad(x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0, 5, kind, 0, cs, 225);
+    // a box: faces bit 1 = top, 2 = bottom; the four sides always (as lod.js); aux (default 0) on every vertex — t-polish2:
+    // a glowing box with bit 7 set is a night light (the citadel's beam), bits 0–6 its strength (LOD_FS under FORM)
+    box(x0, y0, z0, x1, y1, z1, ct, cs, kind, faces, aux) {
+      const a = aux | 0;
+      if (faces & 1) this.quad(x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, 2, kind, a, ct, 255);
+      if (faces & 2) this.quad(x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, 3, kind, a, cs, 150);
+      this.quad(x1, y1, z1, x1, y0, z1, x1, y0, z0, x1, y1, z0, 0, kind, a, cs, 200);
+      this.quad(x0, y1, z0, x0, y0, z0, x0, y0, z1, x0, y1, z1, 1, kind, a, cs, 200);
+      this.quad(x0, y1, z1, x0, y0, z1, x1, y0, z1, x1, y1, z1, 4, kind, a, cs, 225);
+      this.quad(x1, y1, z0, x1, y0, z0, x0, y0, z0, x0, y1, z0, 5, kind, a, cs, 225);
     }
     finish() {
       if (!this.nv) return { empty: true, count: 0, minY: 0, maxY: 0, parts: this.parts };
@@ -680,9 +682,11 @@
         if (s.x < x0 || s.x >= x1 || s.z < z0 || s.z >= z1) continue;
         const tx = s.x - x0, tz = s.z - z0, Rr = s.R, ty = s.y + 1, tcol = s.pal === 1 ? [0xD8, 0xC0, 0x90] : [0x9A, 0x9A, 0x96];
         Bd.box(tx - Rr, s.y - 6, tz - Rr, tx + Rr, ty, tz + Rr, tcol, tcol, 0, 1);
-        for (const b of VR.CitadelGen.lodBoxes(s)) {
+        for (const b of VR.CitadelGen.lodBoxes(s, g)) {
           const bx = b.x - x0, bz = b.z - z0;
           if (b.slits) { const r = b.r, ww = b.w; Bd.box(bx - ww, b.y0, bz - r - 0.6, bx + ww, b.y1, bz + r + 0.6, b.c, b.c, b.kd, 0); Bd.box(bx - r - 0.6, b.y0, bz - ww, bx + r + 0.6, b.y1, bz + ww, b.c, b.c, b.kd, 0); continue; }
+          // (t-polish2: the beam's boxes — night lights, their strength in the aux byte; no top or bottom: a column of light)
+          if (b.night) { Bd.box(bx - b.r, b.y0, bz - b.r, bx + b.r, b.y1, bz + b.r, b.c, b.c, b.kd, 0, 128 | Math.round(b.night * 127)); continue; }
           Bd.box(bx - b.r, b.y0, bz - b.r, bx + b.r, b.y1, bz + b.r, b.c, b.c, b.kd, b.kd === 0 ? 1 : 3);
         }
       }
