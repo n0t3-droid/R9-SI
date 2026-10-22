@@ -176,8 +176,9 @@
     if (f.helper || f.st === 'helper') g = 1;
     else if (f.st === 'calm') g = clamp(f.calm, 0, 1);
     else if (f.st === 'down' || f.st === 'leave') g = f.t > 0.8 ? 1 : ((f.t * 11) | 0) & 1;
+    // (the flare brightens the colour's own channels; the weak one stays low, so a warning glows red-violet, not white)
     const b = 1 + 2.4 * clamp(f.flare, 0, 1);
-    for (let i = 0; i < 3; i++) OPT[i] = (RV[i] + (GN[i] - RV[i]) * g) * b;
+    for (let i = 0; i < 3; i++) { const c = RV[i] + (GN[i] - RV[i]) * g; OPT[i] = c * (c >= 0.5 ? b : Math.min(b, 1.25)); }
     return OPT;
   };
 
@@ -565,8 +566,10 @@
       P.spawn(m.pos[0] + Math.cos(a) * r, y + 0.1 + Math.random() * 0.9, m.pos[2] + Math.sin(a) * r, Math.cos(a) * 0.12, 0.08, Math.sin(a) * 0.12, { life: 1.4, size: 0.3 + Math.random() * 0.2, grav: -0.05, col: [0.07, 0.06, 0.16], emis: 0.12, drag: 0.8, collide: false, grow: 0.4, alpha: 0.55 });
       if (f.burn > 0) P.glow(m.pos[0], y + 0.8, m.pos[2], [0.9, 1, 0.75], 1.2, 0.05, 0.6);
     }
-    if (f.st === 'tele' && Math.random() < 0.6) {   // the telegraph: sparks at the optic
-      const c = F.optic(m); P.spark(m.pos[0] - Math.sin(m.yaw) * K.w * 1.2, y + K.h * 0.8, m.pos[2] - Math.cos(m.yaw) * K.w * 1.2, [Math.min(1, c[0] * 0.5), Math.min(1, c[1] * 0.5), Math.min(1, c[2] * 0.5)], 3, 1.6, 1);
+    if (f.st === 'tele') {   // the telegraph: a halo growing round the optic, sparks off it
+      const oa = OPTIC_AT[f.k], oy = y + (oa ? oa[0] : K.h * 0.8), of = oa ? oa[1] : K.w * 1.2, ox = m.pos[0] - Math.sin(m.yaw) * of, oz = m.pos[2] - Math.cos(m.yaw) * of;
+      P.glow(ox, oy, oz, [1, 0.28, 0.9], 0.22, 0.1 + 0.16 * f.flare, 0);
+      if (Math.random() < 0.6) { const c = F.optic(m); P.spark(ox, oy, oz, [Math.min(1, c[0] * 0.5), Math.min(1, c[1] * 0.5), Math.min(1, c[2] * 0.5)], 3, 1.6, 1); }
     }
     if (f.st === 'down') {
       if (K.fam === 'stray') {
@@ -579,6 +582,8 @@
     }
     if (f.st === 'calm' && f.t < 1.4 && Math.random() < 0.6) P.glow(m.pos[0] + (Math.random() - 0.5) * 0.8, y + K.h * 0.7, m.pos[2] + (Math.random() - 0.5) * 0.8, [0.5, 1, 0.75], 1.4, 0.05, 0.5);
   };
+  // where the optic sits: [height, forward] in blocks (the models' layouts; the Kranarm's moves with its arm: by its size)
+  const OPTIC_AT = { driller: [13 / 16, 9.5 / 16], sentry: [29 / 16, 5.5 / 16], drone: [4.5 / 16, 6 / 16], wisp: [13 / 16, 5 / 16] };
   // a plate, a gear, a shard: tumbling with a little bounce, gone in five seconds
   F.shed = function (g, m, what) {
     if (F.bits.length >= 24) F.bits.shift();

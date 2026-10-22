@@ -60,8 +60,15 @@
       optic: part(3, 3, 1, [1, 1, 0], (g) => { g.box(0, 0, 0, 2, 2, 0, LENS, { emis: 1 }); }),
       core: part(5, 5, 2, [2, 2, 0], (g) => { g.ell(2, 2, 0.5, 2.3, 2.3, 1, LENS, { emis: 1 }); }),
       arm: part(3, 10, 3, [1, 9, 1], (g) => { g.box(0, 0, 0, 2, 9, 2, GR); g.box(0, 3, 0, 2, 4, 2, OR); }),
+      // (its plate: a grey rim with cut corners, a viewing slit, an orange chevron pointing down — a worker's guard plate)
       shield: part(14, 17, 2, [13, 8, 1], (g) => {
-        g.box(0, 0, 0, 13, 16, 1, (x, y, z) => { const edge = x === 0 || x === 13 || y === 0 || y === 16; return edge ? GR : (y === 8 || x === 6 || x === 7) ? OR : weather(WH, x, y, z); }, { shade: 0.05 });
+        g.box(0, 0, 0, 13, 16, 1, (x, y, z) => {
+          if ((x === 0 || x === 13) && (y === 0 || y === 16)) return null;
+          if (x === 0 || x === 13 || y === 0 || y === 16) return GR;
+          if (y === 13 && x >= 4 && x <= 9) return DK;
+          if (y >= 3 && y <= 11 && Math.abs(Math.abs(x - 6.5) - (y - 3) * 0.75) < 0.9) return OR;
+          return weather(WH, x, y, z);
+        }, { shade: 0.05 });
       }),
     },
     layout: { leg_l: [-3, 13, 0], leg_r: [3, 13, 0], body: [0, 13, 0], head: [0, 26, -1], optic: [0, 29, -5], core: [0, 20, 4.5], arm: [-7, 24, -2], shield: [6, 18, -7] },
