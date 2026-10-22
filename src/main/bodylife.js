@@ -204,7 +204,7 @@
       const ag = c.createGain(); ag.gain.value = K.hum.airG;
       src2.connect(lp); lp.connect(ag); ag.connect(hg);
       hg.connect(bus); o1.start(); o2.start(); src2.start();
-      BL.su = { bg, hg, next: now + 0.6 };
+      BL.su = { bg, hg, next: now + 0.6, srcs: [src, o1, o2, src2] };
     }
     const su = BL.su;
     if (!BL.vacuum) return;
@@ -220,9 +220,12 @@
       su.next = now + every * (0.92 + Math.random() * 0.16);
     }
   }
+  // (faded out, then the sources stopped: at home nothing of the suit keeps running; the next arrival builds it anew)
   function suitOff(g) {
     const su = BL.su, a = g && g.audio; if (!su || !a || !a.ctx) return;
     const now = a.ctx.currentTime;
     su.hg.gain.setTargetAtTime(0, now, 0.4); su.bg.gain.cancelScheduledValues(now); su.bg.gain.setTargetAtTime(0, now, 0.2);
+    for (const n of su.srcs) { try { n.stop(now + 2); } catch (e) { /* already stopped */ } }
+    BL.su = null;
   }
 })(VR);

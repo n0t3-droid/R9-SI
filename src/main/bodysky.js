@@ -25,9 +25,10 @@
   // the worlds seen from the moons: their albedo colour (linear), their air's limb
   const LOOK = { herz: [0.3, 0.38, 0.52, 1], aqua: [0.2, 0.33, 0.5, 0.6], zinn: [0.55, 0.46, 0.22, 0], opal: [0.86, 0.88, 0.92, 0], basalt: [0.12, 0.12, 0.12, 0], ocker: [0.5, 0.3, 0.17, 0.3] };
   // per body: the ground's albedo for the far ground and the bounce (Basalt by its two grounds), the exposure by day and by
-  // night (Basalt's dust is dark — the eye opens; Opal's ice is bright), the plumes' brightness
+  // night (Basalt by day: the maria mid-grey and the highlands, 3.5× brighter, still short of white — run 1 at 1.35 burnt
+  // them out; at night the eye opens; Opal's ice is bright), the plumes' brightness
   const KIND = {
-    basalt: { alb: { basalt_mare: 0.075, basalt_highlands: 0.26, basalt_crater: 0.2 }, alb0: 0.1, tint: [1.0, 0.98, 0.95], bounce: 0.32, floor: 0.06, expoDay: 1.35, expoNight: 3.6, plume: 0 },
+    basalt: { alb: { basalt_mare: 0.075, basalt_highlands: 0.26, basalt_crater: 0.2 }, alb0: 0.1, tint: [1.0, 0.98, 0.95], bounce: 0.32, floor: 0.06, expoDay: 0.9, expoNight: 3.6, plume: 0 },
     opal: { alb: {}, alb0: 0.72, tint: [0.96, 0.98, 1.02], bounce: 0.38, floor: 0.05, expoDay: 0.62, expoNight: 1.7, plume: 1 },
   };
   BS.KIND = KIND; BS.SUN = SUN;
@@ -120,7 +121,7 @@
       parK: [Math.cos(reach), 1, 0.004, sAng],
       B: Bv, Bc,
       ground: [far[0], far[1], far[2], dip],
-      J, Js, Jk: [K.plume ? 1 : 0, hDist, R, he],
+      J, Js, Jk: [K.plume ? free : 0, hDist, R, he],   // (the plumes dark while Amarant hides Helia)
       lum: [0, 0],
     };
     const expo = lit ? K.expoDay + (K.expoNight - K.expoDay) * night : K.expoNight, exE = o.expo > 0 ? o.expo : expo;

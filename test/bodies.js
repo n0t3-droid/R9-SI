@@ -184,12 +184,12 @@ const tally = (g, cxs, czs, f) => { for (let cz = czs[0]; cz <= czs[1]; cz++) fo
     const m = o.m; if (m > 0.05 && m < 0.95) return;
     if (o.fresh || o.ray > 0.3 || o.rille > 0.5 || gB.boulderAt(x, z)) return;
     const k = m >= 0.95 ? T.mare : T.high, y = topOf(col, i), b = col.blocks[(y << 8) | i];
-    k.n++; if (b === dark) k.dark++; if (b === reg || b === S.calcite) k.light++;
+    k.n++; if (b === dark) k.dark++; if (b === reg || b === st('andesite') || b === st('diorite')) k.light++;
     let t = 0; while (t < 12 && (col.blocks[((y - t) << 8) | i] === reg || col.blocks[((y - t) << 8) | i] === dark)) t++; k.thick += t; k.h += y;
   });
   const fm = T.mare.dark / Math.max(1, T.mare.n), fh = T.high.light / Math.max(1, T.high.n);
   check(T.mare.n > 200 && fm > 0.75, 'the maria dark (regolith_dark on top)', (fm * 100).toFixed(0) + ' % of ' + T.mare.n);
-  check(T.high.n > 200 && fh > 0.75, 'the highlands bright (regolith, calcite)', (fh * 100).toFixed(0) + ' % of ' + T.high.n);
+  check(T.high.n > 200 && fh > 0.75, 'the highlands bright (regolith, andesite, diorite)', (fh * 100).toFixed(0) + ' % of ' + T.high.n);
   const tm = T.mare.thick / Math.max(1, T.mare.n), th = T.high.thick / Math.max(1, T.high.n);
   check(th >= 3 && tm <= 2.2 && th > tm + 1, 'regolith thicker on the old highlands', 'highlands ' + th.toFixed(1) + ' blocks, maria ' + tm.toFixed(1));
   check(T.high.h / Math.max(1, T.high.n) > T.mare.h / Math.max(1, T.mare.n) + 2, 'the maria lie lower (lava filled the basins)', (T.high.h / T.high.n - T.mare.h / T.mare.n).toFixed(1) + ' m');
@@ -208,7 +208,7 @@ const tally = (g, cxs, czs, f) => { for (let cz = czs[0]; cz <= czs[1]; cz++) fo
     wall++; if (b !== st('regolith') && b !== st('regolith_dark')) rock++;
     for (const f of [1.6, 2.4, 3.2]) {
       const x2 = Math.round(L.x + Math.cos(th) * L.R * f), z2 = Math.round(L.z + Math.sin(th) * L.R * f);
-      if (gB.rayAt(x2, z2) > 0.5 && !gB.boulderAt(x2, z2)) { ray++; const c2 = gB.generate(x2 >> 4, z2 >> 4), i2 = ((z2 & 15) << 4) | (x2 & 15), b2 = c2.blocks[(topOf(c2, i2) << 8) | i2]; if (b2 === st('regolith') || b2 === S.calcite) rays++; }
+      if (gB.rayAt(x2, z2) > 0.5 && !gB.boulderAt(x2, z2)) { ray++; const c2 = gB.generate(x2 >> 4, z2 >> 4), i2 = ((z2 & 15) << 4) | (x2 & 15), b2 = c2.blocks[(topOf(c2, i2) << 8) | i2]; if (b2 === st('regolith') || b2 === st('diorite')) rays++; }
     }
   }
   check(rock / wall > 0.4, 'bare rock in the fresh walls', (rock / wall * 100).toFixed(0) + ' % of the wall\'s top');

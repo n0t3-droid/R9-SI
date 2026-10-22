@@ -8,7 +8,7 @@
 //   bash test/wt_run.sh body_same.js 300
 require('./dom_stub.js');
 const V = require('./load_shared.js');
-const EXPECT = '2eec0b88';
+const EXPECT = 'a5408432';   // bgen 1 (before it ships: run 1's tuning — the highlands' crust andesite / diorite, never calcite; the rays two waves, thinner; was 2eec0b88)
 const R = V.R, fnv = (h, x) => { h ^= x; return Math.imul(h, 16777619) >>> 0; };
 const str = (s) => { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) h = fnv(h, s.charCodeAt(i)); return h; };
 // a state's stable key: its block's name and its offset from the block's first state

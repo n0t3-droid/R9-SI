@@ -31,7 +31,10 @@
     if (S_) return S_;
     const R = VR.R, s = (n, p) => R.S(n, p), G = VR.GEN.S();
     S_ = {
-      bedrock: G.bedrock, basalt: s('basalt'), smoothBasalt: G.smoothbasalt, tuff: G.tuff, calcite: G.calcite, gravel: G.gravel,
+      bedrock: G.bedrock, basalt: s('basalt'), smoothBasalt: G.smoothbasalt, gravel: G.gravel,
+      // the highlands' crust (anorthosite, albedo ~0.3: andesite's grey; the freshest, deepest crust a little brighter:
+      // diorite) — never calcite, which is white and burns out under an airless sun
+      crust: s('andesite'), crustDark: s('stone'), crustBright: s('diorite'),
       reg: s('regolith'), regDark: s('regolith_dark'), tholin: s('tholin_ice'),
       snow: G.snowblock, snow1: G.snow1, packed: G.packed, blue: G.blueice, ice: G.ice,
     };
@@ -319,15 +322,17 @@
       o.h = h + add;
       return o;
     }
-    // a young crater's rays at (dx, dz) from its centre: the bright halo to 1.7 R, then 9–17 rays narrowing and breaking up
-    // with the distance out to 6–12 R (R§5.1: Tycho's rays run across the near side)
+    // a young crater's rays at (dx, dz) from its centre: the bright halo to 1.7 R, then 9–17 main rays and as many thin
+    // ones between them (two angular waves: the rays of unequal width), narrowing and breaking into streaks with the
+    // distance out to 6–12 R (R§5.1: Tycho's rays run across the near side) — run 1's map showed even spokes, a starburst
     rayOf(c, dx, dz, r) {
       if (r < 1.7 * c.R) return 1;   // (the halo: all bright)
-      const th = Math.atan2(dz, dx), p = 0.5 + 0.5 * Math.cos(c.rayN * th + c.rayPh + 0.8 * Math.sin(3 * th + c.rayPh2));
+      const th = Math.atan2(dz, dx), w3 = Math.sin(3 * th + c.rayPh2);
+      const p = 0.5 + 0.3 * Math.cos(c.rayN * th + c.rayPh + 0.8 * w3) + 0.2 * Math.cos((2 * c.rayN + 5) * th + 1.7 * c.rayPh2 + 0.5 * w3);
       const t = (r - 1.7 * c.R) / (c.rayLen - 1.7 * c.R);
-      const cut = 0.62 + 0.3 * t;
-      let v = ss(cut, cut + 0.12, p) * (1 - ss(0.55, 1, t));
-      if (v > 0 && this.nRay) v *= ss(-0.35 - 0.3 * (1 - t), 0.1, this.nRay.n2(c.x + dx, c.z + dz));
+      const cut = 0.68 + 0.22 * t;
+      let v = ss(cut, cut + 0.1, p) * (1 - ss(0.45, 1, t));
+      if (v > 0 && this.nRay) v *= ss(-0.25 - 0.3 * (1 - t), 0.2, this.nRay.n2(c.x + dx, c.z + dz));
       return v;
     }
     rayAt(x, z) { const o = this.column(x, z, this.cratersBox(x, z, x, z, false, true), {}); return o.ray; }
@@ -408,7 +413,7 @@
         blocks[col] = T.bedrock;
         if (air) {
           const mare = o.m >= 0.5 + (pn * 0.08);
-          const rockDeep = T.basalt, rock = mare ? (pn > 0.35 ? T.smoothBasalt : T.basalt) : (pn > 0.3 ? T.calcite : T.tuff);
+          const rockDeep = T.basalt, rock = mare ? (pn > 0.35 ? T.smoothBasalt : T.basalt) : (pn > 0.3 ? T.crust : T.crustDark);
           let reg = mare ? 1 + (hp < 0.5 ? 1 : 0) : 3 + Math.floor(hp * 3);
           let topB = mare ? T.regDark : T.reg;
           const fr = o.fresh;
@@ -417,9 +422,9 @@
             // its central peak of bright deep crust
             reg = 0;
             const s = fr.shape, rr = o.freshQ * fr.R;
-            if (fr.kind !== 'simple' && rr < s.floorR) topB = s.peakR > 0 && rr < s.peakR * 1.05 ? T.calcite : (s.ringR > 0 && Math.abs(rr - s.ringR) < s.ringW ? T.calcite : T.smoothBasalt);
+            if (fr.kind !== 'simple' && rr < s.floorR) topB = s.peakR > 0 && rr < s.peakR * 1.05 ? T.crustBright : (s.ringR > 0 && Math.abs(rr - s.ringR) < s.ringW ? T.crustBright : T.smoothBasalt);
             else topB = slope > 0.45 || hp < 0.55 ? rock : T.gravel;
-          } else if (o.ray > 0.5) { topB = mare ? T.reg : (o.ray > 0.8 && hp < 0.6 ? T.calcite : T.reg); reg = Math.max(reg, 1); }
+          } else if (o.ray > 0.5) { topB = mare ? T.reg : (o.ray > 0.8 && hp < 0.4 ? T.crustBright : T.reg); reg = Math.max(reg, 1); }
           if (!fr && slope > 1.25) { topB = rock; reg = 0; }
           if (o.rille > 0.5 && slope > 0.6) { topB = T.basalt; reg = 0; }
           for (let y = 1; y <= top; y++) {
@@ -474,7 +479,7 @@
           // its seat: the ground under its centre (a boulder sits a little sunk in, an ellipsoid 0.8 as high as wide)
           const cxI = Math.floor(b.x), czI = Math.floor(b.z), lxc = cxI - x0, lzc = czI - z0;
           const base = lxc >= -1 && lxc <= 16 && lzc >= -1 && lzc <= 16 ? H[(lzc + 1) * 18 + lxc + 1] : this.heightAt(cxI, czI);
-          const st = c.mare > 0.5 ? (b.kind < 0.6 ? T.basalt : T.smoothBasalt) : (b.kind < 0.65 ? T.tuff : T.calcite);
+          const st = c.mare > 0.5 ? (b.kind < 0.6 ? T.basalt : T.smoothBasalt) : (b.kind < 0.65 ? T.crust : T.crustBright);
           for (let dz = -ri; dz <= ri; dz++) for (let dx = -ri; dx <= ri; dx++) {
             const x = cxI + dx, z = czI + dz, lx = x - x0, lz = z - z0;
             if (lx < 0 || lx > 15 || lz < 0 || lz > 15) continue;

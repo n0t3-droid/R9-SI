@@ -62,7 +62,7 @@ if (mode === 'sky') {
   const out = path.join(ROOT, tag); fs.mkdirSync(out, { recursive: true });
   const g = new V.BodyGen(4242, body, {}), R = V.R;
   // the top block's colour: the texture recipes' palettes would need the canvas; a table of the blocks used is enough
-  const C = { regolith: [150, 146, 138], regolith_dark: [74, 72, 69], tholin_ice: [140, 92, 70], basalt: [70, 70, 74], smooth_basalt: [56, 56, 60], tuff: [118, 116, 104], calcite: [214, 214, 206], gravel: [128, 124, 120], bedrock: [40, 40, 40], snow_block: [236, 240, 244], packed_ice: [170, 196, 230], blue_ice: [110, 150, 220], ice: [180, 210, 240], snow: [240, 244, 248] };
+  const C = { regolith: [150, 146, 138], regolith_dark: [74, 72, 69], tholin_ice: [140, 92, 70], basalt: [70, 70, 74], smooth_basalt: [56, 56, 60], tuff: [118, 116, 104], calcite: [214, 214, 206], andesite: [138, 139, 140], stone: [115, 118, 122], diorite: [195, 195, 192], gravel: [128, 124, 120], bedrock: [40, 40, 40], snow_block: [236, 240, 244], packed_ice: [170, 196, 230], blue_ice: [110, 150, 220], ice: [180, 210, 240], snow: [240, 244, 248] };
   const rgb = Buffer.alloc(px * px * 3);
   const cache = new Map();
   const colAt = (x, z) => {

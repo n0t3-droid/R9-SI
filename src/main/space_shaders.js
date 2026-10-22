@@ -738,9 +738,12 @@ vec3 bsAmarant(vec3 D, vec3 col, float px) {
   }
   return col;
 }
-// the geysers' plumes: columns of ice over their vents, widening as they rise, thinning toward the top; the way of the
-// view through each (its closest approach to the column's axis); bright against Helia (ice scatters forward), lit where
-// Helia stands over the horizon at the column's height (the tops keep the light after the ground's sunset)
+// the geysers' plumes: jets of ice over their vents, narrow at the vent and spreading as they rise (±2.6°); the way of
+// the view through each (its closest approach to the column's axis). The ice thins as it spreads, so a jet is brightest
+// at its foot and fades upward into a faint veil (run 1's columns, as bright at the top as wide, read as searchlights);
+// the stripe's many small jets side by side as filaments (High: a noise across the column); bright against Helia (ice
+// scatters forward), lit where Helia stands over the horizon at the jet's height (the tops keep the light after the
+// ground's sunset) and dark while Amarant hides Helia (u_bsJk.x carries the free part of Helia's disc)
 vec3 bsPlumes(vec3 D, vec3 col) {
   float pl = 0.0;
   for (int j = 0; j < 4; j++) {
@@ -753,14 +756,16 @@ vec3 bsPlumes(vec3 D, vec3 col) {
     if (s <= 0.0 || hh < 0.0 || hh > J.w * 1.08) continue;
     if (D.y < -u_bsGround.w && s > u_bsJk.y) continue;      // (behind the curve of the ground)
     vec3 q = D * s - V - vec3(0.0, hh, 0.0);
-    float w = 3.0 + hh * 0.11, r2 = dot(q, q) / (w * w);
+    float w = 2.5 + hh * 0.035, r2 = dot(q, q) / (w * w);
     if (r2 > 6.0) continue;
-    float fall = exp(-hh / (0.42 * J.w)) * (1.0 - smoothstep(0.78 * J.w, 1.08 * J.w, hh));
+    float fil = 1.0;
+    if (u_bsSunK.w > 0.5) { float lat = (q.z * D.x - q.x * D.z) / (w * sqrt(den)) + 0.35 * sin(hh * 0.004 + float(j) * 2.1); fil = 0.1 + 1.8 * vnoise3(vec3(lat * 2.4 + float(j) * 13.0, hh * 0.006, float(j) * 3.7)); }
+    float fall = (exp(-hh / 320.0) + 0.08 * exp(-hh / (0.5 * J.w))) * (1.0 - smoothstep(0.78 * J.w, 1.08 * J.w, hh));
     float lit = smoothstep(-0.003, 0.003, u_bsSun.y + sqrt(2.0 * max(hh + V.y + u_bsJk.w, 0.0) / u_bsJk.z));
-    pl += exp(-r2) * fall * min(1.77 * w / sqrt(den), 600.0) * 0.004 * lit * js;
+    pl += exp(-r2) * fil * fall * 0.45 * lit * js;
   }
   if (pl <= 0.0) return col;
-  float ph = 0.3 + 3.2 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 5.0);
+  float ph = 0.25 + 2.2 * exp(-(1.0 - dot(D, u_bsSun.xyz)) * 5.0);
   return col + vec3(0.86, 0.93, 1.0) * u_bsSunCol * ph * pl * u_bsJk.x;
 }
 vec3 bodySky(vec3 dir, bool withSun) {
