@@ -621,7 +621,7 @@ if (!process.env.NO_TRAIL) {
     for (let i = 0; i < 90 && f.ok && !q.none && q.t < 0.5; i++) { await ev(() => window.__S.frames(10, false)); q = await lead(); }
     const shots = [], TL = require(ROOT + 'test/trail_lines.js');
     for (let k = 1; k <= 3 && f.ok && !q.none; k++) {
-      await ev(() => window.__S.frames(k === 1 ? 14 : 59, false));
+      await ev((n) => window.__S.frames(n, false), k === 1 ? 14 : 59);   // (the count from here: the page has no k)
       const url = await ev(() => { const g = VR.game; window.__norender = false; const t0 = performance.now(); g.last = t0 - 1000 / 30; g.loop(t0); window.__norender = true; try { g.renderer.gl.finish(); } catch (e) { /* none */ } const src = g.canvas || document.getElementById('gl'), c = document.createElement('canvas'); c.width = src.width; c.height = src.height; c.getContext('2d').drawImage(src, 0, 0); return c.toDataURL('image/png'); });
       const file = `${SHOTS}session_trail_${k}.png`; fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64'));
       const r = await TL.measure(file); shots.push({ file: file.replace(ROOT, ''), longest: r.longest, segs: r.sky.slice(0, 3).map(s => `${s.len} px ${s.deg}° w${s.width}`) });
