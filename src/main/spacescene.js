@@ -360,7 +360,7 @@
   // ================================================================ GL (the game's page; not in node)
   if (typeof window === 'undefined' || !VR.Renderer || !VR.GL) return;
   const GL = VR.GL;
-  const ST = SS.state = { tex: {}, texBytes: {}, bytes: 0, jobs: {}, progs: {}, seed: 0, patch: null, blank: null };
+  const ST = SS.state = { tex: {}, texBytes: {}, bytes: 0, jobs: {}, progs: {}, seed: 0, patch: null, blank: null, patchKeys: [] };
   const T = (k, v, fb) => (VR.I18N ? VR.I18N.t(k, v, fb) : (fb !== undefined ? fb : k));
   function program(name) {
     if (ST.progs[name] !== undefined) return ST.progs[name];
@@ -406,6 +406,11 @@
     for (const j of list) { j.seed = ST.seed; send(j); }
     return st;
   }
+  // a patch's two textures deleted (the newest two are kept: a long session of /raum at many places stays bounded)
+  function dropPatch(gl, key) {
+    for (const n of ['patchA@', 'patchB@']) { const k = n + key; if (ST.tex[k]) { gl.deleteTexture(ST.tex[k]); ST.bytes -= ST.texBytes[k] || 0; delete ST.tex[k]; delete ST.texBytes[k]; } }
+    delete ST.jobs[key];
+  }
   function got(g, st, j, m) {
     if (ST.jobs[st.key] !== st) return;   // (dropped meanwhile: another world)
     if (!m || m.type !== 'bodytex' || !m.a) { if (st.err++ < 3) { delete j.id; st.send(j); } return; }
@@ -415,6 +420,7 @@
     const gl = g.renderer && g.renderer.gl; if (!gl) return;
     const b = st.body, rep = b !== 'patch' && b !== 'ring';
     if (b === 'herz' || b === 'patch') { upload(gl, (b === 'herz' ? 'herzA' : 'patchA') + '@' + st.key, st.w, st.h, st.a, true, rep); upload(gl, (b === 'herz' ? 'herzB' : 'patchB') + '@' + st.key, st.w, st.h, st.b, false, rep); }
+    if (b === 'patch') { ST.patchKeys = ST.patchKeys.filter(k => k !== st.key); ST.patchKeys.push(st.key); while (ST.patchKeys.length > 2) dropPatch(gl, ST.patchKeys.shift()); }
     else upload(gl, b + '@' + st.key, st.w, st.h, st.a, true, rep);
     st.a = st.b = null; st.done = true; st.wall = performance.now() - st.t0;
   }
@@ -438,7 +444,7 @@
   SS.drop = function (g) {
     const gl = g && g.renderer && g.renderer.gl;
     if (gl) for (const k in ST.tex) gl.deleteTexture(ST.tex[k]);
-    ST.tex = {}; ST.texBytes = {}; ST.bytes = 0; ST.jobs = {}; ST.patch = null;
+    ST.tex = {}; ST.texBytes = {}; ST.bytes = 0; ST.jobs = {}; ST.patch = null; ST.patchKeys = [];
   };
   // the renderer's own frame calls this (F.drawOpaque) with the scene's framebuffer bound
   SS.draw = function (r) {
@@ -541,6 +547,6 @@
     const jobs = {};
     for (const k in ST.jobs) { const s = ST.jobs[k]; jobs[k] = { done: s.done, ms: +s.ms.toFixed(0), maxMs: +s.maxMs.toFixed(0), wall: +s.wall.toFixed(0), jobs: s.jobs, w: s.w, h: s.h }; }
     const r = g && g.renderer;
-    return { open: !!(g && g.space), ready: !!(g && g.space && g.space.ready), name: g && g.space ? g.space.name : null, tier: SS.tier(g), gpuMB: +(ST.bytes / 1048576).toFixed(2), jobs, draws: r ? r.stats.draws : 0, sunVis: SS.cur ? +SS.cur.sunVis.toFixed(3) : null, exposure: SS.cur ? SS.cur.look.exposure : null, progs: Object.keys(ST.progs).filter(k => ST.progs[k]).length, failed: Object.keys(ST.progs).filter(k => !ST.progs[k]) };
+    return { open: !!(g && g.space), ready: !!(g && g.space && g.space.ready), name: g && g.space ? g.space.name : null, tier: SS.tier(g), gpuMB: +(ST.bytes / 1048576).toFixed(2), patches: ST.patchKeys.length, jobs, draws: r ? r.stats.draws : 0, sunVis: SS.cur ? +SS.cur.sunVis.toFixed(3) : null, exposure: SS.cur ? SS.cur.look.exposure : null, progs: Object.keys(ST.progs).filter(k => ST.progs[k]).length, failed: Object.keys(ST.progs).filter(k => !ST.progs[k]) };
   };
 })(VR);
