@@ -1,11 +1,14 @@
 // regress: skip — „nie langweilig", played: the scripted sessions of erlebnis §7 (plan docs/superpowers/plans/2026-10-22-e-log.md §2.6). One browser run a wave.
-// Two 5-minute sessions in a new default world (seed 4242, the Heartland, vgen 11), Creative · Friedlich, Balanced at 960 × 540, de-DE, the weather held clear:
+// Two 5-minute sessions in a new default world (seed 4242, the Heartland, vgen 11), Creative · Friedlich, Balanced at 480 × 270 (f-flow: SIZE), de-DE, the weather held clear:
 //   builder — look round on the Hangar Hall's deck (the spawn) → out of the portal, over the Gate Plaza, the ways east to the river meadow → the Bauhand: a
 //             Bungalow (the bench when no ghost fits) → watch the Baustelle rise → walk on: the farm way north, the stone bridge over the river, on;
 //   walk    — the Gate Plaza → the way east and north to Nova Haven (day 0 is its festival evening) → its ring road to the city's plaza (a look round) → the
 //             radial road, the east branch, the southern arc, the west branch, the plaza again, the ring west, the way back toward the temple.
-// The simulation at the game's full rate (every frame of 1/30 s simulated, none drawn) and a picture at 2 Hz drawn and captured in the page (the canvas →
-// 480 × 270 JPEG; no page.screenshot — it timed out at 150 s on this machine in other runs). The world streams ahead of the walker: before every half
+// The simulation at the game's full rate (every frame of 1/30 s simulated, none drawn) and a picture every 2 s drawn and captured in the page (the canvas →
+// 480 × 270 JPEG; no page.screenshot — it timed out at 150 s on this machine in other runs). f-flow (R50-03; plan docs/superpowers/plans/2026-10-23-f-flow.md
+// §2.1): the pictures were the cost — Chromium's WebGL finish() is a flush, the read-back waits for SwiftShader: ~10 s a picture at 960 × 540 under a load of
+// 11–16, 600 a session at 2 Hz; now the canvas is the picture's size (SIZE=480x270, Balanced's own scale and TSR) and a picture comes every PIC_EVERY = 2 s
+// (150 a session), each one's real cost logged. The world streams ahead of the walker: before every half
 // second of play the columns within 64 m must be loaded and the sections within 32 m meshed (the clock waits, the workers do not). The walker is a
 // pure-pursuit steer on the real player physics (W held, auto-jump, a jump when stuck, a 4-m hop along the way after 5 s stuck: counted). Parts whose
 // feature does not exist yet are skipped and logged (travel by intent VR.Intent and Funke VR.Funke: wave 4), and their minutes leave the targets.
@@ -17,7 +20,11 @@
 // ≤ 0.05 ms a frame; no page error.
 //   nohup bash test/wt_run.sh session.mjs 5400 > .tmp_tests/session.log 2>&1 &
 //   ONLY=builder|walk · DUR=300 · SEED=4242 · NO_BENCH=1 · ALL=1 (every picture too) · DRY=1 (node only: the routes, the walker and the Bauhand on a
-//   stand-in, a synthetic sheet in the scratch folder) · SHEET_ONLY=builder|walk (rebuild a sheet from its JSON and frames)
+//   stand-in, a synthetic sheet in the scratch folder) · SHEET_ONLY=builder|walk (rebuild a sheet from its JSON and frames) · f-flow: SIZE=480x270 (the
+//   canvas; 960x540 the old pictures) · PIC_EVERY=2 (s between pictures) · REAL_BUDGET=5400 (s a session) — in the release lane:
+//   R9_EXCLUSIVE=1 nohup bash test/wt_run.sh session.mjs 12000 > .tmp_tests/session.log 2>&1 &
+//   After each session its pictures go through test/trail_lines.js (the contrails' straight constant-width segments, R50-04) and the checks add f-flow's
+//   measures: the most repeated event ≤ 40 % of all, spam ≤ 2 / 10 min, ≥ 6 kinds seen.
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
@@ -26,7 +33,9 @@ const require = createRequire(import.meta.url);
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const SHOTS = ROOT + 'test/shots/';
 const DIST = process.env.DIST || new URL('../dist/index.html', import.meta.url).href;
-const SEED = +(process.env.SEED || 4242), DUR = +(process.env.DUR || 300), VW = 960, VH = 540, PW = 480, PH = 270, SLOTS = 12;
+const SIZE = (process.env.SIZE || '480x270').split('x').map(Number);   // (f-flow: the canvas — the picture's size)
+const SEED = +(process.env.SEED || 4242), DUR = +(process.env.DUR || 300), VW = SIZE[0] || 480, VH = SIZE[1] || 270, PW = 480, PH = 270, SLOTS = 12;
+const PIC_EVERY = Math.max(0.5, +(process.env.PIC_EVERY || 2));   // (f-flow: seconds of play between two pictures)
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const DRY = !!process.env.DRY, SHEET_ONLY = process.env.SHEET_ONLY || '';
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
@@ -283,7 +292,7 @@ async function buildSheet(rec, frames, out) {
   const m = rec.metrics, v = rec.verdict, gl = m.gaps.longest, T1 = playedT(rec), cutShort = T1 < rec.dur - 1;
   let svg = `<svg width="${SW}" height="${SH}" xmlns="http://www.w3.org/2000/svg"><style>text{font-family:'DejaVu Sans',sans-serif}</style>`;
   const T = (x, y, s, size, fill, weight) => { svg += `<text x="${x}" y="${y}" font-size="${size}" fill="${fill}"${weight ? ` font-weight="${weight}"` : ''}>${esc(s)}</text>`; };
-  T(G, 26, `Sitzung · ${TYPE_DE[rec.type] || rec.type} (${rec.type}) — Saat ${rec.seed} · Ausgewogen ${VW}×${VH} · ${mmss(T1)} Spielzeit${cutShort ? ` von ${mmss(rec.dur)} (Zeitbudget)` : ''} · ${clock(rec.tod0)} → ${clock(rec.tod1)} Uhr · Tag ${rec.day} · ${rec.build || ''}`, 18, '#f0f0f5', 600);
+  T(G, 26, `Sitzung · ${TYPE_DE[rec.type] || rec.type} (${rec.type}) — Saat ${rec.seed} · Ausgewogen ${(rec.size || [VW, VH]).join('×')} · ${mmss(T1)} Spielzeit${cutShort ? ` von ${mmss(rec.dur)} (Zeitbudget)` : ''} · ${clock(rec.tod0)} → ${clock(rec.tod1)} Uhr · Tag ${rec.day} · ${rec.build || ''}`, 18, '#f0f0f5', 600);
   const mt = `Ereignisse ≥ 2 im Blick ${m.weighted.perMin.toFixed(2)}/min · längste Lücke ${Math.round(gl.d)} s (${mmss(gl.a)}–${mmss(gl.b)}) · p90 ${Math.round(m.gaps.p90)} s · Beweger ${m.movers.toFixed(2)} · Wahrzeichen/Himmel ${m.lmSky.toFixed(2)} · Vielfalt ${m.variety.n} · Spam ${m.spam.n} · freihändig ${m.handsFree.toFixed(2)}`;
   T(G, 50, mt, 14, '#c9cbd6');
   T(G, 70, `Ziele (${v.base}) erreicht: ${v.met} / ${v.total} — ${v.rows.filter(r => !r.ok).map(r => r.key).join(', ') || 'alle'}`, 14, v.met === v.total ? '#7ce39a' : '#ff9a8a', 600);
@@ -329,7 +338,7 @@ function analyze(rec, keep) {
 }
 const summary = (rec) => {
   const m = rec.metrics, gl = m.gaps.longest;
-  return `${rec.type}: ${m.weighted.n} weighted in view (${m.weighted.perMin.toFixed(2)}/min), longest gap ${gl.d.toFixed(0)} s (${mmss(gl.a)}–${mmss(gl.b)}), p90 ${m.gaps.p90.toFixed(0)} s, movers ${m.movers.toFixed(2)}, landmark/sky ${m.lmSky.toFixed(2)}, variety ${m.variety.n} (${m.variety.kinds.join(',')}), spam ${m.spam.n}, hands-free ${m.handsFree.toFixed(2)} — targets ${rec.verdict.met}/${rec.verdict.total}`;
+  return `${rec.type}: ${(+m.weighted.n).toFixed(1)} weighted seen (${m.weighted.full === undefined ? '' : m.weighted.full + ' full, '}${m.weighted.perMin.toFixed(2)}/min), longest gap ${gl.d.toFixed(0)} s (${mmss(gl.a)}–${mmss(gl.b)}), p90 ${m.gaps.p90.toFixed(0)} s, movers ${m.movers.toFixed(2)}, landmark/sky ${m.lmSky.toFixed(2)}, variety ${m.variety.n} (${m.variety.kinds.join(',')}), spam ${m.spam.n}, hands-free ${m.handsFree.toFixed(2)}${m.repeat ? `, repeat ${m.repeat.name} ${m.repeat.share.toFixed(2)}` : ''} — targets ${rec.verdict.met}/${rec.verdict.total}`;
 };
 
 // ============================================================================ DRY: everything node can check before the one browser run
@@ -420,7 +429,7 @@ page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slic
 page.on('crash', () => { logs.push('[pageerror] the page crashed'); console.log('  !! the page crashed'); });
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const wait = (ms) => page.waitForTimeout(ms);
-const RUN = { renders: [], picEvery: 1, waits: 0, waitS: 0 };
+const RUN = { renders: [], picEvery: Math.max(1, Math.round(PIC_EVERY / 0.5)), waits: 0, waitS: 0, picReal: [] };
 await page.goto(DIST);
 for (let i = 0; i < 240; i++) { await wait(500); if (await ev(() => !!(window.VR && VR.game && VR.game.state === 'title')).catch(() => false)) break; }
 await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.autoJump = 'on'; g.settings.wowMoments = true; g.applySettings('*'); });
@@ -446,7 +455,7 @@ const settle = async (maxS, r, rm) => { const t = Date.now(); let s = null; whil
 
 // half a second of play: the world ahead first, then 15 frames, the last drawn and captured (2 Hz; 1 Hz when a picture costs > 1.5 s)
 let chunkN = 0, sessionReal0 = Date.now(), overBudget = false;
-const REAL_BUDGET = +(process.env.REAL_BUDGET || 32 * 60) * 1000;   // a session's own wall-clock budget: a stall must not cost the run its files
+const REAL_BUDGET = +(process.env.REAL_BUDGET || 5400) * 1000;   // a session's own wall-clock budget: a stall must not cost the run its files (f-flow: 90 min)
 async function play(t0, tEnd, untilDone) {
   let last = null;
   for (;;) {
@@ -454,11 +463,11 @@ async function play(t0, tEnd, untilDone) {
     let s = await ev(() => window.__S.ready(4, 2));
     // (columns missing: up to 20 s; only sections to mesh — a Baustelle keeps rewriting them —: up to 6 s)
     if (s.miss || s.dirty > 8) { const w0 = Date.now(), cap = s.miss ? 20000 : 6000; while ((s.miss || s.dirty > 8) && Date.now() - w0 < cap) { await wait(50); s = await ev(() => window.__S.pump(4, 2)); } RUN.waits++; RUN.waitS += (Date.now() - w0) / 1000; }
-    const pic = chunkN++ % RUN.picEvery === 0;
+    const pic = chunkN++ % RUN.picEvery === 0, c0 = Date.now();
     last = await ev(([n, r]) => window.__S.frames(n, r), [15, pic]);
     if (pic) {
-      RUN.renders.push(last.rms);
-      if (RUN.renders.length === 24 && RUN.picEvery === 1) { const md = RUN.renders.slice().sort((a, b) => a - b)[12]; if (md > 1500) { RUN.picEvery = 2; console.log(`  (a picture costs ${md.toFixed(0)} ms: 1 Hz from now)`); } }
+      RUN.renders.push(last.rms); RUN.picReal.push(Date.now() - c0);   // (f-flow: what a drawn half second really costs — the read-back waits for the GPU)
+      if (RUN.picReal.length % 30 === 0) { const q = RUN.picReal.slice(-30).sort((a, b) => a - b); console.log(`  (the last 30 pictures: ${q[15]} ms a drawn half second, the median; ${q[29]} the worst)`); }
     }
     const t = last.t - t0;
     if (t >= tEnd - 1e-3 || (untilDone && last.done) || last.state) return { t, last };
@@ -507,7 +516,8 @@ async function session(type, setup, script) {
   const c0 = start.cost, c1 = end.cost, fr = c1.frames - c0.frames, sm = c1.samples - c0.samples;
   rec.cost = { frames: fr, msPerFrame: +((c1.ms - c0.ms) / Math.max(1, fr)).toFixed(5), worstMs: +c1.worst.toFixed(3), samples: sm, msPerSample: +((c1.sampleMs - c0.sampleMs) / Math.max(1, sm)).toFixed(4), emits: c1.emits - c0.emits, msPerEmit: +((c1.emitMs - c0.emitMs) / Math.max(1, c1.emits - c0.emits)).toFixed(4), errors: (c1.errors | 0) - (c0.errors | 0), error: end.error || null };
   const rs = RUN.renders.slice(r0).sort((a, b) => a - b);
-  rec.run = { overBudget, realS: Math.round((Date.now() - real0) / 1000), pictures: rs.length, renderMsMedian: rs.length ? Math.round(rs[rs.length >> 1]) : 0, picHz: 2 / RUN.picEvery, waits: RUN.waits - w0[0], waitS: Math.round(RUN.waitS - w0[1]), hops: end.stat.hops, jumps: end.stat.jumps, walkerLog: end.log.slice(-40), end: end.pos.map(v => +v.toFixed(1)) };
+  const pr = RUN.picReal.slice(r0).sort((a, b) => a - b);
+  rec.run = { overBudget, realS: Math.round((Date.now() - real0) / 1000), pictures: rs.length, renderMsMedian: rs.length ? Math.round(rs[rs.length >> 1]) : 0, picRealMsMedian: pr.length ? pr[pr.length >> 1] : 0, picEveryS: PIC_EVERY, waits: RUN.waits - w0[0], waitS: Math.round(RUN.waitS - w0[1]), hops: end.stat.hops, jumps: end.stat.jumps, walkerLog: end.log.slice(-40), end: end.pos.map(v => +v.toFixed(1)) };
   analyze(rec);
   // the twelve frames and the one in the middle of the longest gap
   const gl = rec.metrics.gaps.longest, times = rec.frames.map(f => t0 + f.t).concat([t0 + (gl.a + gl.b) / 2]);
@@ -533,6 +543,18 @@ async function session(type, setup, script) {
   check(fs.existsSync(`${SHOTS}session_${type}.json`) && !!sheet, `${type}: session_${type}.json and session_${type}_sheet.png written (${frames.filter(f => f.file).length} of 12 frames)`);
   check(rec.cost.errors === 0, `${type}: the log never failed (${rec.cost.errors} errors${rec.cost.error ? ': ' + rec.cost.error.split('\n')[0] : ''})`);
   check(rec.cost.msPerFrame <= 0.05, `${type}: the log costs ${(rec.cost.msPerFrame * 1000).toFixed(1)} µs a frame (≤ 50), ${rec.cost.msPerSample} ms a sample, over ${rec.cost.frames} frames`);
+  // f-flow: R50-03's measures and R50-04's line detector over the session's pictures
+  const M3 = rec.metrics;
+  check(M3.repeat.share <= 0.40, `${type}: the most repeated event ${M3.repeat.name} is ${(M3.repeat.share * 100).toFixed(0)} % of the ${M3.events.n} events (≤ 40)`);
+  check(M3.spam.per10 <= 2, `${type}: spam ${M3.spam.n} pair(s), ${M3.spam.per10.toFixed(2)} per 10 minutes (≤ 2)`);
+  check(M3.variety.n >= 6, `${type}: ${M3.variety.n} kinds seen (≥ 6): ${M3.variety.kinds.join(', ')}`);
+  try {
+    const TL = require(ROOT + 'test/trail_lines.js'), files = frames.filter(f => f.file).map(f => f.file).concat(fs.existsSync(`${SHOTS}session_${type}_gap.jpg`) ? [`${SHOTS}session_${type}_gap.jpg`] : []);
+    const per = []; for (const f of files) { const r = await TL.measure(f); per.push({ file: f.replace(ROOT, ''), longest: r.longest, segs: r.sky.slice(0, 3) }); }
+    rec.trails = { longest: per.reduce((m, q) => Math.max(m, q.longest), 0), per };
+    fs.writeFileSync(`${SHOTS}session_${type}.json`, JSON.stringify(rec, null, 1));
+    check(rec.trails.longest <= 150, `${type}: no straight constant-width trail segment over 150 px in its ${per.length} pictures (the longest ${rec.trails.longest} px)`);
+  } catch (e) { console.log('  !! the line detector: ' + String(e && e.message || e).slice(0, 200)); }
   return rec;
 }
 
