@@ -485,6 +485,7 @@ void main() {
       return !!((BH && BH.state && BH.state !== 'closed') || (p && p.breaking) || (I && I.captured && ms && ms.down && (ms.down[0] || ms.down[2]) && !(g.ui && g.ui.screen)));
     }
     solid(x, y, z) { const w = this.g.world, R = VR.R, Fl = VR.F; if (!w || !R) return false; const b = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(b && (R.T.flags[b] & Fl.SOLID)); }
+    ground(x, y, z) { const w = this.g.world, R = VR.R, Fl = VR.F; if (!w || !R) return false; const b = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !!(b && (R.T.flags[b] & (Fl.SOLID | (Fl.WATER || 0)))); }
     // ---- the frame
     update(dt) {
       const t0 = now(), g = this.g;
@@ -801,7 +802,7 @@ void main() {
       let th = s0 ? Math.atan2(Math.cos(this.wayYaw) * s0, -Math.sin(this.wayYaw) * s0) : Math.atan2(tg.pos[0] - P[0], tg.pos[2] - P[2]);
       const L = Math.min(F.WAY_L, Lh + (s0 ? 6 : 0)), n = clamp(Math.ceil(L / 2), 2, 25), step = L / n;
       O[0] = P[0]; O[1] = P[1]; O[2] = P[2];
-      const off = !this.seat && this.inVehicle() ? 2.5 : 0.45;   // (riding: it sits beside the eye — the line starts ahead)
+      const off = !this.seat && this.inVehicle() ? 2.5 : 0.45, lvl = !!this.seat || !!(this.g.player && this.g.player.flying);   // (flying: the line keeps its height over a deep drop)   // (riding: it sits beside the eye — the line starts ahead)
       let x = P[0] + Math.sin(th) * off, z = P[2] + Math.cos(th) * off, y = P[1] - 0.1, d = 0, end = false, i = 1;
       A[0] = x - O[0]; A[1] = y - O[1]; A[2] = z - O[2]; D[0] = 0;
       for (; i <= n; i++) {
@@ -810,8 +811,8 @@ void main() {
         end = rem <= step + 0.01;
         if (end) { x = tg.pos[0]; z = tg.pos[2]; } else { x += Math.sin(th) * step; z += Math.cos(th) * step; }
         let k = 0; while (k < 10 && this.solid(x, y, z)) { y += 1; k++; }                     // up over a wall or a hill
-        let gy = null; for (let j = 0; j < 7; j++) if (this.solid(x, y - 1 - j, z)) { gy = Math.floor(y - 1 - j) + 1; break; }
-        const want = gy === null ? y - 0.8 : gy + 1.25;                                         // follow the ground loosely
+        let gy = null; for (let j = 0; j < 7; j++) if (this.ground(x, y - 1 - j, z)) { gy = Math.floor(y - 1 - j) + 1; break; }
+        const want = gy === null ? (lvl ? y : y - 0.8) : gy + 0.55;   // a path of light low over the ground (water too): seen from above, not edge-on
         y = end ? tg.pos[1] + 1.2 : y + clamp(want - y, -0.9, 0.9);
         const px = x - O[0], py = y - O[1], pz = z - O[2], q = (i - 1) * 3;
         d += Math.hypot(px - A[q], py - A[q + 1], pz - A[q + 2]);
@@ -988,7 +989,8 @@ void main() {
       if (nb) {
         gl.bindVertexArray(B.vao);
         gl.uniform4f(p.u.u_tint, 1, 1, 1, fade); gl.drawArrays(gl.TRIANGLES, 0, this.scanFaces);
-        gl.uniform4f(p.u.u_tint, 1.3, 1.3, 1.3, fade); gl.drawArrays(gl.LINES, this.scanFaces, B.n - this.scanFaces);
+        // (the edges blended over, not added: run 2's orange and cyan boxes read white on the bright cyan hall floor)
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.uniform4f(p.u.u_tint, 1.3, 1.3, 1.3, fade); gl.drawArrays(gl.LINES, this.scanFaces, B.n - this.scanFaces); gl.blendFunc(gl.ONE, gl.ONE);
         F.cost.draws += 2; this.g.renderer.stats.draws += 2;
       }
       // the wave's ring on the ground, running out and fading

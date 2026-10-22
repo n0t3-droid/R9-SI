@@ -266,6 +266,11 @@ check(!!F && typeof F.ask === 'function' && !!F.Budget && !!F.Lost && !!F.Actor,
     let rec = true; for (let i = 1; i < R1.length; i++) if (camD(R1[i]) < camD(R1[i - 1]) - 0.05) rec = false;
     const ahead1 = (A.anchor[0] - g.cam.x) * f[0] + (A.anchor[2] - g.cam.z) * f[1];
     check(rec && ahead1 > 1 && camD(R1[0]) > 1, `a target ahead: the drone ${ahead1.toFixed(2)} m ahead, the ribbon runs away from the eye (${camD(R1[0]).toFixed(1)} → ${camD(R1[R1.length - 1]).toFixed(1)} m)`);
+    // (run 2: at 1.25 m over the ground the line ran 0.4 m under the eye — seen edge-on, hidden behind the drone; a path of
+    // light low over the ground is seen from above)
+    const hi = R1.slice(3).map(q => q[1] - 64), dip = (q) => Math.atan2(g.cam.y - q[1], Math.hypot(q[0] - g.cam.x, q[2] - g.cam.z)) * 180 / Math.PI;
+    const at20 = R1.find(q => Math.hypot(q[0] - g.cam.x, q[2] - g.cam.z) >= 20);
+    check(Math.min(...hi) >= 0.35 && Math.max(...hi) <= 0.8 && at20 && dip(at20) >= 2.5, `the line runs low over the ground (${Math.min(...hi).toFixed(2)}–${Math.max(...hi).toFixed(2)} m), seen from above (${at20 ? dip(at20).toFixed(1) : '—'}° under the eye at 20 m)`);
     step(140, 1 / 30);
     // a target behind on the left: the drone peeks in on the left, the ribbon starts beside it and bends round
     A.wayT = 0; A.way({ pos: [-60.5, 64, 120.5], name: 'Hinten', kind: 'test' }, true); step(20, 1 / 30);
