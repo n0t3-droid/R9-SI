@@ -434,6 +434,7 @@ if (!A) { console.log('  ✗ VR.Adventure missing (src/main/adventure.js)'); con
   A.pendingCreate = { at: Date.now() };
   VR.game = mkGame(nm); A.bind();
   check(A.on() && nm.adventure && nm.adventure.on && A.pendingCreate === null, 'created with ⚔ Abenteuer: the new world starts as an Abenteuer world');
+  { const gg = VR.game; gg.ui.screen = 'loading'; A.tick(); const t0 = gg.ui.toasts; gg.ui.screen = null; A.tick(); A.tick(); check(t0 === 0 && gg.ui.toasts === 1, 'it says hello once, when the world is there (' + gg.ui.toasts + ' toast)'); }
   const om = { id: 'w3', name: 'Alt', difficulty: 'easy', mode: 'survival', created: Date.now() - 1e7 };
   A.pendingCreate = { at: Date.now() - 60000 };
   VR.game = mkGame(om); A.bind();

@@ -39,7 +39,7 @@
     rec: null, meta: null, sess: Adv.session(), pendingCreate: null, lastBuildAt: 0, up: null, upT: 0, banT: 0, asking: false,
     hudEl: null, hudHost: null, hud: null, hudKey: null, hudPending: false, floatXP: 0, floatTaler: 0, lastPos: null, timer: 0, ui: null, cwPrev: null,
     KEYS, MAX_STEP: 400, HOME_R: 24,
-    stats: { hudWrites: 0, awards: 0, ups: 0, chimes: 0, survival: 0 },
+    stats: { hudWrites: 0, awards: 0, ups: 0, chimes: 0, survival: 0, welcomes: 0 },
   };
 
   // ⚙ Spiel: the ring on the HUD; Funke's word when a story beat is ready (read by the story front, a-story)
@@ -76,7 +76,7 @@
       if (P && !m.adventure && (m.created || 0) >= P.at - 2000 && Date.now() - P.at < 120000) {
         A.pendingCreate = null;
         m.adventure = Adv.fresh({ on: true, band: P.band, enc: g.settings && g.settings.kids ? 'off' : P.enc, since: g.env ? g.env.day | 0 : 0 });
-        peaceful(g, m, m.adventure);
+        peaceful(g, m, m.adventure); A.greet = true;   // (the welcome when the world is there: tick)
         if (g.store && g.store.saveWorld) { try { const p = g.store.saveWorld(m); if (p && p.catch) p.catch(() => {}); } catch (e) { /* saved with the next autosave */ } }
       } else if (P && Date.now() - P.at >= 120000) A.pendingCreate = null;
       if (m.adventure) { A.rec = m.adventure = Adv.load(m.adventure); if (A.rec.on) peaceful(g, m, A.rec); }
@@ -158,6 +158,7 @@
       if (L) { const dx = q[0] - L[0], dy = q[1] - L[1], dz = q[2] - L[2], d = Math.sqrt(dx * dx + dy * dy + dz * dz); if (d > 0.5 && d < A.MAX_STEP) A.award('distance', { m: d }); }
       A.lastPos = [q[0], q[1], q[2]];
     } else A.lastPos = null;
+    if (A.greet && rec && rec.on && g.state === 'play' && !A.busy()) { A.greet = false; A.welcome(); }   // a new Abenteuer world says hello once
     if (A.up) A.flushUp();
   };
 
@@ -321,6 +322,7 @@
   };
   A.pulse = function () { const el = A.hudEl; if (!el || !el.classList) return; el.classList.remove('up'); void el.offsetWidth; el.classList.add('up'); };
   A.welcome = function () {
+    A.stats.welcomes++;
     const g = game(); if (g && g.ui && g.ui.toast) g.ui.toast(T('g.adv.welcome'), T('g.adv.welcomeSub'), null);
     const el = A.hudEl; if (el && el.classList) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
   };

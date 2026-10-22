@@ -1,4 +1,5 @@
 // Das Abenteuer in the page (a-core; plan docs/superpowers/plans/2026-10-22-a-core.md). One run, German UI, 1280 × 720:
+//   0. 🎒 Meins on the start screen opens with „⚔ Abenteuer-Welt beginnen" → adventure_meins.png
 //   1. the create form (Profi) shows the row „Spielweg"; ⚔ Abenteuer sets the difficulty row to Normal → adventure_create.png;
 //      ✓ Welt erstellen makes an Abenteuer world: its record on, the world itself peaceful, the band and Begegnungen from
 //      the difficulty row
@@ -42,11 +43,23 @@ const release = () => ev(() => { for (const a of document.getAnimations()) { try
 const pics = {};
 
 try {
-  for (let i = 0; i < 160; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
-  check(await ev(() => VR.game && VR.game.state === 'title'), 'the start screen (' + secs() + ')');
+  await page.goto(DIST);
+  const atTitle = () => ev(() => typeof VR !== 'undefined' && !!VR.game && VR.game.state === 'title');
+  for (let i = 0; i < 160; i++) { await wait(500); if (await atTitle()) break; }
+  check(await atTitle(), 'the start screen (' + secs() + ')');
   check(await ev(() => !!(VR.Adv && VR.Adventure && VR.Adventure.ui)), 'VR.Adv and VR.Adventure are in the page, mounted by start.js');
   await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.settings.wowMoments = false; g.applySettings('*'); g.audio.resume(); if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); if (VR.Hints) for (const h of ['play', 'move', 'fly']) VR.Hints.done(h); });
   check(await ev(() => !!VR.game.audio.ctx), 'the audio graph is up (the chime can play)');
+
+  // ---------------------------------------------------------------- 0 · 🎒 Meins on the start screen: „⚔ Abenteuer-Welt beginnen"
+  console.log('0 · 🎒 Meins');
+  await ev(() => VR.Start.meins('title'));
+  await wait(600);
+  const mt = await ev(() => { const t = document.querySelector('#meins .advtile'), r = t && t.getBoundingClientRect(); return t ? { text: t.innerText.replace(/\s+/g, ' '), act: t.dataset.act, first: t === document.querySelector('#meins .mbody').firstElementChild, w: Math.round(r.width) } : null; });
+  check(!!mt && mt.act === 'adv:newworld' && mt.first && /Abenteuer-Welt beginnen/.test(mt.text) && mt.w > 300, '🎒 Meins opens with the tile „⚔ Abenteuer-Welt beginnen" across the page (' + JSON.stringify(mt) + ')');
+  pics.meins = await shot('adventure_meins');
+  await ev(() => VR.game.ui.show('title'));
+  await wait(300);
 
   // ---------------------------------------------------------------- 1 · the create row „Spielweg"
   console.log('1 · the create form');
@@ -67,6 +80,9 @@ try {
   console.log('     ' + JSON.stringify(w));
   check(w.on && w.bound && w.diff === 'peaceful' && w.gdiff === 'peaceful' && w.band === 'normal' && w.enc === 'normal', 'an Abenteuer world: its record on, the world peaceful (the old mobs stay out), Schwierigkeit Normal → band normal, Begegnungen normal');
   N.firstXP = w.xp;
+  await step(20);
+  const hello = await ev(() => ({ n: VR.Adventure.stats.welcomes, greet: !!VR.Adventure.greet }));
+  check(hello.n === 1 && !hello.greet, 'the new Abenteuer world said hello once („⚔ Das Abenteuer beginnt", ' + JSON.stringify(hello) + ')');
   check(w.xp >= 15 && w.once.some(k => /^biome:/.test(k)), 'the first biome found counted on its own through codex.js (' + w.xp + ' XP: ' + w.once.join(', ') + ')');
 
   // ---------------------------------------------------------------- 2 · the ring, placing
@@ -204,6 +220,7 @@ try {
       { label: 'create', labels: ['1 · Neue Welt: Spielweg ⚔ Abenteuer', '3 · Stufe 5 (CSS bei 0,7 s)'], imgs: [pics.create || null, pics.levelup || null] },
       { label: 'menu', labels: ['4 · Pause: ⚔ Abenteuer', '4 · die Karte „Abenteuer"'], imgs: [pics.pause || null, pics.card || null] },
       { label: 'stats', labels: ['4 · Deine Werte', '2 · der Ring im Spiel'], imgs: [pics.stats || null, pics.hud || null] },
+      { label: 'meins', labels: ['0 · 🎒 Meins: ⚔ Abenteuer-Welt beginnen', ''], imgs: [pics.meins || null, null] },
     ] };
     fs.writeFileSync(SHOTS + 'adventure_sheet.json', JSON.stringify(spec));
     execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'adventure_sheet.jpg', SHOTS + 'adventure_sheet.json'], { stdio: 'inherit' });
