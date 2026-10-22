@@ -69,7 +69,7 @@ try {
   for (let i = 0; i < 160; i++) { await wait(500); if (await atTitle()) break; }
   check(await atTitle(), 'the start screen (' + secs() + ')');
   check(await ev(() => !!(VR.Quests && VR.Shop && VR.Adventure && VR.Adventure.ui)), 'VR.Quests, VR.Shop and VR.Adventure are in the page');
-  await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.settings.wowMoments = false; g.applySettings('*'); g.audio.resume(); if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); if (VR.Hints) for (const h of ['play', 'move', 'fly']) VR.Hints.done(h); });
+  await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.settings.horizon = 1; g.settings.wowMoments = false; g.applySettings('*'); g.audio.resume(); if (VR.UIPrefs) VR.UIPrefs.set({ pro: true }); if (VR.Hints) for (const h of ['play', 'move', 'fly', 'bauhand', 'bhring', 'bhundo', 'bhchange']) VR.Hints.done(h); });   // (run 2: the Bauhand's hint covered the lost scarf)
   // the test's helpers in the page: a camera spot in front of a villager (free line of sight), the view set, the face
   await ev(() => {
     const air = (x, y, z) => !VR.game.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
@@ -511,7 +511,7 @@ try {
     await step(4);
     await ev(() => { const Q = VR.Quests; if (!Q.__d) { const od = Q.draw; Q.__d = { t: 0, n: 0, od }; Q.draw = function () { const t = performance.now(); try { return od.apply(this, arguments); } finally { Q.__d.t += performance.now() - t; Q.__d.n++; } }; } Q.__d.t = 0; Q.__d.n = 0; Q.__d.s0 = Q.stats.draws; });
     for (let i = 0; i < 4; i++) await draw();
-    const qd = await ev(() => { const Q = VR.Quests, d = Q.__d; return { ms: d.n ? d.t / d.n : 0, calls: d.n, stars: Q.stats.draws - d.s0, marks: Q.stats.marks }; });
+    const qd = await ev(() => { const Q = VR.Quests, d = Q.__d; return { ms: d.n ? d.t / d.n : 0, calls: d.n, stars: Q.stats.draws - d.s0, marks: Q.stats.marks, err: Q.stats.drawErr, lastErr: Q.lastDrawErr || null }; });
     await ev(() => { VR.Adventure.setOn(false); VR.Quests.mark(VR.game.villages); const d = VR.Quests.__d; d.t = 0; d.n = 0; d.s0 = VR.Quests.stats.draws; VR.Quests.drawTargets = null; });
     for (let i = 0; i < 2; i++) await draw();
     const qd0 = await ev(() => { const Q = VR.Quests, d = Q.__d; return { ms: d.n ? d.t / d.n : 0, calls: d.n, stars: Q.stats.draws - d.s0, marks: Q.stats.marks }; });
@@ -519,7 +519,7 @@ try {
     N.qdraw = { on: qd, off: qd0 };
     console.log('     ' + JSON.stringify(N.qdraw));
     if (!mk) console.log('     (no marked giver with a free view here: the star draw not timed)');
-    else check(qd.stars >= 1 && qd.ms < 2, 'Q.draw on Very Low: ' + qd.ms.toFixed(3) + ' ms a call with ' + qd.marks + ' ✦ near (' + qd.stars + ' star draws in ' + qd.calls + ' calls; SwiftShader)');
+    else check(qd.stars >= 1 && qd.ms < 2, 'Q.draw on Very Low: ' + qd.ms.toFixed(3) + ' ms a call with ' + qd.marks + ' ✦ near (' + qd.stars + ' star draws in ' + qd.calls + ' calls; SwiftShader' + (qd.err ? '; ' + qd.err + ' errors: ' + qd.lastErr : '') + ')');
     check(qd0.stars === 0 && qd0.ms < 0.02, 'the Abenteuer off: no star, the draw hook returns at once (' + qd0.ms.toFixed(4) + ' ms a call)');
     // the game loop on Very Low and High, the Abenteuer off and on (alternating blocks of 200 frames, CPU, drawing off)
     const frames = (n) => ev((n) => { const g = VR.game; window.__norender = true; const a = performance.now(); for (let i = 0; i < n; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } return (performance.now() - a) / n; }, n);
@@ -529,13 +529,15 @@ try {
       await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('renderDist'); }, preset);
       await step(120);
       const offs = [], ons = [];
-      for (let r = 0; r < 3; r++) {
+      for (let r = 0; r < 5; r++) {
         await ev(() => VR.Adventure.setOn(false)); await step(20); offs.push(await frames(200));
         await ev(() => VR.Adventure.setOn(true)); await step(20); ons.push(await frames(200));
       }
-      const o = med(offs), n = med(ons);
-      N.cost[preset] = { off: +o.toFixed(3), on: +n.toFixed(3), offs: offs.map(v => +v.toFixed(3)), ons: ons.map(v => +v.toFixed(3)) };
-      check(n <= o * 1.1 + 0.1, (preset === 'potato' ? 'Very Low' : 'High') + ': the game loop ' + o.toFixed(3) + ' ms off → ' + n.toFixed(3) + ' ms on with ' + (await ev(() => VR.Quests.open(VR.Adventure.rec).length)) + ' quests open (medians of three blocks of 200 frames; CPU, drawing off)');
+      // (the best block of each side: a shared machine's bursts land in whole blocks — run 2 had blocks from 1.5 to
+      // 7.8 ms on both sides; the medians are kept in the numbers too)
+      const o = Math.min(...offs), n = Math.min(...ons);
+      N.cost[preset] = { off: +o.toFixed(3), on: +n.toFixed(3), medOff: +med(offs).toFixed(3), medOn: +med(ons).toFixed(3), offs: offs.map(v => +v.toFixed(3)), ons: ons.map(v => +v.toFixed(3)) };
+      check(n <= o * 1.1 + 0.1, (preset === 'potato' ? 'Very Low' : 'High') + ': the game loop ' + o.toFixed(3) + ' ms off → ' + n.toFixed(3) + ' ms on with ' + (await ev(() => VR.Quests.open(VR.Adventure.rec).length)) + ' quests open (the best of five blocks of 200 frames each; CPU, drawing off; test/quests_cost.js times the hooks themselves)');
     }
     await ev(() => { const g = VR.game; g.applyPreset('balanced'); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('renderDist'); });
     // the record in IndexedDB

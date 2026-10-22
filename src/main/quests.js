@@ -480,7 +480,7 @@
     return !!(VR.Adventure && VR.Adventure.on && VR.Adventure.on() && g && !(g.meta && g.meta.guest));
   };
   const save = () => { const g = game(); if (!g || !g.saveMeta) return; try { const p = g.saveMeta(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* the autosave keeps it */ } };
-  Q.stats = { marks: 0, draws: 0, ticks: 0, offers: 0, done: 0 };
+  Q.stats = { marks: 0, draws: 0, ticks: 0, offers: 0, done: 0, drawErr: 0 };
 
   // ---------------------------------------------------------------- the world's places (for a village)
   const PL = { key: null, vistas: null, asking: false, at: 0, ver: 0 };
@@ -753,21 +753,25 @@
     const g = mgr.g; if (!g || !g.entities || !Q.stats.marks && !Q.drawTargets) return;
     const LK = VR.LifeKit, ent = g.entities; if (!LK || !LK.drawModel) return;
     let p = null; const t = g.time || 0;
+    // as far as the villagers are drawn (g.folkDist: 32 on Very Low), at most 48 blocks; the frustum test is LifeKit's.
+    // (Not a.drawn: the street's budget may leave a giver's model out on Very Low — the ✦ still shows where to go.)
+    const R = Math.min(48, g.folkDist || g.folkBase || 48), R2 = R * R;
     if (Q.stats.marks) for (const a of mgr.agents) {
-      if (!a.qMark || a.drawn === false) continue;
-      const dx = a.pos[0] - cam.x, dz = a.pos[2] - cam.z; if (dx * dx + dz * dz > 48 * 48) continue;
+      if (!a.qMark) continue;
+      const dx = a.pos[0] - cam.x, dz = a.pos[2] - cam.z; if (dx * dx + dz * dz > R2) continue;
       if (!p) p = ent.beginVox(r, E);
       const pos = [a.pos[0], a.pos[1] + (a.h || 1.75) * (a.kid ? 0.82 : 1) + 0.5 + Math.sin(t * 2.4 + a.p.seed) * 0.07, a.pos[2]];
-      LK.drawModel(g, r, p, a.qMark === 2 ? 'quest_star_c' : 'quest_star', pos, t * 1.7 + a.p.seed, cam, { light: FULL, noShade: true, shade: 0 });
-      Q.stats.draws++;
+      // the star faces the eye (never seen edge-on), rocking a little
+      if (LK.drawModel(g, r, p, a.qMark === 2 ? 'quest_star_c' : 'quest_star', pos, Math.atan2(dx, dz) + Math.sin(t * 1.3 + a.p.seed) * 0.45, cam, { light: FULL, noShade: true, shade: 0 })) Q.stats.draws++;
     }
     const tg = Q.drawTargets; if (!tg || !tg.length) return;
     for (const d of tg) {
       const dx = d.x - cam.x, dz = d.z - cam.z; if (dx * dx + dz * dz > 64 * 64) continue;
       if (!p) p = ent.beginVox(r, E);
-      if (d.kind === 'kitten' || d.kind === 'puppy') LK.drawQuad(g, r, p, d.q || (d.q = { kind: d.kind === 'kitten' ? 'moss_cat' : 'life_dog', pos: [d.x, d.y, d.z], yaw: d.yaw, state: 'sit', walk: 0, walkAmt: 0, id: 3 }), cam, t);
-      else LK.drawModel(g, r, p, d.model, [d.x, d.y + (d.hover ? 0.15 * Math.sin(t * 2) : 0), d.z], d.hover ? t * 1.4 : d.yaw, cam, d.hover ? { light: FULL, noShade: true, shade: 0 } : { shade: 0 });
-      Q.stats.draws++;
+      let ok;
+      if (d.kind === 'kitten' || d.kind === 'puppy') ok = LK.drawQuad(g, r, p, d.q || (d.q = { kind: d.kind === 'kitten' ? 'moss_cat' : 'life_dog', pos: [d.x, d.y, d.z], yaw: d.yaw, state: 'sit', walk: 0, walkAmt: 0, id: 3 }), cam, t);
+      else ok = LK.drawModel(g, r, p, d.model, [d.x, d.y + (d.hover ? 0.15 * Math.sin(t * 2) : 0), d.z], d.hover ? Math.atan2(dx, dz) + Math.sin(t * 1.3) * 0.45 : d.yaw, cam, d.hover ? { light: FULL, noShade: true, shade: 0 } : { shade: 0 });
+      if (ok) Q.stats.draws++;
     }
   };
   // what to draw at the open targets (the lost thing at its spot, a cyan ✦ over a repair, build or escort spot) —
@@ -971,7 +975,7 @@
       };
       P.think = function (a) { if (a.act && a.act.type === 'escort') return; return oth.apply(this, arguments); };
       P.runAct = function (a, dt) { if (a.act && a.act.type === 'escort') { try { Q.escortAct(this, a, dt); } catch (e) { a.act = null; } return; } return orun.apply(this, arguments); };
-      P.draw = function (r, E, cam) { od.apply(this, arguments); try { Q.draw(this, r, E, cam); } catch (e) { /* the world draws on */ } };
+      P.draw = function (r, E, cam) { od.apply(this, arguments); try { Q.draw(this, r, E, cam); } catch (e) { Q.stats.drawErr++; Q.lastDrawErr = String((e && e.message) || e); } };   // (the world draws on; the error is kept for a test)
       P.talkOptions.__q = true;
     }
     mapHooks();
