@@ -172,7 +172,7 @@
     return v;
   }
   function herz(g, m, w, h, y0, y1, a, b) {
-    const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M;
+    const S = sampler(g), CL = clouds(g.seed), o = [0, 0, 0, 0, 0, 0, 0], N = [0, 0, 0], M = VR.M, POP = new VR.Simplex((g.seed ^ 0x9e0) >>> 0);
     for (let j = y0; j < y1; j++) {
       const th = (j + 0.5) / h * Math.PI;
       for (let i = 0; i < w; i++) {
@@ -183,9 +183,10 @@
         putA(a, k, o);
         BT.normal(th, lam, N);
         // the lights, statistically (a village a 640² cell, ~35 % of the cells; a texel ~1.2 km): one liveable texel in
-        // eight lit, the rest dark — points from far, not a glow — far views only
-        const hsh = M.hashf2(i, j, g.seed ^ 0x11657);
-        let L = o[5] ? (hsh < 0.12 ? 60 + hsh * 1150 : 0) : 0;
+        // twelve lit, gathered into clusters of ~15 km and empty land between (points and webs from far, not a glow) —
+        // far views only
+        const hsh = M.hashf2(i, j, g.seed ^ 0x11657), pl = 0.1 * (0.15 + 1.7 * ss(-0.15, 0.45, POP.n3(N[0] * 7, N[1] * 7, N[2] * 7)));
+        let L = o[5] && hsh < pl ? 60 + (hsh / pl) * 140 : 0;
         if (Math.hypot(p[0], p[1]) < 1500) L = 255;
         b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 5) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }

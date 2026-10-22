@@ -294,12 +294,12 @@
   const PAR_ALB = { amarant: 0.5, herz: 0.32 };
   const smooth = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
   // the parent's light on a body's night side: its lit disc (phase), its size in the sky; × 4 — the shadows lifted to stay
-  // readable (U§12) — Amarant over Zinnober's night is a lamp (U§4.4)
+  // readable (U§12) — Amarant over Zinnober's night is a lamp (U§4.4); Herzwelt's night × 2 (its lights must lead)
   SS.parentLight = function (eph, id) {
     const par = PARENT[id]; if (!par) return [0, 0, 0];
     const b = eph.bodies[id], p = eph.bodies[par], dP = len(sub(p.p, b.p));
     const angP = Math.asin(Math.min(1, B[par].R / dP)), f = (1 + Math.cos(SS.phase(eph, par, b.p))) / 2;
-    return mul(SUN, PAR_ALB[par] * f * angP * angP * 4.0);
+    return mul(SUN, PAR_ALB[par] * f * angP * angP * (id === 'herz' ? 2.0 : 4.0));
   };
   // S: { anc, tier }; o: { H (pixels), tier, bloom, patch: {x0, z0, size, step, on} }
   SS.frameSetup = function (S, eph, o) {

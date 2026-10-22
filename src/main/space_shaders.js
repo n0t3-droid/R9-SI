@@ -310,7 +310,7 @@ void main() {
       vec3 lc = mix(vec3(1.0, 0.55, 0.2), vec3(1.0, 0.86, 0.62), step(0.72, hq));
       col += lc * (lights * pts * 1.6 + lights * lights * 0.1) * u_look.x * night * Tv * (1.0 - 0.85 * cl);
     }
-    col += albG * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) * Tv + vec3(0.9) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
+    col += albG * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) * Tv + vec3(0.6) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
     col += AG_COL * u_air.w * 0.06 * night;
     alpha = 1.0;
   } else if (Di.z > 0.0) {
