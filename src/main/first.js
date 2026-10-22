@@ -38,13 +38,24 @@
   FI.clearUntil = (day) => ((day | 0) + 1) * 24000;
 
   // ---------------------------------------------------------------- the vista
-  // the wow vista whose landmark scores highest (gen_vista.js's score: the landmark's weight × its size in the eye × the
-  // rise × the side view), ties by id; null when there is none (no vistas: a vgen ≤ 10 world, outside the Heartland)
+  // f-arrival (R50-02, docs/superpowers/plans/2026-10-23-f-arrival.md): the wow vista the sight test passed (gen_vista.js
+  // VISTA.arrivals, the worker's records: its landmark ≥ 8 % of the arrival's frame, ≤ 10 % of it hidden, nothing within
+  // 6 m in the frame's upper half) with the highest score; none passed (or no sight measured: an older worker) → the
+  // highest score, as before (the landmark's weight × its size in the eye × the rise × the side view); ties by id; null
+  // when there is none (no vistas: a vgen ≤ 10 world, outside the Heartland)
   FI.pick = function (list) {
     if (!Array.isArray(list)) return null;
-    let best = null;
-    for (const v of list) if (v && v.wow && Number.isFinite(v.score) && (!best || v.score > best.score || (v.score === best.score && String(v.id) < String(best.id)))) best = v;
-    return best;
+    const better = (v, b) => !b || v.score > b.score || (v.score === b.score && String(v.id) < String(b.id));
+    let best = null, ok = null;
+    for (const v of list) if (v && v.wow && Number.isFinite(v.score)) { if (better(v, best)) best = v; if (v.sight && v.sight.ok && better(v, ok)) ok = v; }
+    return ok || best;
+  };
+  // the record the arrival's wow moment plays: the vista with the sight test's camera (aimed at the landmark, the lens
+  // narrowed until it fills a tenth of the frame), the vista's own composition kept as `look` (the eyes after the moment)
+  FI.arrivalOf = function (v) {
+    const a = v && v.arrive, A = Object.assign({}, v, { look: { yaw: v.yaw, pitch: v.pitch } });
+    if (a && Array.isArray(a.eye) && Number.isFinite(a.yaw) && Number.isFinite(a.pitch) && a.fov > 0) Object.assign(A, { eye: a.eye.slice(0, 3), yaw: a.yaw, pitch: a.pitch, fov: a.fov });
+    return A;
   };
   // the feet on the spur's walk: its axis 2.5 blocks out from the way's middle (past the way's own cells, between the
   // low walls, within the wow trigger's reach), on the paving (the walk's floor is at the way's level)
@@ -245,11 +256,12 @@
     meta.vistaStart = 2;   // (decided: the next start of this world is an ordinary one)
     const v = FI.pick(await FI.vistas(g, dim));
     if (!v || g.meta !== meta) return null;
-    const sp = FI.spawn(v), tod = FI.clock(v.yaw);
+    // (the arrival's camera faces the landmark's middle: the feet face it too, at the walk's own pitch)
+    const A = FI.arrivalOf(v), sp = { pos: FI.feet(v), yaw: A.yaw, pitch: v.pitch, vista: A }, tod = FI.clock(A.yaw);
     g.env.setTime(tod); meta.time = tod;
     meta.clearUntil = FI.clearUntil(g.env.day | 0); g.env.wx.clearUntil = meta.clearUntil;
     meta.vistaId = v.id;
-    g.arrivalPending = { vista: v };
+    g.arrivalPending = { vista: A };
     return sp;
   };
   // a world's start: its first day's clear sky again after a reload on that day

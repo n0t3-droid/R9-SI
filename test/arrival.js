@@ -11,9 +11,6 @@
 //       hidden, nothing within 6 m in the frame's upper half — seeds 53, 4242, 31337, 7 (the before: vgen 12, t-first's
 //       pick by score, the vista's own composition)
 //   4 · VR.First.pick: the sight-ok wow vista with the best score; none ok → the best score; no records → none
-//   5 · Heimkehr's facing (VR.Travel.facing): at Herzwelt's spawn of seed 4242 (the Hangar Hall, its craft 2 m behind
-//       the pad) the view leaves the craft and the nearest geometry in the frame's centre third is ≥ 8 m away (the
-//       ground under the feet not counted); a wall 2 m ahead turns the view; a vista's walk faces its view
 //   bash test/wt_run.sh arrival.js 1800        (SEEDS=53,4242,… the arrival's seeds · ONLY=1,2,… some parts)
 require('./dom_stub.js');
 const V = require('./load_shared.js');
@@ -107,6 +104,76 @@ if (on(1) || on(2)) {
     if (on(1)) check(row[13].fl.length === 0, `seed ${SEED}, vgen 13: no floating leaf in the wow vistas' cones (${row[13].fl.length}${row[13].fl.length ? ': ' + row[13].fl.slice(0, 4).map(f => f.name + '@' + f.at.join(',') + (f.n > 1 ? '×' + f.n : '')).join(' ') : ''}; vgen 12 had ${row[12].fl.length})`);
     if (on(2) && SEED === 53) check(row[12].h === PIN12, `vgen 12 keeps every chunk under seed 53's wow cones (${row[12].chunks} chunks hash ${row[12].h}, pinned ${PIN12})`);
   }
+}
+
+// ================================================================ 3 · the arrival, measured with real blocks
+// rays from the camera through the generated chunks (block by block to 140 blocks and inside the landmark's footprint —
+// its members' discs, r + 6 —, the land's surface beyond, the lakes at the sea's level); the landmark = its own blocks
+// above its base inside the footprint; hidden = its rays stopped nearer by anything outside the footprint
+const ASPECT = 16 / 9;
+function truth(g, P, v, cam, W, H) {
+  const Wd = world(g), L = VI.landmarks(g, P).find(l => l.id === v.lm), lmk = (L.members || [L]).map(q => ({ x: q.x, z: q.z, r: Math.min(60, q.r + 6) })), BASE = (L.base || 0) + 1;
+  const NEAR = 140, FAR = 1300;
+  const cast = (e, d, mode) => {
+    let x = Math.floor(e[0]), y = Math.floor(e[1]), z = Math.floor(e[2]);
+    const sx = d[0] > 0 ? 1 : -1, sy = d[1] > 0 ? 1 : -1, sz = d[2] > 0 ? 1 : -1;
+    const tdx = Math.abs(1 / (d[0] || 1e-9)), tdy = Math.abs(1 / (d[1] || 1e-9)), tdz = Math.abs(1 / (d[2] || 1e-9));
+    let tx = (d[0] > 0 ? x + 1 - e[0] : e[0] - x) * tdx, ty = (d[1] > 0 ? y + 1 - e[1] : e[1] - y) * tdy, tz = (d[2] > 0 ? z + 1 - e[2] : e[2] - z) * tdz, s = 0;
+    for (let k = 0; k < 6000; k++) {
+      if (s > FAR || (y > 262 && d[1] >= 0) || y < 0) return null;
+      const inLm = lmk.some(q => (x - q.x) * (x - q.x) + (z - q.z) * (z - q.z) <= q.r * q.r);
+      if (mode === 1) { if (inLm && y >= BASE) { const b = Wd.blockAt(x, y, z); if (hits(b)) return { s, b, lm: true }; } }
+      else if (s <= NEAR || inLm) { const b = Wd.blockAt(x, y, z); if (hits(b)) return { s, b, lm: inLm }; }
+      else if (y <= Math.max(Wd.surfAt(x, z), SEA)) return { s, b: -1, lm: false };
+      if (tx < ty && tx < tz) { s = tx; tx += tdx; x += sx; } else if (ty < tz) { s = ty; ty += tdy; y += sy; } else { s = tz; tz += tdz; z += sz; }
+    }
+    return null;
+  };
+  const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), f = [-Math.sin(cam.yaw) * cp, sp, -Math.cos(cam.yaw) * cp], r = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)], u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]], th = Math.tan(cam.fov * DEG / 2);
+  let lm = 0, hid = 0, near = 0; const by = new Map(), d = [0, 0, 0];
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    const a = ((i + 0.5) / W * 2 - 1) * th * ASPECT, b = (1 - (j + 0.5) / H * 2) * th;
+    d[0] = f[0] + r[0] * a + u[0] * b; d[1] = f[1] + r[1] * a + u[1] * b; d[2] = f[2] + r[2] * a + u[2] * b; const l = Math.hypot(d[0], d[1], d[2]); d[0] /= l; d[1] /= l; d[2] /= l;
+    const full = cast(cam.eye, d, 0), m = cast(cam.eye, d, 1);
+    if (j < H / 2 && full && full.s < 6) near++;
+    if (m) { lm++; if (full && full.s < m.s - 1.5 && !full.lm) { hid++; const n = full.b > 0 ? nameOf(full.b) : 'land'; by.set(n, (by.get(n) || 0) + 1); } }
+  }
+  return { share: lm / (W * H), hidden: lm ? hid / lm : 1, near: near / (W * H / 2), by: [...by].sort((p, q) => q[1] - p[1]).slice(0, 3).map(([n, c]) => n + ' ' + c).join(', ') || '—', chunks: Wd.CH.size };
+}
+const pct = (v) => (v * 100).toFixed(1) + ' %';
+const TW = +(process.env.TW || 128), TH = Math.round(TW * 9 / 16);
+if (on(3)) {
+  console.log('3 · the arrival, measured with real blocks (' + TW + ' × ' + TH + ' rays)');
+  const out = [];
+  for (const SEED of SEEDS) {
+    // before: vgen 12, t-first's pick (the best score), the vista's own composition
+    const g0 = V.makeGen('overworld', SEED, { vgen: 12 }), P0 = LAND.plan(g0);
+    const best0 = P0.vistas.filter(v => v.wow).sort((a, b) => b.score - a.score || (a.id < b.id ? -1 : 1))[0];
+    const tb = best0 ? truth(g0, P0, best0, { eye: best0.eye, yaw: best0.yaw, pitch: best0.pitch, fov: best0.fov }, TW, TH) : null;
+    // after: vgen 13, the worker's records, the game's pick, its arrival's camera
+    const g = V.makeGen('overworld', SEED, { vgen: 13 }), P = LAND.plan(g), t0 = Date.now();
+    const recs = VI.arrivals(g, P), ms = Date.now() - t0, v = FI.pick(recs), A = v ? FI.arrivalOf(v) : null;
+    if (!v) { check(false, `seed ${SEED}: a vista to open on`); continue; }
+    const ta = truth(g, P, v, { eye: A.eye, yaw: A.yaw, pitch: A.pitch, fov: A.fov }, TW, TH);
+    const measured = recs.filter(q => q.sight).length;
+    console.log(`     seed ${SEED} · before: ${best0 ? best0.id + ' ' + best0.lm + ' ' + best0.d + ' m at ' + best0.fov + '°' : '—'}: the landmark ${tb ? pct(tb.share) : '—'} of the frame, ${tb ? pct(tb.hidden) : '—'} hidden (${tb ? tb.by : ''}), upper half within 6 m ${tb ? pct(tb.near) : '—'}`);
+    console.log(`     seed ${SEED} · after:  ${v.id} ${v.lm} ${v.d} m at ${A.fov}° (the sight test measured ${measured} vista${measured === 1 ? '' : 's'} in ${ms} ms; the model: ${v.sight ? pct(v.sight.share) + ' / ' + pct(v.sight.hidden) + ' hidden / near ' + pct(v.sight.near) : '—'}): the landmark ${pct(ta.share)} of the frame, ${pct(ta.hidden)} hidden (${ta.by}), upper half within 6 m ${pct(ta.near)} (${secs()})`);
+    check(ta.share >= 0.08 && ta.hidden <= 0.10 && ta.near === 0, `seed ${SEED}: the arrival shows its landmark — ${pct(ta.share)} of the frame (≥ 8 %), ${pct(ta.hidden)} of it hidden (≤ 10 %), nothing within 6 m in the upper half (${pct(ta.near)})`);
+    out.push({ seed: SEED, before: best0 ? { id: best0.id, lm: best0.lm, d: best0.d, fov: best0.fov, eye: best0.eye, yaw: best0.yaw, pitch: best0.pitch, truth: tb } : null, after: { id: v.id, lm: v.lm, d: v.d, cam: { eye: A.eye, yaw: A.yaw, pitch: A.pitch, fov: A.fov }, look: { yaw: v.yaw, pitch: v.pitch }, model: v.sight, truth: ta, ms } });
+  }
+  try { const SH = __dirname.replace(/\/\.tmp_tests$/, '/test') + '/shots'; require('fs').mkdirSync(SH, { recursive: true }); require('fs').writeFileSync(SH + '/arrival.json', JSON.stringify(out, null, 1)); } catch (e) { /* a convenience */ }
+}
+
+// ================================================================ 4 · FI.pick
+if (on(4)) {
+  console.log('4 · VR.First.pick');
+  const mk = (id, score, wow, sight) => ({ id, score, wow, sight, eye: [0, 80, 0], yaw: 1, pitch: 0.1, fov: 50, arrive: sight ? { eye: [0, 80, 0], yaw: 1.1, pitch: 0.2, fov: 34 } : undefined });
+  const L1 = [mk('v0', 6, true, { ok: false }), mk('v1', 5, true, { ok: true }), mk('v2', 4, true, { ok: true }), mk('v3', 9, false, { ok: true })];
+  check(FI.pick(L1).id === 'v1', 'the sight-ok wow vista with the best score (a better-scored one hidden, a quiet one never)');
+  check(FI.pick([mk('v0', 6, true, { ok: false }), mk('v1', 5, true, { ok: false })]).id === 'v0' && FI.pick([mk('v0', 6, true), mk('v1', 7, true)]).id === 'v1', 'none ok, or no sight measured (an older worker): the best score, as before');
+  check(FI.pick([]) === null && FI.pick(null) === null && FI.pick([mk('q', 3, false, { ok: true })]) === null, 'no wow vista: none (the generator\'s spawn)');
+  const A = FI.arrivalOf(L1[1]);
+  check(A.id === 'v1' && A.fov === 34 && A.yaw === 1.1 && A.pitch === 0.2 && A.look && A.look.yaw === 1 && A.look.pitch === 0.1 && FI.arrivalOf(mk('w', 1, true)).fov === 50, 'the arrival plays the moment from its own camera (the vista\'s composition kept for the eyes after it); without one the composition');
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
