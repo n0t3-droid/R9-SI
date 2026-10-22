@@ -274,7 +274,7 @@ void main() {
       vec2 dpl = (toP * dot(Lt, Ln) + eastP * dot(Lt, Le)) / max(length(Lt), 1e-5) * min(off, 2500.0);
       csh = 1.0 - 0.62 * smoothstep(0.1, 0.9, texture(u_patB, (xz + dpl - u_patch.xy) * u_patch.z).g) * pw;
     }
-    vec3 ground = alb * (Ed * csh + sky + twi);
+    vec3 ground = alb * (Ed * csh + sky + twi), albG = alb;   // (albG: the ground's albedo for the night's light — the sea's own)
     // water: turquoise over the shallows, deep blue to navy with depth, ice white; the sky in it by Fresnel, the
     // sunglint (GGX on a wind-roughened sea)
     if (water > 0.001) {
@@ -285,6 +285,7 @@ void main() {
       float spec = ggx(max(dot(N, H), 0.0), 0.22) * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
       vec3 sea = seaC * (u_sunCol * max(mus, 0.0) * Ts * csh + sky) + F * vec3(0.16, 0.26, 0.48) * u_sunCol * day * (1.0 - ice) + Ts * u_sunCol * spec * max(mus, 0.0) * csh;
       ground = mix(ground, sea, water);
+      albG = mix(alb, seaC, water);
     }
     // the clouds: lit from above, the sunset tinting them, a little light from the sky
     vec3 cloudCol = vec3(0.92) * (u_sunCol * (max(mus, 0.0) * 0.85 * (1.0 + puff) + 0.12 * day) * sunTrans(0.002, mus) + sky * 2.5) + twi * 0.6;
@@ -307,7 +308,7 @@ void main() {
       vec3 lc = mix(vec3(1.0, 0.55, 0.2), vec3(1.0, 0.86, 0.62), step(0.72, hq));
       col += lc * (lights * pts * 1.6 + lights * lights * 0.1) * u_look.x * night * Tv * (1.0 - 0.85 * cl);
     }
-    col += alb * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) + vec3(0.9) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
+    col += albG * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) * Tv + vec3(0.9) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
     col += AG_COL * u_air.w * 0.06 * night;
     alpha = 1.0;
   } else if (Di.z > 0.0) {
