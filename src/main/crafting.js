@@ -257,8 +257,7 @@
     };
     g.sleep = (x, y, z) => {
       const tod = g.env.timeOfDay;
-      g.player.spawn = [x + 0.5, y + 0.6, z + 0.5];
-      g.player.spawnBed = [x, y, z];
+      if (!(VR.Travel && VR.Travel.awaySpawn(g, [x + 0.5, y + 0.6, z + 0.5], [x, y, z]))) { g.player.spawn = [x + 0.5, y + 0.6, z + 0.5]; g.player.spawnBed = [x, y, z]; }   // u-dims: a bed on another world is that world's place (travel.js); Herzwelt's spawn stays
       if (g.mp && g.mp.isClient) { g.ui.chatLine(T('g.chat.spawnSetGuest'), '#ffe0a0'); return; }
       if (tod > 12500 && tod < 23500) { g.ui.loading(T('g.load.sleeping'), 1); setTimeout(() => { g.env.setTime(0); g.env.day = (g.env.day || 0) + 1; g.env.rainTarget = 0; g.ui.show(null); g.input.captured = true; g.ui.chatLine(T('g.chat.morning'), '#ffe0a0'); g.codex && g.codex.event && g.codex.event('sleep'); }, 900); }
       else g.ui.chatLine(T('g.chat.spawnSetNight'), '#ffe0a0');

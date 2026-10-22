@@ -185,7 +185,7 @@
       this.dim = o.dim || 'overworld';
       this.seed = o.seed >>> 0;
       this.genOpts = o.genOpts || {};
-      this.hasSky = this.dim === 'overworld' || this.dim === 'drift' || this.dim === 'flat';
+      this.hasSky = VR.DimReg.sky(this.dim);   // u-dims: the dim registry's sky (src/shared/dimreg.js — overworld, drift, flat as before)
       this.cols = new Map();
       this.pending = new Map();       // key → true (gen requested)
       this.pool = o.pool;

@@ -56,7 +56,7 @@
       const meta = this.title ? {} : (g.meta || {});
       this.meta = meta;
       this.spawned = new Set(meta.starshipSpawns || []);
-      for (const s of meta.starships || []) this.spawn(s.seed, s.arch, s.palette, s.pos, s.yaw, s.key);
+      for (const s of meta.starships || []) if (!VR.Travel || VR.Travel.shipHere(g, s, this)) this.spawn(s.seed, s.arch, s.palette, s.pos, s.yaw, s.key);   // u-dims: this world's ships (no dim = home's); the others wait in this.elsewhere
       this.plainGet = (x, y, z) => g.world.getBlock(x, y, z);
       this.proxyGet = (x, y, z) => this.getBlock(x, y, z);
       this.cabin = VR.Cabin ? new VR.Cabin(g, this) : null;
@@ -524,6 +524,7 @@
     // ---------------------------------------------------------------- persistence
     beforeSave(meta) {
       meta.starships = this.ships.filter(s => s.d.meta).map(s => ({ seed: s.d.seed, arch: s.d.meta.arch, palette: s.d.palette || null, pos: s.pos.map(v => Math.round(v * 100) / 100), yaw: s.yaw, key: s.key }));
+      if (VR.Travel) VR.Travel.shipsSave(this, meta);   // u-dims: each ship keeps its world (meta.starships[i].dim); the other worlds' ships stay in the list
       meta.starshipSpawns = [...this.spawned];
     }
     // (saving & leaving: out of the seat, or off the ship you walk in, so the world reloads with you beside it)

@@ -34,6 +34,10 @@
     key(L, tx, tz) { return L + ':' + tx + ':' + tz; }
     free(t) { const gl = this.g.renderer.gl; if (t.vao) { gl.deleteVertexArray(t.vao); gl.deleteBuffer(t.vbo); gl.deleteBuffer(t.ibo); t.vao = null; this.bytes -= t.bytes || 0; t.bytes = 0; } }
     reset() { for (const t of this.tiles.values()) this.free(t); this.tiles.clear(); this.drawList.length = 0; this.inflight = 0; this.bytes = 0; if (this.far) this.far.reset(); }
+    // u-dims · a trip between the worlds of one save (travel.js): the tiles on the GPU stay for the way back (the same
+    // world key finds them, the coarse ring is whole on the first frame home); what was still asked for is forgotten
+    // with its jobs (the pool is cleared with the world), ring 1 starts again. Not drawn elsewhere (enabled: overworld)
+    keepReady() { for (const [k, t] of this.tiles) if (!(t.state === 1 && (t.vao || t.empty))) this.tiles.delete(k); this.drawList.length = 0; this.inflight = 0; if (this.far) this.far.reset(); }
     // how much of the horizon around the camera is built (1 = every wanted tile is on the GPU)
     progress() { const s = this.stats; return s.want + s.done > 0 ? s.done / (s.want + s.done) : 1; }
     enabled() { const g = this.g, w = g.world; return this.radius > 0 && w && (g.dim || 'overworld') === 'overworld' && w.dim === 'overworld'; }

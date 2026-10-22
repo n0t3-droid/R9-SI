@@ -7,7 +7,7 @@
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   const hex3 = (h, k) => [((h >> 16) & 255) / 255 * (k || 1), ((h >> 8) & 255) / 255 * (k || 1), (h & 255) / 255 * (k || 1)];
   const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
-  const DIM_ID = { overworld: 0, flat: 0, underforge: 1, hollow: 2, drift: 3 };
+  const DIM_ID = VR.DimReg.CODES;   // u-dims: each dim's u_dim code, a live table of the dim registry (src/shared/dimreg.js)
   // the picture's grade (t-look, the trailer's numbers: test/look_stats.js). VR.Grade holds the knobs the look is tuned
   // with; the defaults are the trailer look, and the look test sets them one at a time to measure each (see
   // test/trailer_look.mjs). expo: exposure of the day · sat: saturation · contrast: S-curve · vignette · fogDens: the

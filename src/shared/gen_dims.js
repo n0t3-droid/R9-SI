@@ -347,6 +347,7 @@
   VR.FlatGen = FlatGen;
 
   VR.makeGen = function (dim, seed, opts) {
+    const mk = VR.DimReg && VR.DimReg.gen(dim); if (mk) return mk(seed, opts);   // u-dims: the registry's generator (src/shared/dimreg.js); the branches below stay for a bundle without it
     if (dim === 'underforge') return new UnderforgeGen(seed);
     if (dim === 'hollow') return new HollowGen(seed);
     if (dim === 'drift') return new DriftGen(seed, opts);

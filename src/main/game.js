@@ -474,8 +474,9 @@
       if (this.trams) { this.trams.destroy(); this.trams = null; }
       if (this.padLife) { this.padLife.destroy(); this.padLife = null; } if (this.lifeDirector) { this.lifeDirector.destroy(); this.lifeDirector = null; }   // (t-life: the pads' visitors, the Regisseur des Lebens)
       if (this.wow) { this.wow.destroy(); this.wow = null; }   // (t-vista)
-      if (this.horizon) this.horizon.reset();
+      if (this.horizon) { if (VR.Travel && VR.Travel.busy(this) && this.horizon.keepReady) this.horizon.keepReady(); else this.horizon.reset(); }   // u-dims: a trip keeps Herzwelt's horizon for the way home (Heimkehr: the coarse ring is there on the first frame)
       if (this.furnaces) this.furnaces.clear();
+      this.dim = 'overworld'; if (VR.Travel) VR.Travel.onTeardown(this);   // u-dims: the title and the next start begin at Herzwelt (a trip left this.dim elsewhere); a gate's charge ends
       this.renderer && (this.renderer.visDirty = true);
     }
 
@@ -497,10 +498,10 @@
       this.keepInventory = meta.keep;
       const genOpts = { worldType: meta.type === 'flat' ? 'flat' : meta.type, vgen: meta.vgen || 1 };
       this.style = this.styleNow(); this.styleKey = this.styleSig(this.style);
-      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null });   // (townWords: the shop signs' words in the player's language, voxtown.js)
+      this.pool.broadcast({ type: 'init', seed: meta.seed, opts: genOpts, custom: VR.CUSTOM, style: this.style, townWords: VR.Town && VR.Town.table ? VR.Town.table() : null, keep: !!(VR.Travel && VR.Travel.busy(this)) });   // (townWords: the shop signs' words in the player's language, voxtown.js) (u-dims · keep: a trip keeps the workers' generators warm)
       // the variants this world contains, back when this browser lost them (B1: the world keeps a copy, meta.vars)
       if (VR.LiveLoop) VR.LiveLoop.openWorld(this, meta);
-      const dim = meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld');
+      const dim = VR.Travel ? VR.Travel.openDim(this, meta) : (meta.type === 'flat' ? 'flat' : (meta.dim || 'overworld'));   // u-dims: the world the save was left in (VR.DimReg.dimOf: old saves as before; an unknown one → home)
       this.dim = dim;
       const savedKeys = await this.store.savedKeys(dim);
       this.world = new VR.World(this, { dim, seed: meta.seed, genOpts, pool: this.pool, renderer: this.renderer, store: this.store, savedKeys, renderDist: this.settings.renderDist });
@@ -674,6 +675,7 @@
     // 📍 in the pause menu: your spawn point is where you stand
     setSpawnHere() {
       const p = this.player; if (!p || p.dead || !this.meta || this.meta.guest) return false;
+      if (VR.Travel && VR.Travel.awaySpawn(this, [Math.floor(p.pos[0]) + 0.5, Math.floor(p.pos[1] + 0.01), Math.floor(p.pos[2]) + 0.5], null)) { this.saveMeta(); return true; }   // u-dims: on another world 📍 marks that world's place; Herzwelt's spawn stays
       p.spawn = [Math.floor(p.pos[0]) + 0.5, Math.floor(p.pos[1] + 0.01), Math.floor(p.pos[2]) + 0.5]; p.spawnBed = null;
       this.saveMeta();
       return true;
@@ -686,6 +688,7 @@
       return [0.5, 100, 0.5];
     }
     goHome() {
+      if (VR.Travel && VR.Travel.goHome(this)) return;   // u-dims: from another world the trip home — Herzwelt's spawn or bed, the ship you fly along (travel.js)
       const p = this.player; if (!p || p.dead) return;
       if (this.gadgets && this.gadgets.riding) { this.ui.chatLine(T('g.chat.landFirst'), '#ff8a8a'); return; }
       const sp = p.spawn && p.spawn.every(v => isFinite(v)) ? p.spawn : this.worldSpawn();
@@ -781,6 +784,7 @@
       if (this.companions) this.companions.beforeSave(m);
       if (this.villages) this.villages.beforeSave(m);
       if (this.wonders) this.wonders.beforeSave(m);
+      if (VR.Travel) VR.Travel.beforeSave(this, m);   // u-dims: meta.pos[dim] = the place in this world
       return this.store.saveWorld(m);
     }
     async quitToTitle() {
@@ -1146,7 +1150,7 @@
         this.input.captured = true;
         this.ui.updateHUD(true);
         if (this.meta.guest) this.ui.chatLine(T('g.chat.joined', { name: this.mp && this.mp.hostName ? this.mp.hostName : T('g.mp.friend') }), '#9affd8');
-        else this.ui.chatLine(T('g.chat.welcome', { name: this.meta.name }), '#9ad8ff');
+        else if (!(VR.Travel && VR.Travel.busy(this))) this.ui.chatLine(T('g.chat.welcome', { name: this.meta.name }), '#9ad8ff');   // u-dims: a trip's arrival says where you are instead (travel.js)
         if (this.player.mode === 'zen') this.ui.chatLine(T('g.chat.zen'), '#b8ffcf');
         this.autosaveAt = performance.now() + 60000;
         this.startPrewarm();
@@ -1193,6 +1197,7 @@
       if (this.director) this.director.update(dt);
       if (this.wow) this.wow.update(dt);   // (t-vista: four times a second a look at the vistas loaded)
       if (this.trams) this.trams.update(dt);
+      if (VR.Travel) VR.Travel.update(this, dt);   // u-dims: a gate's two seconds, a trip's arrival, the ship that came along
       if (this.tickFurnaces) this.tickFurnaces(dt);
       const vd = w.viewDir || (w.viewDir = [0, 0]); vd[0] = -Math.sin(p.yaw); vd[1] = -Math.cos(p.yaw);   // the way the player looks (flat): uploads in the view first (F10: no new array a frame)
       { const r0 = this.renderer, asp = r0 && r0.H ? r0.W / r0.H : 16 / 9; w.viewCos = Math.cos(Math.atan(Math.tan((this.settings.fov || 75) * Math.PI / 360) * asp)); }   // (F10: the horizontal half field of view)
@@ -1530,10 +1535,11 @@
         if (c0 === 'home') { this.goHome(); return; }
         if (c0 === 'look') { this.lookCommand(a0[0]); return; }
         if (c0 === 'lang' || c0 === 'sprache') { this.langCommand(a0[0]); return; }
+        if (c0 === 'spawn' && VR.Travel && VR.Travel.goHome(this, 'spawn')) return;   // u-dims: from another world /spawn leads home to the world's spawn
         if (c0 === 'spawn') { const ws = this.worldSpawn(); this.player.safeTeleport(ws[0], ws[1], ws[2]); say0(T('g.cmd.spawn')); return; }
         if (c0 === 'help' && this.meta && !this.meta.cheats && this.player.mode === 'survival') { say0(T('g.cmd.helpHome')); return; }
         if (c0 === 'pfeifen') { if (this.companions) this.companions.call(); else say0(T('g.pet.none')); return; }
-        if (c0 === 'sethome') { const p = this.player; p.spawn = p.pos.slice(); p.spawnBed = null; say0(T('g.cmd.sethome')); return; }
+        if (c0 === 'sethome') { const p = this.player; if (!(VR.Travel && VR.Travel.awaySpawn(this, p.pos, null))) { p.spawn = p.pos.slice(); p.spawnBed = null; } say0(T('g.cmd.sethome')); return; }   // u-dims: on another world that world's place, Herzwelt's spawn stays
         if (c0 === 'spiegel' || c0 === 'mirror') { if (this.mirror) this.mirror.command(a0); return; }   // 🪞 x|z|4|8|aus (Überleben: a kind hint)
         if (c0 === 'players' || c0 === 'list') { const L = this.mp && this.mp.active ? this.mp.players() : []; say0(L.length ? T('g.cmd.players', { list: L.map(q => q.name + (q.host ? ' ' + T('g.mp.hostTag') : '') + ' ' + Math.round(q.dist) + 'm').join(', ') }) : T('g.cmd.onlyYou')); return; }
         if (c0 === 'tphost' && this.mp && this.mp.isClient) { this.mp.teleportToHost(); return; }
@@ -1551,6 +1557,7 @@
         case 'tp': if (a.length >= 3) { const v = a.map((s, i) => s.startsWith('~') ? p.pos[i] + (parseFloat(s.slice(1)) || 0) : parseFloat(s)); if (p.teleport(v[0], v[1], v[2])) say(T('g.cmd.tp')); else say(T('g.cmd.tpBad'), '#ff8a8a'); } break;
         case 'give': { const id = a[0], n = parseInt(a[1] || '1', 10) || 1; if (VR.itemDef(id)) { p.inv.add(id, n); say(T('g.cmd.gave', { n, item: VR.itemName(id) })); } else say(T('g.cmd.noItem', { id }), '#ff8a8a'); break; }
         case 'seed': say(T('g.cmd.seed', { seed: this.meta.seed })); break;
+        case 'dim': if (VR.Travel) VR.Travel.command(this, a); break;   // u-dims: /dim — the worlds of this save; /dim <Welt> travels there
         case 'kill': p.damage(1000, 'void'); break;
         case 'fly': p.flySpeed = Math.max(0.2, Math.min(8, parseFloat(a[0]) || 1)); say(T('g.cmd.fly', { v: p.flySpeed })); break;
         case 'trailer': case 'cinema': if (this.director && this.director.play('trailer')) say(T('g.cmd.trailer')); else say(T('g.cmd.noTrailer')); break;

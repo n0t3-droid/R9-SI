@@ -232,7 +232,7 @@
         const accel = this.onGround ? 14 : 3.2;
         const a = 1 - Math.exp(-dt * accel);
         v[0] += (wx * sp - v[0]) * a; v[2] += (wz * sp - v[2]) * a;
-        v[1] -= 30 * dt;
+        v[1] -= (this.grav || (this.grav = VR.DimReg.gravity(this.game.dim))) * dt;   // u-dims: 30 × g / 9.81 of this world (VR.DimReg; 30 at home)
         if (v[1] < -78) v[1] = -78;
         this.jumpCooldown -= dt;
         // auto-jump: walking into a one-block step lifts you over it (F5), a wall never does
@@ -377,6 +377,7 @@
     respawn() {
       this.dead = false; this.health = 20; this.food = 20; this.sat = 5; this.air = 300; this.onFire = 0;
       const g = this.game, sp = this.spawn && this.spawn.every(v => isFinite(v)) ? this.spawn : g.worldSpawn();
+      if (VR.Travel && VR.Travel.respawn(g, this)) { g.ui && g.ui.updateHUD(true); return; }   // u-dims: on another world — its own place if you set one there, else home at once (never a respawn into its void)
       // a bed spawn remembers the bed; if it was broken meanwhile we fall back to the world spawn
       this.safeTeleport(sp[0], sp[1], sp[2], { bed: this.spawnBed || null });
       g.ui && g.ui.updateHUD(true);
