@@ -99,19 +99,19 @@
     return { held, armed: m < 0.15 };
   };
   // a key pressed after the trip began (one held from before counts once it was let go), a stick pushed after it came
-  // back to the middle, the wheel in a ship; the mouse never
+  // back to the middle, the wheel in a ship; the mouse never. → what took over (the key's name, 'stick', 'wheel') or false
   I.wantsControl = function (input, st, inShip) {
     if (!input) return false;
     const names = inShip ? MOVE.concat(FLY) : MOVE;
     for (let i = 0; i < names.length; i++) {
       const k = names[i], down = input.down(k);
       if (st.held.has(k)) { if (!down) st.held.delete(k); else if (!input.hit(k)) continue; }
-      if (input.hit(k) || down) return true;
+      if (input.hit(k) || down) return k;
     }
     const m = Math.max(stickMag(input.padMove), stickMag(input.touchMove));
     if (m < 0.15) st.armed = true;
-    else if (m > 0.35 && st.armed) return true;
-    if (inShip && input.mouse && input.mouse.wheel) return true;
+    else if (m > 0.35 && st.armed) return 'stick';
+    if (inShip && input.mouse && input.mouse.wheel) return 'wheel';
     return false;
   };
 
@@ -459,6 +459,8 @@
   // the trip ends: the camera blends back over 0.4 s (cut: at once), the walk's camera and the HUD come back
   function end(g, why, cut) {
     const c = I.cur; if (!c) return;
+    // (how the last trip ended — the session runner and the browser test read it; I.debug adds where from)
+    I.lastEnd = { why, by: c.by || null, means: c.means, phase: c.phase, t: Math.round((c.t || 0) * 100) / 100, stack: I.debug ? String(new Error().stack).split('\n').slice(2, 7).join(' | ') : null };
     if (c.injJump && g.input && g.input.tDown) { g.input.tDown.delete('jump'); c.injJump = false; }   // (never leave a jump held)
     if (c.ship && c.ship.ectxBusy && c.arr && !c.shipLanded) { c.ship.ectxDetached = true; detached.push({ c, ship: c.ship }); }   // a called ship on its way still lands
     else if (c.ship) c.ship.ectxBusy = false;
@@ -487,7 +489,8 @@
     const In = g.input, ui = g.ui;
     if (ui && (ui.screen || ui.typing)) return;
     const inShip = !!(g.starships && g.starships.pilot && g.flight);
-    if (c.phase !== 'arrive' && I.wantsControl(In, c.cs, inShip)) { end(g, 'input'); return; }
+    const took = c.phase !== 'arrive' && I.wantsControl(In, c.cs, inShip);
+    if (took) { c.by = took; end(g, 'input'); return; }
     if (c.phase === 'arrive' && In && (In.pressed.size > 0 || (In.mouse.clicked && In.mouse.clicked.some(Boolean)))) { c.skip = true; return; }   // (any key: the arrival's framing ends)
     if (c.means === 'walk' && c.phase === 'walk' && In) {
       const p = g.player, f = I.follow(c.path, [p.pos[0], p.pos[2]], c.fst);

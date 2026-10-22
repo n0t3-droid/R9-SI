@@ -322,7 +322,7 @@
   };
 
   // ---------------------------------------------------------------- the prompt, the ring, the touch button
-  let dom = null, last = null, lastText = '', lastIcon = '', acc = 0, ringShown = -1;
+  let dom = null, last = null, lastText = '', lastIcon = '', acc = 0, ringShown = -1, textRes = null, text = '';
   const st = C.pressState();
   function mount() {
     if (dom || typeof document === 'undefined') return dom;
@@ -375,12 +375,13 @@
     const travelling = !!(VR.Intent && VR.Intent.current && VR.Intent.current());
     acc += dt;
     const down = ok && !travelling && !!I && I.down('KeyV');
-    if (ok && (acc >= 0.1 || (down && st.t < 0))) { acc = 0; last = C.resolve(C.gather(g)); }
+    if (ok && !travelling && (acc >= 0.1 || (down && st.t < 0))) { acc = 0; last = C.resolve(C.gather(g)); }
     if (!ok || travelling) { show('', null); ring(0); st.t = -1; st.fired = false; g.ctxRow = 0; touchIcon(null); const Cs = C.cost; Cs.frames++; Cs.ms += now() - t0; return; }
     const res = last || NONE;
     g.ctxRow = res.row;
-    const B = VR.Binds, code = B && B.current ? (B.current.slots('veh') || ['KeyV'])[0] || 'KeyV' : 'KeyV';
-    show(C.text(res, code), res);
+    // the prompt's words only when the resolution changed (10 Hz at most): no binding or language lookups in between
+    if (res !== textRes) { textRes = res; const B = VR.Binds, code = B && B.current ? (B.current.slots('veh') || ['KeyV'])[0] || 'KeyV' : 'KeyV'; text = C.text(res, code); }
+    show(text, res);
     touchIcon(res);
     // V: on foot a tap is the action and a hold the Heimkehr ring; a tool or a vehicle has V to itself
     const ringOk = res.row >= 3;
@@ -391,5 +392,5 @@
     const Cs = C.cost, ms = now() - t0; Cs.frames++; Cs.ms += ms; if (ms > Cs.worst) Cs.worst = ms;
   };
   C.current = () => last;
-  C.reset = () => { last = null; lastText = ''; lastIcon = ''; st.t = -1; st.fired = false; ringShown = -1; if (dom) { dom.pr.classList.remove('on'); dom.rg.style.display = 'none'; dom.rl.style.display = 'none'; } };
+  C.reset = () => { last = null; lastText = ''; lastIcon = ''; textRes = null; text = ''; st.t = -1; st.fired = false; ringShown = -1; if (dom) { dom.pr.classList.remove('on'); dom.rg.style.display = 'none'; dom.rl.style.display = 'none'; } };
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

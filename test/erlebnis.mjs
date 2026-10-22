@@ -33,8 +33,10 @@ const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle
 const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, locale: 'de-DE' });
 const page = await ctx.newPage();
 const logs = [];
-page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail/i.test(s)) logs.push(`[${t}] ${s.slice(0, 500)}`); });
-page.on('pageerror', e => logs.push('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
+// (each page error is also printed as it comes: a run cut short still says what went wrong)
+const note = (l) => { logs.push(l); if (logs.length <= 30) console.log('    [page] ' + l.slice(0, 600)); };
+page.on('console', m => { const t = m.type(), s = m.text(); if (t === 'error' || /error|fail/i.test(s)) note(`[${t}] ${s.slice(0, 500)}`); });
+page.on('pageerror', e => note('[pageerror] ' + (e.stack || e.message).slice(0, 1500)));
 page.on('crash', () => { logs.push('[pageerror] the page crashed'); console.log('  !! the page crashed'); });
 const ev = (fn, arg) => page.evaluate(fn, arg);
 const wait = (ms) => page.waitForTimeout(ms);
@@ -93,8 +95,10 @@ await ev(() => {
     return { t: +(+g.time).toFixed(2), pos: p.pos.map(v => +v.toFixed(1)), yaw: +p.yaw.toFixed(3), camMode: g.camMode, prompt: pr && pr.classList.contains('on') ? pr.textContent : '', row: g.ctxRow || 0,
       aimed: I.aimed ? I.aimed.id : null, intent: c ? { means: c.means, phase: c.phase, ending: !!c.ending, dist: c.dist !== undefined ? +(+c.dist).toFixed(1) : null, shot: c.seq ? c.seq.kind : null, shotT: c.seq ? +c.seq.t.toFixed(2) : 0, ship: c.ship && c.ship.pos ? c.ship.pos.map(v => +v.toFixed(1)) : null, stage: c.shipStage || null, pad: c.pad || null } : null,
       flight: fl ? { state: fl.state, auto: !!fl.auto, alt: +fl.b.pos[1].toFixed(1), speed: +(fl.speed || 0).toFixed(1), landing: !!(fl.auto && fl.auto.landing), spot: fl.auto && fl.auto.spot ? fl.auto.spot.map(v => +(+v).toFixed(1)) : null } : null,
-      pilot: !!(S && S.pilot), cam: g.cam ? { x: +g.cam.x.toFixed(1), y: +g.cam.y.toFixed(1), z: +g.cam.z.toFixed(1), shot: g.cam.shot || null } : null };
+      pilot: !!(S && S.pilot), cam: g.cam ? { x: +g.cam.x.toFixed(1), y: +g.cam.y.toFixed(1), z: +g.cam.z.toFixed(1), shot: g.cam.shot || null } : null,
+      lastEnd: I.lastEnd || null };
   };
+  VR.Intent.debug = true;   // (lastEnd says where a trip was ended from)
 });
 const save = (name, url) => { const f = SHOTS + name; fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64')); OUT.pictures.push(f); return f; };
 const settle = async (maxS, r, rm) => { const t = Date.now(); let s = null; while (Date.now() - t < maxS * 1000) { s = await ev(([r, rm]) => window.__E.pump(r, rm), [r, rm]); if (s.miss === 0 && s.dirty === 0) break; await wait(80); } return s; };
@@ -117,8 +121,14 @@ if (want('A')) {
   console.log(`== A · the prompt (${secs()})`);
   await settle(40, 4, 2);
   const kinds = [];
-  // the hangar's shuttle on the deck (the spawn) — or a parked ship anywhere near
-  const ship = await ev(() => { const S = VR.game.starships, p = VR.game.player; const s = S.ships.filter(q => q.d && q.d.meta && q.state === 'parked' && !q.hidden).sort((a, b) => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) - Math.hypot(b.pos[0] - p.pos[0], b.pos[2] - p.pos[2]))[0]; return s ? { pos: s.pos.slice(), yaw: s.yaw, h: s.d.meta.height, w: s.d.meta.width, l: s.d.meta.length, hangar: !!s.hangar } : null; });
+  // the hangar's shuttle on the deck (the spawn) — or a parked ship anywhere near; none: one is set down on the plaza
+  const findShip = () => ev(() => { const S = VR.game.starships, p = VR.game.player; const s = S.ships.filter(q => q.d && q.d.meta && q.state === 'parked' && !q.hidden && Math.hypot(q.pos[0] - p.pos[0], q.pos[2] - p.pos[2]) < 300).sort((a, b) => Math.hypot(a.pos[0] - p.pos[0], a.pos[2] - p.pos[2]) - Math.hypot(b.pos[0] - p.pos[0], b.pos[2] - p.pos[2]))[0]; return s ? { pos: s.pos.slice(), yaw: s.yaw, h: s.d.meta.height, w: s.d.meta.width, l: s.d.meta.length, hangar: !!s.hangar } : null; });
+  let ship = await findShip();
+  if (!ship) {
+    await toPlaza();
+    await ev(() => { const g = VR.game; window.__E.lookAt(g.player.pos[0] + 20, g.player.pos[1] + 1.6, g.player.pos[2]); g.starships.placeInFront(5151, 'shuttle', null, g.player); });
+    for (let i = 0; i < 60 && !ship; i++) { await wait(500); await ev(() => window.__E.frames(2)); ship = await findShip(); }
+  }
   if (ship) {
     await ev((s) => { const g = VR.game, p = g.player, x = s.pos[0] + Math.cos(s.yaw) * (s.w * 0.5 + 3), z = s.pos[2] - Math.sin(s.yaw) * (s.w * 0.5 + 3); p.teleport(x, s.pos[1] + 0.1, z); window.__E.lookAt(s.pos[0], s.pos[1] + s.h * 0.45, s.pos[2]); }, ship);
     await settle(20, 3, 2);
@@ -163,6 +173,8 @@ if (want('A')) {
     OUT.prompts.villager = st ? st.prompt : ''; kinds.push(['villager', st ? st.prompt : '(lost)']);
     save('erlebnis_prompt_villager.jpg', await ev(() => window.__E.picHud(4)));
   } else kinds.push(['villager', '(no villager)']);
+  // (the ship set down for the prompt goes again: the trip in B calls its own)
+  await ev(() => { const S = VR.game.starships, s = S.ships.find(q => q.d && q.d.seed === 5151); if (s) { S.ships.splice(S.ships.indexOf(s), 1); S.refreshNear(true); } });
   // the travel target: the citadel from the plaza
   await toPlaza();
   await ev(() => { window.__E.lookAt(-420, 175, 380); window.__E.frames(8); window.__E.lookAt(-420, 175, 380); });
@@ -235,6 +247,7 @@ if (want('B')) {
   const ph = trip.phases.map(p => p.phase);
   console.log('    phases: ' + trip.phases.map(p => `${p.phase} ${(p.t - trip.t0).toFixed(1)}`).join(' · '));
   console.log('    shots: ' + trip.shots.map(s => `${s.shot} ${(s.t - trip.t0).toFixed(1)}`).join(' · '));
+  console.log('    the end: ' + JSON.stringify(st.lastEnd));
   check(['call', 'board', 'takeoff', 'cruise', 'approach', 'land', 'arrive'].every(p => ph.includes(p)), 'every phase in order: ' + ph.join(' → '));
   const callT = trip.phases.find(p => p.phase === 'board'), callS = trip.phases.find(p => p.phase === 'call');
   check(callT && callS && callT.t - callS.t >= 8 && callT.t - callS.t <= 32, `the ship came and landed in ${callT && callS ? (callT.t - callS.t).toFixed(1) : '?'} s (10–30 + the wait for its design)`);
@@ -275,7 +288,7 @@ if (want('C')) {
   console.log('    ' + JSON.stringify(OUT.hud));
   check(off(faded, 'hotbar') && off(faded, 'stats') && off(faded, 'minimap') && /hf-dot/.test(faded.crosshair), 'standing still 10 s: the hotbar, the hearts and the map faded, a dot');
   check(!off(back, 'hotbar') && !off(back, 'stats'), 'a slot change and a hurt: the hotbar and the hearts are back');
-  check(off(again, 'hotbar') && off(again, 'stats'), '9 s later (hearts at 65 %, unchanged for 9 s): both faded again');
+  check(off(again, 'hotbar') && !off(again, 'stats'), '8 s later: the hotbar faded again, the hearts stay (they regenerate: a change every few seconds)');
   check(['hotbar', 'stats', 'minimap'].every(id => !off(always, id)), 'Immer: everything shown');
   check(!off(danger, 'stats'), 'hearts at 20 %: never hidden');
 }
@@ -314,8 +327,9 @@ if (want('E') && !process.env.NO_COST) {
   const bench = async (preset, on) => {
     await ev(([pr, on]) => { const g = VR.game; if (g.settings.preset !== pr) { g.applyPreset(pr); g.settings.dynRes = false; g.applySettings('*'); } VR.Ctx.on = on; VR.Intent.on = on; VR.HudFade.on = on; for (const o of [VR.Ctx.cost, VR.Intent.cost, VR.HudFade.cost]) for (const k in o) o[k] = 0; window.__E.lookAt(-420, 175, 380); }, [preset, on]);
     await settle(30, 4, 2);
-    await ev(() => window.__E.frames(30, 1));
-    const r = await ev(() => { for (const o of [VR.Ctx.cost, VR.Intent.cost, VR.HudFade.cost]) for (const k in o) o[k] = 0; const t0 = performance.now(); for (let i = 0; i < 90; i++) window.__E.frame(true); const wall = (performance.now() - t0) / 90; const C = VR.Ctx.cost, I = VR.Intent.cost, H = VR.HudFade.cost; return { wall: +wall.toFixed(2), ctx: C.frames ? +(C.ms / C.frames).toFixed(4) : 0, intent: I.frames ? +(I.ms / I.frames).toFixed(4) : 0, hud: H.frames ? +(H.ms / H.frames).toFixed(4) : 0, ctxWorst: +C.worst.toFixed(3), intentWorst: +I.worst.toFixed(3), gathers: C.gathers }; });
+    const n = preset === 'high' ? 40 : 90;   // (a High frame takes seconds on this software GPU)
+    await ev((w) => window.__E.frames(w, 1), preset === 'high' ? 10 : 30);
+    const r = await ev((n) => { for (const o of [VR.Ctx.cost, VR.Intent.cost, VR.HudFade.cost]) for (const k in o) o[k] = 0; const t0 = performance.now(); for (let i = 0; i < n; i++) window.__E.frame(true); const wall = (performance.now() - t0) / n; const C = VR.Ctx.cost, I = VR.Intent.cost, H = VR.HudFade.cost; return { wall: +wall.toFixed(2), ctx: C.frames ? +(C.ms / C.frames).toFixed(4) : 0, intent: I.frames ? +(I.ms / I.frames).toFixed(4) : 0, hud: H.frames ? +(H.ms / H.frames).toFixed(4) : 0, ctxWorst: +C.worst.toFixed(3), intentWorst: +I.worst.toFixed(3), gathers: C.gathers, gatherMs: C.gathers ? +(C.gatherMs / C.gathers).toFixed(4) : 0, frames: n }; }, n);
     return r;
   };
   const cost = {};
