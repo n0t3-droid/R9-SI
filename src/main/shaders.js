@@ -2892,6 +2892,7 @@ void main() { o = texture(u_src, v_uv); }`;
   // the eye. Out: the hit premultiplied by its confidence (a miss: 0, the sky's reflection of the gloss pass stays).
   S.SSR_FS = `
 uniform highp sampler2D u_depth;
+uniform highp sampler2D u_tdepth;   // t-polish2 · gap 1: the terrain's own depth (renderer.js ssrKeep), the mirror's surface
 uniform sampler2D u_mat;
 uniform sampler2D u_color;
 uniform mat4 u_vp;
@@ -2907,6 +2908,10 @@ void main() {
   if (m.b < 0.01) return;
   float d = texture(u_depth, v_uv).r;
   if (d >= 0.99999) return;
+  // (t-polish2 · gap 1: the mirror marches after the furniture, the people and the ships are drawn — they stand in it now,
+  //  as in t1_22 — so a pixel where one of them stands in front of the mirror's surface keeps no mirror of its own)
+  float dT = lin(texture(u_tdepth, v_uv).r);
+  if (lin(d) < dT - 0.05 - 0.01 * dT) return;
   vec4 wp = u_invVP * vec4(v_uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
   vec3 P = wp.xyz / wp.w, N = octDec(m.rg * 2.0 - 1.0), V = normalize(-P);
   // (run 2: per-pixel jitter and a rough-scattered ray left a sparse spray of hits — single bright texels on the plaza and
@@ -2948,11 +2953,17 @@ void main() {
   S.SSR_APPLY_FS = `
 uniform sampler2D u_mat;
 uniform sampler2D u_ssr;
+uniform highp sampler2D u_depth;    // t-polish2 · gap 1: the scene's depth and the terrain's own (ssrKeep): nothing of the
+uniform highp sampler2D u_tdepth;   // mirror over a lamp post, a chair or a person standing in front of it
+uniform vec2 u_nearFar;
 in vec2 v_uv;
 out vec4 o;
+float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
 void main() {
   vec4 m = texture(u_mat, v_uv);
   if (m.b < 0.003) discard;
+  float dT = lin(texture(u_tdepth, v_uv).r);
+  if (lin(texture(u_depth, v_uv).r) < dT - 0.05 - 0.01 * dT) discard;
   // the hits, gathered over a footprint that grows with the roughness (a polished floor sharp, a honed one soft), drawn
   // out up and down the screen as a glossy floor smears what it mirrors toward the eye (run 4: the hangar's floor mirrored
   // the holo walls' fine data as a mottle; streaked, it reads as gloss); a texel's hit counts by its own weight, so a lone

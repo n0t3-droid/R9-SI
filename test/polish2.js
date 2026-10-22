@@ -12,6 +12,24 @@ const S = V.SHADERS, P = V.PBR, R = V.R;
 // the text between `#ifdef X` and its `#endif` that holds `needle` (the nearest #ifdef before it, no #endif between)
 const inside = (src, needle, def) => { const i = src.indexOf(needle); if (i < 0) return false; const j = src.lastIndexOf('#ifdef ' + def, i), k = src.lastIndexOf('#endif', i); return j > 0 && j > k; };
 
+console.log('1 · the hall\'s floor: the mirror sees the furniture, the people and the ships (renderer.js ssrKeep, SSR_FS, SSR_APPLY_FS)');
+{
+  // (the first browser run: the porcelain floor mirrored the shopfronts but not one lamp post or person — the mirror
+  //  marched right after the terrain, before the props and the models were drawn; t1_22 holds the heroes and the posts)
+  const RS = require('fs').readFileSync(__dirname + '/../src/main/renderer.js', 'utf8');
+  const iKeep = RS.indexOf('ssrLate = ssr && this.ssrKeep();'), iProps = RS.indexOf('this.liveProps(E, camPos, fc);'), iModels = RS.indexOf('F.drawOpaque(this, E);'), iLate = RS.indexOf('if (ssrLate) { this.gpuPass(\'ssr\'); this.ssrPass(F, E); }');
+  check(iKeep > 0 && iProps > iKeep && iModels > iProps && iLate > iModels && /if \(ssr && !ssrLate\) \{ this\.gpuPass\('ssr'\); this\.ssrPass\(F, E\); \}/.test(RS), 'the main pass: the terrain\'s depth kept, then the props, the far land, the models, then the mirror (as before without the kept depth)');
+  check(/S\.tdepth = GL\.tex2D\(w, h, gl\.DEPTH_COMPONENT24/.test(RS) && /S\.tdFB = S\.tdepth \? GL\.fbo\(\[\], S\.tdepth\) : null;/.test(RS) && /gl\.blitFramebuffer\(0, 0, this\.w, this\.h, 0, 0, this\.w, this\.h, gl\.DEPTH_BUFFER_BIT, gl\.NEAREST\);\s*gl\.bindFramebuffer\(gl\.FRAMEBUFFER, this\.sceneFB\)/.test(RS) && /for \(const t of \[S\.mat, S\.tex, S\.tdepth\]\)/.test(RS), 'ssrKeep: one depth blit into the mirror\'s own depth target (made with the mirror, freed with it), the props drawn into the scene alone');
+  const occl = /if \(lin\(d\) < dT - 0\.05 - 0\.01 \* dT\) return;/.test(S.SSR_FS) && /uniform highp sampler2D u_tdepth;/.test(S.SSR_FS), occlA = /if \(lin\(texture\(u_depth, v_uv\)\.r\) < dT - 0\.05 - 0\.01 \* dT\) discard;/.test(S.SSR_APPLY_FS) && /uniform highp sampler2D u_tdepth;/.test(S.SSR_APPLY_FS);
+  check(occl && occlA, 'SSR_FS and SSR_APPLY_FS: no mirror where something stands in front of the mirror\'s surface (its depth nearer than the kept one)');
+  // the rule in numbers: a lamp post 6 blocks off in front of the floor 9 blocks off is in front; the floor itself, or a
+  // depth a hair off by the depth buffer's precision, is not
+  const front = (d, t) => d < t - 0.05 - 0.01 * t;
+  check(front(6, 9) && front(30, 40) && !front(9, 9) && !front(8.97, 9) && !front(39.6, 40), 'the rule: a post 6 blocks off before the floor at 9 hides the mirror; the floor, or its depth a hair off, keeps it');
+  const RJ = require('fs').readFileSync(__dirname + '/../src/main/renderer.js', 'utf8');
+  check(/this\.tex\(3, td, p\.u\.u_tdepth\);[\s\S]{0,1500}this\.tex\(2, this\.sceneDepth, p\.u\.u_depth\); this\.tex\(3, td, p\.u\.u_tdepth\);/.test(RJ), 'ssrPass binds the kept depth to both (the scene\'s when none was kept: the rule then never hides)');
+}
+
 console.log('2 · the vistas at night: the far citadel\'s lights (gen_citadel.js lodBoxes, vgen 12), the far lights in LOD_FS, the halos by the lamp');
 {
   const CIT = V.CitadelGen, C = V.Heart.CITADEL;

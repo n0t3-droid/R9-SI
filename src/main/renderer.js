@@ -2008,9 +2008,24 @@
     // half size and mixes the hits into the scene by the full-size weight. Off: nothing is made, nothing is drawn.
     ssrFree() {
       const gl = this.gl, S = this.ssr; if (!S) return;
-      for (const f of [S.mrtFB, S.fb, S.applyFB]) if (f) gl.deleteFramebuffer(f);
-      for (const t of [S.mat, S.tex]) if (t) gl.deleteTexture(t);
+      for (const f of [S.mrtFB, S.fb, S.applyFB, S.tdFB]) if (f) gl.deleteFramebuffer(f);
+      for (const t of [S.mat, S.tex, S.tdepth]) if (t) gl.deleteTexture(t);
       this.ssr = null;
+    }
+    // t-polish2 · gap 1 (docs/superpowers/plans/2026-10-16-t-polish2.md): the mirror sees the furniture, the people and the
+    // ships — t1_22's floor holds the heroes and the posts upside down. After the terrain its depth is kept (one depth
+    // blit, High and up: the mirror's tier), the props, the far land and the models are drawn into the scene alone, and
+    // only then does ssrPass march: the rays meet the lamp posts and the people, and a pixel where one of them stands in
+    // front of the mirror's surface (its depth nearer than the kept one) keeps no mirror. Without the kept depth (a driver
+    // that cannot make the target) the mirror marches right after the terrain as before.
+    ssrKeep() {
+      const gl = this.gl, S = this.ssr;
+      if (!S || !S.tdFB) return false;
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, S.mrtFB); gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, S.tdFB);
+      gl.blitFramebuffer(0, 0, this.w, this.h, 0, 0, this.w, this.h, gl.DEPTH_BUFFER_BIT, gl.NEAREST);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFB); gl.viewport(0, 0, this.w, this.h);
+      this.fsMark('ssrKeep', this.w, this.h, this.w * this.h * 4, this.w * this.h * 4);
+      return (S.kept = true);
     }
     ssrBegin() {
       const gl = this.gl;
@@ -2026,7 +2041,11 @@
         const tex = GL.tex2D(hw, hh, hdr ? gl.RGBA16F : gl.RGBA8, gl.RGBA, hdr ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE, { filter: gl.LINEAR });
         S = this.ssr = { col: this.sceneCol, w, h, hw, hh, fmt: this.sceneFmt().name, mat, tex, mrtFB: GL.fbo([this.sceneCol, mat], this.sceneDepth), fb: GL.fbo([tex]), applyFB: GL.fbo([this.sceneCol]) };
         if (!S.mrtFB || !S.fb || !S.applyFB) { this.ssrFree(); this.ssrBroken = S.fmt; return false; }
+        // (t-polish2: the terrain's kept depth — ssrKeep; none, and the mirror marches before the props as before)
+        S.tdepth = GL.tex2D(w, h, gl.DEPTH_COMPONENT24, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, { filter: gl.NEAREST });
+        S.tdFB = S.tdepth ? GL.fbo([], S.tdepth) : null;
       }
+      S.kept = false;
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.mrtFB);
       gl.clearBufferfv(gl.COLOR, 1, [0, 0, 0, 0]);
       this.ssrOn = true;
@@ -2040,16 +2059,18 @@
       // the march, half size
       let p = P.ssr; gl.useProgram(p.p);
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.fb); gl.viewport(0, 0, S.hw, S.hh);
-      this.tex(0, this.sceneDepth, p.u.u_depth); this.tex(1, S.mat, p.u.u_mat); this.tex(2, this.sceneCol, p.u.u_color);
+      const td = S.kept ? S.tdepth : this.sceneDepth, far = (F.cam && F.cam.far) || 1200;   // (t-polish2: the terrain's kept depth; none kept — the scene's, which is the terrain's then)
+      this.tex(0, this.sceneDepth, p.u.u_depth); this.tex(1, S.mat, p.u.u_mat); this.tex(2, this.sceneCol, p.u.u_color); this.tex(3, td, p.u.u_tdepth);
       gl.uniformMatrix4fv(p.u.u_vp, false, this.viewProj); gl.uniformMatrix4fv(p.u.u_invVP, false, this.invViewProj);
-      gl.uniform2f(p.u.u_nearFar, 0.06, (F.cam && F.cam.far) || 1200);
+      gl.uniform2f(p.u.u_nearFar, 0.06, far);
       const sb = this.sceneFmt().bytes, n = this.w * this.h, hn = S.hw * S.hh;
-      this.fsMark('ssr', S.hw, S.hh, hn * (4 + 4) + hn * 17 * 4 + hn * sb, hn * (this.hdr ? 8 : 4), hn * 18);
+      this.fsMark('ssr', S.hw, S.hh, hn * (4 + 4) + hn * 18 * 4 + hn * sb, hn * (this.hdr ? 8 : 4), hn * 18);
       this.fs(p);
       // the apply, full size over the scene's colour
       p = P.ssrApply; gl.useProgram(p.p);
       gl.bindFramebuffer(gl.FRAMEBUFFER, S.applyFB); gl.viewport(0, 0, this.w, this.h);
-      this.tex(0, S.mat, p.u.u_mat); this.tex(1, S.tex, p.u.u_ssr);
+      this.tex(0, S.mat, p.u.u_mat); this.tex(1, S.tex, p.u.u_ssr); this.tex(2, this.sceneDepth, p.u.u_depth); this.tex(3, td, p.u.u_tdepth);
+      gl.uniform2f(p.u.u_nearFar, 0.06, far);
       gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       this.fsMark('ssrApply', this.w, this.h, n * 4 + hn * (this.hdr ? 8 : 4), n * sb);
       this.fs(p);
@@ -2111,6 +2132,7 @@
       gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
       if (this.q.cloudShadow) this.updateCloudShadow(E, F.cam);   // (t-motion: the clouds' shadow mask)
       // terrain opaque + cutout
+      let ssrLate = false;   // (t-polish2: the mirror after the props and the models — ssrKeep)
       if (world) {
         const ssr = this.ssrBegin();   // t-material: on High the terrain writes the mirror's second target too (ssrPass)
         for (const [p, layer] of [[this.P.opaque, 0], [this.P.cutout, 1]]) {
@@ -2144,7 +2166,10 @@
           }
           gl.enable(gl.CULL_FACE);
         }
-        if (ssr) { this.gpuPass('ssr'); this.ssrPass(F, E); }   // (t-material: the screen-space mirror, right after the terrain)
+        // (t-material: the screen-space mirror, right after the terrain — t-polish2: after the props and the models, the
+        // terrain's depth kept for it: ssrKeep)
+        ssrLate = ssr && this.ssrKeep();
+        if (ssr && !ssrLate) { this.gpuPass('ssr'); this.ssrPass(F, E); }
       }
       // smooth props (t-smooth): the palms and the furniture after the opaque terrain, one instanced draw per model
       if (world && (this.q.smoothProps || this.q.smoothFurn)) { this.gpuPass('props'); this.liveProps(E, camPos, fc); }
@@ -2152,6 +2177,7 @@
       if (F.horizon && !fc) { this.gpuPass('far'); F.horizon.draw(this, E); }
       // voxel models & meshes
       if (F.drawOpaque) { this.gpuPass('models'); F.drawOpaque(this, E); }
+      if (ssrLate) { this.gpuPass('ssr'); this.ssrPass(F, E); }   // (t-polish2 · gap 1: the mirror sees the furniture, the people, the ships)
       if (this.l2Ssao) this.l2Ssao(F, E);   // (t-light2: the contact shadows from this depth — the next frame reads them, light2_gl.js)
       // ---------------- planar reflection of the water (F7): the near world and the sky, mirrored about the water plane
       this.reflOn = false;
