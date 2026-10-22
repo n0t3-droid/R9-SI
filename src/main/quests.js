@@ -585,14 +585,16 @@
     if (!res.ok) { say(mgr, T(res.why === 'full' ? 'g.q.full' : 'g.q.later')); if (mgr.talkOptions) mgr.talkOptions(a); return; }
     let line = T('g.q.accepted');
     if (offer.k === 'build') { const n = Q.kit(g, offer); if (n) line += ' ' + T('g.q.kitGiven', { n, item: itemName(offer.q.block) }); }
-    if (offer.k === 'escort') { startEscort(mgr, a); line = T('g.q.escort.go'); }
     if (g.ui && g.ui.toast) g.ui.toast(T('g.q.toast.new'), Q.title(Q.get(r0, a.p.id)), null);
     if (g.audio && g.audio.play) g.audio.play('click');
     a._qoff = null; Q.mark(mgr);
     save();
+    // Begleiten: the walk starts at once — the talk closes, the villager sets off
+    if (offer.k === 'escort') { goEscort(mgr, a); return; }
     say(mgr, line);
     if (mgr.talkOptions) mgr.talkOptions(a);
   }
+  function goEscort(mgr, a) { startEscort(mgr, a); if (mgr.closeTalk && mgr.talking === a) mgr.closeTalk(); if (a.say) a.say(T('g.q.escort.go'), 4); }
   // Bauen: the kit (the giver's parts) — topped up to what the quest still needs
   Q.kit = function (g, r) {
     const inv = g && g.player && g.player.inv, q = r && r.q; if (!inv || !q || !q.block) return 0;
@@ -612,7 +614,7 @@
         if (r.q.tried.indexOf(i) >= 0) { b.disabled = true; b.className += ' tried'; }
         list.push(b);
       });
-    } else if (r.k === 'escort') list.push(mkBtn(T('g.q.btn.go'), 'go', () => { startEscort(mgr, a); say(mgr, T('g.q.escort.go')); if (mgr.closeTalk) mgr.closeTalk(); }, 'primary'));
+    } else if (r.k === 'escort') list.push(mkBtn(T('g.q.btn.go'), 'go', () => goEscort(mgr, a), 'primary'));
     else if (r.k === 'build' && g.player && g.player.inv && g.player.inv.count(r.q.block) + (r.n | 0) < r.q.n) list.push(mkBtn(T('g.q.btn.kit'), 'kit', () => { const n = Q.kit(g, r); say(mgr, T('g.q.kitGiven', { n, item: itemName(r.q.block) })); }));
     list.push(back(mgr, a));
     setOpts(list);
@@ -979,8 +981,10 @@
       try {
         const panel = hasDoc && document.querySelector('#pause .panel'); if (!panel) return r;
         let b = panel.querySelector('[data-act="journal"]');
-        if (!b) { b = document.createElement('button'); b.type = 'button'; b.className = 'btn qjbtn'; b.dataset.act = 'journal'; b.dataset.t = 'g.q.pause'; b.dataset.tt = 'g.q.pauseTip'; b.textContent = T('g.q.pause'); b.title = T('g.q.pauseTip'); const adv = panel.querySelector('[data-act="adventure"]'); if (adv && adv.after) adv.after(b); else (panel.querySelector('.ptop') || panel).appendChild(b); }
+        if (!b) { b = document.createElement('button'); b.type = 'button'; b.className = 'btn qjbtn'; b.dataset.act = 'journal'; b.dataset.t = 'g.q.pause'; b.dataset.tt = 'g.q.pauseTip'; b.textContent = T('g.q.pause'); b.title = T('g.q.pauseTip'); (panel.querySelector('.ptop') || panel).appendChild(b); }
         b.style.display = Q.on() ? '' : 'none';
+        // (after ⚔ Abenteuer: a-core puts its button in once this call has returned)
+        setTimeout(() => { const adv = panel.querySelector('[data-act="adventure"]'); if (adv && adv.after && adv.nextElementSibling !== b) adv.after(b); }, 0);
       } catch (e) { console.warn('quests', e); }
       return r;
     };
