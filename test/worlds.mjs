@@ -46,18 +46,22 @@ async function openWorld(dist, preset, rd, extra) {
   const ev = (fn, arg) => page.evaluate(fn, arg);
   const step = async (n, dtms = 33) => { for (let k = 0; k < n; k += 10) { await ev(([m, d]) => { const g = VR.game; if (!g.renderer._render) { g.renderer._render = g.renderer.render; g.renderer.render = function (F) { if (window.__norender) { this.setupCamera(F.cam); return; } return this._render(F); }; } window.__norender = true; for (let i = 0; i < m; i++) { g.last = performance.now() - d; g.loop(performance.now()); } }, [Math.min(10, n - k), dtms]); await wait(4); } };
   const boost = (on) => ev((on) => { const g = VR.game, q = g.renderer && g.renderer.q; if (!q) return; if (on) { if (q.__up === undefined) q.__up = q.upload; q.upload = 24; } else if (q.__up !== undefined) { q.upload = q.__up; delete q.__up; } }, on);
-  const settle = async (max = 60, farMax = 30) => {
-    let s = null;
+  // (maxS: past `max` rounds, keep streaming until the near world is shown or maxS seconds passed — run 2's crater and
+  // night pictures were taken on a machine at load 12 after 80 and 20 rounds, the crater's walls and the landing unshown)
+  const settle = async (max = 60, farMax = 30, maxS = 0) => {
+    let s = null; const t0 = Date.now();
     await boost(true);
-    for (let i = 0; i < max; i++) {
+    for (let i = 0; i < max || (maxS && (Date.now() - t0) / 1000 < maxS); i++) {
       await step(20, 16);
       s = await ev(() => { const g = VR.game, w = g.world, p = g.player; if (!w || !p || g.state !== 'play') return { state: g.state }; const rd = Math.max(1, (w.renderDist | 0) - 1), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let dirty = 0; for (const c of w.cols.values()) { let n = 0; for (const sc of c.sec) if (sc.dirty || sc.pending) n++; const ex = c.cx - pcx, ez = c.cz - pcz; if (n && ex * ex + ez * ez <= rd * rd) dirty += n; } let unshown = 0; for (let dz = -rd; dz <= rd; dz++) for (let dx = -rd; dx <= rd; dx++) { if (dx * dx + dz * dz > rd * rd) continue; const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) unshown++; } const h = g.horizon, f = h && h.far, fr = f && f.report ? f.report() : null; return { state: g.state, busy: g.pool.busy, pend: w.pending.size, dirty, up: w.uploadQ ? w.uploadQ.size : 0, fading: w.fading ? w.fading.size : 0, unshown, hz: h && h.enabled() ? h.inflight : 0, far: fr ? fr.inflight + fr.want : 0, hold: !!p.hold }; });
       const near = s.state === 'play' && s.busy === 0 && s.pend === 0 && s.dirty === 0 && s.up === 0 && s.fading === 0 && s.unshown === 0 && !s.hold;
       s.i = i;
+      s.near = near;
       if (near && i > 2 && ((s.hz === 0 && s.far === 0) || i >= farMax)) break;
       await wait(30);
     }
     await boost(false);
+    if (s && !s.near) console.log(`  (the near world not yet all shown: ${JSON.stringify(s)})`);
     return s;
   };
   const picture = async (path, frames = 4) => {
@@ -93,7 +97,8 @@ async function trip(A, to) {
 const setT = (A, t) => A.ev((t) => { const e = VR.game.env, k = Math.round(t * 20); e.day = Math.floor(k / 24000); e.ticks = k - e.day * 24000; }, t);
 // the camera: flying in place at (x, y, z) looking at yaw / pitch (radians)
 const place = (A, x, y, z, yaw, pitch) => A.ev(([x, y, z, yaw, pitch]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); p.yaw = yaw; p.pitch = pitch; p.vel = [0, 0, 0]; }, [x, y, z, yaw, pitch]);
-const shot = async (A, name, frames = 6) => { await A.step(60, 33); const ok = await A.picture(SHOTS + name + '.png', frames); const info = await A.ev(() => { const B = VR.BodySky, c = B && B.cur; return c ? { exposure: +VR.game.env.E.exposure.toFixed(2), sunEl: +(c.light.sunEl * 57.3).toFixed(1), lightK: +c.light.lightK.toFixed(2), eclipse: +c.light.eclipse.toFixed(2), parEl: +(c.light.parEl * 57.3).toFixed(1), parPhase: +c.light.parPhase.toFixed(2), plumes: B.plumes.length, bodySky: !!VR.game.renderer.bsBuilt, dimId: VR.game.env.E.dimId } : null; }); rec.pictures[name] = info; save(); check(ok, `test/shots/${name}.png ${JSON.stringify(info)}`); return ok; };
+const shot = async (A, name, frames = 6) => { await A.page.bringToFront(); await A.step(60, 33);   // (a page behind another never answers a screenshot: run 2's opal_eclipse_vl)
+ const ok = await A.picture(SHOTS + name + '.png', frames); const info = await A.ev(() => { const B = VR.BodySky, c = B && B.cur; return c ? { exposure: +VR.game.env.E.exposure.toFixed(2), sunEl: +(c.light.sunEl * 57.3).toFixed(1), lightK: +c.light.lightK.toFixed(2), eclipse: +c.light.eclipse.toFixed(2), parEl: +(c.light.parEl * 57.3).toFixed(1), parPhase: +c.light.parPhase.toFixed(2), plumes: B.plumes.length, bodySky: !!VR.game.renderer.bsBuilt, dimId: VR.game.env.E.dimId } : null; }); rec.pictures[name] = info; save(); check(ok, `test/shots/${name}.png ${JSON.stringify(info)}`); return ok; };
 // a jump in the game's own loop: the up-velocity of player.js's jump (9.1 m/s), the frames stepped, the highest point
 const jumpOf = (A) => A.ev(() => new Promise((ok) => {
   const g = VR.game, p = g.player; p.flying = false; p.noclip = false;
@@ -131,19 +136,19 @@ if (ONLY !== 'opal') {
   const L = await A.ev(() => { const g = new VR.BodyGen(VR.game.meta.seed >>> 0, 'basalt', {}), L = g.landmark; return { x: L.x, z: L.z, R: L.R, rimY: g.surfaceY(Math.round(L.x), Math.round(L.z + L.R)), peakY: g.surfaceY(Math.floor(L.x), Math.floor(L.z)), spawnY: g.surfaceY(0, 0) }; });
   // the landing at noon: north over the mare (Helia high behind)
   await setT(A, 2850); await place(A, 0.5, L.spawnY + 2.62, 0.5, 0, -0.06);
-  await A.settle(40, 4); await shot(A, 'basalt_noon');
+  await A.settle(40, 4, 300); await shot(A, 'basalt_noon');
   // Helia setting in the west, Amarant full and rising in the east over the long shadows
   await setT(A, 440); await place(A, 0.5, L.spawnY + 2.62, 0.5, -99 * Math.PI / 180, 0.05);
-  await A.settle(20, 2); await shot(A, 'basalt_amarantrise');
+  await A.settle(20, 2, 120); await shot(A, 'basalt_amarantrise');
+  // night under a full Amarant (34° high): the mare in the giant's lilac light, the eye opened (still at the landing)
+  await setT(A, 1300); await place(A, 0.5, L.spawnY + 2.62, 0.5, Math.PI, 0.3);
+  await A.settle(20, 2, 120); await shot(A, 'basalt_amarantnight');
   // the landmark from the top of its central peak: the flat floor of dark melt, the west wall's terraces rising 40 m to the
   // rim 180 m off, lit by the morning sun from the east-south-east behind (run 1 from the south rim at view 8 saw no crater)
   await setT(A, 2400); await place(A, L.x + 0.5, L.peakY + 2.0, L.z + 0.5, Math.PI / 2, 0.04);
-  await A.settle(80, 6); await shot(A, 'basalt_crater');
-  // night under a full Amarant (34° high): the mare in the giant's lilac light, the eye opened
-  await setT(A, 1300); await place(A, 0.5, L.spawnY + 2.62, 0.5, Math.PI, 0.3);
-  await A.settle(20, 2); await shot(A, 'basalt_amarantnight');
-  // the jump on Basalt (8.4 m)
-  await place(A, 0.5, L.spawnY + 1.2, 0.5, 0, 0); await A.settle(20, 2);
+  await A.settle(80, 6, 420); await shot(A, 'basalt_crater');
+  // the jump on Basalt (8.4 m), at the landmark's peak (its ground is shown)
+  await place(A, L.x + 0.5, L.peakY + 1.2, L.z + 0.5, 0, 0); await A.settle(20, 2);
   rec.jumps.basalt = await jumpOf(A); save();
   check(Math.abs(rec.jumps.basalt.top - 8.43) < 0.4, `a jump on Basalt in the game: ${JSON.stringify(rec.jumps.basalt)} (8.4 m)`);
 }
@@ -164,12 +169,12 @@ if (ONLY !== 'basalt') {
   console.log('  opal moments', JSON.stringify(G));
   if (G.vent) {
     await setT(A, G.vent.t); await place(A, G.vent.x, G.vent.ground + 3.6, G.vent.z - 230, Math.PI, 0.32);
-    await A.settle(80, 6); await A.step(150, 33);   // (the column's foot: five seconds of grains)
+    await A.settle(80, 6, 300); await A.step(150, 33);   // (the column's foot: five seconds of grains)
     await shot(A, 'opal_geyser');
   } else check(false, 'a vent erupting in the morning');
   await setT(A, 1800); await place(A, 0.5, G.landY + 28, 60.5, 0, -0.38);
-  await A.settle(60, 4); await shot(A, 'opal_lineae');
-  if (G.eclipse) { await setT(A, G.eclipse); await place(A, 0.5, G.landY + 2.62, 0.5, Math.PI, 0.42); await A.settle(30, 2); await shot(A, 'opal_eclipse'); }
+  await A.settle(60, 4, 300); await shot(A, 'opal_lineae');
+  if (G.eclipse) { await setT(A, G.eclipse); await place(A, 0.5, G.landY + 2.62, 0.5, Math.PI, 0.42); await A.settle(30, 2, 200); await shot(A, 'opal_eclipse'); }
   else check(false, 'the eclipse found');
   await place(A, 0.5, G.landY + 1.2, 0.5, 0, 0); await A.settle(20, 2);
   rec.jumps.opal = await jumpOf(A); save();
