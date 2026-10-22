@@ -13,6 +13,14 @@
 //      only in a dark sky
 //  e · the aurora: seeded per night, about one night in three, at the north horizon, faded in after dusk and out before
 //      the dawn, none under clouds or rain
+//  f · the clouds' light by the hour (white by day, gold at the golden hour, rose round the sunset, moon-grey-blue at
+//      night, grey in the rain) and the volume atlas (four cumulus: a flat base, lobes heaped on top, the normals out of the
+//      cloud, thick in the middle, the creases darker); the frame's uniforms (every name the GLSL declares, filled, finite;
+//      off the overworld the layers off)
+//  g · the band model (test/sky3_model.js: the gradient, the glows, the cirrus and t-sky3's layers through the composite
+//      and t-light2's grade, sampled as test/sky3.mjs measures, plus run 1's measured residual — the space, the bloom):
+//      ΔE per band before (v0.48: the switch off) and after against the frames' targets — the golden hour and the dusk
+//      far nearer the frames, every band within ΔE 12, the day unchanged
 // usage: node test/sky3.js   (bash test/wt_run.sh sky3.js 300)
 const V = require('./load_shared.js');
 const fs = require('fs'), path = require('path');
@@ -195,6 +203,98 @@ console.log('e · the aurora');
   check(at(17000, 1) === 0 && at(17000, 0, 0.95) < 0.1, 'none under rain or a closed sky');
   const dir = S3.AURORA;
   check(dir && dir.az === 0 && dir.span > 0 && dir.span < Math.PI && dir.el[0] > 0 && dir.el[1] < 0.8, 'at the north horizon (yaw 0 looks along −z: the curtains round it, low over the horizon)');
+}
+
+// ---------------------------------------------------------------- f · the clouds' light and the atlas
+console.log('f · the clouds\' light and the volume atlas');
+{
+  const th = (tod) => tod / 24000 * Math.PI * 2, sunAt = (tod) => { const t = th(tod), el = Math.sin(t) * 0.42, az = t + 0.4; return [Math.cos(az) * Math.cos(el), Math.sin(el), Math.sin(az) * Math.cos(el)]; };
+  const CLAt = (tod, rain) => { const s = sunAt(tod); return S3.cloudLight({ sunDir: s, moonDir: s.map(v => -v), rain: rain || 0, sky3: { moons: [{ k: 1 }] } }); };
+  const noon = CLAt(6000), gold = CLAt(10800), dusk = CLAt(11900), night = CLAt(17000), wet = CLAt(6000, 1);
+  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], fmt = (c) => c.map(v => v.toFixed(2)).join(',');
+  check(lum(noon.sun) > 1 && noon.sun[2] / noon.sun[0] > 0.8, `noon: the sun's light on the clouds near white (${fmt(noon.sun)})`);
+  check(gold.sun[0] > gold.sun[1] && gold.sun[1] > gold.sun[2] && gold.sun[2] / gold.sun[0] < 0.7, `the golden hour: gold (${fmt(gold.sun)})`);
+  check(dusk.sun[0] > dusk.sun[1] * 1.4 && dusk.sun[2] > dusk.sun[1] * 0.55, `the sunset: rose-orange (${fmt(dusk.sun)})`);
+  check(lum(night.sun) < 0.2 && night.sun[2] > night.sun[0] && night.L[1] > 0, `night: the moon's dim grey-blue from above (${fmt(night.sun)})`);
+  check(lum(wet.sun) < lum(noon.sun) * 0.2 && Math.abs(wet.top[0] - wet.top[2]) < 0.1, `rain: the sun dimmed, the sky's light grey (${fmt(wet.top)})`);
+  const A = S3.atlas(), S = 256, N = 128;
+  let ok = 0;
+  const rep = [];
+  for (let k = 0; k < 4; k++) {
+    const ox = (k % 2) * N, oy = Math.floor(k / 2) * N, at = (i, j, c) => A[((oy + j) * S + ox + i) * 4 + c] / 255;
+    let base = [], tops = [], nL = 0, nR = 0, nT = 0, nB = 0, thC = 0, thE = 0, cE = 0, aoBase = 0, aoTop = 0, nb = 0, nt = 0;
+    for (let i = 4; i < N - 4; i++) { let lo = -1, hi = -1; for (let j = 0; j < N; j++) if (at(i, j, 0) > 0.04) { if (lo < 0) lo = j; hi = j; } if (lo >= 0) { base.push(lo); tops.push(hi); } }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      if (at(i, j, 0) <= 0.04) continue;
+      const l = i > 0 && at(i - 1, j, 0) <= 0.04, r = i < N - 1 && at(i + 1, j, 0) <= 0.04, t = j < N - 1 && at(i, j + 1, 0) <= 0.04, b = j > 0 && at(i, j - 1, 0) <= 0.04;
+      const nx = at(i, j, 1) * 2 - 1, ny = at(i, j, 2) * 2 - 1;
+      if (l && !r && !t && !b) nL += nx < 0 ? 1 : 0; if (r && !l && !t && !b) nR += nx > 0 ? 1 : 0;
+      if (t && !b) nT += ny > 0 ? 1 : 0; if (b && !t) nB += ny < 0 ? 1 : 0;
+      const edge = l || r || t || b; if (edge) { thE += at(i, j, 0); cE++; }
+    }
+    const mid = (j) => at(N >> 1, j, 0);
+    let jm = -1; for (let j = 0; j < N; j++) if (mid(j) > 0.04) { jm = j; break; }
+    thC = jm >= 0 ? mid(Math.min(N - 1, jm + 20)) : 0;
+    for (let i = 0; i < N; i++) { const lo = base[i]; if (lo === undefined) continue; }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { if (at(i, j, 0) <= 0.04) continue; if (j < N * 0.32) { aoBase += at(i, j, 3); nb++; } else if (j > N * 0.6) { aoTop += at(i, j, 3); nt++; } }
+    const sd = (v) => { const m = v.reduce((a, b) => a + b, 0) / v.length; return Math.sqrt(v.reduce((a, b) => a + (b - m) * (b - m), 0) / v.length); };
+    const flat = sd(base.slice(Math.floor(base.length * 0.15), Math.ceil(base.length * 0.85))), lumpy = sd(tops);
+    const good = flat < 2.5 && lumpy > 6 && nL > 0 && nR > 0 && nT > nB * 0.5 && thC > thE / Math.max(1, cE) && aoBase / nb < aoTop / nt;
+    rep.push(`${k}: base ±${flat.toFixed(1)} px, tops ±${lumpy.toFixed(1)} px, thickness middle ${thC.toFixed(2)} / edge ${(thE / Math.max(1, cE)).toFixed(2)}, occlusion base ${(aoBase / nb).toFixed(2)} / top ${(aoTop / nt).toFixed(2)}`);
+    if (good) ok++;
+  }
+  check(A.length === S * S * 4 && ok === 4, `the atlas: four cumulus, each a flat base under heaped lobes, the normals out of the cloud, thick in the middle, darker low down (${rep.join('; ')})`);
+  check(S3.atlas() === A, 'the atlas is made once');
+  // the frame's uniforms: every name the GLSL declares, filled and finite; off the overworld the layers off; nothing with the switches off
+  const glsl = S3.glslSky() + S3.glslPuff();
+  const names = S3.U4.concat(S3.U3);
+  check(names.every(n => new RegExp('uniform vec[34] ' + n + ';').test(glsl)), `every uniform the frame fills is declared in the GLSL (${names.length})`);
+  const env = new VR.Env(); env.setTime(11900); env.wx.setSeed(4242); env.wx.force('klar');
+  S3.use({ sky3: 2, cloudVol: true, clouds: 2 });
+  let E = env.update(0, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 0, freezeTime: true, freezeWeather: true });
+  const u = E.sky3.u;
+  check(names.every(n => u[n] && Array.from(u[n]).every(Number.isFinite)) && u.u_s3Warm[3] === 1 && u.u_s3Glow[0] > 0.3 && u.u_s3MoonA[3] > 0, 'at the sunset on the overworld: the uniforms filled (the sun-side band on, the aureole, the moons)');
+  E = env.update(0, { dim: 'hollow', biome: null, eyeSky: 1, renderDist: 8, horizon: 0, freezeTime: true, freezeWeather: true });
+  check(E.sky3.u.u_s3Warm[3] === 0 && E.sky3.u.u_s3Glow[0] === 0 && E.sky3.u.u_s3Belt[3] === 0 && E.sky3.u.u_s3MoonA[3] === 0 && E.sky3.u.u_s3Aur[0] === 0, 'off the overworld the layers, the moons and the aurora are off');
+  S3.use({ sky3: 0, cloudVol: false });
+  E = env.update(0, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 0, freezeTime: true, freezeWeather: true });
+  check(E.sky3.level === 0 && E.sky3.moons === null, 'with the switches off the frame does nothing (Very Low)');
+}
+
+// ---------------------------------------------------------------- g · the band model against the frames
+console.log('g · the band model: golden hour and dusk against the frames');
+{
+  const M = require('./sky3_model.js'), SR = require('./sky_ref.js');
+  const ref = JSON.parse(fs.readFileSync(SR.REF, 'utf8'));
+  // run 1's residual (test/sky3.mjs on v0.48, the measured bands less this model's: the space, the bloom, the light in
+  // the air), CIELAB per band; at the golden hour t-sky3 shows a seventh of the space it showed (its residual ×0.2)
+  const RES = {"canyon_noon": {"H": 225, "yaw": 1.36, "kind": "day", "d": [[0.2, 0.8, 0.3], [0.6, 0.9, 0.9], [2, 0, 1.7], [6.6, -1.6, 1.7], [9.5, -1.7, -2.4], [10.7, -0.7, -5.4], [21.1, -0.2, -12.1], [24.9, 2.8, -16.5]]}, "canyon_golden": {"H": 225, "yaw": 1.36, "kind": "golden", "d": [[0.2, 0.7, 0.3], [0.1, 0.2, 0.6], [0.1, -0.1, 0.2], [-0.3, -1.2, -0.2], [2.9, -1, 0.7], [3.7, -0.2, -0.4], [10.1, -0.6, -5.8], [14.1, 0.5, -7.8]]}, "canyon_dusk": {"H": 226, "yaw": 1.36, "kind": "dusk", "d": [[-0.1, 0.6, 0], [0.2, 0.2, 0.9], [-0.9, -0.2, -0.6], [-0.6, -0.4, -0.7], [2.4, -0.3, 0.8], [3.5, -0.9, 0.1], [5.2, -3, -2.5], [5.5, -2.8, -3.2]]}, "city_noon": {"H": 205, "yaw": -0.35, "kind": "day", "d": [[1.7, 0.8, -0.3], [0.6, 1.1, 0.1], [5.2, 0, 1.9], [12.2, 0.2, 0.6], [16.2, 1.2, -0.7], [17, 2.8, -6.3], [18.8, 3, -7.4], [13.2, 4.5, -8.4]]}, "city_golden": {"H": 205, "yaw": -0.35, "kind": "golden", "d": [[2.2, 1.1, -0.4], [0.8, 1.3, 0.2], [2.4, 0.3, 1.5], [5.7, 0.5, 1.9], [8.1, 1, 1.8], [9.9, 1.6, -1.3], [10.6, 1.2, -1.8], [8.6, 1.5, -2.3]]}, "city_dusk": {"H": 206, "yaw": -0.35, "kind": "dusk", "d": [[1.9, 1.2, -1.5], [0.5, 0.9, 0.1], [0.7, 0.7, 0.8], [0.7, 0.8, 0.8], [1.5, 1.1, 0.3], [2.7, 1.4, 1.4], [3.1, 1.7, 0.8], [3.1, 1.1, 0.5]]}, "isles_noon": {"H": 230, "yaw": 1.36, "kind": "day", "d": [[-0.4, 0.8, 0.5], [0.4, 0.7, 0.4], [0.6, 0.7, 0.2], [6, -1, 1.5], [9.5, -1.8, -2.1], [10.5, -0.5, -5.6], [20.5, -0.3, -11.7], [25.1, 3.2, -16.7]]}, "isles_golden": {"H": 230, "yaw": 1.36, "kind": "golden", "d": [[-0.7, 0.4, 0], [0.3, 0.6, 0.5], [0.4, 0.5, 0.4], [1.4, 0, 0.6], [2.9, -1, 0.6], [3.3, -0.1, -0.4], [9.8, -0.1, -5.9], [13.2, 0.8, -7.7]]}, "isles_dusk": {"H": 231, "yaw": 1.36, "kind": "dusk", "d": [[-0.8, 0.1, 0.4], [0.4, 0.6, 0.5], [0.6, 0.6, 0.5], [1.4, 0.3, 0.7], [2.4, -0.3, 0.7], [3.1, -0.8, -0.1], [6.3, -2.3, -0.8], [7, -2.5, -2.2]]}};
+  const azOf = (yaw) => Math.atan2(-Math.cos(yaw), -Math.sin(yaw));
+  const HOUR = { noon: 6000, golden: 10800, dusk: 11900 };
+  const bandsOf = (view, on) => {
+    const R = RES[view], [place, hour] = view.split('_');
+    S3.use(on ? { sky3: 2, cloudVol: true, clouds: 2 } : { sky3: 0, cloudVol: false });
+    const env = new VR.Env(); env.setTime(HOUR[hour]); env.wx.setSeed(4242); env.wx.force('klar');
+    env.planetsOverride = { az: azOf(R.yaw - 30 * Math.PI / 180), el: 24, az2: azOf(R.yaw + 30 * Math.PI / 180), el2: 36 };
+    let E; for (let i = 0; i < 3; i++) E = env.update(0.033, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 4096, freezeTime: true, freezeWeather: true, drama: true, motion: true });
+    const B = E.bodies, bodies = [[E.planetDir, B.radius.giant * 2.6], [E.planet2Dir, B.radius.blue * 1.6], [E.moonDir, 0.06], ...B.moons.map(m => [[m[0], m[1], m[2]], m[3] * 1.8]), ...(E.sky3 && E.sky3.bodies ? E.sky3.bodies.map(m => [[m[0], m[1], m[2]], m[3] * 1.8]) : [])];
+    const b = M.bands(E, { yaw: R.yaw, pitch: 12 * Math.PI / 180, H: R.H, kind: R.kind, bodies }, on ? E.sky3.u : null, VR.Light2.grade(E), { stepX: 10, stepY: 3 });
+    const rk = on && hour === 'golden' ? 0.2 : 1, T = ref.targets[R.kind].bands;
+    S3.use({ sky3: 0, cloudVol: false });
+    return b.map((x, k) => SR.dE(x.lab.map((v, i) => v + R.d[k][i] * rk), T[k].lab));
+  };
+  const mean = (v) => v.reduce((a, b) => a + b, 0) / v.length;
+  const hours = {};
+  for (const view of Object.keys(RES)) {
+    const a = bandsOf(view, false), b = bandsOf(view, true), h = view.split('_')[1];
+    (hours[h] = hours[h] || { a: [], b: [], worst: 0 }).a.push(mean(a)); hours[h].b.push(mean(b)); hours[h].worst = Math.max(hours[h].worst, ...b);
+    console.log(`   ${view.padEnd(14)} ΔE ${a.map(v => v.toFixed(0).padStart(2)).join(' ')} (${mean(a).toFixed(1)})  →  ${b.map(v => v.toFixed(0).padStart(2)).join(' ')} (${mean(b).toFixed(1)})`);
+  }
+  const H = (h) => ({ a: mean(hours[h].a), b: mean(hours[h].b), w: hours[h].worst });
+  const g = H('golden'), d = H('dusk'), n = H('noon');
+  check(g.b < 7 && g.b < g.a * 0.4 && g.w <= 12, `the golden hour: the mean ΔE ${g.a.toFixed(1)} → ${g.b.toFixed(1)} (under 7, every band within 12: worst ${g.w.toFixed(1)})`);
+  check(d.b < 6 && d.b < d.a * 0.6 && d.w <= 12, `the dusk: the mean ΔE ${d.a.toFixed(1)} → ${d.b.toFixed(1)} (under 6, every band within 12: worst ${d.w.toFixed(1)})`);
+  check(Math.abs(n.b - n.a) < 0.6, `the day as it was: noon's mean ΔE ${n.a.toFixed(1)} → ${n.b.toFixed(1)}`);
 }
 
 console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
