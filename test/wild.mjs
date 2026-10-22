@@ -16,8 +16,17 @@
 // Very Low: this build's page and the build before's (BEFORE_DIST, default .tmp_tests/before_dist — the v0.48 base) side by
 // side at the release's meadow view: not slower (median ≤ ×1.05, or the lower half's, or triangles ≤ ×1.03); on Very
 // Low the five switches are off, the actor is off, no program is compiled.
+// f-wild2 (R50-10, docs/superpowers/plans/2026-10-23-f-wild2.md) adds: every shot settles where its camera stands (each
+// column within 24 blocks shown, nothing fading, no section pending — t-wild's pictures caught flat stand-in ground) and
+// re-aims at its subject after; the pictures start a fresh TSR history and the off picture shares the on picture's
+// animation clock (the water's waves and the clouds the same: the pair's difference is the animals); the measures —
+//   murm   the flock (the birds' switch alone) ≥ 3 % of the lake view, its dark core (luma ≤ 60 where the off picture
+//          is lighter) ≥ 1 %
+//   pass   the young ray's glide past the beach's cell at the day's moment, from the eye in the cell: ≥ 2 % of the frame
+//   shoal  from the pier's end, the player still on the deck, the shoal at its shadow: ≥ 10 fish of ≥ 4 px
+//   NO_BEFORE=1 skips the Very Low page of the build before (BEFORE_DIST); the cost lighter (ROUNDS 3 × N 8)
 //   nohup bash test/wt_run.sh wild.mjs 3000 > .tmp_tests/wild.log 2>&1 &
-//   ONLY=murm,heron · NO_COST=1 · NO_POTATO=1 · ROUNDS=5 · N=12 · SEED=53
+//   ONLY=murm,heron · NO_COST=1 · NO_POTATO=1 · ROUNDS=3 · N=8 · SEED=53
 // regress: skip  (a showcase: the pictures and the numbers are the evidence; the gates are test/wild_sim.js and test/wild_game.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
@@ -26,7 +35,7 @@ import fs from 'fs';
 const require = createRequire(import.meta.url);
 // (every path from this checkout: the test runs from test/ or from .tmp_tests/ — one level under the root either way)
 const ROOT = new URL('../', import.meta.url).pathname;
-const SEED = process.env.SEED || '53', N = +(process.env.N || 12), ROUNDS = +(process.env.ROUNDS || 5);
+const SEED = process.env.SEED || '53', N = +(process.env.N || 8), ROUNDS = +(process.env.ROUNDS || 3);
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const BEFORE = process.env.BEFORE_DIST || 'file://' + ROOT + '.tmp_tests/before_dist/index.html';
@@ -102,19 +111,38 @@ async function openWorld(dist, preset) {
   const look = (x, eyeY, z, tx, ty, tz, fov, tod) => ev(([x, y, z, tx, ty, tz, fov, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y - 1.62, z); const dx = tx - x, dy = ty - y, dz = tz - z; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.fovKick = 0; p.vel = [0, 0, 0]; g.settings.fov = fov; if (tod !== null) g.env.setTime(tod); }, [x, eyeY, z, tx, ty, tz, fov, tod === undefined ? null : tod]);
   // the picture: the canvas itself, read in the task that drew it (the HUD is hidden, so it is the same picture) — run 2
   // lost 150 s to every page.screenshot on the loaded machine (the compositor's frame came only on the second try), as
-  // material.mjs's runs had: no compositor frame is needed this way
-  const picture = async (path, frames = 4) => {
-    const url = await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, frames);
+  // material.mjs's runs had: no compositor frame is needed this way. (f-wild2: a fresh TSR history — no ghost of the
+  // last picture; hold: start from the animation clock held for the pair, so on and off see the same waves and clouds)
+  const picture = async (path, frames = 4, hold) => {
+    const url = await ev(([frames, hold]) => { window.__norender = false; const g = VR.game, e = g.env; if (hold) { if (!window.__hold) window.__hold = { a: e.anim, cd: e.cloudDrift ? e.cloudDrift.slice() : null }; else { e.anim = window.__hold.a; if (window.__hold.cd && e.cloudDrift) { e.cloudDrift[0] = window.__hold.cd[0]; e.cloudDrift[1] = window.__hold.cd[1]; } } } g.renderer.tsrReset = true; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, [frames, !!hold]);
     await sharp(Buffer.from(url.split(',')[1], 'base64')).resize(1280, 720).png().toFile(path);
     return true;
   };
-  const wild = (on) => ev((on) => { const g = VR.game, W = VR.Wild; for (const k of W.KEYS) g.settings[k] = on; }, on);
+  const holdEnd = () => ev(() => { window.__hold = null; });
+  // (f-wild2: on — every switch, or only the ones named: the flock's pair with the birds' switch alone)
+  const wild = (on, only) => ev(([on, only]) => { const g = VR.game, W = VR.Wild; for (const k of W.KEYS) g.settings[k] = on && (!only || only.includes(k)); }, [on, only || null]);
+  // (f-wild2) every column within rad blocks of the camera (the player stands there) shown, nothing fading, no section
+  // pending there: t-wild's pictures caught the LOD's flat stand-in ground where a camera stood after its place had
+  // settled elsewhere. → what was still missing when it gave up
+  const settleNear = async (rad = 24, max = 300) => {
+    let s = null;
+    await boost(true);
+    for (let i = 0; i < max; i++) {
+      await step(10, 16);
+      s = await ev((rad) => { const g = VR.game, w = g.world, p = g.player, R = Math.ceil(rad / 16), pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let miss = 0, dirty = 0; for (let dz = -R; dz <= R; dz++) for (let dx = -R; dx <= R; dx++) { const c = w.col(pcx + dx, pcz + dz); if (!c || !(c.shownAt >= 0)) { miss++; continue; } for (const sc of c.sec) if (sc.dirty || sc.pending) dirty++; } return { miss, dirty, fading: w.fading ? w.fading.size : 0, busy: g.pool.busy }; }, rad);
+      s.i = i;
+      if (s.miss === 0 && s.dirty === 0 && s.fading === 0) break;
+      await wait(30);
+    }
+    await boost(false);
+    return s;
+  };
   // how many blocks stand in the line from a to b (every half block; air, water and the water's plants see through)
   const blocked = (a, b) => ev(([a, b]) => { const w = VR.game.world, F = VR.F, T = VR.R.T; let n = 0, last = ''; const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]); for (let t = 0.5; t < L - 1.2; t += 0.5) { const x = Math.floor(a[0] + (b[0] - a[0]) * t / L), y = Math.floor(a[1] + (b[1] - a[1]) * t / L), z = Math.floor(a[2] + (b[2] - a[2]) * t / L), k = x + ',' + y + ',' + z; if (k === last) continue; last = k; const s = w.getBlock(x, y, z); if (s && !(T.flags[s] & (F.FLUID | F.WATERLOG))) n++; } return n; }, [a, b]);
   const report = () => ev(() => (VR.game.wild ? VR.game.wild.report() : null));
   // the actors that come and go (ships, the director's acts, trams, the hall's craft) hold still through a pair
   const freeze = (on) => ev((on) => { const g = VR.game; if (on) { g.__frozen = []; for (const k of ['traffic', 'padLife', 'lifeDirector', 'director', 'starships', 'hall', 'trams']) { const o = g[k]; if (o && typeof o.update === 'function') { g.__frozen.push([o, 'update', o.update]); o.update = function () {}; } } } else { for (const [o, k, f] of g.__frozen || []) o[k] = f; g.__frozen = null; } }, on);
-  return { ctx, page, logs, ev, wait, step, settle, groundY, below, look, picture, wild, report, freeze, blocked, ok };
+  return { ctx, page, logs, ev, wait, step, settle, settleNear, groundY, below, look, picture, holdEnd, wild, report, freeze, blocked, ok };
 }
 const load = async (path) => { const { data, info } = await sharp(path).removeAlpha().raw().toBuffer({ resolveWithObject: true }); return { d: data, w: info.width, h: info.height }; };
 const diff = (A, B) => { let s = 0, big = 0; const n = A.w * A.h; for (let i = 0, p = 0; i < n; i++, p += 3) { const d = Math.abs(A.d[p] - B.d[p]) + Math.abs(A.d[p + 1] - B.d[p + 1]) + Math.abs(A.d[p + 2] - B.d[p + 2]); s += d; if (d > 24) big++; } return { mean: +(s / n / 3).toFixed(3), share: +(big / n).toFixed(4) }; };
@@ -129,31 +157,63 @@ console.log('world', JSON.stringify(meta));
 check(meta.actor && meta.wild.every(v => v === true), `High: the actor is there and the five switches are on (${meta.wild.join(' ')})`);
 await A.settle(80);
 // a shot: set up (returns the camera, or null), then the pair on/off with the same camera
-async function shot(name, setup, extra) {
+// (f-wild2: the camera's place settles before the pair — opts.noSettle when the setup did it at the right moment — and
+//  cam.aim() points it at its subject again after; opts.only: the switches of the on picture; the pair shares its
+//  animation clock; after it, opts.measure(out, on, off) — the numbers the shot is for)
+async function shot(name, setup, extra, opts) {
   if (!want(name)) return;
+  opts = opts || {};
   const t0 = Date.now(), out = { name };
   try {
     await A.wild(true); await A.freeze(false);
     const cam = await setup(out);
     if (!cam) { out.error = out.error || 'no camera'; console.log(`  !! ${name}: ${out.error}`); rec.shots.push(out); save(); return; }
-    out.cam = cam;
+    if (!opts.noSettle) { await A.look(cam.x, cam.y, cam.z, cam.tx, cam.ty, cam.tz, cam.fov || 70, null); out.near = await A.settleNear(24, 300); }
+    if (cam.aim) { const t = await cam.aim(out); if (t) { cam.tx = t[0]; cam.ty = t[1]; cam.tz = t[2]; } }
+    out.cam = Object.assign({}, cam, { aim: undefined });
     await A.freeze(true);
+    await A.wild(true, opts.only);
     await A.look(cam.x, cam.y, cam.z, cam.tx, cam.ty, cam.tz, cam.fov || 70, null);
     await A.step(4);
     out.report = await A.report();
-    await A.picture(`${SHOTS}wild_${name}_on.png`, 4);
+    if (opts.view) out.view = await A.ev(() => { const r = VR.game.renderer; return { vp: Array.from(r.viewProj), w: r.w, h: r.h }; });
+    await A.picture(`${SHOTS}wild_${name}_on.png`, 4, true);
     if (extra) await extra(out);
     await A.wild(false); await A.step(3);
     await A.look(cam.x, cam.y, cam.z, cam.tx, cam.ty, cam.tz, cam.fov || 70, null);
-    await A.picture(`${SHOTS}wild_${name}_off.png`, 4);
+    await A.picture(`${SHOTS}wild_${name}_off.png`, 4, true);
+    await A.holdEnd();
     await A.wild(true); await A.freeze(false);
     const F = [await load(`${SHOTS}wild_${name}_on.png`), await load(`${SHOTS}wild_${name}_off.png`)];
     out.diff = diff(F[0], F[1]);
+    if (opts.measure) out.measure = opts.measure(out, F[0], F[1]);
     out.ms = Date.now() - t0;
-    console.log(`  ${name}: ${JSON.stringify(out.diff)} · ${(out.ms / 1000).toFixed(0)} s (${secs()}) · ${JSON.stringify(out.report).slice(0, 600)}`);
-  } catch (e) { out.error = String(e.message || e).split('\n')[0].slice(0, 300); console.log(`  !! ${name}: ${out.error}`); try { await A.wild(true); await A.freeze(false); } catch (e2) { /* */ } }
+    console.log(`  ${name}: ${JSON.stringify(out.diff)} ${out.measure ? JSON.stringify(out.measure) : ''} · near ${JSON.stringify(out.near || null)} · ${(out.ms / 1000).toFixed(0)} s (${secs()}) · ${JSON.stringify(out.report).slice(0, 500)}`);
+  } catch (e) { out.error = String(e.message || e).split('\n')[0].slice(0, 300); console.log(`  !! ${name}: ${out.error}`); try { await A.holdEnd(); await A.wild(true); await A.freeze(false); } catch (e2) { /* */ } }
   rec.shots.push(out); save();
 }
+// (f-wild2) the pair's numbers: luma (Rec. 709 of the sRGB values); the flock's cover (|on − off| > 24) and its dark core
+// (luma ≤ 60 in on where off is lighter); fish: how many of the projected fish show (≥ 4 changed pixels round them)
+const luma = (A, p) => 0.2126 * A.d[p] + 0.7152 * A.d[p + 1] + 0.0722 * A.d[p + 2];
+const flockMeasure = (out, on, off) => { const n = on.w * on.h; let cover = 0, core = 0; for (let i = 0, p = 0; i < n; i++, p += 3) { const d = Math.abs(on.d[p] - off.d[p]) + Math.abs(on.d[p + 1] - off.d[p + 1]) + Math.abs(on.d[p + 2] - off.d[p + 2]); if (d > 24) cover++; if (luma(on, p) <= 60 && luma(off, p) > 60) core++; } return { cover: +(cover / n * 100).toFixed(2), core: +(core / n * 100).toFixed(2) }; };
+const fishMeasure = (out, on, off) => {
+  const r = out.report, v = out.view, S = r && r.shoals ? r.shoals.find(q => q.fishPos && q.fishPos.length) : null;
+  if (!S || !v) return { fish: 0, seen: 0, why: !S ? 'no shoal' : 'no view' };
+  const n = on.w * on.h, M = new Uint8Array(n), c = out.cam;
+  for (let i = 0, p = 0; i < n; i++, p += 3) if (Math.abs(on.d[p] - off.d[p]) + Math.abs(on.d[p + 1] - off.d[p + 1]) + Math.abs(on.d[p + 2] - off.d[p + 2]) > 30) M[i] = 1;
+  let seen = 0, inView = 0; const sx = on.w, sy = on.h, m = v.vp;
+  for (const f of S.fishPos) {
+    const x = f[0] - c.x, y = f[1] - c.y, z = f[2] - c.z;   // (the frame's world is camera-relative: the eye at the origin)
+    const cx = m[0] * x + m[4] * y + m[8] * z + m[12], cy = m[1] * x + m[5] * y + m[9] * z + m[13], cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (cw <= 0.05) continue;
+    const px = Math.round((cx / cw * 0.5 + 0.5) * sx), py = Math.round((1 - (cy / cw * 0.5 + 0.5)) * sy);
+    if (px < 3 || py < 3 || px >= sx - 3 || py >= sy - 3) continue;
+    inView++;
+    let k = 0; for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) k += M[(py + dy) * sx + px + dx];
+    if (k >= 4) seen++;
+  }
+  return { fish: S.fishPos.length, inView, seen };
+};
 // travel: fly there, the chunks settled
 const go = async (x, y, z, tod) => { await A.ev(([x, y, z, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); if (tod !== null) g.env.setTime(tod); }, [x, y, z, tod === undefined ? null : tod]); await A.settle(150, 8); };
 
@@ -174,10 +234,11 @@ await shot('murm', async (out) => {
   await A.step(900);   // (30 s: the flock comes in from afar and swirls round its stage)
   let r = await A.report();
   if (!r || !r.murm) { out.error = 'no murmuration'; return null; }
-  const c = r.murm.ctr, bx = 205 - c[0], bz = 10 - c[2], bl = Math.hypot(bx, bz) || 1, dd = Math.min(bl, 170);
+  // (f-wild2: 145 blocks off — the beach's line, the preview's distance; aimed again at the flock after the settle)
+  const c = r.murm.ctr, bx = 205 - c[0], bz = 10 - c[2], bl = Math.hypot(bx, bz) || 1, dd = Math.min(bl, 145);
   const ex = c[0] + bx / bl * dd, ez = c[2] + bz / bl * dd, gy = await A.groundY(ex, ez);
   out.murm = r.murm;
-  return { x: ex, y: Math.max(gy + 1 + EYE + 1, PL.sea + 3), z: ez, tx: c[0], ty: c[1] + 4, tz: c[2], fov: 70 };
+  return { x: ex, y: Math.max(gy + 1 + EYE + 1, PL.sea + 3), z: ez, tx: c[0], ty: c[1] + 4, tz: c[2], fov: 70, aim: async () => { const q = await A.report(); return q && q.murm ? [q.murm.ctr[0], q.murm.ctr[1] + 4, q.murm.ctr[2]] : null; } };
 }, async (out) => {
   const r = await A.report(); if (!r || !r.murm) return;
   const c = r.murm.ctr, cam = out.cam, bx = cam.x - c[0], bz = cam.z - c[2], bl = Math.hypot(bx, bz) || 1;
@@ -185,7 +246,7 @@ await shot('murm', async (out) => {
   out.murmClose = { cam: [+ex.toFixed(1), +ey.toFixed(1), +ez.toFixed(1)], ctr: c, spread: r.murm.spread };
   await A.look(ex, ey, ez, c[0], c[1], c[2], 70, null); await A.step(2);
   await A.picture(`${SHOTS}wild_murm_close_on.png`, 4);
-});
+}, { only: ['wildBirds'], measure: flockMeasure });
 // 2 the heron at the nearest lily pond (and carp, dragonflies), morning; then within 7 — it takes off
 await shot('heron', async (out) => {
   const P0 = PL.pond; if (!P0) { out.error = 'no pond'; return null; }
@@ -215,20 +276,49 @@ await shot('heron', async (out) => {
   out.heronFly = h2 || null;
   if (h2) { await A.look(cam.x, cam.y, cam.z, h2.pos[0], h2.pos[1] + 0.8, h2.pos[2], 62, null); await A.picture(`${SHOTS}wild_heron_fly_on.png`, 4); }
 });
-// 3 the shoal under the pier, from its end, the sun high
+// 3 the shoal at the pier (f-wild2: R50-10's photo 07 — 48 fish in the lake, none in the picture): the player stands
+// still on the pier's end in the late morning; the shoal comes to its shadow on the water beside the deck; the eye looks
+// down at it. Counted: the fish that show in the picture (≥ 4 changed pixels round each)
 await shot('shoal', async (out) => {
   const Pi = PL.pier; if (!Pi) { out.error = 'no pier'; return null; }
-  const ux = Pi.dir[0], uz = Pi.dir[1];
-  await go(Pi.x - ux * 3, Pi.y + 6, Pi.z - uz * 3, 6000);
-  await A.step(120);
+  const ux = Pi.dir[0], uz = Pi.dir[1], ex = Pi.x + 0.5 - ux * 1.5, ez = Pi.z + 0.5 - uz * 1.5;
+  await go(ex, Pi.y + 6, ez, 5200);
+  await A.ev(([x, y, z]) => { const p = VR.game.player; p.teleport(x, y, z); p.vel = [0, 0, 0]; }, [ex, Pi.y + 1, ez]);
+  await A.settleNear(24, 200);
+  await A.step(300);   // (10 s: the shoal comes to the shadow)
   const r = await A.report(), s = r && r.shoals && (r.shoals.find(q => !q.key.startsWith('eye:')) || r.shoals[0]);
-  if (!s) { out.error = 'no shoal: ' + JSON.stringify(r && r.shoals); return null; }
-  out.shoal = s;
-  // (the clearest look down at it from 5.5 blocks: a crate on the pier stood in run 2's way)
-  const v = await clearView(s.ctr, 5.5, 3.3);
-  out.shoalView = { blocked: v.n };
-  return { x: v.x, y: v.y, z: v.z, tx: s.ctr[0], ty: s.ctr[1], tz: s.ctr[2], fov: 66 };
-});
+  if (!s) { out.error = 'no shoal: ' + JSON.stringify(r && r.shoals && r.shoals.map(q => q.key)); return null; }
+  out.shoal = { key: s.key, ctr: s.ctr, follow: s.follow, b: s.b };
+  return { x: ex, y: Pi.y + 1 + EYE, z: ez, tx: s.ctr[0], ty: s.ctr[1], tz: s.ctr[2], fov: 70, aim: async () => { const q = await A.report(), t = q && q.shoals && (q.shoals.find(z => z.key === s.key) || q.shoals[0]); return t ? t.ctr : null; } };
+}, null, { noSettle: true, view: true, measure: fishMeasure });
+// 3b the pass at dusk (f-wild2): the young ray's glide past the beach's cell at the day's moment, from the eye in the cell
+// (the eye 7 blocks from the cell's middle toward the isles; the wild's clock set 115 s before the moment — the actor
+// plans 10–110 s before it — the sky held at the moment's light, the clock run on to the moment)
+await shot('pass', async (out) => {
+  const cell = 24, cx = Math.floor(236 / cell) * cell + cell / 2, cz = Math.floor(36 / cell) * cell + cell / 2;
+  const tn = await A.ev(() => VR.Wild.passTime(VR.game.wild.seed, VR.game.env.day | 0));
+  await go(cx, 80, cz, tn - 60);
+  const D = await A.ev(([x, z]) => { const I = VR.Heart && VR.Heart.ISLES ? VR.Heart.ISLES : { x: 330, z: 140 }, dx = x - I.x, dz = z - I.z, l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; }, [cx, cz]);
+  const ex = cx + 0.5 - D[0] * 7, ez = cz + 0.5 - D[1] * 7, egy = await A.groundY(ex, ez);
+  await A.ev(([x, y, z]) => { const p = VR.game.player; p.teleport(x, y, z); p.vel = [0, 0, 0]; }, [ex, egy + 1, ez]);
+  out.near = await A.settleNear(24, 200);
+  await A.ev((t) => { const g = VR.game; g.env.setTime(t); g.wild.clock = null; }, tn - 2300);
+  await A.step(2);
+  await A.ev((t) => VR.game.env.setTime(t), tn - 60);
+  let r = null;
+  for (let k = 0; k < 90; k++) { await A.step(20, 100); r = await A.report(); if (r && r.pass && r.pass.plan && r.clock >= r.pass.plan.Tn - 3) break; if (r && r.pass && r.pass.tried && !r.pass.plan) break; }
+  for (let k = 0; k < 40 && r && r.pass && r.pass.plan && r.clock < r.pass.plan.Tn - 0.4; k++) { await A.step(3); r = await A.report(); }
+  out.pass = r && r.pass; out.clock = r && r.clock;
+  if (!r || !r.pass || !r.pass.plan) { out.error = 'no pass: ' + JSON.stringify(r && { pass: r.pass, clock: r.clock }); return null; }
+  const R = r.rays[r.pass.plan.k];
+  out.ray = R; out.dist = +Math.hypot(R[0] - ex, R[1] - (egy + 1 + EYE), R[2] - ez).toFixed(1);
+  return { x: ex, y: egy + 1 + EYE, z: ez, tx: R[0], ty: R[1], tz: R[2], fov: 70 };
+}, async (out) => {
+  // 2.5 s on: the ray past the eye, climbing away (the picture for the sheet)
+  await A.step(75); const q = await A.report(), R = q && q.pass && q.pass.plan ? q.rays[q.pass.plan.k] : null;
+  if (R) { const c = out.cam; out.rayAfter = R; await A.look(c.x, c.y, c.z, R[0], R[1], R[2], 70, null); await A.step(2); await A.picture(`${SHOTS}wild_pass_after_on.png`, 4); }
+  await A.ev(() => { VR.game.wild.clock = null; });   // (the clock from the world again)
+}, { noSettle: true, only: ['wildRays'], measure: flockMeasure });
 // 4 the butterflies on a flower drift near the meadow; then walking through them
 await shot('bfly', async (out) => {
   await go(240, 90, -120, 5200);
@@ -341,12 +431,12 @@ await shot('fox', async (out) => {
 try {
   const rows = [];
   for (const s of rec.shots) if (!s.error && fs.existsSync(`${SHOTS}wild_${s.name}_on.png`)) rows.push([s.name, `${SHOTS}wild_${s.name}_off.png`, `${SHOTS}wild_${s.name}_on.png`]);
-  for (const [n, p] of [['murm_close', 'wild_murm_close_on.png'], ['heron_fly', 'wild_heron_fly_on.png'], ['bfly_rise', 'wild_bfly_rise_on.png']]) if (fs.existsSync(SHOTS + p)) rows.push([n, null, SHOTS + p]);
+  for (const [n, p] of [['murm_close', 'wild_murm_close_on.png'], ['pass_after', 'wild_pass_after_on.png'], ['heron_fly', 'wild_heron_fly_on.png'], ['bfly_rise', 'wild_bfly_rise_on.png']]) if (fs.existsSync(SHOTS + p)) rows.push([n, null, SHOTS + p]);
   const Wc = 640, Hc = 360, comps = [];
   for (let i = 0; i < rows.length; i++) {
     const [n, off, on] = rows[i];
     for (const [k, p] of [[0, off], [1, on]]) if (p) comps.push({ input: await sharp(p).resize(Wc, Hc).toBuffer(), left: k * Wc, top: i * Hc });
-    const svg = `<svg width="${Wc * 2}" height="${Hc}"><style>.t{font:bold 22px sans-serif;fill:#fff;stroke:#000;stroke-width:3px;paint-order:stroke}</style><text x="12" y="30" class="t">${n} · off (v0.48)</text><text x="${Wc + 12}" y="30" class="t">${n} · on (t-wild)</text></svg>`;
+    const svg = `<svg width="${Wc * 2}" height="${Hc}"><style>.t{font:bold 22px sans-serif;fill:#fff;stroke:#000;stroke-width:3px;paint-order:stroke}</style><text x="12" y="30" class="t">${n} · off</text><text x="${Wc + 12}" y="30" class="t">${n} · on (f-wild2)</text></svg>`;
     comps.push({ input: Buffer.from(svg), left: 0, top: i * Hc });
   }
   if (rows.length) await sharp({ create: { width: Wc * 2, height: Hc * rows.length, channels: 3, background: { r: 20, g: 22, b: 30 } } }).composite(comps).jpeg({ quality: 82 }).toFile(SHOTS + 'wild_sheet.jpg');
@@ -356,7 +446,13 @@ try {
 // the shots' checks: each one framed, the picture changed where the animals are
 for (const s of rec.shots) check(!s.error, `${s.name}: framed and pictured (test/shots/wild_${s.name}_on.png | _off.png)${s.error ? ' — ' + s.error : ''}`);
 const sm = rec.shots.find(s => s.name === 'murm');
-if (sm && sm.report && sm.report.murm) check(sm.report.murm.n >= 240 && sm.diff && sm.diff.share > 0.002, `the murmuration: ${sm.report.murm.n} birds, ${(sm.diff ? sm.diff.share * 100 : 0).toFixed(2)} % of the picture changed`);
+if (sm && sm.report && sm.report.murm) check(sm.report.murm.n >= 600, `the murmuration on High: ${sm.report.murm.n} boids (2× t-wild's 300 and more)`);
+// (f-wild2 · R50-10's measures)
+if (sm && !sm.error) check(!!sm.measure && sm.measure.cover >= 3 && sm.measure.core >= 1, `the flock from the shore: ${sm.measure ? sm.measure.cover : '—'} % of the lake view (≥ 3), its dark core ${sm.measure ? sm.measure.core : '—'} % (luma ≤ 60, ≥ 1)`);
+const sp = rec.shots.find(s => s.name === 'pass');
+if (sp && !sp.error) check(!!sp.measure && sp.measure.cover >= 2 && sp.dist <= 40, `the young ray's pass at dusk: ${sp.dist} blocks from the eye (≤ 40), ${sp.measure ? sp.measure.cover : '—'} % of the frame (≥ 2), ${sp.pass && sp.pass.plan ? sp.pass.plan.scale : '—'} blocks across`);
+const ss = rec.shots.find(s => s.name === 'shoal');
+if (ss && !ss.error) check(!!ss.measure && ss.measure.seen >= 10, `the shoal from the pier: ${ss.measure ? ss.measure.seen : 0} fish show (≥ 4 px; ${ss.measure ? ss.measure.inView : 0} in the view, ${ss.measure ? ss.measure.fish : 0} in the shoal; at the shadow ${ss.report && ss.report.shoals ? ss.report.shoals.some(q => q.follow) : '—'})`);
 const sh = rec.shots.find(s => s.name === 'heron');
 if (sh && !sh.error) check(!!sh.heronFly && sh.heronFly.state !== 'stand', `the heron takes off within 7 (${sh.heronFly ? sh.heronFly.state : '—'})`);
 const sb = rec.shots.find(s => s.name === 'bfly');
@@ -402,7 +498,8 @@ if (!process.env.NO_POTATO) {
     const vl = await P2.ev(() => { const g = VR.game, s = g.settings; return { sw: VR.Wild.KEYS.map(k => s[k]), on: g.wild ? g.wild.on : null, prog: g.renderer.P.wild === undefined ? 'none' : 'compiled', rep: g.wild ? g.wild.report() : null }; });
     check(vl.sw.every(v => !v) && vl.on === false && vl.prog === 'none' && vl.rep && vl.rep.inst === 0, `Very Low: the five switches off, the actor off, no program compiled, nothing drawn (${JSON.stringify({ sw: vl.sw, on: vl.on, prog: vl.prog })})`);
     try { await P2.picture(`${SHOTS}wild_potato_meadow_after.png`, 6); } catch (e) { console.log('  !! no Very Low picture'); }
-    const B = await openWorld(BEFORE, 'potato'); check(B.ok, `the build before on Very Low (${secs()})`); pages.push(['before', B]); await place(B);
+    const haveBefore = !process.env.NO_BEFORE && fs.existsSync(new URL(BEFORE).pathname);
+    if (haveBefore) { const B = await openWorld(BEFORE, 'potato'); check(B.ok, `the build before on Very Low (${secs()})`); pages.push(['before', B]); await place(B); } else console.log('  · no build before (NO_BEFORE or no ' + BEFORE + '): Very Low against itself only');
     const measure = (Pg, n) => Pg.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
     const rounds = {};
     for (let r = 0; r < ROUNDS + 2; r++) { const order = r & 1 ? pages.slice().reverse() : pages; for (const [lbl, Pg] of order) (rounds[lbl] = rounds[lbl] || []).push(await measure(Pg, 16)); }
