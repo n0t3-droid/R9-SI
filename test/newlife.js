@@ -75,8 +75,10 @@ TR.FADE_IN = 5; TR.FADE_OUT = 5;
     check(h0.dim === 'overworld' && h0.implicit === true && close(h0.pos, [7.5, 81, 9.5]) && close(h0.bed, [7, 80, 9]), 'an old save lives on Herzwelt at its spot and bed', JSON.stringify(h0));
     check(NL.homeOf(META({ type: 'flat', dim: 'flat' }), null).dim === 'flat', 'a flat world lives on its flat land');
     // a home on a world this build does not know: Herzwelt, and the save keeps it for a newer build
-    const mu = META({ universe: { v: 1, home: { dim: 'opal', pos: [1, 2, 3], since: 5 } } });
-    check(NL.homeOf(mu, null).dim === 'overworld' && mu.universe.home.dim === 'opal', 'a home on an unknown world (opal before u-moons1): Herzwelt now, kept in the save', NL.homeOf(mu, null).dim);
+    const mu = META({ universe: { v: 1, home: { dim: 'nowhere', pos: [1, 2, 3], since: 5 } } });   // (opal is a real world since u-moons1)
+    check(NL.homeOf(mu, null).dim === 'overworld' && mu.universe.home.dim === 'nowhere', 'a home on an unknown world (a dim this build does not know): Herzwelt now, kept in the save', NL.homeOf(mu, null).dim);
+    const mo = META({ universe: { v: 1, home: { dim: 'opal', pos: [1, 2, 3], since: 5 } } });
+    check(!VR.DimReg || !VR.DimReg.get('opal') || NL.homeOf(mo, null).dim === 'opal', 'a home on Opal (u-moons1) is a home on Opal', NL.homeOf(mo, null).dim);
     check(NL.homeOf(META({ universe: { home: { dim: 'drift', pos: [1, NaN, 3] } } }), null).dim === 'overworld', 'a broken home (NaN) counts as Herzwelt');
 
     const g = mkGame(META()), meta = META();
