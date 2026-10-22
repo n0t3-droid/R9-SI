@@ -222,6 +222,14 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
   run(Af, gf, 40, 0.05, () => { if (Af.fox) { fox = fox || Af.fox; if (Af.fox.state === 'pounce') pounce = true; if (Af.fox.state === 'slip') slip = true; } });
   check(!!fox, 'at dusk a fox comes along the hedge');
   check(pounce && slip, `it pounces at nothing and slips into the hedge at the end (pounce ${pounce}, slip ${slip})`);
+  // (the fox's rest after a walk is the evening's: run 3 of wild.mjs met a rest carried over from an earlier dusk — the
+  //  next dusk's fox, and the one after the switches were off, comes at once)
+  gf.env.ticks = 6000; run(Af, gf, 2, 0.05);
+  gf.env.ticks = 11400; let next = null; run(Af, gf, 3, 0.05, () => { next = next || Af.fox; });
+  check(!!next, `the next dusk's fox comes at once (rest left ${(Af.foxT || 0).toFixed(0)} s)`);
+  for (const k of W.KEYS) gf.settings[k] = false; run(Af, gf, 0.5, 0.05);
+  for (const k of W.KEYS) gf.settings[k] = true; let back = null; run(Af, gf, 3, 0.05, () => { back = back || Af.fox; });
+  check(!!back, 'and after the switches were off and on again');
 }
 
 // ---------------------------------------------------------------- 8. the herds' paths

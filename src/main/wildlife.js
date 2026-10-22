@@ -209,7 +209,7 @@
       for (const k of PIECES) { this.stats.ms[k] = 0; this.stats.avg[k] = 0; }
     }
     destroy() { this.reset(); if (this.g.airLife) this.g.airLife.noButterflies = false; }
-    reset() { this.murm = null; this.gulls.length = 0; this.herons.length = 0; this.shoals.length = 0; this.carps.length = 0; this.swarms.length = 0; this.dflies.length = 0; this.rabbits.length = 0; this.fox = null; this.live = false; }
+    reset() { this.murm = null; this.gulls.length = 0; this.herons.length = 0; this.shoals.length = 0; this.carps.length = 0; this.swarms.length = 0; this.dflies.length = 0; this.rabbits.length = 0; this.fox = null; this.foxT = 0; this.live = false; }
     // the world's clock (s): the world time at the start, then real seconds; again from the world when the two part (a
     // time set by hand) — the rays are where this clock says (the same for host and guests)
     tick(dt) {
@@ -726,7 +726,7 @@
       for (const r of RB) this.rabbitStep(r, dt, ctx);
       // the fox at dusk: along a hedge (a run of cover) near the eye, a pounce at nothing, into the hedge at the end
       const okF = cap.fox && ctx.sc.fox && !ctx.wet;
-      if (!okF) this.fox = null;
+      if (!okF) { this.fox = null; this.foxT = 0; }   // (the rest after a walk is the evening's: the next dusk's fox comes at once)
       else if (!this.fox && S.done && !S.miss && (this.foxT = (this.foxT || 0) - dt) <= 0) {
         // (only on a whole scan — run 2's first look met a hedge whose columns had not come and waited 20 s; no hedge:
         //  another look in 6 s)

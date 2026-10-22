@@ -322,7 +322,12 @@ await shot('rabbit', async (out) => {
 });
 // 9 the fox at dusk along a hedge (a straight hedgerow by the way east of the origin), from its open side
 await shot('fox', async (out) => {
+  // (run 3 met no fox: it came while the place settled — 16 s along the hedge, the node probe has it at 0.2 s — and then
+  //  rested 90 s, past the 32 s of looking. Now the place settles with the wild off, and the evening begins when the
+  //  camera is there; the game clears the rest when the dusk or the switches go)
+  await A.wild(false);
   await go(88, 90, 57, 11200);
+  await A.wild(true);
   let r = null, f = null;
   for (let k = 0; k < 16 && !f; k++) { await A.step(60); r = await A.report(); f = r && r.fox && r.fox.state !== "slip" ? r.fox : null; }
   if (!f) { out.error = 'no fox (cover ' + (r && r.cover) + ')'; return null; }
