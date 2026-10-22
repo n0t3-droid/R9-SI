@@ -483,16 +483,18 @@
   Q.stats = { marks: 0, draws: 0, ticks: 0, offers: 0, done: 0 };
 
   // ---------------------------------------------------------------- the world's places (for a village)
-  const PL = { key: null, vistas: null, asking: false };
+  const PL = { key: null, vistas: null, asking: false, at: 0, ver: 0 };
   Q.placesNow = null;   // (a test may give the places itself)
+  Q.VISTA_WAIT = 60000;   // a worker that never answers: after a minute the places go without the vistas
   function heartOn(g) { const m = g && g.meta; return !!(m && (m.vgen | 0) >= 3 && m.type !== 'flat' && g.dim === 'overworld'); }
   function vistas(g) {
     const key = (g.meta && g.meta.id) + ':' + g.dim;
-    if (PL.key !== key) { PL.key = key; PL.vistas = null; PL.asking = false; }
+    if (PL.key !== key) { PL.key = key; PL.vistas = null; PL.asking = false; PL.ver++; }
+    if (PL.asking && !PL.vistas && Date.now() - PL.at >= Q.VISTA_WAIT) { PL.vistas = []; PL.ver++; }
     if (PL.vistas || PL.asking) return PL.vistas;
     if (!heartOn(g) || (g.meta.vgen | 0) < 11 || !g.pool || !g.pool.direct) { PL.vistas = []; return PL.vistas; }
-    PL.asking = true;
-    try { g.pool.direct(0, { type: 'vistas', dim: g.dim }, null, (m) => { if (PL.key === key) { PL.vistas = (m && m.list) || []; PL.asking = false; } }); } catch (e) { PL.vistas = []; PL.asking = false; }
+    PL.asking = true; PL.at = Date.now();
+    try { g.pool.direct(0, { type: 'vistas', dim: g.dim }, null, (m) => { if (PL.key === key) { PL.vistas = (m && m.list) || []; PL.asking = false; PL.ver++; } }); } catch (e) { PL.vistas = []; PL.asking = false; }
     return null;
   }
   // a village's places: null while the world's list is not complete (no offer, no ✦ until it is)
@@ -501,12 +503,14 @@
     const g = game(); if (!g || !vil) return null;
     const vs = vistas(g); if (!vs) return null;
     const mgr = g.villages, P = vil.plan || vil, at0 = mgr && mgr.siteAt;
-    // the villages' list (r 900 around where it was asked) holds every village within 600 of this one when asked near it
+    // the villages' list (r 900 around where it was asked) holds every village within 600 of this one when asked within
+    // 300 of it — so the villages within 600 only: the same list wherever near it the player asked (deterministic)
     const sitesOk = !mgr || !at0 || Math.hypot(at0[0] - P.x, at0[1] - P.z) <= 300;
     if (!sitesOk) return null;
-    const key = vil.id + ':' + PL.key + ':' + (mgr && mgr.sites ? mgr.sites.length : 0);
+    const near = (mgr && mgr.sites || []).filter(s => Math.hypot(s.x - P.x, s.z - P.z) <= 600);
+    const key = vil.id + ':' + PL.key + ':' + PL.ver + ':' + near.map(s => s.id).join(',');
     if (vil._qpl && vil._qpl.key === key) return vil._qpl.list;
-    const list = Q.places({ heart: heartOn(g), vistas: vs, villages: (mgr && mgr.sites || []).filter(s => Math.hypot(s.x - P.x, s.z - P.z) <= 900), vid: vil.id });
+    const list = Q.places({ heart: heartOn(g), vistas: vs, villages: near, vid: vil.id });
     vil._qpl = { key, list };
     return list;
   };
@@ -591,6 +595,8 @@
     save();
     // Begleiten: the walk starts at once — the talk closes, the villager sets off
     if (offer.k === 'escort') { goEscort(mgr, a); return; }
+    // Rätsel: the three answers at once (the question stays in view)
+    if (offer.k === 'riddle') { const r = Q.get(r0, a.p.id); if (r) { say(mgr, open(mgr, a, r)); return; } }
     say(mgr, line);
     if (mgr.talkOptions) mgr.talkOptions(a);
   }
@@ -812,14 +818,19 @@
     if (!s) { css(); s = document.createElement('div'); s.id = 'journal'; s.className = 'screen'; if (s.setAttribute) s.setAttribute('id', 'journal'); const p = document.createElement('div'); p.className = 'panel box jcard'; s.appendChild(p); (document.getElementById('ui') || document.body).appendChild(s); }
     return s;
   }
-  Q.jArm = null;
+  Q.jArm = null; Q.jFrom = null;
   Q.journal = function () {
     const g = game(); if (!g || !g.ui) return false;
     if (!Q.on()) { if (g.ui.hint) g.ui.hint(T('g.q.j.off'), 2600); return false; }
+    Q.jFrom = g.ui.screen === 'pause' ? 'pause' : null;   // (opened from the pause menu: Esc steps back to it)
     journalEl(); g.ui.show('journal'); Q.renderJournal();
     return true;
   };
-  Q.closeJournal = function () { const g = game(); if (g && g.ui && g.ui.screen === 'journal') { Q.jArm = null; if (g.ui.resume) g.ui.resume(); } };
+  Q.closeJournal = function () {
+    const g = game(); if (!g || !g.ui || g.ui.screen !== 'journal') return;
+    const back = Q.jFrom; Q.jArm = null; Q.jFrom = null;
+    if (back === 'pause' && g.ui.pause) g.ui.pause(); else if (g.ui.resume) g.ui.resume();
+  };
   const COIN = '<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#ffc83d" stroke="#8a5208" stroke-width="1"/><path d="M12 5.8L13.47 9.98 17.9 10.08 14.38 12.77 15.64 17.02 12 14.5 8.36 17.02 9.62 12.77 6.1 10.08 10.53 9.98Z" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6" stroke-linejoin="round"/></svg>';
   Q.renderJournal = function () {
     const s = journalEl(), g = game(), r0 = rec(); if (!s || !g || !r0) return;
@@ -930,6 +941,7 @@
     const V = VR.Villages, A = VR.Adventure;
     if (!A) return;   // (quests.js runs after adventure.js in the game; a test loads it later)
     hooked = true;
+    css();   // (the talk's ✦ button and the answers are styled before the journal is ever opened)
     // placing: VR.Adventure.placed (a-core's chained g.onBlockPlaced) → the block read back from the world
     const op = A.placed;
     A.placed = function (x, y, z) {

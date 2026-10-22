@@ -583,7 +583,7 @@
   #create .hr { margin: 6px 0; }
   #create label.note { min-height: 34px; }
 }
-#create .panel.box > .row.gap:last-child { position: sticky; bottom: -14px; z-index: 2; padding: 8px 0 6px; background: linear-gradient(180deg, rgba(12, 17, 34, 0), rgba(12, 17, 34, .96) 35%); }
+@media (max-height: 680px) { #create .panel.box > .row.gap:last-child { position: sticky; bottom: -14px; z-index: 2; padding: 8px 0 6px; background: linear-gradient(180deg, rgba(12, 17, 34, 0), rgba(12, 17, 34, .96) 35%); } }   /* (where it would scroll: the row stays in view) */
 @media (prefers-reduced-motion: reduce) { #advup .rays, #advup .sparks { display: none; } #advup.on, #advup.off, #advhud.up .ring, #advhud.pop, #advhud .fl { animation-duration: .01s; } #advhud .ring .arc { transition: none; } }
 `;
 })(VR);

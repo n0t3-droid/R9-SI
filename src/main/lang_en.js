@@ -160,7 +160,7 @@
     'g.q.j.track': '🧭 Track', 'g.q.j.tracked': '🧭 Tracking', 'g.q.j.drop': 'Give up', 'g.q.j.dropSure': 'Really give up?', 'g.q.j.from': 'from {g} · {v}', 'g.q.j.where': '{place} · {d} m to the {dir}',
     'g.q.j.sky': 'In the sky — maybe you know the answer already', 'g.q.j.moon': 'On {dim}', 'g.q.j.whenNow': '⏰ {hour} — now!', 'g.q.j.whenIn': '⏰ {hour} — in {m} min.', 'g.q.j.back': 'Back to {g}', 'g.q.j.keys': 'J opens and closes the journal · Esc closes it',
     'g.q.j.close': 'Close', 'g.q.j.prog': '{a} of {b} placed', 'g.q.j.size.S': 'small', 'g.q.j.size.M': 'medium', 'g.q.j.size.L': 'large', 'g.q.j.off': 'The journal is there in Abenteuer worlds (Pause → ⚔ Adventure).',
-    'g.q.j.stub': 'This needs something that is coming soon.', 'g.q.pause': '📖 Journal', 'g.q.pauseTip': 'Your tasks: where, when and what they bring (J)', 'g.q.compass': '{name} — {d} m {arrow}',
+    'g.q.j.stub': 'This needs something that is coming soon.', 'g.q.pause': '📖 Journal', 'g.q.pauseTip': 'Your tasks: where, when and what they bring (J)', 'g.q.compass': '{name} — {d}\u00a0m\u00a0{arrow}',
     'g.q.rid.dust_sunset.q': 'Ocker is a dust moon like Mars: by day its sky is butterscotch. What colour is the sky around the setting sun?',
     'g.q.rid.dust_sunset.a0': 'Blue — the fine dust sends blue light forward, close around the sun', 'g.q.rid.dust_sunset.a1': 'Green — because of all the plants', 'g.q.rid.dust_sunset.a2': 'Deep red, just like here',
     'g.q.rid.dust_sunset.why': 'The dust is tiny, about one and a half thousandths of a millimetre. It sends blue light forward in a narrow cone — so on Ocker the sky glows blue around the sun. A Mars rover photographed just such a blue sunset.',

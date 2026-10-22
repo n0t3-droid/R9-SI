@@ -377,6 +377,29 @@ const A = VR.Adventure;
   const jq = DOM.body.querySelector('#journal .panel');
   check(jq && /Tagebuch/.test(jq.innerHTML) && /Mira|Lindenau/.test(jq.innerHTML), 'it lists the open quest with its giver and village');
   check(VR.Binds.byName('KeyJ') === 'journal', 'binds.js: J is the Tagebuch\'s key (journal)');
+  Q.closeJournal();
+  check(g.ui.screen === null, 'opened in the game: closing it goes back to the game');
+  g.ui.pause = function () { this.screen = 'pause'; };
+  g.ui.screen = 'pause'; Q.journal(); Q.closeJournal();
+  check(g.ui.screen === 'pause', 'opened from the pause menu: Esc steps back to the pause menu');
+  g.ui.screen = null;
+  // the world's places for a village (the game's path, not the test's): the vistas from a worker, the villages within 600
+  {
+    Q.placesNow = null;
+    const meta0 = g.meta.vgen, pool0 = g.pool, sa0 = mgr.siteAt, si0 = mgr.sites, w0 = Q.VISTA_WAIT;
+    g.meta.vgen = 11; let asked = 0;
+    g.pool = { direct() { asked++; } };   // a worker that never answers
+    mgr.siteAt = [village.x + 120, village.z]; mgr.sites = [{ id: 'near', x: village.x + 500, y: 70, z: village.z, name: 'Nahdorf' }, { id: 'far', x: village.x + 800, y: 70, z: village.z, name: 'Ferndorf' }];
+    check(Q.placesFor(vil) === null && asked === 1, 'the vistas asked from a worker once: no places (no offers) until the answer');
+    Q.VISTA_WAIT = 0;
+    const pl1 = Q.placesFor(vil);
+    check(Array.isArray(pl1) && pl1.length > 0 && !pl1.some(p => p.kind === 'vista'), 'a worker that never answers: after Q.VISTA_WAIT the places go without the vistas (' + (pl1 ? pl1.length : 0) + ')');
+    const ids = (pl1 || []).filter(p => p.kind === 'village').map(p => p.id);
+    check(ids.indexOf('vil:near') >= 0 && ids.indexOf('vil:far') < 0, 'the villages within 600 only (the same list from anywhere within 300 of the village): ' + ids.join(', '));
+    mgr.siteAt = [village.x + 500, village.z];
+    check(Q.placesFor(vil) === null, 'asked far from the village (500): no places — the list might miss a village');
+    g.meta.vgen = meta0; g.pool = pool0; mgr.siteAt = sa0; mgr.sites = si0; Q.VISTA_WAIT = w0; Q.placesNow = places;
+  }
   // the marks do nothing in a builder's world
   A.setOn(false); Q.mark(mgr);
   check(vil.agents.every(a => !a.qMark), 'the Abenteuer off: no ✦');

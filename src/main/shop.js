@@ -180,6 +180,7 @@
   S.talkButtons = function (mgr, a, box) {
     if (!box || !a || !on()) return 0;
     const shop = S.shopOf(a.role || (a.p && a.p.role)); if (!shop) return 0;
+    css();
     const b = mk('button', 'btn small shopbtn', T('g.shop.btn.' + shop));
     b.dataset.shop = shop; if (b.setAttribute) b.setAttribute('data-shop', shop);
     b.onclick = () => { if (mgr && mgr.chirp) mgr.chirp(a); S.open(shop, a, mgr); };
