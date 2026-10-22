@@ -507,9 +507,9 @@
     if (this.space) SS.close(this);
     SS.open(this, name);
   };
-  // one space frame: Esc leaves, T / Enter / / open the chat, the mouse turns the view; the clock and the weather's
-  // schedule go on, the world itself waits (it is not updated and not torn down)
-  SS.frame = function (g, dt) {
+  // one space frame (SS.step — SS.frame is a body's axes): Esc leaves, T / Enter / / open the chat, the mouse turns the
+  // view; the clock and the weather's schedule go on, the world itself waits (it is not updated and not torn down)
+  SS.step = function (g, dt) {
     const S = g.space, r = g.renderer, i = g.input, ui = g.ui;
     if (!ui.typing) {
       if (i.hit('Escape')) { if (ui.screen) ui.resume(); else { SS.close(g); ui.chatLine(T('g.space.off'), '#cfe6ff'); return; } }
@@ -537,7 +537,7 @@
       S.ready = SS.needs(this, S.anc, SS.tier(this)) || performance.now() - S.since > 45000;
       if (S.ready) { S.shown = true; hud(false); if (this.renderer) this.renderer.tsrReset = true; this.ui.chatLine(T('g.space.on', { place: T('g.space.place.' + S.name) }), '#cfe6ff'); }
     }
-    if (S && S.ready) return SS.frame(this, dt);
+    if (S && S.ready) return SS.step(this, dt);
     return origPlay.call(this, dt);
   };
   const origTear = G.prototype.teardownWorld;

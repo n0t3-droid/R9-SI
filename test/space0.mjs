@@ -174,6 +174,7 @@ async function runPreset(preset) {
     let firstWall = null;
     for (const v of VIEWS) {
       const t1 = Date.now();
+      try {   // (a view that throws is logged and the next one runs)
       await P.ev(([d, tk, sun, cmd]) => {
         const g = VR.game, p = g.player, SS = VR.SpaceScene, BT = VR.BodyTex;
         g.env.day = d; g.env.ticks = tk;
@@ -213,8 +214,9 @@ async function runPreset(preset) {
         console.log(`  cost: plaza ${R.cost.plazaWall} ms (CPU ${R.cost.plazaCpu}) · space ${R.cost.spaceWall} ms (CPU ${R.cost.spaceCpu}) — the medians of ${ROUNDS} rounds in turns`);
         if (preset === 'potato') check(R.cost.spaceWall <= R.cost.plazaWall && R.cost.spaceCpu <= R.cost.plazaCpu * 1.03, `Very Low: the space frame is not dearer than the plaza frame (${R.cost.spaceWall} ≤ ${R.cost.plazaWall} ms, CPU ${R.cost.spaceCpu} ≤ ${R.cost.plazaCpu} ms)`);
       }
-      await P.ev(() => VR.game.chat('/raum'));
-      await P.step(2);
+      } catch (e) { check(false, `${v.id}: ${String(e.stack || e.message || e).slice(0, 400)}`); }
+      await P.ev(() => { if (VR.game.space) VR.game.chat('/raum'); }).catch(() => {});
+      await P.step(2).catch(() => {});
       save();
     }
     // the textures: the GPU bytes and the worker's time of every job

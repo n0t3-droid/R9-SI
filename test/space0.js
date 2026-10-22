@@ -277,5 +277,60 @@ console.log('shaders and budgets');
   check(mb0 <= 24 && mb3 <= 96, `the space layer's textures: ${mb0.toFixed(1)} MB on Very Low (≤ 24), ${mb3.toFixed(1)} MB on High (≤ 96)`);
 }
 
+// ---------------------------------------------------------------- 8 · the page's parts keep the pure API
+// (run 1 of space0.mjs: the game part's frame step was also called SS.frame and replaced the body frame — every view
+// threw in the browser while node, which never loads that part, stayed green). Here the GL and game parts are loaded
+// over stubs of the page's objects and every pure function must still be the same one.
+console.log('the page');
+{
+  const pure = {}; for (const k in SS) pure[k] = SS[k];
+  const keep = { window: global.window, Renderer: VR.Renderer, GL: VR.GL, Game: VR.Game, Settings: VR.Settings };
+  global.window = {};
+  VR.Renderer = function () {}; VR.GL = {};
+  const G = VR.Game = function () {}; G.prototype.playFrame = function () {}; G.prototype.teardownWorld = function () {}; G.PRESETS = { potato: {}, high: {} };
+  let added = null; VR.Settings = { add: (o) => { added = o; } };
+  delete require.cache[require.resolve('../src/main/spacescene.js')];
+  require('../src/main/spacescene.js');
+  const S2 = VR.SpaceScene, changed = Object.keys(pure).filter(k => S2[k] && String(S2[k]) !== String(pure[k]));
+  check(!changed.length, 'the GL and game parts change none of the pure functions' + (changed.length ? ' (replaced: ' + changed.join(', ') + ')' : ''));
+  const F2 = S2.frame({ xb: [1, 0, 0], axis: [0, 1, 0] });
+  check(Array.isArray(F2) && F2.length === 3 && near(F2[2][2], 1, 1e-9), 'SS.frame(body) is still the body frame with the page loaded');
+  check(typeof S2.step === 'function' && typeof G.prototype.raumCommand === 'function' && G.PRESETS.potato.spaceDetail === 0 && G.PRESETS.high.spaceDetail === 3 && added && added.key === 'spaceDetail', 'the page part adds the frame step, /raum, the presets\' tiers and the Weltraum-Detail switch');
+  // the page's way through a view, every call the browser makes, over a GL that records and a pool that runs the worker's
+  // jobs at once: /raum herz → the textures in → the frame step → the draw list drawn; zinn, aqua and amarant after it;
+  // the patches of three places (two kept); Esc-less close through /raum; the world's teardown
+  const gl = new Proxy({ calls: [] }, { get: (t, k) => (k in t ? t[k] : typeof k === 'string' && /^[A-Z0-9_]+$/.test(k) ? 1 : (...a) => { t.calls.push(k); return k === 'createTexture' ? {} : null; }) });
+  VR.GL.program = (vs, fs, name) => ({ p: { name }, u: new Proxy({}, { get: () => ({}) }), name });
+  VR.GL.tex2D = () => ({}); VR.GL.ext = {};
+  global.document = { getElementById: () => null };
+  const gen = new V.OverworldGen(4242, { vgen: 11 });
+  const lines = [], frames = [];
+  const r = { gl, viewProj: new Float32Array(16), invViewProj: new Float32Array(16), stats: { draws: 0, tris: 0 }, emptyVAO: {}, H: 360, q: { bloom: false }, hdr: false, render(F) { frames.push(F); } };
+  const g = Object.create(G.prototype);
+  Object.assign(g, { renderer: r, pool: { submit: (m, tr, cb) => cb(BT.job(m, () => gen)), pump() {} }, player: { pos: [4.5, 80, 74.5], yaw: 0 }, env: { day: 2, ticks: 6000 }, time: 0,
+    ui: { typing: false, screen: null, chatLine: (t) => lines.push(t), openChat() {}, resume() {} }, input: { hit: () => false, mouse: { dx: 0, dy: 0 }, sensitivity: 0.002 }, envFor() {}, meta: { seed: 4242 }, settings: { preset: 'potato' } });
+  const t0 = Date.now(), tour = {};
+  for (const [name, x, z] of [['herz', 4.5, 74.5], ['zinn', 0, 0], ['aqua', 0, 0], ['amarant', 4.5, 74.5], ['herz', 9000, 2000], ['herz', -7000, 5000]]) {
+    g.player.pos[0] = x; g.player.pos[2] = z; frames.length = 0;
+    g.raumCommand(name);
+    for (let k = 0; k < 3; k++) g.playFrame(0.033);
+    const F = frames[frames.length - 1];
+    r.stats.draws = 0; S2.draw(r);
+    tour[name + '@' + x] = { ok: !!(g.space && g.space.ready && F && F.world === null && F.noSky === true && F.drawOpaque === S2.draw), draws: r.stats.draws };
+    g.raumCommand('');
+  }
+  const st = S2.stats(g), bad = Object.entries(tour).filter(([, v]) => !v.ok || v.draws < 4 || v.draws > 12);
+  check(!bad.length, `/raum herz · zinn · aqua · amarant over the page's stubs: shown, the frame world-less and sky-less, ${Object.values(tour).map(v => v.draws).join('/')} draws (≤ 12)` + (bad.length ? ' — failed: ' + bad.map(b => b[0]).join(', ') : ''));
+  check(st.progs === 6 && !st.failed.length && st.gpuMB > 1 && st.gpuMB <= 24 && st.patches === 2, `the page's textures: the six programs, ${st.gpuMB} MB on Very Low (≤ 24), ${st.patches} patches kept of four places (${((Date.now() - t0) / 1000).toFixed(1)} s with the jobs)`);
+  check(!g.space && lines.length >= 12, `/raum alone closes the view, every step said in the chat (${lines.length} lines)`);
+  let torn = false; G.prototype.teardownWorld = function () { torn = true; };
+  delete require.cache[require.resolve('../src/main/spacescene.js')];
+  require('../src/main/spacescene.js');
+  const g2 = Object.create(G.prototype); Object.assign(g2, g, { space: null }); g2.raumCommand('herz'); g2.teardownWorld();
+  check(torn && !g2.space && VR.SpaceScene.stats(g2).gpuMB === 0, 'a world torn down closes the view and frees the space textures');
+  delete global.document;
+  global.window = keep.window; VR.Renderer = keep.Renderer; VR.GL = keep.GL; VR.Game = keep.Game; VR.Settings = keep.Settings;
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
