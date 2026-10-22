@@ -129,14 +129,16 @@
   ];
   // the life of each kind (s): the caps hold the spawn rate to cap / life a second
   const LIFE = { steam: 2.6, tmote: 6, sparkle: 0.12, leaf: 6, splash: 0.35, veil: 4 };
-  // t-polish2 · gap 7 (docs/superpowers/plans/2026-10-16-t-polish2.md): the café's steam reads by day — bigger, denser
-  // wisps in a light grey that shows on the bright stone (the white 0.96 vanished on the travertine) — and at night as
-  // v0.48's merge set it (half as bright, lit by the lamps, not emissive). steamLook sets EVERY field of the shared spawn
-  // object: the merge's comment had swallowed fade, alpha, grow, wind and turb, so the steam took whatever the kind
-  // spawned before it left there (the constructor's or the motes' alpha 1, no growth: small opaque white balls)
+  // t-polish2 · gap 7 (docs/superpowers/plans/2026-10-16-t-polish2.md): the café's steam reads by day — denser wisps in a
+  // light grey that shows on the bright stone (the white 0.96 vanished on the travertine) — and at night as v0.48's merge
+  // set it (half as bright, lit by the lamps, not emissive). steamLook sets EVERY field of the shared spawn object: the
+  // merge's comment had swallowed fade, alpha, grow, wind and turb, so the steam took whatever the kind spawned before it
+  // left there (the constructor's or the motes' alpha 1, no growth: small opaque white balls). Wisps, not clouds: the
+  // first browser run's growth 0.3 a second (t-motion's 0.22 never reached a picture) swelled each wisp to a 1.8-block
+  // puff over its 2.6 s that hid the café's table — now a wisp ends under half a block wide
   const STEAM = M.STEAM = {
-    day: { size: 0.085, sizeR: 0.04, col: [0.78, 0.79, 0.82], emis: 0.05, alpha: 0.5, grow: 0.3 },
-    night: { size: 0.055, sizeR: 0.03, col: [0.48, 0.48, 0.49], emis: 0, alpha: 0.38, grow: 0.22 },
+    day: { size: 0.06, sizeR: 0.03, col: [0.78, 0.79, 0.82], emis: 0.05, alpha: 0.5, grow: 0.05 },
+    night: { size: 0.055, sizeR: 0.03, col: [0.48, 0.48, 0.49], emis: 0, alpha: 0.38, grow: 0.05 },
     grav: -0.06, drag: 0.9, wind: 0.5, turb: 0.35,
   };
   M.steamLook = function (sunUp, O, r) {

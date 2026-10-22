@@ -83,7 +83,9 @@ console.log('the café\'s steam (motion.js STEAM)');
     M.steamLook(true, d, 0.5); M.steamLook(false, n, 0.5);
     const keys = ['life', 'size', 'grav', 'drag', 'col', 'emis', 'fade', 'alpha', 'grow', 'wind', 'turb'];
     check(keys.every(k => d[k] !== undefined && n[k] !== undefined), 'every field of the look is set (life, size, gravity, drag, colour, glow, fade, alpha, growth, wind, turbulence)');
-    check(d.size >= 0.08 && d.alpha >= 0.45 && d.grow >= 0.25 && d.fade === true, `by day bigger, denser wisps: ${(2 * d.size).toFixed(2)} blocks wide at the cup, ${d.alpha} opaque, growing ${d.grow} a second`);
+    // (wisps, not clouds: the first browser run's growth 0.3 a second swelled a wisp to a 1.8-block puff that hid the café)
+    const endW = (L) => 2 * (L.size + L.sizeR + L.grow * M.AIR_LIFE.steam * 1.2);
+    check(2 * ST.day.size >= 0.12 && d.alpha >= 0.45 && d.fade === true && endW(ST.day) <= 0.6 && endW(ST.night) <= 0.6, `by day denser wisps: ${(2 * ST.day.size).toFixed(2)}–${(2 * (ST.day.size + ST.day.sizeR)).toFixed(2)} blocks wide at the cup, ${d.alpha} opaque, at most ${endW(ST.day).toFixed(2)} wide when they fade (night ${endW(ST.night).toFixed(2)}): wisps, not clouds`);
     check(Math.max(...d.col) <= 0.86 && Math.min(...d.col) >= 0.7 && d.col[2] >= d.col[0] && d.emis <= 0.1, `in a light grey that shows on the bright stone (${d.col.join(', ')}; the old white 0.96 vanished on the travertine)`);
     check(Math.max(...n.col) <= 0.5 && n.emis === 0 && n.alpha <= 0.4 && n.size <= d.size, `at night as v0.48's merge set it: half as bright, lit by the lamps, not emissive (${n.col.join(', ')})`);
     check(d.wind === 0.5 && d.turb === 0.35 && n.wind === 0.5 && n.turb === 0.35, 'it takes up the wind and curls (wind 0.5, turbulence 0.35)');
@@ -102,7 +104,7 @@ console.log('the café\'s steam (motion.js STEAM)');
   const E = { sunDir: [0, 1, 0], night: 0, rain: 0, snow: 0, wind: 1, windDir: [1, 0] };
   for (let i = 0; i < 900; i++) a.update(1 / 30, { w: world, eye: [4.5, 65.6, 3.5], E, particles: parts, drama: true });
   const steam = log.filter(p => Math.abs(p.y - 64.95) < 1e-6), motes = log.filter(p => Math.abs(p.y - 64.95) >= 1e-6);
-  const ok = steam.length > 0 && M.STEAM && steam.every(p => p.alpha === M.STEAM.day.alpha && p.grow === M.STEAM.day.grow && p.fade === true && p.wind === 0.5 && p.turb === 0.35 && p.size >= M.STEAM.day.size);
+  const ok = steam.length > 0 && M.STEAM && steam.every(p => p.alpha === M.STEAM.day.alpha && p.grow === M.STEAM.day.grow && p.fade === true && p.wind === 0.5 && p.turb === 0.35 && p.size >= M.STEAM.day.size && p.size <= M.STEAM.day.size + M.STEAM.day.sizeR);
   check(motes.length > 0 && ok, `every wisp carries the steam's own look, also after the motes (${steam.length} wisps among ${motes.length} motes; alphas ${[...new Set(steam.map(p => p.alpha))].join(', ')})`);
 }
 
