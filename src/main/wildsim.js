@@ -24,7 +24,7 @@
   // per tier: 0 Very Low · 1 Low · 2 Balanced · 3 High · 4 Ultra. Very Low: nothing new drawn; Low: the small things;
   // Balanced and up: all of it
   W.CAPS = {
-    murm: [0, 0, 160, 240, 300],     // the murmuration's birds (one flock)
+    murm: [0, 0, 200, 300, 360],     // the murmuration's boids (one flock; each drawn as MURM_K birds)
     gull: [0, 3, 5, 7, 9],           // gulls over the lake by day
     heron: [0, 1, 1, 2, 2],          // herons at the ponds
     fish: [0, 32, 48, 64, 80],       // fish in a shoal
@@ -47,6 +47,10 @@
     wildHerds: ['rabbit', 'fox', 'deerLine'],
   };
   W.KEYS = Object.keys(W.SWITCH);
+  // the murmuration's boid is drawn as a party of MURM_K birds round it (wildgpu.js 'flock': in the boid's own frame,
+  // flattened into its sheet, each its own beat and a little drift) — thousands of birds for the cost of a few hundred
+  // boids; the sheets turn with the boids' bank, so the cloud darkens where they turn edge-on
+  W.MURM_K = 12; W.MURM_RC = 3.5;
   const PRESET_TIER = { potato: 0, low: 1, balanced: 2, high: 3, ultra: 4, ultraLite: 4 };
   // the tier of a settings record: its preset, or for a custom setup its particle level (0 … 2) — as the living air's
   W.tierOf = function (S) {
@@ -82,8 +86,10 @@
   // (cohesion, its vertical factor) · wTgt (the target's pull, blocks/s²) · flat (the climb's damping, 1/s) · vmin, vmax,
   // amax · stride (steering every n-th bird a step) · wave ([min, max] s between turning waves, or null), waveV, waveW,
   // waveA · fearR, fearA (the scatter from a fear point)
-  W.FLOCK = { r: 6, K: 10, maxC: 32, sepR: 2.8, wSep: 30, wAli: 2.4, wCoh: 0.5, cohY: 2.4, wTgt: 6, tgtR: 12, flat: 0.9, vmin: 7, vmax: 12, amax: 34, stride: 2, wave: [5, 10], waveV: 24, waveW: 3.2, waveA: 22, fearR: 6, fearA: 30 };
-  W.SHOAL = { r: 2.0, K: 8, maxC: 24, sepR: 0.85, wSep: 22, wAli: 2.8, wCoh: 0.7, cohY: 1.4, wTgt: 2.0, tgtR: 1.8, flat: 2.4, vmin: 0.5, vmax: 2.4, amax: 10, stride: 1, wave: null, waveV: 0, waveW: 0, waveA: 0, fearR: 3.5, fearA: 16 };
+  // roost (the murmuration): the target pulls only beyond tgtR and only across (the flock roams its stage free and keeps
+  // its own shape), heights held in a band of ±bandY round it (wY); lobes: the flock parts into wings (murmLobes)
+  W.FLOCK = { roost: 1, r: 14, K: 7, maxC: 32, sepR: 8, wSep: 30, wAli: 2.2, wCoh: 0.25, cohY: 4, wTgt: 8, tgtR: 40, bandY: 6, wY: 0.6, lobes: 3, lobeR: 34, flat: 1.2, vmin: 7, vmax: 12, amax: 34, stride: 2, wave: [5, 10], waveV: 26, waveW: 4.5, waveMax: 110, waveA: 22, fearR: 6, fearA: 30 };
+  W.SHOAL = { roost: 0, lobes: 0, r: 2.0, K: 8, maxC: 24, sepR: 0.85, wSep: 22, wAli: 2.8, wCoh: 0.7, cohY: 1.4, wTgt: 2.0, tgtR: 1.8, flat: 2.4, vmin: 0.5, vmax: 2.4, amax: 10, stride: 1, wave: null, waveV: 0, waveW: 0, waveA: 0, fearR: 3.5, fearA: 16 };
   const GN = 1024, GM = GN - 1;   // the grid's hash table (a power of two)
   class Flock {
     constructor(n, seed, P) {
@@ -97,6 +103,9 @@
       this.rand = W.rng(seed); this.frame = 0; this.time = 0;
       this.bound = null;                  // a cylinder of water to stay in: {x, z, r, y0, y1}
       this.fear = null;                   // a point to scatter from ([x, y, z])
+      // lobes: bird i follows the target moved by its lobe's offset (lobe i % lobes; murmLobes sets them from the clock)
+      // — the cloud parts into two or three wings that swing apart and fold back into one
+      this.lobes = this.P.lobes | 0; this.lofs = this.lobes > 1 ? new Float32Array(this.lobes * 3) : null;
       this.waveT = this.P.wave ? this.P.wave[0] + this.rand() * (this.P.wave[1] - this.P.wave[0]) : 1e9;
       this.wv = { on: false, x: 0, y: 0, z: 0, r: 0, dir: 1 }; this.waves = 0;
     }
@@ -134,7 +143,7 @@
           wv.on = true; wv.x = p[i0 * 3]; wv.y = p[i0 * 3 + 1]; wv.z = p[i0 * 3 + 2]; wv.r = 0; wv.dir = this.rand() < 0.5 ? -1 : 1; this.waves++;
           this.waveT = P.wave[0] + this.rand() * (P.wave[1] - P.wave[0]);
         }
-        if (wv.on) { wv.r += P.waveV * dt; if (wv.r > 70) wv.on = false; }
+        if (wv.on) { wv.r += P.waveV * dt; if (wv.r > (P.waveMax || 70)) wv.on = false; }
       }
       const tg = this.tgt, B = this.bound, fe = this.fear, stride = P.stride, ph = this.frame % stride;
       for (let i = 0; i < n; i++) {
@@ -161,8 +170,18 @@
         }
         // the target's pull (stronger the farther), the climb's damping (they fly level: sheets)
         // (none within tgtR of it: the cloud is not drawn to a point — the birds sweep through the target's zone and turn)
-        const tx = tg[0] - px, ty = tg[1] - py, tz = tg[2] - pz, td = Math.sqrt(tx * tx + ty * ty + tz * tz) + 1e-4, kt = td > P.tgtR ? P.wTgt * Math.min(1.6, 0.25 + (td - P.tgtR) / 18) / td : 0;
-        ax += tx * kt; ay += ty * kt * 1.2; az += tz * kt;
+        const lo = this.lofs ? (i % this.lobes) * 3 : -1, lx = lo >= 0 ? this.lofs[lo] : 0, ly = lo >= 0 ? this.lofs[lo + 1] : 0, lz = lo >= 0 ? this.lofs[lo + 2] : 0;
+        const tx = tg[0] + lx - px, ty = tg[1] + ly - py, tz = tg[2] + lz - pz;
+        if (P.roost) {
+          // the roost's pull (the murmuration): only beyond a wide circle round the target and only across (the birds turn
+          // back in, their speed held), a band of heights — the flock roams the stage free and keeps its own shape
+          const dh = Math.sqrt(tx * tx + tz * tz) + 1e-4;
+          if (dh > P.tgtR) { const k = P.wTgt * Math.min(1.5, (dh - P.tgtR) / 16) / dh; ax += tx * k; az += tz * k; }
+          if (ty > P.bandY) ay += (ty - P.bandY) * P.wY; else if (ty < -P.bandY) ay += (ty + P.bandY) * P.wY;
+        } else {
+          const td = Math.sqrt(tx * tx + ty * ty + tz * tz) + 1e-4, kt = td > P.tgtR ? P.wTgt * Math.min(1.6, 0.25 + (td - P.tgtR) / 18) / td : 0;
+          ax += tx * kt; ay += ty * kt * 1.2; az += tz * kt;
+        }
         ay -= vy * P.flat;
         // the turning wave: a lateral push where its shell passes
         if (wv.on) {
@@ -236,7 +255,18 @@
     const R1 = 28 + 12 * h(1), R2 = 10 + 8 * h(2), w1 = 0.1 + 0.04 * h(3), w2 = 0.21 + 0.08 * h(4), p1 = TAU * h(5), p2 = TAU * h(6);
     out[0] = st.x + R1 * Math.cos(w1 * t + p1) + R2 * Math.cos(w2 * t + p2);
     out[2] = st.z + R1 * 0.85 * Math.sin(w1 * t + p1) + R2 * Math.sin(w2 * 1.3 * t + p2);
-    out[1] = st.y + 8 + 7 * Math.sin(0.17 * t + p1) + 4 * Math.sin(0.41 * t + p2);
+    out[1] = st.y + 6 + 5 * Math.sin(0.17 * t + p1) + 3 * Math.sin(0.41 * t + p2);
+    return out;
+  };
+  // the murmuration's lobes: n offsets (out: n × 3) that swing apart up to R and fold back to nothing, slowly (a breath
+  // of 26–38 s), each its own way round — the cloud stretches into wings and ribbons and gathers into one again
+  W.murmLobes = function (seed, t, n, R, out) {
+    const h = (k) => W.h(seed, k, 0x4c), per = 26 + 12 * h(1), br = 0.5 - 0.5 * Math.cos(TAU * t / per + TAU * h(2)), amp = R * br * br * (3 - 2 * br);
+    const rot = t * (0.05 + 0.03 * h(3)) * (h(4) < 0.5 ? 1 : -1);
+    for (let k = 0; k < n; k++) {
+      const a = rot + k * TAU / n + 0.6 * Math.sin(t * 0.07 + k * 2.1);
+      out[k * 3] = Math.cos(a) * amp; out[k * 3 + 1] = Math.sin(t * 0.11 + k * 1.7) * amp * 0.22; out[k * 3 + 2] = Math.sin(a) * amp * 0.8;
+    }
     return out;
   };
   // a shoal's: a slow loop round the middle of its water
@@ -351,15 +381,17 @@
     const d = (day | 0) * 2 + (phase === 'dawn' ? 1 : 0);
     if (nearLake) {
       const L = (VR.Land && VR.Land.LAKE) || { x: 345, z: 150 }, SEA = (VR.C && VR.C.SEA) || 63;
-      return { x: L.x + (W.h(seed, d, 11) - 0.5) * 60, y: SEA + 44 + W.h(seed, d, 12) * 10, z: L.z + (W.h(seed, d, 13) - 0.5) * 44, lake: true };
+      // (low over the water: 20–26 blocks, well under the Sky Isles' rock — seen from the shores against the evening sky)
+      return { x: L.x + (W.h(seed, d, 11) - 0.5) * 60, y: SEA + 20 + W.h(seed, d, 12) * 6, z: L.z + (W.h(seed, d, 13) - 0.5) * 44, lake: true };
     }
     const cx = Math.floor(eye[0] / 256), cz = Math.floor(eye[2] / 256);
     return { x: cx * 256 + 128 + (W.h(seed ^ cx, d, cz) - 0.5) * 120, y: null, z: cz * 256 + 128 + (W.h(seed ^ cz, d + 7, cx) - 0.5) * 120, lake: false };
   };
 
   // ---------------------------------------------------------------- the sky rays' circuit
-  // RAY: the mesh's span is 1 (wingtip to wingtip); each ray 7–10 of it; speed blocks/s; the wing wave's period (s)
-  W.RAY = { span: 1, minScale: 7, maxScale: 10, speed: 5.4, period: 4.6, alt: 121, altA: 6, side: 4.5, up: 3 };
+  // RAY: the mesh's span is 1 (wingtip to wingtip); a great ray 15–22 of it, its young one beside it 0.6 of that; speed
+  // blocks/s; the wing wave's period (s); the circuit's height (alt ± altA: under the isles' lowest rock, between them)
+  W.RAY = { span: 1, minScale: 15, maxScale: 22, young: 0.6, speed: 5.4, period: 4.6, alt: 107, altA: 5, side: 4.5, up: 3, pairBack: 7, pairSide: 15 };
   // the rock of an island at a height: the widest it can be there (gen_realm islandShape at its worst: the warp's 1.28,
   // the underside's jag 1) — an inverted cone from y − 2 down to y − 2 − r·deep; up to the dome and the trees the full disc
   W.coneR = function (I, y) {
@@ -374,10 +406,10 @@
     const L0 = isles && isles.length ? isles : [];
     let C = L0.find(I => I.name === 'C') || L0[0];
     if (!C) C = { x: 330, z: 140, y: 158, r: 42, deep: 1 };
-    const N = 120, pts = [], R = W.RAY, half = R.span * R.maxScale / 2, clear = half + R.side + 6;
+    const N = 120, pts = [], R = W.RAY, half = R.span * R.maxScale / 2, clear = half + R.side + R.pairSide + 4;
     for (let k = 0; k < N; k++) {
       const a = k / N * TAU;
-      const r = 62 + 9 * Math.sin(3 * a + 0.6);
+      const r = 72 + 14 * Math.sin(3 * a + 0.6);
       pts.push([C.x + Math.cos(a) * r, R.alt + R.altA * Math.sin(2 * a + 1.1), C.z + Math.sin(a) * r]);
     }
     for (let pass = 0; pass < 6; pass++) {
@@ -422,22 +454,27 @@
     out[5] = dh / 4.5;
     return out;
   };
-  // where ray k of n is at the world clock (s): out = [x, y, z, yaw, pitch, bank, phase, scale] — the same for every guest
+  // where ray k of n is at the world clock (s): out = [x, y, z, yaw, pitch, bank, phase, scale] — the same for every guest.
+  // They fly in pairs: ray 2j a great one, ray 2j + 1 its young one gliding beside it (a little behind, to its right),
+  // the pairs spread evenly round the circuit
   const RS = [0, 0, 0, 0, 0, 0];
   W.rayState = function (seed, clock, k, n, loop, out) {
-    const R = W.RAY, L = loop.L;
-    const s = clock * R.speed + k * L / n + W.h(seed, 0, 0x7a) * L;
+    const R = W.RAY, L = loop.L, j = k >> 1, young = (k & 1) === 1, pairs = Math.max(1, (n + 1) >> 1);
+    const s = clock * R.speed + j * L / pairs + W.h(seed, 0, 0x7a) * L - (young ? R.pairBack : 0);
     W.rayAt(loop, s, RS);
-    const side = R.side * Math.sin(clock * 0.05 + k * 1.7), up = R.up * Math.sin(clock * 0.07 + k * 2.3);
+    // (the pair drifts as one: the leader's side and up drift; the young one its own small one on top)
+    const side = R.side * Math.sin(clock * 0.05 + j * 1.7) + (young ? R.pairSide + 2.5 * Math.sin(clock * 0.21 + j) : 0);
+    const up = R.up * Math.sin(clock * 0.07 + j * 2.3) + (young ? 1.2 * Math.sin(clock * 0.17 + 1 + j) : 0);
     // the side drift: across the heading (yaw: the model's −z is forward → its right is (cos yaw, −sin yaw) in x, z)
     const cy = Math.cos(RS[3]), sy = Math.sin(RS[3]);
     out[0] = RS[0] + cy * side; out[1] = RS[1] + up; out[2] = RS[2] - sy * side;
     // (the pitch: the circuit's climb and the up drift's; the bank: into the turn — a right turn, dh > 0 in x-z, dips the
     // right wing, a negative roll about the model's z)
-    out[3] = RS[3]; out[4] = RS[4] + Math.atan(R.up * 0.07 * Math.cos(clock * 0.07 + k * 2.3) / R.speed);
+    out[3] = RS[3]; out[4] = RS[4] + Math.atan(R.up * 0.07 * Math.cos(clock * 0.07 + j * 2.3) / R.speed);
     out[5] = Math.max(-0.55, Math.min(0.55, -RS[5] * 22));
-    out[6] = clock * TAU / R.period + k * 1.9;
-    out[7] = R.minScale + (R.maxScale - R.minScale) * W.h(seed, k, 0x5c);
+    out[6] = clock * TAU / R.period + k * 1.9 + (young ? 0.8 : 0);
+    const big = R.minScale + (R.maxScale - R.minScale) * W.h(seed, j, 0x5c);
+    out[7] = young ? big * R.young : big;
     return out;
   };
 })(typeof VR !== 'undefined' ? VR : (globalThis.VR = globalThis.VR || {}));

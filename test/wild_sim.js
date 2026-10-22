@@ -26,7 +26,10 @@ check(!!W && !!W.CAPS && !!W.Flock && !!W.Swarm && !!W.sched && !!W.rayLoop, 'VR
   check(keys.length >= 12 && keys.every(k => W.CAPS[k].length === 5), `one table: ${keys.length} caps, five tiers each`);
   check(keys.every(k => W.CAPS[k][0] === 0), 'Very Low: every cap 0 (nothing new drawn)');
   check(keys.every(k => W.CAPS[k].every((v, i) => i === 0 || v >= W.CAPS[k][i - 1])), 'every cap grows with the tier');
-  check(W.CAPS.murm[1] === 0 && W.CAPS.ray[1] === 0 && W.CAPS.murm[2] >= 120 && W.CAPS.murm[4] <= 300 && W.CAPS.murm[3] >= 200, `Low: no murmuration, no rays; the murmuration 120–300 from Balanced (${W.CAPS.murm.join(' ')})`);
+  check(W.CAPS.murm[1] === 0 && W.CAPS.ray[1] === 0 && W.CAPS.murm[2] >= 160 && W.CAPS.murm[4] <= 400 && W.CAPS.murm[3] >= 280, `Low: no murmuration, no rays; the murmuration 160–400 boids from Balanced (${W.CAPS.murm.join(' ')})`);
+  // each boid of the murmuration is drawn as a little party of birds (wildgpu.js 'flock': MURM_K birds round it, in its
+  // own frame, flattened into its sheet): thousands of birds in the sky for the cost of a few hundred boids
+  check(W.MURM_K >= 8 && W.MURM_K <= 16 && W.CAPS.murm[3] * W.MURM_K >= 3000, `the murmuration on High: ${W.CAPS.murm[3]} boids × ${W.MURM_K} birds = ${W.CAPS.murm[3] * W.MURM_K} birds in the sky`);
   check(W.CAPS.fish[4] >= 40 && W.CAPS.fish[4] <= 80 && W.CAPS.bfly[4] >= 30 && W.CAPS.bfly[4] <= 60 && W.CAPS.ray[3] >= 3 && W.CAPS.ray[4] <= 4, 'the sizes asked: shoal 40–80, swarm 30–60, three or four rays');
   const all = new Set(); for (const k of W.KEYS) for (const c of W.SWITCH[k]) all.add(c);
   check(W.KEYS.length === 5 && keys.every(k => all.has(k)), `five switches (${W.KEYS.join(', ')}) and every cap belongs to one`);
@@ -42,7 +45,7 @@ check(!!W && !!W.CAPS && !!W.Flock && !!W.Swarm && !!W.sched && !!W.rayLoop, 'VR
 }
 
 // ---------------------------------------------------------------- 2. the boids
-const stage = { x: 345, y: 110, z: 150 };
+const stage = { x: 345, y: 86, z: 150 };
 const run = (n, seed, secs, o) => {
   const f = new W.Flock(n, seed, o);
   f.place(stage.x, stage.y, stage.z, 12);
@@ -69,10 +72,17 @@ const run = (n, seed, secs, o) => {
   const P = A.f.P;
   check(!A.nan, 'no NaN in 60 s of 300 birds');
   check(A.vlo >= P.vmin - 0.05 && A.vhi <= P.vmax + 0.05, `every bird flies between ${P.vmin} and ${P.vmax} blocks/s (${A.vlo.toFixed(2)} – ${A.vhi.toFixed(2)})`);
-  let out = 0; for (let i = 0; i < 300; i++) { const x = A.f.pos[i * 3], y = A.f.pos[i * 3 + 1], z = A.f.pos[i * 3 + 2]; if (Math.abs(x - stage.x) > 110 || Math.abs(z - stage.z) > 110 || y < stage.y - 40 || y > stage.y + 70) out++; }
-  check(out === 0, `bounded: every bird within the stage's box after 60 s (${out} outside)`);
-  check(A.spreadMax < 24 && A.far < 60, `cohesive: one cloud (its spread at most ${A.spreadMax.toFixed(1)} blocks, the farthest bird ${A.far.toFixed(1)} from its middle)`);
-  check(A.spreadMax > 3, `not collapsed into a knot (spread ${A.spreadMax.toFixed(1)})`);
+  let out = 0, blo = 1e9, bhi = -1e9; for (let i = 0; i < 300; i++) { const x = A.f.pos[i * 3], y = A.f.pos[i * 3 + 1], z = A.f.pos[i * 3 + 2]; blo = Math.min(blo, y); bhi = Math.max(bhi, y); if (Math.abs(x - stage.x) > 140 || Math.abs(z - stage.z) > 140 || y < stage.y - 30 || y > stage.y + 40) out++; }
+  check(out === 0, `bounded: every bird within the stage's box after 60 s (${out} outside; heights ${(blo - stage.y).toFixed(0)} … +${(bhi - stage.y).toFixed(0)})`);
+  check(blo > stage.y - 22 && bhi < 112, `over the water and under the isles' lowest rock (115): ${blo.toFixed(0)} … ${bhi.toFixed(0)}`);
+  check(A.spreadMax < 44 && A.far < 110, `cohesive: one cloud (its spread at most ${A.spreadMax.toFixed(1)} blocks, the farthest bird ${A.far.toFixed(1)} from its middle)`);
+  // a great cloud: from the beach (150–200 blocks) it spans a good part of the evening sky
+  const sp = A.f.spread();
+  check(sp >= 14, `a great cloud, not a knot (spread ${sp.toFixed(1)} blocks: ${(sp * 4).toFixed(0)} across)`);
+  // flat: sheets, not a ball — the vertical spread a fraction of the horizontal (the sheets darken where they turn edge-on)
+  { const c = A.f.ctr; let sh = 0, sv = 0; for (let i = 0; i < 300; i++) { const x = A.f.pos[i * 3] - c[0], y = A.f.pos[i * 3 + 1] - c[1], z = A.f.pos[i * 3 + 2] - c[2]; sh += x * x + z * z; sv += y * y; } const r = Math.sqrt(sv / (sh / 2)); check(r < 0.55, `flat: its height ${(r * 100).toFixed(0)} % of its breadth`); }
+  // the lobes: the cloud's wings swing apart and fold back into one (a breath of 26–38 s)
+  { const o = new Float32Array(9); let lo = 1e9, hi = 0; for (let t = 0; t < 80; t += 0.25) { W.murmLobes(4242, t, 3, 30, o); const a = Math.hypot(o[0], o[2] / 0.8); lo = Math.min(lo, a); hi = Math.max(hi, a); } check(lo < 3 && hi > 27, `the lobes swing apart to ${hi.toFixed(0)} and fold back to ${lo.toFixed(1)}`); }
   const B = run(300, 7, 20), C = run(300, 7, 20), D = run(300, 8, 20);
   let same = true, diff = false; for (let i = 0; i < 900; i++) { if (B.f.pos[i] !== C.f.pos[i]) same = false; if (B.f.pos[i] !== D.f.pos[i]) diff = true; }
   check(same, 'deterministic: the same seed gives the same flock, bird for bird');
@@ -162,6 +172,9 @@ const run = (n, seed, secs, o) => {
   check(same, 'the schedule is a pure function of (seed, day, ticks): the same for host and guests');
   const s1 = W.stageOf(53, 4, 'dusk', [300, 70, 100], true), s2 = W.stageOf(53, 4, 'dusk', [310, 72, 120], true);
   check(Math.abs(s1.x - s2.x) < 1e-9 && Math.abs(s1.z - s2.z) < 1e-9 && Math.hypot(s1.x - V.Land.LAKE.x, s1.z - V.Land.LAKE.z) < 60, `the stage over the lake is the same for two clients near it (${s1.x.toFixed(0)}, ${s1.z.toFixed(0)})`);
+  // low over the water, well under the Sky Isles' rock (their lowest tips at 115): seen from the shore against the evening
+  // sky, not lost among the isles' undersides
+  check(s1.y >= V.C.SEA + 16 && s1.y <= V.C.SEA + 30, `the stage over the lake: ${(s1.y - V.C.SEA).toFixed(0)} blocks over the water (${s1.y.toFixed(0)})`);
   const s3 = W.stageOf(53, 4, 'dusk', [1000, 80, 1000], false), s4 = W.stageOf(53, 4, 'dusk', [1010, 80, 1020], false), s5 = W.stageOf(53, 5, 'dusk', [1010, 80, 1020], false);
   check(s3.x === s4.x && s3.z === s4.z && (s5.x !== s4.x || s5.z !== s4.z), 'away from the lake: the same stage for clients in one cell; another day, another place');
 }
@@ -200,13 +213,21 @@ const run = (n, seed, secs, o) => {
       const L = loop.L, sp = W.RAY.speed;
       check(L > 300 && L < 700 && L / sp > 50 && L / sp < 140, `the circuit: ${L.toFixed(0)} blocks, a lap in ${(L / sp).toFixed(0)} s`);
       const ys = []; for (let s = 0; s < L; s += 4) { W.rayAt(loop, s, a); ys.push(a[1]); }
-      check(Math.min(...ys) >= 112 && Math.max(...ys) <= 150, `between the isles' tops and their cones (${Math.min(...ys).toFixed(0)} … ${Math.max(...ys).toFixed(0)} high)`);
+      check(Math.min(...ys) >= 96 && Math.max(...ys) <= 124, `under and between the isles' lowest rock, against the sky from the shores (${Math.min(...ys).toFixed(0)} … ${Math.max(...ys).toFixed(0)} high)`);
+      check(W.RAY.minScale >= 14 && W.RAY.maxScale <= 26, `great gentle creatures: ${W.RAY.minScale}–${W.RAY.maxScale} blocks from wing tip to wing tip`);
       // the same at a clock for every guest; evenly spaced
       const r1 = W.rayState(53, 1234.5, 2, 4, loop, [0, 0, 0, 0, 0, 0]).slice(), r2 = W.rayState(53, 1234.5, 2, 4, loop, [0, 0, 0, 0, 0, 0]).slice();
       check(JSON.stringify(r1) === JSON.stringify(r2), 'a ray is where the world clock says (the same for every guest)');
-      const q = []; for (let k = 0; k < 4; k++) q.push(W.rayState(53, 50, k, 4, loop, [0, 0, 0, 0, 0, 0]).slice());
-      let dmin = 1e9; for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) dmin = Math.min(dmin, Math.hypot(q[i][0] - q[j][0], q[i][2] - q[j][2]));
-      check(dmin > 40, `four rays spread round the circuit (the nearest two ${dmin.toFixed(0)} apart)`);
+      // two pairs: a great ray with a smaller one gliding beside it, the pairs on opposite sides of the circuit
+      let pairOk = true, apart = 1e9, side = 1e9;
+      for (let t = 0; t < 140; t += 5) {
+        const q = []; for (let k = 0; k < 4; k++) q.push(W.rayState(53, t, k, 4, loop, [0, 0, 0, 0, 0, 0, 0, 0]).slice());
+        const d01 = Math.hypot(q[0][0] - q[1][0], q[0][2] - q[1][2]), d23 = Math.hypot(q[2][0] - q[3][0], q[2][2] - q[3][2]);
+        if (d01 > 34 || d23 > 34 || q[1][7] >= q[0][7] || q[3][7] >= q[2][7]) pairOk = false;
+        side = Math.min(side, d01, d23);
+        for (const i of [0, 1]) for (const j of [2, 3]) apart = Math.min(apart, Math.hypot(q[i][0] - q[j][0], q[i][2] - q[j][2]));
+      }
+      check(pairOk && side > 1.1 * W.RAY.maxScale / 2 && apart > 100, `two pairs, a great ray and a smaller one beside it (${side.toFixed(0)}–34 blocks apart), the pairs on opposite sides (${apart.toFixed(0)} apart at the nearest)`);
     }
   }
   check(closed && smooth, 'the circuit is closed and turns smoothly in every world');

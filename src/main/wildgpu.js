@@ -60,6 +60,29 @@
     }
     return B.v;
   }
+  // a party of birds — the murmuration's boid drawn as MURM_K small starlings round its place (mode 2): each vertex
+  // relative to its own bird (span about 1, the beak −z: a body cross, two wings with a wrist), its bird's place in the
+  // party in the normal's slot (the boid's frame: x across the wings, z along the heading, y up — flattened into the
+  // sheet), its bird's beat offset in the emission's slot; the shader spreads the party (i_x.w) and lets each bird drift
+  // a little in its place. The first bird sits on the boid itself
+  function party() {
+    const Wd = VR.Wild || {}, K = Wd.MURM_K || 12, RC = Wd.MURM_RC || 3.5, hh = Wd.h || ((a, b, c) => ((Math.sin(a * 12.9898 + b * 78.233 + c * 37.719) * 43758.5453) % 1 + 1) % 1);
+    const out = [], body = lin([0.09, 0.09, 0.11]), wing = lin([0.11, 0.10, 0.13]), tipC = lin([0.07, 0.07, 0.08]);
+    for (let k = 0; k < K; k++) {
+      const h = (q) => hh(k, 77, q);
+      const o = k ? [(h(1) - 0.5) * 2 * RC, (h(2) - 0.5) * 2 * RC * 0.2, (h(3) - 0.5) * 2 * RC * 0.8] : [0, 0, 0];
+      const ph = k ? h(4) * TAU : 0, sc = k ? 0.85 + 0.3 * h(5) : 1;
+      const V = (p, c, w) => out.push(p[0] * sc, p[1] * sc, p[2] * sc, o[0], o[1], o[2], c[0], c[1], c[2], w, ph);
+      const T = (a, b, c, col, w) => { V(a, col, w ? a[3] : 0); V(b, col, w ? b[3] : 0); V(c, col, w ? c[3] : 0); };
+      const N = [0, 0, -0.24], Tl = [0, 0.01, 0.26], L = [-0.055, 0, -0.02], R = [0.055, 0, -0.02], U = [0, 0.05, -0.03], D = [0, -0.045, -0.02];
+      T(N, L, Tl, body); T(N, Tl, R, body); T(N, U, Tl, body); T(N, Tl, D, body);
+      for (const sd of [1, -1]) {
+        const rf = [0.04 * sd, 0.012, -0.07, 0.6], rb = [0.04 * sd, 0.012, 0.07, 0.6], wf = [0.25 * sd, 0.02, -0.045, 0.8], wb = [0.24 * sd, 0.02, 0.075, 0.8], tp = [0.5 * sd, 0, 0.1, 1];
+        T(rf, wf, wb, wing, 1); T(rf, wb, rb, wing, 1); T(wf, tp, wb, tipC, 1);
+      }
+    }
+    return out;
+  }
   // a fish: 1 long (the head at −0.5), 0.26 high, 0.11 wide; the bend weight from 0 (the head) to 1 (the tail fin);
   // a dark back, a silver flank, a pale belly — carp: gold and orange with pale patches
   function fish(carp) {
@@ -131,7 +154,9 @@
     const botC = (u, v) => lin([0.78 - 0.1 * Math.abs(u), 0.80 - 0.06 * Math.abs(u), 0.90 - 0.02 * v]);
     // the glowing chevrons: bands across the back that point forward, and a line along the spine
     const glowAt = (u, v) => { const k = Math.abs(u), c = (k * 2.6 + v * 1.4) % 1; return (c < 0.13 && k > 0.12 && k < 0.92 ? 1 : 0) + (k < 0.04 && v > 0.15 && v < 0.85 ? 0.8 : 0); };
-    const P = (u, v, top) => { const x = u * 0.5, z = zf(u) + (zb(u) - zf(u)) * v, t = th(u, v); return [x, top ? t * 0.62 : -t * 0.38, z, Math.pow(Math.abs(u), 1.15), top ? glowAt(u, v) : 0]; };
+    // (the underside: a soft luminous rim along the leading edge — seen from below against the sky, the outline glows)
+    const rimAt = (u, v) => { const k = Math.abs(u); return v < 0.05 && k > 0.1 && k < 0.97 ? 0.55 : 0; };
+    const P = (u, v, top) => { const x = u * 0.5, z = zf(u) + (zb(u) - zf(u)) * v, t = th(u, v); return [x, top ? t * 0.62 : -t * 0.38, z, Math.pow(Math.abs(u), 1.15), top ? glowAt(u, v) : rimAt(u, v)]; };
     // two surfaces on one (NU+1) × (NV+1) grid, with smooth normals
     for (const top of [true, false]) {
       const G = [], Nn = [];
@@ -163,9 +188,11 @@
     }
     return B.v;
   }
-  // the kinds: mode 0 wings (a hinge on the body's axis, the wave out along them), 1 swim (the body bends side to side)
+  // the kinds: mode 0 wings (a hinge on the body's axis, the wave out along them), 1 swim (the body bends side to side),
+  // 2 a party of birds (the wings' hinge per bird, the party spread round the boid)
   WG.KINDS = {
     bird: { make: () => bird(false), mode: 0 },
+    flock: { make: party, mode: 2 },
     gull: { make: () => bird(true), mode: 0 },
     fish: { make: () => fish(false), mode: 1 },
     carp: { make: () => fish(true), mode: 1 },
@@ -189,6 +216,7 @@ layout(location=8) in vec4 i_y;     // glow, glint
 uniform mat4 u_viewProj;
 uniform int u_mode;
 uniform float u_pale;               // 1: the wings keep their own pale colour (a dragonfly's), not the tint
+uniform float u_time;               // (COMMON's: the parties' birds drift round their places)
 out vec3 v_n;
 out vec3 v_col;
 out vec3 v_rel;
@@ -196,8 +224,24 @@ out float v_em;
 flat out vec4 v_l;                  // sky, glow, glint, the glow's hue (0 cyan … 1 violet)
 void main() {
   vec3 p = a_pos, n = a_nrm;
-  float w = a_col.a;
-  if (u_mode == 0) {
+  float w = a_col.a, em = a_em;
+  if (u_mode == 2) {
+    // a party of birds: this vertex's bird beats a_em later than the boid, sits at a_nrm in the party (spread i_x.w: 1 in
+    // the sky, small on the perch) and drifts a little round its place
+    float ph = i_a.w + a_em;
+    n = vec3(0.0, 1.0, 0.0);
+    if (w > 0.0) {
+      float side = p.x < 0.0 ? -1.0 : 1.0;
+      float ang = side * (i_x.z * w + i_x.x * w * sin(ph));
+      float c = cos(ang), s = sin(ang);
+      p.xy = vec2(p.x * c - p.y * s, p.x * s + p.y * c);
+      n.xy = vec2(-s, c);
+    }
+    float dr = u_time * 1.1 + a_em * 3.0;
+    // (the party's places in blocks, whatever the birds' size: the scale below multiplies them back)
+    p += (a_nrm + vec3(sin(dr), 0.3 * sin(dr * 1.3 + 1.0), cos(dr * 0.8)) * 0.35) * i_x.w / max(i_p.w, 0.05);
+    em = 0.0;
+  } else if (u_mode == 0) {
     if (w > 0.0) {
       // the wing about the body's long axis: the beat (and its wave out along the span) and the rest angle, mirrored
       float side = p.x < 0.0 ? -1.0 : 1.0, span = abs(p.x);
@@ -224,7 +268,7 @@ void main() {
   v_rel = rel;
   v_n = n;
   v_col = a_col.rgb * mix(i_c.rgb, vec3(1.0), u_pale * step(0.5, w));
-  v_em = a_em;
+  v_em = em;
   v_l = vec4(i_c.w, i_y.x, i_y.y, i_y.z);
   gl_Position = u_viewProj * vec4(rel, 1.0);
 }`;

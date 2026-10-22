@@ -38,10 +38,10 @@
     for (let s = 1; s < n; s++) {
       const ty = R.types[R.T.type[s]]; if (!ty) continue;
       const nm = ty.name, f = R.T.flags[s];
-      if (FLOWER.test(nm) && !NOT_PLANT.test(nm)) m[s] |= 1;                  // a flower
+      if (FLOWER.test(nm) && !NOT_PLANT.test(nm) && !(f & VR.F.SOLID)) m[s] |= 1;   // a flower (a plant: never a rose-coloured wall)
       if (nm === 'grass_block') m[s] |= 2;                                    // grass ground
       if ((f & VR.F.LEAVES) || /^(bush|sweet_berry_bush)$/.test(nm)) m[s] |= 4;   // cover (a hedge, a bush)
-      if (f & VR.F.WATER) m[s] |= 8;                                          // water
+      if (f & (VR.F.WATER | VR.F.WATERLOG)) m[s] |= 8;                        // water (and the seagrass standing in it)
       if (f & VR.F.LEAVES) m[s] |= 16;                                        // leaves (a tree's crown)
     }
     return (MASK = m);
@@ -188,7 +188,9 @@
   };
 
   // ---------------------------------------------------------------- the actor
-  const KINDCAP = { bird: 320, gull: 16, fish: 340, carp: 64, bfly: 128, dfly: 64, ray: 8 };
+  const RAYCOL = [[0.32, 0.85, 1.0], [0.72, 0.5, 1.0]], MOTECOL = [[0.5, 0.95, 1.0], [0.82, 0.62, 1.0]];
+  const TKEY = []; for (let k = 0; k < 8; k++) TKEY.push('wray' + (k >> 1) + (k & 1 ? 'r' : 'l'));
+  const KINDCAP = { flock: 400, gull: 16, fish: 340, carp: 64, bfly: 128, dfly: 64, ray: 8 };
   const PIECES = ['birds', 'fish', 'bugs', 'rays', 'herds'];
   class Actor {
     constructor(game) {
@@ -232,17 +234,19 @@
       }
       return null;
     }
-    // a disc of water round (x, z) for a shoal: its radius (≤ rMax, every one of 12 directions still water at the
-    // surface), the band under the surface and over the bottom → {x, z, r, y0, y1, sky} or null
+    // a disc of water round (x, z) for a shoal: its radius — out to where (≤ rMax) at least 14 of 16 directions still meet
+    // the same water (a pier's posts are a column or two: the fish swim round them, they do not end the water) — and the
+    // band under the surface and over the bottom → {x, z, r, y0, y1, surf, sky} or null
     waterDisc(x, z, y0, rMax, minDepth) {
       const S = this.surface(x, z, y0); if (!S || S.depth < (minDepth || 1)) return null;
-      let r = rMax;
-      for (let k = 0; k < 12; k++) {
-        const a = k / 12 * TAU;
-        // (a post of the pier is one column: the water goes on past it)
-        const wet = (d) => { const s2 = this.surface(x + Math.cos(a) * d, z + Math.sin(a) * d, S.top); return !!s2 && s2.top === S.top && s2.depth >= 1; };
-        for (let d = 1; d <= r; d += 0.75) if (!wet(d) && !wet(d + 1.5)) { r = Math.min(r, d - 0.8); break; }
+      let r = 0.9;
+      for (let d = 1.5; d <= rMax + 0.01; d += 0.75) {
+        let ok = 0;
+        for (let k = 0; k < 16 && ok + 16 - k >= 14; k++) { const a = k / 16 * TAU, s2 = this.surface(x + Math.cos(a) * d, z + Math.sin(a) * d, S.top); if (s2 && s2.top === S.top && s2.depth >= 1) ok++; }
+        if (ok < 14) break;
+        r = d;
       }
+      r -= 0.3;
       if (r < 1.6) return null;
       const bottom = S.top - S.depth + 1, y1 = S.y - 0.35, y0b = Math.max(bottom + 0.3, S.y - 2.4);
       return { x, z, r, y0: Math.min(y0b, y1 - 0.45), y1, surf: S.y, sky: Math.max(0.35, lightOf(this.g.world, x, S.top + 1, z)) };
@@ -316,8 +320,10 @@
       }
       if (Mu.state !== 'fly') return;
       // the target: the seeded loop round the stage; roosting the tree line (or far off when there is none); leaving far off
-      const tg = fl.tgt;
-      if (ph === 'swirl' || ph === 'rise') W.murmTarget(this.seed ^ Mu.key, ctx.clock, Mu.st, tg);
+      const tg = fl.tgt, swirl = ph === 'swirl' || ph === 'rise';
+      // (the lobes: the cloud parts into wings and folds back while it swirls; roosting and leaving it holds together)
+      if (fl.lofs) { if (swirl) W.murmLobes(this.seed ^ Mu.key, ctx.clock, fl.lobes, fl.P.lobeR || 30, fl.lofs); else fl.lofs.fill(0); }
+      if (swirl) W.murmTarget(this.seed ^ Mu.key, ctx.clock, Mu.st, tg);
       else if (ph === 'roost' && Mu.perch) { tg[0] = Mu.roost[0]; tg[1] = Mu.roost[1] + 6; tg[2] = Mu.roost[2]; }
       else { const a = W.h(this.seed, Mu.key, 9) * TAU; tg[0] = Mu.st.x + Math.cos(a) * 500; tg[1] = Mu.st.y + 30; tg[2] = Mu.st.z + Math.sin(a) * 500; if ((Mu.leaveT = (Mu.leaveT || 0) + dt) > 70) { Mu.state = 'away'; Mu.leaveT = 0; return; } }
       // the step: 30 times a second at most (15 when far); the draw extrapolates in between
@@ -505,16 +511,16 @@
         for (const a of A.fish) {
           if (SH.length >= nS) break;
           if (Math.hypot(a.x - eye[0], a.z - eye[2]) > 64 || SH.some(s => s.key === a.key)) continue;
-          const b = this.waterDisc(a.x + 0.5, a.z + 0.5, a.y, Math.min(7, (a.extra && a.extra[0]) || 5), 2);
+          const b = this.anchorDisc(a, Math.min(7, (a.extra && a.extra[0]) || 5));
           if (b) SH.push(this.newShoal(a.key, b, nF, false));
         }
         // the shallows round the eye: water at sea level with two blocks of depth, the nearest ahead first
-        if (SH.length < nS && !SH.some(s => s.eyeOwn) && !SH.some(s => Math.hypot(s.b.x - eye[0], s.b.z - eye[2]) < 30) && this.waterNear(eye)) {
+        if (SH.length < nS && !SH.some(s => s.eyeOwn) && !SH.some(s => Math.hypot(s.b.x - eye[0], s.b.z - eye[2]) < 18) && this.waterNear(eye)) {
           const yaw = this.g.player.yaw, f = [-Math.sin(yaw), -Math.cos(yaw)];
           for (let k = 0; k < 12; k++) {
             const a = Math.atan2(f[1], f[0]) + ((k & 1) ? 1 : -1) * Math.ceil(k / 2) * 0.35, dd = 7 + (k % 3) * 3;
             const x = Math.floor(eye[0] + Math.cos(a) * dd) + 0.5, z = Math.floor(eye[2] + Math.sin(a) * dd) + 0.5;
-            const b = this.waterDisc(x, z, eye[1] - 1.6, 5, 2);
+            const b = this.waterDisc(x, z, eye[1] - 1.6, 5, 1);   // (the shallows too: minnows in a hand's depth of clear water)
             if (b && b.r >= 2.4) { SH.push(this.newShoal('eye:' + Math.floor(x) + ',' + Math.floor(z), b, nF, true)); break; }
           }
         }
@@ -543,6 +549,18 @@
         W.shoalTarget(s.seed, ctx.clock * 0.6, s.b, s.fl.tgt);
         s.acc += dt; if (s.acc >= 1 / 20) { s.fl.step(Math.min(0.1, s.acc)); s.acc = 0; }
       }
+    }
+    // the water of a fish anchor: its own disc, or — when the pier's posts crowd its end — the widest within 2.5 of it
+    // (eight places round it); once per anchor (kept 30 s: the water does not move)
+    anchorDisc(a, rMax) {
+      const C = this.discs || (this.discs = new Map()), c = C.get(a.key);
+      if (c && this.time - c.t < 30) return c.b;
+      const x = a.x + 0.5, z = a.z + 0.5;
+      let b = this.waterDisc(x, z, a.y, rMax, 2);
+      for (let k = 0; k < 8 && !(b && b.r >= 4); k++) { const q = this.waterDisc(x + Math.cos(k / 8 * TAU) * 2.5, z + Math.sin(k / 8 * TAU) * 2.5, a.y, rMax, 2); if (q && (!b || q.r > b.r)) b = q; }
+      C.set(a.key, { b, t: this.time });
+      if (C.size > 24) C.delete(C.keys().next().value);
+      return b;
     }
     // is there water at the surface round the eye (eight columns 6 and 11 blocks out)? (a cheap look before the search)
     waterNear(eye) {
@@ -612,11 +630,13 @@
     scanStep(eye) {
       const S = this.scan, w = this.g.world, MK = mask();
       const cx = Math.floor(eye[0] / 16) * 16 + 8, cz = Math.floor(eye[2] / 16) * 16 + 8, N = 28;
-      if (!S.at || S.at[0] !== cx || S.at[1] !== cz) { S.at = [cx, cz]; S.i = 0; S.flowers = new Map(); S.cover = []; S.done = false; }
+      // (again when it met columns that had not come yet — 3 s later — and every 30 s: the land round you changes)
+      const again = S.done && this.time - S.t > (S.miss ? 3 : 30);
+      if (!S.at || S.at[0] !== cx || S.at[1] !== cz || again) { S.at = [cx, cz]; S.i = 0; S.flowers = new Map(); S.cover = []; S.done = false; S.miss = 0; }
       if (S.done) return;
       for (let k = 0; k < 140 && S.i < N * N; k++, S.i++) {
         const x = cx - N + (S.i % N) * 2, z = cz - N + Math.floor(S.i / N) * 2;
-        if (!w.isLoaded(x, z)) continue;
+        if (!w.isLoaded(x, z)) { S.miss++; continue; }
         const y = w.topAt(x, z), b = w.getBlock(x, y, z), m = MK[b];
         if (m & 1) {   // (topAt can name the flower itself, or the grass under it)
           const ck = Math.floor(x / 8) + ',' + Math.floor(z / 8); let c = S.flowers.get(ck); if (!c) S.flowers.set(ck, c = []); c.push([x + 0.5, y, z + 0.5]);
@@ -630,7 +650,7 @@
         }
       }
       if (S.i < N * N) return;
-      S.done = true;
+      S.done = true; S.t = this.time;
       // the drifts: cells with six flowers or more, their flowers and the neighbours' within 7 of the middle
       const drifts = [];
       for (const [ck, c] of S.flowers) {
@@ -653,13 +673,25 @@
       const C = VR.Heart && VR.Heart.ISLES ? VR.Heart.ISLES : { x: 330, z: 140 };
       if (Math.hypot(ctx.eye[0] - C.x, ctx.eye[2] - C.z) > 1100) return;
       if (!this.loop) { const I = VR.IslesGen && VR.IslesGen.list ? VR.IslesGen.list({ seed: g.meta.seed }) : null; this.loop = W.rayLoop(I || []); }
-      const P = g.particles, rate = cap.motes, night = ctx.E.night || 0;
+      const P = g.particles, TR = g.trails, rate = cap.motes, night = ctx.E.night || 0;
       for (let k = 0; k < n; k++) {
         const st = W.rayState(this.seed, ctx.clock, k, 4, this.loop, this.rs);
         const R = this.rays[k] || (this.rays[k] = new Float32Array(8)); R.set(st);
         this.rays.length = k + 1;
-        // the light motes from the wing tips and the tail's end: drifting, slowly fading
         const d = Math.hypot(st[0] - ctx.eye[0], st[1] - ctx.eye[1], st[2] - ctx.eye[2]);
+        // the luminous trails from the wing tips (the trails' own glow ribbons, one additive draw for all): cyan and
+        // violet, a few seconds long, brighter at night — the long light lines of the trailer's sky
+        if (TR && TR.emit && d < 700) {
+          const cy = Math.cos(st[3]), sy = Math.sin(st[3]), cb = Math.cos(st[5]), sb = Math.sin(st[5]), sc = st[7], col = k & 1 ? RAYCOL[1] : RAYCOL[0];
+          // (one options record per trail, kept: the trails hold on to it)
+          const o = this.trailO || (this.trailO = TKEY.map(() => ({ kind: 'glow', col: null, width: 1, life: 3.2, step: 1.2, k: 0.3, max: 48 })));
+          for (let sd = 0; sd < 2; sd++) {
+            const lx = (sd ? -0.5 : 0.5) * sc * 0.97 * cb, ly = (sd ? -0.5 : 0.5) * sc * 0.97 * sb, lz = 0.05 * sc;
+            const q = o[k * 2 + sd]; q.col = col; q.width = 0.05 * sc; q.k = 0.26 + 0.34 * night;
+            TR.emit(TKEY[k * 2 + sd], st[0] + lx * cy + lz * sy, st[1] + ly, st[2] - lx * sy + lz * cy, q);
+          }
+        }
+        // the light motes from the wing tips and the tail's end: drifting, slowly fading
         if (!P || !rate || d > 230) continue;
         this.rayAcc[k] += dt * rate * (0.6 + 0.4 * night);
         while (this.rayAcc[k] >= 1) {
@@ -667,8 +699,8 @@
           const cy = Math.cos(st[3]), sy = Math.sin(st[3]), s = st[7], pick = (Math.random() * 3) | 0;
           const lx = pick === 2 ? 0 : (pick ? -0.5 : 0.5) * s * 0.96, lz = pick === 2 ? 0.85 * s : 0.06 * s;
           const x = st[0] + lx * cy + lz * sy, z = st[2] - lx * sy + lz * cy, y = st[1] + (pick === 2 ? 0 : Math.sin(st[5]) * lx);
-          const col = k & 1 ? [0.82, 0.62, 1.0] : [0.5, 0.95, 1.0];
-          P.spawn(x, y, z, (Math.random() - 0.5) * 0.3, -0.12 - Math.random() * 0.2, (Math.random() - 0.5) * 0.3, { life: 3.2 + Math.random() * 1.6, size: 0.11 + Math.random() * 0.08, grav: 0, drag: 0.5, col, emis: 1, collide: false, fade: true, force: true });
+          const col = k & 1 ? MOTECOL[1] : MOTECOL[0];
+          P.spawn(x, y, z, (Math.random() - 0.5) * 0.3, -0.12 - Math.random() * 0.2, (Math.random() - 0.5) * 0.3, { life: 3.2 + Math.random() * 1.6, size: 0.22 + Math.random() * 0.16, grav: 0, drag: 0.5, col, emis: 1, collide: false, fade: true, force: true });
         }
       }
     }
@@ -795,15 +827,20 @@
       // the murmuration (one draw), the gulls
       const Mu = this.murm;
       if (Mu && cap.murm) {
-        const K = WG.kind(gl, 'bird', KINDCAP.bird), D = K.data, fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0;
+        // each boid a party of W.MURM_K birds (wildgpu.js 'flock'): spread round it in the sky, close together on the perch
+        const K = WG.kind(gl, 'flock', KINDCAP.flock), D = K.data, fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0, P = Mu.perch;
         const dc = Mu.state === 'seated' && Mu.roost ? Math.hypot(Mu.roost[0] - cx, Mu.roost[2] - cz) : Math.hypot(fl.ctr[0] - cx, fl.ctr[2] - cz);
+        const roosting = Mu.ph === 'roost' && P;
         let n = 0;
-        if (Mu.state !== 'away' && dc < (Mu.state === 'seated' ? 90 : 460)) for (let i = 0; i < Mu.n && n < K.cap; i++) {
+        if (Mu.state !== 'away' && dc < (Mu.state === 'seated' ? 90 : 520)) for (let i = 0; i < Mu.n && n < K.cap; i++) {
           const o = i * 3, sit = Mu.landed[i] === 1, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2];
           const x = fl.pos[o] + (sit ? 0 : vx * ex) - cx, y = fl.pos[o + 1] + (sit ? 0 : vy * ex) - cy, z = fl.pos[o + 2] + (sit ? 0 : vz * ex) - cz;
-          const d = Math.sqrt(x * x + y * y + z * z), s = 0.44 * Math.max(1, Math.min(2.3, d / 85));
+          // (the birds' size: half a block, growing with the distance — a speck never thinner than a few pixels)
+          const d = Math.sqrt(x * x + y * y + z * z), s = 0.5 * Math.max(1, Math.min(3, d / 60));
           const hv = Math.hypot(vx, vz) + 1e-4, k = 0.86 + 0.24 * ((i * 0.618) % 1);
-          put(D, n++, x, y, z, s, sit ? (i * 2.4) % TAU : yawOf(vx, vz), sit ? 0 : Math.atan2(vy, hv) * 0.8, sit ? 0 : fl.bank[i], fl.phase[i], 0.9 * k, 0.88 * k, 0.95 * k, 1, sit ? 0.02 : 0.45 + 0.5 * fl.flap[i], 0, sit ? -0.55 : 0.05, 0, 0, 0.12);
+          // the party's spread: 1 in the sky; closing to its perch while it lands; small on the perch
+          const spread = sit ? 0.22 : roosting ? 0.22 + 0.78 * sm(Math.hypot(P[o] - fl.pos[o], P[o + 1] - fl.pos[o + 1], P[o + 2] - fl.pos[o + 2]) / 14) : 1;
+          put(D, n++, x, y, z, s, sit ? (i * 2.4) % TAU : yawOf(vx, vz), sit ? 0 : Math.atan2(vy, hv) * 0.8, sit ? 0 : fl.bank[i], fl.phase[i], 0.9 * k, 0.88 * k, 0.95 * k, 1, sit ? 0.02 : 0.45 + 0.5 * fl.flap[i], 0, sit ? -0.55 : 0.05, spread, 0, 0.12);
         }
         if (n) list.push([K, n]);
       }
