@@ -432,10 +432,10 @@
     // the far banks (level 2): their cover, their drift (azimuth), the warmth of the sun's side; the ray fan round a low
     // sun through the cloud gaps (stronger the more cloud there is, none in the rain)
     const el = Y.el;
-    set4(u.u_s3Bank, lv >= 2 && over ? clamp(0.12 + 0.8 * cover, 0, 0.95) * (1 - 0.5 * rain) : 0, dx / 2600, dz / 2600, 0);
+    set4(u.u_s3Bank, lv >= 2 && over ? clamp(0.12 + 0.8 * cover, 0, 0.95) * (1 - 0.95 * rain) : 0, dx / 2600, dz / 2600, 0);
     // the cumulus field beyond the sprites' window, in perspective on the cloud plane (y 210): the plane's height over the
     // eye and the eye in cloud space are the renderer's (sky3_gl.js sets x, y, z each frame); w the cover (level 2)
-    u.u_s3Field[3] = lv >= 2 && over ? cover * (1 - 0.6 * rain) : 0;
+    u.u_s3Field[3] = lv >= 2 && over ? cover * (1 - 0.95 * rain) : 0;   // (in the rain the deck closes the sky: no far field, no banks)
     set4(u.u_s3Fan, lv >= 2 && over ? (1 - sstep(5, 14, el)) * sstep(-2.5, 0.5, el) * sstep(0.12, 0.45, cover) * (1 - rain) * 0.5 : 0, (E.time || 0) * 0.004, 0, 0);
     // the clouds' light (the sprites, the box clouds, the far banks)
     set3(u.u_c3Sun, C.sun); set3(u.u_c3Top, C.top); set3(u.u_c3Low, C.low); set3(u.u_c3Ld, C.L);
@@ -500,10 +500,11 @@ vec3 s3Deck(vec3 col, vec3 dir) {
   float hz = 1.0 - smoothstep(0.0, 0.35, dir.y);
   vec3 c = u_s3Rain.rgb * (0.76 + 0.48 * n);
   c = mix(c, u_skyHorizon * 1.08, hz * 0.5);
-  // the scud: torn darker rags under the deck, lower and faster with the wind
-  vec2 qs = dir.xz / y * 0.75 + u_s3Drift.zw;
-  float sn = vnoise(qs) * 0.62 + vnoise(qs * 2.7 + 3.3) * 0.38;
-  float scud = smoothstep(0.56, 0.74, sn) * (1.0 - hz * 0.7);
+  // the scud: torn darker rags under the deck, lower and faster with the wind, drawn out along it, their edges frayed
+  vec2 wd = normalize(u_s3Drift.zw + vec2(1e-4, 0.0)), qw = dir.xz / y * 0.75 + u_s3Drift.zw;
+  vec2 qs = vec2(dot(qw, wd) * 0.42, dot(qw, vec2(-wd.y, wd.x)));
+  float sn = vnoise(qs) * 0.62 + vnoise(qs * 2.7 + 3.3) * 0.38 + (vnoise(qs * 7.0 - 1.9) - 0.5) * 0.2;
+  float scud = smoothstep(0.56, 0.72, sn) * (1.0 - hz * 0.7);
   c = mix(c, u_s3Rain.rgb * 0.52, scud * 0.75);
   return mix(col, c, u_s3Neb.z * smoothstep(-0.04, 0.06, dir.y));
 }
