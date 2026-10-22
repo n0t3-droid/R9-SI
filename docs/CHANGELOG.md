@@ -148,6 +148,20 @@ the Driftinseln, the Unterschmiede or the Hohlwelt; each world remembers where y
 or /home) brings you back to Herzwelt from anywhere, your ship with you. `VR.EventLog` records what happens in view —
 the instrument of the never-boring measure every release review uses from now on.
 
+**🪐 The first look into space** (`/raum herz · amarant · zinn · aqua`, also in Einfach; the „Weltraum-Detail" slider).
+Herzwelt seen from 3 km above your own town: the thin blue limb, sunglint, the clouds, at night the lights of the villages
+and the green glow of the air, the dawn arc along the rim; Amarant with its bands and its ring, the ring's shadow on the
+planet and the planet's on the ring; Amarant 37° wide over Zinnober; Aquamarin with Herzwelt behind it — every body where
+`VR.Universe` puts it at this moment. Esc or /raum takes you back. 9–10 draws; Very Low draws the space frame in half
+the time of the plaza. There is no flight there yet — that is the next release.
+
+**⭐ The Abenteuer begins** (a choice per world: „Spielweg" Frei bauen / Abenteuer in the create form, „Abenteuer-Welt
+beginnen" in Meins; worlds without it stay exactly as they are, new worlds stay peaceful). A gold level ring with the
+Sterntaler at the top left; experience from exploring biomes, building, vistas, wonders, villagers' requests, families
+moving in, inventions, blueprints and the first flight, with guards against farming; a banner, a chime and a golden burst
+at every level, a gift every fifth; an „Abenteuer" card and a card of five values in the pause menu. Kindersicher worlds
+have no encounters at all. Quests, shops, the foes to free places from and the story follow in the next waves.
+
 **Known gaps.** The clouds are still sprites (no self-shadowing); the murmuration reads as specks more than a dark
 folding mass; the fox was never pictured; the title's citadel is a placeholder of boxes; the wood's light shafts are as
 in v0.48; Villa Nova's windows glow but do not mirror; Heimkehr takes 17 s on a software renderer; the never-boring
