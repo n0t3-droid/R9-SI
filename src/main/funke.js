@@ -1004,7 +1004,7 @@ void main() {
   if (U && U.prototype && U.prototype.settingsAct && !U.prototype._funke) {
     U.prototype._funke = true;
     const sa = U.prototype.settingsAct;
-    U.prototype.settingsAct = function (name) { if (name === 'funkeQuiet') { F.mute(this.game); if (this.hint) this.hint(T('g.funke.mute'), 2400); return; } return sa.apply(this, arguments); };
+    U.prototype.settingsAct = function (name) { if (name === 'funkeQuiet') { F.mute(this.game); if (this.hint) this.hint(F.say('mute', null, 0), 2400); return; } return sa.apply(this, arguments); };
   }
   // the 🧭 hints as Funke's lines (Einfach): the box stays the record (done, dismissed, counted), Funke shows it
   const H = VR.Hints;
