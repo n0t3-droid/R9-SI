@@ -303,5 +303,64 @@ console.log('g · the band model: golden hour and dusk against the frames');
   check(Math.abs(n.b - n.a) < 0.6, `the day as it was: noon's mean ΔE ${n.a.toFixed(1)} → ${n.b.toFixed(1)}`);
 }
 
+// ---------------------------------------------------------------- h · f-sky4: the golden hour with structure, the storm
+// (docs/reviews/v0.49.md R50-01: the golden hour fitted to the band means turned into pink milk — no space, no disc, the
+// grade flat; R50-11: storm clouds bright white slabs). The parts the band means cannot see, checked in the model
+console.log('h · f-sky4: the golden hour with structure (R50-01), the storm\'s clouds (R50-11)');
+{
+  const M = require('./sky3_model.js'), SR = require('./sky_ref.js'), L2 = VR.Light2;
+  const envAt = (tod, wx, rain) => {
+    S3.use({ sky3: 2, cloudVol: true, clouds: 2 });
+    const env = new VR.Env(); env.setTime(tod); env.wx.setSeed(4242); env.wx.force(wx || 'klar');
+    if (wx && VR.WX && VR.WX.VIS[wx]) Object.assign(env.wx.v, VR.WX.VIS[wx]);
+    let E; for (let i = 0; i < 3; i++) E = env.update(0.033, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 4096, freezeTime: true, freezeWeather: true, drama: true, motion: true });
+    return E;
+  };
+  const E = envAt(10800), G = L2.grade(E), U = E.sky3.u;
+  // the nebula and the stars over the top at the golden hour (t-sky3 cut them to 15 %; the frames show the nebula and planets)
+  const P = S3.palette(E.sunDir[1], VR.Sky);
+  check(P.space[2] >= 0.5 * VR.Sky.space[2], `the nebula and the stars at the golden hour: space ${P.space[2].toFixed(2)} of the day's ${VR.Sky.space[2]} (≥ half)`);
+  // the sun a white-hot disc in a warm glow (the trailer's t1_07: a white core ~0.6° across, gold, peach, pink within ~5°):
+  // the core displays ≥ 250 luma over ≥ 0.4° (SR.SUN_CORE), the glow 3° out a step down (≤ 228), 5° out ≤ 215
+  const prof = M.sunProfile(E, U, G, [0, 0.1, 0.2, 0.3, 0.5, 1, 2, 3, 5]), at = (a) => prof.find(p => p.a === a);
+  let core = 0; for (const p of prof) if (p.luma >= SR.SUN_CORE) core = Math.max(core, p.a);
+  check(core >= 0.2, `the sun's white core: luma ≥ ${SR.SUN_CORE} out to ${core}° from its centre (≥ 0.2°: ≥ 0.4° wide; centre ${at(0).rgb.map(Math.round).join(',')})`);
+  check(at(3).luma <= 228 && at(5).luma <= 215 && at(0).luma - at(3).luma >= 22, `the glow falls away from the disc: luma ${prof.map(p => p.a + '° ' + p.luma.toFixed(0)).join(', ')}`);
+  // the sky's hue structure (the frames: blue away from the sun, magenta-pink beside it; their band means the violet of the
+  // target): at 20° up, 15° of azimuth from the sun magenta-pink or salmon, 100° from it blue-violet, both saturated
+  const hueAt = (dAz, el) => {
+    const s = E.sunDir, az0 = Math.atan2(s[2], s[0]) + dAz * Math.PI / 180, e = el * Math.PI / 180;
+    const dir = [Math.cos(az0) * Math.cos(e), Math.sin(e), Math.sin(az0) * Math.cos(e)];
+    const d = M.display(M.skyWithSun(E, dir, U), E, G, [0.5, 0.5], 16 / 9), c = SR.lch(SR.lab(d));
+    return { rgb: d.map(Math.round), C: c.C, h: c.h, L: c.L };
+  };
+  const near = hueAt(15, 20), far = hueAt(100, 20), top = hueAt(60, 45);
+  check((near.h >= 315 || near.h <= 30) && near.C >= 22, `beside the sun magenta-pink: 20° up, 15° from it ${near.rgb.join(',')} (h ${near.h.toFixed(0)}°, C* ${near.C.toFixed(0)})`);
+  check(far.h >= 262 && far.h <= 305 && far.C >= 25, `away from the sun blue-violet: 20° up, 100° from it ${far.rgb.join(',')} (h ${far.h.toFixed(0)}°, C* ${far.C.toFixed(0)})`);
+  check(top.C >= 28 && top.L <= 62, `the high sky saturated and not milky: 45° up ${top.rgb.join(',')} (L* ${top.L.toFixed(0)}, C* ${top.C.toFixed(0)})`);
+  // the grade at the golden hour as v0.48's (t-polish2 took it to 1.04 / 0.26: the land and the sky lost their colour), its
+  // shoulder at white (the disc's core and the trailer's whites reach 255)
+  const GG = L2.GRADE.gold;
+  check(GG.sat >= 1.16 && GG.s >= 0.3 && GG.sh >= 0.995, `the golden grade: saturation ${GG.sat} (≥ 1.16), S ${GG.s} (≥ 0.3), shoulder ${GG.sh} (≥ 0.995)`);
+  // the sun-side mist halved (the review: 0.3 veiled the far land toward the sun)
+  const air = L2.air(E, 10800);
+  check(air.sunK <= 0.155, `the mist toward the sun halved at the golden hour (sunK ${air.sunK.toFixed(3)} ≤ 0.155)`);
+  // R50-11 · a storm's clouds have weight: in a thunderstorm the clouds' light (S3.cloudLight) is an overcast grey — the
+  // sun's light on them nearly gone, the base ≈ 0.25 of a fair cloud's lit top, the base under 0.55 of the storm cloud's
+  // own top — and the puffs carry a gradient and ragged bases (CLOUD3)
+  const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const tod = 9500, fair = envAt(tod), storm = envAt(tod, 'gewitter');
+  const Cf = S3.cloudLight(fair), Cs = S3.cloudLight(storm);
+  const fairTop = lum(Cf.top) + lum(Cf.sun), stTop = lum(Cs.top) + lum(Cs.sun), stBase = lum(Cs.low);
+  check(storm.rain > 0.5 && (storm.cloudCover || 0) > 0.6, `the thunderstorm forced (rain ${storm.rain.toFixed(2)}, cover ${(storm.cloudCover || 0).toFixed(2)})`);
+  check(stBase / fairTop >= 0.15 && stBase / fairTop <= 0.32, `a storm cloud's base ≈ 0.25 of a fair cloud's lit top (${(stBase / fairTop).toFixed(3)})`);
+  check(stBase / stTop <= 0.55, `a storm cloud's base under 0.55 of its own top (${(stBase / stTop).toFixed(3)})`);
+  const Us = storm.sky3.u;
+  check(!!Us.u_c3Storm && Us.u_c3Storm[0] > 0.6 && envAt(tod).sky3.u.u_c3Storm[0] < 0.05, `the puffs know the storm (u_c3Storm.x ${Us.u_c3Storm ? Us.u_c3Storm[0].toFixed(2) : '—'} in the thunderstorm, ${envAt(tod).sky3.u.u_c3Storm ? envAt(tod).sky3.u.u_c3Storm[0].toFixed(2) : '—'} in clear weather)`);
+  const PU = S3.glslPuff();
+  check(/u_c3Storm/.test(PU) && /ragged|c3Rag/.test(PU), 'the puff shader darkens a storm cloud from its top to its base and frays its base (CLOUD3)');
+  S3.use({ sky3: 0, cloudVol: false });
+}
+
 console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
 process.exit(fails ? 1 : 0);
