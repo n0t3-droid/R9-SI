@@ -809,7 +809,7 @@ void main() { float a = v_col.a * u_tint.a; o = vec4(v_col.rgb * u_tint.rgb * a,
     }
     // the Kranarm's warning: a red-violet ring under the player
     if (crane) { const f = crane.foe, sc = 1.8 * (f.st === 'tele' ? 0.6 + 0.4 * f.flare : 1); drawGeo(gl, p, thick, f.lock[0] - cam.x, f.lock[1] + 0.06 - cam.y, f.lock[2] - cam.z, sc, 1, sc, 1, 0.25, 0.85, 1.2); }
-    gl.depthMask(true); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE); gl.bindVertexArray(null);
+    gl.depthMask(true); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.disable(gl.BLEND); gl.enable(gl.CULL_FACE); gl.bindVertexArray(null);   // (the pass's state as it was)
     L.cost.fxMs += now() - t0;
     void OFF; void E;
   };

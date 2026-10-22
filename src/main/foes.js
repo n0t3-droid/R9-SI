@@ -990,6 +990,7 @@
         break;
       }
     }
+    gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_flash, 0);   // (the program's tint as the next model expects it)
     F.cost.drawMs += now() - t0;
   };
   const A0 = (f) => F.KINDS[f.k].att.recover;
@@ -1008,6 +1009,7 @@
     for (const b of F.bolts) one('foe_bolt', b.pos, 0, b.t * 6, 1.1, BT);
     if (F.rbolts) for (const b of F.rbolts) one('foe_bolt', b.pos, 0, 0, 1.1, BT);
     if (F.pile) one('foe_pile', F.pile.pos, 0, (r.frame || 0) * 0.02, 1.2, null);
+    gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_flash, 0);
     F.cost.drawMs += now() - t0;
   };
 
