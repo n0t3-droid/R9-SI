@@ -113,11 +113,14 @@
       const wDay = M.smoothstep(0.03, 0.2, sy), wNight = 1 - M.smoothstep(-0.28, -0.1, sy), wDusk = (1 - wDay) * (1 - wNight);
       const pal = (k) => SKY.day[k].map((v, i) => v * wDay + SKY.dusk[k][i] * wDusk + SKY.night[k][i] * wNight);
       let zen, hor, mid, stops;
+      // t-sky3 (sky3.js S3.palette, with the sky's level on): the golden hour's palette between the day and the dusk, the dusk
+      // refitted to the frames, the space faint at the golden hour, the warm glow by the hour
+      const P3 = SKY.on && VR.Sky3 && VR.Sky3.level && VR.Sky3.level() >= 1 ? VR.Sky3.palette(sy, SKY) : null;
       if (SKY.on) {
         // the biome's sky tints the stops a little (relative to the plains' blue, so the Heartland keeps the fitted colours)
         const tint = [0, 1, 2].map(i => 1 + (bsky[i] / [0.48, 0.64, 1][i] - 1) * 0.15);
-        hor = pal('hor').map((v, i) => v * tint[i] * GRADE.skyK); mid = pal('mid').map((v, i) => v * tint[i] * GRADE.skyK); zen = pal('zen').map((v, i) => v * tint[i] * GRADE.skyK);
-        stops = pal('stops');
+        hor = (P3 ? P3.hor : pal('hor')).map((v, i) => v * tint[i] * GRADE.skyK); mid = (P3 ? P3.mid : pal('mid')).map((v, i) => v * tint[i] * GRADE.skyK); zen = (P3 ? P3.zen : pal('zen')).map((v, i) => v * tint[i] * GRADE.skyK);
+        stops = P3 ? P3.stops : pal('stops');
       } else {
         const dayZen = (oldPal ? mix3([0.045, 0.17, 0.68], mix3(bsky, [0.07, 0.22, 0.74], 0.62), 0.22) : mix3([0.12, 0.09, 0.34], mix3(bsky, [0.12, 0.09, 0.40], 0.62), 0.22)).map(v => v * GRADE.skyK);
         const dayHor = (oldPal ? mix3([0.40, 0.63, 0.98], bsky, 0.12) : mix3([0.453, 0.337, 0.668], bsky, 0.12)).map(v => v * GRADE.skyK);
@@ -131,13 +134,13 @@
       }
       // the warm glow round the low sun and along the horizon (t-sky: halved by day — the trailer's day sky is cool and
       // clean, the warmth belongs to the dusk)
-      const sunset = [1.25, 0.46, 0.16].map(v => v * horizonness * GRADE.sunsetK * (SKY.on ? 1 - 0.5 * wDay : 1));
+      const sunset = [1.25, 0.46, 0.16].map(v => v * horizonness * GRADE.sunsetK * (SKY.on ? 1 - 0.5 * wDay : 1) * (P3 ? P3.sunset : 1));
       // rain desaturates
       const gray = (c, k) => { const l = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11; return mix3(c, [l, l, l], k); };
       // the state of the sky (weather.js): overcast and storms darken the sky, dim the sun, add cloud and wind
       zen = gray(zen, rain * 0.75); hor = gray(hor, rain * 0.7); mid = gray(mid, rain * 0.72);
       zen = zen.map(v => v * (1 - rain * 0.45) * (1 - W.dark * 0.5)); hor = hor.map(v => v * (1 - rain * 0.4) * (1 - W.dark * 0.4)); mid = mid.map(v => v * (1 - rain * 0.42) * (1 - W.dark * 0.45));
-      E.zenith = zen; E.horizon = hor; E.skyMid = mid; E.skyStops = stops; E.skySpace = SKY.on ? [0, 1, 2, 3].map(i => { const d = SKY.spaceDusk[i], v = i < 3 ? SKY.space[i] : SKY.nebDay; return d + (v - d) * wDay; }) : [SKY.space[0], SKY.space[1], SKY.space[2], 1.3];
+      E.zenith = zen; E.horizon = hor; E.skyMid = mid; E.skyStops = stops; E.skySpace = P3 ? P3.space : SKY.on ? [0, 1, 2, 3].map(i => { const d = SKY.spaceDusk[i], v = i < 3 ? SKY.space[i] : SKY.nebDay; return d + (v - d) * wDay; }) : [SKY.space[0], SKY.space[1], SKY.space[2], 1.3];
       E.skyDay = SKY.on ? [0.6 + (SKY.haze[0] - 0.6) * wDay, 1 + (SKY.haze[1] - 1) * wDay, wDay, SKY.fil * (0.3 + 0.7 * wDay)] : [0.6, 1, 0, 0]; E.sunset = sunset.map(v => v * (1 - rain * 0.8));
       const sunI = M.smoothstep(-0.05, 0.3, sy);
       const warm = (1 - M.smoothstep(0.05, 0.6, sy)) * GRADE.sunWarm;
@@ -148,6 +151,12 @@
       // the horizon's white-cyan a little toward the middle blue, so the land fades into the sky at the horizon
       const veil = mix3(hor, [0.25, 0.22, 0.46], 0.6);
       E.fogColor = mix3(SKY.on ? mix3(mix3(hor, mid, SKY.fog), veil, 1 - wDay) : (oldPal ? hor : veil), [0.5, 0.55, 0.62], rain * 0.4);
+      if (P3) {
+        // t-sky3: the far land takes the golden hour's and the dusk's new horizon half way — the far hills a shade darker and
+        // bluer than the bright horizon, as the frames' far mountains (the old palette's haze the other half)
+        const t0 = [0, 1, 2].map(i => 1 + (bsky[i] / [0.48, 0.64, 1][i] - 1) * 0.15), ho = pal('hor').map((v, i) => v * t0[i] * GRADE.skyK), mo = pal('mid').map((v, i) => v * t0[i] * GRADE.skyK);
+        E.fogColor = mix3(E.fogColor, mix3(mix3(mix3(ho, mo, SKY.fog), mix3(ho, [0.25, 0.22, 0.46], 0.6), 1 - wDay), [0.5, 0.55, 0.62], rain * 0.4), 0.5);
+      }
       E.blockTint = [1.0, 0.84, 0.64];
       E.emissiveBoost = 0.45 + night * 1.1;
       E.wind = W.wind;
@@ -248,6 +257,7 @@
       E.contrast = GRADE.contrast; E.vignette = GRADE.vignette; E.nebula = GRADE.nebula; E.sunDisc = GRADE.sunDisc;
       // t-sky: the god rays at 40 % by day (a high sun's rays streak the clean day sky the trailer shows), full round dusk
       E.rays = GRADE.rays * (SKY.on ? 1 - 0.92 * wDay : 1); E.gridK = GRADE.gridK;   // t-sky2: 8 % by day (the frames' day has no rays; with the sun in view every ray sampled its core and veiled the whole sky, L* +6 at the top)
+      if (VR.Sky3 && VR.Sky3.frame) VR.Sky3.frame(E, this);   // t-sky3: the moons in their phases, the shooting star, the aurora (sky3.js; nothing with the sky's switch off)
       return E;
     }
     lightning() { this.wx.strike(); }

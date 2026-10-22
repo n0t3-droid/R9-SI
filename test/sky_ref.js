@@ -18,7 +18,10 @@
 // against the measurement and the targets against the trailer's look: by day bright white-cyan at the horizon, light
 // then medium blue, deep navy space at the top with stars and nebula; at dusk a warm horizon under a dark top.
 // The browser test (test/trailer_skycurve.mjs) samples the game's pictures with the same functions (exports below).
-// usage: node test/sky_ref.js [--write] [--overlay <dir>]
+// t-sky3 adds the comparison of two runs of test/sky3.mjs (--runs before.json after.json: the ΔE of every band to the
+// frames' target of its hour, before → after, per view and as the mean per hour; the target: under 6 at the golden hour
+// and the dusk — printed; the check: every hour's mean no worse than before, the golden hour and the dusk better)
+// usage: node test/sky_ref.js [--write] [--overlay <dir>] [--runs <before.json> <after.json>]
 const fs = require('fs'), path = require('path');
 const sharp = require('/home/dev/.npm-global/lib/node_modules/sharp');
 const FRAMES_DIR = path.join(__dirname, '..', 'docs', 'trailer', 'frames');
@@ -311,12 +314,43 @@ async function overlay(dir) {
   }
 }
 
-module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, hfOf, measureFrames, targetOf, reference, compare, REF };
+// t-sky3 · two runs of test/sky3.mjs (their JSON): per view the ΔE per band before → after, per hour the means; the High
+// views with a target (noon → day, golden → golden, dusk → dusk; the afterglow and the dawn against the dusk, for the record)
+function compareRuns(before, after) {
+  const mean = (v) => { const w = (v || []).filter(x => x !== null && x !== undefined); return w.length ? w.reduce((a, b) => a + b, 0) / w.length : null; };
+  const rows = [], hours = {};
+  for (const a of after.results.filter(r => r.dE && r.preset === 'high')) {
+    const b = before.results.find(x => x.view === a.view && x.preset === a.preset && x.dE);
+    rows.push({ view: a.view, hour: a.hour, before: b ? b.dE : null, after: a.dE, mb: b ? mean(b.dE) : null, ma: mean(a.dE) });
+    const h = hours[a.hour] || (hours[a.hour] = { a: [], b: [] });
+    h.a.push(mean(a.dE)); if (b) h.b.push(mean(b.dE));
+  }
+  for (const h of Object.keys(hours)) { hours[h].ma = mean(hours[h].a); hours[h].mb = mean(hours[h].b); }
+  return { rows, hours };
+}
+
+module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, hfOf, measureFrames, targetOf, reference, compare, compareRuns, REF };
 
 if (require.main === module) {
   (async () => {
     const args = process.argv.slice(2);
     if (args[0] === '--overlay') { await overlay(args[1] || '.tmp_tests/sky_overlay'); console.log('overlays written'); return; }
+    if (args[0] === '--runs') {
+      const C = compareRuns(JSON.parse(fs.readFileSync(args[1], 'utf8')), JSON.parse(fs.readFileSync(args[2], 'utf8')));
+      const f = (v) => (v === null || v === undefined ? ' —' : v.toFixed(0).padStart(2));
+      console.log('ΔE per band to the frames (horizon → top): before → after');
+      for (const r of C.rows) console.log(`  ${r.view.padEnd(18)} ${r.before ? r.before.map(f).join(' ') : '(none)'}  (${r.mb === null ? '—' : r.mb.toFixed(1)})  →  ${r.after.map(f).join(' ')}  (${r.ma.toFixed(1)})`);
+      let fails = 0;
+      const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
+      for (const h of ['noon', 'golden', 'dusk', 'afterglow', 'dawn']) {
+        const H = C.hours[h]; if (!H || H.mb === null) continue;
+        const tgt = h === 'golden' || h === 'dusk' ? `; the target under 6: ${H.ma < 6 ? 'reached' : 'not yet'}` : '';
+        if (h === 'golden' || h === 'dusk') check(H.ma < H.mb, `${h}: the mean ΔE ${H.mb.toFixed(2)} → ${H.ma.toFixed(2)} (better${tgt})`);
+        else check(H.ma <= H.mb + 0.5, `${h}: the mean ΔE ${H.mb.toFixed(2)} → ${H.ma.toFixed(2)} (no worse${tgt})`);
+      }
+      console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
+      process.exit(fails ? 1 : 0);
+    }
     const ref = await reference();
     const fmtB = (b) => (b.rgb ? `${b.rgb.map(v => Math.round(v)).join(',').padEnd(12)} L${b.L.toFixed(0).padStart(3)} C${b.C.toFixed(0).padStart(3)} h${b.h.toFixed(0).padStart(4)}` : '—'.padEnd(26));
     for (const [n, f] of Object.entries(ref.frames)) {

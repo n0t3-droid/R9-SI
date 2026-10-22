@@ -165,6 +165,7 @@
     }
     buildPrograms() {
       if (VR.Light2) { VR.Light2.use(this.q); this.l2Key = VR.Light2.key ? VR.Light2.key(this.q) : ''; if (VR.GL && !VR.GL.defineHook) VR.GL.defineHook = VR.Light2.hook; }   // (t-light2: its switches are defines, light2.js)
+      if (VR.Sky3) { VR.Sky3.use(this.q); this.s3Key = VR.Sky3.key(this.q); }   // (t-sky3: the sky's switches are defines too, sky3.js — its hook follows the light's)
       const md = this.multi ? ['MULTIDRAW'] : [];
       const sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // LITE: flat materials, no normal map / specular / macro noise (very low PCs) · MOTION (t-motion): the wind in everything (wind.js; off on Very Low) · CLOUDSH (t-motion): the clouds' shadows (Balanced+)
       const P = this.P = {};
@@ -476,6 +477,7 @@
       if (!!this.q.texLite !== prevT && this.texAlbedo) this.setAniso(this.q.texLite ? 2 : 4);   // (F10 · texLite: anisotropic filtering 4 → 2 — no preset turns it on: plan)
       this.shadowValid = false;
       if (VR.Light2 && VR.Light2.key && VR.Light2.key(this.q) !== this.l2Key) this.buildPrograms();   // (t-light2: the light's switches are program defines)
+      else if (VR.Sky3 && VR.Sky3.key(this.q) !== this.s3Key) this.buildPrograms();   // (t-sky3: the same for the sky's)
       if (full || this.q.shadows !== prevSize) this.ensureShadowMap();
       this.resize(full || this.q.scale !== prevScale);
     }
@@ -876,6 +878,7 @@
       // and the far terrain per block
       if (u.u_blockVar) gl.uniform1f(u.u_blockVar, VR.LOOK && VR.LOOK.vary ? 1 : 0);
       if (this.l2Uniforms) this.l2Uniforms(p, E);   // (t-light2: the light's values, light2_gl.js)
+      if (this.s3Uniforms) this.s3Uniforms(p, E);   // (t-sky3: the sky's and the clouds' values, sky3_gl.js)
     }
     bindTerrainTextures(p) {
       const gl = this.gl;
@@ -1805,7 +1808,9 @@
     }
     drawPuffs(E) {
       const gl = this.gl, cam = this.cam;
-      if (!this.cloudAtlas) this.cloudAtlas = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: VR.Clouds.atlas(), filter: gl.LINEAR });
+      const vol = !!(VR.Sky3 && VR.Sky3.vol(this.q));   // (t-sky3 · Wolken mit Volumen: its own atlas — thickness, normal, occlusion: sky3.js)
+      if (this.cloudAtlas && vol !== !!this.cloudAtlasVol) { gl.deleteTexture(this.cloudAtlas); this.cloudAtlas = null; }
+      if (!this.cloudAtlas) { this.cloudAtlasVol = vol; this.cloudAtlas = GL.tex2D(256, 256, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, { data: vol ? VR.Sky3.atlas() : VR.Clouds.atlas(), filter: gl.LINEAR }); }
       this.updatePuffs(E, cam);
       const p = this.P.puff, u = p.u;
       gl.useProgram(p.p); this.common(p, E);
