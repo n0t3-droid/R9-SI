@@ -98,17 +98,13 @@ async function openWorld(dist, preset) {
   const groundY = (x, z) => ev(([x, z]) => { const w = VR.game.world, R = VR.R, F = VR.F; for (let y = 200; y > 30; y--) { const s = w.getBlock(Math.floor(x), y, Math.floor(z)); if (s && (R.T.flags[s] & (F.OPAQUE | F.FLUID)) && !(R.T.flags[s] & F.LEAVES)) return y; } return 80; }, [x, z]);
   // the eye at (x, eyeY, z) looking at (tx, ty, tz)
   const look = (x, eyeY, z, tx, ty, tz, fov, tod) => ev(([x, y, z, tx, ty, tz, fov, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y - 1.62, z); const dx = tx - x, dy = ty - y, dz = tz - z; p.yaw = Math.atan2(-dx, -dz); p.pitch = Math.atan2(dy, Math.hypot(dx, dz)); p.fovKick = 0; p.vel = [0, 0, 0]; g.settings.fov = fov; if (tod !== null) g.env.setTime(tod); }, [x, eyeY, z, tx, ty, tz, fov, tod === undefined ? null : tod]);
+  // the picture: the canvas itself, read in the task that drew it (the HUD is hidden, so it is the same picture) — run 2
+  // lost 150 s to every page.screenshot on the loaded machine (the compositor's frame came only on the second try), as
+  // material.mjs's runs had: no compositor frame is needed this way
   const picture = async (path, frames = 4) => {
-    await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; }, frames);
-    try { await page.bringToFront(); } catch (e) { /* (two pages open for the cost) */ }
-    for (let k = 0; k < 2; k++) {
-      try { await page.screenshot({ path, timeout: 150000 }); return true; } catch (e) {
-        const alive = await Promise.race([ev(() => Math.round(performance.now())).then(() => 'answers', () => 'error'), wait(20000).then(() => 'silent')]);
-        console.log(`  !! screenshot ${path.replace(/^.*\//, '')} failed (${String(e.message || e).split('\n')[0].slice(0, 120)}); the page ${alive}`);
-        if (alive !== 'answers') throw e;
-      }
-    }
-    return false;
+    const url = await ev((frames) => { window.__norender = false; const g = VR.game; for (let i = 0; i < frames; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } const u = g.renderer.gl.canvas.toDataURL('image/png'); window.__norender = true; return u; }, frames);
+    await sharp(Buffer.from(url.split(',')[1], 'base64')).resize(1280, 720).png().toFile(path);
+    return true;
   };
   const wild = (on) => ev((on) => { const g = VR.game, W = VR.Wild; for (const k of W.KEYS) g.settings[k] = on; }, on);
   // how many blocks stand in the line from a to b (every half block; air, water and the water's plants see through)
@@ -159,6 +155,16 @@ async function shot(name, setup, extra) {
 // travel: fly there, the chunks settled
 const go = async (x, y, z, tod) => { await A.ev(([x, y, z, tod]) => { const g = VR.game, p = g.player; p.flying = true; p.noclip = true; p.teleport(x, y, z); if (tod !== null) g.env.setTime(tod); }, [x, y, z, tod === undefined ? null : tod]); await A.settle(150, 8); };
 
+// the clearest view of a point from d blocks (sixteen places round it; the fewest blocks between) → {x, y, z, n}
+const clearView = async (P, dd, lift, prefer) => {
+  let best = null;
+  for (let k = 0; k < 16; k++) {
+    const a = k / 16 * Math.PI * 2 + (prefer || 0), ex = P[0] + Math.cos(a) * dd, ez = P[2] + Math.sin(a) * dd, gy = await A.groundY(ex, ez), ey = Math.max(gy + 1 + EYE, P[1] + lift);
+    const n = await A.blocked([ex, ey, ez], [P[0], P[1] + 0.4, P[2]]), score = n * 10 + Math.abs(ey - P[1] - lift) + k * 0.01;
+    if (!best || score < best.score) best = { score, n, x: ex, y: ey, z: ez };
+  }
+  return best;
+};
 // 1 the murmuration at the golden hour over the lake: from the shore (the beach west of the lake), 150-190 blocks from the
 // cloud — the whole of it against the evening sky, the lake and the isles behind; then 70 from it (murm_close: the birds)
 await shot('murm', async (out) => {
@@ -173,7 +179,7 @@ await shot('murm', async (out) => {
 }, async (out) => {
   const r = await A.report(); if (!r || !r.murm) return;
   const c = r.murm.ctr, cam = out.cam, bx = cam.x - c[0], bz = cam.z - c[2], bl = Math.hypot(bx, bz) || 1;
-  const ex = c[0] + bx / bl * 70, ez = c[2] + bz / bl * 70, gy = await A.groundY(ex, ez), ey = Math.max(gy + 1 + EYE + 1, PL.sea + 3);
+  const ex = c[0] + bx / bl * 70, ez = c[2] + bz / bl * 70, top = await A.ev(([x, z]) => VR.game.world.topAt(Math.floor(x), Math.floor(z)), [ex, ez]), ey = Math.max(top + 1 + EYE + 1, PL.sea + 3);   // (over a tree's crown, not in it)
   out.murmClose = { cam: [+ex.toFixed(1), +ey.toFixed(1), +ez.toFixed(1)], ctr: c, spread: r.murm.spread };
   await A.look(ex, ey, ez, c[0], c[1], c[2], 70, null); await A.step(2);
   await A.picture(`${SHOTS}wild_murm_close_on.png`, 4);
@@ -216,7 +222,10 @@ await shot('shoal', async (out) => {
   const r = await A.report(), s = r && r.shoals && (r.shoals.find(q => !q.key.startsWith('eye:')) || r.shoals[0]);
   if (!s) { out.error = 'no shoal: ' + JSON.stringify(r && r.shoals); return null; }
   out.shoal = s;
-  return { x: Pi.x - ux * 2.5, y: Pi.y + 1 + EYE, z: Pi.z - uz * 2.5, tx: s.ctr[0], ty: s.ctr[1], tz: s.ctr[2], fov: 66 };
+  // (the clearest look down at it from 5.5 blocks: a crate on the pier stood in run 2's way)
+  const v = await clearView(s.ctr, 5.5, 3.3);
+  out.shoalView = { blocked: v.n };
+  return { x: v.x, y: v.y, z: v.z, tx: s.ctr[0], ty: s.ctr[1], tz: s.ctr[2], fov: 66 };
 });
 // 4 the butterflies on a flower drift near the meadow; then walking through them
 await shot('bfly', async (out) => {
@@ -225,8 +234,9 @@ await shot('bfly', async (out) => {
   const r = await A.report(), sw = r && r.swarms && r.swarms[0];
   if (!sw) { out.error = 'no swarm (drifts ' + (r && r.drifts) + ')'; return null; }
   out.swarm = sw;
-  const [hx, hy, hz] = sw.home, ex = hx - 6, ez = hz - 3, gy = await A.groundY(ex, ez);
-  return { x: ex, y: gy + 1 + EYE, z: ez, tx: hx, ty: hy + 0.8, tz: hz, fov: 66 };
+  // (4.5 blocks from the drift's middle, the eye low over the flowers: run 2's six blocks made them specks)
+  const [hx, hy, hz] = sw.home, ex = hx - 4, ez = hz - 2, gy = await A.groundY(ex, ez);
+  return { x: ex, y: gy + 1 + EYE, z: ez, tx: hx, ty: hy + 1.0, tz: hz, fov: 66 };
 }, async (out) => {
   // walking through: the player steps into the drift (1.6 blocks a step), the camera with it
   const [hx, hy, hz] = out.swarm.home, cam = out.cam;
@@ -237,23 +247,26 @@ await shot('bfly', async (out) => {
   }
   const r = await A.report(); out.rise = r.swarms[0] ? r.swarms[0].up : 0;
   await A.ev(() => { VR.game.player.vel = [0, 0, 0]; });
-  const p = await A.ev(() => VR.game.player.pos.slice());
-  await A.look(p[0] - (hx - cam.x) * 0.25, p[1] + EYE, p[2] - (hz - cam.z) * 0.25, hx, hy + 1.6, hz, 70, null);
+  // what the walker sees: from its own eye, on along the way it walked, a little up — the swarm rising round it
+  const p = await A.ev(() => VR.game.player.pos.slice()), wx = hx - cam.x, wz = hz - cam.z, wl = Math.hypot(wx, wz) || 1;
+  await A.look(p[0], p[1] + EYE, p[2], p[0] + wx / wl * 6, p[1] + EYE + 1.2, p[2] + wz / wl * 6, 74, null);
   await A.picture(`${SHOTS}wild_bfly_rise_on.png`, 3);
 });
 // 5 the rays between the isles: from over the lake, the nearest ray framed (afternoon), then their lines at dusk
 // (from the beach where the release's lake view stands: the isles over the lake, the rays gliding under and between them;
 // the nearest pair framed when it comes within 80-170 — the game runs on until one does)
+// (run 2 framed them from the beach, 150 off: two pale specks — now from the lake's south-west shore, 45-100 from the
+// great ray of the nearest pair as it comes by)
 const rayShot = (name, tod) => shot(name, async (out) => {
-  const ex = 201.5, ez = 6.5;
-  await go(ex, 70, ez, tod);
-  const ey = (await A.groundY(ex, ez)) + 1 + EYE;
+  const ex = 243, ez = 49;
+  await go(ex, 75, ez, tod);
+  const ey = Math.max((await A.ev(([x, z]) => VR.game.world.topAt(Math.floor(x), Math.floor(z)), [ex, ez])) + 1 + EYE, PL.sea + 3);
   let r = null, best = null;
-  for (let k = 0; k < 24 && !best; k++) {
-    await A.step(60);
+  for (let k = 0; k < 30 && !best; k++) {
+    await A.step(45);
     r = await A.report();
     if (!r || !r.rays || !r.rays.length) continue;
-    let bd = 1e9; for (let i = 0; i < r.rays.length; i += 2) { const R = r.rays[i], d = Math.hypot(R[0] - ex, R[2] - ez); if (d > 80 && d < 170 && d < bd) { bd = d; best = R; } }
+    let bd = 1e9; for (let i = 0; i < r.rays.length; i += 2) { const R = r.rays[i], d = Math.hypot(R[0] - ex, R[2] - ez); if (d > 45 && d < 100 && d < bd) { bd = d; best = R; } }
   }
   if (!r || !r.rays || !r.rays.length) { out.error = 'no rays'; return null; }
   if (!best) best = r.rays[0];
@@ -287,16 +300,6 @@ await shot('deer', async (out) => {
   return { x: ex, y: gy + 1 + EYE + 1, z: ez, tx: cx, ty: cy + 0.9, tz: cz, fov: 58 };
 });
 
-// the clearest view of a point from d blocks (sixteen places round it; the fewest blocks between) → {x, y, z, n}
-const clearView = async (P, dd, lift, prefer) => {
-  let best = null;
-  for (let k = 0; k < 16; k++) {
-    const a = k / 16 * Math.PI * 2 + (prefer || 0), ex = P[0] + Math.cos(a) * dd, ez = P[2] + Math.sin(a) * dd, gy = await A.groundY(ex, ez), ey = Math.max(gy + 1 + EYE, P[1] + lift);
-    const n = await A.blocked([ex, ey, ez], [P[0], P[1] + 0.4, P[2]]), score = n * 10 + Math.abs(ey - P[1] - lift) + k * 0.01;
-    if (!best || score < best.score) best = { score, n, x: ex, y: ey, z: ez };
-  }
-  return best;
-};
 // 8 rabbits at a field's edge by day (the pasture's lane by farm_c: bushes and hedges at the foot of the fields), seen
 // from 12.5 blocks — near enough to see them nibble, far enough that they only sit up
 await shot('rabbit', async (out) => {

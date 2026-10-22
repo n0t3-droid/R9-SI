@@ -29,7 +29,7 @@ check(!!W && !!W.CAPS && !!W.Flock && !!W.Swarm && !!W.sched && !!W.rayLoop, 'VR
   check(W.CAPS.murm[1] === 0 && W.CAPS.ray[1] === 0 && W.CAPS.murm[2] >= 160 && W.CAPS.murm[4] <= 400 && W.CAPS.murm[3] >= 280, `Low: no murmuration, no rays; the murmuration 160–400 boids from Balanced (${W.CAPS.murm.join(' ')})`);
   // each boid of the murmuration is drawn as a little party of birds (wildgpu.js 'flock': MURM_K birds round it, in its
   // own frame, flattened into its sheet): thousands of birds in the sky for the cost of a few hundred boids
-  check(W.MURM_K >= 8 && W.MURM_K <= 16 && W.CAPS.murm[3] * W.MURM_K >= 3000, `the murmuration on High: ${W.CAPS.murm[3]} boids × ${W.MURM_K} birds = ${W.CAPS.murm[3] * W.MURM_K} birds in the sky`);
+  check(W.MURM_K >= 8 && W.MURM_K <= 24 && W.CAPS.murm[3] * W.MURM_K >= 5000, `the murmuration on High: ${W.CAPS.murm[3]} boids × ${W.MURM_K} birds = ${W.CAPS.murm[3] * W.MURM_K} birds in the sky`);
   check(W.CAPS.fish[4] >= 40 && W.CAPS.fish[4] <= 80 && W.CAPS.bfly[4] >= 30 && W.CAPS.bfly[4] <= 60 && W.CAPS.ray[3] >= 3 && W.CAPS.ray[4] <= 4, 'the sizes asked: shoal 40–80, swarm 30–60, three or four rays');
   const all = new Set(); for (const k of W.KEYS) for (const c of W.SWITCH[k]) all.add(c);
   check(W.KEYS.length === 5 && keys.every(k => all.has(k)), `five switches (${W.KEYS.join(', ')}) and every cap belongs to one`);

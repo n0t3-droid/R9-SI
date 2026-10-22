@@ -50,7 +50,7 @@
   // the murmuration's boid is drawn as a party of MURM_K birds round it (wildgpu.js 'flock': in the boid's own frame,
   // flattened into its sheet, each its own beat and a little drift) — thousands of birds for the cost of a few hundred
   // boids; the sheets turn with the boids' bank, so the cloud darkens where they turn edge-on
-  W.MURM_K = 12; W.MURM_RC = 3.5;
+  W.MURM_K = 20; W.MURM_RC = 3.0;
   const PRESET_TIER = { potato: 0, low: 1, balanced: 2, high: 3, ultra: 4, ultraLite: 4 };
   // the tier of a settings record: its preset, or for a custom setup its particle level (0 … 2) — as the living air's
   W.tierOf = function (S) {
@@ -88,7 +88,7 @@
   // waveA · fearR, fearA (the scatter from a fear point)
   // roost (the murmuration): the target pulls only beyond tgtR and only across (the flock roams its stage free and keeps
   // its own shape), heights held in a band of ±bandY round it (wY); lobes: the flock parts into wings (murmLobes)
-  W.FLOCK = { roost: 1, r: 14, K: 7, maxC: 32, sepR: 8, wSep: 30, wAli: 2.2, wCoh: 0.25, cohY: 4, wTgt: 8, tgtR: 40, bandY: 6, wY: 0.6, lobes: 3, lobeR: 34, flat: 1.2, vmin: 7, vmax: 12, amax: 34, stride: 2, wave: [5, 10], waveV: 26, waveW: 4.5, waveMax: 110, waveA: 22, fearR: 6, fearA: 30 };
+  W.FLOCK = { roost: 1, r: 11, K: 7, maxC: 32, sepR: 6, wSep: 30, wAli: 2.2, wCoh: 0.25, cohY: 4, wTgt: 8, tgtR: 40, bandY: 6, wY: 0.6, lobes: 3, lobeR: 34, flat: 1.2, vmin: 7, vmax: 12, amax: 34, stride: 2, wave: [5, 10], waveV: 26, waveW: 4.5, waveMax: 110, waveA: 22, fearR: 6, fearA: 30 };
   W.SHOAL = { roost: 0, lobes: 0, r: 2.0, K: 8, maxC: 24, sepR: 0.85, wSep: 22, wAli: 2.8, wCoh: 0.7, cohY: 1.4, wTgt: 2.0, tgtR: 1.8, flat: 2.4, vmin: 0.5, vmax: 2.4, amax: 10, stride: 1, wave: null, waveV: 0, waveW: 0, waveA: 0, fearR: 3.5, fearA: 16 };
   const GN = 1024, GM = GN - 1;   // the grid's hash table (a power of two)
   class Flock {

@@ -836,7 +836,7 @@
           const o = i * 3, sit = Mu.landed[i] === 1, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2];
           const x = fl.pos[o] + (sit ? 0 : vx * ex) - cx, y = fl.pos[o + 1] + (sit ? 0 : vy * ex) - cy, z = fl.pos[o + 2] + (sit ? 0 : vz * ex) - cz;
           // (the birds' size: half a block, growing with the distance — a speck never thinner than a few pixels)
-          const d = Math.sqrt(x * x + y * y + z * z), s = 0.5 * Math.max(1, Math.min(3, d / 60));
+          const d = Math.sqrt(x * x + y * y + z * z), s = 0.55 * Math.max(1, Math.min(3.2, d / 55));
           const hv = Math.hypot(vx, vz) + 1e-4, k = 0.86 + 0.24 * ((i * 0.618) % 1);
           // the party's spread: 1 in the sky; closing to its perch while it lands; small on the perch
           const spread = sit ? 0.22 : roosting ? 0.22 + 0.78 * sm(Math.hypot(P[o] - fl.pos[o], P[o + 1] - fl.pos[o + 1], P[o + 2] - fl.pos[o + 2]) / 14) : 1;
@@ -871,7 +871,7 @@
           for (let i = 0; i < sw.n && n < K.cap; i++) {
             const o = i * 3, st = sw.state[i], c = SP[sw.kind[i]], sit = st === 1;
             const yaw = sit ? sw.seedOf[i] : yawOf(sw.vel[o], sw.vel[o + 2]);
-            put(D, n++, sw.pos[o] - cx, sw.pos[o + 1] - cy, sw.pos[o + 2] - cz, 0.25 + 0.04 * (sw.kind[i] % 3), yaw, sit ? 0 : 0.25, 0, sw.phase[i], c[0], c[1], c[2], s.sky, sit ? 0.35 : 1.05, 0, sit ? 0.95 : 0.4, 0, 0, 0.15);
+            put(D, n++, sw.pos[o] - cx, sw.pos[o + 1] - cy, sw.pos[o + 2] - cz, 0.34 + 0.05 * (sw.kind[i] % 3), yaw, sit ? 0 : 0.25, 0, sw.phase[i], c[0], c[1], c[2], s.sky, sit ? 0.35 : 1.05, 0, sit ? 0.95 : 0.4, 0, 0, 0.15);
           }
         }
         if (n) list.push([K, n]);
@@ -902,9 +902,12 @@
         const dx = h.pos[0] - cam.x, dz = h.pos[2] - cam.z; if (dx * dx + dz * dz > 100 * 100) continue;
         const model = VR.getVoxModel(r.gl, 'wild_heron'); if (!model) continue;
         // the wings: folded down the flanks (wing 0) … spread and beating (wing 1); the neck folded in flight; the legs trail
-        const pose = h.pose || (h.pose = { wing_l: [0, 0, 0], wing_r: [0, 0, 0], neck: [0, 0, 0], head: [0, 0, 0], legs: [0, 0, 0] });
-        const fold = 1.35 * (1 - h.wing), beat = h.wing * (Math.sin(h.ph) * 0.85 * h.flap + 0.1);
-        pose.wing_l[2] = fold - beat; pose.wing_r[2] = -fold + beat;
+        const pose = h.pose || (h.pose = { wing_l: [0, 0, 0, 0, 0, 0], wing_r: [0, 0, 0, 0, 0, 0], neck: [0, 0, 0], head: [0, 0, 0], legs: [0, 0, 0] });
+        // folded, a wing lies along the flank with its tip back over the tail (the span turned back, the chord down, a
+        // little lower at the shoulder); spread, it beats about the shoulder
+        const fw = 1 - h.wing, beat = h.wing * (Math.sin(h.ph) * 0.85 * h.flap + 0.1), Q = Math.PI / 2;
+        pose.wing_l[0] = Q * fw; pose.wing_l[1] = Q * fw; pose.wing_l[2] = -beat; pose.wing_l[4] = -2 * fw;
+        pose.wing_r[0] = Q * fw; pose.wing_r[1] = -Q * fw; pose.wing_r[2] = beat; pose.wing_r[4] = -2 * fw;
         pose.neck[0] = h.state === 'stand' ? 0.05 : h.state === 'crouch' ? 0.45 : -0.8 * h.wing; pose.neck[1] = h.state === 'stand' ? h.look * 0.5 : 0;
         pose.head[0] = h.state === 'stand' ? -0.1 + Math.sin(t * 0.7 + h.a) * 0.08 : 0.9 * h.wing; pose.head[1] = h.state === 'stand' ? h.look * 0.4 : 0;
         pose.legs[0] = 1.25 * h.legs;

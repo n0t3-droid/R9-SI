@@ -74,11 +74,12 @@
       const ph = k ? h(4) * TAU : 0, sc = k ? 0.85 + 0.3 * h(5) : 1;
       const V = (p, c, w) => out.push(p[0] * sc, p[1] * sc, p[2] * sc, o[0], o[1], o[2], c[0], c[1], c[2], w, ph);
       const T = (a, b, c, col, w) => { V(a, col, w ? a[3] : 0); V(b, col, w ? b[3] : 0); V(c, col, w ? c[3] : 0); };
-      const N = [0, 0, -0.24], Tl = [0, 0.01, 0.26], L = [-0.055, 0, -0.02], R = [0.055, 0, -0.02], U = [0, 0.05, -0.03], D = [0, -0.045, -0.02];
-      T(N, L, Tl, body); T(N, Tl, R, body); T(N, U, Tl, body); T(N, Tl, D, body);
+      // (six triangles: a speck at a distance needs no more — the body a flat diamond, each wing an inner and an outer)
+      const N = [0, 0.01, -0.24], Tl = [0, 0.01, 0.26], L = [-0.06, 0, -0.02], R = [0.06, 0, -0.02];
+      T(N, L, Tl, body); T(N, Tl, R, body);
       for (const sd of [1, -1]) {
-        const rf = [0.04 * sd, 0.012, -0.07, 0.6], rb = [0.04 * sd, 0.012, 0.07, 0.6], wf = [0.25 * sd, 0.02, -0.045, 0.8], wb = [0.24 * sd, 0.02, 0.075, 0.8], tp = [0.5 * sd, 0, 0.1, 1];
-        T(rf, wf, wb, wing, 1); T(rf, wb, rb, wing, 1); T(wf, tp, wb, tipC, 1);
+        const rf = [0.04 * sd, 0.012, -0.07, 0.6], rb = [0.04 * sd, 0.012, 0.07, 0.6], wr = [0.25 * sd, 0.02, 0.0, 0.8], tp = [0.5 * sd, 0, 0.1, 1];
+        T(rf, wr, rb, wing, 1); T(rf, tp, wr, tipC, 1);
       }
     }
     return out;
@@ -151,7 +152,9 @@
     const zf = (u) => -0.2 + 0.27 * Math.pow(Math.abs(u), 1.35), zb = (u) => 0.27 - 0.21 * Math.pow(Math.abs(u), 0.8);
     const th = (u, v) => 0.085 * (1 - Math.pow(Math.abs(u), 1.7)) * Math.pow(Math.sin(Math.PI * v), 0.75) + 0.004;
     const topC = (u, v) => { const k = Math.abs(u); return lin([0.09 + 0.06 * k, 0.13 + 0.16 * k, 0.30 + 0.12 * k + 0.05 * v]); };
-    const botC = (u, v) => lin([0.78 - 0.1 * Math.abs(u), 0.80 - 0.06 * Math.abs(u), 0.90 - 0.02 * v]);
+    // (the underside a dusky periwinkle, paler at the belly: from below against a bright sky a ray must read as a shape,
+    //  not vanish as a white sheet — run 2's afternoon picture)
+    const botC = (u, v) => { const k = Math.abs(u), b = Math.max(0, 1 - k * 2.2) * 0.16; return lin([0.34 + b, 0.36 + b, 0.58 + b * 0.6 - 0.03 * v]); };
     // the glowing chevrons: bands across the back that point forward, and a line along the spine
     const glowAt = (u, v) => { const k = Math.abs(u), c = (k * 2.6 + v * 1.4) % 1; return (c < 0.13 && k > 0.12 && k < 0.92 ? 1 : 0) + (k < 0.04 && v > 0.15 && v < 0.85 ? 0.8 : 0); };
     // (the underside: a soft luminous rim along the leading edge — seen from below against the sky, the outline glows)
@@ -183,7 +186,7 @@
     }
     const tailC = lin([0.1, 0.14, 0.26]);
     for (let k = 0; k < 6; k++) {
-      const z0 = 0.25 + k * 0.1, z1 = z0 + 0.1, w0 = 0.018 * (1 - k / 6) + 0.002, w1 = 0.018 * (1 - (k + 1) / 6) + 0.002, e1 = k === 5 ? 1 : 0;
+      const z0 = 0.25 + k * 0.1, z1 = z0 + 0.1, w0 = 0.03 * (1 - k / 6) + 0.006, w1 = 0.03 * (1 - (k + 1) / 6) + 0.006, e1 = k === 5 ? 1 : 0;   // (wide enough to stay a line, not dots, at a distance)
       B.quad([-w0, 0.006, z0, 0], [w0, 0.006, z0, 0], [w1, 0.004, z1, 0, e1], [-w1, 0.004, z1, 0, e1], tailC, tailC, e1 ? glow : tailC, e1 ? glow : tailC);
     }
     return B.v;
