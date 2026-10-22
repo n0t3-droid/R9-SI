@@ -474,8 +474,21 @@ void main() {
   // the ground's grain below the texel when the camera is near (from tier 1): rock and dust in two octaves
   if (u_grain.x > 0.5) alb *= 1.0 + detailN(N, u_grain.y) * 0.45 + detailN(N, u_grain.y * 3.7) * 0.3 + detailN(N, u_grain.y * 0.27) * 0.3;
   float mus = dot(N, L), muv = max(dot(N, -Db), 0.0);
+  // the airless ground's relief when the camera is near (from tier 1): hills and hollows of ~400 m from a noise's slope —
+  // under a low Helia they throw the light about (the sphere's own terminator stays where it is)
+  float musR = mus;
+  if (u_grain.x > 0.5 && u_mk.x < 0.5) {
+    float k = u_grain.y * 0.5, fade = 1.0 - smoothstep(0.3, 0.9, length(fwidth(N)) * k);
+    if (fade > 0.0) {
+      vec3 p = N * k; const float e = 0.3;
+      float h0 = vnoise3(p);
+      vec3 gr = vec3(vnoise3(p + vec3(e, 0.0, 0.0)) - h0, vnoise3(p + vec3(0.0, e, 0.0)) - h0, vnoise3(p + vec3(0.0, 0.0, e)) - h0) / e;
+      gr -= N * dot(gr, N);
+      musR = max(dot(normalize(N - gr * 0.12 * fade), L), mus * 0.3) * smoothstep(-0.02, 0.04, mus);   // (gentle: a few degrees of slope, the shade never black)
+    }
+  }
   float lit;
-  if (u_mk.x < 0.5) { float m0 = max(mus, 0.0); lit = mix(2.0 * m0 / (m0 + muv + 1e-3), m0, 0.5); }   // Lommel–Seeliger half and half with Lambert
+  if (u_mk.x < 0.5) { float m0 = max(musR, 0.0); lit = mix(2.0 * m0 / (m0 + muv + 1e-3), m0, 0.5); }   // Lommel–Seeliger half and half with Lambert
   else lit = max(mus, 0.0) * smoothstep(-0.05, 0.08, mus) + 0.03 * smoothstep(-0.2, 0.05, mus);
   vec3 col = alb * u_sunCol * lit;
   // the parent's light on the night side (Amarant over Zinnober's night is a lamp — U§4.4)
