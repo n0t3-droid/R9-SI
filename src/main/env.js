@@ -151,6 +151,12 @@
       // the horizon's white-cyan a little toward the middle blue, so the land fades into the sky at the horizon
       const veil = mix3(hor, [0.25, 0.22, 0.46], 0.6);
       E.fogColor = mix3(SKY.on ? mix3(mix3(hor, mid, SKY.fog), veil, 1 - wDay) : (oldPal ? hor : veil), [0.5, 0.55, 0.62], rain * 0.4);
+      if (P3) {
+        // t-sky3: the far land takes the golden hour's and the dusk's new horizon half way — the far hills a shade darker and
+        // bluer than the bright horizon, as the frames' far mountains (the old palette's haze the other half)
+        const t0 = [0, 1, 2].map(i => 1 + (bsky[i] / [0.48, 0.64, 1][i] - 1) * 0.15), ho = pal('hor').map((v, i) => v * t0[i] * GRADE.skyK), mo = pal('mid').map((v, i) => v * t0[i] * GRADE.skyK);
+        E.fogColor = mix3(E.fogColor, mix3(mix3(mix3(ho, mo, SKY.fog), mix3(ho, [0.25, 0.22, 0.46], 0.6), 1 - wDay), [0.5, 0.55, 0.62], rain * 0.4), 0.5);
+      }
       E.blockTint = [1.0, 0.84, 0.64];
       E.emissiveBoost = 0.45 + night * 1.1;
       E.wind = W.wind;
