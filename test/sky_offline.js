@@ -48,6 +48,10 @@ function viewOf(name) {
     return name === 'sun' ? { name, tod, kind: 'golden', cam: [0.5, 136, -292.5], aim: 'sun', fov: 70, W: 1280, H: 720, Hline: null, seed: 53 }
       : { name, tod, kind: 'golden', cam: [201.5, 65.6, 6.5], at: [250, 64, 70], fov: 70, W: 1280, H: 720, Hline: null, seed: 53 };
   }
+  // (sky3.mjs's weather views: the storm — rain over the canyon at noon; thunder — a thunderstorm there; gap — the canyon
+  // at the golden hour under clouds, facing the sun, 8° up)
+  if (name === 'storm' || name === 'thunder') return Object.assign(viewOf('canyon_noon'), { name, wx: name === 'storm' ? 'regen' : 'gewitter', kind: 'day' });
+  if (name === 'gap') return Object.assign(viewOf('canyon_golden'), { name, wx: 'bewoelkt', aim: 'sun', pitch: 8 * Math.PI / 180 });
   const [pl, hr] = name.split('_'), P = PLACES[pl];
   if (!P || !HOURS[hr]) throw new Error('no such view ' + name);
   return { name, place: pl, hour: hr, tod: HOURS[hr][0], kind: HOURS[hr][1], cam: P.cam, yaw: P.yaw, pitch: 12 * Math.PI / 180, fov: 75, W: +(process.env.W || 640), H: +(process.env.H || 360), Hline: P.H, pins: { az: azOf(P.yaw - 30 * Math.PI / 180), el: 24, az2: azOf(P.yaw + 30 * Math.PI / 180), el2: 36 }, seed: SEED };
@@ -58,7 +62,10 @@ const DEFAULT_VIEWS = ['canyon_golden', 'isles_golden', 'city_golden'];
 function frameOf(v, q) {
   S3.use(q); L2.use(q);
   const env = new VR.Env(); env.setTime(v.tod); env.wx.setSeed(v.seed); env.wx.force('klar');
-  if (VR.WX && VR.WX.VIS && VR.WX.VIS.klar) Object.assign(env.wx.v, VR.WX.VIS.klar);
+  const wx = v.wx || 'klar';
+  if (wx !== 'klar') env.wx.force(wx);
+  if (VR.WX && VR.WX.VIS && VR.WX.VIS[wx]) Object.assign(env.wx.v, VR.WX.VIS[wx]);
+  if (env.wx) env.wx.front = wx === 'gewitter' ? 1 : 0;
   if (v.pins) env.planetsOverride = v.pins;
   let E;
   for (let i = 0; i < 4; i++) { env.anim = 80; E = env.update(0.033, { dim: 'overworld', biome: null, eyeSky: 1, renderDist: 8, horizon: 4096, freezeTime: true, freezeWeather: true, drama: !!q.wxDrama, motion: !!q.motion }); }
@@ -68,7 +75,7 @@ function frameOf(v, q) {
 // the camera (renderer.setupCamera: yaw 0 looks along −z, camera-relative, no jitter)
 function camOf(v, E) {
   let yaw = v.yaw, pitch = v.pitch;
-  if (v.aim === 'sun') { const s = E.sunDir; yaw = Math.atan2(-s[0], -s[2]); pitch = Math.atan2(s[1], Math.hypot(s[0], s[2])) - 0.06; }
+  if (v.aim === 'sun') { const s = E.sunDir; yaw = Math.atan2(-s[0], -s[2]); pitch = v.name === 'gap' ? v.pitch : Math.atan2(s[1], Math.hypot(s[0], s[2])) - 0.06; }
   if (v.at) { const d = [v.at[0] - v.cam[0], v.at[1] - v.cam[1], v.at[2] - v.cam[2]]; yaw = Math.atan2(-d[0], -d[2]); pitch = Math.atan2(d[1], Math.hypot(d[0], d[2])); }
   const proj = mat4.create(), view = mat4.create(), vp = mat4.create(), inv = mat4.create();
   mat4.perspective(proj, v.fov * Math.PI / 180, v.W / v.H, 0.06, 1200);
@@ -109,7 +116,7 @@ function skyUniforms(E, q, cam) {
     for (const k of S3.U3) if (U[k]) u[k] = Array.from(U[k]);
   }
   // the sky pass
-  u.u_skyProbe = 0; u.u_invViewProj = cam.inv; u.u_cirrus = q.clouds >= 2 ? 1 : 0; u.u_skyOff = [0, 0, 0];
+  u.u_skyProbe = process.env.PROBE ? 1 : 0; u.u_invViewProj = cam.inv;   // (PROBE=1: the sky pass painted magenta, as sky3.mjs's probe) u.u_cirrus = q.clouds >= 2 ? 1 : 0; u.u_skyOff = [0, 0, 0];
   { const dr = E.cloudDrift || [E.time * 0.9, 0], qx = dr[0] / 4000, qz = dr[1] / 4000; u.u_cirrusDrift = [qx * 0.35 + qz * 0.2, qz * 5.0]; }
   return u;
 }
@@ -160,6 +167,7 @@ function prep(views, q) {
   S3.use(q); L2.use(q);   // (the define hooks read the switches: the composite takes GRADE2, the sky SKY3 + SKY3HI)
   const progs = {
     sky: programText(S.FS_VS, S.SKY_FS, 'sky', (q.lite ? ['LITE'] : []).concat(q.wxDrama ? ['WXDRAMA'] : []).concat(q.motion ? ['MOTION'] : [])),
+    puff: programText(S.PUFF_VS, S.PUFF_FS, 'puff', q.wxDrama ? ['WXDRAMA'] : []),
     bloomPre: programText(S.FS_VS, S.BLOOM_PRE_FS, 'bloomPre', []), down: programText(S.FS_VS, S.DOWN_FS, 'down', []), up: programText(S.FS_VS, S.UP_FS, 'up', []),
     composite: programText(S.FS_VS, S.COMPOSITE_FS, 'composite', []),
     // a stand-in for the land under the horizon line (the game's land occludes the low sky: without it the bright low sky
@@ -173,6 +181,22 @@ function prep(views, q) {
     const Hl = lineOf(v, cam), land = { u_line: (1 - Hl / 360) * v.H, u_h: v.H, u_hor: E.horizon.slice(0, 3), u_near: [0.07, 0.09, 0.05].map((x, i) => x * (0.4 + 0.6 * E.sunColor[i] / 2.5)) };
     const frame = { tag, view: name, W: v.W, H: v.H, preset: PRESET, sky: skyUniforms(E, q, cam), land: process.env.NOLAND ? null : land, threshold: C.g ? C.g.bThr : (E.bloomThreshold || 1.1), bloom: !!q.bloom, composite: C.u };
     fs.mkdirSync(OUT + name, { recursive: true });
+    if (q.clouds >= 2 && process.env.PUFFS !== '0') {
+      // the cumulus sprites (renderer.js updatePuffs / drawPuffs: clouds.js's field round the eye at the cover, far to near,
+      // in cloud space at − wind; the volume atlas of sky3.js under cloudVol), drawn over the sky before the land
+      const dr = E.cloudDrift, wind = dr ? dr[0] : E.time * 0.9, windZ = dr ? dr[1] : 0, C3 = VR.Clouds;
+      const eye = { x: v.cam[0], y: v.cam[1], z: v.cam[2], yaw: cam.yaw, pitch: cam.pitch };
+      const f = C3.field(eye, wind, { cover: Math.round(E.cloudCover * 20) / 20, windZ }), data = C3.pack(f.cumulus);
+      fs.writeFileSync(OUT + name + '/puffs.bin', Buffer.from(data.buffer, data.byteOffset, data.byteLength));
+      const cy = Math.cos(cam.yaw), sy = Math.sin(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), right = [cy, 0, -sy], up = [sy * sp, cp, cy * sp];
+      const L = E.sunDir, lx = L[0] * right[0] + L[2] * right[2], ly = L[0] * up[0] + L[1] * up[1] + L[2] * up[2], ll = Math.hypot(lx, ly) || 1, sk = Math.min(1, Math.max(0, (L[1] + 0.12) / 0.24));
+      const pu = Object.assign({}, frame.sky);
+      delete pu.u_invViewProj;
+      Object.assign(pu, { u_viewProj: cam.vp, u_camRight: right, u_camUp: up, u_sunScreen: [lx / ll, ly / ll], u_sunK: sk * sk * (3 - 2 * sk), u_fogK: 0, u_cloudR: C3.RANGE * C3.CELL * 1.04, u_origin: [-wind - eye.x, -eye.y, -windZ - eye.z], u_cloudHigh: [C3.HIGH.from, 1 / (C3.HIGH.to - C3.HIGH.from), C3.HIGH.k * C3.clearDay(E.cloudCover, E.skyDay ? E.skyDay[2] : 0), 0] });
+      if (E.sky3 && E.sky3.u && E.sky3.u.u_c3Ld) pu.u_c3L = S3.billboardL(Array.from(E.sky3.u.u_c3Ld), { yaw: cam.yaw, pitch: cam.pitch });
+      frame.puffs = { n: data.length / C3.SPRITE_FLOATS, u: pu, atlas: q.cloudVol ? 'atlas3.bin' : 'atlas.bin' };
+      if (!fs.existsSync(OUT + frame.puffs.atlas)) { const A = q.cloudVol ? S3.atlas() : C3.atlas(); fs.writeFileSync(OUT + frame.puffs.atlas, Buffer.from(A.buffer, A.byteOffset, A.byteLength)); }
+    }
     fs.writeFileSync(OUT + name + '/frame.json', JSON.stringify(frame));
     const bodies = [[E.planetDir, E.bodies.radius.giant * 2.6], [E.planet2Dir, E.bodies.radius.blue * 1.6], [E.moonDir, 0.06], ...E.bodies.moons.map(m => [[m[0], m[1], m[2]], m[3] * 1.8]), ...(E.sky3 && E.sky3.bodies ? E.sky3.bodies.map(m => [[m[0], m[1], m[2]], m[3] * 1.8]) : [])];
     list.push({ name, kind: v.kind, hour: v.hour || 'golden', W: v.W, H: v.H, Hline: lineOf(v, cam), cam: { inv: cam.inv, vp: cam.vp, yaw: cam.yaw, pitch: cam.pitch, fov: cam.fov }, sun: E.sunDir, bodies, sunPx: sunPx(cam, E, v.W, v.H), palette: { hor: E.horizon, mid: E.skyMid, zen: E.zenith, space: E.skySpace } });

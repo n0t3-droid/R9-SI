@@ -386,7 +386,7 @@
     // are an overcast's — the light from above a lighter grey (top ×), from below a dark slate (low ×: a storm base ≈ 0.25
     // of a fair cloud's lit top); in the puffs (glslPuff, u_c3Storm) the body darkens from its top to its base (base: the
     // base's light over the top's in a storm, fair: in fair weather) and the base is torn (rag: its depth, of the sprite)
-    storm: { top: 1.15, low: 0.75, base: 0.3, fair: 0.82, rag: 0.09 },
+    storm: { top: 1.3, low: 0.75, base: 0.1, fair: 0.82, rag: 0.09 },
   };
   // the storm's strength: rain under a closed cover (0 fair … 1 a thunderstorm)
   S3.stormK = (E) => clamp(E.rain || 0, 0, 1) * (0.55 + 0.45 * sstep(0.45, 0.9, clamp(E.cloudCover || 0, 0, 1)));
@@ -793,7 +793,7 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   c3Core = smoothstep(0.12, 0.3, th);
   // the flat base a soft fringe, not a cut: a cluster's sprites stand on one another, and their bases drawn hard read as
   // stacked slabs (the second run's golden hour)
-  cov *= mix(0.3, 1.0, smoothstep(0.0, 0.06, texture(u_cloudTex, c3At(cell, uv - vec2(0.0, 0.06))).r));
+  cov *= mix(mix(0.3, 0.75, u_c3Storm.x), 1.0, smoothstep(0.0, 0.06, texture(u_cloudTex, c3At(cell, uv - vec2(0.0, 0.06))).r));   // (f-sky4: a storm's base dense, not a pale fringe)
   // f-sky4 (R50-11) · c3Rag, the ragged base: its coverage eaten upward by a noise along it, deeper in a storm — a row of
   // puffs no longer stands on one ruled line (the review: "thirty separate cartoon puffs in rows, each with a hard flat base")
   float hb = uv.y - 0.28;   // the height over the atlas's flat base (S3.ATLAS base −0.44 → uv 0.28)
@@ -831,10 +831,12 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   vec3 col = sun * (0.55 + 0.45 * ao) + amb;
   // f-sky4 (R50-11): the body darker from its top to its base — by its height in the cluster and a little in the sprite:
   // a storm's base u_c3Storm.y of its top's light (heavy, slate), a fair cloud's u_c3Storm.w (volume, not a sticker)
-  float hv = clamp(0.6 * hc + 0.4 * smoothstep(0.0, 0.55, hb), 0.0, 1.0);
+  // (after the haze: far off the haze's light lies over the cloud, but a storm's far bases stay dark — offline the haze
+  // mixed in after the fall left the storm's far clouds at a base/top of 0.73)
+  float hl = smoothstep(0.0, 0.55, hb), hv = clamp(mix(0.6 * hc + 0.4 * hl, 0.2 * hc + 0.8 * hl, u_c3Storm.x), 0.0, 1.0);   // (a storm: each puff's own base dark)
   c3Grad = mix(mix(u_c3Storm.w, u_c3Storm.y, u_c3Storm.x), 1.0, hv);
-  col *= c3Grad;
   col = mix(col, u_c3Haze, smoothstep(260.0, 700.0, dist) * 0.45);
+  col *= c3Grad;
   return vec4(col, cov);
 }
 `;

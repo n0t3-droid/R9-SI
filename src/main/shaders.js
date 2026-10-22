@@ -2375,7 +2375,10 @@ void main() {
   {
     // t-sky3 · Wolken mit Volumen (sky3.js c3Shade: the atlas of thickness, normal and occlusion lit as a volume by the hour)
     c3Y = v_y3; c3Seed = v_seed3;
-    vec4 c3 = c3Shade(vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5, v_uv, v_dist, normalize(v_dir3));
+    // (f-sky4: the variant rounded — interpolated, the instance's 2.0 came out 1.99999 on part of a quad, which read the
+    // neighbouring cell of the atlas there: the straight cuts and slabs through the puffs, one triangle against the other)
+    float c3v = floor(v_var + 0.5);
+    vec4 c3 = c3Shade(vec2(mod(c3v, 2.0), floor(c3v * 0.5)) * 0.5, v_uv, v_dist, normalize(v_dir3));
     if (c3.a < 0.0) discard;
     vec3 col = c3.rgb;
 #ifdef WXDRAMA
