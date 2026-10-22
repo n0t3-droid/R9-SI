@@ -2054,5 +2054,17 @@
     'g.set.cloudShadow.tip': 'Die Schatten der Wolken ziehen mit dem Wind über Wiesen, Hügel und Dächer. Ab Ausgewogen.',
     'g.set.wxDrama': 'Wetter-Drama: Gewitterfront, Blitze, Regenbogen, Nebelbänke',
     'g.set.wxDrama.tip': 'Ein Gewitter zieht von einer Seite heran, der Wind frischt auf, Blitze zeichnen die Hügel nach, der Regen weht schräg; danach ein Regenbogen. Morgens liegen Nebelbänke in den Tälern. Auf Sehr niedrig aus.',
+    // u-space0 · die Raumansicht (src/main/spacescene.js: /raum, Weltraum-Detail)
+    'g.space.on': '🪐 Raumansicht: {place} — Esc oder /raum führt zurück, die Maus schaut sich um',
+    'g.space.wait': '🪐 Die Raumansicht wird vorbereitet …',
+    'g.space.off': 'Zurück auf dem Boden',
+    'g.space.help': 'Raumansicht: /raum herz · amarant · zinn · aqua — /raum allein führt zurück',
+    'g.space.place.herz': 'drei Kilometer über der Herzwelt',
+    'g.space.place.amarant': 'Amarant über dem Rand der Herzwelt',
+    'g.space.place.zinn': 'Amarant über Zinnober',
+    'g.space.place.aqua': 'Aquamarin und die Herzwelt',
+    'g.set.spaceDetail': 'Weltraum-Detail',
+    'g.set.spaceDetail.tip': 'Wie fein Planeten, Monde, Ring und Sterne in der Raumansicht sind: Texturgröße, feine Wolken, Sternfelder. Folgt der Voreinstellung.',
+    'g.set.spaceDetailV': ['Sehr niedrig', 'Niedrig', 'Mittel', 'Hoch'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

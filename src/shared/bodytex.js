@@ -2,8 +2,8 @@
 // u-space0 · the bodies' textures for the space scene (docs/superpowers/plans/2026-10-22-u-space0.md §2.1).
 // Pure: the worker runs it (worker_main.js 'bodytex'), node tests too. Every texture is a set of rows of RGBA8, made in
 // row jobs of ≤ 0.8 s so the pool's workers share a big one.
-//   herz     Herzwelt, equirect (λ −π..π across, θ 0..π down): A = albedo (sRGB) + water, B = lights · clouds · relief ·
-//            kind — one sample of the world's own generator a texel through the chart (the far look: mipmaps average the
+//   herz     Herzwelt, equirect (λ −π..π across, θ 0..π down): A = albedo (sRGB) + water, B = lights · clouds · the
+//            height code · ice — one sample of the world's own generator a texel through the chart (the far look: mipmaps average the
 //            km-sized mosaic of seas, forests and snowfields the overworld really is)
 //   patch    the plane round a nadir (the camera's ground point), square, `step` metres a texel: the same channels at
 //            100 m (Very Low) / 50 m (High) — the true mosaic under the camera, the villages' lights from the village
@@ -38,6 +38,10 @@
   BT.normal = (th, lam, out) => { const o = out || [0, 0, 0], s = Math.sin(th); o[0] = s * Math.cos(lam); o[1] = Math.cos(th); o[2] = -s * Math.sin(lam); return o; };
   // how far the map's north is turned from true north at (x, z): the angle from map north (−z) to the pole's direction
   BT.northTurn = (x, z) => Math.atan2(C.Px - x, -(C.Pz - z));
+  // the height code of the B texture: h metres over the sea → 0..255, 128 the shore; 3 a metre below the sea (to 42 m
+  // deep), h / (h + 48) above it (the peaks of 160 m still apart) — space_shaders.js hOf() is the inverse
+  BT.hcode = (h) => clamp(Math.round(h < 0 ? 128 + h * 3 : 128 + 127 * h / (h + 48)), 0, 255);
+  BT.hdecode = (code) => { const c = code - 128; return c < 0 ? c / 3 : 48 * c / Math.max(127 - c, 2.5); };
 
   // ---------------------------------------------------------------- the ring (REFERENCE §4.2 scaled to Amarant)
   // Saturn's main rings span 1.24–2.27 of its radius exactly as Amarant's do (U§2.1); the Cassini gap 73 km, the 5-km gap
@@ -71,11 +75,12 @@
   };
   BT.MOONS = ['aqua', 'zinn', 'opal', 'basalt', 'ocker'];
   BT.TWO = { herz: 1, patch: 1 };   // the bodies with a second texture (B)
-  // the row jobs of one texture: ~131k texels a job for the generator's bodies (≈ 0.6 s), more for the cheap ones
+  // the row jobs of one texture: ~131k texels a job for Herzwelt's globe (≈ 0.5 s), 65k for the patch (its villages and
+  // finer clouds: ≈ 0.45 s), more for the cheap ones
   BT.jobs = function (body, tier, extra) {
     const kind = BT.MOONS.includes(body) ? 'moon' : body, sz = BT.size(kind, tier);
     const w = sz[0], h = body === 'patch' ? sz[0] : sz[1];
-    const per = body === 'herz' || body === 'patch' ? 131072 : body === 'ring' ? 1 << 20 : 98304;
+    const per = body === 'herz' ? 131072 : body === 'patch' ? 65536 : body === 'ring' ? 1 << 20 : 98304;
     const rows = Math.max(1, Math.floor(per / w)), out = [];
     for (let y0 = 0; y0 < h; y0 += rows) out.push(Object.assign({ type: 'bodytex', body, w, h, y0, y1: Math.min(h, y0 + rows) }, body === 'patch' ? { step: sz[1] } : null, extra || null));
     return out;
@@ -105,7 +110,7 @@
   // ---------------------------------------------------------------- Herzwelt's surface from the generator
   const BAD = /ocean|river|beach|shore|swamp|mangrove|mushroom|peaks|ice_spikes|deep_dark|frozen_river|stony/;   // (gen_village.js: no village there)
   const CANON = { c: 0, e: 0, w: 0, t: 0, h: 0, H: 70, A: 3, river: 0, mountain: 0, ember: 0, canyon: 0, prism: 0, hz1: 1, hz2: 0, hz3: 0, heart: 0 };
-  const WATER_SHALLOW = [46, 150, 158], WATER_MID = [24, 92, 138], WATER_DEEP = [12, 40, 82], ICE = [214, 232, 244];
+  const COAST = [214, 204, 166], ICE = [206, 220, 236];   // (a water texel's albedo is the beach the coast blends into; the sea itself is the shader's, by depth)
   // the sampler: a cell's colour by its biome (lod.js LOD.look once a biome, the canopy blended in — the far horizon's
   // colours), the water by depth, snow by height; the clouds a field of our own on the sphere
   function sampler(g) {
@@ -123,37 +128,38 @@
       }
       return c;
     };
-    const snow = P ? P.snow : [240, 246, 250];
-    // o: [r, g, b, water, kind, liveable, height]
+    const snow = [212, 222, 234];   // (the snowfields a shade bluer and darker than the clouds over them)
+    // o: [r, g, b (sRGB albedo), water 0/1, ice 0/1, liveable 0/1, the height code]. The height code (BT.hcode) is
+    // continuous: the shader finds the coast where it crosses 128 between the texels — round shores, not squares —,
+    // colours the sea by its depth and shades the land's relief
     return function (X, Z, o) {
       const cl = g.computeClimate(X, Z), y = Math.round(cl.H), bi = g.biomeFor(cl, y), c = land(bi, cl, X, Z, y);
       const cold = (c.temp - Math.max(0, y - 90) * 0.0025) < 0.15;
       if (y < SEA) {
-        const d = SEA - y;
-        if (cold || c.frozen) { o[0] = ICE[0]; o[1] = ICE[1]; o[2] = ICE[2]; o[3] = 0.35; o[4] = 2; }
-        else { const k1 = ss(1, 7, d), k2 = ss(8, 26, d); const w1 = mix3(WATER_SHALLOW, WATER_MID, k1), w2 = mix3(w1, WATER_DEEP, k2); o[0] = w2[0]; o[1] = w2[1]; o[2] = w2[2]; o[3] = 1; o[4] = 1; }
-        o[5] = 0;
+        const ice = cold || c.frozen;
+        const t = ice ? ICE : COAST;   // (ICE the same shade as the snow)
+        o[0] = t[0]; o[1] = t[1]; o[2] = t[2]; o[3] = 1; o[4] = ice ? 1 : 0; o[5] = 0;
       } else {
         const t = cold || c.kd === 6 ? snow : c.t;
-        o[0] = t[0]; o[1] = t[1]; o[2] = t[2]; o[3] = 0; o[4] = cold || c.kd === 6 ? 2 : (cl.ember > 0.45 && cl.canyon > 0.3 ? 3 : 0);
+        o[0] = t[0]; o[1] = t[1]; o[2] = t[2]; o[3] = 0; o[4] = 0;
         o[5] = c.live && y > SEA + 2 && y <= 150 && cl.river < 0.3 && !(cl.ember > 0.45) ? 1 : 0;
       }
-      o[6] = y;
+      o[6] = BT.hcode(cl.H - SEA);
       return o;
     };
   }
   // the clouds: a warped fbm on the unit sphere (Herzwelt's body frame), the same octaves for the globe and the patch
-  // (the patch adds finer ones), ~35 % covered — weather systems of 30–100 km (Earth's cyclones at 1/64) down to cells
-  // of a few hundred metres
+  // (the patch adds finer ones), ~30 % covered — fields of ~10 km (Earth's fronts at 1/64), broken into cells down to a
+  // few hundred metres (the patch: tens)
   function clouds(seed) {
     const S = new VR.Simplex((seed ^ 0xc10d5) >>> 0), Wx = new VR.Simplex((seed ^ 0x77a1) >>> 0), Wy = new VR.Simplex((seed ^ 0x3b29) >>> 0);
     return function (x, y, z, oct) {
       const wx = Wx.n3(x * 1.7, y * 1.7, z * 1.7) * 0.22, wy = Wy.n3(x * 1.7 + 5, y * 1.7, z * 1.7) * 0.22;
       const px = x + wx, py = y + wy, pz = z - wx * 0.6;
-      let v = 0, amp = 1, f = 3.1, norm = 0;
-      for (let o = 0; o < oct; o++) { v += S.n3(px * f, py * f, pz * f) * amp; norm += amp; amp *= o < 3 ? 0.62 : 0.5; f *= 2.07; }
+      let v = 0, amp = 1, f = 9.5, norm = 0;
+      for (let o = 0; o < oct; o++) { v += S.n3(px * f, py * f, pz * f) * amp; norm += amp; amp *= o < 2 ? 0.7 : 0.55; f *= 2.07; }
       v /= norm;
-      return ss(-0.03, 0.33, v + 0.06 * Math.cos(y * 9.0));   // (a hint of latitude belts)
+      return ss(0.0, 0.3, v + 0.06 * Math.cos(y * 9.0));   // (a hint of latitude belts)
     };
   }
   const putA = (a, i, o) => { a[i] = clamp(o[0], 0, 255); a[i + 1] = clamp(o[1], 0, 255); a[i + 2] = clamp(o[2], 0, 255); a[i + 3] = o[3] * 255; };
@@ -176,11 +182,12 @@
         const k = ((j - y0) * w + i) * 4;
         putA(a, k, o);
         BT.normal(th, lam, N);
-        // the lights, statistically (a village a 640² cell, ~35 % of the cells: ~1 a texel on liveable land) — far views only
+        // the lights, statistically (a village a 640² cell, ~35 % of the cells; a texel ~1.2 km): one liveable texel in
+        // eight lit, the rest dark — points from far, not a glow — far views only
         const hsh = M.hashf2(i, j, g.seed ^ 0x11657);
-        let L = o[5] ? (hsh < 0.62 ? 36 + hsh * 190 : 0) : 0;
+        let L = o[5] ? (hsh < 0.12 ? 60 + hsh * 1150 : 0) : 0;
         if (Math.hypot(p[0], p[1]) < 1500) L = 255;
-        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 5) * 255; b[k + 2] = clamp(o[6], 0, 255); b[k + 3] = o[4] * 60;
+        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 5) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }
     }
   }
@@ -209,7 +216,8 @@
         let mx = hh, mn = hh, wet = 0;
         for (const o of FLAT) { const c2 = g.computeClimate(x + o[0], z + o[1]); if (c2.H > mx) mx = c2.H; if (c2.H < mn) mn = c2.H; if (c2.H <= SEA + 1) wet++; }
         if (mx - mn > 8 || wet > 1) continue;
-        out.push([x, z, g.vgen >= 9 ? 100 : RAD, 150 + ((M.hash2(i, j, 7) >>> 0) % 90)]);
+        // [x, z, radius, strength, the lit share of the radius (the village's own size, 0.55–1.1)]
+        out.push([x, z, g.vgen >= 9 ? 100 : RAD, 150 + ((M.hash2(i, j, 7) >>> 0) % 90), 0.55 + 0.55 * M.hashf2(i, j, 0x51e)]);
         break;
       }
     }
@@ -222,6 +230,7 @@
     const V = villages(g, X0, Z0 + y0 * step, X0 + w * step, Z0 + y1 * step);
     for (let j = y0; j < y1; j++) {
       const z = Z0 + (j + 0.5) * step;
+      const VR_ = V.filter(v => Math.abs(z - v[1]) < v[2] * v[4] + step * 0.4);   // (the villages this row meets)
       for (let i = 0; i < w; i++) {
         const x = X0 + (i + 0.5) * step;
         S(Math.round(x), Math.round(z), o);
@@ -229,11 +238,11 @@
         putA(a, k, o);
         const sp = BT.toSphere(x, z); BT.normal(sp[0], sp[1], N);
         let L = 0;
-        for (const v of V) { const dx = x - v[0], dz = z - v[1], r = v[2] + step * 0.6; if (dx * dx + dz * dz < r * r) { const q = Math.sqrt(dx * dx + dz * dz) / r; L = Math.max(L, v[3] * (1 - 0.6 * q * q)); } }
+        for (const v of VR_) { const dx = x - v[0], dz = z - v[1], r = v[2] * v[4] + step * 0.4; if (dx * dx + dz * dz < r * r) { const q = 1 - (dx * dx + dz * dz) / (r * r); L = Math.max(L, v[3] * q * Math.sqrt(q) * (0.55 + 0.45 * M.hashf2(Math.floor(x / step), Math.floor(z / step), 0x5e7))); } }
         if (Math.abs(x) < 1400 && Math.abs(z) < 1400) L = Math.max(L, heartLight(x, z, step));
         // the farmsteads and roads between: a faint scatter on liveable land
         if (!L && o[5] && M.hashf2(Math.floor(x / 160), Math.floor(z / 160), g.seed ^ 0x7a3) < 0.07) L = 30;
-        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 9) * 255; b[k + 2] = clamp(o[6], 0, 255); b[k + 3] = o[4] * 60;
+        b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 9) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }
     }
   }
@@ -341,12 +350,15 @@
       const n = fbm(S[0], p[0], p[1], p[2], 5, 2.2), arc = 1 - Math.abs(fbm(S[1], p[0], p[1], p[2], 3, 1.6));
       const isl = n * 0.55 + arc * 0.5 - 0.62;   // archipelagos along arcs
       const cr = craters(p, 7, seed ^ 0x47, 0.22);
-      const atoll = cr[0] > 0.55 && n > -0.25;
-      let c = [18, 78, 112], al = 1;
-      const sh = ss(-0.14, 0.0, isl);
-      c = mix3(c, [44, 150, 156], sh);   // the shallows
-      if (cr[1] > 0.4 && n > -0.3) c = mix3(c, [70, 196, 186], 0.75);   // the lagoons
-      if (isl > 0 || atoll) { const g = fbm(S[2], p[0], p[1], p[2], 3, 9); c = isl > 0.04 ? mix3([72, 132, 74], [150, 140, 96], ss(-0.2, 0.4, g)) : [214, 204, 160]; al = 0; }
+      const atoll = ss(0.45, 0.7, cr[0]) * ss(-0.32, -0.2, n);
+      let c = [18, 78, 112];
+      c = mix3(c, [44, 150, 156], ss(-0.14, 0.0, isl));                              // the shallows
+      c = mix3(c, [70, 196, 186], ss(0.32, 0.5, cr[1]) * ss(-0.36, -0.24, n) * 0.75);   // the lagoons
+      const g = fbm(S[2], p[0], p[1], p[2], 3, 9);
+      const landK = Math.max(ss(-0.006, 0.006, isl), atoll);
+      const lc = mix3([214, 204, 160], mix3([72, 132, 74], [150, 140, 96], ss(-0.2, 0.4, g)), ss(0.006, 0.022, isl));
+      c = mix3(c, lc, landK);
+      const al = 1 - landK;
       const cl = ss(0.25, 0.55, fbm(S[3], p[0] * 1.3, p[1] * 3.2, p[2] * 1.3, 4, 2.0));   // squall bands
       c = mix3(c, [236, 240, 244], cl * 0.75);
       return [c[0], c[1], c[2], al ? 255 - cl * 200 : 0];
@@ -359,7 +371,7 @@
       if (Math.abs(lat) > 58) c = mix3(c, [150, 112, 72], ss(58, 75, Math.abs(lat)) * 0.6);
       const cr = craters(p, 6, seed ^ 0x2e, 0.3);
       let glow = 0;
-      if (cr[1] > 0.45) { c = mix3(c, [44, 32, 28], 0.85); glow = ss(0.75, 0.95, cr[1]); }       // calderas, lava lakes
+      c = mix3(c, [44, 32, 28], ss(0.38, 0.52, cr[1]) * 0.85); glow = ss(0.75, 0.95, cr[1]);       // calderas, lava lakes
       if (cr[0] > 0.2) c = mix3(c, [190, 64, 40], cr[0] * 0.6);                                     // red plume rings
       return [c[0], c[1], c[2], 255 - glow * 255];
     },
@@ -388,9 +400,9 @@
       const n = fbm(S[0], p[0], p[1], p[2], 5, 2.1), m = fbm(S[1], p[0], p[1], p[2], 3, 1.2);
       let c = mix3([196, 112, 62], [222, 160, 104], ss(-0.15, 0.3, n));
       c = mix3(c, [112, 66, 46], ss(0.12, 0.38, m) * 0.75);                                         // dark albedo lands
-      const can = Math.abs(p[1] + 0.1 * Math.sin(Math.atan2(p[2], p[0]) * 2)) < 0.03 && p[0] > 0.2 ? 1 : 0;   // the canyon
+      const can = (1 - ss(0.018, 0.034, Math.abs(p[1] + 0.1 * Math.sin(Math.atan2(p[2], p[0]) * 2)))) * ss(0.15, 0.3, p[0]);   // the canyon
       c = mix3(c, [92, 54, 40], can * 0.8);
-      const vd = Math.hypot(p[0] - 0.52, p[1] - 0.3, p[2] - 0.8); if (vd < 0.12) c = mix3(c, vd < 0.04 ? [120, 70, 50] : [210, 150, 110], 0.6);   // the shield volcano
+      const vd = Math.hypot(p[0] - 0.52, p[1] - 0.3, p[2] - 0.8); c = mix3(c, mix3([120, 70, 50], [210, 150, 110], ss(0.03, 0.05, vd)), (1 - ss(0.1, 0.13, vd)) * 0.6);   // the shield volcano
       const cr = craters(p, 12, seed ^ 0x0c, 0.25); c = mix3(c, [150, 92, 60], cr[0] * 0.35);
       if (Math.abs(lat) > 74) c = mix3(c, [242, 238, 232], ss(74, 80, Math.abs(lat)));               // the frost caps
       return [c[0], c[1], c[2], 255];

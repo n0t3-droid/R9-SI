@@ -302,6 +302,8 @@
         // a Forge structure (🏭) from its DNA: lot-local cells (forge.js Forge.job — the game's placer gets them)
         const r = VR.Forge ? VR.Forge.job(m) : { type: 'forge', id: m.id, error: 'no forge' };
         post(r, r.ops ? [r.ops.buffer] : []);
+      } else if (m.type === 'bodytex') {   // u-space0: a body's texture rows for the space scene (src/shared/bodytex.js)
+        const r = VR.BodyTex.job(m, getGen), tr = r.transfer; delete r.transfer; post(r, tr);
       } else if (m.type === 'locate') {
         const g = getGen(m.dim);
         let found = null;

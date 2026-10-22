@@ -18,6 +18,7 @@ if (!BT || !SS || !SS.math) { console.log('FAILED ' + fails); process.exit(1); }
 const M = SS.math;
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], len = (a) => Math.hypot(a[0], a[1], a[2]);
 const nrm = (a) => { const l = len(a); return [a[0] / l, a[1] / l, a[2] / l]; };
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k], cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 
 // ---------------------------------------------------------------- 1 · the impostor: one quad, analytic ray–sphere
 console.log('impostor');
@@ -147,11 +148,24 @@ console.log('views');
   const B = SS.BODIES;
   const vH = SS.view('herz', e, { x: 0, z: 0, yaw: 0 });
   const altH = len(sub(vH.pos, e.bodies.herz.p)) - B.herz.R;
-  check(near(altH, 3000, 1), `herz: 3 km over the Heartland (${altH.toFixed(1)} m)`);
+  check(near(altH, 3000, 1), `herz: 3 km over the ground (${altH.toFixed(1)} m)`);
   const upH = nrm(sub(vH.pos, e.bodies.herz.p)), dip = Math.acos(B.herz.R / (B.herz.R + 3000));
   const fwdEl = Math.asin(dot(vH.fwd, upH));
   check(fwdEl < -dip && fwdEl > -dip - 0.35, `herz: the view looks ${(-fwdEl * R2D).toFixed(1)}° down — the limb (dip ${(dip * R2D).toFixed(1)}°) in the upper half`);
   check(near(dot(vH.up, upH), Math.cos(fwdEl), 1e-6), 'herz: the horizon is level (the camera\'s up lies in the plane of the local vertical)');
+  // aimed at Helia: the view's way over the ground is Helia's azimuth there
+  { const sp0 = BT.toSphere(0, 0), sun = SS.localSun(e, sp0[0], sp0[1]), vS = SS.view('herz', e, { x: 0, z: 0, yaw: SS.yawFor(sun.az, 0, 0) });
+    const upS = nrm(sub(vS.pos, e.bodies.herz.p)), toSun = nrm(sub(e.bodies.helia.p, vS.pos)), hf = nrm(sub(vS.fwd, mul(upS, dot(vS.fwd, upS)))), hs = nrm(sub(toSun, mul(upS, dot(toSun, upS))));
+    const off = Math.acos(Math.min(1, dot(hf, hs))) * R2D;
+    check(off < 2, `herz: SS.yawFor turns the view toward Helia's azimuth (${off.toFixed(2)}° off)`); }
+  // the player's place (the Heartland here) lies in the picture's lower middle — the camera hangs 6 km behind it — and
+  // the patch round the ground the view looks at reaches past the horizon (24 km off) and 15 km behind the camera
+  const F0 = SS.frame(e.bodies.herz), Pp = SS.toSys(F0, BT.normal(BT.toSphere(0, 0)[0], BT.toSphere(0, 0)[1])), atP = add(e.bodies.herz.p, mul(Pp, B.herz.R));
+  const toP = nrm(sub(atP, vH.pos)), vy = dot(toP, vH.up), vx = dot(toP, nrm(cross(vH.fwd, vH.up))), inFov = Math.acos(dot(toP, vH.fwd)) * R2D;
+  check(inFov < 12 && vy < 0 && Math.abs(vx) < 0.02, `herz: the player's place is in the picture, ${inFov.toFixed(1)}° below the centre`);
+  const camG = BT.toPlane(...(() => { const nb = SS.toBody(F0, upH); return [Math.acos(nb[1]), Math.atan2(-nb[2], nb[0])]; })());
+  const dPatch = Math.hypot(vH.nadir.x - camG[0], vH.nadir.z - camG[1]);
+  check(dPatch > 8000 && dPatch < 12000 && Math.hypot(vH.nadir.x, vH.nadir.z) < 6000, `herz: the patch's centre ${(dPatch / 1000).toFixed(1)} km ahead of the camera's ground point`);
   const vZ = SS.view('zinn', e, {});
   const toA = sub(e.bodies.amarant.p, vZ.pos), aZ = 2 * Math.asin(B.amarant.R / len(toA)) * R2D, offZ = Math.acos(dot(nrm(toA), vZ.fwd)) * R2D;
   const altZ = len(sub(vZ.pos, e.bodies.zinn.p)) - B.zinn.R;
@@ -159,6 +173,9 @@ console.log('views');
   const vA = SS.view('amarant', e, { x: 0, z: 0 });
   const toAm = sub(e.bodies.amarant.p, vA.pos), elA = Math.asin(dot(nrm(toAm), nrm(sub(vA.pos, e.bodies.herz.p)))) * R2D, offA = Math.acos(dot(nrm(toAm), vA.fwd)) * R2D;
   check(near(len(sub(vA.pos, e.bodies.herz.p)) - B.herz.R, 3000, 1) && elA > -6 && elA < 6 && offA < 10, `amarant: 3 km over Herzwelt, Amarant ${elA.toFixed(1)}° high (just over the limb), ${offA.toFixed(1)}° off centre`);
+  // the giant's equator (its bands, its ring) lies level in both views: the camera's up near the ring's normal
+  const tiltZ = Math.acos(Math.min(1, Math.abs(dot(vZ.up, e.bodies.amarant.axis)))) * R2D, tiltA = Math.acos(Math.min(1, Math.abs(dot(vA.up, e.bodies.amarant.axis)))) * R2D;
+  check(tiltZ < 6 && tiltA < 30, `the bands lie level: the camera's up ${tiltZ.toFixed(1)}° (zinn) and ${tiltA.toFixed(1)}° (amarant) from the ring's normal`);
   const vQ = SS.view('aqua', e, {});
   const cQ = Math.acos(dot(nrm(sub(e.bodies.aqua.p, vQ.pos)), vQ.fwd)) * R2D, cHz = Math.acos(dot(nrm(sub(e.bodies.herz.p, vQ.pos)), vQ.fwd)) * R2D;
   const sQ = 2 * Math.asin(B.aqua.R / len(sub(e.bodies.aqua.p, vQ.pos))) * R2D, sHz = 2 * Math.asin(B.herz.R / len(sub(e.bodies.herz.p, vQ.pos))) * R2D;
@@ -178,7 +195,7 @@ console.log('bodytex');
   BT.job({ type: 'bodytex', body: 'herz', w: 64, h: 32, y0: 0, y1: 32 }, gen);
   const J = cpuMs(() => BT.job({ type: 'bodytex', body: 'herz', w: 512, h: 256, y0: 0, y1: 256 }, gen));
   const r = J.r;
-  check(r.type === 'bodytex' && r.w === 512 && r.h === 256 && r.y0 === 0 && r.y1 === 256 && r.a.length === 512 * 256 * 4 && r.b.length === 512 * 256 * 4, 'herz: 512×256 rows of two RGBA textures (albedo + water, lights · clouds · relief · kind)');
+  check(r.type === 'bodytex' && r.w === 512 && r.h === 256 && r.y0 === 0 && r.y1 === 256 && r.a.length === 512 * 256 * 4 && r.b.length === 512 * 256 * 4, 'herz: 512×256 rows of two RGBA textures (albedo + water, lights · clouds · the height code · ice)');
   check(J.ms <= 800, `herz: ${J.ms.toFixed(0)} ms of CPU for 512×256 (budget 800 ms)`);
   let water = 0, n = 512 * 256; for (let i = 0; i < n; i++) if (r.a[i * 4 + 3] > 127) water++;
   check(water / n > 0.2 && water / n < 0.42, `herz: ${(water / n * 100).toFixed(1)} % water (the generator's ~30 %)`);
@@ -187,6 +204,13 @@ console.log('bodytex');
   const hi = Math.floor(BT.CHART.thetaH / Math.PI * 256) * 512 * 4 + 256 * 4;
   check(r.a[hi + 3] < 128, 'herz: the Heartland\'s texel is land');
   check(r.transfer && r.transfer.length === 2, 'herz: both buffers are handed over (transfer)');
+  // the height code (B.b): the shore at 128 — every water texel below it, every land texel at or above 127 — and its
+  // inverse (the shader's hOf) gives the height back within a code step
+  let codeBad = 0; for (let i = 0; i < n; i++) { const wv = r.a[i * 4 + 3] > 127, c = r.b[i * 4 + 2]; if (wv ? c >= 128 : c < 127) codeBad++; }
+  check(codeBad < n * 0.002, `herz: the height code puts the shore at 128 (${codeBad} texels the other side)`);
+  let rt = 0; for (let h = -42; h <= 160; h += 0.7) { const e = Math.abs(BT.hdecode(BT.hcode(h)) - h); rt = Math.max(rt, e / (1 + 0.035 * Math.abs(h))); }
+  check(rt <= 1, `the height code: −42…160 m back within 1 m + 3.5 % (worst ${rt.toFixed(2)} of that)`);
+  check(/48\.0 \* c \/ max\(127\.0 - c/.test(SH.programs().herz.fs) && BT.hdecode(255) > 150 && BT.hdecode(0) < -42, 'the shader decodes the height code as bodytex encodes it');
   // rows: a job for part of the rows gives the same texels
   const part = BT.job({ type: 'bodytex', body: 'herz', w: 512, h: 256, y0: 100, y1: 140 }, gen);
   let same = part.a.length === 40 * 512 * 4; for (let i = 0; same && i < part.a.length; i += 97) if (part.a[i] !== r.a[100 * 512 * 4 + i]) same = false;
@@ -195,6 +219,8 @@ console.log('bodytex');
   const P = cpuMs(() => BT.job({ type: 'bodytex', body: 'patch', w: 512, h: 512, y0: 0, y1: 128, cx: 0, cz: 0, step: 100 }, gen));
   check(P.r.w === 512 && P.r.y1 - P.r.y0 === 128 && P.r.a.length === 512 * 128 * 4, 'patch: 128 rows of 512 texels');
   check(P.ms <= 800, `patch: ${P.ms.toFixed(0)} ms of CPU for 128 rows (a job; the 512² patch is four of them)`);
+  const jh = BT.jobs('patch', 3, { cx: 0, cz: 0 }), JH = cpuMs(() => BT.job(jh[Math.floor(jh.length / 2)], gen));
+  check(jh.every(j => (j.y1 - j.y0) * j.w <= 65536) && JH.ms <= 800, `patch on High: ${jh.length} jobs of ≤ 65,536 texels, the middle one ${JH.ms.toFixed(0)} ms (budget 800 ms)`);
   const Pc = BT.job({ type: 'bodytex', body: 'patch', w: 512, h: 512, y0: 248, y1: 264, cx: 0, cz: 0, step: 100 }, gen);
   let lights = 0, lit = 0; for (let i = 0; i < Pc.b.length; i += 4) { lights = Math.max(lights, Pc.b[i]); if (Pc.b[i] > 20) lit++; }
   const mid = (8 * 512 + 256) * 4;

@@ -2054,5 +2054,17 @@
     'g.set.cloudShadow.tip': 'The clouds\' shadows drift with the wind over meadows, hills and roofs. From Balanced up.',
     'g.set.wxDrama': 'Weather drama: storm front, lightning, rainbow, fog banks',
     'g.set.wxDrama.tip': 'A storm rolls in from one side, the wind picks up, lightning outlines the hills, the rain blows sideways; afterwards a rainbow. In the morning fog banks lie in the valleys. Off on Very Low.',
+    // u-space0 · the space view (src/main/spacescene.js: /raum, space detail)
+    'g.space.on': '🪐 Space view: {place} — Esc or /raum takes you back, the mouse looks around',
+    'g.space.wait': '🪐 Preparing the space view …',
+    'g.space.off': 'Back on the ground',
+    'g.space.help': 'Space view: /raum herz · amarant · zinn · aqua — /raum alone takes you back',
+    'g.space.place.herz': 'three kilometres above Herzwelt',
+    'g.space.place.amarant': 'Amarant over Herzwelt\'s rim',
+    'g.space.place.zinn': 'Amarant over Zinnober',
+    'g.space.place.aqua': 'Aquamarin and Herzwelt',
+    'g.set.spaceDetail': 'Space detail',
+    'g.set.spaceDetail.tip': 'How fine planets, moons, the ring and the stars are in the space view: texture size, fine clouds, star fields. Follows the preset.',
+    'g.set.spaceDetailV': ['Very low', 'Low', 'Medium', 'High'],
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
