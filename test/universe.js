@@ -21,7 +21,8 @@
 //      (Zinnober ~7 min, Opal ~5 min, Herzwelt none), the rare seasons of Herzwelt's eclipses, the cost of a call
 //  (o) TRIAD and the postcard blend
 //  (p) the wiring: build.js SHARED (and out of the texture key), test/load_shared.js; the module runs in a bare context
-// usage: node test/universe.js
+//  (q) the pinned sky: SKY_PIN, a fingerprint of the ephemeris — a change of the system's data is deliberate (like gen_same)
+// usage: node test/universe.js (bash test/wt_run.sh universe.js 300)
 const fs = require('fs'), path = require('path'), vm = require('vm');
 globalThis.VR = globalThis.VR || {};
 require('../src/shared/core.js');
