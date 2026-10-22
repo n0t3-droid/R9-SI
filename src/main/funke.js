@@ -38,14 +38,14 @@
   F.WAY_L = 48;        // m it reaches at most
   F.SCAN_T = 8;        // s the scan's outlines show
   F.SCAN_R = 32;       // blocks the scan reaches (+8 per Spürsinn point)
-  F.SCAN_MAX = 192;    // boxes drawn at most (chests first, then nearest)
+  F.SCAN_MAX = 256;    // boxes drawn at most (chests first, then the rare, the nearest of each kind)
   F.SCAN_V = 16;       // m/s: the scan's wave
   F.SNAP = 24;         // m: beyond this the drone snaps to its place (a teleport)
   F.LAG = 2.6;         // m it may trail behind its place
   F.ASK_T = 8;         // s: asking again within this goes on to the next trick
   F.KIND_WAIT = { vista: 240, _: 600 };   // s before the same kind is told again unprompted (asked: any time)
   F.SCALE = 0.62;      // the drone's size (≈ 35 cm)
-  F.SEAT_SCALE = 0.55; // on the dashboard
+  F.SEAT_SCALE = 0.45; // on the dashboard (run 1: 0.55 filled the middle of the windscreen)
   F.cost = { frames: 0, ms: 0, worst: 0, draws: 0, drawMs: 0, scanMs: 0 };
 
   // ---------------------------------------------------------------- the talking budget (pure)
@@ -261,6 +261,7 @@
     }
     return (R._funkeMarks = { mark, CHEST: 1 });
   };
+  const GRID = { g: null, st: null, rk: null };   // (the finds' grid and stack, kept between scans)
   class Scan {
     constructor(world, M, center, r) {
       this.w = world; this.M = M; this.r = r; this.c = [Math.floor(center[0]), Math.floor(center[1]), Math.floor(center[2])];
@@ -295,16 +296,37 @@
       if (this.i >= this.cols.length) this.done = true;
       return this.done;
     }
-    // the counts of all found, the boxes to draw: chests first, then the nearest, at most SCAN_MAX
+    // the counts of all found (blocks), the finds (veins: blocks of a kind that touch count once — a seam of 170 coal is
+    // one find), the boxes to draw: chests first, then the rare kinds, the nearest of each kind, at most SCAN_MAX
     result() {
-      const counts = {}, K = F.SCAN_KINDS;
-      for (const f of this.found) { const nm = K[f.k]; counts[nm] = (counts[nm] || 0) + 1; }
-      const list = this.found.slice().sort((a, b) => ((a.k === 1) !== (b.k === 1) ? (a.k === 1 ? -1 : 1) : a.d2 - b.d2)).slice(0, F.SCAN_MAX)
+      const counts = {}, veins = {}, K = F.SCAN_KINDS, c = this.c, r = Math.ceil(this.r) + 1, S = 2 * r + 1, SS = S * S, N = SS * S, found = this.found;
+      // the finds on a grid of the scan's box (one byte a cell, kept between scans; 4096 blocks ≈ 1 ms)
+      if (!GRID.g || GRID.g.length < N) GRID.g = new Uint8Array(N);
+      const G = GRID.g, st = GRID.st || (GRID.st = new Int32Array(4096)), ix = (x, y, z) => (x - c[0] + r) * SS + (y - c[1] + r) * S + (z - c[2] + r);
+      G.fill(0, 0, N);
+      for (const f of found) { const nm = K[f.k]; counts[nm] = (counts[nm] || 0) + 1; G[ix(f.x, f.y, f.z)] = f.k; }
+      for (const f of found) {
+        const i0 = ix(f.x, f.y, f.z), k = G[i0]; if (!k) continue;   // (already part of a find)
+        veins[K[k]] = (veins[K[k]] || 0) + 1; G[i0] = 0;
+        if (k === 1) continue;   // (a chest is a find of its own)
+        let sp = 0; st[sp++] = i0;
+        while (sp) {
+          const i = st[--sp];
+          if (G[i + SS] === k) { G[i + SS] = 0; st[sp++] = i + SS; } if (G[i - SS] === k) { G[i - SS] = 0; st[sp++] = i - SS; }
+          if (G[i + S] === k) { G[i + S] = 0; st[sp++] = i + S; } if (G[i - S] === k) { G[i - S] = 0; st[sp++] = i - S; }
+          if (G[i + 1] === k) { G[i + 1] = 0; st[sp++] = i + 1; } if (G[i - 1] === k) { G[i - 1] = 0; st[sp++] = i - 1; }
+        }
+      }
+      const RK = GRID.rk || (GRID.rk = K.map(n => { const i = F.SCAN_RANK.indexOf(n); return i < 0 ? 99 : i; }));
+      const list = found.slice().sort((a, b) => (RK[a.k] - RK[b.k]) || (a.d2 - b.d2)).slice(0, F.SCAN_MAX)
         .map(f => ({ x: f.x, y: f.y, z: f.z, k: f.k, kind: K[f.k], d2: f.d2 }));
-      return { counts, list };
+      return { counts, veins, list };
     }
   }
   F.Scan = Scan;
+  // the kinds from the rarest down (the line names the first four, the boxes go in this order)
+  F.SCAN_RANK = ['chest', 'relic', 'diamond', 'emerald', 'crystal', 'gold', 'voltite', 'lapis', 'quartz', 'iron', 'copper', 'coal', 'ore'];
+  F.scanOrder = (counts) => Object.keys(counts).filter(k => counts[k] > 0).sort((a, b) => { const i = F.SCAN_RANK.indexOf(a), j = F.SCAN_RANK.indexOf(b); return (i < 0 ? 99 : i) - (j < 0 ? 99 : j); });
 
   // ---------------------------------------------------------------- the drone (our own: a light variant of the hover drone)
   const MM = VR.VOXMODELS, Grid = VR.VoxGrid;
@@ -439,7 +461,7 @@ void main() {
       this.budget = new Budget(); this.lost = new Lost(); this.said = new Set(); this.n = 0;
       this.visible = false; this.brainT = 0.5; this.wowAt = -Infinity; this.targetsAt = -Infinity; this.targets = [];
       this.line = null; this.startT = null; this.askT = -Infinity; this.askI = 0; this.blinkT = 2; this.inputT = -Infinity;
-      this.wayT = 0; this.wayPts = 0; this.wayTg = null; this.wayDirty = false; this.wayP = new Float32Array(26 * 3); this.wayD = new Float32Array(26); this.wayO = [0, 0, 0]; this.wayEnd = false;
+      this.wayT = 0; this.wayPts = 0; this.wayTg = null; this.wayDirty = false; this.waySide = 0; this.wayYaw = 0; this.wayP = new Float32Array(26 * 3); this.wayD = new Float32Array(26); this.wayO = [0, 0, 0]; this.wayEnd = false;
       this.scanJob = null; this.scanT = 0; this.scanR = F.SCAN_R; this.scanO = [0, 0, 0]; this.scanN = 0; this.scanData = null; this.scanDirty = false; this.scanAsked = false;
       this.shot = null; this.ph = null; this.light = { sky: 1, bl: [0.32, 0.55, 0.62] }; this.lightT = 0;
       this.seat = null; this.seatM = VR.mat4 ? VR.mat4.create() : null; this.wp = [0, 0, 0];
@@ -504,7 +526,11 @@ void main() {
       if (this.ph && this.ph.spot) { const s = this.ph.spot; A[0] = s[0]; A[1] = s[1]; A[2] = s[2]; return; }
       if (this.inVehicle() && cam) { A[0] = cam.x + rx * 0.8 - fx * 0.2; A[1] = cam.y - 0.25 + bob; A[2] = cam.z + rz * 0.8 - fz * 0.2; return; }
       const P = p.pos, firstPerson = (g.camMode | 0) === 0 && !(g.photoCam && g.photoCam.on);
-      if (this.wayT > 0 && this.wayTg) {
+      if (this.wayT > 0 && this.wayTg && this.waySide && firstPerson && cam) {
+        // the target off the view (first person): in the view on the target's side — the ribbon bends round from here
+        const s = this.waySide;
+        A[0] = cam.x + fx * 1.5 + rx * 0.72 * s; A[1] = cam.y - 0.12 + bob * 0.5; A[2] = cam.z + fz * 1.5 + rz * 0.72 * s;
+      } else if (this.wayT > 0 && this.wayTg) {
         // ahead toward the target, at eye height
         const tg = this.wayTg.pos, dx = tg[0] - P[0], dz = tg[2] - P[2], L = Math.hypot(dx, dz) || 1;
         A[0] = P[0] + dx / L * 1.5 + rx * 0.35; A[1] = P[1] + 1.45 + bob; A[2] = P[2] + dz / L * 1.5 + rz * 0.35;
@@ -537,9 +563,10 @@ void main() {
       void g;
     }
     lookYaw(T) {
-      const g = this.g, cam = g.cam, P = this.pos;
-      if (this.wayT > 0 && this.wayTg) { const tg = this.wayTg.pos; return Math.atan2(-(tg[0] - P[0]), -(tg[2] - P[2])); }
-      if (cam && (this.line || this.ph)) return Math.atan2(-(cam.x - P[0]), -(cam.z - P[2]));   // to the player (the camera)
+      const g = this.g, cam = g.cam, P = this.pos, pose = !!(g.photoCam && g.photoCam.on);
+      // the way: to the player while it says it (the first second), then along the ribbon
+      if (this.wayT > 0 && this.wayTg && !(cam && this.line && F.WAY_T - this.wayT < 1.1)) { const W = this.wayP, n = this.wayPts; if (n > 2) { const a = this.wayO; return Math.atan2(-(a[0] + W[6] - P[0]), -(a[2] + W[8] - P[2])); } const tg = this.wayTg.pos; return Math.atan2(-(tg[0] - P[0]), -(tg[2] - P[2])); }
+      if (cam && (this.line || this.ph || pose)) return Math.atan2(-(cam.x - P[0]), -(cam.z - P[2]));   // to the player (the camera; in the 📷 photo mode it poses)
       const base = cam && Number.isFinite(cam.yaw) ? cam.yaw : (g.player ? g.player.yaw : 0);
       return base + Math.sin(T * 0.37) * 0.35;   // looking about a little
     }
@@ -752,27 +779,45 @@ void main() {
       this.startWay(tg);
       return true;
     }
-    startWay(tg) { this.wayTg = tg; this.wayT = F.WAY_T; this.buildWay(); }
-    // the points: from the drone along the bearing to the target, 2 m apart, up to 48 m (or the target), over what is solid
+    // the way starts from where the drone is going (its anchor), not from where it happens to be (run 1: the ribbon began
+    // behind the camera and swept past it); in first person a target off the view puts the drone in the view on its side
+    startWay(tg) {
+      const g = this.g, cam = g.cam, p = g.player, T0 = g.time || 0;
+      this.wayTg = tg; this.wayT = F.WAY_T; this.waySide = 0;
+      const yaw = cam && Number.isFinite(cam.yaw) ? cam.yaw : (p ? p.yaw : 0), firstPerson = (g.camMode | 0) === 0 && !(g.photoCam && g.photoCam.on);
+      this.wayYaw = yaw;
+      if (!this.seat && firstPerson && cam && p) {
+        const a = wrapA(Math.atan2(-(tg.pos[0] - p.pos[0]), -(tg.pos[2] - p.pos[2])) - yaw);
+        if (Math.abs(a) > 0.85) this.waySide = a > 0 ? -1 : 1;   // (yaw grows to the left)
+      }
+      if (!this.seat && p) this.place(T0);
+      this.buildWay();
+    }
+    // the points: from the drone's place toward the target, 2 m apart, up to 48 m (or the target), over what is solid; a
+    // target off the view: it starts sideways and turns ≤ 0.5 rad a step (an arc round the player, never through the eye)
     buildWay() {
-      const tg = this.wayTg, P = this.seat ? this.wp : this.pos, A = this.wayP, D = this.wayD, O = this.wayO;
-      const dx = tg.pos[0] - P[0], dz = tg.pos[2] - P[2], Lh = Math.hypot(dx, dz) || 1, ux = dx / Lh, uz = dz / Lh;
-      const L = Math.min(F.WAY_L, Lh), n = clamp(Math.ceil(L / 2), 2, 25), step = L / n;
+      const tg = this.wayTg, P = this.seat ? this.wp : this.anchor, A = this.wayP, D = this.wayD, O = this.wayO, s0 = this.waySide;
+      const Lh = Math.hypot(tg.pos[0] - P[0], tg.pos[2] - P[2]) || 1;
+      let th = s0 ? Math.atan2(Math.cos(this.wayYaw) * s0, -Math.sin(this.wayYaw) * s0) : Math.atan2(tg.pos[0] - P[0], tg.pos[2] - P[2]);
+      const L = Math.min(F.WAY_L, Lh + (s0 ? 6 : 0)), n = clamp(Math.ceil(L / 2), 2, 25), step = L / n;
       O[0] = P[0]; O[1] = P[1]; O[2] = P[2];
-      let y = P[1] - 0.25, d = 0;
-      A[0] = 0; A[1] = -0.25; A[2] = 0; D[0] = 0;
-      for (let i = 1; i <= n; i++) {
-        const x = P[0] + ux * step * i, z = P[2] + uz * step * i;
+      let x = P[0] + Math.sin(th) * 0.45, z = P[2] + Math.cos(th) * 0.45, y = P[1] - 0.1, d = 0, end = false, i = 1;
+      A[0] = x - O[0]; A[1] = y - O[1]; A[2] = z - O[2]; D[0] = 0;
+      for (; i <= n; i++) {
+        const tx = tg.pos[0] - x, tz = tg.pos[2] - z, rem = Math.hypot(tx, tz);
+        th += clamp(wrapA(Math.atan2(tx, tz) - th), -0.5, 0.5);
+        end = rem <= step + 0.01;
+        if (end) { x = tg.pos[0]; z = tg.pos[2]; } else { x += Math.sin(th) * step; z += Math.cos(th) * step; }
         let k = 0; while (k < 10 && this.solid(x, y, z)) { y += 1; k++; }                     // up over a wall or a hill
         let gy = null; for (let j = 0; j < 7; j++) if (this.solid(x, y - 1 - j, z)) { gy = Math.floor(y - 1 - j) + 1; break; }
         const want = gy === null ? y - 0.8 : gy + 1.25;                                         // follow the ground loosely
-        const last = i === n && Lh <= F.WAY_L ? tg.pos[1] + 1.2 : null;
-        y = last !== null ? last : y + clamp(want - y, -0.9, 0.9);
+        y = end ? tg.pos[1] + 1.2 : y + clamp(want - y, -0.9, 0.9);
         const px = x - O[0], py = y - O[1], pz = z - O[2], q = (i - 1) * 3;
         d += Math.hypot(px - A[q], py - A[q + 1], pz - A[q + 2]);
         A[i * 3] = px; A[i * 3 + 1] = py; A[i * 3 + 2] = pz; D[i] = d;
+        if (end) break;
       }
-      this.wayPts = n + 1; this.wayLen = d; this.wayEnd = Lh <= F.WAY_L; this.wayDirty = true;
+      this.wayPts = (end ? i : n) + 1; this.wayLen = d; this.wayEnd = end; this.wayDirty = true;
     }
 
     // ---- the scan
@@ -780,7 +825,7 @@ void main() {
     scan(prompted) {
       const g = this.g, w = g.world, R = VR.R; if (!this.on() || !w || !R || this.scanJob) return false;
       const P = g.player.pos;
-      this.scanR = this.scanRadius();
+      this.scanR = Math.min(48, this.scanRadius());
       this.scanJob = new Scan(w, F.scanMarks(R), [P[0], P[1] + 1, P[2]], this.scanR);
       this.scanO[0] = Math.floor(P[0]) + 0.5; this.scanO[1] = Math.floor(P[1]); this.scanO[2] = Math.floor(P[2]) + 0.5;
       this.scanT = F.SCAN_T; this.scanT0 = g.time || 0; this.scanN = 0; this.scanData = null; this.scanAsked = !!prompted;
@@ -790,9 +835,9 @@ void main() {
     scanDone() {
       const job = this.scanJob, res = job.result(); this.scanJob = null;
       this.scanData = res.list; this.scanDirty = true; this.scanN = res.list.length;
-      const K = Object.keys(res.counts).sort((a, b) => (a === 'chest' ? -1 : b === 'chest' ? 1 : res.counts[b] - res.counts[a])).slice(0, 4);
+      const K = F.scanOrder(res.veins).slice(0, 4);   // (the rarest four kinds, each counted in finds)
       if (!K.length) { this.say('scan.none', null, this.scanAsked); return; }
-      const list = K.map(k => T('g.funke.scan.item', { n: res.counts[k], what: T('g.funke.ore.' + k) })).join(' · ');
+      const list = K.map(k => T('g.funke.scan.item', { n: res.veins[k], what: T('g.funke.ore.' + k) })).join(' · ');
       this.say('scan.found', { list }, this.scanAsked);
     }
 
@@ -855,7 +900,7 @@ void main() {
       if (fl && fl.toWorld && fl.b && fl.R3 && this.seatM) {
         // on the dashboard: the glare shield right of the pilot, with the ship's attitude
         const b = fl.b, e = b.eye || [0, 1.5, 0], K = g.cockpit && g.cockpit.kit ? g.cockpit.kit(fl) : null, top = K && K.def && Number.isFinite(K.def.dashTop) ? K.def.dashTop : e[1] - 0.3;
-        const wp = fl.toWorld([e[0] + 0.42, top + 0.1, e[2] - 1.02], this.wp); wp[1] += fl.dip || 0; P = wp;
+        const wp = fl.toWorld([e[0] + 0.5, top + 0.11, e[2] - 1.05], this.wp); wp[1] += fl.dip || 0; P = wp;
         const M = this.seatM; M.set(fl.R3); M[12] = wp[0] - cam.x; M[13] = wp[1] - cam.y; M[14] = wp[2] - cam.z;
         m4.rotY(M, M, this.line ? Math.PI + Math.sin(T0 * 1.3) * 0.15 : Math.sin(T0 * 0.6) * 0.5);
         m4.translate(M, M, 0, Math.sin(T0 * 2.4) * 0.012, 0);

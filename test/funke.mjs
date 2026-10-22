@@ -65,6 +65,8 @@ const picture = async (path, frames = 3) => {
   return false;
 };
 const fk = () => ev(() => { const g = VR.game, a = g.funke, F = VR.Funke, b = document.getElementById('funkebub'); return a ? { pos: a.pos.map(v => +v.toFixed(2)), anchor: a.anchor.map(v => +v.toFixed(2)), visible: a.visible, line: a.line ? a.line.text : null, last: F.last ? F.last.text : null, wayT: +a.wayT.toFixed(2), wayPts: a.wayPts, scanT: +a.scanT.toFixed(2), scanN: a.scanN, draws: F.cost.draws, bub: b ? { shown: b.style.display !== 'none', text: (b.querySelector('.tx') || {}).textContent, tf: b.style.transform } : null, roll: +a.roll.toFixed(3), seat: !!a.seat } : null; });
+// (the photo's shutter flash fades out on requestAnimationFrame, which this test holds: it is taken away by hand)
+const unflash = () => ev(() => { for (const d of document.querySelectorAll('div')) if (d.style && d.style.zIndex === '32' && d.style.background && /255, 255, 255|#fff/.test(d.style.background)) d.remove(); });
 const run = async (name, fn) => { try { await fn(); } catch (e) { check(false, `${name}: ${String(e && e.stack || e).split('\n').slice(0, 3).join(' | ')}`); } };
 
 for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
@@ -108,9 +110,10 @@ await run('follow', async () => {
   const roll = await ev(async () => { const g = VR.game, p = g.player; let mx = 0; for (let i = 0; i < 40; i++) { p.yaw += 0.05; g.last = performance.now() - 33; g.loop(performance.now()); mx = Math.max(mx, Math.abs(g.funke.roll)); } for (let i = 0; i < 40; i++) { p.yaw -= 0.05; g.last = performance.now() - 33; g.loop(performance.now()); } return mx; });
   check(roll > 0.03, `turning: it banks into the turn (roll up to ${roll.toFixed(2)} rad)`);
   await step(40);
-  // close: the photo mode's free camera 1.4 m in front of the drone, looking back at it and the player
-  await ev(() => { const g = VR.game, a = g.funke, p = g.player; g.photoMode(true); const s = g.photoCam.s; const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw); s.x = a.pos[0] + fx * 1.5 + rx * 0.7; s.y = a.pos[1] + 0.15; s.z = a.pos[2] + fz * 1.5 + rz * 0.7; const vx = (a.pos[0] - rx * 0.35) - s.x, vy = a.pos[1] - 0.25 - s.y, vz = (a.pos[2] - rz * 0.35) - s.z; s.yaw = Math.atan2(-vx, -vz); s.pitch = Math.atan2(vy, Math.hypot(vx, vz)); g.camMode = 1; });
-  await step(4);
+  // close: the photo mode's free camera 1.3 m in front of the drone and to its right, the player's head behind it — in
+  // the photo mode Funke turns to the camera (it poses)
+  await ev(() => { const g = VR.game, a = g.funke, p = g.player; g.photoMode(true); const s = g.photoCam.s; const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw), rx = Math.cos(p.yaw), rz = -Math.sin(p.yaw); s.x = a.pos[0] + fx * 1.15 + rx * 0.75; s.y = a.pos[1] + 0.22; s.z = a.pos[2] + fz * 1.15 + rz * 0.75; const vx = (a.pos[0] - rx * 0.25) - s.x, vy = a.pos[1] - 0.05 - s.y, vz = (a.pos[2] - rz * 0.25) - s.z; s.yaw = Math.atan2(-vx, -vz); s.pitch = Math.atan2(vy, Math.hypot(vx, vz)); g.camMode = 1; });
+  await step(40);
   check(await picture(SHOTS + 'funke_close.png', 3), 'test/shots/funke_close.png — close by: the drone, its eye and antenna, the player');
   await ev(() => { const g = VR.game; g.photoMode(false); g.camMode = 0; });
   await step(10);
@@ -125,7 +128,7 @@ await run('talk', async () => {
   const f = await fk();
   console.log('  talk', JSON.stringify(f));
   rec.lines.talk = f && f.last; save();
-  check(ok && f && f.line && /[äöüß]|Jetzt|Gleich|Minute|goldene|Stare|Aussicht|ruhig/.test(f.line), `asked about the next wow, it speaks German: „${f && f.line}"`);
+  check(ok && f && f.line && /[äöüß]|\b(Jetzt|Gleich|Heute|Minute|goldene|Stare|Aussicht|ruhig|du|ist|der|die|das)\b/.test(f.line) && !/\b(the|is|you)\b/.test(f.line), `asked about the next wow, it speaks German: „${f && f.line}"`);
   check(f && f.bub && f.bub.shown && f.bub.text === f.line, 'its bubble shows the line beside it');
   check(await picture(SHOTS + 'funke_talk.png', 3), 'test/shots/funke_talk.png — first person: it peeks into the view and talks');
   const proj = await ev(() => { const g = VR.game, r = g.renderer, a = g.funke, c = g.cam, vp = r.viewProj, x = a.pos[0] - c.x, y = a.pos[1] - c.y, z = a.pos[2] - c.z, w = vp[3] * x + vp[7] * y + vp[11] * z + vp[15]; return w > 0 ? [(vp[0] * x + vp[4] * y + vp[8] * z + vp[12]) / w, (vp[1] * x + vp[5] * y + vp[9] * z + vp[13]) / w] : null; });
@@ -161,7 +164,7 @@ await run('scan', async () => {
     return list.length;
   });
   await step(4);
-  await ev(() => { const g = VR.game; g.player.pitch = -0.42; g.funke.askT = -1e9; });
+  await ev(() => { const g = VR.game; g.player.pitch = -0.62; g.funke.askT = -1e9; });
   const ok = await ev(() => VR.Funke.scan());
   await step(40);
   const f = await fk();
@@ -183,7 +186,7 @@ await run('photo', async () => {
   let shotAt = -1, saved = null;
   for (let i = 0; i < 80 && !saved; i++) {
     await step(2);
-    if (shotAt < 0 && await ev(() => !!VR.game.funke.shot)) { shotAt = i; await picture(SHOTS + 'funke_photo_screen.png', 1); }
+    if (shotAt < 0 && await ev(() => !!VR.game.funke.shot)) { shotAt = i; await unflash(); await picture(SHOTS + 'funke_photo_screen.png', 1); }
     saved = await ev(() => { const L = VR.PhotoMode.last; return L && L !== window.__lastPhoto ? { name: L.name, w: L.w, h: L.h, bytes: L.bytes, url: L.url } : null; });
     if (!saved) await wait(120);
   }
@@ -198,6 +201,7 @@ await run('photo', async () => {
   const f = await fk();
   rec.lines.photo = f && f.last; save();
   check(f && /Hab dich|Klick/.test(f.last || ''), `and says so: „${f && f.last}"`);
+  await unflash();
   check(await ev(() => VR.game.camMode === 0 && !VR.game.funke.shot), 'the view is the player\'s own again');
 });
 
@@ -225,7 +229,7 @@ await run('cockpit', async () => {
   for (let i = 0; i < 80; i++) { if (await ev(() => !!(VR.game.flight && VR.game.cockpit.ready(VR.game.flight)))) break; await step(2); await wait(100); }
   await ev(() => { const fl = VR.game.flight; if (fl.setPower) fl.setPower(true); if (fl.startEngines) fl.startEngines(); });
   await step(100);
-  await ev(() => { const g = VR.game, fl = g.flight; fl.headYaw = -0.3; fl.headPitch = -0.2; fl.recenter = false; g.funke.askT = -1e9; VR.Funke.wow(); });
+  await ev(() => { const g = VR.game, fl = g.flight; fl.headYaw = -0.24; fl.headPitch = -0.14; fl.recenter = false; g.funke.askT = -1e9; VR.Funke.wow(); });
   await step(20);
   const f = await fk();
   console.log('  cockpit', JSON.stringify(f));
@@ -252,30 +256,37 @@ await run('mute', async () => {
 }
 
 // ================================================================ 9 · the cost: Very Low and High, Funke on and off
+// (run 1 measured with gl.finish() alone: SwiftShader did not wait there — "Very Low on 1971.7 / off 4.1 ms"; now every
+// frame is drained by a 1-pixel read of the picture; the full probe with six states is test/funke_cost.mjs)
 if (!process.env.NO_COST) {
   for (const preset of ['potato', 'high']) {
     await run('cost ' + preset, async () => {
       await ev((p) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; g.settings.renderDist = 8; g.applySettings('*'); g.camMode = 1; g.settings.funke = true; }, preset);
       await settle(40, 4);
       await step(20);
-      // Funke's own: its update and its draw (in view: third person), frames rendered
-      const own = await ev((n) => { const g = VR.game, C = VR.Funke.cost; window.__norender = false; for (const k in C) C[k] = 0; for (let i = 0; i < n; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); window.__norender = true; return { frames: C.frames, upd: C.ms / Math.max(1, C.frames), worst: C.worst, draws: C.draws, draw: C.drawMs / Math.max(1, C.frames) }; }, 30);
-      // and the frame with the switch on and off, in turns (the GPU drained each frame)
       const ab = await ev(([rounds, n]) => {
-        const g = VR.game, r = g.renderer, gl = r.gl, out = { on: [], off: [] };
+        const g = VR.game, r = g.renderer, gl = r.gl, A = g.funke, C = VR.Funke.cost, px = new Uint8Array(4), out = { none: [], off: [], on: [] };
         window.__norender = false;
-        const frame = () => { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); return performance.now() - t0; };
-        for (let k = 0; k < rounds; k++) for (const on of (k % 2 ? [true, false] : [false, true])) { g.settings.funke = on; frame(); const ts = []; for (let i = 0; i < n; i++) ts.push(frame()); ts.sort((a, b) => a - b); out[on ? 'on' : 'off'].push(ts[n >> 1]); }
-        g.settings.funke = true; window.__norender = true;
-        const med = (a) => { const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; };
-        return { on: +med(out.on).toFixed(2), off: +med(out.off).toFixed(2), rounds };
-      }, preset === 'high' ? [4, 6] : [ROUNDS, N]);
-      const tot = own.upd + own.draw;
-      rec.cost[preset] = { own, ab, total: +tot.toFixed(4) }; save();
-      console.log(`  ${preset}: Funke ${(own.upd * 1000).toFixed(1)} µs update + ${(own.draw * 1000).toFixed(1)} µs draw a frame (worst ${(own.worst).toFixed(3)} ms, ${own.draws} draws in ${own.frames} frames) · frame on ${ab.on} ms / off ${ab.off} ms`);
-      if (preset === 'potato') check(tot <= 0.1, `Very Low: Funke costs ${(tot * 1000).toFixed(1)} µs a frame (≤ 100 µs), the frame ${ab.off} → ${ab.on} ms`);
+        const drain = () => { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); };
+        const frame = () => { const t0 = performance.now(); g.last = t0 - 33; g.loop(performance.now()); drain(); return performance.now() - t0; };
+        const set = (s) => { g.funke = s === 'none' ? null : A; g.settings.funke = s !== 'off'; };
+        drain(); for (const k in C) C[k] = 0;
+        const S = ['none', 'off', 'on'];
+        for (let k = 0; k < rounds; k++) for (const s of S.slice(k % 3).concat(S.slice(0, k % 3))) { set(s); frame(); const ts = []; for (let i = 0; i < n; i++) ts.push(frame()); ts.sort((a, b) => a - b); out[s].push(ts[n >> 1]); }
+        set('on'); window.__norender = true;
+        const med = (a) => { const b = a.slice().sort((x, y) => x - y); return +b[b.length >> 1].toFixed(2); };
+        return { none: med(out.none), off: med(out.off), on: med(out.on), rounds, own: { upd: C.ms / Math.max(1, C.frames), draw: C.drawMs / Math.max(1, C.frames), worst: C.worst, frames: C.frames } };
+      }, preset === 'high' ? [3, 4] : [ROUNDS, N]);
+      const tot = ab.own.upd + ab.own.draw;
+      rec.cost[preset] = { ab, total: +tot.toFixed(4) }; save();
+      console.log(`  ${preset}: Funke ${(ab.own.upd * 1000).toFixed(1)} µs update + ${(ab.own.draw * 1000).toFixed(1)} µs draw a frame (worst ${ab.own.worst.toFixed(3)} ms) · frame (drained) without Funke ${ab.none} ms / off ${ab.off} ms / on ${ab.on} ms`);
+      if (preset === 'potato') check(tot <= 0.1 && ab.off <= ab.none * 1.1 + 0.5, `Very Low: Funke costs ${(tot * 1000).toFixed(1)} µs a frame (≤ 100 µs); the frame without it ${ab.none} ms, off ${ab.off} ms, on ${ab.on} ms`);
     });
   }
+}
+{
+  const errs = logs.filter(l => l.startsWith('[pageerror]') || l.startsWith('[error]'));
+  console.log(`--- all logs (${logs.length}, errors ${errs.length})`); for (const l of logs.slice(0, 20)) console.log(l);
 }
 save();
 await browser.close();

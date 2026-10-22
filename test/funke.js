@@ -189,16 +189,21 @@ check(!!F && typeof F.ask === 'function' && !!F.Budget && !!F.Lost && !!F.Actor,
   const put = (x, y, z, s) => { const c = col(x >> 4, z >> 4); c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)] = s; };
   for (let cz = -4; cz <= 4; cz++) for (let cx = -4; cx <= 4; cx++) col(cx, cz);
   put(5, 64, 3, st('chest')); put(-10, 50, 7, st('iron_ore')); put(20, 40, -2, st('iron_ore')); put(60, 50, 0, st('gold_ore'));
-  for (let i = 0; i < 300; i++) put(-30 + (i % 20), 30 + ((i / 20) | 0), -20, st('coal_ore'));   // a big coal seam (beyond the cap)
+  for (let i = 0; i < 300; i++) put(-10 + (i % 20), 50 + ((i / 20) | 0), -20, st('coal_ore'));   // a big coal seam, all in reach (beyond the cap)
   const world = { col: (cx, cz) => cols.get(cx + ',' + cz) || null };
   const sc = new F.Scan(world, M, [0, 64, 0], 32);
   let steps = 0; while (!sc.done && steps < 200) { sc.step(2); steps++; }
   const f = sc.result();
   check(sc.done && steps > 3, `the scan runs in steps (${steps} steps of two columns)`);
   check(f.counts.chest === 1 && f.counts.iron === 2 && !f.counts.gold, `found: ${JSON.stringify(f.counts)} (the gold 60 blocks away is out of reach)`);
-  check(f.list.length <= F.SCAN_MAX && f.list[0].kind === 'chest', `chests first, at most ${F.SCAN_MAX} boxes (${f.list.length})`);
-  let sorted = true; for (let i = 2; i < f.list.length; i++) if (f.list[i].kind !== 'chest' && f.list[i - 1].kind !== 'chest' && f.list[i].d2 < f.list[i - 1].d2) sorted = false;
-  check(sorted, 'the rest nearest first');
+  check(f.list.length === F.SCAN_MAX && f.list[0].kind === 'chest', `chests first, at most ${F.SCAN_MAX} boxes (${f.list.length} of ${sc.found.length})`);
+  // (run 1: „3× Truhe · 170× Kohle · 152× Kupfer · 4× Eisen" — blocks counted, the coal seams crowding out the diamond)
+  check(f.veins && f.veins.chest === 1 && f.veins.iron === 2 && f.veins.coal === 1 && f.counts.coal > 50, `the line counts the finds, not the blocks: ${JSON.stringify(f.veins)} (one coal seam of ${f.counts.coal} blocks = 1)`);
+  const rank = (k) => F.SCAN_RANK.indexOf(k);
+  let byRank = true, near = true;
+  for (let i = 1; i < f.list.length; i++) { const a = f.list[i - 1], b = f.list[i]; if (rank(b.kind) < rank(a.kind)) byRank = false; if (a.kind === b.kind && b.d2 < a.d2) near = false; }
+  check(byRank && near && f.list[1].kind === 'iron', `the boxes: the rare first (chest, iron before coal), then the nearest of each kind (${f.list.slice(0, 4).map(q => q.kind).join(', ')} …)`);
+  check(F.scanOrder({ chest: 2, coal: 9, copper: 7, iron: 1, diamond: 1 }).join(',') === 'chest,diamond,iron,copper,coal', `the line names the rare first: ${F.scanOrder({ chest: 2, coal: 9, copper: 7, iron: 1, diamond: 1 }).join(', ')}`);
 }
 
 // ---------------------------------------------------------------- h · the hooks
@@ -245,6 +250,39 @@ check(!!F && typeof F.ask === 'function' && !!F.Budget && !!F.Lost && !!F.Actor,
   step(150, 1 / 30);
   check(A.wayT === 0, 'the way ends after 4 s');
   check(lines.some(s => /Teststadt/.test(s)), `the way says where: „${lines.filter(s => /Teststadt/.test(s))[0] || '—'}"`);
+  // (run 1: the ribbon began where the drone had been — behind the camera — and swept past it; a target behind: the
+  // drone flew behind the player, out of the first-person view)
+  {
+    const fw = (yaw) => [-Math.sin(yaw), -Math.cos(yaw)], rt = (yaw) => [Math.cos(yaw), -Math.sin(yaw)];
+    const rib = () => { const out = []; for (let i = 0; i < A.wayPts; i++) out.push([A.wayO[0] + A.wayP[i * 3], A.wayO[1] + A.wayP[i * 3 + 1], A.wayO[2] + A.wayP[i * 3 + 2]]); return out; };
+    const camD = (q) => Math.hypot(q[0] - g.cam.x, q[1] - g.cam.y, q[2] - g.cam.z);
+    // a target ahead (yaw 0: −z): the drone ahead, the ribbon from it away from the eye
+    player.pos = [0.5, 64, 0.5]; player.yaw = 0; step(40, 1 / 30);
+    A.pos[0] += 6; A.pos[2] += 5;   // (the drone somewhere else when it is asked: the ribbon must not start there)
+    A.wayT = 0; A.way({ pos: [10.5, 64, -150.5], name: 'Vorne', kind: 'test' }, true); step(2, 1 / 30);
+    let R1 = rib(), f = fw(0);
+    const o1 = [A.wayO[0] - A.anchor[0], A.wayO[2] - A.anchor[2]];
+    check(Math.hypot(o1[0], o1[1]) < 0.6, `the ribbon starts at the drone's place, not where it was (${Math.hypot(o1[0], o1[1]).toFixed(2)} m)`);
+    let rec = true; for (let i = 1; i < R1.length; i++) if (camD(R1[i]) < camD(R1[i - 1]) - 0.05) rec = false;
+    const ahead1 = (A.anchor[0] - g.cam.x) * f[0] + (A.anchor[2] - g.cam.z) * f[1];
+    check(rec && ahead1 > 1 && camD(R1[0]) > 1, `a target ahead: the drone ${ahead1.toFixed(2)} m ahead, the ribbon runs away from the eye (${camD(R1[0]).toFixed(1)} → ${camD(R1[R1.length - 1]).toFixed(1)} m)`);
+    step(140, 1 / 30);
+    // a target behind on the left: the drone peeks in on the left, the ribbon starts beside it and bends round
+    A.wayT = 0; A.way({ pos: [-60.5, 64, 120.5], name: 'Hinten', kind: 'test' }, true); step(20, 1 / 30);
+    R1 = rib(); f = fw(0); const r = rt(0);
+    const fa = (A.anchor[0] - g.cam.x) * f[0] + (A.anchor[2] - g.cam.z) * f[1], la = (A.anchor[0] - g.cam.x) * r[0] + (A.anchor[2] - g.cam.z) * r[1];
+    check(fa > 1 && la < -0.4, `a target behind on the left: the drone stays in view on the left (${fa.toFixed(2)} m ahead, ${la.toFixed(2)} m to the side)`);
+    let minD = 1e9; for (const q of R1) minD = Math.min(minD, camD(q));
+    const tg = [-60.5, 120.5], dT = (q) => Math.hypot(q[0] - tg[0], q[2] - tg[1]);
+    check(minD > 1.2 && dT(R1[R1.length - 1]) < dT(R1[0]) - 10, `the ribbon never passes the eye (nearest ${minD.toFixed(2)} m) and bends toward the target (${dT(R1[0]).toFixed(0)} → ${dT(R1[R1.length - 1]).toFixed(0)} m)`);
+    step(140, 1 / 30);
+    // the photo mode: it looks at the camera (it poses)
+    g.photoCam = { on: true }; g.cam.x = A.pos[0] + 3; g.cam.z = A.pos[2]; A.yaw = 0;
+    for (let i = 0; i < 60; i++) { g.time += 1 / 30; A.attitude(1 / 30, g.time); }
+    const want = Math.atan2(-(g.cam.x - A.pos[0]), -(g.cam.z - A.pos[2]));
+    check(Math.abs(Math.atan2(Math.sin(A.yaw - want), Math.cos(A.yaw - want))) < 0.15, `in the photo mode it turns to the camera (${A.yaw.toFixed(2)} → ${want.toFixed(2)} rad)`);
+    g.photoCam = null;
+  }
   // switched off: nothing
   g.settings.funke = false; const n0 = lines.length; A.way({ pos: [0, 64, -50], name: 'Aus', kind: 'test' }, true); step(30, 1 / 30);
   check(!A.visible && lines.length === n0, 'switched off: no drone and no line');
