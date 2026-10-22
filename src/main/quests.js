@@ -13,7 +13,7 @@
 //                 emissive, turning; drawn after the villagers (Villages.prototype.draw, wrapped), one per marked giver
 //   the Tagebuch  J (binds.js 'journal') or the pause menu: open, ready, done; where, how far, which way, the hour, the
 //                 reward; 🧭 tracks one — the map's ✦ and the compass line (map.js wrapped), Q.target() for Funke
-//   rewards       by size through VR.Adventure.award('quest', {size}) (S 20 XP + 15 Sterntaler, M 50 + 40, L 120 +
+//   rewards       by size through VR.Adventure.award('quest', {size}) (S 20 XP + 15 Heliataler, M 50 + 40, L 120 +
 //                 100), friendship hearts (the village's love), sometimes an item
 //   costs         nothing per frame without a UI: a 2-Hz timer (Abenteuer worlds only) marks the givers and checks the
 //                 targets; the marker draw early-outs when nothing is marked
@@ -626,7 +626,7 @@
     setOpts(list);
     return Q.still(r, g.env ? g.env.timeOfDay : 0);
   }
-  // the reward (at the giver or where it was done): VR.Adventure's XP and Sterntaler, the village's love, maybe an item
+  // the reward (at the giver or where it was done): VR.Adventure's XP and Heliataler, the village's love, maybe an item
   Q.complete = function (mgr, a, r) {
     const g = game(), r0 = rec(); if (!g || !r0 || !r) return '';
     const f = Q.finish(r0, r.pid, Date.now(), dayOf(g)); if (!f.ok) return '';
@@ -835,7 +835,8 @@
     const back = Q.jFrom; Q.jArm = null; Q.jFrom = null;
     if (back === 'pause' && g.ui.pause) g.ui.pause(); else if (g.ui.resume) g.ui.resume();
   };
-  const COIN = '<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#ffc83d" stroke="#8a5208" stroke-width="1"/><path d="M12 5.8L13.47 9.98 17.9 10.08 14.38 12.77 15.64 17.02 12 14.5 8.36 17.02 9.62 12.77 6.1 10.08 10.53 9.98Z" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6" stroke-linejoin="round"/></svg>';
+  // the Heliataler on a reward chip (f-names: Helia's sun stamped in the gold, as in the HUD and the shops)
+  const COIN = '<svg class="coin" data-coin="helia" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#ffc83d" stroke="#8a5208" stroke-width="1"/><path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#b86b0c" stroke-width="2.3" stroke-linecap="round"/><path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#fff6c8" stroke-width="1.2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6"/></svg>';
   Q.renderJournal = function () {
     const s = journalEl(), g = game(), r0 = rec(); if (!s || !g || !r0) return;
     const p = s.querySelector('.panel'), list = Q.open(r0), tr = Q.track(), pos = g.player ? g.player.pos : [0, 0, 0], tod = g.env ? g.env.timeOfDay : 0;

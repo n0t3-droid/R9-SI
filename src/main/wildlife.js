@@ -11,7 +11,7 @@
 //     and in the shallows near you — swirling, flashing as they turn into the sun, scattering from you; carp in the ponds
 //   Falter & Libellen (wildBugs): a swarm of butterflies at home on a flower drift (found round you), visiting its
 //     flowers, rising round you as you walk through; dragonflies hovering and darting over the ponds
-//   Himmelsrochen (wildRays): three or four great sky rays on a slow circuit between the Sky Isles (wildsim.js: where
+//   Wolkenrochen (wildRays): three or four great cloud rays on a slow circuit between the Sky Isles (wildsim.js: where
 //     they are is a pure function of the world's clock — every guest sees them in the same place), a trail of light motes
 //   Herden ziehen (wildHerds): the deer cross the meadow in a line at dawn and graze, the sheep drift as one herd
 //     (landlife.js / entities.js ask Wild.lineTarget / herdTarget); rabbits at the field edges that bolt into the hedge;
@@ -668,7 +668,7 @@
       S.drifts = drifts.slice(0, 6);
     }
 
-    // ================================================================ the sky rays
+    // ================================================================ the cloud rays
     updRays(dt, ctx, cap) {
       const g = this.g, n = cap.ray;
       this.rays.length = 0;
@@ -886,7 +886,7 @@
         for (const p of this.dflies) { if (Math.hypot(p.x - cx, p.z - cz) > 40) continue; for (const q of p.list) { if (n >= K.cap) break; const c = q.col; put(D, n++, q.x - cx, q.y - cy, q.z - cz, 0.55, q.yaw, 0, 0, q.ph, c[0], c[1], c[2], p.sky, 0.22, 0, 0.05, 0, 0, 0.6); } }
         if (n) list.push([K, n]);
       }
-      // the sky rays (glowing brighter at night)
+      // the cloud rays (glowing brighter at night)
       if (this.rays.length) {
         const K = WG.kind(gl, 'ray', KINDCAP.ray), D = K.data; let n = 0;
         for (let k = 0; k < this.rays.length; k++) { const R = this.rays[k], x = R[0] - cx, y = R[1] - cy, z = R[2] - cz; if (x * x + z * z > 1100 * 1100) continue; put(D, n++, x, y, z, R[7], R[3], R[4], R[5], R[6], 1, 1, 1, 1, 0.42, 2.4, 0.06, 0, 0.42 + 0.58 * night, 0.35, k & 1 ? 0.65 : 0); }

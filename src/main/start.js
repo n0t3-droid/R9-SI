@@ -80,7 +80,7 @@
     if (VR.I18N && VR.I18N.on) VR.I18N.on(() => { texts(); worldsPanel(); createForm(); if (ui.screen === 'worlds') ST.worlds(ui); else if (ui.screen === 'meins') ST.renderMeins(); try { if (ui.renderHosts) ui.renderHosts(); if (ui.studioNote) ui.studioNote(); } catch (e) { /* not built yet */ } });
     // the worlds, read once now and again whenever the start screen shows
     ST.listWorlds().then(() => texts());
-    if (VR.Adventure && VR.Adventure.mount) VR.Adventure.mount(ui);   // a-core: ⚔ the pause card „Abenteuer", the stats card and the create row „Spielweg" (src/main/adventure.js)
+    if (VR.Adventure && VR.Adventure.mount) VR.Adventure.mount(ui);   // a-core: ⚔ the pause card „Abenteuer", the stats card and the create form's one question „Wie willst du spielen?" (src/main/adventure.js, f-names)
   }
   ST.mount = mount;
   // every label on the start screen (also after a language change, also after a Profi switch)
@@ -130,12 +130,12 @@
     g.loadWorld(ws[0]);
     return true;
   };
-  // „Meine Welt" (Zen, Realm), „Meine Welt 2", …
+  // „Meine Welt" (Zen, Realm), „Meine Welt 2", … (▶ Losspielen and Einfach's create form name a world alike)
+  const myWorldName = (ws) => { const base = tx('start.myWorld', null, 'Meine Welt', 'My World'), n = ws.filter(w => w && String(w.name || '').startsWith(base)).length; return base + (n ? ' ' + (n + 1) : ''); };
   ST.newWorld = async function () {
     const g = game(); if (!(await ready(g))) return false;
-    const ws = await ST.listWorlds(), base = tx('start.myWorld', null, 'Meine Welt', 'My World');
-    const n = ws.filter(w => String(w.name || '').startsWith(base)).length;
-    g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true, first: true });   // (first: t-first — it opens on its finest vista)
+    const ws = await ST.listWorlds();
+    g.createWorld({ name: myWorldName(ws), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true, first: true });   // (first: t-first — it opens on its finest vista)
     return true;
   };
   // 🧸 Kindersicher: a peaceful Zen world (no hostile creatures) — the last one of that kind, or a new "Kinderwelt"
@@ -245,18 +245,21 @@
   }
   ST.pauseMenu = pauseMenu;
 
-  // ---------------------------------------------------------------- the create form (Profi), in German
+  // ---------------------------------------------------------------- the create form, in German
+  // (f-names: Einfach opens it too — the world's name and the Abenteuer's one question „Wie willst du spielen?", which
+  // adventure.js puts after the name; the rows with class "pro" — Spielart, Schwierigkeit, Welttyp, Seed, the boxes —
+  // are Profi's)
   function createForm() {
     const panel = $('#create .panel'); if (!panel) return;
     const seg = (id, label, items, on) => `<div class="seg" id="${id}" role="group" aria-label="${esc(label)}">` + items.map(([v, name, sub]) => `<button type="button" data-v="${v}"${v === on ? ' class="on"' : ''}>${esc(name)}${sub ? `<small>${esc(sub)}</small>` : ''}</button>`).join('') + '</div>';
     const L = { name: tx('start.cw.name', null, 'Weltname', 'World name'), mode: tx('start.cw.mode', null, 'Spielart', 'Game mode'), diff: tx('start.cw.diff', null, 'Schwierigkeit', 'Difficulty'), type: tx('start.cw.type', null, 'Welttyp', 'World type'), seed: tx('start.cw.seed', null, 'Seed (optional)', 'Seed (optional)') };
     panel.innerHTML = `<h2>${esc(tx('start.newWorld', null, '＋ Neue Welt', '＋ New world'))}</h2>
-      <div class="field"><label for="cw_name">${esc(L.name)}</label><input type="text" id="cw_name" maxlength="40"></div>
-      <div class="field"><label>${esc(L.mode)}</label>${seg('cw_mode', L.mode, [['survival', t('g.mode.survival'), tx('start.cw.survivalS', null, 'Sammeln, bauen, überleben', 'Gather, craft, survive')], ['creative', t('g.mode.creative'), tx('start.cw.creativeS', null, 'Alle Blöcke, Fliegen', 'Every block, flying')], ['zen', t('g.mode.zen'), tx('start.cw.zenS', null, 'In Ruhe: keine Monster, kein Schaden', 'At ease: no monsters, no damage')]], 'zen')}</div>
-      <div class="field"><label>${esc(L.diff)}</label>${seg('cw_diff', L.diff, [['peaceful', tx('start.cw.peaceful', null, 'Friedlich', 'Peaceful')], ['easy', tx('start.cw.easy', null, 'Leicht', 'Easy')], ['normal', tx('start.cw.normal', null, 'Normal', 'Normal')], ['hard', tx('start.cw.hard', null, 'Schwer', 'Hard')]], (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'))}</div>
-      <div class="field"><label>${esc(L.type)}</label>${seg('cw_type', L.type, [['default', tx('start.cw.default', null, 'Realm', 'Realm')], ['large', tx('start.cw.large', null, 'Große Biome', 'Large biomes')], ['amplified', tx('start.cw.amplified', null, 'Verstärkt', 'Amplified')], ['flat', tx('start.cw.flat', null, 'Flach', 'Flat')]], 'default')}</div>
-      <div class="field"><label for="cw_seed">${esc(L.seed)}</label><input type="text" id="cw_seed" placeholder="${esc(tx('start.cw.seedP', null, 'Leer lassen für Zufall', 'Leave empty for a random one'))}"></div>
-      <div class="row gap" style="flex-wrap:wrap">
+      <div class="field"><label for="cw_name">${esc(L.name)}</label><input type="text" id="cw_name" maxlength="40" spellcheck="false" autocomplete="off"></div>
+      <div class="field pro"><label>${esc(L.mode)}</label>${seg('cw_mode', L.mode, [['survival', t('g.mode.survival'), tx('start.cw.survivalS', null, 'Sammeln, bauen, überleben', 'Gather, craft, survive')], ['creative', t('g.mode.creative'), tx('start.cw.creativeS', null, 'Alle Blöcke, Fliegen', 'Every block, flying')], ['zen', t('g.mode.zen'), tx('start.cw.zenS', null, 'In Ruhe: keine Monster, kein Schaden', 'At ease: no monsters, no damage')]], 'zen')}</div>
+      <div class="field pro"><label>${esc(L.diff)}</label>${seg('cw_diff', L.diff, [['peaceful', tx('start.cw.peaceful', null, 'Friedlich', 'Peaceful')], ['easy', tx('start.cw.easy', null, 'Leicht', 'Easy')], ['normal', tx('start.cw.normal', null, 'Normal', 'Normal')], ['hard', tx('start.cw.hard', null, 'Schwer', 'Hard')]], (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'))}</div>
+      <div class="field pro"><label>${esc(L.type)}</label>${seg('cw_type', L.type, [['default', tx('start.cw.default', null, 'Realm', 'Realm')], ['large', tx('start.cw.large', null, 'Große Biome', 'Large biomes')], ['amplified', tx('start.cw.amplified', null, 'Verstärkt', 'Amplified')], ['flat', tx('start.cw.flat', null, 'Flach', 'Flat')]], 'default')}</div>
+      <div class="field pro"><label for="cw_seed">${esc(L.seed)}</label><input type="text" id="cw_seed" placeholder="${esc(tx('start.cw.seedP', null, 'Leer lassen für Zufall', 'Leave empty for a random one'))}"></div>
+      <div class="row gap pro" style="flex-wrap:wrap">
         <label class="row gap note"><input type="checkbox" id="cw_cheats" checked> ${esc(tx('start.cw.cheats', null, 'Befehle', 'Commands'))}</label>
         <label class="row gap note"><input type="checkbox" id="cw_keep"> ${esc(tx('start.cw.keep', null, 'Inventar behalten', 'Keep inventory'))}</label>
         <label class="row gap note"><input type="checkbox" id="cw_kit" checked> ${esc(tx('start.cw.kit', null, 'Starter-Kit', 'Starter kit'))}</label>
@@ -274,7 +277,7 @@
       case 'tile': { const k = b && b.dataset.tile; if (k === 'play') ST.play(); else if (k === 'bauen') ST.bauen(); else if (k === 'erschaffen') ST.erschaffen(); else if (k === 'meins') ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true; }
       case 'worlds': ST.worlds(ui); return true;
       case 'kids': ST.kids(); return true;
-      case 'newworld': if (prefs().pro) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = tx('start.newWorldName', null, 'Neue Welt', 'New World'); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;
+      case 'newworld': if (prefs().pro || VR.Adventure) { ui.show('create'); const n = $('#cw_name'); if (n) { n.value = prefs().pro ? tx('start.newWorldName', null, 'Neue Welt', 'New World') : myWorldName(ST.worldsCache || []); try { n.focus({ preventScroll: true }); n.select(); } catch (e) { /* */ } } const s = $('#cw_seed'); if (s) s.value = ''; } else ST.newWorld(); return true;   // (f-names: Einfach asks the one question too; its world is „Meine Welt N" as ▶ makes it)
       case 'bauenlive': { const g = game(); if (!g || !g.openStudio('karte')) ui.hint(t('g.pause.studioGuest'), 2400); return true; }
       case 'meins': ST.meins(ui.screen === 'pause' ? 'pause' : 'title'); return true;
       case 'zeitraffer': if (VR.Zeit) VR.Zeit.open(ui.screen === 'pause' ? 'pause' : null); return true;

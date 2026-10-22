@@ -214,7 +214,7 @@
       gait: 'quad',
     };
   };
-  // Sky Ray: huge gliding manta with glowing patterns
+  // Cloud Ray (Wolkenrochen; id sky_ray): a huge gliding ray with glowing patterns
   M.sky_ray = () => {
     const top = 0x2a4ab0, under = 0xd8e8ff, glow = 0x5af0ff;
     return {

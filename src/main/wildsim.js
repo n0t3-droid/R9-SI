@@ -12,7 +12,7 @@
 //     ones rise, and they settle again
 //   · Wild.sched — the hours of every piece, a pure function of (seed, day, ticks): the same for host and guests;
 //     Wild.stageOf — where the murmuration plays; Wild.murmTarget / shoalTarget — the seeded wandering targets
-//   · Wild.rayLoop / rayAt / rayState — the sky rays' circuit between the Sky Isles (clear of their rock) and where each
+//   · Wild.rayLoop / rayAt / rayState — the cloud rays' circuit between the Sky Isles (clear of their rock) and where each
 //     ray is at a world clock (the same for every guest)
 // ============================================================================
 (function (VR) {
@@ -33,7 +33,7 @@
     bfly: [0, 18, 36, 48, 60],       // butterflies in a swarm
     swarms: [0, 1, 1, 2, 2],         // swarms near the eye
     dfly: [0, 3, 5, 6, 8],           // dragonflies over a pond
-    ray: [0, 0, 3, 4, 4],            // the sky rays between the isles
+    ray: [0, 0, 3, 4, 4],            // the cloud rays between the isles
     motes: [0, 0, 6, 10, 14],        // light motes a second from each ray
     rabbit: [0, 3, 5, 6, 8],         // rabbits at the field edges
     fox: [0, 0, 1, 1, 1],            // the fox at dusk
@@ -388,7 +388,7 @@
     return { x: cx * 256 + 128 + (W.h(seed ^ cx, d, cz) - 0.5) * 120, y: null, z: cz * 256 + 128 + (W.h(seed ^ cz, d + 7, cx) - 0.5) * 120, lake: false };
   };
 
-  // ---------------------------------------------------------------- the sky rays' circuit
+  // ---------------------------------------------------------------- the cloud rays' circuit
   // RAY: the mesh's span is 1 (wingtip to wingtip); a great ray 15–22 of it, its young one beside it 0.6 of that; speed
   // blocks/s; the wing wave's period (s); the circuit's height (alt ± altA: under the isles' lowest rock, between them)
   W.RAY = { span: 1, minScale: 15, maxScale: 22, young: 0.6, speed: 5.4, period: 4.6, alt: 107, altA: 5, side: 4.5, up: 3, pairBack: 7, pairSide: 15 };
