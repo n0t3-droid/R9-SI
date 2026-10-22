@@ -563,7 +563,7 @@ vec3 s3Meteor(vec3 dir) {
   vec3 head = u_s3Met.xyz, tail = u_s3MetT.xyz, ab = head - tail;
   float t = clamp(dot(dir - tail, ab) / max(dot(ab, ab), 1e-8), 0.0, 1.0);
   vec3 dd = dir - (tail + ab * t), dh = dir - head;
-  float w2 = 1.2e-6;
+  float w2 = 5e-6;   // (the streak's core about 0.13° wide: a pixel or two)
   float core = exp(-dot(dd, dd) / w2) * t * t, glow = exp(-dot(dh, dh) / (w2 * 6.0));
   vec3 c = mix(vec3(1.0, 0.95, 0.84), vec3(0.62, 1.0, 0.78), u_s3MetT.w);
   return c * (core * 2.6 + glow * 5.0) * u_s3Met.w;
@@ -619,7 +619,7 @@ vec3 s3Aurora(vec3 dir) {
     vec3 c = mix(vec3(0.16, 1.0, 0.5), vec3(0.62, 0.24, 0.95), smoothstep(0.03, 0.22, hh));
     acc += c * (body * rays * (1.0 - fi * 0.35));
   }
-  return acc * (u_s3Aur.x * side * 0.9);
+  return acc * (u_s3Aur.x * side * 0.75);
 }
 vec3 s3Banks(vec3 col, vec3 dir) {
   float e = dir.y;
@@ -630,14 +630,18 @@ vec3 s3Banks(vec3 col, vec3 dir) {
   float up = smoothstep(-0.1, 0.05, u_sunDir.y);
   for (int i = 0; i < 2; i++) {
     float fi = float(i);
-    float x = a * (8.0 + fi * 5.0) + u_s3Bank.y * (0.6 + fi * 0.6) + fi * 37.0;
-    float n = s3n1(x) * 0.65 + s3n1(x * 2.3 + 5.1) * 0.35;
-    float c = smoothstep(1.0 - u_s3Bank.x, 1.0 - u_s3Bank.x + 0.22, n);
-    if (c < 0.02) continue;
-    float lobes = s3n1(x * 4.7 + 11.0) * 0.6 + s3n1(x * 11.0 - 3.0) * 0.4;
-    float base = 0.006 + fi * 0.014, hgt = (0.03 + fi * 0.045) * c * (0.55 + 0.45 * lobes);
+    // the azimuth in cells (the far layer's wider), one heaped cloud in a cell that holds one: a flat base, a rounded top
+    // with the cauliflower's lobes on it
+    float x = a * (7.0 + fi * 5.0) + u_s3Bank.y * (0.6 + fi * 0.6) + fi * 37.0;
+    float cell = floor(x), f = fract(x);
+    if (s3h1(cell * 1.7 + fi * 13.0) < 1.0 - u_s3Bank.x) continue;
+    float wv = 0.7 + 0.3 * s3h1(cell + 5.3), uu = (f - 0.5) / (0.5 * wv);
+    if (abs(uu) >= 1.0) continue;
+    float dome = sqrt(1.0 - uu * uu);
+    float lobes = s3n1(x * 6.0 + 11.0) * 0.6 + s3n1(x * 14.0 - 3.0) * 0.4;
+    float base = 0.006 + fi * 0.014, hgt = (0.026 + fi * 0.04) * (0.6 + 0.4 * s3h1(cell + 9.1)) * dome * (0.72 + 0.28 * lobes);
     float top = base + hgt, soft = 0.0025 + 0.004 * fi;
-    float inside = smoothstep(top + soft * 0.5, top - soft, e) * smoothstep(base - 0.004, base + 0.002, e);
+    float inside = smoothstep(top + soft * 0.5, top - soft, e) * smoothstep(base - 0.004, base + 0.002, e) * smoothstep(1.0, 0.85, abs(uu));
     if (inside <= 0.0) continue;
     float v = clamp((e - base) / max(hgt, 1e-4), 0.0, 1.0);
     // the tops lit, the flat bases in shade; toward the sun a darker body with a bright rim (the light behind it)
