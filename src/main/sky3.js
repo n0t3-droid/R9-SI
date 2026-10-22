@@ -582,9 +582,9 @@ vec3 s3Sparkle(vec3 dir) {
   float x = dot(v, t1), y = dot(v, t2);
   float tw = 0.6 + 0.4 * sin(u_time * (1.7 + 2.6 * fract(s * 97.0)) + s * 911.0);
   float core = exp(-(x * x + y * y) * 260.0);
-  float cr = exp(-abs(x) * 9.0 - y * y * 900.0) + exp(-abs(y) * 9.0 - x * x * 900.0);
+  float cr = exp(-abs(x) * 6.0 - y * y * 900.0) + exp(-abs(y) * 6.0 - x * x * 900.0);   // (the arms ~7 px at 720p, half a pixel thin)
   vec3 sc = mix(vec3(0.82, 0.9, 1.0), vec3(1.0, 0.88, 0.74), hash13(g + 9.9));
-  return sc * (core * 6.0 + cr * 0.9) * tw * u_s3Night.z;
+  return sc * (core * 6.0 + cr * 1.2) * tw * u_s3Night.z;
 }
 vec4 s3Pale(vec4 b, vec3 air) {
   float p = u_s3Night.w;
