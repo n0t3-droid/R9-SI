@@ -118,7 +118,9 @@ const picture = async (P, key, path, k, overlay) => {
     if (!F) return { err: 'no frame kept' };
     window.__norender = false;
     r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false;
-    try { for (let i = 0; i < k; i++) r.render(F); } catch (e) { window.__norender = true; return { err: String(e && e.stack || e).slice(0, 600) }; }
+    // (the furnished cockpit is drawn once a game frame — cockpit.js drawKit's drawnAt — and a kept frame drawn again is
+    // the same game frame: each draw here forgets it, or the last one shows the seat without its room, as run 2's did)
+    try { for (let i = 0; i < k; i++) { if (g.cockpit) g.cockpit.drawnAt = -1; r.render(F); } } catch (e) { window.__norender = true; return { err: String(e && e.stack || e).slice(0, 600) }; }
     const W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
     let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
@@ -137,6 +139,17 @@ const picture = async (P, key, path, k, overlay) => {
   delete m.png; delete m.ov;
   return m;
 };
+// the flown ship in a kept frame: the frame drawn as it is and once without the ship, the pixels that differ (runs 1–2 flew
+// a hidden ship: nothing would have differed)
+const shipSeen = (P, key) => P.ev((key) => {
+  const g = VR.game, r = g.renderer, gl = r.gl, F = window[key], s = g.starships && g.starships.pilot;
+  if (!F || !s) return { changed: 0, hidden: null };
+  const was = !!s.hidden, W = gl.drawingBufferWidth, H = gl.drawingBufferHeight;
+  const shot = (hide) => { s.hidden = hide; window.__norender = false; r.frameNo = 1000; r.tsrReset = true; if (g.cockpit) g.cockpit.drawnAt = -1; r.render(F); window.__norender = true; const px = new Uint8Array(W * H * 4); gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px); return px; };
+  const a = shot(was), b = shot(true); s.hidden = was;
+  let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 30) n++;
+  return { changed: n, hidden: was };
+}, key);
 const cost = async (P, key, k, n) => {
   await P.ev(([key, k]) => { const r = VR.game.renderer, F = window[key]; window.__norender = false; r.frameNo = 1000; r.tsrReset = true; r.shadowValid = false; for (let i = 0; i < k; i++) r.render(F); window.__sync(); window.__norender = true; }, [key, k]);
   const c0 = cpuNow();
@@ -147,7 +160,9 @@ const cost = async (P, key, k, n) => {
 const st = (P) => P.ev(() => VR.SpaceFlight.debug.state(VR.game));
 const spaceReady = (P) => P.ev(() => { const need = VR.SpaceScene.cur_need || []; return { done: need.filter(s => s.done).length, need: need.length }; });
 // step until the space scene's textures are in (the patch round the nadir included), max ms
-const waitTex = async (P, maxMs) => { const t0 = Date.now(); let s = null; for (;;) { await P.step(6); s = await spaceReady(P); if ((s.need && s.done === s.need) || Date.now() - t0 > maxMs) return s; await P.wait(60); } };
+// (dtms: the game time a frame — in orbit 1 ms, so the ship waits where it was put: run 2's night picture was taken 97 km
+// on, in that place's morning, the nadir's patch never caught up with a ship moving 4 km every five seconds)
+const waitTex = async (P, maxMs, dtms = 33) => { const t0 = Date.now(); let s = null; for (;;) { await P.step(6, dtms); s = await spaceReady(P); if ((s.need && s.done === s.need) || Date.now() - t0 > maxMs) return s; await P.wait(60); } };
 const view = (P, v, hp, hy) => P.ev(([v, hp, hy]) => { const fl = VR.game.flight; fl.view = v; VR.game.camMode = v === 0 ? 0 : 1; fl.headPitch = hp; fl.headYaw = hy || 0; fl.backT = 0; fl.recenter = false; fl.mouseIdle = 0; fl.chaseYaw = null; fl.shot = null; fl.shakeAmp = 0; fl.bump = 0; }, [v, hp, hy]);
 
 // the plaza view: the Gate Temple from the plaza path at noon (space0.mjs), the animation clock pinned so the two builds
@@ -214,9 +229,12 @@ async function runPreset(preset, base) {
     const ap = await P.ev(() => VR.SpaceFlight.apron());
     const ay = await P.groundY(ap.x, ap.z);
     await P.ev(([x, y, z]) => { const g = VR.game, p = g.player; p.flying = false; p.noclip = false; p.teleport(x + 0.5, y + 1, z + 12.5); p.yaw = 0; g.starships.placeInFront(4242, 'shuttle', null, p); }, [ap.x, ay, ap.z]);
-    for (let i = 0; i < 60; i++) { await P.step(4); if (await P.ev(() => { const s = VR.game.starships.ships; return s.length && s[s.length - 1].d.meta; })) break; await P.wait(100); }
-    const boarded = await P.ev(() => { const g = VR.game, s = g.starships.ships[g.starships.ships.length - 1]; if (!s || !s.d.meta) return null; g.starships.board(s, g.player); const fl = s.flight; fl.power = 'running'; fl.startT = 3; return { name: s.d.meta.name, pos: s.pos.slice() }; });
-    check(!!boarded, `a shuttle on the apron, boarded (${boarded && boarded.name})`);
+    // (the one placed here, seed 4242 — it joins the list once its worker built it. Runs 1–2 took the list's last ship
+    // before that: the Gate Temple's own shuttle, which the hangar's show had hidden on its pad — flown hidden all the way)
+    const mine = () => P.ev(() => { const s = VR.game.starships.ships.find(q => q.d.seed === 4242 && !q.hangar); return !!(s && s.d.meta && s.d.cells); });
+    for (let i = 0; i < 90; i++) { await P.step(4); if (await mine()) break; await P.wait(100); }
+    const boarded = await P.ev(() => { const g = VR.game, s = g.starships.ships.find(q => q.d.seed === 4242 && !q.hangar); if (!s || !s.d.meta || !s.d.cells) return null; g.starships.board(s, g.player); const fl = s.flight; fl.power = 'running'; fl.startT = 3; return { name: s.d.meta.name, pos: s.pos.slice(), hidden: !!s.hidden, pilot: g.starships.pilot === s }; });
+    check(!!boarded && boarded.pilot && !boarded.hidden, `the shuttle placed on the apron, boarded and in sight (${boarded && boarded.name}${boarded && boarded.hidden ? ', hidden' : ''})`);
     if (!boarded) return;
     await P.step(30);
     // the hour: Amarant up ahead (10–30° over the horizon) in daylight — the ship's nose toward it
@@ -253,6 +271,7 @@ async function runPreset(preset, base) {
             const m = await picture(P, '__Fc', path, K);
             const sp = m.err ? { sd: 0, mean: 0 } : await spread(path);
             row[nm] = { draws: m.draws, err: m.err, pic: sp };
+            if (nm === 'chase' && y === 1500 && !m.err) { const sv = row.seen = await shipSeen(P, '__Fc'); check(sv.changed > 3000 && !sv.hidden, `1,500 m: the ship in the chase picture (${sv.changed} pixels its own${sv.hidden ? ', hidden' : ''})`); }
             if (m.err) check(false, `${y} m ${nm}: ${m.err}`);
           }
           const s1 = await st(P);
@@ -282,11 +301,15 @@ async function runPreset(preset, base) {
         // through the edge: rendered every frame, each synced
         await P.ev(() => { const g = VR.game, fl = g.flight, b = fl.b; VR.Ascent.enterClimb(fl, [b.pos[0], 2486, b.pos[2]], [0, 22, 0]); fl.throttle = 0.05; });
         const trace = await P.ev(() => { const g = VR.game, out = []; window.__norender = false; for (let i = 0; i < 32; i++) { const t0 = performance.now(); g.last = t0 - 33; g.loop(t0); window.__sync(); const s = VR.SpaceFlight.debug.state(g); out.push([+(performance.now() - t0).toFixed(1), s.regime, s.y]); } window.__norender = true; return out; });
+        // (the space frame draws no voxel world: it is the cheaper one, so the whole trace's median sits between the two
+        // regimes — run 2 on High: the climb's frames 6–16 s, space's 2–6 s. A hitch is a frame over twice the climb's own
+        // median, wherever it falls; the whole trace's median is logged beside it)
         const ms = trace.map(x => x[0]).slice(3), m = med(ms), mx = Math.max(...ms), hand = trace.findIndex(x => x[1] === 'space');
-        Rr.handoff = { median: r1(m), max: r1(mx), at: hand, trace };
-        console.log(`  hand-off: frame ${hand} (${hand >= 0 ? trace[hand][2] : '-'} m), median ${r1(m)} ms, max ${r1(mx)} ms; around it ${trace.slice(Math.max(0, hand - 2), hand + 3).map(x => x[0]).join(' · ')}`);
+        const mc = med(trace.slice(3).filter(x => x[1] === 'climb').map(x => x[0])), atMax = trace.findIndex((x, i) => i >= 3 && x[0] === mx);
+        Rr.handoff = { median: r1(m), climbMedian: r1(mc), max: r1(mx), atMax, at: hand, trace };
+        console.log(`  hand-off: frame ${hand} (${hand >= 0 ? trace[hand][2] : '-'} m), the climb's median ${r1(mc)} ms, the whole trace's ${r1(m)} ms, max ${r1(mx)} ms (frame ${atMax}, ${trace[atMax] ? trace[atMax][1] : '-'}); around it ${trace.slice(Math.max(0, hand - 2), hand + 3).map(x => x[0]).join(' · ')}`);
         check(hand > 0, 'the space frame takes over at 2,500 m');
-        check(mx <= 2 * m, `no frame through the hand-off over twice the median (${r1(mx)} ≤ 2 × ${r1(m)} ms)`);
+        check(mx <= 2 * mc, `no frame through the hand-off over twice the climb's median (${r1(mx)} ≤ 2 × ${r1(mc)} ms)`);
         await P.step(20);
         const s2 = await st(P);
         await P.ev(() => { window.__Fh2 = window.__F; });
@@ -301,11 +324,12 @@ async function runPreset(preset, base) {
         try {
           await P.ev((tk) => { const g = VR.game; g.env.day = 2; g.env.setTime(tk); VR.SpaceFlight.debug.orbit(g, 0, 40, 3063); }, tk);
           await view(P, 1, 0.45);
-          await waitTex(P, 60000); await P.step(10);
+          await waitTex(P, 60000, 1); await P.step(10);
           const s3 = await st(P);
           await P.ev(() => { window.__Fo = window.__F; });
           const path = SHOTS + `ascent_orbit_${nm}_${tag}.png`, m = await picture(P, '__Fo', path, K), sp = m.err ? { sd: 0 } : await spread(path);
           (Rr.orbit = Rr.orbit || {})[nm] = { state: s3, draws: m.draws, pic: sp, err: m.err };
+          if (nm === 'day' && !m.err) { const sv = Rr.orbit.seen = await shipSeen(P, '__Fo'); check(sv.changed > 3000 && !sv.hidden, `orbit: the ship in the chase picture (${sv.changed} pixels its own${sv.hidden ? ', hidden' : ''})`); }
           console.log(`  orbit ${nm}: ${s3.regime}, Ap ${r1(s3.ap)} Pe ${r1(s3.pe)}, ${r1(s3.period / 60)} min, ${m.err || m.draws + ' draws'}, L ${sp.mean} ± ${sp.sd} (${secs()})`);
           check(s3.regime === 'space' && Math.abs(s3.period / 60 - 11.0) < 0.3 && !m.err && sp.sd > 3, `orbit (${nm}): ${r1(s3.period / 60)} min round, the picture not blank`);
           if (hi && nm === 'day') { await view(P, 0, -0.1); await P.step(3); await P.ev(() => { window.__Fo = window.__F; }); await picture(P, '__Fo', SHOTS + `ascent_orbit_cockpit_${tag}.png`, K); }
@@ -339,9 +363,12 @@ async function runPreset(preset, base) {
         await view(P, 1, 0.08);
         let glowMax = 0, pic = false, landed = null, s5 = null;
         const t1 = Date.now();
-        for (let i = 0; i < 400; i++) {
+        for (let i = 0; i < 3000; i++) {
           await P.step(10);
           s5 = await st(P);
+          // (down in the air the last metres wait for the ground's columns: the workers get wall time to make them —
+          // run 2 ran out of steps 55 m over a field 89 km out while three browsers shared the machine)
+          if (s5.regime === 'air') await P.wait(150);
           glowMax = Math.max(glowMax, s5.glow || 0);
           if (!pic && s5.glow > 0.75) {
             await P.ev(() => { window.__Fe = window.__F; });
@@ -383,15 +410,20 @@ async function runPreset(preset, base) {
 for (const p of PRESETS) await runPreset(p, BASE ? await basePlaza(p) : null);
 await browser.close();
 
-// ---------------------------------------------------------------- the sheet: the climb (High chase · High cockpit · Very Low), then the rest
+// ---------------------------------------------------------------- the sheet: the climb (High chase · High cockpit · Very Low),
+// then the hand-off, the orbit, the way down, the Reisesprung and the ground before/after — every picture labelled, only
+// this run's pictures (an older one stays out: 'kein Bild')
 try {
-  const f = (n) => (fs.existsSync(SHOTS + n) ? SHOTS + n : null);
-  const rows = ALTS.map(y => { const a = String(y).padStart(4, '0'); return { label: y + ' m', imgs: [f(`ascent_${a}_high.png`), f(`ascent_${a}_cockpit_high.png`), f(`ascent_${a}_vl.png`)] }; });
-  rows.push({ label: 'hand-off', imgs: [f('ascent_handoff_climb_high.png'), f('ascent_handoff_space_high.png'), f('ascent_handoff_space_vl.png')] });
-  rows.push({ label: 'orbit', imgs: [f('ascent_orbit_day_high.png'), f('ascent_orbit_night_high.png'), f('ascent_orbit_day_vl.png')] });
-  rows.push({ label: 'way down', imgs: [f('ascent_reentry_high.png'), f('ascent_land_high.png'), f('ascent_orbit_cockpit_high.png')] });
-  rows.push({ label: 'Reisesprung', imgs: [f('ascent_jump_mid_high.png'), f('ascent_jump_opal_high.png'), f('ascent_plaza_vl.png')] });
-  rows.push({ label: 'ground v0.49 / now', imgs: [f('ascent_plaza_base_high.png'), f('ascent_plaza_high.png'), f('ascent_plaza_base_vl.png')] });
+  const f = (n) => { const p = SHOTS + n; try { return fs.statSync(p).mtimeMs >= T0 ? p : null; } catch (e) { return null; } };
+  const row = (label, cells) => { const cs = cells.filter(Boolean); return { label, imgs: cs.map(c => f(c[0])), labels: cs.map(c => c[1]) }; };
+  const rows = ALTS.map(y => { const a = String(y).padStart(4, '0'); return row(y + ' m', [[`ascent_${a}_high.png`, `High · chase · ${y} m`], [`ascent_${a}_cockpit_high.png`, `High · cockpit · ${y} m`], [`ascent_${a}_vl.png`, `Very Low · chase · ${y} m`]]); });
+  rows.push(row('hand-off', [['ascent_handoff_climb_high.png', 'High · 2,490 m, the climb'], ['ascent_handoff_space_high.png', 'High · 2,520 m, the space frame'], ['ascent_handoff_space_vl.png', 'Very Low · the space frame']]));
+  rows.push(row('orbit', [['ascent_orbit_day_high.png', 'High · orbit 3 km, day'], ['ascent_orbit_night_high.png', 'High · orbit 3 km, night'], ['ascent_orbit_day_vl.png', 'Very Low · orbit, day']]));
+  rows.push(row('orbit 2', [['ascent_orbit_cockpit_high.png', 'High · orbit, cockpit'], ['ascent_orbit_night_vl.png', 'Very Low · orbit, night'], ['ascent_handoff_climb_vl.png', 'Very Low · 2,490 m, the climb']]));
+  rows.push(row('way down', [['ascent_reentry_high.png', 'High · re-entry, the plasma'], ['ascent_land_high.png', 'High · landed far east, its own hour'], null]));
+  rows.push(row('Reisesprung', [['ascent_jump_mid_high.png', 'High · Reisesprung, half way'], ['ascent_jump_opal_high.png', 'High · Reisesprung, at Opal'], null]));
+  rows.push(row('ground', [['ascent_plaza_base_high.png', 'High · the ground, v0.49'], ['ascent_plaza_high.png', 'High · the ground, now'], null]));
+  rows.push(row('ground VL', [['ascent_plaza_base_vl.png', 'Very Low · the ground, v0.49'], ['ascent_plaza_vl.png', 'Very Low · the ground, now'], null]));
   const spec = ROOT + '.tmp_tests/ascent_sheet.json';
   fs.writeFileSync(spec, JSON.stringify({ cols: ['High · chase', 'High · cockpit', 'Very Low'], w: 560, rows }));
   execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'ascent_sheet.jpg', spec], { stdio: 'inherit' });
