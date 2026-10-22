@@ -43,7 +43,10 @@
   // light in the air round the lamp, not a ball
   // (v0.48, the merged build's night pictures: with t-light2's night level the halo came out a hard white ball — the lamp's
   // colour times the flicker, times the particles' emissive ×4; now no emissive boost and a gentler disc: it never saturates)
-  M.HALO = { size: 1.0, alpha: 0.36, emis: 0, gain: 0.9 };
+  // (t-polish2, gap 2: the vista balconies' four small lanterns each wore a 2-block disc — as big as their post is tall —
+  // and drew the eye from the landmark: a small lantern, a candle, a torch, a sconce, a bollard's head keeps `small` of
+  // the size (particles.js Particles.HALO_SMALL); the lamp posts' heads the full size)
+  M.HALO = { size: 1.0, alpha: 0.36, emis: 0, gain: 0.9, small: 0.6 };
   M.hash3 = function (x, y, z) { let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1) ^ Math.imul(z | 0, 0x9e3779b1); h ^= h >>> 15; h = Math.imul(h, 0x2c1b3c6d); h ^= h >>> 12; return (h >>> 0) / 4294967296; };
 
   // ---- the rainbow (Wetter-Drama; the sky shader's WXDRAMA block, the same numbers): th degrees from the antisolar point.
@@ -126,6 +129,24 @@
   ];
   // the life of each kind (s): the caps hold the spawn rate to cap / life a second
   const LIFE = { steam: 2.6, tmote: 6, sparkle: 0.12, leaf: 6, splash: 0.35, veil: 4 };
+  // t-polish2 · gap 7 (docs/superpowers/plans/2026-10-16-t-polish2.md): the café's steam reads by day — denser wisps in a
+  // light grey that shows on the bright stone (the white 0.96 vanished on the travertine) — and at night as v0.48's merge
+  // set it (half as bright, lit by the lamps, not emissive). steamLook sets EVERY field of the shared spawn object: the
+  // merge's comment had swallowed fade, alpha, grow, wind and turb, so the steam took whatever the kind spawned before it
+  // left there (the constructor's or the motes' alpha 1, no growth: small opaque white balls). Wisps, not clouds: the
+  // first browser run's growth 0.3 a second (t-motion's 0.22 never reached a picture) swelled each wisp to a 1.8-block
+  // puff over its 2.6 s that hid the café's table — now a wisp ends under half a block wide
+  const STEAM = M.STEAM = {
+    day: { size: 0.06, sizeR: 0.03, col: [0.78, 0.79, 0.82], emis: 0.05, alpha: 0.5, grow: 0.05 },
+    night: { size: 0.055, sizeR: 0.03, col: [0.48, 0.48, 0.49], emis: 0, alpha: 0.38, grow: 0.05 },
+    grav: -0.06, drag: 0.9, wind: 0.5, turb: 0.35,
+  };
+  M.steamLook = function (sunUp, O, r) {
+    const L = sunUp ? STEAM.day : STEAM.night;
+    O.life = LIFE.steam * (0.8 + r * 0.4); O.size = L.size + r * L.sizeR; O.grav = STEAM.grav; O.drag = STEAM.drag;
+    O.col = L.col; O.emis = L.emis; O.fade = true; O.alpha = L.alpha; O.grow = L.grow; O.wind = STEAM.wind; O.turb = STEAM.turb;
+    return O;
+  };
   const VEIL_COOL = [0.65, 0.95, 1.3], VEIL_WARM = [1.3, 0.85, 0.45];   // the veil's motes: its blue-white energy, a few warm off the rim
   const VEIL_SCAN = M.VEIL_SCAN = { r: 30, rLow: 18, ry: 8 };   // how far round the eye the veils are looked for (blocks: across — Balanced and up, Low —, up and down)
   M.AIR_KINDS = KINDS; M.AIR_CAPS = CAPS; M.AIR_LIFE = LIFE;
@@ -199,7 +220,7 @@
           const tb = this.tables[(Math.random() * this.tables.length) | 0];
           this.acc.steam -= 1; this.drawn.steam++;
           // (wisps that read from across the street: the third run's 0.035-block ones were a pixel at ten blocks)
-          O.life = LIFE.steam * (0.8 + Math.random() * 0.4); O.size = 0.055 + Math.random() * 0.03; O.grav = -0.06; O.drag = 0.9; O.col = [0.96 * (sunUp ? 1 : 0.5), 0.96 * (sunUp ? 1 : 0.5), 0.98 * (sunUp ? 1 : 0.5)]; O.emis = sunUp ? 0.15 : 0;   // (at night the steam is lit by the lamps, not white: v0.48's merged pictures) O.fade = true; O.alpha = 0.38; O.grow = 0.22; O.wind = 0.5; O.turb = 0.35;
+          M.steamLook(sunUp, O, Math.random());   // (t-polish2: the whole look, by day and by night — M.STEAM)
           this.spawn(P, tb[0] + 0.35 + Math.random() * 0.3, tb[1] + 0.95, tb[2] + 0.35 + Math.random() * 0.3, (Math.random() - 0.5) * 0.04, 0.18 + Math.random() * 0.1, (Math.random() - 0.5) * 0.04);
         }
       }

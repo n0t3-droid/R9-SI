@@ -32,6 +32,30 @@
   // the puddle mask's threshold for a fill (the shader: a hollow is under water where the noise is below it)
   W.edge = (pud) => 0.31 + 0.13 * pud;
 
+  // ---- rain under roofs (t-polish2, t-material's gap): the wet look asked the sky light, and glass passes it — a street
+  // under a glass vault (Weißstadt's) got wet and grew puddles though no rain reaches it. A column is open to the rain
+  // above its top rain-stopping block: anything solid (glass is solid), a fluid, leaves — the column heights world.js keeps
+  // (topAt) and the rain's particles stop at. The terrain reads the rain's height map round the camera (game.js keeps it
+  // while it rains and while the ground is wet; TERRAIN_FS rainOpen: the same rule)
+  W.blocksRain = (s) => !!s && (VR.R.T.flags[s] & (VR.F.SOLID | VR.F.FLUID | VR.F.LEAVES)) !== 0;
+  // the column's top rain-stopping block between yLo and yHi (yLo − 1: none)
+  W.rainTop = function (getBlock, x, z, yHi, yLo) { for (let y = yHi; y >= yLo; y--) if (W.blocksRain(getBlock(x, y, z))) return y; return yLo - 1; };
+  // the face of the block at (x, y, z) that faces (nx, ny, nz) gets the rain where the air cell in front of it lies above
+  // its column's top (top(x, z))
+  W.faceOpen = (top, x, y, z, nx, ny, nz) => y + ny > top(x + nx, z + nz);
+  // the map: 128 × 128 columns from (hx, hz), each its top clamped to the R8 range (the old fill wrapped above y 255) —
+  // read a chunk column at a time (81 lookups instead of 16 384)
+  W.MAP = 128;
+  W.fillMap = function (w, hx, hz, out) {
+    const N = W.MAP;
+    for (let cz = hz >> 4; cz <= (hz + N - 1) >> 4; cz++) for (let cx = hx >> 4; cx <= (hx + N - 1) >> 4; cx++) {
+      const c = w.col ? w.col(cx, cz) : null, H = c && c.height;
+      const x0 = Math.max(hx, cx << 4), x1 = Math.min(hx + N - 1, (cx << 4) + 15), z0 = Math.max(hz, cz << 4), z1 = Math.min(hz + N - 1, (cz << 4) + 15);
+      for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { const y = H ? H[((z & 15) << 4) | (x & 15)] : 0; out[(z - hz) * N + (x - hx)] = y > 255 ? 255 : y < 0 ? 0 : y; }
+    }
+    return out;
+  };
+
   // ---- the drops from the eaves (main thread). g: the game; dt: seconds
   W.drips = function (g, dt) {
     const E = g.env && g.env.E, P = g.particles, w = g.world, p = g.player;

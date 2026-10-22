@@ -29,6 +29,10 @@
   const SHEEN = W.SHEEN = 0.16;       // how much a full gust brightens grass and leaves
   const HANG = W.HANG = { amp: 0.06, w: 2.6, w2: 4.3, kx: 0.09, kz: 0.06, flutter: 0.003, fw: 9.0 };
   const FROND = W.FROND = { amp: 0.16, flap: 0.45, droop: 0.35 };
+  // t-polish2 (gap 7 of docs/superpowers/plans/2026-10-16-t-polish2.md): cloth is not a lantern — an awning's cloth swings
+  // `gain` times the hung swing, and a ripple runs along its valance: rip blocks high at the valance (the square of the
+  // distance from the wall), w rad a second over k rad a block (w / k blocks a second), out of the wall by `out` of it
+  const CLOTH = W.CLOTH = { gain: 2.4, rip: 0.05, w: 5.5, k: 2.2, out: 0.6 };
   // the ground's bands: k the swing per unit of gust; mid the field's mean of g² (0.5 + 0.36·sin + 0.24·sin, squared), so
   // the bands are centred on it at every gust; wind the strongest wind they follow; warm the paler, yellower crest
   const GROUND = W.GROUND = { k: 0.5, mid: 0.344, wind: 1.25, warm: [1.06, 1.04, 0.86], warmK: 1.5, warmMax: 0.4 };
@@ -53,6 +57,17 @@
     const sw = Math.sin(HANG.w * t + ph) * (0.75 + 0.5 * G) + 0.3 * Math.sin(HANG.w2 * t + 2 * ph + 1);
     const fl = h * HANG.flutter * Math.max(0, wind) * Math.sin(HANG.fw * t + x * 3.1 + y * 4 + z * 2.3);
     return { along: A * (0.35 + 0.9 * G + sw) + fl, across: A * 0.35 * Math.sin(2.1 * t + ph * 1.3 + 1.7), up: fl * 0.6 };
+  };
+  // ---- t-polish2 · cloth: the ripple along an awning's valance at s blocks along its width (the piece's own x), the piece
+  // at (x, z) (its phase), level lv (0..3: the distance from the wall in thirds); and a cloth vertex's whole displacement —
+  // the hung swing × gain, the ripple up and out of the wall (blocks)
+  W.clothRip = function (s, x, z, t, wind, G, lv) {
+    const h = clamp(lv, 0, 3) / 3, ph = x * HANG.kx + z * HANG.kz;
+    return h * h * CLOTH.rip * Math.max(0, wind) * (0.6 + 0.8 * clamp(G, 0, 1)) * Math.sin(CLOTH.k * s - CLOTH.w * t + 3 * ph);
+  };
+  W.cloth = function (x, y, z, t, wind, G, lv, s) {
+    const hg = W.hang(x, y, z, t, wind, G, lv), r = W.clothRip(s, x, z, t, wind, G, lv);
+    return { along: CLOTH.gain * hg.along, across: CLOTH.gain * hg.across, up: CLOTH.gain * hg.up + r, out: CLOTH.out * r };
   };
   // ---- a palm frond vertex: sway weight w (props.js: 0.12 at the crown, 1 at a frond's tip), its frond slot, the palm's
   // phase ph and scale sc, the gust G there: its displacement along the wind, across it and up (palm units)
@@ -108,6 +123,11 @@ float windHangUp(float x, float y, float z, float t, float wind, float G, float 
   float h = clamp(lv, 0.0, 3.0) / 3.0;
   float fl = h * ${f(HANG.flutter)} * max(0.0, wind) * sin(${f(HANG.fw)} * t + x * 3.1 + y * 4.0 + z * 2.3);
   return fl * 0.6;
+}
+float windClothRip(float s, float x, float z, float t, float wind, float G, float lv) {
+  float h = clamp(lv, 0.0, 3.0) / 3.0;
+  float ph = x * ${f(HANG.kx)} + z * ${f(HANG.kz)};
+  return h * h * ${f(CLOTH.rip)} * max(0.0, wind) * (0.6 + 0.8 * clamp(G, 0.0, 1.0)) * sin(${f(CLOTH.k)} * s - ${f(CLOTH.w)} * t + 3.0 * ph);
 }
 float windFrondAmp(float w, float sc, float wind, float G) {
   return max(0.0, wind) * w * sc * ${f(FROND.amp)} * (0.75 + 0.6 * G);

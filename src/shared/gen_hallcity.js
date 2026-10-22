@@ -63,6 +63,11 @@
     RAD: 112, VGEN: 9,
   };
   VG.hallOn = (g) => !!(g && g.vgen >= H.VGEN);
+  // t-polish2 (vgen 12, new worlds): the nave's floor — the street, the plaza's paving outside its marble disc, the cross
+  // street — polished porcelain tile with polished andesite along the kerb lines and across the street every eight rows,
+  // so the mirror (t-material's screen-space reflections) finds a clear reflecting floor (t1_22); vgen ≤ 11 keep their pavers
+  H.FLOOR_VGEN = 12;
+  VG.hallFloorOn = (g) => !!(g && g.vgen >= H.FLOOR_VGEN);
   VG.hallFrame = (site) => (site.seed >>> 3) & 3;
   // the sky over a hall city stays clear: no floating island over it (vgen 9). The light engine's sky light falls straight
   // down a column (light_local.js), so an island anywhere over the hall shut its light off below — run 3's apse and the
@@ -245,15 +250,17 @@
     yield;
     // the floor's materials by code
     const MAT = { street: st('paver_grey'), street2: st('granite_paver'), front: st('travertine'), plaza: st('marble_white'), ring: st('travertine'), lane: st('paver_grey'), aisle: st('marble_white'), fore: st('travertine'), yard: st('travertine') };
+    const polished = VG.hallFloorOn(g), PO = st('porcelain_tile'), PA = st('polished_andesite');   // (t-polish2: vgen 12's nave floor)
     for (let v = H.V0 + 3; v <= 80; v++) {
       if ((v & 15) === 0) yield;
       for (let u = -H.HW; u <= H.HW; u++) {
         const c = getC(u, v); if (!c || c === C.WALL) continue;
         const [x, z] = W2(u, v), a = Math.abs(u);
         let s;
-        if (c === C.STREET) s = (M.hash2(x, z, 931) & 7) === 0 ? MAT.street2 : MAT.street;
+        if (c === C.STREET) s = polished ? (a === H.ST || ((v % 8) + 8) % 8 === 0 ? PA : PO) : (M.hash2(x, z, 931) & 7) === 0 ? MAT.street2 : MAT.street;
         else if (c === C.FRONT) s = MAT.front;
-        else if (c === C.PLAZA) { const d = Math.hypot(u, v); s = d <= H.PR ? ((d >= 5 && d < 6) || (d >= 10 && d < 11) ? MAT.ring : MAT.plaza) : (M.hash2(x, z, 932) & 7) === 0 ? MAT.street2 : MAT.street; }
+        else if (c === C.PLAZA) { const d = Math.hypot(u, v); s = d <= H.PR ? ((d >= 5 && d < 6) || (d >= 10 && d < 11) ? MAT.ring : MAT.plaza) : polished ? PO : (M.hash2(x, z, 932) & 7) === 0 ? MAT.street2 : MAT.street; }
+        else if (c === C.CROSS && polished) s = PO;
         else if (c === C.LANE || c === C.CROSS) s = (M.hash2(x, z, 933) & 7) === 0 ? MAT.street2 : MAT.lane;
         else if (c === C.YARD) s = MAT.yard;
         else if (c === C.FORE || c === C.GALLERY || c === C.STAIR) s = MAT.fore;

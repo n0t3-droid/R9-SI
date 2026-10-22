@@ -196,6 +196,34 @@
     // a step paler each (t1_05, t3_06)
     return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: 0.55, sunK, morning, moods: m };
   };
+  // t-polish2 · the room's air (gap 8, the Hangar Hall: t1_12, t1_13 — the hall's air holds the cyan of its strips): where
+  // the eye stands indoors (its sky light low) the air takes the colour of the lamps round it — the block light of a few
+  // cells round the eye, averaged and eased — thin: col → mix(col, room, 1 − e^(−min(d, max)·rho)). Outdoors nothing (the
+  // valley haze and the volumetric light are the open air's). One mix in l2Fog (AIR2), no pass.
+  // (the first polish2.mjs run: a mix toward the dim cyan — k 0.34, HDR ≈ 0.18 — only darkened the hangar's lit far end, by
+  // 2.6 L*, and the air read as nothing. The air glows: it lifts what is darker than its light and never dims what is
+  // brighter — max(col, mix(col, room, haze)) — the room's light at full strength (k 1: the hangar's cyan ≈ 0.3, 0.5),
+  // a third of the way at the hall's 40 blocks)
+  L2.ROOM = { rho: 0.008, max: 48, k: 1.0, sky: [0.25, 0.85], pts: [[0, 0, 0], [4, 0, 0], [-4, 0, 0], [0, 0, 4], [0, 0, -4], [0, 3, 0], [0, -1, 0]] };
+  L2.roomIndoor = (eyeSky) => 1 - sstep(L2.ROOM.sky[0], L2.ROOM.sky[1], eyeSky);
+  L2.roomHaze = (d, rho) => 1 - Math.exp(-Math.min(Math.max(d, 0), L2.ROOM.max) * rho);
+  // the JS mirror of l2Fog's room air: a colour at d blocks in the room's air of colour `room` and density rho
+  L2.roomAir = (col, room, d, rho) => { const h = L2.roomHaze(d, rho); return col.map((c, i) => Math.max(c, c + (room[i] - c) * h)); };
+  // the haze's colour (HDR) from the block light at the sample points: [r, g, b] 0..15 each
+  L2.roomColor = function (samples, out) {
+    out = out || [0, 0, 0]; out[0] = out[1] = out[2] = 0;
+    if (!samples.length) return out;
+    for (const s of samples) for (let i = 0; i < 3; i++) { const v = s[i] / 15; out[i] += v * v; }
+    for (let i = 0; i < 3; i++) out[i] = out[i] / samples.length * L2.ROOM.k;
+    return out;
+  };
+  // t-polish2 · the far lights at night (gap 2: the landmarks' lights did not read from afar — one-pixel lines, dim, eaten by
+  // the haze): in the far land's program (LOD_FS, under LIGHT2) the glowing kinds and the lit windows shine ×(1 + night ·
+  // night weight) — at night over the bloom's threshold (GRADE.night.bThr) — and keep exp(−d / pierce) of themselves
+  // through the fog (L2.farLight: the factor, L2.farPierce: the share kept at d blocks)
+  L2.FARLIT = { night: 1.6, pierce: 1600 };
+  L2.farLight = (nightW) => 1 + L2.FARLIT.night * clamp(nightW, 0, 1);
+  L2.farPierce = (d) => Math.exp(-Math.max(d, 0) / L2.FARLIT.pierce);
   // the valley mist's colour: between the horizon's and the fog's, a little lighter by day
   L2.mistColor = function (E) {
     const h = E.horizon || [0.6, 0.7, 0.8], f = E.fogColor || h, m = L2.moods(E.sunDir[1]), lift = 1 + 0.08 * m.day;
@@ -223,8 +251,13 @@
     // e: within 3.5 L* of the old curve), the mid-tones' saturation up, the vignette lighter, the glow by day wider;
     // after run 3: the golden hour's split 10.1 against the frames' 6.2 — its lights' lean eased; at night the many light
     // lines' glow washed the avenue's paving cyan — the night's glow narrower, threshold 0.62, strength 0.25)
+    // (t-polish2, gap 4: v0.48's golden land against the frames' — its mid-tones ran more saturated than theirs: the
+    // saturation 1.16 → 1.04, the S 0.32 → 0.26. The split of warm light over cool shade held at the frames' 6.2: the first
+    // fit halved the lights' lean on t-light2's pictures (split 9.2), but polish2.mjs's run 1 measured v0.48 at 5.8 and
+    // the halved lean at 2.3 — over both sets (test/land_grade.js, 320 × 180) v0.48 sits at 6.2; now the lights ×0.85 and
+    // the shade's cool lean ×1.5: split 6.1, bands ΔE 30.9 / 29.8 → 29.3 / 28.3)
     day: { toe: 0.014, mid: 0.5, s: 0.3, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.1, vig: 0.16, bThr: 1.05, bStr: 0.13 },
-    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 0.985, dark: [-0.02, 0.0, 0.04], light: [0.062, 0.022, -0.045], sat: 1.16, vig: 0.2, bThr: 0.9, bStr: 0.17 },
+    gold: { toe: 0.016, mid: 0.5, s: 0.26, sh: 0.985, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.04, vig: 0.2, bThr: 0.9, bStr: 0.17 },
     dusk: { toe: 0.022, mid: 0.5, s: 0.28, sh: 0.975, dark: [0.01, -0.014, 0.05], light: [0.065, 0.018, -0.035], sat: 1.15, vig: 0.24, bThr: 0.75, bStr: 0.22 },
     night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.62, bStr: 0.25 },
   };
@@ -290,6 +323,9 @@
   // (JS mirror of the march's weight: lit = the share of the ray in the light, its density-weighted length; the weight
   // 6.75 · lit · (1 − lit)² peaks at a third lit)
   L2.volShaft = (lit) => 1 + L2.VOL.shaft * 6.75 * lit * (1 - lit) * (1 - lit);
+  // (t-polish2 tried a canopy weight on top — the air of a ray crossing light and shade under leaves ×13 at noon: in its
+  // second browser run it drew nothing under the canopy and turned a wood's opening toward the sunlit land into a white,
+  // blocky veil; taken back — the march is v0.48's. Plan 2026-10-16-t-polish2.md §3 Results)
   // the sun's flare: its strength (HDR, before the exposure) and the disc's radius (screen heights) its visibility is read in
   L2.FLARE = { k: 0.05, disc: 0.012 };
   // blue noise (void and cluster, Ulichney 1993): an N × N tiling threshold map whose values are spread with no low
@@ -380,6 +416,7 @@ float l2Ao() {
 uniform vec4 u_l2Fog;      // x the density at the base (per block), y k (1 / scale height), z the base's height, w the eye's height
 uniform vec4 u_l2Fog2;     // x 1 / the aerial perspective's distance, y its most, z the sun's in-scatter, w the night's dimming
 uniform vec3 u_l2FogCol;   // the valley haze's colour
+uniform vec4 u_l2Room;     // t-polish2: the room's air — rgb its colour (the lamps round the eye), w its density (0 outdoors)
 vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   vec3 dir = rel / max(dist, 0.001);
   if (u_fog.w > 0.5) return mix(col, u_fogColor, clamp(1.0 - exp(-dist * 0.07), 0.0, 1.0));
@@ -401,6 +438,9 @@ vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   float toSun = max(dot(dir, u_sunDir), 0.0), t2 = toSun * toSun, t4 = t2 * t2;
   vec3 mist = u_l2FogCol + u_sunColor * (t4 * t4 * u_l2Fog2.z);
   col = mix(col, mist, clamp(hf, 0.0, 0.92));
+  // t-polish2 · the room's air (light2.js ROOM): indoors the air glows with the lamps' colour — it lifts what is darker
+  // than its light, never dims what is brighter (0 outdoors: w = 0)
+  if (u_l2Room.w > 0.0) col = max(col, mix(col, u_l2Room.rgb, 1.0 - exp(-min(dist, ${L2.ROOM.max.toFixed(1)}) * u_l2Room.w)));
   return mix(col, fc, clamp(f, 0.0, 1.0));
 }
 #endif

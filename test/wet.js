@@ -92,5 +92,69 @@ console.log('e · the shader text');
   check(/pudRing\(/.test(fs) && fs.indexOf('vec2 pudRing(') > fs.lastIndexOf('#ifdef PBR', fs.indexOf('vec2 pudRing(')), 'rain rings in the puddles (PBR only)');
 }
 
+console.log('f · rain under glass (t-polish2): a face is open to the rain above its column\'s top rain-stopping block');
+{
+  // (t-material's gap: the wet look asked the sky light, and glass passes it — Weißstadt's street under its glass vault got
+  //  wet and grew puddles though the rain particles stop at the vault. The rain's own height map decides now)
+  const R = V.R, Fl = V.F, st = (n) => R.byName[n].defaultState;
+  check(typeof W.blocksRain === 'function' && typeof W.rainTop === 'function' && typeof W.faceOpen === 'function' && typeof W.fillMap === 'function', 'VR.Wet has the column test (blocksRain, rainTop, faceOpen, fillMap)');
+  if (typeof W.blocksRain === 'function') {
+    check(['glass', 'frosted_glass', 'glass_pane', 'stone', 'oak_leaves', 'water'].every(n => W.blocksRain(st(n))) && !W.blocksRain(0) && !W.blocksRain(st('short_grass')) && !W.blocksRain(st('torch')), 'glass, panes, stone, leaves and water stop the rain; air, grass tufts and torches do not');
+    // the same rule as the column heights the world keeps (world.js: SOLID | FLUID | LEAVES) and the rain particles stop at
+    let diff = 0; for (let s = 1; s < R.T.flags.length; s++) if (W.blocksRain(s) !== !!(R.T.flags[s] & (Fl.SOLID | Fl.FLUID | Fl.LEAVES))) diff++;
+    check(diff === 0, 'the rule is the world\'s column heights\' rule for every state', diff + ' states differ');
+    // a small world: a floor at y 10 over x 0…9, a glass roof at y 16 over x 0…3, a leaf at (6, 14), a wall at x 9 up to 13
+    const B = new Map(), key = (x, y, z) => x + ',' + y + ',' + z;
+    for (let x = 0; x < 10; x++) for (let z = 0; z < 4; z++) B.set(key(x, 10, z), st('stone'));
+    for (let x = 0; x < 4; x++) for (let z = 0; z < 4; z++) B.set(key(x, 16, z), st('glass'));
+    for (let z = 0; z < 4; z++) { B.set(key(6, 14, z), st('oak_leaves')); for (let y = 11; y <= 13; y++) B.set(key(9, y, z), st('stone')); }
+    const get = (x, y, z) => B.get(key(x, y, z)) || 0, top = (x, z) => W.rainTop(get, x, z, 40, 0);
+    check(top(1, 1) === 16 && top(5, 1) === 10 && top(6, 1) === 14 && top(9, 1) === 13 && top(20, 20) === -1, 'the column\'s top: the glass roof, the floor, the leaf, the wall, none', [top(1, 1), top(5, 1), top(6, 1), top(9, 1), top(20, 20)].join(' · '));
+    check(!W.faceOpen(top, 1, 10, 1, 0, 1, 0) && W.faceOpen(top, 5, 10, 1, 0, 1, 0), 'the floor under the glass roof stays dry, the floor in the open gets the rain');
+    check(!W.faceOpen(top, 6, 10, 1, 0, 1, 0), 'under a leaf the floor stays dry (the canopy holds the rain, as the particles stop at it)');
+    check(W.faceOpen(top, 9, 12, 1, -1, 0, 0) && W.faceOpen(top, 9, 12, 1, 1, 0, 0), 'a wall\'s faces are open where the cell in front of them is open to the sky');
+    check(!W.faceOpen(top, 4, 11, 1, -1, 0, 0), 'a wall face whose cell in front lies under the glass roof stays dry');
+    // the map (game.js): the 128² window's texels are the columns' tops, clamped to the R8 range
+    const cols = new Map(), Hc = new Uint16Array(256); Hc.fill(300); cols.set('0,0', { height: Hc });
+    const w = { col: (cx, cz) => cols.get(cx + ',' + cz) || null, topAt: (x, z) => { const c = w.col(x >> 4, z >> 4); return c ? c.height[((z & 15) << 4) | (x & 15)] : 0; } };
+    const out = new Uint8Array(128 * 128); W.fillMap(w, -64, -64, out);
+    check(out[64 * 128 + 64] === 255 && out[0] === 0, 'the map holds the columns\' tops round the camera, clamped to 255 (an R8 map wrapped above y 255)', out[64 * 128 + 64] + ' · ' + out[0]);
+    // the hall city (seed 53, the meadow site of cell (−2, −1), vgen 9+): the plan's blocks applied, its street under the
+    // frosted glass vault closed, the forecourt before its entrance end open
+    const VG = V.VillageGen, g = new V.OverworldGen(53, { worldType: 'default', vgen: 11 }), s = VG.site(g, -2, -1);
+    if (s && s.style === 'hall') {
+      const plan = VG.plan(g, s), H = plan.hall, cmap = new Map(), ROT = [(u, v) => [u, v], (u, v) => [-v, u], (u, v) => [-u, -v], (u, v) => [v, -u]];
+      const colOf = (x, z) => { const k = x * 65536 + z; let c = cmap.get(k); if (!c) { c = new Int32Array(256); cmap.set(k, c); } return c; };
+      for (const b of plan.chunks.values()) {
+        for (let i = 0; i < b.f.length; i += 5) { const c = colOf(b.f[i], b.f[i + 1]); for (let y = Math.max(1, b.f[i + 2]); y <= Math.min(254, b.f[i + 3]); y++) c[y] = b.f[i + 4]; }
+        for (let i = 0; i < b.o.length; i += 4) { const y = b.o[i + 1]; if (y >= 1 && y <= 254) colOf(b.o[i], b.o[i + 2])[y] = b.o[i + 3]; }
+      }
+      const getH = (x, y, z) => { const c = cmap.get(x * 65536 + z); return c ? Math.max(0, c[y]) : 0; }, topH = (x, z) => W.rainTop(getH, x, z, 254, 1);
+      const W2 = (u, v) => { const q = ROT[H.r](u, v); return [H.cx + q[0], H.cz + q[1]]; };
+      let under = 0, wetUnder = 0;
+      for (let v = -70; v <= 36; v += 2) for (let u = -3; u <= 3; u++) { if (Math.abs(v) <= 13) continue; const [x, z] = W2(u, v); under++; if (W.faceOpen(topH, x, H.F, z, 0, 1, 0)) wetUnder++; }
+      // the paths out of the two gates in the long walls, at the floor's level outside the hall
+      let fore = 0, wetFore = 0;
+      for (const sg of [-1, 1]) for (let a = 50; a <= 60; a++) for (let v = -3; v <= 3; v++) { const [x, z] = W2(sg * a, v); if (topH(x, z) !== H.F) continue; fore++; if (W.faceOpen(topH, x, H.F, z, 0, 1, 0)) wetFore++; }
+      check(under > 250 && wetUnder === 0, `the hall city's street under its glass vault stays dry in the rain (${wetUnder} of ${under} street cells open)`);
+      check(fore > 50 && wetFore === fore, `the paths out of its gates get the rain (${wetFore} of ${fore} cells open)`);
+    } else check(false, 'the hall city of seed 53 at cell (−2, −1)');
+  }
+  // the shader: the wet look asks the rain's map (PBR only: Very Low's programs never see it)
+  const fs = V.SHADERS.TERRAIN_FS, i = fs.indexOf('t-material · the wet world'), k = fs.indexOf('#endif', i), blk = fs.slice(i, k);
+  check(/rainOpen\(/.test(blk) && /float rainOpen\(/.test(fs) && fs.indexOf('float rainOpen(') > fs.lastIndexOf('#ifdef PBR', fs.indexOf('float rainOpen(')) && fs.indexOf('uniform sampler2D u_rainTop') > fs.lastIndexOf('#ifdef PBR', fs.indexOf('uniform sampler2D u_rainTop')), 'the wet look asks the rain\'s height map (rainOpen, u_rainTop: inside #ifdef PBR)');
+  const R2 = fs.slice(fs.indexOf('float rainOpen('), fs.indexOf('}', fs.indexOf('float rainOpen(')) + 1);
+  check(/u_rainMap\.z/.test(R2) && /N \* 0\.5/.test(R2) && /texelFetch\(u_rainTop/.test(R2), 'a face reads the cell in front of it; without this frame\'s map the sky light alone decides');
+  // the renderer binds it on a unit no other sampler of the terrain programs uses (common, bindTerrainTextures, bindRainMap)
+  const src = require('fs').readFileSync(__dirname + '/../src/main/renderer.js', 'utf8');
+  const body = (head) => { const a = src.indexOf(head), b = src.indexOf('\n    }\n', a); return a > 0 && b > a ? src.slice(a, b) : ''; };
+  const text = body('    common(p, E) {') + body('    bindTerrainTextures(p) {') + body('    bindRainMap(p) {'), units = {};
+  for (const m of text.matchAll(/uniform1i\(p\.u\.(u_\w+), (\d+)\)/g)) (units[m[2]] = units[m[2]] || new Set()).add(m[1]);
+  check(units['9'] && units['9'].size === 1 && units['9'].has('u_rainTop') && /bindRainMap\(p\)/.test(body('    bindTerrainTextures(p) {')), 'the rain\'s map sits on unit 9 of the terrain programs, alone, bound with the others', units['9'] ? [...units['9']].join(', ') : 'none');
+  // and game.js hands it over only while the ground is wet on a PBR tier (never on Very Low: no wet ground, no PBR)
+  const gsrc = require('fs').readFileSync(__dirname + '/../src/main/game.js', 'utf8');
+  check(/wetMap = \(E\.wet > 0\.001 \|\| E\.puddle > 0\.001\) && !!rq && \(rq\.pbr \| 0\) >= 1 && !rq\.lite/.test(gsrc) && /precip, rainMap,/.test(gsrc), 'game.js keeps the map while the ground is wet (PBR tiers only) and hands it to the renderer');
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

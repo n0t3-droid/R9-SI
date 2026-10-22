@@ -29,7 +29,25 @@
     const w = F.world, c = F.cam;
     let es = 1;
     if (w && w.getLight && c) es = (w.getLight(Math.floor(c.x), Math.floor(c.y), Math.floor(c.z)) >>> 12) / 15;
-    this.l2EyeSky = this.l2EyeSky === undefined ? es : this.l2EyeSky + (es - this.l2EyeSky) * 0.1;
+    // (t-polish2: a jump — a teleport, a respawn, a cut — sets the eased values at once instead of easing from the place
+    // before: 6 blocks or more since the last frame)
+    const at = this.l2At || (this.l2At = [NaN, NaN, NaN]), jump = !c || !(Math.abs(c.x - at[0]) + Math.abs(c.y - at[1]) + Math.abs(c.z - at[2]) < 6);
+    if (c) { at[0] = c.x; at[1] = c.y; at[2] = c.z; }
+    this.l2EyeSky = this.l2EyeSky === undefined || jump ? es : this.l2EyeSky + (es - this.l2EyeSky) * 0.1;
+    // t-polish2 · the room's air (L2.ROOM): indoors, the lamps' colour round the eye (seven cells, every fourth frame),
+    // eased like the eye's sky light; outdoors its density falls to 0
+    if (q.l2Air) {
+      const R = L2.ROOM, room = this.l2Room || (this.l2Room = [0, 0, 0, 0]), tgt = this.l2RoomT || (this.l2RoomT = [0, 0, 0]);
+      const ind = L2.roomIndoor(this.l2EyeSky);
+      if (ind > 0.001 && w && w.getLight && c && ((this.frameNo & 3) === 0 || jump)) {
+        const S = this.l2RoomS || (this.l2RoomS = R.pts.map(() => [0, 0, 0]));
+        const cx = Math.floor(c.x), cy = Math.floor(c.y), cz = Math.floor(c.z);
+        R.pts.forEach((p, i) => { const l = w.getLight(cx + p[0], cy + p[1], cz + p[2]) | 0; S[i][0] = (l >> 8) & 15; S[i][1] = (l >> 4) & 15; S[i][2] = l & 15; });
+        L2.roomColor(S, tgt);
+      }
+      for (let i = 0; i < 3; i++) room[i] = jump ? tgt[i] : room[i] + (tgt[i] - room[i]) * 0.1;
+      room[3] = R.rho * ind;
+    } else if (this.l2Room) this.l2Room[3] = 0;
     // the moon a cool key light, teal like the night's shade (the lit things' u_moonColor, set again in l2Uniforms: E
     // itself is not changed — a frame drawn twice from the same E stays the same)
     const k = L2.K.moon, m = E.moonColor || [0, 0, 0];
@@ -48,6 +66,7 @@
       if (u.u_l2Pool) gl.uniform4f(u.u_l2Pool, L2.K.poolHot, L2.K.poolK, L2.K.poolTail, L2.K.poolHue);
       if (u.u_l2K) gl.uniform4f(u.u_l2K, 0, 0.94, L2.K.wrapLeaf, L2.K.wrapSkin);
       if (u.u_l2Fog) { gl.uniform4f(u.u_l2Fog, 0, 0.06, 62, 64); gl.uniform4f(u.u_l2Fog2, 0, 0, 0, 0); gl.uniform3f(u.u_l2FogCol, 0, 0, 0); }
+      if (u.u_l2Room) gl.uniform4f(u.u_l2Room, 0, 0, 0, 0);   // (t-polish2: no room air)
       return;
     }
     if (u.u_l2Sky) { gl.uniform3f(u.u_l2Sky, l.sky[0], l.sky[1], l.sky[2]); gl.uniform3f(u.u_l2Ground, l.ground[0], l.ground[1], l.ground[2]); }
@@ -63,6 +82,7 @@
       gl.uniform4f(u.u_l2Fog, a.rho * L2.fogEye(ey, a.base), a.k, a.base, ey);   // (no valley haze far under the sea level)
       gl.uniform4f(u.u_l2Fog2, 1 / a.apDist, a.apMax, a.sunK, 0);
       gl.uniform3f(u.u_l2FogCol, m[0], m[1], m[2]);
+      if (u.u_l2Room) { const r = this.l2Room; gl.uniform4f(u.u_l2Room, r ? r[0] : 0, r ? r[1] : 0, r ? r[2] : 0, r ? r[3] : 0); }   // (t-polish2: the room's air)
     }
   };
 

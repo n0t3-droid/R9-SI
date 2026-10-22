@@ -10,7 +10,10 @@
 // ============================================================================
 (function (VR) {
   'use strict';
-  const PBR = VR.PBR = { WIN: 1, GLASS: 2, TINTED: 4 };
+  // GLOWSKY (t-polish2): an emissive face of this layer mirrors the sky by Fresnel over its glow — the fine VX pieces'
+  // glowing voxels (Villa Nova's turquoise glass bands, their amber frames and light lines: t1_24, t3_05), which the
+  // emissive mix had left an even, flat glow from every angle
+  const PBR = VR.PBR = { WIN: 1, GLASS: 2, TINTED: 4, GLOWSKY: 8 };
   // the rules, in order: the first whose pattern matches the name decides; a rule's fields default to metal 0, coat 0,
   // rk 1 (the roughness scale), flags 0
   const RULES = [
@@ -24,6 +27,9 @@
     [/^ctm:|^window_(black|white)|^mod_glass|^spire_window|^stained_glass:/, { coat: 1, flags: 1 | 2 }],
     // other glass: smooth, no glow (railings, plain glass's frame, frosted, ice)
     [/glass|^ice$|packed_ice|blue_ice/, { coat: 1, flags: 2 }],
+    // the fine VX pieces' plain surface (16³ and finer): its glowing voxels — Villa Nova's glass, frames, light lines — carry
+    // the sky over their glow (flag 8; the surface itself keeps no coat)
+    [/^vx_smooth$/, { flags: 8 }],
     // ores sit in rock (before the metal words)
     [/^ore:/, {}],
     // metals: polished blocks and the VX furniture's brushed steel; bars, chains, grates and raw lumps stay rougher

@@ -911,6 +911,20 @@ float shadowAt(vec3 N, vec3 L) {
 // t-material · PBR-lite (plan 2026-10-15-t-material.md, step 1). The material table (tex_pbr.js): per layer r metal, g a
 // clear coat (polish, lacquer, gloss tiles, painted hulls), b a scale on the painter's roughness (128 = ×1), a flags.
 uniform sampler2D u_pbr;
+// t-polish2 · rain under roofs: the rain's height map round the camera (game.js, wet.js fillMap: each column's top
+// rain-stopping block — solid, glass, fluid, leaves — R8) on unit 9. Glass passes the sky light, so the sky light cannot tell
+// a street under a glass vault from one in the open; a face gets the rain where the air cell in front of it lies above its
+// column's top (wet.js faceOpen). u_rainMap: xy the map's origin (world x, z of texel 0), z 1 when it holds this frame's
+// columns (0: the sky light alone decides, as before), w its size
+uniform sampler2D u_rainTop;
+uniform vec4 u_rainMap;
+float rainOpen(vec3 wq, vec3 N) {
+  if (u_rainMap.z < 0.5) return 1.0;
+  vec3 c = floor(wq + N * 0.5);
+  vec2 t = c.xz - u_rainMap.xy;
+  if (t.x < 0.0 || t.y < 0.0 || t.x >= u_rainMap.w || t.y >= u_rainMap.w) return 1.0;
+  return step(texelFetch(u_rainTop, ivec2(t), 0).r * 255.0 + 0.5, c.y);
+}
 #ifdef SSR
 // t-material · the screen-space mirror (step 2, High): the terrain's second target — the shaded normal (octahedral, y up),
 // how much of the fragment is mirror (its Fresnel weight) and the mirror's roughness; renderer.js ssrPass reads it
@@ -1142,7 +1156,7 @@ void main() {
   // hollows of a low-frequency field whose edge falls with the fill — they shrink from their rims as they dry
   vec3 wq = v_localPos + vec3(u_camInt);
   if (u_wet > 0.001 || u_puddle > 0.001) {
-    float open = smoothstep(0.86, 0.99, v_sky), upW = smoothstep(0.55, 0.92, N.y);
+    float open = smoothstep(0.86, 0.99, v_sky) * rainOpen(wq, N), upW = smoothstep(0.55, 0.92, N.y);   // (t-polish2: and under no roof — glass passes the sky light, not the rain)
     float streak = upW > 0.5 ? 1.0 : smoothstep(0.3, 0.72, texture(u_noise, vec2((wq.x + wq.z) * 0.37, wq.y * 0.05 - u_time * 0.002)).g);
     wetK = u_wet * open * mix(0.55 * streak, 1.0, upW);
     pud = 0.0;
@@ -1248,6 +1262,15 @@ void main() {
     float e = emissiveFace ? max(emis, 0.85) : emis;
     col = mix(col, alb.rgb * (1.4 + u_emissiveBoost), e);
   }
+#ifdef PBR
+  // t-polish2 · a glowing pane carries the sky (t1_24, t3_05): the fine VX pieces' glowing voxels (the table's flag 8 —
+  // Villa Nova's turquoise glass, its amber frames and lines) mirror the sky by Fresnel over their glow, by the sky light:
+  // straight on the glow, toward the facade's edge the sky (the emissive mix above had left them one flat colour)
+  if (emissiveFace && (uint(texelFetch(u_pbr, ivec2(int(layer), 0), 0).a * 255.0 + 0.5) & 8u) != 0u) {
+    float fg = (0.04 + 0.96 * pow5(1.0 - clamp(dot(N, V), 1e-3, 1.0))) * skyL * 0.85;
+    col = mix(col, pbrSky(reflect(-V, N), 0.06), fg);
+  }
+#endif
 #ifdef MOTION
   // t-motion · the light lines run: a bright packet travels along every upward light (motion.js FLOW, the same numbers)
   if (emissiveFace && face == 2u && kind == 0u && u_animOn > 0.5) {
@@ -1540,8 +1563,12 @@ void main() {
     float lv = 3.0 * clamp(((u_hang.x < 1.5 ? u_hang.y - a_pos.y : u_hang.y - a_pos.z)) / u_hang.z, 0.0, 1.0);
     vec3 ap = a_inst0.xyz + u_camPos;   // (the piece's place: one phase for the whole piece)
     float G = windGust(ap.x, ap.z, u_time, u_windDir.x, u_windDir.y, u_gust);
-    q.xz += u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + vec2(-u_windDir.y, u_windDir.x) * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
-    q.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv);
+    // (t-polish2, gap 7: cloth — u_hang.w, the town's awnings — swings ×gain and ripples along its width, the piece's x,
+    // up and out of the wall at its own −z; a lantern as before: wind.js CLOTH)
+    float cg = u_hang.w > 0.5 ? ${(VR.Wind && VR.Wind.CLOTH ? VR.Wind.CLOTH.gain : 2.4).toFixed(2)} : 1.0;
+    q.xz += (u_windDir * windHangAlong(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) + vec2(-u_windDir.y, u_windDir.x) * windHangAcross(ap.x, ap.y, ap.z, u_time, u_wind, G, lv)) * cg;
+    q.y += windHangUp(ap.x, ap.y, ap.z, u_time, u_wind, G, lv) * cg;
+    if (u_hang.w > 0.5) { float rp = windClothRip(a_pos.x, ap.x, ap.z, u_time, u_wind, G, lv); q.y += rp; q.xz += vec2(s, -c) * rp * ${(VR.Wind && VR.Wind.CLOTH ? VR.Wind.CLOTH.out : 0.6).toFixed(2)}; }
   }
 #endif
   vec3 nq = vec3(c * a_nrm.x - s * a_nrm.z, a_nrm.y, s * a_nrm.x + c * a_nrm.z);
@@ -2470,6 +2497,9 @@ void main() {
   float th = bayer4(gl_FragCoord.xy), cR = min(bR, nR);
 #ifdef FORM
   if (th < cR || th >= nG) discard;
+  // t-polish2 · a night light (a glowing box with aux bit 7: the citadel's beam, CitadelGen.lodBoxes): drawn at night only,
+  // dithered by its strength (aux bits 0–6, fainter up the beam) and the night's weight
+  if (v_kind == 4u && v_aux >= 128u && th >= float(v_aux & 127u) / 127.0 * (1.0 - smoothstep(-0.06, 0.1, u_sunDir.y))) discard;
 #else
   if (th < max(cR, min(bG, nG) * u_g1)) discard;
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
@@ -2575,7 +2605,21 @@ void main() {
       col = mix(col, vec3(1.0, 0.66, 0.32) * (1.1 + u_emissiveBoost * 0.6) * (0.8 + 0.4 * hash13(bp + 2.3)), night * lit);
     }
   }
+#ifdef LIGHT2
+  // t-polish2 · the far lights at night (gap 2): the glowing kinds and the lit windows shine ×(1 + NIGHT·night) — over the
+  // bloom's night threshold, so they glow — and pierce the haze: a light keeps exp(−d / PIERCE) of itself through the
+  // fog instead of fading into its colour (Low and up; Very Low's program is as before)
+  float lk = 0.0;
+  if (v_kind == 4u) lk = 1.0;
+  else if (v_kind == 7u) lk = step(0.28, hash13(floor(vec3(wp.x, v_rel.y + u_camFrac.y + float(u_camInt.y), wp.y) - N * 0.02) * 1.37 + 5.1));
+  lk *= 1.0 - smoothstep(-0.06, 0.16, u_sunDir.y);
+  col *= 1.0 + ${(VR.Light2 && VR.Light2.FARLIT ? VR.Light2.FARLIT.night : 1.6).toFixed(2)} * lk;
+  vec3 lit0 = col;
   col = applyFog(col, v_rel, dist);
+  col = mix(col, lit0, lk * exp(-dist / ${(VR.Light2 && VR.Light2.FARLIT ? VR.Light2.FARLIT.pierce : 1600).toFixed(1)}));
+#else
+  col = applyFog(col, v_rel, dist);
+#endif
   o = vec4(col, 1.0);
 }`;
 
@@ -2968,6 +3012,7 @@ void main() { o = texture(u_src, v_uv); }`;
   // the eye. Out: the hit premultiplied by its confidence (a miss: 0, the sky's reflection of the gloss pass stays).
   S.SSR_FS = `
 uniform highp sampler2D u_depth;
+uniform highp sampler2D u_tdepth;   // t-polish2 · gap 1: the terrain's own depth (renderer.js ssrKeep), the mirror's surface
 uniform sampler2D u_mat;
 uniform sampler2D u_color;
 uniform mat4 u_vp;
@@ -2983,6 +3028,10 @@ void main() {
   if (m.b < 0.01) return;
   float d = texture(u_depth, v_uv).r;
   if (d >= 0.99999) return;
+  // (t-polish2 · gap 1: the mirror marches after the furniture, the people and the ships are drawn — they stand in it now,
+  //  as in t1_22 — so a pixel where one of them stands in front of the mirror's surface keeps no mirror of its own)
+  float dT = lin(texture(u_tdepth, v_uv).r);
+  if (lin(d) < dT - 0.05 - 0.01 * dT) return;
   vec4 wp = u_invVP * vec4(v_uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
   vec3 P = wp.xyz / wp.w, N = octDec(m.rg * 2.0 - 1.0), V = normalize(-P);
   // (run 2: per-pixel jitter and a rough-scattered ray left a sparse spray of hits — single bright texels on the plaza and
@@ -3024,11 +3073,17 @@ void main() {
   S.SSR_APPLY_FS = `
 uniform sampler2D u_mat;
 uniform sampler2D u_ssr;
+uniform highp sampler2D u_depth;    // t-polish2 · gap 1: the scene's depth and the terrain's own (ssrKeep): nothing of the
+uniform highp sampler2D u_tdepth;   // mirror over a lamp post, a chair or a person standing in front of it
+uniform vec2 u_nearFar;
 in vec2 v_uv;
 out vec4 o;
+float lin(float d) { float z = d * 2.0 - 1.0; return 2.0 * u_nearFar.x * u_nearFar.y / (u_nearFar.y + u_nearFar.x - z * (u_nearFar.y - u_nearFar.x)); }
 void main() {
   vec4 m = texture(u_mat, v_uv);
   if (m.b < 0.003) discard;
+  float dT = lin(texture(u_tdepth, v_uv).r);
+  if (lin(texture(u_depth, v_uv).r) < dT - 0.05 - 0.01 * dT) discard;
   // the hits, gathered over a footprint that grows with the roughness (a polished floor sharp, a honed one soft), drawn
   // out up and down the screen as a glossy floor smears what it mirrors toward the eye (run 4: the hangar's floor mirrored
   // the holo walls' fine data as a mottle; streaked, it reads as gloss); a texel's hit counts by its own weight, so a lone
