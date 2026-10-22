@@ -335,7 +335,7 @@
     const xp = top ? T('g.adv.xpStar', { a: fmt(lv.into), b: fmt(lv.need) }) : T('g.adv.xp', { a: fmt(lv.into), b: fmt(lv.need), n: me.level + 1 });
     const title = top && me.stars ? T('g.adv.levelMax', { s: me.stars }) : T('g.adv.level', { n: me.level });
     return `<div class="advsum${on ? '' : ' adv-dim'}"><div class="bigring">${RING('advgold-c', +(100 - lv.frac * 100).toFixed(2))}<div class="lvl">${me.level}</div></div>`
-      + `<div class="advnums"><div class="lv">${esc(title)}</div><div class="xp">${esc(xp)}</div><div class="bar"><i style="width:${(lv.frac * 100).toFixed(1)}%"></i></div>`
+      + `<div class="advnums"><div class="lv">${esc(title)}</div><div class="xp">${esc(xp)}</div><div class="advbar"><i style="width:${(lv.frac * 100).toFixed(1)}%"></i></div>`
       + `<div class="advrow"><span class="tal">${COIN('advcoin-c')}${esc(T('g.adv.taler', { n: fmt(me.taler) }))}</span><span class="ptsl${p ? ' has' : ''}">${esc(ptsText(p))}</span></div></div>`
       + `<button type="button" class="btn primary go" data-act="adv:stats"${on ? '' : ' disabled'}>${esc(T('g.adv.toStats'))}</button></div>`;
   };
@@ -539,8 +539,8 @@
 .advsum .bigring .lvl { position: absolute; inset: 0; display: grid; place-items: center; font: 900 38px/1 var(--display); color: #fff6dc; text-shadow: 0 0 14px rgba(255, 196, 90, .75); }
 .advsum .lv { font: 800 23px/1.1 var(--display); color: #fff; letter-spacing: 1px; }
 .advsum .xp { color: var(--muted); font-size: 15px; margin: 4px 0 6px; }
-.advsum .bar { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; }
-.advsum .bar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #ffe08a, #ff9a3c); box-shadow: 0 0 10px rgba(255, 170, 70, .7); }
+.advsum .advbar { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.advsum .advbar i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #ffe08a, #ff9a3c); box-shadow: 0 0 10px rgba(255, 170, 70, .7); }
 .advsum .advrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; }
 .advsum .tal { display: inline-flex; align-items: center; gap: 7px; font: 700 18px/1 var(--font); color: #ffe7a6; }
 .advcard .ptsl { font: 700 15px/1 var(--font); color: var(--muted); }

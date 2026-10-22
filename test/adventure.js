@@ -15,6 +15,7 @@
 //      a change only
 //  10. award() ≤ 0.01 ms (the rules and the glue)
 //  11. every text key the Abenteuer uses is in both tables, German first
+//  12. no class name of the Abenteuer is styled by a bare global rule of src/ui/*.css it did not ask for
 //   bash test/wt_run.sh adventure.js 300
 const DOM = require('./dom_stub.js');
 require('./load_shared.js');
@@ -491,6 +492,27 @@ console.log('11 · the texts, German first');
   check(de['g.adv.confirm'] === 'Maschinen und Schatten tauchen auf — in den Außenposten, in Ruinen und nachts. Dein Zuhause und die Dörfer bleiben sicher.', 'the switch-on question as A§1 writes it');
   VR.I18N.lang = 'de'; const lvDe = VR.I18N.t('g.adv.up.title', { n: 5 }); VR.I18N.lang = 'en'; const lvEn = VR.I18N.t('g.adv.up.title', { n: 5 }); VR.I18N.lang = 'de';
   check(/Stufe 5/.test(lvDe) && /Level 5/.test(lvEn), 'the banner: „' + lvDe + '" / "' + lvEn + '"');
+}
+
+// ---------------------------------------------------------------- 12 · the classes meet no global rule by accident
+// (browser run 2: the card's XP bar took the loading screen's `.bar { width: min(520px, 80vw) }` and pushed the bar and
+// „Werte verteilen →" out of the card. A class of the Abenteuer that a bare global rule in src/ui/*.css styles must be
+// one of the UI kit's on purpose.)
+console.log('12 · no class of the Abenteuer meets a global rule by accident');
+{
+  const fs = require('fs'), path = require('path'), ui = path.join(__dirname, '../src/ui'), glob = new Map();
+  for (const f of fs.readdirSync(ui).filter(f => f.endsWith('.css'))) {
+    const css = fs.readFileSync(path.join(ui, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''), re = /([^{}]+)\{[^{}]*\}/g; let m;
+    while ((m = re.exec(css))) for (const s0 of m[1].split(',')) { const k = /^\.([A-Za-z][\w-]*)(?::{1,2}[\w-]+(?:\([^)]*\))?)*(?:\s|>|\+|~|$)/.exec(s0.trim()); if (k && !glob.has(k[1])) glob.set(k[1], f + ': ' + s0.trim()); }
+  }
+  const src = fs.readFileSync(path.join(__dirname, '../src/main/adventure.js'), 'utf8'), used = new Set();
+  const add = (s) => { for (const t of s.replace(/\$\{[^}]*\}/g, ' ').split(/\s+/)) if (/^[A-Za-z][\w-]*$/.test(t)) used.add(t); };
+  for (const re of [/class="([^"]*)"/g, /mk\('[a-z0-9]+',\s*'([^']*)'/g, /className\s*=\s*'([^']*)'/g, /classList\.(?:add|toggle|remove)\('([^']*)'/g]) { let m; while ((m = re.exec(src))) add(m[1]); }
+  const KIT = new Set(['btn', 'panel', 'box', 'screen', 'field', 'note', 'seg', 'row', 'gap', 'small', 'primary', 'on']);   // the game's own kit, used on purpose
+  const clash = [...used].filter(c => glob.has(c) && !KIT.has(c)).map(c => c + ' (' + glob.get(c) + ')');
+  check(glob.size > 20 && used.size > 30, 'read ' + glob.size + ' global class rules and ' + used.size + ' classes of the Abenteuer');
+  check(!clash.length, 'no class of the Abenteuer is styled by a global rule it did not ask for' + (clash.length ? ': ' + clash.join(', ') : ''));
+  check(/class="advbar"/.test(src) && /\.advsum \.advbar \{/.test(src), 'the card\'s XP bar is its own (.advbar)');
 }
 
 Promise.all(later).catch((e) => { fails++; console.log('  ✗ ' + (e && e.stack || e)); }).then(() => {
