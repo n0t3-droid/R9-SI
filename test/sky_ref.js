@@ -332,7 +332,10 @@ function looksOf(img, pr, geo, o) {
     const isSky = (x, y) => { const p = (y * W + x) * 3, R = pr.d[p], G = pr.d[p + 1], B = pr.d[p + 2]; return R > 140 && B > 140 && G < 0.55 * Math.min(R, B); };
     const low = new Int32Array(W).fill(-1);
     for (let x = 0; x < W; x++) for (let y = H - 1; y >= 0; y--) if (isSky(x, y)) { low[x] = y; break; }
-    out.clouds = cloudsOf(img, (x, y) => low[x] > y && !isSky(x, y));
+    // (a cloud has breadth: the rain's streaks and the air's motes over the probe's magenta are 1–3 px wide — a pixel is
+    // cloud where the probe has no sky 2 px to its left and to its right as well)
+    const solid = (x, y) => !isSky(x, y) && (x < 2 || !isSky(x - 2, y)) && (x >= W - 2 || !isSky(x + 2, y));
+    out.clouds = cloudsOf(img, (x, y) => low[x] > y && solid(x, y));
   }
   return out;
 }
@@ -547,6 +550,17 @@ if (require.main === module) {
         `the structure measure: the golden frames' top 40 % luma sd ${S7.sd} / ${S9.sd}, saturation ${S7.sat} / ${S9.sat}, the land ${S7.land} / ${S9.land} (the review's 49, 82–85, 115)`);
       const D7 = sunDiscOf(await load(path.join(FRAMES_DIR, 't1_07.jpg')), 541, 38, 7, 6);
       check(!!D7 && D7.max > 250 && D7.core >= 3 && D7.ring[1] > D7.ring[3] && D7.ring[3] > D7.ring[5], `the sun-disc measure on t1_07: a white core ${D7 ? D7.core : 0} px (max ${D7 ? D7.max : '—'}), the glow falling (1°/3°/5°: ${D7 ? [D7.ring[1], D7.ring[3], D7.ring[5]].join(' / ') : '—'})`);
+      // the clouds' measure counts clouds, not the rain: a storm's sky probe has the rain's streaks over its magenta (wow48
+      // run of f-sky4: 1–2 px wide, as vertical runs of 6–30 px with base = top, they lifted base/top 0.53 → 0.63). A cloud
+      // (60 × 30, its top 160, its base 60), two steep 1-px streaks of 200 (one over the cloud) and a 3-px mote: the streak and the mote are not cloud
+      const W = 160, Hh = 90, im = { w: W, h: Hh, d: new Uint8Array(W * Hh * 3) }, pr = { w: W, h: Hh, d: new Uint8Array(W * Hh * 3) };
+      const put = (o, x, y, v) => { const p = (y * W + x) * 3; o.d[p] = v[0]; o.d[p + 1] = v[1]; o.d[p + 2] = v[2]; };
+      for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) { put(im, x, y, y < 70 ? [120, 110, 150] : [40, 60, 30]); put(pr, x, y, y < 70 ? [230, 20, 230] : [40, 60, 30]); }
+      for (let y = 20; y < 50; y++) for (let x = 20; x < 80; x++) { const v = Math.round(160 - 100 * (y - 20) / 29); put(im, x, y, [v, v, v]); put(pr, x, y, [v, v, v]); }
+      for (let y = 2; y < 68; y++) for (const x0 of [44, 100]) { const x = x0 + Math.round(y * 0.08); put(im, x, y, [200, 200, 200]); put(pr, x, y, [200, 200, 200]); }
+      for (let y = 10; y < 13; y++) for (let x = 130; x < 133; x++) { put(im, x, y, [210, 200, 90]); put(pr, x, y, [210, 200, 90]); }
+      const Cm = looksOf(im, pr, null, { clouds: true }).clouds, own = cloudsOf(im, (x, y) => x >= 22 && x < 78 && y >= 20 && y < 50);
+      check(!!Cm && Cm.ratio !== null && Math.abs(Cm.ratio - own.ratio) < 0.02 && Math.abs(Cm.mean - own.mean) < 3, `the clouds' measure leaves the rain's streaks and the motes out: base/top ${Cm ? Cm.ratio : '—'} (the cloud's own ${own.ratio}), mean ${Cm ? Cm.mean : '—'} (${own.mean})`);
     }
     console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
     process.exit(fails ? 1 : 0);
