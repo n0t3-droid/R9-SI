@@ -433,10 +433,12 @@ await page.evaluate(`(${pageHelpers.toString()})(window)`);
 const settle = async (maxS, r, rm) => { const t = Date.now(); let s = null; while (Date.now() - t < maxS * 1000) { s = await ev(([r, rm]) => window.__S.pump(r, rm), [r, rm]); if (s.miss === 0 && s.dirty === 0) break; await wait(60); } return s; };
 
 // half a second of play: the world ahead first, then 15 frames, the last drawn and captured (2 Hz; 1 Hz when a picture costs > 1.5 s)
-let chunkN = 0;
+let chunkN = 0, sessionReal0 = Date.now(), overBudget = false;
+const REAL_BUDGET = +(process.env.REAL_BUDGET || 32 * 60) * 1000;   // a session's own wall-clock budget: a stall must not cost the run its files
 async function play(t0, tEnd, untilDone) {
   let last = null;
   for (;;) {
+    if (Date.now() - sessionReal0 > REAL_BUDGET) { overBudget = true; const t = (await ev(() => VR.game.time)) - t0; console.log(`  !! the session's real-time budget is spent at ${t.toFixed(0)} s of play`); return { t, last: last || { done: true } }; }
     let s = await ev(() => window.__S.ready(4, 2));
     // (columns missing: up to 20 s; only sections to mesh — a Baustelle keeps rewriting them —: up to 6 s)
     if (s.miss || s.dirty > 8) { const w0 = Date.now(), cap = s.miss ? 20000 : 6000; while ((s.miss || s.dirty > 8) && Date.now() - w0 < cap) { await wait(50); s = await ev(() => window.__S.pump(4, 2)); } RUN.waits++; RUN.waitS += (Date.now() - w0) / 1000; }
@@ -454,6 +456,7 @@ async function play(t0, tEnd, untilDone) {
 async function session(type, setup, script) {
   console.log(`== ${type} (${secs()})`);
   const real0 = Date.now(), r0 = RUN.renders.length, w0 = [RUN.waits, RUN.waitS];
+  sessionReal0 = real0; overBudget = false;
   const rec = { type, seed: SEED, preset: 'balanced', size: [VW, VH], dur: DUR, build: BUILD, parts: [], notes: setup.notes || [], exclude: [] };
   await ev((o) => { const g = VR.game, p = g.player; p.flying = false; if (o.at) { p.teleport(o.at[0], o.at[1], o.at[2]); } if (o.yaw !== undefined) { p.yaw = o.yaw; p.viewYaw = o.yaw; } p.pitch = 0; if (p.vel) { p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; } g.env.setTime(o.tod); g.env.rain = 0; g.env.rainTarget = 0; window.__S.pics = []; window.__S.log = []; window.__S.stat = { hops: 0, jumps: 0 }; window.__S.set({ kind: 'idle' }); }, setup);
   const st = await settle(90, 6, 3);
@@ -463,7 +466,7 @@ async function session(type, setup, script) {
   const t0 = start.t; rec.tod0 = Math.round(start.tod); rec.day = start.day;
   let tNow = 0;
   for (const part of script) {
-    if (tNow >= DUR - 0.25) break;
+    if (tNow >= DUR - 0.25 || overBudget) break;
     const P = { name: part.name, de: part.de, t0: +tNow.toFixed(2) };
     if (part.need) {
       const has = await ev(part.need).catch(() => false);
@@ -478,7 +481,7 @@ async function session(type, setup, script) {
     rec.parts.push(P);
     console.log(`  · ${part.name} ${P.t0}–${P.t1} s${P.failed ? ' FAILED ' + P.failed : ''} ${JSON.stringify(P.status && { stat: P.status.stat, route: P.status.route, B: P.status.B && { phase: P.status.B.phase, ding: P.status.B.ding, tries: P.status.B.tries, whys: P.status.B.whys.slice(-4), site: !!P.status.B.site } })} (${secs()})`);
   }
-  if (tNow < DUR - 0.25) {
+  if (tNow < DUR - 0.25 && !overBudget) {
     await ev(() => window.__S.set({ kind: 'look', sec: 999, speed: 0.25 }));
     const P = { name: 'linger', de: 'Umsehen bis zum Ende', t0: +tNow.toFixed(2) };
     const r = await play(t0, DUR, false); tNow = r.t; P.t1 = +tNow.toFixed(2); rec.parts.push(P);
@@ -492,7 +495,7 @@ async function session(type, setup, script) {
   const c0 = start.cost, c1 = end.cost, fr = c1.frames - c0.frames, sm = c1.samples - c0.samples;
   rec.cost = { frames: fr, msPerFrame: +((c1.ms - c0.ms) / Math.max(1, fr)).toFixed(5), worstMs: +c1.worst.toFixed(3), samples: sm, msPerSample: +((c1.sampleMs - c0.sampleMs) / Math.max(1, sm)).toFixed(4), emits: c1.emits - c0.emits, msPerEmit: +((c1.emitMs - c0.emitMs) / Math.max(1, c1.emits - c0.emits)).toFixed(4) };
   const rs = RUN.renders.slice(r0).sort((a, b) => a - b);
-  rec.run = { realS: Math.round((Date.now() - real0) / 1000), pictures: rs.length, renderMsMedian: rs.length ? Math.round(rs[rs.length >> 1]) : 0, picHz: 2 / RUN.picEvery, waits: RUN.waits - w0[0], waitS: Math.round(RUN.waitS - w0[1]), hops: end.stat.hops, jumps: end.stat.jumps, walkerLog: end.log.slice(-40), end: end.pos.map(v => +v.toFixed(1)) };
+  rec.run = { overBudget, realS: Math.round((Date.now() - real0) / 1000), pictures: rs.length, renderMsMedian: rs.length ? Math.round(rs[rs.length >> 1]) : 0, picHz: 2 / RUN.picEvery, waits: RUN.waits - w0[0], waitS: Math.round(RUN.waitS - w0[1]), hops: end.stat.hops, jumps: end.stat.jumps, walkerLog: end.log.slice(-40), end: end.pos.map(v => +v.toFixed(1)) };
   analyze(rec);
   // the twelve frames and the one in the middle of the longest gap
   const gl = rec.metrics.gaps.longest, times = rec.frames.map(f => t0 + f.t).concat([t0 + (gl.a + gl.b) / 2]);
