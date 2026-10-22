@@ -349,7 +349,7 @@ if (want('E') && !process.env.NO_COST) {
 fs.writeFileSync(SHOTS + 'erlebnis.json', JSON.stringify(OUT, null, 1));
 const rows = [];
 const P = (n) => (fs.existsSync(SHOTS + n) ? SHOTS + n : null);
-rows.push({ label: 'Die Aktion: Schiff · Tür · Truhe', imgs: [P('erlebnis_prompt_ship.jpg'), P('erlebnis_prompt_door.jpg'), P('erlebnis_prompt_chest.jpg')], labels: ['[V] ' + (OUT.prompts.ship || '—'), OUT.prompts.door || '—', OUT.prompts.chest || '—'] });
+rows.push({ label: 'Die Aktion: Schiff · Tür · Truhe', imgs: [P('erlebnis_prompt_ship.jpg'), P('erlebnis_prompt_door.jpg'), P('erlebnis_prompt_chest.jpg')], labels: [OUT.prompts.ship || '—', OUT.prompts.door || '—', OUT.prompts.chest || '—'] });
 rows.push({ label: 'Die Aktion: Bett · Dorfbewohner · Reiseziel', imgs: [P('erlebnis_prompt_bed.jpg'), P('erlebnis_prompt_villager.jpg'), P('erlebnis_prompt_travel.jpg')], labels: [OUT.prompts.bed || '—', OUT.prompts.villager || '—', OUT.prompts.travel || '—'] });
 const tp = fs.readdirSync(SHOTS).filter(f => /^erlebnis_trip_\d\d_/.test(f)).sort();
 for (let i = 0; i < tp.length; i += 3) rows.push({ label: 'Platz → Turmzitadelle', imgs: tp.slice(i, i + 3).map(f => SHOTS + f).concat([null, null, null]).slice(0, 3), labels: tp.slice(i, i + 3).map(f => f.replace(/^erlebnis_trip_\d\d_|\.jpg$/g, '')).concat(['', '', '']).slice(0, 3) });
