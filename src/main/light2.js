@@ -251,11 +251,13 @@
     // e: within 3.5 L* of the old curve), the mid-tones' saturation up, the vignette lighter, the glow by day wider;
     // after run 3: the golden hour's split 10.1 against the frames' 6.2 — its lights' lean eased; at night the many light
     // lines' glow washed the avenue's paving cyan — the night's glow narrower, threshold 0.62, strength 0.25)
-    // (t-polish2, gap 4: v0.48's golden land against the frames' — bands ΔE 30.8, split 9.2 against their 6.2: its lights
-    // leaned twice as warm as theirs and its mid-tones ran more saturated — the lights' lean halved, the saturation 1.16 →
-    // 1.04, the S 0.32 → 0.26; test/land_grade.js over t-light2's seven golden pictures: ΔE 29.4, split 6.5)
+    // (t-polish2, gap 4: v0.48's golden land against the frames' — its mid-tones ran more saturated than theirs: the
+    // saturation 1.16 → 1.04, the S 0.32 → 0.26. The split of warm light over cool shade held at the frames' 6.2: the first
+    // fit halved the lights' lean on t-light2's pictures (split 9.2), but polish2.mjs's run 1 measured v0.48 at 5.8 and
+    // the halved lean at 2.3 — over both sets (test/land_grade.js, 320 × 180) v0.48 sits at 6.2; now the lights ×0.85 and
+    // the shade's cool lean ×1.5: split 6.1, bands ΔE 30.9 / 29.8 → 29.3 / 28.3)
     day: { toe: 0.014, mid: 0.5, s: 0.3, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.1, vig: 0.16, bThr: 1.05, bStr: 0.13 },
-    gold: { toe: 0.016, mid: 0.5, s: 0.26, sh: 0.985, dark: [-0.02, 0.0, 0.04], light: [0.031, 0.011, -0.0225], sat: 1.04, vig: 0.2, bThr: 0.9, bStr: 0.17 },
+    gold: { toe: 0.016, mid: 0.5, s: 0.26, sh: 0.985, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.04, vig: 0.2, bThr: 0.9, bStr: 0.17 },
     dusk: { toe: 0.022, mid: 0.5, s: 0.28, sh: 0.975, dark: [0.01, -0.014, 0.05], light: [0.065, 0.018, -0.035], sat: 1.15, vig: 0.24, bThr: 0.75, bStr: 0.22 },
     night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.62, bStr: 0.25 },
   };

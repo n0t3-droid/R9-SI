@@ -101,9 +101,11 @@ console.log('4 · the golden hour\'s grade toward the frames (light2.js GRADE.go
     worst = Math.max(worst, ...b.map((x, i) => Math.abs(x - c[i])));
   }
   check(worst < 0.004, 'land_grade.js: the grade taken back out of a picture gives back its colour (the measure\'s footing)', worst.toFixed(4));
-  // the stop: the lights' lean halved (v0.48's golden split 9.2 against the frames' 6.2), the mid-tones less saturated
+  // the stop: the mid-tones less saturated; the split of warm light over cool shade held at the frames' 6.2 (polish2.mjs
+  // run 1: v0.48 measured 5.8 there, 9.2 on t-light2's pictures — 6.2 over both; the first fit's halved lean gave 2.3):
+  // the lights' lean ×0.85, the shade's cool lean ×1.5
   const lean = (G, l) => { const c = L2.split([l, l, l], G.dark, G.light); return c[0] - c[2]; };
-  check(lean(g, 0.85) > 0.02 && lean(g, 0.85) < lean(g48, 0.85) * 0.6 && lean(g, 0.1) < -0.01 && JSON.stringify(g.dark) === JSON.stringify(g48.dark), 'the lights\' warm lean about half of v0.48\'s, the shade\'s cool lean kept', [lean(g48, 0.85), lean(g, 0.85), lean(g, 0.1)].map(x => x.toFixed(3)).join(' · '));
+  check(lean(g, 0.85) > 0.02 && Math.abs(lean(g, 0.85) / lean(g48, 0.85) - 0.85) < 0.05 && lean(g, 0.1) < lean(g48, 0.1) - 0.003 && g.dark.every((x, i) => Math.abs(x - 1.5 * g48.dark[i]) < 1e-9), 'the lights\' warm lean 0.85 of v0.48\'s, the shade\'s cool lean ×1.5 (the split held)', [lean(g48, 0.85), lean(g, 0.85), lean(g48, 0.1), lean(g, 0.1)].map(x => x.toFixed(3)).join(' · '));
   check(g.sat < g48.sat && g.sat >= 1 && g.s <= g48.s && g.mid === g48.mid && g.toe === g48.toe && g.sh === g48.sh, 'the mid-tones\' saturation 1.16 → ' + g.sat + ', the S ' + g48.s + ' → ' + g.s + '; the curve\'s ends and middle kept (the sky\'s fit)');
   // a warm sunlit wall in the middle of the picture: less orange than v0.48 graded it, still warm
   const m = { day: 0.06, gold: 0.94, dusk: 0, night: 0 }, wall = [0.78, 0.6, 0.42];
