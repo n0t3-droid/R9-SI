@@ -76,7 +76,7 @@ check(V.makeGen('basalt', SEED, {}) instanceof BG && V.makeGen('opal', SEED, {})
   const names = ['regolith', 'regolith_dark', 'tholin_ice'], types = names.map(n => R.byName[n]);
   check(types.every(Boolean), 'the blocks regolith, regolith_dark, tholin_ice exist');
   // (a-foes: later late blocks may follow them — the Leuchtfeuer does: the three in a row, after every shipped block)
-  const snapEnd = JSON.parse(require('fs').readFileSync(__dirname + '/id_snapshot.json', 'utf8')).reduce((m, r) => Math.max(m, r[1] + r[2]), 0);
+  const snapEnd = JSON.parse(require('fs').readFileSync(require('path').join(__dirname, '..', 'test', 'id_snapshot.json'), 'utf8')).reduce((m, r) => Math.max(m, r[1] + r[2]), 0);
   const ix = types.map(t => R.types.indexOf(t)), last = ix.map(i => R.types[i].name).join();
   check(ix[1] === ix[0] + 1 && ix[2] === ix[0] + 2 && types[0].base >= snapEnd, 'appended late, in a row, after every shipped block (VR.BL.late)', last + ' from ' + types[0].base);
   check(types.every(t => R.T.flags[t.defaultState] & V.F.OPAQUE), 'all three full opaque blocks');
