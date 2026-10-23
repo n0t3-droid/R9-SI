@@ -3,6 +3,7 @@
 // stand-in for WebGL, and every recorded draw is rasterised in software (perspective, z-buffer, a sun and the sky's
 // hemisphere; the emissive voxels unlit and tinted, as the vox shader lights them). Three rows:
 //   test/shots/foe_sheet_patrol.png — Bohrläufer, Wächter, Kranarm, Schattendrohne, Schattenwesen as they patrol
+//   test/shots/foe_sheet_lite.png   — the same on Very Low: a machine at rest drawn whole (one mesh, the optic, the core)
 //   test/shots/foe_sheet_warn.png   — each in its warning (the optic flaring, the shield swung aside, the arm raised)
 //   test/shots/foe_sheet_after.png  — a power-down (kneeling), a calmed Wächter, a Helfer, the parts, a bolt, a pile
 // Each picture is checked to hold the foes (pixels drawn); ALL OK when every one does.
@@ -114,9 +115,24 @@ const scene = (name, list, extra, eye, at, dim) => {
   check(cv.drawn > 20000, name + ': ' + list.length + ' foes, ' + REC.length + ' draws, ' + cv.drawn + ' pixels');
   return cv;
 };
-const OUT = path.join(__dirname, 'shots'); fs.mkdirSync(OUT, { recursive: true });
+const OUT = path.join(__dirname, '..', 'test', 'shots'); fs.mkdirSync(OUT, { recursive: true });   // (test/shots, run from test/ or from .tmp_tests/)
 const X = [-3.6, -1.6, 0.6, 2.3, 3.8];
-scene('foe_sheet_patrol', [mob('driller', X[0], 0, 0.45), mob('sentry', X[1], 0, 0.25), mob('crane', X[2], 0.6, -0.5), mob('drone', X[3], 0, -0.3), mob('wisp', X[4], 0, -0.5)]);
+const row = () => { ID = 1; return [mob('driller', X[0], 0, 0.45), mob('sentry', X[1], 0, 0.25), mob('crane', X[2], 0.6, -0.5), mob('drone', X[3], 0, -0.3), mob('wisp', X[4], 0, -0.5)]; };   // (the same ids: the same bob and breath)
+const pat = scene('foe_sheet_patrol', row());
+// Very Low (the animation off): a machine at rest drawn whole — one mesh and its tinted optic and core — looks the same
+En.game = { settings: { anim: false } };
+const lite = scene('foe_sheet_lite', row());
+En.game = null;
+{
+  let fg = 0, diff = 0;
+  for (let i = 0; i < pat.zb.length; i++) {
+    if (pat.zb[i] >= 1e30 && lite.zb[i] >= 1e30) continue;
+    fg++;
+    const d = Math.max(Math.abs(pat.col[i * 3] - lite.col[i * 3]), Math.abs(pat.col[i * 3 + 1] - lite.col[i * 3 + 1]), Math.abs(pat.col[i * 3 + 2] - lite.col[i * 3 + 2]));
+    if (d > 0.1) diff++;
+  }
+  check(diff / fg < 0.04, 'Very Low draws the machines whole: ' + (100 * diff / fg).toFixed(1) + ' % of the foes\' pixels differ from every part drawn (≤ 4 %)');
+}
 scene('foe_sheet_warn', [
   mob('driller', X[0], 0, 0.45, (f) => { f.st = 'tele'; f.t = 0.7; f.flare = 0.9; }),
   mob('sentry', X[1], 0, 0.25, (f) => { f.st = 'tele'; f.t = 0.5; f.flare = 0.8; }),

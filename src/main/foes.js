@@ -921,26 +921,35 @@
   // ---------------------------------------------------------------- drawing (entities.js draw → F.draw; the vox program is bound)
   const mat4 = VR.mat4, M1 = mat4 ? mat4.create() : null, MB = mat4 ? mat4.create() : null, IDENT = mat4 ? mat4.create() : null;
   const ONE = [1, 1, 1];
+  // the tint and the flash a part sets only when they change (a part: three GL calls, not five); NaN: not known yet
+  let T0 = NaN, T1 = NaN, T2 = NaN, FL = NaN;
+  const glUnknown = () => { T0 = T1 = T2 = FL = NaN; };
+  function tintTo(gl, p, c) { if (c[0] !== T0 || c[1] !== T1 || c[2] !== T2) { T0 = c[0]; T1 = c[1]; T2 = c[2]; gl.uniform3f(p.u.u_tint, T0, T1, T2); } }
+  function flashTo(gl, p, v) { if (v !== FL) { FL = v; gl.uniform1f(p.u.u_flash, v); } }
   function part(r, p, model, name, base, L, rx, ry, rz, tint, flash) {
     const pr = model.parts[name]; if (!pr) return;
     const gl = r.gl, t = M1; t.set(base);
     const lay = model.def.layout[name] || [0, 0, 0];
     mat4.translate(t, t, L ? L[0] : lay[0], L ? L[1] : lay[1], L ? L[2] : lay[2]);
     if (ry) mat4.rotY(t, t, ry); if (rx) mat4.rotX(t, t, rx); if (rz) mat4.rotZ(t, t, rz);
-    const c = tint || ONE; gl.uniform3f(p.u.u_tint, c[0], c[1], c[2]);
-    gl.uniform1f(p.u.u_flash, flash || 0);
+    tintTo(gl, p, tint || ONE); flashTo(gl, p, flash || 0);
     gl.uniformMatrix4fv(p.u.u_model, false, t);
     gl.bindVertexArray(pr.vao); gl.drawArrays(gl.TRIANGLES, 0, pr.count);
     F.cost.draws++;
   }
+  // a machine at rest is drawn whole (one mesh, foemodels.js) on Very Low — the animation is off there — and beyond
+  // LOD_D; its warning, strike, power-down and kneeling keep every part (the warning has to read)
+  const LOD_D = 28, REST = { patrol: 1, notice: 1, approach: 1, helper: 1, calm: 1 };
   const LP = [0, 0, 0], CORE = [0, 0, 0];
   F.draw = function (En, r, p, m, cam, time) {
     const t0 = now(), f = m.foe; if (!f || !mat4) return;
     const K = F.KINDS[f.k], gl = r.gl, model = VR.getVoxModel(gl, K.model); if (!model) return;
     const light = En.lightAt(m.pos[0], m.pos[1] + K.h * 0.6, m.pos[2]);
     gl.uniform1f(p.u.u_sky, light.sky); gl.uniform3f(p.u.u_blockLight, light.bl[0], light.bl[1], light.bl[2]);
-    if (p.u.u_sunShadow) gl.uniform1f(p.u.u_sunShadow, En.sunShade ? En.sunShade(m.pos, K.h * 0.6) : 0);
+    // (the terrain's shade toward the sun: a ray through the height map, so once every few frames per foe)
+    if (p.u.u_sunShadow) { if (!((f.shadeN = (f.shadeN | 0) - 1) > 0)) { f.shade = En.sunShade ? En.sunShade(m.pos, K.h * 0.6) : 0; f.shadeN = 6; } gl.uniform1f(p.u.u_sunShadow, f.shade || 0); }
     gl.uniform1f(p.u.u_noFog, 0);
+    glUnknown();
     const B = MB; B.set(IDENT);
     const kn = f.kneel || 0, bob = K.fly ? Math.sin(f.spin * 2.2 + f.id) * 0.05 : 0;
     mat4.translate(B, B, m.pos[0] - cam.x, m.pos[1] - cam.y + bob - kn * K.kneel / 16, m.pos[2] - cam.z);
@@ -956,7 +965,12 @@
     const hint = (Adv() && rec() ? Adv().hints(rec().tension) : 0) + ((rec() && rec().me.pts.spu >= 3) ? 1 : 0), glow = hint ? 1.6 : 1;
     if (f.helper || f.st === 'helper') { CORE[0] = 0.35; CORE[1] = 1.2; CORE[2] = 1.4; } else { CORE[0] = opt[0] * glow; CORE[1] = opt[1] * glow; CORE[2] = opt[2] * glow; }
     const s = Math.sin(f.walk * 3) * 0.6 * (m.walkAmt || 0);
-    switch (f.k) {
+    const st = En.game && En.game.settings, cdx = m.pos[0] - cam.x, cdz = m.pos[2] - cam.z;
+    if (model.parts.whole && REST[f.st] && kn < 0.02 && ((st && st.anim === false) || cdx * cdx + cdz * cdz > LOD_D * LOD_D)) {
+      part(r, p, model, 'whole', B, null, 0, 0, 0, null, fl);
+      part(r, p, model, 'optic', B, null, 0, 0, 0, opt, 0);
+      if (model.parts.core) part(r, p, model, 'core', B, null, 0, 0, 0, CORE, 0);
+    } else switch (f.k) {
       case 'driller': {
         const sp = kn * 0.75;
         part(r, p, model, 'leg_fl', B, null, s, 0, -sp, null, fl); part(r, p, model, 'leg_br', B, null, s, 0, sp, null, fl);
@@ -1002,7 +1016,7 @@
         break;
       }
     }
-    gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_flash, 0);   // (the program's tint as the next model expects it)
+    tintTo(gl, p, ONE); flashTo(gl, p, 0);   // (the program's tint as the next model expects it)
     F.cost.drawMs += now() - t0;
   };
   const A0 = (f) => F.KINDS[f.k].att.recover;
@@ -1010,6 +1024,7 @@
   F.drawExtra = function (En, r, p, cam) {
     if (!mat4 || (!F.bits.length && !F.bolts.length && !F.pile && !(F.rbolts && F.rbolts.length))) return;
     const gl = r.gl, t0 = now();
+    glUnknown();
     const one = (name, pos, rx, ry, sc, tint) => {
       const md = VR.getVoxModel(gl, name); if (!md) return;
       const B = MB; B.set(IDENT); mat4.translate(B, B, pos[0] - cam.x, pos[1] - cam.y, pos[2] - cam.z); if (ry) mat4.rotY(B, B, ry); if (rx) mat4.rotX(B, B, rx); mat4.scale(B, B, sc / 16, sc / 16, sc / 16);
@@ -1021,7 +1036,7 @@
     for (const b of F.bolts) one('foe_bolt', b.pos, 0, b.t * 6, 1.1, BT);
     if (F.rbolts) for (const b of F.rbolts) one('foe_bolt', b.pos, 0, 0, 1.1, BT);
     if (F.pile) one('foe_pile', F.pile.pos, 0, (r.frame || 0) * 0.02, 1.2, null);
-    gl.uniform3f(p.u.u_tint, 1, 1, 1); gl.uniform1f(p.u.u_flash, 0);
+    tintTo(gl, p, ONE); flashTo(gl, p, 0);
     F.cost.drawMs += now() - t0;
   };
 

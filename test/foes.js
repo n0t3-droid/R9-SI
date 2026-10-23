@@ -41,7 +41,8 @@ for (const k of KINDS) {
   const K = F.KINDS[k], mob = V.MOBS['foe_' + k];
   check(!!mob && mob.foe === true && !mob.hostile && mob.foeKind === k, k + ': a mob kind foe_' + k + ' (foe, never hostile: an Abenteuer world is peaceful)');
   const M = V.VOXMODELS[K.model] && V.VOXMODELS[K.model]();
-  check(!!M && M.parts && Object.keys(M.parts).length >= 1 && Object.keys(M.parts).length <= 8, k + ': its own voxel model ' + K.model + ' (' + (M ? Object.keys(M.parts).join(' ') : 'none') + ')');
+  const pn = M ? (M.order || Object.keys(M.parts)) : [];   // (the articulated parts; 'whole' is the machine in one mesh for Very Low)
+  check(!!M && pn.length >= 1 && pn.length <= 8 && (!M.parts.whole || pn.indexOf('whole') < 0), k + ': its own voxel model ' + K.model + ' (' + pn.join(' ') + (M && M.parts.whole ? ' + whole' : '') + ')');
   check(K.fam === 'shadow' || !!(M && M.parts.optic), k + ': an optic of its own (tinted red-violet → green, flares in the telegraph)');
   check(K.hp > 0 && K.att && K.att.tele >= F.MIN_TELE, k + ': ' + K.hp + ' half-hearts, attack ' + K.att.kind + ' telegraphed ' + K.att.tele + ' s');
   let minT = Infinity;
@@ -329,6 +330,29 @@ console.log('9 · a foe\'s step');
     best = Math.min(best, us);
   }
   check(best <= 20, 'a foe\'s step ' + best.toFixed(2) + ' µs (≤ 20; twelve foes ' + (best * 12 / 1000).toFixed(3) + ' ms a frame)');
+}
+{
+  // a foe's draw: the GL calls for twelve (four Bohrläufer, four Wächter, four drones — the browser's cost scene) at
+  // 10–25 m. On Very Low (the animation off there) a machine at rest is one mesh, its optic and its core; a part sets
+  // its tint and flash only when they change. Browser run 3 measured F.draw at 0.97 ms for 63 draws on Very Low
+  // (SwiftShader), the calls being the cost — before: every part five calls, every foe six more.
+  const calls = { draw: 0, all: 0 }, gpu = V.VoxGPU.upload;
+  V.VoxGPU.upload = (gl, mesh) => ({ vao: {}, count: mesh.count });
+  const glc = { TRIANGLES: 4 };
+  for (const k of ['uniform1f', 'uniform3f', 'uniformMatrix4fv', 'bindVertexArray', 'drawArrays']) glc[k] = () => { calls.all++; if (k === 'drawArrays') calls.draw++; };
+  const r = { gl: glc, frame: 0 }, prog = { u: { u_tint: 1, u_flash: 2, u_model: 3, u_sky: 4, u_blockLight: 5, u_sunShadow: 6, u_noFog: 7 } };
+  const En = { lightAt: () => ({ sky: 1, bl: [0, 0, 0] }), sunShade: () => 0, game: { settings: { anim: true } } }, cam = { x: 0, y: 66, z: 0 };
+  const twelve = ['driller', 'driller', 'driller', 'driller', 'sentry', 'sentry', 'sentry', 'sentry', 'drone', 'drone', 'drone', 'drone'].map((k, i) => { const a = i / 12 * Math.PI * 2, d = 10 + (i % 4) * 5, mm = mob(k, 300 + i, [Math.sin(a) * d, 64, Math.cos(a) * d]); mm.foe.st = 'approach'; return mm; });
+  const frame = () => { calls.draw = 0; calls.all = 0; for (const mm of twelve) F.draw(En, r, prog, mm, cam, 0); return { draw: calls.draw, all: calls.all }; };
+  const full = frame(), before = twelve.length * 6 + full.draw * 5;
+  En.game.settings.anim = false; const lite = frame();
+  twelve[0].foe.st = 'tele'; twelve[0].foe.t = 0.4; twelve[0].foe.flare = 0.5; const warn = frame();
+  const whole = V.getVoxModel(glc, 'foe_driller').parts.whole, sum = ['leg_fl', 'leg_fr', 'leg_bl', 'leg_br', 'body', 'drill'].reduce((a, n) => a + V.getVoxModel(glc, 'foe_driller').parts[n].count, 0);
+  V.VoxGPU.upload = gpu;
+  check(full.draw === 76 && full.all < before, 'twelve foes, every part: ' + full.draw + ' draws in ' + full.all + ' GL calls (before ' + before + ')');
+  check(lite.draw === 32 && lite.all <= before * 0.45, 'on Very Low at rest: ' + lite.draw + ' draws in ' + lite.all + ' GL calls (' + Math.round(100 - lite.all / before * 100) + ' % fewer than before)');
+  check(warn.draw === lite.draw - 3 + 8, 'a Bohrläufer in its warning keeps every part on Very Low (' + (warn.draw - lite.draw + 3) + ' draws): the warning reads');
+  check(!!whole && Math.abs(whole.count - sum) <= sum * 0.1, 'the Bohrläufer whole: ' + (whole ? whole.count : 0) + ' vertices, about its six parts\' ' + sum + ' (the faces between them gone, the shade where they meet added)');
 }
 
 // ---------------------------------------------------------------- 10 · the words

@@ -20,12 +20,28 @@
   const M = VR.VOXMODELS, Grid = VR.VoxGrid;
   if (!M || !Grid) return;
   const part = (sx, sy, sz, pivot, build) => { const g = new Grid(sx, sy, sz, pivot[0], pivot[1], pivot[2]); build(g); return { grid: g, pivot: [0, 0, 0] }; };
+  // the whole machine in its rest pose as one mesh, 'whole' (F.draw: on Very Low — the animation off there — and far
+  // away, a machine at rest is three draws, not eight; the optic and the core stay parts of their own, tinted). The
+  // parts are copied in order at their layout places (integers), so a later part covers an earlier one where they
+  // overlap; def.order keeps a generic drawer to the real parts.
+  const whole = (def, names) => {
+    let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+    for (const n of names) { const g = def.parts[n].grid, L = def.layout[n]; x0 = Math.min(x0, L[0] - g.ox); y0 = Math.min(y0, L[1] - g.oy); z0 = Math.min(z0, L[2] - g.oz); x1 = Math.max(x1, L[0] - g.ox + g.sx); y1 = Math.max(y1, L[1] - g.oy + g.sy); z1 = Math.max(z1, L[2] - g.oz + g.sz); }
+    const W = new Grid(x1 - x0, y1 - y0, z1 - z0, -x0, -y0, -z0);
+    for (const n of names) {
+      const g = def.parts[n].grid, L = def.layout[n], dx = L[0] - g.ox - x0, dy = L[1] - g.oy - y0, dz = L[2] - g.oz - z0;
+      for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) { const c = g.c[g.i(x, y, z)]; if (c) W.c[W.i(x + dx, y + dy, z + dz)] = c; }
+    }
+    def.order = Object.keys(def.parts);
+    def.parts.whole = { grid: W, pivot: [0, 0, 0] }; def.layout.whole = [0, 0, 0];
+    return def;
+  };
   // the palette: weathered white and orange plating, grey joints, rust; the optic and the core are white (tinted)
   const WH = 0xe6dfd2, WH2 = 0xd4cbbb, OR = 0xe2702c, OR2 = 0xb4521c, GR = 0x5b616a, GR2 = 0x3a3f47, DK = 0x24272d, RU = 0x95603c, LENS = 0xf6f2ff;
   const weather = (base, x, y, z) => { const h = ((x * 73856093) ^ (y * 19349663) ^ (z * 83492791)) >>> 0; return h % 23 === 0 ? RU : h % 7 === 0 ? WH2 : base; };
 
   // ---------------------------------------------------------------- Bohrläufer
-  M.foe_driller = () => ({
+  M.foe_driller = () => whole({
     h: 1.15, w: 0.55, gait: 'quad', parts: {
       body: part(14, 10, 20, [7, 4, 10], (g) => {
         g.ell(7, 5, 10, 6.6, 4.6, 9.6, (x, y, z) => (y <= 2 ? GR2 : y === 4 && (z & 3) !== 0 ? OR : y < 4 ? OR2 : weather(WH, x, y, z)), { shade: 0.08 });
@@ -44,10 +60,10 @@
       leg_br: part(3, 9, 3, [1, 8, 1], (g) => { g.box(0, 5, 0, 2, 8, 2, GR); g.box(0, 1, 0, 2, 4, 2, (x, y, z) => (y === 3 ? OR : WH)); g.box(0, 0, 0, 2, 0, 2, DK); }),
     },
     layout: { body: [0, 9, 0], drill: [0, 9, -10], optic: [0, 13, -9], core: [0, 13.5, 6], leg_fl: [-6, 9, -6], leg_fr: [6, 9, -6], leg_bl: [-6, 9, 6], leg_br: [6, 9, 6] },
-  });
+  }, ['leg_fl', 'leg_fr', 'leg_bl', 'leg_br', 'body', 'drill']);
 
   // ---------------------------------------------------------------- Wächter
-  M.foe_sentry = () => ({
+  M.foe_sentry = () => whole({
     h: 1.9, w: 0.45, gait: 'biped', parts: {
       leg_l: part(4, 13, 5, [2, 12, 2], (g) => { g.box(0, 7, 0, 3, 12, 3, GR); g.box(0, 1, 0, 3, 6, 3, (x, y, z) => (y === 5 ? OR : weather(WH, x, y, z))); g.box(0, 0, -1, 3, 0, 4, DK); }),
       leg_r: part(4, 13, 5, [2, 12, 2], (g) => { g.box(0, 7, 0, 3, 12, 3, GR); g.box(0, 1, 0, 3, 6, 3, (x, y, z) => (y === 5 ? OR : weather(WH, x, y, z))); g.box(0, 0, -1, 3, 0, 4, DK); }),
@@ -72,10 +88,10 @@
       }),
     },
     layout: { leg_l: [-3, 13, 0], leg_r: [3, 13, 0], body: [0, 13, 0], head: [0, 26, -1], optic: [0, 29, -5], core: [0, 20, 4.5], arm: [-7, 24, -2], shield: [6, 18, -7] },
-  });
+  }, ['leg_l', 'leg_r', 'body', 'head', 'arm', 'shield']);
 
   // ---------------------------------------------------------------- Kranarm
-  M.foe_crane = () => ({
+  M.foe_crane = () => whole({
     h: 1.4, w: 0.6, gait: 'turret', parts: {
       base: part(14, 8, 14, [7, 0, 7], (g) => {
         g.box(0, 0, 0, 13, 2, 13, (x, y, z) => ((x + z) % 6 === 0 ? OR : GR2));
@@ -93,10 +109,10 @@
       optic: part(4, 4, 1, [2, 2, 0], (g) => { g.ell(1.5, 1.5, 0.5, 1.9, 1.9, 0.9, LENS, { emis: 1 }); }),
     },
     layout: { base: [0, 0, 0], core: [0, 8, 0], arm: [0, 10, 0], head: [0, 9, -22], optic: [0, 12, -26.5] },
-  });
+  }, ['base', 'arm', 'head']);
 
   // ---------------------------------------------------------------- Schattendrohne
-  M.foe_drone = () => ({
+  M.foe_drone = () => whole({
     h: 0.6, w: 0.35, gait: 'hover', fly: true, parts: {
       shell: part(11, 8, 11, [5, 4, 5], (g) => {
         g.ell(5, 4, 5, 5.2, 3.8, 5.2, (x, y, z) => (y === 4 ? 0x9ea4b0 : y < 3 ? 0xc9ccd6 : 0xf2f3f7), { shade: 0.05 });
@@ -106,7 +122,7 @@
       ring: part(15, 1, 15, [7, 0, 7], (g) => { for (let x = 0; x < 15; x++) for (let z = 0; z < 15; z++) { const d = Math.hypot(x - 7, z - 7); if (d >= 6.2 && d <= 7.2 && ((Math.atan2(z - 7, x - 7) * 4 / Math.PI + 8) % 2) < 1.4) g.set(x, 0, z, 0x2a1f44); } }),
     },
     layout: { shell: [0, 4, 0], optic: [0, 4.5, -5.6], ring: [0, 4, 0] },
-  });
+  }, ['shell', 'ring']);
 
   // ---------------------------------------------------------------- Schattenwesen
   M.foe_wisp = () => ({
