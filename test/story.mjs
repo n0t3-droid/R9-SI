@@ -223,6 +223,7 @@ try {
   // ---------------------------------------------------------------- 5 · the journal
   await section('5', async () => {
     console.log('5 · the journal\'s chapter page');
+    await ev(() => { for (const id of ['advup', 'libban']) { const el = document.getElementById(id); if (el) el.className = ''; } });   // (the level-up of the beats' XP: not in the journal's picture)
     const ok = await ev(() => { if (!VR.Quests || !VR.Quests.journal) return false; VR.Quests.journal(); return VR.game.ui.screen === 'journal'; });
     check(ok, 'the journal opens');
     const t = await ev(() => { const el = document.querySelector('.jstory'); return el ? el.textContent.slice(0, 400) : null; });
@@ -278,16 +279,18 @@ try {
     const t0 = Date.now(); let sp = null;
     for (;;) { await run(6, 1); sp = await ev(() => { const need = VR.SpaceScene.cur_need || []; return { done: need.filter(s => s.done).length, need: need.length }; }); if ((sp.need && sp.done === sp.need) || Date.now() - t0 > 90000) break; await wait(60); }
     for (let i = 0; i < 60; i++) { await run(4, 1); const s = await ev(() => { const PG = VR.PlanetLODGL; return PG ? { n: PG.stats.tiles, left: PG.pending() } : null; }); if (!s || !s.n || s.left === 0) break; await wait(80); }
+    await ev(() => { delete VR.game.story.rec.beats['c3.b2']; });   // (the run's order: chapter 4 came first)
     const o = await ev(() => { const g = VR.game, s = g.story; return { orbit: VR.StoryPlay.orbit(g), why: VR.Story.why(VR.Story.byId('c3.b2'), Object.assign(VR.StoryPlay.ctxOf(g, s), { calm: 30 }), s.rec), regime: g.flight && g.flight.regime }; });
     check(o.orbit && o.why === null, 'in orbit: c3.b2 holds (' + JSON.stringify(o) + ')');
     await ev(() => VR.StoryPlay.debug.play('c3.b2'));
     await ev(() => { const s = VR.game.story; if (s.scene) s.scene.t = 2.6; });
-    await run(6, 1);
-    await draw(null, 1);
+    await run(6, 1); await wait(5600); await run(2, 1);   // (orbit.mjs's wait: the planet's tiles)
+    await draw(null, 1); await draw(null, 1);
     const st = await ev(() => ({ station: VR.StoryPlay.station ? { blink: +VR.StoryPlay.station.blink.toFixed(2) } : null, scene: VR.StoryPlay.debug.state().scene }));
     check(!!st.station, 'the Ringstation\'s beacon in the space scene\'s list (' + JSON.stringify(st) + ')');
     // (the blink's bright phase for the picture: the page's clock decides it — a few tries)
-    for (let i = 0; i < 6; i++) { await draw(null, 1); const b = await ev(() => VR.StoryPlay.station ? VR.StoryPlay.station.blink : 0); if (b > 0.7) break; await wait(200); }
+    for (let i = 0; i < 6; i++) { await draw(null, 1); await draw(null, 1); const b = await ev(() => VR.StoryPlay.station ? VR.StoryPlay.station.blink : 0); if (b > 0.7) break; await wait(200); }
+    console.log('     space: ' + JSON.stringify(await ev(() => { const g = VR.game, r = g.renderer, SS = VR.SpaceScene, need = SS.cur_need || []; return { draws: r.stats.draws, tris: Math.round(r.stats.tris), need: need.length, done: need.filter(q => q.done).length, regime: g.flight && g.flight.regime, view: g.flight && g.flight.view, hp: g.flight && g.flight.headPitch, cam: VR.StoryPlay.station ? VR.StoryPlay.station.dir.map(v => +v.toFixed(3)) : null }; })));
     await shot('c3_station_beacon');
     N.c3 = { o, st };
     await page.keyboard.press('KeyE'); await run(4, 1);

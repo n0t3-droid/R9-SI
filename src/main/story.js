@@ -141,6 +141,8 @@
       this.resolve(sc);
       if (VR.Regie) VR.Regie.inScene(g, true);
       if (VR.EventLog) VR.EventLog.emit('story', b.id, 4, null, 'story');
+      // in orbit the ship's view holds, levelled on the horizon (the limb across the frame, the station above it)
+      const fl = g.flight; if (P.orbit(g) && fl) { sc.fl0 = { hp: fl.headPitch, hy: fl.headYaw }; fl.headPitch = 0.07; fl.headYaw = 0; }
       P.stats.scenes++;
       // ch. 2: the light ring replayed round the freed beacon (the moment's sights and its chord, not its rewards): it
       // leaves the beacon a second in, with Funke's first line
@@ -170,16 +172,16 @@
       sc.tg.sky = ahead(60, 60);
       const BS = VR.BodySky, md = BS && BS.cur && BS.cur.light && g.dim !== 'overworld' ? BS.cur.light.moonDir : null;
       sc.tg.amarant = md && md[1] > -0.05 ? [eye[0] + md[0] * 200, eye[1] + md[1] * 200, eye[2] + md[2] * 200] : ahead(80, 70);
-      // the Eiswächter: 9 m ahead, its back 3 m under the ice
-      const wx = eye[0] + fwd[0] * 9, wz = eye[2] + fwd[2] * 9, wy = top(wx, wz, eye[1] - 1.6);
-      sc.tg.warden = [wx, wy - 3.2, wz]; sc.wardenYaw = yaw + 0.6;
+      // the Eiswächter: 8 m ahead, standing frozen in the ice — its head 1.6 m under the surface — and facing the player
+      const wx = eye[0] + fwd[0] * 8, wz = eye[2] + fwd[2] * 8, wy = top(wx, wz, eye[1] - 1.6);
+      sc.tg.warden = [wx, wy - 1.6 - 1.9 * P.WARDEN_SCALE, wz]; sc.wardenYaw = yaw + 0.25; sc.surf = wy;
     }
     target(sc, name) {
       const g = this.g, p = g.player;
       if (name === 'player') return [p.pos[0], p.pos[1] + 1.2, p.pos[2]];
       if (name === 'funke') { const f = g.funke; return f && f.pos ? [f.pos[0], f.pos[1], f.pos[2]] : [p.pos[0], p.pos[1] + 1.7, p.pos[2]]; }
       if (name === 'beacon') return sc.tg.beacon || this.target(sc, 'funke');
-      if (name === 'warden') { const W = sc.tg.warden, a = sc.wardenYaw, k = 1.9 * P.WARDEN_SCALE / 2; return [W[0] + Math.sin(a) * k, W[1] + 0.6, W[2] + Math.cos(a) * k]; }   // (its middle: it lies with its head along the yaw)
+      if (name === 'warden') { const W = sc.tg.warden; return [W[0], W[1] + 1.45 * P.WARDEN_SCALE, W[2]]; }   // (its shoulders)
       return sc.tg[name] || sc.tg.horizon;
     }
     step(dt) {
@@ -193,6 +195,7 @@
       const g = this.g, sc = this.scene; if (!sc) return;
       this.scene = null; overlay(this, false);
       if (VR.Regie) VR.Regie.inScene(g, false);
+      if (sc.fl0 && g.flight) { g.flight.headPitch = sc.fl0.hp; g.flight.headYaw = sc.fl0.hy; }
       if (sc.b.id === 'c2.b2' && VR.Liberate && VR.Liberate.moment && VR.Liberate.moment.replay) VR.Liberate.moment = null;
       if (sc.seen) return;   // (watched again from the journal)
       S.mark(this.rec, sc.b.id, skipped ? 'skip' : 'done');
@@ -207,7 +210,7 @@
       this.wayKind = b.task.target;
       if (!fk || !fk.on || !fk.on()) return;
       if (fk.show) fk.show(T('story.task.' + k));
-      const tg = P.wayTarget(g);
+      const tg = P.wayTarget(g) || (b.task.target === 'vista' && fk.target ? fk.target(false) : null);   // (the vista: Funke's own — the nearest unseen one)
       if (tg && fk.startWay) { try { fk.startWay(tg); } catch (e) { /* the way */ } }
     }
     // the camera of the frame while a scene plays (null: the game's own)
@@ -225,10 +228,11 @@
       switch (sh.cam) {
         case 'close': {
           // beside the subject, a little below its eye line, on the player's side; a slow push-in
-          const d = (sh.target === 'funke' ? 1.25 : 4.5) * (1 - 0.18 * smooth(u)), dir = [pe[0] - Q[0], 0, pe[2] - Q[2]], L0 = Math.hypot(dir[0], dir[2]);
+          const d = (sh.target === 'funke' ? 2.3 : 4.5) * (1 - 0.15 * smooth(u)), dir = [pe[0] - Q[0], 0, pe[2] - Q[2]], L0 = Math.hypot(dir[0], dir[2]);
           if (L0 < 0.3) { dir[0] = f[0]; dir[2] = f[2]; }   // (the subject at the player's own place: from in front)
-          const L = Math.hypot(dir[0], dir[2]) || 1, sx = dir[0] / L, sz = dir[2] / L, C = [Q[0] + (sx * 0.8 + sz * 0.6) * d, Q[1] + 0.12 * d, Q[2] + (sz * 0.8 - sx * 0.6) * d];
-          return lookAt(lift(C, Q), Q, sh.target === 'funke' ? 42 : 50, base);
+          const L = Math.hypot(dir[0], dir[2]) || 1, sx = dir[0] / L, sz = dir[2] / L, C = [Q[0] + (sx * 0.8 + sz * 0.6) * d, Q[1] - 0.18 * d, Q[2] + (sz * 0.8 - sx * 0.6) * d];
+          // (a little from below — the hero's angle — the subject a touch above the middle)
+          return lookAt(lift(C, Q), [Q[0], Q[1] - 0.12 * d, Q[2]], sh.target === 'funke' ? 48 : 50, base);
         }
         case 'shoulder': {
           const C = [pe[0] - f[0] * 2.4 + rt[0] * 0.75, pe[1] + 0.35, pe[2] - f[2] * 2.4 + rt[2] * 0.75];
@@ -247,20 +251,23 @@
           return lookAt(lift(C, Q), sh.target === 'beacon' ? [Q[0], Q[1] + 3, Q[2]] : Q, 60, base);
         }
         case 'up': {
-          const C = [pe[0] - f[0] * 1.5, pe[1] - 0.3, pe[2] - f[2] * 1.5];
-          return lookAt(C, Q, 66 - 8 * smooth(u), base);
+          // the sky's subject on the upper third, the land's edge in the frame below it when the subject stands low enough
+          const C = [pe[0] - f[0] * 1.5, pe[1] - 0.3, pe[2] - f[2] * 1.5], fov = 66 - 8 * smooth(u), c = lookAt(C, Q, fov, base);
+          c.pitch = Math.max(c.pitch * 0.45, c.pitch - fov * DEG * 0.3);
+          return c;
         }
         case 'limb': {
           const C = [pe[0], pe[1] + 0.2, pe[2]];
           return lookAt(C, [Q[0], C[1], Q[2]], 52, base);   // (the horizon at the eye's height: the curve shows itself)
         }
         case 'ice': {
-          const W = this.target(sc, 'warden'), C = [W[0] - f[0] * 3 + rt[0] * 1.5, W[1] + 8.5 - 1.2 * u, W[2] - f[2] * 3 + rt[2] * 1.5];
-          return lookAt(C, W, 56, base);
+          // from the surface in front of its face, looking down through the ice; a slow crane down
+          const W = this.target(sc, 'warden'), C = [W[0] - f[0] * 4.6 + rt[0] * 1.2, sc.surf + 3.4 - 1.0 * smooth(u), W[2] - f[2] * 4.6 + rt[2] * 1.2];
+          return lookAt(C, [W[0], W[1] - 0.6, W[2]], 58, base);
         }
         case 'eye': {
-          const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 1.2 + rt[0] * 0.6, E2[1] + 4.6 - 0.9 * u, E2[2] - f[2] * 1.2 + rt[2] * 0.6];
-          return lookAt(C, E2, 38, base);
+          const E2 = sc.eyePos || this.target(sc, 'warden'), C = [E2[0] - f[0] * 2.6 + rt[0] * 0.5, sc.surf + 1.1 - 0.4 * smooth(u), E2[2] - f[2] * 2.6 + rt[2] * 0.5];
+          return lookAt(C, E2, 40, base);
         }
         default: return null;
       }
@@ -269,7 +276,7 @@
     destroy() { if (this.scene) { this.scene = null; overlay(this, false); } card(null); if (VR.Regie) VR.Regie.inScene(this.g, false); }
   }
   P.Player = Player;
-  P.WARDEN_SCALE = 4;
+  P.WARDEN_SCALE = 3;
 
   // ---------------------------------------------------------------- the public calls
   const pl = (g) => { g = g || game(); const s = g && g.story; return s && s.world === g.world ? s : null; };
@@ -321,14 +328,16 @@
 #storycard button.w { background: linear-gradient(180deg, #4fd2ff, #2a9fd8); color: #062033; border-color: transparent; }
 #storycard kbd { font: 700 11px system-ui; padding: 1px 5px; border-radius: 4px; background: rgba(6, 32, 51, .35); margin-left: 5px; }
 #storybox { position: fixed; inset: 0; z-index: 58; pointer-events: none; display: none; }
-#storybox .bar { position: absolute; left: 0; right: 0; height: 11.5%; background: #000; transition: transform .6s ease; }
-#storybox .bar.t { top: 0; transform: translateY(-100%); } #storybox .bar.b { bottom: 0; transform: translateY(100%); }
-#storybox.on .bar { transform: none; }
+#storybox .sbar { position: absolute; left: 0; right: 0; width: 100%; max-width: none; height: 11.5%; margin: 0; border-radius: 0; background: #000; transition: transform .6s ease; }
+#storybox .sbar.t { top: 0; transform: translateY(-100%); } #storybox .sbar.b { bottom: 0; transform: translateY(100%); }
+#storybox.on .sbar { transform: none; }
+body.storyon #hud, body.storyon #funkebub, body.storyon #ctxprompt, body.storyon #wcompass, body.storyon #bhBtn, body.storyon #storycard, body.storyon #advup, body.storyon #libban { visibility: hidden !important; }
 #storybox .sub { position: absolute; left: 50%; bottom: 13.5%; transform: translateX(-50%); max-width: min(78%, 900px); text-align: center; color: #fff;
   font: 600 clamp(15px, 2.1vw, 24px)/1.35 system-ui, sans-serif; text-shadow: 0 2px 6px rgba(0, 0, 0, .9), 0 0 2px #000; opacity: 0; transition: opacity .25s; }
 #storybox .sub b { display: block; font-size: .7em; letter-spacing: .06em; text-transform: uppercase; color: #8fe4ff; margin-bottom: 2px; }
 #storybox .sub b.ilka { color: #ffc37a; } #storybox .sub b.oskar { color: #ffe08a; } #storybox .sub b.selma { color: #b9f2a0; } #storybox .sub b.jonte { color: #a8c8ff; } #storybox .sub b.lumi { color: #ffb0d8; }
 #storybox .sub.on { opacity: 1; }
+#storybox:not(.on) .kick, #storybox:not(.on) .skip { opacity: 0 !important; }
 #storybox .kick { position: absolute; left: 4%; top: 3.2%; color: rgba(255, 255, 255, .78); font: 600 clamp(11px, 1.3vw, 15px) system-ui, sans-serif; letter-spacing: .04em; }
 #storybox .skip { position: absolute; right: 4%; bottom: 3.6%; color: rgba(255, 255, 255, .55); font: 500 clamp(10px, 1.1vw, 13px) system-ui, sans-serif; opacity: 0; transition: opacity .4s; }
 #storybox .skip.on { opacity: 1; }
@@ -364,13 +373,15 @@
     if (!hasDoc) return;
     css();
     let el = document.getElementById('storybox');
-    if (!el) { el = mk('div'); el.id = 'storybox'; if (el.setAttribute) el.setAttribute('id', 'storybox'); for (const c of ['bar t', 'bar b', 'kick', 'sub', 'skip']) el.appendChild(mk('div', c)); const h = host(); if (!h) return; h.appendChild(el); }
+    if (!el) { el = mk('div'); el.id = 'storybox'; if (el.setAttribute) el.setAttribute('id', 'storybox'); for (const c of ['sbar t', 'sbar b', 'kick', 'sub', 'skip']) el.appendChild(mk('div', c)); const h = host(); if (!h) return; h.appendChild(el); }
     if (on) {
       const sc = pl0.scene, b = sc.b, ch = S.CHAPTERS[b.ch - 1];
       el.querySelector('.kick').textContent = T('story.card.kick', { ch: b.ch, title: T(ch.title) });
       el.querySelector('.skip').textContent = T('story.skip');
       el.querySelector('.skip').classList.remove('on'); el.querySelector('.sub').classList.remove('on');
       el.style.display = 'block'; void el.offsetWidth; el.classList.add('on');
+      const g = pl0.g; pl0.hud0 = !!g.hideHud; g.hideHud = true; if (document.body && document.body.classList) document.body.classList.add('storyon');   // (the HUD, the hand and Funke's bubble out of the picture)
+      if (g.funke && g.funke.endLine) { try { g.funke.endLine(); } catch (e) { /* the bubble */ } }
       setTimeout(() => { if (pl0.scene === sc) el.querySelector('.skip').classList.add('on'); }, S.SKIP_AFTER * 1000);
       if (!keyFn) {
         keyFn = (e) => {
@@ -381,6 +392,7 @@
         window.addEventListener('keydown', keyFn, true); window.addEventListener('mousedown', keyFn, true); window.addEventListener('touchstart', keyFn, true);
       }
     } else {
+      const g = pl0.g; g.hideHud = !!pl0.hud0; if (document.body && document.body.classList) document.body.classList.remove('storyon');
       el.classList.remove('on'); el.querySelector('.sub').classList.remove('on');
       setTimeout(() => { const s = pl(); if (!s || !s.scene) el.style.display = 'none'; }, 650);
     }
@@ -400,13 +412,14 @@
   P.journalHTML = function () {
     const s = pl(); if (!s) return '';
     const rec = s.rec, cur = S.chapter(rec), open = S.open(rec), adv = P.adv();
+    const shown = S.ofChapter(cur).some(b => S.isDone(rec, b.id)) || cur === 1 ? cur : cur - 1;
     let h = `<div class="jstory"><h3>${esc(T('story.j.title'))}<span class="bk">${esc(T('story.j.book'))}</span></h3>`;
     for (const c of S.CHAPTERS) {
       if (c.n > cur + 1) break;
       const seen = S.ofChapter(c.n).filter(b => S.isDone(rec, b.id));
       const soon = c.n > cur || !c.written;
       h += `<div class="jch${soon ? ' soon' : ''}"><div><b>${esc(T('story.j.ch', { n: c.n }))} · ${esc(T(c.title))}</b></div><div class="w">${esc(T(c.where))}</div><div class="lg">${esc(T(c.log))}</div>`;
-      for (const b of seen) for (const l of b.scene.lines) h += `<div class="jline"><b>${esc(T('story.who.' + l.who))}:</b> ${esc(T(l.key))}</div>`;
+      if (c.n === shown) for (const b of seen) for (const l of b.scene.lines) h += `<div class="jline"><b>${esc(T('story.who.' + l.who))}:</b> ${esc(T(l.key))}</div>`;   // (the lines of the chapter in play; the others: their logline and ↺)
       if (open && open.ch === c.n) {
         h += `<div class="jwait"><span>${esc(T('story.j.waiting'))}</span><button type="button" class="btn small" data-jact="story:watch">${esc(T('story.j.watch'))}</button></div>`;
         if (open.when.adv && !adv) h += `<div class="jl note">${esc(T('story.j.adv'))}</div>`;
@@ -434,10 +447,14 @@
   // (one additive glare in the space scene's list while chapter 3's station beat is open or playing: red, blinking)
   P.stationOn = function (g) { const s = pl(g); if (!s) return false; const o = S.open(s.rec); return !!((o && o.id === 'c3.b2') || (s.scene && s.scene.b.id === 'c3.b2')); };
   P.blink = (t) => { const u = ((t % 1.6) + 1.6) % 1.6; return u < 0.12 ? smooth(u / 0.12) : u < 0.42 ? 1 : u < 0.62 ? 1 - smooth((u - 0.42) / 0.2) : 0; };
-  P.stationDir = function (fr, eph, t) {
+  P.stationDir = function (fr, eph, t, cam) {
     const b = eph && eph.bodies && eph.bodies.herz, SS = VR.SpaceScene; if (!b || !SS || !SS.BODIES) return null;
     const R = SS.BODIES.herz.R, v = [b.p[0] - fr.pos[0], b.p[1] - fr.pos[1], b.p[2] - fr.pos[2]], d = Math.hypot(v[0], v[1], v[2]); if (!(d > R)) return null;
-    const c = [v[0] / d, v[1] / d, v[2] / d], A = fr.axes, F = [-A[2][0], -A[2][1], -A[2][2]];   // (the view's forward in the system's axes)
+    // (the scene's axes: the camera looks into them by its yaw and pitch — the map's east, up, south in a ship, the view's
+    // own frame in /raum; the system's directions come in through fr.axes)
+    const A = fr.axes, cy = cam ? cam.yaw || 0 : 0, cp = cam ? cam.pitch || 0 : 0, Fs = [-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)];
+    const F = [A[0][0] * Fs[0] + A[1][0] * Fs[1] + A[2][0] * Fs[2], A[0][1] * Fs[0] + A[1][1] * Fs[1] + A[2][1] * Fs[2], A[0][2] * Fs[0] + A[1][2] * Fs[1] + A[2][2] * Fs[2]];
+    const c = [v[0] / d, v[1] / d, v[2] / d];
     const k = F[0] * c[0] + F[1] * c[1] + F[2] * c[2];
     let p = [F[0] - c[0] * k, F[1] - c[1] * k, F[2] - c[2] * k]; const pl0 = Math.hypot(p[0], p[1], p[2]);
     if (pl0 < 1e-6) return null; p = [p[0] / pl0, p[1] / pl0, p[2] / pl0];
@@ -454,7 +471,7 @@
       const g = game();
       try {
         if (g && fr && g.settings && g.settings.storyOffer !== false && P.stationOn(g)) {
-          const tt = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000, dS = P.stationDir(fr, eph, tt);
+          const tt = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000, dS = P.stationDir(fr, eph, tt, P.spaceCam || (g.space && g.space.cam) || null);
           if (dS) {
             const bu = Math.abs(dS[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0], k = bu[0] * dS[0] + bu[1] * dS[1] + bu[2] * dS[2];
             let u = [bu[0] - dS[0] * k, bu[1] - dS[1] * k, bu[2] - dS[2] * k]; const ul = Math.hypot(u[0], u[1], u[2]); u = [u[0] / ul, u[1] / ul, u[2] / ul];
@@ -468,8 +485,16 @@
     };
   }
 
+  // (the ship's camera of the space frame: SpaceFlight.cameraFrame's own argument)
+  const SFc = VR.SpaceFlight;
+  if (SFc && SFc.cameraFrame && !SFc._story) {
+    SFc._story = true;
+    const cf0 = SFc.cameraFrame;
+    SFc.cameraFrame = function (g, cam) { P.spaceCam = cam || null; try { return cf0.apply(this, arguments); } finally { P.spaceCam = null; } };
+  }
+
   // ---------------------------------------------------------------- ch. 4 · the Eiswächter under the ice; Funke flickers awake
-  const WT = [0.55, 0.78, 1.0], EYE = [0.5, 2.6, 3.2];
+  const WT = [0.3, 0.5, 0.82], EYE = [0.5, 2.6, 3.2], SKIP_P = { optic: 1, core: 1, whole: 1, shield: 1 };
   let MB = null;
   P.drawWarden = function (g, r, E, cam) {
     const s = pl(g), sc = s && s.scene; if (!sc || sc.b.id !== 'c4.b2' || !g.entities || !VR.getVoxModel || !VR.mat4) return;
@@ -479,7 +504,7 @@
     gl.uniform1f(p.u.u_sky, 0.9); gl.uniform3f(p.u.u_blockLight, 0.25, 0.4, 0.5);
     if (p.u.u_sunShadow) gl.uniform1f(p.u.u_sunShadow, 0);
     gl.uniform1f(p.u.u_flash, 0); gl.uniform1f(p.u.u_noFog, 1);
-    // seen through the ice: no depth test, blended, pale ice-blue; the eye glows on top
+    // seen through the ice: no depth test, blended, a deep ice-blue; the eye glows on top
     gl.disable(gl.DEPTH_TEST); gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
     const pulse = 0.5 + 0.5 * Math.sin(sc.t * 1.7);
     const draw = (name, tint, a) => {
@@ -488,17 +513,15 @@
       MB.fill(0); MB[0] = MB[5] = MB[10] = MB[15] = 1;
       m4.translate(MB, MB, W[0] - cam.x, W[1] - cam.y, W[2] - cam.z);
       m4.rotY(MB, MB, sc.wardenYaw);
-      m4.rotX(MB, MB, Math.PI / 2);   // (lying on its back under the ice, its face up: the model's −z front turns up, its head along the yaw)
       m4.scale(MB, MB, sc4, sc4, sc4);
       m4.translate(MB, MB, L[0], L[1], L[2]);
       gl.uniform3f(p.u.u_tint, tint[0], tint[1], tint[2]); gl.uniform1f(p.u.u_alpha, a);
       gl.uniformMatrix4fv(p.u.u_model, false, MB);
       gl.bindVertexArray(pr.vao); gl.drawArrays(gl.TRIANGLES, 0, pr.count);
     };
-    for (const n of md.def.order || Object.keys(md.parts)) if (n !== 'optic' && n !== 'core' && n !== 'whole') draw(n, WT, 0.34);
-    draw('core', [0.4, 1.1, 1.4], 0.4);
-    if (!sc.eyePos) {   // (the eye's place for the close shot: the optic's layout point through the same turns)
-      const L = md.def.layout.optic || [0, 26, -4], x = L[0] * sc4, y = -L[2] * sc4, z = L[1] * sc4, a = sc.wardenYaw;
+    for (const n of md.def.order || Object.keys(md.parts)) if (!SKIP_P[n]) draw(n, WT, 0.5);
+    if (!sc.eyePos) {   // (the eye's place for the close shot: the optic's layout point through the same turn)
+      const L = md.def.layout.optic || [0, 26, -4], x = L[0] * sc4, y = L[1] * sc4, z = L[2] * sc4, a = sc.wardenYaw;
       sc.eyePos = [W[0] + x * Math.cos(a) + z * Math.sin(a), W[1] + y, W[2] - x * Math.sin(a) + z * Math.cos(a)];
     }
     draw('optic', [EYE[0] * (0.7 + 0.3 * pulse), EYE[1] * (0.7 + 0.3 * pulse), EYE[2] * (0.7 + 0.3 * pulse)], 0.95);
