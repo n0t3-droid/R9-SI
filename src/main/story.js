@@ -143,9 +143,10 @@
       if (VR.Regie) VR.Regie.inScene(g, true);
       if (VR.EventLog) VR.EventLog.emit('story', b.id, 4, null, 'story');
       P.stats.scenes++;
-      // ch. 2: the light ring replayed round the freed beacon (the moment's sights and its chord, not its rewards)
+      // ch. 2: the light ring replayed round the freed beacon (the moment's sights and its chord, not its rewards): it
+      // leaves the beacon a second in, with Funke's first line
       if (b.id === 'c2.b2' && sc.tg.beacon && sc.tg.site && VR.Liberate && !VR.Liberate.moment) {
-        const L = VR.Liberate; L.moment = { s: sc.tg.site, t: L.RING_T0 - 0.2, done: new Set(['flicker', 'cyan', 'beam', 'ring', 'stand', 'funke', 'banner']), replay: true };
+        const L = VR.Liberate; L.moment = { s: sc.tg.site, t: L.RING_T0 - 1.05, done: new Set(['flicker', 'cyan', 'beam', 'ring', 'stand', 'funke', 'banner']), replay: true };
       }
       overlay(this, true);
       return true;
