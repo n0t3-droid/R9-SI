@@ -1010,9 +1010,11 @@ void main() { float a = v_col.a * u_tint.a; o = vec4(v_col.rgb * u_tint.rgb * a,
         drawGeo(gl, p, thick, dx, b[1] + 0.4 - cam.y, dz, R * 0.985, 1, R * 0.985, 0.2, 0.7, 1, 0.5 * fade);
       }
     }
-    if (far) {   // (a-regie: wide enough to read at the distance — ~3 px — tall over the hills, pulsing red-violet)
-      const b = far.b, dx = b[0] + 0.5 - cam.x, dz = b[2] + 0.5 - cam.z, wd = Math.max(1.4, far.d * 0.004), fl = 0.6 + 0.25 * Math.sin(time * 2.6);
-      drawGeo(gl, p, beam, dx, b[1] + 0.8 - cam.y, dz, wd, 70 + far.d * 0.06, wd, 1, 0.22, 0.75, 0.5 * fl);
+    if (far) {   // (a-regie: a soft glow ~8 px wide at 480 px and a bright core ~3 px, tall over the hills — the beam's alpha
+      // falls off to its top, so the column is twice the hills' height — pulsing red-violet)
+      const b = far.b, dx = b[0] + 0.5 - cam.x, dz = b[2] + 0.5 - cam.z, fl = 0.75 + 0.25 * Math.sin(time * 2.6), H = 140 + far.d * 0.12;
+      drawGeo(gl, p, beam, dx, b[1] - cam.y, dz, far.d * 0.02, H, far.d * 0.02, 1, 0.3, 0.85, 0.55 * fl);
+      drawGeo(gl, p, beam, dx, b[1] - cam.y, dz, far.d * 0.007, H * 1.15, far.d * 0.007, 1, 0.55, 1, 1.1 * fl);
     }
     // the capture ring on the ground: dim all round, bright as far as it is filled
     const RS = L.ringSite;
