@@ -831,7 +831,9 @@
       }
       // f-stipple (R50-08): with the TSR the fade's dither turns with the frame (its history makes a soft blend of it);
       // without it, or with „Sanftes Einblenden" off, things arrive whole (world.js / farring.js read fadeSoft)
-      this.fadeSoft = !!(tsr && this.q.fadeIn !== false && !this.q.lite);
+      // f-stipple2 (R52-05): and only while the drawn frames come close enough for the TSR to resolve it (Stream.softOk on
+      // the gap between drawn frames, smoothed upward fast: one stall stops it; a slow PC or a stall pops things whole)
+      this.fadeSoft = !!(tsr && this.q.fadeIn !== false && !this.q.lite) && VR.Stream.softOk(this.drawGap);
       this.fadePhase = this.fadeSoft ? VR.Stream.fadePhase(this.frameNo) : 0;
       mat4.mul(this.viewProj, this.proj, v);
       mat4.invert(this.invViewProj, this.viewProj);
@@ -2117,6 +2119,8 @@
       if (this.l2Frame) this.l2Frame(F, E);   // (t-light2: the light's values this frame, light2_gl.js)
       this.rainMapF = F.rainMap || null;   // (t-polish2: the rain's height map while the ground is wet — bindRainMap)
       this.resize(false);
+      if (!this.q.lite) { const nowD = performance.now(), gapD = this._drawAt !== undefined ? nowD - this._drawAt : 0; this._drawAt = nowD;   // (f-stipple2: the drawn frames' gap, for fadeSoft)
+        this.drawGap = gapD > (this.drawGap || 0) ? gapD : (this.drawGap || 0) * 0.85 + gapD * 0.15; }
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
       // visibility

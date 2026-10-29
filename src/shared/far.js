@@ -63,6 +63,13 @@
     const cR = Math.min(bR, nR), cG = Math.min(bG, nG);
     return { r0: t < nR, r1: t >= cR && t < nG, r2: t >= Math.max(cR, cG) };
   };
+  // f-stipple2 (R52-05) · the soft path's rule (SOFTFADE: shaders.js cutN): a whole column (nearest fade 1) is cut hard —
+  // ring 0's alone, a whole form ring 1's alone, whatever the bilinear read of the neighbours says; fading ones as draws()
+  const cutN = (n, b) => (n > 0.998 ? 1 : Math.min(n, b));
+  F.drawsSoft = function (t, nR, bR, nG, bG) {
+    const cR = cutN(nR, bR), cG = cutN(nG, bG);
+    return { r0: t < nR, r1: t >= cR && t < nG, r2: t >= Math.max(cR, cG) };
+  };
   // a form wholly under ring 0: its 16 columns and the ring of columns around them (the bilinear read reaches one column
   // over) hold 255 in the chunks' mask (m: N x N columns around the camera's column ccx, ccz). Then min(bR, nR) = 1 > t for
   // every threshold of every pixel: all of it is the chunks', and the tile needs no draw call (farring.js draw)
