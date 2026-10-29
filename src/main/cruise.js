@@ -604,7 +604,9 @@
     const P = g.particles, b = fl.b; if (!P || !fxOn(g) || alt > 50 || alt < 0) return;
     // (run 2: big round puffs thrown up like smoke; regolith in a vacuum flies flat and fast, in a thin sheet, and settles)
     const k = 1 - alt / 50, low = g.settings && g.settings.preset === 'potato', n = Math.round((low ? 4 : 14) * k + 1);
-    const gy = b.pos[1] - alt, col = DUST[g.dim] || _col;
+    const gy = b.pos[1] - alt, BC = VR.BodySky && VR.BodySky.cur;
+    // (Basalt: the dust of the ground under the ship — the maria's dark or the highlands' bright — a shade darker than it)
+    const col = g.dim === 'basalt' && BC && BC.alb > 0 ? [BC.alb * 0.72, BC.alb * 0.69, BC.alb * 0.66] : DUST[g.dim] || _col;
     // (the particles are lit by the sky's light, which an airless moon keeps up at night: the dust by the sun's height —
     // run 3's plume shone white over Basalt's night side)
     const E = g.env && g.env.E, sy = E && E.sunDir ? E.sunDir[1] : 1;

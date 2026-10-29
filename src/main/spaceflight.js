@@ -610,13 +610,13 @@ void main() {
       // the wake: ribbons from the sheath's rim, bending back along the flow and fading
       const ca = Math.cos(ang), sa = Math.sin(ang);
       x.lineCap = 'round';
-      for (let i = 0; i < 30; i++) {
-        const side = i % 2 ? 1 : -1, u = ((i * 0.618) % 1), off = (0.12 + 0.3 * u) * rad * side, ph = t * 2.3 + i * 1.7;
-        const L = rad * (0.9 + 1.4 * (((i * 0.37) + t * 0.9) % 1)), wob = Math.sin(ph) * rad * 0.05;
+      for (let i = 0; i < 20; i++) {
+        const side = i % 2 ? 1 : -1, u = ((i * 0.618) % 1), off = (0.1 + 0.26 * u) * rad * side, ph = t * 2.3 + i * 1.7;
+        const L = rad * (0.45 + 0.6 * (((i * 0.37) + t * 0.9) % 1)), wob = Math.sin(ph) * rad * 0.04;
         const p0x = sx + ca * rad * 0.1 - sa * off, p0y = sy + sa * rad * 0.1 + ca * off;
         const p1x = p0x + ca * L * 0.5 - sa * (off * 0.5 + wob), p1y = p0y + sa * L * 0.5 + ca * (off * 0.5 + wob);
         const p2x = p0x + ca * L - sa * (off * 0.2 - wob), p2y = p0y + sa * L + ca * (off * 0.2 - wob);
-        x.strokeStyle = `rgba(255,${120 + (i % 5) * 22},${60 + (i % 3) * 20},${(0.12 + 0.16 * (1 - u)) * glow})`; x.lineWidth = 1 + (i % 3) * 0.8;
+        x.strokeStyle = `rgba(255,${120 + (i % 5) * 22},${60 + (i % 3) * 20},${(0.1 + 0.14 * (1 - u)) * glow})`; x.lineWidth = 0.8 + (i % 3) * 0.6;
         x.beginPath(); x.moveTo(p0x, p0y); x.quadraticCurveTo(p1x, p1y, p2x, p2y); x.stroke();
       }
       x.globalCompositeOperation = 'source-over';

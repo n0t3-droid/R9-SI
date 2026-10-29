@@ -17,7 +17,7 @@ const ROOT = new URL('../', import.meta.url).pathname;
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const SHOTS = ROOT + 'test/shots/';
 const BASE = process.env.BASE_DIST !== undefined ? process.env.BASE_DIST : (fs.existsSync(ROOT + '.tmp_tests/base/dist/index.html') ? 'file://' + ROOT + '.tmp_tests/base/dist/index.html' : '');
-const SEED = process.env.SEED || '53', RD = +(process.env.RD || 8), K = +(process.env.K || 3), HP = +(process.env.HP || 0.1);   // (HP: the chase camera's pitch in the descent — v0.51's cruise.mjs looked down at 0.32, the sky out of the frame)
+const SEED = process.env.SEED || '53', RD = +(process.env.RD || 8), K = +(process.env.K || 3), HP = +(process.env.HP || -0.04);   // (HP: the chase camera's pitch in the descent — v0.51's cruise.mjs looked down at 0.32, the sky out of the frame)
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const want = (s) => !ONLY || ONLY.includes(s);
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';

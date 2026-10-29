@@ -1126,7 +1126,7 @@ void main() {
   { vec3 gp = v_localPos + vec3(u_camInt);
     float bn = vnoise3(gp * 0.13) * 0.45 + vnoise3(gp * 0.037 + 7.0) * 0.35 + vnoise3(gp * 0.011 + 3.0) * 0.2;
 #ifdef BG_OPAL
-    alb.rgb *= (0.84 + 0.3 * bn) * mix(vec3(1.0), vec3(0.88, 0.95, 1.05), smoothstep(0.5, 0.78, vnoise3(gp * 0.021 + 11.0)));
+    alb.rgb *= (0.76 + 0.44 * bn) * mix(vec3(1.0), vec3(0.88, 0.95, 1.05), smoothstep(0.5, 0.78, vnoise3(gp * 0.021 + 11.0)));
 #else
     alb.rgb *= 0.7 + 0.6 * bn;
 #endif

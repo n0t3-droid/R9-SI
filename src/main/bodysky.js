@@ -30,7 +30,7 @@
   // them out; at night the eye opens; Opal's ice is bright), the plumes' brightness
   const KIND = {
     basalt: { alb: { basalt_mare: 0.075, basalt_highlands: 0.26, basalt_crater: 0.2 }, alb0: 0.1, tint: [1.0, 0.98, 0.95], bounce: 0.32, floor: 0.06, expoDay: 0.9, expoNight: 3.6, plume: 0 },
-    opal: { alb: {}, alb0: 0.72, tint: [0.96, 0.98, 1.02], bounce: 0.38, floor: 0.05, expoDay: 0.62, expoNight: 1.7, plume: 1 },
+    opal: { alb: {}, alb0: 0.72, tint: [0.96, 0.98, 1.02], bounce: 0.38, floor: 0.05, expoDay: 0.5, expoNight: 1.7, plume: 1 },
   };
   BS.KIND = KIND; BS.SUN = SUN;
 
@@ -140,7 +140,7 @@
     const expo = lit ? K.expoDay + (xN - K.expoDay) * night : xN, exE = o.expo > 0 ? o.expo : expo;
     // Amarant and the worlds at the brightness they have at the day's exposure, whatever the eye's (their bands read)
     skyU.lum[0] = Math.min(1, Math.max(0.1, 1.7 / (SUN[1] * exE))); skyU.lum[1] = Math.min(1, Math.max(0.1, 2.4 / (SUN[1] * exE)));
-    return { id, light, sky: skyU, expo, raw: sky };
+    return { id, light, sky: skyU, expo, raw: sky, alb };
   };
 
   // ---------------------------------------------------------------- the env (env.js calls this at the end of update)
