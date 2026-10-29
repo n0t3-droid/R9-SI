@@ -158,7 +158,12 @@
       const fwd = [-Math.sin(yaw), 0, -Math.cos(yaw)];
       const ahead = (d, h) => [eye[0] + fwd[0] * d, eye[1] + (h || 0), eye[2] + fwd[2] * d];
       const top = (x, z, d) => (w && w.isLoaded && w.isLoaded(Math.floor(x), Math.floor(z)) ? w.topAt(Math.floor(x), Math.floor(z)) + 1 : d);
-      sc.ground = (x, z) => (w && w.isLoaded && w.isLoaded(Math.floor(x), Math.floor(z)) ? w.topAt(Math.floor(x), Math.floor(z)) + 1 : null);
+      // the floor under the eye's level (not the column's top: under the Hangar Hall's roof the top is the roof — run 5's
+      // close shot was lifted onto it), and whether a point is free
+      const R0 = VR.R, SOLID = VR.F ? VR.F.SOLID : 1, y0 = Math.floor(eye[1]) + 2;
+      const solid = (x, y, z) => { const b = w && w.getBlock ? w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)) : 0; return !!(b && R0 && (R0.T.flags[b] & SOLID)); };
+      sc.ground = (x, z) => { if (!w || !w.isLoaded || !w.isLoaded(Math.floor(x), Math.floor(z))) return null; for (let y = y0; y > y0 - 40; y--) if (solid(x, y, z)) return y + 1; return null; };
+      sc.free = (C) => !solid(C[0], C[1], C[2]) && !solid(C[0], C[1] + 0.4, C[2]);
       sc.eye0 = eye; sc.yaw0 = yaw; sc.fwd = fwd;
       // the vista: the nearest one in front (wow moments' list), else 90 m ahead
       let vista = null, vd = 400;
@@ -222,6 +227,11 @@
       return this.pose(sc, at.shot, at.u, base);
     }
     pose(sc, sh, u, base) {
+      const c = this.pose0(sc, sh, u, base);
+      if (c && sh.cam !== 'shoulder' && sh.cam !== 'ice' && sh.cam !== 'eye' && sc.free && !sc.free([c.x, c.y, c.z])) { (sc.blocked || (sc.blocked = {}))[sc.shot] = true; return this.pose0(sc, { cam: 'shoulder', target: sh.target, dur: sh.dur }, u, base); }
+      return c;
+    }
+    pose0(sc, sh, u, base) {
       const g = this.g, p = g.player, e = sc.eye0, Q = this.target(sc, sh.target), f = sc.fwd, rt = [-f[2], 0, f[0]];
       const lift = (C, S0) => (VR.DirCam && VR.DirCam.lift ? VR.DirCam.lift(sc.ground, C, S0) : C);
       const pe = [p.pos[0], p.pos[1] + 1.6, p.pos[2]];
