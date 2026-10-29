@@ -1073,6 +1073,7 @@
         return;
       }
       g.raidActive = false;
+      if (VR.Foes && VR.Foes.advOn(g)) return;   // a-foes: no night raid in an Abenteuer world (its own foes come from foes.js)
       if (p.mode !== 'survival' || g.difficulty === 'peaceful' || !g.entities || !VR.DimReg.actorsHome(g.dim)) return;   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
       st.checkT -= dt; if (st.checkT > 0) return;
       st.checkT = 20;

@@ -256,6 +256,7 @@
     if (g.director && g.director.active) return 'director';
     if (g.photo || (g.photoCam && g.photoCam.on)) return 'photo';
     if (g.arrival || g.revealPending || g.studioOpen) return 'arrival';
+    if (VR.Liberate && VR.Liberate.busy && VR.Liberate.busy()) return 'moment';   // a-foes: a freeing's moment and its banner hold the view (the level-up after it)
     if (hasDoc) { const wb = document.getElementById('wbanner'); if (wb && wb.classList && wb.classList.contains('on')) return 'banner'; }
     return '';
   };

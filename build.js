@@ -30,6 +30,7 @@ SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies'); SHARED.splice(SHARED.inde
 MAIN.splice(MAIN.indexOf('space_shaders'), 1); MAIN.splice(MAIN.indexOf('shaders'), 0, 'space_shaders'); MAIN.push('bodysky', 'bodylife');   // u-moons1: the space GLSL before shaders.js (its COMMON takes the airless sky from it), the moons' sky and life
 MAIN.splice(MAIN.indexOf('settings_panel'), 0, 'directorcam', 'intent', 'ctx', 'hudfade');   // e-ctx: the travel camera, travel by intent, the Aktion key, the fading HUD (src/main/)
 MAIN.push('ascent', 'spaceflight', 'entry');   // u-ascent: the climb, space, the way down (after the space scene: they draw with it and wrap the play frame after it)
+SHARED.splice(SHARED.indexOf('blocks4'), 0, 'foeblocks'); MAIN.push('foemodels', 'foes', 'liberate');   // a-foes: the Leuchtfeuer (appended last, after the bodies' blocks), the foes' models, VR.Foes, VR.Liberate (after quests.js and ctx.js, whose parts they use)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /
 // Profi), the hints, the Ding cards, the tiles
@@ -105,6 +106,7 @@ writePage('artifact.html', `<title>R9-SI</title>${fonts}<style>${css}</style>\n$
 // catalogue houses built with the villa generator, lit and meshed with the game's mesher.
 const STUDIO_MAIN = ['core', 'noise', 'registry', 'models', 'voxarch', 'voxtech', 'voxlife', 'voxcity', 'voxhome', 'voxmodel', 'voxcells', 'voxfurn', 'voxfacade', 'blocks1', 'blocks2', 'blocks3', 'blocks_heart', 'blocks5', 'blocks6', 'voxmodern', 'blocks_var', 'voxplants', 'voxnova', 'voxtown', 'blocks4', 'items', 'groceries', 'physics', 'custom', 'smoothvox', 'style', 'edits', 'looks', 'schem', 'forge', 'forge_kit', 'forge_tower', 'forge_house', 'forge_bridge', 'forge_civic', 'forge_park', 'wonders', 'wonders_build', 'names_de'];
 STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'bodies');   // u-moons1: the bodies' blocks (the Studio keeps the game's ids)
+STUDIO_MAIN.splice(STUDIO_MAIN.indexOf('blocks4'), 0, 'foeblocks');   // a-foes: the Leuchtfeuer (the Studio keeps the game's ids)
 const studioLibs = js('shared', STUDIO_MAIN) + `\nVR.TEXREC = VR.TEXREC || {}; VR.TEXPRE = VR.TEXPRE || {};\n` + js('main', ['tex_core', 'tex_vox', 'icons', 'place', 'storage', 'favs', 'pack', 'landing']) + '\n' + uiShared;   // (uiShared: the language module and its tables — the choice is shared with the game)
 const studioWorkerSrc = shared + '\n' + js('main', TEX) + '\n' + read('src/worker/worker_main.js') + '\n' + read('src/studio/studio_worker.js');
 const furnSrc = read('src/shared/voxfurn.js') + '\n' + read('src/shared/voxfacade.js') + '\n' + read('src/shared/voxmodern.js');

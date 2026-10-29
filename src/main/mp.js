@@ -159,6 +159,8 @@
       on('pdata', (m) => this.onPdata(m));
       on('pack', (m) => this.onPack(m));
       on('bye', (m) => this.onBye(m));
+      on('foe', (m) => { if (VR.Foes) VR.Foes.onNet(this, m); });   // a-foes: the host's foes at a guest (8 Hz, ≤ 24 within 64 blocks)
+      on('foehit', (m) => { if (VR.Foes) VR.Foes.onNetHit(this, m); });   // a-foes: a guest's hit on a foe, checked by the host (range, sight, rate)
       this.subs.push(room.onPeers((ch) => this.peersChanged(ch), () => { }));
     }
     unsubscribe() { for (const u of this.subs) { try { u(); } catch (e) { /* ignore */ } } this.subs = []; }
@@ -656,6 +658,7 @@
         }
         T.pdata -= dt; if (T.pdata <= 0) { T.pdata = 20; this.sendPdata(); }
       }
+      if (VR.Foes && VR.Foes.netTick) VR.Foes.netTick(this, dt);   // a-foes: the host sends its foes on topic `foe`
       this.pumpSend(dt);
       // smooth the others' movement
       const k = 1 - Math.exp(-dt * 12);
