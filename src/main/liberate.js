@@ -937,6 +937,11 @@ void main() { float a = v_col.a * u_tint.a; o = vec4(v_col.rgb * u_tint.rgb * a,
     // what is there to draw: a disturbed or freed beacon near, the ring, the moment, a Kranarm's warning
     let any = !!L.moment || !!L.ringSite;
     if (!any) for (const s of W0.sites.values()) if (s.known && s.beacon && Math.abs(s.x - p0[0]) < 200 && Math.abs(s.z - p0[2]) < 200) { any = true; break; }
+    // a-regie: the called outpost's beam on the horizon (regie_acts.js — Funke pointed it out): until it is near or free
+    const CS = L.callSite, lite = !!(r.q && r.q.lite);
+    let far = null;
+    if (CS && CS.st !== 'frei' && !lite) { const b = CS.beacon || [CS.x, CS.y + 1, CS.z], d = Math.hypot(b[0] - p0[0], b[2] - p0[2]); if (d > 190 && d < 1150) { far = { b, d }; any = true; } else if (d <= 150) L.callSite = null; }
+    else if (CS && CS.st === 'frei') L.callSite = null;
     let crane = null; if (En.mobs) for (const m of En.mobs) if (m.foe && m.foe.k === 'crane' && (m.foe.st === 'tele' || m.foe.st === 'strike')) { crane = m; any = true; break; }
     if (!any) return;
     const gl = r.gl, p = fxProgram(gl); if (!p) return;
@@ -960,6 +965,10 @@ void main() { float a = v_col.a * u_tint.a; o = vec4(v_col.rgb * u_tint.rgb * a,
         drawGeo(gl, p, thin, dx, b[1] + 0.6 - cam.y, dz, R, 1, R, 0.35, 1, 1, 1.4 * fade);
         drawGeo(gl, p, thick, dx, b[1] + 0.4 - cam.y, dz, R * 0.985, 1, R * 0.985, 0.2, 0.7, 1, 0.5 * fade);
       }
+    }
+    if (far) {   // (a-regie: wide enough to read at the distance — ~3 px — tall over the hills, pulsing red-violet)
+      const b = far.b, dx = b[0] + 0.5 - cam.x, dz = b[2] + 0.5 - cam.z, wd = Math.max(1.4, far.d * 0.004), fl = 0.6 + 0.25 * Math.sin(time * 2.6);
+      drawGeo(gl, p, beam, dx, b[1] + 0.8 - cam.y, dz, wd, 70 + far.d * 0.06, wd, 1, 0.22, 0.75, 0.5 * fl);
     }
     // the capture ring on the ground: dim all round, bright as far as it is filled
     const RS = L.ringSite;

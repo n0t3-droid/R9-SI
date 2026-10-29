@@ -161,6 +161,21 @@ console.log('6 · a-regie: a builder\'s stream with pads and traffic under the R
   check(b.rep < a.rep, `the same act within a minute: ${a.rep} → ${b.rep}`);
 }
 
+console.log('7 · a-regie: the first acts (src/main/regie_acts.js)');
+{
+  require(path.join(__dirname, '../src/main/regie_acts.js'));
+  const RA = VR.RegieActs, base = { adv: true, enc: 'normal', kids: false, guest: false, t0: 0, called: 0, strayed: 0, encounters: 0, site: { x: 1 } };
+  const acts = (o, t) => RA.offers(Object.assign({}, base, o), t).map(q => q.act).join(',');
+  check(acts({}, 20) === '' && acts({}, 40) === 'call' && acts({}, 80) === 'call,stray', 'the call from ' + RA.RULES.call + ' s, the lost stray from ' + RA.RULES.stray + ' s');
+  check(RA.offers(Object.assign({}, base), 80).every(q => q.first) && RA.offers(Object.assign({}, base), 80).find(q => q.act === 'stray').kind === 'encounter', 'both first offers; the stray an encounter');
+  check(acts({ called: 40 }, 90) === 'stray' && acts({ called: 40, strayed: 85 }, 120) === '', 'each once a world');
+  check(acts({ site: null }, 90) === 'stray', 'no disturbed outpost near: no call');
+  check(acts({ kids: true }, 90) === 'call' && acts({ enc: 'off' }, 90) === 'call' && acts({ encounters: 1 }, 90) === 'call', 'no stray in Kindersicher, with Begegnungen aus or after an encounter');
+  check(acts({ adv: false }, 90) === '' && acts({ guest: true }, 90) === '', 'a builder, a guest: none');
+  const P0 = RA.ahead(0, 0, 0, 0), P1 = RA.ahead(0, 0, Math.PI / 2, 0), d0 = Math.hypot(P0[0], P0[1]);
+  check(Math.abs(P0[0]) < 1e-9 && P0[1] < 0 && d0 >= RA.RULES.dmin && d0 <= RA.RULES.dmax && P1[0] < 0, 'the spots ahead: in the view\'s direction, ' + RA.RULES.dmin + '–' + RA.RULES.dmax + ' m');
+}
+
 console.log('3 · pure');
 const a = run(4242).choices.join(','), b = run(4242).choices.join(','), c = run(4243).choices.join(',');
 check(a === b && a.length > 100, 'the same seed and stream: the same choices');

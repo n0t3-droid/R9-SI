@@ -23,6 +23,7 @@
   'use strict';
   const S = VR.Story = VR.Story || {};
   S.CALM = 20;          // s of calm before a beat is offered
+  S.CALM_ADV = 8;       // a-regie (R52-06): an adventurer's calm before the offer — the story is what they came for
   S.SCENE_MAX = 30;     // s a scene lasts at most
   S.SKIP_AFTER = 1;     // s before a scene may be skipped
   S.REMIND = 300;       // s between two reminders after „Später"
@@ -123,7 +124,7 @@
     if (ctx.fighting) return 'fight';
     if (ctx.landing) return 'landing';
     if (ctx.scene) return 'scene';
-    if (!((ctx.calm || 0) >= (w.calm || S.CALM))) return 'calm';
+    if (!((ctx.calm || 0) >= (w.calm || (ctx.adv ? S.CALM_ADV : S.CALM)))) return 'calm';
     if (w.adv && !ctx.adv) return 'adv';
     if (w.dim && w.dim.indexOf(ctx.dim || 'overworld') < 0) return 'dim';
     if (!w.dim && ctx.dim && ctx.dim !== 'overworld' && !ctx.orbit) return 'dim';   // (a beat without dims plays on Herzwelt or above it)

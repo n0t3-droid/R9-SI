@@ -291,7 +291,7 @@
         else { const side = (f.id & 1) ? 1 : -1, sx = -dz / dist * side, sz = dx / dist * side; steer(m, m.pos[0] + sx * 2, m.pos[2] + sz * 2, K.speed * 0.3, dt, false); faceTo(m, dx, dz, dt, 6); }
         hover(m, W, f, K, dt);
         f.flare = Math.max(0, f.flare - dt * 2);
-        if (!shy && f.cool <= 0 && dist <= A.range && W.tokens.take(m.id)) {
+        if (!shy && !f.lost && f.cool <= 0 && dist <= A.range && W.tokens.take(m.id)) {   // a-regie: a lost stray (regie_acts.js) never attacks
           f.tok = true; f.hitDone = false;
           f.lock[0] = pp[0]; f.lock[1] = pp[1]; f.lock[2] = pp[2];
           f.ldir[0] = dx / (dist || 1); f.ldir[1] = dz / (dist || 1);

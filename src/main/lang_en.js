@@ -950,6 +950,8 @@
     'g.funke.wow.skyray': ['{when} a cloud ray glides by!'],
     'g.funke.wow.convoy': ['{when} a convoy flies over the land.'],
     'g.funke.wow.musician': ['{when} someone plays music on the square.'],
+    'g.funke.regie.call': ['See that red-violet light out there? A beacon is disturbed — {d} from here. I\'ll show you the way!', 'Something red-violet glimmers on the horizon: a disturbed outpost, {d} away. Come on, I\'ll show you the way!'],
+    'g.funke.regie.stray': ['Up ahead, a stray! It got lost — it means no harm, it is looking for its beacon. Press [V] to calm it.', 'Look, a lost sentry. It is only confused — talk to it with [V] and it will calm down.'],
     'g.funke.wow.ship': ['{when} a ship lands on the pad!'],
     'g.funke.wow.ship_temple': ['{when} a ship lands at the Gate Temple!'],
     'g.funke.wow.festival': ['Lantern festival in {name} tonight! You have to go.'],
