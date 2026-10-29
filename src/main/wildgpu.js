@@ -257,7 +257,7 @@
 
   // ---------------------------------------------------------------- the program
   // (f-wild2: the impostor's cut radius and the ray's wing pivot, as GLSL literals)
-  const PCUT = (VR.Wild && VR.Wild.PUFF ? VR.Wild.PUFF.cut : 1.6), CUT = PCUT.toFixed(3), PG = (VR.Wild && VR.Wild.PUFF && VR.Wild.PUFF.grain) || [5, 0.3, 1.7], GCELL = PG[0].toFixed(3), GLO = PG[1].toFixed(3), GHI = PG[2].toFixed(3), CUT2 = (PCUT * PCUT).toFixed(3), PIVOT = WG.RAY_SHAPE.body.toFixed(3);
+  const PCUT = (VR.Wild && VR.Wild.PUFF ? VR.Wild.PUFF.cut : 1.6), CUT = PCUT.toFixed(3), PG = (VR.Wild && VR.Wild.PUFF && VR.Wild.PUFF.grain) || [5, 0.4, 1.6], GCELL = PG[0].toFixed(3), GLO = PG[1].toFixed(3), GHI = PG[2].toFixed(3), CUT2 = (PCUT * PCUT).toFixed(3), PIVOT = WG.RAY_SHAPE.body.toFixed(3);
   const WILD_VS = `
 layout(location=0) in vec3 a_pos;
 layout(location=1) in vec3 a_nrm;

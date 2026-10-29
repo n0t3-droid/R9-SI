@@ -337,13 +337,15 @@
       // (f-wild2: swirling, the birds fly the figures — ribbons, a waist, a ball that splits; roosting and leaving the
       //  flock holds together round its target)
       fl.bofs = swirl ? Mu.bofs : null;
-      if (swirl) { W.murmTarget(this.seed ^ Mu.key, ctx.clock, Mu.st, tg); W.murmTargets(this.seed ^ Mu.key, ctx.clock, Mu.S, n, Mu.bofs, tg); }
+      // (f-wild2 cost: the figure's places only on a frame that steps — they are read by the step alone)
+      if (swirl) { if (Mu.acc + dt >= (Math.hypot(fl.ctr[0] - ctx.eye[0], fl.ctr[2] - ctx.eye[2]) > W.MURM_FAR ? 1 / W.MURM_HZ[1] : 1 / W.MURM_HZ[0])) { W.murmTarget(this.seed ^ Mu.key, ctx.clock, Mu.st, tg); W.murmTargets(this.seed ^ Mu.key, ctx.clock, Mu.S, n, Mu.bofs, tg); } }
       else if (ph === 'roost' && Mu.perch) { tg[0] = Mu.roost[0]; tg[1] = Mu.roost[1] + 6; tg[2] = Mu.roost[2]; }
       else { const a = W.h(this.seed, Mu.key, 9) * TAU; tg[0] = Mu.st.x + Math.cos(a) * 500; tg[1] = Mu.st.y + 30; tg[2] = Mu.st.z + Math.sin(a) * 500; if ((Mu.leaveT = (Mu.leaveT || 0) + dt) > 70) { Mu.state = 'away'; Mu.leaveT = 0; return; } }
       // the step: 30 times a second near, 20 from afar (W.MURM_HZ, f-wild2: 2.4× the boids in t-wild's CPU); the draw
       // extrapolates in between
       Mu.acc += dt;
-      const h = Math.hypot(fl.ctr[0] - ctx.eye[0], fl.ctr[2] - ctx.eye[2]) > W.MURM_FAR ? 1 / W.MURM_HZ[1] : 1 / W.MURM_HZ[0];
+      const far = Math.hypot(fl.ctr[0] - ctx.eye[0], fl.ctr[2] - ctx.eye[2]) > W.MURM_FAR, h = far ? 1 / W.MURM_HZ[1] : 1 / W.MURM_HZ[0];
+      fl.P.stride = far ? 4 : W.FLOCK.stride;   // (29 Oct: from afar every fourth boid steers a step)
       if (Mu.acc >= h) {
         const st = Math.min(Mu.acc, 0.1); Mu.acc = 0;
         fl.step(st);
@@ -516,6 +518,18 @@
     }
 
     // ================================================================ the fish
+    // (f-wild2, 29 Oct) a fish that swam into a pier's post (gathered at the shadow by the pier's end): out through the
+    // post's nearest side, its speed into the post dropped — no fish drawn inside the wood
+    outOfPosts(fl) {
+      const w = this.g.world, R = VR.R, F = VR.F, p = fl.pos, v = fl.vel;
+      for (let i = 0; i < fl.n; i++) {
+        const o = i * 3, X = Math.floor(p[o]), Y = Math.floor(p[o + 1]), Z = Math.floor(p[o + 2]), b = w.getBlock(X, Y, Z);
+        if (!b || !(R.T.flags[b] & F.SOLID)) continue;
+        const fx = p[o] - X, fz = p[o + 2] - Z, dx = fx < 0.5 ? -fx : 1 - fx, dz = fz < 0.5 ? -fz : 1 - fz;
+        if (Math.abs(dx) < Math.abs(dz)) { p[o] += dx + (dx < 0 ? -0.02 : 0.02); if (v[o] * dx < 0) v[o] = -v[o] * 0.3; }
+        else { p[o + 2] += dz + (dz < 0 ? -0.02 : 0.02); if (v[o + 2] * dz < 0) v[o + 2] = -v[o + 2] * 0.3; }
+      }
+    }
     updFish(dt, ctx, cap) {
       const A = this.anchorList(), eye = ctx.eye, nS = cap.shoals, nF = cap.fish, nC = cap.carp;
       // shoals: at the fish anchors (the pier, the falls' pool) within 64, then the shallows round the eye
@@ -552,7 +566,7 @@
         s.follow = !!(sh && this.openWater(s.b, sh));
         if (s.follow) { s.fl.tgt[0] = sh[0]; s.fl.tgt[2] = sh[1]; s.fl.tgt[1] = s.b.y0 + (s.b.y1 - s.b.y0) * 0.65; }
         else W.shoalTarget(s.seed, ctx.clock, s.b, s.fl.tgt);
-        s.acc += dt; if (s.acc >= 1 / 30) { s.fl.step(Math.min(0.1, s.acc)); s.acc = 0; }
+        s.acc += dt; if (s.acc >= 1 / 30) { s.fl.step(Math.min(0.1, s.acc)); s.acc = 0; this.outOfPosts(s.fl); }
       }
       // carp: in the ponds within 40
       const CP = this.carps;
@@ -898,7 +912,8 @@
         //  far party's vertex work is its few birds', not the whole party's)
         const KT = this.flockKinds || (this.flockKinds = []), PT = FLOCK_TIERS;
         for (let t = 0; t < PT.length; t++) { KT[t] = WG.kind(gl, t ? 'flock' + PT[t] : 'flock', KINDCAP.flock); KT[t].nn = 0; }
-        const fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0, P = Mu.perch, S = WG.STRIDE;
+        const fl = Mu.fl, ex = Mu.state === 'fly' ? Mu.ex : 0, P = Mu.perch, S = WG.STRIDE, PC = this.pc || (this.pc = new Float32Array(KINDCAP.flock * 5));
+        this.pcAt = NaN;
         const dc = Mu.state === 'seated' && Mu.roost ? Math.hypot(Mu.roost[0] - cx, Mu.roost[2] - cz) : Math.hypot(fl.ctr[0] - cx, fl.ctr[2] - cz);
         const roosting = Mu.ph === 'roost' && P;
         if (Mu.state !== 'away' && dc < (Mu.state === 'seated' ? 90 : 520)) for (let i = 0; i < Mu.n && i < KINDCAP.flock; i++) {
@@ -906,15 +921,18 @@
           const x = fl.pos[o] + (sit ? 0 : vx * ex) - cx, y = fl.pos[o + 1] + (sit ? 0 : vy * ex) - cy, z = fl.pos[o + 2] + (sit ? 0 : vz * ex) - cz;
           // (the birds' size: half a block, a little more far off; the shader keeps a dash at least ~1.3 px thick)
           const d = Math.sqrt(x * x + y * y + z * z), s = 0.55 * Math.max(1, Math.min(1.5, d / 80));
-          const hv = Math.hypot(vx, vz) + 1e-4, k = 0.86 + 0.24 * ((i * 0.618) % 1);
+          const hv = Math.sqrt(vx * vx + vz * vz) + 1e-4, k = 0.86 + 0.24 * ((i * 0.618) % 1);
           // the party's spread: 1 in the sky; closing to its perch while it lands; small on the perch
           const spread = sit ? 0.22 : roosting ? 0.22 + 0.78 * sm(Math.hypot(P[o] - fl.pos[o], P[o + 1] - fl.pos[o + 1], P[o + 2] - fl.pos[o + 2]) / 14) : 1;
           const kv = sit || Mu.state !== 'fly' ? W.MURM_K : W.birdsVisible(d);
           let t = PT.length - 1; while (t > 0 && kv > PT[t] + 1e-6) t--;
           const K = KT[t], D = K.data, n = K.nn++;
-          put(D, n, x, y, z, s, sit ? (i * 2.4) % TAU : yawOf(vx, vz), sit ? 0 : Math.atan2(vy, hv) * 0.8, sit ? 0 : fl.bank[i], fl.phase[i], 0.9 * k, 0.88 * k, 0.95 * k, 1, sit ? 0.02 : 0.45 + 0.5 * fl.flap[i], 0, sit ? -0.55 : 0.05, spread, 0, 0.12);
+          put(D, n, x, y, z, s, sit ? (i * 2.4) % TAU : yawOf(vx, vz), sit ? 0 : vy / Math.sqrt(vy * vy + hv * hv) * 0.8, sit ? 0 : fl.bank[i], fl.phase[i], 0.9 * k, 0.88 * k, 0.95 * k, 1, sit ? 0.02 : 0.45 + 0.5 * fl.flap[i], 0, sit ? -0.55 : 0.05, spread, 0, 0.12);
           D[n * S + 19] = kv;
+          // (the boid's place and its birds shown, for the cloud in the translucent pass of this frame: no second pass)
+          if (!sit) { const q = i * 5; PC[q] = x; PC[q + 1] = y; PC[q + 2] = z; PC[q + 3] = d; PC[q + 4] = kv; }
         }
+        this.pcAt = cx * 1.31 + cy * 0.77 + cz * 0.53 + ex * 3.7;
         for (let t = 0; t < PT.length; t++) if (KT[t].nn) list.push([KT[t], KT[t].nn]);
       }
       if (this.gulls.length) {
@@ -979,20 +997,25 @@
       if (!Mu || !cap.murm || Mu.state !== 'fly') return;
       const fl = Mu.fl, cx = cam.x, cy = cam.y, cz = cam.z;
       if (Math.hypot(fl.ctr[0] - cx, fl.ctr[2] - cz) > 520) return;
-      const gl = r.gl, K = WG.kind(gl, 'puff', KINDCAP.flock), D = K.data, ex = Mu.ex, KB = W.MURM_K, R = W.PUFF.R, put = WG.put;
+      const gl = r.gl, K = WG.kind(gl, 'puff', KINDCAP.flock), D = K.data, ex = Mu.ex, KB = W.MURM_K, R = W.PUFF.R, WS = WG.STRIDE;
       let n = 0;
+      // (the opaque pass of this frame left each boid's place, distance and birds shown in this.pc)
+      const PC = this.pc, cached = PC && this.pcAt === cx * 1.31 + cy * 0.77 + cz * 0.53 + ex * 3.7;
       for (let i = 0; i < Mu.n && n < K.cap; i++) {
         const o = i * 3, vx = fl.vel[o], vy = fl.vel[o + 1], vz = fl.vel[o + 2];
-        const x = fl.pos[o] + vx * ex - cx, y = fl.pos[o + 1] + vy * ex - cy, z = fl.pos[o + 2] + vz * ex - cz, d = Math.sqrt(x * x + y * y + z * z) + 1e-4;
-        const kv = W.birdsVisible(d);
+        let x, y, z, d, kv;
+        if (cached) { const q = i * 5; x = PC[q]; y = PC[q + 1]; z = PC[q + 2]; d = PC[q + 3] + 1e-4; kv = PC[q + 4]; }
+        else { x = fl.pos[o] + vx * ex - cx; y = fl.pos[o + 1] + vy * ex - cy; z = fl.pos[o + 2] + vz * ex - cz; d = Math.sqrt(x * x + y * y + z * z) + 1e-4; kv = W.birdsVisible(d); }
         if (kv >= KB) continue;
         // the wings' plane: the boid's up, banked about its heading; its turn to the eye's ray
-        const sv = Math.hypot(vx, vy, vz) + 1e-6, fx = vx / sv, fy = vy / sv, fz = vz / sv, hl = Math.hypot(fx, fz) + 1e-6, rx = -fz / hl, rz = fx / hl;
-        const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy, b = fl.bank[i], cb = Math.cos(b), sb = Math.sin(b);
+        const sv = Math.sqrt(vx * vx + vy * vy + vz * vz) + 1e-6, fx = vx / sv, fy = vy / sv, fz = vz / sv, hl = Math.sqrt(fx * fx + fz * fz) + 1e-6, rx = -fz / hl, rz = fx / hl;
+        // (the bank ≤ 0.9 rad: its cosine and sine as short series, within 0.3 %)
+        const ux = -rz * fy, uy = rz * fx - rx * fz, uz = rx * fy, b = fl.bank[i], b2 = b * b, cb = 1 - b2 * (0.5 - b2 / 24), sb = b * (1 - b2 * (1 / 6 - b2 / 120));
         const nx = ux * cb + rx * sb, ny = uy * cb, nz = uz * cb + rz * sb, ndv = Math.abs(nx * x + ny * y + nz * z) / d;
         const tau = W.puffTau(fl.dens[i], ndv, kv, KB, Mu.n);
         if (tau < 0.004) continue;
-        put(D, n++, x, y, z, R, 0, 0, 0, 0, 0.022, 0.02, 0.026, tau, 0, 0, 0, 0, (i * 0.618034) % 1, 0, 0);   // (the glow's slot: the grain's seed)
+        // (WG.put's layout written in place — the slots it leaves 0 stay 0: the buffer holds only impostors)
+        const q = n++ * WS; D[q] = x; D[q + 1] = y; D[q + 2] = z; D[q + 3] = R; D[q + 8] = 0.022; D[q + 9] = 0.02; D[q + 10] = 0.026; D[q + 11] = tau; D[q + 16] = (i * 0.618034) % 1;   // (the glow's slot: the grain's seed)
       }
       if (!n) return;
       list.push([K, n]);

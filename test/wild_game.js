@@ -160,7 +160,7 @@ const cam = (g) => ({ x: g.player.pos[0], y: g.player.pos[1] + 1.62, z: g.player
   const S = A.shoals.find(s => s.key === 'fish:70,0');
   check(!!S && S.n === W.CAPS.fish[3], `a shoal of ${S ? S.n : 0} at the pier's anchor`);
   if (S) {
-    let out = 0; for (let i = 0; i < S.n; i++) { const x = S.fl.pos[i * 3], y = S.fl.pos[i * 3 + 1], z = S.fl.pos[i * 3 + 2]; if (getBlock(x, y, z) !== WATER || y > SEA + 0.88) out++; }
+    let out = 0; for (let i = 0; i < S.n; i++) { const x = S.fl.pos[i * 3], y = S.fl.pos[i * 3 + 1], z = S.fl.pos[i * 3 + 2]; if (getBlock(x, y, z) !== WATER || y > SEA + 0.88) { out++; if (process.env.DBG) console.log("out", x.toFixed(2), y.toFixed(2), z.toFixed(2), getBlock(x, y, z)); } }
     check(out === 0 && S.b.y1 <= SEA + 0.88 - 0.12 && S.b.y0 >= 60.9, `every fish in the water under the surface (${out} out; band ${S.b.y0.toFixed(2)} … ${S.b.y1.toFixed(2)})`);
     // f-wild2: close under the surface, where the eye on the pier sees them (the band within 1.2 of it)
     check(S.b.y1 >= SEA + 0.88 - 0.25 && S.b.y0 >= SEA + 0.88 - 1.25, `close under the surface (the band ${(SEA + 0.88 - S.b.y1).toFixed(2)} … ${(SEA + 0.88 - S.b.y0).toFixed(2)} under it)`);

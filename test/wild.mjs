@@ -290,7 +290,12 @@ await shot('shoal', async (out) => {
   const r = await A.report(), s = r && r.shoals && (r.shoals.find(q => !q.key.startsWith('eye:')) || r.shoals[0]);
   if (!s) { out.error = 'no shoal: ' + JSON.stringify(r && r.shoals && r.shoals.map(q => q.key)); return null; }
   out.shoal = { key: s.key, ctr: s.ctr, follow: s.follow, b: s.b };
-  return { x: ex, y: Pi.y + 1 + EYE, z: ez, tx: s.ctr[0], ty: s.ctr[1], tz: s.ctr[2], fov: 70, aim: async () => { const q = await A.report(), t = q && q.shoals && (q.shoals.find(z => z.key === s.key) || q.shoals[0]); return t ? t.ctr : null; } };
+  // (29 Oct: the shoal at a still player's noon shadow is nearly under the eye — a camera aimed straight down has no
+  //  up and the picture came out as the deck's underside; the eye looks out along the pier, ≥ 2.5 ahead of the shoal's
+  //  middle, about 50° down, as a player looking over the end does)
+  const off = (c) => { const hx = c[0] - ex, hz = c[2] - ez, h = Math.hypot(hx, hz); return h >= 2.5 ? c : [c[0] + ux * (2.5 - h), c[1], c[2] + uz * (2.5 - h)]; };
+  const t0 = off(s.ctr);
+  return { x: ex, y: Pi.y + 1 + EYE, z: ez, tx: t0[0], ty: t0[1], tz: t0[2], fov: 70, aim: async () => { const q = await A.report(), t = q && q.shoals && (q.shoals.find(z => z.key === s.key) || q.shoals[0]); return t ? off(t.ctr) : null; } };
 }, null, { noSettle: true, view: true, measure: fishMeasure });
 // 3b the pass at dusk (f-wild2): the young ray's glide past the beach's cell at the day's moment, from the eye in the cell
 // (the eye 7 blocks from the cell's middle toward the isles; the wild's clock set 115 s before the moment — the actor

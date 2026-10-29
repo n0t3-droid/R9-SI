@@ -26,7 +26,7 @@
   W.CAPS = {
     // (f-wild2: 2.4× t-wild's 200 / 300 / 360 — the CPU held in its tier: every third boid steers a step, nine blocks of
     //  neighbourhood, 20 steps a second from afar — test/wild_sim.js § 2 measures it against t-wild's flock)
-    murm: [0, 0, 480, 720, 840],     // the murmuration's boids (one flock; each drawn as MURM_K birds)
+    murm: [0, 0, 400, 600, 720],     // the murmuration's boids (one flock; each drawn as MURM_K birds)
     gull: [0, 3, 5, 7, 9],           // gulls over the lake by day
     heron: [0, 1, 1, 2, 2],          // herons at the ponds
     fish: [0, 32, 48, 64, 80],       // fish in a shoal
@@ -95,9 +95,11 @@
   //  at most 20 met, every third bird steering a step: 2.4× the boids for t-wild's CPU)
   W.FLOCK = { roost: 1, r: 9, K: 7, maxC: 26, sepR: 5.5, wSep: 30, wAli: 2.2, wCoh: 0.25, cohY: 4, wTgt: 8, tgtR: 15, bandY: 3, wY: 0.6, lobes: 0, lobeR: 34, flat: 1.2, vmin: 7, vmax: 12, amax: 34, stride: 3, wave: [5, 10], waveV: 26, waveW: 4.5, waveMax: 110, waveA: 22, fearR: 6, fearA: 30 };
   // the murmuration's steps a second: near (within MURM_FAR blocks of the eye) and from afar (the draw extrapolates)
-  W.MURM_HZ = [30, 20]; W.MURM_FAR = 120;
+  W.MURM_HZ = [24, 12]; W.MURM_FAR = 120;   // (29 Oct: near 30 → 24, from afar 20 → 12 from afar — at 120+ blocks the draw's extrapolation hides it)
   W.SHOAL = { roost: 0, lobes: 0, r: 2.0, K: 8, maxC: 24, sepR: 0.85, wSep: 22, wAli: 2.8, wCoh: 0.7, cohY: 1.4, wTgt: 2.0, tgtR: 1.8, flat: 2.4, vmin: 0.5, vmax: 2.4, amax: 10, stride: 1, wave: null, waveV: 0, waveW: 0, waveA: 0, fearR: 3.5, fearA: 16 };
   const GN = 1024, GM = GN - 1;   // the grid's hash table (a power of two)
+  // the 27 cells round a bird's, its own first (the scan's order)
+  const NB27 = new Int8Array(81); { let q = 3; for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (dx || dy || dz) { NB27[q++] = dx; NB27[q++] = dy; NB27[q++] = dz; } }
   class Flock {
     constructor(n, seed, P) {
       this.n = n; this.P = Object.assign({}, W.FLOCK, P || {});
@@ -136,7 +138,7 @@
       if (!(dt > 0)) return;
       dt = Math.min(dt, 0.1);
       const n = this.n, P = this.P, p = this.pos, v = this.vel, A = this.acc, C = this.cell, head = this.head, next = this.next;
-      const r = P.r, r2 = r * r, inv = 1 / r, s2 = P.sepR * P.sepR, K = P.K, MAXC = P.maxC || 48;
+      const r = P.r, r2 = r * r, inv = 1 / r, s2 = P.sepR * P.sepR, K = P.K, MAXC = P.maxC || 48, MAXX = P.maxX || 1e9;
       this.time += dt; this.frame++;
       // the grid: each bird in its cell's list
       head.fill(-1);
@@ -161,9 +163,13 @@
         const px = p[i * 3], py = p[i * 3 + 1], pz = p[i * 3 + 2], vx = v[i * 3], vy = v[i * 3 + 1], vz = v[i * 3 + 2];
         let cnt = 0, seen = 0, mx = 0, my = 0, mz = 0, ax = 0, ay = 0, az = 0, sx = 0, sy = 0, sz = 0, ux = 0, uy = 0, uz = 0;
         const cx = C[i * 3], cy = C[i * 3 + 1], cz = C[i * 3 + 2];
-        scan: for (let dz = -1; dz <= 1; dz++) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-          for (let j = head[this.key(cx + dx, cy + dy, cz + dz)]; j >= 0; j = next[j]) {
+        // (f-wild2 cost: its own cell first, then the 26 round it, and at most MAXX looked at — in a figure's crowded
+        //  core a cell holds dozens and the scan went through all 27 cells' birds to find its 26)
+        let looked = 0;
+        scan: for (let c27 = 0; c27 < 81; c27 += 3) {
+          for (let j = head[this.key(cx + NB27[c27], cy + NB27[c27 + 1], cz + NB27[c27 + 2])]; j >= 0; j = next[j]) {
             if (j === i) continue;
+            if (++looked > MAXX) break scan;
             const ex = p[j * 3] - px, ey = p[j * 3 + 1] - py, ez = p[j * 3 + 2] - pz, d2 = ex * ex + ey * ey + ez * ez;
             if (d2 > r2) continue;
             // (separation from every one met — the nearest may be the last; alignment and cohesion from the first K)
@@ -230,8 +236,8 @@
           if (p[o + 1] < B.y0) { p[o + 1] = B.y0; if (v[o + 1] < 0) v[o + 1] = 0; } else if (p[o + 1] > B.y1) { p[o + 1] = B.y1; if (v[o + 1] > 0) v[o + 1] = 0; }
         }
         // the turn rate (the heading's change) banks the bird; climbing and speeding up beat the wings
-        const h0 = Math.atan2(hz0, hx0), h1 = Math.atan2(v[o + 2], v[o]);
-        let dh = h1 - h0; if (dh > Math.PI) dh -= TAU; else if (dh < -Math.PI) dh += TAU;
+        // (f-wild2 cost: the signed angle between the two headings in one atan2 — the same value as h1 − h0 wrapped)
+        const dh = Math.atan2(hx0 * v[o + 2] - hz0 * v[o], hx0 * v[o] + hz0 * v[o + 2]);
         const bk = Math.max(-0.9, Math.min(0.9, dh / dt * 0.35));
         this.bank[i] += (bk - this.bank[i]) * Math.min(1, dt * 5);
         const climb = v[o + 1] / s, want = Math.max(0, Math.min(1, 0.35 + climb * 2.5 + (A[o] * v[o] + A[o + 2] * v[o + 2]) / (s * P.amax)));
@@ -352,7 +358,7 @@
   // each carries more) · fog: the share of the distance the flock's own air counts (a dark mass stays dark at dusk)
   // (f-wild2 cost, 29 Oct: R 5.2 → 2.2, cut 1.6 → 1.2 — the impostors rasterized 2.7× the frame for 4.7 % of it on
   //  SwiftShader, now 0.19×; denser and with more turn in it, the cloud keeps its cover and core and shows its grain)
-  W.PUFF = { R: 2.2, tau0: 0.6, gam: 2.0, dref: 9, base: 0.15, nRef: 720, kFar: [90, 150], kMin: 2, fog: 0.55, cut: 1.2, grain: [5, 0.3, 1.7] };
+  W.PUFF = { R: 2.2, tau0: 1.0, gam: 2.0, dref: 9, base: 0.15, nRef: 720, kFar: [90, 150], kMin: 2, fog: 0.55, cut: 1.2, grain: [5, 0.4, 1.6] };
   // (grain: the impostor's stipple — cells across a unit radius, the depth's factor in half the cells and in the other half)
   W.puffGrain = function (cx, cy, seed) { const G = W.PUFF.grain, v = Math.sin(cx * 12.9898 + cy * 78.233 + seed * 61.7) * 43758.5453; return v - Math.floor(v) < 0.5 ? G[1] : G[2]; };
   W.birdsVisible = function (d) {
@@ -365,7 +371,7 @@
   // (the party's birds drawn), K (a party's birds), n (the flock's boids)
   W.puffTau = function (dens, ndv, kVis, K, n) {
     const P = W.PUFF, q = Math.max(0.15, Math.min(3, dens / P.dref)), share = Math.max(0, K - kVis) / K;
-    return share <= 0 ? 0 : P.tau0 * (P.nRef / Math.max(1, n)) * Math.pow(q, P.gam) * (P.base + (1 - P.base) * Math.min(1, Math.abs(ndv))) * share;
+    return share <= 0 ? 0 : P.tau0 * (P.nRef / Math.max(1, n)) * (P.gam === 2 ? q * q : Math.pow(q, P.gam)) * (P.base + (1 - P.base) * Math.min(1, Math.abs(ndv))) * share;
   };
 
   // a shoal's: a slow loop round the middle of its water
