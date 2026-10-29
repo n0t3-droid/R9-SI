@@ -992,7 +992,7 @@
         const nx = ux * cb + rx * sb, ny = uy * cb, nz = uz * cb + rz * sb, ndv = Math.abs(nx * x + ny * y + nz * z) / d;
         const tau = W.puffTau(fl.dens[i], ndv, kv, KB, Mu.n);
         if (tau < 0.004) continue;
-        put(D, n++, x, y, z, R, 0, 0, 0, 0, 0.022, 0.02, 0.026, tau, 0, 0, 0, 0, 0, 0, 0);
+        put(D, n++, x, y, z, R, 0, 0, 0, 0, 0.022, 0.02, 0.026, tau, 0, 0, 0, 0, (i * 0.618034) % 1, 0, 0);   // (the glow's slot: the grain's seed)
       }
       if (!n) return;
       list.push([K, n]);

@@ -61,7 +61,8 @@ const save = async (path, img, w, h) => { if (sharp) await sharp(Buffer.from(img
           const Rp = P.R * cam.F / pr[2], ext = Math.ceil(Rp * P.cut) + 1; quad += 2.828 * (Rp * P.cut) ** 2; nq++;   // (the octagon wildgpu.js draws: 2√2 r²)
           for (let py = Math.max(0, Math.floor(pr[1] - ext)); py <= Math.min(HT - 1, Math.ceil(pr[1] + ext)); py++) for (let px = Math.max(0, Math.floor(pr[0] - ext)); px <= Math.min(WD - 1, Math.ceil(pr[0] + ext)); px++) {
             const q2 = ((px + 0.5 - pr[0]) ** 2 + (py + 0.5 - pr[1]) ** 2) / (Rp * Rp); if (q2 > P.cut * P.cut) continue; { const ax = Math.abs(px + 0.5 - pr[0]) / (Rp * P.cut), ay = Math.abs(py + 0.5 - pr[1]) / (Rp * P.cut); if (Math.max(ax, ay) > 0.924 || (ax + ay) > 1.307) continue; }
-            tau[py * WD + px] += t0 * Math.exp(-2.2 * q2);
+            const gx = Math.floor((px + 0.5 - pr[0]) / Rp * P.grain[0]), gy = Math.floor(-(py + 0.5 - pr[1]) / Rp * P.grain[0]);
+            tau[py * WD + px] += t0 * W.puffGrain(gx, gy, (i * 0.618034) % 1) * Math.exp(-2.2 * q2);
           }
         }
         // the party's birds drawn (dashes ≥ 1.3 px: each its pixel's share, about its true area at least)

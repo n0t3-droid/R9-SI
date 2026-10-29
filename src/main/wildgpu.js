@@ -257,7 +257,7 @@
 
   // ---------------------------------------------------------------- the program
   // (f-wild2: the impostor's cut radius and the ray's wing pivot, as GLSL literals)
-  const PCUT = (VR.Wild && VR.Wild.PUFF ? VR.Wild.PUFF.cut : 1.6), CUT = PCUT.toFixed(3), CUT2 = (PCUT * PCUT).toFixed(3), PIVOT = WG.RAY_SHAPE.body.toFixed(3);
+  const PCUT = (VR.Wild && VR.Wild.PUFF ? VR.Wild.PUFF.cut : 1.6), CUT = PCUT.toFixed(3), PG = (VR.Wild && VR.Wild.PUFF && VR.Wild.PUFF.grain) || [5, 0.3, 1.7], GCELL = PG[0].toFixed(3), GLO = PG[1].toFixed(3), GHI = PG[2].toFixed(3), CUT2 = (PCUT * PCUT).toFixed(3), PIVOT = WG.RAY_SHAPE.body.toFixed(3);
   const WILD_VS = `
 layout(location=0) in vec3 a_pos;
 layout(location=1) in vec3 a_nrm;
@@ -287,7 +287,7 @@ void main() {
     // f-wild2 · an impostor of the density cloud: a disc of radius i_p.w (cut at ${CUT}) turned to the camera
     vec3 c = i_p.xyz, f = normalize(c), up0 = abs(f.y) > 0.95 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
     vec3 rt = normalize(cross(f, up0)), up = cross(rt, f), rel = c + (rt * a_pos.x + up * a_pos.y) * i_p.w * ${CUT};
-    v_q = a_pos.xy * ${CUT}; v_rel = rel; v_n = -f; v_col = i_c.rgb; v_em = 0.0; v_l = vec4(1.0, i_c.w, 0.0, 0.0);
+    v_q = a_pos.xy * ${CUT}; v_rel = rel; v_n = -f; v_col = i_c.rgb; v_em = 0.0; v_l = vec4(1.0, i_c.w, i_y.x, 0.0);
     gl_Position = u_viewProj * vec4(rel, 1.0);
     return;
   }
@@ -376,7 +376,11 @@ void main() {
     // blends as 1 − e^(−Στ) (one colour: the order does not matter)
     float q2 = dot(v_q, v_q);
     if (q2 > ${CUT2}) discard;
-    float a = 1.0 - exp(-v_l.y * exp(-2.2 * q2));
+    // (29 Oct: the grain — a fixed stipple in the impostor's own frame, its seed the boid's: half the cells carry 1.7 of
+    //  the depth, half 0.3 — the same mean; overlapping, the cloud shows countless birds, not soft spots)
+    vec2 gc = floor(v_q * ${GCELL});
+    float gm = fract(sin(dot(gc, vec2(12.9898, 78.233)) + v_l.z * 61.7) * 43758.5453) < 0.5 ? ${GLO} : ${GHI};
+    float a = 1.0 - exp(-v_l.y * gm * exp(-2.2 * q2));
     if (a < 0.004) discard;
     vec3 c = v_col * (u_ambSky * 0.55 + 0.02);
     c = applyFog(c, v_rel * u_fogK, length(v_rel) * u_fogK);
