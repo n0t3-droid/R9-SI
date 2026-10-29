@@ -108,6 +108,38 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### ✦ Outposts to free, 🌕 flying to the moons yourself, 📖 the story begins, 🛰 Herzwelt from orbit, 🌅 colour at the golden hour (v0.51)
+**✦ Outposts to free** (Abenteuer with Begegnungen; builders never meet a foe, Kindersicher frees by puzzle alone). A
+disturbed outpost burns a red-violet Leuchtfeuer and its land wears a faint red-violet cast. Its machines — the
+Bohrläufer, the Wächter with his shield, the Kranarm, swarms of Schattendrohnen — announce every attack (their optic
+flares, never more than two attack at once, weak points take double); beaten, a machine powers down into plates and
+sparks, or [V] *Beruhigen* calms it with a timing ring. Then the Lichtleiter puzzle or holding the beacon against a wave
+of drones — and the moment: the camera rises over the land, the beam turns cyan, a ring of light rolls out, the land
+heals to clear colours with sparks in the grass, ✦ BEFREIT ✦, +250 EP and +300 Heliataler; the machines stand up one by
+one with a green eye and a small bow, one follows you as a Helfer, the pad becomes a fast-travel target. At night
+Schattenwesen gather near ruins — a lamp keeps them away. A faint wakes you at the last freed beacon, looking up its beam.
+
+**🌕 Flying to the moons yourself.** In orbit look at a world and press G: the Reiseantrieb takes hold with a punch
+(speed = 0.25/s × the distance to the nearest surface), Amarant slides past, the moon swells over the nose, the ship
+drops into a circular orbit; V lands — a retro burn, „Landeplatz wird vermessen …", a plume of regolith, „👣 Erster
+Schritt auf Opal!". The ship comes along to the other world; Heimkehr brings you home in under a second.
+
+**📖 „Funke und die Leuchtfeuer" — the story begins.** After a calm moment Funke receives a signal: [V] plays a short
+scene like a film (letterbox, subtitles, director shots; any key skips; „Später" brings it back). Chapters 1–4: Funke
+wakes in the Hangar, the light ring over the canyon, a red beacon blinking over the rim of the world, the Eiswächter under
+Opal's ice and the eclipse. The journal (J) keeps the chapters to watch again. Builders only ever get an offer. A new
+Regie schedules story, life and quiet together so something worth seeing comes along without crowding.
+
+**🛰 Herzwelt from orbit.** Muted greens, tans and navy lakes instead of a patchwork, soft clouds, a faint airglow,
+green aurora curtains over the night limb, relief tiles under the ship (Balanced and up), a clear cockpit window, and no
+grey band in the climb.
+
+**🌅 Colour and life.** The golden hour has its nebula, stars, planets and the sun's disc back (v0.49's pink milk is
+gone); storm clouds are dark and heavy. The murmuration is a shape-shifting flock, fish gather at your shadow by the
+pier, the young Wolkenrochen glides past at dusk. Things arriving in the distance no longer show a screen-door pattern
+(they fade smoothly, near ones grow from the ground; switch „Sanftes Einblenden"); Very Low draws its lamps whole; the
+page is 7.6 MB (from 8.9).
+
 ### 🚀 Into orbit, 🌑 the first moons, 🧭 Funke, ⭐ quests and shops, 🏠 a new life elsewhere (v0.50)
 **🚀 Into orbit.** A starship no longer stops at 252 m: it climbs on, the land bends away beneath it (the world's curve
 in the terrain and horizon programs, Very Low included), the sky thins from blue to black with a 400-m scale height,
