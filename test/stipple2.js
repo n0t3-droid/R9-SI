@@ -68,6 +68,15 @@ if (typeof S.fadeMs === 'function' && Wp) {
   check(t.fade === 1, 'farring: a far form likewise');
 }
 
+console.log('(f) the texture detail where nothing resolves the jitter');
+check(typeof S.mipK === 'function', 'Stream.mipK');
+if (typeof S.mipK === 'function') {
+  check(Math.abs(S.mipK(true, true, 0.7, false) - Math.sqrt(0.7)) < 1e-9, 'the TSR resolving: the full-size image\'s detail (√scale, as before)');
+  check(S.mipK(false, true, 1, false) === S.MIP_CALM && S.mipK(true, false, 0.7, false) === S.MIP_CALM && S.MIP_CALM > 1.3 && S.MIP_CALM < 1.5, 'no TSR, or frames too far apart: half a mip coarser (√2)');
+  check(S.mipK(false, false, 0.55, true) === 1 && S.mipK(true, true, 0.55, true) === 1, 'Very Low (lite): its natural mips, as before');
+}
+check((rd.match(/u_mipScale, VR\.Stream\.mipK\(/g) || []).length === 2, 'renderer: both terrain passes (the depth pre-pass and the colour) take Stream.mipK');
+
 console.log('(d)(e) the shaders');
 {
   const sh = fs.readFileSync(path.join(ROOT, 'src/main/shaders.js'), 'utf8');
@@ -75,6 +84,7 @@ console.log('(d)(e) the shaders');
   check(/#ifdef SOFTFADE[\s\S]{0,200}cutN\(nR, bR\)/.test(lod) && /cutN\(nG, bG\)/.test(lod) && /cutN\(nC, bC\)/.test(lod), 'LOD_FS: the soft path cuts a whole column hard (cutN), ring 0, 1 and 2');
   check(/float cutN\(float n, float b\)\{ return n > 0\.998 \? 1\.0 : min\(n, b\); \}/.test(sh), 'cutN: the same rule as Stream.lodCoverSoft');
   check(/#ifdef SOFTFADE[\s\S]{0,400}texelGrain/.test(lod), 'LOD_FS: a texel grain on the stand-in tiles up close (SOFTFADE only)');
+  check((lod.match(/#ifdef SOFTFADE\n(  \/\/[^\n]*\n)?  if \(u_lodNear > 8\.0 && dot\(v_rel, v_rel\) < u_lodNear \* u_lodNear\) discard;/g) || []).length === 2, 'LOD_FS soft path: no 4-m hole around the eye where nothing is drawn yet (both cuts)');
 }
 {
   const TE = require('./tex_energy.js'), W = 320, H = 180;

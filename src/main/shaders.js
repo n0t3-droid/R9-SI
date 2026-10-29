@@ -2515,9 +2515,9 @@ const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-
 // like a block texture — 16 texels a block and clusters of 4 — so the near field is never a flat slab; it fades out where
 // a texel shrinks under a pixel (px: blocks a pixel), so the far land looks as before
 float texelGrain(vec3 p, float px) {
-  float k1 = 1.0 - smoothstep(0.03, 0.07, px), k4 = 1.0 - smoothstep(0.12, 0.3, px);
+  float k1 = 1.0 - smoothstep(0.05, 0.12, px), k4 = 1.0 - smoothstep(0.15, 0.4, px);
   if (k4 <= 0.0) return 1.0;
-  return 1.0 + k1 * (hash13(floor(p * 16.0)) - 0.5) * 0.34 + k4 * (hash13(floor(p * 4.0) + 7.31) - 0.5) * 0.2;
+  return 1.0 + k1 * (hash13(floor(p * 16.0)) - 0.5) * 0.44 + k4 * (hash13(floor(p * 4.0) + 7.31) - 0.5) * 0.3;
 }
 #endif
 vec3 waveN(vec2 p) {
@@ -2563,7 +2563,12 @@ void main() {
 #else
   if (th < max(cR, min(bG, nG) * u_g1)) discard;
 #endif
+#ifdef SOFTFADE
+  // (f-stipple2) a whole column is cut above already: the 4-m guard would only open a hole where nothing is drawn yet
+  if (u_lodNear > 8.0 && dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#else
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#endif
 #endif
 #else
   ivec2 ch = ivec2(floor(cl / 16.0)) + 32;
@@ -2582,7 +2587,11 @@ void main() {
   if (cover > 0.0 && bayer4(gl_FragCoord.xy) < cover) discard;
 #endif
   // never right in front of the eyes: coarse cells only stand in at a distance
+#ifdef SOFTFADE
+  if (u_lodNear > 8.0 && dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;   // (f-stipple2: as above)
+#else
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#endif
 #endif
   vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
 #ifdef FORM
