@@ -43,7 +43,7 @@
     B(1, 1, { when: { after: null, place: ['hangar'], anyAfter: 240, adv: false },
       scene: { shots: [{ cam: 'close', target: 'funke', dur: 5 }, { cam: 'shoulder', target: 'funke', dur: 5 }, { cam: 'wide', target: 'player', dur: 5 }], music: 'warm' },
       who: ['funke', 'funke', 'ilka', 'funke'], task: { kind: 'follow', target: 'vista' }, reward: { xp: 30 } }),
-    B(1, 2, { when: { after: 'c1.b1', place: ['plaza', 'street', 'hills', 'isles', 'water', 'wild'], hours: ['dawn', 'morning', 'noon', 'afternoon', 'dusk'], adv: false },
+    B(1, 2, { when: { after: 'c1.b1', place: ['plaza', 'street', 'hills', 'isles', 'water', 'wild'], adv: false },   // (by day the land, by night its dark hills: the lines fit both)
       scene: { shots: [{ cam: 'wide', target: 'vista', dur: 6 }, { cam: 'orbit', target: 'player', dur: 6 }, { cam: 'shoulder', target: 'vista', dur: 5 }], music: 'wide' },
       who: ['funke', 'ilka', 'funke'], task: { kind: 'go', target: 'outpost' }, reward: { xp: 40 } }),
     B(1, 3, { when: { after: 'c1.b2', adv: true, near: { outpost: 700 } },

@@ -93,6 +93,17 @@ check(worst.perTen >= 1, `≥ 1 beat per 10 min while one is ready (${worst.perT
 let wb = 0; for (let s = 1; s <= 10; s++) wb = Math.max(wb, run(s * 104729, { builder: true }).gap);
 check(wb <= 90, `builder: the longest gap ${wb.toFixed(1)} s ≤ 90 s`);
 
+console.log('2b · the fill order');
+{
+  const H = { musician: 1, bells: 1 }, hist = [[100, 'meteor'], [130, 'cat']];
+  const o1 = R.fillOrder(['musician', 'cat', 'birds'], ['musician', 'cat', 'birds', 'meteor'], hist, 160, 20, H);
+  check(o1.join(' ') === 'cat birds musician', 'the acts seen before the ones only heard (' + o1.join(' ') + ')');
+  const o2 = R.fillOrder(['musician'], ['musician', 'meteor', 'cat'], hist, 140, 50, H);
+  check(o2.join(' ') === 'meteor musician', 'a long gap: an act held back for the last minute comes back after 30 s (' + o2.join(' ') + ')');
+  const o3 = R.fillOrder([], ['meteor'], hist, 120, 50, H);
+  check(o3.length === 0, 'never one played within 30 s');
+}
+
 console.log('3 · pure');
 const a = run(4242).choices.join(','), b = run(4242).choices.join(','), c = run(4243).choices.join(',');
 check(a === b && a.length > 100, 'the same seed and stream: the same choices');

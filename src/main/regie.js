@@ -100,12 +100,28 @@
     g.regie = S;
     return S;
   }
+  // the order a gap is filled from (pure): the acts seen before the ones only heard (a gap wants something in view);
+  // when the gap is long (≥ RULES.urgent s) the acts the rotation holds back for being played within the last minute come
+  // after them, if they were not played within RULES.again s — a second meteor in a dark sky rather than nothing
+  R.RULES.urgent = 45; R.RULES.again = 30;
+  R.fillOrder = function (order, C, hist, t, since, heard) {
+    const seen = order.filter(c => !(heard && heard[c])), only = order.filter(c => heard && heard[c]);
+    let out = seen.concat(only);
+    if (since >= R.RULES.urgent) {
+      const last = (c) => { for (let i = hist.length - 1; i >= 0; i--) if (hist[i][1] === c) return hist[i][0]; return -Infinity; };
+      const more = C.filter(c => out.indexOf(c) < 0 && !(heard && heard[c]) && t - last(c) >= R.RULES.again).sort((a, b) => last(a) - last(b));
+      out = seen.concat(more, only);
+    }
+    return out;
+  };
   // the director's next act (its rotation's order), pulled forward into a gap
   R.addSource(function ldOffer(g) {
-    const D = g.lifeDirector, LD = VR.LifeDirector;
+    const D = g.lifeDirector, LD = VR.LifeDirector, S = R.of(g);
     if (!D || !D.on || !D.ctx || !LD || D.pend || (D.events && D.events.length >= (D.tier >= 2 ? 4 : 2)) || D.time < D.flyUntil) return null;
     const k = (D.lastK || 0) + 1, C = LD.candidates(D.ctx); if (!C.length) return null;
-    const order = LD.order(D.seed, k, C, D.acts, D.time, LD.pick(D.seed, k, D.ctx));
+    const since = S ? now(g) - S.sched.last2 : 0, HEARD = {};
+    for (const c of C) if (LD.ACTS[c] && LD.ACTS[c].heard) HEARD[c] = 1;
+    const order = R.fillOrder(LD.order(D.seed, k, C, D.acts, D.time, LD.pick(D.seed, k, D.ctx)), C, D.acts, D.time, since, HEARD);
     if (!order.length) return null;
     const kind = LD.FLY[order[0]] ? 'travel' : order[0] === 'meteor' || order[0] === 'skyray' || order[0] === 'fireworks' ? 'sky' : 'ambient';
     return [{ source: 'ld', act: order[0], weight: 2, kind, place: D.ctx.place, eta: LD.FLY[order[0]] ? LD.ROT.eta : 0, start: () => { const ev = D.play(order, { k: 600000 + k * 16 + ((D.fillN = (D.fillN | 0) + 1) & 15) }); if (ev) D.st.filled++; return !!ev; } }];

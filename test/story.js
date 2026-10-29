@@ -55,7 +55,7 @@ check(S.why(b1, calm({ adv: false }), rec0) === null, 'chapter 1 begins in a bui
 const r1 = S.fresh(); S.mark(r1, 'c1.b1');
 const b2 = S.byId('c1.b2');
 check(S.why(b2, calm({ place: 'hills' }), rec0) === 'after' && S.why(b2, calm({ place: 'hills' }), r1) === null, 'c1.b2 after c1.b1, out on the hills');
-check(S.why(b2, calm({ place: 'hills', hour: 'night' }), r1) === 'hour', 'c1.b2 waits for the day (its vista)');
+check(S.why(b2, calm({ place: 'hills', hour: 'night' }), r1) === null, 'c1.b2 by night too (the session: night fell before its 5 minutes were up)');
 S.mark(r1, 'c1.b2');
 const b3 = S.byId('c1.b3');
 check(S.why(b3, calm({ adv: false, near: { outpost: 300 } }), r1) === 'adv', 'chapter 1 · beat 3 on only in an Abenteuer world');
@@ -123,7 +123,7 @@ check(sh.i === 0 && sh2.i === 1 && Math.abs(sh2.u - 0.1) < 1e-6 && sh3.i === 2 &
 
 console.log('7 · chapter 1 walked through');
 const r7 = S.fresh(); let t = 0; const got = [];
-const steps = [calm({ place: 'hall', calm: 5 }), calm({ place: 'hangar' }), calm({ place: 'hangar' }), calm({ place: 'hills', hour: 'night' }), calm({ place: 'hills', hour: 'dusk' }), calm({ place: 'wild', near: { outpost: 650 } }), calm({ place: 'wild', near: { outpost: 100 } })];
+const steps = [calm({ place: 'hall', calm: 5 }), calm({ place: 'hangar' }), calm({ place: 'hangar' }), calm({ place: 'hills', building: true }), calm({ place: 'hills', hour: 'dusk' }), calm({ place: 'wild', near: { outpost: 650 } }), calm({ place: 'wild', near: { outpost: 100 } })];
 for (const c of steps) { t += 400; const b = S.next(r7, c, t); if (b) { got.push(b.id); S.mark(r7, b.id); } }
 check(got.join(' ') === 'c1.b1 c1.b2 c1.b3 c2.b1', 'the beats as their places come: ' + got.join(' '));
 
