@@ -231,7 +231,10 @@
     G.box(-0.4, 0.4, cy + H - 0.3, cy + H + 0.35, z0 + L * 0.34, z1 - 3.2, (x, y) => (y > cy + H + 0.1 && Math.abs(x) < 0.15 ? glow : hull2));
     antenna(G, S, -0.75, cy + H - 0.15, z0 + L * 0.38, 1.6);
     // the aft housing and three engines (the centre one high)
-    G.box(-W * 0.95, W * 0.95, gearH, cy + H * 0.7, z1 - 2.3, z1 - 0.8, (x, y) => (Math.abs(y - cy) < 0.18 ? acc : hull2));
+    // (t_hangar.mjs run 2: from the hall's door the craft shows its tail — a slimmer housing so the round hull reads,
+    // a cyan light bar over the engines)
+    G.box(-W * 0.7, W * 0.7, gearH + 0.3, cy + H * 0.45, z1 - 2.3, z1 - 0.8, (x, y) => (Math.abs(y - cy) < 0.18 ? acc : hull2));
+    G.box(-W * 0.55, W * 0.55, cy + H * 0.45, cy + H * 0.45 + 0.25, z1 - 1.1, z1 - 0.8, glow);
     engine(G, S, 0, cy + 0.95, 0.5, z1 + 0.2, 1.4);
     // the engine pods on short pylons: grey, an orange band, a cyan ring at the intake, a big engine each
     for (const sx of [-1, 1]) {

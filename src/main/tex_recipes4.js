@@ -127,7 +127,7 @@
     return img;
   };
   // the gate's glow: four rings from the white-gold core (0) to the deep orange rim (3); a soft sheen, nearly opaque
-  const GLOW = [[0xfff4d0, 0.9], [0xffd66a, 0.88], [0xffa63a, 0.86], [0xff6e1a, 0.86]];
+  const GLOW = [[0xfffae8, 0.92], [0xffe896, 0.9], [0xffc456, 0.88], [0xff9a32, 0.88]];   // (t_hangar.mjs run 2: a step yellower — the rim read red)
   for (let k = 0; k < 4; k++) REC['gate_glow_' + k] = () => {
     const img = new TX.Img();
     img.forEach((x, y, i) => { const n = TX.fbm(x, y, 8, 2, 4150 + k); img.set(x, y, TX.scale(C(GLOW[k][0]), 0.94 + (n - 0.5) * 0.12), GLOW[k][1]); img.em[i] = 1; img.ro[i] = 0.1; });

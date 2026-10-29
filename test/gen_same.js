@@ -48,7 +48,7 @@ console.log(`     vgen 13 · seed 53's arrival cone and seed 4242's woods: 6 col
 // vgen 14 (t-hangar: the Gate Temple's dark stone, gatehouse and gate glow, the Hangar Hall's bay, coffer, navy lining,
 // screens and consoles) has its own pin: six chunks of seed 4242's temple — and the same six chunks of a vgen-13 world
 // pinned beside it (the temple as v0.51 built it: c9f35c0a, recorded from the base build before t-hangar)
-const T14 = [[0, -1], [0, 1], [-1, 0], [0, -3], [3, 0], [-2, -2]], EXPECT14 = '6eff341f', EXPECT13T = 'c9f35c0a';
+const T14 = [[0, -1], [0, 1], [-1, 0], [0, -3], [3, 0], [-2, -2]], EXPECT14 = 'a081e5c3', EXPECT13T = 'c9f35c0a';
 const pinT = (vg) => { let h = 2166136261 >>> 0; const g = V.makeGen('overworld', 4242, { vgen: vg }); for (const [cx, cz] of T14) h = fnv(h, g.generate(cx, cz).blocks); return h.toString(16).padStart(8, '0'); };
 const hex14 = pinT(14), hex13T = pinT(13);
 console.log(`     vgen 14 · seed 4242's Gate Temple and Hangar Hall: 6 columns, hash ${hex14} (vgen 13 there: ${hex13T})`);

@@ -19,7 +19,8 @@ const SHOT = {
   golden: { from: [0.5, 86, 104], to: [0.5, 92, 20], tod: 12500 },          // the temple from the plaza, the golden hour (t1_11)
   night: { from: [0.5, 86, 104], to: [0.5, 92, 20], tod: 16000 },           // the same at night
 };
-const shots = (process.env.SHOTS || Object.keys(SHOT).join(',')).split(',');
+// (the pad and the consoles first: in run 2 the first picture, the hall's, caught a section of the hall not yet in)
+const shots = (process.env.SHOTS || 'pad,consoles,hall,front,golden,night').split(',');
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 let bad = 0; const ok = (c, m) => { if (!c) bad++; console.log((c ? '  ok   ' : '  FAIL ') + m); };
 const res = {};
@@ -67,6 +68,7 @@ for (const [tag, dist] of BUILDS) {
     const ms = Math.min(...runs); console.log('cost', tag, label, ms.toFixed(1) + ' ms/frame (blocks ' + runs.map(v => v.toFixed(0)).join(', ') + ')'); return ms;
   };
   res[tag] = { vgen: info.vgen, ships, logs: logs.filter(l => l.startsWith('[pageerror]')) };
+  if (process.env.NOCOST) { console.log('--- logs', tag, logs.length); for (const l of logs.slice(0, 8)) console.log(l); await ctx.close(); continue; }   // (the costs: critic_vl.mjs's alternating rounds)
   await ev((t) => VR.game.env.setTime(t), 12500); await look(SHOT.hall.from, SHOT.hall.to);
   res[tag].high = await timeFrames('High');
   await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
