@@ -91,9 +91,24 @@
     const seen = L && L.inView ? L.inView([m.pos[0], m.pos[1] + 1, m.pos[2]], 1.2, g).inView : true;
     if (!seen || d > 30) { Fo.leaveAll([m], Fo.W); S.m = null; }
   }
+  // the first sight of a disturbed outpost (its beacon in the view within RULES.sight m): Funke names it, the event
+  // log's discovery — once a site, never on top of another moment (Regie.busy)
+  RA.RULES.sight = 110;
+  function sight(g, S) {
+    const s = nearestSite(g), b = s && s.known && s.beacon; if (!b || (S.seen && S.seen[s.id])) return;
+    const P = g.player.pos, d = Math.hypot(b[0] - P[0], b[2] - P[2]); if (d > RA.RULES.sight) return;
+    const L = VR.EventLog, q = [b[0] + 0.5, b[1] + 2, b[2] + 0.5]; if (!L || !L.inView) return;
+    const v = L.inView(q, 12, g); if (!v.inView || (v.frac > 0 && v.frac < 0.005)) return;
+    if (VR.Regie && VR.Regie.busy && VR.Regie.busy(g)) return;
+    (S.seen || (S.seen = {}))[s.id] = g.time || 0;
+    const fk = g.funke, Lb = VR.Liberate; if (fk && fk.on && fk.on()) fk.say('regie.sight', { name: Lb && Lb.nameOf ? Lb.nameOf(s) : '' }, true);
+    L.emit('discovery', 'outpost', 3, q, 'regie', 12);
+    if (VR.Regie && VR.Regie.note) VR.Regie.note(g, 3, 'discovery', 'sight');
+    RA.stats.sights = (RA.stats.sights | 0) + 1;
+  }
   RA.source = function (g) {
     const Fo = VR.Foes; if (!Fo || !Fo.advOn || !Fo.advOn(g) || (g.dim || 'overworld') !== 'overworld') return null;
-    const S = state(g); tend(g, S);
+    const S = state(g); tend(g, S); sight(g, S);
     if ((g.time || 0) < (S.retry || 0)) return null;
     const st = { adv: true, guest: !!(g.meta && g.meta.guest), enc: Fo.enc ? Fo.enc() : 'off', kids: !!(g.settings && g.settings.kids), t0: S.t0, called: S.called, strayed: S.strayed, encounters: Fo.stats ? Fo.stats.encounters : 0, site: S.called ? null : nearestSite(g) };
     const list = RA.offers(st, g.time || 0); if (!list.length) return null;

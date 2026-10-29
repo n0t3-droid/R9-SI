@@ -97,11 +97,11 @@ function planRoutes() {
   const walkA = join([[10.5, 60.5], [30, 66], [59, 74]], l11, span(ring, [112, -97], [1, -65]), [plaza]);
   const walkB = join([plaza], span(radial, [0, -59], [0, -101]), span(east, [0, -101], [13, -158]), span(arc, [9, -155], [-15, -155]), span(west, [-16, -153], [0, -101]), span(radial, [0, -101], [0, -59]), [plaza], span(ring, [1, -65], [-112, -97]), l17.slice().reverse());
   // a-regie (R52-06): the adventurer follows Funke's call — out of the Hangar Hall over the Gate Plaza, then straight
-  // toward the nearest disturbed outpost (the generator's own, as the worker's /locate finds it), stopping 90 m short
+  // toward the nearest disturbed outpost (the generator's own, as the worker's /locate finds it), stopping 70 m short
   // (outside its guardians' 76 m: the lost stray on the way is the encounter, not a fight at the pad)
   const OP = gen.nearestOutpost ? gen.nearestOutpost(0.5, 58) : null;
   let advA = null;
-  if (OP) { const a = [-80, 60], dx = OP.x - a[0], dz = OP.z - a[1], d = Math.hypot(dx, dz), L = Math.max(0, d - 90), pts = []; for (let k = 0; k <= L; k += 20) pts.push([a[0] + dx / d * k, a[1] + dz / d * k]); advA = join(GATE.slice(0, 4), [[-40, 59]], pts); }   // (west along the plaza first: the line from the plaza itself crosses the Gate Temple's halls)
+  if (OP) { const a = [-80, 60], dx = OP.x - a[0], dz = OP.z - a[1], d = Math.hypot(dx, dz), L = Math.max(0, d - 70), pts = []; for (let k = 0; k <= L; k += 20) pts.push([a[0] + dx / d * k, a[1] + dz / d * k]); advA = join(GATE.slice(0, 4), [[-40, 59]], pts); }   // (west along the plaza first: the line from the plaza itself crosses the Gate Temple's halls)
   return { M, STAND, builderA, builderB, walkA, walkB, advA, outpost: OP && { x: OP.x, y: OP.y, z: OP.z }, len, plaza, landmarks: V.Vista && V.Vista.landmarks ? V.Vista.landmarks(gen, LP).filter(q => q.great).map(q => ({ id: q.id, x: q.x, z: q.z, base: q.base, top: q.top, r: q.r })) : [] };
 }
 
@@ -657,7 +657,7 @@ try {
   // there, 5 min after the first). Only when asked (ONLY=adventurer; DUR=600 for ten minutes: two beats)
   if (ONLY && ONLY.includes('adventurer')) {
     await ev(() => { const A = VR.Adventure; if (A && A.setOn) { A.setOn(true); A.setEnc('normal'); } window.__S.acceptStory = true; });
-    recs.adventurer = await session('adventurer', { tod: 9200, at: [0.5, 81, 4.5], notes: ['a-story: Abenteuer on, the story offered by Funke and taken at once', 'a-regie: the adventurer follows Funke\'s call toward the nearest disturbed outpost ' + JSON.stringify(ROUTES.outpost) + ' and stops 90 m short; the Regie\'s lost stray on the way'] }, [
+    recs.adventurer = await session('adventurer', { tod: 9200, at: [0.5, 81, 4.5], notes: ['a-story: Abenteuer on, the story offered by Funke and taken at once', 'a-regie: the adventurer follows Funke\'s call toward the nearest disturbed outpost ' + JSON.stringify(ROUTES.outpost) + ' and stops 70 m short (its guardians patrol in sight, outside their notice); the Regie\'s lost stray on the way'] }, [
       { name: 'hangar', de: 'Hangarhalle: umsehen (Kapitel 1)', mode: { kind: 'look', sec: 40, speed: 0.25 }, max: 40 },
     ].concat(ROUTES.advA ? [
       // a-regie: Funke's call — the way to the nearest disturbed outpost (its beam on the horizon), a look at it at the end

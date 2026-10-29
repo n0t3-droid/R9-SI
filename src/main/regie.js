@@ -158,13 +158,15 @@
     const D = g.lifeDirector, LD = VR.LifeDirector, S = R.of(g);
     const no = (w) => { if (S) { const q = S.st.ldNo || (S.st.ldNo = {}); q[w] = (q[w] | 0) + 1; } return null; };   // (a-regie: why the director offered nothing — the session's JSON)
     if (!D || !D.on || !D.ctx || !LD) return no('off');
-    if (D.pend) return no('pend');
     if (D.events && D.events.length >= (D.tier >= 2 ? 4 : 2)) return no('full');
     if (D.time < D.flyUntil) return no('fly');
-    const k = (D.lastK || 0) + 1, C = LD.candidates(D.ctx); if (!C.length) return no('none');
+    // a-regie: a slot of the director's own waiting for its pace (D.pend) is offered as it is — the Regie's spacing decides
+    // (v0.51's sessions: the pending slot held the Regie's fill up a third of the time)
+    const P = D.pend, k = P ? P.k : (D.lastK || 0) + 1, C = LD.candidates(D.ctx); if (!C.length) return no('none');
+    if (P) no('pend');
     const since = S ? now(g) - S.sched.last2 : 0, HEARD = {};
     for (const c of C) if (LD.ACTS[c] && LD.ACTS[c].heard) HEARD[c] = 1;
-    const order = R.fillOrder(LD.order(D.seed, k, C, D.acts, D.time, LD.pick(D.seed, k, D.ctx)), C, D.acts, D.time, since, HEARD);
+    const order = R.fillOrder(LD.order(D.seed, k, C, D.acts, D.time, P ? P.first : LD.pick(D.seed, k, D.ctx)), C, D.acts, D.time, since, HEARD);
     if (!order.length) return no('order');
     // a-regie: the first three of the order with different kinds (the event log's own kind for each act) — the Regie
     // chooses among them by its rules (the variety, the cooldown); the one chosen plays first, the rest of the order after it
@@ -173,7 +175,7 @@
       const act = order[i], kind = LD.FLY[act] ? 'travel' : EA && EA[act] && EA[act].kind ? EA[act].kind : act === 'meteor' || act === 'skyray' || act === 'fireworks' ? 'sky' : 'ambient';
       if (kinds[kind]) continue; kinds[kind] = 1;
       const ord = [act].concat(order.filter(c => c !== act));
-      out.push({ source: 'ld', act, weight: 2, kind, place: D.ctx.place, eta: LD.FLY[act] ? LD.ROT.eta : 0, start: () => { const ev = D.play(ord, { k: 600000 + k * 16 + ((D.fillN = (D.fillN | 0) + 1) & 15) }); if (ev) D.st.filled++; return !!ev; } });
+      out.push({ source: 'ld', act, weight: 2, kind, place: D.ctx.place, eta: LD.FLY[act] ? LD.ROT.eta : 0, start: () => { const ev = D.play(ord, { k: P ? P.k : 600000 + k * 16 + ((D.fillN = (D.fillN | 0) + 1) & 15) }); if (ev) { D.st.filled++; if (P && D.pend === P) D.pend = null; } return !!ev; } });
     }
     return out;
   });
