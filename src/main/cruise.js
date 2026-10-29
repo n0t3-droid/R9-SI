@@ -487,7 +487,9 @@
   C.ride = (g, S, s, R0) => {
     if (!R0 || !R0.air) return false;
     const p = g.player, SS = g.starships;
-    s.pos[0] = p.pos[0]; s.pos[1] = p.pos[1] + R0.air; s.pos[2] = p.pos[2];
+    // (under flight.js's cap: above 252 m a starship's climb begins)
+    const H = (s.d.meta && s.d.meta.height) || 6;
+    s.pos[0] = p.pos[0]; s.pos[1] = Math.min(p.pos[1] + R0.air, 246 - H); s.pos[2] = p.pos[2];
     SS.board(s, p);
     const fl = s.flight; if (!fl) return true;
     fl.power = 'running'; fl.startT = 3; fl.state = 'flying'; fl.holdAlt = null; fl.auto = null;
