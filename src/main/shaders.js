@@ -1119,6 +1119,19 @@ void main() {
   alb.rgb = mix(alb.rgb, alb.rgb * tint, alb.a);
 #endif
   }
+#ifdef BODYGROUND
+  // u-orbit2 (R52-09: the ground a uniform stepped grey): on an airless body from Low up (bodysky.js's define hook) the
+  // ground's albedo in patches over metres to a hundred metres — the regolith's darker and brighter dust, the ice's frost
+  // and its bluer, older crust
+  { vec3 gp = v_localPos + vec3(u_camInt);
+    float bn = vnoise3(gp * 0.13) * 0.45 + vnoise3(gp * 0.037 + 7.0) * 0.35 + vnoise3(gp * 0.011 + 3.0) * 0.2;
+#ifdef BG_OPAL
+    alb.rgb *= (1.0 + (bn - 0.5) * 1.5) * mix(vec3(1.0), vec3(0.88, 0.95, 1.05), smoothstep(0.5, 0.78, vnoise3(gp * 0.021 + 11.0)));
+#else
+    alb.rgb *= 1.0 + (bn - 0.5) * 2.0;   // (a sum of three noises: its spread ~±0.12 — run 4's ×0.6 did not show)
+#endif
+  }
+#endif
 #ifdef MOTION
   // t-motion · the wind's waves over the meadow: grass and leaves bent by a gust show their paler side; on a green block's
   // top the bands run over the ground itself, per pixel (wind.js windGroundSheen: brighter and a touch yellower under a

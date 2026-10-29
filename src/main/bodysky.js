@@ -18,10 +18,11 @@
   'use strict';
   const BS = VR.BodySky = { want: false, eye: [0, 73.6, 0], groundY: null, plumes: [], cur: null, expo: 0, t: 0 };
   const D2R = Math.PI / 180;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
   const ss = (a, b, x) => { let t = (x - a) / (b - a); t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); };
   const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   // Helia's light (F5, a white with a breath of blue; the home sun's noon is [2.9, 2.72, 2.4]) and its disc's radiance
-  const SUN = [2.85, 2.9, 3.05], DISC = 60;
+  const SUN = [2.85, 2.9, 3.05], DISC = 60, STAR = 0.006;   // (u-orbit2: STAR the starlight's floor on the ground)
   // the worlds seen from the moons: their albedo colour (linear), their air's limb
   const LOOK = { herz: [0.3, 0.38, 0.52, 1], aqua: [0.2, 0.33, 0.5, 0.6], zinn: [0.55, 0.46, 0.22, 0], opal: [0.86, 0.88, 0.92, 0], basalt: [0.12, 0.12, 0.12, 0], ocker: [0.5, 0.3, 0.17, 0.3] };
   // per body: the ground's albedo for the far ground and the bounce (Basalt by its two grounds), the exposure by day and by
@@ -29,7 +30,7 @@
   // them out; at night the eye opens; Opal's ice is bright), the plumes' brightness
   const KIND = {
     basalt: { alb: { basalt_mare: 0.075, basalt_highlands: 0.26, basalt_crater: 0.2 }, alb0: 0.1, tint: [1.0, 0.98, 0.95], bounce: 0.32, floor: 0.06, expoDay: 0.9, expoNight: 3.6, plume: 0 },
-    opal: { alb: {}, alb0: 0.72, tint: [0.96, 0.98, 1.02], bounce: 0.38, floor: 0.05, expoDay: 0.62, expoNight: 1.7, plume: 1 },
+    opal: { alb: {}, alb0: 0.72, tint: [0.96, 0.98, 1.02], bounce: 0.38, floor: 0.05, expoDay: 0.5, expoNight: 1.7, plume: 1 },
   };
   BS.KIND = KIND; BS.SUN = SUN;
 
@@ -70,12 +71,20 @@
     const pAbove = ss(-dip - pAng, -dip + pAng, pEl);
     // its light on the night side: its lit part × its solid angle (π·ang²) × its albedo 0.5 / π, × 4 (readable nights)
     const parK = 0.5 * (p.phase || 0) * pAng * pAng * 4 * pAbove;
-    const parLight = SUN.map(v => v * parK);
+    // u-orbit2 (R52-09: Basalt's night near black): the other worlds' shine — each lit part × its solid angle × its
+    // albedo, × 4 as Amarant's — and the starlight with the galaxy's band (a floor: no moonless night is quite black)
+    let othK = 0;
+    for (const b of sky.bodies) {
+      const L = LOOK[b.id]; if (!L || b.id === 'helia' || b.id === p.id) continue;
+      const lit = 0.5 * (1 - (b.dir[0] * sd[0] + b.dir[1] * sd[1] + b.dir[2] * sd[2])), bEl = Math.asin(Math.max(-1, Math.min(1, b.dir[1])));
+      othK += (0.2126 * L[0] + 0.7152 * L[1] + 0.0722 * L[2]) * lit * b.ang * b.ang * 4 * ss(-dip - b.ang, -dip + b.ang, bEl);
+    }
+    const parLight = SUN.map(v => v * (parK + othK));
     // the ground's albedo here (Basalt: the mare's dark dust or the highlands' bright), its far colour in this light
     const alb = (o.biome && K.alb[o.biome] !== undefined ? K.alb[o.biome] : K.alb0);
     const sunLight = SUN.map((v, i) => v * lightK * (VR.Grade ? VR.Grade.sunK : 1));
     const sinEl = Math.max(0, sd[1]);
-    const amb = sunLight.map((v, i) => (v * alb * K.bounce + parLight[i] * 0.35 + K.floor * 0.02) * K.tint[i]);
+    const amb = sunLight.map((v, i) => (v * alb * K.bounce + parLight[i] * 0.35 + K.floor * 0.02 + STAR) * K.tint[i]);
     const far = sunLight.map((v, i) => alb * (v * (0.18 + 0.6 * sinEl) + parLight[i] * 0.6 + amb[i]) * K.tint[i]);
     const night = 1 - ss(0, 1, lightK);
     // the terrain's direct light: the shader fades the sun over ±7° (its sunUp, made for an air) — here the light is the
@@ -123,11 +132,15 @@
       ground: [far[0], far[1], far[2], dip],
       J, Js, Jk: [K.plume ? free : 0, hDist, R, he],   // (the plumes dark while Amarant hides Helia)
       lum: [0, 0],
+      eye: [eye[0] % 40000, eye[1], eye[2] % 40000],   // u-orbit2: the far ground's texture (bsFarGround)
     };
-    const expo = lit ? K.expoDay + (K.expoNight - K.expoDay) * night : K.expoNight, exE = o.expo > 0 ? o.expo : expo;
+    // (u-orbit2: on the darkest nights the eye opens further — up to 1.7× — as it does under the stars alone)
+    const nl = 0.2126 * amb[0] + 0.7152 * amb[1] + 0.0722 * amb[2] + 0.7 * (parK + othK) * SUN[1] * Math.max(0, pd[1]);
+    const xN = K.expoNight * clamp(0.05 / Math.max(nl, 0.004), 1, 1.7);
+    const expo = lit ? K.expoDay + (xN - K.expoDay) * night : xN, exE = o.expo > 0 ? o.expo : expo;
     // Amarant and the worlds at the brightness they have at the day's exposure, whatever the eye's (their bands read)
     skyU.lum[0] = Math.min(1, Math.max(0.1, 1.7 / (SUN[1] * exE))); skyU.lum[1] = Math.min(1, Math.max(0.1, 2.4 / (SUN[1] * exE)));
-    return { id, light, sky: skyU, expo, raw: sky };
+    return { id, light, sky: skyU, expo, raw: sky, alb };
   };
 
   // ---------------------------------------------------------------- the env (env.js calls this at the end of update)
@@ -148,7 +161,7 @@
     E.zenith = fc; E.horizon = fc; E.skyMid = fc; E.fogColor = fc; E.sunset = [0, 0, 0];
     E.skyStops = [0.25, 0.1, 1.0, 0.45]; E.skyDay = [0, 1, 0, 0];
     const rd = (o.renderDist || 8) * 16;
-    E.fog = [rd * 0.78, rd * 0.99, 0, 0];
+    E.fog = [rd * 0.9, rd * 0.995, 0, 0];   // (u-orbit2: no air, no haze over the near land — only the last columns' edge)
     if (o.underwater) { E.fog = [0, 1, 0, 1]; }
     E.rain = 0; E.snow = 0; E.wet = 0; E.puddle = 0; E.wind = 0; E.gust = 0; E.cloudCover = 0; E.cloudDrift = null; E.rays = 0; E.nebula = 0; E.snowCover = 0;
     if (E.storm) { E.storm[2] = 0; E.storm[3] = 0; } if (E.bolt) E.bolt[3] = 0;
@@ -177,11 +190,20 @@
     v4('u_bsJs', S.Js);
     v4('u_bsJk', S.Jk);
     if (u.u_bsLum) gl.uniform2f(u.u_bsLum, S.lum[0], S.lum[1]);
+    if (u.u_bsEye && S.eye) gl.uniform3f(u.u_bsEye, S.eye[0], S.eye[1], S.eye[2]);
   };
-  // the sky program alone gets BODYSKY, and only while a body's sky is shown (light2.js's and sky3.js's hooks first)
+  // the sky program alone gets BODYSKY, and only while a body's sky is shown (light2.js's and sky3.js's hooks first).
+  // u-orbit2: the terrain's programs get BODYGROUND (+ BG_<body>) on a body from Low up — the ground's albedo patches
+  // (shaders.js TERRAIN_FS); Herzwelt's programs and Very Low's stay the text they were
+  BS.groundKey = '';
   if (VR.GL && !VR.GL.__bodySky) {
     const prev = VR.GL.defineHook || null;
-    VR.GL.defineHook = (name, defines) => { const d = prev ? prev(name, defines) : (defines || []); return name === 'sky' && BS.want ? d.concat(['BODYSKY']) : d; };
+    VR.GL.defineHook = (name, defines) => {
+      const d = prev ? prev(name, defines) : (defines || []);
+      if (name === 'sky' && BS.want) return d.concat(['BODYSKY']);
+      if ((name === 'terrain' || name === 'terrainCut') && BS.groundKey) return d.concat(['BODYGROUND', 'BG_' + BS.groundKey.toUpperCase()]);
+      return d;
+    };
     VR.GL.__bodySky = true;
   }
   const Rn = VR.Renderer;
@@ -189,7 +211,8 @@
     // the programs rebuilt once when the body's sky comes or goes (on the trip, under its veil)
     const render0 = Rn.prototype.render;
     Rn.prototype.render = function (F) {
-      if (BS.want !== !!this.bsBuilt) { this.bsBuilt = BS.want; this.buildPrograms(); }
+      const gk = BS.want && this.q && !this.q.lite && BS.cur && BS.cur.id ? BS.cur.id : '';
+      if (BS.want !== !!this.bsBuilt || gk !== BS.groundKey) { this.bsBuilt = BS.want; BS.groundKey = gk; this.buildPrograms(); }
       BS.tier = this.q ? (this.q.lite ? 0 : Math.max(1, Math.min(3, (this.q.matTier | 0) || 2))) : 2;
       return render0.call(this, F);
     };

@@ -54,7 +54,7 @@ console.log('one albedo (R50-14)');
   for (const [cx, cz, step] of [[0, 0, 50], [9000, -7000, 50], [-15000, 12000, 100]]) {
     const r = BT.job({ type: 'bodytex', body: 'patch', w: 256, h: 256, y0: 0, y1: 256, cx, cz, step }, gen), s = stats(r.a, 256, 256);
     check(s.edge < (step > 50 ? 0.08 : 0.05) && s.runs < 40, `patch at (${cx}, ${cz}), ${step} m: ${(s.edge * 100).toFixed(1)} % of land neighbours differ by > 48 levels (v0.50: 30–44 %), the longest run of edges ${s.runs} texels (< 40)`);
-    check(s.warm < 0.01 && s.blue < 0.01 && s.sat < 0.36, `…its land is muted: ${(s.warm * 100).toFixed(2)} % pink/orange, ${(s.blue * 100).toFixed(2)} % saturated blue, mean saturation ${s.sat.toFixed(2)} (v0.50 0.50)`);
+    check(s.warm < 0.01 && s.blue < 0.01 && s.sat < 0.42, `…its land is muted: ${(s.warm * 100).toFixed(2)} % pink/orange, ${(s.blue * 100).toFixed(2)} % saturated blue, mean saturation ${s.sat.toFixed(2)} (< 0.42: u-orbit2's continents bring their deserts and forests back, f-rules' review item; v0.50 0.50)`);
   }
   const r = BT.job({ type: 'bodytex', body: 'herz', w: 512, h: 256, y0: 60, y1: 120 }, gen), s = stats(r.a, 512, 60);
   check(s.edge < 0.08 && s.warm < 0.01, `the globe's rows (512 wide): ${(s.edge * 100).toFixed(1)} % hard edges (v0.50 74 %), ${(s.warm * 100).toFixed(2)} % pink/orange`);
