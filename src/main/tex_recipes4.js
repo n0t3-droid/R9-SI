@@ -102,4 +102,35 @@
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const bar = (x % 8) < 5; if (bar) { img.set(x, y, TX.scale(C(0xe8e8e2), 0.85 + hh(x, y, 4123) * 0.2), 1); img.ro[y * N + x] = 0.65; } }
     return img;
   };
+
+  // ---- t-hangar (vgen 14): the Gate Temple's dark stone, its tall windows and the gate's glow (src/shared/voxhangar.js)
+  // the dark set is the slate set with every stone texel darkened toward a deep blue-grey (the glowing texels stay):
+  // the trailer's temple reads as dark stone with warm light in it (t1_10), not a lilac façade at the golden hour
+  const darken = (img) => { img.forEach((x, y, i) => { if (img.em[i] > 0.2) return; const j = i * 4; img.c[j] *= 0.5; img.c[j + 1] *= 0.53; img.c[j + 2] *= 0.6; }); return img; };
+  REC.temple_stone_dark = () => darken(REC.temple_stone());
+  REC.temple_stone_dark_smooth = () => darken(REC.temple_stone_smooth());
+  REC.temple_stone_dark_band = () => darken(REC.temple_stone_band());
+  REC.temple_pilaster_dark = () => darken(REC.temple_pilaster());
+  REC.temple_light_bar_dark = () => darken(REC.temple_light_bar());
+  REC.temple_slit_dark = () => darken(REC.temple_slit());
+  // a tall warm window: a dark stone reveal, one mullion down the middle, glass from deep orange at the sill to
+  // gold at the head (no grid: from the plaza a row of them reads as lit slots, not office windows)
+  REC.amber_window_tall = () => {
+    const img = new TX.Img(), m = N >> 4;
+    img.forEach((x, y, i) => {
+      const e = Math.min(x, N - 1 - x);
+      if (e < 3 * m) { img.set(x, y, C(0x262c36), 1); img.em[i] = 0; img.ro[i] = 0.7; img.h[i] = 0.75; return; }
+      if (Math.abs(x - (N - 1) / 2) < m) { img.set(x, y, C(0x3a2a1c), 1); img.em[i] = 0.05; img.ro[i] = 0.5; img.h[i] = 0.62; return; }
+      const t = y / (N - 1), g = 0.9 + (TX.fbm(x, y, 8, 2, 4141) - 0.5) * 0.18;
+      img.set(x, y, TX.scale(TX.mix(C(0xffc24a), C(0xff7a1a), t), g), 1); img.em[i] = 0.95; img.ro[i] = 0.1; img.h[i] = 0.55;
+    });
+    return img;
+  };
+  // the gate's glow: four rings from the white-gold core (0) to the deep orange rim (3); a soft sheen, nearly opaque
+  const GLOW = [[0xfff4d0, 0.9], [0xffd66a, 0.88], [0xffa63a, 0.86], [0xff6e1a, 0.86]];
+  for (let k = 0; k < 4; k++) REC['gate_glow_' + k] = () => {
+    const img = new TX.Img();
+    img.forEach((x, y, i) => { const n = TX.fbm(x, y, 8, 2, 4150 + k); img.set(x, y, TX.scale(C(GLOW[k][0]), 0.94 + (n - 0.5) * 0.12), GLOW[k][1]); img.em[i] = 1; img.ro[i] = 0.1; });
+    return img;
+  };
 })(VR);
