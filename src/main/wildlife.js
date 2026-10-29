@@ -975,7 +975,7 @@
     // and how far its wings turn to the eye (W.puffTau); overlapping, they blend into a dark core with a lighter rim
     drawCloud(r, E, cam) {
       const Mu = this.murm, cap = this.b.cap, list = this.list;
-      list.length = 0;
+      list.length = 0; this.stats.drawsT = 0;
       if (!Mu || !cap.murm || Mu.state !== 'fly') return;
       const fl = Mu.fl, cx = cam.x, cy = cam.y, cz = cam.z;
       if (Math.hypot(fl.ctr[0] - cx, fl.ctr[2] - cz) > 520) return;
@@ -1000,8 +1000,11 @@
     }
     drawVox(r, E, cam) {
       const g = this.g, ent = g.entities;
+      this.stats.vox = 0;
       if (!ent || (!this.herons.length && !this.rabbits.length && !this.fox)) return;
-      let prog = null; const pg = () => prog || (prog = ent.beginVox(r, E));
+      // (f-wild2: the parts drawn, for the cost's report — one draw a part)
+      let prog = null; const pg = () => prog || (prog = ent.beginVox(r, E)), st = this.stats; st.vox = 0;
+      const dm = (model, pos, c, yaw, pose, light, o) => { st.vox += model.np || (model.np = (model.def.order || Object.keys(model.parts)).length); ent.drawModel(r, pg(), model, pos, c, yaw, pose, light, o); };
       const t = g.time || this.time;
       for (const h of this.herons) {
         const dx = h.pos[0] - cam.x, dz = h.pos[2] - cam.z; if (dx * dx + dz * dz > 100 * 100) continue;
@@ -1017,7 +1020,7 @@
         pose.head[0] = h.state === 'stand' ? -0.1 + Math.sin(t * 0.7 + h.a) * 0.08 : 0.9 * h.wing; pose.head[1] = h.state === 'stand' ? h.look * 0.4 : 0;
         pose.legs[0] = 1.25 * h.legs;
         const light = ent.lightAt(h.pos[0], h.pos[1] + 1, h.pos[2]);
-        ent.drawModel(r, pg(), model, h.pos, cam, h.yaw, pose, light, { shade: 0, pitch: h.pitch || 0, scale: 1.15 });
+        dm(model, h.pos, cam, h.yaw, pose, light, { shade: 0, pitch: h.pitch || 0, scale: 1.15 });
       }
       for (const q of this.rabbits) {
         const dx = q.pos[0] - cam.x, dz = q.pos[2] - cam.z; if (dx * dx + dz * dz > 60 * 60) continue;
@@ -1027,7 +1030,7 @@
         if (P.head && !q.hop) P.head[0] += q.state === 'graze' ? -0.55 + Math.max(0, Math.sin(t * 7 + q.id)) * 0.18 : 0.25 * q.alert;
         if (P.ear_l) { P.ear_l[0] = -0.25 * (1 - q.alert); P.ear_r[0] = -0.25 * (1 - q.alert); }
         if (P.body && q.alert > 0.5 && !q.hop) P.body[0] += 0.35 * q.alert;
-        ent.drawModel(r, pg(), model, q.pos, cam, q.yaw, P, ent.lightAt(q.pos[0], q.pos[1] + 0.4, q.pos[2]), { shade: 0, scale: 0.85 });
+        dm(model, q.pos, cam, q.yaw, P, ent.lightAt(q.pos[0], q.pos[1] + 0.4, q.pos[2]), { shade: 0, scale: 0.85 });
       }
       const f = this.fox;
       if (f) {
@@ -1037,7 +1040,7 @@
           const P = VR.Companions && VR.Companions.poseOf ? VR.Companions.poseOf(f, t) : {};
           if (P.head && f.state === 'sniff') P.head[0] = -0.8 + Math.sin(t * 9) * 0.06;
           if (P.body && f.state === 'pounce') P.body[0] = -0.5 + f.jump * 0.8;
-          ent.drawModel(r, pg(), model, f.pos, cam, f.yaw, P, ent.lightAt(f.pos[0], f.pos[1] + 0.5, f.pos[2]), { shade: 0 });
+          dm(model, f.pos, cam, f.yaw, P, ent.lightAt(f.pos[0], f.pos[1] + 0.5, f.pos[2]), { shade: 0 });
         }
       }
     }
@@ -1053,7 +1056,7 @@
         dflies: this.dflies.reduce((s, p) => s + p.list.length, 0), rays: this.rays.map(R => Array.from(R).map(v => +v.toFixed(2))),
         rabbits: this.rabbits.map(q => ({ state: q.state, pos: q.pos.map(v => +v.toFixed(1)) })), fox: this.fox ? { state: this.fox.state, pos: this.fox.pos.map(v => +v.toFixed(1)) } : null,
         drifts: this.scan.drifts ? this.scan.drifts.length : 0, cover: this.scan.cover.length,
-        ms: Object.assign({}, this.stats.avg), drawMs: +this.stats.drawMs.toFixed(3), draws: this.stats.draws, inst: this.stats.n.inst || 0,
+        ms: Object.assign({}, this.stats.avg), drawMs: +this.stats.drawMs.toFixed(3), draws: this.stats.draws, drawsT: this.stats.drawsT || 0, vox: this.stats.vox || 0, inst: this.stats.n.inst || 0,
         // (f-wild2) the murmuration's figure, the pass at dusk
         figure: Mu && Mu.state === 'fly' && this.ctx ? W.murmFigure(this.seed ^ Mu.key, this.ctx.clock) : null,
         pass: this.pass ? { day: this.pass.day, tried: this.pass.tried, plan: this.pass.plan ? { k: this.pass.plan.k, T0: +this.pass.plan.T0.toFixed(1), Tn: +this.pass.plan.Tn.toFixed(1), T1: +this.pass.plan.T1.toFixed(1), P: this.pass.plan.P.map(v => +v.toFixed(1)), scale: +this.pass.plan.scale.toFixed(2) } : null } : null,

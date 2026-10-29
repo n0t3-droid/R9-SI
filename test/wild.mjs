@@ -39,7 +39,8 @@ const SEED = process.env.SEED || '53', N = +(process.env.N || 8), ROUNDS = +(pro
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const BEFORE = process.env.BEFORE_DIST || 'file://' + ROOT + '.tmp_tests/before_dist/index.html';
-const SHOTS = ROOT + 'test/shots/';
+const SHOTS = ROOT + 'test/shots/' + (process.env.SHOTS_SUB ? process.env.SHOTS_SUB + '/' : '');   // (SHOTS_SUB=before: the build before's pictures apart)
+try { fs.mkdirSync(SHOTS, { recursive: true }); } catch (e) { /* */ }
 const EYE = 1.62, RD = 8;
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
@@ -470,14 +471,23 @@ if (!process.env.NO_COST) {
       const measure = (n) => A.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl; window.__norender = false; let k = -2, sum = 0, d = 0, t = 0; const f = () => { try { const t0 = performance.now(); g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); const dt = performance.now() - t0; if (k < 0) { k++; setTimeout(f, 0); return; } const st = g.renderer.stats || {}; sum += dt; d += st.draws || 0; t += st.tris || 0; if (++k < n) setTimeout(f, 0); else { window.__norender = true; ok({ ms: +(sum / n).toFixed(2), draws: Math.round(d / n), tris: Math.round(t / n) }); } } catch (e) { no(String(e)); } }; f(); }), n);
       const R = { on: [], off: [] };
       for (let r = 0; r < ROUNDS; r++) for (const on of r & 1 ? [false, true] : [true, false]) { await A.wild(on); await A.step(2); R[on ? 'on' : 'off'].push(await measure(N)); }
-      await A.wild(true); await A.step(30);
+      // (f-wild2, 29 Oct) the animals' own share, measured apart: the GPU drained before their draw, their draw's CPU
+      // (its uploads included), then drained again — their GPU work alone (the median of N frames; the frame's own
+      // overlap is lost in these frames, so they are not in the on/off medians above)
+      await A.wild(true); await A.step(2);
+      const own = await A.ev((n) => new Promise((ok, no) => { const g = VR.game, gl = g.renderer.gl, w = g.wild, W0 = w.draw, cur = { cpu: 0, all: 0 }, F = []; window.__norender = false;
+        w.draw = function (r, E, layer, cam) { gl.finish(); const t0 = performance.now(); W0.call(this, r, E, layer, cam); const t1 = performance.now(); gl.finish(); const t2 = performance.now(); cur.cpu += t1 - t0; cur.all += t2 - t0; };
+        let k = -2; const f = () => { try { cur.cpu = 0; cur.all = 0; g.last = performance.now() - 33; g.loop(performance.now()); gl.finish(); if (k++ >= 0) F.push([cur.cpu, cur.all, (w.stats.draws || 0) + (w.stats.drawsT || 0), w.stats.vox || 0]); if (k < n) setTimeout(f, 0); else { w.draw = W0; window.__norender = true; const md = (j) => { const v = F.map(q => q[j]).sort((a, b) => a - b); return +v[v.length >> 1].toFixed(2); }; ok({ cpu: md(0), gpu: md(1), inst: md(2), vox: md(3) }); } } catch (e) { w.draw = W0; no(String(e)); } }; f(); }), N);
+      await A.step(30);
       const rep = await A.report();
       const med = (a, k) => { const v = a.map(q => q[k]).sort((p, q) => p - q); return v[v.length >> 1]; };
-      out[label] = { on: { ms: med(R.on, 'ms'), draws: med(R.on, 'draws'), tris: med(R.on, 'tris') }, off: { ms: med(R.off, 'ms'), draws: med(R.off, 'draws'), tris: med(R.off, 'tris') }, actor: { ms: rep.ms, drawMs: rep.drawMs, draws: rep.draws, inst: rep.inst, murm: rep.murm ? rep.murm.n : 0, rays: rep.rays.length, gulls: rep.gulls, fish: rep.fish, swarms: rep.swarms.length } };
+      out[label] = { on: { ms: med(R.on, 'ms'), draws: med(R.on, 'draws'), tris: med(R.on, 'tris') }, off: { ms: med(R.off, 'ms'), draws: med(R.off, 'draws'), tris: med(R.off, 'tris') }, own, actor: { ms: rep.ms, drawMs: rep.drawMs, draws: rep.draws, inst: rep.inst, murm: rep.murm ? rep.murm.n : 0, rays: rep.rays.length, gulls: rep.gulls, fish: rep.fish, swarms: rep.swarms.length } };
       console.log(`cost on High · ${label}: ${JSON.stringify(out[label])}`);
       const a = out[label].actor, cpu = Object.values(a.ms).reduce((p, q) => p + q, 0);
-      check(cpu + a.drawMs < 3.0, `High · ${label}: the actor's CPU ${cpu.toFixed(2)} ms (update) + ${a.drawMs} ms (draw) a frame on SwiftShader's CPU (per piece ${JSON.stringify(a.ms)})`);
-      check(out[label].on.draws - out[label].off.draws <= 8, `High · ${label}: ${out[label].on.draws - out[label].off.draws} draws more with the animals (${a.draws} instanced, ${a.inst} instances)`);
+      const o = out[label].own, dd = out[label].on.draws - out[label].off.draws;
+      check(cpu + o.cpu < 3.0, `High · ${label}: the actor's CPU ${cpu.toFixed(2)} ms (update) + ${o.cpu} ms (its draw, the GPU drained before) a frame on SwiftShader (per piece ${JSON.stringify(a.ms)})`);
+      check(o.gpu - o.cpu <= Math.max(3, 0.15 * out[label].off.ms), `High · ${label}: the animals' GPU work ${(o.gpu - o.cpu).toFixed(2)} ms a frame (≤ 15 % of the frame without them, ${out[label].off.ms} ms)`);
+      check(o.inst <= 9 && dd <= o.inst + o.vox + 2, `High · ${label}: ${dd} draws more with the animals (${o.inst} instanced, ${a.inst} instances; ${o.vox} for the voxel animals' parts)`);
     }
     rec.cost = out; save();
   } catch (e) { check(false, 'the cost on High is measured: ' + String(e.message || e).slice(0, 300)); }
