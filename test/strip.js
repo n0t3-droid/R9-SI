@@ -172,6 +172,16 @@ const SAMPLES = [
     'x = 2; <!-- the rest of this line is a comment',
     '  --> and this one too',
     'return x;') },
+  { name: 'tight: the blanks between tokens go, unless the two would join (f-stipple)', src: L(
+    'let a = 5, b = 2, i = 3, o = { k: 1 };',
+    'const c = a - -b, d = a + +b, e = a - - - b, f = i-- > 0, g = a < !--b, h = 1 .toFixed(1), k = /k/ instanceof RegExp;',
+    "const m = 'k' in o, n = typeof 'x', p = `t${ a }` + `u`, q = a / /x/.source.length, r = 2..toString(), s = 0x1F .toString();",
+    'return [a, b, c, d, e, f, g, h, k, m, n, p, q, r, s];'),
+    wantTight: L(
+    'let a=5,b=2,i=3,o={k:1};',
+    'const c=a- -b,d=a+ +b,e=a- - -b,f=i-- >0,g=a< !--b,h=1 .toFixed(1),k= /k/ instanceof RegExp;',
+    "const m='k'in o,n=typeof'x',p=`t${a}`+`u`,q=a/ /x/.source.length,r=2..toString(),s=0x1F .toString();",
+    'return[a,b,c,d,e,f,g,h,k,m,n,p,q,r,s];') },
   { name: 'comment-only lines keep the line count', src: L(
     '// one',
     '',
@@ -190,7 +200,9 @@ for (const S of SAMPLES) {
   if (lines(out) !== lines(S.src)) problems.push(`lines ${lines(S.src)} → ${lines(out)}`);
   let again = null; try { again = Strip.js(out); } catch (e) { again = 'THROWS ' + e.message; }
   if (again !== out) problems.push('not idempotent');
-  if (S.want !== undefined && out !== S.want) problems.push('text ' + JSON.stringify(out).slice(0, 300));
+  const loose = S.want !== undefined ? Strip.js(S.src, { tight: false }) : null;   // (the wants: one blank kept between tokens)
+  if (S.want !== undefined && loose !== S.want) problems.push('text ' + JSON.stringify(loose).slice(0, 300));
+  if (S.wantTight !== undefined && out !== S.wantTight) problems.push('tight text ' + JSON.stringify(out).slice(0, 300));
   if (S.glsl) {
     const v0 = vm.runInNewContext('(function () {\n' + S.src + '\n})()'), v1 = vm.runInNewContext('(function () {\n' + out + '\n})()');
     if (glslNorm(v0) !== glslNorm(v1)) problems.push('GLSL differs: ' + JSON.stringify(glslNorm(v1)).slice(0, 200));
@@ -263,8 +275,8 @@ const scriptsOf = (html) => [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/scr
       check(S.length >= 2 && !errs.length, `${f}: all ${S.length} scripts parse (${(fs.statSync(path.join(DIST, f)).size / 1e6).toFixed(2)} MB)`, errs.slice(0, 2).join(' · ') || undefined);
     }
     const w = /<script type="text\/js-worker" id="worker-src">([\s\S]*?)<\/script>/.exec(idx);
-    check(!!w && w[1].includes('VR.TEX_MODS = function (VR) {') && w[1].includes("m.type === 'texhi'"), 'the worker bundle keeps what tex_hi.js reads (VR.TEX_MODS, the texhi answer)');
-    check(/VR\.TEX_SRC_HASH = "[0-9a-f]{16}"/.test(idx) && (/VR\.TEX_SRC_HASH = "([0-9a-f]{16})"/.exec(idx) || [])[1] === (/VR\.TEX_SRC_HASH = "([0-9a-f]{16})"/.exec(dbg) || [])[1], 'the texture hash is the same in both pages (taken from the sources)');
+    check(!!w && /VR\.TEX_MODS ?= ?function ?\(VR\) ?\{/.test(w[1]) && /m\.type ?=== ?'texhi'/.test(w[1]), 'the worker bundle keeps what tex_hi.js reads (VR.TEX_MODS, the texhi answer)');
+    check(/VR\.TEX_SRC_HASH ?= ?"[0-9a-f]{16}"/.test(idx) && (/VR\.TEX_SRC_HASH ?= ?"([0-9a-f]{16})"/.exec(idx) || [])[1] === (/VR\.TEX_SRC_HASH ?= ?"([0-9a-f]{16})"/.exec(dbg) || [])[1], 'the texture hash is the same in both pages (taken from the sources)');
   }
 }
 if (process.env.QUICK) { console.log(`\n(QUICK: (d)–(e) skipped) ${secs()}`); console.log(fails ? 'FAILED ' + fails : 'ALL OK'); process.exit(fails ? 1 : 0); }

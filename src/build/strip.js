@@ -103,12 +103,21 @@
     const flush = () => { if (runEnd > runStart) out.push(src.slice(runStart, runEnd)); };
     // a token at [a, b): what was skipped before it (blanks, comments) becomes one space between two tokens of a line
     // (a single blank stays in the run) and nothing at a line's start
-    const tok = (a, b) => {
+    // (f-stipple, tight — the default) the blank between two tokens of a line goes too, unless the two would join: two
+    // word characters (`in x`), two operator characters (`a - -b`, `x-- > y`, `a < !--b`, `/ /`), a number and a dot
+    // (`1 .x`), a regular expression and a word (`/a/ in o`); opts.tight === false keeps one blank
+    const tight = opts.tight !== false;
+    let lastC = 0, lastK = 0;   // the last token's last character, its kind (1 a number, 2 a regular expression)
+    const isOp = (c) => c === 43 || c === 45 || c === 42 || c === 47 || c === 37 || c === 60 || c === 62 || c === 61 || c === 33 || c === 38 || c === 124 || c === 94 || c === 126 || c === 63 || c === 58 || c === 46;
+    const isW = (c) => isIdPart(c) || c === 35 || c === 92;
+    const needBlank = (c) => (isW(lastC) && isW(c)) || (isOp(lastC) && isOp(c)) || (lastK === 1 && c === 46) || (lastK === 2 && isW(c));
+    const tok = (a, b, k) => {
       if (a !== runEnd) {
         if (!lineHasCode) { flush(); runStart = a; }
+        else if (tight && !needBlank(src.charCodeAt(a))) { flush(); runStart = a; }
         else if (a - runEnd !== 1 || src.charCodeAt(runEnd) !== 32) { flush(); out.push(' '); runStart = a; }
       }
-      runEnd = b; lineHasCode = true;
+      runEnd = b; lineHasCode = true; lastC = src.charCodeAt(b - 1); lastK = k || 0;
     };
     const fail = (what, at) => { const ln = src.slice(0, at).split('\n').length; throw new Error(what + ' at line ' + ln + ': ' + JSON.stringify(src.slice(at, at + 60))); };
     const skipLine = (j) => { while (j < n && !isNl(src.charCodeAt(j))) j++; return j; };
@@ -123,7 +132,7 @@
         j++;
       }
       flush(); T.parts.push(src.slice(s, j)); T.at.push(s); out.push({ t: id, p: T.parts.length - 1 });
-      runStart = j; lineHasCode = true; afterDot = false; ctrlNext = false;
+      runStart = j; lineHasCode = true; afterDot = false; ctrlNext = false; lastK = 0; lastC = src.charCodeAt(j) === 96 ? 96 : 123;
       if (src.charCodeAt(j) === 96) {
         runEnd = j + 1;
         T.glsl = !T.tagged && opts.glsl !== false && looksGLSL(T.parts.join(''));
@@ -194,7 +203,7 @@
           }
           j++;
           while (j < n && isIdPart(src.charCodeAt(j))) j++;
-          tok(i, j); i = j; reOK = false; blockOK = true; ctrlNext = false; afterDot = false;
+          tok(i, j, 2); i = j; reOK = false; blockOK = true; ctrlNext = false; afterDot = false;
           continue;
         }
         tok(i, i + 1); i++; reOK = true; blockOK = false; ctrlNext = false; afterDot = false;
@@ -211,7 +220,7 @@
           if (e === 101 || e === 69) { j++; if (src.charCodeAt(j) === 43 || src.charCodeAt(j) === 45) j++; while (j < n && isDigit(src.charCodeAt(j))) j++; }
           if (src.charCodeAt(j) === 110) j++;   // BigInt
         }
-        tok(i, j); i = j; reOK = false; blockOK = true; ctrlNext = false; afterDot = false;
+        tok(i, j, 1); i = j; reOK = false; blockOK = true; ctrlNext = false; afterDot = false;
         continue;
       }
       // ---- words: identifiers, keywords, private names

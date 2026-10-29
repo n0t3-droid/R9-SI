@@ -110,7 +110,7 @@ console.log('e · the switch, the presets, the shader');
   const rsrc = fs.readFileSync(path.join(__dirname, '..', 'src', 'main', 'renderer.js'), 'utf8');
   check(/const th = this\.q\.texHi && !this\.q\.lite \? \['TEXHI'\] : \[\]/.test(rsrc), 'the define only when the switch is on and never on the lite look (Very Low)');
   const dist = path.join(__dirname, '..', 'dist', 'index.html');
-  if (fs.existsSync(dist)) { const h = fs.readFileSync(dist, 'utf8'); const w = /<script type="text\/js-worker" id="worker-src">([\s\S]*?)<\/script>/.exec(h); check(!!w && w[1].includes('VR.TEX_MODS = function (VR) {') && w[1].includes("m.type === 'texhi'"), 'the worker bundle keeps the texture modules as VR.TEX_MODS and answers \'texhi\''); }
+  if (fs.existsSync(dist)) { const h = fs.readFileSync(dist, 'utf8'); const w = /<script type="text\/js-worker" id="worker-src">([\s\S]*?)<\/script>/.exec(h); check(!!w && /VR\.TEX_MODS ?= ?function ?\(VR\) ?\{/.test(w[1]) && /m\.type ?=== ?'texhi'/.test(w[1]), 'the worker bundle keeps the texture modules as VR.TEX_MODS and answers \'texhi\''); }
 }
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
