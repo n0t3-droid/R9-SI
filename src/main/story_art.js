@@ -230,7 +230,14 @@
       for (let y = 2; y <= 14; y += 3) S(-1, y, -8 + 1, RUNE, 1);
       box(-4, 15, -7, 3, 15, -6, ICE[3]); box(-1, 21, -7, 0, 22, -6, ICE[2]);
       // the head: a tall helm of ice, a dark face, the crest along the top
-      box(-4, 32, -3, 3, 39, 3, (x, y, z) => facet(x, y, z, side(x) - (y > 37 ? 1 : 0)));
+      for (let y = 32; y <= 39; y++) { const hw = y <= 35 ? 4 : y <= 37 ? 3 : 2; box(-hw, y, -3, hw - 1, y, 3, (x, yy, z) => facet(x, y, z, side(x) - (y > 37 ? 1 : 0))); }   // (the helm, tapering to its crown)
+      box(-6, 30, -4, 5, 31, 4, (x, y, z) => (Math.abs(x + 0.5) + Math.abs(z) > 8.5 ? null : facet(x, y, z, side(x) - 1)));   // (a collar of ice round the neck)
+      // shards: crystals grown out of it, slanting up and out (the shoulders, the hips, the back)
+      const shard = (x0, y0, z0, dx, dz, len, base) => { for (let i = 0; i < len; i++) { const x = Math.round(x0 + dx * i), y = y0 + i, z = Math.round(z0 + dz * i), c = ICE[Math.max(0, base - (i > len - 3 ? 1 : 0))]; S(x, y, z, c); if (i < len - 2) { S(x + (dx < 0 ? 1 : -1), y, z, c); S(x, y, z + 1, c); } } };
+      shard(-11, 30, 2, -0.35, 0.2, 6, 1); shard(10, 30, 2, 0.35, 0.2, 6, 2); shard(-8, 12, 2, -0.45, 0.3, 5, 2); shard(7, 10, 2, 0.45, 0.3, 5, 3);
+      shard(-3, 24, 4, -0.2, 0.5, 6, 1); shard(2, 22, 4, 0.25, 0.5, 6, 2);
+      // the back: a mantle of ice plates, wider toward the hem
+      for (let y = 4; y <= 29; y++) { const hw = Math.round(6 + (29 - y) * 0.1); box(-hw, y, 4, hw - 1, y, 5, (x, yy, z) => ((x + y) % 5 === 0 ? ICE[4] : facet(x, y, z, side(x) + 1))); }
       box(-3, 33, -4, 2, 37, -4, (x, y, z) => (y === 37 || x === -3 || x === 2 ? facet(x, y, z, 3) : ICE[5]));
       box(-1, 40, -2, 0, 41, 4, (x, y, z) => facet(x, y, z, 1)); box(-1, 42, -1, 0, 42, 2, ICE[0]); box(-1, 39, 4, 0, 39, 5, ICE[2]);
       box(-5, 34, -2, -5, 37, 1, ICE[1]); box(4, 34, -2, 4, 37, 1, ICE[3]);   // (the helm's cheek plates)
