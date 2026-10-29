@@ -114,5 +114,82 @@ console.log('(h) the words');
   check(!!D && !!E && miss.length === 0, 'the cruise\'s texts in German and English', miss.join(', ') || 'all ' + keys.length);
 }
 
+console.log('(i) the wiring: a shuttle in orbit, the cruise to Opal through flight.js, G by intent, Landen there');
+{
+  // the game's glue in node: a page-less Game (spaceflight.js and cruise.js wire themselves to it), ascent.js's harness
+  global.window = global.window || {};
+  global.document = global.document || { getElementById: () => null, createElement: () => ({ style: {}, getContext: () => null }), body: { appendChild() { } } };
+  global.performance = global.performance || { now: () => Date.now() };
+  VR.SHADERS = VR.SHADERS || {};
+  VR.Game = VR.Game || function () { }; VR.Game.prototype.playFrame = VR.Game.prototype.playFrame || function () { };
+  const trips = [];
+  VR.Travel = { canGo: () => null, go: (g, o) => { trips.push(o); return Promise.resolve(true); } };
+  delete VR.Cruise; delete require.cache[require.resolve(ROOT + 'src/main/cruise.js')];
+  for (const f of ['voxmodels', 'flight', 'cockpit', 'starships', 'gadgets', 'skybodies', 'ascent', 'spaceflight', 'entry', 'cruise']) require(ROOT + 'src/main/' + f + '.js');
+  const R = VR.R, A = VR.Ascent, SF = VR.SpaceFlight, CRg = VR.Cruise;
+  check(!!CRg.page, 'the glue is wired (VR.Cruise.page)', String(!!CRg.page));
+  const G = 64, STONE = R.byName.stone.defaultState;
+  class World { constructor() { this.cols = new Map(); } col(cx, cz) { const k = cx + ',' + cz; let c = this.cols.get(k); if (!c) { c = { cx, cz, ready: true, H: 256, height: new Uint8Array(256).fill(G - 1), blocks: new Uint16Array(256 * 256), blockEntities: new Map(), sec: [] }; for (let y = 0; y < G; y++) for (let i = 0; i < 256; i++) c.blocks[(y << 8) | i] = STONE; this.cols.set(k, c); } return c; }
+    nbFn() { return this._nb || (this._nb = (x, y, z, d) => this.getBlock(x + VR.HF_DX[d], y, z + VR.HF_DZ[d])); }
+    getBlock(x, y, z) { if (y < 0 || y >= 256) return 0; const c = this.col(x >> 4, z >> 4); return c.blocks[(y << 8) | ((z & 15) << 4) | (x & 15)]; } setBlock() { } getLight() { return 0xf000; } }
+  const hints = [], chats = [];
+  const ui = { hint(t) { hints.push(t); }, chatLine(t) { chats.push(t); }, typing: false, vehicleHud() { } };
+  const g = { world: new World(), frame: 0, renderer: { gl: null, uploadShip: () => [], freeShip() { } }, particles: { spawn() { }, smoke() { }, spark() { }, explosion() { } }, settings: { camShake: true }, ui, audio: { play() { }, loop() { }, turbine() { }, tone() { } }, trails: null, time: 0, meta: {}, player: { pos: [0, G, 0], eye: 1.62, yaw: 0, pitch: 0, teleport(x, y, z) { this.pos = [x, y, z]; }, lookDir() { return [0, 0, -1]; } } };
+  g.pool = { workers: [{ inflight: 0 }], direct(i, msg, tr, cb) { if (msg.type === 'surface') { cb({ res: msg.points.map(() => G - 1) }); return; } if (msg.type === 'shipmesh') { cb({ type: 'shipmesh', sections: [] }); return; } const r = VR.Starship.build(msg.seed, msg.arch); cb({ type: 'starship', meta: r.meta, occ: r.occ, hull: { count: 0 }, glass: { count: 0 }, gear: { count: 0 } }); } };
+  VR.C = VR.C || {}; if (VR.C.SEA === undefined) VR.C.SEA = 40;
+  if (!VR.ckey) VR.ckey = (cx, cz) => cx + ',' + cz;
+  g.villages = { list: () => [] };
+  const mgr = new VR.Starships(g, { title: true });
+  mgr.g.gadgets = { riding: null, freeSpot: (c) => c[0] };
+  const input = { keys: new Set(), pressed: new Set(), captured: true, sensitivity: 0.0024, invertY: false, dragLook: false, mouse: { dx: 0, dy: 0, down: [false, false, false], clicked: [false, false, false], wheel: 0 }, down(c) { return this.keys.has(c); }, hit(c) { return this.pressed.has(c); }, clickAction() { return false; } };
+  const frame = (dt) => { g.time += dt; mgr.drive(dt, input, false); input.pressed.clear(); };
+  const s = mgr.spawn(4242, 'shuttle', null, [0.5, G, 0.5], 0);
+  mgr.board(s, g.player);
+  const fl = s.flight; fl.power = 'running'; fl.startT = 3; fl.state = 'flying';
+  A.orbitAt(fl, [0, 3063, 0], 0);
+  check(fl.regime === 'space' && fl.asc.st.frame === 'herz', 'the shuttle in a low orbit', fl.regime + ' ' + fl.asc.st.frame);
+  const t0 = fl.asc.st.t, ok = CRg.start(fl, 'opal');
+  check(ok && fl.auto && fl.auto.space === 'cruise' && fl.asc.cruise, 'the Reiseantrieb to Opal starts (fl.auto.space = cruise)');
+  let n = 0, maxFov = 1, frames = [], lastP = null, worstJump = 0;
+  while (fl.asc.cruise && n++ < 60 * 120) {
+    frame(1 / 60); maxFov = Math.max(maxFov, fl.fovK || 1);
+    const st = fl.asc.st, S2 = U.home, pf = S2.pos(st.frame, st.t, new Float64Array(3)), P = [pf[0] + st.r[0], pf[1] + st.r[1], pf[2] + st.r[2]];
+    if (lastP) worstJump = Math.max(worstJump, Math.hypot(P[0] - lastP[0], P[1] - lastP[1], P[2] - lastP[2]) - (len(st.v) + 6000) / 60);
+    lastP = P;
+  }
+  const st = fl.asc.st, el = U.stateToEl(st.r, st.v, U.home.body('opal').mu), dt = st.t - t0;
+  check(!fl.asc.cruise && st.frame === 'opal' && fl.regime === 'space' && el.e < 0.03, `arrived: in orbit round Opal after ${f1(dt)} s of flight (e ${el.e.toFixed(3)}, ${f1(len(st.r) / U.home.body('opal').R * 100) / 100} R)`, chats.slice(-1)[0]);
+  check(maxFov > 1.08, 'the punch: the FOV kick', 'fovK max ' + maxFov.toFixed(3));
+  check(worstJump < 50, 'no jump in the ship\'s place along the way', f1(worstJump) + ' m beyond v·dt');
+  check(CRg.last && CRg.last.t2R > 25 && CRg.last.t2R < 70, `the trip's time to 2 R of Opal ${f1(CRg.last && CRg.last.t2R)} s (the phases ${CRg.last && JSON.stringify(Object.fromEntries(Object.entries(CRg.last.phases).map(([k, v]) => [k, +v.toFixed(1)])))})`);
+  // G by intent: the camera looking at Herzwelt from Opal's orbit → the cruise armed, G again → the jump there, again → off
+  for (let i = 0; i < 300; i++) frame(1 / 60);   // (the frame's turn from the ecliptic's into Opal's)
+  const S2 = U.home, st2 = fl.asc.st, ph = S2.pos('opal', st2.t, new Float64Array(3)), hz = S2.pos('herz', st2.t, new Float64Array(3));
+  const dSys = [hz[0] - ph[0] - st2.r[0], hz[1] - ph[1] - st2.r[1], hz[2] - ph[2] - st2.r[2]], l = len(dSys);
+  const M9 = A.localFrame(st2, new Float64Array(9)), dm = [0, 1, 2].map(i => (M9[i] * dSys[0] + M9[3 + i] * dSys[1] + M9[6 + i] * dSys[2]) / l);   // (system → map: Mᵀ)
+  g.cam = { x: 0, y: 0, z: 0, yaw: Math.atan2(-dm[0], -dm[2]), pitch: Math.asin(dm[1]) };
+  const pk = CRg.lookPick(g, fl);
+  check(pk && pk.id === 'herz', 'looking at Herzwelt from Opal\'s orbit picks Herzwelt', pk && pk.id);
+  SF.toggle(fl);
+  check(fl.auto && fl.auto.space === 'arm' && fl.auto.cruiseTo === 'herz', 'G: the cruise to Herzwelt armed', hints.slice(-1)[0]);
+  SF.toggle(fl);
+  check(fl.auto && fl.auto.space === 'arm' && !fl.auto.cruiseTo && fl.auto.to === 'herz', 'G again: the Reisesprung there instead', hints.slice(-1)[0]);
+  SF.toggle(fl);
+  check(!fl.auto, 'G a third time: off');
+  // Landen round Opal: the descent (five seconds down), then the trip into Opal's world with the ship
+  const landable = SF.landable('opal');
+  if (landable) {
+    SF.land(fl);
+    check(fl.asc.cruise && fl.asc.cruise.kind === 'descent', 'V round Opal: the descent starts');
+    for (let i = 0; i < 60 * 6 && fl.asc.cruise; i++) frame(1 / 60);
+    check(trips.length === 1 && trips[0].dim === 'opal' && trips[0].via === 'ship', 'then VR.Travel.go({dim: opal, via: ship}) — the ship along', JSON.stringify(trips));
+  } else check(false, 'Opal is landable (u-moons1 registers its dim)');
+  // a flight key during a cruise drops out where the ship is (coasting in the frame it is in)
+  A.orbitAt(fl, [0, 3063, 0], fl.asc.st.t); CRg.start(fl, 'basalt');
+  for (let i = 0; i < 60 * 8; i++) frame(1 / 60);
+  input.keys.add('KeyW'); frame(1 / 60); frame(1 / 60); input.keys.delete('KeyW');
+  check(!fl.asc.cruise && fl.asc.st.coast !== undefined && ['herz', 'amarant', 'aqua'].includes(fl.asc.st.frame), 'a flight key: the drive off, the ship coasting where it is', fl.asc.st.frame);
+}
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
