@@ -443,8 +443,8 @@
           if (d.gpu.stair && H && H.door > 0.55) { const k = Math.min(1, (H.door - 0.55) / 0.45), y = (C.floor - O[1]) * R; T.set(M2); mat4.translate(T, T, 0, y, 0); mat4.scale(T, T, 1, Math.max(0.02, k * k * (3 - 2 * k)), 1); mat4.translate(T, T, 0, -y, 0); mesh(d.gpu.stair, T); }
           if (!aboard) mesh(d.gpu.cabin);
         }
-      } else if (d.gpu.glass && !hideGlass) {
-        if (room) gl.uniform1f(prog.u.u_alpha, VR.SpaceFlight && VR.SpaceFlight.inSpace && VR.SpaceFlight.inSpace(this.g) ? 0.02 : 0.13);   // u-orbitlod: in space the window clear (against black its tinted voxels showed as dark blue blocks)
+      } else if (d.gpu.glass && !hideGlass && !(room && VR.SpaceFlight && VR.SpaceFlight.inSpace && VR.SpaceFlight.inSpace(this.g))) {   // u-orbitlod: in space, seen from the seat, the window clear (against black its tinted voxels showed as dark blue blocks: orbit.mjs's probe)
+        if (room) gl.uniform1f(prog.u.u_alpha, 0.13);
         gl.bindVertexArray(d.gpu.glass.vao); gl.drawArrays(gl.TRIANGLES, 0, d.gpu.glass.count);
         if (room) gl.uniform1f(prog.u.u_alpha, 0.42);
       }

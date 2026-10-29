@@ -316,8 +316,10 @@ void main() {
       vec3 H = normalize(L - Db);
       float F = 0.02 + 0.98 * pow(1.0 - muv, 5.0);
       // u-orbitlod · the sunglint: a mirror core (calm water) in a broad sheen whose roughness the wind varies (lanes)
-      float wind = u_air.z > 0.5 ? 0.26 + 0.16 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0)) : 0.22;
-      float glint = u_air.z > 0.5 ? ggx(max(dot(N, H), 0.0), 0.09) * 0.6 + ggx(max(dot(N, H), 0.0), wind) * 2.6 : ggx(max(dot(N, H), 0.0), 0.22);   // (Very Low: v0.50's one lobe)
+      // (branches, not ?: — a select may evaluate both sides: Very Low keeps v0.50's one lobe and nothing more)
+      float glint;
+      if (u_air.z > 0.5) { float wind = 0.26 + 0.16 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0)); glint = ggx(max(dot(N, H), 0.0), 0.09) * 0.6 + ggx(max(dot(N, H), 0.0), wind) * 2.6; }
+      else glint = ggx(max(dot(N, H), 0.0), 0.22);
       float spec = glint * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
       vec3 sea = seaC * (u_sunCol * max(mus, 0.0) * Ts * csh + sky) + F * vec3(0.16, 0.26, 0.48) * u_sunCol * day * (1.0 - ice) + Ts * u_sunCol * spec * max(mus, 0.0) * csh;
       ground = mix(ground, sea, water);
@@ -347,8 +349,7 @@ void main() {
     col += albG * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day) * (1.0 - cl * 0.3) * Tv + vec3(0.6) * cl * u_parCol * max(dot(N, u_parB), 0.0) * (1.0 - day);
     col += AG_COL * u_air.w * 0.06 * night;
     // u-orbitlod: the aurora's oval seen from above (night side): green curtains over the land, a pink lower fringe
-    float au = u_air.z > 0.5 && mus < 0.0 ? auroraAt(N, u_air.y) * (1.0 - smoothstep(-0.12, 0.0, mus)) : 0.0;   // (from Low)
-    col += (vec3(0.12, 1.0, 0.42) * 0.3 + vec3(0.5, 0.1, 0.3) * 0.05) * au * u_look.z * Tv;
+    if (u_air.z > 0.5 && mus < 0.0) { float au = auroraAt(N, u_air.y) * (1.0 - smoothstep(-0.12, 0.0, mus)); col += (vec3(0.12, 1.0, 0.42) * 0.3 + vec3(0.5, 0.1, 0.3) * 0.05) * au * u_look.z * Tv; }   // (from Low)
     alpha = 1.0;
   } else if (Di.z > 0.0) {
     // the limb: the ray passes the planet at h radii up; the tangent column (white low down, blue above, black at the top)
@@ -377,8 +378,9 @@ void main() {
       }
       // u-orbitlod · the aurora over the limb (night side): green curtains 100–200 km up (their lower edge crisp, a pink
       // fringe below it), red tops fading out above 200 km
-      float au = u_air.z > 0.5 ? auroraAt(Ptb, u_air.y) * (1.0 - smoothstep(-0.14, -0.02, mus)) : 0.0;
-      if (au > 0.001 && u_air.z > 0.5) {
+      float au = 0.0;
+      if (u_air.z > 0.5) au = auroraAt(Ptb, u_air.y) * (1.0 - smoothstep(-0.14, -0.02, mus));
+      if (au > 0.001) {
         // (the rays: tall streaks along the curtain — the noise across it, the same up its height)
         float rays = 0.55 + 0.45 * vnoise3(vec3(atan(-Ptb.z, Ptb.x) * 160.0, 0.5, u_air.y * 0.02));
         float green = smoothstep(0.0148, 0.0162, h) * exp(-max(h - 0.0165, 0.0) / 0.011);
