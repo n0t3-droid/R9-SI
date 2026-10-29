@@ -43,6 +43,7 @@
     // ---- Bild · Qualität
     { key: 'scale', g: 'img', sec: 'quality', t: 'slider', lab: 'g.set.scale', tip: 'g.set.scale.tip', cost: 'high', def: 0.9, min: 0.4, max: 1, step: 0.05, fmt: 'pct' },
     { key: 'tsr', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.tsr', tip: 'g.set.tsr.tip', cost: 'low', def: true },
+    { key: 'fadeIn', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.fadeIn', tip: 'g.set.fadeIn.tip', cost: 'low', def: true },   // f-stipple (R50-08): the soft fade-in (where the TSR runs); off: things pop in whole
     { key: 'fxaa', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.fxaa', tip: 'g.set.fxaa.tip', cost: 'low', def: true },
     { key: 'sharpen', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.sharpen', tip: 'g.set.sharpen.tip', cost: 'low', def: true },
     { key: 'dynRes', g: 'img', sec: 'quality', t: 'switch', lab: 'g.set.dynRes', tip: 'g.set.dynRes.tip', cost: 'low', def: true },

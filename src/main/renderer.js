@@ -173,9 +173,11 @@
       // FADE: the chunk terrain programs dither a column's sections in over 300 ms (the ship programs stay whole)
       const pb = VR.PBR ? VR.PBR.defines(this.q) : [];   // t-material: PBR (tier ≥ 1), SSR (tier 2); none on the lite look (Very Low)
       const th = this.q.texHi && !this.q.lite ? ['TEXHI'] : [];   // t-material · hero textures (Balanced and up; never Very Low)
-      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb, ...th]));
-      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb, th)));   // (F10 · zPre: invariant positions)
-      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE', ...pb]));
+      // f-stipple (R50-08): SOFTFADE — the turning dither the TSR resolves, a near column's growth; Very Low pops (its text as before)
+      const sf = this.q.lite ? [] : ['SOFTFADE'];
+      P.opaque = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrain', [...md, ...sh, 'FADE', ...pb, ...th, ...sf]));
+      P.cutout = bindUBO(GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCut', [...md, ...sh, 'CUTOUT', 'FADE'].concat(this.q.zPre ? ['ZINV'] : [], pb, th, sf)));   // (F10 · zPre: invariant positions)
+      P.trans = bindUBO(GL.program(S.TERRAIN_VS, S.TRANS_FS, 'trans', [...md, ...sh, 'FADE', ...pb, ...sf]));
       P.shipOpaque = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipOpaque', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
       P.shipCutout = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'shipCutout', [...sh, 'MODEL', 'CUTOUT', ...pb.filter(d => d !== 'SSR')]);
       P.shipTrans = GL.program(S.TERRAIN_VS, S.TRANS_FS, 'shipTrans', [...sh, 'MODEL', ...pb.filter(d => d !== 'SSR')]);
@@ -199,7 +201,7 @@
       P.line = GL.program(S.LINE_VS, S.LINE_FS, 'line');
       P.rain = GL.program(S.RAIN_VS, S.RAIN_FS, 'rain', this.q.wxDrama ? ['WXDRAMA'] : []);   // (t-motion: the rain blown sideways in sheets)
       P.decal = GL.program(S.DECAL_VS, S.DECAL_FS, 'decal');
-      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod');
+      P.lod = GL.program(S.LOD_VS, S.LOD_FS, 'lod', this.q.lite ? [] : ['SOFTFADE']);   // (f-stipple: the far tiles' cut turns with the chunks' dither)
       // (the smooth props' programs are compiled on their first use, propProgram: Very Low never compiles them)
     }
     rebuildShadowPrograms() { this.buildPrograms(); }
@@ -267,7 +269,7 @@
     farProgram(name) {
       const P = this.P, k = 'far_' + name;
       if (P[k] !== undefined) return P[k];
-      try { P[k] = GL.program(S.LOD_VS, S.LOD_FS, name, [name === 'form' ? 'FORM' : 'FAR1']); } catch (e) { console.error(e); P[k] = null; }
+      try { P[k] = GL.program(S.LOD_VS, S.LOD_FS, name, [name === 'form' ? 'FORM' : 'FAR1'].concat(this.q.lite ? [] : ['SOFTFADE'])); } catch (e) { console.error(e); P[k] = null; }
       return P[k];
     }
 
@@ -827,6 +829,10 @@
         this.proj[8] += jx; this.proj[9] += jy;
         this.jit = [jx * 0.5, jy * 0.5];
       }
+      // f-stipple (R50-08): with the TSR the fade's dither turns with the frame (its history makes a soft blend of it);
+      // without it, or with „Sanftes Einblenden" off, things arrive whole (world.js / farring.js read fadeSoft)
+      this.fadeSoft = !!(tsr && this.q.fadeIn !== false && !this.q.lite);
+      this.fadePhase = this.fadeSoft ? VR.Stream.fadePhase(this.frameNo) : 0;
       mat4.mul(this.viewProj, this.proj, v);
       mat4.invert(this.invViewProj, this.viewProj);
       mat4.frustum(this.planes, this.viewProj);
@@ -843,6 +849,7 @@
     common(p, E) {
       const gl = this.gl, u = p.u;
       const v3 = (n, a) => { if (u[n]) gl.uniform3f(u[n], a[0], a[1], a[2]); };
+      if (u.u_fadePhase) gl.uniform1f(u.u_fadePhase, this.fadePhase || 0);   // (f-stipple)
       v3('u_sunDir', E.sunDir); v3('u_moonDir', E.moonDir); v3('u_sunColor', E.sunColor); v3('u_moonColor', E.moonColor);
       v3('u_ambSky', E.ambSky); v3('u_skyZenith', E.zenith); v3('u_skyHorizon', E.horizon); v3('u_sunset', E.sunset);
       // t-sky: the sky's middle stop, the stops' heights and the space by day (env.js VR.Sky)
@@ -1001,7 +1008,7 @@
         if (planes && !mat4.boxInFrustum(planes, ox, oy, oz, ox + 16, oy + 16, oz + 16)) continue;
         if (m.arena !== batchArena || cnt === 512) { flush(); batchArena = m.arena; }
         firsts[cnt] = m.off; counts[cnt] = m.count;
-        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = fade;
+        org[cnt * 4] = ox; org[cnt * 4 + 1] = oy; org[cnt * 4 + 2] = oz; org[cnt * 4 + 3] = s.grow !== undefined && s.grow < 1 ? 2 + s.grow : fade;   // (f-stipple: Stream.originW — a near column growing)
         cnt++;
         this.stats.tris += m.count / 3;
       }

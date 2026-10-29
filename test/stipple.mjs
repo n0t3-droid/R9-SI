@@ -1,17 +1,21 @@
-// regress: skip — f-stipple's pictures (review R50-08 the screen-door, R50-12 the Very Low hall lamp): walks and still
-// frames on this build, each picture measured by test/stipple.js (the share of the frame in a coherent 2-px checker).
-//   cherry   Balanced, seed 53: arriving at the cherry grove (−150, 316) and walking 40 blocks through it (the walk's
-//            clock: 33 ms a frame, so the 300 ms fades span nine frames as at 30 fps) · cherry_high the same on High
-//   meadow   Balanced: a walk over the meadow east of the temple (240, −120)
-//   pond     Balanced: the nearest lily pond's mirror, settled
-//   palms    Balanced, seed 4242: Palm City's fork at the golden hour (trailer_city.mjs's F1), arriving and walking
-//   hall     Very Low, seed 53: the hall street (critic_vl.mjs's pose); the nearest lamp's lantern: its brightest tenth's
-//            luma inside its projected box (≥ 60 wanted, R50-12), and the lamp's section's near/far state
-// pictures test/shots/stipple_<scene>_<TAG>_<k>.png · numbers .tmp_tests/stipple_<TAG>.json
-// usage: TAG=before nohup bash test/wt_run.sh stipple.mjs 3600 > .tmp_tests/stipple.log 2>&1 &   (ONLY=cherry,hall)
-// Checks (TAG=after): the walking frames (cherry, cherry_high) < 1 % stippled; the hall lantern ≥ 60; no page error.
+// regress: skip — f-stipple's pictures (review R50-08 the screen-door, R50-12 the Very Low hall lamp): each place settled,
+// then ARRIVING again — every shown column and far form shown anew in one frame (the game's own checkShown: on this build
+// its plan), the eye walking on at 4.3 blocks a second on the walk's clock (33 ms a frame, so the 300 ms fade spans nine
+// frames as at 30 fps); pictures at frames 3, 5, 8, each measured by test/stipple.js (the share of the frame in a
+// coherent 2-px checker):
+//   hall     Very Low (the world made on it), seed 53: the hall street (critic_vl.mjs's pose), settled; the nearest lamp's
+//            lantern: its brightest tenth's luma inside its projected box (≥ 60 wanted, R50-12)
+//   cherry   Balanced, seed 53: into the cherry grove from its west edge (318, −372) · cherry_high the same on High
+//   meadow   Balanced: the meadow east of the temple (220, −120) · pond: the nearest lily pond's mirror (−232, −182)
+//   palms    Balanced, seed 4242: Palm City's fork at the golden hour (trailer_city.mjs's F1)
+// pictures test/shots/stipple_<scene>_<TAG>_f<k>.png · numbers .tmp_tests/stipple_<TAG>.json
+// usage: TAG=before DIST=file:///…/index.html nohup bash test/wt_run.sh stipple.mjs 3600 > .tmp_tests/stipple.log 2>&1 &
+//   (ONLY=cherry,hall)
+// Checks (TAG≠before): the arriving frames (cherry, cherry_high, meadow, palms) < 1 % stippled; the hall lantern ≥ 60;
+// no page error.
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
+import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
 import { createRequire } from 'module';
 const ROOT = new URL('../', import.meta.url).pathname.replace(/\.tmp_tests\/$/, '');
 const require = createRequire(import.meta.url);
@@ -116,81 +120,80 @@ async function openWorld(dist, tag, preset, seed) {
 }
 
 // ---------------------------------------------------------------- frames
-// n frames drawn on the walk's clock (33 ms each), the player moved along a → b (eye above the ground), a picture every
-// `every` frames; each picture: its stipple share and the streaming state at that moment
-async function walk(P, scene, a, b, n, every, tod) {
-  const out = { shots: [] };
-  await P.ev(() => { window.__vt = performance.now(); window.__norender = false; });
-  let k = 0;
-  for (let f = 0; f <= n; f++) {
-    const u = n ? f / n : 0;
-    const st = await P.ev(([x, z, yaw, tod, shot]) => {
-      const g = VR.game, p = g.player, w = g.world, R = VR.R, F = VR.F;
-      let y = p.pos[1];
-      for (let yy = 200; yy > 30; yy--) { const s = w.getBlock(Math.floor(x), yy, Math.floor(z)); if (s && (R.T.flags[s] & (F.OPAQUE | F.FLUID)) && !(R.T.flags[s] & F.LEAVES)) { y = yy + 1; break; } }
-      p.flying = true; p.noclip = true; p.pos[0] = x; p.pos[2] = z; p.pos[1] = y; p.vel = [0, 0, 0]; p.yaw = yaw; p.viewYaw = yaw; p.pitch = -0.04;
-      if (tod !== null) g.env.setTime(tod);
-      window.__vt += 33; g.last = window.__vt - 33; g.loop(window.__vt);
-      if (!shot) return null;
-      g.renderer.gl.finish();
-      let part = 0; for (const c of w.cols.values()) for (const s of c.sec) if (s && s.hasMesh && s.fade > 0 && s.fade < 1) part++;
-      const fr = g.horizon && g.horizon.far;
-      return { fadingCols: w.fading.size, partSecs: part, farFading: fr ? fr.fading.length : null, pend: w.pending ? w.pending.size : null };
-    }, [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, Math.atan2(-(b[0] - a[0]), -(b[1] - a[1])), tod === undefined ? null : tod, f % every === 0]);
-    if (st) {
-      const pic = `${SHOTS}stipple_${scene}_${TAG}_${k++}.png`;
-      await P.page.screenshot({ path: pic, timeout: 180000 });
-      const m = await measure(pic);
-      st.share = r1(m.share * 100); st.f = f; st.pic = pic.replace(ROOTR, '');
-      out.shots.push(st);
-      console.log(`  ${scene} f${f}: ${st.share} % stippled · fading columns ${st.fadingCols}, sections mid-fade ${st.partSecs}, far forms fading ${st.farFading} (${secs()})`);
+// the screen read back right after a drawn frame (no compositor wait: page.screenshot hangs on a loaded machine)
+const grab = async (P, file) => {
+  const m = await P.ev(() => {
+    const gl = VR.game.renderer.gl, W = gl.drawingBufferWidth, H = gl.drawingBufferHeight, px = new Uint8Array(W * H * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
+    return { png: btoa(s), W, H };
+  });
+  await sharp(Buffer.from(m.png, 'base64'), { raw: { width: m.W, height: m.H, channels: 4 } }).flip().removeAlpha().png().toFile(file);
+};
+// one frame on the walk's clock (33 ms), the eye moved by (dx, dz) — drawn, so the TSR's history builds as in play
+const frame = (P, dx, dz) => P.ev(([dx, dz]) => { const g = VR.game, p = g.player; p.pos[0] += dx; p.pos[2] += dz; window.__vt += 33; g.last = window.__vt - 33; g.loop(window.__vt); }, [dx, dz]);
+// the scene settled at a pose, then ARRIVING again: every shown column and far form shown anew this frame (the game's own
+// checkShown — on this build its plan; the far forms as farring.js does it), the eye walking on at 4.3 blocks a second;
+// pictures at frames 3, 5 and 8 (the 300 ms fade's first half, its middle, its end), each measured
+async function arrival(P, scene, x, feet, z, yaw, pitch, fov, tod) {
+  await P.pose(x, feet, z, yaw, pitch, fov); if (tod !== undefined) await P.ev((t) => VR.game.env.setTime(t), tod);
+  await P.settle(240, 20); await P.step(4); await P.warmVx(); await P.step(3);
+  await P.ev((t) => { window.__norender = false; window.__vt = performance.now(); const g = VR.game; if (t !== undefined) g.env.setTime(t); }, tod);
+  const vx = -Math.sin(yaw) * 0.142, vz = -Math.cos(yaw) * 0.142;
+  for (let i = 0; i < 6; i++) await frame(P, 0, 0);   // the TSR's history settles on the still scene
+  const st = await P.ev(() => {
+    const g = VR.game, w = g.world, r = g.renderer, now = window.__vt; let cols = 0, forms = 0;
+    for (const c of w.cols.values()) if (c.shownAt >= 0) { c.shownAt = -1; w.checkShown(c, now); cols++; }
+    const fr = g.horizon && g.horizon.far;
+    if (fr) { const soft = !VR.Stream.fadePlan || r.fadeSoft; for (const t of fr.live) { t.shownAt = now; if (soft) { t.fade = 0; if (!fr.fading.includes(t)) fr.fading.push(t); } else t.fade = 1; forms++; } fr.maskDirty = true; }
+    return { cols, forms, soft: VR.Stream.fadePlan ? !!r.fadeSoft : 'old', tsr: !!r.jit };
+  });
+  const out = { shots: [], arrived: st };
+  for (let f = 1; f <= 8; f++) {
+    await frame(P, vx, vz);
+    if (f === 3 || f === 5 || f === 8) {
+      const pic = `${SHOTS}stipple_${scene}_${TAG}_f${f}.png`;
+      await grab(P, pic);
+      const m = await measure(pic), d = await P.ev(() => { const w = VR.game.world; let part = 0, grow = 0; for (const c of w.cols.values()) for (const s of c.sec) { if (s && s.hasMesh && s.fade > 0 && s.fade < 1) part++; if (s && s.hasMesh && s.grow < 1) grow++; } return { part, grow }; });
+      out.shots.push({ f, share: r1(m.share * 100), midFade: d.part, growing: d.grow, pic: pic.replace(ROOTR, '') });
+      console.log(`  ${scene} f${f}: ${r1(m.share * 100)} % stippled · sections mid-fade ${d.part}, growing ${d.grow} (${secs()})`);
     }
   }
   await P.ev(() => { window.__vt = null; window.__norender = true; });
   out.max = Math.max(...out.shots.map(s => s.share)); out.mean = r1(out.shots.reduce((t, s) => t + s.share, 0) / out.shots.length);
+  console.log(`  ${scene}: ${JSON.stringify(st)} · max ${out.max} %`);
   return out;
-}
-const arrive = async (P, x, z) => { await P.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 160, z); }, [x, z]); };
+};
+const arrive = async (P, x, z) => { await P.ev(([x, z]) => { const p = VR.game.player; p.flying = true; p.noclip = true; p.teleport(x, 160, z); }, [x, z]); await P.holdFar(true); await P.settle(240, 0); await P.holdFar(false); };
 const still = async (P, scene, x, feet, z, yaw, pitch, fov, tod) => {
   await P.pose(x, feet, z, yaw, pitch, fov); if (tod !== undefined) await P.ev((t) => VR.game.env.setTime(t), tod);
   await P.settle(240, 20); await P.step(4); await P.warmVx(); await P.step(3);
-  await P.ev((t) => { window.__norender = false; const g = VR.game; if (t !== undefined) g.env.setTime(t); for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } g.renderer.gl.finish(); }, tod);
+  await P.ev((t) => { window.__norender = false; const g = VR.game; if (t !== undefined) g.env.setTime(t); for (let i = 0; i < 8; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } }, tod);
   const pic = `${SHOTS}stipple_${scene}_${TAG}_0.png`;
-  await P.page.screenshot({ path: pic, timeout: 180000 });
+  await grab(P, pic);
   await P.ev(() => { window.__norender = true; });
   const m = await measure(pic);
   console.log(`  ${scene}: ${r1(m.share * 100)} % stippled (${secs()})`);
   return { share: r1(m.share * 100), pic: pic.replace(ROOTR, '') };
 };
-
-// ---------------------------------------------------------------- run: seed 53 (Balanced, High, Very Low), seed 4242
-const errsOf = (P) => P.logs.filter(l => l.startsWith('[pageerror]'));
-const A = await openWorld(DIST, TAG, 'balanced', '53');
-console.log(`world 53: ${A.ok ? 'play' : 'NOT PLAYING'} in ${r1(A.loadS)} s ${JSON.stringify(A.info)}`);
-const grove = async (scene) => {
-  await arrive(A, -150, 316); await A.step(20);
-  rec.scenes[scene] = await walk(A, scene, [-150, 316], [-110, 330], 240, 30, 6000); save();
+// a place's pose: the ground there (the game's blocks, settled), the eye 1.62 above, toward `at`
+const place = async (P, x, z, at, fov, tod, scene) => {
+  await arrive(P, x, z);
+  const gy = await P.groundY(x, z);
+  const [yaw, pitch] = aimAt(x, gy + 1 + EYE, z, at);
+  return arrival(P, scene, x, gy + 1, z, yaw, pitch, fov, tod);
 };
-if (want('cherry')) await grove('cherry');
-if (want('meadow')) { await arrive(A, 220, -120); await A.step(20); rec.scenes.meadow = await walk(A, 'meadow', [220, -120], [260, -112], 150, 50, 7000); save(); }
-if (want('pond')) {
-  const P0 = { x: -232, y: 80, z: -182 };   // the nearest lily pond of seed 53 (vgen 12, the land plan)
-  await arrive(A, P0.x + 9, P0.z + 2); await A.holdFar(true); await A.settle(240, 0); await A.holdFar(false);
-  const gy = await A.groundY(P0.x + 9, P0.z + 2);
-  const [yaw, pitch] = aimAt(P0.x + 9, gy + 1 + EYE, P0.z + 2, [P0.x - 4, P0.y, P0.z]);
-  rec.scenes.pond = await still(A, 'pond', P0.x + 9, gy + 1, P0.z + 2, yaw, pitch, 66, 7000); save();
-}
-if (want('cherry_high')) {
-  await A.ev(() => { const g = VR.game; g.applyPreset('high'); g.settings.dynRes = false; g.applySettings('*'); });
-  await grove('cherry_high');
-}
+
+// ---------------------------------------------------------------- run: seed 53 (Very Low, Balanced, High), seed 4242
+const errsOf = (P) => P.logs.filter(l => l.startsWith('[pageerror]'));
+const A = await openWorld(DIST, TAG, 'potato', '53');
+console.log(`world 53: ${A.ok ? 'play' : 'NOT PLAYING'} in ${r1(A.loadS)} s ${JSON.stringify(A.info)}`);
 if (want('hall')) {
-  await A.ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.applySettings('*'); });
   const site0 = await A.ev(() => { try { const W = VR.game.world, VG = VR.VillageGen, og = new VR.OverworldGen(W.seed, W.genOpts); const s = VG.site(og, -2, -1); if (!s) return null; const Pl = VG.plan(og, s), h = Pl.hall || null; window.__lamps = Pl.lamps || []; return h ? { x: s.x, z: s.z, r: h.r, F: h.F } : { x: s.x, z: s.z, r: (s.seed >>> 3) & 3, F: s.y }; } catch (e) { return { err: String(e.message || e) }; } });
   const site = site0 && !site0.err ? site0 : { x: -944, z: -296, r: 3, F: 73 };
   const q = ROT[site.r](0.5, -24.5), t = ROT[site.r](0.5, 40);
   const x = site.x + q[0], z = site.z + q[1], feet = site.F + 1, at = [site.x + t[0], site.F + 1 + 8, site.z + t[1]];
-  await arrive(A, x, z); await A.holdFar(true); await A.settle(240, 0); await A.holdFar(false);
+  await arrive(A, x, z);
   const [yaw, pitch] = aimAt(x, feet + EYE, z, at);
   const h = await still(A, 'hall', x, feet, z, yaw, pitch, 66, 6000);
   // the nearest lamp in view: its lantern's box on the screen (the head, y F+3 … F+5), the section's state
@@ -208,11 +211,10 @@ if (want('hall')) {
     }
     if (!best) return { err: 'no lamp in view', n: (window.__lamps || []).length };
     const w = g.world, l = best.lamp, c = w.cols.get((l[0] >> 4) + ',' + (l[2] >> 4)), s = c && c.sec[l[1] >> 4];
-    if (s) { const dx = s.ox + 8 - ex, dy = s.oy + 8 - ey, dz = s.oz + 8 - ez; best.sec = { centre: Math.round(Math.sqrt(dx * dx + dy * dy * 0.5 + dz * dz) * 10) / 10, vxLod: r.q.vxLod, near: !!s.mesh[3], far: !!s.mesh[4], vxData: !!s.vxData }; }
+    if (s) { const dx = s.ox + 8 - ex, dy = s.oy + 8 - ey, dz = s.oz + 8 - ez; best.sec = { centre: Math.round(Math.sqrt(dx * dx + dy * dy * 0.5 + dz * dz) * 10) / 10, vxLod: r.q.vxLod, near: !!s.mesh[3], far: !!s.mesh[4], vxData: !!s.vxData, vxDropped: !!s.vxDropped, vxQ: !!s.vxQ, dirty: !!s.dirty, pending: !!s.pending, split: r.splitVx([s], [ex, ey, ez]).near.length ? 'near' : 'far' }; }
     return best;
   }, [VW, VH]);
   if (L && L.box) {
-    const sharp = require('/home/dev/.npm-global/lib/node_modules/sharp');
     const bx = Math.max(0, L.box[0]), by = Math.max(0, L.box[1]), bw = Math.max(2, Math.min(VW, L.box[2]) - bx), bh = Math.max(2, Math.min(VH, L.box[3]) - by);
     const { data, info } = await sharp(ROOTR + h.pic).extract({ left: bx, top: by, width: bw, height: bh }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
     const lum = []; for (let i = 0; i < info.width * info.height; i++) lum.push(0.2126 * data[i * 3] + 0.7152 * data[i * 3 + 1] + 0.0722 * data[i * 3 + 2]);
@@ -223,22 +225,35 @@ if (want('hall')) {
   h.lamp = L; rec.scenes.hall = h; save();
   console.log('  hall lamp: ' + JSON.stringify(L));
 }
+const preset = (P, k) => P.ev((k) => { const g = VR.game; g.applyPreset(k); g.settings.dynRes = false; g.applySettings('*'); }, k);
+// seed 53's cherry grove (vgen 13: the chunks (20…23, −24…−23) hold 200–1600 cherry leaves each — a search over the
+// generator), from its west edge into it
+const GROVE = [318, -372, [360, 84, -370]];
+if (want('cherry')) { await preset(A, 'balanced'); rec.scenes.cherry = await place(A, GROVE[0], GROVE[1], GROVE[2], 70, 6000, 'cherry'); save(); }
+if (want('meadow')) { await preset(A, 'balanced'); rec.scenes.meadow = await place(A, 220, -120, [300, 78, -110], 70, 7000, 'meadow'); save(); }
+if (want('pond')) {
+  const P0 = { x: -232, y: 80, z: -182 };   // the nearest lily pond of seed 53 (the land plan)
+  await preset(A, 'balanced'); await arrive(A, P0.x + 9, P0.z + 2);
+  const gy = await A.groundY(P0.x + 9, P0.z + 2);
+  const [yaw, pitch] = aimAt(P0.x + 9, gy + 1 + EYE, P0.z + 2, [P0.x - 4, P0.y, P0.z]);
+  rec.scenes.pond = await arrival(A, 'pond', P0.x + 9, gy + 1, P0.z + 2, yaw, pitch, 66, 7000); save();
+}
+if (want('cherry_high')) { await preset(A, 'high'); rec.scenes.cherry_high = await place(A, GROVE[0], GROVE[1], GROVE[2], 70, 6000, 'cherry_high'); save(); }
 const errsA = errsOf(A); await A.ctx.close();
 let errsB = [];
 if (want('palms')) {
   const B = await openWorld(DIST, TAG, 'balanced', '4242');
   console.log(`world 4242: ${B.ok ? 'play' : 'NOT PLAYING'} in ${r1(B.loadS)} s`);
-  await arrive(B, 3.5, -96.5); await B.step(20);
-  // the fork, looking yaw 0.3 (trailer_city.mjs's F1): a walk toward it at the golden hour (13000)
-  const yaw = 0.3, dx = -Math.sin(yaw), dz = -Math.cos(yaw);
-  rec.scenes.palms = await walk(B, 'palms', [3.5 - dx * 20, -96.5 - dz * 20], [3.5, -96.5], 150, 50, 13000); save();
+  // the fork at eye height (trailer_city.mjs's F1: (3.5, −96.5), yaw 0.3, pitch 0.03, fov 60) at the golden hour (13000)
+  await arrive(B, 3.5, -96.5); const gy = await B.groundY(3.5, -96.5);
+  rec.scenes.palms = await arrival(B, 'palms', 3.5, gy + 1, -96.5, 0.3, 0.03, 60, 13000); save();
   errsB = errsOf(B); await B.ctx.close();
 }
 await browser.close();
 console.log('\n' + JSON.stringify(Object.fromEntries(Object.entries(rec.scenes).map(([k, v]) => [k, v.max !== undefined ? { max: v.max, mean: v.mean } : { share: v.share, lamp: v.lamp && v.lamp.luma }]))));
 check(!errsA.length && !errsB.length, 'no page error' + (errsA.length || errsB.length ? ': ' + errsA.concat(errsB).slice(0, 2).join(' | ').slice(0, 500) : ''));
 if (TAG !== 'before') {
-  for (const s of ['cherry', 'cherry_high']) if (rec.scenes[s]) check(rec.scenes[s].max < 1, `${s}: every walking frame < 1 % stippled (max ${rec.scenes[s].max} %)`);
+  for (const s of ['cherry', 'cherry_high', 'meadow', 'palms']) if (rec.scenes[s]) check(rec.scenes[s].max < 1, `${s}: every walking frame < 1 % stippled (max ${rec.scenes[s].max} %)`);
   if (rec.scenes.hall) check(rec.scenes.hall.lamp && rec.scenes.hall.lamp.luma >= 60, `hall (Very Low): the lamp's lantern lit, its brightest tenth ≥ 60 luma (${rec.scenes.hall.lamp && rec.scenes.hall.lamp.luma})`);
 }
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');

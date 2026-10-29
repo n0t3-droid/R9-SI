@@ -620,12 +620,23 @@
     checkShown(c, now) {
       if (c.shownAt >= 0) return;
       for (let i = 0; i < c.sec.length; i++) if (!c.sec[i].meshed) return;
-      c.shownAt = now; c.fade = 0; this.fading.add(c);
-      for (let i = 0; i < c.sec.length; i++) c.sec[i].fade = 0;
+      // (f-stipple, R50-08) near the player whole at once and growing from the ground; beyond, the soft fade where the
+      // renderer has it (the TSR resolves the turning dither), else whole at once (Stream.fadePlan)
+      const lp = this.lastPos, r = this.renderer;
+      const plan = VR.Stream.fadePlan(lp ? c.cx - (Math.floor(lp[0]) >> 4) : 99, lp ? c.cz - (Math.floor(lp[2]) >> 4) : 99, !!(r && r.fadeSoft));
+      c.shownAt = now; c.fade = plan.fade; c.grow = plan.grow ? 0 : 1;
+      if (c.fade < 1 || c.grow < 1) this.fading.add(c);
+      for (let i = 0; i < c.sec.length; i++) { c.sec[i].fade = c.fade; c.sec[i].grow = c.grow; }
     }
     stepFades(now) {
       if (!this.fading.size) return;
       for (const c of this.fading) {
+        if (c.grow < 1) {   // (f-stipple) a near column grows; it is whole from the start
+          const g = VR.Stream.growCurve(now - c.shownAt);
+          c.grow = g; for (let i = 0; i < c.sec.length; i++) c.sec[i].grow = g;
+          if (g >= 1 && c.fade >= 1) this.fading.delete(c);
+          continue;
+        }
         const f = Math.round(255 * VR.Stream.fadeCurve(now - c.shownAt)) / 255;   // 8-bit: the value the far mask holds
         if (f === c.fade) continue;
         c.fade = f;
@@ -775,7 +786,7 @@
         const done = () => {
           if (!detail && m.vxFar && m.vxFar.length) s.vxDropped = true;   // comes back for its detail when the player gets close
           s.meshVer = ver; s.meshed = true;
-          s.fade = c.shownAt >= 0 ? c.fade : 0;
+          s.fade = c.shownAt >= 0 ? c.fade : 0; s.grow = c.shownAt >= 0 && c.grow !== undefined ? c.grow : 1;
           if (s.ver !== ver) s.dirty = true;
           this.checkShown(c, performance.now());
           this.visDirty = true;

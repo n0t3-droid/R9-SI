@@ -2,25 +2,26 @@
 // share of pixels that sit in a coherent 2-px checker (the 4x4 ordered dither at fades 1/4 … 3/4, also after the TSR's
 // upscale): per pixel r = a − b − c + d over its 2x2 block (zero on edges, stripes and gradients), signed by (−1)^(x+y);
 // a pixel is stippled where the mean of that signed r over a 6x6 window is ≥ AMP luma and ≥ COH × the mean |r| there
-// (a checker is coherent, texture noise is not). The share counts the flagged pixels, grown by the window.
+// (a checker is coherent, texture noise is not) and |r| ≥ AMP in ≥ DENSE of the window (a dither fills it; an edge's
+// staircase is a line through it). The share counts the flagged pixels, grown by the window.
 //   node test/stipple.js                 the calibration (synthetic frames) — ALL OK / FAILED n
 //   node test/stipple.js a.png b.jpg …   each picture's share (and the calibration)
 //   require('./stipple.js').measure(file) → Promise<{ share, w, h }>   ·   .measureRaw(lum, w, h) → share
 const path = require('path');
-const AMP = 18, COH = 0.5, WIN = 6;
+const AMP = 14, COH = 0.5, WIN = 6, DENSE = 0.6;
 let sharp = null;
 for (const p of ['sharp', '/home/dev/.npm-global/lib/node_modules/sharp']) { try { sharp = require(p); break; } catch (e) { /* next */ } }
 
-function measureRaw(L, w, h) {
+function measureRaw(L, w, h, withMask) {
   const W1 = w + 1, n = W1 * (h + 1);
-  const S = new Float64Array(n), A = new Float64Array(n);   // integral images: the signed r and |r|
+  const S = new Float64Array(n), A = new Float64Array(n), D = new Float64Array(n);   // integral images: the signed r, |r|, |r| ≥ AMP
   for (let y = 0; y < h; y++) {
-    let rs = 0, ra = 0;
+    let rs = 0, ra = 0, rd = 0;
     for (let x = 0; x < w; x++) {
       let r = 0;
       if (x + 1 < w && y + 1 < h) { const i = y * w + x; r = L[i] - L[i + 1] - L[i + w] + L[i + w + 1]; if ((x + y) & 1) r = -r; }
-      rs += r; ra += Math.abs(r);
-      S[(y + 1) * W1 + x + 1] = S[y * W1 + x + 1] + rs; A[(y + 1) * W1 + x + 1] = A[y * W1 + x + 1] + ra;
+      rs += r; ra += Math.abs(r); rd += Math.abs(r) >= AMP ? 1 : 0;
+      S[(y + 1) * W1 + x + 1] = S[y * W1 + x + 1] + rs; A[(y + 1) * W1 + x + 1] = A[y * W1 + x + 1] + ra; D[(y + 1) * W1 + x + 1] = D[y * W1 + x + 1] + rd;
     }
   }
   const box = (I, x0, y0, x1, y1) => I[y1 * W1 + x1] - I[y0 * W1 + x1] - I[y1 * W1 + x0] + I[y0 * W1 + x0];
@@ -28,10 +29,10 @@ function measureRaw(L, w, h) {
   const flag = new Uint8Array(w * h);
   for (let y = 0; y + WIN <= h - 1; y += 2) for (let x = 0; x + WIN <= w - 1; x += 2) {
     const k = WIN * WIN, s = Math.abs(box(S, x, y, x + WIN, y + WIN)) / k, a = box(A, x, y, x + WIN, y + WIN) / k;
-    if (s >= AMP && s >= COH * a) for (let yy = y; yy < y + WIN; yy++) flag.fill(1, yy * w + x, yy * w + x + WIN);
+    if (s >= AMP && s >= COH * a && box(D, x, y, x + WIN, y + WIN) >= DENSE * k) for (let yy = y; yy < y + WIN; yy++) flag.fill(1, yy * w + x, yy * w + x + WIN);
   }
   let c = 0; for (let i = 0; i < flag.length; i++) c += flag[i];
-  return c / (w * h);
+  return withMask ? { share: c / (w * h), flag } : c / (w * h);
 }
 async function measure(file) {
   const { data, info } = await sharp(file).removeAlpha().raw().toBuffer({ resolveWithObject: true });
@@ -39,7 +40,7 @@ async function measure(file) {
   for (let i = 0; i < w * h; i++) L[i] = ch >= 3 ? 0.2126 * data[i * ch] + 0.7152 * data[i * ch + 1] + 0.0722 * data[i * ch + 2] : data[i * ch];
   return { share: measureRaw(L, w, h), w, h };
 }
-module.exports = { measure, measureRaw, AMP, COH, WIN };
+module.exports = { measure, measureRaw, AMP, COH, WIN, DENSE };
 
 if (require.main === module) (async () => {
   let fails = 0;
