@@ -21,6 +21,10 @@
   'use strict';
   const R = VR.Regie = VR.Regie || {};
   R.RULES = { min: 18, max: 42, gap: 75, gapBuilder: 90, space: 8, major: 60, beat: 300, bauruhe: 2, seenFrac: 0.005 };
+  // a-regie (plan docs/superpowers/plans/2026-10-29-a-regie.md §2.1): the repeat cooldown per act (s); the adventurer's
+  // rhythm (an Abenteuer world: a shorter target, a lower cap) — its first offers (`first`) are taken at the first allowed
+  // moment like a story beat
+  R.RULES.cool = 90; R.ADV = { min: 12, max: 30, gap: 55 };
   // a hash in [0, 1) of three integers (the life director's own, LifeKit.h, when it is there)
   const h = (a, b, c) => { let x = (a | 0) ^ Math.imul(b | 0, 0x9E3779B1) ^ Math.imul((c | 0) + 0x7F4A7C15, 0x85EBCA77); x ^= x >>> 16; x = Math.imul(x, 0x7FEB352D); x ^= x >>> 15; x = Math.imul(x, 0x846CA68B); x ^= x >>> 16; return (x >>> 0) / 4294967296; };
   const sh = (s) => { let x = 0x811c9dc5; s = String(s || ''); for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 0x01000193); } return x | 0; };
@@ -33,8 +37,9 @@
       this.last2 = 0; this.lastStart = -Infinity; this.lastMajor = -Infinity; this.lastBeat = -Infinity;
       this.kinds = []; this.slot = 0; this.target = this.jit(0); this.scene = false; this.bauruhe = false;
       this.log = [];   // (what it started or allowed: [t, w, kind, source] — the last 64)
+      this.acts = Object.create(null);   // a-regie: act → its last start (the repeat cooldown)
     }
-    jit(k) { const o = this.o, cap = this.o.builder ? o.gapBuilder : o.gap; return Math.min(cap - 5, o.min + (o.max - o.min) * h(this.seed, k, 0x5e91)); }
+    jit(k) { const o = this.o, A = o.adv && !o.builder ? R.ADV : null, lo = A ? A.min : o.min, hi = A ? A.max : o.max; return Math.min(this.gapCap() - 5, lo + (hi - lo) * h(this.seed, k, 0x5e91)); }
     // the budget now: the heaviest weight that may start
     budget(t) { if (this.bauruhe) return this.o.bauruhe; return t - this.lastMajor >= this.o.major ? 5 : 3; }
     // an event of weight w seen at t (in view): the clocks move
@@ -48,15 +53,19 @@
       this.kinds.push(kind); if (this.kinds.length > 2) this.kinds.shift();
     }
     // may a source start an event of weight w and kind now?
-    allow(t, w, kind) {
+    allow(t, w, kind, act) {
       if (this.scene) return false;
+      if (act && this.cooling(t, act)) return false;   // a-regie: the same act within its cooldown
       if (t - this.lastStart < this.o.space) return false;
       if ((w | 0) > this.budget(t)) return false;
       if (kind === 'story' && t - this.lastBeat < this.o.beat) return false;
       return true;
     }
     due(t) { return t - this.last2 >= this.target; }
-    gapCap() { return this.o.builder ? this.o.gapBuilder : this.o.gap; }
+    gapCap() { return this.o.builder ? this.o.gapBuilder : this.o.adv ? R.ADV.gap : this.o.gap; }
+    cooling(t, act) { const a = this.acts[act]; return a !== undefined && t - a < this.o.cool; }
+    // a-regie: a self-scheduling source started an act (it asked allow first): the spacing and the cooldown move
+    note(t, w, kind, act) { if (t > this.lastStart) this.lastStart = t; if (act) this.acts[act] = t; this.log.push([t, w, kind, act || '']); if (this.log.length > 64) this.log.shift(); }
     // the offer to start now, or null: a story beat at the first allowed moment; else, when the gap is due, the best
     // allowed offer (weight ≥ 2 within the budget, not the kind of the last two unless nothing else, ties by the hash)
     choose(t, offers, place) {
@@ -64,19 +73,24 @@
       let best = null, bs = -Infinity;
       for (const of of offers) if (of && of.kind === 'story' && this.allow(t, of.weight, 'story')) { const s = of.weight * 10 + h(this.seed, this.slot, sh(of.act)); if (s > bs) { bs = s; best = of; } }
       if (best) return best;
+      // a-regie: an adventurer's first offers (the call, the first encounter) at the first allowed moment
+      if (this.o.adv && !this.o.builder) for (const of of offers) if (of && of.first && of.kind !== 'story' && this.allow(t, of.weight, of.kind, of.act)) { const s = of.weight * 10 + h(this.seed, this.slot, sh(of.act)); if (s > bs) { bs = s; best = of; } }
+      if (best) return best;
       if (!this.due(t) || t - this.lastStart < this.o.space) return null;
+      const since = t - this.last2;
       const B = this.budget(t), pl = sh(place);
       for (const of of offers) {
         if (!of || of.kind === 'story' || !(of.weight >= 2) || of.weight > B) continue;
         let s = of.weight * 10 + 6 * h(this.seed ^ pl, this.slot, sh(of.source + ':' + of.act));
         if (this.kinds.indexOf(of.kind) >= 0) s -= 25;
+        if (this.cooling(t, of.act)) { if (since < R.RULES.urgent) continue; s -= 40; }   // a-regie: not the same act again soon
         if (of.eta > 0) s -= Math.min(10, of.eta);   // (an act that comes later fills the gap later)
         if (s > bs) { bs = s; best = of; }
       }
       return best;
     }
     // the record of a start (the source tells the event log; seen() follows when it is seen)
-    started(t, of) { this.log.push([t, of.weight, of.kind, of.source]); if (this.log.length > 64) this.log.shift(); }
+    started(t, of) { this.log.push([t, of.weight, of.kind, of.source]); if (this.log.length > 64) this.log.shift(); if (of.act) this.acts[of.act] = t; }
   }
   R.Sched = Sched;
 
@@ -87,15 +101,17 @@
   const now = (g) => +((g && g.time) || 0);
   R.of = (g) => { g = g || game(); return g && g.regie && g.regie.world === g.world ? g.regie : null; };
   // the life director's question (lifedirector.js): may an act of weight w start now?
-  R.allow = function (g, w, kind) {
+  R.allow = function (g, w, kind, act) {
     const S = R.of(g); if (!S) return true;
-    return S.sched.allow(now(g), w || 2, kind || 'ambient');   // (a query: what starts is seen through the event log)
+    return S.sched.allow(now(g), w || 2, kind || 'ambient', act);   // (a query: what starts is seen through the event log)
   };
+  // a-regie: a self-scheduling source (the pads' visitors, the traffic's passes) tells what it started after allow said yes
+  R.note = function (g, w, kind, act) { const S = R.of(g); if (S) { S.sched.note(now(g), w || 2, kind || 'ambient', act); S.st.noted = (S.st.noted | 0) + 1; } };
   R.inScene = (g, on) => { const S = R.of(g); if (S) S.sched.scene = !!on; };
   function bind(g) {
     const seed = ((g.meta && g.meta.seed) >>> 0) || 0x5eed, A = VR.Adventure;
     let adv = false; try { adv = !!(A && A.on && A.on()); } catch (e) { /* optional */ }
-    const S = { world: g.world, sched: new Sched(seed, { builder: !adv }), n: 0, t: 0, st: { offers: 0, started: 0, story: 0, ld: 0, seen: 0 } };
+    const S = { world: g.world, sched: new Sched(seed, { builder: !adv, adv }), n: 0, t: 0, st: { offers: 0, started: 0, story: 0, ld: 0, seen: 0 } };
     S.sched.last2 = now(g); S.sched.lastStart = now(g) - 4;
     if (VR.EventLog) S.n = VR.EventLog.count | 0;
     g.regie = S;

@@ -106,6 +106,61 @@ console.log('2b · the fill order');
   check(o3.length === 0, 'never one played within 30 s');
 }
 
+// a-regie (plan docs/superpowers/plans/2026-10-29-a-regie.md §2.1): the repeat cooldown per act, the self-scheduling
+// sources told (note), the adventurer's rhythm and its first offers, the builder's spam on a stream with pads and traffic
+console.log('4 · a-regie: the repeat cooldown per act');
+{
+  const q = new S(11);
+  const cat = { source: 'ld', act: 'cat', weight: 2, kind: 'ambient' }, birds = { source: 'ld', act: 'birds', weight: 2, kind: 'sky' };
+  q.started(100, cat); q.seen(100, 2, 'ambient');
+  q.seen(130, 2, 'travel'); q.seen(150, 2, 'social'); q.target = 15;   // (the kinds of the last two: neither; the gap due at 165)
+  check(q.choose(170, [cat, birds], 'plaza') === birds, 'an act started 70 s ago is not taken while another is offered');
+  check(q.choose(170, [cat], 'plaza') === null, 'alone within its cooldown (' + R.RULES.cool + ' s), not taken before the gap is long');
+  check(q.choose(150 + R.RULES.urgent + 0.5, [cat], 'plaza') === cat, 'a gap of ' + R.RULES.urgent + ' s: rather the same act than nothing');
+  check(q.choose(221, [cat, birds], 'plaza') !== null, 'after its cooldown it is offered again');
+  const q2 = new S(12);
+  q2.note(50, 2, 'travel', 'pad:land');
+  check(q2.lastStart === 50 && !q2.allow(55, 2, 'ambient'), 'note: a self-scheduling source\'s start moves the spacing');
+  check(!q2.allow(120, 2, 'travel', 'pad:land') && q2.allow(120, 2, 'travel', 'pass:low') && q2.allow(171, 2, 'travel', 'pad:land'), 'allow(…, act): the same act refused within its cooldown, another allowed');
+}
+console.log('5 · a-regie: the adventurer');
+{
+  const q = new S(21, { adv: true });
+  let lo = 99, hi = 0; for (let k = 0; k < 500; k++) { const v = q.jit(k); lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  check(lo >= 12 && hi <= 30 && q.gapCap() === 55, `the adventurer's rhythm: target ${lo.toFixed(1)}–${hi.toFixed(1)} s, cap ${q.gapCap()} s`);
+  q.seen(10, 2, 'ambient');
+  const call = { source: 'regie', act: 'call', weight: 3, kind: 'discovery', first: true }, amb = { source: 'ld', act: 'cat', weight: 2, kind: 'ambient' };
+  check(q.choose(14, [call, amb], 'hangar') === null, 'a first offer waits for the spacing (8 s)');
+  check(q.choose(19, [amb, call], 'hangar') === call, 'a first offer is taken at the first allowed moment, not only in a gap');
+  const stray = { source: 'regie', act: 'stray', weight: 4, kind: 'encounter', first: true };
+  q.lastMajor = 0;
+  check(q.choose(40, [stray], 'wild') === null && q.choose(61, [stray], 'wild') === stray, 'a first encounter keeps the one-major-a-minute rule');
+  const qb = new S(21, { builder: true });
+  check(qb.choose(19, [call], 'hangar') === null, 'a builder\'s Regie takes no first offer (Abenteuer only)');
+}
+console.log('6 · a-regie: a builder\'s stream with pads and traffic under the Regie');
+{
+  // pads land every 25–60 s and low passes come every 20–50 s on their own clocks; asked (allow + note), a refused one
+  // waits 3 s and asks again; the life director offers; spam = consecutive weighted starts < 8 s apart
+  const sim = (asked) => {
+    let spam = 0, last = -1e9, x = 99; const rnd = () => { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; };
+    const q = new S(77, { builder: true });
+    let pad = 20, pass = 35;
+    const same = {}; let rep = 0;
+    const tick = (t, act, kind) => { if (t - last < 8) spam++; last = t; if (same[act] !== undefined && t - same[act] < 60) rep++; same[act] = t; void kind; };
+    for (let t = 0; t < 1800; t += 0.25) {
+      if (t >= pad) { if (!asked || q.allow(t, 2, 'travel', 'pad:land')) { tick(t, 'pad:land'); if (asked) q.note(t, 2, 'travel', 'pad:land'); q.seen(t, 2, 'travel'); pad = t + 25 + rnd() * 35; } else pad = t + 3; }
+      if (t >= pass) { if (!asked || q.allow(t, 2, 'travel', 'pass:low')) { tick(t, 'pass:low'); if (asked) q.note(t, 2, 'travel', 'pass:low'); q.seen(t, 2, 'travel'); pass = t + 20 + rnd() * 30; } else pass = t + 3; }
+      const of = q.choose(t, [{ source: 'ld', act: 'a' + (Math.floor(t / 11) % 6), weight: 2, kind: 'ambient' }], 'wild');
+      if (of) { q.started(t, of); tick(t, of.act); q.seen(t, 2, 'ambient'); }
+    }
+    return { spam: spam / 3, rep };
+  };
+  const a = sim(false), b = sim(true);
+  check(b.spam <= 2 && a.spam > b.spam, `spam per 10 min: ${a.spam.toFixed(1)} on their own clocks → ${b.spam.toFixed(1)} under the Regie (≤ 2)`);
+  check(b.rep < a.rep, `the same act within a minute: ${a.rep} → ${b.rep}`);
+}
+
 console.log('3 · pure');
 const a = run(4242).choices.join(','), b = run(4242).choices.join(','), c = run(4243).choices.join(',');
 check(a === b && a.length > 100, 'the same seed and stream: the same choices');
