@@ -2539,6 +2539,8 @@
     'g.asc.hudAuto': 'Autopilot fliegt: {site}',
     'g.asc.hudKeys': 'W/S Schub · Leertaste/Umschalt Nase · A/D drehen · X Schub aus · G Autopilot · V Landen · C Ansicht',
     'g.asc.stay': 'Hier oben bleibst du am Steuer.',
+    'g.set.planetTiles': 'Planetenrelief aus dem Orbit',
+    'g.set.planetTiles.tip': 'Aus dem Orbit zeigt Herzwelt ihre echten Hügel, Täler und Küsten bis zum Horizont (ab „Ausgewogen“ und Weltraum-Detail 2). Aus: der Planet als glatte Kugel mit seiner Karte. Kostet etwas Grafikleistung im Orbit, am Boden nichts.',
     'g.set.curvature': 'Krümmung der Welt im Steigflug',
     'g.set.curvature.tip': 'Beim Aufstieg biegt sich das Land zum Horizont hin weg, wie auf einer echten Kugel. Aus: das Land bleibt bis zum Rand flach. Kostet fast nichts.',
     'g.set.cruiseFx': 'Reiseantrieb-Effekte',

@@ -69,8 +69,10 @@ try {
   // terrain and tile programs carry the world's bend (u_curve: one multiply-add a vertex, 0 below 300 m) and the tiles'
   // far edge in the climb (u_climbCut: one uniform branch a fragment, off on the ground). Those lines — and only those —
   // are taken out before the comparison; they must be there, in the terrain and the tile programs
-  const ASC = /\bu_curve\b|\bu_climbCut\b/;
-  const strip = (t) => t.split('\n').filter(l => !ASC.test(l)).join('\n');
+  const ASC = /\bu_curve\b|\bu_climbCut\b|\bclimbA\b|uniform float u_dip;/;
+  // (u-orbitlod: the sky reads its horizon at the dip, `dir.y + u_dip` — 0 below 300 m; normalised to the base's `dir.y`;
+  // the climb's soft tile edge `climbA` set aside with the cut)
+  const strip = (t) => t.replace(/\(dir\.y \+ u_dip\)/g, 'dir.y').replace(/dir\.y \+ u_dip/g, 'dir.y').split('\n').filter(l => !ASC.test(l)).join('\n');
   const a = dump(tmp, 'potato').map(pre), b0 = dump(here, 'potato').map(pre), b = b0.map(strip);
   const diff = []; for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) diff.push(i);
   check(a.length > 20 && a.length === b.length, `as many shader sources (${b.length}) as the base built (${a.length})`);

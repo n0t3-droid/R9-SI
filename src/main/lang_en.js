@@ -2539,6 +2539,8 @@
     'g.asc.hudAuto': 'Autopilot flying: {site}',
     'g.asc.hudKeys': 'W/S thrust · Space/Shift nose · A/D turn · X thrust off · G autopilot · V land · C view',
     'g.asc.stay': 'Up here you stay at the controls.',
+    'g.set.planetTiles': 'Planet relief from orbit',
+    'g.set.planetTiles.tip': 'From orbit Herzwelt shows its real hills, valleys and coasts out to the horizon (from Balanced and space detail 2). Off: the planet as a smooth sphere with its map. Costs some GPU time in orbit, nothing on the ground.',
     'g.set.curvature': 'Curvature of the world in the climb',
     'g.set.curvature.tip': 'As you climb, the land bends away toward the horizon as on a real sphere. Off: the land stays flat to the edge. Costs next to nothing.',
     'g.set.cruiseFx': 'Cruise drive effects',

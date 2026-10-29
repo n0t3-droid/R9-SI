@@ -7,7 +7,8 @@
 // must find no grid in the Nahtlos shots. Shots: test/shots/cl2_<look>_<n>_<scene>.png
 // LOOKS=classic,seamless (default) · PRESET=high · TAG=cl2 · NO_POTATO=1 skips the Very Low shots
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
-import sharp from '/home/dev/.npm-global/lib/node_modules/sharp/lib/index.js';
+import { createRequire } from 'module';
+const sharp = createRequire(import.meta.url)('/home/dev/.npm-global/lib/node_modules/sharp');   // (the package's own entry: sharp 0.35 moved lib/ to dist/)
 const TAG = process.env.TAG || 'cl2';
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });

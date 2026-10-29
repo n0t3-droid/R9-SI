@@ -24,6 +24,7 @@ MAIN.splice(MAIN.indexOf('game'), 0, 'travel');   // u-dims: VR.Travel (src/main
 MAIN.splice(MAIN.indexOf('game'), 0, 'newlife');   // u-home: VR.NewLife (src/main/newlife.js) — one home on any world, 🌍 Herzwelt one click away, Heimkehr in a moment
 MAIN.splice(MAIN.indexOf('lifedirector'), 0, 'eventlog');   // e-log: VR.EventLog (src/main/eventlog.js), the never-boring measure
 SHARED.push('bodytex'); MAIN.push('space_shaders', 'spacescene');   // u-space0: the bodies' textures (main and workers), the space scene (after game.js: it wraps two of its methods)
+SHARED.push('planetlod'); MAIN.push('planetlod_gl');   // u-orbitlod: the planet tiles (the job in the workers, the GL after the space scene)
 MAIN.splice(MAIN.indexOf('photomode') + 1, 0, 'funke');   // e-funke: VR.Funke (src/main/funke.js), the companion drone
 MAIN.push('quests');   // a-quests: VR.Quests (src/main/quests.js) — after adventure.js and photomode.js, whose parts it wraps (shop.js is listed already)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies'); SHARED.splice(SHARED.indexOf('gen_dims') + 1, 0, 'gen_body'); TEX.splice(TEX.indexOf('tex_items'), 0, 'tex_body');   // u-moons1: the bodies' profiles and blocks (before blocks4 closes the registry), their generator, their textures

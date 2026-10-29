@@ -703,7 +703,8 @@
     const ak = A.airK(y), bg = A.bgK(y), V = A.view, imp = A.impK(y);
     // (the tiles give their far edge to the impostor only once it is whole there: below 700 m they keep all of it)
     const hzR = imp >= 0.999 ? (V.hzR || 0) * (V.hzK === undefined ? 1 : V.hzK) : 0;
-    E.climb = { y, k, airK: ak, bg, body: A.bodyK(y), imp, t, curve: V.curve === false ? 0 : A.curve(y), cut0: hzR * 0.75, cut1: hzR * 0.95, hzR };
+    E.climb = { y, k, airK: ak, bg, body: A.bodyK(y), imp, t, curve: V.curve === false ? 0 : A.curve(y), cut0: hzR * 0.45, cut1: hzR * 0.95, hzR };   // (u-orbitlod: a wide soft band, was 0.75–0.95 dithered)
+    E.climb.dip = VR.PlanetLOD ? VR.PlanetLOD.dip(y - ((VR.C && VR.C.SEA) || 64), A.R()) * ss(300, 450, y) : 0;   // u-orbitlod: the band on the limb (the impostor's true horizon; faded in over 300–450 m)
     A.blendSky(E, sky, k);
     A.thinSky(E, ak, bg, k);
     A.thinFog(E, ak);
