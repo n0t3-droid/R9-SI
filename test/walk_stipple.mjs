@@ -2,7 +2,8 @@
 // untextured ground 2–15 m ahead). A new default world (seed 4242, the Heartland — the sessions' world), 480 × 270 (the
 // sessions' SIZE), de-DE, clear weather, the time held at 6000. From the spawn the walker takes the clearest of eight
 // headings over open ground (the ground ahead loaded and meshed first) and walks it at 6 blocks a second, the eye 1.62
-// over the ground, in two ways:
+// over the ground, in two ways (the start: the sessions' river meadow (272, −40); the heading with the most natural
+// ground — grass, dirt, sand, stone — and the fewest climbs over the next 90 m; the probe counts natural ground only):
 //   play     every frame drawn on a 33-ms clock (as a player at 30 fps); a picture every 12th frame, 24 of them
 //   session  as test/session.mjs plays: 15 frames simulated, only the 15th drawn (and captured); 24 of them
 // each on Balanced and High, for BUILDS before (DIST_BEFORE: v042's dist) and after (this checkout's dist).
@@ -44,12 +45,14 @@ const PAGE = `window.__W = (() => {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
     let s = ''; const CH = 0x8000; for (let i = 0; i < px.length; i += CH) s += String.fromCharCode.apply(null, px.subarray(i, i + CH));
     return { png: btoa(s), W: w, H: h }; };
+  const st = (x, y, z) => VR.game.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)) || 0;
+  const nat = (x, y, z) => !!(VR.R.natural && VR.R.natural[st(x, y, z)]);
   const fl = (x, y, z) => { const g = VR.game, s = g.world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return s ? VR.R.T.flags[s] : 0; };
   W.ground = (x, z, y0) => { const F = VR.F; for (let y = Math.floor(y0); y > 20; y--) { const f = fl(x, y, z); if (f & F.FLUID) return -1; if ((f & F.OPAQUE) && !(f & F.LEAVES)) return y + 1; } return -1; };
   // the clearest heading over the next 90 m: open ground (no fluid), small climbs, nothing solid at the eye
-  W.pick = (x, z, y0) => { let best = null; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, dx = -Math.sin(a), dz = -Math.cos(a); let bad = 0, last = W.ground(x, z, y0 + 8); if (last < 0) last = y0;
-      for (let t = 2; t <= 90; t += 2) { const gy = W.ground(x + dx * t, z + dz * t, last + 8); if (gy < 0) { bad += 4; continue; } bad += Math.max(0, Math.abs(gy - last) - 1); if (fl(x + dx * t, gy + 1.6, z + dz * t) & VR.F.SOLID) bad += 2; last = gy; }
-      if (!best || bad < best.bad) best = { yaw: a, bad }; } return best; };
+  W.pick = (x, z, y0) => { let best = null; for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4, dx = -Math.sin(a), dz = -Math.cos(a); let bad = 0, gr = 0, last = W.ground(x, z, y0 + 8); if (last < 0) last = y0;
+      for (let t = 2; t <= 90; t += 2) { const gy = W.ground(x + dx * t, z + dz * t, last + 8); if (gy < 0) { bad += 4; continue; } bad += Math.max(0, Math.abs(gy - last) - 1); if (nat(x + dx * t, gy - 1, z + dz * t)) gr++; if (fl(x + dx * t, gy + 1.6, z + dz * t) & VR.F.SOLID) bad += 2; last = gy; }
+      const sc = bad - 2 * gr; if (!best || sc < best.sc) best = { yaw: a, bad, natural: gr, sc }; } return best; };
   W.frames = (n, draw, speed) => { const g = VR.game, p = g.player, dx = -Math.sin(p.yaw) * speed / 30, dz = -Math.cos(p.yaw) * speed / 30; let px = null;
     for (let i = 0; i < n; i++) { const last = i === n - 1; window.__norender = !(draw === 'all' || (draw === 'last' && last));
       p.pos[0] += dx; p.pos[2] += dz; const gy = W.ground(p.pos[0], p.pos[2], p.pos[1] + 6); if (gy > 0) p.pos[1] += (gy - p.pos[1]) * 0.35;
@@ -61,7 +64,7 @@ const PAGE = `window.__W = (() => {
     const f = [-Math.sin(yaw) * Math.cos(pit), Math.sin(pit), -Math.cos(yaw) * Math.cos(pit)], rt = [Math.cos(yaw), 0, -Math.sin(yaw)];
     const up = [rt[1] * f[2] - rt[2] * f[1], rt[2] * f[0] - rt[0] * f[2], rt[0] * f[1] - rt[1] * f[0]];
     const hit = (sx, sy) => { const nx = (sx / cw) * 2 - 1, ny = 1 - (sy / ch) * 2; const d = [0, 1, 2].map(i => f[i] + rt[i] * nx * fx + up[i] * ny * fy); const L = Math.hypot(d[0], d[1], d[2]);
-      for (let t = 0.3; t <= 15.5; t += 0.1) { const x = eye[0] + d[0] / L * t, y = eye[1] + d[1] / L * t, z = eye[2] + d[2] / L * t, fl0 = fl(x, y, z); if (fl0 & VR.F.FLUID) return 0; if (fl0 & VR.F.SOLID) return t >= 2 && t <= 15 && !(fl0 & VR.F.LEAVES) ? t : 0; } return 0; };
+      for (let t = 0.3; t <= 15.5; t += 0.1) { const x = eye[0] + d[0] / L * t, y = eye[1] + d[1] / L * t, z = eye[2] + d[2] / L * t, fl0 = fl(x, y, z); if (fl0 & VR.F.FLUID) return 0; if (fl0 & VR.F.SOLID) return t >= 2 && t <= 15 && !(fl0 & VR.F.LEAVES) && nat(x, y, z) ? t : 0; } return 0; };
     const out = []; for (let ty = 0; ty + T <= ch; ty += T) for (let tx = 0; tx + T <= cw; tx += T) { let ok = true; for (const [a, b] of [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]) if (!hit(tx + a * T, ty + b * T)) { ok = false; break; } if (ok) out.push([tx, ty]); } return out; };
   W.diag = () => { const g = VR.game, w = g.world, r = g.renderer, p = g.player, pcx = Math.floor(p.pos[0]) >> 4, pcz = Math.floor(p.pos[2]) >> 4; let unshown = 0, fading = 0;
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) { const c = w.col(pcx + dx, pcz + dz); if (!c || c.shownAt < 0) unshown++; }
@@ -98,7 +101,7 @@ async function run(build, preset) {
   const out = { build, preset, modes: {} };
   for (const mode of MODES) {
     // the start: the spawn (session's place), then the clearest heading
-    await ev(() => { const g = VR.game, p = g.player; if (!window.__start) window.__start = p.pos.slice(0, 3); const sp = window.__start; p.flying = true; p.noclip = true; window.__vt = performance.now(); p.teleport(sp[0], sp[1] + 4, sp[2]); p.pitch = -0.12; p.fovKick = 0; });
+    await ev(() => { const g = VR.game, p = g.player; if (!window.__start) window.__start = [272, Math.max(70, window.__W.ground(272, -40, 200)), -40]; const sp = window.__start; p.flying = true; p.noclip = true; window.__vt = performance.now(); p.teleport(sp[0], sp[1] + 4, sp[2]); p.pitch = -0.12; p.fovKick = 0; });
     await settle(150);
     const head = await ev(() => { const p = VR.game.player, b = window.__W.pick(p.pos[0], p.pos[2], p.pos[1]); p.yaw = b.yaw; p.viewYaw = b.yaw; const gy = window.__W.ground(p.pos[0], p.pos[2], p.pos[1] + 8); if (gy > 0) p.pos[1] = gy; return b; });
     await settle(150);
