@@ -38,6 +38,9 @@
     freighter: { label: 'Freighter', code: 'HX', res: 3, weight: 2 },
     cruiser: { label: 'Cruiser', code: 'CR', res: 3, weight: 1 },
     carrier: { label: 'Carrier', code: 'CV', res: 2, weight: 0 },
+    // (t-hangar: the Gate Temple's own craft on the Hangar Hall's pad in vgen-14 worlds — never picked at random, not
+    // offered in the shipyard)
+    hero: { label: 'Gate Craft', code: 'GC', res: 4, weight: 0, hidden: true },
   };
 
   // 3×5 stencil font
@@ -200,6 +203,53 @@
     antenna(G, S, 0.6, cy + H - 0.1, z0 + L * 0.45, 0.9);
     // the walkable inside: cabin & cargo bay, the side door with its stair, the rear ramp (shipcabin.js)
     if (VR.ShipCabin) VR.ShipCabin.carve(G, S, { zb: S.meta.cockpit.zb, cfloor: S.meta.cockpit.floor, zT: z1 - 0.8, W, Hh: H, cy, side: -1, hull2: S.hull2, trim: S.trim }, { pack, mul, GLASSF });
+  };
+  // ---- t-hangar: the Gate Temple's hero craft (our own design; the trailer's hangar shots t1_13/t1_16 as the mood): a
+  // chunky white fuselage with a blunt rounded nose, a dark face with four orange lamps under the canopy, a dorsal spine
+  // with a cyan light line and a mast, two big engine pods on short pylons, swept wings with glowing cyan leading edges
+  // and orange tips with small fins, three engines. The shuttle's size (it parks, flies and passes the gate as the
+  // shuttle did: hangarflight.js HF.SCALE), the Starforge palette always.
+  ARCHS.hero = (G, S, rng) => {
+    const L = 21.5, z0 = -L / 2, z1 = L / 2, W = 2.35, H = 2.0, gearH = 1.1, cy = gearH + H;
+    const hullC = pack(S.hull), hull2 = pack(S.hull2), acc = pack(S.acc), dark = pack(S.trim), glow = pack(S.glow, 1), lamp = pack(S.core, 1), face = pack(mul(S.trim, 0.8));
+    hull(G, z0, z1 - 2.0, (t) => {
+      const n = Math.min(1, t / 0.22);
+      return { w: W * (0.6 + 0.4 * Math.pow(n, 0.5)), h: H * (0.66 + 0.34 * Math.pow(n, 0.6)), cy: cy - (1 - n) * 0.25, p: 4 };
+    }, (x, y, z, t, P) => {
+      const ry = (y - P.cy) / P.h, rx = Math.abs(x) / P.w;
+      if (t < 0.05) {   // the face: dark, four round-ish orange lamps in two pairs
+        for (const [lx, ly] of [[0.42, -0.28], [0.42, -0.62]]) if (Math.hypot(rx - lx, ry - ly) < 0.17) return lamp;
+        return face;
+      }
+      if (ry < -0.6) return hull2;                                   // the belly
+      if (Math.abs(ry + 0.18) < 0.07 && t > 0.08) return acc;          // the orange side stripe
+      if (Math.abs(ry + 0.36) < 0.05 && t > 0.12 && t < 0.9) return glow;   // a cyan light line under it
+      if (ry > 0.55 && rx < 0.22 && t > 0.3) return hull2;            // the spine's base
+      return hullC;
+    });
+    // the dorsal spine with its light line, the mast
+    G.box(-0.4, 0.4, cy + H - 0.3, cy + H + 0.35, z0 + L * 0.34, z1 - 3.2, (x, y) => (y > cy + H + 0.1 && Math.abs(x) < 0.15 ? glow : hull2));
+    antenna(G, S, -0.75, cy + H - 0.15, z0 + L * 0.38, 1.6);
+    // the aft housing and three engines (the centre one high)
+    G.box(-W * 0.95, W * 0.95, gearH, cy + H * 0.7, z1 - 2.3, z1 - 0.8, (x, y) => (Math.abs(y - cy) < 0.18 ? acc : hull2));
+    engine(G, S, 0, cy + 0.95, 0.5, z1 + 0.2, 1.4);
+    // the engine pods on short pylons: grey, an orange band, a cyan ring at the intake, a big engine each
+    for (const sx of [-1, 1]) {
+      const px = sx * (W + 1.15), py = cy - 0.35;
+      cylZ(G, px, py, 0.95, z0 + L * 0.45, z1 - 0.2, (x, y, z, dr) => (z < z0 + L * 0.45 + 0.3 ? glow : Math.abs(z - (z0 + L * 0.68)) < 0.3 ? acc : dr > 0.75 ? hull2 : hullC));
+      G.box(Math.min(sx * W * 0.8, px), Math.max(sx * W * 0.8, px), py - 0.25, py + 0.25, z0 + L * 0.55, z0 + L * 0.8, hull2);
+      engine(G, S, px, py, 0.72, z1 + 0.3, 1.6);
+    }
+    // the swept wings off the pods: glowing cyan leading edges, orange tips, panel lines
+    const SPAN = 3.2;
+    wing(G, W + 1.9, SPAN, (s) => z0 + L * 0.47 + s * 1.05, (s) => Math.max(1.5, L * 0.34 - s * 1.2), () => 0.5, () => cy - 0.55,
+      (x, y, z, s, u) => (u < 0.1 ? glow : s > 0.86 ? acc : u > 0.88 ? dark : (Math.floor(u * 5) % 2 && s > 0.2 ? hull2 : hullC)));
+    // small upturned fins on the tips
+    for (const sx of [-1, 1]) { const tx = sx * (W + 1.9 + SPAN - 0.15), zt = z0 + L * 0.47 + SPAN * 1.05; G.box(tx - 0.13, tx + 0.13, cy - 0.5, cy + 0.9, zt + 0.2, zt + 1.5, acc); }
+    cockpitRoom(G, S, { zNose: z0 + 0.4, zf: z0 + L * 0.1, zb: z0 + L * 0.28, floor: cy - 0.85, rim: cy + 0.2, hw: 1.15, seats: 2 });
+    S.meta.gearParts = [[-1.1, z0 + L * 0.2], [1.1, z0 + L * 0.2], [-2.2, z0 + L * 0.66], [2.2, z0 + L * 0.66]];
+    for (const [x, z] of S.meta.gearParts) gear(G, S, x, z, cy - H * 0.6);
+    void rng;
   };
   ARCHS.interceptor = (G, S, rng) => {
     const L = rng.range(13, 17), z0 = -L / 2, z1 = L / 2, W = rng.range(1.2, 1.5), H = 1.15, gearH = 1.0, cy = gearH + H;
@@ -516,7 +566,7 @@
 
   // ---------------------------------------------------------------- public API
   const Starship = VR.Starship = {
-    ARCH, PAL, archetypes: Object.keys(ARCH),
+    ARCH, PAL, archetypes: Object.keys(ARCH).filter(k => !ARCH[k].hidden),
     pickArch(rng, allow) {
       const keys = (allow || Object.keys(ARCH)).filter(k => ARCH[k] && (allow || ARCH[k].weight > 0));
       let tot = 0; for (const k of keys) tot += Math.max(0.2, ARCH[k].weight);
@@ -528,8 +578,8 @@
       opts = opts || {};
       const rng = new VR.RNG(((seed >>> 0) ^ 0x2545f491) >>> 0);
       arch = arch && ARCH[arch] ? arch : this.pickArch(rng, opts.allow);
-      const palOpts = arch === 'shuttle' ? [PAL[0], PAL[0], PAL[7]] : arch === 'freighter' ? [PAL[5], PAL[0], PAL[3], PAL[2]] : PAL;
-      const pal = opts.palette ? (PAL.find(p => p.key === opts.palette) || PAL[0]) : rng.pick(palOpts);
+      const palOpts = arch === 'hero' ? [PAL[0]] : arch === 'shuttle' ? [PAL[0], PAL[0], PAL[7]] : arch === 'freighter' ? [PAL[5], PAL[0], PAL[3], PAL[2]] : PAL;
+      const pal = arch === 'hero' ? PAL[0] : opts.palette ? (PAL.find(p => p.key === opts.palette) || PAL[0]) : rng.pick(palOpts);
       const S = { hull: rgb(pal.hull), hull2: rgb(pal.hull2), trim: rgb(pal.trim), acc: rgb(pal.acc), acc2: rgb(pal.acc2), glow: rgb(pal.glow), glass: rgb(pal.glass), eng: rgb(pal.eng), core: rgb(pal.core), meta: { exhaust: [], guns: [], eye: null, seat: null } };
       const R = ARCH[arch].res;
       const big = arch === 'carrier', mid = arch === 'cruiser' || arch === 'freighter';

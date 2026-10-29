@@ -138,6 +138,6 @@
     def2('temple_slit_dark', Object.assign({ display: 'Cyan Light Slit · Dark Stone', tex: side('temple_slit_dark'), light: [3, 9, 11], flags: F.EMISSIVE }, stone, { hard: 1 }));
     def2('amber_window_tall', Object.assign({ display: 'Tall Amber Window', tex: () => T('amber_window_tall'), light: [12, 7, 2], flags: F.EMISSIVE }, stone, { hard: 1, sound: 'glass' }));
     // the gate's energy field: four rings, each its own colour (the generator lays them as concentric octagons)
-    def2('gate_glow', Object.assign({ display: 'Gate Glow', props: [['ring', 4]], tex: (p) => T('gate_glow_' + (p.ring | 0)), layer: 'trans', opaque: false, filter: 0, light: [15, 9, 3], flags: F.SELFCULL | F.EMISSIVE, solid: false }, stone, { hard: 50, blast: 500, sound: 'glass' }));
+    def2('gate_glow', Object.assign({ display: 'Gate Glow', props: [['ring', 4]], tex: (p) => T('gate_glow_' + (p.ring | 0)), layer: 'trans', opaque: false, filter: 0, light: [10, 6, 2], flags: F.SELFCULL | F.EMISSIVE, solid: false }, stone, { hard: 50, blast: 500, sound: 'glass' }));
   });
 })(VR);

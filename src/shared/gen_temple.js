@@ -115,7 +115,7 @@
         const t = y - (Y + 1), k = z - fx;                               // k 1 (at the gate) … 3 (the plaza face)
         const o = t <= 12 ? OPEN[t] + k - 1 : -1;
         if (t <= 12 && ax <= o) return 0;                                // the opening
-        if (t <= 13 && ax <= o + 1 + (t === 13 ? 4 : 0) && k === 1) return K.BAR;   // the light ring at the gate
+        if (t <= 13 && ax <= o + 1 + (t === 13 ? 3 + k : 0) && (k === 1 || k === 3)) return K.BAR;   // light rings at the gate and round the mouth
         if (y === Y + 19) return K.BAR;                                  // the cornice
         if (ax === 12 || ax === 11 && k === 3) return K.PIL;            // the gatehouse's corner pilasters
         if (k === 3 && (y === Y + 15 || y === Y + 16)) return K.BAND;    // a carved band over the gate

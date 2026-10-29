@@ -13,7 +13,7 @@ const W = 1280, H = 704;
 const BUILDS = [['v051', process.env.BASE_DIST || ROOT + '.tmp_tests/base/dist'], ['now', ROOT + 'dist']].filter(b => !process.env.ONLY || process.env.ONLY.split(',').includes(b[0]));
 const SHOT = {
   hall: { from: [0.5, 83.2, 16], to: [0, 86, -36], tod: 12500 },            // the hall from the door (t1_13)
-  pad: { from: [0.5, 83.0, 5.5], to: [0.5, 83.6, -10], tod: 12500 },        // the pad with the craft (t1_16)
+  pad: { from: [0.5, 84.2, 13], to: [0.5, 84, -10], tod: 12500 },        // the pad with the craft (t1_16)
   consoles: { from: [3.5, 83.4, 9], to: [-10, 85, -3], tod: 12500 },        // the console row and its screens (t1_17)
   front: { from: [0.5, 83, 48], to: [0, 89, 20], tod: 12500 },              // the temple's front, the gate (t1_10)
   golden: { from: [0.5, 86, 104], to: [0.5, 92, 20], tod: 12500 },          // the temple from the plaza, the golden hour (t1_11)
@@ -49,7 +49,7 @@ for (const [tag, dist] of BUILDS) {
   await ev(`VR.game.createWorld({name:'Hangar',mode:'creative',difficulty:'peaceful',type:'default',seed:'${process.env.SEED || '4242'}',cheats:true,kit:true})`);
   for (let i = 0; i < 120; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   // the pictures: the time held, clear sky, no HUD; Animierte Anzeigen off so the hall's craft stands parked on the pad
-  await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; const h = document.getElementById('hud'); if (h) h.style.display = 'none'; g.settings.anim = false; g.applySettings('anim'); });
+  await ev(() => { const g = VR.game; g.zenFreezeTime = true; g.env.rain = 0; g.env.rainTarget = 0; window.requestAnimationFrame = () => 0; g.hideHud = true; for (const id of ['hud', 'ui', 'hints']) { const h = document.getElementById(id); if (h) h.style.display = 'none'; } g.settings.anim = false; g.applySettings('anim'); });
   const info = await ev(() => ({ vgen: VR.game.meta && VR.game.meta.vgen }));
   console.log(`== ${tag}: vgen ${info.vgen}`);
   for (const name of shots) {

@@ -67,13 +67,13 @@ ok(count(W, -12, 12, Y + 1, Y + 15, -40, 20, n => n === 'vx_holo_screen') === 0,
 
 console.log('the hero craft');
 {
-  const SG = V.ShipGen;
-  const d = SG.design(0x5e7a11, 'hero', {}), s = SG.design(0x5e7a11, 'shuttle', {});
-  ok(d && d.arch === 'hero' && d.helm && d.thrusters >= 2, `it builds, with a helm and ${d && d.thrusters} thrusters`);
-  ok(d.length <= s.length + 1 && d.width <= s.width + 1 && d.height <= s.height + 1, `inside the shuttle's envelope (${d.width} × ${d.height} × ${d.length} against ${s.width} × ${s.height} × ${s.length})`);
-  ok(!SG.archetypes.includes('hero'), 'not offered in the shipyard (the temple\'s own)');
-  const lamps = [...d.blocks].filter(b => b && /neon_amber|beacon/.test(name(b))).length;
-  ok(lamps >= 4, `its face carries orange lamps (${lamps})`);
+  const SS = V.Starship;
+  const d = SS.build(0x5e7a11, 'hero', { palette: 'starforge' }), s = SS.build(0x5e7a11, 'shuttle', { palette: 'starforge' });
+  const m = d.meta, n = s.meta;
+  ok(m.arch === 'hero' && m.palette === 'starforge' && m.cockpit && m.exhaust.length === 3 && m.gear.length === 4, `it builds: the Starforge palette, a cockpit, ${m.exhaust.length} engines, ${m.gear.length} feet`);
+  ok(m.length <= n.length + 1.5 && m.width <= n.width + 1.5 && m.height <= n.height + 1, `the shuttle's size (${m.width} × ${m.height} × ${m.length} m against ${n.width} × ${n.height} × ${n.length})`);
+  ok(!SS.archetypes.includes('hero') && SS.pickArch(new V.RNG(7)) !== 'hero', 'not offered in the shipyard, never picked at random (the temple\'s own)');
+  ok(SS.build(0x5e7a11, 'hero', {}).meta.palette === 'starforge', 'white and orange, whatever palette is asked');
 }
 console.log(bad ? `FAILED ${bad}` : 'ALL OK');
 process.exitCode = bad ? 1 : 0;
