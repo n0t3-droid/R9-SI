@@ -3,11 +3,11 @@
 The README is short on purpose: how to play, the mathematics and physics of the game, and what we found. This file
 keeps the full release notes, moved here unchanged on 9 Oct 2026.
 
-# R9-SI — Voxel Realm · Starforge Edition
+# R9-SI — Voxel Realm · Sternglut Edition
 
 An original browser voxel sandbox with its own art style: violet prism fields with giant glowing
 crystal spires, red-ochre ember canyons cut by lava rivers, glowing aether energy rivers, sky
-islands with waterfalls, Starforge outposts with docked shuttles, a cosmic sky with a nebula
+islands with waterfalls, Sternglut outposts with docked shuttles, a cosmic sky with a nebula
 and a ringed gas giant — and a full block roster of the genre, re-imagined with procedural textures.
 
 **An independent work.** R9-SI and R9 Studio are an independent, non-commercial hobby project — an original voxel game
@@ -1070,7 +1070,7 @@ neighbours:
 | **Palms** (trunk, crown, fronds), ferns | Stack trunks, put a crown on top and click fronds onto its sides |
 | **Domes** | One block is a small dome; two-by-two make one big dome for mushroom towers |
 
-## Starforge tech
+## Sternglut tech
 
 | Thing | How it works |
 |---|---|
@@ -1079,7 +1079,7 @@ neighbours:
 | **Mini-voxel starships** | Detailed ships built from cubes a quarter of a block: shuttles, interceptors, racers, gunships, dropships, freighters, cruisers and capital carriers, grown from seeds with panel seams, framed canopies, glowing engine bells, stripes and the ship's code stencilled on the hull. Every outpost has one parked on its pad — right-click to board, mouse to steer, **V** to land. Creative: the **Shipyard** (Shuttle Beacon item or `/ship`) previews and launches any design. |
 | Sky traffic | Ships drop out of hyperspace, cross the sky in formations and jump away; when raiders attack at night a defence wing arrives. |
 | **Ships you build** | Build any hull around a **Ship Helm** and right-click the helm: every block connected to it lifts off as one ship (thrusters and reactor cores make it faster, heavier ships turn slower). Steer with the mouse, W/S thrust, A/D strafe, Space/Shift climb/descend, Ctrl boost, left-click fires nose lasers, F5 switches cockpit/chase view, **V lands** — the ship snaps back into the world as blocks, chests and all. Landing Pads and terrain are never lifted. |
-| Shuttles | Every Starforge outpost has one docked on its pad. In Creative, the **Shuttle Beacon** item (or `/shuttle`) conjures one in front of you. |
+| Shuttles | Every Sternglut outpost has one docked on its pad. In Creative, the **Shuttle Beacon** item (or `/shuttle`) conjures one in front of you. |
 | Hoverbike | Right-click to ride (outposts keep one parked), W/S throttle, mouse or A/D steer, Space hops, Ctrl boost, left-click blasters, Shift to get off. Sneak + right-click picks it up. |
 | Jetpack | Wear it (chest slot) or hold it: jump and hold Space. Fuel refills on the ground. |
 | Pulse Blaster / Mining Laser | Left-click fires; the blaster overheats, the laser mines anything it touches. |
