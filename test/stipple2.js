@@ -72,10 +72,14 @@ console.log('(f) the texture detail where nothing resolves the jitter');
 check(typeof S.mipK === 'function', 'Stream.mipK');
 if (typeof S.mipK === 'function') {
   check(Math.abs(S.mipK(true, true, 0.7, false) - Math.sqrt(0.7)) < 1e-9, 'the TSR resolving: the full-size image\'s detail (√scale, as before)');
-  check(S.mipK(false, true, 1, false) === S.MIP_CALM && S.mipK(true, false, 0.7, false) === S.MIP_CALM && S.MIP_CALM > 1.3 && S.MIP_CALM < 1.5, 'no TSR, or frames too far apart: half a mip coarser (√2)');
+  check(S.mipK(false, true, 1, false) === S.MIP_CALM && S.mipK(true, false, 0.7, false) === S.MIP_CALM && S.MIP_CALM > 1.3 && S.MIP_CALM <= 1.6, 'no TSR, or frames too far apart: a coarser mip (×' + S.MIP_CALM + ')');
   check(S.mipK(false, false, 0.55, true) === 1 && S.mipK(true, true, 0.55, true) === 1, 'Very Low (lite): its natural mips, as before');
 }
 check((rd.match(/u_mipScale, VR\.Stream\.mipK\(/g) || []).length === 2, 'renderer: both terrain passes (the depth pre-pass and the colour) take Stream.mipK');
+
+{ const sh0 = fs.readFileSync(path.join(ROOT, 'src/main/shaders.js'), 'utf8');
+  check(/#ifdef CUTOUT\n#ifdef SOFTFADE[\s\S]{0,500}u_mipScale > 1\.3 \? textureGrad\(u_albedo, vec3\(fu, layer\), dx \* 4\.0, dy \* 4\.0\)\.a < 0\.5/.test(sh0), 'TERRAIN_FS: a cut-out\'s edge two mips coarser where nothing resolves the jitter (SOFTFADE only)');
+  check(/'ZPRE', \.\.\.\(this\.q\.lite \? \[\] : \['SOFTFADE'\]\)/.test(rd), 'the cut-out depth pre-pass cuts as the colour pass (SOFTFADE off the lite look)'); }
 
 console.log('(d)(e) the shaders');
 {

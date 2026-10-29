@@ -211,7 +211,7 @@
       const P = this.P;
       if (P.cutZ) return P.cutZ;
       const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // (t-motion: the colour pass's MOTION too — the same displaced fragments)
-      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE']);
+      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE', ...(this.q.lite ? [] : ['SOFTFADE'])]);   // (f-stipple2: the colour pass's fade, growth and cut)
       if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
       return (P.cutZ = p);
     }

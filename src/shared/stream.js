@@ -49,9 +49,9 @@
   S.softOk = function (gapMs) { return !(gapMs >= S.SOFT_GAP_MS); };
   // the terrain's texture detail (u_mipScale, a factor on the UV gradients: > 1 a coarser mip). Where the TSR resolves the
   // jitter it may pick the full-size image's detail (√scale, as before); where nothing resolves it — no TSR (High/Ultra at
-  // 100 %), or drawn frames too far apart for its history — a half mip coarser (√2), so a texel never flickers as a 1-px
+  // 100 %), or drawn frames too far apart for its history — two thirds of a mip coarser (×1.6), so a texel never flickers as a 1-px
   // speck pattern when walking (R52-05: the grass 3–10 m ahead read as a checker); Very Low (lite) its natural mips
-  S.MIP_CALM = Math.SQRT2;
+  S.MIP_CALM = 1.6;
   S.mipK = function (tsr, soft, scale, lite) { if (lite) return 1; if (tsr && soft) return Math.sqrt(Math.max(0.35, scale)); return S.MIP_CALM; };
   // the far tile's cut on the soft path: a column the chunks draw whole is theirs alone (no bilinear soft edge dithering
   // a stand-in over half of it beside a culled or unshown neighbour); a fading one as lodCover
