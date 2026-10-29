@@ -330,9 +330,10 @@ try {
   await section('8', async () => {
     console.log('8 · the moment');
     let r = await run(60, { until: 'moment', arg: 1.2, god: true });
-    const c1 = await ev(() => { const L = VR.Liberate; return { cam: !!L.mcam, t: L.mcam ? +L.mcam.t.toFixed(2) : null, ring: +L.ringR(L.moment.t).toFixed(1), k: +L.moodNow.toFixed(2), pass: L.passAt !== null }; });
+    const c1 = await ev(() => { const L = VR.Liberate; return { cam: !!L.mcam, t: L.mcam ? +L.mcam.t.toFixed(2) : null, ring: +L.ringR(L.moment.t).toFixed(1), k: +L.moodNow.toFixed(2), pass: L.passAt !== null, occ: L.mcam && L.mcam.b ? L.mcam.b.occ : null, k: L.mcam && L.mcam.b ? L.mcam.b.k : null, ships: L.shipBoxes ? L.shipBoxes(VR.game, window.__ft.site().x, window.__ft.site().z, 40).length : null }; });
     console.log('     at 1.2 s: ' + JSON.stringify(c1));
     check(c1.cam, 'the moment\'s camera swings out over the land (' + JSON.stringify(c1) + ')');
+    check(c1.occ !== null && c1.occ <= 0.15, 'a-regie (R52-07): the moment\'s frame clear of the parked ship and the walls — ' + (c1.occ * 100).toFixed(0) + ' % of its rays blocked (≤ 15), ' + c1.ships + ' ship(s) in the composer\'s boxes');
     await draw(11300);
     pics.heal = await shot('outpost_heal');
     r = await run(120, { until: 'moment', arg: 2.55, god: true });

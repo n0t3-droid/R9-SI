@@ -621,22 +621,66 @@
     const mp = g.mp;
     return !!(g.settings && g.settings.wowMoments !== false) && !(g.meta && g.meta.guest) && !(mp && (mp.isClient || (mp.isHost && mp.remote && mp.remote.size > 0))) && !(g.director && g.director.active) && !(g.wow && g.wow.active) && !(g.gadgets && g.gadgets.controlling) && !g.photo;
   };
+  // a-regie (R52-07): what stands in a shot's way (pure, test/liberate.js) — a 7 × 5 grid of rays over the frame (yaw,
+  // pitch; fov the vertical angle, aspect w/h) marched in 0.5-m steps: a ray is blocked by a box (a parked ship: {x, y,
+  // z, yaw, ex, ez, h} — its half extents along its own axes, its height) within D + 12 m, or by a solid block (air(x, y,
+  // z) false) above the ground line `floor` within D m (the land below the subject is the picture, not in its way) → the
+  // blocked share 0…1
+  L.OCC = { nx: 7, ny: 5, step: 0.5, ok: 0.1 };
+  L.occ = function (c, fov, aspect, D, boxes, air, floor) {
+    const O = L.OCC, cy = Math.cos(c.yaw), sy = Math.sin(c.yaw), cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
+    const f = [-sy * cp, sp, -cy * cp], rt = [cy, 0, -sy], up = [sy * sp, cp, cy * sp], tv = Math.tan(fov / 2) * 0.9, th = tv * aspect;
+    const DB = D + 12, fl = Number.isFinite(floor) ? floor : -Infinity;
+    let hit = 0, n = 0;
+    for (let j = 0; j < O.ny; j++) for (let i = 0; i < O.nx; i++) {
+      const u = (i / (O.nx - 1)) * 2 - 1, v = (j / (O.ny - 1)) * 2 - 1;
+      let dx = f[0] + rt[0] * u * th + up[0] * v * tv, dy = f[1] + up[1] * v * tv, dz = f[2] + rt[2] * u * th + up[2] * v * tv;
+      const l = Math.hypot(dx, dy, dz); dx /= l; dy /= l; dz /= l; n++;
+      let blocked = false;
+      for (let t = O.step; t <= DB && !blocked; t += O.step) {
+        const x = c.x + dx * t, y = c.y + dy * t, z = c.z + dz * t;
+        for (const b of boxes || []) { const ox = x - b.x, oz = z - b.z, bc = Math.cos(b.yaw || 0), bs = Math.sin(b.yaw || 0), lx = ox * bc - oz * bs, lz = ox * bs + oz * bc; if (Math.abs(lx) <= b.ex && Math.abs(lz) <= b.ez && y >= b.y && y <= b.y + b.h) { blocked = true; break; } }
+        if (!blocked && t <= D && y > fl && air && !air(x, y, z)) blocked = true;
+        if (!blocked && y <= fl && t > D * 0.5) break;   // (the ray went into the land beyond the half way: the picture's ground)
+      }
+      if (blocked) hit++;
+    }
+    return n ? hit / n : 0;
+  };
+  // the parked ships near a point as boxes for L.occ
+  L.shipBoxes = function (g, x, z, r) {
+    const out = [], S = g.starships; if (!S || !S.ships) return out;
+    for (const sh of S.ships) {
+      const m = sh && sh.d && sh.d.meta, P = sh && sh.pos; if (!m || !P || Math.hypot(P[0] - x, P[2] - z) > r) continue;
+      const B = m.bounds || [-m.width / 2, 0, -m.length / 2, m.width / 2, m.height, m.length / 2];
+      out.push({ x: P[0], y: P[1] - 0.5, z: P[2], yaw: sh.yaw || 0, ex: Math.max(Math.abs(B[0]), Math.abs(B[3])) + 0.3, ez: Math.max(Math.abs(B[2]), Math.abs(B[5])) + 0.3, h: (m.height || 4) + 0.5 });
+    }
+    return out;
+  };
   L.compose = function (g, s) {
     const b = s.beacon, w = g.world, p = g.player; if (!b || !w || !p) return null;
     const RT = VR.R && VR.R.T, SOLID = VR.F ? VR.F.SOLID : 1;
     const air = (x, y, z) => { const k = w.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)); return !k || !(RT.flags[k] & SOLID); };
     const tx = b[0] + 0.5, ty = b[1] + 1.5, tz = b[2] + 0.5, y0 = Math.atan2(p.pos[0] - tx, p.pos[2] - tz);
-    for (let k = 0; k < 12; k++) {
-      const yaw = y0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 10, D = k < 8 ? 14 : 10, H = k < 8 ? 6 : 5;
+    // a-regie: every candidate scored by what stands in its frame (the parked ship, a wall): the first ≤ 10 % wins, else
+    // the least blocked; 20 candidates round the beacon (14 m out and 6 up, then 10 and 5)
+    const boxes = L.shipBoxes(g, s.x, s.z, 40), fov = ((g.settings && g.settings.fov) || 70) * Math.PI / 180 * 1.1, asp = g.renderer && g.renderer.W ? g.renderer.W / Math.max(1, g.renderer.H) : 16 / 9;
+    let best = null, bo = 2;
+    for (let k = 0; k < 20; k++) {
+      const yaw = y0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * Math.PI / 10, D = k < 12 ? 14 : 10, H = k < 12 ? 6 : 5;
       const cx = tx + Math.sin(yaw) * D, cz = tz + Math.cos(yaw) * D, cy = ty + H;
       let ok = air(cx, cy, cz) && air(cx, cy + 1, cz);
       for (let i = 1; i < 20 && ok; i++) { const u = i / 20; if (u > 0.9) break; if (!air(cx + (tx - cx) * u, cy + (ty - cy) * u, cz + (tz - cz) * u)) ok = false; }
       if (!ok) continue;
       // the beacon in the lower middle, its beam rising through the frame, the land beyond to the horizon
       const lx = tx, lz = tz, ly = b[1] + 5;
-      return { x: cx, y: cy, z: cz, yaw: Math.atan2(-(lx - cx), -(lz - cz)), pitch: Math.atan2(ly - cy, Math.hypot(lx - cx, lz - cz)), fov: null };
+      const c = { x: cx, y: cy, z: cz, yaw: Math.atan2(-(lx - cx), -(lz - cz)), pitch: Math.atan2(ly - cy, Math.hypot(lx - cx, lz - cz)), fov: null };
+      const o = L.occ(c, fov, asp, Math.hypot(tx - cx, tz - cz), boxes, air, b[1] + 0.5);
+      c.occ = +o.toFixed(3); c.k = k;
+      if (o <= L.OCC.ok) return c;
+      if (o < bo) { bo = o; best = c; }
     }
-    return null;
+    return best;
   };
   L.camStart = function (g, s) {
     L.mcam = null; if (!L.camOk(g)) return false;
@@ -940,6 +984,11 @@ void main() { float a = v_col.a * u_tint.a; o = vec4(v_col.rgb * u_tint.rgb * a,
     // what is there to draw: a disturbed or freed beacon near, the ring, the moment, a Kranarm's warning
     let any = !!L.moment || !!L.ringSite;
     if (!any) for (const s of W0.sites.values()) if (s.known && s.beacon && Math.abs(s.x - p0[0]) < 200 && Math.abs(s.z - p0[2]) < 200) { any = true; break; }
+    // a-regie: the called outpost's beam on the horizon (regie_acts.js — Funke pointed it out): until it is near or free
+    const CS = L.callSite, lite = !!(r.q && r.q.lite);
+    let far = null;
+    if (CS && CS.st !== 'frei' && !lite) { const b = CS.beacon || [CS.x, CS.y + 1, CS.z], d = Math.hypot(b[0] - p0[0], b[2] - p0[2]); if (d > 190 && d < 1150) { far = { b, d }; any = true; } else if (d <= 150) L.callSite = null; }
+    else if (CS && CS.st === 'frei') L.callSite = null;
     let crane = null; if (En.mobs) for (const m of En.mobs) if (m.foe && m.foe.k === 'crane' && (m.foe.st === 'tele' || m.foe.st === 'strike')) { crane = m; any = true; break; }
     if (!any) return;
     const gl = r.gl, p = fxProgram(gl); if (!p) return;
@@ -963,6 +1012,12 @@ void main() { float a = v_col.a * u_tint.a; o = vec4(v_col.rgb * u_tint.rgb * a,
         drawGeo(gl, p, thin, dx, b[1] + 0.6 - cam.y, dz, R, 1, R, 0.35, 1, 1, 1.4 * fade);
         drawGeo(gl, p, thick, dx, b[1] + 0.4 - cam.y, dz, R * 0.985, 1, R * 0.985, 0.2, 0.7, 1, 0.5 * fade);
       }
+    }
+    if (far) {   // (a-regie: a soft glow ~8 px wide at 480 px and a bright core ~3 px, tall over the hills — the beam's alpha
+      // falls off to its top, so the column is twice the hills' height — pulsing red-violet)
+      const b = far.b, dx = b[0] + 0.5 - cam.x, dz = b[2] + 0.5 - cam.z, fl = 0.75 + 0.25 * Math.sin(time * 2.6), H = 140 + far.d * 0.12;
+      drawGeo(gl, p, beam, dx, b[1] - cam.y, dz, far.d * 0.02, H, far.d * 0.02, 1, 0.3, 0.85, 0.55 * fl);
+      drawGeo(gl, p, beam, dx, b[1] - cam.y, dz, far.d * 0.007, H * 1.15, far.d * 0.007, 1, 0.55, 1, 1.1 * fl);
     }
     // the capture ring on the ground: dim all round, bright as far as it is filled
     const RS = L.ringSite;

@@ -48,10 +48,11 @@ console.log('2 · when');
 const calm = (o) => Object.assign({ calm: 30, place: 'hangar', hour: 'noon', played: 60, adv: true, dim: 'overworld', near: { outpost: 9999 }, freed: 0, high: 0, orbit: false, eclipse: 0 }, o || {});
 const rec0 = S.fresh(), b1 = S.byId('c1.b1');
 check(S.why(b1, calm(), rec0) === null, 'c1.b1 is offered in the Hangar Hall after 20 s of calm');
-const reasons = [['calm', { calm: 19.9 }], ['building', { building: true }], ['fight', { fighting: true }], ['menu', { menu: true }], ['studio', { studio: true }], ['landing', { landing: true }], ['scene', { scene: true }], ['guest', { guest: true }], ['place', { place: 'plaza', played: 100 }], ['dim', { dim: 'basalt' }]];
+const reasons = [['calm', { calm: 19.9, adv: false }], ['calm', { calm: 7.9, adv: true }], ['building', { building: true }], ['fight', { fighting: true }], ['menu', { menu: true }], ['studio', { studio: true }], ['landing', { landing: true }], ['scene', { scene: true }], ['guest', { guest: true }], ['place', { place: 'plaza', played: 100 }], ['dim', { dim: 'basalt' }]];
 for (const [r, o] of reasons) check(S.why(b1, calm(o), rec0) === r, `c1.b1 not offered: ${r}`);
 check(S.why(b1, calm({ place: 'plaza', played: 260 }), rec0) === null, 'c1.b1 anywhere after 4 minutes in a world without a Hangar Hall');
 check(S.why(b1, calm({ adv: false }), rec0) === null, 'chapter 1 begins in a builder world too (an offer only)');
+check(S.why(b1, calm({ adv: true, calm: 8.1 }), rec0) === null && S.why(b1, calm({ adv: false, calm: 8.1 }), rec0) === 'calm', 'a-regie: an adventurer\'s calm before the offer is ' + S.CALM_ADV + ' s, a builder\'s 20');
 const r1 = S.fresh(); S.mark(r1, 'c1.b1');
 const b2 = S.byId('c1.b2');
 check(S.why(b2, calm({ place: 'hills' }), rec0) === 'after' && S.why(b2, calm({ place: 'hills' }), r1) === null, 'c1.b2 after c1.b1, out on the hills');
@@ -85,7 +86,7 @@ let bad = 0, readyN = 0, calmBad = 0;
 for (let i = 0; i < 3000; i++) {
   const rec = S.fresh(), k = Math.floor(rnd() * 12); for (let j = 0; j < k; j++) S.mark(rec, S.BEATS[j].id);
   const c = { calm: rnd() * 60, building: rnd() < 0.3, fighting: rnd() < 0.3, menu: rnd() < 0.1, landing: rnd() < 0.1, place: PL[Math.floor(rnd() * 8)], hour: HR[Math.floor(rnd() * 6)], played: rnd() * 600, adv: rnd() < 0.7, dim: DM[Math.floor(rnd() * 4)], near: { outpost: rnd() * 1000 }, freed: Math.floor(rnd() * 2), high: rnd() * 2000, orbit: rnd() < 0.2, eclipse: rnd() };
-  for (const b of S.BEATS) { if (S.ready(b, c, rec)) { readyN++; if (c.building || c.fighting || c.menu || c.landing) bad++; if (c.calm < 20) calmBad++; } }
+  for (const b of S.BEATS) { if (S.ready(b, c, rec)) { readyN++; if (c.building || c.fighting || c.menu || c.landing) bad++; if (c.calm < (c.adv ? S.CALM_ADV : 20)) calmBad++; } }
 }
 check(readyN > 50 && bad === 0 && calmBad === 0, `3,000 contexts: ${readyN} ready, ${bad} while building / fighting / in a menu / landing, ${calmBad} before 20 s of calm`);
 

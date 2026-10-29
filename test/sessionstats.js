@@ -186,5 +186,12 @@ const S = (t, o) => Object.assign({ t, movers: 0, landmark: '', sky: '', input: 
   check(/repeat|wiederholt|most repeated/i.test(SS.table([['builder', m]])), 'the table has the repeat row');
 }
 
+// a-regie: the story's offer (src 'offer', the beat's own id) and the beat taken at once are one moment (no spam), and
+// the offer is no beat
+{
+  const ev = [{ t: 40, kind: 'story', sub: 'c1.b1', w: 2, inView: true, frac: 0, src: 'offer' }, { t: 40, kind: 'story', sub: 'c1.b1', w: 4, inView: true, frac: 1, src: 'story' }, { t: 100, kind: 'story', sub: 'c1.b2', w: 2, inView: true, frac: 0, src: 'offer' }];
+  const m = SS.analyze({ t0: 0, t1: 300, events: ev, samples: [] });
+  check(m.spam.n === 0 && m.story.n === 1, `a-regie: an offer taken at once is one moment with its beat (spam ${m.spam.n}); offers are no beats (${m.story.n} beat)`);
+}
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);
