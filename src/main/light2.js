@@ -235,6 +235,13 @@
   // of its own (MIST_GOLD, ~188,195,228 through the golden grade), less in rain; toward the sun it still glows warm: l2Fog
   // adds the sun's colour × sunK there)
   L2.MIST_GOLD = [0.42, 0.49, 0.8];
+  // f-sky5 (docs/reviews/v0.51.md R52-03: the far land and the isles drowned in a white-pink haze): the aerial
+  // perspective and the end fog took the luminous horizon's pink-white (hazeColor) — at the golden hour they take the
+  // golden far air instead: away from the sun a blue-lilac darker than the sky over it (the frames' far land 109,148,189),
+  // beside the sun the pale lilac of the mist (192,198,227); k: its share at the golden hour (less in rain)
+  L2.AIRGOLD = { away: [0.2, 0.29, 0.55], side: [0.46, 0.47, 0.72], k: 0.75 };
+  L2.airGold = (t) => { const A = L2.AIRGOLD, q = clamp(t, 0, 1); return [0, 1, 2].map(i => A.away[i] + (A.side[i] - A.away[i]) * q); };
+  L2.airGoldK = (E) => L2.moods(E.sunDir[1]).gold * (1 - clamp(E.rain || 0, 0, 1)) * L2.AIRGOLD.k;
   L2.mistColor = function (E) {
     const h = E.horizon || [0.6, 0.7, 0.8], f = E.fogColor || h, m = L2.moods(E.sunDir[1]), lift = 1 + 0.08 * m.day;
     const w = m.gold * (1 - clamp(E.rain || 0, 0, 1)), c = L2.MIST_GOLD, o = [0, 0, 0];
@@ -379,6 +386,7 @@
     out.pool = [K.poolHot, K.poolK, K.poolTail, K.poolHue];
     out.air = L2.air(E, ticks || 0);
     out.mist = L2.mistColor(E);
+    out.airK = L2.airGoldK(E);   // (f-sky5)
     out.sunTint = L2.sunTint(h.moods);
     out.grade = L2.grade(E);
     return out;
@@ -432,11 +440,15 @@ float l2Ao() {
 uniform vec4 u_l2Fog;      // x the density at the base (per block), y k (1 / scale height), z the base's height, w the eye's height
 uniform vec4 u_l2Fog2;     // x 1 / the aerial perspective's distance, y its most, z the sun's in-scatter, w the night's dimming
 uniform vec3 u_l2FogCol;   // the valley haze's colour
+uniform vec4 u_l2Air;      // f-sky5: rgb the golden far air away from the sun, w its share (L2.airGoldK)
+uniform vec3 u_l2Air2;     // f-sky5: the golden far air beside the sun
 uniform vec4 u_l2Room;     // t-polish2: the room's air — rgb its colour (the lamps round the eye), w its density (0 outdoors)
 vec3 l2Fog(vec3 col, vec3 rel, float dist) {
   vec3 dir = rel / max(dist, 0.001);
   if (u_fog.w > 0.5) return mix(col, u_fogColor, clamp(1.0 - exp(-dist * 0.07), 0.0, 1.0));
   vec3 hz = hazeColor(dir);
+  // f-sky5 (R52-03): at the golden hour the far air a blue-lilac of its own (L2.AIRGOLD), not the horizon's pink-white
+  if (u_l2Air.w > 0.0) { float ts = max(dot(dir, u_sunDir), 0.0); hz = mix(hz, mix(u_l2Air.rgb, u_l2Air2, ts * ts), u_l2Air.w); }
   vec3 fc = u_dim == 1 || u_dim == 2 ? u_fogColor : mix(hz, u_fogColor, 0.35);
   float hd = max(length(rel.xz), abs(rel.y) * 0.35);
   float f = smoothstep(u_fog.x, u_fog.y, hd);

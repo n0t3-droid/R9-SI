@@ -388,6 +388,19 @@
     // base's light over the top's in a storm, fair: in fair weather) and the base is torn (rag: its depth, of the sprite)
     storm: { top: 1.45, low: 0.75, base: 0.06, fair: 0.82, rag: 0.09 },
   };
+  // f-sky5 · the storm deck (docs/reviews/v0.51.md R52-04: a storm was a field of separate charcoal cotton balls in rows):
+  // in a storm the cumulus sprites dissolve into the sky's closed deck (puff: their share left — the near scud), and the
+  // deck gets weight — rolls and lumps of a warped noise, a charcoal base (base: of the clouds' light from below), rain
+  // shafts hanging from it to the horizon (SKY3HI: Balanced and up), a lit edge low toward the sun where it can break
+  // (by day, the cover not total). Its switch: cloudVol (Wolken mit Volumen) and the sky's level ≥ 1; Very Low has neither.
+  S3.DECK = { from: 0.3, full: 0.75, puff: 0.08, base: 0.55, shafts: 0.85, edge: 0.7 };
+  S3.deck = function (E) {
+    const q = S3.q || OFF, D = S3.DECK;
+    if (!(q.sky3 >= 1) || !q.cloudVol) return { on: 0, puff: 1, shafts: 0, edge: 0, base: [0, 0, 0] };
+    const on = sstep(D.from, D.full, S3.stormK(E)), C = S3.cloudLight(E);
+    const el = Math.asin(clamp(E.sunDir[1], -1, 1)) * 180 / Math.PI, dayK = sstep(-2, 6, el), cover = clamp(E.cloudCover || 0, 0, 1);
+    return { on, puff: 1 - (1 - D.puff) * on, shafts: q.sky3 >= 2 ? D.shafts * on : 0, edge: D.edge * on * dayK * (1 - 0.6 * sstep(0.9, 1.0, cover)), base: C.low.map(v => v * D.base) };
+  };
   // the storm's strength: rain under a closed cover (0 fair … 1 a thunderstorm)
   S3.stormK = (E) => clamp(E.rain || 0, 0, 1) * (0.55 + 0.45 * sstep(0.45, 0.9, clamp(E.cloudCover || 0, 0, 1)));
   S3.cloudLight = function (E) {
@@ -407,7 +420,7 @@
   // env: the Env (its day, ticks, weather seed); E: its frame. E.sky3 holds the schedules' state and the uniforms (o.u:
   // name → Float32Array, filled in place: no allocation per frame for them); nothing of E's own values changes (with the
   // sky's level on env.js takes the palette of the golden hour and the dusk from S3.palette)
-  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3SunW', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_s3Field', 'u_c3K', 'u_c3Storm'];
+  const U4 = S3.U4 = ['u_s3Warm', 'u_s3Warm2', 'u_s3Reach', 'u_s3Glow', 'u_s3Shade', 'u_s3Belt', 'u_s3Sun', 'u_s3SunW', 'u_s3MoonA', 'u_s3MoonB', 'u_s3Night', 'u_s3Met', 'u_s3MetT', 'u_s3Neb', 'u_s3Rain', 'u_s3Drift', 'u_s3Aur', 'u_s3Bank', 'u_s3Fan', 'u_s3Cir', 'u_s3Field', 'u_c3K', 'u_c3Storm', 'u_s3Deck2', 'u_c3Deck'];
   const U3 = S3.U3 = ['u_c3Sun', 'u_c3Top', 'u_c3Low', 'u_c3Ld', 'u_c3Haze'];
   S3.state = function () {
     const u = {};
@@ -466,8 +479,10 @@
     const gw = S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]) * (1 - rain);
     set4(u.u_s3Cir, 0.3 + 0.7 * golden * (1 - night), 0.55 * golden * (1 - rain), (PAL.gold.cirPink || 0) * gw, (PAL.gold.cirMore || 0) * gw);
     const C = S3.cloudLight(E);
-    const deck = mix3(C.grey, C.top, 0.35);
+    const Dk = S3.deck(E), deck = mix3(mix3(C.grey, C.top, 0.35), Dk.base, Dk.on * 0.6);   // (f-sky5: the storm's deck a charcoal)
     set4(u.u_s3Rain, deck[0], deck[1], deck[2], 0);
+    set4(u.u_s3Deck2, over ? Dk.on : 0, over ? Dk.shafts : 0, over ? Dk.edge : 0, (E.time || 0) * 0.02);
+    set4(u.u_c3Deck, Dk.puff, Dk.on, 0, 0);
     const dr = E.cloudDrift, dx = dr ? dr[0] : (E.time || 0) * 0.9, dz = dr ? dr[1] : 0;
     set4(u.u_s3Drift, dx / 900, dz / 900, dx / 340, dz / 340);
     // the aurora (level 2): its strength, its curtains' seed, the time, its span round north
@@ -533,6 +548,7 @@ uniform vec4 u_s3MetT;     // its tail's end (direction), w its hue (0 white-gol
 uniform vec4 u_s3Neb;      // x the filaments' share, y the swirl's share, z the rain's closed deck, w the lit rims' share
 uniform vec4 u_s3Rain;     // rgb the deck's underside
 uniform vec4 u_s3Drift;    // xy the deck's drift, zw the scud's (faster, lower)
+uniform vec4 u_s3Deck2;    // f-sky5: x the storm deck (its weight), y the rain shafts, z the lit edge toward the sun, w the time
 uniform vec4 u_s3Cir;      // the high streaks: x lit by the hour (the clouds' light), y more of them at the golden hour and the sunset, z their pink at the golden hour, w their extra cover then
 uniform vec3 u_c3Sun;      // the clouds' light (sky3.js cloudLight): the sun's on them, the sky's from above, the light from below, toward the light
 uniform vec3 u_c3Top;
@@ -553,6 +569,34 @@ vec3 s3Deck(vec3 col, vec3 dir) {
   float sn = vnoise(qs) * 0.62 + vnoise(qs * 2.7 + 3.3) * 0.38 + (vnoise(qs * 7.0 - 1.9) - 0.5) * 0.2;
   float scud = smoothstep(0.56, 0.72, sn) * (1.0 - hz * 0.7);
   c = mix(c, u_s3Rain.rgb * 0.52, scud * 0.75);
+  if (u_s3Deck2.x > 0.0) {
+    // f-sky5 (R52-04) · the storm deck's weight: rolls and lumps of a warped noise over the whole underside (one layer,
+    // merged — no puffs), darker where it is thick, its base ragged toward the horizon over the paler rain-veiled distance
+    vec2 qd = q * 1.5 + vec2(vnoise(q * 0.5 + 3.7), vnoise(q * 0.5 - 8.1)) * 1.4;
+    float bil = vnoise(qd) * 0.55 + vnoise(qd * 2.3 + 1.3) * 0.3 + vnoise(qd * 5.1 - 4.2) * 0.15;
+    // (the rolls' relief: the billow against itself a step toward the horizon — the side facing the far light paler)
+    vec2 st = normalize(dir.xz + vec2(1e-5, 0.0)) * 0.22;
+    float bil2 = vnoise(qd + st) * 0.55 + vnoise((qd + st) * 2.3 + 1.3) * 0.3 + vnoise((qd + st) * 5.1 - 4.2) * 0.15;
+    float lump = smoothstep(0.25, 0.8, bil), relief = clamp(0.5 + (bil2 - bil) * 5.0, 0.0, 1.0);
+    vec3 dk = u_s3Rain.rgb * mix(1.08, 0.45, lump) * (0.74 + 0.5 * relief);
+    float rag = smoothstep(0.02, 0.16, dir.y + (bil - 0.5) * 0.1);   // (the base's torn edge low over the horizon)
+    dk = mix(u_skyHorizon * 0.82 + u_s3Rain.rgb * 0.25, dk, rag);
+#ifdef SKY3HI
+    // the rain shafts: grey curtains from the base to the horizon, drawn out downward, swaying slowly
+    vec2 dh = normalize(dir.xz + vec2(1e-5, 0.0));
+    float az = atan(dh.y, dh.x);
+    float sh = s3n1(az * 11.0 + u_s3Deck2.w * 0.3 + dir.y * 6.0) * 0.55 + s3n1(az * 37.0 - u_s3Deck2.w * 0.2 + dir.y * 14.0) * 0.3 + s3n1(az * 90.0) * 0.15;
+    float shaft = smoothstep(0.42, 0.75, sh) * (1.0 - smoothstep(0.0, 0.17, dir.y)) * smoothstep(-0.03, 0.005, dir.y) * u_s3Deck2.y;
+    dk = mix(dk, u_s3Rain.rgb * 0.66, shaft * (0.6 + 0.3 * s3n1(az * 160.0 + dir.y * 40.0)));
+    // the lit edge: low toward the sun the deck thins and its torn lower edge catches the light (where the sun breaks)
+    vec2 sd = normalize(u_sunDir.xz + vec2(1e-5, 0.0));
+    float toS = pow(max(dot(dh, sd), 0.0), 6.0) * (1.0 - smoothstep(0.05, 0.26, dir.y)) * u_s3Deck2.z;
+    float thin = smoothstep(0.62, 0.3, bil);
+    dk = mix(dk, u_skyHorizon * 1.15 + u_sunColor * 0.12, toS * thin * 0.75);
+    dk += u_sunColor * (toS * smoothstep(0.5, 0.62, bil) * (1.0 - smoothstep(0.62, 0.75, bil)) * 0.18);
+#endif
+    c = mix(c, dk, u_s3Deck2.x);
+  }
   return mix(col, c, u_s3Neb.z * smoothstep(-0.04, 0.06, dir.y));
 }
 vec3 s3Layers(vec3 col, vec3 dir, float h) {
@@ -760,6 +804,8 @@ vec3 s3Fan(vec3 dir) {
   // thick cores dark, the thin edges lit); the silver lining — forward scattering round the light's direction (u_c3Ld,
   // world) through the thin parts; the sky's light from above and the low light from below by the normal, the creases
   // darker; far ones take the sky's horizon colour. Returns the colour and the coverage (a < 0: nothing)
+  S3.MIST_NEAR = [60, 180];
+  S3.mistNear = (d) => sstep(S3.MIST_NEAR[0], S3.MIST_NEAR[1], d);
   S3.glslPuff = () => `
 #ifndef SKY3
 uniform vec3 u_c3Sun;      // the direct light on the clouds (colour × strength, S3.cloudLight)
@@ -770,12 +816,16 @@ uniform vec3 u_c3Ld;       // toward the light, world
 uniform vec3 u_c3L;        // toward the light in the billboard's frame (x right, y up, z toward the eye)
 uniform vec4 u_c3K;        // x the self-shadow's density, y the silver lining, z the wrap, w the powder
 uniform vec3 u_c3Haze;     // the far ones' colour (the sky at the horizon)
+uniform vec4 u_c3Deck;     // f-sky5: x the sprites' share in a storm (they dissolve into the sky's deck: S3.deck), y the deck
 uniform vec4 u_c3Storm;    // f-sky4: x the storm (rain under a closed cover: 0 fair … 1 a thunderstorm), y a storm base's light over its top's, z the torn base's depth, w a fair base's light over its top's
 vec2 c3At(vec2 cell, vec2 uv) { return cell + clamp(uv, vec2(0.5 / 128.0), vec2(1.0 - 0.5 / 128.0)) * 0.5; }
 float c3Core = 0.0;         // the thick core of this texel (PUFF_FS: there the sprite is opaque — the second run's moon shone through)
 float c3Y = 210.0;         // the texel's height in the world (PUFF_FS sets it from the vertex shader: one shading over a cluster's sprites)
 float c3Seed = 0.0;        // f-sky4: the sprite's own number (PUFF_FS sets it: the torn base differs from puff to puff)
 float c3Grad = 1.0;        // f-sky4: the light's fall from the top to the base (c3Shade sets it; PUFF_FS's storm slate keeps it)
+// f-sky5 (R52-03: a bank of the isles lay as a white sheet over the canyon floor under the eye): the mist fades near the
+// eye — none within ${S3.MIST_NEAR[0]} blocks (horizontal), full from ${S3.MIST_NEAR[1]} (S3.mistNear); far off the banks stay
+float c3MistNear(float d) { return smoothstep(${S3.MIST_NEAR[0].toFixed(1)}, ${S3.MIST_NEAR[1].toFixed(1)}, d); }
 vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
   vec4 t = texture(u_cloudTex, c3At(cell, uv));
   float th = t.r;
@@ -786,7 +836,7 @@ vec4 c3Shade(vec2 cell, vec2 uv, float dist, vec3 vdir) {
     float d = smoothstep(0.0, 0.22, th);
     if (d < 0.02) return vec4(0.0, 0.0, 0.0, -1.0);
     vec3 mc = mix(u_c3Low, u_c3Top, 0.6) + u_c3Sun * 0.35;
-    return vec4(mix(mc, u_c3Haze, 0.45), d);
+    return vec4(mix(mc, u_c3Haze, 0.45), d * c3MistNear(dist));
   }
   float cov = smoothstep(0.0, 0.08, th);
   if (cov < 0.01) return vec4(0.0, 0.0, 0.0, -1.0);

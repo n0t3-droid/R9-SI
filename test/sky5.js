@@ -88,6 +88,7 @@ console.log('c · the storm deck');
 {
   check(typeof S3.deck === 'function', 'S3.deck exists');
   if (S3.deck) {
+    S3.use({ sky3: 2, cloudVol: true });   // (High's sky)
     const fair = S3.deck({ rain: 0, cloudCover: 0.3, sunDir: [0.3, 0.7, 0.6] }), storm = S3.deck({ rain: 1, cloudCover: 0.95, sunDir: [0.3, 0.7, 0.6] }), night = S3.deck({ rain: 1, cloudCover: 0.95, sunDir: [0.3, -0.7, 0.6] });
     const light = S3.cloudLight({ rain: 0, cloudCover: 0.3, sunDir: [0.3, 0.7, 0.6] });
     const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], top = lum(light.top) + lum(light.sun);
