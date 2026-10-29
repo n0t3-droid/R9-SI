@@ -318,6 +318,7 @@
       // features & structures from 3x3 neighborhood
       const chests = [];
       const w = new GEN.ColumnWriter(cx, cz, blocks);
+      w.v13 = GEN.treeFix(this);   // (f-arrival, vgen 13: the trees' tops on their crowns — gen_common.js)
       for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) this.features(w, cx + dx, cz + dz, chests);
       // vegetation (own column)
       this.vegetation(blocks, cx, cz, biome, climate, rng);

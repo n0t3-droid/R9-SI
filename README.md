@@ -86,6 +86,16 @@ are recomputed on a budget by distance (every frame within 24 blocks, every 2nd 
 8th); a town's population follows a rule — one person per nine blocks of walkable street plus two per home — and nobody
 walks a path search for a walk nobody sees. Crowding is solved on a spatial grid; path-finding is budgeted per frame.
 
+**Space.** Our sun Helia, the ringed giant Amarant and its moons (home is the moon Herzwelt) move on Kepler orbits:
+each body's state comes from its elements by Newton's method on Kepler's equation, a ship in space follows patched conics
+— the body whose sphere of influence it is in pulls it with μ/r², a velocity-Verlet step integrates thrust and coasting is
+solved exactly with universal variables (energy and angular momentum kept to 1e-12 over a hundred orbits). Lengths are
+1/64 of real size with true gravity ratios, so a 3-km orbit round Herzwelt takes 11 minutes; between worlds and stars a
+drive openly labelled as fiction shortens what would take years. The climb bends the world by y − d²/2R, the air thins
+with a 400-m scale height, the sky's bodies glide from their postcard places to the directions the ephemeris gives; the
+moons' craters follow the real size-frequency slope (−2.9) and the simple-to-complex transition (18 km real), and every
+world's gravity sets its jumps and falls. The facts come from mission data: docs/universe/REFERENCE.md (120 sources).
+
 **Physics.** Per-block collision shapes, AABB sweeps against the voxel grid for the player, and voxel raycasts for
 targeting; the camera carries a head bob, a landing dip, a sprint field-of-view kick and the push of a placed block as
 pure curves that the node tests check against the very numbers the GPU adds for the plants' sway.
@@ -112,6 +122,13 @@ ambience (wind, rain, thunder, birds, crickets, water) on one bus that is muffle
 - **149 people cost less than 38** once nobody computes what nobody sees.
 - **16 cells a block is the threshold** at which a surface-nets mesh of a voxel piece reads as an object instead of a
   pile of cubes; 32 only pays within a few blocks.
+
+- **Two good fixes can make one bad picture.** Two fronts each fitted the golden hour to the trailer's colour bands and
+  both passed; merged, the sky went pale and lost its sun. Colour means are not enough — the tests now also measure
+  contrast, saturation and the sun's disc, and one front owns each look.
+- **What a test measures is what improves.** The never-boring sessions counted every event the same, so a ship passing
+  every 12 s looked like a busy world; weighed by how much of the screen they fill, and with a director that varies its
+  acts, the same five minutes became honest.
 
 ## Tests
 

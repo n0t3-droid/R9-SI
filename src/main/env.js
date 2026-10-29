@@ -87,7 +87,7 @@
       const dim = o.dim || 'overworld';
       E.dimId = DIM_ID[dim] !== undefined ? DIM_ID[dim] : 0;
       E.time = this.anim;
-      const tod = this.timeOfDay / 24000;
+      const tod = ((this.timeOfDay + (VR.Entry && o.pos && dim === 'overworld' ? VR.Entry.tickShift(o.pos[0], o.pos[2]) : 0)) % 24000 + 24000) % 24000 / 24000;   // u-ascent: the local time — the clock plus the longitude, faded in from 4 km (U§4.5, entry.js)
       const th = tod * Math.PI * 2;
       // "eternal dusk" (TRAILER.md §2.1): the sun circles low — it rises in the east, peaks at only ~32° in
       // the south and sets in the west, so the day is one long golden hour with long shadows and the
@@ -259,6 +259,7 @@
       E.rays = GRADE.rays * (SKY.on ? 1 - 0.92 * wDay : 1); E.gridK = GRADE.gridK;   // t-sky2: 8 % by day (the frames' day has no rays; with the sun in view every ray sampled its core and veiled the whole sky, L* +6 at the top)
       if (VR.Sky3 && VR.Sky3.frame) VR.Sky3.frame(E, this);   // t-sky3: the moons in their phases, the shooting star, the aurora (sky3.js; nothing with the sky's switch off)
       if (VR.BodySky) VR.BodySky.env(E, this, o, dt);   // u-moons1: the sky and the light over an airless body (bodysky.js; nothing elsewhere)
+      if (VR.Ascent && VR.Ascent.env) VR.Ascent.env(E, o, this);   // u-ascent: the climb's sky — it thins, the postcard glides to the true sky (ascent.js)
       return E;
     }
     lightning() { this.wx.strike(); }

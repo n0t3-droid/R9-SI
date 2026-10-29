@@ -507,7 +507,7 @@
     async createWorld(o) {
       const seedStr = o.seed;
       let seed = seedStr ? (/^-?\d+$/.test(seedStr) ? (parseInt(seedStr, 10) >>> 0) : VR.seedFromString(seedStr)) : (Math.floor(Math.random() * 4294967295) >>> 0);
-      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty || (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'), type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 12 }; // vgen 12 (t-polish2): the hall city's polished nave floor · vgen 11: the vistas (t-vista: eye-catchers, sight windows, vista spurs, the landmarks' silhouettes; vgen 10, t-land's land between, shipped with v0.46) · vgen 9: no crystals of any kind (f-nocrystal: GEN.noCry; t-town's villages too) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
+      const meta = { id: 'w' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36), name: o.name, seed, mode: o.mode, difficulty: o.difficulty || (VR.Peace ? VR.Peace.DEFAULT : 'peaceful'), type: o.type, cheats: o.cheats !== false, keep: !!o.keep, kit: o.kit !== false, created: Date.now(), lastPlayed: Date.now(), player: null, time: 1000, dim: 'overworld', vgen: o.vgen ? +o.vgen : 13 }; // vgen 13 (f-arrival): the trees' tops on their crowns, the vistas' views cleared as cones, the frame trees out of the eye's face · vgen 12 (t-polish2): the hall city's polished nave floor · vgen 11: the vistas (t-vista: eye-catchers, sight windows, vista spurs, the landmarks' silhouettes; vgen 10, t-land's land between, shipped with v0.46) · vgen 9: no crystals of any kind (f-nocrystal: GEN.noCry; t-town's villages too) · vgen 2: bigger villages with farmsteads & a supermarket · 3: the Heartland (TRAILER.md) · 4: modern towns · 5: villa-scale towns in 640-block cells · 7: the trailer's plants (VR.Plants, the default of v0.42) · 8: the trailer's Nova Haven — Villa Nova lots on curved roads with light lines, the terraced hills (gen_city.js, gen_hills.js; the default since t-city2; o.vgen picks an older generator) · 6: the citadel viaducts carry a track and trams (t-infra), the Gate Temple's landing lights, the hex corridor and the Hangar Hall (TRAILER.md D, E)
       if (o.first && VR.First) VR.First.mark(this, meta);   // (t-first: made from the start screen — it may open on its finest vista)
       await this.store.saveWorld(meta);
       this.startWorld(meta, true);
@@ -551,6 +551,7 @@
         this.player.spawn = [pos[0], pos[1] + up, pos[2]];
         this.player.yaw = fs ? fs.yaw : pos[3] !== undefined ? pos[3] : Math.random() * Math.PI * 2;
         if (fs) { this.player.pitch = fs.pitch; this.player.viewYaw = fs.yaw; }
+        if (!meta.guest) { meta.spawnYaw = +this.player.yaw.toFixed(3); meta.spawnPitch = +(this.player.pitch || 0).toFixed(3); }   // (f-arrival: the world's own view from its spawn — Heimkehr faces it, travel.js faceHome)
         this.giveKit(meta);
       }
       this.landOnEntry(entry, !meta.player);
@@ -721,6 +722,7 @@
       return [0.5, 100, 0.5];
     }
     goHome() {
+      if (VR.SpaceFlight && VR.SpaceFlight.goHome && VR.SpaceFlight.goHome(this)) return;   // u-ascent: in the sky the six-second home jump (spaceflight.js)
       if (VR.NewLife && VR.NewLife.goHome(this)) return;   // u-home: to the home on whatever world it is — there, or the trip there; the ships left elsewhere come too (newlife.js)
       if (VR.Travel && VR.Travel.goHome(this)) return;   // u-dims: from another world the trip home — Herzwelt's spawn or bed, the ship you fly along (travel.js)
       const p = this.player; if (!p || p.dead) return;
@@ -1130,7 +1132,7 @@
       const b = w ? VR.BIOMES[w.biomeAt(Math.floor(pos[0]), Math.floor(pos[2]))] : null;
       const eye = w ? w.getLight(Math.floor(pos[0]), Math.floor(pos[1]), Math.floor(pos[2])) : 0xf000;
       const hz = this.horizon && this.horizon.enabled() ? this.horizon.radius : 0;
-      return this.env.update(dt, Object.assign({ dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather, drama: !!this.settings.wxDrama, motion: !!this.settings.motion }, extra || {}));   // (t-motion: drama, motion)
+      return this.env.update(dt, Object.assign({ pos, dim: this.dim || 'overworld', biome: b, eyeSky: (eye >>> 12) / 15, renderDist: w ? w.renderDist : 8, horizon: hz, lowK: this.ambience ? this.ambience.lowK : 0, wetOn: !!this.settings.wetGround, freezeTime: this.zenFreezeTime, freezeWeather: this.zenFreezeWeather, drama: !!this.settings.wxDrama, motion: !!this.settings.motion }, extra || {}));   // (t-motion: drama, motion) (u-ascent: pos — the local time, the climb's sky)
     }
     titleFrame(dt) {
       const c = this.titleCam, w = this.world;

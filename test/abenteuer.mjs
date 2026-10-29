@@ -7,7 +7,7 @@
 //      Auftrag?" in place of „Kann ich helfen?", the offer → abenteuer_quest_offer.png; ✓ Mach ich! → in the Tagebuch,
 //      tracked; up to two more accepted through the talk
 //   4. a riddle (today's, or the first day a villager here has one): ✓ Mach ich! shows the three answers at once →
-//      abenteuer_quest_riddle.png; a wrong one is struck through (nothing lost), the right one: 20 EP, 15 Sterntaler,
+//      abenteuer_quest_riddle.png; a wrong one is struck through (nothing lost), the right one: 20 EP, 15 Heliataler,
 //      a heart → abenteuer_quest_reward.png
 //   5. J: the Tagebuch → abenteuer_journal.png (open quests with where, how far, which way, the reward; the riddle
 //      done); 🧭 tracks another; the compass line ✦; J and Esc close it; the pause menu: 📖 Tagebuch after ⚔ Abenteuer
@@ -116,18 +116,18 @@ try {
     await wait(300);
     await ev(() => document.querySelector('#title [data-act="newworld"]').click());
     await wait(400);
-    await ev(() => { document.querySelector('#cw_way [data-v="adv"]').click(); document.querySelector('#cw_mode [data-v="survival"]').click(); const n = document.querySelector('#cw_name'); n.value = 'Aufträge'; document.querySelector('#cw_seed').value = '4242'; });
+    await ev(() => { document.querySelector('#cw_way [data-v="gentle"]').click(); document.querySelector('#cw_mode [data-v="survival"]').click(); const n = document.querySelector('#cw_name'); n.value = 'Aufträge'; document.querySelector('#cw_seed').value = '4242'; });
     await wait(300);
     const cf = await ev(() => {
       const b = document.querySelector('#create [data-act="docreate"]'), r = b.getBoundingClientRect();
       const scr = document.getElementById('create'), panel = scr.querySelector('.panel');
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, hit: !!hit && (hit === b || b.contains(hit)), scroll: [scr.scrollTop, panel.scrollTop], over: [scr.scrollHeight - scr.clientHeight, panel.scrollHeight - panel.clientHeight], panelH: Math.round(panel.getBoundingClientRect().height), text: b.textContent.trim(), note: !document.querySelector('#create .advwaynote').hidden, way: document.querySelector('#cw_way .on').dataset.v, mode: document.querySelector('#cw_mode .on').dataset.v, cols: getComputedStyle(panel).gridTemplateColumns };
+      return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight, hit: !!hit && (hit === b || b.contains(hit)), scroll: [scr.scrollTop, panel.scrollTop], over: [scr.scrollHeight - scr.clientHeight, panel.scrollHeight - panel.clientHeight], panelH: Math.round(panel.getBoundingClientRect().height), text: b.textContent.trim(), way: document.querySelector('#cw_way .on').dataset.v, mode: document.querySelector('#cw_mode .on').dataset.v, cols: getComputedStyle(panel).gridTemplateColumns };
     });
     console.log('     ' + JSON.stringify(cf));
     N.create = cf;
-    check(cf.text === 'Welt erstellen' && cf.top >= 0 && cf.bottom <= cf.vh && cf.hit && cf.scroll[0] === 0 && cf.scroll[1] === 0, '„Welt erstellen" in view at 1280 × 720 without scrolling (Profi, ⚔ Abenteuer with its note: the button ' + cf.top + '–' + cf.bottom + ' of ' + cf.vh + ' px, nothing over it)');
-    check(cf.way === 'adv' && cf.mode === 'survival' && cf.note, '⚔ Abenteuer and Überleben chosen, the note shown');
+    check(cf.text === 'Welt erstellen' && cf.top >= 0 && cf.bottom <= cf.vh && cf.hit && cf.scroll[0] === 0 && cf.scroll[1] === 0, '„Welt erstellen" in view at 1280 × 720 without scrolling (Profi, 🧭 Abenteuer, sanft: the button ' + cf.top + '–' + cf.bottom + ' of ' + cf.vh + ' px, nothing over it)');
+    check(cf.way === 'gentle' && cf.mode === 'survival', '🧭 Abenteuer, sanft and Überleben chosen (f-names: the one question)');
     pics.create = await shot('abenteuer_create_720');
     await ev(() => document.querySelector('#create [data-act="docreate"]').click());
     for (let i = 0; i < 180; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
@@ -272,7 +272,7 @@ try {
     const right = await ev(() => { const me = VR.Adventure.rec.me; return { text: document.querySelector('#tk_text').textContent, xp: me.xp, taler: me.taler, rep: window.__qr.vil.st.rep || 0, open: !!VR.Quests.get(VR.Adventure.rec, window.__qr.p.id), log: VR.Quests.log(VR.Adventure.rec).length, hearts: (document.querySelector('#tk_rep') || {}).textContent }; });
     console.log('     „' + right.text + '"');
     N.riddle = { before, after: { xp: right.xp, taler: right.taler, rep: right.rep } };
-    check(!right.open && right.xp - before.xp >= 20 && right.taler - before.taler >= 15 && right.rep - before.rep === 2 && /^Richtig!/.test(right.text) && /\+20 EP · \+15 Sterntaler · ♥ \+1/.test(right.text), 'the right answer: „Richtig!", why, +20 EP · +15 Sterntaler · ♥ +1 (' + (right.xp - before.xp) + ' EP, ' + (right.taler - before.taler) + ' Taler, love ' + before.rep + ' → ' + right.rep + ')');
+    check(!right.open && right.xp - before.xp >= 20 && right.taler - before.taler >= 15 && right.rep - before.rep === 2 && /^Richtig!/.test(right.text) && /\+20 EP · \+15 Heliataler · ♥ \+1/.test(right.text), 'the right answer: „Richtig!", why, +20 EP · +15 Heliataler · ♥ +1 (' + (right.xp - before.xp) + ' EP, ' + (right.taler - before.taler) + ' Taler, love ' + before.rep + ' → ' + right.rep + ')');
     await step(3); await draw();
     pics.reward = await shot('abenteuer_quest_reward');
     await toGame();
@@ -289,7 +289,7 @@ try {
     const jn = await ev(() => { const s = document.getElementById('journal'), p = s && s.querySelector('.panel'); return { screen: VR.game.ui.screen, shown: !!s && getComputedStyle(s).display !== 'none', cards: p ? p.querySelectorAll('.jq').length : 0, tracked: p ? p.querySelectorAll('.jq.tracked').length : 0, where: p ? [...p.querySelectorAll('.jq .jl')].filter(e => /🧭/.test(e.textContent)).map(e => e.textContent) : [], chips: p ? p.querySelectorAll('.jq .chip').length : 0, done: p ? p.querySelectorAll('.jdone > div').length : 0, title: p && p.querySelector('h2') ? p.querySelector('h2').textContent : '', h: p ? Math.round(p.getBoundingClientRect().height) : 0, open: VR.Quests.open(VR.Adventure.rec).length }; });
     console.log('     ' + JSON.stringify(jn));
     check(jn.screen === 'journal' && jn.shown && jn.title === '📖 Tagebuch', 'J opens „📖 Tagebuch"');
-    check(jn.cards === jn.open && jn.cards >= 1 && jn.tracked === 1 && jn.chips >= 3 * jn.cards, 'every open quest a card (' + jn.cards + '), one tracked, its reward as chips (EP, Sterntaler, ♥)');
+    check(jn.cards === jn.open && jn.cards >= 1 && jn.tracked === 1 && jn.chips >= 3 * jn.cards, 'every open quest a card (' + jn.cards + '), one tracked, its reward as chips (EP, Heliataler, ♥)');
     check(jn.where.length >= 1 && jn.where.every(t => /\d+ m Richtung/.test(t) || /Zurück|Himmel/.test(t)), 'where, how far and which way: ' + jn.where.join(' | '));
     check(jn.done >= 1, 'the riddle under „Zuletzt erledigt" (' + jn.done + ')');
     check(jn.h <= 700, 'the Tagebuch fits a 720-px screen (' + jn.h + ' px)');
@@ -372,7 +372,7 @@ try {
     await wait(300);
     const done = await ev((pid) => ({ text: document.querySelector('#tk_text').textContent, open: !!VR.Quests.get(VR.Adventure.rec, pid), xp: VR.Adventure.rec.me.xp, taler: VR.Adventure.rec.me.taler }), fq.pid);
     console.log('     „' + done.text + '"');
-    check(!done.open && done.xp - before.xp >= 20 && done.taler - before.taler >= 15 && /gefunden/.test(done.text) && /Sterntaler/.test(done.text), 'handed back: „' + done.text.slice(0, 120) + '" (+' + (done.xp - before.xp) + ' EP, +' + (done.taler - before.taler) + ' Sterntaler)');
+    check(!done.open && done.xp - before.xp >= 20 && done.taler - before.taler >= 15 && /gefunden/.test(done.text) && /Heliataler/.test(done.text), 'handed back: „' + done.text.slice(0, 120) + '" (+' + (done.xp - before.xp) + ' EP, +' + (done.taler - before.taler) + ' Heliataler)');
     pics.done = await shot('abenteuer_quest_done');
     await toGame();
   });
@@ -401,12 +401,12 @@ try {
     await wait(300);
     const eng = await ev(() => { const me = VR.Adventure.rec.me, t0 = me.taler, p = document.querySelector('#shop .panel'), ups = p.querySelectorAll('.shopitem .sico').length, b = p.querySelector('[data-sact="buy"][data-key="up:engine"]'); if (!b) return { none: true, ups }; b.click(); const row = [...document.querySelectorAll('#shop .shopitem')].find(r => r.querySelector('[data-key="up:engine"]')); return { ups, paid: t0 - me.taler, price0: VR.Adv.PRICES.engine[0], step: me.owned && me.owned.engine, pips: row ? row.querySelectorAll('.pips i.on').length : -1, pipsAll: row ? row.querySelectorAll('.pips i').length : -1, msg: (document.querySelector('#shop .shopmsg') || {}).textContent, title: p.querySelector('h2').textContent, tabs: [...document.querySelectorAll('#shop .shoptabs button')].map(x => x.textContent), h: Math.round(p.getBoundingClientRect().height) }; });
     console.log('     ' + JSON.stringify(eng));
-    check(!eng.none && eng.title === '🚀 Hangar' && eng.ups >= 4 && eng.step === 1 && eng.paid === eng.price0 && eng.pips === 1 && eng.pipsAll >= 2, 'the Hangar: the engine\'s first step bought (' + eng.paid + ' Sterntaler; the pips ' + eng.pips + ' of ' + eng.pipsAll + ', „' + eng.msg + '")');
+    check(!eng.none && eng.title === '🚀 Hangar' && eng.ups >= 4 && eng.step === 1 && eng.paid === eng.price0 && eng.pips === 1 && eng.pipsAll >= 2, 'the Hangar: the engine\'s first step bought (' + eng.paid + ' Heliataler; the pips ' + eng.pips + ' of ' + eng.pipsAll + ', „' + eng.msg + '")');
     check(eng.h <= 700, 'the Hangar fits a 720-px screen (' + eng.h + ' px)');
     pics.hangar = await shot('abenteuer_shop_hangar');
     const sell = await ev(() => { const g = VR.game, me = VR.Adventure.rec.me; g.player.inv.add('iron_ingot', 6); document.querySelector('#shop [data-sact="tab"][data-key="sell"]').click(); const t0 = me.taler, n0 = g.player.inv.count('iron_ingot'), b = document.querySelector('#shop [data-sact="sell"][data-key="iron_ingot"][data-n="1"]'); if (b) b.click(); return { listed: !!b, got: me.taler - t0, n0, left: g.player.inv.count('iron_ingot'), price: VR.Adv.sellPrice('iron_ingot'), msg: (document.querySelector('#shop .shopmsg') || {}).textContent, rows: document.querySelectorAll('#shop .shopitem').length }; });
     console.log('     ' + JSON.stringify(sell));
-    check(sell.listed && sell.got === sell.price && sell.left === sell.n0 - 1 && /verkauft/.test(sell.msg || ''), 'selling (Überleben): one iron ingot for ' + sell.price + ' Sterntaler — „' + sell.msg + '"');
+    check(sell.listed && sell.got === sell.price && sell.left === sell.n0 - 1 && /verkauft/.test(sell.msg || ''), 'selling (Überleben): one iron ingot for ' + sell.price + ' Heliataler — „' + sell.msg + '"');
     pics.sell = await shot('abenteuer_shop_sell');
     await toGame();
   });
@@ -466,10 +466,10 @@ try {
     await ev(() => { const b = document.querySelector('#shop [data-sact="cat"][data-key="fruit"]'); if (b) b.click(); });
     const buy = await ev(() => { const me = VR.Adventure.rec.me, t0 = me.taler, b = document.querySelector('#shop [data-sact="buy"]'), key = b.getAttribute('data-key'), e = VR.Shop.entry('supermarkt', key), n0 = VR.game.player.inv.count(e.id); b.click(); return { key, price: e.price, paid: t0 - me.taler, got: VR.game.player.inv.count(e.id) - n0, msg: (document.querySelector('#shop .shopmsg') || {}).textContent, tal: document.querySelector('#shop .shoptal b').textContent }; });
     console.log('     ' + JSON.stringify(buy));
-    check(buy.paid === buy.price && buy.got === 1 && /gekauft/.test(buy.msg || ''), 'bought: „' + buy.msg + '" (' + buy.price + ' Sterntaler, one in the backpack, the wallet shows ' + buy.tal + ')');
+    check(buy.paid === buy.price && buy.got === 1 && /gekauft/.test(buy.msg || ''), 'bought: „' + buy.msg + '" (' + buy.price + ' Heliataler, one in the backpack, the wallet shows ' + buy.tal + ')');
     pics.supermarkt = await shot('abenteuer_shop_supermarkt');
     const poor = await ev(() => { const me = VR.Adventure.rec.me; me.taler = 2; VR.Shop.render(); const b = [...document.querySelectorAll('#shop [data-sact="buy"]')].find(x => VR.Shop.entry('supermarkt', x.getAttribute('data-key')).price > 2); const key = b.getAttribute('data-key'), e = VR.Shop.entry('supermarkt', key), n0 = VR.game.player.inv.count(e.id); b.click(); return { price: e.price, taler: me.taler, got: VR.game.player.inv.count(e.id) - n0, msg: (document.querySelector('#shop .shopmsg') || {}).textContent, no: !!document.querySelector('#shop .shopmsg.no'), poorRows: document.querySelectorAll('#shop .shopitem.poor').length }; });
-    check(poor.taler === 2 && poor.got === 0 && poor.no && /fehlen dir noch \d+ Sterntaler/.test(poor.msg || ''), 'too few Taler: „' + poor.msg + '" — nothing paid, nothing given (' + poor.poorRows + ' things greyed)');
+    check(poor.taler === 2 && poor.got === 0 && poor.no && /fehlen dir noch \d+ Heliataler/.test(poor.msg || ''), 'too few Taler: „' + poor.msg + '" — nothing paid, nothing given (' + poor.poorRows + ' things greyed)');
     pics.poor = await shot('abenteuer_shop_poor');
     await page.keyboard.press('Escape'); await wait(250);
     const back = await screen();
@@ -563,11 +563,11 @@ try {
     const spec = { cols: [], w: 640, rows: [
       { label: 'create', labels: ['1 - Neue Welt bei 1280x720: Welt erstellen ohne Scrollen', '3 - der Stern ueber dem Kopf: ein Auftrag'], imgs: [pics.create || null, pics.marker || null] },
       { label: 'talk', labels: ['3 - das Angebot im Gespraech', '4 - ein Raetsel: drei Antworten'], imgs: [pics.offer || null, pics.riddle || null] },
-      { label: 'reward', labels: ['4 - richtig: EP, Sterntaler, ein Herz', '5 - das Tagebuch (J)'], imgs: [pics.reward || null, pics.journal || null] },
+      { label: 'reward', labels: ['4 - richtig: EP, Heliataler, ein Herz', '5 - das Tagebuch (J)'], imgs: [pics.reward || null, pics.journal || null] },
       { label: 'find', labels: ['5b - der vergessene Schal am Aussichtspunkt', '5b - zurueckgebracht: Erledigt'], imgs: [pics.find || null, pics.done || null] },
       { label: 'hangar', labels: ['6 - Hangar: Antrieb Stufe 1', '6 - Verkaufen im Hangar (Ueberleben)'], imgs: [pics.hangar || null, pics.sell || null] },
       { label: 'till', labels: ['6b - an der Kasse: die Kassiererin laedt ein', '6b - Supermarkt: gekauft'], imgs: [pics.till || null, pics.supermarkt || null] },
-      { label: 'pause', labels: ['6b - zu wenig Sterntaler', '5 - Pause: Tagebuch nach Abenteuer'], imgs: [pics.poor || null, pics.pause || null] },
+      { label: 'pause', labels: ['6b - zu wenig Heliataler', '5 - Pause: Tagebuch nach Abenteuer'], imgs: [pics.poor || null, pics.pause || null] },
     ] };
     fs.writeFileSync(SHOTS + 'abenteuer_sheet.json', JSON.stringify(spec));
     execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'abenteuer_sheet.jpg', SHOTS + 'abenteuer_sheet.json'], { stdio: 'inherit' });

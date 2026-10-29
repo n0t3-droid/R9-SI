@@ -21,6 +21,12 @@
 // t-sky3 adds the comparison of two runs of test/sky3.mjs (--runs before.json after.json: the ΔE of every band to the
 // frames' target of its hour, before → after, per view and as the mean per hour; the target: under 6 at the golden hour
 // and the dusk — printed; the check: every hour's mean no worse than before, the golden hour and the dusk better)
+// f-sky4 adds the structure the band means cannot see (docs/reviews/v0.49.md R50-01: a flat pastel sky passed the band
+// gate): structureOf (the critic's measure: the top 40 % of the picture's rows — the luma's sd and the HSV saturation —
+// and the bottom 40 % — the land's saturation), sunDiscOf (the ≥ 250-luma core through the sun's place, in degrees, and
+// the glow's fall), cloudsOf (a storm's clouds: their mean luma and their bases against their tops, R50-11) and the
+// review's gates on a run (--runs applies them to the run after; RUNS_FIT=1: the golden hour and the dusk need only hold
+// their mean ΔE against a run that already fitted them)
 // usage: node test/sky_ref.js [--write] [--overlay <dir>] [--runs <before.json> <after.json>]
 const fs = require('fs'), path = require('path');
 const sharp = require('/home/dev/.npm-global/lib/node_modules/sharp');
@@ -246,6 +252,125 @@ function hazeOf(img, H, inMask) {
   return { L0, width, profile: prof };
 }
 
+// ------------------------------------------------------------ f-sky4 · structure, the sun's disc, the clouds
+// The critic's structure measure (docs/reviews/v0.49.md R50-01 — a gate on band means passes a flat picture): on the
+// picture at 640 × 360 (load(file, 640, 360)), the top 40 % of the rows — the luma's (Rec. 709) standard deviation and the
+// mean HSV saturation (× 255) — and the bottom 40 % — the land's mean saturation. The trailer's golden frames t1_07 /
+// t1_09: sd 48.9 / 48.4, saturation 82.1 / 85.4, the land 114.6 / 114.9; the v0.48 sun view 37.8 / 79.3 / 166.7, v0.49's
+// 30.5 / 48.0 / 131.8
+const STRUCT = { top: 0.4, land: 0.6 };
+function structureOf(img) {
+  const W = img.w, Hh = img.h, yTop = Math.floor(Hh * STRUCT.top), yLand = Math.floor(Hh * STRUCT.land);
+  const sat = (r, g, b) => { const mx = Math.max(r, g, b), mn = Math.min(r, g, b); return mx > 0 ? (mx - mn) / mx * 255 : 0; };
+  let n = 0, s1 = 0, s2 = 0, st = 0, nl = 0, sl = 0;
+  for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
+    const p = (y * W + x) * 3, R = img.d[p], G = img.d[p + 1], B = img.d[p + 2];
+    if (y < yTop) { const l = luma(R, G, B); n++; s1 += l; s2 += l * l; st += sat(R, G, B); }
+    else if (y >= yLand) { nl++; sl += sat(R, G, B); }
+  }
+  const m = s1 / n;
+  return { luma: +m.toFixed(1), sd: +Math.sqrt(Math.max(0, s2 / n - m * m)).toFixed(1), sat: +(st / n).toFixed(1), land: +(sl / nl).toFixed(1) };
+}
+// the sun's disc: the run of pixels with luma ≥ SUN_CORE (≈ 98 %) along the row and the column through the brightest
+// pixel within `r` pixels of the sun's projected place (sx, sy), in degrees (pxPerDeg at that place); the ring means of
+// the luma at 1°, 2°, 3° and 5° from it (the glow's fall). null when the place is off the picture. The trailer's sun
+// (t1_07 at 640 px): a white core (≥ 247) of ~4 px radius, 231 at 8 px, 207 at 16, 155 at 32
+const SUN_CORE = 250;
+function sunDiscOf(img, sx, sy, pxPerDeg, r) {
+  const W = img.w, Hh = img.h, L = (x, y) => { const p = (y * W + x) * 3; return luma(img.d[p], img.d[p + 1], img.d[p + 2]); };
+  if (!(sx >= 0 && sy >= 0 && sx < W && sy < Hh)) return null;
+  r = r || Math.max(4, Math.round(pxPerDeg * 1.5));
+  let bx = Math.round(sx), by = Math.round(sy), bl = -1;
+  for (let y = Math.max(0, Math.round(sy) - r); y <= Math.min(Hh - 1, Math.round(sy) + r); y++) for (let x = Math.max(0, Math.round(sx) - r); x <= Math.min(W - 1, Math.round(sx) + r); x++) {
+    const l = L(x, y); if (l > bl) { bl = l; bx = x; by = y; }
+  }
+  const run = (dx, dy) => { if (L(bx, by) < SUN_CORE) return 0; let a = 0, b = 0; while (bx - (a + 1) * dx >= 0 && by - (a + 1) * dy >= 0 && L(bx - (a + 1) * dx, by - (a + 1) * dy) >= SUN_CORE) a++; while (bx + (b + 1) * dx < W && by + (b + 1) * dy < Hh && L(bx + (b + 1) * dx, by + (b + 1) * dy) >= SUN_CORE) b++; return a + b + 1; };
+  const wpx = Math.min(run(1, 0), run(0, 1));
+  const ring = (deg) => { const rr = deg * pxPerDeg; let s = 0, k = 0; for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2, x = Math.round(bx + Math.cos(a) * rr), y = Math.round(by + Math.sin(a) * rr); if (x >= 0 && y >= 0 && x < W && y < Hh) { s += L(x, y); k++; } } return k ? +(s / k).toFixed(1) : null; };
+  return { x: bx, y: by, max: +bl.toFixed(1), core: wpx, width: +(wpx / pxPerDeg).toFixed(2), ring: { 1: ring(1), 2: ring(2), 3: ring(3), 5: ring(5) } };
+}
+// the clouds (R50-11): the pixels isCloud(x, y) says are cloud (sky3.mjs: not sky in the sky probe, over the horizon
+// line) — their mean luma, and per column each vertical run of cloud ≥ 6 px: the mean luma of its lowest third over its
+// highest third (summed over the runs: the bases against the tops). A storm's: mean ≤ 120, base/top ≤ 0.55
+function cloudsOf(img, isCloud) {
+  const W = img.w, Hh = img.h, L = (x, y) => { const p = (y * W + x) * 3; return luma(img.d[p], img.d[p + 1], img.d[p + 2]); };
+  let n = 0, s = 0, lo = 0, hi = 0, runs = 0;
+  for (let x = 0; x < W; x++) {
+    let y0 = -1;
+    for (let y = 0; y <= Hh; y++) {
+      const c = y < Hh && isCloud(x, y);
+      if (c) { n++; s += L(x, y); if (y0 < 0) y0 = y; continue; }
+      if (y0 >= 0) {
+        const len = y - y0;
+        if (len >= 6) { const t = Math.max(2, Math.floor(len / 3)); let a = 0, b = 0; for (let k = 0; k < t; k++) { a += L(x, y0 + k); b += L(x, y - 1 - k); } hi += a / t; lo += b / t; runs++; }
+        y0 = -1;
+      }
+    }
+  }
+  return n < 200 ? { n } : { n, share: +(n / (W * Hh)).toFixed(3), mean: +(s / n).toFixed(1), ratio: runs && hi > 0 ? +(lo / hi).toFixed(3) : null, runs };
+}
+// f-sky4 · the parts the band means cannot see, of one picture (img, at W × H; pr: its sky probe, the sky pass painted
+// magenta, or null): the critic's structure, the sun's disc where the sun stands in the picture (its place the pixel
+// nearest its direction — geo.inv the inverse view-projection, geo.sun its direction; a coarse search, then a fine one;
+// fovDeg the vertical lens), with clouds the clouds over the land (the probe's non-sky pixels above each column's lowest
+// sky pixel). Used by test/sky3.mjs and test/wow48.mjs
+function looksOf(img, pr, geo, o) {
+  const W = img.w, H = img.h, fov = (o && o.fovDeg) || 72;
+  const out = { structure: structureOf(img) };
+  const mv = (m, v) => [0, 1, 2, 3].map(i => m[i] * v[0] + m[4 + i] * v[1] + m[8 + i] * v[2] + m[12 + i] * v[3]);
+  const nv = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const an = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])));
+  const dirAt = (x, y) => { const c = mv(geo.inv, [(x + 0.5) / W * 2 - 1, 1 - (y + 0.5) / H * 2, 1, 1]); return nv([c[0] / c[3], c[1] / c[3], c[2] / c[3]]); };
+  if (geo && geo.inv && geo.sun) {
+    let best = [1e9, 0, 0];
+    for (let y = 0; y < H; y += 4) for (let x = 0; x < W; x += 4) { const a = an(dirAt(x, y), geo.sun); if (a < best[0]) best = [a, x, y]; }
+    if (best[0] < 3 * Math.PI / 180) { const [, bx, by] = best; for (let y = Math.max(0, by - 4); y <= Math.min(H - 1, by + 4); y++) for (let x = Math.max(0, bx - 4); x <= Math.min(W - 1, bx + 4); x++) { const a = an(dirAt(x, y), geo.sun); if (a < best[0]) best = [a, x, y]; } }
+    const pxPerDeg = (H / 2) / Math.tan(fov / 2 * Math.PI / 180) * Math.PI / 180;
+    if (best[0] < 0.6 * Math.PI / 180) out.disc = sunDiscOf(img, best[1], best[2], pxPerDeg);   // (the sun not in the picture: no disc to see)
+  }
+  if (o && o.clouds && pr) {
+    const isSky = (x, y) => { const p = (y * W + x) * 3, R = pr.d[p], G = pr.d[p + 1], B = pr.d[p + 2]; return R > 140 && B > 140 && G < 0.55 * Math.min(R, B); };
+    const low = new Int32Array(W).fill(-1);
+    for (let x = 0; x < W; x++) for (let y = H - 1; y >= 0; y--) if (isSky(x, y)) { low[x] = y; break; }
+    // (a cloud has breadth: the rain's streaks and the air's motes over the probe's magenta are 1–3 px wide — a pixel is
+    // cloud where the probe has no sky 2 px to its left and to its right as well)
+    const solid = (x, y) => !isSky(x, y) && (x < 2 || !isSky(x - 2, y)) && (x >= W - 2 || !isSky(x + 2, y));
+    out.clouds = cloudsOf(img, (x, y) => low[x] > y && solid(x, y));
+  }
+  return out;
+}
+// the gates of the review's R50-01 and R50-11 on one run's views (sky3.mjs's JSON or wow48.mjs's record: each view's
+// structure, disc, clouds where measured): the golden views' band means close to the frames' (their mean ΔE ≤ 8: the
+// frames' band 4 is the magenta beside their sun — a view facing away from the sun cannot match it band by band without
+// pink everywhere, the milk the review measured), sd ≥ 40, sky saturation ≥ 75, land ≥ 90; a visible disc where the sun
+// stands in a clear golden picture (a ≥ 250-luma core ≥ 0.4° wide); a storm's clouds mean ≤ 120, base/top ≤ 0.55
+const GATES = { dE: 8, sd: 40, sat: 75, land: 90, disc: 0.4, cloudMean: 120, cloudRatio: 0.55 };
+function gates(views) {
+  const out = [];
+  for (const v of views) {
+    const nm = v.view || v.name;
+    if (v.hour === 'golden' && v.dE && v.curve) {
+      const ds = v.dE.filter((d, k) => d !== null && v.curve[k] && v.curve[k].n >= 100), m = ds.length ? ds.reduce((a, b) => a + b, 0) / ds.length : Infinity;
+      out.push({ ok: m <= GATES.dE, msg: `${nm}: the band means close to the golden target (mean ΔE ${m.toFixed(1)} ≤ ${GATES.dE}; ${v.dE.map(d => (d === null ? '—' : d.toFixed(0))).join(' ')})` });
+    }
+    if (v.hour === 'golden' || v.golden) {
+      const S = v.structure;
+      if (!S) out.push({ ok: true, msg: `${nm}: no structure numbers (an older run)` });
+      else {
+        out.push({ ok: S.sd >= GATES.sd, msg: `${nm}: the top 40 % has contrast (luma sd ${S.sd} ≥ ${GATES.sd}; the frames 49)` });
+        out.push({ ok: S.sat >= GATES.sat, msg: `${nm}: the sky has colour (saturation ${S.sat} ≥ ${GATES.sat}; the frames 82–85)` });
+        out.push({ ok: S.land >= GATES.land, msg: `${nm}: the land has colour (saturation ${S.land} ≥ ${GATES.land}; the frames 115)` });
+      }
+    }
+    if (v.disc !== undefined && v.disc !== null && (v.hour === 'golden' || v.golden) && v.clouds === undefined) out.push({ ok: v.disc.width >= GATES.disc, msg: `${nm}: a visible sun disc (a ≥ ${SUN_CORE}-luma core ${v.disc.width}° wide, max ${v.disc.max}; ≥ ${GATES.disc}°)` });
+    if (v.clouds !== undefined && /storm/.test(nm)) {
+      const C = v.clouds;
+      out.push({ ok: !!C && C.mean <= GATES.cloudMean && C.ratio !== null && C.ratio <= GATES.cloudRatio, msg: `${nm}: the storm's clouds have weight (mean luma ${C ? C.mean : '—'} ≤ ${GATES.cloudMean}, base/top ${C ? C.ratio : '—'} ≤ ${GATES.cloudRatio}; ${C ? C.n : 0} px)` });
+    }
+  }
+  return out;
+}
+
 // ------------------------------------------------------------ the frames and the targets
 async function measureFrames() {
   const out = {};
@@ -319,7 +444,7 @@ async function overlay(dir) {
 function compareRuns(before, after) {
   const mean = (v) => { const w = (v || []).filter(x => x !== null && x !== undefined); return w.length ? w.reduce((a, b) => a + b, 0) / w.length : null; };
   const rows = [], hours = {};
-  for (const a of after.results.filter(r => r.dE && r.preset === 'high')) {
+  for (const a of after.results.filter(r => r.dE && r.preset === 'high' && !r.variant)) {
     const b = before.results.find(x => x.view === a.view && x.preset === a.preset && x.dE);
     rows.push({ view: a.view, hour: a.hour, before: b ? b.dE : null, after: a.dE, mb: b ? mean(b.dE) : null, ma: mean(a.dE) });
     const h = hours[a.hour] || (hours[a.hour] = { a: [], b: [] });
@@ -329,7 +454,7 @@ function compareRuns(before, after) {
   return { rows, hours };
 }
 
-module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, hfOf, measureFrames, targetOf, reference, compare, compareRuns, REF };
+module.exports = { NB, FRAMES, STAR_T, HAZE_L, NSLICE, lab, rgbOf, dE, lch, load, bandRows, rectMask, bandOf, curveOf, spaceOf, starsOf, chromaOf, hazeOf, hfOf, measureFrames, targetOf, reference, compare, compareRuns, REF, structureOf, sunDiscOf, cloudsOf, looksOf, gates, GATES, SUN_CORE, STRUCT };
 
 if (require.main === module) {
   (async () => {
@@ -342,12 +467,20 @@ if (require.main === module) {
       for (const r of C.rows) console.log(`  ${r.view.padEnd(18)} ${r.before ? r.before.map(f).join(' ') : '(none)'}  (${r.mb === null ? '—' : r.mb.toFixed(1)})  →  ${r.after.map(f).join(' ')}  (${r.ma.toFixed(1)})`);
       let fails = 0;
       const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
+      // (f-sky4: the golden hour and the dusk "better" against the build before only while that build was the old palette;
+      // against t-sky3's fit — means already near the frames' — they must hold (≤ +0.5), the structure gates below decide)
+      const fit = process.env.RUNS_FIT === '1';
       for (const h of ['noon', 'golden', 'dusk', 'afterglow', 'dawn']) {
         const H = C.hours[h]; if (!H || H.mb === null) continue;
         const tgt = h === 'golden' || h === 'dusk' ? `; the target under 6: ${H.ma < 6 ? 'reached' : 'not yet'}` : '';
-        if (h === 'golden' || h === 'dusk') check(H.ma < H.mb, `${h}: the mean ΔE ${H.mb.toFixed(2)} → ${H.ma.toFixed(2)} (better${tgt})`);
+        if ((h === 'golden' || h === 'dusk') && !fit) check(H.ma < H.mb, `${h}: the mean ΔE ${H.mb.toFixed(2)} → ${H.ma.toFixed(2)} (better${tgt})`);
         else check(H.ma <= H.mb + 0.5, `${h}: the mean ΔE ${H.mb.toFixed(2)} → ${H.ma.toFixed(2)} (no worse${tgt})`);
       }
+      // f-sky4 · the structure, the disc and the clouds of the run after (the review's R50-01 and R50-11 gates)
+      const after = JSON.parse(fs.readFileSync(args[2], 'utf8'));
+      const G = gates((after.results || after.views || []).filter(v => (!v.preset || v.preset === 'high') && !v.variant));   // (sky3.mjs's palette variants are for the record)
+      if (G.length) console.log('the review\'s gates (structure, the sun\'s disc, the storm\'s clouds) on ' + args[2]);
+      for (const g of G) check(g.ok, g.msg);
       console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
       process.exit(fails ? 1 : 0);
     }
@@ -408,6 +541,27 @@ if (require.main === module) {
       'the stored fine structure of the top band (per frame and target) is this measurement');
     const hfN = TD.frames.filter(n => ref.frames[n].hf !== null).length;
     check(hfN >= 5 && TD.hf > 100 && ref.frames.t1_05.hf > 50 && ref.frames.t3_05.hf > TD.hf, `day: the top band has fine structure, ${hfN} frames (the variance of the 3-px Laplacian: median ${TD.hf}; t1_05 ${ref.frames.t1_05.hf}, t3_05 ${ref.frames.t3_05.hf})`);
+    // f-sky4: the critic's structure measure on the golden frames (docs/reviews/v0.49.md: sd 49, saturation 82–85, the
+    // land 115) and the trailer's sun (t1_07: a white core)
+    {
+      const S7 = structureOf(await load(path.join(FRAMES_DIR, 't1_07.jpg'), 640, 360)), S9 = structureOf(await load(path.join(FRAMES_DIR, 't1_09.jpg'), 640, 360));
+      // (±1: the review's numbers to the resampling filter — sharp's lanczos here, 48.9 / 82.1 / 114.6 with PIL's bicubic)
+      check(Math.abs(S7.sd - 48.9) < 1 && Math.abs(S9.sd - 48.4) < 1 && Math.abs(S7.sat - 82.1) < 1 && Math.abs(S9.sat - 85.4) < 1 && Math.abs(S7.land - 114.6) < 1 && Math.abs(S9.land - 114.9) < 1,
+        `the structure measure: the golden frames' top 40 % luma sd ${S7.sd} / ${S9.sd}, saturation ${S7.sat} / ${S9.sat}, the land ${S7.land} / ${S9.land} (the review's 49, 82–85, 115)`);
+      const D7 = sunDiscOf(await load(path.join(FRAMES_DIR, 't1_07.jpg')), 541, 38, 7, 6);
+      check(!!D7 && D7.max > 250 && D7.core >= 3 && D7.ring[1] > D7.ring[3] && D7.ring[3] > D7.ring[5], `the sun-disc measure on t1_07: a white core ${D7 ? D7.core : 0} px (max ${D7 ? D7.max : '—'}), the glow falling (1°/3°/5°: ${D7 ? [D7.ring[1], D7.ring[3], D7.ring[5]].join(' / ') : '—'})`);
+      // the clouds' measure counts clouds, not the rain: a storm's sky probe has the rain's streaks over its magenta (wow48
+      // run of f-sky4: 1–2 px wide, as vertical runs of 6–30 px with base = top, they lifted base/top 0.53 → 0.63). A cloud
+      // (60 × 30, its top 160, its base 60), two steep 1-px streaks of 200 (one over the cloud) and a 3-px mote: the streak and the mote are not cloud
+      const W = 160, Hh = 90, im = { w: W, h: Hh, d: new Uint8Array(W * Hh * 3) }, pr = { w: W, h: Hh, d: new Uint8Array(W * Hh * 3) };
+      const put = (o, x, y, v) => { const p = (y * W + x) * 3; o.d[p] = v[0]; o.d[p + 1] = v[1]; o.d[p + 2] = v[2]; };
+      for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) { put(im, x, y, y < 70 ? [120, 110, 150] : [40, 60, 30]); put(pr, x, y, y < 70 ? [230, 20, 230] : [40, 60, 30]); }
+      for (let y = 20; y < 50; y++) for (let x = 20; x < 80; x++) { const v = Math.round(160 - 100 * (y - 20) / 29); put(im, x, y, [v, v, v]); put(pr, x, y, [v, v, v]); }
+      for (let y = 2; y < 68; y++) for (const x0 of [44, 100]) { const x = x0 + Math.round(y * 0.08); put(im, x, y, [200, 200, 200]); put(pr, x, y, [200, 200, 200]); }
+      for (let y = 10; y < 13; y++) for (let x = 130; x < 133; x++) { put(im, x, y, [210, 200, 90]); put(pr, x, y, [210, 200, 90]); }
+      const Cm = looksOf(im, pr, null, { clouds: true }).clouds, own = cloudsOf(im, (x, y) => x >= 22 && x < 78 && y >= 20 && y < 50);
+      check(!!Cm && Cm.ratio !== null && Math.abs(Cm.ratio - own.ratio) < 0.02 && Math.abs(Cm.mean - own.mean) < 3, `the clouds' measure leaves the rain's streaks and the motes out: base/top ${Cm ? Cm.ratio : '—'} (the cloud's own ${own.ratio}), mean ${Cm ? Cm.mean : '—'} (${own.mean})`);
+    }
     console.log(fails === 0 ? 'ALL OK' : 'FAILED ' + fails);
     process.exit(fails ? 1 : 0);
   })().catch(e => { console.error(e); console.log('FAILED 1'); process.exit(1); });

@@ -108,6 +108,51 @@ a 25-block-wide palace with a twin-column portico, balustrade balconies, quoins 
 grand checkered hall with a double staircase under a two-storey glass front, salon with fireplace and piano, dining
 hall, library or home cinema, a bar, and a **glass swimming hall** with a tiled pool behind the dining wing.
 
+### 🚀 Into orbit, 🌑 the first moons, 🧭 Funke, ⭐ quests and shops, 🏠 a new life elsewhere (v0.50)
+**🚀 Into orbit.** A starship no longer stops at 252 m: it climbs on, the land bends away beneath it (the world's curve
+in the terrain and horizon programs, Very Low included), the sky thins from blue to black with a 400-m scale height,
+the stars come out, the limb of Herzwelt appears and Amarant and the moons glide from their postcard places to where
+they really stand. At 2 500 m space takes over without a wall. In space the ship flies Newtonian — gravity μ/r², patched
+conics, a Verlet step under thrust and exact coasting between burns —, the cockpit's navigation tile draws the ghost path
+of the orbit, and the autopilot knows „Zum Orbit" and „Kreisbahn" (a 3-km orbit takes 11.0 minutes, as the physics says
+at our scale of 1/64). Coming home is a re-entry through glowing plasma to a landing anywhere on Herzwelt — 90 km away
+the local time is another hour of the day. From orbit a six-second Reisesprung reaches any body of Helia, and Heimkehr
+works from space too.
+
+**🌑 The first moons.** **Basalt** — black sky with stars at noon, Amarant rising full with its ring seen edge-on, dark
+maria and bright highlands, craters sized by the real crater laws (bowls, and above the transition central peaks and
+terraces), rays, boulders, rilles, impact flashes; jumps of 8 m. **Opal** — an ice moon with reddish-brown lineae,
+chaos, four tiger stripes whose geysers fire every 40–90 s kilometres high, an eclipse when Amarant covers the sun (the
+jets go dark), jumps of 27 m and long, slow falls. Both are worlds of the same save (`/dim basalt`, `/dim opal`, and by
+ship); the suit's breath and fans replace the air's sounds, eight codex pages tell what they are.
+
+**🏠 A new life elsewhere.** A bed or „📍 Hier wohne ich" in the pause menu makes any world your home: you respawn
+there, the pause menu offers 🏠 Zuhause (your world) and 🌍 Herzwelt side by side, the compass points home, the start
+screen's card says where you live and where you were, and ships left on other worlds come home with Heimkehr. Heimkehr
+itself lands you looking out through the Hangar's portal instead of at the craft, in under a second when the way home
+was kept warm.
+
+**🧭 Funke and one key for everything.** Funke, a small glowing drone of our own design, flies at your shoulder, shows
+the way with a line of light, scans for chests and ores, takes a photo of you from where it hovers, tells you what is
+worth seeing soon („In einer Minute kommt der Sonnenuntergang — perfekt für ein Foto!") and keeps quiet while you build
+(„Funke, Ruhe!" mutes it). **V is the action key**: it does the right thing for what you look at; aim at something far
+away and press V — you walk there, or a shuttle lands beside you and flies you there, filmed like a film (the call, the
+pad, take-off, chase, approach, landing, the arrival's caption); any movement key takes over. Hold V for Heimkehr.
+The HUD fades when it has nothing to say.
+
+**⭐ The Abenteuer grows** (still a choice per world: „Wie willst du spielen?" — 🏗 Frei bauen, the peaceful default ·
+🧭 Abenteuer, sanft · ⚔ mit Begegnungen; Kindersicher shows the first two). Villagers with a quest wear a gold star:
+bring, build, find, escort, photograph, repair, riddles built from real astronomy; the Tagebuch (J) keeps them with
+direction and distance; rewards are experience, **Heliataler** (the coin — renamed from „Sterntaler" after a name check)
+and friendship. The supermarket's cashiers and the Hangar sell and buy — engines, shields, Funke's scanner and camera.
+
+**🔧 What the v0.49 review asked for.** The first frame of a new world looks at its landmark large and clear (a sight
+test picks the vista; 10–11 % of the picture instead of 2–3 %, nothing in front), the floating leaf block is gone (new
+worlds, `vgen` 13), the director lets different things happen in turn instead of a ship every twelve seconds (fly-bys at
+most a third of the acts, quiet stretches filled with herons, rays or the murmuration), contrails widen, break into puffs
+and fade within six seconds, the never-boring sessions play their full five minutes, the ray is called **Wolkenrochen /
+Cloud Ray**, and the player's page is 23 % smaller (comments stripped: 11.4 → 8.7 MB; `index.debug.html` keeps them).
+
 ### 🌅 The sky, 🐦 the wild, 🎬 the first minute, ✨ the gaps closed, 🌍 the foundations of the universe (v0.49)
 **🌅 The sky perfected** (`sky3`, `cloudVol`; Low and up, the far layers from Balanced; Very Low as before). Measured
 against the trailer frames per band: the golden hour ΔE 26.7 → 6.8, dusk 11.7 → 5.1 (noon unchanged at 5.1). The

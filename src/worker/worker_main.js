@@ -261,7 +261,9 @@
         // are none; the land plan is the one the first chunks need anyway (a town plan it waits for parks the job: VG.probe)
         const g = getGen(m.dim), VI = VR.Vista, LANDm = VR.Land;
         let list = [];
-        try { if (VI && LANDm && VI.on(g)) list = (LANDm.plan(g).vistas || []).map(v => ({ id: v.id, x: v.x, y: v.y, z: v.z, u: v.u, eye: v.eye, yaw: v.yaw, pitch: v.pitch, fov: v.fov, lm: v.lm, wow: !!v.wow, score: v.score, aim: v.aim, d: v.d })); }
+        // (f-arrival: VI.arrivals adds the sight test's measures and the arrival's camera to the wow vistas, best score
+        // first, until one passes — gen_vista.js; first.js FI.pick takes it)
+        try { if (VI && LANDm && VI.on(g)) { const P = LANDm.plan(g); list = VI.arrivals ? VI.arrivals(g, P, { budget: 6000 }) : (P.vistas || []).map(v => ({ id: v.id, x: v.x, y: v.y, z: v.z, u: v.u, eye: v.eye, yaw: v.yaw, pitch: v.pitch, fov: v.fov, lm: v.lm, wow: !!v.wow, score: v.score, aim: v.aim, d: v.d })); } }
         catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; list = []; }
         post({ type: 'vistas', id: m.id, list });
       } else if (m.type === 'surface') {

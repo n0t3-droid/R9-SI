@@ -182,6 +182,7 @@
   // perspective's distance, the morning layer (thicker and lower round sunrise); the sea level is the Heartland's 62
   // (by day a light haze — the far shore stays crisp at noon; the valleys fill toward evening, at night and at dawn)
   const FOG = { day: [0.0007, 1 / 14, 62], gold: [0.0016, 1 / 13, 62], dusk: [0.0022, 1 / 12, 60], night: [0.0016, 1 / 12, 60] };
+  L2.FOG = FOG;   // (f-sky4: open to the tests — sky3.mjs's palette variants try the golden valley haze too)
   L2.air = function (E, ticks) {
     const m = L2.moods(E.sunDir[1]);
     const f = byMood(m, FOG);
@@ -190,12 +191,15 @@
     const morning = sstep(-1800, -200, mt) * (1 - sstep(1200, 3000, mt));
     const rho = f[0] * (1 + 2.2 * morning), k = f[1] * (1 + 0.8 * morning), base = f[2] - 1.5 * morning;
     const rain = E.rain || 0;
-    // the mist toward the sun glows (forward scattering): a little by day, most in the golden hour
-    const sunK = byMood(m, { day: 0.12, gold: 0.3, dusk: 0.2, night: 0 });
+    // the mist toward the sun glows (forward scattering): a little by day, most in the golden hour (f-sky4, R50-01: halved
+    // at the golden hour — 0.3 veiled the far land toward the sun in pink)
+    const sunK = byMood(m, { day: 0.12, gold: 0.15, dusk: 0.2, night: 0 });
     // the aerial perspective: 1 − exp(−(d / apDist)²) of apMax — the near and the middle ground clear, the far planes
-    // a step paler each (t1_05, t3_06)
-    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: 0.55, sunK, morning, moods: m };
+    // a step paler each (t1_05, t3_06). (f-sky4, R50-01 after sky3.mjs run 1: at the golden hour 0.55 of the luminous
+    // horizon washed the far land to a pink-white; the frames' far islands keep their green under a blue haze — 0.35)
+    return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: byMood(m, AP), sunK, morning, moods: m };
   };
+  const AP = { day: 0.55, gold: 0.35, dusk: 0.55, night: 0.55 };
   // t-polish2 · the room's air (gap 8, the Hangar Hall: t1_12, t1_13 — the hall's air holds the cyan of its strips): where
   // the eye stands indoors (its sky light low) the air takes the colour of the lamps round it — the block light of a few
   // cells round the eye, averaged and eased — thin: col → mix(col, room, 1 − e^(−min(d, max)·rho)). Outdoors nothing (the
@@ -224,10 +228,18 @@
   L2.FARLIT = { night: 1.6, pierce: 1600 };
   L2.farLight = (nightW) => 1 + L2.FARLIT.night * clamp(nightW, 0, 1);
   L2.farPierce = (d) => Math.exp(-Math.max(d, 0) / L2.FARLIT.pierce);
-  // the valley mist's colour: between the horizon's and the fog's, a little lighter by day
+  // the valley mist's colour: between the horizon's and the fog's, a little lighter by day.
+  // (f-sky4, R50-01 after sky3.mjs run 1: at the golden hour that was the luminous horizon's pink-white — 229,216,217 on
+  // the screen — and the far land and the valleys under the isles read as milk; the frames' far land is blue 109,148,189
+  // away from their sun and a pale blue-lilac 192,198,227 beside it. So at the golden hour the mist takes a pale blue-lilac
+  // of its own (MIST_GOLD, ~188,195,228 through the golden grade), less in rain; toward the sun it still glows warm: l2Fog
+  // adds the sun's colour × sunK there)
+  L2.MIST_GOLD = [0.42, 0.49, 0.8];
   L2.mistColor = function (E) {
     const h = E.horizon || [0.6, 0.7, 0.8], f = E.fogColor || h, m = L2.moods(E.sunDir[1]), lift = 1 + 0.08 * m.day;
-    return [(h[0] + f[0]) * 0.5 * lift, (h[1] + f[1]) * 0.5 * lift, (h[2] + f[2]) * 0.5 * lift];
+    const w = m.gold * (1 - clamp(E.rain || 0, 0, 1)), c = L2.MIST_GOLD, o = [0, 0, 0];
+    for (let i = 0; i < 3; i++) { const v = (h[i] + f[i]) * 0.5 * lift; o[i] = v + (c[i] - v) * w; }
+    return o;
   };
 
   // ---------------------------------------------------------------- step 5 · the grade
@@ -257,7 +269,11 @@
     // the halved lean at 2.3 — over both sets (test/land_grade.js, 320 × 180) v0.48 sits at 6.2; now the lights ×0.85 and
     // the shade's cool lean ×1.5: split 6.1, bands ΔE 30.9 / 29.8 → 29.3 / 28.3)
     day: { toe: 0.014, mid: 0.5, s: 0.3, sh: 0.985, dark: [0.008, 0.004, -0.012], light: [-0.008, 0.002, 0.014], sat: 1.1, vig: 0.16, bThr: 1.05, bStr: 0.13 },
-    gold: { toe: 0.016, mid: 0.5, s: 0.26, sh: 0.985, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.04, vig: 0.2, bThr: 0.9, bStr: 0.17 },
+    // (f-sky4, docs/reviews/v0.49.md R50-01: with t-sky3's band fit on top, 1.04 / 0.26 left the golden hour grey — the land's
+    // saturation 115 in the frames, 69 in v0.49's lake; refitted together with the sky (sky3.js PAL.gold): the saturation
+    // 1.2, the S back to 0.32, the shoulder at white (the sun's core and the trailer's whites reach 255), the bloom's
+    // threshold over the sky (1.3: at 0.9 the whole bright horizon bloomed into a veil))
+    gold: { toe: 0.016, mid: 0.5, s: 0.32, sh: 1.0, dark: [-0.03, 0.0, 0.06], light: [0.0527, 0.0187, -0.0383], sat: 1.2, vig: 0.2, bThr: 1.3, bStr: 0.17 },
     dusk: { toe: 0.022, mid: 0.5, s: 0.28, sh: 0.975, dark: [0.01, -0.014, 0.05], light: [0.065, 0.018, -0.035], sat: 1.15, vig: 0.24, bThr: 0.75, bStr: 0.22 },
     night: { toe: 0.026, mid: 0.48, s: 0.25, sh: 0.97, dark: [-0.026, 0.016, 0.042], light: [0.055, 0.022, -0.028], sat: 1.08, vig: 0.28, bThr: 0.62, bStr: 0.25 },
   };

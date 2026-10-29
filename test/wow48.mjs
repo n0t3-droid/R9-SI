@@ -51,6 +51,11 @@ const DIST = process.env.DIST || 'file://' + ROOT + 'dist/index.html';
 const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const PRESET = 'high', RD = 8, EYE = 1.62;
 const SHOTS = ROOT + 'test/shots/';
+// f-sky4 (docs/reviews/v0.49.md R50-01, R50-11): the sun, the lake, the storm and the rainbow measured as the critic did
+// (test/sky_ref.js looksOf: the top 40 %'s luma sd and saturation, the land's saturation, the sun's disc; the storm's
+// clouds on a sky-probe frame — their mean luma, base over top) into the record (out.looks) and the review's gates
+const SR = require(ROOT + 'test/sky_ref.js'), LOOKS = ['sun', 'lake', 'storm', 'rainbow'];
+const TMPD = ROOT + '.tmp_tests/'; fs.mkdirSync(TMPD, { recursive: true });
 // the fronts' times of day
 const L2T = { noon: 6000, golden: 10800, dusk: 12600, night: 16500 };   // test/light2.mjs TIMES
 const MAT = { am: 4000, noon: 6000, golden: 12500, night: 16000 };      // test/material.mjs
@@ -397,6 +402,21 @@ async function shootView(A, v, path) {
     out.trail.pic = await A.picture(tp2, { tod: null, frames: 4 });
     console.log(`  the meadow with a low pass: ${JSON.stringify(out.trail)}`);
   }
+  if (LOOKS.includes(v.name)) {
+    // f-sky4: the camera of the picture (its inverse view-projection, the sun) and, for the storm, the sky probe
+    try {
+      const geo = await A.ev(() => { const g = VR.game, R = g.renderer, E = g.env.E; return { inv: Array.from(R.invVPNJ || R.invViewProj), sun: E.sunDir.slice(), fov: g.settings.fov }; });
+      let pr = null;
+      if (v.name === 'storm') {
+        const probe = `${TMPD}wow48probe_${v.name}_${TAG}.png`;
+        await A.ev(() => { window.__norender = false; const g = VR.game, R = g.renderer, G = VR.Grade || {}, rays = G.rays; G.rays = 0; R.skyProbe = true; try { for (let i = 0; i < 2; i++) { g.last = performance.now() - 33; g.loop(performance.now()); } R.gl.finish(); } finally { R.skyProbe = false; G.rays = rays; window.__norender = true; } });
+        await A.page.screenshot({ path: probe, timeout: 90000 });
+        pr = await SR.load(probe, 640, 360);
+      }
+      out.looks = SR.looksOf(await SR.load(path, 640, 360), pr, geo, { fovDeg: geo.fov || v.fov || 70, clouds: v.name === 'storm' });
+      out.looks.golden = v.tod === L2T.golden;
+    } catch (e) { out.looks = { error: String(e.message || e).split('\n')[0].slice(0, 200) }; }
+  }
   if (v.front === 'material') await A.weather('dry');
   return out;
 }
@@ -435,6 +455,7 @@ for (const v of SHOOT) {
     out.blank = !nb.ok; out.lum = [nb.mean, nb.sd];
     if (fs.existsSync(path)) { pics++; if (!nb.ok) blank.push(v.name); } else failed.push(v.name);
     const s1 = out.settle[1] || {}, s0 = out.settle[0] || {}, done = s1.near >= 0;
+    if (out.looks) console.log(`  ${v.name} looks: ${JSON.stringify(out.looks)}`);
     console.log(`  ${v.name}: settled in ${out.settleS} s (the columns ${s0.s} s, at the pose ${s1.s} s, near after ${s1.near} s${done ? '' : ' — NOT complete'}: ${JSON.stringify({ pend: s1.pend, dirty: s1.dirty, up: s1.up, unshown: s1.unshown, busy: s1.busy, hz: s1.hz, far: s1.far })}) · picture ${out.picS} s (${JSON.stringify(out.st)}, L ${nb.mean} ±${nb.sd}) · ${JSON.stringify(out.pose)}${out.bolt !== undefined ? ' · bolt ' + out.bolt : ''}${out.sunDir ? ' · sun ' + JSON.stringify(out.sunDir) : ''} → ${path.replace(/^.*test\//, 'test/')} (${secs()})`);
   } catch (e) {
     const msg = String(e.message || e).split('\n')[0].slice(0, 240);
@@ -451,6 +472,8 @@ check(blank.length === 0, `${TAG}: no picture is blank (${blank.length}${blank.l
 const errs = A ? A.logs.filter(l => l.startsWith('[pageerror]')) : [];
 console.log(`--- ${TAG} logs (${A ? A.logs.length : 0})`); if (A) for (const l of A.logs.slice(0, 12)) console.log(l);
 check(errs.length === 0, `${TAG}: no page error (${errs.length})`);
+// f-sky4 · the review's gates on the measured views (the golden ones' structure and disc, the storm's clouds)
+for (const g of SR.gates(rec.views.filter(q => q.looks && !q.looks.error && SHOOT.some(v => v.name === q.name)).map(q => Object.assign({ name: q.name, golden: q.looks.golden }, q.looks)))) check(g.ok, `${TAG}: gate ` + g.msg);
 rec.failed = failed; rec.blank = blank; save();
 if (A) await Promise.race([A.ctx.close().catch(() => {}), new Promise(ok => setTimeout(ok, 30000))]);
 await browser.close();

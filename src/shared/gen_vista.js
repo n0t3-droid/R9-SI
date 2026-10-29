@@ -561,7 +561,9 @@
       const q = { x: V.aim[0], z: V.aim[2], top: V.aim[1], r: 4 }, [ex, ey, ez] = V.eye;
       const d = Math.hypot(q.x - ex, q.z - ez), half = Math.min(14, Math.round(Math.tan(Math.atan2((V.box[3] - V.box[0]) / 2, d) + 4 * DEG) * 30));
       const w = corridor(ex, ey, ez, q, Math.max(6, half) + 3, 160);
-      P.windows.push({ vista: V.id, x: Math.round(ex), z: Math.round(ez), lm: V.lm, len: w.len, cut: w.cut });
+      // (f-arrival, vgen 13: and the whole landmark's cone — VISTA.clearCone)
+      const c = VISTA.coneOn(g) ? VISTA.clearCone(g, P, V) : null;
+      P.windows.push(c ? { vista: V.id, x: Math.round(ex), z: Math.round(ez), lm: V.lm, len: Math.max(w.len, c.len), cut: w.cut + c.cut, cone: c.cells } : { vista: V.id, x: Math.round(ex), z: Math.round(ez), lm: V.lm, len: w.len, cut: w.cut });
     }
     // the ways
     P.lines.forEach((Ln, li) => {
@@ -593,6 +595,48 @@
     });
   };
 
+  // ---- f-arrival (vgen 13; docs/superpowers/plans/2026-10-23-f-arrival.md §3.2): a vista's view cleared as a cone, not
+  // a corridor — the corridor (constant width, the line to the landmark's top) fell behind the cone after ~60 blocks and
+  // let the woods hide the landmark's lower half (v0.49's arrivals: 15 of 25 wow vistas of two seeds hid more than 10 %
+  // of it). Every keep cell whose middle lies in the landmark's span from the eye (all of it: every member of the isles)
+  // and 2° more — a crown's reach beyond (a cherry's 9, a dark or fancy oak's 5, the rest 3) —, from 3 blocks to the
+  // landmark's near edge (220 at most), where a tree (15 high, on the land's raster ±2) could reach the line to the
+  // landmark's lower fifth, becomes VIEW: no tree of the woods, the parkland or a grove stands there.
+  VISTA.CONE_VGEN = 13;
+  VISTA.coneOn = (g) => !!g && (g.vgen | 0) >= VISTA.CONE_VGEN;
+  VISTA.clearCone = function (g, P, V) {
+    const L = VISTA.landmarks(g, P).find(l => l.id === V.lm); if (!L) return { len: 0, cut: 0, cells: 0 };
+    const Rr = VISTA.rasters(g), [ex, ey, ez] = V.eye, ax = -Math.sin(V.yaw), az = -Math.cos(V.yaw);
+    const ang = (vx, vz) => Math.atan2(ax * vz - az * vx, ax * vx + az * vz);   // (signed, from the view's axis)
+    let aLo = 9, aHi = -9, dNear = 1e9, dMid = 0, n = 0;
+    for (const q of (L.members || [L])) {
+      const vx = q.x - ex, vz = q.z - ez, d = Math.hypot(vx, vz), r = q.r || L.r; if (d < 1) continue;
+      const a = ang(vx, vz), h = Math.asin(Math.min(1, r / d));
+      aLo = Math.min(aLo, a - h); aHi = Math.max(aHi, a + h); dNear = Math.min(dNear, d - r); dMid += d; n++;
+    }
+    if (!n) return { len: 0, cut: 0, cells: 0 };
+    aLo -= 2 * DEG; aHi += 2 * DEG; dMid /= n;
+    const sMax = Math.max(12, Math.min(220, dNear)), slope = (L.base + 0.2 * (L.top - L.base) - ey) / dMid;
+    // the wedge's box on the keep raster (2-block cells: every cell's middle tested)
+    let x0 = ex, x1 = ex, z0 = ez, z1 = ez;
+    for (const a of [aLo, aHi, (aLo + aHi) / 2]) for (const s of [sMax / 2, sMax]) {
+      const c = Math.cos(a), sn = Math.sin(a), dx = ax * c - az * sn, dz = az * c + ax * sn, r = s / Math.max(0.2, Math.cos(Math.min(1.3, Math.abs(a))));
+      x0 = Math.min(x0, ex + dx * r); x1 = Math.max(x1, ex + dx * r); z0 = Math.min(z0, ez + dz * r); z1 = Math.max(z1, ez + dz * r);
+    }
+    let cells = 0, cut = 0, len = 0;
+    const ev = (v) => Math.floor(v / 2) * 2;   // (the raster's cells start at even blocks)
+    for (let z = ev(z0 - 12); z <= z1 + 12; z += 2) for (let x = ev(x0 - 12); x <= x1 + 12; x += 2) {
+      const k = LAND._keepIdx(x, z); if (k < 0) continue;
+      const cx = x + 1, cz = z + 1, vx = cx - ex, vz = cz - ez, s = vx * ax + vz * az;   // (the cell's middle: the raster is 2-aligned)
+      if (s < 3 || s > sMax) continue;
+      const a = ang(vx, vz), q = LAND.woodAt(g, cx, cz), reach = q.kind === 4 ? 9 : q.kind === 2 || q.kind === 0 ? 5 : 3, m = Math.atan2(reach, s);
+      if (a < aLo - m || a > aHi + m) continue;
+      if (VISTA.groundAt(Rr, cx, cz) + 17 <= ey + slope * s) continue;   // (no tree there reaches the line)
+      if (!(P.keep[k] & 32)) { P.keep[k] |= 32; cells++; if (q.d > 0.05) cut++; }
+      if (s > len) len = Math.round(s);
+    }
+    return { len, cut, cells };
+  };
   VISTA.fill = function (g, P, K) {
     const Rr = VISTA.rasters(g), gy = groundOf(g, P);
     for (let round = 0; round < 3; round++) {
@@ -657,6 +701,14 @@
   };
   // the landmark's box across the picture: [left, right] in −1…1
   const boxSpan = (V) => { let l = 9, r = -9; const [x0, y0, z0, x1, y1, z1] = V.box; for (const x of [x0, x1]) for (const y of [y0, y1]) for (const z of [z0, z1]) { const q = VISTA.ndc(V, x, y, z); if (q) { l = Math.min(l, q[0]); r = Math.max(r, q[0]); } } return [l, r]; };
+  // (f-arrival, vgen 13) the whole landmark across the picture: every member's box (its disc, the landmark's base to the
+  // member's top)
+  const spanAll = (g, P, V) => {
+    const L = VISTA.landmarks(g, P).find(q => q.id === V.lm); if (!L) return boxSpan(V);
+    let l = 9, r = -9;
+    for (const q of (L.members || [L])) { const rr = q.r || L.r; for (const x of [q.x - rr, q.x + rr]) for (const y of [L.base, q.top]) for (const z of [q.z - rr, q.z + rr]) { const p = VISTA.ndc(V, x, y, z); if (p) { l = Math.min(l, p[0]); r = Math.max(r, p[0]); } } }
+    return l <= r ? [l, r] : boxSpan(V);
+  };
   VISTA.dressFrame = function (g, P, V) {
     const [ux, uz] = V.u;
     P.trees = P.trees || [];
@@ -667,8 +719,12 @@
     // (a cherry's boughs arch 8–9 blocks: in a narrower lens they reach across the axis — test/vista_preview.js: a pink
     // crown over half the picture under the isles — so it frames the wide pictures, a broad oak the narrow ones)
     const fk = V.fov >= 56 && h01(V.x, V.z, 0x7a1) < 0.5 ? 4 : 0;
-    const span = boxSpan(V), reach = fk === 4 ? 8.5 : 5, clearOf = (x, z, sd) => {
+    // (f-arrival, vgen 13: the span of the whole landmark — every member of the isles, not the one the vista aims at:
+    // an oak 7 blocks out hid a third of them —, and the crown 8 blocks from the eye at least: the v0.49 arrival opened
+    // under a cherry's canopy)
+    const v13 = VISTA.coneOn(g), span = v13 ? spanAll(g, P, V) : boxSpan(V), reach = fk === 4 ? 8.5 : 5, clearOf = (x, z, sd) => {
       const ex = V.eye[0] + ux * 8, ez = V.eye[2] + uz * 8, dx = ex - x, dz = ez - z, l = Math.hypot(dx, dz) || 1;
+      if (v13 && Math.hypot(x + 0.5 - V.eye[0], z + 0.5 - V.eye[2]) - reach < 8) return false;
       const q = VISTA.ndc(V, x + 0.5 + dx / l * reach, V.y + 7, z + 0.5 + dz / l * reach);   // (the crown's inner edge: a cherry's boughs arch far)
       const q4 = VISTA.ndc(V, x + 0.5 + dx / l * 4, V.y + 5, z + 0.5 + dz / l * 4);           // (its body: inside the picture's side, or it frames nothing)
       return !!q && !!q4 && Math.abs(q4[0]) < 0.97 && (sd > 0 ? q[0] > span[1] + 0.08 : q[0] < span[0] - 0.08);
@@ -778,5 +834,237 @@
       out.push({ x, z, top: ft.top, foot: ft.top - base - 6, lava: !!I.lava, isle: I.name });
     }
     return (g._vistaFalls = out);
+  };
+
+  // ============================================================================ the sight (f-arrival · R50-02)
+  // docs/superpowers/plans/2026-10-23-f-arrival.md §3. What a vista's eye sees of its landmark — without a chunk: a model of
+  // the view from what the plan knows — the land's surface (surfaceY; the lakes at the sea's level), the trees as their
+  // builders plant them (the woods' grid, the parkland's solo trees, the plan's own: planted into a sparse recorder — the
+  // exact cells), the plan's pieces (P.ops: the spur, the gates, the towers; their air cuts the land) — and the landmark
+  // as its far form, what the game draws at those distances (the temple's and the citadel's boxes, the isles' columns,
+  // the station's tower on its peak, the land's towers). Rays from the eye:
+  //   VISTA.aim(g, P, V)          the arrival's camera: at the vista's eye, aimed at the landmark's silhouette, the lens
+  //                               narrowed (FOV_MIN … the vista's own, FOV_MAX at most) until the silhouette fills TARGET of
+  //                               the frame, its top under the frame's top
+  //   VISTA.sight(g, P, V, cam)   at a camera: share (the silhouette's rays of the frame's), hidden (of them, stopped nearer
+  //                               than the landmark — outside its own footprint), near (of the upper half's rays, stopped
+  //                               within NEAR blocks), ok = share ≥ SHARE, hidden ≤ HIDE, near = 0
+  //   VISTA.arrivals(g, P, o)     the worker's records (worker_main.js 'vistas'): every vista's; the wow ones measured in
+  //                               the order of their score until the first ok (first.js FI.pick takes the best ok)
+  // test/arrival.js §3 checks the picks with real blocks (rays through the generated chunks).
+  const SIGHT = VISTA.SIGHT = { W: 64, H: 36, NEAR: 6, HIDE: 0.10, SHARE: 0.09, TARGET: 0.13, FOV_MIN: 27, FOV_MAX: 62, REACH: 460, SW: 80, SH: 45, SFOV: 80 };
+  const HITS = { arr: null };
+  const hitsOf = () => {
+    if (HITS.arr && HITS.arr.length === R.T.flags.length) return HITS.arr;
+    const F = VR.F, a = new Uint8Array(R.T.flags.length);
+    for (let s = 1; s < a.length; s++) { const f = R.T.flags[s]; a[s] = (f & (F.OPAQUE | F.LEAVES | F.FLUID)) || ((f & F.SOLID) && !(f & F.PLANT)) ? 1 : 0; }
+    return (HITS.arr = a);
+  };
+  // the landmark as the game draws it far: {boxes (6 numbers a box), isles (discs: the columns of islandAt), peak (a disc
+  // of land above `above`), x, z, r, base, top}
+  VISTA.shape = function (g, P, id) {
+    const L = VISTA.landmarks(g, P).find(l => l.id === id); if (!L) return null;
+    const S = { id, x: L.x, z: L.z, r: L.r, base: L.base, top: L.top, boxes: [], isles: null, peak: null, discs: (L.members || [L]).map(q => ({ x: q.x, z: q.z, r: Math.min(60, (q.r || L.r) + 6) })) };
+    const add = (x0, y0, z0, x1, y1, z1) => S.boxes.push(x0, y0, z0, x1, y1, z1);
+    if (id === 'temple') { const out = []; VISTA.templeBoxes(out); for (const b of out) add(b.x0, b.y0, b.z0, b.x1, b.y1, b.z1); }
+    else if (id === 'citadel') {
+      const CIT = VR.CitadelGen, s = CIT && CIT.heartSite ? CIT.heartSite(g, HEART.CITADEL) : null;
+      if (s) for (const b of CIT.lodBoxes(s, g)) {
+        if (b.night !== undefined) continue;   // (the beam: the night's)
+        if (b.slits) { add(b.x - b.w, b.y0, b.z - b.r - 0.6, b.x + b.w, b.y1, b.z + b.r + 0.6); add(b.x - b.r - 0.6, b.y0, b.z - b.w, b.x + b.r + 0.6, b.y1, b.z + b.w); }
+        else add(b.x - b.r, b.y0, b.z - b.r, b.x + b.r, b.y1, b.z + b.r);
+      }
+    } else if (id === 'isles') S.isles = (L.members || []).map(q => ({ x: q.x, z: q.z, r: q.r + 5 }));
+    else if (id === 'station') {
+      const STA = VR.StationGen, s = STA && STA.site ? STA.site(g) : null;
+      if (s) {
+        // (gen_station.js: the tower r 6–8 and 42 high, the mast and its disc, the radial modules of three levels, 5 wide)
+        add(s.x - 6.2, s.y - 14, s.z - 6.2, s.x + 7.2, s.y + 43, s.z + 7.2); add(s.x - 0.5, s.y + 43, s.z - 0.5, s.x + 1.5, s.y + 72, s.z + 1.5); add(s.x - 5, s.y + 69, s.z - 5, s.x + 6, s.y + 71, s.z + 6);
+        for (let lvl = 0; lvl < 3; lvl++) for (let k = 0; k < 4; k++) {
+          const a = k * Math.PI / 2 + lvl * Math.PI / 4 + 0.3, y0 = s.y + 6 + lvl * 12, len = 9 + (lvl === 1 ? 3 : 0);
+          for (let u = 6.5; u <= 5 + len; u += 3) add(s.x + Math.cos(a) * u - 1.5, y0, s.z + Math.sin(a) * u - 1.5, s.x + Math.cos(a) * u + 2.5, y0 + 7, s.z + Math.sin(a) * u + 2.5);
+        }
+      }
+      S.peak = { x: L.x, z: L.z, r: L.r + 6, above: L.base };
+    } else {
+      const lb = VISTA.lodBoxes(g, L.x - L.r - 8, L.z - L.r - 8, L.x + L.r + 9, L.z + L.r + 9, 2) || [];
+      for (const b of lb) add(b.x0, b.y0, b.z0, b.x1, b.y1, b.z1);
+    }
+    if (!S.boxes.length && !S.isles && !S.peak) { add(L.x - L.r, L.base, L.z - L.r, L.x + L.r + 1, L.top + 1, L.z + L.r + 1); S.coarse = true; }
+    return S;
+  };
+  // the camera's frame: forward f, right r, up u (the game's: forward (−sin yaw, ·, −cos yaw)); the ray of the frame's
+  // point (nx, ny) in −1…1, normalised into d
+  const camBasis = (cam) => { const cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), f = [-Math.sin(cam.yaw) * cp, sp, -Math.cos(cam.yaw) * cp], r = [Math.cos(cam.yaw), 0, -Math.sin(cam.yaw)]; return { f, r, u: [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]], th: Math.tan(cam.fov * DEG / 2) }; };
+  const rayOf = (B, nx, ny, d) => { const a = nx * B.th * ASPECT, b = ny * B.th; d[0] = B.f[0] + B.r[0] * a + B.u[0] * b; d[1] = B.f[1] + B.r[1] * a + B.u[1] * b; d[2] = B.f[2] + B.r[2] * a + B.u[2] * b; const l = Math.hypot(d[0], d[1], d[2]); d[0] /= l; d[1] /= l; d[2] /= l; return d; };
+  // where a ray from e along d (unit) meets the landmark first: the distance, or Infinity
+  function landmarkHit(g, S, e, d, cache) {
+    let best = Infinity;
+    const B = S.boxes, ix = 1 / (d[0] || 1e-12), iy = 1 / (d[1] || 1e-12), iz = 1 / (d[2] || 1e-12);
+    for (let k = 0; k < B.length; k += 6) {
+      let t0 = (B[k] - e[0]) * ix, t1 = (B[k + 3] - e[0]) * ix; if (t0 > t1) { const q = t0; t0 = t1; t1 = q; }
+      let u0 = (B[k + 1] - e[1]) * iy, u1 = (B[k + 4] - e[1]) * iy; if (u0 > u1) { const q = u0; u0 = u1; u1 = q; }
+      if (u0 > t0) t0 = u0; if (u1 < t1) t1 = u1;
+      let v0 = (B[k + 2] - e[2]) * iz, v1 = (B[k + 5] - e[2]) * iz; if (v0 > v1) { const q = v0; v0 = v1; v1 = q; }
+      if (v0 > t0) t0 = v0; if (v1 < t1) t1 = v1;
+      if (t1 >= t0 && t1 > 0) { const t = Math.max(0, t0); if (t < best) best = t; }
+    }
+    const hs = Math.hypot(d[0], d[2]);
+    const march = (q, test) => {   // along the ray through a disc (x, z, r), a block at a time
+      if (hs < 1e-6) return;
+      const ox = e[0] - q.x, oz = e[2] - q.z, a = hs * hs, b = 2 * (ox * d[0] + oz * d[2]), c = ox * ox + oz * oz - q.r * q.r, D = b * b - 4 * a * c;
+      if (D < 0) return;
+      const sq = Math.sqrt(D), t0 = Math.max(0, (-b - sq) / (2 * a)), t1 = Math.min(best, (-b + sq) / (2 * a)), st = 0.9 / hs;
+      for (let t = t0; t <= t1; t += st) { const x = e[0] + d[0] * t, y = e[1] + d[1] * t, z = e[2] + d[2] * t; if (test(Math.floor(x), y, Math.floor(z))) { if (t < best) best = t; return; } }
+    };
+    if (S.isles) for (const q of S.isles) march(q, (x, y, z) => { const k = x * 65536 + z; let J = cache.isl.get(k); if (J === undefined) { J = g.islandAt ? g.islandAt(x, z) : null; J = J ? [J.bottom, J.top] : null; cache.isl.set(k, J); } return !!J && y >= J[0] && y <= J[1] + 1; });
+    if (S.peak) march(S.peak, (x, y, z) => y >= S.peak.above && y <= cache.surf(x, z) + 1);
+    return best;
+  }
+  // the distance at which a ray from e along d enters the landmark's footprint (its own land, trees and rock are its)
+  function footprintAt(S, e, d) {
+    let best = Infinity; const hs = Math.hypot(d[0], d[2]); if (hs < 1e-6) return best;
+    for (const q of S.discs) {
+      const ox = e[0] - q.x, oz = e[2] - q.z, a = hs * hs, b = 2 * (ox * d[0] + oz * d[2]), c = ox * ox + oz * oz - q.r * q.r, D = b * b - 4 * a * c;
+      if (D < 0) continue;
+      const sq = Math.sqrt(D), t0 = (-b - sq) / (2 * a), t1 = (-b + sq) / (2 * a);
+      if (t1 > 0) best = Math.min(best, Math.max(0, t0));
+    }
+    return best;
+  }
+  // a cache of the land's surface: exact columns within 40 blocks of the eye, 4-block cells beyond (as far.js's forms)
+  function surfCache(g, e) {
+    const near = new Map(), far = new Map();
+    return (x, z) => {
+      if (Math.abs(x - e[0]) <= 40 && Math.abs(z - e[2]) <= 40) { const k = x * 65536 + z; let h = near.get(k); if (h === undefined) { h = g.surfaceY(x, z); near.set(k, h); } return h; }
+      const X = x >> 2, Z = z >> 2, k = X * 65536 + Z; let h = far.get(k); if (h === undefined) { h = g.surfaceY(X * 4 + 2, Z * 4 + 2); far.set(k, h); } return h;
+    };
+  }
+  // the arrival's camera: the silhouette from a wide look round the vista's own (rays at the landmark alone), the lens
+  // that makes it TARGET of the frame, the aim at its middle, its top a little under the frame's top
+  VISTA.aim = function (g, P, V, S) {
+    S = S || VISTA.shape(g, P, V.lm);
+    const cache = { isl: new Map(), surf: surfCache(g, V.eye) };
+    const wide = { yaw: V.yaw, pitch: V.pitch, fov: SIGHT.SFOV }, Bw = camBasis(wide), d = [0, 0, 0];
+    const dA = (2 * Bw.th / SIGHT.SH) * (2 * Bw.th * ASPECT / SIGHT.SW);   // a ray's patch of the frame (tangent plane)
+    let w = 0, sx = 0, sy = 0, sz = 0, top = -9, lo = 9, aLo = 9, aHi = -9, n = 0;
+    for (let j = 0; j < SIGHT.SH; j++) for (let i = 0; i < SIGHT.SW; i++) {
+      const nx = (i + 0.5) / SIGHT.SW * 2 - 1, ny = 1 - (j + 0.5) / SIGHT.SH * 2;
+      rayOf(Bw, nx, ny, d);
+      if (landmarkHit(g, S, V.eye, d, cache) === Infinity) continue;
+      const a = nx * Bw.th * ASPECT, b = ny * Bw.th, sa = dA / Math.pow(1 + a * a + b * b, 1.5);   // its solid angle
+      n++; w += sa; sx += d[0] * sa; sy += d[1] * sa; sz += d[2] * sa;
+      const el = Math.asin(d[1]), az = Math.atan2(-d[0], -d[2]) - V.yaw, azn = Math.atan2(Math.sin(az), Math.cos(az));
+      if (el > top) top = el; if (el < lo) lo = el; if (azn < aLo) aLo = azn; if (azn > aHi) aHi = azn;
+    }
+    if (!n) return { eye: V.eye.slice(), yaw: V.yaw, pitch: V.pitch, fov: V.fov, n: 0, omega: 0 };
+    const cl = Math.hypot(sx, sy, sz), c = [sx / cl, sy / cl, sz / cl], yaw = Math.atan2(-c[0], -c[2]), elc = Math.asin(c[1]);
+    // the frame's solid angle at a vertical lens f: a rectangular pyramid of half-tangents (ASPECT·t, t)
+    const omega = (f) => { const t = Math.tan(f * DEG / 2), A = ASPECT * t; return 4 * Math.asin(A * t / Math.sqrt((1 + A * A) * (1 + t * t))); };
+    const fmax = Math.max(SIGHT.FOV_MAX, V.fov);
+    let lo2 = SIGHT.FOV_MIN, hi2 = fmax;
+    for (let k = 0; k < 30; k++) { const m = (lo2 + hi2) / 2; if (w / omega(m) > SIGHT.TARGET) lo2 = m; else hi2 = m; }
+    let fov = Math.min(fmax, Math.max(SIGHT.FOV_MIN, (lo2 + hi2) / 2));
+    // (it fits: its width within 90 % of the frame's, its height within 80 %)
+    const half = Math.max(Math.abs(aLo - (yaw - V.yaw)), Math.abs(aHi - (yaw - V.yaw)));
+    const needH = Math.atan(Math.tan(Math.min(1.45, half / 0.9)) / ASPECT) * 2 / DEG, needV = (top - lo) / 0.8 / DEG;
+    fov = Math.min(fmax, Math.max(fov, needH, needV));
+    // (the middle at 46 % from the top, the top at least 12 % under the frame's top; looking up 20° at most, down 8°)
+    const f = fov * DEG, pitch = Math.max(-8 * DEG, Math.min(20 * DEG, Math.max(elc + 0.04 * f, top - 0.38 * f)));
+    return { eye: V.eye.slice(), yaw: +yaw.toFixed(4), pitch: +pitch.toFixed(4), fov: +fov.toFixed(1), n, omega: +w.toFixed(5) };
+  };
+  // the occluders round a view: the cells of the trees and the plan's pieces over a region (the frame's footprint on the
+  // land out to `reach` and its trees' crowns), the land's surface
+  function scene(g, P, cam, reach) {
+    const B = camBasis(cam), d = [0, 0, 0], e = cam.eye;
+    let x0 = e[0], x1 = e[0], z0 = e[2], z1 = e[2];
+    for (const [nx, ny] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0], [-1, 0], [1, 0]]) { rayOf(B, nx, ny, d); const hl = Math.hypot(d[0], d[2]) || 1e-6, x = e[0] + d[0] / hl * reach, z = e[2] + d[2] / hl * reach; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const M = 14, bx0 = Math.floor(x0) - M, bz0 = Math.floor(z0) - M, bx1 = Math.ceil(x1) + M, bz1 = Math.ceil(z1) + M, NX = bx1 - bx0 + 1, NZ = bz1 - bz0 + 1;
+    const cells = new Map(), colTop = new Int16Array(NX * NZ).fill(-1), H = hitsOf(), F = VR.F;
+    const colOf = (x, z) => { const ix = x - bx0, iz = z - bz0; return ix < 0 || iz < 0 || ix >= NX || iz >= NZ ? -1 : ix * NZ + iz; };
+    const setCell = (x, y, z, s) => { const c = colOf(x, z); if (c < 0 || y < 0 || y > 255) return; cells.set(c * 256 + y, s); if (s > 0 && H[s] && y > colTop[c]) colTop[c] = y; };
+    // the plan's pieces, in the order they are stamped (air: -1, a cut in the land)
+    const cx0 = bx0 >> 4, cx1 = bx1 >> 4, cz0 = bz0 >> 4, cz1 = bz1 >> 4;
+    if (P.ops) for (let cz = cz0; cz <= cz1; cz++) for (let cx = cx0; cx <= cx1; cx++) { const b = P.ops.get(cx * 4096 + cz); if (b) for (let i = 0; i < b.length; i += 4) setCell(b[i], b[i + 1], b[i + 2], b[i + 3] || -1); }
+    // the trees, into a recorder with ColumnWriter's rules (a log takes a leaf's cell, a leaf only air)
+    const rec = {
+      v13: GEN.treeFix(g), ok: () => true,
+      get: (x, y, z) => { const c = colOf(x, z); if (c < 0) return 0; const v = cells.get(c * 256 + y); return v > 0 ? v : 0; },
+      set: (x, y, z, s) => setCell(x, y, z, s || -1),
+      place: (x, y, z, s, mode) => {
+        const c = colOf(x, z); if (c < 0 || y < 0 || y > 255) return false;
+        const cur = cells.get(c * 256 + y);
+        if (!(cur > 0)) { setCell(x, y, z, s); return true; }
+        const fl = R.T.flags[cur];
+        if (mode === 1) { if ((fl & (F.LEAVES | F.REPLACE | F.PLANT)) || ((fl & F.FLUID) && (fl & F.WATER))) { setCell(x, y, z, s); return true; } return false; }
+        if (mode === 2 || ((fl & F.REPLACE) && !(fl & F.FLUID))) { setCell(x, y, z, s); return true; }
+        return false;
+      },
+    };
+    // (only the trees whose crown may reach into the frame: their foot within its horizontal wedge, 10 blocks to spare)
+    const half = Math.atan(B.th * ASPECT / Math.max(0.2, Math.cos(Math.abs(cam.pitch) + Math.atan(B.th)))) + 4 * DEG;
+    const inWedge = (x, z) => { const vx = x + 0.5 - e[0], vz = z + 0.5 - e[2], dd = Math.hypot(vx, vz); if (dd < 12) return true; if (dd > reach + 12) return false; let a = Math.atan2(-vx, -vz) - cam.yaw; a = Math.abs(Math.atan2(Math.sin(a), Math.cos(a))); return a <= half + Math.atan2(10, dd); };
+    if (LAND.woodsTrees) { LAND.woodsTrees(g, P, rec, bx0 + 6, bz0 + 6, bx1 - 6, bz1 - 6, inWedge); LAND.soloTrees(g, P, rec, bx0 + 6, bz0 + 6, bx1 - 6, bz1 - 6, inWedge); }
+    if (P.trees && LAND.planTree) for (const t of P.trees) if (t.x >= bx0 + 6 && t.x <= bx1 - 6 && t.z >= bz0 + 6 && t.z <= bz1 - 6 && inWedge(t.x, t.z)) LAND.planTree(g, rec, t);
+    let maxY = 0; for (let i = 0; i < colTop.length; i++) if (colTop[i] > maxY) maxY = colTop[i];
+    return { cells, colTop, colOf, bx0, bz0, NX, NZ, surf: surfCache(g, e), H, maxY };
+  }
+  // the first occluder along a ray (block by block): its distance, or Infinity before tMax
+  function occluderHit(Sc, e, d, tMax) {
+    let x = Math.floor(e[0]), y = Math.floor(e[1]), z = Math.floor(e[2]);
+    const sx = d[0] > 0 ? 1 : -1, sy = d[1] > 0 ? 1 : -1, sz = d[2] > 0 ? 1 : -1;
+    const tdx = Math.abs(1 / (d[0] || 1e-12)), tdy = Math.abs(1 / (d[1] || 1e-12)), tdz = Math.abs(1 / (d[2] || 1e-12));
+    let tx = (d[0] > 0 ? x + 1 - e[0] : e[0] - x) * tdx, ty = (d[1] > 0 ? y + 1 - e[1] : e[1] - y) * tdy, tz = (d[2] > 0 ? z + 1 - e[2] : e[2] - z) * tdz, t = 0;
+    const cells = Sc.cells, top = Sc.colTop, H = Sc.H;
+    while (t < tMax) {
+      if (d[1] > 0 && y > Sc.maxY && y > 215) return Infinity;   // (above every tree, piece and hill: the sky)
+      if (y > 262 && d[1] >= 0) return Infinity;
+      if (y < 1) return t;
+      const c = Sc.colOf(x, z);
+      if (c >= 0 && y <= top[c]) { const v = cells.get(c * 256 + y); if (v > 0 && H[v]) return t; }
+      if (y <= Math.max(Sc.surf(x, z), SEA)) { const v = c >= 0 ? cells.get(c * 256 + y) : undefined; if (v !== -1) return t; }
+      if (tx < ty && tx < tz) { t = tx; tx += tdx; x += sx; }
+      else if (ty < tz) { t = ty; ty += tdy; y += sy; }
+      else { t = tz; tz += tdz; z += sz; }
+    }
+    return Infinity;
+  }
+  VISTA.sight = function (g, P, V, cam, S) {
+    S = S || VISTA.shape(g, P, V.lm);
+    cam = cam || VISTA.aim(g, P, V, S);
+    const dl = Math.hypot(S.x - cam.eye[0], S.z - cam.eye[2]), reach = Math.min(SIGHT.REACH, dl + S.r + 8);
+    const Sc = scene(g, P, cam, reach), cache = { isl: new Map(), surf: Sc.surf };
+    const B = camBasis(cam), d = [0, 0, 0], W = SIGHT.W, H = SIGHT.H;
+    let lm = 0, hid = 0, near = 0, clutter = 0;
+    for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+      rayOf(B, (i + 0.5) / W * 2 - 1, 1 - (j + 0.5) / H * 2, d);
+      const tl = landmarkHit(g, S, cam.eye, d, cache), tf = footprintAt(S, cam.eye, d);
+      const to = occluderHit(Sc, cam.eye, d, Math.min(tl, tf, reach));
+      if (tl < Infinity) { lm++; if (to < tl - 1.5) hid++; }
+      if (j < H / 2) { if (to < SIGHT.NEAR) near++; if (to < 20) clutter++; }
+    }
+    const share = lm / (W * H), hidden = lm ? hid / lm : 1, nearF = near / (W * H / 2);
+    return { ok: share >= SIGHT.SHARE && hidden <= SIGHT.HIDE && near === 0, share: +share.toFixed(4), hidden: +hidden.toFixed(4), near: +nearF.toFixed(4), clutter: +(clutter / (W * H / 2)).toFixed(4), fov: cam.fov, cells: Sc.cells.size };
+  };
+  // the worker's records of a world's vistas (worker_main.js 'vistas' → first.js): the wow ones measured, best score first,
+  // until one is ok (o.budget ms, o.max vistas at most)
+  VISTA.arrivals = function (g, P, o) {
+    o = o || {};
+    const recs = (P.vistas || []).map(v => ({ id: v.id, x: v.x, y: v.y, z: v.z, u: v.u, eye: v.eye, yaw: v.yaw, pitch: v.pitch, fov: v.fov, lm: v.lm, wow: !!v.wow, score: v.score, aim: v.aim, d: v.d }));
+    const order = recs.filter(r => r.wow && Number.isFinite(r.score)).sort((a, b) => b.score - a.score || (String(a.id) < String(b.id) ? -1 : 1));
+    const t0 = Date.now(), budget = o.budget || 5000, max = o.max || 8;
+    let n = 0;
+    for (const r of order) {
+      if (n >= max || Date.now() - t0 > budget) break;
+      n++;
+      const V = P.vistas.find(v => v.id === r.id);
+      try {
+        const S = VISTA.shape(g, P, V.lm), cam = VISTA.aim(g, P, V, S), s = VISTA.sight(g, P, V, cam, S);
+        r.arrive = { eye: cam.eye, yaw: cam.yaw, pitch: cam.pitch, fov: cam.fov };
+        r.sight = s;
+        if (s.ok) break;
+      } catch (e) { if (VR.VillageGen && VR.VillageGen.probe && e === VR.VillageGen.probe) throw e; r.sight = { ok: false, err: String((e && e.message) || e) }; }
+    }
+    return recs;
   };
 })(VR);

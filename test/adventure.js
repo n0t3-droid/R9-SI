@@ -2,11 +2,11 @@
 // docs/superpowers/specs/2026-10-22-abenteuer-design.md §2–§4, §12, §15). Every rule a check:
 //   1. the curve: need(L) = 60 + 30 L, the totals 600 / 1,950 / 6,900 / 14,850 / 39,750 at 5 / 10 / 20 / 30 / 50, the
 //      level of every XP at the boundaries, the cap and the stars beyond it
-//   2. every award row of A§2: its XP, its Sterntaler, its limit (once, per id, per window, per 25 blocks, per km)
+//   2. every award row of A§2: its XP, its Heliataler, its limit (once, per id, per window, per 25 blocks, per km)
 //   3. the farming guards: positions counted per session, ×0.5 for every five of a kind within ten minutes, a zone
 //      provoked again within two minutes, the windows kept in the save
 //   4. the five stats: 0–10, one point per level, respec, their effects
-//   5. the Sterntaler: earn, pay, the price table of A§4, buying step by step, too few, never real money
+//   5. the Heliataler: earn, pay, the price table of A§4, buying step by step, too few, never real money
 //   6. Spannung (A§12): the bands, an encounter, two faints, a band down only when asked
 //   7. the save: a JSON round trip, garbage and old records loaded sane, a world without meta.adventure stays without one
 //   8. the level-up chime: the day's pentatonic scale, rising, short
@@ -225,8 +225,8 @@ console.log('4 · the five stats');
   check(ew.hp === 30 && near(ew.energy, 1) && ew.scan === 32, 'effects of nonsense points are bounded (0–10)');
 }
 
-// ---------------------------------------------------------------- 5 · Sterntaler
-console.log('5 · the Sterntaler and the prices');
+// ---------------------------------------------------------------- 5 · Heliataler
+console.log('5 · the Heliataler and the prices');
 {
   const me = me0();
   check(Adv.earn(me, 120) === 120 && me.taler === 120, 'earn');
@@ -430,7 +430,7 @@ if (!A) { console.log('  ✗ VR.Adventure missing (src/main/adventure.js)'); con
   const gm = { id: 'guest-x', guest: true, difficulty: 'normal' };
   VR.game = mkGame(gm); A.bind();
   check(!A.on() && !A.setOn(true) && !('adventure' in gm), 'a multiplayer guest: no Abenteuer (the host\'s comes with u-mp)');
-  // a world created with Spielweg „Abenteuer" (the create row): its record when it starts
+  // a world created with „⚔ Abenteuer mit Begegnungen" (the create form): its record when it starts
   const nm = { id: 'w2', name: 'Neu', difficulty: 'peaceful', mode: 'zen', created: Date.now() + 5 };
   A.pendingCreate = { at: Date.now() };
   VR.game = mkGame(nm); A.bind();
@@ -459,7 +459,7 @@ if (!A) { console.log('  ✗ VR.Adventure missing (src/main/adventure.js)'); con
   const made = [], tg = mkGame({ id: 'title' }); tg.state = 'title'; tg.createWorld = (o) => { made.push(o); }; VR.game = tg;
   later.push(A.newWorld().then((ok) => {
     const o = made[0], P = A.pendingCreate;
-    check(ok && o && o.name === 'Abenteuer-Welt 2' && o.difficulty === 'peaceful' && o.mode === 'zen' && P && P.band === 'normal' && P.enc === 'normal', 'the tile makes „Abenteuer-Welt 2" (peaceful, Zen like ▶ Losspielen) and marks it for the Abenteuer (' + JSON.stringify([o, P]) + ')');
+    check(ok && o && o.name === 'Abenteuer-Welt 2' && o.difficulty === 'peaceful' && o.mode === 'zen' && P && P.band === 'normal' && P.enc === 'off', 'the tile makes „Abenteuer-Welt 2" (peaceful, Zen like ▶ Losspielen) and marks it for a gentle Abenteuer — no encounters (f-names, R50-05; ' + JSON.stringify([o, P]) + ')');
     A.pendingCreate = null; VR.game = g; A.bind();
   }));
   VR.game = g; A.bind();

@@ -7,7 +7,7 @@
 //   the guards     placed positions counted per session, ×0.5 for every five foes of a kind within ten minutes, nothing
 //                  from a zone provoked again within two minutes; the limits' windows are saved (a reload resets none)
 //   the stats      five, 0–10 each, one point per level, a free respec (the game allows it at home), their effects
-//   the Sterntaler the wallet (earned in the world — never real money), the prices of A§4, the upgrades' effects
+//   the Heliataler the wallet (earned in the world — never real money), the prices of A§4, the upgrades' effects
 //   Spannung       s ∈ [0, 1] kept in the band (A§12), after each encounter and two faints
 //   the save       meta.adventure = { v: 1, on, band, enc, since, tension, freed, bosses, chapter, beats, prevDiff, faints,
 //                  me: { xp, level, stars, pts, taler, owned, quests, once, lim } } — load() makes anything sane
@@ -170,7 +170,7 @@
     return { hp, hearts: hp / 2, energy: 1 + 0.08 * q.ene, boost: 1 + 0.06 * q.ene, scan: 32 + 8 * q.spu, chests: q.spu >= 5, speed: 1 + 0.05 * q.ges, hints: (q.ges >= 5 ? 1 : 0) + (q.ges >= 10 ? 1 : 0), boostTime: 1 + 0.08 * q.pil, turn: 1 + 0.03 * q.pil };
   };
 
-  // ---------------------------------------------------------------- the Sterntaler (A§4): earned in the world only
+  // ---------------------------------------------------------------- the Heliataler (A§4): earned in the world only
   Adv.earn = (me, n) => { const k = Math.floor(num(n, 0)); if (k <= 0) return 0; const b = me.taler | 0; me.taler = Math.min(TALER_MAX, b + k); return me.taler - b; };
   Adv.pay = (me, n) => { const k = Math.floor(num(n, 0)); if (k <= 0 || (me.taler | 0) < k) return false; me.taler -= k; return true; };
   Adv.PRICES = { engine: [600, 1500, 3500], shield: [500, 1200, 3000], jump: [1000, 2500, 5000], suitHeat: [800], suitCold: [600], suitPressure: [600], suitRad: [1200], boots: [400], anchor: [300], scanner: [400], repair: [900], camera: [200] };
@@ -249,6 +249,7 @@
     if (plain(raw.bosses)) r.bosses = raw.bosses;
     r.chapter = int(raw.chapter, 0, 99, 0);
     if (plain(raw.beats)) r.beats = raw.beats;
+    if (plain(raw.sites)) r.sites = raw.sites; if (plain(raw.foeSaid)) r.foeSaid = raw.foeSaid; if (plain(raw.helper)) r.helper = raw.helper;   // a-foes: the outposts' progress, Funke's once-words, the Helfer (each sanitised where it is read: liberate.js L.load, foes.js)
     r.prevDiff = DIFFS.indexOf(raw.prevDiff) >= 0 ? raw.prevDiff : null;
     r.faints = Array.isArray(raw.faints) ? raw.faints.filter(t => typeof t === 'number' && Number.isFinite(t)).slice(-4) : [];
     const m = plain(raw.me) ? raw.me : {}, me = r.me;
@@ -262,6 +263,61 @@
     if (plain(m.lim)) for (const k in m.lim) { const w = m.lim[k]; if (Array.isArray(w) && w.length === 2 && Number.isFinite(w[0]) && Number.isFinite(w[1])) me.lim[k] = [w[0], Math.max(0, w[1])]; }
     return r;
   };
+
+  // ---------------------------------------------------------------- one question for a new world (f-names, review R50-05)
+  // „Wie willst du spielen?" — 🏗 Frei bauen (the default: peaceful) · 🧭 Abenteuer, sanft (quests, levels, Taler, no
+  // encounters) · ⚔ Abenteuer mit Begegnungen. The form's state: { way, mode, diffFree, band, pro, kids, foes, zenFrom }
+  // (pro: Profi's form; kids: 🧸 Kindersicher; foes: the encounters exist yet; zenFrom: „mit Begegnungen" moved Zen to
+  // Überleben, leaving the card moves it back). formView → what the rows show; formWorld → what the world gets; the rule
+  // that ties them (test/create_form.js, every combination): the shown difficulty is the one the world gets — a free
+  // world's difficulty, or the encounters' band — and a hidden row means a peaceful world without encounters
+  Adv.WAYS = ['free', 'gentle', 'enc'];
+  Adv.MODES = ['survival', 'creative', 'zen'];
+  Adv.DIFFS = DIFFS;
+  const pick1 = (v, list, d) => (list.indexOf(v) >= 0 ? v : d);
+  Adv.form = (o) => {
+    o = o || {};
+    const st = { way: pick1(o.way, Adv.WAYS, 'free'), mode: pick1(o.mode, Adv.MODES, 'zen'), diffFree: pick1(o.diffFree, DIFFS, 'peaceful'), band: pick1(o.band, Adv.BAND_ORDER, 'normal'), pro: !!o.pro, kids: !!o.kids, foes: !!o.foes, zenFrom: !!o.zenFrom };
+    if (st.kids && st.way === 'enc') st.way = 'gentle';
+    return st;
+  };
+  // the Spielart the world gets: Einfach — Zen, but Überleben under „mit Begegnungen" (hearts count there); Profi — the
+  // lit one, never Zen under „mit Begegnungen" („keine Monster, kein Schaden")
+  const modeOf = (st) => (!st.pro ? (st.way === 'enc' ? 'survival' : 'zen') : st.way === 'enc' && st.mode === 'zen' ? 'survival' : st.mode);
+  Adv.formView = (st) => {
+    const way = st.kids && st.way === 'enc' ? 'gentle' : st.way, mode = modeOf(Object.assign({}, st, { way }));
+    const ways = st.kids ? ['free', 'gentle'] : Adv.WAYS.slice();
+    const modes = !st.pro ? [] : way === 'enc' ? ['survival', 'creative'] : Adv.MODES.slice();
+    const diffs = !st.pro || st.kids ? [] : way === 'free' ? (mode === 'zen' ? [] : DIFFS.slice()) : way === 'enc' ? Adv.BAND_ORDER.slice() : [];
+    const diff = !diffs.length ? null : way === 'enc' ? st.band : st.diffFree;
+    const note = st.kids ? 'kids' : way === 'enc' && !st.foes ? 'encLater' : null;
+    return { ways, way, modes, mode, diffs, diff, note };
+  };
+  Adv.formWorld = (st) => {
+    const v = Adv.formView(st);
+    // (only what is shown reaches the world: a hidden row gives its default — peaceful, the band Normal)
+    return { mode: v.mode, difficulty: v.way === 'free' && v.diff ? v.diff : 'peaceful', adventure: v.way === 'free' ? null : { on: true, band: v.way === 'enc' && v.diff ? v.diff : 'normal', enc: v.way === 'enc' ? 'normal' : 'off' } };
+  };
+  Adv.formPick = (st, what, val) => {
+    const n = Object.assign({}, st);
+    if (what === 'way') {
+      if (Adv.WAYS.indexOf(val) < 0 || (st.kids && val === 'enc')) return st;
+      n.way = val;
+      if (val === 'enc' && st.way !== 'enc' && st.mode === 'zen') { n.mode = 'survival'; n.zenFrom = true; }
+      else if (val !== 'enc' && st.way === 'enc' && st.zenFrom) { if (st.mode === 'survival') n.mode = 'zen'; n.zenFrom = false; }
+    } else if (what === 'mode') {
+      if (Adv.MODES.indexOf(val) < 0 || (st.way === 'enc' && val === 'zen')) return st;
+      n.mode = val; n.zenFrom = false;
+    } else if (what === 'diff') {
+      if (st.way === 'free' && DIFFS.indexOf(val) >= 0) n.diffFree = val;
+      else if (st.way === 'enc' && Adv.BAND_ORDER.indexOf(val) >= 0) n.band = val;
+      else return st;
+    } else if (what === 'pro' || what === 'kids' || what === 'foes') { n[what] = !!val; if (n.kids && n.way === 'enc') n.way = 'gentle'; }
+    else return st;
+    return n;
+  };
+  // the pause card asks the same question of a running world: off → free, encounters off → gentle, else → enc
+  Adv.wayOf = (rec, kids) => (!rec || !rec.on ? 'free' : kids || rec.enc === 'off' ? 'gentle' : 'enc');
 
   // ---------------------------------------------------------------- the level-up chime
   // six bells up the day's pentatonic scale 70 ms apart (the start degree climbs with the level), then the chord and

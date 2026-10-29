@@ -79,7 +79,7 @@
         const b = VR.BIOMES[w.biomeAt(x, z)];
         const key = b ? b.key : '';
         if (Math.random() < 0.35 && counts.ambient < 6 && VR.DimReg.actorsHome(g.dim)) {   // u-moons1: the actors live where the registry says (DimReg.actorsHome: Herzwelt only, never on a moon)
-          // ambient: sky rays near islands/altitude by day, wisps at night
+          // ambient: cloud rays near islands/altitude by day, wisps at night
           if (night && counts.ambient < 6) { this.summon('shard_wisp', x + 0.5, top + 2 + Math.random() * 3, z + 0.5); counts.ambient++; }
           else if (!night && Math.random() < 0.25) { const m = this.summon('sky_ray', x + 0.5, Math.max(top + 30, 140 + Math.random() * 40), z + 0.5); m.alt = m.pos[1]; counts.ambient++; }
           continue;
@@ -91,7 +91,7 @@
         }
         const light = w.getLight(x, top + 1, z);
         const sky = (light >>> 12), blk = Math.max((light >> 8) & 15, (light >> 4) & 15, light & 15);
-        const hostileOK = g.difficulty !== 'peaceful' && counts.hostile < (g.difficulty === 'hard' ? 14 : 9) && (night ? sky * (1 - E.night) < 7 : sky < 4) && blk < 6;
+        const hostileOK = g.difficulty !== 'peaceful' && !(VR.Foes && VR.Foes.advOn(g)) && counts.hostile < (g.difficulty === 'hard' ? 14 : 9) && (night ? sky * (1 - E.night) < 7 : sky < 4) && blk < 6;
         if (hostileOK && (night || key === 'ember_canyons') && Math.random() < 0.7) {
           const kind = Math.random() < 0.12 ? 'void_stalker' : 'ember_husk';
           this.summon(kind, x + 0.5, top + 1, z + 0.5); counts.hostile++;
@@ -134,6 +134,7 @@
     update(dt) {
       const g = this.game, w = g.world, p = g.player;
       const get = (x, y, z) => w.getBlock(x, y, z), nb = w.nbFn();
+      if (VR.Foes) VR.Foes.tick(this, dt);   // a-foes: the foes' director, their bolts and shed parts, the hearts (foes.js; nothing outside an Abenteuer world)
       this.trySpawn(dt);
       if (this.land) this.land.update(dt);
       // mobs
@@ -220,6 +221,7 @@
       if (m.pos[1] < -20) m.dead = true;
     }
     ai(m, dt, d2) {
+      if (m.def.foe && VR.Foes) { VR.Foes.ai(this, m, dt, d2); return; }   // a-foes: a foe's own AI (foes.js)
       if (m.pet) { if (this.game.companions) this.game.companions.steer(m, dt, d2); return; }
       const g = this.game, p = g.player, def = m.def, A = m.ai, w = g.world;
       A.t -= dt; A.cool -= dt; A.flee -= dt;
@@ -379,6 +381,7 @@
       input.mouse.clicked[0] = false; input.mouse.releasedBtn[0] = false; p.breakCooldown = 0.35;
     }
     hurtMob(m, dmg, from) {
+      if (m.def.foe && VR.Foes) { VR.Foes.hurtMob(this, m, dmg, from); return; }   // a-foes: a foe takes a hit its own way (weak points, the power-down)
       if (m.dead || m.hurt > 0.3 || m.def.companion) return;
       m.hp -= dmg; m.hurt = 0.5;
       if (from) { const dx = m.pos[0] - from[0], dz = m.pos[2] - from[2], l = Math.hypot(dx, dz) || 1; m.vel[0] += dx / l * 7; m.vel[2] += dz / l * 7; if (!m.def.fly) m.vel[1] = 5.5; }
@@ -387,6 +390,7 @@
       if (m.hp <= 0) { m.dead = true; this.game.particles.spark(m.pos[0], m.pos[1] + m.h * 0.5, m.pos[2], [1, 1, 1], 14, 3, 0); }
     }
     onMobDeath(m) {
+      if (m.def.foe) { if (VR.Foes) VR.Foes.gone(this, m); return; }   // a-foes: a machine powers down into parts, a shadow into motes — no smoke, no survival XP, no kill in the codex
       const g = this.game;
       g.particles.smoke(m.pos[0], m.pos[1] + 0.4, m.pos[2], 10);
       for (const [id, a, b] of m.def.drops || []) { const n = a + Math.floor(Math.random() * (b - a + 1)); if (n > 0 && VR.itemDef(id)) this.dropStack({ id, n }, false, [m.pos[0], m.pos[1] + 0.5, m.pos[2]]); }
@@ -400,6 +404,7 @@
       if (peace && owner && owner.def && owner.def.hostile) return;
       const l = Math.hypot(dir[0], dir[1], dir[2]) || 1;
       this.bolts.push({ pos: origin.slice(), vel: [dir[0] / l * speed, dir[1] / l * speed, dir[2] / l * speed], dmg: peace ? 0 : dmg, harmless: peace, owner, life: 2.5, col: col || [0.3, 1, 1] });
+      this.bolts[this.bolts.length - 1].fd = dmg;   // a-foes: the shot's own strength — only a foe takes it (people and animals stay untouched in peace)
       this.game.audio.play('laser');
     }
     updateBolt(b, dt, get) {
@@ -419,7 +424,7 @@
       for (let k = 0; k < 3; k++) { const t = (k / 3) * Math.min(len, et); g.particles.spawn(b.pos[0] + dn[0] * t, b.pos[1] + dn[1] * t, b.pos[2] + dn[2] * t, 0, 0, 0, { life: 0.12, size: 0.07, grav: 0, col: b.col, emis: 1, collide: false }); }
       if (eh) {
         const hp = [b.pos[0] + dn[0] * et, b.pos[1] + dn[1] * et, b.pos[2] + dn[2] * et];
-        if (b.harmless) { /* light only (a peaceful world): it sparkles where it lands */ } else if (eh === p) p.damage(b.dmg, 'laser', b.pos); else this.hurtMob(eh, b.dmg, b.pos);
+        if (b.harmless) { if (eh.def && eh.def.foe && b.owner === p) this.hurtMob(eh, b.fd || 0, b.pos); /* a-foes: light only (a peaceful world) — a foe alone takes it */ } else if (eh === p) p.damage(b.dmg, 'laser', b.pos); else this.hurtMob(eh, b.dmg, b.pos);
         g.particles.spark(hp[0], hp[1], hp[2], b.col, 10, 3);
         return true;
       }
@@ -511,6 +516,7 @@
         const dx = m.pos[0] - cam.x, dy = m.pos[1] - cam.y, dz = m.pos[2] - cam.z;
         if (dx * dx + dz * dz > 110 * 110) continue;
         if (!mat4.boxInFrustum(r.planes, dx - 2, dy - 1, dz - 2, dx + 2, dy + 3, dz + 2)) continue;
+        if (m.def.foe && VR.Foes) { VR.Foes.draw(this, r, p, m, cam, t); continue; }   // a-foes: a foe's parts, its optic and core tinted (foes.js)
         const model = VR.getVoxModel(gl, m.def.model);
         if (!model) continue;
         const light = this.lightAt(m.pos[0], m.pos[1] + m.h * 0.6, m.pos[2]);
@@ -518,6 +524,7 @@
         const deathRoll = m.dead ? Math.min(1.5, m.deathT * 4) : 0;
         this.drawModel(r, p, model, m.pos, cam, m.yaw, this.pose(m, t), light, { flash: m.hurt > 0.25 ? 1 : 0, roll: deathRoll, pitch: m.def.fly === 'glide' ? Math.sin(m.age * 0.4) * 0.1 : 0 });
       }
+      if (VR.Foes && VR.Foes.drawExtra) VR.Foes.drawExtra(this, r, p, cam);   // a-foes: shed plates and shards, the slow bolts, a pile of Taler
       // other players' shadows / third person self
       const g = this.game, pl = g.player;
       if (g.camMode !== 0 && !pl.dead && !(g.gadgets && g.gadgets.controlling)) {

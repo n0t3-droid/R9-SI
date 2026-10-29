@@ -6,7 +6,7 @@
 //  b · vgen 12: the street's cells porcelain with andesite bands (every eight rows across, the kerb lines), the plaza's
 //      marble disc and its travertine rings as before, its ring outside the disc and the cross street porcelain
 //  c · vgen 12 changes nothing but those floor cells (every other cell of the plan the same as vgen 11)
-//  d · new worlds are vgen 12 (game.js createWorld)
+//  d · new worlds are vgen 12 or later (game.js createWorld; f-arrival: 13)
 //  e · the two floors are polished in t-material's table: a clear coat ≥ 0.6, the sharp polish
 //   bash test/wt_run.sh hallfloor.js 300
 const V = require('./load_shared.js');
@@ -88,7 +88,9 @@ console.log('c · nothing else changes');
 console.log('d · new worlds');
 {
   const src = fs.readFileSync(__dirname + '/../src/main/game.js', 'utf8');
-  check(/vgen: o\.vgen \? \+o\.vgen : 12 \}/.test(src), 'game.js creates new worlds at vgen 12');
+  // (f-arrival made new worlds vgen 13 — the polished floor is in every vgen from 12 on: the default may only grow)
+  const m = /vgen: o\.vgen \? \+o\.vgen : (\d+) \}/.exec(src);
+  check(!!m && +m[1] >= 12, `game.js creates new worlds at vgen 12 or later (vgen ${m ? m[1] : '?'})`);
 }
 
 console.log('e · polished in the material table');

@@ -9,7 +9,7 @@
 //   the awards    award(kind, ctx) from one marked line each in crafting.js, codex.js, villages.js, homes.js,
 //                 wonders_game.js and wowmoment.js; placing takes g.onBlockPlaced (player.js afterPlace calls it);
 //                 the flown distance and the binding to the world come from a timer twice a second — nothing per frame
-//   the HUD       a ring with the level, the Sterntaler and the free points, top left inside #hud (it hides with the
+//   the HUD       a ring with the level, the Heliataler and the free points, top left inside #hud (it hides with the
 //                 HUD: F1, the wow moment, the photo mode); written only when its numbers change, the motion is CSS
 //   the level-up  a banner with rays and sparks, a chime in the day's key (klang.js), golden motes round the player —
 //                 waiting while a menu, a wow moment, the director, the photo mode or a wonder's banner holds the view
@@ -23,13 +23,13 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const game = () => VR.game || null;
   const hasDoc = typeof document !== 'undefined' && !!document.createElement;
-  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (!e.style) e.style = {}; if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (!e.style) e.style = {}; if (!e.dataset) e.dataset = {}; if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const fmt = (n) => { try { return Number(n).toLocaleString(VR.I18N && VR.I18N.locale ? VR.I18N.locale() : undefined); } catch (e) { return String(n); } };
   const pct = (m) => Math.round((m - 1) * 100);
   // every text key the Abenteuer shows (test/adventure.js checks them in both tables)
-  const KEYS = ['g.adv.title', 'g.adv.pause', 'g.adv.pauseTip', 'g.adv.way', 'g.adv.way.free', 'g.adv.way.freeS', 'g.adv.way.adv', 'g.adv.way.advS', 'g.adv.wayNote',
-    'g.adv.band', 'g.adv.band.easy', 'g.adv.band.normal', 'g.adv.band.hard', 'g.adv.enc', 'g.adv.enc.normal', 'g.adv.enc.rare', 'g.adv.enc.off', 'g.adv.encNote', 'g.adv.encKids',
-    'g.adv.confirm', 'g.adv.confirmCalm', 'g.adv.yes', 'g.adv.no', 'g.adv.offNote', 'g.adv.teaser', 'g.adv.level', 'g.adv.levelMax', 'g.adv.xp', 'g.adv.xpStar', 'g.adv.taler',
+  const KEYS = ['g.adv.title', 'g.adv.pause', 'g.adv.pauseTip', 'g.adv.how', 'g.adv.c.free', 'g.adv.c.freeS', 'g.adv.c.gentle', 'g.adv.c.gentleS', 'g.adv.c.enc', 'g.adv.c.encS', 'g.adv.c.encLater',
+    'g.adv.band', 'g.adv.band.easy', 'g.adv.band.normal', 'g.adv.band.hard', 'g.adv.enc', 'g.adv.enc.normal', 'g.adv.enc.rare', 'g.adv.encNote', 'g.adv.encKids',
+    'g.adv.confirm', 'g.adv.confirmCalm', 'g.adv.confirmGentle', 'g.adv.yes', 'g.adv.no', 'g.adv.offNote', 'g.adv.teaser', 'g.adv.level', 'g.adv.levelMax', 'g.adv.xp', 'g.adv.xpStar', 'g.adv.taler',
     'g.adv.pts1', 'g.adv.pts', 'g.adv.pts0', 'g.adv.toStats', 'g.adv.stats', 'g.adv.stat.aus', 'g.adv.stat.ene', 'g.adv.stat.spu', 'g.adv.stat.ges', 'g.adv.stat.pil',
     'g.adv.eff.aus', 'g.adv.eff.ene', 'g.adv.eff.spu', 'g.adv.eff.ges', 'g.adv.eff.pil', 'g.adv.plusTip', 'g.adv.respec', 'g.adv.respecTip', 'g.adv.respecFar', 'g.adv.statsNote',
     'g.adv.up.kick', 'g.adv.up.title', 'g.adv.up.star', 'g.adv.up.pt1', 'g.adv.up.pts', 'g.adv.up.gift', 'g.adv.up.how', 'g.adv.float', 'g.adv.welcome', 'g.adv.welcomeSub', 'g.adv.newWorld', 'g.adv.newWorldSub', 'g.adv.worldName',
@@ -180,10 +180,12 @@
     nb.__adv = true; VR.Player.prototype.breakTime = nb;
   }
 
-  // ---------------------------------------------------------------- the HUD: the ring, the Sterntaler, the free points
+  // ---------------------------------------------------------------- the HUD: the ring, the Heliataler, the free points
   const RING = (id, off) => `<svg viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff3bf"/><stop offset=".5" stop-color="#ffc94d"/><stop offset="1" stop-color="#ff8a3d"/></linearGradient></defs><circle class="bg" cx="32" cy="32" r="27"/><circle class="arc" cx="32" cy="32" r="27" pathLength="100" stroke="url(#${id})" stroke-dasharray="100" stroke-dashoffset="${off === undefined ? 100 : off}"/></svg>`;
-  // the Sterntaler (our own): a gold disc, a raised rim, a five-pointed star stamped in its middle
-  const COIN = (id) => `<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><defs><radialGradient id="${id}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff3b0"/><stop offset=".55" stop-color="#ffc83d"/><stop offset="1" stop-color="#c97a10"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#${id})" stroke="#8a5208" stroke-width="1"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#fff1a8" stroke-opacity=".6" stroke-width=".8"/><path d="M12 5.8L13.47 9.98 17.9 10.08 14.38 12.77 15.64 17.02 12 14.5 8.36 17.02 9.62 12.77 6.1 10.08 10.53 9.98Z" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6" stroke-linejoin="round"/></svg>`;
+  // the Heliataler (our own; f-names — the name and the mark of Helia, the sun of Herzwelt): a gold disc, a raised rim,
+  // the sun stamped in its middle — a disc and eight rays (shop.js draws the same coin)
+  const SUN = '<path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#b86b0c" stroke-width="2.3" stroke-linecap="round"/><path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#fff6c8" stroke-width="1.2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6"/>';
+  const COIN = (id) => `<svg class="coin" data-coin="helia" viewBox="0 0 24 24" aria-hidden="true"><defs><radialGradient id="${id}" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff3b0"/><stop offset=".55" stop-color="#ffc83d"/><stop offset="1" stop-color="#c97a10"/></radialGradient></defs><circle cx="12" cy="12" r="11" fill="url(#${id})" stroke="#8a5208" stroke-width="1"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#fff1a8" stroke-opacity=".6" stroke-width=".8"/>${SUN}</svg>`;
   A.ensureHud = function () {
     if (!hasDoc) return null;
     const hud = document.getElementById('hud'); if (!hud) return null;
@@ -227,7 +229,7 @@
     const f = () => { A.renderHud(); A.flushFloat(); };
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(f); else setTimeout(f, 16);
   };
-  // „+20 EP" rising beside the ring (CSS), the Sterntaler of the award with it
+  // „+20 EP" rising beside the ring (CSS), the Heliataler of the award with it
   A.flushFloat = function () {
     const xp = A.floatXP, tl = A.floatTaler; A.floatXP = 0; A.floatTaler = 0;
     const el = A.hudEl; if (!el || el.style.display === 'none' || (!xp && !tl)) return;
@@ -254,6 +256,7 @@
     if (g.director && g.director.active) return 'director';
     if (g.photo || (g.photoCam && g.photoCam.on)) return 'photo';
     if (g.arrival || g.revealPending || g.studioOpen) return 'arrival';
+    if (VR.Liberate && VR.Liberate.busy && VR.Liberate.busy()) return 'moment';   // a-foes: a freeing's moment and its banner hold the view (the level-up after it)
     if (hasDoc) { const wb = document.getElementById('wbanner'); if (wb && wb.classList && wb.classList.contains('on')) return 'banner'; }
     return '';
   };
@@ -345,12 +348,16 @@
     const g = game(), rec = A.rec, on = !!(rec && rec.on), kids = !!(g && g.settings && g.settings.kids);
     let h = `<div class="advhead"><h2>${esc(T('g.adv.title'))}</h2><button type="button" class="btn small" data-act="adv:back">← ${esc(T('g.btn.back'))}</button></div>`;
     h += rec ? A.summary(rec, on) : `<div class="advteaser">${esc(T('g.adv.teaser'))}</div>`;
-    h += `<div class="field"><label>${esc(T('g.adv.way'))}</label>` + seg('adv:way', [['free', T('g.adv.way.free'), T('g.adv.way.freeS')], ['adv', T('g.adv.way.adv'), T('g.adv.way.advS')]], on || A.asking ? 'adv' : 'free') + '</div>';
-    if (A.asking) h += `<div class="advask"><p>${esc(T(VR.Foes ? 'g.adv.confirm' : 'g.adv.confirmCalm'))}</p><div class="row gap"><button type="button" class="btn primary" data-act="adv:yes">${esc(T('g.adv.yes'))}</button><button type="button" class="btn small" data-act="adv:no">${esc(T('g.adv.no'))}</button></div></div>`;
-    const band = rec ? rec.band : 'normal', enc = Adv.encOf(rec, kids);
-    h += `<div class="field${on ? '' : ' adv-dim'}"><label>${esc(T('g.adv.band'))}</label>` + seg('adv:band', [['easy', T('g.adv.band.easy')], ['normal', T('g.adv.band.normal')], ['hard', T('g.adv.band.hard')]], band, !on) + '</div>';
-    h += `<div class="field${on ? '' : ' adv-dim'}"><label>${esc(T('g.adv.enc'))}</label>` + seg('adv:enc', [['normal', T('g.adv.enc.normal')], ['rare', T('g.adv.enc.rare')], ['off', T('g.adv.enc.off')]], enc, !on || kids) + `<div class="note">${esc(T(kids ? 'g.adv.encKids' : 'g.adv.encNote'))}</div></div>`;
-    if (rec && !on) h += `<div class="note advfoot">${esc(T('g.adv.offNote'))}</div>`;
+    // f-names (R50-05): the create form's one question, asked of this world — 🏗 Frei bauen · 🧭 sanft · ⚔ mit Begegnungen
+    // (🧸 the first two); the band and „selten" only under „mit Begegnungen", so „Normal" never stands beside „aus"
+    const way = Adv.wayOf(on ? rec : null, kids), lit = A.asking || way;
+    h += `<div class="field advways"><label>${esc(T('g.adv.how'))}</label>` + seg('adv:way', (kids ? ['free', 'gentle'] : Adv.WAYS).map(k => [k, T('g.adv.c.' + k), T('g.adv.c.' + k + 'S')]), lit) + '</div>';
+    if (A.asking) h += `<div class="advask"><p>${esc(T(A.asking === 'enc' ? (VR.Foes ? 'g.adv.confirm' : 'g.adv.confirmCalm') : 'g.adv.confirmGentle'))}</p><div class="row gap"><button type="button" class="btn primary" data-act="adv:yes">${esc(T('g.adv.yes'))}</button><button type="button" class="btn small" data-act="adv:no">${esc(T('g.adv.no'))}</button></div></div>`;
+    else if (way === 'enc') {
+      h += `<div class="field"><label>${esc(T('g.adv.band'))}</label>` + seg('adv:band', [['easy', T('g.adv.band.easy')], ['normal', T('g.adv.band.normal')], ['hard', T('g.adv.band.hard')]], rec.band) + '</div>';
+      h += `<div class="field"><label>${esc(T('g.adv.enc'))}</label>` + seg('adv:enc', [['normal', T('g.adv.enc.normal')], ['rare', T('g.adv.enc.rare')]], Adv.encOf(rec, kids)) + (VR.Foes ? '' : `<div class="note">${esc(T('g.adv.c.encLater'))}</div>`) + '</div>';
+    } else if (way === 'gentle') h += `<div class="note advfoot">${esc(T(kids ? 'g.adv.encKids' : 'g.adv.encNote'))}</div>`;
+    if (rec && !on && !A.asking) h += `<div class="note advfoot">${esc(T('g.adv.offNote'))}</div>`;
     box.innerHTML = h;
   };
   const STAT_COL = { aus: '#ff7f93', ene: '#ffd84d', spu: '#7dffb4', ges: '#ffb35c', pil: '#7cc9ff' };
@@ -374,41 +381,67 @@
   A.openCard = function () { const ui = A.ui || (game() && game().ui); if (!ui) return; A.asking = false; A.renderCard(); ui.show('adventure'); };
   A.openStats = function () { const ui = A.ui || (game() && game().ui); if (!ui) return; A.renderStats(); ui.show('advstats'); };
 
-  // ---------------------------------------------------------------- the create row „Spielweg" (Profi's create form)
-  const pickSeg = (s, v) => { for (const x of s.children) { const on = x.dataset && x.dataset.v === v; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); } };
+  // ---------------------------------------------------------------- the create form's one question (f-names, R50-05)
+  // „Wie willst du spielen?" — three cards right after the world's name, in Einfach and Profi: 🏗 Frei bauen (lit:
+  // peaceful) · 🧭 Abenteuer, sanft · ⚔ Abenteuer mit Begegnungen (🧸 Kindersicher: the first two). The rules are VR.Adv's
+  // (formView: what the rows show — Spielart without Zen under „mit Begegnungen", the difficulty only in Profi and only
+  // where it decides something; formWorld: what the world gets). start.js's Spielart and Schwierigkeit rows stay where
+  // they are; this shows, hides and lights them, so what is lit is what the world gets (ui.js reads the lit buttons)
+  const dv = (x) => (x && x.dataset && x.dataset.v) || (x && x.getAttribute ? x.getAttribute('data-v') : null);
+  const pickSeg = (s, v) => { for (const x of s.children) { const on = dv(x) === v; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); } };
+  const showEl = (e, on) => { if (!e) return; if (!e.style) e.style = {}; e.style.display = on ? '' : 'none'; e.hidden = !on; };
+  const fieldOf = (e) => { let a = e; while (a && !(a.classList && a.classList.contains('field'))) a = a.parentNode; return a || null; };
+  const formFlags = () => { const g = game(); return { pro: !!(VR.UIPrefs && VR.UIPrefs.get && VR.UIPrefs.get().pro), kids: !!(g && g.settings && g.settings.kids), foes: !!VR.Foes }; };
+  A.cw = null;   // the form's state (VR.Adv.form)
   function createRow() {
     const panel = hasDoc && document.querySelector('#create .panel'); if (!panel) return;
     if (!panel.querySelector('#cw_way')) {
-      const mode = panel.querySelector('#cw_mode'), field = mode && mode.closest ? mode.closest('.field') : null;
-      const f = document.createElement('div'); f.className = 'field advway';
-      f.innerHTML = `<label>${esc(T('g.adv.way'))}</label><div class="seg" id="cw_way" role="group" aria-label="${esc(T('g.adv.way'))}"><button type="button" data-act="adv:cway" data-v="free">${esc(T('g.adv.way.free'))}<small>${esc(T('g.adv.way.freeS'))}</small></button><button type="button" data-act="adv:cway" data-v="adv">${esc(T('g.adv.way.adv'))}<small>${esc(T('g.adv.way.advS'))}</small></button></div><div class="note advwaynote" hidden>${esc(T('g.adv.wayNote'))}</div>`;
-      if (field && field.after) field.after(f); else panel.appendChild(f);
+      const f = mk('div', 'field advway'), lab = mk('label', '', T('g.adv.how')), s = mk('div', 'seg advcards'), note = mk('div', 'note advwaynote');
+      s.setAttribute('id', 'cw_way'); s.setAttribute('role', 'group'); s.setAttribute('aria-label', T('g.adv.how'));
+      for (const k of Adv.WAYS) {
+        const b = mk('button', 'advc advc-' + k); b.setAttribute('type', 'button'); b.setAttribute('data-act', 'adv:cway'); b.setAttribute('data-v', k);
+        b.dataset.act = 'adv:cway'; b.dataset.v = k;
+        b.appendChild(mk('b', '', T('g.adv.c.' + k))); b.appendChild(mk('small', '', T('g.adv.c.' + k + 'S')));
+        s.appendChild(b);
+      }
+      f.appendChild(lab); f.appendChild(s); f.appendChild(note);
+      const nameField = fieldOf(panel.querySelector('#cw_name'));
+      if (nameField && nameField.after) nameField.after(f); else panel.appendChild(f);
+      // Spielart and Schwierigkeit: start.js lights the clicked button; the rules then decide what stays lit and shown
+      for (const id of ['cw_mode', 'cw_diff']) { const r = panel.querySelector('#' + id); if (r && r.addEventListener) r.addEventListener('click', (e) => { const b = e.target && e.target.closest ? e.target.closest('button') : null; if (b) A.formPick(id === 'cw_mode' ? 'mode' : 'diff', dv(b)); }); }
     }
-    A.cwPrev = null; createWay('free');
+    A.cw = Adv.form(formFlags());   // (every time the form opens: Frei bauen, Zen, peaceful)
+    renderForm();
   }
-  // Abenteuer: the difficulty row now says how strong the encounters are (Friedlich = without them) — Normal to start
-  // with; Frei bauen gives the row its old choice back
-  function createWay(v) {
-    const s = hasDoc && document.querySelector('#cw_way'); if (!s) return;
-    pickSeg(s, v);
-    const note = document.querySelector('#create .advwaynote'); if (note) note.hidden = v !== 'adv';
-    const diff = document.querySelector('#cw_diff'); if (!diff) return;
-    if (v === 'adv' && A.cwPrev === null) { const cur = diff.querySelector('.on'); A.cwPrev = cur && cur.dataset ? cur.dataset.v : 'peaceful'; pickSeg(diff, 'normal'); }
-    else if (v !== 'adv' && A.cwPrev !== null) { pickSeg(diff, A.cwPrev); A.cwPrev = null; }
+  A.createRow = createRow;
+  function renderForm() {
+    const panel = hasDoc && document.querySelector('#create .panel'); if (!panel || !A.cw) return null;
+    A.cw = Adv.form(Object.assign({}, A.cw, formFlags()));
+    const v = Adv.formView(A.cw), w = Adv.formWorld(A.cw);
+    const s = panel.querySelector('#cw_way');
+    if (s) { for (const b of s.children) showEl(b, v.ways.indexOf(dv(b)) >= 0); pickSeg(s, v.way); }
+    const note = panel.querySelector('.advwaynote');
+    if (note) { note.textContent = v.note === 'encLater' ? T('g.adv.c.encLater') : v.note === 'kids' ? T('g.adv.encKids') : ''; showEl(note, !!v.note); }
+    const mode = panel.querySelector('#cw_mode');
+    if (mode) { for (const b of mode.children) showEl(b, !v.modes.length || v.modes.indexOf(dv(b)) >= 0); pickSeg(mode, w.mode); showEl(fieldOf(mode), v.modes.length > 0); }
+    const diff = panel.querySelector('#cw_diff');
+    if (diff) { for (const b of diff.children) showEl(b, v.diffs.indexOf(dv(b)) >= 0); pickSeg(diff, v.diff || w.difficulty); showEl(fieldOf(diff), v.diffs.length > 0); }
+    return w;
   }
-  // ✓ Welt erstellen: an Abenteuer world is peaceful itself (A§1); its band and Begegnungen come from the difficulty row
+  A.formPick = (what, val) => { if (!A.cw) A.cw = Adv.form(formFlags()); A.cw = Adv.formPick(A.cw, what, val); return renderForm(); };
+  // ✓ Welt erstellen: the lit Spielart and difficulty are the world's (an Abenteuer world is peaceful itself, A§1 — its
+  // band and Begegnungen go into its record when it starts: pendingCreate → A.bind)
   A.beforeCreate = function () {
-    const way = hasDoc && document.querySelector('#cw_way button.on');
-    if (!way || way.dataset.v !== 'adv') { A.pendingCreate = null; return; }
-    const cur = document.querySelector('#cw_diff .on'), d = cur && cur.dataset ? cur.dataset.v : 'normal';
-    A.pendingCreate = { at: Date.now(), band: d === 'easy' || d === 'hard' ? d : 'normal', enc: d === 'peaceful' ? 'off' : 'normal' };
-    const diff = document.querySelector('#cw_diff'); if (diff) pickSeg(diff, 'peaceful');
-    A.cwPrev = null;
+    const panel = hasDoc && document.querySelector('#create .panel');
+    if (!panel || !A.cw || !panel.querySelector('#cw_way')) { A.pendingCreate = null; return; }
+    const w = renderForm();
+    const diff = panel.querySelector('#cw_diff'); if (diff) pickSeg(diff, w.difficulty);
+    A.pendingCreate = w.adventure ? { at: Date.now(), band: w.adventure.band, enc: w.adventure.enc } : null;
   };
 
   // ---------------------------------------------------------------- 🎒 Meins on the start screen: „⚔ Abenteuer-Welt beginnen" (A§1)
-  // the way in for Einfach (no create form there): a tile on top of the page (all things, the worlds) that makes a new
-  // world the way ▶ Losspielen does (Zen, peaceful) and marks it for the Abenteuer
+  // a tile on top of the page (all things, the worlds) that makes a new world the way ▶ Losspielen does (Zen, peaceful)
+  // and marks it for a gentle Abenteuer (f-names: no encounters by default — the create form's third card asks for them)
   A.meinsTile = function () {
     const ST = VR.Start, body = hasDoc && document.querySelector('#meins .mbody'); if (!ST || !body) return false;
     if (ST.meinsFrom === 'pause' || (ST.meinsChip !== 'all' && ST.meinsChip !== 'worlds') || body.querySelector('.advtile')) return false;
@@ -424,7 +457,7 @@
     if (typeof g.createWorld !== 'function') return false;
     const base = T('g.adv.worldName'), ws = (ST && ST.worldsCache) || [];
     const n = ws.filter(w => w && String(w.name || '').startsWith(base)).length;
-    A.pendingCreate = { at: Date.now(), band: 'normal', enc: g.settings && g.settings.kids ? 'off' : 'normal' };
+    A.pendingCreate = { at: Date.now(), band: 'normal', enc: 'off' };
     g.createWorld({ name: base + (n ? ' ' + (n + 1) : ''), mode: 'zen', difficulty: 'peaceful', type: 'default', seed: '', cheats: true, kit: true });
     return true;
   };
@@ -436,17 +469,23 @@
       case 'adventure': case 'adv:card': A.openCard(); return true;
       case 'adv:back': ui.pause(); return true;
       case 'adv:stats': A.openStats(); return true;
-      case 'adv:way':
-        if (v === 'adv' && !A.on()) { if (A.rec) { A.setOn(true); A.welcome(); } else A.asking = true; }   // (a world that never had it asks once)
-        else if (v === 'free') { A.asking = false; if (A.on()) A.setOn(false); }
+      case 'adv:way': {   // (f-names: the three cards; „sanft" is Begegnungen aus, „mit Begegnungen" the last choice or normal)
+        const g = game(), kids = !!(g && g.settings && g.settings.kids);
+        if (v === 'free') { A.asking = false; if (A.on()) A.setOn(false); }
+        else if (v === 'gentle' || (v === 'enc' && !kids)) {
+          if (!A.on()) { if (A.rec) { A.setOn(true); A.setEnc(v === 'enc' ? A.lastEnc || 'normal' : 'off'); A.welcome(); } else A.asking = v; }   // (a world that never had it asks once)
+          else if (v === 'gentle') { const e = A.enc(); if (e !== 'off') A.lastEnc = e; A.setEnc('off'); }
+          else if (A.enc() === 'off') A.setEnc(A.lastEnc || 'normal');
+        }
         A.renderCard(); return true;
-      case 'adv:yes': A.asking = false; A.setOn(true); A.welcome(); A.renderCard(); return true;
+      }
+      case 'adv:yes': { const w = A.asking; A.asking = false; A.setOn(true); A.setEnc(w === 'enc' ? 'normal' : 'off'); A.welcome(); A.renderCard(); return true; }
       case 'adv:no': A.asking = false; A.renderCard(); return true;
       case 'adv:band': A.setBand(v); A.renderCard(); return true;
       case 'adv:enc': A.setEnc(v); A.renderCard(); return true;
       case 'adv:pt': A.addPoint(b.dataset.stat); A.renderStats(); return true;
       case 'adv:respec': A.respec(); A.renderStats(); return true;
-      case 'adv:cway': createWay(v); return true;
+      case 'adv:cway': A.formPick('way', v); return true;
       case 'adv:newworld': A.newWorld(); return true;
       case 'docreate': A.beforeCreate(); return false;   // (ui.js makes the world)
       default: return false;
@@ -583,6 +622,24 @@
   #create .hr { margin: 6px 0; }
   #create label.note { min-height: 34px; }
 }
+/* f-names: the one question — three cards (two under Kindersicher), each a title and one line; the lit card glows in its
+   own colour (green: peaceful, gold: gentle, coral: encounters). Einfach stacks them, big and clear */
+#create .advcards button { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 3px; text-align: left; min-height: 66px; padding: 9px 12px; }   /* (top: the titles of a row stay on one line when one card's line wraps) */
+#create .advcards button b { font-weight: 700; line-height: 1.15; }
+#create .advcards button small { margin: 0; line-height: 1.25; }
+#create .advcards .advc-free.on { border-color: #7dffb4; background: linear-gradient(135deg, rgba(125, 255, 180, .2), rgba(58, 240, 255, .08)); box-shadow: 0 0 14px rgba(125, 255, 180, .28); }
+#create .advcards .advc-gentle.on { border-color: #ffd166; background: linear-gradient(135deg, rgba(255, 209, 102, .22), rgba(58, 240, 255, .06)); box-shadow: 0 0 14px rgba(255, 209, 102, .3); }
+#create .advcards .advc-enc.on { border-color: #ff9a6b; background: linear-gradient(135deg, rgba(255, 154, 107, .22), rgba(255, 74, 216, .08)); box-shadow: 0 0 14px rgba(255, 154, 107, .3); }
+#create .advwaynote { font-size: 13px; color: var(--st-mute, #a9b8d2); }
+html:not(.pro) #create .panel.box > .field:has(#cw_name) { grid-column: 1 / -1; }   /* (Einfach: no seed beside the name) */
+html:not(.pro) #create .advcards { flex-direction: column; }
+html:not(.pro) #create .advcards button { min-height: 72px; padding: 12px 16px; justify-content: center; }
+html:not(.pro) #create .advcards button b { font-size: calc(var(--st-fs, 18px) * 1.08); }
+html:not(.pro) #create .advcards button small { font-size: calc(var(--st-fs, 18px) * .8); }
+#adventure .advways .seg button { text-align: left; }
+#adventure .advways .seg button[data-v="free"].on { border-color: #7dffb4; background: linear-gradient(135deg, rgba(125, 255, 180, .2), rgba(58, 240, 255, .08)); box-shadow: 0 0 14px rgba(125, 255, 180, .28); }   /* (the pause card's cards glow like the create form's) */
+#adventure .advways .seg button[data-v="gentle"].on { border-color: #ffd166; background: linear-gradient(135deg, rgba(255, 209, 102, .22), rgba(58, 240, 255, .06)); box-shadow: 0 0 14px rgba(255, 209, 102, .3); }
+#adventure .advways .seg button[data-v="enc"].on { border-color: #ff9a6b; background: linear-gradient(135deg, rgba(255, 154, 107, .22), rgba(255, 74, 216, .08)); box-shadow: 0 0 14px rgba(255, 154, 107, .3); }
 @media (max-height: 680px) { #create .panel.box > .row.gap:last-child { position: sticky; bottom: -14px; z-index: 2; padding: 8px 0 6px; background: linear-gradient(180deg, rgba(12, 17, 34, 0), rgba(12, 17, 34, .96) 35%); } }   /* (where it would scroll: the row stays in view) */
 @media (prefers-reduced-motion: reduce) { #advup .rays, #advup .sparks { display: none; } #advup.on, #advup.off, #advhud.up .ring, #advhud.pop, #advhud .fl { animation-duration: .01s; } #advhud .ring .arc { transition: none; } }
 `;

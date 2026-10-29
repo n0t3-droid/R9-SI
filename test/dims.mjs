@@ -3,18 +3,25 @@
 //  1 · page A (this build, Balanced, view 8): a world (seed 4242), a drift gate set into a stone frame in front of the
 //      spawn (test/shots/dims_gate.png), the player steps into it: two seconds later the Driftinseln
 //      (test/shots/dims_drift.png); 🏠 Heimkehr (game.goHome, the pause menu's button): back at Herzwelt's spawn
-//      (test/shots/dims_home.png). Checks: the dims, where the player stands, the veil open again, the pointer never
+//      (test/shots/dims_home.png — the view Heimkehr chose, f-arrival R50-06: out of the hangar, the nearest geometry in
+//      the frame's middle third ≥ 8 m; test/shots/dims_home_before.png the same place facing north as v0.49 showed it,
+//      the hangar's craft 2 m ahead). Checks: the dims, where the player stands, the veil open again, the pointer never
 //      handed back to a loading screen, no page error.
 //  2 · page A: three round trips Herzwelt ⇄ Driftinseln (/dim and Heimkehr); after each return, settled at the spawn: the
 //      JS heap after a GC (CDP) and the GPU arenas (count, MB allocated, MB used); the third within 5 % of the first.
 //  3 · pages B (this build) and C (the build before, BEFORE_DIST, default .tmp_tests/before_src/dist — v042 de4d638) on
 //      Very Low (potato): the Nova Haven plaza (ipu.mjs's plaza), the actors held still, rounds in turns (ms per frame
 //      with the GPU drained, draws, triangles): ×1.00 ± 0.03 (or the same draws and triangles). Then on page B with the
-//      game's own frame loop running: a gate trip and Heimkehr timed (gate → first frame of the other world, ms).
+//      game's own frame loop running: a gate trip and Heimkehr timed (gate → first frame of the other world, ms;
+//      Heimkehr ≤ 6 s), the frame it opens on (test/shots/dims_home_potato.png). Both pages make the world at vgen 12
+//      (CMP_VGEN): the same land in both builds, the code's cost compared (vgen 13's trees: test/arrival.js).
 //  4 · pages B' and C' on High (view 8, ring 1's far forms off in both): the same plaza, the same work in both builds,
 //      the frame before/after.
 //   nohup bash test/wt_run.sh dims.mjs 5400 > .tmp_tests/dims.log 2>&1 &
+//  5 · (HOME_VL=1: this part alone; f-arrival) Heimkehr on Very Low in both builds, the frames stepped: left from home
+//      and from away, ≤ 6 s, facing out (test/shots/dims_home_vl_{after,before}.png)
 //   NO_COST=1 · NO_HIGH=1 · ROUNDS=9 · N=30 · ROUNDS_HIGH=5 · N_HIGH=10 · SEED=4242 · BEFORE_DIST=file:///…/index.html
+//   HOME_VL=1 · ROUNDS_H=2 · CMP_VGEN=12
 // regress: skip  (a showcase with pictures and the cost against the build before; the gate is test/dims.js)
 import { chromium } from '/home/dev/.npm-global/lib/node_modules/playwright/index.mjs';
 import fs from 'fs';
@@ -23,6 +30,7 @@ const DIST = process.env.DIST || 'file://' + ROOT + '/dist/index.html';
 const BEFORE = process.env.BEFORE_DIST || 'file://' + ROOT + '/.tmp_tests/before_src/dist/index.html';
 const SHOTS = ROOT + '/test/shots/';
 const SEED = process.env.SEED || '4242', ROUNDS = +(process.env.ROUNDS || 9), N = +(process.env.N || 30);
+const CMP_VGEN = +(process.env.CMP_VGEN || 12);   // (the cost pages' generator in both builds: the same land, the code compared)
 const T0 = Date.now(), secs = () => ((Date.now() - T0) / 1000).toFixed(0) + ' s';
 let fails = 0;
 const check = (ok, msg) => { if (!ok) fails++; console.log((ok ? '  ✓ ' : '  ✗ ') + msg); };
@@ -32,7 +40,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const browser = await chromium.launch({ channel: 'chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl'] });
 
 // ---------------------------------------------------------------- a page with a world (motion.mjs's machinery)
-async function openWorld(dist, preset, rd, natural, extra) {
+async function openWorld(dist, preset, rd, natural, extra, wopt) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 }, locale: 'de-DE' });
   const page = await ctx.newPage();
   const logs = [];
@@ -69,13 +77,36 @@ async function openWorld(dist, preset, rd, natural, extra) {
   const heapMB = async () => { await cdp.send('HeapProfiler.collectGarbage'); await wait(200); await cdp.send('HeapProfiler.collectGarbage'); const u = await cdp.send('Runtime.getHeapUsage'); return +(u.usedSize / 1048576).toFixed(2); };
   for (let i = 0; i < 120; i++) { await wait(500); if (await ev(() => VR.game && VR.game.state === 'title')) break; }
   await ev(([p, rd, ex]) => { const g = VR.game; g.applyPreset(p); g.settings.dynRes = false; if (rd) g.settings.renderDist = rd; if (ex) Object.assign(g.settings, ex); g.applySettings('*'); }, [preset, rd, extra || null]);
-  await ev(`VR.game.createWorld({name:'Welten',mode:'creative',difficulty:'peaceful',type:'default',seed:'${SEED}',cheats:true,kit:true})`);
+  await ev((o) => VR.game.createWorld(Object.assign({ name: 'Welten', mode: 'creative', difficulty: 'peaceful', type: 'default', cheats: true, kit: true }, o)), Object.assign({ seed: SEED }, wopt || {}));
   for (let i = 0; i < 180; i++) { await wait(1000); if (await ev(() => VR.game.state) === 'play') break; }
   const ok = await ev(() => VR.game.state) === 'play';
   // the test drives the frames itself (the page's own loop off), the weather clear, the hints away (pictures)
   await ev((natural) => { const g = VR.game; window.__raf = window.requestAnimationFrame.bind(window); if (!natural) window.requestAnimationFrame = () => 0; g.zenFreezeTime = true; g.zenFreezeWeather = true; g.env.wx.force('klar'); if (!document.getElementById('__nohint')) { const st = document.createElement('style'); st.id = '__nohint'; st.textContent = '#hint,#hints,#lockhint{display:none !important}'; document.head.appendChild(st); } }, !!natural);
   return { ctx, page, logs, ev, wait, step, settle, picture, heapMB, ok };
 }
+// the nearest geometry in the middle third (a third across, a third up) of the player's frame (f-arrival, R50-06): 9 × 5
+// rays at the player's camera through the loaded blocks (no plants, no fluids; the ground under the feet not counted) and
+// the ships near by as boxes (the test's own rays — not VR.Travel.facing's)
+const midThird = (A) => A.ev(() => {
+  const g = VR.game, w = g.world, p = g.player, R = VR.R, F = VR.F, fov = ((g.settings && g.settings.fov) || 75) * Math.PI / 180, th = Math.tan(fov / 2), asp = g.canvas.width / g.canvas.height;
+  const eye = [p.pos[0], p.pos[1] + (p.eye || 1.62), p.pos[2]], feet = Math.floor(p.pos[1] + 0.01), yaw = p.yaw, pitch = p.pitch || 0;
+  const f = [-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch)], r = [Math.cos(yaw), 0, -Math.sin(yaw)];
+  const u = [r[1] * f[2] - r[2] * f[1], r[2] * f[0] - r[0] * f[2], r[0] * f[1] - r[1] * f[0]];
+  const boxes = []; for (const s of (g.starships && g.starships.ships) || []) { if (!s || !s.pos || Math.hypot(s.pos[0] - eye[0], s.pos[2] - eye[2]) > 60) continue; const m = s.d && s.d.meta, hw = m && m.bounds ? Math.max(m.bounds[3] - m.bounds[0], m.bounds[5] - m.bounds[2]) / 2 : 10, h = m && m.height ? m.height : 8; boxes.push([s.pos[0] - hw, s.pos[1], s.pos[2] - hw, s.pos[0] + hw, s.pos[1] + h, s.pos[2] + hw]); }
+  let near = 60, what = 'nothing within 60 m';
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 9; i++) {
+    const a = (-1 / 3 + i / 8 * (2 / 3)) * th * asp, b = (-1 / 3 + j / 4 * (2 / 3)) * th, d = [0, 1, 2].map(k => f[k] + r[k] * a + u[k] * b), l = Math.hypot(d[0], d[1], d[2]); for (let k = 0; k < 3; k++) d[k] /= l;
+    for (const bx of boxes) { let t0 = -Infinity, t1 = Infinity; for (let k = 0; k < 3; k++) { const iv = 1 / (d[k] || 1e-12), q0 = (bx[k] - eye[k]) * iv, q1 = (bx[k + 3] - eye[k]) * iv; t0 = Math.max(t0, Math.min(q0, q1)); t1 = Math.min(t1, Math.max(q0, q1)); } if (t1 >= t0 && t1 > 0 && Math.max(0, t0) < near) { near = Math.max(0, t0); what = 'a ship'; } }
+    for (let t = 0.05; t < near; t += 0.05) {
+      const x = Math.floor(eye[0] + d[0] * t), y = Math.floor(eye[1] + d[1] * t), z = Math.floor(eye[2] + d[2] * t);
+      if (y < feet) { if (d[1] < 0) break; continue; }
+      const s = w.getBlock(x, y, z); if (!s) continue; const fl = R.T.flags[s];
+      if ((fl & F.PLANT) || (fl & F.FLUID) || !((fl & (F.OPAQUE | F.LEAVES)) || (fl & F.SOLID))) continue;
+      near = t; what = R.types[R.T.type[s]].name + ' (' + (x - Math.floor(eye[0])) + ', ' + (y - feet) + ', ' + (z - Math.floor(eye[2])) + ')'; break;
+    }
+  }
+  return { near: +near.toFixed(1), what, yaw: +yaw.toFixed(3), pitch: +pitch.toFixed(3), fovDeg: Math.round(fov * 180 / Math.PI), ships: boxes.length };
+});
 const gpuOf = (A) => A.ev(() => { const r = VR.game.renderer; let cap = 0; for (const a of r.arenas) cap += a.cap * 16; return { arenas: r.arenas.length, allocMB: +(cap / 1048576).toFixed(1), usedMB: +r.gpuMemoryMB().toFixed(2), hzMB: VR.game.horizon && VR.game.horizon.stats ? +(VR.game.horizon.stats.mb || 0).toFixed(1) : 0 }; });
 // a trip: started by `start` (in the page), the frames stepped until the first frame in `to`
 async function trip(A, to, start, label) {
@@ -93,6 +124,51 @@ async function trip(A, to, start, label) {
   rec.trips.push(r); save();
   console.log(`  trip ${label}: ${JSON.stringify(r.last)} · ${r.wallMs} ms wall (stepped) (${secs()})`);
   return s;
+}
+
+// ================================================================ 5 · (HOME_VL=1 alone) Heimkehr on Very Low, both builds (f-arrival)
+// The game's own loop runs a frame every few seconds on SwiftShader on this machine (part 3's run: the gate's 2 s took
+// 140 s, its Heimkehr's 28.7 s were a handful of frames — u-dims measured 28–30 s the same way), so the trips are timed
+// as u-home's newlife.mjs times them: the frames stepped by the test, nothing drawn until the arrival, VR.Travel.last's
+// ms from the veil's start to the first play frame. Pages B (this build) and C (the build before), Very Low, the same
+// land (vgen CMP_VGEN), in turns × ROUNDS_H: from home (the spawn's ring loaded when leaving: kept) and from 150 blocks
+// away (nothing kept): /dim drift, 🏠. This build: ≤ 6 s both ways, facing out (the frame's middle third ≥ 8 m);
+// test/shots/dims_home_vl_{after,before}.png the frame each opens on.
+if (process.env.HOME_VL) {
+  const out = { after: [], before: [] }, pages = [];
+  const pB = await openWorld(DIST, 'potato', 0, false, null, { vgen: CMP_VGEN }); check(pB.ok, `page B (this build, Very Low) is loaded (${secs()})`); pages.push(['after', pB]);
+  if (fs.existsSync(BEFORE.replace(/^file:\/\//, ''))) { const pC = await openWorld(BEFORE, 'potato', 0, false, null, { vgen: CMP_VGEN }); check(pC.ok, `page C (the build before, Very Low) is loaded (${secs()})`); pages.push(['before', pC]); }
+  for (const [, P] of pages) { await P.page.bringToFront(); await P.settle(80, 10); }
+  const R_H = +(process.env.ROUNDS_H || 2);
+  for (let r = 0; r < R_H; r++) for (const [lbl, P] of (r & 1 ? pages.slice().reverse() : pages)) {
+    await P.page.bringToFront();
+    for (const from of ['home', 'away']) {
+      await P.ev((away) => { const g = VR.game, p = g.player, s = p.spawn; p.flying = !!away; p.noclip = !!away; if (away) p.teleport(s[0] + 150, s[1] + 40, s[2]); else p.teleport(s[0], s[1], s[2]); p.yaw = 0; p.pitch = 0; }, from === 'away');
+      await P.settle(60, 6);
+      await trip(P, 'drift', () => { VR.Travel.go(VR.game, { dim: 'drift', via: 'cmd' }); }, `${lbl} (Very Low): /dim drift from ${from}`);
+      await P.settle(30, 4);
+      const s = await trip(P, 'overworld', () => { const g = VR.game; if (g.ui && g.ui.resume) g.ui.resume(); g.goHome(); }, `${lbl} (Very Low): Heimkehr, left from ${from}`);
+      out[lbl].push({ from, round: r, ms: s && s.last ? s.last.totalMs : null, loadMs: s && s.last ? s.last.loadMs : null, face: s && s.last ? s.last.face || null : null });
+    }
+  }
+  const med = (a) => { const b = a.filter(v => v !== null).sort((p, q) => p - q); return b.length ? b[b.length >> 1] : null; };
+  for (const [lbl, P] of pages) {
+    await P.page.bringToFront(); await P.step(24, 33);   // (the veil's 0.65 s)
+    out[lbl + 'Mid'] = await midThird(P);
+    await P.picture(SHOTS + 'dims_home_vl_' + lbl + '.png', 4);
+  }
+  rec.homeVL = out; save();
+  const mh = med(out.after.filter(q => q.from === 'home').map(q => q.ms)), ma = med(out.after.filter(q => q.from === 'away').map(q => q.ms));
+  const bh = med(out.before.filter(q => q.from === 'home').map(q => q.ms)), ba = med(out.before.filter(q => q.from === 'away').map(q => q.ms));
+  console.log('  Heimkehr on Very Low (stepped)', JSON.stringify(out));
+  check(mh !== null && ma !== null && mh <= 6000 && ma <= 6000, `Heimkehr on Very Low (SwiftShader, stepped): left from home ${mh} ms, from 150 blocks away ${ma} ms (≤ 6 s; the build before: ${bh} ms, ${ba} ms)`);
+  const fa = out.after.map(q => q.face).filter(Boolean), mid = out.afterMid;
+  check(fa.length === out.after.length && fa.every(f => f.clear >= 8) && mid && mid.near >= 8, `every Heimkehr faces out: ${fa.map(f => (f.yaw * 180 / Math.PI).toFixed(0) + '° ' + f.clear + ' m').join(', ')}; the last frame's middle third ${mid ? mid.near + ' m (' + mid.what + ')' : '—'} (the build before: ${out.beforeMid ? out.beforeMid.near + ' m, ' + out.beforeMid.what : '—'})`);
+  for (const [lbl, P] of pages) { const errs = P.logs.filter(l => l.startsWith('[pageerror]')); check(errs.length === 0, `page ${lbl}: no page error (${errs.length})`); await P.ctx.close(); }
+  await browser.close();
+  console.log(`(${secs()})`);
+  console.log(fails ? 'FAILED ' + fails : 'ALL OK');
+  process.exit(fails ? 1 : 0);
 }
 
 // ================================================================ 1 · the gate, the drift, Heimkehr (pictures)
@@ -161,9 +237,20 @@ check(s2 && s2.arrived && atHome2.dim === 'overworld' && atHome2.d < 4, `Heimkeh
 // (run 1, before the keep: 25.0–25.9 s every time — the Heartland's plans built again)
 check(s2 && s2.last && s2.last.loadMs < 15000, `Heimkehr loads in ${s2 && s2.last ? s2.last.loadMs : '?'} ms (below 15 s; the loading limit is 25 s)`);
 check(atHome.keys.includes('drift'), 'the drift\'s place is kept for the next visit');
-await A.ev(() => { const g = VR.game, p = g.player; g.env.setTime(5200); g.env.wx.force('klar'); p.yaw = 0; p.pitch = 0.04; });
+// (f-arrival, R50-06: the view Heimkehr chose is kept for the picture — u-dims's run turned it north, into the hangar's
+// craft, and that was the picture the review saw: dims_home_before.png shows that view again)
+await A.ev(() => { const g = VR.game; g.env.setTime(5200); g.env.wx.force('klar'); });
 await A.step(40, 33);
-check(await A.picture(SHOTS + 'dims_home.png', 6), 'test/shots/dims_home.png — after Heimkehr');
+const face = s2 && s2.last ? s2.last.face : null, mid = await midThird(A);
+rec.home = { face, mid }; save();
+console.log('  Heimkehr\'s view', JSON.stringify(rec.home));
+check(await A.picture(SHOTS + 'dims_home.png', 6), 'test/shots/dims_home.png — after Heimkehr, the view it chose');
+check(!!face && face.clear >= 8 && mid.near >= 8, `Heimkehr faces out: the view ${face ? (face.yaw * 180 / Math.PI).toFixed(0) + '°' + (face.kept ? ' (the world\'s own spawn view)' : '') : '—'}; the nearest geometry in its frame's middle third ${mid.near} m (${mid.what}; Travel.facing's rays: ${face ? face.clear + ' m' : '—'}) — ≥ 8 m`);
+const yaw1 = await A.ev(() => { const p = VR.game.player, y = [p.yaw, p.pitch]; p.yaw = 0; if ('viewYaw' in p) p.viewYaw = 0; p.pitch = 0.04; return y; });
+await A.step(4, 33);
+rec.homeBefore = await midThird(A); save();
+check(await A.picture(SHOTS + 'dims_home_before.png', 6), `test/shots/dims_home_before.png — the same place facing north, as v0.49's picture showed it (its middle third: ${rec.homeBefore.near} m, ${rec.homeBefore.what})`);
+await A.ev((y) => { const p = VR.game.player; p.yaw = y[0]; if ('viewYaw' in p) p.viewYaw = y[0]; p.pitch = y[1]; }, yaw1);
 
 // ================================================================ 2 · three round trips: memory
 console.log(`round trips (${secs()})`);
@@ -226,10 +313,10 @@ if (!process.env.NO_COST) {
   };
   const pages = [];
   try {
-    const B = await openWorld(DIST, 'potato', 0, false); check(B.ok, `page B (this build, Very Low) is loaded (${secs()})`); pages.push(['after', B]);
+    const B = await openWorld(DIST, 'potato', 0, false, null, { vgen: CMP_VGEN }); check(B.ok, `page B (this build, Very Low) is loaded (${secs()})`); pages.push(['after', B]);
     console.log('  B settled', JSON.stringify(await place(B)));
     await B.picture(SHOTS + 'dims_potato_plaza.png', 8);
-    if (beforeOk) { const C = await openWorld(BEFORE, 'potato', 0, false); check(C.ok, `page C (the build before, Very Low) is loaded (${secs()})`); pages.push(['before', C]); console.log('  C settled', JSON.stringify(await place(C))); }
+    if (beforeOk) { const C = await openWorld(BEFORE, 'potato', 0, false, null, { vgen: CMP_VGEN }); check(C.ok, `page C (the build before, Very Low) is loaded (${secs()})`); pages.push(['before', C]); console.log('  C settled', JSON.stringify(await place(C))); }
     if (pages.length === 2) {
       const out = await compare(pages, ROUNDS, N);
       rec.cost = out; save();
@@ -269,6 +356,12 @@ if (!process.env.NO_COST) {
     rec.timed = t; save();
     console.log('  timed (Very Low, its own loop)', JSON.stringify(t));
     check(t.switchMs !== null && t.homeMs !== null, `the switch time on Very Low: the trip ${t.switchMs} ms from its start to the first frame of the Driftinseln (the gate's 2 s before it: ${t.gateToStartMs} ms), Heimkehr ${t.homeMs} ms`);
+    // (f-arrival, R50-06) Heimkehr on Very Low: within 6 s, and the frame it opens on faces out
+    await B.wait(1200);
+    const midP = await midThird(B), faceP = t.toHome ? t.toHome.face : null;
+    rec.timed.mid = midP; save();
+    try { await B.page.screenshot({ path: SHOTS + 'dims_home_potato.png', timeout: 150000 }); } catch (e) { console.log('  !! screenshot dims_home_potato.png failed'); }
+    check(t.homeMs !== null && t.homeMs <= 6000 && !!faceP && midP.near >= 8, `Heimkehr on Very Low (SwiftShader, the game's own loop): ${t.homeMs} ms (≤ 6 s), the view ${faceP ? JSON.stringify(faceP) : '—'}, the nearest geometry in the frame's middle third ${midP.near} m (${midP.what}) — test/shots/dims_home_potato.png`);
     const errs = B.logs.filter(l => l.startsWith('[pageerror]'));
     console.log(`--- page B logs (${B.logs.length})`); for (const l of B.logs.slice(0, 8)) console.log(l);
     check(errs.length === 0, `page B: no page error (${errs.length})`);
@@ -280,9 +373,9 @@ if (!process.env.NO_COST) {
   if (!process.env.NO_HIGH && fs.existsSync(BEFORE.replace(/^file:\/\//, ''))) {
     const pagesH = [];
     try {
-      const BH = await openWorld(DIST, 'high', 8, false, { far: 0 }); check(BH.ok, `page B' (this build, High) is loaded (${secs()})`); pagesH.push(['after', BH]);
+      const BH = await openWorld(DIST, 'high', 8, false, { far: 0 }, { vgen: CMP_VGEN }); check(BH.ok, `page B' (this build, High) is loaded (${secs()})`); pagesH.push(['after', BH]);
       const sb = await place(BH, 150); console.log('  B\' settled', JSON.stringify(sb));
-      const CH = await openWorld(BEFORE, 'high', 8, false, { far: 0 }); check(CH.ok, `page C' (the build before, High) is loaded (${secs()})`); pagesH.push(['before', CH]);
+      const CH = await openWorld(BEFORE, 'high', 8, false, { far: 0 }, { vgen: CMP_VGEN }); check(CH.ok, `page C' (the build before, High) is loaded (${secs()})`); pagesH.push(['before', CH]);
       const sc = await place(CH, 150); console.log('  C\' settled', JSON.stringify(sc));
       const outH = await compare(pagesH, +(process.env.ROUNDS_HIGH || 5), +(process.env.N_HIGH || 10));
       outH.settled = [sb && sb.hz === 0 && sb.far === 0, sc && sc.hz === 0 && sc.far === 0];

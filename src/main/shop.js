@@ -1,8 +1,8 @@
 // ============================================================================
 // Die Läden des Abenteuers (a-quests; plan docs/superpowers/plans/2026-10-22-a-quests.md, spec
-// docs/superpowers/specs/2026-10-22-abenteuer-design.md §4). VR.Shop — Sterntaler earned in the world, spent here:
+// docs/superpowers/specs/2026-10-22-abenteuer-design.md §4). VR.Shop — Heliataler earned in the world, spent here:
 //   🛒 Supermarkt  the cashiers (and the clerk) sell the groceries catalogue (groceries.js 50–77, VR.SHOP) at its own
-//                  prices — 1 credit of the catalogue is 1 Sterntaler; the offers (Angebote) are cheaper
+//                  prices — 1 credit of the catalogue is 1 Heliataler; the offers (Angebote) are cheaper
 //   🛠 Werkstatt   the smith, the crafter, the factory worker: tools, the suit modules and the boots of A§4
 //   🚀 Hangar      the pilot and the flight controller: engine, shield, jump core (in steps), Funke's modules, things
 //                  that fly
@@ -12,7 +12,7 @@
 //   Refusals       said in plain words: too few Taler (how many are missing), the top step, bought already, a full
 //                  backpack (checked before paying — nothing is ever paid for what does not fit)
 // Only in Abenteuer worlds (VR.Adventure.on()); a builder's world keeps its cashiers as decoration. Never real money: the
-// Sterntaler are whole numbers that come from quests, levels and selling, and never go below zero.
+// Heliataler are whole numbers that come from quests, levels and selling, and never go below zero.
 // The pure part (catalogues, quote, buy, sell) is node-tested (test/shop.js); the screen #shop, the talk button and the
 // cashier's invitation at the till are the glue (villages.js has one marked line at the till; talkOptions is wrapped).
 // ============================================================================
@@ -31,7 +31,7 @@
   const ROLE = { cashier: 'supermarkt', clerk: 'supermarkt', smith: 'werkstatt', crafter: 'werkstatt', worker: 'werkstatt', pilot: 'hangar', operator: 'hangar', builder: 'baumarkt' };
   S.shopOf = (role) => (Object.prototype.hasOwnProperty.call(ROLE, role) ? ROLE[role] : null);
   S.ICON = { supermarkt: '🛒', werkstatt: '🛠', hangar: '🚀', baumarkt: '🧱' };
-  // the Werkstatt's tools (Sterntaler; the tech items at the catalogue's prices where it has them)
+  // the Werkstatt's tools (Heliataler; the tech items at the catalogue's prices where it has them)
   const TOOLS = [['iron_pickaxe', 40], ['iron_axe', 30], ['iron_shovel', 25], ['shears', 15], ['compass', 15], ['clock', 15], ['spyglass', 25], ['scanner', 60], ['diamond_pickaxe', 150], ['builder_wand', 120], ['jetpack', 300]];
   const WERK_UPS = ['suitHeat', 'suitCold', 'suitPressure', 'suitRad', 'boots', 'anchor'];
   const HANGAR_UPS = ['engine', 'shield', 'jump', 'scanner', 'repair', 'camera'];
@@ -229,7 +229,9 @@
     S.render();
     return r;
   };
-  const COIN = '<svg class="coin" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#ffc83d" stroke="#8a5208" stroke-width="1"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#fff1a8" stroke-opacity=".6" stroke-width=".8"/><path d="M12 5.8L13.47 9.98 17.9 10.08 14.38 12.77 15.64 17.02 12 14.5 8.36 17.02 9.62 12.77 6.1 10.08 10.53 9.98Z" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6" stroke-linejoin="round"/></svg>';
+  // the Heliataler: the gold disc with Helia's sun stamped in it (adventure.js draws the same coin in the HUD)
+  const SUN = '<path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#b86b0c" stroke-width="2.3" stroke-linecap="round"/><path d="M12 7V5M12 17v2M7 12H5M17 12h2M8.46 8.46L7.05 7.05M15.54 8.46l1.41-1.41M8.46 15.54l-1.41 1.41M15.54 15.54l1.41 1.41" stroke="#fff6c8" stroke-width="1.2" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" fill="#fff6c8" stroke="#b86b0c" stroke-width=".6"/>';
+  const COIN = '<svg class="coin" data-coin="helia" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#ffc83d" stroke="#8a5208" stroke-width="1"/><circle cx="12" cy="12" r="8.4" fill="none" stroke="#fff1a8" stroke-opacity=".6" stroke-width=".8"/>' + SUN + '</svg>';
   S.render = function () {
     const s = screen(), r0 = rec(), sh = S.st.shop; if (!s || !r0 || !sh) return;
     const p = s.querySelector('.panel'), me = r0.me, g = game(), k = S.st.keeper;

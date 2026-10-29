@@ -513,7 +513,8 @@ vec3 skyColor(vec3 dir, bool withSun) {
 #ifdef SKY3
       // t-sky3: the high streaks lit by the hour (pink-gold at the golden hour and the sunset: the frames' stratus), more of them then
       cir = mix(cir, u_c3Top * 0.7 + u_c3Sun * 0.6, u_s3Cir.x);
-      st = max(st, smoothstep(0.62, 0.86, a * 0.7 + b * 0.38) * smoothstep(0.4, 0.62, vnoise(q * 0.22 + 17.0)) * smoothstep(0.12, 0.24, dir.y) * (1.0 - smoothstep(0.6, 0.85, dir.y)) * u_s3Cir.y);
+      cir *= mix(vec3(1.0), vec3(1.0, 0.74, 0.9), u_s3Cir.z);   // f-sky4: the golden hour's stratus lit pink (t1_07's streaks)
+      st = max(st, smoothstep(0.62 - u_s3Cir.w, 0.86 - u_s3Cir.w, a * 0.7 + b * 0.38) * smoothstep(0.4 - u_s3Cir.w * 0.5, 0.62 - u_s3Cir.w * 0.5, vnoise(q * 0.22 + 17.0)) * smoothstep(0.12, 0.24, dir.y) * (1.0 - smoothstep(0.6, 0.85, dir.y)) * u_s3Cir.y);
 #endif
       col = mix(col, cir, st * u_cirrus * 0.5 * (1.0 - u_rain) * (1.0 - u_night * 0.8));
     }
@@ -684,6 +685,7 @@ uniform float u_time;
 uniform float u_wind;
 uniform vec2 u_windDir;                  // the wind's direction in x and z (weather.js, F3 · Da-Sein)
 uniform float u_gust;                    // 0..1: a gust swells the sway by up to half
+uniform float u_curve;                   // u-ascent: the world's bend in the climb, climbK(y)/2R (0 below 300 m: ascent.js)
 #ifdef MULTIDRAW
 layout(std140) uniform Origins { vec4 u_origins[512]; };
 #else
@@ -793,6 +795,7 @@ void main() {
     vec3 ap = wp + vec3(u_camInt);
     rel.y += (sin(ap.x * 0.8 + u_time * 1.4) * 0.5 + sin(ap.z * 0.7 + u_time * 1.1) * 0.5) * 0.035 - 0.04;
   }
+  rel.y -= u_curve * dot(rel.xz, rel.xz);   // u-ascent: the land bends away under the climb (a sphere's drop d²/2R)
   v_rel = rel;
   v_localPos = wp;
   v_uv = vec2(float(a_uvp & 255u), float(a_uvp >> 8u)) / 16.0;
@@ -2330,6 +2333,7 @@ out vec3 v_dir;    // t-motion: the sprite's heading from the eye (the bolt's fl
 #ifdef CLOUD3
 out vec3 v_dir3;   // t-sky3: the fragment's heading from the eye (the silver lining round the sun's direction)
 out float v_y3;    // and its height in the world (the cluster's shading, sky3.js c3Shade)
+out float v_seed3; // f-sky4: the sprite's own number (its place in cloud space: the torn base differs from puff to puff)
 #endif
 void main() {
   vec3 rel = u_origin + a_c.xyz;
@@ -2340,6 +2344,7 @@ void main() {
 #ifdef CLOUD3
   v_dir3 = p / max(length(p), 1.0);
   v_y3 = a_c.y + u_camUp.y * a_corner.y * a_p.y * a_c.w;
+  v_seed3 = fract(a_c.x * 0.0173 + a_c.z * 0.0291 + a_p.z * 0.37);
 #endif
   float hi = clamp((rel.y / max(length(rel), 1.0) - u_cloudHigh.x) * u_cloudHigh.y, 0.0, 1.0);
   v_uv = a_corner * 0.5 + 0.5; v_alpha = a_p.x * (1.0 - u_cloudHigh.z * hi * hi * (3.0 - 2.0 * hi)); v_var = a_p.z; v_dist = length(rel.xz);
@@ -2365,6 +2370,7 @@ in vec3 v_dir;
 #ifdef CLOUD3
 in vec3 v_dir3;
 in float v_y3;
+in float v_seed3;
 ${VR.Sky3 && VR.Sky3.glslPuff ? VR.Sky3.glslPuff() : ''}
 #endif
 out vec4 o;
@@ -2372,17 +2378,23 @@ void main() {
 #ifdef CLOUD3
   {
     // t-sky3 · Wolken mit Volumen (sky3.js c3Shade: the atlas of thickness, normal and occlusion lit as a volume by the hour)
-    c3Y = v_y3;
-    vec4 c3 = c3Shade(vec2(mod(v_var, 2.0), floor(v_var * 0.5)) * 0.5, v_uv, v_dist, normalize(v_dir3));
+    c3Y = v_y3; c3Seed = v_seed3;
+    // (f-sky4: the variant rounded — interpolated, the instance's 2.0 came out 1.99999 on part of a quad, which read the
+    // neighbouring cell of the atlas there: the straight cuts and slabs through the puffs, one triangle against the other)
+    float c3v = floor(v_var + 0.5);
+    vec4 c3 = c3Shade(vec2(mod(c3v, 2.0), floor(c3v * 0.5)) * 0.5, v_uv, v_dist, normalize(v_dir3));
     if (c3.a < 0.0) discard;
     vec3 col = c3.rgb;
 #ifdef WXDRAMA
     // the storm's clouds (t-motion's slate, motion.js STORM) and the bolt's flash in them, on the lit volume
     float sk = clamp(max(u_storm.z, u_rain), 0.0, 1.0) * (1.0 - u_fogK);
-    col = mix(col, vec3(0.16, 0.18, 0.22) * (0.55 + 0.6 * clamp(dot(col, vec3(0.3, 0.59, 0.11)), 0.0, 1.0)) + u_ambSky * 0.12, sk * 0.6);
+    col = mix(col, (vec3(0.16, 0.18, 0.22) * (0.55 + 0.6 * clamp(dot(col, vec3(0.3, 0.59, 0.11)), 0.0, 1.0)) + u_ambSky * 0.12) * c3Grad, sk * 0.6);   // (f-sky4: the slate keeps the fall to the base)
     if (u_bolt.w > 0.001 && u_fogK < 0.5) {
+      // (f-sky4, R50-11: the flash a glow in the cloud the bolt comes from — 0.35 of it on every cloud within ~60° and the
+      // most on the bases lit the whole storm white in the bolt's frame (offline: cloud mean 154, base/top 0.96); now the
+      // clouds within ~10° of its heading, a flicker of 0.06 on the rest; inside the body, under the same fall to the base)
       vec2 bh = normalize(v_dir.xz + vec2(1e-5, 0.0));
-      col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.35 + 0.65 * smoothstep(0.2, 0.97, dot(bh, u_bolt.xy))) * (0.6 + 0.8 * (1.0 - v_uv.y));
+      col += vec3(0.7, 0.72, 0.95) * u_bolt.w * (0.06 + 0.94 * smoothstep(0.96, 0.995, dot(bh, u_bolt.xy))) * c3Grad * (0.45 + 0.55 * c3Core);
     }
 #endif
     float fade = 1.0 - smoothstep(u_cloudR * 0.5, u_cloudR * 0.98, v_dist);
@@ -2436,6 +2448,7 @@ layout(location=1) in uvec2 a_info;
 layout(location=2) in vec4 a_col;
 uniform mat4 u_viewProj;
 uniform vec3 u_tileOrigin;
+uniform float u_curve;        // u-ascent: the world's bend in the climb (ascent.js)
 out vec3 v_rel;
 out vec3 v_col;
 out float v_shade;
@@ -2444,6 +2457,7 @@ flat out uint v_kind;
 flat out uint v_aux;
 void main() {
   vec3 rel = u_tileOrigin + a_pos / 8.0;
+  rel.y -= u_curve * dot(rel.xz, rel.xz);   // u-ascent: the far land bends away under the climb
   v_rel = rel;
   v_col = pow(a_col.rgb, vec3(2.2));
   v_shade = a_col.a;
@@ -2462,6 +2476,7 @@ uniform ivec3 u_camInt;
 uniform float u_emissiveBoost;
 uniform float u_lodNear;
 uniform float u_blockVar;     // Klassisch: per-block shades and the block grid instead of the macro mottling
+uniform vec2 u_climbCut;      // u-ascent: in the climb the tiles' far edge dissolves (from, to: metres from the eye)
 ${'__COMMON__'}
 in vec3 v_rel;
 in vec3 v_col;
@@ -2483,6 +2498,7 @@ vec3 waveN(vec2 p) {
 }
 void main() {
   // real chunks are drawn here: the far terrain steps aside
+  if (u_climbCut.y > 0.0 && bayer4(gl_FragCoord.xy) < smoothstep(u_climbCut.x, u_climbCut.y, length(v_rel.xz))) discard;   // u-ascent: Herzwelt's impostor takes the land beyond (spaceflight.js)
   vec2 cl = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz & 15);
 #if defined(FAR1) || defined(FORM)
   // F-Far · three rings: per column R = the chunk's fade (ring 0), G = the form's (ring 1). Ring 1 draws where
