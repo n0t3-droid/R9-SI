@@ -162,7 +162,7 @@ if (baseS) for (const k of ['TERRAIN_VS', 'TERRAIN_FS', 'TRANS_FS', 'SKY_FS', 'R
   const tidy = (t) => t.split('\n').map((l) => l.replace(/\s+$/, '')).filter((l) => l.length).join('\n');   // (a blank line changes no program)
   // (u-ascent: the climb's bend — u_curve, 0 on the ground: the same picture — is Very Low's one new line pair in
   // TERRAIN_VS, on purpose; test/vl_programs.js counts it)
-  const noAscent = (t) => t.split('\n').filter((l) => !/\bu_curve\b|\bu_climbCut\b/.test(l)).join('\n');
+  const noAscent = (t) => t.replace(/\(dir\.y \+ u_dip\)/g, 'dir.y').replace(/dir\.y \+ u_dip/g, 'dir.y').split('\n').filter((l) => !/\bu_curve\b|\bu_climbCut\b|\bclimbA\b|uniform float u_dip;/.test(l)).join('\n');   // (u-orbitlod: the dip normalised, the soft tile edge set aside)
   const mine = tidy(noAscent(pp(VR.SHADERS[k], LITE_DEFS))), was = tidy(pp(baseS[k], LITE_DEFS));
   // (the base text's own COMMON resolved the same way: both strings come with COMMON inlined)
   let at = -1; if (mine !== was) { const a = mine.split('\n'), b = was.split('\n'); at = a.findIndex((l, i) => l !== b[i]); }

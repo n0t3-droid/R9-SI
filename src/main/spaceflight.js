@@ -446,7 +446,7 @@ void main() {
     return n;
   };
   // the cut where the horizon tiles end (their radius in metres, the share of it the tiles keep; 0: no cut)
-  SF.cutFor = (hzR) => { const R = A.R(); return hzR > 0 ? [Math.sin(0.6 * hzR / R), Math.sin(0.75 * hzR / R), 1, 0] : null; };
+  SF.cutFor = (hzR) => { const R = A.R(); return hzR > 0 ? [Math.sin(0.3 * hzR / R), Math.sin(0.45 * hzR / R), 1, 0] : null; };   // (u-orbitlod: whole before the tiles' soft band begins, 0.45–0.95)
 
   // the climb's layers (renderer.js, right after its sky pass → VR.Ascent.drawSky): Herzwelt beyond the tiles from 400 m,
   // space's background behind the thinning air from 1,200 m (added: the air's light stays), the true bodies over the
@@ -510,7 +510,7 @@ void main() {
     // the horizon tiles of the hand-off fade out over the first five seconds (their cut shrinks from the edge in)
     const hz = g.horizon, onHerz = st.frame === 'herz', tilesK = onHerz && hz && hz.enabled() && !a.jump ? 1 - ss(1.5, 5, since) : 0;
     const hzR = tilesK > 0.01 ? (A.view.hzR || 0) * tilesK : 0;
-    ES2.climb = { space: true, y: A.mapY(st), curve: hzR > 0 && A.view.curve !== false ? 0.5 / A.R() : 0, cut0: hzR * 0.75, cut1: hzR * 0.95, hzR, t };
+    ES2.climb = { space: true, y: A.mapY(st), curve: hzR > 0 && A.view.curve !== false ? 0.5 / A.R() : 0, cut0: hzR * 0.45, cut1: hzR * 0.95, hzR, t };   // (u-orbitlod: the wide soft band)
     ES2.bodies = null;
     if (hzR > 0) hz.update(cam);
     r.render({ cam, world: null, env: ES2, noSky: true, horizon: hzR > 0 ? hz : null, particles: g.particles,

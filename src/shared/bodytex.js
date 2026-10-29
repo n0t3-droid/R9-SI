@@ -135,6 +135,7 @@
     return function (X, Z, o) {
       const cl = g.computeClimate(X, Z), y = Math.round(cl.H), bi = g.biomeFor(cl, y), c = land(bi, cl, X, Z, y);
       const cold = (c.temp - Math.max(0, y - 90) * 0.0025) < 0.15;
+      if (BT.ALB2 && y >= SEA) { BT.albedo(cl, y - SEA, c.t, c.kd === 6, o); o[3] = 0; o[4] = 0; o[5] = c.live && y > SEA + 2 && y <= 150 && cl.river < 0.3 && !(cl.ember > 0.45) ? 1 : 0; o[6] = BT.hcode(cl.H - SEA); return o; }   // u-orbitlod: one albedo
       if (y < SEA) {
         const ice = cold || c.frozen;
         const t = ice ? ICE : COAST;   // (ICE the same shade as the snow)
@@ -148,6 +149,27 @@
       return o;
     };
   }
+  // ---------------------------------------------------------------- u-orbitlod · one albedo (R50-14)
+  // the land as orbital photographs show it: one colour from the climate's continuous fields — moisture (h) from tans
+  // through olive and grass to forest and jungle, the cold side grey-brown tundra and dark conifers, bare rock with height,
+  // snow by temperature and height — with a little of the biome's own vista colour (LOD.look, half desaturated) for
+  // its character. The fields are continuous, so the land has gradients, not outlines; muted for the distance
+  BT.ALB2 = true;
+  const N_W = [[0, [184, 164, 124]], [0.3, [158, 146, 102]], [0.5, [112, 120, 72]], [0.72, [70, 92, 52]], [1, [46, 74, 40]]];
+  const N_C = [[0, [140, 132, 114]], [0.4, [114, 114, 88]], [0.75, [58, 76, 56]], [1, [46, 64, 50]]];
+  const ROCK = [122, 112, 98], SNOW2 = [214, 222, 232];
+  const ramp = (R, x) => { if (x <= R[0][0]) return R[0][1]; for (let i = 1; i < R.length; i++) if (x <= R[i][0]) { const a = R[i - 1], b = R[i]; return mix3(a[1], b[1], ss(0, 1, (x - a[0]) / (b[0] - a[0]))); } return R[R.length - 1][1]; };
+  BT.albedo = function (cl, a, bc, bSnow, o) {
+    const m = clamp((cl.h + 1) / 2, 0, 1), w = ss(0.22, 0.62, (cl.t + 1) / 2);
+    let c = mix3(ramp(N_C, m), ramp(N_W, m), w);
+    const gy = 0.3 * bc[0] + 0.59 * bc[1] + 0.11 * bc[2], bd = [gy + (bc[0] - gy) * 0.5, gy + (bc[1] - gy) * 0.5, gy + (bc[2] - gy) * 0.5];
+    c = mix3(c, bd, bSnow ? 0 : 0.28);
+    c = mix3(c, ROCK, 0.65 * ss(45, 115, a) + 0.25 * clamp(cl.mountain || 0, 0, 1));
+    const sn = ss(-0.28, -0.62, cl.t - Math.max(0, a - 26) * 0.004);
+    c = mix3(c, SNOW2, Math.max(sn, bSnow ? 0.5 : 0));
+    o[0] = c[0]; o[1] = c[1]; o[2] = c[2];
+    return o;
+  };
   // the clouds: a warped fbm on the unit sphere (Herzwelt's body frame), the same octaves for the globe and the patch
   // (the patch adds finer ones), ~30 % covered — fields of ~10 km (Earth's fronts at 1/64), broken into cells down to a
   // few hundred metres (the patch: tens)
@@ -192,6 +214,7 @@
         b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], oct) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }
     }
+    if (BT.ALB2) soften(a, w, y1 - y0, (j) => { const r = new Uint8Array(w * 4); if (j < 0 || j >= h) return null; const th = (j + 0.5) / h * Math.PI; for (let i = 0; i < w; i++) { const p = BT.toPlane(th, (i + 0.5) / w * TAU - Math.PI); S(Math.round(p[0]), Math.round(p[1]), o); putA(r, i * 4, o); } return r; }, y0, y1, true);   // u-orbitlod
   }
   // the village cells' own spots (gen_village.js VG.siteSteps replayed: the same RNG, the cheap tests from the climate —
   // the real search also asks for flat ground, which a calm climate stands in for)
@@ -246,6 +269,27 @@
         if (!L && o[5] && M.hashf2(Math.floor(x / 160), Math.floor(z / 160), g.seed ^ 0x7a3) < 0.07) L = 30;
         b[k] = L; b[k + 1] = CL(N[0], N[1], N[2], 9) * 255; b[k + 2] = o[6]; b[k + 3] = o[4] * 255;
       }
+    }
+    if (BT.ALB2) soften(a, w, y1 - y0, (j) => { if (j < 0 || j >= h) return null; const r = new Uint8Array(w * 4), z = Z0 + (j + 0.5) * step; for (let i = 0; i < w; i++) { S(Math.round(X0 + (i + 0.5) * step), Math.round(z), o); putA(r, i * 4, o); } return r; }, y0, y1, false);   // u-orbitlod
+  }
+  // u-orbitlod · the land's colours softened over its 3 × 3 texels (binomial; land with land only, so the coasts and
+  // the lakes keep their edges): the world's few-hundred-metre mosaic of climates reads as fields and gradients from
+  // orbit, as real land does. row(j) gives a row outside the job's own (or null past the texture's edge); wrap: λ
+  function soften(a, w, rows, row, y0, y1, wrap) {
+    const up = row(y0 - 1), dn = row(y1), src = a.slice(), W1 = [1, 2, 1];
+    const at = (j) => (j < 0 ? up : j >= rows ? dn : null);
+    for (let j = 0; j < rows; j++) for (let i = 0; i < w; i++) {
+      const k = (j * w + i) * 4; if (src[k + 3] >= 128) continue;
+      let r = 0, gg = 0, bb = 0, n = 0;
+      for (let dj = -1; dj <= 1; dj++) {
+        const jj = j + dj, ext = at(jj), buf = ext || src; if (jj !== j && (jj < 0 || jj >= rows) && !ext) continue;
+        for (let di = -1; di <= 1; di++) {
+          let ii = i + di; if (ii < 0 || ii >= w) { if (!wrap) continue; ii = (ii + w) % w; }
+          const q = ext ? ii * 4 : (jj * w + ii) * 4; if (buf[q + 3] >= 128) continue;
+          const wt = W1[dj + 1] * W1[di + 1]; r += buf[q] * wt; gg += buf[q + 1] * wt; bb += buf[q + 2] * wt; n += wt;
+        }
+      }
+      a[k] = Math.round(r / n); a[k + 1] = Math.round(gg / n); a[k + 2] = Math.round(bb / n);
     }
   }
 
