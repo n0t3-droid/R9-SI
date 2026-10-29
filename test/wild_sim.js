@@ -301,7 +301,7 @@ const run = (n, seed, secs, o) => {
     check(T(18, 1, P.kMin, K, n) > T(18, 0.1, P.kMin, K, n) * 1.8, 'a banked party (its wings to the eye) darker than a level one seen edge-on: the turning wave sweeps through as a dark band');
     check(T(18, 0.5, K, K, n) === 0 && T(18, 0.5, P.kMin, K, n) > 0, 'no impostor where every bird is drawn; it carries the birds not drawn');
     let mx = 0; for (let d = 0; d < 80; d += 3) for (let v = 0; v <= 1; v += 0.25) mx = Math.max(mx, T(d, v, P.kMin, K, n));
-    check(mx > 0.3 && mx < 4, `bounded (the densest party's depth at its middle ${mx.toFixed(2)})`);
+    check(mx > 0.3 && mx < 6, `bounded (≤ 6: smaller impostors since 29 Oct carry their depth on less area; the densest party's depth at its middle ${mx.toFixed(2)})`);
     const B = W.birdsVisible;
     check(B(20) === K && B(P.kFar[0]) === K && Math.abs(B(P.kFar[1]) - P.kMin) < 1e-6 && B(400) === P.kMin && B(130) < K && B(130) > P.kMin, `birds as dashes up close (${K} within ${P.kFar[0]} blocks), the cloud beyond (${P.kMin} sparkle birds from ${P.kFar[1]})`);
     check(Math.abs(T(18, 0.5, P.kMin, K, W.CAPS.murm[2]) / T(18, 0.5, P.kMin, K, n) - n / W.CAPS.murm[2]) < 1e-6, 'Balanced\'s fewer boids each carry more: the same cloud');

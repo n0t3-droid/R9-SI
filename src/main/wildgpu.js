@@ -227,7 +227,13 @@
     return B.v;
   }
   // an impostor of the density cloud (mode 3): a quad whose corners the shader turns to the camera
-  function puff() { const v = []; for (const [x, y] of [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]]) v.push(x, y, 0, 0, 0, 1, 0, 0, 0, 0, 0); return v; }
+  // (f-wild2 cost: an octagon inscribed in the cut disc, not a quad round it — SwiftShader fills every pixel of the
+  //  quad, the discarded corners too; the octagon is 0.71 of the quad's area)
+  function puff() {
+    const v = [], c = (k) => [Math.cos((k + 0.5) * Math.PI / 4), Math.sin((k + 0.5) * Math.PI / 4)];
+    for (let k = 1; k < 7; k++) for (const [x, y] of [c(0), c(k), c(k + 1)]) v.push(x, y, 0, 0, 0, 1, 0, 0, 0, 0, 0);
+    return v;
+  }
   // the kinds: mode 0 wings (a hinge on the body's axis, the wave out along them), 1 swim (the body bends side to side),
   // 2 a party of birds (the wings' hinge per bird, the party spread round the boid, the first i_y.w birds drawn as
   // dashes), 3 the density cloud's impostors (blended, the translucent pass), 4 the sky ray (the wing curve)

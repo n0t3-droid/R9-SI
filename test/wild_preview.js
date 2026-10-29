@@ -16,6 +16,8 @@ require(__dirname + '/../src/main/wildgpu.js');
 const fs = require('fs');
 let sharp = null; try { sharp = require('/home/dev/.npm-global/lib/node_modules/sharp'); } catch (e) { /* the pictures are a convenience */ }
 const W = V.Wild, WG = V.WildGPU, SEA = V.C.SEA, TAU = Math.PI * 2;
+// (try the impostor's model without editing wildsim.js: PUFF='{"R":3.4,"cut":1.3}')
+if (process.env.PUFF) Object.assign(W.PUFF, JSON.parse(process.env.PUFF));
 let fails = 0;
 const check = (ok, msg) => { if (!ok) { fails++; console.log('  ✗ ' + msg); } else console.log('  ✓ ' + msg); };
 const SHOTS = require('path').resolve(__dirname, '..') + '/test/shots/';   // (the test runs from test/ or .tmp_tests/)
@@ -47,7 +49,7 @@ const save = async (path, img, w, h) => { if (sharp) await sharp(Buffer.from(img
       if (!shotAt.has(s)) continue;
       const c = fl.ctr, bx = 205 - c[0], bz = 10 - c[2], bl = Math.hypot(bx, bz), dd = Math.min(bl, 145);
       const cam = camera([c[0] + bx / bl * dd, SEA + 3, c[2] + bz / bl * dd], [c[0], c[1] + 4, c[2]], 70, WD, HT);
-      const tau = new Float32Array(WD * HT);
+      const tau = new Float32Array(WD * HT); let quad = 0, nq = 0;
       for (let i = 0; i < n; i++) {
         const p = [fl.pos[i * 3], fl.pos[i * 3 + 1], fl.pos[i * 3 + 2]], pr = cam.project(p); if (!pr) continue;
         const d = Math.hypot(...sub(p, cam.eye)), kv = W.birdsVisible(d);
@@ -56,9 +58,9 @@ const save = async (path, img, w, h) => { if (sharp) await sharp(Buffer.from(img
         const nw = [u2[0] * Math.cos(b) + r2[0] * Math.sin(b), u2[1] * Math.cos(b), u2[2] * Math.cos(b) + r2[2] * Math.sin(b)], ndv = Math.abs(dot(nw, sub(p, cam.eye))) / d;
         const t0 = W.puffTau(fl.dens[i], ndv, kv, K, n);
         if (t0 > 0.004) {
-          const Rp = P.R * cam.F / pr[2], ext = Math.ceil(Rp * P.cut) + 1;
+          const Rp = P.R * cam.F / pr[2], ext = Math.ceil(Rp * P.cut) + 1; quad += 2.828 * (Rp * P.cut) ** 2; nq++;   // (the octagon wildgpu.js draws: 2√2 r²)
           for (let py = Math.max(0, Math.floor(pr[1] - ext)); py <= Math.min(HT - 1, Math.ceil(pr[1] + ext)); py++) for (let px = Math.max(0, Math.floor(pr[0] - ext)); px <= Math.min(WD - 1, Math.ceil(pr[0] + ext)); px++) {
-            const q2 = ((px + 0.5 - pr[0]) ** 2 + (py + 0.5 - pr[1]) ** 2) / (Rp * Rp); if (q2 > P.cut * P.cut) continue;
+            const q2 = ((px + 0.5 - pr[0]) ** 2 + (py + 0.5 - pr[1]) ** 2) / (Rp * Rp); if (q2 > P.cut * P.cut) continue; { const ax = Math.abs(px + 0.5 - pr[0]) / (Rp * P.cut), ay = Math.abs(py + 0.5 - pr[1]) / (Rp * P.cut); if (Math.max(ax, ay) > 0.924 || (ax + ay) > 1.307) continue; }
             tau[py * WD + px] += t0 * Math.exp(-2.2 * q2);
           }
         }
@@ -78,14 +80,17 @@ const save = async (path, img, w, h) => { if (sharp) await sharp(Buffer.from(img
         if (a >= 0.1) cov++; if (a >= 0.85) core++;
       }
       const F = W.murmFigure(seed ^ key, clock);
-      stats.push({ t: s / 20, fig: F.a + (F.w > 0 ? '→' + F.b : ''), cov: +(cov / WD / HT * 100).toFixed(2), core: +(core / WD / HT * 100).toFixed(2), d: Math.round(dd) });
+      stats.push({ t: s / 20, fig: F.a + (F.w > 0 ? '→' + F.b : ''), cov: +(cov / WD / HT * 100).toFixed(2), od: +(quad / WD / HT).toFixed(3), nq, core: +(core / WD / HT * 100).toFixed(2), d: Math.round(dd) });
       tiles.push(img);
     }
-    console.log('     ' + stats.map(q => `${q.t}s ${q.fig}: ${q.cov} % · core ${q.core} %`).join('\n     '));
+    console.log('     ' + stats.map(q => `${q.t}s ${q.fig}: ${q.cov} % · core ${q.core} % · the impostors' quads ${q.od}× the frame (${q.nq})`).join('\n     '));
     const covs = stats.map(q => q.cov).sort((a, b) => a - b), cores = stats.map(q => q.core).sort((a, b) => a - b);
     const mc = covs[covs.length >> 1], mk = cores[cores.length >> 1];
     check(mc >= 3, `the flock covers ${mc} % of the lake view from the shore (the median of ${stats.length} moments; ≥ 3 %)`);
     check(mk >= 1, `with a dark core: ${mk} % of the frame at α ≥ 0.85 (≥ 1 %)`);
+    const ods = stats.map(q => q.od).sort((a, b) => a - b), od = ods[ods.length >> 1];
+    // (f-wild2 cost: the impostors' rasterized area — SwiftShader fills each quad's pixels, the cut disc's outside too)
+    check(od <= 0.25, `the impostors rasterize ${od}× the frame's pixels (the median; ≤ 0.25×)`);
     check(covs[0] >= 2, `never small: the least of the moments ${covs[0]} %`);
     // the strip: four moments a row
     const cols = 4, rows = Math.ceil(tiles.length / cols), big = Buffer.alloc(cols * WD * rows * HT * 3, 12);
