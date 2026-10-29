@@ -130,10 +130,20 @@
   F.wake = function (o) {
     let best = null;
     for (const f of (o && o.freed) || []) if (f && Array.isArray(f.pos) && (!best || (+f.t || 0) > (+best.t || 0))) best = f;
+    if (best && Array.isArray(best.beacon)) {
+      // a-foes2: 5 blocks out from the beacon (away from the pad's middle), facing it and looking up its beam
+      const b = best.beacon, cx = b[0] + 0.5, cz = b[2] + 0.5, pd = Array.isArray(best.pad) ? best.pad : [cx, cz - 1];
+      let ux = cx - pd[0], uz = cz - pd[1]; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
+      const x = cx + ux * 5, z = cz + uz * 5;
+      return { pos: [x, b[1] + 1, z], why: 'beacon', id: best.id, yaw: Math.atan2(ux, uz), pitch: 0.45 };
+    }
     if (best) return { pos: best.pos.slice(0, 3), why: 'beacon', id: best.id };
     const h = o && Array.isArray(o.home) ? o.home : [0.5, 100, 0.5];
     return { pos: h.slice(0, 3), why: 'home' };
   };
+  // a-foes2 · the bow after standing up: 0.7 s to stand, then a small nod of the body (≤ 0.3 rad) over 0.9 s
+  F.BOW_END = 1.6;
+  F.bowOf = (f) => { const t = f && f.bowT; if (t === undefined || t === null || t < 0.7 || t >= F.BOW_END) return 0; return 0.3 * Math.sin(Math.PI * (t - 0.7) / 0.9); };
   F.lostTaler = (band, taler) => (band === 'hard' ? Math.floor(Math.max(0, taler | 0) * 0.05) : 0);
   // a hit in half-hearts on the 20 of survival: Ausdauer's extra hearts make it a smaller bite
   F.dmgFor = (dmg, mode, hpMax) => (mode === 'survival' ? dmg * 20 / Math.max(20, hpMax || 20) : dmg);
@@ -347,6 +357,13 @@
       }
       case 'helper': {
         f.helper = true; f.calm = 1; f.flare = 0;
+        // a-foes2: freed, they stand up one by one (f.rise: the wait) and bow a little toward the player (f.bowT)
+        if (f.rise > 0) { f.rise -= dt; stop(m, dt); f.kneel = 1; if (f.rise <= 0) { f.rise = 0; f.bowT = 0; W.out.events.push({ k: 'rise', id: m.id, f: f.k }); } hover(m, W, f, K, dt); break; }
+        if (f.bowT !== undefined && f.bowT !== null) {
+          f.bowT += dt; stop(m, dt); if (pp && !K.fixed) faceTo(m, dx, dz, dt, 4);
+          f.kneel = Math.max(0, f.kneel - dt * 1.5); if (f.bowT >= F.BOW_END) f.bowT = null;
+          hover(m, W, f, K, dt); break;
+        }
         const hp = f.follow ? f.follow : pp, near = f.sit ? 0.8 : 4.2;   // (at night by the home's door: close, and it sits)
         let sat = false;
         if (hp && !K.fixed) {
@@ -545,6 +562,7 @@
     else if (what === 'bolt') { const o = au.tone(880, 0.06 * v, 0.25, 'triangle', true, t); if (o && o.frequency) o.frequency.exponentialRampToValueAtTime(330, t + 0.25); }
     else if (what === 'down') { const o = au.tone(420, 0.09 * v, 1.4, 'sawtooth', false, t); if (o && o.frequency) o.frequency.exponentialRampToValueAtTime(70, t + 1.3); if (au.play) au.play('clatter', { vol: v }); }
     else if (what === 'calm') { [523, 659, 784].forEach((f2, i) => au.tone(f2, 0.07 * v, 0.9, 'sine', true, t + i * 0.09)); }
+    else if (what === 'rise') { const o = au.tone(392, 0.05 * v, 0.7, 'sine', true, t); if (o && o.frequency) o.frequency.exponentialRampToValueAtTime(784, t + 0.5); au.tone(1175, 0.02 * v, 0.5, 'sine', true, t + 0.25); }
     else if (what === 'motes') { if (au.play) au.play('twinkle', { vol: 0.6 * v }); }
     else if (what === 'clang') { if (au.play) au.play('clang', { vol: 0.8 * v }); }
   };
@@ -557,6 +575,7 @@
       case 'slam': if (g.particles) { g.particles.spark(e.x, e.y + 0.2, e.z, [1, 0.35, 0.9], 22, 4); g.particles.smoke(e.x, e.y + 0.2, e.z, 6, false); } if (g.audio && g.audio.play) g.audio.play('thump', { vol: 0.5 }); break;
       case 'down': F.stats.downs++; if (m) F.sound(g, F.KINDS[m.foe.k].fam === 'stray' ? 'down' : 'motes', m.pos); break;
       case 'calm': F.stats.calms++; if (m) F.sound(g, 'calm', m.pos); break;
+      case 'rise': if (m) { if (g.particles) g.particles.spark(m.pos[0], m.pos[1] + 0.8, m.pos[2], [0.4, 1, 0.6], 14, 2.6, 1); F.sound(g, 'rise', m.pos); } break;   // (a-foes2: one by one)
       case 'gone': if (m) { m.foe.gone = true; m.dead = true; m.deathT = 99; } break;
     }
     if (F.net && F.net.ev && (e.k === 'down' || e.k === 'calm' || e.k === 'tele')) F.net.ev.push([e.id & 0xffff, e.k]);
@@ -703,11 +722,12 @@
     if (S.t >= 1.1 && !S.moved) {
       S.moved = true;
       const L = VR.Liberate, r0 = rec(), freed = [];
-      if (L && L.freedList && r0) for (const s of L.freedList(r0)) freed.push({ id: s.id, pos: s.beacon ? [s.beacon[0] + 0.5, s.beacon[1] + 1, s.beacon[2] + 2.5] : [s.x, s.y + 2, s.z], t: s.t || s.day || 0 });
+      if (L && L.freedList && r0) for (const s of L.freedList(r0)) freed.push({ id: s.id, pos: s.beacon ? [s.beacon[0] + 0.5, s.beacon[1] + 1, s.beacon[2] + 2.5] : [s.x, s.y + 2, s.z], beacon: s.beacon || null, pad: [s.x + 0.5, s.z + 0.5], t: s.t || s.day || 0 });
       const NL = VR.NewLife, h = NL && NL.home ? NL.home(g) : null;
       const home = h && h.dim === g.dim && Array.isArray(h.pos) ? h.pos : (Array.isArray(p.spawn) && p.spawn.every(Number.isFinite) ? p.spawn : g.worldSpawn ? g.worldSpawn() : [0.5, 100, 0.5]);
       const wk = F.wake({ freed, home }); S.why = wk.why;
-      try { p.safeTeleport(wk.pos[0], wk.pos[1], wk.pos[2]); } catch (e) { p.pos = wk.pos.slice(); }
+      try { p.safeTeleport(wk.pos[0], wk.pos[1], wk.pos[2], Number.isFinite(wk.yaw) ? { yaw: wk.yaw, pitch: wk.pitch } : undefined); } catch (e) { p.pos = wk.pos.slice(); }
+      if (Number.isFinite(wk.yaw)) { p.yaw = wk.yaw; p.viewYaw = wk.yaw; p.pitch = wk.pitch; }   // (a-foes2: up the cyan beam)
       if (p.mode === 'survival') { p.health = 20; if (g.ui && g.ui.updateHUD) g.ui.updateHUD(true); }
       F.hp = F.hpMax();
     }
@@ -962,6 +982,7 @@
     mat4.translate(B, B, m.pos[0] - cam.x, m.pos[1] - cam.y + bob - kn * K.kneel / 16, m.pos[2] - cam.z);
     mat4.rotY(B, B, m.yaw);
     if (f.st === 'tele' && f.k === 'driller') mat4.rotX(B, B, -0.1 * f.flare);
+    { const bw = F.bowOf(f); if (bw) mat4.rotX(B, B, -bw); }   // (a-foes2: the bow after standing up, from the feet)
     if (f.st === 'recover' && f.k === 'driller') mat4.rotX(B, B, -0.22);
     if (kn && f.k !== 'drone') mat4.rotX(B, B, -0.12 * kn);
     if (f.k === 'drone') { mat4.rotZ(B, B, clamp(m.vel[0] * 0.05, -0.3, 0.3)); if (f.st === 'down') mat4.rotX(B, B, f.t * 4); }
