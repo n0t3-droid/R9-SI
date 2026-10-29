@@ -1825,7 +1825,7 @@
       this.puffKey = ''; this.puffCount = 0;
     }
     updatePuffs(E, cam) {
-      const dr = E.cloudDrift, cov = Math.round(E.cloudCover * 20) / 20, wind = dr ? dr[0] : E.time * 0.9, windZ = dr ? dr[1] : 0, cell = VR.Clouds.CELL;   // (t-motion: the drift along the wind's heading, env.js)
+      const dr = E.cloudDrift, cov = VR.Sky3 && VR.Sky3.puffCover ? VR.Sky3.puffCover(E) : Math.round(E.cloudCover * 20) / 20, wind = dr ? dr[0] : E.time * 0.9, windZ = dr ? dr[1] : 0, cell = VR.Clouds.CELL;   // (t-motion: the drift along the wind's heading, env.js)
       const ocx = Math.floor((cam.x + wind) / cell), ocz = Math.floor((cam.z + windZ) / cell);
       const key = ocx + ',' + ocz + ',' + cov.toFixed(2) + ',' + Math.floor(cam.x / 96) + ',' + Math.floor(cam.z / 96) + ',' + (this.valleyFogV | 0);   // (t-motion: the valley fog's version)
       if (key === this.puffKey) return;

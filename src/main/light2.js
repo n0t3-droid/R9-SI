@@ -199,7 +199,7 @@
     // horizon washed the far land to a pink-white; the frames' far islands keep their green under a blue haze — 0.35)
     return { rho: rho * (1 + 1.5 * rain), k, base, apDist: 1100 * (1 - 0.4 * rain), apMax: byMood(m, AP), sunK, morning, moods: m };
   };
-  const AP = { day: 0.55, gold: 0.35, dusk: 0.55, night: 0.55 };
+  const AP = L2.AP = { day: 0.55, gold: 0.35, dusk: 0.55, night: 0.55 };   // (f-sky5: open to sky3.mjs's variants)
   // t-polish2 · the room's air (gap 8, the Hangar Hall: t1_12, t1_13 — the hall's air holds the cyan of its strips): where
   // the eye stands indoors (its sky light low) the air takes the colour of the lamps round it — the block light of a few
   // cells round the eye, averaged and eased — thin: col → mix(col, room, 1 − e^(−min(d, max)·rho)). Outdoors nothing (the

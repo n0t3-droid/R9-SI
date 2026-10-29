@@ -378,9 +378,12 @@
   // the moon's grey-blue. The sky's light on their upper sides (top) and the light from below — the ground's bounce and the
   // horizon (low) — by the same hour. Rain greys and dims it all (the deck's diffuse light).
   const CL = S3.CLOUDLIGHT = {
-    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.2, 0.7, 0.5]], [8, [1.28, 0.92, 0.72]], [16, [1.22, 1.14, 1.04]]],
-    top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.46, 0.41, 0.58]], [8, [0.52, 0.5, 0.64]], [16, [0.5, 0.56, 0.72]]],
-    low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.32, 0.25, 0.34]], [8, [0.35, 0.31, 0.42]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
+    // (f-sky5, R52-03: at the golden hour the sunlit tops were a dull beige no brighter than the luminous sky round them —
+    // the frames' golden cumulus are white over lilac shade: the sun's light on them and the sky's from above lifted at
+    // 2° and 8°, offline (sky_offline.js) the top's luma sd 28.8 → 32.4 with the bands' ΔE held)
+    sun: [[-9, [0, 0, 0]], [-5, [0.42, 0.22, 0.28]], [-1.5, [0.95, 0.48, 0.42]], [2, [1.7, 1.15, 0.85]], [8, [2.0, 1.6, 1.3]], [16, [1.22, 1.14, 1.04]]],
+    top: [[-12, [0.05, 0.06, 0.11]], [-4, [0.28, 0.25, 0.42]], [2, [0.7, 0.6, 0.85]], [8, [0.8, 0.76, 0.98]], [16, [0.5, 0.56, 0.72]]],
+    low: [[-12, [0.035, 0.04, 0.07]], [-4, [0.2, 0.15, 0.24]], [2, [0.5, 0.4, 0.55]], [8, [0.55, 0.5, 0.66]], [16, [0.39, 0.37, 0.5]]],   // (the bases lavender-grey, t1_05)
     moon: [0.1, 0.12, 0.19], rainGrey: [0.42, 0.44, 0.48], k: [1.0, 1.0, 0.3, 0.5],
     // f-sky4 (docs/reviews/v0.49.md R50-11: storm clouds bright white flat slabs): under rain and a closed cover the clouds
     // are an overcast's — the light from above a lighter grey (top ×), from below a dark slate (low ×: a storm base ≈ 0.25
@@ -400,6 +403,16 @@
     const on = sstep(D.from, D.full, S3.stormK(E)), C = S3.cloudLight(E);
     const el = Math.asin(clamp(E.sunDir[1], -1, 1)) * 180 / Math.PI, dayK = sstep(-2, 6, el), cover = clamp(E.cloudCover || 0, 0, 1);
     return { on, puff: 1 - (1 - D.puff) * on, shafts: q.sky3 >= 2 ? D.shafts * on : 0, edge: D.edge * on * dayK * (1 - 0.6 * sstep(0.9, 1.0, cover)), base: C.low.map(v => v * D.base) };
+  };
+  // f-sky5 · the golden hour's cumulus: in clear weather at the golden hour a few more of them (the frames t1_07, t1_09:
+  // big white clouds over the land) — the sprites' cover (renderer.updatePuffs) raised by add × the golden weight, under
+  // half cover and dry only; cloudVol only (Very Low and Low draw the sprites they drew)
+  S3.GOLDCLOUD = { add: 0.12 };
+  S3.puffCover = function (E) {
+    const c = clamp(E.cloudCover || 0, 0, 1), q = S3.q || OFF;
+    if (!q.cloudVol || !(q.sky3 >= 1) || !E.sunDir) return c;
+    const w = S3.weights(E.sunDir[1]).gold * S3.goldK(E.sunDir[1]);
+    return Math.round((c + S3.GOLDCLOUD.add * w * (1 - sstep(0.3, 0.5, c)) * (1 - clamp(E.rain || 0, 0, 1))) * 20) / 20;
   };
   // the storm's strength: rain under a closed cover (0 fair … 1 a thunderstorm)
   S3.stormK = (E) => clamp(E.rain || 0, 0, 1) * (0.55 + 0.45 * sstep(0.45, 0.9, clamp(E.cloudCover || 0, 0, 1)));

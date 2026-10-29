@@ -79,6 +79,20 @@ console.log('b · the golden land clear');
     check(side[0] / side[2] > away[0] / away[2] && lum(side) > lum(away), `beside the sun paler and warmer (${side.map(v => v.toFixed(2))})`);
     check(L2.AIRGOLD && L2.AIRGOLD.k > 0.5, `the golden hour's far air takes it (share ${L2.AIRGOLD && L2.AIRGOLD.k})`);
   }
+  // the golden hour's cumulus (t1_07, t1_09: big white clouds over the land — the top's contrast): a few more of them in
+  // clear weather at the golden hour (S3.puffCover, cloudVol only), their sunlit tops brighter (CLOUDLIGHT at 2–8°)
+  check(typeof S3.puffCover === 'function', 'S3.puffCover exists');
+  if (S3.puffCover) {
+    const sun7 = [0, Math.sin(7 * Math.PI / 180), Math.cos(7 * Math.PI / 180)], sun24 = [0, Math.sin(24 * Math.PI / 180), Math.cos(24 * Math.PI / 180)];
+    S3.use({ sky3: 2, cloudVol: true });
+    const g = S3.puffCover({ cloudCover: 0.2, rain: 0, sunDir: sun7 }), n = S3.puffCover({ cloudCover: 0.2, rain: 0, sunDir: sun24 }), r = S3.puffCover({ cloudCover: 0.9, rain: 1, sunDir: sun7 });
+    S3.use({ sky3: 0, cloudVol: false });
+    const vl = S3.puffCover({ cloudCover: 0.2, rain: 0, sunDir: sun7 });
+    S3.use({ sky3: 2, cloudVol: true });
+    check(g >= 0.28 && g <= 0.4 && n === 0.2 && r === 0.9 && vl === 0.2, `the golden hour's clear sky a few more cumulus (golden ${g.toFixed(2)}, noon ${n}, rain ${r}, Very Low ${vl})`);
+    const lum = (c) => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], C = S3.cloudLight({ rain: 0, cloudCover: 0.2, sunDir: sun7 });
+    check(lum(C.sun) >= 1.45, `the golden cumulus' sunlit tops bright (the sun's light on them, luma ${lum(C.sun).toFixed(2)} ≥ 1.45)`);
+  }
   check(L2.FOG.gold[0] <= 0.0016, `the golden valley haze no denser than f-sky4's (${L2.FOG.gold[0]})`);
   check(/u_l2Air/.test(L2.glslCommon ? L2.glslCommon() : ''), 'l2Fog (AIR2, Low and up) mixes the golden far air');
 }
