@@ -52,6 +52,8 @@ function viewOf(name) {
   // at the golden hour under clouds, facing the sun, 8° up)
   if (name === 'storm' || name === 'thunder') return Object.assign(viewOf('canyon_noon'), { name, wx: name === 'storm' ? 'regen' : 'gewitter', kind: 'day' });
   if (name === 'gap') return Object.assign(viewOf('canyon_golden'), { name, wx: 'bewoelkt', aim: 'sun', pitch: 8 * Math.PI / 180 });
+  // (f-sky5: the giant — the city's view turned to the pinned giant, 30° right at 24°, a 14° lens: its bands up close)
+  if (name.startsWith('giant_')) { const g = viewOf('city_' + name.slice(6)); return Object.assign(g, { name, yaw: g.yaw - 30 * Math.PI / 180, pitch: 24 * Math.PI / 180, fov: 14, Hline: null }); }
   const [pl, hr] = name.split('_'), P = PLACES[pl];
   if (!P || !HOURS[hr]) throw new Error('no such view ' + name);
   return { name, place: pl, hour: hr, tod: HOURS[hr][0], kind: HOURS[hr][1], cam: P.cam, yaw: P.yaw, pitch: 12 * Math.PI / 180, fov: 75, W: +(process.env.W || 640), H: +(process.env.H || 360), Hline: P.H, pins: { az: azOf(P.yaw - 30 * Math.PI / 180), el: 24, az2: azOf(P.yaw + 30 * Math.PI / 180), el2: 36 }, seed: SEED };

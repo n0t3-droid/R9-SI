@@ -11,7 +11,7 @@
 //  d · Amarant (bodytex.js): the band edge contrast — the 95th percentile of the CIELAB ΔE between the texture's latitude
 //      rows 1.4° apart (|lat| ≤ 70°) — at most half of v0.51's 36.2; 5–7 broad bands (the zone/belt turns of the
 //      profile's L* against its 40° mean within ±60°: 4–8 crossings … counted as bands), ≥ 4 hues (30° bins of h*);
-//      the ground sky's giant (shaders.js gasGiant): the stripes' sin(lat · 22) gone outside Very Low (LITE keeps v0.48's)
+//      the ground sky's giant (shaders.js gasGiant): the stripes' sin(lat · 22) gone where the sky's level is on (SKY3; Very Low keeps v0.48's)
 //  e · the costs: Very Low's values — no deck, no fade, the giant's LITE path unchanged (vl_programs.js and frame_cost.js
 //      pin its programs and its frame)
 //   bash test/wt_run.sh sky5.js 300
@@ -129,8 +129,8 @@ console.log('d · Amarant');
   const hues = new Set(rows.filter((_, j) => Math.abs(latOf(j)) < 80).map(x => Math.floor((Math.atan2(x[2], x[1]) * 180 / Math.PI + 360) % 360 / 30)));
   check(hues.size >= 4, `≥ 4 hues (${hues.size} of the 30° bins of h*)`);
   const fs = require('fs'), sh = fs.readFileSync(SRC + 'main/shaders.js', 'utf8'), gg = sh.slice(sh.indexOf('vec4 gasGiant('), sh.indexOf('vec4 gasGiant(') + 4000);
-  const lite = gg.match(/#ifdef LITE([\s\S]*?)#else([\s\S]*?)#endif/);
-  check(!!lite && /sin\(lat \* 22\.0/.test(lite[1]) && !/sin\(lat \* 22\.0/.test(lite[2]), 'the ground sky\'s giant: the hard stripes only on Very Low (LITE: v0.48\'s), soft bands above it');
+  const lite = gg.match(/#ifndef SKY3([\s\S]*?)#else([\s\S]*?)#endif/);
+  check(!!lite && /sin\(lat \* 22\.0/.test(lite[1]) && !/sin\(lat \* 22\.0/.test(lite[2]), 'the ground sky\'s giant: the hard stripes only without SKY3 (Very Low: v0.48\'s), soft bands with it');
 }
 
 // ---------------------------------------------------------------- e · Very Low
