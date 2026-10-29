@@ -63,6 +63,8 @@ const shot = async (name) => { await wait(150); await page.screenshot({ path: SH
 const hold = (map) => ev((map) => { for (const a of document.getAnimations()) { const t = a.effect && a.effect.target; let ms = null; for (const id in map) { const el = document.getElementById(id); if (el && t && (t === el || el.contains(t))) ms = map[id]; } if (ms === null) continue; try { a.pause(); a.currentTime = ms; } catch (e) { /* */ } } }, map);
 const release = () => ev(() => { for (const a of document.getAnimations()) { try { a.play(); } catch (e) { /* */ } } });
 const pics = {};
+// a-foes2: the world settles in the test's own frames (the lost run's real-time frames lost the player out of the world)
+const settle = async (sec, tag) => { const t = Date.now(); let n = 0; while (Date.now() - t < sec * 1000) { n += (await run(4, { god: true })).n; await wait(300); } console.log('     settled ' + sec + ' s (' + n + ' frames' + (tag ? ', ' + tag : '') + ', ' + secs() + ')'); };
 const section = async (tag, fn) => {
   try { await fn(); } catch (e) {
     fails++; console.log('  ✗ section ' + tag + ' stopped: ' + (e.stack || e.message).slice(0, 900));
@@ -112,6 +114,7 @@ try {
         moment: (t) => !!VR.Liberate.moment && VR.Liberate.moment.t >= t,
         momentEnd: () => !VR.Liberate.moment && window.__ft.site() && window.__ft.site().st === 'frei',
         noFaint: () => !VR.Foes.fainting,
+        bow: (id) => { const m = g().entities.mobs.find(x => x.id === id); return !!m && VR.Foes.bowOf(m.foe) > 0.22; },
         near: (id) => { const m = g().entities.mobs.find(x => x.id === id), p = g().player.pos; return !!m && Math.hypot(m.pos[0] - p[0], m.pos[2] - p[2]) < 5.5 && Math.hypot(m.vel[0], m.vel[2]) < 0.4; },
         wispNear: () => window.__ft.foes().filter(m => m.foe.k === 'wisp' && m.foe.st !== 'patrol').length >= 2,
       },
@@ -143,6 +146,10 @@ try {
     await ev(`VR.game.createWorld({name:'Begegnungen',mode:'survival',difficulty:'normal',type:'default',seed:'4242',cheats:true})`);
     for (let i = 0; i < 200; i++) { await wait(500); if (await ev(() => VR.game.state === 'play' && VR.game.player && !VR.game.player.hold)) break; }
     check(await ev(() => VR.game.state) === 'play', 'the world is open (' + secs() + ')');
+    // (a-foes2) from here the game runs only the test's own frames, and the world settles 30 s
+    await ev(() => { const g = VR.game, L0 = Object.getPrototypeOf(g).loop; if (window.__step) return; window.__step = (t) => L0.call(g, t); g.loop = function (t) { if (window.__live) return L0.call(this, t); }; });
+    await ev(() => { const p = VR.game.player; p.flying = true; p.vel[0] = 0; p.vel[1] = 0; p.vel[2] = 0; });
+    await settle(30, 'the world opened');
     out = await ev(() => new Promise((res) => { const g = VR.game, p = g.player; g.pool.direct(0, { type: 'locate', dim: 'overworld', biome: 'outpost', x: Math.floor(p.pos[0]), z: Math.floor(p.pos[2]) }, null, (m) => res(m && m.pos)); }));
     console.log('     the nearest outpost: ' + JSON.stringify(out));
     check(Array.isArray(out), 'the worker found the nearest outpost');
@@ -167,6 +174,8 @@ try {
     cam0 = await ev((p) => { const b = p.beacon, yaw = Math.atan2(b[0] - p.x, b[2] - p.z); return window.__ft.camAt([b[0] + 0.5, b[1] + 1.2, b[2] + 0.5], 16, 5, yaw); }, pad);   // (run 3: 24 blocks off, the beacon small behind the ship)
     check(!!cam0, 'a camera spot with the beacon in view (' + JSON.stringify(cam0 && [Math.round(cam0.x), Math.round(cam0.y), Math.round(cam0.z)]) + ')');
     if (!cam0) return;
+    await ev((c) => window.__ft.look(c), cam0);
+    await settle(75, 'before the postcards');
     await ev((c) => window.__ft.look(c), cam0);
     await run(10);
     await draw(11300);
@@ -195,6 +204,8 @@ try {
     await run(20, { god: true });
     await draw(11300);
     pics.before = await shot('outpost_before');
+    N.mood0 = await ev(() => ({ k: +VR.Liberate.moodNow.toFixed(2), sat: +VR.game.env.E.saturation.toFixed(3), grade: VR.game.env.E.grade.map(v => +v.toFixed(3)) }));
+    check(N.mood0.k > 0.8, 'the land round the disturbed outpost tinted red-violet (k ' + N.mood0.k + ', saturation ' + N.mood0.sat + ', grade ' + N.mood0.grade.join(',') + ')');
   });
 
   // ---------------------------------------------------------------- 3 · a Bohrläufer's warning
@@ -221,6 +232,12 @@ try {
     check(r.hit && t.st === 'tele' && t.flare > 0.5, 'it announces its charge: the optic flares (' + t.flare + ' of 1 after ' + t.t + ' s of ' + t.tele + ' s)');
     await draw();
     pics.driller = await shot('foe_bohrlaeufer');
+    // a-foes2: the same warning 1.2 blocks from the eye — the lost run saw an opaque lilac disc over a quarter of the screen
+    await ev((id) => { const m = VR.game.entities.mobs.find(x => x.id === id), f = m.foe, K = VR.Foes.KINDS[f.k], y = m.pos[1] + 13 / 16, fx = m.pos[0] - Math.sin(m.yaw) * 1.8, fz = m.pos[2] - Math.cos(m.yaw) * 1.8; window.__ft.look({ x: fx, y: y + 0.25, z: fz, tx: m.pos[0], ty: y, tz: m.pos[2] }); f.st = 'tele'; f.t = 0.3; f.flare = 0.9; void K; }, dr.id);
+    await run(3, { god: true });
+    await ev((id) => { const f = VR.game.entities.mobs.find(x => x.id === id).foe; f.st = 'tele'; f.flare = 0.9; f.t = 0.4; }, dr.id);
+    await draw();
+    pics.close = await shot('foe_close');
     await run(90, { god: true, cb: 'watch' });
     const w = await ev(() => window.__ft.w && { tok: window.__ft.w.tok, minTele: window.__ft.w.minTele, strikes: window.__ft.w.strikes });
     console.log('     ' + JSON.stringify(w));
@@ -297,6 +314,7 @@ try {
     check(r.hit && d.drones >= 3, 'the first wave: ' + d.drones + ' shadow drones round the player at ' + d.ring + ' % of the ring');
     await draw();
     pics.drones = await shot('foe_drones');
+    await ev(() => { VR.game.settings.wowMoments = true; });   // (a-foes2: the moment's camera follows ⚙ Wow-Momente)
     r = await run(2400, { until: 'moment', arg: 0.01, god: true, cb: 'ringHold', arg2: spot });
     const w = await ev(() => { const ft = window.__ft; return { tok: ft.w.tok, wave: ft.w.wave, minTele: +ft.w.minTele.toFixed(2), strikes: ft.w.strikes, bolts: ft.w.bolts }; });
     console.log('     ' + JSON.stringify(w) + ' after ' + r.n + ' more frames');
@@ -309,7 +327,13 @@ try {
   // ---------------------------------------------------------------- 8 · the MOMENT
   await section('8', async () => {
     console.log('8 · the moment');
-    const r = await run(120, { until: 'moment', arg: 2.55, god: true });
+    let r = await run(60, { until: 'moment', arg: 1.2, god: true });
+    const c1 = await ev(() => { const L = VR.Liberate; return { cam: !!L.mcam, t: L.mcam ? +L.mcam.t.toFixed(2) : null, ring: +L.ringR(L.moment.t).toFixed(1), k: +L.moodNow.toFixed(2), pass: L.passAt !== null }; });
+    console.log('     at 1.2 s: ' + JSON.stringify(c1));
+    check(c1.cam, 'the moment\'s camera swings out over the land (' + JSON.stringify(c1) + ')');
+    await draw(11300);
+    pics.heal = await shot('outpost_heal');
+    r = await run(120, { until: 'moment', arg: 2.55, god: true });
     await ev((c) => { window.__ft.look(c); clearTimeout(VR.Liberate.banT); }, cam0);   // (the banner kept up for the picture: the real clock runs on while SwiftShader draws)
     const m = await ev(() => { const L = VR.Liberate, s = window.__ft.site(), g = VR.game, b = s.beacon; return { t: +L.moment.t.toFixed(2), st: s.st, cyan: g.world.getBlock(b[0], b[1], b[2]) === VR.R.byName.leuchtfeuer.state({ frei: 1 }), banner: (document.getElementById('libban') || {}).className || '', said: (g.funke && g.funke.last) || null }; });
     console.log('     ' + JSON.stringify(m) + ' after ' + r.n + ' frames');
@@ -318,8 +342,38 @@ try {
     await draw(11300);
     pics.after = await shot('outpost_after');
     await release();
+    // a key in the camera's hold: the view turns back from where it is, no jump (the lost run: 2.2 blocks)
+    const sk = await ev(() => {
+      const g = VR.game, L = VR.Liberate, p = g.player, e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], base = { x: e[0], y: e[1], z: e[2], yaw: p.yaw, pitch: p.pitch, fov: 1.2 };
+      if (!L.mcam) return null;
+      const st = []; const at = () => { const c = L.cam(g, base); return c ? [c.x, c.y, c.z] : null; };
+      let prev = at(), worst = 0, t0 = L.mcam.t;
+      for (let i = 0; i < 6; i++) { if (i === 2) g.input.pressed.add('Pause'); g.last = performance.now() - 33; window.__step(performance.now()); const c = at(); if (c && prev) worst = Math.max(worst, Math.hypot(c[0] - prev[0], c[1] - prev[1], c[2] - prev[2])); if (c) prev = c; st.push(L.mcam ? +L.mcam.t.toFixed(2) : null); }
+      return { t0: +t0.toFixed(2), skipped: !!(L.mcam && L.mcam.skipped), worst: +worst.toFixed(3), ts: st };
+    });
+    console.log('     the key in the hold: ' + JSON.stringify(sk));
+    N.skip = sk;
+    check(!!sk && sk.skipped && sk.worst < 0.6, 'a key in the hold: the camera turns back from where it is (at most ' + (sk && sk.worst) + ' blocks a frame)');
+    // the strays stand up one by one with a small bow: a close look at the next one to bow
+    const sb = await ev(() => {
+      const ft = window.__ft, L = VR.Liberate, F = VR.Foes; L.mcam = null;
+      const hs = ft.foes().filter(m => m.foe.helper && m.foe.site !== undefined);
+      const nx = hs.filter(m => m.foe.rise > 0 || (m.foe.bowT !== null && m.foe.bowT !== undefined && m.foe.bowT < 0.9)).sort((a, b) => (a.foe.rise || 0) - (b.foe.rise || 0))[0] || hs[0];
+      if (!nx) return null;
+      const K = F.KINDS[nx.foe.k], c = ft.camAt([nx.pos[0], nx.pos[1] + K.h * 0.5, nx.pos[2]], 4.5, 0.9, nx.yaw + Math.PI);
+      if (c) ft.look(c);
+      window.__bw = nx.id;
+      return { id: nx.id, k: nx.foe.k, rise: +(nx.foe.rise || 0).toFixed(2), n: hs.length, rises: hs.map(m => +(m.foe.rise || 0).toFixed(2)) };
+    });
+    console.log('     the stand-up: ' + JSON.stringify(sb));
+    if (sb) { const rr = await run(150, { until: "bow", arg: sb.id, god: true }); check(rr.hit, 'a freed stray stands up and bows (' + sb.k + ', ' + sb.n + ' rising ' + sb.rises.join(' · ') + ' s apart)'); }
+    await draw(11300);
+    pics.stand = await shot('stand');
     await ev(() => { const el = document.getElementById('libban'); if (el) el.className = ''; });
     const a = await ev(() => { const A = VR.Adventure.rec, s = window.__ft.site(); return { freed: !!A.freed[s.id], xp: A.me.xp, taler: A.me.taler, ev: VR.EventLog && VR.EventLog.peaks ? VR.EventLog.peaks().length : null }; });
+    const md = await ev(() => ({ k: +VR.Liberate.moodNow.toFixed(2), pass: VR.Liberate.passAt !== null, sat: +VR.game.env.E.saturation.toFixed(3) }));
+    N.mood1 = md;
+    check(md.k < 0.5, 'the land healed: the red-violet tint gone where the ring passed (k ' + md.k + ', saturation ' + md.sat + ')');
     check(a.freed, 'in the record: meta.adventure.freed[' + (await ev(() => window.__ft.site().id)) + '] (XP ' + a.xp + ', Taler ' + a.taler + ')');
   });
 
@@ -370,9 +424,12 @@ try {
     check(f0.fainting, 'a last hit: Ohnmacht instead of death');
     await run(90, { until: 'noFaint' });
     await run(10);
-    const f1 = await ev(() => { const g = VR.game, p = g.player, b = window.__ft.site().beacon; return { d: +Math.hypot(p.pos[0] - b[0] - 0.5, p.pos[2] - b[2] - 2.5).toFixed(2), health: p.health, dead: !!p.dead, inv: p.inv.slots.filter(Boolean).length, faints: VR.Adventure.rec.faints.length }; });
+    const f1 = await ev(() => { const g = VR.game, p = g.player, b = window.__ft.site().beacon; return { d: +Math.hypot(p.pos[0] - b[0] - 0.5, p.pos[2] - b[2] - 0.5).toFixed(2), pitch: +p.pitch.toFixed(2), health: p.health, dead: !!p.dead, inv: p.inv.slots.filter(Boolean).length, faints: VR.Adventure.rec.faints.length }; });
     console.log('     ' + JSON.stringify(f1));
-    check(f1.d < 1.5 && f1.health >= 20 && !f1.dead && f1.inv === f0.inv, 'woke at the freed beacon with full hearts and everything kept (' + JSON.stringify(f1) + ')');
+    check(f1.d > 4 && f1.d < 6.5 && f1.health >= 20 && !f1.dead && f1.inv === f0.inv, 'woke 5 blocks out from the freed beacon with full hearts and everything kept (' + JSON.stringify(f1) + ')');
+    await run(20);
+    await draw();
+    pics.wake = await shot('wake');
   });
 
   // ---------------------------------------------------------------- 11 · the numbers
@@ -382,10 +439,10 @@ try {
     await ev(() => {
       const g = VR.game, Fo = VR.Foes;
       window.__ft.clear = () => { const En = g.entities; for (let i = En.mobs.length - 1; i >= 0; i--) if (En.mobs[i].foe) En.mobs.splice(i, 1); Fo.bolts.length = 0; Fo.bits.length = 0; Fo.W.tokens.clear(); Fo.enc0 = null; };
-      window.__ft.spawn12 = () => {
+      window.__ft.spawn12 = (r0) => {
         const En = g.entities, p = g.player.pos, w = g.world, ids = [];
         const kinds = ['driller', 'driller', 'driller', 'driller', 'sentry', 'sentry', 'sentry', 'sentry', 'drone', 'drone', 'drone', 'drone'];
-        kinds.forEach((k, i) => { const a = i / 12 * Math.PI * 2, r = 9 + (i % 3) * 2, x = Math.floor(p[0] + Math.sin(a) * r), z = Math.floor(p[2] + Math.cos(a) * r), y = w.topAt(x, z) + 1 + (k === 'drone' ? 4 : 0); const m = En.summon('foe_' + k, x + 0.5, y, z + 0.5); if (!m) return; m.foe = Fo.make(k, m.id, m.pos); m.foe.zone = { id: 'cost', kind: 'outpost', x: p[0], z: p[2], r: 40 }; m.foe.st = 'approach'; ids.push(m.id); });
+        kinds.forEach((k, i) => { const a = i / 12 * Math.PI * 2, r = (r0 || 9) + (i % 3) * 2, x = Math.floor(p[0] + Math.sin(a) * r), z = Math.floor(p[2] + Math.cos(a) * r), y = w.topAt(x, z) + 1 + (k === 'drone' ? 4 : 0); const m = En.summon('foe_' + k, x + 0.5, y, z + 0.5); if (!m) return; m.foe = Fo.make(k, m.id, m.pos); m.foe.zone = { id: 'cost', kind: 'outpost', x: p[0], z: p[2], r: 40 }; m.foe.st = 'approach'; ids.push(m.id); });
         return ids.length;
       };
     });
@@ -413,6 +470,12 @@ try {
       const fc = await ev(() => { const C = VR.Foes.cost; return { frames: C.frames, ms: C.ms, ai: C.ai, aiMs: C.aiMs }; });
       N.cost[preset] = { off: +o.toFixed(3), on: +n.toFixed(3), medOff: +med(offs).toFixed(3), medOn: +med(ons).toFixed(3), offs: offs.map(v => +v.toFixed(3)), ons: ons.map(v => +v.toFixed(3)), foes: fc };
       console.log('     ' + preset + ': ' + JSON.stringify(N.cost[preset]));
+      if (preset === 'potato') {   // (a-foes2) the same twelve patrolling 34–38 blocks off (none has noticed the player)
+        const po = [], pn = [];
+        for (let r = 0; r < 5; r++) { await ev(() => window.__ft.clear()); await run(10); po.push(await frames(150)); await ev(() => window.__ft.spawn12(34)); await run(10, { god: true }); pn.push(await frames(150)); }
+        N.cost.patrol = { off: +Math.min(...po).toFixed(3), on: +Math.min(...pn).toFixed(3), medOff: +med(po).toFixed(3), medOn: +med(pn).toFixed(3) };
+        console.log('     potato, patrolling: ' + JSON.stringify(N.cost.patrol));
+      }
     }
     // F.draw on Very Low: the foes in view, drawn
     await ev(() => { const g = VR.game; g.applyPreset('potato'); g.settings.dynRes = false; g.settings.renderDist = 6; g.applySettings('renderDist'); window.__ft.clear(); window.__ft.spawn12(); });
@@ -443,15 +506,23 @@ try {
   fs.writeFileSync(SHOTS + 'abenteuer2_numbers.json', JSON.stringify(N, null, 1));
   try {
     // (the sheet's labels: plain letters — sheet.py's font has no emoji, no umlauts and no „ quotes)
-    const spec = { cols: [], w: 640, rows: [
-      { label: 'outpost', labels: ['1 - Bauwelt: der Aussenposten wie immer, kein Gegner', '2 - Abenteuer: gestoert, rot-violettes Leuchtfeuer'], imgs: [pics.builder || null, pics.before || null] },
-      { label: 'freed', labels: ['8 - befreit: cyan, Strahl, Lichtring, BEFREIT', '9 - ein Helfer folgt, der Handelsposten'], imgs: [pics.after || null, pics.helfer || null] },
-      { label: 'foes', labels: ['3 - Bohrlaeufer: die Warnung (Optik flammt)', '4 - Abschalten: Dampf, Funken, Platten'], imgs: [pics.driller || null, pics.down || null] },
-      { label: 'swarm', labels: ['7 - Schattendrohnen im Schwarm (Welle 1)', '10 - Schattenwesen bei Nacht'], imgs: [pics.drones || null, pics.wisps || null] },
-      { label: 'calm', labels: ['5 - Beruhigen: der Zeitring', '6 - Lichtleiter: halb gedreht'], imgs: [pics.calm || null, pics.puzzle || null] },
-    ] };
+    // (a-foes2) pairs.py: a row a moment, two pictures each; every row a real picture
+    const R = [
+      ['1 Bauwelt: kein Gegner  |  2 Abenteuer: gestoert, das Land rot-violett getoent', [pics.builder, pics.before]],
+      ['8a der Lichtring heilt das Land (1,2 s)  |  8b BEFREIT: Strahl, Banner (2,5 s)', [pics.heal, pics.after]],
+      ['8c sie stehen nacheinander auf, mit kleiner Verbeugung  |  9 der Helfer folgt', [pics.stand, pics.helfer]],
+      ['3 Bohrlaeufer: die Warnung  |  3b dieselbe Warnung 1,2 Bloecke vor dem Auge', [pics.driller, pics.close]],
+      ['4 Abschalten  |  5 Beruhigen: der Zeitring', [pics.down, pics.calm]],
+      ['6 Lichtleiter  |  7 Schattendrohnen, Welle 1', [pics.puzzle, pics.drones]],
+      ['10 Schattenwesen bei Nacht  |  10b Ohnmacht: Aufwachen am befreiten Leuchtfeuer', [pics.wisps, pics.wake]],
+    ];
+    const rows = R.filter(([, im]) => im.every(Boolean)).map(([label, imgs]) => ({ label, imgs }));
+    const lum = (f) => { try { return +execFileSync('python3', ['-c', 'import sys; from PIL import Image, ImageStat; print(sum(ImageStat.Stat(Image.open(sys.argv[1]).convert("L")).mean))', f]).toString().trim(); } catch (e) { return 0; } };
+    const dark = []; for (const [, im] of R) for (const f of im) if (f && lum(f) < 16) dark.push(f.split('/').pop());
+    check(rows.length === R.length && !dark.length, 'every sheet row a real picture (' + rows.length + ' of ' + R.length + (dark.length ? '; dark: ' + dark.join(', ') : '') + ')');
+    const spec = { w: 620, rows };
     fs.writeFileSync(SHOTS + 'abenteuer2_sheet.json', JSON.stringify(spec));
-    execFileSync('python3', ['/root/r9coord/sheet.py', SHOTS + 'abenteuer2_sheet.jpg', SHOTS + 'abenteuer2_sheet.json'], { stdio: 'inherit' });
+    execFileSync('python3', ['/root/r9coord/pairs.py', SHOTS + 'abenteuer2_sheet.jpg', SHOTS + 'abenteuer2_sheet.json'], { stdio: 'inherit' });
   } catch (e) { console.log('sheet: ' + e.message); }
   await browser.close();
   console.log('numbers ' + JSON.stringify(N));
