@@ -32,7 +32,7 @@
       r.innerHTML = `
       <div id="title" class="screen">
         <div class="logo">R9&#8209;SI</div>
-        <div class="tagline">Voxel Realm · Starforge Edition</div>
+        <div class="tagline">Voxel Realm · Sternglut Edition</div>
         <div class="splash" style="margin-left:360px;margin-top:-10px" id="splash"></div>
         <div class="menu">
           <button class="btn primary" data-act="play">Play</button>

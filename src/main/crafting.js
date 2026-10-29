@@ -128,7 +128,7 @@
     const X = AM[m];
     shaped(['XXX', 'X X'], { X }, m + '_helmet'); shaped(['X X', 'XXX', 'XXX'], { X }, m + '_chestplate'); shaped(['XXX', 'X X', 'X X'], { X }, m + '_leggings'); shaped(['X X', 'X X'], { X }, m + '_boots');
   }
-  // Starforge tech
+  // Sternglut tech
   shaped(['CRC', 'RGR', 'CRC'], { C: 'copper_ingot', R: 'voltite_dust', G: 'glass' }, 'energy_cell', 2);
   shaped(['GAG', 'ACA', 'GAG'], { G: 'glass', A: 'crystal_shard_azure', C: 'energy_cell' }, 'aether_cell');
   shaped(['III', 'IEI', 'III'], { I: 'iron_ingot', E: 'energy_cell' }, 'hull_plating', 8);

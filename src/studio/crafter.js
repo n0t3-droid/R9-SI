@@ -33,7 +33,7 @@
   const nameOf = (id) => { const t = R.byName[id]; return t ? (t.display || id) : (VR.ITEMS && VR.ITEMS[id] ? VR.ITEMS[id].name || id : id); };
 
   // ---------------------------------------------------------------- the palette: every placeable item
-  const PCATS = [['all', 'Alle'], ['fav', '★ Favoriten'], ['recent', 'Zuletzt'], ['modern', 'Modern & Vollton'], ['build', 'Bauen'], ['arch', 'Voxel Homes'], ['vtech', 'Möbel & Technik'], ['vlife', 'Leben'], ['vshop', 'Markt'], ['nature', 'Natur'], ['func', 'Funktion'], ['volt', 'Mechanik'], ['tech', 'Starforge']];
+  const PCATS = [['all', 'Alle'], ['fav', '★ Favoriten'], ['recent', 'Zuletzt'], ['modern', 'Modern & Vollton'], ['build', 'Bauen'], ['arch', 'Voxel Homes'], ['vtech', 'Möbel & Technik'], ['vlife', 'Leben'], ['vshop', 'Markt'], ['nature', 'Natur'], ['func', 'Funktion'], ['volt', 'Mechanik'], ['tech', 'Sternglut']];
   PCATS.splice(4, 0, ['vmodern', '✨ Modern Living']);   // the Modern Living pack (voxmodern.js)
   let itemsByCat = null, itemSet = null;
   const FV = () => VR.Favs;
@@ -45,7 +45,7 @@
     for (const t of R.types) {
       if (!t.cat || t.o.noItem || t.o.cutOf || t.name === 'air') continue;
       if (t.o.kind === 'model' && t.has && t.has('part') && !VM.MODELS[t.name] && !(VX.spec && VX.spec(t.defaultState))) continue;
-      let c = t.cat; if (t.group && /Starforge|Realm/.test(t.group) && t.group.indexOf('Starforge') >= 0) c = 'tech'; if (c === 'creative') c = 'func';
+      let c = t.cat; if (t.group && /Sternglut|Realm/.test(t.group) && t.group.indexOf('Sternglut') >= 0) c = 'tech'; if (c === 'creative') c = 'func';
       (itemsByCat[c] || (itemsByCat[c] = [])).push(t.name); itemsByCat.all.push(t.name);
     }
     itemSet = new Set(itemsByCat.all);

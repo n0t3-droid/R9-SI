@@ -1,6 +1,6 @@
 // ============================================================================
 // Texture recipes part 2: plants, flowers, crops, fungi, aquatic, functional,
-// volt components, fluids & fire animation, crystals, Starforge sci-fi set
+// volt components, fluids & fire animation, crystals, Sternglut sci-fi set
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -67,7 +67,7 @@
   PRE.crystal = (c) => { const img = new TX.Img(); const P = TX.pal(CRY[c], 6); img.forEach((x, y, i) => { const f = 0.35 + (x % 16) / 16 * 0.4 + (1 - y / N) * 0.25 + (hh(x >> 2, y >> 3, 7) - 0.5) * 0.2; img.set(x, y, TX.ramp(P, Math.max(0, Math.min(0.999, f))), 1); img.em[i] = 0.55 + f * 0.4; img.ro[i] = 0.05; img.h[i] = f; if (x % 8 === 0) img.mul(x, y, 1.25); }); return img; };
   REC.aether_still = () => { const img = TX.natural([0x0a5aa0, 0x1a90e0, 0x4ad0ff, 0xb0f4ff], { period: 4, oct: 3, seed: 2060, rough: 0.05 }); img.forEach((x, y, i) => { img.em[i] = 0.8; img.alpha(x, y, 0.8); }); return img; };
 
-  // ---------------- Starforge sci-fi ----------------
+  // ---------------- Sternglut sci-fi ----------------
   const HULL = { white: [0xb8bcc2, 0xd4d8dc, 0xe8ebee, 0xf6f8fa], gray: [0x5e636a, 0x777d85, 0x90969e, 0xa8aeb5], dark: [0x1e2228, 0x2a2f36, 0x363c44, 0x444b54] };
   PRE.hull = (c) => {
     const img = TX.metal(HULL[c], { rough: c === 'dark' ? 0.45 : 0.35, seed: 2070 + c.length });

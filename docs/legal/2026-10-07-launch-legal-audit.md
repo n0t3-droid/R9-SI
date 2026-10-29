@@ -117,7 +117,7 @@ Storing or reading information on the end-user's device needs consent **unless**
 - **Minecraft**: the only mentions are in README and the Studio's file help (tool names). Mojang's usage guidelines allow descriptive, honest references ("compatible with WorldEdit .schem files") if the disclaimer is shown prominently on "product, listing, description, website". Add it. Never put "Minecraft" into the game name, tags or keywords; never use the logo font, "Creeper", "Steve", textures or sounds (none are used).
 - **Minecraft Wiki**: its text is CC BY-NC-SA 3.0. The code copies no wiki text (checked codex, tooltips, milestone texts); the `wiki:` field holds page *names*. Fine. Rewording `README.md:6-7` avoids implying the wiki's structure was copied.
 - **German house companies**: see table #9. The protected thing could be the architectural design (a *Werk der Baukunst*, § 2 Abs. 1 Nr. 4 UrhG) if the game reproduces a recognisable, original design; block approximations of standard prefab villas are far from that, but publicly crediting the companies as the source is unnecessary and invites attention. Trademarks: no use in trade → no infringement; renaming three product-like names removes even the argument.
-- **"Starforge"**: see #10.
+- **"Starforge"**: see #10. **Retired 2026-10-29 (f-stipple2)**: renamed „Sternglut" everywhere a player reads it (tech category, outposts, the shuttle livery, the edition line); only the internal keys `starforge` stay (test/names.js).
 - **Milestone titles**: four identical to Minecraft advancements — rename ("Stone Age" → "First Stone", "Hot Stuff" → "Fired Up", "Diamonds!" → "Blue Fire", "Sweet Dreams" → "Good Night").
 
 ### 3.6 Licences of what is bundled

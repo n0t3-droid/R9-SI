@@ -1,7 +1,7 @@
 // ============================================================================
 // Block definitions part 4 — Voxel Realm originals (art direction from the
 // concept image): realm rocks, glowing prism crystals, Aether energy fluid,
-// and the Starforge sci-fi set (hulls, tech panels, neon, thrusters, helm...).
+// and the Sternglut sci-fi set (hulls, tech panels, neon, thrusters, helm...).
 // ============================================================================
 (function (VR) {
   'use strict';
@@ -11,7 +11,7 @@
   const { slab, stairs, wall } = VR.FAM;
   const { box, quad, cross, rotY, rotX } = MD;
   G.REALM = 'Realm · Crystals & Rock';
-  G.STAR = 'Starforge · Sci-fi';
+  G.STAR = 'Sternglut · Sci-fi';
   VR.GROUP_ORDER.push(G.REALM, G.STAR);
 
   // ---------------------------- realm rocks ----------------------------
@@ -51,7 +51,7 @@
   // ---------------------------- aether (energy fluid) ----------------------------
   def('aether', { display: 'Aether', cat: null, group: G.REALM, props: [['level', 16]], shape: 'fluid', layer: 'trans', tex: T('aether_still'), light: [5, 12, 15], filter: 1, hard: 100, blast: 100, solid: false, flags: F.FLUID | F.REPLACE, sound: 'water', noItem: true, aether: true });
 
-  // ---------------------------- Starforge (sci-fi) ----------------------------
+  // ---------------------------- Sternglut (sci-fi) ----------------------------
   const sf = { cat: 'build', group: G.STAR, tool: 'pick', needTool: true, tier: 2, sound: 'metal', hard: 4, blast: 9 };
   def('hull_plating', Object.assign({ display: 'Hull Plating', tex: T('hull:white') }, sf));
   def('hull_plating_gray', Object.assign({ display: 'Gray Hull Plating', tex: T('hull:gray') }, sf));

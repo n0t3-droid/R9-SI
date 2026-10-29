@@ -4,7 +4,7 @@
 //  · Ember Canyons: red-ochre mesas cut by lava rivers, basalt & ember veins
 //  · Aether rivers: glowing blue energy instead of water in realm biomes
 //  · Sky islands with waterfalls / aetherfalls drifting over every biome
-//  · Starforge outposts: landing pad + docked shuttle, control tower, turrets,
+//  · Sternglut outposts: landing pad + docked shuttle, control tower, turrets,
 //    elevated maglev rails; crystal meteor craters
 // New worlds (vgen ≥ 9, VR.GEN.noCry) have no crystals: the prism lands keep their violet meadows and highlands with
 // rock pinnacles of their duskrock where the spires stood, flowers for the small clusters, blossom trees on the islands,

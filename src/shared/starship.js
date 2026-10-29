@@ -18,7 +18,7 @@
   const hash = (a, b, c) => { let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
   const PAL = [
-    { key: 'starforge', name: 'Starforge', hull: 0xe9ecf1, hull2: 0xc3c9d3, trim: 0x3a3f4b, acc: 0xf07a1e, acc2: 0x2e7de0, glow: 0x5af4ff, glass: 0x1b3a66, eng: 0x4a4f5a, core: 0xffb45a },
+    { key: 'starforge', name: 'Sternglut', hull: 0xe9ecf1, hull2: 0xc3c9d3, trim: 0x3a3f4b, acc: 0xf07a1e, acc2: 0x2e7de0, glow: 0x5af4ff, glass: 0x1b3a66, eng: 0x4a4f5a, core: 0xffb45a },
     { key: 'nightwing', name: 'Nightwing', hull: 0x2c2f3a, hull2: 0x3d4150, trim: 0x16181e, acc: 0xe0409e, acc2: 0x8a4bff, glow: 0xff5ad8, glass: 0x2a1446, eng: 0x23252d, core: 0xff6adf },
     { key: 'sunstrike', name: 'Sunstrike', hull: 0xf2efe8, hull2: 0xd9d3c7, trim: 0x46403a, acc: 0xd83b2b, acc2: 0xf5c43a, glow: 0xffc23a, glass: 0x1d4f7a, eng: 0x4d4843, core: 0xffd27a },
     { key: 'verdant', name: 'Verdant Corps', hull: 0xd8ddd2, hull2: 0xaeb8a4, trim: 0x2f4a2b, acc: 0x6fd83a, acc2: 0x2c8a4a, glow: 0x9cff6a, glass: 0x173d33, eng: 0x3e4a3e, core: 0xc8ff7a },

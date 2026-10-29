@@ -68,6 +68,8 @@ const NAMES = [
   { de: 'Meisterin Ilka', en: 'Chief Ilka', role: 'speaker', what: 'a story speaker', checked: '2026-10-29', by: 'f-rules', found: 'a given name; no game character' },
   { de: 'Kapitän Jonte', en: 'Captain Jonte', role: 'speaker', what: 'a story speaker', checked: '2026-10-29', by: 'f-rules', found: 'a given name; no game character' },
   { de: 'Ringstation', en: 'Ringstation', role: 'station', what: 'the station over the air (story ch. 3)', checked: '2026-10-29', by: 'f-rules', found: 'a generic word' },
+  // f-stipple2 (the owner's note: „Starforge" is also the title of a 2014 voxel game)
+  { de: 'Sternglut', en: 'Sternglut', role: 'tech', what: 'the tech category, the outposts\' maker, the classic shuttle\'s livery, the title\'s edition line (replaces „Starforge"; the keys stay starforge)', checked: '2026-10-29', by: 'f-stipple2', found: 'no game, brand or product of that name (searched „Sternglut" with game/Spiel/Marke; „Zenitwerk" near the Zenit camera maker and „Funkenwerk" near our own Funke were set aside)' },
   { de: 'Reiseantrieb', en: 'Cruise drive', role: 'drive', what: "u-cruise's drive", checked: '2026-10-29', by: 'f-rules', found: 'generic words' },
 ];
 // the words that went: never again in a table, an item name or a string the game writes
@@ -83,6 +85,8 @@ const RETIRED = [
   { word: 'Pulse Blaster', re: /Puls(e )?[Bb]laster/, why: 'close to known games\' and toys\' blasters (review R52-01)', now: 'Calm Beam / Ruhestrahler' },
   { word: 'Warden', re: /\bWarden\b/, why: 'Ice Warden / Warden: known game creatures (review R52-01)', now: 'Keeper / Ice Keeper' },
   { word: 'Shadow Drone', re: /Shadow Drone|Shadow Wisp|Schattendrohne/, why: 'a trading card; ≈ „Shade Wisp"', now: 'Dusk Drone, Dusk Wisp, Dämmerdrohne' },
+  // f-stipple2
+  { word: 'Starforge', re: /Starforge/, why: 'the title of a 2014 voxel game (StarForge); the lower-case keys starforge stay', now: 'Sternglut' },
 ];
 module.exports = { NAMES, RETIRED };
 if (require.main !== module && !process.env.NAMES_RUN) return;

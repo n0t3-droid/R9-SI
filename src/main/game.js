@@ -1480,7 +1480,7 @@
         for (const t of R.types) {
           if (!t.cat || t.o.noItem) continue;
           let c = t.cat;
-          if (t.group && /Starforge|Realm/.test(t.group)) c = t.group.indexOf('Starforge') >= 0 ? 'tech' : c;
+          if (t.group && /Sternglut|Realm/.test(t.group)) c = t.group.indexOf('Sternglut') >= 0 ? 'tech' : c;
           if (c === 'creative') c = 'func';
           push(c, t.name);
         }
