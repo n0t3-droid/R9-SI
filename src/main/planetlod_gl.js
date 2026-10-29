@@ -110,7 +110,7 @@
   // the drawers' two hooks round the impostor: before it (the tiles drawn first, their depth kept; n tiles) and after it
   // (the depth cleared: the ship and the voxel world draw as they always did)
   PG.before = function (gl, p, n, setU2) { if (!n) return; setU2(gl, p, 'u_zFar', 1); gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(false); };
-  PG.after = function (gl, p, n, setU2) { if (!n) return; setU2(gl, p, 'u_zFar', 0); gl.clear(gl.DEPTH_BUFFER_BIT); gl.disable(gl.DEPTH_TEST); gl.depthMask(false); };
+  PG.after = function (gl, p, n, setU2) { if (!n) return; setU2(gl, p, 'u_zFar', 0); gl.depthMask(true); gl.clear(gl.DEPTH_BUFFER_BIT); gl.disable(gl.DEPTH_TEST); gl.depthMask(false); };   // (the mask on for the clear: a masked clear clears nothing)
   // how many of the selected tiles are still on their way (tests)
   PG.again = () => (PG.last ? PG.update.apply(null, PG.last) : false);
   PG.pending = () => sel.filter(x => { const t = PG.tiles.get(x.key); return !(t && t.ready); }).length;

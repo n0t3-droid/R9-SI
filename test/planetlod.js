@@ -127,11 +127,11 @@ console.log('the shaders');
 {
   const S = SRC('main/space_shaders.js'), L = SRC('main/shaders.js'), G = fs.existsSync(path.join(__dirname, '../src/main/planetlod_gl.js')) ? SRC('main/planetlod_gl.js') : '';
   check(/#ifdef PTILE/.test(S) && /in vec3 v_nb;/.test(S), 'HERZ_FS draws the tiles too (#ifdef PTILE: the vertex\'s own sphere normal, the mesh\'s for the relief)');
-  check(/PTILE/.test(G) && /DEPTH_BUFFER_BIT/.test(G), 'planetlod_gl.js compiles it with PTILE and clears its own depth after the pass');
+  check(/PTILE/.test(G) && /gl\.depthMask\(true\); gl\.clear\(gl\.DEPTH_BUFFER_BIT\)/.test(G), 'planetlod_gl.js compiles it with PTILE and clears its own depth after the impostor — with the depth mask on (orbit.mjs run 3: a masked clear left the tiles\' depth, the dashboard behind the planet)');
   const ag = (S.match(/AG_COL \* u_air\.w \* ag \* ([0-9.]+)/) || [])[1];
   check(ag !== undefined && +ag <= 0.15, `the airglow's shell faint (×${ag}; v0.50 ×0.45)`);
   check(/aurora/i.test(S) && /auroraAt\(/.test(S), 'the aurora: a function for the oval (the disc and the limb)');
-  check(/glint/i.test(S) && /ggx\(max\(dot\(N, H\), 0\.0\), 0\.06\)/.test(S), 'the sunglint: a mirror core (GGX 0.06) in the broad sheen');
+  check(/glint/i.test(S) && /ggx\(max\(dot\(N, H\), 0\.0\), 0\.09\)/.test(S) && /ggx\(max\(dot\(N, H\), 0\.0\), wind\)/.test(S), 'the sunglint: a mirror core (GGX 0.09) in a broad sheen whose roughness the wind varies');
   const lod = L.slice(L.indexOf('S.LOD_FS'), L.indexOf('S.LOD_FS') + 6000);
   check(!/bayer4\(gl_FragCoord\.xy\) < smoothstep\(u_climbCut/.test(lod) && /climbA/.test(lod), 'the horizon tiles\' climb edge: an alpha (climbA), not the Bayer dissolve');
 }

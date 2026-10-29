@@ -317,7 +317,7 @@ void main() {
       float F = 0.02 + 0.98 * pow(1.0 - muv, 5.0);
       // u-orbitlod · the sunglint: a mirror core (calm water) in a broad sheen whose roughness the wind varies (lanes)
       float wind = u_air.z > 0.5 ? 0.26 + 0.16 * vnoise3(N * 420.0 + vec3(0.0, u_air.y * 0.0004, 0.0)) : 0.22;
-      float glint = u_air.z > 0.5 ? ggx(max(dot(N, H), 0.0), 0.06) * 0.3 + ggx(max(dot(N, H), 0.0), wind) * 1.4 : ggx(max(dot(N, H), 0.0), 0.22);   // (Very Low: v0.50's one lobe)
+      float glint = u_air.z > 0.5 ? ggx(max(dot(N, H), 0.0), 0.09) * 0.6 + ggx(max(dot(N, H), 0.0), wind) * 2.6 : ggx(max(dot(N, H), 0.0), 0.22);   // (Very Low: v0.50's one lobe)
       float spec = glint * F * 0.25 / max(muv, 0.05) * (1.0 - ice);
       vec3 sea = seaC * (u_sunCol * max(mus, 0.0) * Ts * csh + sky) + F * vec3(0.16, 0.26, 0.48) * u_sunCol * day * (1.0 - ice) + Ts * u_sunCol * spec * max(mus, 0.0) * csh;
       ground = mix(ground, sea, water);
