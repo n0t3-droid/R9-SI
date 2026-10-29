@@ -1,4 +1,5 @@
 // f-wild2 · R50-10 (docs/superpowers/plans/2026-10-23-f-wild2.md §2.4) — the wild's CPU on High, this branch against
+// regress: skip — a front-local cost bench: it compares this checkout with `git archive v042`, meaningless once merged
 // its base (v042: t-wild's animals) in the same machine, turn about: the actor in a stand-in world (flat grass at 80, a
 // lake east of x 60 with the murmuration's stage over it), dusk, the eye on the shore; a fake GL that only counts. Per
 // frame: the update (every piece) and the draw (opaque + translucent: the parties, the impostors, the rest). The best of
