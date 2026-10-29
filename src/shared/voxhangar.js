@@ -23,7 +23,7 @@
   const H = VR.Hangar = VR.Hangar || {};
   const C = H.COL = {
     navy: 0x2D3C5A, navyD: 0x1A2436, navyL: 0x3E5274, frame: 0x223048, rim: 0x3AF0FF, rimL: 0xC8FFFF,
-    bg: 0x0C2C4C, bgL: 0x123A60, cyan: 0x3AF0FF, cyanL: 0x9AFBFF, cyanD: 0x1A8AA8, amber: 0xFF9A2A, red: 0xFF4A4A,
+    bg: 0x123E78, bgL: 0x1C5296, cyan: 0x3AF0FF, cyanL: 0x9AFBFF, cyanD: 0x1A8AA8, amber: 0xFF9A2A, red: 0xFF4A4A,
     grey: 0xC8D0DA, greyD: 0x8C96A4, top: 0x2E3440, keyR: 0xFF4A4A, keyY: 0xFFE04A, keyG: 0x5AFF7A, keyB: 0x4A8AFF,
   };
   const NAMES = H.NAMES = [];
@@ -122,8 +122,8 @@
     K.wall('vx_hangar_navy', 'Navy Hangar Wall · Light Strip', { bothSides: true, band: false, corner: 0, pat: 'techpanel', col: C.navy, col2: C.navyD, gloss: true, strip: 12, glow: T_.cyan }, Object.assign({ sound: 'metal', hard: 2.5, light: [2, 7, 10] }, grp));
     K.wall('vx_hangar_navy_amber', 'Navy Hangar Wall · Amber Strip', { bothSides: true, band: false, corner: 0, pat: 'techpanel', col: C.navy, col2: C.navyD, gloss: true, strip: 12, glow: T_.amber }, Object.assign({ sound: 'metal', hard: 2.5, light: [9, 5, 1] }, grp));
     const FL = (name, display, sp, o) => K.add(name, display, Object.assign({ kind: 'floor', side: 0x4A5462, sidePat: 'techpanel', sideSpec: { col: 0x4A5462, col2: 0x2E3440 } }, sp), Object.assign({ opaque: true, filter: 15, sound: 'metal', hard: 2 }, grp, o || {}));
-    FL('vx_floor_hangar', 'Hangar Tile Deck', { pat: 'plaza', col: 0x4A5462, col2: 0x2C3446 });
-    FL('vx_floor_hangar_line', 'Hangar Light-Line', { pat: 'line', family: 'hangar', col: 0x4A5462, col2: 0x2C3446, glow: T_.cyan }, { light: [0, 7, 9] });
+    FL('vx_floor_hangar', 'Hangar Tile Deck', { pat: 'plaza', col: 0x8D9AB2, col2: 0x5A6472 });   // (t1_13's floor is a light blue-grey: L 52 b −28)
+    FL('vx_floor_hangar_line', 'Hangar Light-Line', { pat: 'line', family: 'hangar', col: 0x8D9AB2, col2: 0x5A6472, glow: T_.cyan }, { light: [0, 7, 9] });
     VM.registerLate(NAMES);
     // the Gate Temple's dark stone (texture recipes in src/main/tex_recipes4.js). The faces are named lazily — in
     // R.finalize, at these (the last) types — so the new texture names come after every older one and no older block's
