@@ -187,5 +187,91 @@ check(!!SP && typeof S.watch === 'function' && typeof S.offer === 'function', 'V
   check(!SP.debug.state().offer && !S.watch(g), 'a guest: no offer, no scene');
 }
 
+// ---------------------------------------------------------------- a-story2 (plan docs/superpowers/plans/2026-10-30-a-story2.md)
+console.log('9 · the speakers\' faces (src/main/story_art.js, VR.Portrait)');
+check(Array.isArray(S.MOODS) && ['neutral', 'happy', 'surprised', 'worried'].every(m => S.MOODS.includes(m)), 'four moods: neutral, happy, surprised, worried');
+check(S.BEATS.every(b => b.scene.lines.every(l => S.MOODS.includes(l.mood))), 'every line has a mood');
+const moodsUsed = new Set(); for (const b of S.BEATS) for (const l of b.scene.lines) moodsUsed.add(l.mood);
+check(moodsUsed.size === 4, 'the book uses all four moods (' + [...moodsUsed].join(', ') + ')');
+if (!fs.existsSync(SRC + 'main/story_art.js')) check(false, 'src/main/story_art.js missing');
+else {
+  if (!VR.M) VR.M = { hash3: (x, y, z, s) => (((x * 73856093) ^ (y * 19349663) ^ (z * 83492791) ^ (s * 2654435761)) >>> 0) };
+  require(SRC + 'main/voxmodels.js'); require(SRC + 'main/story_art.js');
+  const Po = VR.Portrait;
+  check(!!Po && typeof Po.ops === 'function' && typeof Po.paint === 'function', 'VR.Portrait.ops / paint');
+  const N = Po.N || 24; let inGrid = true, okCol = true, moodDiff = true, blinkDiff = true, mouthDiff = true;
+  const key = (o) => JSON.stringify(o);
+  const pal = {};
+  for (const w of S.WHO) {
+    const seen = new Set();
+    for (const m of S.MOODS) {
+      const o = Po.ops(w, m, false, false);
+      for (const r of o) { if (r[0] < 0 || r[1] < 0 || r[2] <= 0 || r[3] <= 0 || r[0] + r[2] > N || r[1] + r[3] > N) inGrid = false; if (!/^#[0-9a-f]{6}$/i.test(r[4])) okCol = false; }
+      seen.add(key(o));
+      if (key(Po.ops(w, m, true, false)) === key(o)) blinkDiff = false;
+      if (key(Po.ops(w, m, false, true)) === key(o)) mouthDiff = false;
+    }
+    if (seen.size !== S.MOODS.length) moodDiff = false;
+    pal[w] = new Set(Po.ops(w, 'neutral', false, false).map(r => r[4].toLowerCase()));
+  }
+  check(inGrid && okCol, `every speaker × mood: rects inside the ${N} × ${N} grid, colours #rrggbb`);
+  check(moodDiff, 'each speaker\'s four moods are four different faces');
+  check(blinkDiff && mouthDiff, 'a blink and an open mouth change every face (the animation)');
+  let palOk = true; const ws = S.WHO; for (let i = 0; i < ws.length; i++) for (let j = i + 1; j < ws.length; j++) { const a = pal[ws[i]], b = pal[ws[j]]; let sh = 0; for (const c of a) if (b.has(c)) sh++; if (sh > 0.6 * Math.min(a.size, b.size)) palOk = false; }
+  check(palOk, 'six faces, six palettes (no two share most colours)');
+  check(S.WHO.every(w => Po.ops(w, 'neutral', false, false).length >= 20), 'each face is drawn of ≥ 20 rects (' + S.WHO.map(w => Po.ops(w, 'neutral', false, false).length).join(' ') + ')');
+  // the animation: blink every 2.4–4.2 s for ~0.13 s, the mouth while the line is spoken (its first 75 %)
+  let bl = 0, mo = 0, moLate = 0;
+  for (let t = 0; t < 20; t += 0.02) { const a = Po.anim('lumi', t, 4); if (a.blink) bl++; if (a.mouth && t < 3) mo++; if (a.mouth && t > 3.1 && t < 4) moLate++; }
+  check(bl > 0 && bl * 0.02 < 1.6 && mo > 20 && moLate === 0, `the animation: blink ${(bl * 0.02).toFixed(2)} s of 20, mouth open ${(mo * 0.02).toFixed(1)} s while speaking, ${moLate} after`);
+  // the painter on a stand-in canvas
+  const calls = []; const cv = { width: 0, height: 0, getContext: () => ({ fillStyle: '', clearRect() { calls.push('clear'); }, fillRect(x, y, w, h) { calls.push([x, y, w, h, this.fillStyle]); } }) };
+  Po.paint(cv, Po.ops('funke', 'happy', false, true));
+  check(cv.width === N && calls[0] === 'clear' && calls.length > 25, 'paint: a ' + N + ' × ' + N + ' canvas, cleared, one fillRect a rect');
+
+  console.log('11 · the Eiswächter\'s own model');
+  const M = VR.VOXMODELS, def = M && M.story_warden ? M.story_warden() : null;
+  check(!!def && def.parts.whole && def.parts.optic && def.layout.optic, 'story_warden: the body whole, the eye a part of its own');
+  if (def) {
+    const g = def.parts.whole.grid; let n = 0, blue = 0, ymax = 0;
+    for (let y = 0; y < g.sy; y++) for (let z = 0; z < g.sz; z++) for (let x = 0; x < g.sx; x++) { const c = g.c[g.i(x, y, z)]; if (!c) continue; n++; ymax = Math.max(ymax, y); const r = (c >> 16) & 255, gg = (c >> 8) & 255, b = c & 255; if (b > r + 20 && b >= gg) blue++; }
+    check(g.sy >= 36 && g.sy > 2.2 * g.sx * 0.5, `tall: ${g.sx} × ${g.sy} × ${g.sz} voxels`);
+    check(n > 1500 && blue / n > 0.6, `crystalline ice colours: ${(100 * blue / n).toFixed(0)} % of ${n} voxels blue`);
+    check(Math.abs(def.h - g.sy / 16) < 0.3, 'its height h = ' + def.h + ' blocks');
+    const fd = M.story_icewin ? M.story_icewin() : null;
+    check(!!fd && fd.parts.win && fd.parts.veil, 'the ice window: the clear disc and its veil (cracks)');
+  }
+}
+
+console.log('10 · the deeds between the beats');
+const KINDS = ['look', 'scan', 'touch', 'photo'];
+check(S.BEATS.every(b => b.act && KINDS.includes(b.act.kind) && b.act.target), 'every beat of chapters 1–4 has one deed (look · scan · touch · photo)');
+const kindsUsed = new Set(S.BEATS.map(b => b.act.kind));
+check(kindsUsed.size === 4, 'all four kinds are used (' + [...kindsUsed].join(', ') + ')');
+const actKeys = S.BEATS.map(b => 'story.act.' + b.id).concat(['story.act.done', 'story.ctx.scan', 'story.ctx.touch', 'story.act.scanning']);
+check(actKeys.every(k => tr('de', k) && tr('en', k) && tr('de', k) !== tr('en', k)), 'every deed\'s words in both tables (German first)');
+check(S.byId('c4.b3').act.kind === 'photo' && S.byId('c2.b1').act.kind === 'touch' && S.byId('c1.b2').act.kind === 'scan', 'photograph the eclipse, touch the beacon, scan with Funke');
+const lk = S.byId('c1.b1').act, sn = S.byId('c1.b2').act, tc = S.byId('c2.b1').act, ph = S.byId('c4.b3').act;
+check(S.actCheck(lk, { ang: 5, dist: 100 }) === 'ok' && S.actCheck(lk, { ang: 40, dist: 100 }) === 'ang' && S.actCheck(lk, { ang: 5, dist: 9999 }) === 'far' && S.actCheck(lk, { dist: 100 }) === 'none', 'look: in the cone and in reach, else why');
+check(S.actCheck(sn, { ang: 8, dist: 300 }) === 'armed' && S.actCheck(sn, { ang: 8, dist: 300, press: true }) === 'ok' && S.actCheck(sn, { ang: 60, dist: 300, press: true }) === 'ang', 'scan: armed when aimed, done with [V]');
+check(S.actCheck(tc, { dist: 2.5 }) === 'armed' && S.actCheck(tc, { dist: 9 }) === 'far' && S.actCheck(tc, { dist: 2.5, press: true }) === 'ok', 'touch: armed within reach, done with [V]');
+check(S.actCheck(ph, { dim: 'opal', eclipse: 0.8 }) === 'armed' && S.actCheck(ph, { dim: 'opal', eclipse: 0.8, photo: true }) === 'ok' && S.actCheck(ph, { dim: 'opal', eclipse: 0.1, photo: true }) === 'eclipse' && S.actCheck(ph, { dim: 'overworld', eclipse: 0.9, photo: true }) === 'dim', 'photo: the eclipse, a picture taken, on a moon');
+const sky = S.byId('c2.b3').act;
+check(S.actCheck(sky, { pitch: 50, press: true }) === 'ok' && S.actCheck(sky, { pitch: 5, press: true }) === 'pitch', 'scan the sky: the view up ≥ ' + sky.pitch + '°');
+const st = {}; let doneAt = -1;
+for (let i = 0; i < 100; i++) { const tt = i * 0.25, a = { ang: tt < 1 || (tt > 1.5 && tt < 2) ? 40 : 4, dist: 50 }; if (S.actStep(st, lk, a, 0.25)) { doneAt = tt; break; } }
+check(doneAt > 3 && doneAt < 4.5, `look holds ${lk.hold} s unbroken (looking away resets): done at ${doneAt} s`);
+const ra = S.fresh();
+check(S.openAct(ra) === null, 'no deed before a beat is seen');
+S.mark(ra, 'c1.b1');
+check(S.openAct(ra) && S.openAct(ra).id === 'c1.b1', 'after c1.b1: its deed is open');
+S.mark(ra, 'c1.b2');
+check(S.openAct(ra).id === 'c1.b2', 'the open deed is the last seen beat\'s');
+S.markAct(ra, 'c1.b2');
+check(S.openAct(ra) === null && S.actDone(ra, 'c1.b2') && !S.actDone(ra, 'c1.b1'), 'done: recorded; an older deed is not forced');
+const rl = S.load(JSON.parse(JSON.stringify(Object.assign({}, ra, { acts: Object.assign({ 'c9.b9': 1, 'c2.b2': 'x' }, ra.acts) }))));
+check(rl.acts['c1.b2'] === 1 && !rl.acts['c9.b9'] && !rl.acts['c2.b2'] && JSON.stringify(S.load(JSON.parse(JSON.stringify(rl)))) === JSON.stringify(rl), 'the record keeps the deeds (sanitised, a round trip)');
+check(S.next(ra, calm({ place: 'hills', adv: true, near: { outpost: 300 } }), 0) && S.next(ra, calm({ place: 'hills', adv: true, near: { outpost: 300 } }), 0).id === 'c1.b3', 'a deed never holds the story back');
+
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

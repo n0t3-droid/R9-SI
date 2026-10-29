@@ -2679,5 +2679,24 @@
     'g.set.storyOffer': 'Geschichte: Funke meldet Kapitel',
     'g.set.storyOffer.tip': 'Bist du eine Weile in Ruhe, meldet Funke ein Signal — [V] spielt eine kurze Szene. Nie beim Bauen oder in einem Kampf. Aus: die Kapitel warten im Tagebuch.',
     // ---- a-story end
+    // ---- a-story2 (the deeds between the beats, the story's [V] words)
+    'story.act.c1.b1': 'Schau dir den Ausblick in Ruhe an.',
+    'story.act.c1.b2': 'Scanne mit Funke den Außenposten: Schau hin und drück [V].',
+    'story.act.c1.b3': 'Schau dir das rote Flackern genau an.',
+    'story.act.c2.b1': 'Berühre das Leuchtfeuer: Geh ganz nah heran und drück [V].',
+    'story.act.c2.b2': 'Dreh dich um und schau zurück zum Licht über dem Canyon.',
+    'story.act.c2.b3': 'Scanne mit Funke den Himmel: Schau nach oben und drück [V].',
+    'story.act.c3.b1': 'Schau hoch oben geradeaus zum Horizont — siehst du, wie er sich biegt?',
+    'story.act.c3.b2': 'Mach ein Foto vom Himmel für Kapitän Jonte.',
+    'story.act.c3.b3': 'Berühre den Staub von Basalt: Steh auf dem Mond und drück [V].',
+    'story.act.c4.b1': 'Scanne das Eis von Opal: Schau nach unten und drück [V].',
+    'story.act.c4.b2': 'Behalte Amarant im Blick, bis die Finsternis kommt.',
+    'story.act.c4.b3': 'Fotografiere die Finsternis!',
+    'story.act.done': 'Geschafft! Das schreib ich ins Tagebuch.',
+    'story.act.scanning': 'Scanne … piep … piep … gespeichert!',
+    'story.act.j': 'Kleine Aufgabe',
+    'story.ctx.scan': 'Scannen',
+    'story.ctx.touch': 'Berühren',
+    // ---- a-story2 end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));

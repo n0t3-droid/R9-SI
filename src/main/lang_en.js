@@ -2679,5 +2679,24 @@
     'g.set.storyOffer': 'Story: Funke announces chapters',
     'g.set.storyOffer.tip': 'When you have been calm for a while, Funke picks up a signal — [V] plays a short scene. Never while building or in a fight. Off: the chapters wait in the journal.',
     // ---- a-story end
+    // ---- a-story2 (the deeds between the beats, the story's [V] words)
+    'story.act.c1.b1': 'Take a good look at the view.',
+    'story.act.c1.b2': 'Scan the outpost with Funke: look at it and press [V].',
+    'story.act.c1.b3': 'Take a close look at the red flicker.',
+    'story.act.c2.b1': 'Touch the beacon: walk right up to it and press [V].',
+    'story.act.c2.b2': 'Turn round and look back at the light over the canyon.',
+    'story.act.c2.b3': 'Scan the sky with Funke: look up and press [V].',
+    'story.act.c3.b1': 'High up, look straight at the horizon — see how it bends?',
+    'story.act.c3.b2': 'Take a photo of the sky for Captain Jonte.',
+    'story.act.c3.b3': 'Touch the dust of Basalt: stand on the moon and press [V].',
+    'story.act.c4.b1': 'Scan the ice of Opal: look down and press [V].',
+    'story.act.c4.b2': 'Keep Amarant in view until the eclipse comes.',
+    'story.act.c4.b3': 'Photograph the eclipse!',
+    'story.act.done': 'Done! I\'ll write that in the journal.',
+    'story.act.scanning': 'Scanning … beep … beep … saved!',
+    'story.act.j': 'Little task',
+    'story.ctx.scan': 'Scan',
+    'story.ctx.touch': 'Touch',
+    // ---- a-story2 end
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
