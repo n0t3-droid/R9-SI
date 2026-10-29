@@ -510,10 +510,12 @@
       const data = [opaque, cutout, trans, vx, vxFar];
       if (sec.mesh.length < 5) sec.mesh.push(null, null);
       for (let l = 0; l < 5; l++) {
-        if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
         const d = data[l];
         const n = d ? d.length >> 3 : 0;
-        if (l === 3) { sec.vxData = n ? d : null; sec.vxDropped = false; continue; }   // mini-voxel detail stays in RAM; vxResidency uploads it within the detail distance
+        // (f-stipple, R50-12) a resident detail keeps drawing until the new one is up (vxOld), never the far boxes
+        if (l === 3 && sec.mesh[3] && n) { sec.vxOld = true; sec.vxData = d; sec.vxDropped = false; continue; }
+        if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
+        if (l === 3) { sec.vxOld = false; sec.vxData = n ? d : null; sec.vxDropped = false; continue; }   // mini-voxel detail stays in RAM; vxResidency uploads it within the detail distance
         if (!n) continue;
         const m = this.allocMesh(n);
         gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
@@ -558,12 +560,15 @@
     commitStage(st, sec, col, sy) {
       this.propSet(sec, st.props);
       if (sec.mesh.length < 5) sec.mesh.push(null, null);
+      const vn = st.vx ? st.vx.length >> 3 : 0;
       for (let l = 0; l < 5; l++) {
         const o = sec.mesh[l];
+        // (f-stipple, R50-12) the resident detail draws on until the new detail is up (vxResidency asks for it at once);
+        // without new detail it goes now
+        if (l === 3) { if (o && vn) { sec.vxOld = true; continue; } sec.vxOld = false; }
         if (o) o.arena.release(o.off, o.cap);
         sec.mesh[l] = st.m[l]; st.m[l] = null;
       }
-      const vn = st.vx ? st.vx.length >> 3 : 0;
       sec.vxData = vn ? st.vx : null; sec.vxDropped = false;
       sec.hasMesh = !!(sec.mesh[0] || sec.mesh[1] || sec.mesh[2] || sec.vxData || sec.mesh[4]);
       sec.transW = this.transWaterOf(st.d[2]);   // (F10 · postLite: water or aether among its translucent faces)
@@ -666,7 +671,7 @@
     queueVx(s, Q) {
       const d = s.vxData, n = d.length >> 3, R = this;
       const it = { x: s.ox + 8, z: s.oz + 8, bytes: n * VSTRIDE, m: null, o: 0,
-        alive: () => s.vxData === d && !s.mesh[3],
+        alive: () => s.vxData === d && (!s.mesh[3] || s.vxOld),
         step: (max) => {
           const k = Math.min(n - it.o, Math.floor(max / VSTRIDE));
           if (k <= 0) return 0;
@@ -677,7 +682,7 @@
           it.o += k;
           return k * VSTRIDE;
         },
-        commit: () => { s.vxQ = null; s.mesh[3] = it.m; it.m = null; R.nearShadow(s); },
+        commit: () => { s.vxQ = null; const o = s.mesh[3]; if (o) o.arena.release(o.off, o.cap); s.mesh[3] = it.m; s.vxOld = false; it.m = null; R.nearShadow(s); },
         abort: () => { if (s.vxQ === it) s.vxQ = null; if (it.m) { it.m.arena.release(it.m.off, it.m.cap); it.m = null; } } };
       s.vxQ = it;
       Q.push(it);
@@ -692,7 +697,7 @@
     freeSection(sec) {
       if (sec.hasMesh) this.nearShadow(sec);
       for (let l = 0; l < sec.mesh.length; l++) if (sec.mesh[l]) { sec.mesh[l].arena.release(sec.mesh[l].off, sec.mesh[l].cap); sec.mesh[l] = null; }
-      sec.vxData = null; sec.transW = false;
+      sec.vxData = null; sec.vxOld = false; sec.transW = false;
       this.propSet(sec, null);
       sec.hasMesh = false; sec.meshed = false;
       this.visDirty = true;
@@ -708,7 +713,7 @@
       for (const s of list) {
         if (!s.vxData && !s.mesh[3]) { if (s.vxDropped) { const dx = s.ox + 8 - camPos[0], dy = s.oy + 8 - camPos[1], dz = s.oz + 8 - camPos[2]; if (dx * dx + dy * dy * 0.5 + dz * dz < back2) { s.vxDropped = false; s.dirty = true; } } continue; }
         const dx = s.ox + 8 - camPos[0], dy = s.oy + 8 - camPos[1], dz = s.oz + 8 - camPos[2], d2 = dx * dx + dy * dy * 0.5 + dz * dz;
-        if (s.mesh[3]) { if (d2 > down2) { s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap); s.mesh[3] = null; } continue; }
+        if (s.mesh[3]) { if (d2 > down2) { s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap); s.mesh[3] = null; s.vxOld = false; continue; } if (!s.vxOld) continue; }   // (vxOld: a stale detail draws while the new one goes up)
         if (d2 > keep2) { s.vxData = null; s.vxDropped = true; continue; }
         if (d2 < up2) {
           if (this.upQ) { if (!s.vxQ) this.queueVx(s, this.upQ); }   // (F10: the world's upload queue — one budget for everything)
@@ -723,7 +728,8 @@
       const m = this.allocMesh(n);
       gl.bindBuffer(gl.ARRAY_BUFFER, m.arena.buf);
       gl.bufferSubData(gl.ARRAY_BUFFER, m.off * VSTRIDE, d);
-      s.mesh[3] = m;
+      if (s.mesh[3]) s.mesh[3].arena.release(s.mesh[3].off, s.mesh[3].cap);
+      s.mesh[3] = m; s.vxOld = false;
       this.nearShadow(s);
     }
     gpuMemoryMB() { let u = 0; for (const a of this.arenas) u += a.used; return (u * VSTRIDE / 1048576); }
