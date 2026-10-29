@@ -387,6 +387,8 @@ async function glue() {
   for (const m of g2) {
     p.pos = [m.pos[0] + 2, 64, m.pos[2]];
     check(L.calmBegin(g, m), 'the timing ring opens at the ' + m.foe.k);
+    if (!miss) { const e0 = [p.pos[0], 65.6, p.pos[2]], nr = L.near(g, e0, [0, 0, 1]), d = nr ? [nr.pos[0] - e0[0], nr.pos[1] - e0[1], nr.pos[2] - e0[2]] : null, dl = d ? Math.hypot(...d) : 99;
+      check(!!nr && nr.kind === 'machine' && dl <= 4.5 && d[2] / dl > 0.999, 'while the ring runs, [V] taps it wherever the eye looks (a-foes2: Funke\'s row took the key in run 2)'); }
     if (!miss) { const S = L.calmSt; g.time = S.t0 + ((S.c + 180) % 360) / 360 * L.CALM_T; miss = L.calmTap(g) === false && !!L.calmSt; check(miss, 'a press outside the arc: a miss, the ring stays'); }
     let ok = false; for (let i = 0; i < 80 && !ok; i++) { g.time += 0.025; if (L.calmPress(L.calmSt, g.time)) ok = L.calmTap(g); }
     check(ok && m.foe.st === 'calm', 'calmed in the arc (' + m.foe.k + ')');

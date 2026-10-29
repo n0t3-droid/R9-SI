@@ -803,7 +803,9 @@
   // ---------------------------------------------------------------- [V]: e-ctx's row 4 — Beruhigen · Reparieren · Schnellreise · Einkaufen
   L.near = function (g, eye, dir) {
     if (!F() || !F().on(g)) return null;
-    if (L.calmSt) return { kind: 'machine', pos: [L.calmSt.m.pos[0], L.calmSt.m.pos[1] + 0.8, L.calmSt.m.pos[2]], r: 1.2, act: (gg) => L.calmTap(gg) };
+    // (a-foes2) while the timing ring runs, [V] taps it wherever the eye is (the ring is on the screen): the target sits on
+    // the view ray, so Funke's row never takes the key from it (run 2 of abenteuer2: „[V] Funke fragen" over the ring)
+    if (L.calmSt) { const k = L.calmSt.m.foe ? L.calmSt.m.foe.k : 'driller'; return { kind: 'machine', name: T('g.foe.name.' + k), pos: [eye[0] + dir[0] * 2, eye[1] + dir[1] * 2, eye[2] + dir[2] * 2], r: 1.2, act: (gg) => L.calmTap(gg) }; }
     const En = g.entities, list = NEAR; list.length = 0;
     if (En) for (const m of En.mobs) {
       const f = m.foe; if (!f || f.gone || f.remote || Math.abs(m.pos[0] - eye[0]) > 6 || Math.abs(m.pos[2] - eye[2]) > 6) continue;

@@ -135,7 +135,7 @@
       const b = best.beacon, cx = b[0] + 0.5, cz = b[2] + 0.5, pd = Array.isArray(best.pad) ? best.pad : [cx, cz - 1];
       let ux = cx - pd[0], uz = cz - pd[1]; const l = Math.hypot(ux, uz) || 1; ux /= l; uz /= l;
       const x = cx + ux * 5, z = cz + uz * 5;
-      return { pos: [x, b[1] + 1, z], why: 'beacon', id: best.id, yaw: Math.atan2(ux, uz), pitch: 0.45 };
+      return { pos: [x, b[1] + 1, z], why: 'beacon', id: best.id, yaw: Math.atan2(ux, uz), pitch: 0.45, at: [cx, b[1] + 4, cz] };
     }
     if (best) return { pos: best.pos.slice(0, 3), why: 'beacon', id: best.id };
     const h = o && Array.isArray(o.home) ? o.home : [0.5, 100, 0.5];
@@ -729,12 +729,14 @@
       // (a-foes2) on the ground out there: the hold's nearest floor would else be the beacon's own top (the lost run's black wake)
       if (Number.isFinite(wk.yaw) && g.world && g.world.isLoaded(Math.floor(wk.pos[0]), Math.floor(wk.pos[2]))) wk.pos[1] = g.world.topAt(Math.floor(wk.pos[0]), Math.floor(wk.pos[2])) + 1;
       try { p.safeTeleport(wk.pos[0], wk.pos[1], wk.pos[2], Number.isFinite(wk.yaw) ? { yaw: wk.yaw, pitch: wk.pitch } : undefined); } catch (e) { p.pos = wk.pos.slice(); }
-      if (Number.isFinite(wk.yaw)) { p.yaw = wk.yaw; p.viewYaw = wk.yaw; p.pitch = wk.pitch; }   // (a-foes2: up the cyan beam)
+      if (Number.isFinite(wk.yaw)) { p.yaw = wk.yaw; p.viewYaw = wk.yaw; p.pitch = wk.pitch; S.look = wk.at; }   // (a-foes2: up the cyan beam)
       if (p.mode === 'survival') { p.health = 20; if (g.ui && g.ui.updateHUD) g.ui.updateHUD(true); }
       F.hp = F.hpMax();
     }
     if (S.t >= 2.2) {
       F.fainting = null; F.veil(false);
+      // (a-foes2) wherever the hold set the feet down: face the beacon, its beam through the middle of the view
+      if (S.look && !p.hold) { const e = [p.pos[0], p.pos[1] + 1.62, p.pos[2]], dx = S.look[0] - e[0], dz = S.look[2] - e[2]; if (dx * dx + dz * dz > 1) { p.yaw = Math.atan2(-dx, -dz); p.viewYaw = p.yaw; p.pitch = Math.max(0.2, Math.min(0.6, Math.atan2(S.look[1] - e[1], Math.hypot(dx, dz)) + 0.25)); } }
       const fk = g.funke;
       const say = (txt) => { if (fk && fk.on && fk.on() && fk.show) fk.show(txt); else if (g.ui && g.ui.toast) g.ui.toast(txt, '', null); };
       say(T('g.foe.funke.faint') + ' ' + T(S.why === 'beacon' ? 'g.foe.wake.beacon' : 'g.foe.wake.home'));
