@@ -11,6 +11,10 @@
 //      without meta.story gets a fresh one, a round trip through JSON
 //   6. the timeline: the lines inside the scene, in order, ≥ 2.6 s each where they fit; shotAt walks the shots
 //   7. a session's chapter 1 walk-through: the beats come one after another as their conditions come true
+//   8. the player (src/main/story.js, regie.js) on a stand-in game: no offer while building or before 20 s of calm; the
+//      offer through the Regie, Funke's line, the card; untaken → Später, the reminder after 5 min; [V] plays, the player
+//      held, no skip in the first second, the camera fixed, the subtitles; skip → seen, the task, saved, the journal page;
+//      the next beat 5 min later; a scene ends by itself ≤ 30 s; storyOffer off; a guest
 //   bash test/wt_run.sh story.js 300
 const fs = require('fs'), path = require('path');
 global.VR = {};
@@ -122,6 +126,65 @@ const r7 = S.fresh(); let t = 0; const got = [];
 const steps = [calm({ place: 'hall', calm: 5 }), calm({ place: 'hangar' }), calm({ place: 'hangar' }), calm({ place: 'hills', hour: 'night' }), calm({ place: 'hills', hour: 'dusk' }), calm({ place: 'wild', near: { outpost: 650 } }), calm({ place: 'wild', near: { outpost: 100 } })];
 for (const c of steps) { t += 400; const b = S.next(r7, c, t); if (b) { got.push(b.id); S.mark(r7, b.id); } }
 check(got.join(' ') === 'c1.b1 c1.b2 c1.b3 c2.b1', 'the beats as their places come: ' + got.join(' '));
+
+console.log('8 · the player on a stand-in game (src/main/story.js, regie.js)');
+require('./dom_stub.js');
+{ const ce = document.createElement; document.createElement = (t) => { const e = ce(t); e.style = e.style || {}; return e; }; if (!window.addEventListener) window.addEventListener = () => {}; }
+global.setTimeout = (f) => 0;   // (the overlay's fades: not needed here)
+global.performance = global.performance || { now: () => Date.now() };
+require(SRC + 'main/regie.js'); require(SRC + 'main/story.js');
+const SP = VR.StoryPlay;
+I.lang = 'de';
+check(!!SP && typeof S.watch === 'function' && typeof S.offer === 'function', 'VR.StoryPlay and VR.Story.offer / watch (ctx.js row 3)');
+{
+  const said = [];
+  const g = { state: 'play', world: {}, time: 0, dim: 'overworld', settings: { storyOffer: true }, meta: { seed: 4242 }, ui: { screen: null },
+    player: { pos: [0, 70, 0], yaw: 0, spawn: [0, 70, 0], eyePos() { return [0, 71.6, 0]; } },
+    funke: { on: () => true, show: (t) => said.push(t), budget: { quiet: () => false }, buildFocus: () => g.__build === true, startWay: () => { g.__way = true; } },
+    lifeDirector: { ctx: { place: 'hangar', hour: 'noon' } }, saveMeta: () => { g.__saved = (g.__saved | 0) + 1; } };
+  VR.game = g;
+  const run = (sec) => { for (let i = 0; i < sec * 20; i++) { g.time += 0.05; SP.frame(g, 0.05); } };
+  g.__build = true; run(40);
+  check(!SP.debug.state().offer && SP.debug.state().why === 'building', 'building: no offer (why: ' + SP.debug.state().why + ')');
+  g.__build = false; run(12);
+  check(!SP.debug.state().offer, 'not before 20 s of calm');
+  run(14);
+  const st = SP.debug.state();
+  check(st.offer === 'c1.b1' && said.some(t => /Signal/.test(t)) && S.offer(g) && S.offer(g).id === 'c1.b1', 'after 20 s of calm the Regie takes the beat: Funke says the signal (' + said[said.length - 1] + ')');
+  check(st.regie && st.regie.st.story === 1, 'the offer came through the Regie (' + JSON.stringify(st.regie && st.regie.st) + ')');
+  const cardEl = document.getElementById('storycard');
+  check(cardEl && cardEl.style.display === 'flex', 'the card shows (🎬 Ansehen · Später)');
+  run(26);
+  check(!SP.debug.state().offer && SP.debug.state().later['c1.b1'] && SP.debug.state().later['c1.b1'].n === 1, 'untaken for 25 s: Später (again in 5 min)');
+  run(200);
+  check(!SP.debug.state().offer, 'quiet during the 5 minutes');
+  const until = (id, max) => { const t0 = g.time; while (SP.debug.state().offer !== id && g.time - t0 < max) run(0.5); return g.time; };
+  const tLater = 77, tR = until('c1.b1', 150);
+  check(SP.debug.state().offer === 'c1.b1' && said.some(t => /noch da/.test(t)), `after 5 min the reminder (at ${tR.toFixed(0)} s)`);
+  check(S.watch(g) && SP.holds(g) && SP.debug.state().scene.id === 'c1.b1', '[V]: the scene plays, the player is held');
+  check(VR.Regie.stats(g).scene === true, 'the Regie knows a scene plays (nothing else starts)');
+  const box = document.getElementById('storybox');
+  run(0.5);
+  const sk0 = g.story.skip();
+  check(!sk0 && SP.holds(g), 'no skip in the first second');
+  run(2);
+  const cam = SP.cam(g, { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, fov: 1.2, far: 200 });
+  check(cam && cam.fixed && Number.isFinite(cam.x + cam.y + cam.z + cam.yaw + cam.pitch + cam.fov), 'the camera of the scene: a fixed shot (' + (cam && [cam.x, cam.y, cam.z].map(v => v.toFixed(1)).join(', ')) + ')');
+  check(box && /Mensch|geschlafen|Leuchtfeuer/.test(box.querySelector('.sub').textContent), 'the subtitle shows Funke\'s line');
+  check(g.story.skip() && !SP.holds(g) && SP.debug.state().beats['c1.b1'] === 'skip', 'any key after 1 s skips: the beat counts as seen (skip)');
+  check(said.some(t => /Ausblick/.test(t)) && g.__saved > 0, 'then the task: Funke\'s line, and the record saved');
+  check(/Funke und die Leuchtfeuer/.test(SP.journalHTML()) && /geschlafen/.test(SP.journalHTML()), 'the journal\'s chapter page has the book and the lines seen');
+  g.lifeDirector.ctx.place = 'hills'; run(40);
+  check(!SP.debug.state().offer, 'the next beat waits 5 min after the last (the Regie)');
+  const t2 = until('c1.b2', 330);
+  check(SP.debug.state().offer === 'c1.b2', `c1.b2 offered out on the hills after the 5 min (at ${t2.toFixed(0)} s)`);
+  S.watch(g); let n = 0; while (SP.holds(g) && n++ < 40 * 20) run(0.05);
+  check(!SP.holds(g) && SP.debug.state().beats['c1.b2'] === 'done' && n * 0.05 <= 31, `a scene ends by itself (${(n * 0.05).toFixed(1)} s ≤ 30 s)`);
+  g.settings.storyOffer = false; run(400);
+  check(!SP.debug.state().offer, '⚙ storyOffer off: nothing offered');
+  g.meta.guest = true; g.settings.storyOffer = true; run(400);
+  check(!SP.debug.state().offer && !S.watch(g), 'a guest: no offer, no scene');
+}
 
 console.log(fails ? 'FAILED ' + fails : 'ALL OK');
 process.exit(fails ? 1 : 0);

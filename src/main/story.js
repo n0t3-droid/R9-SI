@@ -116,7 +116,7 @@
       const fk = g.funke; if (fk && fk.on && fk.on() && fk.show) fk.show(text); else if (g.ui && g.ui.hint) g.ui.hint(text, 4000);
       if (g.audio && g.audio.play) { try { g.audio.play('ping', { vol: 0.5 }); } catch (e) { /* a sound */ } }
       if (VR.EventLog) VR.EventLog.emit('story', 'offer', 3, null, 'story');
-      card(this);
+      try { card(this); } catch (e) { /* the card is a convenience: [V] and the journal work without it */ }
       return true;
     }
     offerTick(dt) {
@@ -225,8 +225,9 @@
       switch (sh.cam) {
         case 'close': {
           // beside the subject, a little below its eye line, on the player's side; a slow push-in
-          const d = (sh.target === 'funke' ? 1.25 : 4.5) * (1 - 0.18 * smooth(u)), dir = [pe[0] - Q[0], 0, pe[2] - Q[2]], L = Math.hypot(dir[0], dir[2]) || 1;
-          const sx = dir[0] / L, sz = dir[2] / L, C = [Q[0] + (sx * 0.8 + sz * 0.6) * d, Q[1] + 0.12 * d, Q[2] + (sz * 0.8 - sx * 0.6) * d];
+          const d = (sh.target === 'funke' ? 1.25 : 4.5) * (1 - 0.18 * smooth(u)), dir = [pe[0] - Q[0], 0, pe[2] - Q[2]], L0 = Math.hypot(dir[0], dir[2]);
+          if (L0 < 0.3) { dir[0] = f[0]; dir[2] = f[2]; }   // (the subject at the player's own place: from in front)
+          const L = Math.hypot(dir[0], dir[2]) || 1, sx = dir[0] / L, sz = dir[2] / L, C = [Q[0] + (sx * 0.8 + sz * 0.6) * d, Q[1] + 0.12 * d, Q[2] + (sz * 0.8 - sx * 0.6) * d];
           return lookAt(lift(C, Q), Q, sh.target === 'funke' ? 42 : 50, base);
         }
         case 'shoulder': {
@@ -339,19 +340,23 @@
 .jstory .jline { margin: 3px 0 3px 8px; font-size: 13px; } .jstory .jline b { color: #8fe4ff; font-weight: 600; }
 .jstory .jwait { margin-top: 6px; display: flex; gap: 8px; align-items: center; }
 `;
-  function css() { if (!hasDoc || document.getElementById('storycss')) return; const s = document.createElement('style'); s.id = 'storycss'; s.textContent = CSS; document.head.appendChild(s); }
+  function css() { if (!hasDoc || document.getElementById('storycss')) return; const s = document.createElement('style'); s.id = 'storycss'; s.textContent = CSS; (document.head || document.body).appendChild(s); }
   function host() { return (hasDoc && (document.getElementById('app') || document.body)) || null; }
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   function card(pl0) {
     if (!hasDoc) return;
     let el = document.getElementById('storycard');
     if (!pl0) { if (el) el.style.display = 'none'; return; }
     css();
-    if (!el) { el = document.createElement('div'); el.id = 'storycard'; const h = host(); if (!h) return; h.appendChild(el); }
+    if (!el) { el = mk('div'); el.id = 'storycard'; if (el.setAttribute) el.setAttribute('id', 'storycard'); const h = host(); if (!h) return; h.appendChild(el); }
     const b = pl0.offer.b, ch = S.CHAPTERS[b.ch - 1];
-    el.innerHTML = `<div><div class="k">${esc(T('story.card.kick', { ch: b.ch, title: T(ch.title) }))}</div><div class="t">${esc(T(ch.where))}</div></div>`
-      + `<button type="button" class="w">🎬 ${esc(T('story.card.watch'))}<kbd>${esc(keyLabel())}</kbd></button><button type="button" class="l">${esc(T('story.card.later'))}</button>`;
-    el.querySelector('.w').onclick = (e) => { if (e && e.stopPropagation) e.stopPropagation(); pl0.watch(); };
-    el.querySelector('.l').onclick = (e) => { if (e && e.stopPropagation) e.stopPropagation(); pl0.later(true); };
+    el.innerHTML = '';
+    const tx = mk('div'); tx.appendChild(mk('div', 'k', T('story.card.kick', { ch: b.ch, title: T(ch.title) }))); tx.appendChild(mk('div', 't', T(ch.where)));
+    const w = mk('button', 'w', '🎬 ' + T('story.card.watch')), kb = mk('kbd', '', keyLabel()), l = mk('button', 'l', T('story.card.later'));
+    w.type = 'button'; l.type = 'button'; w.appendChild(kb);
+    w.onclick = (e) => { if (e && e.stopPropagation) e.stopPropagation(); pl0.watch(); };
+    l.onclick = (e) => { if (e && e.stopPropagation) e.stopPropagation(); pl0.later(true); };
+    el.appendChild(tx); el.appendChild(w); el.appendChild(l);
     el.style.display = 'flex';
   }
   let keyFn = null;
@@ -359,7 +364,7 @@
     if (!hasDoc) return;
     css();
     let el = document.getElementById('storybox');
-    if (!el) { el = document.createElement('div'); el.id = 'storybox'; el.innerHTML = '<div class="bar t"></div><div class="bar b"></div><div class="kick"></div><div class="sub"></div><div class="skip"></div>'; const h = host(); if (!h) return; h.appendChild(el); }
+    if (!el) { el = mk('div'); el.id = 'storybox'; if (el.setAttribute) el.setAttribute('id', 'storybox'); for (const c of ['bar t', 'bar b', 'kick', 'sub', 'skip']) el.appendChild(mk('div', c)); const h = host(); if (!h) return; h.appendChild(el); }
     if (on) {
       const sc = pl0.scene, b = sc.b, ch = S.CHAPTERS[b.ch - 1];
       el.querySelector('.kick').textContent = T('story.card.kick', { ch: b.ch, title: T(ch.title) });
@@ -386,7 +391,7 @@
     const s = el.querySelector('.sub');
     if (i < 0) { s.classList.remove('on'); return; }
     const who = sc.b.scene.lines[i].who;
-    s.innerHTML = `<b class="${esc(who)}">${esc(T('story.who.' + who))}</b>${esc(sc.texts[i])}`;
+    s.innerHTML = ''; s.appendChild(mk('b', who, T('story.who.' + who))); s.appendChild(mk('span', '', sc.texts[i]));
     s.classList.add('on');
     const g = game(); if (g && g.funke && g.funke.blips && who === 'funke') { try { g.funke.blips(sc.texts[i]); } catch (e) { /* the blips */ } }
   }
