@@ -624,7 +624,7 @@
       // renderer has it (the TSR resolves the turning dither), else whole at once (Stream.fadePlan)
       const lp = this.lastPos, r = this.renderer;
       const plan = VR.Stream.fadePlan(lp ? c.cx - (Math.floor(lp[0]) >> 4) : 99, lp ? c.cz - (Math.floor(lp[2]) >> 4) : 99, !!(r && r.fadeSoft));
-      c.shownAt = now; c.fade = plan.fade; c.grow = plan.grow ? 0 : 1;
+      c.shownAt = now; c.fade = plan.fade; c.grow = plan.grow ? 0 : 1; c.fadeMs = plan.ms || VR.Stream.FADE_MS;   // (f-stipple2: shorter far out)
       if (c.fade < 1 || c.grow < 1) this.fading.add(c);
       for (let i = 0; i < c.sec.length; i++) { c.sec[i].fade = c.fade; c.sec[i].grow = c.grow; }
     }
@@ -637,7 +637,9 @@
           if (g >= 1 && c.fade >= 1) this.fading.delete(c);
           continue;
         }
-        const f = Math.round(255 * VR.Stream.fadeCurve(now - c.shownAt)) / 255;   // 8-bit: the value the far mask holds
+        // (f-stipple2) the frames slowed down (no TSR history to resolve the dither): the fade completes at once
+        const soft = !this.renderer || this.renderer.fadeSoft !== false;
+        const f = soft ? Math.round(255 * VR.Stream.fadeCurve(now - c.shownAt, c.fadeMs)) / 255 : 1;   // 8-bit: the value the far mask holds
         if (f === c.fade) continue;
         c.fade = f;
         for (let i = 0; i < c.sec.length; i++) c.sec[i].fade = f;

@@ -47,7 +47,7 @@
 
   const S = (n, p) => { const t = R.byName[n]; if (!t) return 0; return p ? t.state(p) : t.defaultState; };
   const PALETTES = [
-    { key: 'starforge', name: 'Starforge', hull: 'hull_plating', hull2: 'hull_plating_gray', trim: 'hull_plating_dark', acc: 'hull_stripe_orange', acc2: 'hull_stripe_blue', glow: 'neon_cyan', glass: 'viewport', eng: 'hull_plating_dark' },
+    { key: 'starforge', name: 'Sternglut', hull: 'hull_plating', hull2: 'hull_plating_gray', trim: 'hull_plating_dark', acc: 'hull_stripe_orange', acc2: 'hull_stripe_blue', glow: 'neon_cyan', glass: 'viewport', eng: 'hull_plating_dark' },
     { key: 'nightwing', name: 'Nightwing', hull: 'hull_plating_dark', hull2: 'black_concrete', trim: 'gray_concrete', acc: 'magenta_concrete', acc2: 'purple_concrete', glow: 'neon_magenta', glass: 'purple_stained_glass', eng: 'black_concrete' },
     { key: 'sunstrike', name: 'Sunstrike', hull: 'white_concrete', hull2: 'light_gray_concrete', trim: 'gray_concrete', acc: 'red_concrete', acc2: 'yellow_concrete', glow: 'neon_amber', glass: 'light_blue_stained_glass', eng: 'hull_plating_dark' },
     { key: 'verdant', name: 'Verdant Corps', hull: 'light_gray_concrete', hull2: 'hull_plating_gray', trim: 'green_concrete', acc: 'lime_concrete', acc2: 'green_concrete', glow: 'neon_lime', glass: 'viewport', eng: 'hull_plating_dark' },
@@ -412,7 +412,7 @@
   };
   ARCHS.shuttle = (rng, B, st) => {
     if (!VR.buildShuttle) return ARCHS.interceptor(rng, B, st);
-    // the classic Starforge shuttle, written straight into the builder as fixtures
+    // the classic Sternglut shuttle, written straight into the builder as fixtures
     VR.buildShuttle((u, yy, v, s) => { if (!B.in(u, yy, v)) return; const i = B.i(u, yy, v); if (s) { B.fixt[i] = s; B.role[i] = HULL; } else { B.fixt[i] = 0; B.role[i] = AIR; } }, (f) => f, rng);
     B.prebuilt = true;
   };

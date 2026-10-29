@@ -171,7 +171,7 @@ console.log('e · zPre and texLite: their programs and the sampler; off: the ter
   const z = defsOf(r, { zPre: true });
   check(z.terrainCut === 'SHADOWS HSHADOW CUTOUT FADE ZINV SOFTFADE' && z.terrain === off.terrain, 'zPre: the cut-out colour pass with invariant positions (ZINV), the opaque one unchanged', z.terrainCut);
   progs.length = 0; const zp = r.zProgram();
-  check(progs.length === 1 && progs[0].defs.join(' ') === 'SHADOWS HSHADOW CUTOUT FADE ZINV ZPRE' && r.zProgram() === zp, 'its prepass program: the same defines and ZPRE, made once', progs.length ? progs[0].defs.join(' ') : 'none');
+  check(progs.length === 1 && progs[0].defs.join(' ') === 'SHADOWS HSHADOW CUTOUT FADE ZINV ZPRE SOFTFADE' && r.zProgram() === zp, 'its prepass program: the same defines and ZPRE (f-stipple2: and the soft fade, off the lite look), made once', progs.length ? progs[0].defs.join(' ') : 'none');
   const fsSrc = require('fs').readFileSync(__dirname + '/../src/main/shaders.js', 'utf8');
   check(/#ifdef ZPRE\n\s+o_col = vec4\(1\.0 \/ 255\.0[^\n]*return;/.test(fsSrc) && /#ifdef ZINV\ninvariant gl_Position;/.test(fsSrc), 'the shader: ZPRE returns right after the alpha test; ZINV declares gl_Position invariant');
   const t = defsOf(r, { zPre: false, texLite: true });

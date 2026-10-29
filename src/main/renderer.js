@@ -211,7 +211,7 @@
       const P = this.P;
       if (P.cutZ) return P.cutZ;
       const md = this.multi ? ['MULTIDRAW'] : [], sh = (this.q.shadows ? ['SHADOWS'] : []).concat(this.q.hshadow ? ['HSHADOW'] : []).concat(this.q.lite ? ['LITE'] : []).concat(this.q.motion ? ['MOTION'] : []).concat(this.q.cloudShadow ? ['CLOUDSH'] : []);   // (t-motion: the colour pass's MOTION too — the same displaced fragments)
-      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE']);
+      const p = GL.program(S.TERRAIN_VS, S.TERRAIN_FS, 'terrainCutZ', [...md, ...sh, 'CUTOUT', 'FADE', 'ZINV', 'ZPRE', ...(this.q.lite ? [] : ['SOFTFADE'])]);   // (f-stipple2: the colour pass's fade, growth and cut)
       if (this.multi) { const gl = this.gl, bi = gl.getUniformBlockIndex(p.p, 'Origins'); if (bi !== 0xffffffff && bi !== -1) gl.uniformBlockBinding(p.p, bi, 0); }
       return (P.cutZ = p);
     }
@@ -227,7 +227,7 @@
       gl.uniform3f(p.u.u_camFrac, this.camFrac[0], this.camFrac[1], this.camFrac[2]);
       gl.uniform3i(p.u.u_camInt, this.camInt[0], this.camInt[1], this.camInt[2]);
       if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
-      if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, this.jit && !this.q.lite ? Math.sqrt(Math.max(0.35, this.w / this.W)) : 1);   // (as the colour pass: the same mip, the same alpha)
+      if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, VR.Stream.mipK(!!this.jit, VR.Stream.softOk(this.drawGap), this.w / this.W, !!this.q.lite));   // (f-stipple2)   // (as the colour pass: the same mip, the same alpha)
       if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
       gl.disable(gl.CULL_FACE);
       if (count) { gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); } else gl.colorMask(false, false, false, false);
@@ -831,7 +831,9 @@
       }
       // f-stipple (R50-08): with the TSR the fade's dither turns with the frame (its history makes a soft blend of it);
       // without it, or with „Sanftes Einblenden" off, things arrive whole (world.js / farring.js read fadeSoft)
-      this.fadeSoft = !!(tsr && this.q.fadeIn !== false && !this.q.lite);
+      // f-stipple2 (R52-05): and only while the drawn frames come close enough for the TSR to resolve it (Stream.softOk on
+      // the gap between drawn frames, smoothed upward fast: one stall stops it; a slow PC or a stall pops things whole)
+      this.fadeSoft = !!(tsr && this.q.fadeIn !== false && !this.q.lite) && VR.Stream.softOk(this.drawGap);
       this.fadePhase = this.fadeSoft ? VR.Stream.fadePhase(this.frameNo) : 0;
       mat4.mul(this.viewProj, this.proj, v);
       mat4.invert(this.invViewProj, this.viewProj);
@@ -2117,6 +2119,8 @@
       if (this.l2Frame) this.l2Frame(F, E);   // (t-light2: the light's values this frame, light2_gl.js)
       this.rainMapF = F.rainMap || null;   // (t-polish2: the rain's height map while the ground is wet — bindRainMap)
       this.resize(false);
+      if (!this.q.lite) { const nowD = performance.now(), gapD = this._drawAt !== undefined ? nowD - this._drawAt : 0; this._drawAt = nowD;   // (f-stipple2: the drawn frames' gap, for fadeSoft)
+        this.drawGap = gapD > (this.drawGap || 0) ? gapD : (this.drawGap || 0) * 0.85 + gapD * 0.15; }
       this.setupCamera(F.cam);
       const camPos = [F.cam.x, F.cam.y, F.cam.z];
       // visibility
@@ -2172,7 +2176,7 @@
           if (p.u.u_wind) gl.uniform1f(p.u.u_wind, E.wind); if (p.u.u_windDir && E.windDir) gl.uniform2f(p.u.u_windDir, E.windDir[0], E.windDir[1]); if (p.u.u_gust) gl.uniform1f(p.u.u_gust, E.gust || 0);
           if (p.u.u_emissiveBoost) gl.uniform1f(p.u.u_emissiveBoost, E.emissiveBoost);
           if (p.u.u_normalStrength) gl.uniform1f(p.u.u_normalStrength, this.q.normals === 0 ? 0 : 1);
-          if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, this.jit && !this.q.lite ? Math.sqrt(Math.max(0.35, this.w / this.W)) : 1);   // lite: natural mips (cheaper texture reads on weak GPUs)
+          if (p.u.u_mipScale) gl.uniform1f(p.u.u_mipScale, VR.Stream.mipK(!!this.jit, VR.Stream.softOk(this.drawGap), this.w / this.W, !!this.q.lite));   // (f-stipple2)   // lite: natural mips (cheaper texture reads on weak GPUs)
           if (p.u.u_shadowMat) gl.uniformMatrix4fv(p.u.u_shadowMat, false, this.shadowMat);
           if (p.u.u_shadowTexel) gl.uniform1f(p.u.u_shadowTexel, 1 / (this.shadowSize || 1024));
           this.shadowOffUni(p.u);

@@ -93,6 +93,9 @@ float bayer4(vec2 a){ return bayer2(0.5 * a) * 0.25 + bayer2(a); }
 // pixel is drawn in the fade's share of them and the TSR's history makes a soft blend of it (stream.js fadeT)
 uniform float u_fadePhase;
 float fadeT(vec2 a){ a = floor(a); return fract(fract(52.9829189 * fract(dot(a, vec2(0.06711056, 0.00583715)))) + u_fadePhase); }
+// f-stipple2 (R52-05): a far tile's cut by a column — whole (nearest fade 1): the chunks' alone, hard; fading: the soft
+// edge min(nearest, bilinear) as before (stream.js lodCoverSoft, far.js drawsSoft)
+float cutN(float n, float b){ return n > 0.998 ? 1.0 : min(n, b); }
 #endif
 float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);
   return mix(mix(hash12(i), hash12(i+vec2(1,0)), f.x), mix(hash12(i+vec2(0,1)), hash12(i+vec2(1,1)), f.x), f.y); }
@@ -2543,6 +2546,16 @@ flat in uint v_kind;
 flat in uint v_aux;
 out vec4 o;
 const vec3 NORMALS[6] = vec3[6](vec3(1,0,0), vec3(-1,0,0), vec3(0,1,0), vec3(0,-1,0), vec3(0,0,1), vec3(0,0,-1));
+#ifdef SOFTFADE
+// f-stipple2 (R52-05): a stand-in tile up close (a near column waiting for its mesh, one the flood culled) wears a grain
+// like a block texture — 16 texels a block and clusters of 4 — so the near field is never a flat slab; it fades out where
+// a texel shrinks under a pixel (px: blocks a pixel), so the far land looks as before
+float texelGrain(vec3 p, float px) {
+  float k1 = 1.0 - smoothstep(0.05, 0.12, px), k4 = 1.0 - smoothstep(0.15, 0.4, px);
+  if (k4 <= 0.0) return 1.0;
+  return 1.0 + k1 * (hash13(floor(p * 16.0)) - 0.5) * 0.44 + k4 * (hash13(floor(p * 4.0) + 7.31) - 0.5) * 0.3;
+}
+#endif
 vec3 waveN(vec2 p) {
   float t = u_time;
   vec2 a = p * 0.9 + vec2(t * 0.35, t * 0.22);
@@ -2571,7 +2584,7 @@ void main() {
     nG = texelFetch(u_mask1, ch, 0).r; bG = textureLod(u_mask1, muv, 0.0).r;
   }
 #ifdef SOFTFADE
-  float th = fadeT(gl_FragCoord.xy), cR = min(bR, nR);
+  float th = fadeT(gl_FragCoord.xy), cR = cutN(nR, bR);
 #else
   float th = bayer4(gl_FragCoord.xy), cR = min(bR, nR);
 #endif
@@ -2581,8 +2594,17 @@ void main() {
   // dithered by its strength (aux bits 0–6, fainter up the beam) and the night's weight
   if (v_kind == 4u && v_aux >= 128u && th >= float(v_aux & 127u) / 127.0 * (1.0 - smoothstep(-0.06, 0.1, u_sunDir.y))) discard;
 #else
+#ifdef SOFTFADE
+  if (th < max(cR, cutN(nG, bG) * u_g1)) discard;
+#else
   if (th < max(cR, min(bG, nG) * u_g1)) discard;
+#endif
+#ifdef SOFTFADE
+  // (f-stipple2) a whole column is cut above already: the 4-m guard would only open a hole where nothing is drawn yet
+  if (u_lodNear > 8.0 && dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#else
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#endif
 #endif
 #else
   ivec2 ch = ivec2(floor(cl / 16.0)) + 32;
@@ -2590,14 +2612,22 @@ void main() {
   // soft edge (bilinear) makes the cut fade over a chunk; min() with the nearest fade keeps the cut under the chunk's own
   // threshold, so a pixel is always drawn by one of the two (no holes)
   float cover = 0.0;
+#ifdef SOFTFADE
+  if (ch.x >= 0 && ch.y >= 0 && ch.x < 64 && ch.y < 64) { float nC = texelFetch(u_mask, ch, 0).r, bC = textureLod(u_mask, (cl / 16.0 + 32.0) / 64.0, 0.0).r; cover = cutN(nC, bC); }
+#else
   if (ch.x >= 0 && ch.y >= 0 && ch.x < 64 && ch.y < 64) cover = min(texelFetch(u_mask, ch, 0).r, textureLod(u_mask, (cl / 16.0 + 32.0) / 64.0, 0.0).r);
+#endif
 #ifdef SOFTFADE
   if (cover > 0.0 && fadeT(gl_FragCoord.xy) < cover) discard;
 #else
   if (cover > 0.0 && bayer4(gl_FragCoord.xy) < cover) discard;
 #endif
   // never right in front of the eyes: coarse cells only stand in at a distance
+#ifdef SOFTFADE
+  if (u_lodNear > 8.0 && dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;   // (f-stipple2: as above)
+#else
   if (dot(v_rel, v_rel) < u_lodNear * u_lodNear) discard;
+#endif
 #endif
   vec2 wp = v_rel.xz + u_camFrac.xz + vec2(u_camInt.xz);
 #ifdef FORM
@@ -2666,6 +2696,9 @@ void main() {
       // per-block speckle so the big cells read as many small blocks
       alb *= 0.93 + hash13(bp) * 0.14;
     }
+#ifdef SOFTFADE
+    alb *= texelGrain(wp3, length(fwidth(wp3)));   // (f-stipple2: never a flat slab up close)
+#endif
     float faceShade = v_face == 2u ? 1.0 : v_face == 3u ? 0.55 : (v_face <= 1u ? 0.78 : 0.88);
 #ifdef FORM
     if (v_face == 6u) faceShade = mix(0.8, 1.0, clamp(N.y, 0.0, 1.0));

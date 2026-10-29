@@ -37,9 +37,25 @@
   // at once (a pop: the far tiles stood in until now)
   S.NEAR_COLS = 2; S.GROW_MS = 150;
   S.fadePlan = function (dcx, dcz, soft) {
-    if (Math.max(Math.abs(dcx), Math.abs(dcz)) <= S.NEAR_COLS) return { fade: 1, grow: true };
-    return soft ? { fade: 0, grow: false } : { fade: 1, grow: false };
+    const d = Math.max(Math.abs(dcx), Math.abs(dcz));
+    if (d <= S.NEAR_COLS) return { fade: 1, grow: true };
+    return soft ? { fade: 0, grow: false, ms: S.fadeMs(d) } : { fade: 1, grow: false };
   };
+  // f-stipple2 (R52-05) · far out the fade is shorter (fewer frames of grain on distant trees; the far forms too), and
+  // the fade needs frames: drawn frames further apart than SOFT_GAP_MS (a slow PC, a stall, a picture every half second)
+  // leave the TSR nothing to resolve the turning dither with — there things pop whole and a running fade completes
+  S.FAR_FADE_COLS = 6; S.FAR_FADE_MS = 180; S.SOFT_GAP_MS = 55;
+  S.fadeMs = function (dcheb) { return dcheb > S.FAR_FADE_COLS ? S.FAR_FADE_MS : S.FADE_MS; };
+  S.softOk = function (gapMs) { return !(gapMs >= S.SOFT_GAP_MS); };
+  // the terrain's texture detail (u_mipScale, a factor on the UV gradients: > 1 a coarser mip). Where the TSR resolves the
+  // jitter it may pick the full-size image's detail (√scale, as before); where nothing resolves it — no TSR (High/Ultra at
+  // 100 %), or drawn frames too far apart for its history — two thirds of a mip coarser (×1.6), so a texel never flickers as a 1-px
+  // speck pattern when walking (R52-05: the grass 3–10 m ahead read as a checker); Very Low (lite) its natural mips
+  S.MIP_CALM = 1.6;
+  S.mipK = function (tsr, soft, scale, lite) { if (lite) return 1; if (tsr && soft) return Math.sqrt(Math.max(0.35, scale)); return S.MIP_CALM; };
+  // the far tile's cut on the soft path: a column the chunks draw whole is theirs alone (no bilinear soft edge dithering
+  // a stand-in over half of it beside a culled or unshown neighbour); a fading one as lodCover
+  S.lodCoverSoft = function (near, bilinear) { const n = clamp01(near); return n > 0.998 ? 1 : S.lodCover(n, bilinear); };
   S.growCurve = function (ms) { const t = clamp01(ms / S.GROW_MS); return t * t * (3 - 2 * t); };
   // the origins' w for a section: its fade, or 2 + its growth while it grows (the vertex shader takes the growth out)
   S.originW = function (fade, grow) { return grow !== undefined && grow < 1 ? 2 + grow : fade; };

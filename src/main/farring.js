@@ -154,7 +154,8 @@
     stepFades(now) {
       const fa = this.fading;
       for (let i = fa.length - 1; i >= 0; i--) {
-        const t = fa[i], f = Math.round(255 * VR.Stream.fadeCurve(now - t.shownAt)) / 255;
+        // (f-stipple2) far forms fade in FAR_FADE_MS; when the frames slow down (renderer.fadeSoft off) at once
+        const r = this.g && this.g.renderer, t = fa[i], f = r && r.fadeSoft === false ? 1 : Math.round(255 * VR.Stream.fadeCurve(now - t.shownAt, VR.Stream.FAR_FADE_MS)) / 255;
         if (f !== t.fade) { t.fade = f; this.maskDirty = true; }
         if (f >= 1) { fa[i] = fa[fa.length - 1]; fa.pop(); }
       }
