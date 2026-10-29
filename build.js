@@ -30,6 +30,7 @@ SHARED.splice(SHARED.indexOf('blocks4'), 0, 'bodies'); SHARED.splice(SHARED.inde
 MAIN.splice(MAIN.indexOf('space_shaders'), 1); MAIN.splice(MAIN.indexOf('shaders'), 0, 'space_shaders'); MAIN.push('bodysky', 'bodylife');   // u-moons1: the space GLSL before shaders.js (its COMMON takes the airless sky from it), the moons' sky and life
 MAIN.splice(MAIN.indexOf('settings_panel'), 0, 'directorcam', 'intent', 'ctx', 'hudfade');   // e-ctx: the travel camera, travel by intent, the Aktion key, the fading HUD (src/main/)
 MAIN.push('ascent', 'spaceflight', 'entry');   // u-ascent: the climb, space, the way down (after the space scene: they draw with it and wrap the play frame after it)
+MAIN.push('cruise');   // u-cruise: the Reiseantrieb between the worlds, the descent into a moon's world, the Konvoi (src/main/cruise.js)
 SHARED.splice(SHARED.indexOf('blocks4'), 0, 'foeblocks'); MAIN.push('foemodels', 'foes', 'liberate');   // a-foes: the Leuchtfeuer (appended last, after the bodies' blocks), the foes' models, VR.Foes, VR.Liberate (after quests.js and ctx.js, whose parts they use)
 // the UI both pages share (W1), before ui.js / studio.js: the languages first — the module and the game's two tables
 // (de, en; the start screen's words are in them too) are there before any text is drawn — then r9si.ui (Einfach /

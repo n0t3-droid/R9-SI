@@ -2541,5 +2541,18 @@
     'g.asc.stay': 'Hier oben bleibst du am Steuer.',
     'g.set.curvature': 'Krümmung der Welt im Steigflug',
     'g.set.curvature.tip': 'Beim Aufstieg biegt sich das Land zum Horizont hin weg, wie auf einer echten Kugel. Aus: das Land bleibt bis zum Rand flach. Kostet fast nichts.',
+    // u-cruise: the Reiseantrieb, the descent, the Konvoi
+    'g.cr.arm': '🚀 Reiseantrieb nach {name} in 2 Sekunden — G nochmal: Reisesprung.',
+    'g.cr.armJump': '✨ Reisesprung nach {name} in 2 Sekunden — G nochmal: aus.',
+    'g.cr.go': '🚀 Reiseantrieb: Kurs auf {name} — etwa {s} Sekunden.',
+    'g.cr.hud': '🚀 {name} · {km} km · {v} km/s · noch {s} s',
+    'g.cr.arrived': '🛰 In der Umlaufbahn um {name}. V: Landen.',
+    'g.cr.off': 'Reiseantrieb aus — das Schiff treibt weiter.',
+    'g.cr.survey': 'Landeplatz wird vermessen …',
+    'g.cr.descent': '⬇ Landeanflug auf {name}: Bremsschub, der Boden kommt näher.',
+    'g.cr.along': '🚀 Du reist mit {host} nach {dim}.',
+    'g.cr.alongQ': '{host} fliegt nach {dim}. Mitreisen? J: ja · N: nein',
+    'g.cr.firstStep': '👣 Erster Schritt auf {name}!',
+    'g.cr.look': 'Schau eine Welt am Himmel an und drück G: dorthin fliegt der Reiseantrieb.',
   });
 })(typeof VR !== 'undefined' ? VR : (self.VR = self.VR || {}));
