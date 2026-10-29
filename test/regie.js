@@ -123,6 +123,14 @@ console.log('4 · a-regie: the repeat cooldown per act');
   check(q2.lastStart === 50 && !q2.allow(55, 2, 'ambient'), 'note: a self-scheduling source\'s start moves the spacing');
   check(!q2.allow(120, 2, 'travel', 'pad:land') && q2.allow(120, 2, 'travel', 'pass:low') && q2.allow(171, 2, 'travel', 'pad:land'), 'allow(…, act): the same act refused within its cooldown, another allowed');
 }
+{
+  // the variety: a kind not seen for VARY s (or never) comes before one seen a minute ago
+  const q = new S(31); q.seen(10, 2, 'sky'); q.seen(40, 2, 'ambient'); q.seen(70, 2, 'social'); q.target = 15;
+  const sky = { source: 'ld', act: 'balloon', weight: 2, kind: 'sky' }, tr = { source: 'ld', act: 'flyby', weight: 2, kind: 'travel', eta: 3 };
+  let n = 0; for (let s = 1; s <= 20; s++) { const r = new S(s); r.seen(10, 2, 'sky'); r.seen(40, 2, 'ambient'); r.seen(70, 2, 'social'); r.target = 15; if (r.choose(90, [sky, tr], 'wild') === tr) n++; }
+  check(n === 20, `a kind never seen (travel) before one seen 80 s ago (sky), its eta 3 s notwithstanding: ${n} of 20 seeds`);
+  void q;
+}
 console.log('5 · a-regie: the adventurer');
 {
   const q = new S(21, { adv: true });
@@ -182,8 +190,8 @@ console.log('8 · a-regie: busy — a toast waits');
   R.frame(g, 0.25);
   check(R.busy(g), 'just bound (a start 4 s ago): busy');
   g.time = 130; check(R.busy(g), 'an unseen vista 25 m away: its moment is coming — busy');
-  g.wow.list.get('v').x = 300; check(!R.busy(g), 'nothing near, nothing within 8 s: free');
-  g.regie.sched.seen(128, 2, 'ambient'); check(R.busy(g), 'a weighted event seen 2 s ago: busy');
+  g.wow.list.get('v').x = 300; g.time = 131.5; check(!R.busy(g), 'nothing near, nothing within 8 s: free');
+  g.regie.sched.seen(129.5, 2, 'ambient'); check(R.busy(g), 'a weighted event seen 2 s ago: busy');
   g.time = 140; g.wow.active = true; check(R.busy(g), 'a wow moment: busy');
 }
 
